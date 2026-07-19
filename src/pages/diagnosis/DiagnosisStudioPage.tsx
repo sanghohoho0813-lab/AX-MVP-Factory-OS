@@ -23,6 +23,10 @@ import {
 } from '../../repositories'
 import { calculateTemplateQuality } from '../../services/surveyTemplateService'
 import { summarizeProjectSurveys } from '../../services/projectSurveyService'
+import {
+  countSubmittedResponses,
+  getProjectAnalysisLifecycle,
+} from '../../services/assessmentService'
 import { Button } from '../../components/ui/Button'
 import { DataTable, type DataTableColumn } from '../../components/ui/DataTable'
 import { DiagnosisStudioNav } from '../../components/diagnosis/DiagnosisStudioNav'
@@ -39,7 +43,7 @@ import {
 } from '../../components/diagnosis/badges'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 
-/** Blueprint + Distribution을 함께 고려한 프로젝트 설문 라이프사이클 */
+/** Blueprint + Distribution + 분석을 함께 고려한 프로젝트 설문 라이프사이클 */
 type SurveyLifecycle =
   | 'unset'
   | 'draft'
@@ -47,6 +51,10 @@ type SurveyLifecycle =
   | 'issued'
   | 'in_progress'
   | 'submitted'
+  | 'analysis_needed'
+  | 'analysis_review'
+  | 'finalized'
+  | 'needs_reanalysis'
 
 const LIFECYCLE_META: Record<
   SurveyLifecycle,
@@ -57,12 +65,31 @@ const LIFECYCLE_META: Record<
   ready: { label: '설문 준비 완료', tone: 'info', action: '테스트 링크 생성' },
   issued: { label: '테스트 링크 발급', tone: 'info', action: '응답 현황' },
   in_progress: { label: '응답 작성 중', tone: 'warning', action: '응답 현황' },
-  submitted: { label: '응답 제출 완료', tone: 'success', action: '응답 보기' },
+  submitted: { label: '응답 제출 완료', tone: 'success', action: '분석 시작' },
+  analysis_needed: { label: '진단 분석 필요', tone: 'warning', action: '분석 시작' },
+  analysis_review: { label: '분석 검토 중', tone: 'info', action: '분석 계속' },
+  finalized: { label: '진단 확정', tone: 'success', action: '결과 보기' },
+  needs_reanalysis: { label: '재분석 필요', tone: 'warning', action: '재분석' },
 }
 
 function projectSurveyLifecycle(project: Project): SurveyLifecycle {
   const dists = surveyDistributionRepository.getByProjectId(project.id)
-  if (dists.some((d) => d.status === 'submitted')) return 'submitted'
+  const hasSubmitted =
+    dists.some((d) => d.status === 'submitted') ||
+    countSubmittedResponses(project.id) > 0
+  if (hasSubmitted) {
+    switch (getProjectAnalysisLifecycle(project)) {
+      case 'finalized':
+        return 'finalized'
+      case 'needs_reanalysis':
+        return 'needs_reanalysis'
+      case 'draft':
+      case 'reviewed':
+        return 'analysis_review'
+      default:
+        return 'analysis_needed'
+    }
+  }
   if (dists.some((d) => d.status === 'in_progress')) return 'in_progress'
   if (dists.some((d) => d.status === 'issued' || d.status === 'opened')) {
     return 'issued'
@@ -73,10 +100,23 @@ function projectSurveyLifecycle(project: Project): SurveyLifecycle {
   return 'unset'
 }
 
+const ANALYSIS_LIFECYCLES: SurveyLifecycle[] = [
+  'submitted',
+  'analysis_needed',
+  'analysis_review',
+  'finalized',
+  'needs_reanalysis',
+]
+
 /** 라이프사이클에 따른 이동 경로 */
 function lifecycleTarget(project: Project, lifecycle: SurveyLifecycle): string {
   if (lifecycle === 'unset' || lifecycle === 'draft') {
     return `/diagnosis/projects/${project.id}/setup`
+  }
+  if (ANALYSIS_LIFECYCLES.includes(lifecycle)) {
+    return lifecycle === 'finalized'
+      ? `/diagnosis/projects/${project.id}/analysis/result`
+      : `/diagnosis/projects/${project.id}/analysis`
   }
   return `/diagnosis/projects/${project.id}/surveys`
 }
@@ -105,7 +145,7 @@ export function DiagnosisStudioPage() {
         p.projectType === 'website' &&
         (p.currentStage === 'intake' || p.currentStage === 'website_design')
       if (!isAxEarly && !isWebsiteEarly) return false
-      return projectSurveyLifecycle(p) !== 'submitted'
+      return !ANALYSIS_LIFECYCLES.includes(projectSurveyLifecycle(p))
     })
 
     const emptyModules = modules.filter((m) => m.questionIds.length === 0)

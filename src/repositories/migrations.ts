@@ -54,6 +54,22 @@ function initDistributionStores(): void {
   }
 }
 
+/**
+ * v4 마이그레이션 — 진단 분석 저장소 추가.
+ * 분석 결과·이슈·인터뷰 질문은 시드하지 않고 빈 배열만 준비한다.
+ */
+function initAssessmentStores(): void {
+  if (!hasKey(STORAGE_KEYS.assessments)) {
+    writeJson(STORAGE_KEYS.assessments, [])
+  }
+  if (!hasKey(STORAGE_KEYS.analysisIssues)) {
+    writeJson(STORAGE_KEYS.analysisIssues, [])
+  }
+  if (!hasKey(STORAGE_KEYS.interviewQuestions)) {
+    writeJson(STORAGE_KEYS.interviewQuestions, [])
+  }
+}
+
 /** 순차 적용 마이그레이션 목록 (버전 오름차순) */
 const MIGRATIONS: Migration[] = [
   {
@@ -70,6 +86,11 @@ const MIGRATIONS: Migration[] = [
     version: 3,
     describe: '설문 발급·응답 저장소 추가',
     migrate: initDistributionStores,
+  },
+  {
+    version: 4,
+    describe: '진단 분석·이슈·인터뷰 저장소 추가',
+    migrate: initAssessmentStores,
   },
 ]
 

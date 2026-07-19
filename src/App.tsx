@@ -58,6 +58,27 @@ const ResponseDetailPage = lazy(() =>
 const PublicSurveyPage = lazy(() =>
   import('./pages/public/PublicSurveyPage').then((m) => ({ default: m.PublicSurveyPage })),
 )
+const AssessmentsListPage = lazy(() =>
+  import('./pages/diagnosis/AssessmentsListPage').then((m) => ({ default: m.AssessmentsListPage })),
+)
+const AnalysisMainPage = lazy(() =>
+  import('./pages/diagnosis/analysis/AnalysisMainPage').then((m) => ({ default: m.AnalysisMainPage })),
+)
+const ResponseComparePage = lazy(() =>
+  import('./pages/diagnosis/analysis/ResponseComparePage').then((m) => ({ default: m.ResponseComparePage })),
+)
+const AnalysisIssuesPage = lazy(() =>
+  import('./pages/diagnosis/analysis/AnalysisIssuesPage').then((m) => ({ default: m.AnalysisIssuesPage })),
+)
+const InterviewQuestionsPage = lazy(() =>
+  import('./pages/diagnosis/analysis/InterviewQuestionsPage').then((m) => ({ default: m.InterviewQuestionsPage })),
+)
+const ScoreDetailPage = lazy(() =>
+  import('./pages/diagnosis/analysis/ScoreDetailPage').then((m) => ({ default: m.ScoreDetailPage })),
+)
+const AssessmentResultPage = lazy(() =>
+  import('./pages/diagnosis/analysis/AssessmentResultPage').then((m) => ({ default: m.AssessmentResultPage })),
+)
 
 /** 진단 스튜디오는 실제 기능으로 대체되므로 빈 상태 페이지에서 제외 */
 const EMPTY_MODULE_KEYS = new Set(['clients', 'diagnosis'])
@@ -97,8 +118,15 @@ const router = createBrowserRouter([
       { path: 'diagnosis/surveys', element: <SurveysMainPage /> },
       { path: 'diagnosis/surveys/:distributionId', element: <DistributionDetailPage /> },
       { path: 'diagnosis/surveys/:distributionId/response', element: <ResponseDetailPage /> },
+      { path: 'diagnosis/assessments', element: <AssessmentsListPage /> },
       { path: 'diagnosis/projects/:projectId/setup', element: <ProjectSurveySetupPage /> },
       { path: 'diagnosis/projects/:projectId/surveys', element: <ProjectSurveysPage /> },
+      { path: 'diagnosis/projects/:projectId/analysis', element: <AnalysisMainPage /> },
+      { path: 'diagnosis/projects/:projectId/analysis/compare', element: <ResponseComparePage /> },
+      { path: 'diagnosis/projects/:projectId/analysis/issues', element: <AnalysisIssuesPage /> },
+      { path: 'diagnosis/projects/:projectId/analysis/interview', element: <InterviewQuestionsPage /> },
+      { path: 'diagnosis/projects/:projectId/analysis/score', element: <ScoreDetailPage /> },
+      { path: 'diagnosis/projects/:projectId/analysis/result', element: <AssessmentResultPage /> },
 
       ...MODULE_PAGES.filter((config) => !EMPTY_MODULE_KEYS.has(config.key)).map(
         (config) => ({

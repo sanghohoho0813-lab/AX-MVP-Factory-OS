@@ -25,8 +25,23 @@ import {
 } from '../repositories'
 import { archiveProject } from '../services/projectService'
 import { summarizeProjectSurveys } from '../services/projectSurveyService'
+import { getProjectAnalysisContext } from '../services/assessmentService'
+import {
+  AssessmentConfidenceBadge,
+  AssessmentRecommendationBadge,
+  AssessmentStatusBadge,
+} from '../components/assessment/badges'
 import { RESPONDENT_ROLE_META } from '../lib/surveyMeta'
-import { ClipboardList, Copy, ExternalLink, FilePen, Link2, Plus } from 'lucide-react'
+import {
+  BarChart3,
+  ClipboardList,
+  Copy,
+  ExternalLink,
+  FilePen,
+  Link2,
+  Plus,
+  RefreshCw,
+} from 'lucide-react'
 import { surveyDistributionRepository } from '../repositories'
 import { buildSurveyUrl } from '../services/surveyTokenService'
 import { LocalTestModeBadge } from '../components/runtime/LocalTestModeBanner'
@@ -99,6 +114,8 @@ export function ProjectDetailPage() {
   const distsByRole = (role: string) =>
     distributions.filter((d) => d.respondentRole === role)
   const anyReady = surveyStatuses.some((s) => s.state === 'ready')
+  const analysis = getProjectAnalysisContext(project.id)
+  const analysisPath = `/diagnosis/projects/${project.id}/analysis`
 
   const copyLink = async (token: string) => {
     try {
@@ -368,6 +385,81 @@ export function ProjectDetailPage() {
             <LocalTestModeBadge />
             테스트 링크와 응답은 이 브라우저에만 저장됩니다. 외부 공유는 Supabase 연결 후 제공됩니다.
           </p>
+        </Panel>
+      )}
+
+      {/* 진단 분석 */}
+      {analysis && analysis.submittedCount > 0 && (
+        <Panel
+          title="진단 분석"
+          actions={
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() =>
+                navigate(analysis.latest ? `${analysisPath}/result` : analysisPath)
+              }
+            >
+              <BarChart3 aria-hidden="true" className="size-4" />
+              {analysis.latest ? '분석 결과 보기' : '진단 분석 시작'}
+            </Button>
+          }
+        >
+          {!analysis.latest ? (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-[13px] break-keep text-slate-600">
+                제출 완료된 응답 {analysis.submittedCount}건을 기준으로 진단 분석을 실행할 수
+                있습니다.
+              </p>
+              <Button variant="primary" size="sm" onClick={() => navigate(analysisPath)}>
+                <BarChart3 aria-hidden="true" className="size-4" />
+                진단 분석 시작
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <AssessmentStatusBadge status={analysis.latest.status} />
+                {analysis.needsReanalysisFlag && (
+                  <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700">
+                    <RefreshCw aria-hidden="true" className="size-3" />
+                    재분석 필요
+                  </span>
+                )}
+              </div>
+              {analysis.latest.analysisKind === 'website' ? (
+                <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                  <span className="text-2xl font-bold text-slate-900">
+                    준비도 {analysis.latest.websiteReadiness?.overallScore ?? 0}
+                    <span className="text-sm font-medium text-slate-400"> / 100</span>
+                  </span>
+                  <AssessmentConfidenceBadge confidence={analysis.latest.confidence} />
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                  <span className="text-2xl font-bold text-slate-900">
+                    {analysis.latest.finalScore}
+                    <span className="text-sm font-medium text-slate-400"> / 100</span>
+                  </span>
+                  <AssessmentRecommendationBadge recommendation={analysis.latest.recommendation} />
+                  <AssessmentConfidenceBadge confidence={analysis.latest.confidence} />
+                </div>
+              )}
+              {analysis.latest.status === 'finalized' && analysis.latest.finalizedAt && (
+                <p className="text-xs text-slate-400">
+                  확정 {formatDate(analysis.latest.finalizedAt)}
+                </p>
+              )}
+              {analysis.latest.suggestedNextActions.length > 0 && (
+                <p className="text-[13px] break-keep text-slate-600">
+                  다음 행동: {analysis.latest.suggestedNextActions[0]}
+                </p>
+              )}
+              <p className="text-xs break-keep text-slate-400">
+                제출 응답과 사전 정의된 진단 규칙을 기준으로 계산되었습니다.
+              </p>
+            </div>
+          )}
         </Panel>
       )}
 
