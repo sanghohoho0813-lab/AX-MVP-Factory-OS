@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+@theme {
+  /* Typography */
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", "Malgun Gothic", sans-serif;
+
+  /* Deep navy — sidebar surface */
+  --color-navy-950: #0a1129;
+  --color-navy-900: #0f1a38;
+  --color-navy-800: #16234a;
+  --color-navy-700: #1e2e5e;
+  --color-navy-600: #2a3d78;
+  --color-navy-300: #8b9bc4;
+  --color-navy-200: #b6c1dd;
+
+  /* Brand blue — primary action */
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+
+  /* Status — restrained usage only */
+  --color-success-50: #ecfdf5;
+  --color-success-200: #a7f3d0;
+  --color-success-500: #10b981;
+  --color-success-600: #059669;
+  --color-success-700: #047857;
+
+  --color-warning-50: #fff7ed;
+  --color-warning-200: #fed7aa;
+  --color-warning-500: #f97316;
+  --color-warning-600: #ea580c;
+  --color-warning-700: #c2410c;
+
+  --color-danger-50: #fef2f2;
+  --color-danger-200: #fecaca;
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+  --color-danger-700: #b91c1c;
+
+  /* AI / design accent — limited violet */
+  --color-accent-50: #f5f3ff;
+  --color-accent-200: #ddd6fe;
+  --color-accent-600: #7c3aed;
+  --color-accent-700: #6d28d9;
+
+  /* Restrained radii (10–14px) */
+  --radius-card: 12px;
+  --radius-panel: 14px;
+  --radius-control: 10px;
+
+  /* Very subtle elevation */
+  --shadow-card: 0 1px 2px 0 rgb(15 26 56 / 0.04);
+  --shadow-overlay: 0 8px 24px -6px rgb(15 26 56 / 0.16);
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+body {
+  @apply bg-slate-50 text-slate-800 antialiased;
+  font-feature-settings: "tnum";
+}
+
+/* Visible keyboard focus everywhere */
+:focus-visible {
+  @apply outline-2 outline-offset-2 outline-brand-600;
+}
