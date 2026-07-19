@@ -1,12 +1,12 @@
 import { Plus } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { PRIORITY_TASKS, TIMELINE_ITEMS, TIMELINE_TRACKS } from '../data/demo'
+import { useStoreVersion } from '../lib/useStoreVersion'
+import { organizationRepository, projectRepository } from '../repositories'
 import {
-  METRIC_SUMMARIES,
-  PORTFOLIO_PROJECTS,
-  PRIORITY_TASKS,
-  TIMELINE_ITEMS,
-  TIMELINE_TRACKS,
-} from '../data/demo'
+  buildDashboardMetrics,
+  buildPortfolioItems,
+} from '../services/dashboardService'
 import { MetricStrip } from '../components/dashboard/MetricStrip'
 import { PortfolioHealth } from '../components/dashboard/PortfolioHealth'
 import { PriorityList } from '../components/dashboard/PriorityList'
@@ -17,6 +17,17 @@ import { PageHeader } from '../components/ui/PageHeader'
 
 export function DashboardPage() {
   const [diagnosisModalOpen, setDiagnosisModalOpen] = useState(false)
+  const version = useStoreVersion()
+
+  const { metrics, portfolioItems } = useMemo(() => {
+    const projects = projectRepository.getAll()
+    const organizations = organizationRepository.getAll()
+    return {
+      metrics: buildDashboardMetrics(projects),
+      portfolioItems: buildPortfolioItems(organizations, projects),
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [version])
 
   return (
     <div className="flex flex-col gap-6">
@@ -31,7 +42,7 @@ export function DashboardPage() {
         }
       />
 
-      <MetricStrip metrics={METRIC_SUMMARIES} />
+      <MetricStrip metrics={metrics} />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="min-w-0 xl:col-span-2">
@@ -42,7 +53,7 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <PortfolioHealth projects={PORTFOLIO_PROJECTS} />
+      <PortfolioHealth projects={portfolioItems} />
 
       <Modal
         open={diagnosisModalOpen}

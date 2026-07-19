@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 @theme {
-  /* Typography */
-  --font-sans: "Pretendard Variable", Pretendard, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", "Malgun Gothic", sans-serif;
+  /* Typography — 로컬 설치 폰트 우선, 외부 CDN 의존 없음 */
+  --font-sans: "Pretendard Variable", Pretendard, SUIT,
+    "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
 
   /* Deep navy — sidebar surface */
   --color-navy-950: #0a1129;

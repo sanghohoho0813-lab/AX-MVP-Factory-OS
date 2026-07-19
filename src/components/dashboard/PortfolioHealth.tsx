@@ -1,4 +1,5 @@
 import { Building2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import type { HealthStatus, PortfolioProject } from '../../types'
 import { HEALTH_META, PROJECT_STAGE_META, TONE_DOT_CLASS } from '../../lib/statusMeta'
 import { ProgressBar } from '../ui/ProgressBar'
@@ -47,10 +48,12 @@ export function PortfolioHealth({ projects }: PortfolioHealthProps) {
           const stage = PROJECT_STAGE_META[project.stage]
           const health = HEALTH_META[project.health]
           return (
-            <li
-              key={project.id}
-              className="rounded-(--radius-card) border border-slate-200 px-4 py-4"
-            >
+            <li key={project.id}>
+              <Link
+                to={`/clients/${project.id}`}
+                aria-label={`${project.client} 고객사 상세 보기`}
+                className="block rounded-(--radius-card) border border-slate-200 px-4 py-4 transition-colors hover:border-slate-300 hover:bg-slate-50"
+              >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2.5">
                   <span
@@ -88,6 +91,7 @@ export function PortfolioHealth({ projects }: PortfolioHealthProps) {
                   {health.label}
                 </StatusBadge>
               </div>
+              </Link>
             </li>
           )
         })}

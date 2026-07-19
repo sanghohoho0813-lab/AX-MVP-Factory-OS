@@ -34,7 +34,7 @@ export const PROJECT_STAGE_META: Record<
   ProjectStage,
   { label: string; tone: StatusTone }
 > = {
-  intake: { label: '고객 등록', tone: 'neutral' },
+  intake: { label: '상담 접수', tone: 'neutral' },
   diagnosis: { label: '진단 진행', tone: 'info' },
   selection: { label: '과제선별', tone: 'warning' },
   mvp_design: { label: 'MVP 설계', tone: 'info' },

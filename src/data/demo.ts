@@ -1,11 +1,4 @@
-import { Box, ClipboardList, FileText, Filter } from 'lucide-react'
-import type {
-  MetricSummary,
-  PortfolioProject,
-  PriorityTask,
-  TimelineItem,
-  TimelineTrack,
-} from '../types'
+import type { PriorityTask, TimelineItem, TimelineTrack } from '../types'
 
 /* ------------------------------------------------------------------ */
 /* 워크스페이스 / 사용자                                                */
@@ -28,49 +21,6 @@ export const NOTIFICATIONS = [
   { id: 'n2', message: '스마트물류 과제선별 워크숍 자료가 업로드되었습니다.', time: '1시간 전' },
   { id: 'n3', message: 'C병원 MVP 설계 검토 일정이 확정되었습니다.', time: '어제' },
 ] as const
-
-/* ------------------------------------------------------------------ */
-/* A. 핵심 운영 현황 KPI                                                */
-/* ------------------------------------------------------------------ */
-
-export const METRIC_SUMMARIES: MetricSummary[] = [
-  {
-    key: 'diagnosis-active',
-    label: '진행 중 진단',
-    value: 12,
-    unit: '건',
-    weeklyDelta: 2,
-    tone: 'info',
-    icon: ClipboardList,
-  },
-  {
-    key: 'selection-pending',
-    label: '선별 대기 과제',
-    value: 7,
-    unit: '건',
-    weeklyDelta: 1,
-    tone: 'warning',
-    icon: Filter,
-  },
-  {
-    key: 'mvp-building',
-    label: '제작 중 MVP',
-    value: 5,
-    unit: '건',
-    weeklyDelta: 0,
-    tone: 'success',
-    icon: Box,
-  },
-  {
-    key: 'deliverables-preparing',
-    label: '제출자료 준비',
-    value: 3,
-    unit: '건',
-    weeklyDelta: -1,
-    tone: 'danger',
-    icon: FileText,
-  },
-]
 
 /* ------------------------------------------------------------------ */
 /* B. 이번 주 운영 타임라인 (2026.07.20 월 ~ 07.26 일)                   */
@@ -203,41 +153,4 @@ export const PRIORITY_TASKS: PriorityTask[] = [
   },
 ]
 
-/* ------------------------------------------------------------------ */
-/* D. 고객사 포트폴리오 건강도                                           */
-/* ------------------------------------------------------------------ */
-
-export const PORTFOLIO_PROJECTS: PortfolioProject[] = [
-  {
-    id: 'c1',
-    client: 'ABC제조',
-    industry: '제조업',
-    stage: 'diagnosis',
-    progress: 65,
-    health: 'healthy',
-  },
-  {
-    id: 'c2',
-    client: 'C병원',
-    industry: '병원',
-    stage: 'mvp_design',
-    progress: 70,
-    health: 'healthy',
-  },
-  {
-    id: 'c3',
-    client: '스마트물류',
-    industry: '물류',
-    stage: 'selection',
-    progress: 40,
-    health: 'attention',
-  },
-  {
-    id: 'c4',
-    client: '한빛세무사무소',
-    industry: '세무사무소',
-    stage: 'validation',
-    progress: 25,
-    health: 'risk',
-  },
-]
+/* 고객사 포트폴리오 데이터는 Repository(대시보드 서비스)에서 계산한다 */
