@@ -1,0 +1,458 @@
+import type { RespondentRole } from './index'
+import type { ExpertRiskGrade } from './survey'
+import type { MvpLevel } from './domain'
+
+/* ------------------------------------------------------------------ */
+/* 과제선별 도메인 타입 (Stage 6)                                        */
+/*                                                                     */
+/* 확정 진단 결과에서 자동화 후보 업무를 추출·점수화하고 1차 MVP 핵심     */
+/* 과제를 선정하는 규칙 기반 도메인. 자동 계산값과 담당자 보정값을 함께   */
+/* 보존하며, 근거 없는 수치는 생성하지 않는다.                           */
+/* ------------------------------------------------------------------ */
+
+export type CandidateStatus =
+  | 'discovered'
+  | 'reviewing'
+  | 'shortlisted'
+  | 'selected_primary'
+  | 'selected_secondary'
+  | 'deferred'
+  | 'rejected'
+  | 'archived'
+
+export type CandidateSourceType =
+  | 'repeat_table'
+  | 'structured_answer'
+  | 'assessment_evidence'
+  | 'analysis_issue'
+  | 'interview_answer'
+  | 'manual'
+
+export type CandidateTaskFamily =
+  | 'data_collection'
+  | 'data_validation'
+  | 'document_generation'
+  | 'diagnosis_decision'
+  | 'schedule_progress'
+  | 'approval_workflow'
+  | 'quotation_cost_profit'
+  | 'inventory_asset'
+  | 'field_operation'
+  | 'customer_sales'
+  | 'customer_response'
+  | 'reporting_dashboard'
+  | 'system_integration'
+  | 'website_content'
+  | 'other'
+
+export type RecommendedMvpTemplate =
+  | 'diagnosis_decision'
+  | 'document_report'
+  | 'schedule_progress'
+  | 'quotation_cost_profit'
+  | 'inventory_asset_field'
+  | 'customer_sales'
+  | 'data_collection_validation'
+  | 'approval_workflow'
+
+export interface CandidateTemplateMix {
+  template: RecommendedMvpTemplate
+  percentage: number
+  reason: string
+}
+
+export type AutomationApproach =
+  | 'rule_based'
+  | 'workflow_automation'
+  | 'ai_assisted'
+  | 'hybrid'
+  | 'data_cleanup_first'
+  | 'process_definition_first'
+  | 'manual_improvement_only'
+  | 'not_recommended'
+
+export type AiNecessity =
+  | 'unnecessary'
+  | 'optional'
+  | 'useful'
+  | 'advanced_later'
+  | 'not_applicable'
+
+export type CandidateComplexity = 'low' | 'medium' | 'high' | 'very_high'
+
+export type CandidateRiskLevel = 'low' | 'medium' | 'high' | 'critical'
+
+export type CandidateConfidence = 'high' | 'medium' | 'low' | 'insufficient'
+
+export type CandidateDependencyType =
+  | 'data'
+  | 'process'
+  | 'user'
+  | 'expert'
+  | 'external_system'
+  | 'contract'
+  | 'security'
+  | 'other'
+
+export interface CandidateDependency {
+  id: string
+  type: CandidateDependencyType
+  title: string
+  description: string
+  requiredBeforeMvp: boolean
+  resolved: boolean
+  resolutionNote: string
+}
+
+export type CandidateMetricType =
+  | 'monthly_volume'
+  | 'time_per_case_minutes'
+  | 'monthly_hours'
+  | 'error_count'
+  | 'delay_hours'
+  | 'external_cost'
+  | 'response_time'
+  | 'training_time'
+  | 'manual_steps'
+  | 'duplicate_entries'
+  | 'users'
+  | 'data_records'
+  | 'custom'
+
+export interface CandidateMetric {
+  id: string
+  type: CandidateMetricType
+  label: string
+  value: number | null
+  unit: string
+  sourceEvidenceIds: string[]
+  confidence: CandidateConfidence
+  manuallyEdited: boolean
+  editReason: string
+}
+
+export type ExpectedEffectType =
+  | 'time_saving'
+  | 'cost_saving'
+  | 'error_reduction'
+  | 'response_improvement'
+  | 'capacity_increase'
+  | 'visibility'
+  | 'standardization'
+  | 'knowledge_transfer'
+  | 'compliance_support'
+  | 'customer_conversion'
+  | 'other'
+
+export interface ExpectedEffect {
+  id: string
+  type: ExpectedEffectType
+  title: string
+  /** 정량 효과일 때만 값 존재. 정성 효과는 null */
+  currentValue: number | null
+  expectedValue: number | null
+  unit: string
+  calculationMethod: string
+  assumption: string
+  confidence: CandidateConfidence
+  evidenceIds: string[]
+  manuallyEdited: boolean
+  /** 산정 불가 표시 */
+  notEstimable: boolean
+  qualitative: boolean
+}
+
+export type CandidateScoreDomain =
+  | 'operational_impact'
+  | 'repetition_value'
+  | 'economic_benefit'
+  | 'process_suitability'
+  | 'data_readiness'
+  | 'implementation_feasibility'
+  | 'adoption_readiness'
+  | 'funding_scalability'
+
+export interface CandidateDomainScore {
+  domain: CandidateScoreDomain
+  rawScore: number
+  maxScore: number
+  normalizedScore: number
+  confidence: CandidateConfidence
+  evidenceIds: string[]
+  explanation: string
+  warnings: string[]
+  autoScore: number
+  adjustedScore: number | null
+  adjustmentReason: string
+}
+
+export type CandidateRiskDeductionType =
+  | 'expert_risk'
+  | 'privacy_risk'
+  | 'unclear_process'
+  | 'insufficient_data'
+  | 'low_adoption'
+  | 'external_dependency'
+  | 'integration_complexity'
+  | 'excessive_scope'
+  | 'no_owner'
+  | 'low_measurement'
+  | 'custom'
+
+export interface CandidateRiskDeduction {
+  id: string
+  type: CandidateRiskDeductionType
+  label: string
+  points: number
+  reason: string
+  evidenceIds: string[]
+  autoGenerated: boolean
+  excluded: boolean
+  exclusionReason: string
+  /** 해결 방법 안내 */
+  resolution: string
+}
+
+export type PriorityQuadrant =
+  | 'quick_win'
+  | 'strategic_bet'
+  | 'prepare_first'
+  | 'defer'
+
+export interface AutomationCandidate {
+  id: string
+  projectId: string
+  organizationId: string
+  assessmentId: string
+  assessmentVersion: number
+
+  name: string
+  /** 후보명을 자동으로 확정하지 못해 확인이 필요한 경우 */
+  nameNeedsReview: boolean
+  problemStatement: string
+  currentProcess: string
+  trigger: string
+  users: string
+  ownerRole: RespondentRole | 'unknown'
+  inputData: string
+  outputResult: string
+  startCondition: string
+  endCondition: string
+  desiredProcess: string
+  excludedScope: string
+
+  taskFamily: CandidateTaskFamily
+  sourceTypes: CandidateSourceType[]
+  sourceEvidenceIds: string[]
+  sourceQuestionCodes: string[]
+  sourceIssueIds: string[]
+  sourceInterviewQuestionIds: string[]
+
+  metrics: CandidateMetric[]
+  expectedEffects: ExpectedEffect[]
+  /** 예상 자동화 비율(가정) — 절감시간 계산용 */
+  automationRatioAssumption: number
+
+  automationApproach: AutomationApproach
+  automationApproachReason: string
+  aiNecessity: AiNecessity
+  aiReason: string
+  humanReviewRequired: boolean
+  expertRiskGrade: ExpertRiskGrade
+  privacyRisk: boolean
+
+  complexity: CandidateComplexity
+  dependencies: CandidateDependency[]
+  templateMix: CandidateTemplateMix[]
+  recommendedMvpLevel: MvpLevel
+
+  domainScores: CandidateDomainScore[]
+  subtotalScore: number
+  deductions: CandidateRiskDeduction[]
+  deductionTotal: number
+  priorityScore: number
+  confidence: CandidateConfidence
+  confidenceReason: string
+  quadrant: PriorityQuadrant
+  /** 점수 구간과 최종 분류가 다를 때의 예외 사유 */
+  quadrantExceptionReason: string
+
+  status: CandidateStatus
+  /** 자동 후보 중복 방지 키 */
+  generationKey: string
+  autoGenerated: boolean
+  /** 병합으로 흡수된 원본 후보 id */
+  mergedFromIds: string[]
+  manualNotes: string
+
+  createdAt: string
+  updatedAt: string
+  archivedAt: string | null
+}
+
+export type AutomationCandidateInput = Omit<
+  AutomationCandidate,
+  'id' | 'createdAt' | 'updatedAt' | 'archivedAt'
+>
+
+export interface CandidateFilters {
+  query?: string
+  status?: CandidateStatus
+  taskFamily?: CandidateTaskFamily
+  automationApproach?: AutomationApproach
+  aiNecessity?: AiNecessity
+  complexity?: CandidateComplexity
+  quadrant?: PriorityQuadrant
+  confidence?: CandidateConfidence
+  autoOnly?: boolean
+  manualOnly?: boolean
+  minScore?: number
+  includeArchived?: boolean
+}
+
+export type CandidateSortKey =
+  | 'score_desc'
+  | 'effect_desc'
+  | 'feasible_desc'
+  | 'confidence_desc'
+  | 'recent'
+  | 'name'
+
+/* ------------------------------------------------------------------ */
+/* 선정 결과                                                            */
+/* ------------------------------------------------------------------ */
+
+export type SelectionResultStatus = 'draft' | 'reviewed' | 'finalized' | 'superseded'
+
+export type CandidateSelectionReason =
+  | 'high_impact'
+  | 'quick_win'
+  | 'strategic_value'
+  | 'data_ready'
+  | 'field_demand'
+  | 'funding_value'
+  | 'prerequisite'
+  | 'manual_decision'
+  | 'other'
+
+export interface SelectedCandidateReference {
+  candidateId: string
+  selectionType: 'primary' | 'secondary'
+  rank: number
+  reasons: CandidateSelectionReason[]
+  decisionNote: string
+}
+
+export interface SelectionDecision {
+  id: string
+  projectId: string
+  organizationId: string
+  assessmentId: string
+  assessmentVersion: number
+  version: number
+  status: SelectionResultStatus
+
+  candidateIds: string[]
+  primaryCandidateId: string | null
+  secondaryCandidateIds: string[]
+  selectedCandidates: SelectedCandidateReference[]
+  deferredCandidateIds: string[]
+  rejectedCandidateIds: string[]
+
+  decisionSummary: string
+  autoSummary: string
+  decisionRisks: string[]
+  prerequisiteActions: string[]
+  expectedPrimaryKpis: string[]
+  recommendedTemplateMix: CandidateTemplateMix[]
+  recommendedMvpLevel: MvpLevel
+
+  sourceSnapshotHash: string
+  ruleVersion: string
+  createdBy: string
+  reviewedBy: string
+  finalizedBy: string
+  createdAt: string
+  updatedAt: string
+  reviewedAt: string | null
+  finalizedAt: string | null
+  supersededAt: string | null
+}
+
+export type SelectionDecisionInput = Omit<
+  SelectionDecision,
+  'id' | 'version' | 'createdAt' | 'updatedAt'
+>
+
+export interface SelectionFilters {
+  query?: string
+  projectType?: 'ax' | 'ax_website' | 'website'
+  status?: SelectionResultStatus
+  quadrant?: PriorityQuadrant
+  confidence?: CandidateConfidence
+  minScore?: number
+  needsReselection?: boolean
+}
+
+/* ------------------------------------------------------------------ */
+/* Stage 7 인계 스냅샷                                                   */
+/* ------------------------------------------------------------------ */
+
+export type ScopeBucket = 'mvp_first' | 'phase_two' | 'maintenance' | 'separate_quote' | 'excluded'
+
+export interface ScopeItem {
+  label: string
+  bucket: ScopeBucket
+}
+
+export interface HandoffCandidateSummary {
+  candidateId: string
+  name: string
+  taskFamily: CandidateTaskFamily
+  problemStatement: string
+  priorityScore: number
+  quadrant: PriorityQuadrant
+  confidence: CandidateConfidence
+  automationApproach: AutomationApproach
+  aiNecessity: AiNecessity
+  recommendedMvpLevel: MvpLevel
+  templateMix: CandidateTemplateMix[]
+  keyMetrics: string[]
+  keyEffects: string[]
+}
+
+export interface SelectionHandoffSnapshot {
+  id: string
+  projectId: string
+  organizationId: string
+  selectionDecisionId: string
+  selectionVersion: number
+
+  primaryCandidate: HandoffCandidateSummary | null
+  secondaryCandidates: HandoffCandidateSummary[]
+
+  problemDefinition: string
+  targetUsers: string
+  currentWorkflow: string
+  desiredWorkflow: string
+  inputData: string
+  outputResults: string
+  dependencies: CandidateDependency[]
+  risks: string[]
+  expectedKpis: string[]
+  templateMix: CandidateTemplateMix[]
+  recommendedMvpLevel: MvpLevel
+
+  scopeGuardrails: string[]
+  scopeItems: ScopeItem[]
+  excludedItems: string[]
+
+  hasWebsiteTrack: boolean
+  websiteReadinessScore: number | null
+  websiteStudioRecommended: boolean
+
+  sourceAssessmentVersion: number
+  generatedAt: string
+}
+
+export type SelectionHandoffInput = Omit<SelectionHandoffSnapshot, 'id'>

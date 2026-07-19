@@ -70,6 +70,22 @@ function initAssessmentStores(): void {
   }
 }
 
+/**
+ * v5 마이그레이션 — 과제선별 저장소 추가.
+ * 자동화 후보·선정 결과·인계 스냅샷은 시드하지 않고 빈 배열만 준비한다.
+ */
+function initSelectionStores(): void {
+  if (!hasKey(STORAGE_KEYS.automationCandidates)) {
+    writeJson(STORAGE_KEYS.automationCandidates, [])
+  }
+  if (!hasKey(STORAGE_KEYS.selectionDecisions)) {
+    writeJson(STORAGE_KEYS.selectionDecisions, [])
+  }
+  if (!hasKey(STORAGE_KEYS.selectionHandoffs)) {
+    writeJson(STORAGE_KEYS.selectionHandoffs, [])
+  }
+}
+
 /** 순차 적용 마이그레이션 목록 (버전 오름차순) */
 const MIGRATIONS: Migration[] = [
   {
@@ -91,6 +107,11 @@ const MIGRATIONS: Migration[] = [
     version: 4,
     describe: '진단 분석·이슈·인터뷰 저장소 추가',
     migrate: initAssessmentStores,
+  },
+  {
+    version: 5,
+    describe: '과제선별 후보·선정·인계 저장소 추가',
+    migrate: initSelectionStores,
   },
 ]
 

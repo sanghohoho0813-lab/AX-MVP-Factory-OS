@@ -18,16 +18,24 @@ import {
   LocalAssessmentRepository,
   LocalInterviewQuestionRepository,
 } from './assessmentRepositories'
+import {
+  LocalAutomationCandidateRepository,
+  LocalSelectionDecisionRepository,
+  LocalSelectionHandoffRepository,
+} from './selectionRepositories'
 import { runMigrations } from './migrations'
 import type {
   ActivityRepository,
   AnalysisIssueRepository,
   AssessmentRepository,
+  AutomationCandidateRepository,
   InterviewQuestionRepository,
   OrganizationRepository,
   ProjectRepository,
   ProjectSurveyBlueprintRepository,
   QuestionRepository,
+  SelectionDecisionRepository,
+  SelectionHandoffRepository,
   SurveyDistributionRepository,
   SurveyModuleRepository,
   SurveyResponseRepository,
@@ -73,5 +81,14 @@ export const analysisIssueRepository: AnalysisIssueRepository =
 
 export const interviewQuestionRepository: InterviewQuestionRepository =
   new LocalInterviewQuestionRepository()
+
+export const automationCandidateRepository: AutomationCandidateRepository =
+  new LocalAutomationCandidateRepository()
+
+export const selectionDecisionRepository: SelectionDecisionRepository =
+  new LocalSelectionDecisionRepository()
+
+export const selectionHandoffRepository: SelectionHandoffRepository =
+  new LocalSelectionHandoffRepository()
 
 export { EntityNotFoundError, DuplicateCodeError } from './types'

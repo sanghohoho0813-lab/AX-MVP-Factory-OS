@@ -79,9 +79,30 @@ const ScoreDetailPage = lazy(() =>
 const AssessmentResultPage = lazy(() =>
   import('./pages/diagnosis/analysis/AssessmentResultPage').then((m) => ({ default: m.AssessmentResultPage })),
 )
+const SelectionMainPage = lazy(() =>
+  import('./pages/selection/SelectionMainPage').then((m) => ({ default: m.SelectionMainPage })),
+)
+const SelectionProjectPage = lazy(() =>
+  import('./pages/selection/SelectionProjectPage').then((m) => ({ default: m.SelectionProjectPage })),
+)
+const CandidateBoardPage = lazy(() =>
+  import('./pages/selection/CandidateBoardPage').then((m) => ({ default: m.CandidateBoardPage })),
+)
+const CandidateDetailPage = lazy(() =>
+  import('./pages/selection/CandidateDetailPage').then((m) => ({ default: m.CandidateDetailPage })),
+)
+const PriorityMatrixPage = lazy(() =>
+  import('./pages/selection/PriorityMatrixPage').then((m) => ({ default: m.PriorityMatrixPage })),
+)
+const SelectionDecisionPage = lazy(() =>
+  import('./pages/selection/SelectionDecisionPage').then((m) => ({ default: m.SelectionDecisionPage })),
+)
+const SelectionResultsPage = lazy(() =>
+  import('./pages/selection/SelectionResultsPage').then((m) => ({ default: m.SelectionResultsPage })),
+)
 
 /** 진단 스튜디오는 실제 기능으로 대체되므로 빈 상태 페이지에서 제외 */
-const EMPTY_MODULE_KEYS = new Set(['clients', 'diagnosis'])
+const EMPTY_MODULE_KEYS = new Set(['clients', 'diagnosis', 'selection'])
 
 function RouteFallback() {
   return (
@@ -127,6 +148,14 @@ const router = createBrowserRouter([
       { path: 'diagnosis/projects/:projectId/analysis/interview', element: <InterviewQuestionsPage /> },
       { path: 'diagnosis/projects/:projectId/analysis/score', element: <ScoreDetailPage /> },
       { path: 'diagnosis/projects/:projectId/analysis/result', element: <AssessmentResultPage /> },
+
+      { path: 'selection', element: <SelectionMainPage /> },
+      { path: 'selection/results', element: <SelectionResultsPage /> },
+      { path: 'selection/projects/:projectId', element: <SelectionProjectPage /> },
+      { path: 'selection/projects/:projectId/candidates', element: <CandidateBoardPage /> },
+      { path: 'selection/projects/:projectId/candidates/:candidateId', element: <CandidateDetailPage /> },
+      { path: 'selection/projects/:projectId/matrix', element: <PriorityMatrixPage /> },
+      { path: 'selection/projects/:projectId/decision', element: <SelectionDecisionPage /> },
 
       ...MODULE_PAGES.filter((config) => !EMPTY_MODULE_KEYS.has(config.key)).map(
         (config) => ({

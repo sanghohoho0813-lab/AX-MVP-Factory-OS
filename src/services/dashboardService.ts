@@ -5,8 +5,14 @@ import { pickPrimaryProject } from './organizationService'
 
 const HEALTH_ORDER = { healthy: 0, attention: 1, risk: 2 } as const
 
-/** 대시보드 KPI — Repository 데이터 기준으로 계산 (전주 대비는 데모 값 유지) */
-export function buildDashboardMetrics(projects: Project[]): MetricSummary[] {
+/**
+ * 대시보드 KPI — Repository 데이터 기준으로 계산 (전주 대비는 데모 값 유지).
+ * selectionPending은 과제선별 서비스에서 계산한 값을 주입한다(확정 진단·선정 미확정).
+ */
+export function buildDashboardMetrics(
+  projects: Project[],
+  selectionPending?: number,
+): MetricSummary[] {
   const open = projects.filter(
     (p) => p.status !== 'completed' && p.status !== 'archived',
   )
@@ -23,7 +29,8 @@ export function buildDashboardMetrics(projects: Project[]): MetricSummary[] {
     {
       key: 'selection-pending',
       label: '선별 대기 과제',
-      value: open.filter((p) => p.currentStage === 'selection').length,
+      value:
+        selectionPending ?? open.filter((p) => p.currentStage === 'selection').length,
       unit: '건',
       weeklyDelta: 1,
       tone: 'warning',

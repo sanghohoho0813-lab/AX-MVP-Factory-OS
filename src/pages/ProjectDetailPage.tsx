@@ -26,11 +26,17 @@ import {
 import { archiveProject } from '../services/projectService'
 import { summarizeProjectSurveys } from '../services/projectSurveyService'
 import { getProjectAnalysisContext } from '../services/assessmentService'
+import { getProjectSelectionContext } from '../services/selectionService'
 import {
   AssessmentConfidenceBadge,
   AssessmentRecommendationBadge,
   AssessmentStatusBadge,
 } from '../components/assessment/badges'
+import {
+  PriorityQuadrantBadge,
+  SelectionStatusBadge,
+} from '../components/selection/badges'
+import { Filter, Target } from 'lucide-react'
 import { RESPONDENT_ROLE_META } from '../lib/surveyMeta'
 import {
   BarChart3,
@@ -116,6 +122,12 @@ export function ProjectDetailPage() {
   const anyReady = surveyStatuses.some((s) => s.state === 'ready')
   const analysis = getProjectAnalysisContext(project.id)
   const analysisPath = `/diagnosis/projects/${project.id}/analysis`
+  const selection = getProjectSelectionContext(project.id)
+  const selectionPath = `/selection/projects/${project.id}`
+  const primaryCandidate =
+    selection?.decision?.primaryCandidateId && selection
+      ? selection.candidates.find((c) => c.id === selection.decision?.primaryCandidateId) ?? null
+      : null
 
   const copyLink = async (token: string) => {
     try {
@@ -458,6 +470,85 @@ export function ProjectDetailPage() {
               <p className="text-xs break-keep text-slate-400">
                 제출 응답과 사전 정의된 진단 규칙을 기준으로 계산되었습니다.
               </p>
+            </div>
+          )}
+        </Panel>
+      )}
+
+      {/* 과제선별 */}
+      {selection && project.projectType !== 'website' && (
+        <Panel
+          title="과제선별"
+          actions={
+            selection.lifecycle !== 'not_eligible' ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() =>
+                  navigate(selection.lifecycle === 'finalized' ? `${selectionPath}/decision` : selectionPath)
+                }
+              >
+                <Filter aria-hidden="true" className="size-4" />
+                {selection.lifecycle === 'finalized'
+                  ? '선정 결과 보기'
+                  : selection.candidates.length > 0
+                    ? '과제선별 계속'
+                    : '과제선별 시작'}
+              </Button>
+            ) : undefined
+          }
+        >
+          {selection.lifecycle === 'not_eligible' ? (
+            <p className="text-[13px] break-keep text-slate-500">
+              진단 결과를 확정하면 자동화 후보 과제를 추출하고 핵심 과제를 선정할 수 있습니다.
+            </p>
+          ) : selection.lifecycle === 'finalized' && selection.decision ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <SelectionStatusBadge status={selection.decision.status} />
+                {selection.needsReselectionFlag && (
+                  <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700">
+                    <RefreshCw aria-hidden="true" className="size-3" />
+                    재선별 필요
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Target aria-hidden="true" className="size-4 text-brand-500" />
+                <span className="text-lg font-bold text-slate-900">{primaryCandidate?.name ?? '핵심 과제 미정'}</span>
+                {primaryCandidate && (
+                  <>
+                    <span className="text-sm font-semibold text-slate-500">{primaryCandidate.priorityScore}점</span>
+                    <PriorityQuadrantBadge quadrant={primaryCandidate.quadrant} />
+                  </>
+                )}
+              </div>
+              <p className="text-xs text-slate-400">
+                보조 과제 {selection.decision.secondaryCandidateIds.length}개 · 권장 {mvpLevelLabel(selection.decision.recommendedMvpLevel, 'ax')}
+                {selection.decision.finalizedAt && ` · 확정 ${formatDate(selection.decision.finalizedAt)}`}
+              </p>
+              <p className="text-xs break-keep text-slate-400">
+                Stage 7 MVP 설계 준비 {selection.handoff ? '완료' : '대기'}
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                {selection.candidates.length > 0 ? (
+                  <p className="text-[13px] break-keep text-slate-600">
+                    자동화 후보 {selection.candidates.length}건이 추출되었습니다.
+                    {selection.decision ? ' 선정 초안을 검토하세요.' : ' 후보를 검토하고 핵심 과제를 선정하세요.'}
+                  </p>
+                ) : (
+                  <p className="text-[13px] break-keep text-slate-600">
+                    확정된 진단 결과에서 자동화 후보 과제를 추출할 수 있습니다.
+                  </p>
+                )}
+              </div>
+              <Button variant="primary" size="sm" onClick={() => navigate(selectionPath)}>
+                <Filter aria-hidden="true" className="size-4" />
+                {selection.candidates.length > 0 ? '과제선별 계속' : '과제선별 시작'}
+              </Button>
             </div>
           )}
         </Panel>
