@@ -24,6 +24,9 @@ import {
   projectRepository,
 } from '../repositories'
 import { archiveProject } from '../services/projectService'
+import { summarizeProjectSurveys } from '../services/projectSurveyService'
+import { RESPONDENT_ROLE_META } from '../lib/surveyMeta'
+import { ClipboardList, Eye, FilePen } from 'lucide-react'
 import { ProjectTypeBadge } from '../components/domain/ProjectTypeBadge'
 import { ActivityTimeline } from '../components/ui/ActivityTimeline'
 import { Button } from '../components/ui/Button'
@@ -84,8 +87,16 @@ export function ProjectDetailPage() {
   const nextModule = STAGE_NEXT_MODULE[project.currentStage]
   const dday = getDDay(project.nextActionDueDate)
   const levelLabel = levelFieldLabel(project.projectType)
+  const isDiagnosisStage =
+    project.currentStage === 'intake' || project.currentStage === 'diagnosis'
+  const surveyStatuses = summarizeProjectSurveys(project)
 
   const handleNextStage = () => {
+    // 상담 접수·진단 단계는 프로젝트 설문 설계 워크벤치로 이동
+    if (isDiagnosisStage) {
+      navigate(`/diagnosis/projects/${project.id}/setup`)
+      return
+    }
     if (nextModule.path) {
       navigate(nextModule.path)
     } else {
@@ -188,6 +199,94 @@ export function ProjectDetailPage() {
           currentStage={project.currentStage}
         />
       </Panel>
+
+      {/* 진단 설문 (상담 접수·진단 단계) */}
+      {isDiagnosisStage && (
+        <Panel
+          title={
+            project.projectType === 'website'
+              ? '홈페이지 제작 사전진단'
+              : '진단 설문'
+          }
+          actions={
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => navigate(`/diagnosis/projects/${project.id}/setup`)}
+            >
+              <ClipboardList aria-hidden="true" className="size-4" />
+              설문 설계 열기
+            </Button>
+          }
+        >
+          <ul className="flex flex-col gap-2.5">
+            {surveyStatuses.map((status) => {
+              const tone =
+                status.state === 'ready'
+                  ? 'success'
+                  : status.state === 'draft'
+                    ? 'warning'
+                    : 'neutral'
+              const label =
+                status.state === 'ready'
+                  ? '준비 완료'
+                  : status.state === 'draft'
+                    ? '초안'
+                    : '미작성'
+              return (
+                <li
+                  key={status.respondentRole}
+                  className="flex flex-wrap items-center gap-3 rounded-(--radius-card) border border-slate-200 px-4 py-3"
+                >
+                  <span className="min-w-24 text-sm font-medium text-slate-700">
+                    {RESPONDENT_ROLE_META[status.respondentRole].label}
+                  </span>
+                  <StatusBadge tone={tone} withDot>
+                    {label}
+                  </StatusBadge>
+                  {status.state !== 'none' && (
+                    <span className="text-xs text-slate-400">
+                      문항 {status.questionCount}개 · 약 {status.estimatedMinutes}분 ·{' '}
+                      {formatDate(status.updatedAt)}
+                    </span>
+                  )}
+                  <div className="ml-auto flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(`/diagnosis/projects/${project.id}/setup`)
+                      }
+                      className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-semibold text-brand-600 hover:bg-brand-50"
+                    >
+                      {status.state === 'none' ? (
+                        <>
+                          <ClipboardList aria-hidden="true" className="size-3.5" />
+                          설계 시작
+                        </>
+                      ) : (
+                        <>
+                          <FilePen aria-hidden="true" className="size-3.5" />
+                          계속 편집
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              type="button"
+              disabled
+              className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] text-slate-400"
+            >
+              <Eye aria-hidden="true" className="size-3.5" />
+              고객용 설문 링크 발급 (다음 단계에서 제공)
+            </button>
+          </div>
+        </Panel>
+      )}
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-5 xl:col-span-2">

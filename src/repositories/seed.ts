@@ -1,12 +1,5 @@
 import type { ActivityLog, Organization, Project } from '../types/domain'
-import {
-  SCHEMA_VERSION,
-  STORAGE_KEYS,
-  readJson,
-  readSchemaVersion,
-  writeJson,
-  writeSchemaVersion,
-} from '../storage/localStore'
+import { STORAGE_KEYS, readJson, writeJson } from '../storage/localStore'
 
 /**
  * 최초 실행 시 1회만 시드한다.
@@ -427,26 +420,14 @@ const SEED_ACTIVITIES: ActivityLog[] = [
   ),
 ]
 
-/** 최초 1회만 데모 데이터를 시드한다 */
-export function ensureSeeded(): void {
-  const version = readSchemaVersion()
-  if (version !== null) return
-
-  // 버전 기록이 없더라도 기존 데이터가 있으면 덮어쓰지 않는다
+/**
+ * 스키마 v1 마이그레이션 — 고객사·프로젝트·활동 이력 시드.
+ * 기존 데이터가 있으면 덮어쓰지 않는다.
+ */
+export function seedCoreData(): void {
   const existing = readJson<unknown[]>(STORAGE_KEYS.organizations, [])
-  if (!Array.isArray(existing) || existing.length === 0) {
-    try {
-      writeJson(STORAGE_KEYS.organizations, SEED_ORGANIZATIONS)
-      writeJson(STORAGE_KEYS.projects, SEED_PROJECTS)
-      writeJson(STORAGE_KEYS.activities, SEED_ACTIVITIES)
-    } catch {
-      // 저장 불가 환경에서도 앱은 계속 동작해야 한다
-      return
-    }
-  }
-  try {
-    writeSchemaVersion(SCHEMA_VERSION)
-  } catch {
-    // 버전 기록 실패는 치명적이지 않다
-  }
+  if (Array.isArray(existing) && existing.length > 0) return
+  writeJson(STORAGE_KEYS.organizations, SEED_ORGANIZATIONS)
+  writeJson(STORAGE_KEYS.projects, SEED_PROJECTS)
+  writeJson(STORAGE_KEYS.activities, SEED_ACTIVITIES)
 }

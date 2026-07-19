@@ -3,14 +3,24 @@ import {
   LocalOrganizationRepository,
   LocalProjectRepository,
 } from './localRepositories'
-import { ensureSeeded } from './seed'
+import {
+  LocalProjectSurveyBlueprintRepository,
+  LocalQuestionRepository,
+  LocalSurveyModuleRepository,
+  LocalSurveyTemplateRepository,
+} from './surveyRepositories'
+import { runMigrations } from './migrations'
 import type {
   ActivityRepository,
   OrganizationRepository,
   ProjectRepository,
+  ProjectSurveyBlueprintRepository,
+  QuestionRepository,
+  SurveyModuleRepository,
+  SurveyTemplateRepository,
 } from './types'
 
-ensureSeeded()
+runMigrations()
 
 /**
  * 앱 전역 저장소 싱글턴.
@@ -23,4 +33,16 @@ export const projectRepository: ProjectRepository = new LocalProjectRepository()
 
 export const activityRepository: ActivityRepository = new LocalActivityRepository()
 
-export { EntityNotFoundError } from './types'
+export const questionRepository: QuestionRepository =
+  new LocalQuestionRepository()
+
+export const surveyModuleRepository: SurveyModuleRepository =
+  new LocalSurveyModuleRepository()
+
+export const surveyTemplateRepository: SurveyTemplateRepository =
+  new LocalSurveyTemplateRepository()
+
+export const projectSurveyBlueprintRepository: ProjectSurveyBlueprintRepository =
+  new LocalProjectSurveyBlueprintRepository()
+
+export { EntityNotFoundError, DuplicateCodeError } from './types'

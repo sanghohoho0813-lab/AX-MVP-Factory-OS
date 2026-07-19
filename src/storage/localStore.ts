@@ -4,14 +4,27 @@
  */
 
 const KEY_PREFIX = 'axmvp'
-export const SCHEMA_VERSION = 1
+/**
+ * 데이터 저장 네임스페이스. 스키마 버전과 분리되어 있으며, 절대 바꾸지 않는다.
+ * (키 이름을 바꾸면 기존 localStorage 데이터가 고아가 되어 손실된다.)
+ */
+const DATA_NS = 'v1'
+/** 현재 앱이 기대하는 스키마 버전. 마이그레이션 목표값. */
+export const SCHEMA_VERSION = 2
 export const SCHEMA_VERSION_KEY = `${KEY_PREFIX}.schema_version`
 
 export const STORAGE_KEYS = {
-  organizations: `${KEY_PREFIX}.v${SCHEMA_VERSION}.organizations`,
-  projects: `${KEY_PREFIX}.v${SCHEMA_VERSION}.projects`,
-  activities: `${KEY_PREFIX}.v${SCHEMA_VERSION}.activities`,
+  organizations: `${KEY_PREFIX}.${DATA_NS}.organizations`,
+  projects: `${KEY_PREFIX}.${DATA_NS}.projects`,
+  activities: `${KEY_PREFIX}.${DATA_NS}.activities`,
+  questions: `${KEY_PREFIX}.${DATA_NS}.questions`,
+  surveyModules: `${KEY_PREFIX}.${DATA_NS}.survey_modules`,
+  surveyTemplates: `${KEY_PREFIX}.${DATA_NS}.survey_templates`,
+  surveyBlueprints: `${KEY_PREFIX}.${DATA_NS}.survey_blueprints`,
 } as const
+
+/** 마이그레이션 전 안전 백업 키 접두어 */
+export const BACKUP_KEY_PREFIX = `${KEY_PREFIX}.backup`
 
 export class StorageWriteError extends Error {
   constructor() {
@@ -73,6 +86,21 @@ export function readJson<T>(key: string, fallback: T): T {
 
 export function writeJson(key: string, value: unknown): void {
   rawSet(key, JSON.stringify(value))
+}
+
+/** 키 존재 여부 (마이그레이션에서 이미 시드된 데이터 확인용) */
+export function hasKey(key: string): boolean {
+  return rawGet(key) !== null
+}
+
+/** 원문 그대로 읽기 (백업용) */
+export function readRaw(key: string): string | null {
+  return rawGet(key)
+}
+
+/** 원문 그대로 쓰기 (백업 복원용) */
+export function writeRaw(key: string, value: string): void {
+  rawSet(key, value)
 }
 
 export function readSchemaVersion(): number | null {

@@ -14,6 +14,9 @@ export type ProjectStage =
 /** 고객사 포트폴리오 건강 상태 */
 export type HealthStatus = 'healthy' | 'attention' | 'risk'
 
+/** 설문 응답자 역할 (진단 스튜디오 공용) */
+export type RespondentRole = 'owner' | 'manager' | 'worker' | 'mixed'
+
 /** 배지·상태 표시에 쓰는 절제된 색 톤 */
 export type StatusTone =
   | 'neutral'

@@ -281,6 +281,8 @@ interface CheckboxGroupFieldProps {
   onChange: (values: string[]) => void
   error?: string
   fullWidth?: boolean
+  /** 저장값과 다른 표시 라벨이 필요할 때 */
+  renderLabel?: (value: string) => string
 }
 
 export function CheckboxGroupField({
@@ -290,6 +292,7 @@ export function CheckboxGroupField({
   onChange,
   error,
   fullWidth = true,
+  renderLabel,
 }: CheckboxGroupFieldProps) {
   return (
     <fieldset className={fullWidth ? 'sm:col-span-2' : ''}>
@@ -320,7 +323,7 @@ export function CheckboxGroupField({
                 }
                 className="size-3.5 accent-brand-600"
               />
-              {option}
+              {renderLabel ? renderLabel(option) : option}
             </label>
           )
         })}
