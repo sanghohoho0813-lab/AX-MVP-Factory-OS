@@ -7,9 +7,11 @@ interface ModalProps {
   onClose: () => void
   children: ReactNode
   footer?: ReactNode
+  /** 넓은 폼용 최대 너비 */
+  size?: 'md' | 'lg'
 }
 
-export function Modal({ open, title, onClose, children, footer }: ModalProps) {
+export function Modal({ open, title, onClose, children, footer, size = 'md' }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -38,9 +40,11 @@ export function Modal({ open, title, onClose, children, footer }: ModalProps) {
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="relative w-full max-w-md rounded-(--radius-panel) border border-slate-200 bg-white shadow-(--shadow-overlay)"
+        className={`relative flex max-h-[90vh] w-full flex-col rounded-(--radius-panel) border border-slate-200 bg-white shadow-(--shadow-overlay) ${
+          size === 'lg' ? 'max-w-2xl' : 'max-w-md'
+        }`}
       >
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-4">
           <h2 className="text-base font-semibold text-slate-900">{title}</h2>
           <button
             type="button"
@@ -51,11 +55,11 @@ export function Modal({ open, title, onClose, children, footer }: ModalProps) {
             <X aria-hidden="true" className="size-4" />
           </button>
         </div>
-        <div className="px-5 py-4 text-sm leading-relaxed text-slate-600">
+        <div className="overflow-y-auto px-5 py-4 text-sm leading-relaxed text-slate-600">
           {children}
         </div>
         {footer && (
-          <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
+          <div className="flex shrink-0 justify-end gap-2 border-t border-slate-100 px-5 py-4">
             {footer}
           </div>
         )}

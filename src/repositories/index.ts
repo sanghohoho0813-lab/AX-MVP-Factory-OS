@@ -9,6 +9,10 @@ import {
   LocalSurveyModuleRepository,
   LocalSurveyTemplateRepository,
 } from './surveyRepositories'
+import {
+  LocalSurveyDistributionRepository,
+  LocalSurveyResponseRepository,
+} from './runtimeRepositories'
 import { runMigrations } from './migrations'
 import type {
   ActivityRepository,
@@ -16,7 +20,9 @@ import type {
   ProjectRepository,
   ProjectSurveyBlueprintRepository,
   QuestionRepository,
+  SurveyDistributionRepository,
   SurveyModuleRepository,
+  SurveyResponseRepository,
   SurveyTemplateRepository,
 } from './types'
 
@@ -44,5 +50,11 @@ export const surveyTemplateRepository: SurveyTemplateRepository =
 
 export const projectSurveyBlueprintRepository: ProjectSurveyBlueprintRepository =
   new LocalProjectSurveyBlueprintRepository()
+
+export const surveyDistributionRepository: SurveyDistributionRepository =
+  new LocalSurveyDistributionRepository()
+
+export const surveyResponseRepository: SurveyResponseRepository =
+  new LocalSurveyResponseRepository()
 
 export { EntityNotFoundError, DuplicateCodeError } from './types'

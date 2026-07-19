@@ -1,7 +1,15 @@
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
+
+function ShellFallback() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center">
+      <span className="text-sm text-slate-400">불러오는 중…</span>
+    </div>
+  )
+}
 
 export function AppShell() {
   const [collapsed, setCollapsed] = useState(false)
@@ -25,7 +33,9 @@ export function AppShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Header onOpenMobileMenu={() => setMobileOpen(true)} />
         <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          <Outlet />
+          <Suspense fallback={<ShellFallback />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

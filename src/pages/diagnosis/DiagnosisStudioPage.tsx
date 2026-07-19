@@ -17,14 +17,12 @@ import {
   organizationRepository,
   projectRepository,
   questionRepository,
+  surveyDistributionRepository,
   surveyModuleRepository,
   surveyTemplateRepository,
 } from '../../repositories'
 import { calculateTemplateQuality } from '../../services/surveyTemplateService'
-import {
-  summarizeProjectSurveys,
-  type SurveyDesignState,
-} from '../../services/projectSurveyService'
+import { summarizeProjectSurveys } from '../../services/projectSurveyService'
 import { Button } from '../../components/ui/Button'
 import { DataTable, type DataTableColumn } from '../../components/ui/DataTable'
 import { DiagnosisStudioNav } from '../../components/diagnosis/DiagnosisStudioNav'
@@ -41,18 +39,46 @@ import {
 } from '../../components/diagnosis/badges'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 
-const DESIGN_STATE_META: Record<SurveyDesignState, { label: string; tone: 'neutral' | 'warning' | 'success' }> = {
-  none: { label: '미작성', tone: 'neutral' },
-  draft: { label: '초안', tone: 'warning' },
-  ready: { label: '준비 완료', tone: 'success' },
+/** Blueprint + Distribution을 함께 고려한 프로젝트 설문 라이프사이클 */
+type SurveyLifecycle =
+  | 'unset'
+  | 'draft'
+  | 'ready'
+  | 'issued'
+  | 'in_progress'
+  | 'submitted'
+
+const LIFECYCLE_META: Record<
+  SurveyLifecycle,
+  { label: string; tone: 'neutral' | 'warning' | 'info' | 'success'; action: string }
+> = {
+  unset: { label: '설문 미설계', tone: 'neutral', action: '설문 설계' },
+  draft: { label: '설문 초안', tone: 'warning', action: '설문 설계' },
+  ready: { label: '설문 준비 완료', tone: 'info', action: '테스트 링크 생성' },
+  issued: { label: '테스트 링크 발급', tone: 'info', action: '응답 현황' },
+  in_progress: { label: '응답 작성 중', tone: 'warning', action: '응답 현황' },
+  submitted: { label: '응답 제출 완료', tone: 'success', action: '응답 보기' },
 }
 
-/** 프로젝트의 대표 설문 설계 상태 (가장 진행된 역할 기준) */
-function bestDesignState(project: Project): SurveyDesignState {
+function projectSurveyLifecycle(project: Project): SurveyLifecycle {
+  const dists = surveyDistributionRepository.getByProjectId(project.id)
+  if (dists.some((d) => d.status === 'submitted')) return 'submitted'
+  if (dists.some((d) => d.status === 'in_progress')) return 'in_progress'
+  if (dists.some((d) => d.status === 'issued' || d.status === 'opened')) {
+    return 'issued'
+  }
   const states = summarizeProjectSurveys(project).map((s) => s.state)
   if (states.includes('ready')) return 'ready'
   if (states.includes('draft')) return 'draft'
-  return 'none'
+  return 'unset'
+}
+
+/** 라이프사이클에 따른 이동 경로 */
+function lifecycleTarget(project: Project, lifecycle: SurveyLifecycle): string {
+  if (lifecycle === 'unset' || lifecycle === 'draft') {
+    return `/diagnosis/projects/${project.id}/setup`
+  }
+  return `/diagnosis/projects/${project.id}/surveys`
 }
 
 export function DiagnosisStudioPage() {
@@ -79,7 +105,7 @@ export function DiagnosisStudioPage() {
         p.projectType === 'website' &&
         (p.currentStage === 'intake' || p.currentStage === 'website_design')
       if (!isAxEarly && !isWebsiteEarly) return false
-      return bestDesignState(p) !== 'ready'
+      return projectSurveyLifecycle(p) !== 'submitted'
     })
 
     const emptyModules = modules.filter((m) => m.questionIds.length === 0)
@@ -157,10 +183,10 @@ export function DiagnosisStudioPage() {
       key: 'design',
       header: '설문 상태',
       cell: (p) => {
-        const state = bestDesignState(p)
+        const lc = projectSurveyLifecycle(p)
         return (
-          <StatusBadge tone={DESIGN_STATE_META[state].tone} withDot>
-            {DESIGN_STATE_META[state].label}
+          <StatusBadge tone={LIFECYCLE_META[lc].tone} withDot>
+            {LIFECYCLE_META[lc].label}
           </StatusBadge>
         )
       },
@@ -176,14 +202,14 @@ export function DiagnosisStudioPage() {
       header: '',
       className: 'text-right',
       cell: (p) => {
-        const state = bestDesignState(p)
+        const lc = projectSurveyLifecycle(p)
         return (
           <button
             type="button"
-            onClick={() => navigate(`/diagnosis/projects/${p.id}/setup`)}
+            onClick={() => navigate(lifecycleTarget(p, lc))}
             className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-semibold text-brand-600 hover:bg-brand-50"
           >
-            {state === 'none' ? '설문 설계 시작' : '초안 계속하기'}
+            {LIFECYCLE_META[lc].action}
             <ArrowRight aria-hidden="true" className="size-3.5" />
           </button>
         )
@@ -241,29 +267,32 @@ export function DiagnosisStudioPage() {
               />
             </div>
             <ul className="flex flex-col divide-y divide-slate-100 lg:hidden">
-              {data.needsSetup.map((p) => (
-                <li key={p.id} className="px-5 py-3.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="min-w-0 truncate text-sm font-semibold text-slate-800">
-                      {data.orgById.get(p.organizationId)?.name} · {p.name}
-                    </p>
-                    <StatusBadge tone={DESIGN_STATE_META[bestDesignState(p)].tone} withDot>
-                      {DESIGN_STATE_META[bestDesignState(p)].label}
-                    </StatusBadge>
-                  </div>
-                  <div className="mt-1.5 flex items-center justify-between">
-                    <ProjectTypeBadge type={p.projectType} compact />
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/diagnosis/projects/${p.id}/setup`)}
-                      className="inline-flex cursor-pointer items-center gap-1 text-[13px] font-semibold text-brand-600"
-                    >
-                      {bestDesignState(p) === 'none' ? '설계 시작' : '계속하기'}
-                      <ArrowRight aria-hidden="true" className="size-3.5" />
-                    </button>
-                  </div>
-                </li>
-              ))}
+              {data.needsSetup.map((p) => {
+                const lc = projectSurveyLifecycle(p)
+                return (
+                  <li key={p.id} className="px-5 py-3.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="min-w-0 truncate text-sm font-semibold text-slate-800">
+                        {data.orgById.get(p.organizationId)?.name} · {p.name}
+                      </p>
+                      <StatusBadge tone={LIFECYCLE_META[lc].tone} withDot>
+                        {LIFECYCLE_META[lc].label}
+                      </StatusBadge>
+                    </div>
+                    <div className="mt-1.5 flex items-center justify-between">
+                      <ProjectTypeBadge type={p.projectType} compact />
+                      <button
+                        type="button"
+                        onClick={() => navigate(lifecycleTarget(p, lc))}
+                        className="inline-flex cursor-pointer items-center gap-1 text-[13px] font-semibold text-brand-600"
+                      >
+                        {LIFECYCLE_META[lc].action}
+                        <ArrowRight aria-hidden="true" className="size-3.5" />
+                      </button>
+                    </div>
+                  </li>
+                )
+              })}
             </ul>
           </>
         )}

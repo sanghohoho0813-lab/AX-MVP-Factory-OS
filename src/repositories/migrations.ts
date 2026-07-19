@@ -41,6 +41,19 @@ function seedSurveyData(): void {
   }
 }
 
+/**
+ * v3 마이그레이션 — 설문 발급·응답 저장소 추가.
+ * 테스트 링크·응답은 시드하지 않고 빈 배열만 준비한다.
+ */
+function initDistributionStores(): void {
+  if (!hasKey(STORAGE_KEYS.surveyDistributions)) {
+    writeJson(STORAGE_KEYS.surveyDistributions, [])
+  }
+  if (!hasKey(STORAGE_KEYS.surveyResponses)) {
+    writeJson(STORAGE_KEYS.surveyResponses, [])
+  }
+}
+
 /** 순차 적용 마이그레이션 목록 (버전 오름차순) */
 const MIGRATIONS: Migration[] = [
   {
@@ -52,6 +65,11 @@ const MIGRATIONS: Migration[] = [
     version: 2,
     describe: '진단 질문·모듈·템플릿 시드',
     migrate: seedSurveyData,
+  },
+  {
+    version: 3,
+    describe: '설문 발급·응답 저장소 추가',
+    migrate: initDistributionStores,
   },
 ]
 

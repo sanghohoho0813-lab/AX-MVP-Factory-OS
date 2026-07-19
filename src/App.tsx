@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react'
 import {
   Navigate,
   RouterProvider,
@@ -13,18 +14,61 @@ import { OrganizationDetailPage } from './pages/OrganizationDetailPage'
 import { OrganizationFormPage } from './pages/OrganizationFormPage'
 import { ProjectDetailPage } from './pages/ProjectDetailPage'
 import { ProjectFormPage } from './pages/ProjectFormPage'
-import { DiagnosisStudioPage } from './pages/diagnosis/DiagnosisStudioPage'
-import { QuestionBankPage } from './pages/diagnosis/QuestionBankPage'
-import { QuestionFormPage } from './pages/diagnosis/QuestionFormPage'
-import { ModulesPage } from './pages/diagnosis/ModulesPage'
-import { ModuleFormPage } from './pages/diagnosis/ModuleFormPage'
-import { TemplatesPage } from './pages/diagnosis/TemplatesPage'
-import { TemplateBuilderPage } from './pages/diagnosis/TemplateBuilderPage'
-import { TemplatePreviewPage } from './pages/diagnosis/TemplatePreviewPage'
-import { ProjectSurveySetupPage } from './pages/diagnosis/ProjectSurveySetupPage'
+
+// 진단 관리·공개 설문은 route-level lazy loading으로 초기 번들을 줄인다
+const DiagnosisStudioPage = lazy(() =>
+  import('./pages/diagnosis/DiagnosisStudioPage').then((m) => ({ default: m.DiagnosisStudioPage })),
+)
+const QuestionBankPage = lazy(() =>
+  import('./pages/diagnosis/QuestionBankPage').then((m) => ({ default: m.QuestionBankPage })),
+)
+const QuestionFormPage = lazy(() =>
+  import('./pages/diagnosis/QuestionFormPage').then((m) => ({ default: m.QuestionFormPage })),
+)
+const ModulesPage = lazy(() =>
+  import('./pages/diagnosis/ModulesPage').then((m) => ({ default: m.ModulesPage })),
+)
+const ModuleFormPage = lazy(() =>
+  import('./pages/diagnosis/ModuleFormPage').then((m) => ({ default: m.ModuleFormPage })),
+)
+const TemplatesPage = lazy(() =>
+  import('./pages/diagnosis/TemplatesPage').then((m) => ({ default: m.TemplatesPage })),
+)
+const TemplateBuilderPage = lazy(() =>
+  import('./pages/diagnosis/TemplateBuilderPage').then((m) => ({ default: m.TemplateBuilderPage })),
+)
+const TemplatePreviewPage = lazy(() =>
+  import('./pages/diagnosis/TemplatePreviewPage').then((m) => ({ default: m.TemplatePreviewPage })),
+)
+const ProjectSurveySetupPage = lazy(() =>
+  import('./pages/diagnosis/ProjectSurveySetupPage').then((m) => ({ default: m.ProjectSurveySetupPage })),
+)
+const SurveysMainPage = lazy(() =>
+  import('./pages/diagnosis/SurveysMainPage').then((m) => ({ default: m.SurveysMainPage })),
+)
+const ProjectSurveysPage = lazy(() =>
+  import('./pages/diagnosis/ProjectSurveysPage').then((m) => ({ default: m.ProjectSurveysPage })),
+)
+const DistributionDetailPage = lazy(() =>
+  import('./pages/diagnosis/DistributionDetailPage').then((m) => ({ default: m.DistributionDetailPage })),
+)
+const ResponseDetailPage = lazy(() =>
+  import('./pages/diagnosis/ResponseDetailPage').then((m) => ({ default: m.ResponseDetailPage })),
+)
+const PublicSurveyPage = lazy(() =>
+  import('./pages/public/PublicSurveyPage').then((m) => ({ default: m.PublicSurveyPage })),
+)
 
 /** 진단 스튜디오는 실제 기능으로 대체되므로 빈 상태 페이지에서 제외 */
 const EMPTY_MODULE_KEYS = new Set(['clients', 'diagnosis'])
+
+function RouteFallback() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center">
+      <span className="text-sm text-slate-400">불러오는 중…</span>
+    </div>
+  )
+}
 
 const router = createBrowserRouter([
   {
@@ -50,7 +94,11 @@ const router = createBrowserRouter([
       { path: 'diagnosis/templates/new', element: <TemplateBuilderPage /> },
       { path: 'diagnosis/templates/:templateId/edit', element: <TemplateBuilderPage /> },
       { path: 'diagnosis/templates/:templateId/preview', element: <TemplatePreviewPage /> },
+      { path: 'diagnosis/surveys', element: <SurveysMainPage /> },
+      { path: 'diagnosis/surveys/:distributionId', element: <DistributionDetailPage /> },
+      { path: 'diagnosis/surveys/:distributionId/response', element: <ResponseDetailPage /> },
       { path: 'diagnosis/projects/:projectId/setup', element: <ProjectSurveySetupPage /> },
+      { path: 'diagnosis/projects/:projectId/surveys', element: <ProjectSurveysPage /> },
 
       ...MODULE_PAGES.filter((config) => !EMPTY_MODULE_KEYS.has(config.key)).map(
         (config) => ({
@@ -60,6 +108,15 @@ const router = createBrowserRouter([
       ),
       { path: '*', element: <Navigate to="/" replace /> },
     ],
+  },
+  {
+    // 공개 설문 — 내부 AppShell과 완전히 분리
+    path: '/survey/:accessToken',
+    element: (
+      <Suspense fallback={<RouteFallback />}>
+        <PublicSurveyPage />
+      </Suspense>
+    ),
   },
 ])
 

@@ -3,29 +3,46 @@ import type { RendererProps } from './types'
 const inputClass =
   'h-11 w-full rounded-(--radius-control) border border-slate-300 px-3 text-sm focus:border-brand-500 disabled:bg-slate-50'
 
+const SHORT_MAX = 300
+const LONG_MAX = 3000
+
 export function TextQuestion({ question, answer, onAnswer, disabled }: RendererProps) {
   const value = answer?.kind === 'text' ? answer.value : ''
   if (question.type === 'long_text') {
     return (
-      <textarea
-        rows={4}
-        value={value}
-        disabled={disabled}
-        placeholder={question.example ? `예: ${question.example}` : undefined}
-        onChange={(e) => onAnswer({ kind: 'text', value: e.target.value })}
-        className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-500 disabled:bg-slate-50"
-      />
+      <div>
+        <textarea
+          rows={4}
+          value={value}
+          maxLength={LONG_MAX}
+          disabled={disabled}
+          placeholder={question.example ? `예: ${question.example}` : undefined}
+          onChange={(e) => onAnswer({ kind: 'text', value: e.target.value })}
+          className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-500 disabled:bg-slate-50"
+        />
+        <p className="mt-1 text-right text-xs text-slate-400">
+          {value.length} / {LONG_MAX}
+        </p>
+      </div>
     )
   }
   return (
-    <input
-      type="text"
-      value={value}
-      disabled={disabled}
-      placeholder={question.example ? `예: ${question.example}` : undefined}
-      onChange={(e) => onAnswer({ kind: 'text', value: e.target.value })}
-      className={inputClass}
-    />
+    <div>
+      <input
+        type="text"
+        value={value}
+        maxLength={SHORT_MAX}
+        disabled={disabled}
+        placeholder={question.example ? `예: ${question.example}` : undefined}
+        onChange={(e) => onAnswer({ kind: 'text', value: e.target.value })}
+        className={inputClass}
+      />
+      {value.length > SHORT_MAX * 0.7 && (
+        <p className="mt-1 text-right text-xs text-slate-400">
+          {value.length} / {SHORT_MAX}
+        </p>
+      )}
+    </div>
   )
 }
 

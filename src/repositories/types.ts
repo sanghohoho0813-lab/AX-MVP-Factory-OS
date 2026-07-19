@@ -20,6 +20,14 @@ import type {
   SurveyTemplateInput,
   TemplateFilters,
 } from '../types/survey'
+import type {
+  DistributionFilters,
+  ResponseFilters,
+  SurveyDistribution,
+  SurveyDistributionInput,
+  SurveyResponse,
+  SurveyResponseInput,
+} from '../types/surveyRuntime'
 
 /**
  * 저장소 계층 인터페이스.
@@ -53,7 +61,17 @@ export interface ActivityRepository {
 }
 
 export class EntityNotFoundError extends Error {
-  constructor(entity: '고객사' | '프로젝트' | '질문' | '모듈' | '템플릿' | '설문 초안') {
+  constructor(
+    entity:
+      | '고객사'
+      | '프로젝트'
+      | '질문'
+      | '모듈'
+      | '템플릿'
+      | '설문 초안'
+      | '설문 링크'
+      | '설문 응답',
+  ) {
     super(`${entity}를 찾을 수 없습니다.`)
     this.name = 'EntityNotFoundError'
   }
@@ -116,4 +134,30 @@ export interface ProjectSurveyBlueprintRepository {
     input: Partial<ProjectSurveyBlueprintInput>,
   ): ProjectSurveyBlueprint
   markReady(id: string): ProjectSurveyBlueprint
+}
+
+export interface SurveyDistributionRepository {
+  getAll(): SurveyDistribution[]
+  getById(id: string): SurveyDistribution | null
+  getByToken(accessToken: string): SurveyDistribution | null
+  getByProjectId(projectId: string): SurveyDistribution[]
+  create(input: SurveyDistributionInput, accessToken: string): SurveyDistribution
+  update(
+    id: string,
+    input: Partial<SurveyDistribution>,
+  ): SurveyDistribution
+  revoke(id: string): SurveyDistribution
+  regenerateToken(id: string, accessToken: string): SurveyDistribution
+  markOpened(id: string): SurveyDistribution
+  isTokenTaken(token: string): boolean
+  search(filters: DistributionFilters): SurveyDistribution[]
+}
+
+export interface SurveyResponseRepository {
+  getAll(): SurveyResponse[]
+  getById(id: string): SurveyResponse | null
+  getByDistributionId(distributionId: string): SurveyResponse | null
+  create(input: SurveyResponseInput): SurveyResponse
+  update(id: string, input: Partial<SurveyResponseInput>): SurveyResponse
+  search(filters: ResponseFilters): SurveyResponse[]
 }

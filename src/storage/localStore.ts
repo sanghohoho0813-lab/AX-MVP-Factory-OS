@@ -10,7 +10,7 @@ const KEY_PREFIX = 'axmvp'
  */
 const DATA_NS = 'v1'
 /** 현재 앱이 기대하는 스키마 버전. 마이그레이션 목표값. */
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 export const SCHEMA_VERSION_KEY = `${KEY_PREFIX}.schema_version`
 
 export const STORAGE_KEYS = {
@@ -21,6 +21,8 @@ export const STORAGE_KEYS = {
   surveyModules: `${KEY_PREFIX}.${DATA_NS}.survey_modules`,
   surveyTemplates: `${KEY_PREFIX}.${DATA_NS}.survey_templates`,
   surveyBlueprints: `${KEY_PREFIX}.${DATA_NS}.survey_blueprints`,
+  surveyDistributions: `${KEY_PREFIX}.${DATA_NS}.survey_distributions`,
+  surveyResponses: `${KEY_PREFIX}.${DATA_NS}.survey_responses`,
 } as const
 
 /** 마이그레이션 전 안전 백업 키 접두어 */

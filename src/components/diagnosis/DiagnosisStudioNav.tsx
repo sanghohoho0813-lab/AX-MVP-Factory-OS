@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom'
-import { FileStack, LayoutDashboard, Layers, ListChecks } from 'lucide-react'
+import { FileStack, LayoutDashboard, Layers, ListChecks, Send } from 'lucide-react'
 
 const TABS = [
   { to: '/diagnosis', label: '개요', icon: LayoutDashboard, end: true },
   { to: '/diagnosis/questions', label: '질문은행', icon: ListChecks, end: false },
   { to: '/diagnosis/modules', label: '업종·목적 모듈', icon: Layers, end: false },
   { to: '/diagnosis/templates', label: '설문 템플릿', icon: FileStack, end: false },
+  { to: '/diagnosis/surveys', label: '발급·응답관리', icon: Send, end: false },
 ]
 
 /** 진단 스튜디오 하위 탭 내비게이션 */

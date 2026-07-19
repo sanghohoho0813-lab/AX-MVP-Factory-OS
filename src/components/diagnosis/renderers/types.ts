@@ -4,6 +4,7 @@ import type {
   QuestionType,
   RepeatTableColumn,
 } from '../../../types/survey'
+import type { SurveyFileMetadata } from '../../../types/surveyRuntime'
 
 /** 렌더러가 필요로 하는 최소 질문 정보 (Question·Snapshot 공통) */
 export interface RenderQuestion {
@@ -16,13 +17,14 @@ export interface RenderQuestion {
   repeatTableColumns: RepeatTableColumn[]
 }
 
-/** 미리보기 답변 값 (discriminated union — 화면 상태에만 유지) */
+/** 답변 값 (discriminated union — 렌더러 UI 상태) */
 export type SurveyAnswer =
   | { kind: 'text'; value: string }
   | { kind: 'choice'; value: string }
   | { kind: 'multi'; value: string[] }
   | { kind: 'table'; rows: Array<Record<string, string>> }
   | { kind: 'ranking'; order: string[] }
+  | { kind: 'file'; file: SurveyFileMetadata | null }
 
 export interface RendererProps {
   question: RenderQuestion
@@ -42,6 +44,8 @@ export function defaultAnswer(question: RenderQuestion): SurveyAnswer {
       return { kind: 'choice', value: '' }
     case 'repeat_table':
       return { kind: 'table', rows: [] }
+    case 'file':
+      return { kind: 'file', file: null }
     case 'ranking':
       return {
         kind: 'ranking',
@@ -96,9 +100,13 @@ function isAnswered(answer: SurveyAnswer | undefined): boolean {
     case 'multi':
       return answer.value.length > 0
     case 'table':
-      return answer.rows.length > 0
+      return answer.rows.some((row) =>
+        Object.values(row).some((v) => v.trim() !== ''),
+      )
     case 'ranking':
       return answer.order.length > 0
+    case 'file':
+      return answer.file !== null
   }
 }
 

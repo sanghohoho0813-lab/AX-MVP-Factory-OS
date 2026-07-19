@@ -26,7 +26,11 @@ import {
 import { archiveProject } from '../services/projectService'
 import { summarizeProjectSurveys } from '../services/projectSurveyService'
 import { RESPONDENT_ROLE_META } from '../lib/surveyMeta'
-import { ClipboardList, Eye, FilePen } from 'lucide-react'
+import { ClipboardList, Copy, ExternalLink, FilePen, Link2, Plus } from 'lucide-react'
+import { surveyDistributionRepository } from '../repositories'
+import { buildSurveyUrl } from '../services/surveyTokenService'
+import { LocalTestModeBadge } from '../components/runtime/LocalTestModeBanner'
+import { SurveyLinkCreateModal } from '../components/runtime/SurveyLinkCreateModal'
 import { ProjectTypeBadge } from '../components/domain/ProjectTypeBadge'
 import { ActivityTimeline } from '../components/ui/ActivityTimeline'
 import { Button } from '../components/ui/Button'
@@ -55,6 +59,7 @@ export function ProjectDetailPage() {
   const { showToast } = useToast()
   const version = useStoreVersion()
   const [archiveOpen, setArchiveOpen] = useState(false)
+  const [linkModalOpen, setLinkModalOpen] = useState(false)
 
   const project = useMemo(
     () => projectRepository.getById(projectId),
@@ -90,6 +95,19 @@ export function ProjectDetailPage() {
   const isDiagnosisStage =
     project.currentStage === 'intake' || project.currentStage === 'diagnosis'
   const surveyStatuses = summarizeProjectSurveys(project)
+  const distributions = surveyDistributionRepository.getByProjectId(project.id)
+  const distsByRole = (role: string) =>
+    distributions.filter((d) => d.respondentRole === role)
+  const anyReady = surveyStatuses.some((s) => s.state === 'ready')
+
+  const copyLink = async (token: string) => {
+    try {
+      await navigator.clipboard?.writeText(buildSurveyUrl(token))
+      showToast('테스트 링크를 복사했습니다.')
+    } catch {
+      showToast('복사에 실패했습니다. 링크 상세에서 직접 복사해 주세요.')
+    }
+  }
 
   const handleNextStage = () => {
     // 상담 접수·진단 단계는 프로젝트 설문 설계 워크벤치로 이동
@@ -209,14 +227,26 @@ export function ProjectDetailPage() {
               : '진단 설문'
           }
           actions={
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => navigate(`/diagnosis/projects/${project.id}/setup`)}
-            >
-              <ClipboardList aria-hidden="true" className="size-4" />
-              설문 설계 열기
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => navigate(`/diagnosis/projects/${project.id}/setup`)}
+              >
+                <ClipboardList aria-hidden="true" className="size-4" />
+                설문 설계
+              </Button>
+              {anyReady && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => navigate(`/diagnosis/projects/${project.id}/surveys`)}
+                >
+                  <Link2 aria-hidden="true" className="size-4" />
+                  링크 관리
+                </Button>
+              )}
+            </div>
           }
         >
           <ul className="flex flex-col gap-2.5">
@@ -233,6 +263,14 @@ export function ProjectDetailPage() {
                   : status.state === 'draft'
                     ? '초안'
                     : '미작성'
+              const links = distsByRole(status.respondentRole)
+              const submitted = links.find((d) => d.status === 'submitted')
+              const activeLink = links.find(
+                (d) =>
+                  d.status === 'issued' ||
+                  d.status === 'opened' ||
+                  d.status === 'in_progress',
+              )
               return (
                 <li
                   key={status.respondentRole}
@@ -246,45 +284,90 @@ export function ProjectDetailPage() {
                   </StatusBadge>
                   {status.state !== 'none' && (
                     <span className="text-xs text-slate-400">
-                      문항 {status.questionCount}개 · 약 {status.estimatedMinutes}분 ·{' '}
-                      {formatDate(status.updatedAt)}
+                      문항 {status.questionCount}개 · 약 {status.estimatedMinutes}분
                     </span>
                   )}
-                  <div className="ml-auto flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        navigate(`/diagnosis/projects/${project.id}/setup`)
-                      }
-                      className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-semibold text-brand-600 hover:bg-brand-50"
-                    >
-                      {status.state === 'none' ? (
-                        <>
-                          <ClipboardList aria-hidden="true" className="size-3.5" />
-                          설계 시작
-                        </>
-                      ) : (
-                        <>
-                          <FilePen aria-hidden="true" className="size-3.5" />
-                          계속 편집
-                        </>
-                      )}
-                    </button>
+                  {links.length > 0 && (
+                    <span className="text-xs text-slate-400">
+                      발급 {links.length}
+                    </span>
+                  )}
+                  <div className="ml-auto flex flex-wrap items-center gap-1">
+                    {status.state === 'draft' && (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/diagnosis/projects/${project.id}/setup`)}
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-semibold text-brand-600 hover:bg-brand-50"
+                      >
+                        <FilePen aria-hidden="true" className="size-3.5" />
+                        계속 설계
+                      </button>
+                    )}
+                    {status.state === 'none' && (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/diagnosis/projects/${project.id}/setup`)}
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-semibold text-brand-600 hover:bg-brand-50"
+                      >
+                        <ClipboardList aria-hidden="true" className="size-3.5" />
+                        설계 시작
+                      </button>
+                    )}
+                    {status.state === 'ready' && links.length === 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setLinkModalOpen(true)}
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-semibold text-brand-600 hover:bg-brand-50"
+                      >
+                        <Plus aria-hidden="true" className="size-3.5" />
+                        테스트 링크 생성
+                      </button>
+                    )}
+                    {submitted && (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/diagnosis/surveys/${submitted.id}/response`)}
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-semibold text-brand-600 hover:bg-brand-50"
+                      >
+                        응답 상세 보기
+                      </button>
+                    )}
+                    {!submitted && activeLink && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/diagnosis/surveys/${activeLink.id}`)}
+                          className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-semibold text-brand-600 hover:bg-brand-50"
+                        >
+                          응답 현황 보기
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="응답자 화면 열기"
+                          onClick={() => window.open(buildSurveyUrl(activeLink.accessToken), '_blank')}
+                          className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                        >
+                          <ExternalLink aria-hidden="true" className="size-4" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="테스트 링크 복사"
+                          onClick={() => copyLink(activeLink.accessToken)}
+                          className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                        >
+                          <Copy aria-hidden="true" className="size-4" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </li>
               )
             })}
           </ul>
-          <div className="mt-3 flex items-center gap-2">
-            <button
-              type="button"
-              disabled
-              className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] text-slate-400"
-            >
-              <Eye aria-hidden="true" className="size-3.5" />
-              고객용 설문 링크 발급 (다음 단계에서 제공)
-            </button>
-          </div>
+          <p className="mt-3 flex items-center gap-2 text-xs break-keep text-slate-400">
+            <LocalTestModeBadge />
+            테스트 링크와 응답은 이 브라우저에만 저장됩니다. 외부 공유는 Supabase 연결 후 제공됩니다.
+          </p>
         </Panel>
       )}
 
@@ -453,6 +536,13 @@ export function ProjectDetailPage() {
         danger
         onConfirm={handleArchive}
         onCancel={() => setArchiveOpen(false)}
+      />
+
+      <SurveyLinkCreateModal
+        open={linkModalOpen}
+        presetProjectId={project.id}
+        onClose={() => setLinkModalOpen(false)}
+        onViewDetail={(d) => navigate(`/diagnosis/surveys/${d.id}`)}
       />
     </div>
   )
