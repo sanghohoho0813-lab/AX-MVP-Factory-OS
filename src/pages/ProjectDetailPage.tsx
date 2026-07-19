@@ -27,6 +27,7 @@ import { archiveProject } from '../services/projectService'
 import { summarizeProjectSurveys } from '../services/projectSurveyService'
 import { getProjectAnalysisContext } from '../services/assessmentService'
 import { getProjectSelectionContext } from '../services/selectionService'
+import { getProjectDesignContext } from '../services/mvpDesignService'
 import {
   AssessmentConfidenceBadge,
   AssessmentRecommendationBadge,
@@ -36,7 +37,8 @@ import {
   PriorityQuadrantBadge,
   SelectionStatusBadge,
 } from '../components/selection/badges'
-import { Filter, Target } from 'lucide-react'
+import { DesignStatusBadge } from '../components/mvpDesign/badges'
+import { Filter, PencilRuler, Target } from 'lucide-react'
 import { RESPONDENT_ROLE_META } from '../lib/surveyMeta'
 import {
   BarChart3,
@@ -128,6 +130,8 @@ export function ProjectDetailPage() {
     selection?.decision?.primaryCandidateId && selection
       ? selection.candidates.find((c) => c.id === selection.decision?.primaryCandidateId) ?? null
       : null
+  const design = getProjectDesignContext(project.id)
+  const designPath = `/mvp-design/projects/${project.id}`
 
   const copyLink = async (token: string) => {
     try {
@@ -550,6 +554,60 @@ export function ProjectDetailPage() {
                 {selection.candidates.length > 0 ? '과제선별 계속' : '과제선별 시작'}
               </Button>
             </div>
+          )}
+        </Panel>
+      )}
+
+      {/* MVP 설계 */}
+      {design && project.projectType !== 'website' && design.lifecycle !== 'not_eligible' && (
+        <Panel
+          title="MVP 설계"
+          actions={
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => navigate(design.design ? designPath : `${designPath}`)}
+            >
+              <PencilRuler aria-hidden="true" className="size-4" />
+              {design.lifecycle === 'finalized'
+                ? '설계 결과 보기'
+                : design.design
+                  ? 'MVP 설계 계속'
+                  : 'MVP 설계 시작'}
+            </Button>
+          }
+        >
+          {design.lifecycle === 'finalized' && design.design ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <DesignStatusBadge status={design.design.status} />
+                {design.needsRedesignFlag && (
+                  <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700">
+                    <RefreshCw aria-hidden="true" className="size-3" />
+                    재설계 필요
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <PencilRuler aria-hidden="true" className="size-4 text-brand-500" />
+                <span className="text-lg font-bold text-slate-900">{design.design.coreTaskName}</span>
+                <span className="text-sm font-semibold text-slate-500">
+                  {mvpLevelLabel(design.design.levelDecision.selectedLevel, project.projectType)}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                필수 기능 {design.design.features.filter((f) => f.scope === 'must').length}개 · 화면{' '}
+                {design.design.screens.filter((s) => s.scope !== 'excluded').length}개
+                {design.design.finalizedAt && ` · 확정 ${formatDate(design.design.finalizedAt)}`}
+              </p>
+              <p className="text-xs break-keep text-slate-400">Stage 8 현장검증 인계 준비 완료</p>
+            </div>
+          ) : (
+            <p className="text-[13px] break-keep text-slate-600">
+              {design.design
+                ? `MVP 설계 초안이 있습니다. 기능 범위와 검증 기준을 검토해 확정하세요.`
+                : '확정된 핵심 과제로 개발 가능한 기능·화면·데이터·검증 기준을 설계할 수 있습니다.'}
+            </p>
           )}
         </Panel>
       )}

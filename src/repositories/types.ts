@@ -47,6 +47,13 @@ import type {
   SelectionHandoffInput,
   SelectionHandoffSnapshot,
 } from '../types/selection'
+import type {
+  MvpDesign,
+  MvpDesignFilters,
+  MvpDesignHandoffInput,
+  MvpDesignHandoffSnapshot,
+  MvpDesignInput,
+} from '../types/mvpDesign'
 
 /**
  * 저장소 계층 인터페이스.
@@ -95,7 +102,9 @@ export class EntityNotFoundError extends Error {
       | '인터뷰 질문'
       | '자동화 후보'
       | '선정 결과'
-      | '인계 스냅샷',
+      | '인계 스냅샷'
+      | 'MVP 설계'
+      | 'MVP 설계 인계',
   ) {
     super(`${entity}를 찾을 수 없습니다.`)
     this.name = 'EntityNotFoundError'
@@ -272,4 +281,28 @@ export interface SelectionHandoffRepository {
     selectionDecisionId: string,
     snapshot: SelectionHandoffInput,
   ): SelectionHandoffSnapshot
+}
+
+export interface MvpDesignRepository {
+  getAll(): MvpDesign[]
+  getById(id: string): MvpDesign | null
+  getByProjectId(projectId: string): MvpDesign[]
+  getLatestByProjectId(projectId: string): MvpDesign | null
+  create(input: MvpDesignInput): MvpDesign
+  update(id: string, input: Partial<MvpDesignInput>): MvpDesign
+  markReviewed(id: string, reviewerName: string): MvpDesign
+  finalize(id: string, finalizerName: string): MvpDesign
+  supersede(id: string): MvpDesign
+  nextVersion(projectId: string): number
+  search(filters: MvpDesignFilters): MvpDesign[]
+}
+
+export interface MvpDesignHandoffRepository {
+  getAll(): MvpDesignHandoffSnapshot[]
+  getByProjectId(projectId: string): MvpDesignHandoffSnapshot[]
+  getByDesignId(mvpDesignId: string): MvpDesignHandoffSnapshot | null
+  replaceForDesign(
+    mvpDesignId: string,
+    snapshot: MvpDesignHandoffInput,
+  ): MvpDesignHandoffSnapshot
 }

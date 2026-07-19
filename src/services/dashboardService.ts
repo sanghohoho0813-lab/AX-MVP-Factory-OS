@@ -12,6 +12,7 @@ const HEALTH_ORDER = { healthy: 0, attention: 1, risk: 2 } as const
 export function buildDashboardMetrics(
   projects: Project[],
   selectionPending?: number,
+  designInProgress?: number,
 ): MetricSummary[] {
   const open = projects.filter(
     (p) => p.status !== 'completed' && p.status !== 'archived',
@@ -39,10 +40,12 @@ export function buildDashboardMetrics(
     {
       key: 'mvp-building',
       label: '제작 중 MVP',
-      value: open.filter(
-        (p) =>
-          p.currentStage === 'mvp_design' || p.currentStage === 'website_design',
-      ).length,
+      value:
+        designInProgress ??
+        open.filter(
+          (p) =>
+            p.currentStage === 'mvp_design' || p.currentStage === 'website_design',
+        ).length,
       unit: '건',
       weeklyDelta: 0,
       tone: 'success',

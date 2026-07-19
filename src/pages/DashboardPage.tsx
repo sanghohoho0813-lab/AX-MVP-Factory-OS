@@ -8,6 +8,7 @@ import {
   buildPortfolioItems,
 } from '../services/dashboardService'
 import { countSelectionPending } from '../services/selectionService'
+import { countDesignInProgress } from '../services/mvpDesignService'
 import { MetricStrip } from '../components/dashboard/MetricStrip'
 import { PortfolioHealth } from '../components/dashboard/PortfolioHealth'
 import { PriorityList } from '../components/dashboard/PriorityList'
@@ -24,7 +25,7 @@ export function DashboardPage() {
     const projects = projectRepository.getAll()
     const organizations = organizationRepository.getAll()
     return {
-      metrics: buildDashboardMetrics(projects, countSelectionPending()),
+      metrics: buildDashboardMetrics(projects, countSelectionPending(), countDesignInProgress()),
       portfolioItems: buildPortfolioItems(organizations, projects),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
