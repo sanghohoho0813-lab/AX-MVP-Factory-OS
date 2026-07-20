@@ -2,6 +2,8 @@ import { useParams } from 'react-router-dom'
 import { AlertTriangle, ArrowRight, Bot, Lock, UserCheck } from 'lucide-react'
 import type { FeatureScope, MvpDesign, MvpFeature } from '../../types/mvpDesign'
 import { FEATURE_SCOPES, FEATURE_SCOPE_META } from '../../lib/mvpDesignMeta'
+import { GLOSSARY } from '../../lib/glossary'
+import { Term } from '../../components/ui/Term'
 import { Panel } from '../../components/ui/Panel'
 import { useToast } from '../../components/ui/toastContext'
 import {
@@ -108,6 +110,12 @@ export function DesignFeaturesPage() {
               <p className="flex items-start gap-2 text-[13px] break-keep text-slate-600">
                 <Lock aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-brand-500" />
                 1차 MVP는 Must 기능에 집중합니다. 검증되지 않은 기능은 Should/Later로 미루고, 각 기능은 입력·처리·출력으로 정의합니다.
+              </p>
+              <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                <Term label="Must" description={GLOSSARY.Must} />
+                <Term label="Should" description={GLOSSARY.Should} />
+                <Term label="Later" description={GLOSSARY.Later} />
+                <Term label="Excluded" description={GLOSSARY.Excluded} />
               </p>
             </div>
             {groups.map((group) =>

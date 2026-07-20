@@ -1,10 +1,12 @@
 import {
   ArrowRight,
+  ChevronDown,
   FileStack,
   Layers,
   ListChecks,
   Plus,
   Send,
+  Settings,
 } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -29,8 +31,8 @@ import {
 } from '../../services/assessmentService'
 import { Button } from '../../components/ui/Button'
 import { DataTable, type DataTableColumn } from '../../components/ui/DataTable'
-import { DiagnosisStudioNav } from '../../components/diagnosis/DiagnosisStudioNav'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { HelpNote } from '../../components/ui/HelpNote'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Panel } from '../../components/ui/Panel'
 import { SummaryStrip } from '../../components/ui/SummaryStrip'
@@ -260,35 +262,50 @@ export function DiagnosisStudioPage() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        title="진단 스튜디오"
-        description="공통 질문과 업종별 질문을 조합해 고객사의 실제 업무와 AX 도입 가능성을 진단합니다."
+        title="기업 진단"
+        description="설문으로 고객사의 실제 업무·데이터 상태를 확인하고 AX 도입 가능성을 진단합니다."
         actions={
-          <>
-            <Button variant="secondary" onClick={() => navigate('/diagnosis/questions/new')}>
-              <Plus aria-hidden="true" className="size-4" />
-              질문 등록
-            </Button>
-            <Button variant="primary" onClick={startFirstSetup}>
-              프로젝트 설문 설계
-              <ArrowRight aria-hidden="true" className="size-4" />
-            </Button>
-          </>
+          <Button variant="primary" onClick={startFirstSetup}>
+            설문 구성하기
+            <ArrowRight aria-hidden="true" className="size-4" />
+          </Button>
         }
       />
-      <DiagnosisStudioNav />
+
+      <HelpNote
+        summary="진단은 ① 설문 준비 → ② 응답 현황 → ③ 진단 결과 순서로 진행합니다."
+        what="대표자·현장 담당자에게 설문을 보내고, 제출된 응답으로 AX 적합성을 계산합니다."
+        when="새 프로젝트의 업무·데이터 상태를 처음 파악할 때 사용합니다."
+        next="진단 결과가 확정되면 '만들 업무 선택' 단계로 이어집니다."
+      />
+
+      {/* 3단계 흐름 안내 */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {[
+          { n: 1, label: '설문 준비', desc: '보낼 질문을 고르고 테스트 링크를 만듭니다.' },
+          { n: 2, label: '응답 현황', desc: '대표자·현장 담당자의 제출을 확인합니다.' },
+          { n: 3, label: '진단 결과', desc: '응답을 비교해 AX 적합성을 판단합니다.' },
+        ].map((f) => (
+          <div key={f.n} className="flex flex-col gap-1 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 shadow-(--shadow-card)">
+            <span className="flex size-6 items-center justify-center rounded-full bg-brand-50 text-[12px] font-bold text-brand-600">{f.n}</span>
+            <span className="text-sm font-semibold text-slate-800">{f.label}</span>
+            <span className="text-xs break-keep text-slate-500">{f.desc}</span>
+          </div>
+        ))}
+      </div>
 
       <SummaryStrip
-        ariaLabel="진단 스튜디오 요약"
+        ariaLabel="진단 요약"
         items={[
-          { key: 'q', label: '활성 질문', value: data.counts.activeQuestions, unit: '개', tone: 'info', icon: ListChecks },
-          { key: 'm', label: '활성 모듈', value: data.counts.activeModules, unit: '개', tone: 'accent', icon: Layers },
-          { key: 't', label: '게시 템플릿', value: data.counts.publishedTemplates, unit: '개', tone: 'success', icon: Send },
-          { key: 's', label: '설문 준비 필요 프로젝트', value: data.counts.needsSetup, unit: '건', tone: 'warning', icon: FileStack },
+          { key: 's', label: '진단이 필요한 프로젝트', value: data.counts.needsSetup, unit: '건', tone: 'warning', icon: FileStack },
+          { key: 'q', label: '설문 질문', value: data.counts.activeQuestions, unit: '개', tone: 'info', icon: ListChecks },
+          { key: 'm', label: '업종·목적 모듈', value: data.counts.activeModules, unit: '개', tone: 'accent', icon: Layers },
+          { key: 't', label: '설문 양식', value: data.counts.publishedTemplates, unit: '개', tone: 'success', icon: Send },
         ]}
       />
 
-      {/* A. 진단 준비가 필요한 프로젝트 */}
-      <Panel title="진단 준비가 필요한 프로젝트" flush>
+      {/* A. 진단이 필요한 프로젝트 */}
+      <Panel title="진단이 필요한 프로젝트" flush>
         {data.needsSetup.length === 0 ? (
           <EmptyState
             icon={FileStack}
@@ -338,80 +355,84 @@ export function DiagnosisStudioPage() {
         )}
       </Panel>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
-        {/* C. 최근 수정 템플릿 */}
-        <div className="min-w-0 xl:col-span-2">
-          <Panel title="최근 수정 템플릿" flush>
-            <ul className="divide-y divide-slate-100">
-              {data.recentTemplates.map((t) => (
-                <li key={t.id}>
-                  <Link
-                    to={`/diagnosis/templates/${t.id}/preview`}
-                    className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-slate-800">{t.name}</p>
-                      <p className="text-xs text-slate-400">
-                        문항 {t.sections.reduce((n, s) => n + s.placements.length, 0)}개 · 약{' '}
-                        {t.estimatedMinutes}분 · {formatDate(t.updatedAt)}
-                      </p>
-                    </div>
-                    <RespondentRoleBadge role={t.respondentRole} />
-                    <div className="flex items-center gap-1.5">
+      {/* 진단 설정 — 질문·모듈·양식 등 고급 관리 (기본 접힘) */}
+      <details className="group rounded-(--radius-panel) border border-slate-200 bg-white shadow-(--shadow-card)">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-5 py-4">
+          <span className="min-w-0">
+            <span className="flex items-center gap-2 text-[15px] font-semibold text-slate-900">
+              <Settings aria-hidden="true" className="size-4 text-slate-400" />
+              진단 설정
+            </span>
+            <span className="mt-0.5 block text-[13px] break-keep text-slate-500">
+              질문·업종 모듈·설문 양식 등은 자동 점수·분석 규칙을 수정할 때만 사용합니다.
+            </span>
+          </span>
+          <ChevronDown aria-hidden="true" className="size-5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="flex flex-col gap-4 border-t border-slate-100 px-5 py-4">
+          <div className="flex flex-col gap-2">
+            {[
+              { to: '/diagnosis/questions', label: '질문 은행 관리', icon: ListChecks, desc: '진단에 쓰는 질문 104개를 관리합니다.' },
+              { to: '/diagnosis/modules', label: '업종·목적 모듈', icon: Layers, desc: '업종·목적별 질문 묶음을 관리합니다.' },
+              { to: '/diagnosis/templates', label: '설문 양식', icon: FileStack, desc: '역할별 설문 양식을 만들고 게시합니다.' },
+              { to: '/diagnosis/questions/new', label: '새 질문 등록', icon: Plus, desc: '새로운 진단 질문을 추가합니다.' },
+            ].map((item) => (
+              <Link
+                key={item.to}
+                to={item.to}
+                className="flex items-center gap-3 rounded-(--radius-control) border border-slate-200 px-3.5 py-2.5 hover:border-slate-300 hover:bg-slate-50"
+              >
+                <item.icon aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-slate-700">{item.label}</span>
+                  <span className="block text-xs break-keep text-slate-400">{item.desc}</span>
+                </span>
+                <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-slate-300" />
+              </Link>
+            ))}
+          </div>
+
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-slate-100 pt-4 sm:grid-cols-3">
+            {[
+              ['공통 질문', data.library.common],
+              ['업종 특화', data.library.industry],
+              ['목적 특화', data.library.objective],
+              ['비활성·보관', data.library.inactiveOrArchived],
+              ['질문 없는 모듈', data.library.emptyModules],
+              ['품질 경고 양식', data.library.warnedTemplates],
+            ].map(([label, value]) => (
+              <div key={label as string}>
+                <dt className="text-xs text-slate-400">{label}</dt>
+                <dd className="text-lg font-bold text-slate-800">
+                  {value}
+                  <span className="ml-0.5 text-xs font-medium text-slate-400">개</span>
+                </dd>
+              </div>
+            ))}
+          </dl>
+
+          {data.recentTemplates.length > 0 && (
+            <div className="border-t border-slate-100 pt-4">
+              <p className="mb-2 text-[13px] font-semibold text-slate-500">최근 수정 설문 양식</p>
+              <ul className="flex flex-col gap-1.5">
+                {data.recentTemplates.map((t) => (
+                  <li key={t.id}>
+                    <Link
+                      to={`/diagnosis/templates/${t.id}/preview`}
+                      className="flex items-center gap-3 rounded-(--radius-control) px-2 py-1.5 hover:bg-slate-50"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-slate-700">{t.name}</span>
+                      <RespondentRoleBadge role={t.respondentRole} />
                       <TemplateStatusBadge status={t.status} />
-                      <span className="text-xs text-slate-400">v{t.version}</span>
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Panel>
-        </div>
-
-        {/* B + D. 라이브러리 현황 & 빠른 이동 */}
-        <div className="flex min-w-0 flex-col gap-5">
-          <Panel title="설문 라이브러리 현황">
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
-              {[
-                ['공통 질문', data.library.common],
-                ['업종 특화', data.library.industry],
-                ['목적 특화', data.library.objective],
-                ['비활성·보관', data.library.inactiveOrArchived],
-                ['질문 없는 모듈', data.library.emptyModules],
-                ['품질 경고 템플릿', data.library.warnedTemplates],
-              ].map(([label, value]) => (
-                <div key={label as string}>
-                  <dt className="text-xs text-slate-400">{label}</dt>
-                  <dd className="text-lg font-bold text-slate-800">
-                    {value}
-                    <span className="ml-0.5 text-xs font-medium text-slate-400">개</span>
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </Panel>
-
-          <Panel title="빠른 이동">
-            <div className="flex flex-col gap-2">
-              {[
-                { to: '/diagnosis/questions', label: '질문은행', icon: ListChecks },
-                { to: '/diagnosis/modules', label: '업종·목적 모듈', icon: Layers },
-                { to: '/diagnosis/templates', label: '설문 템플릿', icon: FileStack },
-              ].map((item) => (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  className="flex items-center gap-2.5 rounded-(--radius-control) border border-slate-200 px-3.5 py-2.5 text-sm font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50"
-                >
-                  <item.icon aria-hidden="true" className="size-4 text-slate-400" />
-                  {item.label}
-                  <ArrowRight aria-hidden="true" className="ml-auto size-4 text-slate-300" />
-                </Link>
-              ))}
+                      <span className="text-xs text-slate-400">{formatDate(t.updatedAt)}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             </div>
-          </Panel>
+          )}
         </div>
-      </div>
+      </details>
     </div>
   )
 }

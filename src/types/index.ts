@@ -32,6 +32,17 @@ export interface NavigationItem {
   label: string
   path: string
   icon: LucideIcon
+  /** AX 제작 흐름에서의 단계 번호 (1~5). 흐름 외 메뉴는 미지정 */
+  step?: number
+  /** 기존 전문 용어 등 보조 설명 (툴팁) */
+  hint?: string
+}
+
+export interface NavigationGroup {
+  key: string
+  /** 그룹 제목 (표시용). 없으면 구분선만 */
+  title?: string
+  items: NavigationItem[]
 }
 
 /** KPI 요약 지표 */

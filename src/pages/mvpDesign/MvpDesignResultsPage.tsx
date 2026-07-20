@@ -9,7 +9,8 @@ import {
   organizationRepository,
   projectRepository,
 } from '../../repositories'
-import { EmptyState } from '../../components/ui/EmptyState'
+import { GuidedEmptyState } from '../../components/ui/GuidedEmptyState'
+import { useDemoTour } from '../../components/demo/demoTour'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Panel } from '../../components/ui/Panel'
 import { DesignStatusBadge } from '../../components/mvpDesign/badges'
@@ -26,6 +27,7 @@ interface Row {
 
 export function MvpDesignResultsPage() {
   const navigate = useNavigate()
+  const demo = useDemoTour()
   const version = useStoreVersion()
 
   const rows = useMemo<Row[]>(() => {
@@ -65,10 +67,20 @@ export function MvpDesignResultsPage() {
 
       {rows.length === 0 ? (
         <Panel title="확정 설계" flush>
-          <EmptyState
+          <GuidedEmptyState
             icon={PencilRuler}
-            title="확정된 설계가 없습니다"
-            description="설계를 확정하면 이곳에 정리됩니다."
+            title="아직 확정한 설계가 없습니다"
+            reason="핵심 업무를 선정한 뒤 기능·화면 설계를 확정하면 이곳에 정리됩니다."
+            flowPosition="3단계 · 기능·화면 설계"
+            prereqs={[
+              { label: '진단 결과 확정', done: false },
+              { label: '만들 업무 1개 선택', done: false },
+              { label: '기능·화면 설계 확정', done: false },
+            ]}
+            primaryLabel="기능·화면 설계로 이동"
+            onPrimary={() => navigate('/mvp-design')}
+            sampleLabel="샘플 설계 보기"
+            onSample={() => demo.start()}
           />
         </Panel>
       ) : (

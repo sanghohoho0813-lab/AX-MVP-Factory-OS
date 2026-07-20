@@ -21,6 +21,8 @@ import { needsReanalysis } from '../../services/assessmentService'
 import { DataTable, type DataTableColumn } from '../../components/ui/DataTable'
 import { DiagnosisStudioNav } from '../../components/diagnosis/DiagnosisStudioNav'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { GuidedEmptyState } from '../../components/ui/GuidedEmptyState'
+import { useDemoTour } from '../../components/demo/demoTour'
 import { FilterBar } from '../../components/ui/FilterBar'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Panel } from '../../components/ui/Panel'
@@ -48,6 +50,7 @@ function scoreLabel(a: AssessmentResult): string {
 
 export function AssessmentsListPage() {
   const navigate = useNavigate()
+  const demo = useDemoTour()
   const version = useStoreVersion()
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('')
@@ -285,11 +288,29 @@ export function AssessmentsListPage() {
 
       <Panel title={`진단 결과 (${filtered.length})`} flush>
         {filtered.length === 0 ? (
-          <EmptyState
-            icon={ClipboardCheck}
-            title="진단 결과가 없습니다"
-            description="제출된 설문 응답을 기준으로 진단 분석을 실행하면 이곳에 표시됩니다."
-          />
+          hasActiveFilters ? (
+            <EmptyState
+              icon={ClipboardCheck}
+              title="조건에 맞는 결과가 없습니다"
+              description="필터를 조정해 다시 확인해 보세요."
+            />
+          ) : (
+            <GuidedEmptyState
+              icon={ClipboardCheck}
+              title="아직 진단 결과가 없습니다"
+              reason="설문 응답이 제출되면 대표자와 현장 담당자의 답변을 비교해 AX 도입 적합성을 계산할 수 있습니다."
+              flowPosition="1단계 · 기업 진단"
+              prereqs={[
+                { label: '설문 구성', done: false },
+                { label: '테스트 링크로 응답 받기', done: false },
+                { label: '진단 결과 만들기', done: false },
+              ]}
+              primaryLabel="응답 현황 확인"
+              onPrimary={() => navigate('/diagnosis/surveys')}
+              sampleLabel="샘플 진단 결과 보기"
+              onSample={() => demo.start()}
+            />
+          )
         ) : (
           <>
             <div className="hidden overflow-x-auto lg:block">

@@ -61,9 +61,26 @@ html {
   scrollbar-gutter: stable;
 }
 
+/*
+ * 데스크톱 가독성 — 넓은 화면에서 본문·폼 글자가 작다는 피드백 반영.
+ * rem 기반 크기를 큰 화면에서만 소폭 확대하고, 모바일(검증된 390px 레이아웃)은
+ * 기본 16px를 유지해 가로 스크롤 회귀를 막는다.
+ */
+@media (min-width: 1280px) {
+  html {
+    font-size: 16.5px;
+  }
+}
+@media (min-width: 1680px) {
+  html {
+    font-size: 17px;
+  }
+}
+
 body {
   @apply bg-slate-50 text-slate-800 antialiased;
   font-feature-settings: "tnum";
+  line-height: 1.6;
 }
 
 /* Visible keyboard focus everywhere */

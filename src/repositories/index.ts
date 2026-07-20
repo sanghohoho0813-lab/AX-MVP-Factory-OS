@@ -103,4 +103,6 @@ export const mvpDesignRepository: MvpDesignRepository =
 export const mvpDesignHandoffRepository: MvpDesignHandoffRepository =
   new LocalMvpDesignHandoffRepository()
 
+export { guidedDemoRepository } from './guidedDemoRepository'
+
 export { EntityNotFoundError, DuplicateCodeError } from './types'
