@@ -6,6 +6,7 @@ import {
 } from 'react-router-dom'
 import { AppShell } from './components/layout/AppShell'
 import { ToastProvider } from './components/ui/toast'
+import { TextScaleProvider } from './components/ui/TextScaleProvider'
 import { MODULE_PAGES } from './data/modules'
 import { ClientsListPage } from './pages/ClientsListPage'
 import { DashboardPage } from './pages/DashboardPage'
@@ -14,6 +15,7 @@ import { OrganizationDetailPage } from './pages/OrganizationDetailPage'
 import { OrganizationFormPage } from './pages/OrganizationFormPage'
 import { ProjectDetailPage } from './pages/ProjectDetailPage'
 import { ProjectFormPage } from './pages/ProjectFormPage'
+import { SettingsPage } from './pages/SettingsPage'
 
 // 진단 관리·공개 설문은 route-level lazy loading으로 초기 번들을 줄인다
 const DiagnosisStudioPage = lazy(() =>
@@ -163,9 +165,51 @@ const WebsitePromptPage = lazy(() =>
 const WebsiteReviewPage = lazy(() =>
   import('./pages/websiteStudio/WebsiteReviewPage').then((m) => ({ default: m.WebsiteReviewPage })),
 )
+const ValidationMainPage = lazy(() =>
+  import('./pages/validation/ValidationMainPage').then((m) => ({ default: m.ValidationMainPage })),
+)
+const ValidationResultsPage = lazy(() =>
+  import('./pages/validation/ValidationResultsPage').then((m) => ({ default: m.ValidationResultsPage })),
+)
+const ValidationProjectPage = lazy(() =>
+  import('./pages/validation/ValidationProjectPage').then((m) => ({ default: m.ValidationProjectPage })),
+)
+const TrackOverviewPage = lazy(() =>
+  import('./pages/validation/TrackOverviewPage').then((m) => ({ default: m.TrackOverviewPage })),
+)
+const TrackPlanPage = lazy(() =>
+  import('./pages/validation/TrackPlanPage').then((m) => ({ default: m.TrackPlanPage })),
+)
+const TrackBuildPage = lazy(() =>
+  import('./pages/validation/TrackBuildPage').then((m) => ({ default: m.TrackBuildPage })),
+)
+const TrackScenariosPage = lazy(() =>
+  import('./pages/validation/TrackScenariosPage').then((m) => ({ default: m.TrackScenariosPage })),
+)
+const TrackRoundsPage = lazy(() =>
+  import('./pages/validation/TrackRoundsPage').then((m) => ({ default: m.TrackRoundsPage })),
+)
+const RoundDetailPage = lazy(() =>
+  import('./pages/validation/RoundDetailPage').then((m) => ({ default: m.RoundDetailPage })),
+)
+const TrackFeedbackPage = lazy(() =>
+  import('./pages/validation/TrackFeedbackPage').then((m) => ({ default: m.TrackFeedbackPage })),
+)
+const TrackMetricsPage = lazy(() =>
+  import('./pages/validation/TrackMetricsPage').then((m) => ({ default: m.TrackMetricsPage })),
+)
+const TrackGatesPage = lazy(() =>
+  import('./pages/validation/TrackGatesPage').then((m) => ({ default: m.TrackGatesPage })),
+)
+const TrackDecisionPage = lazy(() =>
+  import('./pages/validation/TrackDecisionPage').then((m) => ({ default: m.TrackDecisionPage })),
+)
+const LocalTestPage = lazy(() =>
+  import('./pages/validation/LocalTestPage').then((m) => ({ default: m.LocalTestPage })),
+)
 
 /** 진단 스튜디오는 실제 기능으로 대체되므로 빈 상태 페이지에서 제외 */
-const EMPTY_MODULE_KEYS = new Set(['clients', 'diagnosis', 'selection', 'mvp-design', 'website-studio'])
+const EMPTY_MODULE_KEYS = new Set(['clients', 'diagnosis', 'selection', 'mvp-design', 'website-studio', 'validation', 'settings'])
 
 function RouteFallback() {
   return (
@@ -187,6 +231,7 @@ const router = createBrowserRouter([
       { path: 'projects/new', element: <ProjectFormPage /> },
       { path: 'projects/:projectId', element: <ProjectDetailPage /> },
       { path: 'projects/:projectId/edit', element: <ProjectFormPage /> },
+      { path: 'settings', element: <SettingsPage /> },
 
       { path: 'diagnosis', element: <DiagnosisStudioPage /> },
       { path: 'diagnosis/questions', element: <QuestionBankPage /> },
@@ -243,6 +288,20 @@ const router = createBrowserRouter([
       { path: 'website-studio/projects/:projectId/prompt', element: <WebsitePromptPage /> },
       { path: 'website-studio/projects/:projectId/review', element: <WebsiteReviewPage /> },
 
+      { path: 'validation', element: <ValidationMainPage /> },
+      { path: 'validation/results', element: <ValidationResultsPage /> },
+      { path: 'validation/projects/:projectId', element: <ValidationProjectPage /> },
+      { path: 'validation/projects/:projectId/:trackType', element: <TrackOverviewPage /> },
+      { path: 'validation/projects/:projectId/:trackType/plan', element: <TrackPlanPage /> },
+      { path: 'validation/projects/:projectId/:trackType/build', element: <TrackBuildPage /> },
+      { path: 'validation/projects/:projectId/:trackType/scenarios', element: <TrackScenariosPage /> },
+      { path: 'validation/projects/:projectId/:trackType/rounds', element: <TrackRoundsPage /> },
+      { path: 'validation/projects/:projectId/:trackType/rounds/:roundId', element: <RoundDetailPage /> },
+      { path: 'validation/projects/:projectId/:trackType/feedback', element: <TrackFeedbackPage /> },
+      { path: 'validation/projects/:projectId/:trackType/metrics', element: <TrackMetricsPage /> },
+      { path: 'validation/projects/:projectId/:trackType/gates', element: <TrackGatesPage /> },
+      { path: 'validation/projects/:projectId/:trackType/decision', element: <TrackDecisionPage /> },
+
       ...MODULE_PAGES.filter((config) => !EMPTY_MODULE_KEYS.has(config.key)).map(
         (config) => ({
           path: config.path,
@@ -261,13 +320,24 @@ const router = createBrowserRouter([
       </Suspense>
     ),
   },
+  {
+    // 로컬 테스트 런타임 — 내부 AppShell과 완전히 분리 (localStorage 로컬 전용)
+    path: '/test/:accessToken',
+    element: (
+      <Suspense fallback={<RouteFallback />}>
+        <LocalTestPage />
+      </Suspense>
+    ),
+  },
 ])
 
 function App() {
   return (
-    <ToastProvider>
-      <RouterProvider router={router} />
-    </ToastProvider>
+    <TextScaleProvider>
+      <ToastProvider>
+        <RouterProvider router={router} />
+      </ToastProvider>
+    </TextScaleProvider>
   )
 }
 

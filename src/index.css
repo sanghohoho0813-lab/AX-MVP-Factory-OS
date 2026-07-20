@@ -62,19 +62,25 @@ html {
 }
 
 /*
- * 데스크톱 가독성 — 넓은 화면에서 본문·폼 글자가 작다는 피드백 반영.
- * rem 기반 크기를 큰 화면에서만 소폭 확대하고, 모바일(검증된 390px 레이아웃)은
- * 기본 16px를 유지해 가로 스크롤 회귀를 막는다.
+ * 전역 글자 크기 — 사용자 표시 설정(UiTextScale)으로 3단계 배율을 중앙 관리한다.
+ * 기존(Stage 8) 16px 기준의 1.5배를 기본값으로 하고, 큰 화면 미디어쿼리 확대는
+ * 배율 이중 적용을 막기 위해 제거한다. rem 기반 크기·여백이 배율을 함께 따른다.
+ *   기본(default)     = 1.5   (16 → 24px)
+ *   크게(large)       = 1.8   (기본의 1.2배)
+ *   매우 크게(x_large)= 2.1   (기본의 1.4배)
+ * index.html의 인라인 스크립트가 렌더 전에 data-text-scale를 적용해 깜빡임을 막는다.
  */
-@media (min-width: 1280px) {
-  html {
-    font-size: 16.5px;
-  }
+:root {
+  --ui-text-scale: 1.5;
 }
-@media (min-width: 1680px) {
-  html {
-    font-size: 17px;
-  }
+html[data-text-scale="large"] {
+  --ui-text-scale: 1.8;
+}
+html[data-text-scale="extra_large"] {
+  --ui-text-scale: 2.1;
+}
+html {
+  font-size: calc(16px * var(--ui-text-scale));
 }
 
 body {

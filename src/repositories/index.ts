@@ -31,6 +31,11 @@ import {
   LocalWebsiteDesignHandoffRepository,
   LocalWebsiteDesignRepository,
 } from './websiteDesignRepositories'
+import {
+  LocalValidationHandoffRepository,
+  LocalValidationTestSessionRepository,
+  LocalValidationWorkspaceRepository,
+} from './validationRepositories'
 import { runMigrations } from './migrations'
 import type {
   ActivityRepository,
@@ -52,6 +57,9 @@ import type {
   SurveyModuleRepository,
   SurveyResponseRepository,
   SurveyTemplateRepository,
+  ValidationHandoffRepository,
+  ValidationTestSessionRepository,
+  ValidationWorkspaceRepository,
 } from './types'
 
 runMigrations()
@@ -114,6 +122,15 @@ export const websiteDesignRepository: WebsiteDesignRepository =
 
 export const websiteDesignHandoffRepository: WebsiteDesignHandoffRepository =
   new LocalWebsiteDesignHandoffRepository()
+
+export const validationWorkspaceRepository: ValidationWorkspaceRepository =
+  new LocalValidationWorkspaceRepository()
+
+export const validationHandoffRepository: ValidationHandoffRepository =
+  new LocalValidationHandoffRepository()
+
+export const validationTestSessionRepository: ValidationTestSessionRepository =
+  new LocalValidationTestSessionRepository()
 
 export { guidedDemoRepository } from './guidedDemoRepository'
 

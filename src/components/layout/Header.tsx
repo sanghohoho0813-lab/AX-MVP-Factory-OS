@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { TextScaleControl } from '../ui/TextScaleControl'
 import {
   Bell,
   Building,
@@ -129,22 +130,22 @@ function UserMenu() {
         >
           {CURRENT_USER.initial}
         </span>
-        <span className="hidden text-left leading-tight md:block">
-          <span className="block text-[13px] font-semibold text-slate-800">
+        <span className="hidden max-w-[160px] text-left leading-tight xl:block">
+          <span className="block truncate text-[13px] font-semibold text-slate-800">
             {CURRENT_USER.name}
           </span>
-          <span className="block text-[11px] text-slate-400">
+          <span className="block truncate text-[11px] text-slate-400">
             {CURRENT_USER.role}
           </span>
         </span>
         <ChevronDown
           aria-hidden="true"
-          className="hidden size-4 text-slate-400 md:block"
+          className="hidden size-4 text-slate-400 xl:block"
         />
       </button>
       {open && (
         <div className="absolute top-full right-0 z-30 mt-1.5 w-52 rounded-(--radius-card) border border-slate-200 bg-white p-1.5 shadow-(--shadow-overlay)">
-          <div className="border-b border-slate-100 px-3 py-2.5 md:hidden">
+          <div className="border-b border-slate-100 px-3 py-2.5 xl:hidden">
             <p className="text-sm font-semibold text-slate-800">
               {CURRENT_USER.name}
             </p>
@@ -169,6 +170,10 @@ function UserMenu() {
             <Settings aria-hidden="true" className="size-4 text-slate-400" />
             설정
           </Link>
+          <div className="mt-1 border-t border-slate-100 px-3 pt-2.5 pb-1.5">
+            <p className="mb-1.5 text-xs font-semibold text-slate-500">글자 크기</p>
+            <TextScaleControl compact />
+          </div>
         </div>
       )}
     </div>

@@ -61,6 +61,15 @@ import type {
   WebsiteDesignHandoffSnapshot,
   WebsiteDesignInput,
 } from '../types/websiteDesign'
+import type {
+  ValidationFilters,
+  ValidationHandoffInput,
+  ValidationHandoffSnapshot,
+  ValidationTestSession,
+  ValidationTestSessionInput,
+  ValidationWorkspace,
+  ValidationWorkspaceInput,
+} from '../types/validation'
 
 /**
  * 저장소 계층 인터페이스.
@@ -113,7 +122,10 @@ export class EntityNotFoundError extends Error {
       | 'MVP 설계'
       | 'MVP 설계 인계'
       | '홈페이지 설계'
-      | '홈페이지 설계 인계',
+      | '홈페이지 설계 인계'
+      | '검증 워크스페이스'
+      | '검증 인계'
+      | '로컬 테스트 세션',
   ) {
     super(`${entity}를 찾을 수 없습니다.`)
     this.name = 'EntityNotFoundError'
@@ -339,4 +351,48 @@ export interface WebsiteDesignHandoffRepository {
     websiteDesignId: string,
     snapshot: WebsiteDesignHandoffInput,
   ): WebsiteDesignHandoffSnapshot
+}
+
+export interface ValidationWorkspaceRepository {
+  getAll(): ValidationWorkspace[]
+  getById(id: string): ValidationWorkspace | null
+  getByProjectId(projectId: string): ValidationWorkspace[]
+  getByProjectAndTrack(projectId: string, trackType: ValidationWorkspace['trackType']): ValidationWorkspace[]
+  getLatestByProjectAndTrack(
+    projectId: string,
+    trackType: ValidationWorkspace['trackType'],
+  ): ValidationWorkspace | null
+  create(input: ValidationWorkspaceInput): ValidationWorkspace
+  update(id: string, input: Partial<ValidationWorkspaceInput>): ValidationWorkspace
+  markReady(id: string): ValidationWorkspace
+  startTesting(id: string): ValidationWorkspace
+  markEvaluating(id: string): ValidationWorkspace
+  finalize(id: string, finalizerName: string): ValidationWorkspace
+  supersede(id: string): ValidationWorkspace
+  nextVersion(projectId: string, trackType: ValidationWorkspace['trackType']): number
+  search(filters: ValidationFilters): ValidationWorkspace[]
+}
+
+export interface ValidationHandoffRepository {
+  getAll(): ValidationHandoffSnapshot[]
+  getByWorkspaceId(workspaceId: string): ValidationHandoffSnapshot | null
+  getByProjectAndTrack(
+    projectId: string,
+    trackType: ValidationHandoffSnapshot['trackType'],
+  ): ValidationHandoffSnapshot[]
+  create(snapshot: ValidationHandoffInput): ValidationHandoffSnapshot
+  replaceForWorkspace(
+    workspaceId: string,
+    snapshot: ValidationHandoffInput,
+  ): ValidationHandoffSnapshot
+}
+
+export interface ValidationTestSessionRepository {
+  getAll(): ValidationTestSession[]
+  getByToken(accessToken: string): ValidationTestSession | null
+  getByWorkspaceId(workspaceId: string): ValidationTestSession[]
+  create(input: ValidationTestSessionInput, accessToken: string): ValidationTestSession
+  update(id: string, input: Partial<ValidationTestSession>): ValidationTestSession
+  revoke(id: string): ValidationTestSession
+  complete(id: string): ValidationTestSession
 }

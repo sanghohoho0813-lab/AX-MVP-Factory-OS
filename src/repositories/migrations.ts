@@ -112,6 +112,22 @@ function initWebsiteDesignStores(): void {
   }
 }
 
+/**
+ * v8 마이그레이션 — 실제 사용 테스트·Stage-Gate 저장소 추가.
+ * 워크스페이스·인계 스냅샷·로컬 테스트 세션은 시드하지 않고 빈 배열만 준비한다.
+ */
+function initValidationStores(): void {
+  if (!hasKey(STORAGE_KEYS.validationWorkspaces)) {
+    writeJson(STORAGE_KEYS.validationWorkspaces, [])
+  }
+  if (!hasKey(STORAGE_KEYS.validationHandoffs)) {
+    writeJson(STORAGE_KEYS.validationHandoffs, [])
+  }
+  if (!hasKey(STORAGE_KEYS.validationTestSessions)) {
+    writeJson(STORAGE_KEYS.validationTestSessions, [])
+  }
+}
+
 /** 순차 적용 마이그레이션 목록 (버전 오름차순) */
 const MIGRATIONS: Migration[] = [
   {
@@ -148,6 +164,11 @@ const MIGRATIONS: Migration[] = [
     version: 7,
     describe: '홈페이지 설계 스튜디오·인계 저장소 추가',
     migrate: initWebsiteDesignStores,
+  },
+  {
+    version: 8,
+    describe: '실제 사용 테스트·Stage-Gate·로컬 테스트 세션 저장소 추가',
+    migrate: initValidationStores,
   },
 ]
 

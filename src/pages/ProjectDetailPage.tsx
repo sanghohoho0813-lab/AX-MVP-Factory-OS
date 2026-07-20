@@ -29,6 +29,11 @@ import { getProjectAnalysisContext } from '../services/assessmentService'
 import { getProjectSelectionContext } from '../services/selectionService'
 import { getProjectDesignContext } from '../services/mvpDesignService'
 import { getProjectWebsiteContext } from '../services/websiteDesignService'
+import { getProjectValidationContext } from '../services/validationService'
+import {
+  TrackBadge,
+  WorkspaceStatusBadge,
+} from '../components/validation/badges'
 import { WebsiteStatusBadge, WebsiteTypeBadge } from '../components/websiteStudio/badges'
 import { WEBSITE_TYPE_META } from '../lib/websiteDesignMeta'
 import {
@@ -58,6 +63,7 @@ import {
   Link2,
   Plus,
   RefreshCw,
+  SearchCheck,
 } from 'lucide-react'
 import { surveyDistributionRepository } from '../repositories'
 import { buildSurveyUrl } from '../services/surveyTokenService'
@@ -146,6 +152,8 @@ export function ProjectDetailPage() {
       ? getProjectWebsiteContext(project.id)
       : null
   const websitePath = `/website-studio/projects/${project.id}`
+  const validation = getProjectValidationContext(project.id)
+  const validationPath = `/validation/projects/${project.id}`
   const journey = computeProjectJourney(project)
   const currentFlowIndex = flowStepIndex(journey.currentStepKey)
 
@@ -716,6 +724,49 @@ export function ProjectDetailPage() {
                 : '홈페이지 진단 결과로 사이트 구조·콘텐츠·디자인 방향과 개발 지시문을 설계할 수 있습니다.'}
             </p>
           )}
+        </Panel>
+      )}
+
+      {/* 실제 사용 테스트 (Stage-Gate) */}
+      {validation && validation.tracks.some((t) => t.eligibility.available || t.workspace) && (
+        <Panel
+          title="실제 사용 테스트"
+          actions={
+            <Button variant="secondary" size="sm" onClick={() => navigate(validationPath)}>
+              <SearchCheck aria-hidden="true" className="size-4" />
+              테스트 열기
+            </Button>
+          }
+        >
+          <p className="mb-3 text-[13px] break-keep text-slate-500">
+            확정된 설계를 실제 담당자가 사용해 보고 Gate로 판정합니다. AX와 홈페이지는 별도 트랙으로 각각 검증합니다(결과를 합산하지 않습니다).
+          </p>
+          <div className="flex flex-col gap-2.5">
+            {validation.tracks.map((track) => (
+              <div
+                key={track.trackType}
+                className="flex flex-wrap items-center gap-2 rounded-(--radius-card) border border-slate-200 px-3.5 py-2.5"
+              >
+                <TrackBadge track={track.trackType} />
+                {track.workspace ? (
+                  <>
+                    <WorkspaceStatusBadge status={track.workspace.status} />
+                    <span className="text-xs text-slate-500">{track.summary?.headline}</span>
+                    {track.needsRevalidationFlag && (
+                      <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700">
+                        <RefreshCw aria-hidden="true" className="size-3" />
+                        재검증 필요
+                      </span>
+                    )}
+                  </>
+                ) : track.eligibility.available ? (
+                  <span className="text-xs text-slate-500">검증 준비됨 — 워크스페이스 생성 대기</span>
+                ) : (
+                  <span className="text-xs break-keep text-slate-400">{track.eligibility.reason}</span>
+                )}
+              </div>
+            ))}
+          </div>
         </Panel>
       )}
 

@@ -18,6 +18,7 @@ import {
 import { countSelectionPending } from '../services/selectionService'
 import { countDesignInProgress } from '../services/mvpDesignService'
 import { countWebsitePending } from '../services/websiteDesignService'
+import { countValidationPending } from '../services/validationService'
 import {
   FLOW_STEPS,
   computeProjectJourney,
@@ -54,7 +55,7 @@ export function DashboardPage() {
     const organizations = organizationRepository.getAll()
     const recentProject = getMostRecentProject()
     return {
-      metrics: buildDashboardMetrics(projects, countSelectionPending(), countDesignInProgress(), countWebsitePending()),
+      metrics: buildDashboardMetrics(projects, countSelectionPending(), countDesignInProgress(), countWebsitePending(), countValidationPending()),
       portfolioItems: buildPortfolioItems(organizations, projects),
       nextActions: getTopNextActions(3),
       recent: recentProject ? computeProjectJourney(recentProject) : null,

@@ -1,7 +1,22 @@
-import { Box, FileText, Filter, FolderKanban, Palette } from 'lucide-react'
+import {
+  Box,
+  ClipboardCheck,
+  FileText,
+  Filter,
+  FlaskConical,
+  FolderKanban,
+  Palette,
+  ShieldAlert,
+} from 'lucide-react'
 import type { MetricSummary, PortfolioProject } from '../types'
 import type { Organization, Project } from '../types/domain'
 import { pickPrimaryProject } from './organizationService'
+
+export interface ValidationKpiCounts {
+  preparing: number
+  testing: number
+  criticalIssues: number
+}
 
 const HEALTH_ORDER = { healthy: 0, attention: 1, risk: 2 } as const
 
@@ -14,31 +29,65 @@ export function buildDashboardMetrics(
   selectionPending?: number,
   designInProgress?: number,
   websitePending?: number,
+  validation?: ValidationKpiCounts,
 ): MetricSummary[] {
   const open = projects.filter(
     (p) => p.status !== 'completed' && p.status !== 'archived',
   )
-  // 홈페이지 설계 대기가 있으면 마지막 KPI를 홈페이지 항목으로 대체 (최대 1개, 과복잡 방지)
-  const lastMetric: MetricSummary =
-    websitePending && websitePending > 0
-      ? {
-          key: 'website-pending',
-          label: '홈페이지 설계 대기',
-          value: websitePending,
-          unit: '건',
-          weeklyDelta: 0,
-          tone: 'accent',
-          icon: Palette,
-        }
-      : {
-          key: 'deliverables-preparing',
-          label: '제출자료 준비',
-          value: open.filter((p) => p.currentStage === 'deliverables').length,
-          unit: '건',
-          weeklyDelta: -1,
-          tone: 'danger',
-          icon: FileText,
-        }
+  // 마지막 KPI는 최대 1개만 노출한다(과복잡 방지). 우선순위: 중대 이슈 > 홈페이지 대기 > 테스트 중 > 테스트 준비 > 제출자료.
+  const deliverablesMetric: MetricSummary = {
+    key: 'deliverables-preparing',
+    label: '제출자료 준비',
+    value: open.filter((p) => p.currentStage === 'deliverables').length,
+    unit: '건',
+    weeklyDelta: -1,
+    tone: 'danger',
+    icon: FileText,
+  }
+  let lastMetric: MetricSummary
+  if (validation && validation.criticalIssues > 0) {
+    lastMetric = {
+      key: 'validation-critical',
+      label: '중대 이슈',
+      value: validation.criticalIssues,
+      unit: '건',
+      weeklyDelta: 0,
+      tone: 'danger',
+      icon: ShieldAlert,
+    }
+  } else if (websitePending && websitePending > 0) {
+    lastMetric = {
+      key: 'website-pending',
+      label: '홈페이지 설계 대기',
+      value: websitePending,
+      unit: '건',
+      weeklyDelta: 0,
+      tone: 'accent',
+      icon: Palette,
+    }
+  } else if (validation && validation.testing > 0) {
+    lastMetric = {
+      key: 'validation-testing',
+      label: '테스트 중',
+      value: validation.testing,
+      unit: '건',
+      weeklyDelta: 0,
+      tone: 'warning',
+      icon: FlaskConical,
+    }
+  } else if (validation && validation.preparing > 0) {
+    lastMetric = {
+      key: 'validation-preparing',
+      label: '테스트 준비',
+      value: validation.preparing,
+      unit: '건',
+      weeklyDelta: 0,
+      tone: 'info',
+      icon: ClipboardCheck,
+    }
+  } else {
+    lastMetric = deliverablesMetric
+  }
   return [
     {
       key: 'active-projects',
