@@ -100,9 +100,42 @@ const SelectionDecisionPage = lazy(() =>
 const SelectionResultsPage = lazy(() =>
   import('./pages/selection/SelectionResultsPage').then((m) => ({ default: m.SelectionResultsPage })),
 )
+const MvpDesignMainPage = lazy(() =>
+  import('./pages/mvpDesign/MvpDesignMainPage').then((m) => ({ default: m.MvpDesignMainPage })),
+)
+const MvpDesignResultsPage = lazy(() =>
+  import('./pages/mvpDesign/MvpDesignResultsPage').then((m) => ({ default: m.MvpDesignResultsPage })),
+)
+const DesignProjectPage = lazy(() =>
+  import('./pages/mvpDesign/DesignProjectPage').then((m) => ({ default: m.DesignProjectPage })),
+)
+const DesignWorkflowPage = lazy(() =>
+  import('./pages/mvpDesign/DesignWorkflowPage').then((m) => ({ default: m.DesignWorkflowPage })),
+)
+const DesignFeaturesPage = lazy(() =>
+  import('./pages/mvpDesign/DesignFeaturesPage').then((m) => ({ default: m.DesignFeaturesPage })),
+)
+const DesignScreensPage = lazy(() =>
+  import('./pages/mvpDesign/DesignScreensPage').then((m) => ({ default: m.DesignScreensPage })),
+)
+const DesignDataPage = lazy(() =>
+  import('./pages/mvpDesign/DesignDataPage').then((m) => ({ default: m.DesignDataPage })),
+)
+const DesignPermissionsPage = lazy(() =>
+  import('./pages/mvpDesign/DesignPermissionsPage').then((m) => ({ default: m.DesignPermissionsPage })),
+)
+const DesignRulesPage = lazy(() =>
+  import('./pages/mvpDesign/DesignRulesPage').then((m) => ({ default: m.DesignRulesPage })),
+)
+const DesignValidationPage = lazy(() =>
+  import('./pages/mvpDesign/DesignValidationPage').then((m) => ({ default: m.DesignValidationPage })),
+)
+const DesignReviewPage = lazy(() =>
+  import('./pages/mvpDesign/DesignReviewPage').then((m) => ({ default: m.DesignReviewPage })),
+)
 
 /** 진단 스튜디오는 실제 기능으로 대체되므로 빈 상태 페이지에서 제외 */
-const EMPTY_MODULE_KEYS = new Set(['clients', 'diagnosis', 'selection'])
+const EMPTY_MODULE_KEYS = new Set(['clients', 'diagnosis', 'selection', 'mvp-design'])
 
 function RouteFallback() {
   return (
@@ -156,6 +189,18 @@ const router = createBrowserRouter([
       { path: 'selection/projects/:projectId/candidates/:candidateId', element: <CandidateDetailPage /> },
       { path: 'selection/projects/:projectId/matrix', element: <PriorityMatrixPage /> },
       { path: 'selection/projects/:projectId/decision', element: <SelectionDecisionPage /> },
+
+      { path: 'mvp-design', element: <MvpDesignMainPage /> },
+      { path: 'mvp-design/results', element: <MvpDesignResultsPage /> },
+      { path: 'mvp-design/projects/:projectId', element: <DesignProjectPage /> },
+      { path: 'mvp-design/projects/:projectId/workflow', element: <DesignWorkflowPage /> },
+      { path: 'mvp-design/projects/:projectId/features', element: <DesignFeaturesPage /> },
+      { path: 'mvp-design/projects/:projectId/screens', element: <DesignScreensPage /> },
+      { path: 'mvp-design/projects/:projectId/data', element: <DesignDataPage /> },
+      { path: 'mvp-design/projects/:projectId/permissions', element: <DesignPermissionsPage /> },
+      { path: 'mvp-design/projects/:projectId/rules', element: <DesignRulesPage /> },
+      { path: 'mvp-design/projects/:projectId/validation', element: <DesignValidationPage /> },
+      { path: 'mvp-design/projects/:projectId/review', element: <DesignReviewPage /> },
 
       ...MODULE_PAGES.filter((config) => !EMPTY_MODULE_KEYS.has(config.key)).map(
         (config) => ({

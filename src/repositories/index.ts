@@ -23,6 +23,10 @@ import {
   LocalSelectionDecisionRepository,
   LocalSelectionHandoffRepository,
 } from './selectionRepositories'
+import {
+  LocalMvpDesignHandoffRepository,
+  LocalMvpDesignRepository,
+} from './mvpDesignRepositories'
 import { runMigrations } from './migrations'
 import type {
   ActivityRepository,
@@ -30,6 +34,8 @@ import type {
   AssessmentRepository,
   AutomationCandidateRepository,
   InterviewQuestionRepository,
+  MvpDesignHandoffRepository,
+  MvpDesignRepository,
   OrganizationRepository,
   ProjectRepository,
   ProjectSurveyBlueprintRepository,
@@ -90,5 +96,13 @@ export const selectionDecisionRepository: SelectionDecisionRepository =
 
 export const selectionHandoffRepository: SelectionHandoffRepository =
   new LocalSelectionHandoffRepository()
+
+export const mvpDesignRepository: MvpDesignRepository =
+  new LocalMvpDesignRepository()
+
+export const mvpDesignHandoffRepository: MvpDesignHandoffRepository =
+  new LocalMvpDesignHandoffRepository()
+
+export { guidedDemoRepository } from './guidedDemoRepository'
 
 export { EntityNotFoundError, DuplicateCodeError } from './types'

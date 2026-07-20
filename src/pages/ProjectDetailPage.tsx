@@ -27,6 +27,13 @@ import { archiveProject } from '../services/projectService'
 import { summarizeProjectSurveys } from '../services/projectSurveyService'
 import { getProjectAnalysisContext } from '../services/assessmentService'
 import { getProjectSelectionContext } from '../services/selectionService'
+import { getProjectDesignContext } from '../services/mvpDesignService'
+import {
+  FLOW_STEPS,
+  computeProjectJourney,
+  flowStepIndex,
+} from '../services/journeyService'
+import { JourneyFlow, type JourneyFlowStep } from '../components/domain/JourneyFlow'
 import {
   AssessmentConfidenceBadge,
   AssessmentRecommendationBadge,
@@ -36,7 +43,8 @@ import {
   PriorityQuadrantBadge,
   SelectionStatusBadge,
 } from '../components/selection/badges'
-import { Filter, Target } from 'lucide-react'
+import { DesignStatusBadge } from '../components/mvpDesign/badges'
+import { Filter, PencilRuler, Target } from 'lucide-react'
 import { RESPONDENT_ROLE_META } from '../lib/surveyMeta'
 import {
   BarChart3,
@@ -128,6 +136,39 @@ export function ProjectDetailPage() {
     selection?.decision?.primaryCandidateId && selection
       ? selection.candidates.find((c) => c.id === selection.decision?.primaryCandidateId) ?? null
       : null
+  const design = getProjectDesignContext(project.id)
+  const designPath = `/mvp-design/projects/${project.id}`
+  const journey = computeProjectJourney(project)
+  const currentFlowIndex = flowStepIndex(journey.currentStepKey)
+
+  // 완료·현재·잠금 상태의 쉬운 명칭 흐름 (홈페이지 단독 프로젝트는 제외)
+  const flowStepPath: Partial<Record<string, string>> = {
+    prepare: `/projects/${project.id}`,
+    diagnosis: analysis?.latest ? `${analysisPath}/result` : analysisPath,
+    selection: selectionPath,
+    design: designPath,
+    validation: design?.design ? `${designPath}/review` : undefined,
+    deliverables: undefined,
+  }
+  const flowHint: Partial<Record<string, string>> = {
+    diagnosis: '설문 응답 제출 후 진행',
+    selection: '진단 결과 확정 후 진행',
+    design: '핵심 업무 선정 후 진행',
+    validation: '설계 확정 후 진행',
+    deliverables: '검증 완료 후 진행',
+  }
+  const journeySteps: JourneyFlowStep[] = FLOW_STEPS.filter((s) => s.key !== 'done').map((s) => {
+    const idx = flowStepIndex(s.key)
+    const state: JourneyFlowStep['state'] =
+      idx < currentFlowIndex ? 'done' : idx === currentFlowIndex ? 'current' : 'locked'
+    return {
+      key: s.key,
+      label: s.label,
+      state,
+      path: state === 'locked' ? undefined : flowStepPath[s.key],
+      hint: flowHint[s.key],
+    }
+  })
 
   const copyLink = async (token: string) => {
     try {
@@ -135,19 +176,6 @@ export function ProjectDetailPage() {
       showToast('테스트 링크를 복사했습니다.')
     } catch {
       showToast('복사에 실패했습니다. 링크 상세에서 직접 복사해 주세요.')
-    }
-  }
-
-  const handleNextStage = () => {
-    // 상담 접수·진단 단계는 프로젝트 설문 설계 워크벤치로 이동
-    if (isDiagnosisStage) {
-      navigate(`/diagnosis/projects/${project.id}/setup`)
-      return
-    }
-    if (nextModule.path) {
-      navigate(nextModule.path)
-    } else {
-      showToast('모든 단계가 완료된 프로젝트입니다.')
     }
   }
 
@@ -212,8 +240,8 @@ export function ProjectDetailPage() {
               <Pencil aria-hidden="true" className="size-4" />
               프로젝트 수정
             </Button>
-            <Button variant="primary" onClick={handleNextStage}>
-              다음 단계 작업 시작
+            <Button variant="primary" onClick={() => navigate(journey.actionPath)}>
+              {journey.actionLabel}
               <ArrowRight aria-hidden="true" className="size-4" />
             </Button>
             <DropdownMenu
@@ -239,13 +267,37 @@ export function ProjectDetailPage() {
         </p>
       )}
 
-      {/* A. 전체 진행 흐름 */}
-      <Panel title="전체 진행 흐름">
-        <StageProgress
-          flow={STAGE_FLOW_BY_TYPE[project.projectType]}
-          currentStage={project.currentStage}
-        />
-      </Panel>
+      {/* 지금 해야 할 일 — 하나의 핵심 행동 */}
+      {!project.archivedAt && (
+        <section
+          aria-label="지금 해야 할 일"
+          className="rounded-(--radius-panel) border border-brand-200 bg-brand-50/50 p-5"
+        >
+          <p className="text-xs font-semibold tracking-wide text-brand-700 uppercase">지금 해야 할 일</p>
+          <p className="mt-1.5 text-base font-semibold break-keep text-slate-900">{journey.actionText}</p>
+          <p className="mt-1 text-[13px] break-keep text-slate-600">{journey.reason}</p>
+          <div className="mt-3">
+            <Button variant="primary" onClick={() => navigate(journey.actionPath)}>
+              {journey.actionLabel}
+              <ArrowRight aria-hidden="true" className="size-4" />
+            </Button>
+          </div>
+        </section>
+      )}
+
+      {/* A. 전체 진행 흐름 (쉬운 명칭 · 완료/현재/잠금) */}
+      {project.projectType !== 'website' ? (
+        <Panel title="전체 진행 흐름">
+          <JourneyFlow steps={journeySteps} onNavigate={(path) => navigate(path)} />
+        </Panel>
+      ) : (
+        <Panel title="전체 진행 흐름">
+          <StageProgress
+            flow={STAGE_FLOW_BY_TYPE[project.projectType]}
+            currentStage={project.currentStage}
+          />
+        </Panel>
+      )}
 
       {/* 진단 설문 (상담 접수·진단 단계) */}
       {isDiagnosisStage && (
@@ -550,6 +602,60 @@ export function ProjectDetailPage() {
                 {selection.candidates.length > 0 ? '과제선별 계속' : '과제선별 시작'}
               </Button>
             </div>
+          )}
+        </Panel>
+      )}
+
+      {/* MVP 설계 */}
+      {design && project.projectType !== 'website' && design.lifecycle !== 'not_eligible' && (
+        <Panel
+          title="MVP 설계"
+          actions={
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => navigate(design.design ? designPath : `${designPath}`)}
+            >
+              <PencilRuler aria-hidden="true" className="size-4" />
+              {design.lifecycle === 'finalized'
+                ? '설계 결과 보기'
+                : design.design
+                  ? 'MVP 설계 계속'
+                  : 'MVP 설계 시작'}
+            </Button>
+          }
+        >
+          {design.lifecycle === 'finalized' && design.design ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <DesignStatusBadge status={design.design.status} />
+                {design.needsRedesignFlag && (
+                  <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700">
+                    <RefreshCw aria-hidden="true" className="size-3" />
+                    재설계 필요
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <PencilRuler aria-hidden="true" className="size-4 text-brand-500" />
+                <span className="text-lg font-bold text-slate-900">{design.design.coreTaskName}</span>
+                <span className="text-sm font-semibold text-slate-500">
+                  {mvpLevelLabel(design.design.levelDecision.selectedLevel, project.projectType)}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                필수 기능 {design.design.features.filter((f) => f.scope === 'must').length}개 · 화면{' '}
+                {design.design.screens.filter((s) => s.scope !== 'excluded').length}개
+                {design.design.finalizedAt && ` · 확정 ${formatDate(design.design.finalizedAt)}`}
+              </p>
+              <p className="text-xs break-keep text-slate-400">Stage 8 현장검증 인계 준비 완료</p>
+            </div>
+          ) : (
+            <p className="text-[13px] break-keep text-slate-600">
+              {design.design
+                ? `MVP 설계 초안이 있습니다. 기능 범위와 검증 기준을 검토해 확정하세요.`
+                : '확정된 핵심 과제로 개발 가능한 기능·화면·데이터·검증 기준을 설계할 수 있습니다.'}
+            </p>
           )}
         </Panel>
       )}

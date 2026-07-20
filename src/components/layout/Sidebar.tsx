@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { BookOpen, ChevronsLeft, ChevronsRight, X } from 'lucide-react'
-import { APP_VERSION, NAVIGATION_ITEMS } from '../../data/navigation'
+import { APP_VERSION, NAVIGATION_GROUPS } from '../../data/navigation'
 import { useToast } from '../ui/toastContext'
 
 interface SidebarProps {
@@ -61,29 +61,63 @@ function SidebarContent({
         )}
       </div>
 
-      {/* 내비게이션 */}
+      {/* 내비게이션 — 업무 흐름 중심 그룹 */}
       <nav aria-label="주 메뉴" className="flex-1 overflow-y-auto px-3 py-4">
-        <ul className="flex flex-col gap-1">
-          {NAVIGATION_ITEMS.map((item) => (
-            <li key={item.key}>
-              <NavLink
-                to={item.path}
-                end={item.path === '/'}
-                onClick={onNavigate}
-                title={collapsed ? item.label : undefined}
-                className={({ isActive }) =>
-                  `flex min-h-10 items-center gap-3 rounded-(--radius-control) px-3 py-2 text-sm font-medium transition-colors ${
-                    collapsed ? 'justify-center px-0' : ''
-                  } ${
-                    isActive
-                      ? 'bg-brand-600 text-white'
-                      : 'text-navy-200 hover:bg-navy-800 hover:text-white'
-                  }`
-                }
+        <ul className="flex flex-col gap-5">
+          {NAVIGATION_GROUPS.map((group) => (
+            <li key={group.key}>
+              {!collapsed && group.title && (
+                <p
+                  id={`nav-group-${group.key}`}
+                  className="px-3 pb-1.5 text-[11px] font-semibold tracking-wide text-navy-300 uppercase"
+                >
+                  {group.title}
+                </p>
+              )}
+              <ul
+                aria-labelledby={!collapsed && group.title ? `nav-group-${group.key}` : undefined}
+                aria-label={collapsed && group.title ? group.title : undefined}
+                className="flex flex-col gap-1"
               >
-                <item.icon aria-hidden="true" className="size-[18px] shrink-0" />
-                {!collapsed && <span className="truncate">{item.label}</span>}
-              </NavLink>
+                {group.items.map((item) => (
+                  <li key={item.key}>
+                    <NavLink
+                      to={item.path}
+                      end={item.path === '/'}
+                      onClick={onNavigate}
+                      title={collapsed ? (item.hint ? `${item.label} (${item.hint})` : item.label) : item.hint}
+                      className={({ isActive }) =>
+                        `flex min-h-11 items-center gap-3 rounded-(--radius-control) px-3 py-2.5 text-[15px] font-medium transition-colors ${
+                          collapsed ? 'justify-center px-0' : ''
+                        } ${
+                          isActive
+                            ? 'bg-brand-600 text-white'
+                            : 'text-navy-200 hover:bg-navy-800 hover:text-white'
+                        }`
+                      }
+                    >
+                      {typeof item.step === 'number' ? (
+                        <span
+                          aria-hidden="true"
+                          className="flex size-5 shrink-0 items-center justify-center rounded-md bg-navy-800 text-[11px] font-bold text-navy-200"
+                        >
+                          {item.step}
+                        </span>
+                      ) : (
+                        <item.icon aria-hidden="true" className="size-5 shrink-0" />
+                      )}
+                      {!collapsed && (
+                        <span className="truncate">
+                          {typeof item.step === 'number' && (
+                            <span className="sr-only">{item.step}단계 </span>
+                          )}
+                          {item.label}
+                        </span>
+                      )}
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
             </li>
           ))}
         </ul>

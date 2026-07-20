@@ -86,6 +86,19 @@ function initSelectionStores(): void {
   }
 }
 
+/**
+ * v6 마이그레이션 — MVP 설계 워크벤치 저장소 추가.
+ * 설계·인계 스냅샷은 시드하지 않고 빈 배열만 준비한다.
+ */
+function initMvpDesignStores(): void {
+  if (!hasKey(STORAGE_KEYS.mvpDesigns)) {
+    writeJson(STORAGE_KEYS.mvpDesigns, [])
+  }
+  if (!hasKey(STORAGE_KEYS.mvpDesignHandoffs)) {
+    writeJson(STORAGE_KEYS.mvpDesignHandoffs, [])
+  }
+}
+
 /** 순차 적용 마이그레이션 목록 (버전 오름차순) */
 const MIGRATIONS: Migration[] = [
   {
@@ -112,6 +125,11 @@ const MIGRATIONS: Migration[] = [
     version: 5,
     describe: '과제선별 후보·선정·인계 저장소 추가',
     migrate: initSelectionStores,
+  },
+  {
+    version: 6,
+    describe: 'MVP 설계 워크벤치·인계 저장소 추가',
+    migrate: initMvpDesignStores,
   },
 ]
 

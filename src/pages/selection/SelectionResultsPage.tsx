@@ -23,6 +23,8 @@ import {
 import { needsReselection } from '../../services/selectionService'
 import { DataTable, type DataTableColumn } from '../../components/ui/DataTable'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { GuidedEmptyState } from '../../components/ui/GuidedEmptyState'
+import { useDemoTour } from '../../components/demo/demoTour'
 import { FilterBar } from '../../components/ui/FilterBar'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Panel } from '../../components/ui/Panel'
@@ -45,6 +47,7 @@ interface Row {
 
 export function SelectionResultsPage() {
   const navigate = useNavigate()
+  const demo = useDemoTour()
   const version = useStoreVersion()
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('')
@@ -197,11 +200,29 @@ export function SelectionResultsPage() {
 
       <Panel title={`과제선정 결과 (${filtered.length})`} flush>
         {filtered.length === 0 ? (
-          <EmptyState
-            icon={ClipboardCheck}
-            title="과제선정 결과가 없습니다"
-            description="확정된 진단 결과에서 과제선별을 실행하면 이곳에 표시됩니다."
-          />
+          hasActive ? (
+            <EmptyState
+              icon={ClipboardCheck}
+              title="조건에 맞는 결과가 없습니다"
+              description="필터를 조정해 다시 확인해 보세요."
+            />
+          ) : (
+            <GuidedEmptyState
+              icon={ClipboardCheck}
+              title="아직 확정한 핵심 업무가 없습니다"
+              reason="진단 결과를 확정한 뒤 만들 업무를 고르면 이곳에 정리됩니다."
+              flowPosition="2단계 · 핵심 업무 선택"
+              prereqs={[
+                { label: '진단 결과 확정', done: false },
+                { label: '자동화 후보 검토', done: false },
+                { label: '핵심 업무 1개 선정', done: false },
+              ]}
+              primaryLabel="만들 업무 선택으로 이동"
+              onPrimary={() => navigate('/selection')}
+              sampleLabel="샘플 결과 보기"
+              onSample={() => demo.start()}
+            />
+          )
         ) : (
           <>
             <div className="hidden overflow-x-auto lg:block">

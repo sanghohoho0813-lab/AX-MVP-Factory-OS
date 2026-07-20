@@ -10,7 +10,7 @@ const KEY_PREFIX = 'axmvp'
  */
 const DATA_NS = 'v1'
 /** 현재 앱이 기대하는 스키마 버전. 마이그레이션 목표값. */
-export const SCHEMA_VERSION = 5
+export const SCHEMA_VERSION = 6
 export const SCHEMA_VERSION_KEY = `${KEY_PREFIX}.schema_version`
 
 export const STORAGE_KEYS = {
@@ -29,6 +29,8 @@ export const STORAGE_KEYS = {
   automationCandidates: `${KEY_PREFIX}.${DATA_NS}.automation_candidates`,
   selectionDecisions: `${KEY_PREFIX}.${DATA_NS}.selection_decisions`,
   selectionHandoffs: `${KEY_PREFIX}.${DATA_NS}.selection_handoffs`,
+  mvpDesigns: `${KEY_PREFIX}.${DATA_NS}.mvp_designs`,
+  mvpDesignHandoffs: `${KEY_PREFIX}.${DATA_NS}.mvp_design_handoffs`,
 } as const
 
 /** 마이그레이션 전 안전 백업 키 접두어 */

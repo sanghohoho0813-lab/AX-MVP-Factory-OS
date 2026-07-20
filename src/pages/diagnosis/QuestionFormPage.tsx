@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { RespondentRole } from '../../types'
 import type {
@@ -179,6 +180,7 @@ export function QuestionFormPage() {
   const [errors, setErrors] = useState<QuestionErrors>({})
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
   const { blocker, allowNavigation } = useUnsavedChangesGuard(dirty && !saving)
 
   if (isEdit && !existing) {
@@ -246,7 +248,10 @@ export function QuestionFormPage() {
     const nextErrors = validateQuestion(input, questionId)
     setErrors(nextErrors)
     if (Object.values(nextErrors).some(Boolean)) {
-      focusFirstError(nextErrors)
+      // 고급 설정 안의 오류면 접힌 영역을 먼저 펼친 뒤 포커스한다
+      const advancedErrorKeys = ['code', 'scoringWeight', 'riskReason', 'industryKeys', 'objectiveKeys'] as const
+      if (advancedErrorKeys.some((k) => nextErrors[k])) setAdvancedOpen(true)
+      setTimeout(() => focusFirstError(nextErrors), 0)
       return
     }
     setSaving(true)
@@ -284,28 +289,7 @@ export function QuestionFormPage() {
         }}
         className="flex flex-col gap-5"
       >
-        <FormSection title="기본정보" description="질문의 코드와 문구, 유형·범주를 정의합니다.">
-          <TextField
-            id={FIELD_IDS.code}
-            label="질문 코드"
-            required
-            value={form.code}
-            onChange={(e) => set('code', e.target.value)}
-            error={errors.code}
-            placeholder="예: COM-WF-010"
-            help="영역-주제-번호 형식을 권장합니다. 중복될 수 없습니다."
-          />
-          <SelectField
-            id={FIELD_IDS.type}
-            label="질문 유형"
-            required
-            value={form.type}
-            onChange={(e) => handleTypeChange(e.target.value as QuestionType)}
-            options={QUESTION_TYPES.map((t) => ({
-              value: t,
-              label: QUESTION_TYPE_META[t].label,
-            }))}
-          />
+        <FormSection title="질문 내용" description="응답자가 보게 될 질문 문구와 설명을 작성합니다.">
           <TextAreaField
             id={FIELD_IDS.text}
             label="질문 문구"
@@ -342,60 +326,20 @@ export function QuestionFormPage() {
               label: QUESTION_CATEGORY_META[c].label,
             }))}
           />
-          <SelectField
-            id="q-role"
-            label="응답자"
-            value={form.respondentRole}
-            onChange={(e) => set('respondentRole', e.target.value as RespondentRole)}
-            options={RESPONDENT_ROLES.map((r) => ({
-              value: r,
-              label: RESPONDENT_ROLE_META[r].label,
-            }))}
-          />
-          <SelectField
-            id="q-scope"
-            label="질문 범위"
-            value={form.scope}
-            onChange={(e) => set('scope', e.target.value as QuestionScope)}
-            options={QUESTION_SCOPES.map((s) => ({
-              value: s,
-              label: QUESTION_SCOPE_META[s].label,
-            }))}
-          />
-          {form.scope === 'industry' && (
-            <CheckboxGroupField
-              label="관련 업종"
-              values={form.industryKeys}
-              options={INDUSTRY_KEYS}
-              renderLabel={(k) => INDUSTRY_KEY_META[k]?.label ?? k}
-              onChange={(v) => set('industryKeys', v)}
-              error={errors.industryKeys}
-            />
-          )}
-          {form.scope === 'objective' && (
-            <CheckboxGroupField
-              label="관련 목적"
-              values={form.objectiveKeys}
-              options={OBJECTIVE_KEYS}
-              renderLabel={(k) => OBJECTIVE_KEY_META[k]?.label ?? k}
-              onChange={(v) => set('objectiveKeys', v)}
-              error={errors.objectiveKeys}
-            />
-          )}
         </FormSection>
 
-        {form.scope === 'industry' && form.industryKeys.length > 0 && (
-          <p className="-mt-2 px-1 text-xs text-slate-400">
-            선택한 업종: {form.industryKeys.map((k) => INDUSTRY_KEY_META[k]?.label ?? k).join(', ')}
-          </p>
-        )}
-        {form.scope === 'objective' && form.objectiveKeys.length > 0 && (
-          <p className="-mt-2 px-1 text-xs text-slate-400">
-            선택한 목적: {form.objectiveKeys.map((k) => OBJECTIVE_KEY_META[k]?.label ?? k).join(', ')}
-          </p>
-        )}
-
-        <FormSection title="응답 설정" description="필수 여부와 유형별 응답 옵션을 설정합니다.">
+        <FormSection title="답변 방식" description="답변 유형과 선택지, 필수 여부를 설정합니다.">
+          <SelectField
+            id={FIELD_IDS.type}
+            label="답변 유형"
+            required
+            value={form.type}
+            onChange={(e) => handleTypeChange(e.target.value as QuestionType)}
+            options={QUESTION_TYPES.map((t) => ({
+              value: t,
+              label: QUESTION_TYPE_META[t].label,
+            }))}
+          />
           <SelectField
             id="q-required"
             label="기본 필수 여부"
@@ -406,7 +350,6 @@ export function QuestionFormPage() {
               { value: 'yes', label: '필수 응답' },
             ]}
           />
-          <div className="hidden sm:block" />
           {showOptions && (
             <div id={FIELD_IDS.options}>
               <OptionEditor
@@ -432,86 +375,152 @@ export function QuestionFormPage() {
           )}
         </FormSection>
 
-        <FormSection title="분석 설정" description="향후 진단 계산과 검토 흐름에 사용할 메타 정보입니다.">
+        <FormSection title="응답 대상" description="이 질문을 누구에게 물어볼지 정합니다.">
           <SelectField
-            id="q-scoring"
-            label="점수 영역"
-            value={form.scoringDomain}
-            onChange={(e) => {
-              const domain = e.target.value as ScoringDomain
-              setForm((prev) => ({
-                ...prev,
-                scoringDomain: domain,
-                scoringWeight: domain === 'none' ? 0 : prev.scoringWeight || 2,
-              }))
-              setDirty(true)
-            }}
-            options={SCORING_DOMAINS.map((d) => ({
-              value: d,
-              label: SCORING_DOMAIN_META[d].label,
+            id="q-role"
+            label="응답 대상"
+            value={form.respondentRole}
+            onChange={(e) => set('respondentRole', e.target.value as RespondentRole)}
+            options={RESPONDENT_ROLES.map((r) => ({
+              value: r,
+              label: RESPONDENT_ROLE_META[r].label,
             }))}
           />
-          <TextField
-            id={FIELD_IDS.scoringWeight}
-            label="점수 가중치 (0~5)"
-            type="number"
-            min={0}
-            max={5}
-            value={String(form.scoringWeight)}
-            disabled={form.scoringDomain === 'none'}
-            onChange={(e) => set('scoringWeight', Number(e.target.value) || 0)}
-            error={errors.scoringWeight}
-            help={form.scoringDomain === 'none' ? '점수 영역이 없으면 0으로 고정됩니다.' : undefined}
-          />
-          <SelectField
-            id="q-risk"
-            label="전문가 위험등급"
-            value={form.expertRiskGrade}
-            onChange={(e) => set('expertRiskGrade', e.target.value as ExpertRiskGrade)}
-            options={EXPERT_RISK_GRADES.map((g) => ({
-              value: g,
-              label: EXPERT_RISK_META[g].label,
-            }))}
-          />
-          <TextField
-            id="q-tags"
-            label="분석 태그"
-            value={form.analysisTags}
-            onChange={(e) => set('analysisTags', e.target.value)}
-            placeholder="쉼표로 구분 (예: 반복업무, 데이터)"
-          />
-          <TextField
-            id={FIELD_IDS.riskReason}
-            label="위험 이유"
-            fullWidth
-            value={form.riskReason}
-            onChange={(e) => set('riskReason', e.target.value)}
-            error={errors.riskReason}
-            placeholder="전문가 확인이 필요한 이유 (red 등급은 필수)"
-          />
-        </FormSection>
-
-        <FormSection title="운영 설정" description="질문의 사용 상태를 관리합니다.">
           <SelectField
             id="q-active"
-            label="활성 여부"
+            label="사용 여부"
             value={form.active ? 'active' : 'inactive'}
             onChange={(e) => set('active', e.target.value === 'active')}
             options={[
-              { value: 'active', label: '활성' },
-              { value: 'inactive', label: '비활성' },
+              { value: 'active', label: '사용함' },
+              { value: 'inactive', label: '사용 안 함' },
             ]}
           />
-          {existing && (
-            <TextField
-              id="q-version"
-              label="버전"
-              value={`v${existing.version}`}
-              disabled
-              onChange={() => undefined}
-            />
-          )}
         </FormSection>
+
+        {/* 고급 분석 설정 — 자동 점수·분석 규칙 (기본 접힘) */}
+        <details
+          open={advancedOpen}
+          onToggle={(e) => setAdvancedOpen((e.currentTarget as HTMLDetailsElement).open)}
+          className="group rounded-(--radius-panel) border border-slate-200 bg-white shadow-(--shadow-card)"
+        >
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-5 py-4">
+            <span className="min-w-0">
+              <span className="text-[15px] font-semibold text-slate-900">고급 분석 설정</span>
+              <span className="mt-0.5 block text-[13px] break-keep text-slate-500">
+                자동 점수와 분석 규칙을 수정할 때만 사용합니다.
+              </span>
+            </span>
+            <ChevronDown aria-hidden="true" className="size-5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="grid grid-cols-1 gap-x-6 gap-y-5 border-t border-slate-100 px-5 py-5 sm:grid-cols-2">
+            <TextField
+              id={FIELD_IDS.code}
+              label="질문 코드"
+              required
+              value={form.code}
+              onChange={(e) => set('code', e.target.value)}
+              error={errors.code}
+              placeholder="예: COM-WF-010"
+              help="영역-주제-번호 형식을 권장합니다. 중복될 수 없습니다."
+            />
+            <SelectField
+              id="q-scope"
+              label="질문 범위"
+              value={form.scope}
+              onChange={(e) => set('scope', e.target.value as QuestionScope)}
+              options={QUESTION_SCOPES.map((s) => ({
+                value: s,
+                label: QUESTION_SCOPE_META[s].label,
+              }))}
+            />
+            {form.scope === 'industry' && (
+              <CheckboxGroupField
+                label="관련 업종"
+                values={form.industryKeys}
+                options={INDUSTRY_KEYS}
+                renderLabel={(k) => INDUSTRY_KEY_META[k]?.label ?? k}
+                onChange={(v) => set('industryKeys', v)}
+                error={errors.industryKeys}
+              />
+            )}
+            {form.scope === 'objective' && (
+              <CheckboxGroupField
+                label="관련 목적"
+                values={form.objectiveKeys}
+                options={OBJECTIVE_KEYS}
+                renderLabel={(k) => OBJECTIVE_KEY_META[k]?.label ?? k}
+                onChange={(v) => set('objectiveKeys', v)}
+                error={errors.objectiveKeys}
+              />
+            )}
+            <SelectField
+              id="q-scoring"
+              label="점수 영역"
+              value={form.scoringDomain}
+              onChange={(e) => {
+                const domain = e.target.value as ScoringDomain
+                setForm((prev) => ({
+                  ...prev,
+                  scoringDomain: domain,
+                  scoringWeight: domain === 'none' ? 0 : prev.scoringWeight || 2,
+                }))
+                setDirty(true)
+              }}
+              options={SCORING_DOMAINS.map((d) => ({
+                value: d,
+                label: SCORING_DOMAIN_META[d].label,
+              }))}
+            />
+            <TextField
+              id={FIELD_IDS.scoringWeight}
+              label="점수 가중치 (0~5)"
+              type="number"
+              min={0}
+              max={5}
+              value={String(form.scoringWeight)}
+              disabled={form.scoringDomain === 'none'}
+              onChange={(e) => set('scoringWeight', Number(e.target.value) || 0)}
+              error={errors.scoringWeight}
+              help={form.scoringDomain === 'none' ? '점수 영역이 없으면 0으로 고정됩니다.' : undefined}
+            />
+            <SelectField
+              id="q-risk"
+              label="전문가 위험등급"
+              value={form.expertRiskGrade}
+              onChange={(e) => set('expertRiskGrade', e.target.value as ExpertRiskGrade)}
+              options={EXPERT_RISK_GRADES.map((g) => ({
+                value: g,
+                label: EXPERT_RISK_META[g].label,
+              }))}
+            />
+            <TextField
+              id="q-tags"
+              label="분석 태그"
+              value={form.analysisTags}
+              onChange={(e) => set('analysisTags', e.target.value)}
+              placeholder="쉼표로 구분 (예: 반복업무, 데이터)"
+            />
+            <TextField
+              id={FIELD_IDS.riskReason}
+              label="위험 이유"
+              fullWidth
+              value={form.riskReason}
+              onChange={(e) => set('riskReason', e.target.value)}
+              error={errors.riskReason}
+              placeholder="전문가 확인이 필요한 이유 (red 등급은 필수)"
+            />
+            {existing && (
+              <TextField
+                id="q-version"
+                label="버전"
+                value={`v${existing.version}`}
+                disabled
+                onChange={() => undefined}
+              />
+            )}
+          </div>
+        </details>
 
         <div className="flex items-center justify-end gap-2 pb-2">
           <Button
