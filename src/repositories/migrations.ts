@@ -99,6 +99,19 @@ function initMvpDesignStores(): void {
   }
 }
 
+/**
+ * v7 마이그레이션 — 홈페이지 설계 스튜디오 저장소 추가.
+ * 설계·인계 스냅샷은 시드하지 않고 빈 배열만 준비한다.
+ */
+function initWebsiteDesignStores(): void {
+  if (!hasKey(STORAGE_KEYS.websiteDesigns)) {
+    writeJson(STORAGE_KEYS.websiteDesigns, [])
+  }
+  if (!hasKey(STORAGE_KEYS.websiteDesignHandoffs)) {
+    writeJson(STORAGE_KEYS.websiteDesignHandoffs, [])
+  }
+}
+
 /** 순차 적용 마이그레이션 목록 (버전 오름차순) */
 const MIGRATIONS: Migration[] = [
   {
@@ -130,6 +143,11 @@ const MIGRATIONS: Migration[] = [
     version: 6,
     describe: 'MVP 설계 워크벤치·인계 저장소 추가',
     migrate: initMvpDesignStores,
+  },
+  {
+    version: 7,
+    describe: '홈페이지 설계 스튜디오·인계 저장소 추가',
+    migrate: initWebsiteDesignStores,
   },
 ]
 

@@ -28,6 +28,9 @@ import { summarizeProjectSurveys } from '../services/projectSurveyService'
 import { getProjectAnalysisContext } from '../services/assessmentService'
 import { getProjectSelectionContext } from '../services/selectionService'
 import { getProjectDesignContext } from '../services/mvpDesignService'
+import { getProjectWebsiteContext } from '../services/websiteDesignService'
+import { WebsiteStatusBadge, WebsiteTypeBadge } from '../components/websiteStudio/badges'
+import { WEBSITE_TYPE_META } from '../lib/websiteDesignMeta'
 import {
   FLOW_STEPS,
   computeProjectJourney,
@@ -44,7 +47,7 @@ import {
   SelectionStatusBadge,
 } from '../components/selection/badges'
 import { DesignStatusBadge } from '../components/mvpDesign/badges'
-import { Filter, PencilRuler, Target } from 'lucide-react'
+import { Filter, Palette, PencilRuler, Target } from 'lucide-react'
 import { RESPONDENT_ROLE_META } from '../lib/surveyMeta'
 import {
   BarChart3,
@@ -138,6 +141,11 @@ export function ProjectDetailPage() {
       : null
   const design = getProjectDesignContext(project.id)
   const designPath = `/mvp-design/projects/${project.id}`
+  const website =
+    project.projectType === 'website' || project.projectType === 'ax_website'
+      ? getProjectWebsiteContext(project.id)
+      : null
+  const websitePath = `/website-studio/projects/${project.id}`
   const journey = computeProjectJourney(project)
   const currentFlowIndex = flowStepIndex(journey.currentStepKey)
 
@@ -655,6 +663,57 @@ export function ProjectDetailPage() {
               {design.design
                 ? `MVP 설계 초안이 있습니다. 기능 범위와 검증 기준을 검토해 확정하세요.`
                 : '확정된 핵심 과제로 개발 가능한 기능·화면·데이터·검증 기준을 설계할 수 있습니다.'}
+            </p>
+          )}
+        </Panel>
+      )}
+
+      {/* 홈페이지 설계 */}
+      {website && (
+        <Panel
+          title="홈페이지 설계"
+          actions={
+            <Button variant="secondary" size="sm" onClick={() => navigate(websitePath)}>
+              <Palette aria-hidden="true" className="size-4" />
+              {website.lifecycle === 'finalized'
+                ? '설계 결과 보기'
+                : website.design
+                  ? '홈페이지 설계 계속'
+                  : '홈페이지 설계 시작'}
+            </Button>
+          }
+        >
+          {website.lifecycle === 'finalized' && website.design ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <WebsiteStatusBadge status={website.design.status} />
+                <WebsiteTypeBadge type={website.design.strategy.websiteType} />
+                {website.needsRedesignFlag && (
+                  <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700">
+                    <RefreshCw aria-hidden="true" className="size-3" />
+                    재설계 필요
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-400">
+                {WEBSITE_TYPE_META[website.design.strategy.websiteType].label} · 페이지{' '}
+                {website.design.pages.filter((p) => p.status !== 'excluded').length}개 · 개발 지시문{' '}
+                {website.design.generatedPrompts.length}종
+                {website.design.finalizedAt && ` · 확정 ${formatDate(website.design.finalizedAt)}`}
+              </p>
+              <p className="text-xs break-keep text-slate-400">
+                핵심 CTA:{' '}
+                {website.design.strategy.conversionActions.find(
+                  (c) => c.id === website.design?.strategy.primaryConversionActionId,
+                )?.label ?? '미설정'}
+                {' · '}콘텐츠 준비 확인 필요
+              </p>
+            </div>
+          ) : (
+            <p className="text-[13px] break-keep text-slate-600">
+              {website.design
+                ? '홈페이지 설계 초안이 있습니다. 사이트 구조·콘텐츠·디자인을 검토해 개발 지시문을 확정하세요.'
+                : '홈페이지 진단 결과로 사이트 구조·콘텐츠·디자인 방향과 개발 지시문을 설계할 수 있습니다.'}
             </p>
           )}
         </Panel>

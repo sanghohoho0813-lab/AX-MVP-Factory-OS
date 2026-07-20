@@ -1,4 +1,4 @@
-import { Box, FileText, Filter, FolderKanban } from 'lucide-react'
+import { Box, FileText, Filter, FolderKanban, Palette } from 'lucide-react'
 import type { MetricSummary, PortfolioProject } from '../types'
 import type { Organization, Project } from '../types/domain'
 import { pickPrimaryProject } from './organizationService'
@@ -13,10 +13,32 @@ export function buildDashboardMetrics(
   projects: Project[],
   selectionPending?: number,
   designInProgress?: number,
+  websitePending?: number,
 ): MetricSummary[] {
   const open = projects.filter(
     (p) => p.status !== 'completed' && p.status !== 'archived',
   )
+  // 홈페이지 설계 대기가 있으면 마지막 KPI를 홈페이지 항목으로 대체 (최대 1개, 과복잡 방지)
+  const lastMetric: MetricSummary =
+    websitePending && websitePending > 0
+      ? {
+          key: 'website-pending',
+          label: '홈페이지 설계 대기',
+          value: websitePending,
+          unit: '건',
+          weeklyDelta: 0,
+          tone: 'accent',
+          icon: Palette,
+        }
+      : {
+          key: 'deliverables-preparing',
+          label: '제출자료 준비',
+          value: open.filter((p) => p.currentStage === 'deliverables').length,
+          unit: '건',
+          weeklyDelta: -1,
+          tone: 'danger',
+          icon: FileText,
+        }
   return [
     {
       key: 'active-projects',
@@ -51,15 +73,7 @@ export function buildDashboardMetrics(
       tone: 'success',
       icon: Box,
     },
-    {
-      key: 'deliverables-preparing',
-      label: '제출자료 준비',
-      value: open.filter((p) => p.currentStage === 'deliverables').length,
-      unit: '건',
-      weeklyDelta: -1,
-      tone: 'danger',
-      icon: FileText,
-    },
+    lastMetric,
   ]
 }
 

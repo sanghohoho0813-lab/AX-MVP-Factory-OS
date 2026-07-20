@@ -133,9 +133,39 @@ const DesignValidationPage = lazy(() =>
 const DesignReviewPage = lazy(() =>
   import('./pages/mvpDesign/DesignReviewPage').then((m) => ({ default: m.DesignReviewPage })),
 )
+const WebsiteStudioMainPage = lazy(() =>
+  import('./pages/websiteStudio/WebsiteStudioMainPage').then((m) => ({ default: m.WebsiteStudioMainPage })),
+)
+const WebsiteResultsPage = lazy(() =>
+  import('./pages/websiteStudio/WebsiteResultsPage').then((m) => ({ default: m.WebsiteResultsPage })),
+)
+const WebsiteProjectPage = lazy(() =>
+  import('./pages/websiteStudio/WebsiteProjectPage').then((m) => ({ default: m.WebsiteProjectPage })),
+)
+const WebsiteStrategyPage = lazy(() =>
+  import('./pages/websiteStudio/WebsiteStrategyPage').then((m) => ({ default: m.WebsiteStrategyPage })),
+)
+const WebsiteSitemapPage = lazy(() =>
+  import('./pages/websiteStudio/WebsiteSitemapPage').then((m) => ({ default: m.WebsiteSitemapPage })),
+)
+const WebsitePagesPage = lazy(() =>
+  import('./pages/websiteStudio/WebsitePagesPage').then((m) => ({ default: m.WebsitePagesPage })),
+)
+const WebsiteContentPage = lazy(() =>
+  import('./pages/websiteStudio/WebsiteContentPage').then((m) => ({ default: m.WebsiteContentPage })),
+)
+const WebsiteDesignDirectionPage = lazy(() =>
+  import('./pages/websiteStudio/WebsiteDesignDirectionPage').then((m) => ({ default: m.WebsiteDesignDirectionPage })),
+)
+const WebsitePromptPage = lazy(() =>
+  import('./pages/websiteStudio/WebsitePromptPage').then((m) => ({ default: m.WebsitePromptPage })),
+)
+const WebsiteReviewPage = lazy(() =>
+  import('./pages/websiteStudio/WebsiteReviewPage').then((m) => ({ default: m.WebsiteReviewPage })),
+)
 
 /** 진단 스튜디오는 실제 기능으로 대체되므로 빈 상태 페이지에서 제외 */
-const EMPTY_MODULE_KEYS = new Set(['clients', 'diagnosis', 'selection', 'mvp-design'])
+const EMPTY_MODULE_KEYS = new Set(['clients', 'diagnosis', 'selection', 'mvp-design', 'website-studio'])
 
 function RouteFallback() {
   return (
@@ -201,6 +231,17 @@ const router = createBrowserRouter([
       { path: 'mvp-design/projects/:projectId/rules', element: <DesignRulesPage /> },
       { path: 'mvp-design/projects/:projectId/validation', element: <DesignValidationPage /> },
       { path: 'mvp-design/projects/:projectId/review', element: <DesignReviewPage /> },
+
+      { path: 'website-studio', element: <WebsiteStudioMainPage /> },
+      { path: 'website-studio/results', element: <WebsiteResultsPage /> },
+      { path: 'website-studio/projects/:projectId', element: <WebsiteProjectPage /> },
+      { path: 'website-studio/projects/:projectId/strategy', element: <WebsiteStrategyPage /> },
+      { path: 'website-studio/projects/:projectId/sitemap', element: <WebsiteSitemapPage /> },
+      { path: 'website-studio/projects/:projectId/pages', element: <WebsitePagesPage /> },
+      { path: 'website-studio/projects/:projectId/content', element: <WebsiteContentPage /> },
+      { path: 'website-studio/projects/:projectId/design', element: <WebsiteDesignDirectionPage /> },
+      { path: 'website-studio/projects/:projectId/prompt', element: <WebsitePromptPage /> },
+      { path: 'website-studio/projects/:projectId/review', element: <WebsiteReviewPage /> },
 
       ...MODULE_PAGES.filter((config) => !EMPTY_MODULE_KEYS.has(config.key)).map(
         (config) => ({

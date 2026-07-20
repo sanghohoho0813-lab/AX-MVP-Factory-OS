@@ -54,6 +54,13 @@ import type {
   MvpDesignHandoffSnapshot,
   MvpDesignInput,
 } from '../types/mvpDesign'
+import type {
+  WebsiteDesign,
+  WebsiteDesignFilters,
+  WebsiteDesignHandoffInput,
+  WebsiteDesignHandoffSnapshot,
+  WebsiteDesignInput,
+} from '../types/websiteDesign'
 
 /**
  * 저장소 계층 인터페이스.
@@ -104,7 +111,9 @@ export class EntityNotFoundError extends Error {
       | '선정 결과'
       | '인계 스냅샷'
       | 'MVP 설계'
-      | 'MVP 설계 인계',
+      | 'MVP 설계 인계'
+      | '홈페이지 설계'
+      | '홈페이지 설계 인계',
   ) {
     super(`${entity}를 찾을 수 없습니다.`)
     this.name = 'EntityNotFoundError'
@@ -305,4 +314,29 @@ export interface MvpDesignHandoffRepository {
     mvpDesignId: string,
     snapshot: MvpDesignHandoffInput,
   ): MvpDesignHandoffSnapshot
+}
+
+export interface WebsiteDesignRepository {
+  getAll(): WebsiteDesign[]
+  getById(id: string): WebsiteDesign | null
+  getByProjectId(projectId: string): WebsiteDesign[]
+  getLatestByProjectId(projectId: string): WebsiteDesign | null
+  create(input: WebsiteDesignInput): WebsiteDesign
+  update(id: string, input: Partial<WebsiteDesignInput>): WebsiteDesign
+  markReviewed(id: string, reviewerName: string): WebsiteDesign
+  finalize(id: string, finalizerName: string): WebsiteDesign
+  supersede(id: string): WebsiteDesign
+  nextVersion(projectId: string): number
+  search(filters: WebsiteDesignFilters): WebsiteDesign[]
+}
+
+export interface WebsiteDesignHandoffRepository {
+  getAll(): WebsiteDesignHandoffSnapshot[]
+  getByProjectId(projectId: string): WebsiteDesignHandoffSnapshot[]
+  getByDesignId(websiteDesignId: string): WebsiteDesignHandoffSnapshot | null
+  create(snapshot: WebsiteDesignHandoffInput): WebsiteDesignHandoffSnapshot
+  replaceForDesign(
+    websiteDesignId: string,
+    snapshot: WebsiteDesignHandoffInput,
+  ): WebsiteDesignHandoffSnapshot
 }

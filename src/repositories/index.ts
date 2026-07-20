@@ -27,6 +27,10 @@ import {
   LocalMvpDesignHandoffRepository,
   LocalMvpDesignRepository,
 } from './mvpDesignRepositories'
+import {
+  LocalWebsiteDesignHandoffRepository,
+  LocalWebsiteDesignRepository,
+} from './websiteDesignRepositories'
 import { runMigrations } from './migrations'
 import type {
   ActivityRepository,
@@ -36,6 +40,8 @@ import type {
   InterviewQuestionRepository,
   MvpDesignHandoffRepository,
   MvpDesignRepository,
+  WebsiteDesignHandoffRepository,
+  WebsiteDesignRepository,
   OrganizationRepository,
   ProjectRepository,
   ProjectSurveyBlueprintRepository,
@@ -102,6 +108,12 @@ export const mvpDesignRepository: MvpDesignRepository =
 
 export const mvpDesignHandoffRepository: MvpDesignHandoffRepository =
   new LocalMvpDesignHandoffRepository()
+
+export const websiteDesignRepository: WebsiteDesignRepository =
+  new LocalWebsiteDesignRepository()
+
+export const websiteDesignHandoffRepository: WebsiteDesignHandoffRepository =
+  new LocalWebsiteDesignHandoffRepository()
 
 export { guidedDemoRepository } from './guidedDemoRepository'
 
