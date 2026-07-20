@@ -2,6 +2,7 @@ import {
   Box,
   ClipboardCheck,
   FileText,
+  FileWarning,
   Filter,
   FlaskConical,
   FolderKanban,
@@ -18,6 +19,14 @@ export interface ValidationKpiCounts {
   criticalIssues: number
 }
 
+export interface DeliverableKpiCounts {
+  creatable: number
+  inProgress: number
+  needsReview: number
+  stale: number
+  qualityErrors: number
+}
+
 const HEALTH_ORDER = { healthy: 0, attention: 1, risk: 2 } as const
 
 /**
@@ -30,11 +39,13 @@ export function buildDashboardMetrics(
   designInProgress?: number,
   websitePending?: number,
   validation?: ValidationKpiCounts,
+  deliverable?: DeliverableKpiCounts,
 ): MetricSummary[] {
   const open = projects.filter(
     (p) => p.status !== 'completed' && p.status !== 'archived',
   )
-  // 마지막 KPI는 최대 1개만 노출한다(과복잡 방지). 우선순위: 중대 이슈 > 홈페이지 대기 > 테스트 중 > 테스트 준비 > 제출자료.
+  // 마지막 KPI는 최대 1개만 노출한다(과복잡 방지).
+  // 우선순위: 중대 이슈 > 자료 품질 오류 > 자료 원본 변경 > 홈페이지 대기 > 테스트 중 > 자료 검토 > 테스트 준비 > 자료 생성 가능 > 제출자료 단계.
   const deliverablesMetric: MetricSummary = {
     key: 'deliverables-preparing',
     label: '제출자료 준비',
@@ -46,45 +57,21 @@ export function buildDashboardMetrics(
   }
   let lastMetric: MetricSummary
   if (validation && validation.criticalIssues > 0) {
-    lastMetric = {
-      key: 'validation-critical',
-      label: '중대 이슈',
-      value: validation.criticalIssues,
-      unit: '건',
-      weeklyDelta: 0,
-      tone: 'danger',
-      icon: ShieldAlert,
-    }
+    lastMetric = { key: 'validation-critical', label: '중대 이슈', value: validation.criticalIssues, unit: '건', weeklyDelta: 0, tone: 'danger', icon: ShieldAlert }
+  } else if (deliverable && deliverable.qualityErrors > 0) {
+    lastMetric = { key: 'deliverable-errors', label: '제출자료 오류', value: deliverable.qualityErrors, unit: '건', weeklyDelta: 0, tone: 'danger', icon: FileWarning }
+  } else if (deliverable && deliverable.stale > 0) {
+    lastMetric = { key: 'deliverable-stale', label: '자료 원본 변경', value: deliverable.stale, unit: '건', weeklyDelta: 0, tone: 'warning', icon: FileWarning }
   } else if (websitePending && websitePending > 0) {
-    lastMetric = {
-      key: 'website-pending',
-      label: '홈페이지 설계 대기',
-      value: websitePending,
-      unit: '건',
-      weeklyDelta: 0,
-      tone: 'accent',
-      icon: Palette,
-    }
+    lastMetric = { key: 'website-pending', label: '홈페이지 설계 대기', value: websitePending, unit: '건', weeklyDelta: 0, tone: 'accent', icon: Palette }
   } else if (validation && validation.testing > 0) {
-    lastMetric = {
-      key: 'validation-testing',
-      label: '테스트 중',
-      value: validation.testing,
-      unit: '건',
-      weeklyDelta: 0,
-      tone: 'warning',
-      icon: FlaskConical,
-    }
+    lastMetric = { key: 'validation-testing', label: '테스트 중', value: validation.testing, unit: '건', weeklyDelta: 0, tone: 'warning', icon: FlaskConical }
+  } else if (deliverable && deliverable.needsReview > 0) {
+    lastMetric = { key: 'deliverable-review', label: '제출자료 검토', value: deliverable.needsReview, unit: '건', weeklyDelta: 0, tone: 'info', icon: FileText }
   } else if (validation && validation.preparing > 0) {
-    lastMetric = {
-      key: 'validation-preparing',
-      label: '테스트 준비',
-      value: validation.preparing,
-      unit: '건',
-      weeklyDelta: 0,
-      tone: 'info',
-      icon: ClipboardCheck,
-    }
+    lastMetric = { key: 'validation-preparing', label: '테스트 준비', value: validation.preparing, unit: '건', weeklyDelta: 0, tone: 'info', icon: ClipboardCheck }
+  } else if (deliverable && deliverable.creatable > 0) {
+    lastMetric = { key: 'deliverable-creatable', label: '자료 생성 가능', value: deliverable.creatable, unit: '건', weeklyDelta: 0, tone: 'info', icon: FileText }
   } else {
     lastMetric = deliverablesMetric
   }

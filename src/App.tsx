@@ -207,9 +207,48 @@ const TrackDecisionPage = lazy(() =>
 const LocalTestPage = lazy(() =>
   import('./pages/validation/LocalTestPage').then((m) => ({ default: m.LocalTestPage })),
 )
+const DeliverablesMainPage = lazy(() =>
+  import('./pages/deliverables/DeliverablesMainPage').then((m) => ({ default: m.DeliverablesMainPage })),
+)
+const DeliverableResultsPage = lazy(() =>
+  import('./pages/deliverables/DeliverableResultsPage').then((m) => ({ default: m.DeliverableResultsPage })),
+)
+const ProjectDeliverablesPage = lazy(() =>
+  import('./pages/deliverables/ProjectDeliverablesPage').then((m) => ({ default: m.ProjectDeliverablesPage })),
+)
+const CreatePackagePage = lazy(() =>
+  import('./pages/deliverables/CreatePackagePage').then((m) => ({ default: m.CreatePackagePage })),
+)
+const PackageDetailPage = lazy(() =>
+  import('./pages/deliverables/PackageDetailPage').then((m) => ({ default: m.PackageDetailPage })),
+)
+const PackageContentsPage = lazy(() =>
+  import('./pages/deliverables/PackageContentsPage').then((m) => ({ default: m.PackageContentsPage })),
+)
+const PackageReportsPage = lazy(() =>
+  import('./pages/deliverables/PackageReportsPage').then((m) => ({ default: m.PackageReportsPage })),
+)
+const PackageSpecificationPage = lazy(() =>
+  import('./pages/deliverables/PackageSpecificationPage').then((m) => ({ default: m.PackageSpecificationPage })),
+)
+const PackageRoadmapPage = lazy(() =>
+  import('./pages/deliverables/PackageRoadmapPage').then((m) => ({ default: m.PackageRoadmapPage })),
+)
+const PackagePromptsPage = lazy(() =>
+  import('./pages/deliverables/PackagePromptsPage').then((m) => ({ default: m.PackagePromptsPage })),
+)
+const PackageEvidencePage = lazy(() =>
+  import('./pages/deliverables/PackageEvidencePage').then((m) => ({ default: m.PackageEvidencePage })),
+)
+const PackagePreviewPage = lazy(() =>
+  import('./pages/deliverables/PackagePreviewPage').then((m) => ({ default: m.PackagePreviewPage })),
+)
+const PackageReviewPage = lazy(() =>
+  import('./pages/deliverables/PackageReviewPage').then((m) => ({ default: m.PackageReviewPage })),
+)
 
 /** 진단 스튜디오는 실제 기능으로 대체되므로 빈 상태 페이지에서 제외 */
-const EMPTY_MODULE_KEYS = new Set(['clients', 'diagnosis', 'selection', 'mvp-design', 'website-studio', 'validation', 'settings'])
+const EMPTY_MODULE_KEYS = new Set(['clients', 'diagnosis', 'selection', 'mvp-design', 'website-studio', 'validation', 'deliverables', 'settings'])
 
 function RouteFallback() {
   return (
@@ -301,6 +340,20 @@ const router = createBrowserRouter([
       { path: 'validation/projects/:projectId/:trackType/metrics', element: <TrackMetricsPage /> },
       { path: 'validation/projects/:projectId/:trackType/gates', element: <TrackGatesPage /> },
       { path: 'validation/projects/:projectId/:trackType/decision', element: <TrackDecisionPage /> },
+
+      { path: 'deliverables', element: <DeliverablesMainPage /> },
+      { path: 'deliverables/results', element: <DeliverableResultsPage /> },
+      { path: 'deliverables/projects/:projectId', element: <ProjectDeliverablesPage /> },
+      { path: 'deliverables/projects/:projectId/create', element: <CreatePackagePage /> },
+      { path: 'deliverables/projects/:projectId/packages/:packageId', element: <PackageDetailPage /> },
+      { path: 'deliverables/projects/:projectId/packages/:packageId/contents', element: <PackageContentsPage /> },
+      { path: 'deliverables/projects/:projectId/packages/:packageId/reports', element: <PackageReportsPage /> },
+      { path: 'deliverables/projects/:projectId/packages/:packageId/specification', element: <PackageSpecificationPage /> },
+      { path: 'deliverables/projects/:projectId/packages/:packageId/roadmap', element: <PackageRoadmapPage /> },
+      { path: 'deliverables/projects/:projectId/packages/:packageId/prompts', element: <PackagePromptsPage /> },
+      { path: 'deliverables/projects/:projectId/packages/:packageId/evidence', element: <PackageEvidencePage /> },
+      { path: 'deliverables/projects/:projectId/packages/:packageId/preview', element: <PackagePreviewPage /> },
+      { path: 'deliverables/projects/:projectId/packages/:packageId/review', element: <PackageReviewPage /> },
 
       ...MODULE_PAGES.filter((config) => !EMPTY_MODULE_KEYS.has(config.key)).map(
         (config) => ({

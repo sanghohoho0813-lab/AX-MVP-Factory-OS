@@ -128,6 +128,22 @@ function initValidationStores(): void {
   }
 }
 
+/**
+ * v9 마이그레이션 — 제출자료 패키지 저장소 추가.
+ * 패키지·확정 스냅샷·내보내기 기록은 시드하지 않고 빈 배열만 준비한다.
+ */
+function initDeliverableStores(): void {
+  if (!hasKey(STORAGE_KEYS.deliverablePackages)) {
+    writeJson(STORAGE_KEYS.deliverablePackages, [])
+  }
+  if (!hasKey(STORAGE_KEYS.deliverablePackageSnapshots)) {
+    writeJson(STORAGE_KEYS.deliverablePackageSnapshots, [])
+  }
+  if (!hasKey(STORAGE_KEYS.deliverableExportRecords)) {
+    writeJson(STORAGE_KEYS.deliverableExportRecords, [])
+  }
+}
+
 /** 순차 적용 마이그레이션 목록 (버전 오름차순) */
 const MIGRATIONS: Migration[] = [
   {
@@ -169,6 +185,11 @@ const MIGRATIONS: Migration[] = [
     version: 8,
     describe: '실제 사용 테스트·Stage-Gate·로컬 테스트 세션 저장소 추가',
     migrate: initValidationStores,
+  },
+  {
+    version: 9,
+    describe: '제출자료 패키지·확정 스냅샷·내보내기 기록 저장소 추가',
+    migrate: initDeliverableStores,
   },
 ]
 

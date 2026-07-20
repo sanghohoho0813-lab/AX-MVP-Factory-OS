@@ -70,6 +70,15 @@ import type {
   ValidationWorkspace,
   ValidationWorkspaceInput,
 } from '../types/validation'
+import type {
+  DeliverableExportRecord,
+  DeliverableExportRecordInput,
+  DeliverableFilters,
+  DeliverablePackage,
+  DeliverablePackageInput,
+  DeliverablePackageSnapshot,
+  DeliverablePackageSnapshotInput,
+} from '../types/deliverables'
 
 /**
  * 저장소 계층 인터페이스.
@@ -125,7 +134,9 @@ export class EntityNotFoundError extends Error {
       | '홈페이지 설계 인계'
       | '검증 워크스페이스'
       | '검증 인계'
-      | '로컬 테스트 세션',
+      | '로컬 테스트 세션'
+      | '제출자료 패키지'
+      | '제출자료 스냅샷',
   ) {
     super(`${entity}를 찾을 수 없습니다.`)
     this.name = 'EntityNotFoundError'
@@ -395,4 +406,36 @@ export interface ValidationTestSessionRepository {
   update(id: string, input: Partial<ValidationTestSession>): ValidationTestSession
   revoke(id: string): ValidationTestSession
   complete(id: string): ValidationTestSession
+}
+
+export interface DeliverablePackageRepository {
+  getAll(): DeliverablePackage[]
+  getById(id: string): DeliverablePackage | null
+  getByProjectId(projectId: string): DeliverablePackage[]
+  getLatestByProjectId(projectId: string): DeliverablePackage | null
+  create(input: DeliverablePackageInput): DeliverablePackage
+  update(id: string, input: Partial<DeliverablePackageInput>): DeliverablePackage
+  markReviewed(id: string, reviewerName: string): DeliverablePackage
+  finalize(id: string, finalizerName: string): DeliverablePackage
+  supersede(id: string): DeliverablePackage
+  archive(id: string): DeliverablePackage
+  nextVersion(projectId: string): number
+  search(filters: DeliverableFilters): DeliverablePackage[]
+}
+
+export interface DeliverablePackageSnapshotRepository {
+  getAll(): DeliverablePackageSnapshot[]
+  getByPackageId(packageId: string): DeliverablePackageSnapshot | null
+  getByProjectId(projectId: string): DeliverablePackageSnapshot[]
+  create(snapshot: DeliverablePackageSnapshotInput): DeliverablePackageSnapshot
+  replaceForPackage(
+    packageId: string,
+    snapshot: DeliverablePackageSnapshotInput,
+  ): DeliverablePackageSnapshot
+}
+
+export interface DeliverableExportRepository {
+  getByPackageId(packageId: string): DeliverableExportRecord[]
+  create(record: DeliverableExportRecordInput): DeliverableExportRecord
+  deleteByPackageId(packageId: string): void
 }

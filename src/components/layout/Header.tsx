@@ -29,13 +29,13 @@ function WorkspaceSelector() {
   const [workspace, setWorkspace] = useState<string>(WORKSPACES[0])
 
   return (
-    <div ref={containerRef} className="relative min-w-0">
+    <div ref={containerRef} className="relative min-w-0 max-w-[34vw] shrink">
       <button
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex h-10 min-w-0 cursor-pointer items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:border-slate-300 hover:text-slate-900"
+        className="flex h-10 w-full min-w-0 cursor-pointer items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:border-slate-300 hover:text-slate-900"
       >
         <Building aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
         <span className="truncate">{workspace}</span>
@@ -182,7 +182,7 @@ function UserMenu() {
 
 export function Header({ onOpenMobileMenu }: HeaderProps) {
   return (
-    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-4 lg:px-6">
+    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-[16px] sm:gap-3 lg:px-[24px]">
       <button
         type="button"
         aria-label="메뉴 열기"

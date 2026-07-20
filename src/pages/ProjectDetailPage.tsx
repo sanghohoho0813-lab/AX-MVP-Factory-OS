@@ -34,6 +34,11 @@ import {
   TrackBadge,
   WorkspaceStatusBadge,
 } from '../components/validation/badges'
+import { getProjectDeliverableContext } from '../services/deliverableService'
+import {
+  PackageStatusBadge,
+  PackageTypeBadge,
+} from '../components/deliverables/badges'
 import { WebsiteStatusBadge, WebsiteTypeBadge } from '../components/websiteStudio/badges'
 import { WEBSITE_TYPE_META } from '../lib/websiteDesignMeta'
 import {
@@ -60,6 +65,7 @@ import {
   Copy,
   ExternalLink,
   FilePen,
+  FileText,
   Link2,
   Plus,
   RefreshCw,
@@ -154,6 +160,8 @@ export function ProjectDetailPage() {
   const websitePath = `/website-studio/projects/${project.id}`
   const validation = getProjectValidationContext(project.id)
   const validationPath = `/validation/projects/${project.id}`
+  const deliverable = getProjectDeliverableContext(project.id)
+  const deliverablePath = `/deliverables/projects/${project.id}`
   const journey = computeProjectJourney(project)
   const currentFlowIndex = flowStepIndex(journey.currentStepKey)
 
@@ -767,6 +775,42 @@ export function ProjectDetailPage() {
               </div>
             ))}
           </div>
+        </Panel>
+      )}
+
+      {/* 제출자료 */}
+      {deliverable && deliverable.eligibility.canCreate && (
+        <Panel
+          title="제출자료"
+          actions={
+            <Button variant="secondary" size="sm" onClick={() => navigate(deliverablePath)}>
+              <FileText aria-hidden="true" className="size-4" />
+              {deliverable.latest ? '자료 열기' : '자료 만들기'}
+            </Button>
+          }
+        >
+          {deliverable.latest ? (
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <PackageTypeBadge type={deliverable.latest.type} />
+                <PackageStatusBadge status={deliverable.latest.status} />
+                <span className="text-xs text-slate-400">v{deliverable.latest.version}</span>
+                {deliverable.latestStale && (
+                  <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700">
+                    <RefreshCw aria-hidden="true" className="size-3" />
+                    원본 변경
+                  </span>
+                )}
+              </div>
+              <p className="text-[13px] break-keep text-slate-500">
+                확정 결과를 보고서·개발명세·로드맵·개발 프롬프트로 정리합니다. AX와 홈페이지는 별도 트랙으로 관리하며 결과를 합산하지 않습니다.
+              </p>
+            </div>
+          ) : (
+            <p className="text-[13px] break-keep text-slate-600">
+              확정된 진단·설계·테스트 결과를 고객 설명·개발 전달·기관 준비용 자료 패키지로 만들 수 있습니다.
+            </p>
+          )}
         </Panel>
       )}
 

@@ -93,3 +93,62 @@ body {
 :focus-visible {
   @apply outline-2 outline-offset-2 outline-brand-600;
 }
+
+/* ------------------------------------------------------------------ */
+/* 인쇄·PDF 저장 — 제출자료 미리보기 문서만 인쇄한다.                    */
+/* UI 글자 배율(최대 2.1배) 대신 읽기 좋은 고정 크기를 사용해            */
+/* 페이지 수가 비정상적으로 폭증하지 않게 한다.                          */
+/* ------------------------------------------------------------------ */
+@media print {
+  html {
+    font-size: 11.5pt !important;
+  }
+  body {
+    background: #fff !important;
+  }
+  /* 인쇄 격리: 문서 영역만 보이게 한다 (사이드바·헤더·버튼 숨김) */
+  body * {
+    visibility: hidden !important;
+  }
+  .print-document,
+  .print-document * {
+    visibility: visible !important;
+  }
+  .print-document {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+  }
+  .no-print,
+  .no-print * {
+    display: none !important;
+  }
+  .print-document pre {
+    white-space: pre-wrap !important;
+    word-break: break-word;
+    overflow: visible !important;
+  }
+  .print-document table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .print-document tr,
+  .print-document .avoid-break {
+    break-inside: avoid;
+  }
+  .print-document h1,
+  .print-document h2,
+  .print-document h3 {
+    break-after: avoid;
+  }
+  .print-page-break {
+    break-before: page;
+  }
+  @page {
+    size: A4;
+    margin: 16mm 14mm;
+  }
+}

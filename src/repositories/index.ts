@@ -36,6 +36,11 @@ import {
   LocalValidationTestSessionRepository,
   LocalValidationWorkspaceRepository,
 } from './validationRepositories'
+import {
+  LocalDeliverableExportRepository,
+  LocalDeliverablePackageRepository,
+  LocalDeliverablePackageSnapshotRepository,
+} from './deliverableRepositories'
 import { runMigrations } from './migrations'
 import type {
   ActivityRepository,
@@ -60,6 +65,9 @@ import type {
   ValidationHandoffRepository,
   ValidationTestSessionRepository,
   ValidationWorkspaceRepository,
+  DeliverablePackageRepository,
+  DeliverablePackageSnapshotRepository,
+  DeliverableExportRepository,
 } from './types'
 
 runMigrations()
@@ -131,6 +139,15 @@ export const validationHandoffRepository: ValidationHandoffRepository =
 
 export const validationTestSessionRepository: ValidationTestSessionRepository =
   new LocalValidationTestSessionRepository()
+
+export const deliverablePackageRepository: DeliverablePackageRepository =
+  new LocalDeliverablePackageRepository()
+
+export const deliverablePackageSnapshotRepository: DeliverablePackageSnapshotRepository =
+  new LocalDeliverablePackageSnapshotRepository()
+
+export const deliverableExportRepository: DeliverableExportRepository =
+  new LocalDeliverableExportRepository()
 
 export { guidedDemoRepository } from './guidedDemoRepository'
 
