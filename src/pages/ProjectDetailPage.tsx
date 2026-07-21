@@ -5,8 +5,10 @@ import {
   Pencil,
   ShieldAlert,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useActiveProject } from '../context/activeProject'
+import { NextActionHero } from '../components/workspace/NextActionHero'
 import { HEALTH_META, PROJECT_STAGE_META } from '../lib/statusMeta'
 import {
   PROJECT_STATUS_META,
@@ -125,6 +127,12 @@ export function ProjectDetailPage() {
     [projectId, version],
   )
 
+  // 프로젝트를 열면 전역 프로젝트 컨텍스트로 설정한다(프로젝트 중심 정보구조).
+  const { setActiveProject } = useActiveProject()
+  useEffect(() => {
+    if (projectId) setActiveProject(projectId)
+  }, [projectId, setActiveProject])
+
   if (!project) {
     return (
       <NotFoundState
@@ -224,6 +232,14 @@ export function ProjectDetailPage() {
 
   return (
     <div className="flex flex-col gap-5">
+      {/* 프로젝트 컨트롤 센터 — 지금 해야 할 일이 가장 크게 보인다 */}
+      <NextActionHero
+        eyebrow={`${organization?.name ?? '고객사'} · ${project.name}`}
+        actionText={journey.actionText}
+        reason={journey.reason}
+        actionLabel={journey.actionLabel}
+        actionPath={journey.actionPath}
+      />
       <DetailHeader
         backTo={organization ? `/clients/${organization.id}` : '/clients'}
         backLabel={organization ? `${organization.name} 상세` : '고객사 목록'}
