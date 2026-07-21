@@ -145,9 +145,9 @@ export function SelectionProjectPage() {
 
       <div className="flex flex-wrap items-center gap-2">
         {decision && <SelectionStatusBadge status={decision.status} />}
-        <span className="text-xs text-slate-400">후보 {counts.total}건</span>
+        <span className="text-[0.875rem] text-slate-400">후보 {counts.total}건</span>
         {assessment && (
-          <span className="text-xs text-slate-400">
+          <span className="text-[0.875rem] text-slate-400">
             진단 v{assessment.version} · {RECOMMENDATION_META[assessment.recommendation].label}
           </span>
         )}
@@ -173,12 +173,12 @@ export function SelectionProjectPage() {
                         <div className="flex items-center gap-2">
                           <p className="truncate text-sm font-semibold text-slate-800">{c.name}</p>
                           {isPrimary && (
-                            <span className="rounded-md border border-success-200 bg-success-50 px-1.5 py-0.5 text-[11px] font-medium text-success-700">
+                            <span className="rounded-md border border-success-200 bg-success-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-success-700">
                               추천 핵심
                             </span>
                           )}
                         </div>
-                        <p className="mt-0.5 text-xs text-slate-400">
+                        <p className="mt-0.5 text-[0.875rem] text-slate-400">
                           {monthlySavingLabel(c)} · {risk ? `위험: ${risk}` : '주요 위험 없음'}
                         </p>
                       </div>
@@ -219,7 +219,7 @@ export function SelectionProjectPage() {
               {STEPS.map((label, i) => (
                 <li key={label} className="flex items-center gap-2 text-[13px]">
                   <span
-                    className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
+                    className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[0.8125rem] font-semibold ${
                       stepStates[i] === 'done' ? 'bg-success-100 text-success-700' : 'bg-slate-100 text-slate-400'
                     }`}
                   >
@@ -241,7 +241,7 @@ export function SelectionProjectPage() {
                 ['제외', counts.rejected],
               ].map(([label, value]) => (
                 <div key={label as string}>
-                  <dt className="text-xs text-slate-400">{label}</dt>
+                  <dt className="text-[0.875rem] text-slate-400">{label}</dt>
                   <dd className="text-lg font-bold text-slate-800">{value}</dd>
                 </div>
               ))}
@@ -296,9 +296,9 @@ export function SelectionProjectPage() {
 function SummaryBlock({ title, items, empty }: { title: string; items: string[]; empty: string }) {
   return (
     <div>
-      <p className="mb-1 text-xs font-semibold text-slate-500">{title}</p>
+      <p className="mb-1 text-[0.875rem] font-semibold text-slate-500">{title}</p>
       {items.length === 0 ? (
-        <p className="text-xs text-slate-400">{empty}</p>
+        <p className="text-[0.875rem] text-slate-400">{empty}</p>
       ) : (
         <ul className="flex flex-col gap-0.5">
           {items.slice(0, 3).map((item) => (

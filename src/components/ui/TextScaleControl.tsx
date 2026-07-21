@@ -22,7 +22,7 @@ export function TextScaleControl({ showPreview = false, compact = false }: { sho
               aria-checked={on}
               aria-label={`글자 크기 ${TEXT_SCALE_META[s].label}`}
               onClick={() => setScale(s)}
-              className={`flex-1 rounded-(--radius-control) border px-2 py-1.5 text-xs font-medium transition-colors ${
+              className={`flex-1 rounded-(--radius-control) border px-2 py-1.5 text-[0.875rem] font-medium transition-colors ${
                 on ? 'border-brand-400 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
               }`}
             >
@@ -51,7 +51,7 @@ export function TextScaleControl({ showPreview = false, compact = false }: { sho
               }`}
             >
               <span className="text-sm font-semibold text-slate-800">{TEXT_SCALE_META[s].label}</span>
-              <span className="text-xs text-slate-500">{TEXT_SCALE_META[s].hint}</span>
+              <span className="text-[0.875rem] text-slate-500">{TEXT_SCALE_META[s].hint}</span>
             </button>
           )
         })}
@@ -59,12 +59,12 @@ export function TextScaleControl({ showPreview = false, compact = false }: { sho
 
       {showPreview && (
         <div className="rounded-(--radius-card) border border-slate-200 bg-white p-4">
-          <p className="text-xs font-semibold tracking-wide text-slate-400 uppercase">미리보기</p>
+          <p className="text-[0.875rem] font-semibold tracking-wide text-slate-400 uppercase">미리보기</p>
           <h3 className="mt-2 text-xl font-bold text-slate-900">진단부터 검증까지 한눈에</h3>
           <p className="mt-1.5 text-sm text-slate-700">
             기업의 현재 업무를 진단하고 다음에 만들 기능을 확인합니다.
           </p>
-          <p className="mt-1 text-xs text-slate-400">보조 설명 · 이 문장은 작은 글씨의 예시입니다.</p>
+          <p className="mt-1 text-[0.875rem] text-slate-400">보조 설명 · 이 문장은 작은 글씨의 예시입니다.</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="inline-flex h-10 items-center rounded-(--radius-control) bg-brand-600 px-4 text-sm font-medium text-white">
               핵심 행동 버튼

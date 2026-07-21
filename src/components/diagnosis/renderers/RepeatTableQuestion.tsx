@@ -26,7 +26,7 @@ export function RepeatTableQuestion({ question, answer, onAnswer, disabled }: Re
                 <th
                   key={col.id}
                   scope="col"
-                  className="border-b border-slate-200 px-3 py-2 text-left text-xs font-medium text-slate-500"
+                  className="border-b border-slate-200 px-3 py-2 text-left text-[0.875rem] font-medium text-slate-500"
                 >
                   {col.label}
                   {col.unit && <span className="text-slate-400"> ({col.unit})</span>}

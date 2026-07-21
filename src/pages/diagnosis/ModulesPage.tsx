@@ -98,7 +98,7 @@ export function ModulesPage() {
       cell: (m) => (
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-slate-800">{m.name}</p>
-          <p className="mt-0.5 line-clamp-1 text-xs text-slate-400">{m.description}</p>
+          <p className="mt-0.5 line-clamp-1 text-[0.875rem] text-slate-400">{m.description}</p>
         </div>
       ),
     },
@@ -255,14 +255,14 @@ export function ModulesPage() {
                     className="min-w-0 cursor-pointer text-left"
                   >
                     <p className="truncate text-sm font-semibold text-slate-800">{m.name}</p>
-                    <p className="mt-0.5 line-clamp-2 text-xs text-slate-400">{m.description}</p>
+                    <p className="mt-0.5 line-clamp-2 text-[0.875rem] text-slate-400">{m.description}</p>
                   </button>
                   {rowMenu(m)}
                 </div>
                 <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                   <ModuleKindBadge kind={m.kind} />
                   <ModuleStatusBadge status={m.status} />
-                  <span className="text-xs text-slate-400">질문 {m.questionIds.length}개</span>
+                  <span className="text-[0.875rem] text-slate-400">질문 {m.questionIds.length}개</span>
                 </div>
               </li>
             ))}

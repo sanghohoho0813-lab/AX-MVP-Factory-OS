@@ -36,7 +36,7 @@ function matchOf(strategy: FundingStrategy, matchId: string | null): FundingMatc
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col">
-      <dt className="text-xs text-slate-400">{label}</dt>
+      <dt className="text-[0.875rem] text-slate-400">{label}</dt>
       <dd className="text-[13px] break-keep text-slate-700">{value || '—'}</dd>
     </div>
   )
@@ -153,7 +153,7 @@ function AddAppModal({
             })}
           </select>
           {matches.length === 0 && (
-            <span className="text-xs text-warning-600">
+            <span className="text-[0.875rem] text-warning-600">
               신청 가능한 후보가 없습니다. 기관 후보 화면에서 후보를 확인하세요.
             </span>
           )}
@@ -185,7 +185,7 @@ function AddAppModal({
               onChange={(e) => setDraft((d) => ({ ...d, requestedAmount: e.target.value }))}
               placeholder="입력한 값만 저장됩니다"
             />
-            <span className="text-xs text-slate-400">금액을 임의로 생성하지 않습니다. 실제 값만 입력하세요.</span>
+            <span className="text-[0.875rem] text-slate-400">금액을 임의로 생성하지 않습니다. 실제 값만 입력하세요.</span>
           </label>
           <label className="flex flex-col gap-1.5">
             <span className="text-[13px] font-semibold text-slate-700">통화</span>
@@ -273,7 +273,7 @@ function EditAppModal({
             />
           </label>
         </div>
-        <span className="-mt-2 text-xs text-slate-400">
+        <span className="-mt-2 text-[0.875rem] text-slate-400">
           금액은 사용자가 입력한 값만 저장하며, 예상 금액을 자동으로 만들지 않습니다.
         </span>
         <label className="flex flex-col gap-1.5">
@@ -398,7 +398,7 @@ function ApplicationCard({
             <ChevronRight aria-hidden="true" className="size-4" />
           </Button>
           <label className="ml-auto flex items-center gap-1.5">
-            <span className="text-xs text-slate-500">단계 이동</span>
+            <span className="text-[0.875rem] text-slate-500">단계 이동</span>
             <select
               className="rounded-(--radius-control) border border-slate-200 px-2 py-1 text-[13px]"
               value={app.applicationStage}

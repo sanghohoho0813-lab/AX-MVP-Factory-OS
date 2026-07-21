@@ -156,7 +156,7 @@ export function InstitutionDetailPage() {
                     <FileText aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-slate-800">{prog.name}</p>
-                      <p className="truncate text-xs text-slate-400">{prog.summary || '요약 없음'}</p>
+                      <p className="truncate text-[0.875rem] text-slate-400">{prog.summary || '요약 없음'}</p>
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">

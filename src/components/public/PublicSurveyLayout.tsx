@@ -30,7 +30,7 @@ export function PublicSurveyLayout({
             AX
           </span>
           <div className="min-w-0">
-            <p className="truncate text-[11px] text-slate-400">
+            <p className="truncate text-[0.8125rem] text-slate-400">
               기업 AX 현장진단{organizationName ? ` · ${organizationName}` : ''}
             </p>
             <p className="truncate text-sm font-semibold text-slate-800">
@@ -55,7 +55,7 @@ export function PublicSurveyLayout({
 
       <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-1.5 px-5 py-4 text-center">
-          <p className="text-xs break-keep text-slate-400">
+          <p className="text-[0.875rem] break-keep text-slate-400">
             문의는 담당 컨설턴트에게 요청해 주세요. 입력 내용은 자동으로 임시
             저장됩니다.
           </p>

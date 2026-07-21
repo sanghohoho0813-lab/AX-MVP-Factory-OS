@@ -56,7 +56,7 @@ function Chip({ label, tone }: { label: string; tone: 'danger' | 'warning' | 'ne
     info: 'border-brand-200 bg-brand-50 text-brand-700',
   }
   return (
-    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${cls[tone]}`}>
+    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[0.875rem] font-medium ${cls[tone]}`}>
       {label}
     </span>
   )
@@ -316,7 +316,7 @@ function LinkPackageModal({
                 />
                 <span className="min-w-0">
                   <span className="block text-[13px] font-medium break-keep text-slate-800">{p.name}</span>
-                  <span className="block text-xs text-slate-400">v{p.version}</span>
+                  <span className="block text-[0.875rem] text-slate-400">v{p.version}</span>
                 </span>
               </label>
             ))}
@@ -358,7 +358,7 @@ function DocRow({
         <div className="flex flex-col gap-1">
           <span className="text-[13px] font-semibold break-keep text-slate-900">{doc.title}</span>
           {doc.description && (
-            <span className="text-xs break-keep text-slate-500">{doc.description}</span>
+            <span className="text-[0.875rem] break-keep text-slate-500">{doc.description}</span>
           )}
           <div className="flex flex-wrap gap-1.5">
             {doc.required && <Chip label="필수" tone="danger" />}
@@ -391,12 +391,12 @@ function DocRow({
       <td className="px-3 py-3 text-[13px] break-keep text-slate-600">
         <div className="flex flex-col gap-0.5">
           <span>{doc.ownerId || '담당 미지정'}</span>
-          <span className="text-xs text-slate-400">{doc.dueDate ? `기한 ${doc.dueDate}` : '기한 미정'}</span>
+          <span className="text-[0.875rem] text-slate-400">{doc.dueDate ? `기한 ${doc.dueDate}` : '기한 미정'}</span>
           {!readOnly && (
             <button
               type="button"
               onClick={() => onEditOwner(doc)}
-              className="self-start text-xs font-medium text-brand-600 hover:text-brand-700"
+              className="self-start text-[0.875rem] font-medium text-brand-600 hover:text-brand-700"
             >
               담당·기한 편집
             </button>
@@ -563,12 +563,12 @@ function ChecklistView({
               <section key={category} className="flex flex-col gap-2">
                 <h3 className="text-[13px] font-semibold text-slate-700">
                   {DOCUMENT_CATEGORY_LABEL[category]}
-                  <span className="ml-1.5 text-xs font-normal text-slate-400">{docs.length}건</span>
+                  <span className="ml-1.5 text-[0.875rem] font-normal text-slate-400">{docs.length}건</span>
                 </h3>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[640px] border-collapse text-sm">
                     <thead>
-                      <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
+                      <tr className="border-b border-slate-200 text-left text-[0.875rem] text-slate-500">
                         <th scope="col" className="px-3 py-2 font-medium">
                           자료명 / 필요한 이유
                         </th>

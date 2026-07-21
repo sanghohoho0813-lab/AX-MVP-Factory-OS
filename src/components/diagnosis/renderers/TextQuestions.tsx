@@ -20,7 +20,7 @@ export function TextQuestion({ question, answer, onAnswer, disabled }: RendererP
           onChange={(e) => onAnswer({ kind: 'text', value: e.target.value })}
           className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-500 disabled:bg-slate-50"
         />
-        <p className="mt-1 text-right text-xs text-slate-400">
+        <p className="mt-1 text-right text-[0.875rem] text-slate-400">
           {value.length} / {LONG_MAX}
         </p>
       </div>
@@ -38,7 +38,7 @@ export function TextQuestion({ question, answer, onAnswer, disabled }: RendererP
         className={inputClass}
       />
       {value.length > SHORT_MAX * 0.7 && (
-        <p className="mt-1 text-right text-xs text-slate-400">
+        <p className="mt-1 text-right text-[0.875rem] text-slate-400">
           {value.length} / {SHORT_MAX}
         </p>
       )}

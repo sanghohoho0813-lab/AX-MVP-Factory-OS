@@ -53,7 +53,7 @@ function BulletList({ label, items }: { label: string; items: string[] }) {
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col">
-      <dt className="text-xs text-slate-400">{label}</dt>
+      <dt className="text-[0.875rem] text-slate-400">{label}</dt>
       <dd className="text-[13px] break-keep text-slate-700">{value || '—'}</dd>
     </div>
   )
@@ -141,7 +141,7 @@ function AddPlanModal({
             ))}
           </select>
           {options.length === 0 && (
-            <span className="text-xs text-warning-600">
+            <span className="text-[0.875rem] text-warning-600">
               후보 기관이 없습니다. 먼저 기관 후보 화면에서 후보를 확인하세요.
             </span>
           )}
@@ -377,7 +377,7 @@ function RecordActivityModal({
             onChange={(e) => setDraft((d) => ({ ...d, contactNameNote: e.target.value }))}
             placeholder="식별용 최소 메모만"
           />
-          <span className="text-xs text-warning-600">개인 연락처·실명 등 민감정보를 과도하게 저장하지 마세요.</span>
+          <span className="text-[0.875rem] text-warning-600">개인 연락처·실명 등 민감정보를 과도하게 저장하지 마세요.</span>
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="text-[13px] font-semibold text-slate-700">접촉 요약</span>
@@ -515,7 +515,7 @@ function PlanCard({
             ))}
             {internal.length > 0 && (
               <div className="flex flex-col gap-3 rounded-(--radius-card) border border-warning-200 bg-warning-50/50 p-3">
-                <p className="text-xs font-semibold text-warning-700">내부 메모 (외부 공유 대상 아님)</p>
+                <p className="text-[0.875rem] font-semibold text-warning-700">내부 메모 (외부 공유 대상 아님)</p>
                 {internal.map((a) => (
                   <ActivityItem key={a.id} activity={a} internal={true} />
                 ))}
@@ -538,11 +538,11 @@ function ActivityItem({
   return (
     <div className="rounded-(--radius-card) border border-slate-100 bg-slate-50/40 p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-slate-400">{activity.occurredAt.slice(0, 10)}</span>
+        <span className="text-[0.875rem] text-slate-400">{activity.occurredAt.slice(0, 10)}</span>
         <OutreachChannelBadge channel={activity.channel} />
-        {activity.contactRole && <span className="text-xs text-slate-500">{activity.contactRole}</span>}
+        {activity.contactRole && <span className="text-[0.875rem] text-slate-500">{activity.contactRole}</span>}
         {internal && (
-          <span className="inline-flex items-center rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700">
+          <span className="inline-flex items-center rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.875rem] font-medium text-warning-700">
             내부 메모
           </span>
         )}

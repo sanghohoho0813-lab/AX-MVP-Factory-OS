@@ -233,7 +233,7 @@ export function SurveysMainPage() {
       cell: (r) => (
         <div className="flex items-center gap-2">
           <ProgressBar value={r.progress} tone="info" label="응답 진행률" />
-          <span className="w-9 shrink-0 text-right text-xs font-semibold text-slate-600">
+          <span className="w-9 shrink-0 text-right text-[0.875rem] font-semibold text-slate-600">
             {r.progress}%
           </span>
         </div>
@@ -244,7 +244,7 @@ export function SurveysMainPage() {
       header: '마지막 저장',
       className: 'hidden lg:table-cell',
       cell: (r) => (
-        <span className="text-xs whitespace-nowrap text-slate-500">
+        <span className="text-[0.875rem] whitespace-nowrap text-slate-500">
           {r.lastSaved ? formatDateTime(r.lastSaved) : '-'}
         </span>
       ),
@@ -254,7 +254,7 @@ export function SurveysMainPage() {
       header: '만료일',
       className: 'hidden xl:table-cell',
       cell: (r) => (
-        <span className="text-xs whitespace-nowrap text-slate-500">
+        <span className="text-[0.875rem] whitespace-nowrap text-slate-500">
           {r.distribution.expiresAt ? formatDate(r.distribution.expiresAt) : '없음'}
         </span>
       ),
@@ -391,7 +391,7 @@ export function SurveysMainPage() {
                     <p className="truncate text-sm font-semibold text-slate-800">
                       {r.orgName} · {r.distribution.recipientName}
                     </p>
-                    <p className="mt-0.5 truncate text-xs text-slate-400">
+                    <p className="mt-0.5 truncate text-[0.875rem] text-slate-400">
                       {r.distribution.surveyTitle}
                     </p>
                   </button>
@@ -403,7 +403,7 @@ export function SurveysMainPage() {
                 </div>
                 <div className="mt-2.5 flex items-center gap-2">
                   <ProgressBar value={r.progress} tone="info" label="응답 진행률" />
-                  <span className="shrink-0 text-xs font-semibold text-slate-600">
+                  <span className="shrink-0 text-[0.875rem] font-semibold text-slate-600">
                     {r.progress}%
                   </span>
                 </div>

@@ -114,7 +114,7 @@ export function FundingMainPage() {
       cell: (r) => (
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-slate-800">{r.project.name}</p>
-          <p className="text-xs text-slate-400">{r.project.projectCode}</p>
+          <p className="text-[0.875rem] text-slate-400">{r.project.projectCode}</p>
         </div>
       ),
     },
@@ -134,7 +134,7 @@ export function FundingMainPage() {
         return (
           <div className="flex flex-wrap gap-1">
             {labels.map((label) => (
-              <span key={label} className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">{label}</span>
+              <span key={label} className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-slate-600">{label}</span>
             ))}
           </div>
         )
@@ -239,9 +239,9 @@ export function FundingMainPage() {
                   <button type="button" onClick={() => go(r)} className="flex w-full items-center justify-between gap-2 px-5 py-3.5 text-left hover:bg-slate-50">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-slate-800">{r.orgName} · {r.project.name}</p>
-                      <p className="mt-0.5 text-xs text-slate-400">{evidenceFlags(r.eligibility).join(' · ') || '근거 없음'}</p>
+                      <p className="mt-0.5 text-[0.875rem] text-slate-400">{evidenceFlags(r.eligibility).join(' · ') || '근거 없음'}</p>
                       <div className="mt-1.5 flex items-center gap-2">
-                        {r.latest ? <StrategyStatusBadge status={r.latest.status} /> : <span className="text-xs text-slate-400">연계 전략 없음</span>}
+                        {r.latest ? <StrategyStatusBadge status={r.latest.status} /> : <span className="text-[0.875rem] text-slate-400">연계 전략 없음</span>}
                         <ProjectTypeBadge type={r.project.projectType} compact />
                       </div>
                     </div>
@@ -265,7 +265,7 @@ export function FundingMainPage() {
                   <button type="button" onClick={() => go(r)} className="flex w-full items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50">
                     <div className="min-w-0 text-left">
                       <p className="truncate text-sm font-medium text-slate-800">{r.orgName} · {r.project.name}</p>
-                      <p className="text-xs text-slate-400">{r.summary?.currentStageLabel || '진행 중'}</p>
+                      <p className="text-[0.875rem] text-slate-400">{r.summary?.currentStageLabel || '진행 중'}</p>
                     </div>
                     <Building2 aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
                   </button>
@@ -285,7 +285,7 @@ export function FundingMainPage() {
                   <button type="button" onClick={() => go(r)} className="flex w-full items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50">
                     <div className="min-w-0 text-left">
                       <p className="truncate text-sm font-medium text-slate-800">{r.orgName} · {r.project.name}</p>
-                      <p className="text-xs text-warning-600">기관이 추가 자료를 요청했습니다.</p>
+                      <p className="text-[0.875rem] text-warning-600">기관이 추가 자료를 요청했습니다.</p>
                     </div>
                     <ApplicationStageBadge stage="supplement_requested" />
                   </button>
@@ -309,7 +309,7 @@ export function FundingMainPage() {
                     <button type="button" onClick={() => go(r)} className="flex w-full items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50">
                       <div className="min-w-0 text-left">
                         <p className="truncate text-sm font-medium text-slate-800">{r.orgName} · {r.project.name}</p>
-                        <p className="text-xs text-slate-400">결과 {r.latest?.outcomes.length}건 기록</p>
+                        <p className="text-[0.875rem] text-slate-400">결과 {r.latest?.outcomes.length}건 기록</p>
                       </div>
                       {outcome && <OutcomeTypeBadge type={outcome.type} />}
                     </button>

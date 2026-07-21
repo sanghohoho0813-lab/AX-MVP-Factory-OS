@@ -42,12 +42,12 @@ export function FieldWrapper({
       </label>
       {children}
       {help && !error && (
-        <p id={`${id}-help`} className="mt-1 text-xs break-keep text-slate-400">
+        <p id={`${id}-help`} className="mt-1 text-[0.875rem] break-keep text-slate-400">
           {help}
         </p>
       )}
       {error && (
-        <p id={`${id}-error`} className="mt-1 text-xs break-keep text-danger-600">
+        <p id={`${id}-error`} className="mt-1 text-[0.875rem] break-keep text-danger-600">
           {error}
         </p>
       )}
@@ -56,7 +56,7 @@ export function FieldWrapper({
 }
 
 export const inputClass =
-  'h-10 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand-500 disabled:bg-slate-50 disabled:text-slate-400 aria-invalid:border-danger-500'
+  'h-10 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 text-[1rem] text-slate-800 placeholder:text-slate-400 focus:border-brand-500 disabled:bg-slate-50 disabled:text-slate-400 aria-invalid:border-danger-500'
 
 function describedBy(id: string, help?: string, error?: string): string | undefined {
   if (error) return `${id}-error`
@@ -201,7 +201,7 @@ export function TextAreaField({
         rows={rows}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy(id, help, error)}
-        className={`w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand-500 aria-invalid:border-danger-500 ${className}`}
+        className={`w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2.5 text-[1rem] text-slate-800 placeholder:text-slate-400 focus:border-brand-500 aria-invalid:border-danger-500 ${className}`}
         {...rest}
       />
     </FieldWrapper>
@@ -328,7 +328,7 @@ export function CheckboxGroupField({
           )
         })}
       </div>
-      {error && <p className="mt-1 text-xs text-danger-600">{error}</p>}
+      {error && <p className="mt-1 text-[0.875rem] text-danger-600">{error}</p>}
     </fieldset>
   )
 }

@@ -204,7 +204,7 @@ export function SelectionDecisionPage() {
       <div className="flex flex-wrap items-center gap-2">
         <SelectionStatusBadge status={decision.status} />
         {context.needsReselectionFlag && (
-          <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700">
+          <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.875rem] font-medium text-warning-700">
             <RefreshCw aria-hidden="true" className="size-3" />
             재선별 필요
           </span>
@@ -222,7 +222,7 @@ export function SelectionDecisionPage() {
             )}
             {editable && (
               <div className="mt-3">
-                <p className="mb-1.5 text-xs font-medium text-slate-500">후보 중 핵심 과제 선택</p>
+                <p className="mb-1.5 text-[0.875rem] font-medium text-slate-500">후보 중 핵심 과제 선택</p>
                 <ul className="flex flex-col gap-1.5">
                   {selectableCandidates.map((c) => {
                     const eligible = isPrimaryEligible(c) && isSelectable(c)
@@ -238,12 +238,12 @@ export function SelectionDecisionPage() {
                         />
                         <span className={`min-w-0 flex-1 truncate text-[13px] ${eligible ? 'text-slate-700' : 'text-slate-400'}`}>{c.name}</span>
                         <span className="shrink-0 text-sm font-bold text-slate-700">{c.priorityScore}</span>
-                        {!eligible && <span className="shrink-0 text-[11px] text-slate-400">지정 불가</span>}
+                        {!eligible && <span className="shrink-0 text-[0.8125rem] text-slate-400">지정 불가</span>}
                       </li>
                     )
                   })}
                 </ul>
-                <p className="mt-1 text-xs text-slate-400">very_high 복잡도·중대 위험·자료정리 우선·신뢰도 미달 후보는 핵심 과제로 지정할 수 없습니다.</p>
+                <p className="mt-1 text-[0.875rem] text-slate-400">very_high 복잡도·중대 위험·자료정리 우선·신뢰도 미달 후보는 핵심 과제로 지정할 수 없습니다.</p>
               </div>
             )}
           </Panel>
@@ -287,13 +287,13 @@ export function SelectionDecisionPage() {
                   .map((c) => (
                     <li key={c.id} className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 px-3 py-2">
                       <span className="min-w-0 flex-1 truncate text-[13px] text-slate-700">{c.name}</span>
-                      <button type="button" onClick={() => setCandidateDecisionBucket(decision.id, c.id, 'deferred')} className="cursor-pointer text-xs font-medium text-warning-700 hover:underline">보류</button>
-                      <button type="button" onClick={() => setCandidateDecisionBucket(decision.id, c.id, 'rejected')} className="cursor-pointer text-xs font-medium text-danger-600 hover:underline">제외</button>
+                      <button type="button" onClick={() => setCandidateDecisionBucket(decision.id, c.id, 'deferred')} className="cursor-pointer text-[0.875rem] font-medium text-warning-700 hover:underline">보류</button>
+                      <button type="button" onClick={() => setCandidateDecisionBucket(decision.id, c.id, 'rejected')} className="cursor-pointer text-[0.875rem] font-medium text-danger-600 hover:underline">제외</button>
                     </li>
                   ))}
               </ul>
               {decision.deferredCandidateIds.length + decision.rejectedCandidateIds.length > 0 && (
-                <p className="mt-2 text-xs text-slate-400">
+                <p className="mt-2 text-[0.875rem] text-slate-400">
                   보류 {decision.deferredCandidateIds.length}건 · 제외 {decision.rejectedCandidateIds.length}건
                 </p>
               )}
@@ -306,7 +306,7 @@ export function SelectionDecisionPage() {
               <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] break-keep text-slate-600">
                 {decision.autoSummary}
               </p>
-              <label htmlFor="decision-summary" className="text-xs font-medium text-slate-400">담당자 최종 의견</label>
+              <label htmlFor="decision-summary" className="text-[0.875rem] font-medium text-slate-400">담당자 최종 의견</label>
               <textarea
                 id="decision-summary"
                 value={summary}
@@ -343,7 +343,7 @@ export function SelectionDecisionPage() {
                     type="button"
                     disabled={!editable}
                     onClick={() => toggleKpi(kpi)}
-                    className={`rounded-full border px-3 py-1 text-xs font-medium ${on ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-500'} ${editable ? 'cursor-pointer' : ''}`}
+                    className={`rounded-full border px-3 py-1 text-[0.875rem] font-medium ${on ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-500'} ${editable ? 'cursor-pointer' : ''}`}
                   >
                     {kpi}
                   </button>
@@ -374,14 +374,14 @@ export function SelectionDecisionPage() {
               <div className="flex flex-col gap-2 text-[13px] text-slate-600">
                 <p>권장 MVP 수준: <span className="font-medium text-slate-800">{mvpLevelLabel(decision.recommendedMvpLevel, 'ax')}</span></p>
                 <div>
-                  <p className="mb-1 text-xs font-medium text-slate-400">템플릿 조합</p>
+                  <p className="mb-1 text-[0.875rem] font-medium text-slate-400">템플릿 조합</p>
                   <ul className="flex flex-col gap-0.5">
                     {(decision.recommendedTemplateMix.length > 0 ? decision.recommendedTemplateMix : primary.templateMix).map((t) => (
                       <li key={t.template} className="text-[13px]">{MVP_TEMPLATE_META[t.template].label} {t.percentage}%</li>
                     ))}
                   </ul>
                 </div>
-                <p className="text-xs text-slate-400">확정 시 Stage 7 인계 스냅샷이 생성되어 이후 후보 변경과 무관하게 보존됩니다.</p>
+                <p className="text-[0.875rem] text-slate-400">확정 시 Stage 7 인계 스냅샷이 생성되어 이후 후보 변경과 무관하게 보존됩니다.</p>
               </div>
             </Panel>
           )}
@@ -391,7 +391,7 @@ export function SelectionDecisionPage() {
             <Panel title="결과 상태">
               {!check.ok && (
                 <ul className="mb-3 flex flex-col gap-1 rounded-(--radius-control) border border-warning-200 bg-warning-50/60 px-3 py-2">
-                  {check.reasons.map((r) => <li key={r} className="text-xs break-keep text-warning-800">• {r}</li>)}
+                  {check.reasons.map((r) => <li key={r} className="text-[0.875rem] break-keep text-warning-800">• {r}</li>)}
                 </ul>
               )}
               <div className="flex flex-col gap-2">
@@ -411,7 +411,7 @@ export function SelectionDecisionPage() {
               <p className="text-[13px] break-keep text-slate-600">
                 핵심 과제 '{primary?.name}'이(가) 확정되어 기능·화면 설계로 전달할 인계 스냅샷이 생성되었습니다.
               </p>
-              <p className="mt-1 text-xs text-slate-400">생성 {formatDateTime(context.handoff.generatedAt)}</p>
+              <p className="mt-1 text-[0.875rem] text-slate-400">생성 {formatDateTime(context.handoff.generatedAt)}</p>
             </Panel>
           )}
         </div>
@@ -471,7 +471,7 @@ function SelectedCandidateCard({ candidate, onOpen, highlight }: { candidate: Au
       <div className="flex flex-wrap items-center gap-1.5">
         <PriorityQuadrantBadge quadrant={candidate.quadrant} />
         <CandidateConfidenceBadge confidence={candidate.confidence} />
-        <span className="text-xs text-slate-400">{monthlySavingLabel(candidate)} 절감</span>
+        <span className="text-[0.875rem] text-slate-400">{monthlySavingLabel(candidate)} 절감</span>
       </div>
     </button>
   )

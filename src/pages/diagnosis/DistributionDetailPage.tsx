@@ -41,7 +41,7 @@ import { useToast } from '../../components/ui/toastContext'
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs text-slate-400">{label}</dt>
+      <dt className="text-[0.875rem] text-slate-400">{label}</dt>
       <dd className="mt-0.5 text-sm break-keep text-slate-700">{value || '-'}</dd>
     </div>
   )
@@ -309,7 +309,7 @@ export function DistributionDetailPage() {
                   />
                   <div>
                     <p className="text-[13px] font-medium text-slate-700">{event.label}</p>
-                    <p className="text-xs text-slate-400">{formatDateTime(event.at)}</p>
+                    <p className="text-[0.875rem] text-slate-400">{formatDateTime(event.at)}</p>
                   </div>
                 </li>
               ))}

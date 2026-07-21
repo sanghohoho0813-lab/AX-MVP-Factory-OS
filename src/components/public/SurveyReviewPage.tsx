@@ -83,7 +83,7 @@ export function SurveyReviewPage({
                         {p.required && <span className="ml-0.5 text-danger-500">*</span>}
                       </p>
                       {p.required && !answered && (
-                        <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-warning-600">
+                        <span className="flex shrink-0 items-center gap-1 text-[0.875rem] font-medium text-warning-600">
                           <AlertTriangle aria-hidden="true" className="size-3" />
                           미응답
                         </span>

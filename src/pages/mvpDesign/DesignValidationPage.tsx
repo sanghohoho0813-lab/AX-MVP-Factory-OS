@@ -53,7 +53,7 @@ export function DesignValidationPage() {
                   <li key={g.key} className="flex items-center justify-between gap-2 rounded-(--radius-card) border border-slate-200 px-3.5 py-2">
                     <div className="min-w-0">
                       <p className="truncate text-[0.92rem] text-slate-700">{g.label}</p>
-                      <p className="text-xs text-slate-400">{g.message}</p>
+                      <p className="text-[0.875rem] text-slate-400">{g.message}</p>
                     </div>
                     <GuardrailStatusBadge status={g.status} />
                   </li>
@@ -68,7 +68,7 @@ export function DesignValidationPage() {
                 <ul className="flex flex-col gap-2">
                   {design.acceptanceCriteria.map((a) => (
                     <li key={a.id} className="rounded-(--radius-card) border border-slate-200 px-3.5 py-2.5 text-[0.92rem]">
-                      <p className="text-xs font-semibold text-slate-400">{featureName(design, a.featureId)}</p>
+                      <p className="text-[0.875rem] font-semibold text-slate-400">{featureName(design, a.featureId)}</p>
                       <p className="mt-1 break-keep text-slate-600">
                         <span className="text-slate-400">조건</span> {a.given} · <span className="text-slate-400">실행</span> {a.when} · <span className="text-slate-400">기대</span> {a.then}
                       </p>
@@ -90,7 +90,7 @@ export function DesignValidationPage() {
                           {TEST_KIND_META[t.kind].label}
                         </span>
                       </div>
-                      <p className="mt-1 text-xs break-keep text-slate-500">{t.steps.join(' → ')} · 기대: {t.expected}</p>
+                      <p className="mt-1 text-[0.875rem] break-keep text-slate-500">{t.steps.join(' → ')} · 기대: {t.expected}</p>
                     </li>
                   ))}
                 </ul>
@@ -107,7 +107,7 @@ export function DesignValidationPage() {
                           <span className="text-sm text-slate-400">{KPI_DIRECTION_META[k.direction].symbol}</span>
                           <p className="text-[0.92rem] font-medium text-slate-700">{k.name}</p>
                         </div>
-                        <p className="mt-0.5 text-xs text-slate-500">
+                        <p className="mt-0.5 text-[0.875rem] text-slate-500">
                           {k.notEstimable ? '목표값은 검증 단계에서 측정 · ' : ''}{k.measureMethod}
                         </p>
                       </li>

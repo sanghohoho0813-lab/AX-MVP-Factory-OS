@@ -149,7 +149,7 @@ export function AssessmentsListPage() {
       cell: (r) => (
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-slate-800">{r.project.name}</p>
-          <p className="text-xs text-slate-400">{r.project.projectCode}</p>
+          <p className="text-[0.875rem] text-slate-400">{r.project.projectCode}</p>
         </div>
       ),
     },
@@ -185,7 +185,7 @@ export function AssessmentsListPage() {
         <div className="flex items-center gap-1.5">
           <AssessmentStatusBadge status={r.assessment.status} />
           {r.needsReanalysis && (
-            <span className="inline-flex items-center gap-0.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[11px] font-medium text-warning-700">
+            <span className="inline-flex items-center gap-0.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-warning-700">
               <RefreshCw aria-hidden="true" className="size-3" />
               재분석
             </span>
@@ -197,7 +197,7 @@ export function AssessmentsListPage() {
       key: 'version',
       header: '버전',
       className: 'hidden xl:table-cell',
-      cell: (r) => <span className="text-xs text-slate-400">v{r.assessment.version}</span>,
+      cell: (r) => <span className="text-[0.875rem] text-slate-400">v{r.assessment.version}</span>,
     },
     {
       key: 'updated',
@@ -348,7 +348,7 @@ export function AssessmentsListPage() {
                         />
                       )}
                       {r.needsReanalysis && (
-                        <span className="inline-flex items-center gap-0.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[11px] font-medium text-warning-700">
+                        <span className="inline-flex items-center gap-0.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-warning-700">
                           <RefreshCw aria-hidden="true" className="size-3" />
                           재분석
                         </span>

@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ClipboardCheck, PencilRuler, RefreshCw } from 'lucide-react'
+import { PencilRuler, RefreshCw } from 'lucide-react'
 import type { MvpDesign } from '../../types/mvpDesign'
 import type { ProjectDesignContext } from '../../services/mvpDesignService'
 import { Button } from '../../components/ui/Button'
 import { NotFoundState } from '../../components/ui/NotFoundState'
+import { PrerequisiteNotice } from '../../components/workspace/FeatureNotices'
 import {
   WorkspaceHeader,
   WorkspaceStepNav,
@@ -77,22 +78,14 @@ export function DesignGateNotice({ context }: { context: ProjectDesignContext })
     )
   }
   return (
-    <div className="rounded-(--radius-panel) border border-slate-200 bg-white p-6 shadow-(--shadow-card)">
-      <div className="flex items-start gap-3">
-        <ClipboardCheck aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-slate-400" />
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-slate-800">먼저 핵심 과제 확정이 필요합니다</p>
-          <p className="mt-1 text-[0.92rem] break-keep text-slate-600">
-            MVP 설계는 과제선별에서 확정된 핵심 과제를 기준으로 시작됩니다. 과제선별을 먼저 확정하세요.
-          </p>
-          <div className="mt-3">
-            <Button variant="primary" size="sm" onClick={() => navigate(`/selection/projects/${context.project.id}/decision`)}>
-              과제선별로 이동
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <PrerequisiteNotice
+      title="먼저 만들 업무가 아직 확정되지 않았습니다"
+      description="기업 진단 결과에서 첫 번째로 만들 업무를 선택하면 기능·화면 설계를 시작할 수 있습니다."
+      missing={['확정된 핵심 업무 선택 결과']}
+      unlocks="업무 흐름·기능·화면·데이터 설계"
+      actionLabel="만들 업무 선택으로 이동"
+      actionPath={`/selection/projects/${context.project.id}`}
+    />
   )
 }
 

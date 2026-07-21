@@ -7,7 +7,6 @@ import type {
   ProjectType,
 } from '../types/domain'
 import type { HealthStatus, ProjectStage } from '../types'
-import { PROJECT_STAGE_META } from '../lib/statusMeta'
 import {
   MVP_LEVELS,
   PROJECT_STATUS_META,
@@ -167,10 +166,6 @@ function validate(form: FormState): FormErrors {
   if (!form.dueDate) errors.dueDate = '목표 완료일을 선택해 주세요.'
   if (!form.nextAction.trim()) errors.nextAction = '다음 행동을 입력해 주세요.'
 
-  const progress = Number(form.progress)
-  if (!Number.isFinite(progress) || progress < 0 || progress > 100) {
-    errors.progress = '진행률은 0~100 사이 숫자로 입력해 주세요.'
-  }
   if (form.targetMvpLevel < form.currentMvpLevel) {
     errors.targetMvpLevel = `목표 수준은 현재 수준(${mvpLevelLabel(form.currentMvpLevel, form.projectType)}) 이상으로 설정해 주세요.`
   }
@@ -277,7 +272,6 @@ export function ProjectFormPage() {
     }
   }
 
-  const stageFlow = STAGE_FLOW_BY_TYPE[form.projectType]
   const levelLabel = levelFieldLabel(form.projectType)
   const nextActionDday = getDDay(form.nextActionDueDate || null)
   const cancelTo = isEdit
@@ -317,7 +311,7 @@ export function ProjectFormPage() {
     }
     if (i === 0) return check(['organizationId'])
     if (i === 1) return check(['name', 'objective'])
-    if (i === 3) return check(['ownerId', 'dueDate', 'nextAction', 'progress', 'targetMvpLevel'])
+    if (i === 3) return check(['ownerId', 'dueDate', 'nextAction', 'targetMvpLevel'])
     return true
   }
 
@@ -399,9 +393,7 @@ export function ProjectFormPage() {
           <div className="flex flex-col gap-5">
             <FormSection title="담당자·일정" description="담당자와 목표 완료일, 지금 해야 할 다음 행동을 정합니다.">
               <SelectField id={FIELD_IDS.ownerId} label="내부 담당자" required value={form.ownerId} onChange={(e) => set('ownerId', e.target.value)} error={errors.ownerId} options={INTERNAL_MEMBERS.map((member) => ({ value: member.id, label: `${member.name} · ${member.role}` }))} />
-              <SelectField id={FIELD_IDS.currentStage} label="현재 단계" required value={form.currentStage} onChange={(e) => set('currentStage', e.target.value as ProjectStage)} options={stageFlow.map((stage) => ({ value: stage, label: PROJECT_STAGE_META[stage].label }))} />
               <SelectField id={FIELD_IDS.status} label="프로젝트 상태" value={form.status} onChange={(e) => set('status', e.target.value as ProjectStatus)} options={(['planned', 'active', 'waiting_client', 'on_hold', 'completed'] as const).map((status) => ({ value: status, label: PROJECT_STATUS_META[status].label }))} />
-              <TextField id={FIELD_IDS.progress} label="진행률 (%)" type="number" min={0} max={100} inputMode="numeric" value={form.progress} onChange={(e) => set('progress', e.target.value)} error={errors.progress} />
               <TextField id={FIELD_IDS.startDate} label="시작일" type="date" value={form.startDate} onChange={(e) => set('startDate', e.target.value)} />
               <TextField id={FIELD_IDS.dueDate} label="목표 완료일" required type="date" value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)} error={errors.dueDate} />
               <TextField id={FIELD_IDS.nextAction} label="다음 행동" required fullWidth value={form.nextAction} onChange={(e) => set('nextAction', e.target.value)} error={errors.nextAction} placeholder="예: 대표자 진단 설문 준비" />

@@ -5,6 +5,9 @@ import { ensureWorkspace, ValidationBlockedError } from '../../services/validati
 import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/toastContext'
 import { TrackBadge, WorkspaceStatusBadge } from '../../components/validation/badges'
+import { AdvancedFeatureNotice, LocalModeNotice } from '../../components/workspace/FeatureNotices'
+import { isAdvancedVisible } from '../../lib/featureVisibility'
+import { useStoreVersion } from '../../lib/useStoreVersion'
 import { TRACK_META } from '../../lib/validationMeta'
 import { ValidationModuleHeader, ValidationProjectNotFound } from './validationShared'
 import { useValidationData } from './useValidationData'
@@ -14,6 +17,8 @@ export function ValidationProjectPage() {
   const navigate = useNavigate()
   const { showToast } = useToast()
   const { context } = useValidationData(projectId)
+  useStoreVersion()
+  const advanced = isAdvancedVisible()
 
   if (!context) return <ValidationProjectNotFound />
 
@@ -31,7 +36,16 @@ export function ValidationProjectPage() {
 
   return (
     <div className="flex flex-col gap-5">
+      {!advanced && (
+        <AdvancedFeatureNotice
+          featureName="실제 사용 테스트"
+          whenToUse="설계를 확정한 뒤, 실제 사용자가 시험하고 문제·성과를 기록할 때 사용합니다."
+        />
+      )}
+
       <ValidationModuleHeader saveStatus="local" />
+
+      <LocalModeNotice context="설문·테스트 링크는 이 브라우저에서만 열립니다." />
 
       <section
         aria-label="테스트 진행 방식 안내"

@@ -120,7 +120,7 @@ export function WorkspaceMembersPanel() {
           <li key={m.userId} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-slate-800">{m.displayName ?? m.email ?? m.userId}</p>
-              {m.email && <p className="truncate text-[12px] text-slate-400">{m.email}</p>}
+              {m.email && <p className="truncate text-[0.875rem] text-slate-400">{m.email}</p>}
             </div>
             <div className="flex items-center gap-2">
               {canManage && m.userId !== session?.user.id ? (
@@ -145,7 +145,7 @@ export function WorkspaceMembersPanel() {
                   </button>
                 </>
               ) : (
-                <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[12px] font-medium text-slate-600">
+                <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[0.875rem] font-medium text-slate-600">
                   <ShieldCheck aria-hidden="true" className="size-3.5" /> {ROLE_LABEL[m.role]}
                 </span>
               )}
@@ -161,7 +161,7 @@ export function WorkspaceMembersPanel() {
           </p>
           <div className="flex flex-wrap items-end gap-2">
             <div className="min-w-0 flex-1">
-              <label htmlFor="invite-email" className="mb-1 block text-[12px] text-slate-500">이메일</label>
+              <label htmlFor="invite-email" className="mb-1 block text-[0.875rem] text-slate-500">이메일</label>
               <input
                 id="invite-email"
                 type="email"
@@ -173,7 +173,7 @@ export function WorkspaceMembersPanel() {
               />
             </div>
             <div>
-              <label htmlFor="invite-role" className="mb-1 block text-[12px] text-slate-500">역할</label>
+              <label htmlFor="invite-role" className="mb-1 block text-[0.875rem] text-slate-500">역할</label>
               <select
                 id="invite-role"
                 value={inviteRole}
@@ -190,7 +190,7 @@ export function WorkspaceMembersPanel() {
 
           {issuedToken && (
             <div className="mt-3 rounded-(--radius-control) border border-brand-200 bg-white px-3 py-2.5">
-              <p className="text-[12px] text-slate-500">아래 초대 코드는 지금만 표시됩니다(서버에는 해시만 저장). 7일 후 만료, 1회 사용.</p>
+              <p className="text-[0.875rem] text-slate-500">아래 초대 코드는 지금만 표시됩니다(서버에는 해시만 저장). 7일 후 만료, 1회 사용.</p>
               <div className="mt-1.5 flex items-center gap-2">
                 <code className="min-w-0 flex-1 truncate rounded bg-slate-100 px-2 py-1 text-[13px] text-slate-800">{issuedToken}</code>
                 <button

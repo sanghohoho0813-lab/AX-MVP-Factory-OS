@@ -113,7 +113,7 @@ export function SurveyPreviewShell({
 
       {/* 진행률 */}
       <div className="border-b border-slate-100 px-5 py-3">
-        <div className="flex items-center justify-between text-xs text-slate-500">
+        <div className="flex items-center justify-between text-[0.875rem] text-slate-500">
           <span>
             섹션 {safeIndex + 1} / {total} · {section.title}
           </span>

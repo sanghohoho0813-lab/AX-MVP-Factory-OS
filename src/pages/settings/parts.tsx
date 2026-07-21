@@ -132,7 +132,7 @@ export function LocalDataSummaryPanel() {
           <Button variant="secondary" onClick={() => { downloadLocalBackup(); showToast('로컬 백업(JSON)을 내려받았습니다.') }}>
             로컬 데이터 내보내기(JSON)
           </Button>
-          <p className="mt-2 text-[12px] break-keep text-slate-400">
+          <p className="mt-2 text-[0.875rem] break-keep text-slate-400">
             클라우드 저장(supabase 모드)으로 옮기려면 로그인 후 설정 &gt; 데이터에서 가져오기를 실행하세요. 로컬 데이터는 자동으로 지워지지 않습니다.
           </p>
         </div>

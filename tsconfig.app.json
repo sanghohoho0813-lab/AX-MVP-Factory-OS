@@ -23,5 +23,5 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"],
-  "exclude": ["src/**/__contract__/**"]
+  "exclude": ["src/**/__contract__/**", "src/**/__tests__/**"]
 }

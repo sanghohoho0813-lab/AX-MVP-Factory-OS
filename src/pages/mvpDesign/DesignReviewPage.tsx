@@ -109,8 +109,8 @@ function ReviewBody({ design, projectType }: { design: MvpDesign; projectType: P
     <>
       <div className="flex flex-wrap items-center gap-2">
         <DesignStatusBadge status={design.status} />
-        <span className="text-xs text-slate-400">설계 v{design.version}</span>
-        {finalized && design.finalizedBy && <span className="text-xs text-slate-400">확정: {design.finalizedBy}</span>}
+        <span className="text-[0.875rem] text-slate-400">설계 v{design.version}</span>
+        {finalized && design.finalizedBy && <span className="text-[0.875rem] text-slate-400">확정: {design.finalizedBy}</span>}
       </div>
 
       <Panel title="MVP 수준 결정">
@@ -134,7 +134,7 @@ function ReviewBody({ design, projectType }: { design: MvpDesign; projectType: P
         </div>
         {isOverride && editable && (
           <div className="mt-3">
-            <label className="mb-1 block text-xs font-semibold text-slate-500">권장과 다른 수준 선택 사유 (필수)</label>
+            <label className="mb-1 block text-[0.875rem] font-semibold text-slate-500">권장과 다른 수준 선택 사유 (필수)</label>
             <textarea
               value={overrideReason}
               onChange={(e) => setOverrideReason(e.target.value)}
@@ -155,9 +155,9 @@ function ReviewBody({ design, projectType }: { design: MvpDesign; projectType: P
           className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.92rem] focus:border-brand-400 focus:outline-none disabled:bg-slate-50"
           placeholder="담당자 최종 설계 의견을 작성하세요. 확정하려면 필수입니다."
         />
-        <p className="mt-2 text-xs break-keep text-slate-400">자동 요약: {design.autoSummary}</p>
+        <p className="mt-2 text-[0.875rem] break-keep text-slate-400">자동 요약: {design.autoSummary}</p>
         <div className="mt-3">
-          <label className="mb-1 block text-xs font-semibold text-slate-500">범위 메모 (선택)</label>
+          <label className="mb-1 block text-[0.875rem] font-semibold text-slate-500">범위 메모 (선택)</label>
           <textarea
             value={scopeNotes}
             onChange={(e) => setScopeNotes(e.target.value)}
@@ -176,7 +176,7 @@ function ReviewBody({ design, projectType }: { design: MvpDesign; projectType: P
       <Panel title="제외 범위">
         <ul className="flex flex-wrap gap-2">
           {design.outOfScope.map((item) => (
-            <li key={item} className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-500">{item}</li>
+            <li key={item} className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-[0.875rem] text-slate-500">{item}</li>
           ))}
         </ul>
       </Panel>
@@ -248,7 +248,7 @@ function ReviewBody({ design, projectType }: { design: MvpDesign; projectType: P
 function SnapItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs font-semibold text-slate-500">{label}</dt>
+      <dt className="text-[0.875rem] font-semibold text-slate-500">{label}</dt>
       <dd className="mt-0.5 text-[0.92rem] break-keep text-slate-700">{value}</dd>
     </div>
   )

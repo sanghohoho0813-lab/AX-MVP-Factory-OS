@@ -15,6 +15,7 @@ import { Button } from '../../components/ui/Button'
 import { Panel } from '../../components/ui/Panel'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { AudienceBadge, PackageStatusBadge, PackageTypeBadge } from '../../components/deliverables/badges'
+import { PrerequisiteNotice } from '../../components/workspace/FeatureNotices'
 import {
   WorkspaceShell,
   WorkspaceNextAction,
@@ -165,6 +166,21 @@ export function ProjectDeliverablesPage() {
       summary={summary}
     >
       <div className="flex flex-col gap-5">
+        {!canCreate && (
+          <PrerequisiteNotice
+            title="결과자료에 담을 확정 결과가 아직 없습니다"
+            description="진단 또는 설계 결과를 확정하면 고객·개발자·기관용 자료를 만들 수 있습니다."
+            missing={eligibility.reasons}
+            unlocks="고객 설명자료·개발자 전달자료·개발 지시문 생성"
+            actionLabel="현재 프로젝트 단계 확인"
+            actionPath={`/projects/${projectId}`}
+          />
+        )}
+
+        <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-[0.875rem] leading-relaxed break-keep text-slate-500">
+          이 시스템은 진단·설계·개발 지시문을 만듭니다. 실제 프로그램과 홈페이지 제작·배포는 별도의 개발 과정이 필요합니다.
+        </p>
+
         {project.projectType === 'ax_website' && (
           <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.9rem] break-keep text-slate-600">
             AX와 홈페이지는 별도 트랙으로 관리되며 결과를 하나의 점수로 합산하지 않습니다. 각 트랙의 결과는 자료에서 구분되어 표시됩니다.

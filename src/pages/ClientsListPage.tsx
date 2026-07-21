@@ -175,7 +175,19 @@ export function ClientsListPage() {
       cell: (row) =>
         row.primaryProject ? (
           <div className="min-w-0">
-            <p className="max-w-52 truncate text-[0.95rem] font-medium text-slate-700">{row.primaryProject.name}</p>
+            <div className="flex min-w-0 items-center gap-1.5">
+              <p className="max-w-52 truncate text-[0.95rem] font-medium text-slate-700">{row.primaryProject.name}</p>
+              {row.primaryProgress?.isSample && (
+                <span className="shrink-0 rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[0.78rem] font-medium text-brand-700">
+                  샘플
+                </span>
+              )}
+            </div>
+            {row.primaryProgress && (
+              <p className="mt-0.5 text-[0.85rem] text-slate-500">
+                {row.primaryProgress.stepText} · {row.primaryProgress.currentStepLabel}
+              </p>
+            )}
             {row.projects.length > 1 && <p className="mt-0.5 text-[0.85rem] text-slate-400">외 {row.projects.length - 1}건</p>}
           </div>
         ) : (
@@ -192,7 +204,7 @@ export function ClientsListPage() {
       header: '다음 행동',
       cell: (row) => (
         <span className="block max-w-64 truncate text-[0.95rem] font-medium text-brand-700">
-          {row.primaryProject?.nextAction || '다음 행동 없음'}
+          {row.primaryProgress?.nextActionLabel || '다음 행동 없음'}
         </span>
       ),
     },
@@ -391,46 +403,51 @@ export function ClientsListPage() {
                   <StatusBadge tone={HEALTH_META[row.organization.healthStatus].tone} withDot>
                     {HEALTH_META[row.organization.healthStatus].label}
                   </StatusBadge>
-                  {row.primaryProject && (
-                    <StatusBadge
-                      tone={PROJECT_STAGE_META[row.primaryProject.currentStage].tone}
-                    >
-                      {PROJECT_STAGE_META[row.primaryProject.currentStage].label}
+                  {row.primaryProgress && (
+                    <StatusBadge tone="info">
+                      {row.primaryProgress.currentStepLabel}
                     </StatusBadge>
+                  )}
+                  {row.primaryProgress?.isSample && (
+                    <span className="rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[0.78rem] font-medium text-brand-700">
+                      샘플
+                    </span>
                   )}
                 </div>
                 <div className="px-4 pt-3 pb-4">
                   {row.primaryProject ? (
                     <>
-                      <p className="truncate text-[13px] font-medium text-slate-700">
+                      <p className="truncate text-sm font-medium text-slate-700">
                         {row.primaryProject.name}
                         {row.projects.length > 1 && (
-                          <span className="ml-1 text-xs font-normal text-slate-400">
+                          <span className="ml-1 text-[0.85rem] font-normal text-slate-400">
                             외 {row.projects.length - 1}건
                           </span>
                         )}
                       </p>
-                      <div className="mt-2 flex items-center gap-2">
-                        <ProgressBar
-                          value={row.primaryProject.progress}
-                          tone={HEALTH_META[row.organization.healthStatus].tone}
-                          label={`${row.organization.name} 진행률`}
-                        />
-                        <span className="shrink-0 text-xs font-semibold text-slate-600">
-                          {row.primaryProject.progress}%
-                        </span>
-                      </div>
-                      {row.primaryProject.nextAction && (
-                        <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
+                      {row.primaryProgress && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <ProgressBar
+                            value={row.primaryProgress.percent}
+                            tone={HEALTH_META[row.organization.healthStatus].tone}
+                            label={`${row.organization.name} 진행 단계`}
+                          />
+                          <span className="shrink-0 text-[0.875rem] font-semibold text-slate-600">
+                            {row.primaryProgress.stepText}
+                          </span>
+                        </div>
+                      )}
+                      {row.primaryProgress?.nextActionLabel && (
+                        <p className="mt-2 flex items-center gap-1.5 text-[0.875rem] break-keep text-slate-500">
                           <UserRound aria-hidden="true" className="size-3 shrink-0" />
                           <span className="truncate">
-                            다음 행동: {row.primaryProject.nextAction}
+                            다음 행동: {row.primaryProgress.nextActionLabel}
                           </span>
                         </p>
                       )}
                     </>
                   ) : (
-                    <p className="text-[13px] text-slate-400">
+                    <p className="text-sm text-slate-400">
                       연결된 프로젝트가 없습니다.
                     </p>
                   )}

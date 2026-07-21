@@ -32,27 +32,27 @@ export function AssessmentScoreHeadline({
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
       <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50 px-4 py-3">
-        <p className="text-xs text-slate-400">최종 점수</p>
+        <p className="text-[0.875rem] text-slate-400">최종 점수</p>
         <p className="mt-0.5 text-3xl font-bold text-slate-900">
           {result.finalScore}
           <span className="text-base font-medium text-slate-400"> / 100</span>
         </p>
-        <p className="mt-1 text-xs text-slate-400">
+        <p className="mt-1 text-[0.875rem] text-slate-400">
           원점수 {result.subtotalScore} · 감점 -{result.deductionTotal}
         </p>
       </div>
       <div className="flex flex-col justify-center gap-1.5 sm:col-span-2">
-        <p className="text-xs text-slate-400">판정</p>
+        <p className="text-[0.875rem] text-slate-400">판정</p>
         <AssessmentRecommendationBadge recommendation={result.recommendation} />
         {result.recommendationExceptionReason && (
-          <p className="text-xs break-keep text-warning-700">
+          <p className="text-[0.875rem] break-keep text-warning-700">
             예외 적용: {result.recommendationExceptionReason}
           </p>
         )}
       </div>
       <div className="flex flex-col justify-center gap-1.5">
         <AssessmentConfidenceBadge confidence={result.confidence} />
-        <p className="text-xs break-keep text-slate-500">{result.confidenceReason}</p>
+        <p className="text-[0.875rem] break-keep text-slate-500">{result.confidenceReason}</p>
       </div>
     </div>
   )
@@ -77,13 +77,13 @@ export function DataCompletenessPanel({ result }: { result: AssessmentResult }) 
             <span className="text-sm font-semibold text-slate-800">{value}%</span>
           </div>
           <ProgressBar value={value} tone="info" label={label} />
-          <p className="mt-1 text-xs text-slate-400">{help}</p>
+          <p className="mt-1 text-[0.875rem] text-slate-400">{help}</p>
         </div>
       ))}
       <div className="mt-1 flex items-center gap-2 border-t border-slate-100 pt-2">
-        <span className="text-xs text-slate-400">신뢰도</span>
+        <span className="text-[0.875rem] text-slate-400">신뢰도</span>
         <AssessmentConfidenceBadge confidence={result.confidence} />
-        <span className="text-xs text-slate-400">{CONFIDENCE_META[result.confidence].label}</span>
+        <span className="text-[0.875rem] text-slate-400">{CONFIDENCE_META[result.confidence].label}</span>
       </div>
     </div>
   )
@@ -130,7 +130,7 @@ export function AnalysisProgressSteps({ steps }: { steps: AnalysisStep[] }) {
                 <span className="mr-1 text-slate-400">{i + 1}.</span>
                 {step.label}
               </p>
-              {step.hint && <p className="text-xs text-slate-400">{step.hint}</p>}
+              {step.hint && <p className="text-[0.875rem] text-slate-400">{step.hint}</p>}
             </div>
           </li>
         )
@@ -149,7 +149,7 @@ export function RuleVersionInfo({
   result?: AssessmentResult
 }) {
   return (
-    <p className="text-xs text-slate-400">
+    <p className="text-[0.875rem] text-slate-400">
       진단 규칙 버전 v{result?.ruleVersion ?? ASSESSMENT_RULE_VERSION}
       {result && ` · 분석 버전 v${result.version}`}
     </p>
@@ -170,16 +170,16 @@ export function WebsiteReadinessSummary({
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50 px-4 py-3">
-          <p className="text-xs text-slate-400">홈페이지 제작 준비도</p>
+          <p className="text-[0.875rem] text-slate-400">홈페이지 제작 준비도</p>
           <p className="mt-0.5 text-3xl font-bold text-slate-900">
             {website.overallScore}
             <span className="text-base font-medium text-slate-400"> / 100</span>
           </p>
         </div>
         <div className="flex flex-col justify-center gap-1.5 sm:col-span-2">
-          <p className="text-xs text-slate-400">판정</p>
+          <p className="text-[0.875rem] text-slate-400">판정</p>
           <span
-            className={`inline-flex w-fit items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium ${
+            className={`inline-flex w-fit items-center gap-1 rounded-md border px-2 py-0.5 text-[0.875rem] font-medium ${
               meta.tone === 'success'
                 ? 'border-success-200 bg-success-50 text-success-700'
                 : meta.tone === 'info'
@@ -190,7 +190,7 @@ export function WebsiteReadinessSummary({
             <meta.icon aria-hidden="true" className="size-3.5" />
             {meta.label}
           </span>
-          <p className="text-xs break-keep text-slate-500">{meta.description}</p>
+          <p className="text-[0.875rem] break-keep text-slate-500">{meta.description}</p>
         </div>
       </div>
 
@@ -209,7 +209,7 @@ export function WebsiteReadinessSummary({
               </div>
               <span className="w-16 shrink-0 text-right text-sm font-semibold text-slate-800">
                 {d.score}
-                <span className="text-xs font-normal text-slate-400"> / {d.maxScore}</span>
+                <span className="text-[0.875rem] font-normal text-slate-400"> / {d.maxScore}</span>
               </span>
             </div>
           )
@@ -220,7 +220,7 @@ export function WebsiteReadinessSummary({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {website.missingContent.length > 0 && (
             <div className="rounded-(--radius-control) border border-warning-200 bg-warning-50/40 px-3 py-2">
-              <p className="text-xs font-semibold text-warning-700">부족한 콘텐츠</p>
+              <p className="text-[0.875rem] font-semibold text-warning-700">부족한 콘텐츠</p>
               <p className="mt-0.5 text-[13px] break-keep text-slate-600">
                 {website.missingContent.join(', ')}
               </p>
@@ -228,7 +228,7 @@ export function WebsiteReadinessSummary({
           )}
           {website.missingAssets.length > 0 && (
             <div className="rounded-(--radius-control) border border-warning-200 bg-warning-50/40 px-3 py-2">
-              <p className="text-xs font-semibold text-warning-700">부족한 이미지·영상 자산</p>
+              <p className="text-[0.875rem] font-semibold text-warning-700">부족한 이미지·영상 자산</p>
               <p className="mt-0.5 text-[13px] break-keep text-slate-600">
                 {website.missingAssets.join(', ')}
               </p>

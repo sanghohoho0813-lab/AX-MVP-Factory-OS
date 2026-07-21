@@ -62,7 +62,7 @@ export function ConditionEditor({
         />
         조건부 표시
         {sourceQuestions.length === 0 && (
-          <span className="text-xs font-normal text-slate-400">
+          <span className="text-[0.875rem] font-normal text-slate-400">
             (앞에 배치된 질문이 있어야 설정할 수 있습니다)
           </span>
         )}
@@ -70,7 +70,7 @@ export function ConditionEditor({
 
       {enabled && condition && (
         <div className="mt-2.5 flex flex-col gap-2">
-          <p className="text-xs text-slate-500">
+          <p className="text-[0.875rem] text-slate-500">
             아래 조건을 만족할 때 이 질문을 표시합니다.
           </p>
           <select

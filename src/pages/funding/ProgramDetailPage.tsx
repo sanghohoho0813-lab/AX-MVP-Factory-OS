@@ -91,7 +91,7 @@ export function ProgramDetailPage() {
             <SourceStatusBadge status={program.sourceStatus} />
             <FreshnessBadge status={freshness} />
             {program.isTemplate && (
-              <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-500">검토용 템플릿 · 실제 공고 아님</span>
+              <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.875rem] font-medium text-slate-500">검토용 템플릿 · 실제 공고 아님</span>
             )}
           </>
         }

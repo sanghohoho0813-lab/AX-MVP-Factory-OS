@@ -63,11 +63,11 @@ export function FileQuestion({ question, answer, onAnswer, disabled }: RendererP
           </span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-slate-800">{file.name}</p>
-            <p className="text-xs text-slate-400">
+            <p className="text-[0.875rem] text-slate-400">
               {formatSize(file.size)} · {file.type || '알 수 없음'}
             </p>
             {oversize && (
-              <p className="mt-0.5 text-xs text-danger-600">
+              <p className="mt-0.5 text-[0.875rem] text-danger-600">
                 10MB를 초과하는 파일입니다. 다른 파일을 선택해 주세요.
               </p>
             )}
@@ -101,7 +101,7 @@ export function FileQuestion({ question, answer, onAnswer, disabled }: RendererP
           </span>
         </label>
       )}
-      <p className="mt-1.5 text-xs break-keep text-slate-400">
+      <p className="mt-1.5 text-[0.875rem] break-keep text-slate-400">
         현재 테스트 모드에서는 파일 원본이 업로드되지 않고 파일 정보만 저장됩니다.
         실제 파일 업로드는 Supabase Storage 연결 후 제공됩니다.
       </p>

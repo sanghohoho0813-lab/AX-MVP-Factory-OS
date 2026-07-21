@@ -2,81 +2,49 @@ import {
   Archive,
   ArrowRight,
   CalendarClock,
+  Check,
+  ChevronDown,
+  ClipboardList,
+  Copy,
+  ExternalLink,
+  FilePen,
+  Landmark,
+  Link2,
+  Lock,
+  Minus,
   Pencil,
+  Plus,
+  SearchCheck,
   ShieldAlert,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useActiveProject } from '../context/activeProject'
-import { NextActionHero } from '../components/workspace/NextActionHero'
-import { HEALTH_META, PROJECT_STAGE_META } from '../lib/statusMeta'
+import { HEALTH_META } from '../lib/statusMeta'
 import {
   PROJECT_STATUS_META,
-  STAGE_FLOW_BY_TYPE,
-  STAGE_NEXT_MODULE,
   levelFieldLabel,
   mvpLevelLabel,
 } from '../lib/domainMeta'
 import { formatDate, formatKrw, formatKrwCompact, getDDay } from '../lib/format'
 import { memberName } from '../data/members'
 import { useStoreVersion } from '../lib/useStoreVersion'
+import { isAdvancedVisible } from '../lib/featureVisibility'
 import {
   activityRepository,
   organizationRepository,
   projectRepository,
+  surveyDistributionRepository,
 } from '../repositories'
 import { archiveProject } from '../services/projectService'
 import { summarizeProjectSurveys } from '../services/projectSurveyService'
-import { getProjectAnalysisContext } from '../services/assessmentService'
-import { getProjectSelectionContext } from '../services/selectionService'
-import { getProjectDesignContext } from '../services/mvpDesignService'
-import { getProjectWebsiteContext } from '../services/websiteDesignService'
-import { getProjectValidationContext } from '../services/validationService'
 import {
-  TrackBadge,
-  WorkspaceStatusBadge,
-} from '../components/validation/badges'
-import { getProjectDeliverableContext } from '../services/deliverableService'
-import {
-  PackageStatusBadge,
-  PackageTypeBadge,
-} from '../components/deliverables/badges'
-import { getProjectFundingContext } from '../services/fundingService'
-import { StrategyStatusBadge } from '../components/funding/badges'
-import { WebsiteStatusBadge, WebsiteTypeBadge } from '../components/websiteStudio/badges'
-import { WEBSITE_TYPE_META } from '../lib/websiteDesignMeta'
-import {
-  FLOW_STEPS,
-  computeProjectJourney,
-  flowStepIndex,
-} from '../services/journeyService'
-import { JourneyFlow, type JourneyFlowStep } from '../components/domain/JourneyFlow'
-import {
-  AssessmentConfidenceBadge,
-  AssessmentRecommendationBadge,
-  AssessmentStatusBadge,
-} from '../components/assessment/badges'
-import {
-  PriorityQuadrantBadge,
-  SelectionStatusBadge,
-} from '../components/selection/badges'
-import { DesignStatusBadge } from '../components/mvpDesign/badges'
-import { Filter, Palette, PencilRuler, Target } from 'lucide-react'
+  STEP_STATE_LABEL,
+  collectProgressInputs,
+  getProjectProgress,
+  type StepViewState,
+} from '../services/projectProgressService'
 import { RESPONDENT_ROLE_META } from '../lib/surveyMeta'
-import {
-  BarChart3,
-  ClipboardList,
-  Copy,
-  ExternalLink,
-  FilePen,
-  FileText,
-  Landmark,
-  Link2,
-  Plus,
-  RefreshCw,
-  SearchCheck,
-} from 'lucide-react'
-import { surveyDistributionRepository } from '../repositories'
 import { buildSurveyUrl } from '../services/surveyTokenService'
 import { LocalTestModeBadge } from '../components/runtime/LocalTestModeBanner'
 import { SurveyLinkCreateModal } from '../components/runtime/SurveyLinkCreateModal'
@@ -88,18 +56,31 @@ import { DetailHeader } from '../components/ui/DetailHeader'
 import { DropdownMenu } from '../components/ui/DropdownMenu'
 import { NotFoundState } from '../components/ui/NotFoundState'
 import { Panel } from '../components/ui/Panel'
-import { ProgressBar } from '../components/ui/ProgressBar'
-import { StageProgress } from '../components/ui/StageProgress'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { useToast } from '../components/ui/toastContext'
 
 function SummaryItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs text-slate-400">{label}</dt>
+      <dt className="text-[0.875rem] text-slate-400">{label}</dt>
       <dd className="mt-0.5 text-sm break-keep text-slate-700">{value || '-'}</dd>
     </div>
   )
+}
+
+/** 단계 상태별 색상 (완료=초록, 진행 중=브랜드, 시작 가능=슬레이트, 잠김=연한 슬레이트) */
+const STEP_STATE_TEXT_CLASS: Record<StepViewState, string> = {
+  completed: 'text-success-700',
+  in_progress: 'text-brand-700',
+  ready: 'text-slate-500',
+  blocked_by_prerequisite: 'text-slate-400',
+}
+
+const STEP_CIRCLE_CLASS: Record<StepViewState, string> = {
+  completed: 'border-success-600 bg-success-600 text-white',
+  in_progress: 'border-brand-600 bg-white text-brand-700 ring-2 ring-brand-100',
+  ready: 'border-slate-300 bg-white text-slate-500',
+  blocked_by_prerequisite: 'border-slate-200 bg-slate-50 text-slate-300',
 }
 
 export function ProjectDetailPage() {
@@ -109,6 +90,7 @@ export function ProjectDetailPage() {
   const version = useStoreVersion()
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [linkModalOpen, setLinkModalOpen] = useState(false)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
 
   const project = useMemo(
     () => projectRepository.getById(projectId),
@@ -144,68 +126,75 @@ export function ProjectDetailPage() {
     )
   }
 
-  const nextModule = STAGE_NEXT_MODULE[project.currentStage]
+  // 진행상태 단일 기준 — 화면 임의 계산·하드코딩 진행률 금지
+  const progress = getProjectProgress(project)
+  const inputs = collectProgressInputs(project)
+  const nextAction = progress.nextAction
+
   const dday = getDDay(project.nextActionDueDate)
   const levelLabel = levelFieldLabel(project.projectType)
-  const isDiagnosisStage =
-    project.currentStage === 'intake' || project.currentStage === 'diagnosis'
   const surveyStatuses = summarizeProjectSurveys(project)
   const distributions = surveyDistributionRepository.getByProjectId(project.id)
   const distsByRole = (role: string) =>
     distributions.filter((d) => d.respondentRole === role)
   const anyReady = surveyStatuses.some((s) => s.state === 'ready')
-  const analysis = getProjectAnalysisContext(project.id)
-  const analysisPath = `/diagnosis/projects/${project.id}/analysis`
-  const selection = getProjectSelectionContext(project.id)
-  const selectionPath = `/selection/projects/${project.id}`
-  const primaryCandidate =
-    selection?.decision?.primaryCandidateId && selection
-      ? selection.candidates.find((c) => c.id === selection.decision?.primaryCandidateId) ?? null
-      : null
-  const design = getProjectDesignContext(project.id)
-  const designPath = `/mvp-design/projects/${project.id}`
-  const website =
-    project.projectType === 'website' || project.projectType === 'ax_website'
-      ? getProjectWebsiteContext(project.id)
-      : null
-  const websitePath = `/website-studio/projects/${project.id}`
-  const validation = getProjectValidationContext(project.id)
-  const validationPath = `/validation/projects/${project.id}`
-  const deliverable = getProjectDeliverableContext(project.id)
-  const deliverablePath = `/deliverables/projects/${project.id}`
-  const funding = getProjectFundingContext(project.id)
-  const fundingPath = `/funding/projects/${project.id}`
-  const journey = computeProjectJourney(project)
-  const currentFlowIndex = flowStepIndex(journey.currentStepKey)
 
-  // 완료·현재·잠금 상태의 쉬운 명칭 흐름 (홈페이지 단독 프로젝트는 제외)
-  const flowStepPath: Partial<Record<string, string>> = {
-    prepare: `/projects/${project.id}`,
-    diagnosis: analysis?.latest ? `${analysisPath}/result` : analysisPath,
-    selection: selectionPath,
-    design: designPath,
-    validation: design?.design ? `${designPath}/review` : undefined,
-    deliverables: undefined,
-  }
-  const flowHint: Partial<Record<string, string>> = {
-    diagnosis: '설문 응답 제출 후 진행',
-    selection: '진단 결과 확정 후 진행',
-    design: '핵심 업무 선정 후 진행',
-    validation: '설계 확정 후 진행',
-    deliverables: '검증 완료 후 진행',
-  }
-  const journeySteps: JourneyFlowStep[] = FLOW_STEPS.filter((s) => s.key !== 'done').map((s) => {
-    const idx = flowStepIndex(s.key)
-    const state: JourneyFlowStep['state'] =
-      idx < currentFlowIndex ? 'done' : idx === currentFlowIndex ? 'current' : 'locked'
-    return {
-      key: s.key,
-      label: s.label,
-      state,
-      path: state === 'locked' ? undefined : flowStepPath[s.key],
-      hint: flowHint[s.key],
-    }
-  })
+  // 진단 설문 패널 — 진단 단계가 열려 있고 아직 완료되지 않았을 때만 (홈페이지 단독은 사전진단 확정 전까지)
+  const diagnosisStep = progress.steps.find((s) => s.key === 'diagnosis')
+  const showSurveyPanel = diagnosisStep
+    ? diagnosisStep.state === 'ready' || diagnosisStep.state === 'in_progress'
+    : project.projectType === 'website' && !inputs.assessmentFinalized
+
+  const validationPath = `/validation/projects/${project.id}`
+  const fundingPath = `/funding/projects/${project.id}`
+  const advancedVisible = isAdvancedVisible()
+
+  // 현재 준비된 결과물 — 진행상태 서비스와 동일한 확정 기준만 사용
+  const resultItems = [
+    {
+      key: 'assessment',
+      label: '확정 진단 결과',
+      exists: inputs.assessmentFinalized,
+      path: `/diagnosis/projects/${project.id}/analysis`,
+      condition: '대표자·현장 응답이 제출되면 진단 결과를 만들 수 있습니다.',
+      show: true,
+    },
+    {
+      key: 'selection',
+      label: '확정 핵심 업무',
+      exists: inputs.selectionFinalized,
+      path: `/selection/projects/${project.id}/decision`,
+      condition: '진단 결과를 확정하면 먼저 만들 업무를 선택할 수 있습니다.',
+      show: project.projectType !== 'website',
+    },
+    {
+      key: 'ax-design',
+      label: 'AX 설계안',
+      exists: inputs.axDesignFinalized,
+      path: `/mvp-design/projects/${project.id}`,
+      condition: '만들 업무를 확정하면 기능·화면 설계안을 만들 수 있습니다.',
+      show: project.projectType !== 'website',
+    },
+    {
+      key: 'website-design',
+      label: '홈페이지 설계안',
+      exists: inputs.websiteFinalized,
+      path: `/website-studio/projects/${project.id}`,
+      condition:
+        project.projectType === 'website'
+          ? '홈페이지 구조·콘텐츠·디자인 설계를 확정하면 설계안이 준비됩니다.'
+          : '만들 업무를 확정하면 홈페이지 설계안을 함께 만들 수 있습니다.',
+      show: project.projectType !== 'ax',
+    },
+    {
+      key: 'deliverables',
+      label: '결과자료',
+      exists: inputs.deliverableFinalized,
+      path: `/deliverables/projects/${project.id}`,
+      condition: '진단 또는 설계 결과를 확정하면 결과자료를 만들 수 있습니다.',
+      show: true,
+    },
+  ].filter((item) => item.show)
 
   const copyLink = async (token: string) => {
     try {
@@ -232,24 +221,22 @@ export function ProjectDetailPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      {/* 프로젝트 컨트롤 센터 — 지금 해야 할 일이 가장 크게 보인다 */}
-      <NextActionHero
-        eyebrow={`${organization?.name ?? '고객사'} · ${project.name}`}
-        actionText={journey.actionText}
-        reason={journey.reason}
-        actionLabel={journey.actionLabel}
-        actionPath={journey.actionPath}
-      />
+      {/* 1. 현재 프로젝트 — 이름·고객사·유형과 실제 진행상태 */}
       <DetailHeader
         backTo={organization ? `/clients/${organization.id}` : '/clients'}
         backLabel={organization ? `${organization.name} 상세` : '고객사 목록'}
         title={project.name}
         badges={
           <>
-            <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold tracking-wide text-slate-500">
+            <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[13px] font-semibold tracking-wide text-slate-500">
               {project.projectCode}
             </span>
             <ProjectTypeBadge type={project.projectType} compact />
+            {progress.isSample && (
+              <span className="rounded-full border border-brand-200 bg-brand-50 px-2.5 py-0.5 text-[13px] font-semibold text-brand-700">
+                샘플
+              </span>
+            )}
             <StatusBadge tone={PROJECT_STATUS_META[project.status].tone}>
               {PROJECT_STATUS_META[project.status].label}
             </StatusBadge>
@@ -272,6 +259,9 @@ export function ProjectDetailPage() {
                 연결된 고객사를 찾을 수 없습니다
               </span>
             )}
+            <span className="font-medium text-slate-700">
+              진행 {progress.stepText} · 현재 단계 {progress.currentStep.label}
+            </span>
             <span>담당 {memberName(project.ownerId)}</span>
             <span>최근 수정 {formatDate(project.updatedAt)}</span>
           </>
@@ -284,10 +274,6 @@ export function ProjectDetailPage() {
             >
               <Pencil aria-hidden="true" className="size-4" />
               프로젝트 수정
-            </Button>
-            <Button variant="primary" onClick={() => navigate(journey.actionPath)}>
-              {journey.actionLabel}
-              <ArrowRight aria-hidden="true" className="size-4" />
             </Button>
             <DropdownMenu
               ariaLabel="프로젝트 더보기 메뉴"
@@ -306,46 +292,141 @@ export function ProjectDetailPage() {
       />
 
       {project.archivedAt && (
-        <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] break-keep text-slate-600">
+        <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50 px-4 py-3 text-[0.875rem] break-keep text-slate-600">
           {formatDate(project.archivedAt)}에 보관 처리된 프로젝트입니다. 데이터는
           유지됩니다.
         </p>
       )}
 
-      {/* 지금 해야 할 일 — 하나의 핵심 행동 */}
+      {/* 2. 지금 해야 할 일 — 하나의 핵심 행동 (진행상태 단일 기준) */}
       {!project.archivedAt && (
         <section
           aria-label="지금 해야 할 일"
           className="rounded-(--radius-panel) border border-brand-200 bg-brand-50/50 p-5"
         >
-          <p className="text-xs font-semibold tracking-wide text-brand-700 uppercase">지금 해야 할 일</p>
-          <p className="mt-1.5 text-base font-semibold break-keep text-slate-900">{journey.actionText}</p>
-          <p className="mt-1 text-[13px] break-keep text-slate-600">{journey.reason}</p>
-          <div className="mt-3">
-            <Button variant="primary" onClick={() => navigate(journey.actionPath)}>
-              {journey.actionLabel}
+          <p className="text-[13px] font-semibold tracking-wide text-brand-700 uppercase">
+            지금 해야 할 일
+          </p>
+          <p className="mt-1.5 text-lg font-bold break-keep text-slate-900">
+            {nextAction.title}
+          </p>
+          <p className="mt-1 text-[0.875rem] break-keep text-slate-600">
+            {nextAction.reason}
+          </p>
+          <div className="mt-3.5">
+            <Button variant="primary" onClick={() => navigate(nextAction.path)}>
+              {nextAction.buttonLabel}
               <ArrowRight aria-hidden="true" className="size-4" />
             </Button>
           </div>
         </section>
       )}
 
-      {/* A. 전체 진행 흐름 (쉬운 명칭 · 완료/현재/잠금) */}
-      {project.projectType !== 'website' ? (
-        <Panel title="전체 진행 흐름">
-          <JourneyFlow steps={journeySteps} onNavigate={(path) => navigate(path)} />
-        </Panel>
-      ) : (
-        <Panel title="전체 진행 흐름">
-          <StageProgress
-            flow={STAGE_FLOW_BY_TYPE[project.projectType]}
-            currentStage={project.currentStage}
-          />
-        </Panel>
-      )}
+      {/* 3. 핵심 단계 — 실제 데이터 기준의 단계별 상태 */}
+      <Panel title="핵심 단계" flush>
+        <ol className="flex flex-col divide-y divide-slate-100">
+          {progress.steps.map((step, index) => {
+            const blocked = step.state === 'blocked_by_prerequisite'
+            const inner = (
+              <>
+                <span
+                  className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full border text-[13px] font-semibold ${STEP_CIRCLE_CLASS[step.state]}`}
+                >
+                  {step.state === 'completed' ? (
+                    <Check aria-hidden="true" className="size-4" />
+                  ) : blocked ? (
+                    <Lock aria-hidden="true" className="size-3.5" />
+                  ) : (
+                    index + 1
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
+                    <span
+                      className={`text-[0.95rem] font-semibold break-keep ${blocked ? 'text-slate-400' : 'text-slate-800'}`}
+                    >
+                      {step.label}
+                    </span>
+                    <span
+                      className={`text-[13px] font-semibold ${STEP_STATE_TEXT_CLASS[step.state]}`}
+                    >
+                      {STEP_STATE_LABEL[step.state]}
+                    </span>
+                  </div>
+                  <p
+                    className={`mt-1 text-[0.875rem] leading-relaxed break-keep ${blocked ? 'text-slate-400' : 'text-slate-600'}`}
+                  >
+                    {step.detail}
+                  </p>
+                </div>
+              </>
+            )
+            return (
+              <li key={step.key}>
+                {blocked ? (
+                  // 잠긴 단계는 이동 메뉴가 아니라 이유 안내로만 보여준다
+                  <div className="flex items-start gap-3.5 px-5 py-4">{inner}</div>
+                ) : (
+                  <Link
+                    to={step.path}
+                    className="flex items-start gap-3.5 px-5 py-4 transition-colors hover:bg-slate-50"
+                  >
+                    {inner}
+                    <ArrowRight
+                      aria-hidden="true"
+                      className="mt-1.5 size-4 shrink-0 text-slate-300"
+                    />
+                  </Link>
+                )}
+              </li>
+            )
+          })}
+        </ol>
+      </Panel>
 
-      {/* 진단 설문 (상담 접수·진단 단계) */}
-      {isDiagnosisStage && (
+      {/* 4. 현재 준비된 결과물 — 확정 기준으로 실제 존재하는 것만 */}
+      <Panel title="현재 준비된 결과물" flush>
+        <ul className="flex flex-col divide-y divide-slate-100">
+          {resultItems.map((item) =>
+            item.exists ? (
+              <li key={item.key}>
+                <Link
+                  to={item.path}
+                  className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-slate-50"
+                >
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-success-100 text-success-700">
+                    <Check aria-hidden="true" className="size-3.5" />
+                  </span>
+                  <span className="text-[0.95rem] font-semibold break-keep text-slate-800">
+                    {item.label}
+                  </span>
+                  <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-[13px] font-semibold text-brand-600">
+                    열기
+                    <ArrowRight aria-hidden="true" className="size-3.5" />
+                  </span>
+                </Link>
+              </li>
+            ) : (
+              <li key={item.key} className="flex items-start gap-3 px-5 py-3.5">
+                <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-300">
+                  <Minus aria-hidden="true" className="size-3.5" />
+                </span>
+                <div className="min-w-0">
+                  <span className="text-[0.95rem] font-medium break-keep text-slate-500">
+                    {item.label}
+                  </span>
+                  <p className="mt-0.5 text-[0.875rem] leading-relaxed break-keep text-slate-500">
+                    {item.condition}
+                  </p>
+                </div>
+              </li>
+            ),
+          )}
+        </ul>
+      </Panel>
+
+      {/* 진단 설문 운영 (진단 단계가 열려 있는 동안) */}
+      {showSurveyPanel && (
         <Panel
           title={
             project.projectType === 'website'
@@ -409,12 +490,12 @@ export function ProjectDetailPage() {
                     {label}
                   </StatusBadge>
                   {status.state !== 'none' && (
-                    <span className="text-xs text-slate-400">
+                    <span className="text-[0.875rem] text-slate-500">
                       문항 {status.questionCount}개 · 약 {status.estimatedMinutes}분
                     </span>
                   )}
                   {links.length > 0 && (
-                    <span className="text-xs text-slate-400">
+                    <span className="text-[0.875rem] text-slate-500">
                       발급 {links.length}
                     </span>
                   )}
@@ -490,392 +571,133 @@ export function ProjectDetailPage() {
               )
             })}
           </ul>
-          <p className="mt-3 flex items-center gap-2 text-xs break-keep text-slate-400">
+          <p className="mt-3 flex items-center gap-2 text-[0.875rem] break-keep text-slate-500">
             <LocalTestModeBadge />
             테스트 링크와 응답은 이 브라우저에만 저장됩니다. 외부 공유는 Supabase 연결 후 제공됩니다.
           </p>
         </Panel>
       )}
 
-      {/* 진단 분석 */}
-      {analysis && analysis.submittedCount > 0 && (
-        <Panel
-          title="진단 분석"
-          actions={
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() =>
-                navigate(analysis.latest ? `${analysisPath}/result` : analysisPath)
-              }
-            >
-              <BarChart3 aria-hidden="true" className="size-4" />
-              {analysis.latest ? '분석 결과 보기' : '진단 분석 시작'}
-            </Button>
-          }
-        >
-          {!analysis.latest ? (
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-[13px] break-keep text-slate-600">
-                제출 완료된 응답 {analysis.submittedCount}건을 기준으로 진단 분석을 실행할 수
-                있습니다.
+      {/* 5. 확인이 필요한 항목 — 등록된 위험·다음 행동 메모 */}
+      <Panel title="확인이 필요한 항목">
+        {project.riskSummary || project.nextAction ? (
+          <div className="flex flex-col gap-3">
+            {project.riskSummary && (
+              <p className="flex items-start gap-2.5 rounded-(--radius-card) border border-warning-200 bg-warning-50 px-4 py-3 text-sm break-keep text-warning-700">
+                <ShieldAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                {project.riskSummary}
               </p>
-              <Button variant="primary" size="sm" onClick={() => navigate(analysisPath)}>
-                <BarChart3 aria-hidden="true" className="size-4" />
-                진단 분석 시작
-              </Button>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <AssessmentStatusBadge status={analysis.latest.status} />
-                {analysis.needsReanalysisFlag && (
-                  <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700">
-                    <RefreshCw aria-hidden="true" className="size-3" />
-                    재분석 필요
+            )}
+            {project.nextAction && (
+              <div className="rounded-(--radius-card) border border-slate-200 px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[0.875rem] font-semibold text-slate-500">
+                    다음 행동 메모
                   </span>
-                )}
-              </div>
-              {analysis.latest.analysisKind === 'website' ? (
-                <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                  <span className="text-2xl font-bold text-slate-900">
-                    준비도 {analysis.latest.websiteReadiness?.overallScore ?? 0}
-                    <span className="text-sm font-medium text-slate-400"> / 100</span>
-                  </span>
-                  <AssessmentConfidenceBadge confidence={analysis.latest.confidence} />
+                  {dday && (
+                    <StatusBadge
+                      tone={
+                        dday.overdue
+                          ? 'danger'
+                          : dday.daysLeft <= 2
+                            ? 'warning'
+                            : 'info'
+                      }
+                    >
+                      {dday.label}
+                    </StatusBadge>
+                  )}
+                  {dday?.overdue && (
+                    <StatusBadge tone="danger" withDot>
+                      지연
+                    </StatusBadge>
+                  )}
                 </div>
-              ) : (
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                  <span className="text-2xl font-bold text-slate-900">
-                    {analysis.latest.finalScore}
-                    <span className="text-sm font-medium text-slate-400"> / 100</span>
-                  </span>
-                  <AssessmentRecommendationBadge recommendation={analysis.latest.recommendation} />
-                  <AssessmentConfidenceBadge confidence={analysis.latest.confidence} />
-                </div>
-              )}
-              {analysis.latest.status === 'finalized' && analysis.latest.finalizedAt && (
-                <p className="text-xs text-slate-400">
-                  확정 {formatDate(analysis.latest.finalizedAt)}
+                <p className="mt-2 text-sm font-medium break-keep text-slate-800">
+                  {project.nextAction}
                 </p>
-              )}
-              {analysis.latest.suggestedNextActions.length > 0 && (
-                <p className="text-[13px] break-keep text-slate-600">
-                  다음 행동: {analysis.latest.suggestedNextActions[0]}
-                </p>
-              )}
-              <p className="text-xs break-keep text-slate-400">
-                제출 응답과 사전 정의된 진단 규칙을 기준으로 계산되었습니다.
-              </p>
-            </div>
-          )}
-        </Panel>
-      )}
-
-      {/* 과제선별 */}
-      {selection && project.projectType !== 'website' && (
-        <Panel
-          title="과제선별"
-          actions={
-            selection.lifecycle !== 'not_eligible' ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() =>
-                  navigate(selection.lifecycle === 'finalized' ? `${selectionPath}/decision` : selectionPath)
-                }
-              >
-                <Filter aria-hidden="true" className="size-4" />
-                {selection.lifecycle === 'finalized'
-                  ? '선정 결과 보기'
-                  : selection.candidates.length > 0
-                    ? '과제선별 계속'
-                    : '과제선별 시작'}
-              </Button>
-            ) : undefined
-          }
-        >
-          {selection.lifecycle === 'not_eligible' ? (
-            <p className="text-[13px] break-keep text-slate-500">
-              진단 결과를 확정하면 자동화 후보 과제를 추출하고 핵심 과제를 선정할 수 있습니다.
-            </p>
-          ) : selection.lifecycle === 'finalized' && selection.decision ? (
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <SelectionStatusBadge status={selection.decision.status} />
-                {selection.needsReselectionFlag && (
-                  <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700">
-                    <RefreshCw aria-hidden="true" className="size-3" />
-                    재선별 필요
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Target aria-hidden="true" className="size-4 text-brand-500" />
-                <span className="text-lg font-bold text-slate-900">{primaryCandidate?.name ?? '핵심 과제 미정'}</span>
-                {primaryCandidate && (
-                  <>
-                    <span className="text-sm font-semibold text-slate-500">{primaryCandidate.priorityScore}점</span>
-                    <PriorityQuadrantBadge quadrant={primaryCandidate.quadrant} />
-                  </>
-                )}
-              </div>
-              <p className="text-xs text-slate-400">
-                보조 과제 {selection.decision.secondaryCandidateIds.length}개 · 권장 {mvpLevelLabel(selection.decision.recommendedMvpLevel, 'ax')}
-                {selection.decision.finalizedAt && ` · 확정 ${formatDate(selection.decision.finalizedAt)}`}
-              </p>
-              <p className="text-xs break-keep text-slate-400">
-                Stage 7 MVP 설계 준비 {selection.handoff ? '완료' : '대기'}
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="min-w-0">
-                {selection.candidates.length > 0 ? (
-                  <p className="text-[13px] break-keep text-slate-600">
-                    자동화 후보 {selection.candidates.length}건이 추출되었습니다.
-                    {selection.decision ? ' 선정 초안을 검토하세요.' : ' 후보를 검토하고 핵심 과제를 선정하세요.'}
-                  </p>
-                ) : (
-                  <p className="text-[13px] break-keep text-slate-600">
-                    확정된 진단 결과에서 자동화 후보 과제를 추출할 수 있습니다.
+                {project.nextActionDueDate && (
+                  <p className="mt-1.5 flex items-center gap-1.5 text-[0.875rem] text-slate-500">
+                    <CalendarClock aria-hidden="true" className="size-3.5" />
+                    예정일 {formatDate(project.nextActionDueDate)}
                   </p>
                 )}
               </div>
-              <Button variant="primary" size="sm" onClick={() => navigate(selectionPath)}>
-                <Filter aria-hidden="true" className="size-4" />
-                {selection.candidates.length > 0 ? '과제선별 계속' : '과제선별 시작'}
-              </Button>
-            </div>
-          )}
-        </Panel>
-      )}
-
-      {/* MVP 설계 */}
-      {design && project.projectType !== 'website' && design.lifecycle !== 'not_eligible' && (
-        <Panel
-          title="MVP 설계"
-          actions={
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => navigate(design.design ? designPath : `${designPath}`)}
-            >
-              <PencilRuler aria-hidden="true" className="size-4" />
-              {design.lifecycle === 'finalized'
-                ? '설계 결과 보기'
-                : design.design
-                  ? 'MVP 설계 계속'
-                  : 'MVP 설계 시작'}
-            </Button>
-          }
-        >
-          {design.lifecycle === 'finalized' && design.design ? (
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <DesignStatusBadge status={design.design.status} />
-                {design.needsRedesignFlag && (
-                  <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700">
-                    <RefreshCw aria-hidden="true" className="size-3" />
-                    재설계 필요
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <PencilRuler aria-hidden="true" className="size-4 text-brand-500" />
-                <span className="text-lg font-bold text-slate-900">{design.design.coreTaskName}</span>
-                <span className="text-sm font-semibold text-slate-500">
-                  {mvpLevelLabel(design.design.levelDecision.selectedLevel, project.projectType)}
-                </span>
-              </div>
-              <p className="text-xs text-slate-400">
-                필수 기능 {design.design.features.filter((f) => f.scope === 'must').length}개 · 화면{' '}
-                {design.design.screens.filter((s) => s.scope !== 'excluded').length}개
-                {design.design.finalizedAt && ` · 확정 ${formatDate(design.design.finalizedAt)}`}
-              </p>
-              <p className="text-xs break-keep text-slate-400">Stage 8 현장검증 인계 준비 완료</p>
-            </div>
-          ) : (
-            <p className="text-[13px] break-keep text-slate-600">
-              {design.design
-                ? `MVP 설계 초안이 있습니다. 기능 범위와 검증 기준을 검토해 확정하세요.`
-                : '확정된 핵심 과제로 개발 가능한 기능·화면·데이터·검증 기준을 설계할 수 있습니다.'}
-            </p>
-          )}
-        </Panel>
-      )}
-
-      {/* 홈페이지 설계 */}
-      {website && (
-        <Panel
-          title="홈페이지 설계"
-          actions={
-            <Button variant="secondary" size="sm" onClick={() => navigate(websitePath)}>
-              <Palette aria-hidden="true" className="size-4" />
-              {website.lifecycle === 'finalized'
-                ? '설계 결과 보기'
-                : website.design
-                  ? '홈페이지 설계 계속'
-                  : '홈페이지 설계 시작'}
-            </Button>
-          }
-        >
-          {website.lifecycle === 'finalized' && website.design ? (
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <WebsiteStatusBadge status={website.design.status} />
-                <WebsiteTypeBadge type={website.design.strategy.websiteType} />
-                {website.needsRedesignFlag && (
-                  <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700">
-                    <RefreshCw aria-hidden="true" className="size-3" />
-                    재설계 필요
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-slate-400">
-                {WEBSITE_TYPE_META[website.design.strategy.websiteType].label} · 페이지{' '}
-                {website.design.pages.filter((p) => p.status !== 'excluded').length}개 · 개발 지시문{' '}
-                {website.design.generatedPrompts.length}종
-                {website.design.finalizedAt && ` · 확정 ${formatDate(website.design.finalizedAt)}`}
-              </p>
-              <p className="text-xs break-keep text-slate-400">
-                핵심 CTA:{' '}
-                {website.design.strategy.conversionActions.find(
-                  (c) => c.id === website.design?.strategy.primaryConversionActionId,
-                )?.label ?? '미설정'}
-                {' · '}콘텐츠 준비 확인 필요
-              </p>
-            </div>
-          ) : (
-            <p className="text-[13px] break-keep text-slate-600">
-              {website.design
-                ? '홈페이지 설계 초안이 있습니다. 사이트 구조·콘텐츠·디자인을 검토해 개발 지시문을 확정하세요.'
-                : '홈페이지 진단 결과로 사이트 구조·콘텐츠·디자인 방향과 개발 지시문을 설계할 수 있습니다.'}
-            </p>
-          )}
-        </Panel>
-      )}
-
-      {/* 실제 사용 테스트 (Stage-Gate) */}
-      {validation && validation.tracks.some((t) => t.eligibility.available || t.workspace) && (
-        <Panel
-          title="실제 사용 테스트"
-          actions={
-            <Button variant="secondary" size="sm" onClick={() => navigate(validationPath)}>
-              <SearchCheck aria-hidden="true" className="size-4" />
-              테스트 열기
-            </Button>
-          }
-        >
-          <p className="mb-3 text-[13px] break-keep text-slate-500">
-            확정된 설계를 실제 담당자가 사용해 보고 Gate로 판정합니다. AX와 홈페이지는 별도 트랙으로 각각 검증합니다(결과를 합산하지 않습니다).
-          </p>
-          <div className="flex flex-col gap-2.5">
-            {validation.tracks.map((track) => (
-              <div
-                key={track.trackType}
-                className="flex flex-wrap items-center gap-2 rounded-(--radius-card) border border-slate-200 px-3.5 py-2.5"
-              >
-                <TrackBadge track={track.trackType} />
-                {track.workspace ? (
-                  <>
-                    <WorkspaceStatusBadge status={track.workspace.status} />
-                    <span className="text-xs text-slate-500">{track.summary?.headline}</span>
-                    {track.needsRevalidationFlag && (
-                      <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700">
-                        <RefreshCw aria-hidden="true" className="size-3" />
-                        재검증 필요
-                      </span>
-                    )}
-                  </>
-                ) : track.eligibility.available ? (
-                  <span className="text-xs text-slate-500">검증 준비됨 — 워크스페이스 생성 대기</span>
-                ) : (
-                  <span className="text-xs break-keep text-slate-400">{track.eligibility.reason}</span>
-                )}
-              </div>
-            ))}
+            )}
           </div>
-        </Panel>
-      )}
+        ) : (
+          <p className="text-[0.875rem] text-slate-500">
+            현재 확인이 필요한 항목이 없습니다.
+          </p>
+        )}
+      </Panel>
 
-      {/* 제출자료 */}
-      {deliverable && deliverable.eligibility.canCreate && (
-        <Panel
-          title="제출자료"
-          actions={
-            <Button variant="secondary" size="sm" onClick={() => navigate(deliverablePath)}>
-              <FileText aria-hidden="true" className="size-4" />
-              {deliverable.latest ? '자료 열기' : '자료 만들기'}
-            </Button>
-          }
+      {/* 6. 고급 운영 기능 — 기본 접힘 */}
+      <section className="rounded-(--radius-panel) border border-slate-200 bg-white shadow-(--shadow-card)">
+        <button
+          type="button"
+          aria-expanded={advancedOpen}
+          onClick={() => setAdvancedOpen((v) => !v)}
+          className="flex w-full cursor-pointer items-center justify-between gap-3 px-5 py-4 text-left"
         >
-          {deliverable.latest ? (
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <PackageTypeBadge type={deliverable.latest.type} />
-                <PackageStatusBadge status={deliverable.latest.status} />
-                <span className="text-xs text-slate-400">v{deliverable.latest.version}</span>
-                {deliverable.latestStale && (
-                  <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700">
-                    <RefreshCw aria-hidden="true" className="size-3" />
-                    원본 변경
-                  </span>
-                )}
-              </div>
-              <p className="text-[13px] break-keep text-slate-500">
-                확정 결과를 보고서·개발명세·로드맵·개발 프롬프트로 정리합니다. AX와 홈페이지는 별도 트랙으로 관리하며 결과를 합산하지 않습니다.
-              </p>
-            </div>
-          ) : (
-            <p className="text-[13px] break-keep text-slate-600">
-              확정된 진단·설계·테스트 결과를 고객 설명·개발 전달·기관 준비용 자료 패키지로 만들 수 있습니다.
+          <div className="min-w-0">
+            <h2 className="text-[15px] font-semibold text-slate-900">고급 운영 기능</h2>
+            <p className="mt-0.5 text-[0.875rem] break-keep text-slate-500">
+              프로젝트 후반에 사용하는 고급 운영 기능입니다.
             </p>
-          )}
-        </Panel>
-      )}
-
-      {/* 기관·자금 연계 */}
-      {funding && funding.eligibility.canCreate && (
-        <Panel
-          title="기관·자금 연계"
-          actions={
-            <Button variant="secondary" size="sm" onClick={() => navigate(fundingPath)}>
-              <Landmark aria-hidden="true" className="size-4" />
-              {funding.latest ? '연계 열기' : '연계 시작'}
-            </Button>
-          }
-        >
-          {funding.latest ? (
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <StrategyStatusBadge status={funding.latest.status} />
-                <span className="text-xs text-slate-400">v{funding.latest.version}</span>
-                <span className="text-xs text-slate-500">
-                  후보 기관 {funding.latest.matches.filter((m) => m.priority !== 'excluded').length}개 · 결과 {funding.latest.outcomes.length}건
+          </div>
+          <ChevronDown
+            aria-hidden="true"
+            className={`size-4 shrink-0 text-slate-400 transition-transform ${advancedOpen ? 'rotate-180' : ''}`}
+          />
+        </button>
+        {advancedOpen && (
+          <div className="flex flex-col gap-2.5 border-t border-slate-100 px-5 py-4">
+            <Link
+              to={validationPath}
+              className="flex items-center gap-3 rounded-(--radius-card) border border-slate-200 px-4 py-3 transition-colors hover:border-slate-300 hover:bg-slate-50"
+            >
+              <SearchCheck aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
+              <div className="min-w-0">
+                <span className="text-[0.95rem] font-semibold text-slate-800">
+                  실제 사용 테스트
                 </span>
-                {funding.latestStale && (
-                  <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700">
-                    <RefreshCw aria-hidden="true" className="size-3" />
-                    재검토 필요
-                  </span>
-                )}
+                <p className="mt-0.5 text-[0.875rem] break-keep text-slate-500">
+                  확정된 설계를 실제 담당자가 사용해 보고 판정합니다.
+                </p>
               </div>
-              <p className="text-[13px] break-keep text-slate-500">
-                연결할 기관·지원 유형을 검토하고 준비자료·진행상태·결과·사례를 관리합니다. 승인 가능성·금액은 예측하지 않으며, 실제 조건은 공식 공고 확인이 필요합니다.
+              <ArrowRight aria-hidden="true" className="ml-auto size-4 shrink-0 text-slate-300" />
+            </Link>
+            <Link
+              to={fundingPath}
+              className="flex items-center gap-3 rounded-(--radius-card) border border-slate-200 px-4 py-3 transition-colors hover:border-slate-300 hover:bg-slate-50"
+            >
+              <Landmark aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
+              <div className="min-w-0">
+                <span className="text-[0.95rem] font-semibold text-slate-800">
+                  기관·자금 연계
+                </span>
+                <p className="mt-0.5 text-[0.875rem] break-keep text-slate-500">
+                  연결할 기관·지원 유형과 준비자료·진행 결과를 관리합니다.
+                </p>
+              </div>
+              <ArrowRight aria-hidden="true" className="ml-auto size-4 shrink-0 text-slate-300" />
+            </Link>
+            {!advancedVisible && (
+              <p className="text-[0.875rem] break-keep text-slate-500">
+                설정에서 "고급 운영 기능 보기"를 켜면 메뉴에 항상 표시됩니다.{' '}
+                <Link to="/settings" className="font-medium text-brand-600 hover:underline">
+                  설정 열기
+                </Link>
               </p>
-            </div>
-          ) : (
-            <p className="text-[13px] break-keep text-slate-600">
-              진단·설계·검증 결과를 바탕으로 연결할 기관·지원 유형과 준비자료, 진행 결과를 관리할 수 있습니다.
-            </p>
-          )}
-        </Panel>
-      )}
+            )}
+          </div>
+        )}
+      </section>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-5 xl:col-span-2">
-          {/* B. 핵심 요약 */}
+          {/* 핵심 요약 */}
           <Panel title="핵심 요약">
             <p className="text-sm break-keep text-slate-700">{project.objective}</p>
             <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-3">
@@ -890,28 +712,19 @@ export function ProjectDetailPage() {
                 label={`목표 ${levelLabel}`}
                 value={mvpLevelLabel(project.targetMvpLevel, project.projectType)}
               />
-              <div>
-                <dt className="text-xs text-slate-400">현재 진행률</dt>
-                <dd className="mt-1.5 flex items-center gap-2">
-                  <ProgressBar
-                    value={project.progress}
-                    tone={HEALTH_META[project.healthStatus].tone}
-                    label={`${project.name} 진행률`}
-                  />
-                  <span className="shrink-0 text-sm font-semibold text-slate-700">
-                    {project.progress}%
-                  </span>
-                </dd>
-              </div>
+              <SummaryItem
+                label="진행 단계"
+                value={`${progress.stepText} · ${progress.currentStep.label}`}
+              />
             </dl>
           </Panel>
 
-          {/* D. 자금조달 연계 */}
+          {/* 자금조달 연계 */}
           <Panel title="자금조달 연계">
             {project.fundingRequired ? (
               <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
                 <div className="sm:col-span-2">
-                  <dt className="text-xs text-slate-400">목표 기관</dt>
+                  <dt className="text-[0.875rem] text-slate-400">목표 기관</dt>
                   <dd className="mt-1.5 flex flex-wrap gap-1.5">
                     {project.targetInstitutions.length > 0 ? (
                       project.targetInstitutions.map((institution) => (
@@ -933,97 +746,22 @@ export function ProjectDetailPage() {
                   }
                 />
                 <div className="sm:col-span-3">
-                  <dt className="text-xs text-slate-400">현재 준비 상태</dt>
+                  <dt className="text-[0.875rem] text-slate-400">현재 준비 상태</dt>
                   <dd className="mt-0.5 text-sm break-keep text-slate-700">
-                    {project.currentStage === 'deliverables'
-                      ? '자료 패키지 단계에서 제출자료를 준비하고 있습니다.'
-                      : '자료 패키지 단계에 도달하면 제출자료 준비가 시작됩니다.'}
+                    {inputs.deliverableFinalized
+                      ? '결과자료가 확정되어 제출자료로 활용할 수 있습니다.'
+                      : '진단·설계 결과를 확정하면 제출자료 준비를 시작할 수 있습니다.'}
                   </dd>
                 </div>
               </dl>
             ) : (
-              <p className="text-[13px] text-slate-500">자금조달 연계 없음</p>
-            )}
-          </Panel>
-
-          {/* E. 주요 위험 */}
-          <Panel title="주요 위험">
-            {project.riskSummary ? (
-              <p className="flex items-start gap-2.5 rounded-(--radius-card) border border-warning-200 bg-warning-50 px-4 py-3 text-sm break-keep text-warning-700">
-                <ShieldAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-                {project.riskSummary}
-              </p>
-            ) : (
-              <p className="text-[13px] text-slate-500">
-                현재 등록된 주요 위험이 없습니다.
-              </p>
+              <p className="text-[0.875rem] text-slate-500">자금조달 연계 없음</p>
             )}
           </Panel>
         </div>
 
         <div className="flex min-w-0 flex-col gap-5">
-          {/* C. 다음 행동 */}
-          <Panel title="다음 행동">
-            {project.nextAction ? (
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {dday && (
-                    <StatusBadge
-                      tone={
-                        dday.overdue
-                          ? 'danger'
-                          : dday.daysLeft <= 2
-                            ? 'warning'
-                            : 'info'
-                      }
-                    >
-                      {dday.label}
-                    </StatusBadge>
-                  )}
-                  {dday?.overdue && (
-                    <StatusBadge tone="danger" withDot>
-                      지연
-                    </StatusBadge>
-                  )}
-                </div>
-                <p className="mt-2.5 text-sm font-medium break-keep text-slate-800">
-                  {project.nextAction}
-                </p>
-                <p className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-400">
-                  <CalendarClock aria-hidden="true" className="size-3.5" />
-                  예정일 {formatDate(project.nextActionDueDate)}
-                </p>
-              </div>
-            ) : (
-              <p className="text-[13px] text-slate-400">
-                등록된 다음 행동이 없습니다.
-              </p>
-            )}
-          </Panel>
-
-          {/* G. 다음 모듈 안내 */}
-          <Panel title="다음 모듈 안내">
-            <p className="text-sm break-keep text-slate-600">
-              현재 프로젝트는{' '}
-              <span className="font-semibold text-slate-800">
-                {PROJECT_STAGE_META[project.currentStage].label}
-              </span>{' '}
-              단계입니다. {nextModule.guide}
-            </p>
-            {nextModule.path && (
-              <Button
-                variant="secondary"
-                size="sm"
-                className="mt-3"
-                onClick={() => navigate(nextModule.path ?? '/')}
-              >
-                {nextModule.moduleName} 열기
-                <ArrowRight aria-hidden="true" className="size-3.5" />
-              </Button>
-            )}
-          </Panel>
-
-          {/* F. 최근 활동 */}
+          {/* 최근 활동 */}
           <Panel title="최근 활동">
             <ActivityTimeline activities={activities} />
           </Panel>

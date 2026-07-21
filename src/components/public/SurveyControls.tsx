@@ -27,7 +27,7 @@ export function SurveyAutosaveIndicator({
   onRetry,
 }: SurveyAutosaveIndicatorProps) {
   return (
-    <div aria-live="polite" className="flex items-center gap-1.5 text-xs">
+    <div aria-live="polite" className="flex items-center gap-1.5 text-[0.875rem]">
       {state === 'saving' && (
         <span className="flex items-center gap-1 text-slate-400">
           <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
@@ -82,12 +82,12 @@ export function SurveyProgressHeader({
 }: SurveyProgressHeaderProps) {
   return (
     <div className="mb-5">
-      <p className="text-xs text-slate-400">{surveyTitle}</p>
+      <p className="text-[0.875rem] text-slate-400">{surveyTitle}</p>
       <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-lg font-semibold break-keep text-slate-900">
           {sectionTitle}
         </h1>
-        <span className="text-xs text-slate-400">{pageInfo}</span>
+        <span className="text-[0.875rem] text-slate-400">{pageInfo}</span>
       </div>
       <div
         className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200"
@@ -102,7 +102,7 @@ export function SurveyProgressHeader({
           style={{ width: `${progressPercent}%` }}
         />
       </div>
-      <p className="mt-1.5 text-xs text-slate-400" aria-live="polite">
+      <p className="mt-1.5 text-[0.875rem] text-slate-400" aria-live="polite">
         전체 {progressPercent}% · 응답 {answered} / {total} 문항
       </p>
     </div>

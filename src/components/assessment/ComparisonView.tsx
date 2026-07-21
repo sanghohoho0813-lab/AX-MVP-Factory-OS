@@ -18,13 +18,13 @@ function ComparisonCard({ item }: { item: ResponseComparisonItem }) {
         <ComparisonStatusBadge status={item.status} />
         <ComparisonImportanceBadge importance={item.importance} />
         {item.requiresInterview && (
-          <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[11px] font-medium text-warning-700">
+          <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-warning-700">
             <MessageCircleQuestion aria-hidden="true" className="size-3" />
             인터뷰 필요
           </span>
         )}
       </div>
-      <p className="mt-1 text-xs text-slate-400">{item.description}</p>
+      <p className="mt-1 text-[0.875rem] text-slate-400">{item.description}</p>
 
       <dl className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {item.respondentValues.map((v) => (
@@ -32,7 +32,7 @@ function ComparisonCard({ item }: { item: ResponseComparisonItem }) {
             key={`${v.role}-${v.responseId}`}
             className="rounded-(--radius-control) border border-slate-100 bg-slate-50 px-3 py-2"
           >
-            <dt className="text-xs font-medium text-slate-500">
+            <dt className="text-[0.875rem] font-medium text-slate-500">
               {RESPONDENT_ROLE_META[v.role].label}
               <span className="ml-1 font-normal text-slate-400">{v.respondentName}</span>
             </dt>
@@ -43,7 +43,7 @@ function ComparisonCard({ item }: { item: ResponseComparisonItem }) {
             >
               {v.displayValue}
               {v.normalizedValue !== null && (
-                <span className="ml-1 text-xs text-slate-400">({v.normalizedValue}점)</span>
+                <span className="ml-1 text-[0.875rem] text-slate-400">({v.normalizedValue}점)</span>
               )}
             </dd>
           </div>
@@ -55,7 +55,7 @@ function ComparisonCard({ item }: { item: ResponseComparisonItem }) {
         <button
           type="button"
           onClick={() => setExpanded((e) => !e)}
-          className="mt-1 cursor-pointer text-xs font-medium text-brand-600 hover:text-brand-700"
+          className="mt-1 cursor-pointer text-[0.875rem] font-medium text-brand-600 hover:text-brand-700"
         >
           {expanded ? '접기' : '전체 보기'}
         </button>

@@ -40,7 +40,7 @@ export function PriorityList({ tasks }: PriorityListProps) {
             <div className="flex items-center gap-2.5">
               <span
                 aria-label={`${task.rank}순위`}
-                className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[0.8125rem] font-bold ${
                   RANK_CLASS[task.rank] ?? 'bg-slate-500 text-white'
                 }`}
               >
@@ -55,7 +55,7 @@ export function PriorityList({ tasks }: PriorityListProps) {
               {task.nextAction}
             </p>
             <div className="mt-auto flex items-center justify-between gap-3 pt-0.5">
-              <span className="flex min-w-0 items-center gap-1.5 text-xs text-slate-400">
+              <span className="flex min-w-0 items-center gap-1.5 text-[0.875rem] text-slate-400">
                 <UserRound aria-hidden="true" className="size-3.5 shrink-0" />
                 <span className="truncate">{task.owner}</span>
               </span>

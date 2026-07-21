@@ -296,7 +296,7 @@ export function SurveyLinkCreateModal({
             }))}
           />
           {draftOnly && (
-            <p className="text-xs break-keep text-warning-700 sm:col-span-2">
+            <p className="text-[0.875rem] break-keep text-warning-700 sm:col-span-2">
               이 프로젝트의 설문이 아직 초안 상태입니다. 설문 설계에서 먼저 준비
               완료해 주세요.
             </p>
@@ -398,13 +398,13 @@ export function SurveyLinkCreateModal({
                   )
                 })}
               </div>
-              <p className="mt-1.5 text-xs text-slate-400">
+              <p className="mt-1.5 text-[0.875rem] text-slate-400">
                 {expiryDays === null
                   ? '만료 없이 유지됩니다.'
                   : `${toDateInputValue(expiryDays)}에 만료됩니다.`}
               </p>
               {errors.expiry && (
-                <p className="mt-1 text-xs text-danger-600">{errors.expiry}</p>
+                <p className="mt-1 text-[0.875rem] text-danger-600">{errors.expiry}</p>
               )}
             </div>
           </div>

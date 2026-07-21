@@ -57,11 +57,11 @@ export function DesignRulesPage() {
                         <p className="text-sm font-semibold text-slate-800">{ai.name}</p>
                         <span className="rounded-md border border-accent-200 bg-accent-50 px-1.5 py-0.5 text-[0.82rem] text-accent-700">{AI_PURPOSE_META[ai.purpose].label}</span>
                         {ai.humanConfirms && (
-                          <span className="inline-flex items-center gap-1 text-xs text-warning-600"><ShieldCheck aria-hidden="true" className="size-3.5" />사람이 확정</span>
+                          <span className="inline-flex items-center gap-1 text-[0.875rem] text-warning-600"><ShieldCheck aria-hidden="true" className="size-3.5" />사람이 확정</span>
                         )}
                       </div>
                       <p className="mt-1.5 text-[0.92rem] break-keep text-slate-600">{ai.justification}</p>
-                      <p className="mt-1 text-xs text-slate-400">대체 방식: {ai.fallback}</p>
+                      <p className="mt-1 text-[0.875rem] text-slate-400">대체 방식: {ai.fallback}</p>
                     </li>
                   ))}
                 </ul>
@@ -82,7 +82,7 @@ export function DesignRulesPage() {
                         </div>
                         <p className="mt-1 text-[0.92rem] break-keep text-slate-500">{i.purpose}</p>
                         {i.fallbackWhenNotReady && (
-                          <p className="mt-1 text-xs break-keep text-warning-600">미준비 시: {i.fallbackWhenNotReady}</p>
+                          <p className="mt-1 text-[0.875rem] break-keep text-warning-600">미준비 시: {i.fallbackWhenNotReady}</p>
                         )}
                       </li>
                     ))}
@@ -100,7 +100,7 @@ export function DesignRulesPage() {
                           <meta.icon aria-hidden="true" className="size-3.5 text-slate-400" />
                           <p className="text-[0.92rem] font-medium text-slate-700">{e.situation}</p>
                         </div>
-                        <p className="mt-1 text-xs break-keep text-slate-500">→ {e.handling}</p>
+                        <p className="mt-1 text-[0.875rem] break-keep text-slate-500">→ {e.handling}</p>
                       </li>
                     )
                   })}

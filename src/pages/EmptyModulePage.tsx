@@ -25,14 +25,14 @@ export function EmptyModulePage({ config }: EmptyModulePageProps) {
             <config.icon className="size-6" />
           </span>
           <div className="mt-4">
-            <StatusBadge tone="info">다음 개발 단계에서 구현될 기능</StatusBadge>
+            <StatusBadge tone="info">아직 제공되지 않는 기능</StatusBadge>
           </div>
           <h2 className="mt-4 text-lg font-semibold break-keep text-slate-900">
-            {config.title} 화면을 준비하고 있습니다
+            {config.title}은(는) 아직 제공되지 않는 기능입니다
           </h2>
           <p className="mt-2 text-sm break-keep text-slate-500">
-            현재는 1단계(기반·대시보드) 개발이 완료된 상태이며, 이 모듈은 이후
-            단계에서 순차적으로 제공됩니다.
+            데이터가 없거나 이전 단계가 부족해서가 아니라, 이 기능 자체가 아직
+            만들어지지 않았습니다. 이후 개발 단계에서 순차적으로 제공됩니다.
           </p>
 
           <ul className="mt-6 w-full space-y-2.5 text-left">

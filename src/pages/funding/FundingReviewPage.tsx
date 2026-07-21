@@ -171,11 +171,11 @@ function ReviewContent({ strategy, projectId }: { strategy: FundingStrategy; pro
           <SummaryStrip ariaLabel="전략 요약 통계" items={stats} />
           <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <dt className="text-xs text-slate-400">연계 목적</dt>
+              <dt className="text-[0.875rem] text-slate-400">연계 목적</dt>
               <dd className="text-[13px] break-keep text-slate-700">{strategy.objective || '미입력'}</dd>
             </div>
             <div>
-              <dt className="text-xs text-slate-400">자금 용도</dt>
+              <dt className="text-[0.875rem] text-slate-400">자금 용도</dt>
               <dd className="text-[13px] break-keep text-slate-700">{strategy.targetUse || '미입력'}</dd>
             </div>
           </dl>
@@ -192,7 +192,7 @@ function ReviewContent({ strategy, projectId }: { strategy: FundingStrategy; pro
             <ul className="flex flex-col gap-2">
               {primaryMatches.map((m) => (
                 <li key={m.id} className="rounded-(--radius-card) border border-slate-100 bg-slate-50/60 px-3 py-2 text-[13px] break-keep text-slate-700">
-                  <span className="mr-1.5 rounded-md border border-success-200 bg-success-50 px-1.5 py-0.5 text-xs font-medium text-success-700">우선</span>
+                  <span className="mr-1.5 rounded-md border border-success-200 bg-success-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-success-700">우선</span>
                   {m.reasonSummary || '사유 미입력'}
                 </li>
               ))}
@@ -216,7 +216,7 @@ function ReviewContent({ strategy, projectId }: { strategy: FundingStrategy; pro
                   <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-danger-600" />
                   <div>
                     <p className="text-[13px] font-medium break-keep text-danger-800">{g.title}</p>
-                    <p className="text-xs break-keep text-danger-700">{g.requiredAction || g.description}</p>
+                    <p className="text-[0.875rem] break-keep text-danger-700">{g.requiredAction || g.description}</p>
                   </div>
                 </li>
               ))}
@@ -273,7 +273,7 @@ function ReviewContent({ strategy, projectId }: { strategy: FundingStrategy; pro
             <div className="overflow-x-auto px-5 py-4">
               <table className="w-full text-left text-[13px]">
                 <thead>
-                  <tr className="border-b border-slate-100 text-xs text-slate-400">
+                  <tr className="border-b border-slate-100 text-[0.875rem] text-slate-400">
                     <th scope="col" className="py-2 pr-3 font-medium">출처</th>
                     <th scope="col" className="py-2 pr-3 font-medium">유형</th>
                     <th scope="col" className="py-2 pr-3 font-medium">버전</th>
@@ -309,7 +309,7 @@ function ReviewContent({ strategy, projectId }: { strategy: FundingStrategy; pro
         <Panel title="위험·미해결 질문">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <p className="mb-1.5 text-xs font-semibold text-slate-500">위험</p>
+              <p className="mb-1.5 text-[0.875rem] font-semibold text-slate-500">위험</p>
               {strategy.risks.length === 0 ? (
                 <p className="text-[13px] text-slate-400">등록된 위험 없음</p>
               ) : (
@@ -321,7 +321,7 @@ function ReviewContent({ strategy, projectId }: { strategy: FundingStrategy; pro
               )}
             </div>
             <div>
-              <p className="mb-1.5 text-xs font-semibold text-slate-500">미해결 질문</p>
+              <p className="mb-1.5 text-[0.875rem] font-semibold text-slate-500">미해결 질문</p>
               {strategy.openQuestions.length === 0 ? (
                 <p className="text-[13px] text-slate-400">등록된 질문 없음</p>
               ) : (
@@ -376,7 +376,7 @@ function ReviewContent({ strategy, projectId }: { strategy: FundingStrategy; pro
                 </p>
                 <ul className="mt-1 flex flex-col gap-0.5">
                   {finalizeCheck.reasons.map((r, idx) => (
-                    <li key={idx} className="text-xs break-keep text-danger-700">· {r}</li>
+                    <li key={idx} className="text-[0.875rem] break-keep text-danger-700">· {r}</li>
                   ))}
                 </ul>
               </div>
@@ -445,7 +445,7 @@ function ProgressRow({ label, value, to }: { label: string; value: string; to: s
   return (
     <li className="flex items-center justify-between gap-3 rounded-(--radius-card) border border-slate-100 bg-slate-50/60 px-3 py-2">
       <div className="min-w-0">
-        <p className="text-xs text-slate-400">{label}</p>
+        <p className="text-[0.875rem] text-slate-400">{label}</p>
         <p className="text-[13px] break-keep text-slate-700">{value}</p>
       </div>
       <NavLink to={to} className="shrink-0 text-[13px] font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800">
@@ -469,17 +469,17 @@ const SEVERITY_BORDER: Record<FundingQualitySeverity, string> = {
 function QualityGroup({ severity, items }: { severity: FundingQualitySeverity; items: FundingQualityCheck[] }) {
   return (
     <div>
-      <p className={`mb-1.5 text-xs font-semibold ${SEVERITY_TEXT[severity]}`}>{SEVERITY_LABEL[severity]} ({items.length})</p>
+      <p className={`mb-1.5 text-[0.875rem] font-semibold ${SEVERITY_TEXT[severity]}`}>{SEVERITY_LABEL[severity]} ({items.length})</p>
       <ul className="flex flex-col gap-1.5">
         {items.map((c) => (
           <li key={c.id} className={`rounded-(--radius-card) border ${SEVERITY_BORDER[severity]} px-3 py-2`}>
             <div className="flex items-center gap-2">
-              <span className={`rounded-md border px-1.5 py-0.5 text-xs font-medium ${c.passed ? 'border-success-200 bg-success-50 text-success-700' : SEVERITY_CHIP[severity]}`}>
+              <span className={`rounded-md border px-1.5 py-0.5 text-[0.875rem] font-medium ${c.passed ? 'border-success-200 bg-success-50 text-success-700' : SEVERITY_CHIP[severity]}`}>
                 {c.passed ? '통과' : SEVERITY_LABEL[severity]}
               </span>
               <span className="text-[13px] font-medium break-keep text-slate-700">{c.title}</span>
             </div>
-            <p className="mt-0.5 text-xs break-keep text-slate-500">{c.description}</p>
+            <p className="mt-0.5 text-[0.875rem] break-keep text-slate-500">{c.description}</p>
           </li>
         ))}
       </ul>

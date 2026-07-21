@@ -151,16 +151,16 @@ export function AssessmentResultPage() {
         <AssessmentStatusBadge status={viewed.status} />
         <RuleVersionInfo result={viewed} />
         {viewed.finalizedAt && (
-          <span className="text-xs text-slate-400">확정 {formatDateTime(viewed.finalizedAt)}</span>
+          <span className="text-[0.875rem] text-slate-400">확정 {formatDateTime(viewed.finalizedAt)}</span>
         )}
         {versions.length > 1 && (
-          <label className="ml-auto flex items-center gap-1.5 text-xs text-slate-500">
+          <label className="ml-auto flex items-center gap-1.5 text-[0.875rem] text-slate-500">
             분석 버전
             <select
               value={viewed.id}
               onChange={(e) => setViewedId(e.target.value)}
               aria-label="분석 버전 선택"
-              className="rounded-(--radius-control) border border-slate-300 px-2 py-1 text-xs focus:border-brand-500 focus:outline-none"
+              className="rounded-(--radius-control) border border-slate-300 px-2 py-1 text-[0.875rem] focus:border-brand-500 focus:outline-none"
             >
               {versions.map((v) => (
                 <option key={v.id} value={v.id}>
@@ -220,13 +220,13 @@ export function AssessmentResultPage() {
       <Panel title="내부 진단 의견">
         <div className="flex flex-col gap-3">
           <div>
-            <p className="mb-1 text-xs font-medium text-slate-400">자동 요약 (규칙 기반)</p>
+            <p className="mb-1 text-[0.875rem] font-medium text-slate-400">자동 요약 (규칙 기반)</p>
             <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] break-keep text-slate-600">
               {viewed.autoSummary}
             </p>
           </div>
           <div>
-            <label htmlFor="manual-summary" className="mb-1 block text-xs font-medium text-slate-400">
+            <label htmlFor="manual-summary" className="mb-1 block text-[0.875rem] font-medium text-slate-400">
               담당자 최종 의견
             </label>
             <textarea
@@ -256,7 +256,7 @@ export function AssessmentResultPage() {
           {!finalizeCheck.ok && (
             <ul className="mb-3 flex flex-col gap-1 rounded-(--radius-control) border border-warning-200 bg-warning-50/60 px-3 py-2">
               {finalizeCheck.reasons.map((r) => (
-                <li key={r} className="text-xs break-keep text-warning-800">• {r}</li>
+                <li key={r} className="text-[0.875rem] break-keep text-warning-800">• {r}</li>
               ))}
             </ul>
           )}
@@ -273,7 +273,7 @@ export function AssessmentResultPage() {
               진단 결과 확정
             </Button>
             {!finalizeCheck.ok && (
-              <span className="self-center text-xs text-slate-400">
+              <span className="self-center text-[0.875rem] text-slate-400">
                 확정 조건을 먼저 충족해야 합니다.
               </span>
             )}

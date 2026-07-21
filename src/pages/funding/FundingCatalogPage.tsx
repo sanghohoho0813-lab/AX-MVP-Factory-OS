@@ -42,7 +42,7 @@ function Field({ label, htmlFor, children, hint }: { label: string; htmlFor: str
     <div className="flex flex-col gap-1.5">
       <label htmlFor={htmlFor} className="text-[13px] font-medium text-slate-700">{label}</label>
       {children}
-      {hint && <p className="text-xs text-slate-400">{hint}</p>}
+      {hint && <p className="text-[0.875rem] text-slate-400">{hint}</p>}
     </div>
   )
 }
@@ -231,7 +231,7 @@ export function FundingCatalogPage() {
                   <SourceStatusBadge status={inst.sourceStatus} />
                 </div>
                 {inst.typicalReviewFocus.length > 0 && (
-                  <p className="line-clamp-2 text-xs text-slate-500">
+                  <p className="line-clamp-2 text-[0.875rem] text-slate-500">
                     참고 점검항목: {inst.typicalReviewFocus.join(', ')}
                   </p>
                 )}
@@ -253,11 +253,11 @@ export function FundingCatalogPage() {
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="border-b border-slate-200">
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500">프로그램</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500">지원 유형</th>
-                  <th scope="col" className="hidden px-4 py-3 text-left text-xs font-semibold text-slate-500 lg:table-cell">기관</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500">최신성</th>
-                  <th scope="col" className="hidden px-4 py-3 text-left text-xs font-semibold text-slate-500 xl:table-cell">출처</th>
+                  <th scope="col" className="px-4 py-3 text-left text-[0.875rem] font-semibold text-slate-500">프로그램</th>
+                  <th scope="col" className="px-4 py-3 text-left text-[0.875rem] font-semibold text-slate-500">지원 유형</th>
+                  <th scope="col" className="hidden px-4 py-3 text-left text-[0.875rem] font-semibold text-slate-500 lg:table-cell">기관</th>
+                  <th scope="col" className="px-4 py-3 text-left text-[0.875rem] font-semibold text-slate-500">최신성</th>
+                  <th scope="col" className="hidden px-4 py-3 text-left text-[0.875rem] font-semibold text-slate-500 xl:table-cell">출처</th>
                 </tr>
               </thead>
               <tbody>
@@ -279,7 +279,7 @@ export function FundingCatalogPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm font-medium text-slate-800">{prog.name}</span>
                         {prog.isTemplate && (
-                          <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] font-medium text-slate-500">실제 공고 아님(템플릿)</span>
+                          <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-slate-500">실제 공고 아님(템플릿)</span>
                         )}
                       </div>
                     </td>
@@ -386,7 +386,7 @@ function InstitutionCreateModal({
         <Field label="공식 URL" htmlFor="inst-url" hint="공식 누리집 주소를 입력하면 최신성 확인에 도움이 됩니다.">
           <input id="inst-url" className={inputClass} value={officialUrl} onChange={(e) => setOfficialUrl(e.target.value)} placeholder="https://" />
         </Field>
-        <p className="text-xs text-slate-400">출처 상태는 "직접 입력"으로 저장됩니다. 이후 상세 화면에서 확인일·유효기간을 갱신하세요.</p>
+        <p className="text-[0.875rem] text-slate-400">출처 상태는 "직접 입력"으로 저장됩니다. 이후 상세 화면에서 확인일·유효기간을 갱신하세요.</p>
       </div>
     </Modal>
   )

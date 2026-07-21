@@ -48,10 +48,10 @@ export function PriorityMatrix({
           <div className="bg-warning-50/30" />
         </div>
         {/* 사분면 라벨 */}
-        <span className="absolute top-2 left-2 text-[11px] font-medium text-accent-600">전략적 투자</span>
-        <span className="absolute top-2 right-2 text-[11px] font-medium text-success-700">빠른 실행</span>
-        <span className="absolute bottom-2 left-2 text-[11px] font-medium text-slate-400">후순위 보류</span>
-        <span className="absolute right-2 bottom-2 text-[11px] font-medium text-warning-700">선행 준비 필요</span>
+        <span className="absolute top-2 left-2 text-[0.8125rem] font-medium text-accent-600">전략적 투자</span>
+        <span className="absolute top-2 right-2 text-[0.8125rem] font-medium text-success-700">빠른 실행</span>
+        <span className="absolute bottom-2 left-2 text-[0.8125rem] font-medium text-slate-400">후순위 보류</span>
+        <span className="absolute right-2 bottom-2 text-[0.8125rem] font-medium text-warning-700">선행 준비 필요</span>
 
         {/* 축 */}
         <div className="absolute top-0 bottom-0 left-1/2 w-px bg-slate-200" />
@@ -71,17 +71,17 @@ export function PriorityMatrix({
             <span
               className={`block size-3.5 rounded-full ring-2 ring-white ${TONE_DOT_CLASS[QUADRANT_META[candidate.quadrant].tone]}`}
             />
-            <span className="pointer-events-none absolute bottom-full left-1/2 mb-1 hidden -translate-x-1/2 rounded-md bg-navy-900 px-2 py-1 text-[11px] whitespace-nowrap text-white group-hover:block group-focus:block">
+            <span className="pointer-events-none absolute bottom-full left-1/2 mb-1 hidden -translate-x-1/2 rounded-md bg-navy-900 px-2 py-1 text-[0.8125rem] whitespace-nowrap text-white group-hover:block group-focus:block">
               {candidate.name}
             </span>
           </button>
         ))}
       </div>
-      <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
+      <div className="mt-2 flex items-center justify-between text-[0.875rem] text-slate-400">
         <span>← 구현 가능성 낮음</span>
         <span>구현 가능성 높음 →</span>
       </div>
-      <p className="mt-1 text-center text-xs text-slate-400">세로축: 운영·사업 효과 (위로 갈수록 큼)</p>
+      <p className="mt-1 text-center text-[0.875rem] text-slate-400">세로축: 운영·사업 효과 (위로 갈수록 큼)</p>
     </div>
   )
 }

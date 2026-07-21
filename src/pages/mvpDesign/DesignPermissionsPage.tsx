@@ -46,7 +46,7 @@ export function DesignPermissionsPage() {
                       )}
                     </div>
                     <p className="mt-1 text-[0.92rem] break-keep text-slate-500">{role.description}</p>
-                    <p className="mt-1 text-xs text-slate-400">실제 사용자: {role.sourceUsers}</p>
+                    <p className="mt-1 text-[0.875rem] text-slate-400">실제 사용자: {role.sourceUsers}</p>
                   </li>
                 ))}
               </ul>
@@ -56,7 +56,7 @@ export function DesignPermissionsPage() {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[520px] text-left text-[0.92rem]">
                   <thead>
-                    <tr className="border-b border-slate-100 text-xs text-slate-400">
+                    <tr className="border-b border-slate-100 text-[0.875rem] text-slate-400">
                       <th className="py-2 pr-3 font-medium">데이터</th>
                       {roles.map((r) => (
                         <th key={r.id} className="py-2 pr-3 font-medium">{r.name}</th>
@@ -80,7 +80,7 @@ export function DesignPermissionsPage() {
                   </tbody>
                 </table>
               </div>
-              <p className="mt-3 text-xs break-keep text-slate-400">
+              <p className="mt-3 text-[0.875rem] break-keep text-slate-400">
                 민감정보가 포함된 데이터는 담당 역할만 조회하도록 제한합니다. 관리자 기능은 최소로 유지합니다.
               </p>
             </Panel>

@@ -225,14 +225,14 @@ export function ProjectSurveysPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">
                         {d.recipientName}
-                        <span className="ml-1.5 text-xs font-normal text-slate-400">
+                        <span className="ml-1.5 text-[0.875rem] font-normal text-slate-400">
                           {d.recipientPosition}
                         </span>
                       </p>
                       <RespondentRoleBadge role={d.respondentRole} />
                       <SurveyDistributionStatusBadge status={d.status} />
                     </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400">
+                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.875rem] text-slate-400">
                       <span>발급 {formatDate(d.issuedAt)}</span>
                       <span>만료 {d.expiresAt ? formatDate(d.expiresAt) : '없음'}</span>
                       {d.submittedAt && <span>제출 {formatDateTime(d.submittedAt)}</span>}
@@ -281,7 +281,7 @@ export function ProjectSurveysPage() {
                 ['제출 완료', responseSummary.submitted],
               ].map(([label, value]) => (
                 <div key={label as string}>
-                  <dt className="text-xs text-slate-400">{label}</dt>
+                  <dt className="text-[0.875rem] text-slate-400">{label}</dt>
                   <dd className="text-lg font-bold text-slate-800">{value}</dd>
                 </div>
               ))}

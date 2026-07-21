@@ -19,9 +19,12 @@ import {
   SUPPORT_TYPE_META,
 } from '../../lib/fundingMeta'
 import { institutionRepository, supportProgramRepository } from '../../repositories'
+import { isAdvancedVisible } from '../../lib/featureVisibility'
+import { useStoreVersion } from '../../lib/useStoreVersion'
 import { Button } from '../../components/ui/Button'
 import { Panel } from '../../components/ui/Panel'
 import { useToast } from '../../components/ui/toastContext'
+import { AdvancedFeatureNotice } from '../../components/workspace/FeatureNotices'
 import {
   WorkspaceShell,
   WorkspaceNextAction,
@@ -466,6 +469,8 @@ function StartFunding({ projectId, eligibility, objective }: { projectId: string
 export function ProjectFundingPage() {
   const { projectId = '' } = useParams<{ projectId: string }>()
   const { context } = useFundingData(projectId)
+  useStoreVersion()
+  const advanced = isAdvancedVisible()
 
   if (!context) {
     return (
@@ -477,9 +482,21 @@ export function ProjectFundingPage() {
   }
 
   const { project, eligibility, latest } = context
+  const advancedNotice = !advanced ? (
+    <AdvancedFeatureNotice
+      featureName="기관·자금 연계"
+      whenToUse="프로젝트 결과와 근거가 쌓인 뒤, 검토할 기관과 준비자료를 관리할 때 사용합니다."
+    />
+  ) : null
 
-  if (latest) {
-    return <StrategyOverview strategy={latest} projectId={projectId} objectiveFallback={project.objective} />
-  }
-  return <StartFunding projectId={projectId} eligibility={eligibility} objective={project.objective} />
+  return (
+    <div className="flex flex-col gap-5">
+      {advancedNotice}
+      {latest ? (
+        <StrategyOverview strategy={latest} projectId={projectId} objectiveFallback={project.objective} />
+      ) : (
+        <StartFunding projectId={projectId} eligibility={eligibility} objective={project.objective} />
+      )}
+    </div>
+  )
 }

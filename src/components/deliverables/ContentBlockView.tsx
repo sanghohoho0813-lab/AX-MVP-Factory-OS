@@ -15,7 +15,7 @@ const TONE_CALLOUT: Record<DeliverableBlockTone, string> = {
 export function ContentBlockView({ block, showInternal }: { block: DeliverableContentBlock; showInternal: boolean }) {
   if (block.internalOnly && !showInternal) return null
   const internalTag = block.internalOnly && showInternal ? (
-    <span className="ml-2 rounded border border-danger-200 bg-danger-50 px-1.5 py-0.5 text-[10px] font-semibold text-danger-600">내부 전용</span>
+    <span className="ml-2 rounded border border-danger-200 bg-danger-50 px-1.5 py-0.5 text-[0.78rem] font-semibold text-danger-600">내부 전용</span>
   ) : null
 
   switch (block.type) {
@@ -59,7 +59,7 @@ export function ContentBlockView({ block, showInternal }: { block: DeliverableCo
           <ol className="flex flex-col gap-1">
             {block.items.map((item, i) => (
               <li key={i} className="flex items-start gap-2 text-[13px] break-keep text-slate-700">
-                <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-500">{i + 1}</span>
+                <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[0.8125rem] font-semibold text-slate-500">{i + 1}</span>
                 <span className="min-w-0 whitespace-pre-wrap">{item}</span>
               </li>
             ))}
@@ -73,7 +73,7 @@ export function ContentBlockView({ block, showInternal }: { block: DeliverableCo
           <dl className="grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
             {block.keyValues.map((kv, i) => (
               <div key={i} className="flex flex-col">
-                <dt className="text-xs text-slate-400">{kv.key}</dt>
+                <dt className="text-[0.875rem] text-slate-400">{kv.key}</dt>
                 <dd className="text-[13px] break-keep whitespace-pre-wrap text-slate-700">{kv.value || '-'}</dd>
               </div>
             ))}
@@ -120,7 +120,7 @@ export function ContentBlockView({ block, showInternal }: { block: DeliverableCo
       return (
         <div>
           {block.title && <p className="mb-1 text-[13px] font-semibold text-slate-700">{block.title}{internalTag}</p>}
-          <pre className="overflow-x-auto rounded-(--radius-card) border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed break-words whitespace-pre-wrap text-slate-700">{block.text}</pre>
+          <pre className="overflow-x-auto rounded-(--radius-card) border border-slate-200 bg-slate-50 p-3 text-[0.875rem] leading-relaxed break-words whitespace-pre-wrap text-slate-700">{block.text}</pre>
         </div>
       )
     case 'divider':

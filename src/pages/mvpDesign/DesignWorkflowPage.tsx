@@ -28,7 +28,7 @@ function WorkflowColumn({ workflow, tone }: { workflow: MvpWorkflow; tone: 'curr
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-[0.92rem] break-keep text-slate-700">{step.action}</p>
-                  <p className={`mt-0.5 inline-flex items-center gap-1 text-xs ${meta.tone}`}>
+                  <p className={`mt-0.5 inline-flex items-center gap-1 text-[0.875rem] ${meta.tone}`}>
                     <meta.icon aria-hidden="true" className="size-3" />
                     {meta.label}
                   </p>

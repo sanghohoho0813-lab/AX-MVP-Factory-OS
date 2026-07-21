@@ -30,11 +30,11 @@ export function FileMetadataDisplay({ file }: { file: SurveyFileMetadata }) {
       <FileText aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
       <div className="min-w-0">
         <p className="truncate text-[13px] font-medium text-slate-700">{file.name}</p>
-        <p className="text-xs text-slate-400">
+        <p className="text-[0.875rem] text-slate-400">
           {sizeLabel} · {file.type || '형식 미상'}
         </p>
       </div>
-      <span className="ml-auto shrink-0 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[11px] font-medium text-warning-700">
+      <span className="ml-auto shrink-0 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-warning-700">
         실제 파일 미보관
       </span>
     </div>
@@ -70,7 +70,7 @@ export function SurveyAnswerDisplay({ placement, value }: SurveyAnswerDisplayPro
             {(value as string[]).map((v) => (
               <span
                 key={v}
-                className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-700"
+                className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.875rem] text-slate-700"
               >
                 {optionLabel(placement, v)}
               </span>
@@ -124,7 +124,7 @@ export function SurveyAnswerDisplay({ placement, value }: SurveyAnswerDisplayPro
                     <th
                       key={c.id}
                       scope="col"
-                      className="border-b border-slate-200 px-3 py-1.5 text-left text-xs font-medium text-slate-500"
+                      className="border-b border-slate-200 px-3 py-1.5 text-left text-[0.875rem] font-medium text-slate-500"
                     >
                       {c.label}
                       {c.unit && <span className="text-slate-400"> ({c.unit})</span>}

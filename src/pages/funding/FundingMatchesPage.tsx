@@ -58,10 +58,10 @@ function ChipList({ label, items, tone = 'slate' }: { label: string; items: stri
           : 'border-slate-200 bg-slate-50 text-slate-600'
   return (
     <div className="flex flex-col gap-1">
-      <p className="text-[11px] font-semibold tracking-wide text-slate-400 uppercase">{label}</p>
+      <p className="text-[0.8125rem] font-semibold tracking-wide text-slate-400 uppercase">{label}</p>
       <ul className="flex flex-wrap gap-1.5">
         {items.map((item, i) => (
-          <li key={i} className={`rounded-md border px-2 py-0.5 text-[12px] break-keep ${toneClass}`}>
+          <li key={i} className={`rounded-md border px-2 py-0.5 text-[0.875rem] break-keep ${toneClass}`}>
             {item}
           </li>
         ))}
@@ -90,16 +90,16 @@ function CriterionTable({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="min-w-0 text-[13px] font-medium break-keep text-slate-700">{c.label}</p>
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-500">{CRITERION_CATEGORY_LABEL[c.category]}</span>
+              <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.8125rem] text-slate-500">{CRITERION_CATEGORY_LABEL[c.category]}</span>
               <CriterionStatusBadge status={c.status} />
             </div>
           </div>
-          {c.description && <p className="mt-1 text-xs break-keep text-slate-400">{c.description}</p>}
+          {c.description && <p className="mt-1 text-[0.875rem] break-keep text-slate-400">{c.description}</p>}
           {c.status === 'unknown' && (
-            <p className="mt-1 text-[11px] break-keep text-slate-400">데이터 없음 — 미충족과 다릅니다(확인 필요).</p>
+            <p className="mt-1 text-[0.8125rem] break-keep text-slate-400">데이터 없음 — 미충족과 다릅니다(확인 필요).</p>
           )}
           {c.missingEvidence && (
-            <p className="mt-1 text-xs break-keep text-slate-500">부족한 증빙: {c.missingEvidence}</p>
+            <p className="mt-1 text-[0.875rem] break-keep text-slate-500">부족한 증빙: {c.missingEvidence}</p>
           )}
           {!readOnly && (
             <label className="mt-2 flex flex-col gap-1">
@@ -107,7 +107,7 @@ function CriterionTable({
               <select
                 value={c.status}
                 onChange={(e) => onStatus(c.id, e.target.value as CriterionStatus)}
-                className="w-full max-w-[220px] rounded-(--radius-control) border border-slate-200 px-2 py-1 text-xs text-slate-700"
+                className="w-full max-w-[220px] rounded-(--radius-control) border border-slate-200 px-2 py-1 text-[0.875rem] text-slate-700"
               >
                 {CRITERION_STATUSES.map((s) => (
                   <option key={s} value={s}>{CRITERION_STATUS_META[s].label}</option>
@@ -172,12 +172,12 @@ function MatchCard({
         </div>
         {!readOnly && (
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-1.5 text-xs text-slate-500">
+            <label className="flex items-center gap-1.5 text-[0.875rem] text-slate-500">
               <span>우선순위</span>
               <select
                 value={match.priority}
                 onChange={(e) => handlePriority(e.target.value as MatchPriority)}
-                className="rounded-(--radius-control) border border-slate-200 px-2 py-1 text-xs text-slate-700"
+                className="rounded-(--radius-control) border border-slate-200 px-2 py-1 text-[0.875rem] text-slate-700"
               >
                 {MATCH_PRIORITIES.map((p) => (
                   <option key={p} value={p}>{MATCH_PRIORITY_META[p].label}</option>
@@ -193,7 +193,7 @@ function MatchCard({
       </div>
 
       {excluded && match.exclusionReason && (
-        <p className="mt-2 text-[12px] break-keep text-slate-500">제외 사유: {match.exclusionReason}</p>
+        <p className="mt-2 text-[0.875rem] break-keep text-slate-500">제외 사유: {match.exclusionReason}</p>
       )}
 
       {!excluded && (
@@ -235,7 +235,7 @@ function MatchCard({
           )}
 
           <div>
-            <p className="mb-2 text-[12px] font-semibold tracking-wide text-slate-400 uppercase">요건 점검</p>
+            <p className="mb-2 text-[0.875rem] font-semibold tracking-wide text-slate-400 uppercase">요건 점검</p>
             <CriterionTable match={match} readOnly={readOnly} onStatus={handleCriterion} />
           </div>
         </div>

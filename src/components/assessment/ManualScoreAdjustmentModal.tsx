@@ -85,7 +85,7 @@ export function ManualScoreAdjustmentModal({
             aria-invalid={error !== '' && (Number(score) < 0 || Number(score) > domainScore.maxScore)}
             className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
           />
-          <p id="adjust-score-help" className="mt-1 text-xs text-slate-400">
+          <p id="adjust-score-help" className="mt-1 text-[0.875rem] text-slate-400">
             영역 최대 배점 {domainScore.maxScore}점을 초과할 수 없습니다.
           </p>
         </div>

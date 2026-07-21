@@ -70,7 +70,7 @@ export function SurveyCompletionPage({
         </div>
       </dl>
 
-      <p className="mt-5 text-xs break-keep text-slate-400">
+      <p className="mt-5 text-[0.875rem] break-keep text-slate-400">
         담당자 검토가 예정되어 있습니다. 이 화면은 닫으셔도 됩니다.
       </p>
     </div>

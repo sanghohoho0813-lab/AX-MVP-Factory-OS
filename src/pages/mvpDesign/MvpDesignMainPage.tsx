@@ -89,7 +89,7 @@ export function MvpDesignMainPage() {
       cell: (r) => (
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-slate-800">{r.project.name}</p>
-          <p className="text-xs text-slate-400">{r.project.projectCode}</p>
+          <p className="text-[0.875rem] text-slate-400">{r.project.projectCode}</p>
         </div>
       ),
     },
@@ -147,7 +147,7 @@ export function MvpDesignMainPage() {
                   <button type="button" onClick={() => go(r)} className="flex w-full items-center justify-between gap-2 px-5 py-3.5 text-left hover:bg-slate-50">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-slate-800">{r.orgName} · {r.project.name}</p>
-                      <p className="text-xs text-slate-400">{r.coreTask ?? '핵심 과제 확정됨'}</p>
+                      <p className="text-[0.875rem] text-slate-400">{r.coreTask ?? '핵심 과제 확정됨'}</p>
                     </div>
                     <span className="shrink-0 text-[0.92rem] font-semibold text-brand-600">{LIFECYCLE_ACTION[r.lifecycle]}</span>
                   </button>
@@ -169,7 +169,7 @@ export function MvpDesignMainPage() {
                   <button type="button" onClick={() => go(r)} className="flex w-full items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50">
                     <div className="min-w-0 text-left">
                       <p className="truncate text-sm font-medium text-slate-800">{r.orgName} · {r.coreTask ?? r.project.name}</p>
-                      <p className="text-xs text-slate-400">필수 기능 {r.mustCount}건</p>
+                      <p className="text-[0.875rem] text-slate-400">필수 기능 {r.mustCount}건</p>
                     </div>
                     {r.status && <DesignStatusBadge status={r.status} />}
                   </button>
@@ -189,7 +189,7 @@ export function MvpDesignMainPage() {
                   <button type="button" onClick={() => go(r)} className="flex w-full items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50">
                     <div className="min-w-0 text-left">
                       <p className="truncate text-sm font-medium text-slate-800">{r.coreTask ?? r.project.name}</p>
-                      <p className="text-xs text-slate-400">{r.orgName} · {memberName(r.project.ownerId)}</p>
+                      <p className="text-[0.875rem] text-slate-400">{r.orgName} · {memberName(r.project.ownerId)}</p>
                     </div>
                     <span className="shrink-0 text-sm font-bold text-slate-800">{r.mustCount} Must</span>
                   </button>
@@ -200,7 +200,7 @@ export function MvpDesignMainPage() {
         </Panel>
       </div>
 
-      <p className="text-xs text-slate-400">
+      <p className="text-[0.875rem] text-slate-400">
         설계 산출물은 확정 핵심 과제와 사전 정의된 설계 규칙으로 생성됩니다. 원본 과제가 바뀌어도 확정된 설계는 보존됩니다.
       </p>
     </div>

@@ -43,11 +43,11 @@ export function ActivityTimeline({ activities }: ActivityTimelineProps) {
                 {activity.title}
               </p>
               {activity.description && (
-                <p className="mt-0.5 text-xs break-keep text-slate-500">
+                <p className="mt-0.5 text-[0.875rem] break-keep text-slate-500">
                   {activity.description}
                 </p>
               )}
-              <p className="mt-1 text-[11px] text-slate-400">
+              <p className="mt-1 text-[0.8125rem] text-slate-400">
                 {activity.actorName} · {formatDateTime(activity.createdAt)}
               </p>
             </div>

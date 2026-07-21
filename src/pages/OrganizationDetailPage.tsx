@@ -7,7 +7,7 @@ import {
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { Project } from '../types/domain'
-import { HEALTH_META, PROJECT_STAGE_META } from '../lib/statusMeta'
+import { HEALTH_META } from '../lib/statusMeta'
 import { ORG_STATUS_META, mvpLevelLabel } from '../lib/domainMeta'
 import {
   formatDate,
@@ -109,53 +109,57 @@ export function OrganizationDetailPage() {
     }
   }
 
-  const projectRow = (project: Project) => (
-    <li key={project.id}>
-      <Link
-        to={`/projects/${project.id}`}
-        className="block px-5 py-4 transition-colors hover:bg-slate-50"
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold tracking-wide text-slate-400">
-            {project.projectCode}
-          </span>
-          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">
-            {project.name}
+  const projectRow = (project: Project) => {
+    const progress = computeProjectJourney(project).progress
+    return (
+      <li key={project.id}>
+        <Link
+          to={`/projects/${project.id}`}
+          className="block px-5 py-4 transition-colors hover:bg-slate-50"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold tracking-wide text-slate-400">
+              {project.projectCode}
+            </span>
+            <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">
+              {project.name}
+            </p>
+            <ProjectTypeBadge type={project.projectType} compact />
+            {progress.isSample && (
+              <span className="rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[0.78rem] font-medium text-brand-700">
+                샘플
+              </span>
+            )}
+            <StatusBadge tone="info">{progress.currentStep.label}</StatusBadge>
+            <StatusBadge tone={HEALTH_META[project.healthStatus].tone} withDot>
+              {HEALTH_META[project.healthStatus].label}
+            </StatusBadge>
+          </div>
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.875rem] text-slate-500">
+            <span>
+              수준: {mvpLevelLabel(project.currentMvpLevel, project.projectType)} →{' '}
+              {mvpLevelLabel(project.targetMvpLevel, project.projectType)}
+            </span>
+            <span>담당 {memberName(project.ownerId)}</span>
+            <span>마감 {formatDate(project.dueDate)}</span>
+          </div>
+          <div className="mt-2.5 flex items-center gap-2">
+            <ProgressBar
+              value={progress.percent}
+              tone={HEALTH_META[project.healthStatus].tone}
+              label={`${project.name} 진행 단계`}
+            />
+            <span className="shrink-0 text-[0.875rem] font-semibold text-slate-600">
+              {progress.stepText}
+            </span>
+          </div>
+          <p className="mt-2 truncate text-[0.875rem] break-keep text-slate-500">
+            다음 행동: {progress.nextAction.title}
           </p>
-          <ProjectTypeBadge type={project.projectType} compact />
-          <StatusBadge tone={PROJECT_STAGE_META[project.currentStage].tone}>
-            {PROJECT_STAGE_META[project.currentStage].label}
-          </StatusBadge>
-          <StatusBadge tone={HEALTH_META[project.healthStatus].tone} withDot>
-            {HEALTH_META[project.healthStatus].label}
-          </StatusBadge>
-        </div>
-        <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-          <span>
-            수준: {mvpLevelLabel(project.currentMvpLevel, project.projectType)} →{' '}
-            {mvpLevelLabel(project.targetMvpLevel, project.projectType)}
-          </span>
-          <span>담당 {memberName(project.ownerId)}</span>
-          <span>마감 {formatDate(project.dueDate)}</span>
-        </div>
-        <div className="mt-2.5 flex items-center gap-2">
-          <ProgressBar
-            value={project.progress}
-            tone={HEALTH_META[project.healthStatus].tone}
-            label={`${project.name} 진행률`}
-          />
-          <span className="w-9 shrink-0 text-right text-xs font-semibold text-slate-600">
-            {project.progress}%
-          </span>
-        </div>
-        {project.nextAction && (
-          <p className="mt-2 truncate text-xs text-slate-500">
-            다음 행동: {project.nextAction}
-          </p>
-        )}
-      </Link>
-    </li>
-  )
+        </Link>
+      </li>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-5">

@@ -40,7 +40,7 @@ export function DesignScreensPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-slate-800">{screen.name}</p>
-                        <p className="mt-0.5 text-xs break-keep text-slate-500">{screen.purpose}</p>
+                        <p className="mt-0.5 text-[0.875rem] break-keep text-slate-500">{screen.purpose}</p>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1">
                         <ScreenTypeBadge type={screen.type} />
@@ -59,7 +59,7 @@ export function DesignScreensPage() {
                     </div>
                     <div>
                       <p className="mb-1 text-[0.82rem] font-semibold text-slate-400">담는 기능</p>
-                      <p className="text-xs break-keep text-slate-600">
+                      <p className="text-[0.875rem] break-keep text-slate-600">
                         {screen.featureIds.map((id) => featureName(design, id)).join(', ')}
                       </p>
                     </div>

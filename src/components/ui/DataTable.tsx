@@ -32,7 +32,7 @@ export function DataTable<T>({
             <th
               key={column.key}
               scope="col"
-              className={`px-4 py-3 text-left text-xs font-semibold whitespace-nowrap text-slate-500 ${column.className ?? ''}`}
+              className={`px-4 py-3 text-left text-[0.875rem] font-semibold whitespace-nowrap text-slate-500 ${column.className ?? ''}`}
             >
               {column.header}
             </th>

@@ -9,7 +9,7 @@ interface MetricStripProps {
 function DeltaIndicator({ delta }: { delta: number }) {
   if (delta === 0) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-xs font-medium text-slate-500">
+      <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-slate-500">
         <Minus aria-hidden="true" className="size-3" />
         변동 없음
       </span>
@@ -18,7 +18,7 @@ function DeltaIndicator({ delta }: { delta: number }) {
   const rising = delta > 0
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-medium ${
+      className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[0.875rem] font-medium ${
         rising
           ? 'border-success-200 bg-success-50 text-success-700'
           : 'border-danger-200 bg-danger-50 text-danger-700'
@@ -65,7 +65,7 @@ export function MetricStrip({ metrics }: MetricStripProps) {
                     {metric.unit}
                   </span>
                 </p>
-                <p className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-400">
+                <p className="mt-1.5 flex items-center gap-1.5 text-[0.875rem] text-slate-400">
                   전주 대비 <DeltaIndicator delta={metric.weeklyDelta} />
                 </p>
               </dd>

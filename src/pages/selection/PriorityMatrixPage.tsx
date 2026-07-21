@@ -89,8 +89,8 @@ export function PriorityMatrixPage() {
                       <span className={`mt-1 size-2.5 shrink-0 rounded-full ${TONE_DOT_CLASS[QUADRANT_META[q].tone]}`} />
                       <div>
                         <p className="text-[13px] font-medium text-slate-700">{QUADRANT_META[q].label}</p>
-                        <p className="text-xs break-keep text-slate-400">{QUADRANT_META[q].description}</p>
-                        <p className="mt-0.5 text-xs text-slate-400">후보 {active.filter((c) => c.quadrant === q).length}건</p>
+                        <p className="text-[0.875rem] break-keep text-slate-400">{QUADRANT_META[q].description}</p>
+                        <p className="mt-0.5 text-[0.875rem] text-slate-400">후보 {active.filter((c) => c.quadrant === q).length}건</p>
                       </div>
                     </li>
                   ))}

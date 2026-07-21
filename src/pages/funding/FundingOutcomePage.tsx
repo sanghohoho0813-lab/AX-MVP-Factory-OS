@@ -382,20 +382,20 @@ function OutcomeContent({ strategy }: { strategy: FundingStrategy }) {
                   <div className="flex min-w-0 flex-col gap-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-medium text-slate-700">{metric.name || OUTCOME_METRIC_TYPE_META[metric.type].label}</span>
-                      <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-xs text-slate-500">
+                      <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.875rem] text-slate-500">
                         {OUTCOME_METRIC_TYPE_META[metric.type].label}
                       </span>
                       {metric.verified ? (
-                        <span className="rounded-md border border-success-200 bg-success-50 px-1.5 py-0.5 text-xs font-medium text-success-700">검증됨</span>
+                        <span className="rounded-md border border-success-200 bg-success-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-success-700">검증됨</span>
                       ) : (
-                        <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-xs text-slate-500">미검증</span>
+                        <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.875rem] text-slate-500">미검증</span>
                       )}
                       {metric.sensitive && (
-                        <span className="rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-xs font-medium text-warning-700">민감정보</span>
+                        <span className="rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">민감정보</span>
                       )}
                     </div>
                     {metric.outcomeId && (
-                      <span className="text-xs text-slate-400">연결 결과: {outcomeLabel(metric.outcomeId)}</span>
+                      <span className="text-[0.875rem] text-slate-400">연결 결과: {outcomeLabel(metric.outcomeId)}</span>
                     )}
                   </div>
                   {!readOnly && (
@@ -673,7 +673,7 @@ function AmountField({ label, value }: { label: string; value: string }) {
   const empty = value.trim() === ''
   return (
     <div className="flex flex-col">
-      <dt className="text-xs text-slate-400">{label}</dt>
+      <dt className="text-[0.875rem] text-slate-400">{label}</dt>
       <dd className={`text-[13px] ${empty ? 'text-slate-400' : 'font-medium text-slate-700'}`}>{empty ? '미입력' : value}</dd>
     </div>
   )
@@ -682,7 +682,7 @@ function AmountField({ label, value }: { label: string; value: string }) {
 function ListBlock({ title, items }: { title: string; items: string[] }) {
   return (
     <div className="rounded-(--radius-card) border border-slate-100 bg-slate-50/60 px-3 py-2">
-      <p className="text-xs font-semibold text-slate-500">{title}</p>
+      <p className="text-[0.875rem] font-semibold text-slate-500">{title}</p>
       <ul className="mt-1 flex flex-col gap-0.5">
         {items.map((item, idx) => (
           <li key={idx} className="text-[13px] break-keep text-slate-600">· {item}</li>
@@ -695,7 +695,7 @@ function ListBlock({ title, items }: { title: string; items: string[] }) {
 function TextBlock({ title, value }: { title: string; value: string }) {
   return (
     <div className="rounded-(--radius-card) border border-slate-100 bg-slate-50/60 px-3 py-2">
-      <p className="text-xs font-semibold text-slate-500">{title}</p>
+      <p className="text-[0.875rem] font-semibold text-slate-500">{title}</p>
       <p className="mt-0.5 text-[13px] break-keep text-slate-600">{value}</p>
     </div>
   )

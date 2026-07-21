@@ -34,7 +34,7 @@ export function RankingQuestion({ question, answer, onAnswer, disabled }: Render
           key={value}
           className="flex items-center gap-3 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5"
         >
-          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">
+          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[0.875rem] font-semibold text-slate-600">
             {index + 1}
           </span>
           <span className="min-w-0 flex-1 truncate text-sm text-slate-700">

@@ -66,7 +66,7 @@ export function CloudSaveStatus({
   const spin = state === 'saving' || state === 'initializing'
   return (
     <span
-      className={`inline-flex min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium ${meta.className}`}
+      className={`inline-flex min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.875rem] font-medium ${meta.className}`}
     >
       <Icon aria-hidden="true" className={`size-3.5 shrink-0 ${spin ? 'animate-spin' : ''}`} />
       {!compact && <span className="truncate">{meta.label}</span>}
@@ -74,7 +74,7 @@ export function CloudSaveStatus({
         <button
           type="button"
           onClick={onRetry}
-          className="ml-1 inline-flex cursor-pointer items-center gap-1 rounded px-1 text-[12px] font-semibold underline hover:no-underline"
+          className="ml-1 inline-flex cursor-pointer items-center gap-1 rounded px-1 text-[0.875rem] font-semibold underline hover:no-underline"
         >
           <RefreshCw aria-hidden="true" className="size-3" />
           다시 시도

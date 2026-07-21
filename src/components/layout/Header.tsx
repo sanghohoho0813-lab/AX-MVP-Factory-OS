@@ -95,7 +95,7 @@ function NotificationMenu() {
         className="relative flex size-10 cursor-pointer items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-100 hover:text-slate-700"
       >
         <Bell aria-hidden="true" className="size-5" />
-        <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger-500 px-1 text-[10px] font-semibold text-white">
+        <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger-500 px-1 text-[0.78rem] font-semibold text-white">
           {NOTIFICATION_COUNT}
         </span>
       </button>
@@ -111,7 +111,7 @@ function NotificationMenu() {
                 className="border-b border-slate-50 px-4 py-3 last:border-0"
               >
                 <p className="text-[13px] break-keep text-slate-700">{n.message}</p>
-                <p className="mt-1 text-xs text-slate-400">{n.time}</p>
+                <p className="mt-1 text-[0.875rem] text-slate-400">{n.time}</p>
               </li>
             ))}
           </ul>
@@ -144,7 +144,7 @@ function UserMenu() {
           <span className="block truncate text-[13px] font-semibold text-slate-800">
             {CURRENT_USER.name}
           </span>
-          <span className="block truncate text-[11px] text-slate-400">
+          <span className="block truncate text-[0.8125rem] text-slate-400">
             {CURRENT_USER.role}
           </span>
         </span>
@@ -159,7 +159,7 @@ function UserMenu() {
             <p className="text-sm font-semibold text-slate-800">
               {CURRENT_USER.name}
             </p>
-            <p className="text-xs text-slate-400">{CURRENT_USER.role}</p>
+            <p className="text-[0.875rem] text-slate-400">{CURRENT_USER.role}</p>
           </div>
           <button
             type="button"
@@ -181,7 +181,7 @@ function UserMenu() {
             설정
           </Link>
           <div className="mt-1 border-t border-slate-100 px-3 pt-2.5 pb-1.5">
-            <p className="mb-1.5 text-xs font-semibold text-slate-500">글자 크기</p>
+            <p className="mb-1.5 text-[0.875rem] font-semibold text-slate-500">글자 크기</p>
             <TextScaleControl compact />
           </div>
         </div>

@@ -142,7 +142,7 @@ export function FundingResultsPage() {
       cell: (r) => (
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-slate-800">{r.projectName}</p>
-          <p className="truncate text-xs text-slate-400">{r.primaryInstitutionName ?? '우선 기관 미선정'} · v{r.strategy.version}</p>
+          <p className="truncate text-[0.875rem] text-slate-400">{r.primaryInstitutionName ?? '우선 기관 미선정'} · v{r.strategy.version}</p>
         </div>
       ),
     },
@@ -187,7 +187,7 @@ export function FundingResultsPage() {
       cell: (r) => (
         <div className="flex flex-wrap items-center gap-1.5">
           {r.latestOutcome ? <OutcomeTypeBadge type={r.latestOutcome.type} /> : <span className="text-[13px] text-slate-400">결과 없음</span>}
-          {r.summary.caseCandidate && <span className="rounded-md border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[11px] font-medium text-brand-700">사례 후보</span>}
+          {r.summary.caseCandidate && <span className="rounded-md border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-brand-700">사례 후보</span>}
           <StrategyStatusBadge status={r.strategy.status} />
         </div>
       ),
@@ -249,21 +249,21 @@ export function FundingResultsPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-900">{r.projectName}</p>
-                    <p className="mt-0.5 truncate text-xs text-slate-400">{r.orgName} · {r.primaryInstitutionName ?? '우선 기관 미선정'} · v{r.strategy.version}</p>
+                    <p className="mt-0.5 truncate text-[0.875rem] text-slate-400">{r.orgName} · {r.primaryInstitutionName ?? '우선 기관 미선정'} · v{r.strategy.version}</p>
                   </div>
                   <StrategyStatusBadge status={r.strategy.status} />
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
                   {r.bestStage ? <ApplicationStageBadge stage={r.bestStage} /> : <span className="text-[13px] text-slate-400">신청 전</span>}
                   {r.latestOutcome && <OutcomeTypeBadge type={r.latestOutcome.type} />}
-                  {r.summary.caseCandidate && <span className="rounded-md border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[11px] font-medium text-brand-700">사례 후보</span>}
+                  {r.summary.caseCandidate && <span className="rounded-md border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-brand-700">사례 후보</span>}
                 </div>
                 {r.strategy.preferredSupportTypes.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {r.strategy.preferredSupportTypes.map((t) => <SupportTypeBadge key={t} type={t} />)}
                   </div>
                 )}
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.875rem] text-slate-500">
                   <span>요청 {r.requested || '-'}</span>
                   <span>승인 {r.approved || '-'}</span>
                   <span>미해결 {r.summary.openGapCount}건</span>

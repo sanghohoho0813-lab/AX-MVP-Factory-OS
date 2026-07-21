@@ -131,7 +131,7 @@ function EvidenceSection({ strategy, readOnly }: { strategy: FundingStrategy; re
           <div className="min-w-0 overflow-x-auto">
             <table className="w-full min-w-[680px] border-collapse text-[13px]">
               <thead>
-                <tr className="border-b border-slate-200 text-left text-xs text-slate-400">
+                <tr className="border-b border-slate-200 text-left text-[0.875rem] text-slate-400">
                   <th scope="col" className="px-5 py-2.5 font-medium">근거명</th>
                   <th scope="col" className="px-3 py-2.5 font-medium">값</th>
                   <th scope="col" className="px-3 py-2.5 font-medium">출처</th>
@@ -145,20 +145,20 @@ function EvidenceSection({ strategy, readOnly }: { strategy: FundingStrategy; re
                   <tr key={e.id} className={`border-b border-slate-100 align-top ${e.sensitive ? 'bg-danger-50/30' : ''}`}>
                     <td className="px-5 py-2.5">
                       <p className="font-medium break-keep text-slate-700">{e.label}</p>
-                      {e.description && <p className="mt-0.5 text-xs break-keep text-slate-400">{e.description}</p>}
+                      {e.description && <p className="mt-0.5 text-[0.875rem] break-keep text-slate-400">{e.description}</p>}
                     </td>
                     <td className="px-3 py-2.5 break-keep text-slate-600">
                       {e.value ? `${e.value}${e.unit ? ` ${e.unit}` : ''}` : '—'}
                     </td>
                     <td className="px-3 py-2.5 text-slate-500">{SOURCE_TYPE_LABEL[e.sourceType]}</td>
                     <td className="px-3 py-2.5">
-                      <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium ${e.verified ? 'border-success-200 bg-success-50 text-success-700' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
+                      <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[0.8125rem] font-medium ${e.verified ? 'border-success-200 bg-success-50 text-success-700' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
                         {e.verified ? '검증' : '미검증'}
                       </span>
                     </td>
                     <td className="px-3 py-2.5">
                       {e.sensitive && (
-                        <span className="inline-flex items-center gap-1 rounded-md border border-danger-200 bg-danger-50 px-2 py-0.5 text-[11px] font-medium text-danger-700">
+                        <span className="inline-flex items-center gap-1 rounded-md border border-danger-200 bg-danger-50 px-2 py-0.5 text-[0.8125rem] font-medium text-danger-700">
                           <Lock aria-hidden="true" className="size-3" />
                           민감정보
                         </span>
@@ -359,7 +359,7 @@ function GapSection({ strategy, readOnly }: { strategy: FundingStrategy; readOnl
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+                      <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.8125rem] font-medium text-slate-500">
                         {CATEGORY_LABEL[gap.category]}
                       </span>
                       <GapSeverityBadge severity={gap.severity} />
@@ -378,22 +378,22 @@ function GapSection({ strategy, readOnly }: { strategy: FundingStrategy; readOnl
                 <dl className="mt-3 grid grid-cols-1 gap-x-4 gap-y-2 text-[13px] sm:grid-cols-2">
                   {gap.requiredAction && (
                     <div className="flex flex-col gap-0.5">
-                      <dt className="text-xs font-semibold text-slate-400">필요한 행동</dt>
+                      <dt className="text-[0.875rem] font-semibold text-slate-400">필요한 행동</dt>
                       <dd className="break-keep text-slate-600">{gap.requiredAction}</dd>
                     </div>
                   )}
                   {gap.evidenceNeeded && (
                     <div className="flex flex-col gap-0.5">
-                      <dt className="text-xs font-semibold text-slate-400">필요한 증빙</dt>
+                      <dt className="text-[0.875rem] font-semibold text-slate-400">필요한 증빙</dt>
                       <dd className="break-keep text-slate-600">{gap.evidenceNeeded}</dd>
                     </div>
                   )}
                   <div className="flex flex-col gap-0.5">
-                    <dt className="text-xs font-semibold text-slate-400">담당자</dt>
+                    <dt className="text-[0.875rem] font-semibold text-slate-400">담당자</dt>
                     <dd className="text-slate-600">{gap.ownerId || '미지정'}</dd>
                   </div>
                   <div className="flex flex-col gap-0.5">
-                    <dt className="text-xs font-semibold text-slate-400">기한</dt>
+                    <dt className="text-[0.875rem] font-semibold text-slate-400">기한</dt>
                     <dd className="text-slate-600">{gap.dueDate || '미지정'}</dd>
                   </div>
                 </dl>

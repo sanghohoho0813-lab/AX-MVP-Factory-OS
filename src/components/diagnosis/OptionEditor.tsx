@@ -65,7 +65,7 @@ export function OptionEditor({ options, onChange, error }: OptionEditorProps) {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] border-collapse text-sm">
             <thead>
-              <tr className="text-left text-xs text-slate-400">
+              <tr className="text-left text-[0.875rem] text-slate-400">
                 <th scope="col" className="pb-1.5 pl-1 font-medium">순서</th>
                 <th scope="col" className="pb-1.5 font-medium">라벨</th>
                 <th scope="col" className="pb-1.5 font-medium">내부값</th>
@@ -160,7 +160,7 @@ export function OptionEditor({ options, onChange, error }: OptionEditorProps) {
           </table>
         </div>
       )}
-      {error && <p className="mt-1 text-xs text-danger-600">{error}</p>}
+      {error && <p className="mt-1 text-[0.875rem] text-danger-600">{error}</p>}
     </div>
   )
 }

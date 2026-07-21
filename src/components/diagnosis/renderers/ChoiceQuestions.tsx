@@ -68,7 +68,7 @@ export function ScaleQuestion({ question, answer, onAnswer, disabled }: Renderer
         return (
           <label
             key={option.id}
-            className={`flex min-w-16 flex-1 cursor-pointer flex-col items-center gap-1 rounded-(--radius-control) border px-2 py-2.5 text-center text-xs transition-colors ${
+            className={`flex min-w-16 flex-1 cursor-pointer flex-col items-center gap-1 rounded-(--radius-control) border px-2 py-2.5 text-center text-[0.875rem] transition-colors ${
               checked
                 ? 'border-brand-600 bg-brand-50 text-brand-800'
                 : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'

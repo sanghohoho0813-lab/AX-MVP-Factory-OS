@@ -143,6 +143,10 @@ export function DeliverableResultsPage() {
       </button>
       <PageHeader title="제출자료 결과" description="지금까지 만든 모든 자료 패키지를 상태·유형·대상별로 모아 봅니다. AX와 홈페이지 결과는 트랙별로 구분되며 합산하지 않습니다." />
 
+      <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-[0.875rem] leading-relaxed break-keep text-slate-500">
+        이 시스템은 진단·설계·개발 지시문을 만듭니다. 실제 프로그램과 홈페이지 제작·배포는 별도의 개발 과정이 필요합니다.
+      </p>
+
       <FilterBar
         searchValue={query}
         searchPlaceholder="고객사·프로젝트·패키지명 검색"

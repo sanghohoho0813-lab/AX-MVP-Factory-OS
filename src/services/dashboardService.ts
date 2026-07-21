@@ -13,6 +13,7 @@ import {
 import type { MetricSummary, PortfolioProject } from '../types'
 import type { Organization, Project } from '../types/domain'
 import { pickPrimaryProject } from './organizationService'
+import { getProjectProgress } from './projectProgressService'
 
 export interface ValidationKpiCounts {
   preparing: number
@@ -128,23 +129,40 @@ export function buildDashboardMetrics(
   ]
 }
 
-/** 포트폴리오 건강도 — 고객사 + 대표 프로젝트 기준 */
+/** 포트폴리오 카드 — 기존 PortfolioProject에 실제 진행상태 파생 필드를 더한 것 */
+export interface PortfolioHealthItem extends PortfolioProject {
+  /** "n / N단계" (프로젝트 없으면 빈 문자열) */
+  stepText: string
+  /** 현재 단계 라벨 (프로젝트 없으면 빈 문자열) */
+  currentStepLabel: string
+  /** 지금 해야 할 일 한 줄 */
+  nextActionLabel: string
+  isSample: boolean
+}
+
+/** 포트폴리오 건강도 — 고객사 + 대표 프로젝트 기준 (진행상태 단일 기준 사용) */
 export function buildPortfolioItems(
   organizations: Organization[],
   projects: Project[],
-): PortfolioProject[] {
+): PortfolioHealthItem[] {
   return organizations
-    .map<PortfolioProject>((org) => {
+    .map<PortfolioHealthItem>((org) => {
       const primary = pickPrimaryProject(
         projects.filter((p) => p.organizationId === org.id),
       )
+      const progress = primary ? getProjectProgress(primary) : null
       return {
         id: org.id,
         client: org.name,
         industry: org.industry,
         stage: primary?.currentStage ?? 'intake',
-        progress: primary?.progress ?? 0,
+        // 실제 데이터 기반 파생 진행률 (완료 단계 ÷ 전체 단계)
+        progress: progress?.percent ?? 0,
         health: org.healthStatus,
+        stepText: progress?.stepText ?? '',
+        currentStepLabel: progress?.currentStep.label ?? '',
+        nextActionLabel: progress?.nextAction.title ?? '',
+        isSample: progress?.isSample ?? false,
       }
     })
     .sort((a, b) => HEALTH_ORDER[a.health] - HEALTH_ORDER[b.health])

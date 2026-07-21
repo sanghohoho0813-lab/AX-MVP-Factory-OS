@@ -49,28 +49,28 @@ function FeatureCard({ design, feature }: { design: MvpDesign; feature: MvpFeatu
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {feature.usesAi && (
-          <span className="inline-flex items-center gap-1 text-xs text-accent-600"><Bot aria-hidden="true" className="size-3.5" />AI 보조</span>
+          <span className="inline-flex items-center gap-1 text-[0.875rem] text-accent-600"><Bot aria-hidden="true" className="size-3.5" />AI 보조</span>
         )}
         {feature.humanReviewRequired && (
-          <span className="inline-flex items-center gap-1 text-xs text-warning-600"><UserCheck aria-hidden="true" className="size-3.5" />사람 확정</span>
+          <span className="inline-flex items-center gap-1 text-[0.875rem] text-warning-600"><UserCheck aria-hidden="true" className="size-3.5" />사람 확정</span>
         )}
         {feature.expertJudgmentBoundary && (
-          <span className="inline-flex items-center gap-1 text-xs text-danger-600"><AlertTriangle aria-hidden="true" className="size-3.5" />전문가 최종판단 영역</span>
+          <span className="inline-flex items-center gap-1 text-[0.875rem] text-danger-600"><AlertTriangle aria-hidden="true" className="size-3.5" />전문가 최종판단 영역</span>
         )}
         {feature.evidence.length > 0 && (
-          <span className="inline-flex items-center gap-1 text-xs text-slate-400"><ArrowRight aria-hidden="true" className="size-3" />{feature.evidence[0].label}</span>
+          <span className="inline-flex items-center gap-1 text-[0.875rem] text-slate-400"><ArrowRight aria-hidden="true" className="size-3" />{feature.evidence[0].label}</span>
         )}
       </div>
 
       {editable && (
         <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-3">
-          <span className="text-xs text-slate-400">범위 변경:</span>
+          <span className="text-[0.875rem] text-slate-400">범위 변경:</span>
           {FEATURE_SCOPES.map((scope) => (
             <button
               key={scope}
               type="button"
               onClick={() => changeScope(scope)}
-              className={`rounded-md border px-2 py-0.5 text-xs font-medium transition-colors ${
+              className={`rounded-md border px-2 py-0.5 text-[0.875rem] font-medium transition-colors ${
                 scope === feature.scope
                   ? 'border-brand-300 bg-brand-50 text-brand-700'
                   : 'border-slate-200 text-slate-500 hover:bg-slate-50'
@@ -89,7 +89,7 @@ function IoBox({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-(--radius-control) bg-slate-50 px-3 py-2">
       <p className="text-[0.82rem] font-semibold text-slate-400">{label}</p>
-      <p className="mt-0.5 text-xs break-keep text-slate-600">{value || '-'}</p>
+      <p className="mt-0.5 text-[0.875rem] break-keep text-slate-600">{value || '-'}</p>
     </div>
   )
 }
@@ -111,7 +111,7 @@ export function DesignFeaturesPage() {
                 <Lock aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-brand-500" />
                 1차 MVP는 Must 기능에 집중합니다. 검증되지 않은 기능은 Should/Later로 미루고, 각 기능은 입력·처리·출력으로 정의합니다.
               </p>
-              <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+              <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.875rem] text-slate-500">
                 <Term label="Must" description={GLOSSARY.Must} />
                 <Term label="Should" description={GLOSSARY.Should} />
                 <Term label="Later" description={GLOSSARY.Later} />

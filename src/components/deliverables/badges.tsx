@@ -29,7 +29,7 @@ function Badge({ tone, label, icon: Icon, title }: Base) {
   return (
     <span
       title={title}
-      className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium ${TONE_BADGE_CLASS[tone]}`}
+      className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[0.875rem] font-medium ${TONE_BADGE_CLASS[tone]}`}
     >
       {Icon && <Icon aria-hidden="true" className="size-3.5" />}
       {label}

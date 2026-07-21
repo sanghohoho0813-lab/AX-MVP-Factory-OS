@@ -13,6 +13,7 @@ import {
   projectRepository,
 } from '../repositories'
 import { CURRENT_USER } from '../data/demo'
+import { getProjectProgress } from './projectProgressService'
 
 const HEALTH_RISK_ORDER = { risk: 0, attention: 1, healthy: 2 } as const
 
@@ -66,11 +67,26 @@ export function archiveOrganization(id: string): Organization {
 /* 목록 조회용 결합 데이터                                               */
 /* ------------------------------------------------------------------ */
 
+/** 목록 표시용 — 대표 프로젝트의 실제 진행상태 요약 (projectProgressService 단일 기준) */
+export interface PrimaryProjectProgressSummary {
+  /** "n / N단계" */
+  stepText: string
+  /** 완료 단계 ÷ 전체 단계 (파생값) */
+  percent: number
+  /** 현재 단계 라벨 (예: "기업 진단") */
+  currentStepLabel: string
+  /** 지금 해야 할 일 한 줄 */
+  nextActionLabel: string
+  isSample: boolean
+}
+
 export interface OrganizationRow {
   organization: Organization
   projects: Project[]
   /** 다음 행동 기준 대표 프로젝트 */
   primaryProject: Project | null
+  /** 대표 프로젝트의 실제 데이터 기반 진행상태 (없으면 null) */
+  primaryProgress: PrimaryProjectProgressSummary | null
   activeCount: number
 }
 
@@ -111,10 +127,21 @@ export function searchOrganizationRows(
       const projects = allProjects.filter(
         (p) => p.organizationId === organization.id,
       )
+      const primaryProject = pickPrimaryProject(projects)
+      const progress = primaryProject ? getProjectProgress(primaryProject) : null
       return {
         organization,
         projects,
-        primaryProject: pickPrimaryProject(projects),
+        primaryProject,
+        primaryProgress: progress
+          ? {
+              stepText: progress.stepText,
+              percent: progress.percent,
+              currentStepLabel: progress.currentStep.label,
+              nextActionLabel: progress.nextAction.title,
+              isSample: progress.isSample,
+            }
+          : null,
         activeCount: projects.filter((p) => OPEN_STATUSES.has(p.status)).length,
       }
     })
@@ -154,7 +181,7 @@ export function searchOrganizationRows(
         return a.organization.name.localeCompare(b.organization.name, 'ko')
       case 'progress':
         return (
-          (b.primaryProject?.progress ?? -1) - (a.primaryProject?.progress ?? -1)
+          (b.primaryProgress?.percent ?? -1) - (a.primaryProgress?.percent ?? -1)
         )
       case 'risk':
         return (

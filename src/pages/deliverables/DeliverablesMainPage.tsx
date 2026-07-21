@@ -139,6 +139,10 @@ export function DeliverablesMainPage() {
         next="자료를 확정하면 대상 독자별로 인쇄하거나 파일로 내보낼 수 있습니다. AX와 홈페이지 결과는 합산하지 않습니다."
       />
 
+      <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-[0.875rem] leading-relaxed break-keep text-slate-500">
+        이 시스템은 진단·설계·개발 지시문을 만듭니다. 실제 프로그램과 홈페이지 제작·배포는 별도의 개발 과정이 필요합니다.
+      </p>
+
       <SummaryStrip
         ariaLabel="제출자료 요약"
         items={[

@@ -79,7 +79,7 @@ export function SupabaseWorkspaceSelector() {
                 >
                   <span className="min-w-0 truncate">
                     {ws.workspace?.name ?? ws.workspaceId}
-                    <span className="ml-1.5 text-[11px] text-slate-400">{ROLE_LABEL[ws.role]}</span>
+                    <span className="ml-1.5 text-[0.8125rem] text-slate-400">{ROLE_LABEL[ws.role]}</span>
                   </span>
                   {ws.workspaceId === currentWorkspaceId && <Check aria-hidden="true" className="size-4 shrink-0 text-brand-600" />}
                 </button>
@@ -154,7 +154,7 @@ export function SupabaseUserMenu() {
             <LogOut aria-hidden="true" className="size-4 text-slate-400" /> 로그아웃
           </button>
           <div className="mt-1 border-t border-slate-100 px-3 pt-2.5 pb-1.5">
-            <p className="mb-1.5 text-xs font-semibold text-slate-500">글자 크기</p>
+            <p className="mb-1.5 text-[0.875rem] font-semibold text-slate-500">글자 크기</p>
             <TextScaleControl compact />
           </div>
         </div>
