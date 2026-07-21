@@ -15,6 +15,7 @@ import {
   SEED_MODULES,
   SEED_TEMPLATES,
 } from '../data/seed/surveySeed'
+import { SEED_INSTITUTIONS, SEED_PROGRAMS } from '../data/seed/fundingSeed'
 
 interface Migration {
   version: number
@@ -144,6 +145,29 @@ function initDeliverableStores(): void {
   }
 }
 
+/**
+ * v10 마이그레이션 — 기관·자금 연계 저장소 추가.
+ * 전략·스냅샷·사례는 시드하지 않고 빈 배열만 준비한다.
+ * 기관·프로그램은 최소 참고 시드(reference_only)만 넣으며 이미 있으면 덮어쓰지 않는다.
+ */
+function initFundingStores(): void {
+  if (!hasKey(STORAGE_KEYS.institutions)) {
+    writeJson(STORAGE_KEYS.institutions, SEED_INSTITUTIONS)
+  }
+  if (!hasKey(STORAGE_KEYS.supportPrograms)) {
+    writeJson(STORAGE_KEYS.supportPrograms, SEED_PROGRAMS)
+  }
+  if (!hasKey(STORAGE_KEYS.fundingStrategies)) {
+    writeJson(STORAGE_KEYS.fundingStrategies, [])
+  }
+  if (!hasKey(STORAGE_KEYS.fundingStrategySnapshots)) {
+    writeJson(STORAGE_KEYS.fundingStrategySnapshots, [])
+  }
+  if (!hasKey(STORAGE_KEYS.caseStudies)) {
+    writeJson(STORAGE_KEYS.caseStudies, [])
+  }
+}
+
 /** 순차 적용 마이그레이션 목록 (버전 오름차순) */
 const MIGRATIONS: Migration[] = [
   {
@@ -190,6 +214,11 @@ const MIGRATIONS: Migration[] = [
     version: 9,
     describe: '제출자료 패키지·확정 스냅샷·내보내기 기록 저장소 추가',
     migrate: initDeliverableStores,
+  },
+  {
+    version: 10,
+    describe: '기관·자금 연계·전략·스냅샷·사례 저장소 추가 (기관·프로그램 참고 시드)',
+    migrate: initFundingStores,
   },
 ]
 

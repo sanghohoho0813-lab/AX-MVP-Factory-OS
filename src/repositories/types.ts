@@ -79,6 +79,22 @@ import type {
   DeliverablePackageSnapshot,
   DeliverablePackageSnapshotInput,
 } from '../types/deliverables'
+import type {
+  CaseStudy,
+  CaseStudyFilters,
+  CaseStudyInput,
+  FundingStrategy,
+  FundingStrategyFilters,
+  FundingStrategyInput,
+  FundingStrategySnapshot,
+  FundingStrategySnapshotInput,
+  Institution,
+  InstitutionFilters,
+  InstitutionInput,
+  ProgramFilters,
+  SupportProgram,
+  SupportProgramInput,
+} from '../types/funding'
 
 /**
  * 저장소 계층 인터페이스.
@@ -136,7 +152,11 @@ export class EntityNotFoundError extends Error {
       | '검증 인계'
       | '로컬 테스트 세션'
       | '제출자료 패키지'
-      | '제출자료 스냅샷',
+      | '제출자료 스냅샷'
+      | '기관'
+      | '지원 프로그램'
+      | '연계 전략'
+      | '사례',
   ) {
     super(`${entity}를 찾을 수 없습니다.`)
     this.name = 'EntityNotFoundError'
@@ -438,4 +458,58 @@ export interface DeliverableExportRepository {
   getByPackageId(packageId: string): DeliverableExportRecord[]
   create(record: DeliverableExportRecordInput): DeliverableExportRecord
   deleteByPackageId(packageId: string): void
+}
+
+export interface InstitutionRepository {
+  getAll(includeArchived?: boolean): Institution[]
+  getById(id: string): Institution | null
+  create(input: InstitutionInput): Institution
+  update(id: string, input: Partial<InstitutionInput>): Institution
+  archive(id: string): Institution
+  search(filters: InstitutionFilters): Institution[]
+}
+
+export interface SupportProgramRepository {
+  getAll(includeArchived?: boolean): SupportProgram[]
+  getById(id: string): SupportProgram | null
+  getByInstitutionId(institutionId: string): SupportProgram[]
+  create(input: SupportProgramInput): SupportProgram
+  update(id: string, input: Partial<SupportProgramInput>): SupportProgram
+  archive(id: string): SupportProgram
+  search(filters: ProgramFilters): SupportProgram[]
+  findStalePrograms(): SupportProgram[]
+}
+
+export interface FundingStrategyRepository {
+  getAll(): FundingStrategy[]
+  getById(id: string): FundingStrategy | null
+  getLatestByProjectId(projectId: string): FundingStrategy | null
+  getByProjectId(projectId: string): FundingStrategy[]
+  create(input: FundingStrategyInput): FundingStrategy
+  update(id: string, input: Partial<FundingStrategyInput>): FundingStrategy
+  markReviewed(id: string, reviewerName: string): FundingStrategy
+  finalize(id: string, finalizerName: string): FundingStrategy
+  supersede(id: string): FundingStrategy
+  nextVersion(projectId: string): number
+  search(filters: FundingStrategyFilters): FundingStrategy[]
+}
+
+export interface FundingStrategySnapshotRepository {
+  getAll(): FundingStrategySnapshot[]
+  getByStrategyId(strategyId: string): FundingStrategySnapshot | null
+  getByProjectId(projectId: string): FundingStrategySnapshot[]
+  create(snapshot: FundingStrategySnapshotInput): FundingStrategySnapshot
+  replaceForStrategy(strategyId: string, snapshot: FundingStrategySnapshotInput): FundingStrategySnapshot
+}
+
+export interface CaseStudyRepository {
+  getAll(includeArchived?: boolean): CaseStudy[]
+  getById(id: string): CaseStudy | null
+  getByProjectId(projectId: string): CaseStudy[]
+  create(input: CaseStudyInput): CaseStudy
+  update(id: string, input: Partial<CaseStudyInput>): CaseStudy
+  markReview(id: string): CaseStudy
+  approve(id: string, approverName: string): CaseStudy
+  archive(id: string): CaseStudy
+  search(filters: CaseStudyFilters): CaseStudy[]
 }

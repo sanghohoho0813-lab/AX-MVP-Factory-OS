@@ -6,6 +6,7 @@ import {
   Filter,
   FlaskConical,
   FolderKanban,
+  Landmark,
   Palette,
   ShieldAlert,
 } from 'lucide-react'
@@ -27,6 +28,15 @@ export interface DeliverableKpiCounts {
   qualityErrors: number
 }
 
+export interface FundingKpiCounts {
+  creatable: number
+  reviewing: number
+  applyingReady: number
+  underReview: number
+  outcomeDone: number
+  supplementNeeded: number
+}
+
 const HEALTH_ORDER = { healthy: 0, attention: 1, risk: 2 } as const
 
 /**
@@ -40,6 +50,7 @@ export function buildDashboardMetrics(
   websitePending?: number,
   validation?: ValidationKpiCounts,
   deliverable?: DeliverableKpiCounts,
+  funding?: FundingKpiCounts,
 ): MetricSummary[] {
   const open = projects.filter(
     (p) => p.status !== 'completed' && p.status !== 'archived',
@@ -62,6 +73,8 @@ export function buildDashboardMetrics(
     lastMetric = { key: 'deliverable-errors', label: '제출자료 오류', value: deliverable.qualityErrors, unit: '건', weeklyDelta: 0, tone: 'danger', icon: FileWarning }
   } else if (deliverable && deliverable.stale > 0) {
     lastMetric = { key: 'deliverable-stale', label: '자료 원본 변경', value: deliverable.stale, unit: '건', weeklyDelta: 0, tone: 'warning', icon: FileWarning }
+  } else if (funding && funding.supplementNeeded > 0) {
+    lastMetric = { key: 'funding-supplement', label: '자금 보완 요청', value: funding.supplementNeeded, unit: '건', weeklyDelta: 0, tone: 'warning', icon: Landmark }
   } else if (websitePending && websitePending > 0) {
     lastMetric = { key: 'website-pending', label: '홈페이지 설계 대기', value: websitePending, unit: '건', weeklyDelta: 0, tone: 'accent', icon: Palette }
   } else if (validation && validation.testing > 0) {
@@ -70,6 +83,8 @@ export function buildDashboardMetrics(
     lastMetric = { key: 'deliverable-review', label: '제출자료 검토', value: deliverable.needsReview, unit: '건', weeklyDelta: 0, tone: 'info', icon: FileText }
   } else if (validation && validation.preparing > 0) {
     lastMetric = { key: 'validation-preparing', label: '테스트 준비', value: validation.preparing, unit: '건', weeklyDelta: 0, tone: 'info', icon: ClipboardCheck }
+  } else if (funding && funding.underReview > 0) {
+    lastMetric = { key: 'funding-review', label: '자금 심사 중', value: funding.underReview, unit: '건', weeklyDelta: 0, tone: 'info', icon: Landmark }
   } else if (deliverable && deliverable.creatable > 0) {
     lastMetric = { key: 'deliverable-creatable', label: '자료 생성 가능', value: deliverable.creatable, unit: '건', weeklyDelta: 0, tone: 'info', icon: FileText }
   } else {

@@ -8,14 +8,28 @@ import { AppShell } from './components/layout/AppShell'
 import { ToastProvider } from './components/ui/toast'
 import { TextScaleProvider } from './components/ui/TextScaleProvider'
 import { MODULE_PAGES } from './data/modules'
-import { ClientsListPage } from './pages/ClientsListPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { EmptyModulePage } from './pages/EmptyModulePage'
-import { OrganizationDetailPage } from './pages/OrganizationDetailPage'
-import { OrganizationFormPage } from './pages/OrganizationFormPage'
-import { ProjectDetailPage } from './pages/ProjectDetailPage'
-import { ProjectFormPage } from './pages/ProjectFormPage'
-import { SettingsPage } from './pages/SettingsPage'
+
+// 초기 진입(대시보드) 외 화면은 route-level lazy loading으로 entry 번들을 줄인다.
+const ClientsListPage = lazy(() =>
+  import('./pages/ClientsListPage').then((m) => ({ default: m.ClientsListPage })),
+)
+const OrganizationDetailPage = lazy(() =>
+  import('./pages/OrganizationDetailPage').then((m) => ({ default: m.OrganizationDetailPage })),
+)
+const OrganizationFormPage = lazy(() =>
+  import('./pages/OrganizationFormPage').then((m) => ({ default: m.OrganizationFormPage })),
+)
+const ProjectDetailPage = lazy(() =>
+  import('./pages/ProjectDetailPage').then((m) => ({ default: m.ProjectDetailPage })),
+)
+const ProjectFormPage = lazy(() =>
+  import('./pages/ProjectFormPage').then((m) => ({ default: m.ProjectFormPage })),
+)
+const SettingsPage = lazy(() =>
+  import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })),
+)
 
 // 진단 관리·공개 설문은 route-level lazy loading으로 초기 번들을 줄인다
 const DiagnosisStudioPage = lazy(() =>
@@ -246,6 +260,54 @@ const PackagePreviewPage = lazy(() =>
 const PackageReviewPage = lazy(() =>
   import('./pages/deliverables/PackageReviewPage').then((m) => ({ default: m.PackageReviewPage })),
 )
+const FundingMainPage = lazy(() =>
+  import('./pages/funding/FundingMainPage').then((m) => ({ default: m.FundingMainPage })),
+)
+const FundingCatalogPage = lazy(() =>
+  import('./pages/funding/FundingCatalogPage').then((m) => ({ default: m.FundingCatalogPage })),
+)
+const InstitutionDetailPage = lazy(() =>
+  import('./pages/funding/InstitutionDetailPage').then((m) => ({ default: m.InstitutionDetailPage })),
+)
+const ProgramDetailPage = lazy(() =>
+  import('./pages/funding/ProgramDetailPage').then((m) => ({ default: m.ProgramDetailPage })),
+)
+const FundingResultsPage = lazy(() =>
+  import('./pages/funding/FundingResultsPage').then((m) => ({ default: m.FundingResultsPage })),
+)
+const ProjectFundingPage = lazy(() =>
+  import('./pages/funding/ProjectFundingPage').then((m) => ({ default: m.ProjectFundingPage })),
+)
+const FundingMatchesPage = lazy(() =>
+  import('./pages/funding/FundingMatchesPage').then((m) => ({ default: m.FundingMatchesPage })),
+)
+const FundingGapsPage = lazy(() =>
+  import('./pages/funding/FundingGapsPage').then((m) => ({ default: m.FundingGapsPage })),
+)
+const FundingOutreachPage = lazy(() =>
+  import('./pages/funding/FundingOutreachPage').then((m) => ({ default: m.FundingOutreachPage })),
+)
+const FundingChecklistPage = lazy(() =>
+  import('./pages/funding/FundingChecklistPage').then((m) => ({ default: m.FundingChecklistPage })),
+)
+const FundingPipelinePage = lazy(() =>
+  import('./pages/funding/FundingPipelinePage').then((m) => ({ default: m.FundingPipelinePage })),
+)
+const FundingOutcomePage = lazy(() =>
+  import('./pages/funding/FundingOutcomePage').then((m) => ({ default: m.FundingOutcomePage })),
+)
+const FundingCasePage = lazy(() =>
+  import('./pages/funding/FundingCasePage').then((m) => ({ default: m.FundingCasePage })),
+)
+const FundingReviewPage = lazy(() =>
+  import('./pages/funding/FundingReviewPage').then((m) => ({ default: m.FundingReviewPage })),
+)
+const CasesLibraryPage = lazy(() =>
+  import('./pages/funding/CasesLibraryPage').then((m) => ({ default: m.CasesLibraryPage })),
+)
+const CaseDetailPage = lazy(() =>
+  import('./pages/funding/CaseDetailPage').then((m) => ({ default: m.CaseDetailPage })),
+)
 
 /** 진단 스튜디오는 실제 기능으로 대체되므로 빈 상태 페이지에서 제외 */
 const EMPTY_MODULE_KEYS = new Set(['clients', 'diagnosis', 'selection', 'mvp-design', 'website-studio', 'validation', 'deliverables', 'settings'])
@@ -354,6 +416,23 @@ const router = createBrowserRouter([
       { path: 'deliverables/projects/:projectId/packages/:packageId/evidence', element: <PackageEvidencePage /> },
       { path: 'deliverables/projects/:projectId/packages/:packageId/preview', element: <PackagePreviewPage /> },
       { path: 'deliverables/projects/:projectId/packages/:packageId/review', element: <PackageReviewPage /> },
+
+      { path: 'funding', element: <FundingMainPage /> },
+      { path: 'funding/catalog', element: <FundingCatalogPage /> },
+      { path: 'funding/catalog/institutions/:institutionId', element: <InstitutionDetailPage /> },
+      { path: 'funding/catalog/programs/:programId', element: <ProgramDetailPage /> },
+      { path: 'funding/results', element: <FundingResultsPage /> },
+      { path: 'funding/projects/:projectId', element: <ProjectFundingPage /> },
+      { path: 'funding/projects/:projectId/matches', element: <FundingMatchesPage /> },
+      { path: 'funding/projects/:projectId/gaps', element: <FundingGapsPage /> },
+      { path: 'funding/projects/:projectId/outreach', element: <FundingOutreachPage /> },
+      { path: 'funding/projects/:projectId/checklist', element: <FundingChecklistPage /> },
+      { path: 'funding/projects/:projectId/pipeline', element: <FundingPipelinePage /> },
+      { path: 'funding/projects/:projectId/outcome', element: <FundingOutcomePage /> },
+      { path: 'funding/projects/:projectId/case', element: <FundingCasePage /> },
+      { path: 'funding/projects/:projectId/review', element: <FundingReviewPage /> },
+      { path: 'cases', element: <CasesLibraryPage /> },
+      { path: 'cases/:caseId', element: <CaseDetailPage /> },
 
       ...MODULE_PAGES.filter((config) => !EMPTY_MODULE_KEYS.has(config.key)).map(
         (config) => ({

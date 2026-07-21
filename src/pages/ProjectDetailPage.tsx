@@ -39,6 +39,8 @@ import {
   PackageStatusBadge,
   PackageTypeBadge,
 } from '../components/deliverables/badges'
+import { getProjectFundingContext } from '../services/fundingService'
+import { StrategyStatusBadge } from '../components/funding/badges'
 import { WebsiteStatusBadge, WebsiteTypeBadge } from '../components/websiteStudio/badges'
 import { WEBSITE_TYPE_META } from '../lib/websiteDesignMeta'
 import {
@@ -66,6 +68,7 @@ import {
   ExternalLink,
   FilePen,
   FileText,
+  Landmark,
   Link2,
   Plus,
   RefreshCw,
@@ -162,6 +165,8 @@ export function ProjectDetailPage() {
   const validationPath = `/validation/projects/${project.id}`
   const deliverable = getProjectDeliverableContext(project.id)
   const deliverablePath = `/deliverables/projects/${project.id}`
+  const funding = getProjectFundingContext(project.id)
+  const fundingPath = `/funding/projects/${project.id}`
   const journey = computeProjectJourney(project)
   const currentFlowIndex = flowStepIndex(journey.currentStepKey)
 
@@ -809,6 +814,44 @@ export function ProjectDetailPage() {
           ) : (
             <p className="text-[13px] break-keep text-slate-600">
               확정된 진단·설계·테스트 결과를 고객 설명·개발 전달·기관 준비용 자료 패키지로 만들 수 있습니다.
+            </p>
+          )}
+        </Panel>
+      )}
+
+      {/* 기관·자금 연계 */}
+      {funding && funding.eligibility.canCreate && (
+        <Panel
+          title="기관·자금 연계"
+          actions={
+            <Button variant="secondary" size="sm" onClick={() => navigate(fundingPath)}>
+              <Landmark aria-hidden="true" className="size-4" />
+              {funding.latest ? '연계 열기' : '연계 시작'}
+            </Button>
+          }
+        >
+          {funding.latest ? (
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <StrategyStatusBadge status={funding.latest.status} />
+                <span className="text-xs text-slate-400">v{funding.latest.version}</span>
+                <span className="text-xs text-slate-500">
+                  후보 기관 {funding.latest.matches.filter((m) => m.priority !== 'excluded').length}개 · 결과 {funding.latest.outcomes.length}건
+                </span>
+                {funding.latestStale && (
+                  <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700">
+                    <RefreshCw aria-hidden="true" className="size-3" />
+                    재검토 필요
+                  </span>
+                )}
+              </div>
+              <p className="text-[13px] break-keep text-slate-500">
+                연결할 기관·지원 유형을 검토하고 준비자료·진행상태·결과·사례를 관리합니다. 승인 가능성·금액은 예측하지 않으며, 실제 조건은 공식 공고 확인이 필요합니다.
+              </p>
+            </div>
+          ) : (
+            <p className="text-[13px] break-keep text-slate-600">
+              진단·설계·검증 결과를 바탕으로 연결할 기관·지원 유형과 준비자료, 진행 결과를 관리할 수 있습니다.
             </p>
           )}
         </Panel>

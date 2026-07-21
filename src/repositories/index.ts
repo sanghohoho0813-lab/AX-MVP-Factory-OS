@@ -41,6 +41,13 @@ import {
   LocalDeliverablePackageRepository,
   LocalDeliverablePackageSnapshotRepository,
 } from './deliverableRepositories'
+import {
+  LocalCaseStudyRepository,
+  LocalFundingStrategyRepository,
+  LocalFundingStrategySnapshotRepository,
+  LocalInstitutionRepository,
+  LocalSupportProgramRepository,
+} from './fundingRepositories'
 import { runMigrations } from './migrations'
 import type {
   ActivityRepository,
@@ -68,6 +75,11 @@ import type {
   DeliverablePackageRepository,
   DeliverablePackageSnapshotRepository,
   DeliverableExportRepository,
+  InstitutionRepository,
+  SupportProgramRepository,
+  FundingStrategyRepository,
+  FundingStrategySnapshotRepository,
+  CaseStudyRepository,
 } from './types'
 
 runMigrations()
@@ -148,6 +160,21 @@ export const deliverablePackageSnapshotRepository: DeliverablePackageSnapshotRep
 
 export const deliverableExportRepository: DeliverableExportRepository =
   new LocalDeliverableExportRepository()
+
+export const institutionRepository: InstitutionRepository =
+  new LocalInstitutionRepository()
+
+export const supportProgramRepository: SupportProgramRepository =
+  new LocalSupportProgramRepository()
+
+export const fundingStrategyRepository: FundingStrategyRepository =
+  new LocalFundingStrategyRepository()
+
+export const fundingStrategySnapshotRepository: FundingStrategySnapshotRepository =
+  new LocalFundingStrategySnapshotRepository()
+
+export const caseStudyRepository: CaseStudyRepository =
+  new LocalCaseStudyRepository()
 
 export { guidedDemoRepository } from './guidedDemoRepository'
 

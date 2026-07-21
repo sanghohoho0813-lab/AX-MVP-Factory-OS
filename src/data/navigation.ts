@@ -5,6 +5,8 @@ import {
   Filter,
   FolderOpen,
   Home,
+  Landmark,
+  Library,
   Palette,
   PencilRuler,
   SearchCheck,
@@ -37,6 +39,7 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
       { key: 'mvp-design', label: '기능·화면 설계', path: '/mvp-design', icon: PencilRuler, step: 3, hint: 'MVP 설계' },
       { key: 'validation', label: '실제 사용 테스트', path: '/validation', icon: SearchCheck, step: 4, hint: '현장검증' },
       { key: 'deliverables', label: '제출자료 만들기', path: '/deliverables', icon: FolderOpen, step: 5, hint: '자료 패키지' },
+      { key: 'funding', label: '기관·자금 연계', path: '/funding', icon: Landmark, step: 6, hint: '기관·자금·성과·사례 관리' },
     ],
   },
   {
@@ -50,6 +53,7 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
     key: 'manage',
     title: '관리',
     items: [
+      { key: 'cases', label: '사례 라이브러리', path: '/cases', icon: Library, hint: '기관·자금 연계 사례' },
       { key: 'reports', label: '리포트', path: '/reports', icon: BarChart3 },
       { key: 'settings', label: '설정', path: '/settings', icon: Settings },
     ],
