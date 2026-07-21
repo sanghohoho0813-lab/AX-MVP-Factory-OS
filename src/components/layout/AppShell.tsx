@@ -4,6 +4,7 @@ import { Header } from './Header'
 import { Sidebar } from './Sidebar'
 import { DemoTourProvider } from '../demo/DemoTourProvider'
 import { ActiveProjectProvider } from '../../context/ActiveProjectProvider'
+import { RouteProjectSync } from '../../context/RouteProjectSync'
 
 function ShellFallback() {
   return (
@@ -26,6 +27,7 @@ export function AppShell() {
 
   return (
     <ActiveProjectProvider>
+      <RouteProjectSync />
       <DemoTourProvider>
       <div className="flex min-h-screen">
         <Sidebar
