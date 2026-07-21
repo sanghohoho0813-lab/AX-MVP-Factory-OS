@@ -27,7 +27,7 @@ function PagesBody({ design }: { design: WebsiteDesign }) {
   return (
     <>
       <div className="rounded-(--radius-card) border border-brand-100 bg-brand-50/50 px-4 py-3">
-        <p className="text-[13px] break-keep text-slate-600">각 페이지의 섹션 구조·순서·목적·준비상태를 정리합니다. 복잡한 빌더가 아니라 블록 구조를 정리하는 도구입니다.</p>
+        <p className="text-[0.9rem] break-keep text-slate-600">각 페이지의 섹션 구조·순서·목적·준비상태를 정리합니다. 복잡한 빌더가 아니라 블록 구조를 정리하는 도구입니다.</p>
       </div>
       {pages.map((p) => <PageCard key={p.id} design={design} page={p} onToast={showToast} />)}
     </>
@@ -46,14 +46,14 @@ function PageCard({ design, page, onToast }: { design: WebsiteDesign; page: Webs
         {sections.map((s, i) => (
           <li key={s.id} className="rounded-(--radius-card) border border-slate-200 px-3.5 py-2.5">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-500">{i + 1}</span>
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[0.85rem] font-semibold text-slate-500">{i + 1}</span>
               <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">{s.title || SECTION_TYPE_META[s.sectionType].label}</p>
               <SectionStatusBadge status={s.contentStatus} />
               <select
                 aria-label={`${SECTION_TYPE_META[s.sectionType].label} 범위`}
                 value={s.scope}
                 onChange={(e) => run(() => updateSection(design.id, page.id, s.id, { scope: e.target.value as WebsiteSection['scope'] }), '범위를 변경했습니다.')}
-                className="rounded-(--radius-control) border border-slate-300 px-2 py-1 text-xs text-slate-700 focus:border-brand-400 focus:outline-none"
+                className="rounded-(--radius-control) border border-slate-300 px-2 py-1 text-[0.85rem] text-slate-700 focus:border-brand-400 focus:outline-none"
               >
                 {PAGE_STATUSES.map((sc) => <option key={sc} value={sc}>{PAGE_STATUS_META[sc].label}</option>)}
               </select>
@@ -65,7 +65,7 @@ function PageCard({ design, page, onToast }: { design: WebsiteDesign; page: Webs
               </div>
             </div>
             {(s.keyMessage || s.requiredAssets.length > 0) && (
-              <p className="mt-1.5 pl-8 text-xs break-keep text-slate-500">
+              <p className="mt-1.5 pl-8 text-[0.85rem] break-keep text-slate-500">
                 {s.keyMessage && <span>{s.keyMessage}</span>}
                 {s.requiredAssets.length > 0 && <span className="text-slate-400"> · 필요 이미지: {s.requiredAssets.join(', ')}</span>}
                 {s.ctaActionId && <span className="text-brand-500"> · CTA 포함</span>}
@@ -75,10 +75,10 @@ function PageCard({ design, page, onToast }: { design: WebsiteDesign; page: Webs
         ))}
       </ul>
       <div className="mt-3 flex items-center gap-2">
-        <select value={addType} onChange={(e) => setAddType(e.target.value as WebsiteSection['sectionType'])} aria-label="추가할 섹션 유형" className="rounded-(--radius-control) border border-slate-300 px-2.5 py-1.5 text-[13px] text-slate-700 focus:border-brand-400 focus:outline-none">
+        <select value={addType} onChange={(e) => setAddType(e.target.value as WebsiteSection['sectionType'])} aria-label="추가할 섹션 유형" className="rounded-(--radius-control) border border-slate-300 px-2.5 py-1.5 text-[0.9rem] text-slate-700 focus:border-brand-400 focus:outline-none">
           {SECTION_TYPES.map((st) => <option key={st} value={st}>{SECTION_TYPE_META[st].label}</option>)}
         </select>
-        <button type="button" onClick={() => run(() => addSection(design.id, page.id, addType), '섹션을 추가했습니다.')} className="inline-flex items-center gap-1 rounded-(--radius-control) border border-slate-200 px-3 py-1.5 text-[13px] font-medium text-slate-600 hover:bg-slate-50">
+        <button type="button" onClick={() => run(() => addSection(design.id, page.id, addType), '섹션을 추가했습니다.')} className="inline-flex items-center gap-1 rounded-(--radius-control) border border-slate-200 px-3 py-1.5 text-[0.9rem] font-medium text-slate-600 hover:bg-slate-50">
           <Plus aria-hidden="true" className="size-4" />섹션 추가
         </button>
       </div>

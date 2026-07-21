@@ -35,7 +35,7 @@ function SitemapBody({ design }: { design: WebsiteDesign }) {
   return (
     <>
       <div className="rounded-(--radius-card) border border-brand-100 bg-brand-50/50 px-4 py-3">
-        <p className="flex items-start gap-2 text-[13px] break-keep text-slate-600">
+        <p className="flex items-start gap-2 text-[0.9rem] break-keep text-slate-600">
           <Network aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-brand-500" />
           1차 홈페이지는 꼭 필요한 페이지만 담습니다. 필요 없는 페이지는 나중에·제외로 미루세요. (활성 페이지 최대 8개)
         </p>
@@ -45,16 +45,16 @@ function SitemapBody({ design }: { design: WebsiteDesign }) {
         <ul className="flex flex-col gap-2">
           {pages.map((p, i) => (
             <li key={p.id} className="flex flex-wrap items-center gap-2 rounded-(--radius-card) border border-slate-200 px-3.5 py-2.5">
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-500">{i + 1}</span>
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[0.85rem] font-semibold text-slate-500">{i + 1}</span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-slate-800">{p.name} <span className="text-xs font-normal text-slate-400">{p.slug}</span></p>
-                <p className="text-xs text-slate-400">{PAGE_TYPE_META[p.pageType].label} · 섹션 {p.sections.length}개</p>
+                <p className="truncate text-sm font-medium text-slate-800">{p.name} <span className="text-[0.85rem] font-normal text-slate-400">{p.slug}</span></p>
+                <p className="text-[0.85rem] text-slate-400">{PAGE_TYPE_META[p.pageType].label} · 섹션 {p.sections.length}개</p>
               </div>
               <select
                 aria-label={`${p.name} 상태`}
                 value={p.status}
                 onChange={(e) => run(() => setPageStatus(design.id, p.id, e.target.value as WebsitePageStatus), '상태를 변경했습니다.')}
-                className="rounded-(--radius-control) border border-slate-300 px-2 py-1 text-xs text-slate-700 focus:border-brand-400 focus:outline-none"
+                className="rounded-(--radius-control) border border-slate-300 px-2 py-1 text-[0.85rem] text-slate-700 focus:border-brand-400 focus:outline-none"
               >
                 {PAGE_STATUSES.map((s) => <option key={s} value={s}>{PAGE_STATUS_META[s].label}</option>)}
               </select>
@@ -70,7 +70,7 @@ function SitemapBody({ design }: { design: WebsiteDesign }) {
         </ul>
 
         <div className="mt-4 flex max-w-[560px] items-end gap-2">
-          <label className="min-w-0 flex-1 text-xs font-semibold text-slate-500">새 페이지 이름
+          <label className="min-w-0 flex-1 text-[0.85rem] font-semibold text-slate-500">새 페이지 이름
             <input value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} className="mt-0.5 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[14px] focus:border-brand-400 focus:outline-none" placeholder="예: 자료실" />
           </label>
           <Button variant="secondary" onClick={add}><Plus aria-hidden="true" className="size-4" />페이지 추가</Button>

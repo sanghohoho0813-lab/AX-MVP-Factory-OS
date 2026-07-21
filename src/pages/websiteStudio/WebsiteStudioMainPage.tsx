@@ -87,23 +87,23 @@ export function WebsiteStudioMainPage() {
   const startSample = () => navigate('/website-studio/projects/proj-106')
 
   const columns: DataTableColumn<Row>[] = [
-    { key: 'client', header: '고객사', cell: (r) => <span className="text-[13px] font-medium text-slate-700">{r.orgName}</span> },
+    { key: 'client', header: '고객사', cell: (r) => <span className="text-[0.9rem] font-medium text-slate-700">{r.orgName}</span> },
     {
       key: 'project', header: '프로젝트', className: 'min-w-[150px]',
       cell: (r) => (
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-slate-800">{r.project.name}</p>
-          <p className="text-xs text-slate-400">{r.project.projectCode}</p>
+          <p className="text-[0.85rem] text-slate-400">{r.project.projectCode}</p>
         </div>
       ),
     },
     { key: 'type', header: '유형', cell: (r) => <ProjectTypeBadge type={r.project.projectType} compact /> },
-    { key: 'readiness', header: '준비도', className: 'hidden lg:table-cell', cell: (r) => <span className="text-[13px] text-slate-600">{r.readiness !== null ? `${r.readiness}점` : '미확정'}</span> },
-    { key: 'missing', header: '부족 자료', className: 'hidden xl:table-cell', cell: (r) => <span className="text-[13px] text-slate-600">콘텐츠 {r.missingContent} · 자산 {r.missingAssets}</span> },
+    { key: 'readiness', header: '준비도', className: 'hidden lg:table-cell', cell: (r) => <span className="text-[0.9rem] text-slate-600">{r.readiness !== null ? `${r.readiness}점` : '미확정'}</span> },
+    { key: 'missing', header: '부족 자료', className: 'hidden xl:table-cell', cell: (r) => <span className="text-[0.9rem] text-slate-600">콘텐츠 {r.missingContent} · 자산 {r.missingAssets}</span> },
     {
       key: 'action', header: '', className: 'text-right',
       cell: (r) => (
-        <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand-600">
+        <span className="inline-flex items-center gap-1 text-[0.9rem] font-semibold text-brand-600">
           {LIFECYCLE_ACTION[r.lifecycle]}
           <ArrowRight aria-hidden="true" className="size-3.5" />
         </span>
@@ -162,9 +162,9 @@ export function WebsiteStudioMainPage() {
                   <button type="button" onClick={() => go(r)} className="flex w-full items-center justify-between gap-2 px-5 py-3.5 text-left hover:bg-slate-50">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-slate-800">{r.orgName} · {r.project.name}</p>
-                      <p className="text-xs text-slate-400">준비도 {r.readiness !== null ? `${r.readiness}점` : '미확정'}</p>
+                      <p className="text-[0.85rem] text-slate-400">준비도 {r.readiness !== null ? `${r.readiness}점` : '미확정'}</p>
                     </div>
-                    <span className="shrink-0 text-[13px] font-semibold text-brand-600">{LIFECYCLE_ACTION[r.lifecycle]}</span>
+                    <span className="shrink-0 text-[0.9rem] font-semibold text-brand-600">{LIFECYCLE_ACTION[r.lifecycle]}</span>
                   </button>
                 </li>
               ))}
@@ -176,7 +176,7 @@ export function WebsiteStudioMainPage() {
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <Panel title="진행 중인 설계" flush>
           {inProgress.length === 0 ? (
-            <div className="px-5 py-8 text-center text-[13px] text-slate-400">진행 중인 설계가 없습니다.</div>
+            <div className="px-5 py-8 text-center text-[0.9rem] text-slate-400">진행 중인 설계가 없습니다.</div>
           ) : (
             <ul className="divide-y divide-slate-100">
               {inProgress.map((r) => (
@@ -184,7 +184,7 @@ export function WebsiteStudioMainPage() {
                   <button type="button" onClick={() => go(r)} className="flex w-full items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50">
                     <div className="min-w-0 text-left">
                       <p className="truncate text-sm font-medium text-slate-800">{r.orgName} · {r.project.name}</p>
-                      <p className="text-xs text-slate-400">부족 콘텐츠 {r.missingContent} · 자산 {r.missingAssets}</p>
+                      <p className="text-[0.85rem] text-slate-400">부족 콘텐츠 {r.missingContent} · 자산 {r.missingAssets}</p>
                     </div>
                     {r.status && <WebsiteStatusBadge status={r.status} />}
                   </button>
@@ -196,7 +196,7 @@ export function WebsiteStudioMainPage() {
 
         <Panel title="최근 확정 설계" flush>
           {finalized.length === 0 ? (
-            <div className="px-5 py-8 text-center text-[13px] text-slate-400">확정된 설계가 없습니다.</div>
+            <div className="px-5 py-8 text-center text-[0.9rem] text-slate-400">확정된 설계가 없습니다.</div>
           ) : (
             <ul className="divide-y divide-slate-100">
               {finalized.map((r) => (
@@ -204,7 +204,7 @@ export function WebsiteStudioMainPage() {
                   <button type="button" onClick={() => go(r)} className="flex w-full items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50">
                     <div className="min-w-0 text-left">
                       <p className="truncate text-sm font-medium text-slate-800">{r.orgName} · {r.project.name}</p>
-                      <p className="text-xs text-slate-400">{memberName(r.project.ownerId)}</p>
+                      <p className="text-[0.85rem] text-slate-400">{memberName(r.project.ownerId)}</p>
                     </div>
                     {r.websiteType && <WebsiteTypeBadge type={r.websiteType} />}
                   </button>
@@ -217,13 +217,13 @@ export function WebsiteStudioMainPage() {
 
       {axProjects.length > 0 && (
         <Panel title="AX 전용 프로젝트 (홈페이지 설계 대상 아님)">
-          <p className="mb-2 text-[13px] break-keep text-slate-500">
+          <p className="mb-2 text-[0.9rem] break-keep text-slate-500">
             아래 프로젝트는 홈페이지 트랙이 없어 홈페이지 설계 대상이 아닙니다. AX 설계에서 진행하세요.
           </p>
           <ul className="flex flex-wrap gap-2">
             {axProjects.map((p) => (
               <li key={p.id}>
-                <button type="button" onClick={() => navigate(`/mvp-design/projects/${p.id}`)} className="rounded-(--radius-control) border border-slate-200 px-3 py-1.5 text-[13px] text-slate-600 hover:bg-slate-50">
+                <button type="button" onClick={() => navigate(`/mvp-design/projects/${p.id}`)} className="rounded-(--radius-control) border border-slate-200 px-3 py-1.5 text-[0.9rem] text-slate-600 hover:bg-slate-50">
                   {p.name}
                 </button>
               </li>

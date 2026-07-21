@@ -46,7 +46,7 @@ export function WebsiteResultsPage() {
       <button
         type="button"
         onClick={() => navigate('/website-studio')}
-        className="inline-flex w-fit items-center gap-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-800"
+        className="inline-flex w-fit items-center gap-1.5 text-[0.9rem] font-medium text-slate-500 hover:text-slate-800"
       >
         <ArrowLeft aria-hidden="true" className="size-3.5" />
         홈페이지 설계
@@ -85,18 +85,18 @@ export function WebsiteResultsPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-900">{r.design.name}</p>
-                    <p className="mt-0.5 text-xs text-slate-400">{r.orgName} · {r.projectName} · v{r.design.version}</p>
+                    <p className="mt-0.5 text-[0.85rem] text-slate-400">{r.orgName} · {r.projectName} · v{r.design.version}</p>
                   </div>
                   <WebsiteStatusBadge status={r.design.status} />
                 </div>
-                <p className="line-clamp-2 text-[13px] break-keep text-slate-600">{r.design.designSummary || r.design.strategy.purpose}</p>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                <p className="line-clamp-2 text-[0.9rem] break-keep text-slate-600">{r.design.designSummary || r.design.strategy.purpose}</p>
+                <div className="flex flex-wrap items-center gap-2 text-[0.85rem] text-slate-500">
                   <WebsiteTypeBadge type={r.design.strategy.websiteType} />
                   <span>페이지 {pages}개</span>
                   <span>개발 지시문 {r.design.generatedPrompts.length}종</span>
                 </div>
                 {r.stale && (
-                  <span className="w-fit rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[11px] font-medium text-warning-700">
+                  <span className="w-fit rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.85rem] font-medium text-warning-700">
                     진단 변경됨 · 재설계 권장
                   </span>
                 )}

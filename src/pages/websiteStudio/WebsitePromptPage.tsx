@@ -50,13 +50,13 @@ function PromptBody({ design }: { design: WebsiteDesign }) {
   return (
     <>
       <div className="rounded-(--radius-card) border border-brand-100 bg-brand-50/50 px-4 py-3">
-        <p className="text-[13px] break-keep text-slate-600">사이트 구조·디자인·콘텐츠를 바탕으로 개발 지시문을 조립합니다. 렌더마다 자동 생성하지 않고, 명시적으로 생성합니다.</p>
+        <p className="text-[0.9rem] break-keep text-slate-600">사이트 구조·디자인·콘텐츠를 바탕으로 개발 지시문을 조립합니다. 렌더마다 자동 생성하지 않고, 명시적으로 생성합니다.</p>
       </div>
 
       <div className="flex flex-wrap gap-2">
         {PROMPT_TYPES.map((t) => (
           <button key={t} type="button" onClick={() => { setActive(t); setDraft(null) }}
-            className={`rounded-(--radius-control) border px-3 py-1.5 text-[13px] font-medium transition-colors ${t === active ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}>
+            className={`rounded-(--radius-control) border px-3 py-1.5 text-[0.9rem] font-medium transition-colors ${t === active ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}>
             {PROMPT_TYPE_META[t].label}
           </button>
         ))}
@@ -65,10 +65,10 @@ function PromptBody({ design }: { design: WebsiteDesign }) {
       <p aria-live="polite" className="sr-only">{live}</p>
 
       <Panel title={PROMPT_TYPE_META[active].label}>
-        <p className="mb-3 text-[13px] break-keep text-slate-500">{PROMPT_TYPE_META[active].description}</p>
+        <p className="mb-3 text-[0.9rem] break-keep text-slate-500">{PROMPT_TYPE_META[active].description}</p>
         {!prompt ? (
           <div className="flex flex-col items-start gap-3">
-            <p className="text-[13px] text-slate-500">아직 생성되지 않았습니다.</p>
+            <p className="text-[0.9rem] text-slate-500">아직 생성되지 않았습니다.</p>
             <Button variant="primary" onClick={() => run(() => generatePrompt(design.id, active), '개발 지시문을 생성했습니다.')}>
               <Sparkles aria-hidden="true" className="size-4" />
               개발 지시문 생성
@@ -80,15 +80,15 @@ function PromptBody({ design }: { design: WebsiteDesign }) {
               <Button variant="secondary" size="sm" onClick={() => copy(draft ?? prompt.content)}><Copy aria-hidden="true" className="size-4" />전체 복사</Button>
               <Button variant="secondary" size="sm" onClick={() => download(draft ?? prompt.content)}><Download aria-hidden="true" className="size-4" />파일로 저장</Button>
               <Button variant="secondary" size="sm" onClick={() => run(() => regeneratePrompt(design.id, active), '원본으로 재생성했습니다.')}><RefreshCw aria-hidden="true" className="size-4" />원본 재생성</Button>
-              {prompt.manuallyEdited && <span className="rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[11px] font-medium text-warning-700">수정됨</span>}
+              {prompt.manuallyEdited && <span className="rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.85rem] font-medium text-warning-700">수정됨</span>}
             </div>
-            <label htmlFor="prompt-text" className="text-xs font-semibold text-slate-500">개발 지시문 텍스트 (직접 수정 가능)</label>
+            <label htmlFor="prompt-text" className="text-[0.85rem] font-semibold text-slate-500">개발 지시문 텍스트 (직접 수정 가능)</label>
             <textarea
               id="prompt-text"
               value={draft ?? prompt.content}
               onChange={(e) => setDraft(e.target.value)}
               rows={20}
-              className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 font-mono text-[12px] leading-relaxed text-slate-700 focus:border-brand-400 focus:outline-none"
+              className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 font-mono text-[0.9rem] leading-relaxed text-slate-700 focus:border-brand-400 focus:outline-none"
             />
             {draft !== null && draft !== prompt.content && (
               <div className="flex gap-2">
