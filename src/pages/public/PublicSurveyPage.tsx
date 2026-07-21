@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { getDataModeConfig } from '../../data/dataMode'
 import { useCallbackRef } from '../../lib/useCallbackRef'
 import type { RespondentProfile, SurveyAnswerValue } from '../../types/surveyRuntime'
 import type { SurveyResponse } from '../../types/surveyRuntime'
@@ -36,7 +37,23 @@ import {
 
 type Phase = 'start' | 'filling' | 'review' | 'completed'
 
+// supabase 모드 공개 설문은 공개 RPC 를 쓰며 lazy 로드한다(local 청크에 SDK 미포함).
+const SupabasePublicSurvey = lazy(() =>
+  import('./SupabasePublicSurvey').then((m) => ({ default: m.SupabasePublicSurvey })),
+)
+
 export function PublicSurveyPage() {
+  if (getDataModeConfig().mode === 'supabase') {
+    return (
+      <Suspense fallback={<div className="p-8 text-center text-sm text-slate-400">불러오는 중…</div>}>
+        <SupabasePublicSurvey />
+      </Suspense>
+    )
+  }
+  return <LocalPublicSurvey />
+}
+
+function LocalPublicSurvey() {
   const { accessToken = '' } = useParams()
 
   // 토큰 1회 해석 + markOpened

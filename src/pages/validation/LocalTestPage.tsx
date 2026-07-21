@@ -1,10 +1,27 @@
-import { useMemo, useState } from 'react'
+import { Suspense, lazy, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { CheckCircle2, MonitorSmartphone, ShieldAlert } from 'lucide-react'
 import type { TestSessionScenarioResult } from '../../types/validation'
+import { getDataModeConfig } from '../../data/dataMode'
 import { useStoreVersion } from '../../lib/useStoreVersion'
 import { Button } from '../../components/ui/Button'
 import { resolveTestSession, submitTestSession } from '../../services/validationService'
+
+// supabase 모드 공개 테스트는 공개 RPC 를 쓰며 lazy 로드한다(local 청크에 SDK 미포함).
+const SupabasePublicTest = lazy(() =>
+  import('./SupabasePublicTest').then((m) => ({ default: m.SupabasePublicTest })),
+)
+
+export function LocalTestPage() {
+  if (getDataModeConfig().mode === 'supabase') {
+    return (
+      <Suspense fallback={<div className="p-8 text-center text-sm text-slate-400">불러오는 중…</div>}>
+        <SupabasePublicTest />
+      </Suspense>
+    )
+  }
+  return <LocalTestPageInner />
+}
 
 const inputCls =
   'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-base text-slate-700 focus:border-brand-400 focus:outline-none'
@@ -59,7 +76,7 @@ function FullPageNotice({
   )
 }
 
-export function LocalTestPage() {
+function LocalTestPageInner() {
   const { accessToken = '' } = useParams()
   const version = useStoreVersion()
   const resolved = useMemo(
