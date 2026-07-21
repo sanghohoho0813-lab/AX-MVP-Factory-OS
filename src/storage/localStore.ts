@@ -126,6 +126,19 @@ export function writeRaw(key: string, value: string): void {
   rawSet(key, value)
 }
 
+/** 키 삭제 (가져오기 후 로컬 정리 등. 명시적 요청 시에만 호출) */
+export function removeKey(key: string): void {
+  if (!storageAvailable) {
+    memoryFallback.delete(key)
+    return
+  }
+  try {
+    window.localStorage.removeItem(key)
+  } catch {
+    memoryFallback.delete(key)
+  }
+}
+
 export function readSchemaVersion(): number | null {
   const raw = rawGet(SCHEMA_VERSION_KEY)
   if (raw === null) return null

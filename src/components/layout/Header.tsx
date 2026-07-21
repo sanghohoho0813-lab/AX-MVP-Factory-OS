@@ -9,7 +9,7 @@ import {
   Settings,
   UserRound,
 } from 'lucide-react'
-import { useState } from 'react'
+import { Suspense, lazy, useState } from 'react'
 import {
   CURRENT_USER,
   NOTIFICATIONS,
@@ -19,6 +19,16 @@ import {
 import { useDismissable } from '../../lib/useDismissable'
 import { SearchInput } from '../ui/SearchInput'
 import { useToast } from '../ui/toastContext'
+import { getDataModeConfig } from '../../data/dataMode'
+import { CloudSaveStatus } from '../cloud/CloudSaveStatus'
+
+// supabase 전용 헤더 조각은 lazy 로 불러와 local entry 번들에 Supabase SDK 가 섞이지 않게 한다.
+const SupabaseWorkspaceSelector = lazy(() =>
+  import('./SupabaseHeaderParts').then((m) => ({ default: m.SupabaseWorkspaceSelector })),
+)
+const SupabaseUserMenu = lazy(() =>
+  import('./SupabaseHeaderParts').then((m) => ({ default: m.SupabaseUserMenu })),
+)
 
 interface HeaderProps {
   onOpenMobileMenu: () => void
@@ -181,6 +191,7 @@ function UserMenu() {
 }
 
 export function Header({ onOpenMobileMenu }: HeaderProps) {
+  const isSupabase = getDataModeConfig().mode === 'supabase'
   return (
     <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-[16px] sm:gap-3 lg:px-[24px]">
       <button
@@ -192,16 +203,25 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
         <Menu aria-hidden="true" className="size-5" />
       </button>
 
-      <WorkspaceSelector />
+      {isSupabase ? (
+        <Suspense fallback={<div className="h-10 min-w-0 max-w-[34vw] shrink" />}>
+          <SupabaseWorkspaceSelector />
+        </Suspense>
+      ) : (
+        <WorkspaceSelector />
+      )}
 
-      <div className="flex min-w-0 flex-1 justify-center px-1 sm:px-4">
+      <div className="flex min-w-0 flex-1 items-center justify-center gap-2 px-1 sm:px-4">
         <SearchInput
           placeholder="고객사, 프로젝트, 과제, 자료 검색"
           className="hidden w-full max-w-xl sm:block"
         />
       </div>
 
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1.5">
+        <span className="hidden lg:inline-flex">
+          <CloudSaveStatus state={isSupabase ? 'saved' : 'local'} compact={false} />
+        </span>
         <NotificationMenu />
         <Link
           to="/settings"
@@ -210,7 +230,13 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
         >
           <Settings aria-hidden="true" className="size-5" />
         </Link>
-        <UserMenu />
+        {isSupabase ? (
+          <Suspense fallback={<div className="size-10" />}>
+            <SupabaseUserMenu />
+          </Suspense>
+        ) : (
+          <UserMenu />
+        )}
       </div>
     </header>
   )
