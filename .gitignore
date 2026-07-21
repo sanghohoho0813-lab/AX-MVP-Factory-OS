@@ -29,3 +29,6 @@ dist-ssr
 .env.*.local
 .env.development
 .env.production
+
+# contract test build output
+.contract-out

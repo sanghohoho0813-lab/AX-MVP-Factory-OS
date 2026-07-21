@@ -12,12 +12,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { DataMode } from '../../data/dataMode'
 import { createLocalAsyncBundle, type AsyncRepositoryBundle } from './bundle'
+import { createSupabaseBundle } from '../supabase/bundle'
 
 export class SupabaseModeNotWiredError extends Error {
   constructor() {
     super(
-      'Supabase 저장소가 아직 런타임에 연결되지 않았습니다. ' +
-        '로컬 데이터 모드로 이용하거나, Supabase 도메인 어댑터 연동(다음 단계)이 필요합니다.',
+      'Supabase 저장소를 만들 수 없습니다. 로그인·워크스페이스 선택 후 다시 시도하세요.',
     )
     this.name = 'SupabaseModeNotWiredError'
   }
@@ -38,12 +38,8 @@ export function createRepositoryBundle(options: RepositoryFactoryOptions): Async
     return createLocalAsyncBundle()
   }
   // supabase 모드: 필수 조건이 없으면 fake 성공 대신 명시적으로 실패시킨다.
-  if (!options.supabaseClient) {
+  if (!options.supabaseClient || !options.workspaceId) {
     throw new SupabaseModeNotWiredError()
   }
-  if (!options.workspaceId) {
-    throw new SupabaseModeNotWiredError()
-  }
-  // 도메인별 Supabase 어댑터는 다음 단계에서 채운다. 현재는 조용한 성공을 만들지 않는다.
-  throw new SupabaseModeNotWiredError()
+  return createSupabaseBundle(options.supabaseClient, options.workspaceId)
 }

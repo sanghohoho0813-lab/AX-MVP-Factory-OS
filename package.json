@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:contract": "vite build --config vite.contract.config.mjs && node .contract-out/contract.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.7",
