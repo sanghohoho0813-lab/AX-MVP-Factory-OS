@@ -215,7 +215,7 @@ function ensureFinalizedAnalysis(): void {
   if (assessment.manualSummary.trim() === '') {
     updateManualSummary(
       assessment.id,
-      '핵심 반복 업무인 생산계획 수립을 1차 MVP로 검증하는 것을 권장합니다.',
+      '반복성과 효과가 큰 핵심 업무를 1차 MVP로 먼저 검증하는 것을 권장합니다.',
     )
   }
   finalizeAssessment(assessment.id)
@@ -229,15 +229,17 @@ function ensureFinalizedSelection(): void {
   }
   runOrRefreshCandidates(DEMO_PROJECT_ID)
   const decision = ensureDraftDecision(DEMO_PROJECT_ID)
-  if (!decision.primaryCandidateId) {
-    const best = automationCandidateRepository
-      .getByProjectId(DEMO_PROJECT_ID)
-      .sort((a, b) => b.priorityScore - a.priorityScore)[0]
-    if (!best) throw new GuidedDemoError('시연용 자동화 후보를 만들지 못했습니다.')
-  }
+  // 실제 확정된 핵심 후보명을 근거로 요약을 구성한다(하드코딩 금지).
+  const primaryId = decision.primaryCandidateId
+  const primaryCandidate = primaryId
+    ? automationCandidateRepository.getById(primaryId)
+    : automationCandidateRepository
+        .getByProjectId(DEMO_PROJECT_ID)
+        .sort((a, b) => b.priorityScore - a.priorityScore)[0]
+  if (!primaryCandidate) throw new GuidedDemoError('시연용 자동화 후보를 만들지 못했습니다.')
   if (decision.decisionSummary.trim() === '') {
     updateDecision(decision.id, {
-      decisionSummary: '반복성과 효과가 큰 생산계획 수립을 1차 핵심 과제로 선정합니다.',
+      decisionSummary: `반복성과 효과가 큰 '${primaryCandidate.name}'을(를) 1차 핵심 과제로 선정합니다.`,
     })
   }
   finalizeSelection(decision.id)
