@@ -197,11 +197,19 @@ export function DashboardPage() {
           <div id="home-ops" className="flex flex-col gap-5">
             <MetricStrip metrics={metrics} />
             <PortfolioHealth projects={portfolioItems} />
-            {demoExists && (
-              <button type="button" onClick={() => setResetOpen(true)} className="w-fit text-[0.9rem] font-medium text-slate-400 underline-offset-2 hover:text-slate-600 hover:underline">
-                샘플 데이터 초기화
-              </button>
-            )}
+            <div className="flex flex-wrap items-center gap-3">
+              <Button variant="secondary" onClick={() => demo.start()}>
+                <Sparkles aria-hidden="true" className="size-4" /> 샘플 데이터 완성·전체 흐름 체험
+              </Button>
+              {demoExists && (
+                <button type="button" onClick={() => setResetOpen(true)} className="text-[0.9rem] font-medium text-slate-400 underline-offset-2 hover:text-slate-600 hover:underline">
+                  샘플 데이터 초기화
+                </button>
+              )}
+            </div>
+            <p className="text-[0.9rem] break-keep text-slate-400">
+              샘플 데이터 완성은 실제 진단·선정 엔진을 호출해 대한정밀 샘플을 진단 결과·후보 선정 상태까지 채웁니다. 여러 번 눌러도 중복되지 않습니다.
+            </p>
           </div>
         )}
       </section>
