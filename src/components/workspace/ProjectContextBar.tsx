@@ -32,6 +32,7 @@ export function ProjectContextBar() {
 
   const journey = computeProjectJourney(project)
   const typeMeta = PROJECT_TYPE_META[project.projectType]
+  const progress = journey.progress
 
   return (
     <section className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-4">
@@ -40,11 +41,16 @@ export function ProjectContextBar() {
           <p className="flex items-center gap-1.5 text-[0.95rem] font-medium text-slate-500">
             <Building2 aria-hidden="true" className="size-4 shrink-0" />
             <span className="truncate">{organization?.name ?? '고객사'}</span>
+            {progress.isSample && (
+              <span className="shrink-0 rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[0.78rem] font-semibold text-brand-700">샘플</span>
+            )}
           </p>
           <h1 className="mt-0.5 text-[1.35rem] leading-tight font-bold break-keep text-slate-900">{project.name}</h1>
           <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.9rem] text-slate-500">
             <span className="rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-600">{typeMeta.label}</span>
-            <span>현재: {journey.actionText.length > 24 ? journey.currentStepKey : journey.actionText.replace(/합니다\.$/, '')}</span>
+            <span className="break-keep">
+              {progress.stepText} · 현재 {progress.currentStep.label}
+            </span>
           </p>
         </div>
 

@@ -21,6 +21,8 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import { APP_VERSION } from '../../data/navigation'
 import { useActiveProject } from '../../context/activeProject'
+import { useStoreVersion } from '../../lib/useStoreVersion'
+import { isAdvancedVisible } from '../../lib/featureVisibility'
 
 interface SidebarProps {
   collapsed: boolean
@@ -40,8 +42,15 @@ interface NavGroup {
   items: NavItem[]
 }
 
-/** 전역 5개 그룹. 세부 하위 페이지는 프로젝트 작업공간 안에서 접근한다. */
-function buildGroups(activeProjectId: string | null, projectType: string | undefined): NavGroup[] {
+/**
+ * 전역 메뉴. 기본(core)은 핵심 흐름만 표시하고,
+ * 고급 운영 기능(테스트·기관·사례·전체 현황)은 advanced 모드에서만 추가한다.
+ */
+function buildGroups(
+  activeProjectId: string | null,
+  projectType: string | undefined,
+  advanced: boolean,
+): NavGroup[] {
   const pid = activeProjectId
   const workspaceItems: NavItem[] = pid
     ? [
@@ -51,9 +60,16 @@ function buildGroups(activeProjectId: string | null, projectType: string | undef
         ...(projectType !== 'website' ? [{ label: '만들 업무 선택', path: `/selection/projects/${pid}`, icon: Filter }] : []),
         ...(projectType !== 'website' ? [{ label: 'AX 기능 설계', path: `/mvp-design/projects/${pid}`, icon: PencilRuler }] : []),
         ...(projectType !== 'ax' ? [{ label: '홈페이지 설계', path: `/website-studio/projects/${pid}`, icon: Palette }] : []),
-        { label: '실제 사용 테스트', path: `/validation/projects/${pid}`, icon: SearchCheck },
-        { label: '제출자료', path: `/deliverables/projects/${pid}`, icon: FolderOpen },
-        { label: '기관·자금 연계', path: `/funding/projects/${pid}`, icon: Landmark },
+        { label: '결과자료', path: `/deliverables/projects/${pid}`, icon: FolderOpen },
+      ]
+    : []
+  const advancedItems: NavItem[] = advanced
+    ? [
+        ...(pid ? [{ label: '실제 사용 테스트', path: `/validation/projects/${pid}`, icon: SearchCheck }] : []),
+        ...(pid ? [{ label: '기관·자금 연계', path: `/funding/projects/${pid}`, icon: Landmark }] : []),
+        { label: '검증 결과', path: '/validation/results', icon: ListChecks },
+        { label: '사례 라이브러리', path: '/cases', icon: Library },
+        { label: '전체 진행 현황', path: '/reports', icon: TrendingUp },
       ]
     : []
 
@@ -64,13 +80,9 @@ function buildGroups(activeProjectId: string | null, projectType: string | undef
     {
       key: 'results',
       title: '결과·자료',
-      items: [
-        { label: '제출자료·보고서', path: '/deliverables/results', icon: FileCheck2 },
-        { label: '검증 결과', path: '/validation/results', icon: ListChecks },
-        { label: '사례 라이브러리', path: '/cases', icon: Library },
-        { label: '전체 진행 현황', path: '/reports', icon: TrendingUp },
-      ],
+      items: [{ label: '제출자료·보고서', path: '/deliverables/results', icon: FileCheck2 }],
     },
+    ...(advancedItems.length > 0 ? [{ key: 'advanced', title: '고급 운영', items: advancedItems }] : []),
     { key: 'settings', title: '설정', items: [{ label: '설정', path: '/settings', icon: Settings }] },
   ]
 }
@@ -88,7 +100,8 @@ function SidebarContent({
 }) {
   const navigate = useNavigate()
   const { project } = useActiveProject()
-  const groups = buildGroups(project?.id ?? null, project?.projectType)
+  useStoreVersion()
+  const groups = buildGroups(project?.id ?? null, project?.projectType, isAdvancedVisible())
 
   return (
     <div className="flex h-full flex-col bg-navy-900 text-navy-200">

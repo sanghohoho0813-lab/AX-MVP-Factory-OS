@@ -15,7 +15,7 @@ import { downloadLocalBackup, clearLocalDomainData } from '../../services/dataIm
 import { useAuth } from '../../auth/AuthProvider'
 import { WorkspaceMembersPanel } from '../../components/data/WorkspaceMembersPanel'
 import { ImportWizard } from '../../components/data/ImportWizard'
-import { TabNav, SettingRow, TextScalePanel, SystemPanel, type TabKey } from './parts'
+import { TabNav, SettingRow, TextScalePanel, FeatureVisibilityPanel, SystemPanel, type TabKey } from './parts'
 
 function DataPanelSupabase() {
   const { showToast } = useToast()
@@ -86,6 +86,7 @@ export function SupabaseSettingsView() {
             <SettingRow label="내 역할">{current ? roleLabel[current.role] : '—'}</SettingRow>
           </Panel>
           <TextScalePanel />
+          <FeatureVisibilityPanel />
         </>
       )}
       {tab === 'workspace' && (

@@ -13,6 +13,8 @@ import { CloudSaveStatus } from '../../components/cloud/CloudSaveStatus'
 import { SCHEMA_VERSION } from '../../storage/localStore'
 import { buildLocalSnapshot, summarizeSnapshot } from '../../services/dataImport/localSnapshot'
 import { downloadLocalBackup } from '../../services/dataImport/localBackup'
+import { useStoreVersion } from '../../lib/useStoreVersion'
+import { isAdvancedVisible, setFeatureVisibility } from '../../lib/featureVisibility'
 
 export type TabKey = 'me' | 'workspace' | 'data' | 'system'
 
@@ -59,6 +61,34 @@ export function TextScalePanel() {
       <div className="mt-4">
         <TextScaleControl showPreview />
       </div>
+    </Panel>
+  )
+}
+
+/** 고급 운영 기능 노출 토글 (Stage 12B-UX 5차) */
+export function FeatureVisibilityPanel() {
+  const version = useStoreVersion()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const advanced = useMemo(() => isAdvancedVisible(), [version])
+  return (
+    <Panel title="고급 운영 기능 보기">
+      <HelpNote summary="테스트 운영, 기관 연계, 사례 관리처럼 프로젝트 후반에 사용하는 기능을 추가로 표시합니다. 꺼도 데이터는 삭제되지 않으며 직접 주소로는 계속 접근할 수 있습니다." />
+      <label className="mt-4 flex cursor-pointer items-center justify-between gap-3 rounded-(--radius-control) border border-slate-200 px-4 py-3">
+        <span className="min-w-0">
+          <span className="block text-[0.95rem] font-semibold text-slate-800">고급 운영 기능 보기</span>
+          <span className="block text-[0.88rem] break-keep text-slate-500">
+            {advanced ? '실제 사용 테스트·기관 연계·사례 메뉴가 표시됩니다.' : '지금은 핵심 흐름만 표시합니다.'}
+          </span>
+        </span>
+        <input
+          type="checkbox"
+          role="switch"
+          aria-label="고급 운영 기능 보기"
+          checked={advanced}
+          onChange={(e) => setFeatureVisibility(e.target.checked ? 'advanced' : 'core')}
+          className="size-5 shrink-0 accent-brand-600"
+        />
+      </label>
     </Panel>
   )
 }

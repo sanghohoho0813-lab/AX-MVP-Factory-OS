@@ -8,6 +8,7 @@ import {
   TabNav,
   SettingRow,
   TextScalePanel,
+  FeatureVisibilityPanel,
   SystemPanel,
   LocalDataSummaryPanel,
   type TabKey,
@@ -32,6 +33,7 @@ function LocalSettings() {
             <SettingRow label="역할">{CURRENT_USER.role}</SettingRow>
           </Panel>
           <TextScalePanel />
+          <FeatureVisibilityPanel />
         </>
       )}
       {tab === 'workspace' && (

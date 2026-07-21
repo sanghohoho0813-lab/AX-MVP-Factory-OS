@@ -85,7 +85,7 @@ export function DashboardPage() {
       {/* A. 오늘 가장 먼저 할 일 */}
       {hero ? (
         <NextActionHero
-          eyebrow={`${hero.orgName} · ${hero.project.name}`}
+          eyebrow={`${hero.orgName} · ${hero.project.name}${hero.progress.isSample ? ' · 샘플' : ''}`}
           actionText={hero.actionText}
           reason={hero.reason}
           actionLabel={hero.actionLabel}
@@ -136,13 +136,21 @@ export function DashboardPage() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-[0.95rem] text-slate-500">{j.orgName}</p>
+                      <p className="flex items-center gap-1.5 text-[0.95rem] text-slate-500">
+                        <span className="truncate">{j.orgName}</span>
+                        {j.progress.isSample && (
+                          <span className="shrink-0 rounded-full border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[0.78rem] font-semibold text-brand-700">샘플</span>
+                        )}
+                      </p>
                       <p className="mt-0.5 text-[1.15rem] leading-tight font-bold break-keep text-slate-900">{j.project.name}</p>
                     </div>
                     <StatusPill status={toFriendlyStatus(j.project.status)} size="sm" />
                   </div>
+                  <p className="text-[0.9rem] text-slate-500">
+                    <span className="font-semibold text-slate-700">{j.progress.stepText}</span> · 현재 {j.progress.currentStep.label}
+                  </p>
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                    <span className="block h-full rounded-full bg-brand-500" style={{ width: `${j.project.progress}%` }} />
+                    <span className="block h-full rounded-full bg-brand-500" style={{ width: `${j.progress.percent}%` }} />
                   </div>
                   <p className="mt-auto flex items-center gap-1.5 text-[1rem] font-semibold text-brand-700">
                     {j.actionLabel}
@@ -208,7 +216,7 @@ export function DashboardPage() {
               )}
             </div>
             <p className="text-[0.9rem] break-keep text-slate-400">
-              샘플 데이터 완성은 실제 진단·선정 엔진을 호출해 대한정밀 샘플을 진단 결과·후보 선정 상태까지 채웁니다. 여러 번 눌러도 중복되지 않습니다.
+              샘플 프로젝트는 모든 단계의 결과가 준비되어 있어 전체 기능을 둘러볼 수 있습니다. 실제 진단·선정 엔진을 호출해 채우며, 여러 번 눌러도 중복되지 않고 직접 등록한 데이터는 보존됩니다.
             </p>
           </div>
         )}

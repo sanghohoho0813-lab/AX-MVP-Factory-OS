@@ -1,13 +1,13 @@
 import type { UiTextScale } from '../types/ui'
 
 /**
- * 글자 크기 배율 — 기존(Stage 8) 16px 기준.
- * 기본은 반드시 1.5배이며, 이전 1.0 크기 선택지는 제공하지 않는다.
+ * 글자 크기 배율 — 16px 표준 기준 (Stage 12B-UX 5차 재조정).
+ * 설정값 이름은 유지하고 배율만 조정해 기존 사용자 설정을 보존한다.
  */
 export const TEXT_SCALE_VALUE: Record<UiTextScale, number> = {
-  default: 1.5,
-  large: 1.8,
-  extra_large: 2.1,
+  default: 1.0,
+  large: 1.15,
+  extra_large: 1.3,
 }
 
 export interface TextScaleMeta {
@@ -17,9 +17,9 @@ export interface TextScaleMeta {
 }
 
 export const TEXT_SCALE_META: Record<UiTextScale, TextScaleMeta> = {
-  default: { label: '기본', hint: '현재보다 1.5배', order: 0 },
-  large: { label: '크게', hint: '기본보다 20% 크게', order: 1 },
-  extra_large: { label: '매우 크게', hint: '기본보다 40% 크게', order: 2 },
+  default: { label: '기본', hint: '표준 크기', order: 0 },
+  large: { label: '크게', hint: '기본보다 15% 크게', order: 1 },
+  extra_large: { label: '매우 크게', hint: '기본보다 30% 크게', order: 2 },
 }
 
 export const TEXT_SCALES: UiTextScale[] = ['default', 'large', 'extra_large']
