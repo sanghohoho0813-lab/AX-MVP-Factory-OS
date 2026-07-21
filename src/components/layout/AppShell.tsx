@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
 import { DemoTourProvider } from '../demo/DemoTourProvider'
+import { ActiveProjectProvider } from '../../context/ActiveProjectProvider'
 
 function ShellFallback() {
   return (
@@ -24,7 +25,8 @@ export function AppShell() {
   }, [location.pathname])
 
   return (
-    <DemoTourProvider>
+    <ActiveProjectProvider>
+      <DemoTourProvider>
       <div className="flex min-h-screen">
         <Sidebar
           collapsed={collapsed}
@@ -35,13 +37,14 @@ export function AppShell() {
         <div className="flex min-w-0 flex-1 flex-col">
           <Header onOpenMobileMenu={() => setMobileOpen(true)} />
           {/* 하단 여백: 시연 안내 바가 본문을 가리지 않도록 확보 */}
-          <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-6 pb-24 sm:px-6 sm:pb-8 lg:px-8 lg:py-8">
+          <main className="mx-auto w-full max-w-[1840px] flex-1 px-4 py-6 pb-24 sm:px-6 sm:pb-8 lg:px-10 lg:py-9 2xl:px-14">
             <Suspense fallback={<ShellFallback />}>
               <Outlet />
             </Suspense>
           </main>
         </div>
       </div>
-    </DemoTourProvider>
+      </DemoTourProvider>
+    </ActiveProjectProvider>
   )
 }
