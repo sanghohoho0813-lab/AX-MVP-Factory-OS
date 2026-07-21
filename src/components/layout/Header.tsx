@@ -218,7 +218,7 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5">
-        <span className="hidden lg:inline-flex">
+        <span className="hidden xl:inline-flex">
           <CloudSaveStatus state={isSupabase ? 'saved' : 'local'} compact={false} />
         </span>
         <NotificationMenu />

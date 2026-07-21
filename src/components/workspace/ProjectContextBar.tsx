@@ -53,12 +53,13 @@ export function ProjectContextBar() {
             type="button"
             aria-haspopup="menu"
             aria-expanded={open}
+            aria-label="프로젝트 변경"
             onClick={() => setOpen((v) => !v)}
-            className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-(--radius-control) border border-slate-300 bg-white px-4 text-[0.95rem] font-medium text-slate-700 hover:bg-slate-50"
+            className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-(--radius-control) border border-slate-300 bg-white px-3 text-[0.95rem] font-medium text-slate-700 hover:bg-slate-50 sm:px-4"
           >
-            <Repeat aria-hidden="true" className="size-4 text-slate-400" />
-            프로젝트 변경
-            <ChevronDown aria-hidden="true" className="size-4 text-slate-400" />
+            <Repeat aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
+            <span className="hidden sm:inline">프로젝트 변경</span>
+            <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
           </button>
           {open && (
             <div role="menu" className="absolute top-full right-0 z-30 mt-1.5 w-72 rounded-(--radius-card) border border-slate-200 bg-white p-1.5 shadow-(--shadow-overlay)">
