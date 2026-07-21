@@ -11,7 +11,7 @@
  */
 
 import { useState, type ReactNode } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import {
   ArrowRight,
   Check,
@@ -95,10 +95,23 @@ export function WorkspaceStepNav({
   label = '작업 단계',
 }: {
   steps: WorkspaceStep[]
-  currentKey: string
+  /** 명시하면 그 단계를 현재로 표시, 없으면 URL로 자동 판단 */
+  currentKey?: string
   label?: string
 }) {
-  const currentIdx = steps.findIndex((s) => s.key === currentKey)
+  const { pathname } = useLocation()
+  let currentIdx = currentKey ? steps.findIndex((s) => s.key === currentKey) : -1
+  if (currentIdx < 0) {
+    // URL과 가장 길게 일치하는 단계를 현재로 본다 (개요=기본 경로 정확 일치 처리)
+    let bestLen = -1
+    steps.forEach((s, i) => {
+      const match = pathname === s.path || pathname.startsWith(s.path + '/')
+      if (match && s.path.length > bestLen) {
+        bestLen = s.path.length
+        currentIdx = i
+      }
+    })
+  }
   return (
     <nav aria-label={label} className="rounded-(--radius-panel) border border-slate-200 bg-white px-2 py-1.5">
       <ol className="flex min-w-0 gap-1 overflow-x-auto">
@@ -342,7 +355,7 @@ export function WorkspaceShell({
   return (
     <div className="flex flex-col gap-5">
       <WorkspaceHeader moduleName={moduleName} moduleDescription={moduleDescription} saveStatus={saveStatus} />
-      {steps && currentKey && <WorkspaceStepNav steps={steps} currentKey={currentKey} />}
+      {steps && <WorkspaceStepNav steps={steps} currentKey={currentKey} />}
       {nextAction}
       {summary ? (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
