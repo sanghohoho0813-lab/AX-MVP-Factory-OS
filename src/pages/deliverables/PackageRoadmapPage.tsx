@@ -48,7 +48,7 @@ const INPUT_CLASS = 'w-full rounded-(--radius-control) border border-slate-200 p
 function PhaseStatusChip({ status }: { status: RoadmapPhaseStatus }) {
   const m = PHASE_STATUS_META[status]
   return (
-    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${m.tone}`}>
+    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[0.82rem] font-medium ${m.tone}`}>
       {m.label}
     </span>
   )
@@ -58,10 +58,10 @@ function BulletList({ label, items }: { label: string; items: string[] }) {
   if (items.length === 0) return null
   return (
     <div>
-      <p className="mb-1 text-[13px] font-semibold text-slate-700">{label}</p>
+      <p className="mb-1 text-[0.9rem] font-semibold text-slate-700">{label}</p>
       <ul className="flex flex-col gap-1">
         {items.map((item, i) => (
-          <li key={i} className="flex items-start gap-2 text-[13px] break-keep text-slate-700">
+          <li key={i} className="flex items-start gap-2 text-[0.9rem] break-keep text-slate-700">
             <span aria-hidden="true" className="mt-1.5 size-1.5 shrink-0 rounded-full bg-slate-300" />
             <span className="min-w-0 whitespace-pre-wrap">{item}</span>
           </li>
@@ -91,14 +91,14 @@ function PhaseCard({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-500">
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[0.82rem] font-semibold text-slate-500">
               {phase.orderIndex + 1}
             </span>
             <h3 className="text-[15px] font-semibold break-keep text-slate-900">{phase.name}</h3>
             <PhaseStatusChip status={phase.status} />
           </div>
           {phase.objective && (
-            <p className="mt-1.5 text-[13px] leading-relaxed break-keep whitespace-pre-wrap text-slate-600">
+            <p className="mt-1.5 text-[0.9rem] leading-relaxed break-keep whitespace-pre-wrap text-slate-600">
               {phase.objective}
             </p>
           )}
@@ -111,7 +111,7 @@ function PhaseCard({
       </div>
 
       {phase.scope && (
-        <p className="mt-3 text-[13px] leading-relaxed break-keep whitespace-pre-wrap text-slate-700">
+        <p className="mt-3 text-[0.9rem] leading-relaxed break-keep whitespace-pre-wrap text-slate-700">
           {phase.scope}
         </p>
       )}
@@ -125,12 +125,12 @@ function PhaseCard({
 
       <dl className="mt-3 grid grid-cols-1 gap-x-4 gap-y-1.5 border-t border-slate-100 pt-3 sm:grid-cols-2">
         <div className="flex flex-col">
-          <dt className="text-xs text-slate-400">담당자</dt>
-          <dd className="text-[13px] break-keep text-slate-700">{phase.owner || '지정 필요'}</dd>
+          <dt className="text-[0.9rem] text-slate-400">담당자</dt>
+          <dd className="text-[0.9rem] break-keep text-slate-700">{phase.owner || '지정 필요'}</dd>
         </div>
         <div className="flex flex-col">
-          <dt className="text-xs text-slate-400">기간</dt>
-          <dd className="text-[13px] break-keep text-slate-700">{phase.estimatedDurationText}</dd>
+          <dt className="text-[0.9rem] text-slate-400">기간</dt>
+          <dd className="text-[0.9rem] break-keep text-slate-700">{phase.estimatedDurationText}</dd>
         </div>
       </dl>
     </article>
@@ -236,7 +236,7 @@ function RoadmapView({ pkg, readOnly }: { pkg: DeliverablePackage; readOnly: boo
       >
         <div className="flex flex-col gap-4">
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-semibold text-slate-700">담당자</span>
+            <span className="text-[0.9rem] font-semibold text-slate-700">담당자</span>
             <input
               className={INPUT_CLASS}
               value={draft.owner}
@@ -245,17 +245,17 @@ function RoadmapView({ pkg, readOnly }: { pkg: DeliverablePackage; readOnly: boo
             />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-semibold text-slate-700">기간</span>
+            <span className="text-[0.9rem] font-semibold text-slate-700">기간</span>
             <input
               className={INPUT_CLASS}
               value={draft.estimatedDurationText}
               onChange={(e) => setDraft((d) => ({ ...d, estimatedDurationText: e.target.value }))}
               placeholder="담당 개발자 산정 필요"
             />
-            <span className="text-xs text-slate-400">근거 없는 일수는 입력하지 마세요. 담당 개발자가 산정합니다.</span>
+            <span className="text-[0.9rem] text-slate-400">근거 없는 일수는 입력하지 마세요. 담당 개발자가 산정합니다.</span>
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-semibold text-slate-700">상태</span>
+            <span className="text-[0.9rem] font-semibold text-slate-700">상태</span>
             <select
               className={INPUT_CLASS}
               value={draft.status}

@@ -25,7 +25,7 @@ const EVIDENCE_TYPE_LABEL: Record<DeliverableEvidenceType, string> = {
 function EvidenceTable({ pkg }: { pkg: DeliverablePackage }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-[13px]">
+      <table className="w-full border-collapse text-[0.9rem]">
         <thead>
           <tr className="border-b border-slate-200">
             <th scope="col" className="px-2.5 py-2 text-left font-semibold text-slate-600">출처</th>
@@ -42,7 +42,7 @@ function EvidenceTable({ pkg }: { pkg: DeliverablePackage }) {
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="font-medium">{item.title}</span>
                   {item.internalOnly && (
-                    <span className="inline-flex items-center rounded border border-danger-200 bg-danger-50 px-1.5 py-0.5 text-[10px] font-semibold text-danger-600">
+                    <span className="inline-flex items-center rounded border border-danger-200 bg-danger-50 px-1.5 py-0.5 text-[0.82rem] font-semibold text-danger-600">
                       내부 전용
                     </span>
                   )}
@@ -56,11 +56,11 @@ function EvidenceTable({ pkg }: { pkg: DeliverablePackage }) {
               </td>
               <td className="px-2.5 py-2 whitespace-nowrap">
                 {item.verified ? (
-                  <span className="inline-flex items-center rounded-md border border-success-200 bg-success-50 px-2 py-0.5 text-xs font-medium text-success-700">
+                  <span className="inline-flex items-center rounded-md border border-success-200 bg-success-50 px-2 py-0.5 text-[0.82rem] font-medium text-success-700">
                     확인
                   </span>
                 ) : (
-                  <span className="inline-flex items-center rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700">
+                  <span className="inline-flex items-center rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.82rem] font-medium text-warning-700">
                     확인 필요
                   </span>
                 )}

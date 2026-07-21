@@ -94,13 +94,13 @@ export function CasesLibraryPage() {
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="text-[15px] font-semibold break-keep text-slate-900">{c.title || '제목 없음'}</p>
-                    {c.industry && <p className="mt-0.5 text-xs text-slate-400">{c.industry}</p>}
+                    <p className="text-[1.05rem] font-semibold break-keep text-slate-900">{c.title || '제목 없음'}</p>
+                    {c.industry && <p className="mt-0.5 text-[0.9rem] text-slate-400">{c.industry}</p>}
                   </div>
                   {c.visibility === 'internal' && (
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-danger-200 bg-danger-50 px-1.5 py-0.5 text-xs font-medium text-danger-700">
-                      <Lock aria-hidden="true" className="size-3" />
-                      외부 노출 금지
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-danger-200 bg-danger-50 px-2 py-0.5 text-[0.82rem] font-medium text-danger-700">
+                      <Lock aria-hidden="true" className="size-3.5" />
+                      외부 공개 금지
                     </span>
                   )}
                 </div>
@@ -109,13 +109,13 @@ export function CasesLibraryPage() {
                   <CaseVisibilityBadge visibility={c.visibility} />
                   <ConsentBadge status={c.consentStatus} />
                 </div>
-                <p className="text-[13px] break-keep text-slate-600">{c.outcomeSummary || '결과 요약 없음'}</p>
+                <p className="text-[0.95rem] break-keep text-slate-600">{c.outcomeSummary || '아직 결과 요약이 없습니다'}</p>
                 {c.keyProblems[0] && (
-                  <p className="text-xs break-keep text-slate-500">초기 문제: {c.keyProblems[0]}</p>
+                  <p className="text-[0.9rem] break-keep text-slate-500">처음 문제: {c.keyProblems[0]}</p>
                 )}
-                <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.9rem] text-slate-500">
                   <span>연결 기관 {c.selectedInstitutions.length}곳</span>
-                  <span>검증 성과 {c.verifiedMetrics.length}건</span>
+                  <span>검증된 성과 {c.verifiedMetrics.length}건</span>
                 </div>
               </button>
             </li>

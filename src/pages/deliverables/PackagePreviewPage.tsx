@@ -63,7 +63,7 @@ function SectionBlock({
         <Heading className={`break-keep font-bold text-slate-900 ${isCover ? 'text-2xl' : 'text-lg'}`}>
           {section.title}
         </Heading>
-        {section.subtitle && <p className="text-[13px] break-keep text-slate-500">{section.subtitle}</p>}
+        {section.subtitle && <p className="text-[0.9rem] break-keep text-slate-500">{section.subtitle}</p>}
       </div>
       <ContentBlocks blocks={section.structuredContent} showInternal={showInternal} />
     </section>
@@ -123,7 +123,7 @@ function PreviewBody({
           aria-label="대상 독자"
           className="flex flex-wrap items-center gap-2"
         >
-          <span className="mr-1 text-[13px] font-medium text-slate-500">대상 독자</span>
+          <span className="mr-1 text-[0.9rem] font-medium text-slate-500">대상 독자</span>
           {PREVIEW_AUDIENCES.map((a) => {
             const active = audience === a
             return (
@@ -133,7 +133,7 @@ function PreviewBody({
                 role="radio"
                 aria-checked={active}
                 onClick={() => setAudience(a)}
-                className={`inline-flex items-center gap-1.5 rounded-(--radius-control) border px-3 py-1.5 text-[13px] font-medium transition-colors ${
+                className={`inline-flex items-center gap-1.5 rounded-(--radius-control) border px-3 py-1.5 text-[0.9rem] font-medium transition-colors ${
                   active
                     ? 'border-brand-600 bg-brand-50 text-brand-700'
                     : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
@@ -166,11 +166,11 @@ function PreviewBody({
         </div>
 
         {isRedactedAudience && (view.removedSectionCount > 0 || view.removedBlockCount > 0) && (
-          <p className="text-[13px] break-keep text-slate-500">
+          <p className="text-[0.9rem] break-keep text-slate-500">
             이 보기에서 {view.removedSectionCount}개 Section·{view.removedBlockCount}개 내부 항목이 숨겨졌습니다.
           </p>
         )}
-        <p aria-live="polite" className="min-h-[1rem] text-[13px] break-keep text-success-700">
+        <p aria-live="polite" className="min-h-[1rem] text-[0.9rem] break-keep text-success-700">
           {statusMessage}
         </p>
       </div>
@@ -179,10 +179,10 @@ function PreviewBody({
       <div className="print-document flex flex-col gap-6 rounded-(--radius-panel) border border-slate-200 bg-white p-6 shadow-(--shadow-card) sm:p-8">
         {/* 표지 */}
         <header className="avoid-break flex flex-col gap-2 border-b-2 border-slate-900 pb-5 print-page-break">
-          <p className="text-[13px] font-medium text-slate-500">{organizationName}</p>
+          <p className="text-[0.9rem] font-medium text-slate-500">{organizationName}</p>
           <h1 className="text-2xl font-bold break-keep text-slate-900">{pkg.name}</h1>
-          {pkg.description && <p className="text-[13px] break-keep text-slate-600">{pkg.description}</p>}
-          <dl className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 text-[13px] sm:grid-cols-2">
+          {pkg.description && <p className="text-[0.9rem] break-keep text-slate-600">{pkg.description}</p>}
+          <dl className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 text-[0.9rem] sm:grid-cols-2">
             <div className="flex gap-2">
               <dt className="text-slate-400">프로젝트</dt>
               <dd className="break-keep text-slate-700">{project.name}</dd>
@@ -204,21 +204,21 @@ function PreviewBody({
 
         {isInstitution && (
           <div className="avoid-break rounded-(--radius-card) border border-success-200 bg-success-50/70 px-4 py-3">
-            <p className="text-[13px] font-semibold break-keep text-success-800">기관 제출 준비 안내</p>
-            <p className="mt-1 text-[13px] leading-relaxed break-keep text-success-800">{INSTITUTION_DISCLAIMER}</p>
+            <p className="text-[0.9rem] font-semibold break-keep text-success-800">기관 제출 준비 안내</p>
+            <p className="mt-1 text-[0.9rem] leading-relaxed break-keep text-success-800">{INSTITUTION_DISCLAIMER}</p>
           </div>
         )}
 
         {!includesValidation && (
           <div className="avoid-break rounded-(--radius-card) border border-warning-200 bg-warning-50/70 px-4 py-3">
-            <p className="text-[13px] leading-relaxed break-keep text-warning-800">
+            <p className="text-[0.9rem] leading-relaxed break-keep text-warning-800">
               검증 전 설계안입니다. 실제 사용 테스트로 검증되지 않은 설계 기준의 자료이며, 검증 완료 자료가 아닙니다.
             </p>
           </div>
         )}
 
         {view.sections.length === 0 ? (
-          <p className="text-[13px] break-keep text-slate-500">이 대상 독자에게 공개할 Section이 없습니다.</p>
+          <p className="text-[0.9rem] break-keep text-slate-500">이 대상 독자에게 공개할 Section이 없습니다.</p>
         ) : (
           view.sections.map((section, index) => (
             <SectionBlock key={section.id} section={section} index={index} showInternal={showInternal} />

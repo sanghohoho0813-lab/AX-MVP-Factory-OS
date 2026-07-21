@@ -1,94 +1,44 @@
 import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
-import {
-  Building2,
-  ClipboardCheck,
-  ClipboardList,
-  FileText,
-  LayoutDashboard,
-  ListChecks,
-  Phone,
-  Sparkles,
-  Target,
-  TrendingUp,
-} from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import type { Project } from '../../types/domain'
 import type { FundingStrategy } from '../../types/funding'
-import { DetailHeader } from '../../components/ui/DetailHeader'
 import { NotFoundState } from '../../components/ui/NotFoundState'
-import { ProjectTypeBadge } from '../../components/domain/ProjectTypeBadge'
-import { StrategyStatusBadge } from '../../components/funding/badges'
+import {
+  WorkspaceHeader,
+  WorkspaceStepNav,
+  type WorkspaceSaveState,
+  type WorkspaceStep,
+} from '../../components/workspace/WorkspaceShell'
 import { useFundingData, useStrategy } from './useFundingData'
 
-export function FundingHeader({
-  project,
-  organizationName,
-  strategy,
-  actions,
-}: {
-  project: Project
-  organizationName: string
-  strategy: FundingStrategy | null
-  actions?: ReactNode
-}) {
+export const FUNDING_MODULE_NAME = '기관·자금 연계'
+export const FUNDING_MODULE_DESC =
+  '프로젝트 근거를 확인하고 검토할 기관·준비자료·진행결과를 관리합니다.'
+
+/** 기관·자금 연계 내부 단계 (실제 라우트 연결 — 경로 보존) */
+export function fundingSteps(projectId: string): WorkspaceStep[] {
+  const base = `/funding/projects/${projectId}`
+  return [
+    { key: 'overview', label: '개요', path: base },
+    { key: 'evidence', label: '근거 확인', path: `${base}/gaps` },
+    { key: 'matches', label: '기관 후보', path: `${base}/matches` },
+    { key: 'gaps', label: '부족조건', path: `${base}/gaps` },
+    { key: 'outreach', label: '접촉 계획', path: `${base}/outreach` },
+    { key: 'checklist', label: '준비자료', path: `${base}/checklist` },
+    { key: 'pipeline', label: '신청·심사', path: `${base}/pipeline` },
+    { key: 'outcome', label: '결과·사례', path: `${base}/outcome` },
+  ]
+}
+
+export function FundingHeader({ saveStatus }: { saveStatus?: WorkspaceSaveState }) {
   return (
-    <DetailHeader
-      backTo="/funding"
-      backLabel="기관·자금 연계"
-      title="기관·자금 연계"
-      badges={
-        <>
-          <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-500">
-            {project.projectCode}
-          </span>
-          <ProjectTypeBadge type={project.projectType} compact />
-          {strategy && <StrategyStatusBadge status={strategy.status} />}
-          {strategy && <span className="text-xs text-slate-400">v{strategy.version}</span>}
-        </>
-      }
-      meta={
-        <>
-          <span>{organizationName}</span>
-          <span>{project.name}</span>
-        </>
-      }
-      actions={actions}
-    />
+    <WorkspaceHeader moduleName={FUNDING_MODULE_NAME} moduleDescription={FUNDING_MODULE_DESC} saveStatus={saveStatus} />
   )
 }
 
 export function FundingNav({ projectId }: { projectId: string }) {
-  const base = `/funding/projects/${projectId}`
-  const tabs = [
-    { to: base, label: '개요', icon: LayoutDashboard, end: true },
-    { to: `${base}/matches`, label: '기관 후보', icon: Building2, end: false },
-    { to: `${base}/gaps`, label: '근거·부족조건', icon: ClipboardList, end: false },
-    { to: `${base}/outreach`, label: '접촉 계획', icon: Phone, end: false },
-    { to: `${base}/checklist`, label: '준비자료', icon: ListChecks, end: false },
-    { to: `${base}/pipeline`, label: '신청·심사', icon: Target, end: false },
-    { to: `${base}/outcome`, label: '결과·성과', icon: TrendingUp, end: false },
-    { to: `${base}/case`, label: '사례', icon: FileText, end: false },
-    { to: `${base}/review`, label: '검토·확정', icon: ClipboardCheck, end: false },
-  ]
-  return (
-    <nav aria-label="기관·자금 연계 메뉴" className="flex min-w-0 gap-1 overflow-x-auto border-b border-slate-200">
-      {tabs.map((tab) => (
-        <NavLink
-          key={tab.to}
-          to={tab.to}
-          end={tab.end}
-          className={({ isActive }) =>
-            `-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors ${
-              isActive ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`
-          }
-        >
-          <tab.icon aria-hidden="true" className="size-4" />
-          {tab.label}
-        </NavLink>
-      ))}
-    </nav>
-  )
+  return <WorkspaceStepNav steps={fundingSteps(projectId)} />
 }
 
 export function FundingNotFound() {
@@ -107,7 +57,7 @@ export function StaleBanner({ show }: { show: boolean }) {
   return (
     <div className="flex items-start gap-2 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3">
       <Sparkles aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning-600" />
-      <p className="text-[13px] break-keep text-warning-800">
+      <p className="text-[0.9rem] break-keep text-warning-800">
         출처 원본이 변경되었습니다. 확정된 전략은 그대로 보존되며, 최신 결과를 반영하려면 새 버전을 만드세요.
       </p>
     </div>
@@ -117,7 +67,7 @@ export function StaleBanner({ show }: { show: boolean }) {
 export function ReadOnlyNotice({ strategy }: { strategy: FundingStrategy }) {
   if (strategy.status !== 'finalized' && strategy.status !== 'superseded') return null
   return (
-    <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-[13px] text-slate-500">
+    <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-[0.9rem] break-keep text-slate-500">
       {strategy.status === 'finalized' ? '확정된 전략입니다. 원본 보존을 위해 읽기 전용입니다. 수정하려면 새 버전을 만드세요.' : '이전 버전입니다. 읽기 전용입니다.'}
     </div>
   )
@@ -141,9 +91,9 @@ export function FundingStrategyFrame({
   if (!strategy) {
     return (
       <div className="flex flex-col gap-5">
-        <FundingHeader project={context.project} organizationName={organizationName} strategy={null} />
+        <FundingHeader />
         <FundingNav projectId={projectId} />
-        <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[13px] text-slate-500">
+        <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.9rem] break-keep text-slate-500">
           아직 연계 전략이 없습니다. 개요 화면에서{' '}
           <NavLink to={`/funding/projects/${projectId}`} className="font-medium text-brand-700 underline">연계 시작</NavLink>
           을 눌러 생성하세요.
@@ -153,7 +103,7 @@ export function FundingStrategyFrame({
   }
   return (
     <div className="flex flex-col gap-5">
-      <FundingHeader project={context.project} organizationName={organizationName} strategy={strategy} />
+      <FundingHeader />
       <FundingNav projectId={projectId} />
       <StaleBanner show={stale} />
       {render(strategy, context.project, organizationName)}

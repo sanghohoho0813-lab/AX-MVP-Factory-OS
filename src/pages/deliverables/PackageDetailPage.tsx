@@ -28,9 +28,9 @@ interface NextStep {
 function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="rounded-(--radius-card) border border-slate-200 px-4 py-3">
-      <p className="text-xs text-slate-400">{label}</p>
+      <p className="text-[0.9rem] text-slate-400">{label}</p>
       <p className="mt-1 text-2xl font-bold text-slate-900">{value}</p>
-      {hint && <p className="mt-0.5 text-xs break-keep text-slate-400">{hint}</p>}
+      {hint && <p className="mt-0.5 text-[0.9rem] break-keep text-slate-400">{hint}</p>}
     </div>
   )
 }
@@ -92,16 +92,16 @@ function DetailBody({ pkg, projectId, packageId }: { pkg: DeliverablePackage; pr
       <ReadOnlyNotice pkg={pkg} />
 
       {!summary.includesValidation && (
-        <div className="rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3 text-[13px] break-keep text-warning-700">
+        <div className="rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3 text-[0.9rem] break-keep text-warning-700">
           이 자료에는 실제 사용 테스트(검증) 결과가 포함되어 있지 않습니다. &lsquo;검증 완료&rsquo;가 아닌 <span className="font-semibold">검증 전 설계안</span>으로 다뤄야 합니다.
         </div>
       )}
 
       {/* 지금 해야 할 일 */}
       <section aria-label="지금 해야 할 일" className="rounded-(--radius-panel) border border-brand-200 bg-brand-50/50 p-5">
-        <p className="text-xs font-semibold tracking-wide text-brand-700 uppercase">지금 해야 할 일</p>
+        <p className="text-[0.9rem] font-semibold tracking-wide text-brand-700 uppercase">지금 해야 할 일</p>
         <p className="mt-1.5 text-base font-semibold break-keep text-slate-900">{nextStep.title}</p>
-        <p className="mt-1 text-[13px] break-keep text-slate-600">{nextStep.description}</p>
+        <p className="mt-1 text-[0.9rem] break-keep text-slate-600">{nextStep.description}</p>
         <div className="mt-3">
           <Button variant="primary" onClick={() => navigate(nextStep.path)}>
             {nextStep.label}
@@ -113,7 +113,7 @@ function DetailBody({ pkg, projectId, packageId }: { pkg: DeliverablePackage; pr
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-5 xl:col-span-2">
           <Panel title="자료 요약">
-            <p className="text-[13px] leading-relaxed break-keep text-slate-700">{summary.headline}</p>
+            <p className="text-[0.9rem] leading-relaxed break-keep text-slate-700">{summary.headline}</p>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
               <StatCard
                 label="포함 Section"
@@ -129,7 +129,7 @@ function DetailBody({ pkg, projectId, packageId }: { pkg: DeliverablePackage; pr
           </Panel>
 
           <Panel title="포함 트랙">
-            <p className="mb-3 text-[13px] break-keep text-slate-500">
+            <p className="mb-3 text-[0.9rem] break-keep text-slate-500">
               AX와 홈페이지는 별도 트랙이며 하나의 점수로 합산하지 않습니다.
             </p>
             {pkg.includedTracks.length > 0 ? (
@@ -139,14 +139,14 @@ function DetailBody({ pkg, projectId, packageId }: { pkg: DeliverablePackage; pr
                 ))}
               </div>
             ) : (
-              <p className="text-[13px] break-keep text-slate-400">포함된 트랙이 없습니다.</p>
+              <p className="text-[0.9rem] break-keep text-slate-400">포함된 트랙이 없습니다.</p>
             )}
           </Panel>
         </div>
 
         <div className="flex min-w-0 flex-col gap-5">
           <Panel title="점검 상태">
-            <div className="flex items-center justify-between text-[13px]">
+            <div className="flex items-center justify-between text-[0.9rem]">
               <span className="text-slate-600">해결할 오류</span>
               <span className={blockingQuality.length > 0 ? 'font-semibold text-danger-600' : 'text-slate-400'}>
                 {blockingQuality.length}건
@@ -157,12 +157,12 @@ function DetailBody({ pkg, projectId, packageId }: { pkg: DeliverablePackage; pr
                 {blockingQuality.map((c) => (
                   <li key={c.id} className="flex items-start gap-2">
                     <DeliverableQualityBadge severity={c.severity} />
-                    <span className="min-w-0 text-xs break-keep text-slate-600">{c.description}</span>
+                    <span className="min-w-0 text-[0.9rem] break-keep text-slate-600">{c.description}</span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="mt-3 text-[13px] break-keep text-slate-500">해결해야 할 오류가 없습니다.</p>
+              <p className="mt-3 text-[0.9rem] break-keep text-slate-500">해결해야 할 오류가 없습니다.</p>
             )}
           </Panel>
 
@@ -185,7 +185,7 @@ function DetailBody({ pkg, projectId, packageId }: { pkg: DeliverablePackage; pr
 
           {!readOnly && (
             <Panel title="자료 구성">
-              <p className="mb-3 text-[13px] break-keep text-slate-500">
+              <p className="mb-3 text-[0.9rem] break-keep text-slate-500">
                 포함 자료·본문을 편집하려면 각 화면으로 이동하세요.
               </p>
               <Button variant="secondary" onClick={() => navigate(`${base}/contents`)}>

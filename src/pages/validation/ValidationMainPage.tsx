@@ -113,7 +113,7 @@ export function ValidationMainPage() {
     {
       key: 'client',
       header: '고객사',
-      cell: (r) => <span className="text-[13px] font-medium text-slate-700">{r.orgName}</span>,
+      cell: (r) => <span className="text-[0.95rem] font-medium text-slate-700">{r.orgName}</span>,
     },
     {
       key: 'project',
@@ -122,7 +122,7 @@ export function ValidationMainPage() {
       cell: (r) => (
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-slate-800">{r.project.name}</p>
-          <p className="text-xs text-slate-400">{r.project.projectCode}</p>
+          <p className="text-[0.9rem] text-slate-400">{r.project.projectCode}</p>
         </div>
       ),
     },
@@ -145,7 +145,7 @@ export function ValidationMainPage() {
                 {t.workspace ? (
                   <WorkspaceStatusBadge status={t.workspace.status} />
                 ) : (
-                  <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-500">
+                  <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.9rem] font-medium text-slate-500">
                     준비 필요
                   </span>
                 )}
@@ -159,7 +159,7 @@ export function ValidationMainPage() {
       header: '',
       className: 'text-right',
       cell: () => (
-        <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand-600">
+        <span className="inline-flex items-center gap-1 text-[0.95rem] font-semibold text-brand-600">
           트랙 보기
           <ArrowRight aria-hidden="true" className="size-3.5" />
         </span>
@@ -204,7 +204,7 @@ export function ValidationMainPage() {
         </Button>
       </div>
 
-      <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-[13px] break-keep text-slate-500">
+      <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-[0.95rem] break-keep text-slate-500">
         AX MVP와 홈페이지는 서로 독립된 트랙입니다. 통과율·판정은 절대 합산하지 않고 트랙별로 따로 확정합니다.
       </p>
 
@@ -247,7 +247,7 @@ export function ValidationMainPage() {
                               {t.workspace ? (
                                 <WorkspaceStatusBadge status={t.workspace.status} />
                               ) : (
-                                <span className="text-xs text-slate-400">준비 필요</span>
+                                <span className="text-[0.9rem] text-slate-400">준비 필요</span>
                               )}
                             </span>
                           ))}
@@ -264,7 +264,7 @@ export function ValidationMainPage() {
 
       {blocked.length > 0 && (
         <Panel title="설계 확정이 필요한 트랙">
-          <p className="mb-3 text-[13px] break-keep text-slate-500">
+          <p className="mb-3 text-[0.95rem] break-keep text-slate-500">
             아래 트랙은 출처 설계가 확정(FINALIZED)되어야 실제 사용 테스트를 시작할 수 있습니다.
           </p>
           <ul className="flex flex-col gap-2">
@@ -278,12 +278,12 @@ export function ValidationMainPage() {
                   <Lock aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-400" />
                   <span className="min-w-0">
                     <span className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-[13px] font-medium text-slate-700">
+                      <span className="text-[0.95rem] font-medium text-slate-700">
                         {b.orgName} · {b.project.name}
                       </span>
                       <TrackBadge track={b.trackType} />
                     </span>
-                    <span className="mt-0.5 block text-xs break-keep text-slate-500">
+                    <span className="mt-0.5 block text-[0.9rem] break-keep text-slate-500">
                       {b.reason || `${TRACK_META[b.trackType].label} 출처 설계를 먼저 확정하세요.`}
                     </span>
                   </span>

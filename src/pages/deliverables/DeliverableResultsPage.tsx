@@ -93,13 +93,13 @@ export function DeliverableResultsPage() {
   const validationLabel = (pkg: DeliverablePackage) => (pkg.includedTracks.includes('validation') ? '테스트 포함' : '검증 전')
 
   const columns: DataTableColumn<Row>[] = [
-    { key: 'client', header: '고객사', cell: (r) => <span className="text-[13px] font-medium text-slate-700">{r.orgName}</span> },
+    { key: 'client', header: '고객사', cell: (r) => <span className="text-[0.9rem] font-medium text-slate-700">{r.orgName}</span> },
     {
       key: 'package', header: '패키지', className: 'min-w-[180px]',
       cell: (r) => (
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-slate-800">{r.pkg.name}</p>
-          <p className="truncate text-xs text-slate-400">{r.projectName} · v{r.pkg.version}</p>
+          <p className="truncate text-[0.9rem] text-slate-400">{r.projectName} · v{r.pkg.version}</p>
         </div>
       ),
     },
@@ -118,17 +118,17 @@ export function DeliverableResultsPage() {
     },
     {
       key: 'counts', header: '구성', className: 'hidden lg:table-cell',
-      cell: (r) => <span className="text-[13px] text-slate-600">Section {r.pkg.sections.length} · 프롬프트 {r.pkg.prompts.length}</span>,
+      cell: (r) => <span className="text-[0.9rem] text-slate-600">Section {r.pkg.sections.length} · 프롬프트 {r.pkg.prompts.length}</span>,
     },
     {
       key: 'validation', header: '검증', className: 'hidden lg:table-cell',
       cell: (r) => (
-        <span className={`text-[13px] font-medium ${r.pkg.includedTracks.includes('validation') ? 'text-success-600' : 'text-slate-400'}`}>
+        <span className={`text-[0.9rem] font-medium ${r.pkg.includedTracks.includes('validation') ? 'text-success-600' : 'text-slate-400'}`}>
           {validationLabel(r.pkg)}
         </span>
       ),
     },
-    { key: 'finalized', header: '확정일', className: 'hidden xl:table-cell', cell: (r) => <span className="text-[13px] text-slate-500">{formatDate(r.pkg.finalizedAt)}</span> },
+    { key: 'finalized', header: '확정일', className: 'hidden xl:table-cell', cell: (r) => <span className="text-[0.9rem] text-slate-500">{formatDate(r.pkg.finalizedAt)}</span> },
   ]
 
   return (
@@ -136,7 +136,7 @@ export function DeliverableResultsPage() {
       <button
         type="button"
         onClick={() => navigate('/deliverables')}
-        className="inline-flex w-fit items-center gap-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-800"
+        className="inline-flex w-fit items-center gap-1.5 text-[0.9rem] font-medium text-slate-500 hover:text-slate-800"
       >
         <ArrowLeft aria-hidden="true" className="size-3.5" />
         제출자료 만들기
@@ -184,7 +184,7 @@ export function DeliverableResultsPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-900">{r.pkg.name}</p>
-                    <p className="mt-0.5 text-xs text-slate-400">{r.orgName} · {r.projectName} · v{r.pkg.version}</p>
+                    <p className="mt-0.5 text-[0.9rem] text-slate-400">{r.orgName} · {r.projectName} · v{r.pkg.version}</p>
                   </div>
                   <PackageStatusBadge status={r.pkg.status} />
                 </div>
@@ -197,7 +197,7 @@ export function DeliverableResultsPage() {
                     <DeliverableTrackBadge key={track} track={track} />
                   ))}
                 </div>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.9rem] text-slate-500">
                   <span>Section {r.pkg.sections.length}개</span>
                   <span>프롬프트 {r.pkg.prompts.length}종</span>
                   <span className={r.pkg.includedTracks.includes('validation') ? 'font-medium text-success-600' : ''}>{validationLabel(r.pkg)}</span>

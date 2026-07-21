@@ -65,24 +65,24 @@ function PromptCard({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand-100 text-[0.82rem] font-semibold text-brand-700">
               {prompt.sequenceNumber}
             </span>
             <h3 className="text-[15px] font-semibold break-keep text-slate-900">{prompt.title}</h3>
             {prompt.manuallyEdited && (
-              <span className="inline-flex items-center rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700">
+              <span className="inline-flex items-center rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.82rem] font-medium text-warning-700">
                 수동 수정됨
               </span>
             )}
             {done && (
-              <span className="inline-flex items-center gap-1 rounded-md border border-success-200 bg-success-50 px-2 py-0.5 text-xs font-medium text-success-700">
+              <span className="inline-flex items-center gap-1 rounded-md border border-success-200 bg-success-50 px-2 py-0.5 text-[0.82rem] font-medium text-success-700">
                 <Check aria-hidden="true" className="size-3" />
                 완료 표시
               </span>
             )}
           </div>
           {prompt.purpose && (
-            <p className="mt-1.5 text-[13px] leading-relaxed break-keep whitespace-pre-wrap text-slate-600">
+            <p className="mt-1.5 text-[0.9rem] leading-relaxed break-keep whitespace-pre-wrap text-slate-600">
               {prompt.purpose}
             </p>
           )}
@@ -103,10 +103,10 @@ function PromptCard({
 
       {prompt.prerequisites.length > 0 && (
         <div className="mt-3 rounded-(--radius-control) border border-slate-200 bg-slate-50/60 px-3 py-2.5">
-          <p className="mb-1 text-[13px] font-semibold text-slate-700">전제조건 (이전 프롬프트가 끝났는지 확인)</p>
+          <p className="mb-1 text-[0.9rem] font-semibold text-slate-700">전제조건 (이전 프롬프트가 끝났는지 확인)</p>
           <ul className="flex flex-col gap-1">
             {prompt.prerequisites.map((pre, i) => (
-              <li key={i} className="flex items-start gap-2 text-[13px] break-keep text-slate-600">
+              <li key={i} className="flex items-start gap-2 text-[0.9rem] break-keep text-slate-600">
                 <span aria-hidden="true" className="mt-1.5 size-1.5 shrink-0 rounded-full bg-slate-300" />
                 <span className="min-w-0 whitespace-pre-wrap">{pre}</span>
               </li>
@@ -117,9 +117,9 @@ function PromptCard({
 
       <div className="mt-3">
         <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-          <span className="text-[13px] font-semibold text-slate-700">프롬프트 내용</span>
+          <span className="text-[0.9rem] font-semibold text-slate-700">프롬프트 내용</span>
           <div className="flex items-center gap-2">
-            <span aria-live="polite" className="text-xs font-medium text-success-600">
+            <span aria-live="polite" className="text-[0.9rem] font-medium text-success-600">
               {copied ? '복사되었습니다' : ''}
             </span>
             <Button variant="secondary" size="sm" onClick={copy}>
@@ -130,14 +130,14 @@ function PromptCard({
         </div>
         <pre
           tabIndex={0}
-          className="max-h-96 overflow-auto rounded-(--radius-card) border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed break-words whitespace-pre-wrap text-slate-700"
+          className="max-h-96 overflow-auto rounded-(--radius-card) border border-slate-200 bg-slate-50 p-3 text-[0.9rem] leading-relaxed break-words whitespace-pre-wrap text-slate-700"
         >
           {prompt.content}
         </pre>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
-        <label className="flex items-center gap-2 text-[13px] text-slate-600">
+        <label className="flex items-center gap-2 text-[0.9rem] text-slate-600">
           <input
             type="checkbox"
             checked={done}
@@ -149,7 +149,7 @@ function PromptCard({
         {index < total - 1 && (
           <a
             href={`#prompt-${prompt.id}-next`}
-            className="text-[13px] font-medium text-brand-600 hover:text-brand-700 hover:underline"
+            className="text-[0.9rem] font-medium text-brand-600 hover:text-brand-700 hover:underline"
           >
             다음 프롬프트 보기 →
           </a>
@@ -231,7 +231,7 @@ function PromptsView({ pkg, readOnly }: { pkg: DeliverablePackage; readOnly: boo
 
       {pkg.prompts.length > 0 && (
         <Panel title="프롬프트 사용 순서">
-          <div className="flex flex-col gap-2 text-[13px] leading-relaxed break-keep text-slate-600">
+          <div className="flex flex-col gap-2 text-[0.9rem] leading-relaxed break-keep text-slate-600">
             <p>
               아래 프롬프트는 <strong className="text-slate-800">실제 Claude Code와 자동 연동하지 않습니다.</strong> 각
               프롬프트의 &ldquo;복사&rdquo; 버튼으로 내용을 복사한 뒤, Claude Code에 순서대로 붙여넣어 사용하세요.
@@ -311,15 +311,15 @@ function PromptsView({ pkg, readOnly }: { pkg: DeliverablePackage; readOnly: boo
         {edit && (
           <div className="flex flex-col gap-4">
             <label className="flex flex-col gap-1.5">
-              <span className="text-[13px] font-semibold text-slate-700">프롬프트 내용</span>
+              <span className="text-[0.9rem] font-semibold text-slate-700">프롬프트 내용</span>
               <textarea
-                className={`${INPUT_CLASS} min-h-64 font-mono text-xs leading-relaxed`}
+                className={`${INPUT_CLASS} min-h-64 font-mono text-[0.9rem] leading-relaxed`}
                 value={edit.content}
                 onChange={(e) => setEdit((s) => (s ? { ...s, content: e.target.value } : s))}
               />
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[13px] font-semibold text-slate-700">수정 메모</span>
+              <span className="text-[0.9rem] font-semibold text-slate-700">수정 메모</span>
               <input
                 className={INPUT_CLASS}
                 value={edit.editNotes}

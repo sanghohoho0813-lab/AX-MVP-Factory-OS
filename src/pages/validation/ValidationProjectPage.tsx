@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/toastContext'
 import { TrackBadge, WorkspaceStatusBadge } from '../../components/validation/badges'
 import { TRACK_META } from '../../lib/validationMeta'
-import { ValidationHeader, ValidationProjectNotFound } from './validationShared'
+import { ValidationModuleHeader, ValidationProjectNotFound } from './validationShared'
 import { useValidationData } from './useValidationData'
 
 export function ValidationProjectPage() {
@@ -31,24 +31,24 @@ export function ValidationProjectPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <ValidationHeader project={context.project} organizationName={context.organization?.name ?? ''} />
+      <ValidationModuleHeader saveStatus="local" />
 
       <section
         aria-label="Stage-Gate 안내"
         className="rounded-(--radius-panel) border border-brand-100 bg-brand-50/60 p-5"
       >
-        <p className="text-xs font-semibold tracking-wide text-brand-700 uppercase">진행 방식</p>
-        <p className="mt-1.5 text-base font-semibold break-keep text-slate-900">
+        <p className="text-[0.82rem] font-semibold tracking-wide text-brand-700 uppercase">진행 방식</p>
+        <p className="mt-1.5 text-[1.05rem] font-semibold break-keep text-slate-900">
           트랙별로 실제 사용 테스트를 진행하고 Stage-Gate로 판정합니다.
         </p>
-        <p className="mt-1 text-[13px] break-keep text-slate-600">
+        <p className="mt-1 text-[0.95rem] break-keep text-slate-600">
           ① 계획 → ② 제작·참여자 → ③ 시나리오 → ④ 회차 실행 → ⑤ 피드백·이슈 → ⑥ KPI → ⑦ Gate 판정 → ⑧ 다음 결정.
           근거(관찰·측정) 없이 통과로 단정하지 않으며, critical 이슈가 있으면 확정할 수 없습니다.
         </p>
       </section>
 
       {isCombined && (
-        <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-[13px] break-keep text-slate-500">
+        <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-[0.95rem] break-keep text-slate-500">
           이 프로젝트는 AX MVP와 홈페이지 두 트랙을 각각 독립적으로 검증합니다. 두 트랙의 통과율·판정은 절대 합산하지 않습니다.
         </p>
       )}
@@ -82,16 +82,16 @@ function TrackCard({
           <TrackBadge track={track.trackType} />
           {workspace && <WorkspaceStatusBadge status={workspace.status} />}
         </div>
-        {workspace && <span className="text-xs text-slate-400">검증 v{workspace.version}</span>}
+        {workspace && <span className="text-[0.82rem] text-slate-400">검증 v{workspace.version}</span>}
       </div>
 
       {!track.eligibility.available ? (
         <div className="flex flex-col gap-2 rounded-(--radius-card) border border-warning-200 bg-warning-50/50 p-4">
-          <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+          <p className="flex items-center gap-1.5 text-[1.05rem] font-semibold break-keep text-slate-800">
             <Lock aria-hidden="true" className="size-4 text-warning-600" />
             {meta.label}를 시작할 수 없습니다
           </p>
-          <p className="text-[13px] break-keep text-slate-600">{track.eligibility.reason}</p>
+          <p className="text-[0.95rem] break-keep text-slate-600">{track.eligibility.reason}</p>
           <div className="mt-1">
             <Button variant="secondary" size="sm" disabled>
               검증 시작
@@ -100,7 +100,7 @@ function TrackCard({
         </div>
       ) : !workspace ? (
         <div className="flex flex-col gap-3">
-          <p className="text-[13px] break-keep text-slate-600">
+          <p className="text-[0.95rem] break-keep text-slate-600">
             확정된 출처 설계로 검증 워크스페이스를 생성해 실제 사용 테스트를 시작할 수 있습니다.
           </p>
           <div>
@@ -113,16 +113,16 @@ function TrackCard({
       ) : (
         <div className="flex flex-col gap-3">
           {track.needsRevalidationFlag && (
-            <p className="flex items-start gap-1.5 rounded-(--radius-card) border border-warning-200 bg-warning-50 px-3 py-2 text-xs break-keep text-warning-700">
+            <p className="flex items-start gap-1.5 rounded-(--radius-card) border border-warning-200 bg-warning-50 px-3 py-2 text-[0.9rem] break-keep text-warning-700">
               <RefreshCw aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
               출처 설계가 새 버전으로 확정됨 — 새 버전 검증 필요
             </p>
           )}
 
-          <p className="text-[13px] break-keep text-slate-600">{summary?.headline}</p>
+          <p className="text-[0.95rem] break-keep text-slate-600">{summary?.headline}</p>
 
           {summary?.hasOpenCritical && (
-            <p className="flex items-center gap-1.5 text-xs font-medium text-danger-600">
+            <p className="flex items-center gap-1.5 text-[0.9rem] font-medium text-danger-600">
               <AlertTriangle aria-hidden="true" className="size-3.5" />
               미해결 critical 이슈 — 확정 불가
             </p>
@@ -150,7 +150,7 @@ function TrackCard({
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs text-slate-400">{label}</dt>
+      <dt className="text-[0.9rem] text-slate-400">{label}</dt>
       <dd className="text-lg font-bold text-slate-800">{value}</dd>
     </div>
   )

@@ -64,7 +64,7 @@ export function ValidationResultsPage() {
       <button
         type="button"
         onClick={() => navigate('/validation')}
-        className="inline-flex w-fit items-center gap-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-800"
+        className="inline-flex w-fit items-center gap-1.5 text-[0.95rem] font-medium text-slate-500 hover:text-slate-800"
       >
         <ArrowLeft aria-hidden="true" className="size-3.5" />
         실제 사용 테스트
@@ -95,7 +95,7 @@ export function ValidationResultsPage() {
           <section key={group.trackType} className="flex flex-col gap-3">
             <div className="flex items-center gap-2">
               <TrackBadge track={group.trackType} />
-              <span className="text-[13px] font-medium text-slate-500">
+              <span className="text-[0.95rem] font-medium text-slate-500">
                 {TRACK_META[group.trackType].label} · {group.rows.length}건
               </span>
             </div>
@@ -112,7 +112,7 @@ export function ValidationResultsPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-slate-900">{r.workspace.title}</p>
-                        <p className="mt-0.5 text-xs text-slate-400">
+                        <p className="mt-0.5 text-[0.9rem] text-slate-400">
                           {r.orgName} · {r.projectName} · v{r.workspace.version}
                         </p>
                       </div>
@@ -121,8 +121,8 @@ export function ValidationResultsPage() {
                         {decisionType && <DecisionBadge type={decisionType} />}
                       </div>
                     </div>
-                    <p className="line-clamp-2 text-[13px] break-keep text-slate-600">{r.headline}</p>
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                    <p className="line-clamp-2 text-[0.95rem] break-keep text-slate-600">{r.headline}</p>
+                    <div className="flex flex-wrap items-center gap-3 text-[0.9rem] text-slate-500">
                       <span>
                         <span className="font-semibold text-slate-700">{r.requiredPassRate}%</span> 필수 통과율
                       </span>
@@ -137,7 +137,7 @@ export function ValidationResultsPage() {
       )}
 
       {total > 0 && (
-        <p className="inline-flex w-fit items-center gap-1.5 rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-[13px] break-keep text-slate-500">
+        <p className="inline-flex w-fit items-center gap-1.5 rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-[0.95rem] break-keep text-slate-500">
           <FlaskConical aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
           AX MVP와 홈페이지 결과는 별개의 트랙으로, 하나의 점수로 합치지 않습니다.
         </p>

@@ -17,7 +17,7 @@ const HYPOTHESIS_PRIORITY_LABEL: Record<string, string> = {
 }
 
 const inputClass = 'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[14px] focus:border-brand-400 focus:outline-none'
-const labelClass = 'mb-1 block text-xs font-semibold text-slate-500'
+const labelClass = 'mb-1 block text-[0.9rem] font-semibold text-slate-500'
 
 function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
   return (
@@ -155,7 +155,7 @@ function HypothesesPanel({ w }: { w: ValidationWorkspace }) {
   return (
     <Panel title="가설">
       {w.hypotheses.length === 0 ? (
-        <p className="text-[13px] break-keep text-slate-500">등록된 가설이 없습니다.</p>
+        <p className="text-[0.95rem] break-keep text-slate-500">등록된 가설이 없습니다.</p>
       ) : (
         <ul className="flex flex-col gap-3">
           {w.hypotheses.map((h) => (
@@ -163,18 +163,18 @@ function HypothesesPanel({ w }: { w: ValidationWorkspace }) {
               <div className="flex items-start gap-2">
                 <Lightbulb aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-400" />
                 <p className="min-w-0 text-sm font-semibold break-keep text-slate-800">{h.statement}</p>
-                <span className="ml-auto shrink-0 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-500">
+                <span className="ml-auto shrink-0 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.82rem] text-slate-500">
                   {HYPOTHESIS_PRIORITY_LABEL[h.priority] ?? h.priority}
                 </span>
               </div>
               <dl className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                 <div>
-                  <dt className="text-xs font-semibold text-slate-500">성공 조건</dt>
-                  <dd className="text-[13px] break-keep text-slate-600">{h.successCondition || '-'}</dd>
+                  <dt className="text-[0.9rem] font-semibold text-slate-500">성공 조건</dt>
+                  <dd className="text-[0.95rem] break-keep text-slate-600">{h.successCondition || '-'}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs font-semibold text-slate-500">실패 조건</dt>
-                  <dd className="text-[13px] break-keep text-slate-600">{h.failureCondition || '-'}</dd>
+                  <dt className="text-[0.9rem] font-semibold text-slate-500">실패 조건</dt>
+                  <dd className="text-[0.95rem] break-keep text-slate-600">{h.failureCondition || '-'}</dd>
                 </div>
               </dl>
             </li>

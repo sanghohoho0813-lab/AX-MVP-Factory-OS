@@ -124,7 +124,7 @@ export function SectionEditorCard({
       actions={
         <div className="flex items-center gap-1.5">
           {section.manuallyEdited && (
-            <span className="rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700">
+            <span className="rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.82rem] font-medium text-warning-700">
               수동 수정됨
             </span>
           )}
@@ -134,13 +134,13 @@ export function SectionEditorCard({
       }
     >
       {section.subtitle && (
-        <p className="mb-3 text-[13px] break-keep text-slate-500">{section.subtitle}</p>
+        <p className="mb-3 text-[0.9rem] break-keep text-slate-500">{section.subtitle}</p>
       )}
 
       <ContentBlocks blocks={section.structuredContent} showInternal={true} />
 
       {section.manuallyEdited && section.editNotes && (
-        <p className="mt-4 rounded-(--radius-control) border border-warning-200 bg-warning-50/60 px-3 py-2 text-[13px] break-keep text-warning-700">
+        <p className="mt-4 rounded-(--radius-control) border border-warning-200 bg-warning-50/60 px-3 py-2 text-[0.9rem] break-keep text-warning-700">
           <span className="font-semibold">수정 사유</span> · {section.editNotes}
         </p>
       )}
@@ -189,19 +189,19 @@ export function SectionEditorCard({
       >
         <div className="flex flex-col gap-4">
           <div>
-            <label className="mb-1.5 block text-[13px] font-medium text-slate-700">본문</label>
+            <label className="mb-1.5 block text-[0.9rem] font-medium text-slate-700">본문</label>
             <textarea
               value={draftBody}
               onChange={(e) => setDraftBody(e.target.value)}
               rows={14}
               className={`${INPUT_CLASS} font-mono leading-relaxed`}
             />
-            <p className="mt-1 text-xs break-keep text-slate-400">
+            <p className="mt-1 text-[0.9rem] break-keep text-slate-400">
               수동 수정 후에도 자동 생성 원본은 보존되며, 언제든 원본으로 복구할 수 있습니다.
             </p>
           </div>
           <div>
-            <label className="mb-1.5 block text-[13px] font-medium text-slate-700">수정 사유</label>
+            <label className="mb-1.5 block text-[0.9rem] font-medium text-slate-700">수정 사유</label>
             <textarea
               value={draftNotes}
               onChange={(e) => setDraftNotes(e.target.value)}
@@ -231,18 +231,18 @@ export function SectionEditorCard({
         }
       >
         <div className="flex flex-col gap-4">
-          <p className="text-[13px] break-keep text-slate-500">
+          <p className="text-[0.9rem] break-keep text-slate-500">
             최신 출처로 다시 생성한 원본입니다. 적용하면 현재 본문(수동 수정 포함)이 새 원본으로 교체됩니다.
           </p>
           <div>
-            <p className="mb-1.5 text-[13px] font-semibold text-slate-700">현재 본문</p>
-            <pre className="max-h-48 overflow-auto rounded-(--radius-card) border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed break-words whitespace-pre-wrap text-slate-600">
+            <p className="mb-1.5 text-[0.9rem] font-semibold text-slate-700">현재 본문</p>
+            <pre className="max-h-48 overflow-auto rounded-(--radius-card) border border-slate-200 bg-slate-50 p-3 text-[0.9rem] leading-relaxed break-words whitespace-pre-wrap text-slate-600">
               {section.body}
             </pre>
           </div>
           <div>
-            <p className="mb-1.5 text-[13px] font-semibold text-brand-700">새 원본</p>
-            <pre className="max-h-48 overflow-auto rounded-(--radius-card) border border-brand-200 bg-brand-50/50 p-3 text-xs leading-relaxed break-words whitespace-pre-wrap text-slate-700">
+            <p className="mb-1.5 text-[0.9rem] font-semibold text-brand-700">새 원본</p>
+            <pre className="max-h-48 overflow-auto rounded-(--radius-card) border border-brand-200 bg-brand-50/50 p-3 text-[0.9rem] leading-relaxed break-words whitespace-pre-wrap text-slate-700">
               {regenBody}
             </pre>
           </div>

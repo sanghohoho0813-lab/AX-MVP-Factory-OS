@@ -75,7 +75,7 @@ function ContentsBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: 
       <ReadOnlyNotice pkg={pkg} />
 
       {showLeakWarning && (
-        <div className="rounded-(--radius-card) border border-danger-200 bg-danger-50/60 px-4 py-3 text-[13px] break-keep text-danger-700">
+        <div className="rounded-(--radius-card) border border-danger-200 bg-danger-50/60 px-4 py-3 text-[0.9rem] break-keep text-danger-700">
           대상이 {pkg.audience === 'client' ? '고객용' : '기관 준비용'}인데 <span className="font-semibold">내부 전용</span> Section {leakingSections.length}개가 포함되어 있습니다. 공개 범위를 조정하거나 제외하세요.
         </div>
       )}
@@ -89,7 +89,7 @@ function ContentsBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: 
           >
             <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-3">
               <DeliverableTrackBadge track={track} />
-              <span className="text-[13px] text-slate-400">{rows.length}개</span>
+              <span className="text-[0.82rem] text-slate-400">{rows.length}개</span>
             </div>
             <ul className="divide-y divide-slate-100">
               {rows.map((section) => {
@@ -110,17 +110,17 @@ function ContentsBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: 
                         <SectionStatusBadge status={section.status} />
                         {!excluded && <VisibilityBadge visibility={section.visibility} />}
                         {section.manuallyEdited && (
-                          <span className="rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700">
+                          <span className="rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.82rem] font-medium text-warning-700">
                             수동 수정됨
                           </span>
                         )}
                       </div>
-                      <p className="mt-1 font-mono text-xs text-slate-400">{section.type}</p>
+                      <p className="mt-1 font-mono text-[0.82rem] text-slate-400">{section.type}</p>
                     </div>
 
                     {!readOnly && (
                       <div className="flex flex-wrap items-center gap-2">
-                        <label className="flex items-center gap-1.5 text-[13px] text-slate-600">
+                        <label className="flex items-center gap-1.5 text-[0.9rem] text-slate-600">
                           <input
                             type="checkbox"
                             checked={!excluded}
@@ -134,7 +134,7 @@ function ContentsBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: 
                           onChange={(e) => handleVisibility(section, e.target.value)}
                           disabled={excluded}
                           aria-label={`${section.title} 공개 범위`}
-                          className="rounded-(--radius-control) border border-slate-200 px-2.5 py-1.5 text-[13px] disabled:opacity-50"
+                          className="rounded-(--radius-control) border border-slate-200 px-2.5 py-1.5 text-[0.9rem] disabled:opacity-50"
                         >
                           {VISIBILITIES.map((v) => (
                             <option key={v} value={v}>

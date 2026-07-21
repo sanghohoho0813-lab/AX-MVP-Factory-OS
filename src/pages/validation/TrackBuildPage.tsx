@@ -44,7 +44,7 @@ import {
 import { ReadOnlyNotice, TrackSectionFrame } from './validationShared'
 
 const inputClass = 'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[14px] focus:border-brand-400 focus:outline-none'
-const labelClass = 'mb-1 block text-xs font-semibold text-slate-500'
+const labelClass = 'mb-1 block text-[0.9rem] font-semibold text-slate-500'
 
 const CONSENT_STATUSES = Object.keys(CONSENT_META) as ParticipantConsentStatus[]
 const PARTICIPANT_STATUSES = Object.keys(PARTICIPANT_STATUS_META) as ParticipantStatus[]
@@ -219,34 +219,34 @@ function BuildPanel({ w, readOnly }: { w: ValidationWorkspace; readOnly: boolean
             <li key={b.id} className="rounded-(--radius-card) border border-slate-200 px-4 py-3">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm font-semibold text-slate-800">{b.name}</p>
-                {b.version && <span className="text-xs text-slate-400">v{b.version}</span>}
+                {b.version && <span className="text-[0.9rem] text-slate-400">v{b.version}</span>}
                 <BuildStatusBadge status={b.status} />
-                <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-500">
+                <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.82rem] text-slate-500">
                   {BUILD_TYPE_META[b.type].label}
                 </span>
                 {b.isCurrent && (
-                  <span className="inline-flex items-center gap-1 rounded-md border border-success-200 bg-success-50 px-1.5 py-0.5 text-[11px] font-medium text-success-700">
+                  <span className="inline-flex items-center gap-1 rounded-md border border-success-200 bg-success-50 px-1.5 py-0.5 text-[0.82rem] font-medium text-success-700">
                     <CheckCircle2 aria-hidden="true" className="size-3.5" />
                     활성 버전
                   </span>
                 )}
               </div>
-              <dl className="mt-2 grid grid-cols-1 gap-1.5 text-[13px] sm:grid-cols-2">
+              <dl className="mt-2 grid grid-cols-1 gap-1.5 text-[0.95rem] sm:grid-cols-2">
                 {b.url && (
                   <div>
-                    <dt className="text-xs font-semibold text-slate-500">링크·위치</dt>
+                    <dt className="text-[0.9rem] font-semibold text-slate-500">링크·위치</dt>
                     <dd className="break-all text-slate-600">{b.url}</dd>
                   </div>
                 )}
                 {b.accessMethod && (
                   <div>
-                    <dt className="text-xs font-semibold text-slate-500">접근 방법</dt>
+                    <dt className="text-[0.9rem] font-semibold text-slate-500">접근 방법</dt>
                     <dd className="break-keep text-slate-600">{b.accessMethod}</dd>
                   </div>
                 )}
                 {b.environment && (
                   <div>
-                    <dt className="text-xs font-semibold text-slate-500">환경</dt>
+                    <dt className="text-[0.9rem] font-semibold text-slate-500">환경</dt>
                     <dd className="break-keep text-slate-600">{b.environment}</dd>
                   </div>
                 )}
@@ -452,18 +452,18 @@ function ParticipantPanel({ w, readOnly }: { w: ValidationWorkspace; readOnly: b
                 <ParticipantStatusBadge status={p.status} />
               </div>
               {(p.organization || p.expertise) && (
-                <p className="mt-1 text-[13px] break-keep text-slate-600">
+                <p className="mt-1 text-[0.95rem] break-keep text-slate-600">
                   {[p.organization, p.expertise].filter(Boolean).join(' · ')}
                 </p>
               )}
               {!readOnly && (
                 <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <label className="text-xs text-slate-500">
+                  <label className="text-[0.9rem] text-slate-500">
                     동의
                     <select
                       value={p.consentStatus}
                       onChange={(e) => doUpdate(p.id, { consentStatus: e.target.value as ParticipantConsentStatus })}
-                      className="ml-1.5 rounded-(--radius-control) border border-slate-300 px-2 py-1 text-[13px] text-slate-700 focus:border-brand-400 focus:outline-none"
+                      className="ml-1.5 rounded-(--radius-control) border border-slate-300 px-2 py-1 text-[0.95rem] text-slate-700 focus:border-brand-400 focus:outline-none"
                     >
                       {CONSENT_STATUSES.map((c) => (
                         <option key={c} value={c}>
@@ -472,12 +472,12 @@ function ParticipantPanel({ w, readOnly }: { w: ValidationWorkspace; readOnly: b
                       ))}
                     </select>
                   </label>
-                  <label className="text-xs text-slate-500">
+                  <label className="text-[0.9rem] text-slate-500">
                     상태
                     <select
                       value={p.status}
                       onChange={(e) => doUpdate(p.id, { status: e.target.value as ParticipantStatus })}
-                      className="ml-1.5 rounded-(--radius-control) border border-slate-300 px-2 py-1 text-[13px] text-slate-700 focus:border-brand-400 focus:outline-none"
+                      className="ml-1.5 rounded-(--radius-control) border border-slate-300 px-2 py-1 text-[0.95rem] text-slate-700 focus:border-brand-400 focus:outline-none"
                     >
                       {PARTICIPANT_STATUSES.map((s) => (
                         <option key={s} value={s}>

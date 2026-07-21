@@ -45,7 +45,7 @@ function ScenarioTypeBadge({ type }: { type: ValidationScenarioType }) {
   const m = SCENARIO_TYPE_META[type]
   const Icon = m.icon
   return (
-    <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium ${TONE_BADGE_CLASS[m.tone]}`}>
+    <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[0.9rem] font-medium ${TONE_BADGE_CLASS[m.tone]}`}>
       <Icon aria-hidden="true" className="size-3.5" />
       {m.label}
     </span>
@@ -78,8 +78,8 @@ const EMPTY_FORM: ScenarioForm = {
   measurementMethod: '',
 }
 
-const labelClass = 'mb-1 block text-xs font-semibold text-slate-500'
-const inputClass = 'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[13px] focus:border-brand-400 focus:outline-none'
+const labelClass = 'mb-1 block text-[0.9rem] font-semibold text-slate-500'
+const inputClass = 'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.95rem] focus:border-brand-400 focus:outline-none'
 
 function ScenariosBody({ workspace: w }: { workspace: ValidationWorkspace }) {
   const { showToast } = useToast()
@@ -207,23 +207,23 @@ function ScenariosBody({ workspace: w }: { workspace: ValidationWorkspace }) {
               <p className="text-sm font-semibold break-keep text-slate-800">{s.title}</p>
               <ScenarioTypeBadge type={s.type} />
               {s.required ? (
-                <span className="rounded-md border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[11px] font-semibold text-brand-700">필수</span>
+                <span className="rounded-md border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[0.82rem] font-semibold text-brand-700">필수</span>
               ) : (
-                <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-500">선택</span>
+                <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.82rem] text-slate-500">선택</span>
               )}
-              <span className={`rounded-md border px-1.5 py-0.5 text-[11px] font-medium ${TONE_BADGE_CLASS[PRIORITY_META[s.priority].tone]}`}>
+              <span className={`rounded-md border px-1.5 py-0.5 text-[0.82rem] font-medium ${TONE_BADGE_CLASS[PRIORITY_META[s.priority].tone]}`}>
                 {PRIORITY_META[s.priority].label}
               </span>
-              <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-500">
+              <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.82rem] text-slate-500">
                 {STATUS_LABEL[s.status]}
               </span>
             </div>
-            {s.description && <p className="mt-1 text-[13px] break-keep text-slate-600">{s.description}</p>}
-            <p className="mt-1 text-xs break-keep text-slate-500">
+            {s.description && <p className="mt-1 text-[0.95rem] break-keep text-slate-600">{s.description}</p>}
+            <p className="mt-1 text-[0.9rem] break-keep text-slate-500">
               통과 기준: {s.passRule.trim() ? s.passRule : <span className="text-warning-700">미입력</span>}
             </p>
             {invalid && (
-              <p className="mt-1 flex items-center gap-1 text-xs font-medium text-warning-700">
+              <p className="mt-1 flex items-center gap-1 text-[0.9rem] font-medium text-warning-700">
                 <AlertTriangle aria-hidden="true" className="size-3.5" />
                 필수 시나리오에는 통과 기준(passRule)이 필요합니다.
               </p>
@@ -286,7 +286,7 @@ function ScenariosBody({ workspace: w }: { workspace: ValidationWorkspace }) {
 
       <Panel title={`선택 시나리오 (${optional.length})`}>
         {optional.length === 0 ? (
-          <p className="text-[13px] text-slate-500">선택 시나리오가 없습니다.</p>
+          <p className="text-[0.95rem] text-slate-500">선택 시나리오가 없습니다.</p>
         ) : (
           <ul className="flex flex-col gap-2">{optional.map(renderRow)}</ul>
         )}
@@ -335,7 +335,7 @@ function ScenariosBody({ workspace: w }: { workspace: ValidationWorkspace }) {
             <label htmlFor="sc-pass" className={labelClass}>통과 기준 (passRule)</label>
             <textarea id="sc-pass" rows={2} value={form.passRule} onChange={(e) => setForm({ ...form, passRule: e.target.value })} className={inputClass} placeholder="예: 도움 없이 3분 내 완료하고 오류 0건" />
           </div>
-          <label className="flex items-center gap-2 text-[13px] text-slate-700">
+          <label className="flex items-center gap-2 text-[0.95rem] text-slate-700">
             <input type="checkbox" checked={form.required} onChange={(e) => setForm({ ...form, required: e.target.checked })} className="size-4 rounded border-slate-300" />
             필수 시나리오
           </label>

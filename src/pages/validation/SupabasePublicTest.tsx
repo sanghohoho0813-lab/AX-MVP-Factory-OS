@@ -154,13 +154,13 @@ export function SupabasePublicTest() {
         <section className="rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
           <label className="mb-1 block text-sm font-medium text-slate-700">전반적인 의견</label>
           <textarea className={inputCls} rows={4} value={overall} onChange={(e) => setOverall(e.target.value)} placeholder="사용하면서 느낀 점을 자유롭게 적어 주세요." />
-          <label className="mt-4 flex items-start gap-2 text-[13px] break-keep text-slate-600">
+          <label className="mt-4 flex items-start gap-2 text-[0.95rem] break-keep text-slate-600">
             <input type="checkbox" checked={consented} onChange={(e) => setConsented(e.target.checked)} className="mt-0.5" />
             수집된 피드백이 서비스 개선 목적으로 사용되는 것에 동의합니다.
           </label>
         </section>
 
-        {error && <p className="rounded-(--radius-card) border border-danger-200 bg-danger-50 px-4 py-3 text-[13px] text-danger-700">{error}</p>}
+        {error && <p className="rounded-(--radius-card) border border-danger-200 bg-danger-50 px-4 py-3 text-[0.95rem] text-danger-700">{error}</p>}
 
         <Button variant="primary" disabled={submitting || !consented} onClick={() => void handleSubmit()} className="h-11">
           {submitting ? '제출 중…' : '피드백 제출'}

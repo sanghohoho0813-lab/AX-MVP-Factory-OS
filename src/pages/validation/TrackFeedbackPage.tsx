@@ -51,7 +51,7 @@ import { ReadOnlyNotice, TrackSectionFrame } from './validationShared'
 
 const inputCls =
   'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-brand-400 focus:outline-none'
-const labelCls = 'mb-1 block text-xs font-semibold text-slate-500'
+const labelCls = 'mb-1 block text-[0.9rem] font-semibold text-slate-500'
 
 const FEEDBACK_SOURCE_LABEL: Record<FeedbackSource, string> = {
   participant: '참여자',
@@ -134,7 +134,7 @@ function AddFeedbackModal({
       }
     >
       <div className="flex flex-col gap-3">
-        <p className="rounded-(--radius-control) border border-brand-100 bg-brand-50/60 px-3 py-2 text-[13px] break-keep text-slate-600">
+        <p className="rounded-(--radius-control) border border-brand-100 bg-brand-50/60 px-3 py-2 text-[0.95rem] break-keep text-slate-600">
           피드백은 참여자·관찰자의 <span className="font-semibold">의견·관찰</span>입니다. 재현 가능한 문제·증거는 이슈로 등록하세요.
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -252,7 +252,7 @@ function AddIssueModal({
       }
     >
       <div className="flex flex-col gap-3">
-        <p className="rounded-(--radius-control) border border-warning-200 bg-warning-50/60 px-3 py-2 text-[13px] break-keep text-slate-600">
+        <p className="rounded-(--radius-control) border border-warning-200 bg-warning-50/60 px-3 py-2 text-[0.95rem] break-keep text-slate-600">
           이슈는 <span className="font-semibold">재현 가능한 문제·증거</span>입니다. 재현 절차와 기대·실제 동작을 함께 기록하세요.
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -357,7 +357,7 @@ function AcceptRiskModal({
       }
     >
       <div className="flex flex-col gap-3">
-        <p className="text-[13px] break-keep text-slate-600">
+        <p className="text-[0.95rem] break-keep text-slate-600">
           위험 감수는 문제를 남겨두고 진행하겠다는 판단입니다. 사유와 승인자를 반드시 기록하세요.
         </p>
         <div>
@@ -429,9 +429,9 @@ function FeedbackCard({
         <FeedbackStatusBadge status={item.status} />
         <p className="text-sm font-semibold text-slate-800">{item.title}</p>
       </div>
-      {item.description && <p className="mt-1.5 text-[13px] break-keep whitespace-pre-wrap text-slate-600">{item.description}</p>}
-      {item.context && <p className="mt-1 text-xs break-keep text-slate-400">맥락: {item.context}</p>}
-      <p className="mt-1 text-xs text-slate-400">출처: {FEEDBACK_SOURCE_LABEL[item.source]}</p>
+      {item.description && <p className="mt-1.5 text-[0.95rem] break-keep whitespace-pre-wrap text-slate-600">{item.description}</p>}
+      {item.context && <p className="mt-1 text-[0.9rem] break-keep text-slate-400">맥락: {item.context}</p>}
+      <p className="mt-1 text-[0.9rem] text-slate-400">출처: {FEEDBACK_SOURCE_LABEL[item.source]}</p>
       {!readOnly && (
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
           <label className="sr-only" htmlFor={`fb-st-${item.id}`}>상태 변경</label>
@@ -439,7 +439,7 @@ function FeedbackCard({
             id={`fb-st-${item.id}`}
             value={item.status}
             onChange={(e) => changeStatus(e.target.value as FeedbackStatus)}
-            className="rounded-(--radius-control) border border-slate-300 px-2.5 py-1.5 text-[13px] text-slate-700 focus:border-brand-400 focus:outline-none"
+            className="rounded-(--radius-control) border border-slate-300 px-2.5 py-1.5 text-[0.95rem] text-slate-700 focus:border-brand-400 focus:outline-none"
           >
             {FEEDBACK_STATUSES.map((s) => (
               <option key={s} value={s}>{FEEDBACK_STATUS_META[s].label}</option>
@@ -507,23 +507,23 @@ function IssueCard({
         <IssueStatusBadge status={issue.status} />
         <p className="text-sm font-semibold text-slate-800">{issue.title}</p>
       </div>
-      {issue.description && <p className="mt-1.5 text-[13px] break-keep whitespace-pre-wrap text-slate-600">{issue.description}</p>}
-      <dl className="mt-2 grid grid-cols-1 gap-1.5 text-[13px] sm:grid-cols-2">
+      {issue.description && <p className="mt-1.5 text-[0.95rem] break-keep whitespace-pre-wrap text-slate-600">{issue.description}</p>}
+      <dl className="mt-2 grid grid-cols-1 gap-1.5 text-[0.95rem] sm:grid-cols-2">
         {issue.reproductionSteps && (
-          <div><dt className="text-xs font-semibold text-slate-500">재현 절차</dt><dd className="break-keep whitespace-pre-wrap text-slate-600">{issue.reproductionSteps}</dd></div>
+          <div><dt className="text-[0.9rem] font-semibold text-slate-500">재현 절차</dt><dd className="break-keep whitespace-pre-wrap text-slate-600">{issue.reproductionSteps}</dd></div>
         )}
         {issue.impact && (
-          <div><dt className="text-xs font-semibold text-slate-500">영향</dt><dd className="break-keep text-slate-600">{issue.impact}</dd></div>
+          <div><dt className="text-[0.9rem] font-semibold text-slate-500">영향</dt><dd className="break-keep text-slate-600">{issue.impact}</dd></div>
         )}
         {issue.expectedBehavior && (
-          <div><dt className="text-xs font-semibold text-slate-500">기대 동작</dt><dd className="break-keep text-slate-600">{issue.expectedBehavior}</dd></div>
+          <div><dt className="text-[0.9rem] font-semibold text-slate-500">기대 동작</dt><dd className="break-keep text-slate-600">{issue.expectedBehavior}</dd></div>
         )}
         {issue.actualBehavior && (
-          <div><dt className="text-xs font-semibold text-slate-500">실제 동작</dt><dd className="break-keep text-slate-600">{issue.actualBehavior}</dd></div>
+          <div><dt className="text-[0.9rem] font-semibold text-slate-500">실제 동작</dt><dd className="break-keep text-slate-600">{issue.actualBehavior}</dd></div>
         )}
       </dl>
       {issue.status === 'accepted_risk' && issue.acceptedRiskReason && (
-        <p className="mt-2 rounded-(--radius-control) border border-warning-200 bg-warning-50/60 px-3 py-2 text-xs break-keep text-warning-700">
+        <p className="mt-2 rounded-(--radius-control) border border-warning-200 bg-warning-50/60 px-3 py-2 text-[0.9rem] break-keep text-warning-700">
           위험 감수 사유: {issue.acceptedRiskReason} · 승인: {issue.acceptedRiskApprovedBy || '미지정'}
         </p>
       )}
@@ -534,7 +534,7 @@ function IssueCard({
             id={`is-st-${issue.id}`}
             value={issue.status}
             onChange={(e) => changeStatus(e.target.value as ValidationIssueStatus)}
-            className="rounded-(--radius-control) border border-slate-300 px-2.5 py-1.5 text-[13px] text-slate-700 focus:border-brand-400 focus:outline-none"
+            className="rounded-(--radius-control) border border-slate-300 px-2.5 py-1.5 text-[0.95rem] text-slate-700 focus:border-brand-400 focus:outline-none"
           >
             {ISSUE_STATUSES.map((s) => (
               <option key={s} value={s}>{ISSUE_STATUS_META[s].label}</option>
@@ -617,7 +617,7 @@ function FeedbackBody({ w }: { w: ValidationWorkspace }) {
           {openCriticals.length > 0 && (
             <div className="flex items-start gap-2.5 rounded-(--radius-card) border border-danger-200 bg-danger-50 px-4 py-3" role="alert">
               <ShieldAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-danger-600" />
-              <p className="text-[13px] font-medium break-keep text-danger-700">
+              <p className="text-[0.95rem] font-medium break-keep text-danger-700">
                 미해결 critical 이슈 {openCriticals.length}건 — 미해결 critical 이슈는 Gate 6 통과·검증 확정을 막습니다.
               </p>
             </div>

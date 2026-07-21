@@ -12,8 +12,8 @@ import { RoundStatusBadge } from '../../components/validation/badges'
 import { createRound } from '../../services/validationService'
 import { TrackSectionFrame, ReadOnlyNotice } from './validationShared'
 
-const labelClass = 'mb-1 block text-xs font-semibold text-slate-500'
-const inputClass = 'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[13px] focus:border-brand-400 focus:outline-none'
+const labelClass = 'mb-1 block text-[0.9rem] font-semibold text-slate-500'
+const inputClass = 'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.95rem] focus:border-brand-400 focus:outline-none'
 
 function RoundsBody({
   workspace: w,
@@ -84,7 +84,7 @@ function RoundsBody({
           </Button>
         ) : undefined}
       >
-        <p className="mb-3 text-[13px] break-keep text-slate-500">완료된 회차는 수정할 수 없습니다(원본 보존).</p>
+        <p className="mb-3 text-[0.95rem] break-keep text-slate-500">완료된 회차는 수정할 수 없습니다(원본 보존).</p>
         {rounds.length === 0 ? (
           <EmptyState icon={FlaskConical} title="회차가 없습니다" description="참여자가 시나리오를 수행할 첫 회차를 만드세요." />
         ) : (
@@ -100,12 +100,12 @@ function RoundsBody({
                     className="w-full rounded-(--radius-card) border border-slate-200 px-4 py-3 text-left transition-colors hover:border-brand-300 hover:bg-slate-50"
                   >
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs font-semibold text-slate-400">#{r.roundNumber}</span>
+                      <span className="text-[0.9rem] font-semibold text-slate-400">#{r.roundNumber}</span>
                       <p className="text-sm font-semibold break-keep text-slate-800">{r.name}</p>
                       <RoundStatusBadge status={r.status} />
                     </div>
-                    {r.objective && <p className="mt-1 text-[13px] break-keep text-slate-600">{r.objective}</p>}
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                    {r.objective && <p className="mt-1 text-[0.95rem] break-keep text-slate-600">{r.objective}</p>}
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[0.9rem] text-slate-500">
                       <span>참여자 {r.participantIds.length}명</span>
                       <span>시나리오 {scenarioCount}개</span>
                       <span>실행 기록 {runsRecorded}/{scenarioCount}</span>
@@ -147,11 +147,11 @@ function RoundsBody({
           <div>
             <p className={labelClass}>참여자</p>
             {w.participants.length === 0 ? (
-              <p className="text-[13px] text-slate-500">등록된 참여자가 없습니다. 제작·참여자 화면에서 먼저 추가하세요.</p>
+              <p className="text-[0.95rem] text-slate-500">등록된 참여자가 없습니다. 제작·참여자 화면에서 먼저 추가하세요.</p>
             ) : (
               <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 p-2">
                 {w.participants.map((p) => (
-                  <label key={p.id} className="flex items-center gap-2 text-[13px] text-slate-700">
+                  <label key={p.id} className="flex items-center gap-2 text-[0.95rem] text-slate-700">
                     <input type="checkbox" checked={participantIds.includes(p.id)} onChange={() => setParticipantIds((prev) => toggle(prev, p.id))} className="size-4 rounded border-slate-300" />
                     {p.name}
                   </label>
@@ -162,14 +162,14 @@ function RoundsBody({
           <div>
             <p className={labelClass}>시나리오 (필수 시나리오가 기본 선택됩니다)</p>
             {activeScenarios.length === 0 ? (
-              <p className="text-[13px] text-slate-500">사용 가능한 시나리오가 없습니다. 시나리오 화면에서 먼저 추가하세요.</p>
+              <p className="text-[0.95rem] text-slate-500">사용 가능한 시나리오가 없습니다. 시나리오 화면에서 먼저 추가하세요.</p>
             ) : (
               <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 p-2">
                 {activeScenarios.map((s) => (
-                  <label key={s.id} className="flex items-center gap-2 text-[13px] text-slate-700">
+                  <label key={s.id} className="flex items-center gap-2 text-[0.95rem] text-slate-700">
                     <input type="checkbox" checked={scenarioIds.includes(s.id)} onChange={() => setScenarioIds((prev) => toggle(prev, s.id))} className="size-4 rounded border-slate-300" />
                     <span className="break-keep">{s.title}</span>
-                    {s.required && <span className="rounded border border-brand-200 bg-brand-50 px-1 text-[11px] font-semibold text-brand-700">필수</span>}
+                    {s.required && <span className="rounded border border-brand-200 bg-brand-50 px-1 text-[0.82rem] font-semibold text-brand-700">필수</span>}
                   </label>
                 ))}
               </div>

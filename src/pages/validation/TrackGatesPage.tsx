@@ -29,7 +29,7 @@ import { ReadOnlyNotice, TrackSectionFrame } from './validationShared'
 
 const inputCls =
   'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-brand-400 focus:outline-none'
-const labelCls = 'mb-1 block text-xs font-semibold text-slate-500'
+const labelCls = 'mb-1 block text-[0.9rem] font-semibold text-slate-500'
 const GATE_STATUSES = Object.keys(GATE_STATUS_META) as ValidationGateStatus[]
 
 function toastError(showToast: (m: string) => void, error: unknown) {
@@ -95,7 +95,7 @@ function GateCard({
         {gateLocked && <Lock aria-hidden="true" className="size-4 text-slate-400" />}
         <span className="text-[15px] font-semibold text-slate-900">{meta.label}</span>
         <GateStatusBadge status={review.status} />
-        <span className="inline-flex items-center gap-1 text-xs text-slate-400">
+        <span className="inline-flex items-center gap-1 text-[0.9rem] text-slate-400">
           자동 초안 <GateStatusBadge status={review.autoDraftStatus} />
         </span>
         <ChevronDown aria-hidden="true" className={`ml-auto size-4 text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`} />
@@ -103,12 +103,12 @@ function GateCard({
 
       {expanded && (
         <div className="border-t border-slate-100 px-5 py-4">
-          <p className="text-[13px] break-keep text-slate-500">{meta.purpose}</p>
-          <p className="mt-1 text-xs break-keep text-slate-400">
+          <p className="text-[0.95rem] break-keep text-slate-500">{meta.purpose}</p>
+          <p className="mt-1 text-[0.9rem] break-keep text-slate-400">
             자동 초안은 규칙 기반 참고값입니다. 최종 상태는 담당자가 판정합니다.
           </p>
           {gateLocked && (
-            <p className="mt-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-xs break-keep text-slate-500">
+            <p className="mt-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.9rem] break-keep text-slate-500">
               이 Gate는 잠금 상태입니다. 이전 Gate를 먼저 진행하세요.
             </p>
           )}
@@ -118,11 +118,11 @@ function GateCard({
               {review.criteria.map((c) => (
                 <li key={c.id} className="rounded-(--radius-card) border border-slate-200 px-3 py-2.5">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-[13px] font-medium text-slate-800">{c.title}</p>
-                    {c.required && <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-500">필수</span>}
+                    <p className="text-[0.95rem] font-medium text-slate-800">{c.title}</p>
+                    {c.required && <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.82rem] text-slate-500">필수</span>}
                     <span className="ml-auto"><GateCriterionStatusBadge status={c.status} /></span>
                   </div>
-                  {c.description && <p className="mt-1 text-xs break-keep text-slate-500">{c.description}</p>}
+                  {c.description && <p className="mt-1 text-[0.9rem] break-keep text-slate-500">{c.description}</p>}
                   <div className="mt-2">
                     <label className="sr-only" htmlFor={`crit-${c.id}`}>기준 상태</label>
                     <select
@@ -130,7 +130,7 @@ function GateCard({
                       value={c.status}
                       disabled={!editable}
                       onChange={(e) => changeCriterion(c.id, e.target.value as GateCriterionStatus)}
-                      className="rounded-(--radius-control) border border-slate-300 px-2.5 py-1.5 text-[13px] text-slate-700 focus:border-brand-400 focus:outline-none disabled:opacity-50"
+                      className="rounded-(--radius-control) border border-slate-300 px-2.5 py-1.5 text-[0.95rem] text-slate-700 focus:border-brand-400 focus:outline-none disabled:opacity-50"
                     >
                       {GATE_CRITERION_STATUSES.map((s) => (
                         <option key={s} value={s}>{GATE_CRITERION_STATUS_META[s].label}</option>

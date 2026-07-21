@@ -27,7 +27,7 @@ import { ReadOnlyNotice, TrackSectionFrame } from './validationShared'
 
 const inputCls =
   'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-brand-400 focus:outline-none'
-const labelCls = 'mb-1 block text-xs font-semibold text-slate-500'
+const labelCls = 'mb-1 block text-[0.9rem] font-semibold text-slate-500'
 const DIRECTIONS: MetricDirection[] = ['increase', 'decrease', 'maintain', 'threshold']
 
 function toastError(showToast: (m: string) => void, error: unknown) {
@@ -113,7 +113,7 @@ function MetricModal({
       }
     >
       <div className="flex flex-col gap-3">
-        <p className="rounded-(--radius-control) border border-brand-100 bg-brand-50/60 px-3 py-2 text-[13px] break-keep text-slate-600">
+        <p className="rounded-(--radius-control) border border-brand-100 bg-brand-50/60 px-3 py-2 text-[0.95rem] break-keep text-slate-600">
           기준값·목표값은 근거가 있을 때만 입력하세요. 측정값은 별도로 '측정값 기록'에서 실측을 남깁니다.
         </p>
         <div>
@@ -294,14 +294,14 @@ function MetricCard({
       <div className="flex flex-wrap items-center gap-2">
         <p className="text-sm font-semibold text-slate-800">{metric.name}</p>
         <MetricDirectionBadge direction={metric.direction} />
-        {metric.required && <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] font-medium text-slate-500">필수</span>}
-        {metric.unit && <span className="text-xs text-slate-400">단위: {metric.unit}</span>}
+        {metric.required && <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.82rem] font-medium text-slate-500">필수</span>}
+        {metric.unit && <span className="text-[0.9rem] text-slate-400">단위: {metric.unit}</span>}
       </div>
-      <div className="mt-2 grid grid-cols-2 gap-2 text-[13px] sm:grid-cols-3">
-        <div><span className="text-xs text-slate-400">기준값</span><p className="font-medium text-slate-700">{metric.baselineValue || '미입력'}</p></div>
-        <div><span className="text-xs text-slate-400">목표값</span><p className="font-medium text-slate-700">{metric.targetValue || '미입력'}</p></div>
+      <div className="mt-2 grid grid-cols-2 gap-2 text-[0.95rem] sm:grid-cols-3">
+        <div><span className="text-[0.9rem] text-slate-400">기준값</span><p className="font-medium text-slate-700">{metric.baselineValue || '미입력'}</p></div>
+        <div><span className="text-[0.9rem] text-slate-400">목표값</span><p className="font-medium text-slate-700">{metric.targetValue || '미입력'}</p></div>
         <div>
-          <span className="text-xs text-slate-400">최근 측정값</span>
+          <span className="text-[0.9rem] text-slate-400">최근 측정값</span>
           {latest ? (
             <p className="font-semibold text-slate-800">{latest.value}{latest.unit ? ` ${latest.unit}` : ''}</p>
           ) : (
@@ -309,17 +309,17 @@ function MetricCard({
           )}
         </div>
       </div>
-      {metric.measurementMethod && <p className="mt-1.5 text-xs break-keep text-slate-400">측정 방법: {metric.measurementMethod}</p>}
+      {metric.measurementMethod && <p className="mt-1.5 text-[0.9rem] break-keep text-slate-400">측정 방법: {metric.measurementMethod}</p>}
 
       {history.length > 0 && (
         <div className="mt-2.5 border-t border-slate-100 pt-2.5">
-          <p className="mb-1 text-xs font-semibold text-slate-500">측정 이력</p>
+          <p className="mb-1 text-[0.9rem] font-semibold text-slate-500">측정 이력</p>
           <ul className="flex flex-col gap-1">
             {history.map((m) => (
-              <li key={m.id} className="flex flex-wrap items-baseline gap-x-2 text-[13px] text-slate-600">
+              <li key={m.id} className="flex flex-wrap items-baseline gap-x-2 text-[0.95rem] text-slate-600">
                 <span className="font-medium text-slate-800">{m.value}{m.unit ? ` ${m.unit}` : ''}</span>
-                <span className="text-xs text-slate-400">{new Date(m.measuredAt).toLocaleDateString('ko-KR')}{roundLabel(m.roundId)}</span>
-                {m.notes && <span className="text-xs break-keep text-slate-400">— {m.notes}</span>}
+                <span className="text-[0.9rem] text-slate-400">{new Date(m.measuredAt).toLocaleDateString('ko-KR')}{roundLabel(m.roundId)}</span>
+                {m.notes && <span className="text-[0.9rem] break-keep text-slate-400">— {m.notes}</span>}
               </li>
             ))}
           </ul>
@@ -402,7 +402,7 @@ function MetricsBody({ w }: { w: ValidationWorkspace }) {
         )}
       </Panel>
 
-      <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-[13px] break-keep text-slate-500">
+      <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-[0.95rem] break-keep text-slate-500">
         근거 없는 KPI 숫자를 만들지 마세요 — 측정값이 없으면 '측정 필요'로 둡니다.
       </p>
 

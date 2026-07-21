@@ -49,7 +49,7 @@ function SpecificationBody({ pkg, packageId }: { pkg: DeliverablePackage; packag
         next="개발 프롬프트 화면에서 이 명세를 바탕으로 한 프롬프트를 확인하세요."
       />
 
-      <div className="rounded-(--radius-card) border border-brand-100 bg-brand-50/40 px-4 py-3 text-[13px] break-keep text-slate-600">
+      <div className="rounded-(--radius-card) border border-brand-100 bg-brand-50/40 px-4 py-3 text-[0.9rem] break-keep text-slate-600">
         이 명세는 개발자 전달용 문서이며, 이 화면에서 실제 코딩은 하지 않습니다. 확정된 AX MVP 설계 스냅샷을 기준으로 생성됩니다.
       </div>
 

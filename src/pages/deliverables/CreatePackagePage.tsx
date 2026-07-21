@@ -76,7 +76,7 @@ export function CreatePackagePage() {
       <button
         type="button"
         onClick={() => navigate(`/deliverables/projects/${projectId}`)}
-        className="inline-flex w-fit items-center gap-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-800"
+        className="inline-flex w-fit items-center gap-1.5 text-[0.9rem] font-medium text-slate-500 hover:text-slate-800"
       >
         <ArrowLeft aria-hidden="true" className="size-3.5" />
         자료 패키지 목록
@@ -92,8 +92,8 @@ export function CreatePackagePage() {
 
       {!canCreate && (
         <div className="rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3">
-          <p className="text-[13px] font-semibold text-warning-800">지금은 자료를 만들 수 없습니다</p>
-          <ul className="mt-1.5 list-disc space-y-1 pl-5 text-[13px] break-keep text-warning-700">
+          <p className="text-[0.9rem] font-semibold text-warning-800">지금은 자료를 만들 수 없습니다</p>
+          <ul className="mt-1.5 list-disc space-y-1 pl-5 text-[0.9rem] break-keep text-warning-700">
             {eligibility.reasons.length > 0
               ? eligibility.reasons.map((reason, i) => <li key={i}>{reason}</li>)
               : <li>확정된 진단 결과 또는 확정된 설계가 필요합니다.</li>}
@@ -115,7 +115,7 @@ export function CreatePackagePage() {
             />
 
             <fieldset>
-              <legend className="mb-1.5 block text-[13px] font-medium text-slate-700">패키지 유형</legend>
+              <legend className="mb-1.5 block text-[0.9rem] font-medium text-slate-700">패키지 유형</legend>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {PACKAGE_TYPES.map((t) => {
                   const meta = PACKAGE_TYPE_META[t]
@@ -142,7 +142,7 @@ export function CreatePackagePage() {
                         <meta.icon aria-hidden="true" className="size-4 text-slate-500" />
                         {meta.label}
                       </span>
-                      <span className="pl-5 text-xs break-keep text-slate-500">{meta.description}</span>
+                      <span className="pl-5 text-[0.9rem] break-keep text-slate-500">{meta.description}</span>
                     </label>
                   )
                 })}
@@ -161,7 +161,7 @@ export function CreatePackagePage() {
             />
 
             <fieldset>
-              <legend className="mb-1.5 block text-[13px] font-medium text-slate-700">공개 범위 정리</legend>
+              <legend className="mb-1.5 block text-[0.9rem] font-medium text-slate-700">공개 범위 정리</legend>
               <div className="flex flex-col gap-2">
                 <label className="flex cursor-pointer items-start gap-2.5 rounded-(--radius-control) border border-slate-200 px-3.5 py-2.5">
                   <input
@@ -171,8 +171,8 @@ export function CreatePackagePage() {
                     className="mt-0.5 size-3.5 accent-brand-600"
                   />
                   <span>
-                    <span className="block text-[13px] font-medium text-slate-700">개인정보 제거</span>
-                    <span className="block text-xs break-keep text-slate-500">담당자 연락처 등 개인정보를 자료에서 가립니다.</span>
+                    <span className="block text-[0.9rem] font-medium text-slate-700">개인정보 제거</span>
+                    <span className="block text-[0.9rem] break-keep text-slate-500">담당자 연락처 등 개인정보를 자료에서 가립니다.</span>
                   </span>
                 </label>
                 <label className="flex cursor-pointer items-start gap-2.5 rounded-(--radius-control) border border-slate-200 px-3.5 py-2.5">
@@ -183,8 +183,8 @@ export function CreatePackagePage() {
                     className="mt-0.5 size-3.5 accent-brand-600"
                   />
                   <span>
-                    <span className="block text-[13px] font-medium text-slate-700">내부 메모 제거</span>
-                    <span className="block text-xs break-keep text-slate-500">내부 전용 메모·리스크 코멘트를 자료에서 가립니다.</span>
+                    <span className="block text-[0.9rem] font-medium text-slate-700">내부 메모 제거</span>
+                    <span className="block text-[0.9rem] break-keep text-slate-500">내부 전용 메모·리스크 코멘트를 자료에서 가립니다.</span>
                   </span>
                 </label>
               </div>
@@ -192,7 +192,7 @@ export function CreatePackagePage() {
 
             <div className="flex items-start gap-2 rounded-(--radius-card) border border-brand-100 bg-brand-50/60 px-4 py-3">
               <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-brand-500" />
-              <p className="text-[13px] break-keep text-slate-600">
+              <p className="text-[0.9rem] break-keep text-slate-600">
                 검증(실제 사용 테스트) 결과가 포함되지 않은 자료는 <span className="font-semibold">검증 전 설계안</span>으로 표시됩니다. 근거가 없는 수치는 자동으로 "산정 필요"로 남습니다.
               </p>
             </div>
@@ -200,7 +200,7 @@ export function CreatePackagePage() {
             {type === 'institution_preparation' && (
               <div className="flex items-start gap-2 rounded-(--radius-card) border border-success-200 bg-success-50/60 px-4 py-3">
                 <Landmark aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-success-600" />
-                <p className="text-[13px] font-medium break-keep text-success-800">{INSTITUTION_DISCLAIMER}</p>
+                <p className="text-[0.9rem] font-medium break-keep text-success-800">{INSTITUTION_DISCLAIMER}</p>
               </div>
             )}
           </div>
@@ -212,23 +212,23 @@ export function CreatePackagePage() {
               <div className="flex flex-col gap-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-(--radius-card) border border-slate-200 px-3.5 py-3">
-                    <p className="text-xs text-slate-500">예상 Section</p>
+                    <p className="text-[0.9rem] text-slate-500">예상 Section</p>
                     <p className="mt-0.5 text-lg font-bold text-slate-900">{preview.sectionCount}개</p>
                   </div>
                   <div className="rounded-(--radius-card) border border-slate-200 px-3.5 py-3">
-                    <p className="text-xs text-slate-500">개발 프롬프트</p>
+                    <p className="text-[0.9rem] text-slate-500">개발 프롬프트</p>
                     <p className="mt-0.5 text-lg font-bold text-slate-900">{preview.promptCount}종</p>
                   </div>
                 </div>
 
                 <div>
-                  <p className="mb-1.5 text-[13px] font-semibold text-slate-700">사용 가능한 출처</p>
+                  <p className="mb-1.5 text-[0.9rem] font-semibold text-slate-700">사용 가능한 출처</p>
                   {preview.availableSources.length === 0 ? (
-                    <p className="text-[13px] text-slate-400">사용 가능한 출처가 없습니다.</p>
+                    <p className="text-[0.9rem] text-slate-400">사용 가능한 출처가 없습니다.</p>
                   ) : (
                     <ul className="flex flex-col gap-1">
                       {preview.availableSources.map((source, i) => (
-                        <li key={i} className="flex items-start gap-1.5 text-[13px] break-keep text-slate-600">
+                        <li key={i} className="flex items-start gap-1.5 text-[0.9rem] break-keep text-slate-600">
                           <CheckCircle2 aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-success-500" />
                           {source}
                         </li>
@@ -239,10 +239,10 @@ export function CreatePackagePage() {
 
                 {preview.missingSources.length > 0 && (
                   <div>
-                    <p className="mb-1.5 text-[13px] font-semibold text-slate-700">아직 없는 출처</p>
+                    <p className="mb-1.5 text-[0.9rem] font-semibold text-slate-700">아직 없는 출처</p>
                     <ul className="flex flex-col gap-1">
                       {preview.missingSources.map((source, i) => (
-                        <li key={i} className="flex items-start gap-1.5 text-[13px] break-keep text-slate-400">
+                        <li key={i} className="flex items-start gap-1.5 text-[0.9rem] break-keep text-slate-400">
                           <MinusCircle aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-slate-300" />
                           {source}
                         </li>
@@ -253,8 +253,8 @@ export function CreatePackagePage() {
 
                 {preview.warnings.length > 0 && (
                   <div className="rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-3.5 py-3">
-                    <p className="text-[13px] font-semibold text-warning-800">확인이 필요한 항목</p>
-                    <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[13px] break-keep text-warning-700">
+                    <p className="text-[0.9rem] font-semibold text-warning-800">확인이 필요한 항목</p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[0.9rem] break-keep text-warning-700">
                       {preview.warnings.map((warning, i) => (
                         <li key={i}>{warning}</li>
                       ))}
@@ -262,10 +262,10 @@ export function CreatePackagePage() {
                   </div>
                 )}
 
-                <p className="text-xs break-keep text-slate-400">대상 독자: {AUDIENCE_META[audience].label}</p>
+                <p className="text-[0.9rem] break-keep text-slate-400">대상 독자: {AUDIENCE_META[audience].label}</p>
               </div>
             ) : (
-              <p className="text-[13px] break-keep text-slate-500">
+              <p className="text-[0.9rem] break-keep text-slate-500">
                 예상 결과를 계산할 출처가 없습니다. 진단 또는 설계를 먼저 확정하세요.
               </p>
             )}

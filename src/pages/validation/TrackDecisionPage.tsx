@@ -24,7 +24,7 @@ import { ReadOnlyNotice, TrackSectionFrame } from './validationShared'
 
 const inputCls =
   'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-brand-400 focus:outline-none'
-const labelCls = 'mb-1 block text-xs font-semibold text-slate-500'
+const labelCls = 'mb-1 block text-[0.9rem] font-semibold text-slate-500'
 
 function toastError(showToast: (m: string) => void, error: unknown) {
   showToast(error instanceof Error ? error.message : '처리에 실패했습니다.')
@@ -40,16 +40,16 @@ function FinalizedView({ w }: { w: ValidationWorkspace }) {
     <Panel title="확정된 최종 결정">
       <div className="flex flex-wrap items-center gap-2">
         {d.type ? <DecisionBadge type={d.type} /> : <span className="text-sm text-slate-500">결정 미기록</span>}
-        {d.decidedAt && <span className="text-xs text-slate-400">{new Date(d.decidedAt).toLocaleDateString('ko-KR')}</span>}
+        {d.decidedAt && <span className="text-[0.9rem] text-slate-400">{new Date(d.decidedAt).toLocaleDateString('ko-KR')}</span>}
       </div>
       {d.summary && <p className="mt-3 text-sm break-keep text-slate-700">{d.summary}</p>}
       {d.rationale && (
-        <div className="mt-3"><p className={labelCls}>근거</p><p className="text-[13px] break-keep whitespace-pre-wrap text-slate-600">{d.rationale}</p></div>
+        <div className="mt-3"><p className={labelCls}>근거</p><p className="text-[0.95rem] break-keep whitespace-pre-wrap text-slate-600">{d.rationale}</p></div>
       )}
       {d.requiredActions.length > 0 && (
         <div className="mt-3">
           <p className={labelCls}>필요 조치</p>
-          <ul className="list-disc pl-5 text-[13px] break-keep text-slate-600">
+          <ul className="list-disc pl-5 text-[0.95rem] break-keep text-slate-600">
             {d.requiredActions.map((a, i) => <li key={i}>{a}</li>)}
           </ul>
         </div>
@@ -99,7 +99,7 @@ function DecisionForm({ w }: { w: ValidationWorkspace }) {
 
   return (
     <Panel title="최종 결정">
-      <p className="mb-3 rounded-(--radius-control) border border-brand-100 bg-brand-50/60 px-3 py-2 text-[13px] break-keep text-slate-600">
+      <p className="mb-3 rounded-(--radius-control) border border-brand-100 bg-brand-50/60 px-3 py-2 text-[0.95rem] break-keep text-slate-600">
         범위 확대·운영 전환은 Gate 6 통과·미해결 critical 0·필수 통과율 80% 이상·KPI 측정 증거가 있어야 선택할 수 있습니다.
       </p>
       <div className="flex flex-col gap-3">
@@ -188,13 +188,13 @@ function DecisionBody({ w }: { w: ValidationWorkspace }) {
 
       <Panel title="현재 상태 요약">
         <p className="text-sm font-semibold text-slate-800">{summary.headline}</p>
-        <div className="mt-3 grid grid-cols-2 gap-3 text-[13px] sm:grid-cols-4">
-          <div><span className="text-xs text-slate-400">필수 통과율</span><p className="font-semibold text-slate-800">{summary.requiredMeasured ? `${summary.requiredPassRate}%` : '측정 필요'}</p></div>
-          <div><span className="text-xs text-slate-400">미실행 필수</span><p className="font-semibold text-slate-800">{summary.requiredNotRun}건</p></div>
-          <div><span className="text-xs text-slate-400">미해결 이슈</span><p className="font-semibold text-slate-800">{summary.openIssues}건</p></div>
-          <div><span className="text-xs text-slate-400">KPI 측정</span><p className="font-semibold text-slate-800">{summary.metricsMeasured}/{summary.metricsDefined}</p></div>
+        <div className="mt-3 grid grid-cols-2 gap-3 text-[0.95rem] sm:grid-cols-4">
+          <div><span className="text-[0.9rem] text-slate-400">필수 통과율</span><p className="font-semibold text-slate-800">{summary.requiredMeasured ? `${summary.requiredPassRate}%` : '측정 필요'}</p></div>
+          <div><span className="text-[0.9rem] text-slate-400">미실행 필수</span><p className="font-semibold text-slate-800">{summary.requiredNotRun}건</p></div>
+          <div><span className="text-[0.9rem] text-slate-400">미해결 이슈</span><p className="font-semibold text-slate-800">{summary.openIssues}건</p></div>
+          <div><span className="text-[0.9rem] text-slate-400">KPI 측정</span><p className="font-semibold text-slate-800">{summary.metricsMeasured}/{summary.metricsDefined}</p></div>
         </div>
-        <div className="mt-3 flex items-center gap-2 text-[13px]">
+        <div className="mt-3 flex items-center gap-2 text-[0.95rem]">
           {summary.finalizeReady ? (
             <><CheckCircle2 aria-hidden="true" className="size-4 text-success-600" /><span className="font-medium text-success-700">확정 준비 완료</span></>
           ) : (
@@ -202,12 +202,12 @@ function DecisionBody({ w }: { w: ValidationWorkspace }) {
           )}
         </div>
         {summary.hasOpenCritical && (
-          <p className="mt-2 rounded-(--radius-control) border border-danger-200 bg-danger-50 px-3 py-2 text-[13px] font-medium break-keep text-danger-700">
+          <p className="mt-2 rounded-(--radius-control) border border-danger-200 bg-danger-50 px-3 py-2 text-[0.95rem] font-medium break-keep text-danger-700">
             미해결 critical 이슈가 있어 검증을 확정할 수 없습니다.
           </p>
         )}
         {summary.blockingReasons.length > 0 && (
-          <ul className="mt-2 list-disc pl-5 text-[13px] break-keep text-slate-600">
+          <ul className="mt-2 list-disc pl-5 text-[0.95rem] break-keep text-slate-600">
             {summary.blockingReasons.map((r, i) => <li key={i}>{r}</li>)}
           </ul>
         )}
@@ -225,11 +225,11 @@ function DecisionBody({ w }: { w: ValidationWorkspace }) {
           <DecisionForm w={w} />
 
           <Panel title="검증 확정">
-            <p className="text-[13px] break-keep text-slate-600">
+            <p className="text-[0.95rem] break-keep text-slate-600">
               확정하면 이 검증은 읽기 전용으로 고정되고, 인계 스냅샷이 생성됩니다. 확정 전 아래 차단 요인이 모두 해소되어야 합니다.
             </p>
             {!finalizeCheck.ok && (
-              <ul className="mt-3 list-disc pl-5 text-[13px] break-keep text-danger-700">
+              <ul className="mt-3 list-disc pl-5 text-[0.95rem] break-keep text-danger-700">
                 {finalizeCheck.reasons.map((r, i) => <li key={i}>{r}</li>)}
               </ul>
             )}

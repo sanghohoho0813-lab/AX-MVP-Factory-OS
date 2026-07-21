@@ -25,8 +25,8 @@ import {
 } from '../../services/validationService'
 import { TrackSectionFrame, ReadOnlyNotice } from './validationShared'
 
-const labelClass = 'mb-1 block text-xs font-semibold text-slate-500'
-const inputClass = 'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[13px] focus:border-brand-400 focus:outline-none'
+const labelClass = 'mb-1 block text-[0.9rem] font-semibold text-slate-500'
+const inputClass = 'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.95rem] focus:border-brand-400 focus:outline-none'
 
 interface RunForm {
   participantId: string
@@ -207,15 +207,15 @@ function RoundDetailBody({
       >
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-slate-400">#{round.roundNumber}</span>
+            <span className="text-[0.9rem] font-semibold text-slate-400">#{round.roundNumber}</span>
             <RoundStatusBadge status={round.status} />
           </div>
-          {round.objective && <p className="text-[13px] break-keep text-slate-600">{round.objective}</p>}
-          <p className="text-xs text-slate-500">테스트 버전: {build ? `${build.name}${build.version ? ` (${build.version})` : ''}` : '미지정'}</p>
+          {round.objective && <p className="text-[0.95rem] break-keep text-slate-600">{round.objective}</p>}
+          <p className="text-[0.9rem] text-slate-500">테스트 버전: {build ? `${build.name}${build.version ? ` (${build.version})` : ''}` : '미지정'}</p>
         </div>
 
         {roundClosed && (
-          <p className="mt-3 flex items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] break-keep text-slate-600">
+          <p className="mt-3 flex items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2 text-[0.95rem] break-keep text-slate-600">
             <FileWarning aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
             완료된 회차의 결과는 보존되며 수정할 수 없습니다.
           </p>
@@ -225,18 +225,18 @@ function RoundDetailBody({
       <Panel title="결과 요약">
         <div className="flex flex-wrap gap-2">
           {resultCounts.map(({ result, count }) => (
-            <span key={result} className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[13px] font-medium ${TONE_BADGE_CLASS[RUN_RESULT_META[result].tone]}`}>
+            <span key={result} className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[0.95rem] font-medium ${TONE_BADGE_CLASS[RUN_RESULT_META[result].tone]}`}>
               {RUN_RESULT_META[result].label}
               <span className="font-bold">{count}</span>
             </span>
           ))}
         </div>
-        <p className="mt-2 text-xs text-slate-500">기록된 실행 {round.scenarioRuns.length}건 · 대상 시나리오 {scenarios.length}개</p>
+        <p className="mt-2 text-[0.9rem] text-slate-500">기록된 실행 {round.scenarioRuns.length}건 · 대상 시나리오 {scenarios.length}개</p>
       </Panel>
 
       <Panel title={`시나리오 (${scenarios.length})`}>
         {scenarios.length === 0 ? (
-          <p className="text-[13px] text-slate-500">이 회차에 배정된 시나리오가 없습니다.</p>
+          <p className="text-[0.95rem] text-slate-500">이 회차에 배정된 시나리오가 없습니다.</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {scenarios.map((s) => {
@@ -247,11 +247,11 @@ function RoundDetailBody({
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-sm font-semibold break-keep text-slate-800">{s.title}</p>
-                        {s.required && <span className="rounded border border-brand-200 bg-brand-50 px-1 text-[11px] font-semibold text-brand-700">필수</span>}
-                        {run ? <RunResultBadge result={run.result} /> : <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-500">미기록</span>}
+                        {s.required && <span className="rounded border border-brand-200 bg-brand-50 px-1 text-[0.82rem] font-semibold text-brand-700">필수</span>}
+                        {run ? <RunResultBadge result={run.result} /> : <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.9rem] text-slate-500">미기록</span>}
                       </div>
-                      <p className="mt-1 text-xs break-keep text-slate-500">통과 기준: {s.passRule.trim() ? s.passRule : '미입력'}</p>
-                      {run?.observedBehavior && <p className="mt-1 text-xs break-keep text-slate-500">관찰: {run.observedBehavior}</p>}
+                      <p className="mt-1 text-[0.9rem] break-keep text-slate-500">통과 기준: {s.passRule.trim() ? s.passRule : '미입력'}</p>
+                      {run?.observedBehavior && <p className="mt-1 text-[0.9rem] break-keep text-slate-500">관찰: {run.observedBehavior}</p>}
                     </div>
                     {canRecord && (
                       <Button variant="secondary" size="sm" onClick={() => openRun(s)}>결과 기록</Button>
@@ -342,7 +342,7 @@ function RoundDetailBody({
               <input id="run-errors" type="number" min={0} value={runForm.errorCount} onChange={(e) => setRunForm({ ...runForm, errorCount: e.target.value })} className={inputClass} />
             </div>
           </div>
-          <label className="flex items-center gap-2 text-[13px] text-slate-700">
+          <label className="flex items-center gap-2 text-[0.95rem] text-slate-700">
             <input type="checkbox" checked={runForm.assistanceNeeded} onChange={(e) => setRunForm({ ...runForm, assistanceNeeded: e.target.checked })} className="size-4 rounded border-slate-300" />
             도움이 필요했음
           </label>
@@ -370,7 +370,7 @@ function RoundNotFound() {
           <FileWarning className="size-5" />
         </span>
         <p className="mt-3 text-sm font-semibold break-keep text-slate-800">회차를 찾을 수 없습니다</p>
-        <p className="mt-1 text-[13px] break-keep text-slate-500">주소가 잘못되었거나 이미 삭제된 회차입니다. 회차 목록에서 다시 선택하세요.</p>
+        <p className="mt-1 text-[0.95rem] break-keep text-slate-500">주소가 잘못되었거나 이미 삭제된 회차입니다. 회차 목록에서 다시 선택하세요.</p>
       </div>
     </div>
   )

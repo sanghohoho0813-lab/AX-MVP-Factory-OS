@@ -153,7 +153,7 @@ function ReviewBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: st
       <ReadOnlyNotice pkg={pkg} />
 
       {/* 화면 내 이동 */}
-      <nav aria-label="검토 항목 이동" className="flex flex-wrap gap-2 text-[13px]">
+      <nav aria-label="검토 항목 이동" className="flex flex-wrap gap-2 text-[0.9rem]">
         {[
           { href: '#review-overview', label: 'A. 패키지 개요' },
           { href: '#review-sources', label: 'B. 출처 최신성' },
@@ -176,9 +176,9 @@ function ReviewBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: st
       {/* A. 패키지 개요 */}
       <div id="review-overview" className="flex flex-col gap-4 scroll-mt-4">
         <Panel title="A. 패키지 개요">
-          <p className="text-[13px] leading-relaxed break-keep text-slate-700">{summary.headline}</p>
+          <p className="text-[0.9rem] leading-relaxed break-keep text-slate-700">{summary.headline}</p>
           {!summary.includesValidation && (
-            <p className="mt-2 text-[13px] break-keep text-warning-700">
+            <p className="mt-2 text-[0.9rem] break-keep text-warning-700">
               검증 전 설계안입니다. 실제 사용 테스트로 검증되지 않았으므로 &ldquo;검증 완료&rdquo;로 표기하지 않습니다.
             </p>
           )}
@@ -202,7 +202,7 @@ function ReviewBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: st
           {stale && (
             <div className="mx-5 mt-5 flex items-start gap-2 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3">
               <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning-600" />
-              <p className="text-[13px] break-keep text-warning-800">
+              <p className="text-[0.9rem] break-keep text-warning-800">
                 출처 원본이 변경되었습니다. 확정된 자료는 그대로 보존되며, 최신 결과를 반영하려면 새 버전을 만드세요.
               </p>
             </div>
@@ -215,7 +215,7 @@ function ReviewBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: st
                 rowKey={(r) => r.id}
               />
             ) : (
-              <p className="text-[13px] break-keep text-slate-500">연결된 출처가 없습니다.</p>
+              <p className="text-[0.9rem] break-keep text-slate-500">연결된 출처가 없습니다.</p>
             )}
           </div>
         </Panel>
@@ -234,12 +234,12 @@ function ReviewBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: st
               { label: '근거 항목', value: `${summary.evidenceCount}개` },
             ].map((item) => (
               <div key={item.label} className="rounded-(--radius-card) border border-slate-200 px-4 py-3">
-                <dt className="text-xs text-slate-400">{item.label}</dt>
+                <dt className="text-[0.9rem] text-slate-400">{item.label}</dt>
                 <dd className="mt-1 text-lg font-bold text-slate-900">{item.value}</dd>
               </div>
             ))}
           </dl>
-          <div className="mt-4 flex flex-wrap gap-2 text-[13px]">
+          <div className="mt-4 flex flex-wrap gap-2 text-[0.9rem]">
             <span className="text-slate-500">세부 내용은 각 탭에서 확인하세요:</span>
             {[
               { to: 'contents', label: '포함 자료', icon: ListChecks },
@@ -272,7 +272,7 @@ function ReviewBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: st
         >
           <div className="flex flex-col gap-4">
             <div>
-              <label htmlFor="final-summary" className="mb-1.5 block text-[13px] font-semibold text-slate-700">
+              <label htmlFor="final-summary" className="mb-1.5 block text-[0.9rem] font-semibold text-slate-700">
                 최종 요약
               </label>
               <textarea
@@ -286,7 +286,7 @@ function ReviewBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: st
               />
             </div>
             <div>
-              <label htmlFor="review-notes" className="mb-1.5 block text-[13px] font-semibold text-slate-700">
+              <label htmlFor="review-notes" className="mb-1.5 block text-[0.9rem] font-semibold text-slate-700">
                 검토 메모
               </label>
               <textarea
@@ -302,33 +302,33 @@ function ReviewBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: st
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <p className="mb-1.5 text-[13px] font-semibold text-slate-700">가정</p>
+                <p className="mb-1.5 text-[0.9rem] font-semibold text-slate-700">가정</p>
                 {pkg.assumptions.length > 0 ? (
                   <ul className="flex flex-col gap-1">
                     {pkg.assumptions.map((a, i) => (
-                      <li key={i} className="flex items-start gap-2 text-[13px] break-keep text-slate-600">
+                      <li key={i} className="flex items-start gap-2 text-[0.9rem] break-keep text-slate-600">
                         <span aria-hidden="true" className="mt-1.5 size-1.5 shrink-0 rounded-full bg-slate-300" />
                         <span className="min-w-0">{a}</span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-[13px] text-slate-400">등록된 가정이 없습니다.</p>
+                  <p className="text-[0.9rem] text-slate-400">등록된 가정이 없습니다.</p>
                 )}
               </div>
               <div>
-                <p className="mb-1.5 text-[13px] font-semibold text-slate-700">미확인 질문</p>
+                <p className="mb-1.5 text-[0.9rem] font-semibold text-slate-700">미확인 질문</p>
                 {pkg.openQuestions.length > 0 ? (
                   <ul className="flex flex-col gap-1">
                     {pkg.openQuestions.map((q, i) => (
-                      <li key={i} className="flex items-start gap-2 text-[13px] break-keep text-slate-600">
+                      <li key={i} className="flex items-start gap-2 text-[0.9rem] break-keep text-slate-600">
                         <span aria-hidden="true" className="mt-1.5 size-1.5 shrink-0 rounded-full bg-warning-400" />
                         <span className="min-w-0">{q}</span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-[13px] text-slate-400">미확인 질문이 없습니다.</p>
+                  <p className="text-[0.9rem] text-slate-400">미확인 질문이 없습니다.</p>
                 )}
               </div>
             </div>
@@ -352,8 +352,8 @@ function ReviewBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: st
                     className="flex flex-col gap-2 rounded-(--radius-card) border border-slate-200 px-4 py-3"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <p className="min-w-0 text-[13px] break-keep text-slate-700">{rule.description}</p>
-                      <label className="inline-flex shrink-0 cursor-pointer items-center gap-2 text-[13px] text-slate-600">
+                      <p className="min-w-0 text-[0.9rem] break-keep text-slate-700">{rule.description}</p>
+                      <label className="inline-flex shrink-0 cursor-pointer items-center gap-2 text-[0.9rem] text-slate-600">
                         <input
                           type="checkbox"
                           checked={rule.enabled}
@@ -365,7 +365,7 @@ function ReviewBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: st
                       </label>
                     </div>
                     {personalWarn && (
-                      <p className="flex items-start gap-1.5 text-[13px] break-keep text-danger-600">
+                      <p className="flex items-start gap-1.5 text-[0.9rem] break-keep text-danger-600">
                         <AlertTriangle aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
                         고객·기관용 자료에서 개인정보 가림을 해제하면 연락처·이메일이 그대로 노출됩니다.
                       </p>
@@ -375,7 +375,7 @@ function ReviewBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: st
               })}
             </ul>
           ) : (
-            <p className="text-[13px] break-keep text-slate-500">등록된 가림 규칙이 없습니다.</p>
+            <p className="text-[0.9rem] break-keep text-slate-500">등록된 가림 규칙이 없습니다.</p>
           )}
         </Panel>
       </div>
@@ -383,7 +383,7 @@ function ReviewBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: st
       {/* F. 품질검사 */}
       <div id="review-quality" className="scroll-mt-4">
         <Panel title="F. 품질검사">
-          <p aria-live="polite" className="text-[13px] break-keep">
+          <p aria-live="polite" className="text-[0.9rem] break-keep">
             {finalizeCheck.ok ? (
               <span className="inline-flex items-center gap-1.5 font-medium text-success-700">
                 <CheckCircle2 aria-hidden="true" className="size-4" />
@@ -401,7 +401,7 @@ function ReviewBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: st
             <div className="mt-4 flex flex-col gap-4">
               {grouped.map((group) => (
                 <div key={group.severity}>
-                  <p className="mb-2 text-[13px] font-semibold text-slate-600">
+                  <p className="mb-2 text-[0.9rem] font-semibold text-slate-600">
                     {SEVERITY_LABEL[group.severity]} ({group.checks.length})
                   </p>
                   <ul className="flex flex-col gap-2">
@@ -412,8 +412,8 @@ function ReviewBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: st
                       >
                         <DeliverableQualityBadge severity={check.severity} />
                         <div className="min-w-0 flex-1">
-                          <p className="text-[13px] font-medium break-keep text-slate-700">{check.title}</p>
-                          <p className="text-[13px] break-keep text-slate-500">{check.description}</p>
+                          <p className="text-[0.9rem] font-medium break-keep text-slate-700">{check.title}</p>
+                          <p className="text-[0.9rem] break-keep text-slate-500">{check.description}</p>
                         </div>
                         {check.passed ? (
                           <CheckCircle2 aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-success-500" />
@@ -427,7 +427,7 @@ function ReviewBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: st
               ))}
             </div>
           ) : (
-            <p className="mt-3 text-[13px] break-keep text-slate-500">기록된 품질검사 항목이 없습니다.</p>
+            <p className="mt-3 text-[0.9rem] break-keep text-slate-500">기록된 품질검사 항목이 없습니다.</p>
           )}
         </Panel>
       </div>
@@ -437,14 +437,14 @@ function ReviewBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: st
         <Panel title="G. 상태·확정">
           {pkg.status === 'finalized' ? (
             <div className="flex flex-col gap-2 rounded-(--radius-card) border border-success-200 bg-success-50/60 px-4 py-3">
-              <p className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-success-800">
+              <p className="inline-flex items-center gap-1.5 text-[0.9rem] font-semibold text-success-800">
                 <CheckCircle2 aria-hidden="true" className="size-4" />
                 자료가 확정되었습니다.
               </p>
-              <p className="text-[13px] break-keep text-success-800">
+              <p className="text-[0.9rem] break-keep text-success-800">
                 확정일 {formatDateTime(pkg.finalizedAt)} · 확정 스냅샷이 생성되어 원본 보존됩니다.
               </p>
-              {pkg.finalizedBy && <p className="text-[13px] text-success-700">확정자 {pkg.finalizedBy}</p>}
+              {pkg.finalizedBy && <p className="text-[0.9rem] text-success-700">확정자 {pkg.finalizedBy}</p>}
             </div>
           ) : (
             <>
@@ -465,10 +465,10 @@ function ReviewBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: st
               </div>
               {finalizeDisabled && !readOnly && finalizeCheck.reasons.length > 0 && (
                 <div className="mt-3 rounded-(--radius-card) border border-danger-200 bg-danger-50/60 px-4 py-3">
-                  <p className="text-[13px] font-semibold text-danger-700">확정 전 해결이 필요합니다.</p>
+                  <p className="text-[0.9rem] font-semibold text-danger-700">확정 전 해결이 필요합니다.</p>
                   <ul className="mt-1.5 flex flex-col gap-1">
                     {finalizeCheck.reasons.map((reason, i) => (
-                      <li key={i} className="flex items-start gap-2 text-[13px] break-keep text-danger-700">
+                      <li key={i} className="flex items-start gap-2 text-[0.9rem] break-keep text-danger-700">
                         <span aria-hidden="true" className="mt-1.5 size-1.5 shrink-0 rounded-full bg-danger-400" />
                         <span className="min-w-0">{reason}</span>
                       </li>
