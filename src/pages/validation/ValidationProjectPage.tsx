@@ -34,16 +34,16 @@ export function ValidationProjectPage() {
       <ValidationModuleHeader saveStatus="local" />
 
       <section
-        aria-label="Stage-Gate 안내"
+        aria-label="테스트 진행 방식 안내"
         className="rounded-(--radius-panel) border border-brand-100 bg-brand-50/60 p-5"
       >
         <p className="text-[0.82rem] font-semibold tracking-wide text-brand-700 uppercase">진행 방식</p>
         <p className="mt-1.5 text-[1.05rem] font-semibold break-keep text-slate-900">
-          트랙별로 실제 사용 테스트를 진행하고 Stage-Gate로 판정합니다.
+          트랙별로 실제 사용 테스트를 진행하고 단계별 검토로 다음 진행을 판정합니다.
         </p>
         <p className="mt-1 text-[0.95rem] break-keep text-slate-600">
-          ① 계획 → ② 제작·참여자 → ③ 시나리오 → ④ 회차 실행 → ⑤ 피드백·이슈 → ⑥ KPI → ⑦ Gate 판정 → ⑧ 다음 결정.
-          근거(관찰·측정) 없이 통과로 단정하지 않으며, critical 이슈가 있으면 확정할 수 없습니다.
+          ① 계획 → ② 제작·참여자 → ③ 시나리오 → ④ 회차 실행 → ⑤ 피드백·이슈 → ⑥ 성과 측정 → ⑦ 단계 판정 → ⑧ 다음 결정.
+          관찰·측정 근거 없이 통과로 단정하지 않으며, 테스트를 막는 중대한 문제가 있으면 확정할 수 없습니다.
         </p>
       </section>
 
@@ -124,7 +124,7 @@ function TrackCard({
           {summary?.hasOpenCritical && (
             <p className="flex items-center gap-1.5 text-[0.9rem] font-medium text-danger-600">
               <AlertTriangle aria-hidden="true" className="size-3.5" />
-              미해결 critical 이슈 — 확정 불가
+              테스트를 막는 중대한 문제가 남아 있어 확정할 수 없습니다
             </p>
           )}
 

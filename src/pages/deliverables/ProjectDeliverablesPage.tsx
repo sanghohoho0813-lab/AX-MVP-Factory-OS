@@ -205,16 +205,16 @@ export function ProjectDeliverablesPage() {
 
         {/* 포함하는 프로젝트 결과 */}
         <Panel title="자료에 담을 수 있는 프로젝트 결과">
-          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <ul className="flex flex-col gap-2">
             {rows.map((row) => (
               <li key={row.key} className="flex items-center gap-2.5 rounded-(--radius-card) border border-slate-200 px-3.5 py-2.5">
                 {row.ready ? (
-                  <CheckCircle2 aria-hidden="true" className="size-4 shrink-0 text-success-500" />
+                  <CheckCircle2 aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-success-500" />
                 ) : (
-                  <CircleDashed aria-hidden="true" className="size-4 shrink-0 text-slate-300" />
+                  <CircleDashed aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-300" />
                 )}
-                <span className="min-w-0 flex-1 truncate text-[0.9rem] font-medium text-slate-700">{row.label}</span>
-                <span className={`shrink-0 text-[0.85rem] font-medium ${row.ready ? 'text-success-600' : 'text-slate-400'}`}>
+                <span className="min-w-0 flex-1 break-keep text-[0.9rem] font-medium text-slate-700">{row.label}</span>
+                <span className={`shrink-0 text-[0.85rem] font-medium whitespace-nowrap ${row.ready ? 'text-success-600' : 'text-slate-400'}`}>
                   {row.ready ? '사용 가능' : '아직 없음'}
                 </span>
               </li>
@@ -265,12 +265,12 @@ export function ProjectDeliverablesPage() {
                       onClick={() => navigate(`/deliverables/projects/${projectId}/packages/${pkg.id}`)}
                       className="flex h-full w-full flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4 text-left hover:border-slate-300"
                     >
-                      <div className="flex items-start justify-between gap-2">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="truncate text-[1.05rem] font-semibold text-slate-900">{pkg.name}</p>
+                          <p className="text-[1.05rem] font-semibold break-keep text-slate-900">{pkg.name}</p>
                           <p className="mt-0.5 text-[0.82rem] text-slate-400">확정 당시 내용 v{pkg.version}</p>
                         </div>
-                        <PackageStatusBadge status={pkg.status} />
+                        <span className="shrink-0"><PackageStatusBadge status={pkg.status} /></span>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <PackageTypeBadge type={pkg.type} />

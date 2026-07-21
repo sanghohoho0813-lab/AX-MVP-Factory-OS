@@ -171,7 +171,7 @@ export function ValidationMainPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="실제 사용 테스트"
-        description="확정된 AX MVP·홈페이지 설계를 실제 사용 환경에서 테스트하고 Stage-Gate로 판정합니다."
+        description="확정된 AX MVP·홈페이지 설계를 실제 사용 환경에서 테스트하고 단계별 검토로 판정합니다."
         actions={
           <Button variant="primary" onClick={() => navigate('/validation/results')}>
             결과 보기

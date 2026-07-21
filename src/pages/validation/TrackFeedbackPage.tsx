@@ -566,7 +566,7 @@ function FeedbackBody({ w }: { w: ValidationWorkspace }) {
         summary="피드백은 참여자·관찰자의 의견·관찰이고, 이슈는 재현 가능한 문제·증거입니다. 두 가지를 구분해서 관리하세요."
         what="의견은 피드백으로, 재현되는 문제는 이슈로 등록합니다. 피드백은 '이슈로 전환'해 추적 대상으로 승격할 수 있습니다."
         when="테스트 회차 중·후에 나온 반응을 정리할 때 사용합니다."
-        next="미해결 critical 이슈가 없어야 Gate 6 통과·검증 확정이 가능합니다."
+        next="테스트를 막는 중대한 문제가 없어야 결과 검토 통과·검증 확정이 가능합니다."
       />
 
       <div className="flex gap-1 border-b border-slate-200" role="tablist" aria-label="피드백·이슈 탭">

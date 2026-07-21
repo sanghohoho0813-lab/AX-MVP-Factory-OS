@@ -18,8 +18,9 @@ import {
 } from '../../repositories'
 import { ensureWorkspace } from '../validationService'
 import { createPackage } from '../deliverableService'
-import { createStrategy } from '../fundingService'
-import { createCaseFromStrategy } from '../caseStudyService'
+import { createStrategy, recordOutcome } from '../fundingService'
+import { createCaseFromStrategy, updateCase } from '../caseStudyService'
+import { ensureWebsiteDraft, generatePrompt } from '../websiteDesignService'
 import { buildSnapshot, type ResolvedSection } from '../surveyComposition'
 import {
   createOrResumeSurveyResponse,
@@ -271,8 +272,11 @@ function ensureFinalizedDesign(): void {
 /* 공개 API                                                            */
 /* ------------------------------------------------------------------ */
 
+/** 홈페이지 설계 시연용 홈페이지 유형 샘플 프로젝트 */
+const DEMO_WEBSITE_PROJECT_ID = 'proj-102'
+
 /**
- * 확정된 설계 이후 후속 작업공간(실제 사용 테스트·제출자료·기관연계·사례)의
+ * 확정된 설계 이후 후속 작업공간(실제 사용 테스트·제출자료·기관연계·사례·홈페이지)의
  * 초안을 실제 서비스로 만든다. 선행 근거가 부족한 단계는 조용히 건너뛴다.
  * 각 단계는 존재 여부를 확인해 중복 생성하지 않는다(idempotent).
  */
@@ -291,22 +295,54 @@ function ensureModuleDrafts(): void {
   } catch {
     /* 출처 부족 시 건너뜀 */
   }
-  // 기관·자금 연계 초안
+  // 기관·자금 연계 초안 + 샘플 결과(보류) 기록 → 내부 학습 사례 초안
   try {
     if (!fundingStrategyRepository.getLatestByProjectId(DEMO_PROJECT_ID)) {
       createStrategy(DEMO_PROJECT_ID)
     }
-  } catch {
-    /* 연계 근거 부족 시 건너뜀 */
-  }
-  // 사례 초안 (연계 전략 기반)
-  try {
     const strategy = fundingStrategyRepository.getLatestByProjectId(DEMO_PROJECT_ID)
-    if (strategy && caseStudyRepository.getByProjectId(DEMO_PROJECT_ID).length === 0) {
-      createCaseFromStrategy(strategy.id)
+    if (strategy) {
+      // 실제 기관 결과가 없으므로, 사례를 만들 수 있도록 샘플 '보류' 결과를
+      // 기록한다. 금액은 비워 두고, 문구에 샘플임을 명시한다.
+      if (strategy.outcomes.length === 0) {
+        recordOutcome(strategy.id, {
+          applicationId: strategy.applications[0]?.id ?? '',
+          type: 'on_hold',
+          summary:
+            '[샘플 데이터] 추가 자료 보강 요청으로 심사가 보류되었습니다. 실제 기관·실제 결과가 아닙니다.',
+          rejectionReasons: ['재무 자료 보강 필요', '사업 계획 구체화 필요'],
+          lessonsLearned:
+            '초기 근거 자료를 더 촘촘히 준비하면 심사 진행이 원활해집니다.',
+          followUpActions: ['재무 자료 재정리', '기관 담당자 재확인'],
+        })
+      }
+      const refreshed = fundingStrategyRepository.getLatestByProjectId(DEMO_PROJECT_ID)
+      if (
+        refreshed &&
+        refreshed.outcomes.length > 0 &&
+        caseStudyRepository.getByProjectId(DEMO_PROJECT_ID).length === 0
+      ) {
+        // 내부 전용·동의 미요청(공개 차단 상태)으로 생성된다.
+        const created = createCaseFromStrategy(refreshed.id)
+        // 샘플임을 제목에 명시하고, 보류(내부 학습) 결과 요약을 채운다.
+        updateCase(created.id, {
+          title: `[샘플] ${created.title}`,
+          outcomeSummary:
+            '[샘플 데이터] 추가 자료 보강 요청으로 심사가 보류되었습니다. 실제 기관·실제 결과가 아니며, 내부 학습용으로 정리한 사례입니다.',
+        })
+      }
     }
   } catch {
-    /* 사례 생성 불가 시 건너뜀 */
+    /* 연계 근거·결과 부족 시 건너뜀 */
+  }
+  // 홈페이지 설계 초안 + 개발 지시문(복사·다운로드 확인용) 생성
+  try {
+    const website = ensureWebsiteDraft(DEMO_WEBSITE_PROJECT_ID)
+    if (!website.generatedPrompts.some((p) => p.type === 'claude_code')) {
+      generatePrompt(website.id, 'claude_code')
+    }
+  } catch {
+    /* 홈페이지 대상 프로젝트가 없으면 건너뜀 */
   }
 }
 
