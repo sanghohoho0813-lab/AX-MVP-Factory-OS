@@ -3,6 +3,9 @@ import type { SurveyAnswer, SurveyDistribution } from '../../types/surveyRuntime
 import {
   assessmentRepository,
   automationCandidateRepository,
+  caseStudyRepository,
+  deliverablePackageRepository,
+  fundingStrategyRepository,
   guidedDemoRepository,
   mvpDesignRepository,
   organizationRepository,
@@ -13,6 +16,10 @@ import {
   surveyDistributionRepository,
   surveyResponseRepository,
 } from '../../repositories'
+import { ensureWorkspace } from '../validationService'
+import { createPackage } from '../deliverableService'
+import { createStrategy } from '../fundingService'
+import { createCaseFromStrategy } from '../caseStudyService'
 import { buildSnapshot, type ResolvedSection } from '../surveyComposition'
 import {
   createOrResumeSurveyResponse,
@@ -264,6 +271,45 @@ function ensureFinalizedDesign(): void {
 /* 공개 API                                                            */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 확정된 설계 이후 후속 작업공간(실제 사용 테스트·제출자료·기관연계·사례)의
+ * 초안을 실제 서비스로 만든다. 선행 근거가 부족한 단계는 조용히 건너뛴다.
+ * 각 단계는 존재 여부를 확인해 중복 생성하지 않는다(idempotent).
+ */
+function ensureModuleDrafts(): void {
+  // 실제 사용 테스트 초안 (ensureWorkspace는 미확정 워크스페이스가 있으면 그대로 반환)
+  try {
+    ensureWorkspace(DEMO_PROJECT_ID, 'ax_mvp')
+  } catch {
+    /* 선행 조건 부족 시 건너뜀 */
+  }
+  // 제출자료 초안 (고객 설명자료)
+  try {
+    if (deliverablePackageRepository.getByProjectId(DEMO_PROJECT_ID).length === 0) {
+      createPackage(DEMO_PROJECT_ID, 'client_proposal', '')
+    }
+  } catch {
+    /* 출처 부족 시 건너뜀 */
+  }
+  // 기관·자금 연계 초안
+  try {
+    if (!fundingStrategyRepository.getLatestByProjectId(DEMO_PROJECT_ID)) {
+      createStrategy(DEMO_PROJECT_ID)
+    }
+  } catch {
+    /* 연계 근거 부족 시 건너뜀 */
+  }
+  // 사례 초안 (연계 전략 기반)
+  try {
+    const strategy = fundingStrategyRepository.getLatestByProjectId(DEMO_PROJECT_ID)
+    if (strategy && caseStudyRepository.getByProjectId(DEMO_PROJECT_ID).length === 0) {
+      createCaseFromStrategy(strategy.id)
+    }
+  } catch {
+    /* 사례 생성 불가 시 건너뜀 */
+  }
+}
+
 /** 시연 데이터를 준비한다. 여러 번 실행해도 중복이 쌓이지 않는다(idempotent). */
 export function prepareGuidedDemo(): GuidedDemoStatus {
   const org = organizationRepository.getById(DEMO_ORG_ID)
@@ -275,6 +321,7 @@ export function prepareGuidedDemo(): GuidedDemoStatus {
   ensureFinalizedAnalysis()
   ensureFinalizedSelection()
   ensureFinalizedDesign()
+  ensureModuleDrafts()
   return getGuidedDemoStatus()
 }
 
