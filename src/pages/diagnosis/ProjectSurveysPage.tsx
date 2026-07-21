@@ -142,8 +142,8 @@ export function ProjectSurveysPage() {
                 ? '필요한 역할의 응답이 모두 제출되었습니다. 이제 진단 결과를 만들 수 있습니다.'
                 : `${pendingRoles.map((r) => r.roleLabel).join(', ')}의 응답이 제출되면 서로 다른 관점을 비교해 진단 결과를 만들 수 있습니다.`}
             </p>
-            <Button variant="primary" className="mt-4 h-auto w-full py-2.5 whitespace-normal sm:w-auto" disabled={!canBuildResult} onClick={() => navigate(`/diagnosis/projects/${projectId}/analysis`)}>
-              제출된 응답으로 진단 결과 만들기
+            <Button variant="primary" className="mt-4 h-auto w-full py-2.5 sm:w-auto" disabled={!canBuildResult} onClick={() => navigate(`/diagnosis/projects/${projectId}/analysis`)}>
+              <span className="whitespace-normal">제출된 응답으로 진단 결과 만들기</span>
             </Button>
             {!canBuildResult && <p className="mt-2 text-[0.9rem] text-slate-500">아직 제출된 응답이 없습니다. 아래에서 역할별 링크를 만들어 응답을 받으세요.</p>}
           </section>

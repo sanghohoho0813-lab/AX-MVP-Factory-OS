@@ -608,8 +608,8 @@ export function ProjectSurveySetupPage() {
           </p>
 
           <div className="mt-4 flex flex-wrap gap-2.5">
-            <Button variant="primary" className="h-auto py-2.5 whitespace-normal" onClick={() => handleSave(true)} disabled={saving || quality.verdict === 'error'} title={quality.verdict === 'error' ? '확인이 필요한 항목을 먼저 해결하세요.' : undefined}>
-              <Check aria-hidden="true" className="size-4" />{roleLabel} 설문 준비 완료
+            <Button variant="primary" className="h-auto py-2.5" onClick={() => handleSave(true)} disabled={saving || quality.verdict === 'error'} title={quality.verdict === 'error' ? '확인이 필요한 항목을 먼저 해결하세요.' : undefined}>
+              <Check aria-hidden="true" className="size-4 shrink-0" /><span className="whitespace-normal">{roleLabel} 설문 준비 완료</span>
             </Button>
             <Button variant="secondary" onClick={() => handleSave(false)} disabled={saving}>
               <Save aria-hidden="true" className="size-4" />초안으로 저장

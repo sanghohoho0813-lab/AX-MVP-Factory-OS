@@ -195,8 +195,8 @@ export function SelectionDecisionPage() {
           <p className="mt-1.5 max-w-3xl text-[1.02rem] leading-relaxed break-keep text-slate-600">
             {summary.trim() || decision.autoSummary}
           </p>
-          <Button variant="primary" className="mt-5 h-auto w-full py-2.5 text-[1.05rem] whitespace-normal sm:w-auto" onClick={() => navigate(`/mvp-design/projects/${projectId}`)}>
-            기능·화면 설계 시작하기<ArrowRight aria-hidden="true" className="size-5 shrink-0" />
+          <Button variant="primary" className="mt-5 h-auto w-full py-2.5 text-[1.05rem] sm:w-auto" onClick={() => navigate(`/mvp-design/projects/${projectId}`)}>
+            <span className="whitespace-normal">기능·화면 설계 시작하기</span><ArrowRight aria-hidden="true" className="size-5 shrink-0" />
           </Button>
         </section>
       )}
