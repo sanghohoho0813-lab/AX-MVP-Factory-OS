@@ -114,7 +114,7 @@ function ReviewBody({ design, projectType }: { design: MvpDesign; projectType: P
       </div>
 
       <Panel title="MVP 수준 결정">
-        <p className="mb-3 text-[13px] break-keep text-slate-500">
+        <p className="mb-3 text-[0.92rem] break-keep text-slate-500">
           권장 수준: <span className="font-medium text-slate-700">{mvpLevelLabel(design.levelDecision.recommendedLevel, projectType)}</span>. 권장과 다른 수준을 선택하면 사유가 필요합니다.
         </p>
         <div className="flex flex-wrap gap-2">
@@ -124,7 +124,7 @@ function ReviewBody({ design, projectType }: { design: MvpDesign; projectType: P
               type="button"
               disabled={!editable}
               onClick={() => saveLevel(lv)}
-              className={`rounded-(--radius-control) border px-3 py-1.5 text-[13px] font-medium transition-colors disabled:opacity-50 ${
+              className={`rounded-(--radius-control) border px-3 py-1.5 text-[0.92rem] font-medium transition-colors disabled:opacity-50 ${
                 lv === level ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
               }`}
             >
@@ -139,7 +139,7 @@ function ReviewBody({ design, projectType }: { design: MvpDesign; projectType: P
               value={overrideReason}
               onChange={(e) => setOverrideReason(e.target.value)}
               rows={2}
-              className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[13px] focus:border-brand-400 focus:outline-none"
+              className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.92rem] focus:border-brand-400 focus:outline-none"
               placeholder="예: 현장 검증을 위해 실사용 MVP 수준이 필요합니다."
             />
           </div>
@@ -152,7 +152,7 @@ function ReviewBody({ design, projectType }: { design: MvpDesign; projectType: P
           onChange={(e) => setSummary(e.target.value)}
           disabled={!editable}
           rows={4}
-          className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[13px] focus:border-brand-400 focus:outline-none disabled:bg-slate-50"
+          className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.92rem] focus:border-brand-400 focus:outline-none disabled:bg-slate-50"
           placeholder="담당자 최종 설계 의견을 작성하세요. 확정하려면 필수입니다."
         />
         <p className="mt-2 text-xs break-keep text-slate-400">자동 요약: {design.autoSummary}</p>
@@ -163,7 +163,7 @@ function ReviewBody({ design, projectType }: { design: MvpDesign; projectType: P
             onChange={(e) => setScopeNotes(e.target.value)}
             disabled={!editable}
             rows={2}
-            className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[13px] focus:border-brand-400 focus:outline-none disabled:bg-slate-50"
+            className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.92rem] focus:border-brand-400 focus:outline-none disabled:bg-slate-50"
           />
         </div>
         {editable && (
@@ -220,7 +220,7 @@ function ReviewBody({ design, projectType }: { design: MvpDesign; projectType: P
       {!check.ok && editable && (
         <ul className="flex flex-col gap-1 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3">
           {check.reasons.map((r) => (
-            <li key={r} className="text-[13px] break-keep text-warning-800">• {r}</li>
+            <li key={r} className="text-[0.92rem] break-keep text-warning-800">• {r}</li>
           ))}
         </ul>
       )}
@@ -249,7 +249,7 @@ function SnapItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <dt className="text-xs font-semibold text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-[13px] break-keep text-slate-700">{value}</dd>
+      <dd className="mt-0.5 text-[0.92rem] break-keep text-slate-700">{value}</dd>
     </div>
   )
 }
