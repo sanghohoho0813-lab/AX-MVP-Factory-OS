@@ -206,7 +206,7 @@ export function CandidateBoardPage() {
                   <div><dt className="text-slate-400">현재 방식</dt><dd className="break-keep text-slate-700">{c.currentProcess || '—'}</dd></div>
                   <div><dt className="text-slate-400">추천 이유</dt><dd className="break-keep text-slate-700">{c.aiReason || '—'}</dd></div>
                 </dl>
-                <Button variant="primary" className="mt-auto" onClick={() => onOpen(c)}>이 업무 자세히 보고 선택하기</Button>
+                <Button variant="primary" className="mt-auto h-auto w-full py-2.5 whitespace-normal" onClick={() => onOpen(c)}>이 업무 자세히 보고 선택하기</Button>
               </li>
             ))}
           </ul>
