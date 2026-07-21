@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ClipboardCheck, RefreshCw, Rocket, Save, Wand2 } from 'lucide-react'
+import { ArrowRight, ChevronDown, ClipboardCheck, RefreshCw, Rocket, Save, Trophy, Wand2 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { AutomationCandidate } from '../../types/selection'
 import { formatDateTime } from '../../lib/format'
@@ -48,6 +48,7 @@ export function SelectionDecisionPage() {
   const { context } = useSelectionData(projectId)
   const [summary, setSummary] = useState('')
   const [finalizeOpen, setFinalizeOpen] = useState(false)
+  const [showSystem, setShowSystem] = useState(false)
 
   const decision = context?.decision ?? null
   useEffect(() => {
@@ -181,16 +182,33 @@ export function SelectionDecisionPage() {
       {header}
       <SelectionNav projectId={projectId} />
 
+      {/* §7 핵심 업무 확정 결과 히어로 */}
+      {finalized && primary && (
+        <section className="rounded-(--radius-panel) border border-success-200 bg-success-50/50 p-6 sm:p-7">
+          <p className="flex items-center gap-1.5 text-[0.95rem] font-semibold text-success-700">
+            <Trophy aria-hidden="true" className="size-4.5" />핵심 업무 확정
+          </p>
+          <h1 className="mt-1.5 text-[1.5rem] leading-snug font-bold break-keep text-slate-900 sm:text-[1.65rem]">
+            첫 번째로 만들 업무가 정해졌습니다
+          </h1>
+          <p className="mt-3 text-[1.15rem] font-bold break-keep text-slate-900">{primary.name}</p>
+          <p className="mt-1.5 max-w-3xl text-[1.02rem] leading-relaxed break-keep text-slate-600">
+            {summary.trim() || decision.autoSummary}
+          </p>
+          <Button variant="primary" className="mt-5 h-auto w-full py-2.5 text-[1.05rem] whitespace-normal sm:w-auto" onClick={() => navigate(`/mvp-design/projects/${projectId}`)}>
+            기능·화면 설계 시작하기<ArrowRight aria-hidden="true" className="size-5 shrink-0" />
+          </Button>
+        </section>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <SelectionStatusBadge status={decision.status} />
-        <span className="text-xs text-slate-400">선정 v{decision.version} · 진단 v{decision.assessmentVersion} · 규칙 v{decision.ruleVersion}</span>
         {context.needsReselectionFlag && (
           <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700">
             <RefreshCw aria-hidden="true" className="size-3" />
             재선별 필요
           </span>
         )}
-        {decision.finalizedAt && <span className="text-xs text-slate-400">확정 {formatDateTime(decision.finalizedAt)}</span>}
       </div>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
@@ -391,12 +409,31 @@ export function SelectionDecisionPage() {
           {finalized && context.handoff && (
             <Panel title="확정 완료">
               <p className="text-[13px] break-keep text-slate-600">
-                핵심 과제 '{primary?.name}'이(가) 확정되어 Stage 7 인계 스냅샷이 생성되었습니다.
+                핵심 과제 '{primary?.name}'이(가) 확정되어 기능·화면 설계로 전달할 인계 스냅샷이 생성되었습니다.
               </p>
               <p className="mt-1 text-xs text-slate-400">생성 {formatDateTime(context.handoff.generatedAt)}</p>
             </Panel>
           )}
         </div>
+      </div>
+
+      {/* §7 시스템 정보 (버전·스냅샷·규칙 — 접힘) */}
+      <div className="rounded-(--radius-panel) border border-slate-200 bg-white">
+        <button type="button" onClick={() => setShowSystem((v) => !v)} aria-expanded={showSystem}
+          className="flex w-full items-center justify-between gap-2 px-5 py-4 text-left text-[0.95rem] font-semibold text-slate-600">
+          시스템 정보 (버전·스냅샷·규칙)
+          <ChevronDown aria-hidden="true" className={`size-5 transition-transform ${showSystem ? 'rotate-180' : ''}`} />
+        </button>
+        {showSystem && (
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 border-t border-slate-100 px-5 py-4 sm:grid-cols-3">
+            <SysItem label="선정 버전" value={`v${decision.version}`} />
+            <SysItem label="진단 버전" value={`v${decision.assessmentVersion}`} />
+            <SysItem label="규칙 버전" value={`v${decision.ruleVersion}`} />
+            {decision.finalizedAt && <SysItem label="확정 시각" value={formatDateTime(decision.finalizedAt)} />}
+            {context.handoff && <SysItem label="인계 스냅샷 ID" value={context.handoff.id} />}
+            {context.handoff && <SysItem label="스냅샷 생성" value={formatDateTime(context.handoff.generatedAt)} />}
+          </dl>
+        )}
       </div>
 
       <ConfirmModal
@@ -407,6 +444,15 @@ export function SelectionDecisionPage() {
         onConfirm={doFinalize}
         onCancel={() => setFinalizeOpen(false)}
       />
+    </div>
+  )
+}
+
+function SysItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[0.8rem] text-slate-400">{label}</dt>
+      <dd className="truncate text-[0.9rem] font-medium text-slate-700">{value}</dd>
     </div>
   )
 }
