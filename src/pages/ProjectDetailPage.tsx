@@ -21,11 +21,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useActiveProject } from '../context/activeProject'
 import { HEALTH_META } from '../lib/statusMeta'
-import {
-  PROJECT_STATUS_META,
-  levelFieldLabel,
-  mvpLevelLabel,
-} from '../lib/domainMeta'
+import { PROJECT_STATUS_META } from '../lib/domainMeta'
 import { formatDate, formatKrw, formatKrwCompact, getDDay } from '../lib/format'
 import { memberName } from '../data/members'
 import { useStoreVersion } from '../lib/useStoreVersion'
@@ -132,7 +128,6 @@ export function ProjectDetailPage() {
   const nextAction = progress.nextAction
 
   const dday = getDDay(project.nextActionDueDate)
-  const levelLabel = levelFieldLabel(project.projectType)
   const surveyStatuses = summarizeProjectSurveys(project)
   const distributions = surveyDistributionRepository.getByProjectId(project.id)
   const distsByRole = (role: string) =>
@@ -592,7 +587,7 @@ export function ProjectDetailPage() {
               <div className="rounded-(--radius-card) border border-slate-200 px-4 py-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[0.875rem] font-semibold text-slate-500">
-                    다음 행동 메모
+                    다음 행동 메모 (직접 입력한 메모 — 시스템 판정 아님)
                   </span>
                   {dday && (
                     <StatusBadge
@@ -704,14 +699,6 @@ export function ProjectDetailPage() {
               <SummaryItem label="담당자" value={memberName(project.ownerId)} />
               <SummaryItem label="시작일" value={formatDate(project.startDate)} />
               <SummaryItem label="목표 완료일" value={formatDate(project.dueDate)} />
-              <SummaryItem
-                label={`현재 ${levelLabel}`}
-                value={mvpLevelLabel(project.currentMvpLevel, project.projectType)}
-              />
-              <SummaryItem
-                label={`목표 ${levelLabel}`}
-                value={mvpLevelLabel(project.targetMvpLevel, project.projectType)}
-              />
               <SummaryItem
                 label="진행 단계"
                 value={`${progress.stepText} · ${progress.currentStep.label}`}
