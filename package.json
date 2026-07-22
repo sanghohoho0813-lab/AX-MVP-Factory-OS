@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test:contract": "vite build --config vite.contract.config.mjs && node .contract-out/contract.mjs",
     "test:progress": "vite build --config vite.progress.config.mjs && node .progress-out/progress.mjs",
-    "test:persistence": "vite build --config vite.persistence.config.mjs && node .persistence-out/persistence.mjs"
+    "test:persistence": "vite build --config vite.persistence.config.mjs && node .persistence-out/persistence.mjs",
+    "test:onboarding": "vite build --config vite.onboarding.config.mjs && node .onboarding-out/onboarding.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.7",

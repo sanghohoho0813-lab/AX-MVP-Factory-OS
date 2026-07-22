@@ -18,6 +18,7 @@ import {
 } from '../../data/demo'
 import { useDismissable } from '../../lib/useDismissable'
 import { GlobalSearch } from '../search/GlobalSearch'
+import { GuideButton } from '../onboarding/GuideButton'
 import { useToast } from '../ui/toastContext'
 import { getDataModeConfig } from '../../data/dataMode'
 import { CloudSaveStatus } from '../cloud/CloudSaveStatus'
@@ -218,6 +219,7 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5">
+        <GuideButton />
         <span className="hidden xl:inline-flex">
           <CloudSaveStatus state={isSupabase ? 'saved' : 'local'} compact={false} />
         </span>

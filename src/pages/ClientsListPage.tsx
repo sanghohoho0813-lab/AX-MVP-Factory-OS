@@ -35,6 +35,7 @@ import { ProgressBar } from '../components/ui/ProgressBar'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { SummaryStrip } from '../components/ui/SummaryStrip'
 import { useToast } from '../components/ui/toastContext'
+import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 
 const SORT_OPTIONS: { value: OrganizationSortKey; label: string }[] = [
   { value: 'updated', label: '최근 수정순' },
@@ -225,6 +226,9 @@ export function ClientsListPage() {
 
   return (
     <div className="flex flex-col gap-5">
+      <div className="flex justify-end">
+        <ScreenGuide screenKey="clients" />
+      </div>
       <PageHeader
         title="고객사"
         description="AX 진단, MVP 제작, 홈페이지 및 자금조달 프로젝트를 고객사별로 관리합니다."

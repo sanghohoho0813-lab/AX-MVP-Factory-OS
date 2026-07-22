@@ -29,6 +29,7 @@ import { SurveyLinkCreateModal } from '../../components/runtime/SurveyLinkCreate
 import { SurveyDistributionStatusBadge } from '../../components/runtime/badges'
 import { RespondentRoleBadge } from '../../components/diagnosis/badges'
 import { useToast } from '../../components/ui/toastContext'
+import { ScreenGuide } from '../../components/onboarding/ScreenGuide'
 
 export function ProjectSurveysPage() {
   const { projectId = '' } = useParams()
@@ -117,6 +118,9 @@ export function ProjectSurveysPage() {
   return (
     <DiagnosisFlowShell projectId={projectId} step="responses">
       <div className="flex flex-col gap-5">
+        <div className="flex justify-end">
+          <ScreenGuide screenKey="responses" />
+        </div>
         <LocalTestModeBanner />
 
       {!hasAnySurvey ? (

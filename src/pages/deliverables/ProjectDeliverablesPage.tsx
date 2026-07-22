@@ -31,6 +31,7 @@ import {
   DeliverableNotFound,
 } from './deliverableShared'
 import { useDeliverableData } from './useDeliverableData'
+import { ScreenGuide } from '../../components/onboarding/ScreenGuide'
 
 /** 현재 프로젝트 결과 — 상태·이동·생성 조건을 함께 표시 (§6) */
 interface ReadinessRow {
@@ -218,6 +219,9 @@ export function ProjectDeliverablesPage() {
       summary={summary}
     >
       <div className="flex flex-col gap-5">
+        <div className="flex justify-end">
+          <ScreenGuide screenKey="deliverables" />
+        </div>
         {!canCreate && (
           <PrerequisiteNotice
             title="결과자료에 담을 확정 결과가 아직 없습니다"

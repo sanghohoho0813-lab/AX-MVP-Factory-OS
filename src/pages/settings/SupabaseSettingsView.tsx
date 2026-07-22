@@ -16,6 +16,7 @@ import { useAuth } from '../../auth/AuthProvider'
 import { WorkspaceMembersPanel } from '../../components/data/WorkspaceMembersPanel'
 import { ImportWizard } from '../../components/data/ImportWizard'
 import { TabNav, SettingRow, TextScalePanel, FeatureVisibilityPanel, SystemPanel, type TabKey } from './parts'
+import { OnboardingSettingsPanel } from './OnboardingSettingsPanel'
 
 function DataPanelSupabase() {
   const { showToast } = useToast()
@@ -87,6 +88,7 @@ export function SupabaseSettingsView() {
           </Panel>
           <TextScalePanel />
           <FeatureVisibilityPanel />
+          <OnboardingSettingsPanel />
         </>
       )}
       {tab === 'workspace' && (
