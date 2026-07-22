@@ -15,6 +15,7 @@ import {
   SEED_MODULES,
   SEED_TEMPLATES,
 } from '../data/seed/surveySeed'
+import { SEED_INSTITUTIONS, SEED_PROGRAMS } from '../data/seed/fundingSeed'
 
 interface Migration {
   version: number
@@ -99,6 +100,74 @@ function initMvpDesignStores(): void {
   }
 }
 
+/**
+ * v7 마이그레이션 — 홈페이지 설계 스튜디오 저장소 추가.
+ * 설계·인계 스냅샷은 시드하지 않고 빈 배열만 준비한다.
+ */
+function initWebsiteDesignStores(): void {
+  if (!hasKey(STORAGE_KEYS.websiteDesigns)) {
+    writeJson(STORAGE_KEYS.websiteDesigns, [])
+  }
+  if (!hasKey(STORAGE_KEYS.websiteDesignHandoffs)) {
+    writeJson(STORAGE_KEYS.websiteDesignHandoffs, [])
+  }
+}
+
+/**
+ * v8 마이그레이션 — 실제 사용 테스트·Stage-Gate 저장소 추가.
+ * 워크스페이스·인계 스냅샷·로컬 테스트 세션은 시드하지 않고 빈 배열만 준비한다.
+ */
+function initValidationStores(): void {
+  if (!hasKey(STORAGE_KEYS.validationWorkspaces)) {
+    writeJson(STORAGE_KEYS.validationWorkspaces, [])
+  }
+  if (!hasKey(STORAGE_KEYS.validationHandoffs)) {
+    writeJson(STORAGE_KEYS.validationHandoffs, [])
+  }
+  if (!hasKey(STORAGE_KEYS.validationTestSessions)) {
+    writeJson(STORAGE_KEYS.validationTestSessions, [])
+  }
+}
+
+/**
+ * v9 마이그레이션 — 제출자료 패키지 저장소 추가.
+ * 패키지·확정 스냅샷·내보내기 기록은 시드하지 않고 빈 배열만 준비한다.
+ */
+function initDeliverableStores(): void {
+  if (!hasKey(STORAGE_KEYS.deliverablePackages)) {
+    writeJson(STORAGE_KEYS.deliverablePackages, [])
+  }
+  if (!hasKey(STORAGE_KEYS.deliverablePackageSnapshots)) {
+    writeJson(STORAGE_KEYS.deliverablePackageSnapshots, [])
+  }
+  if (!hasKey(STORAGE_KEYS.deliverableExportRecords)) {
+    writeJson(STORAGE_KEYS.deliverableExportRecords, [])
+  }
+}
+
+/**
+ * v10 마이그레이션 — 기관·자금 연계 저장소 추가.
+ * 전략·스냅샷·사례는 시드하지 않고 빈 배열만 준비한다.
+ * 기관·프로그램은 최소 참고 시드(reference_only)만 넣으며 이미 있으면 덮어쓰지 않는다.
+ */
+function initFundingStores(): void {
+  if (!hasKey(STORAGE_KEYS.institutions)) {
+    writeJson(STORAGE_KEYS.institutions, SEED_INSTITUTIONS)
+  }
+  if (!hasKey(STORAGE_KEYS.supportPrograms)) {
+    writeJson(STORAGE_KEYS.supportPrograms, SEED_PROGRAMS)
+  }
+  if (!hasKey(STORAGE_KEYS.fundingStrategies)) {
+    writeJson(STORAGE_KEYS.fundingStrategies, [])
+  }
+  if (!hasKey(STORAGE_KEYS.fundingStrategySnapshots)) {
+    writeJson(STORAGE_KEYS.fundingStrategySnapshots, [])
+  }
+  if (!hasKey(STORAGE_KEYS.caseStudies)) {
+    writeJson(STORAGE_KEYS.caseStudies, [])
+  }
+}
+
 /** 순차 적용 마이그레이션 목록 (버전 오름차순) */
 const MIGRATIONS: Migration[] = [
   {
@@ -130,6 +199,26 @@ const MIGRATIONS: Migration[] = [
     version: 6,
     describe: 'MVP 설계 워크벤치·인계 저장소 추가',
     migrate: initMvpDesignStores,
+  },
+  {
+    version: 7,
+    describe: '홈페이지 설계 스튜디오·인계 저장소 추가',
+    migrate: initWebsiteDesignStores,
+  },
+  {
+    version: 8,
+    describe: '실제 사용 테스트·Stage-Gate·로컬 테스트 세션 저장소 추가',
+    migrate: initValidationStores,
+  },
+  {
+    version: 9,
+    describe: '제출자료 패키지·확정 스냅샷·내보내기 기록 저장소 추가',
+    migrate: initDeliverableStores,
+  },
+  {
+    version: 10,
+    describe: '기관·자금 연계·전략·스냅샷·사례 저장소 추가 (기관·프로그램 참고 시드)',
+    migrate: initFundingStores,
   },
 ]
 

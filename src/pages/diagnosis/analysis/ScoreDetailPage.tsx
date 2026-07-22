@@ -127,7 +127,7 @@ export function ScoreDetailPage() {
       <div className="flex flex-col gap-5">
         {header}
         <AnalysisNav projectId={projectId} />
-        <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2 text-xs break-keep text-slate-500">
+        <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2 text-[0.875rem] break-keep text-slate-500">
           홈페이지 단독 프로젝트에는 AX 적합성 총점을 적용하지 않습니다. 대신 홈페이지 제작
           준비도를 표시합니다.
         </p>

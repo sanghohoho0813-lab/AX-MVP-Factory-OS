@@ -1,6 +1,5 @@
 import {
   Archive,
-  CalendarClock,
   FolderKanban,
   FolderPlus,
   Pencil,
@@ -8,13 +7,12 @@ import {
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { Project } from '../types/domain'
-import { HEALTH_META, PROJECT_STAGE_META } from '../lib/statusMeta'
+import { HEALTH_META } from '../lib/statusMeta'
 import { ORG_STATUS_META, mvpLevelLabel } from '../lib/domainMeta'
 import {
   formatDate,
   formatKrw,
   formatKrwCompact,
-  getDDay,
 } from '../lib/format'
 import { memberName } from '../data/members'
 import { useStoreVersion } from '../lib/useStoreVersion'
@@ -24,6 +22,8 @@ import {
   projectRepository,
 } from '../repositories'
 import { archiveOrganization, pickPrimaryProject } from '../services/organizationService'
+import { computeProjectJourney } from '../services/journeyService'
+import { useActiveProject } from '../context/activeProject'
 import { ProjectTypeBadge } from '../components/domain/ProjectTypeBadge'
 import { ActivityTimeline } from '../components/ui/ActivityTimeline'
 import { Button } from '../components/ui/Button'
@@ -52,8 +52,10 @@ export function OrganizationDetailPage() {
   const { organizationId = '' } = useParams()
   const navigate = useNavigate()
   const { showToast } = useToast()
+  const { setActiveProject } = useActiveProject()
   const version = useStoreVersion()
   const [archiveOpen, setArchiveOpen] = useState(false)
+  const [tab, setTab] = useState<'overview' | 'projects' | 'info' | 'activity'>('overview')
 
   const organization = useMemo(
     () => organizationRepository.getById(organizationId),
@@ -84,9 +86,6 @@ export function OrganizationDetailPage() {
 
   const activeProjects = projects.filter((p) => OPEN_STATUSES.has(p.status))
   const primaryProject = pickPrimaryProject(projects)
-  const nextActionDday = primaryProject
-    ? getDDay(primaryProject.nextActionDueDate)
-    : null
 
   const summaryCounts = {
     total: projects.length,
@@ -110,53 +109,57 @@ export function OrganizationDetailPage() {
     }
   }
 
-  const projectRow = (project: Project) => (
-    <li key={project.id}>
-      <Link
-        to={`/projects/${project.id}`}
-        className="block px-5 py-4 transition-colors hover:bg-slate-50"
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold tracking-wide text-slate-400">
-            {project.projectCode}
-          </span>
-          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">
-            {project.name}
+  const projectRow = (project: Project) => {
+    const progress = computeProjectJourney(project).progress
+    return (
+      <li key={project.id}>
+        <Link
+          to={`/projects/${project.id}`}
+          className="block px-5 py-4 transition-colors hover:bg-slate-50"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold tracking-wide text-slate-400">
+              {project.projectCode}
+            </span>
+            <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">
+              {project.name}
+            </p>
+            <ProjectTypeBadge type={project.projectType} compact />
+            {progress.isSample && (
+              <span className="rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[0.78rem] font-medium text-brand-700">
+                샘플
+              </span>
+            )}
+            <StatusBadge tone="info">{progress.currentStep.label}</StatusBadge>
+            <StatusBadge tone={HEALTH_META[project.healthStatus].tone} withDot>
+              {HEALTH_META[project.healthStatus].label}
+            </StatusBadge>
+          </div>
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.875rem] text-slate-500">
+            <span>
+              수준: {mvpLevelLabel(project.currentMvpLevel, project.projectType)} →{' '}
+              {mvpLevelLabel(project.targetMvpLevel, project.projectType)}
+            </span>
+            <span>담당 {memberName(project.ownerId)}</span>
+            <span>마감 {formatDate(project.dueDate)}</span>
+          </div>
+          <div className="mt-2.5 flex items-center gap-2">
+            <ProgressBar
+              value={progress.percent}
+              tone={HEALTH_META[project.healthStatus].tone}
+              label={`${project.name} 진행 단계`}
+            />
+            <span className="shrink-0 text-[0.875rem] font-semibold text-slate-600">
+              {progress.stepText}
+            </span>
+          </div>
+          <p className="mt-2 truncate text-[0.875rem] break-keep text-slate-500">
+            다음 행동: {progress.nextAction.title}
           </p>
-          <ProjectTypeBadge type={project.projectType} compact />
-          <StatusBadge tone={PROJECT_STAGE_META[project.currentStage].tone}>
-            {PROJECT_STAGE_META[project.currentStage].label}
-          </StatusBadge>
-          <StatusBadge tone={HEALTH_META[project.healthStatus].tone} withDot>
-            {HEALTH_META[project.healthStatus].label}
-          </StatusBadge>
-        </div>
-        <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-          <span>
-            수준: {mvpLevelLabel(project.currentMvpLevel, project.projectType)} →{' '}
-            {mvpLevelLabel(project.targetMvpLevel, project.projectType)}
-          </span>
-          <span>담당 {memberName(project.ownerId)}</span>
-          <span>마감 {formatDate(project.dueDate)}</span>
-        </div>
-        <div className="mt-2.5 flex items-center gap-2">
-          <ProgressBar
-            value={project.progress}
-            tone={HEALTH_META[project.healthStatus].tone}
-            label={`${project.name} 진행률`}
-          />
-          <span className="w-9 shrink-0 text-right text-xs font-semibold text-slate-600">
-            {project.progress}%
-          </span>
-        </div>
-        {project.nextAction && (
-          <p className="mt-2 truncate text-xs text-slate-500">
-            다음 행동: {project.nextAction}
-          </p>
-        )}
-      </Link>
-    </li>
-  )
+        </Link>
+      </li>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -225,150 +228,98 @@ export function OrganizationDetailPage() {
         </p>
       )}
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
-        {/* 본문 */}
-        <div className="flex min-w-0 flex-col gap-5 xl:col-span-2">
-          <Panel title="기업 개요">
+      {/* 탭 */}
+      <nav aria-label="고객사 상세 메뉴" className="flex min-w-0 gap-1 overflow-x-auto border-b border-slate-200">
+        {([['overview', '개요'], ['projects', `프로젝트 (${projects.length})`], ['info', '기업정보'], ['activity', '활동이력']] as const).map(([k, label]) => (
+          <button key={k} type="button" onClick={() => setTab(k)}
+            aria-current={tab === k ? 'page' : undefined}
+            className={`-mb-px shrink-0 border-b-2 px-4 py-2.5 text-[0.95rem] font-medium transition-colors ${tab === k ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      {/* 개요 */}
+      {tab === 'overview' && (
+        <div className="flex flex-col gap-5">
+          {primaryProject ? (
+            (() => {
+              const j = computeProjectJourney(primaryProject)
+              return (
+                <section className="rounded-(--radius-panel) border border-brand-100 bg-brand-50/50 p-5 sm:p-6">
+                  <p className="text-[0.9rem] font-semibold text-brand-700">현재 가장 중요한 일</p>
+                  <p className="mt-1.5 text-[1.3rem] leading-snug font-bold break-keep text-slate-900">{primaryProject.name} · {j.actionText}</p>
+                  <p className="mt-2 text-[1rem] break-keep text-slate-600">{j.reason}</p>
+                  <Button variant="primary" className="mt-4" onClick={() => { setActiveProject(primaryProject.id); navigate(j.actionPath) }}>{j.actionLabel}</Button>
+                </section>
+              )
+            })()
+          ) : (
+            <EmptyState icon={FolderKanban} title="연결된 프로젝트가 없습니다" description="새 프로젝트를 등록해 진단부터 자료 패키지까지 흐름을 시작하세요."
+              action={<Button variant="primary" size="sm" onClick={() => navigate(`/projects/new?organizationId=${organization.id}`)}><FolderPlus aria-hidden="true" className="size-4" />새 프로젝트 만들기</Button>} />
+          )}
+
+          {activeProjects.length > 0 && (
+            <Panel title="진행 중 프로젝트" flush>
+              <ul className="divide-y divide-slate-100">{activeProjects.slice(0, 3).map(projectRow)}</ul>
+            </Panel>
+          )}
+
+          <Panel title="최근 활동">
+            <ActivityTimeline activities={activities.slice(0, 5)} />
+          </Panel>
+        </div>
+      )}
+
+      {/* 프로젝트 */}
+      {tab === 'projects' && (
+        <Panel title={`전체 프로젝트 (${projects.length})`} flush>
+          {projects.length === 0 ? (
+            <EmptyState icon={FolderKanban} title="연결된 프로젝트가 없습니다" description="새 프로젝트를 등록해 흐름을 시작하세요."
+              action={<Button variant="primary" size="sm" onClick={() => navigate(`/projects/new?organizationId=${organization.id}`)}><FolderPlus aria-hidden="true" className="size-4" />새 프로젝트 만들기</Button>} />
+          ) : (
+            <ul className="divide-y divide-slate-100">{projects.map(projectRow)}</ul>
+          )}
+        </Panel>
+      )}
+
+      {/* 기업정보 */}
+      {tab === 'info' && (
+        <div className="flex flex-col gap-5">
+          <Panel title="기업 기본정보">
             <dl className="grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-3">
-              <InfoItem
-                label="사업자등록번호"
-                value={organization.businessRegistrationNumber}
-              />
-              <InfoItem
-                label="세부 업종"
-                value={organization.subIndustry}
-              />
+              <InfoItem label="사업자등록번호" value={organization.businessRegistrationNumber} />
+              <InfoItem label="세부 업종" value={organization.subIndustry} />
               <InfoItem label="설립일" value={formatDate(organization.foundedAt)} />
-              <InfoItem
-                label="직원 수"
-                value={
-                  organization.employeeCount !== null
-                    ? `${organization.employeeCount}명`
-                    : '-'
-                }
-              />
-              <InfoItem
-                label="연매출"
-                value={
-                  organization.annualRevenue !== null
-                    ? `${formatKrw(organization.annualRevenue)} (${formatKrwCompact(organization.annualRevenue)})`
-                    : '-'
-                }
-              />
+              <InfoItem label="직원 수" value={organization.employeeCount !== null ? `${organization.employeeCount}명` : '-'} />
+              <InfoItem label="연매출" value={organization.annualRevenue !== null ? `${formatKrw(organization.annualRevenue)} (${formatKrwCompact(organization.annualRevenue)})` : '-'} />
               <InfoItem label="지역" value={organization.region} />
               <InfoItem label="주소" value={organization.address} />
               <InfoItem label="홈페이지" value={organization.website} />
-              <InfoItem
-                label="담당자 연락처"
-                value={[
-                  organization.primaryContact.phone,
-                  organization.primaryContact.email,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              />
+              <InfoItem label="담당자 연락처" value={[organization.primaryContact.phone, organization.primaryContact.email].filter(Boolean).join(' · ')} />
             </dl>
             {organization.notes && (
-              <p className="mt-5 rounded-(--radius-card) border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] break-keep text-slate-600">
-                {organization.notes}
-              </p>
+              <p className="mt-5 rounded-(--radius-card) border border-slate-200 bg-slate-50 px-4 py-3 text-[0.95rem] break-keep text-slate-600">{organization.notes}</p>
             )}
           </Panel>
-
-          <Panel title={`프로젝트 현황 (${projects.length})`} flush>
-            {projects.length === 0 ? (
-              <EmptyState
-                icon={FolderKanban}
-                title="연결된 프로젝트가 없습니다"
-                description="새 프로젝트를 등록해 진단부터 자료 패키지까지 흐름을 시작하세요."
-                action={
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() =>
-                      navigate(`/projects/new?organizationId=${organization.id}`)
-                    }
-                  >
-                    <FolderPlus aria-hidden="true" className="size-4" />새 프로젝트
-                    등록
-                  </Button>
-                }
-              />
-            ) : (
-              <ul className="divide-y divide-slate-100">
-                {projects.map(projectRow)}
-              </ul>
-            )}
-          </Panel>
-        </div>
-
-        {/* 우측 정보 */}
-        <div className="flex min-w-0 flex-col gap-5">
           <Panel title="운영 요약">
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-3.5">
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-3.5 sm:grid-cols-3">
               <InfoItem label="총 프로젝트" value={`${summaryCounts.total}건`} />
               <InfoItem label="진행 중" value={`${summaryCounts.active}건`} />
-              <InfoItem
-                label="고객 응답 대기"
-                value={`${summaryCounts.waiting}건`}
-              />
+              <InfoItem label="고객 응답 대기" value={`${summaryCounts.waiting}건`} />
               <InfoItem label="완료" value={`${summaryCounts.completed}건`} />
               <InfoItem label="보류" value={`${summaryCounts.onHold}건`} />
             </dl>
           </Panel>
-
-          <Panel title="다음 행동">
-            {primaryProject && primaryProject.nextAction ? (
-              <div>
-                <div className="flex items-center gap-2">
-                  {nextActionDday && (
-                    <StatusBadge
-                      tone={
-                        nextActionDday.overdue
-                          ? 'danger'
-                          : nextActionDday.daysLeft <= 2
-                            ? 'warning'
-                            : 'info'
-                      }
-                    >
-                      {nextActionDday.label}
-                    </StatusBadge>
-                  )}
-                  <p className="min-w-0 truncate text-sm font-semibold text-slate-800">
-                    {primaryProject.name}
-                  </p>
-                </div>
-                <p className="mt-2 text-sm break-keep text-slate-600">
-                  {primaryProject.nextAction}
-                </p>
-                <p className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-400">
-                  <CalendarClock aria-hidden="true" className="size-3.5" />
-                  예정일 {formatDate(primaryProject.nextActionDueDate)} · 담당{' '}
-                  {memberName(primaryProject.ownerId)}
-                </p>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="mt-3"
-                  onClick={() => navigate(`/projects/${primaryProject.id}`)}
-                >
-                  프로젝트 열기
-                </Button>
-              </div>
-            ) : (
-              <p className="text-[13px] text-slate-400">
-                {activeProjects.length === 0
-                  ? '진행 중인 프로젝트가 없습니다.'
-                  : '등록된 다음 행동이 없습니다.'}
-              </p>
-            )}
-          </Panel>
-
-          <Panel title="활동 이력">
-            <ActivityTimeline activities={activities} />
-          </Panel>
         </div>
-      </div>
+      )}
+
+      {/* 활동이력 */}
+      {tab === 'activity' && (
+        <Panel title="활동 이력">
+          <ActivityTimeline activities={activities} />
+        </Panel>
+      )}
 
       <ConfirmModal
         open={archiveOpen}

@@ -61,7 +61,7 @@ export function SurveyLinkCopyField({ url, onOpen }: SurveyLinkCopyFieldProps) {
         </div>
       </div>
       {failed && (
-        <p className="mt-1.5 text-xs break-keep text-warning-700">
+        <p className="mt-1.5 text-[0.875rem] break-keep text-warning-700">
           자동 복사에 실패했습니다. 위 입력창을 눌러 링크를 직접 선택·복사해 주세요.
         </p>
       )}

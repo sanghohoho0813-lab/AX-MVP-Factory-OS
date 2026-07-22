@@ -31,7 +31,7 @@ export function DesignPermissionsPage() {
           <>
             <Panel title={`역할 · ${roles.length}개`}>
               {overLimit && overLimit.status === 'exceeded' && (
-                <p className="mb-3 text-[13px] font-medium text-danger-600">역할이 상한(3개)을 초과했습니다. 1차 범위에서는 역할을 최소화하세요.</p>
+                <p className="mb-3 text-[0.92rem] font-medium text-danger-600">역할이 상한(3개)을 초과했습니다. 1차 범위에서는 역할을 최소화하세요.</p>
               )}
               <ul className="flex flex-col gap-3">
                 {roles.map((role) => (
@@ -40,13 +40,13 @@ export function DesignPermissionsPage() {
                       <ShieldCheck aria-hidden="true" className="size-4 text-slate-400" />
                       <p className="text-sm font-semibold text-slate-800">{role.name}</p>
                       {role.isPrimaryUser && (
-                        <span className="inline-flex items-center gap-1 rounded-md border border-success-200 bg-success-50 px-1.5 py-0.5 text-[11px] font-medium text-success-700">
+                        <span className="inline-flex items-center gap-1 rounded-md border border-success-200 bg-success-50 px-1.5 py-0.5 text-[0.82rem] font-medium text-success-700">
                           <Star aria-hidden="true" className="size-3" />주 사용자
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 text-[13px] break-keep text-slate-500">{role.description}</p>
-                    <p className="mt-1 text-xs text-slate-400">실제 사용자: {role.sourceUsers}</p>
+                    <p className="mt-1 text-[0.92rem] break-keep text-slate-500">{role.description}</p>
+                    <p className="mt-1 text-[0.875rem] text-slate-400">실제 사용자: {role.sourceUsers}</p>
                   </li>
                 ))}
               </ul>
@@ -54,9 +54,9 @@ export function DesignPermissionsPage() {
 
             <Panel title="권한 매트릭스">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[520px] text-left text-[13px]">
+                <table className="w-full min-w-[520px] text-left text-[0.92rem]">
                   <thead>
-                    <tr className="border-b border-slate-100 text-xs text-slate-400">
+                    <tr className="border-b border-slate-100 text-[0.875rem] text-slate-400">
                       <th className="py-2 pr-3 font-medium">데이터</th>
                       {roles.map((r) => (
                         <th key={r.id} className="py-2 pr-3 font-medium">{r.name}</th>
@@ -80,7 +80,7 @@ export function DesignPermissionsPage() {
                   </tbody>
                 </table>
               </div>
-              <p className="mt-3 text-xs break-keep text-slate-400">
+              <p className="mt-3 text-[0.875rem] break-keep text-slate-400">
                 민감정보가 포함된 데이터는 담당 역할만 조회하도록 제한합니다. 관리자 기능은 최소로 유지합니다.
               </p>
             </Panel>

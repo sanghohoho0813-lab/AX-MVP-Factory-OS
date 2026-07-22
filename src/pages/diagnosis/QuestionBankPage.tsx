@@ -213,7 +213,7 @@ export function QuestionBankPage() {
       key: 'code',
       header: '코드',
       cell: (q) => (
-        <span className="font-mono text-xs font-semibold whitespace-nowrap text-slate-500">
+        <span className="font-mono text-[0.875rem] font-semibold whitespace-nowrap text-slate-500">
           {q.code}
         </span>
       ),
@@ -268,7 +268,7 @@ export function QuestionBankPage() {
       header: '상태',
       cell: (q) => (
         <span
-          className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium ${
+          className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[0.875rem] font-medium ${
             q.active
               ? 'border-success-200 bg-success-50 text-success-700'
               : 'border-slate-200 bg-slate-50 text-slate-500'
@@ -450,7 +450,7 @@ export function QuestionBankPage() {
                     onClick={() => navigate(`/diagnosis/questions/${q.id}/edit`)}
                     className="min-w-0 cursor-pointer text-left"
                   >
-                    <span className="font-mono text-xs font-semibold text-slate-400">
+                    <span className="font-mono text-[0.875rem] font-semibold text-slate-400">
                       {q.code}
                     </span>
                     <p className="mt-0.5 text-[13px] break-keep text-slate-800">
@@ -465,7 +465,7 @@ export function QuestionBankPage() {
                   <QuestionScopeBadge scope={q.scope} />
                   <ExpertRiskBadge grade={q.expertRiskGrade} />
                   {!q.active && (
-                    <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-500">
+                    <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.875rem] text-slate-500">
                       비활성
                     </span>
                   )}

@@ -43,7 +43,7 @@ function RatioBar({
           />
         ))}
       </div>
-      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[0.875rem] text-slate-500">
         <span>공통 {common}%</span>
         <span>업종 {industry}%</span>
         <span>목적 {objective}%</span>
@@ -77,15 +77,15 @@ export function SurveyCompositionSummaryView({
         <Stat label="전문가 위험 질문" value={`${summary.expertRiskCount}개`} />
       </div>
       <div>
-        <p className="mb-1.5 text-xs font-medium text-slate-500">점수 영역 커버리지</p>
+        <p className="mb-1.5 text-[0.875rem] font-medium text-slate-500">점수 영역 커버리지</p>
         {summary.scoringCoverage.length === 0 ? (
-          <p className="text-xs text-slate-400">점수 영역이 지정된 질문이 없습니다.</p>
+          <p className="text-[0.875rem] text-slate-400">점수 영역이 지정된 질문이 없습니다.</p>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {summary.scoringCoverage.map((domain) => (
               <span
                 key={domain}
-                className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600"
+                className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.875rem] text-slate-600"
               >
                 {SCORING_DOMAIN_META[domain].label}
               </span>

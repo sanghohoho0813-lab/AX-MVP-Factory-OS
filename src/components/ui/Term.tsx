@@ -21,7 +21,7 @@ export function Term({ label, description }: { label: string; description: strin
       <span
         role="tooltip"
         id={id}
-        className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 w-56 -translate-x-1/2 rounded-(--radius-control) bg-navy-900 px-3 py-2 text-xs leading-relaxed break-keep text-white opacity-0 shadow-(--shadow-overlay) transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+        className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 w-56 -translate-x-1/2 rounded-(--radius-control) bg-navy-900 px-3 py-2 text-[0.875rem] leading-relaxed break-keep text-white opacity-0 shadow-(--shadow-overlay) transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
       >
         {description}
       </span>

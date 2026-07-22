@@ -14,7 +14,7 @@ export function DesignDataPage() {
         const entities = [...design.entities].sort((a, b) => a.order - b.order)
         return (
           <>
-            <div className="flex flex-wrap items-center gap-2 rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[13px]">
+            <div className="flex flex-wrap items-center gap-2 rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.92rem]">
               <Boxes aria-hidden="true" className="size-4 text-slate-400" />
               <span className="text-slate-600">데이터 {entities.length}종</span>
               {entities.some((e) => e.hasSensitiveData) && (
@@ -28,11 +28,11 @@ export function DesignDataPage() {
             ) : (
               entities.map((entity) => (
                 <Panel key={entity.id} title={`${entity.label} · ${entity.name}`}>
-                  <p className="mb-3 text-[13px] break-keep text-slate-500">{entity.description}</p>
+                  <p className="mb-3 text-[0.92rem] break-keep text-slate-500">{entity.description}</p>
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[520px] text-left text-[13px]">
+                    <table className="w-full min-w-[520px] text-left text-[0.92rem]">
                       <thead>
-                        <tr className="border-b border-slate-100 text-xs text-slate-400">
+                        <tr className="border-b border-slate-100 text-[0.875rem] text-slate-400">
                           <th className="py-2 pr-3 font-medium">필드</th>
                           <th className="py-2 pr-3 font-medium">유형</th>
                           <th className="py-2 pr-3 font-medium">필수</th>
@@ -44,8 +44,8 @@ export function DesignDataPage() {
                           <tr key={f.id}>
                             <td className="py-2 pr-3">
                               <span className="font-medium text-slate-700">{f.label}</span>
-                              {f.sensitive && <span className="ml-1.5 rounded border border-warning-200 bg-warning-50 px-1 text-[10px] text-warning-700">민감</span>}
-                              <span className="ml-1 text-xs text-slate-400">{f.name}</span>
+                              {f.sensitive && <span className="ml-1.5 rounded border border-warning-200 bg-warning-50 px-1 text-[0.78rem] text-warning-700">민감</span>}
+                              <span className="ml-1 text-[0.875rem] text-slate-400">{f.name}</span>
                             </td>
                             <td className="py-2 pr-3 text-slate-600">{FIELD_TYPE_META[f.type].label}</td>
                             <td className="py-2 pr-3 text-slate-500">{f.required ? '필수' : '선택'}</td>

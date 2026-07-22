@@ -27,6 +27,27 @@ import {
   LocalMvpDesignHandoffRepository,
   LocalMvpDesignRepository,
 } from './mvpDesignRepositories'
+import {
+  LocalWebsiteDesignHandoffRepository,
+  LocalWebsiteDesignRepository,
+} from './websiteDesignRepositories'
+import {
+  LocalValidationHandoffRepository,
+  LocalValidationTestSessionRepository,
+  LocalValidationWorkspaceRepository,
+} from './validationRepositories'
+import {
+  LocalDeliverableExportRepository,
+  LocalDeliverablePackageRepository,
+  LocalDeliverablePackageSnapshotRepository,
+} from './deliverableRepositories'
+import {
+  LocalCaseStudyRepository,
+  LocalFundingStrategyRepository,
+  LocalFundingStrategySnapshotRepository,
+  LocalInstitutionRepository,
+  LocalSupportProgramRepository,
+} from './fundingRepositories'
 import { runMigrations } from './migrations'
 import type {
   ActivityRepository,
@@ -36,6 +57,8 @@ import type {
   InterviewQuestionRepository,
   MvpDesignHandoffRepository,
   MvpDesignRepository,
+  WebsiteDesignHandoffRepository,
+  WebsiteDesignRepository,
   OrganizationRepository,
   ProjectRepository,
   ProjectSurveyBlueprintRepository,
@@ -46,6 +69,17 @@ import type {
   SurveyModuleRepository,
   SurveyResponseRepository,
   SurveyTemplateRepository,
+  ValidationHandoffRepository,
+  ValidationTestSessionRepository,
+  ValidationWorkspaceRepository,
+  DeliverablePackageRepository,
+  DeliverablePackageSnapshotRepository,
+  DeliverableExportRepository,
+  InstitutionRepository,
+  SupportProgramRepository,
+  FundingStrategyRepository,
+  FundingStrategySnapshotRepository,
+  CaseStudyRepository,
 } from './types'
 
 runMigrations()
@@ -102,6 +136,45 @@ export const mvpDesignRepository: MvpDesignRepository =
 
 export const mvpDesignHandoffRepository: MvpDesignHandoffRepository =
   new LocalMvpDesignHandoffRepository()
+
+export const websiteDesignRepository: WebsiteDesignRepository =
+  new LocalWebsiteDesignRepository()
+
+export const websiteDesignHandoffRepository: WebsiteDesignHandoffRepository =
+  new LocalWebsiteDesignHandoffRepository()
+
+export const validationWorkspaceRepository: ValidationWorkspaceRepository =
+  new LocalValidationWorkspaceRepository()
+
+export const validationHandoffRepository: ValidationHandoffRepository =
+  new LocalValidationHandoffRepository()
+
+export const validationTestSessionRepository: ValidationTestSessionRepository =
+  new LocalValidationTestSessionRepository()
+
+export const deliverablePackageRepository: DeliverablePackageRepository =
+  new LocalDeliverablePackageRepository()
+
+export const deliverablePackageSnapshotRepository: DeliverablePackageSnapshotRepository =
+  new LocalDeliverablePackageSnapshotRepository()
+
+export const deliverableExportRepository: DeliverableExportRepository =
+  new LocalDeliverableExportRepository()
+
+export const institutionRepository: InstitutionRepository =
+  new LocalInstitutionRepository()
+
+export const supportProgramRepository: SupportProgramRepository =
+  new LocalSupportProgramRepository()
+
+export const fundingStrategyRepository: FundingStrategyRepository =
+  new LocalFundingStrategyRepository()
+
+export const fundingStrategySnapshotRepository: FundingStrategySnapshotRepository =
+  new LocalFundingStrategySnapshotRepository()
+
+export const caseStudyRepository: CaseStudyRepository =
+  new LocalCaseStudyRepository()
 
 export { guidedDemoRepository } from './guidedDemoRepository'
 

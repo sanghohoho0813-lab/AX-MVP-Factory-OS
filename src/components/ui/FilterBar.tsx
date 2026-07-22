@@ -80,7 +80,7 @@ export function FilterBar({
           </button>
         )}
       </div>
-      <p className="mt-2.5 text-xs text-slate-400" aria-live="polite">
+      <p className="mt-2.5 text-[0.875rem] text-slate-400" aria-live="polite">
         총 <span className="font-semibold text-slate-600">{resultCount}</span>
         {resultUnit}
       </p>

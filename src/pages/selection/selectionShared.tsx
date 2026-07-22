@@ -32,11 +32,11 @@ export function SelectionHeader({
       title="과제선별"
       badges={
         <>
-          <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-500">
+          <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.875rem] font-semibold text-slate-500">
             {project.projectCode}
           </span>
           <ProjectTypeBadge type={project.projectType} compact />
-          <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-500">
+          <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.875rem] text-slate-500">
             {PROJECT_STAGE_META[project.currentStage].label}
           </span>
         </>

@@ -119,7 +119,7 @@ export function SelectionResultsPage() {
       cell: (r) => (
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-slate-800">{r.project.name}</p>
-          <p className="text-xs text-slate-400">{r.project.projectCode}</p>
+          <p className="text-[0.875rem] text-slate-400">{r.project.projectCode}</p>
         </div>
       ),
     },
@@ -137,7 +137,7 @@ export function SelectionResultsPage() {
         <div className="flex items-center gap-1.5">
           <SelectionStatusBadge status={r.decision.status} />
           {r.reselection && (
-            <span className="inline-flex items-center gap-0.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[11px] font-medium text-warning-700">
+            <span className="inline-flex items-center gap-0.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-warning-700">
               <RefreshCw aria-hidden="true" className="size-3" />
               재선별
             </span>
@@ -145,7 +145,7 @@ export function SelectionResultsPage() {
         </div>
       ),
     },
-    { key: 'version', header: '버전', className: 'hidden xl:table-cell', cell: (r) => <span className="text-xs text-slate-400">v{r.decision.version}</span> },
+    { key: 'version', header: '버전', className: 'hidden xl:table-cell', cell: (r) => <span className="text-[0.875rem] text-slate-400">v{r.decision.version}</span> },
     { key: 'updated', header: '확정일', className: 'hidden lg:table-cell', cell: (r) => <span className="text-[13px] text-slate-500">{formatDate(r.decision.finalizedAt ?? r.decision.updatedAt)}</span> },
     { key: 'owner', header: '담당자', className: 'hidden xl:table-cell', cell: (r) => <span className="text-[13px] text-slate-600">{memberName(r.project.ownerId)}</span> },
   ]
@@ -242,7 +242,7 @@ export function SelectionResultsPage() {
                       <SelectionStatusBadge status={r.decision.status} />
                       {r.primary && <CandidateConfidenceBadge confidence={r.primary.confidence} />}
                       {r.reselection && (
-                        <span className="inline-flex items-center gap-0.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[11px] font-medium text-warning-700">
+                        <span className="inline-flex items-center gap-0.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-warning-700">
                           <RefreshCw aria-hidden="true" className="size-3" />
                           재선별
                         </span>

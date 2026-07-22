@@ -46,7 +46,7 @@ export function GuidedEmptyState({
         <Icon aria-hidden="true" className="size-6" />
       </span>
       {flowPosition && (
-        <span className="mt-3 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500">
+        <span className="mt-3 rounded-full bg-slate-100 px-2.5 py-0.5 text-[0.875rem] font-medium text-slate-500">
           {flowPosition}
         </span>
       )}

@@ -66,7 +66,7 @@ export function QuestionLibraryPanel({ addedIds, onAdd }: QuestionLibraryPanelPr
             aria-label="범주 필터"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="h-9 rounded-(--radius-control) border border-slate-200 px-2 text-xs text-slate-700"
+            className="h-9 rounded-(--radius-control) border border-slate-200 px-2 text-[0.875rem] text-slate-700"
           >
             <option value="">모든 범주</option>
             {QUESTION_CATEGORIES.map((c) => (
@@ -79,7 +79,7 @@ export function QuestionLibraryPanel({ addedIds, onAdd }: QuestionLibraryPanelPr
             aria-label="범위 필터"
             value={scope}
             onChange={(e) => setScope(e.target.value)}
-            className="h-9 rounded-(--radius-control) border border-slate-200 px-2 text-xs text-slate-700"
+            className="h-9 rounded-(--radius-control) border border-slate-200 px-2 text-[0.875rem] text-slate-700"
           >
             <option value="">모든 범위</option>
             {QUESTION_SCOPES.map((s) => (
@@ -92,7 +92,7 @@ export function QuestionLibraryPanel({ addedIds, onAdd }: QuestionLibraryPanelPr
             aria-label="모듈 필터"
             value={moduleId}
             onChange={(e) => setModuleId(e.target.value)}
-            className="col-span-2 h-9 rounded-(--radius-control) border border-slate-200 px-2 text-xs text-slate-700"
+            className="col-span-2 h-9 rounded-(--radius-control) border border-slate-200 px-2 text-[0.875rem] text-slate-700"
           >
             <option value="">모든 모듈</option>
             {modules.map((m) => (
@@ -115,7 +115,7 @@ export function QuestionLibraryPanel({ addedIds, onAdd }: QuestionLibraryPanelPr
             return (
               <li key={q.id} className="flex items-start gap-2 px-4 py-2.5">
                 <div className="min-w-0 flex-1">
-                  <span className="font-mono text-xs font-semibold text-slate-400">
+                  <span className="font-mono text-[0.875rem] font-semibold text-slate-400">
                     {q.code}
                   </span>
                   <p className="line-clamp-2 text-[13px] break-keep text-slate-700">
@@ -124,7 +124,7 @@ export function QuestionLibraryPanel({ addedIds, onAdd }: QuestionLibraryPanelPr
                   <div className="mt-1 flex flex-wrap items-center gap-1">
                     <QuestionScopeBadge scope={q.scope} />
                     <QuestionCategoryBadge category={q.category} />
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-[0.8125rem] text-slate-400">
                       약 {QUESTION_TYPE_META[q.type].estimateMinutes}분
                     </span>
                   </div>
@@ -134,7 +134,7 @@ export function QuestionLibraryPanel({ addedIds, onAdd }: QuestionLibraryPanelPr
                   disabled={added}
                   onClick={() => onAdd(q.id)}
                   aria-label={added ? `${q.code} 이미 추가됨` : `${q.code} 추가`}
-                  className={`inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium ${
+                  className={`inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[0.875rem] font-medium ${
                     added
                       ? 'cursor-default border-success-200 bg-success-50 text-success-600'
                       : 'cursor-pointer border-slate-300 text-slate-600 hover:bg-slate-50'

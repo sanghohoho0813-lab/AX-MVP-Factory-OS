@@ -21,7 +21,7 @@ export function LocalTestModeBanner({ compact = false }: LocalTestModeBannerProp
       <div className="min-w-0">
         <p className="text-[13px] font-semibold">로컬 테스트 모드</p>
         {!compact && (
-          <p className="mt-0.5 text-xs break-keep text-warning-700">{MESSAGE}</p>
+          <p className="mt-0.5 text-[0.875rem] break-keep text-warning-700">{MESSAGE}</p>
         )}
       </div>
     </div>
@@ -31,7 +31,7 @@ export function LocalTestModeBanner({ compact = false }: LocalTestModeBannerProp
 /** 공개 설문 하단용 작은 테스트 배지 */
 export function LocalTestModeBadge() {
   return (
-    <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+    <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.8125rem] font-medium text-slate-500">
       <FlaskConical aria-hidden="true" className="size-3" />
       로컬 테스트 모드
     </span>

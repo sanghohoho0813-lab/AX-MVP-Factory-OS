@@ -1,0 +1,44 @@
+# Supabase 로컬 개발 설정 (Stage 12A)
+# project_id 는 로컬 Supabase CLI 컨테이너 식별용 이름이며 비밀값이 아니다.
+project_id = "ax-mvp-factory-os"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.pooler]
+enabled = false
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[auth]
+enabled = true
+# 로컬 개발용 기본 사이트. 실제 배포에서는 Supabase 대시보드에서 설정한다.
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+double_confirm_changes = true
+
+[analytics]
+enabled = false

@@ -200,7 +200,7 @@ export function TemplatesPage() {
       cell: (t) => (
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-slate-800">{t.name}</p>
-          <p className="mt-0.5 line-clamp-1 text-xs text-slate-400">{t.description}</p>
+          <p className="mt-0.5 line-clamp-1 text-[0.875rem] text-slate-400">{t.description}</p>
         </div>
       ),
     },
@@ -235,7 +235,7 @@ export function TemplatesPage() {
       cell: (t) => (
         <div className="flex items-center gap-1.5">
           <TemplateStatusBadge status={t.status} />
-          <span className="text-xs text-slate-400">v{t.version}</span>
+          <span className="text-[0.875rem] text-slate-400">v{t.version}</span>
         </div>
       ),
     },
@@ -352,14 +352,14 @@ export function TemplatesPage() {
                     className="min-w-0 cursor-pointer text-left"
                   >
                     <p className="truncate text-sm font-semibold text-slate-800">{t.name}</p>
-                    <p className="mt-0.5 line-clamp-1 text-xs text-slate-400">{t.description}</p>
+                    <p className="mt-0.5 line-clamp-1 text-[0.875rem] text-slate-400">{t.description}</p>
                   </button>
                   {rowMenu(t)}
                 </div>
                 <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                   <RespondentRoleBadge role={t.respondentRole} />
                   <TemplateStatusBadge status={t.status} />
-                  <span className="text-xs text-slate-400">
+                  <span className="text-[0.875rem] text-slate-400">
                     문항 {questionCount(t)}개 · 약 {t.estimatedMinutes}분
                   </span>
                 </div>

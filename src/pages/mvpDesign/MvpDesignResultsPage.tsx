@@ -55,7 +55,7 @@ export function MvpDesignResultsPage() {
       <button
         type="button"
         onClick={() => navigate('/mvp-design')}
-        className="inline-flex w-fit items-center gap-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-800"
+        className="inline-flex w-fit items-center gap-1.5 text-[0.92rem] font-medium text-slate-500 hover:text-slate-800"
       >
         <ArrowLeft aria-hidden="true" className="size-3.5" />
         MVP 설계 워크벤치
@@ -98,18 +98,18 @@ export function MvpDesignResultsPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-900">{r.design.coreTaskName}</p>
-                    <p className="mt-0.5 text-xs text-slate-400">{r.orgName} · {r.projectName} · v{r.design.version}</p>
+                    <p className="mt-0.5 text-[0.875rem] text-slate-400">{r.orgName} · {r.projectName} · v{r.design.version}</p>
                   </div>
                   <DesignStatusBadge status={r.design.status} />
                 </div>
-                <p className="line-clamp-2 text-[13px] break-keep text-slate-600">{r.design.designSummary || r.design.autoSummary}</p>
-                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                <p className="line-clamp-2 text-[0.92rem] break-keep text-slate-600">{r.design.designSummary || r.design.autoSummary}</p>
+                <div className="flex flex-wrap items-center gap-3 text-[0.875rem] text-slate-500">
                   <span className="inline-flex items-center gap-1"><BadgeCheck aria-hidden="true" className="size-3.5 text-success-500" />Must {must} · Should {should}</span>
                   <span>화면 {r.design.screens.filter((s) => s.scope !== 'excluded').length}개</span>
                   <span>{mvpLevelLabel(r.design.levelDecision.selectedLevel, r.projectType)}</span>
                 </div>
                 {r.stale && (
-                  <span className="w-fit rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[11px] font-medium text-warning-700">
+                  <span className="w-fit rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.82rem] font-medium text-warning-700">
                     핵심 과제 변경됨 · 재설계 권장
                   </span>
                 )}

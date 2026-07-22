@@ -5,8 +5,17 @@ import { HEALTH_META, PROJECT_STAGE_META, TONE_DOT_CLASS } from '../../lib/statu
 import { ProgressBar } from '../ui/ProgressBar'
 import { StatusBadge } from '../ui/StatusBadge'
 
+/** 실제 진행상태 파생 필드 — dashboardService.buildPortfolioItems가 채워 준다 */
+interface DerivedProgressFields {
+  /** "n / N단계" */
+  stepText?: string
+  /** 현재 단계 라벨 (있으면 stage 메타 라벨 대신 표시) */
+  currentStepLabel?: string
+  isSample?: boolean
+}
+
 interface PortfolioHealthProps {
-  projects: PortfolioProject[]
+  projects: (PortfolioProject & DerivedProgressFields)[]
 }
 
 const HEALTH_ORDER: HealthStatus[] = ['healthy', 'attention', 'risk']
@@ -71,19 +80,39 @@ export function PortfolioHealth({ projects }: PortfolioHealthProps) {
                     </p>
                   </div>
                 </div>
-                <StatusBadge tone={stage.tone}>{stage.label}</StatusBadge>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {project.isSample && (
+                    <span className="rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[0.78rem] font-medium text-brand-700">
+                      샘플
+                    </span>
+                  )}
+                  <StatusBadge tone={stage.tone}>
+                    {project.currentStepLabel || stage.label}
+                  </StatusBadge>
+                </div>
               </div>
               <div className="mt-4 flex items-center gap-3">
-                <span className="shrink-0 text-xs text-slate-400">
-                  진행률{' '}
-                  <span className="font-semibold text-slate-700">
-                    {project.progress}%
-                  </span>
+                <span className="shrink-0 text-sm text-slate-500">
+                  {project.stepText ? (
+                    <>
+                      진행{' '}
+                      <span className="font-semibold text-slate-700">
+                        {project.stepText}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      진행률{' '}
+                      <span className="font-semibold text-slate-700">
+                        {project.progress}%
+                      </span>
+                    </>
+                  )}
                 </span>
                 <ProgressBar
                   value={project.progress}
                   tone={health.tone}
-                  label={`${project.client} 진행률`}
+                  label={`${project.client} 진행 단계`}
                 />
               </div>
               <div className="mt-3">

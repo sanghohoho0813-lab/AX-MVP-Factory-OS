@@ -1,7 +1,42 @@
-import { Box, FileText, Filter, FolderKanban } from 'lucide-react'
+import {
+  Box,
+  ClipboardCheck,
+  FileText,
+  FileWarning,
+  Filter,
+  FlaskConical,
+  FolderKanban,
+  Landmark,
+  Palette,
+  ShieldAlert,
+} from 'lucide-react'
 import type { MetricSummary, PortfolioProject } from '../types'
 import type { Organization, Project } from '../types/domain'
 import { pickPrimaryProject } from './organizationService'
+import { getProjectProgress } from './projectProgressService'
+
+export interface ValidationKpiCounts {
+  preparing: number
+  testing: number
+  criticalIssues: number
+}
+
+export interface DeliverableKpiCounts {
+  creatable: number
+  inProgress: number
+  needsReview: number
+  stale: number
+  qualityErrors: number
+}
+
+export interface FundingKpiCounts {
+  creatable: number
+  reviewing: number
+  applyingReady: number
+  underReview: number
+  outcomeDone: number
+  supplementNeeded: number
+}
 
 const HEALTH_ORDER = { healthy: 0, attention: 1, risk: 2 } as const
 
@@ -13,10 +48,49 @@ export function buildDashboardMetrics(
   projects: Project[],
   selectionPending?: number,
   designInProgress?: number,
+  websitePending?: number,
+  validation?: ValidationKpiCounts,
+  deliverable?: DeliverableKpiCounts,
+  funding?: FundingKpiCounts,
 ): MetricSummary[] {
   const open = projects.filter(
     (p) => p.status !== 'completed' && p.status !== 'archived',
   )
+  // 마지막 KPI는 최대 1개만 노출한다(과복잡 방지).
+  // 우선순위: 중대 이슈 > 자료 품질 오류 > 자료 원본 변경 > 홈페이지 대기 > 테스트 중 > 자료 검토 > 테스트 준비 > 자료 생성 가능 > 제출자료 단계.
+  const deliverablesMetric: MetricSummary = {
+    key: 'deliverables-preparing',
+    label: '제출자료 준비',
+    value: open.filter((p) => p.currentStage === 'deliverables').length,
+    unit: '건',
+    weeklyDelta: -1,
+    tone: 'danger',
+    icon: FileText,
+  }
+  let lastMetric: MetricSummary
+  if (validation && validation.criticalIssues > 0) {
+    lastMetric = { key: 'validation-critical', label: '중대 이슈', value: validation.criticalIssues, unit: '건', weeklyDelta: 0, tone: 'danger', icon: ShieldAlert }
+  } else if (deliverable && deliverable.qualityErrors > 0) {
+    lastMetric = { key: 'deliverable-errors', label: '제출자료 오류', value: deliverable.qualityErrors, unit: '건', weeklyDelta: 0, tone: 'danger', icon: FileWarning }
+  } else if (deliverable && deliverable.stale > 0) {
+    lastMetric = { key: 'deliverable-stale', label: '자료 원본 변경', value: deliverable.stale, unit: '건', weeklyDelta: 0, tone: 'warning', icon: FileWarning }
+  } else if (funding && funding.supplementNeeded > 0) {
+    lastMetric = { key: 'funding-supplement', label: '자금 보완 요청', value: funding.supplementNeeded, unit: '건', weeklyDelta: 0, tone: 'warning', icon: Landmark }
+  } else if (websitePending && websitePending > 0) {
+    lastMetric = { key: 'website-pending', label: '홈페이지 설계 대기', value: websitePending, unit: '건', weeklyDelta: 0, tone: 'accent', icon: Palette }
+  } else if (validation && validation.testing > 0) {
+    lastMetric = { key: 'validation-testing', label: '테스트 중', value: validation.testing, unit: '건', weeklyDelta: 0, tone: 'warning', icon: FlaskConical }
+  } else if (deliverable && deliverable.needsReview > 0) {
+    lastMetric = { key: 'deliverable-review', label: '제출자료 검토', value: deliverable.needsReview, unit: '건', weeklyDelta: 0, tone: 'info', icon: FileText }
+  } else if (validation && validation.preparing > 0) {
+    lastMetric = { key: 'validation-preparing', label: '테스트 준비', value: validation.preparing, unit: '건', weeklyDelta: 0, tone: 'info', icon: ClipboardCheck }
+  } else if (funding && funding.underReview > 0) {
+    lastMetric = { key: 'funding-review', label: '자금 심사 중', value: funding.underReview, unit: '건', weeklyDelta: 0, tone: 'info', icon: Landmark }
+  } else if (deliverable && deliverable.creatable > 0) {
+    lastMetric = { key: 'deliverable-creatable', label: '자료 생성 가능', value: deliverable.creatable, unit: '건', weeklyDelta: 0, tone: 'info', icon: FileText }
+  } else {
+    lastMetric = deliverablesMetric
+  }
   return [
     {
       key: 'active-projects',
@@ -51,35 +125,44 @@ export function buildDashboardMetrics(
       tone: 'success',
       icon: Box,
     },
-    {
-      key: 'deliverables-preparing',
-      label: '제출자료 준비',
-      value: open.filter((p) => p.currentStage === 'deliverables').length,
-      unit: '건',
-      weeklyDelta: -1,
-      tone: 'danger',
-      icon: FileText,
-    },
+    lastMetric,
   ]
 }
 
-/** 포트폴리오 건강도 — 고객사 + 대표 프로젝트 기준 */
+/** 포트폴리오 카드 — 기존 PortfolioProject에 실제 진행상태 파생 필드를 더한 것 */
+export interface PortfolioHealthItem extends PortfolioProject {
+  /** "n / N단계" (프로젝트 없으면 빈 문자열) */
+  stepText: string
+  /** 현재 단계 라벨 (프로젝트 없으면 빈 문자열) */
+  currentStepLabel: string
+  /** 지금 해야 할 일 한 줄 */
+  nextActionLabel: string
+  isSample: boolean
+}
+
+/** 포트폴리오 건강도 — 고객사 + 대표 프로젝트 기준 (진행상태 단일 기준 사용) */
 export function buildPortfolioItems(
   organizations: Organization[],
   projects: Project[],
-): PortfolioProject[] {
+): PortfolioHealthItem[] {
   return organizations
-    .map<PortfolioProject>((org) => {
+    .map<PortfolioHealthItem>((org) => {
       const primary = pickPrimaryProject(
         projects.filter((p) => p.organizationId === org.id),
       )
+      const progress = primary ? getProjectProgress(primary) : null
       return {
         id: org.id,
         client: org.name,
         industry: org.industry,
         stage: primary?.currentStage ?? 'intake',
-        progress: primary?.progress ?? 0,
+        // 실제 데이터 기반 파생 진행률 (완료 단계 ÷ 전체 단계)
+        progress: progress?.percent ?? 0,
         health: org.healthStatus,
+        stepText: progress?.stepText ?? '',
+        currentStepLabel: progress?.currentStep.label ?? '',
+        nextActionLabel: progress?.nextAction.title ?? '',
+        isSample: progress?.isSample ?? false,
       }
     })
     .sort((a, b) => HEALTH_ORDER[a.health] - HEALTH_ORDER[b.health])

@@ -70,10 +70,10 @@ export function SurveyPage({
               onAnswer={(a) => onAnswer(placement.questionId, answerToValue(a))}
             />
             {placement.example && placement.type !== 'short_text' && placement.type !== 'long_text' && (
-              <p className="mt-2 text-xs text-slate-400">예시: {placement.example}</p>
+              <p className="mt-2 text-[0.875rem] text-slate-400">예시: {placement.example}</p>
             )}
             {hasError && (
-              <p className="mt-2 text-xs font-medium text-danger-600" role="alert">
+              <p className="mt-2 text-[0.875rem] font-medium text-danger-600" role="alert">
                 필수 응답 문항입니다.
               </p>
             )}

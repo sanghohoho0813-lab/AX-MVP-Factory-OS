@@ -41,7 +41,7 @@ export function TemplatePreviewPage() {
           <>
             <RespondentRoleBadge role={template.respondentRole} />
             <TemplateStatusBadge status={template.status} />
-            <span className="text-xs text-slate-400">v{template.version}</span>
+            <span className="text-[0.875rem] text-slate-400">v{template.version}</span>
           </>
         }
         meta={

@@ -106,7 +106,7 @@ export function SelectionMainPage() {
       cell: (r) => (
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-slate-800">{r.project.name}</p>
-          <p className="text-xs text-slate-400">{r.project.projectCode}</p>
+          <p className="text-[0.875rem] text-slate-400">{r.project.projectCode}</p>
         </div>
       ),
     },
@@ -165,7 +165,7 @@ export function SelectionMainPage() {
                   <button type="button" onClick={() => go(r)} className="flex w-full items-center justify-between gap-2 px-5 py-3.5 text-left hover:bg-slate-50">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-slate-800">{r.orgName} · {r.project.name}</p>
-                      <p className="text-xs text-slate-400">후보 {r.candidateCount}건</p>
+                      <p className="text-[0.875rem] text-slate-400">후보 {r.candidateCount}건</p>
                     </div>
                     <span className="shrink-0 text-[13px] font-semibold text-brand-600">{LIFECYCLE_ACTION[r.lifecycle]}</span>
                   </button>
@@ -187,7 +187,7 @@ export function SelectionMainPage() {
                   <button type="button" onClick={() => go(r)} className="flex w-full items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50">
                     <div className="min-w-0 text-left">
                       <p className="truncate text-sm font-medium text-slate-800">{r.orgName} · {r.project.name}</p>
-                      <p className="text-xs text-slate-400">후보 {r.candidateCount}건 · {r.lifecycle === 'draft' ? '선정 초안' : '내부 검토'}</p>
+                      <p className="text-[0.875rem] text-slate-400">후보 {r.candidateCount}건 · {r.lifecycle === 'draft' ? '선정 초안' : '내부 검토'}</p>
                     </div>
                     <AssessmentConfidenceBadge confidence={r.confidence} />
                   </button>
@@ -207,7 +207,7 @@ export function SelectionMainPage() {
                   <button type="button" onClick={() => go(r)} className="flex w-full items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50">
                     <div className="min-w-0 text-left">
                       <p className="truncate text-sm font-medium text-slate-800">{r.primaryName ?? r.project.name}</p>
-                      <p className="text-xs text-slate-400">{r.orgName} · {memberName(r.project.ownerId)}</p>
+                      <p className="text-[0.875rem] text-slate-400">{r.orgName} · {memberName(r.project.ownerId)}</p>
                     </div>
                     {r.primaryScore !== null && <span className="shrink-0 text-sm font-bold text-slate-800">{r.primaryScore}점</span>}
                   </button>
@@ -235,7 +235,7 @@ export function SelectionMainPage() {
         </Panel>
       )}
 
-      <p className="text-xs text-slate-400">
+      <p className="text-[0.875rem] text-slate-400">
         후보 점수는 제출 응답과 사전 정의된 선별 규칙으로 계산됩니다.
       </p>
     </div>

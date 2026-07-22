@@ -63,12 +63,12 @@ export function CandidateCard({ candidate, onOpen, onStatusChange }: CandidateCa
       <div className="mt-2.5 flex items-center gap-3">
         <div className="flex items-baseline gap-1">
           <span className="text-xl font-bold text-slate-900">{candidate.priorityScore}</span>
-          <span className="text-xs text-slate-400">/ 100</span>
+          <span className="text-[0.875rem] text-slate-400">/ 100</span>
         </div>
         <CandidateConfidenceBadge confidence={candidate.confidence} />
       </div>
 
-      <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+      <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[0.875rem]">
         <div className="flex justify-between">
           <dt className="text-slate-400">월 절감</dt>
           <dd className="font-medium text-slate-700">{monthlySavingLabel(candidate)}</dd>
@@ -85,7 +85,7 @@ export function CandidateCard({ candidate, onOpen, onStatusChange }: CandidateCa
       </div>
 
       {risk && (
-        <p className="mt-2 flex items-center gap-1 text-xs text-danger-600">
+        <p className="mt-2 flex items-center gap-1 text-[0.875rem] text-danger-600">
           <AlertTriangle aria-hidden="true" className="size-3" />
           {risk}
         </p>
@@ -135,10 +135,10 @@ export function CandidateBoard({
                 <span className="text-[13px] font-semibold text-slate-600">
                   {CANDIDATE_STATUS_META[col.key].label}
                 </span>
-                <span className="text-xs text-slate-400">{items.length}</span>
+                <span className="text-[0.875rem] text-slate-400">{items.length}</span>
               </header>
               {items.length === 0 ? (
-                <p className="rounded-(--radius-card) border border-dashed border-slate-200 px-3 py-4 text-center text-xs text-slate-300">
+                <p className="rounded-(--radius-card) border border-dashed border-slate-200 px-3 py-4 text-center text-[0.875rem] text-slate-300">
                   없음
                 </p>
               ) : (
@@ -170,7 +170,7 @@ export function CandidateTable({
       cell: (c) => (
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-slate-800">{c.name}</p>
-          <p className="text-xs text-slate-400">{c.sourceQuestionCodes.slice(0, 2).join(', ')}</p>
+          <p className="text-[0.875rem] text-slate-400">{c.sourceQuestionCodes.slice(0, 2).join(', ')}</p>
         </div>
       ),
     },

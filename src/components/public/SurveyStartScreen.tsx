@@ -53,7 +53,7 @@ function Field({
         className="h-11 w-full rounded-(--radius-control) border border-slate-300 px-3 text-sm focus:border-brand-500 aria-invalid:border-danger-500"
       />
       {error && (
-        <p id={`${id}-err`} className="mt-1 text-xs text-danger-600">
+        <p id={`${id}-err`} className="mt-1 text-[0.875rem] text-danger-600">
           {error}
         </p>
       )}
@@ -94,7 +94,7 @@ export function SurveyStartScreen({
           <div className="flex items-center gap-2">
             <ListChecks aria-hidden="true" className="size-4 text-slate-400" />
             <div>
-              <dt className="text-[11px] text-slate-400">전체 섹션</dt>
+              <dt className="text-[0.8125rem] text-slate-400">전체 섹션</dt>
               <dd className="text-sm font-semibold text-slate-700">
                 {view.totalSections}개
               </dd>
@@ -103,14 +103,14 @@ export function SurveyStartScreen({
           <div className="flex items-center gap-2">
             <Clock aria-hidden="true" className="size-4 text-slate-400" />
             <div>
-              <dt className="text-[11px] text-slate-400">예상 시간</dt>
+              <dt className="text-[0.8125rem] text-slate-400">예상 시간</dt>
               <dd className="text-sm font-semibold text-slate-700">약 {estimatedMinutes}분</dd>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <FileText aria-hidden="true" className="size-4 text-slate-400" />
             <div>
-              <dt className="text-[11px] text-slate-400">응답 역할</dt>
+              <dt className="text-[0.8125rem] text-slate-400">응답 역할</dt>
               <dd className="text-sm font-semibold text-slate-700">
                 {RESPONDENT_ROLE_META[view.respondentRole].label}
               </dd>
@@ -119,14 +119,14 @@ export function SurveyStartScreen({
           <div className="flex items-center gap-2">
             <Clock aria-hidden="true" className="size-4 text-slate-400" />
             <div>
-              <dt className="text-[11px] text-slate-400">응답 만료</dt>
+              <dt className="text-[0.8125rem] text-slate-400">응답 만료</dt>
               <dd className="text-sm font-semibold text-slate-700">
                 {view.expiresAt ? formatDate(view.expiresAt) : '없음'}
               </dd>
             </div>
           </div>
         </dl>
-        <ul className="mt-4 flex flex-col gap-1 rounded-(--radius-card) bg-slate-50 px-4 py-3 text-xs break-keep text-slate-500">
+        <ul className="mt-4 flex flex-col gap-1 rounded-(--radius-card) bg-slate-50 px-4 py-3 text-[0.875rem] break-keep text-slate-500">
           <li>· 입력 내용은 자동으로 임시 저장되며, 같은 링크로 다시 들어오면 이어서 작성할 수 있습니다.</li>
           <li>· <span className="text-danger-500">*</span> 표시는 필수 응답 문항입니다.</li>
           <li>· 제출한 뒤에는 이 링크에서 답변을 수정할 수 없습니다.</li>
@@ -193,7 +193,7 @@ export function SurveyStartScreen({
         <p className="mt-2 text-[13px] break-keep whitespace-pre-wrap text-slate-600">
           {view.privacyNotice}
         </p>
-        <p className="mt-2 text-xs break-keep text-slate-400">
+        <p className="mt-2 text-[0.875rem] break-keep text-slate-400">
           본 문구는 내부 테스트용 예시이며, 실제 운영 전 법적 검토가 필요합니다.
         </p>
         {view.consentRequired && (
@@ -210,7 +210,7 @@ export function SurveyStartScreen({
           </label>
         )}
         {error && view.consentRequired && !consented && (
-          <p className="mt-2 text-xs text-danger-600">
+          <p className="mt-2 text-[0.875rem] text-danger-600">
             설문을 시작하려면 개인정보 수집에 동의해야 합니다.
           </p>
         )}

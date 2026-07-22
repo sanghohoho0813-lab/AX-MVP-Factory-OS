@@ -29,11 +29,12 @@ import {
   TextAreaField,
   TextField,
 } from '../components/form/fields'
-import { Button } from '../components/ui/Button'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
+import { Modal } from '../components/ui/Modal'
 import { NotFoundState } from '../components/ui/NotFoundState'
-import { PageHeader } from '../components/ui/PageHeader'
 import { useToast } from '../components/ui/toastContext'
+import { WizardLayout, WizardSummaryRow, type WizardStep } from '../components/workspace/WizardLayout'
+import { Button } from '../components/ui/Button'
 
 interface FormState {
   name: string
@@ -206,6 +207,8 @@ export function OrganizationFormPage() {
   const [errors, setErrors] = useState<FormErrors>({})
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [step, setStep] = useState(0)
+  const [savedOrg, setSavedOrg] = useState<{ id: string; name: string } | null>(null)
   const { blocker, allowNavigation } = useUnsavedChangesGuard(dirty && !saving)
 
   if (isEdit && !existing) {
@@ -250,12 +253,14 @@ export function OrganizationFormPage() {
         ? updateOrganization(organizationId, toInput(form))
         : createOrganization(toInput(form))
       allowNavigation()
-      showToast(
-        isEdit
-          ? '고객사 정보를 저장했습니다.'
-          : `${saved.name} 고객사를 등록했습니다.`,
-      )
-      navigate(`/clients/${saved.id}`)
+      if (isEdit) {
+        showToast('고객사 정보를 저장했습니다.')
+        navigate(`/clients/${saved.id}`)
+      } else {
+        // 신규 등록: 다음 행동 선택 모달 표시
+        setSaving(false)
+        setSavedOrg({ id: saved.id, name: saved.name })
+      }
     } catch (error) {
       setSaving(false)
       showToast(
@@ -268,229 +273,139 @@ export function OrganizationFormPage() {
 
   const cancelTo = isEdit ? `/clients/${organizationId}` : '/clients'
 
+  const STEPS: WizardStep[] = [
+    { key: 'basic', title: '기본정보' },
+    { key: 'contact', title: '담당자·연락처' },
+    { key: 'status', title: '기업현황', optional: true },
+    { key: 'confirm', title: '확인·저장' },
+  ]
+
+  const validateStep = (i: number): boolean => {
+    const e = validate(form)
+    if (i === 0) {
+      const stepErr: FormErrors = { name: e.name, industry: e.industry }
+      setErrors((prev) => ({ ...prev, ...stepErr }))
+      if (e.name || e.industry) { focusFirstError(stepErr); return false }
+    }
+    if (i === 1) {
+      const stepErr: FormErrors = { contactName: e.contactName, contactPhone: e.contactPhone, contactEmail: e.contactEmail }
+      setErrors((prev) => ({ ...prev, ...stepErr }))
+      if (e.contactName || e.contactPhone || e.contactEmail) { focusFirstError(stepErr); return false }
+    }
+    return true
+  }
+
+  const goNext = () => { if (validateStep(step)) setStep((s) => Math.min(s + 1, STEPS.length - 1)) }
+  const goPrev = () => { if (step === 0) { allowNavigation(); navigate(cancelTo) } else setStep((s) => s - 1) }
+
+  const summary = (
+    <div>
+      <WizardSummaryRow label="고객사명" value={form.name} />
+      <WizardSummaryRow label="업종" value={form.industry} />
+      <WizardSummaryRow label="담당자" value={form.contactName} />
+      <WizardSummaryRow label="직원 수" value={form.employeeCount ? `${form.employeeCount}명` : ''} />
+    </div>
+  )
+
+  const missingRequired: string[] = []
+  {
+    const e = validate(form)
+    if (e.name) missingRequired.push('고객사명')
+    if (e.industry) missingRequired.push('업종')
+    if (e.contactName) missingRequired.push('담당자 이름')
+    if (e.contactPhone || e.contactEmail) missingRequired.push('연락처(전화 또는 이메일)')
+  }
+
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
-      <PageHeader
+    <>
+      <WizardLayout
         title={isEdit ? '고객사 수정' : '고객사 등록'}
-        description={
-          isEdit
-            ? `${existing?.name}의 기업 정보와 운영 상태를 수정합니다.`
-            : '기업 기본정보와 담당자를 등록하면 진단·프로젝트 관리를 시작할 수 있습니다.'
-        }
-      />
-
-      {existing?.archivedAt && (
-        <p className="rounded-(--radius-card) border border-warning-200 bg-warning-50 px-4 py-3 text-[13px] break-keep text-warning-700">
-          보관 처리된 고객사입니다. 수정 내용은 저장되지만 기본 목록에는 표시되지
-          않습니다.
-        </p>
-      )}
-
-      <form
-        noValidate
-        onSubmit={(event) => {
-          event.preventDefault()
-          handleSubmit()
-        }}
-        className="flex flex-col gap-5"
+        description={isEdit ? `${existing?.name}의 기업 정보를 단계별로 수정합니다.` : '기업 정보와 담당자를 단계별로 입력하면 진단·프로젝트 관리를 시작할 수 있습니다.'}
+        steps={STEPS}
+        current={step}
+        onStepChange={(i) => { if (i <= step) setStep(i) }}
+        onPrev={goPrev}
+        onNext={goNext}
+        onSubmit={handleSubmit}
+        submitLabel={isEdit ? '저장' : '고객사 등록하기'}
+        saving={saving}
+        summary={summary}
       >
-        <FormSection
-          title="기업 기본정보"
-          description="고객사의 기본 현황 정보를 입력합니다."
-        >
-          <TextField
-            id={FIELD_IDS.name}
-            label="고객사명"
-            required
-            value={form.name}
-            onChange={(e) => set('name', e.target.value)}
-            error={errors.name}
-            placeholder="예: 대한정밀"
-          />
-          <TextField
-            id={FIELD_IDS.businessRegistrationNumber}
-            label="사업자등록번호"
-            inputMode="numeric"
-            value={form.businessRegistrationNumber}
-            onChange={(e) =>
-              set(
-                'businessRegistrationNumber',
-                formatBusinessNumber(e.target.value),
-              )
-            }
-            error={errors.businessRegistrationNumber}
-            placeholder="000-00-00000"
-            help="숫자만 입력하면 자동으로 형식이 적용됩니다."
-          />
-          <TextField
-            id={FIELD_IDS.industry}
-            label="업종"
-            required
-            value={form.industry}
-            onChange={(e) => set('industry', e.target.value)}
-            error={errors.industry}
-            placeholder="예: 정밀가공 제조업"
-          />
-          <TextField
-            id={FIELD_IDS.subIndustry}
-            label="세부 업종"
-            value={form.subIndustry}
-            onChange={(e) => set('subIndustry', e.target.value)}
-            placeholder="예: 금속 절삭가공"
-          />
-          <SelectField
-            id={FIELD_IDS.businessType}
-            label="기업 형태"
-            value={form.businessType}
-            onChange={(e) => set('businessType', e.target.value as BusinessType)}
-            options={(
-              Object.keys(BUSINESS_TYPE_META) as BusinessType[]
-            ).map((type) => ({
-              value: type,
-              label: BUSINESS_TYPE_META[type].label,
-            }))}
-          />
-          <TextField
-            id={FIELD_IDS.foundedAt}
-            label="설립일"
-            type="date"
-            value={form.foundedAt}
-            onChange={(e) => set('foundedAt', e.target.value)}
-            error={errors.foundedAt}
-          />
-          <TextField
-            id={FIELD_IDS.employeeCount}
-            label="직원 수"
-            type="number"
-            min={0}
-            inputMode="numeric"
-            value={form.employeeCount}
-            onChange={(e) => set('employeeCount', e.target.value)}
-            error={errors.employeeCount}
-            placeholder="예: 42"
-          />
-          <CurrencyField
-            id={FIELD_IDS.annualRevenue}
-            label="연매출"
-            value={form.annualRevenue}
-            onChange={(value) => set('annualRevenue', value)}
-            placeholder="예: 1,200,000,000"
-          />
-          <TextField
-            id={FIELD_IDS.region}
-            label="지역"
-            value={form.region}
-            onChange={(e) => set('region', e.target.value)}
-            placeholder="예: 경기 시흥"
-          />
-          <TextField
-            id={FIELD_IDS.website}
-            label="홈페이지 주소"
-            type="url"
-            value={form.website}
-            onChange={(e) => set('website', e.target.value)}
-            error={errors.website}
-            placeholder="https://company.com"
-          />
-          <TextField
-            id={FIELD_IDS.address}
-            label="주소"
-            fullWidth
-            value={form.address}
-            onChange={(e) => set('address', e.target.value)}
-            placeholder="예: 경기도 시흥시 공단1대로 000"
-          />
-        </FormSection>
+        {existing?.archivedAt && (
+          <p className="mb-4 rounded-(--radius-card) border border-warning-200 bg-warning-50 px-4 py-3 text-[0.9rem] break-keep text-warning-700">
+            보관 처리된 고객사입니다. 수정 내용은 저장되지만 기본 목록에는 표시되지 않습니다.
+          </p>
+        )}
 
-        <FormSection
-          title="대표 연락 담당자"
-          description="프로젝트 진행 시 기본으로 연락할 담당자입니다."
-        >
-          <TextField
-            id={FIELD_IDS.contactName}
-            label="이름"
-            required
-            value={form.contactName}
-            onChange={(e) => set('contactName', e.target.value)}
-            error={errors.contactName}
-            placeholder="예: 김도현"
-          />
-          <TextField
-            id={FIELD_IDS.contactPosition}
-            label="직책"
-            value={form.contactPosition}
-            onChange={(e) => set('contactPosition', e.target.value)}
-            placeholder="예: 생산혁신팀장"
-          />
-          <TextField
-            id={FIELD_IDS.contactPhone}
-            label="전화번호"
-            type="tel"
-            inputMode="tel"
-            value={form.contactPhone}
-            onChange={(e) => set('contactPhone', e.target.value)}
-            onBlur={(e) => set('contactPhone', formatPhone(e.target.value))}
-            error={errors.contactPhone}
-            placeholder="010-0000-0000"
-            help="전화번호 또는 이메일 중 하나는 필수입니다."
-          />
-          <TextField
-            id={FIELD_IDS.contactEmail}
-            label="이메일"
-            type="email"
-            value={form.contactEmail}
-            onChange={(e) => set('contactEmail', e.target.value)}
-            error={errors.contactEmail}
-            placeholder="name@company.com"
-          />
-        </FormSection>
+        {step === 0 && (
+          <FormSection title="기업 기본정보" description="꼭 필요한 정보만 먼저 입력합니다.">
+            <TextField id={FIELD_IDS.name} label="고객사명" required value={form.name} onChange={(e) => set('name', e.target.value)} error={errors.name} placeholder="예: 대한정밀" />
+            <TextField id={FIELD_IDS.industry} label="업종" required value={form.industry} onChange={(e) => set('industry', e.target.value)} error={errors.industry} placeholder="예: 정밀가공 제조업" />
+            <TextField id={FIELD_IDS.subIndustry} label="세부 업종" value={form.subIndustry} onChange={(e) => set('subIndustry', e.target.value)} placeholder="예: 금속 절삭가공" />
+            <TextField id={FIELD_IDS.region} label="지역" value={form.region} onChange={(e) => set('region', e.target.value)} placeholder="예: 경기 시흥" />
+            <TextField id={FIELD_IDS.businessRegistrationNumber} label="사업자등록번호" inputMode="numeric" value={form.businessRegistrationNumber} onChange={(e) => set('businessRegistrationNumber', formatBusinessNumber(e.target.value))} error={errors.businessRegistrationNumber} placeholder="000-00-00000" help="숫자만 입력하면 자동으로 형식이 적용됩니다." />
+            <SelectField id={FIELD_IDS.businessType} label="기업 형태" value={form.businessType} onChange={(e) => set('businessType', e.target.value as BusinessType)} options={(Object.keys(BUSINESS_TYPE_META) as BusinessType[]).map((type) => ({ value: type, label: BUSINESS_TYPE_META[type].label }))} />
+            <TextField id={FIELD_IDS.address} label="주소" fullWidth value={form.address} onChange={(e) => set('address', e.target.value)} placeholder="예: 경기도 시흥시 공단1대로 000" />
+          </FormSection>
+        )}
 
-        <FormSection
-          title="운영 정보"
-          description="내부 운영 관점의 상태를 관리합니다."
-        >
-          <SelectField
-            id={FIELD_IDS.status}
-            label="고객 상태"
-            value={form.status}
-            onChange={(e) => set('status', e.target.value as OrganizationStatus)}
-            options={(['active', 'prospect', 'paused'] as const).map((s) => ({
-              value: s,
-              label: ORG_STATUS_META[s].label,
-            }))}
-          />
-          <SelectField
-            id={FIELD_IDS.healthStatus}
-            label="건강 상태"
-            value={form.healthStatus}
-            onChange={(e) => set('healthStatus', e.target.value as HealthStatus)}
-            options={(['healthy', 'attention', 'risk'] as const).map((h) => ({
-              value: h,
-              label: HEALTH_META[h].label,
-            }))}
-          />
-          <TextAreaField
-            id={FIELD_IDS.notes}
-            label="내부 메모"
-            value={form.notes}
-            onChange={(e) => set('notes', e.target.value)}
-            placeholder="고객사 특이사항, 진행 맥락 등을 기록하세요."
-          />
-        </FormSection>
+        {step === 1 && (
+          <FormSection title="대표 연락 담당자" description="프로젝트 진행 시 기본으로 연락할 담당자입니다. 전화 또는 이메일 중 하나는 필수입니다.">
+            <TextField id={FIELD_IDS.contactName} label="이름" required value={form.contactName} onChange={(e) => set('contactName', e.target.value)} error={errors.contactName} placeholder="예: 김도현" />
+            <TextField id={FIELD_IDS.contactPosition} label="직책" value={form.contactPosition} onChange={(e) => set('contactPosition', e.target.value)} placeholder="예: 생산혁신팀장" />
+            <TextField id={FIELD_IDS.contactPhone} label="전화번호" type="tel" inputMode="tel" value={form.contactPhone} onChange={(e) => set('contactPhone', e.target.value)} onBlur={(e) => set('contactPhone', formatPhone(e.target.value))} error={errors.contactPhone} placeholder="010-0000-0000" />
+            <TextField id={FIELD_IDS.contactEmail} label="이메일" type="email" value={form.contactEmail} onChange={(e) => set('contactEmail', e.target.value)} error={errors.contactEmail} placeholder="name@company.com" />
+            <TextAreaField id={FIELD_IDS.notes} label="연락 메모" value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder="고객사 특이사항, 진행 맥락 등을 기록하세요." />
+          </FormSection>
+        )}
 
-        <div className="flex items-center justify-end gap-2 pb-2">
-          <Button
-            variant="secondary"
-            onClick={() => navigate(cancelTo)}
-            disabled={saving}
-          >
-            취소
-          </Button>
-          <Button type="submit" variant="primary" disabled={saving}>
-            {saving ? '저장 중…' : isEdit ? '저장' : '고객사 등록'}
-          </Button>
+        {step === 2 && (
+          <FormSection title="기업현황 (선택)" description="아는 만큼만 입력하세요. 나중에 수정할 수 있습니다.">
+            <TextField id={FIELD_IDS.foundedAt} label="설립일" type="date" value={form.foundedAt} onChange={(e) => set('foundedAt', e.target.value)} error={errors.foundedAt} />
+            <TextField id={FIELD_IDS.employeeCount} label="직원 수" type="number" min={0} inputMode="numeric" value={form.employeeCount} onChange={(e) => set('employeeCount', e.target.value)} error={errors.employeeCount} placeholder="예: 42" />
+            <CurrencyField id={FIELD_IDS.annualRevenue} label="연매출" value={form.annualRevenue} onChange={(value) => set('annualRevenue', value)} placeholder="예: 1,200,000,000" />
+            <TextField id={FIELD_IDS.website} label="홈페이지 주소" type="url" value={form.website} onChange={(e) => set('website', e.target.value)} error={errors.website} placeholder="https://company.com" />
+            <SelectField id={FIELD_IDS.status} label="고객 상태" value={form.status} onChange={(e) => set('status', e.target.value as OrganizationStatus)} options={(['active', 'prospect', 'paused'] as const).map((s) => ({ value: s, label: ORG_STATUS_META[s].label }))} />
+            <SelectField id={FIELD_IDS.healthStatus} label="건강 상태" value={form.healthStatus} onChange={(e) => set('healthStatus', e.target.value as HealthStatus)} options={(['healthy', 'attention', 'risk'] as const).map((h) => ({ value: h, label: HEALTH_META[h].label }))} />
+          </FormSection>
+        )}
+
+        {step === 3 && (
+          <div className="flex flex-col gap-4">
+            <h2 className="text-[1.15rem] font-bold text-slate-900">입력 내용 확인</h2>
+            <dl className="rounded-(--radius-card) border border-slate-200">
+              {[
+                ['고객사명', form.name], ['업종', form.industry], ['세부 업종', form.subIndustry], ['지역', form.region],
+                ['담당자', form.contactName], ['전화', form.contactPhone], ['이메일', form.contactEmail],
+                ['직원 수', form.employeeCount ? `${form.employeeCount}명` : ''],
+              ].map(([label, value]) => (
+                <div key={label} className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-2.5 last:border-0">
+                  <dt className="shrink-0 text-[0.95rem] text-slate-500">{label}</dt>
+                  <dd className="min-w-0 break-keep text-right text-[0.95rem] font-medium text-slate-800">{value || <span className="text-slate-300">미입력</span>}</dd>
+                </div>
+              ))}
+            </dl>
+            {missingRequired.length > 0 ? (
+              <p className="rounded-(--radius-card) border border-warning-200 bg-warning-50 px-4 py-3 text-[0.95rem] break-keep text-warning-700">
+                아직 필요한 정보가 있습니다: {missingRequired.join(', ')}. 이전 단계에서 입력해 주세요.
+              </p>
+            ) : (
+              <p className="rounded-(--radius-card) border border-brand-100 bg-brand-50/60 px-4 py-3 text-[0.95rem] break-keep text-brand-800">
+                등록 후 이 고객사로 <b>새 프로젝트</b>를 만들어 진단을 시작할 수 있습니다.
+              </p>
+            )}
+          </div>
+        )}
+      </WizardLayout>
+
+      {/* 등록 완료 후 다음 행동 선택 */}
+      <Modal open={savedOrg !== null} title="고객사를 등록했습니다" onClose={() => { setSavedOrg(null); navigate(`/clients/${savedOrg?.id}`) }}>
+        <p className="mb-4 text-[1rem] break-keep text-slate-600">{savedOrg?.name} 고객사가 등록되었습니다. 다음으로 무엇을 할까요?</p>
+        <div className="flex flex-col gap-2.5">
+          <Button variant="primary" onClick={() => { const id = savedOrg?.id; setSavedOrg(null); navigate(`/projects/new?organizationId=${id}`) }}>이 고객사로 새 프로젝트 만들기</Button>
+          <Button variant="secondary" onClick={() => { const id = savedOrg?.id; setSavedOrg(null); navigate(`/clients/${id}`) }}>고객사 상세 보기</Button>
         </div>
-      </form>
+      </Modal>
 
       <ConfirmModal
         open={blocker.state === 'blocked'}
@@ -502,6 +417,6 @@ export function OrganizationFormPage() {
         onConfirm={() => blocker.proceed?.()}
         onCancel={() => blocker.reset?.()}
       />
-    </div>
+    </>
   )
 }

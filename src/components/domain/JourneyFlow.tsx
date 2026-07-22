@@ -44,7 +44,7 @@ export function JourneyFlow({
             >
               <span className="flex items-center gap-1.5">
                 <span
-                  className={`flex size-5 items-center justify-center rounded-full text-[11px] font-bold ${
+                  className={`flex size-5 items-center justify-center rounded-full text-[0.8125rem] font-bold ${
                     step.state === 'done'
                       ? 'bg-success-100 text-success-700'
                       : step.state === 'current'
@@ -61,7 +61,7 @@ export function JourneyFlow({
                   )}
                 </span>
                 {step.state === 'current' && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand-600">
+                  <span className="inline-flex items-center gap-1 text-[0.78rem] font-semibold text-brand-600">
                     <Circle aria-hidden="true" className="size-1.5 fill-current" />
                     지금 단계
                   </span>
@@ -77,7 +77,7 @@ export function JourneyFlow({
                 {step.state === 'locked' && <span className="sr-only"> 잠김</span>}
               </span>
               {step.state === 'locked' && step.hint && (
-                <span className="text-[11px] break-keep text-slate-400">{step.hint}</span>
+                <span className="text-[0.8125rem] break-keep text-slate-400">{step.hint}</span>
               )}
             </Wrapper>
           </li>

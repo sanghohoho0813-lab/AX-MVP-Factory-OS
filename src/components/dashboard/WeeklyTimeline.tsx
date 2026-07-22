@@ -39,7 +39,7 @@ export function WeeklyTimeline({ tracks, items }: WeeklyTimelineProps) {
           {WEEK_DAYS.map((day, index) => (
             <div key={day.label} className="pb-2 text-center">
               <span
-                className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[0.875rem] font-medium ${
                   index === DEMO_TODAY_INDEX
                     ? 'bg-brand-600 text-white'
                     : 'text-slate-500'
@@ -79,10 +79,10 @@ export function WeeklyTimeline({ tracks, items }: WeeklyTimelineProps) {
                     }}
                   >
                     <div className="mx-0.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5">
-                      <p className="truncate text-xs font-medium text-slate-700">
+                      <p className="truncate text-[0.875rem] font-medium text-slate-700">
                         {item.title}
                       </p>
-                      <p className="truncate text-[11px] text-slate-400">
+                      <p className="truncate text-[0.8125rem] text-slate-400">
                         {item.owner}
                       </p>
                     </div>
@@ -126,7 +126,7 @@ export function WeeklyTimeline({ tracks, items }: WeeklyTimelineProps) {
               className="rounded-(--radius-card) border border-slate-200 bg-slate-50 px-3.5 py-3"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-slate-500">
+                <span className="flex min-w-0 items-center gap-1.5 text-[0.875rem] font-medium text-slate-500">
                   {track && (
                     <span
                       aria-hidden="true"
@@ -135,14 +135,14 @@ export function WeeklyTimeline({ tracks, items }: WeeklyTimelineProps) {
                   )}
                   <span className="truncate">{track?.label}</span>
                 </span>
-                <span className="shrink-0 text-xs text-slate-400">
+                <span className="shrink-0 text-[0.875rem] text-slate-400">
                   {start.label} {start.date} ~ {end.label} {end.date}
                 </span>
               </div>
               <p className="mt-1 text-sm font-medium break-keep text-slate-800">
                 {item.title}
               </p>
-              <p className="mt-0.5 text-xs text-slate-400">{item.owner}</p>
+              <p className="mt-0.5 text-[0.875rem] text-slate-400">{item.owner}</p>
             </li>
           )
         })}

@@ -62,6 +62,7 @@ export function CandidateBoardPage() {
   const [sort, setSort] = useState('score_desc')
   const [mergeOpen, setMergeOpen] = useState(false)
   const [manualOpen, setManualOpen] = useState(false)
+  const [showAll, setShowAll] = useState(false)
 
   const candidates = context?.candidates ?? []
   const filtered = useMemo(() => {
@@ -185,7 +186,45 @@ export function CandidateBoardPage() {
       />
       <SelectionNav projectId={projectId} />
 
-      <p className="text-sm break-keep text-slate-500">
+      {/* 의사결정 — 첫 번째 MVP 업무 선택 */}
+      {activeCandidates.length > 0 && (
+        <section className="flex flex-col gap-4">
+          <div>
+            <h2 className="text-[1.4rem] font-bold break-keep text-slate-900">첫 번째 MVP에서 어떤 업무를 먼저 해결할까요?</h2>
+            <p className="mt-1 text-[1rem] break-keep text-slate-500">진단에서 발견된 업무 중 추천도가 높은 후보입니다. 하나를 골라 첫 번째로 만들 업무를 확정하세요.</p>
+          </div>
+          <ul className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            {[...activeCandidates].sort((a, b) => b.priorityScore - a.priorityScore).slice(0, 3).map((c, i) => (
+              <li key={c.id} className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-5">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-[0.85rem] font-bold text-brand-700">추천 {i + 1}</span>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.8rem] font-medium text-slate-500">추천도 {Math.round(c.priorityScore)}</span>
+                </div>
+                <p className="text-[1.15rem] font-bold break-keep text-slate-900">{c.name}</p>
+                <dl className="flex flex-col gap-2 text-[0.92rem]">
+                  <div><dt className="text-slate-400">가장 큰 문제</dt><dd className="break-keep text-slate-700">{c.problemStatement || '—'}</dd></div>
+                  <div><dt className="text-slate-400">현재 방식</dt><dd className="break-keep text-slate-700">{c.currentProcess || '—'}</dd></div>
+                  <div><dt className="text-slate-400">추천 이유</dt><dd className="break-keep text-slate-700">{c.aiReason || '—'}</dd></div>
+                </dl>
+                <Button variant="primary" className="mt-auto h-auto w-full py-2.5" onClick={() => onOpen(c)}><span className="whitespace-normal">이 업무 자세히 보고 선택하기</span></Button>
+              </li>
+            ))}
+          </ul>
+          <div>
+            <Button variant="secondary" onClick={() => navigate(`/selection/projects/${projectId}/decision`)}>
+              <Star aria-hidden="true" className="size-4" /> 첫 번째 업무 확정하기
+            </Button>
+          </div>
+          <button type="button" onClick={() => setShowAll((v) => !v)} aria-expanded={showAll}
+            className="flex w-fit items-center gap-1.5 text-[0.95rem] font-semibold text-slate-500 hover:text-slate-800">
+            {showAll ? '후보 관리 접기' : '다른 후보 모두 보기·관리'}
+          </button>
+        </section>
+      )}
+
+      {!showAll && activeCandidates.length > 0 ? null : (
+      <>
+      <p className="text-[0.95rem] break-keep text-slate-500">
         진단 응답에서 발견된 업무를 검토하고 중복·범위·효과·위험을 정리합니다.
       </p>
 
@@ -301,6 +340,8 @@ export function CandidateBoardPage() {
         <Panel title={`후보 (${filtered.length})`} flush>
           <CandidateTable candidates={filtered} onOpen={onOpen} />
         </Panel>
+      )}
+      </>
       )}
 
       <CandidateMergeModal open={mergeOpen} candidates={activeCandidates} onClose={() => setMergeOpen(false)} onSubmit={onMerge} />

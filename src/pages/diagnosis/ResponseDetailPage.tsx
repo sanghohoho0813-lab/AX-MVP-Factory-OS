@@ -40,7 +40,7 @@ import { Button } from '../../components/ui/Button'
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs text-slate-400">{label}</dt>
+      <dt className="text-[0.875rem] text-slate-400">{label}</dt>
       <dd className="mt-0.5 text-sm break-keep text-slate-700">{value || '-'}</dd>
     </div>
   )
@@ -191,13 +191,13 @@ export function ResponseDetailPage() {
               {rows.map((p) => (
                 <li key={p.id} className="py-4 first:pt-0 last:pb-0">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="font-mono text-xs font-semibold text-slate-400">
+                    <span className="font-mono text-[0.875rem] font-semibold text-slate-400">
                       {p.questionCode}
                     </span>
                     <QuestionCategoryBadge category={p.category} />
                     <QuestionScopeBadge scope={p.sourceScope} />
                     {p.required && (
-                      <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-500">
+                      <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.8125rem] text-slate-500">
                         필수
                       </span>
                     )}
@@ -212,7 +212,7 @@ export function ResponseDetailPage() {
                     <SurveyAnswerDisplay placement={p} value={answerMap.get(p.questionId)} />
                   </div>
                   {answeredAtOf.get(p.questionId) && (
-                    <p className="mt-1.5 text-[11px] text-slate-400">
+                    <p className="mt-1.5 text-[0.8125rem] text-slate-400">
                       응답 {formatDateTime(answeredAtOf.get(p.questionId) ?? null)}
                     </p>
                   )}
@@ -232,12 +232,12 @@ export function ResponseDetailPage() {
             <ul className="flex flex-col gap-2">
               {unanswered.map((p) => (
                 <li key={p.id} className="flex items-center gap-2 text-[13px]">
-                  <span className="font-mono text-xs text-slate-400">{p.questionCode}</span>
+                  <span className="font-mono text-[0.875rem] text-slate-400">{p.questionCode}</span>
                   <span className="min-w-0 flex-1 truncate text-slate-600">{p.questionText}</span>
                   {p.required ? (
-                    <span className="shrink-0 text-xs font-medium text-danger-600">필수</span>
+                    <span className="shrink-0 text-[0.875rem] font-medium text-danger-600">필수</span>
                   ) : (
-                    <span className="shrink-0 text-xs text-slate-400">선택</span>
+                    <span className="shrink-0 text-[0.875rem] text-slate-400">선택</span>
                   )}
                 </li>
               ))}
@@ -281,7 +281,7 @@ export function ResponseDetailPage() {
               .filter((p) => !visibleIds.has(p.questionId))
               .map((p) => (
                 <li key={p.id} className="flex items-center gap-2 text-[13px]">
-                  <span className="font-mono text-xs text-slate-400">{p.questionCode}</span>
+                  <span className="font-mono text-[0.875rem] text-slate-400">{p.questionCode}</span>
                   <span className="min-w-0 flex-1 truncate text-slate-500">{p.questionText}</span>
                 </li>
               ))}

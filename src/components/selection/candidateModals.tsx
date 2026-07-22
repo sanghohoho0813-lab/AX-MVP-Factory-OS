@@ -74,7 +74,7 @@ export function CandidateScoreAdjustModal({
             aria-describedby="cand-adjust-help"
             className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
           />
-          <p id="cand-adjust-help" className="mt-1 text-xs text-slate-400">영역 최대 {domainScore.maxScore}점을 초과할 수 없습니다.</p>
+          <p id="cand-adjust-help" className="mt-1 text-[0.875rem] text-slate-400">영역 최대 {domainScore.maxScore}점을 초과할 수 없습니다.</p>
         </div>
         <div>
           <label htmlFor="cand-adjust-reason" className="mb-1.5 block text-sm font-medium text-slate-700">
@@ -165,7 +165,7 @@ export function CandidateMergeModal({
                 <input type="checkbox" checked={isChecked} onChange={() => toggle(c)} aria-label={`${c.name} 병합 선택`} />
                 <span className="min-w-0 flex-1 truncate text-slate-700">{c.name}</span>
                 {isChecked && (
-                  <label className="flex shrink-0 items-center gap-1 text-xs text-slate-500">
+                  <label className="flex shrink-0 items-center gap-1 text-[0.875rem] text-slate-500">
                     <input type="radio" name="merge-target" checked={targetId === c.id} onChange={() => { setTargetId(c.id); setName(c.name); setProblem(c.problemStatement) }} />
                     유지
                   </label>

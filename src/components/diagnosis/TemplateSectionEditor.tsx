@@ -179,7 +179,7 @@ export function TemplateSectionEditor({
                     updateSection(section.id, { description: e.target.value })
                   }
                   placeholder="섹션 설명 (선택)"
-                  className="mt-0.5 w-full rounded-lg border border-transparent px-1 text-xs text-slate-500 hover:border-slate-200 focus:border-brand-500"
+                  className="mt-0.5 w-full rounded-lg border border-transparent px-1 text-[0.875rem] text-slate-500 hover:border-slate-200 focus:border-brand-500"
                 />
               </div>
               <div className="flex shrink-0 items-center gap-0.5">
@@ -245,7 +245,7 @@ export function TemplateSectionEditor({
                           </button>
                         </div>
                         <div className="min-w-0 flex-1">
-                          <span className="font-mono text-xs font-semibold text-slate-400">
+                          <span className="font-mono text-[0.875rem] font-semibold text-slate-400">
                             {question?.code ?? '삭제된 질문'}
                           </span>
                           <p
@@ -256,7 +256,7 @@ export function TemplateSectionEditor({
                           {question && (
                             <div className="mt-1 flex flex-wrap items-center gap-1.5">
                               <QuestionTypeBadge type={question.type} />
-                              <label className="flex cursor-pointer items-center gap-1 text-xs text-slate-500">
+                              <label className="flex cursor-pointer items-center gap-1 text-[0.875rem] text-slate-500">
                                 <input
                                   type="checkbox"
                                   checked={placement.required}
@@ -282,7 +282,7 @@ export function TemplateSectionEditor({
                                       )
                                     }
                                   }}
-                                  className="h-7 rounded-md border border-slate-200 px-1.5 text-xs text-slate-500"
+                                  className="h-7 rounded-md border border-slate-200 px-1.5 text-[0.875rem] text-slate-500"
                                 >
                                   <option value="">섹션 이동…</option>
                                   {ordered

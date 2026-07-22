@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { getDataModeConfig } from '../../data/dataMode'
 import { useCallbackRef } from '../../lib/useCallbackRef'
 import type { RespondentProfile, SurveyAnswerValue } from '../../types/surveyRuntime'
 import type { SurveyResponse } from '../../types/surveyRuntime'
@@ -20,6 +21,12 @@ import {
   type PublicSurveyResolution,
 } from '../../services/surveyRuntimeService'
 import {
+  clearSurveyDraft,
+  isDraftNewer,
+  readSurveyDraft,
+  writeSurveyDraft,
+} from '../../storage/surveyDraftCache'
+import {
   PublicSurveyLayout,
   PublicSurveyNotice,
 } from '../../components/public/PublicSurveyLayout'
@@ -36,7 +43,23 @@ import {
 
 type Phase = 'start' | 'filling' | 'review' | 'completed'
 
+// supabase 모드 공개 설문은 공개 RPC 를 쓰며 lazy 로드한다(local 청크에 SDK 미포함).
+const SupabasePublicSurvey = lazy(() =>
+  import('./SupabasePublicSurvey').then((m) => ({ default: m.SupabasePublicSurvey })),
+)
+
 export function PublicSurveyPage() {
+  if (getDataModeConfig().mode === 'supabase') {
+    return (
+      <Suspense fallback={<div className="p-8 text-center text-sm text-slate-400">불러오는 중…</div>}>
+        <SupabasePublicSurvey />
+      </Suspense>
+    )
+  }
+  return <LocalPublicSurvey />
+}
+
+function LocalPublicSurvey() {
   const { accessToken = '' } = useParams()
 
   // 토큰 1회 해석 + markOpened
@@ -53,16 +76,27 @@ export function PublicSurveyPage() {
   const distribution = resolution.kind === 'ok' ? resolution.distribution : null
   const view = resolution.kind === 'ok' ? resolution.view : null
 
+  // 복구 우선순위: 정식 저장 Response → (더 최신이면) emergency draft → 빈 초기값.
+  // 오래된 draft 가 최신 정식 저장을 덮어쓰지 않도록 updatedAt 을 비교한다.
+  const [initialDraft] = useState(() => {
+    if (!response || response.status === 'submitted') return null
+    const draft = readSurveyDraft(response.id)
+    if (!draft) return null
+    return isDraftNewer(draft, response.updatedAt) ? draft : null
+  })
+
   const [phase, setPhase] = useState<Phase>(() => {
     if (resolution.kind !== 'ok' || !response) return 'start'
     return response.status === 'in_progress' && response.consented ? 'start' : 'start'
   })
   const [answers, setAnswers] = useState<Record<string, SurveyAnswerValue>>(() => {
+    if (initialDraft) return initialDraft.answers
     if (!response) return {}
     return Object.fromEntries(response.answers.map((a) => [a.questionId, a.value]))
   })
   const [profile, setProfile] = useState<RespondentProfile>(
     () =>
+      initialDraft?.profile ??
       response?.respondentProfile ?? {
         name: distribution?.recipientName ?? '',
         position: distribution?.recipientPosition ?? '',
@@ -71,9 +105,9 @@ export function PublicSurveyPage() {
         phone: distribution?.recipientPhone ?? '',
       },
   )
-  const [consented, setConsented] = useState(response?.consented ?? false)
+  const [consented, setConsented] = useState(initialDraft?.consented ?? response?.consented ?? false)
   const [currentPageIndex, setCurrentPageIndex] = useState(
-    response?.currentPageIndex ?? 0,
+    initialDraft?.currentPageIndex ?? response?.currentPageIndex ?? 0,
   )
   const [startError, setStartError] = useState<string | null>(null)
   const [errorIds, setErrorIds] = useState<Set<string>>(new Set())
@@ -163,11 +197,28 @@ export function PublicSurveyPage() {
       setResponse(updated)
       setLastSavedAt(updated.lastSavedAt)
       setAutosave('saved')
+      // 정식 저장이 성공했으므로 emergency draft 는 정리한다
+      clearSurveyDraft(updated.id)
     } catch {
-      // 입력값을 버리지 않고 오류 상태만 표시
+      // 입력값을 버리지 않고 오류 상태만 표시 (emergency draft 는 남아 있음)
       setAutosave('error')
     }
   })
+
+  // 동기 emergency draft — debounce 실행 전에 탭이 닫혀도 마지막 답변을 보존한다.
+  // localStorage 동기 쓰기이므로 이벤트 발생 여부와 무관하게 항상 최신 상태가 남는다.
+  useEffect(() => {
+    if (!response || response.status === 'submitted') return
+    if (phase === 'completed') return
+    writeSurveyDraft({
+      responseId: response.id,
+      answers,
+      profile,
+      consented,
+      currentPageIndex: safePageIndex,
+      updatedAt: new Date().toISOString(),
+    })
+  }, [answers, profile, consented, safePageIndex, phase, response])
 
   // 디바운스 자동 저장
   useEffect(() => {
@@ -176,18 +227,24 @@ export function PublicSurveyPage() {
     return () => window.clearTimeout(t)
   }, [answers, profile, consented, phase, safePageIndex, saveNow])
 
-  // 탭 숨김·종료 시 즉시 저장
+  // 탭 숨김·페이지 종료·컴포넌트 unmount 시 즉시 저장(모두 동기 localStorage 경로).
+  // beforeunload 는 보조 수단일 뿐, async 완료에 의존하지 않는다.
   useEffect(() => {
     if (phase !== 'filling') return
     const onHide = () => {
       if (document.visibilityState === 'hidden') saveNow(true)
     }
+    const onPageHide = () => saveNow(true)
     const onBeforeUnload = () => saveNow(true)
     document.addEventListener('visibilitychange', onHide)
+    window.addEventListener('pagehide', onPageHide)
     window.addEventListener('beforeunload', onBeforeUnload)
     return () => {
       document.removeEventListener('visibilitychange', onHide)
+      window.removeEventListener('pagehide', onPageHide)
       window.removeEventListener('beforeunload', onBeforeUnload)
+      // SPA 내 다른 화면으로 이동(unmount)·phase 전환 시 마지막 flush
+      saveNow(true)
     }
   }, [phase, saveNow])
 
@@ -355,6 +412,7 @@ export function PublicSurveyPage() {
       const sanitized = sanitizeAnswersForSubmission(sections, buildAnswerRecords())
       const withSanitized: SurveyResponse = { ...response, answers: sanitized }
       const submitted = submitSurveyResponse(withSanitized, distribution)
+      clearSurveyDraft(submitted.id)
       setResponse(submitted)
       setPhase('completed')
       window.scrollTo(0, 0)
@@ -381,7 +439,7 @@ export function PublicSurveyPage() {
         <SurveyStartScreen
           view={view}
           estimatedMinutes={Math.max(1, Math.round(progress.estimatedRemainingMinutes) || 5)}
-          hasDraft={response.status === 'in_progress'}
+          hasDraft={response.status === 'in_progress' || initialDraft !== null}
           draftProgress={response.progressPercent}
           draftLastSaved={response.lastSavedAt}
           profile={profile}
@@ -432,7 +490,7 @@ export function PublicSurveyPage() {
           canPrev={safePageIndex > 0 || true}
           isLast={safePageIndex >= pages.length - 1}
           submitting={submitting}
-          autosave={<SurveyAutosaveIndicator state={autosave} lastSavedAt={lastSavedAt} onRetry={() => saveNow(true)} />}
+          autosave={<SurveyAutosaveIndicator state={autosave} lastSavedAt={lastSavedAt} savedLabel="이 브라우저에 임시저장됨" onRetry={() => saveNow(true)} />}
           onPrev={handlePrev}
           onNext={handleNext}
         />
@@ -449,7 +507,7 @@ export function PublicSurveyPage() {
             total={progress.totalVisibleQuestions}
           />
           <div className="mb-3 sm:hidden">
-            <SurveyAutosaveIndicator state={autosave} lastSavedAt={lastSavedAt} onRetry={() => saveNow(true)} />
+            <SurveyAutosaveIndicator state={autosave} lastSavedAt={lastSavedAt} savedLabel="이 브라우저에 임시저장됨" onRetry={() => saveNow(true)} />
           </div>
           {errorIds.size > 0 && (
             <p

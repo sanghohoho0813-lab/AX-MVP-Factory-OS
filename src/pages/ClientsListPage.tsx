@@ -16,7 +16,6 @@ import type { Organization, OrganizationSortKey } from '../types/domain'
 import type { ProjectStage } from '../types'
 import { HEALTH_META, PROJECT_STAGE_META } from '../lib/statusMeta'
 import { ORG_STATUS_META } from '../lib/domainMeta'
-import { formatDate } from '../lib/format'
 import { useStoreVersion } from '../lib/useStoreVersion'
 import {
   archiveOrganization,
@@ -27,6 +26,7 @@ import {
 import { Button } from '../components/ui/Button'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { DataTable, type DataTableColumn } from '../components/ui/DataTable'
+import { StatusPill } from '../components/workspace/StatusPill'
 import { DropdownMenu } from '../components/ui/DropdownMenu'
 import { EmptyState } from '../components/ui/EmptyState'
 import { FilterBar } from '../components/ui/FilterBar'
@@ -155,28 +155,18 @@ export function ClientsListPage() {
     />
   )
 
+  const healthToStatus = (h: string): 'done' | 'in_progress' | 'attention' | 'blocked' =>
+    h === 'risk' ? 'blocked' : h === 'attention' ? 'attention' : 'in_progress'
+
   const columns: DataTableColumn<OrganizationRow>[] = [
     {
       key: 'name',
       header: '고객사',
       cell: (row) => (
         <div className="min-w-0">
-          <p className="max-w-48 truncate text-sm font-semibold text-slate-800">
-            {row.organization.name}
-          </p>
-          <p className="mt-0.5 text-xs text-slate-400">
-            {ORG_STATUS_META[row.organization.status].label}
-          </p>
+          <p className="truncate text-[1.1rem] font-bold text-slate-900">{row.organization.name}</p>
+          <p className="mt-0.5 text-[0.9rem] text-slate-500">{row.organization.industry}</p>
         </div>
-      ),
-    },
-    {
-      key: 'industry',
-      header: '업종',
-      cell: (row) => (
-        <span className="text-[13px] whitespace-nowrap text-slate-600">
-          {row.organization.industry}
-        </span>
       ),
     },
     {
@@ -185,88 +175,43 @@ export function ClientsListPage() {
       cell: (row) =>
         row.primaryProject ? (
           <div className="min-w-0">
-            <p className="max-w-52 truncate text-[13px] font-medium text-slate-700">
-              {row.primaryProject.name}
-            </p>
-            {row.projects.length > 1 && (
-              <p className="mt-0.5 text-xs text-slate-400">
-                외 {row.projects.length - 1}건
+            <div className="flex min-w-0 items-center gap-1.5">
+              <p className="max-w-52 truncate text-[0.95rem] font-medium text-slate-700">{row.primaryProject.name}</p>
+              {row.primaryProgress?.isSample && (
+                <span className="shrink-0 rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[0.78rem] font-medium text-brand-700">
+                  샘플
+                </span>
+              )}
+            </div>
+            {row.primaryProgress && (
+              <p className="mt-0.5 text-[0.85rem] text-slate-500">
+                {row.primaryProgress.stepText} · {row.primaryProgress.currentStepLabel}
               </p>
             )}
+            {row.projects.length > 1 && <p className="mt-0.5 text-[0.85rem] text-slate-400">외 {row.projects.length - 1}건</p>}
           </div>
         ) : (
-          <span className="text-[13px] text-slate-400">프로젝트 없음</span>
+          <span className="text-[0.95rem] text-slate-400">프로젝트 없음</span>
         ),
     },
     {
-      key: 'stage',
-      header: '현재 단계',
-      cell: (row) =>
-        row.primaryProject ? (
-          <StatusBadge tone={PROJECT_STAGE_META[row.primaryProject.currentStage].tone}>
-            {PROJECT_STAGE_META[row.primaryProject.currentStage].label}
-          </StatusBadge>
-        ) : (
-          <span className="text-[13px] text-slate-400">-</span>
-        ),
-    },
-    {
-      key: 'contact',
-      header: '담당자',
-      cell: (row) => (
-        <span className="text-[13px] whitespace-nowrap text-slate-600">
-          {row.organization.primaryContact.name}
-        </span>
-      ),
-    },
-    {
-      key: 'progress',
-      header: '진행률',
-      className: 'w-36',
-      cell: (row) =>
-        row.primaryProject ? (
-          <div className="flex items-center gap-2">
-            <ProgressBar
-              value={row.primaryProject.progress}
-              tone={HEALTH_META[row.organization.healthStatus].tone}
-              label={`${row.organization.name} 진행률`}
-            />
-            <span className="w-9 shrink-0 text-right text-xs font-semibold text-slate-600">
-              {row.primaryProject.progress}%
-            </span>
-          </div>
-        ) : (
-          <span className="text-[13px] text-slate-400">-</span>
-        ),
-    },
-    {
-      key: 'health',
-      header: '건강 상태',
-      cell: (row) => (
-        <StatusBadge tone={HEALTH_META[row.organization.healthStatus].tone} withDot>
-          {HEALTH_META[row.organization.healthStatus].label}
-        </StatusBadge>
-      ),
+      key: 'status',
+      header: '현재 상태',
+      cell: (row) => <StatusPill status={healthToStatus(row.organization.healthStatus)} size="sm" />,
     },
     {
       key: 'next-action',
       header: '다음 행동',
-      className: 'hidden 2xl:table-cell',
       cell: (row) => (
-        <span className="block max-w-56 truncate text-[13px] text-slate-600">
-          {row.primaryProject?.nextAction || '-'}
+        <span className="block max-w-64 truncate text-[0.95rem] font-medium text-brand-700">
+          {row.primaryProgress?.nextActionLabel || '다음 행동 없음'}
         </span>
       ),
     },
     {
-      key: 'updated',
-      header: '최근 수정일',
-      className: 'hidden xl:table-cell',
-      cell: (row) => (
-        <span className="text-[13px] whitespace-nowrap text-slate-500">
-          {formatDate(row.organization.updatedAt)}
-        </span>
-      ),
+      key: 'contact',
+      header: '담당자',
+      cell: (row) => <span className="text-[0.95rem] whitespace-nowrap text-slate-600">{row.organization.primaryContact.name}</span>,
     },
     {
       key: 'actions',
@@ -458,46 +403,51 @@ export function ClientsListPage() {
                   <StatusBadge tone={HEALTH_META[row.organization.healthStatus].tone} withDot>
                     {HEALTH_META[row.organization.healthStatus].label}
                   </StatusBadge>
-                  {row.primaryProject && (
-                    <StatusBadge
-                      tone={PROJECT_STAGE_META[row.primaryProject.currentStage].tone}
-                    >
-                      {PROJECT_STAGE_META[row.primaryProject.currentStage].label}
+                  {row.primaryProgress && (
+                    <StatusBadge tone="info">
+                      {row.primaryProgress.currentStepLabel}
                     </StatusBadge>
+                  )}
+                  {row.primaryProgress?.isSample && (
+                    <span className="rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[0.78rem] font-medium text-brand-700">
+                      샘플
+                    </span>
                   )}
                 </div>
                 <div className="px-4 pt-3 pb-4">
                   {row.primaryProject ? (
                     <>
-                      <p className="truncate text-[13px] font-medium text-slate-700">
+                      <p className="truncate text-sm font-medium text-slate-700">
                         {row.primaryProject.name}
                         {row.projects.length > 1 && (
-                          <span className="ml-1 text-xs font-normal text-slate-400">
+                          <span className="ml-1 text-[0.85rem] font-normal text-slate-400">
                             외 {row.projects.length - 1}건
                           </span>
                         )}
                       </p>
-                      <div className="mt-2 flex items-center gap-2">
-                        <ProgressBar
-                          value={row.primaryProject.progress}
-                          tone={HEALTH_META[row.organization.healthStatus].tone}
-                          label={`${row.organization.name} 진행률`}
-                        />
-                        <span className="shrink-0 text-xs font-semibold text-slate-600">
-                          {row.primaryProject.progress}%
-                        </span>
-                      </div>
-                      {row.primaryProject.nextAction && (
-                        <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
+                      {row.primaryProgress && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <ProgressBar
+                            value={row.primaryProgress.percent}
+                            tone={HEALTH_META[row.organization.healthStatus].tone}
+                            label={`${row.organization.name} 진행 단계`}
+                          />
+                          <span className="shrink-0 text-[0.875rem] font-semibold text-slate-600">
+                            {row.primaryProgress.stepText}
+                          </span>
+                        </div>
+                      )}
+                      {row.primaryProgress?.nextActionLabel && (
+                        <p className="mt-2 flex items-center gap-1.5 text-[0.875rem] break-keep text-slate-500">
                           <UserRound aria-hidden="true" className="size-3 shrink-0" />
                           <span className="truncate">
-                            다음 행동: {row.primaryProject.nextAction}
+                            다음 행동: {row.primaryProgress.nextActionLabel}
                           </span>
                         </p>
                       )}
                     </>
                   ) : (
-                    <p className="text-[13px] text-slate-400">
+                    <p className="text-sm text-slate-400">
                       연결된 프로젝트가 없습니다.
                     </p>
                   )}

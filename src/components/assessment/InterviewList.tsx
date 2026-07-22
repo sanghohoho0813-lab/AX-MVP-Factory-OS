@@ -31,19 +31,19 @@ function InterviewItem({
       <div className="flex flex-wrap items-center gap-2">
         <InterviewPriorityBadge priority={q.priority} />
         <InterviewStatusBadge status={q.status} />
-        <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+        <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.8125rem] font-medium text-slate-500">
           {RESPONDENT_ROLE_META[q.targetRespondentRole].label} 대상
         </span>
         {q.manual && (
-          <span className="rounded-md border border-accent-200 bg-accent-50 px-1.5 py-0.5 text-[11px] font-medium text-accent-700">
+          <span className="rounded-md border border-accent-200 bg-accent-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-accent-700">
             수동
           </span>
         )}
       </div>
       <p className="mt-1.5 text-sm font-medium break-keep text-slate-800">{q.question}</p>
-      {q.reason && <p className="mt-1 text-xs break-keep text-slate-400">{q.reason}</p>}
+      {q.reason && <p className="mt-1 text-[0.875rem] break-keep text-slate-400">{q.reason}</p>}
       {q.expectedEvidence && (
-        <p className="mt-1 text-xs break-keep text-slate-500">
+        <p className="mt-1 text-[0.875rem] break-keep text-slate-500">
           기대 확인자료: {q.expectedEvidence}
         </p>
       )}
@@ -52,7 +52,7 @@ function InterviewItem({
         <div className="mt-2 rounded-(--radius-control) border border-success-200 bg-success-50/50 px-3 py-2">
           <p className="text-[13px] break-keep whitespace-pre-wrap text-slate-700">{q.answer}</p>
           {q.answeredAt && (
-            <p className="mt-1 text-xs text-slate-400">기록 {formatDateTime(q.answeredAt)}</p>
+            <p className="mt-1 text-[0.875rem] text-slate-400">기록 {formatDateTime(q.answeredAt)}</p>
           )}
         </div>
       )}

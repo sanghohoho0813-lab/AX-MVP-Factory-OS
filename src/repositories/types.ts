@@ -54,6 +54,47 @@ import type {
   MvpDesignHandoffSnapshot,
   MvpDesignInput,
 } from '../types/mvpDesign'
+import type {
+  WebsiteDesign,
+  WebsiteDesignFilters,
+  WebsiteDesignHandoffInput,
+  WebsiteDesignHandoffSnapshot,
+  WebsiteDesignInput,
+} from '../types/websiteDesign'
+import type {
+  ValidationFilters,
+  ValidationHandoffInput,
+  ValidationHandoffSnapshot,
+  ValidationTestSession,
+  ValidationTestSessionInput,
+  ValidationWorkspace,
+  ValidationWorkspaceInput,
+} from '../types/validation'
+import type {
+  DeliverableExportRecord,
+  DeliverableExportRecordInput,
+  DeliverableFilters,
+  DeliverablePackage,
+  DeliverablePackageInput,
+  DeliverablePackageSnapshot,
+  DeliverablePackageSnapshotInput,
+} from '../types/deliverables'
+import type {
+  CaseStudy,
+  CaseStudyFilters,
+  CaseStudyInput,
+  FundingStrategy,
+  FundingStrategyFilters,
+  FundingStrategyInput,
+  FundingStrategySnapshot,
+  FundingStrategySnapshotInput,
+  Institution,
+  InstitutionFilters,
+  InstitutionInput,
+  ProgramFilters,
+  SupportProgram,
+  SupportProgramInput,
+} from '../types/funding'
 
 /**
  * 저장소 계층 인터페이스.
@@ -104,7 +145,18 @@ export class EntityNotFoundError extends Error {
       | '선정 결과'
       | '인계 스냅샷'
       | 'MVP 설계'
-      | 'MVP 설계 인계',
+      | 'MVP 설계 인계'
+      | '홈페이지 설계'
+      | '홈페이지 설계 인계'
+      | '검증 워크스페이스'
+      | '검증 인계'
+      | '로컬 테스트 세션'
+      | '제출자료 패키지'
+      | '제출자료 스냅샷'
+      | '기관'
+      | '지원 프로그램'
+      | '연계 전략'
+      | '사례',
   ) {
     super(`${entity}를 찾을 수 없습니다.`)
     this.name = 'EntityNotFoundError'
@@ -305,4 +357,159 @@ export interface MvpDesignHandoffRepository {
     mvpDesignId: string,
     snapshot: MvpDesignHandoffInput,
   ): MvpDesignHandoffSnapshot
+}
+
+export interface WebsiteDesignRepository {
+  getAll(): WebsiteDesign[]
+  getById(id: string): WebsiteDesign | null
+  getByProjectId(projectId: string): WebsiteDesign[]
+  getLatestByProjectId(projectId: string): WebsiteDesign | null
+  create(input: WebsiteDesignInput): WebsiteDesign
+  update(id: string, input: Partial<WebsiteDesignInput>): WebsiteDesign
+  markReviewed(id: string, reviewerName: string): WebsiteDesign
+  finalize(id: string, finalizerName: string): WebsiteDesign
+  supersede(id: string): WebsiteDesign
+  nextVersion(projectId: string): number
+  search(filters: WebsiteDesignFilters): WebsiteDesign[]
+}
+
+export interface WebsiteDesignHandoffRepository {
+  getAll(): WebsiteDesignHandoffSnapshot[]
+  getByProjectId(projectId: string): WebsiteDesignHandoffSnapshot[]
+  getByDesignId(websiteDesignId: string): WebsiteDesignHandoffSnapshot | null
+  create(snapshot: WebsiteDesignHandoffInput): WebsiteDesignHandoffSnapshot
+  replaceForDesign(
+    websiteDesignId: string,
+    snapshot: WebsiteDesignHandoffInput,
+  ): WebsiteDesignHandoffSnapshot
+}
+
+export interface ValidationWorkspaceRepository {
+  getAll(): ValidationWorkspace[]
+  getById(id: string): ValidationWorkspace | null
+  getByProjectId(projectId: string): ValidationWorkspace[]
+  getByProjectAndTrack(projectId: string, trackType: ValidationWorkspace['trackType']): ValidationWorkspace[]
+  getLatestByProjectAndTrack(
+    projectId: string,
+    trackType: ValidationWorkspace['trackType'],
+  ): ValidationWorkspace | null
+  create(input: ValidationWorkspaceInput): ValidationWorkspace
+  update(id: string, input: Partial<ValidationWorkspaceInput>): ValidationWorkspace
+  markReady(id: string): ValidationWorkspace
+  startTesting(id: string): ValidationWorkspace
+  markEvaluating(id: string): ValidationWorkspace
+  finalize(id: string, finalizerName: string): ValidationWorkspace
+  supersede(id: string): ValidationWorkspace
+  nextVersion(projectId: string, trackType: ValidationWorkspace['trackType']): number
+  search(filters: ValidationFilters): ValidationWorkspace[]
+}
+
+export interface ValidationHandoffRepository {
+  getAll(): ValidationHandoffSnapshot[]
+  getByWorkspaceId(workspaceId: string): ValidationHandoffSnapshot | null
+  getByProjectAndTrack(
+    projectId: string,
+    trackType: ValidationHandoffSnapshot['trackType'],
+  ): ValidationHandoffSnapshot[]
+  create(snapshot: ValidationHandoffInput): ValidationHandoffSnapshot
+  replaceForWorkspace(
+    workspaceId: string,
+    snapshot: ValidationHandoffInput,
+  ): ValidationHandoffSnapshot
+}
+
+export interface ValidationTestSessionRepository {
+  getAll(): ValidationTestSession[]
+  getByToken(accessToken: string): ValidationTestSession | null
+  getByWorkspaceId(workspaceId: string): ValidationTestSession[]
+  create(input: ValidationTestSessionInput, accessToken: string): ValidationTestSession
+  update(id: string, input: Partial<ValidationTestSession>): ValidationTestSession
+  revoke(id: string): ValidationTestSession
+  complete(id: string): ValidationTestSession
+}
+
+export interface DeliverablePackageRepository {
+  getAll(): DeliverablePackage[]
+  getById(id: string): DeliverablePackage | null
+  getByProjectId(projectId: string): DeliverablePackage[]
+  getLatestByProjectId(projectId: string): DeliverablePackage | null
+  create(input: DeliverablePackageInput): DeliverablePackage
+  update(id: string, input: Partial<DeliverablePackageInput>): DeliverablePackage
+  markReviewed(id: string, reviewerName: string): DeliverablePackage
+  finalize(id: string, finalizerName: string): DeliverablePackage
+  supersede(id: string): DeliverablePackage
+  archive(id: string): DeliverablePackage
+  nextVersion(projectId: string): number
+  search(filters: DeliverableFilters): DeliverablePackage[]
+}
+
+export interface DeliverablePackageSnapshotRepository {
+  getAll(): DeliverablePackageSnapshot[]
+  getByPackageId(packageId: string): DeliverablePackageSnapshot | null
+  getByProjectId(projectId: string): DeliverablePackageSnapshot[]
+  create(snapshot: DeliverablePackageSnapshotInput): DeliverablePackageSnapshot
+  replaceForPackage(
+    packageId: string,
+    snapshot: DeliverablePackageSnapshotInput,
+  ): DeliverablePackageSnapshot
+}
+
+export interface DeliverableExportRepository {
+  getByPackageId(packageId: string): DeliverableExportRecord[]
+  create(record: DeliverableExportRecordInput): DeliverableExportRecord
+  deleteByPackageId(packageId: string): void
+}
+
+export interface InstitutionRepository {
+  getAll(includeArchived?: boolean): Institution[]
+  getById(id: string): Institution | null
+  create(input: InstitutionInput): Institution
+  update(id: string, input: Partial<InstitutionInput>): Institution
+  archive(id: string): Institution
+  search(filters: InstitutionFilters): Institution[]
+}
+
+export interface SupportProgramRepository {
+  getAll(includeArchived?: boolean): SupportProgram[]
+  getById(id: string): SupportProgram | null
+  getByInstitutionId(institutionId: string): SupportProgram[]
+  create(input: SupportProgramInput): SupportProgram
+  update(id: string, input: Partial<SupportProgramInput>): SupportProgram
+  archive(id: string): SupportProgram
+  search(filters: ProgramFilters): SupportProgram[]
+  findStalePrograms(): SupportProgram[]
+}
+
+export interface FundingStrategyRepository {
+  getAll(): FundingStrategy[]
+  getById(id: string): FundingStrategy | null
+  getLatestByProjectId(projectId: string): FundingStrategy | null
+  getByProjectId(projectId: string): FundingStrategy[]
+  create(input: FundingStrategyInput): FundingStrategy
+  update(id: string, input: Partial<FundingStrategyInput>): FundingStrategy
+  markReviewed(id: string, reviewerName: string): FundingStrategy
+  finalize(id: string, finalizerName: string): FundingStrategy
+  supersede(id: string): FundingStrategy
+  nextVersion(projectId: string): number
+  search(filters: FundingStrategyFilters): FundingStrategy[]
+}
+
+export interface FundingStrategySnapshotRepository {
+  getAll(): FundingStrategySnapshot[]
+  getByStrategyId(strategyId: string): FundingStrategySnapshot | null
+  getByProjectId(projectId: string): FundingStrategySnapshot[]
+  create(snapshot: FundingStrategySnapshotInput): FundingStrategySnapshot
+  replaceForStrategy(strategyId: string, snapshot: FundingStrategySnapshotInput): FundingStrategySnapshot
+}
+
+export interface CaseStudyRepository {
+  getAll(includeArchived?: boolean): CaseStudy[]
+  getById(id: string): CaseStudy | null
+  getByProjectId(projectId: string): CaseStudy[]
+  create(input: CaseStudyInput): CaseStudy
+  update(id: string, input: Partial<CaseStudyInput>): CaseStudy
+  markReview(id: string): CaseStudy
+  approve(id: string, approverName: string): CaseStudy
+  archive(id: string): CaseStudy
+  search(filters: CaseStudyFilters): CaseStudy[]
 }

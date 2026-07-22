@@ -1,232 +1,48 @@
 import { Suspense, lazy } from 'react'
-import {
-  Navigate,
-  RouterProvider,
-  createBrowserRouter,
-} from 'react-router-dom'
+import { RouterProvider, createBrowserRouter } from 'react-router-dom'
 import { AppShell } from './components/layout/AppShell'
 import { ToastProvider } from './components/ui/toast'
-import { MODULE_PAGES } from './data/modules'
-import { ClientsListPage } from './pages/ClientsListPage'
-import { DashboardPage } from './pages/DashboardPage'
-import { EmptyModulePage } from './pages/EmptyModulePage'
-import { OrganizationDetailPage } from './pages/OrganizationDetailPage'
-import { OrganizationFormPage } from './pages/OrganizationFormPage'
-import { ProjectDetailPage } from './pages/ProjectDetailPage'
-import { ProjectFormPage } from './pages/ProjectFormPage'
+import { TextScaleProvider } from './components/ui/TextScaleProvider'
+import { getDataModeConfig } from './data/dataMode'
+import { appRouteChildren, publicSurveyRoute, publicTestRoute } from './app/appRouteChildren'
 
-// 진단 관리·공개 설문은 route-level lazy loading으로 초기 번들을 줄인다
-const DiagnosisStudioPage = lazy(() =>
-  import('./pages/diagnosis/DiagnosisStudioPage').then((m) => ({ default: m.DiagnosisStudioPage })),
-)
-const QuestionBankPage = lazy(() =>
-  import('./pages/diagnosis/QuestionBankPage').then((m) => ({ default: m.QuestionBankPage })),
-)
-const QuestionFormPage = lazy(() =>
-  import('./pages/diagnosis/QuestionFormPage').then((m) => ({ default: m.QuestionFormPage })),
-)
-const ModulesPage = lazy(() =>
-  import('./pages/diagnosis/ModulesPage').then((m) => ({ default: m.ModulesPage })),
-)
-const ModuleFormPage = lazy(() =>
-  import('./pages/diagnosis/ModuleFormPage').then((m) => ({ default: m.ModuleFormPage })),
-)
-const TemplatesPage = lazy(() =>
-  import('./pages/diagnosis/TemplatesPage').then((m) => ({ default: m.TemplatesPage })),
-)
-const TemplateBuilderPage = lazy(() =>
-  import('./pages/diagnosis/TemplateBuilderPage').then((m) => ({ default: m.TemplateBuilderPage })),
-)
-const TemplatePreviewPage = lazy(() =>
-  import('./pages/diagnosis/TemplatePreviewPage').then((m) => ({ default: m.TemplatePreviewPage })),
-)
-const ProjectSurveySetupPage = lazy(() =>
-  import('./pages/diagnosis/ProjectSurveySetupPage').then((m) => ({ default: m.ProjectSurveySetupPage })),
-)
-const SurveysMainPage = lazy(() =>
-  import('./pages/diagnosis/SurveysMainPage').then((m) => ({ default: m.SurveysMainPage })),
-)
-const ProjectSurveysPage = lazy(() =>
-  import('./pages/diagnosis/ProjectSurveysPage').then((m) => ({ default: m.ProjectSurveysPage })),
-)
-const DistributionDetailPage = lazy(() =>
-  import('./pages/diagnosis/DistributionDetailPage').then((m) => ({ default: m.DistributionDetailPage })),
-)
-const ResponseDetailPage = lazy(() =>
-  import('./pages/diagnosis/ResponseDetailPage').then((m) => ({ default: m.ResponseDetailPage })),
-)
-const PublicSurveyPage = lazy(() =>
-  import('./pages/public/PublicSurveyPage').then((m) => ({ default: m.PublicSurveyPage })),
-)
-const AssessmentsListPage = lazy(() =>
-  import('./pages/diagnosis/AssessmentsListPage').then((m) => ({ default: m.AssessmentsListPage })),
-)
-const AnalysisMainPage = lazy(() =>
-  import('./pages/diagnosis/analysis/AnalysisMainPage').then((m) => ({ default: m.AnalysisMainPage })),
-)
-const ResponseComparePage = lazy(() =>
-  import('./pages/diagnosis/analysis/ResponseComparePage').then((m) => ({ default: m.ResponseComparePage })),
-)
-const AnalysisIssuesPage = lazy(() =>
-  import('./pages/diagnosis/analysis/AnalysisIssuesPage').then((m) => ({ default: m.AnalysisIssuesPage })),
-)
-const InterviewQuestionsPage = lazy(() =>
-  import('./pages/diagnosis/analysis/InterviewQuestionsPage').then((m) => ({ default: m.InterviewQuestionsPage })),
-)
-const ScoreDetailPage = lazy(() =>
-  import('./pages/diagnosis/analysis/ScoreDetailPage').then((m) => ({ default: m.ScoreDetailPage })),
-)
-const AssessmentResultPage = lazy(() =>
-  import('./pages/diagnosis/analysis/AssessmentResultPage').then((m) => ({ default: m.AssessmentResultPage })),
-)
-const SelectionMainPage = lazy(() =>
-  import('./pages/selection/SelectionMainPage').then((m) => ({ default: m.SelectionMainPage })),
-)
-const SelectionProjectPage = lazy(() =>
-  import('./pages/selection/SelectionProjectPage').then((m) => ({ default: m.SelectionProjectPage })),
-)
-const CandidateBoardPage = lazy(() =>
-  import('./pages/selection/CandidateBoardPage').then((m) => ({ default: m.CandidateBoardPage })),
-)
-const CandidateDetailPage = lazy(() =>
-  import('./pages/selection/CandidateDetailPage').then((m) => ({ default: m.CandidateDetailPage })),
-)
-const PriorityMatrixPage = lazy(() =>
-  import('./pages/selection/PriorityMatrixPage').then((m) => ({ default: m.PriorityMatrixPage })),
-)
-const SelectionDecisionPage = lazy(() =>
-  import('./pages/selection/SelectionDecisionPage').then((m) => ({ default: m.SelectionDecisionPage })),
-)
-const SelectionResultsPage = lazy(() =>
-  import('./pages/selection/SelectionResultsPage').then((m) => ({ default: m.SelectionResultsPage })),
-)
-const MvpDesignMainPage = lazy(() =>
-  import('./pages/mvpDesign/MvpDesignMainPage').then((m) => ({ default: m.MvpDesignMainPage })),
-)
-const MvpDesignResultsPage = lazy(() =>
-  import('./pages/mvpDesign/MvpDesignResultsPage').then((m) => ({ default: m.MvpDesignResultsPage })),
-)
-const DesignProjectPage = lazy(() =>
-  import('./pages/mvpDesign/DesignProjectPage').then((m) => ({ default: m.DesignProjectPage })),
-)
-const DesignWorkflowPage = lazy(() =>
-  import('./pages/mvpDesign/DesignWorkflowPage').then((m) => ({ default: m.DesignWorkflowPage })),
-)
-const DesignFeaturesPage = lazy(() =>
-  import('./pages/mvpDesign/DesignFeaturesPage').then((m) => ({ default: m.DesignFeaturesPage })),
-)
-const DesignScreensPage = lazy(() =>
-  import('./pages/mvpDesign/DesignScreensPage').then((m) => ({ default: m.DesignScreensPage })),
-)
-const DesignDataPage = lazy(() =>
-  import('./pages/mvpDesign/DesignDataPage').then((m) => ({ default: m.DesignDataPage })),
-)
-const DesignPermissionsPage = lazy(() =>
-  import('./pages/mvpDesign/DesignPermissionsPage').then((m) => ({ default: m.DesignPermissionsPage })),
-)
-const DesignRulesPage = lazy(() =>
-  import('./pages/mvpDesign/DesignRulesPage').then((m) => ({ default: m.DesignRulesPage })),
-)
-const DesignValidationPage = lazy(() =>
-  import('./pages/mvpDesign/DesignValidationPage').then((m) => ({ default: m.DesignValidationPage })),
-)
-const DesignReviewPage = lazy(() =>
-  import('./pages/mvpDesign/DesignReviewPage').then((m) => ({ default: m.DesignReviewPage })),
+// supabase 모드 앱(및 Supabase SDK)은 지연 로딩해 local 모드 entry 번들에 포함되지 않게 한다.
+const SupabaseApp = lazy(() =>
+  import('./app/SupabaseApp').then((m) => ({ default: m.SupabaseApp })),
 )
 
-/** 진단 스튜디오는 실제 기능으로 대체되므로 빈 상태 페이지에서 제외 */
-const EMPTY_MODULE_KEYS = new Set(['clients', 'diagnosis', 'selection', 'mvp-design'])
+// local 모드 라우터 — 기존 Stage 1~11 구조를 그대로 유지한다(로그인 없이 진입).
+const localRouter = createBrowserRouter([
+  {
+    element: <AppShell />,
+    children: appRouteChildren,
+  },
+  publicSurveyRoute,
+  publicTestRoute,
+])
 
-function RouteFallback() {
+function BootSplash() {
   return (
-    <div className="flex min-h-[40vh] items-center justify-center">
+    <div className="flex min-h-dvh items-center justify-center bg-slate-50">
       <span className="text-sm text-slate-400">불러오는 중…</span>
     </div>
   )
 }
 
-const router = createBrowserRouter([
-  {
-    element: <AppShell />,
-    children: [
-      { index: true, element: <DashboardPage /> },
-      { path: 'clients', element: <ClientsListPage /> },
-      { path: 'clients/new', element: <OrganizationFormPage /> },
-      { path: 'clients/:organizationId', element: <OrganizationDetailPage /> },
-      { path: 'clients/:organizationId/edit', element: <OrganizationFormPage /> },
-      { path: 'projects/new', element: <ProjectFormPage /> },
-      { path: 'projects/:projectId', element: <ProjectDetailPage /> },
-      { path: 'projects/:projectId/edit', element: <ProjectFormPage /> },
-
-      { path: 'diagnosis', element: <DiagnosisStudioPage /> },
-      { path: 'diagnosis/questions', element: <QuestionBankPage /> },
-      { path: 'diagnosis/questions/new', element: <QuestionFormPage /> },
-      { path: 'diagnosis/questions/:questionId/edit', element: <QuestionFormPage /> },
-      { path: 'diagnosis/modules', element: <ModulesPage /> },
-      { path: 'diagnosis/modules/new', element: <ModuleFormPage /> },
-      { path: 'diagnosis/modules/:moduleId/edit', element: <ModuleFormPage /> },
-      { path: 'diagnosis/templates', element: <TemplatesPage /> },
-      { path: 'diagnosis/templates/new', element: <TemplateBuilderPage /> },
-      { path: 'diagnosis/templates/:templateId/edit', element: <TemplateBuilderPage /> },
-      { path: 'diagnosis/templates/:templateId/preview', element: <TemplatePreviewPage /> },
-      { path: 'diagnosis/surveys', element: <SurveysMainPage /> },
-      { path: 'diagnosis/surveys/:distributionId', element: <DistributionDetailPage /> },
-      { path: 'diagnosis/surveys/:distributionId/response', element: <ResponseDetailPage /> },
-      { path: 'diagnosis/assessments', element: <AssessmentsListPage /> },
-      { path: 'diagnosis/projects/:projectId/setup', element: <ProjectSurveySetupPage /> },
-      { path: 'diagnosis/projects/:projectId/surveys', element: <ProjectSurveysPage /> },
-      { path: 'diagnosis/projects/:projectId/analysis', element: <AnalysisMainPage /> },
-      { path: 'diagnosis/projects/:projectId/analysis/compare', element: <ResponseComparePage /> },
-      { path: 'diagnosis/projects/:projectId/analysis/issues', element: <AnalysisIssuesPage /> },
-      { path: 'diagnosis/projects/:projectId/analysis/interview', element: <InterviewQuestionsPage /> },
-      { path: 'diagnosis/projects/:projectId/analysis/score', element: <ScoreDetailPage /> },
-      { path: 'diagnosis/projects/:projectId/analysis/result', element: <AssessmentResultPage /> },
-
-      { path: 'selection', element: <SelectionMainPage /> },
-      { path: 'selection/results', element: <SelectionResultsPage /> },
-      { path: 'selection/projects/:projectId', element: <SelectionProjectPage /> },
-      { path: 'selection/projects/:projectId/candidates', element: <CandidateBoardPage /> },
-      { path: 'selection/projects/:projectId/candidates/:candidateId', element: <CandidateDetailPage /> },
-      { path: 'selection/projects/:projectId/matrix', element: <PriorityMatrixPage /> },
-      { path: 'selection/projects/:projectId/decision', element: <SelectionDecisionPage /> },
-
-      { path: 'mvp-design', element: <MvpDesignMainPage /> },
-      { path: 'mvp-design/results', element: <MvpDesignResultsPage /> },
-      { path: 'mvp-design/projects/:projectId', element: <DesignProjectPage /> },
-      { path: 'mvp-design/projects/:projectId/workflow', element: <DesignWorkflowPage /> },
-      { path: 'mvp-design/projects/:projectId/features', element: <DesignFeaturesPage /> },
-      { path: 'mvp-design/projects/:projectId/screens', element: <DesignScreensPage /> },
-      { path: 'mvp-design/projects/:projectId/data', element: <DesignDataPage /> },
-      { path: 'mvp-design/projects/:projectId/permissions', element: <DesignPermissionsPage /> },
-      { path: 'mvp-design/projects/:projectId/rules', element: <DesignRulesPage /> },
-      { path: 'mvp-design/projects/:projectId/validation', element: <DesignValidationPage /> },
-      { path: 'mvp-design/projects/:projectId/review', element: <DesignReviewPage /> },
-
-      ...MODULE_PAGES.filter((config) => !EMPTY_MODULE_KEYS.has(config.key)).map(
-        (config) => ({
-          path: config.path,
-          element: <EmptyModulePage config={config} />,
-        }),
-      ),
-      { path: '*', element: <Navigate to="/" replace /> },
-    ],
-  },
-  {
-    // 공개 설문 — 내부 AppShell과 완전히 분리
-    path: '/survey/:accessToken',
-    element: (
-      <Suspense fallback={<RouteFallback />}>
-        <PublicSurveyPage />
-      </Suspense>
-    ),
-  },
-])
-
 function App() {
+  const cfg = getDataModeConfig()
   return (
-    <ToastProvider>
-      <RouterProvider router={router} />
-    </ToastProvider>
+    <TextScaleProvider>
+      <ToastProvider>
+        {cfg.mode === 'supabase' ? (
+          <Suspense fallback={<BootSplash />}>
+            <SupabaseApp />
+          </Suspense>
+        ) : (
+          <RouterProvider router={localRouter} />
+        )}
+      </ToastProvider>
+    </TextScaleProvider>
   )
 }
 

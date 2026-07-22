@@ -52,7 +52,7 @@ function CheckRow({ check }: { check: SurveyQualityCheck }) {
           {check.title}
         </p>
         {check.description && (
-          <p className="mt-0.5 text-xs break-keep text-slate-500">
+          <p className="mt-0.5 text-[0.875rem] break-keep text-slate-500">
             {check.description}
           </p>
         )}
@@ -78,14 +78,14 @@ export function SurveyQualityPanel({ checks }: SurveyQualityPanelProps) {
       >
         <meta.icon aria-hidden="true" className="size-4" />
         <span className="text-sm font-semibold">품질검사: {meta.label}</span>
-        <span className="ml-auto text-xs">
+        <span className="ml-auto text-[0.875rem]">
           오류 {errorCount} · 주의 {warningCount}
         </span>
       </div>
 
       {errors.length > 0 && (
         <div>
-          <p className="text-xs font-semibold text-danger-600">오류 ({errors.length})</p>
+          <p className="text-[0.875rem] font-semibold text-danger-600">오류 ({errors.length})</p>
           <ul className="divide-y divide-slate-100">
             {errors.map((c) => (
               <CheckRow key={c.id} check={c} />
@@ -95,7 +95,7 @@ export function SurveyQualityPanel({ checks }: SurveyQualityPanelProps) {
       )}
       {warnings.length > 0 && (
         <div>
-          <p className="text-xs font-semibold text-warning-600">주의 ({warnings.length})</p>
+          <p className="text-[0.875rem] font-semibold text-warning-600">주의 ({warnings.length})</p>
           <ul className="divide-y divide-slate-100">
             {warnings.map((c) => (
               <CheckRow key={c.id} check={c} />
@@ -105,7 +105,7 @@ export function SurveyQualityPanel({ checks }: SurveyQualityPanelProps) {
       )}
       {infos.length > 0 && (
         <div>
-          <p className="text-xs font-semibold text-slate-500">정보</p>
+          <p className="text-[0.875rem] font-semibold text-slate-500">정보</p>
           <ul className="divide-y divide-slate-100">
             {infos.map((c) => (
               <CheckRow key={c.id} check={c} />

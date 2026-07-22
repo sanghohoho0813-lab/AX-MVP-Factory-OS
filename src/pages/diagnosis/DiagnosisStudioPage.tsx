@@ -207,7 +207,7 @@ export function DiagnosisStudioPage() {
       cell: (p) => (
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-slate-800">{p.name}</p>
-          <p className="text-xs text-slate-400">{p.projectCode}</p>
+          <p className="text-[0.875rem] text-slate-400">{p.projectCode}</p>
         </div>
       ),
     },
@@ -287,9 +287,9 @@ export function DiagnosisStudioPage() {
           { n: 3, label: '진단 결과', desc: '응답을 비교해 AX 적합성을 판단합니다.' },
         ].map((f) => (
           <div key={f.n} className="flex flex-col gap-1 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 shadow-(--shadow-card)">
-            <span className="flex size-6 items-center justify-center rounded-full bg-brand-50 text-[12px] font-bold text-brand-600">{f.n}</span>
+            <span className="flex size-6 items-center justify-center rounded-full bg-brand-50 text-[0.875rem] font-bold text-brand-600">{f.n}</span>
             <span className="text-sm font-semibold text-slate-800">{f.label}</span>
-            <span className="text-xs break-keep text-slate-500">{f.desc}</span>
+            <span className="text-[0.875rem] break-keep text-slate-500">{f.desc}</span>
           </div>
         ))}
       </div>
@@ -385,7 +385,7 @@ export function DiagnosisStudioPage() {
                 <item.icon aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-medium text-slate-700">{item.label}</span>
-                  <span className="block text-xs break-keep text-slate-400">{item.desc}</span>
+                  <span className="block text-[0.875rem] break-keep text-slate-400">{item.desc}</span>
                 </span>
                 <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-slate-300" />
               </Link>
@@ -402,10 +402,10 @@ export function DiagnosisStudioPage() {
               ['품질 경고 양식', data.library.warnedTemplates],
             ].map(([label, value]) => (
               <div key={label as string}>
-                <dt className="text-xs text-slate-400">{label}</dt>
+                <dt className="text-[0.875rem] text-slate-400">{label}</dt>
                 <dd className="text-lg font-bold text-slate-800">
                   {value}
-                  <span className="ml-0.5 text-xs font-medium text-slate-400">개</span>
+                  <span className="ml-0.5 text-[0.875rem] font-medium text-slate-400">개</span>
                 </dd>
               </div>
             ))}
@@ -424,7 +424,7 @@ export function DiagnosisStudioPage() {
                       <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-slate-700">{t.name}</span>
                       <RespondentRoleBadge role={t.respondentRole} />
                       <TemplateStatusBadge status={t.status} />
-                      <span className="text-xs text-slate-400">{formatDate(t.updatedAt)}</span>
+                      <span className="text-[0.875rem] text-slate-400">{formatDate(t.updatedAt)}</span>
                     </Link>
                   </li>
                 ))}

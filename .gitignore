@@ -22,3 +22,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment secrets (never commit real values)
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+
+# contract test build output
+.contract-out
+.progress-out
+.persistence-out

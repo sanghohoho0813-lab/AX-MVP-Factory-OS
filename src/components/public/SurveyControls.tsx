@@ -1,12 +1,16 @@
 import { AlertCircle, Check, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { Button } from '../ui/Button'
 
-export type AutosaveState = 'idle' | 'saving' | 'saved' | 'error'
+export type AutosaveState = 'idle' | 'saving' | 'saved' | 'error' | 'offline_draft'
 
 interface SurveyAutosaveIndicatorProps {
   state: AutosaveState
   lastSavedAt: string | null
   onRetry?: () => void
+  /** 저장 성공 표기 (local: '이 브라우저에 임시저장됨' / supabase: '클라우드 저장됨') */
+  savedLabel?: string
+  /** offline_draft 표기 (로컬 draft 는 보존, 서버 저장 재시도 필요) */
+  offlineLabel?: string
 }
 
 function timeLabel(iso: string | null): string {
@@ -25,9 +29,11 @@ export function SurveyAutosaveIndicator({
   state,
   lastSavedAt,
   onRetry,
+  savedLabel = '저장됨',
+  offlineLabel = '이 브라우저에 임시저장됨 · 클라우드 저장 재시도 필요',
 }: SurveyAutosaveIndicatorProps) {
   return (
-    <div aria-live="polite" className="flex items-center gap-1.5 text-xs">
+    <div aria-live="polite" className="flex items-center gap-1.5 text-[0.875rem]">
       {state === 'saving' && (
         <span className="flex items-center gap-1 text-slate-400">
           <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
@@ -37,7 +43,22 @@ export function SurveyAutosaveIndicator({
       {state === 'saved' && (
         <span className="flex items-center gap-1 text-slate-400">
           <Check aria-hidden="true" className="size-3.5 text-success-500" />
-          {lastSavedAt ? `${timeLabel(lastSavedAt)} 저장됨` : '저장됨'}
+          {lastSavedAt ? `${timeLabel(lastSavedAt)} ${savedLabel}` : savedLabel}
+        </span>
+      )}
+      {state === 'offline_draft' && (
+        <span className="flex items-center gap-1.5 break-keep text-warning-700">
+          <AlertCircle aria-hidden="true" className="size-3.5 shrink-0" />
+          {offlineLabel}
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="cursor-pointer font-medium underline"
+            >
+              다시 시도
+            </button>
+          )}
         </span>
       )}
       {state === 'error' && (
@@ -56,7 +77,7 @@ export function SurveyAutosaveIndicator({
         </span>
       )}
       {state === 'idle' && lastSavedAt && (
-        <span className="text-slate-400">{timeLabel(lastSavedAt)} 저장됨</span>
+        <span className="text-slate-400">{timeLabel(lastSavedAt)} {savedLabel}</span>
       )}
     </div>
   )
@@ -82,12 +103,12 @@ export function SurveyProgressHeader({
 }: SurveyProgressHeaderProps) {
   return (
     <div className="mb-5">
-      <p className="text-xs text-slate-400">{surveyTitle}</p>
+      <p className="text-[0.875rem] text-slate-400">{surveyTitle}</p>
       <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-lg font-semibold break-keep text-slate-900">
           {sectionTitle}
         </h1>
-        <span className="text-xs text-slate-400">{pageInfo}</span>
+        <span className="text-[0.875rem] text-slate-400">{pageInfo}</span>
       </div>
       <div
         className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200"
@@ -102,7 +123,7 @@ export function SurveyProgressHeader({
           style={{ width: `${progressPercent}%` }}
         />
       </div>
-      <p className="mt-1.5 text-xs text-slate-400" aria-live="polite">
+      <p className="mt-1.5 text-[0.875rem] text-slate-400" aria-live="polite">
         전체 {progressPercent}% · 응답 {answered} / {total} 문항
       </p>
     </div>

@@ -7,9 +7,13 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:contract": "vite build --config vite.contract.config.mjs && node .contract-out/contract.mjs",
+    "test:progress": "vite build --config vite.progress.config.mjs && node .progress-out/progress.mjs",
+    "test:persistence": "vite build --config vite.persistence.config.mjs && node .persistence-out/persistence.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.7",
     "lucide-react": "^1.25.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

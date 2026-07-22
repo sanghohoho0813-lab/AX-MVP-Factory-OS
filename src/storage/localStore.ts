@@ -10,7 +10,7 @@ const KEY_PREFIX = 'axmvp'
  */
 const DATA_NS = 'v1'
 /** 현재 앱이 기대하는 스키마 버전. 마이그레이션 목표값. */
-export const SCHEMA_VERSION = 6
+export const SCHEMA_VERSION = 10
 export const SCHEMA_VERSION_KEY = `${KEY_PREFIX}.schema_version`
 
 export const STORAGE_KEYS = {
@@ -31,6 +31,19 @@ export const STORAGE_KEYS = {
   selectionHandoffs: `${KEY_PREFIX}.${DATA_NS}.selection_handoffs`,
   mvpDesigns: `${KEY_PREFIX}.${DATA_NS}.mvp_designs`,
   mvpDesignHandoffs: `${KEY_PREFIX}.${DATA_NS}.mvp_design_handoffs`,
+  websiteDesigns: `${KEY_PREFIX}.${DATA_NS}.website_designs`,
+  websiteDesignHandoffs: `${KEY_PREFIX}.${DATA_NS}.website_design_handoffs`,
+  validationWorkspaces: `${KEY_PREFIX}.${DATA_NS}.validation_workspaces`,
+  validationHandoffs: `${KEY_PREFIX}.${DATA_NS}.validation_handoffs`,
+  validationTestSessions: `${KEY_PREFIX}.${DATA_NS}.validation_test_sessions`,
+  deliverablePackages: `${KEY_PREFIX}.${DATA_NS}.deliverable_packages`,
+  deliverablePackageSnapshots: `${KEY_PREFIX}.${DATA_NS}.deliverable_package_snapshots`,
+  deliverableExportRecords: `${KEY_PREFIX}.${DATA_NS}.deliverable_export_records`,
+  institutions: `${KEY_PREFIX}.${DATA_NS}.institutions`,
+  supportPrograms: `${KEY_PREFIX}.${DATA_NS}.support_programs`,
+  fundingStrategies: `${KEY_PREFIX}.${DATA_NS}.funding_strategies`,
+  fundingStrategySnapshots: `${KEY_PREFIX}.${DATA_NS}.funding_strategy_snapshots`,
+  caseStudies: `${KEY_PREFIX}.${DATA_NS}.case_studies`,
 } as const
 
 /** 마이그레이션 전 안전 백업 키 접두어 */
@@ -111,6 +124,19 @@ export function readRaw(key: string): string | null {
 /** 원문 그대로 쓰기 (백업 복원용) */
 export function writeRaw(key: string, value: string): void {
   rawSet(key, value)
+}
+
+/** 키 삭제 (가져오기 후 로컬 정리 등. 명시적 요청 시에만 호출) */
+export function removeKey(key: string): void {
+  if (!storageAvailable) {
+    memoryFallback.delete(key)
+    return
+  }
+  try {
+    window.localStorage.removeItem(key)
+  } catch {
+    memoryFallback.delete(key)
+  }
 }
 
 export function readSchemaVersion(): number | null {

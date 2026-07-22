@@ -197,7 +197,7 @@ export function ModuleFormPage() {
             }}
             error={errors.keys}
           />
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-[0.875rem] text-slate-400">
             {form.keys
               .map((k) =>
                 form.kind === 'industry'

@@ -99,7 +99,7 @@ export function ModuleQuestionPicker({
                   </button>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <span className="font-mono text-xs font-semibold text-slate-400">
+                  <span className="font-mono text-[0.875rem] font-semibold text-slate-400">
                     {q.code}
                   </span>
                   <p className="text-[13px] break-keep text-slate-700">{q.text}</p>
@@ -162,7 +162,7 @@ export function ModuleQuestionPicker({
             candidates.map((q) => (
               <li key={q.id} className="flex items-start gap-2 px-4 py-2.5">
                 <div className="min-w-0 flex-1">
-                  <span className="font-mono text-xs font-semibold text-slate-400">
+                  <span className="font-mono text-[0.875rem] font-semibold text-slate-400">
                     {q.code}
                   </span>
                   <p className="text-[13px] break-keep text-slate-700">{q.text}</p>
@@ -174,7 +174,7 @@ export function ModuleQuestionPicker({
                 <button
                   type="button"
                   onClick={() => add(q.id)}
-                  className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                  className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-[0.875rem] font-medium text-slate-600 hover:bg-slate-50"
                 >
                   <Plus aria-hidden="true" className="size-3" />
                   추가

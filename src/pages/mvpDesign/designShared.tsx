@@ -1,95 +1,46 @@
 import type { ReactNode } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
-import {
-  BadgeCheck,
-  Boxes,
-  ClipboardCheck,
-  GitBranch,
-  LayoutDashboard,
-  LayoutList,
-  PencilRuler,
-  RefreshCw,
-  ShieldCheck,
-  Workflow,
-} from 'lucide-react'
-import type { Project } from '../../types/domain'
+import { useNavigate } from 'react-router-dom'
+import { PencilRuler, RefreshCw } from 'lucide-react'
 import type { MvpDesign } from '../../types/mvpDesign'
-import { PROJECT_STAGE_META } from '../../lib/statusMeta'
 import type { ProjectDesignContext } from '../../services/mvpDesignService'
-import { ProjectTypeBadge } from '../../components/domain/ProjectTypeBadge'
 import { Button } from '../../components/ui/Button'
-import { DetailHeader } from '../../components/ui/DetailHeader'
 import { NotFoundState } from '../../components/ui/NotFoundState'
+import { PrerequisiteNotice } from '../../components/workspace/FeatureNotices'
+import {
+  WorkspaceHeader,
+  WorkspaceStepNav,
+  type WorkspaceStep,
+} from '../../components/workspace/WorkspaceShell'
 import { useDesignData } from './useDesignData'
 
-export function DesignHeader({
-  project,
-  organizationName,
-  actions,
-}: {
-  project: Project
-  organizationName: string
-  actions?: ReactNode
-}) {
+export const DESIGN_MODULE_NAME = 'AX 기능·화면 설계'
+export const DESIGN_MODULE_DESC =
+  '확정한 핵심 업무를 실제로 만들 기능·화면·데이터 구조로 구체화합니다.'
+
+/** 설계 내부 단계 (실제 라우트 연결) */
+export function designSteps(projectId: string): WorkspaceStep[] {
+  const base = `/mvp-design/projects/${projectId}`
+  return [
+    { key: 'overview', label: '개요', path: base },
+    { key: 'workflow', label: '업무 흐름', path: `${base}/workflow` },
+    { key: 'features', label: '기능 범위', path: `${base}/features` },
+    { key: 'screens', label: '화면 구성', path: `${base}/screens` },
+    { key: 'data', label: '데이터', path: `${base}/data` },
+    { key: 'permissions', label: '권한', path: `${base}/permissions` },
+    { key: 'rules', label: '업무 규칙·AI', path: `${base}/rules` },
+    { key: 'validation', label: '검증 기준', path: `${base}/validation` },
+    { key: 'review', label: '설계 확정', path: `${base}/review` },
+  ]
+}
+
+export function DesignHeader({ saveStatus }: { saveStatus?: 'idle' | 'saving' | 'saved' | 'local' | 'error' }) {
   return (
-    <DetailHeader
-      backTo={`/projects/${project.id}`}
-      backLabel={`${project.name} 상세`}
-      title="MVP 설계 워크벤치"
-      badges={
-        <>
-          <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-500">
-            {project.projectCode}
-          </span>
-          <ProjectTypeBadge type={project.projectType} compact />
-          <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-500">
-            {PROJECT_STAGE_META[project.currentStage].label}
-          </span>
-        </>
-      }
-      meta={
-        <>
-          <span>{organizationName}</span>
-          <span>{project.name}</span>
-        </>
-      }
-      actions={actions}
-    />
+    <WorkspaceHeader moduleName={DESIGN_MODULE_NAME} moduleDescription={DESIGN_MODULE_DESC} saveStatus={saveStatus} />
   )
 }
 
 export function DesignNav({ projectId }: { projectId: string }) {
-  const base = `/mvp-design/projects/${projectId}`
-  const tabs = [
-    { to: base, label: '개요', icon: LayoutDashboard, end: true },
-    { to: `${base}/workflow`, label: '업무 흐름', icon: Workflow, end: false },
-    { to: `${base}/features`, label: '기능·범위', icon: BadgeCheck, end: false },
-    { to: `${base}/screens`, label: '화면', icon: LayoutList, end: false },
-    { to: `${base}/data`, label: '데이터', icon: Boxes, end: false },
-    { to: `${base}/permissions`, label: '역할·권한', icon: ShieldCheck, end: false },
-    { to: `${base}/rules`, label: '규칙·AI', icon: GitBranch, end: false },
-    { to: `${base}/validation`, label: '검증', icon: ClipboardCheck, end: false },
-    { to: `${base}/review`, label: '설계 확정', icon: PencilRuler, end: false },
-  ]
-  return (
-    <nav aria-label="MVP 설계 메뉴" className="flex gap-1 overflow-x-auto border-b border-slate-200">
-      {tabs.map((tab) => (
-        <NavLink
-          key={tab.to}
-          to={tab.to}
-          end={tab.end}
-          className={({ isActive }) =>
-            `-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors ${
-              isActive ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`
-          }
-        >
-          <tab.icon aria-hidden="true" className="size-4" />
-          {tab.label}
-        </NavLink>
-      ))}
-    </nav>
-  )
+  return <WorkspaceStepNav steps={designSteps(projectId)} />
 }
 
 export function DesignProjectNotFound() {
@@ -113,7 +64,7 @@ export function DesignGateNotice({ context }: { context: ProjectDesignContext })
           <PencilRuler aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-slate-400" />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-slate-800">홈페이지 단독 프로젝트입니다</p>
-            <p className="mt-1 text-[13px] break-keep text-slate-600">
+            <p className="mt-1 text-[0.92rem] break-keep text-slate-600">
               홈페이지 제작 프로젝트에는 AX MVP 설계를 적용하지 않습니다. 제작 방향은 웹사이트 스튜디오에서 설계합니다.
             </p>
             <div className="mt-3">
@@ -127,22 +78,14 @@ export function DesignGateNotice({ context }: { context: ProjectDesignContext })
     )
   }
   return (
-    <div className="rounded-(--radius-panel) border border-slate-200 bg-white p-6 shadow-(--shadow-card)">
-      <div className="flex items-start gap-3">
-        <ClipboardCheck aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-slate-400" />
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-slate-800">먼저 핵심 과제 확정이 필요합니다</p>
-          <p className="mt-1 text-[13px] break-keep text-slate-600">
-            MVP 설계는 과제선별에서 확정된 핵심 과제를 기준으로 시작됩니다. 과제선별을 먼저 확정하세요.
-          </p>
-          <div className="mt-3">
-            <Button variant="primary" size="sm" onClick={() => navigate(`/selection/projects/${context.project.id}/decision`)}>
-              과제선별로 이동
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <PrerequisiteNotice
+      title="먼저 만들 업무가 아직 확정되지 않았습니다"
+      description="기업 진단 결과에서 첫 번째로 만들 업무를 선택하면 기능·화면 설계를 시작할 수 있습니다."
+      missing={['확정된 핵심 업무 선택 결과']}
+      unlocks="업무 흐름·기능·화면·데이터 설계"
+      actionLabel="만들 업무 선택으로 이동"
+      actionPath={`/selection/projects/${context.project.id}`}
+    />
   )
 }
 
@@ -151,7 +94,7 @@ export function RedesignBanner({ show, onRun }: { show: boolean; onRun: () => vo
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3">
       <RefreshCw aria-hidden="true" className="size-4 shrink-0 text-warning-600" />
-      <p className="min-w-0 flex-1 text-[13px] break-keep text-warning-800">
+      <p className="min-w-0 flex-1 text-[0.92rem] break-keep text-warning-800">
         확정된 핵심 과제가 변경되어 재설계가 필요합니다. 확정된 설계는 그대로 보존됩니다.
       </p>
       <Button variant="secondary" size="sm" onClick={onRun}>
@@ -166,7 +109,7 @@ export function RedesignBanner({ show, onRun }: { show: boolean; onRun: () => vo
 export function DesignEmptyNotice({ projectId }: { projectId: string }) {
   const navigate = useNavigate()
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[13px] text-slate-500">
+    <div className="flex flex-wrap items-center gap-3 rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.92rem] text-slate-500">
       <span className="min-w-0 flex-1">아직 설계 초안이 없습니다. 개요 화면에서 설계를 생성하세요.</span>
       <Button variant="secondary" size="sm" onClick={() => navigate(`/mvp-design/projects/${projectId}`)}>
         개요로 이동
@@ -185,10 +128,10 @@ export function DesignSectionFrame({
 }) {
   const { context } = useDesignData(projectId)
   if (!context) return <DesignProjectNotFound />
-  const { project, organization, eligibility, design } = context
+  const { eligibility, design } = context
   return (
     <div className="flex flex-col gap-5">
-      <DesignHeader project={project} organizationName={organization?.name ?? ''} />
+      <DesignHeader />
       {eligibility.canDesign && <DesignNav projectId={projectId} />}
       {!eligibility.canDesign ? (
         <DesignGateNotice context={context} />
