@@ -49,6 +49,7 @@ import {
   SelectionProjectNotFound,
   } from './selectionShared'
 import { useSelectionData } from './useSelectionData'
+import { ScreenGuide } from '../../components/onboarding/ScreenGuide'
 
 export function CandidateBoardPage() {
   const { projectId = '' } = useParams()
@@ -164,6 +165,9 @@ export function CandidateBoardPage() {
 
   return (
     <div className="flex flex-col gap-5">
+      <div className="flex justify-end">
+        <ScreenGuide screenKey="selection_compare" />
+      </div>
       <SelectionHeader
         project={project}
         organizationName={organization?.name ?? ''}

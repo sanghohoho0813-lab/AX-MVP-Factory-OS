@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
 import { DemoTourProvider } from '../demo/DemoTourProvider'
+import { OnboardingProvider } from '../onboarding/OnboardingProvider'
 import { ActiveProjectProvider } from '../../context/ActiveProjectProvider'
 import { RouteProjectSync } from '../../context/RouteProjectSync'
 
@@ -29,6 +30,7 @@ export function AppShell() {
     <ActiveProjectProvider>
       <RouteProjectSync />
       <DemoTourProvider>
+      <OnboardingProvider>
       <div className="flex min-h-screen">
         <Sidebar
           collapsed={collapsed}
@@ -46,6 +48,7 @@ export function AppShell() {
           </main>
         </div>
       </div>
+      </OnboardingProvider>
       </DemoTourProvider>
     </ActiveProjectProvider>
   )

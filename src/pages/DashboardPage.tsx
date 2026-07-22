@@ -25,6 +25,7 @@ import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { Modal } from '../components/ui/Modal'
 import { useToast } from '../components/ui/toastContext'
 import { NextActionHero } from '../components/workspace/NextActionHero'
+import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { StatusPill, toFriendlyStatus } from '../components/workspace/StatusPill'
 import { useActiveProject } from '../context/activeProject'
 
@@ -82,7 +83,11 @@ export function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-8">
+      <div className="flex justify-end">
+        <ScreenGuide screenKey="home" />
+      </div>
       {/* A. 오늘 가장 먼저 할 일 */}
+      <div data-tour="home-next-actions">
       {hero ? (
         <NextActionHero
           eyebrow={`${hero.orgName} · ${hero.project.name}${hero.progress.isSample ? ' · 샘플' : ''}`}
@@ -116,10 +121,11 @@ export function DashboardPage() {
           </div>
         </section>
       )}
+      </div>
 
       {/* B. 이어서 할 프로젝트 */}
       {continueList.length > 0 && (
-        <section aria-labelledby="home-continue" className="flex flex-col gap-3">
+        <section aria-labelledby="home-continue" data-tour="home-projects" className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <h2 id="home-continue" className="text-[1.25rem] font-bold text-slate-900">이어서 할 프로젝트</h2>
             <button type="button" onClick={() => navigate('/clients')} className="text-[0.95rem] font-medium text-brand-700 hover:underline">

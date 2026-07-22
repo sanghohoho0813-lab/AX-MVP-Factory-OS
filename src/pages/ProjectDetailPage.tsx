@@ -53,6 +53,7 @@ import { DropdownMenu } from '../components/ui/DropdownMenu'
 import { NotFoundState } from '../components/ui/NotFoundState'
 import { Panel } from '../components/ui/Panel'
 import { StatusBadge } from '../components/ui/StatusBadge'
+import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { useToast } from '../components/ui/toastContext'
 
 function SummaryItem({ label, value }: { label: string; value: string }) {
@@ -263,6 +264,7 @@ export function ProjectDetailPage() {
         }
         actions={
           <>
+            <ScreenGuide screenKey="project_detail" />
             <Button
               variant="secondary"
               onClick={() => navigate(`/projects/${project.id}/edit`)}
@@ -297,6 +299,7 @@ export function ProjectDetailPage() {
       {!project.archivedAt && (
         <section
           aria-label="지금 해야 할 일"
+          data-tour="control-next"
           className="rounded-(--radius-panel) border border-brand-200 bg-brand-50/50 p-5"
         >
           <p className="text-[13px] font-semibold tracking-wide text-brand-700 uppercase">
@@ -318,6 +321,7 @@ export function ProjectDetailPage() {
       )}
 
       {/* 3. 핵심 단계 — 실제 데이터 기준의 단계별 상태 */}
+      <div data-tour="control-progress">
       <Panel title="핵심 단계" flush>
         <ol className="flex flex-col divide-y divide-slate-100">
           {progress.steps.map((step, index) => {
@@ -378,6 +382,7 @@ export function ProjectDetailPage() {
           })}
         </ol>
       </Panel>
+      </div>
 
       {/* 4. 현재 준비된 결과물 — 확정 기준으로 실제 존재하는 것만 */}
       <Panel title="현재 준비된 결과물" flush>

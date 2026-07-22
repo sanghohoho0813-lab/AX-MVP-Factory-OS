@@ -13,6 +13,7 @@ import {
   LocalDataSummaryPanel,
   type TabKey,
 } from './settings/parts'
+import { OnboardingSettingsPanel } from './settings/OnboardingSettingsPanel'
 
 // supabase 설정 화면은 lazy 로 로드해 local entry 번들에 Supabase SDK 가 섞이지 않게 한다.
 const SupabaseSettingsView = lazy(() =>
@@ -34,6 +35,7 @@ function LocalSettings() {
           </Panel>
           <TextScalePanel />
           <FeatureVisibilityPanel />
+          <OnboardingSettingsPanel />
         </>
       )}
       {tab === 'workspace' && (

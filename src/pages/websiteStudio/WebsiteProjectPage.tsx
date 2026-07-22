@@ -33,6 +33,7 @@ import {
   websiteSteps,
 } from './websiteShared'
 import { useWebsiteData } from './useWebsiteData'
+import { ScreenGuide } from '../../components/onboarding/ScreenGuide'
 
 export function WebsiteProjectPage() {
   const { projectId = '' } = useParams()
@@ -176,6 +177,9 @@ export function WebsiteProjectPage() {
       summary={summary}
     >
       <div className="flex flex-col gap-5">
+        <div className="flex justify-end">
+          <ScreenGuide screenKey="website_design" />
+        </div>
         <RedesignBanner show={context.needsRedesignFlag} onRun={() => navigate(`${base}/review`)} />
         <ReadinessNotice show={!eligibility.hasReadiness} />
 

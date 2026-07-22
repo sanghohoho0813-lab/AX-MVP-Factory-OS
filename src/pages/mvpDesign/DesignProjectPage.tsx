@@ -31,6 +31,7 @@ import {
   designSteps,
 } from './designShared'
 import { useDesignData } from './useDesignData'
+import { ScreenGuide } from '../../components/onboarding/ScreenGuide'
 
 /** 영어 범위 용어를 쉬운 표현으로 (전문가 정보에서만 원어 보존) */
 const SCOPE_LABEL: Record<string, string> = {
@@ -148,6 +149,9 @@ export function DesignProjectPage() {
       summary={summary}
     >
       <div className="flex flex-col gap-5">
+        <div className="flex justify-end">
+          <ScreenGuide screenKey="ax_design" />
+        </div>
         <RedesignBanner show={context.needsRedesignFlag} onRun={() => navigate(`${base}/review`)} />
 
         {/* 확정한 핵심 업무 */}
