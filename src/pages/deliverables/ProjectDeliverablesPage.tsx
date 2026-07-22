@@ -32,20 +32,72 @@ import {
 } from './deliverableShared'
 import { useDeliverableData } from './useDeliverableData'
 
-/** 확정 결과 준비 상태 — 쉬운 말로 */
+/** 현재 프로젝트 결과 — 상태·이동·생성 조건을 함께 표시 (§6) */
 interface ReadinessRow {
   key: string
   label: string
   ready: boolean
+  /** 준비됨일 때 이동 경로 */
+  path: string
+  /** 준비 전 상태 라벨 (이전 단계가 필요함 / 아직 생성되지 않음) */
+  pendingState: string
+  /** 준비 전 생성 조건 문장 */
+  condition: string
+  show: boolean
 }
-function readinessRows(e: DeliverableEligibility): ReadinessRow[] {
+function readinessRows(
+  e: DeliverableEligibility,
+  projectId: string,
+  projectType: string,
+): ReadinessRow[] {
+  const isWebsiteOnly = projectType === 'website'
   return [
-    { key: 'diagnosis', label: '진단 결과', ready: e.hasDiagnosis },
-    { key: 'selection', label: '핵심 과제 선정', ready: e.hasSelection },
-    { key: 'ax', label: 'AX 기능·화면 설계', ready: e.hasAx },
-    { key: 'website', label: '홈페이지 설계', ready: e.hasWebsite },
-    { key: 'validation', label: '실제 사용 테스트 결과', ready: e.hasValidation },
-  ]
+    {
+      key: 'diagnosis',
+      label: '진단 결과',
+      ready: e.hasDiagnosis,
+      path: `/diagnosis/projects/${projectId}/analysis`,
+      pendingState: '아직 생성되지 않음',
+      condition: '제출된 설문 응답으로 진단 결과를 확정하면 이곳에서 확인할 수 있습니다.',
+      show: !isWebsiteOnly,
+    },
+    {
+      key: 'selection',
+      label: '업무 선택 결과',
+      ready: e.hasSelection,
+      path: `/selection/projects/${projectId}/decision`,
+      pendingState: e.hasDiagnosis ? '아직 생성되지 않음' : '이전 단계가 필요함',
+      condition: '진단 결과에서 첫 번째로 만들 업무를 확정해야 합니다.',
+      show: !isWebsiteOnly,
+    },
+    {
+      key: 'ax',
+      label: 'AX 설계 결과',
+      ready: e.hasAx,
+      path: `/mvp-design/projects/${projectId}`,
+      pendingState: e.hasSelection ? '아직 생성되지 않음' : '이전 단계가 필요함',
+      condition: '먼저 만들 업무가 확정되면 기능·화면 설계를 시작할 수 있습니다.',
+      show: !isWebsiteOnly,
+    },
+    {
+      key: 'website',
+      label: '홈페이지 설계 결과',
+      ready: e.hasWebsite,
+      path: `/website-studio/projects/${projectId}`,
+      pendingState: '아직 생성되지 않음',
+      condition: '홈페이지 구조·콘텐츠·디자인 설계를 확정하면 이곳에서 확인할 수 있습니다.',
+      show: projectType !== 'ax',
+    },
+    {
+      key: 'validation',
+      label: '테스트 결과',
+      ready: e.hasValidation,
+      path: `/validation/projects/${projectId}`,
+      pendingState: e.hasAx || e.hasWebsite ? '아직 생성되지 않음' : '이전 단계가 필요함',
+      condition: '설계를 확정한 뒤 실제 사용 테스트를 진행하면 결과가 기록됩니다.',
+      show: true,
+    },
+  ].filter((r) => r.show)
 }
 
 /** 자료 유형 안내 카드 (쉬운 이름 우선) — 어떤 자료를 누구에게 만들지 */
@@ -68,7 +120,7 @@ export function ProjectDeliverablesPage() {
   const { project, eligibility, packages, latest, latestStale } = context
   const canCreate = eligibility.canCreate
   const createPath = `/deliverables/projects/${projectId}/create`
-  const rows = readinessRows(eligibility)
+  const rows = readinessRows(eligibility, projectId, project.projectType)
   const readyCount = rows.filter((r) => r.ready).length
   const latestSummary = latest ? summarizePackage(latest) : null
   const latestBase = latest ? `/deliverables/projects/${projectId}/packages/${latest.id}` : ''
@@ -138,7 +190,7 @@ export function ProjectDeliverablesPage() {
       <div>
         <WorkspaceSummaryLine label="만든 자료 묶음" value={`${packages.length}개`} />
         <WorkspaceSummaryLine label="최근 자료 상태" value={latestSummary ? latestSummary.headline : '아직 없음'} tone={finalizedCount > 0 ? 'ok' : 'default'} />
-        <WorkspaceSummaryLine label="포함할 결과" value={`${readyCount}/5 준비됨`} tone={readyCount === 0 ? 'warn' : 'default'} />
+        <WorkspaceSummaryLine label="포함할 결과" value={`${readyCount}/${rows.length} 준비됨`} tone={readyCount === 0 ? 'warn' : 'default'} />
         <WorkspaceSummaryLine label="민감정보 가림" value={redactionRules.length > 0 ? `${redactionRules.length}개 적용` : '설정 없음'} tone={redactionRules.length > 0 ? 'ok' : 'default'} />
       </div>
       <WorkspaceCompletionChecklist items={checklist} />
@@ -178,7 +230,7 @@ export function ProjectDeliverablesPage() {
         )}
 
         <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-2.5 text-[0.875rem] leading-relaxed break-keep text-slate-500">
-          이 시스템은 진단·설계·개발 지시문을 만듭니다. 실제 프로그램과 홈페이지 제작·배포는 별도의 개발 과정이 필요합니다.
+          이곳에서 만드는 결과물은 진단서·설계서·보고서·개발 지시문입니다. 실제 프로그램과 홈페이지 제작·배포는 별도의 개발 과정이 필요합니다.
         </p>
 
         {project.projectType === 'ax_website' && (
@@ -219,23 +271,57 @@ export function ProjectDeliverablesPage() {
           )}
         </Panel>
 
-        {/* 포함하는 프로젝트 결과 */}
-        <Panel title="자료에 담을 수 있는 프로젝트 결과">
+        {/* 1. 현재 프로젝트 결과 (§6 — 상태·이동·생성 조건) */}
+        <Panel title="현재 프로젝트 결과">
           <ul className="flex flex-col gap-2">
             {rows.map((row) => (
-              <li key={row.key} className="flex items-center gap-2.5 rounded-(--radius-card) border border-slate-200 px-3.5 py-2.5">
-                {row.ready ? (
-                  <CheckCircle2 aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-success-500" />
-                ) : (
-                  <CircleDashed aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-300" />
+              <li key={row.key} className="rounded-(--radius-card) border border-slate-200 px-3.5 py-2.5">
+                <div className="flex items-center gap-2.5">
+                  {row.ready ? (
+                    <CheckCircle2 aria-hidden="true" className="size-4 shrink-0 text-success-500" />
+                  ) : (
+                    <CircleDashed aria-hidden="true" className="size-4 shrink-0 text-slate-300" />
+                  )}
+                  <span className="min-w-0 flex-1 break-keep text-[0.9rem] font-medium text-slate-700">{row.label}</span>
+                  <span className={`shrink-0 text-[0.85rem] font-medium whitespace-nowrap ${row.ready ? 'text-success-600' : 'text-slate-400'}`}>
+                    {row.ready ? '준비됨' : row.pendingState}
+                  </span>
+                  {row.ready && (
+                    <button
+                      type="button"
+                      onClick={() => navigate(row.path)}
+                      className="inline-flex shrink-0 cursor-pointer items-center gap-1 text-[0.875rem] font-semibold text-brand-600 hover:text-brand-700"
+                    >
+                      열기
+                      <ArrowRight aria-hidden="true" className="size-3.5" />
+                    </button>
+                  )}
+                </div>
+                {!row.ready && (
+                  <p className="mt-1.5 pl-6.5 text-[0.875rem] leading-relaxed break-keep text-slate-500">{row.condition}</p>
                 )}
-                <span className="min-w-0 flex-1 break-keep text-[0.9rem] font-medium text-slate-700">{row.label}</span>
-                <span className={`shrink-0 text-[0.85rem] font-medium whitespace-nowrap ${row.ready ? 'text-success-600' : 'text-slate-400'}`}>
-                  {row.ready ? '사용 가능' : '아직 없음'}
-                </span>
               </li>
             ))}
           </ul>
+        </Panel>
+
+        {/* 3. 개발 지시문 (§5 — Claude Code용·범용·디자인·콘텐츠) */}
+        <Panel title="개발 지시문">
+          {latest ? (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="min-w-0 text-[0.9rem] break-keep text-slate-600">
+                Claude Code용·범용 개발용·디자인용·콘텐츠용 개발 지시문을 복사·다운로드할 수 있습니다.
+              </p>
+              <Button variant="secondary" size="sm" onClick={() => navigate(`${latestBase}/prompts`)}>
+                개발 지시문 열기
+                <ArrowRight aria-hidden="true" className="size-3.5" />
+              </Button>
+            </div>
+          ) : (
+            <p className="text-[0.9rem] break-keep text-slate-500">
+              전달자료 묶음을 만들면 개발 지시문이 함께 준비됩니다.
+            </p>
+          )}
         </Panel>
 
         {/* 개인정보 가림 상태 */}

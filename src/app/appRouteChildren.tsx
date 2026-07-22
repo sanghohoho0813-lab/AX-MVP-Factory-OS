@@ -7,6 +7,7 @@ import { Navigate } from 'react-router-dom'
 import { MODULE_PAGES } from '../data/modules'
 import { DashboardPage } from '../pages/DashboardPage'
 import { EmptyModulePage } from '../pages/EmptyModulePage'
+import { ReportsRedirectPage } from '../pages/ReportsRedirectPage'
 
 const ClientsListPage = lazy(() =>
   import('../pages/ClientsListPage').then((m) => ({ default: m.ClientsListPage })),
@@ -426,6 +427,8 @@ export const appRouteChildren = [
       { path: 'funding/projects/:projectId/review', element: <FundingReviewPage /> },
       { path: 'cases', element: <CasesLibraryPage /> },
       { path: 'cases/:caseId', element: <CaseDetailPage /> },
+      // /reports 스텁은 결과자료로 안내한다 (라우트 보존)
+      { path: 'reports', element: <ReportsRedirectPage /> },
 
       ...MODULE_PAGES.filter((config) => !EMPTY_MODULE_KEYS.has(config.key)).map(
         (config) => ({

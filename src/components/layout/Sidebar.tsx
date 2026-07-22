@@ -52,11 +52,12 @@ function buildGroups(
   advanced: boolean,
 ): NavGroup[] {
   const pid = activeProjectId
+  // 프로젝트 유형별 핵심 메뉴 — AX: 진단·선택·AX설계 / 홈페이지: 홈페이지 설계 / 혼합: 모두
   const workspaceItems: NavItem[] = pid
     ? [
-        projectType !== 'website'
-          ? { label: '기업 진단', path: `/diagnosis/projects/${pid}/setup`, icon: ClipboardList }
-          : { label: '홈페이지 진단', path: `/website-studio/projects/${pid}`, icon: ClipboardList },
+        ...(projectType !== 'website'
+          ? [{ label: '기업 진단', path: `/diagnosis/projects/${pid}/setup`, icon: ClipboardList }]
+          : []),
         ...(projectType !== 'website' ? [{ label: '만들 업무 선택', path: `/selection/projects/${pid}`, icon: Filter }] : []),
         ...(projectType !== 'website' ? [{ label: 'AX 기능 설계', path: `/mvp-design/projects/${pid}`, icon: PencilRuler }] : []),
         ...(projectType !== 'ax' ? [{ label: '홈페이지 설계', path: `/website-studio/projects/${pid}`, icon: Palette }] : []),
@@ -77,11 +78,17 @@ function buildGroups(
     { key: 'today', title: '오늘 할 일', items: [{ label: '오늘 할 일', path: '/', icon: CheckSquare }] },
     { key: 'clients', title: '고객·프로젝트', items: [{ label: '고객사·프로젝트', path: '/clients', icon: Building2 }] },
     { key: 'workspace', title: '작업공간', items: workspaceItems },
-    {
-      key: 'results',
-      title: '결과·자료',
-      items: [{ label: '제출자료·보고서', path: '/deliverables/results', icon: FileCheck2 }],
-    },
+    // 결과자료는 최상위 1개만 — 프로젝트 선택 시 작업공간의 '결과자료'가 대표이므로
+    // 전체 목록 메뉴는 프로젝트 미선택 상태에서만 표시한다(같은 목적의 메뉴 중복 금지).
+    ...(!pid
+      ? [
+          {
+            key: 'results',
+            title: '결과·자료',
+            items: [{ label: '결과자료', path: '/deliverables/results', icon: FileCheck2 }],
+          },
+        ]
+      : []),
     ...(advancedItems.length > 0 ? [{ key: 'advanced', title: '고급 운영', items: advancedItems }] : []),
     { key: 'settings', title: '설정', items: [{ label: '설정', path: '/settings', icon: Settings }] },
   ]
@@ -126,7 +133,16 @@ function SidebarContent({
               )}
               {group.key === 'workspace' && group.items.length === 0 ? (
                 !collapsed && (
-                  <p className="px-3 py-1.5 text-[0.85rem] leading-snug break-keep text-navy-300/80">프로젝트를 선택하면 단계별 작업이 표시됩니다.</p>
+                  <div className="px-3 py-1.5">
+                    <p className="text-[0.85rem] leading-snug break-keep text-navy-300/80">먼저 작업할 프로젝트를 선택하세요.</p>
+                    <button
+                      type="button"
+                      onClick={() => { navigate('/clients'); onNavigate?.() }}
+                      className="mt-2 w-full cursor-pointer rounded-(--radius-control) border border-navy-700 px-3 py-2 text-[0.875rem] font-medium text-navy-100 hover:bg-navy-800"
+                    >
+                      프로젝트 선택하기
+                    </button>
+                  </div>
                 )
               ) : (
                 <ul aria-labelledby={!collapsed ? `nav-${group.key}` : undefined} aria-label={collapsed ? group.title : undefined} className="flex flex-col gap-1">

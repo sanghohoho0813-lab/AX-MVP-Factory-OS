@@ -9,7 +9,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test:contract": "vite build --config vite.contract.config.mjs && node .contract-out/contract.mjs",
-    "test:progress": "vite build --config vite.progress.config.mjs && node .progress-out/progress.mjs"
+    "test:progress": "vite build --config vite.progress.config.mjs && node .progress-out/progress.mjs",
+    "test:persistence": "vite build --config vite.persistence.config.mjs && node .persistence-out/persistence.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.7",

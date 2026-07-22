@@ -6,7 +6,7 @@
  * 렌더링·검증은 로컬 모드와 동일한 순수 헬퍼·프레젠테이션 컴포넌트를 재사용한다.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import type { RespondentRole } from '../../types'
 import type { SnapshotSection } from '../../types/survey'
@@ -22,6 +22,12 @@ import {
   validateFinalSubmission,
   type PublicSurveyView,
 } from '../../services/surveyRuntimeService'
+import {
+  clearSurveyDraft,
+  readSurveyDraft,
+  writeSurveyDraft,
+} from '../../storage/surveyDraftCache'
+import { createSerialSaveQueue } from '../../lib/serialSaveQueue'
 import { PublicSurveyLayout, PublicSurveyNotice } from '../../components/public/PublicSurveyLayout'
 import { SurveyStartScreen } from '../../components/public/SurveyStartScreen'
 import { SurveyPage } from '../../components/public/SurveyPage'
@@ -74,6 +80,7 @@ export function SupabasePublicSurvey() {
   const [autosave, setAutosave] = useState<AutosaveState>('idle')
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [hasLocalDraft, setHasLocalDraft] = useState(false)
 
   // 최초 로드
   useEffect(() => {
@@ -92,6 +99,15 @@ export function SupabasePublicSurvey() {
         }
         setView(toView(rpc))
         setProfile((p) => ({ ...p, name: (rpc.recipientName as string) ?? '', position: (rpc.recipientPosition as string) ?? '' }))
+        // 이 브라우저의 안전 draft 가 있으면 복구한다 (서버는 이전 답변을 반환하지 않음)
+        const draft = readSurveyDraft(`sb-${accessToken}`)
+        if (draft) {
+          setAnswers(draft.answers)
+          setConsented(draft.consented)
+          setCurrentPageIndex(draft.currentPageIndex)
+          setProfile((p) => ({ ...p, ...draft.profile, name: draft.profile.name || p.name, position: draft.profile.position || p.position }))
+          setHasLocalDraft(true)
+        }
         setPhase('start')
       } catch {
         if (alive) setLoadError('설문을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.')
@@ -117,48 +133,103 @@ export function SupabasePublicSurvey() {
   )
   const safePageIndex = Math.min(currentPageIndex, Math.max(0, pages.length - 1))
 
-  function buildAnswerRecords() {
+  /* ---------- 저장 (직렬화·순서 역전 방지·제출 후 차단) ---------- */
+  // 항상 실행 시점의 최신 입력을 전송한다 — 오래된 응답이 최신 답변을 덮어쓰지 않는다.
+  const stateRef = useRef({ answers, profile, consented, pageIndex: safePageIndex })
+  stateRef.current = { answers, profile, consented, pageIndex: safePageIndex }
+  // 저장 직렬화 큐 — 순서 역전 방지·중복 건너뛰기·제출 후 차단 (단위 테스트: persistence.test)
+  const queueRef = useRef(createSerialSaveQueue())
+  const draftId = `sb-${accessToken}`
+
+  function buildAnswerRecords(source: Record<string, SurveyAnswerValue>) {
     const now = new Date().toISOString()
-    return Object.entries(answers)
+    return Object.entries(source)
       .filter(([, v]) => v !== undefined)
       .map(([questionId, value]) => ({ questionId, questionCode: codeById.get(questionId) ?? '', value, answeredAt: now, updatedAt: now }))
   }
 
-  async function saveNow(isFinal: boolean) {
-    if (!view) return
-    setAutosave('saving')
-    try {
-      const records = isFinal ? sanitizeAnswersForSubmission(sections, buildAnswerRecords()) : buildAnswerRecords()
-      const prog = calculateSurveyProgress(sections, answerMap)
-      await client.submitSurveyResponse(
-        accessToken,
-        {
-          respondentProfile: profile,
-          consented,
-          answers: records,
-          currentPageIndex: safePageIndex,
-          progressPercent: prog.progressPercent,
-          answeredVisibleCount: prog.answeredVisibleQuestions,
-          requiredVisibleCount: prog.totalRequiredQuestions,
-          requiredAnsweredCount: prog.answeredRequiredQuestions,
-        },
-        isFinal,
-      )
-      setAutosave('saved')
-      setLastSavedAt(new Date().toISOString())
-    } catch {
-      setAutosave('error') // 실패를 성공처럼 표시하지 않음
-      throw new Error('save-failed')
+  function saveNow(isFinal: boolean): Promise<void> {
+    const queue = queueRef.current
+    const seq = queue.nextSeq()
+    const run = async () => {
+      if (!view) return
+      // 더 최신 저장 요청이 이미 대기 중이면 이 비최종 요청은 건너뛴다(마지막 요청이 최신 상태를 전송)
+      if (!isFinal && seq !== queue.currentSeq()) return
+      const latest = stateRef.current
+      setAutosave('saving')
+      try {
+        const raw = buildAnswerRecords(latest.answers)
+        const records = isFinal ? sanitizeAnswersForSubmission(sections, raw) : raw
+        const prog = calculateSurveyProgress(sections, new Map(Object.entries(latest.answers)))
+        await client.submitSurveyResponse(
+          accessToken,
+          {
+            respondentProfile: latest.profile,
+            consented: latest.consented,
+            answers: records,
+            currentPageIndex: latest.pageIndex,
+            progressPercent: prog.progressPercent,
+            answeredVisibleCount: prog.answeredVisibleQuestions,
+            requiredVisibleCount: prog.totalRequiredQuestions,
+            requiredAnsweredCount: prog.answeredRequiredQuestions,
+          },
+          isFinal,
+        )
+        if (isFinal) queue.close()
+        // 서버 저장 성공 → 로컬 안전 draft 정리, 상태는 최신 요청만 반영
+        clearSurveyDraft(draftId)
+        if (isFinal || seq === queue.currentSeq()) {
+          setAutosave('saved')
+          setLastSavedAt(new Date().toISOString())
+        }
+      } catch {
+        // 실패를 성공처럼 표시하지 않는다. 로컬 안전 draft 는 change-effect 가 이미 보존.
+        setAutosave('offline_draft')
+        throw new Error('save-failed')
+      }
     }
+    return queue.enqueue(run)
   }
 
-  // 디바운스 자동 저장
+  // 로컬 안전 draft — 서버 autosave 와 별개로, 입력 즉시 이 브라우저에 동기 보존한다.
+  // (브라우저 종료 시 네트워크 완료는 보장할 수 없으므로 2단계 구조: 로컬 draft + 서버 autosave)
+  useEffect(() => {
+    if (phase === 'loading' || phase === 'unavailable' || phase === 'completed') return
+    if (queueRef.current.isClosed()) return
+    writeSurveyDraft({
+      responseId: draftId,
+      answers,
+      profile,
+      consented,
+      currentPageIndex: safePageIndex,
+      updatedAt: new Date().toISOString(),
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answers, profile, consented, safePageIndex, phase])
+
+  // 디바운스 자동 저장 (서버)
   useEffect(() => {
     if (phase !== 'filling' || !view) return
     const t = window.setTimeout(() => { void saveNow(false).catch(() => {}) }, 800)
     return () => window.clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answers, profile, consented, phase, safePageIndex])
+
+  // 탭 숨김·페이지 종료 시 서버 저장 시도(완료는 보장되지 않음 — 로컬 draft 가 안전망)
+  useEffect(() => {
+    if (phase !== 'filling') return
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') void saveNow(false).catch(() => {})
+    }
+    const onPageHide = () => { void saveNow(false).catch(() => {}) }
+    document.addEventListener('visibilitychange', onHide)
+    window.addEventListener('pagehide', onPageHide)
+    return () => {
+      document.removeEventListener('visibilitychange', onHide)
+      window.removeEventListener('pagehide', onPageHide)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase])
 
   if (phase === 'loading') {
     return <PublicSurveyNotice title="설문을 불러오는 중입니다…" description="잠시만 기다려 주세요." />
@@ -293,7 +364,7 @@ export function SupabasePublicSurvey() {
         <SurveyStartScreen
           view={view}
           estimatedMinutes={Math.max(1, Math.round(progress.estimatedRemainingMinutes) || 5)}
-          hasDraft={false}
+          hasDraft={hasLocalDraft}
           draftProgress={0}
           draftLastSaved={null}
           profile={profile}
@@ -338,7 +409,7 @@ export function SupabasePublicSurvey() {
           canPrev
           isLast={safePageIndex >= pages.length - 1}
           submitting={submitting}
-          autosave={<SurveyAutosaveIndicator state={autosave} lastSavedAt={lastSavedAt} onRetry={() => void saveNow(false).catch(() => {})} />}
+          autosave={<SurveyAutosaveIndicator state={autosave} lastSavedAt={lastSavedAt} savedLabel="클라우드 저장됨" onRetry={() => void saveNow(false).catch(() => {})} />}
           onPrev={handlePrev}
           onNext={handleNext}
         />

@@ -63,7 +63,8 @@ function sourceAnswerFor(
     .sort((a, b) => a.orderIndex - b.orderIndex)
     .map((o) => o.value)
   return valueToAnswer(
-    answers.get(source.id) ?? null,
+    // 답변 맵은 questionId 로 키가 지정된다 (placement id 아님)
+    answers.get(source.questionId) ?? null,
     source.type,
     fallbackOrder,
   )
@@ -71,26 +72,44 @@ function sourceAnswerFor(
 
 /**
  * 조건을 적용해 현재 보이는 질문만 반환한다.
- * source가 없거나 손상되면 해당 조건 질문은 숨긴다(공개 설문 중단 방지).
+ * - source가 없거나 손상되면 해당 조건 질문은 숨긴다(공개 설문 중단 방지).
+ * - 중첩 조건 지원: source 질문 자체가 숨겨져 있으면, 남아 있는 이전 답변을
+ *   근거로 쓰지 않고 하위 질문도 함께 숨긴다(고정점 반복).
+ * 진행률·페이지·review·제출 sanitizer 가 모두 이 한 구현을 공유한다.
  */
 export function evaluateVisibleSnapshotQuestions(
   sections: SnapshotSection[],
   answers: Map<string, SurveyAnswerValue>,
 ): SnapshotPlacement[] {
   const byId = placementById(sections)
-  return flattenSnapshot(sections).filter((placement) => {
-    if (!placement.condition) return true
-    const source = byId.get(placement.condition.sourceQuestionId)
-    if (!source) return false // 손상된 조건 → 숨김
-    try {
-      return evaluateCondition(
-        placement.condition,
-        sourceAnswerFor(placement, byId, answers),
-      )
-    } catch {
-      return false
+  const all = flattenSnapshot(sections)
+  const visible = new Set(all.filter((p) => !p.condition).map((p) => p.questionId))
+  let changed = true
+  let guard = 0
+  while (changed && guard <= all.length) {
+    changed = false
+    guard += 1
+    for (const placement of all) {
+      if (!placement.condition || visible.has(placement.questionId)) continue
+      const source = byId.get(placement.condition.sourceQuestionId)
+      if (!source) continue // 손상된 조건 → 숨김 유지
+      if (!visible.has(source.questionId)) continue // 숨겨진 source 답변은 근거로 쓰지 않음
+      try {
+        if (
+          evaluateCondition(
+            placement.condition,
+            sourceAnswerFor(placement, byId, answers),
+          )
+        ) {
+          visible.add(placement.questionId)
+          changed = true
+        }
+      } catch {
+        /* 평가 실패 → 숨김 유지 */
+      }
     }
-  })
+  }
+  return all.filter((p) => visible.has(p.questionId))
 }
 
 /** 조건 source가 없어 경고가 필요한 질문 (내부 관리자용) */

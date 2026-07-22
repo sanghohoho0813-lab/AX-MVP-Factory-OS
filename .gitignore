@@ -33,3 +33,4 @@ dist-ssr
 # contract test build output
 .contract-out
 .progress-out
+.persistence-out
