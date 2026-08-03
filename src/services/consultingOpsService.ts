@@ -1,6 +1,7 @@
-import type { StatusTone } from '../types'
+import type { ProjectStage, StatusTone } from '../types'
 import type { Organization, Project } from '../types/domain'
 import { getDDay } from '../lib/format'
+import { PROJECT_STAGE_META } from '../lib/statusMeta'
 import { getProjectProgress } from './projectProgressService'
 
 export interface ConsultingOpsItem {
@@ -23,6 +24,7 @@ export interface ConsultingOpsBrief {
   activeCount: number
   monthlyCapacityTarget: number
   capacityLabel: string
+  focusLabel: string
   waitingClientCount: number
   overdueCount: number
   fundingPipelineCount: number
@@ -30,9 +32,28 @@ export interface ConsultingOpsBrief {
   urgentItems: ConsultingOpsItem[]
   clientWaitingItems: ConsultingOpsItem[]
   fundingItems: ConsultingOpsItem[]
+  stageLoads: ConsultingOpsStageLoad[]
+  recommendations: ConsultingOpsRecommendation[]
 }
 
 const MONTHLY_CAPACITY_TARGET = 5
+
+export interface ConsultingOpsStageLoad {
+  stage: ProjectStage
+  label: string
+  count: number
+  riskCount: number
+  waitingCount: number
+  percent: number
+  tone: StatusTone
+}
+
+export interface ConsultingOpsRecommendation {
+  id: string
+  title: string
+  detail: string
+  tone: StatusTone
+}
 
 function orgNameById(organizations: Organization[], organizationId: string): string {
   return organizations.find((org) => org.id === organizationId)?.name ?? '알 수 없는 고객사'
@@ -92,6 +113,98 @@ function sortByOperationalRisk(a: ConsultingOpsItem, b: ConsultingOpsItem): numb
   return toneRank[a.tone] - toneRank[b.tone] || aDays - bDays
 }
 
+function buildStageLoads(activeProjects: Project[]): ConsultingOpsStageLoad[] {
+  const total = Math.max(activeProjects.length, 1)
+  const stages = new Map<ProjectStage, Project[]>()
+  for (const project of activeProjects) {
+    const group = stages.get(project.currentStage) ?? []
+    group.push(project)
+    stages.set(project.currentStage, group)
+  }
+
+  return Array.from(stages.entries())
+    .map(([stage, stageProjects]) => {
+      const riskCount = stageProjects.filter((project) => project.healthStatus === 'risk').length
+      const waitingCount = stageProjects.filter((project) => project.status === 'waiting_client').length
+      return {
+        stage,
+        label: PROJECT_STAGE_META[stage].label,
+        count: stageProjects.length,
+        riskCount,
+        waitingCount,
+        percent: Math.round((stageProjects.length / total) * 100),
+        tone: riskCount > 0 ? 'danger' : waitingCount > 0 ? 'warning' : PROJECT_STAGE_META[stage].tone,
+      }
+    })
+    .sort((a, b) => b.count - a.count || b.riskCount - a.riskCount)
+}
+
+function buildRecommendations(
+  activeCount: number,
+  waitingClientCount: number,
+  overdueCount: number,
+  fundingPipelineCount: number,
+  deliverablePipelineCount: number,
+  stageLoads: ConsultingOpsStageLoad[],
+): ConsultingOpsRecommendation[] {
+  const recommendations: ConsultingOpsRecommendation[] = []
+  const biggestLoad = stageLoads[0]
+
+  if (overdueCount > 0) {
+    recommendations.push({
+      id: 'clear-overdue',
+      title: '오늘은 마감 초과부터 정리',
+      detail: `${overdueCount}건이 기한을 넘겼습니다. 신규 상담보다 기존 프로젝트의 다음 행동을 먼저 닫는 편이 안전합니다.`,
+      tone: 'danger',
+    })
+  }
+
+  if (waitingClientCount > 0) {
+    recommendations.push({
+      id: 'client-reminder',
+      title: '고객 회신 리마인드 묶음 처리',
+      detail: `${waitingClientCount}건이 고객 답변 대기입니다. 오전에 한 번에 리마인드하면 오후 작업 슬롯을 되찾을 수 있습니다.`,
+      tone: 'warning',
+    })
+  }
+
+  if (activeCount >= MONTHLY_CAPACITY_TARGET) {
+    recommendations.push({
+      id: 'capacity-full',
+      title: '이번 달 신규 수임은 보수적으로',
+      detail: `현재 ${activeCount}건이 열려 있습니다. 5건 이상부터는 병목 해소 없이는 품질 저하 위험이 커집니다.`,
+      tone: 'warning',
+    })
+  } else {
+    recommendations.push({
+      id: 'capacity-open',
+      title: '신규 상담 여지 있음',
+      detail: `현재 ${activeCount}건 진행 중입니다. 병목 큐를 정리하면 이번 달 ${MONTHLY_CAPACITY_TARGET - activeCount}건까지 추가 여지가 있습니다.`,
+      tone: 'info',
+    })
+  }
+
+  if (fundingPipelineCount > 0 && deliverablePipelineCount === 0) {
+    recommendations.push({
+      id: 'funding-materials',
+      title: '정책자금 자료화 선행 필요',
+      detail: '정책자금 트랙은 열려 있지만 결과자료 단계 프로젝트가 없습니다. 진단/설계 산출물을 제출자료로 묶는 흐름을 앞당기세요.',
+      tone: 'accent',
+    })
+  }
+
+  if (biggestLoad && biggestLoad.count >= 2) {
+    recommendations.push({
+      id: 'stage-bottleneck',
+      title: `${biggestLoad.label} 단계에 작업 쏠림`,
+      detail: `${biggestLoad.count}건이 같은 단계에 있습니다. 같은 유형의 회의, 검토, 자료 요청을 묶어서 처리하면 전환 속도가 빨라집니다.`,
+      tone: biggestLoad.tone,
+    })
+  }
+
+  return recommendations.slice(0, 3)
+}
+
 export function buildConsultingOpsBrief(
   projects: Project[],
   organizations: Organization[],
@@ -118,7 +231,16 @@ export function buildConsultingOpsBrief(
   const deliverablePipelineCount = activeProjects.filter(
     (project) => project.currentStage === 'deliverables',
   ).length
+  const stageLoads = buildStageLoads(activeProjects)
   const remainingCapacity = Math.max(MONTHLY_CAPACITY_TARGET - activeProjects.length, 0)
+  const focusLabel =
+    overdueCount > 0
+      ? '마감 초과 해소'
+      : waitingClientCount > 0
+        ? '고객 답변 회수'
+        : fundingPipelineCount > 0
+          ? '정책자금 자료화'
+          : '신규 상담 가능'
 
   return {
     activeCount: activeProjects.length,
@@ -127,6 +249,7 @@ export function buildConsultingOpsBrief(
       remainingCapacity > 0
         ? `이번 달 ${remainingCapacity}건 추가 가능`
         : '처리 용량 가득 참. 병목부터 해소',
+    focusLabel,
     waitingClientCount,
     overdueCount,
     fundingPipelineCount,
@@ -134,5 +257,14 @@ export function buildConsultingOpsBrief(
     urgentItems,
     clientWaitingItems,
     fundingItems,
+    stageLoads,
+    recommendations: buildRecommendations(
+      activeProjects.length,
+      waitingClientCount,
+      overdueCount,
+      fundingPipelineCount,
+      deliverablePipelineCount,
+      stageLoads,
+    ),
   }
 }
