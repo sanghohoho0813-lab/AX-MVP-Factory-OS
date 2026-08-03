@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useStoreVersion } from '../lib/useStoreVersion'
 import { organizationRepository, projectRepository } from '../repositories'
 import { buildDashboardMetrics, buildPortfolioItems } from '../services/dashboardService'
+import { buildConsultingOpsBrief } from '../services/consultingOpsService'
 import { countSelectionPending } from '../services/selectionService'
 import { countDesignInProgress } from '../services/mvpDesignService'
 import { countWebsitePending } from '../services/websiteDesignService'
@@ -20,6 +21,7 @@ import { getGuidedDemoStatus, resetGuidedDemo } from '../services/guidedDemo/gui
 import { useDemoTour } from '../components/demo/demoTour'
 import { MetricStrip } from '../components/dashboard/MetricStrip'
 import { PortfolioHealth } from '../components/dashboard/PortfolioHealth'
+import { ConsultingOpsBoard } from '../components/dashboard/ConsultingOpsBoard'
 import { Button } from '../components/ui/Button'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { Modal } from '../components/ui/Modal'
@@ -39,9 +41,10 @@ export function DashboardPage() {
   const [showOps, setShowOps] = useState(false)
   const version = useStoreVersion()
 
-  const { hero, continueList, attention, metrics, portfolioItems, demoExists } = useMemo(() => {
+  const { hero, continueList, attention, metrics, portfolioItems, opsBrief, demoExists } = useMemo(() => {
     void version
-    const projects = projectRepository.getAll().filter((p) => p.status === 'active')
+    const allProjects = projectRepository.getAll()
+    const projects = allProjects.filter((p) => p.status === 'active')
     const organizations = organizationRepository.getAll()
     const journeys = projects
       .slice()
@@ -69,6 +72,7 @@ export function DashboardPage() {
         countFundingPending(),
       ),
       portfolioItems: buildPortfolioItems(organizations, projects),
+      opsBrief: buildConsultingOpsBrief(allProjects, organizations),
       demoExists: getGuidedDemoStatus().hasResponses,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -122,6 +126,8 @@ export function DashboardPage() {
         </section>
       )}
       </div>
+
+      <ConsultingOpsBoard brief={opsBrief} />
 
       {/* B. 이어서 할 프로젝트 */}
       {continueList.length > 0 && (
