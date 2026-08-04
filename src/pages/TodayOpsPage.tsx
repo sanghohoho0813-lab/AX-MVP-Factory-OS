@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   ClipboardCopy,
   Clock3,
+  MessageSquareText,
   RotateCcw,
   TimerReset,
 } from 'lucide-react'
@@ -118,16 +119,32 @@ export function TodayOpsPage() {
     showToast('오늘 완료 표시를 초기화했습니다.')
   }
 
+  const copyBatchReminder = async () => {
+    try {
+      if (!navigator.clipboard || !plan.batchReminderScript) throw new Error('No reminder script')
+      await navigator.clipboard.writeText(plan.batchReminderScript)
+      showToast('고객 회신 리마인드 묶음을 복사했습니다.')
+    } catch {
+      showToast('복사할 고객 회신 리마인드가 없습니다.')
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="오늘 할 일"
         description="마감, 고객 답변, 정책자금, 단계 전환을 기준으로 오늘 처리 순서를 자동으로 정리합니다."
         actions={
-          <Button variant="secondary" size="sm" onClick={resetDone} disabled={plan.completedMinutes === 0}>
-            <RotateCcw aria-hidden="true" className="size-4" />
-            완료 초기화
-          </Button>
+          <>
+            <Button variant="secondary" size="sm" onClick={copyBatchReminder} disabled={!plan.batchReminderScript}>
+              <MessageSquareText aria-hidden="true" className="size-4" />
+              회신 묶음 복사
+            </Button>
+            <Button variant="secondary" size="sm" onClick={resetDone} disabled={plan.completedMinutes === 0}>
+              <RotateCcw aria-hidden="true" className="size-4" />
+              완료 초기화
+            </Button>
+          </>
         }
       />
 
@@ -154,6 +171,53 @@ export function TodayOpsPage() {
           </div>
         </div>
       </section>
+
+      <Panel title="이번 주 예보">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+          <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-[0.82rem] font-semibold text-slate-500">7일 운영 요약</p>
+            <dl className="mt-3 grid grid-cols-2 gap-3">
+              <div>
+                <dt className="text-[0.78rem] text-slate-400">예정/지연</dt>
+                <dd className="mt-0.5 text-xl font-bold text-slate-900">{plan.weeklyForecast.totalDueCount}건</dd>
+              </div>
+              <div>
+                <dt className="text-[0.78rem] text-slate-400">과부하일</dt>
+                <dd className="mt-0.5 text-xl font-bold text-slate-900">{plan.weeklyForecast.overloadedDays}일</dd>
+              </div>
+              <div>
+                <dt className="text-[0.78rem] text-slate-400">회신 회수</dt>
+                <dd className="mt-0.5 text-xl font-bold text-slate-900">{plan.weeklyForecast.clientFollowUps}건</dd>
+              </div>
+              <div>
+                <dt className="text-[0.78rem] text-slate-400">자금 후속</dt>
+                <dd className="mt-0.5 text-xl font-bold text-slate-900">{plan.weeklyForecast.fundingFollowUps}건</dd>
+              </div>
+            </dl>
+          </div>
+
+          <ol className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-7">
+            {plan.weeklyForecast.days.map((day) => (
+              <li key={day.key} className="rounded-(--radius-card) border border-slate-200 px-3 py-3">
+                <div className="flex items-center justify-between gap-2 xl:flex-col xl:items-start">
+                  <div>
+                    <p className="text-[0.9rem] font-semibold text-slate-900">{day.label}</p>
+                    <p className="text-[0.76rem] text-slate-400">{day.dateLabel}</p>
+                  </div>
+                  <StatusBadge tone={day.tone}>{day.focus}</StatusBadge>
+                </div>
+                <div className="mt-3 flex items-end justify-between gap-2">
+                  <span className="text-xl font-bold text-slate-900">{day.dueCount}</span>
+                  <span className="text-[0.78rem] font-medium text-slate-400">{day.plannedMinutes}분</span>
+                </div>
+                {day.overdueCount > 0 && (
+                  <p className="mt-1 text-[0.78rem] font-semibold text-danger-600">지연 {day.overdueCount}건 포함</p>
+                )}
+              </li>
+            ))}
+          </ol>
+        </div>
+      </Panel>
 
       <Panel title="시간 블록">
         <ol className="grid grid-cols-1 gap-3 lg:grid-cols-3">

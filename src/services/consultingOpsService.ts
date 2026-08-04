@@ -99,8 +99,29 @@ export interface ConsultingDailyPlan {
   completedMinutes: number
   completionPercent: number
   headline: string
+  batchReminderScript: string
   actions: ConsultingDailyAction[]
   timeBlocks: ConsultingTimeBlock[]
+  weeklyForecast: ConsultingWeeklyForecast
+}
+
+export interface ConsultingWeeklyDay {
+  key: string
+  label: string
+  dateLabel: string
+  dueCount: number
+  overdueCount: number
+  plannedMinutes: number
+  focus: string
+  tone: StatusTone
+}
+
+export interface ConsultingWeeklyForecast {
+  totalDueCount: number
+  overloadedDays: number
+  clientFollowUps: number
+  fundingFollowUps: number
+  days: ConsultingWeeklyDay[]
 }
 
 function orgNameById(organizations: Organization[], organizationId: string): string {
@@ -341,6 +362,100 @@ function todayLabel(): string {
   }).format(new Date())
 }
 
+function dateKey(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function compactDateLabel(date: Date): string {
+  return new Intl.DateTimeFormat('ko-KR', {
+    month: 'numeric',
+    day: 'numeric',
+    weekday: 'short',
+  }).format(date)
+}
+
+function daysUntil(dateIso: string | null): number | null {
+  if (!dateIso) return null
+  const target = new Date(dateIso)
+  if (Number.isNaN(target.getTime())) return null
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  target.setHours(0, 0, 0, 0)
+  return Math.round((target.getTime() - today.getTime()) / 86_400_000)
+}
+
+function buildBatchReminderScript(actions: ConsultingDailyAction[]): string {
+  const clientActions = actions.filter((action) => action.lane === 'client' && !action.completed)
+  if (clientActions.length === 0) return ''
+  return clientActions
+    .map((action, index) => `${index + 1}. ${action.script}`)
+    .join('\n\n')
+}
+
+function buildWeeklyForecast(projects: Project[], actions: ConsultingDailyAction[]): ConsultingWeeklyForecast {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const days = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(today)
+    date.setDate(today.getDate() + index)
+    const dueProjects = projects.filter((project) => {
+      if (project.status === 'completed' || project.status === 'archived') return false
+      const left = daysUntil(project.nextActionDueDate)
+      return left === index || (index === 0 && left !== null && left < 0)
+    })
+    const overdueCount = dueProjects.filter((project) => {
+      const left = daysUntil(project.nextActionDueDate)
+      return left !== null && left < 0
+    }).length
+    const relatedActions = actions.filter((action) =>
+      dueProjects.some((project) => project.id === action.projectId),
+    )
+    const plannedMinutes = relatedActions.reduce((sum, action) => sum + action.estimatedMinutes, 0)
+    const clientCount = dueProjects.filter((project) => project.status === 'waiting_client').length
+    const fundingCount = dueProjects.filter((project) => project.fundingRequired).length
+    const focus =
+      overdueCount > 0
+        ? '지연 회복'
+        : clientCount > 0
+          ? '회신 회수'
+          : fundingCount > 0
+            ? '자금 자료'
+            : dueProjects.length > 0
+              ? '단계 전환'
+              : '여유'
+    const tone: StatusTone =
+      overdueCount > 0
+        ? 'danger'
+        : plannedMinutes >= 120
+          ? 'warning'
+          : dueProjects.length > 0
+            ? 'info'
+            : 'neutral'
+
+    return {
+      key: dateKey(date),
+      label: index === 0 ? '오늘' : index === 1 ? '내일' : compactDateLabel(date),
+      dateLabel: compactDateLabel(date),
+      dueCount: dueProjects.length,
+      overdueCount,
+      plannedMinutes,
+      focus,
+      tone,
+    } satisfies ConsultingWeeklyDay
+  })
+
+  return {
+    totalDueCount: days.reduce((sum, day) => sum + day.dueCount, 0),
+    overloadedDays: days.filter((day) => day.plannedMinutes >= 120 || day.overdueCount > 0).length,
+    clientFollowUps: actions.filter((action) => action.lane === 'client' && !action.completed).length,
+    fundingFollowUps: actions.filter((action) => action.lane === 'funding' && !action.completed).length,
+    days,
+  }
+}
+
 export function buildConsultingDailyPlan(
   projects: Project[],
   organizations: Organization[],
@@ -369,8 +484,10 @@ export function buildConsultingDailyPlan(
     completedMinutes,
     completionPercent,
     headline,
+    batchReminderScript: buildBatchReminderScript(actions),
     actions,
     timeBlocks: buildTimeBlocks(actions),
+    weeklyForecast: buildWeeklyForecast(projects, actions),
   }
 }
 
