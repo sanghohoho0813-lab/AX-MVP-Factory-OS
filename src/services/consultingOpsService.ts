@@ -55,6 +55,54 @@ export interface ConsultingOpsRecommendation {
   tone: StatusTone
 }
 
+export type ConsultingActionLane =
+  | 'recover'
+  | 'client'
+  | 'funding'
+  | 'advance'
+  | 'protect'
+
+export interface ConsultingDailyAction {
+  id: string
+  projectId: string
+  organizationId: string
+  clientName: string
+  projectName: string
+  lane: ConsultingActionLane
+  title: string
+  detail: string
+  stageLabel: string
+  dueLabel: string
+  estimatedMinutes: number
+  priority: number
+  tone: StatusTone
+  path: string
+  script: string
+  checklist: string[]
+  completed: boolean
+}
+
+export interface ConsultingTimeBlock {
+  id: string
+  label: string
+  timeLabel: string
+  intent: string
+  actionIds: string[]
+  totalMinutes: number
+  tone: StatusTone
+}
+
+export interface ConsultingDailyPlan {
+  dateLabel: string
+  workModeLabel: string
+  plannedMinutes: number
+  completedMinutes: number
+  completionPercent: number
+  headline: string
+  actions: ConsultingDailyAction[]
+  timeBlocks: ConsultingTimeBlock[]
+}
+
 function orgNameById(organizations: Organization[], organizationId: string): string {
   return organizations.find((org) => org.id === organizationId)?.name ?? '알 수 없는 고객사'
 }
@@ -111,6 +159,219 @@ function sortByOperationalRisk(a: ConsultingOpsItem, b: ConsultingOpsItem): numb
     neutral: 5,
   }
   return toneRank[a.tone] - toneRank[b.tone] || aDays - bDays
+}
+
+function actionLaneFor(project: Project, item: ConsultingOpsItem): ConsultingActionLane {
+  if (item.daysLeft !== null && item.daysLeft < 0) return 'recover'
+  if (project.healthStatus === 'risk') return 'recover'
+  if (project.status === 'waiting_client') return 'client'
+  if (project.fundingRequired) return 'funding'
+  if (item.daysLeft !== null && item.daysLeft <= 3) return 'advance'
+  return 'protect'
+}
+
+function laneTone(lane: ConsultingActionLane, fallback: StatusTone): StatusTone {
+  if (lane === 'recover') return 'danger'
+  if (lane === 'client') return 'warning'
+  if (lane === 'funding') return 'accent'
+  if (lane === 'advance') return 'info'
+  return fallback
+}
+
+function laneEstimate(lane: ConsultingActionLane): number {
+  if (lane === 'recover') return 45
+  if (lane === 'client') return 20
+  if (lane === 'funding') return 35
+  if (lane === 'advance') return 30
+  return 25
+}
+
+function actionTitle(item: ConsultingOpsItem, lane: ConsultingActionLane): string {
+  if (lane === 'recover') return item.nextAction || '막힌 다음 행동 정리'
+  if (lane === 'client') return `${item.clientName} 회신 리마인드`
+  if (lane === 'funding') return `${item.clientName} 정책자금 자료 상태 점검`
+  if (lane === 'advance') return item.nextAction || `${item.stageLabel} 단계 전환`
+  return `${item.clientName} 진행 상태 업데이트`
+}
+
+function actionDetail(project: Project, item: ConsultingOpsItem, lane: ConsultingActionLane): string {
+  if (lane === 'recover') return project.riskSummary || item.reason
+  if (lane === 'client') return '고객에게 필요한 자료와 답변 기한을 한 번에 정리해서 보냅니다.'
+  if (lane === 'funding') return '대상 기관, 예상 금액, 부족 자료를 확인해 제출자료 단계로 넘길 준비를 합니다.'
+  if (lane === 'advance') return `${item.stageLabel} 단계의 다음 전환 조건을 닫습니다.`
+  return '진행률, 다음 행동, 마감일이 실제 상황과 맞는지 점검합니다.'
+}
+
+function actionScript(project: Project, item: ConsultingOpsItem, lane: ConsultingActionLane): string {
+  if (lane === 'client') {
+    return `${item.clientName} 담당자님, 안녕하세요. ${project.name} 진행을 위해 ${item.nextAction} 확인이 필요합니다. 가능하시면 오늘 중 회신 부탁드립니다. 회신 주시면 바로 다음 단계로 이어가겠습니다.`
+  }
+  if (lane === 'funding') {
+    return `${item.clientName} 정책자금 검토 메모: 대상 기관은 ${project.targetInstitutions.join(', ') || '미정'}이고, 목표 금액은 ${project.targetFundingAmount ? project.targetFundingAmount.toLocaleString('ko-KR') + '원' : '미정'}입니다. 부족 자료와 제출 가능 일정을 확인합니다.`
+  }
+  if (lane === 'recover') {
+    return `${item.clientName} 병목 해소 메모: 현재 이슈는 "${item.reason}"입니다. 오늘 안에 다음 행동 "${item.nextAction}"을 닫고 새 마감일을 지정합니다.`
+  }
+  return `${item.clientName} 진행 메모: ${project.name}의 현재 단계는 ${item.stageLabel}입니다. 다음 행동은 "${item.nextAction}"입니다.`
+}
+
+function actionChecklist(lane: ConsultingActionLane): string[] {
+  if (lane === 'client') return ['필요 답변 1문장으로 정리', '자료 요청 항목 번호 붙이기', '회신 기한 지정']
+  if (lane === 'funding') return ['대상 기관 확인', '부족 증빙 표시', '사업계획서 반영 항목 정리']
+  if (lane === 'recover') return ['막힌 원인 확인', '오늘 닫을 행동 하나 선택', '새 마감일 또는 담당자 지정']
+  if (lane === 'advance') return ['현재 단계 완료 조건 확인', '다음 화면 또는 자료 열기', '완료 여부 기록']
+  return ['진행률 확인', '다음 행동 최신화', '위험 메모 정리']
+}
+
+function actionPath(project: Project): string {
+  if (project.status === 'waiting_client') return `/projects/${project.id}`
+  if (project.fundingRequired) return `/funding/projects/${project.id}`
+  if (project.currentStage === 'diagnosis') return `/diagnosis/projects/${project.id}/setup`
+  if (project.currentStage === 'selection') return `/selection/projects/${project.id}`
+  if (project.currentStage === 'mvp_design') return `/mvp-design/projects/${project.id}`
+  if (project.currentStage === 'website_design') return `/website-studio/projects/${project.id}`
+  if (project.currentStage === 'validation') return `/validation/projects/${project.id}`
+  if (project.currentStage === 'deliverables') return `/deliverables/projects/${project.id}`
+  return `/projects/${project.id}`
+}
+
+function buildDailyActions(
+  projects: Project[],
+  organizations: Organization[],
+  completedActionIds: Set<string>,
+): ConsultingDailyAction[] {
+  const activeProjects = projects.filter(
+    (project) => project.status !== 'completed' && project.status !== 'archived',
+  )
+  return activeProjects
+    .map((project) => {
+      const item = toOpsItem(project, organizations)
+      const lane = actionLaneFor(project, item)
+      const priorityBase =
+        lane === 'recover'
+          ? 0
+          : lane === 'client'
+            ? 10
+            : lane === 'funding'
+              ? 20
+              : lane === 'advance'
+                ? 30
+                : 40
+      const dayRank = item.daysLeft ?? 99
+      const id = `daily-${project.id}-${lane}`
+      return {
+        id,
+        projectId: project.id,
+        organizationId: project.organizationId,
+        clientName: item.clientName,
+        projectName: project.name,
+        lane,
+        title: actionTitle(item, lane),
+        detail: actionDetail(project, item, lane),
+        stageLabel: item.stageLabel,
+        dueLabel: item.dueLabel,
+        estimatedMinutes: laneEstimate(lane),
+        priority: priorityBase + Math.max(dayRank, -10),
+        tone: laneTone(lane, item.tone),
+        path: actionPath(project),
+        script: actionScript(project, item, lane),
+        checklist: actionChecklist(lane),
+        completed: completedActionIds.has(id),
+      } satisfies ConsultingDailyAction
+    })
+    .sort((a, b) => Number(a.completed) - Number(b.completed) || a.priority - b.priority)
+    .slice(0, 8)
+}
+
+function buildTimeBlocks(actions: ConsultingDailyAction[]): ConsultingTimeBlock[] {
+  const recoveryIds = actions
+    .filter((action) => action.lane === 'recover' || action.lane === 'client')
+    .slice(0, 3)
+    .map((action) => action.id)
+  const progressIds = actions
+    .filter((action) => action.lane === 'advance' || action.lane === 'funding')
+    .slice(0, 3)
+    .map((action) => action.id)
+  const protectIds = actions
+    .filter((action) => !recoveryIds.includes(action.id) && !progressIds.includes(action.id))
+    .slice(0, 2)
+    .map((action) => action.id)
+
+  const minutesFor = (ids: string[]) =>
+    actions
+      .filter((action) => ids.includes(action.id))
+      .reduce((sum, action) => sum + action.estimatedMinutes, 0)
+
+  return [
+    {
+      id: 'morning-recovery',
+      label: '오전 회복 블록',
+      timeLabel: '09:30-11:30',
+      intent: '마감 초과, 고객 답변 대기, 위험 프로젝트를 먼저 닫습니다.',
+      actionIds: recoveryIds,
+      totalMinutes: minutesFor(recoveryIds),
+      tone: recoveryIds.length > 0 ? 'warning' : 'neutral',
+    },
+    {
+      id: 'afternoon-progress',
+      label: '오후 전환 블록',
+      timeLabel: '13:30-15:30',
+      intent: '정책자금, 설계, 검증처럼 산출물 전환이 필요한 일을 처리합니다.',
+      actionIds: progressIds,
+      totalMinutes: minutesFor(progressIds),
+      tone: progressIds.length > 0 ? 'info' : 'neutral',
+    },
+    {
+      id: 'closing-protect',
+      label: '마감 전 보호 블록',
+      timeLabel: '16:30-17:30',
+      intent: '진행률과 다음 행동을 업데이트해 내일의 누락을 줄입니다.',
+      actionIds: protectIds,
+      totalMinutes: minutesFor(protectIds),
+      tone: protectIds.length > 0 ? 'success' : 'neutral',
+    },
+  ]
+}
+
+function todayLabel(): string {
+  return new Intl.DateTimeFormat('ko-KR', {
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long',
+  }).format(new Date())
+}
+
+export function buildConsultingDailyPlan(
+  projects: Project[],
+  organizations: Organization[],
+  completedActionIds: string[] = [],
+): ConsultingDailyPlan {
+  const completed = new Set(completedActionIds)
+  const actions = buildDailyActions(projects, organizations, completed)
+  const plannedMinutes = actions.reduce((sum, action) => sum + action.estimatedMinutes, 0)
+  const completedMinutes = actions
+    .filter((action) => action.completed)
+    .reduce((sum, action) => sum + action.estimatedMinutes, 0)
+  const criticalCount = actions.filter((action) => !action.completed && action.tone === 'danger').length
+  const clientCount = actions.filter((action) => !action.completed && action.lane === 'client').length
+  const completionPercent = plannedMinutes > 0 ? Math.round((completedMinutes / plannedMinutes) * 100) : 0
+  const headline =
+    criticalCount > 0
+      ? `오늘은 위험 ${criticalCount}건부터 닫으세요`
+      : clientCount > 0
+        ? `고객 회신 ${clientCount}건을 먼저 회수하세요`
+        : '오늘은 전환 작업에 집중해도 좋습니다'
+
+  return {
+    dateLabel: todayLabel(),
+    workModeLabel: plannedMinutes > 240 ? '집중 운영일' : plannedMinutes > 120 ? '표준 운영일' : '가벼운 점검일',
+    plannedMinutes,
+    completedMinutes,
+    completionPercent,
+    headline,
+    actions,
+    timeBlocks: buildTimeBlocks(actions),
+  }
 }
 
 function buildStageLoads(activeProjects: Project[]): ConsultingOpsStageLoad[] {

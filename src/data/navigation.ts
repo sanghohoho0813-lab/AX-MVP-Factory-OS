@@ -1,6 +1,7 @@
 import {
   BarChart3,
   Building2,
+  CalendarCheck2,
   ClipboardList,
   Filter,
   FolderOpen,
@@ -27,6 +28,7 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
     title: '시작',
     items: [
       { key: 'home', label: '홈', path: '/', icon: Home },
+      { key: 'today', label: '오늘 할 일', path: '/today', icon: CalendarCheck2, hint: '일일 실행계획' },
       { key: 'clients', label: '고객사', path: '/clients', icon: Building2, hint: '고객사·프로젝트 관리' },
     ],
   },

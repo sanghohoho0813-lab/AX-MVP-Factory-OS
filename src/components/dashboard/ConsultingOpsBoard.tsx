@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  ArrowRight,
   CalendarClock,
   Landmark,
   ListChecks,
@@ -132,6 +133,13 @@ export function ConsultingOpsBoard({ brief }: ConsultingOpsBoardProps) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Link
+            to="/today"
+            className="inline-flex items-center gap-1.5 rounded-md border border-brand-600 bg-brand-600 px-2.5 py-1 text-[0.82rem] font-semibold text-white transition-colors hover:bg-brand-700"
+          >
+            오늘 할 일 열기
+            <ArrowRight aria-hidden="true" className="size-3.5" />
+          </Link>
           <div className="inline-flex items-center gap-1.5 rounded-md border border-brand-200 bg-brand-50 px-2.5 py-1 text-[0.82rem] font-semibold text-brand-700">
             <TrendingUp aria-hidden="true" className="size-3.5" />
             오늘 초점: {brief.focusLabel}
