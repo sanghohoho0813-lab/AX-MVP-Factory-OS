@@ -99,10 +99,19 @@ export interface ConsultingDailyPlan {
   completedMinutes: number
   completionPercent: number
   headline: string
+  operatorSignals: ConsultingOperatorSignal[]
   batchReminderScript: string
   actions: ConsultingDailyAction[]
   timeBlocks: ConsultingTimeBlock[]
   weeklyForecast: ConsultingWeeklyForecast
+}
+
+export interface ConsultingOperatorSignal {
+  id: string
+  label: string
+  value: string
+  detail: string
+  tone: StatusTone
 }
 
 export interface ConsultingWeeklyDay {
@@ -456,6 +465,79 @@ function buildWeeklyForecast(projects: Project[], actions: ConsultingDailyAction
   }
 }
 
+function buildOperatorSignals(
+  projects: Project[],
+  actions: ConsultingDailyAction[],
+  forecast: ConsultingWeeklyForecast,
+): ConsultingOperatorSignal[] {
+  const activeProjects = projects.filter(
+    (project) => project.status !== 'completed' && project.status !== 'archived',
+  )
+  const openActions = actions.filter((action) => !action.completed)
+  const recoveryCount = openActions.filter((action) => action.lane === 'recover').length
+  const clientCount = openActions.filter((action) => action.lane === 'client').length
+  const fundingCount = openActions.filter((action) => action.lane === 'funding').length
+  const plannedMinutes = openActions.reduce((sum, action) => sum + action.estimatedMinutes, 0)
+  const capacityRatio = Math.round((activeProjects.length / MONTHLY_CAPACITY_TARGET) * 100)
+
+  const signals: ConsultingOperatorSignal[] = [
+    {
+      id: 'capacity',
+      label: '월간 수임 용량',
+      value: `${activeProjects.length}/${MONTHLY_CAPACITY_TARGET}건`,
+      detail:
+        activeProjects.length >= MONTHLY_CAPACITY_TARGET
+          ? '신규 상담보다 기존 병목 정리가 우선입니다.'
+          : `현재 기준 용량 ${capacityRatio}% 사용 중입니다.`,
+      tone: activeProjects.length >= MONTHLY_CAPACITY_TARGET ? 'warning' : 'info',
+    },
+    {
+      id: 'today-load',
+      label: '오늘 남은 작업량',
+      value: `${plannedMinutes}분`,
+      detail:
+        plannedMinutes > 240
+          ? '오늘은 새 작업 추가 없이 회복과 회신에 집중해야 합니다.'
+          : plannedMinutes > 120
+            ? '표준 업무일 수준입니다. 오전에 고객 회신을 먼저 닫는 편이 좋습니다.'
+            : '추가 상담이나 자료 정리 슬롯을 확보할 수 있습니다.',
+      tone: plannedMinutes > 240 ? 'warning' : plannedMinutes > 120 ? 'info' : 'success',
+    },
+    {
+      id: 'recovery',
+      label: '회복 필요',
+      value: `${recoveryCount}건`,
+      detail:
+        recoveryCount > 0
+          ? '마감 초과 또는 위험 표시 항목을 오늘 첫 블록에 배치하세요.'
+          : '현재 즉시 회복해야 할 위험 액션은 없습니다.',
+      tone: recoveryCount > 0 ? 'danger' : 'success',
+    },
+    {
+      id: 'follow-up',
+      label: '외부 응답 회수',
+      value: `${clientCount + fundingCount}건`,
+      detail:
+        clientCount + fundingCount > 0
+          ? `고객 회신 ${clientCount}건, 정책자금 후속 ${fundingCount}건을 묶어서 처리하세요.`
+          : '오늘 당장 묶어서 보낼 외부 리마인드는 없습니다.',
+      tone: clientCount + fundingCount > 0 ? 'warning' : 'neutral',
+    },
+    {
+      id: 'week-pressure',
+      label: '이번 주 압력',
+      value: `${forecast.totalDueCount}건`,
+      detail:
+        forecast.overloadedDays > 0
+          ? `${forecast.overloadedDays}일은 과부하 위험이 있습니다. 오늘 일부를 앞당기세요.`
+          : '이번 주 일정은 현재 기준으로 분산되어 있습니다.',
+      tone: forecast.overloadedDays > 0 ? 'warning' : 'info',
+    },
+  ]
+
+  return signals
+}
+
 export function buildConsultingDailyPlan(
   projects: Project[],
   organizations: Organization[],
@@ -470,6 +552,7 @@ export function buildConsultingDailyPlan(
   const criticalCount = actions.filter((action) => !action.completed && action.tone === 'danger').length
   const clientCount = actions.filter((action) => !action.completed && action.lane === 'client').length
   const completionPercent = plannedMinutes > 0 ? Math.round((completedMinutes / plannedMinutes) * 100) : 0
+  const weeklyForecast = buildWeeklyForecast(projects, actions)
   const headline =
     criticalCount > 0
       ? `오늘은 위험 ${criticalCount}건부터 닫으세요`
@@ -484,10 +567,11 @@ export function buildConsultingDailyPlan(
     completedMinutes,
     completionPercent,
     headline,
+    operatorSignals: buildOperatorSignals(projects, actions, weeklyForecast),
     batchReminderScript: buildBatchReminderScript(actions),
     actions,
     timeBlocks: buildTimeBlocks(actions),
-    weeklyForecast: buildWeeklyForecast(projects, actions),
+    weeklyForecast,
   }
 }
 

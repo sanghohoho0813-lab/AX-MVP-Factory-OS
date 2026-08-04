@@ -172,6 +172,20 @@ export function TodayOpsPage() {
         </div>
       </section>
 
+      <Panel title="운영 판단">
+        <dl className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+          {plan.operatorSignals.map((signal) => (
+            <div key={signal.id} className="rounded-(--radius-card) border border-slate-200 px-4 py-3">
+              <div className="flex items-center justify-between gap-2">
+                <dt className="text-[0.82rem] font-semibold text-slate-500">{signal.label}</dt>
+                <StatusBadge tone={signal.tone}>{signal.value}</StatusBadge>
+              </div>
+              <dd className="mt-2 text-[0.86rem] leading-relaxed break-keep text-slate-600">{signal.detail}</dd>
+            </div>
+          ))}
+        </dl>
+      </Panel>
+
       <Panel title="이번 주 예보">
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
           <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50 px-4 py-3">
