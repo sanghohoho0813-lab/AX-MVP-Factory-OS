@@ -76,7 +76,14 @@ function buildGroups(
 
   return [
     { key: 'today', title: '오늘 할 일', items: [{ label: '오늘 할 일', path: '/', icon: CheckSquare }] },
-    { key: 'clients', title: '고객·프로젝트', items: [{ label: '고객사·프로젝트', path: '/clients', icon: Building2 }] },
+    {
+      key: 'clients',
+      title: '고객·프로젝트',
+      items: [
+        { label: '고객 운영', path: '/ops/clients', icon: ListChecks },
+        { label: '고객사·프로젝트', path: '/clients', icon: Building2 },
+      ],
+    },
     { key: 'workspace', title: '작업공간', items: workspaceItems },
     // 결과자료는 최상위 1개만 — 프로젝트 선택 시 작업공간의 '결과자료'가 대표이므로
     // 전체 목록 메뉴는 프로젝트 미선택 상태에서만 표시한다(같은 목적의 메뉴 중복 금지).

@@ -8,6 +8,7 @@ import {
   Home,
   Landmark,
   Library,
+  ListChecks,
   Palette,
   PencilRuler,
   SearchCheck,
@@ -29,6 +30,7 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
     items: [
       { key: 'home', label: '홈', path: '/', icon: Home },
       { key: 'today', label: '오늘 할 일', path: '/today', icon: CalendarCheck2, hint: '일일 실행계획' },
+      { key: 'client-ops', label: '고객 운영', path: '/ops/clients', icon: ListChecks, hint: '고객별 운영 레저' },
       { key: 'clients', label: '고객사', path: '/clients', icon: Building2, hint: '고객사·프로젝트 관리' },
     ],
   },

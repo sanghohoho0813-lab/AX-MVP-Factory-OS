@@ -33,6 +33,9 @@ const GettingStartedPage = lazy(() =>
 const TodayOpsPage = lazy(() =>
   import('../pages/TodayOpsPage').then((m) => ({ default: m.TodayOpsPage })),
 )
+const ClientOpsLedgerPage = lazy(() =>
+  import('../pages/ClientOpsLedgerPage').then((m) => ({ default: m.ClientOpsLedgerPage })),
+)
 
 // 진단 관리·공개 설문은 route-level lazy loading으로 초기 번들을 줄인다
 const DiagnosisStudioPage = lazy(() =>
@@ -335,6 +338,7 @@ export const appRouteChildren = [
       { path: 'settings', element: <SettingsPage /> },
       { path: 'getting-started', element: <GettingStartedPage /> },
       { path: 'today', element: <TodayOpsPage /> },
+      { path: 'ops/clients', element: <ClientOpsLedgerPage /> },
       { path: 'guide', element: <Navigate to="/getting-started" replace /> },
 
       { path: 'diagnosis', element: <DiagnosisStudioPage /> },

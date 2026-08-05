@@ -134,6 +134,13 @@ export function ConsultingOpsBoard({ brief }: ConsultingOpsBoardProps) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link
+            to="/ops/clients"
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-[0.82rem] font-semibold text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900"
+          >
+            고객 운영 레저
+            <ArrowRight aria-hidden="true" className="size-3.5" />
+          </Link>
+          <Link
             to="/today"
             className="inline-flex items-center gap-1.5 rounded-md border border-brand-600 bg-brand-600 px-2.5 py-1 text-[0.82rem] font-semibold text-white transition-colors hover:bg-brand-700"
           >
