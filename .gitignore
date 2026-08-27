@@ -37,3 +37,4 @@ dist-ssr
 .onboarding-out
 .client-ops-out
 .client-operations-out
+.client-ops-alerts-out

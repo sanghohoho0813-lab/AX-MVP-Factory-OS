@@ -13,7 +13,8 @@
     "test:client-operations": "vite build --config vite.client-operations.config.mjs && node .client-operations-out/client-operations.mjs",
     "test:progress": "vite build --config vite.progress.config.mjs && node .progress-out/progress.mjs",
     "test:persistence": "vite build --config vite.persistence.config.mjs && node .persistence-out/persistence.mjs",
-    "test:onboarding": "vite build --config vite.onboarding.config.mjs && node .onboarding-out/onboarding.mjs"
+    "test:onboarding": "vite build --config vite.onboarding.config.mjs && node .onboarding-out/onboarding.mjs",
+    "test:client-ops-alerts": "vite build --config vite.client-ops-alerts.config.mjs && node .client-ops-alerts-out/client-ops-alerts.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.7",

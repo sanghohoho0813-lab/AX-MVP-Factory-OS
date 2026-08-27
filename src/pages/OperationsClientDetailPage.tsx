@@ -1,55 +1,740 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, CalendarDays, Check, CircleCheck, FileUp, Save } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import {
+  ArrowLeft,
+  Check,
+  FileWarning,
+  Lock,
+  Paperclip,
+  Plus,
+  ShieldAlert,
+  Trash2,
+  Upload,
+  Wallet,
+} from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { getDataModeConfig } from '../data/dataMode'
-import { listOperationsClients, OPERATIONS_DOCUMENTS, OPERATIONS_TASKS, operationsProgress, saveOperationsClient, uploadOperationsDocument, type OperationsClient, type OperationsDocumentKey, type OperationsTaskKey } from '../services/operationsClientService'
+import {
+  canUploadFiles,
+  listClients,
+  saveClient,
+  uploadDocumentFile,
+  withDocument,
+  withFee,
+  withNewFee,
+  withService,
+  withoutFee,
+} from '../services/clientOpsService'
+import {
+  buildClientAlerts,
+  clientOpsProgress,
+  documentStatus,
+  dueText,
+  missingDocumentsFor,
+} from '../services/clientOpsAlerts'
+import {
+  DOCUMENTS,
+  FEE_KIND_LABEL,
+  FEE_KIND_ORDER,
+  SERVICES,
+  SERVICE_STATUS_LABEL,
+  SERVICE_STATUS_ORDER,
+  servicesNeeding,
+} from '../content/clientOpsCatalog'
+import { todayLocalDate } from '../lib/appClock'
+import { formatKrw } from '../lib/format'
+import type {
+  ClientOpsRecord,
+  ClientOpsStatus,
+  DocumentKey,
+  FeeKind,
+  ServiceKey,
+} from '../types/clientOps'
 import { Button } from '../components/ui/Button'
-import { PageHeader } from '../components/ui/PageHeader'
+import { NotFoundState } from '../components/ui/NotFoundState'
 import { Panel } from '../components/ui/Panel'
+import { useToast } from '../components/ui/toastContext'
+import { AlertRow, ClientStatusChip, StatTile } from '../components/ops/opsParts'
 
-const statusLabel = { active: '진행 중', waiting: '고객 응답 대기', paused: '보류', completed: '완료' } as const
+const CLIENT_STATUS_ORDER: ClientOpsStatus[] = ['active', 'waiting', 'paused', 'completed']
 
-function dateFromToday(days: number) { const date = new Date(); date.setDate(date.getDate() + days); return date.toISOString().slice(0, 10) }
+const inputCls =
+  'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.98rem] focus:border-brand-500 focus:outline-none'
 
 function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
-  const { clientId } = useParams()
-  const [record, setRecord] = useState<OperationsClient | null>(null)
+  const { clientId = '' } = useParams()
+  const navigate = useNavigate()
+  const { showToast } = useToast()
+  const [record, setRecord] = useState<ClientOpsRecord | null>(null)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState('')
-  useEffect(() => { void (async () => { try { const all = await listOperationsClients(workspaceId); setRecord(all.find((item) => item.id === clientId) ?? null) } finally { setLoading(false) } })() }, [clientId, workspaceId])
-  const progress = useMemo(() => record ? operationsProgress(record) : { tasks: 0, documents: 0, payment: 0 }, [record])
-  const percent = Math.round(((progress.tasks + progress.documents + progress.payment) / 17) * 100)
-  const change = <K extends keyof OperationsClient>(key: K, value: OperationsClient[K]) => setRecord((current) => current ? { ...current, [key]: value } : current)
-  const persist = async (next: OperationsClient, confirmation = '저장했습니다.') => { try { setSaving(true); setRecord(await saveOperationsClient(next)); setMessage(confirmation) } catch (cause) { setMessage(cause instanceof Error ? cause.message : '저장하지 못했습니다.') } finally { setSaving(false) } }
-  const save = () => { if (record) void persist(record) }
-  const attach = async (key: OperationsDocumentKey, file: File) => { if (!record) return; try { setSaving(true); setRecord(await uploadOperationsDocument(record, key, file)); setMessage(`${file.name} 파일을 보관했습니다.`) } catch (cause) { setMessage(cause instanceof Error ? cause.message : '파일을 보관하지 못했습니다.') } finally { setSaving(false) } }
-  if (loading) return <p className="py-10 text-sm text-slate-500">불러오는 중...</p>
-  if (!record) return <div className="space-y-4"><Link to="/ops/clients" className="inline-flex items-center gap-1 text-sm text-brand-700"><ArrowLeft className="size-4" />고객 운영으로</Link><Panel className="p-8 text-center text-slate-500">고객을 찾을 수 없습니다.</Panel></div>
-  const taskUpdate = (key: OperationsTaskKey, patch: Partial<OperationsClient['tasks'][OperationsTaskKey]>, immediate = false) => { const next = { ...record, tasks: { ...record.tasks, [key]: { ...record.tasks[key], ...patch } } }; setRecord(next); if (immediate) void persist(next, patch.completed ? '업무를 완료로 처리했습니다.' : '업무 상태를 변경했습니다.') }
-  const documentUpdate = (key: OperationsDocumentKey, received: boolean) => { const next = { ...record, documents: { ...record.documents, [key]: { ...record.documents[key], received, updatedAt: received ? new Date().toISOString() : null } } }; setRecord(next); void persist(next, received ? '자료 수령을 처리했습니다.' : '자료 수령을 되돌렸습니다.') }
-  return <div className="space-y-6">
-    <PageHeader title={record.companyName} description="업무, 자료, 수금, 지원사업 준비 상태를 클릭으로 관리합니다." actions={<div className="flex items-center gap-2"><Link to="/ops/clients" className="inline-flex min-h-10 items-center gap-1 px-2 text-sm font-medium text-slate-600"><ArrowLeft className="size-4" />목록</Link><Button onClick={save} disabled={saving}><Save className="size-4" />{saving ? '저장 중...' : '저장'}</Button></div>} />
-    {message && <p role="status" className="rounded-(--radius-control) bg-brand-50 px-4 py-3 text-sm text-brand-800">{message}</p>}
-    <section className="grid gap-3 md:grid-cols-[1.4fr_1fr]">
-      <div className="border border-slate-200 bg-white p-5 shadow-(--shadow-card)"><div className="flex items-start justify-between gap-4"><div><p className="text-sm text-slate-500">전체 진행률</p><strong className="mt-1 block text-3xl text-slate-900">{percent}%</strong><p className="mt-1 text-sm text-slate-500">업무 {progress.tasks}/5 · 자료 {progress.documents}/10 · 수금 {progress.payment}/2</p></div><div className="flex size-16 items-center justify-center rounded-full" style={{ background: `conic-gradient(#2563eb ${percent}%, #e2e8f0 0)` }}><span className="flex size-12 items-center justify-center rounded-full bg-white text-sm font-semibold text-slate-800">{percent}%</span></div></div><div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-brand-600 transition-all" style={{ width: `${percent}%` }} /></div></div>
-      <div className="border border-slate-200 bg-white p-5 shadow-(--shadow-card)"><p className="text-sm text-slate-500">현재 상태</p><div className="mt-3 grid grid-cols-2 gap-2">{Object.entries(statusLabel).map(([status, label]) => <button key={status} type="button" onClick={() => void persist({ ...record, status: status as OperationsClient['status'] }, `${label} 상태로 변경했습니다.`)} className={`min-h-10 rounded-(--radius-control) border px-2 text-sm font-medium ${record.status === status ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-brand-300'}`}>{label}</button>)}</div></div>
-    </section>
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.8fr)]">
-      <div className="space-y-5">
-        <Panel className="overflow-hidden"><div className="border-b border-slate-200 px-5 py-4"><h2 className="font-semibold text-slate-900">기본 업무</h2><p className="mt-1 text-sm text-slate-500">완료와 기한을 빠르게 지정합니다.</p></div><ul className="divide-y divide-slate-100">{OPERATIONS_TASKS.map(([key, label]) => <li key={key} className="px-5 py-4"><div className="flex flex-wrap items-center gap-3"><button type="button" onClick={() => taskUpdate(key, { completed: !record.tasks[key].completed }, true)} className={`flex size-7 shrink-0 items-center justify-center rounded-full border ${record.tasks[key].completed ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 text-transparent hover:border-brand-500'}`} aria-label={`${label} 완료 처리`}><Check className="size-4" /></button><strong className={`min-w-35 flex-1 text-sm ${record.tasks[key].completed ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{label}</strong><div className="flex items-center gap-1"><button type="button" onClick={() => taskUpdate(key, { dueDate: dateFromToday(0) }, true)} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:border-brand-300">오늘</button><button type="button" onClick={() => taskUpdate(key, { dueDate: dateFromToday(3) }, true)} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:border-brand-300">3일</button><button type="button" onClick={() => taskUpdate(key, { dueDate: dateFromToday(7) }, true)} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:border-brand-300">1주</button><label className="relative flex size-7 cursor-pointer items-center justify-center rounded border border-slate-200 text-slate-500 hover:border-brand-300" title="직접 날짜 선택"><CalendarDays className="size-4" /><input aria-label={`${label} 기한`} type="date" value={record.tasks[key].dueDate} onChange={(event) => taskUpdate(key, { dueDate: event.target.value }, true)} className="absolute inset-0 cursor-pointer opacity-0" /></label></div></div><div className="mt-2 flex items-center gap-2 pl-10"><span className="text-xs text-slate-400">{record.tasks[key].dueDate ? `기한 ${record.tasks[key].dueDate}` : '기한 미정'}</span><input value={record.tasks[key].note} onChange={(event) => taskUpdate(key, { note: event.target.value })} onBlur={save} placeholder="진행 메모" className="min-w-0 flex-1 border-b border-slate-200 bg-transparent py-1 text-sm outline-none focus:border-brand-500" /></div></li>)}</ul></Panel>
-        <Panel className="overflow-hidden"><div className="border-b border-slate-200 px-5 py-4"><h2 className="font-semibold text-slate-900">필수 자료</h2><p className="mt-1 text-sm text-slate-500">자료를 받으면 항목을 눌러 즉시 반영합니다.</p></div><ul className="grid divide-y divide-slate-100 sm:grid-cols-2 sm:divide-x">{OPERATIONS_DOCUMENTS.map(([key, label]) => <li key={key} className="flex items-center gap-2 px-4 py-3"><button type="button" onClick={() => documentUpdate(key, !record.documents[key].received)} className={`flex min-h-9 flex-1 items-center gap-2 text-left text-sm ${record.documents[key].received ? 'text-brand-700' : 'text-slate-700'}`}><CircleCheck className={`size-5 shrink-0 ${record.documents[key].received ? 'fill-brand-600 text-white' : 'text-slate-300'}`} /><span className="truncate">{record.documents[key].fileName || label}</span></button>{getDataModeConfig().mode === 'supabase' ? <label title={`${label} 파일 첨부`} className="cursor-pointer text-slate-400 hover:text-brand-600"><FileUp className="size-4" /><input aria-label={`${label} 파일 첨부`} type="file" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void attach(key, file); event.currentTarget.value = '' }} /></label> : <FileUp className="size-4 text-slate-300" />}</li>)}</ul></Panel>
+  const [notFound, setNotFound] = useState(false)
+  const fileInputs = useRef<Record<string, HTMLInputElement | null>>({})
+
+  const today = todayLocalDate()
+
+  const load = useCallback(async () => {
+    try {
+      setLoading(true)
+      const all = await listClients(workspaceId)
+      const found = all.find((r) => r.id === clientId) ?? null
+      setRecord(found)
+      setNotFound(found === null)
+    } catch (cause) {
+      showToast(cause instanceof Error ? cause.message : '불러오지 못했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }, [workspaceId, clientId, showToast])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  /** 변경 즉시 저장 (낙관적 반영) */
+  const commit = useCallback(
+    async (next: ClientOpsRecord) => {
+      setRecord(next)
+      try {
+        const saved = await saveClient(next)
+        setRecord(saved)
+      } catch (cause) {
+        showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
+        void load()
+      }
+    },
+    [showToast, load],
+  )
+
+  const alerts = useMemo(() => (record ? buildClientAlerts(record, today) : []), [record, today])
+  const progress = useMemo(() => (record ? clientOpsProgress(record, today) : null), [record, today])
+
+  if (loading) {
+    return <p className="px-1 py-10 text-[0.98rem] text-slate-500">불러오는 중…</p>
+  }
+  if (notFound || !record || !progress) {
+    return (
+      <NotFoundState
+        title="업체를 찾을 수 없습니다"
+        description="주소가 잘못되었거나 이미 삭제된 업체입니다."
+        backTo="/ops/clients"
+        backLabel="고객 운영 현황으로"
+      />
+    )
+  }
+
+  const uploadable = canUploadFiles()
+
+  const onPickFile = async (key: DocumentKey, file: File | undefined) => {
+    if (!file) return
+    try {
+      const saved = await uploadDocumentFile(record, key, file)
+      setRecord(saved)
+      showToast('파일을 보관했습니다.')
+    } catch (cause) {
+      showToast(cause instanceof Error ? cause.message : '파일을 보관하지 못했습니다.')
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* 헤더 */}
+      <div className="flex flex-col gap-3">
+        <button
+          type="button"
+          onClick={() => navigate('/ops/clients')}
+          className="inline-flex w-fit items-center gap-1.5 text-[0.95rem] font-medium text-slate-500 hover:text-slate-800"
+        >
+          <ArrowLeft aria-hidden="true" className="size-4" />
+          고객 운영 현황
+        </button>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-[1.75rem] leading-tight font-bold break-keep text-slate-900">
+                {record.companyName || '(이름 없음)'}
+              </h1>
+              <ClientStatusChip status={record.status} />
+            </div>
+            <p className="mt-1 text-[0.98rem] text-slate-500">
+              업무 {progress.servicesDone}/{progress.servicesTotal} 완료 · 서류 {progress.documentsUsable}/
+              {progress.documentsTotal} 확보 · 전체 {progress.percent}%
+            </p>
+          </div>
+          <label className="text-[0.92rem] font-medium text-slate-600">
+            업체 상태
+            <select
+              value={record.status}
+              onChange={(e) => void commit({ ...record, status: e.target.value as ClientOpsStatus })}
+              className="mt-1 block rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.98rem]"
+            >
+              {CLIENT_STATUS_ORDER.map((s) => (
+                <option key={s} value={s}>
+                  {s === 'active' ? '진행 중' : s === 'waiting' ? '고객 대기' : s === 'paused' ? '일시 중지' : '종료'}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
-      <div className="space-y-5">
-        <Panel className="p-5"><h2 className="font-semibold text-slate-900">다음 할 일</h2><input value={record.nextAction} onChange={(event) => change('nextAction', event.target.value)} onBlur={save} placeholder="다음에 처리할 내용을 적어두세요" className="mt-3 w-full rounded border border-slate-300 px-3 py-2 text-sm" /><div className="mt-2 flex gap-2"><button type="button" onClick={() => void persist({ ...record, nextActionDueDate: dateFromToday(0) })} className="rounded border border-slate-200 px-2 py-1 text-xs">오늘</button><button type="button" onClick={() => void persist({ ...record, nextActionDueDate: dateFromToday(7) })} className="rounded border border-slate-200 px-2 py-1 text-xs">1주</button><input type="date" value={record.nextActionDueDate} onChange={(event) => change('nextActionDueDate', event.target.value)} onBlur={save} className="min-w-0 flex-1 rounded border border-slate-300 px-2 py-1 text-sm" /></div></Panel>
-        <Panel className="p-5"><h2 className="font-semibold text-slate-900">계약·수금</h2><div className="mt-3 grid gap-3">{([['contractDepositAmount', '계약금'], ['successFeeAmount', '성공보수']] as const).map(([key, label]) => <label key={key} className="text-xs font-medium text-slate-600">{label}<input type="number" min="0" value={record[key] ?? ''} onChange={(event) => change(key, event.target.value === '' ? null : Number(event.target.value))} onBlur={save} className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm" /></label>)}<button type="button" onClick={() => void persist({ ...record, contractDepositReceived: !record.contractDepositReceived }, record.contractDepositReceived ? '계약금 수령을 되돌렸습니다.' : '계약금 수령을 처리했습니다.')} className={`min-h-10 rounded-(--radius-control) border text-sm font-medium ${record.contractDepositReceived ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 text-slate-600'}`}>계약금 {record.contractDepositReceived ? '수령 완료' : '미수령'}</button><button type="button" onClick={() => void persist({ ...record, successFeeReceived: !record.successFeeReceived }, record.successFeeReceived ? '성공보수 수령을 되돌렸습니다.' : '성공보수 수령을 처리했습니다.')} className={`min-h-10 rounded-(--radius-control) border text-sm font-medium ${record.successFeeReceived ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 text-slate-600'}`}>성공보수 {record.successFeeReceived ? '수령 완료' : '미수령'}</button></div></Panel>
-        <Panel className="p-5"><h2 className="font-semibold text-slate-900">고객 정보</h2><div className="mt-4 grid gap-3">{([['contactName', '담당자'], ['contactPhone', '연락처'], ['contactEmail', '이메일'], ['businessNumber', '사업자등록번호'], ['corporateNumber', '법인번호'], ['businessAddress', '사업장 주소'], ['industry', '업종']] as const).map(([key, label]) => <label key={key} className="text-xs font-medium text-slate-600">{label}<input value={record[key]} onChange={(event) => change(key, event.target.value)} onBlur={save} className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" /></label>)}</div></Panel>
-        <Panel className="p-5"><h2 className="font-semibold text-slate-900">정책자금·지원사업</h2><input value={record.fundingStatus} onChange={(event) => change('fundingStatus', event.target.value)} onBlur={save} placeholder="예: 2026 혁신바우처 검토 중" className="mt-3 w-full rounded border border-slate-300 px-3 py-2 text-sm" /><textarea value={record.fundingNote} onChange={(event) => change('fundingNote', event.target.value)} onBlur={save} placeholder="컨택, 사업계획서, 보완자료 진행 메모" className="mt-2 min-h-24 w-full rounded border border-slate-300 px-3 py-2 text-sm" /></Panel>
-      </div>
+
+      {/* 이 업체에서 지금 챙길 것 */}
+      {alerts.length > 0 && (
+        <section aria-labelledby="client-alerts" className="flex flex-col gap-2">
+          <h2 id="client-alerts" className="text-[1.15rem] font-bold text-slate-900">
+            이 업체에서 지금 챙길 것 {alerts.length}건
+          </h2>
+          <ul className="flex flex-col gap-2">
+            {alerts.slice(0, 6).map((a) => (
+              <AlertRow key={a.id} alert={a} onOpen={() => undefined} />
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* 요약 타일 */}
+      <section className="grid gap-3 sm:grid-cols-3">
+        <StatTile
+          label="완료한 업무"
+          value={`${progress.servicesDone}/${progress.servicesTotal}`}
+          icon={Check}
+          tone={progress.servicesDone === progress.servicesTotal ? 'success' : 'neutral'}
+        />
+        <StatTile
+          label="확보한 서류"
+          value={`${progress.documentsUsable}/${progress.documentsTotal}`}
+          icon={Paperclip}
+          tone={progress.documentsUsable < progress.documentsTotal ? 'warning' : 'success'}
+          hint="유효기간이 지난 서류는 빠집니다"
+        />
+        <StatTile
+          label="아직 못 받은 돈"
+          value={formatKrw(progress.unpaidAmount)}
+          icon={Wallet}
+          tone={progress.overduePayments > 0 ? 'danger' : 'neutral'}
+          hint={progress.overduePayments > 0 ? `예정일 지난 건 ${progress.overduePayments}건` : undefined}
+        />
+      </section>
+
+      {/* 표준 업무 6종 */}
+      <section aria-labelledby="svc" className="flex flex-col gap-3">
+        <h2 id="svc" className="text-[1.3rem] font-bold text-slate-900">
+          진행 업무
+        </h2>
+        <div className="grid gap-3 xl:grid-cols-2">
+          {SERVICES.map((meta) => {
+            const state = record.services[meta.key]
+            const missing = missingDocumentsFor(record, meta.key, today)
+            const started =
+              state.status === 'preparing' ||
+              state.status === 'in_progress' ||
+              state.status === 'waiting_client' ||
+              state.status === 'submitted'
+            const blocked = started && missing.length > 0
+            const dLeft = state.dueDate
+              ? (() => {
+                  const a = Date.parse(`${today}T00:00:00Z`)
+                  const b = Date.parse(`${state.dueDate}T00:00:00Z`)
+                  return Number.isNaN(a) || Number.isNaN(b) ? null : Math.round((b - a) / 86_400_000)
+                })()
+              : null
+            const open = state.status !== 'done' && state.status !== 'not_applicable'
+
+            return (
+              <div
+                key={meta.key}
+                id={meta.key}
+                className={`flex flex-col gap-3 rounded-(--radius-panel) border p-4 ${
+                  blocked || (open && dLeft !== null && dLeft < 0)
+                    ? 'border-danger-200 bg-danger-50/40'
+                    : 'border-slate-200 bg-white'
+                }`}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3 className="text-[1.1rem] font-bold break-keep text-slate-900">
+                      {meta.label}
+                      {meta.recurring && (
+                        <span className="ml-1.5 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.75rem] font-medium text-slate-500">
+                          반복
+                        </span>
+                      )}
+                    </h3>
+                    <p className="mt-1 text-[0.9rem] break-keep text-slate-500">{meta.description}</p>
+                  </div>
+                  <select
+                    aria-label={`${meta.label} 상태`}
+                    value={state.status}
+                    onChange={(e) =>
+                      void commit(withService(record, meta.key, { status: e.target.value as never }))
+                    }
+                    className="shrink-0 rounded-(--radius-control) border border-slate-300 px-2.5 py-1.5 text-[0.92rem] font-medium"
+                  >
+                    {SERVICE_STATUS_ORDER.map((s) => (
+                      <option key={s} value={s}>
+                        {SERVICE_STATUS_LABEL[s]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {blocked && (
+                  <p className="flex items-start gap-1.5 rounded-(--radius-control) border border-danger-200 bg-danger-50 px-3 py-2 text-[0.92rem] break-keep text-danger-700">
+                    <Lock aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                    <span>
+                      필요한 서류가 없어 막혔습니다 — {missing.map((m) => (m.expired ? `${m.label}(만료)` : m.label)).join(', ')}
+                    </span>
+                  </p>
+                )}
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label className="text-[0.9rem] font-medium text-slate-600">
+                    마감·목표일
+                    <input
+                      type="date"
+                      value={state.dueDate}
+                      onChange={(e) => void commit(withService(record, meta.key, { dueDate: e.target.value }))}
+                      className={`mt-1 ${inputCls}`}
+                    />
+                    {open && dLeft !== null && (
+                      <span
+                        className={`mt-1 block text-[0.85rem] font-semibold ${
+                          dLeft < 0 ? 'text-danger-700' : dLeft <= 7 ? 'text-warning-800' : 'text-slate-500'
+                        }`}
+                      >
+                        {dueText(dLeft)}
+                      </span>
+                    )}
+                  </label>
+                  <label className="text-[0.9rem] font-medium text-slate-600">
+                    다음에 할 일
+                    <input
+                      value={state.nextStep}
+                      onChange={(e) => void commit(withService(record, meta.key, { nextStep: e.target.value }))}
+                      placeholder="예: 선행기술 조사 결과 검토"
+                      className={`mt-1 ${inputCls}`}
+                    />
+                  </label>
+                </div>
+
+                <label className="text-[0.9rem] font-medium text-slate-600">
+                  메모
+                  <textarea
+                    value={state.note}
+                    onChange={(e) => void commit(withService(record, meta.key, { note: e.target.value }))}
+                    rows={2}
+                    className={`mt-1 ${inputCls}`}
+                  />
+                </label>
+
+                <p className="text-[0.85rem] text-slate-400">
+                  필요 서류: {meta.requiredDocuments.map((k) => DOCUMENTS.find((d) => d.key === k)?.label).join(', ')}
+                </p>
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
+      {/* 서류함 */}
+      <section aria-labelledby="docs" className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="docs" className="text-[1.3rem] font-bold text-slate-900">
+            서류함
+          </h2>
+          <p className="text-[0.9rem] text-slate-500">
+            발급일을 넣으면 유효기간이 지났는지 자동으로 알려드립니다.
+          </p>
+        </div>
+
+        {!uploadable && (
+          <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-4 py-3 text-[0.92rem] break-keep text-slate-600">
+            지금은 이 브라우저에만 저장되는 모드입니다. 받았는지 여부·발급일·보관 위치는 지금도 기록되고, 실제 파일 첨부는 Supabase 클라우드를 연결하면 켜집니다.
+          </p>
+        )}
+
+        <div className="grid gap-3 lg:grid-cols-2">
+          {DOCUMENTS.map((meta) => {
+            const state = record.documents[meta.key]
+            const view = documentStatus(meta.key, state, today)
+            const needed = servicesNeeding(meta.key)
+            return (
+              <div
+                key={meta.key}
+                className={`flex flex-col gap-2.5 rounded-(--radius-panel) border p-4 ${
+                  view.expired
+                    ? 'border-danger-200 bg-danger-50/40'
+                    : view.expiringSoon
+                      ? 'border-warning-200 bg-warning-50/40'
+                      : 'border-slate-200 bg-white'
+                }`}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <label className="flex min-w-0 items-start gap-2.5">
+                    <input
+                      type="checkbox"
+                      checked={state.received}
+                      onChange={(e) =>
+                        void commit(withDocument(record, meta.key, { received: e.target.checked }))
+                      }
+                      className="mt-1 size-5 shrink-0 accent-brand-600"
+                    />
+                    <span className="min-w-0">
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[1.05rem] font-bold break-keep text-slate-900">{meta.label}</span>
+                        {meta.sensitive && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.75rem] font-medium text-slate-500">
+                            <ShieldAlert aria-hidden="true" className="size-3" />
+                            민감
+                          </span>
+                        )}
+                      </span>
+                      <span className="mt-0.5 block text-[0.88rem] break-keep text-slate-500">{meta.hint}</span>
+                    </span>
+                  </label>
+                  {view.expired && (
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-danger-200 bg-danger-100 px-2 py-0.5 text-[0.8rem] font-bold text-danger-700">
+                      <FileWarning aria-hidden="true" className="size-3.5" />
+                      만료됨
+                    </span>
+                  )}
+                  {!view.expired && view.expiringSoon && (
+                    <span className="shrink-0 rounded-full border border-warning-200 bg-warning-100 px-2 py-0.5 text-[0.8rem] font-bold text-warning-800">
+                      {dueText(view.daysLeft)}
+                    </span>
+                  )}
+                </div>
+
+                {state.received && (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {meta.validMonths !== null && (
+                      <label className="text-[0.88rem] font-medium text-slate-600">
+                        발급일
+                        <input
+                          type="date"
+                          value={state.issuedAt}
+                          onChange={(e) =>
+                            void commit(withDocument(record, meta.key, { issuedAt: e.target.value }))
+                          }
+                          className={`mt-1 ${inputCls}`}
+                        />
+                        <span className="mt-1 block text-[0.8rem] text-slate-500">
+                          {view.expiresOn ? `${view.expiresOn}까지 유효 (${meta.validMonths}개월)` : `유효 ${meta.validMonths}개월`}
+                        </span>
+                      </label>
+                    )}
+                    <label className="text-[0.88rem] font-medium text-slate-600">
+                      {meta.key === 'jointCertificate' ? '보관 위치 (비밀번호는 적지 마세요)' : '메모'}
+                      <input
+                        value={state.note}
+                        onChange={(e) => void commit(withDocument(record, meta.key, { note: e.target.value }))}
+                        placeholder={
+                          meta.key === 'jointCertificate'
+                            ? '예: 대표님 USB / 회사 PC 바탕화면'
+                            : meta.needsFile
+                              ? '예: 8월 갱신본'
+                              : '값을 적어 두세요'
+                        }
+                        className={`mt-1 ${inputCls}`}
+                      />
+                    </label>
+                  </div>
+                )}
+
+                {meta.needsFile && state.received && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      ref={(el) => {
+                        fileInputs.current[meta.key] = el
+                      }}
+                      type="file"
+                      accept=".pdf,image/*"
+                      className="hidden"
+                      onChange={(e) => void onPickFile(meta.key, e.target.files?.[0])}
+                    />
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={!uploadable}
+                      onClick={() => fileInputs.current[meta.key]?.click()}
+                    >
+                      <Upload aria-hidden="true" className="size-3.5" />
+                      {state.fileName ? '파일 교체' : '파일 첨부'}
+                    </Button>
+                    {state.fileName && (
+                      <span className="inline-flex min-w-0 items-center gap-1 text-[0.88rem] text-slate-600">
+                        <Paperclip aria-hidden="true" className="size-3.5 shrink-0" />
+                        <span className="truncate">{state.fileName}</span>
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {needed.length > 0 && (
+                  <p className="text-[0.82rem] break-keep text-slate-400">
+                    필요한 업무: {needed.map((s) => s.shortLabel).join(', ')}
+                  </p>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
+      {/* 수금 */}
+      <FeesSection record={record} onChange={commit} today={today} />
+
+      {/* 기본 정보 */}
+      <section aria-labelledby="info" className="flex flex-col gap-3">
+        <h2 id="info" className="text-[1.3rem] font-bold text-slate-900">
+          업체 정보
+        </h2>
+        <Panel>
+          <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+            <TextField label="업체명" value={record.companyName} onChange={(v) => void commit({ ...record, companyName: v })} />
+            <TextField label="대표자·담당자" value={record.contactName} onChange={(v) => void commit({ ...record, contactName: v })} />
+            <TextField label="휴대폰번호" value={record.contactPhone} onChange={(v) => void commit({ ...record, contactPhone: v })} placeholder="010-0000-0000" />
+            <TextField label="이메일" value={record.contactEmail} onChange={(v) => void commit({ ...record, contactEmail: v })} />
+            <TextField label="사업자등록번호" value={record.businessNumber} onChange={(v) => void commit({ ...record, businessNumber: v })} placeholder="000-00-00000" />
+            <TextField label="법인번호" value={record.corporateNumber} onChange={(v) => void commit({ ...record, corporateNumber: v })} />
+            <TextField label="업종" value={record.industry} onChange={(v) => void commit({ ...record, industry: v })} />
+            <TextField label="사업장 주소" value={record.businessAddress} onChange={(v) => void commit({ ...record, businessAddress: v })} />
+          </div>
+          <label className="mt-3 block text-[0.9rem] font-medium text-slate-600">
+            메모
+            <textarea
+              value={record.notes}
+              onChange={(e) => void commit({ ...record, notes: e.target.value })}
+              rows={3}
+              className={`mt-1 ${inputCls}`}
+            />
+          </label>
+          <p className="mt-3 flex items-start gap-1.5 text-[0.85rem] break-keep text-slate-400">
+            <ShieldAlert aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+            공동인증서 비밀번호와 주민등록번호는 이 시스템에 저장하지 않습니다. 인증서는 "받았는지"와 "어디에 보관 중인지"만 기록하세요.
+          </p>
+        </Panel>
+      </section>
     </div>
-  </div>
+  )
 }
 
-function CloudClientDetail() { const { currentWorkspaceId } = useAuth(); return <ClientDetailContent workspaceId={currentWorkspaceId} /> }
-export function OperationsClientDetailPage() { return getDataModeConfig().mode === 'supabase' ? <CloudClientDetail /> : <ClientDetailContent workspaceId={null} /> }
+function TextField({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+}) {
+  return (
+    <label className="block py-1.5 text-[0.9rem] font-medium text-slate-600">
+      {label}
+      <input
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        className={`mt-1 ${inputCls}`}
+      />
+    </label>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* 수금 섹션                                                            */
+/* ------------------------------------------------------------------ */
+
+function FeesSection({
+  record,
+  onChange,
+  today,
+}: {
+  record: ClientOpsRecord
+  onChange: (next: ClientOpsRecord) => void
+  today: string
+}) {
+  const [kind, setKind] = useState<FeeKind>('deposit')
+  const [serviceKey, setServiceKey] = useState<ServiceKey | ''>('')
+  const [amount, setAmount] = useState('')
+  const [dueDate, setDueDate] = useState('')
+
+  const unpaid = record.fees.filter((f) => f.receivedAt === null)
+  const unpaidTotal = unpaid.reduce((s, f) => s + (f.amount ?? 0), 0)
+  const paidTotal = record.fees
+    .filter((f) => f.receivedAt !== null)
+    .reduce((s, f) => s + (f.amount ?? 0), 0)
+
+  const add = () => {
+    const numeric = Number(amount.replace(/[^0-9]/g, ''))
+    onChange(
+      withNewFee(record, {
+        kind,
+        serviceKey: serviceKey === '' ? null : serviceKey,
+        amount: Number.isFinite(numeric) && numeric > 0 ? numeric : null,
+        dueDate,
+      }),
+    )
+    setAmount('')
+    setDueDate('')
+  }
+
+  return (
+    <section aria-labelledby="fees" className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="fees" className="text-[1.3rem] font-bold text-slate-900">
+          계약금 · 성공보수
+        </h2>
+        <p className="text-[0.95rem] text-slate-600">
+          받은 돈 <strong className="text-slate-900">{formatKrw(paidTotal)}</strong> · 못 받은 돈{' '}
+          <strong className={unpaidTotal > 0 ? 'text-danger-700' : 'text-slate-900'}>
+            {formatKrw(unpaidTotal)}
+          </strong>
+        </p>
+      </div>
+
+      <Panel flush>
+        {record.fees.length === 0 ? (
+          <p className="px-5 py-6 text-[0.95rem] text-slate-500">
+            아직 등록한 수금 항목이 없습니다. 아래에서 계약금·중도금·성공보수를 추가하세요.
+          </p>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {record.fees.map((fee) => {
+              const overdue =
+                fee.receivedAt === null &&
+                fee.dueDate !== '' &&
+                Date.parse(`${fee.dueDate}T00:00:00Z`) < Date.parse(`${today}T00:00:00Z`)
+              return (
+                <li key={fee.id} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={fee.receivedAt !== null}
+                      onChange={(e) =>
+                        onChange(withFee(record, fee.id, { receivedAt: e.target.checked ? today : null }))
+                      }
+                      className="size-5 accent-brand-600"
+                    />
+                    <span className="sr-only">입금 완료</span>
+                  </label>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[1rem] font-semibold break-keep text-slate-900">{fee.label}</span>
+                      {fee.serviceKey && (
+                        <span className="rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.78rem] text-slate-500">
+                          {SERVICES.find((s) => s.key === fee.serviceKey)?.shortLabel}
+                        </span>
+                      )}
+                      {overdue && (
+                        <span className="rounded-full border border-danger-200 bg-danger-100 px-1.5 py-0.5 text-[0.78rem] font-bold text-danger-700">
+                          연체
+                        </span>
+                      )}
+                      {fee.receivedAt && (
+                        <span className="rounded-full border border-success-200 bg-success-50 px-1.5 py-0.5 text-[0.78rem] font-semibold text-success-700">
+                          {fee.receivedAt} 입금
+                        </span>
+                      )}
+                    </span>
+                  </span>
+                  <input
+                    type="date"
+                    aria-label={`${fee.label} 받기로 한 날`}
+                    value={fee.dueDate}
+                    onChange={(e) => onChange(withFee(record, fee.id, { dueDate: e.target.value }))}
+                    className="rounded-(--radius-control) border border-slate-300 px-2 py-1.5 text-[0.92rem]"
+                  />
+                  <span
+                    className={`w-32 shrink-0 text-right text-[1rem] font-semibold ${
+                      fee.receivedAt ? 'text-slate-500 line-through' : 'text-slate-900'
+                    }`}
+                  >
+                    {formatKrw(fee.amount)}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={`${fee.label} 삭제`}
+                    onClick={() => onChange(withoutFee(record, fee.id))}
+                    className="rounded-(--radius-control) p-2 text-slate-400 hover:bg-slate-100 hover:text-danger-600"
+                  >
+                    <Trash2 aria-hidden="true" className="size-4" />
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+
+        <div className="flex flex-wrap items-end gap-2 border-t border-slate-100 px-5 py-4">
+          <label className="text-[0.88rem] font-medium text-slate-600">
+            종류
+            <select
+              value={kind}
+              onChange={(e) => setKind(e.target.value as FeeKind)}
+              className="mt-1 block rounded-(--radius-control) border border-slate-300 px-2 py-2 text-[0.95rem]"
+            >
+              {FEE_KIND_ORDER.map((k) => (
+                <option key={k} value={k}>
+                  {FEE_KIND_LABEL[k]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-[0.88rem] font-medium text-slate-600">
+            관련 업무
+            <select
+              value={serviceKey}
+              onChange={(e) => setServiceKey(e.target.value as ServiceKey | '')}
+              className="mt-1 block rounded-(--radius-control) border border-slate-300 px-2 py-2 text-[0.95rem]"
+            >
+              <option value="">전체 계약</option>
+              {SERVICES.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.shortLabel}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-[0.88rem] font-medium text-slate-600">
+            금액(원)
+            <input
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              inputMode="numeric"
+              placeholder="3000000"
+              className="mt-1 block w-36 rounded-(--radius-control) border border-slate-300 px-2 py-2 text-[0.95rem]"
+            />
+          </label>
+          <label className="text-[0.88rem] font-medium text-slate-600">
+            받기로 한 날
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="mt-1 block rounded-(--radius-control) border border-slate-300 px-2 py-2 text-[0.95rem]"
+            />
+          </label>
+          <Button variant="secondary" onClick={add}>
+            <Plus aria-hidden="true" className="size-4" />
+            추가
+          </Button>
+        </div>
+      </Panel>
+    </section>
+  )
+}
+
+function CloudClientDetail() {
+  const { currentWorkspaceId } = useAuth()
+  return <ClientDetailContent workspaceId={currentWorkspaceId} />
+}
+
+export function OperationsClientDetailPage() {
+  return getDataModeConfig().mode === 'supabase' ? (
+    <CloudClientDetail />
+  ) : (
+    <ClientDetailContent workspaceId={null} />
+  )
+}
