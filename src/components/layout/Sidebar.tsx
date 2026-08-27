@@ -4,6 +4,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Landmark,
+  LayoutGrid,
   Settings,
   X,
 } from 'lucide-react'
@@ -42,6 +43,7 @@ function buildGroups(): NavGroup[] {
         { label: '자금·지원사업', path: '/funding', icon: Landmark },
       ],
     },
+    { key: 'tools', title: '도구함', items: [{ label: '전체 기능', path: '/tools', icon: LayoutGrid }] },
     { key: 'settings', title: '설정', items: [{ label: '설정', path: '/settings', icon: Settings }] },
   ]
 }
