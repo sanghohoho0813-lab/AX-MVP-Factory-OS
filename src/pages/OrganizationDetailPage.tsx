@@ -2,6 +2,7 @@ import {
   Archive,
   FolderKanban,
   FolderPlus,
+  ListChecks,
   Pencil,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
@@ -204,6 +205,9 @@ export function OrganizationDetailPage() {
             >
               <Pencil aria-hidden="true" className="size-4" />
               고객사 수정
+            </Button>
+            <Button variant="secondary" onClick={() => navigate(`/ops/clients/${organization.id}`)}>
+              <ListChecks aria-hidden="true" className="size-4" />운영 파일
             </Button>
             <DropdownMenu
               ariaLabel="고객사 더보기 메뉴"

@@ -46,6 +46,7 @@ export const STORAGE_KEYS = {
   caseStudies: `${KEY_PREFIX}.${DATA_NS}.case_studies`,
   opsCompletedActions: `${KEY_PREFIX}.${DATA_NS}.ops_completed_actions`,
   clientOpsChecks: `${KEY_PREFIX}.${DATA_NS}.client_ops_checks`,
+  clientOperations: `${KEY_PREFIX}.${DATA_NS}.client_operations`,
 } as const
 
 /** 마이그레이션 전 안전 백업 키 접두어 */

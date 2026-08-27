@@ -121,8 +121,8 @@ function MobileLedgerCard({
           <p className="mt-0.5 truncate text-[0.875rem] text-slate-500">{row.projectName}</p>
         </div>
         <Link
-          to={row.path}
-          aria-label={`${row.clientName} 작업 화면 열기`}
+          to={`/ops/clients/${row.organizationId}`}
+          aria-label={`${row.clientName} 운영 파일 열기`}
           className="inline-flex size-9 shrink-0 items-center justify-center rounded-(--radius-control) border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900"
         >
           <ArrowRight aria-hidden="true" className="size-4" />
@@ -270,11 +270,11 @@ export function ClientOpsLedgerPage() {
       className: 'w-24 text-right',
       cell: (row) => (
         <Link
-          to={row.path}
+          to={`/ops/clients/${row.organizationId}`}
           onClick={(event) => event.stopPropagation()}
           className="inline-flex h-8 items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-2.5 text-[0.8rem] font-medium whitespace-nowrap text-slate-700 hover:bg-slate-50 hover:text-slate-900"
         >
-          열기
+          운영 파일
           <ArrowRight aria-hidden="true" className="size-3.5" />
         </Link>
       ),
