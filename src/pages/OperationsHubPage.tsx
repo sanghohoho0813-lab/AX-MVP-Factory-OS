@@ -1,0 +1,38 @@
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { ArrowRight, Building2, CirclePlus, FileCheck2, ReceiptText, TriangleAlert } from 'lucide-react'
+import { useAuth } from '../auth/AuthProvider'
+import { getDataModeConfig } from '../data/dataMode'
+import { createOperationsClient, listOperationsClients, operationsProgress, type OperationsClient } from '../services/operationsClientService'
+import { Button } from '../components/ui/Button'
+import { PageHeader } from '../components/ui/PageHeader'
+import { Panel } from '../components/ui/Panel'
+
+function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
+  const navigate = useNavigate()
+  const [records, setRecords] = useState<OperationsClient[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [formOpen, setFormOpen] = useState(false)
+  const [form, setForm] = useState({ companyName: '', contactName: '', contactPhone: '', nextAction: '', nextActionDueDate: '' })
+  const load = async () => { try { setLoading(true); setRecords(await listOperationsClients(workspaceId)); setError('') } catch (cause) { setError(cause instanceof Error ? cause.message : '고객 목록을 불러오지 못했습니다.') } finally { setLoading(false) } }
+  useEffect(() => { void load() }, [workspaceId])
+  const summary = useMemo(() => ({ active: records.filter((item) => item.status === 'active' || item.status === 'waiting').length, next: records.filter((item) => item.nextAction).length, docs: records.reduce((sum, item) => sum + (10 - operationsProgress(item).documents), 0), payments: records.filter((item) => !item.contractDepositReceived || (item.successFeeAmount !== null && !item.successFeeReceived)).length }), [records])
+  const submit = async (event: React.FormEvent) => { event.preventDefault(); if (!form.companyName.trim()) return; try { setSaving(true); const record = await createOperationsClient(workspaceId, form); navigate(`/ops/clients/${record.id}`) } catch (cause) { setError(cause instanceof Error ? cause.message : '고객을 등록하지 못했습니다.') } finally { setSaving(false) } }
+  return <div className="space-y-6">
+    <PageHeader title="고객 운영" description="고객별 업무, 서류, 수금, 지원사업 준비를 한 곳에서 관리합니다." actions={<Button onClick={() => setFormOpen(true)}><CirclePlus className="size-4" />새 고객 등록</Button>} />
+    {error && <div role="alert" className="rounded-(--radius-control) border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {[[Building2, '진행 고객', `${summary.active}곳`], [TriangleAlert, '다음 할 일', `${summary.next}건`], [FileCheck2, '미수령 서류', `${summary.docs}개`], [ReceiptText, '수금 확인', `${summary.payments}곳`]].map(([Icon, label, value]) => <Panel key={String(label)} className="p-4"><div className="flex items-center justify-between"><span className="text-sm text-slate-500">{label as string}</span><Icon className="size-4 text-brand-600" /></div><strong className="mt-2 block text-2xl text-slate-900">{value as string}</strong></Panel>)}
+    </section>
+    <Panel className="overflow-hidden">
+      <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4"><div><h2 className="font-semibold text-slate-900">고객 목록</h2><p className="mt-0.5 text-sm text-slate-500">지금 처리할 내용이 있는 고객부터 확인하세요.</p></div></div>
+      {loading ? <p className="px-5 py-10 text-sm text-slate-500">불러오는 중...</p> : records.length === 0 ? <div className="px-5 py-12 text-center"><Building2 className="mx-auto size-8 text-slate-300" /><h2 className="mt-3 font-semibold text-slate-900">등록된 고객이 없습니다</h2><p className="mt-1 text-sm text-slate-500">첫 고객을 등록하면 업무와 서류 체크가 바로 시작됩니다.</p><Button className="mt-5" onClick={() => setFormOpen(true)}><CirclePlus className="size-4" />첫 고객 등록</Button></div> : <ul className="divide-y divide-slate-100">{records.map((record) => { const progress = operationsProgress(record); return <li key={record.id}><Link to={`/ops/clients/${record.id}`} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50"><span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand-50 font-semibold text-brand-700">{record.companyName.slice(0, 1)}</span><span className="min-w-0 flex-1"><strong className="block truncate text-slate-900">{record.companyName}</strong><span className="mt-1 block truncate text-sm text-slate-500">{record.nextAction || '다음 할 일을 입력하세요.'}{record.nextActionDueDate ? ` · ${record.nextActionDueDate}` : ''}</span></span><span className="hidden text-right text-xs text-slate-500 md:block">업무 {progress.tasks}/5<br />서류 {progress.documents}/10</span><ArrowRight className="size-4 shrink-0 text-slate-400" /></Link></li> })}</ul>}
+    </Panel>
+    {formOpen && <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-4 sm:items-center"><form onSubmit={submit} className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl"><div className="flex items-center justify-between"><h2 className="text-lg font-semibold text-slate-900">새 고객 등록</h2><button type="button" className="text-sm text-slate-500" onClick={() => setFormOpen(false)}>닫기</button></div><div className="mt-5 grid gap-4"><label className="text-sm font-medium text-slate-700">업체명<input autoFocus required value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} className="mt-1.5 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2.5" /></label><div className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-medium text-slate-700">담당자<input value={form.contactName} onChange={(event) => setForm({ ...form, contactName: event.target.value })} className="mt-1.5 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2.5" /></label><label className="text-sm font-medium text-slate-700">연락처<input value={form.contactPhone} onChange={(event) => setForm({ ...form, contactPhone: event.target.value })} className="mt-1.5 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2.5" /></label></div><label className="text-sm font-medium text-slate-700">바로 할 일<input value={form.nextAction} onChange={(event) => setForm({ ...form, nextAction: event.target.value })} placeholder="예: 사업자등록증 요청" className="mt-1.5 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2.5" /></label><label className="text-sm font-medium text-slate-700">기한<input type="date" value={form.nextActionDueDate} onChange={(event) => setForm({ ...form, nextActionDueDate: event.target.value })} className="mt-1.5 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2.5" /></label></div><div className="mt-6 flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setFormOpen(false)}>취소</Button><Button type="submit" disabled={saving}>{saving ? '등록 중...' : '등록하고 열기'}</Button></div></form></div>}
+  </div>
+}
+
+function CloudOperationsHub() { const { currentWorkspaceId } = useAuth(); return <OperationsHubContent workspaceId={currentWorkspaceId} /> }
+export function OperationsHubPage() { return getDataModeConfig().mode === 'supabase' ? <CloudOperationsHub /> : <OperationsHubContent workspaceId={null} /> }

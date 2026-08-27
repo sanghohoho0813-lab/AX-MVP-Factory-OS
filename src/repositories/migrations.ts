@@ -3,6 +3,7 @@ import {
   SCHEMA_VERSION,
   STORAGE_KEYS,
   hasKey,
+  readJson,
   readRaw,
   readSchemaVersion,
   writeJson,
@@ -10,12 +11,6 @@ import {
   writeSchemaVersion,
 } from '../storage/localStore'
 import { seedCoreData } from './seed'
-import {
-  ALL_SEED_QUESTIONS,
-  SEED_MODULES,
-  SEED_TEMPLATES,
-} from '../data/seed/surveySeed'
-import { SEED_INSTITUTIONS, SEED_PROGRAMS } from '../data/seed/fundingSeed'
 
 interface Migration {
   version: number
@@ -29,13 +24,13 @@ interface Migration {
  */
 function seedSurveyData(): void {
   if (!hasKey(STORAGE_KEYS.questions)) {
-    writeJson(STORAGE_KEYS.questions, ALL_SEED_QUESTIONS)
+    writeJson(STORAGE_KEYS.questions, [])
   }
   if (!hasKey(STORAGE_KEYS.surveyModules)) {
-    writeJson(STORAGE_KEYS.surveyModules, SEED_MODULES)
+    writeJson(STORAGE_KEYS.surveyModules, [])
   }
   if (!hasKey(STORAGE_KEYS.surveyTemplates)) {
-    writeJson(STORAGE_KEYS.surveyTemplates, SEED_TEMPLATES)
+    writeJson(STORAGE_KEYS.surveyTemplates, [])
   }
   if (!hasKey(STORAGE_KEYS.surveyBlueprints)) {
     writeJson(STORAGE_KEYS.surveyBlueprints, [])
@@ -152,10 +147,10 @@ function initDeliverableStores(): void {
  */
 function initFundingStores(): void {
   if (!hasKey(STORAGE_KEYS.institutions)) {
-    writeJson(STORAGE_KEYS.institutions, SEED_INSTITUTIONS)
+    writeJson(STORAGE_KEYS.institutions, [])
   }
   if (!hasKey(STORAGE_KEYS.supportPrograms)) {
-    writeJson(STORAGE_KEYS.supportPrograms, SEED_PROGRAMS)
+    writeJson(STORAGE_KEYS.supportPrograms, [])
   }
   if (!hasKey(STORAGE_KEYS.fundingStrategies)) {
     writeJson(STORAGE_KEYS.fundingStrategies, [])
@@ -166,6 +161,19 @@ function initFundingStores(): void {
   if (!hasKey(STORAGE_KEYS.caseStudies)) {
     writeJson(STORAGE_KEYS.caseStudies, [])
   }
+}
+
+/** v11 — 실운영 전환: 고정 예시 고객 데이터만 제거하고 새 운영 저장소를 준비한다. */
+function prepareOperationsHub(): void {
+  const demoOrganizationIds = new Set(['org-001', 'org-002', 'org-003', 'org-004', 'org-005', 'org-006'])
+  const demoProjectIds = new Set(['proj-101', 'proj-102', 'proj-103', 'proj-104', 'proj-105', 'proj-106', 'proj-107'])
+  const organizations = readJson<Array<{ id?: string }>>(STORAGE_KEYS.organizations, [])
+  const projects = readJson<Array<{ id?: string }>>(STORAGE_KEYS.projects, [])
+  const activities = readJson<Array<{ organizationId?: string; projectId?: string }>>(STORAGE_KEYS.activities, [])
+  writeJson(STORAGE_KEYS.organizations, organizations.filter((item) => !demoOrganizationIds.has(item.id ?? '')))
+  writeJson(STORAGE_KEYS.projects, projects.filter((item) => !demoProjectIds.has(item.id ?? '')))
+  writeJson(STORAGE_KEYS.activities, activities.filter((item) => !demoOrganizationIds.has(item.organizationId ?? '') && !demoProjectIds.has(item.projectId ?? '')))
+  if (!hasKey(STORAGE_KEYS.operationsClients)) writeJson(STORAGE_KEYS.operationsClients, [])
 }
 
 /** 순차 적용 마이그레이션 목록 (버전 오름차순) */
@@ -219,6 +227,11 @@ const MIGRATIONS: Migration[] = [
     version: 10,
     describe: '기관·자금 연계·전략·스냅샷·사례 저장소 추가 (기관·프로그램 참고 시드)',
     migrate: initFundingStores,
+  },
+  {
+    version: 11,
+    describe: '실운영 고객 허브 준비 및 고정 예시 고객 제거',
+    migrate: prepareOperationsHub,
   },
 ]
 

@@ -1,28 +1,14 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
-  Building2,
   CheckSquare,
   ChevronsLeft,
   ChevronsRight,
-  ClipboardList,
-  FileCheck2,
-  Filter,
-  FolderOpen,
   Landmark,
-  Library,
-  ListChecks,
-  Palette,
-  PencilRuler,
-  SearchCheck,
   Settings,
-  TrendingUp,
   X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { APP_VERSION } from '../../data/navigation'
-import { useActiveProject } from '../../context/activeProject'
-import { useStoreVersion } from '../../lib/useStoreVersion'
-import { isAdvancedVisible } from '../../lib/featureVisibility'
 
 interface SidebarProps {
   collapsed: boolean
@@ -46,57 +32,16 @@ interface NavGroup {
  * 전역 메뉴. 기본(core)은 핵심 흐름만 표시하고,
  * 고급 운영 기능(테스트·기관·사례·전체 현황)은 advanced 모드에서만 추가한다.
  */
-function buildGroups(
-  activeProjectId: string | null,
-  projectType: string | undefined,
-  advanced: boolean,
-): NavGroup[] {
-  const pid = activeProjectId
-  // 프로젝트 유형별 핵심 메뉴 — AX: 진단·선택·AX설계 / 홈페이지: 홈페이지 설계 / 혼합: 모두
-  const workspaceItems: NavItem[] = pid
-    ? [
-        ...(projectType !== 'website'
-          ? [{ label: '기업 진단', path: `/diagnosis/projects/${pid}/setup`, icon: ClipboardList }]
-          : []),
-        ...(projectType !== 'website' ? [{ label: '만들 업무 선택', path: `/selection/projects/${pid}`, icon: Filter }] : []),
-        ...(projectType !== 'website' ? [{ label: 'AX 기능 설계', path: `/mvp-design/projects/${pid}`, icon: PencilRuler }] : []),
-        ...(projectType !== 'ax' ? [{ label: '홈페이지 설계', path: `/website-studio/projects/${pid}`, icon: Palette }] : []),
-        { label: '결과자료', path: `/deliverables/projects/${pid}`, icon: FolderOpen },
-      ]
-    : []
-  const advancedItems: NavItem[] = advanced
-    ? [
-        ...(pid ? [{ label: '실제 사용 테스트', path: `/validation/projects/${pid}`, icon: SearchCheck }] : []),
-        ...(pid ? [{ label: '기관·자금 연계', path: `/funding/projects/${pid}`, icon: Landmark }] : []),
-        { label: '검증 결과', path: '/validation/results', icon: ListChecks },
-        { label: '사례 라이브러리', path: '/cases', icon: Library },
-        { label: '전체 진행 현황', path: '/reports', icon: TrendingUp },
-      ]
-    : []
-
+function buildGroups(): NavGroup[] {
   return [
-    { key: 'today', title: '오늘 할 일', items: [{ label: '오늘 할 일', path: '/', icon: CheckSquare }] },
+    { key: 'today', title: '운영', items: [{ label: '고객 운영', path: '/ops/clients', icon: CheckSquare }] },
     {
-      key: 'clients',
-      title: '고객·프로젝트',
+      key: 'funding',
+      title: '지원사업',
       items: [
-        { label: '고객 운영', path: '/ops/clients', icon: ListChecks },
-        { label: '고객사·프로젝트', path: '/clients', icon: Building2 },
+        { label: '자금·지원사업', path: '/funding', icon: Landmark },
       ],
     },
-    { key: 'workspace', title: '작업공간', items: workspaceItems },
-    // 결과자료는 최상위 1개만 — 프로젝트 선택 시 작업공간의 '결과자료'가 대표이므로
-    // 전체 목록 메뉴는 프로젝트 미선택 상태에서만 표시한다(같은 목적의 메뉴 중복 금지).
-    ...(!pid
-      ? [
-          {
-            key: 'results',
-            title: '결과·자료',
-            items: [{ label: '결과자료', path: '/deliverables/results', icon: FileCheck2 }],
-          },
-        ]
-      : []),
-    ...(advancedItems.length > 0 ? [{ key: 'advanced', title: '고급 운영', items: advancedItems }] : []),
     { key: 'settings', title: '설정', items: [{ label: '설정', path: '/settings', icon: Settings }] },
   ]
 }
@@ -113,9 +58,7 @@ function SidebarContent({
   onCloseMobile?: () => void
 }) {
   const navigate = useNavigate()
-  const { project } = useActiveProject()
-  useStoreVersion()
-  const groups = buildGroups(project?.id ?? null, project?.projectType, isAdvancedVisible())
+  const groups = buildGroups()
 
   return (
     <div className="flex h-full flex-col bg-navy-900 text-navy-200">
@@ -138,21 +81,7 @@ function SidebarContent({
               {!collapsed && (
                 <p id={`nav-${group.key}`} className="px-3 pb-1.5 text-[0.8rem] font-semibold tracking-wide text-navy-300">{group.title}</p>
               )}
-              {group.key === 'workspace' && group.items.length === 0 ? (
-                !collapsed && (
-                  <div className="px-3 py-1.5">
-                    <p className="text-[0.85rem] leading-snug break-keep text-navy-300/80">먼저 작업할 프로젝트를 선택하세요.</p>
-                    <button
-                      type="button"
-                      onClick={() => { navigate('/clients'); onNavigate?.() }}
-                      className="mt-2 w-full cursor-pointer rounded-(--radius-control) border border-navy-700 px-3 py-2 text-[0.875rem] font-medium text-navy-100 hover:bg-navy-800"
-                    >
-                      프로젝트 선택하기
-                    </button>
-                  </div>
-                )
-              ) : (
-                <ul aria-labelledby={!collapsed ? `nav-${group.key}` : undefined} aria-label={collapsed ? group.title : undefined} className="flex flex-col gap-1">
+              <ul aria-labelledby={!collapsed ? `nav-${group.key}` : undefined} aria-label={collapsed ? group.title : undefined} className="flex flex-col gap-1">
                   {group.items.map((item) => (
                     <li key={item.path + item.label}>
                       <NavLink
@@ -171,8 +100,7 @@ function SidebarContent({
                       </NavLink>
                     </li>
                   ))}
-                </ul>
-              )}
+              </ul>
             </li>
           ))}
         </ul>

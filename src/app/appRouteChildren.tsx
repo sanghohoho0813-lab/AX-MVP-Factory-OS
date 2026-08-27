@@ -5,7 +5,6 @@
 import { Suspense, lazy } from 'react'
 import { Navigate } from 'react-router-dom'
 import { MODULE_PAGES } from '../data/modules'
-import { DashboardPage } from '../pages/DashboardPage'
 import { EmptyModulePage } from '../pages/EmptyModulePage'
 import { ReportsRedirectPage } from '../pages/ReportsRedirectPage'
 
@@ -33,12 +32,8 @@ const GettingStartedPage = lazy(() =>
 const TodayOpsPage = lazy(() =>
   import('../pages/TodayOpsPage').then((m) => ({ default: m.TodayOpsPage })),
 )
-const ClientOpsLedgerPage = lazy(() =>
-  import('../pages/ClientOpsLedgerPage').then((m) => ({ default: m.ClientOpsLedgerPage })),
-)
-const ClientOperationsWorkspacePage = lazy(() =>
-  import('../pages/ClientOperationsWorkspacePage').then((m) => ({ default: m.ClientOperationsWorkspacePage })),
-)
+const OperationsHubPage = lazy(() => import('../pages/OperationsHubPage').then((m) => ({ default: m.OperationsHubPage })))
+const OperationsClientDetailPage = lazy(() => import('../pages/OperationsClientDetailPage').then((m) => ({ default: m.OperationsClientDetailPage })))
 
 // 진단 관리·공개 설문은 route-level lazy loading으로 초기 번들을 줄인다
 const DiagnosisStudioPage = lazy(() =>
@@ -330,7 +325,7 @@ export function RouteFallback() {
 }
 
 export const appRouteChildren = [
-      { index: true, element: <DashboardPage /> },
+      { index: true, element: <Navigate to="/ops/clients" replace /> },
       { path: 'clients', element: <ClientsListPage /> },
       { path: 'clients/new', element: <OrganizationFormPage /> },
       { path: 'clients/:organizationId', element: <OrganizationDetailPage /> },
@@ -341,8 +336,8 @@ export const appRouteChildren = [
       { path: 'settings', element: <SettingsPage /> },
       { path: 'getting-started', element: <GettingStartedPage /> },
       { path: 'today', element: <TodayOpsPage /> },
-      { path: 'ops/clients', element: <ClientOpsLedgerPage /> },
-      { path: 'ops/clients/:organizationId', element: <ClientOperationsWorkspacePage /> },
+      { path: 'ops/clients', element: <OperationsHubPage /> },
+      { path: 'ops/clients/:clientId', element: <OperationsClientDetailPage /> },
       { path: 'guide', element: <Navigate to="/getting-started" replace /> },
 
       { path: 'diagnosis', element: <DiagnosisStudioPage /> },
