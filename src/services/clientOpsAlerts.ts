@@ -417,3 +417,37 @@ export function summarizeAlerts(alerts: OpsAlert[]): AlertSummary {
     criticalByClient,
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* 업체 정렬 (급한 순)                                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 급한 업체가 위로 오도록 정렬한다.
+ * 1) 심각 경고 수 → 2) 전체 경고 수 → 3) 가장 급한 마감(작은 daysLeft) → 4) 이름
+ */
+export function sortClientsByUrgency(
+  records: ClientOpsRecord[],
+  today: string = todayLocalDate(),
+): ClientOpsRecord[] {
+  const score = new Map<string, { critical: number; total: number; soonest: number }>()
+  for (const r of records) {
+    const list = buildClientAlerts(r, today)
+    const days = list.map((a) => a.daysLeft).filter((d): d is number => d !== null)
+    score.set(r.id, {
+      critical: list.filter((a) => a.severity === 'critical').length,
+      total: list.length,
+      soonest: days.length > 0 ? Math.min(...days) : Number.POSITIVE_INFINITY,
+    })
+  }
+  const done = (r: ClientOpsRecord) => (r.status === 'completed' ? 1 : 0)
+  return [...records].sort((a, b) => {
+    if (done(a) !== done(b)) return done(a) - done(b)
+    const sa = score.get(a.id)!
+    const sb = score.get(b.id)!
+    if (sa.critical !== sb.critical) return sb.critical - sa.critical
+    if (sa.total !== sb.total) return sb.total - sa.total
+    if (sa.soonest !== sb.soonest) return sa.soonest - sb.soonest
+    return a.companyName.localeCompare(b.companyName)
+  })
+}

@@ -15,6 +15,12 @@ import {
   missingDocumentsFor,
   summarizeAlerts,
 } from '../clientOpsAlerts'
+import { sortClientsByUrgency } from '../clientOpsAlerts'
+import {
+  buildDocumentRequestMessage,
+  buildStatusReportMessage,
+  collectMissingDocuments,
+} from '../clientOpsMessages'
 import { normalizeClientOps, withService } from '../clientOpsService'
 import { DOCUMENTS, SERVICES } from '../../content/clientOpsCatalog'
 import type { ClientOpsRecord, DocumentKey } from '../../types/clientOps'
@@ -285,6 +291,85 @@ check('문구: 미정', dueText(null) === '기한 미정')
   check('카탈로그: 정책자금은 반복 업무', SERVICES.find((s) => s.key === 'policyFund')?.recurring === true)
   const certDoc = DOCUMENTS.find((d) => d.key === 'jointCertificate')
   check('보안: 공동인증서에 비밀번호 필드 없음', !('password' in (certDoc ?? {})))
+}
+
+
+/* ---------------- 서류 요청 문구 ---------------- */
+{
+  let r = client({ contactName: '홍길동' })
+  r = withService(r, 'venture', { status: 'in_progress' })
+  const missing = collectMissingDocuments(r, TODAY)
+  check('문구: 진행 중 업무 기준 부족 서류 4건', missing.length === 4, String(missing.length))
+  check('문구: 사유는 미보유', missing.every((m) => m.reason === 'missing'))
+  check('문구: 어느 업무에 필요한지 포함', missing[0].neededFor.includes('벤처인증 (혁신성장유형)'))
+
+  const msg = buildDocumentRequestMessage(r, TODAY)
+  check('문구: 대표님 호칭', msg.includes('홍길동 대표님'))
+  check('문구: 서류명 나열', msg.includes('중소기업 확인서') && msg.includes('법인등기부등본'))
+  check('문구: 발급처 안내', msg.includes('인터넷등기소') && msg.includes('중소기업현황정보시스템'))
+  check('문구: 번호 매김', msg.includes('1.') && msg.includes('4.'))
+}
+{
+  // 만료 서류는 "새 발급본 필요"로 표기
+  let r = client()
+  r = withService(r, 'venture', { status: 'in_progress' })
+  r = withDocs(r, ['businessRegistration', 'smeCertificate', 'representativeId'])
+  r = withDocs(r, ['corporateRegistry'], '2026-01-01')
+  const lines = collectMissingDocuments(r, TODAY)
+  check('문구: 만료 서류만 남음', lines.length === 1 && lines[0].key === 'corporateRegistry')
+  check('문구: 만료 사유', lines[0].reason === 'expired')
+  check('문구: 재발급 안내 포함', buildDocumentRequestMessage(r, TODAY).includes('유효기간이 지나'))
+}
+{
+  // 부족한 서류가 없으면 요청 문구가 아니라 안내 문구
+  let r = client()
+  r = withService(r, 'ax', { status: 'in_progress' })
+  r = withDocs(r, ['businessRegistration'])
+  check('문구: 부족 없음 안내', buildDocumentRequestMessage(r, TODAY).includes('추가로 받을 서류는 없습니다'))
+}
+{
+  // 특정 업무만 지정하면 그 업무 기준으로만 계산
+  const r = client()
+  const only = collectMissingDocuments(r, TODAY, ['patent'])
+  check('문구: 업무 지정 시 해당 서류만', only.length === 2, String(only.length))
+  check('문구: 지정 업무의 서류', only.map((x) => x.key).join(',') === 'businessRegistration,representativeId')
+}
+{
+  // 진행 상황 보고
+  let r = client({ companyName: '가나테크' })
+  r = withService(r, 'patent', { status: 'done' })
+  r = withService(r, 'venture', { status: 'in_progress', nextStep: '평가자료 정리', dueDate: '2026-09-05' })
+  r = withService(r, 'incorporation', { status: 'not_applicable' })
+  const msg = buildStatusReportMessage(r, TODAY)
+  check('보고: 업체명 포함', msg.includes('가나테크'))
+  check('보고: 완료 업무 표시', msg.includes('특허 출원: 완료'))
+  check('보고: 진행 업무 상태', msg.includes('벤처인증 (혁신성장유형): 진행 중'))
+  check('보고: 목표일·남은 일수', msg.includes('2026-09-05') && msg.includes('9일 남음'))
+  check('보고: 다음 단계 섹션', msg.includes('[다음 단계]') && msg.includes('평가자료 정리'))
+  check('보고: 해당 없음 업무는 제외', !msg.includes('법인설립'))
+}
+
+/* ---------------- 업체 정렬(급한 순) ---------------- */
+{
+  let calm = client({ id: 'calm', companyName: '평온사' })
+  calm = withDocs(calm, ['businessRegistration'])
+
+  let hot = client({ id: 'hot', companyName: '급한사' })
+  hot = withService(hot, 'venture', { status: 'in_progress', dueDate: '2026-08-01' })
+
+  let mid = client({ id: 'mid', companyName: '보통사' })
+  mid = withService(mid, 'patent', { status: 'in_progress', dueDate: '2026-08-30' })
+  mid = withDocs(mid, ['businessRegistration', 'representativeId'])
+
+  const sorted = sortClientsByUrgency([calm, mid, hot], TODAY)
+  check('정렬: 심각 경고 많은 업체가 1위', sorted[0].id === 'hot', sorted.map((s) => s.id).join(','))
+  check('정렬: 경고 없는 업체가 마지막', sorted[2].id === 'calm', sorted.map((s) => s.id).join(','))
+}
+{
+  const active = client({ id: 'a', companyName: 'A' })
+  const finished = client({ id: 'z', companyName: 'Z', status: 'completed' })
+  const sorted = sortClientsByUrgency([finished, active], TODAY)
+  check('정렬: 종료 업체는 뒤로', sorted[0].id === 'a')
 }
 
 console.log(`\nclient-ops-alerts: ${passed} passed, ${failed} failed`)

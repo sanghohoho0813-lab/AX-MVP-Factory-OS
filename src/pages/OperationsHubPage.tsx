@@ -14,6 +14,7 @@ import { createClient, listClients } from '../services/clientOpsService'
 import {
   buildAllAlerts,
   clientOpsProgress,
+  sortClientsByUrgency,
   summarizeAlerts,
 } from '../services/clientOpsAlerts'
 import { DUE_SOON_DAYS, SERVICES } from '../content/clientOpsCatalog'
@@ -30,6 +31,7 @@ import {
   StatTile,
   cellStateFor,
 } from '../components/ops/opsParts'
+import { SERVICE_STATUS_LABEL } from '../content/clientOpsCatalog'
 
 const SEVERITY_TABS: { key: AlertSeverity | 'all'; label: string }[] = [
   { key: 'all', label: '전체' },
@@ -67,6 +69,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     void load()
   }, [load])
 
+  const ordered = useMemo(() => sortClientsByUrgency(records, today), [records, today])
   const alerts = useMemo(() => buildAllAlerts(records, today), [records, today])
   const summary = useMemo(() => summarizeAlerts(alerts), [alerts])
   const visibleAlerts = useMemo(
@@ -132,7 +135,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       )}
 
       {/* 요약 */}
-      <section aria-label="요약" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section aria-label="요약" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatTile
           label="지금 처리할 일"
           value={`${summary.critical}건`}
@@ -158,7 +161,10 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       </section>
 
       {/* A. 지금 챙길 것 */}
-      <section aria-labelledby="ops-alerts" className="flex flex-col gap-3">
+      <section
+        aria-labelledby="ops-alerts"
+        className={`flex-col gap-3 ${records.length === 0 ? 'hidden' : 'flex'}`}
+      >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 id="ops-alerts" className="text-[1.3rem] font-bold text-slate-900">
             지금 챙길 것
@@ -199,12 +205,12 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
           <div className="rounded-(--radius-panel) border border-success-200 bg-success-50/60 px-5 py-8 text-center">
             <ClipboardCheck aria-hidden="true" className="mx-auto size-8 text-success-600" />
             <p className="mt-2 text-[1.05rem] font-semibold text-slate-800">
-              {records.length === 0 ? '아직 등록된 업체가 없습니다' : '지금 급하게 챙길 일이 없습니다'}
+              {tab === 'all' ? '지금 급하게 챙길 일이 없습니다' : '이 분류에는 항목이 없습니다'}
             </p>
             <p className="mt-1 text-[0.95rem] break-keep text-slate-600">
-              {records.length === 0
-                ? '업체를 등록하면 마감·서류·수금을 자동으로 확인해 드립니다.'
-                : '마감이 지난 일, 빠진 서류, 못 받은 돈이 모두 없습니다.'}
+              {tab === 'all'
+                ? '마감이 지난 일, 빠진 서류, 못 받은 돈이 모두 없습니다.'
+                : '다른 분류를 눌러 확인해 보세요.'}
             </p>
           </div>
         ) : (
@@ -238,17 +244,90 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
 
         {records.length === 0 ? (
           <div className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-12 text-center">
-            <Building2 aria-hidden="true" className="mx-auto size-8 text-slate-300" />
-            <p className="mt-3 text-[1.05rem] font-semibold text-slate-800">첫 업체를 등록해 보세요</p>
-            <p className="mt-1 text-[0.95rem] break-keep text-slate-600">
-              등록하면 특허·벤처인증·AX 개발·정책자금까지 6가지 업무가 자동으로 준비됩니다.
+            <Building2 aria-hidden="true" className="mx-auto size-9 text-brand-400" />
+            <p className="mt-3 text-[1.25rem] font-bold text-slate-900">첫 업체를 등록해 보세요</p>
+            <p className="mx-auto mt-2 max-w-xl text-[1rem] break-keep text-slate-600">
+              업체를 만들면 법인설립·업종추가·특허·벤처인증·AX 개발·정책자금 6가지 업무와 서류 10종이 자동으로 준비됩니다.
+              이후에는 마감이 지났거나 서류가 빠진 것을 이 화면이 알아서 찾아 올려 드립니다.
             </p>
             <Button variant="primary" className="mt-5" onClick={() => setFormOpen(true)}>
               <CirclePlus aria-hidden="true" className="size-4" />첫 업체 등록
             </Button>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-(--radius-panel) border border-slate-200 bg-white">
+          <>
+          {/* 모바일: 카드 목록 (표 가로 스크롤 대신) */}
+          <ul className="flex flex-col gap-3 lg:hidden">
+            {ordered.map((record) => {
+              const p = clientOpsProgress(record, today)
+              const critical = summary.criticalByClient[record.id] ?? 0
+              const openServices = SERVICES.filter((s) => {
+                const st = record.services[s.key].status
+                return st !== 'not_started' && st !== 'not_applicable'
+              })
+              return (
+                <li key={record.id}>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/ops/clients/${record.id}`)}
+                    className="flex w-full flex-col gap-2.5 rounded-(--radius-panel) border border-slate-200 bg-white p-4 text-left"
+                  >
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[1.1rem] font-bold break-keep text-slate-900">
+                        {record.companyName || '(이름 없음)'}
+                      </span>
+                      {critical > 0 && (
+                        <span className="rounded-full border border-danger-200 bg-danger-100 px-1.5 py-0.5 text-[0.78rem] font-bold text-danger-700">
+                          지금 처리 {critical}건
+                        </span>
+                      )}
+                      <ClientStatusChip status={record.status} />
+                    </span>
+                    <span className="flex flex-wrap gap-1.5">
+                      {openServices.length === 0 ? (
+                        <span className="text-[0.9rem] text-slate-500">아직 시작한 업무가 없습니다</span>
+                      ) : (
+                        openServices.map((s) => {
+                          const cell = cellStateFor(record, s.key, today, DUE_SOON_DAYS)
+                          const danger = cell.overdue || cell.blocked
+                          return (
+                            <span
+                              key={s.key}
+                              className={`rounded-full border px-2 py-0.5 text-[0.82rem] font-medium ${
+                                danger
+                                  ? 'border-danger-200 bg-danger-50 text-danger-700'
+                                  : cell.dueSoon
+                                    ? 'border-warning-200 bg-warning-50 text-warning-800'
+                                    : cell.status === 'done'
+                                      ? 'border-success-200 bg-success-50 text-success-700'
+                                      : 'border-slate-200 bg-slate-50 text-slate-600'
+                              }`}
+                            >
+                              {s.shortLabel} · {cell.blocked ? '서류 없음' : SERVICE_STATUS_LABEL[cell.status]}
+                            </span>
+                          )
+                        })
+                      )}
+                    </span>
+                    <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.9rem] text-slate-500">
+                      <span>진행 {p.percent}%</span>
+                      <span>
+                        서류 {p.documentsUsable}/{p.documentsTotal}
+                      </span>
+                      {p.unpaidAmount > 0 && (
+                        <span className={p.overduePayments > 0 ? 'font-semibold text-danger-700' : ''}>
+                          미수금 {formatKrw(p.unpaidAmount)}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+
+          {/* 데스크톱: 현황표 */}
+          <div className="hidden overflow-x-auto rounded-(--radius-panel) border border-slate-200 bg-white lg:block">
             <table className="w-full min-w-[900px] border-collapse">
               <caption className="sr-only">업체별 표준 업무 진행 현황</caption>
               <thead>
@@ -277,7 +356,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                 </tr>
               </thead>
               <tbody>
-                {records.map((record) => {
+                {ordered.map((record) => {
                   const p = clientOpsProgress(record, today)
                   const critical = summary.criticalByClient[record.id] ?? 0
                   return (
@@ -342,10 +421,11 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
               </tbody>
             </table>
           </div>
+          </>
         )}
 
         {/* 범례 */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.85rem] text-slate-500">
+        <div className="hidden flex-wrap items-center gap-x-4 gap-y-1 text-[0.85rem] text-slate-500 lg:flex">
           <span className="font-medium text-slate-600">표 보는 법:</span>
           <span>완료 = 끝난 업무</span>
           <span>진행/준비/접수 = 하는 중</span>

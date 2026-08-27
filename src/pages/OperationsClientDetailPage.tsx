@@ -3,10 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
   Check,
+  ChevronDown,
+  ClipboardCopy,
   FileWarning,
   Lock,
   Paperclip,
   Plus,
+  Send,
   ShieldAlert,
   Trash2,
   Upload,
@@ -31,7 +34,12 @@ import {
   documentStatus,
   dueText,
   missingDocumentsFor,
+  daysLeftFrom,
 } from '../services/clientOpsAlerts'
+import {
+  buildDocumentRequestMessage,
+  buildStatusReportMessage,
+} from '../services/clientOpsMessages'
 import {
   DOCUMENTS,
   FEE_KIND_LABEL,
@@ -39,6 +47,7 @@ import {
   SERVICES,
   SERVICE_STATUS_LABEL,
   SERVICE_STATUS_ORDER,
+  isServiceStarted,
   servicesNeeding,
 } from '../content/clientOpsCatalog'
 import { todayLocalDate } from '../lib/appClock'
@@ -49,14 +58,27 @@ import type {
   DocumentKey,
   FeeKind,
   ServiceKey,
+  ServiceStatus,
 } from '../types/clientOps'
 import { Button } from '../components/ui/Button'
 import { NotFoundState } from '../components/ui/NotFoundState'
 import { Panel } from '../components/ui/Panel'
 import { useToast } from '../components/ui/toastContext'
 import { AlertRow, ClientStatusChip, StatTile } from '../components/ops/opsParts'
+import {
+  DueDateField,
+  MessageModal,
+  PhoneLink,
+  SavedBadge,
+} from '../components/ops/opsControls'
 
 const CLIENT_STATUS_ORDER: ClientOpsStatus[] = ['active', 'waiting', 'paused', 'completed']
+const CLIENT_STATUS_TEXT: Record<ClientOpsStatus, string> = {
+  active: '진행 중',
+  waiting: '고객 대기',
+  paused: '일시 중지',
+  completed: '종료',
+}
 
 const inputCls =
   'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.98rem] focus:border-brand-500 focus:outline-none'
@@ -68,6 +90,9 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
   const [record, setRecord] = useState<ClientOpsRecord | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [savedAt, setSavedAt] = useState<number | null>(null)
+  const [openCards, setOpenCards] = useState<Record<string, boolean>>({})
+  const [message, setMessage] = useState<{ title: string; description: string; text: string } | null>(null)
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({})
 
   const today = todayLocalDate()
@@ -90,13 +115,13 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
     void load()
   }, [load])
 
-  /** 변경 즉시 저장 (낙관적 반영) */
   const commit = useCallback(
     async (next: ClientOpsRecord) => {
       setRecord(next)
       try {
         const saved = await saveClient(next)
         setRecord(saved)
+        setSavedAt(Date.now())
       } catch (cause) {
         showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
         void load()
@@ -108,9 +133,18 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
   const alerts = useMemo(() => (record ? buildClientAlerts(record, today) : []), [record, today])
   const progress = useMemo(() => (record ? clientOpsProgress(record, today) : null), [record, today])
 
-  if (loading) {
-    return <p className="px-1 py-10 text-[0.98rem] text-slate-500">불러오는 중…</p>
-  }
+  /** 지금 착수한 업무가 필요로 하는데 없는 서류 (서류함 상단 고정) */
+  const urgentDocs = useMemo(() => {
+    if (!record) return new Set<DocumentKey>()
+    const set = new Set<DocumentKey>()
+    for (const s of SERVICES) {
+      if (!isServiceStarted(record.services[s.key].status)) continue
+      for (const d of missingDocumentsFor(record, s.key, today)) set.add(d.key)
+    }
+    return set
+  }, [record, today])
+
+  if (loading) return <p className="px-1 py-10 text-[0.98rem] text-slate-500">불러오는 중…</p>
   if (notFound || !record || !progress) {
     return (
       <NotFoundState
@@ -129,14 +163,21 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
     try {
       const saved = await uploadDocumentFile(record, key, file)
       setRecord(saved)
+      setSavedAt(Date.now())
       showToast('파일을 보관했습니다.')
     } catch (cause) {
       showToast(cause instanceof Error ? cause.message : '파일을 보관하지 못했습니다.')
     }
   }
 
+  const cardOpen = (key: ServiceKey, auto: boolean) => openCards[key] ?? auto
+  const toggleCard = (key: ServiceKey, auto: boolean) =>
+    setOpenCards((s) => ({ ...s, [key]: !(s[key] ?? auto) }))
+
   return (
     <div className="flex flex-col gap-5">
+      <SavedBadge savedAt={savedAt} />
+
       {/* 헤더 */}
       <div className="flex flex-col gap-3">
         <button
@@ -155,9 +196,10 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
               </h1>
               <ClientStatusChip status={record.status} />
             </div>
-            <p className="mt-1 text-[0.98rem] text-slate-500">
-              업무 {progress.servicesDone}/{progress.servicesTotal} 완료 · 서류 {progress.documentsUsable}/
-              {progress.documentsTotal} 확보 · 전체 {progress.percent}%
+            <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.95rem] text-slate-500">
+              <PhoneLink phone={record.contactPhone} />
+              {record.contactName && <span>{record.contactName}</span>}
+              {record.businessNumber && <span>사업자 {record.businessNumber}</span>}
             </p>
           </div>
           <label className="text-[0.92rem] font-medium text-slate-600">
@@ -169,11 +211,41 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
             >
               {CLIENT_STATUS_ORDER.map((s) => (
                 <option key={s} value={s}>
-                  {s === 'active' ? '진행 중' : s === 'waiting' ? '고객 대기' : s === 'paused' ? '일시 중지' : '종료'}
+                  {CLIENT_STATUS_TEXT[s]}
                 </option>
               ))}
             </select>
           </label>
+        </div>
+
+        {/* 고객에게 보낼 문구 */}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="primary"
+            onClick={() =>
+              setMessage({
+                title: '서류 요청 문구',
+                description: '지금 진행 중인 업무에 필요한데 아직 없는 서류만 골라 정리했습니다.',
+                text: buildDocumentRequestMessage(record, today),
+              })
+            }
+          >
+            <Send aria-hidden="true" className="size-4" />
+            서류 요청 문구 만들기
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() =>
+              setMessage({
+                title: '진행 상황 보고 문구',
+                description: '업무별 현재 상태와 다음 단계를 정리했습니다.',
+                text: buildStatusReportMessage(record, today),
+              })
+            }
+          >
+            <ClipboardCopy aria-hidden="true" className="size-4" />
+            진행 상황 보고 문구
+          </Button>
         </div>
       </div>
 
@@ -191,8 +263,8 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
         </section>
       )}
 
-      {/* 요약 타일 */}
-      <section className="grid gap-3 sm:grid-cols-3">
+      {/* 요약 */}
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <StatTile
           label="완료한 업무"
           value={`${progress.servicesDone}/${progress.servicesTotal}`}
@@ -204,7 +276,6 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
           value={`${progress.documentsUsable}/${progress.documentsTotal}`}
           icon={Paperclip}
           tone={progress.documentsUsable < progress.documentsTotal ? 'warning' : 'success'}
-          hint="유효기간이 지난 서류는 빠집니다"
         />
         <StatTile
           label="아직 못 받은 돈"
@@ -215,59 +286,93 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
         />
       </section>
 
-      {/* 표준 업무 6종 */}
+      {/* 진행 업무 */}
       <section aria-labelledby="svc" className="flex flex-col gap-3">
-        <h2 id="svc" className="text-[1.3rem] font-bold text-slate-900">
-          진행 업무
-        </h2>
-        <div className="grid gap-3 xl:grid-cols-2">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="svc" className="text-[1.3rem] font-bold text-slate-900">
+            진행 업무
+          </h2>
+          <p className="text-[0.9rem] text-slate-500">제목을 누르면 자세한 내용이 열립니다.</p>
+        </div>
+        <div className="flex flex-col gap-2.5">
           {SERVICES.map((meta) => {
             const state = record.services[meta.key]
             const missing = missingDocumentsFor(record, meta.key, today)
-            const started =
-              state.status === 'preparing' ||
-              state.status === 'in_progress' ||
-              state.status === 'waiting_client' ||
-              state.status === 'submitted'
+            const started = isServiceStarted(state.status)
             const blocked = started && missing.length > 0
-            const dLeft = state.dueDate
-              ? (() => {
-                  const a = Date.parse(`${today}T00:00:00Z`)
-                  const b = Date.parse(`${state.dueDate}T00:00:00Z`)
-                  return Number.isNaN(a) || Number.isNaN(b) ? null : Math.round((b - a) / 86_400_000)
-                })()
-              : null
             const open = state.status !== 'done' && state.status !== 'not_applicable'
+            const dLeft = state.dueDate ? daysLeftFrom(today, state.dueDate) : null
+            const overdue = open && dLeft !== null && dLeft < 0
+            const dueSoon = open && dLeft !== null && dLeft >= 0 && dLeft <= 7
+            // 손댈 필요가 있는 업무는 기본으로 펼친다
+            const auto = started || overdue || blocked
+            const expanded = cardOpen(meta.key, auto)
 
             return (
               <div
                 key={meta.key}
                 id={meta.key}
-                className={`flex flex-col gap-3 rounded-(--radius-panel) border p-4 ${
-                  blocked || (open && dLeft !== null && dLeft < 0)
+                className={`rounded-(--radius-panel) border ${
+                  blocked || overdue
                     ? 'border-danger-200 bg-danger-50/40'
-                    : 'border-slate-200 bg-white'
+                    : dueSoon
+                      ? 'border-warning-200 bg-warning-50/40'
+                      : 'border-slate-200 bg-white'
                 }`}
               >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <h3 className="text-[1.1rem] font-bold break-keep text-slate-900">
-                      {meta.label}
-                      {meta.recurring && (
-                        <span className="ml-1.5 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.75rem] font-medium text-slate-500">
-                          반복
+                <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+                  <button
+                    type="button"
+                    aria-expanded={expanded}
+                    onClick={() => toggleCard(meta.key, auto)}
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                  >
+                    <ChevronDown
+                      aria-hidden="true"
+                      className={`size-4 shrink-0 text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
+                    />
+                    <span className="min-w-0">
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[1.08rem] font-bold break-keep text-slate-900">{meta.label}</span>
+                        {meta.recurring && (
+                          <span className="rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.75rem] font-medium text-slate-500">
+                            반복
+                          </span>
+                        )}
+                        {blocked && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-danger-200 bg-danger-100 px-1.5 py-0.5 text-[0.78rem] font-bold text-danger-700">
+                            <Lock aria-hidden="true" className="size-3" />
+                            서류 {missing.length}건 부족
+                          </span>
+                        )}
+                        {open && dLeft !== null && (
+                          <span
+                            className={`rounded-full border px-1.5 py-0.5 text-[0.78rem] font-bold ${
+                              dLeft < 0
+                                ? 'border-danger-200 bg-danger-100 text-danger-700'
+                                : dLeft <= 7
+                                  ? 'border-warning-200 bg-warning-100 text-warning-800'
+                                  : 'border-slate-200 bg-slate-50 text-slate-500'
+                            }`}
+                          >
+                            {dueText(dLeft)}
+                          </span>
+                        )}
+                      </span>
+                      {!expanded && state.nextStep && (
+                        <span className="mt-0.5 block truncate text-[0.9rem] text-slate-500">
+                          다음: {state.nextStep}
                         </span>
                       )}
-                    </h3>
-                    <p className="mt-1 text-[0.9rem] break-keep text-slate-500">{meta.description}</p>
-                  </div>
+                    </span>
+                  </button>
                   <select
                     aria-label={`${meta.label} 상태`}
                     value={state.status}
                     onChange={(e) =>
-                      void commit(withService(record, meta.key, { status: e.target.value as never }))
+                      void commit(withService(record, meta.key, { status: e.target.value as ServiceStatus }))
                     }
-                    className="shrink-0 rounded-(--radius-control) border border-slate-300 px-2.5 py-1.5 text-[0.92rem] font-medium"
+                    className="shrink-0 rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-1.5 text-[0.92rem] font-medium"
                   >
                     {SERVICE_STATUS_ORDER.map((s) => (
                       <option key={s} value={s}>
@@ -277,58 +382,99 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
                   </select>
                 </div>
 
-                {blocked && (
-                  <p className="flex items-start gap-1.5 rounded-(--radius-control) border border-danger-200 bg-danger-50 px-3 py-2 text-[0.92rem] break-keep text-danger-700">
-                    <Lock aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-                    <span>
-                      필요한 서류가 없어 막혔습니다 — {missing.map((m) => (m.expired ? `${m.label}(만료)` : m.label)).join(', ')}
-                    </span>
-                  </p>
-                )}
+                {expanded && (
+                  <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-3.5">
+                    <p className="text-[0.92rem] break-keep text-slate-500">{meta.description}</p>
 
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <label className="text-[0.9rem] font-medium text-slate-600">
-                    마감·목표일
-                    <input
-                      type="date"
-                      value={state.dueDate}
-                      onChange={(e) => void commit(withService(record, meta.key, { dueDate: e.target.value }))}
-                      className={`mt-1 ${inputCls}`}
-                    />
-                    {open && dLeft !== null && (
-                      <span
-                        className={`mt-1 block text-[0.85rem] font-semibold ${
-                          dLeft < 0 ? 'text-danger-700' : dLeft <= 7 ? 'text-warning-800' : 'text-slate-500'
-                        }`}
-                      >
-                        {dueText(dLeft)}
-                      </span>
+                    {blocked && (
+                      <div className="rounded-(--radius-control) border border-danger-200 bg-danger-50 px-3 py-2.5">
+                        <p className="flex items-start gap-1.5 text-[0.95rem] font-semibold break-keep text-danger-700">
+                          <Lock aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                          아래 서류가 없어 진행이 막혔습니다
+                        </p>
+                        <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                          {missing.map((m) => (
+                            <li
+                              key={m.key}
+                              className="rounded-full border border-danger-200 bg-white px-2 py-0.5 text-[0.85rem] font-medium text-danger-700"
+                            >
+                              {m.label}
+                              {m.expired ? ' (만료)' : ''}
+                            </li>
+                          ))}
+                        </ul>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="mt-2.5"
+                          onClick={() =>
+                            setMessage({
+                              title: `${meta.label} — 서류 요청 문구`,
+                              description: '이 업무에 필요한 서류만 정리했습니다.',
+                              text: buildDocumentRequestMessage(record, today, [meta.key]),
+                            })
+                          }
+                        >
+                          <Send aria-hidden="true" className="size-3.5" />이 업무 서류 요청 문구
+                        </Button>
+                      </div>
                     )}
-                  </label>
-                  <label className="text-[0.9rem] font-medium text-slate-600">
-                    다음에 할 일
-                    <input
-                      value={state.nextStep}
-                      onChange={(e) => void commit(withService(record, meta.key, { nextStep: e.target.value }))}
-                      placeholder="예: 선행기술 조사 결과 검토"
-                      className={`mt-1 ${inputCls}`}
-                    />
-                  </label>
-                </div>
 
-                <label className="text-[0.9rem] font-medium text-slate-600">
-                  메모
-                  <textarea
-                    value={state.note}
-                    onChange={(e) => void commit(withService(record, meta.key, { note: e.target.value }))}
-                    rows={2}
-                    className={`mt-1 ${inputCls}`}
-                  />
-                </label>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <DueDateField
+                        label="마감·목표일"
+                        value={state.dueDate}
+                        today={today}
+                        onChange={(v) => void commit(withService(record, meta.key, { dueDate: v }))}
+                      />
+                      <label className="text-[0.9rem] font-medium text-slate-600">
+                        다음에 할 일
+                        <input
+                          value={state.nextStep}
+                          onChange={(e) => void commit(withService(record, meta.key, { nextStep: e.target.value }))}
+                          placeholder="예: 선행기술 조사 결과 검토"
+                          className={`mt-1 ${inputCls}`}
+                        />
+                      </label>
+                    </div>
 
-                <p className="text-[0.85rem] text-slate-400">
-                  필요 서류: {meta.requiredDocuments.map((k) => DOCUMENTS.find((d) => d.key === k)?.label).join(', ')}
-                </p>
+                    <label className="text-[0.9rem] font-medium text-slate-600">
+                      메모
+                      <textarea
+                        value={state.note}
+                        onChange={(e) => void commit(withService(record, meta.key, { note: e.target.value }))}
+                        rows={2}
+                        className={`mt-1 ${inputCls}`}
+                      />
+                    </label>
+
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[0.85rem] text-slate-500">필요 서류</span>
+                      {meta.requiredDocuments.map((k) => {
+                        const v = documentStatus(k, record.documents[k], today)
+                        return (
+                          <span
+                            key={k}
+                            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[0.82rem] font-medium ${
+                              v.usable
+                                ? 'border-success-200 bg-success-50 text-success-700'
+                                : 'border-slate-200 bg-slate-50 text-slate-500'
+                            }`}
+                          >
+                            {v.usable ? (
+                              <Check aria-hidden="true" className="size-3" />
+                            ) : (
+                              <span aria-hidden="true" className="text-[0.9em]">
+                                ○
+                              </span>
+                            )}
+                            {DOCUMENTS.find((d) => d.key === k)?.label}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })}
@@ -341,9 +487,7 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
           <h2 id="docs" className="text-[1.3rem] font-bold text-slate-900">
             서류함
           </h2>
-          <p className="text-[0.9rem] text-slate-500">
-            발급일을 넣으면 유효기간이 지났는지 자동으로 알려드립니다.
-          </p>
+          <p className="text-[0.9rem] text-slate-500">발급일을 넣으면 유효기간이 지났는지 자동으로 알려드립니다.</p>
         </div>
 
         {!uploadable && (
@@ -353,137 +497,144 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
         )}
 
         <div className="grid gap-3 lg:grid-cols-2">
-          {DOCUMENTS.map((meta) => {
-            const state = record.documents[meta.key]
-            const view = documentStatus(meta.key, state, today)
-            const needed = servicesNeeding(meta.key)
-            return (
-              <div
-                key={meta.key}
-                className={`flex flex-col gap-2.5 rounded-(--radius-panel) border p-4 ${
-                  view.expired
-                    ? 'border-danger-200 bg-danger-50/40'
-                    : view.expiringSoon
-                      ? 'border-warning-200 bg-warning-50/40'
-                      : 'border-slate-200 bg-white'
-                }`}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <label className="flex min-w-0 items-start gap-2.5">
-                    <input
-                      type="checkbox"
-                      checked={state.received}
-                      onChange={(e) =>
-                        void commit(withDocument(record, meta.key, { received: e.target.checked }))
-                      }
-                      className="mt-1 size-5 shrink-0 accent-brand-600"
-                    />
-                    <span className="min-w-0">
-                      <span className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-[1.05rem] font-bold break-keep text-slate-900">{meta.label}</span>
-                        {meta.sensitive && (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.75rem] font-medium text-slate-500">
-                            <ShieldAlert aria-hidden="true" className="size-3" />
-                            민감
-                          </span>
-                        )}
+          {[...DOCUMENTS]
+            .sort((a, b) => Number(urgentDocs.has(b.key)) - Number(urgentDocs.has(a.key)))
+            .map((meta) => {
+              const state = record.documents[meta.key]
+              const view = documentStatus(meta.key, state, today)
+              const needed = servicesNeeding(meta.key)
+              const urgent = urgentDocs.has(meta.key)
+              return (
+                <div
+                  key={meta.key}
+                  className={`flex flex-col gap-2.5 rounded-(--radius-panel) border p-4 ${
+                    view.expired
+                      ? 'border-danger-200 bg-danger-50/40'
+                      : urgent
+                        ? 'border-danger-200 bg-white'
+                        : view.expiringSoon
+                          ? 'border-warning-200 bg-warning-50/40'
+                          : 'border-slate-200 bg-white'
+                  }`}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <label className="flex min-w-0 items-start gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={state.received}
+                        onChange={(e) => void commit(withDocument(record, meta.key, { received: e.target.checked }))}
+                        className="mt-1 size-5 shrink-0 accent-brand-600"
+                      />
+                      <span className="min-w-0">
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[1.05rem] font-bold break-keep text-slate-900">{meta.label}</span>
+                          {urgent && (
+                            <span className="rounded-full border border-danger-200 bg-danger-100 px-1.5 py-0.5 text-[0.75rem] font-bold text-danger-700">
+                              지금 필요
+                            </span>
+                          )}
+                          {meta.sensitive && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.75rem] font-medium text-slate-500">
+                              <ShieldAlert aria-hidden="true" className="size-3" />
+                              민감
+                            </span>
+                          )}
+                        </span>
+                        <span className="mt-0.5 block text-[0.88rem] break-keep text-slate-500">{meta.hint}</span>
                       </span>
-                      <span className="mt-0.5 block text-[0.88rem] break-keep text-slate-500">{meta.hint}</span>
-                    </span>
-                  </label>
-                  {view.expired && (
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-danger-200 bg-danger-100 px-2 py-0.5 text-[0.8rem] font-bold text-danger-700">
-                      <FileWarning aria-hidden="true" className="size-3.5" />
-                      만료됨
-                    </span>
-                  )}
-                  {!view.expired && view.expiringSoon && (
-                    <span className="shrink-0 rounded-full border border-warning-200 bg-warning-100 px-2 py-0.5 text-[0.8rem] font-bold text-warning-800">
-                      {dueText(view.daysLeft)}
-                    </span>
-                  )}
-                </div>
+                    </label>
+                    {view.expired && (
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-danger-200 bg-danger-100 px-2 py-0.5 text-[0.8rem] font-bold text-danger-700">
+                        <FileWarning aria-hidden="true" className="size-3.5" />
+                        만료됨
+                      </span>
+                    )}
+                    {!view.expired && view.expiringSoon && (
+                      <span className="shrink-0 rounded-full border border-warning-200 bg-warning-100 px-2 py-0.5 text-[0.8rem] font-bold text-warning-800">
+                        {dueText(view.daysLeft)}
+                      </span>
+                    )}
+                  </div>
 
-                {state.received && (
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {meta.validMonths !== null && (
+                  {state.received && (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {meta.validMonths !== null && (
+                        <label className="text-[0.88rem] font-medium text-slate-600">
+                          발급일
+                          <input
+                            type="date"
+                            value={state.issuedAt}
+                            onChange={(e) => void commit(withDocument(record, meta.key, { issuedAt: e.target.value }))}
+                            className={`mt-1 ${inputCls}`}
+                          />
+                          <span className="mt-1 block text-[0.8rem] text-slate-500">
+                            {view.expiresOn
+                              ? `${view.expiresOn}까지 유효 (${meta.validMonths}개월)`
+                              : `유효 ${meta.validMonths}개월 — 발급일을 넣어주세요`}
+                          </span>
+                        </label>
+                      )}
                       <label className="text-[0.88rem] font-medium text-slate-600">
-                        발급일
+                        {meta.key === 'jointCertificate' ? '보관 위치 (비밀번호는 적지 마세요)' : '메모'}
                         <input
-                          type="date"
-                          value={state.issuedAt}
-                          onChange={(e) =>
-                            void commit(withDocument(record, meta.key, { issuedAt: e.target.value }))
+                          value={state.note}
+                          onChange={(e) => void commit(withDocument(record, meta.key, { note: e.target.value }))}
+                          placeholder={
+                            meta.key === 'jointCertificate'
+                              ? '예: 대표님 USB / 회사 PC 바탕화면'
+                              : meta.needsFile
+                                ? '예: 8월 갱신본'
+                                : '값을 적어 두세요'
                           }
                           className={`mt-1 ${inputCls}`}
                         />
-                        <span className="mt-1 block text-[0.8rem] text-slate-500">
-                          {view.expiresOn ? `${view.expiresOn}까지 유효 (${meta.validMonths}개월)` : `유효 ${meta.validMonths}개월`}
-                        </span>
                       </label>
-                    )}
-                    <label className="text-[0.88rem] font-medium text-slate-600">
-                      {meta.key === 'jointCertificate' ? '보관 위치 (비밀번호는 적지 마세요)' : '메모'}
+                    </div>
+                  )}
+
+                  {meta.needsFile && state.received && (
+                    <div className="flex flex-wrap items-center gap-2">
                       <input
-                        value={state.note}
-                        onChange={(e) => void commit(withDocument(record, meta.key, { note: e.target.value }))}
-                        placeholder={
-                          meta.key === 'jointCertificate'
-                            ? '예: 대표님 USB / 회사 PC 바탕화면'
-                            : meta.needsFile
-                              ? '예: 8월 갱신본'
-                              : '값을 적어 두세요'
-                        }
-                        className={`mt-1 ${inputCls}`}
+                        ref={(el) => {
+                          fileInputs.current[meta.key] = el
+                        }}
+                        type="file"
+                        accept=".pdf,image/*"
+                        className="hidden"
+                        onChange={(e) => void onPickFile(meta.key, e.target.files?.[0])}
                       />
-                    </label>
-                  </div>
-                )}
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={!uploadable}
+                        onClick={() => fileInputs.current[meta.key]?.click()}
+                      >
+                        <Upload aria-hidden="true" className="size-3.5" />
+                        {state.fileName ? '파일 교체' : '파일 첨부'}
+                      </Button>
+                      {state.fileName && (
+                        <span className="inline-flex min-w-0 items-center gap-1 text-[0.88rem] text-slate-600">
+                          <Paperclip aria-hidden="true" className="size-3.5 shrink-0" />
+                          <span className="truncate">{state.fileName}</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
 
-                {meta.needsFile && state.received && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <input
-                      ref={(el) => {
-                        fileInputs.current[meta.key] = el
-                      }}
-                      type="file"
-                      accept=".pdf,image/*"
-                      className="hidden"
-                      onChange={(e) => void onPickFile(meta.key, e.target.files?.[0])}
-                    />
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      disabled={!uploadable}
-                      onClick={() => fileInputs.current[meta.key]?.click()}
-                    >
-                      <Upload aria-hidden="true" className="size-3.5" />
-                      {state.fileName ? '파일 교체' : '파일 첨부'}
-                    </Button>
-                    {state.fileName && (
-                      <span className="inline-flex min-w-0 items-center gap-1 text-[0.88rem] text-slate-600">
-                        <Paperclip aria-hidden="true" className="size-3.5 shrink-0" />
-                        <span className="truncate">{state.fileName}</span>
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {needed.length > 0 && (
-                  <p className="text-[0.82rem] break-keep text-slate-400">
-                    필요한 업무: {needed.map((s) => s.shortLabel).join(', ')}
-                  </p>
-                )}
-              </div>
-            )
-          })}
+                  {needed.length > 0 && (
+                    <p className="text-[0.82rem] break-keep text-slate-400">
+                      필요한 업무: {needed.map((s) => s.shortLabel).join(', ')}
+                    </p>
+                  )}
+                </div>
+              )
+            })}
         </div>
       </section>
 
-      {/* 수금 */}
       <FeesSection record={record} onChange={commit} today={today} />
 
-      {/* 기본 정보 */}
+      {/* 업체 정보 */}
       <section aria-labelledby="info" className="flex flex-col gap-3">
         <h2 id="info" className="text-[1.3rem] font-bold text-slate-900">
           업체 정보
@@ -514,6 +665,15 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
           </p>
         </Panel>
       </section>
+
+      {message && (
+        <MessageModal
+          title={message.title}
+          description={message.description}
+          text={message.text}
+          onClose={() => setMessage(null)}
+        />
+      )}
     </div>
   )
 }
@@ -542,10 +702,6 @@ function TextField({
   )
 }
 
-/* ------------------------------------------------------------------ */
-/* 수금 섹션                                                            */
-/* ------------------------------------------------------------------ */
-
 function FeesSection({
   record,
   onChange,
@@ -562,9 +718,7 @@ function FeesSection({
 
   const unpaid = record.fees.filter((f) => f.receivedAt === null)
   const unpaidTotal = unpaid.reduce((s, f) => s + (f.amount ?? 0), 0)
-  const paidTotal = record.fees
-    .filter((f) => f.receivedAt !== null)
-    .reduce((s, f) => s + (f.amount ?? 0), 0)
+  const paidTotal = record.fees.filter((f) => f.receivedAt !== null).reduce((s, f) => s + (f.amount ?? 0), 0)
 
   const add = () => {
     const numeric = Number(amount.replace(/[^0-9]/g, ''))
@@ -588,9 +742,7 @@ function FeesSection({
         </h2>
         <p className="text-[0.95rem] text-slate-600">
           받은 돈 <strong className="text-slate-900">{formatKrw(paidTotal)}</strong> · 못 받은 돈{' '}
-          <strong className={unpaidTotal > 0 ? 'text-danger-700' : 'text-slate-900'}>
-            {formatKrw(unpaidTotal)}
-          </strong>
+          <strong className={unpaidTotal > 0 ? 'text-danger-700' : 'text-slate-900'}>{formatKrw(unpaidTotal)}</strong>
         </p>
       </div>
 
@@ -602,10 +754,8 @@ function FeesSection({
         ) : (
           <ul className="divide-y divide-slate-100">
             {record.fees.map((fee) => {
-              const overdue =
-                fee.receivedAt === null &&
-                fee.dueDate !== '' &&
-                Date.parse(`${fee.dueDate}T00:00:00Z`) < Date.parse(`${today}T00:00:00Z`)
+              const left = fee.dueDate ? daysLeftFrom(today, fee.dueDate) : null
+              const overdue = fee.receivedAt === null && left !== null && left < 0
               return (
                 <li key={fee.id} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
                   <label className="flex items-center gap-2">
@@ -629,7 +779,7 @@ function FeesSection({
                       )}
                       {overdue && (
                         <span className="rounded-full border border-danger-200 bg-danger-100 px-1.5 py-0.5 text-[0.78rem] font-bold text-danger-700">
-                          연체
+                          {dueText(left)}
                         </span>
                       )}
                       {fee.receivedAt && (
