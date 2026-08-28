@@ -14,14 +14,17 @@
     "test:progress": "vite build --config vite.progress.config.mjs && node .progress-out/progress.mjs",
     "test:persistence": "vite build --config vite.persistence.config.mjs && node .persistence-out/persistence.mjs",
     "test:onboarding": "vite build --config vite.onboarding.config.mjs && node .onboarding-out/onboarding.mjs",
-    "test:client-ops-alerts": "vite build --config vite.client-ops-alerts.config.mjs && node .client-ops-alerts-out/client-ops-alerts.mjs"
+    "test:client-ops-alerts": "vite build --config vite.client-ops-alerts.config.mjs && node .client-ops-alerts-out/client-ops-alerts.mjs",
+    "test:doc-parser": "vite build --config vite.doc-parser.config.mjs && node .doc-parser-out/doc-parser.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.7",
     "lucide-react": "^1.25.0",
+    "pdfjs-dist": "^5.7.284",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-router-dom": "^7.18.1"
+    "react-router-dom": "^7.18.1",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

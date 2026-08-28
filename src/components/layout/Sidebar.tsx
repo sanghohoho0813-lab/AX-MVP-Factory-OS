@@ -1,4 +1,42 @@
 import { NavLink, useNavigate } from 'react-router-dom'
+
+/** 사이드바 그룹 색 띠 */
+const GROUP_ACCENT: Record<string, string> = {
+  start: 'bg-sky-400',
+  ops: 'bg-sky-400',
+  flow: 'bg-violet-400',
+  website: 'bg-rose-400',
+  funding: 'bg-emerald-400',
+  manage: 'bg-amber-400',
+  tools: 'bg-slate-400',
+  settings: 'bg-slate-400',
+}
+
+/** 메뉴 경로별 아이콘 색 (비활성 상태에서만 적용) — 앞에서부터 일치하는 것을 쓴다 */
+const ITEM_ACCENT: [prefix: string, cls: string][] = [
+  ['/ops', 'text-sky-300'],
+  ['/today', 'text-sky-300'],
+  ['/clients', 'text-sky-300'],
+  ['/diagnosis', 'text-violet-300'],
+  ['/selection', 'text-violet-300'],
+  ['/mvp-design', 'text-violet-300'],
+  ['/validation', 'text-violet-300'],
+  ['/deliverables', 'text-violet-300'],
+  ['/funding', 'text-emerald-300'],
+  ['/website-studio', 'text-rose-300'],
+  ['/cases', 'text-amber-300'],
+  ['/reports', 'text-amber-300'],
+  ['/tools', 'text-slate-300'],
+  ['/settings', 'text-slate-300'],
+  ['/', 'text-sky-300'],
+]
+
+function itemAccent(path: string): string {
+  for (const [prefix, cls] of ITEM_ACCENT) {
+    if (path === prefix || (prefix !== '/' && path.startsWith(prefix))) return cls
+  }
+  return 'text-navy-300'
+}
 import {
   CheckSquare,
   ChevronsLeft,
@@ -81,7 +119,10 @@ function SidebarContent({
           {groups.map((group) => (
             <li key={group.key}>
               {!collapsed && (
-                <p id={`nav-${group.key}`} className="px-3 pb-1.5 text-[0.8rem] font-semibold tracking-wide text-navy-300">{group.title}</p>
+                <p id={`nav-${group.key}`} className="flex items-center gap-1.5 px-3 pb-1.5 text-[0.8rem] font-semibold tracking-wide text-navy-300">
+                  <span aria-hidden="true" className={`h-3 w-1 shrink-0 rounded-full ${GROUP_ACCENT[group.key] ?? 'bg-navy-500'}`} />
+                  {group.title}
+                </p>
               )}
               <ul aria-labelledby={!collapsed ? `nav-${group.key}` : undefined} aria-label={collapsed ? group.title : undefined} className="flex flex-col gap-1">
                   {group.items.map((item) => (
@@ -92,13 +133,26 @@ function SidebarContent({
                         onClick={onNavigate}
                         title={collapsed ? item.label : undefined}
                         className={({ isActive }) =>
-                          `flex min-h-11 items-center gap-3 rounded-(--radius-control) px-3 py-2.5 text-[0.95rem] font-medium transition-colors ${collapsed ? 'justify-center px-0' : ''} ${
+                          `relative flex min-h-11 items-center gap-3 rounded-(--radius-control) px-3 py-2.5 text-[0.95rem] font-medium transition-colors ${collapsed ? 'justify-center px-0' : ''} ${
                             isActive ? 'bg-brand-600 text-white' : 'text-navy-200 hover:bg-navy-800 hover:text-white'
                           }`
                         }
                       >
-                        <item.icon aria-hidden="true" className="size-5 shrink-0" />
-                        {!collapsed && <span className="truncate">{item.label}</span>}
+                        {({ isActive }: { isActive: boolean }) => (
+                          <>
+                            {isActive && !collapsed && (
+                              <span
+                                aria-hidden="true"
+                                className="absolute top-1/2 left-0 h-6 w-1 -translate-y-1/2 rounded-r-full bg-white/90"
+                              />
+                            )}
+                            <item.icon
+                              aria-hidden="true"
+                              className={`size-5 shrink-0 ${isActive ? 'text-white' : itemAccent(item.path)}`}
+                            />
+                            {!collapsed && <span className="truncate">{item.label}</span>}
+                          </>
+                        )}
                       </NavLink>
                     </li>
                   ))}

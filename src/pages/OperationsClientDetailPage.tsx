@@ -25,8 +25,12 @@ import {
   withDocument,
   withFee,
   withNewFee,
+  withNewNote,
+  withNotePinned,
+  withNoteText,
   withService,
   withoutFee,
+  withoutNote,
 } from '../services/clientOpsService'
 import {
   buildClientAlerts,
@@ -41,6 +45,7 @@ import {
   buildStatusReportMessage,
 } from '../services/clientOpsMessages'
 import {
+  ACCENT_CLASS,
   DOCUMENTS,
   FEE_KIND_LABEL,
   FEE_KIND_ORDER,
@@ -71,6 +76,8 @@ import {
   PhoneLink,
   SavedBadge,
 } from '../components/ops/opsControls'
+import { CompanyProfileCard, NotesSection } from '../components/ops/opsProfile'
+import { DocImportModal } from '../components/ops/DocImportModal'
 
 const CLIENT_STATUS_ORDER: ClientOpsStatus[] = ['active', 'waiting', 'paused', 'completed']
 const CLIENT_STATUS_TEXT: Record<ClientOpsStatus, string> = {
@@ -93,6 +100,7 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [openCards, setOpenCards] = useState<Record<string, boolean>>({})
   const [message, setMessage] = useState<{ title: string; description: string; text: string } | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({})
 
   const today = todayLocalDate()
@@ -249,6 +257,9 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
         </div>
       </div>
 
+      {/* 회사 기본 정보 — 자주 찾는 값 */}
+      <CompanyProfileCard record={record} today={today} onImport={() => setImportOpen(true)} />
+
       {/* 이 업체에서 지금 챙길 것 */}
       {alerts.length > 0 && (
         <section aria-labelledby="client-alerts" className="flex flex-col gap-2">
@@ -312,7 +323,7 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
               <div
                 key={meta.key}
                 id={meta.key}
-                className={`rounded-(--radius-panel) border ${
+                className={`overflow-hidden rounded-(--radius-panel) border ${
                   blocked || overdue
                     ? 'border-danger-200 bg-danger-50/40'
                     : dueSoon
@@ -320,6 +331,7 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
                       : 'border-slate-200 bg-white'
                 }`}
               >
+                <div className={`h-1 w-full ${ACCENT_CLASS[meta.accent].bar}`} />
                 <div className="flex flex-wrap items-center gap-2 px-4 py-3">
                   <button
                     type="button"
@@ -333,6 +345,7 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
                     />
                     <span className="min-w-0">
                       <span className="flex flex-wrap items-center gap-1.5">
+                        <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${ACCENT_CLASS[meta.accent].dot}`} />
                         <span className="text-[1.08rem] font-bold break-keep text-slate-900">{meta.label}</span>
                         {meta.recurring && (
                           <span className="rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.75rem] font-medium text-slate-500">
@@ -634,6 +647,14 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
 
       <FeesSection record={record} onChange={commit} today={today} />
 
+      <NotesSection
+        record={record}
+        onAdd={(text) => void commit(withNewNote(record, text))}
+        onEdit={(id, text) => void commit(withNoteText(record, id, text))}
+        onPin={(id, pinned) => void commit(withNotePinned(record, id, pinned))}
+        onDelete={(id) => void commit(withoutNote(record, id))}
+      />
+
       {/* 업체 정보 */}
       <section aria-labelledby="info" className="flex flex-col gap-3">
         <h2 id="info" className="text-[1.3rem] font-bold text-slate-900">
@@ -647,7 +668,14 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
             <TextField label="이메일" value={record.contactEmail} onChange={(v) => void commit({ ...record, contactEmail: v })} />
             <TextField label="사업자등록번호" value={record.businessNumber} onChange={(v) => void commit({ ...record, businessNumber: v })} placeholder="000-00-00000" />
             <TextField label="법인번호" value={record.corporateNumber} onChange={(v) => void commit({ ...record, corporateNumber: v })} />
-            <TextField label="업종" value={record.industry} onChange={(v) => void commit({ ...record, industry: v })} />
+            <TextField label="담당자 직급" value={record.contactTitle} onChange={(v) => void commit({ ...record, contactTitle: v })} placeholder="예: 대표이사, 부장" />
+            <TextField label="대표자 생년월일" value={record.representativeBirth} onChange={(v) => void commit({ ...record, representativeBirth: v })} placeholder="1980-12-31" />
+            <TextField label="설립일(개업일)" value={record.establishedAt} onChange={(v) => void commit({ ...record, establishedAt: v })} placeholder="2019-03-05" />
+            <TextField label="업태" value={record.businessCategory} onChange={(v) => void commit({ ...record, businessCategory: v })} placeholder="예: 제조업" />
+            <TextField label="종목" value={record.businessItem} onChange={(v) => void commit({ ...record, businessItem: v })} placeholder="예: 자동차부품" />
+            <TextField label="업종(분류)" value={record.industry} onChange={(v) => void commit({ ...record, industry: v })} />
+            <TextField label="회사 대표번호" value={record.companyPhone} onChange={(v) => void commit({ ...record, companyPhone: v })} />
+            <TextField label="홈페이지" value={record.homepage} onChange={(v) => void commit({ ...record, homepage: v })} />
             <TextField label="사업장 주소" value={record.businessAddress} onChange={(v) => void commit({ ...record, businessAddress: v })} />
           </div>
           <label className="mt-3 block text-[0.9rem] font-medium text-slate-600">
@@ -665,6 +693,38 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
           </p>
         </Panel>
       </section>
+
+      {importOpen && (
+        <DocImportModal
+          currentValues={{
+            companyName: record.companyName,
+            businessNumber: record.businessNumber,
+            corporateNumber: record.corporateNumber,
+            representativeName: record.contactName,
+            representativeBirth: record.representativeBirth,
+            establishedAt: record.establishedAt,
+            address: record.businessAddress,
+            businessCategory: record.businessCategory,
+            businessItem: record.businessItem,
+          }}
+          onClose={() => setImportOpen(false)}
+          onApply={({ picked }) => {
+            const next = { ...record }
+            if (picked.companyName) next.companyName = picked.companyName
+            if (picked.businessNumber) next.businessNumber = picked.businessNumber
+            if (picked.corporateNumber) next.corporateNumber = picked.corporateNumber
+            if (picked.representativeName) next.contactName = picked.representativeName
+            if (picked.representativeBirth) next.representativeBirth = picked.representativeBirth
+            if (picked.establishedAt) next.establishedAt = picked.establishedAt
+            if (picked.address) next.businessAddress = picked.address
+            if (picked.businessCategory) next.businessCategory = picked.businessCategory
+            if (picked.businessItem) next.businessItem = picked.businessItem
+            void commit(next)
+            setImportOpen(false)
+            showToast('서류에서 읽은 정보를 반영했습니다.')
+          }}
+        />
+      )}
 
       {message && (
         <MessageModal

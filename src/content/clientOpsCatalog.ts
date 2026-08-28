@@ -27,6 +27,23 @@ export interface ServiceMeta {
   recurring: boolean
   /** 진행 순서 (앞 업무가 대체로 먼저) */
   order: number
+  /** 업무별 색상 계열 — 화면에서 한눈에 구분하기 위함 */
+  accent: ServiceAccent
+}
+
+/** 업무 색상 계열 */
+export type ServiceAccent = 'slate' | 'violet' | 'amber' | 'emerald' | 'sky' | 'rose'
+
+export const ACCENT_CLASS: Record<
+  ServiceAccent,
+  { bar: string; chip: string; dot: string; softBg: string; text: string }
+> = {
+  slate: { bar: 'bg-slate-400', chip: 'border-slate-200 bg-slate-50 text-slate-700', dot: 'bg-slate-400', softBg: 'bg-slate-50', text: 'text-slate-700' },
+  violet: { bar: 'bg-violet-500', chip: 'border-violet-200 bg-violet-50 text-violet-700', dot: 'bg-violet-500', softBg: 'bg-violet-50', text: 'text-violet-700' },
+  amber: { bar: 'bg-amber-500', chip: 'border-amber-200 bg-amber-50 text-amber-700', dot: 'bg-amber-500', softBg: 'bg-amber-50', text: 'text-amber-700' },
+  emerald: { bar: 'bg-emerald-500', chip: 'border-emerald-200 bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500', softBg: 'bg-emerald-50', text: 'text-emerald-700' },
+  sky: { bar: 'bg-sky-500', chip: 'border-sky-200 bg-sky-50 text-sky-700', dot: 'bg-sky-500', softBg: 'bg-sky-50', text: 'text-sky-700' },
+  rose: { bar: 'bg-rose-500', chip: 'border-rose-200 bg-rose-50 text-rose-700', dot: 'bg-rose-500', softBg: 'bg-rose-50', text: 'text-rose-700' },
 }
 
 export const SERVICES: ServiceMeta[] = [
@@ -38,6 +55,7 @@ export const SERVICES: ServiceMeta[] = [
     requiredDocuments: ['representativeId', 'representativePhone', 'businessAddress'],
     recurring: false,
     order: 1,
+    accent: 'slate',
   },
   {
     key: 'businessScope',
@@ -48,6 +66,7 @@ export const SERVICES: ServiceMeta[] = [
     requiredDocuments: ['businessRegistration', 'corporateRegistry', 'jointCertificate'],
     recurring: false,
     order: 2,
+    accent: 'amber',
   },
   {
     key: 'patent',
@@ -57,6 +76,7 @@ export const SERVICES: ServiceMeta[] = [
     requiredDocuments: ['businessRegistration', 'representativeId'],
     recurring: false,
     order: 3,
+    accent: 'violet',
   },
   {
     key: 'venture',
@@ -71,6 +91,7 @@ export const SERVICES: ServiceMeta[] = [
     ],
     recurring: false,
     order: 4,
+    accent: 'emerald',
   },
   {
     key: 'ax',
@@ -81,6 +102,7 @@ export const SERVICES: ServiceMeta[] = [
     requiredDocuments: ['businessRegistration'],
     recurring: false,
     order: 5,
+    accent: 'sky',
   },
   {
     key: 'policyFund',
@@ -98,6 +120,7 @@ export const SERVICES: ServiceMeta[] = [
     ],
     recurring: true,
     order: 6,
+    accent: 'rose',
   },
 ]
 

@@ -31,7 +31,7 @@ import {
   StatTile,
   cellStateFor,
 } from '../components/ops/opsParts'
-import { SERVICE_STATUS_LABEL } from '../content/clientOpsCatalog'
+import { ACCENT_CLASS, SERVICE_STATUS_LABEL } from '../content/clientOpsCatalog'
 
 const SEVERITY_TABS: { key: AlertSeverity | 'all'; label: string }[] = [
   { key: 'all', label: '전체' },
@@ -300,7 +300,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                                     ? 'border-warning-200 bg-warning-50 text-warning-800'
                                     : cell.status === 'done'
                                       ? 'border-success-200 bg-success-50 text-success-700'
-                                      : 'border-slate-200 bg-slate-50 text-slate-600'
+                                      : ACCENT_CLASS[s.accent].chip
                               }`}
                             >
                               {s.shortLabel} · {cell.blocked ? '서류 없음' : SERVICE_STATUS_LABEL[cell.status]}
@@ -344,7 +344,10 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                       scope="col"
                       className="px-2 py-3 text-center text-[0.92rem] font-semibold text-slate-600"
                     >
-                      {s.shortLabel}
+                      <span className="inline-flex items-center gap-1.5">
+                        <span aria-hidden="true" className={`size-2 rounded-full ${ACCENT_CLASS[s.accent].dot}`} />
+                        {s.shortLabel}
+                      </span>
                     </th>
                   ))}
                   <th scope="col" className="px-3 py-3 text-center text-[0.92rem] font-semibold text-slate-600">

@@ -17,6 +17,7 @@ import {
   serviceMeta,
 } from '../content/clientOpsCatalog'
 import type {
+  ClientNote,
   ClientOpsRecord,
   ClientOpsStatus,
   CreateClientOpsInput,
@@ -180,6 +181,13 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
     corporateNumber: value.corporateNumber ?? '',
     businessAddress: value.businessAddress ?? '',
     industry: value.industry ?? '',
+    representativeBirth: value.representativeBirth ?? '',
+    establishedAt: value.establishedAt ?? '',
+    businessCategory: value.businessCategory ?? '',
+    businessItem: value.businessItem ?? '',
+    contactTitle: value.contactTitle ?? '',
+    companyPhone: value.companyPhone ?? '',
+    homepage: value.homepage ?? '',
     status: (value.status as ClientOpsStatus) ?? 'active',
     nextAction: value.nextAction ?? '',
     nextActionDueDate: value.nextActionDueDate ?? '',
@@ -187,6 +195,15 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
     services: upgradeServices(value),
     documents,
     fees: upgradeFees(value),
+    notes_list: Array.isArray(value.notes_list)
+      ? value.notes_list.map((n) => ({
+          id: n.id ?? generateId(),
+          text: typeof n.text === 'string' ? n.text : '',
+          pinned: n.pinned === true,
+          createdAt: n.createdAt ?? now,
+          updatedAt: n.updatedAt ?? now,
+        }))
+      : [],
     createdAt: value.createdAt ?? now,
     updatedAt: value.updatedAt ?? now,
   }
@@ -412,6 +429,42 @@ export function withFee(record: ClientOpsRecord, feeId: string, patch: Partial<F
 
 export function withoutFee(record: ClientOpsRecord, feeId: string): ClientOpsRecord {
   return { ...record, fees: record.fees.filter((f) => f.id !== feeId) }
+}
+
+/* ------------------------------------------------------------------ */
+/* 메모                                                                 */
+/* ------------------------------------------------------------------ */
+
+export function withNewNote(record: ClientOpsRecord, text: string): ClientOpsRecord {
+  const now = nowIso()
+  const note: ClientNote = { id: generateId(), text, pinned: false, createdAt: now, updatedAt: now }
+  return { ...record, notes_list: [note, ...record.notes_list] }
+}
+
+export function withNoteText(record: ClientOpsRecord, id: string, text: string): ClientOpsRecord {
+  return {
+    ...record,
+    notes_list: record.notes_list.map((n) => (n.id === id ? { ...n, text, updatedAt: nowIso() } : n)),
+  }
+}
+
+export function withNotePinned(record: ClientOpsRecord, id: string, pinned: boolean): ClientOpsRecord {
+  return {
+    ...record,
+    notes_list: record.notes_list.map((n) => (n.id === id ? { ...n, pinned, updatedAt: nowIso() } : n)),
+  }
+}
+
+export function withoutNote(record: ClientOpsRecord, id: string): ClientOpsRecord {
+  return { ...record, notes_list: record.notes_list.filter((n) => n.id !== id) }
+}
+
+/** 고정된 메모가 위, 그다음 최근 수정순 */
+export function sortedNotes(record: ClientOpsRecord): ClientNote[] {
+  return [...record.notes_list].sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+    return b.updatedAt.localeCompare(a.updatedAt)
+  })
 }
 
 /* ------------------------------------------------------------------ */

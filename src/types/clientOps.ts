@@ -110,6 +110,19 @@ export interface FeeItem {
 
 export type ClientOpsStatus = 'active' | 'waiting' | 'paused' | 'completed'
 
+/* ------------------------------------------------------------------ */
+/* 메모                                                                 */
+/* ------------------------------------------------------------------ */
+
+export interface ClientNote {
+  id: string
+  text: string
+  /** 위로 고정 */
+  pinned: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 export interface ClientOpsRecord {
   id: string
   workspaceId: string | null
@@ -126,9 +139,26 @@ export interface ClientOpsRecord {
   nextAction: string
   nextActionDueDate: string
   notes: string
+  /* 주기적으로 찾게 되는 기업 기본 정보 */
+  /** 대표자 생년월일 (YYYY-MM-DD) — 나이 자동 계산 */
+  representativeBirth: string
+  /** 설립일·개업일 (YYYY-MM-DD) — 업력 자동 계산 */
+  establishedAt: string
+  /** 업태 */
+  businessCategory: string
+  /** 종목 */
+  businessItem: string
+  /** 담당자 직급 */
+  contactTitle: string
+  /** 회사 대표번호 */
+  companyPhone: string
+  /** 홈페이지 */
+  homepage: string
+
   services: Record<ServiceKey, ServiceState>
   documents: Record<DocumentKey, DocumentState>
   fees: FeeItem[]
+  notes_list: ClientNote[]
   createdAt: string
   updatedAt: string
 }
