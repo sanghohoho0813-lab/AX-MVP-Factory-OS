@@ -1,16 +1,22 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
+  Archive,
   Building2,
+  CalendarDays,
   CirclePlus,
   ClipboardCheck,
+  Download,
   RefreshCw,
+  Search,
+  Upload,
   Wallet,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { getDataModeConfig } from '../data/dataMode'
-import { createClient, listClients } from '../services/clientOpsService'
+import { createClient, listClients, replaceAllClients } from '../services/clientOpsService'
+import { downloadBackup, mergeBackup, parseBackup, type MergeMode } from '../services/clientOpsBackup'
 import {
   buildAllAlerts,
   clientOpsProgress,
@@ -50,6 +56,10 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const [tab, setTab] = useState<AlertSeverity | 'all'>('all')
   const [showAllAlerts, setShowAllAlerts] = useState(false)
   const [form, setForm] = useState({ companyName: '', contactName: '', contactPhone: '', businessNumber: '' })
+  const [query, setQuery] = useState('')
+  const [showArchived, setShowArchived] = useState(false)
+  const [restoring, setRestoring] = useState(false)
+  const restoreRef = useRef<HTMLInputElement>(null)
 
   const today = todayLocalDate()
 
@@ -69,7 +79,21 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     void load()
   }, [load])
 
-  const ordered = useMemo(() => sortClientsByUrgency(records, today), [records, today])
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return records.filter((r) => {
+      if (!showArchived && r.archivedAt !== null) return false
+      if (showArchived && r.archivedAt === null) return false
+      if (q === '') return true
+      return [r.companyName, r.contactName, r.businessNumber, r.industry, r.businessAddress]
+        .join(' ')
+        .toLowerCase()
+        .includes(q)
+    })
+  }, [records, query, showArchived])
+  const archivedCount = records.filter((r) => r.archivedAt !== null).length
+
+  const ordered = useMemo(() => sortClientsByUrgency(visible, today), [visible, today])
   const alerts = useMemo(() => buildAllAlerts(records, today), [records, today])
   const summary = useMemo(() => summarizeAlerts(alerts), [alerts])
   const visibleAlerts = useMemo(
@@ -93,6 +117,34 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
 
   const openAlert = (a: OpsAlert) => navigate(`/ops/clients/${a.clientId}`)
 
+  const onRestoreFile = async (file: File | undefined) => {
+    if (!file) return
+    setRestoring(true)
+    setError('')
+    try {
+      const incoming = parseBackup(await file.text())
+      const mode: MergeMode = window.confirm(
+        `백업에 고객 ${incoming.length}곳이 들어 있습니다.\n\n[확인] 지금 데이터와 합치기 (같은 업체는 최근에 수정한 쪽을 남깁니다)\n[취소] 백업 내용으로 전부 바꾸기`,
+      )
+        ? 'merge'
+        : 'replace'
+      const result = mergeBackup(records, incoming, mode)
+      await replaceAllClients(workspaceId, result.records)
+      await load()
+      setError('')
+      window.alert(
+        mode === 'merge'
+          ? `복원했습니다. 추가 ${result.added}곳 · 갱신 ${result.updated}곳 · 유지 ${result.kept}곳`
+          : `백업 내용으로 바꿨습니다. 고객 ${result.records.length}곳`,
+      )
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '백업을 불러오지 못했습니다.')
+    } finally {
+      setRestoring(false)
+      if (restoreRef.current) restoreRef.current.value = ''
+    }
+  }
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!form.companyName.trim()) return
@@ -114,6 +166,25 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
         description={`오늘 ${today} · 여러 업체를 한 화면에서 보고, 빠뜨린 일이 없는지 확인합니다.`}
         actions={
           <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => navigate('/ops/calendar')}>
+              <CalendarDays aria-hidden="true" className="size-4" />
+              일정
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                downloadBackup(records, today)
+                setError('')
+              }}
+              disabled={records.length === 0}
+            >
+              <Download aria-hidden="true" className="size-4" />
+              백업 내려받기
+            </Button>
+            <Button variant="secondary" onClick={() => restoreRef.current?.click()} disabled={restoring}>
+              <Upload aria-hidden="true" className="size-4" />
+              {restoring ? '복원 중…' : '백업 불러오기'}
+            </Button>
             <Button variant="secondary" onClick={() => void load()} disabled={loading}>
               <RefreshCw aria-hidden="true" className="size-4" />
               새로고침
@@ -131,6 +202,46 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
           className="rounded-(--radius-control) border border-danger-200 bg-danger-50 px-4 py-3 text-[0.95rem] text-danger-700"
         >
           {error}
+        </div>
+      )}
+
+      <input
+        ref={restoreRef}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        onChange={(e) => void onRestoreFile(e.target.files?.[0])}
+      />
+
+      {/* 검색 · 보관 */}
+      {records.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-0 flex-1 sm:max-w-md">
+            <Search aria-hidden="true" className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="업체명·대표자·사업자번호로 찾기"
+              aria-label="업체 검색"
+              className="w-full rounded-(--radius-control) border border-slate-300 py-2 pr-3 pl-9 text-[0.98rem] focus:border-brand-500 focus:outline-none"
+            />
+          </div>
+          <button
+            type="button"
+            aria-pressed={showArchived}
+            onClick={() => setShowArchived((v) => !v)}
+            className={`inline-flex items-center gap-1.5 rounded-(--radius-control) border px-3 py-2 text-[0.92rem] font-medium ${
+              showArchived
+                ? 'border-brand-300 bg-brand-50 text-brand-700'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <Archive aria-hidden="true" className="size-4" />
+            보관함 {archivedCount}
+          </button>
+          {query !== '' && (
+            <span className="text-[0.9rem] text-slate-500">{visible.length}곳 찾음</span>
+          )}
         </div>
       )}
 

@@ -15,7 +15,8 @@
     "test:persistence": "vite build --config vite.persistence.config.mjs && node .persistence-out/persistence.mjs",
     "test:onboarding": "vite build --config vite.onboarding.config.mjs && node .onboarding-out/onboarding.mjs",
     "test:client-ops-alerts": "vite build --config vite.client-ops-alerts.config.mjs && node .client-ops-alerts-out/client-ops-alerts.mjs",
-    "test:doc-parser": "vite build --config vite.doc-parser.config.mjs && node .doc-parser-out/doc-parser.mjs"
+    "test:doc-parser": "vite build --config vite.doc-parser.config.mjs && node .doc-parser-out/doc-parser.mjs",
+    "test:client-ops-stage2": "vite build --config vite.client-ops-stage2.config.mjs && node .client-ops-stage2-out/stage2.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.7",

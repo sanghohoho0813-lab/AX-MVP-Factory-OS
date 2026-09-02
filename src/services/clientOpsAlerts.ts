@@ -369,6 +369,42 @@ export function buildClientAlerts(record: ClientOpsRecord, today: string): OpsAl
     }
   }
 
+  // 7) 정책자금 신청 마감
+  for (const app of record.fundingApplications) {
+    const open = app.status === 'watching' || app.status === 'preparing'
+    if (!open || !app.applyDueDate) continue
+    const left = daysLeftFrom(today, app.applyDueDate)
+    if (left === null) continue
+    const name = app.programName || '정책자금 공고'
+    if (left < 0) {
+      push(out, {
+        id: `${record.id}:funding:${app.id}:overdue`,
+        clientId: record.id,
+        clientName: record.companyName,
+        kind: 'funding_overdue',
+        severity: 'critical',
+        title: `${name} 신청 마감이 ${Math.abs(left)}일 지났습니다`,
+        detail: app.institution ? `${app.institution} · 아직 접수하지 않았습니다` : '아직 접수하지 않았습니다',
+        serviceKey: 'policyFund',
+        dueDate: app.applyDueDate,
+        daysLeft: left,
+      })
+    } else if (left <= DUE_SOON_DAYS) {
+      push(out, {
+        id: `${record.id}:funding:${app.id}:duesoon`,
+        clientId: record.id,
+        clientName: record.companyName,
+        kind: 'funding_due_soon',
+        severity: 'warning',
+        title: `${name} 신청 마감 ${dueText(left)}`,
+        detail: app.institution || '서류를 미리 준비하세요.',
+        serviceKey: 'policyFund',
+        dueDate: app.applyDueDate,
+        daysLeft: left,
+      })
+    }
+  }
+
   return out
 }
 
@@ -378,7 +414,7 @@ export function buildAllAlerts(
   today: string = todayLocalDate(),
 ): OpsAlert[] {
   const all = records
-    .filter((r) => r.status !== 'completed')
+    .filter((r) => r.status !== 'completed' && r.archivedAt === null)
     .flatMap((r) => buildClientAlerts(r, today))
 
   return all.sort((a, b) => {

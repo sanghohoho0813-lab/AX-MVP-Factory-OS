@@ -19,6 +19,8 @@ import {
 import type {
   ClientNote,
   ClientOpsRecord,
+  FundingApplication,
+  FundingStatus,
   ClientOpsStatus,
   CreateClientOpsInput,
   DocumentKey,
@@ -204,6 +206,23 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
           updatedAt: n.updatedAt ?? now,
         }))
       : [],
+    fundingApplications: Array.isArray(value.fundingApplications)
+      ? value.fundingApplications.map((a) => ({
+          id: a.id ?? generateId(),
+          programName: a.programName ?? '',
+          institution: a.institution ?? '',
+          status: (a.status as FundingStatus) ?? 'watching',
+          applyDueDate: a.applyDueDate ?? '',
+          submittedAt: a.submittedAt ?? null,
+          resultAt: a.resultAt ?? null,
+          requestedAmount: typeof a.requestedAmount === 'number' ? a.requestedAmount : null,
+          approvedAmount: typeof a.approvedAmount === 'number' ? a.approvedAmount : null,
+          note: a.note ?? '',
+          createdAt: a.createdAt ?? now,
+          updatedAt: a.updatedAt ?? now,
+        }))
+      : [],
+    archivedAt: typeof value.archivedAt === 'string' ? value.archivedAt : null,
     createdAt: value.createdAt ?? now,
     updatedAt: value.updatedAt ?? now,
   }
@@ -342,6 +361,43 @@ export async function saveClient(record: ClientOpsRecord): Promise<ClientOpsReco
   return fromRow(data as Record<string, unknown>)
 }
 
+/**
+ * 백업 복원용 일괄 저장.
+ * local: 전체 목록을 통째로 교체한다(추가·삭제 모두 반영).
+ * supabase: 전달된 레코드를 upsert 하고, 목록에 없는 행은 지운다.
+ */
+export async function replaceAllClients(
+  workspaceId: string | null,
+  records: ClientOpsRecord[],
+): Promise<ClientOpsRecord[]> {
+  const normalized = records.map((r) => normalizeClientOps({ ...r, workspaceId }))
+  if (isLocal()) {
+    writeLocal(normalized)
+    return normalized
+  }
+  if (!workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  const client = getSupabaseClient()
+  const rows = normalized.map((r) => ({
+    id: r.id,
+    workspace_id: workspaceId,
+    company_name: r.companyName,
+    status: r.status,
+    next_action: r.nextAction,
+    next_action_due_date: r.nextActionDueDate || null,
+    payload: payloadOf(r),
+  }))
+  if (rows.length > 0) {
+    const { error } = await client.from('operations_clients').upsert(rows)
+    if (error) throw error
+  }
+  const keepIds = normalized.map((r) => r.id)
+  const del = client.from('operations_clients').delete().eq('workspace_id', workspaceId)
+  const { error: delError } =
+    keepIds.length > 0 ? await del.not('id', 'in', `(${keepIds.join(',')})`) : await del
+  if (delError) throw delError
+  return normalized
+}
+
 export async function deleteClient(record: ClientOpsRecord): Promise<void> {
   if (isLocal()) {
     writeLocal(readLocal().filter((item) => item.id !== record.id))
@@ -465,6 +521,66 @@ export function sortedNotes(record: ClientOpsRecord): ClientNote[] {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
     return b.updatedAt.localeCompare(a.updatedAt)
   })
+}
+
+/* ------------------------------------------------------------------ */
+/* 정책자금 신청 건                                                     */
+/* ------------------------------------------------------------------ */
+
+export function withNewFunding(
+  record: ClientOpsRecord,
+  input: Partial<FundingApplication>,
+): ClientOpsRecord {
+  const now = nowIso()
+  const item: FundingApplication = {
+    id: generateId(),
+    programName: input.programName ?? '',
+    institution: input.institution ?? '',
+    status: input.status ?? 'watching',
+    applyDueDate: input.applyDueDate ?? '',
+    submittedAt: input.submittedAt ?? null,
+    resultAt: input.resultAt ?? null,
+    requestedAmount: input.requestedAmount ?? null,
+    approvedAmount: input.approvedAmount ?? null,
+    note: input.note ?? '',
+    createdAt: now,
+    updatedAt: now,
+  }
+  return { ...record, fundingApplications: [item, ...record.fundingApplications] }
+}
+
+export function withFunding(
+  record: ClientOpsRecord,
+  id: string,
+  patch: Partial<FundingApplication>,
+): ClientOpsRecord {
+  return {
+    ...record,
+    fundingApplications: record.fundingApplications.map((a) => {
+      if (a.id !== id) return a
+      const next = { ...a, ...patch, updatedAt: nowIso() }
+      // 상태 전환 시 날짜 자동 기록
+      if (patch.status && patch.status !== a.status) {
+        if (patch.status === 'submitted' && next.submittedAt === null) next.submittedAt = nowIso().slice(0, 10)
+        if ((patch.status === 'selected' || patch.status === 'rejected') && next.resultAt === null) {
+          next.resultAt = nowIso().slice(0, 10)
+        }
+      }
+      return next
+    }),
+  }
+}
+
+export function withoutFunding(record: ClientOpsRecord, id: string): ClientOpsRecord {
+  return { ...record, fundingApplications: record.fundingApplications.filter((a) => a.id !== id) }
+}
+
+/* ------------------------------------------------------------------ */
+/* 보관                                                                 */
+/* ------------------------------------------------------------------ */
+
+export function withArchived(record: ClientOpsRecord, archived: boolean): ClientOpsRecord {
+  return { ...record, archivedAt: archived ? nowIso() : null }
 }
 
 /* ------------------------------------------------------------------ */

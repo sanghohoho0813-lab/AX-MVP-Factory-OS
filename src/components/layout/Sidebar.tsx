@@ -14,8 +14,9 @@ const GROUP_ACCENT: Record<string, string> = {
 
 /** 메뉴 경로별 아이콘 색 (비활성 상태에서만 적용) — 앞에서부터 일치하는 것을 쓴다 */
 const ITEM_ACCENT: [prefix: string, cls: string][] = [
+  ['/ops/calendar', 'text-emerald-300'],
   ['/ops', 'text-sky-300'],
-  ['/today', 'text-sky-300'],
+  ['/today', 'text-amber-300'],
   ['/clients', 'text-sky-300'],
   ['/diagnosis', 'text-violet-300'],
   ['/selection', 'text-violet-300'],
@@ -38,12 +39,14 @@ function itemAccent(path: string): string {
   return 'text-navy-300'
 }
 import {
+  CalendarDays,
   CheckSquare,
   ChevronsLeft,
   ChevronsRight,
   Landmark,
   LayoutGrid,
   Settings,
+  Sun,
   X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -73,7 +76,15 @@ interface NavGroup {
  */
 function buildGroups(): NavGroup[] {
   return [
-    { key: 'today', title: '운영', items: [{ label: '고객 운영', path: '/ops/clients', icon: CheckSquare }] },
+    {
+      key: 'today',
+      title: '운영',
+      items: [
+        { label: '고객 운영', path: '/ops/clients', icon: CheckSquare },
+        { label: '오늘 할 일', path: '/today', icon: Sun },
+        { label: '일정', path: '/ops/calendar', icon: CalendarDays },
+      ],
+    },
     {
       key: 'funding',
       title: '지원사업',

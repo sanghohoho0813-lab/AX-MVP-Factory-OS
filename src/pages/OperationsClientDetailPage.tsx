@@ -25,11 +25,15 @@ import {
   withDocument,
   withFee,
   withNewFee,
+  withArchived,
+  withFunding,
+  withNewFunding,
   withNewNote,
   withNotePinned,
   withNoteText,
   withService,
   withoutFee,
+  withoutFunding,
   withoutNote,
 } from '../services/clientOpsService'
 import {
@@ -77,6 +81,7 @@ import {
   SavedBadge,
 } from '../components/ops/opsControls'
 import { CompanyProfileCard, NotesSection } from '../components/ops/opsProfile'
+import { FundingSection } from '../components/ops/FundingSection'
 import { DocImportModal } from '../components/ops/DocImportModal'
 
 const CLIENT_STATUS_ORDER: ClientOpsStatus[] = ['active', 'waiting', 'paused', 'completed']
@@ -254,7 +259,22 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
             <ClipboardCopy aria-hidden="true" className="size-4" />
             진행 상황 보고 문구
           </Button>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              const next = withArchived(record, record.archivedAt === null)
+              void commit(next)
+              showToast(next.archivedAt ? '보관 처리했습니다. 목록·경고에서 빠집니다.' : '보관을 해제했습니다.')
+            }}
+          >
+            {record.archivedAt ? '보관 해제' : '보관하기'}
+          </Button>
         </div>
+        {record.archivedAt && (
+          <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-4 py-2.5 text-[0.92rem] break-keep text-slate-600">
+            보관된 업체입니다. 현황표·경고·일정에 나타나지 않습니다. 데이터는 그대로 있습니다.
+          </p>
+        )}
       </div>
 
       {/* 회사 기본 정보 — 자주 찾는 값 */}
@@ -644,6 +664,14 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
             })}
         </div>
       </section>
+
+      <FundingSection
+        record={record}
+        today={today}
+        onAdd={(input) => void commit(withNewFunding(record, input))}
+        onChange={(id, patch) => void commit(withFunding(record, id, patch))}
+        onRemove={(id) => void commit(withoutFunding(record, id))}
+      />
 
       <FeesSection record={record} onChange={commit} today={today} />
 

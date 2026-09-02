@@ -39,3 +39,4 @@ dist-ssr
 .client-operations-out
 .client-ops-alerts-out
 .doc-parser-out
+.client-ops-stage2-out

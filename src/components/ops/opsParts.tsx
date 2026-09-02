@@ -6,6 +6,7 @@ import {
   Clock,
   FileWarning,
   Info,
+  Landmark,
   Lock,
   Minus,
   Pause,
@@ -62,6 +63,8 @@ const ALERT_KIND_LABEL: Record<AlertKind, string> = {
   payment_due_soon: '수금 예정',
   waiting_too_long: '회신 지연',
   no_next_step: '할 일 미정',
+  funding_due_soon: '신청 마감 임박',
+  funding_overdue: '신청 마감 지남',
 }
 
 const ALERT_KIND_ICON: Record<AlertKind, typeof AlertTriangle> = {
@@ -74,6 +77,8 @@ const ALERT_KIND_ICON: Record<AlertKind, typeof AlertTriangle> = {
   payment_due_soon: Wallet,
   waiting_too_long: Clock,
   no_next_step: CircleDashed,
+  funding_due_soon: Landmark,
+  funding_overdue: Landmark,
 }
 
 /** 경고 한 줄 — 클릭하면 해당 업체로 이동 */

@@ -1,279 +1,143 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { AlertTriangle, CalendarDays, CheckCircle2, ClipboardList, Sun } from 'lucide-react'
+import { useAuth } from '../auth/AuthProvider'
+import { getDataModeConfig } from '../data/dataMode'
+import { listClients } from '../services/clientOpsService'
 import {
-  ArrowRight,
-  CheckCircle2,
-  ClipboardCopy,
-  Clock3,
-  MessageSquareText,
-  RotateCcw,
-  TimerReset,
-} from 'lucide-react'
-import { useMemo } from 'react'
-import { Link } from 'react-router-dom'
-import { organizationRepository, projectRepository } from '../repositories'
-import { useStoreVersion } from '../lib/useStoreVersion'
-import { buildConsultingDailyPlan, type ConsultingDailyAction } from '../services/consultingOpsService'
-import {
-  clearTodayOpsCompletions,
-  getCompletedOpsActionIds,
-  getTodayOpsDateKey,
-  setOpsActionCompleted,
-} from '../services/opsExecutionService'
+  buildAllSchedule,
+  overdueEvents,
+  upcomingWithin,
+  type ScheduleEvent,
+} from '../services/clientOpsSchedule'
+import { buildAllAlerts, summarizeAlerts } from '../services/clientOpsAlerts'
+import { todayLocalDate } from '../lib/appClock'
+import type { ClientOpsRecord } from '../types/clientOps'
 import { Button } from '../components/ui/Button'
 import { PageHeader } from '../components/ui/PageHeader'
-import { Panel } from '../components/ui/Panel'
-import { ProgressBar } from '../components/ui/ProgressBar'
-import { StatusBadge } from '../components/ui/StatusBadge'
-import { useToast } from '../components/ui/toastContext'
+import { StatTile } from '../components/ops/opsParts'
+import { EventRow } from './OpsCalendarPage'
 
-const LANE_LABEL = {
-  recover: '병목 회복',
-  client: '고객 회신',
-  funding: '정책자금',
-  advance: '단계 전환',
-  protect: '운영 보호',
-} as const
-
-function ActionCard({ action }: { action: ConsultingDailyAction }) {
-  const { showToast } = useToast()
-
-  const toggleDone = () => {
-    setOpsActionCompleted(action.id, !action.completed)
-    showToast(action.completed ? '오늘 할 일 완료를 취소했습니다.' : '오늘 할 일을 완료 처리했습니다.')
-  }
-
-  const copyScript = async () => {
-    try {
-      if (!navigator.clipboard) throw new Error('Clipboard API unavailable')
-      await navigator.clipboard.writeText(action.script)
-      showToast('실행 메모를 복사했습니다.')
-    } catch {
-      showToast('복사하지 못했습니다. 메모를 직접 선택해 복사해 주세요.')
-    }
-  }
-
+function Group({
+  title,
+  hint,
+  events,
+  onOpen,
+  tone,
+}: {
+  title: string
+  hint: string
+  events: ScheduleEvent[]
+  onOpen: (e: ScheduleEvent) => void
+  tone: 'danger' | 'warning' | 'neutral'
+}) {
+  if (events.length === 0) return null
+  const bar = tone === 'danger' ? 'bg-danger-500' : tone === 'warning' ? 'bg-warning-500' : 'bg-slate-300'
   return (
-    <li className={`rounded-(--radius-panel) border bg-white shadow-(--shadow-card) ${action.completed ? 'border-success-200' : 'border-slate-200'}`}>
-      <div className="flex flex-col gap-4 px-5 py-4 lg:grid lg:grid-cols-[minmax(0,1fr)_220px]">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge tone={action.tone}>{LANE_LABEL[action.lane]}</StatusBadge>
-            <span className="text-[0.82rem] font-medium text-slate-400">{action.dueLabel}</span>
-            <span className="text-[0.82rem] font-medium text-slate-400">{action.estimatedMinutes}분</span>
-          </div>
-          <h2 className="mt-2 text-[1.05rem] font-bold break-keep text-slate-900">{action.title}</h2>
-          <p className="mt-1 text-[0.9rem] leading-relaxed break-keep text-slate-500">{action.detail}</p>
-          <div className="mt-3 rounded-(--radius-card) border border-slate-200 bg-slate-50 px-3.5 py-3">
-            <p className="text-[0.82rem] font-semibold text-slate-500">실행 메모</p>
-            <p className="mt-1 text-[0.88rem] leading-relaxed break-keep text-slate-700">{action.script}</p>
-          </div>
-        </div>
-
-        <div className="flex min-w-0 flex-col gap-2.5">
-          <div className="rounded-(--radius-card) border border-slate-200 px-3.5 py-3">
-            <p className="text-[0.82rem] font-semibold text-slate-500">완료 체크</p>
-            <ul className="mt-2 flex flex-col gap-1.5">
-              {action.checklist.map((item) => (
-                <li key={item} className="flex items-start gap-1.5 text-[0.84rem] break-keep text-slate-600">
-                  <CheckCircle2 aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-slate-300" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <Button variant={action.completed ? 'secondary' : 'primary'} size="sm" onClick={toggleDone}>
-              <CheckCircle2 aria-hidden="true" className="size-4" />
-              {action.completed ? '완료 취소' : '완료'}
-            </Button>
-            <Button variant="secondary" size="sm" onClick={copyScript}>
-              <ClipboardCopy aria-hidden="true" className="size-4" />
-              복사
-            </Button>
-          </div>
-          <Link
-            to={action.path}
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 text-[0.875rem] font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900"
-          >
-            작업 화면 열기
-            <ArrowRight aria-hidden="true" className="size-4" />
-          </Link>
-        </div>
+    <section className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <span aria-hidden="true" className={`h-4 w-1 rounded-full ${bar}`} />
+        <h2 className="text-[1.15rem] font-bold text-slate-900">
+          {title} <span className="text-slate-400">{events.length}</span>
+        </h2>
+        <span className="text-[0.9rem] text-slate-500">{hint}</span>
       </div>
-    </li>
+      <ul className="flex flex-col gap-2">
+        {events.map((e) => (
+          <EventRow key={e.id} event={e} onOpen={() => onOpen(e)} />
+        ))}
+      </ul>
+    </section>
   )
 }
 
-export function TodayOpsPage() {
-  const version = useStoreVersion()
-  const { showToast } = useToast()
-  const dateKey = getTodayOpsDateKey()
-  const plan = useMemo(() => {
-    void version
-    const projects = projectRepository.getAll()
-    const organizations = organizationRepository.getAll()
-    return buildConsultingDailyPlan(projects, organizations, getCompletedOpsActionIds(dateKey))
-  }, [dateKey, version])
+function TodayContent({ workspaceId }: { workspaceId: string | null }) {
+  const navigate = useNavigate()
+  const today = todayLocalDate()
+  const [records, setRecords] = useState<ClientOpsRecord[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const resetDone = () => {
-    clearTodayOpsCompletions(dateKey)
-    showToast('오늘 완료 표시를 초기화했습니다.')
-  }
-
-  const copyBatchReminder = async () => {
+  const load = useCallback(async () => {
     try {
-      if (!navigator.clipboard || !plan.batchReminderScript) throw new Error('No reminder script')
-      await navigator.clipboard.writeText(plan.batchReminderScript)
-      showToast('고객 회신 리마인드 묶음을 복사했습니다.')
-    } catch {
-      showToast('복사할 고객 회신 리마인드가 없습니다.')
+      setLoading(true)
+      setRecords(await listClients(workspaceId))
+    } finally {
+      setLoading(false)
     }
-  }
+  }, [workspaceId])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const events = useMemo(() => buildAllSchedule(records, today), [records, today])
+  const alerts = useMemo(() => buildAllAlerts(records, today), [records, today])
+  const summary = useMemo(() => summarizeAlerts(alerts), [alerts])
+
+  const past = overdueEvents(events)
+  const dueToday = events.filter((e) => !e.done && e.daysLeft === 0)
+  const thisWeek = upcomingWithin(events, 7).filter((e) => e.daysLeft !== 0)
+  const openClients = records.filter((r) => r.archivedAt === null && r.status !== 'completed').length
+
+  const go = (e: ScheduleEvent) => navigate(`/ops/clients/${e.clientId}`)
+  const nothing = past.length === 0 && dueToday.length === 0 && thisWeek.length === 0
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       <PageHeader
         title="오늘 할 일"
-        description="마감, 고객 답변, 정책자금, 단계 전환을 기준으로 오늘 처리 순서를 자동으로 정리합니다."
+        description={`${today} · 마감이 지난 일과 이번 주에 끝내야 할 일만 모았습니다.`}
         actions={
-          <>
-            <Button variant="secondary" size="sm" onClick={copyBatchReminder} disabled={!plan.batchReminderScript}>
-              <MessageSquareText aria-hidden="true" className="size-4" />
-              회신 묶음 복사
-            </Button>
-            <Button variant="secondary" size="sm" onClick={resetDone} disabled={plan.completedMinutes === 0}>
-              <RotateCcw aria-hidden="true" className="size-4" />
-              완료 초기화
-            </Button>
-          </>
+          <Button variant="secondary" onClick={() => navigate('/ops/calendar')}>
+            <CalendarDays aria-hidden="true" className="size-4" />
+            달력으로 보기
+          </Button>
         }
       />
 
-      <section className="rounded-(--radius-panel) border border-brand-200 bg-brand-50/70 px-5 py-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge tone="info">{plan.dateLabel}</StatusBadge>
-              <StatusBadge tone={plan.plannedMinutes > 240 ? 'warning' : 'success'}>{plan.workModeLabel}</StatusBadge>
-            </div>
-            <h1 className="mt-2 text-xl font-bold break-keep text-slate-900">{plan.headline}</h1>
-            <p className="mt-1 text-[0.92rem] break-keep text-slate-600">
-              총 {plan.actions.length}개 액션, 예상 {plan.plannedMinutes}분 중 {plan.completedMinutes}분 완료
-            </p>
-          </div>
-          <div className="w-full max-w-sm">
-            <div className="flex items-center justify-between text-[0.84rem] font-medium text-brand-700">
-              <span>오늘 실행률</span>
-              <span>{plan.completionPercent}%</span>
-            </div>
-            <div className="mt-2">
-              <ProgressBar value={plan.completionPercent} tone="info" label="오늘 실행률" />
-            </div>
-          </div>
-        </div>
+      <section aria-label="요약" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <StatTile
+          label="마감 지난 일"
+          value={`${past.length}건`}
+          tone={past.length > 0 ? 'danger' : 'success'}
+          icon={AlertTriangle}
+        />
+        <StatTile label="오늘까지" value={`${dueToday.length}건`} tone={dueToday.length > 0 ? 'warning' : 'neutral'} icon={Sun} />
+        <StatTile label="이번 주" value={`${thisWeek.length}건`} icon={ClipboardList} />
+        <StatTile label="관리 중인 업체" value={`${openClients}곳`} hint={`경고 ${summary.total}건`} icon={CheckCircle2} />
       </section>
 
-      <Panel title="운영 판단">
-        <dl className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-          {plan.operatorSignals.map((signal) => (
-            <div key={signal.id} className="rounded-(--radius-card) border border-slate-200 px-4 py-3">
-              <div className="flex items-center justify-between gap-2">
-                <dt className="text-[0.82rem] font-semibold text-slate-500">{signal.label}</dt>
-                <StatusBadge tone={signal.tone}>{signal.value}</StatusBadge>
-              </div>
-              <dd className="mt-2 text-[0.86rem] leading-relaxed break-keep text-slate-600">{signal.detail}</dd>
-            </div>
-          ))}
-        </dl>
-      </Panel>
-
-      <Panel title="이번 주 예보">
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-          <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-[0.82rem] font-semibold text-slate-500">7일 운영 요약</p>
-            <dl className="mt-3 grid grid-cols-2 gap-3">
-              <div>
-                <dt className="text-[0.78rem] text-slate-400">예정/지연</dt>
-                <dd className="mt-0.5 text-xl font-bold text-slate-900">{plan.weeklyForecast.totalDueCount}건</dd>
-              </div>
-              <div>
-                <dt className="text-[0.78rem] text-slate-400">과부하일</dt>
-                <dd className="mt-0.5 text-xl font-bold text-slate-900">{plan.weeklyForecast.overloadedDays}일</dd>
-              </div>
-              <div>
-                <dt className="text-[0.78rem] text-slate-400">회신 회수</dt>
-                <dd className="mt-0.5 text-xl font-bold text-slate-900">{plan.weeklyForecast.clientFollowUps}건</dd>
-              </div>
-              <div>
-                <dt className="text-[0.78rem] text-slate-400">자금 후속</dt>
-                <dd className="mt-0.5 text-xl font-bold text-slate-900">{plan.weeklyForecast.fundingFollowUps}건</dd>
-              </div>
-            </dl>
-          </div>
-
-          <ol className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-7">
-            {plan.weeklyForecast.days.map((day) => (
-              <li key={day.key} className="rounded-(--radius-card) border border-slate-200 px-3 py-3">
-                <div className="flex items-center justify-between gap-2 xl:flex-col xl:items-start">
-                  <div>
-                    <p className="text-[0.9rem] font-semibold text-slate-900">{day.label}</p>
-                    <p className="text-[0.76rem] text-slate-400">{day.dateLabel}</p>
-                  </div>
-                  <StatusBadge tone={day.tone}>{day.focus}</StatusBadge>
-                </div>
-                <div className="mt-3 flex items-end justify-between gap-2">
-                  <span className="text-xl font-bold text-slate-900">{day.dueCount}</span>
-                  <span className="text-[0.78rem] font-medium text-slate-400">{day.plannedMinutes}분</span>
-                </div>
-                {day.overdueCount > 0 && (
-                  <p className="mt-1 text-[0.78rem] font-semibold text-danger-600">지연 {day.overdueCount}건 포함</p>
-                )}
-              </li>
-            ))}
-          </ol>
+      {loading ? (
+        <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-10 text-[0.95rem] text-slate-500">
+          불러오는 중…
+        </p>
+      ) : nothing ? (
+        <div className="rounded-(--radius-panel) border border-success-200 bg-success-50/60 px-5 py-12 text-center">
+          <CheckCircle2 aria-hidden="true" className="mx-auto size-9 text-success-600" />
+          <p className="mt-3 text-[1.2rem] font-bold text-slate-900">이번 주에 급한 일이 없습니다</p>
+          <p className="mt-1 text-[1rem] break-keep text-slate-600">
+            마감이 지난 일도, 이번 주 안에 끝내야 할 일도 없습니다.
+          </p>
+          <Button variant="secondary" className="mt-5" onClick={() => navigate('/ops/clients')}>
+            전체 현황 보기
+          </Button>
         </div>
-      </Panel>
-
-      <Panel title="시간 블록">
-        <ol className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-          {plan.timeBlocks.map((block) => (
-            <li key={block.id} className="rounded-(--radius-card) border border-slate-200 px-4 py-3">
-              <div className="flex items-center justify-between gap-3">
-                <StatusBadge tone={block.tone}>{block.timeLabel}</StatusBadge>
-                <span className="inline-flex items-center gap-1 text-[0.82rem] font-medium text-slate-400">
-                  <Clock3 aria-hidden="true" className="size-3.5" />
-                  {block.totalMinutes}분
-                </span>
-              </div>
-              <p className="mt-2 text-[0.98rem] font-semibold text-slate-900">{block.label}</p>
-              <p className="mt-1 text-[0.86rem] leading-relaxed break-keep text-slate-500">{block.intent}</p>
-              <p className="mt-2 text-[0.82rem] font-medium text-slate-400">액션 {block.actionIds.length}개</p>
-            </li>
-          ))}
-        </ol>
-      </Panel>
-
-      <section aria-labelledby="today-actions" className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
-          <h2 id="today-actions" className="text-[1.05rem] font-bold text-slate-900">실행 큐</h2>
-          <span className="inline-flex items-center gap-1.5 text-[0.86rem] font-medium text-slate-400">
-            <TimerReset aria-hidden="true" className="size-4" />
-            완료한 일은 오늘 날짜에만 저장됩니다
-          </span>
+      ) : (
+        <div className="flex flex-col gap-6">
+          <Group title="마감이 지났습니다" hint="가장 먼저 처리하세요" events={past} onOpen={go} tone="danger" />
+          <Group title="오늘까지" hint="오늘 안에 끝내야 합니다" events={dueToday} onOpen={go} tone="warning" />
+          <Group title="이번 주" hint="7일 이내" events={thisWeek} onOpen={go} tone="neutral" />
         </div>
-        {plan.actions.length > 0 ? (
-          <ul className="flex flex-col gap-3">
-            {plan.actions.map((action) => (
-              <ActionCard key={action.id} action={action} />
-            ))}
-          </ul>
-        ) : (
-          <Panel title="실행 큐">
-            <p className="text-[0.9rem] break-keep text-slate-500">
-              오늘 처리할 활성 프로젝트가 없습니다. 신규 상담을 받거나 기존 고객사 정보를 정리하기 좋은 상태입니다.
-            </p>
-          </Panel>
-        )}
-      </section>
+      )}
     </div>
   )
+}
+
+function CloudToday() {
+  const { currentWorkspaceId } = useAuth()
+  return <TodayContent workspaceId={currentWorkspaceId} />
+}
+
+export function TodayOpsPage() {
+  return getDataModeConfig().mode === 'supabase' ? <CloudToday /> : <TodayContent workspaceId={null} />
 }

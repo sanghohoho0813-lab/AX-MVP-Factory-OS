@@ -105,6 +105,41 @@ export interface FeeItem {
 }
 
 /* ------------------------------------------------------------------ */
+/* 정책자금 · 정부지원금 신청 건 (공고마다 반복)                        */
+/* ------------------------------------------------------------------ */
+
+export type FundingStatus =
+  | 'watching' // 공고 확인 중
+  | 'preparing' // 서류 준비 중
+  | 'submitted' // 신청 접수
+  | 'reviewing' // 심사 중
+  | 'selected' // 선정
+  | 'rejected' // 탈락
+  | 'given_up' // 포기
+
+export interface FundingApplication {
+  id: string
+  /** 사업·공고명 */
+  programName: string
+  /** 주관 기관 */
+  institution: string
+  status: FundingStatus
+  /** 신청 마감일 (YYYY-MM-DD) */
+  applyDueDate: string
+  /** 접수한 날 */
+  submittedAt: string | null
+  /** 결과 나온 날 */
+  resultAt: string | null
+  /** 신청 금액(원) */
+  requestedAmount: number | null
+  /** 확정 금액(원) */
+  approvedAmount: number | null
+  note: string
+  createdAt: string
+  updatedAt: string
+}
+
+/* ------------------------------------------------------------------ */
 /* 고객사 레코드                                                        */
 /* ------------------------------------------------------------------ */
 
@@ -159,6 +194,9 @@ export interface ClientOpsRecord {
   documents: Record<DocumentKey, DocumentState>
   fees: FeeItem[]
   notes_list: ClientNote[]
+  fundingApplications: FundingApplication[]
+  /** 보관 처리 시각 (보관하면 목록·경고에서 빠진다) */
+  archivedAt: string | null
   createdAt: string
   updatedAt: string
 }
@@ -187,6 +225,8 @@ export type AlertKind =
   | 'payment_due_soon' // 수금 예정일 임박
   | 'waiting_too_long' // 고객 회신 장기 대기
   | 'no_next_step' // 진행 중인데 다음 할 일이 비어 있음
+  | 'funding_due_soon' // 정책자금 신청 마감 임박
+  | 'funding_overdue' // 정책자금 신청 마감 지남
 
 export interface OpsAlert {
   id: string

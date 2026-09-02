@@ -34,6 +34,7 @@ const TodayOpsPage = lazy(() =>
 )
 const OperationsHubPage = lazy(() => import('../pages/OperationsHubPage').then((m) => ({ default: m.OperationsHubPage })))
 const OperationsClientDetailPage = lazy(() => import('../pages/OperationsClientDetailPage').then((m) => ({ default: m.OperationsClientDetailPage })))
+const OpsCalendarPage = lazy(() => import('../pages/OpsCalendarPage').then((m) => ({ default: m.OpsCalendarPage })))
 const ToolsHubPage = lazy(() => import('../pages/ToolsHubPage').then((m) => ({ default: m.ToolsHubPage })))
 
 // 진단 관리·공개 설문은 route-level lazy loading으로 초기 번들을 줄인다
@@ -338,6 +339,7 @@ export const appRouteChildren = [
       { path: 'getting-started', element: <GettingStartedPage /> },
       { path: 'today', element: <TodayOpsPage /> },
       { path: 'ops/clients', element: <OperationsHubPage /> },
+      { path: 'ops/calendar', element: <OpsCalendarPage /> },
       { path: 'ops/clients/:clientId', element: <OperationsClientDetailPage /> },
       { path: 'tools', element: <ToolsHubPage /> },
       { path: 'guide', element: <Navigate to="/getting-started" replace /> },
