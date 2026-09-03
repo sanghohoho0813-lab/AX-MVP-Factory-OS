@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button'
 import { useToast } from '../components/ui/toastContext'
 import { EventCard } from '../components/ops/EventCard'
 import { LinkCustomerModal } from '../components/ops/LinkCustomerModal'
+import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { listClients } from '../services/clientOpsService'
 import { isOpenEvent, listEvents, seedDemoEvents, updateEvent } from '../services/customerBridgeService'
 import { getDataModeConfig } from '../data/dataMode'
@@ -105,9 +106,12 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
         title="고객 이벤트함"
         description={`${brand.customerPlatformLabel}(${brand.customerPlatformUrl.replace('https://', '')})에서 고객이 한 일이 여기로 들어옵니다. 고객사에 연결하고 처리 상태를 남기세요.`}
         actions={
-          <Button variant="secondary" onClick={() => void load()}>
-            <RefreshCw aria-hidden="true" className="size-4" /> 새로고침
-          </Button>
+          <>
+            <ScreenGuide screenKey="inbox" />
+            <Button variant="secondary" onClick={() => void load()}>
+              <RefreshCw aria-hidden="true" className="size-4" /> 새로고침
+            </Button>
+          </>
         }
       />
 

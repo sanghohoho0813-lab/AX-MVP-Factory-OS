@@ -35,26 +35,30 @@ export const TUTORIAL_CHAPTERS: TutorialChapter[] = [
     id: 'system',
     order: 0,
     title: '시스템 이해하기',
-    shortDescription: '이 시스템이 무엇을 만들고, 무엇은 만들지 않는지 먼저 이해합니다.',
+    shortDescription: '하루가 어떻게 흐르는지(오늘 → 고객 → 일기)와 AX STUDIO 의 위치를 먼저 이해합니다.',
     detailedPurpose:
-      '컨설턴트가 중소기업의 AI 전환(AX)과 홈페이지 프로젝트를 진단부터 결과자료까지 한 흐름으로 진행하도록 돕는 내부 운영 도구입니다. 각 단계의 결과가 다음 단계의 입력이 됩니다.',
+      'MIRAE AI LAB OS 는 대표가 매일 쓰는 운영 도구입니다. "오늘" 화면이 오늘 무엇부터 할지 정해 주고, "고객 운영"이 업체별 업무·서류·수금·자금을 한 표로 보여 주며, "고객 이벤트함"에는 miraeailab.com 에서 고객이 한 일(진단·주문·서류·요청)이 들어옵니다. "업무 일기"에는 통화·결정·후속조치를 남깁니다. 진단·설계·결과자료 같은 프로젝트당 한 번 쓰는 전문 기능은 AX STUDIO 에 접혀 있습니다.',
     whyNeeded:
       '전체 그림을 먼저 이해하면 지금 화면이 왜 필요한지, 다음에 무엇을 해야 하는지 헷갈리지 않습니다.',
     prerequisites: ['별도 준비물 없음 — 처음이라면 여기서 시작하세요.'],
     tasks: [
-      '전체 핵심 흐름(진단 → 선택 → 설계 → 결과자료)을 살펴봅니다.',
-      '이 시스템이 만드는 결과물(진단서·설계서·보고서·개발 지시문)을 확인합니다.',
+      '"오늘" 화면에서 지금 이것부터(Top 3)·빠른 기록·고객 이벤트를 살펴봅니다.',
+      '"고객 운영"에서 업체별 현황표와 업체 상세(개요·업무·서류·수금·자금·고객 플랫폼·업무 일기·파일)를 확인합니다.',
+      '"고객 이벤트함"과 "업무 일기"가 어디 있는지, "일정"과 "자금·지원사업"이 무엇을 보여 주는지 확인합니다.',
+      'AX STUDIO 를 펼쳐 진단 → 선택 → 설계 → 결과자료 흐름과 결과물을 확인합니다.',
     ],
     inputs: ['입력 없음 — 읽고 이해하는 단계입니다.'],
     warnings: [
       '이 시스템은 실제 프로그램·홈페이지를 배포하지 않습니다. 개발 지시문까지 만들어 전달합니다.',
+      '고객 플랫폼(miraeailab.com)과의 연결은 브릿지 마이그레이션이 적용된 뒤에 켜집니다(그 전에는 "준비 중" 표시).',
     ],
-    completionCriteria: ['전체 흐름과 결과물의 범위를 이해했습니다.'],
-    expectedOutputs: ['앞으로의 작업 순서에 대한 이해'],
-    nextStepHint: '다음은 "고객사·프로젝트 준비"입니다. 실제 고객사를 등록하며 시작하세요.',
+    completionCriteria: ['오늘 → 고객 → 이벤트 → 일기 → 일정 → 자금 → AX STUDIO → 고객 플랫폼 연결의 위치를 알았습니다.'],
+    expectedOutputs: ['앞으로의 하루 순서에 대한 이해'],
+    nextStepHint: '다음은 "고객사·프로젝트 준비"입니다. 매일 운영만 한다면 "고객 운영"에서 첫 업체를 등록해도 됩니다.',
     estimatedMinutes: 3,
     commonMistakes: [
       '이 시스템만으로 완성된 프로그램이 나온다고 오해하기 — 실제 개발은 별도 과정입니다.',
+      '고객에게 내부 메모가 자동으로 보인다고 오해하기 — 고객에게는 "고객에게 업데이트"로 공개한 것만 보입니다.',
     ],
     routeTemplate: '/getting-started',
     availableProjectTypes: ['ax', 'website', 'ax_website'],
@@ -347,6 +351,46 @@ export const FAQ_ITEMS: FaqItem[] = [
 
 export const SCREEN_HELP: ScreenHelp[] = [
   {
+    key: 'home',
+    screenTitle: '오늘',
+    purpose: '앱을 켠 뒤 5초 안에 오늘 무엇부터 할지 알기 위한 화면입니다.',
+    checkFirst: ['"지금 이것부터" 3개 — 규칙(마감 지남 → 결제 주문 → 지난 후속조치 → 고객 서류·요청 → 임박)으로 고른 순서입니다.', '새 고객 이벤트가 있으면 먼저 고객사에 연결합니다.'],
+    howToInput: ['"무슨 일이 있었나요?"에 통화·결정·후속조치를 바로 적습니다(Ctrl+Enter).', '하루가 끝나면 "오늘 정리하기"로 처리·남음·넘김·결정·이슈를 정리합니다.'],
+    completionCriteria: ['Top 3 가 비고 새 이벤트가 0 이면 오늘 급한 일은 끝난 것입니다.'],
+    nextStep: '이번 주 마감과 고객 대기 건을 "고객 운영"에서 미리 챙깁니다.',
+    relatedChapterId: 'system',
+  },
+  {
+    key: 'inbox',
+    screenTitle: '고객 이벤트함',
+    purpose: 'miraeailab.com 에서 고객이 한 일(진단 완료·주문·서류 업로드·요청)을 놓치지 않고 처리합니다.',
+    checkFirst: ['연결되지 않은 이벤트는 "고객사와 연결" 또는 "새 고객사로 만들기"부터 합니다.', '같은 회사명·연락처의 후보가 위에 뜨지만 자동으로 합치지 않습니다 — 확인 후 고르세요.'],
+    howToInput: ['연결 후 "확인·처리 중" → "처리 완료"로 상태를 남깁니다.', '나중에 볼 것은 "보류"로 두면 목록 아래로 내려갑니다.'],
+    completionCriteria: ['"열린 것" 필터가 0 건입니다.'],
+    nextStep: '연결된 업체 상세 > 고객 플랫폼 탭에서 고객에게 업데이트를 공개합니다.',
+    relatedChapterId: 'system',
+  },
+  {
+    key: 'journal',
+    screenTitle: '업무 일기',
+    purpose: '왜 그렇게 판단했는지, 누구와 무엇을 이야기했는지, 다음에 무엇을 해야 하는지를 시간순으로 남깁니다. 고객에게는 보이지 않습니다.',
+    checkFirst: ['후속조치는 기한을 넣어야 "오늘" 화면의 Top 3 에 올라옵니다.'],
+    howToInput: ['종류(메모·통화·결정·후속조치·막힘·성과·아이디어)를 고르고 한 줄 적습니다.', '고객사를 연결하면 업체 상세 > 업무 일기 탭에서도 보입니다.'],
+    completionCriteria: ['"안 끝난 후속조치만"이 비어 있습니다.'],
+    nextStep: '주간 돌아보기에서 결정과 성과를 다시 읽습니다.',
+    relatedChapterId: 'system',
+  },
+  {
+    key: 'client_detail',
+    screenTitle: '업체 상세',
+    purpose: '한 업체의 지금·업무·서류·수금·자금·고객 플랫폼·업무 일기·파일을 탭으로 나누어 봅니다.',
+    checkFirst: ['개요의 "지금" — 다음 행동, 진행 중 업무, 없는 서류, 못 받은 돈.'],
+    howToInput: ['업무 탭에서 단계를 바꾸면 활동 기록에 자동으로 남습니다.', '고객 플랫폼 탭에서 계정을 연결하고 "고객에게 업데이트"로 공개합니다. 내부 메모는 자동으로 나가지 않습니다.'],
+    completionCriteria: ['개요 탭의 급한 경고가 0 건입니다.'],
+    nextStep: '고객에게 공개할 진행 상황이 있으면 고객 플랫폼 탭에서 발행합니다.',
+    relatedChapterId: 'system',
+  },
+  {
     key: 'clients',
     screenTitle: '고객사 목록',
     purpose: '고객사를 등록·관리하고, 고객사 아래 프로젝트를 시작합니다.',
@@ -459,11 +503,34 @@ export function getScreenHelp(key: string): ScreenHelp | undefined {
 export const SCREEN_TOURS: ScreenTour[] = [
   {
     key: 'home',
-    screenTitle: '홈',
+    screenTitle: '오늘',
     steps: [
-      { target: '[data-tour="home-next-actions"]', title: '지금 해야 할 일', body: '진행 중인 프로젝트에서 오늘 가장 먼저 할 일을 여기서 확인합니다.' },
-      { target: '[data-tour="home-projects"]', title: '프로젝트 목록', body: '고객사별 프로젝트와 각 진행상태를 볼 수 있습니다.' },
-      { target: '[data-tour="guide-button"]', title: '처음 사용 가이드', body: '언제든 이 버튼으로 전체 안내와 오늘의 추천 작업을 다시 볼 수 있습니다.' },
+      { target: '[data-tour="home-today"]', title: '오늘', body: '실제 날짜·시각과 함께 오늘 반드시·이번 주 마감·고객 대기·받을 돈·새 이벤트 다섯 가지를 봅니다. 숫자를 누르면 해당 목록으로 갑니다.' },
+      { target: '[data-tour="home-top3"]', title: '지금 이것부터', body: '경고·고객 이벤트·후속조치·자금 마감을 규칙으로 합쳐 최대 3개만 보여 줍니다. 각 항목 아래 "이유"가 순서의 근거입니다.' },
+      { target: '[data-tour="home-capture"]', title: '무슨 일이 있었나요?', body: '통화·결정·후속조치를 바로 적습니다. 후속조치에 기한을 넣으면 그날 Top 3 에 올라옵니다.' },
+      { target: '[data-tour="home-events"]', title: '고객 이벤트', body: 'miraeailab.com 에서 고객이 한 일이 들어옵니다. 고객사에 연결하고 처리 상태를 남기세요.' },
+      { target: '[data-tour="guide-button"]', title: '처음 사용 가이드', body: '언제든 이 버튼으로 전체 안내를 다시 볼 수 있습니다.' },
+    ],
+  },
+  {
+    key: 'inbox',
+    screenTitle: '고객 이벤트함',
+    steps: [
+      { target: null, title: '고객 이벤트함', body: '진단 완료·주문·서류 업로드·요청이 우선순위(지금 / 오늘 중 / 참고)와 함께 쌓입니다. 연결 → 처리 중 → 처리 완료 순서로 남깁니다.' },
+    ],
+  },
+  {
+    key: 'journal',
+    screenTitle: '업무 일기',
+    steps: [
+      { target: null, title: '업무 일기', body: '오늘 / 이번 주 / 전체로 보고, 고객사·종류로 좁힙니다. 고정·수정·삭제·후속조치 완료가 됩니다. 고객에게는 보이지 않습니다.' },
+    ],
+  },
+  {
+    key: 'client_detail',
+    screenTitle: '업체 상세',
+    steps: [
+      { target: null, title: '업체 상세', body: '개요(지금·진행 업무·막힘·돈·고객) → 업무 → 서류 → 수금 → 자금 → 고객 플랫폼 → 업무 일기 → 파일 순서의 탭입니다. 고객 플랫폼 탭에서만 고객에게 공개됩니다.' },
     ],
   },
   {

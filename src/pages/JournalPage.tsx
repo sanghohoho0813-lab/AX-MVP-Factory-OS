@@ -6,6 +6,7 @@ import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { useToast } from '../components/ui/toastContext'
 import { QuickCapture } from '../components/journal/QuickCapture'
 import { JournalList } from '../components/journal/JournalList'
+import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { listClients } from '../services/clientOpsService'
 import {
   JOURNAL_TYPES,
@@ -96,6 +97,7 @@ function JournalContent({ workspaceId, userId }: { workspaceId: string | null; u
       <PageHeader
         title="업무 일기"
         description="통화·결정·후속조치·막힘·성과·아이디어를 시간순으로 남깁니다. 고객에게는 보이지 않는 나만의 기록입니다."
+        actions={<ScreenGuide screenKey="journal" />}
       />
 
       <QuickCapture

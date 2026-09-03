@@ -86,6 +86,7 @@ import { DocImportModal } from '../components/ops/DocImportModal'
 import { withActivity } from '../services/clientOpsActivity'
 import { ActivityLog } from '../components/ops/ActivityLog'
 import { PortalTab } from '../components/ops/PortalTab'
+import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { ClientJournalTab } from '../components/ops/ClientJournalTab'
 import { FilesTab } from '../components/ops/FilesTab'
 import { listLinksForClient } from '../services/customerBridgeService'
@@ -273,6 +274,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               )}
             </p>
           </div>
+          <div className="flex flex-wrap items-end gap-2">
+          <ScreenGuide screenKey="client_detail" />
           <label className="text-[0.92rem] font-medium text-slate-600">
             업체 상태
             <select
@@ -296,6 +299,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               ))}
             </select>
           </label>
+          </div>
         </div>
 
         {/* 고객에게 보낼 문구 */}

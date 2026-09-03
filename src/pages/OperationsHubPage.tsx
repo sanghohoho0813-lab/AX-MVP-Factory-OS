@@ -29,6 +29,8 @@ import { todayLocalDate } from '../lib/appClock'
 import { formatKrw } from '../lib/format'
 import type { ClientOpsRecord, OpsAlert, AlertSeverity } from '../types/clientOps'
 import { Button } from '../components/ui/Button'
+import { useToast } from '../components/ui/toastContext'
+import { Modal } from '../components/ui/Modal'
 import { PageHeader } from '../components/ui/PageHeader'
 import {
   AlertRow,
@@ -62,6 +64,9 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const [restoring, setRestoring] = useState(false)
   const [leftover, setLeftover] = useState<ClientOpsRecord[]>([])
   const [migrating, setMigrating] = useState(false)
+  /** 백업 파일을 읽은 뒤 합칠지/바꿀지 묻는 단계 */
+  const [restorePrompt, setRestorePrompt] = useState<ClientOpsRecord[] | null>(null)
+  const { showToast } = useToast()
   const restoreRef = useRef<HTMLInputElement>(null)
 
   const today = todayLocalDate()
@@ -132,20 +137,27 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
 
   const onRestoreFile = async (file: File | undefined) => {
     if (!file) return
+    setError('')
+    try {
+      setRestorePrompt(parseBackup(await file.text()))
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '백업을 불러오지 못했습니다.')
+    } finally {
+      if (restoreRef.current) restoreRef.current.value = ''
+    }
+  }
+
+  const applyRestore = async (mode: MergeMode) => {
+    const incoming = restorePrompt
+    if (!incoming) return
     setRestoring(true)
     setError('')
     try {
-      const incoming = parseBackup(await file.text())
-      const mode: MergeMode = window.confirm(
-        `백업에 고객 ${incoming.length}곳이 들어 있습니다.\n\n[확인] 지금 데이터와 합치기 (같은 업체는 최근에 수정한 쪽을 남깁니다)\n[취소] 백업 내용으로 전부 바꾸기`,
-      )
-        ? 'merge'
-        : 'replace'
       const result = mergeBackup(records, incoming, mode)
       await replaceAllClients(workspaceId, result.records)
       await load()
-      setError('')
-      window.alert(
+      setRestorePrompt(null)
+      showToast(
         mode === 'merge'
           ? `복원했습니다. 추가 ${result.added}곳 · 갱신 ${result.updated}곳 · 유지 ${result.kept}곳`
           : `백업 내용으로 바꿨습니다. 고객 ${result.records.length}곳`,
@@ -154,7 +166,6 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       setError(cause instanceof Error ? cause.message : '백업을 불러오지 못했습니다.')
     } finally {
       setRestoring(false)
-      if (restoreRef.current) restoreRef.current.value = ''
     }
   }
 
@@ -167,9 +178,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       await replaceAllClients(workspaceId, result.records)
       await load()
       setLeftover([])
-      window.alert(
-        `이 브라우저에 있던 고객 ${leftover.length}곳을 클라우드로 옮겼습니다.\n추가 ${result.added}곳 · 갱신 ${result.updated}곳\n\n브라우저에 있던 원본은 그대로 남아 있습니다.`,
-      )
+      showToast(`이 브라우저에 있던 고객 ${leftover.length}곳을 클라우드로 옮겼습니다. 추가 ${result.added}곳 · 갱신 ${result.updated}곳. 브라우저 원본은 그대로 남아 있습니다.`)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '옮기지 못했습니다.')
     } finally {
@@ -262,6 +271,25 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
         className="hidden"
         onChange={(e) => void onRestoreFile(e.target.files?.[0])}
       />
+
+      <Modal
+        open={restorePrompt !== null}
+        title="백업 불러오기"
+        onClose={() => { if (!restoring) setRestorePrompt(null) }}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setRestorePrompt(null)} disabled={restoring}>취소</Button>
+            <Button variant="secondary" onClick={() => void applyRestore('replace')} disabled={restoring}>백업 내용으로 전부 바꾸기</Button>
+            <Button variant="primary" onClick={() => void applyRestore('merge')} disabled={restoring}>{restoring ? '복원 중…' : '지금 데이터와 합치기'}</Button>
+          </>
+        }
+      >
+        <p className="text-[0.98rem] break-keep text-slate-700">백업에 고객 {restorePrompt?.length ?? 0}곳이 들어 있습니다.</p>
+        <ul className="mt-3 list-disc space-y-1 pl-5 text-[0.92rem] break-keep text-slate-600">
+          <li><strong>합치기</strong> — 같은 업체는 최근에 수정한 쪽을 남기고, 없던 업체는 추가합니다.</li>
+          <li><strong>전부 바꾸기</strong> — 지금 목록을 지우고 백업 내용으로 채웁니다. 되돌릴 수 없습니다.</li>
+        </ul>
+      </Modal>
 
       {/* 검색 · 보관 */}
       {records.length > 0 && (

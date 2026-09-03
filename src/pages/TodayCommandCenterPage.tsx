@@ -22,6 +22,7 @@ import { QuickCapture } from '../components/journal/QuickCapture'
 import { JournalList } from '../components/journal/JournalList'
 import { EventCard } from '../components/ops/EventCard'
 import { LinkCustomerModal } from '../components/ops/LinkCustomerModal'
+import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { listClients } from '../services/clientOpsService'
 import { buildAllAlerts, summarizeAlerts, dueText } from '../services/clientOpsAlerts'
 import { buildAllSchedule, upcomingWithin } from '../services/clientOpsSchedule'
@@ -246,7 +247,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6">
       {/* A. 오늘 */}
-      <section aria-label="오늘" className="flex flex-col gap-4">
+      <section aria-label="오늘" data-tour="home-today" className="flex flex-col gap-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[0.95rem] font-medium text-slate-500">
@@ -257,6 +258,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             </h1>
           </div>
           <div className="flex flex-wrap gap-2">
+            <ScreenGuide screenKey="home" />
             <Button variant="secondary" onClick={() => navigate('/ops/clients')}>
               <Building2 aria-hidden="true" className="size-4" /> 고객 운영
             </Button>
@@ -283,7 +285,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
         {/* B. Top 3 */}
-        <section aria-labelledby="top3" className="flex flex-col gap-3">
+        <section aria-labelledby="top3" data-tour="home-top3" className="flex flex-col gap-3">
           <SectionTitle title="지금 이것부터" icon={ClipboardCheck} />
           {loading ? (
             <p className="text-[0.95rem] text-slate-500">불러오는 중…</p>
@@ -304,7 +306,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         </section>
 
         {/* C. 빠른 기록 + H. 오늘 기록 */}
-        <section aria-labelledby="capture" className="flex flex-col gap-3">
+        <section aria-labelledby="capture" data-tour="home-capture" className="flex flex-col gap-3">
           <SectionTitle title="무슨 일이 있었나요?" icon={NotebookPen} to="/journal" count={todayJournal.length} />
           <QuickCapture
             clients={active}
@@ -333,7 +335,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
 
       <div className="grid gap-6 xl:grid-cols-2">
         {/* D. 고객 이벤트 */}
-        <section aria-labelledby="events" className="flex flex-col gap-3">
+        <section aria-labelledby="events" data-tour="home-events" className="flex flex-col gap-3">
           <SectionTitle title="고객 이벤트" icon={Inbox} to="/ops/inbox" count={openEvents.length} />
           {openEvents.length === 0 ? (
             <div className="rounded-(--radius-card) border border-dashed border-slate-300 bg-white p-5 text-[0.92rem] break-keep text-slate-500">
