@@ -11,6 +11,7 @@ export function SignupPage() {
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [errorKind, setErrorKind] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -18,6 +19,7 @@ export function SignupPage() {
     e.preventDefault()
     if (submitting) return
     setError(null)
+    setErrorKind(null)
     setNotice(null)
     if (password.length < 6) {
       setError('비밀번호는 6자 이상으로 설정해 주세요.')
@@ -31,6 +33,7 @@ export function SignupPage() {
     const result = await signUpWithPassword(email.trim(), password, name.trim() || undefined)
     if (!result.ok) {
       setError(result.errorMessage ?? '회원가입에 실패했습니다.')
+      setErrorKind(result.errorKind ?? null)
       setSubmitting(false)
       return
     }
@@ -58,6 +61,22 @@ export function SignupPage() {
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
         <AuthError message={error} />
+        {errorKind === 'email_taken' && (
+          <div className="flex flex-wrap gap-2">
+            <Link
+              to="/login"
+              className="inline-flex h-9 items-center rounded-(--radius-control) border border-brand-300 bg-brand-50 px-3 text-[0.92rem] font-semibold text-brand-700 hover:bg-brand-100"
+            >
+              로그인하러 가기
+            </Link>
+            <Link
+              to="/forgot-password"
+              className="inline-flex h-9 items-center rounded-(--radius-control) border border-slate-300 bg-white px-3 text-[0.92rem] font-medium text-slate-700 hover:bg-slate-50"
+            >
+              비밀번호 찾기
+            </Link>
+          </div>
+        )}
         <AuthNotice message={notice} />
         <AuthField id="name" label="이름" value={name} onChange={setName} autoComplete="name" placeholder="홍길동" disabled={submitting} />
         <AuthField id="email" label="이메일" type="email" value={email} onChange={setEmail} autoComplete="email" placeholder="you@example.com" disabled={submitting} />

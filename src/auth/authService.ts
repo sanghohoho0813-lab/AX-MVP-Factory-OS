@@ -6,13 +6,15 @@
 
 import type { Session, User } from '@supabase/supabase-js'
 import { getSupabaseClient } from '../lib/supabase/client'
-import { toFriendlyAuthError } from './authErrors'
+import { toFriendlyAuthError, type FriendlyAuthError } from './authErrors'
 
 export interface AuthResult {
   ok: boolean
   user: User | null
   session: Session | null
   errorMessage?: string
+  /** 화면에서 다음 행동을 안내하기 위한 원인 분류 */
+  errorKind?: FriendlyAuthError['kind']
 }
 
 function ok(session: Session | null): AuthResult {
@@ -20,7 +22,8 @@ function ok(session: Session | null): AuthResult {
 }
 
 function fail(error: unknown): AuthResult {
-  return { ok: false, user: null, session: null, errorMessage: toFriendlyAuthError(error).message }
+  const friendly = toFriendlyAuthError(error)
+  return { ok: false, user: null, session: null, errorMessage: friendly.message, errorKind: friendly.kind }
 }
 
 export async function signInWithPassword(email: string, password: string): Promise<AuthResult> {
