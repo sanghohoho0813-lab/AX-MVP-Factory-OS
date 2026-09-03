@@ -47,7 +47,14 @@ psql "$SHADOW_URL" -v ON_ERROR_STOP=1 -f supabase/tests/bridge_contract.sql
 ```
 
 ### 3.3 적용
-Supabase Dashboard → SQL Editor 에 `supabase/migrations/20260903000006_customer_bridge.sql` 전체를 붙여 실행한다(멱등 — 두 번 실행해도 안전). 또는 `supabase db push`.
+Supabase Dashboard → SQL Editor 에서 **두 파일을 순서대로** 붙여 실행한다(둘 다 멱등 — 두 번 실행해도 안전). 또는 `supabase db push`.
+
+1. `supabase/migrations/20260903000006_customer_bridge.sql` — 브릿지 본체
+2. `supabase/migrations/20260903000007_bridge_hardening.sql` — 권한 하드닝
+
+2번은 Supabase Security Advisor 가 지적하는 항목을 닫는다: 트리거 전용 `bridge_on_*` SECURITY DEFINER 함수 6개와 `bridge_touch_updated_at` 에 PostgreSQL 이 기본으로 부여하는 PUBLIC EXECUTE 를 회수하고, `bridge_touch_updated_at` 의 `search_path` 를 고정하며, 내부 전용 헬퍼 `portal_link_owned` 를 authenticated 에서 닫는다. 앱이 실제로 호출하는 RPC 권한은 건드리지 않는다.
+
+> 트리거 실행 권한은 CREATE TRIGGER 시점에만 확인하고 발화 시점에는 확인하지 않으므로, EXECUTE 회수 후에도 트리거는 정상 발화한다. `supabase/tests/bridge_hardening.sql` 의 H5 가 이것을 회귀 테스트로 고정한다.
 
 ### 3.4 적용 후 확인
 ```sql
@@ -88,7 +95,7 @@ select tgname from pg_trigger where tgname like 'trg_bridge_%' order by 1;
 select count(*) from public.portal_client_links;   -- 0
 select public.default_intake_workspace();          -- 내 워크스페이스 uuid
 ```
-그리고 `psql "$PROD_URL" -f supabase/tests/bridge_contract.sql` 을 돌리면 트랜잭션 안에서 검증 후 ROLLBACK 된다(데이터 남지 않음). 다만 Production 에서 직접 돌리기보다 3.2 의 그림자 DB 에서 돌리는 것을 권장한다.
+그리고 `DATABASE_URL=... npm run test:sql` (계약 + 하드닝 테스트)을 돌리면 트랜잭션 안에서 검증 후 ROLLBACK 된다(데이터 남지 않음). 다만 Production 에서 직접 돌리기보다 3.2 의 그림자 DB 에서 돌리는 것을 권장한다.
 
 ### 3.5 유입 워크스페이스 지정 (선택)
 워크스페이스가 여러 개면 연결 전 이벤트를 받을 곳을 정한다:
