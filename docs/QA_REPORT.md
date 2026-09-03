@@ -47,6 +47,45 @@
 | 24 | 설정: 화면 색 9종 선택기 | PASS |
 | 25 | 홈 "이 화면 따라 해보기" 시작·종료 후 dialog 0 · body 정상 | PASS |
 
+## 3-B. 고객 → 내부 OS → 고객 왕복 E2E (`npm run e2e:roundtrip`)
+
+손으로 쓴 픽스처를 쓰지 않는다. `supabase/tests/gen_roundtrip_payloads.sql` 이 마이그레이션이 적용된 PostgreSQL 에서 실제 왕복을 돌리며 각 시점의 응답(`portal_my_projects` · `portal_project` · `portal_preview_project` · `customer_events`)을 뽑고, 그 응답을 두 앱의 실제 화면에 먹인다. 고객 행동 하나마다 별도 스냅샷을 떠서 사용 순서를 그대로 재현한다.
+
+| # | 시나리오 | 결과 |
+|---|---|---|
+| A1 | 고객: `/my-projects` 목록 (실제 RPC 응답) | PASS |
+| A2 | 고객: 상세 진입 — 조치 필요 배너 | PASS |
+| A3 | 고객 화면에 내부 정보(수임료·내부메모·내부 id) 0 | PASS |
+| A4 | 고객: "올렸어요" → `portal_complete_action` | PASS |
+| A5 | 고객: 요청 보내기 → `portal_create_request` | PASS |
+| A6 | 고객: 서류 업로드 → `portal_upload_path` → storage → `portal_register_document` | PASS |
+| A7 | 고객 앱이 부른 REST 경로 중 내부 테이블 0 (14 calls) | PASS |
+| B1 | 내부 OS(supabase 모드): 이벤트함이 실제 `customer_events` 3건 렌더 | PASS |
+| **B2** | **왕복① 고객 요청이 내부 이벤트함에 뜬다** | **PASS** |
+| **B3** | **왕복① 고객 서류 업로드가 내부 이벤트함에 뜬다** | **PASS** |
+| B4 | 이벤트가 고객사와 연결된 상태로 보인다 | PASS |
+| B5 | 처리 완료 → `customer_events` PATCH | PASS |
+| **C1** | **왕복② 내부 발행 업데이트가 고객 My MIRAE 에 보인다** | **PASS** |
+| C2 | 초안(미발행)은 고객에게 보이지 않는다 | PASS |
+| C3 | 발행 후에도 내부 정보 누출 0 | PASS |
+| C4 | 내부 "고객 화면 보기" 투영 == 고객이 받은 투영 (완전 일치) | PASS |
+
+**16/16**. 앱 JS 오류 0 (프록시가 막는 외부 폰트 CDN 제외). 스크린샷 `docs/qa/2026-09-03/roundtrip/`.
+
+검증하지 못한 것: 실제 이메일 인증·로그인, Production Supabase 네트워크. 그 두 가지는 사람이 확인한다(SETUP.md §3.7).
+
+## 3-C. 권한 하드닝 (`supabase/tests/bridge_hardening.sql`)
+| 항목 | 결과 |
+|---|---|
+| H1 트리거 전용 함수 8개에 anon/authenticated EXECUTE 0 | PASS |
+| H2 내부 헬퍼(`portal_link_owned`·`portal_project_projection`·`default_intake_workspace`) 닫힘 | PASS |
+| H3 앱이 호출하는 RPC 9개 권한 유지 · anon 에는 미개방 | PASS |
+| H4 `bridge_*`/`portal_*` 전 함수 search_path 고정 | PASS |
+| H5 EXECUTE 회수 후에도 트리거 정상 발화 | PASS |
+| H6 트리거 함수 직접 호출 거부 (authenticated·anon) | PASS |
+| R1 왕복① 이벤트 수신 + `operations_client_id` 채워짐 | PASS |
+| R2 왕복② 발행 업데이트 노출 · 초안/수임료/내부메모 비노출 | PASS |
+
 ## 4. 9 Theme 전수 (홈 화면)
 | 테마 | 셸 배경 | 본문 글자색 | 결과 |
 |---|---|---|---|
@@ -80,12 +119,13 @@
 - 고객 인증 우회 없음: 내부 "고객 화면 보기"는 워크스페이스 멤버 RPC
 
 ## 9. Known Issues
-- 브릿지(이벤트·일기·포털)는 Production Supabase 미적용 → supabase 모드에서 READY 안내(LIVE 아님). 적용 절차 SETUP.md.
+- 브릿지 본체(…0006)는 Production 적용 완료(2026-09-03). 하드닝(…0007)·이벤트 고객사 id(…0008)는 **미적용** — SETUP.md §3.3.
+- Dashboard 로 만든 테스트 고객 계정은 `member_type` 이 비어 공개 사이트가 `/auth/onboarding` 으로 보내고, 그 화면의 휴대폰 본인인증이 "준비 중" 이라 막힌다 (SETUP.md §3.7 우회 SQL).
 - local 모드 헤더의 워크스페이스/사용자 표시는 데모 상수(P2).
 - Vercel Preview READY 여부는 이 실행 환경에서 API 접근이 막혀(403) 확인하지 못함 — 사용자가 Vercel 대시보드에서 확인.
 
 ## 10. Red Team (1회)
-P0 0 · P1 2건 수정(PostgrestError 판정, QA 포트 오류) · 반응형 3건 수정(위 §5) · E2E 스크립트 오류 1건 수정(투어 "다음" 버튼이 오버레이 아래 페이지의 "완료" 버튼과 먼저 매칭 — 앱 결함 아님) · P2 → RECOMMENDATIONS.md
+P0 0 · P1 3건 수정(PostgrestError 판정, QA 포트 오류, **이벤트에 `operations_client_id` 누락 → 이벤트함이 "연결 안 됨"으로 보여 고객사 중복 생성 위험**) · 반응형 3건 수정(위 §5) · E2E 스크립트 오류 1건 수정(투어 "다음" 버튼이 오버레이 아래 페이지의 "완료" 버튼과 먼저 매칭 — 앱 결함 아님) · P2 → RECOMMENDATIONS.md
 
 ## 11. 점수(자가)
 - STRATEGY 92 / 100 — 제약·핵심가치·왕복·증거 구조 확정, Money KPI baseline 미측정(-5), Proof 실적 없음(-3)

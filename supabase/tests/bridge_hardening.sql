@@ -230,7 +230,7 @@ select pg_temp.as_admin();
 -- 내부 멤버가 이벤트함에서 본다  ← 대표님이 화면에서 확인할 ①
 select pg_temp.as_user((select v from hfx where k='owner'));
 do $$
-declare n_req int; n_doc int; sample text;
+declare n_req int; n_doc int; n_bad int; sample text;
 begin
   select count(*) into n_req from public.customer_events
    where event_type = 'customer_request_created' and portal_client_link_id = (select v from hfx where k='link');
@@ -244,6 +244,18 @@ begin
   select string_agg(distinct status, ',') into sample from public.customer_events
    where portal_client_link_id = (select v from hfx where k='link');
   assert sample = 'linked', 'R1① 고객 행동 이벤트는 linked 상태여야 한다 (실제 ' || sample || ')';
+
+  -- 연결된 이벤트는 고객사 id 를 들고 있어야 한다.
+  -- 비어 있으면 이벤트함이 "아직 고객사와 연결되지 않음" 으로 보여 담당자가
+  -- "새 고객사로 만들기" 를 누르게 되고 고객사가 중복 생성된다. (…0008 에서 수정)
+  select count(*) into n_bad from public.customer_events
+   where portal_client_link_id is not null and operations_client_id is null;
+  assert n_bad = 0, 'R1① 연결된 이벤트에 operations_client_id 가 비어 있다 (' || n_bad || '건)';
+
+  select count(*) into n_bad from public.customer_events
+   where portal_client_link_id = (select v from hfx where k='link')
+     and operations_client_id is distinct from 'cli_h';
+  assert n_bad = 0, 'R1① 이벤트의 고객사 id 가 연결의 고객사와 달라서는 안 된다 (' || n_bad || '건)';
 end $$;
 
 -- =====================================================================

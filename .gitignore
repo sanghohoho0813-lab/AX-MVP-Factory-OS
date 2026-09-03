@@ -43,3 +43,4 @@ dist-ssr
 .datamode-out
 .autherrors-out
 .mirae-os-out
+dist-qa*/

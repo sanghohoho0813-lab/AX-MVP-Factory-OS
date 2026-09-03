@@ -51,10 +51,15 @@ Supabase Dashboard → SQL Editor 에서 **두 파일을 순서대로** 붙여 �
 
 1. `supabase/migrations/20260903000006_customer_bridge.sql` — 브릿지 본체
 2. `supabase/migrations/20260903000007_bridge_hardening.sql` — 권한 하드닝
+3. `supabase/migrations/20260903000008_event_client_link.sql` — 이벤트에 고객사 id 채우기(결함 수정 + 기존 행 backfill)
 
 2번은 Supabase Security Advisor 가 지적하는 항목을 닫는다: 트리거 전용 `bridge_on_*` SECURITY DEFINER 함수 6개와 `bridge_touch_updated_at` 에 PostgreSQL 이 기본으로 부여하는 PUBLIC EXECUTE 를 회수하고, `bridge_touch_updated_at` 의 `search_path` 를 고정하며, 내부 전용 헬퍼 `portal_link_owned` 를 authenticated 에서 닫는다. 앱이 실제로 호출하는 RPC 권한은 건드리지 않는다.
 
 > 트리거 실행 권한은 CREATE TRIGGER 시점에만 확인하고 발화 시점에는 확인하지 않으므로, EXECUTE 회수 후에도 트리거는 정상 발화한다. `supabase/tests/bridge_hardening.sql` 의 H5 가 이것을 회귀 테스트로 고정한다.
+
+3번은 `bridge_emit_customer_event` 가 연결(`portal_client_link`)에서 `operations_client_id` 를 복사하지 않던 결함을 고친다. 이 값이 비어 있으면 이벤트함이 이미 연결된 고객사인데도 "아직 고객사와 연결되지 않음 · 새 고객사로 만들기" 를 보여 고객사가 중복 생성된다. 이미 쌓인 행도 함께 backfill 한다(멱등).
+
+> **…0006 을 이미 적용했다면** 2번과 3번만 실행하면 된다. 셋 다 멱등이라 전부 다시 실행해도 안전하다.
 
 ### 3.4 적용 후 확인
 ```sql
@@ -107,7 +112,17 @@ insert into public.customer_intake_routing (workspace_id) values ('<내 workspac
 ### 3.6 앱 상태 전환
 적용이 끝나면 내부 OS 의 고객 이벤트함·고객 플랫폼 탭이 자동으로 READY 안내를 내리고 동작한다(배포 불필요 — 앱이 RPC 존재를 런타임에 판정한다). `docs/PROJECT_STATE.md` 의 Capability 표에서 브릿지를 LIVE 로 바꾼다.
 
-### 3.7 고객 업로드 제약 (기존 버킷 설정)
+### 3.7 테스트용 고객 계정 만들기
+Dashboard → Authentication → Users → **Add user** (Auto Confirm User 체크)로 만들면 이메일 인증을 건너뛸 수 있다.
+
+다만 그렇게 만든 계정은 `profiles.member_type` 이 비어 있어 공개 사이트가 `/auth/onboarding` 으로 보내고, 그 화면의 휴대폰 본인인증은 현재 "준비 중" 이라 진행이 막힌다. 테스트 계정만 아래로 통과시킨다(실제 고객에게는 쓰지 않는다):
+```sql
+update public.profiles
+   set member_type = 'business', phone_verified = true
+ where email = '<테스트 계정 이메일>';
+```
+
+### 3.8 고객 업로드 제약 (기존 버킷 설정)
 `client-documents` 버킷은 `20260827000005_operations_hub.sql` 이 만든 것으로 **10MB · pdf/jpeg/png/webp** 만 허용한다. 이번 마이그레이션은 이 설정을 바꾸지 않는다. 고객이 다른 형식을 올려야 하면 버킷 설정을 별도로 조정한다.
 
 ## 4. 기존 데이터에 대한 영향
