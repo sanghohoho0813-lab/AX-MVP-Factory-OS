@@ -40,7 +40,16 @@
 1. 왼쪽 메뉴 맨 아래 **Project Settings**(톱니바퀴) → **API**
 2. 두 값을 복사해 둡니다
    - **Project URL** — `https://xxxxxxxx.supabase.co` 형태
-   - **anon public** 키 — `eyJ...` 로 시작하는 긴 글자
+   - **공개 키** — `sb_publishable_...` 또는 `eyJ...` 로 시작하는 긴 글자
+
+> ⚠️ **가장 많이 하는 실수**: 브라우저 주소창에 있는 대시보드 주소를 넣는 것입니다.
+>
+> | | 값 |
+> |---|---|
+> | ❌ 틀림 | `https://supabase.com/dashboard/project/abcdefgh` ← 브라우저 주소창 |
+> | ✅ 맞음 | `https://abcdefgh.supabase.co` ← Project Settings > API 의 Project URL |
+>
+> 뒤쪽 영문자(`abcdefgh`)는 같습니다. 앞뒤 형태만 다릅니다.
 
 > 🔒 **주의**: 같은 화면에 있는 **`service_role`** 키는 **절대 쓰지 마세요.** 그건 모든 보안을 무시하는 마스터 키입니다.
 > `anon public` 키만 씁니다. 이 키는 원래 브라우저에 공개되는 값이고, 위에서 만든 보안 규칙(RLS)이 데이터를 지킵니다.

@@ -40,3 +40,4 @@ dist-ssr
 .client-ops-alerts-out
 .doc-parser-out
 .client-ops-stage2-out
+.datamode-out
