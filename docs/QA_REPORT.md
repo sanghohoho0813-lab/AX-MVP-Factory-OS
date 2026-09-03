@@ -19,7 +19,7 @@
 | **bridge_contract.sql** — dedupe · 라우팅 · 고객 격리 · 투영 allowlist(내부 메모/수임료/ID 부재) · storage 경로 · 워크스페이스 격리 · anon 거부 · 내부 미리보기 = 고객 투영 | PASS (로컬 PostgreSQL 16, 기존 5개 마이그레이션 + 공개 사이트 schema 위에 적용, 2회 적용 멱등) |
 
 ## 3. 브라우저 E2E (Playwright · Chromium · local 모드 · `vite preview`)
-**85/85 PASS** (기능 25 · 테마 9 · 반응형 48 · 큰 글자 2 · 모바일 메뉴 1) · 페이지 JS 오류 0. 스크린샷 23장(`shots-internal/`).
+**85/85 PASS** (기능 25 · 테마 9 · 반응형 48 · 큰 글자 2 · 모바일 메뉴 1) · 페이지 JS 오류 0. 스크린샷 23장 → `docs/qa/2026-09-03/internal/` (고객 플랫폼 Mock E2E 10장 → `docs/qa/2026-09-03/public/`).
 
 | # | 시나리오 | 결과 |
 |---|---|---|
