@@ -158,6 +158,38 @@ export interface ClientNote {
   updatedAt: string
 }
 
+/* ------------------------------------------------------------------ */
+/* 활동 기록 (자동 축적)                                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 무엇이 바뀌었는지 자동으로 남기는 기록.
+ * 사람이 직접 쓰는 메모(ClientNote)와 달리, 화면에서 상태를 바꾸는 순간
+ * 시스템이 알아서 한 줄씩 붙인다. "이 업체 어디까지 했더라"를 카톡·기억이 아니라
+ * 여기서 확인하게 하는 것이 목적이다.
+ */
+export type ActivityKind =
+  | 'service_status' // 업무 단계 변경
+  | 'service_due' // 업무 마감일 설정·변경
+  | 'document' // 서류 수령·해제·파일 첨부
+  | 'fee_added' // 수금 항목 추가
+  | 'fee_received' // 입금 확인
+  | 'funding_added' // 지원사업 신청 건 추가
+  | 'funding_status' // 지원사업 상태 변경
+  | 'profile' // 기업 기본 정보 변경
+  | 'archive' // 보관·보관 해제
+
+export interface ActivityEntry {
+  id: string
+  kind: ActivityKind
+  /** 화면에 그대로 보여줄 한 줄 (예: "벤처인증 · 준비 중 → 접수 완료") */
+  text: string
+  /** 관련 업무 (있을 때만) */
+  serviceKey: ServiceKey | null
+  /** 발생 시각 */
+  at: string
+}
+
 export interface ClientOpsRecord {
   id: string
   workspaceId: string | null
@@ -195,6 +227,8 @@ export interface ClientOpsRecord {
   fees: FeeItem[]
   notes_list: ClientNote[]
   fundingApplications: FundingApplication[]
+  /** 자동 활동 기록 — 최신순. 오래된 것은 잘라낸다. */
+  activity: ActivityEntry[]
   /** 보관 처리 시각 (보관하면 목록·경고에서 빠진다) */
   archivedAt: string | null
   createdAt: string

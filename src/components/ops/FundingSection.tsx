@@ -1,20 +1,11 @@
 import { useState } from 'react'
 import { Landmark, Plus, Trash2 } from 'lucide-react'
 import type { ClientOpsRecord, FundingStatus } from '../../types/clientOps'
+import { FUNDING_STATUS_LABEL } from '../../content/clientOpsCatalog'
 import { daysLeftFrom, dueText } from '../../services/clientOpsAlerts'
 import { formatKrw } from '../../lib/format'
 import { Button } from '../ui/Button'
 import { Panel } from '../ui/Panel'
-
-export const FUNDING_STATUS_LABEL: Record<FundingStatus, string> = {
-  watching: '공고 확인 중',
-  preparing: '서류 준비 중',
-  submitted: '접수 완료',
-  reviewing: '심사 중',
-  selected: '선정',
-  rejected: '탈락',
-  given_up: '포기',
-}
 
 const FUNDING_STATUS_ORDER: FundingStatus[] = [
   'watching',

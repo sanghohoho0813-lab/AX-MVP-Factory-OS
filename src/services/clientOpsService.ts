@@ -16,7 +16,18 @@ import {
   SERVICES,
   serviceMeta,
 } from '../content/clientOpsCatalog'
+import {
+  ACTIVITY_LIMIT,
+  documentFileText,
+  documentReceivedText,
+  feeReceivedText,
+  fundingStatusText,
+  serviceDueText,
+  serviceStatusText,
+  withActivity,
+} from './clientOpsActivity'
 import type {
+  ActivityEntry,
   ClientNote,
   ClientOpsRecord,
   FundingApplication,
@@ -221,6 +232,18 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
           createdAt: a.createdAt ?? now,
           updatedAt: a.updatedAt ?? now,
         }))
+      : [],
+    activity: Array.isArray(value.activity)
+      ? value.activity
+          .filter((a) => a && typeof a.text === 'string' && typeof a.at === 'string')
+          .map((a) => ({
+            id: a.id ?? generateId(),
+            kind: (a.kind as ActivityEntry['kind']) ?? 'profile',
+            text: a.text,
+            serviceKey: (a.serviceKey as ServiceKey | null) ?? null,
+            at: a.at,
+          }))
+          .slice(0, ACTIVITY_LIMIT)
       : [],
     archivedAt: typeof value.archivedAt === 'string' ? value.archivedAt : null,
     createdAt: value.createdAt ?? now,
@@ -450,7 +473,14 @@ export function withService(
     }
   }
 
-  return { ...record, services: { ...record.services, [key]: next } }
+  let out: ClientOpsRecord = { ...record, services: { ...record.services, [key]: next } }
+  if (patch.status && patch.status !== prev.status) {
+    out = withActivity(out, 'service_status', serviceStatusText(key, prev.status, patch.status), key)
+  }
+  if (patch.dueDate !== undefined && patch.dueDate !== prev.dueDate) {
+    out = withActivity(out, 'service_due', serviceDueText(key, patch.dueDate), key)
+  }
+  return out
 }
 
 export function withDocument(
@@ -458,13 +488,21 @@ export function withDocument(
   key: DocumentKey,
   patch: Partial<DocumentState>,
 ): ClientOpsRecord {
-  return {
+  const prev = record.documents[key]
+  let out: ClientOpsRecord = {
     ...record,
     documents: {
       ...record.documents,
-      [key]: { ...record.documents[key], ...patch, updatedAt: nowIso() },
+      [key]: { ...prev, ...patch, updatedAt: nowIso() },
     },
   }
+  if (patch.received !== undefined && patch.received !== prev.received) {
+    out = withActivity(out, 'document', documentReceivedText(key, patch.received))
+  }
+  if (patch.fileName && patch.fileName !== prev.fileName) {
+    out = withActivity(out, 'document', documentFileText(key, patch.fileName))
+  }
+  return out
 }
 
 export function withNewFee(record: ClientOpsRecord, fee: Partial<FeeItem>): ClientOpsRecord {
@@ -481,14 +519,21 @@ export function withNewFee(record: ClientOpsRecord, fee: Partial<FeeItem>): Clie
     receivedAt: fee.receivedAt ?? null,
     note: fee.note ?? '',
   }
-  return { ...record, fees: [...record.fees, item] }
+  const label = item.amount === null ? item.label : `${item.label} ${item.amount.toLocaleString('ko-KR')}원`
+  return withActivity({ ...record, fees: [...record.fees, item] }, 'fee_added', `수금 항목 추가 — ${label}`)
 }
 
 export function withFee(record: ClientOpsRecord, feeId: string, patch: Partial<FeeItem>): ClientOpsRecord {
-  return {
+  const prev = record.fees.find((f) => f.id === feeId)
+  const out: ClientOpsRecord = {
     ...record,
     fees: record.fees.map((f) => (f.id === feeId ? { ...f, ...patch } : f)),
   }
+  // 입금 확인은 계약 이행의 증거라 반드시 남긴다(해제는 오기 정정으로 보고 남기지 않는다).
+  if (prev && patch.receivedAt !== undefined && patch.receivedAt && !prev.receivedAt) {
+    return withActivity(out, 'fee_received', feeReceivedText(prev.label, patch.amount ?? prev.amount))
+  }
+  return out
 }
 
 export function withoutFee(record: ClientOpsRecord, feeId: string): ClientOpsRecord {
@@ -554,7 +599,12 @@ export function withNewFunding(
     createdAt: now,
     updatedAt: now,
   }
-  return { ...record, fundingApplications: [item, ...record.fundingApplications] }
+  return withActivity(
+    { ...record, fundingApplications: [item, ...record.fundingApplications] },
+    'funding_added',
+    `지원사업 등록 — ${item.programName.trim() || '이름 미정'}`,
+    'policyFund',
+  )
 }
 
 export function withFunding(
@@ -562,7 +612,8 @@ export function withFunding(
   id: string,
   patch: Partial<FundingApplication>,
 ): ClientOpsRecord {
-  return {
+  const prev = record.fundingApplications.find((a) => a.id === id)
+  const out: ClientOpsRecord = {
     ...record,
     fundingApplications: record.fundingApplications.map((a) => {
       if (a.id !== id) return a
@@ -577,6 +628,15 @@ export function withFunding(
       return next
     }),
   }
+  if (prev && patch.status && patch.status !== prev.status) {
+    return withActivity(
+      out,
+      'funding_status',
+      fundingStatusText(prev.programName, prev.status, patch.status),
+      'policyFund',
+    )
+  }
+  return out
 }
 
 export function withoutFunding(record: ClientOpsRecord, id: string): ClientOpsRecord {
@@ -588,7 +648,11 @@ export function withoutFunding(record: ClientOpsRecord, id: string): ClientOpsRe
 /* ------------------------------------------------------------------ */
 
 export function withArchived(record: ClientOpsRecord, archived: boolean): ClientOpsRecord {
-  return { ...record, archivedAt: archived ? nowIso() : null }
+  return withActivity(
+    { ...record, archivedAt: archived ? nowIso() : null },
+    'archive',
+    archived ? '보관 처리' : '보관 해제',
+  )
 }
 
 /* ------------------------------------------------------------------ */
