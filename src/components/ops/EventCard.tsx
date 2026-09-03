@@ -103,8 +103,8 @@ export function EventCard({
         </span>
       </div>
 
-      <p className="mt-1.5 text-[1.02rem] font-semibold break-keep text-slate-900">{s.who}</p>
-      <p className="text-[0.95rem] break-keep text-slate-600">{s.what}</p>
+      <p className="mt-1.5 text-[1.02rem] font-semibold break-keep [overflow-wrap:anywhere] text-slate-900">{s.who}</p>
+      <p className="text-[0.95rem] break-keep [overflow-wrap:anywhere] text-slate-600">{s.what}</p>
 
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.88rem]">
         {event.operationsClientId ? (

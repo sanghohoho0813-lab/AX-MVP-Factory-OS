@@ -283,9 +283,9 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         </div>
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
         {/* B. Top 3 */}
-        <section aria-labelledby="top3" data-tour="home-top3" className="flex flex-col gap-3">
+        <section aria-labelledby="top3" data-tour="home-top3" className="flex min-w-0 flex-col gap-3">
           <SectionTitle title="지금 이것부터" icon={ClipboardCheck} />
           {loading ? (
             <p className="text-[0.95rem] text-slate-500">불러오는 중…</p>
@@ -306,7 +306,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         </section>
 
         {/* C. 빠른 기록 + H. 오늘 기록 */}
-        <section aria-labelledby="capture" data-tour="home-capture" className="flex flex-col gap-3">
+        <section aria-labelledby="capture" data-tour="home-capture" className="flex min-w-0 flex-col gap-3">
           <SectionTitle title="무슨 일이 있었나요?" icon={NotebookPen} to="/journal" count={todayJournal.length} />
           <QuickCapture
             clients={active}
@@ -333,9 +333,9 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         </section>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         {/* D. 고객 이벤트 */}
-        <section aria-labelledby="events" data-tour="home-events" className="flex flex-col gap-3">
+        <section aria-labelledby="events" data-tour="home-events" className="flex min-w-0 flex-col gap-3">
           <SectionTitle title="고객 이벤트" icon={Inbox} to="/ops/inbox" count={openEvents.length} />
           {openEvents.length === 0 ? (
             <div className="rounded-(--radius-card) border border-dashed border-slate-300 bg-white p-5 text-[0.92rem] break-keep text-slate-500">
@@ -366,7 +366,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         </section>
 
         {/* E. 챙길 업체 */}
-        <section aria-labelledby="attention" className="flex flex-col gap-3">
+        <section aria-labelledby="attention" className="flex min-w-0 flex-col gap-3">
           <SectionTitle title="챙겨야 할 업체" icon={Building2} to="/ops/clients" count={attention.length} />
           {attention.length === 0 ? (
             <div className="rounded-(--radius-card) border border-dashed border-slate-300 bg-white p-5 text-[0.92rem] text-slate-500">
@@ -399,17 +399,17 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         </section>
 
         {/* F. 돈 */}
-        <section aria-labelledby="money" className="flex flex-col gap-3">
+        <section aria-labelledby="money" className="flex min-w-0 flex-col gap-3">
           <SectionTitle title="돈" icon={Wallet} />
-          <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-(--radius-card) border border-slate-200 bg-white p-3">
+          <div className="grid grid-cols-1 gap-2 min-[480px]:grid-cols-3">
+            <div className="min-w-0 rounded-(--radius-card) border border-slate-200 bg-white p-3">
               <p className="text-[0.85rem] text-slate-500">예정 수금</p>
-              <p className="text-[1.15rem] font-bold text-slate-900">{formatKrw(money.scheduled.total)}</p>
+              <p className="text-[1.15rem] font-bold break-all text-slate-900">{formatKrw(money.scheduled.total)}</p>
               <p className="text-[0.82rem] text-slate-400">{money.scheduled.count}건</p>
             </div>
-            <div className={`rounded-(--radius-card) border p-3 ${money.overdue.count > 0 ? 'border-danger-200 bg-danger-50/60' : 'border-slate-200 bg-white'}`}>
+            <div className={`min-w-0 rounded-(--radius-card) border p-3 ${money.overdue.count > 0 ? 'border-danger-200 bg-danger-50/60' : 'border-slate-200 bg-white'}`}>
               <p className="text-[0.85rem] text-slate-500">연체</p>
-              <p className={`text-[1.15rem] font-bold ${money.overdue.count > 0 ? 'text-danger-700' : 'text-slate-900'}`}>{formatKrw(money.overdue.total)}</p>
+              <p className={`text-[1.15rem] font-bold break-all ${money.overdue.count > 0 ? 'text-danger-700' : 'text-slate-900'}`}>{formatKrw(money.overdue.total)}</p>
               <p className="text-[0.82rem] text-slate-400">{money.overdue.count}건</p>
             </div>
             <div className="rounded-(--radius-card) border border-slate-200 bg-white p-3">
@@ -434,7 +434,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         </section>
 
         {/* G. 자금 마감 */}
-        <section aria-labelledby="funding" className="flex flex-col gap-3">
+        <section aria-labelledby="funding" className="flex min-w-0 flex-col gap-3">
           <SectionTitle title="지원사업 마감" icon={Landmark} to="/funding" count={funding.length} />
           {funding.length === 0 ? (
             <div className="rounded-(--radius-card) border border-dashed border-slate-300 bg-white p-5 text-[0.92rem] text-slate-500">
