@@ -27,3 +27,15 @@
 ## QA
 17. Playwright 스모크를 CI 로(현재 로컬 실행 스크립트).
 18. pgTAP 버전의 브릿지 계약 테스트(`supabase test db` 통합).
+
+## 2026-09-03 추가 (P2)
+
+- `customer_intake_routing` 은 `is_default` 에 유니크 제약이 없다. `default_intake_workspace()` 는
+  `is_default` 중 `created_at` 이 가장 이른 것을 고르므로 결과는 결정적이지만, 나중에 행을 하나 더
+  넣어도 유입처가 바뀌지 않는다(조용히 무시된다). 워크스페이스를 여러 개 쓰게 되면 부분 유니크
+  인덱스(`where is_default`)나 "지정 시 기존 default 해제" 규칙을 넣는다.
+- 고객 알림 발송(이메일/카톡)이 없어, 내부가 업데이트를 발행해도 고객은 직접 들어와야 안다.
+- 공개 사이트 `public` 스키마에 RLS 가 꺼진 테이블이 있다(`tools`, `tool_access`, `reviews`,
+  `surveys`, `user_roles`, `payments`). 이번 브릿지와 무관하고 고객 포털 경로도 이들을 읽지
+  않지만, Supabase Security Advisor 는 별도로 지적한다. 공개 사이트 저장소에서 따로 판단한다.
+- 내부 OS local 모드 헤더의 워크스페이스/사용자 표시는 아직 데모 상수다.

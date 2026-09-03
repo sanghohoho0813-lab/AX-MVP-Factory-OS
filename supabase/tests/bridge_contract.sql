@@ -52,7 +52,11 @@ insert into public.workspace_members (workspace_id, user_id, role) values
   ((select v from fx where k='ws1'), (select v from fx where k='owner1'), 'owner'),
   ((select v from fx where k='ws2'), (select v from fx where k='owner2'), 'owner');
 
--- ws2 가 먼저 만들어졌더라도 라우팅 테이블이 우선한다
+-- ws2 가 먼저 만들어졌더라도 라우팅 테이블이 우선한다.
+-- default_intake_workspace() 는 is_default 중 created_at 이 가장 이른 것을 고르므로,
+-- 이미 라우팅 행이 있는 DB(운영에서 유입 워크스페이스를 지정한 경우)에서도
+-- 이 테스트가 성립하도록 트랜잭션 안에서만 기존 행을 치운다(마지막에 ROLLBACK).
+delete from public.customer_intake_routing;
 insert into public.customer_intake_routing (workspace_id, is_default) values ((select v from fx where k='ws1'), true);
 
 insert into public.operations_clients (id, workspace_id, company_name, payload)
