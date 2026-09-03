@@ -18,7 +18,8 @@ type Filter = 'open' | 'all' | CustomerEventStatus
 
 /** 브릿지 테이블이 아직 없을 때(마이그레이션 미적용) 나는 오류인지 */
 function isNotReadyError(cause: unknown): boolean {
-  const msg = cause instanceof Error ? cause.message : String(cause)
+  const o = cause as { message?: unknown; code?: unknown; details?: unknown } | null
+  const msg = [o?.message, o?.code, o?.details].filter((v) => typeof v === 'string').join(' ') || String(cause)
   return /relation .* does not exist|customer_events|42P01|schema cache/i.test(msg)
 }
 

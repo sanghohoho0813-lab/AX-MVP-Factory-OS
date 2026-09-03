@@ -17,7 +17,7 @@ export function PageHeader({ title, description, actions }: PageHeaderProps) {
           <p className="mt-1.5 text-[0.95rem] break-keep text-slate-500">{description}</p>
         )}
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {actions && <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">{actions}</div>}
     </div>
   )
 }

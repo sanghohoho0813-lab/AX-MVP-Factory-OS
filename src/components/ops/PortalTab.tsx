@@ -40,7 +40,8 @@ import { getDataModeConfig } from '../../data/dataMode'
 import { brand } from '../../brand/brand.config'
 
 function isNotReadyError(cause: unknown): boolean {
-  const msg = cause instanceof Error ? cause.message : String(cause)
+  const o = cause as { message?: unknown; code?: unknown; details?: unknown } | null
+  const msg = [o?.message, o?.code, o?.details].filter((v) => typeof v === 'string').join(' ') || String(cause)
   return /relation .* does not exist|portal_|42P01|schema cache|PGRST/i.test(msg)
 }
 
