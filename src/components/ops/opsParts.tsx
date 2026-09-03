@@ -254,18 +254,28 @@ export function ClientStatusChip({ status }: { status: ClientOpsStatus }) {
 }
 
 /** 숫자 요약 타일 */
+/**
+ * 요약 숫자 한 칸.
+ * onClick 을 주면 눌러서 해당 숫자를 만든 목록으로 좁혀 볼 수 있다.
+ * 숫자만 보여 주고 끝나면 "그래서 어느 업체인데?"를 다시 찾아야 하므로,
+ * 셀 수 있는 숫자에는 되도록 목록으로 가는 길을 붙인다.
+ */
 export function StatTile({
   label,
   value,
   tone = 'neutral',
   hint,
   icon: Icon,
+  onClick,
+  active = false,
 }: {
   label: string
   value: string
   tone?: 'neutral' | 'danger' | 'warning' | 'success'
   hint?: string
   icon: typeof Check
+  onClick?: () => void
+  active?: boolean
 }) {
   const cls =
     tone === 'danger'
@@ -275,8 +285,15 @@ export function StatTile({
         : tone === 'success'
           ? 'border-success-200 bg-success-50/70'
           : 'border-slate-200 bg-white'
+  const interactive = onClick
+    ? `cursor-pointer text-left transition-shadow hover:shadow-(--shadow-card) ${active ? 'ring-2 ring-brand-600' : ''}`
+    : ''
+  const Tag = onClick ? 'button' : 'div'
   return (
-    <div className={`rounded-(--radius-panel) border p-4 ${cls}`}>
+    <Tag
+      {...(onClick ? { type: 'button' as const, onClick, 'aria-pressed': active } : {})}
+      className={`block w-full rounded-(--radius-panel) border p-4 ${cls} ${interactive}`}
+    >
       <div className="flex items-center justify-between gap-2">
         <span className="text-[0.95rem] font-medium text-slate-600">{label}</span>
         <Icon aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
@@ -285,7 +302,7 @@ export function StatTile({
         {value}
       </strong>
       {hint && <span className="mt-0.5 block text-[0.85rem] break-keep text-slate-500">{hint}</span>}
-    </div>
+    </Tag>
   )
 }
 

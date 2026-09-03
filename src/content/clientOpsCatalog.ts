@@ -7,6 +7,7 @@
 import type {
   DocumentKey,
   FeeKind,
+  FundingStatus,
   ServiceKey,
   ServiceStatus,
 } from '../types/clientOps'
@@ -135,6 +136,16 @@ export function serviceMeta(key: ServiceKey): ServiceMeta {
 }
 
 /* 업무 상태 표시 */
+export const FUNDING_STATUS_LABEL: Record<FundingStatus, string> = {
+  watching: '공고 확인 중',
+  preparing: '서류 준비 중',
+  submitted: '신청 접수',
+  reviewing: '심사 중',
+  selected: '선정',
+  rejected: '탈락',
+  given_up: '포기',
+}
+
 export const SERVICE_STATUS_LABEL: Record<ServiceStatus, string> = {
   not_applicable: '해당 없음',
   not_started: '시작 전',

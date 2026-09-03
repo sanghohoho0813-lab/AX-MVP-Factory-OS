@@ -83,6 +83,8 @@ import {
 import { CompanyProfileCard, NotesSection } from '../components/ops/opsProfile'
 import { FundingSection } from '../components/ops/FundingSection'
 import { DocImportModal } from '../components/ops/DocImportModal'
+import { withActivity } from '../services/clientOpsActivity'
+import { ActivityLog } from '../components/ops/ActivityLog'
 
 const CLIENT_STATUS_ORDER: ClientOpsStatus[] = ['active', 'waiting', 'paused', 'completed']
 const CLIENT_STATUS_TEXT: Record<ClientOpsStatus, string> = {
@@ -219,7 +221,16 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
             업체 상태
             <select
               value={record.status}
-              onChange={(e) => void commit({ ...record, status: e.target.value as ClientOpsStatus })}
+              onChange={(e) => {
+                const status = e.target.value as ClientOpsStatus
+                void commit(
+                  withActivity(
+                    { ...record, status },
+                    'profile',
+                    `업체 상태 · ${CLIENT_STATUS_TEXT[record.status]} → ${CLIENT_STATUS_TEXT[status]}`,
+                  ),
+                )
+              }}
               className="mt-1 block rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.98rem]"
             >
               {CLIENT_STATUS_ORDER.map((s) => (
@@ -675,6 +686,8 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
 
       <FeesSection record={record} onChange={commit} today={today} />
 
+      <ActivityLog entries={record.activity} />
+
       <NotesSection
         record={record}
         onAdd={(text) => void commit(withNewNote(record, text))}
@@ -747,7 +760,8 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
             if (picked.address) next.businessAddress = picked.address
             if (picked.businessCategory) next.businessCategory = picked.businessCategory
             if (picked.businessItem) next.businessItem = picked.businessItem
-            void commit(next)
+            const filled = Object.values(picked).filter((v) => typeof v === 'string' && v.trim() !== '').length
+            void commit(withActivity(next, 'profile', `서류에서 기업 정보 ${filled}개 항목 반영`))
             setImportOpen(false)
             showToast('서류에서 읽은 정보를 반영했습니다.')
           }}
