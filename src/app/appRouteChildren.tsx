@@ -36,6 +36,9 @@ const OperationsHubPage = lazy(() => import('../pages/OperationsHubPage').then((
 const OperationsClientDetailPage = lazy(() => import('../pages/OperationsClientDetailPage').then((m) => ({ default: m.OperationsClientDetailPage })))
 const OpsCalendarPage = lazy(() => import('../pages/OpsCalendarPage').then((m) => ({ default: m.OpsCalendarPage })))
 const ToolsHubPage = lazy(() => import('../pages/ToolsHubPage').then((m) => ({ default: m.ToolsHubPage })))
+const TodayCommandCenterPage = lazy(() => import('../pages/TodayCommandCenterPage').then((m) => ({ default: m.TodayCommandCenterPage })))
+const JournalPage = lazy(() => import('../pages/JournalPage').then((m) => ({ default: m.JournalPage })))
+const CustomerInboxPage = lazy(() => import('../pages/CustomerInboxPage').then((m) => ({ default: m.CustomerInboxPage })))
 
 // 진단 관리·공개 설문은 route-level lazy loading으로 초기 번들을 줄인다
 const DiagnosisStudioPage = lazy(() =>
@@ -327,7 +330,8 @@ export function RouteFallback() {
 }
 
 export const appRouteChildren = [
-      { index: true, element: <Navigate to="/ops/clients" replace /> },
+      // 홈 = 오늘의 Command Center. 예전 /today 는 홈으로 안내한다(주소 호환).
+      { index: true, element: <TodayCommandCenterPage /> },
       { path: 'clients', element: <ClientsListPage /> },
       { path: 'clients/new', element: <OrganizationFormPage /> },
       { path: 'clients/:organizationId', element: <OrganizationDetailPage /> },
@@ -337,7 +341,11 @@ export const appRouteChildren = [
       { path: 'projects/:projectId/edit', element: <ProjectFormPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'getting-started', element: <GettingStartedPage /> },
-      { path: 'today', element: <TodayOpsPage /> },
+      { path: 'today', element: <Navigate to="/" replace /> },
+      { path: 'today/legacy', element: <TodayOpsPage /> },
+      { path: 'journal', element: <JournalPage /> },
+      { path: 'journal/:range', element: <JournalPage /> },
+      { path: 'ops/inbox', element: <CustomerInboxPage /> },
       { path: 'ops/clients', element: <OperationsHubPage /> },
       { path: 'ops/calendar', element: <OpsCalendarPage /> },
       { path: 'ops/clients/:clientId', element: <OperationsClientDetailPage /> },

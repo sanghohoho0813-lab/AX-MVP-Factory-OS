@@ -48,6 +48,13 @@ export const STORAGE_KEYS = {
   clientOpsChecks: `${KEY_PREFIX}.${DATA_NS}.client_ops_checks`,
   clientOperations: `${KEY_PREFIX}.${DATA_NS}.client_operations`,
   operationsClients: `${KEY_PREFIX}.${DATA_NS}.operations_clients`,
+  // 고객 플랫폼 브릿지 · 업무 일기 (local 모드 어댑터)
+  journalEntries: `${KEY_PREFIX}.${DATA_NS}.ops_journal_entries`,
+  customerEvents: `${KEY_PREFIX}.${DATA_NS}.customer_events`,
+  portalLinks: `${KEY_PREFIX}.${DATA_NS}.portal_client_links`,
+  portalUpdates: `${KEY_PREFIX}.${DATA_NS}.portal_updates`,
+  portalRequests: `${KEY_PREFIX}.${DATA_NS}.portal_requests`,
+  portalDocuments: `${KEY_PREFIX}.${DATA_NS}.portal_documents`,
 } as const
 
 /** 마이그레이션 전 안전 백업 키 접두어 */

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
   Check,
@@ -85,6 +85,12 @@ import { FundingSection } from '../components/ops/FundingSection'
 import { DocImportModal } from '../components/ops/DocImportModal'
 import { withActivity } from '../services/clientOpsActivity'
 import { ActivityLog } from '../components/ops/ActivityLog'
+import { PortalTab } from '../components/ops/PortalTab'
+import { ClientJournalTab } from '../components/ops/ClientJournalTab'
+import { FilesTab } from '../components/ops/FilesTab'
+import { listLinksForClient } from '../services/customerBridgeService'
+import { buildClientSchedule } from '../services/clientOpsSchedule'
+import { brand } from '../brand/brand.config'
 
 const CLIENT_STATUS_ORDER: ClientOpsStatus[] = ['active', 'waiting', 'paused', 'completed']
 const CLIENT_STATUS_TEXT: Record<ClientOpsStatus, string> = {
@@ -97,9 +103,30 @@ const CLIENT_STATUS_TEXT: Record<ClientOpsStatus, string> = {
 const inputCls =
   'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.98rem] focus:border-brand-500 focus:outline-none'
 
-function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
+type DetailTab = 'overview' | 'work' | 'docs' | 'fees' | 'funding' | 'portal' | 'journal' | 'files'
+const DETAIL_TABS: { key: DetailTab; label: string }[] = [
+  { key: 'overview', label: '개요' },
+  { key: 'work', label: '업무' },
+  { key: 'docs', label: '서류' },
+  { key: 'fees', label: '수금' },
+  { key: 'funding', label: '자금·지원' },
+  { key: 'portal', label: '고객 플랫폼' },
+  { key: 'journal', label: '업무 일기' },
+  { key: 'files', label: '파일' },
+]
+function isDetailTab(v: string | null): v is DetailTab {
+  return DETAIL_TABS.some((t) => t.key === v)
+}
+
+function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | null; userId: string | null }) {
   const { clientId = '' } = useParams()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const tab: DetailTab = isDetailTab(tabParam) ? tabParam : 'overview'
+  const setTab = (next: DetailTab) => setSearchParams(next === 'overview' ? {} : { tab: next }, { replace: true })
+  const [portalLinked, setPortalLinked] = useState<boolean | null>(null)
+  const [infoOpen, setInfoOpen] = useState(false)
   const { showToast } = useToast()
   const [record, setRecord] = useState<ClientOpsRecord | null>(null)
   const [loading, setLoading] = useState(true)
@@ -130,6 +157,15 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
     void load()
   }, [load])
 
+  // 고객 플랫폼 연결 여부 — 헤더 칩용. 브릿지 미적용이면 null(표시 안 함)
+  useEffect(() => {
+    let alive = true
+    listLinksForClient(workspaceId, clientId)
+      .then((links) => { if (alive) setPortalLinked(links.some((l) => l.status === 'active')) })
+      .catch(() => { if (alive) setPortalLinked(null) })
+    return () => { alive = false }
+  }, [workspaceId, clientId, tab])
+
   const commit = useCallback(
     async (next: ClientOpsRecord) => {
       setRecord(next)
@@ -157,6 +193,13 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
       for (const d of missingDocumentsFor(record, s.key, today)) set.add(d.key)
     }
     return set
+  }, [record, today])
+
+  /** 가장 임박한 마감 (헤더 표시) */
+  const nearest = useMemo(() => {
+    if (!record) return null
+    const upcoming = buildClientSchedule(record, today).filter((e) => !e.done)
+    return upcoming.sort((a, b) => a.date.localeCompare(b.date))[0] ?? null
   }, [record, today])
 
   if (loading) return <p className="px-1 py-10 text-[0.98rem] text-slate-500">불러오는 중…</p>
@@ -215,6 +258,19 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
               <PhoneLink phone={record.contactPhone} />
               {record.contactName && <span>{record.contactName}</span>}
               {record.businessNumber && <span>사업자 {record.businessNumber}</span>}
+            </p>
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.92rem]">
+              <span className="text-slate-700"><span className="text-slate-400">다음 행동 · </span>{record.nextAction || '미정'}{record.nextActionDueDate ? ` (${record.nextActionDueDate})` : ''}</span>
+              {nearest && (
+                <span className={nearest.daysLeft !== null && nearest.daysLeft < 0 ? 'font-semibold text-danger-700' : 'text-slate-700'}>
+                  <span className="text-slate-400">가장 임박 · </span>{nearest.title} {nearest.date}
+                </span>
+              )}
+              {portalLinked !== null && (
+                <button type="button" onClick={() => setTab('portal')} className={`rounded-full px-2 py-0.5 text-[0.82rem] font-semibold ${portalLinked ? 'bg-success-50 text-success-700' : 'bg-slate-100 text-slate-500'}`}>
+                  {brand.customerPlatformLabel} {portalLinked ? '연결됨' : '미연결'}
+                </button>
+              )}
             </p>
           </div>
           <label className="text-[0.92rem] font-medium text-slate-600">
@@ -288,8 +344,72 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
         )}
       </div>
 
-      {/* 회사 기본 정보 — 자주 찾는 값 */}
-      <CompanyProfileCard record={record} today={today} onImport={() => setImportOpen(true)} />
+      {/* 탭 — 개요는 요약, 나머지는 각 영역 */}
+      <div role="tablist" aria-label="업체 상세" className="-mx-1 flex gap-1 overflow-x-auto border-b border-slate-200 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {DETAIL_TABS.map((t) => {
+          const badge =
+            t.key === 'overview' ? alerts.filter((a) => a.severity === 'critical').length
+              : t.key === 'docs' ? urgentDocs.size
+                : t.key === 'fees' ? record.fees.filter((f) => !f.receivedAt).length
+                  : t.key === 'funding' ? record.fundingApplications.filter((a) => a.status === 'watching' || a.status === 'preparing').length
+                    : 0
+          return (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.key}
+              onClick={() => setTab(t.key)}
+              className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[0.95rem] font-semibold whitespace-nowrap ${
+                tab === t.key ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              {t.label}
+              {badge > 0 && <span className={`rounded-full px-1.5 text-[0.75rem] ${t.key === 'overview' ? 'bg-danger-50 text-danger-700' : 'bg-slate-100 text-slate-600'}`}>{badge}</span>}
+            </button>
+          )
+        })}
+      </div>
+
+      {tab === 'overview' && (
+        <>
+      {/* NOW → 진행 중 업무 → 막힘 → 돈 → 고객 */}
+      <section aria-label="지금" className="grid gap-3 lg:grid-cols-2">
+        <div className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 shadow-(--shadow-card)">
+          <p className="text-[0.85rem] font-semibold tracking-wide text-slate-400 uppercase">지금</p>
+          <p className="mt-1 text-[1.05rem] font-bold break-keep text-slate-900">{record.nextAction || '다음 행동이 정해지지 않았습니다.'}</p>
+          {record.nextActionDueDate && <p className="text-[0.9rem] text-slate-500">{record.nextActionDueDate}까지</p>}
+          <div className="mt-3">
+            <p className="text-[0.85rem] font-semibold text-slate-500">진행 중인 업무</p>
+            <ul className="mt-1 flex flex-wrap gap-1.5">
+              {SERVICES.filter((m) => isServiceStarted(record.services[m.key].status) && record.services[m.key].status !== 'done').map((m) => (
+                <li key={m.key}>
+                  <button type="button" onClick={() => setTab('work')} className={`rounded-full border px-2.5 py-1 text-[0.85rem] font-medium ${ACCENT_CLASS[m.accent].chip}`}>
+                    {m.shortLabel} · {SERVICE_STATUS_LABEL[record.services[m.key].status]}
+                  </button>
+                </li>
+              ))}
+              {SERVICES.every((m) => !isServiceStarted(record.services[m.key].status) || record.services[m.key].status === 'done') && (
+                <li className="text-[0.9rem] text-slate-400">진행 중인 업무가 없습니다.</li>
+              )}
+            </ul>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-1">
+          <button type="button" onClick={() => setTab('docs')} className={`rounded-(--radius-panel) border p-4 text-left shadow-(--shadow-card) ${urgentDocs.size > 0 ? 'border-danger-200 bg-danger-50/60' : 'border-slate-200 bg-white'}`}>
+            <p className="text-[0.85rem] font-semibold text-slate-500">막힘 · 없는 서류</p>
+            <p className={`text-[1.2rem] font-bold ${urgentDocs.size > 0 ? 'text-danger-700' : 'text-slate-900'}`}>{urgentDocs.size}건</p>
+          </button>
+          <button type="button" onClick={() => setTab('fees')} className={`rounded-(--radius-panel) border p-4 text-left shadow-(--shadow-card) ${progress.overduePayments > 0 ? 'border-danger-200 bg-danger-50/60' : 'border-slate-200 bg-white'}`}>
+            <p className="text-[0.85rem] font-semibold text-slate-500">돈 · 아직 못 받음</p>
+            <p className={`text-[1.2rem] font-bold ${progress.overduePayments > 0 ? 'text-danger-700' : 'text-slate-900'}`}>{formatKrw(progress.unpaidAmount)}</p>
+          </button>
+          <button type="button" onClick={() => setTab('portal')} className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 text-left shadow-(--shadow-card)">
+            <p className="text-[0.85rem] font-semibold text-slate-500">고객 · {brand.customerPortalLabel}</p>
+            <p className="text-[1.2rem] font-bold text-slate-900">{portalLinked === null ? '준비 중' : portalLinked ? '연결됨' : '미연결'}</p>
+          </button>
+        </div>
+      </section>
 
       {/* 이 업체에서 지금 챙길 것 */}
       {alerts.length > 0 && (
@@ -328,7 +448,14 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
         />
       </section>
 
-      {/* 진행 업무 */}
+      <ActivityLog entries={record.activity} />
+
+      {/* 회사 기본 정보 — 자주 찾는 값 */}
+      <CompanyProfileCard record={record} today={today} onImport={() => setImportOpen(true)} />
+        </>
+      )}
+
+      {tab === 'work' && (
       <section aria-labelledby="svc" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 id="svc" className="text-[1.3rem] font-bold text-slate-900">
@@ -525,7 +652,9 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
         </div>
       </section>
 
-      {/* 서류함 */}
+      )}
+
+      {tab === 'docs' && (
       <section aria-labelledby="docs" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 id="docs" className="text-[1.3rem] font-bold text-slate-900">
@@ -676,30 +805,44 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
         </div>
       </section>
 
-      <FundingSection
-        record={record}
-        today={today}
-        onAdd={(input) => void commit(withNewFunding(record, input))}
-        onChange={(id, patch) => void commit(withFunding(record, id, patch))}
-        onRemove={(id) => void commit(withoutFunding(record, id))}
-      />
+      )}
 
-      <FeesSection record={record} onChange={commit} today={today} />
+      {tab === 'funding' && (
+        <FundingSection
+          record={record}
+          today={today}
+          onAdd={(input) => void commit(withNewFunding(record, input))}
+          onChange={(id, patch) => void commit(withFunding(record, id, patch))}
+          onRemove={(id) => void commit(withoutFunding(record, id))}
+        />
+      )}
 
-      <ActivityLog entries={record.activity} />
+      {tab === 'fees' && <FeesSection record={record} onChange={commit} today={today} />}
 
-      <NotesSection
-        record={record}
-        onAdd={(text) => void commit(withNewNote(record, text))}
-        onEdit={(id, text) => void commit(withNoteText(record, id, text))}
-        onPin={(id, pinned) => void commit(withNotePinned(record, id, pinned))}
-        onDelete={(id) => void commit(withoutNote(record, id))}
-      />
+      {tab === 'portal' && <PortalTab record={record} workspaceId={workspaceId} />}
 
-      {/* 업체 정보 */}
+      {tab === 'journal' && (
+        <>
+          <ClientJournalTab record={record} workspaceId={workspaceId} userId={userId} />
+          <NotesSection
+            record={record}
+            onAdd={(text) => void commit(withNewNote(record, text))}
+            onEdit={(id, text) => void commit(withNoteText(record, id, text))}
+            onPin={(id, pinned) => void commit(withNotePinned(record, id, pinned))}
+            onDelete={(id) => void commit(withoutNote(record, id))}
+          />
+        </>
+      )}
+
+      {tab === 'files' && <FilesTab record={record} workspaceId={workspaceId} />}
+
+      {/* 업체 정보 — 개요 아래에 접어 둔다 */}
+      {tab === 'overview' && (
       <section aria-labelledby="info" className="flex flex-col gap-3">
         <h2 id="info" className="text-[1.3rem] font-bold text-slate-900">
-          업체 정보
+          <button type="button" onClick={() => setInfoOpen((v) => !v)} aria-expanded={infoOpen} className="inline-flex items-center gap-2">
+            업체 정보 수정 <span className="text-[0.85rem] font-medium text-slate-400">{infoOpen ? '접기' : '펼치기'}</span>
+          </button>
         </h2>
         <Panel>
           <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
@@ -734,6 +877,8 @@ function ClientDetailContent({ workspaceId }: { workspaceId: string | null }) {
           </p>
         </Panel>
       </section>
+
+      )}
 
       {importOpen && (
         <DocImportModal
@@ -979,14 +1124,14 @@ function FeesSection({
 }
 
 function CloudClientDetail() {
-  const { currentWorkspaceId } = useAuth()
-  return <ClientDetailContent workspaceId={currentWorkspaceId} />
+  const { currentWorkspaceId, session } = useAuth()
+  return <ClientDetailContent workspaceId={currentWorkspaceId} userId={session?.user.id ?? null} />
 }
 
 export function OperationsClientDetailPage() {
   return getDataModeConfig().mode === 'supabase' ? (
     <CloudClientDetail />
   ) : (
-    <ClientDetailContent workspaceId={null} />
+    <ClientDetailContent workspaceId={null} userId={null} />
   )
 }
