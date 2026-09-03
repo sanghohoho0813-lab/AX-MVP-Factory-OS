@@ -15,7 +15,8 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { getDataModeConfig } from '../data/dataMode'
-import { createClient, listClients, replaceAllClients } from '../services/clientOpsService'
+import { CloudUpload } from 'lucide-react'
+import { createClient, listClients, readLocalClients, replaceAllClients } from '../services/clientOpsService'
 import { downloadBackup, mergeBackup, parseBackup, type MergeMode } from '../services/clientOpsBackup'
 import {
   buildAllAlerts,
@@ -59,6 +60,8 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const [query, setQuery] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const [restoring, setRestoring] = useState(false)
+  const [leftover, setLeftover] = useState<ClientOpsRecord[]>([])
+  const [migrating, setMigrating] = useState(false)
   const restoreRef = useRef<HTMLInputElement>(null)
 
   const today = todayLocalDate()
@@ -78,6 +81,16 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   useEffect(() => {
     void load()
   }, [load])
+
+  // 클라우드 모드인데 이 브라우저에 예전 로컬 데이터가 남아 있으면 옮기도록 안내한다
+  useEffect(() => {
+    if (getDataModeConfig().mode !== 'supabase') return
+    try {
+      setLeftover(readLocalClients())
+    } catch {
+      setLeftover([])
+    }
+  }, [])
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -145,6 +158,25 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     }
   }
 
+  const migrateLocal = async () => {
+    if (leftover.length === 0) return
+    setMigrating(true)
+    setError('')
+    try {
+      const result = mergeBackup(records, leftover, 'merge')
+      await replaceAllClients(workspaceId, result.records)
+      await load()
+      setLeftover([])
+      window.alert(
+        `이 브라우저에 있던 고객 ${leftover.length}곳을 클라우드로 옮겼습니다.\n추가 ${result.added}곳 · 갱신 ${result.updated}곳\n\n브라우저에 있던 원본은 그대로 남아 있습니다.`,
+      )
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '옮기지 못했습니다.')
+    } finally {
+      setMigrating(false)
+    }
+  }
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!form.companyName.trim()) return
@@ -202,6 +234,24 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
           className="rounded-(--radius-control) border border-danger-200 bg-danger-50 px-4 py-3 text-[0.95rem] text-danger-700"
         >
           {error}
+        </div>
+      )}
+
+      {leftover.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-(--radius-panel) border border-brand-200 bg-brand-50/70 px-4 py-3.5">
+          <CloudUpload aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
+          <p className="min-w-0 flex-1 text-[0.98rem] break-keep text-slate-800">
+            이 브라우저에 예전에 입력한 고객 <strong>{leftover.length}곳</strong>이 남아 있습니다. 클라우드로 옮기면 휴대폰·다른 PC에서도 볼 수 있습니다.
+          </p>
+          <div className="flex shrink-0 gap-2">
+            <Button variant="primary" onClick={() => void migrateLocal()} disabled={migrating}>
+              <CloudUpload aria-hidden="true" className="size-4" />
+              {migrating ? '옮기는 중…' : '클라우드로 옮기기'}
+            </Button>
+            <Button variant="ghost" onClick={() => setLeftover([])}>
+              나중에
+            </Button>
+          </div>
         </div>
       )}
 

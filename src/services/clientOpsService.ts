@@ -239,6 +239,14 @@ function readLocal(): ClientOpsRecord[] {
   ).map(normalizeClientOps)
 }
 
+/**
+ * 데이터 모드와 상관없이 이 브라우저(localStorage)에 남아 있는 고객을 읽는다.
+ * 로컬 → 클라우드 이전에만 사용한다.
+ */
+export function readLocalClients(): ClientOpsRecord[] {
+  return readLocal()
+}
+
 function writeLocal(records: ClientOpsRecord[]): void {
   writeJson(STORAGE_KEYS.operationsClients, records)
   notifyStoreChanged()

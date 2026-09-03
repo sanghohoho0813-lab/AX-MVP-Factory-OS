@@ -17,6 +17,7 @@ import { WorkspaceMembersPanel } from '../../components/data/WorkspaceMembersPan
 import { ImportWizard } from '../../components/data/ImportWizard'
 import { TabNav, SettingRow, TextScalePanel, FeatureVisibilityPanel, SystemPanel, type TabKey } from './parts'
 import { OnboardingSettingsPanel } from './OnboardingSettingsPanel'
+import { SupabaseHealthPanel } from './SupabaseHealthPanel'
 
 function DataPanelSupabase() {
   const { showToast } = useToast()
@@ -97,6 +98,7 @@ export function SupabaseSettingsView() {
         </Panel>
       )}
       {tab === 'data' && <DataPanelSupabase />}
+      {tab === 'system' && <SupabaseHealthPanel />}
       {tab === 'system' && <SystemPanel mode="supabase" connection={<CloudSaveStatus state="saved" />} />}
     </div>
   )

@@ -16,19 +16,23 @@ create index if not exists operations_clients_workspace_updated_idx
 
 alter table public.operations_clients enable row level security;
 
+drop policy if exists "Workspace members can read operations clients" on public.operations_clients;
 create policy "Workspace members can read operations clients"
   on public.operations_clients for select to authenticated
   using (public.is_workspace_member(workspace_id));
 
+drop policy if exists "Workspace members can create operations clients" on public.operations_clients;
 create policy "Workspace members can create operations clients"
   on public.operations_clients for insert to authenticated
   with check (public.can_write_workspace(workspace_id));
 
+drop policy if exists "Workspace members can update operations clients" on public.operations_clients;
 create policy "Workspace members can update operations clients"
   on public.operations_clients for update to authenticated
   using (public.can_write_workspace(workspace_id))
   with check (public.can_write_workspace(workspace_id));
 
+drop policy if exists "Workspace members can delete operations clients" on public.operations_clients;
 create policy "Workspace members can delete operations clients"
   on public.operations_clients for delete to authenticated
   using (public.can_write_workspace(workspace_id));
@@ -43,19 +47,23 @@ insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
 values ('client-documents', 'client-documents', false, 10485760, array['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
 on conflict (id) do update set public = false, file_size_limit = 10485760;
 
+drop policy if exists "Workspace members can list client documents" on storage.objects;
 create policy "Workspace members can list client documents"
   on storage.objects for select to authenticated
   using (bucket_id = 'client-documents' and public.is_workspace_member((storage.foldername(name))[1]::uuid));
 
+drop policy if exists "Workspace members can upload client documents" on storage.objects;
 create policy "Workspace members can upload client documents"
   on storage.objects for insert to authenticated
   with check (bucket_id = 'client-documents' and public.can_write_workspace((storage.foldername(name))[1]::uuid));
 
+drop policy if exists "Workspace members can update client documents" on storage.objects;
 create policy "Workspace members can update client documents"
   on storage.objects for update to authenticated
   using (bucket_id = 'client-documents' and public.can_write_workspace((storage.foldername(name))[1]::uuid))
   with check (bucket_id = 'client-documents' and public.can_write_workspace((storage.foldername(name))[1]::uuid));
 
+drop policy if exists "Workspace members can remove client documents" on storage.objects;
 create policy "Workspace members can remove client documents"
   on storage.objects for delete to authenticated
   using (bucket_id = 'client-documents' and public.can_write_workspace((storage.foldername(name))[1]::uuid));
