@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./styles/themes.generated.css";
 
 @theme {
   /* Typography — 로컬 설치 폰트 우선, 외부 CDN 의존 없음 */
@@ -41,11 +42,68 @@
   --color-danger-600: #dc2626;
   --color-danger-700: #b91c1c;
 
-  /* AI / design accent — limited violet */
+  /* AI / design accent — 테마 Accent 로 치환된다 */
   --color-accent-50: #f5f3ff;
   --color-accent-200: #ddd6fe;
   --color-accent-600: #7c3aed;
   --color-accent-700: #6d28d9;
+
+  /* 테마 Secondary — 보조 배지·차트 */
+  --color-second-50: #ecfeff;
+  --color-second-200: #a5f3fc;
+  --color-second-600: #0891b2;
+  --color-second-700: #0e7490;
+
+  /* 테마 Highlight — 강조 라인·포인트 */
+  --color-highlight-100: #fef3c7;
+  --color-highlight-500: #e7c873;
+  --color-highlight-700: #97791d;
+
+  /* 테마 Soft — 넓은 면적의 옅은 브랜드 틴트 */
+  --color-soft-50: #f8fafc;
+  --color-soft-100: #e2e8f0;
+
+  /*
+   * 분류 식별색 — 테마와 무관하게 고정한다.
+   * "이건 서류, 저건 돈, 저건 지원사업" 같은 종류 구분에만 쓰며,
+   * 화면 테마를 바꿔도 구분 방식이 흔들리지 않게 하려는 의도다.
+   * 일반 강조·버튼·선택 상태에는 절대 쓰지 않는다(그건 테마 색의 몫).
+   *   plan 기획/설계 · doc 서류 · money 수금 · client 고객 · fund 지원사업
+   */
+  --color-cat-plan-50: #eff3ff;
+  --color-cat-plan-200: #ced4ff;
+  --color-cat-plan-500: #7376d9;
+  --color-cat-plan-700: #3f3b99;
+  --color-cat-doc-50: #fff5e1;
+  --color-cat-doc-200: #ffdeb5;
+  --color-cat-doc-500: #d79a43;
+  --color-cat-doc-700: #8c5400;
+  --color-cat-money-50: #e6fbf0;
+  --color-cat-money-200: #b9e5d0;
+  --color-cat-money-500: #3c9a75;
+  --color-cat-money-700: #005f3e;
+  --color-cat-client-50: #e8f7ff;
+  --color-cat-client-200: #c0deff;
+  --color-cat-client-500: #5b8def;
+  --color-cat-client-700: #204da9;
+  --color-cat-fund-50: #ffeee9;
+  --color-cat-fund-200: #ffcbc2;
+  --color-cat-fund-500: #d66a5e;
+  --color-cat-fund-700: #902a23;
+
+  /* 달력 요일 — 한국 달력 관례(일요일 빨강 · 토요일 파랑)로 고정한다 */
+  --color-weekday-sun: #c2410c;
+  --color-weekday-sat: #1d4ed8;
+
+  /* 메뉴 아이콘 식별색 — 테마와 무관하게 고정한다(목차 인지용, 6~8색 제한) */
+  --color-nav-overview: #5b8def;
+  --color-nav-ops: #3aafa9;
+  --color-nav-revenue: #d79a43;
+  --color-nav-customer: #a66bbe;
+  --color-nav-ai: #7376d9;
+  --color-nav-evidence: #3c9a75;
+  --color-nav-alert: #d66a5e;
+  --color-nav-system: #94a3b8;
 
   /* Restrained radii (10–14px) */
   --radius-card: 12px;
@@ -92,6 +150,29 @@ body {
 /* Visible keyboard focus everywhere */
 :focus-visible {
   @apply outline-2 outline-offset-2 outline-brand-600;
+}
+
+/*
+ * 화면 움직임 줄이기 — 설정에서 켜거나 OS 설정이 요청하면 전환/애니메이션을 끈다.
+ * 스크롤 위치·포커스는 그대로 두고 시각 효과만 제거한다.
+ */
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ------------------------------------------------------------------ */

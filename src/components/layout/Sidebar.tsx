@@ -1,35 +1,40 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 
-/** 사이드바 그룹 색 띠 */
+/**
+ * 메뉴 구분색 — 목차를 빠르게 알아보기 위한 고정 팔레트다.
+ * 테마(화면 색)와는 분리해 8색으로 제한하며, index.css 의 --color-nav-* 토큰을 쓴다.
+ * 테마를 바꿔도 "지원사업은 초록, 자료는 노랑" 같은 인지 방식이 흔들리지 않게 하려는 의도다.
+ */
 const GROUP_ACCENT: Record<string, string> = {
-  start: 'bg-sky-400',
-  ops: 'bg-sky-400',
-  flow: 'bg-violet-400',
-  website: 'bg-rose-400',
-  funding: 'bg-emerald-400',
-  manage: 'bg-amber-400',
-  tools: 'bg-slate-400',
-  settings: 'bg-slate-400',
+  start: 'bg-nav-overview',
+  ops: 'bg-nav-ops',
+  today: 'bg-nav-ops',
+  flow: 'bg-nav-ai',
+  website: 'bg-nav-customer',
+  funding: 'bg-nav-evidence',
+  manage: 'bg-nav-revenue',
+  tools: 'bg-nav-system',
+  settings: 'bg-nav-system',
 }
 
 /** 메뉴 경로별 아이콘 색 (비활성 상태에서만 적용) — 앞에서부터 일치하는 것을 쓴다 */
 const ITEM_ACCENT: [prefix: string, cls: string][] = [
-  ['/ops/calendar', 'text-emerald-300'],
-  ['/ops', 'text-sky-300'],
-  ['/today', 'text-amber-300'],
-  ['/clients', 'text-sky-300'],
-  ['/diagnosis', 'text-violet-300'],
-  ['/selection', 'text-violet-300'],
-  ['/mvp-design', 'text-violet-300'],
-  ['/validation', 'text-violet-300'],
-  ['/deliverables', 'text-violet-300'],
-  ['/funding', 'text-emerald-300'],
-  ['/website-studio', 'text-rose-300'],
-  ['/cases', 'text-amber-300'],
-  ['/reports', 'text-amber-300'],
-  ['/tools', 'text-slate-300'],
-  ['/settings', 'text-slate-300'],
-  ['/', 'text-sky-300'],
+  ['/ops/calendar', 'text-nav-evidence'],
+  ['/ops', 'text-nav-ops'],
+  ['/today', 'text-nav-alert'],
+  ['/clients', 'text-nav-ops'],
+  ['/diagnosis', 'text-nav-ai'],
+  ['/selection', 'text-nav-ai'],
+  ['/mvp-design', 'text-nav-ai'],
+  ['/validation', 'text-nav-ai'],
+  ['/deliverables', 'text-nav-ai'],
+  ['/funding', 'text-nav-evidence'],
+  ['/website-studio', 'text-nav-customer'],
+  ['/cases', 'text-nav-revenue'],
+  ['/reports', 'text-nav-revenue'],
+  ['/tools', 'text-nav-system'],
+  ['/settings', 'text-nav-system'],
+  ['/', 'text-nav-overview'],
 ]
 
 function itemAccent(path: string): string {

@@ -36,7 +36,7 @@ export function CompanyProfileCard({
   return (
     <section
       aria-labelledby="profile"
-      className="rounded-(--radius-panel) border border-indigo-200 bg-gradient-to-br from-indigo-50/80 via-white to-sky-50/60 p-5"
+      className="rounded-(--radius-panel) border border-cat-plan-200 bg-gradient-to-br from-cat-plan-50/80 via-white to-cat-client-50/60 p-5"
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
@@ -131,7 +131,7 @@ export function NotesSection({
         <p className="text-[0.9rem] text-slate-500">통화 내용·요청사항을 적어두세요. 수정·삭제할 수 있습니다.</p>
       </div>
 
-      <div className="rounded-(--radius-panel) border border-amber-200 bg-amber-50/50 p-3">
+      <div className="rounded-(--radius-panel) border border-cat-doc-200 bg-cat-doc-50/50 p-3">
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -140,7 +140,7 @@ export function NotesSection({
           }}
           rows={2}
           placeholder="예: 9/3 대표님 통화 — 중소기업확인서 이번 주 안에 발급해서 보내주기로 함"
-          className="w-full rounded-(--radius-control) border border-amber-200 bg-white px-3 py-2 text-[0.98rem] focus:border-amber-400 focus:outline-none"
+          className="w-full rounded-(--radius-control) border border-cat-doc-200 bg-white px-3 py-2 text-[0.98rem] focus:border-cat-doc-500 focus:outline-none"
         />
         <div className="mt-2 flex items-center justify-between gap-2">
           <span className="text-[0.82rem] text-slate-500">Ctrl(⌘) + Enter 로도 추가됩니다</span>
@@ -161,7 +161,7 @@ export function NotesSection({
             <li
               key={n.id}
               className={`rounded-(--radius-panel) border p-3.5 ${
-                n.pinned ? 'border-amber-300 bg-amber-50/60' : 'border-slate-200 bg-white'
+                n.pinned ? 'border-cat-doc-200 bg-cat-doc-50/60' : 'border-slate-200 bg-white'
               }`}
             >
               {editingId === n.id ? (
@@ -200,7 +200,7 @@ export function NotesSection({
                       title={n.pinned ? '고정 해제' : '위로 고정'}
                       onClick={() => onPin(n.id, !n.pinned)}
                       className={`rounded-(--radius-control) p-1.5 hover:bg-slate-100 ${
-                        n.pinned ? 'text-amber-600' : 'text-slate-400'
+                        n.pinned ? 'text-cat-doc-700' : 'text-slate-400'
                       }`}
                     >
                       {n.pinned ? (
