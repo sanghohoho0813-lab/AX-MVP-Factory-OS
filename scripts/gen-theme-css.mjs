@@ -24,8 +24,8 @@ const THEMES = [
   { key: 'steel',         label: '스틸 플래티넘', shell: '#24303B', primary: '#44647A', secondary: '#6D8899', accent: '#4C9AAA', highlight: '#C9D6DE', soft: '#E7EDF1' },
 ]
 
-/** 기본 테마 — 기존 화면 색과 가장 가까운 팔레트 */
-const DEFAULT_THEME = 'navy-blue'
+/** 기본 테마 — 브랜드 로고(짙은 청록)와 공개 사이트 웜 액센트에 가장 가까운 팔레트 */
+const DEFAULT_THEME = 'deep-teal'
 
 /* ---------- sRGB ↔ OKLab ---------- */
 const toLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)

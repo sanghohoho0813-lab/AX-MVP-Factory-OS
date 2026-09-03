@@ -3,7 +3,7 @@
  */
 
 import type { ReactNode } from 'react'
-import { Sparkles } from 'lucide-react'
+import { BrandLogo, ProductWordmark } from '../../components/brand/BrandLogo'
 
 export function AuthLayout({
   title,
@@ -19,11 +19,9 @@ export function AuthLayout({
   return (
     <div className="flex min-h-dvh items-center justify-center bg-slate-50 px-4 py-10">
       <div className="w-full max-w-[420px]">
-        <div className="mb-6 flex items-center gap-2">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-brand-600 text-white">
-            <Sparkles aria-hidden="true" className="size-5" />
-          </span>
-          <span className="text-lg font-bold text-slate-900">AX MVP Factory OS</span>
+        <div className="mb-6 flex flex-col items-start gap-2">
+          <BrandLogo imgClassName="h-10 max-w-[220px]" />
+          <ProductWordmark />
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
           <h1 className="text-xl font-bold break-keep text-slate-900">{title}</h1>

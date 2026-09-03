@@ -8,7 +8,6 @@
  */
 
 /* 딥 네이비 블루 */
-html:not([data-theme]),
 html[data-theme='navy-blue'] {
   --theme-shell: #0B1830;
   --theme-primary: #2457D6;
@@ -153,6 +152,7 @@ html[data-theme='forest-sage'] {
 }
 
 /* 딥 틸 */
+html:not([data-theme]),
 html[data-theme='deep-teal'] {
   --theme-shell: #08323A;
   --theme-primary: #087A83;

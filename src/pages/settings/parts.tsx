@@ -16,6 +16,7 @@ import { buildLocalSnapshot, summarizeSnapshot } from '../../services/dataImport
 import { downloadLocalBackup } from '../../services/dataImport/localBackup'
 import { useStoreVersion } from '../../lib/useStoreVersion'
 import { isAdvancedVisible, setFeatureVisibility } from '../../lib/featureVisibility'
+import { brand } from '../../brand/brand.config'
 
 export type TabKey = 'me' | 'workspace' | 'data' | 'system'
 
@@ -112,7 +113,7 @@ export function FeatureVisibilityPanel() {
 export function SystemPanel({ mode, connection }: { mode: string; connection: ReactNode }) {
   return (
     <Panel title="시스템 정보">
-      <SettingRow label="앱">AX MVP Factory OS</SettingRow>
+      <SettingRow label="앱">{brand.productName} · {brand.productSubtitle}</SettingRow>
       <SettingRow label="데이터 모드">{mode === 'supabase' ? '클라우드(supabase)' : '로컬 데모(local)'}</SettingRow>
       <SettingRow label="연결 상태">{connection}</SettingRow>
       <SettingRow label="로컬 스키마">v{SCHEMA_VERSION}</SettingRow>

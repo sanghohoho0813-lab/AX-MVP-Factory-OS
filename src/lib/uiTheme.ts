@@ -20,7 +20,7 @@ export const UI_THEMES: UiThemeMeta[] = [
   {
     key: 'navy-blue',
     label: '딥 네이비 블루',
-    hint: '기본값 · 차분한 남색',
+    hint: '차분한 남색',
     swatch: ['#0B1830', '#2457D6', '#1687A7', '#17A889', '#E7C873', '#DCE8F7'],
   },
   {
@@ -44,7 +44,7 @@ export const UI_THEMES: UiThemeMeta[] = [
   {
     key: 'deep-teal',
     label: '딥 틸',
-    hint: '청록 + 주황 포인트',
+    hint: '기본값 · 브랜드 청록 + 웜 포인트',
     swatch: ['#08323A', '#087A83', '#1597A3', '#D2704C', '#E9B59B', '#DDEDEF'],
   },
   {
@@ -73,7 +73,7 @@ export const UI_THEMES: UiThemeMeta[] = [
   },
 ]
 
-export const DEFAULT_THEME: UiThemeKey = 'navy-blue'
+export const DEFAULT_THEME: UiThemeKey = 'deep-teal'
 
 const THEME_KEYS = new Set<string>(UI_THEMES.map((t) => t.key))
 
