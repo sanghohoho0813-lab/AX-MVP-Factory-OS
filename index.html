@@ -10,19 +10,30 @@
     />
     <title>AX MVP Factory OS</title>
     <script>
-      /* 렌더 전 저장된 글자 크기 설정을 적용해 깜빡임을 막는다. 손상 시 기본(1.5)로 복구. */
+      /* 렌더 전 저장된 화면 설정(글자 크기·테마·모션)을 적용해 깜빡임을 막는다. 손상 시 기본값. */
       (function () {
+        var el = document.documentElement
+        var THEMES = [
+          'navy-blue', 'navy-gold', 'emerald-gold', 'forest-sage', 'deep-teal',
+          'onyx-gold', 'burgundy', 'plum-indigo', 'steel',
+        ]
+        var scale = 'default'
+        var theme = 'navy-blue'
+        var motion = 'full'
         try {
           var raw = localStorage.getItem('axmvp.ui.preferences')
-          var scale = 'default'
           if (raw) {
-            var v = JSON.parse(raw).textScale
-            if (v === 'large' || v === 'extra_large') scale = v
+            var p = JSON.parse(raw)
+            if (p.textScale === 'large' || p.textScale === 'extra_large') scale = p.textScale
+            if (THEMES.indexOf(p.theme) !== -1) theme = p.theme
+            if (p.motion === 'reduced') motion = 'reduced'
           }
-          document.documentElement.setAttribute('data-text-scale', scale)
         } catch (e) {
-          document.documentElement.setAttribute('data-text-scale', 'default')
+          /* 손상된 설정은 무시하고 기본값을 쓴다 */
         }
+        el.setAttribute('data-text-scale', scale)
+        el.setAttribute('data-theme', theme)
+        el.setAttribute('data-motion', motion)
       })()
     </script>
   </head>

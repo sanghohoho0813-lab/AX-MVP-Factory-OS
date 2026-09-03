@@ -1,0 +1,333 @@
+/*
+ * 자동 생성 파일 — 직접 수정하지 말 것.
+ * 생성: node scripts/gen-theme-css.mjs
+ *
+ * 마스터 규격의 CANONICAL 9 THEME(각 6색)을 앱 전역 색 토큰으로 확장한 결과다.
+ * - Theme 토큰(navy/brand/accent/second/highlight/soft)만 테마에 따라 바뀐다.
+ * - 본문 중립색(slate)과 의미색(success/warning/danger)은 테마와 분리되어 고정이다.
+ */
+
+/* 딥 네이비 블루 */
+html:not([data-theme]),
+html[data-theme='navy-blue'] {
+  --theme-shell: #0B1830;
+  --theme-primary: #2457D6;
+  --theme-secondary: #1687A7;
+  --theme-accent: #17A889;
+  --theme-highlight: #E7C873;
+  --theme-soft: #DCE8F7;
+  --color-navy-950: #01071D;
+  --color-navy-900: #0B1830;
+  --color-navy-800: #1A2740;
+  --color-navy-700: #2A3850;
+  --color-navy-600: #3F4D64;
+  --color-navy-300: #949FB2;
+  --color-navy-200: #B4BDCC;
+  --color-brand-50: #E7F6FF;
+  --color-brand-100: #D1E9FF;
+  --color-brand-200: #B4D5FF;
+  --color-brand-500: #396CE3;
+  --color-brand-600: #2457D6;
+  --color-brand-700: #0E3CBA;
+  --color-accent-50: #E5FEF5;
+  --color-accent-200: #B7EDDB;
+  --color-accent-600: #17A889;
+  --color-accent-700: #00876A;
+  --color-second-50: #E5F9FF;
+  --color-second-200: #B4E0F1;
+  --color-second-600: #1687A7;
+  --color-second-700: #006B8A;
+  --color-highlight-100: #FEEEC4;
+  --color-highlight-500: #E7C873;
+  --color-highlight-700: #97791D;
+  --color-soft-50: #EDF5FF;
+  --color-soft-100: #DCE8F7;
+}
+
+/* 네이비 골드 */
+html[data-theme='navy-gold'] {
+  --theme-shell: #111A2D;
+  --theme-primary: #2847A7;
+  --theme-secondary: #A37A28;
+  --theme-accent: #D0A84B;
+  --theme-highlight: #F0D995;
+  --theme-soft: #EFE8D7;
+  --color-navy-950: #03091A;
+  --color-navy-900: #111A2D;
+  --color-navy-800: #20293C;
+  --color-navy-700: #30394C;
+  --color-navy-600: #444E61;
+  --color-navy-300: #98A0AF;
+  --color-navy-200: #B7BDC9;
+  --color-brand-50: #E9F4FF;
+  --color-brand-100: #D4E5FF;
+  --color-brand-200: #B8CEFF;
+  --color-brand-500: #3C5DB8;
+  --color-brand-600: #2847A7;
+  --color-brand-700: #183290;
+  --color-accent-50: #FFF8E5;
+  --color-accent-200: #FAE6BB;
+  --color-accent-600: #D0A84B;
+  --color-accent-700: #AA831D;
+  --color-second-50: #FFF5E3;
+  --color-second-200: #EDD8B3;
+  --color-second-600: #A37A28;
+  --color-second-700: #855D00;
+  --color-highlight-100: #FFF4D1;
+  --color-highlight-500: #F0D995;
+  --color-highlight-700: #9B8543;
+  --color-soft-50: #F9F5EA;
+  --color-soft-100: #EFE8D7;
+}
+
+/* 에메랄드 골드 */
+html[data-theme='emerald-gold'] {
+  --theme-shell: #11332B;
+  --theme-primary: #0E7663;
+  --theme-secondary: #2C9277;
+  --theme-accent: #B4862A;
+  --theme-highlight: #E8CE88;
+  --theme-soft: #E2F0EA;
+  --color-navy-950: #001A13;
+  --color-navy-900: #11332B;
+  --color-navy-800: #224139;
+  --color-navy-700: #325048;
+  --color-navy-600: #47645C;
+  --color-navy-300: #99AEA7;
+  --color-navy-200: #B6C7C2;
+  --color-brand-50: #E9FAF5;
+  --color-brand-100: #D4EFE7;
+  --color-brand-200: #B8DFD3;
+  --color-brand-500: #348774;
+  --color-brand-600: #0E7663;
+  --color-brand-700: #005E4D;
+  --color-accent-50: #FFF5E3;
+  --color-accent-200: #F3DBB3;
+  --color-accent-600: #B4862A;
+  --color-accent-700: #936700;
+  --color-second-50: #E7FBF4;
+  --color-second-200: #B9E5D5;
+  --color-second-600: #2C9277;
+  --color-second-700: #00755C;
+  --color-highlight-100: #FDF0CD;
+  --color-highlight-500: #E8CE88;
+  --color-highlight-700: #967E38;
+  --color-soft-50: #F0F9F5;
+  --color-soft-100: #E2F0EA;
+}
+
+/* 포레스트 세이지 */
+html[data-theme='forest-sage'] {
+  --theme-shell: #17352C;
+  --theme-primary: #356E58;
+  --theme-secondary: #73977E;
+  --theme-accent: #A58E4D;
+  --theme-highlight: #D9D2AA;
+  --theme-soft: #E5ECE5;
+  --color-navy-950: #001B13;
+  --color-navy-900: #17352C;
+  --color-navy-800: #27433A;
+  --color-navy-700: #375249;
+  --color-navy-600: #4B655C;
+  --color-navy-300: #9BAEA7;
+  --color-navy-200: #B8C8C2;
+  --color-brand-50: #ECF8F3;
+  --color-brand-100: #D9EDE4;
+  --color-brand-200: #C0DBCF;
+  --color-brand-500: #4B7F6A;
+  --color-brand-600: #356E58;
+  --color-brand-700: #1D5743;
+  --color-accent-50: #FCF7E8;
+  --color-accent-200: #EADEBE;
+  --color-accent-600: #A58E4D;
+  --color-accent-700: #856F2D;
+  --color-second-50: #F1F9F3;
+  --color-second-200: #D1E4D6;
+  --color-second-600: #73977E;
+  --color-second-700: #557860;
+  --color-highlight-100: #F5F2DD;
+  --color-highlight-500: #D9D2AA;
+  --color-highlight-700: #88825C;
+  --color-soft-50: #F2F7F2;
+  --color-soft-100: #E5ECE5;
+}
+
+/* 딥 틸 */
+html[data-theme='deep-teal'] {
+  --theme-shell: #08323A;
+  --theme-primary: #087A83;
+  --theme-secondary: #1597A3;
+  --theme-accent: #D2704C;
+  --theme-highlight: #E9B59B;
+  --theme-soft: #DDEDEF;
+  --color-navy-950: #001920;
+  --color-navy-900: #08323A;
+  --color-navy-800: #1C4148;
+  --color-navy-700: #2D5057;
+  --color-navy-600: #43636A;
+  --color-navy-300: #96ADB2;
+  --color-navy-200: #B4C7CB;
+  --color-brand-50: #E8FAFC;
+  --color-brand-100: #D3F0F2;
+  --color-brand-200: #B7DFE3;
+  --color-brand-500: #338A92;
+  --color-brand-600: #087A83;
+  --color-brand-700: #00616A;
+  --color-accent-50: #FFF1E7;
+  --color-accent-200: #FFD1BE;
+  --color-accent-600: #D2704C;
+  --color-accent-700: #AF502C;
+  --color-second-50: #E5FBFE;
+  --color-second-200: #B5E6EC;
+  --color-second-600: #1597A3;
+  --color-second-700: #007985;
+  --color-highlight-100: #FFE6D8;
+  --color-highlight-500: #E9B59B;
+  --color-highlight-700: #9A6B53;
+  --color-soft-50: #EDF8F9;
+  --color-soft-100: #DDEDEF;
+}
+
+/* 오닉스 골드 */
+html[data-theme='onyx-gold'] {
+  --theme-shell: #15171C;
+  --theme-primary: #343942;
+  --theme-secondary: #6A717C;
+  --theme-accent: #B89032;
+  --theme-highlight: #E0C76F;
+  --theme-soft: #E6E8EC;
+  --color-navy-950: #06080C;
+  --color-navy-900: #15171C;
+  --color-navy-800: #24262B;
+  --color-navy-700: #34363B;
+  --color-navy-600: #494B50;
+  --color-navy-300: #9C9EA2;
+  --color-navy-200: #BABBBF;
+  --color-brand-50: #F1F2F4;
+  --color-brand-100: #DEE1E5;
+  --color-brand-200: #C4C7CD;
+  --color-brand-500: #494E57;
+  --color-brand-600: #343942;
+  --color-brand-700: #262B34;
+  --color-accent-50: #FFF7E3;
+  --color-accent-200: #F3DFB5;
+  --color-accent-600: #B89032;
+  --color-accent-700: #966F00;
+  --color-second-50: #F3F5F8;
+  --color-second-200: #D1D5DC;
+  --color-second-600: #6A717C;
+  --color-second-700: #525863;
+  --color-highlight-100: #FBEFC3;
+  --color-highlight-500: #E0C76F;
+  --color-highlight-700: #917918;
+  --color-soft-50: #F3F5F7;
+  --color-soft-100: #E6E8EC;
+}
+
+/* 버건디 슬레이트 */
+html[data-theme='burgundy'] {
+  --theme-shell: #3A1724;
+  --theme-primary: #7A2C49;
+  --theme-secondary: #667085;
+  --theme-accent: #A85C72;
+  --theme-highlight: #E6B6A5;
+  --theme-soft: #EEE4E8;
+  --color-navy-950: #22030F;
+  --color-navy-900: #3A1724;
+  --color-navy-800: #492633;
+  --color-navy-700: #593642;
+  --color-navy-600: #6D4B56;
+  --color-navy-300: #B79CA4;
+  --color-navy-200: #D0B9C0;
+  --color-brand-50: #FFEDF3;
+  --color-brand-100: #FBDAE3;
+  --color-brand-200: #ECBFCB;
+  --color-brand-500: #8E435C;
+  --color-brand-600: #7A2C49;
+  --color-brand-700: #651838;
+  --color-accent-50: #FFEFF4;
+  --color-accent-200: #F5CAD4;
+  --color-accent-600: #A85C72;
+  --color-accent-700: #8B4258;
+  --color-second-50: #F2F4FA;
+  --color-second-200: #CFD5E1;
+  --color-second-600: #667085;
+  --color-second-700: #4E576B;
+  --color-highlight-100: #FFE6DD;
+  --color-highlight-500: #E6B6A5;
+  --color-highlight-700: #976C5C;
+  --color-soft-50: #F9F2F5;
+  --color-soft-100: #EEE4E8;
+}
+
+/* 플럼 인디고 */
+html[data-theme='plum-indigo'] {
+  --theme-shell: #291A3D;
+  --theme-primary: #573F91;
+  --theme-secondary: #4E63A8;
+  --theme-accent: #8B5AA6;
+  --theme-highlight: #C4B0E6;
+  --theme-soft: #E9E5F3;
+  --color-navy-950: #140526;
+  --color-navy-900: #291A3D;
+  --color-navy-800: #38294C;
+  --color-navy-700: #47395B;
+  --color-navy-600: #5B4E6F;
+  --color-navy-300: #A89FB8;
+  --color-navy-200: #C3BBD1;
+  --color-brand-50: #F4F1FF;
+  --color-brand-100: #E6E0FF;
+  --color-brand-200: #D0C8F4;
+  --color-brand-500: #6954A2;
+  --color-brand-600: #573F91;
+  --color-brand-700: #452B7B;
+  --color-accent-50: #FCEFFF;
+  --color-accent-200: #E4CAF4;
+  --color-accent-600: #8B5AA6;
+  --color-accent-700: #71408A;
+  --color-second-50: #EDF4FF;
+  --color-second-200: #C4D2F8;
+  --color-second-600: #4E63A8;
+  --color-second-700: #384B8E;
+  --color-highlight-100: #EFE5FF;
+  --color-highlight-500: #C4B0E6;
+  --color-highlight-700: #7B689A;
+  --color-soft-50: #F5F3FC;
+  --color-soft-100: #E9E5F3;
+}
+
+/* 스틸 플래티넘 */
+html[data-theme='steel'] {
+  --theme-shell: #24303B;
+  --theme-primary: #44647A;
+  --theme-secondary: #6D8899;
+  --theme-accent: #4C9AAA;
+  --theme-highlight: #C9D6DE;
+  --theme-soft: #E7EDF1;
+  --color-navy-950: #0B1620;
+  --color-navy-900: #24303B;
+  --color-navy-800: #323E49;
+  --color-navy-700: #414D58;
+  --color-navy-600: #55606B;
+  --color-navy-300: #A2AAB3;
+  --color-navy-200: #BEC5CB;
+  --color-brand-50: #EFF6FC;
+  --color-brand-100: #DDE9F2;
+  --color-brand-200: #C5D6E2;
+  --color-brand-500: #57768B;
+  --color-brand-600: #44647A;
+  --color-brand-700: #2F4E63;
+  --color-accent-50: #E9FAFE;
+  --color-accent-200: #C1E6EE;
+  --color-accent-600: #4C9AAA;
+  --color-accent-700: #297B8A;
+  --color-second-50: #F0F7FC;
+  --color-second-200: #CFDEE7;
+  --color-second-600: #6D8899;
+  --color-second-700: #516B7B;
+  --color-highlight-100: #ECF3F7;
+  --color-highlight-500: #C9D6DE;
+  --color-highlight-700: #79858C;
+  --color-soft-50: #F3F7FA;
+  --color-soft-100: #E7EDF1;
+}

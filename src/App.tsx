@@ -3,6 +3,7 @@ import { RouterProvider, createBrowserRouter } from 'react-router-dom'
 import { AppShell } from './components/layout/AppShell'
 import { ToastProvider } from './components/ui/toast'
 import { TextScaleProvider } from './components/ui/TextScaleProvider'
+import { AppearanceProvider } from './components/ui/AppearanceProvider'
 import { getDataModeConfig } from './data/dataMode'
 import { appRouteChildren, publicSurveyRoute, publicTestRoute } from './app/appRouteChildren'
 
@@ -33,15 +34,17 @@ function App() {
   const cfg = getDataModeConfig()
   return (
     <TextScaleProvider>
-      <ToastProvider>
-        {cfg.mode === 'supabase' ? (
-          <Suspense fallback={<BootSplash />}>
-            <SupabaseApp />
-          </Suspense>
-        ) : (
-          <RouterProvider router={localRouter} />
-        )}
-      </ToastProvider>
+      <AppearanceProvider>
+        <ToastProvider>
+          {cfg.mode === 'supabase' ? (
+            <Suspense fallback={<BootSplash />}>
+              <SupabaseApp />
+            </Suspense>
+          ) : (
+            <RouterProvider router={localRouter} />
+          )}
+        </ToastProvider>
+      </AppearanceProvider>
     </TextScaleProvider>
   )
 }

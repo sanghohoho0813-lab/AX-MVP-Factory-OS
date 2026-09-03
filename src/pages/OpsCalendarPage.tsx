@@ -140,7 +140,7 @@ function CalendarContent({ workspaceId }: { workspaceId: string | null }) {
                 <div
                   key={w}
                   className={`py-2 text-center text-[0.88rem] font-semibold ${
-                    i === 0 ? 'text-rose-600' : i === 6 ? 'text-sky-600' : 'text-slate-600'
+                    i === 0 ? 'text-weekday-sun' : i === 6 ? 'text-weekday-sat' : 'text-slate-600'
                   }`}
                 >
                   {w}
@@ -170,9 +170,9 @@ function CalendarContent({ workspaceId }: { workspaceId: string | null }) {
                           : !inMonth
                             ? 'text-slate-300'
                             : dow === 0
-                              ? 'text-rose-600'
+                              ? 'text-weekday-sun'
                               : dow === 6
-                                ? 'text-sky-600'
+                                ? 'text-weekday-sat'
                                 : 'text-slate-700'
                       }`}
                     >

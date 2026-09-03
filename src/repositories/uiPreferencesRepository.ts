@@ -1,5 +1,6 @@
-import type { FeatureVisibilityMode, UiPreferences, UiTextScale } from '../types/ui'
+import type { FeatureVisibilityMode, UiMotionMode, UiPreferences, UiTextScale, UiThemeKey } from '../types/ui'
 import { isTextScale } from '../lib/uiTextScale'
+import { DEFAULT_THEME, isThemeKey } from '../lib/uiTheme'
 import { notifyStoreChanged, readRaw, writeRaw } from '../storage/localStore'
 
 /**
@@ -17,9 +18,19 @@ function isVisibilityMode(v: unknown): v is FeatureVisibilityMode {
   return v === 'core' || v === 'advanced'
 }
 
-/** 손상·미저장 시 기본값 (표준 크기 · 핵심 기능만 표시) */
+function isMotionMode(v: unknown): v is UiMotionMode {
+  return v === 'full' || v === 'reduced'
+}
+
+/** 손상·미저장 시 기본값 (표준 크기 · 핵심 기능만 표시 · 기본 테마) */
 function defaults(): UiPreferences {
-  return { textScale: 'default', featureVisibility: 'core', updatedAt: nowIso() }
+  return {
+    textScale: 'default',
+    featureVisibility: 'core',
+    theme: DEFAULT_THEME,
+    motion: 'full',
+    updatedAt: nowIso(),
+  }
 }
 
 function persist(next: UiPreferences): UiPreferences {
@@ -45,6 +56,8 @@ export const uiPreferencesRepository = {
       return {
         textScale,
         featureVisibility,
+        theme: isThemeKey(parsed.theme) ? parsed.theme : DEFAULT_THEME,
+        motion: isMotionMode(parsed.motion) ? parsed.motion : 'full',
         updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : nowIso(),
       }
     } catch {
@@ -55,6 +68,16 @@ export const uiPreferencesRepository = {
   update(textScale: UiTextScale): UiPreferences {
     const current = this.get()
     return persist({ ...current, textScale, updatedAt: nowIso() })
+  },
+
+  setTheme(theme: UiThemeKey): UiPreferences {
+    const current = this.get()
+    return persist({ ...current, theme, updatedAt: nowIso() })
+  },
+
+  setMotion(motion: UiMotionMode): UiPreferences {
+    const current = this.get()
+    return persist({ ...current, motion, updatedAt: nowIso() })
   },
 
   setFeatureVisibility(mode: FeatureVisibilityMode): UiPreferences {
