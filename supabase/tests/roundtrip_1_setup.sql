@@ -4,9 +4,10 @@
 -- Supabase Dashboard → SQL Editor 에 붙여 넣고, 맨 위 한 줄만 고쳐서 Run.
 --
 -- 먼저 해둘 것
---   1) 마이그레이션 …0007, …0008 적용
+--   1) 마이그레이션 …0007, …0008, …0009 적용
 --   2) Dashboard → Authentication → Users → Add user
 --      (Auto Confirm User 체크 — 이메일 인증을 건너뛴다)
+--      ※ …0009 를 먼저 적용해야 계정이 만들어진다
 --
 -- 이 스크립트가 하는 일
 --   · 그 계정의 프로필을 온보딩 통과 상태로 맞춘다 (member_type 이 비면 /auth/onboarding 에 갇힌다)
@@ -80,7 +81,7 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------
--- 준비 상태 확인 — 4줄 모두 OK 여야 다음 단계로 간다
+-- 준비 상태 확인 — 5줄 모두 OK 여야 다음 단계로 간다
 -- ---------------------------------------------------------------------
 select 항목, 실제, 기대, case when 실제 = 기대 then '✅ OK' else '❌ 확인 필요' end as 결과
 from (
@@ -94,11 +95,16 @@ from (
                  to_regprocedure('public.bridge_on_portal_request()')::oid, 'execute')
                then 0 else 1 end), 1
   union all
-  select '3. 테스트 업체와 고객 계정이 연결됨',
+  select '3. 가입 트리거 정상 (…0009)',
+         (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'public' and p.proname = 'handle_new_user'
+             and pg_get_functiondef(p.oid) like '%information_schema.columns%'), 1
+  union all
+  select '4. 테스트 업체와 고객 계정이 연결됨',
          (select count(*)::int from public.portal_client_links
            where operations_client_id = 'cli_roundtrip_check'), 1
   union all
-  select '4. 사업자등록증(테스트)이 요청 상태',
+  select '5. 사업자등록증(테스트)이 요청 상태',
          (select count(*)::int from public.portal_documents d
            join public.portal_client_links l on l.id = d.portal_client_link_id
           where l.operations_client_id = 'cli_roundtrip_check' and d.status = 'requested'), 1
