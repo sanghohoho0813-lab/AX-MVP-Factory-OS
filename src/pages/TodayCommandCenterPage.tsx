@@ -490,7 +490,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             ['오늘 처리', daySummary.done, 'text-success-700'],
             ['아직 남음', daySummary.remaining, 'text-danger-700'],
             ['내일로 넘김', daySummary.carriedOver, 'text-warning-700'],
-            ['중요한 결정', daySummary.decisions, 'text-cat-plan-700'],
+            ['중요한 결정', daySummary.decisions, 'text-slate-800'],
             ['새로운 이슈', daySummary.issues, 'text-slate-700'],
           ] as const
         ).map(([title, items, cls]) => (

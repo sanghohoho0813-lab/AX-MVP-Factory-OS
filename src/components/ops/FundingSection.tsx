@@ -19,11 +19,12 @@ const FUNDING_STATUS_ORDER: FundingStatus[] = [
 
 const STATUS_CLASS: Record<FundingStatus, string> = {
   watching: 'border-slate-200 bg-slate-50 text-slate-600',
-  preparing: 'border-cat-doc-200 bg-cat-doc-50 text-cat-doc-700',
-  submitted: 'border-cat-client-200 bg-cat-client-50 text-cat-client-700',
-  reviewing: 'border-cat-plan-200 bg-cat-plan-50 text-cat-plan-700',
-  selected: 'border-cat-money-200 bg-cat-money-50 text-cat-money-700',
-  rejected: 'border-cat-fund-200 bg-cat-fund-50 text-cat-fund-700',
+  // 상태는 뜻대로만 칠한다 — 선정은 초록, 탈락은 회색, 나머지는 무채색·브랜드
+  preparing: 'border-brand-200 bg-brand-50 text-brand-700',
+  submitted: 'border-slate-200 bg-slate-50 text-slate-600',
+  reviewing: 'border-slate-200 bg-slate-50 text-slate-600',
+  selected: 'border-success-200 bg-success-50 text-success-700',
+  rejected: 'border-slate-200 bg-slate-100 text-slate-500',
   given_up: 'border-slate-200 bg-slate-100 text-slate-500',
 }
 
@@ -75,7 +76,7 @@ export function FundingSection({
     <section aria-labelledby="funding" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 id="funding" className="flex items-center gap-2 text-[1.3rem] font-bold text-slate-900">
-          <Landmark aria-hidden="true" className="size-5 text-cat-fund-500" />
+          <Landmark aria-hidden="true" className="size-5 text-slate-400" />
           정책자금 · 정부지원금 신청
         </h2>
         <p className="text-[0.95rem] text-slate-600">
@@ -83,7 +84,7 @@ export function FundingSection({
           {selectedTotal > 0 && (
             <>
               {' '}
-              선정 확정 <strong className="text-cat-money-700">{formatKrw(selectedTotal)}</strong>
+              선정 확정 <strong className="text-success-700">{formatKrw(selectedTotal)}</strong>
             </>
           )}
         </p>

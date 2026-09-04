@@ -329,7 +329,7 @@ export function PortalTab({ record, workspaceId }: { record: ClientOpsRecord; wo
                 {requests.map((r) => (
                   <li key={r.id} className="rounded-(--radius-card) border border-slate-200 p-3">
                     <div className="flex flex-wrap items-center gap-2 text-[0.85rem]">
-                      <span className="rounded-full bg-cat-fund-50 px-2 py-0.5 font-semibold text-cat-fund-700">{REQUEST_TYPE_LABEL[r.requestType]}</span>
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600">{REQUEST_TYPE_LABEL[r.requestType]}</span>
                       <span className="text-slate-500">{REQUEST_STATUS_LABEL[r.status]}</span>
                       <span className="text-slate-400">{activityTimeText(r.createdAt)}</span>
                     </div>

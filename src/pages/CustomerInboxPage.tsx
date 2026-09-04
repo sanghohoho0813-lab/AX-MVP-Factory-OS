@@ -165,7 +165,7 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
                 showToast(created.length ? `샘플 이벤트 ${created.length}건을 만들었습니다 (DEMO).` : '샘플 이벤트가 이미 있습니다.')
                 void load()
               }}
-              className="mt-2 inline-flex h-10 items-center gap-1.5 rounded-(--radius-control) border border-dashed border-highlight-700/50 bg-highlight-100 px-4 text-[0.92rem] font-semibold text-highlight-700"
+              className="tap t-sub mt-2 inline-flex h-11 items-center gap-1.5 rounded-(--radius-control) border border-dashed border-slate-300 bg-white px-4 font-medium text-slate-600 hover:bg-slate-50 sm:h-10"
             >
               <Sparkles aria-hidden="true" className="size-4" /> 샘플 이벤트 만들기 (로컬 데모)
             </button>
