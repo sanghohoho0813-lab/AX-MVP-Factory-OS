@@ -120,7 +120,7 @@ export function buildDocumentRequestMessage(
 /** 진행 상황 보고 문구 */
 export function buildStatusReportMessage(record: ClientOpsRecord, today: string): string {
   const name = record.contactName ? `${record.contactName} 대표님` : '대표님'
-  const rows = SERVICES.filter((s) => record.services[s.key].status !== 'not_applicable').map((s) => {
+  const rows = SERVICES.filter((s) => record.services[s.key].status !== 'on_hold').map((s) => {
     const st = record.services[s.key]
     const due = st.dueDate ? ` (목표 ${st.dueDate}, ${dueText(daysLeftFrom(today, st.dueDate))})` : ''
     return `- ${s.label}: ${SERVICE_STATUS_LABEL[st.status]}${due}`

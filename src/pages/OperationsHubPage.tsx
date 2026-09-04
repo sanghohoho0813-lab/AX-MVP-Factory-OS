@@ -24,7 +24,9 @@ import {
   sortClientsByUrgency,
   summarizeAlerts,
 } from '../services/clientOpsAlerts'
-import { DUE_SOON_DAYS, SERVICES } from '../content/clientOpsCatalog'
+import { DUE_SOON_DAYS, SERVICES,
+  isServiceOpen,
+} from '../content/clientOpsCatalog'
 import { todayLocalDate } from '../lib/appClock'
 import { formatKrw } from '../lib/format'
 import type { ClientOpsRecord, OpsAlert, AlertSeverity } from '../types/clientOps'
@@ -452,7 +454,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
               const critical = summary.criticalByClient[record.id] ?? 0
               const openServices = SERVICES.filter((s) => {
                 const st = record.services[s.key].status
-                return st !== 'not_started' && st !== 'not_applicable'
+                return isServiceOpen(st) && st !== 'not_started'
               })
               return (
                 <li key={record.id}>

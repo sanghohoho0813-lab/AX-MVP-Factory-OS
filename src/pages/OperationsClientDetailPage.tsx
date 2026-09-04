@@ -58,6 +58,7 @@ import {
   SERVICE_STATUS_ORDER,
   isServiceStarted,
   servicesNeeding,
+  isServiceOpen,
 } from '../content/clientOpsCatalog'
 import { todayLocalDate } from '../lib/appClock'
 import { formatKrw } from '../lib/format'
@@ -473,7 +474,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             const missing = missingDocumentsFor(record, meta.key, today)
             const started = isServiceStarted(state.status)
             const blocked = started && missing.length > 0
-            const open = state.status !== 'done' && state.status !== 'not_applicable'
+            const open = isServiceOpen(state.status)
             const dLeft = state.dueDate ? daysLeftFrom(today, state.dueDate) : null
             const overdue = open && dLeft !== null && dLeft < 0
             const dueSoon = open && dLeft !== null && dLeft >= 0 && dLeft <= 7

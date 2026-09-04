@@ -78,9 +78,11 @@ check('services: 주문 slug → 업무 추천 (venture-certification)', suggest
 check('services: 주문 slug → 업무 추천 (funding-consulting)', suggestServiceForProduct('funding-consulting')?.key === 'policyFund')
 check('services: 모르는 slug 는 null', suggestServiceForProduct('coffee') === null && suggestServiceForProduct('') === null)
 check('stage: 순서 6단계', CUSTOMER_STAGE_ORDER.length === 6 && CUSTOMER_STAGE_ORDER[0] === 'preparing' && CUSTOMER_STAGE_ORDER[5] === 'completed')
-check('stage: 아무것도 시작 안 함 → 준비 중', suggestCustomerStage(['not_started', 'not_applicable']) === 'preparing')
-check('stage: 모두 완료 → 완료', suggestCustomerStage(['done', 'not_applicable', 'done']) === 'completed')
-check('stage: 접수 있으면 기관 접수', suggestCustomerStage(['submitted', 'in_progress']) === 'submitted')
+check('stage: 아무것도 시작 안 함 → 준비 중', suggestCustomerStage(['not_started', 'on_hold']) === 'preparing')
+check('stage: 모두 완료 → 완료', suggestCustomerStage(['done', 'on_hold', 'done']) === 'completed')
+// 업무 상태가 5단계로 줄면서 '접수 완료' 가 없어졌다. 고객 단계 '기관 접수' 는 남아
+// 있지만 자동 추천 대상이 아니며, 발행 모달에서 사람이 직접 고른다.
+check('stage: 진행 중이 섞이면 진행 중', suggestCustomerStage(['in_progress', 'done']) === 'in_progress')
 check('stage: 진행 중', suggestCustomerStage(['in_progress', 'not_started']) === 'in_progress')
 check('stage: 고객 대기·준비 → 자료 확인 중', suggestCustomerStage(['waiting_client']) === 'reviewing_docs')
 

@@ -14,27 +14,49 @@
 /* 표준 업무 (서비스)                                                   */
 /* ------------------------------------------------------------------ */
 
-export type ServiceKey =
-  | 'incorporation' // 법인설립 (필요한 경우)
-  | 'businessScope' // 사업자등록증 업종추가 · 등기부 목적사항 추가
-  | 'patent' // 특허 출원
-  | 'venture' // 벤처인증 (혁신성장유형)
-  | 'ax' // AX 기획 및 개발
-  | 'policyFund' // 정책자금 · 정부지원금 (반복 신청)
+/**
+ * 업무 식별자.
+ *
+ * 기본 6종은 아래 BUILTIN_SERVICE_KEYS 로 고정돼 있고, 대표가 직접 만든 항목은
+ * 'custom_...' 키를 갖는다. 업체마다 하는 일이 조금씩 달라 목록을 코드에 박아 둘 수
+ * 없으므로 문자열로 연다 — 대신 기본 6종은 상수로 참조해 오타를 막는다.
+ */
+export type ServiceKey = string
+
+/** 코드가 이름으로 아는 기본 업무 6종 */
+export const BUILTIN_SERVICE_KEYS = [
+  'incorporation',  // 법인설립 (필요한 경우)
+  'businessScope',  // 사업자등록증 업종추가 · 등기부 목적사항 추가
+  'patent',         // 특허 출원
+  'venture',        // 벤처인증 (혁신성장유형)
+  'ax',             // AX 기획 및 개발
+  'policyFund',     // 정책자금 · 정부지원금 (반복 신청)
+] as const
+
+export type BuiltinServiceKey = (typeof BUILTIN_SERVICE_KEYS)[number]
+
+/** 대표가 직접 만든 항목인지 */
+export function isCustomServiceKey(key: ServiceKey): boolean {
+  return key.startsWith('custom_')
+}
 
 /**
- * 업무 진행 상태.
- * not_applicable: 이 업체에는 해당 없음(예: 이미 법인이라 설립 불필요)
+ * 업무 진행 상태 — 5단계.
+ *
+ * 예전에는 8단계(서류 준비 중·접수 완료·해당 없음 포함)였다. 쓰다 보니 구분이
+ * 과해서 줄였고, 이미 저장된 값은 읽을 때 normalizeServiceStatus 가 옮긴다.
+ *   서류 준비 중·접수 완료 → 진행 중
+ *   해당 없음             → 보류
  */
 export type ServiceStatus =
-  | 'not_applicable'
   | 'not_started'
-  | 'preparing'
   | 'in_progress'
   | 'waiting_client'
-  | 'submitted'
   | 'done'
   | 'on_hold'
+
+/** 지금은 쓰지 않지만 저장된 데이터에 남아 있을 수 있는 예전 상태 */
+export type LegacyServiceStatus = 'preparing' | 'submitted' | 'not_applicable'
 
 export interface ServiceState {
   status: ServiceStatus

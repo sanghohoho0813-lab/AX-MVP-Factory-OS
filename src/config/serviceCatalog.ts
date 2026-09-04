@@ -92,12 +92,11 @@ export const CUSTOMER_STAGE_LABEL: Record<CustomerStage, string> = {
  * 자동으로 고객 단계를 바꾸지 않는다. "고객에게 업데이트" 모달의 기본값 제안에만 쓴다.
  */
 export function suggestCustomerStage(statuses: ServiceStatus[]): CustomerStage {
-  const started = statuses.filter((s) => s !== 'not_applicable' && s !== 'not_started')
+  const started = statuses.filter((s) => s !== 'on_hold' && s !== 'not_started')
   if (started.length === 0) return 'preparing'
   if (started.every((s) => s === 'done')) return 'completed'
-  if (started.some((s) => s === 'submitted')) return 'submitted'
   if (started.some((s) => s === 'in_progress')) return 'in_progress'
-  if (started.some((s) => s === 'waiting_client' || s === 'preparing')) return 'reviewing_docs'
+  if (started.some((s) => s === 'waiting_client')) return 'reviewing_docs'
   return 'preparing'
 }
 

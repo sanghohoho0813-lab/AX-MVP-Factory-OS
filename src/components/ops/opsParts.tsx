@@ -8,9 +8,7 @@ import {
   Info,
   Landmark,
   Lock,
-  Minus,
   Pause,
-  Send,
   Wallet,
 } from 'lucide-react'
 import type {
@@ -22,7 +20,12 @@ import type {
   ServiceKey,
   ServiceStatus,
 } from '../../types/clientOps'
-import { SERVICE_STATUS_LABEL, serviceMeta } from '../../content/clientOpsCatalog'
+import {
+  SERVICE_STATUS_LABEL,
+  isServiceOpen,
+  isServiceStarted,
+  serviceMeta,
+} from '../../content/clientOpsCatalog'
 import { dueText, missingDocumentsFor } from '../../services/clientOpsAlerts'
 
 /* ------------------------------------------------------------------ */
@@ -131,13 +134,10 @@ interface CellLook {
 
 const STATUS_LOOK: Record<ServiceStatus, CellLook> = {
   done: { icon: Check, cls: 'bg-success-50 text-success-700 border-success-200', short: '완료' },
-  submitted: { icon: Send, cls: 'bg-brand-50 text-brand-700 border-brand-200', short: '접수' },
   in_progress: { icon: Clock, cls: 'bg-brand-50 text-brand-700 border-brand-200', short: '진행' },
-  preparing: { icon: Clock, cls: 'bg-slate-100 text-slate-700 border-slate-200', short: '준비' },
   waiting_client: { icon: Clock, cls: 'bg-warning-50 text-warning-800 border-warning-200', short: '대기' },
   on_hold: { icon: Pause, cls: 'bg-slate-100 text-slate-500 border-slate-200', short: '보류' },
   not_started: { icon: CircleDashed, cls: 'bg-white text-slate-500 border-slate-200', short: '시작 전' },
-  not_applicable: { icon: Minus, cls: 'bg-slate-50 text-slate-300 border-slate-100', short: '해당 없음' },
 }
 
 export interface CellState {
@@ -202,7 +202,7 @@ export function cellStateFor(
   dueSoonDays: number,
 ): CellState {
   const state = record.services[key]
-  const open = state.status !== 'done' && state.status !== 'not_applicable'
+  const open = isServiceOpen(state.status)
   let daysLeft: number | null = null
   if (state.dueDate) {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(state.dueDate)
@@ -213,11 +213,7 @@ export function cellStateFor(
       daysLeft = Math.round((b - a) / 86_400_000)
     }
   }
-  const started =
-    state.status === 'preparing' ||
-    state.status === 'in_progress' ||
-    state.status === 'waiting_client' ||
-    state.status === 'submitted'
+  const started = isServiceStarted(state.status)
   const blocked = open && started && missingDocumentsFor(record, key, today).length > 0
   return {
     status: state.status,

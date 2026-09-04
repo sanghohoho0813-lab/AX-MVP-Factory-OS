@@ -147,41 +147,56 @@ export const FUNDING_STATUS_LABEL: Record<FundingStatus, string> = {
 }
 
 export const SERVICE_STATUS_LABEL: Record<ServiceStatus, string> = {
-  not_applicable: '해당 없음',
   not_started: '시작 전',
-  preparing: '서류 준비 중',
   in_progress: '진행 중',
   waiting_client: '고객 회신 대기',
-  submitted: '접수 완료',
   done: '완료',
   on_hold: '보류',
+}
+
+/**
+ * 저장된 상태를 현재 5단계로 옮긴다.
+ * 예전 8단계 데이터를 고쳐 쓰지 않고, 읽을 때마다 여기서 변환한다.
+ */
+export function normalizeServiceStatus(value: unknown): ServiceStatus {
+  switch (value) {
+    case 'preparing':
+    case 'submitted':
+      return 'in_progress'
+    case 'not_applicable':
+      return 'on_hold'
+    case 'not_started':
+    case 'in_progress':
+    case 'waiting_client':
+    case 'done':
+    case 'on_hold':
+      return value
+    default:
+      return 'not_started'
+  }
 }
 
 /** 선택 가능한 상태 (화면 드롭다운 순서) */
 export const SERVICE_STATUS_ORDER: ServiceStatus[] = [
   'not_started',
-  'preparing',
   'in_progress',
   'waiting_client',
-  'submitted',
   'done',
   'on_hold',
-  'not_applicable',
 ]
 
-/** 아직 끝나지 않았고 실제로 굴러가는 중인 상태 */
+/**
+ * 아직 끝나지 않았고 실제로 굴러가는 중인 상태.
+ * 보류는 제외한다 — 예전 '해당 없음' 이 보류로 합쳐졌고, 보류는 "지금은 건드리지
+ * 않는다" 는 뜻이라 경고·챙길 목록에 올리면 방해가 된다.
+ */
 export function isServiceOpen(status: ServiceStatus): boolean {
-  return status !== 'done' && status !== 'not_applicable'
+  return status !== 'done' && status !== 'on_hold'
 }
 
 /** 이미 착수한 상태 (서류가 없으면 문제가 되는 시점) */
 export function isServiceStarted(status: ServiceStatus): boolean {
-  return (
-    status === 'preparing' ||
-    status === 'in_progress' ||
-    status === 'waiting_client' ||
-    status === 'submitted'
-  )
+  return status === 'in_progress' || status === 'waiting_client'
 }
 
 /* ------------------------------------------------------------------ */
