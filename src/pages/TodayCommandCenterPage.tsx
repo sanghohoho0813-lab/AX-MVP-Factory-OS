@@ -68,26 +68,28 @@ function greeting(hour: number): string {
 }
 
 function ActionRow({ action, rank }: { action: BriefAction; rank: number }) {
-  const bar = action.severity === 'critical' ? 'bg-danger-500' : action.severity === 'warning' ? 'bg-warning-500' : 'bg-slate-300'
+  const edge =
+    action.severity === 'critical' ? 'bg-danger-500' : action.severity === 'warning' ? 'bg-warning-500' : 'bg-slate-300'
   return (
     <li>
       <Link
         to={action.href}
-        className="flex gap-3 rounded-(--radius-card) border border-slate-200 bg-white p-3.5 shadow-(--shadow-card) transition-colors hover:border-brand-300"
+        className="ax-lift relative flex items-start gap-3 overflow-hidden rounded-(--radius-card) border border-slate-200 bg-white py-3.5 pr-3 pl-4"
       >
-        <span className="flex flex-col items-center gap-1">
-          <span className="flex size-7 items-center justify-center rounded-full bg-slate-900 text-[0.85rem] font-bold text-white">{rank}</span>
-          <span aria-hidden="true" className={`w-1 flex-1 rounded-full ${bar}`} />
+        <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${edge}`} />
+        <span className="t-meta mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-900 font-bold text-white">
+          {rank}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[1rem] font-semibold break-keep text-slate-900">{action.title}</span>
-          {action.detail && <span className="block text-[0.9rem] break-keep text-slate-600">{action.detail}</span>}
-          <span className="mt-1 block text-[0.85rem] text-slate-500">
-            {action.clientName && <span className="font-medium text-slate-700">{action.clientName} · </span>}
-            이유: {action.reason}
+          <span className="t-card block break-keep text-slate-900">{action.title}</span>
+          {action.detail && <span className="t-sub block break-keep text-slate-600">{action.detail}</span>}
+          {/* 왜 이것이 위에 있는지 — 한 줄을 넘기지 않는다 */}
+          <span className="t-meta mt-0.5 block truncate text-slate-400">
+            {action.clientName ? `${action.clientName} · ` : ''}
+            {action.reason}
           </span>
         </span>
-        <ArrowRight aria-hidden="true" className="size-4 shrink-0 self-center text-slate-400" />
+        <ArrowRight aria-hidden="true" className="size-4 shrink-0 self-center text-slate-300" />
       </Link>
     </li>
   )
@@ -219,20 +221,21 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
           <div className="min-w-0 flex-1">
             <p className="t-sub font-medium text-slate-500">
-              <time dateTime={now.toISOString()}>{timeText}</time>
+              <time dateTime={now.toISOString()}>{timeText}</time> · {greeting(now.getHours())}
             </p>
             <h1 className="t-page mt-0.5 break-keep text-slate-900">
-              {greeting(now.getHours())}.{' '}
-              {loading ? '오늘 할 일을 정리하는 중…' : mustToday > 0 ? `반드시 처리할 것 ${mustToday}건` : '급한 일 없음'}
+              {loading ? '오늘 할 일을 정리하는 중…' : mustToday > 0 ? `반드시 처리할 것 ${mustToday}건` : '오늘 급한 일 없음'}
             </h1>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2 self-start sm:self-auto">
             <span className="hidden lg:inline-flex">
               <ScreenGuide screenKey="home" />
             </span>
-            <Button variant="primary" onClick={() => setSummaryOpen(true)}>
-              <Moon aria-hidden="true" className="size-4" /> 오늘 정리하기
-            </Button>
+            <span className="hidden sm:inline-flex">
+              <Button variant="primary" onClick={() => setSummaryOpen(true)}>
+                <Moon aria-hidden="true" className="size-4" /> 오늘 정리하기
+              </Button>
+            </span>
           </div>
         </div>
       </section>
@@ -274,10 +277,11 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               hint={money.overdue.count > 0 ? `연체 ${money.overdue.count}건` : undefined}
               onClick={() => navigate('/ops/clients')}
             />
+            {/* 새 요청은 '급한 일' 이 아니라 '새로 온 것' 이다 — 빨강 대신 브랜드색 */}
             <MetricTile
               label="새 고객 이벤트"
               value={`${openEvents.length}건`}
-              tone={openEvents.some((e) => e.priority === 'high') ? 'danger' : 'neutral'}
+              tone={openEvents.length > 0 ? 'brand' : 'neutral'}
               onClick={() => navigate('/ops/inbox')}
             />
           </div>
@@ -458,6 +462,11 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           )}
         </section>
       </div>
+
+      {/* 하루의 끝에 누르는 버튼이라 모바일에서는 화면 맨 아래에 둔다 */}
+      <Button variant="secondary" className="w-full sm:hidden" onClick={() => setSummaryOpen(true)}>
+        <Moon aria-hidden="true" className="size-4" /> 오늘 정리하기
+      </Button>
 
       {/* I. 하루 정리 */}
       <Modal open={summaryOpen} title={`${today} 하루 정리`} size="lg" onClose={() => setSummaryOpen(false)}

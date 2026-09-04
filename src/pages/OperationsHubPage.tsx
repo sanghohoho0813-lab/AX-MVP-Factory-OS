@@ -378,17 +378,17 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       {/* B. 업체별 현황표 */}
       <section aria-labelledby="ops-matrix" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="ops-matrix" className="text-[1.3rem] font-bold text-slate-900">
+          <h2 id="ops-matrix" className="t-section text-slate-900">
             업체별 현황표
           </h2>
           <div className="flex items-center gap-3">
-            <p className="text-[0.9rem] text-slate-500">칸을 누르면 그 업무로 바로 들어갑니다.</p>
+            <p className="t-sub hidden text-slate-500 lg:block">칸을 누르면 그 업무로 바로 들어갑니다.</p>
             <button
               type="button"
               onClick={() => setCatalogOpen(true)}
-              className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-1.5 text-[0.9rem] font-medium text-slate-600 hover:bg-slate-50"
+              className="tap t-sub shrink-0 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 font-medium whitespace-nowrap text-slate-600 hover:bg-slate-50"
             >
-              업무 항목 관리
+              항목 관리
             </button>
           </div>
         </div>

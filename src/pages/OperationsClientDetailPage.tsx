@@ -350,10 +350,13 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             </p>
             {nearest && (
               <p className="t-sub mt-0.5 text-slate-500">
-                가장 임박 · {nearest.title}{' '}
-                <span className={nearest.daysLeft !== null && nearest.daysLeft < 0 ? 'font-semibold text-danger-700' : ''}>
-                  {nearest.date}
-                </span>
+                가장 임박 · {nearest.title} · {nearest.date}
+                {nearest.daysLeft !== null && (
+                  <span className={nearest.daysLeft < 0 ? ' font-semibold text-danger-700' : ' text-slate-600'}>
+                    {' '}
+                    {dueText(nearest.daysLeft)}
+                  </span>
+                )}
               </p>
             )}
           </div>
