@@ -112,7 +112,27 @@ insert into public.customer_intake_routing (workspace_id) values ('<내 workspac
 ### 3.6 앱 상태 전환
 적용이 끝나면 내부 OS 의 고객 이벤트함·고객 플랫폼 탭이 자동으로 READY 안내를 내리고 동작한다(배포 불필요 — 앱이 RPC 존재를 런타임에 판정한다). `docs/PROJECT_STATE.md` 의 Capability 표에서 브릿지를 LIVE 로 바꾼다.
 
-### 3.7 테스트용 고객 계정 만들기
+### 3.7 왕복 확인 자동화 (`scripts/roundtrip-live.mjs`)
+
+준비·검증·정리를 한 도구로 한다. 사람이 할 일은 고객 화면에서 두 가지 동작뿐이다.
+
+```
+export SUPABASE_URL=https://<ref>.supabase.co
+export SUPABASE_SERVICE_ROLE_KEY=<서버 전용 키>       # 셸에만. 파일·저장소에 넣지 않는다
+
+node scripts/roundtrip-live.mjs prepare   # 테스트 고객 계정 + 왕복테스트(주) + 사업자등록증 요청까지
+#   → 고객 플랫폼에 로그인해 ① 요청 보내기 ② PDF 업로드
+node scripts/roundtrip-live.mjs watch     # 두 건이 내부 이벤트함에 들어오는지 지켜본다
+node scripts/roundtrip-live.mjs cleanup   # 이 도구가 만든 것만 삭제
+```
+
+`prepare` 는 Admin API 로 계정을 만들고 `email_confirm: true` 를 주므로 이메일 인증이 필요 없고, `profiles.member_type` 도 함께 채워 `/auth/onboarding` 게이트를 통과시킨다. 손대는 행은 `operations_clients.id = 'cli_roundtrip_check'` 에 매달린 것뿐이라 실제 고객 데이터는 건드리지 않는다.
+
+`verify` 가 보는 것: 요청·업로드 이벤트 수신, 두 이벤트의 `operations_client_id`, `status = linked`, 서류가 `uploaded` 로 전환, 업로드 경로가 `{workspace}/portal/{link}/` 접두를 지키는지 — 총 7개.
+
+이 도구는 실제 스키마·트리거가 도는 로컬 PostgreSQL 16 위에서 prepare → (고객 행동 없음: 0/7) → 고객 RPC 호출 → verify(7/7) → cleanup 까지 검증했다.
+
+### 3.8 테스트용 고객 계정 수동으로 만들기 (도구를 안 쓸 때)
 Dashboard → Authentication → Users → **Add user** (Auto Confirm User 체크)로 만들면 이메일 인증을 건너뛸 수 있다.
 
 다만 그렇게 만든 계정은 `profiles.member_type` 이 비어 있어 공개 사이트가 `/auth/onboarding` 으로 보내고, 그 화면의 휴대폰 본인인증은 현재 "준비 중" 이라 진행이 막힌다. 테스트 계정만 아래로 통과시킨다(실제 고객에게는 쓰지 않는다):
@@ -122,7 +142,7 @@ update public.profiles
  where email = '<테스트 계정 이메일>';
 ```
 
-### 3.8 고객 업로드 제약 (기존 버킷 설정)
+### 3.9 고객 업로드 제약 (기존 버킷 설정)
 `client-documents` 버킷은 `20260827000005_operations_hub.sql` 이 만든 것으로 **10MB · pdf/jpeg/png/webp** 만 허용한다. 이번 마이그레이션은 이 설정을 바꾸지 않는다. 고객이 다른 형식을 올려야 하면 버킷 설정을 별도로 조정한다.
 
 ## 4. 기존 데이터에 대한 영향
