@@ -815,12 +815,12 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                         <span className="flex flex-wrap items-center gap-1.5">
                           <span className="text-[1.05rem] font-bold break-keep text-slate-900">{meta.label}</span>
                           {urgent && (
-                            <span className="rounded-full border border-danger-200 bg-danger-100 px-1.5 py-0.5 text-[0.75rem] font-bold text-danger-700">
+                            <span className="rounded-full border border-danger-200 bg-danger-100 px-1.5 py-0.5 t-meta font-bold text-danger-700">
                               지금 필요
                             </span>
                           )}
                           {meta.sensitive && (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.75rem] font-medium text-slate-500">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 t-meta font-medium text-slate-500">
                               <ShieldAlert aria-hidden="true" className="size-3" />
                               민감
                             </span>
@@ -1219,17 +1219,17 @@ function FeesSection({
                     <span className="flex flex-wrap items-center gap-1.5">
                       <span className="text-[1rem] font-semibold break-keep text-slate-900">{fee.label}</span>
                       {fee.serviceKey && (
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.78rem] text-slate-500">
+                        <span className="rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 t-meta text-slate-500">
                           {SERVICES.find((s) => s.key === fee.serviceKey)?.shortLabel}
                         </span>
                       )}
                       {overdue && (
-                        <span className="rounded-full border border-danger-200 bg-danger-100 px-1.5 py-0.5 text-[0.78rem] font-bold text-danger-700">
+                        <span className="rounded-full border border-danger-200 bg-danger-100 px-1.5 py-0.5 t-meta font-bold text-danger-700">
                           {dueText(left)}
                         </span>
                       )}
                       {fee.receivedAt && (
-                        <span className="rounded-full border border-success-200 bg-success-50 px-1.5 py-0.5 text-[0.78rem] font-semibold text-success-700">
+                        <span className="rounded-full border border-success-200 bg-success-50 px-1.5 py-0.5 t-meta font-semibold text-success-700">
                           {fee.receivedAt} 입금
                         </span>
                       )}

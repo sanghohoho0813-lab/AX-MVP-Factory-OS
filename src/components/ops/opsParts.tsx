@@ -229,7 +229,7 @@ export function ServiceCell({
         <Icon aria-hidden="true" className="size-3.5 shrink-0" />
         {look.short}
       </span>
-      {note && <span className="text-[0.78rem] font-medium whitespace-nowrap">{note}</span>}
+      {note && <span className="t-meta font-medium whitespace-nowrap">{note}</span>}
     </button>
   )
 }

@@ -250,7 +250,7 @@ export function LinkCustomerModal({
                     <span className="block truncate text-[0.95rem] font-semibold text-slate-800">{c.companyName}</span>
                     <span className="block truncate text-[0.85rem] text-slate-500">{[c.contactName, c.contactPhone, c.industry].filter(Boolean).join(' · ') || '정보 없음'}</span>
                   </span>
-                  {s > 0 && <span className="shrink-0 rounded-full bg-highlight-100 px-2 py-0.5 text-[0.78rem] font-semibold text-highlight-700">후보</span>}
+                  {s > 0 && <span className="shrink-0 rounded-full bg-highlight-100 px-2 py-0.5 t-meta font-semibold text-highlight-700">후보</span>}
                 </button>
               </li>
             ))}
