@@ -52,6 +52,7 @@ Supabase Dashboard → SQL Editor 에서 **두 파일을 순서대로** 붙여 �
 1. `supabase/migrations/20260903000006_customer_bridge.sql` — 브릿지 본체
 2. `supabase/migrations/20260903000007_bridge_hardening.sql` — 권한 하드닝
 3. `supabase/migrations/20260903000008_event_client_link.sql` — 이벤트에 고객사 id 채우기(결함 수정 + 기존 행 backfill)
+4. `supabase/migrations/20260903000009_fix_signup_trigger.sql` — **가입 트리거 장애 수정 (먼저 적용 권장)**
 
 2번은 Supabase Security Advisor 가 지적하는 항목을 닫는다: 트리거 전용 `bridge_on_*` SECURITY DEFINER 함수 6개와 `bridge_touch_updated_at` 에 PostgreSQL 이 기본으로 부여하는 PUBLIC EXECUTE 를 회수하고, `bridge_touch_updated_at` 의 `search_path` 를 고정하며, 내부 전용 헬퍼 `portal_link_owned` 를 authenticated 에서 닫는다. 앱이 실제로 호출하는 RPC 권한은 건드리지 않는다.
 
@@ -59,7 +60,10 @@ Supabase Dashboard → SQL Editor 에서 **두 파일을 순서대로** 붙여 �
 
 3번은 `bridge_emit_customer_event` 가 연결(`portal_client_link`)에서 `operations_client_id` 를 복사하지 않던 결함을 고친다. 이 값이 비어 있으면 이벤트함이 이미 연결된 고객사인데도 "아직 고객사와 연결되지 않음 · 새 고객사로 만들기" 를 보여 고객사가 중복 생성된다. 이미 쌓인 행도 함께 backfill 한다(멱등).
 
-> **…0006 을 이미 적용했다면** 2번과 3번만 실행하면 된다. 셋 다 멱등이라 전부 다시 실행해도 안전하다.
+4번은 이 프로젝트에서 **신규 계정 생성이 전부 실패하던 장애**를 고친다. `auth.users` 에 가입 트리거가 두 개(내부 OS `on_auth_user_created`, 공개 사이트 `zz_mirae_on_auth_user_created`) 걸려 있는데, 먼저 도는 내부 트리거가 `profiles.display_name` 에 넣도록 쓰여 있고 이 프로젝트의 `profiles` 에는 그 컬럼이 없어서 INSERT 전체가 롤백된다. Dashboard 의 Add user 도, miraeailab.com 회원가입도 같이 막힌다. 브릿지(…0006/0007/0008)와는 무관하며 그 이전부터 있던 문제다.
+
+> **…0006 을 이미 적용했다면** 나머지만 실행하면 된다. 전부 멱등이라 다시 실행해도 안전하다.
+> 계정을 만들어야 하므로 **4번을 먼저** 적용하는 것이 편하다.
 
 ### 3.4 적용 후 확인
 ```sql
