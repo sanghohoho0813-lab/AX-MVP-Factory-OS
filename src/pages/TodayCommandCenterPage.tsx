@@ -84,7 +84,7 @@ function ActionRow({ action, rank }: { action: BriefAction; rank: number }) {
           <span className="t-card block break-keep text-slate-900">{action.title}</span>
           {action.detail && <span className="t-sub block break-keep text-slate-600">{action.detail}</span>}
           {/* 왜 이것이 위에 있는지 — 한 줄을 넘기지 않는다 */}
-          <span className="t-meta mt-0.5 block truncate text-slate-400">
+          <span className="t-meta mt-0.5 block truncate text-slate-500">
             {action.clientName ? `${action.clientName} · ` : ''}
             {action.reason}
           </span>
@@ -286,7 +286,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             />
           </div>
 
-          <p className="t-meta text-slate-400">
+          <p className="t-meta text-slate-500">
             순서 규칙: 마감 지남·막힘 → 결제된 주문 → 지난 후속조치 → 고객 서류·요청 → 임박 마감. 규칙 기반이며 AI 판단이 아닙니다.
           </p>
         </section>

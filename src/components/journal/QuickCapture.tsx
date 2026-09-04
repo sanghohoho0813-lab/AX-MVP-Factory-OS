@@ -143,7 +143,7 @@ export function QuickCapture({
                 <DueDateField value={dueDate} onChange={setDueDate} label="언제까지" today={todayLocalDate()} />
               </div>
             )}
-            <span className="t-meta ml-auto hidden text-slate-400 sm:inline">Ctrl+Enter 저장</span>
+            <span className="t-meta ml-auto hidden text-slate-500 sm:inline">Ctrl+Enter 저장</span>
             <button
               type="button"
               onClick={() => void submit()}

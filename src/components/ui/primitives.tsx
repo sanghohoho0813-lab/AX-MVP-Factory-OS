@@ -293,7 +293,7 @@ export function MetricTile({
       )}
       <span className="t-sub block break-keep text-slate-500">{label}</span>
       <strong className={`t-num mt-1 block ${valueColor}`}>{value}</strong>
-      {hint && <span className="t-meta mt-0.5 block break-keep text-slate-400">{hint}</span>}
+      {hint && <span className="t-meta mt-0.5 block break-keep text-slate-500">{hint}</span>}
     </Tag>
   )
 }

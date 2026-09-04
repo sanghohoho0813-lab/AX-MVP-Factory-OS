@@ -470,7 +470,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       {/* 1단계 — 지금 할 일 */}
       <Surface showEdge edge={nextActionTone} className="!p-0">
         <div className="px-4 py-4 sm:px-5">
-          <p className="t-meta font-semibold tracking-wide text-slate-400 uppercase">지금 할 일</p>
+          <p className="t-meta font-semibold tracking-wide text-slate-500 uppercase">지금 할 일</p>
           <p className="t-card mt-1 break-keep text-slate-900">
             {record.nextAction || '다음 행동이 정해지지 않았습니다.'}
           </p>
@@ -483,7 +483,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         </div>
         {startedServices.length > 0 && (
           <div className="border-t border-slate-100 px-4 py-3 sm:px-5">
-            <p className="t-meta font-semibold text-slate-400">진행 중인 업무</p>
+            <p className="t-meta font-semibold text-slate-500">진행 중인 업무</p>
             <ul className="mt-1.5 flex flex-wrap gap-1.5">
               {startedServices.map((m) => (
                 <li key={m.key}>

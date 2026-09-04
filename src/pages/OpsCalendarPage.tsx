@@ -202,7 +202,7 @@ function CalendarContent({ workspaceId }: { workspaceId: string | null }) {
                         </span>
                       ))}
                       {list.length > 3 && (
-                        <span className="t-meta px-1 text-slate-400">+{list.length - 3}건</span>
+                        <span className="t-meta px-1 text-slate-500">+{list.length - 3}건</span>
                       )}
                     </span>
                   </button>
