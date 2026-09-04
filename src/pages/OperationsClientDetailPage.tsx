@@ -51,7 +51,6 @@ import {
   buildStatusReportMessage,
 } from '../services/clientOpsMessages'
 import {
-  ACCENT_CLASS,
   DOCUMENTS,
   FEE_KIND_LABEL,
   FEE_KIND_ORDER,
@@ -92,6 +91,7 @@ import { withActivity } from '../services/clientOpsActivity'
 import { ActivityLog } from '../components/ops/ActivityLog'
 import { PortalTab } from '../components/ops/PortalTab'
 import {
+  Badge,
   BottomSheet,
   Disclosure,
   Dot,
@@ -238,6 +238,19 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         : [],
     [record],
   )
+
+  /** 가장 급한 업무 하나 — 업무 탭에서 이것만 펼친 채로 시작한다 */
+  const firstUrgentKey = useMemo(() => {
+    if (!record) return null
+    for (const m of SERVICES) {
+      const st = record.services[m.key]
+      if (!isServiceOpen(st.status)) continue
+      const blocked = isServiceStarted(st.status) && missingDocumentsFor(record, m.key, today).length > 0
+      const left = st.dueDate ? daysLeftFrom(today, st.dueDate) : null
+      if (blocked || (left !== null && left < 0)) return m.key
+    }
+    return null
+  }, [record, today])
 
   const paidAmount = useMemo(
     () => (record ? record.fees.filter((f) => f.receivedAt !== null).reduce((s, f) => s + (f.amount ?? 0), 0) : 0),
@@ -560,21 +573,18 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
       {tab === 'work' && (
       <section aria-labelledby="svc" className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="svc" className="text-[1.3rem] font-bold text-slate-900">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="svc" className="t-section text-slate-900">
             진행 업무
           </h2>
-          <div className="flex items-center gap-3">
-            <p className="text-[0.9rem] text-slate-500">제목을 누르면 자세한 내용이 열립니다.</p>
-            <button
-              type="button"
-              onClick={() => setCatalogOpen(true)}
-              className="flex items-center gap-1 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-1.5 text-[0.9rem] font-medium text-slate-600 hover:bg-slate-50"
-            >
-              <Plus aria-hidden="true" className="size-4" />
-              업무 항목 추가
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setCatalogOpen(true)}
+            className="tap t-sub flex items-center gap-1 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 font-medium text-slate-600 hover:bg-slate-50"
+          >
+            <Plus aria-hidden="true" className="size-4" />
+            업무 항목 추가
+          </button>
         </div>
         <div className="flex flex-col gap-2.5">
           {SERVICES.map((meta) => {
@@ -586,8 +596,9 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             const dLeft = state.dueDate ? daysLeftFrom(today, state.dueDate) : null
             const overdue = open && dLeft !== null && dLeft < 0
             const dueSoon = open && dLeft !== null && dLeft >= 0 && dLeft <= 7
-            // 손댈 필요가 있는 업무는 기본으로 펼친다
-            const auto = started || overdue || blocked
+            // 자동으로 펼치는 것은 딱 하나 — 가장 급한 업무(또는 눌러서 들어온 업무).
+            // 급한 것이 셋이면 셋 다 펼치는 대신 맨 위 하나만 펼친다.
+            const auto = meta.key === focusedService || meta.key === firstUrgentKey
             const expanded = cardOpen(meta.key, auto)
 
             return (
@@ -595,17 +606,17 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 key={meta.key}
                 id={meta.key}
                 ref={meta.key === focusedService ? focusedCardRef : undefined}
-                className={`overflow-hidden rounded-(--radius-panel) border ${
-                  meta.key === focusedService ? 'ring-2 ring-brand-400 ring-offset-2 ' : ''
-                }${
-                  blocked || overdue
-                    ? 'border-danger-200 bg-danger-50/40'
-                    : dueSoon
-                      ? 'border-warning-200 bg-warning-50/40'
-                      : 'border-slate-200 bg-white'
+                className={`relative overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white ${
+                  meta.key === focusedService ? 'ring-2 ring-brand-400 ring-offset-2' : ''
                 }`}
               >
-                <div className={`h-1 w-full ${ACCENT_CLASS[meta.accent].bar}`} />
+                {/* 급한 카드도 배경을 칠하지 않는다 — 왼쪽 3px 선으로만 말한다 */}
+                {(blocked || overdue || dueSoon) && (
+                  <span
+                    aria-hidden="true"
+                    className={`absolute inset-y-0 left-0 w-[3px] ${blocked || overdue ? 'bg-danger-500' : 'bg-warning-500'}`}
+                  />
+                )}
                 <div className="flex flex-wrap items-center gap-2 px-4 py-3">
                   <button
                     type="button"
@@ -619,36 +630,22 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                     />
                     <span className="min-w-0">
                       <span className="flex flex-wrap items-center gap-1.5">
-                        <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${ACCENT_CLASS[meta.accent].dot}`} />
-                        <span className="text-[1.08rem] font-bold break-keep text-slate-900">{meta.label}</span>
-                        {meta.recurring && (
-                          <span className="rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.75rem] font-medium text-slate-500">
-                            반복
-                          </span>
-                        )}
+                        <Dot tone={statusTone(state.status)} />
+                        <span className="t-card break-keep text-slate-900">{meta.label}</span>
                         {blocked && (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-danger-200 bg-danger-100 px-1.5 py-0.5 text-[0.78rem] font-bold text-danger-700">
+                          <Badge tone="danger">
                             <Lock aria-hidden="true" className="size-3" />
-                            서류 {missing.length}건 부족
-                          </span>
+                            서류 {missing.length}건
+                          </Badge>
                         )}
-                        {open && dLeft !== null && (
-                          <span
-                            className={`rounded-full border px-1.5 py-0.5 text-[0.78rem] font-bold ${
-                              dLeft < 0
-                                ? 'border-danger-200 bg-danger-100 text-danger-700'
-                                : dLeft <= 7
-                                  ? 'border-warning-200 bg-warning-100 text-warning-800'
-                                  : 'border-slate-200 bg-slate-50 text-slate-500'
-                            }`}
-                          >
-                            {dueText(dLeft)}
-                          </span>
+                        {open && dLeft !== null && (dLeft < 0 || dLeft <= 7) && (
+                          <Badge tone={dLeft < 0 ? 'danger' : 'warning'}>{dueText(dLeft)}</Badge>
                         )}
                       </span>
-                      {!expanded && state.nextStep && (
-                        <span className="mt-0.5 block truncate text-[0.9rem] text-slate-500">
-                          다음: {state.nextStep}
+                      {!expanded && (
+                        <span className="t-sub mt-0.5 block truncate text-slate-500">
+                          {state.nextStep ? `다음: ${state.nextStep}` : SERVICE_STATUS_LABEL[state.status]}
+                          {meta.recurring ? ' · 반복' : ''}
                         </span>
                       )}
                     </span>

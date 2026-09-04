@@ -178,12 +178,23 @@ function CalendarContent({ workspaceId }: { workspaceId: string | null }) {
                     >
                       {Number(d.slice(8))}
                     </span>
-                    <span className="flex flex-col gap-0.5">
+                    {/* 좁은 화면에서는 업체명이 '한..' 처럼 잘려 쓸모가 없다.
+                        점만 찍고 내용은 아래 그날 목록에서 읽게 한다. */}
+                    <span className="mt-0.5 flex flex-wrap gap-0.5 lg:hidden">
+                      {list.slice(0, 4).map((e) => (
+                        <span
+                          key={e.id}
+                          aria-hidden="true"
+                          className={`size-1.5 rounded-full ${e.done ? 'bg-slate-200' : SCHEDULE_KIND_CLASS[e.kind].dot}`}
+                        />
+                      ))}
+                    </span>
+                    <span className="hidden flex-col gap-0.5 lg:flex">
                       {list.slice(0, 3).map((e) => (
                         <span
                           key={e.id}
-                          className={`flex items-center gap-1 truncate rounded px-1 py-0.5 text-[0.75rem] ${
-                            e.done ? 'text-slate-300 line-through' : SCHEDULE_KIND_CLASS[e.kind].chip
+                          className={`t-meta flex items-center gap-1 truncate rounded border px-1 py-0.5 ${
+                            e.done ? 'border-slate-100 text-slate-300 line-through' : SCHEDULE_KIND_CLASS[e.kind].chip
                           }`}
                         >
                           <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${SCHEDULE_KIND_CLASS[e.kind].dot}`} />
@@ -191,7 +202,7 @@ function CalendarContent({ workspaceId }: { workspaceId: string | null }) {
                         </span>
                       ))}
                       {list.length > 3 && (
-                        <span className="px-1 text-[0.72rem] text-slate-400">+{list.length - 3}건</span>
+                        <span className="t-meta px-1 text-slate-400">+{list.length - 3}건</span>
                       )}
                     </span>
                   </button>

@@ -2,7 +2,7 @@ import { useRef, useState, type KeyboardEvent } from 'react'
 import { Send } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import type { JournalEntryType } from '../../types/bridge'
-import { JOURNAL_TYPES, JOURNAL_TYPE_CLASS, JOURNAL_TYPE_LABEL, type CreateJournalInput } from '../../services/journalService'
+import { JOURNAL_TYPES, JOURNAL_TYPE_LABEL, type CreateJournalInput } from '../../services/journalService'
 import { DueDateField } from '../ops/opsControls'
 import { todayLocalDate } from '../../lib/appClock'
 
@@ -29,6 +29,7 @@ export function QuickCapture({
   const [clientId, setClientId] = useState<string>(defaultClientId ?? '')
   const [dueDate, setDueDate] = useState('')
   const [busy, setBusy] = useState(false)
+  const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
   const textRef = useRef<HTMLTextAreaElement>(null)
 
@@ -70,35 +71,20 @@ export function QuickCapture({
     }
   }
 
-  return (
-    <div className={`rounded-(--radius-panel) border border-slate-200 bg-white shadow-(--shadow-card) ${compact ? 'p-3' : 'p-4'}`}>
-      <div role="radiogroup" aria-label="기록 종류" className="flex flex-wrap gap-1.5">
-        {JOURNAL_TYPES.map((t) => {
-          const on = t === type
-          return (
-            <button
-              key={t}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              onClick={() => setType(t)}
-              className={`rounded-full px-2.5 py-1 text-[0.85rem] font-semibold transition-colors ${
-                on ? `${JOURNAL_TYPE_CLASS[t]} ring-2 ring-brand-600/40` : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
-              }`}
-            >
-              {JOURNAL_TYPE_LABEL[t]}
-            </button>
-          )
-        })}
-      </div>
+  /* 무엇이든 적기 시작하기 전에는 종류·고객사 선택을 보여주지 않는다.
+     처음 보이는 것이 빈 칸 하나뿐이어야 손이 먼저 나간다. */
+  const expanded = open || content.trim().length > 0
 
+  return (
+    <div className={`rounded-(--radius-panel) border border-slate-200 bg-white ${compact ? 'p-3' : 'p-4'}`}>
       <textarea
         ref={textRef}
         value={content}
         onChange={(e) => setContent(e.target.value)}
+        onFocus={() => setOpen(true)}
         onKeyDown={onKeyDown}
         autoFocus={autoFocus}
-        rows={compact ? 2 : 3}
+        rows={expanded ? (compact ? 3 : 4) : 2}
         placeholder={
           type === 'call'
             ? '누구와 통화했고 무엇을 정했나요?'
@@ -111,40 +97,70 @@ export function QuickCapture({
                   : '무슨 일이 있었나요?'
         }
         aria-label="기록 내용"
-        className="mt-3 w-full resize-y rounded-(--radius-control) border border-slate-300 px-3 py-2.5 text-[0.98rem] leading-relaxed focus:border-brand-500 focus:outline-none"
+        className="t-body w-full resize-y rounded-(--radius-control) border border-slate-300 px-3 py-3 focus:border-brand-500 focus:outline-none"
       />
 
-      <div className="mt-2.5 flex flex-wrap items-center gap-2">
-        <select
-          value={clientId}
-          onChange={(e) => setClientId(e.target.value)}
-          aria-label="연결할 고객사"
-          className="min-w-0 max-w-full rounded-(--radius-control) border border-slate-300 px-2.5 py-2 text-[0.92rem] text-slate-700 focus:border-brand-500 focus:outline-none"
-        >
-          <option value="">고객사 연결 안 함</option>
-          {clients.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.companyName}
-            </option>
-          ))}
-        </select>
-        {type === 'follow_up' && (
-          <div className="min-w-0">
-            <DueDateField value={dueDate} onChange={setDueDate} label="언제까지" today={todayLocalDate()} />
+      {expanded && (
+        <>
+          <div role="radiogroup" aria-label="기록 종류" className="mt-3 flex flex-wrap gap-1.5">
+            {JOURNAL_TYPES.map((t) => {
+              const on = t === type
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => setType(t)}
+                  className={`t-sub tap rounded-full border px-3 py-1.5 font-medium ${
+                    on
+                      ? 'border-brand-600 bg-brand-50 text-brand-700'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {JOURNAL_TYPE_LABEL[t]}
+                </button>
+              )
+            })}
           </div>
-        )}
-        <span className="ml-auto hidden text-[0.82rem] text-slate-400 sm:inline">Ctrl+Enter 저장</span>
-        <button
-          type="button"
-          onClick={() => void submit()}
-          disabled={busy}
-          className="inline-flex h-10 items-center gap-1.5 rounded-(--radius-control) bg-brand-600 px-4 text-[0.95rem] font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
-        >
-          <Send aria-hidden="true" className="size-4" />
-          {busy ? '저장 중…' : '기록'}
-        </button>
-      </div>
-      {error && <p role="alert" className="mt-2 text-[0.9rem] text-danger-600">{error}</p>}
+
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            <select
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
+              aria-label="연결할 고객사"
+              className="t-sub h-11 min-w-0 max-w-full rounded-(--radius-control) border border-slate-300 px-2.5 text-slate-700 focus:border-brand-500 focus:outline-none sm:h-10"
+            >
+              <option value="">고객사 연결 안 함</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.companyName}
+                </option>
+              ))}
+            </select>
+            {type === 'follow_up' && (
+              <div className="min-w-0">
+                <DueDateField value={dueDate} onChange={setDueDate} label="언제까지" today={todayLocalDate()} />
+              </div>
+            )}
+            <span className="t-meta ml-auto hidden text-slate-400 sm:inline">Ctrl+Enter 저장</span>
+            <button
+              type="button"
+              onClick={() => void submit()}
+              disabled={busy}
+              className="t-body tap inline-flex h-11 items-center gap-1.5 rounded-(--radius-control) bg-brand-600 px-4 font-semibold text-white hover:bg-brand-700 disabled:opacity-50 sm:h-10"
+            >
+              <Send aria-hidden="true" className="size-4" />
+              {busy ? '저장 중…' : '기록'}
+            </button>
+          </div>
+        </>
+      )}
+      {error && (
+        <p role="alert" className="t-sub mt-2 text-danger-600">
+          {error}
+        </p>
+      )}
     </div>
   )
 }

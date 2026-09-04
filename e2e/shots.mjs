@@ -77,13 +77,22 @@ async function run() {
         problems.push(`[가로넘침] ${vp.tag} ${screen.name}: ${overflow.doc}px > ${overflow.win}px`)
       }
 
-      // 화면 밖으로 나간 요소 찾기
+      // 화면 밖으로 나간 요소 찾기.
+      // 옆으로 미는 칸(탭·필터 줄) 안에 있는 것은 의도된 것이므로 뺀다.
       const escaped = await page.evaluate(() => {
+        const inScroller = (el) => {
+          for (let p = el.parentElement; p; p = p.parentElement) {
+            const s = getComputedStyle(p)
+            if ((s.overflowX === 'auto' || s.overflowX === 'scroll') && p.scrollWidth > p.clientWidth + 1) return true
+          }
+          return false
+        }
         const out = []
         for (const el of document.querySelectorAll('button, a, input, select, h1, h2, h3')) {
           const r = el.getBoundingClientRect()
           if (r.width === 0 || r.height === 0) continue
           if (r.right > window.innerWidth + 1 || r.left < -1) {
+            if (inScroller(el)) continue
             out.push((el.textContent || el.tagName).trim().slice(0, 24) + ` @${Math.round(r.left)}..${Math.round(r.right)}`)
           }
         }

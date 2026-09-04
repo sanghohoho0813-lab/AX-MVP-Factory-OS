@@ -41,11 +41,17 @@ export const SCHEDULE_KIND_LABEL: Record<ScheduleKind, string> = {
 }
 
 /** 종류별 색 (달력 점·칩) */
+/**
+ * 일정 종류 표시.
+ *
+ * 종류는 작은 점 하나로만 구분한다. 칸 전체를 종류색으로 칠하면 달력이
+ * 색 모자이크가 되어 정작 '오늘 뭐가 있나' 가 보이지 않는다.
+ */
 export const SCHEDULE_KIND_CLASS: Record<ScheduleKind, { dot: string; chip: string }> = {
-  task: { dot: 'bg-cat-plan-500', chip: 'border-cat-plan-200 bg-cat-plan-50 text-cat-plan-700' },
-  funding: { dot: 'bg-cat-fund-500', chip: 'border-cat-fund-200 bg-cat-fund-50 text-cat-fund-700' },
-  payment: { dot: 'bg-cat-money-500', chip: 'border-cat-money-200 bg-cat-money-50 text-cat-money-700' },
-  document: { dot: 'bg-cat-doc-500', chip: 'border-cat-doc-200 bg-cat-doc-50 text-cat-doc-700' },
+  task: { dot: 'bg-cat-plan-500', chip: 'border-slate-200 bg-white text-slate-600' },
+  funding: { dot: 'bg-cat-fund-500', chip: 'border-slate-200 bg-white text-slate-600' },
+  payment: { dot: 'bg-cat-money-500', chip: 'border-slate-200 bg-white text-slate-600' },
+  document: { dot: 'bg-cat-doc-500', chip: 'border-slate-200 bg-white text-slate-600' },
 }
 
 /** 한 업체의 일정 */

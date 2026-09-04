@@ -132,11 +132,36 @@ const journal = [
   { id: 'j6', entryDate: d(-3), entryType: 'idea', content: '업체별 정책자금 캘린더를 분기 단위로 미리 만들어 두면 신청 누락이 줄 것 같다.' },
 ]
 
+/** 이벤트함이 비어 있으면 화면 문제를 볼 수 없어 샘플을 함께 넣는다 */
+const events = [
+  {
+    id: 'ev1', eventType: 'customer_request_created', sourceType: 'demo_request', sourceId: 'r1',
+    dedupeKey: 'demo_request:r1:customer_request_created', priority: 'high', status: 'new',
+    operationsClientId: 'cli_hansol',
+    payload: { company_name: '한솔테크(주)', request_type: 'status', title: '벤처인증 진행 상황이 궁금합니다' },
+    occurredAt: '2026-09-04T02:10:00.000Z', receivedAt: '2026-09-04T02:10:00.000Z',
+  },
+  {
+    id: 'ev2', eventType: 'document_uploaded', sourceType: 'demo_doc', sourceId: 'd1',
+    dedupeKey: 'demo_doc:d1:document_uploaded', priority: 'medium', status: 'linked',
+    operationsClientId: 'cli_hansol',
+    payload: { company_name: '한솔테크(주)', title: '사업자등록증', file_name: '사업자등록증.pdf' },
+    occurredAt: '2026-09-03T08:30:00.000Z', receivedAt: '2026-09-03T08:30:00.000Z',
+  },
+  {
+    id: 'ev3', eventType: 'service_order_created', sourceType: 'demo_order', sourceId: 'o1',
+    dedupeKey: 'demo_order:o1:service_order_created', priority: 'high', status: 'new',
+    payload: { company_name: '새길바이오', order_number: 'SO-2026-0042', product_slug: 'venture-certification', buyer_name: '한대표', status: 'payment_confirmed' },
+    occurredAt: '2026-09-02T23:05:00.000Z', receivedAt: '2026-09-02T23:05:00.000Z',
+  },
+]
+
 export function seedScript() {
   return `
     localStorage.setItem('axmvp.onboarding.prefs', ${JSON.stringify(JSON.stringify({ tutorialVersion: 99, autoShowEnabled: false, snoozedUntilDate: '' }))});
     localStorage.setItem('axmvp.v1.operations_clients', ${JSON.stringify(JSON.stringify(clients))});
     localStorage.setItem('axmvp.v1.ops_journal_entries', ${JSON.stringify(JSON.stringify(journal))});
+    localStorage.setItem('axmvp.v1.customer_events', ${JSON.stringify(JSON.stringify(events))});
   `
 }
 
