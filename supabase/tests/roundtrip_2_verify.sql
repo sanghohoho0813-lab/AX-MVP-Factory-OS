@@ -89,6 +89,24 @@ begin
     insert into _v values (20, 'B. 이벤트함 내용', '(비어 있음)', '고객 행동이 아직 하나도 안 들어왔다');
   end if;
 
+  -- ---------------- E. 원본 테이블 상태 ----------------
+  -- 이벤트가 안 왔을 때, "행 자체가 없다(화면에서 전송 실패)" 와
+  -- "행은 있는데 이벤트가 안 생겼다(트리거 문제)" 를 구분한다.
+  select count(*) into n from public.portal_requests where portal_client_link_id = v_link;
+  insert into _v values (25, 'E. 원본 테이블', 'portal_requests 행 수',
+    case when n > 0 then '✅ ' || n || '건 — 요청은 저장됐다'
+         else '❌ 0건 — 요청이 저장되지 않았다 (화면에서 전송이 안 됐다는 뜻)' end);
+
+  insert into _v
+  select 26, 'E. 원본 테이블', 'portal_requests · ' || to_char(r.created_at, 'MM-DD HH24:MI'),
+         r.request_type || ' · ' || r.title || ' · status=' || r.status
+    from public.portal_requests r
+   where r.portal_client_link_id = v_link
+   order by r.created_at desc;
+
+  select count(*) into n from public.portal_documents where portal_client_link_id = v_link;
+  insert into _v values (27, 'E. 원본 테이블', 'portal_documents 행 수', n || '건');
+
   -- ---------------- C. 고객 투영 누출 검사 ----------------
   v_proj := public.portal_project_projection(v_link);
   insert into _v values
