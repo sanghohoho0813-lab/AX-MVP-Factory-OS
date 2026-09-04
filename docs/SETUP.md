@@ -112,35 +112,26 @@ insert into public.customer_intake_routing (workspace_id) values ('<내 workspac
 ### 3.6 앱 상태 전환
 적용이 끝나면 내부 OS 의 고객 이벤트함·고객 플랫폼 탭이 자동으로 READY 안내를 내리고 동작한다(배포 불필요 — 앱이 RPC 존재를 런타임에 판정한다). `docs/PROJECT_STATE.md` 의 Capability 표에서 브릿지를 LIVE 로 바꾼다.
 
-### 3.7 왕복 확인 자동화 (`scripts/roundtrip-live.mjs`)
+### 3.7 왕복 확인 — SQL 3단계
 
-준비·검증·정리를 한 도구로 한다. 사람이 할 일은 고객 화면에서 두 가지 동작뿐이다.
+Dashboard → SQL Editor 에서 순서대로 실행한다. 사람이 화면에서 할 일은 두 가지뿐이다.
 
-```
-export SUPABASE_URL=https://<ref>.supabase.co
-export SUPABASE_SERVICE_ROLE_KEY=<서버 전용 키>       # 셸에만. 파일·저장소에 넣지 않는다
+| 단계 | 파일 | 하는 일 |
+|---|---|---|
+| 사전 | — | 마이그레이션 …0007, …0008 적용 (§3.3) |
+| 사전 | — | Authentication → Users → **Add user** (Auto Confirm User 체크) |
+| 1 | `supabase/tests/roundtrip_1_setup.sql` | 프로필 온보딩 통과 + 업체 "왕복테스트(주)" + 계정 연결 + 사업자등록증 요청 |
+| — | (사람) | 고객 플랫폼 로그인 → ① 요청 보내기 ② PDF 업로드 |
+| 2 | `supabase/tests/roundtrip_2_verify.sql` | 두 건이 이벤트함에 들어왔는지 8개 항목 판정 + 투영 누출 검사 |
+| 3 | `supabase/tests/roundtrip_3_cleanup.sql` | 이 확인이 만든 것만 삭제 |
 
-node scripts/roundtrip-live.mjs prepare   # 테스트 고객 계정 + 왕복테스트(주) + 사업자등록증 요청까지
-#   → 고객 플랫폼에 로그인해 ① 요청 보내기 ② PDF 업로드
-node scripts/roundtrip-live.mjs watch     # 두 건이 내부 이벤트함에 들어오는지 지켜본다
-node scripts/roundtrip-live.mjs cleanup   # 이 도구가 만든 것만 삭제
-```
+1번은 고객 행동을 흉내내지 않는다 — 그건 사람이 실제 화면에서 해야 검증에 의미가 있다.
+1번은 실행 즉시 …0007/…0008 적용 여부까지 함께 확인해 준다.
+2번은 읽기만 한다. 손대는 행은 전부 `operations_clients.id = 'cli_roundtrip_check'` 에 매달린 것뿐이다.
 
-`prepare` 는 Admin API 로 계정을 만들고 `email_confirm: true` 를 주므로 이메일 인증이 필요 없고, `profiles.member_type` 도 함께 채워 `/auth/onboarding` 게이트를 통과시킨다. 손대는 행은 `operations_clients.id = 'cli_roundtrip_check'` 에 매달린 것뿐이라 실제 고객 데이터는 건드리지 않는다.
+세 단계 모두 실제 스키마·트리거가 도는 로컬 PostgreSQL 16 에서 검증했다: setup 4/4 → (고객 행동 전) verify 0/8 → 고객 권한으로 실제 portal RPC 호출 → verify 8/8 + 누출 검사 4/4 → cleanup 이 테스트 행만 삭제.
 
-`verify` 가 보는 것: 요청·업로드 이벤트 수신, 두 이벤트의 `operations_client_id`, `status = linked`, 서류가 `uploaded` 로 전환, 업로드 경로가 `{workspace}/portal/{link}/` 접두를 지키는지 — 총 7개.
-
-이 도구는 실제 스키마·트리거가 도는 로컬 PostgreSQL 16 위에서 prepare → (고객 행동 없음: 0/7) → 고객 RPC 호출 → verify(7/7) → cleanup 까지 검증했다.
-
-### 3.8 테스트용 고객 계정 수동으로 만들기 (도구를 안 쓸 때)
-Dashboard → Authentication → Users → **Add user** (Auto Confirm User 체크)로 만들면 이메일 인증을 건너뛸 수 있다.
-
-다만 그렇게 만든 계정은 `profiles.member_type` 이 비어 있어 공개 사이트가 `/auth/onboarding` 으로 보내고, 그 화면의 휴대폰 본인인증은 현재 "준비 중" 이라 진행이 막힌다. 테스트 계정만 아래로 통과시킨다(실제 고객에게는 쓰지 않는다):
-```sql
-update public.profiles
-   set member_type = 'business', phone_verified = true
- where email = '<테스트 계정 이메일>';
-```
+`service_role` 키를 셸에 줄 수 있으면 `scripts/roundtrip-live.mjs` 로 같은 흐름을 자동화할 수도 있다(계정 생성까지 포함). 키를 공유하지 않는 경우 위 SQL 3단계를 쓴다.
 
 ### 3.9 고객 업로드 제약 (기존 버킷 설정)
 `client-documents` 버킷은 `20260827000005_operations_hub.sql` 이 만든 것으로 **10MB · pdf/jpeg/png/webp** 만 허용한다. 이번 마이그레이션은 이 설정을 바꾸지 않는다. 고객이 다른 형식을 올려야 하면 버킷 설정을 별도로 조정한다.
