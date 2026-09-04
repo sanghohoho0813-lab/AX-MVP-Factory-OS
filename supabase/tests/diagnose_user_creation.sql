@@ -1,88 +1,113 @@
 -- =====================================================================
 -- 진단 · "Failed to create user: Database error creating new user"
 -- ---------------------------------------------------------------------
--- Supabase 는 auth.users 에 걸린 트리거가 실패하면 이 문구만 보여주고
+-- Supabase 는 auth.users 에 걸린 트리거가 실패하면 저 문구만 보여주고
 -- 진짜 원인을 감춘다. 이 스크립트가 그 원인을 꺼낸다.
 --
+-- SQL Editor 는 "마지막 쿼리 결과" 하나만 보여주므로,
+-- 모든 진단 결과를 표 하나에 모아서 마지막에 한 번에 출력한다.
+-- (NOTICE 로 찍지 않는다 — 화면에 안 보이기 때문)
+--
 -- 읽기 전용이다. D 단계에서 시험 삽입을 하지만 곧바로 되돌린다.
--- 결과를 그대로 복사해서 보내면 판독한다.
+-- 결과표를 그대로 복사해서 보내면 판독한다.
 -- =====================================================================
 
+drop table if exists _diag;
+create temp table _diag (순 int, 구분 text, 항목 text, 값 text);
+
 -- ---------------------------------------------------------------------
--- A. auth.users 에 걸린 트리거 (여기 있는 함수 중 하나가 실패하고 있다)
+-- A. auth.users 에 걸린 트리거 — 이 중 하나가 실패하고 있다
 -- ---------------------------------------------------------------------
-select '--- A. auth.users 트리거 ---' as 구분;
-select t.tgname as 트리거,
-       p.proname as 함수,
-       case when t.tgenabled = 'D' then '꺼짐' else '켜짐' end as 상태
+insert into _diag
+select 10, 'A. auth.users 트리거', t.tgname,
+       p.proname || case when t.tgenabled = 'D' then ' (꺼짐)' else '' end
   from pg_trigger t
   join pg_proc p on p.oid = t.tgfoid
- where t.tgrelid = 'auth.users'::regclass
-   and not t.tgisinternal
- order by t.tgname;
+ where t.tgrelid = 'auth.users'::regclass and not t.tgisinternal;
+
+insert into _diag
+select 11, 'A. auth.users 트리거', '(없음)', '트리거가 하나도 없다'
+ where not exists (select 1 from pg_trigger
+                    where tgrelid = 'auth.users'::regclass and not tgisinternal);
 
 -- ---------------------------------------------------------------------
--- B. profiles 의 실제 컬럼과 NOT NULL 여부
---    트리거 함수가 넣는 컬럼과 어긋나면 여기서 드러난다
+-- B. profiles 의 실제 컬럼 — 트리거가 넣는 컬럼과 어긋나면 여기서 드러난다
 -- ---------------------------------------------------------------------
-select '--- B. public.profiles 컬럼 ---' as 구분;
-select ordinal_position as 순, column_name as 컬럼, data_type as 타입,
-       is_nullable as "NULL허용", coalesce(column_default, '-') as 기본값
+insert into _diag
+select 20, 'B. profiles 실제 컬럼', column_name,
+       data_type || ' · NULL' || (case when is_nullable = 'YES' then '허용' else '불가' end)
+       || coalesce(' · 기본값=' || column_default, '')
   from information_schema.columns
- where table_schema = 'public' and table_name = 'profiles'
- order by ordinal_position;
-
-select '--- B2. public.profiles 제약 ---' as 구분;
-select conname as 제약, pg_get_constraintdef(oid) as 정의
-  from pg_constraint
- where conrelid = 'public.profiles'::regclass
- order by conname;
+ where table_schema = 'public' and table_name = 'profiles';
 
 -- ---------------------------------------------------------------------
--- C. 트리거 함수 원본 (컬럼 목록을 B 와 비교한다)
+-- C. handle_new_user 가 profiles 에 넣으려는 컬럼 목록
+--    B 와 나란히 놓고 비교한다
 -- ---------------------------------------------------------------------
-select '--- C. handle_new_user 원본 ---' as 구분;
-select pg_get_functiondef(p.oid) as 정의
-  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
- where n.nspname = 'public' and p.proname = 'handle_new_user';
+insert into _diag
+select 30, 'C. 트리거가 넣는 컬럼', '함수 원본 ' || lpad(n::text, 2, '0') || '행', line
+  from (
+    select row_number() over () as n, line
+      from pg_proc p
+      join pg_namespace ns on ns.oid = p.pronamespace
+      cross join lateral unnest(string_to_array(pg_get_functiondef(p.oid), E'\n')) as line
+     where ns.nspname = 'public' and p.proname = 'handle_new_user'
+  ) s
+ where line ~* 'insert into|values|profiles|\m(name|phone|organization|role|member_type|display_name)\M';
+
+insert into _diag
+select 31, 'C. 트리거가 넣는 컬럼', '(없음)', 'handle_new_user 함수가 존재하지 않는다'
+ where not exists (select 1 from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+                    where ns.nspname = 'public' and p.proname = 'handle_new_user');
 
 -- ---------------------------------------------------------------------
--- D. 진짜 에러 재현 — 트리거가 하는 삽입을 그대로 시도하고 되돌린다
+-- D. 진짜 에러 재현 — 실제 계정 생성과 같은 경로로 넣어 보고 되돌린다
 -- ---------------------------------------------------------------------
-select '--- D. 재현 결과 ---' as 구분;
 do $$
 declare
-  v_id  uuid := gen_random_uuid();
+  v_id   uuid := gen_random_uuid();
   v_mail text := 'diag-' || substr(v_id::text, 1, 8) || '@example.com';
   msg text; det text; hnt text; ctx text;
 begin
   begin
-    -- 실제 계정 생성과 같은 경로: auth.users 삽입 → handle_new_user 트리거 발화
     insert into auth.users (id, email) values (v_id, v_mail);
-    raise notice '결과: ✅ 삽입 성공 — 트리거는 정상이다. 다른 원인을 봐야 한다.';
-    raise exception 'DIAG_ROLLBACK';   -- 남기지 않고 되돌린다
+    insert into _diag values (40, 'D. 재현 결과', '판정', '✅ 삽입 성공 — 트리거는 정상. 원인이 다른 데 있다');
+    raise exception 'DIAG_ROLLBACK';        -- 흔적을 남기지 않고 되돌린다
   exception
     when others then
       get stacked diagnostics
         msg = message_text, det = pg_exception_detail,
         hnt = pg_exception_hint, ctx = pg_exception_context;
-      if msg = 'DIAG_ROLLBACK' then
-        raise notice '(시험 삽입은 되돌렸다 — 데이터 안 남음)';
-      else
-        raise notice '결과: ❌ 진짜 에러 → %', msg;
-        raise notice '  detail : %', coalesce(det, '-');
-        raise notice '  hint   : %', coalesce(hnt, '-');
-        raise notice '  위치   : %', coalesce(split_part(ctx, E'\n', 1), '-');
+      if msg <> 'DIAG_ROLLBACK' then
+        insert into _diag values
+          (40, 'D. 재현 결과', '판정',  '❌ 계정 생성이 실패한다'),
+          (41, 'D. 재현 결과', '에러',   msg),
+          (42, 'D. 재현 결과', 'detail', coalesce(det, '-')),
+          (43, 'D. 재현 결과', 'hint',   coalesce(hnt, '-')),
+          (44, 'D. 재현 결과', '위치',   coalesce(split_part(ctx, E'\n', 1), '-'));
       end if;
   end;
+  -- 시험 삽입은 위 subtransaction 과 함께 되돌아갔다
+  insert into _diag values (45, 'D. 재현 결과', '뒷정리', '시험 계정은 남기지 않았다');
 end $$;
 
 -- ---------------------------------------------------------------------
--- E. 참고 — 브릿지 트리거는 이 경로와 무관하다는 확인
---    (우리 트리거는 아래 6개 테이블에만 걸려 있고 auth.users/profiles 에는 없다)
+-- E. 브릿지 트리거 위치 — 계정 생성 경로와 무관함을 확인
 -- ---------------------------------------------------------------------
-select '--- E. 브릿지 트리거가 걸린 테이블 ---' as 구분;
-select distinct c.relname as 테이블, t.tgname as 트리거
+insert into _diag
+select 50, 'E. 브릿지 트리거', c.relname, t.tgname
   from pg_trigger t join pg_class c on c.oid = t.tgrelid
- where t.tgname like 'trg_bridge%'
- order by 1, 2;
+ where t.tgname like 'trg_bridge%';
+
+insert into _diag
+select 51, 'E. 브릿지 트리거', '판정',
+       case when exists (
+              select 1 from pg_trigger t join pg_class c on c.oid = t.tgrelid
+               where t.tgname like 'trg_bridge%' and c.relname in ('users', 'profiles'))
+            then '❌ 브릿지 트리거가 계정 경로에 걸려 있다'
+            else '✅ 브릿지 트리거는 auth.users·profiles 에 없다 (이번 마이그레이션 무관)' end;
+
+-- =====================================================================
+-- 결과 — 이 표 하나만 복사해서 보내면 된다
+-- =====================================================================
+select 구분, 항목, 값 from _diag order by 순, 항목;
