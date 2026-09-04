@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import type { Tone } from '../ui/primitives'
 import {
   AlertTriangle,
   Check,
@@ -84,35 +85,53 @@ const ALERT_KIND_ICON: Record<AlertKind, typeof AlertTriangle> = {
   funding_overdue: Landmark,
 }
 
-/** 경고 한 줄 — 클릭하면 해당 업체로 이동 */
-export function AlertRow({ alert, onOpen }: { alert: OpsAlert; onOpen: (a: OpsAlert) => void }) {
-  const meta = SEVERITY_META[alert.severity]
+/**
+ * 경고 한 줄.
+ *
+ * 배경을 빨갛게 칠하지 않는다 — 급한 일이 다섯 건만 돼도 화면 전체가 빨개져서
+ * 오히려 무엇이 더 급한지 알 수 없다. 왼쪽 3px 선과 남은 날짜 하나로만 말한다.
+ * 업체 화면 안에서는 업체명을 다시 쓰지 않는다(이미 위에 있다).
+ */
+export function AlertRow({
+  alert,
+  onOpen,
+  hideClient = false,
+}: {
+  alert: OpsAlert
+  onOpen: (a: OpsAlert) => void
+  hideClient?: boolean
+}) {
   const Icon = ALERT_KIND_ICON[alert.kind]
+  const tone: Tone = alert.severity === 'critical' ? 'danger' : alert.severity === 'warning' ? 'warning' : 'neutral'
+  const edge = tone === 'danger' ? 'bg-danger-500' : tone === 'warning' ? 'bg-warning-500' : 'bg-slate-200'
   return (
     <li>
       <button
         type="button"
         onClick={() => onOpen(alert)}
-        className={`ax-lift flex w-full items-start gap-3 rounded-(--radius-card) border px-4 py-3 text-left hover:brightness-[0.98] ${meta.box}`}
+        title={`${ALERT_KIND_LABEL[alert.kind]} · ${alert.clientName}`}
+        className="tap relative flex w-full items-start gap-3 overflow-hidden rounded-(--radius-card) border border-slate-200 bg-white py-3 pr-3 pl-4 text-left hover:bg-slate-50"
       >
-        <Icon aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-slate-500" />
+        <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${edge}`} />
+        <Icon
+          aria-hidden="true"
+          className={`mt-0.5 size-4 shrink-0 ${
+            tone === 'danger' ? 'text-danger-500' : tone === 'warning' ? 'text-warning-500' : 'text-slate-400'
+          }`}
+        />
         <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="text-[1.02rem] font-bold break-keep text-slate-900">
-              {alert.clientName}
-            </span>
-            <span className={`rounded-full border px-2 py-0.5 text-[0.8rem] font-semibold ${meta.chip}`}>
-              {ALERT_KIND_LABEL[alert.kind]}
-            </span>
+          <span className="t-card block break-keep text-slate-900">{alert.title}</span>
+          <span className="t-sub mt-0.5 block break-keep text-slate-500">
+            {!hideClient && <span className="font-medium text-slate-600">{alert.clientName}</span>}
+            {!hideClient && (alert.detail || alert.daysLeft !== null) && ' · '}
+            {alert.detail}
           </span>
-          <span className="mt-0.5 block text-[1rem] break-keep text-slate-800">{alert.title}</span>
-          {alert.detail && (
-            <span className="mt-0.5 block text-[0.9rem] break-keep text-slate-500">{alert.detail}</span>
-          )}
         </span>
         {alert.daysLeft !== null && (
           <span
-            className={`shrink-0 rounded-full border px-2 py-0.5 text-[0.85rem] font-semibold whitespace-nowrap ${meta.chip}`}
+            className={`t-meta shrink-0 font-semibold whitespace-nowrap ${
+              tone === 'danger' ? 'text-danger-700' : tone === 'warning' ? 'text-warning-700' : 'text-slate-500'
+            }`}
           >
             {dueText(alert.daysLeft)}
           </span>
@@ -129,15 +148,34 @@ export function AlertRow({ alert, onOpen }: { alert: OpsAlert; onOpen: (a: OpsAl
 interface CellLook {
   icon: typeof Check
   cls: string
+  /** 배경 없이 글자만 쓸 때의 색 */
+  text: string
   short: string
 }
 
+/**
+ * 상태 → 색.
+ *
+ * 색은 의미가 있을 때만 쓴다.
+ *   초록  완료      · 주황  고객 대기(내가 아니라 상대를 기다리는 중)
+ *   브랜드 진행 중  · 무채색 시작 전 / 보류
+ * 마감 지남·서류 없음(빨강)은 상태가 아니라 사정이므로 아래 cell 계산에서 덮어쓴다.
+ */
+export function statusTone(status: ServiceStatus): Tone {
+  switch (status) {
+    case 'done': return 'success'
+    case 'in_progress': return 'brand'
+    case 'waiting_client': return 'warning'
+    default: return 'neutral'
+  }
+}
+
 const STATUS_LOOK: Record<ServiceStatus, CellLook> = {
-  done: { icon: Check, cls: 'bg-success-50 text-success-700 border-success-200', short: '완료' },
-  in_progress: { icon: Clock, cls: 'bg-brand-50 text-brand-700 border-brand-200', short: '진행' },
-  waiting_client: { icon: Clock, cls: 'bg-warning-50 text-warning-800 border-warning-200', short: '대기' },
-  on_hold: { icon: Pause, cls: 'bg-slate-100 text-slate-500 border-slate-200', short: '보류' },
-  not_started: { icon: CircleDashed, cls: 'bg-white text-slate-500 border-slate-200', short: '시작 전' },
+  done: { icon: Check, cls: 'bg-success-50 text-success-700 border-success-200', text: 'text-success-700', short: '완료' },
+  in_progress: { icon: Clock, cls: 'bg-brand-50 text-brand-700 border-brand-200', text: 'text-brand-700', short: '진행' },
+  waiting_client: { icon: Clock, cls: 'bg-warning-50 text-warning-800 border-warning-200', text: 'text-warning-700', short: '대기' },
+  on_hold: { icon: Pause, cls: 'bg-slate-100 text-slate-500 border-slate-200', text: 'text-slate-400', short: '보류' },
+  not_started: { icon: CircleDashed, cls: 'bg-white text-slate-500 border-slate-200', text: 'text-slate-500', short: '시작 전' },
 }
 
 export interface CellState {
@@ -164,11 +202,13 @@ export function ServiceCell({
   const look = STATUS_LOOK[cell.status]
   const Icon = cell.blocked ? Lock : look.icon
   const danger = cell.overdue || cell.blocked
+  // 칸 전체를 색으로 칠하지 않는다 — 표가 넓어지면 색면끼리 싸운다.
+  // 급한 칸(빨강·주황)만 옅게 칠하고 나머지는 흰 바탕에 글자로 말한다.
   const cls = danger
     ? 'bg-danger-50 text-danger-700 border-danger-200'
     : cell.dueSoon
       ? 'bg-warning-50 text-warning-800 border-warning-200'
-      : look.cls
+      : `bg-white border-slate-200 ${look.text}`
 
   const note = cell.blocked
     ? '서류 없음'

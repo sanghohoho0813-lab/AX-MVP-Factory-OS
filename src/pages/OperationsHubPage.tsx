@@ -1,21 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  AlertTriangle,
   Archive,
   Building2,
   CalendarDays,
   ChevronRight,
+  ListPlus,
+  MoreHorizontal,
   CirclePlus,
   ClipboardCheck,
   Download,
   RefreshCw,
   Search,
   Upload,
-  Wallet,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { ServiceCatalogModal } from '../components/ops/ServiceCatalogModal'
+import { Badge, BottomSheet, MetricTile, ScreenTitle } from '../components/ui/primitives'
 import { loadCustomServicesIntoCatalog } from '../services/customServiceService'
 import { getDataModeConfig } from '../data/dataMode'
 import { CloudUpload } from 'lucide-react'
@@ -24,28 +25,27 @@ import { downloadBackup, mergeBackup, parseBackup, type MergeMode } from '../ser
 import {
   buildAllAlerts,
   clientOpsProgress,
+  daysLeftFrom,
+  dueText,
   sortClientsByUrgency,
   summarizeAlerts,
 } from '../services/clientOpsAlerts'
 import { DUE_SOON_DAYS, SERVICES,
-  isServiceOpen,
 } from '../content/clientOpsCatalog'
 import { todayLocalDate } from '../lib/appClock'
-import { formatKrw } from '../lib/format'
+import { formatKrw, krwTile } from '../lib/format'
 import type { ClientOpsRecord, OpsAlert, AlertSeverity } from '../types/clientOps'
 import { Button } from '../components/ui/Button'
 import { useToast } from '../components/ui/toastContext'
 import { Modal } from '../components/ui/Modal'
-import { PageHeader } from '../components/ui/PageHeader'
 import {
   AlertRow,
   ClientStatusChip,
   SEVERITY_META,
   ServiceCell,
-  StatTile,
   cellStateFor,
 } from '../components/ops/opsParts'
-import { ACCENT_CLASS, SERVICE_STATUS_LABEL } from '../content/clientOpsCatalog'
+import { ACCENT_CLASS } from '../content/clientOpsCatalog'
 
 const SEVERITY_TABS: { key: AlertSeverity | 'all'; label: string }[] = [
   { key: 'all', label: '전체' },
@@ -65,6 +65,8 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   // 현황표를 먼저 보고 싶다는 요청이 있어 이 목록은 기본으로 접어 둔다.
   const [alertsOpen, setAlertsOpen] = useState(false)
   const [catalogOpen, setCatalogOpen] = useState(false)
+  /** 자주 쓰지 않는 도구(백업·일정·항목관리)를 담는 시트 */
+  const [moreOpen, setMoreOpen] = useState(false)
   const [showAllAlerts, setShowAllAlerts] = useState(false)
   const [form, setForm] = useState({ companyName: '', contactName: '', contactPhone: '', businessNumber: '' })
   const [query, setQuery] = useState('')
@@ -213,40 +215,54 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title="고객 운영 현황"
-        description={`오늘 ${today} · 여러 업체를 한 화면에서 보고, 빠뜨린 일이 없는지 확인합니다.`}
+      <ScreenTitle
+        title="고객 운영"
+        sub={`${today} · 관리 중인 업체 ${activeCount}곳`}
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={() => navigate('/ops/calendar')}>
+          <>
+            <Button variant="primary" onClick={() => setFormOpen(true)}>
+              <CirclePlus aria-hidden="true" className="size-4" />
+              <span className="hidden sm:inline">새 업체 등록</span>
+              <span className="sm:hidden">등록</span>
+            </Button>
+            <Button variant="ghost" onClick={() => setMoreOpen(true)} aria-label="더보기">
+              <MoreHorizontal aria-hidden="true" className="size-5" />
+            </Button>
+          </>
+        }
+      />
+
+      {moreOpen && (
+        <BottomSheet title="고객 운영 도구" onClose={() => setMoreOpen(false)}>
+          <div className="flex flex-col gap-2">
+            <Button variant="secondary" className="w-full justify-start" onClick={() => { setMoreOpen(false); navigate('/ops/calendar') }}>
               <CalendarDays aria-hidden="true" className="size-4" />
-              일정
+              일정 보기
             </Button>
             <Button
               variant="secondary"
-              onClick={() => {
-                downloadBackup(records, today)
-                setError('')
-              }}
+              className="w-full justify-start"
               disabled={records.length === 0}
+              onClick={() => { downloadBackup(records, today); setError(''); setMoreOpen(false) }}
             >
               <Download aria-hidden="true" className="size-4" />
               백업 내려받기
             </Button>
-            <Button variant="secondary" onClick={() => restoreRef.current?.click()} disabled={restoring}>
+            <Button variant="secondary" className="w-full justify-start" onClick={() => restoreRef.current?.click()} disabled={restoring}>
               <Upload aria-hidden="true" className="size-4" />
               {restoring ? '복원 중…' : '백업 불러오기'}
             </Button>
-            <Button variant="secondary" onClick={() => void load()} disabled={loading}>
+            <Button variant="secondary" className="w-full justify-start" onClick={() => { setCatalogOpen(true); setMoreOpen(false) }}>
+              <ListPlus aria-hidden="true" className="size-4" />
+              업무 항목 관리
+            </Button>
+            <Button variant="secondary" className="w-full justify-start" onClick={() => { void load(); setMoreOpen(false) }} disabled={loading}>
               <RefreshCw aria-hidden="true" className="size-4" />
               새로고침
             </Button>
-            <Button variant="primary" onClick={() => setFormOpen(true)}>
-              <CirclePlus aria-hidden="true" className="size-4" />새 업체 등록
-            </Button>
           </div>
-        }
-      />
+        </BottomSheet>
+      )}
 
       {error && (
         <div
@@ -334,29 +350,28 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
         </div>
       )}
 
-      {/* 요약 */}
-      <section aria-label="요약" className="ax-stagger grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <StatTile
+      {/* 요약 — 0 일 때는 색을 쓰지 않는다 */}
+      <section aria-label="요약" className="ax-stagger grid grid-cols-2 gap-2.5 xl:grid-cols-4">
+        <MetricTile
           label="지금 처리할 일"
           value={`${summary.critical}건`}
-          tone={summary.critical > 0 ? 'danger' : 'success'}
-          hint={summary.critical > 0 ? '마감이 지났거나 서류가 없습니다' : '급한 일이 없습니다'}
-          icon={AlertTriangle}
+          tone={summary.critical > 0 ? 'danger' : 'neutral'}
+          hint="마감이 지났거나 서류가 없음"
+          onClick={() => { setTab('critical'); setAlertsOpen(true) }}
         />
-        <StatTile
+        <MetricTile
           label="곧 처리할 일"
           value={`${summary.warning}건`}
           tone={summary.warning > 0 ? 'warning' : 'neutral'}
           hint={`${DUE_SOON_DAYS}일 이내 마감·만료`}
-          icon={ClipboardCheck}
+          onClick={() => { setTab('warning'); setAlertsOpen(true) }}
         />
-        <StatTile label="관리 중인 업체" value={`${activeCount}곳`} hint={`전체 ${records.length}곳`} icon={Building2} />
-        <StatTile
+        <MetricTile label="관리 중인 업체" value={`${activeCount}곳`} hint={`전체 ${records.length}곳`} />
+        <MetricTile
           label="아직 못 받은 돈"
-          value={formatKrw(money.unpaid)}
+          value={krwTile(money.unpaid)}
           tone={money.overdueCount > 0 ? 'danger' : 'neutral'}
           hint={money.overdueCount > 0 ? `예정일 지난 건 ${money.overdueCount}건` : '연체 없음'}
-          icon={Wallet}
         />
       </section>
 
@@ -392,64 +407,53 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
           </div>
         ) : (
           <>
-          {/* 모바일: 카드 목록 (표 가로 스크롤 대신) */}
-          <ul className="ax-stagger flex flex-col gap-3 lg:hidden">
+          {/*
+            모바일 목록 한 장에는 네 가지만 둔다 — 업체명 / 지금 할 일 / 마감 / 급한 건수.
+            업무 여섯 개를 다 나열하면 어느 업체를 먼저 봐야 하는지 알 수 없다.
+          */}
+          <ul className="ax-stagger flex flex-col gap-2.5 lg:hidden">
             {ordered.map((record) => {
               const p = clientOpsProgress(record, today)
               const critical = summary.criticalByClient[record.id] ?? 0
-              const openServices = SERVICES.filter((s) => {
-                const st = record.services[s.key].status
-                return isServiceOpen(st) && st !== 'not_started'
-              })
+              const warning = summary.warningByClient[record.id] ?? 0
+              const dLeft = record.nextActionDueDate ? daysLeftFrom(today, record.nextActionDueDate) : null
+              const tone = critical > 0 ? 'danger' : warning > 0 ? 'warning' : 'neutral'
               return (
                 <li key={record.id}>
                   <button
                     type="button"
                     onClick={() => navigate(`/ops/clients/${record.id}`)}
-                    className="ax-lift flex w-full flex-col gap-2.5 rounded-(--radius-panel) border border-slate-200 bg-white p-4 text-left"
+                    className="ax-lift relative flex w-full flex-col gap-2 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white p-4 pl-[1.15rem] text-left"
                   >
-                    <span className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-[1.1rem] font-bold break-keep text-slate-900">
-                        {record.companyName || '(이름 없음)'}
-                      </span>
-                      {critical > 0 && (
-                        <span className="rounded-full border border-danger-200 bg-danger-100 px-1.5 py-0.5 text-[0.78rem] font-bold text-danger-700">
-                          지금 처리 {critical}건
+                    <span
+                      aria-hidden="true"
+                      className={`absolute inset-y-0 left-0 w-[3px] ${
+                        tone === 'danger' ? 'bg-danger-500' : tone === 'warning' ? 'bg-warning-500' : 'bg-slate-200'
+                      }`}
+                    />
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="t-card min-w-0 truncate text-slate-900">{record.companyName}</span>
+                      {critical > 0 ? (
+                        <Badge tone="danger">지금 {critical}</Badge>
+                      ) : warning > 0 ? (
+                        <Badge tone="warning">곧 {warning}</Badge>
+                      ) : (
+                        <Badge tone="success">이상 없음</Badge>
+                      )}
+                    </span>
+
+                    <span className="t-body block break-keep text-slate-700">
+                      {record.nextAction || <span className="text-slate-400">다음 할 일이 정해지지 않았습니다</span>}
+                    </span>
+
+                    <span className="t-sub flex flex-wrap items-center gap-x-3 gap-y-1 text-slate-500">
+                      {record.nextActionDueDate && (
+                        <span className={dLeft !== null && dLeft < 0 ? 'font-semibold text-danger-700' : ''}>
+                          {record.nextActionDueDate}
+                          {dLeft !== null && ` · ${dueText(dLeft)}`}
                         </span>
                       )}
-                      <ClientStatusChip status={record.status} />
-                    </span>
-                    <span className="flex flex-wrap gap-1.5">
-                      {openServices.length === 0 ? (
-                        <span className="text-[0.9rem] text-slate-500">아직 시작한 업무가 없습니다</span>
-                      ) : (
-                        openServices.map((s) => {
-                          const cell = cellStateFor(record, s.key, today, DUE_SOON_DAYS)
-                          const danger = cell.overdue || cell.blocked
-                          return (
-                            <span
-                              key={s.key}
-                              className={`rounded-full border px-2 py-0.5 text-[0.82rem] font-medium ${
-                                danger
-                                  ? 'border-danger-200 bg-danger-50 text-danger-700'
-                                  : cell.dueSoon
-                                    ? 'border-warning-200 bg-warning-50 text-warning-800'
-                                    : cell.status === 'done'
-                                      ? 'border-success-200 bg-success-50 text-success-700'
-                                      : ACCENT_CLASS[s.accent].chip
-                              }`}
-                            >
-                              {s.shortLabel} · {cell.blocked ? '서류 없음' : SERVICE_STATUS_LABEL[cell.status]}
-                            </span>
-                          )
-                        })
-                      )}
-                    </span>
-                    <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.9rem] text-slate-500">
                       <span>진행 {p.percent}%</span>
-                      <span>
-                        서류 {p.documentsUsable}/{p.documentsTotal}
-                      </span>
                       {p.unpaidAmount > 0 && (
                         <span className={p.overduePayments > 0 ? 'font-semibold text-danger-700' : ''}>
                           미수금 {formatKrw(p.unpaidAmount)}

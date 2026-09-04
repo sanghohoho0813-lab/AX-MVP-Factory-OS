@@ -18,10 +18,13 @@ export function CompanyProfileCard({
   record,
   today,
   onImport,
+  /** 접이식 구역 안에 들어갈 때 — 카드 안 카드가 되지 않도록 테두리·제목을 뺀다 */
+  bare = false,
 }: {
   record: ClientOpsRecord
   today: string
   onImport: () => void
+  bare?: boolean
 }) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const fields = profileFields(record, today)
@@ -36,15 +39,17 @@ export function CompanyProfileCard({
   return (
     <section
       aria-labelledby="profile"
-      className="rounded-(--radius-panel) border border-cat-plan-200 bg-gradient-to-br from-cat-plan-50/80 via-white to-cat-client-50/60 p-5"
+      className={bare ? '' : 'rounded-(--radius-panel) border border-slate-200 bg-white p-5'}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <h2 id="profile" className="text-[1.3rem] font-bold text-slate-900">
-            회사 기본 정보
-          </h2>
-          <p className="mt-0.5 text-[0.9rem] break-keep text-slate-600">
-            자주 찾게 되는 값입니다. 항목을 누르면 바로 복사됩니다. ({filled}/{fields.length} 입력됨)
+          {!bare && (
+            <h2 id="profile" className="t-section text-slate-900">
+              회사 기본 정보
+            </h2>
+          )}
+          <p className="t-sub break-keep text-slate-500">
+            항목을 누르면 바로 복사됩니다. ({filled}/{fields.length} 입력됨)
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -59,10 +64,10 @@ export function CompanyProfileCard({
         </div>
       </div>
 
-      <dl className="mt-4 grid gap-x-6 gap-y-0 sm:grid-cols-2 xl:grid-cols-3">
+      <dl className="mt-3 grid gap-x-6 gap-y-0 sm:grid-cols-2 xl:grid-cols-3">
         {fields.map((f) => (
           <div key={f.key} className="flex items-baseline justify-between gap-2 border-b border-slate-200/70 py-2">
-            <dt className="shrink-0 text-[0.88rem] text-slate-500">{f.label}</dt>
+            <dt className="t-sub shrink-0 text-slate-500">{f.label}</dt>
             <dd className="min-w-0 text-right">
               {f.empty ? (
                 <span className="text-[0.95rem] text-slate-300">미입력</span>

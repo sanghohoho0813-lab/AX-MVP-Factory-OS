@@ -437,13 +437,18 @@ export interface AlertSummary {
   info: number
   /** 업체별 심각 경고 수 */
   criticalByClient: Record<string, number>
+  /** 업체별 '곧 처리' 경고 수 */
+  warningByClient: Record<string, number>
 }
 
 export function summarizeAlerts(alerts: OpsAlert[]): AlertSummary {
   const criticalByClient: Record<string, number> = {}
+  const warningByClient: Record<string, number> = {}
   for (const a of alerts) {
     if (a.severity === 'critical') {
       criticalByClient[a.clientId] = (criticalByClient[a.clientId] ?? 0) + 1
+    } else if (a.severity === 'warning') {
+      warningByClient[a.clientId] = (warningByClient[a.clientId] ?? 0) + 1
     }
   }
   return {
@@ -452,6 +457,7 @@ export function summarizeAlerts(alerts: OpsAlert[]): AlertSummary {
     warning: alerts.filter((a) => a.severity === 'warning').length,
     info: alerts.filter((a) => a.severity === 'info').length,
     criticalByClient,
+    warningByClient,
   }
 }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import {
   Archive,
   Banknote,
@@ -47,15 +47,27 @@ const KIND_CLASS: Record<ActivityKind, string> = {
 
 const PAGE = 12
 
-export function ActivityLog({ entries }: { entries: ActivityEntry[] }) {
+export function ActivityLog({
+  entries,
+  /** 접이식 구역 안에 들어갈 때 — 카드 안 카드가 되지 않도록 감싸지 않는다 */
+  bare = false,
+}: {
+  entries: ActivityEntry[]
+  bare?: boolean
+}) {
   const [shown, setShown] = useState(PAGE)
   const visible = entries.slice(0, shown)
 
+  const Wrap = ({ children }: { children: ReactNode }) =>
+    bare ? <div>{children}</div> : <Panel title="활동 기록">{children}</Panel>
+
   return (
-    <Panel title="활동 기록">
-      <p className="mb-4 text-[0.9rem] break-keep text-slate-500">
-        상태를 바꾸면 자동으로 한 줄씩 쌓입니다. 오래 못 본 업체도 여기만 보면 어디까지 했는지 알 수 있습니다.
-      </p>
+    <Wrap>
+      {!bare && (
+        <p className="t-sub mb-4 break-keep text-slate-500">
+          상태를 바꾸면 자동으로 한 줄씩 쌓입니다. 오래 못 본 업체도 여기만 보면 어디까지 했는지 알 수 있습니다.
+        </p>
+      )}
       {entries.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-8 text-center">
           <History aria-hidden="true" className="size-7 text-slate-300" />
@@ -100,6 +112,6 @@ export function ActivityLog({ entries }: { entries: ActivityEntry[] }) {
           )}
         </>
       )}
-    </Panel>
+    </Wrap>
   )
 }

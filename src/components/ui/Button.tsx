@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'link'
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'link' | 'danger'
 type ButtonSize = 'sm' | 'md'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -17,11 +17,13 @@ const VARIANT_CLASS: Record<ButtonVariant, string> = {
   ghost:
     'bg-transparent text-slate-600 border border-transparent hover:bg-slate-100 hover:text-slate-900',
   link: 'bg-transparent text-brand-600 border border-transparent hover:text-brand-700 hover:underline px-0',
+  danger: 'bg-white text-danger-700 border border-danger-200 hover:bg-danger-50',
 }
 
+/* 손가락으로 누르는 화면에서는 44px 아래로 내려가지 않는다 */
 const SIZE_CLASS: Record<ButtonSize, string> = {
-  sm: 'h-9 px-3 text-[0.875rem] gap-1.5',
-  md: 'h-10 px-4 text-[1rem] gap-2',
+  sm: 'h-10 px-3 t-sub gap-1.5',
+  md: 'h-11 px-4 t-body gap-2 sm:h-10',
 }
 
 export function Button({

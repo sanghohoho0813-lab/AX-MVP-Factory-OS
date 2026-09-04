@@ -4,6 +4,9 @@ import {
   ArrowLeft,
   Check,
   ChevronDown,
+  Archive,
+  ChevronRight,
+  MoreHorizontal,
   ClipboardCopy,
   FileWarning,
   Lock,
@@ -13,7 +16,6 @@ import {
   ShieldAlert,
   Trash2,
   Upload,
-  Wallet,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { getDataModeConfig } from '../data/dataMode'
@@ -61,7 +63,7 @@ import {
   isServiceOpen,
 } from '../content/clientOpsCatalog'
 import { todayLocalDate } from '../lib/appClock'
-import { formatKrw } from '../lib/format'
+import { formatKrw, krwTile } from '../lib/format'
 import type {
   ClientOpsRecord,
   ClientOpsStatus,
@@ -74,7 +76,7 @@ import { Button } from '../components/ui/Button'
 import { NotFoundState } from '../components/ui/NotFoundState'
 import { Panel } from '../components/ui/Panel'
 import { useToast } from '../components/ui/toastContext'
-import { AlertRow, ClientStatusChip, StatTile } from '../components/ops/opsParts'
+import { AlertRow, ClientStatusChip, statusTone } from '../components/ops/opsParts'
 import {
   DueDateField,
   AmountField,
@@ -89,6 +91,15 @@ import { DocImportModal } from '../components/ops/DocImportModal'
 import { withActivity } from '../services/clientOpsActivity'
 import { ActivityLog } from '../components/ops/ActivityLog'
 import { PortalTab } from '../components/ops/PortalTab'
+import {
+  BottomSheet,
+  Disclosure,
+  Dot,
+  MetricTile,
+  Section,
+  Surface,
+  type Tone,
+} from '../components/ui/primitives'
 import { loadCustomServicesIntoCatalog } from '../services/customServiceService'
 import { ServiceCatalogModal } from '../components/ops/ServiceCatalogModal'
 import { ScreenGuide } from '../components/onboarding/ScreenGuide'
@@ -148,6 +159,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   /** 개요에서 눌러 들어온 업무 카드로 화면을 옮긴다 */
   const focusedCardRef = useRef<HTMLDivElement | null>(null)
   const [catalogOpen, setCatalogOpen] = useState(false)
+  /** 모바일에서 부가 행동을 담는 시트 */
+  const [moreOpen, setMoreOpen] = useState(false)
 
   const today = todayLocalDate()
 
@@ -194,7 +207,42 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
     [showToast, load],
   )
 
+  /** 업체 상태 변경 — 인라인 select 와 더보기 시트가 함께 쓴다 */
+  const changeStatus = (status: ClientOpsStatus) => {
+    if (!record) return
+    void commit(
+      withActivity(
+        { ...record, status },
+        'profile',
+        `업체 상태 · ${CLIENT_STATUS_TEXT[record.status]} → ${CLIENT_STATUS_TEXT[status]}`,
+      ),
+    )
+  }
+
   const alerts = useMemo(() => (record ? buildClientAlerts(record, today) : []), [record, today])
+  /** 개요에서 경고를 전부 펼쳤는지 */
+  const [alertsOpen, setAlertsOpen] = useState(false)
+
+  /** 다음 행동이 늦었는지 — 늦었을 때만 색을 쓴다 */
+  const nextActionDaysLeft = record?.nextActionDueDate ? daysLeftFrom(today, record.nextActionDueDate) : null
+  const nextActionTone: Tone =
+    nextActionDaysLeft === null ? 'neutral' : nextActionDaysLeft < 0 ? 'danger' : nextActionDaysLeft <= 3 ? 'warning' : 'brand'
+
+  /** 지금 손대고 있는 업무 (완료·보류 제외) */
+  const startedServices = useMemo(
+    () =>
+      record
+        ? SERVICES.filter(
+            (m) => isServiceStarted(record.services[m.key].status) && record.services[m.key].status !== 'done',
+          )
+        : [],
+    [record],
+  )
+
+  const paidAmount = useMemo(
+    () => (record ? record.fees.filter((f) => f.receivedAt !== null).reduce((s, f) => s + (f.amount ?? 0), 0) : 0),
+    [record],
+  )
   const progress = useMemo(() => (record ? clientOpsProgress(record, today) : null), [record, today])
 
   /** 지금 착수한 업무가 필요로 하는데 없는 서류 (서류함 상단 고정) */
@@ -264,63 +312,60 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           <ArrowLeft aria-hidden="true" className="size-4" />
           고객 운영 현황
         </button>
+        {/*
+          머리말은 세 줄로 끝낸다 — 회사명 / 연락처 / 다음 행동.
+          상태 변경·보고 문구·보관·가이드는 모바일에서 '더보기' 안으로 넣는다.
+        */}
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-[1.75rem] leading-tight font-bold break-keep text-slate-900">
-                {record.companyName || '(이름 없음)'}
-              </h1>
+              <h1 className="t-page break-keep text-slate-900">{record.companyName || '(이름 없음)'}</h1>
               <ClientStatusChip status={record.status} />
             </div>
-            <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.95rem] text-slate-500">
+            <p className="t-sub mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-slate-500">
               <PhoneLink phone={record.contactPhone} />
               {record.contactName && <span>{record.contactName}</span>}
-              {record.businessNumber && <span>사업자 {record.businessNumber}</span>}
-            </p>
-            <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.92rem]">
-              <span className="text-slate-700"><span className="text-slate-400">다음 행동 · </span>{record.nextAction || '미정'}{record.nextActionDueDate ? ` (${record.nextActionDueDate})` : ''}</span>
-              {nearest && (
-                <span className={nearest.daysLeft !== null && nearest.daysLeft < 0 ? 'font-semibold text-danger-700' : 'text-slate-700'}>
-                  <span className="text-slate-400">가장 임박 · </span>{nearest.title} {nearest.date}
-                </span>
-              )}
               {portalLinked !== null && (
-                <button type="button" onClick={() => setTab('portal')} className={`rounded-full px-2 py-0.5 text-[0.82rem] font-semibold ${portalLinked ? 'bg-success-50 text-success-700' : 'bg-slate-100 text-slate-500'}`}>
+                <button
+                  type="button"
+                  onClick={() => setTab('portal')}
+                  className={portalLinked ? 'text-success-700' : 'text-slate-400'}
+                >
                   {brand.customerPlatformLabel} {portalLinked ? '연결됨' : '미연결'}
                 </button>
               )}
             </p>
+            {nearest && (
+              <p className="t-sub mt-0.5 text-slate-500">
+                가장 임박 · {nearest.title}{' '}
+                <span className={nearest.daysLeft !== null && nearest.daysLeft < 0 ? 'font-semibold text-danger-700' : ''}>
+                  {nearest.date}
+                </span>
+              </p>
+            )}
           </div>
-          <div className="flex flex-wrap items-end gap-2">
-          <ScreenGuide screenKey="client_detail" />
-          <label className="text-[0.92rem] font-medium text-slate-600">
-            업체 상태
-            <select
-              value={record.status}
-              onChange={(e) => {
-                const status = e.target.value as ClientOpsStatus
-                void commit(
-                  withActivity(
-                    { ...record, status },
-                    'profile',
-                    `업체 상태 · ${CLIENT_STATUS_TEXT[record.status]} → ${CLIENT_STATUS_TEXT[status]}`,
-                  ),
-                )
-              }}
-              className="mt-1 block rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.98rem]"
-            >
-              {CLIENT_STATUS_ORDER.map((s) => (
-                <option key={s} value={s}>
-                  {CLIENT_STATUS_TEXT[s]}
-                </option>
-              ))}
-            </select>
-          </label>
+          {/* 데스크톱에서만 인라인으로 — 모바일은 아래 '더보기' 시트로 */}
+          <div className="hidden items-end gap-2 lg:flex">
+            <ScreenGuide screenKey="client_detail" />
+            <label className="t-sub font-medium text-slate-600">
+              업체 상태
+              <select
+                value={record.status}
+                onChange={(e) => changeStatus(e.target.value as ClientOpsStatus)}
+                className="t-body mt-1 block h-10 rounded-(--radius-control) border border-slate-300 px-3"
+              >
+                {CLIENT_STATUS_ORDER.map((s) => (
+                  <option key={s} value={s}>
+                    {CLIENT_STATUS_TEXT[s]}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
         </div>
 
-        {/* 고객에게 보낼 문구 */}
-        <div className="flex flex-wrap gap-2">
+        {/* 주요 행동 — 한 화면에 강조 버튼은 하나만 둔다 */}
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="primary"
             onClick={() =>
@@ -332,10 +377,11 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             }
           >
             <Send aria-hidden="true" className="size-4" />
-            서류 요청 문구 만들기
+            서류 요청 문구
           </Button>
           <Button
             variant="secondary"
+            className="hidden sm:inline-flex"
             onClick={() =>
               setMessage({
                 title: '진행 상황 보고 문구',
@@ -345,19 +391,14 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             }
           >
             <ClipboardCopy aria-hidden="true" className="size-4" />
-            진행 상황 보고 문구
+            진행 상황 보고
           </Button>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              const next = withArchived(record, record.archivedAt === null)
-              void commit(next)
-              showToast(next.archivedAt ? '보관 처리했습니다. 목록·경고에서 빠집니다.' : '보관을 해제했습니다.')
-            }}
-          >
-            {record.archivedAt ? '보관 해제' : '보관하기'}
+          <Button variant="ghost" onClick={() => setMoreOpen(true)}>
+            <MoreHorizontal aria-hidden="true" className="size-4" />
+            더보기
           </Button>
         </div>
+
         {record.archivedAt && (
           <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-4 py-2.5 text-[0.92rem] break-keep text-slate-600">
             보관된 업체입니다. 현황표·경고·일정에 나타나지 않습니다. 데이터는 그대로 있습니다.
@@ -366,7 +407,12 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       </div>
 
       {/* 탭 — 개요는 요약, 나머지는 각 영역 */}
-      <div role="tablist" aria-label="업체 상세" className="-mx-1 flex gap-1 overflow-x-auto border-b border-slate-200 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {/* 탭은 화면 위에 붙여 둔다 — 아래로 내려가도 지금 어느 영역인지 잃지 않는다 */}
+      <div
+        role="tablist"
+        aria-label="업체 상세"
+        className="sticky top-16 z-20 -mx-4 flex gap-1 overflow-x-auto border-b border-slate-200 bg-slate-50/95 px-4 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         {DETAIL_TABS.map((t) => {
           const badge =
             t.key === 'overview' ? alerts.filter((a) => a.severity === 'critical').length
@@ -381,12 +427,16 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               role="tab"
               aria-selected={tab === t.key}
               onClick={() => setTab(t.key)}
-              className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[0.95rem] font-semibold whitespace-nowrap ${
+              className={`t-body -mb-px flex min-h-12 shrink-0 items-center gap-1.5 border-b-2 px-3 font-semibold whitespace-nowrap ${
                 tab === t.key ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
             >
               {t.label}
-              {badge > 0 && <span className={`rounded-full px-1.5 text-[0.75rem] ${t.key === 'overview' ? 'bg-danger-50 text-danger-700' : 'bg-slate-100 text-slate-600'}`}>{badge}</span>}
+              {badge > 0 && (
+                <span className={`t-meta rounded-full px-1.5 font-semibold ${t.key === 'overview' ? 'bg-danger-50 text-danger-700' : 'bg-slate-100 text-slate-600'}`}>
+                  {badge}
+                </span>
+              )}
             </button>
           )
         })}
@@ -394,85 +444,117 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
       {tab === 'overview' && (
         <>
-      {/* NOW → 진행 중 업무 → 막힘 → 돈 → 고객 */}
-      <section aria-label="지금" className="grid gap-3 lg:grid-cols-2">
-        <div className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 shadow-(--shadow-card)">
-          <p className="text-[0.85rem] font-semibold tracking-wide text-slate-400 uppercase">지금</p>
-          <p className="mt-1 text-[1.05rem] font-bold break-keep text-slate-900">{record.nextAction || '다음 행동이 정해지지 않았습니다.'}</p>
-          {record.nextActionDueDate && <p className="text-[0.9rem] text-slate-500">{record.nextActionDueDate}까지</p>}
-          <div className="mt-3">
-            <p className="text-[0.85rem] font-semibold text-slate-500">진행 중인 업무</p>
-            <ul className="mt-1 flex flex-wrap gap-1.5">
-              {SERVICES.filter((m) => isServiceStarted(record.services[m.key].status) && record.services[m.key].status !== 'done').map((m) => (
+      {/*
+        개요는 세 단계로만 말한다.
+          1단계  지금 할 일
+          2단계  막힘·돈·고객 연결
+          3단계  나머지는 접어 둔다
+      */}
+
+      {/* 1단계 — 지금 할 일 */}
+      <Surface showEdge edge={nextActionTone} className="!p-0">
+        <div className="px-4 py-4 sm:px-5">
+          <p className="t-meta font-semibold tracking-wide text-slate-400 uppercase">지금 할 일</p>
+          <p className="t-card mt-1 break-keep text-slate-900">
+            {record.nextAction || '다음 행동이 정해지지 않았습니다.'}
+          </p>
+          {record.nextActionDueDate && (
+            <p className={`t-sub mt-0.5 ${nextActionTone === 'danger' ? 'font-semibold text-danger-700' : 'text-slate-500'}`}>
+              {record.nextActionDueDate}까지
+              {nextActionDaysLeft !== null && ` · ${dueText(nextActionDaysLeft)}`}
+            </p>
+          )}
+        </div>
+        {startedServices.length > 0 && (
+          <div className="border-t border-slate-100 px-4 py-3 sm:px-5">
+            <p className="t-meta font-semibold text-slate-400">진행 중인 업무</p>
+            <ul className="mt-1.5 flex flex-wrap gap-1.5">
+              {startedServices.map((m) => (
                 <li key={m.key}>
-                  <button type="button" onClick={() => setTab('work', m.key)} className={`rounded-full border px-2.5 py-1 text-[0.85rem] font-medium ${ACCENT_CLASS[m.accent].chip}`}>
+                  <button
+                    type="button"
+                    onClick={() => setTab('work', m.key)}
+                    className="tap t-meta inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1.5 font-medium text-slate-700 hover:border-brand-300 hover:text-brand-700"
+                  >
+                    <Dot tone={statusTone(record.services[m.key].status)} />
                     {m.shortLabel} · {SERVICE_STATUS_LABEL[record.services[m.key].status]}
                   </button>
                 </li>
               ))}
-              {SERVICES.every((m) => !isServiceStarted(record.services[m.key].status) || record.services[m.key].status === 'done') && (
-                <li className="text-[0.9rem] text-slate-400">진행 중인 업무가 없습니다.</li>
-              )}
             </ul>
           </div>
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-1">
-          <button type="button" onClick={() => setTab('docs')} className={`rounded-(--radius-panel) border p-4 text-left shadow-(--shadow-card) ${urgentDocs.size > 0 ? 'border-danger-200 bg-danger-50/60' : 'border-slate-200 bg-white'}`}>
-            <p className="text-[0.85rem] font-semibold text-slate-500">막힘 · 없는 서류</p>
-            <p className={`text-[1.2rem] font-bold ${urgentDocs.size > 0 ? 'text-danger-700' : 'text-slate-900'}`}>{urgentDocs.size}건</p>
-          </button>
-          <button type="button" onClick={() => setTab('fees')} className={`rounded-(--radius-panel) border p-4 text-left shadow-(--shadow-card) ${progress.overduePayments > 0 ? 'border-danger-200 bg-danger-50/60' : 'border-slate-200 bg-white'}`}>
-            <p className="text-[0.85rem] font-semibold text-slate-500">돈 · 아직 못 받음</p>
-            <p className={`text-[1.2rem] font-bold ${progress.overduePayments > 0 ? 'text-danger-700' : 'text-slate-900'}`}>{formatKrw(progress.unpaidAmount)}</p>
-          </button>
-          <button type="button" onClick={() => setTab('portal')} className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 text-left shadow-(--shadow-card)">
-            <p className="text-[0.85rem] font-semibold text-slate-500">고객 · {brand.customerPortalLabel}</p>
-            <p className="text-[1.2rem] font-bold text-slate-900">{portalLinked === null ? '준비 중' : portalLinked ? '연결됨' : '미연결'}</p>
-          </button>
-        </div>
-      </section>
+        )}
+      </Surface>
 
-      {/* 이 업체에서 지금 챙길 것 */}
-      {alerts.length > 0 && (
-        <section aria-labelledby="client-alerts" className="flex flex-col gap-2">
-          <h2 id="client-alerts" className="text-[1.15rem] font-bold text-slate-900">
-            이 업체에서 지금 챙길 것 {alerts.length}건
-          </h2>
-          <ul className="flex flex-col gap-2">
-            {alerts.slice(0, 6).map((a) => (
-              <AlertRow key={a.id} alert={a} onOpen={() => undefined} />
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {/* 요약 */}
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <StatTile
-          label="완료한 업무"
-          value={`${progress.servicesDone}/${progress.servicesTotal}`}
-          icon={Check}
-          tone={progress.servicesDone === progress.servicesTotal ? 'success' : 'neutral'}
+      {/* 2단계 — 막힘 / 돈 / 고객 연결 */}
+      <section aria-label="현재 상태" className="ax-stagger grid grid-cols-2 gap-2.5 lg:grid-cols-3">
+        <MetricTile
+          label="없는 서류"
+          value={`${urgentDocs.size}건`}
+          tone={urgentDocs.size > 0 ? 'danger' : 'neutral'}
+          onClick={() => setTab('docs')}
         />
-        <StatTile
-          label="확보한 서류"
-          value={`${progress.documentsUsable}/${progress.documentsTotal}`}
-          icon={Paperclip}
-          tone={progress.documentsUsable < progress.documentsTotal ? 'warning' : 'success'}
-        />
-        <StatTile
-          label="아직 못 받은 돈"
-          value={formatKrw(progress.unpaidAmount)}
-          icon={Wallet}
+        <MetricTile
+          label="못 받은 돈"
+          value={krwTile(progress.unpaidAmount)}
           tone={progress.overduePayments > 0 ? 'danger' : 'neutral'}
           hint={progress.overduePayments > 0 ? `예정일 지난 건 ${progress.overduePayments}건` : undefined}
+          onClick={() => setTab('fees')}
+        />
+        <MetricTile
+          label={brand.customerPortalLabel}
+          value={portalLinked === null ? '준비 중' : portalLinked ? '연결됨' : '미연결'}
+          onClick={() => setTab('portal')}
         />
       </section>
 
-      <ActivityLog entries={record.activity} />
+      {/* 2단계 — 이 업체에서 지금 챙길 것 (상위 3건만) */}
+      {alerts.length > 0 && (
+        <Section title="지금 챙길 것" count={alerts.length}>
+          <ul className="flex flex-col gap-2">
+            {(alertsOpen ? alerts : alerts.slice(0, 3)).map((a) => (
+              <AlertRow key={a.id} alert={a} hideClient onOpen={() => setTab('work', a.serviceKey ?? undefined)} />
+            ))}
+          </ul>
+          {alerts.length > 3 && (
+            <button
+              type="button"
+              onClick={() => setAlertsOpen((v) => !v)}
+              className="tap t-sub self-start rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 font-medium text-slate-600 hover:bg-slate-50"
+            >
+              {alertsOpen ? '접기' : `${alerts.length - 3}건 더 보기`}
+            </button>
+          )}
+        </Section>
+      )}
 
-      {/* 회사 기본 정보 — 자주 찾는 값 */}
-      <CompanyProfileCard record={record} today={today} onImport={() => setImportOpen(true)} />
+      {/* 3단계 — 나머지는 접어 둔다 */}
+      <Disclosure
+        title="진행 요약"
+        hint={`업무 ${progress.servicesDone}/${progress.servicesTotal} · 서류 ${progress.documentsUsable}/${progress.documentsTotal}`}
+      >
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+          <MetricTile
+            label="완료한 업무"
+            value={`${progress.servicesDone}/${progress.servicesTotal}`}
+            tone={progress.servicesDone === progress.servicesTotal ? 'success' : 'neutral'}
+          />
+          <MetricTile
+            label="확보한 서류"
+            value={`${progress.documentsUsable}/${progress.documentsTotal}`}
+            tone={progress.documentsUsable < progress.documentsTotal ? 'warning' : 'success'}
+          />
+          <MetricTile label="받은 돈" value={krwTile(paidAmount)} />
+        </div>
+      </Disclosure>
+
+      <Disclosure title="회사 기본 정보" hint="사업자번호·주소·설립일 등">
+        <CompanyProfileCard record={record} today={today} onImport={() => setImportOpen(true)} bare />
+      </Disclosure>
+
+      <Disclosure title="활동 기록" hint={`${record.activity.length}건`}>
+        <ActivityLog entries={record.activity} bare />
+      </Disclosure>
         </>
       )}
 
@@ -870,6 +952,73 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
       {tab === 'files' && <FilesTab record={record} workspaceId={workspaceId} />}
 
+      {moreOpen && (
+        <BottomSheet title="이 업체에서 할 수 있는 것" onClose={() => setMoreOpen(false)}>
+          <div className="flex flex-col gap-4">
+            <label className="t-sub font-medium text-slate-600">
+              업체 상태
+              <select
+                value={record.status}
+                onChange={(e) => changeStatus(e.target.value as ClientOpsStatus)}
+                className="t-body mt-1.5 block h-12 w-full rounded-(--radius-control) border border-slate-300 px-3"
+              >
+                {CLIENT_STATUS_ORDER.map((s) => (
+                  <option key={s} value={s}>
+                    {CLIENT_STATUS_TEXT[s]}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="secondary"
+                className="w-full justify-start sm:hidden"
+                onClick={() => {
+                  setMoreOpen(false)
+                  setMessage({
+                    title: '진행 상황 보고 문구',
+                    description: '업무별 현재 상태와 다음 단계를 정리했습니다.',
+                    text: buildStatusReportMessage(record, today),
+                  })
+                }}
+              >
+                <ClipboardCopy aria-hidden="true" className="size-4" />
+                진행 상황 보고 문구
+              </Button>
+              <Button
+                variant="secondary"
+                className="w-full justify-start"
+                onClick={() => {
+                  setMoreOpen(false)
+                  setImportOpen(true)
+                }}
+              >
+                <Upload aria-hidden="true" className="size-4" />
+                서류에서 회사 정보 불러오기
+              </Button>
+              <Button
+                variant="secondary"
+                className="w-full justify-start"
+                onClick={() => {
+                  const next = withArchived(record, record.archivedAt === null)
+                  void commit(next)
+                  setMoreOpen(false)
+                  showToast(next.archivedAt ? '보관 처리했습니다. 목록·경고에서 빠집니다.' : '보관을 해제했습니다.')
+                }}
+              >
+                <Archive aria-hidden="true" className="size-4" />
+                {record.archivedAt ? '보관 해제' : '보관하기'}
+              </Button>
+            </div>
+
+            <div className="border-t border-slate-100 pt-4">
+              <ScreenGuide screenKey="client_detail" />
+            </div>
+          </div>
+        </BottomSheet>
+      )}
+
       {catalogOpen && (
         <ServiceCatalogModal
           workspaceId={workspaceId}
@@ -881,11 +1030,22 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       {/* 업체 정보 — 개요 아래에 접어 둔다 */}
       {tab === 'overview' && (
       <section aria-labelledby="info" className="flex flex-col gap-3">
-        <h2 id="info" className="text-[1.3rem] font-bold text-slate-900">
-          <button type="button" onClick={() => setInfoOpen((v) => !v)} aria-expanded={infoOpen} className="inline-flex items-center gap-2">
-            업체 정보 수정 <span className="text-[0.85rem] font-medium text-slate-400">{infoOpen ? '접기' : '펼치기'}</span>
+        <h2 id="info" className="t-section text-slate-900">
+          <button
+            type="button"
+            onClick={() => setInfoOpen((v) => !v)}
+            aria-expanded={infoOpen}
+            className="tap inline-flex items-center gap-2"
+          >
+            <ChevronRight
+              aria-hidden="true"
+              className={`size-4 text-slate-400 transition-transform duration-200 ${infoOpen ? 'rotate-90' : ''}`}
+            />
+            업체 정보 수정
           </button>
         </h2>
+        {/* 펼쳤을 때만 그린다 — 늘 펼쳐 두면 개요 화면이 입력폼으로 뒤덮인다 */}
+        {infoOpen && (
         <Panel>
           <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
             <TextField label="업체명" value={record.companyName} onChange={(v) => void commit({ ...record, companyName: v })} />
@@ -918,6 +1078,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             공동인증서 비밀번호와 주민등록번호는 이 시스템에 저장하지 않습니다. 인증서는 "받았는지"와 "어디에 보관 중인지"만 기록하세요.
           </p>
         </Panel>
+        )}
       </section>
 
       )}
