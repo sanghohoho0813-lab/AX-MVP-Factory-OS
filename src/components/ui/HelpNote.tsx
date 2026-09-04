@@ -24,14 +24,15 @@ export function HelpNote({ summary, what, when, next }: HelpNoteProps) {
   return (
     <section
       aria-label="화면 안내"
-      className="rounded-(--radius-card) border border-brand-100 bg-brand-50/60 px-4 py-3"
+      className="rounded-(--radius-card) border border-slate-200 bg-slate-50 px-4 py-3"
     >
       <div className="flex items-start gap-2.5">
-        <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-brand-500" />
+        <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-400" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm break-keep text-slate-700">{summary}</p>
+          {/* 안내문은 배경색으로 눈길을 끌지 않는다 — 정작 급한 카드와 경쟁한다 */}
+          <p className="t-sub break-keep text-slate-600">{summary}</p>
           {hasDetail && open && (
-            <dl id={detailId} className="mt-2.5 flex flex-col gap-2 border-t border-brand-100 pt-2.5">
+            <dl id={detailId} className="mt-2.5 flex flex-col gap-2 border-t border-slate-200 pt-2.5">
               {what && <HelpRow label="하는 일" value={what} />}
               {when && <HelpRow label="사용 시점" value={when} />}
               {next && <HelpRow label="완료 후" value={next} />}
@@ -44,7 +45,7 @@ export function HelpNote({ summary, what, when, next }: HelpNoteProps) {
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
             aria-controls={detailId}
-            className="inline-flex shrink-0 items-center gap-1 text-[13px] font-medium text-brand-600 hover:text-brand-700"
+            className="t-meta tap inline-flex shrink-0 items-center gap-1 font-medium text-slate-500 hover:text-slate-800"
           >
             {open ? '접기' : '자세히'}
             <ChevronDown aria-hidden="true" className={`size-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -57,7 +58,7 @@ export function HelpNote({ summary, what, when, next }: HelpNoteProps) {
 
 function HelpRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex gap-2 text-[13px]">
+    <div className="t-meta flex gap-2">
       <dt className="w-14 shrink-0 font-semibold text-slate-500">{label}</dt>
       <dd className="min-w-0 break-keep text-slate-600">{value}</dd>
     </div>

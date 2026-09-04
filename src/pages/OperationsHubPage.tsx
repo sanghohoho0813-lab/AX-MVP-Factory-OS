@@ -514,18 +514,14 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                           className="text-left"
                         >
                           <span className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-[1.02rem] font-bold break-keep text-slate-900 hover:text-brand-700 hover:underline">
+                            <span className="t-card break-keep text-slate-900 hover:text-brand-700 hover:underline">
                               {record.companyName || '(이름 없음)'}
                             </span>
-                            {critical > 0 && (
-                              <span className="rounded-full border border-danger-200 bg-danger-100 px-1.5 py-0.5 text-[0.78rem] font-bold text-danger-700">
-                                !{critical}
-                              </span>
-                            )}
+                            {critical > 0 && <Badge tone="danger">지금 {critical}</Badge>}
                           </span>
                           <span className="mt-1 flex flex-wrap items-center gap-1.5">
                             <ClientStatusChip status={record.status} />
-                            <span className="text-[0.85rem] text-slate-500">진행 {p.percent}%</span>
+                            <span className="t-meta text-slate-500">진행 {p.percent}%</span>
                           </span>
                         </button>
                       </th>
@@ -542,7 +538,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
 
                       <td className="px-3 py-3 text-center align-top">
                         <span
-                          className={`text-[0.95rem] font-semibold ${
+                          className={`t-sub font-semibold tabular-nums ${
                             p.documentsUsable < p.documentsTotal ? 'text-slate-800' : 'text-success-700'
                           }`}
                         >
@@ -551,7 +547,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                       </td>
                       <td className="px-3 py-3 text-right align-top">
                         <span
-                          className={`text-[0.95rem] font-semibold ${
+                          className={`t-sub font-semibold whitespace-nowrap tabular-nums ${
                             p.overduePayments > 0 ? 'text-danger-700' : 'text-slate-700'
                           }`}
                         >
