@@ -28,6 +28,8 @@ import {
 import { buildProjection, eventSummary, isOpenEvent, sortEvents } from '../customerBridgeService'
 import { normalizeClientOps, withFee, withNewFee, withNewFunding, withService } from '../clientOpsService'
 import type { ClientOpsRecord, OpsAlert } from '../../types/clientOps'
+import { mergeServices, normalizeCustomService, toServiceMeta } from '../customServiceService'
+import { BUILTIN_SERVICES, SERVICES, registerCustomServices } from '../../content/clientOpsCatalog'
 import type { CustomerEvent, JournalEntry, PortalClientLink, PortalDocument, PortalRequest, PortalUpdate } from '../../types/bridge'
 
 let passed = 0
@@ -276,6 +278,34 @@ fund = withNewFunding(fund, { programName: '멀었음', applyDueDate: '2026-10-3
 fund = withNewFunding(fund, { programName: '이미 접수', applyDueDate: '2026-09-04', status: 'submitted' })
 const fd = buildFundingDeadlines([fund], TODAY)
 check('funding: 14일 내 미접수만', fd.length === 1 && fd[0].programName === '곧 마감' && fd[0].daysLeft === 2)
+
+
+/* ------------------------------------------------------------------ */
+/* 직접 만든 업무 항목                                                   */
+/* ------------------------------------------------------------------ */
+{
+  const custom = normalizeCustomService({ key: 'custom_iso1', label: 'ISO 인증', order: 100 })
+  check('custom: 짧은 이름은 라벨에서 만든다', custom.shortLabel === 'ISO 인')
+  const merged = mergeServices([custom])
+  check('custom: 기본 6종 뒤에 붙는다', merged.length === BUILTIN_SERVICES.length + 1 && merged[merged.length - 1].key === 'custom_iso1')
+  check('custom: 내린 항목은 빠진다', mergeServices([{ ...custom, archived: true }]).length === BUILTIN_SERVICES.length)
+
+  registerCustomServices([toServiceMeta(custom)])
+  check('custom: 목록에 실제로 올라간다', SERVICES.some((s) => s.key === 'custom_iso1'))
+  const withCustom = normalizeClientOps({
+    id: 'c1', companyName: '커스텀', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z',
+    services: { custom_iso1: { status: 'in_progress' } },
+  } as unknown as Partial<ClientOpsRecord>)
+  check('custom: 상태가 저장·복원된다', withCustom.services.custom_iso1.status === 'in_progress')
+
+  // 목록에서 내려도(등록 해제) 이미 적어 둔 기록은 지키다
+  registerCustomServices([])
+  const kept = normalizeClientOps({
+    id: 'c2', companyName: '보관', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z',
+    services: { custom_iso1: { status: 'done' } },
+  } as unknown as Partial<ClientOpsRecord>)
+  check('custom: 목록에 없어도 기록은 남는다', kept.services.custom_iso1?.status === 'done')
+}
 
 /* ------------------------------------------------------------------ */
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)

@@ -41,6 +41,7 @@ import type {
   ServiceKey,
   ServiceState,
 } from '../types/clientOps'
+import { isCustomServiceKey } from '../types/clientOps'
 
 /* ------------------------------------------------------------------ */
 /* 기본값 · 정규화 (예전 형식 자동 승격 포함)                            */
@@ -94,11 +95,16 @@ function upgradeServices(
 
   // 새 형식이 이미 있으면 그것을 우선 사용
   if (raw.services && typeof raw.services === 'object') {
-    for (const s of SERVICES) {
-      const v = (raw.services as Record<string, Partial<ServiceState>>)[s.key]
+    const stored = raw.services as Record<string, Partial<ServiceState>>
+    // 직접 만든 항목이 아직 목록에 올라오기 전에 저장되는 일이 없도록,
+    // 저장돼 있던 custom_ 키는 목록에 없어도 그대로 지킨다.
+    const keys = new Set<ServiceKey>([...SERVICES.map((s) => s.key), ...Object.keys(stored).filter(isCustomServiceKey)])
+    for (const key of keys) {
+      const v = stored[key]
+      base[key] ??= defaultService()
       if (!v) continue
       // 저장된 값이 예전 8단계일 수 있다 — 읽는 자리에서 현재 5단계로 옮긴다
-      base[s.key] = { ...base[s.key], ...v, status: normalizeServiceStatus(v.status) }
+      base[key] = { ...base[key], ...v, status: normalizeServiceStatus(v.status) }
     }
     return base
   }

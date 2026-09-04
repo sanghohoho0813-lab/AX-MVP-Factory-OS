@@ -12,7 +12,7 @@
  */
 
 import type { ServiceAccent, ServiceMeta } from '../content/clientOpsCatalog'
-import { SERVICES } from '../content/clientOpsCatalog'
+import { SERVICES, registerCustomServices } from '../content/clientOpsCatalog'
 import type { ServiceKey } from '../types/clientOps'
 import { getDataModeConfig } from '../data/dataMode'
 import { getSupabaseClient } from '../lib/supabase/client'
@@ -247,4 +247,27 @@ export async function archiveCustomService(service: CustomService): Promise<Cust
 
 export async function restoreCustomService(service: CustomService): Promise<CustomService> {
   return updateCustomService(service, { archived: false })
+}
+
+/* ------------------------------------------------------------------ */
+/* 카탈로그에 반영                                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 직접 만든 항목을 읽어 화면이 쓰는 업무 목록(SERVICES)에 얹는다.
+ * 업체 기록을 불러오기 전에 불러야 한다 — 목록에 없는 항목은 기본값으로 채워지기
+ * 때문이다.
+ */
+export async function loadCustomServicesIntoCatalog(
+  workspaceId: string | null,
+): Promise<CustomService[]> {
+  let list: CustomService[] = []
+  try {
+    list = await listCustomServices(workspaceId)
+  } catch {
+    // 표가 아직 없는 환경(마이그레이션 미적용)에서도 기본 6종으로 돌아가야 한다
+    list = []
+  }
+  registerCustomServices(list.filter((c) => !c.archived).map(toServiceMeta))
+  return list
 }

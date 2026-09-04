@@ -15,6 +15,8 @@ import {
   Wallet,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
+import { ServiceCatalogModal } from '../components/ops/ServiceCatalogModal'
+import { loadCustomServicesIntoCatalog } from '../services/customServiceService'
 import { getDataModeConfig } from '../data/dataMode'
 import { CloudUpload } from 'lucide-react'
 import { createClient, listClients, readLocalClients, replaceAllClients } from '../services/clientOpsService'
@@ -62,6 +64,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const [tab, setTab] = useState<AlertSeverity | 'all'>('all')
   // 현황표를 먼저 보고 싶다는 요청이 있어 이 목록은 기본으로 접어 둔다.
   const [alertsOpen, setAlertsOpen] = useState(false)
+  const [catalogOpen, setCatalogOpen] = useState(false)
   const [showAllAlerts, setShowAllAlerts] = useState(false)
   const [form, setForm] = useState({ companyName: '', contactName: '', contactPhone: '', businessNumber: '' })
   const [query, setQuery] = useState('')
@@ -79,6 +82,8 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const load = useCallback(async () => {
     try {
       setLoading(true)
+      // 직접 만든 업무 항목을 먼저 목록에 올린 뒤 업체를 읽는다
+      await loadCustomServicesIntoCatalog(workspaceId)
       setRecords(await listClients(workspaceId))
       setError('')
     } catch (cause) {
@@ -361,7 +366,16 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
           <h2 id="ops-matrix" className="text-[1.3rem] font-bold text-slate-900">
             업체별 현황표
           </h2>
-          <p className="text-[0.9rem] text-slate-500">칸을 누르면 해당 업체 화면으로 이동합니다.</p>
+          <div className="flex items-center gap-3">
+            <p className="text-[0.9rem] text-slate-500">칸을 누르면 그 업무로 바로 들어갑니다.</p>
+            <button
+              type="button"
+              onClick={() => setCatalogOpen(true)}
+              className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-1.5 text-[0.9rem] font-medium text-slate-600 hover:bg-slate-50"
+            >
+              업무 항목 관리
+            </button>
+          </div>
         </div>
 
         {records.length === 0 ? (
@@ -649,6 +663,14 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
           </>
         )}
       </section>
+
+      {catalogOpen && (
+        <ServiceCatalogModal
+          workspaceId={workspaceId}
+          onClose={() => setCatalogOpen(false)}
+          onChanged={() => void load()}
+        />
+      )}
 
       {/* 새 업체 등록 */}
       {formOpen && (

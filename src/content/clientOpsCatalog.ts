@@ -51,7 +51,7 @@ export const ACCENT_CLASS: Record<
   fund: { bar: 'bg-cat-fund-500', chip: 'border-cat-fund-200 bg-cat-fund-50 text-cat-fund-700', dot: 'bg-cat-fund-500', softBg: 'bg-cat-fund-50', text: 'text-cat-fund-700' },
 }
 
-export const SERVICES: ServiceMeta[] = [
+export const BUILTIN_SERVICES: ServiceMeta[] = [
   {
     key: 'incorporation',
     label: '법인설립',
@@ -129,7 +129,22 @@ export const SERVICES: ServiceMeta[] = [
   },
 ]
 
+/**
+ * 화면이 실제로 쓰는 업무 목록 = 기본 6종 + 대표가 직접 만든 항목.
+ *
+ * 배열 자체를 통째로 갈아 끼우지 않고 내용만 바꾼다 — 여러 파일이 이 배열을
+ * 그대로 import 해서 그릴 때마다 훑기 때문이다.
+ */
+export const SERVICES: ServiceMeta[] = [...BUILTIN_SERVICES]
+
 export const SERVICE_KEYS: ServiceKey[] = SERVICES.map((s) => s.key)
+
+/** 직접 만든 항목을 목록에 반영한다. 화면을 그리기 전에 한 번 불러 준다. */
+export function registerCustomServices(custom: ServiceMeta[]): void {
+  const merged = [...BUILTIN_SERVICES, ...custom].sort((a, b) => a.order - b.order)
+  SERVICES.splice(0, SERVICES.length, ...merged)
+  SERVICE_KEYS.splice(0, SERVICE_KEYS.length, ...merged.map((s) => s.key))
+}
 
 export function serviceMeta(key: ServiceKey): ServiceMeta {
   return SERVICES.find((s) => s.key === key) ?? SERVICES[0]

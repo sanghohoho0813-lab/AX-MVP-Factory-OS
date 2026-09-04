@@ -87,6 +87,7 @@ import { DocImportModal } from '../components/ops/DocImportModal'
 import { withActivity } from '../services/clientOpsActivity'
 import { ActivityLog } from '../components/ops/ActivityLog'
 import { PortalTab } from '../components/ops/PortalTab'
+import { loadCustomServicesIntoCatalog } from '../services/customServiceService'
 import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { ClientJournalTab } from '../components/ops/ClientJournalTab'
 import { FilesTab } from '../components/ops/FilesTab'
@@ -148,6 +149,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
   const load = useCallback(async () => {
     try {
+      await loadCustomServicesIntoCatalog(workspaceId)
       setLoading(true)
       const all = await listClients(workspaceId)
       const found = all.find((r) => r.id === clientId) ?? null
