@@ -127,8 +127,8 @@ check('문구: 미정', dueText(null) === '기한 미정')
 }
 {
   let r = client()
-  r = withService(r, 'incorporation', { status: 'not_applicable', dueDate: '2026-08-01' })
-  check('마감: 해당 없음은 경고 안 함', !buildClientAlerts(r, TODAY).some((a) => a.kind === 'task_overdue'))
+  r = withService(r, 'incorporation', { status: 'on_hold', dueDate: '2026-08-01' })
+  check('마감: 보류는 경고 안 함', !buildClientAlerts(r, TODAY).some((a) => a.kind === 'task_overdue'))
 }
 
 /* ---------------- 서류 누락으로 막힌 업무 ---------------- */
@@ -242,10 +242,10 @@ check('문구: 미정', dueText(null) === '기한 미정')
 /* ---------------- 진행률 ---------------- */
 {
   let r = client()
-  r = withService(r, 'incorporation', { status: 'not_applicable' })
+  r = withService(r, 'incorporation', { status: 'on_hold' })
   r = withService(r, 'patent', { status: 'done' })
   const p = clientOpsProgress(r, TODAY)
-  check('진행률: 해당 없음은 분모에서 제외', p.servicesTotal === SERVICES.length - 1, String(p.servicesTotal))
+  check('진행률: 보류는 분모에서 제외', p.servicesTotal === SERVICES.length - 1, String(p.servicesTotal))
   check('진행률: 완료 1건', p.servicesDone === 1)
   check('진행률: 서류 총 개수', p.documentsTotal === DOCUMENTS.length)
   check('진행률: 서류 0건', p.documentsUsable === 0)
@@ -339,14 +339,14 @@ check('문구: 미정', dueText(null) === '기한 미정')
   let r = client({ companyName: '가나테크' })
   r = withService(r, 'patent', { status: 'done' })
   r = withService(r, 'venture', { status: 'in_progress', nextStep: '평가자료 정리', dueDate: '2026-09-05' })
-  r = withService(r, 'incorporation', { status: 'not_applicable' })
+  r = withService(r, 'incorporation', { status: 'on_hold' })
   const msg = buildStatusReportMessage(r, TODAY)
   check('보고: 업체명 포함', msg.includes('가나테크'))
   check('보고: 완료 업무 표시', msg.includes('특허 출원: 완료'))
   check('보고: 진행 업무 상태', msg.includes('벤처인증 (혁신성장유형): 진행 중'))
   check('보고: 목표일·남은 일수', msg.includes('2026-09-05') && msg.includes('9일 남음'))
   check('보고: 다음 단계 섹션', msg.includes('[다음 단계]') && msg.includes('평가자료 정리'))
-  check('보고: 해당 없음 업무는 제외', !msg.includes('법인설립'))
+  check('보고: 보류 업무는 제외', !msg.includes('법인설립'))
 }
 
 /* ---------------- 업체 정렬(급한 순) ---------------- */

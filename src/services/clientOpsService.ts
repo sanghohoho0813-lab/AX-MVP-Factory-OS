@@ -15,6 +15,7 @@ import {
   FEE_KIND_LABEL,
   SERVICES,
   serviceMeta,
+  normalizeServiceStatus,
 } from '../content/clientOpsCatalog'
 import {
   ACTIVITY_LIMIT,
@@ -96,7 +97,8 @@ function upgradeServices(
     for (const s of SERVICES) {
       const v = (raw.services as Record<string, Partial<ServiceState>>)[s.key]
       if (!v) continue
-      base[s.key] = { ...base[s.key], ...v }
+      // 저장된 값이 예전 8단계일 수 있다 — 읽는 자리에서 현재 5단계로 옮긴다
+      base[s.key] = { ...base[s.key], ...v, status: normalizeServiceStatus(v.status) }
     }
     return base
   }
@@ -468,7 +470,7 @@ export function withService(
     } else if (prev.status === 'waiting_client') {
       next.waitingSince = null
     }
-    if (next.startedAt === null && patch.status !== 'not_started' && patch.status !== 'not_applicable') {
+    if (next.startedAt === null && patch.status !== 'not_started' && patch.status !== 'on_hold') {
       next.startedAt = nowIso()
     }
   }

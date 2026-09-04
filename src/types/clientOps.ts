@@ -23,18 +23,22 @@ export type ServiceKey =
   | 'policyFund' // 정책자금 · 정부지원금 (반복 신청)
 
 /**
- * 업무 진행 상태.
- * not_applicable: 이 업체에는 해당 없음(예: 이미 법인이라 설립 불필요)
+ * 업무 진행 상태 — 5단계.
+ *
+ * 예전에는 8단계(서류 준비 중·접수 완료·해당 없음 포함)였다. 쓰다 보니 구분이
+ * 과해서 줄였고, 이미 저장된 값은 읽을 때 normalizeServiceStatus 가 옮긴다.
+ *   서류 준비 중·접수 완료 → 진행 중
+ *   해당 없음             → 보류
  */
 export type ServiceStatus =
-  | 'not_applicable'
   | 'not_started'
-  | 'preparing'
   | 'in_progress'
   | 'waiting_client'
-  | 'submitted'
   | 'done'
   | 'on_hold'
+
+/** 지금은 쓰지 않지만 저장된 데이터에 남아 있을 수 있는 예전 상태 */
+export type LegacyServiceStatus = 'preparing' | 'submitted' | 'not_applicable'
 
 export interface ServiceState {
   status: ServiceStatus

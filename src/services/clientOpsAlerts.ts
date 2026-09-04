@@ -154,8 +154,9 @@ export interface ClientOpsProgress {
 }
 
 export function clientOpsProgress(record: ClientOpsRecord, today: string): ClientOpsProgress {
+  // 보류(예전 '해당 없음' 포함)는 진척률 분모에서 뺀다
   const applicable = SERVICES.filter(
-    (s) => record.services[s.key].status !== 'not_applicable',
+    (s) => record.services[s.key].status !== 'on_hold',
   )
   const servicesDone = applicable.filter((s) => record.services[s.key].status === 'done').length
   const documentsUsable = DOCUMENTS.filter(
