@@ -335,7 +335,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       )}
 
       {/* 요약 */}
-      <section aria-label="요약" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <section aria-label="요약" className="ax-stagger grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatTile
           label="지금 처리할 일"
           value={`${summary.critical}건`}
@@ -393,7 +393,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
         ) : (
           <>
           {/* 모바일: 카드 목록 (표 가로 스크롤 대신) */}
-          <ul className="flex flex-col gap-3 lg:hidden">
+          <ul className="ax-stagger flex flex-col gap-3 lg:hidden">
             {ordered.map((record) => {
               const p = clientOpsProgress(record, today)
               const critical = summary.criticalByClient[record.id] ?? 0
@@ -406,7 +406,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                   <button
                     type="button"
                     onClick={() => navigate(`/ops/clients/${record.id}`)}
-                    className="flex w-full flex-col gap-2.5 rounded-(--radius-panel) border border-slate-200 bg-white p-4 text-left"
+                    className="ax-lift flex w-full flex-col gap-2.5 rounded-(--radius-panel) border border-slate-200 bg-white p-4 text-left"
                   >
                     <span className="flex flex-wrap items-center gap-1.5">
                       <span className="text-[1.1rem] font-bold break-keep text-slate-900">
@@ -674,10 +674,10 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
 
       {/* 새 업체 등록 */}
       {formOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-navy-950/50 p-4 sm:items-center">
+        <div className="ax-fade fixed inset-0 z-50 flex items-end justify-center bg-navy-950/50 p-4 sm:items-center">
           <form
             onSubmit={submit}
-            className="w-full max-w-lg rounded-(--radius-panel) bg-white p-6 shadow-(--shadow-overlay)"
+            className="ax-pop w-full max-w-lg rounded-(--radius-panel) bg-white p-6 shadow-(--shadow-overlay)"
           >
             <div className="flex items-center justify-between">
               <h2 className="text-[1.3rem] font-bold text-slate-900">새 업체 등록</h2>

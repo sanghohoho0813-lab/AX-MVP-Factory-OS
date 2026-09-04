@@ -112,10 +112,11 @@ export function GlobalSearch() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex h-10 w-full min-w-0 max-w-xl cursor-pointer items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 text-[0.95rem] text-slate-400 hover:border-slate-300"
+        className="flex h-10 w-full min-w-0 max-w-xl cursor-pointer items-center gap-2 overflow-hidden rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 text-[0.95rem] text-slate-400 hover:border-slate-300"
       >
         <Search aria-hidden="true" className="size-4 shrink-0" />
-        <span className="truncate">고객사, 프로젝트, 할 일 검색</span>
+        {/* min-w-0 이 없으면 좁은 화면에서 글자가 칸 밖으로 삐져나와 옆 버튼을 덮는다 */}
+        <span className="min-w-0 truncate">고객사, 프로젝트, 할 일 검색</span>
         <kbd className="ml-auto hidden shrink-0 rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[0.75rem] font-medium text-slate-400 sm:inline">Ctrl K</kbd>
       </button>
 

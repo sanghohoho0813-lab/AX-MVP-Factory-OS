@@ -188,3 +188,75 @@ export function PhoneLink({ phone }: { phone: string }) {
     </a>
   )
 }
+
+/* ------------------------------------------------------------------ */
+/* 금액 입력                                                            */
+/* ------------------------------------------------------------------ */
+
+/** 누를 때마다 더해지는 단위 — 실제로 자주 쓰는 금액대만 둔다 */
+const AMOUNT_STEPS = [
+  { label: '+10만', value: 100_000 },
+  { label: '+100만', value: 1_000_000 },
+  { label: '+1,000만', value: 10_000_000 },
+]
+
+/** 숫자만 남긴다 (콤마·원 표시·공백 제거) */
+export function parseAmount(text: string): number {
+  const n = Number(text.replace(/[^0-9]/g, ''))
+  return Number.isFinite(n) ? n : 0
+}
+
+/**
+ * 금액 칸 — 직접 입력도 되고, 버튼을 눌러 쌓아 올릴 수도 있다.
+ *
+ * 키보드로 0 을 여섯 번 치는 것보다 "+100만" 을 세 번 누르는 편이 빠르고
+ * 자릿수를 틀리지 않는다. 값은 항상 숫자로 들고, 화면에는 콤마를 넣어 보여준다.
+ */
+export function AmountField({
+  value,
+  onChange,
+  label = '금액(원)',
+  id,
+}: {
+  value: number
+  onChange: (next: number) => void
+  label?: string
+  id?: string
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className="text-[0.88rem] font-medium text-slate-600">
+        {label}
+      </label>
+      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+        <input
+          id={id}
+          value={value === 0 ? '' : value.toLocaleString('ko-KR')}
+          onChange={(e) => onChange(parseAmount(e.target.value))}
+          inputMode="numeric"
+          placeholder="0"
+          className="w-36 rounded-(--radius-control) border border-slate-300 px-2 py-2 text-right text-[1rem] font-semibold tabular-nums"
+        />
+        {AMOUNT_STEPS.map((s) => (
+          <button
+            key={s.value}
+            type="button"
+            onClick={() => onChange(value + s.value)}
+            className="rounded-(--radius-control) border border-slate-200 bg-white px-2.5 py-2 text-[0.9rem] font-semibold text-slate-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+          >
+            {s.label}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => onChange(0)}
+          disabled={value === 0}
+          className="rounded-(--radius-control) px-2 py-2 text-[0.9rem] text-slate-400 hover:text-slate-700 disabled:opacity-40"
+        >
+          <X aria-hidden="true" className="mr-0.5 inline size-3.5" />
+          지우기
+        </button>
+      </div>
+    </div>
+  )
+}

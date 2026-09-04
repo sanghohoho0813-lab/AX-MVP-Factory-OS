@@ -166,7 +166,9 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
       )}
 
       <div className="flex min-w-0 flex-1 items-center justify-center px-1 sm:px-4">
-        <div className="hidden w-full max-w-xl sm:block">
+        {/* 1360px 아래에서는 칸이 아이콘만 겨우 들어갈 만큼 좁아져 빈 상자처럼 보인다.
+            그 폭에서는 감추고 Ctrl+K 로 연다. */}
+        <div className="hidden w-full max-w-xl min-[1360px]:block">
           <GlobalSearch />
         </div>
       </div>

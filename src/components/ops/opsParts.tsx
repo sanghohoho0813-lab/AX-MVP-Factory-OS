@@ -93,7 +93,7 @@ export function AlertRow({ alert, onOpen }: { alert: OpsAlert; onOpen: (a: OpsAl
       <button
         type="button"
         onClick={() => onOpen(alert)}
-        className={`flex w-full items-start gap-3 rounded-(--radius-card) border px-4 py-3 text-left transition-colors hover:brightness-[0.98] ${meta.box}`}
+        className={`ax-lift flex w-full items-start gap-3 rounded-(--radius-card) border px-4 py-3 text-left hover:brightness-[0.98] ${meta.box}`}
       >
         <Icon aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-slate-500" />
         <span className="min-w-0 flex-1">
@@ -282,7 +282,7 @@ export function StatTile({
           ? 'border-success-200 bg-success-50/70'
           : 'border-slate-200 bg-white'
   const interactive = onClick
-    ? `cursor-pointer text-left transition-shadow hover:shadow-(--shadow-card) ${active ? 'ring-2 ring-brand-600' : ''}`
+    ? `ax-lift cursor-pointer text-left ${active ? 'ring-2 ring-brand-600' : ''}`
     : ''
   const Tag = onClick ? 'button' : 'div'
   return (

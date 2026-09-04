@@ -42,9 +42,12 @@ export function AppShell() {
           <Header onOpenMobileMenu={() => setMobileOpen(true)} />
           {/* 하단 여백: 시연 안내 바가 본문을 가리지 않도록 확보 */}
           <main className="mx-auto w-full max-w-[1840px] flex-1 px-4 py-6 pb-24 sm:px-6 sm:pb-8 lg:px-10 lg:py-9 2xl:px-14">
-            <Suspense fallback={<ShellFallback />}>
-              <Outlet />
-            </Suspense>
+            {/* key: 화면이 바뀔 때마다 등장 효과를 한 번씩 다시 준다 */}
+            <div key={location.pathname} className="ax-rise">
+              <Suspense fallback={<ShellFallback />}>
+                <Outlet />
+              </Suspense>
+            </div>
           </main>
         </div>
       </div>

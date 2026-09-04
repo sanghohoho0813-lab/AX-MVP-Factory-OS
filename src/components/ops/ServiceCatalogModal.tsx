@@ -89,8 +89,8 @@ export function ServiceCatalogModal({
   const archived = list.filter((c) => c.archived)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-navy-950/50 p-4 sm:items-center">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-(--radius-panel) bg-white p-6 shadow-(--shadow-overlay)">
+    <div className="ax-fade fixed inset-0 z-50 flex items-end justify-center bg-navy-950/50 p-4 sm:items-center">
+      <div className="ax-pop max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-(--radius-panel) bg-white p-6 shadow-(--shadow-overlay)">
         <div className="flex items-center justify-between">
           <h2 className="text-[1.3rem] font-bold text-slate-900">업무 항목 관리</h2>
           <button

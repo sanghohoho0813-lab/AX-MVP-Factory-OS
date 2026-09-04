@@ -77,7 +77,9 @@ import { useToast } from '../components/ui/toastContext'
 import { AlertRow, ClientStatusChip, StatTile } from '../components/ops/opsParts'
 import {
   DueDateField,
+  AmountField,
   MessageModal,
+  parseAmount,
   PhoneLink,
   SavedBadge,
 } from '../components/ops/opsControls'
@@ -88,6 +90,7 @@ import { withActivity } from '../services/clientOpsActivity'
 import { ActivityLog } from '../components/ops/ActivityLog'
 import { PortalTab } from '../components/ops/PortalTab'
 import { loadCustomServicesIntoCatalog } from '../services/customServiceService'
+import { ServiceCatalogModal } from '../components/ops/ServiceCatalogModal'
 import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { ClientJournalTab } from '../components/ops/ClientJournalTab'
 import { FilesTab } from '../components/ops/FilesTab'
@@ -144,6 +147,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({})
   /** 개요에서 눌러 들어온 업무 카드로 화면을 옮긴다 */
   const focusedCardRef = useRef<HTMLDivElement | null>(null)
+  const [catalogOpen, setCatalogOpen] = useState(false)
 
   const today = todayLocalDate()
 
@@ -478,7 +482,17 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           <h2 id="svc" className="text-[1.3rem] font-bold text-slate-900">
             진행 업무
           </h2>
-          <p className="text-[0.9rem] text-slate-500">제목을 누르면 자세한 내용이 열립니다.</p>
+          <div className="flex items-center gap-3">
+            <p className="text-[0.9rem] text-slate-500">제목을 누르면 자세한 내용이 열립니다.</p>
+            <button
+              type="button"
+              onClick={() => setCatalogOpen(true)}
+              className="flex items-center gap-1 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-1.5 text-[0.9rem] font-medium text-slate-600 hover:bg-slate-50"
+            >
+              <Plus aria-hidden="true" className="size-4" />
+              업무 항목 추가
+            </button>
+          </div>
         </div>
         <div className="flex flex-col gap-2.5">
           {SERVICES.map((meta) => {
@@ -856,6 +870,14 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
       {tab === 'files' && <FilesTab record={record} workspaceId={workspaceId} />}
 
+      {catalogOpen && (
+        <ServiceCatalogModal
+          workspaceId={workspaceId}
+          onClose={() => setCatalogOpen(false)}
+          onChanged={() => void load()}
+        />
+      )}
+
       {/* 업체 정보 — 개요 아래에 접어 둔다 */}
       {tab === 'overview' && (
       <section aria-labelledby="info" className="flex flex-col gap-3">
@@ -980,7 +1002,7 @@ function FeesSection({
 }) {
   const [kind, setKind] = useState<FeeKind>('deposit')
   const [serviceKey, setServiceKey] = useState<ServiceKey | ''>('')
-  const [amount, setAmount] = useState('')
+  const [amount, setAmount] = useState(0)
   const [dueDate, setDueDate] = useState('')
 
   const unpaid = record.fees.filter((f) => f.receivedAt === null)
@@ -988,16 +1010,15 @@ function FeesSection({
   const paidTotal = record.fees.filter((f) => f.receivedAt !== null).reduce((s, f) => s + (f.amount ?? 0), 0)
 
   const add = () => {
-    const numeric = Number(amount.replace(/[^0-9]/g, ''))
     onChange(
       withNewFee(record, {
         kind,
         serviceKey: serviceKey === '' ? null : serviceKey,
-        amount: Number.isFinite(numeric) && numeric > 0 ? numeric : null,
+        amount: amount > 0 ? amount : null,
         dueDate,
       }),
     )
-    setAmount('')
+    setAmount(0)
     setDueDate('')
   }
 
@@ -1063,13 +1084,28 @@ function FeesSection({
                     onChange={(e) => onChange(withFee(record, fee.id, { dueDate: e.target.value }))}
                     className="rounded-(--radius-control) border border-slate-300 px-2 py-1.5 text-[0.92rem]"
                   />
-                  <span
-                    className={`w-32 shrink-0 text-right text-[1rem] font-semibold ${
+                  <input
+                    aria-label={`${fee.label} 금액`}
+                    value={fee.amount === null ? '' : fee.amount.toLocaleString('ko-KR')}
+                    onChange={(e) => {
+                      const n = parseAmount(e.target.value)
+                      onChange(withFee(record, fee.id, { amount: n > 0 ? n : null }))
+                    }}
+                    inputMode="numeric"
+                    placeholder="미정"
+                    className={`w-32 shrink-0 rounded-(--radius-control) border border-transparent px-2 py-1.5 text-right text-[1rem] font-semibold tabular-nums hover:border-slate-300 focus:border-slate-300 ${
                       fee.receivedAt ? 'text-slate-500 line-through' : 'text-slate-900'
                     }`}
+                  />
+                  <button
+                    type="button"
+                    aria-label={`${fee.label} 금액에 100만원 더하기`}
+                    title="누를 때마다 100만원씩 더합니다"
+                    onClick={() => onChange(withFee(record, fee.id, { amount: (fee.amount ?? 0) + 1_000_000 }))}
+                    className="shrink-0 rounded-(--radius-control) border border-slate-200 px-2 py-1.5 text-[0.85rem] font-semibold text-slate-600 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
                   >
-                    {formatKrw(fee.amount)}
-                  </span>
+                    +100만
+                  </button>
                   <button
                     type="button"
                     aria-label={`${fee.label} 삭제`}
@@ -1114,16 +1150,7 @@ function FeesSection({
               ))}
             </select>
           </label>
-          <label className="text-[0.88rem] font-medium text-slate-600">
-            금액(원)
-            <input
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              inputMode="numeric"
-              placeholder="3000000"
-              className="mt-1 block w-36 rounded-(--radius-control) border border-slate-300 px-2 py-2 text-[0.95rem]"
-            />
-          </label>
+          <AmountField id="fee-new-amount" value={amount} onChange={setAmount} />
           <label className="text-[0.88rem] font-medium text-slate-600">
             받기로 한 날
             <input
