@@ -18,7 +18,12 @@
     "test:doc-parser": "vite build --config vite.doc-parser.config.mjs && node .doc-parser-out/doc-parser.mjs",
     "test:client-ops-stage2": "vite build --config vite.client-ops-stage2.config.mjs && node .client-ops-stage2-out/stage2.mjs",
     "test:datamode": "vite build --config vite.datamode.config.mjs && node .datamode-out/datamode.mjs",
-    "test:autherrors": "vite build --config vite.autherrors.config.mjs && node .autherrors-out/autherrors.mjs"
+    "test:autherrors": "vite build --config vite.autherrors.config.mjs && node .autherrors-out/autherrors.mjs",
+    "test:mirae-os": "vite build --config vite.mirae-os.config.mjs && node .mirae-os-out/mirae-os.mjs",
+    "test:sql": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f supabase/tests/bridge_contract.sql && psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f supabase/tests/bridge_hardening.sql",
+    "e2e:internal": "node e2e/internal.mjs",
+    "e2e:roundtrip": "node e2e/roundtrip.mjs",
+    "test:all": "npm run test:contract && npm run test:client-ops && npm run test:client-operations && npm run test:progress && npm run test:persistence && npm run test:onboarding && npm run test:client-ops-alerts && npm run test:doc-parser && npm run test:client-ops-stage2 && npm run test:datamode && npm run test:autherrors && npm run test:mirae-os"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.7",

@@ -1,13 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="7" fill="#0f1a38" />
-  <text
-    x="16"
-    y="20.5"
-    text-anchor="middle"
-    font-family="Pretendard, -apple-system, 'Segoe UI', sans-serif"
-    font-size="12"
-    font-weight="700"
-    fill="#ffffff"
-  >AX</text>
-  <rect x="7" y="24.5" width="18" height="2.5" rx="1.25" fill="#3b82f6" />
+  <!-- 미래AI랩 마크 — 짙은 청록 바탕 위 M, 오른쪽 획은 밝은 청록 (로고 색 계열) -->
+  <rect width="32" height="32" rx="7" fill="#08323A" />
+  <path d="M7 24V8h4.2l4.8 8.2L20.8 8H25v16h-3.6v-9.6l-5.4 8.8-5.4-8.8V24Z" fill="#FFFFFF" />
+  <path d="M20.8 8H25v16h-3.6v-9.6L16 22.6V16.2Z" fill="#22C6E8" />
+  <circle cx="8.4" cy="22.4" r="2" fill="#22C6E8" />
 </svg>

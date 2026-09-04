@@ -15,7 +15,7 @@ import { downloadLocalBackup, clearLocalDomainData } from '../../services/dataIm
 import { useAuth } from '../../auth/AuthProvider'
 import { WorkspaceMembersPanel } from '../../components/data/WorkspaceMembersPanel'
 import { ImportWizard } from '../../components/data/ImportWizard'
-import { TabNav, SettingRow, TextScalePanel, FeatureVisibilityPanel, SystemPanel, type TabKey } from './parts'
+import { TabNav, SettingRow, AppearancePanel, TextScalePanel, FeatureVisibilityPanel, SystemPanel, type TabKey } from './parts'
 import { OnboardingSettingsPanel } from './OnboardingSettingsPanel'
 import { SupabaseHealthPanel } from './SupabaseHealthPanel'
 
@@ -87,6 +87,7 @@ export function SupabaseSettingsView() {
             <SettingRow label="현재 워크스페이스">{current?.workspace?.name ?? '—'}</SettingRow>
             <SettingRow label="내 역할">{current ? roleLabel[current.role] : '—'}</SettingRow>
           </Panel>
+          <AppearancePanel />
           <TextScalePanel />
           <FeatureVisibilityPanel />
           <OnboardingSettingsPanel />

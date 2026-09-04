@@ -7,6 +7,7 @@ import { Database, Info, SlidersHorizontal, Users } from 'lucide-react'
 import { Panel } from '../../components/ui/Panel'
 import { HelpNote } from '../../components/ui/HelpNote'
 import { TextScaleControl } from '../../components/ui/TextScaleControl'
+import { MotionControl, ThemeControl } from '../../components/ui/ThemeControl'
 import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/toastContext'
 import { CloudSaveStatus } from '../../components/cloud/CloudSaveStatus'
@@ -15,6 +16,7 @@ import { buildLocalSnapshot, summarizeSnapshot } from '../../services/dataImport
 import { downloadLocalBackup } from '../../services/dataImport/localBackup'
 import { useStoreVersion } from '../../lib/useStoreVersion'
 import { isAdvancedVisible, setFeatureVisibility } from '../../lib/featureVisibility'
+import { brand } from '../../brand/brand.config'
 
 export type TabKey = 'me' | 'workspace' | 'data' | 'system'
 
@@ -51,6 +53,21 @@ export function SettingRow({ label, children }: { label: string; children: React
       <span className="text-[13px] text-slate-500">{label}</span>
       <span className="text-[13px] font-medium text-slate-800">{children}</span>
     </div>
+  )
+}
+
+/** 화면 색·움직임 (마스터 규격: 테마 9종 + 모션 설정) */
+export function AppearancePanel() {
+  return (
+    <Panel title="화면 색">
+      <HelpNote summary="전체 화면의 색을 9가지 중에서 고릅니다. 고르면 즉시 반영되고 다음 접속에도 유지됩니다. 글자·표·서식의 읽기 편한 색은 테마와 상관없이 그대로 유지됩니다." />
+      <div className="mt-4">
+        <ThemeControl />
+      </div>
+      <div className="mt-4">
+        <MotionControl />
+      </div>
+    </Panel>
   )
 }
 
@@ -96,7 +113,7 @@ export function FeatureVisibilityPanel() {
 export function SystemPanel({ mode, connection }: { mode: string; connection: ReactNode }) {
   return (
     <Panel title="시스템 정보">
-      <SettingRow label="앱">AX MVP Factory OS</SettingRow>
+      <SettingRow label="앱">{brand.productName} · {brand.productSubtitle}</SettingRow>
       <SettingRow label="데이터 모드">{mode === 'supabase' ? '클라우드(supabase)' : '로컬 데모(local)'}</SettingRow>
       <SettingRow label="연결 상태">{connection}</SettingRow>
       <SettingRow label="로컬 스키마">v{SCHEMA_VERSION}</SettingRow>

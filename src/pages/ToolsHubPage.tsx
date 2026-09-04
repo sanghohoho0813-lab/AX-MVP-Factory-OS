@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom'
 import { PageHeader } from '../components/ui/PageHeader'
 
 const groups = [
-  { title: '고객·진단', icon: Users, color: 'bg-sky-50 text-sky-700', links: [['고객사·프로젝트', '/clients'], ['기업 진단', '/diagnosis'], ['설문 관리', '/diagnosis/surveys'], ['분석 결과', '/diagnosis/assessments']] },
-  { title: 'AX 설계', icon: Lightbulb, color: 'bg-amber-50 text-amber-700', links: [['만들 업무 선택', '/selection'], ['AX 기능 설계', '/mvp-design'], ['홈페이지 설계', '/website-studio'], ['제출자료', '/deliverables/results']] },
-  { title: '검증·성과', icon: FlaskConical, color: 'bg-emerald-50 text-emerald-700', links: [['현장 검증', '/validation'], ['검증 결과', '/validation/results'], ['전체 현황', '/reports'], ['사례 라이브러리', '/cases']] },
+  { title: '고객·진단', icon: Users, color: 'bg-cat-client-50 text-cat-client-700', links: [['고객사·프로젝트', '/clients'], ['기업 진단', '/diagnosis'], ['설문 관리', '/diagnosis/surveys'], ['분석 결과', '/diagnosis/assessments']] },
+  { title: 'AX 설계', icon: Lightbulb, color: 'bg-cat-doc-50 text-cat-doc-700', links: [['만들 업무 선택', '/selection'], ['AX 기능 설계', '/mvp-design'], ['홈페이지 설계', '/website-studio'], ['제출자료', '/deliverables/results']] },
+  { title: '검증·성과', icon: FlaskConical, color: 'bg-cat-money-50 text-cat-money-700', links: [['현장 검증', '/validation'], ['검증 결과', '/validation/results'], ['전체 현황', '/reports'], ['사례 라이브러리', '/cases']] },
 ] as const
 
 export function ToolsHubPage() {

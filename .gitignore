@@ -42,3 +42,5 @@ dist-ssr
 .client-ops-stage2-out
 .datamode-out
 .autherrors-out
+.mirae-os-out
+dist-qa*/

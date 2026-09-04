@@ -7,6 +7,7 @@
 import type {
   DocumentKey,
   FeeKind,
+  FundingStatus,
   ServiceKey,
   ServiceStatus,
 } from '../types/clientOps'
@@ -32,18 +33,22 @@ export interface ServiceMeta {
 }
 
 /** 업무 색상 계열 */
-export type ServiceAccent = 'slate' | 'violet' | 'amber' | 'emerald' | 'sky' | 'rose'
+/**
+ * 서비스 구분색 — 화면 테마와 분리된 고정 분류색이다.
+ * neutral 기타 · doc 서류 · plan 기획/설계 · money 수금 · client 고객 · fund 지원사업
+ */
+export type ServiceAccent = 'neutral' | 'plan' | 'doc' | 'money' | 'client' | 'fund'
 
 export const ACCENT_CLASS: Record<
   ServiceAccent,
   { bar: string; chip: string; dot: string; softBg: string; text: string }
 > = {
-  slate: { bar: 'bg-slate-400', chip: 'border-slate-200 bg-slate-50 text-slate-700', dot: 'bg-slate-400', softBg: 'bg-slate-50', text: 'text-slate-700' },
-  violet: { bar: 'bg-violet-500', chip: 'border-violet-200 bg-violet-50 text-violet-700', dot: 'bg-violet-500', softBg: 'bg-violet-50', text: 'text-violet-700' },
-  amber: { bar: 'bg-amber-500', chip: 'border-amber-200 bg-amber-50 text-amber-700', dot: 'bg-amber-500', softBg: 'bg-amber-50', text: 'text-amber-700' },
-  emerald: { bar: 'bg-emerald-500', chip: 'border-emerald-200 bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500', softBg: 'bg-emerald-50', text: 'text-emerald-700' },
-  sky: { bar: 'bg-sky-500', chip: 'border-sky-200 bg-sky-50 text-sky-700', dot: 'bg-sky-500', softBg: 'bg-sky-50', text: 'text-sky-700' },
-  rose: { bar: 'bg-rose-500', chip: 'border-rose-200 bg-rose-50 text-rose-700', dot: 'bg-rose-500', softBg: 'bg-rose-50', text: 'text-rose-700' },
+  neutral: { bar: 'bg-slate-400', chip: 'border-slate-200 bg-slate-50 text-slate-700', dot: 'bg-slate-400', softBg: 'bg-slate-50', text: 'text-slate-700' },
+  plan: { bar: 'bg-cat-plan-500', chip: 'border-cat-plan-200 bg-cat-plan-50 text-cat-plan-700', dot: 'bg-cat-plan-500', softBg: 'bg-cat-plan-50', text: 'text-cat-plan-700' },
+  doc: { bar: 'bg-cat-doc-500', chip: 'border-cat-doc-200 bg-cat-doc-50 text-cat-doc-700', dot: 'bg-cat-doc-500', softBg: 'bg-cat-doc-50', text: 'text-cat-doc-700' },
+  money: { bar: 'bg-cat-money-500', chip: 'border-cat-money-200 bg-cat-money-50 text-cat-money-700', dot: 'bg-cat-money-500', softBg: 'bg-cat-money-50', text: 'text-cat-money-700' },
+  client: { bar: 'bg-cat-client-500', chip: 'border-cat-client-200 bg-cat-client-50 text-cat-client-700', dot: 'bg-cat-client-500', softBg: 'bg-cat-client-50', text: 'text-cat-client-700' },
+  fund: { bar: 'bg-cat-fund-500', chip: 'border-cat-fund-200 bg-cat-fund-50 text-cat-fund-700', dot: 'bg-cat-fund-500', softBg: 'bg-cat-fund-50', text: 'text-cat-fund-700' },
 }
 
 export const SERVICES: ServiceMeta[] = [
@@ -55,7 +60,7 @@ export const SERVICES: ServiceMeta[] = [
     requiredDocuments: ['representativeId', 'representativePhone', 'businessAddress'],
     recurring: false,
     order: 1,
-    accent: 'slate',
+    accent: 'neutral',
   },
   {
     key: 'businessScope',
@@ -66,7 +71,7 @@ export const SERVICES: ServiceMeta[] = [
     requiredDocuments: ['businessRegistration', 'corporateRegistry', 'jointCertificate'],
     recurring: false,
     order: 2,
-    accent: 'amber',
+    accent: 'doc',
   },
   {
     key: 'patent',
@@ -76,7 +81,7 @@ export const SERVICES: ServiceMeta[] = [
     requiredDocuments: ['businessRegistration', 'representativeId'],
     recurring: false,
     order: 3,
-    accent: 'violet',
+    accent: 'plan',
   },
   {
     key: 'venture',
@@ -91,7 +96,7 @@ export const SERVICES: ServiceMeta[] = [
     ],
     recurring: false,
     order: 4,
-    accent: 'emerald',
+    accent: 'money',
   },
   {
     key: 'ax',
@@ -102,7 +107,7 @@ export const SERVICES: ServiceMeta[] = [
     requiredDocuments: ['businessRegistration'],
     recurring: false,
     order: 5,
-    accent: 'sky',
+    accent: 'client',
   },
   {
     key: 'policyFund',
@@ -120,7 +125,7 @@ export const SERVICES: ServiceMeta[] = [
     ],
     recurring: true,
     order: 6,
-    accent: 'rose',
+    accent: 'fund',
   },
 ]
 
@@ -131,6 +136,16 @@ export function serviceMeta(key: ServiceKey): ServiceMeta {
 }
 
 /* 업무 상태 표시 */
+export const FUNDING_STATUS_LABEL: Record<FundingStatus, string> = {
+  watching: '공고 확인 중',
+  preparing: '서류 준비 중',
+  submitted: '신청 접수',
+  reviewing: '심사 중',
+  selected: '선정',
+  rejected: '탈락',
+  given_up: '포기',
+}
+
 export const SERVICE_STATUS_LABEL: Record<ServiceStatus, string> = {
   not_applicable: '해당 없음',
   not_started: '시작 전',

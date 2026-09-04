@@ -42,10 +42,10 @@ export const SCHEDULE_KIND_LABEL: Record<ScheduleKind, string> = {
 
 /** 종류별 색 (달력 점·칩) */
 export const SCHEDULE_KIND_CLASS: Record<ScheduleKind, { dot: string; chip: string }> = {
-  task: { dot: 'bg-violet-500', chip: 'border-violet-200 bg-violet-50 text-violet-700' },
-  funding: { dot: 'bg-rose-500', chip: 'border-rose-200 bg-rose-50 text-rose-700' },
-  payment: { dot: 'bg-emerald-500', chip: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
-  document: { dot: 'bg-amber-500', chip: 'border-amber-200 bg-amber-50 text-amber-700' },
+  task: { dot: 'bg-cat-plan-500', chip: 'border-cat-plan-200 bg-cat-plan-50 text-cat-plan-700' },
+  funding: { dot: 'bg-cat-fund-500', chip: 'border-cat-fund-200 bg-cat-fund-50 text-cat-fund-700' },
+  payment: { dot: 'bg-cat-money-500', chip: 'border-cat-money-200 bg-cat-money-50 text-cat-money-700' },
+  document: { dot: 'bg-cat-doc-500', chip: 'border-cat-doc-200 bg-cat-doc-50 text-cat-doc-700' },
 }
 
 /** 한 업체의 일정 */

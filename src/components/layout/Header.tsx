@@ -1,27 +1,23 @@
 import { Link } from 'react-router-dom'
 import { TextScaleControl } from '../ui/TextScaleControl'
 import {
-  Bell,
   Building,
   Check,
   ChevronDown,
+  ExternalLink,
   Menu,
   Settings,
   UserRound,
 } from 'lucide-react'
 import { Suspense, lazy, useState } from 'react'
-import {
-  CURRENT_USER,
-  NOTIFICATIONS,
-  NOTIFICATION_COUNT,
-  WORKSPACES,
-} from '../../data/demo'
+import { CURRENT_USER, WORKSPACES } from '../../data/demo'
 import { useDismissable } from '../../lib/useDismissable'
 import { GlobalSearch } from '../search/GlobalSearch'
 import { GuideButton } from '../onboarding/GuideButton'
-import { useToast } from '../ui/toastContext'
 import { getDataModeConfig } from '../../data/dataMode'
 import { CloudSaveStatus } from '../cloud/CloudSaveStatus'
+import { SignalBell } from './SignalBell'
+import { brand } from '../../brand/brand.config'
 
 // supabase 전용 헤더 조각은 lazy 로 불러와 local entry 번들에 Supabase SDK 가 섞이지 않게 한다.
 const SupabaseWorkspaceSelector = lazy(() =>
@@ -83,48 +79,8 @@ function WorkspaceSelector() {
   )
 }
 
-function NotificationMenu() {
-  const { open, setOpen, containerRef } = useDismissable<HTMLDivElement>()
-
-  return (
-    <div ref={containerRef} className="relative">
-      <button
-        type="button"
-        aria-label={`알림 ${NOTIFICATION_COUNT}건`}
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        className="relative flex size-10 cursor-pointer items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-      >
-        <Bell aria-hidden="true" className="size-5" />
-        <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger-500 px-1 text-[0.78rem] font-semibold text-white">
-          {NOTIFICATION_COUNT}
-        </span>
-      </button>
-      {open && (
-        <div className="absolute top-full right-0 z-30 mt-1.5 w-80 max-w-[calc(100vw-2rem)] rounded-(--radius-card) border border-slate-200 bg-white shadow-(--shadow-overlay)">
-          <p className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-900">
-            알림
-          </p>
-          <ul>
-            {NOTIFICATIONS.map((n) => (
-              <li
-                key={n.id}
-                className="border-b border-slate-50 px-4 py-3 last:border-0"
-              >
-                <p className="text-[13px] break-keep text-slate-700">{n.message}</p>
-                <p className="mt-1 text-[0.875rem] text-slate-400">{n.time}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  )
-}
-
 function UserMenu() {
   const { open, setOpen, containerRef } = useDismissable<HTMLDivElement>()
-  const { showToast } = useToast()
 
   return (
     <div ref={containerRef} className="relative">
@@ -162,17 +118,14 @@ function UserMenu() {
             </p>
             <p className="text-[0.875rem] text-slate-400">{CURRENT_USER.role}</p>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setOpen(false)
-              showToast('내 프로필은 다음 개발 단계에서 제공됩니다.')
-            }}
-            className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+          <Link
+            to="/settings"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
           >
             <UserRound aria-hidden="true" className="size-4 text-slate-400" />
-            내 프로필
-          </button>
+            내 정보
+          </Link>
           <Link
             to="/settings"
             onClick={() => setOpen(false)}
@@ -219,11 +172,21 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5">
+        {/* 고객이 보는 표면으로 건너가는 문 — 새 탭. 로그인 세션은 공유하지 않는다(가짜 SSO 금지). */}
+        <a
+          href={brand.customerPlatformUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hidden h-10 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 px-3 text-[0.9rem] font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50 md:inline-flex"
+        >
+          <ExternalLink aria-hidden="true" className="size-4 text-slate-400" />
+          {brand.customerPlatformLabel}
+        </a>
         <GuideButton />
         <span className="hidden xl:inline-flex">
           <CloudSaveStatus state={isSupabase ? 'saved' : 'local'} compact={false} />
         </span>
-        <NotificationMenu />
+        <SignalBell />
         <Link
           to="/settings"
           aria-label="설정"
