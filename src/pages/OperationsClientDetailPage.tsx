@@ -126,7 +126,10 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const [searchParams, setSearchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
   const tab: DetailTab = isDetailTab(tabParam) ? tabParam : 'overview'
-  const setTab = (next: DetailTab) => setSearchParams(next === 'overview' ? {} : { tab: next }, { replace: true })
+  /** 개요에서 항목을 누르면 그 항목이 열린 채로 업무 탭이 뜨도록 svc 를 함께 싣는다 */
+  const setTab = (next: DetailTab, svc?: ServiceKey) =>
+    setSearchParams(next === 'overview' ? {} : svc ? { tab: next, svc } : { tab: next }, { replace: true })
+  const focusedService = searchParams.get('svc')
   const [portalLinked, setPortalLinked] = useState<boolean | null>(null)
   const [infoOpen, setInfoOpen] = useState(false)
   const { showToast } = useToast()
@@ -138,6 +141,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const [message, setMessage] = useState<{ title: string; description: string; text: string } | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({})
+  /** 개요에서 눌러 들어온 업무 카드로 화면을 옮긴다 */
+  const focusedCardRef = useRef<HTMLDivElement | null>(null)
 
   const today = todayLocalDate()
 
@@ -204,6 +209,11 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
     return upcoming.sort((a, b) => a.date.localeCompare(b.date))[0] ?? null
   }, [record, today])
 
+  useEffect(() => {
+    if (!focusedService) return
+    focusedCardRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [focusedService, tab])
+
   if (loading) return <p className="px-1 py-10 text-[0.98rem] text-slate-500">불러오는 중…</p>
   if (notFound || !record || !progress) {
     return (
@@ -230,7 +240,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
     }
   }
 
-  const cardOpen = (key: ServiceKey, auto: boolean) => openCards[key] ?? auto
+  const cardOpen = (key: ServiceKey, auto: boolean) => openCards[key] ?? (key === focusedService ? true : auto)
   const toggleCard = (key: ServiceKey, auto: boolean) =>
     setOpenCards((s) => ({ ...s, [key]: !(s[key] ?? auto) }))
 
@@ -389,7 +399,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             <ul className="mt-1 flex flex-wrap gap-1.5">
               {SERVICES.filter((m) => isServiceStarted(record.services[m.key].status) && record.services[m.key].status !== 'done').map((m) => (
                 <li key={m.key}>
-                  <button type="button" onClick={() => setTab('work')} className={`rounded-full border px-2.5 py-1 text-[0.85rem] font-medium ${ACCENT_CLASS[m.accent].chip}`}>
+                  <button type="button" onClick={() => setTab('work', m.key)} className={`rounded-full border px-2.5 py-1 text-[0.85rem] font-medium ${ACCENT_CLASS[m.accent].chip}`}>
                     {m.shortLabel} · {SERVICE_STATUS_LABEL[record.services[m.key].status]}
                   </button>
                 </li>
@@ -486,7 +496,10 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               <div
                 key={meta.key}
                 id={meta.key}
+                ref={meta.key === focusedService ? focusedCardRef : undefined}
                 className={`overflow-hidden rounded-(--radius-panel) border ${
+                  meta.key === focusedService ? 'ring-2 ring-brand-400 ring-offset-2 ' : ''
+                }${
                   blocked || overdue
                     ? 'border-danger-200 bg-danger-50/40'
                     : dueSoon

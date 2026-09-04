@@ -5,6 +5,7 @@ import {
   Archive,
   Building2,
   CalendarDays,
+  ChevronRight,
   CirclePlus,
   ClipboardCheck,
   Download,
@@ -59,6 +60,8 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const [error, setError] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [tab, setTab] = useState<AlertSeverity | 'all'>('all')
+  // 현황표를 먼저 보고 싶다는 요청이 있어 이 목록은 기본으로 접어 둔다.
+  const [alertsOpen, setAlertsOpen] = useState(false)
   const [showAllAlerts, setShowAllAlerts] = useState(false)
   const [form, setForm] = useState({ companyName: '', contactName: '', contactPhone: '', businessNumber: '' })
   const [query, setQuery] = useState('')
@@ -135,7 +138,8 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
 
   const activeCount = records.filter((r) => r.status === 'active' || r.status === 'waiting').length
 
-  const openAlert = (a: OpsAlert) => navigate(`/ops/clients/${a.clientId}`)
+  const openAlert = (a: OpsAlert) =>
+    navigate(a.serviceKey ? `/ops/clients/${a.clientId}?tab=work&svc=${a.serviceKey}` : `/ops/clients/${a.clientId}`)
 
   const onRestoreFile = async (file: File | undefined) => {
     if (!file) return
@@ -351,79 +355,6 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
         />
       </section>
 
-      {/* A. 지금 챙길 것 */}
-      <section
-        aria-labelledby="ops-alerts"
-        className={`flex-col gap-3 ${records.length === 0 ? 'hidden' : 'flex'}`}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="ops-alerts" className="text-[1.3rem] font-bold text-slate-900">
-            지금 챙길 것
-          </h2>
-          <div className="flex flex-wrap gap-1">
-            {SEVERITY_TABS.map((t) => {
-              const count =
-                t.key === 'all'
-                  ? alerts.length
-                  : alerts.filter((a) => a.severity === t.key).length
-              return (
-                <button
-                  key={t.key}
-                  type="button"
-                  aria-pressed={tab === t.key}
-                  onClick={() => {
-                    setTab(t.key)
-                    setShowAllAlerts(false)
-                  }}
-                  className={`rounded-(--radius-control) border px-3 py-1.5 text-[0.9rem] font-medium ${
-                    tab === t.key
-                      ? 'border-brand-300 bg-brand-50 text-brand-700'
-                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  {t.label} {count}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {loading ? (
-          <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-8 text-[0.95rem] text-slate-500">
-            불러오는 중…
-          </p>
-        ) : visibleAlerts.length === 0 ? (
-          <div className="rounded-(--radius-panel) border border-success-200 bg-success-50/60 px-5 py-8 text-center">
-            <ClipboardCheck aria-hidden="true" className="mx-auto size-8 text-success-600" />
-            <p className="mt-2 text-[1.05rem] font-semibold text-slate-800">
-              {tab === 'all' ? '지금 급하게 챙길 일이 없습니다' : '이 분류에는 항목이 없습니다'}
-            </p>
-            <p className="mt-1 text-[0.95rem] break-keep text-slate-600">
-              {tab === 'all'
-                ? '마감이 지난 일, 빠진 서류, 못 받은 돈이 모두 없습니다.'
-                : '다른 분류를 눌러 확인해 보세요.'}
-            </p>
-          </div>
-        ) : (
-          <>
-            <ul className="flex flex-col gap-2">
-              {shownAlerts.map((a) => (
-                <AlertRow key={a.id} alert={a} onOpen={openAlert} />
-              ))}
-            </ul>
-            {visibleAlerts.length > shownAlerts.length && (
-              <button
-                type="button"
-                onClick={() => setShowAllAlerts(true)}
-                className="self-start rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.92rem] font-medium text-slate-600 hover:bg-slate-50"
-              >
-                {visibleAlerts.length - shownAlerts.length}건 더 보기
-              </button>
-            )}
-          </>
-        )}
-      </section>
-
       {/* B. 업체별 현황표 */}
       <section aria-labelledby="ops-matrix" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -586,7 +517,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                           <ServiceCell
                             cell={cellStateFor(record, s.key, today, DUE_SOON_DAYS)}
                             label={s.label}
-                            onClick={() => navigate(`/ops/clients/${record.id}#${s.key}`)}
+                            onClick={() => navigate(`/ops/clients/${record.id}?tab=work&svc=${s.key}`)}
                           />
                         </td>
                       ))}
@@ -627,6 +558,96 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
           <span className="text-danger-700">빨강 = 마감 지났거나 서류가 없어 막힘</span>
           <span className="text-warning-800">노랑 = 마감 임박</span>
         </div>
+      </section>
+
+      {/* A. 지금 챙길 것 */}
+      <section
+        aria-labelledby="ops-alerts"
+        className={`flex-col gap-3 ${records.length === 0 ? 'hidden' : 'flex'}`}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <button
+            type="button"
+            id="ops-alerts"
+            aria-expanded={alertsOpen}
+            onClick={() => setAlertsOpen((v) => !v)}
+            className="flex items-center gap-2 text-[1.3rem] font-bold text-slate-900"
+          >
+            <ChevronRight
+              aria-hidden="true"
+              className={`size-5 text-slate-400 transition-transform ${alertsOpen ? 'rotate-90' : ''}`}
+            />
+            지금 챙길 것
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.85rem] font-semibold text-slate-600">
+              {alerts.length}
+            </span>
+          </button>
+          <div className={`flex-wrap gap-1 ${alertsOpen ? 'flex' : 'hidden'}`}>
+            {SEVERITY_TABS.map((t) => {
+              const count =
+                t.key === 'all'
+                  ? alerts.length
+                  : alerts.filter((a) => a.severity === t.key).length
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  aria-pressed={tab === t.key}
+                  onClick={() => {
+                    setTab(t.key)
+                    setShowAllAlerts(false)
+                  }}
+                  className={`rounded-(--radius-control) border px-3 py-1.5 text-[0.9rem] font-medium ${
+                    tab === t.key
+                      ? 'border-brand-300 bg-brand-50 text-brand-700'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {t.label} {count}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {alertsOpen && (
+          <>
+          {loading ? (
+            <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-8 text-[0.95rem] text-slate-500">
+              불러오는 중…
+            </p>
+          ) : visibleAlerts.length === 0 ? (
+            <div className="rounded-(--radius-panel) border border-success-200 bg-success-50/60 px-5 py-8 text-center">
+              <ClipboardCheck aria-hidden="true" className="mx-auto size-8 text-success-600" />
+              <p className="mt-2 text-[1.05rem] font-semibold text-slate-800">
+                {tab === 'all' ? '지금 급하게 챙길 일이 없습니다' : '이 분류에는 항목이 없습니다'}
+              </p>
+              <p className="mt-1 text-[0.95rem] break-keep text-slate-600">
+                {tab === 'all'
+                  ? '마감이 지난 일, 빠진 서류, 못 받은 돈이 모두 없습니다.'
+                  : '다른 분류를 눌러 확인해 보세요.'}
+              </p>
+            </div>
+          ) : (
+            <>
+              <ul className="flex flex-col gap-2">
+                {shownAlerts.map((a) => (
+                  <AlertRow key={a.id} alert={a} onOpen={openAlert} />
+                ))}
+              </ul>
+              {visibleAlerts.length > shownAlerts.length && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllAlerts(true)}
+                  className="self-start rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.92rem] font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  {visibleAlerts.length - shownAlerts.length}건 더 보기
+                </button>
+              )}
+            </>
+          )}
+          </>
+        )}
       </section>
 
       {/* 새 업체 등록 */}
