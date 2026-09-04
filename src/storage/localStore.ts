@@ -55,6 +55,7 @@ export const STORAGE_KEYS = {
   portalUpdates: `${KEY_PREFIX}.${DATA_NS}.portal_updates`,
   portalRequests: `${KEY_PREFIX}.${DATA_NS}.portal_requests`,
   portalDocuments: `${KEY_PREFIX}.${DATA_NS}.portal_documents`,
+  customServices: `${KEY_PREFIX}.${DATA_NS}.custom_services`,
 } as const
 
 /** 마이그레이션 전 안전 백업 키 접두어 */
