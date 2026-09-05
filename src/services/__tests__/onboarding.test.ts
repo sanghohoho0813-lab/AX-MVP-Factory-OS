@@ -8,7 +8,6 @@ import { deriveProjectProgress, type ProgressInputs } from '../projectProgressSe
 import {
   chapterDisplayStatus,
   guideProgressSummary,
-  shouldAutoShowToday,
   visibleChapters,
 } from '../onboardingService'
 import { chaptersForPath, getChapter } from '../../content/onboardingGuideContent'
@@ -72,25 +71,8 @@ function progressInputs(over: Partial<ProgressInputs> = {}): ProgressInputs {
   }
 }
 
-/* ---------------- shouldAutoShowToday (§3) ---------------- */
-check('auto: 기본값 오늘 노출', shouldAutoShowToday(prefs(), TODAY) === true)
-check('auto: 자동 노출 OFF', shouldAutoShowToday(prefs({ autoShowEnabled: false }), TODAY) === false)
-check('auto: 오늘 이미 노출', shouldAutoShowToday(prefs({ lastShownDate: TODAY }), TODAY) === false)
-check('auto: 어제 노출 → 오늘 다시', shouldAutoShowToday(prefs({ lastShownDate: '2026-07-21' }), TODAY) === true)
-check('auto: 오늘까지 스누즈', shouldAutoShowToday(prefs({ snoozedUntilDate: TODAY }), TODAY) === false)
-check('auto: 미래 스누즈', shouldAutoShowToday(prefs({ snoozedUntilDate: '2026-07-25' }), TODAY) === false)
-check('auto: 어제까지 스누즈 → 오늘 노출', shouldAutoShowToday(prefs({ snoozedUntilDate: '2026-07-21' }), TODAY) === true)
-check(
-  'auto: 버전 상승 시 오늘 노출됐어도 재노출',
-  shouldAutoShowToday(prefs({ lastShownDate: TODAY, tutorialVersion: TUTORIAL_VERSION - 1 }), TODAY) === true,
-)
-check(
-  'auto: 버전 상승이라도 스누즈는 지킴',
-  shouldAutoShowToday(
-    prefs({ lastShownDate: TODAY, tutorialVersion: TUTORIAL_VERSION - 1, snoozedUntilDate: TODAY }),
-    TODAY,
-  ) === false,
-)
+/* 자동 노출은 없앴다 — 가이드는 사용자가 버튼을 눌러야만 열린다.
+   그래서 '오늘 띄울지' 를 판단하던 shouldAutoShowToday 도 함께 삭제했다. */
 
 /* ---------------- chapterDisplayStatus (§10) ---------------- */
 const systemCh = getChapter('system')!

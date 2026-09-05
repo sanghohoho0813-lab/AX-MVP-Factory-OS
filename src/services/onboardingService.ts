@@ -16,9 +16,7 @@ import type {
 import { getProjectProgress, type ProjectProgress } from './projectProgressService'
 import { computeProjectJourney, type ProjectJourney } from './journeyService'
 import { chaptersForPath, TUTORIAL_CHAPTERS } from '../content/onboardingGuideContent'
-import { TUTORIAL_VERSION } from '../repositories/onboardingPreferencesRepository'
 import { projectRepository } from '../repositories'
-import { todayLocalDate } from '../lib/appClock'
 
 /* ------------------------------------------------------------------ */
 /* 학습 경로 · 챕터 목록                                                */
@@ -155,23 +153,6 @@ export function isRouteAutoShowAllowed(pathname: string): boolean {
   return !AUTO_SHOW_BLOCKED_PREFIXES.some((p) => pathname.startsWith(p))
 }
 
-/**
- * 오늘 자동으로 가이드를 띄울지 판단한다.
- *  - 자동 노출 OFF → 안 함
- *  - 콘텐츠 버전이 올라갔으면 스누즈만 지켜 재노출
- *  - 오늘 날짜가 스누즈 경계 이하이면 안 함(로컬 날짜 기준, 포함)
- *  - 오늘 이미 노출했으면 안 함(버전 변경 시 예외)
- */
-export function shouldAutoShowToday(
-  prefs: OnboardingPreferences,
-  today: string = todayLocalDate(),
-): boolean {
-  if (!prefs.autoShowEnabled) return false
-  const versionChanged = prefs.tutorialVersion < TUTORIAL_VERSION
-  if (prefs.snoozedUntilDate !== null && today <= prefs.snoozedUntilDate) return false
-  if (!versionChanged && prefs.lastShownDate === today) return false
-  return true
-}
 
 /* ------------------------------------------------------------------ */
 /* 가이드 전체 진행률 (안내 센터 헤더용)                                */
