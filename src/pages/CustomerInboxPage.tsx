@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Inbox, RefreshCw, Sparkles } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
-import { PageHeader } from '../components/ui/PageHeader'
+import { ScreenTitle } from '../components/ui/primitives'
 import { Button } from '../components/ui/Button'
 import { useToast } from '../components/ui/toastContext'
 import { EventCard } from '../components/ops/EventCard'
@@ -103,14 +103,17 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
 
   return (
     <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-5">
-      <PageHeader
+      <ScreenTitle
         title="고객 이벤트함"
-        description={`${brand.customerPlatformLabel}(${brand.customerPlatformUrl.replace('https://', '')})에서 고객이 한 일이 여기로 들어옵니다. 고객사에 연결하고 처리 상태를 남기세요.`}
+        sub={`${brand.customerPlatformLabel}에서 고객이 한 일이 여기로 들어옵니다.`}
         actions={
           <>
-            <ScreenGuide screenKey="inbox" />
+            <span className="hidden lg:inline-flex">
+              <ScreenGuide screenKey="inbox" />
+            </span>
             <Button variant="secondary" onClick={() => void load()}>
-              <RefreshCw aria-hidden="true" className="size-4" /> 새로고침
+              <RefreshCw aria-hidden="true" className="size-4" />
+              <span className="hidden sm:inline">새로고침</span>
             </Button>
           </>
         }
@@ -126,18 +129,21 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-1.5">
+      {/* 한 줄로 유지하고 넘치면 옆으로 민다 — 두 줄이 되면 목록이 화면 밖으로 밀린다 */}
+      <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {filters.map((f) => (
           <button
             key={f.key}
             type="button"
             aria-pressed={filter === f.key}
             onClick={() => setFilter(f.key)}
-            className={`rounded-full border px-3 py-1 text-[0.88rem] font-semibold ${
-              filter === f.key ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            className={`tap t-sub shrink-0 rounded-full border px-3.5 py-2 font-medium whitespace-nowrap ${
+              filter === f.key
+                ? 'border-brand-600 bg-brand-50 text-brand-700'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
             }`}
           >
-            {f.label} <span className="text-slate-400">{counts[f.key]}</span>
+            {f.label} <span className={counts[f.key] === 0 ? 'text-slate-300' : 'text-slate-400'}>{counts[f.key]}</span>
           </button>
         ))}
       </div>
@@ -159,7 +165,7 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
                 showToast(created.length ? `샘플 이벤트 ${created.length}건을 만들었습니다 (DEMO).` : '샘플 이벤트가 이미 있습니다.')
                 void load()
               }}
-              className="mt-2 inline-flex h-10 items-center gap-1.5 rounded-(--radius-control) border border-dashed border-highlight-700/50 bg-highlight-100 px-4 text-[0.92rem] font-semibold text-highlight-700"
+              className="tap t-sub mt-2 inline-flex h-11 items-center gap-1.5 rounded-(--radius-control) border border-dashed border-slate-300 bg-white px-4 font-medium text-slate-600 hover:bg-slate-50 sm:h-10"
             >
               <Sparkles aria-hidden="true" className="size-4" /> 샘플 이벤트 만들기 (로컬 데모)
             </button>

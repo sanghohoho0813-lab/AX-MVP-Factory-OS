@@ -121,3 +121,12 @@ export function isValidPhone(value: string): boolean {
 export function normalizeQuery(value: string): string {
   return value.trim().toLowerCase()
 }
+
+/**
+ * 요약 칸에 넣을 금액 — 좁은 칸에서 잘리지 않도록 만원·억 단위로 줄인다.
+ * 목록·상세처럼 자리가 있는 곳에서는 formatKrw 를 그대로 쓴다.
+ */
+export function krwTile(amount: number | null): string {
+  if (amount === null || !Number.isFinite(amount) || amount <= 0) return '0원'
+  return formatKrwCompact(amount)
+}

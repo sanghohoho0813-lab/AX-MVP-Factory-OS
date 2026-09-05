@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
-import { PageHeader } from '../components/ui/PageHeader'
+import { SlidersHorizontal } from 'lucide-react'
+import { ScreenTitle } from '../components/ui/primitives'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { useToast } from '../components/ui/toastContext'
 import { QuickCapture } from '../components/journal/QuickCapture'
@@ -45,6 +46,8 @@ function JournalContent({ workspaceId, userId }: { workspaceId: string | null; u
   const [clientFilter, setClientFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState<JournalEntryType | ''>('')
   const [openOnly, setOpenOnly] = useState(false)
+  /** 거르기 칸은 접어 둔다 — 기록을 보러 온 화면이지 거르러 온 화면이 아니다 */
+  const [filterOpen, setFilterOpen] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<JournalEntry | null>(null)
 
   const load = useCallback(async () => {
@@ -94,10 +97,14 @@ function JournalContent({ workspaceId, userId }: { workspaceId: string | null; u
 
   return (
     <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-5">
-      <PageHeader
+      <ScreenTitle
         title="업무 일기"
-        description="통화·결정·후속조치·막힘·성과·아이디어를 시간순으로 남깁니다. 고객에게는 보이지 않는 나만의 기록입니다."
-        actions={<ScreenGuide screenKey="journal" />}
+        sub="고객에게는 보이지 않는 나만의 기록입니다."
+        actions={
+          <span className="hidden lg:inline-flex">
+            <ScreenGuide screenKey="journal" />
+          </span>
+        }
       />
 
       <QuickCapture
@@ -115,7 +122,7 @@ function JournalContent({ workspaceId, userId }: { workspaceId: string | null; u
               role="tab"
               aria-selected={range === r}
               onClick={() => navigate(r === 'today' ? '/journal' : `/journal/${r}`)}
-              className={`rounded-[8px] px-3 py-1.5 text-[0.92rem] font-semibold ${
+              className={`t-sub tap rounded-[8px] px-3.5 py-2 font-semibold ${
                 range === r ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'
               }`}
             >
@@ -123,36 +130,54 @@ function JournalContent({ workspaceId, userId }: { workspaceId: string | null; u
             </button>
           ))}
         </div>
-        <select
-          value={clientFilter}
-          onChange={(e) => setClientFilter(e.target.value)}
-          aria-label="고객사로 보기"
-          className="rounded-(--radius-control) border border-slate-300 px-2.5 py-2 text-[0.92rem] text-slate-700"
+        <button
+          type="button"
+          aria-expanded={filterOpen}
+          onClick={() => setFilterOpen((v) => !v)}
+          className={`tap t-sub rounded-(--radius-control) border px-3 py-2 font-medium ${
+            clientFilter || typeFilter || openOnly
+              ? 'border-brand-300 bg-brand-50 text-brand-700'
+              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+          }`}
         >
-          <option value="">모든 고객사</option>
-          {clients.map((c) => (
-            <option key={c.id} value={c.id}>{c.companyName}</option>
-          ))}
-        </select>
-        <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value as JournalEntryType | '')}
-          aria-label="종류로 보기"
-          className="rounded-(--radius-control) border border-slate-300 px-2.5 py-2 text-[0.92rem] text-slate-700"
-        >
-          <option value="">모든 종류</option>
-          {JOURNAL_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {JOURNAL_TYPE_LABEL[t]}{counts.get(t) ? ` (${counts.get(t)})` : ''}
-            </option>
-          ))}
-        </select>
-        <label className="inline-flex cursor-pointer items-center gap-1.5 text-[0.92rem] text-slate-600">
-          <input type="checkbox" checked={openOnly} onChange={(e) => setOpenOnly(e.target.checked)} className="size-4 accent-brand-600" />
-          안 끝난 후속조치만
-        </label>
-        <span className="ml-auto text-[0.88rem] text-slate-500">{visible.length}건</span>
+          <SlidersHorizontal aria-hidden="true" className="mr-1 inline size-4" />
+          거르기
+        </button>
+        <span className="t-sub ml-auto text-slate-500">{visible.length}건</span>
       </div>
+
+      {filterOpen && (
+        <div className="flex flex-wrap items-center gap-2 rounded-(--radius-panel) border border-slate-200 bg-white p-3">
+          <select
+            value={clientFilter}
+            onChange={(e) => setClientFilter(e.target.value)}
+            aria-label="고객사로 보기"
+            className="t-sub h-11 rounded-(--radius-control) border border-slate-300 px-2.5 text-slate-700 sm:h-10"
+          >
+            <option value="">모든 고객사</option>
+            {clients.map((c) => (
+              <option key={c.id} value={c.id}>{c.companyName}</option>
+            ))}
+          </select>
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value as JournalEntryType | '')}
+            aria-label="종류로 보기"
+            className="t-sub h-11 rounded-(--radius-control) border border-slate-300 px-2.5 text-slate-700 sm:h-10"
+          >
+            <option value="">모든 종류</option>
+            {JOURNAL_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {JOURNAL_TYPE_LABEL[t]}{counts.get(t) ? ` (${counts.get(t)})` : ''}
+              </option>
+            ))}
+          </select>
+          <label className="t-sub tap inline-flex cursor-pointer items-center gap-1.5 text-slate-600">
+            <input type="checkbox" checked={openOnly} onChange={(e) => setOpenOnly(e.target.checked)} className="size-5 accent-brand-600" />
+            안 끝난 후속조치만
+          </label>
+        </div>
+      )}
 
       {loading ? (
         <p className="py-8 text-center text-[0.95rem] text-slate-500">불러오는 중…</p>

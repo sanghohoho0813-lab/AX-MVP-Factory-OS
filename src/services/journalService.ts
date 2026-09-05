@@ -23,15 +23,19 @@ export const JOURNAL_TYPE_LABEL: Record<JournalEntryType, string> = {
   idea: '아이디어',
 }
 
-/** 종류별 색 — 화면 테마와 분리된 고정 분류색 */
+/**
+ * 종류별 색 — 기본은 무채색이다.
+ * 막힘(빨강)·성과(초록)만 색을 갖는다. 일곱 종류를 전부 다른 색으로 칠하면
+ * 기록 목록이 색종이처럼 보여 정작 막힌 건이 눈에 띄지 않는다.
+ */
 export const JOURNAL_TYPE_CLASS: Record<JournalEntryType, string> = {
-  note: 'bg-slate-100 text-slate-700',
-  call: 'bg-cat-client-50 text-cat-client-700',
-  decision: 'bg-cat-plan-50 text-cat-plan-700',
-  follow_up: 'bg-cat-doc-50 text-cat-doc-700',
+  note: 'bg-slate-100 text-slate-600',
+  call: 'bg-slate-100 text-slate-600',
+  decision: 'bg-slate-100 text-slate-600',
+  follow_up: 'bg-slate-100 text-slate-600',
   blocker: 'bg-danger-50 text-danger-700',
-  win: 'bg-cat-money-50 text-cat-money-700',
-  idea: 'bg-highlight-100 text-highlight-700',
+  win: 'bg-success-50 text-success-700',
+  idea: 'bg-slate-100 text-slate-600',
 }
 
 export function isJournalType(v: unknown): v is JournalEntryType {

@@ -3,27 +3,25 @@ import { Link } from 'react-router-dom'
 import { Building2, ChevronDown, ChevronUp, Link2, Plus, RotateCcw } from 'lucide-react'
 import type { CustomerEvent, CustomerEventStatus } from '../../types/bridge'
 import {
-  EVENT_PRIORITY_LABEL,
   EVENT_STATUS_LABEL,
   EVENT_TYPE_LABEL,
   eventSummary,
   isOpenEvent,
 } from '../../services/customerBridgeService'
 import { activityTimeText } from '../../services/clientOpsActivity'
+import { Badge, type Tone } from '../ui/primitives'
 import { suggestServiceForProduct } from '../../config/serviceCatalog'
 
-const PRIORITY_CLASS: Record<CustomerEvent['priority'], string> = {
-  high: 'bg-danger-50 text-danger-700 border-danger-200',
-  medium: 'bg-warning-50 text-warning-700 border-warning-200',
-  low: 'bg-slate-50 text-slate-600 border-slate-200',
-}
-
-const STATUS_CLASS: Record<CustomerEventStatus, string> = {
-  new: 'bg-cat-fund-50 text-cat-fund-700',
-  linked: 'bg-cat-client-50 text-cat-client-700',
-  in_progress: 'bg-cat-plan-50 text-cat-plan-700',
-  resolved: 'bg-success-50 text-success-700',
-  ignored: 'bg-slate-100 text-slate-500',
+/**
+ * 상태 색 — 분류색(cat-*)을 쓰지 않는다. 이벤트함은 '새로 왔다/처리했다' 두 가지가
+ * 핵심이라 나머지는 전부 무채색으로 둔다.
+ */
+const STATUS_TONE: Record<CustomerEventStatus, Tone> = {
+  new: 'brand',
+  linked: 'neutral',
+  in_progress: 'neutral',
+  resolved: 'success',
+  ignored: 'neutral',
 }
 
 /** payload 키 → 사람이 읽는 이름 (고객이 제출한 값만 표시) */
@@ -87,40 +85,45 @@ export function EventCard({
 
   return (
     <article
-      className={`rounded-(--radius-card) border bg-white shadow-(--shadow-card) ${
-        event.status === 'new' && event.priority === 'high' ? 'border-danger-200' : 'border-slate-200'
-      } ${compact ? 'p-3' : 'p-4'}`}
+      className={`relative overflow-hidden rounded-(--radius-card) border border-slate-200 bg-white ${
+        compact ? 'p-3' : 'p-4'
+      }`}
     >
-      <div className="flex flex-wrap items-center gap-1.5 text-[0.82rem]">
-        <span className={`rounded-full border px-2 py-0.5 font-semibold ${PRIORITY_CLASS[event.priority]}`}>
-          {EVENT_PRIORITY_LABEL[event.priority]}
-        </span>
-        <span className="font-semibold text-slate-700">{EVENT_TYPE_LABEL[event.eventType]}</span>
-        <span className={`rounded-full px-2 py-0.5 font-semibold ${STATUS_CLASS[event.status]}`}>{EVENT_STATUS_LABEL[event.status]}</span>
-        {isDemo && <span className="rounded-full bg-highlight-100 px-2 py-0.5 font-semibold text-highlight-700">DEMO</span>}
+      {event.status === 'new' && isOpenEvent(event) && (
+        <span
+          aria-hidden="true"
+          className={`absolute inset-y-0 left-0 w-[3px] ${event.priority === 'high' ? 'bg-danger-500' : 'bg-brand-500'}`}
+        />
+      )}
+      {/* 머리줄 — 배지는 최대 두 개. 급한 것과 처리 상태만 남긴다 */}
+      <div className="t-meta flex flex-wrap items-center gap-1.5">
+        {event.priority === 'high' && isOpenEvent(event) && <Badge tone="danger">지금</Badge>}
+        <span className="font-medium text-slate-500">{EVENT_TYPE_LABEL[event.eventType]}</span>
+        {event.status !== 'new' && <Badge tone={STATUS_TONE[event.status]}>{EVENT_STATUS_LABEL[event.status]}</Badge>}
+        {isDemo && <Badge tone="neutral">샘플</Badge>}
         <span className="ml-auto text-slate-400">
           <time dateTime={event.occurredAt}>{activityTimeText(event.occurredAt)}</time>
         </span>
       </div>
 
-      <p className="mt-1.5 text-[1.02rem] font-semibold break-keep [overflow-wrap:anywhere] text-slate-900">{s.who}</p>
-      <p className="text-[0.95rem] break-keep [overflow-wrap:anywhere] text-slate-600">{s.what}</p>
+      <p className="t-card mt-1.5 break-keep [overflow-wrap:anywhere] text-slate-900">{s.who}</p>
+      <p className="t-sub break-keep [overflow-wrap:anywhere] text-slate-600">{s.what}</p>
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.88rem]">
+      <div className="t-sub mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
         {event.operationsClientId ? (
-          <Link to={`/ops/clients/${event.operationsClientId}`} className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline">
+          <Link
+            to={`/ops/clients/${event.operationsClientId}`}
+            className="inline-flex items-center gap-1 font-medium text-brand-700 hover:underline"
+          >
             <Building2 aria-hidden="true" className="size-3.5" />
-            {clientName ?? '연결된 고객사'}
+            {clientName ?? '연결된 고객사'} 열기
           </Link>
         ) : (
           <span className="inline-flex items-center gap-1 text-slate-500">
             <Link2 aria-hidden="true" className="size-3.5" /> 아직 고객사와 연결되지 않음
           </span>
         )}
-        {event.portalClientLinkId && <span className="text-slate-400">· 고객 플랫폼 계정 연결됨</span>}
-        {suggestion && (
-          <span className="text-cat-plan-700">· 추천: {suggestion.shortLabel} 업무 시작 검토</span>
-        )}
+        {suggestion && <span className="text-slate-500">· 추천: {suggestion.shortLabel}</span>}
       </div>
 
       {!compact && fields.length > 0 && (
@@ -156,30 +159,30 @@ export function EventCard({
           <>
             {!event.operationsClientId && (
               <>
-                <button type="button" onClick={onLink} className="inline-flex h-9 items-center gap-1 rounded-(--radius-control) bg-brand-600 px-3 text-[0.9rem] font-semibold text-white hover:bg-brand-700">
+                <button type="button" onClick={onLink} className="tap t-sub inline-flex h-11 items-center gap-1 rounded-(--radius-control) bg-brand-600 px-3 font-semibold text-white hover:bg-brand-700 sm:h-10">
                   <Link2 aria-hidden="true" className="size-4" /> 고객사와 연결
                 </button>
-                <button type="button" onClick={onCreateClient} className="inline-flex h-9 items-center gap-1 rounded-(--radius-control) border border-slate-200 px-3 text-[0.9rem] font-medium text-slate-700 hover:bg-slate-50">
+                <button type="button" onClick={onCreateClient} className="tap t-sub inline-flex h-11 items-center gap-1 rounded-(--radius-control) border border-slate-200 px-3 font-medium text-slate-700 hover:bg-slate-50 sm:h-10">
                   <Plus aria-hidden="true" className="size-4" /> 새 고객사로 만들기
                 </button>
               </>
             )}
             {event.operationsClientId && event.status !== 'in_progress' && (
-              <button type="button" onClick={() => onStatus('in_progress')} className="inline-flex h-9 items-center rounded-(--radius-control) border border-slate-200 px-3 text-[0.9rem] font-medium text-slate-700 hover:bg-slate-50">
+              <button type="button" onClick={() => onStatus('in_progress')} className="tap t-sub inline-flex h-11 items-center rounded-(--radius-control) border border-slate-200 px-3 font-medium text-slate-700 hover:bg-slate-50 sm:h-10">
                 확인 · 처리 중
               </button>
             )}
             {event.operationsClientId && (
-              <button type="button" onClick={() => onStatus('resolved')} className="inline-flex h-9 items-center rounded-(--radius-control) bg-success-600 px-3 text-[0.9rem] font-semibold text-white hover:bg-success-700">
+              <button type="button" onClick={() => onStatus('resolved')} className="tap t-sub inline-flex h-11 items-center rounded-(--radius-control) border border-brand-600 bg-brand-600 px-3 font-semibold text-white hover:bg-brand-700 sm:h-10">
                 처리 완료
               </button>
             )}
-            <button type="button" onClick={() => onStatus('ignored')} className="inline-flex h-9 items-center rounded-(--radius-control) px-3 text-[0.9rem] font-medium text-slate-500 hover:bg-slate-100">
+            <button type="button" onClick={() => onStatus('ignored')} className="tap t-sub inline-flex h-11 items-center rounded-(--radius-control) px-3 font-medium text-slate-500 hover:bg-slate-100 sm:h-10">
               보류
             </button>
           </>
         ) : (
-          <button type="button" onClick={() => onStatus(event.operationsClientId ? 'in_progress' : 'new')} className="inline-flex h-9 items-center gap-1 rounded-(--radius-control) border border-slate-200 px-3 text-[0.9rem] font-medium text-slate-700 hover:bg-slate-50">
+          <button type="button" onClick={() => onStatus(event.operationsClientId ? 'in_progress' : 'new')} className="tap t-sub inline-flex h-11 items-center gap-1 rounded-(--radius-control) border border-slate-200 px-3 font-medium text-slate-700 hover:bg-slate-50 sm:h-10">
             <RotateCcw aria-hidden="true" className="size-4" /> 다시 열기
           </button>
         )}

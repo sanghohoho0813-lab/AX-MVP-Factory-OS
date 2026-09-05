@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  AlertTriangle,
   ArrowRight,
   Building2,
-  CalendarDays,
   ClipboardCheck,
   Clock,
   Copy,
@@ -15,6 +13,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
+import { Badge, Blank, Disclosure, ListRow, ListSurface, MetricTile } from '../components/ui/primitives'
 import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
 import { useToast } from '../components/ui/toastContext'
@@ -43,7 +42,7 @@ import {
   type BriefAction,
 } from '../services/dailyBriefService'
 import { nowDate, todayLocalDate } from '../lib/appClock'
-import { formatKrw } from '../lib/format'
+import { formatKrw, krwTile } from '../lib/format'
 import { getDataModeConfig } from '../data/dataMode'
 import { brand } from '../brand/brand.config'
 import type { ClientOpsRecord } from '../types/clientOps'
@@ -68,59 +67,29 @@ function greeting(hour: number): string {
   return '좋은 저녁입니다'
 }
 
-function StatChip({
-  label,
-  value,
-  tone,
-  icon: Icon,
-  to,
-}: {
-  label: string
-  value: string
-  tone: 'danger' | 'warning' | 'neutral' | 'success'
-  icon: typeof Clock
-  to: string
-}) {
-  const cls =
-    tone === 'danger'
-      ? 'border-danger-200 bg-danger-50/70'
-      : tone === 'warning'
-        ? 'border-warning-200 bg-warning-50/70'
-        : tone === 'success'
-          ? 'border-success-200 bg-success-50/60'
-          : 'border-slate-200 bg-white'
-  return (
-    <Link to={to} className={`flex min-w-0 flex-col rounded-(--radius-card) border px-3.5 py-3 transition-shadow hover:shadow-(--shadow-card) ${cls}`}>
-      <span className="flex items-center justify-between gap-2 text-[0.85rem] font-medium text-slate-600">
-        <span className="truncate">{label}</span>
-        <Icon aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
-      </span>
-      <strong className="mt-1 truncate text-[1.45rem] leading-tight font-bold text-slate-900">{value}</strong>
-    </Link>
-  )
-}
-
 function ActionRow({ action, rank }: { action: BriefAction; rank: number }) {
-  const bar = action.severity === 'critical' ? 'bg-danger-500' : action.severity === 'warning' ? 'bg-warning-500' : 'bg-slate-300'
+  const edge =
+    action.severity === 'critical' ? 'bg-danger-500' : action.severity === 'warning' ? 'bg-warning-500' : 'bg-slate-300'
   return (
     <li>
       <Link
         to={action.href}
-        className="flex gap-3 rounded-(--radius-card) border border-slate-200 bg-white p-3.5 shadow-(--shadow-card) transition-colors hover:border-brand-300"
+        className="ax-lift relative flex items-start gap-3 overflow-hidden rounded-(--radius-card) border border-slate-200 bg-white py-3.5 pr-3 pl-4"
       >
-        <span className="flex flex-col items-center gap-1">
-          <span className="flex size-7 items-center justify-center rounded-full bg-slate-900 text-[0.85rem] font-bold text-white">{rank}</span>
-          <span aria-hidden="true" className={`w-1 flex-1 rounded-full ${bar}`} />
+        <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${edge}`} />
+        <span className="t-meta mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-900 font-bold text-white">
+          {rank}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[1rem] font-semibold break-keep text-slate-900">{action.title}</span>
-          {action.detail && <span className="block text-[0.9rem] break-keep text-slate-600">{action.detail}</span>}
-          <span className="mt-1 block text-[0.85rem] text-slate-500">
-            {action.clientName && <span className="font-medium text-slate-700">{action.clientName} · </span>}
-            이유: {action.reason}
+          <span className="t-card block break-keep text-slate-900">{action.title}</span>
+          {action.detail && <span className="t-sub block break-keep text-slate-600">{action.detail}</span>}
+          {/* 왜 이것이 위에 있는지 — 한 줄을 넘기지 않는다 */}
+          <span className="t-meta mt-0.5 block truncate text-slate-500">
+            {action.clientName ? `${action.clientName} · ` : ''}
+            {action.reason}
           </span>
         </span>
-        <ArrowRight aria-hidden="true" className="size-4 shrink-0 self-center text-slate-400" />
+        <ArrowRight aria-hidden="true" className="size-4 shrink-0 self-center text-slate-300" />
       </Link>
     </li>
   )
@@ -247,65 +216,82 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6">
       {/* A. 오늘 */}
-      <section aria-label="오늘" data-tour="home-today" className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[0.95rem] font-medium text-slate-500">
-              <time dateTime={now.toISOString()}>{timeText}</time>
+      {/* 1단계 — 오늘이 어떤 날인지 한 문장 */}
+      <section aria-label="오늘" data-tour="home-today" className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+          <div className="min-w-0 flex-1">
+            <p className="t-sub font-medium text-slate-500">
+              <time dateTime={now.toISOString()}>{timeText}</time> · {greeting(now.getHours())}
             </p>
-            <h1 className="mt-0.5 text-[1.75rem] leading-tight font-bold break-keep text-slate-900 lg:text-[2rem]">
-              {greeting(now.getHours())}. {loading ? '오늘 할 일을 정리하는 중…' : mustToday > 0 ? `오늘 반드시 처리할 것이 ${mustToday}건 있습니다.` : '오늘 급한 일은 없습니다.'}
+            <h1 className="t-page mt-0.5 break-keep text-slate-900">
+              {loading ? '오늘 할 일을 정리하는 중…' : mustToday > 0 ? `반드시 처리할 것 ${mustToday}건` : '오늘 급한 일 없음'}
             </h1>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <ScreenGuide screenKey="home" />
-            <Button variant="secondary" onClick={() => navigate('/ops/clients')}>
-              <Building2 aria-hidden="true" className="size-4" /> 고객 운영
-            </Button>
-            <Button variant="primary" onClick={() => setSummaryOpen(true)}>
-              <Moon aria-hidden="true" className="size-4" /> 오늘 정리하기
-            </Button>
+          <div className="flex shrink-0 flex-wrap gap-2 self-start sm:self-auto">
+            <span className="hidden lg:inline-flex">
+              <ScreenGuide screenKey="home" />
+            </span>
+            <span className="hidden sm:inline-flex">
+              <Button variant="primary" onClick={() => setSummaryOpen(true)}>
+                <Moon aria-hidden="true" className="size-4" /> 오늘 정리하기
+              </Button>
+            </span>
           </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-5">
-          <StatChip label="오늘 반드시 처리" value={`${mustToday}건`} tone={mustToday > 0 ? 'danger' : 'success'} icon={AlertTriangle} to="/ops/clients" />
-          <StatChip label="이번 주 마감" value={`${weekDue.length}건`} tone={weekDue.length > 0 ? 'warning' : 'neutral'} icon={CalendarDays} to="/ops/calendar" />
-          <StatChip label="고객에게 기다리는 것" value={`${waiting}건`} tone={waiting > 0 ? 'warning' : 'neutral'} icon={Clock} to="/ops/clients" />
-          <StatChip
-            label="받아야 할 돈"
-            value={formatKrw(money.scheduled.total + money.overdue.total)}
-            tone={money.overdue.count > 0 ? 'danger' : 'neutral'}
-            icon={Wallet}
-            to="/ops/clients"
-          />
-          <StatChip label="새 고객 이벤트" value={`${openEvents.length}건`} tone={openEvents.some((e) => e.priority === 'high') ? 'danger' : openEvents.length > 0 ? 'warning' : 'neutral'} icon={Inbox} to="/ops/inbox" />
         </div>
       </section>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-        {/* B. Top 3 */}
+        {/* 2단계 — 지금 이것부터 (최대 3건) */}
         <section aria-labelledby="top3" data-tour="home-top3" className="flex min-w-0 flex-col gap-3">
           <SectionTitle title="지금 이것부터" icon={ClipboardCheck} />
           {loading ? (
-            <p className="text-[0.95rem] text-slate-500">불러오는 중…</p>
+            <p className="t-sub text-slate-500">불러오는 중…</p>
           ) : top.length === 0 ? (
-            <div className="rounded-(--radius-card) border border-dashed border-slate-300 bg-white p-5 text-[0.95rem] text-slate-500">
-              마감 지남·막힘·새 주문·오늘 후속조치가 없습니다. 이번 주 마감과 고객 대기 건을 미리 챙겨 두세요.
-            </div>
+            <Blank title="마감 지남·막힘·오늘 후속조치가 없습니다." icon={<ClipboardCheck className="size-7" />} />
           ) : (
-            <ol className="flex flex-col gap-2">
+            <ol className="ax-stagger flex flex-col gap-2">
               {top.map((a, i) => (
                 <ActionRow key={a.id} action={a} rank={i + 1} />
               ))}
             </ol>
           )}
-          <p className="text-[0.82rem] text-slate-400">
+
+          {/* 오늘의 숫자 — 위가 아니라 할 일 아래에 둔다. 숫자는 판단의 근거이지 할 일이 아니다 */}
+          <div className="ax-stagger mt-1 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+            <MetricTile
+              label="이번 주 마감"
+              value={`${weekDue.length}건`}
+              tone={weekDue.length > 0 ? 'warning' : 'neutral'}
+              onClick={() => navigate('/ops/calendar')}
+            />
+            <MetricTile
+              label="고객 회신 대기"
+              value={`${waiting}건`}
+              tone={waiting > 0 ? 'warning' : 'neutral'}
+              onClick={() => navigate('/ops/clients')}
+            />
+            <MetricTile
+              label="받아야 할 돈"
+              value={krwTile(money.scheduled.total + money.overdue.total)}
+              tone={money.overdue.count > 0 ? 'danger' : 'neutral'}
+              hint={money.overdue.count > 0 ? `연체 ${money.overdue.count}건` : undefined}
+              onClick={() => navigate('/ops/clients')}
+            />
+            {/* 새 요청은 '급한 일' 이 아니라 '새로 온 것' 이다 — 빨강 대신 브랜드색 */}
+            <MetricTile
+              label="새 고객 이벤트"
+              value={`${openEvents.length}건`}
+              tone={openEvents.length > 0 ? 'brand' : 'neutral'}
+              onClick={() => navigate('/ops/inbox')}
+            />
+          </div>
+
+          <p className="t-meta text-slate-500">
             순서 규칙: 마감 지남·막힘 → 결제된 주문 → 지난 후속조치 → 고객 서류·요청 → 임박 마감. 규칙 기반이며 AI 판단이 아닙니다.
           </p>
         </section>
 
-        {/* C. 빠른 기록 + H. 오늘 기록 */}
+        {/* 3단계 — 빠른 기록 */}
         <section aria-labelledby="capture" data-tour="home-capture" className="flex min-w-0 flex-col gap-3">
           <SectionTitle title="무슨 일이 있었나요?" icon={NotebookPen} to="/journal" count={todayJournal.length} />
           <QuickCapture
@@ -314,7 +300,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             onCreate={(input) => journalMutate(() => createJournalEntry(workspaceId, userId, input), '기록했습니다.')}
           />
           <JournalList
-            entries={todayJournal.slice(0, 6)}
+            entries={todayJournal.slice(0, 4)}
             clientNames={clientNames}
             today={today}
             showDate={false}
@@ -325,8 +311,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             emptyTitle="오늘 기록된 업무가 없습니다."
             emptyHint="통화·결정·후속조치를 바로 남겨두면 나중에 고객별 이력이 이어집니다."
           />
-          {todayJournal.length > 6 && (
-            <Link to="/journal" className="text-[0.9rem] font-medium text-brand-700 hover:underline">
+          {todayJournal.length > 4 && (
+            <Link to="/journal" className="t-sub font-medium text-brand-700 hover:underline">
               오늘 기록 {todayJournal.length}건 모두 보기
             </Link>
           )}
@@ -334,22 +320,24 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        {/* D. 고객 이벤트 */}
+        {/* 4단계 — 고객 이벤트 */}
         <section aria-labelledby="events" data-tour="home-events" className="flex min-w-0 flex-col gap-3">
           <SectionTitle title="고객 이벤트" icon={Inbox} to="/ops/inbox" count={openEvents.length} />
           {openEvents.length === 0 ? (
-            <div className="rounded-(--radius-card) border border-dashed border-slate-300 bg-white p-5 text-[0.92rem] break-keep text-slate-500">
-              새 고객 요청이 없습니다. {brand.customerPlatformLabel}에서 진단·주문·서류·요청이 생기면 여기에 나타납니다.
-              {isLocal && (
-                <>
-                  {' '}
-                  <Link to="/ops/inbox" className="font-medium text-brand-700 hover:underline">이벤트함에서 샘플 만들기</Link>
-                </>
-              )}
-            </div>
+            <Blank
+              title={`새 고객 요청이 없습니다. ${brand.customerPlatformLabel}에서 요청이 오면 여기에 뜹니다.`}
+              icon={<Inbox className="size-7" />}
+              action={
+                isLocal ? (
+                  <Link to="/ops/inbox" className="t-sub font-medium text-brand-700 hover:underline">
+                    이벤트함에서 샘플 만들기
+                  </Link>
+                ) : undefined
+              }
+            />
           ) : (
             <ul className="flex flex-col gap-2">
-              {openEvents.slice(0, 4).map((e) => (
+              {openEvents.slice(0, 3).map((e) => (
                 <li key={e.id}>
                   <EventCard
                     event={e}
@@ -365,100 +353,120 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           )}
         </section>
 
-        {/* E. 챙길 업체 */}
+        {/* 4단계 — 챙겨야 할 업체 */}
         <section aria-labelledby="attention" className="flex min-w-0 flex-col gap-3">
           <SectionTitle title="챙겨야 할 업체" icon={Building2} to="/ops/clients" count={attention.length} />
           {attention.length === 0 ? (
-            <div className="rounded-(--radius-card) border border-dashed border-slate-300 bg-white p-5 text-[0.92rem] text-slate-500">
-              {active.length === 0 ? (
-                <>
-                  아직 등록된 업체가 없습니다.{' '}
-                  <Link to="/ops/clients" className="font-medium text-brand-700 hover:underline">첫 업체 등록</Link>
-                </>
-              ) : (
-                '경고가 있는 업체가 없습니다.'
-              )}
-            </div>
-          ) : (
-            <ul className="divide-y divide-slate-100 rounded-(--radius-card) border border-slate-200 bg-white">
-              {attention.map(({ record, critical, warning, first }) => (
-                <li key={record.id}>
-                  <Link to={`/ops/clients/${record.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50">
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[0.98rem] font-semibold text-slate-900">{record.companyName}</span>
-                      <span className="block truncate text-[0.88rem] text-slate-500">{first}</span>
-                    </span>
-                    {critical > 0 && <span className="rounded-full bg-danger-50 px-2 py-0.5 text-[0.82rem] font-semibold text-danger-700">급함 {critical}</span>}
-                    {warning > 0 && <span className="rounded-full bg-warning-50 px-2 py-0.5 text-[0.82rem] font-semibold text-warning-700">임박 {warning}</span>}
-                    <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
+            <Blank
+              title={active.length === 0 ? '아직 등록된 업체가 없습니다.' : '경고가 있는 업체가 없습니다.'}
+              icon={<Building2 className="size-7" />}
+              action={
+                active.length === 0 ? (
+                  <Link to="/ops/clients" className="t-sub font-medium text-brand-700 hover:underline">
+                    첫 업체 등록
                   </Link>
-                </li>
+                ) : undefined
+              }
+            />
+          ) : (
+            <ListSurface>
+              {attention.slice(0, 4).map(({ record, critical, warning, first }) => (
+                <ListRow
+                  key={record.id}
+                  title={record.companyName}
+                  meta={first}
+                  badge={
+                    critical > 0 ? (
+                      <Badge tone="danger">지금 {critical}</Badge>
+                    ) : warning > 0 ? (
+                      <Badge tone="warning">곧 {warning}</Badge>
+                    ) : undefined
+                  }
+                  onClick={() => navigate(`/ops/clients/${record.id}`)}
+                />
               ))}
-            </ul>
+            </ListSurface>
+          )}
+          {attention.length > 4 && (
+            <Link to="/ops/clients" className="t-sub font-medium text-brand-700 hover:underline">
+              {attention.length - 4}곳 더 보기
+            </Link>
           )}
         </section>
 
-        {/* F. 돈 */}
+        {/* 5단계 — 돈. 숫자만 먼저 보이고 상세는 펼친다 */}
         <section aria-labelledby="money" className="flex min-w-0 flex-col gap-3">
           <SectionTitle title="돈" icon={Wallet} />
-          <div className="grid grid-cols-1 gap-2 min-[480px]:grid-cols-3">
-            <div className="min-w-0 rounded-(--radius-card) border border-slate-200 bg-white p-3">
-              <p className="text-[0.85rem] text-slate-500">예정 수금</p>
-              <p className="text-[1.15rem] font-bold break-all text-slate-900">{formatKrw(money.scheduled.total)}</p>
-              <p className="text-[0.82rem] text-slate-400">{money.scheduled.count}건</p>
-            </div>
-            <div className={`min-w-0 rounded-(--radius-card) border p-3 ${money.overdue.count > 0 ? 'border-danger-200 bg-danger-50/60' : 'border-slate-200 bg-white'}`}>
-              <p className="text-[0.85rem] text-slate-500">연체</p>
-              <p className={`text-[1.15rem] font-bold break-all ${money.overdue.count > 0 ? 'text-danger-700' : 'text-slate-900'}`}>{formatKrw(money.overdue.total)}</p>
-              <p className="text-[0.82rem] text-slate-400">{money.overdue.count}건</p>
-            </div>
-            <div className="rounded-(--radius-card) border border-slate-200 bg-white p-3">
-              <p className="text-[0.85rem] text-slate-500">금액 미정</p>
-              <p className="text-[1.15rem] font-bold text-slate-900">{money.unknownAmount}건</p>
-              <p className="text-[0.82rem] text-slate-400">합산 제외</p>
-            </div>
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+            <MetricTile label="예정 수금" value={krwTile(money.scheduled.total)} hint={`${money.scheduled.count}건`} />
+            <MetricTile
+              label="연체"
+              value={krwTile(money.overdue.total)}
+              tone={money.overdue.count > 0 ? 'danger' : 'neutral'}
+              hint={`${money.overdue.count}건`}
+            />
+            <MetricTile label="금액 미정" value={`${money.unknownAmount}건`} hint="합산 제외" />
           </div>
           {money.overdue.items.length > 0 && (
-            <ul className="divide-y divide-slate-100 rounded-(--radius-card) border border-danger-200 bg-white">
-              {money.overdue.items.slice(0, 4).map((m) => (
-                <li key={`${m.clientId}-${m.label}-${m.dueDate}`}>
-                  <Link to={`/ops/clients/${m.clientId}`} className="flex items-center justify-between gap-2 px-4 py-2.5 text-[0.92rem] hover:bg-slate-50">
-                    <span className="min-w-0 truncate"><span className="font-semibold text-slate-800">{m.clientName}</span> · {m.label}</span>
-                    <span className="shrink-0 font-semibold text-danger-700">{formatKrw(m.amount)} · {m.dueDate}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <Disclosure title="연체 상세" hint={`${money.overdue.items.length}건`}>
+              <ul className="divide-y divide-slate-100">
+                {money.overdue.items.slice(0, 6).map((m) => (
+                  <li key={`${m.clientId}-${m.label}-${m.dueDate}`}>
+                    <Link
+                      to={`/ops/clients/${m.clientId}`}
+                      className="t-sub flex items-center justify-between gap-2 py-2.5 hover:text-brand-700"
+                    >
+                      <span className="min-w-0 truncate">
+                        <span className="font-semibold text-slate-800">{m.clientName}</span> · {m.label}
+                      </span>
+                      <span className="shrink-0 font-semibold text-danger-700">
+                        {formatKrw(m.amount)} · {m.dueDate}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Disclosure>
           )}
-          <p className="text-[0.82rem] text-slate-400">금액이 입력된 항목만 합산합니다.</p>
         </section>
 
-        {/* G. 자금 마감 */}
+        {/* 5단계 — 지원사업 마감 */}
         <section aria-labelledby="funding" className="flex min-w-0 flex-col gap-3">
           <SectionTitle title="지원사업 마감" icon={Landmark} to="/funding" count={funding.length} />
           {funding.length === 0 ? (
-            <div className="rounded-(--radius-card) border border-dashed border-slate-300 bg-white p-5 text-[0.92rem] text-slate-500">
-              14일 안에 마감되는 신청 건이 없습니다.
-            </div>
+            <Blank title="14일 안에 마감되는 신청 건이 없습니다." icon={<Landmark className="size-7" />} />
           ) : (
-            <ul className="divide-y divide-slate-100 rounded-(--radius-card) border border-slate-200 bg-white">
-              {funding.slice(0, 5).map((f) => (
-                <li key={`${f.clientId}-${f.programName}-${f.applyDueDate}`}>
-                  <Link to={`/ops/clients/${f.clientId}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50">
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[0.95rem] font-semibold text-slate-800">{f.programName}</span>
-                      <span className="block truncate text-[0.85rem] text-slate-500">{f.clientName}{f.institution ? ` · ${f.institution}` : ''}</span>
-                    </span>
-                    <span className={`shrink-0 text-[0.88rem] font-semibold ${f.daysLeft < 0 ? 'text-danger-700' : f.daysLeft <= 3 ? 'text-warning-700' : 'text-slate-600'}`}>
+            <ListSurface>
+              {funding.slice(0, 4).map((f) => (
+                <ListRow
+                  key={`${f.clientId}-${f.programName}-${f.applyDueDate}`}
+                  title={f.programName}
+                  meta={`${f.clientName}${f.institution ? ` · ${f.institution}` : ''}`}
+                  right={
+                    <span
+                      className={
+                        f.daysLeft < 0
+                          ? 'font-semibold text-danger-700'
+                          : f.daysLeft <= 3
+                            ? 'font-semibold text-warning-700'
+                            : ''
+                      }
+                    >
                       {dueText(f.daysLeft)}
                     </span>
-                  </Link>
-                </li>
+                  }
+                  onClick={() => navigate(`/ops/clients/${f.clientId}`)}
+                />
               ))}
-            </ul>
+            </ListSurface>
           )}
         </section>
       </div>
+
+      {/* 하루의 끝에 누르는 버튼이라 모바일에서는 화면 맨 아래에 둔다 */}
+      <Button variant="secondary" className="w-full sm:hidden" onClick={() => setSummaryOpen(true)}>
+        <Moon aria-hidden="true" className="size-4" /> 오늘 정리하기
+      </Button>
 
       {/* I. 하루 정리 */}
       <Modal open={summaryOpen} title={`${today} 하루 정리`} size="lg" onClose={() => setSummaryOpen(false)}
@@ -482,7 +490,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             ['오늘 처리', daySummary.done, 'text-success-700'],
             ['아직 남음', daySummary.remaining, 'text-danger-700'],
             ['내일로 넘김', daySummary.carriedOver, 'text-warning-700'],
-            ['중요한 결정', daySummary.decisions, 'text-cat-plan-700'],
+            ['중요한 결정', daySummary.decisions, 'text-slate-800'],
             ['새로운 이슈', daySummary.issues, 'text-slate-700'],
           ] as const
         ).map(([title, items, cls]) => (

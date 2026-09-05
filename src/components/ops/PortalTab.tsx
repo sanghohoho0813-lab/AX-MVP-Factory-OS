@@ -171,7 +171,7 @@ export function PortalTab({ record, workspaceId }: { record: ClientOpsRecord; wo
               <div className="mt-1 text-[0.92rem] text-slate-600">
                 <p>
                   <span className="font-semibold text-success-700">연결됨</span> · {link.profileEmail || '(계정)'} · 연결일 {link.linkedAt.slice(0, 10)}
-                  {isLocal && <span className="ml-2 rounded-full bg-highlight-100 px-2 py-0.5 text-[0.78rem] font-semibold text-highlight-700">DEMO</span>}
+                  {isLocal && <span className="ml-2 rounded-full bg-highlight-100 px-2 py-0.5 t-meta font-semibold text-highlight-700">DEMO</span>}
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <label className="text-[0.88rem] text-slate-500">
@@ -329,7 +329,7 @@ export function PortalTab({ record, workspaceId }: { record: ClientOpsRecord; wo
                 {requests.map((r) => (
                   <li key={r.id} className="rounded-(--radius-card) border border-slate-200 p-3">
                     <div className="flex flex-wrap items-center gap-2 text-[0.85rem]">
-                      <span className="rounded-full bg-cat-fund-50 px-2 py-0.5 font-semibold text-cat-fund-700">{REQUEST_TYPE_LABEL[r.requestType]}</span>
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600">{REQUEST_TYPE_LABEL[r.requestType]}</span>
                       <span className="text-slate-500">{REQUEST_STATUS_LABEL[r.status]}</span>
                       <span className="text-slate-400">{activityTimeText(r.createdAt)}</span>
                     </div>
@@ -498,7 +498,7 @@ export function PortalTab({ record, workspaceId }: { record: ClientOpsRecord; wo
               {CUSTOMER_STAGE_ORDER.map((s, i) => {
                 const idx = CUSTOMER_STAGE_ORDER.indexOf(preview.project!.stage)
                 return (
-                  <li key={s} className={`rounded-full px-2 py-0.5 text-[0.78rem] font-semibold ${i <= idx ? 'bg-brand-600 text-white' : 'bg-white text-slate-400'}`}>
+                  <li key={s} className={`rounded-full px-2 py-0.5 t-meta font-semibold ${i <= idx ? 'bg-brand-600 text-white' : 'bg-white text-slate-400'}`}>
                     {CUSTOMER_STAGE_LABEL[s]}
                   </li>
                 )

@@ -61,7 +61,7 @@ export function FilesTab({ record, workspaceId }: { record: ClientOpsRecord; wor
           <ul className="mt-3 divide-y divide-slate-100">
             {internal.map(([key, v]) => (
               <li key={key} className="flex items-center gap-3 py-2.5">
-                <FileText aria-hidden="true" className="size-5 shrink-0 text-cat-doc-500" />
+                <FileText aria-hidden="true" className="size-5 shrink-0 text-slate-400" />
                 <span className="min-w-0 flex-1">
                   <span className="block text-[0.95rem] font-semibold text-slate-800">{DOCUMENTS.find((d) => d.key === key)?.label ?? key}</span>
                   <span className="block truncate text-[0.85rem] text-slate-500">{v.fileName}{v.issuedAt ? ` · 발급 ${v.issuedAt}` : ''}</span>
@@ -85,7 +85,7 @@ export function FilesTab({ record, workspaceId }: { record: ClientOpsRecord; wor
           <ul className="mt-3 divide-y divide-slate-100">
             {portalDocs.map((d) => (
               <li key={d.id} className="flex items-center gap-3 py-2.5">
-                <FileText aria-hidden="true" className={`size-5 shrink-0 ${d.source === 'customer' ? 'text-cat-client-500' : 'text-cat-money-500'}`} />
+                <FileText aria-hidden="true" className={`size-5 shrink-0 ${d.source === 'customer' ? 'text-brand-500' : 'text-slate-400'}`} />
                 <span className="min-w-0 flex-1">
                   <span className="block text-[0.95rem] font-semibold text-slate-800">{d.title}</span>
                   <span className="block truncate text-[0.85rem] text-slate-500">

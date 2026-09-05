@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { ChevronDown, ChevronsLeft, ChevronsRight, X } from 'lucide-react'
+import { ChevronDown, ChevronsLeft, ChevronsRight, ExternalLink, LifeBuoy, X } from 'lucide-react'
 import { APP_VERSION } from '../../data/navigation'
 import { brand } from '../../brand/brand.config'
 import { BrandLogo } from '../brand/BrandLogo'
@@ -11,6 +11,7 @@ import {
   type ModuleGroupKey,
 } from '../../config/moduleRegistry'
 import { readRaw, writeRaw } from '../../storage/localStore'
+import { TextScaleControl } from '../ui/TextScaleControl'
 
 interface SidebarProps {
   collapsed: boolean
@@ -198,6 +199,38 @@ function SidebarContent({
         </ul>
       </nav>
 
+      {/*
+        모바일 서랍 전용 — 상단에서 내린 것들(작업공간·가이드·글자 크기·계정)이
+        갈 곳. 데스크톱에서는 헤더에 그대로 있으므로 그리지 않는다.
+      */}
+      {onCloseMobile && (
+        <div className="shrink-0 border-t border-navy-800 px-3 py-3">
+          <p className="px-3 pb-1.5 t-meta font-semibold tracking-wide text-navy-300">이 기기 · 계정</p>
+          <a
+            href={brand.customerPlatformUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="t-sub flex min-h-11 w-full items-center gap-3 rounded-(--radius-control) px-3 text-navy-200 hover:bg-navy-800 hover:text-white"
+          >
+            <ExternalLink aria-hidden="true" className="size-[18px] shrink-0" />
+            {brand.customerPlatformLabel} 열기
+          </a>
+          <button
+            type="button"
+            onClick={() => { navigate('/getting-started'); onNavigate?.() }}
+            className="t-sub flex min-h-11 w-full items-center gap-3 rounded-(--radius-control) px-3 text-navy-200 hover:bg-navy-800 hover:text-white"
+          >
+            <LifeBuoy aria-hidden="true" className="size-[18px] shrink-0" />
+            처음 사용 가이드
+          </button>
+          {/* 글자 크기 조절은 밝은 바탕 기준으로 만든 부품이라 흰 칸 위에 올린다 */}
+          <div className="mx-1 mt-2 rounded-(--radius-control) bg-white p-3">
+            <p className="t-meta mb-1.5 font-semibold text-slate-500">글자 크기</p>
+            <TextScaleControl compact />
+          </div>
+        </div>
+      )}
+
       <div className="shrink-0 border-t border-navy-800 px-3 py-3">
         {!collapsed && (
           <p className="px-3 pb-2 text-[0.8rem] text-navy-300">
@@ -226,7 +259,7 @@ export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobil
         <SidebarContent collapsed={collapsed} onToggleCollapsed={onToggleCollapsed} />
       </aside>
       {mobileOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
+        <div className="fixed inset-0 z-50 lg:hidden">
           <button type="button" aria-label="메뉴 배경 닫기" onClick={onCloseMobile} className="absolute inset-0 cursor-default bg-navy-950/50" />
           <div className="absolute inset-y-0 left-0 w-[300px] max-w-[85vw] shadow-(--shadow-overlay)">
             <SidebarContent collapsed={false} onNavigate={onCloseMobile} onCloseMobile={onCloseMobile} />

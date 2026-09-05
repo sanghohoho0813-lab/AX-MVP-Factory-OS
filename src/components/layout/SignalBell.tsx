@@ -68,7 +68,7 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
               {events.slice(0, 4).map((e) => (
                 <li key={e.id} className="border-b border-slate-50">
                   <Link to="/ops/inbox" onClick={() => setOpen(false)} className="block px-4 py-2.5 hover:bg-slate-50">
-                    <span className="block text-[0.85rem] font-semibold text-cat-fund-700">고객 이벤트</span>
+                    <span className="block text-[0.85rem] font-semibold text-slate-700">고객 이벤트</span>
                     <span className="block truncate text-[0.9rem] text-slate-700">
                       {typeof e.payload.company_name === 'string' ? e.payload.company_name : '고객'} · {e.eventType.replace(/_/g, ' ')}
                     </span>

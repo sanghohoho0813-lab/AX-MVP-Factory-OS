@@ -18,10 +18,13 @@ export function CompanyProfileCard({
   record,
   today,
   onImport,
+  /** 접이식 구역 안에 들어갈 때 — 카드 안 카드가 되지 않도록 테두리·제목을 뺀다 */
+  bare = false,
 }: {
   record: ClientOpsRecord
   today: string
   onImport: () => void
+  bare?: boolean
 }) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const fields = profileFields(record, today)
@@ -36,15 +39,17 @@ export function CompanyProfileCard({
   return (
     <section
       aria-labelledby="profile"
-      className="rounded-(--radius-panel) border border-cat-plan-200 bg-gradient-to-br from-cat-plan-50/80 via-white to-cat-client-50/60 p-5"
+      className={bare ? '' : 'rounded-(--radius-panel) border border-slate-200 bg-white p-5'}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <h2 id="profile" className="text-[1.3rem] font-bold text-slate-900">
-            회사 기본 정보
-          </h2>
-          <p className="mt-0.5 text-[0.9rem] break-keep text-slate-600">
-            자주 찾게 되는 값입니다. 항목을 누르면 바로 복사됩니다. ({filled}/{fields.length} 입력됨)
+          {!bare && (
+            <h2 id="profile" className="t-section text-slate-900">
+              회사 기본 정보
+            </h2>
+          )}
+          <p className="t-sub break-keep text-slate-500">
+            항목을 누르면 바로 복사됩니다. ({filled}/{fields.length} 입력됨)
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -59,10 +64,10 @@ export function CompanyProfileCard({
         </div>
       </div>
 
-      <dl className="mt-4 grid gap-x-6 gap-y-0 sm:grid-cols-2 xl:grid-cols-3">
+      <dl className="mt-3 grid gap-x-6 gap-y-0 sm:grid-cols-2 xl:grid-cols-3">
         {fields.map((f) => (
           <div key={f.key} className="flex items-baseline justify-between gap-2 border-b border-slate-200/70 py-2">
-            <dt className="shrink-0 text-[0.88rem] text-slate-500">{f.label}</dt>
+            <dt className="t-sub shrink-0 text-slate-500">{f.label}</dt>
             <dd className="min-w-0 text-right">
               {f.empty ? (
                 <span className="text-[0.95rem] text-slate-300">미입력</span>
@@ -131,7 +136,7 @@ export function NotesSection({
         <p className="text-[0.9rem] text-slate-500">통화 내용·요청사항을 적어두세요. 수정·삭제할 수 있습니다.</p>
       </div>
 
-      <div className="rounded-(--radius-panel) border border-cat-doc-200 bg-cat-doc-50/50 p-3">
+      <div className="rounded-(--radius-panel) border border-slate-200 bg-slate-50 p-3">
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -140,7 +145,7 @@ export function NotesSection({
           }}
           rows={2}
           placeholder="예: 9/3 대표님 통화 — 중소기업확인서 이번 주 안에 발급해서 보내주기로 함"
-          className="w-full rounded-(--radius-control) border border-cat-doc-200 bg-white px-3 py-2 text-[0.98rem] focus:border-cat-doc-500 focus:outline-none"
+          className="t-body w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2.5 focus:border-brand-500 focus:outline-none"
         />
         <div className="mt-2 flex items-center justify-between gap-2">
           <span className="text-[0.82rem] text-slate-500">Ctrl(⌘) + Enter 로도 추가됩니다</span>
@@ -161,7 +166,7 @@ export function NotesSection({
             <li
               key={n.id}
               className={`rounded-(--radius-panel) border p-3.5 ${
-                n.pinned ? 'border-cat-doc-200 bg-cat-doc-50/60' : 'border-slate-200 bg-white'
+                n.pinned ? 'border-brand-200 bg-brand-50/60' : 'border-slate-200 bg-white'
               }`}
             >
               {editingId === n.id ? (
@@ -200,7 +205,7 @@ export function NotesSection({
                       title={n.pinned ? '고정 해제' : '위로 고정'}
                       onClick={() => onPin(n.id, !n.pinned)}
                       className={`rounded-(--radius-control) p-1.5 hover:bg-slate-100 ${
-                        n.pinned ? 'text-cat-doc-700' : 'text-slate-400'
+                        n.pinned ? 'text-brand-700' : 'text-slate-400'
                       }`}
                     >
                       {n.pinned ? (

@@ -176,6 +176,89 @@ html[data-motion="reduced"] *::after {
 }
 
 /* ------------------------------------------------------------------ */
+/* 타이포그래피 — 모바일 기준 6단계로 고정한다.                          */
+/*                                                                      */
+/* 화면마다 제각각의 text-[0.82rem] 을 쓰지 않고 이 여섯 개만 쓴다.      */
+/* 13px 아래는 배지·메타데이터에만 허용하고 본문에는 쓰지 않는다.        */
+/* 크기는 rem 이므로 글자 배율 설정(1.0/1.15/1.3)이 그대로 적용된다.     */
+/* ------------------------------------------------------------------ */
+
+.t-page {            /* 화면 제목 — 한 화면에 하나 */
+  font-size: 1.6rem;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+@media (min-width: 640px) {
+  .t-page { font-size: 1.8rem; }
+}
+
+.t-section {         /* 구역 제목 */
+  font-size: 1.2rem;
+  line-height: 1.35;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.t-card {            /* 카드 제목 — 목록에서 가장 먼저 읽히는 줄 */
+  font-size: 1.05rem;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.t-body {            /* 본문 */
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.t-sub {             /* 보조 설명 */
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.t-meta {            /* 배지·메타데이터 전용. 본문에 쓰지 않는다 */
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.t-num {             /* 큰 숫자 — 줄바꿈 금지, 자릿수 정렬 */
+  font-size: 1.35rem;
+  line-height: 1.15;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* 좁은 화면에서 금액이 잘리지 않도록 작은 폭에서만 줄여 둔다 */
+@media (min-width: 480px) {
+  .t-num { font-size: 1.55rem; }
+}
+
+/* ------------------------------------------------------------------ */
+/* 손가락으로 누르는 영역 — 모바일 최소 44px                            */
+/* ------------------------------------------------------------------ */
+@media (pointer: coarse) {
+  .tap {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* 하단 내비게이션이 가리지 않도록 본문 아래에 확보하는 여백 */
+.pb-safe-nav {
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 1024px) {
+  .pb-safe-nav { padding-bottom: 2rem; }
+}
+
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ------------------------------------------------------------------ */
 /* 화면 움직임 — 느리고 절제된 등장. 눈이 따라갈 수 있는 속도로 둔다.    */
 /*                                                                      */
 /* 원칙                                                                 */

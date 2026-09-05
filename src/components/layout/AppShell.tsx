@@ -2,6 +2,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
+import { MobileNav } from './MobileNav'
 import { DemoTourProvider } from '../demo/DemoTourProvider'
 import { OnboardingProvider } from '../onboarding/OnboardingProvider'
 import { ActiveProjectProvider } from '../../context/ActiveProjectProvider'
@@ -41,7 +42,8 @@ export function AppShell() {
         <div className="flex min-w-0 flex-1 flex-col">
           <Header onOpenMobileMenu={() => setMobileOpen(true)} />
           {/* 하단 여백: 시연 안내 바가 본문을 가리지 않도록 확보 */}
-          <main className="mx-auto w-full max-w-[1840px] flex-1 px-4 py-6 pb-24 sm:px-6 sm:pb-8 lg:px-10 lg:py-9 2xl:px-14">
+          {/* pb-safe-nav: 하단 내비게이션과 iOS 홈 인디케이터가 본문 마지막 줄을 가리지 않게 한다 */}
+          <main className="pb-safe-nav mx-auto w-full max-w-[1840px] flex-1 px-4 py-5 sm:px-6 lg:px-10 lg:py-9 2xl:px-14">
             {/* key: 화면이 바뀔 때마다 등장 효과를 한 번씩 다시 준다 */}
             <div key={location.pathname} className="ax-rise">
               <Suspense fallback={<ShellFallback />}>
@@ -50,6 +52,7 @@ export function AppShell() {
             </div>
           </main>
         </div>
+        <MobileNav onOpenMore={() => setMobileOpen(true)} />
       </div>
       </OnboardingProvider>
       </DemoTourProvider>

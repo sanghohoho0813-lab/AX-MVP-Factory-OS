@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { TextScaleControl } from '../ui/TextScaleControl'
 import {
   Building,
@@ -18,6 +18,7 @@ import { getDataModeConfig } from '../../data/dataMode'
 import { CloudSaveStatus } from '../cloud/CloudSaveStatus'
 import { SignalBell } from './SignalBell'
 import { brand } from '../../brand/brand.config'
+import { moduleForPath } from '../../config/moduleRegistry'
 
 // supabase 전용 헤더 조각은 lazy 로 불러와 local entry 번들에 Supabase SDK 가 섞이지 않게 한다.
 const SupabaseWorkspaceSelector = lazy(() =>
@@ -146,29 +147,40 @@ function UserMenu() {
 
 export function Header({ onOpenMobileMenu }: HeaderProps) {
   const isSupabase = getDataModeConfig().mode === 'supabase'
+  const { pathname } = useLocation()
+  const screenTitle = moduleForPath(pathname)?.label ?? brand.brandNameKo
   return (
     <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-[16px] sm:gap-3 lg:px-[24px]">
       <button
         type="button"
         aria-label="메뉴 열기"
         onClick={onOpenMobileMenu}
-        className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-(--radius-control) text-slate-600 hover:bg-slate-100 lg:hidden"
+        className="tap flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-(--radius-control) text-slate-600 hover:bg-slate-100 lg:hidden"
       >
         <Menu aria-hidden="true" className="size-5" />
       </button>
 
-      {isSupabase ? (
-        <Suspense fallback={<div className="h-10 min-w-0 max-w-[34vw] shrink" />}>
-          <SupabaseWorkspaceSelector />
-        </Suspense>
-      ) : (
-        <WorkspaceSelector />
-      )}
+      {/*
+        모바일 상단에는 지금 어느 화면인지만 둔다. 작업공간 선택·가이드·저장상태·
+        설정은 서랍과 '더보기' 로 옮겼다 — 작은 아이콘 대여섯 개가 위에서 경쟁하면
+        정작 화면 제목이 안 보인다.
+      */}
+      <span className="t-card min-w-0 flex-1 truncate text-slate-900 lg:hidden">{screenTitle}</span>
 
-      <div className="flex min-w-0 flex-1 items-center justify-center px-1 sm:px-4">
-        {/* 1360px 아래에서는 칸이 아이콘만 겨우 들어갈 만큼 좁아져 빈 상자처럼 보인다.
-            그 폭에서는 감추고 Ctrl+K 로 연다. */}
-        <div className="hidden w-full max-w-xl min-[1360px]:block">
+      <span className="hidden lg:contents">
+        {isSupabase ? (
+          <Suspense fallback={<div className="h-10 min-w-0 max-w-[34vw] shrink" />}>
+            <SupabaseWorkspaceSelector />
+          </Suspense>
+        ) : (
+          <WorkspaceSelector />
+        )}
+      </span>
+
+      <div className="hidden min-w-0 flex-1 items-center justify-center px-1 sm:px-4 lg:flex">
+        {/* 이 폭 아래에서는 검색 칸이 아이콘만 겨우 들어갈 만큼 좁아진다.
+            그때는 감추고 Ctrl+K 로 연다. */}
+        <div className="hidden w-full max-w-xl min-[1560px]:block">
           <GlobalSearch />
         </div>
       </div>
@@ -184,7 +196,10 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
           <ExternalLink aria-hidden="true" className="size-4 text-slate-400" />
           {brand.customerPlatformLabel}
         </a>
-        <GuideButton />
+        {/* 가이드·저장상태·설정·계정은 모바일에서 서랍/더보기 로 옮겼다 */}
+        <span className="hidden lg:inline-flex">
+          <GuideButton />
+        </span>
         <span className="hidden xl:inline-flex">
           <CloudSaveStatus state={isSupabase ? 'saved' : 'local'} compact={false} />
         </span>
@@ -192,17 +207,19 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
         <Link
           to="/settings"
           aria-label="설정"
-          className="hidden size-10 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-100 hover:text-slate-700 sm:flex"
+          className="hidden size-10 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-100 hover:text-slate-700 lg:flex"
         >
           <Settings aria-hidden="true" className="size-5" />
         </Link>
-        {isSupabase ? (
-          <Suspense fallback={<div className="size-10" />}>
-            <SupabaseUserMenu />
-          </Suspense>
-        ) : (
-          <UserMenu />
-        )}
+        <span className="hidden lg:contents">
+          {isSupabase ? (
+            <Suspense fallback={<div className="size-10" />}>
+              <SupabaseUserMenu />
+            </Suspense>
+          ) : (
+            <UserMenu />
+          )}
+        </span>
       </div>
     </header>
   )
