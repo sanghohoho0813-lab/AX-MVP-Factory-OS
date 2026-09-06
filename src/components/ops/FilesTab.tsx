@@ -7,6 +7,7 @@ import { DOCUMENTS } from '../../content/clientOpsCatalog'
 import { canUploadFiles, documentFileUrl } from '../../services/clientOpsService'
 import { DOCUMENT_STATUS_LABEL, listDocuments, listLinksForClient } from '../../services/customerBridgeService'
 import { activityTimeText } from '../../services/clientOpsActivity'
+import { formatFileSize } from '../../lib/format'
 
 /**
  * 업체 상세 > 파일 탭 — 이 업체와 관련된 실제 파일을 한곳에서.
@@ -64,7 +65,11 @@ export function FilesTab({ record, workspaceId }: { record: ClientOpsRecord; wor
                 <FileText aria-hidden="true" className="size-5 shrink-0 text-slate-400" />
                 <span className="min-w-0 flex-1">
                   <span className="block text-[0.95rem] font-semibold text-slate-800">{DOCUMENTS.find((d) => d.key === key)?.label ?? key}</span>
-                  <span className="block truncate text-[0.85rem] text-slate-500">{v.fileName}{v.issuedAt ? ` · 발급 ${v.issuedAt}` : ''}</span>
+                  <span className="block truncate text-[0.85rem] text-slate-500">
+                    {v.fileName}
+                    {v.fileSize > 0 ? ` · ${formatFileSize(v.fileSize)}` : ''}
+                    {v.issuedAt ? ` · 발급 ${v.issuedAt}` : ''}
+                  </span>
                 </span>
                 {v.storagePath && uploadable && (
                   <button type="button" onClick={() => void open(v.storagePath)} className="inline-flex h-9 items-center gap-1 rounded-(--radius-control) border border-slate-200 px-3 text-[0.88rem] font-medium text-slate-700 hover:bg-slate-50">
@@ -90,6 +95,7 @@ export function FilesTab({ record, workspaceId }: { record: ClientOpsRecord; wor
                   <span className="block text-[0.95rem] font-semibold text-slate-800">{d.title}</span>
                   <span className="block truncate text-[0.85rem] text-slate-500">
                     {d.source === 'customer' ? '고객 업로드' : '고객에게 공유'} · {DOCUMENT_STATUS_LABEL[d.status]} · {d.fileName}
+                    {d.fileSize ? ` · ${formatFileSize(d.fileSize)}` : ''}
                     {d.uploadedAt ? ` · ${activityTimeText(d.uploadedAt)}` : ''}
                   </span>
                 </span>

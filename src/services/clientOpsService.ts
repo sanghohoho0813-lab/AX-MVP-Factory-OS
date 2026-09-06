@@ -10,6 +10,7 @@ import { getDataModeConfig } from '../data/dataMode'
 import { getSupabaseClient } from '../lib/supabase/client'
 import { generateId, notifyStoreChanged, readJson, STORAGE_KEYS, writeJson } from '../storage/localStore'
 import { nowIso } from '../lib/appClock'
+import { formatFileSize } from '../lib/format'
 import {
   DOCUMENTS,
   FEE_KIND_LABEL,
@@ -67,7 +68,7 @@ function defaultServices(): Record<ServiceKey, ServiceState> {
 }
 
 function defaultDocument(): DocumentState {
-  return { received: false, issuedAt: '', fileName: '', storagePath: '', note: '', updatedAt: null }
+  return { received: false, issuedAt: '', fileName: '', fileSize: 0, storagePath: '', note: '', updatedAt: null }
 }
 
 function defaultDocuments(): Record<DocumentKey, DocumentState> {
@@ -672,6 +673,24 @@ export function canUploadFiles(): boolean {
   return getDataModeConfig().mode === 'supabase'
 }
 
+/**
+ * 업로드가 막혔을 때 저장소가 주는 영어 메시지를 사람 말로 바꾼다.
+ * 그대로 보여주면 "무엇을 어떻게 고쳐야 하는지" 를 알 수 없다.
+ */
+function uploadErrorMessage(raw: string, file: File): string {
+  const m = raw.toLowerCase()
+  if (m.includes('exceeded') || m.includes('too large') || m.includes('payload')) {
+    return `파일이 너무 큽니다 (${formatFileSize(file.size)}). Supabase Dashboard → Storage → Settings 의 "Upload file size limit" 을 올리면 더 큰 파일도 올릴 수 있습니다.`
+  }
+  if (m.includes('mime') || m.includes('not supported') || m.includes('content type')) {
+    return `이 형식(${file.type || '알 수 없음'})은 저장소가 아직 막고 있습니다. supabase/migrations/20260906000011_storage_open_types.sql 을 적용하면 모든 형식이 열립니다.`
+  }
+  if (m.includes('duplicate') || m.includes('already exists')) {
+    return '같은 이름의 파일이 이미 있습니다. 잠시 뒤 다시 시도해 주세요.'
+  }
+  return `파일을 올리지 못했습니다. ${raw}`
+}
+
 export async function uploadDocumentFile(
   record: ClientOpsRecord,
   key: DocumentKey,
@@ -681,16 +700,19 @@ export async function uploadDocumentFile(
     throw new Error('파일 보관은 Supabase 클라우드 저장을 연결한 뒤 사용할 수 있습니다.')
   }
   if (!record.workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  // 저장 경로에는 영문·숫자만 남긴다(한글 파일명도 안전하게 올라간다).
+  // 원래 이름은 fileName 에 그대로 보관해 화면에는 한글로 보인다.
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
   const path = `${record.workspaceId}/${record.id}/${key}/${generateId()}-${safeName}`
   const { error } = await getSupabaseClient()
     .storage.from('client-documents')
-    .upload(path, file, { contentType: file.type || undefined })
-  if (error) throw error
+    .upload(path, file, { contentType: file.type || 'application/octet-stream' })
+  if (error) throw new Error(uploadErrorMessage(error.message, file))
   return saveClient(
     withDocument(record, key, {
       received: true,
       fileName: file.name,
+      fileSize: file.size,
       storagePath: path,
     }),
   )

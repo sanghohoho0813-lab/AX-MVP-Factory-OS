@@ -109,6 +109,7 @@ U-5 Minimum Floor: 전략 90 ✓ · 내부 제품 90 ✓ · 고객 제품 90 ✓
 - P2 → RECOMMENDATIONS.md (7건)
 
 ## 11. Known Issues
+- `20260906000011_storage_open_types.sql` Production **미적용** — 적용 전까지 한글·워드·ZIP·10MB 초과 파일은 저장소가 거부한다(한국어 안내 문구로 표시, 데이터 손상 없음)
 - `20260904000010_custom_services.sql` Production **미적용** — 적용 전까지 클라우드에서 "업무 항목 추가" 는 오류 문구(데이터 손상 없음)
 - Vercel Preview 는 환경변수가 없어 로컬 데모 모드로 뜬다 — Preview 로 실데이터를 보려면 RECOMMENDATIONS 참조
 - 자동 접근성 도구(axe) 미실행 — 수동 검사(대비·aria·탭 크기)만

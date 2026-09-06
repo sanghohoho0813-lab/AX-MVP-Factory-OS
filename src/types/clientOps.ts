@@ -94,6 +94,8 @@ export interface DocumentState {
   issuedAt: string
   /** 첨부 파일명 (업로드한 경우) */
   fileName: string
+  /** 첨부 파일 크기(byte). 예전에 올린 파일은 0 */
+  fileSize: number
   /** Supabase Storage 경로 (업로드한 경우) */
   storagePath: string
   /**

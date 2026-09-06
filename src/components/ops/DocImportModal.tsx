@@ -146,6 +146,11 @@ export function DocImportModal({
 
           {tab === 'file' ? (
             <div className="mt-3">
+              {/*
+                여기만 PDF·이미지로 제한한다. 보관이 아니라 "글자를 읽어서 칸을 채우는"
+                기능이라 판독기가 다루지 못하는 형식은 고를 수 있어도 소용이 없다.
+                한글·워드·압축파일 보관은 서류 탭의 파일 첨부(제한 없음)로 한다.
+              */}
               <input
                 ref={fileRef}
                 type="file"

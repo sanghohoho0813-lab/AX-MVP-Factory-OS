@@ -130,3 +130,16 @@ export function krwTile(amount: number | null): string {
   if (amount === null || !Number.isFinite(amount) || amount <= 0) return '0원'
   return formatKrwCompact(amount)
 }
+
+/**
+ * 파일 크기 — 사람이 읽는 단위.
+ * 1024 가 아니라 1000 으로 나눈다. 운영체제가 보여주는 값과 맞추려는 것이다.
+ */
+export function formatFileSize(bytes: number | null): string {
+  if (bytes === null || !Number.isFinite(bytes) || bytes < 0) return ''
+  if (bytes < 1000) return `${bytes}B`
+  if (bytes < 1000 * 1000) return `${Math.round(bytes / 1000)}KB`
+  const mb = bytes / (1000 * 1000)
+  if (mb < 1000) return `${mb >= 10 ? Math.round(mb) : mb.toFixed(1)}MB`
+  return `${(mb / 1000).toFixed(1)}GB`
+}

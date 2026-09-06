@@ -62,7 +62,7 @@ import {
   isServiceOpen,
 } from '../content/clientOpsCatalog'
 import { todayLocalDate } from '../lib/appClock'
-import { formatKrw, krwTile } from '../lib/format'
+import { formatFileSize, formatKrw, krwTile } from '../lib/format'
 import type {
   ClientOpsRecord,
   ClientOpsStatus,
@@ -888,7 +888,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                           fileInputs.current[meta.key] = el
                         }}
                         type="file"
-                        accept=".pdf,image/*"
+                        /* 형식을 제한하지 않는다 — 한글(HWP)·워드·엑셀·압축파일도 그대로 올린다.
+                           휴대폰에서는 카메라로 찍은 사진도 여기서 바로 선택된다. */
                         className="hidden"
                         onChange={(e) => void onPickFile(meta.key, e.target.files?.[0])}
                       />
@@ -902,9 +903,12 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                         {state.fileName ? '파일 교체' : '파일 첨부'}
                       </Button>
                       {state.fileName && (
-                        <span className="inline-flex min-w-0 items-center gap-1 text-[0.88rem] text-slate-600">
+                        <span className="t-sub inline-flex min-w-0 items-center gap-1 text-slate-600">
                           <Paperclip aria-hidden="true" className="size-3.5 shrink-0" />
                           <span className="truncate">{state.fileName}</span>
+                          {state.fileSize > 0 && (
+                            <span className="shrink-0 text-slate-400">{formatFileSize(state.fileSize)}</span>
+                          )}
                         </span>
                       )}
                     </div>

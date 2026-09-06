@@ -88,5 +88,13 @@
 | 정책자금 "보장" 표현 | 없음 |
 | Capital Independence 실패 | PASS |
 
+## FILE STORAGE
+- 버킷 `client-documents` — 비공개. 열람은 5분짜리 서명 URL 로만.
+- 형식·크기 제한 없음(D-22, `20260906000011_storage_open_types.sql`). 한글·워드·엑셀·압축파일·큰 스캔본 모두 올라간다.
+- 실제 상한은 Supabase 전역 설정 한 곳(Dashboard → Storage → Settings → Upload file size limit) — 기본 50MB.
+- 예외: '서류에서 불러오기'(OCR)만 PDF·이미지. 보관이 아니라 판독이라서.
+
 ## BLOCKED FOR COMPLETION?
-- 아니오. 사람 작업 1건 남음: Supabase SQL Editor 에서 `20260904000010_custom_services.sql` 실행 (업무 항목 직접 추가를 클라우드에서 LIVE 로).
+- 아니오. 사람 작업 2건 남음 (둘 다 Supabase SQL Editor 에서 붙여넣기 실행):
+  1. `20260906000011_storage_open_types.sql` — 파일 형식·크기 제한 해제. 실행 전까지 한글·워드·ZIP·10MB 초과는 계속 거부된다.
+  2. `20260904000010_custom_services.sql` — 업무 항목 직접 추가를 클라우드에서 LIVE 로.

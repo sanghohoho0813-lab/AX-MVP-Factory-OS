@@ -2,7 +2,8 @@ import { FileText, Upload, X } from 'lucide-react'
 import { useRef } from 'react'
 import type { RendererProps } from './types'
 
-const MAX_SIZE = 10 * 1024 * 1024 // 10MB
+// 크기·형식 제한 없음 — 한글(HWP)·워드·엑셀·압축파일·큰 스캔본 전부 고를 수 있다.
+// 실행파일만 막는다(안전).
 const BLOCKED_EXT = /\.(exe|bat|cmd|sh|msi|com|scr|dll|js|jar)$/i
 
 function formatSize(bytes: number): string {
@@ -40,8 +41,6 @@ export function FileQuestion({ question, answer, onAnswer, disabled }: RendererP
     })
   }
 
-  const oversize = file !== null && file.size > MAX_SIZE
-
   return (
     <div>
       <input
@@ -66,11 +65,6 @@ export function FileQuestion({ question, answer, onAnswer, disabled }: RendererP
             <p className="text-[0.875rem] text-slate-400">
               {formatSize(file.size)} · {file.type || '알 수 없음'}
             </p>
-            {oversize && (
-              <p className="mt-0.5 text-[0.875rem] text-danger-600">
-                10MB를 초과하는 파일입니다. 다른 파일을 선택해 주세요.
-              </p>
-            )}
           </div>
           <button
             type="button"
@@ -97,7 +91,7 @@ export function FileQuestion({ question, answer, onAnswer, disabled }: RendererP
             <Upload className="size-4" />
           </span>
           <span className="text-sm font-medium text-slate-600">
-            파일 선택 (최대 10MB, 문서·이미지)
+            파일 선택 (형식·크기 제한 없음)
           </span>
         </label>
       )}
