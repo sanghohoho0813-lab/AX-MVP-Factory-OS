@@ -83,12 +83,13 @@ function CalendarContent({ workspaceId }: { workspaceId: string | null }) {
 
       {/* 월 이동 + 종류 필터 */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+        {/* 휴대폰: 달 이동 줄과 건수를 나눈다. 한 줄에 넣으면 건수 칸이 40px 로 눌린다 */}
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             aria-label="이전 달"
             onClick={() => setYm(shiftMonth(ym[0], ym[1], -1))}
-            className="rounded-(--radius-control) border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50"
+            className="tap rounded-(--radius-control) border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50"
           >
             <ChevronLeft aria-hidden="true" className="size-4" />
           </button>
@@ -99,11 +100,13 @@ function CalendarContent({ workspaceId }: { workspaceId: string | null }) {
             type="button"
             aria-label="다음 달"
             onClick={() => setYm(shiftMonth(ym[0], ym[1], 1))}
-            className="rounded-(--radius-control) border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50"
+            className="tap rounded-(--radius-control) border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50"
           >
             <ChevronRight aria-hidden="true" className="size-4" />
           </button>
-          <span className="ml-1 text-[0.9rem] text-slate-500">이 달 남은 일정 {monthOpen.length}건</span>
+          <span className="w-full text-[0.9rem] whitespace-nowrap text-slate-500 sm:ml-1 sm:w-auto">
+            이 달 남은 일정 {monthOpen.length}건
+          </span>
         </div>
 
         <div className="flex flex-wrap gap-1.5">

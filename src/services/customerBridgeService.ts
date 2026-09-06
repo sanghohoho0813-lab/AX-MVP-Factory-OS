@@ -12,7 +12,7 @@ import { getDataModeConfig } from '../data/dataMode'
 import { getSupabaseClient } from '../lib/supabase/client'
 import { nowIso } from '../lib/appClock'
 import { generateId, notifyStoreChanged, readJson, STORAGE_KEYS, writeJson } from '../storage/localStore'
-import { isCustomerStage, type CustomerStage } from '../config/serviceCatalog'
+import { isCustomerStage, suggestServiceForProduct, type CustomerStage } from '../config/serviceCatalog'
 import type {
   CustomerEvent,
   CustomerEventPriority,
@@ -98,8 +98,13 @@ export function eventSummary(e: CustomerEvent): { who: string; what: string } {
       return { who, what: `사업 진단을 마쳤습니다${str('lead_grade') ? ` · 등급 ${str('lead_grade')}` : ''}` }
     case 'consultation_requested':
       return { who, what: `상담을 신청했습니다${str('program') ? ` · ${str('program')}` : ''}` }
-    case 'service_order_created':
-      return { who, what: `서비스를 주문했습니다 · ${str('product_slug') || '상품'}${str('order_number') ? ` (${str('order_number')})` : ''}` }
+    case 'service_order_created': {
+      // 상품 코드(venture-certification)를 그대로 보여 주면 읽을 수 없다.
+      // 아는 코드면 한글 이름으로 바꾼다.
+      const slug = str('product_slug')
+      const name = (slug && suggestServiceForProduct(slug)?.label) || slug || '상품'
+      return { who, what: `서비스를 주문했습니다 · ${name}${str('order_number') ? ` (${str('order_number')})` : ''}` }
+    }
     case 'document_uploaded':
       return { who, what: `서류를 올렸습니다 · ${str('title') || str('file_name') || '파일'}` }
     case 'customer_request_created':

@@ -40,10 +40,14 @@ export function JournalList({
 
   if (entries.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 rounded-(--radius-panel) border border-dashed border-slate-300 bg-white px-4 py-8 text-center">
-        <NotebookPen aria-hidden="true" className="size-7 text-slate-300" />
-        <p className="text-[0.98rem] font-medium text-slate-600">{emptyTitle}</p>
-        <p className="max-w-md text-[0.9rem] break-keep text-slate-400">{emptyHint}</p>
+      // 빈 상태는 휴대폰에서 한 줄로 눕힌다 — 아무것도 없다는 말이 화면 반쪽을
+      // 차지하면 아래 내용이 그만큼 밀린다
+      <div className="flex items-center gap-3 rounded-(--radius-panel) border border-dashed border-slate-300 bg-white px-4 py-4 sm:flex-col sm:justify-center sm:py-8 sm:text-center">
+        <NotebookPen aria-hidden="true" className="size-6 shrink-0 text-slate-300 sm:size-7" />
+        <div className="min-w-0">
+          <p className="text-[0.98rem] font-medium break-keep text-slate-600">{emptyTitle}</p>
+          <p className="mt-0.5 max-w-md text-[0.9rem] break-keep text-slate-500">{emptyHint}</p>
+        </div>
       </div>
     )
   }

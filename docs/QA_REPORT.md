@@ -76,6 +76,13 @@ U-5 Minimum Floor: 전략 90 ✓ · 내부 제품 90 ✓ · 고객 제품 90 ✓
 `npm run e2e:mobile -- <url>` · 오늘 → 고객 → 업체 → 상태 변경 → 서류 → 일기 → 이벤트함 → 일정 → 오늘 → 더보기 → 탭 44px → 가로 넘침 → JS 오류
 **15 / 15 통과**
 
+## 6-1. 짜부라진 글자 (2026-09-06 추가)
+`npm run qa:squeeze -- <url> --all` · 360 / 390 / 430 / 360×글자1.3배 × 15화면 = 60판정
+
+브라우저 안에서 실제 줄 수를 세어 "칸이 화면의 35% 미만인데 4줄 넘게 흐르고 줄당 6자 미만" 인 글자를 찾는다.
+- 처음 실행: **9건** (업체 업무 카드 제목·수금 줄·일정 건수, 옮기기 안내는 클라우드 모드에서만 보여 코드 점검으로 확인)
+- 고친 뒤: **0건** ✅ (D-23)
+
 ## 7. 상호작용 무결성 (Q-4)
 - 시트: Escape · 배경 클릭 · X 로 닫힘, 닫힌 뒤 `[role=dialog]` 0, body 스크롤 복원
 - 서랍: 하단 내비 위 층(z-50), 닫힌 뒤 backdrop 0
@@ -118,6 +125,7 @@ U-5 Minimum Floor: 전략 90 ✓ · 내부 제품 90 ✓ · 고객 제품 90 ✓
 ```bash
 npm run build && npx oxlint src && npm run test:all
 npx vite preview --port 4390
+npm run qa:squeeze -- http://localhost:4390 --all
 npm run qa:shots -- http://localhost:4390 /tmp/shots --wide
 npm run qa:themes -- http://localhost:4390 /tmp/themes
 npm run e2e:mobile -- http://localhost:4390

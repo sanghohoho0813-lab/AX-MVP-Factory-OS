@@ -111,9 +111,10 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
             <span className="hidden lg:inline-flex">
               <ScreenGuide screenKey="inbox" />
             </span>
+            {/* 이 줄에 단추가 이것뿐이라 글자를 줄일 이유가 없다 — 아이콘만 있으면 무엇인지 모른다 */}
             <Button variant="secondary" onClick={() => void load()}>
               <RefreshCw aria-hidden="true" className="size-4" />
-              <span className="hidden sm:inline">새로고침</span>
+              새로고침
             </Button>
           </>
         }

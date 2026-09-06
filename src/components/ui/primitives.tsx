@@ -17,7 +17,9 @@
 
 import type { ReactNode } from 'react'
 import { useEffect, useId, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { ChevronRight, X } from 'lucide-react'
+import { moduleForPath } from '../../config/moduleRegistry'
 
 /* ------------------------------------------------------------------ */
 /* 색 계약                                                              */
@@ -116,7 +118,14 @@ export function Dot({ tone = 'neutral', className = '' }: { tone?: Tone; classNa
 /* 제목                                                                 */
 /* ------------------------------------------------------------------ */
 
-/** 화면 제목 — 한 화면에 하나. 부가 버튼은 최대 2개까지만 노출한다 */
+/**
+ * 화면 제목 — 한 화면에 하나. 부가 버튼은 최대 2개까지만 노출한다.
+ *
+ * 휴대폰에서는 위쪽 띠가 이미 화면 이름을 말한다. 그 이름과 같은 제목을 아래에
+ * 큰 글자로 또 쓰면 같은 말을 두 번 하면서 화면 한 뼘을 잡아먹는다. 그래서
+ * 이름이 겹칠 때만 휴대폰에서 제목을 숨긴다(읽어 주는 기계에는 남는다).
+ * 겹치지 않을 때(예: 띠는 '오늘 기록', 제목은 '업무 일기')는 그대로 보인다.
+ */
 export function ScreenTitle({
   title,
   sub,
@@ -128,13 +137,19 @@ export function ScreenTitle({
   actions?: ReactNode
   back?: ReactNode
 }) {
+  const { pathname } = useLocation()
+  const sameAsHeader = moduleForPath(pathname)?.label === title
+
   return (
     <div className="flex flex-col gap-2">
       {back}
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-        <div className="min-w-0 flex-1">
-          <h1 className="t-page break-keep text-slate-900">{title}</h1>
-          {sub && <p className="t-sub mt-1 break-keep text-slate-500">{sub}</p>}
+        {/* 제목을 숨긴 폭에서는 설명 줄이 한 줄을 다 쓰게 둔다 — 버튼과 나눠 쓰면 두 줄로 접힌다 */}
+        <div className={`min-w-0 ${sameAsHeader ? 'w-full lg:w-auto lg:flex-1' : 'flex-1'}`}>
+          <h1 className={`t-page break-keep text-slate-900 ${sameAsHeader ? 'sr-only lg:not-sr-only' : ''}`}>
+            {title}
+          </h1>
+          {sub && <p className={`t-sub break-keep text-slate-500 ${sameAsHeader ? 'lg:mt-1' : 'mt-1'}`}>{sub}</p>}
         </div>
         {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
       </div>

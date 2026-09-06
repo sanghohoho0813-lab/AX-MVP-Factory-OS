@@ -273,14 +273,23 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
         </div>
       )}
 
+      {/*
+        옮기기 안내 — 휴대폰에서는 글자 줄 → 버튼 줄로 쌓는다.
+        예전에는 한 줄짜리 flex 안에 글자(flex-1)와 버튼(shrink-0)을 같이 두었는데,
+        flex-1 의 기준폭이 0 이라 줄바꿈이 일어나지 않고 글자 칸만 20px 로 눌렸다.
+        그래서 360px 화면에서 한 줄에 한 글자씩 세로로 흘렀다.
+      */}
       {leftover.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-(--radius-panel) border border-brand-200 bg-brand-50/70 px-4 py-3.5">
-          <CloudUpload aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
-          <p className="min-w-0 flex-1 text-[0.98rem] break-keep text-slate-800">
-            이 브라우저에 예전에 입력한 고객 <strong>{leftover.length}곳</strong>이 남아 있습니다. 클라우드로 옮기면 휴대폰·다른 PC에서도 볼 수 있습니다.
-          </p>
-          <div className="flex shrink-0 gap-2">
-            <Button variant="primary" onClick={() => void migrateLocal()} disabled={migrating}>
+        <div className="rounded-(--radius-panel) border border-brand-200 bg-brand-50/70 px-4 py-3.5">
+          <div className="flex items-start gap-2.5">
+            <CloudUpload aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-brand-600" />
+            <p className="min-w-0 flex-1 text-[0.98rem] break-keep text-slate-800">
+              이 브라우저에 예전에 입력한 고객 <strong>{leftover.length}곳</strong>이 남아 있습니다. 클라우드로
+              옮기면 휴대폰·다른 PC에서도 볼 수 있습니다.
+            </p>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="primary" className="flex-1 sm:flex-none" onClick={() => void migrateLocal()} disabled={migrating}>
               <CloudUpload aria-hidden="true" className="size-4" />
               {migrating ? '옮기는 중…' : '클라우드로 옮기기'}
             </Button>
@@ -321,29 +330,34 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       {/* 검색 · 보관 */}
       {records.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-0 flex-1 sm:max-w-md">
+          {/* 휴대폰에서는 검색칸이 한 줄을 다 쓴다 — 보관함 단추와 나눠 쓰면
+              안내 문구가 '…번호로' 에서 잘렸다 */}
+          <div className="relative w-full min-w-0 sm:w-auto sm:flex-1 sm:max-w-md">
             <Search aria-hidden="true" className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="업체명·대표자·사업자번호로 찾기"
               aria-label="업체 검색"
-              className="w-full rounded-(--radius-control) border border-slate-300 py-2 pr-3 pl-9 text-[0.98rem] focus:border-brand-500 focus:outline-none"
+              className="w-full rounded-(--radius-control) border border-slate-300 py-2.5 pr-3 pl-9 text-[0.98rem] focus:border-brand-500 focus:outline-none sm:py-2"
             />
           </div>
-          <button
-            type="button"
-            aria-pressed={showArchived}
-            onClick={() => setShowArchived((v) => !v)}
-            className={`inline-flex items-center gap-1.5 rounded-(--radius-control) border px-3 py-2 text-[0.92rem] font-medium ${
-              showArchived
-                ? 'border-brand-300 bg-brand-50 text-brand-700'
-                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Archive aria-hidden="true" className="size-4" />
-            보관함 {archivedCount}
-          </button>
+          {/* 보관한 업체가 하나도 없으면 단추도 두지 않는다 — 빈 서랍을 여는 단추는 자리만 먹는다 */}
+          {(archivedCount > 0 || showArchived) && (
+            <button
+              type="button"
+              aria-pressed={showArchived}
+              onClick={() => setShowArchived((v) => !v)}
+              className={`tap inline-flex items-center gap-1.5 rounded-(--radius-control) border px-3 py-2 text-[0.92rem] font-medium ${
+                showArchived
+                  ? 'border-brand-300 bg-brand-50 text-brand-700'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <Archive aria-hidden="true" className="size-4" />
+              보관함 {archivedCount}
+            </button>
+          )}
           {query !== '' && (
             <span className="text-[0.9rem] text-slate-500">{visible.length}곳 찾음</span>
           )}
@@ -356,7 +370,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
           label="지금 처리할 일"
           value={`${summary.critical}건`}
           tone={summary.critical > 0 ? 'danger' : 'neutral'}
-          hint="마감이 지났거나 서류가 없음"
+          hint="마감 지남 · 서류 없음"
           onClick={() => { setTab('critical'); setAlertsOpen(true) }}
         />
         <MetricTile

@@ -80,12 +80,47 @@
 - `ax-rise` 등장 / `ax-stagger` 차례로 / `ax-pop` 창 / `ax-lift` 손 올렸을 때.
 - '화면 움직임 줄이기' 설정과 OS `prefers-reduced-motion` 에서 전부 멈춘다.
 
-## 9. 확인 방법
+## 9. 한 줄 안에 글자와 버튼을 같이 두지 않는다 (짜부라짐 금지)
+
+이것 하나로 "글자가 세로로 한 자씩 흐르는" 현상이 거의 다 생겼다.
+
+```jsx
+/* 하지 말 것 — 360px 에서 글자 칸이 20px 로 눌린다 */
+<div className="flex flex-wrap items-center gap-3">
+  <p className="min-w-0 flex-1">긴 안내 문구…</p>
+  <div className="shrink-0"><Button>클라우드로 옮기기</Button></div>
+</div>
+```
+
+`flex-1` 은 기준폭이 `0` 이라 브라우저가 "이미 다 들어갔다" 고 판단한다. 그래서
+`flex-wrap` 이 있어도 줄이 넘어가지 않고, 글자 칸만 계속 좁아진다. 옆의 `shrink-0`
+버튼은 한 뼘도 양보하지 않으므로 결국 글자가 세로로 흐른다.
+
+```jsx
+/* 이렇게 — 휴대폰에서는 줄을 나누고, 넓어지면 한 줄로 합친다 */
+<div>
+  <p className="break-keep">긴 안내 문구…</p>
+  <div className="mt-3 flex flex-wrap gap-2"><Button>클라우드로 옮기기</Button></div>
+</div>
+```
+
+규칙
+- 한 줄짜리 flex 안에 **글자 + 고정폭 컨트롤(select · date · 버튼)** 을 같이 두려면
+  좁은 폭에서 줄을 나눈다: 글자 쪽에 `w-full sm:w-auto sm:flex-1`.
+- 데스크톱 한 줄 배치를 지키고 싶으면 감싼 칸에 `sm:contents` 를 주고 자식에 `order-*`
+  를 달아 원래 순서를 되돌린다 (수금 줄이 이 방식이다).
+- `<select>` 의 폭은 가장 긴 선택지가 정한다. 좁은 곳에 넣기 전에 그 폭을 생각한다.
+- 화면 이름이 위쪽 띠와 같으면 큰 제목을 휴대폰에서 숨긴다(`ScreenTitle`·`PageHeader`
+  가 자동으로 판단한다). 같은 말을 두 번 하지 않는다.
+
+## 10. 확인 방법
 
 ```bash
 npm run build          # 타입·번들
 npx oxlint src         # 린트
 npm run test:all       # 단위·계약 테스트
-npm run qa:shots -- <url> <dir> --wide   # 7개 화면폭 스크린샷 + 넘침 검사
+npm run qa:squeeze -- <url> --all        # 짜부라진 글자 자동 탐지 (360/390/430 + 글자 1.3배)
+npm run qa:shots -- <url> <dir> --wide   # 8개 화면폭 스크린샷 + 넘침 검사
+npm run qa:themes -- <url> <dir>         # 테마 9종
 npm run e2e:mobile -- <url>              # 390px 한 바퀴 여정
 ```

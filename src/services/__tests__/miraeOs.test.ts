@@ -168,6 +168,18 @@ check('events: 열린 것 판정', isOpenEvent(E[1]) && !isOpenEvent(E[0]))
 check('events: 주문 요약', eventSummary(ev({ eventType: 'service_order_created', payload: { company_name: '한빛', product_slug: 'venture', order_number: 'SO-1' } })).what.includes('SO-1'))
 check('events: 요약 who 는 회사명 우선', eventSummary(ev({ payload: { company_name: '한빛', buyer_name: '김' } })).who === '한빛')
 check('events: 값 없으면 고객', eventSummary(ev({ payload: {} })).who === '고객')
+// 상품 코드는 화면에 그대로 나오면 안 된다 — 아는 코드면 한글 이름으로 바꾼다
+check(
+  'events: 주문 요약이 상품 코드를 한글 이름으로 바꾼다',
+  (() => {
+    const what = eventSummary(ev({ eventType: 'service_order_created', payload: { product_slug: 'venture-certification' } })).what
+    return !what.includes('venture-certification') && what.includes('벤처인증')
+  })(),
+)
+check(
+  'events: 모르는 상품 코드는 그대로 둔다',
+  eventSummary(ev({ eventType: 'service_order_created', payload: { product_slug: 'zzz-unknown' } })).what.includes('zzz-unknown'),
+)
 
 // 고객 투영 — SQL portal_project_projection 과 같은 규칙이어야 한다
 const link: PortalClientLink = {

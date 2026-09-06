@@ -620,53 +620,61 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                     className={`absolute inset-y-0 left-0 w-[3px] ${blocked || overdue ? 'bg-danger-500' : 'bg-warning-500'}`}
                   />
                 )}
-                <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+                {/*
+                  머리 부분은 두 줄이다.
+                    1줄 — 펼치기 단추: 점 · 이름 · 급한 배지
+                    2줄 — 다음 할 일(왼쪽) · 상태 고르는 칸(오른쪽)
+                  예전에는 한 줄에 다 넣었는데, 상태 칸의 한글 문구가 자리를 다 먹어
+                  360px 에서 이름이 60px 로 눌리고 글자가 세로로 흘렀다.
+                  또 "완료" 를 요약과 상태 칸이 나란히 두 번 말하던 것도 없앴다.
+                */}
+                <div className="px-4 py-3">
                   <button
                     type="button"
                     aria-expanded={expanded}
                     onClick={() => toggleCard(meta.key, auto)}
-                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    className="flex w-full min-w-0 items-center gap-2 text-left"
                   >
                     <ChevronDown
                       aria-hidden="true"
                       className={`size-4 shrink-0 text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
                     />
-                    <span className="min-w-0">
-                      <span className="flex flex-wrap items-center gap-1.5">
-                        <Dot tone={statusTone(state.status)} />
-                        <span className="t-card break-keep text-slate-900">{meta.label}</span>
-                        {blocked && (
-                          <Badge tone="danger">
-                            <Lock aria-hidden="true" className="size-3" />
-                            서류 {missing.length}건
-                          </Badge>
-                        )}
-                        {open && dLeft !== null && (dLeft < 0 || dLeft <= 7) && (
-                          <Badge tone={dLeft < 0 ? 'danger' : 'warning'}>{dueText(dLeft)}</Badge>
-                        )}
-                      </span>
-                      {!expanded && (
-                        <span className="t-sub mt-0.5 block truncate text-slate-500">
-                          {state.nextStep ? `다음: ${state.nextStep}` : SERVICE_STATUS_LABEL[state.status]}
-                          {meta.recurring ? ' · 반복' : ''}
-                        </span>
+                    <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                      <Dot tone={statusTone(state.status)} />
+                      <span className="t-card break-keep text-slate-900">{meta.label}</span>
+                      {blocked && (
+                        <Badge tone="danger">
+                          <Lock aria-hidden="true" className="size-3" />
+                          서류 {missing.length}건
+                        </Badge>
+                      )}
+                      {open && dLeft !== null && (dLeft < 0 || dLeft <= 7) && (
+                        <Badge tone={dLeft < 0 ? 'danger' : 'warning'}>{dueText(dLeft)}</Badge>
                       )}
                     </span>
                   </button>
-                  <select
-                    aria-label={`${meta.label} 상태`}
-                    value={state.status}
-                    onChange={(e) =>
-                      void commit(withService(record, meta.key, { status: e.target.value as ServiceStatus }))
-                    }
-                    className="shrink-0 rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-1.5 text-[0.92rem] font-medium"
-                  >
-                    {SERVICE_STATUS_ORDER.map((s) => (
-                      <option key={s} value={s}>
-                        {SERVICE_STATUS_LABEL[s]}
-                      </option>
-                    ))}
-                  </select>
+
+                  <div className="mt-1.5 flex items-center gap-2 pl-6">
+                    <span className="t-sub min-w-0 flex-1 truncate text-slate-500">
+                      {state.nextStep ? `다음: ${state.nextStep}` : ''}
+                      {state.nextStep && meta.recurring ? ' · ' : ''}
+                      {meta.recurring ? '반복' : ''}
+                    </span>
+                    <select
+                      aria-label={`${meta.label} 상태`}
+                      value={state.status}
+                      onChange={(e) =>
+                        void commit(withService(record, meta.key, { status: e.target.value as ServiceStatus }))
+                      }
+                      className="shrink-0 rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-1.5 text-[0.92rem] font-medium"
+                    >
+                      {SERVICE_STATUS_ORDER.map((s) => (
+                        <option key={s} value={s}>
+                          {SERVICE_STATUS_LABEL[s]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 {expanded && (
@@ -1210,19 +1218,23 @@ function FeesSection({
               const left = fee.dueDate ? daysLeftFrom(today, fee.dueDate) : null
               const overdue = fee.receivedAt === null && left !== null && left < 0
               return (
-                <li key={fee.id} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={fee.receivedAt !== null}
-                      onChange={(e) =>
-                        onChange(withFee(record, fee.id, { receivedAt: e.target.checked ? today : null }))
-                      }
-                      className="size-5 accent-brand-600"
-                    />
-                    <span className="sr-only">입금 완료</span>
-                  </label>
-                  <span className="min-w-0 flex-1">
+                // 휴대폰: 제목 줄(체크·이름·지우기) → 입력 줄(날짜·금액·+100만) 두 단으로 쌓는다.
+                // 한 줄에 여섯 칸을 밀어 넣으면 이름 칸이 20px 로 짜부라져 글자가 세로로 흐른다.
+                // 데스크톱은 sm:contents 로 감싼 칸을 없애고 order 로 원래 한 줄 순서를 되돌린다.
+                <li key={fee.id} className="flex flex-col gap-2.5 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-3 sm:px-5">
+                  <div className="flex min-w-0 items-start gap-2.5 sm:contents">
+                    <label className="order-1 flex shrink-0 items-center gap-2 pt-0.5 sm:pt-0">
+                      <input
+                        type="checkbox"
+                        checked={fee.receivedAt !== null}
+                        onChange={(e) =>
+                          onChange(withFee(record, fee.id, { receivedAt: e.target.checked ? today : null }))
+                        }
+                        className="size-5 accent-brand-600"
+                      />
+                      <span className="sr-only">입금 완료</span>
+                    </label>
+                    <span className="order-2 min-w-0 flex-1">
                     <span className="flex flex-wrap items-center gap-1.5">
                       <span className="text-[1rem] font-semibold break-keep text-slate-900">{fee.label}</span>
                       {fee.serviceKey && (
@@ -1241,44 +1253,49 @@ function FeesSection({
                         </span>
                       )}
                     </span>
-                  </span>
-                  <input
-                    type="date"
-                    aria-label={`${fee.label} 받기로 한 날`}
-                    value={fee.dueDate}
-                    onChange={(e) => onChange(withFee(record, fee.id, { dueDate: e.target.value }))}
-                    className="rounded-(--radius-control) border border-slate-300 px-2 py-1.5 text-[0.92rem]"
-                  />
-                  <input
-                    aria-label={`${fee.label} 금액`}
-                    value={fee.amount === null ? '' : fee.amount.toLocaleString('ko-KR')}
-                    onChange={(e) => {
-                      const n = parseAmount(e.target.value)
-                      onChange(withFee(record, fee.id, { amount: n > 0 ? n : null }))
-                    }}
-                    inputMode="numeric"
-                    placeholder="미정"
-                    className={`w-32 shrink-0 rounded-(--radius-control) border border-transparent px-2 py-1.5 text-right text-[1rem] font-semibold tabular-nums hover:border-slate-300 focus:border-slate-300 ${
-                      fee.receivedAt ? 'text-slate-500 line-through' : 'text-slate-900'
-                    }`}
-                  />
-                  <button
-                    type="button"
-                    aria-label={`${fee.label} 금액에 100만원 더하기`}
-                    title="누를 때마다 100만원씩 더합니다"
-                    onClick={() => onChange(withFee(record, fee.id, { amount: (fee.amount ?? 0) + 1_000_000 }))}
-                    className="shrink-0 rounded-(--radius-control) border border-slate-200 px-2 py-1.5 text-[0.85rem] font-semibold text-slate-600 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
-                  >
-                    +100만
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`${fee.label} 삭제`}
-                    onClick={() => onChange(withoutFee(record, fee.id))}
-                    className="rounded-(--radius-control) p-2 text-slate-400 hover:bg-slate-100 hover:text-danger-600"
-                  >
-                    <Trash2 aria-hidden="true" className="size-4" />
-                  </button>
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={`${fee.label} 삭제`}
+                      onClick={() => onChange(withoutFee(record, fee.id))}
+                      className="order-6 ml-auto shrink-0 rounded-(--radius-control) p-2 text-slate-400 hover:bg-slate-100 hover:text-danger-600"
+                    >
+                      <Trash2 aria-hidden="true" className="size-4" />
+                    </button>
+                  </div>
+
+                  {/* 입력 줄 — 휴대폰에서는 제목 아래로 내려오고 왼쪽 여백을 체크칸에 맞춘다 */}
+                  <div className="flex items-center gap-2 pl-[1.9rem] sm:contents sm:pl-0">
+                    <input
+                      type="date"
+                      aria-label={`${fee.label} 받기로 한 날`}
+                      value={fee.dueDate}
+                      onChange={(e) => onChange(withFee(record, fee.id, { dueDate: e.target.value }))}
+                      className="order-3 min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 px-2 py-2 text-[0.92rem] sm:flex-none sm:py-1.5"
+                    />
+                    <input
+                      aria-label={`${fee.label} 금액`}
+                      value={fee.amount === null ? '' : fee.amount.toLocaleString('ko-KR')}
+                      onChange={(e) => {
+                        const n = parseAmount(e.target.value)
+                        onChange(withFee(record, fee.id, { amount: n > 0 ? n : null }))
+                      }}
+                      inputMode="numeric"
+                      placeholder="미정"
+                      className={`order-4 w-24 shrink-0 rounded-(--radius-control) border border-slate-300 px-2 py-2 text-right text-[1rem] font-semibold tabular-nums sm:w-32 sm:border-transparent sm:py-1.5 sm:hover:border-slate-300 sm:focus:border-slate-300 ${
+                        fee.receivedAt ? 'text-slate-500 line-through' : 'text-slate-900'
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      aria-label={`${fee.label} 금액에 100만원 더하기`}
+                      title="누를 때마다 100만원씩 더합니다"
+                      onClick={() => onChange(withFee(record, fee.id, { amount: (fee.amount ?? 0) + 1_000_000 }))}
+                      className="order-5 shrink-0 rounded-(--radius-control) border border-slate-200 px-2 py-2 text-[0.85rem] font-semibold whitespace-nowrap text-slate-600 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 sm:py-1.5"
+                    >
+                      +100만
+                    </button>
+                  </div>
                 </li>
               )
             })}
