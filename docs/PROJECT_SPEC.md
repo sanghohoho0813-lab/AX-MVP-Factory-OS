@@ -85,6 +85,23 @@ STRATEGIC ACCEPTANCE
    이 소스가 다른 컨설팅 SaaS의 시작점이 될 수 있는가?" — 전부 YES여야 완료.
 ```
 
+## PROCESS REDESIGN TABLE (v3.0 §3)
+
+| 현재 단계 | 문제 | 제거 가능 | 표준화 | 디지털화 | 자동화 | AI 필요 | 최종 상태 |
+|---|---|---|---|---|---|---|---|
+| 아침 "오늘 뭐부터" 조합 | 카톡·파일·달력을 매일 다시 훑음 | 조합 자체 제거 | 경고 11종 기준 고정 | 업무·서류·수금·자금 상태 | Top 3 규칙 산출 | 아니오 | 오늘 화면 |
+| 진행 상태 되묻기(카톡) | 같은 답을 반복 | 되묻기 제거 | 고객 공개 단계 6종 | portal_updates | 발행 → 고객 화면 | 아니오 | 고객 플랫폼 탭 |
+| 서류 재요청 | 받았는지 기억 불확실 | 재요청 제거 | 서류 10종 × 유효기간 | documents 상태 | 부족 서류 → 요청 문구 | 아니오 | 서류 탭 |
+| 수금·마감 확인 | 예정일을 잊음 | — | 예정일 필수 입력 | fees / applyDueDate | 연체·임박 경고 | 아니오 | 오늘 · 일정 |
+| 통화·결정 기억 | 왜 그렇게 했는지 잊음 | — | 기록 종류 7종 | ops_journal_entries | 후속조치 → Top 3 | 아니오(NEXT: 문장 요약) | 업무 일기 |
+| 고객 요청 옮겨 적기 | 수기 이중 입력 | 이중 입력 제거 | 이벤트 종류 8종 | customer_events | 트리거로 자동 유입 | 아니오 | 이벤트함 |
+
+## WHY MONEY (v3.0 §13)
+
+정책자금·보증·투자가 없어도 대표의 하루 조합 시간과 수금·마감 누락을 줄이므로 만든다(Capital Independence PASS).
+자본이 들어가면 커지는 것은 (1) 대표 1인이 맡는 고객사 수 — SCALE KPI, (2) 같은 구조를 다른 법인컨설팅 회사에 파는 반복 매출 — SaaS 분리(NEXT).
+적합도: 중진공형(AX 도입·생산성) + 기보형(자체 솔루션·데이터). VC형은 아니다. 금액·개선율은 실측 전 기재하지 않는다.
+
 ## PRIMARY JOURNEYS
 
 ```
@@ -140,12 +157,13 @@ Storage: `client-documents` 보존, 고객 업로드 경로 `{workspaceId}/porta
 - 고객 플랫폼은 Theme Picker 미노출, 브랜드 기본색 사용.
 - UiTextScale default 1.0 / 1.15 / 1.30. 본문 15.5~17px, 페이지 제목 28~32px, 메타 12~13px는 진짜 보조 정보에만.
 
-## CAPABILITY STATUS (2026-09-03 시점)
+## CAPABILITY STATUS (2026-09-05 시점 — 코드의 src/config/capabilityStatus.ts 가 SSOT)
 
 | 기능 | 상태 |
 |---|---|
-| 고객 운영·경고·일정·자금·서류·OCR·백업·테마 | LIVE |
-| Daily Command Center · Work Journal · Event Inbox UI · Client Detail V2 · Publish Modal | LIVE(local) / **READY**(supabase — 마이그레이션 적용 전) |
-| Customer Portal(/my-projects) · 서류 업로드 · 요청 | **READY** (마이그레이션 적용 전) |
-| 진단/주문 → customer_events 트리거 | **READY** (SQL 커밋, 적용 절차 SETUP.md) |
-| LLM 요약 · 고객 알림 발송 · SaaS 분리 | NEXT |
+| 고객 운영·경고·일정·자금·서류·OCR·백업·9테마·모바일(하단 내비) | LIVE |
+| 오늘 Command Center · 업무 일기 · 이벤트함 · 업체 상세 V2 · 발행 | LIVE (supabase 브릿지 0006~0009 Production 적용, 2026-09-04 실왕복 확인) |
+| 고객 플랫폼 My MIRAE(/my-projects) · 서류 업로드 · 요청 | LIVE (miraeailab.com) |
+| 업무 항목 직접 추가 | LIVE(local) / **READY**(supabase — 0010 적용 전) |
+| 기획의도 `/why` · 성과 지표 `/kpi` · 향후 확장 `/roadmap` | LIVE |
+| 고객 알림 발송 · LLM 문장 요약 · 팀 일기 · 결과자료 자동 공유 · SaaS 분리 | NEXT (`/roadmap`) |

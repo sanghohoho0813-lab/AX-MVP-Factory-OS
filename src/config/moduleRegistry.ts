@@ -1,7 +1,10 @@
 import type { LucideIcon } from 'lucide-react'
 import {
+  BookOpenText,
   Building2,
   CalendarDays,
+  Compass,
+  Gauge,
   ClipboardList,
   FileCheck2,
   Filter,
@@ -36,6 +39,7 @@ export type ModuleGroupKey =
   | 'funding'
   | 'journal'
   | 'studio'
+  | 'about'
   | 'tools'
   | 'settings'
 
@@ -62,6 +66,11 @@ export interface ModuleDefinition {
   exact?: boolean
   /** 툴팁·도움말용 예전 이름 */
   hint?: string
+  /**
+   * 기능 상태. 'next' 는 아직 없는 기능이다 — 메뉴에는 NEXT 배지로 보이고,
+   * 누르면 404 대신 무엇을 만들 계획인지 설명하는 화면으로 간다. (규격 U-3)
+   */
+  status?: 'live' | 'next'
 }
 
 export const MODULE_GROUPS: ModuleGroup[] = [
@@ -71,6 +80,7 @@ export const MODULE_GROUPS: ModuleGroup[] = [
   { key: 'funding', title: '자금·지원', accent: 'revenue' },
   { key: 'journal', title: '업무 일기', accent: 'customer' },
   { key: 'studio', title: 'AX STUDIO', accent: 'ai', collapsible: true, defaultCollapsed: true },
+  { key: 'about', title: '이 시스템', accent: 'system', collapsible: true, defaultCollapsed: true },
   { key: 'tools', title: '도구함', accent: 'system' },
   { key: 'settings', title: '설정', accent: 'system' },
 ]
@@ -98,6 +108,11 @@ export const MODULES: ModuleDefinition[] = [
   { key: 'institutions', label: '기관 전략', path: '/funding/catalog', icon: Landmark, group: 'studio', accent: 'ai', enabled: true, hint: '기관·프로그램 목록' },
   { key: 'cases', label: '사례', path: '/cases', icon: Library, group: 'studio', accent: 'ai', enabled: true },
   { key: 'clients', label: '고객사·프로젝트', path: '/clients', icon: Building2, group: 'studio', accent: 'ai', enabled: true, hint: 'AX 프로젝트 단위 관리' },
+
+  // 이 시스템이 왜 있는지 · 성과를 어떻게 재는지 · 다음에 무엇을 만들지 — 규격이 요구하는 '찾을 수 있는 이야기'
+  { key: 'why', label: '기획의도', path: '/why', icon: BookOpenText, group: 'about', accent: 'system', enabled: true, hint: '이 시스템을 왜 만들었는가' },
+  { key: 'kpi', label: '성과 지표', path: '/kpi', icon: Gauge, group: 'about', accent: 'system', enabled: true, hint: '돈·시간·규모·사용 지표' },
+  { key: 'roadmap', label: '향후 확장', path: '/roadmap', icon: Compass, group: 'about', accent: 'system', enabled: true, status: 'next', hint: '아직 없는 기능과 계획' },
 
   { key: 'tools', label: '전체 기능', path: '/tools', icon: LayoutGrid, group: 'tools', accent: 'system', enabled: true },
   { key: 'settings', label: '설정', path: '/settings', icon: Settings, group: 'settings', accent: 'system', enabled: true },

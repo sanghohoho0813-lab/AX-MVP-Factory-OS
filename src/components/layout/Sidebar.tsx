@@ -186,6 +186,15 @@ function SidebarContent({
                                 className={`size-5 shrink-0 ${isActive ? 'text-white' : navAccentClass(item.accent)}`}
                               />
                               {!collapsed && <span className="truncate">{item.label}</span>}
+                              {!collapsed && item.status === 'next' && (
+                                <span
+                                  className={`t-meta ml-auto shrink-0 rounded-full border px-1.5 py-0.5 font-semibold tracking-wide ${
+                                    isActive ? 'border-white/40 text-white' : 'border-navy-600 text-navy-300'
+                                  }`}
+                                >
+                                  NEXT
+                                </span>
+                              )}
                             </>
                           )}
                         </NavLink>

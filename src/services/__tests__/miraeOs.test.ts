@@ -29,6 +29,7 @@ import { buildProjection, eventSummary, isOpenEvent, sortEvents } from '../custo
 import { normalizeClientOps, withFee, withNewFee, withNewFunding, withService } from '../clientOpsService'
 import type { ClientOpsRecord, OpsAlert } from '../../types/clientOps'
 import { mergeServices, normalizeCustomService, toServiceMeta } from '../customServiceService'
+import { buildKpis, kpisByGroup, kpiStatusSummary } from '../kpiService'
 import { BUILTIN_SERVICES, SERVICES, registerCustomServices } from '../../content/clientOpsCatalog'
 import type { CustomerEvent, JournalEntry, PortalClientLink, PortalDocument, PortalRequest, PortalUpdate } from '../../types/bridge'
 
@@ -305,6 +306,49 @@ check('funding: 14일 내 미접수만', fd.length === 1 && fd[0].programName ==
     services: { custom_iso1: { status: 'done' } },
   } as unknown as Partial<ClientOpsRecord>)
   check('custom: 목록에 없어도 기록은 남는다', kept.services.custom_iso1?.status === 'done')
+}
+
+
+/* ------------------------------------------------------------------ */
+/* 성과 지표 — 있는 기록에서만 계산하고 숫자를 지어내지 않는다          */
+/* ------------------------------------------------------------------ */
+{
+  const k1 = normalizeClientOps({
+    id: 'k1', companyName: '지표A', status: 'active', createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+    services: { patent: { status: 'in_progress', dueDate: '2026-09-01' }, venture: { status: 'in_progress', dueDate: '2026-09-20' } },
+    fees: [
+      { id: 'a', kind: 'deposit', label: '계약금', amount: 1_000_000, dueDate: '2026-08-01', receivedAt: '2026-08-05' },
+      { id: 'b', kind: 'success', label: '성공보수', amount: 2_000_000, dueDate: '2026-08-30', receivedAt: null },
+      { id: 'c', kind: 'interim', label: '중도금', amount: null, dueDate: '2026-09-10', receivedAt: null },
+    ],
+    fundingApplications: [{ id: 'f1', programName: '놓친 공고', status: 'preparing', applyDueDate: '2026-08-20' }],
+    activity: [{ id: 'act1', kind: 'service_status', text: 'x', serviceKey: null, at: '2026-09-02T01:00:00.000Z' }],
+  } as unknown as Partial<ClientOpsRecord>)
+  const k2 = normalizeClientOps({
+    id: 'k2', companyName: '지표B', status: 'archived', archivedAt: '2026-08-01T00:00:00.000Z',
+    createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+    fees: [{ id: 'z', kind: 'deposit', label: '보관업체', amount: 9_000_000, dueDate: '2026-01-01', receivedAt: null }],
+  } as unknown as Partial<ClientOpsRecord>)
+  const kj: JournalEntry[] = [
+    { id: 'j1', workspaceId: null, ownerId: null, entryDate: '2026-09-03', entryType: 'note', content: 'a', clientId: null, projectId: null, serviceKey: null, dueDate: '', pinned: false, completed: false, completedAt: null, createdAt: '2026-09-03T00:00:00.000Z', updatedAt: '2026-09-03T00:00:00.000Z' },
+    { id: 'j2', workspaceId: null, ownerId: null, entryDate: '2026-07-01', entryType: 'note', content: 'old', clientId: null, projectId: null, serviceKey: null, dueDate: '', pinned: false, completed: false, completedAt: null, createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-07-01T00:00:00.000Z' },
+  ]
+  const kpis = buildKpis({ records: [k1, k2], journal: kj, events: [], today: TODAY })
+  const by = (key: string) => kpis.find((m) => m.key === key)!
+
+  check('kpi: 10개 지표가 4그룹으로 나뉜다', kpis.length === 10 && kpisByGroup(kpis).every((g) => g.items.length >= 2))
+  check('kpi: 잴 수 없는 것은 값 없이 방법만', by('first_action_minutes').value === null && by('first_action_minutes').status === 'unknown' && by('first_action_minutes').method.length > 20)
+  check('kpi: 예정일 지난 미수금 — 보관 업체는 제외', by('overdue_receivables_now').value === '1건 · 2,000,000원')
+  check('kpi: 근거가 적으면 기준선 만드는 중', by('overdue_receivables_now').status === 'baseline_forming')
+  check('kpi: 수금 지연 = 입금일 − 예정일 (4일 늦음)', by('collection_delay_days').value === '4일 늦게 · 제때 0/1건')
+  check('kpi: 마감 지난 업무 1 / 진행 2', by('overdue_tasks_now').value === '1건 / 진행 2건')
+  check('kpi: 놓친 자금 신청 1/1', by('funding_deadlines_missed').value === '1건 / 마감 있는 신청 1건')
+  check('kpi: 관리 중 업체는 보관 제외 1곳', by('active_clients').value === '1곳')
+  check('kpi: 30일 기록일 = 일기 1일 + 활동 1일 (오래된 일기 제외)', by('active_days_30').value === '2일 / 30일')
+  check('kpi: 이벤트 없으면 처리율은 값 없음', by('events_handled_30').value === null)
+  const summary = kpiStatusSummary(kpis)
+  check('kpi: 상태 요약 합이 지표 수', summary.measured + summary.baseline_forming + summary.unknown === kpis.length)
+  check('kpi: 목표치 필드가 없다 (숫자 발명 금지)', kpis.every((m) => !('target' in m)))
 }
 
 /* ------------------------------------------------------------------ */

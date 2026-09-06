@@ -3,8 +3,8 @@
  *
  *   node e2e/shots.mjs <baseUrl> <outDir> [--wide]
  *
- * 기본은 모바일 390. --wide 를 주면 360 / 430 / 768 / 1280 / 1440 과
- * 360 + 글자 1.3배까지 함께 찍는다.
+ * 기본은 모바일 390. --wide 를 주면 규격이 정한 여덟 폭
+ * 360 / 390 / 430 / 768 / 1024 / 1280 / 1440 / 1920 과 360 + 글자 1.3배까지 함께 찍는다.
  */
 
 import { chromium } from 'playwright'
@@ -28,6 +28,9 @@ const SCREENS = [
   { name: 'funding', path: '/ops/clients/cli_daum?tab=funding' },
   { name: 'tools', path: '/tools' },
   { name: 'settings', path: '/settings' },
+  { name: 'why', path: '/why' },
+  { name: 'kpi', path: '/kpi' },
+  { name: 'roadmap', path: '/roadmap' },
 ]
 
 const VIEWPORTS = WIDE
@@ -36,8 +39,10 @@ const VIEWPORTS = WIDE
       { tag: '390', width: 390, height: 900 },
       { tag: '430', width: 430, height: 900 },
       { tag: '768', width: 768, height: 1000 },
+      { tag: '1024', width: 1024, height: 900 },
       { tag: '1280', width: 1280, height: 900 },
       { tag: '1440', width: 1440, height: 900 },
+      { tag: '1920', width: 1920, height: 1000 },
       { tag: '360-large', width: 360, height: 900, scale: 'extra_large' },
     ]
   : [{ tag: '390', width: 390, height: 900 }]

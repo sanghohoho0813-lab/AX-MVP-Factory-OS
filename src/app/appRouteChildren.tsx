@@ -37,6 +37,9 @@ const OperationsClientDetailPage = lazy(() => import('../pages/OperationsClientD
 const OpsCalendarPage = lazy(() => import('../pages/OpsCalendarPage').then((m) => ({ default: m.OpsCalendarPage })))
 const ToolsHubPage = lazy(() => import('../pages/ToolsHubPage').then((m) => ({ default: m.ToolsHubPage })))
 const TodayCommandCenterPage = lazy(() => import('../pages/TodayCommandCenterPage').then((m) => ({ default: m.TodayCommandCenterPage })))
+const WhyAxPage = lazy(() => import('../pages/WhyAxPage').then((m) => ({ default: m.WhyAxPage })))
+const KpiPage = lazy(() => import('../pages/KpiPage').then((m) => ({ default: m.KpiPage })))
+const RoadmapPage = lazy(() => import('../pages/RoadmapPage').then((m) => ({ default: m.RoadmapPage })))
 const JournalPage = lazy(() => import('../pages/JournalPage').then((m) => ({ default: m.JournalPage })))
 const CustomerInboxPage = lazy(() => import('../pages/CustomerInboxPage').then((m) => ({ default: m.CustomerInboxPage })))
 
@@ -350,6 +353,9 @@ export const appRouteChildren = [
       { path: 'ops/calendar', element: <OpsCalendarPage /> },
       { path: 'ops/clients/:clientId', element: <OperationsClientDetailPage /> },
       { path: 'tools', element: <ToolsHubPage /> },
+      { path: 'why', element: <WhyAxPage /> },
+      { path: 'kpi', element: <KpiPage /> },
+      { path: 'roadmap', element: <RoadmapPage /> },
       { path: 'guide', element: <Navigate to="/getting-started" replace /> },
 
       { path: 'diagnosis', element: <DiagnosisStudioPage /> },
