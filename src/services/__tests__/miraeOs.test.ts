@@ -30,6 +30,7 @@ import { normalizeClientOps, withFee, withNewFee, withNewFunding, withService } 
 import type { ClientOpsRecord, OpsAlert } from '../../types/clientOps'
 import { mergeServices, normalizeCustomService, toServiceMeta } from '../customServiceService'
 import { buildKpis, kpisByGroup, kpiStatusSummary } from '../kpiService'
+import { profileFields, profileFieldsByGroup } from '../clientOpsProfile'
 import { BUILTIN_SERVICES, SERVICES, registerCustomServices } from '../../content/clientOpsCatalog'
 import type { CustomerEvent, JournalEntry, PortalClientLink, PortalDocument, PortalRequest, PortalUpdate } from '../../types/bridge'
 
@@ -361,6 +362,49 @@ check('funding: 14일 내 미접수만', fd.length === 1 && fd[0].programName ==
   const summary = kpiStatusSummary(kpis)
   check('kpi: 상태 요약 합이 지표 수', summary.measured + summary.baseline_forming + summary.unknown === kpis.length)
   check('kpi: 목표치 필드가 없다 (숫자 발명 금지)', kpis.every((m) => !('target' in m)))
+}
+
+/* ------------------------------------------------------------------ */
+/* 회사 기본 정보 — 업체를 열면 바로 보이는 값들                          */
+/* ------------------------------------------------------------------ */
+{
+  const TODAY = '2026-09-07'
+  const rec = normalizeClientOps({
+    id: 'p1',
+    companyName: '한솔테크(주)',
+    establishedAt: '2019-03-05',
+    businessNumber: '123-45-67890',
+    corporateNumber: '110111-1234567',
+    businessAddress: '서울시 강남구 …',
+    representativeName: '김대표',
+    representativeBirth: '1980-12-31',
+    contactName: '이과장',
+    contactTitle: '부장',
+    employeeCount: '5명(대표 포함)',
+    shareholders: '대표 60% · 배우자 40%',
+    contactPhone: '010-1111-2222',
+    documents: { jointCertificate: { received: true, issuedAt: '2026-01-10', note: '대표 USB' } },
+  } as unknown as Partial<ClientOpsRecord>)
+  const fields = profileFields(rec, TODAY)
+  const get = (k: string) => fields.find((f) => f.key === k)!
+
+  check('profile: 설립일에 업력이 붙는다', get('establishedAt').value.includes('8년차'))
+  check('profile: 대표자와 담당자가 따로 나온다', get('representativeName').value.startsWith('김대표') && get('contactName').value === '이과장 부장')
+  check('profile: 상시근로자·지분 구성이 있다', !get('employeeCount').empty && !get('shareholders').empty)
+  check('profile: 공동인증서는 받음·발급일·보관 위치만', get('jointCertificate').value === '받음 · 발급 2026-01-10 · 보관: 대표 USB')
+  check('profile: 인증서 칸은 복사 버튼을 붙이지 않는다', get('jointCertificate').copyable === false)
+  // 자격증명 저장 금지 — 어떤 칸도 비밀번호를 담지 않는다
+  check(
+    'profile: 비밀번호를 담는 칸이 없다',
+    fields.every((f) => !/비밀번호|password|passwd|pw/i.test(f.key + f.label)),
+  )
+  check('profile: 주민등록번호를 담는 칸이 없다', fields.every((f) => !/주민|resident/i.test(f.label)))
+  check('profile: 네 묶음으로 나뉜다', profileFieldsByGroup(rec, TODAY).map((g) => g.group).join() === 'identity,people,contact,credential')
+
+  // 예전 기록 — 대표 이름을 담당자 칸에 넣어 두었던 것
+  const old = normalizeClientOps({ id: 'p2', companyName: '옛기록', contactName: '박대표' } as unknown as Partial<ClientOpsRecord>)
+  check('profile: 대표자 칸이 비면 담당자 이름으로 대신한다', profileFields(old, TODAY).find((f) => f.key === 'representativeName')!.value === '박대표')
+  check('profile: 안 받은 인증서는 미입력이 아니라 안 받음으로 말한다', profileFields(old, TODAY).find((f) => f.key === 'jointCertificate')!.value === '아직 안 받음')
 }
 
 /* ------------------------------------------------------------------ */

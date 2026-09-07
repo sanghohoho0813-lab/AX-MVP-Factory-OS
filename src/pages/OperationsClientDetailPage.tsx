@@ -502,7 +502,17 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         )}
       </Surface>
 
-      {/* 2단계 — 막힘 / 돈 / 고객 연결 */}
+      {/*
+        2단계 — 회사 기본 정보.
+        접어 두지 않는다. 업체를 여는 이유의 절반은 "사업자번호가 뭐였지 / 설립이
+        몇 년도지 / 인증서 받았던가" 를 확인하려는 것이고, 그때마다 접힌 칸을 펴야
+        했다. 상담 중에 한 번 더 누르게 만드는 것이 곧 카톡을 뒤지게 만드는 것이다.
+      */}
+      <Surface>
+        <CompanyProfileCard record={record} today={today} onImport={() => setImportOpen(true)} bare />
+      </Surface>
+
+      {/* 3단계 — 막힘 / 돈 / 고객 연결 */}
       <section aria-label="현재 상태" className="ax-stagger grid grid-cols-2 gap-2.5 lg:grid-cols-3">
         <MetricTile
           label="없는 서류"
@@ -562,10 +572,6 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           />
           <MetricTile label="받은 돈" value={krwTile(paidAmount)} />
         </div>
-      </Disclosure>
-
-      <Disclosure title="회사 기본 정보" hint="사업자번호·주소·설립일 등">
-        <CompanyProfileCard record={record} today={today} onImport={() => setImportOpen(true)} bare />
       </Disclosure>
 
       <Disclosure title="활동 기록" hint={`${record.activity.length}건`}>
@@ -1061,20 +1067,26 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         <Panel>
           <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
             <TextField label="업체명" value={record.companyName} onChange={(v) => void commit({ ...record, companyName: v })} />
-            <TextField label="대표자·담당자" value={record.contactName} onChange={(v) => void commit({ ...record, contactName: v })} />
-            <TextField label="휴대폰번호" value={record.contactPhone} onChange={(v) => void commit({ ...record, contactPhone: v })} placeholder="010-0000-0000" />
-            <TextField label="이메일" value={record.contactEmail} onChange={(v) => void commit({ ...record, contactEmail: v })} />
-            <TextField label="사업자등록번호" value={record.businessNumber} onChange={(v) => void commit({ ...record, businessNumber: v })} placeholder="000-00-00000" />
-            <TextField label="법인번호" value={record.corporateNumber} onChange={(v) => void commit({ ...record, corporateNumber: v })} />
-            <TextField label="담당자 직급" value={record.contactTitle} onChange={(v) => void commit({ ...record, contactTitle: v })} placeholder="예: 대표이사, 부장" />
-            <TextField label="대표자 생년월일" value={record.representativeBirth} onChange={(v) => void commit({ ...record, representativeBirth: v })} placeholder="1980-12-31" />
             <TextField label="설립일(개업일)" value={record.establishedAt} onChange={(v) => void commit({ ...record, establishedAt: v })} placeholder="2019-03-05" />
+            <TextField label="사업자등록번호" value={record.businessNumber} onChange={(v) => void commit({ ...record, businessNumber: v })} placeholder="000-00-00000" />
+            <TextField label="법인등록번호" value={record.corporateNumber} onChange={(v) => void commit({ ...record, corporateNumber: v })} />
             <TextField label="업태" value={record.businessCategory} onChange={(v) => void commit({ ...record, businessCategory: v })} placeholder="예: 제조업" />
             <TextField label="종목" value={record.businessItem} onChange={(v) => void commit({ ...record, businessItem: v })} placeholder="예: 자동차부품" />
             <TextField label="업종(분류)" value={record.industry} onChange={(v) => void commit({ ...record, industry: v })} />
-            <TextField label="회사 대표번호" value={record.companyPhone} onChange={(v) => void commit({ ...record, companyPhone: v })} />
-            <TextField label="홈페이지" value={record.homepage} onChange={(v) => void commit({ ...record, homepage: v })} />
             <TextField label="사업장 주소" value={record.businessAddress} onChange={(v) => void commit({ ...record, businessAddress: v })} />
+
+            {/* 대표자와 담당자는 다른 사람일 수 있다 — 대표는 김대표인데 실무는 이과장이 하는 경우 */}
+            <TextField label="대표자 이름" value={record.representativeName} onChange={(v) => void commit({ ...record, representativeName: v })} placeholder="비우면 담당자 이름을 씁니다" />
+            <TextField label="대표자 생년월일" value={record.representativeBirth} onChange={(v) => void commit({ ...record, representativeBirth: v })} placeholder="1980-12-31" />
+            <TextField label="담당자 이름" value={record.contactName} onChange={(v) => void commit({ ...record, contactName: v })} />
+            <TextField label="담당자 직급" value={record.contactTitle} onChange={(v) => void commit({ ...record, contactTitle: v })} placeholder="예: 대표이사, 부장" />
+            <TextField label="상시근로자 수" value={record.employeeCount} onChange={(v) => void commit({ ...record, employeeCount: v })} placeholder="예: 5명(대표 포함)" />
+            <TextField label="주주·임원 구성" value={record.shareholders} onChange={(v) => void commit({ ...record, shareholders: v })} placeholder="예: 대표 60% · 배우자 40% / 등기임원 2명" />
+
+            <TextField label="담당자 휴대폰" value={record.contactPhone} onChange={(v) => void commit({ ...record, contactPhone: v })} placeholder="010-0000-0000" />
+            <TextField label="회사 대표번호" value={record.companyPhone} onChange={(v) => void commit({ ...record, companyPhone: v })} />
+            <TextField label="이메일" value={record.contactEmail} onChange={(v) => void commit({ ...record, contactEmail: v })} />
+            <TextField label="홈페이지" value={record.homepage} onChange={(v) => void commit({ ...record, homepage: v })} />
           </div>
           <label className="mt-3 block text-[0.9rem] font-medium text-slate-600">
             메모
@@ -1101,7 +1113,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             companyName: record.companyName,
             businessNumber: record.businessNumber,
             corporateNumber: record.corporateNumber,
-            representativeName: record.contactName,
+            representativeName: record.representativeName || record.contactName,
             representativeBirth: record.representativeBirth,
             establishedAt: record.establishedAt,
             address: record.businessAddress,
@@ -1114,7 +1126,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             if (picked.companyName) next.companyName = picked.companyName
             if (picked.businessNumber) next.businessNumber = picked.businessNumber
             if (picked.corporateNumber) next.corporateNumber = picked.corporateNumber
-            if (picked.representativeName) next.contactName = picked.representativeName
+            // 서류에서 읽은 대표자 이름은 대표자 칸으로 — 담당자 칸을 덮어쓰지 않는다
+            if (picked.representativeName) next.representativeName = picked.representativeName
             if (picked.representativeBirth) next.representativeBirth = picked.representativeBirth
             if (picked.establishedAt) next.establishedAt = picked.establishedAt
             if (picked.address) next.businessAddress = picked.address

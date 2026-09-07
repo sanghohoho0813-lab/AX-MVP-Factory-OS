@@ -231,8 +231,24 @@ export interface ClientOpsRecord {
   nextActionDueDate: string
   notes: string
   /* 주기적으로 찾게 되는 기업 기본 정보 */
+  /**
+   * 대표자 이름. 담당자(contactName)와 다를 수 있다 — 대표는 김대표인데
+   * 실무는 이과장이 하는 경우가 흔하다. 비어 있으면 화면에서 담당자 이름으로
+   * 대신 보여 준다(예전 기록은 담당자 칸에 대표 이름을 넣어 두었다).
+   */
+  representativeName: string
   /** 대표자 생년월일 (YYYY-MM-DD) — 나이 자동 계산 */
   representativeBirth: string
+  /**
+   * 상시근로자 수. 정책자금·벤처인증·중소기업확인서에서 거의 매번 묻는다.
+   * 숫자만 넣지 않고 글자로 두는 이유: "5명(대표 포함)" 처럼 단서가 붙는다.
+   */
+  employeeCount: string
+  /**
+   * 주주·임원 구성. 지분율과 등기임원이 벤처인증·정책자금 심사에 들어간다.
+   * 예: "대표 60% · 배우자 25% · 김이사 15% / 등기임원 2명"
+   */
+  shareholders: string
   /** 설립일·개업일 (YYYY-MM-DD) — 업력 자동 계산 */
   establishedAt: string
   /** 업태 */

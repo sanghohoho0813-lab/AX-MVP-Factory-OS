@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Check, ClipboardCopy, Copy, FileUp, Pencil, Pin, PinOff, Plus, Trash2 } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
-import { profileAsText, profileFields } from '../../services/clientOpsProfile'
+import { profileAsText, profileFields, profileFieldsByGroup } from '../../services/clientOpsProfile'
 import { sortedNotes } from '../../services/clientOpsService'
 import { Button } from '../ui/Button'
 
@@ -28,6 +28,7 @@ export function CompanyProfileCard({
 }) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const fields = profileFields(record, today)
+  const groups = profileFieldsByGroup(record, today)
   const filled = fields.filter((f) => !f.empty).length
 
   const copy = async (key: string, value: string) => {
@@ -41,19 +42,16 @@ export function CompanyProfileCard({
       aria-labelledby="profile"
       className={bare ? '' : 'rounded-(--radius-panel) border border-slate-200 bg-white p-5'}
     >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          {!bare && (
-            <h2 id="profile" className="t-section text-slate-900">
-              회사 기본 정보
-            </h2>
-          )}
-          <p className="t-sub break-keep text-slate-500">
-            항목을 누르면 바로 복사됩니다. ({filled}/{fields.length} 입력됨)
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="primary" size="sm" onClick={onImport}>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <h2 id="profile" className="t-section min-w-0 text-slate-900">
+          회사 기본 정보
+          <span className="t-meta ml-2 font-medium text-slate-500">
+            {filled}/{fields.length} 입력됨
+          </span>
+        </h2>
+        {/* 글자를 크게 쓰는 설정에서는 단추 두 개가 한 줄을 넘는다 — 줄여도 되고 접혀도 되게 둔다 */}
+        <div className="flex min-w-0 flex-wrap gap-2">
+          <Button variant="secondary" size="sm" onClick={onImport}>
             <FileUp aria-hidden="true" className="size-3.5" />
             서류에서 불러오기
           </Button>
@@ -63,37 +61,55 @@ export function CompanyProfileCard({
           </Button>
         </div>
       </div>
+      <p className="t-meta mt-0.5 break-keep text-slate-500">번호·주소는 눌러서 바로 복사할 수 있습니다.</p>
 
-      <dl className="mt-3 grid gap-x-6 gap-y-0 sm:grid-cols-2 xl:grid-cols-3">
-        {fields.map((f) => (
-          <div key={f.key} className="flex items-baseline justify-between gap-2 border-b border-slate-200/70 py-2">
-            <dt className="t-sub shrink-0 text-slate-500">{f.label}</dt>
-            <dd className="min-w-0 text-right">
-              {f.empty ? (
-                <span className="text-[0.95rem] text-slate-300">미입력</span>
-              ) : f.copyable ? (
-                <button
-                  type="button"
-                  onClick={() => void copy(f.key, f.value)}
-                  title="눌러서 복사"
-                  className="group inline-flex max-w-full items-center gap-1 text-right"
-                >
-                  <span className="truncate text-[0.98rem] font-semibold text-slate-800 group-hover:text-brand-700 group-hover:underline">
-                    {f.value}
-                  </span>
-                  {copiedKey === f.key ? (
-                    <Check aria-hidden="true" className="size-3.5 shrink-0 text-success-600" />
+      {groups.map((g) => (
+        <div key={g.group} className="mt-4 first:mt-3">
+          <p className="t-meta font-semibold tracking-wide text-slate-500 uppercase">{g.label}</p>
+          <dl className="mt-1 grid gap-x-6 gap-y-0 sm:grid-cols-2 xl:grid-cols-3">
+            {g.fields.map((f) => (
+              <div
+                key={f.key}
+                className={`flex items-baseline justify-between gap-2 border-b border-slate-200/70 py-2 ${
+                  f.wide ? 'sm:col-span-2 xl:col-span-3' : ''
+                }`}
+              >
+                <dt className="t-sub shrink-0 text-slate-500">{f.label}</dt>
+                <dd className="min-w-0 text-right">
+                  {f.empty ? (
+                    <span className="text-[0.95rem] text-slate-500">미입력</span>
+                  ) : f.copyable ? (
+                    <button
+                      type="button"
+                      onClick={() => void copy(f.key, f.value)}
+                      title="눌러서 복사"
+                      className="group inline-flex max-w-full items-center gap-1 text-right"
+                    >
+                      <span className="truncate text-[0.98rem] font-semibold text-slate-800 group-hover:text-brand-700 group-hover:underline">
+                        {f.value}
+                      </span>
+                      {copiedKey === f.key ? (
+                        <Check aria-hidden="true" className="size-3.5 shrink-0 text-success-600" />
+                      ) : (
+                        <Copy aria-hidden="true" className="size-3.5 shrink-0 text-slate-400 group-hover:text-brand-600" />
+                      )}
+                    </button>
                   ) : (
-                    <Copy aria-hidden="true" className="size-3.5 shrink-0 text-slate-300 group-hover:text-brand-600" />
+                    <span className="text-[0.98rem] font-semibold break-keep text-slate-800">{f.value}</span>
                   )}
-                </button>
-              ) : (
-                <span className="text-[0.98rem] font-semibold break-keep text-slate-800">{f.value}</span>
-              )}
-            </dd>
-          </div>
-        ))}
-      </dl>
+                </dd>
+              </div>
+            ))}
+          </dl>
+          {g.group === 'credential' && (
+            <p className="t-meta mt-1.5 break-keep text-slate-500">
+              공동인증서 <strong className="font-semibold">비밀번호는 저장하지 않습니다.</strong> 받았는지와 어디에
+              두었는지만 적습니다 — 비밀번호를 여기 두면 이 화면을 여는 사람이 곧 고객사 계정을 쓸 수 있는 사람이 되고,
+              내려받은 백업 파일에도 그대로 남습니다.
+            </p>
+          )}
+        </div>
+      ))}
     </section>
   )
 }
