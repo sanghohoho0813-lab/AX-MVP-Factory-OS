@@ -653,7 +653,15 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                     />
                     <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
                       <Dot tone={statusTone(state.status)} />
-                      <span className="t-card break-keep text-slate-900">{meta.label}</span>
+                      <span
+                        className={`t-card break-keep ${
+                          state.status === 'not_applicable'
+                            ? 'text-slate-400 line-through decoration-slate-300'
+                            : 'text-slate-900'
+                        }`}
+                      >
+                        {meta.label}
+                      </span>
                       {blocked && (
                         <Badge tone="danger">
                           <Lock aria-hidden="true" className="size-3" />

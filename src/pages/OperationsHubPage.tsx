@@ -16,36 +16,29 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { ServiceCatalogModal } from '../components/ops/ServiceCatalogModal'
-import { Badge, BottomSheet, MetricTile, ScreenTitle, type Tone } from '../components/ui/primitives'
+import { ClientBoardCard } from '../components/ops/ClientBoardCard'
+import { ClientMoneySheet, ServiceStatusSheet } from '../components/ops/ClientQuickSheets'
+import { BottomSheet, MetricTile, ScreenTitle, type Tone } from '../components/ui/primitives'
 import { loadCustomServicesIntoCatalog } from '../services/customServiceService'
 import { getDataModeConfig } from '../data/dataMode'
 import { CloudUpload } from 'lucide-react'
-import { createClient, listClients, readLocalClients, replaceAllClients } from '../services/clientOpsService'
+import { createClient, listClients, readLocalClients, replaceAllClients, saveClient } from '../services/clientOpsService'
 import { downloadBackup, mergeBackup, parseBackup, type MergeMode } from '../services/clientOpsBackup'
 import {
   buildAllAlerts,
   clientOpsProgress,
   daysLeftFrom,
-  dueText,
   sortClientsByUrgency,
   summarizeAlerts,
 } from '../services/clientOpsAlerts'
-import { DUE_SOON_DAYS, SERVICES,
-} from '../content/clientOpsCatalog'
+import { DUE_SOON_DAYS } from '../content/clientOpsCatalog'
 import { todayLocalDate } from '../lib/appClock'
-import { formatKrw, krwTile } from '../lib/format'
-import type { ClientOpsRecord, OpsAlert, AlertSeverity } from '../types/clientOps'
+import { krwTile } from '../lib/format'
+import type { ClientOpsRecord, OpsAlert, AlertSeverity, ServiceKey } from '../types/clientOps'
 import { Button } from '../components/ui/Button'
 import { useToast } from '../components/ui/toastContext'
 import { Modal } from '../components/ui/Modal'
-import {
-  AlertRow,
-  ClientStatusChip,
-  SEVERITY_META,
-  ServiceCell,
-  cellStateFor,
-} from '../components/ops/opsParts'
-import { ACCENT_CLASS } from '../content/clientOpsCatalog'
+import { AlertRow, SEVERITY_META } from '../components/ops/opsParts'
 
 const SEVERITY_TABS: { key: AlertSeverity | 'all'; label: string }[] = [
   { key: 'all', label: '전체' },
@@ -69,32 +62,6 @@ function clientTone(dLeft: number | null, overduePayments: number, critical: num
   return 'success'
 }
 
-/** 급한 정도에 따른 아주 옅은 바탕색 — 글자 대비를 해치지 않는 선까지만 */
-const CARD_FILL: Record<Tone, string> = {
-  danger: 'border-danger-200 bg-danger-50/50',
-  warning: 'border-warning-200 bg-warning-50/50',
-  success: 'border-slate-200 bg-white',
-  neutral: 'border-slate-200 bg-white',
-  brand: 'border-brand-200 bg-brand-50/50',
-}
-
-const CARD_EDGE: Record<Tone, string> = {
-  danger: 'bg-danger-500',
-  warning: 'bg-warning-500',
-  success: 'bg-success-400',
-  neutral: 'bg-slate-300',
-  brand: 'bg-brand-500',
-}
-
-/** 데스크톱 표의 업체 이름 칸 — 왼쪽 3px 선 + 아주 옅은 바탕 */
-const ROW_HEAD: Record<Tone, string> = {
-  danger: 'border-danger-500 bg-danger-50/50',
-  warning: 'border-warning-500 bg-warning-50/40',
-  success: 'border-success-400 bg-white',
-  neutral: 'border-slate-300 bg-white',
-  brand: 'border-brand-500 bg-white',
-}
-
 function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const navigate = useNavigate()
   const [records, setRecords] = useState<ClientOpsRecord[]>([])
@@ -108,6 +75,13 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const [catalogOpen, setCatalogOpen] = useState(false)
   /** 자주 쓰지 않는 도구(백업·일정·항목관리)를 담는 시트 */
   const [moreOpen, setMoreOpen] = useState(false)
+  /**
+   * 목록에서 바로 고치는 시트 — 업무 상태 / 수금.
+   * 업체 id 만 들고 있고 기록은 records 에서 다시 찾는다. 저장하면 records 가
+   * 갱신되므로 시트가 열린 채로도 늘 최신 값을 그린다.
+   */
+  const [quick, setQuick] = useState<{ id: string; kind: 'service'; serviceKey: ServiceKey } | { id: string; kind: 'money' } | null>(null)
+  const quickRecord = quick ? (records.find((r) => r.id === quick.id) ?? null) : null
   const [showAllAlerts, setShowAllAlerts] = useState(false)
   const [form, setForm] = useState({ companyName: '', contactName: '', contactPhone: '', businessNumber: '' })
   const [query, setQuery] = useState('')
@@ -188,6 +162,24 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
 
   const openAlert = (a: OpsAlert) =>
     navigate(a.serviceKey ? `/ops/clients/${a.clientId}?tab=work&svc=${a.serviceKey}` : `/ops/clients/${a.clientId}`)
+
+  /**
+   * 목록 시트에서 고친 값을 저장한다.
+   * 먼저 화면을 바꾸고(기다림 없음) 저장에 실패하면 서버 값으로 되돌린다.
+   */
+  const quickSave = useCallback(
+    async (next: ClientOpsRecord) => {
+      setRecords((prev) => prev.map((r) => (r.id === next.id ? next : r)))
+      try {
+        const saved = await saveClient(next)
+        setRecords((prev) => prev.map((r) => (r.id === saved.id ? saved : r)))
+      } catch (cause) {
+        showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
+        void load()
+      }
+    },
+    [showToast, load],
+  )
 
   const onRestoreFile = async (file: File | undefined) => {
     if (!file) return
@@ -437,13 +429,13 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
             업체별 현황표
           </h2>
           <div className="flex items-center gap-3">
-            <p className="t-sub hidden text-slate-500 lg:block">칸을 누르면 그 업무로 바로 들어갑니다.</p>
+            <p className="t-sub hidden text-slate-500 lg:block">업무 조각을 누르면 여기서 바로 상태를 바꿉니다.</p>
             <button
               type="button"
               onClick={() => setCatalogOpen(true)}
               className="tap t-sub shrink-0 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 font-medium whitespace-nowrap text-slate-600 hover:bg-slate-50"
             >
-              항목 관리
+              업무 항목 추가
             </button>
           </div>
         </div>
@@ -463,168 +455,44 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
         ) : (
           <>
           {/*
-            모바일 목록 한 장에는 네 가지만 둔다 — 업체명 / 지금 할 일 / 마감 / 급한 건수.
-            업무 여섯 개를 다 나열하면 어느 업체를 먼저 봐야 하는지 알 수 없다.
+            표를 버리고 카드로 간다.
+            업무가 6개일 때도 표는 가로 900px 를 넘겨 옆으로 밀어야 했고, 앞으로
+            15개까지 늘면 미는 거리만 길어진다. 카드 안에서 업무를 작은 조각으로
+            줄바꿈시키면 몇 개가 되든 가로로는 넘치지 않는다.
+            휴대폰과 데스크톱이 같은 부품을 쓴다 — 한쪽만 어긋날 일이 없다.
           */}
-          <ul className="ax-stagger flex flex-col gap-2.5 lg:hidden">
+          <ul className="ax-stagger flex flex-col gap-2.5 xl:grid xl:grid-cols-2">
             {ordered.map((record) => {
               const p = clientOpsProgress(record, today)
               const critical = summary.criticalByClient[record.id] ?? 0
               const warning = summary.warningByClient[record.id] ?? 0
               const dLeft = record.nextActionDueDate ? daysLeftFrom(today, record.nextActionDueDate) : null
-              const tone = clientTone(dLeft, p.overduePayments, critical, warning)
               return (
-                <li key={record.id}>
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/ops/clients/${record.id}`)}
-                    className={`ax-lift relative flex w-full flex-col gap-2 overflow-hidden rounded-(--radius-panel) border p-4 pl-[1.15rem] text-left ${CARD_FILL[tone]}`}
-                  >
-                    <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${CARD_EDGE[tone]}`} />
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="t-card min-w-0 truncate text-slate-900">{record.companyName}</span>
-                      {critical > 0 ? (
-                        <Badge tone={tone}>지금 {critical}</Badge>
-                      ) : warning > 0 ? (
-                        <Badge tone={tone === 'neutral' ? 'warning' : tone}>곧 {warning}</Badge>
-                      ) : (
-                        <Badge tone="success">이상 없음</Badge>
-                      )}
-                    </span>
-
-                    <span className="t-body block break-keep text-slate-700">
-                      {record.nextAction || <span className="text-slate-400">다음 할 일이 정해지지 않았습니다</span>}
-                    </span>
-
-                    <span className="t-sub flex flex-wrap items-center gap-x-3 gap-y-1 text-slate-500">
-                      {record.nextActionDueDate && (
-                        <span className={dLeft !== null && dLeft < 0 ? 'font-semibold text-danger-700' : ''}>
-                          {record.nextActionDueDate}
-                          {dLeft !== null && ` · ${dueText(dLeft)}`}
-                        </span>
-                      )}
-                      <span>진행 {p.percent}%</span>
-                      {p.unpaidAmount > 0 && (
-                        <span className={p.overduePayments > 0 ? 'font-semibold text-danger-700' : ''}>
-                          미수금 {formatKrw(p.unpaidAmount)}
-                        </span>
-                      )}
-                    </span>
-                  </button>
-                </li>
+                <ClientBoardCard
+                  key={record.id}
+                  record={record}
+                  today={today}
+                  dueSoonDays={DUE_SOON_DAYS}
+                  tone={clientTone(dLeft, p.overduePayments, critical, warning)}
+                  criticalCount={critical}
+                  warningCount={warning}
+                  onOpen={() => navigate(`/ops/clients/${record.id}`)}
+                  onChip={(key) => setQuick({ id: record.id, kind: 'service', serviceKey: key })}
+                  onMoney={() => setQuick({ id: record.id, kind: 'money' })}
+                />
               )
             })}
           </ul>
-
-          {/* 데스크톱: 현황표 */}
-          <div className="hidden overflow-x-auto rounded-(--radius-panel) border border-slate-200 bg-white lg:block">
-            <table className="w-full min-w-[900px] border-collapse">
-              <caption className="sr-only">업체별 표준 업무 진행 현황</caption>
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50/80">
-                  <th
-                    scope="col"
-                    className="sticky left-0 z-10 bg-slate-50/80 px-4 py-3 text-left text-[0.92rem] font-semibold text-slate-600"
-                  >
-                    업체
-                  </th>
-                  {SERVICES.map((s) => (
-                    <th
-                      key={s.key}
-                      scope="col"
-                      className="px-2 py-3 text-center text-[0.92rem] font-semibold text-slate-600"
-                    >
-                      <span className="inline-flex items-center gap-1.5">
-                        <span aria-hidden="true" className={`size-2 rounded-full ${ACCENT_CLASS[s.accent].dot}`} />
-                        {s.shortLabel}
-                      </span>
-                    </th>
-                  ))}
-                  <th scope="col" className="px-3 py-3 text-center text-[0.92rem] font-semibold text-slate-600">
-                    서류
-                  </th>
-                  <th scope="col" className="px-3 py-3 text-right text-[0.92rem] font-semibold text-slate-600">
-                    미수금
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {ordered.map((record) => {
-                  const p = clientOpsProgress(record, today)
-                  const critical = summary.criticalByClient[record.id] ?? 0
-                  const warning = summary.warningByClient[record.id] ?? 0
-                  const dLeft = record.nextActionDueDate ? daysLeftFrom(today, record.nextActionDueDate) : null
-                  const tone = clientTone(dLeft, p.overduePayments, critical, warning)
-                  return (
-                    <tr key={record.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
-                      {/* 이름 칸에만 급한 정도를 옅게 깐다 — 표 전체를 물들이면 셀 상태가 안 보인다 */}
-                      <th
-                        scope="row"
-                        className={`sticky left-0 z-10 border-l-[3px] px-4 py-3 text-left align-top ${ROW_HEAD[tone]}`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/ops/clients/${record.id}`)}
-                          className="text-left"
-                        >
-                          <span className="flex flex-wrap items-center gap-1.5">
-                            <span className="t-card break-keep text-slate-900 hover:text-brand-700 hover:underline">
-                              {record.companyName || '(이름 없음)'}
-                            </span>
-                            {critical > 0 && <Badge tone={tone}>지금 {critical}</Badge>}
-                          </span>
-                          <span className="mt-1 flex flex-wrap items-center gap-1.5">
-                            <ClientStatusChip status={record.status} />
-                            <span className="t-meta text-slate-500">진행 {p.percent}%</span>
-                          </span>
-                        </button>
-                      </th>
-
-                      {SERVICES.map((s) => (
-                        <td key={s.key} className="px-1.5 py-3 align-top">
-                          <ServiceCell
-                            cell={cellStateFor(record, s.key, today, DUE_SOON_DAYS)}
-                            label={s.label}
-                            onClick={() => navigate(`/ops/clients/${record.id}?tab=work&svc=${s.key}`)}
-                          />
-                        </td>
-                      ))}
-
-                      <td className="px-3 py-3 text-center align-top">
-                        <span
-                          className={`t-sub font-semibold tabular-nums ${
-                            p.documentsUsable < p.documentsTotal ? 'text-slate-800' : 'text-success-700'
-                          }`}
-                        >
-                          {p.documentsUsable}/{p.documentsTotal}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 text-right align-top">
-                        <span
-                          className={`t-sub font-semibold whitespace-nowrap tabular-nums ${
-                            p.overduePayments > 0 ? 'text-danger-700' : 'text-slate-700'
-                          }`}
-                        >
-                          {p.unpaidAmount > 0 ? formatKrw(p.unpaidAmount) : '—'}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
           </>
         )}
 
-        {/* 범례 */}
-        <div className="hidden flex-wrap items-center gap-x-4 gap-y-1 text-[0.85rem] text-slate-500 lg:flex">
-          <span className="font-medium text-slate-600">표 보는 법:</span>
-          <span>완료 = 끝난 업무</span>
-          <span>진행/준비/접수 = 하는 중</span>
-          <span>대기 = 고객 회신 기다리는 중</span>
+        {/* 보는 법 — 업무 조각을 처음 보면 무슨 뜻인지 모른다 */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.85rem] text-slate-500">
+          <span className="font-medium text-slate-600">업무 조각 보는 법:</span>
+          <span>눌러서 상태를 바로 바꿉니다</span>
           <span className="text-danger-700">빨강 = 마감 지났거나 서류가 없어 막힘</span>
           <span className="text-warning-800">노랑 = 마감 임박</span>
+          <span className="line-through decoration-slate-300">가로선 = 이 회사에는 해당 없음</span>
         </div>
       </section>
 
@@ -717,6 +585,30 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
           </>
         )}
       </section>
+
+      {/*
+        목록에서 바로 고치기.
+        저장은 상세 화면과 같은 함수를 쓰므로 여기서 바꾼 값이 업체 기록에 그대로
+        들어간다 — 목록용 사본을 따로 두지 않는다.
+      */}
+      {quick?.kind === 'service' && quickRecord && (
+        <ServiceStatusSheet
+          record={quickRecord}
+          serviceKey={quick.serviceKey}
+          onSave={(next) => void quickSave(next)}
+          onOpenClient={() => navigate(`/ops/clients/${quickRecord.id}?tab=work&svc=${quick.serviceKey}`)}
+          onClose={() => setQuick(null)}
+        />
+      )}
+      {quick?.kind === 'money' && quickRecord && (
+        <ClientMoneySheet
+          record={quickRecord}
+          today={today}
+          onSave={(next) => void quickSave(next)}
+          onOpenClient={() => navigate(`/ops/clients/${quickRecord.id}?tab=fees`)}
+          onClose={() => setQuick(null)}
+        />
+      )}
 
       {catalogOpen && (
         <ServiceCatalogModal

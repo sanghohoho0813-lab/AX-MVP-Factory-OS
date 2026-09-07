@@ -167,24 +167,27 @@ export const SERVICE_STATUS_LABEL: Record<ServiceStatus, string> = {
   waiting_client: '고객 회신 대기',
   done: '완료',
   on_hold: '보류',
+  not_applicable: '해당 없음',
 }
 
 /**
- * 저장된 상태를 현재 5단계로 옮긴다.
+ * 저장된 상태를 현재 6단계로 옮긴다.
  * 예전 8단계 데이터를 고쳐 쓰지 않고, 읽을 때마다 여기서 변환한다.
+ *
+ * 예전에 '해당 없음' 으로 저장해 둔 값은 한동안 보류로 보여 주고 있었는데,
+ * 이제 원래 뜻대로 되돌린다(저장된 글자는 처음부터 그대로였다).
  */
 export function normalizeServiceStatus(value: unknown): ServiceStatus {
   switch (value) {
     case 'preparing':
     case 'submitted':
       return 'in_progress'
-    case 'not_applicable':
-      return 'on_hold'
     case 'not_started':
     case 'in_progress':
     case 'waiting_client':
     case 'done':
     case 'on_hold':
+    case 'not_applicable':
       return value
     default:
       return 'not_started'
@@ -198,15 +201,21 @@ export const SERVICE_STATUS_ORDER: ServiceStatus[] = [
   'waiting_client',
   'done',
   'on_hold',
+  'not_applicable',
 ]
 
 /**
  * 아직 끝나지 않았고 실제로 굴러가는 중인 상태.
- * 보류는 제외한다 — 예전 '해당 없음' 이 보류로 합쳐졌고, 보류는 "지금은 건드리지
- * 않는다" 는 뜻이라 경고·챙길 목록에 올리면 방해가 된다.
+ * 보류와 해당 없음은 제외한다 — 둘 다 "지금 챙길 일이 아니다" 라서 경고·챙길
+ * 목록에 올리면 방해만 된다.
  */
 export function isServiceOpen(status: ServiceStatus): boolean {
-  return status !== 'done' && status !== 'on_hold'
+  return status !== 'done' && status !== 'on_hold' && status !== 'not_applicable'
+}
+
+/** 이 회사에는 아예 해당하지 않는 업무 — 진행률의 분모에서도 뺀다 */
+export function isServiceNotApplicable(status: ServiceStatus): boolean {
+  return status === 'not_applicable'
 }
 
 /** 이미 착수한 상태 (서류가 없으면 문제가 되는 시점) */

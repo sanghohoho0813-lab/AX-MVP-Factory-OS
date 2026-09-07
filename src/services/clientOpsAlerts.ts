@@ -154,9 +154,10 @@ export interface ClientOpsProgress {
 }
 
 export function clientOpsProgress(record: ClientOpsRecord, today: string): ClientOpsProgress {
-  // 보류(예전 '해당 없음' 포함)는 진척률 분모에서 뺀다
+  // 보류와 해당 없음은 진척률 분모에서 뺀다.
+  // 특허가 없는 회사에서 특허를 세면 영원히 100% 가 되지 않는다.
   const applicable = SERVICES.filter(
-    (s) => record.services[s.key].status !== 'on_hold',
+    (s) => record.services[s.key].status !== 'on_hold' && record.services[s.key].status !== 'not_applicable',
   )
   const servicesDone = applicable.filter((s) => record.services[s.key].status === 'done').length
   const documentsUsable = DOCUMENTS.filter(

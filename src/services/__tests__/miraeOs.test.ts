@@ -30,7 +30,9 @@ import { normalizeClientOps, withFee, withNewFee, withNewFunding, withService } 
 import type { ClientOpsRecord, OpsAlert } from '../../types/clientOps'
 import { mergeServices, normalizeCustomService, toServiceMeta } from '../customServiceService'
 import { buildKpis, kpisByGroup, kpiStatusSummary } from '../kpiService'
-import { profileFields, profileFieldsByGroup } from '../clientOpsProfile'
+import { profileFields, profileFieldsByGroup, regionOf } from '../clientOpsProfile'
+import { clientOpsProgress } from '../clientOpsAlerts'
+import { SERVICE_STATUS_ORDER, isServiceOpen, isServiceNotApplicable, normalizeServiceStatus } from '../../content/clientOpsCatalog'
 import { BUILTIN_SERVICES, SERVICES, registerCustomServices } from '../../content/clientOpsCatalog'
 import type { CustomerEvent, JournalEntry, PortalClientLink, PortalDocument, PortalRequest, PortalUpdate } from '../../types/bridge'
 
@@ -420,6 +422,35 @@ check('funding: 14일 내 미접수만', fd.length === 1 && fd[0].programName ==
 }
 
 /* ------------------------------------------------------------------ */
+/* '해당 없음' — 이 회사에는 아예 없는 일                                 */
+/* ------------------------------------------------------------------ */
+{
+  const TODAY = '2026-09-07'
+  check('상태: 여섯 단계', SERVICE_STATUS_ORDER.length === 6 && SERVICE_STATUS_ORDER.includes('not_applicable'))
+  check('상태: 해당 없음은 굴러가는 중이 아니다', !isServiceOpen('not_applicable'))
+  check('상태: 보류도 굴러가는 중이 아니다', !isServiceOpen('on_hold'))
+  check('상태: 해당 없음 판정', isServiceNotApplicable('not_applicable') && !isServiceNotApplicable('on_hold'))
+  // 예전에 저장해 둔 'not_applicable' 은 원래 뜻으로 되돌아온다 (보류로 바뀌지 않는다)
+  check('상태: 저장된 해당 없음을 보류로 바꾸지 않는다', normalizeServiceStatus('not_applicable') === 'not_applicable')
+  check('상태: 예전 8단계는 그대로 진행 중으로', normalizeServiceStatus('submitted') === 'in_progress')
+
+  // 특허가 없는 회사에서 특허를 세면 영원히 100% 가 되지 않는다
+  const base = normalizeClientOps({ id: 'na1', companyName: '해당없음테스트' } as unknown as Partial<ClientOpsRecord>)
+  const allDone = SERVICES.reduce((r, s) => withService(r, s.key, { status: 'done' }), base)
+  check('진행률: 전부 완료면 업무 분모를 다 채운다', clientOpsProgress(allDone, TODAY).servicesDone === SERVICES.length)
+  const oneNa = withService(allDone, 'patent', { status: 'not_applicable' })
+  const p = clientOpsProgress(oneNa, TODAY)
+  check('진행률: 해당 없음은 분모에서 빠진다', p.servicesTotal === SERVICES.length - 1 && p.servicesDone === SERVICES.length - 1)
+}
+
+/* ------------------------------------------------------------------ */
+/* 지역 — 목록에 주소 전체를 늘어놓지 않는다                              */
+/* ------------------------------------------------------------------ */
+check('지역: 도 + 시 (시·군·구 글자는 그대로 둔다)', regionOf('경기도 남양주시 순화궁로 282, 221호') === '경기 남양주시')
+check('지역: 특별시', regionOf('서울특별시 강남구 테헤란로 123') === '서울 강남구')
+check('지역: 시·군·구가 아니면 앞말만', regionOf('세종특별자치시 한누리대로 2130') === '세종')
+check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') === '')
+
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
 void (0 as unknown as ClientOpsRecord)

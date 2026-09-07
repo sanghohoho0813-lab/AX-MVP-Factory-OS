@@ -5,6 +5,7 @@ import {
   Check,
   CircleDashed,
   Clock,
+  Minus,
   FileWarning,
   Info,
   Landmark,
@@ -176,6 +177,7 @@ const STATUS_LOOK: Record<ServiceStatus, CellLook> = {
   waiting_client: { icon: Clock, cls: 'bg-warning-50 text-warning-800 border-warning-200', text: 'text-warning-700', short: '대기' },
   on_hold: { icon: Pause, cls: 'bg-slate-100 text-slate-500 border-slate-200', text: 'text-slate-400', short: '보류' },
   not_started: { icon: CircleDashed, cls: 'bg-white text-slate-500 border-slate-200', text: 'text-slate-500', short: '시작 전' },
+  not_applicable: { icon: Minus, cls: 'bg-white text-slate-400 border-slate-200', text: 'text-slate-400', short: '해당 없음' },
 }
 
 export interface CellState {

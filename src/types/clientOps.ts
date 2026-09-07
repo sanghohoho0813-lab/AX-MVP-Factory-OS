@@ -41,12 +41,16 @@ export function isCustomServiceKey(key: ServiceKey): boolean {
 }
 
 /**
- * 업무 진행 상태 — 5단계.
+ * 업무 진행 상태 — 6단계.
  *
- * 예전에는 8단계(서류 준비 중·접수 완료·해당 없음 포함)였다. 쓰다 보니 구분이
- * 과해서 줄였고, 이미 저장된 값은 읽을 때 normalizeServiceStatus 가 옮긴다.
+ * 예전에는 8단계(서류 준비 중·접수 완료 포함)였다. 쓰다 보니 구분이 과해서
+ * 줄였고, 이미 저장된 값은 읽을 때 normalizeServiceStatus 가 옮긴다.
  *   서류 준비 중·접수 완료 → 진행 중
- *   해당 없음             → 보류
+ *
+ * '해당 없음' 은 다시 살렸다. 보류로 합쳐 두었더니 "지금은 안 한다" 와
+ * "이 회사에는 아예 없는 일" 이 한 칸에 섞였다. 특허가 없는 회사에 특허가
+ * '보류' 로 떠 있으면 언젠가 해야 할 일처럼 읽힌다. 진행률 계산에서도 빠져야
+ * 하므로 별도 상태여야 한다.
  */
 export type ServiceStatus =
   | 'not_started'
@@ -54,9 +58,10 @@ export type ServiceStatus =
   | 'waiting_client'
   | 'done'
   | 'on_hold'
+  | 'not_applicable'
 
 /** 지금은 쓰지 않지만 저장된 데이터에 남아 있을 수 있는 예전 상태 */
-export type LegacyServiceStatus = 'preparing' | 'submitted' | 'not_applicable'
+export type LegacyServiceStatus = 'preparing' | 'submitted'
 
 export interface ServiceState {
   status: ServiceStatus
