@@ -295,20 +295,28 @@ export function MetricTile({
 }) {
   const valueColor =
     tone === 'danger' ? 'text-danger-700' : tone === 'warning' ? 'text-warning-700' : 'text-slate-900'
+  // 0 이 아닐 때만 아주 옅게 물들인다 — 숫자 칸끼리 급한 정도가 한눈에 갈린다
+  const fill = tone === 'danger' ? 'bg-danger-50/60' : tone === 'warning' ? 'bg-warning-50/60' : 'bg-white'
   const Tag = onClick ? 'button' : 'div'
   return (
     <Tag
       {...(onClick ? { type: 'button' as const, onClick, 'aria-pressed': active } : {})}
-      className={`tap relative overflow-hidden rounded-(--radius-panel) border bg-white px-3.5 py-3 text-left ${
+      className={`tap relative overflow-hidden rounded-(--radius-panel) border px-3.5 py-2.5 text-left sm:py-3 ${fill} ${
         active ? 'border-brand-400 ring-1 ring-brand-400' : 'border-slate-200'
       } ${onClick ? 'ax-lift cursor-pointer' : ''}`}
     >
       {tone !== 'neutral' && (
         <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-[3px] ${EDGE_TONE[tone]}`} />
       )}
+      {/* 휴대폰에서는 이름과 숫자를 한 줄에 눕힌다 — 네 칸이 300px 를 먹으면 정작 볼 목록이 밀린다 */}
+      {/*
+        이름 줄 · 숫자 줄 두 단. 옆으로 눕히는 쪽이 더 낮지만, 글자를 크게 쓰는
+        설정에서는 어떤 폭을 잡아도 이름이 짜부라진다. 대신 휴대폰에서는 보조
+        설명을 감추고 여백을 줄여 높이를 벌었다(네 칸 230px → 155px).
+      */}
       <span className="t-sub block break-keep text-slate-500">{label}</span>
-      <strong className={`t-num mt-1 block ${valueColor}`}>{value}</strong>
-      {hint && <span className="t-meta mt-0.5 block break-keep text-slate-500">{hint}</span>}
+      <strong className={`t-num mt-0.5 block sm:mt-1 ${valueColor}`}>{value}</strong>
+      {hint && <span className="t-meta mt-0.5 hidden break-keep text-slate-500 sm:block">{hint}</span>}
     </Tag>
   )
 }

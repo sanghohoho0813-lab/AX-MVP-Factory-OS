@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { ServiceCatalogModal } from '../components/ops/ServiceCatalogModal'
-import { Badge, BottomSheet, MetricTile, ScreenTitle } from '../components/ui/primitives'
+import { Badge, BottomSheet, MetricTile, ScreenTitle, type Tone } from '../components/ui/primitives'
 import { loadCustomServicesIntoCatalog } from '../services/customServiceService'
 import { getDataModeConfig } from '../data/dataMode'
 import { CloudUpload } from 'lucide-react'
@@ -53,6 +53,47 @@ const SEVERITY_TABS: { key: AlertSeverity | 'all'; label: string }[] = [
   { key: 'warning', label: '곧 처리' },
   { key: 'info', label: '참고' },
 ]
+
+/*
+ * 업체 한 장의 급한 정도.
+ *
+ * 예전에는 경고 건수만 봤는데, 업무 6개 × 서류 10종이라 거의 모든 업체가
+ * "지금 N" 이 되어 목록이 통째로 빨갛게 물들었다. 다 빨가면 아무것도 안 빨갛다.
+ * 그래서 대표가 실제로 움직이는 기준 — 다음 할 일의 마감과 수금 연체 — 로 세 칸을
+ * 나눈다. 목록의 정렬 순서와 색이 같은 방향을 보게 되어 위에서부터 색이 옅어진다.
+ */
+function clientTone(dLeft: number | null, overduePayments: number, critical: number, warning: number): Tone {
+  if ((dLeft !== null && dLeft < 0) || overduePayments > 0) return 'danger'
+  if (dLeft !== null && dLeft <= DUE_SOON_DAYS) return 'warning'
+  if (critical > 0 || warning > 0) return 'neutral'
+  return 'success'
+}
+
+/** 급한 정도에 따른 아주 옅은 바탕색 — 글자 대비를 해치지 않는 선까지만 */
+const CARD_FILL: Record<Tone, string> = {
+  danger: 'border-danger-200 bg-danger-50/50',
+  warning: 'border-warning-200 bg-warning-50/50',
+  success: 'border-slate-200 bg-white',
+  neutral: 'border-slate-200 bg-white',
+  brand: 'border-brand-200 bg-brand-50/50',
+}
+
+const CARD_EDGE: Record<Tone, string> = {
+  danger: 'bg-danger-500',
+  warning: 'bg-warning-500',
+  success: 'bg-success-400',
+  neutral: 'bg-slate-300',
+  brand: 'bg-brand-500',
+}
+
+/** 데스크톱 표의 업체 이름 칸 — 왼쪽 3px 선 + 아주 옅은 바탕 */
+const ROW_HEAD: Record<Tone, string> = {
+  danger: 'border-danger-500 bg-danger-50/50',
+  warning: 'border-warning-500 bg-warning-50/40',
+  success: 'border-success-400 bg-white',
+  neutral: 'border-slate-300 bg-white',
+  brand: 'border-brand-500 bg-white',
+}
 
 function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const navigate = useNavigate()
@@ -431,26 +472,21 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
               const critical = summary.criticalByClient[record.id] ?? 0
               const warning = summary.warningByClient[record.id] ?? 0
               const dLeft = record.nextActionDueDate ? daysLeftFrom(today, record.nextActionDueDate) : null
-              const tone = critical > 0 ? 'danger' : warning > 0 ? 'warning' : 'neutral'
+              const tone = clientTone(dLeft, p.overduePayments, critical, warning)
               return (
                 <li key={record.id}>
                   <button
                     type="button"
                     onClick={() => navigate(`/ops/clients/${record.id}`)}
-                    className="ax-lift relative flex w-full flex-col gap-2 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white p-4 pl-[1.15rem] text-left"
+                    className={`ax-lift relative flex w-full flex-col gap-2 overflow-hidden rounded-(--radius-panel) border p-4 pl-[1.15rem] text-left ${CARD_FILL[tone]}`}
                   >
-                    <span
-                      aria-hidden="true"
-                      className={`absolute inset-y-0 left-0 w-[3px] ${
-                        tone === 'danger' ? 'bg-danger-500' : tone === 'warning' ? 'bg-warning-500' : 'bg-slate-200'
-                      }`}
-                    />
+                    <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${CARD_EDGE[tone]}`} />
                     <span className="flex items-center justify-between gap-2">
                       <span className="t-card min-w-0 truncate text-slate-900">{record.companyName}</span>
                       {critical > 0 ? (
-                        <Badge tone="danger">지금 {critical}</Badge>
+                        <Badge tone={tone}>지금 {critical}</Badge>
                       ) : warning > 0 ? (
-                        <Badge tone="warning">곧 {warning}</Badge>
+                        <Badge tone={tone === 'neutral' ? 'warning' : tone}>곧 {warning}</Badge>
                       ) : (
                         <Badge tone="success">이상 없음</Badge>
                       )}
@@ -516,11 +552,15 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                 {ordered.map((record) => {
                   const p = clientOpsProgress(record, today)
                   const critical = summary.criticalByClient[record.id] ?? 0
+                  const warning = summary.warningByClient[record.id] ?? 0
+                  const dLeft = record.nextActionDueDate ? daysLeftFrom(today, record.nextActionDueDate) : null
+                  const tone = clientTone(dLeft, p.overduePayments, critical, warning)
                   return (
                     <tr key={record.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
+                      {/* 이름 칸에만 급한 정도를 옅게 깐다 — 표 전체를 물들이면 셀 상태가 안 보인다 */}
                       <th
                         scope="row"
-                        className="sticky left-0 z-10 bg-white px-4 py-3 text-left align-top"
+                        className={`sticky left-0 z-10 border-l-[3px] px-4 py-3 text-left align-top ${ROW_HEAD[tone]}`}
                       >
                         <button
                           type="button"
@@ -531,7 +571,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                             <span className="t-card break-keep text-slate-900 hover:text-brand-700 hover:underline">
                               {record.companyName || '(이름 없음)'}
                             </span>
-                            {critical > 0 && <Badge tone="danger">지금 {critical}</Badge>}
+                            {critical > 0 && <Badge tone={tone}>지금 {critical}</Badge>}
                           </span>
                           <span className="mt-1 flex flex-wrap items-center gap-1.5">
                             <ClientStatusChip status={record.status} />
@@ -758,10 +798,13 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
         </div>
       )}
 
-      <p className="pb-2 text-[0.85rem] text-slate-400">
-        {SEVERITY_META.critical.label}·{SEVERITY_META.warning.label} 판단 기준: 마감 {DUE_SOON_DAYS}일 이내, 서류 유효기간 30일 이내,
-        고객 회신 7일 이상 대기.
-      </p>
+      {/* 판단 기준은 '지금 챙길 것' 을 펼쳤을 때만 — 매일 보는 화면에 각주가 늘 떠 있을 이유가 없다 */}
+      {alertsOpen && (
+        <p className="pb-2 text-[0.85rem] text-slate-500">
+          {SEVERITY_META.critical.label}·{SEVERITY_META.warning.label} 판단 기준: 마감 {DUE_SOON_DAYS}일 이내, 서류 유효기간 30일 이내,
+          고객 회신 7일 이상 대기.
+        </p>
+      )}
     </div>
   )
 }

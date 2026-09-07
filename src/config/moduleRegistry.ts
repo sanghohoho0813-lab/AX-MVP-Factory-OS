@@ -137,12 +137,42 @@ export function moduleForPath(pathname: string): ModuleDefinition | null {
   return best
 }
 
+/*
+ * 아래 두 표는 반드시 클래스 이름을 통째로 적어야 한다.
+ *
+ * 예전에는 `text-nav-${accent}` 처럼 이어 붙여 만들었는데, Tailwind 는 소스에
+ * 적힌 글자만 보고 CSS 를 만들기 때문에 그렇게 만든 이름은 아예 생성되지 않았다.
+ * 그래서 메뉴 아이콘 색이 전부 안 나오고 흰색으로만 보였다. 이어 붙이지 말 것.
+ */
+
 /** 메뉴 아이콘 색 클래스 (비활성 상태) */
-export function navAccentClass(accent: NavAccent): string {
-  return `text-nav-${accent}`
+const NAV_TEXT: Record<NavAccent, string> = {
+  overview: 'text-nav-overview',
+  ops: 'text-nav-ops',
+  revenue: 'text-nav-revenue',
+  customer: 'text-nav-customer',
+  ai: 'text-nav-ai',
+  evidence: 'text-nav-evidence',
+  alert: 'text-nav-alert',
+  system: 'text-nav-system',
 }
 
 /** 그룹 색 띠 클래스 */
+const NAV_BG: Record<NavAccent, string> = {
+  overview: 'bg-nav-overview',
+  ops: 'bg-nav-ops',
+  revenue: 'bg-nav-revenue',
+  customer: 'bg-nav-customer',
+  ai: 'bg-nav-ai',
+  evidence: 'bg-nav-evidence',
+  alert: 'bg-nav-alert',
+  system: 'bg-nav-system',
+}
+
+export function navAccentClass(accent: NavAccent): string {
+  return NAV_TEXT[accent]
+}
+
 export function groupAccentClass(accent: NavAccent): string {
-  return `bg-nav-${accent}`
+  return NAV_BG[accent]
 }

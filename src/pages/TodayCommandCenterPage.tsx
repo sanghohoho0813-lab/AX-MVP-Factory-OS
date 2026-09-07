@@ -68,16 +68,24 @@ function greeting(hour: number): string {
 }
 
 function ActionRow({ action, rank }: { action: BriefAction; rank: number }) {
-  const edge =
-    action.severity === 'critical' ? 'bg-danger-500' : action.severity === 'warning' ? 'bg-warning-500' : 'bg-slate-300'
+  // 급한 정도를 선 하나로만 말하면 세 장이 다 똑같아 보인다. 바탕도 아주 옅게 물들여
+  // 1·2·3번이 서로 다른 무게로 읽히게 한다.
+  const look =
+    action.severity === 'critical'
+      ? { edge: 'bg-danger-500', fill: 'border-danger-200 bg-danger-50/50', rank: 'bg-danger-600' }
+      : action.severity === 'warning'
+        ? { edge: 'bg-warning-500', fill: 'border-warning-200 bg-warning-50/50', rank: 'bg-warning-600' }
+        : { edge: 'bg-slate-300', fill: 'border-slate-200 bg-white', rank: 'bg-slate-700' }
   return (
     <li>
       <Link
         to={action.href}
-        className="ax-lift relative flex items-start gap-3 overflow-hidden rounded-(--radius-card) border border-slate-200 bg-white py-3.5 pr-3 pl-4"
+        className={`ax-lift relative flex items-start gap-3 overflow-hidden rounded-(--radius-card) border py-3.5 pr-3 pl-4 ${look.fill}`}
       >
-        <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${edge}`} />
-        <span className="t-meta mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-900 font-bold text-white">
+        <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${look.edge}`} />
+        <span
+          className={`t-meta mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full font-bold text-white ${look.rank}`}
+        >
           {rank}
         </span>
         <span className="min-w-0 flex-1">
@@ -95,13 +103,51 @@ function ActionRow({ action, rank }: { action: BriefAction; rank: number }) {
   )
 }
 
-function SectionTitle({ title, to, count, icon: Icon }: { title: string; to?: string; count?: number; icon: typeof Clock }) {
+/*
+ * 묶음 머리의 아이콘 색.
+ *
+ * 화면 하나에 묶음이 여덟 개인데 아이콘이 전부 같은 회색이면 스크롤하다가
+ * 지금 어디를 보고 있는지 알 수 없다. 왼쪽 메뉴와 같은 색표를 써서 묶음마다
+ * 다른 색의 작은 칩을 둔다. 급한 정도를 말하는 색(빨강·주황)과는 자리가
+ * 달라서 — 머리에만, 아주 작게 — 헷갈리지 않는다.
+ *
+ * 클래스 이름은 통째로 적는다(이어 붙이면 Tailwind 가 만들지 않는다).
+ */
+type SectionAccent = 'urgent' | 'journal' | 'event' | 'client' | 'money' | 'fund'
+
+const SECTION_CHIP: Record<SectionAccent, string> = {
+  urgent: 'bg-danger-50 text-danger-600',
+  journal: 'bg-purple-50 text-nav-customer',
+  event: 'bg-blue-50 text-nav-overview',
+  client: 'bg-teal-50 text-nav-ops',
+  money: 'bg-amber-50 text-nav-revenue',
+  fund: 'bg-emerald-50 text-nav-evidence',
+}
+
+function SectionTitle({
+  title,
+  to,
+  count,
+  icon: Icon,
+  accent,
+}: {
+  title: string
+  to?: string
+  count?: number
+  icon: typeof Clock
+  accent: SectionAccent
+}) {
   return (
     <div className="flex items-center justify-between gap-2">
       <h2 className="flex items-center gap-2 text-[1.15rem] font-bold text-slate-900">
-        <Icon aria-hidden="true" className="size-5 text-slate-400" />
+        <span
+          aria-hidden="true"
+          className={`flex size-7 shrink-0 items-center justify-center rounded-lg ${SECTION_CHIP[accent]}`}
+        >
+          <Icon className="size-4" />
+        </span>
         {title}
-        {typeof count === 'number' && <span className="text-[0.95rem] font-semibold text-slate-400">{count}</span>}
+        {typeof count === 'number' && <span className="text-[0.95rem] font-semibold text-slate-500">{count}</span>}
       </h2>
       {to && (
         <Link to={to} className="text-[0.9rem] font-medium text-brand-700 hover:underline">
@@ -243,7 +289,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
         {/* 2단계 — 지금 이것부터 (최대 3건) */}
         <section aria-labelledby="top3" data-tour="home-top3" className="flex min-w-0 flex-col gap-3">
-          <SectionTitle title="지금 이것부터" icon={ClipboardCheck} />
+          <SectionTitle title="지금 이것부터" icon={ClipboardCheck} accent="urgent" />
           {loading ? (
             <p className="t-sub text-slate-500">불러오는 중…</p>
           ) : top.length === 0 ? (
@@ -293,7 +339,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
 
         {/* 3단계 — 빠른 기록 */}
         <section aria-labelledby="capture" data-tour="home-capture" className="flex min-w-0 flex-col gap-3">
-          <SectionTitle title="무슨 일이 있었나요?" icon={NotebookPen} to="/journal" count={todayJournal.length} />
+          <SectionTitle title="무슨 일이 있었나요?" icon={NotebookPen} to="/journal" count={todayJournal.length} accent="journal" />
           <QuickCapture
             clients={active}
             compact
@@ -322,7 +368,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         {/* 4단계 — 고객 이벤트 */}
         <section aria-labelledby="events" data-tour="home-events" className="flex min-w-0 flex-col gap-3">
-          <SectionTitle title="고객 이벤트" icon={Inbox} to="/ops/inbox" count={openEvents.length} />
+          <SectionTitle title="고객 이벤트" icon={Inbox} to="/ops/inbox" count={openEvents.length} accent="event" />
           {openEvents.length === 0 ? (
             <Blank
               title={`새 고객 요청이 없습니다. ${brand.customerPlatformLabel}에서 요청이 오면 여기에 뜹니다.`}
@@ -355,7 +401,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
 
         {/* 4단계 — 챙겨야 할 업체 */}
         <section aria-labelledby="attention" className="flex min-w-0 flex-col gap-3">
-          <SectionTitle title="챙겨야 할 업체" icon={Building2} to="/ops/clients" count={attention.length} />
+          <SectionTitle title="챙겨야 할 업체" icon={Building2} to="/ops/clients" count={attention.length} accent="client" />
           {attention.length === 0 ? (
             <Blank
               title={active.length === 0 ? '아직 등록된 업체가 없습니다.' : '경고가 있는 업체가 없습니다.'}
@@ -396,7 +442,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
 
         {/* 5단계 — 돈. 숫자만 먼저 보이고 상세는 펼친다 */}
         <section aria-labelledby="money" className="flex min-w-0 flex-col gap-3">
-          <SectionTitle title="돈" icon={Wallet} />
+          <SectionTitle title="돈" icon={Wallet} accent="money" />
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
             <MetricTile label="예정 수금" value={krwTile(money.scheduled.total)} hint={`${money.scheduled.count}건`} />
             <MetricTile
@@ -432,7 +478,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
 
         {/* 5단계 — 지원사업 마감 */}
         <section aria-labelledby="funding" className="flex min-w-0 flex-col gap-3">
-          <SectionTitle title="지원사업 마감" icon={Landmark} to="/funding" count={funding.length} />
+          <SectionTitle title="지원사업 마감" icon={Landmark} to="/funding" count={funding.length} accent="fund" />
           {funding.length === 0 ? (
             <Blank title="14일 안에 마감되는 신청 건이 없습니다." icon={<Landmark className="size-7" />} />
           ) : (
