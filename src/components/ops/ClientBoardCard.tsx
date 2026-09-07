@@ -15,6 +15,7 @@
  */
 
 import { ArrowRight, ChevronRight } from 'lucide-react'
+import { CONTRACT_STAGE_LABEL, contractStageOf } from '../../types/clientOps'
 import type { ClientOpsRecord, ServiceKey, ServiceStatus } from '../../types/clientOps'
 import { SERVICES, SERVICE_STATUS_LABEL, isServiceOpen } from '../../content/clientOpsCatalog'
 import { clientOpsProgress, daysLeftFrom, dueText, missingDocumentsFor } from '../../services/clientOpsAlerts'
@@ -163,12 +164,16 @@ export function ClientBoardCard({
   const p = clientOpsProgress(record, today)
   const chips = SERVICES.map((s) => chipStateFor(record, s.key, s.shortLabel, today, dueSoonDays))
   const dLeft = record.nextActionDueDate ? daysLeftFrom(today, record.nextActionDueDate) : null
+  const stage = contractStageOf(record.status)
 
   const y = yearsInBusiness(record.establishedAt, today)
   const region = regionOf(record.businessAddress)
   const repName = record.representativeName.trim() || record.contactName.trim()
   // 한 줄 요약 — 복사해서 쓰는 값(사업자번호)과 상담에서 바로 쓰는 값만
+  // 계약 단계는 이름 옆이 아니라 이 줄에 둔다 — 이름 옆에 두면 좁은 폭에서 이름을 밀어낸다.
+  // '계약 완료' 는 보통 상태라 굳이 쓰지 않는다(써 봐야 모든 카드에 붙는다).
   const meta = [
+    stage === 'signed' ? '' : CONTRACT_STAGE_LABEL[stage],
     record.businessNumber,
     y ? `${y.nthYear}년차` : record.establishedAt,
     repName,

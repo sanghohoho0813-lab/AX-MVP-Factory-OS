@@ -11,6 +11,7 @@
  * '측정 방법만 정함' 으로 둔다. 목표치는 어디에도 없다.
  */
 
+import { contractStageOf } from '../types/clientOps'
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { CustomerEvent, JournalEntry } from '../types/bridge'
 import { SERVICES, isServiceStarted } from '../content/clientOpsCatalog'
@@ -206,7 +207,8 @@ function revenueMetrics(input: KpiInput): KpiMetric[] {
 
 function scaleMetrics(input: KpiInput): KpiMetric[] {
   const live = input.records.filter((r) => r.archivedAt === null)
-  const active = live.filter((r) => r.status === 'active' || r.status === 'waiting')
+  // 계약 종료만 뺀다 — 계약 전 업체도 관리 대상이다
+  const active = live.filter((r) => contractStageOf(r.status) !== 'closed')
 
   let openServices = 0
   for (const r of active) {

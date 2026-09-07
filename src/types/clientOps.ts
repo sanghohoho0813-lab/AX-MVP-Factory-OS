@@ -172,7 +172,49 @@ export interface FundingApplication {
 /* 고객사 레코드                                                        */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 저장되는 업체 상태 값. DB 의 check 제약이 이 네 가지만 받는다.
+ * 화면에는 이 값을 그대로 보여 주지 않고 아래 계약 단계 3가지로 옮겨서 보여 준다.
+ */
 export type ClientOpsStatus = 'active' | 'waiting' | 'paused' | 'completed'
+
+/**
+ * 화면에 보이는 계약 단계 — 3단계.
+ *
+ * 예전에는 진행 중 · 고객 대기 · 일시 중지 · 종료 네 가지였는데, 앞의 셋은 업무별
+ * 상태(진행 중·대기·보류)와 겹쳐 같은 말을 두 군데서 하고 있었다. 업체 수준에서
+ * 정말 갈라야 하는 것은 "계약을 했는가" 하나다.
+ *
+ * 저장 값은 예전 네 가지를 그대로 쓴다 — DB 의 check 제약을 건드리지 않기 위해서다.
+ * (제약을 바꾸려면 사람이 SQL 을 돌려야 하는데, 화면 문구 하나 때문에 그럴 이유가 없다.)
+ *   계약 전   ↔ 'waiting'
+ *   계약 완료 ↔ 'active'
+ *   계약 종료 ↔ 'completed'
+ *   'paused'(예전 일시 중지)는 읽을 때 계약 완료로 본다.
+ */
+export type ContractStage = 'pre' | 'signed' | 'closed'
+
+export const CONTRACT_STAGE_ORDER: ContractStage[] = ['pre', 'signed', 'closed']
+
+export const CONTRACT_STAGE_LABEL: Record<ContractStage, string> = {
+  pre: '계약 전',
+  signed: '계약 완료',
+  closed: '계약 종료',
+}
+
+/** 저장 값 → 화면 단계 */
+export function contractStageOf(status: ClientOpsStatus): ContractStage {
+  if (status === 'waiting') return 'pre'
+  if (status === 'completed') return 'closed'
+  return 'signed'
+}
+
+/** 화면 단계 → 저장 값 */
+export function statusForStage(stage: ContractStage): ClientOpsStatus {
+  if (stage === 'pre') return 'waiting'
+  if (stage === 'closed') return 'completed'
+  return 'active'
+}
 
 /* ------------------------------------------------------------------ */
 /* 메모                                                                 */

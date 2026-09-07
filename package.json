@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "typecheck": "tsc -b --force",
     "preview": "vite preview",
     "test:contract": "vite build --config vite.contract.config.mjs && node .contract-out/contract.mjs",
     "test:client-ops": "vite build --config vite.client-ops.config.mjs && node .client-ops-out/client-ops.mjs",

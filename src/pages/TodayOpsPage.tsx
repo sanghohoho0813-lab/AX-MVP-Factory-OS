@@ -12,6 +12,7 @@ import {
 } from '../services/clientOpsSchedule'
 import { buildAllAlerts, summarizeAlerts } from '../services/clientOpsAlerts'
 import { todayLocalDate } from '../lib/appClock'
+import { contractStageOf } from '../types/clientOps'
 import type { ClientOpsRecord } from '../types/clientOps'
 import { Button } from '../components/ui/Button'
 import { PageHeader } from '../components/ui/PageHeader'
@@ -77,7 +78,7 @@ function TodayContent({ workspaceId }: { workspaceId: string | null }) {
   const past = overdueEvents(events)
   const dueToday = events.filter((e) => !e.done && e.daysLeft === 0)
   const thisWeek = upcomingWithin(events, 7).filter((e) => e.daysLeft !== 0)
-  const openClients = records.filter((r) => r.archivedAt === null && r.status !== 'completed').length
+  const openClients = records.filter((r) => r.archivedAt === null && contractStageOf(r.status) !== 'closed').length
 
   const go = (e: ScheduleEvent) => navigate(`/ops/clients/${e.clientId}`)
   const nothing = past.length === 0 && dueToday.length === 0 && thisWeek.length === 0

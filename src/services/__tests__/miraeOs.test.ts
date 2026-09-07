@@ -31,6 +31,8 @@ import type { ClientOpsRecord, OpsAlert } from '../../types/clientOps'
 import { mergeServices, normalizeCustomService, toServiceMeta } from '../customServiceService'
 import { buildKpis, kpisByGroup, kpiStatusSummary } from '../kpiService'
 import { profileFields, profileFieldsByGroup, regionOf } from '../clientOpsProfile'
+import { CONTRACT_STAGE_ORDER, CONTRACT_STAGE_LABEL, contractStageOf, statusForStage } from '../../types/clientOps'
+import type { ClientOpsStatus, ContractStage } from '../../types/clientOps'
 import { clientOpsProgress } from '../clientOpsAlerts'
 import { SERVICE_STATUS_ORDER, isServiceOpen, isServiceNotApplicable, normalizeServiceStatus } from '../../content/clientOpsCatalog'
 import { BUILTIN_SERVICES, SERVICES, registerCustomServices } from '../../content/clientOpsCatalog'
@@ -450,6 +452,32 @@ check('지역: 도 + 시 (시·군·구 글자는 그대로 둔다)', regionOf('
 check('지역: 특별시', regionOf('서울특별시 강남구 테헤란로 123') === '서울 강남구')
 check('지역: 시·군·구가 아니면 앞말만', regionOf('세종특별자치시 한누리대로 2130') === '세종')
 check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') === '')
+
+/* ------------------------------------------------------------------ */
+/* 계약 단계 — 화면은 3단계, 저장은 예전 값 그대로                        */
+/* ------------------------------------------------------------------ */
+{
+  check('계약: 세 단계', CONTRACT_STAGE_ORDER.join() === 'pre,signed,closed')
+  check(
+    '계약: 한글 이름',
+    CONTRACT_STAGE_LABEL.pre === '계약 전' && CONTRACT_STAGE_LABEL.signed === '계약 완료' && CONTRACT_STAGE_LABEL.closed === '계약 종료',
+  )
+
+  // 예전 네 가지 저장 값이 빠짐없이 세 단계 중 하나로 간다
+  const legacy: ClientOpsStatus[] = ['active', 'waiting', 'paused', 'completed']
+  check('계약: 예전 값이 모두 옮겨진다', legacy.every((v) => CONTRACT_STAGE_ORDER.includes(contractStageOf(v))))
+  check('계약: 진행 중·일시 중지 → 계약 완료', contractStageOf('active') === 'signed' && contractStageOf('paused') === 'signed')
+  check('계약: 고객 대기 → 계약 전', contractStageOf('waiting') === 'pre')
+  check('계약: 종료 → 계약 종료', contractStageOf('completed') === 'closed')
+
+  // 저장 값은 DB check 제약이 받는 네 가지 안에 있어야 한다 (마이그레이션 없이 쓰기 위해)
+  const allowed = new Set<string>(legacy)
+  check('계약: 저장 값이 DB 가 받는 범위 안', CONTRACT_STAGE_ORDER.every((s) => allowed.has(statusForStage(s))))
+  check(
+    '계약: 단계 → 저장 → 단계 왕복',
+    CONTRACT_STAGE_ORDER.every((s: ContractStage) => contractStageOf(statusForStage(s)) === s),
+  )
+}
 
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

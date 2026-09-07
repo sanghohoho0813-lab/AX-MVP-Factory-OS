@@ -283,6 +283,36 @@ export function readLocalClients(): ClientOpsRecord[] {
   return readLocal()
 }
 
+/*
+ * '클라우드로 옮기기' 안내는 정말 옮길 것이 있을 때만 뜬다.
+ *
+ * 예전에는 이 브라우저에 로컬 기록이 있기만 하면 무조건 띄웠다. 그런데 옮기고
+ * 나서도 브라우저 원본은 일부러 남겨 두므로(백업), 새로고침할 때마다 같은 안내가
+ * 다시 떴다. '나중에' 도 화면 상태만 껐을 뿐 다음 접속에는 되살아났다.
+ *
+ * 그래서 판단 기준을 "로컬에 있느냐" 가 아니라 "아직 클라우드에 없느냐" 로 바꾼다.
+ * 옮기고 나면 같은 id 가 클라우드에 생기므로 조건이 저절로 거짓이 된다.
+ * '나중에' 는 그 id 들을 기억해 두어 다시 묻지 않는다 — 나중에 새 로컬 기록이
+ * 생기면 그것만 다시 뜬다.
+ */
+function dismissedIds(): Set<string> {
+  return new Set(readJson<string[]>(STORAGE_KEYS.localMigrationDismissed, []))
+}
+
+/** 아직 클라우드에 올라가지 않았고, 미루지도 않은 로컬 기록 */
+export function pendingLocalClients(cloud: ClientOpsRecord[]): ClientOpsRecord[] {
+  const inCloud = new Set(cloud.map((r) => r.id))
+  const skipped = dismissedIds()
+  return readLocal().filter((r) => !inCloud.has(r.id) && !skipped.has(r.id))
+}
+
+/** '나중에' — 이 기록들에 대해서는 다시 묻지 않는다 */
+export function dismissLocalMigration(ids: string[]): void {
+  const next = dismissedIds()
+  for (const id of ids) next.add(id)
+  writeJson(STORAGE_KEYS.localMigrationDismissed, [...next])
+}
+
 function writeLocal(records: ClientOpsRecord[]): void {
   writeJson(STORAGE_KEYS.operationsClients, records)
   notifyStoreChanged()

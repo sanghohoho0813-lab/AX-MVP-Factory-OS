@@ -48,6 +48,8 @@ export const STORAGE_KEYS = {
   clientOpsChecks: `${KEY_PREFIX}.${DATA_NS}.client_ops_checks`,
   clientOperations: `${KEY_PREFIX}.${DATA_NS}.client_operations`,
   operationsClients: `${KEY_PREFIX}.${DATA_NS}.operations_clients`,
+  /** '클라우드로 옮기기' 안내를 '나중에' 로 미룬 업체 id 목록 (안내가 매번 다시 뜨지 않게) */
+  localMigrationDismissed: `${KEY_PREFIX}.ui.local_migration_dismissed`,
   // 고객 플랫폼 브릿지 · 업무 일기 (local 모드 어댑터)
   journalEntries: `${KEY_PREFIX}.${DATA_NS}.ops_journal_entries`,
   customerEvents: `${KEY_PREFIX}.${DATA_NS}.customer_events`,

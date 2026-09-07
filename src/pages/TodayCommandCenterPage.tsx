@@ -45,6 +45,7 @@ import { nowDate, todayLocalDate } from '../lib/appClock'
 import { formatKrw, krwTile } from '../lib/format'
 import { getDataModeConfig } from '../data/dataMode'
 import { brand } from '../brand/brand.config'
+import { contractStageOf } from '../types/clientOps'
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { CustomerEvent, CustomerEventStatus, JournalEntry } from '../types/bridge'
 
@@ -199,15 +200,20 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     void load()
   }, [load])
 
-  const active = useMemo(() => clients.filter((c) => c.archivedAt === null && c.status !== 'completed'), [clients])
+  // 계약 종료·보관을 뺀 곳이 '지금 챙기는 업체'
+  const active = useMemo(
+    () => clients.filter((c) => c.archivedAt === null && contractStageOf(c.status) !== 'closed'),
+    [clients],
+  )
   const clientNames = useMemo(() => new Map(clients.map((c) => [c.id, c.companyName])), [clients])
   const alerts = useMemo(() => buildAllAlerts(clients, today), [clients, today])
   const summary = useMemo(() => summarizeAlerts(alerts), [alerts])
   const schedule = useMemo(() => buildAllSchedule(clients, today), [clients, today])
   const weekDue = useMemo(() => upcomingWithin(schedule, 7).filter((e) => !e.done), [schedule])
   const waiting = useMemo(
-    () => alerts.filter((a) => a.kind === 'waiting_too_long').length + active.filter((c) => c.status === 'waiting').length,
-    [alerts, active],
+    // 업체 수준의 '고객 대기' 는 계약 단계로 바뀌면서 사라졌다 — 경고만 센다
+    () => alerts.filter((a) => a.kind === 'waiting_too_long').length,
+    [alerts],
   )
   const money = useMemo(() => buildMoneySignals(clients, today), [clients, today])
   const funding = useMemo(() => buildFundingDeadlines(clients, today), [clients, today])

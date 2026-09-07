@@ -18,10 +18,12 @@ import type {
   AlertSeverity,
   ClientOpsRecord,
   ClientOpsStatus,
+  ContractStage,
   OpsAlert,
   ServiceKey,
   ServiceStatus,
 } from '../../types/clientOps'
+import { CONTRACT_STAGE_LABEL, contractStageOf } from '../../types/clientOps'
 import {
   SERVICE_STATUS_LABEL,
   isServiceOpen,
@@ -270,23 +272,17 @@ export function cellStateFor(
 /* 기타                                                                 */
 /* ------------------------------------------------------------------ */
 
-export const CLIENT_STATUS_LABEL: Record<ClientOpsStatus, string> = {
-  active: '진행 중',
-  waiting: '고객 대기',
-  paused: '일시 중지',
-  completed: '종료',
-}
-
+/** 계약 단계 칩 — 저장 값이 아니라 3단계로 보여 준다 */
 export function ClientStatusChip({ status }: { status: ClientOpsStatus }) {
-  const cls: Record<ClientOpsStatus, string> = {
-    active: 'bg-brand-50 text-brand-700 border-brand-200',
-    waiting: 'bg-warning-50 text-warning-800 border-warning-200',
-    paused: 'bg-slate-100 text-slate-600 border-slate-200',
-    completed: 'bg-success-50 text-success-700 border-success-200',
+  const stage = contractStageOf(status)
+  const cls: Record<ContractStage, string> = {
+    pre: 'bg-slate-100 text-slate-600 border-slate-200',
+    signed: 'bg-brand-50 text-brand-700 border-brand-200',
+    closed: 'bg-slate-100 text-slate-500 border-slate-200',
   }
   return (
-    <span className={`rounded-full border px-2 py-0.5 text-[0.85rem] font-semibold ${cls[status]}`}>
-      {CLIENT_STATUS_LABEL[status]}
+    <span className={`rounded-full border px-2 py-0.5 text-[0.85rem] font-semibold ${cls[stage]}`}>
+      {CONTRACT_STAGE_LABEL[stage]}
     </span>
   )
 }

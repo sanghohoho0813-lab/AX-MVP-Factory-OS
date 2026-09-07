@@ -103,6 +103,46 @@ const chips = await page.evaluate(() => document.querySelectorAll('button').leng
 const of2 = await page.evaluate(() => ({ d: document.documentElement.scrollWidth, w: window.innerWidth }))
 check('업무 15개에서도 가로 스크롤 없음', of2.d <= of2.w + 1, `${of2.d} > ${of2.w} (버튼 ${chips}개)`)
 
+/* ---------------- 계약 단계 · 업체 삭제 ---------------- */
+await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+await page.waitForTimeout(800)
+
+// 계약 단계 선택기
+await page.getByRole('button', { name: '더보기' }).first().click()
+await page.waitForTimeout(400)
+const opts = await page.evaluate(() => {
+  const sel = Array.from(document.querySelectorAll('select')).find((s) => s.previousSibling || true)
+  const all = Array.from(document.querySelectorAll('select'))
+  const stage = all.find((s) => Array.from(s.options).some((o) => o.textContent === '계약 전'))
+  void sel
+  return stage ? Array.from(stage.options).map((o) => o.textContent) : null
+})
+check('계약 단계 3가지', JSON.stringify(opts) === JSON.stringify(['계약 전','계약 완료','계약 종료']), JSON.stringify(opts))
+
+// 삭제 — 1차
+await page.getByRole('button', { name: '업체 삭제' }).click()
+await page.waitForTimeout(400)
+check('1차 확인이 뜬다', await page.getByText('이 업체를 삭제할까요?').isVisible())
+check('무엇이 사라지는지 알려준다', await page.getByText(/업무 .*개의 진행 상태/).isVisible())
+await page.getByRole('button', { name: '네, 다음으로' }).click()
+await page.waitForTimeout(400)
+check('2차 확인이 뜬다', await page.getByText('마지막 확인').first().isVisible())
+
+const disabled = await page.getByRole('button', { name: /영구 삭제/ }).isDisabled()
+check('이름을 적기 전에는 못 누른다', disabled)
+await page.getByLabel('확인을 위해 업체 이름 입력').fill('틀린이름')
+await page.waitForTimeout(200)
+check('틀린 이름이면 여전히 못 누른다', await page.getByRole('button', { name: /영구 삭제/ }).isDisabled())
+await page.getByLabel('확인을 위해 업체 이름 입력').fill('한솔테크(주)')
+await page.waitForTimeout(200)
+check('이름이 맞으면 눌린다', !(await page.getByRole('button', { name: /영구 삭제/ }).isDisabled()))
+await page.getByRole('button', { name: /영구 삭제/ }).click()
+await page.waitForTimeout(900)
+check('목록으로 돌아온다', page.url().endsWith('/ops/clients'))
+const left = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').some((r) => r.id === 'cli_hansol'))
+check('실제로 지워졌다', left === false)
+
+
 await browser.close()
-console.log(`\n목록 바로 고치기: ${pass} passed, ${fail} failed`)
+console.log(`\n목록 바로 고치기 · 계약 단계 · 삭제: ${pass} passed, ${fail} failed`)
 process.exit(fail > 0 ? 1 : 0)

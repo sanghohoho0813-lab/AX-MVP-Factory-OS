@@ -28,6 +28,7 @@ import {
   withFee,
   withNewFee,
   withArchived,
+  deleteClient,
   withFunding,
   withNewFunding,
   withNewNote,
@@ -63,9 +64,15 @@ import {
 } from '../content/clientOpsCatalog'
 import { todayLocalDate } from '../lib/appClock'
 import { formatFileSize, formatKrw, krwTile } from '../lib/format'
+import {
+  CONTRACT_STAGE_LABEL,
+  CONTRACT_STAGE_ORDER,
+  contractStageOf,
+  statusForStage,
+} from '../types/clientOps'
 import type {
   ClientOpsRecord,
-  ClientOpsStatus,
+  ContractStage,
   DocumentKey,
   FeeKind,
   ServiceKey,
@@ -73,6 +80,7 @@ import type {
 } from '../types/clientOps'
 import { Button } from '../components/ui/Button'
 import { NotFoundState } from '../components/ui/NotFoundState'
+import { Modal } from '../components/ui/Modal'
 import { Panel } from '../components/ui/Panel'
 import { useToast } from '../components/ui/toastContext'
 import { AlertRow, ClientStatusChip, statusTone } from '../components/ops/opsParts'
@@ -109,13 +117,7 @@ import { listLinksForClient } from '../services/customerBridgeService'
 import { buildClientSchedule } from '../services/clientOpsSchedule'
 import { brand } from '../brand/brand.config'
 
-const CLIENT_STATUS_ORDER: ClientOpsStatus[] = ['active', 'waiting', 'paused', 'completed']
-const CLIENT_STATUS_TEXT: Record<ClientOpsStatus, string> = {
-  active: '진행 중',
-  waiting: '고객 대기',
-  paused: '일시 중지',
-  completed: '종료',
-}
+
 
 const inputCls =
   'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.98rem] focus:border-brand-500 focus:outline-none'
@@ -161,6 +163,14 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const [catalogOpen, setCatalogOpen] = useState(false)
   /** 모바일에서 부가 행동을 담는 시트 */
   const [moreOpen, setMoreOpen] = useState(false)
+  /**
+   * 삭제 확인 단계 — 0 닫힘 / 1 첫 번째 물음 / 2 두 번째 물음.
+   * 되돌릴 수 없는 일이라 두 번 묻는다. 두 번째에서는 업체 이름을 그대로 적게 해
+   * "예" 를 습관적으로 누르는 것을 막는다.
+   */
+  const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0)
+  const [deleteTyped, setDeleteTyped] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   const today = todayLocalDate()
 
@@ -207,14 +217,16 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
     [showToast, load],
   )
 
-  /** 업체 상태 변경 — 인라인 select 와 더보기 시트가 함께 쓴다 */
-  const changeStatus = (status: ClientOpsStatus) => {
+  /** 계약 단계 변경 — 인라인 select 와 더보기 시트가 함께 쓴다 */
+  const changeStage = (stage: ContractStage) => {
     if (!record) return
+    const before = contractStageOf(record.status)
+    if (before === stage) return
     void commit(
       withActivity(
-        { ...record, status },
+        { ...record, status: statusForStage(stage) },
         'profile',
-        `업체 상태 · ${CLIENT_STATUS_TEXT[record.status]} → ${CLIENT_STATUS_TEXT[status]}`,
+        `계약 단계 · ${CONTRACT_STAGE_LABEL[before]} → ${CONTRACT_STAGE_LABEL[stage]}`,
       ),
     )
   }
@@ -364,15 +376,15 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           <div className="hidden items-end gap-2 lg:flex">
             <ScreenGuide screenKey="client_detail" />
             <label className="t-sub font-medium text-slate-600">
-              업체 상태
+              계약 단계
               <select
-                value={record.status}
-                onChange={(e) => changeStatus(e.target.value as ClientOpsStatus)}
+                value={contractStageOf(record.status)}
+                onChange={(e) => changeStage(e.target.value as ContractStage)}
                 className="t-body mt-1 block h-10 rounded-(--radius-control) border border-slate-300 px-3"
               >
-                {CLIENT_STATUS_ORDER.map((s) => (
+                {CONTRACT_STAGE_ORDER.map((s) => (
                   <option key={s} value={s}>
-                    {CLIENT_STATUS_TEXT[s]}
+                    {CONTRACT_STAGE_LABEL[s]}
                   </option>
                 ))}
               </select>
@@ -988,15 +1000,15 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         <BottomSheet title="이 업체에서 할 수 있는 것" onClose={() => setMoreOpen(false)}>
           <div className="flex flex-col gap-4">
             <label className="t-sub font-medium text-slate-600">
-              업체 상태
+              계약 단계
               <select
-                value={record.status}
-                onChange={(e) => changeStatus(e.target.value as ClientOpsStatus)}
+                value={contractStageOf(record.status)}
+                onChange={(e) => changeStage(e.target.value as ContractStage)}
                 className="t-body mt-1.5 block h-12 w-full rounded-(--radius-control) border border-slate-300 px-3"
               >
-                {CLIENT_STATUS_ORDER.map((s) => (
+                {CONTRACT_STAGE_ORDER.map((s) => (
                   <option key={s} value={s}>
-                    {CLIENT_STATUS_TEXT[s]}
+                    {CONTRACT_STAGE_LABEL[s]}
                   </option>
                 ))}
               </select>
@@ -1042,6 +1054,17 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 <Archive aria-hidden="true" className="size-4" />
                 {record.archivedAt ? '보관 해제' : '보관하기'}
               </Button>
+              <Button
+                variant="danger"
+                className="w-full justify-start"
+                onClick={() => {
+                  setMoreOpen(false)
+                  setDeleteStep(1)
+                }}
+              >
+                <Trash2 aria-hidden="true" className="size-4" />
+                업체 삭제
+              </Button>
             </div>
 
             <div className="border-t border-slate-100 pt-4">
@@ -1049,6 +1072,91 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             </div>
           </div>
         </BottomSheet>
+      )}
+
+      {/*
+        업체 삭제 — 두 번 묻는다.
+        1) 무엇이 함께 사라지는지 숫자로 보여 준다.
+        2) 업체 이름을 그대로 적게 한다. "예" 를 습관적으로 누르는 것을 막는 장치다.
+        되돌릴 수 없으므로 지우기 전에 백업을 권한다.
+      */}
+      {deleteStep > 0 && (
+        <Modal
+          open
+          title={deleteStep === 1 ? '이 업체를 삭제할까요?' : '정말 지웁니다 — 마지막 확인'}
+          onClose={() => {
+            setDeleteStep(0)
+            setDeleteTyped('')
+          }}
+        >
+          {deleteStep === 1 ? (
+            <>
+              <p className="t-body break-keep text-slate-800">
+                <strong className="font-semibold">{record.companyName || '(이름 없음)'}</strong> 와(과) 함께 아래가 모두
+                사라집니다. <strong className="font-semibold text-danger-700">되돌릴 수 없습니다.</strong>
+              </p>
+              <ul className="t-sub mt-3 flex flex-col gap-1 rounded-(--radius-control) border border-slate-200 bg-slate-50 px-4 py-3 text-slate-700">
+                <li>업무 {SERVICES.length}개의 진행 상태·마감·메모</li>
+                <li>서류 {progress.documentsUsable}/{progress.documentsTotal}건의 기록{canUploadFiles() ? ' (첨부 파일 포함)' : ''}</li>
+                <li>수금 {record.fees.length}건 · 자금 신청 {record.fundingApplications.length}건</li>
+                <li>메모 {record.notes_list.length}건 · 활동 기록 {record.activity.length}건</li>
+              </ul>
+              <p className="t-sub mt-3 break-keep text-slate-600">
+                지우는 대신 <strong className="font-semibold">보관하기</strong>를 쓰면 목록·경고에서만 빠지고 기록은
+                남습니다. 정말 지워야 한다면 먼저 백업(더보기 → 백업 내려받기)을 받아 두세요.
+              </p>
+              <div className="mt-5 flex flex-wrap justify-end gap-2">
+                <Button variant="secondary" onClick={() => setDeleteStep(0)}>
+                  그만두기
+                </Button>
+                <Button variant="danger" onClick={() => setDeleteStep(2)}>
+                  네, 다음으로
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="t-body break-keep text-slate-800">
+                지우려면 업체 이름을 그대로 적어 주세요.
+              </p>
+              <p className="t-sub mt-1 text-slate-500">
+                적어야 할 이름: <strong className="font-semibold text-slate-800">{record.companyName || '(이름 없음)'}</strong>
+              </p>
+              <input
+                autoFocus
+                value={deleteTyped}
+                onChange={(e) => setDeleteTyped(e.target.value)}
+                placeholder="업체 이름"
+                aria-label="확인을 위해 업체 이름 입력"
+                className={`mt-3 ${inputCls}`}
+              />
+              <div className="mt-5 flex flex-wrap justify-end gap-2">
+                <Button variant="secondary" onClick={() => setDeleteStep(1)}>
+                  뒤로
+                </Button>
+                <Button
+                  variant="danger"
+                  disabled={deleting || deleteTyped.trim() !== (record.companyName || '(이름 없음)').trim()}
+                  onClick={() => {
+                    setDeleting(true)
+                    void deleteClient(record)
+                      .then(() => {
+                        showToast(`${record.companyName}을(를) 삭제했습니다.`)
+                        navigate('/ops/clients')
+                      })
+                      .catch((cause: unknown) => {
+                        showToast(cause instanceof Error ? cause.message : '삭제하지 못했습니다.')
+                        setDeleting(false)
+                      })
+                  }}
+                >
+                  <Trash2 aria-hidden="true" className="size-4" />
+                  {deleting ? '지우는 중…' : '영구 삭제'}
+                </Button>
+              </div>
+            </>
+          )}
+        </Modal>
       )}
 
       {catalogOpen && (

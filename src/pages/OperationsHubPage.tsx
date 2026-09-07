@@ -22,7 +22,14 @@ import { BottomSheet, MetricTile, ScreenTitle, type Tone } from '../components/u
 import { loadCustomServicesIntoCatalog } from '../services/customServiceService'
 import { getDataModeConfig } from '../data/dataMode'
 import { CloudUpload } from 'lucide-react'
-import { createClient, listClients, readLocalClients, replaceAllClients, saveClient } from '../services/clientOpsService'
+import {
+  createClient,
+  dismissLocalMigration,
+  listClients,
+  pendingLocalClients,
+  replaceAllClients,
+  saveClient,
+} from '../services/clientOpsService'
 import { downloadBackup, mergeBackup, parseBackup, type MergeMode } from '../services/clientOpsBackup'
 import {
   buildAllAlerts,
@@ -34,6 +41,7 @@ import {
 import { DUE_SOON_DAYS } from '../content/clientOpsCatalog'
 import { todayLocalDate } from '../lib/appClock'
 import { krwTile } from '../lib/format'
+import { contractStageOf } from '../types/clientOps'
 import type { ClientOpsRecord, OpsAlert, AlertSeverity, ServiceKey } from '../types/clientOps'
 import { Button } from '../components/ui/Button'
 import { useToast } from '../components/ui/toastContext'
@@ -114,15 +122,21 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     void load()
   }, [load])
 
-  // 클라우드 모드인데 이 브라우저에 예전 로컬 데이터가 남아 있으면 옮기도록 안내한다
+  /*
+   * 옮기기 안내는 "아직 클라우드에 없는" 기록이 있을 때만 뜬다.
+   *
+   * 예전에는 로컬에 기록이 있기만 하면 무조건 띄웠다. 옮기고 나서도 브라우저
+   * 원본은 일부러 남겨 두므로(백업), 새로고침할 때마다 같은 안내가 다시 떴다.
+   * 이제는 records(클라우드 목록)와 대조하므로 옮기고 나면 저절로 사라진다.
+   */
   useEffect(() => {
     if (getDataModeConfig().mode !== 'supabase') return
     try {
-      setLeftover(readLocalClients())
+      setLeftover(pendingLocalClients(records))
     } catch {
       setLeftover([])
     }
-  }, [])
+  }, [records])
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -158,7 +172,8 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     return { unpaid, overdueCount }
   }, [records, today])
 
-  const activeCount = records.filter((r) => r.status === 'active' || r.status === 'waiting').length
+  // 계약 종료만 뺀다 — 계약 전도 챙겨야 할 업체다
+  const activeCount = records.filter((r) => contractStageOf(r.status) !== 'closed').length
 
   const openAlert = (a: OpsAlert) =>
     navigate(a.serviceKey ? `/ops/clients/${a.clientId}?tab=work&svc=${a.serviceKey}` : `/ops/clients/${a.clientId}`)
@@ -326,7 +341,14 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
               <CloudUpload aria-hidden="true" className="size-4" />
               {migrating ? '옮기는 중…' : '클라우드로 옮기기'}
             </Button>
-            <Button variant="ghost" onClick={() => setLeftover([])}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                // 화면만 끄면 다음 접속에 되살아난다 — 미룬 것을 기억해 둔다
+                dismissLocalMigration(leftover.map((r) => r.id))
+                setLeftover([])
+              }}
+            >
               나중에
             </Button>
           </div>
