@@ -74,7 +74,8 @@ check('판별: 알 수 없음', detectDocSource('그냥 아무 글') === 'unknow
   check('사등: 법인번호', r.corporateNumber === '110111-7654321', r.corporateNumber)
   check('사등: 대표자', r.representativeName === '김영수', r.representativeName)
   check('사등: 개업일', r.establishedAt === '2019-03-05', r.establishedAt)
-  check('사등: 주소', r.address === '서울특별시 강남구 테헤란로 123, 5층', r.address)
+  // 사업장 소재지와 본점 소재지가 다르면 본점을 쓴다 (컨설팅에서 쓰는 것은 등기부상 본점)
+  check('사등: 주소는 본점 우선', r.address === '서울특별시 강남구 테헤란로 123', r.address)
   check('사등: 업태', r.businessCategory === '제조업', r.businessCategory)
   check('사등: 종목', r.businessItem === '자동차부품', r.businessItem)
 }
@@ -161,6 +162,41 @@ check('판별: 알 수 없음', detectDocSource('그냥 아무 글') === 'unknow
 {
   const r = parseKoreanBusinessDocument('사업자등록증\n등록번호: 12-3')
   check('안전: 자릿수 안 맞는 번호는 버림', r.businessNumber === undefined, r.businessNumber)
+}
+
+/* ---------------- 실제 사업자등록증 (칸이 이어 붙어 나오는 경우) ---------------- */
+{
+  // PDF 에서 글자를 뽑으면 표가 칸 단위로 이어 붙어 한 줄이 된다.
+  // 업태 칸에 '제조업' 일곱 번, 종목 칸에 서로 다른 일곱 개가 줄줄이 붙는다.
+  const text = `사 업 자 등 록 증
+( 법인사업자 )
+등록번호 : 519-87-03609
+법 인 명 ( 단 체 명 ) : (주)샤인디자인
+대 표 자 : 권유진
+개 업 연 월 일 : 2024 년 04 월 12 일  법 인 등 록 번 호 : 284111-0443443
+사 업 장 소 재 지 : 경기도 남양주시 순화궁로 282, 221호(별내동, 에이스하이엔드타워)
+본 점 소 재 지 : 경기도 남양주시 순화궁로 282, 221호(별내동, 에이스하이엔드타워)
+사 업 의 종 류 : 업태 제조업 제조업 제조업 제조업 제조업 제조업 제조업 종목 간판 및 광고물 제조업 구조용 금속 판제품 및 공작물 제조업 육상 금속 골조 구조재 제조업 그 외 금속 압형제품 제조업 전기회로 접속장치 제조업 전시 및 광고용 조명장치 제조업 전구 및 램프 제조업 (별지 출력)
+발 급 사 유 :`
+  const r = parseKoreanBusinessDocument(text)
+  check('실물: 회사명', r.companyName === '(주)샤인디자인', r.companyName)
+  check('실물: 대표자', r.representativeName === '권유진', r.representativeName)
+  check('실물: 사업자등록번호', r.businessNumber === '519-87-03609', r.businessNumber)
+  check('실물: 법인등록번호', r.corporateNumber === '284111-0443443', r.corporateNumber)
+  check('실물: 개업일', r.establishedAt === '2024-04-12', r.establishedAt)
+  // 주소는 본점 하나만. 뒤의 '사업의 종류' 가 딸려 오면 안 된다.
+  check(
+    '실물: 주소는 본점 한 줄만',
+    r.address === '경기도 남양주시 순화궁로 282, 221호(별내동, 에이스하이엔드타워)',
+    r.address,
+  )
+  // 업태는 같은 말이 일곱 번 — 하나로 줄인다
+  check('실물: 업태는 중복을 지운 하나', r.businessCategory === '제조업', r.businessCategory)
+  // 종목은 첫 항목이 대표, 나머지는 따로
+  check('실물: 종목은 대표 하나', r.businessItem === '간판 및 광고물 제조업', r.businessItem)
+  check('실물: 나머지 종목 6개 보관', (r.businessItemsExtra ?? '').split(' · ').length === 6, r.businessItemsExtra)
+  check('실물: 나머지 종목에 대표 종목이 없다', !(r.businessItemsExtra ?? '').includes('간판 및'), r.businessItemsExtra)
+  check('실물: 어떤 값도 문단이 되지 않는다', [r.address, r.businessCategory, r.businessItem].every((v) => (v ?? '').length < 80))
 }
 
 console.log(`\ndoc-parser: ${passed} passed, ${failed} failed`)

@@ -1,7 +1,13 @@
 import { useState } from 'react'
 import { Check, ClipboardCopy, Copy, FileUp, Pencil, Pin, PinOff, Plus, Trash2 } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
-import { profileAsText, profileFields, profileFieldsByGroup } from '../../services/clientOpsProfile'
+import {
+  profileAsText,
+  profileFields,
+  profileFieldsByGroup,
+  type ProfileEditKey,
+  type ProfileField,
+} from '../../services/clientOpsProfile'
 import { sortedNotes } from '../../services/clientOpsService'
 import { Button } from '../ui/Button'
 
@@ -13,20 +19,31 @@ async function copyText(text: string): Promise<void> {
   }
 }
 
-/** 자주 찾는 회사 정보 한눈에 — 카톡 뒤져볼 일을 없앤다 */
+/**
+ * 자주 찾는 회사 정보 한눈에 — 카톡 뒤져볼 일을 없앤다.
+ *
+ * 어느 칸이든 눌러서 바로 고칠 수 있다. 서류를 첨부해야만 값이 채워지는 구조가
+ * 아니다 — 등록증이 없는 업체도 있고, 통화 중에 들은 값을 그 자리에서 적어야
+ * 할 때가 더 많다. '서류에서 불러오기' 는 빠른 길일 뿐 유일한 길이 아니다.
+ */
 export function CompanyProfileCard({
   record,
   today,
   onImport,
+  onEdit,
   /** 접이식 구역 안에 들어갈 때 — 카드 안 카드가 되지 않도록 테두리·제목을 뺀다 */
   bare = false,
 }: {
   record: ClientOpsRecord
   today: string
   onImport: () => void
+  /** 칸을 고쳤을 때. 없으면 읽기 전용으로 그린다 */
+  onEdit?: (key: ProfileEditKey, value: string) => void
   bare?: boolean
 }) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
+  const [editingKey, setEditingKey] = useState<string | null>(null)
+  const [draft, setDraft] = useState('')
   const fields = profileFields(record, today)
   const groups = profileFieldsByGroup(record, today)
   const filled = fields.filter((f) => !f.empty).length
@@ -35,6 +52,18 @@ export function CompanyProfileCard({
     await copyText(value)
     setCopiedKey(key)
     setTimeout(() => setCopiedKey(null), 1500)
+  }
+
+  /** 고칠 때는 합쳐 보여 주던 값이 아니라 원래 값을 넣는다 */
+  const startEdit = (f: ProfileField) => {
+    if (!onEdit || !f.edit) return
+    setEditingKey(f.key)
+    setDraft(record[f.edit] ?? '')
+  }
+
+  const saveEdit = (f: ProfileField) => {
+    if (onEdit && f.edit && draft !== (record[f.edit] ?? '')) onEdit(f.edit, draft.trim())
+    setEditingKey(null)
   }
 
   return (
@@ -75,27 +104,63 @@ export function CompanyProfileCard({
                 }`}
               >
                 <dt className="t-sub shrink-0 text-slate-500">{f.label}</dt>
-                <dd className="min-w-0 text-right">
-                  {f.empty ? (
-                    <span className="text-[0.95rem] text-slate-500">미입력</span>
-                  ) : f.copyable ? (
+                <dd className="min-w-0 flex-1 text-right">
+                  {editingKey === f.key ? (
+                    <input
+                      autoFocus
+                      value={draft}
+                      placeholder={f.placeholder}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onBlur={() => saveEdit(f)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') saveEdit(f)
+                        if (e.key === 'Escape') setEditingKey(null)
+                      }}
+                      className="w-full rounded-(--radius-control) border border-brand-400 px-2 py-1 text-right text-[0.98rem] font-semibold text-slate-900 focus:outline-none"
+                    />
+                  ) : f.empty ? (
+                    // 비어 있어도 누르면 바로 적을 수 있다 — 서류가 없어도 채울 수 있어야 한다
                     <button
                       type="button"
-                      onClick={() => void copy(f.key, f.value)}
-                      title="눌러서 복사"
-                      className="group inline-flex max-w-full items-center gap-1 text-right"
+                      disabled={!onEdit || !f.edit}
+                      onClick={() => startEdit(f)}
+                      className="text-[0.95rem] text-slate-500 hover:text-brand-700 hover:underline disabled:hover:text-slate-500 disabled:hover:no-underline"
                     >
-                      <span className="truncate text-[0.98rem] font-semibold text-slate-800 group-hover:text-brand-700 group-hover:underline">
-                        {f.value}
-                      </span>
-                      {copiedKey === f.key ? (
-                        <Check aria-hidden="true" className="size-3.5 shrink-0 text-success-600" />
-                      ) : (
-                        <Copy aria-hidden="true" className="size-3.5 shrink-0 text-slate-400 group-hover:text-brand-600" />
-                      )}
+                      {onEdit && f.edit ? '+ 입력' : '미입력'}
                     </button>
                   ) : (
-                    <span className="text-[0.98rem] font-semibold break-keep text-slate-800">{f.value}</span>
+                    <span className="inline-flex max-w-full items-center gap-1.5">
+                      {f.copyable ? (
+                        <button
+                          type="button"
+                          onClick={() => void copy(f.key, f.value)}
+                          title="눌러서 복사"
+                          className="group inline-flex min-w-0 items-center gap-1 text-right"
+                        >
+                          <span className="truncate text-[0.98rem] font-semibold text-slate-800 group-hover:text-brand-700 group-hover:underline">
+                            {f.value}
+                          </span>
+                          {copiedKey === f.key ? (
+                            <Check aria-hidden="true" className="size-3.5 shrink-0 text-success-600" />
+                          ) : (
+                            <Copy aria-hidden="true" className="size-3.5 shrink-0 text-slate-400 group-hover:text-brand-600" />
+                          )}
+                        </button>
+                      ) : (
+                        <span className="min-w-0 text-[0.98rem] font-semibold break-keep text-slate-800">{f.value}</span>
+                      )}
+                      {onEdit && f.edit && (
+                        <button
+                          type="button"
+                          aria-label={`${f.label} 고치기`}
+                          title="고치기"
+                          onClick={() => startEdit(f)}
+                          className="shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-brand-600"
+                        >
+                          <Pencil aria-hidden="true" className="size-3.5" />
+                        </button>
+                      )}
+                    </span>
                   )}
                 </dd>
               </div>

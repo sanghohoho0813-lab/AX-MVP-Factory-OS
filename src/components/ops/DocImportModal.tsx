@@ -21,6 +21,7 @@ const FIELD_ORDER: FieldKey[] = [
   'address',
   'businessCategory',
   'businessItem',
+  'businessItemsExtra',
 ]
 
 export interface DocImportResult {

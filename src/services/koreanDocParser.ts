@@ -23,8 +23,10 @@ export interface ParsedCompanyInfo {
   address?: string
   /** 업태 */
   businessCategory?: string
-  /** 종목 */
+  /** 종목 — 대표 종목 하나 */
   businessItem?: string
+  /** 대표 종목을 뺀 나머지 종목들 (' · ' 로 이음). 버리지 않되 화면 앞에 두지 않는다 */
+  businessItemsExtra?: string
 }
 
 /* ------------------------------------------------------------------ */
@@ -95,32 +97,52 @@ export function formatCorporateNumber(raw: string): string | undefined {
   return `${d.slice(0, 6)}-${d.slice(6)}`
 }
 
-/** 값에서 뒤따르는 라벨을 잘라낸다 (한 줄에 여러 항목이 붙어 나오는 경우) */
+/*
+ * 값에서 뒤따르는 라벨을 잘라낸다 (한 줄에 여러 항목이 붙어 나오는 경우).
+ *
+ * 국세청 사업자등록증은 라벨을 "본 점 소 재 지" 처럼 글자마다 띄어 인쇄한다.
+ * 그래서 라벨은 글자 그대로 적어 두고, 비교할 때 글자 사이에 공백을 허용하는
+ * 정규식으로 바꾼다. (예전에는 '본 ?점' 처럼 손으로 공백을 넣어 두었는데,
+ * 글자마다 띄어진 실제 인쇄물과 맞지 않아 잘라내기가 통째로 실패했다.
+ * 그 결과 주소 칸에 그 뒤의 '사업의 종류' 까지 다 딸려 들어왔다.)
+ */
 const LABELS = [
   '법인등록번호',
   '등록번호',
   '사업자등록번호',
-  '상 ?호',
+  '상호',
   '법인명',
-  '성 ?명',
-  '대 ?표 ?자',
+  '성명',
+  '대표자',
   '대표이사',
   '개업연월일',
   '생년월일',
   '사업장소재지',
-  '본 ?점',
+  '본점소재지',
+  '본점',
   '소재지',
-  '업 ?태',
-  '종 ?목',
+  '사업의종류',
+  '업태',
+  '종목',
+  '발급사유',
+  '발급기관',
+  '공동사업자',
+  '사업자단위과세',
+  '전자세금계산서',
   '회사성립연월일',
   '교부일자',
-  '주 ?소',
+  '주소',
 ]
+
+/** '본점소재지' → /본\s*점\s*소\s*재\s*지/ — 글자마다 띄어 인쇄된 라벨도 잡는다 */
+function spacedLabel(label: string): string {
+  return label.split('').join('\\s*')
+}
 
 function cutAtNextLabel(value: string): string {
   let out = value
   for (const l of LABELS) {
-    const re = new RegExp(`\\s*\\(?${l}\\)?\\s*[:：]`)
+    const re = new RegExp(`\\s*\\(?${spacedLabel(l)}\\)?\\s*[:：]`)
     const m = re.exec(out)
     if (m && m.index > 0) out = out.slice(0, m.index)
   }
@@ -139,8 +161,11 @@ function valueAfter(text: string, labelPattern: string): string | undefined {
     const next = after.split('\n').find((l) => l.trim() !== '')
     v = cutAtNextLabel(next ?? '')
   }
-  // '(단체명) : 값' 처럼 라벨 조각이 앞에 남는 경우를 제거한다
-  v = v.replace(/^\s*\([^)]{0,12}\)\s*[:：]?\s*/, '')
+  // '(단체명) : 값' 처럼 라벨 조각이 앞에 남는 경우를 제거한다.
+  // 단, 회사명 앞의 '(주)' 는 이름의 일부이므로 건드리지 않는다 — 쌍점이 뒤따르거나
+  // 괄호 안이 라벨 낱말일 때만 지운다.
+  v = v.replace(/^\s*\([^)]{0,12}\)\s*[:：]\s*/, '')
+  v = v.replace(/^\s*\(\s*(?:단체명|법인명|상호|성명|대표자)\s*\)\s*/, '')
   v = v.replace(/^(소재지|성명|법인명|상호|단체명)\s*[:：]\s*/, '')
   v = v.replace(/^[)\]}·.\-]+/, '').trim()
   return v === '' ? undefined : v
@@ -204,10 +229,18 @@ function findCorporateNumber(t: string): string | undefined {
 
 /** 회사명 */
 function findCompanyName(t: string, source: DocSource): string | undefined {
+  // 실제 인쇄물은 "법 인 명 ( 단 체 명 )" 처럼 글자마다 띄어 있다
+  const nameInBracket = `${spacedLabel('법인명')}\\s*\\(?\\s*${spacedLabel('단체명')}\\s*\\)?`
   const patterns =
     source === 'corporate_registry'
-      ? ['상\\s*호', '법인명\\s*\\(?단체명\\)?', '법인명', '회사명']
-      : ['법인명\\s*\\(?단체명\\)?', '상\\s*호\\s*\\(?법인명\\)?', '상\\s*호', '법인명', '회사명']
+      ? [spacedLabel('상호'), nameInBracket, spacedLabel('법인명'), spacedLabel('회사명')]
+      : [
+          nameInBracket,
+          `${spacedLabel('상호')}\\s*\\(?\\s*${spacedLabel('법인명')}\\s*\\)?`,
+          spacedLabel('상호'),
+          spacedLabel('법인명'),
+          spacedLabel('회사명'),
+        ]
   for (const p of patterns) {
     const v = valueAfter(t, p)
     if (v && v.length >= 2 && v.length <= 60) return v
@@ -262,17 +295,55 @@ function findEstablishedAt(t: string, source: DocSource): string | undefined {
   return undefined
 }
 
-/** 주소 */
+/**
+ * 주소 — 본점 소재지를 먼저 찾는다.
+ *
+ * 사업자등록증에는 '사업장 소재지' 와 '본 점 소 재 지' 가 나란히 찍히고 보통 같은
+ * 값이다. 다를 때 컨설팅에서 쓰는 것은 등기부상 본점이므로 그쪽을 먼저 본다.
+ */
 function findAddress(t: string, source: DocSource): string | undefined {
   const keys =
     source === 'corporate_registry'
-      ? ['본\\s*점\\s*소\\s*재\\s*지', '본\\s*점', '주\\s*사\\s*무\\s*소', '소\\s*재\\s*지']
-      : ['사\\s*업\\s*장\\s*소\\s*재\\s*지', '사\\s*업\\s*장\\s*\\(주소\\)', '소\\s*재\\s*지', '주\\s*소']
+      ? ['본점소재지', '본점', '주사무소', '소재지']
+      : ['본점소재지', '사업장소재지', '사업장', '소재지', '주소']
   for (const k of keys) {
-    const v = valueAfter(t, k)
+    const v = valueAfter(t, spacedLabel(k))
     if (v && v.length >= 5 && /[가-힣]/.test(v)) return v
   }
   return undefined
+}
+
+/**
+ * 업태·종목 정리.
+ *
+ * 사업자등록증의 '사업의 종류' 는 표다. 업태 칸에 '제조업' 이 일곱 줄, 종목 칸에
+ * 서로 다른 일곱 개가 들어간다. 그런데 PDF 에서 글자를 뽑으면 칸 단위로 이어
+ * 붙어 한 줄이 된다 — "제조업 제조업 제조업 …" 과
+ * "간판 및 광고물 제조업 구조용 금속 판제품 및 공작물 제조업 …".
+ * 그대로 넣으면 화면이 문단으로 뒤덮인다.
+ *
+ * 업태: 같은 말이 반복되므로 중복을 없앤다 → "제조업"
+ * 종목: 항목이 거의 예외 없이 '…업' 으로 끝나므로 그 경계로 나눈다.
+ *       첫 항목이 대표 종목이고 나머지는 따로 보관한다(버리지 않는다).
+ */
+function splitIndustryItems(value: string): string[] {
+  let flat = value.replace(/\s+/g, ' ').trim()
+  // '사 업 의 종 류 : 업태 … 종목 …' 처럼 칸 제목에 쌍점이 없을 때가 있다.
+  // 그때는 다음 칸 제목에서 끊어 준다(cutAtNextLabel 은 쌍점을 요구한다).
+  flat = flat.replace(/\s*종\s*목\s.*$/, '').replace(/\s*\(\s*별\s*지.*$/, '')
+  if (flat === '') return []
+  // '…업' 으로 끝나는 덩어리를 차례로 떼어낸다
+  const chunks = flat.match(/\S(?:.*?)업(?=\s|$)/g)
+  const items = chunks && chunks.length > 0 ? chunks : [flat]
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of items) {
+    const s = raw.trim()
+    if (s === '' || seen.has(s)) continue
+    seen.add(s)
+    out.push(s)
+  }
+  return out
 }
 
 /** 파싱 본체 */
@@ -292,8 +363,13 @@ export function parseKoreanBusinessDocument(raw: string): ParsedCompanyInfo {
   set('representativeBirth', findRepresentativeBirth(t))
   set('establishedAt', findEstablishedAt(t, source))
   set('address', findAddress(t, source))
-  set('businessCategory', valueAfter(t, '업\\s*태'))
-  set('businessItem', valueAfter(t, '종\\s*목'))
+
+  const categories = splitIndustryItems(valueAfter(t, spacedLabel('업태')) ?? '')
+  set('businessCategory', categories.join(' · '))
+
+  const items = splitIndustryItems(valueAfter(t, spacedLabel('종목')) ?? '')
+  set('businessItem', items[0])
+  set('businessItemsExtra', items.slice(1).join(' · '))
 
   return out
 }
@@ -309,6 +385,7 @@ export const PARSED_FIELD_LABEL: Record<keyof Omit<ParsedCompanyInfo, 'source'>,
   address: '주소',
   businessCategory: '업태',
   businessItem: '종목',
+  businessItemsExtra: '종목(그 외)',
 }
 
 export const DOC_SOURCE_LABEL: Record<DocSource, string> = {

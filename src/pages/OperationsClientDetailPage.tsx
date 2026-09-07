@@ -509,7 +509,13 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         했다. 상담 중에 한 번 더 누르게 만드는 것이 곧 카톡을 뒤지게 만드는 것이다.
       */}
       <Surface>
-        <CompanyProfileCard record={record} today={today} onImport={() => setImportOpen(true)} bare />
+        <CompanyProfileCard
+          record={record}
+          today={today}
+          onImport={() => setImportOpen(true)}
+          onEdit={(key, value) => void commit({ ...record, [key]: value })}
+          bare
+        />
       </Surface>
 
       {/* 3단계 — 막힘 / 돈 / 고객 연결 */}
@@ -1071,9 +1077,10 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             <TextField label="사업자등록번호" value={record.businessNumber} onChange={(v) => void commit({ ...record, businessNumber: v })} placeholder="000-00-00000" />
             <TextField label="법인등록번호" value={record.corporateNumber} onChange={(v) => void commit({ ...record, corporateNumber: v })} />
             <TextField label="업태" value={record.businessCategory} onChange={(v) => void commit({ ...record, businessCategory: v })} placeholder="예: 제조업" />
-            <TextField label="종목" value={record.businessItem} onChange={(v) => void commit({ ...record, businessItem: v })} placeholder="예: 자동차부품" />
+            <TextField label="종목" value={record.businessItem} onChange={(v) => void commit({ ...record, businessItem: v })} placeholder="예: 간판 및 광고물 제조업" />
+            <TextField label="종목(그 외)" value={record.businessItemsExtra} onChange={(v) => void commit({ ...record, businessItemsExtra: v })} placeholder="여러 개면 · 로 이어서" />
             <TextField label="업종(분류)" value={record.industry} onChange={(v) => void commit({ ...record, industry: v })} />
-            <TextField label="사업장 주소" value={record.businessAddress} onChange={(v) => void commit({ ...record, businessAddress: v })} />
+            <TextField label="본점 주소" value={record.businessAddress} onChange={(v) => void commit({ ...record, businessAddress: v })} />
 
             {/* 대표자와 담당자는 다른 사람일 수 있다 — 대표는 김대표인데 실무는 이과장이 하는 경우 */}
             <TextField label="대표자 이름" value={record.representativeName} onChange={(v) => void commit({ ...record, representativeName: v })} placeholder="비우면 담당자 이름을 씁니다" />
@@ -1119,6 +1126,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             address: record.businessAddress,
             businessCategory: record.businessCategory,
             businessItem: record.businessItem,
+            businessItemsExtra: record.businessItemsExtra,
           }}
           onClose={() => setImportOpen(false)}
           onApply={({ picked }) => {
@@ -1133,6 +1141,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             if (picked.address) next.businessAddress = picked.address
             if (picked.businessCategory) next.businessCategory = picked.businessCategory
             if (picked.businessItem) next.businessItem = picked.businessItem
+            if (picked.businessItemsExtra) next.businessItemsExtra = picked.businessItemsExtra
             const filled = Object.values(picked).filter((v) => typeof v === 'string' && v.trim() !== '').length
             void commit(withActivity(next, 'profile', `서류에서 기업 정보 ${filled}개 항목 반영`))
             setImportOpen(false)

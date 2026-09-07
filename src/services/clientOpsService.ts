@@ -210,6 +210,7 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
     establishedAt: value.establishedAt ?? '',
     businessCategory: value.businessCategory ?? '',
     businessItem: value.businessItem ?? '',
+    businessItemsExtra: value.businessItemsExtra ?? '',
     contactTitle: value.contactTitle ?? '',
     companyPhone: value.companyPhone ?? '',
     homepage: value.homepage ?? '',

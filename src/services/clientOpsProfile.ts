@@ -45,6 +45,27 @@ export const PROFILE_GROUP_LABEL: Record<ProfileGroup, string> = {
   credential: '인증서',
 }
 
+/** 이 칸을 고치면 어느 값이 바뀌는가 (없으면 화면에서 직접 못 고치는 칸) */
+export type ProfileEditKey =
+  | 'companyName'
+  | 'establishedAt'
+  | 'businessNumber'
+  | 'corporateNumber'
+  | 'businessCategory'
+  | 'businessItem'
+  | 'businessItemsExtra'
+  | 'businessAddress'
+  | 'representativeName'
+  | 'representativeBirth'
+  | 'contactName'
+  | 'contactTitle'
+  | 'employeeCount'
+  | 'shareholders'
+  | 'contactPhone'
+  | 'companyPhone'
+  | 'contactEmail'
+  | 'homepage'
+
 export interface ProfileField {
   key: string
   label: string
@@ -56,6 +77,14 @@ export interface ProfileField {
   group: ProfileGroup
   /** 한 줄을 다 쓰는 긴 값 (주소·지분 구성) */
   wide?: boolean
+  /**
+   * 눌러서 바로 고칠 수 있는 칸이면 고칠 값의 이름.
+   * 서류를 첨부해야만 채워지는 일이 없도록, 거의 모든 칸이 여기에 해당한다.
+   * '대표자' 처럼 여러 값을 합쳐 보여 주는 칸은 대표 값 하나만 고친다.
+   */
+  edit?: ProfileEditKey
+  /** 입력칸에 넣을 예시 */
+  placeholder?: string
 }
 
 /**
@@ -89,7 +118,7 @@ export function profileFields(
     label: string,
     value: string,
     group: ProfileGroup,
-    opts: { copyable?: boolean; wide?: boolean } = {},
+    opts: { copyable?: boolean; wide?: boolean; edit?: ProfileEditKey; placeholder?: string } = {},
   ): ProfileField => ({
     key,
     label,
@@ -98,22 +127,53 @@ export function profileFields(
     copyable: opts.copyable === true,
     group,
     wide: opts.wide,
+    edit: opts.edit,
+    placeholder: opts.placeholder,
   })
 
-  return [
+  const out: ProfileField[] = [
     // 회사 — 서류에 그대로 옮겨 적는 값들
-    f('companyName', '회사명', record.companyName, 'identity', { copyable: true }),
+    f('companyName', '회사명', record.companyName, 'identity', { copyable: true, edit: 'companyName' }),
     f(
       'establishedAt',
       '설립일 · 업력',
       record.establishedAt ? `${record.establishedAt}${y ? ` · ${y.nthYear}년차 (만 ${y.fullYears}년)` : ''}` : '',
       'identity',
+      { edit: 'establishedAt', placeholder: '2019-03-05' },
     ),
-    f('businessNumber', '사업자등록번호', record.businessNumber, 'identity', { copyable: true }),
-    f('corporateNumber', '법인등록번호', record.corporateNumber, 'identity', { copyable: true }),
-    f('businessCategory', '업태', record.businessCategory, 'identity'),
-    f('businessItem', '종목', record.businessItem, 'identity'),
-    f('businessAddress', '사업장 주소', record.businessAddress, 'identity', { copyable: true, wide: true }),
+    f('businessNumber', '사업자등록번호', record.businessNumber, 'identity', {
+      copyable: true,
+      edit: 'businessNumber',
+      placeholder: '000-00-00000',
+    }),
+    f('corporateNumber', '법인등록번호', record.corporateNumber, 'identity', {
+      copyable: true,
+      edit: 'corporateNumber',
+      placeholder: '000000-0000000',
+    }),
+    f('businessCategory', '업태', record.businessCategory, 'identity', { edit: 'businessCategory', placeholder: '예: 제조업' }),
+    f('businessItem', '종목', record.businessItem, 'identity', {
+      edit: 'businessItem',
+      placeholder: '예: 간판 및 광고물 제조업',
+    }),
+  ]
+
+  // 종목이 여럿인 회사만 — 없으면 줄 자체를 두지 않는다
+  if (record.businessItemsExtra.trim() !== '') {
+    out.push(
+      f('businessItemsExtra', '종목(그 외)', record.businessItemsExtra, 'identity', {
+        wide: true,
+        edit: 'businessItemsExtra',
+      }),
+    )
+  }
+
+  out.push(
+    f('businessAddress', '본점 주소', record.businessAddress, 'identity', {
+      copyable: true,
+      wide: true,
+      edit: 'businessAddress',
+    }),
 
     // 사람 — 심사에서 매번 묻는 것들
     f(
@@ -121,25 +181,45 @@ export function profileFields(
       '대표자',
       repName ? `${repName}${record.representativeBirth ? ` · ${record.representativeBirth}${age !== null ? ` (만 ${age}세)` : ''}` : ''}` : '',
       'people',
+      { edit: 'representativeName' },
     ),
+    f('representativeBirth', '대표자 생년월일', record.representativeBirth, 'people', {
+      edit: 'representativeBirth',
+      placeholder: '1980-12-31',
+    }),
     f(
       'contactName',
       '담당자',
       record.contactName ? `${record.contactName}${record.contactTitle ? ` ${record.contactTitle}` : ''}` : '',
       'people',
+      { edit: 'contactName' },
     ),
-    f('employeeCount', '상시근로자', record.employeeCount, 'people'),
-    f('shareholders', '주주·임원 구성', record.shareholders, 'people', { wide: true }),
+    f('employeeCount', '상시근로자', record.employeeCount, 'people', {
+      edit: 'employeeCount',
+      placeholder: '예: 5명(대표 포함)',
+    }),
+    f('shareholders', '주주·임원 구성', record.shareholders, 'people', {
+      wide: true,
+      edit: 'shareholders',
+      placeholder: '예: 대표 60% · 배우자 40% / 등기임원 2명',
+    }),
 
     // 연락처
-    f('contactPhone', '담당자 휴대폰', record.contactPhone, 'contact', { copyable: true }),
-    f('companyPhone', '회사 대표번호', record.companyPhone, 'contact', { copyable: true }),
-    f('contactEmail', '이메일', record.contactEmail, 'contact', { copyable: true }),
-    f('homepage', '홈페이지', record.homepage, 'contact', { copyable: true }),
+    f('contactPhone', '담당자 휴대폰', record.contactPhone, 'contact', {
+      copyable: true,
+      edit: 'contactPhone',
+      placeholder: '010-0000-0000',
+    }),
+    f('companyPhone', '회사 대표번호', record.companyPhone, 'contact', { copyable: true, edit: 'companyPhone' }),
+    f('contactEmail', '이메일', record.contactEmail, 'contact', { copyable: true, edit: 'contactEmail' }),
+    f('homepage', '홈페이지', record.homepage, 'contact', { copyable: true, edit: 'homepage' }),
 
     // 인증서 — 받았는지·어디에 두었는지만. 비밀번호는 저장하지 않는다.
+    // 여기만 직접 고칠 수 없다: 값이 '서류' 탭의 받음 표시에서 나오기 때문이다.
     f('jointCertificate', '공동인증서', certificateValue(record), 'credential', { wide: true }),
-  ]
+  )
+
+  return out
 }
 
 /** 묶음 순서대로 나눠 준다 (빈 묶음은 빼지 않는다 — 무엇이 비었는지도 정보다) */

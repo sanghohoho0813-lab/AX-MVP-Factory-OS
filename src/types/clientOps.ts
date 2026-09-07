@@ -253,8 +253,14 @@ export interface ClientOpsRecord {
   establishedAt: string
   /** 업태 */
   businessCategory: string
-  /** 종목 */
+  /** 종목 — 대표 종목 하나만. 여러 개면 아래 businessItemsExtra 로 뺀다 */
   businessItem: string
+  /**
+   * 대표 종목을 뺀 나머지 종목 (' · ' 로 이음).
+   * 사업자등록증에 종목이 일곱 줄씩 찍히는 회사가 있는데, 그것을 다 앞에 두면
+   * 화면이 문단이 된다. 버리지는 않고 뒤로 뺀다.
+   */
+  businessItemsExtra: string
   /** 담당자 직급 */
   contactTitle: string
   /** 회사 대표번호 */

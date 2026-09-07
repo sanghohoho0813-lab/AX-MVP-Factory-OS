@@ -383,6 +383,9 @@ check('funding: 14일 내 미접수만', fd.length === 1 && fd[0].programName ==
     employeeCount: '5명(대표 포함)',
     shareholders: '대표 60% · 배우자 40%',
     contactPhone: '010-1111-2222',
+    businessCategory: '제조업',
+    businessItem: '간판 및 광고물 제조업',
+    businessItemsExtra: '구조용 금속 판제품 및 공작물 제조업 · 전구 및 램프 제조업',
     documents: { jointCertificate: { received: true, issuedAt: '2026-01-10', note: '대표 USB' } },
   } as unknown as Partial<ClientOpsRecord>)
   const fields = profileFields(rec, TODAY)
@@ -399,10 +402,19 @@ check('funding: 14일 내 미접수만', fd.length === 1 && fd[0].programName ==
     fields.every((f) => !/비밀번호|password|passwd|pw/i.test(f.key + f.label)),
   )
   check('profile: 주민등록번호를 담는 칸이 없다', fields.every((f) => !/주민|resident/i.test(f.label)))
+  check('profile: 종목은 대표 하나만 앞에 둔다', get('businessItem').value === '간판 및 광고물 제조업')
+  check('profile: 나머지 종목은 따로 한 줄', get('businessItemsExtra').value.includes('전구 및 램프') && get('businessItemsExtra').wide === true)
+  // 서류 없이도 채울 수 있어야 한다 — 인증서만 빼고 전부 화면에서 고칠 수 있다
+  check(
+    'profile: 인증서를 뺀 모든 칸을 화면에서 고칠 수 있다',
+    fields.filter((f) => f.group !== 'credential').every((f) => f.edit !== undefined),
+  )
+  check('profile: 인증서 칸은 화면에서 직접 못 고친다', get('jointCertificate').edit === undefined)
   check('profile: 네 묶음으로 나뉜다', profileFieldsByGroup(rec, TODAY).map((g) => g.group).join() === 'identity,people,contact,credential')
 
   // 예전 기록 — 대표 이름을 담당자 칸에 넣어 두었던 것
   const old = normalizeClientOps({ id: 'p2', companyName: '옛기록', contactName: '박대표' } as unknown as Partial<ClientOpsRecord>)
+  check('profile: 종목이 하나뿐이면 그 외 줄을 두지 않는다', !profileFields(old, TODAY).some((f) => f.key === 'businessItemsExtra'))
   check('profile: 대표자 칸이 비면 담당자 이름으로 대신한다', profileFields(old, TODAY).find((f) => f.key === 'representativeName')!.value === '박대표')
   check('profile: 안 받은 인증서는 미입력이 아니라 안 받음으로 말한다', profileFields(old, TODAY).find((f) => f.key === 'jointCertificate')!.value === '아직 안 받음')
 }
