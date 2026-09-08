@@ -16,9 +16,11 @@ import { defaultArtifactTitle, parsePastedResult } from '../../../domain/consult
 import { parseReturnBlock } from '../../../domain/consulting/returnBlock'
 import { formatDateTime } from '../../../lib/format'
 import type { ConsultingPromptPackage } from '../../../types/consulting'
+import type { DocFactRead } from '../../../domain/consulting/companyDocFacts'
 import { TaskCard } from './TaskCard'
 import { PromptResultPanel } from './PromptResultPanel'
 import { QuickImportSheet } from './QuickImportSheet'
+import { CompanyDocSheet } from './CompanyDocSheet'
 
 export function ProgressTab({ onOpenAdvanced }: { onOpenAdvanced: () => void }) {
   const ed = useEditor()
@@ -26,6 +28,7 @@ export function ProgressTab({ onOpenAdvanced }: { onOpenAdvanced: () => void }) 
   const [busy, setBusy] = useState(false)
   const [generated, setGenerated] = useState<ConsultingPromptPackage | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  const [docOpen, setDocOpen] = useState(false)
 
   const ctx = useMemo(() => ({ artifacts, prompts, evidence, today }), [artifacts, prompts, evidence, today])
   const task = useMemo(() => resolveCurrentTask(p, ctx), [p, ctx])
@@ -95,6 +98,20 @@ export function ProgressTab({ onOpenAdvanced }: { onOpenAdvanced: () => void }) 
     }
   }
 
+  /* ---------- 서류에서 회사 정보 채우기 ---------- */
+  const applyDocFacts = async (facts: DocFactRead[]) => {
+    setBusy(true)
+    try {
+      await ed.submitTask(task, { facts })
+      setDocOpen(false)
+      ed.toast(`${facts.length}개 항목을 서류에서 채웠습니다.`)
+    } catch (cause) {
+      ed.toast(cause instanceof Error ? cause.message : '채우지 못했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   /* ---------- 그 밖의 제출 ---------- */
   const submit = async (sub: TaskSubmission) => {
     if (task.actionType === 'GENERATE_PROMPT') return void generate()
@@ -129,7 +146,14 @@ export function ProgressTab({ onOpenAdvanced }: { onOpenAdvanced: () => void }) 
 
       {generated && <PromptResultPanel pkg={generated} />}
 
-      <TaskCard task={task} busy={busy} quiet={generated !== null} onSubmit={(sub) => void submit(sub)} onEditItem={onOpenAdvanced} />
+      <TaskCard
+        task={task}
+        busy={busy}
+        quiet={generated !== null}
+        onSubmit={(sub) => void submit(sub)}
+        onEditItem={onOpenAdvanced}
+        onImportDoc={() => setDocOpen(true)}
+      />
 
       {/* 작게 — 최근 것만 */}
       {(recent.length > 0 || lastDecision) && (
@@ -148,6 +172,8 @@ export function ProgressTab({ onOpenAdvanced }: { onOpenAdvanced: () => void }) 
           )}
         </div>
       )}
+
+      {docOpen && <CompanyDocSheet project={p} busy={busy} onApply={(facts) => void applyDocFacts(facts)} onClose={() => setDocOpen(false)} />}
 
       {importOpen && task.artifactType && (
         <QuickImportSheet artifactType={task.artifactType} busy={busy} onSave={(t, f) => void importResult(t, f)} onClose={() => setImportOpen(false)} />

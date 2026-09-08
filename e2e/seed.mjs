@@ -180,9 +180,19 @@ const consultingProjects = [
     fieldReview: { reviewDate: '', script: '', demoFlow: '', qa: [], numbersToMemorize: [], evidencePackChecked: {}, mockReviewDone: false, result: '' },
     createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-03T00:00:00.000Z',
   },
+  // 막 만든 프로젝트 — 회사 기본정보가 비어 있어 S0 부터 시작한다 (서류로 채우기 시험용)
+  {
+    id: 'proj_new', workspaceId: null, clientId: 'cli_hansol', clientName: '한솔테크(주)', moduleKey: 'patent_venture_mvp',
+    title: '신규 프로젝트', status: 'active', currentStage: 'S0',
+    stages: { S0: { status: 'in_progress' } },
+    factsheet: {},
+    createdAt: '2026-09-03T00:00:00.000Z', updatedAt: '2026-09-03T00:00:00.000Z',
+  },
 ]
 
 export const SEED_PROJECT_ID = 'proj_hansol'
+/** 회사 기본정보가 비어 있는 프로젝트 — S0 */
+export const SEED_NEW_PROJECT_ID = 'proj_new'
 
 export function seedScript() {
   return `

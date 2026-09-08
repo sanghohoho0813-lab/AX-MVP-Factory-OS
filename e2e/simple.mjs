@@ -12,7 +12,7 @@
  */
 
 import { chromium } from 'playwright'
-import { seedScript, SEED_CLIENT_ID, SEED_PROJECT_ID } from './seed.mjs'
+import { seedScript, SEED_CLIENT_ID, SEED_NEW_PROJECT_ID, SEED_PROJECT_ID } from './seed.mjs'
 
 const BASE = process.argv[2] ?? 'http://localhost:4390'
 let pass = 0
@@ -174,6 +174,63 @@ check('5 탭이 가로 스크롤되지 않는다', await page.evaluate(() => {
   const el = document.querySelector('[role=tablist]')
   return el ? el.scrollWidth - el.clientWidth <= 2 : false
 }))
+
+/* ── 서류로 회사 기본정보 채우기 (사업자등록증 · 법인등기부등본) ── */
+{
+  await page.goto(BASE + `/studio/${SEED_NEW_PROJECT_ID}`, { waitUntil: 'networkidle' })
+  await wait(900)
+  check('서류: 빈 프로젝트는 회사 기본정보부터 묻는다', (await page.getByText(/회사 기본정보/).count()) > 0)
+  const docBtn = page.getByRole('button', { name: /사업자등록증/ }).first()
+  check('서류: 카드에 "서류로 채우기" 가 보인다', (await docBtn.count()) > 0)
+  check('서류: 서류 버튼이 강조 버튼을 뺏지 않는다', (await page.locator('button.bg-brand-600').count()) === 1)
+
+  await docBtn.click()
+  await wait(500)
+  const sheet = page.getByRole('dialog')
+  check('서류: 한 번에 두 장을 고를 수 있다', await sheet.locator('input[type=file][multiple]').count() > 0)
+  check('서류: PDF·사진만 받는다', (await sheet.locator('input[type=file]').getAttribute('accept'))?.includes('pdf') === true)
+
+  // 파일 대신 글자로 — 판독기(pdfjs·OCR)를 브라우저 시험에서 돌리지 않기 위해서다.
+  // 읽어 낸 다음의 흐름(무엇을 채우나 · 무엇을 덮나 · 어떻게 기록되나)은 동일하다.
+  await sheet.getByRole('button', { name: '서류 대신 글자를 붙여 넣기' }).click()
+  await wait(300)
+  await page.getByLabel('서류 글자 붙여넣기').fill(
+    [
+      '사업자등록증 ( 법인사업자 )',
+      '등록번호 : 214-88-01234',
+      '법인명(단체명) : 주식회사 대한정밀',
+      '대표자 : 박정밀',
+      '개업연월일 : 2018 년 05 월 14 일',
+      '사업장 소재지 : 경기도 화성시 동탄산단6길 22',
+      '업태 : 제조업',
+      '종목 : 자동차부품 제조',
+    ].join('\n'),
+  )
+  await sheet.getByRole('button', { name: '글자에서 읽기' }).click()
+  await wait(600)
+  check('서류: 읽은 항목을 목록으로 보여준다', (await sheet.getByText(/에서 \d+개를 읽었습니다/).count()) > 0)
+  check('서류: 회사명을 읽었다', (await sheet.getByText('주식회사 대한정밀').count()) > 0)
+  check('서류: 사업자등록번호를 읽었다', (await sheet.getByText('214-88-01234').count()) > 0)
+  check('서류: 대표자를 읽었다', (await sheet.getByText('박정밀').count()) > 0)
+
+  const applyBtn = sheet.getByRole('button', { name: /개 채우기/ })
+  check('서류: 몇 개를 채울지 버튼에 쓴다', (await applyBtn.count()) > 0, (await applyBtn.first().textContent()) ?? '')
+  await applyBtn.first().click()
+  await wait(1600)
+
+  const saved = await page.evaluate(
+    (id) => (JSON.parse(localStorage.getItem('axmvp.v1.consulting_projects') ?? '[]').find((x) => x.id === id) ?? {}).factsheet ?? {},
+    SEED_NEW_PROJECT_ID,
+  )
+  check('서류: 회사명이 사실표에 들어갔다', saved.companyName?.value === '주식회사 대한정밀', JSON.stringify(saved.companyName))
+  check('서류: 출처가 서류 이름으로 남는다', saved.companyName?.source === '사업자등록증', saved.companyName?.source)
+  check('서류: 본점·설립일·사업자번호도 함께 채워진다', !!saved.headOffice?.value && !!saved.establishedAt?.value && saved.businessNumber?.value === '214-88-01234')
+  check('서류: 종목에서 옮긴 주요제품은 미확인으로 둔다', saved.mainProducts?.status === 'unverified', saved.mainProducts?.status)
+
+  await page.getByRole('tab', { name: '기록' }).click()
+  await wait(700)
+  check('서류: 따로 적지 않아도 기록에 남는다', (await page.getByText(/서류에서 \d+개 항목/).count()) > 0)
+}
 
 /* ── 데스크톱 1024 / 1440 / 1920 ── */
 for (const width of [1024, 1440, 1920]) {

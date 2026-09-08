@@ -14,6 +14,8 @@ import { buildPromptPackage } from '../../domain/consulting/promptPackageBuilder
 import { normalizeProject } from '../../domain/consulting/projectModel'
 import { seedFactsFromClient } from '../../domain/consulting/factsheetSchema'
 import { CORE_PROBLEM_CHOICES } from '../../domain/consulting/operatorChoices'
+import { documentsSummary, factsFromDocuments } from '../../domain/consulting/companyDocFacts'
+import { parseKoreanBusinessDocument } from '../koreanDocParser'
 import { normalizeClientOps } from '../clientOpsService'
 import type { ConsultingArtifact, ConsultingProject, ConsultingPromptPackage } from '../../types/consulting'
 import type { ClientOpsRecord } from '../../types/clientOps'
@@ -255,6 +257,85 @@ function promptPkg(over: Partial<ConsultingPromptPackage>): ConsultingPromptPack
   const fresh = seeded()
   check('자동 추정 금지: 매출·거래처를 만들어 내지 않는다', fresh.factsheet.revenue3y === undefined && fresh.factsheet.customers === undefined)
   check('시드된 값은 미확인으로 표시', fresh.factsheet.companyName?.status === 'unverified')
+}
+
+/* ------------------------------------------------------------------ */
+/* 6-2. 서류에서 회사 기본정보 채우기                                     */
+/* ------------------------------------------------------------------ */
+{
+  const REGISTRATION = [
+    '사업자등록증',
+    '( 법인사업자 )',
+    '등록번호 : 214-88-01234',
+    '법인명(단체명) : 주식회사 대한정밀',
+    '대표자 : 박정밀',
+    '개업연월일 : 2018 년 05 월 14 일',
+    '사업장 소재지 : 경기도 화성시 동탄산단6길 22',
+    '업태 : 제조업',
+    '종목 : 자동차부품 제조, 금형',
+  ].join('\n')
+
+  const REGISTRY = [
+    '등기사항전부증명서(말소사항 포함) - 주식회사',
+    '등기번호 111111',
+    '등록번호 110111-1234567',
+    '상 호 주식회사 대한정밀',
+    '본 점 경기도 화성시 동탄산단6길 22, 3층',
+    '회사성립연월일 2018 년 03 월 02 일',
+    '사내이사 박정밀',
+    '대표이사 박정밀',
+  ].join('\n')
+
+  const fromReg = parseKoreanBusinessDocument(REGISTRATION)
+  const fromRegistry = parseKoreanBusinessDocument(REGISTRY)
+
+  check('서류: 사업자등록증을 알아본다', fromReg.source === 'business_registration', fromReg.source)
+  check('서류: 법인등기부등본을 알아본다', fromRegistry.source === 'corporate_registry', fromRegistry.source)
+
+  // 한 장만 올려도 채워진다 (사용자 요구: "사업자등록증이나 법인등기부등본만 업로드해도")
+  const onlyReg = factsFromDocuments([fromReg])
+  const keys = onlyReg.map((f) => f.key)
+  check('서류 한 장(사업자등록증)만으로 채워진다', keys.includes('companyName') && keys.includes('businessNumber') && keys.includes('representative'), keys.join(','))
+  check('서류: 업태·종목을 업종으로 합친다', onlyReg.find((f) => f.key === 'industry')?.value === '제조업 · 자동차부품 제조, 금형', JSON.stringify(onlyReg.find((f) => f.key === 'industry')))
+  check('서류: 출처가 서류 이름으로 남는다', onlyReg.every((f) => f.source.includes('사업자등록증')), JSON.stringify(onlyReg.map((f) => f.source)))
+  check('서류: 종목에서 옮긴 주요제품은 미확인으로 둔다', onlyReg.find((f) => f.key === 'mainProducts')?.status === 'unverified')
+
+  const onlyRegistry = factsFromDocuments([fromRegistry])
+  check('서류 한 장(법인등기부등본)만으로도 채워진다', onlyRegistry.some((f) => f.key === 'corporateNumber') && onlyRegistry.some((f) => f.key === 'headOffice'), onlyRegistry.map((f) => f.key).join(','))
+
+  // 두 장을 함께 올리면 항목마다 더 믿을 만한 쪽을 쓴다
+  const both = factsFromDocuments([fromReg, fromRegistry])
+  const val = (k: string) => both.find((f) => f.key === k)?.value
+  const src = (k: string) => both.find((f) => f.key === k)?.source
+  check('두 장: 본점은 등기부 것을 쓴다', val('headOffice')?.includes('3층') === true, val('headOffice'))
+  check('두 장: 설립일은 등기부의 회사성립연월일', val('establishedAt') === '2018-03-02', val('establishedAt'))
+  check('두 장: 사업자등록번호는 등록증 것을 쓴다', val('businessNumber') === '214-88-01234' && src('businessNumber') === '사업자등록증', `${val('businessNumber')} / ${src('businessNumber')}`)
+  check('두 장: 법인등록번호도 함께 채워진다', val('corporateNumber') === '110111-1234567', val('corporateNumber'))
+  check('두 장: 사람이 읽을 출처 한 줄', documentsSummary([fromReg, fromRegistry]) === '사업자등록증 · 법인등기부등본', documentsSummary([fromReg, fromRegistry]))
+
+  // 없는 것을 만들어 내지 않는다 (§31)
+  check('서류: 매출·직원수를 지어내지 않는다', !both.some((f) => ['revenue3y', 'employees', 'customers'].includes(f.key)))
+
+  // 실제로 프로젝트에 적용된다
+  const blank = { ...project(), stages: { ...project().stages, S0: { ...project().stages.S0, status: 'in_progress' as const } } }
+  const t0 = resolveCurrentTask(blank, emptyCtx)
+  check('S0: 서류로 채우기를 안내한다', t0.docImport === true && t0.actionType === 'INPUT', `${t0.actionType} ${String(t0.docImport)}`)
+  const afterDoc = applyTask(blank, t0, { facts: both }, emptyCtx, NOW)
+  check('서류 적용: 사실표에 들어간다', afterDoc.project.factsheet.companyName?.value === '주식회사 대한정밀', afterDoc.project.factsheet.companyName?.value)
+  check('서류 적용: 출처가 남는다', afterDoc.project.factsheet.headOffice?.source === '법인등기부등본', afterDoc.project.factsheet.headOffice?.source)
+  check('서류 적용: 자동으로 기록된다', afterDoc.decisions.some((d) => d.kind === 'fact' && d.summary.includes('서류에서')))
+  check('서류 적용: 단계를 끝내 버리지 않는다', afterDoc.project.stages.S0.status !== 'completed', afterDoc.project.stages.S0.status)
+
+  // 확인 화면에서 올려도 '맞아요' 를 누른 것으로 치지 않는다
+  const t1 = resolveCurrentTask(afterDoc.project, emptyCtx)
+  check('S0: 서류로 다 채우면 확인 화면으로 넘어간다', t1.actionType === 'CONFIRM' && t1.docImport === true, t1.actionType)
+  const reDoc = applyTask(afterDoc.project, t1, { facts: [both[0]] }, emptyCtx, NOW)
+  check('확인 화면에서 서류를 다시 올려도 단계가 끝나지 않는다', reDoc.project.stages.S0.status !== 'completed', reDoc.project.stages.S0.status)
+  const confirmed = applyTask(afterDoc.project, t1, {}, emptyCtx, NOW)
+  check('확인 버튼을 눌러야 단계가 끝난다', confirmed.project.stages.S0.status === 'completed')
+
+  // 아무것도 못 읽은 서류
+  check('서류: 못 알아봐도 빈 목록만 돌려준다', factsFromDocuments([parseKoreanBusinessDocument('그냥 아무 글자')]).length === 0)
 }
 
 /* ------------------------------------------------------------------ */

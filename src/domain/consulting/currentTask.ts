@@ -113,6 +113,11 @@ export interface CurrentTask {
   artifactType?: ArtifactType
   /** CONFIRM 이 기록할 일 (freshness 등) */
   confirmKind?: 'stage_done' | 'freshness_patent' | 'freshness_venture' | 'kipo_pdf' | 'redflags'
+  /**
+   * 서류(사업자등록증·법인등기부등본)를 올려 회사 기본정보를 한 번에 채울 수 있는 할 일인가.
+   * 손으로 일곱 칸을 적는 대신 서류 한 장이면 끝나는 자리에만 붙인다.
+   */
+  docImport?: boolean
   /** 프로젝트가 끝났다 */
   finished?: boolean
 }
@@ -229,10 +234,11 @@ function taskForStage(p: ConsultingProject, stage: StageKey, ctx: TaskContext): 
           id: `S0:INPUT:${need.slice(0, 3).join(',')}`,
           stageKey: stage,
           headline: need.length <= 2 ? `${need.length}가지만 확인하면 시작할 수 있습니다` : '회사 기본정보를 채웁니다',
-          detail: '고객 기록에서 가져올 수 있는 것은 이미 채웠습니다. 비어 있는 것만 적어 주세요.',
+          detail: '사업자등록증이나 법인등기부등본을 올리면 아래 칸이 저절로 채워집니다. 직접 적어도 됩니다.',
           actionType: 'INPUT',
           primaryAction: '저장하고 계속',
           inputs: need.slice(0, 3).map((k) => factInput(k)),
+          docImport: true,
           ready,
           nextPreview: next,
         }
@@ -245,6 +251,8 @@ function taskForStage(p: ConsultingProject, stage: StageKey, ctx: TaskContext): 
         actionType: 'CONFIRM',
         primaryAction: '맞아요, 계속',
         confirmKind: 'stage_done',
+        // 틀린 값이 보이면 서류를 다시 올려 덮어쓸 수 있게 여기에도 둔다
+        docImport: true,
         confirmItems: def.requiredFacts.map((k) => {
           const v = p.factsheet[k]
           return { label: factDef(k).label, value: v?.value ?? '', needsCheck: v?.status === 'unverified' || v?.status === 'demo' }

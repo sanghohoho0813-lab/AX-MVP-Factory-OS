@@ -12,7 +12,8 @@ import type { ConsultingProject, DecisionKind, StageKey } from '../../types/cons
 import type { CurrentTask, InputTarget, TaskContext } from './currentTask'
 import { activeStage, stageSatisfied } from './currentTask'
 import { STAGE_ORDER, stageDef } from './workflowDefinition'
-import { emptyFact } from './factsheetSchema'
+import { emptyFact, factDef } from './factsheetSchema'
+import type { DocFactRead } from './companyDocFacts'
 import { GATE_CHOICES } from './operatorChoices'
 import { RED_FLAGS } from './qaRules'
 import { kipoByCode } from './kipoReferences'
@@ -22,6 +23,8 @@ export interface TaskSubmission {
   values?: string[]
   /** SELECT — 고른 값들 */
   selected?: string[]
+  /** 서류(사업자등록증·법인등기부등본)에서 읽어 사람이 확인한 값 */
+  facts?: DocFactRead[]
 }
 
 export interface PendingDecision {
@@ -67,6 +70,25 @@ function writeTarget(p: ConsultingProject, target: InputTarget, value: string, a
       return { ...p, fieldReview: { ...p.fieldReview, [target.key]: v } }
     default:
       return p
+  }
+}
+
+/**
+ * 서류에서 읽은 값을 사실표에 쓴다.
+ *
+ * 사람이 목록에서 체크한 것만 여기로 오므로 조용히 덮어쓰는 일은 없다(§44).
+ * 출처는 '대표 확인' 이 아니라 어느 서류에서 읽었는지를 남긴다 — 나중에 근거를 다시 찾을 수 있게.
+ */
+function writeDocFact(p: ConsultingProject, f: DocFactRead, at: string): ConsultingProject {
+  const v = f.value.trim()
+  if (v === '') return p
+  const prev = p.factsheet[f.key] ?? emptyFact()
+  return {
+    ...p,
+    factsheet: {
+      ...p.factsheet,
+      [f.key]: { ...prev, value: v, status: f.status, source: f.source, asOfDate: prev.asOfDate || at.slice(0, 10), updatedAt: at },
+    },
   }
 }
 
@@ -132,6 +154,30 @@ export function applyTask(p: ConsultingProject, task: CurrentTask, sub: TaskSubm
   let cur = p
   const decisions: PendingDecision[] = []
   const stage = task.stageKey
+
+  /*
+   * 서류에서 읽은 값은 어느 할 일에서 올라오든 먼저 쓴다.
+   * (지금은 S0 의 입력·확인 화면에서 올라온다. 다른 곳에 붙어도 그대로 동작한다.)
+   */
+  const docFacts = sub.facts ?? []
+  if (docFacts.length > 0) {
+    for (const f of docFacts) cur = writeDocFact(cur, f, at)
+    const sources = [...new Set(docFacts.map((f) => f.source))].join(' · ')
+    decisions.push({
+      stageKey: stage,
+      kind: 'fact',
+      summary: `서류에서 ${docFacts.length}개 항목 자동 입력 · ${docFacts.map((f) => factDef(f.key).label).join(', ')}`.slice(0, 160),
+      reason: sources,
+    })
+    /*
+     * 서류를 읽어 채운 것은 그 할 일을 끝냈다는 뜻이 아니다.
+     * 특히 확인 화면에서 올렸다면 '맞아요, 계속' 을 누른 것이 아니므로 단계를 끝내면 안 된다.
+     * 값만 쓰고 다음 할 일은 resolver 가 다시 정한다.
+     */
+    cur = syncCoreThread(cur)
+    const onlyDocs = autoAdvance(cur, ctx, at)
+    return { project: onlyDocs.project, decisions: [...decisions, ...onlyDocs.decisions] }
+  }
 
   switch (task.actionType) {
     case 'INPUT': {

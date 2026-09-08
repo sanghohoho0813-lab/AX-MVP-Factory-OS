@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { ArrowRight, Check, CircleAlert, Pencil } from 'lucide-react'
+import { ArrowRight, Check, CircleAlert, FileUp, Pencil } from 'lucide-react'
 import type { CurrentTask } from '../../../domain/consulting/currentTask'
 import type { TaskSubmission } from '../../../domain/consulting/applyTask'
 import { RED_FLAGS } from '../../../domain/consulting/qaRules'
@@ -17,6 +17,7 @@ export function TaskCard({
   busy,
   onSubmit,
   onEditItem,
+  onImportDoc,
   quiet = false,
 }: {
   task: CurrentTask
@@ -25,6 +26,8 @@ export function TaskCard({
   onSubmit: (sub: TaskSubmission) => void
   /** CONFIRM 에서 '수정' */
   onEditItem?: () => void
+  /** task.docImport 일 때 — 사업자등록증·법인등기부등본 올리기 */
+  onImportDoc?: () => void
   /** 위에 이미 강조 블록(프롬프트 결과)이 있을 때 — 조용하게 그린다 */
   quiet?: boolean
 }) {
@@ -90,6 +93,25 @@ export function TaskCard({
             ))}
           </ul>
         </div>
+      )}
+
+      {/*
+        ── 서류로 채우기 ──
+        손으로 적기 전에 먼저 보이게 둔다. 아래 [저장하고 계속] 과 경쟁하지 않도록
+        강조 버튼이 아니라 점선 칸으로 그린다.
+      */}
+      {task.docImport && onImportDoc && (
+        <button
+          type="button"
+          onClick={onImportDoc}
+          className="tap mt-4 flex w-full items-start gap-3 rounded-(--radius-card) border border-dashed border-brand-300 bg-brand-50/40 px-4 py-3.5 text-left hover:border-brand-500 hover:bg-brand-50"
+        >
+          <FileUp aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-brand-600" />
+          <span className="min-w-0 flex-1">
+            <span className="t-body block font-semibold break-keep text-brand-800">사업자등록증 · 법인등기부등본으로 채우기</span>
+            <span className="t-sub mt-0.5 block break-keep text-slate-500">올리면 회사명 · 대표자 · 설립일 · 본점 · 사업자번호를 알아서 읽습니다.</span>
+          </span>
+        </button>
       )}
 
       {/* ── 확인형 ── */}
