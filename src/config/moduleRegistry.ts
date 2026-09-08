@@ -19,6 +19,7 @@ import {
   PencilRuler,
   Settings,
   Sun,
+  Workflow,
 } from 'lucide-react'
 
 /**
@@ -35,6 +36,7 @@ export type NavAccent = 'overview' | 'ops' | 'revenue' | 'customer' | 'ai' | 'ev
 export type ModuleGroupKey =
   | 'today'
   | 'clients'
+  | 'consulting'
   | 'calendar'
   | 'funding'
   | 'journal'
@@ -76,6 +78,8 @@ export interface ModuleDefinition {
 export const MODULE_GROUPS: ModuleGroup[] = [
   { key: 'today', title: '오늘', accent: 'overview' },
   { key: 'clients', title: '고객', accent: 'ops' },
+  // 특허 × 벤처 × MVP 를 한 줄기로 끌고 가는 단계 엔진 — 고객 바로 다음에 둔다
+  { key: 'consulting', title: '컨설팅', accent: 'ai' },
   { key: 'calendar', title: '일정', accent: 'evidence' },
   { key: 'funding', title: '자금·지원', accent: 'revenue' },
   { key: 'journal', title: '업무 일기', accent: 'customer' },
@@ -90,6 +94,8 @@ export const MODULES: ModuleDefinition[] = [
 
   { key: 'client-ops', label: '고객 운영', path: '/ops/clients', icon: ListChecks, group: 'clients', accent: 'ops', enabled: true },
   { key: 'inbox', label: '고객 이벤트함', path: '/ops/inbox', icon: Inbox, group: 'clients', accent: 'alert', enabled: true },
+
+  { key: 'consulting-studio', label: '컨설팅 작업실', path: '/studio', icon: Workflow, group: 'consulting', accent: 'ai', enabled: true, hint: '특허 · 벤처인증 · MVP 단계 관리' },
 
   { key: 'calendar', label: '일정', path: '/ops/calendar', icon: CalendarDays, group: 'calendar', accent: 'evidence', enabled: true },
 

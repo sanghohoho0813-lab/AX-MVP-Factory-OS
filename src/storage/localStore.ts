@@ -58,6 +58,12 @@ export const STORAGE_KEYS = {
   portalRequests: `${KEY_PREFIX}.${DATA_NS}.portal_requests`,
   portalDocuments: `${KEY_PREFIX}.${DATA_NS}.portal_documents`,
   customServices: `${KEY_PREFIX}.${DATA_NS}.custom_services`,
+  // 컨설팅 작업실 (특허 × 벤처 × MVP) — local 모드 어댑터
+  consultingProjects: `${KEY_PREFIX}.${DATA_NS}.consulting_projects`,
+  consultingArtifacts: `${KEY_PREFIX}.${DATA_NS}.consulting_artifacts`,
+  consultingPromptPackages: `${KEY_PREFIX}.${DATA_NS}.consulting_prompt_packages`,
+  consultingDecisions: `${KEY_PREFIX}.${DATA_NS}.consulting_decisions`,
+  consultingEvidence: `${KEY_PREFIX}.${DATA_NS}.consulting_evidence`,
 } as const
 
 /** 마이그레이션 전 안전 백업 키 접두어 */
