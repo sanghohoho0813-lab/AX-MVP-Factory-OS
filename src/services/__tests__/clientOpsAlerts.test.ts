@@ -140,7 +140,9 @@ check('문구: 미정', dueText(null) === '기한 미정')
   const alerts = buildClientAlerts(r, TODAY)
   const blocked = alerts.find((a) => a.kind === 'blocked_missing_doc')
   check('누락: 막힘 경고 발생', blocked !== undefined)
-  check('누락: critical', blocked?.severity === 'critical')
+  // 서류가 아직 없는 것은 '오늘 당장' 이 아니다 — 요청해 두면 며칠 걸리는 일이다.
+  // critical 은 실제 마감이 걸린 것(업무·수금·자금 신청)에만 남긴다.
+  check('누락: warning (오늘 당장은 아니다)', blocked?.severity === 'warning', blocked?.severity)
   check('누락: 어떤 서류인지 나열', blocked?.detail.includes('중소기업 확인서') === true, blocked?.detail)
 }
 {

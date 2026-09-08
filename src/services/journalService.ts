@@ -17,7 +17,7 @@ export const JOURNAL_TYPE_LABEL: Record<JournalEntryType, string> = {
   note: '메모',
   call: '통화',
   decision: '결정',
-  follow_up: '후속조치',
+  follow_up: '할 일',
   blocker: '막힘',
   win: '성과',
   idea: '아이디어',
@@ -177,12 +177,45 @@ export function applyJournalFilter(entries: JournalEntry[], filter: JournalFilte
     })
 }
 
-/** 오늘까지(또는 지난) 후속조치 중 미완료 — 홈의 "오늘 반드시" 계산에 쓴다 */
+/** 오늘까지(또는 지난) 할 일 중 미완료 — 오늘 화면의 맨 위 */
 export function dueFollowUps(entries: JournalEntry[], today: string): JournalEntry[] {
   return entries
     .filter((e) => e.entryType === 'follow_up' && !e.completed && e.dueDate !== '' && e.dueDate <= today)
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
 }
+
+/**
+ * 어떤 날의 할 일 — 달력의 그 날 칸과 그날 목록이 함께 쓴다.
+ * 기한이 그 날인 것만 본다(지난 것은 오늘 화면에서 따로 챙긴다).
+ */
+export function todosOn(entries: JournalEntry[], date: string): JournalEntry[] {
+  return entries
+    .filter((e) => e.entryType === 'follow_up' && e.dueDate === date)
+    .sort((a, b) => {
+      if (a.completed !== b.completed) return a.completed ? 1 : -1
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+      return a.createdAt.localeCompare(b.createdAt)
+    })
+}
+
+/**
+ * 자주 쓰는 할 일 문구.
+ *
+ * 컨설팅은 같은 동작이 업체만 바꿔 가며 반복된다 — 서류를 달라 하고, 접수하고,
+ * 결과를 알리고, 잔금을 청구한다. 매번 처음부터 타자를 치면 기록을 안 남기게
+ * 되므로, 한 번 눌러 넣고 뒷말만 고치게 한다. (문구는 시작점일 뿐 그대로
+ * 저장되지 않는다 — 사람이 고쳐서 넣는다.)
+ */
+export const TODO_PRESETS: { label: string; text: string }[] = [
+  { label: '통화', text: '대표님 통화 — ' },
+  { label: '서류 요청', text: '서류 요청 문자 보내기 — ' },
+  { label: '서류 확인', text: '받은 서류 확인하고 보관 — ' },
+  { label: '신청서', text: '신청서 초안 쓰기 — ' },
+  { label: '접수', text: '기관 접수 — ' },
+  { label: '결과 확인', text: '진행 결과 확인 — ' },
+  { label: '보고', text: '진행 상황 보고 보내기 — ' },
+  { label: '청구', text: '잔금 청구 — ' },
+]
 
 /* ------------------------------------------------------------------ */
 /* 공개 API                                                               */

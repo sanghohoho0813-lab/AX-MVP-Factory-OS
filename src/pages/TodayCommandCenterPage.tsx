@@ -8,6 +8,7 @@ import {
   Copy,
   Inbox,
   Landmark,
+  ListTodo,
   Moon,
   NotebookPen,
   Wallet,
@@ -18,12 +19,13 @@ import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
 import { useToast } from '../components/ui/toastContext'
 import { QuickCapture } from '../components/journal/QuickCapture'
+import { TodoComposer, TodoRow } from '../components/journal/TodoBoard'
 import { JournalList } from '../components/journal/JournalList'
 import { EventCard } from '../components/ops/EventCard'
 import { LinkCustomerModal } from '../components/ops/LinkCustomerModal'
 import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { listClients } from '../services/clientOpsService'
-import { buildAllAlerts, summarizeAlerts, dueText } from '../services/clientOpsAlerts'
+import { buildAllAlerts, dueText } from '../services/clientOpsAlerts'
 import { buildAllSchedule, upcomingWithin } from '../services/clientOpsSchedule'
 import {
   applyJournalFilter,
@@ -114,9 +116,10 @@ function ActionRow({ action, rank }: { action: BriefAction; rank: number }) {
  *
  * 클래스 이름은 통째로 적는다(이어 붙이면 Tailwind 가 만들지 않는다).
  */
-type SectionAccent = 'urgent' | 'journal' | 'event' | 'client' | 'money' | 'fund'
+type SectionAccent = 'todo' | 'urgent' | 'journal' | 'event' | 'client' | 'money' | 'fund'
 
 const SECTION_CHIP: Record<SectionAccent, string> = {
+  todo: 'bg-brand-50 text-brand-600',
   urgent: 'bg-danger-50 text-danger-600',
   journal: 'bg-purple-50 text-nav-customer',
   event: 'bg-blue-50 text-nav-overview',
@@ -207,7 +210,6 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   )
   const clientNames = useMemo(() => new Map(clients.map((c) => [c.id, c.companyName])), [clients])
   const alerts = useMemo(() => buildAllAlerts(clients, today), [clients, today])
-  const summary = useMemo(() => summarizeAlerts(alerts), [alerts])
   const schedule = useMemo(() => buildAllSchedule(clients, today), [clients, today])
   const weekDue = useMemo(() => upcomingWithin(schedule, 7).filter((e) => !e.done), [schedule])
   const waiting = useMemo(
@@ -242,7 +244,29 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     [today, journal, clients, alerts, events, clientNames],
   )
 
-  const mustToday = summary.critical + dueToday.length + openEvents.filter((e) => e.priority === 'high').length
+  /*
+   * 화면 맨 위 숫자는 '내가 적은 할 일' 만 센다.
+   *
+   * 예전에는 규칙이 찾은 경고(마감·서류·수금)를 전부 더해 "반드시 처리할 것 12건"
+   * 같은 숫자를 띄웠다. 그런데 그 대부분은 아직 안 받은 서류라 오늘 당장의 일이
+   * 아니었다. 매일 두 자리 숫자가 뜨면 그 숫자는 아무 뜻도 없어진다.
+   * 규칙이 찾은 것은 아래 '지금 이것부터' 에서 계속 보인다.
+   */
+  const todoCount = dueToday.filter((e) => !e.completed).length
+
+  /** 오늘 할 일 한 줄 넣기 — 업무 일기의 '할 일' 로 저장된다 */
+  const addTodo = (draft: { content: string; dueDate: string; clientId: string | null }) =>
+    void journalMutate(
+      () =>
+        createJournalEntry(workspaceId, userId, {
+          entryDate: today,
+          entryType: 'follow_up',
+          content: draft.content,
+          clientId: draft.clientId,
+          dueDate: draft.dueDate,
+        }),
+      '할 일을 넣었습니다.',
+    )
 
   const journalMutate = async (fn: () => Promise<unknown>, done?: string) => {
     try {
@@ -276,7 +300,11 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               <time dateTime={now.toISOString()}>{timeText}</time> · {greeting(now.getHours())}
             </p>
             <h1 className="t-page mt-0.5 break-keep text-slate-900">
-              {loading ? '오늘 할 일을 정리하는 중…' : mustToday > 0 ? `반드시 처리할 것 ${mustToday}건` : '오늘 급한 일 없음'}
+              {loading
+                ? '오늘 할 일을 불러오는 중…'
+                : todoCount > 0
+                  ? `오늘 할 일 ${todoCount}건`
+                  : '오늘 할 일을 적어 보세요'}
             </h1>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2 self-start sm:self-auto">
@@ -290,6 +318,32 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             </span>
           </div>
         </div>
+      </section>
+
+      {/*
+        B. 오늘 할 일 — 내가 적은 것.
+        규칙이 찾아 주는 경고보다 위에 둔다. 하루를 실제로 굴리는 것은 내가 적어 둔
+        한 줄이지, 시스템이 센 숫자가 아니다.
+      */}
+      <section aria-labelledby="todos" className="flex flex-col gap-3">
+        <SectionTitle title="오늘 할 일" icon={ListTodo} count={dueToday.length} accent="todo" to="/journal" />
+        <TodoComposer date={today} clients={active} onAdd={addTodo} />
+        {dueToday.length > 0 && (
+          <ul className="ax-stagger flex flex-col gap-2">
+            {dueToday.map((e) => (
+              <TodoRow
+                key={e.id}
+                entry={e}
+                today={today}
+                clientName={e.clientId ? clientNames.get(e.clientId) : undefined}
+                onToggle={() =>
+                  void journalMutate(() => updateJournalEntry(e, { completed: !e.completed }))
+                }
+                onOpenClient={e.clientId ? () => navigate(`/ops/clients/${e.clientId}`) : undefined}
+              />
+            ))}
+          </ul>
+        )}
       </section>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">

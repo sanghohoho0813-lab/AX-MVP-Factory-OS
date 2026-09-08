@@ -27,10 +27,16 @@ export interface BriefAction {
   score: number
 }
 
+/*
+ * '오늘 반드시' 로 셀 것.
+ *
+ * 서류가 아직 없는 것(blocked_missing_doc)과 유효기간이 지난 것(doc_expired)은
+ * 뺐다. 대표 의견 — 서류는 요청해 두면 며칠 걸리는 일이지 '오늘 당장' 이 아니다.
+ * 여기에 넣으면 업무 6개 × 서류 10종 때문에 숫자가 늘 두 자리가 되어, 정작
+ * 진짜 마감이 묻힌다. 서류는 업체 상세와 아래 목록에서 계속 보인다.
+ */
 const CRITICAL_ALERT_KINDS = new Set<OpsAlert['kind']>([
   'task_overdue',
-  'blocked_missing_doc',
-  'doc_expired',
   'payment_overdue',
   'funding_overdue',
 ])
@@ -59,6 +65,8 @@ function alertScore(a: OpsAlert): { score: number; reason: string } {
       return { score: 48, reason: '서류 유효기간이 곧 끝납니다' }
     case 'no_next_step':
       return { score: 40, reason: '진행 중인데 다음 할 일이 비어 있습니다' }
+    case 'client_quiet':
+      return { score: 30, reason: '한동안 아무 기록이 없는 업체입니다' }
   }
 }
 

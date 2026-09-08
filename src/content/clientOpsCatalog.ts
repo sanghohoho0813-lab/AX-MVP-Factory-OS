@@ -357,4 +357,10 @@ export const DUE_SOON_DAYS = 7
 /** 서류 만료 며칠 전부터 경고할지 */
 export const DOC_EXPIRING_DAYS = 30
 /** 고객 회신 대기가 며칠 넘으면 경고할지 */
+/**
+ * 이 기간 동안 아무 기록이 없으면 '한동안 조용함' 으로 본다.
+ * 30일은 한 달에 한 번은 상태를 확인한다는 뜻 — 컨설팅 주기에 맞춘 값이다.
+ */
+export const QUIET_DAYS = 30
+
 export const WAITING_TOO_LONG_DAYS = 7

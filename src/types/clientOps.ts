@@ -354,6 +354,7 @@ export type AlertKind =
   | 'no_next_step' // 진행 중인데 다음 할 일이 비어 있음
   | 'funding_due_soon' // 정책자금 신청 마감 임박
   | 'funding_overdue' // 정책자금 신청 마감 지남
+  | 'client_quiet' // 오랫동안 아무 기록이 없는 업체
 
 export interface OpsAlert {
   id: string

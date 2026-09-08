@@ -27,6 +27,7 @@ import {
   DUE_SOON_DAYS,
   SERVICES,
   SERVICE_STATUS_LABEL,
+  QUIET_DAYS,
   WAITING_TOO_LONG_DAYS,
   documentMeta,
   isServiceOpen,
@@ -252,7 +253,9 @@ export function buildClientAlerts(record: ClientOpsRecord, today: string): OpsAl
           clientId: record.id,
           clientName: name,
           kind: 'blocked_missing_doc',
-          severity: 'critical',
+          // 대표 의견: 서류가 아직 없는 것은 '오늘 당장' 이 아니다. 마감이 실제로
+          // 걸린 것(task_overdue·payment_overdue)만 critical 로 남긴다.
+          severity: 'warning',
           title: `${meta.label}에 필요한 서류 ${missing.length}건이 없습니다`,
           detail: `필요: ${labels.join(', ')}`,
           serviceKey: meta.key,
@@ -403,6 +406,43 @@ export function buildClientAlerts(record: ClientOpsRecord, today: string): OpsAl
         serviceKey: 'policyFund',
         dueDate: app.applyDueDate,
         daysLeft: left,
+      })
+    }
+  }
+
+  /*
+   * 8) 한동안 조용한 업체.
+   *
+   * 컨설팅에서 실제로 놓치는 것은 "마감이 지난 일" 보다 "그냥 잊힌 업체" 다.
+   * 마감도 없고 서류도 다 있으면 어떤 경고도 뜨지 않아 목록 아래로 조용히
+   * 가라앉는다. 그러다 몇 달 뒤에 "그 회사 어떻게 됐지" 가 된다.
+   *
+   * 그래서 기록이 끊긴 기간을 본다. 활동 기록(자동)과 메모(수기) 중 마지막
+   * 시각을 기준으로 QUIET_DAYS 를 넘으면 알린다. 계약 전 업체도 대상이다 —
+   * 오히려 계약 전이 더 잘 잊힌다.
+   */
+  const lastTouch = [
+    ...record.activity.map((a) => a.at),
+    ...record.notes_list.map((n) => n.updatedAt),
+    record.updatedAt,
+  ]
+    .filter((v) => typeof v === 'string' && v !== '')
+    .sort()
+    .pop()
+  if (lastTouch) {
+    const quiet = daysBetween(lastTouch.slice(0, 10), today)
+    if (quiet !== null && quiet >= QUIET_DAYS) {
+      push(out, {
+        id: `${record.id}:quiet`,
+        clientId: record.id,
+        clientName: name,
+        kind: 'client_quiet',
+        severity: 'info',
+        title: `${quiet}일째 아무 기록이 없습니다`,
+        detail: '잊히기 전에 한 번 연락하거나, 끝난 건이면 계약 종료로 바꾸세요.',
+        serviceKey: null,
+        dueDate: '',
+        daysLeft: null,
       })
     }
   }

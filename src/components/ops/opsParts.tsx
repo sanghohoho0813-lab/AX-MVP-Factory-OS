@@ -72,6 +72,7 @@ const ALERT_KIND_LABEL: Record<AlertKind, string> = {
   no_next_step: '할 일 미정',
   funding_due_soon: '신청 마감 임박',
   funding_overdue: '신청 마감 지남',
+  client_quiet: '한동안 조용함',
 }
 
 const ALERT_KIND_ICON: Record<AlertKind, typeof AlertTriangle> = {
@@ -86,6 +87,7 @@ const ALERT_KIND_ICON: Record<AlertKind, typeof AlertTriangle> = {
   no_next_step: CircleDashed,
   funding_due_soon: Landmark,
   funding_overdue: Landmark,
+  client_quiet: Clock,
 }
 
 /**
