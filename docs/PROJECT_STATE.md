@@ -4,12 +4,12 @@
 고객 플랫폼: https://miraeailab.com (`main` 직행)
 
 ## 컨설팅 작업실 (특허 × 벤처 × MVP) — feature 브랜치 (2026-09-08)
-- 브랜치 `claude/patent-venture-mvp-studio-v1` · **main 미병합 · Production 미배포** (D-44)
+- **main 병합·배포 완료** (`5268519`, 2026-09-08 대표 지시 — D-44). 브랜치 `claude/patent-venture-mvp-studio-v1` 도 그대로 남아 있다.
+- **마이그레이션 `20260908000012` 는 Production 미적용** — 적용 전까지 클라우드에서는 '컨설팅 작업실' 이 READY 안내만 보인다(기존 기능 영향 0).
 - 엔진: S0~S16 · 사실표 45항목 · One Core Thread 규칙 경고 · 게이트 6종 · 다음 행동 resolver · 프롬프트 13종×4대상 · 개인정보 필터 · 결과 들여오기(버전) · KIPO 118종
 - 화면: `/studio`, `/studio/:id` 12탭 · 고객 상세 '컨설팅' 탭 · 오늘 '컨설팅 다음 행동' · 전역 검색 그룹
-- 데이터: `consulting_*` 5표 마이그레이션 `20260908000012` — **브랜치에만, 적용 안 함**. 적용 전 클라우드는 READY 안내.
 - LLM API 호출 0. 규칙 계산을 AI 라 부르지 않는다.
-- 사람이 할 일: (1) Preview 확인 (2) 표 적용 여부 결정 (3) main 병합 여부 결정
+- 사람이 할 일: Supabase SQL Editor 에서 `20260908000012_consulting_studio.sql` 실행 (이걸 해야 실제로 쓸 수 있다)
 
 ## STRATEGIC GATES
 

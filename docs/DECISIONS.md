@@ -410,15 +410,20 @@
 - **WHY** 상담하다 "그럼 다음 주에 서류 주세요" 가 나오면 그 자리에서 적어야 한다.
   일기 화면으로 옮겨 가야 하면 십중팔구 안 적는다.
 
-## D-44 컨설팅 작업실은 feature 브랜치에만 있다 — main 병합·Production 배포 없음 (이번 작업의 D-16 예외)
+## D-44 컨설팅 작업실은 코드만 main 에 올리고, 표는 아직 올리지 않는다
 
-- **DECISION** 특허 × 벤처 × MVP 워크플로 엔진은 `claude/patent-venture-mvp-studio-v1` 브랜치에서 만들고
-  Vercel Preview 로만 확인한다. main 병합과 Production 배포는 사람이 결정한다. 마이그레이션
-  `20260908000012_consulting_studio.sql` 도 브랜치에만 있고 Production Supabase 에 적용하지 않았다.
-- **WHY** 새 표 5개와 새 최상위 화면이 한꺼번에 들어가는 큰 변경이다. 요청 자체가 "Preview 까지만" 이었다.
-- **결과** Preview 는 Production 과 같은 Supabase 를 보므로 새 표가 없어 "READY — SQL 적용 후 사용" 안내만 보인다.
-  기능 QA 는 local 모드 E2E(`npm run qa:studio`)로 했다. 아무것도 깨지지 않는다는 것은 표 없음 감지
-  (`isTablesMissing`)가 보장한다.
+- **처음 결정** 특허 × 벤처 × MVP 워크플로 엔진은 `claude/patent-venture-mvp-studio-v1` 브랜치에서 만들고
+  Preview 로만 확인한다(작업 지시가 "Preview 까지만" 이었다).
+- **바뀐 결정 (2026-09-08, 대표 지시)** 브랜치를 main 으로 fast-forward 병합하고 푸시했다(`5268519`).
+  D-16(main 직행)으로 돌아온 것이다. 되돌린 커밋도, 다시 쓴 이력도 없다.
+- **그래도 표는 올리지 않았다** 마이그레이션 `20260908000012_consulting_studio.sql` 은 저장소에만 있고
+  Production Supabase 에 **적용하지 않았다.** 적용은 사람이 SQL Editor 에서 한 번 실행해야 한다.
+- **그래서 Production 에서 지금 무엇이 보이나** 사이드바에 '컨설팅 작업실' 이 생기고, 눌러 들어가면
+  "READY — SQL 적용 후 사용" 안내만 보인다. 고객 상세의 '컨설팅' 탭도 같은 안내다. 오늘 화면의
+  '컨설팅 다음 행동' 은 통째로 숨는다(빈 구역을 만들지 않는다). 기존 화면·데이터는 아무 영향이 없다.
+- **왜 코드를 먼저 올려도 안전한가** 표 없음 감지(`isTablesMissing`)가 모든 읽기 경로를 감싼다.
+  표가 없으면 오류 화면이 아니라 안내로 떨어지고, 쓰기는 애초에 시도되지 않는다. E2E 와 단위 테스트가
+  이 경로를 고정한다.
 
 ## D-45 고객은 하나 — 컨설팅 프로젝트는 operations_clients 에 매달린다
 
