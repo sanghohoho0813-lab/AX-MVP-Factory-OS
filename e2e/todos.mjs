@@ -61,9 +61,16 @@ await page.goto(BASE + '/', { waitUntil: 'networkidle' })
 await page.waitForTimeout(900)
 check('오늘 화면에도 되돌아온다', await page.getByText('일정에서 적은 할 일').first().isVisible())
 
-// 5) 체크하면 저장된다
-const before = await page.locator('[role=checkbox]').first().getAttribute('aria-checked')
-await page.locator('[role=checkbox]').first().click()
+// 5) 눌렀을 때 '무슨 일이 일어나는지' 를 이름으로 보여 준다 (예전 체크상자 대체)
+await page.getByText('일정에서 적은 할 일').first().click()
+await page.waitForTimeout(400)
+check('할 일 시트가 열린다', await page.getByRole('dialog').isVisible())
+for (const name of ['진행 중', '완료', '내일로 미루기', '삭제']) {
+  check(`시트에 '${name}' 이 있다`, (await page.getByRole('dialog').getByText(name, { exact: true }).count()) > 0)
+}
+
+// 완료를 고르면 저장된다
+await page.getByRole('dialog').getByText('완료', { exact: true }).click()
 await page.waitForTimeout(800)
 await page.reload({ waitUntil: 'networkidle' })
 await page.waitForTimeout(900)
@@ -71,7 +78,27 @@ const stored = await page.evaluate(() => {
   const list = JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]')
   return list.some((e) => e.completed === true)
 })
-check('완료 표시가 저장된다', before === 'false' && stored === true, `before=${before} stored=${stored}`)
+check('완료가 저장된다', stored === true, String(stored))
+check('끝낸 것은 접혀 있다', (await page.getByText('끝낸 것').count()) > 0)
+
+// 내일로 미루기
+await page.getByText('테스트 할 일 하나').first().click()
+await page.waitForTimeout(400)
+await page.getByRole('dialog').getByText('내일로 미루기', { exact: true }).click()
+await page.waitForTimeout(800)
+const moved = await page.evaluate(() => {
+  const list = JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]')
+  const e = list.find((x) => x.content === '테스트 할 일 하나')
+  const today = new Date().toISOString().slice(0, 10)
+  return e && e.dueDate > today
+})
+check('내일로 미루면 기한이 내일이 된다', moved === true, String(moved))
+
+// 6) 서류 없음 경고가 어디에도 없다
+await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
+await page.waitForTimeout(900)
+const docNoise = await page.evaluate(() => document.body.innerText.includes('서류 없음'))
+check('목록에 "서류 없음" 경고가 없다', docNoise === false)
 
 // 6) 업체 마감을 할 일로 옮기기
 await page.goto(BASE + '/ops/calendar', { waitUntil: 'networkidle' })

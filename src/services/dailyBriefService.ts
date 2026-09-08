@@ -30,10 +30,10 @@ export interface BriefAction {
 /*
  * '오늘 반드시' 로 셀 것.
  *
- * 서류가 아직 없는 것(blocked_missing_doc)과 유효기간이 지난 것(doc_expired)은
- * 뺐다. 대표 의견 — 서류는 요청해 두면 며칠 걸리는 일이지 '오늘 당장' 이 아니다.
- * 여기에 넣으면 업무 6개 × 서류 10종 때문에 숫자가 늘 두 자리가 되어, 정작
- * 진짜 마감이 묻힌다. 서류는 업체 상세와 아래 목록에서 계속 보인다.
+ * 유효기간이 지난 서류(doc_expired)는 뺐다. '서류가 없어 막힘' 경고는 아예
+ * 없앴다 — 서류는 요청해 두면 며칠 걸리는 일이지 '오늘 당장' 이 아니고,
+ * 업무 6개 × 서류 10종이라 그것만으로 목록이 가득 차서 진짜 마감이 묻혔다.
+ * 서류는 업체 안에서 조용히 표시한다(서류 탭의 빨간 표시).
  */
 const CRITICAL_ALERT_KINDS = new Set<OpsAlert['kind']>([
   'task_overdue',
@@ -49,8 +49,6 @@ function alertScore(a: OpsAlert): { score: number; reason: string } {
       return { score: 96, reason: '업무 마감이 지났습니다' }
     case 'payment_overdue':
       return { score: 94, reason: '받기로 한 날이 지난 돈입니다' }
-    case 'blocked_missing_doc':
-      return { score: 92, reason: '서류가 없어 진행이 막혀 있습니다' }
     case 'doc_expired':
       return { score: 88, reason: '서류 유효기간이 지났습니다' }
     case 'funding_due_soon':

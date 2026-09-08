@@ -19,7 +19,7 @@ import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
 import { useToast } from '../components/ui/toastContext'
 import { QuickCapture } from '../components/journal/QuickCapture'
-import { TodoComposer, TodoRow } from '../components/journal/TodoBoard'
+import { TodoActionSheet, TodoComposer, TodoRow, type TodoAction } from '../components/journal/TodoBoard'
 import { JournalList } from '../components/journal/JournalList'
 import { EventCard } from '../components/ops/EventCard'
 import { LinkCustomerModal } from '../components/ops/LinkCustomerModal'
@@ -32,6 +32,7 @@ import {
   createJournalEntry,
   deleteJournalEntry,
   listJournal,
+  shiftDate,
   updateJournalEntry,
 } from '../services/journalService'
 import { isOpenEvent, listEvents, updateEvent } from '../services/customerBridgeService'
@@ -179,6 +180,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const [loading, setLoading] = useState(true)
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [linking, setLinking] = useState<{ event: CustomerEvent; tab: 'existing' | 'new' } | null>(null)
+  /** 눌러서 연 할 일 — 무엇을 할지 시트에서 고른다 */
+  const [todoPick, setTodoPick] = useState<JournalEntry | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -221,7 +224,14 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const funding = useMemo(() => buildFundingDeadlines(clients, today), [clients, today])
   const openEvents = useMemo(() => events.filter(isOpenEvent), [events])
   const followUps = useMemo(() => journal.filter((j) => j.entryType === 'follow_up' && !j.completed), [journal])
-  const dueToday = useMemo(() => followUps.filter((f) => f.dueDate && f.dueDate <= today), [followUps, today])
+  /**
+   * 오늘 화면에 걸리는 할 일 — 기한이 오늘 이하인 것 전부.
+   * 끝낸 것도 포함한다(아래에서 접어 두려면 목록에 있어야 한다).
+   */
+  const dueToday = useMemo(
+    () => journal.filter((j) => j.entryType === 'follow_up' && j.dueDate !== '' && j.dueDate <= today),
+    [journal, today],
+  )
   const top = useMemo(
     () => buildTopActions({ alerts, events, followUps, clientNames, today }, 3),
     [alerts, events, followUps, clientNames, today],
@@ -252,7 +262,30 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
    * 아니었다. 매일 두 자리 숫자가 뜨면 그 숫자는 아무 뜻도 없어진다.
    * 규칙이 찾은 것은 아래 '지금 이것부터' 에서 계속 보인다.
    */
-  const todoCount = dueToday.filter((e) => !e.completed).length
+  const openTodos = useMemo(() => dueToday.filter((e) => !e.completed), [dueToday])
+  const overdueTodos = useMemo(() => openTodos.filter((e) => e.dueDate < today), [openTodos, today])
+  const todayTodos = useMemo(() => openTodos.filter((e) => e.dueDate >= today), [openTodos, today])
+  const doneTodos = useMemo(() => dueToday.filter((e) => e.completed), [dueToday])
+  const todoCount = openTodos.length
+
+  const clientNameOf = (id: string) => clientNames.get(id)
+
+  /** 할 일 시트에서 고른 것을 실행한다 */
+  const applyTodoAction = (entry: JournalEntry, action: TodoAction) => {
+    setTodoPick(null)
+    if (action === 'delete') {
+      void journalMutate(() => deleteJournalEntry(entry), '지웠습니다.')
+      return
+    }
+    if (action === 'tomorrow') {
+      void journalMutate(
+        () => updateJournalEntry(entry, { dueDate: shiftDate(today, 1), completed: false }),
+        '내일로 미뤘습니다.',
+      )
+      return
+    }
+    void journalMutate(() => updateJournalEntry(entry, { completed: action === 'done' }))
+  }
 
   /** 오늘 할 일 한 줄 넣기 — 업무 일기의 '할 일' 로 저장된다 */
   const addTodo = (draft: { content: string; dueDate: string; clientId: string | null }) =>
@@ -325,24 +358,77 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         규칙이 찾아 주는 경고보다 위에 둔다. 하루를 실제로 굴리는 것은 내가 적어 둔
         한 줄이지, 시스템이 센 숫자가 아니다.
       */}
-      <section aria-labelledby="todos" className="flex flex-col gap-3">
-        <SectionTitle title="오늘 할 일" icon={ListTodo} count={dueToday.length} accent="todo" to="/journal" />
+      <section
+        aria-labelledby="todos"
+        className="flex flex-col gap-3 rounded-(--radius-panel) border-2 border-brand-200 bg-brand-50/30 p-4 sm:p-5"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <h2 id="todos" className="t-page flex items-center gap-2 break-keep text-slate-900">
+            <span
+              aria-hidden="true"
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-white"
+            >
+              <ListTodo className="size-5" />
+            </span>
+            오늘 할 일
+            {openTodos.length > 0 && (
+              <span className="t-section font-bold text-brand-700">{openTodos.length}</span>
+            )}
+          </h2>
+          <Link to="/journal" className="t-sub shrink-0 font-medium text-brand-700 hover:underline">
+            모두 보기
+          </Link>
+        </div>
+
         <TodoComposer date={today} clients={active} onAdd={addTodo} />
-        {dueToday.length > 0 && (
+
+        {/* 밀린 것 — 어제까지가 기한인데 아직 안 끝난 것 */}
+        {overdueTodos.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <p className="t-sub font-semibold text-danger-700">밀린 것 {overdueTodos.length}건</p>
+            <ul className="ax-stagger flex flex-col gap-2">
+              {overdueTodos.map((e) => (
+                <TodoRow
+                  key={e.id}
+                  entry={e}
+                  today={today}
+                  clientName={e.clientId ? clientNames.get(e.clientId) : undefined}
+                  onPick={() => setTodoPick(e)}
+                />
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {todayTodos.length > 0 && (
           <ul className="ax-stagger flex flex-col gap-2">
-            {dueToday.map((e) => (
+            {todayTodos.map((e) => (
               <TodoRow
                 key={e.id}
                 entry={e}
                 today={today}
                 clientName={e.clientId ? clientNames.get(e.clientId) : undefined}
-                onToggle={() =>
-                  void journalMutate(() => updateJournalEntry(e, { completed: !e.completed }))
-                }
-                onOpenClient={e.clientId ? () => navigate(`/ops/clients/${e.clientId}`) : undefined}
+                onPick={() => setTodoPick(e)}
               />
             ))}
           </ul>
+        )}
+
+        {/* 끝낸 것은 접어 둔다 — 남은 일이 목록의 전부여야 한다 */}
+        {doneTodos.length > 0 && (
+          <Disclosure title="끝낸 것" hint={`${doneTodos.length}건`}>
+            <ul className="flex flex-col gap-2">
+              {doneTodos.map((e) => (
+                <TodoRow
+                  key={e.id}
+                  entry={e}
+                  today={today}
+                  clientName={e.clientId ? clientNames.get(e.clientId) : undefined}
+                  onPick={() => setTodoPick(e)}
+                />
+              ))}
+            </ul>
+          </Disclosure>
         )}
       </section>
 
@@ -613,6 +699,19 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           </div>
         ))}
       </Modal>
+
+
+      {todoPick && (
+        <TodoActionSheet
+          entry={todoPick}
+          clientName={todoPick.clientId ? clientNameOf(todoPick.clientId) : undefined}
+          onPick={(action) => applyTodoAction(todoPick, action)}
+          onOpenClient={
+            todoPick.clientId ? () => navigate(`/ops/clients/${todoPick.clientId}`) : undefined
+          }
+          onClose={() => setTodoPick(null)}
+        />
+      )}
 
       {linking && (
         <LinkCustomerModal

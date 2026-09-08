@@ -4,7 +4,14 @@ import { CalendarDays, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { useToast } from '../components/ui/toastContext'
 import { listClients } from '../services/clientOpsService'
-import { createJournalEntry, listJournal, todosOn, updateJournalEntry } from '../services/journalService'
+import {
+  createJournalEntry,
+  deleteJournalEntry,
+  listJournal,
+  shiftDate,
+  todosOn,
+  updateJournalEntry,
+} from '../services/journalService'
 import {
   SCHEDULE_KIND_CLASS,
   SCHEDULE_KIND_LABEL,
@@ -19,7 +26,7 @@ import { dueText } from '../services/clientOpsAlerts'
 import { todayLocalDate } from '../lib/appClock'
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { JournalEntry } from '../types/bridge'
-import { TodoComposer, TodoRow } from '../components/journal/TodoBoard'
+import { TodoActionSheet, TodoComposer, TodoRow, type TodoAction } from '../components/journal/TodoBoard'
 import { Button } from '../components/ui/Button'
 import { PageHeader } from '../components/ui/PageHeader'
 
@@ -40,6 +47,8 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
   })
   const [hidden, setHidden] = useState<Set<ScheduleKind>>(new Set())
   const [picked, setPicked] = useState<string | null>(today)
+  /** 눌러서 연 할 일 */
+  const [todoPick, setTodoPick] = useState<JournalEntry | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -88,6 +97,25 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
     } catch (cause) {
       showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
     }
+  }
+
+  const clientNameOf = (id: string) => records.find((r) => r.id === id)?.companyName
+
+  /** 할 일 시트에서 고른 것을 실행한다 */
+  const applyTodoAction = (entry: JournalEntry, action: TodoAction) => {
+    setTodoPick(null)
+    if (action === 'delete') {
+      void mutate(() => deleteJournalEntry(entry), '지웠습니다.')
+      return
+    }
+    if (action === 'tomorrow') {
+      void mutate(
+        () => updateJournalEntry(entry, { dueDate: shiftDate(today, 1), completed: false }),
+        '내일로 미뤘습니다.',
+      )
+      return
+    }
+    void mutate(() => updateJournalEntry(entry, { completed: action === 'done' }))
   }
 
   const monthEvents = events.filter((e) => e.date.startsWith(monthPrefix))
@@ -299,8 +327,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                           clientName={
                             e.clientId ? records.find((r) => r.id === e.clientId)?.companyName : undefined
                           }
-                          onToggle={() => void mutate(() => updateJournalEntry(e, { completed: !e.completed }))}
-                          onOpenClient={e.clientId ? () => navigate(`/ops/clients/${e.clientId}`) : undefined}
+                          onPick={() => setTodoPick(e)}
                         />
                       ))}
                     </ul>
@@ -345,6 +372,18 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
             </div>
           </section>
         </>
+      )}
+
+      {todoPick && (
+        <TodoActionSheet
+          entry={todoPick}
+          clientName={todoPick.clientId ? clientNameOf(todoPick.clientId) : undefined}
+          onPick={(action) => applyTodoAction(todoPick, action)}
+          onOpenClient={
+            todoPick.clientId ? () => navigate(`/ops/clients/${todoPick.clientId}`) : undefined
+          }
+          onClose={() => setTodoPick(null)}
+        />
       )}
     </div>
   )

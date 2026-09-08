@@ -512,7 +512,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.85rem] text-slate-500">
           <span className="font-medium text-slate-600">업무 조각 보는 법:</span>
           <span>눌러서 상태를 바로 바꿉니다</span>
-          <span className="text-danger-700">빨강 = 마감 지났거나 서류가 없어 막힘</span>
+          <span className="text-danger-700">빨강 = 마감 지남</span>
           <span className="text-warning-800">노랑 = 마감 임박</span>
           <span className="line-through decoration-slate-300">가로선 = 이 회사에는 해당 없음</span>
         </div>

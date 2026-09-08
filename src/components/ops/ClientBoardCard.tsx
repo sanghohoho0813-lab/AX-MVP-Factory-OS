@@ -18,7 +18,7 @@ import { ArrowRight, ChevronRight } from 'lucide-react'
 import { CONTRACT_STAGE_LABEL, contractStageOf } from '../../types/clientOps'
 import type { ClientOpsRecord, ServiceKey, ServiceStatus } from '../../types/clientOps'
 import { SERVICES, SERVICE_STATUS_LABEL, isServiceOpen } from '../../content/clientOpsCatalog'
-import { clientOpsProgress, daysLeftFrom, dueText, missingDocumentsFor } from '../../services/clientOpsAlerts'
+import { clientOpsProgress, daysLeftFrom, dueText } from '../../services/clientOpsAlerts'
 import { yearsInBusiness, regionOf } from '../../services/clientOpsProfile'
 import { formatKrw } from '../../lib/format'
 import { Badge, type Tone } from '../ui/primitives'
@@ -35,8 +35,6 @@ export interface ChipState {
   overdue: boolean
   /** 7일 이내 마감 */
   dueSoon: boolean
-  /** 필요 서류가 없어 막힘 */
-  blocked: boolean
   daysLeft: number | null
 }
 
@@ -56,7 +54,6 @@ export function chipStateFor(
     status: st.status,
     overdue: open && left !== null && left < 0,
     dueSoon: open && left !== null && left >= 0 && left <= dueSoonDays,
-    blocked: (st.status === 'in_progress' || st.status === 'waiting_client') && missingDocumentsFor(record, key, today).length > 0,
     daysLeft: left,
   }
 }
@@ -82,7 +79,7 @@ const SHORT: Record<ServiceStatus, string> = {
 
 function ServiceChip({ chip, onClick }: { chip: ChipState; onClick: () => void }) {
   const na = chip.status === 'not_applicable'
-  const danger = !na && (chip.overdue || chip.blocked)
+  const danger = !na && chip.overdue
   const warn = !na && !danger && chip.dueSoon
 
   // 해당 없음은 가로선으로 지운 것처럼 — 있지만 세지 않는 항목이라는 뜻
@@ -98,9 +95,8 @@ function ServiceChip({ chip, onClick }: { chip: ChipState; onClick: () => void }
 
   // '시작 전' 은 굳이 쓰지 않는다 — 아무 표시 없는 회색 조각이 곧 시작 전이다.
   // 조각이 15개까지 늘어날 것이라 글자 하나가 줄 수를 바꾼다.
-  const note = chip.blocked
-    ? '서류 없음'
-    : chip.overdue || chip.dueSoon
+  const note =
+    chip.overdue || chip.dueSoon
       ? dueText(chip.daysLeft)
       : chip.status === 'not_started'
         ? ''

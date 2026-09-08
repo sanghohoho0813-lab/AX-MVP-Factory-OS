@@ -345,7 +345,6 @@ export type AlertSeverity = 'critical' | 'warning' | 'info'
 export type AlertKind =
   | 'task_overdue' // 업무 마감 지남
   | 'task_due_soon' // 업무 마감 임박
-  | 'blocked_missing_doc' // 필요 서류가 없어 진행 불가
   | 'doc_expired' // 서류 유효기간 지남
   | 'doc_expiring' // 서류 유효기간 임박
   | 'payment_overdue' // 받기로 한 날이 지난 미수금

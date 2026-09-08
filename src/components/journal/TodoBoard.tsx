@@ -13,12 +13,13 @@
  */
 
 import { useState } from 'react'
-import { Check, Plus, X } from 'lucide-react'
+import { ArrowRight, Check, ChevronDown, Plus, X } from 'lucide-react'
 import type { JournalEntry } from '../../types/bridge'
 import { TODO_PRESETS } from '../../services/journalService'
 import { dueText } from '../../services/clientOpsAlerts'
 import { daysLeftFrom } from '../../services/clientOpsAlerts'
 import { Button } from '../ui/Button'
+import { BottomSheet } from '../ui/primitives'
 
 export interface TodoDraft {
   content: string
@@ -133,26 +134,31 @@ export function TodoComposer({
   )
 }
 
-/** 할 일 한 줄 */
+/**
+ * 할 일 한 줄.
+ *
+ * 왼쪽 동그라미는 지금 상태를 보여 주고, 누르면 무엇을 할 수 있는지 시트로 펼친다.
+ * 예전에는 체크상자였는데 눌러 보기 전에는 무슨 일이 일어나는지 알 수 없었다 —
+ * 완료되는 건지, 지워지는 건지. 이름을 붙여 고르게 하는 편이 확실하다.
+ */
 export function TodoRow({
   entry,
   today,
   clientName,
-  onToggle,
-  onOpenClient,
+  onPick,
 }: {
   entry: JournalEntry
   today: string
   clientName?: string
-  onToggle: () => void
-  onOpenClient?: () => void
+  /** 상태 시트를 연다 — 업체로 가는 길도 그 안에 있다 */
+  onPick: () => void
 }) {
   const left = entry.dueDate ? daysLeftFrom(today, entry.dueDate) : null
   const overdue = !entry.completed && left !== null && left < 0
 
   return (
     <li
-      className={`flex items-start gap-3 rounded-(--radius-card) border px-4 py-3 ${
+      className={`flex items-start gap-3 rounded-(--radius-card) border px-4 py-3.5 ${
         entry.completed
           ? 'border-slate-200 bg-white'
           : overdue
@@ -162,31 +168,102 @@ export function TodoRow({
     >
       <button
         type="button"
-        role="checkbox"
-        aria-checked={entry.completed}
-        aria-label={entry.completed ? '완료 취소' : '완료로 표시'}
-        onClick={onToggle}
-        className={`tap mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border-2 ${
-          entry.completed ? 'border-success-500 bg-success-500 text-white' : 'border-slate-300 bg-white hover:border-brand-500'
+        aria-label={`${entry.content} — ${entry.completed ? '완료' : '진행 중'}. 눌러서 바꾸기`}
+        onClick={onPick}
+        className={`tap mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full border-2 ${
+          entry.completed
+            ? 'border-success-500 bg-success-500 text-white'
+            : 'border-slate-300 bg-white text-slate-400 hover:border-brand-500 hover:text-brand-600'
         }`}
       >
-        {entry.completed && <Check aria-hidden="true" className="size-4" />}
+        {entry.completed ? (
+          <Check aria-hidden="true" className="size-4" />
+        ) : (
+          <ChevronDown aria-hidden="true" className="size-4" />
+        )}
       </button>
 
-      <div className="min-w-0 flex-1">
-        <p className={`t-body break-keep ${entry.completed ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
+      <button type="button" onClick={onPick} className="min-w-0 flex-1 text-left">
+        <span className={`t-body block break-keep ${entry.completed ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
           {entry.content}
-        </p>
-        <p className="t-meta mt-0.5 flex flex-wrap items-center gap-x-2 text-slate-500">
+        </span>
+        <span className="t-meta mt-0.5 flex flex-wrap items-center gap-x-2 text-slate-500">
           {overdue && <span className="font-semibold text-danger-700">{dueText(left)}</span>}
-          {clientName && onOpenClient && (
-            <button type="button" onClick={onOpenClient} className="font-medium text-brand-700 hover:underline">
-              {clientName}
-            </button>
-          )}
-          {clientName && !onOpenClient && <span>{clientName}</span>}
-        </p>
-      </div>
+          {entry.completed && <span className="text-success-700">완료</span>}
+          {clientName && <span>{clientName}</span>}
+        </span>
+      </button>
+
     </li>
+  )
+}
+
+/**
+ * 할 일로 무엇을 할지 고르는 시트.
+ *
+ * 네 가지만 둔다 — 진행 중 / 완료 / 내일로 미루기 / 삭제.
+ * '내일로 미루기' 가 있는 이유: 오늘 못 한 일을 그냥 두면 다음 날에도 빨갛게
+ * 남아 목록이 밀린 것으로 뒤덮인다. 미루는 것도 정직한 처리다.
+ */
+export type TodoAction = 'open' | 'done' | 'tomorrow' | 'delete'
+
+export function TodoActionSheet({
+  entry,
+  clientName,
+  onPick,
+  onOpenClient,
+  onClose,
+}: {
+  entry: JournalEntry
+  clientName?: string
+  onPick: (action: TodoAction) => void
+  /** 관련 업체가 있을 때만 */
+  onOpenClient?: () => void
+  onClose: () => void
+}) {
+  const rows: { action: TodoAction; label: string; hint: string; tone?: 'danger' }[] = [
+    { action: 'open', label: '진행 중', hint: '아직 안 끝났습니다 (목록에 남습니다)' },
+    { action: 'done', label: '완료', hint: '끝났습니다 (아래로 접힙니다)' },
+    { action: 'tomorrow', label: '내일로 미루기', hint: '기한을 내일로 옮깁니다' },
+    { action: 'delete', label: '삭제', hint: '기록에서 지웁니다 — 되돌릴 수 없습니다', tone: 'danger' },
+  ]
+
+  return (
+    <BottomSheet title={entry.content} onClose={onClose}>
+      <div className="flex flex-col gap-1">
+        {rows.map((r) => {
+          const active = (r.action === 'done' && entry.completed) || (r.action === 'open' && !entry.completed)
+          return (
+            <button
+              key={r.action}
+              type="button"
+              onClick={() => onPick(r.action)}
+              className={`flex items-center gap-3 rounded-(--radius-control) border px-3 py-3 text-left ${
+                active
+                  ? 'border-brand-400 bg-brand-50'
+                  : r.tone === 'danger'
+                    ? 'border-danger-200 bg-white hover:bg-danger-50'
+                    : 'border-slate-200 bg-white hover:bg-slate-50'
+              }`}
+            >
+              <span className="min-w-0 flex-1">
+                <span className={`t-body block font-semibold ${r.tone === 'danger' ? 'text-danger-700' : 'text-slate-900'}`}>
+                  {r.label}
+                </span>
+                <span className="t-meta block break-keep text-slate-500">{r.hint}</span>
+              </span>
+              {active && <Check aria-hidden="true" className="size-4 shrink-0 text-brand-600" />}
+            </button>
+          )
+        })}
+      </div>
+
+      {clientName && onOpenClient && (
+        <Button variant="secondary" className="mt-3 w-full" onClick={onOpenClient}>
+          <ArrowRight aria-hidden="true" className="size-4" />
+          {clientName} 열기
+        </Button>
+      )}
+    </BottomSheet>
   )
 }

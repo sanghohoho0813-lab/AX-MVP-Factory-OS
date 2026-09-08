@@ -137,24 +137,29 @@ check('문구: 미정', dueText(null) === '기한 미정')
   r = withService(r, 'venture', { status: 'in_progress' })
   const missing = missingDocumentsFor(r, 'venture', TODAY)
   check('누락: 벤처인증 필요서류 4건 전부 없음', missing.length === 4, String(missing.length))
+  /*
+   * 서류가 없어 막혔다는 '경고' 는 없앴다.
+   *
+   * 서류는 요청해 두면 며칠 걸리는 일이지 '지금 해야 할 일' 이 아니다. 업무 6개 ×
+   * 서류 10종이라 이 경고만으로 목록이 가득 차서 정작 마감이 묻혔다.
+   * 대신 업체 안(서류 탭)에서 안 받은 서류에 빨간 점으로 조용히 표시한다.
+   *
+   * missingDocumentsFor 는 그대로 남는다 — 화면이 그 표시를 그릴 때 쓴다.
+   */
   const alerts = buildClientAlerts(r, TODAY)
-  const blocked = alerts.find((a) => a.kind === 'blocked_missing_doc')
-  check('누락: 막힘 경고 발생', blocked !== undefined)
-  // 서류가 아직 없는 것은 '오늘 당장' 이 아니다 — 요청해 두면 며칠 걸리는 일이다.
-  // critical 은 실제 마감이 걸린 것(업무·수금·자금 신청)에만 남긴다.
-  check('누락: warning (오늘 당장은 아니다)', blocked?.severity === 'warning', blocked?.severity)
-  check('누락: 어떤 서류인지 나열', blocked?.detail.includes('중소기업 확인서') === true, blocked?.detail)
+  check('누락: 경고 목록에 올리지 않는다', !alerts.some((a) => a.kind === 'client_quiet' && false) && alerts.every((a) => a.kind !== ('blocked_missing_doc' as never)))
+  check('누락: 그래도 무엇이 없는지는 계산된다', missingDocumentsFor(r, 'venture', TODAY).length === 4)
 }
 {
   let r = client()
   r = withService(r, 'venture', { status: 'in_progress' })
   r = withDocs(r, ['businessRegistration', 'corporateRegistry', 'smeCertificate', 'representativeId'])
-  check('누락: 서류 다 갖추면 막힘 경고 사라짐', !buildClientAlerts(r, TODAY).some((a) => a.kind === 'blocked_missing_doc'))
+  check('누락: 서류를 다 갖추면 없는 서류가 0', missingDocumentsFor(r, 'venture', TODAY).length === 0)
 }
 {
   let r = client()
   r = withService(r, 'venture', { status: 'not_started' })
-  check('누락: 아직 시작 전이면 막힘 경고 안 함', !buildClientAlerts(r, TODAY).some((a) => a.kind === 'blocked_missing_doc'))
+  check('누락: 시작 전 업무는 경고를 만들지 않는다', !buildClientAlerts(r, TODAY).some((a) => a.serviceKey === 'venture' && a.severity === 'critical'))
 }
 
 /* ---------------- 서류 유효기간 ---------------- */

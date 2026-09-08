@@ -93,6 +93,8 @@ import {
   SavedBadge,
 } from '../components/ops/opsControls'
 import { CompanyProfileCard, NotesSection } from '../components/ops/opsProfile'
+import { TodoComposer } from '../components/journal/TodoBoard'
+import { createJournalEntry } from '../services/journalService'
 import { FundingSection } from '../components/ops/FundingSection'
 import { DocImportModal } from '../components/ops/DocImportModal'
 import { withActivity } from '../services/clientOpsActivity'
@@ -515,6 +517,30 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       </Surface>
 
       {/*
+        통화 중에 적는 자리.
+        상담하다 "그럼 다음 주에 서류 주세요" 가 나오면 그 자리에서 적어야 한다.
+        일기 화면으로 옮겨 가면 십중팔구 안 적는다. 이 업체가 자동으로 붙는다.
+      */}
+      <TodoComposer
+        date={today}
+        clients={[]}
+        compact
+        onAdd={(draft) =>
+          void createJournalEntry(workspaceId, userId, {
+            entryDate: today,
+            entryType: 'follow_up',
+            content: draft.content,
+            clientId: record.id,
+            dueDate: draft.dueDate,
+          })
+            .then(() => showToast('오늘 할 일에 넣었습니다.'))
+            .catch((cause: unknown) =>
+              showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.'),
+            )
+        }
+      />
+
+      {/*
         2단계 — 회사 기본 정보.
         접어 두지 않는다. 업체를 여는 이유의 절반은 "사업자번호가 뭐였지 / 설립이
         몇 년도지 / 인증서 받았던가" 를 확인하려는 것이고, 그때마다 접힌 칸을 펴야
@@ -613,7 +639,13 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             업무 항목 추가
           </button>
         </div>
-        <div className="flex flex-col gap-2.5">
+        {/*
+          업무 카드를 넓은 화면에서는 2열로 놓는다.
+          한 카드에 들어가는 것은 제목 한 줄 + 다음 할 일 한 줄 + 상태 칸이 전부라
+          1600px 폭을 가로로 다 쓰면 글자 사이가 텅 비어 오히려 읽기 어렵다.
+          펼친 카드는 내용이 길어지므로 두 열을 다 쓰게 한다(아래 col-span).
+        */}
+        <div className="grid grid-cols-1 gap-2.5 xl:grid-cols-2 xl:items-start">
           {SERVICES.map((meta) => {
             const state = record.services[meta.key]
             const missing = missingDocumentsFor(record, meta.key, today)
@@ -635,13 +667,14 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 ref={meta.key === focusedService ? focusedCardRef : undefined}
                 className={`relative overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white ${
                   meta.key === focusedService ? 'ring-2 ring-brand-400 ring-offset-2' : ''
-                }`}
+                } ${expanded ? 'xl:col-span-2' : ''}`}
               >
-                {/* 급한 카드도 배경을 칠하지 않는다 — 왼쪽 3px 선으로만 말한다 */}
-                {(blocked || overdue || dueSoon) && (
+                {/* 급한 카드도 배경을 칠하지 않는다 — 왼쪽 3px 선으로만 말한다.
+                    서류가 없는 것은 급한 것이 아니라 '아직 안 받은 것' 이라 여기서 뺐다 */}
+                {(overdue || dueSoon) && (
                   <span
                     aria-hidden="true"
-                    className={`absolute inset-y-0 left-0 w-[3px] ${blocked || overdue ? 'bg-danger-500' : 'bg-warning-500'}`}
+                    className={`absolute inset-y-0 left-0 w-[3px] ${overdue ? 'bg-danger-500' : 'bg-warning-500'}`}
                   />
                 )}
                 {/*
@@ -652,12 +685,12 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                   360px 에서 이름이 60px 로 눌리고 글자가 세로로 흘렀다.
                   또 "완료" 를 요약과 상태 칸이 나란히 두 번 말하던 것도 없앴다.
                 */}
-                <div className="px-4 py-3">
+                <div className="flex flex-wrap items-start gap-x-3 gap-y-1.5 px-4 py-3">
                   <button
                     type="button"
                     aria-expanded={expanded}
                     onClick={() => toggleCard(meta.key, auto)}
-                    className="flex w-full min-w-0 items-center gap-2 text-left"
+                    className="flex w-full min-w-0 items-center gap-2 text-left sm:w-auto sm:flex-1"
                   >
                     <ChevronDown
                       aria-hidden="true"
@@ -674,10 +707,11 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                       >
                         {meta.label}
                       </span>
+                      {/* 서류는 경고가 아니라 상태다 — 회색으로 조용히 */}
                       {blocked && (
-                        <Badge tone="danger">
+                        <Badge tone="neutral">
                           <Lock aria-hidden="true" className="size-3" />
-                          서류 {missing.length}건
+                          서류 {missing.length}
                         </Badge>
                       )}
                       {open && dLeft !== null && (dLeft < 0 || dLeft <= 7) && (
@@ -686,12 +720,15 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                     </span>
                   </button>
 
-                  <div className="mt-1.5 flex items-center gap-2 pl-6">
-                    <span className="t-sub min-w-0 flex-1 truncate text-slate-500">
+                  {/* 다음 할 일은 제목 아래에 붙이고, 상태 칸은 넓은 화면에서 제목 옆으로 간다 */}
+                  {(state.nextStep || meta.recurring) && (
+                    <p className="t-sub w-full min-w-0 truncate pl-6 text-slate-500 sm:order-3 sm:pl-6">
                       {state.nextStep ? `다음: ${state.nextStep}` : ''}
                       {state.nextStep && meta.recurring ? ' · ' : ''}
                       {meta.recurring ? '반복' : ''}
-                    </span>
+                    </p>
+                  )}
+                  <div className="flex items-center gap-2 pl-6 sm:pl-0">
                     <select
                       aria-label={`${meta.label} 상태`}
                       value={state.status}
@@ -713,11 +750,12 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                   <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-3.5">
                     <p className="text-[0.92rem] break-keep text-slate-500">{meta.description}</p>
 
+                    {/* 서류는 경고가 아니라 상태다 — 빨간 판이 아니라 회색 판으로 알린다 */}
                     {blocked && (
-                      <div className="rounded-(--radius-control) border border-danger-200 bg-danger-50 px-3 py-2.5">
-                        <p className="flex items-start gap-1.5 text-[0.95rem] font-semibold break-keep text-danger-700">
+                      <div className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2.5">
+                        <p className="flex items-start gap-1.5 text-[0.95rem] font-semibold break-keep text-slate-700">
                           <Lock aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-                          아래 서류가 없어 진행이 막혔습니다
+                          아직 안 받은 서류
                         </p>
                         <ul className="mt-1.5 flex flex-wrap gap-1.5">
                           {missing.map((m) => (
@@ -856,6 +894,18 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                       />
                       <span className="min-w-0">
                         <span className="flex flex-wrap items-center gap-1.5">
+                          {/*
+                            아직 안 받은 서류에 작은 빨간 점 하나.
+                            경고 목록에 올리지 않는 대신, 업체를 열었을 때 여기서
+                            한눈에 보이면 된다 — 서류는 '해야 할 일' 이 아니라 '상태' 다.
+                          */}
+                          {!state.received && (
+                            <span
+                              aria-label="아직 안 받음"
+                              title="아직 안 받음"
+                              className="size-2 shrink-0 rounded-full bg-danger-500"
+                            />
+                          )}
                           <span className="text-[1.05rem] font-bold break-keep text-slate-900">{meta.label}</span>
                           {urgent && (
                             <span className="rounded-full border border-danger-200 bg-danger-100 px-1.5 py-0.5 t-meta font-bold text-danger-700">

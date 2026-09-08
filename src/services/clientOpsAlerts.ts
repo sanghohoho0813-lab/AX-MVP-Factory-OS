@@ -31,7 +31,6 @@ import {
   WAITING_TOO_LONG_DAYS,
   documentMeta,
   isServiceOpen,
-  isServiceStarted,
   serviceMeta,
 } from '../content/clientOpsCatalog'
 import { todayLocalDate } from '../lib/appClock'
@@ -243,27 +242,16 @@ export function buildClientAlerts(record: ClientOpsRecord, today: string): OpsAl
       }
     }
 
-    // 2) 착수했는데 필요 서류가 없어 막힘
-    if (isServiceStarted(state.status)) {
-      const missing = missingDocumentsFor(record, meta.key, today)
-      if (missing.length > 0) {
-        const labels = missing.map((m) => (m.expired ? `${m.label}(만료)` : m.label))
-        push(out, {
-          id: `${record.id}:${meta.key}:blocked`,
-          clientId: record.id,
-          clientName: name,
-          kind: 'blocked_missing_doc',
-          // 대표 의견: 서류가 아직 없는 것은 '오늘 당장' 이 아니다. 마감이 실제로
-          // 걸린 것(task_overdue·payment_overdue)만 critical 로 남긴다.
-          severity: 'warning',
-          title: `${meta.label}에 필요한 서류 ${missing.length}건이 없습니다`,
-          detail: `필요: ${labels.join(', ')}`,
-          serviceKey: meta.key,
-          dueDate: state.dueDate,
-          daysLeft: state.dueDate ? daysLeftFrom(today, state.dueDate) : null,
-        })
-      }
-    }
+    /*
+     * 2) (없앰) 필요 서류가 없어 막힘.
+     *
+     * 예전에는 여기서 "○○에 필요한 서류 N건이 없습니다" 를 경고로 냈다. 그런데
+     * 서류는 요청해 두면 며칠 걸리는 일이지 '지금 해야 할 일' 이 아니다. 업무 6개
+     * × 서류 10종이라 이 경고만으로 목록이 가득 차서, 정작 마감이 묻혔다.
+     *
+     * 대신 업체 안에서 조용히 표시한다 — 서류 탭에서 아직 안 받은 서류에 빨간
+     * 표시를 두는 것으로 충분하다. 경고 목록·오늘 화면에는 올리지 않는다.
+     */
 
     // 3) 고객 회신 장기 대기
     if (state.status === 'waiting_client' && state.waitingSince) {

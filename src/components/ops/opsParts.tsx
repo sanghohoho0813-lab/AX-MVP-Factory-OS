@@ -63,7 +63,6 @@ export const SEVERITY_META: Record<
 const ALERT_KIND_LABEL: Record<AlertKind, string> = {
   task_overdue: '마감 지남',
   task_due_soon: '마감 임박',
-  blocked_missing_doc: '서류 없음',
   doc_expired: '서류 만료',
   doc_expiring: '만료 임박',
   payment_overdue: '수금 연체',
@@ -78,7 +77,6 @@ const ALERT_KIND_LABEL: Record<AlertKind, string> = {
 const ALERT_KIND_ICON: Record<AlertKind, typeof AlertTriangle> = {
   task_overdue: AlertTriangle,
   task_due_soon: Clock,
-  blocked_missing_doc: Lock,
   doc_expired: FileWarning,
   doc_expiring: FileWarning,
   payment_overdue: Wallet,
