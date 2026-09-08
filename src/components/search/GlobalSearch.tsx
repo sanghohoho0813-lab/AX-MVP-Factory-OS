@@ -11,9 +11,10 @@ import { organizationRepository, projectRepository } from '../../repositories'
 import { normalizeQuery } from '../../lib/format'
 import { computeProjectJourney } from '../../services/journeyService'
 import { useActiveProject } from '../../context/activeProject'
+import { peekProjectCache } from '../../domain/consulting/projectCache'
 
 interface Hit {
-  group: '고객사' | '프로젝트' | '지금 해야 할 일' | '결과·자료'
+  group: '고객사' | '프로젝트' | '컨설팅 작업실' | '지금 해야 할 일' | '결과·자료'
   label: string
   sublabel?: string
   onSelect: () => void
@@ -72,6 +73,13 @@ export function GlobalSearch() {
       const orgName = orgs.find((o) => o.id === p.organizationId)?.name ?? ''
       if (!q || `${p.name} ${p.projectCode} ${orgName}`.toLowerCase().includes(q)) {
         out.push({ group: '프로젝트', label: p.name, sublabel: `${orgName} · ${p.projectCode}`, onSelect: () => { setActiveProject(p.id); navigate(`/projects/${p.id}`); close() } })
+      }
+    }
+    // 컨설팅 작업실 (특허·벤처·MVP) — 마지막으로 읽은 목록에서 (화면을 한 번 연 뒤부터 잡힌다)
+    for (const c of peekProjectCache()) {
+      if (c.status === 'archived') continue
+      if (!q || `${c.clientName} ${c.title} ${c.currentStage}`.toLowerCase().includes(q)) {
+        out.push({ group: '컨설팅 작업실', label: `${c.clientName} · ${c.title}`, sublabel: `현재 ${c.currentStage}`, onSelect: () => { navigate(`/studio/${c.id}`); close() } })
       }
     }
     // 지금 해야 할 일 (행동이 필요한 프로젝트)

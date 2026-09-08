@@ -42,6 +42,8 @@ const KpiPage = lazy(() => import('../pages/KpiPage').then((m) => ({ default: m.
 const RoadmapPage = lazy(() => import('../pages/RoadmapPage').then((m) => ({ default: m.RoadmapPage })))
 const JournalPage = lazy(() => import('../pages/JournalPage').then((m) => ({ default: m.JournalPage })))
 const CustomerInboxPage = lazy(() => import('../pages/CustomerInboxPage').then((m) => ({ default: m.CustomerInboxPage })))
+const ConsultingStudioPage = lazy(() => import('../pages/ConsultingStudioPage').then((m) => ({ default: m.ConsultingStudioPage })))
+const ConsultingProjectPage = lazy(() => import('../pages/ConsultingProjectPage').then((m) => ({ default: m.ConsultingProjectPage })))
 
 // 진단 관리·공개 설문은 route-level lazy loading으로 초기 번들을 줄인다
 const DiagnosisStudioPage = lazy(() =>
@@ -352,6 +354,9 @@ export const appRouteChildren = [
       { path: 'ops/clients', element: <OperationsHubPage /> },
       { path: 'ops/calendar', element: <OpsCalendarPage /> },
       { path: 'ops/clients/:clientId', element: <OperationsClientDetailPage /> },
+      // 컨설팅 작업실 — 특허 × 벤처 × MVP 단계 엔진
+      { path: 'studio', element: <ConsultingStudioPage /> },
+      { path: 'studio/:projectId', element: <ConsultingProjectPage /> },
       { path: 'tools', element: <ToolsHubPage /> },
       { path: 'why', element: <WhyAxPage /> },
       { path: 'kpi', element: <KpiPage /> },

@@ -36,6 +36,18 @@ const SCREENS = [
   { name: '기획의도', path: '/why' },
   { name: '성과 지표', path: '/kpi' },
   { name: '향후 확장', path: '/roadmap' },
+  { name: '컨설팅 작업실', path: '/studio' },
+  { name: '컨설팅 개요', path: '/studio/proj_hansol' },
+  { name: '컨설팅 단계', path: '/studio/proj_hansol?tab=stages' },
+  { name: '컨설팅 사실표', path: '/studio/proj_hansol?tab=factsheet' },
+  { name: '컨설팅 줄기', path: '/studio/proj_hansol?tab=thread' },
+  { name: '컨설팅 특허', path: '/studio/proj_hansol?tab=patent' },
+  { name: '컨설팅 MVP', path: '/studio/proj_hansol?tab=mvp' },
+  { name: '컨설팅 벤처', path: '/studio/proj_hansol?tab=venture' },
+  { name: '컨설팅 증빙', path: '/studio/proj_hansol?tab=evidence' },
+  { name: '컨설팅 프롬프트', path: '/studio/proj_hansol?tab=prompts' },
+  { name: '컨설팅 산출물', path: '/studio/proj_hansol?tab=artifacts' },
+  { name: '컨설팅 실사', path: '/studio/proj_hansol?tab=review' },
 ]
 
 const VIEWPORTS = ALL

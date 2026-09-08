@@ -115,6 +115,7 @@ import { ServiceCatalogModal } from '../components/ops/ServiceCatalogModal'
 import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { ClientJournalTab } from '../components/ops/ClientJournalTab'
 import { FilesTab } from '../components/ops/FilesTab'
+import { ClientConsultingTab } from '../components/consulting/ClientConsultingTab'
 import { listLinksForClient } from '../services/customerBridgeService'
 import { buildClientSchedule } from '../services/clientOpsSchedule'
 import { brand } from '../brand/brand.config'
@@ -124,10 +125,11 @@ import { brand } from '../brand/brand.config'
 const inputCls =
   'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.98rem] focus:border-brand-500 focus:outline-none'
 
-type DetailTab = 'overview' | 'work' | 'docs' | 'fees' | 'funding' | 'portal' | 'journal' | 'files'
+type DetailTab = 'overview' | 'work' | 'consulting' | 'docs' | 'fees' | 'funding' | 'portal' | 'journal' | 'files'
 const DETAIL_TABS: { key: DetailTab; label: string }[] = [
   { key: 'overview', label: '개요' },
   { key: 'work', label: '업무' },
+  { key: 'consulting', label: '컨설팅' },
   { key: 'docs', label: '서류' },
   { key: 'fees', label: '수금' },
   { key: 'funding', label: '자금·지원' },
@@ -1026,6 +1028,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           onRemove={(id) => void commit(withoutFunding(record, id))}
         />
       )}
+
+      {tab === 'consulting' && <ClientConsultingTab record={record} workspaceId={workspaceId} />}
 
       {tab === 'fees' && <FeesSection record={record} onChange={commit} today={today} />}
 

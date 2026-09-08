@@ -36,6 +36,7 @@ import { seedFactsFromClient } from '../domain/consulting/factsheetSchema'
 import { isStageKey } from '../domain/consulting/workflowDefinition'
 import { emptyPrivacyReport } from '../domain/consulting/privacyFilter'
 import { createJournalEntry } from './journalService'
+import { setProjectCache } from '../domain/consulting/projectCache'
 
 /* ------------------------------------------------------------------ */
 /* 공통                                                                 */
@@ -116,11 +117,17 @@ function projectToRow(p: ConsultingProject, workspaceId: string) {
 }
 
 export async function listProjects(workspaceId: string | null): Promise<ConsultingProject[]> {
-  if (isLocal()) return projectsLocal().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  if (isLocal()) {
+    const list = projectsLocal().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    setProjectCache(list)
+    return list
+  }
   const ws = needWs(workspaceId)
   const { data, error } = await getSupabaseClient().from('consulting_projects').select('*').eq('workspace_id', ws).order('updated_at', { ascending: false })
   if (error) wrap(error)
-  return (data ?? []).map((r) => projectFromRow(r as Record<string, unknown>))
+  const list = (data ?? []).map((r) => projectFromRow(r as Record<string, unknown>))
+  setProjectCache(list)
+  return list
 }
 
 export async function listProjectsForClient(workspaceId: string | null, clientId: string): Promise<ConsultingProject[]> {

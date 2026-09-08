@@ -12,7 +12,9 @@ import {
   Moon,
   NotebookPen,
   Wallet,
+  Workflow,
 } from 'lucide-react'
+import { ConsultingNextActions } from '../components/consulting/ConsultingNextActions'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { Badge, Blank, Disclosure, ListRow, ListSurface, MetricTile } from '../components/ui/primitives'
 import { Modal } from '../components/ui/Modal'
@@ -178,6 +180,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const [journal, setJournal] = useState<JournalEntry[]>([])
   const [events, setEvents] = useState<CustomerEvent[]>([])
   const [loading, setLoading] = useState(true)
+  const [consultingCount, setConsultingCount] = useState(0)
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [linking, setLinking] = useState<{ event: CustomerEvent; tab: 'existing' | 'new' } | null>(null)
   /** 눌러서 연 할 일 — 무엇을 할지 시트에서 고른다 */
@@ -447,6 +450,14 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               ))}
             </ol>
           )}
+
+          {/* 컨설팅 작업실 — 진행 중인 특허·벤처·MVP 프로젝트의 다음 행동 (없으면 통째로 숨긴다) */}
+          {consultingCount > 0 && (
+            <div className="mt-2 flex flex-col gap-2">
+              <SectionTitle title="컨설팅 다음 행동" icon={Workflow} to="/studio" count={consultingCount} accent="todo" />
+            </div>
+          )}
+          <ConsultingNextActions workspaceId={workspaceId} today={today} onCount={setConsultingCount} />
 
           {/* 오늘의 숫자 — 위가 아니라 할 일 아래에 둔다. 숫자는 판단의 근거이지 할 일이 아니다 */}
           <div className="ax-stagger mt-1 grid grid-cols-2 gap-2.5 sm:grid-cols-4">

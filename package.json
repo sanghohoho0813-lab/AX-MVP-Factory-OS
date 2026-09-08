@@ -29,6 +29,7 @@
     "e2e:mobile": "node e2e/mobile-journey.mjs",
     "qa:board": "node e2e/board.mjs",
     "qa:todos": "node e2e/todos.mjs",
+    "qa:studio": "node e2e/studio.mjs",
     "qa:shots": "node e2e/shots.mjs",
     "qa:squeeze": "node e2e/squeeze.mjs",
     "qa:themes": "node e2e/themes.mjs"

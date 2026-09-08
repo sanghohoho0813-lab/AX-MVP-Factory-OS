@@ -156,8 +156,37 @@ const events = [
   },
 ]
 
+/** 컨설팅 작업실 — 화면 검사(짜부라짐·스크린샷)용 프로젝트 하나. 특허는 출원 중, 핵심 줄기 일부 채움. */
+const fact = (value, status = 'confirmed', source = '등기부등본') => ({ value, status, source, asOfDate: '2026-09-01', note: '', updatedAt: '2026-09-01T00:00:00.000Z' })
+const consultingProjects = [
+  {
+    id: 'proj_hansol', workspaceId: null, clientId: 'cli_hansol', clientName: '한솔테크(주)', moduleKey: 'patent_venture_mvp',
+    title: '작업지연 위험분석 특허 · 벤처인증', status: 'active', currentStage: 'S3',
+    stages: { S0: { status: 'completed' }, S1: { status: 'completed' }, S2: { status: 'completed' }, S3: { status: 'in_progress' } },
+    factsheet: {
+      companyName: fact('한솔테크(주)'), representative: fact('김대표'), establishedAt: fact('2019-03-02'), headOffice: fact('경기도 남양주시 진접읍 해밀예당1로 1'),
+      businessNumber: fact('123-45-67890'), industry: fact('소프트웨어 개발'), mainProducts: fact('제조 현장 작업지시·공정관리 프로그램', 'unverified', '인터뷰'),
+      employees: fact('7', 'confirmed', '4대보험 명부'), revenue3y: fact('2023 8.2억 / 2024 9.1억 / 2025 10.4억', 'confirmed', '재무제표'),
+      customers: fact('거래처 23곳', 'confirmed', '거래명세서'), coreProblem: fact('작업지시가 카톡·엑셀에 흩어져 납기 지연을 늦게 안다', 'confirmed', '대표자 인터뷰'),
+      currentMethod: fact('공정 담당자가 매일 아침 엑셀을 열어 눈으로 확인', 'confirmed', '대표자 인터뷰'), coreTech: fact('작업지시·공정 데이터 기반 작업지연 위험분석 및 우선순위 추천', 'confirmed', '기술기획'),
+      som: fact('수도권 사업체 2,800개 × 3% × 360만원 = 3.0억', 'planned', '통계청 사업체조사'),
+    },
+    coreThread: { fieldProblem: '납기 지연을 늦게 안다', existingMethod: '엑셀·카톡 수기 확인', coreTech: '작업지연 위험분석 및 우선순위 추천', patentPoint: '공정 데이터 정규화 → 위험 산출 → 우선순위 → Action 재반영 순서', axCore: '작업지연 위험 점수 산출(점수기반 추천)', platformSurface: '거래처 납기 조회 포털', ventureSentence: '', keyEvidence: '' },
+    gate: { items: { knowsProblem: true, repeatedInefficiency: true, differentStructure: true, patentPoint: true, mvpShowable: true, realTarget: true }, decision: 'go', reason: '현장문제·거래처 명확. 시장 숫자 보강 필요', decidedAt: '2026-09-02T00:00:00.000Z' },
+    freshness: [], kipo: [{ code: '0217', reason: 'AI 기반 공정 제어의 청구항 구조', pdfAttached: false }],
+    patent: { problem: '납기 지연 인지 지연', existingMethod: '수기', differentStructure: '위험 산출 순서', processFlow: '입력→정규화→위험 산출→추천→Action→재반영', claimPoint: '위험 산출과 우선순위 결합', titleCandidates: '공정 데이터 기반 작업지연 위험 산출 및 우선순위 추천 시스템', priorArtKeywords: '', priorArtFindings: '', inventors: '', applicant: '한솔테크(주)', rightsNote: '', applicationNumber: '', filedAt: '', examRequestDue: '', filingStatus: 'none' },
+    mvp: { productName: '', oneLineValue: '', targetUser: '', primaryJourney: '', axCoreFeature: '', axMode: 'scoring', platformSurface: '', live: '', demo: '', future: '', notBuilding: '', demoDataAssumption: '', mvpUrl: '', referenceStyle: '' },
+    venture: { sections: {}, documents: {}, judgeScores: {}, redFlagsCleared: {}, submittedAt: '', submissionNote: '' },
+    fieldReview: { reviewDate: '', script: '', demoFlow: '', qa: [], numbersToMemorize: [], evidencePackChecked: {}, mockReviewDone: false, result: '' },
+    createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-03T00:00:00.000Z',
+  },
+]
+
+export const SEED_PROJECT_ID = 'proj_hansol'
+
 export function seedScript() {
   return `
+    localStorage.setItem('axmvp.v1.consulting_projects', ${JSON.stringify(JSON.stringify(consultingProjects))});
     localStorage.setItem('axmvp.onboarding.prefs', ${JSON.stringify(JSON.stringify({ tutorialVersion: 99, autoShowEnabled: false, snoozedUntilDate: '' }))});
     localStorage.setItem('axmvp.v1.operations_clients', ${JSON.stringify(JSON.stringify(clients))});
     localStorage.setItem('axmvp.v1.ops_journal_entries', ${JSON.stringify(JSON.stringify(journal))});

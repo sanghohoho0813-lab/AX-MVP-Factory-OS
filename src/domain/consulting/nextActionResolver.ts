@@ -7,6 +7,7 @@
  */
 
 import type {
+  ArtifactType,
   ConsultingArtifact,
   ConsultingEvidence,
   ConsultingProject,
@@ -16,7 +17,7 @@ import type {
 } from '../../types/consulting'
 import { stageDef } from './workflowDefinition'
 import { factDef, missingFacts } from './factsheetSchema'
-import { artifactTypeForPrompt } from './artifactDefinitions'
+import { artifactDef, artifactTypeForPrompt } from './artifactDefinitions'
 import { canCompleteStage, freshnessOk } from './gateEngine'
 import { blockedStages } from './projectModel'
 import { CORE_THREAD_KEYS, CORE_THREAD_LABEL } from './projectModel'
@@ -122,8 +123,8 @@ export function resolveNextActions(p: ConsultingProject, ctx: ResolverContext): 
   return out
 }
 
-function labelOf(type: string): string {
-  return type.replace(/_/g, ' ')
+function labelOf(type: ArtifactType): string {
+  return artifactDef(type).label
 }
 
 /** 단계 자동 이동 — 완료 후 다음 미완료 단계 */

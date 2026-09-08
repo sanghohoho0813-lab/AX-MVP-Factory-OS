@@ -28,6 +28,11 @@
 | Portal Request | `portal_requests` | **브릿지** | 고객(RPC) · 내부(답변·상태) | 내부 · 고객은 RPC | P | M | — | INSERT 트리거 → `customer_request_created` |
 | Intake Routing | `customer_intake_routing` | 브릿지 | 내부 | 내부 | N | L | — | 연결 전 이벤트가 갈 워크스페이스 |
 | Deliverable | `deliverable_packages` (AX STUDIO) | 내부 OS | 내부 | 내부 | N — 공유하려면 `portal_documents(shared)`로 | M | — | 결과자료 고객 공개는 명시 공유만 |
+| Consulting Project | `consulting_projects` (+`payload`) / `axmvp.v1.consulting_projects` | 내부 OS(컨설팅 작업실) | 내부 멤버 | 내부 멤버 | **N** | **H**(사실표·재무·특허 아이디어) | 프로젝트 삭제 시 cascade | `client_id → operations_clients`. payload = 단계 상태·사실표·핵심 줄기·게이트·작업공간 (D-46) |
+| Consulting Artifact | `consulting_artifacts` / `axmvp.v1.consulting_artifacts` | 내부 OS | 내부 멤버(수동 LLM 결과 붙여넣기·직접 작성) | 내부 멤버 | N | H | 버전 이력 보존(`superseded`) | 완료 조건 계산은 superseded 제외 |
+| Consulting Prompt Package | `consulting_prompt_packages` / `axmvp.v1.consulting_prompt_packages` | 내부 OS | 내부 멤버 | 내부 멤버 | N | M(**필터 통과본만 저장**) | — | 외부 API 호출 없음 (D-47·D-48) |
+| Consulting Decision | `consulting_decisions` / `axmvp.v1.consulting_decisions` | 내부 OS | 내부 멤버·시스템(단계 완료·게이트·들여오기) | 내부 멤버 | N | M | — | 같은 내용을 `ops_journal_entries(decision)` 에도 남김 |
+| Consulting Evidence | `consulting_evidence` / `axmvp.v1.consulting_evidence` | 내부 OS | 내부 멤버 | 내부 멤버 | N | M | — | 10개 첨부 슬롯 × 주장·상태·출처 (파일은 P1) |
 | UI Preference | `ui_preferences` + `axmvp.ui.preferences` | 사용자 | 본인 | 본인 | — | L | — | 테마·글자·모션 |
 
 ## 투영 필드 (고객이 보는 전부)

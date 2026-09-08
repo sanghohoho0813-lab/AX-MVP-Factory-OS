@@ -138,4 +138,5 @@ npm run qa:squeeze -- <url> --all        # 짜부라진 글자 자동 탐지 (36
 npm run qa:shots -- <url> <dir> --wide   # 8개 화면폭 스크린샷 + 넘침 검사
 npm run qa:themes -- <url> <dir>         # 테마 9종
 npm run e2e:mobile -- <url>              # 390px 한 바퀴 여정
+npm run qa:studio -- <url>               # 컨설팅 작업실 20단계 E2E
 ```
