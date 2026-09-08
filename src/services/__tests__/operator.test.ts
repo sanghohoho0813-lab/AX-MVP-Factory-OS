@@ -13,7 +13,10 @@ import { parseReturnBlock, stripReturnBlock, returnBlockInstruction, RETURN_BEGI
 import { buildPromptPackage } from '../../domain/consulting/promptPackageBuilder'
 import { normalizeProject } from '../../domain/consulting/projectModel'
 import { seedFactsFromClient } from '../../domain/consulting/factsheetSchema'
-import { CORE_PROBLEM_CHOICES } from '../../domain/consulting/operatorChoices'
+import { CORE_PROBLEM_CHOICES, CUSTOMER_COUNT_CHOICES } from '../../domain/consulting/operatorChoices'
+import { recommendGate, recommendKipo } from '../../domain/consulting/recommendations'
+import { composeProblemSentence, suggestCoreTech, suggestJourney } from '../../domain/consulting/suggestions'
+import { objectParticle, subjectParticle, toPhrase } from '../../domain/consulting/koreanText'
 import { documentsSummary, factsFromDocuments } from '../../domain/consulting/companyDocFacts'
 import { parseKoreanBusinessDocument } from '../koreanDocParser'
 import { normalizeClientOps } from '../clientOpsService'
@@ -78,6 +81,8 @@ function promptPkg(over: Partial<ConsultingPromptPackage>): ConsultingPromptPack
   check('첫 화면: 이미 아는 것은 안 묻는다 (회사명·대표자·번호는 시드됨)', !(a.inputs ?? []).some((i) => i.target.kind === 'fact' && ['companyName', 'representative', 'businessNumber'].includes(i.target.key)))
   check('첫 화면: 준비된 정보를 보여준다', a.ready.length > 0 && a.ready.some((r) => r.ok))
   check('첫 화면: 다음이 무엇인지 알려준다', a.nextPreview.includes('다음'))
+  // 개발·업무 용어가 기본 화면으로 새지 않는다 (§16·§59)
+  check('첫 화면: 다음 단계 이름이 쉬운 한국어', !/GO|HOLD|NO-GO|Judge|Devil|슬롯|잠금/.test(a.nextPreview), a.nextPreview)
   check('첫 화면: 버튼 글자가 한국어 행동', a.primaryAction === '저장하고 계속')
 }
 
@@ -106,17 +111,26 @@ function promptPkg(over: Partial<ConsultingPromptPackage>): ConsultingPromptPack
   t = resolveCurrentTask(p, ctx)
   check('S1: 문제를 고르게 한다', t.actionType === 'SELECT' && (t.choices?.length ?? 0) >= 5, t.actionType)
   check('S1: 직접 입력도 열려 있다', t.allowFreeText === true)
+  check('S1: 고르면 무엇이 저장될지 미리 보여 준다', t.composeKind === 'coreProblem')
   p = applyTask(p, t, { selected: [CORE_PROBLEM_CHOICES[1].value] }, ctx, NOW).project
-  check('S1: 고른 값이 사실표에 확인됨으로 들어간다', p.factsheet.coreProblem?.value === CORE_PROBLEM_CHOICES[1].value && p.factsheet.coreProblem?.status === 'confirmed')
-  check('S1: 핵심 줄기가 자동으로 따라온다', p.coreThread.fieldProblem === CORE_PROBLEM_CHOICES[1].value)
+  // 고른 보기를 그대로 넣지 않고 회사명·업종을 붙인 문장으로 늘려 저장한다 (§9)
+  check('S1: 고른 값이 문장으로 저장된다', (p.factsheet.coreProblem?.value ?? '').includes('하나정보통신') && p.factsheet.coreProblem?.status === 'confirmed', p.factsheet.coreProblem?.value)
+  check('S1: 고른 내용이 문장 안에 그대로 남는다', (p.factsheet.coreProblem?.value ?? '').includes(CORE_PROBLEM_CHOICES[1].value.slice(0, 8)), p.factsheet.coreProblem?.value)
+  // 줄기에는 늘린 문장이 아니라 고른 그대로의 짧은 이름이 들어간다 (뒤의 초안이 말을 겹치지 않게)
+  check('S1: 핵심 줄기에는 짧은 이름이 들어간다', p.coreThread.fieldProblem === CORE_PROBLEM_CHOICES[1].value, p.coreThread.fieldProblem)
+  check('S1: 사실표에는 늘린 문장이 남는다', (p.factsheet.coreProblem?.value ?? '').length > p.coreThread.fieldProblem.length)
 
   t = resolveCurrentTask(p, ctx)
-  check('S1: 이어서 고객수를 묻는다', t.id === 'S1:INPUT:customers', t.id)
-  p = applyTask(p, t, { values: ['거래처 23곳'] }, ctx, NOW).project
+  check('S1: 이어서 거래처 수를 고르게 한다 (타이핑 없이)', t.id === 'S1:SELECT:customers' && t.actionType === 'SELECT', t.id)
+  check('S1: 거래처 수는 몰라도 넘어갈 수 있다', t.deferrable === true)
+  p = applyTask(p, t, { selected: [CUSTOMER_COUNT_CHOICES[2].value] }, ctx, NOW).project
 
   t = resolveCurrentTask(p, ctx)
   check('S1: 세 가지 중 고르기', t.actionType === 'SELECT' && (t.choices?.length ?? 0) === 3, t.actionType)
   check('S1: 화면에 GO/HOLD 같은 말이 없다', !(t.choices ?? []).some((c) => /GO|HOLD/i.test(c.label)))
+  check('S1: 시스템이 먼저 의견을 낸다', t.recommend !== undefined && (t.recommend?.reasons.length ?? 0) > 0, JSON.stringify(t.recommend))
+  check('S1: 추천 버튼 글자가 "추천대로 진행"', t.primaryAction === '추천대로 진행', t.primaryAction)
+  check('S1: 진행 판단이 무엇인지 설명이 붙는다', (t.helpKeys ?? []).includes('gate'))
   const out1 = applyTask(p, t, { selected: ['go'] }, ctx, NOW)
   p = out1.project
   check('S1: 고르면 판단이 저장되고 S2 로', p.gate.decision === 'go' && p.currentStage === 'S2', p.currentStage)
@@ -131,6 +145,10 @@ function promptPkg(over: Partial<ConsultingPromptPackage>): ConsultingPromptPack
   // S3: 핵심기술 한 줄 → 프롬프트
   t = resolveCurrentTask(p, ctx)
   check('S3: 핵심기술을 한 줄로 묻는다', t.actionType === 'INPUT' && t.id === 'S3:INPUT:coreTech', t.id)
+  check('S3: 빈 칸으로 두지 않고 초안을 만들어 준다', (t.inputs?.[0].suggestion ?? '') !== '', t.inputs?.[0].suggestion)
+  check('S3: 초안의 근거를 밝힌다', (t.inputs?.[0].suggestionBasedOn ?? []).length > 0)
+  check('S3: 초안이 있으면 버튼도 "이대로"', t.primaryAction === '이대로 저장하고 계속', t.primaryAction)
+  check('S3: 무엇을 쓰면 되는지 예시가 있다', (t.inputs?.[0].example ?? '') !== '')
   p = applyTask(p, t, { values: ['작업지연 위험분석 및 우선순위 추천'] }, ctx, NOW).project
   t = resolveCurrentTask(p, ctx)
   check('S3: 이제 프롬프트를 만들 차례', t.actionType === 'GENERATE_PROMPT' && t.promptType === 'PATENT_IDEA', `${t.actionType} ${t.promptType}`)
@@ -188,6 +206,150 @@ function promptPkg(over: Partial<ConsultingPromptPackage>): ConsultingPromptPack
   }
   console.log(`  · 결과 저장 → 다음 프롬프트: ${clicks2}회 (목표 1~3)`)
   check(`클릭 수: 결과 저장 후 다음 프롬프트까지 (목표 1~3)`, clicks2 <= 3, `${clicks2}회`)
+}
+
+/* ------------------------------------------------------------------ */
+/* 3-2. 타이핑 예산 (§49) — 몇 번이나 직접 쳐야 하는가                      */
+/* ------------------------------------------------------------------ */
+{
+  /*
+   * 새 프로젝트를 만들어 첫 프롬프트까지 가는 동안, "사람이 자판을 두드려야만 넘어가는" 화면이
+   * 몇 개인지 센다. 고르기 · 추천 확인 · 초안 확인은 타이핑이 아니다.
+   * (S0 회사 기본정보는 서류 한 장으로 채울 수 있으므로 서류를 올린 것으로 친다.)
+   */
+  const REGISTRATION = [
+    '사업자등록증 ( 법인사업자 )', '등록번호 : 214-88-01234', '법인명(단체명) : 주식회사 대한정밀',
+    '대표자 : 박정밀', '개업연월일 : 2018 년 05 월 14 일', '사업장 소재지 : 경기도 화성시 동탄산단6길 22',
+    '업태 : 제조업', '종목 : 자동차부품 제조',
+  ].join('\n')
+  let p = { ...project(), stages: { ...project().stages, S0: { ...project().stages.S0, status: 'in_progress' as const } } }
+  const ctx = emptyCtx
+  let typed = 0
+  let steps = 0
+
+  // 서류 한 장 = 클릭 몇 번, 타이핑 0
+  let t = resolveCurrentTask(p, ctx)
+  p = applyTask(p, t, { facts: factsFromDocuments([parseKoreanBusinessDocument(REGISTRATION)]) }, ctx, NOW).project
+
+  t = resolveCurrentTask(p, ctx)
+  while (t.actionType !== 'GENERATE_PROMPT' && steps < 20) {
+    steps += 1
+    let sub: TaskSubmission = {}
+    if (t.actionType === 'SELECT') sub = { selected: t.recommend ? t.recommend.values : [t.choices?.[0]?.value ?? ''] }
+    else if (t.actionType === 'INPUT') {
+      const draft = (t.inputs ?? []).map((i) => i.suggestion ?? '')
+      const allDrafted = draft.length > 0 && draft.every((d) => d.trim() !== '')
+      if (!allDrafted) typed += 1
+      sub = { values: allDrafted ? draft : (t.inputs ?? []).map((i) => (i.target.kind === 'fact' && i.target.key === 'establishedAt' ? '2019-03-02' : '테스트 값')) }
+    }
+    p = applyTask(p, t, sub, ctx, NOW).project
+    t = resolveCurrentTask(p, ctx)
+  }
+  const ratio = steps === 0 ? 1 : (steps - typed) / steps
+  console.log(`  · 첫 프롬프트까지 ${steps}단계 중 타이핑이 필요한 화면 ${typed}개 (타이핑 없이 ${Math.round(ratio * 100)}%)`)
+  check(`타이핑 예산: 80% 이상을 타이핑 없이 (실측 ${Math.round(ratio * 100)}%)`, ratio >= 0.8, `${typed}/${steps}`)
+}
+
+/* ------------------------------------------------------------------ */
+/* 3-3. 몰라도 멈추지 않는다 (§6·§7·§8)                                    */
+/* ------------------------------------------------------------------ */
+{
+  let p = seeded()
+  const ctx = emptyCtx
+  let t = resolveCurrentTask(p, ctx)
+  check('모름: 회사 기본정보 화면에 "나중에" 가 있다', t.deferrable === true && (t.deferKeys?.length ?? 0) > 0)
+
+  const beforeId = t.id
+  const out = applyTask(p, t, { defer: true }, ctx, NOW)
+  p = out.project
+  check('모름: 미룬 것이 목록에 남는다', p.deferred.length > 0, JSON.stringify(p.deferred))
+  check('모름: 미뤘다는 사실이 자동 기록된다', out.decisions.some((d) => d.summary.includes('나중에 확인')))
+  const after = resolveCurrentTask(p, ctx)
+  check('모름: 같은 것을 다시 묻지 않는다', after.id !== beforeId, `${beforeId} → ${after.id}`)
+  check('모름: 그래도 일은 계속 이어진다', after.finished !== true)
+
+  // 값이 들어오면 미룬 목록에서 빠진다
+  const key = p.deferred[0].key
+  let q = p
+  let tq = resolveCurrentTask(q, ctx)
+  let guard = 0
+  while (q.deferred.some((d) => d.key === key) && guard < 12) {
+    guard += 1
+    if (tq.actionType === 'CONFIRM') { q = applyTask(q, tq, {}, ctx, NOW).project }
+    else if (tq.actionType === 'SELECT') { q = applyTask(q, tq, { selected: [tq.choices?.[0]?.value ?? ''] }, ctx, NOW).project }
+    else if (tq.actionType === 'INPUT') { q = applyTask(q, tq, { values: (tq.inputs ?? []).map((i) => i.suggestion || '채운 값') }, ctx, NOW).project }
+    else break
+    tq = resolveCurrentTask(q, ctx)
+  }
+
+  // 제출에 가까운 단계에서는 다시 묻는다 (§7)
+  const nearSubmit = {
+    ...seeded(),
+    currentStage: 'S10' as const,
+    deferred: [{ key: 'som', label: '3년 내 확보 가능 시장(SOM)', stageKey: 'S1' as const, deferredAt: NOW }],
+    stages: { ...seeded().stages, S10: { ...seeded().stages.S10, status: 'in_progress' as const } },
+  }
+  const t10 = resolveCurrentTask(nearSubmit, ctx)
+  check('모름: 제출 단계에서는 미뤄 둔 숫자를 다시 묻는다', t10.stageKey === 'S10' && (t10.inputs ?? []).some((i) => i.target.kind === 'fact'), `${t10.stageKey} ${t10.id}`)
+  check('모름: 제출 단계에는 "나중에" 를 주지 않는다', t10.deferrable !== true)
+}
+
+/* ------------------------------------------------------------------ */
+/* 3-4. 시스템이 먼저 추천한다 (§5·§27)                                    */
+/* ------------------------------------------------------------------ */
+{
+  const base = seeded()
+  const withProblem = {
+    ...base,
+    factsheet: {
+      ...base.factsheet,
+      coreProblem: { value: '견적 요청이 카톡·전화·메일에 흩어져 담당자가 매번 확인한다', status: 'confirmed' as const, source: '인터뷰', asOfDate: TODAY, note: '', updatedAt: NOW },
+      coreTech: { value: '공정 데이터를 모아 작업지연 위험을 계산하고 처리 순서를 추천', status: 'confirmed' as const, source: '기술기획', asOfDate: TODAY, note: '', updatedAt: NOW },
+    },
+  }
+  const g = recommendGate(withProblem)
+  check('추천: 근거와 함께 의견을 낸다', g !== null && g.reasons.length >= 2, JSON.stringify(g))
+  check('추천: 진행 어려움(NO-GO)을 시스템이 만들지 않는다', g?.value !== 'no_go')
+  check('추천: 문제가 없으면 추천하지 않는다', recommendGate(base) === null)
+
+  const k = recommendKipo(withProblem, 2)
+  check('추천: 참고자료 2개를 골라 준다', k !== null && k.value.length === 2, JSON.stringify(k?.value))
+  check('추천: 왜 골랐는지 함께 말한다', (k?.reasons.length ?? 0) === 2 && (k?.reasons[0] ?? '').length > 8)
+  check('추천: 118종을 사람이 뒤지게 하지 않는다', (k?.value ?? []).every((c) => typeof c === 'string' && c.length === 4))
+}
+
+/* ------------------------------------------------------------------ */
+/* 3-5. 시스템이 먼저 문장을 쓴다 (§9·§18)                                 */
+/* ------------------------------------------------------------------ */
+{
+  const base = seeded()
+  const withProblem = {
+    ...base,
+    factsheet: {
+      ...base.factsheet,
+      coreProblem: { value: '작업지시가 카톡·엑셀에 흩어져 납기 지연을 늦게 안다', status: 'confirmed' as const, source: '인터뷰', asOfDate: TODAY, note: '', updatedAt: NOW },
+      currentMethod: { value: '담당자가 매일 아침 엑셀을 열어 눈으로 확인한다', status: 'confirmed' as const, source: '인터뷰', asOfDate: TODAY, note: '', updatedAt: NOW },
+    },
+  }
+  const tech = suggestCoreTech(withProblem)
+  check('초안: 핵심기술 한 줄을 만들어 준다', tech.text.length > 20, tech.text)
+  // 조사·어미가 틀리면 사용자는 그 순간 시스템을 믿지 않는다
+  check('초안: 조사가 맞는다 (…한다을 같은 말이 없다)', !/[한된는]다[을를이가은는]/.test(tech.text), tech.text)
+  check('초안: 초안이 문단이 되지 않는다', tech.text.length <= 160, `${tech.text.length}자`)
+  check('초안: 무엇을 보고 만들었는지 밝힌다', tech.basedOn.length > 0)
+  check('초안: 근거가 없으면 만들지 않는다', suggestCoreTech(base).text === '')
+
+  const sentence = composeProblemSentence('견적 요청이 여러 곳에 흩어진다', withProblem)
+  check('초안: 고른 보기를 문장으로 늘린다', sentence.text.includes('견적') && sentence.text.endsWith('있습니다'), sentence.text)
+
+  const journey = suggestJourney({ ...withProblem, mvp: { ...withProblem.mvp, targetUser: '견적·수주 담당자' } })
+  check('초안: MVP 흐름을 화살표로 제안한다', journey.text.includes('→') && journey.text.includes('견적'), journey.text)
+
+  // 조사 붙이기 — 받침 유무에 따라 갈린다
+  check('조사: 받침 있는 말에는 을/이/은', objectParticle('담당자') === '담당자를' && objectParticle('작업') === '작업을', `${objectParticle('담당자')} ${objectParticle('작업')}`)
+  check('조사: 주격도 맞춘다', subjectParticle('공정') === '공정이' && subjectParticle('담당자') === '담당자가')
+  check('조사: 판단할 수 없으면 둘 다 적는다', objectParticle('MVP').includes('(') , objectParticle('MVP'))
+  check('어미: 종결어미를 떼어 낸다', toPhrase('담당자가 눈으로 확인한다') === '담당자가 눈으로 확인', toPhrase('담당자가 눈으로 확인한다'))
 }
 
 /* ------------------------------------------------------------------ */
@@ -336,6 +498,34 @@ function promptPkg(over: Partial<ConsultingPromptPackage>): ConsultingPromptPack
 
   // 아무것도 못 읽은 서류
   check('서류: 못 알아봐도 빈 목록만 돌려준다', factsFromDocuments([parseKoreanBusinessDocument('그냥 아무 글자')]).length === 0)
+}
+
+/* ------------------------------------------------------------------ */
+/* 6-3. 쉬운 한국어 — 개발·업무 용어가 새지 않는가 (§16·§59)               */
+/* ------------------------------------------------------------------ */
+{
+  const BANNED = /GO \/ HOLD|NO-GO|Judge|Devil|Artifact|Payload|Blocker|Resolver|Stage |Core Thread|Prompt Package|슬롯|잠금/
+  let p = seeded()
+  const ctx = emptyCtx
+  const seen: string[] = []
+  let t = resolveCurrentTask(p, ctx)
+  for (let i = 0; i < 25; i += 1) {
+    seen.push(`${t.headline} | ${t.detail} | ${t.primaryAction} | ${t.nextPreview}`)
+    for (const c of t.choices ?? []) seen.push(`${c.label} | ${c.hint ?? ''}`)
+    for (const inp of t.inputs ?? []) seen.push(`${inp.label} | ${inp.placeholder} | ${inp.example ?? ''}`)
+    for (const r of t.recommend?.reasons ?? []) seen.push(r)
+    if (t.finished) break
+    let sub: TaskSubmission = {}
+    if (t.actionType === 'SELECT') sub = { selected: t.recommend ? t.recommend.values : (t.choices ?? []).slice(0, t.multi?.min ?? 1).map((c) => c.value) }
+    else if (t.actionType === 'INPUT') sub = { values: (t.inputs ?? []).map((x) => x.suggestion || (x.target.kind === 'fact' && x.target.key === 'establishedAt' ? '2019-03-02' : '값')) }
+    const before = t.id
+    p = applyTask(p, t, sub, ctx, NOW).project
+    t = resolveCurrentTask(p, ctx)
+    if (t.id === before) break // 프롬프트·결과 대기 등 더 진행할 수 없는 자리
+  }
+  const bad = seen.filter((line) => BANNED.test(line))
+  check(`쉬운 한국어: 화면 문구 ${seen.length}줄에 개발·업무 용어 없음`, bad.length === 0, bad.slice(0, 3).join(' // '))
+  check('쉬운 한국어: 실제로 여러 화면을 지났다', seen.length >= 10, `${seen.length}줄`)
 }
 
 /* ------------------------------------------------------------------ */

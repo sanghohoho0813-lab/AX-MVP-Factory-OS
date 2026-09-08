@@ -30,25 +30,31 @@ export function PromptResultPanel({ pkg, onCopied }: { pkg: ConsultingPromptPack
   return (
     <section className="rounded-(--radius-panel) border border-success-200 bg-success-50/40 p-5">
       <p className="t-card break-keep text-slate-900">프롬프트가 만들어졌습니다</p>
-      <p className="t-sub mt-1 break-keep text-slate-600">
+      <p className="t-sub mt-1 break-keep text-slate-700">
         {pkg.title} · {pkg.prompt.length.toLocaleString()}자
         {pkg.privacy.total > 0 && <span className="text-warning-700"> · {privacySummary(pkg.privacy)}</span>}
       </p>
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button variant="primary" onClick={() => void copy()}>
-          {copied ? <Check aria-hidden="true" className="size-4" /> : <ClipboardCopy aria-hidden="true" className="size-4" />}
-          {copied ? '복사했습니다' : '복사'}
+      {/*
+        강조 버튼은 하나다 (§13·§31). 대부분은 "복사해서 ChatGPT 에 붙여넣기" 하나면 끝난다.
+        Claude 로 하거나 내용을 보는 것은 그 다음 줄에 약하게 둔다.
+      */}
+      <div className="mt-3">
+        <Button variant="primary" size="md" className="w-full sm:w-auto" onClick={() => void openAt('https://chatgpt.com/')}>
+          <ExternalLink aria-hidden="true" className="size-4" /> 복사하고 ChatGPT 열기
         </Button>
-        <Button onClick={() => void openAt('https://chatgpt.com/')}>
-          <ExternalLink aria-hidden="true" className="size-4" /> ChatGPT 열기
-        </Button>
-        <Button onClick={() => void openAt('https://claude.ai/new')}>
-          <ExternalLink aria-hidden="true" className="size-4" /> Claude 열기
-        </Button>
-        <Button variant="ghost" onClick={() => setOpen((v) => !v)}>
-          {open ? '접기' : '내용 보기'}
-        </Button>
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+          <button type="button" onClick={() => void copy()} className="tap t-sub inline-flex items-center gap-1.5 font-medium text-slate-600 hover:text-slate-900">
+            {copied ? <Check aria-hidden="true" className="size-4 text-success-600" /> : <ClipboardCopy aria-hidden="true" className="size-4" />}
+            {copied ? '복사했습니다' : '복사만 하기'}
+          </button>
+          <button type="button" onClick={() => void openAt('https://claude.ai/new')} className="tap t-sub inline-flex items-center gap-1.5 font-medium text-slate-600 hover:text-slate-900">
+            <ExternalLink aria-hidden="true" className="size-4" /> Claude 에서 하기
+          </button>
+          <button type="button" onClick={() => setOpen((v) => !v)} className="tap t-sub font-medium text-slate-600 hover:text-slate-900">
+            {open ? '접기' : '내용 보기'}
+          </button>
+        </div>
       </div>
 
       {open && (
@@ -73,8 +79,8 @@ export function PromptResultPanel({ pkg, onCopied }: { pkg: ConsultingPromptPack
         </div>
       )}
 
-      <p className="t-meta mt-3 break-keep text-slate-500">
-        붙여 넣고 결과가 나오면 아래에서 그대로 가져오면 됩니다. 종류·버전은 시스템이 정합니다.
+      <p className="t-sub mt-3 break-keep text-slate-600">
+        새 창에 <strong className="font-semibold">붙여넣기만</strong> 하면 됩니다. 결과가 나오면 아래에서 그대로 가져오세요.
       </p>
     </section>
   )

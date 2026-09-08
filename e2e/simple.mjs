@@ -12,7 +12,7 @@
  */
 
 import { chromium } from 'playwright'
-import { seedScript, SEED_CLIENT_ID, SEED_NEW_PROJECT_ID, SEED_PROJECT_ID } from './seed.mjs'
+import { seedScript, SEED_CLIENT_ID, SEED_DOC_PROJECT_ID, SEED_NEW_PROJECT_ID, SEED_PROJECT_ID } from './seed.mjs'
 
 const BASE = process.argv[2] ?? 'http://localhost:4390'
 let pass = 0
@@ -92,7 +92,8 @@ if (reachedPrompt) {
   check('2 만들어진 프롬프트에 회사 사실이 들어 있다', (after[0]?.prompt ?? '').includes('한솔테크'))
   check('2 반환 블록을 요구한다', (after[0]?.prompt ?? '').includes('MIRAE_OS_RETURN'))
   check('2 내용은 기본으로 접혀 있다', (await page.getByRole('button', { name: '내용 보기' }).count()) === 1)
-  check('2 복사·열기 버튼이 보인다', (await page.getByRole('button', { name: '복사' }).count()) > 0 && (await page.getByText('ChatGPT 열기').count()) > 0)
+  check('2 복사하고 여는 버튼 하나로 끝난다', (await page.getByRole('button', { name: '복사하고 ChatGPT 열기' }).count()) === 1)
+  check('2 프롬프트가 나와도 강조 버튼은 하나', (await page.locator('button.bg-brand-600').count()) === 1)
 }
 
 /* ── TEST 3 · 종류·버전을 고르지 않고 결과 저장 ── */
@@ -175,9 +176,79 @@ check('5 탭이 가로 스크롤되지 않는다', await page.evaluate(() => {
   return el ? el.scrollWidth - el.clientWidth <= 2 : false
 }))
 
-/* ── 서류로 회사 기본정보 채우기 (사업자등록증 · 법인등기부등본) ── */
+/* ── 처음 쓰는 사람 안내 (§20) ── */
+{
+  await page.goto(BASE + '/studio', { waitUntil: 'networkidle' })
+  await wait(800)
+  check('초보: 처음 안내가 세 줄로 뜬다', (await page.getByText('처음이신가요? 세 가지만 알면 됩니다.').count()) > 0)
+  const steps = await page.locator('ol li').count()
+  check('초보: 안내가 3단계를 넘지 않는다', steps <= 3, String(steps))
+  await page.getByRole('button', { name: '안내 닫기' }).click()
+  await wait(400)
+  check('초보: 닫으면 사라진다', (await page.getByText('처음이신가요').count()) === 0)
+  await page.reload({ waitUntil: 'networkidle' })
+  await wait(700)
+  check('초보: 새로고침해도 다시 뜨지 않는다', (await page.getByText('처음이신가요').count()) === 0)
+}
+
+/* ── 모르면 넘어갈 수 있다 · 시스템이 먼저 쓴다 (§5·§8·§9) ── */
 {
   await page.goto(BASE + `/studio/${SEED_NEW_PROJECT_ID}`, { waitUntil: 'networkidle' })
+  await wait(900)
+  const later = page.getByRole('button', { name: /잘 모르겠어요/ })
+  check('모름: 화면에 "잘 모르겠어요"가 있다', (await later.count()) > 0)
+  await later.first().click()
+  await wait(1400)
+  check('모름: 미룬 것을 시스템이 들고 있다고 알려준다', (await page.getByText(/나중에 확인하기로 한 것/).count()) > 0)
+  check('모름: 막히지 않고 다음 할 일이 나온다', (await page.locator('button.bg-brand-600').count()) === 1)
+
+  // 문제 고르기까지 밀고 가서 "이렇게 저장됩니다" 를 확인
+  for (let i = 0; i < 6; i += 1) {
+    const h2 = (await page.locator('h2').first().textContent()) ?? ''
+    if (/문제를 골라/.test(h2)) break
+    const choice = page.locator('button[aria-pressed]').first()
+    if ((await choice.count()) > 0) await choice.click()
+    const ins = page.locator('section input[type=text], section input:not([type]), section textarea')
+    for (let j = 0; j < (await ins.count()); j += 1) await ins.nth(j).fill('테스트 값')
+    const btn = page.locator('button.bg-brand-600').first()
+    if (await btn.isDisabled()) break
+    await btn.click()
+    await wait(900)
+  }
+  const h2now = (await page.locator('h2').first().textContent()) ?? ''
+  if (/문제를 골라/.test(h2now)) {
+    await page.locator('button[aria-pressed]').first().click()
+    await wait(400)
+    check('시스템이 씀: 고르면 저장될 문장을 미리 보여준다', (await page.getByText('이렇게 저장됩니다').count()) > 0)
+    await page.locator('button.bg-brand-600').first().click()
+    await wait(1200)
+  } else {
+    check('시스템이 씀: 문제 고르기 화면에 도달', false, h2now)
+  }
+
+  // 거래처 수 → 진행 판단(추천)
+  for (let i = 0; i < 4; i += 1) {
+    const h = (await page.locator('h2').first().textContent()) ?? ''
+    if (/벤처인증까지 갈 수 있을까요/.test(h)) break
+    const choice = page.locator('button[aria-pressed]').first()
+    if ((await choice.count()) > 0) await choice.click()
+    const btn = page.locator('button.bg-brand-600').first()
+    if (await btn.isDisabled()) break
+    await btn.click()
+    await wait(900)
+  }
+  check('추천: 시스템이 먼저 의견을 낸다', (await page.getByText('지금 자료로 보면').count()) > 0)
+  check('추천: 버튼이 "추천대로 진행"', (await page.getByRole('button', { name: /추천대로 진행/ }).count()) > 0)
+  check('추천: 다르게 고를 수도 있다', (await page.getByRole('button', { name: '다르게 선택할게요' }).count()) > 0)
+  check('추천: 무슨 뜻인지 물어볼 수 있다', (await page.getByRole('button', { name: /이게 뭔가요/ }).count()) > 0)
+  await page.getByRole('button', { name: /이게 뭔가요/ }).click()
+  await wait(400)
+  check('용어풀이: 눌러야 나온다', (await page.getByText(/이 회사로 벤처인증까지 갈 수 있는지/).count()) > 0)
+}
+
+/* ── 서류로 회사 기본정보 채우기 (사업자등록증 · 법인등기부등본) ── */
+{
+  await page.goto(BASE + `/studio/${SEED_DOC_PROJECT_ID}`, { waitUntil: 'networkidle' })
   await wait(900)
   check('서류: 빈 프로젝트는 회사 기본정보부터 묻는다', (await page.getByText(/회사 기본정보/).count()) > 0)
   const docBtn = page.getByRole('button', { name: /사업자등록증/ }).first()
@@ -220,7 +291,7 @@ check('5 탭이 가로 스크롤되지 않는다', await page.evaluate(() => {
 
   const saved = await page.evaluate(
     (id) => (JSON.parse(localStorage.getItem('axmvp.v1.consulting_projects') ?? '[]').find((x) => x.id === id) ?? {}).factsheet ?? {},
-    SEED_NEW_PROJECT_ID,
+    SEED_DOC_PROJECT_ID,
   )
   check('서류: 회사명이 사실표에 들어갔다', saved.companyName?.value === '주식회사 대한정밀', JSON.stringify(saved.companyName))
   check('서류: 출처가 서류 이름으로 남는다', saved.companyName?.source === '사업자등록증', saved.companyName?.source)

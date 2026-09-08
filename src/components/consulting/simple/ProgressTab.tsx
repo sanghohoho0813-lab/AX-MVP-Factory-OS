@@ -14,7 +14,6 @@ import { artifactDef } from '../../../domain/consulting/artifactDefinitions'
 import { createArtifact, savePromptPackage } from '../../../services/consultingStudioService'
 import { defaultArtifactTitle, parsePastedResult } from '../../../domain/consulting/resultImport'
 import { parseReturnBlock } from '../../../domain/consulting/returnBlock'
-import { formatDateTime } from '../../../lib/format'
 import type { ConsultingPromptPackage } from '../../../types/consulting'
 import type { DocFactRead } from '../../../domain/consulting/companyDocFacts'
 import { TaskCard } from './TaskCard'
@@ -148,6 +147,7 @@ export function ProgressTab({ onOpenAdvanced }: { onOpenAdvanced: () => void }) 
 
       <TaskCard
         task={task}
+        project={p}
         busy={busy}
         quiet={generated !== null}
         onSubmit={(sub) => void submit(sub)}
@@ -155,20 +155,37 @@ export function ProgressTab({ onOpenAdvanced }: { onOpenAdvanced: () => void }) 
         onImportDoc={() => setDocOpen(true)}
       />
 
+      {/*
+        나중에 확인하기로 한 것 (§6).
+        사용자가 기억할 필요가 없다 — 시스템이 들고 있다가 필요한 단계에서 다시 묻는다.
+      */}
+      {p.deferred.length > 0 && (
+        <div className="rounded-(--radius-panel) border border-warning-200 bg-warning-50/60 px-4 py-3">
+          <p className="t-sub font-semibold text-warning-800">나중에 확인하기로 한 것 {p.deferred.length}가지</p>
+          <p className="t-sub mt-0.5 break-keep text-slate-700">{p.deferred.map((d) => d.label).join(' · ')}</p>
+          <p className="t-sub mt-1 break-keep text-slate-600">지금은 몰라도 됩니다. 이 값이 꼭 필요해지는 단계에서 다시 여쭤봅니다.</p>
+        </div>
+      )}
+
       {/* 작게 — 최근 것만 */}
       {(recent.length > 0 || lastDecision) && (
         <div className="flex flex-col gap-1.5 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3">
           {recent.map((a) => (
             <button key={a.id} type="button" onClick={() => ed.goTo('results')} className="tap flex items-baseline justify-between gap-3 text-left">
               <span className="t-sub min-w-0 truncate text-slate-700">{a.title}</span>
-              <span className="t-meta shrink-0 text-slate-400">{artifactDef(a.type).label}</span>
+              <span className="t-sub shrink-0 text-slate-500">{artifactDef(a.type).label}</span>
             </button>
           ))}
           {lastDecision && (
-            <button type="button" onClick={() => ed.goTo('timeline')} className="tap flex items-baseline justify-between gap-3 text-left">
-              <span className="t-sub min-w-0 truncate text-slate-500">{lastDecision.summary}</span>
-              <span className="t-meta shrink-0 text-slate-400">{formatDateTime(lastDecision.createdAt).slice(5)}</span>
-            </button>
+            <div className="flex items-baseline justify-between gap-3">
+              <button type="button" onClick={() => ed.goTo('timeline')} className="tap t-sub min-w-0 truncate text-left text-slate-600">
+                방금 · {lastDecision.summary}
+              </button>
+              {/* 잘못 눌렀을 때 돌아갈 자리 (§36) */}
+              <button type="button" onClick={onOpenAdvanced} className="tap t-sub shrink-0 font-medium text-slate-600 hover:text-slate-900">
+                고치기
+              </button>
+            </div>
           )}
         </div>
       )}

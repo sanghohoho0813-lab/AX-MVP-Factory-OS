@@ -29,9 +29,14 @@ import { factDef, factFilled, missingFacts } from './factsheetSchema'
 import { artifactTypeForPrompt } from './artifactDefinitions'
 import { freshnessOk, redFlagsRemaining } from './gateEngine'
 import { evidenceIssues } from './gateEngine'
-import { AX_MODE_CHOICES, CORE_PROBLEM_CHOICES, CURRENT_METHOD_CHOICES, GATE_CHOICES, PLATFORM_USER_CHOICES } from './operatorChoices'
+import {
+  AX_MODE_CHOICES, CORE_PROBLEM_CHOICES, CURRENT_METHOD_CHOICES, CUSTOMER_COUNT_CHOICES,
+  GATE_CHOICES, INTERNAL_USER_CHOICES, PLATFORM_USER_CHOICES,
+} from './operatorChoices'
 import { KIPO_SYSTEM_STARTERS, kipoByCode } from './kipoReferences'
 import { parseReturnBlock } from './returnBlock'
+import { suggestionFor } from './suggestions'
+import { recommendGate, recommendKipo } from './recommendations'
 
 /* ------------------------------------------------------------------ */
 /* 타입                                                                 */
@@ -62,6 +67,15 @@ export interface TaskInput {
   multiline: boolean
   /** 숫자형이면 기준연도·출처를 함께 권한다 */
   numeric: boolean
+  /**
+   * 시스템이 만든 초안 (§9). 있으면 칸을 미리 채워 두고 [이대로 저장하고 계속] 을 강조한다.
+   * 타이핑 없이 넘어가는 것이 기본이고, 고치고 싶을 때만 고친다.
+   */
+  suggestion?: string
+  /** 초안을 무엇을 보고 만들었는지 — 그대로 화면에 보여 준다 */
+  suggestionBasedOn?: string[]
+  /** 무엇을 쓰면 되는지 한 줄 예시 (§18) */
+  example?: string
 }
 
 export interface TaskChoice {
@@ -118,6 +132,25 @@ export interface CurrentTask {
    * 손으로 일곱 칸을 적는 대신 서류 한 장이면 끝나는 자리에만 붙인다.
    */
   docImport?: boolean
+  /**
+   * '나중에 확인' 을 눌러 넘어갈 수 있는 할 일인가 (§6·§8).
+   * 모른다는 이유로 일이 멈추면 안 되는 자리에만 붙인다. 제출에 가까운 단계에는 붙이지 않는다.
+   */
+  deferrable?: boolean
+  /** 미룰 때 기억해 둘 항목들 — 나중에 다시 물어보기 위해서다 */
+  deferKeys?: { key: string; label: string }[]
+  /**
+   * 시스템이 먼저 낸 의견 (§5). 있으면 화면은 이것을 먼저 보여 주고
+   * [추천대로 진행] 을 강조 버튼으로 쓴다. 사용자는 [다르게 선택] 으로 목록을 열 수 있다.
+   */
+  recommend?: { values: string[]; label: string; reasons: string[] }
+  /** 화면에 붙일 용어 풀이 열쇠 (§15·§17) */
+  helpKeys?: string[]
+  /**
+   * 고른 보기를 그대로 저장하지 않고 시스템이 문장으로 늘리는 자리 (§9).
+   * 화면은 고른 즉시 "이렇게 저장됩니다" 로 결과를 보여 준다 — 저장하고 나서 놀라지 않게.
+   */
+  composeKind?: 'coreProblem'
   /** 프로젝트가 끝났다 */
   finished?: boolean
 }
@@ -166,10 +199,67 @@ function readyFromFacts(p: ConsultingProject, keys: FactKey[]): ReadyItem[] {
   return keys.map((k) => ({ label: factDef(k).label, ok: factFilled(p.factsheet[k]) }))
 }
 
+/**
+ * 정확성이 더 중요해지는 단계 (§7).
+ * 출원·사업계획서 숫자·제출 전 점검·신청은 "모르겠다" 로 넘어갈 수 없다.
+ * 그 앞 단계에서는 미뤄 둔 것을 다시 묻지 않는다 — 기획을 멈추지 않기 위해서다.
+ */
+const HARD_ACCURACY_STAGES: StageKey[] = ['S7', 'S10', 'S13', 'S14']
+
+function isDeferred(p: ConsultingProject, key: string): boolean {
+  return p.deferred.some((d) => d.key === key)
+}
+
+/** 아직 없는 사실. 기획 단계에서는 '나중에 확인' 한 것을 빼고 본다. */
+function needFacts(p: ConsultingProject, keys: FactKey[], stage: StageKey): FactKey[] {
+  const missing = missingFacts(p.factsheet, keys)
+  if (HARD_ACCURACY_STAGES.includes(stage)) return missing
+  return missing.filter((k) => !isDeferred(p, k))
+}
+
+/** 사실 하나가 비었는가 — 미뤄 둔 것은 '있는 셈' 으로 본다(기획 단계 한정) */
+function needFact(p: ConsultingProject, key: FactKey, stage: StageKey): boolean {
+  if (factFilled(p.factsheet[key])) return false
+  if (HARD_ACCURACY_STAGES.includes(stage)) return true
+  return !isDeferred(p, key)
+}
+
+/** 작업공간 칸이 비었는가 — 미뤄 둔 것은 '있는 셈' */
+function needField(p: ConsultingProject, key: string, value: string): boolean {
+  return value.trim() === '' && !isDeferred(p, key)
+}
+
+/** 사실표 항목을 미룰 수 있게 표시한다 */
+function deferFacts(keys: FactKey[]): { key: string; label: string }[] {
+  return keys.map((k) => ({ key: k, label: factDef(k).label }))
+}
+
+/**
+ * 간단 모드에서 쓰는 쉬운 이름 (§16).
+ *
+ * 엔진의 단계 이름은 업무 용어 그대로다 — 'GO / HOLD / NO-GO' · 'Judge / Devil' · '증빙 10슬롯'.
+ * 처음 쓰는 사람에게는 그 말이 아무 뜻도 아니므로 여기서 한 번 바꿔 준다.
+ * 엔진 쪽 이름은 건드리지 않는다(고급 보기·문서가 그대로 쓴다).
+ */
+const PLAIN_STAGE_LABEL: Partial<Record<StageKey, string>> = {
+  S1: '진행 여부 판단',
+  S8: 'MVP 설계 확정',
+  S9: 'MVP 만들기',
+  S10: '숫자 확인',
+  S11: '사업계획서 쓰기',
+  S12: '증빙 챙기기',
+  S13: '제출 전 점검',
+}
+
+/** 화면에 보일 단계 이름 — 쉬운 이름이 있으면 그것을 쓴다 */
+export function plainStageLabel(key: StageKey): string {
+  return PLAIN_STAGE_LABEL[key] ?? stageDef(key).label
+}
+
 function nextLabel(key: StageKey): string {
   const i = STAGE_ORDER.indexOf(key)
   for (let j = i + 1; j < STAGE_ORDER.length; j += 1) {
-    return stageDef(STAGE_ORDER[j]).label
+    return plainStageLabel(STAGE_ORDER[j])
   }
   return '마무리'
 }
@@ -227,18 +317,21 @@ function taskForStage(p: ConsultingProject, stage: StageKey, ctx: TaskContext): 
   switch (stage) {
     /* ---------------- S0 회사 이해 ---------------- */
     case 'S0': {
-      const need = missingFacts(p.factsheet, def.requiredFacts)
+      const need = needFacts(p, def.requiredFacts, stage)
       const ready = readyFromFacts(p, def.requiredFacts)
       if (need.length > 0) {
+        const take = need.slice(0, 3)
         return {
-          id: `S0:INPUT:${need.slice(0, 3).join(',')}`,
+          id: `S0:INPUT:${take.join(',')}`,
           stageKey: stage,
           headline: need.length <= 2 ? `${need.length}가지만 확인하면 시작할 수 있습니다` : '회사 기본정보를 채웁니다',
           detail: '사업자등록증이나 법인등기부등본을 올리면 아래 칸이 저절로 채워집니다. 직접 적어도 됩니다.',
           actionType: 'INPUT',
           primaryAction: '저장하고 계속',
-          inputs: need.slice(0, 3).map((k) => factInput(k)),
+          inputs: take.map((k) => factInput(k)),
           docImport: true,
+          deferrable: true,
+          deferKeys: deferFacts(take),
           ready,
           nextPreview: next,
         }
@@ -277,33 +370,44 @@ function taskForStage(p: ConsultingProject, stage: StageKey, ctx: TaskContext): 
           choices: CORE_PROBLEM_CHOICES.map((c) => ({ value: c.value, label: c.value, hint: c.hint })),
           selectTarget: { kind: 'fact', key: 'coreProblem' },
           allowFreeText: true,
+          // 고른 보기를 그대로 저장하지 않는다. 시스템이 문장으로 늘려 주고 사용자는 그것을 본다 (§9)
+          composeKind: 'coreProblem',
           ready,
           nextPreview: next,
         }
       }
-      if (!factFilled(p.factsheet.customers)) {
+      if (needFact(p, 'customers', stage)) {
         return {
-          id: 'S1:INPUT:customers',
+          id: 'S1:SELECT:customers',
           stageKey: stage,
-          headline: '지금 고객이나 거래처가 몇 곳인가요?',
-          detail: '숫자가 정확하지 않아도 됩니다. 다만 지어내지는 않습니다 — 모르면 비워 두고 나중에 채웁니다.',
-          actionType: 'INPUT',
-          primaryAction: '저장하고 계속',
-          inputs: [factInput('customers')],
+          headline: '지금 거래처가 대략 몇 곳인가요?',
+          detail: '정확한 수를 몰라도 됩니다. 대략만 고르고, 확실해지면 그때 고칩니다.',
+          actionType: 'SELECT',
+          primaryAction: '이걸로 저장',
+          choices: CUSTOMER_COUNT_CHOICES.map((c) => ({ value: c.value, label: c.value, hint: c.hint })),
+          selectTarget: { kind: 'fact', key: 'customers' },
+          allowFreeText: true,
+          deferrable: true,
+          deferKeys: deferFacts(['customers']),
           ready,
           nextPreview: next,
         }
       }
       if (p.gate.decision === null) {
+        const rec = recommendGate(p)
         return {
           id: 'S1:SELECT:gate',
           stageKey: stage,
-          headline: '이 회사로 벤처인증을 진행할 수 있을까요?',
-          detail: '지금 판단이 어려우면 "보강한 뒤에" 를 고르세요. 탈락이 아니라 되돌아오는 자리입니다.',
+          headline: '이 회사로 벤처인증까지 갈 수 있을까요?',
+          detail: '지금 정해도 나중에 바꿀 수 있습니다. 탈락을 정하는 자리가 아닙니다.',
           actionType: 'SELECT',
-          primaryAction: '선택',
+          primaryAction: rec ? '추천대로 진행' : '이걸로 진행',
           choices: GATE_CHOICES.map((c) => ({ value: c.value, label: c.label, hint: c.hint })),
           selectTarget: { kind: 'gate' },
+          recommend: rec
+            ? { values: [rec.value], label: GATE_CHOICES.find((c) => c.value === rec.value)?.label ?? '', reasons: rec.reasons }
+            : undefined,
+          helpKeys: ['gate'],
           ready,
           nextPreview: next,
         }
@@ -338,15 +442,18 @@ function taskForStage(p: ConsultingProject, stage: StageKey, ctx: TaskContext): 
         ...readyFromFacts(p, ['coreProblem', 'currentMethod']),
         { label: '핵심 해결기술', ok: factFilled(p.factsheet.coreTech) },
       ]
-      if (!factFilled(p.factsheet.coreTech)) {
+      if (needFact(p, 'coreTech', stage)) {
+        const draft = suggestionFor('S3:INPUT:coreTech', p)
         return {
           id: 'S3:INPUT:coreTech',
           stageKey: stage,
           headline: '이 문제를 어떤 방식으로 풀 생각인가요?',
-          detail: '한 줄이면 됩니다. 특허·MVP·사업계획서가 이 이름을 그대로 쓰게 됩니다.',
+          detail: draft.text !== '' ? '앞에서 고른 내용으로 한 줄을 만들어 봤습니다. 맞으면 그대로 쓰고, 아니면 고치세요.' : '한 줄이면 됩니다. 특허·MVP·사업계획서가 이 이름을 그대로 쓰게 됩니다.',
           actionType: 'INPUT',
-          primaryAction: '저장하고 계속',
-          inputs: [factInput('coreTech')],
+          primaryAction: draft.text !== '' ? '이대로 저장하고 계속' : '저장하고 계속',
+          inputs: [{ ...factInput('coreTech'), suggestion: draft.text, suggestionBasedOn: draft.basedOn, example: '작업지시·공정 데이터를 모아 작업지연 위험을 계산하고 처리 순서를 추천하는 기능' }],
+          deferrable: true,
+          deferKeys: deferFacts(['coreTech']),
           ready,
           nextPreview: next,
         }
@@ -372,22 +479,30 @@ function taskForStage(p: ConsultingProject, stage: StageKey, ctx: TaskContext): 
             headline: '어느 방향으로 갈까요?',
             detail: 'GPT 가 낸 후보입니다. 고른 것이 특허의 권리화 포인트가 됩니다.',
             actionType: 'SELECT',
-            primaryAction: '선택',
+            primaryAction: '이걸로 진행',
             choices: parsed.decisionOptions.map((o, i) => ({ value: o, label: `${i + 1}. ${o}` })),
             selectTarget: { kind: 'thread', key: 'patentPoint' },
             allowFreeText: true,
+            helpKeys: ['patentPoint'],
             ready,
             nextPreview: next,
           }
         }
+        const draftPoint = suggestionFor('S3:INPUT:patentPoint', p)
         return {
           id: 'S3:INPUT:patentPoint',
           stageKey: stage,
           headline: '권리화 포인트를 한 줄로 정리해 주세요',
-          detail: '경쟁사가 가장 쉽게 베낄 구조·처리순서가 무엇인지 적습니다.',
+          detail: draftPoint.text !== '' ? '지금까지 정한 내용으로 초안을 만들어 봤습니다. 맞으면 그대로 쓰세요.' : '경쟁사가 가장 쉽게 베낄 구조·처리순서가 무엇인지 적습니다.',
           actionType: 'INPUT',
-          primaryAction: '저장하고 계속',
-          inputs: [{ target: { kind: 'thread', key: 'patentPoint' }, label: '특허 권리화 포인트', placeholder: '예: 공정 데이터 정규화 → 위험 산출 → 우선순위 → 재반영 순서', multiline: true, numeric: false }],
+          primaryAction: draftPoint.text !== '' ? '이대로 저장하고 계속' : '저장하고 계속',
+          inputs: [{
+            target: { kind: 'thread', key: 'patentPoint' }, label: '특허 권리화 포인트',
+            placeholder: '예: 공정 데이터 정규화 → 위험 산출 → 우선순위 → 재반영 순서', multiline: true, numeric: false,
+            suggestion: draftPoint.text, suggestionBasedOn: draftPoint.basedOn,
+            example: '기능 이름이 아니라 "무엇을 어떤 순서로 처리하는가" 를 씁니다.',
+          }],
+          helpKeys: ['patentPoint'],
           ready,
           nextPreview: next,
         }
@@ -411,19 +526,23 @@ function taskForStage(p: ConsultingProject, stage: StageKey, ctx: TaskContext): 
       const ready: ReadyItem[] = [{ label: '참고자료 선정', ok: p.kipo.length >= 2 }, { label: 'PDF 받기', ok: p.kipo.length > 0 && p.kipo.every((s) => s.pdfAttached) }]
       if (p.kipo.length < 2) {
         const picked = new Set(p.kipo.map((s) => s.code))
+        const recKipo = recommendKipo(p, 2)
+        // 추천이 있으면 추천을 앞에 놓고, 그 뒤에 기본 4종을 붙여 '다르게 고르기' 도 가능하게 한다
+        const kipoChoices = [...new Set([...(recKipo?.value ?? []), ...KIPO_SYSTEM_STARTERS])].filter((c) => !picked.has(c))
         return {
           id: 'S5:SELECT:kipo',
           stageKey: stage,
           headline: '명세서를 쓸 때 참고할 사례를 고릅니다',
-          detail: '특허청 예시 118종 중 시스템·데이터 발명에 가까운 것을 먼저 보여 드립니다. 2~5개를 고르세요.',
+          detail: recKipo ? '지금 기술에 가까운 사례를 골라 뒀습니다. 그대로 쓰거나 다른 것을 더 골라도 됩니다.' : '특허청 예시 118종 중 시스템·데이터 발명에 가까운 것을 먼저 보여 드립니다. 2~5개를 고르세요.',
           actionType: 'SELECT',
-          primaryAction: '고르고 계속',
+          primaryAction: recKipo ? '추천대로 진행' : '고르고 계속',
           multi: { min: 2, max: 5 },
-          choices: KIPO_SYSTEM_STARTERS.filter((c) => !picked.has(c)).map((code) => {
+          choices: kipoChoices.map((code) => {
             const r = kipoByCode(code)!
             return { value: code, label: `${code} · ${r.title}`, hint: r.field }
           }),
           selectTarget: { kind: 'kipo' },
+          recommend: recKipo ? { values: recKipo.value, label: `참고 사례 ${recKipo.value.length}건`, reasons: recKipo.reasons } : undefined,
           ready,
           nextPreview: next,
         }
@@ -473,6 +592,7 @@ function taskForStage(p: ConsultingProject, stage: StageKey, ctx: TaskContext): 
           primaryAction: '확인했습니다',
           confirmKind: 'freshness_patent',
           confirmItems: [{ label: '확인처', value: '특허로 (patent.go.kr)' }, { label: '볼 것', value: '서식 · 요약서 글자수 · 수수료' }],
+          helpKeys: ['freshness'],
           ready,
           nextPreview: next,
         }
@@ -489,6 +609,7 @@ function taskForStage(p: ConsultingProject, stage: StageKey, ctx: TaskContext): 
             { target: { kind: 'patent', key: 'applicationNumber' }, label: '출원번호', placeholder: '10-2026-0000000', multiline: false, numeric: false },
             { target: { kind: 'patent', key: 'filedAt' }, label: '출원일', placeholder: 'YYYY-MM-DD', multiline: false, numeric: false },
           ],
+          helpKeys: ['filed'],
           ready,
           nextPreview: next,
         }
@@ -506,41 +627,55 @@ function taskForStage(p: ConsultingProject, stage: StageKey, ctx: TaskContext): 
         { label: '구현 방식', ok: m.axMode !== '' },
         { label: '향후로 미룰 것', ok: m.future.trim() !== '' },
       ]
-      if (m.targetUser.trim() === '') {
+      if (needField(p, 'mvp.targetUser', m.targetUser)) {
         return {
-          id: 'S8:INPUT:targetUser',
+          id: 'S8:SELECT:targetUser',
           stageKey: stage,
           headline: '이 시스템을 누가 쓰게 되나요?',
-          detail: '회사 안에서 매일 쓰는 사람 한 종류만 적습니다.',
-          actionType: 'INPUT',
-          primaryAction: '저장하고 계속',
-          inputs: [{ target: { kind: 'mvp', key: 'targetUser' }, label: '주 사용자', placeholder: '예: 공정 담당자 · 견적 담당자', multiline: false, numeric: false }],
+          detail: '회사 안에서 매일 쓰는 사람 한 종류만 고릅니다.',
+          actionType: 'SELECT',
+          primaryAction: '이걸로 진행',
+          choices: INTERNAL_USER_CHOICES.map((c) => ({ value: c.value, label: c.value, hint: c.hint })),
+          selectTarget: { kind: 'mvp', key: 'targetUser' },
+          allowFreeText: true,
           ready,
           nextPreview: next,
         }
       }
-      if (m.primaryJourney.trim() === '') {
+      if (needField(p, 'mvp.primaryJourney', m.primaryJourney)) {
+        const dj = suggestionFor('S8:INPUT:primaryJourney', p)
         return {
           id: 'S8:INPUT:primaryJourney',
           stageKey: stage,
           headline: '그 사람이 하는 가장 중요한 행동은 무엇인가요?',
-          detail: '시작부터 끝까지 한 줄로 적습니다. 이 흐름 하나만 끝까지 동작하게 만듭니다.',
+          detail: dj.text !== '' ? '이렇게 잡는 것이 적절해 보입니다. 맞으면 그대로 쓰세요.' : '시작부터 끝까지 한 줄로 적습니다. 이 흐름 하나만 끝까지 동작하게 만듭니다.',
           actionType: 'INPUT',
-          primaryAction: '저장하고 계속',
-          inputs: [{ target: { kind: 'mvp', key: 'primaryJourney' }, label: '핵심 흐름', placeholder: '예: 작업지시 입력 → 지연 위험 확인 → 우선순위 조정 → 처리', multiline: true, numeric: false }],
+          primaryAction: dj.text !== '' ? '이대로 진행' : '저장하고 계속',
+          inputs: [{
+            target: { kind: 'mvp', key: 'primaryJourney' }, label: '핵심 흐름',
+            placeholder: '예: 작업지시 입력 → 지연 위험 확인 → 우선순위 조정 → 처리', multiline: true, numeric: false,
+            suggestion: dj.text, suggestionBasedOn: dj.basedOn,
+            example: '화살표로 이어 씁니다 — 넣는다 → 정리된다 → 위험이 보인다 → 처리한다 → 기록된다',
+          }],
           ready,
           nextPreview: next,
         }
       }
-      if (m.axCoreFeature.trim() === '') {
+      if (needField(p, 'mvp.axCoreFeature', m.axCoreFeature)) {
+        const da = suggestionFor('S8:INPUT:axCore', p)
         return {
           id: 'S8:INPUT:axCore',
           stageKey: stage,
           headline: '이 기능만큼은 실제로 동작해야 합니다',
-          detail: '분석·추천·최적화 중 하나를 고릅니다. 특허의 핵심기술과 같은 것이어야 합니다.',
+          detail: '실사에서 눌러 보여 줄 기능 하나입니다. 특허의 핵심기술과 같은 것이어야 합니다.',
           actionType: 'INPUT',
-          primaryAction: '저장하고 계속',
-          inputs: [{ target: { kind: 'mvp', key: 'axCoreFeature' }, label: '핵심 기능', placeholder: '예: 작업지연 위험 점수를 매겨 우선순위를 보여준다', multiline: true, numeric: false }],
+          primaryAction: da.text !== '' ? '이대로 진행' : '저장하고 계속',
+          inputs: [{
+            target: { kind: 'mvp', key: 'axCoreFeature' }, label: '핵심 기능',
+            placeholder: '예: 작업지연 위험 점수를 매겨 우선순위를 보여준다', multiline: true, numeric: false,
+            suggestion: da.text, suggestionBasedOn: da.basedOn,
+          }],
+          helpKeys: ['axCore'],
           ready,
           nextPreview: next,
         }
@@ -559,7 +694,7 @@ function taskForStage(p: ConsultingProject, stage: StageKey, ctx: TaskContext): 
           nextPreview: next,
         }
       }
-      if (!factFilled(p.factsheet.platformUsers)) {
+      if (needFact(p, 'platformUsers', stage)) {
         return {
           id: 'S8:SELECT:platformUsers',
           stageKey: stage,
@@ -574,15 +709,22 @@ function taskForStage(p: ConsultingProject, stage: StageKey, ctx: TaskContext): 
           nextPreview: next,
         }
       }
-      if (m.future.trim() === '') {
+      if (needField(p, 'mvp.future', m.future)) {
+        const df = suggestionFor('S8:INPUT:future', p)
         return {
           id: 'S8:INPUT:future',
           stageKey: stage,
           headline: '지금은 안 만들고 나중으로 미룰 것은?',
-          detail: '한 줄에 하나씩. 이걸 정해 두어야 범위가 커지지 않고, 사업계획서의 "향후 개발" 이 됩니다.',
+          detail: '범위가 커지지 않게 미리 정해 둡니다. 이것이 사업계획서의 "향후 개발" 이 됩니다.',
           actionType: 'INPUT',
-          primaryAction: '저장하고 계속',
-          inputs: [{ target: { kind: 'mvp', key: 'future' }, label: '향후 기능', placeholder: '예: 수요예측\n거래처 자동 발주\n모바일 알림', multiline: true, numeric: false }],
+          primaryAction: df.text !== '' ? '이대로 진행' : '저장하고 계속',
+          inputs: [{
+            target: { kind: 'mvp', key: 'future' }, label: '향후 기능',
+            placeholder: '예: 수요예측\n거래처 자동 발주\n모바일 알림', multiline: true, numeric: false,
+            suggestion: df.text, suggestionBasedOn: df.basedOn,
+          }],
+          deferrable: true,
+          deferKeys: [{ key: 'mvp.future', label: '향후 기능' }],
           ready,
           nextPreview: next,
         }
@@ -613,7 +755,7 @@ function taskForStage(p: ConsultingProject, stage: StageKey, ctx: TaskContext): 
         ready,
       })
       if (cycle) return cycle
-      if (!factFilled(p.factsheet.mvpUrl)) {
+      if (needFact(p, 'mvpUrl', stage)) {
         return {
           id: 'S9:INPUT:mvpUrl',
           stageKey: stage,
@@ -631,7 +773,8 @@ function taskForStage(p: ConsultingProject, stage: StageKey, ctx: TaskContext): 
 
     /* ---------------- S10 사실표 잠금 ---------------- */
     case 'S10': {
-      const need = missingFacts(p.factsheet, def.requiredFacts)
+      // 제출용 숫자다 — 여기서는 '나중에 확인' 해 둔 것도 다시 묻는다 (§7)
+      const need = needFacts(p, def.requiredFacts, stage)
       const ready = readyFromFacts(p, def.requiredFacts)
       if (need.length > 0) {
         const take = need.slice(0, 3)
@@ -639,10 +782,11 @@ function taskForStage(p: ConsultingProject, stage: StageKey, ctx: TaskContext): 
           id: `S10:INPUT:${take.join(',')}`,
           stageKey: stage,
           headline: need.length <= 3 ? `사업계획서 전에 ${need.length}가지만 확인합니다` : '숫자를 확인할 차례입니다',
-          detail: '지어내면 실사에서 무너집니다. 모르면 비워 두고 나중에 채워도 됩니다 — 다만 그 숫자를 쓰는 서류는 그때까지 미룹니다.',
+          detail: '사업계획서에 그대로 들어갈 숫자입니다. 지어내면 실사에서 무너지므로, 근거 자료를 보고 적어 주세요.',
           actionType: 'INPUT',
           primaryAction: '저장하고 계속',
-          inputs: take.map((k) => factInput(k)),
+          inputs: take.map((k) => ({ ...factInput(k), example: k === 'som' ? '수도권 사업체 2,800개 × 3% × 360만원 = 3.0억 (통계청 사업체조사 2025)' : undefined })),
+          helpKeys: take.some((k) => ['tam', 'sam', 'som'].includes(k)) ? ['market'] : undefined,
           ready,
           nextPreview: next,
         }

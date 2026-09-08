@@ -58,3 +58,24 @@ export const PLATFORM_USER_CHOICES: Choice[] = [
   { value: '가맹점·지점 담당자' },
   { value: '협력업체 (자료 제출)' },
 ]
+
+/**
+ * 거래처 수 — 정확한 숫자를 몰라도 진행할 수 있게 구간으로 고른다 (§9).
+ * 나중에 정확한 숫자가 나오면 그때 고친다. 없는 숫자를 지어내지 않는다.
+ */
+export const CUSTOMER_COUNT_CHOICES: Choice[] = [
+  { value: '주요 거래처 1~5곳', hint: '이제 막 시작한 회사' },
+  { value: '거래처 6~20곳', hint: '' },
+  { value: '거래처 21~50곳', hint: '' },
+  { value: '거래처 50곳 이상', hint: '' },
+  { value: '일반 소비자 대상 (거래처 개념 없음)', hint: 'B2C' },
+]
+
+/** 회사 안에서 이 시스템을 매일 쓰는 사람 */
+export const INTERNAL_USER_CHOICES: Choice[] = [
+  { value: '현장·공정 담당자', hint: '작업지시·진행상황을 다루는 사람' },
+  { value: '견적·수주 담당자', hint: '요청을 받아 견적·발주로 넘기는 사람' },
+  { value: '자재·재고 담당자', hint: '' },
+  { value: '영업·고객 응대 담당자', hint: '' },
+  { value: '관리자 · 대표', hint: '전체를 보고 판단하는 사람' },
+]

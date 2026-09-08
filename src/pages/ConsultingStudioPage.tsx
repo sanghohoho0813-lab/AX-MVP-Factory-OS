@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, Plus, Workflow } from 'lucide-react'
+import { ArrowRight, Plus, Workflow, X } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { Badge, Blank, BottomSheet, ScreenTitle } from '../components/ui/primitives'
 import { Button } from '../components/ui/Button'
@@ -20,6 +20,9 @@ import { contractStageOf } from '../types/clientOps'
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { ConsultingArtifact, ConsultingEvidence, ConsultingProject, ConsultingPromptPackage } from '../types/consulting'
 import { TablesMissingNotice } from '../components/consulting/studioParts'
+
+/** 처음 안내를 닫았는지 — 이 브라우저에만 남는다 */
+const INTRO_KEY = 'axmvp.studio.intro'
 
 function StudioContent({ workspaceId }: { workspaceId: string | null }) {
   const navigate = useNavigate()
@@ -36,6 +39,22 @@ function StudioContent({ workspaceId }: { workspaceId: string | null }) {
   const [newClientId, setNewClientId] = useState('')
   const [busy, setBusy] = useState(false)
   const [showDone, setShowDone] = useState(false)
+  const [showIntro, setShowIntro] = useState(() => {
+    try {
+      return localStorage.getItem(INTRO_KEY) !== 'done'
+    } catch {
+      return false
+    }
+  })
+
+  const dismissIntro = () => {
+    setShowIntro(false)
+    try {
+      localStorage.setItem(INTRO_KEY, 'done')
+    } catch {
+      /* 저장 못 해도 화면은 그대로 동작한다 */
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -109,6 +128,29 @@ function StudioContent({ workspaceId }: { workspaceId: string | null }) {
         }
       />
 
+      {/*
+        처음 오는 사람에게 딱 세 줄 (§20). 모달도 튜토리얼도 아니다 —
+        목록 위에 한 번 뜨고, 닫으면 다시 뜨지 않는다.
+      */}
+      {!missing && showIntro && (
+        <div className="rounded-(--radius-panel) border border-brand-200 bg-brand-50/60 px-5 py-4">
+          <div className="flex items-start justify-between gap-3">
+            <p className="t-card break-keep text-slate-900">처음이신가요? 세 가지만 알면 됩니다.</p>
+            <button type="button" aria-label="안내 닫기" onClick={dismissIntro} className="tap shrink-0 text-slate-500 hover:text-slate-800">
+              <X aria-hidden="true" className="size-4" />
+            </button>
+          </div>
+          <ol className="mt-2 flex flex-col gap-1.5">
+            <li className="t-body break-keep text-slate-700"><strong className="font-semibold">1.</strong> 고객을 고르면 프로젝트가 시작됩니다.</li>
+            <li className="t-body break-keep text-slate-700"><strong className="font-semibold">2.</strong> 화면에 나오는 질문에 답하거나, 시스템이 만든 추천을 확인하세요.</li>
+            <li className="t-body break-keep text-slate-700"><strong className="font-semibold">3.</strong> 준비되면 프롬프트를 만들어 ChatGPT·Claude 에 붙여 넣고, 결과를 다시 붙여 넣으면 됩니다.</li>
+          </ol>
+          <Button variant="primary" className="mt-3" onClick={() => { dismissIntro(); setCreating(true) }}>
+            바로 시작
+          </Button>
+        </div>
+      )}
+
       {missing && <TablesMissingNotice />}
       {!missing && loading && <p className="t-sub py-6 text-center text-slate-500">불러오는 중…</p>}
 
@@ -141,19 +183,19 @@ function StudioContent({ workspaceId }: { workspaceId: string | null }) {
                     {p.status === 'done' && <Badge tone="success">끝남</Badge>}
                   </div>
                   {/* 같은 고객에 프로젝트가 둘 이상일 수 있으므로 이름은 작게 남긴다 */}
-                  <p className="t-meta mt-0.5 break-keep text-slate-400">{p.title}</p>
+                  <p className="t-sub mt-0.5 break-keep text-slate-500">{p.title}</p>
                 </div>
 
                 <div>
                   <p className="t-body break-keep font-semibold text-slate-900">{task.headline}</p>
-                  {task.nextPreview && <p className="t-sub mt-0.5 text-slate-500">{task.nextPreview}</p>}
+                  {task.nextPreview && <p className="t-sub mt-0.5 break-keep text-slate-600">{task.nextPreview}</p>}
                 </div>
 
                 <div className="flex items-center gap-3">
                   <div aria-hidden="true" className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100">
                     <div className="h-full rounded-full bg-brand-500" style={{ width: `${percent}%` }} />
                   </div>
-                  <span className="t-meta shrink-0 tabular-nums text-slate-500">{percent}%</span>
+                  <span className="t-sub shrink-0 tabular-nums text-slate-600">{percent}%</span>
                 </div>
 
                 <span className="t-body inline-flex items-center gap-1.5 font-semibold text-brand-700">

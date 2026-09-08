@@ -15,6 +15,7 @@ import { STAGE_ORDER, stageDef } from './workflowDefinition'
 import { emptyFact, factDef } from './factsheetSchema'
 import type { DocFactRead } from './companyDocFacts'
 import { GATE_CHOICES } from './operatorChoices'
+import { composeProblemSentence } from './suggestions'
 import { RED_FLAGS } from './qaRules'
 import { kipoByCode } from './kipoReferences'
 
@@ -25,6 +26,8 @@ export interface TaskSubmission {
   selected?: string[]
   /** 서류(사업자등록증·법인등기부등본)에서 읽어 사람이 확인한 값 */
   facts?: DocFactRead[]
+  /** '나중에 확인' 을 눌렀다 — 값 없이 넘어간다 */
+  defer?: boolean
 }
 
 export interface PendingDecision {
@@ -90,6 +93,20 @@ function writeDocFact(p: ConsultingProject, f: DocFactRead, at: string): Consult
       [f.key]: { ...prev, value: v, status: f.status, source: f.source, asOfDate: prev.asOfDate || at.slice(0, 10), updatedAt: at },
     },
   }
+}
+
+/**
+ * 미뤄 뒀던 것이 채워졌으면 목록에서 뺀다.
+ * 값이 들어왔는데도 '확인 필요' 로 남아 있으면 사용자가 두 번 일하게 된다.
+ */
+function pruneDeferred(p: ConsultingProject): ConsultingProject {
+  const stillEmpty = (key: string): boolean => {
+    if (key.startsWith('mvp.')) return String(p.mvp[key.slice(4) as keyof typeof p.mvp] ?? '').trim() === ''
+    const v = p.factsheet[key as keyof typeof p.factsheet]
+    return (v?.value ?? '').trim() === ''
+  }
+  const kept = p.deferred.filter((d) => stillEmpty(d.key))
+  return kept.length === p.deferred.length ? p : { ...p, deferred: kept }
 }
 
 /** 핵심 줄기는 사람이 따로 적지 않는다 — 사실표·작업공간에서 자동으로 따라온다 */
@@ -174,9 +191,31 @@ export function applyTask(p: ConsultingProject, task: CurrentTask, sub: TaskSubm
      * 특히 확인 화면에서 올렸다면 '맞아요, 계속' 을 누른 것이 아니므로 단계를 끝내면 안 된다.
      * 값만 쓰고 다음 할 일은 resolver 가 다시 정한다.
      */
-    cur = syncCoreThread(cur)
+    cur = syncCoreThread(pruneDeferred(cur))
     const onlyDocs = autoAdvance(cur, ctx, at)
     return { project: onlyDocs.project, decisions: [...decisions, ...onlyDocs.decisions] }
+  }
+
+  /*
+   * '나중에 확인' (§6·§8).
+   * 모르는 값 하나 때문에 일이 멈추지 않게 한다. 지우는 것이 아니라 미루는 것이고,
+   * 시스템이 목록으로 들고 있다가 제출에 가까운 단계에서 다시 묻는다.
+   */
+  if (sub.defer === true) {
+    const keys = task.deferKeys ?? []
+    const add = keys.filter((k) => !cur.deferred.some((d) => d.key === k.key))
+    if (add.length > 0) {
+      cur = { ...cur, deferred: [...cur.deferred, ...add.map((k) => ({ ...k, stageKey: stage, deferredAt: at }))] }
+      decisions.push({
+        stageKey: stage,
+        kind: 'fact',
+        summary: `나중에 확인하기로 함 · ${add.map((k) => k.label).join(', ')}`.slice(0, 160),
+        reason: '지금은 모르는 값 — 필요한 단계에서 다시 묻는다',
+      })
+    }
+    cur = syncCoreThread(cur)
+    const afterDefer = autoAdvance(cur, ctx, at)
+    return { project: afterDefer.project, decisions: [...decisions, ...afterDefer.decisions] }
   }
 
   switch (task.actionType) {
@@ -221,8 +260,16 @@ export function applyTask(p: ConsultingProject, task: CurrentTask, sub: TaskSubm
         const label = task.choices?.find((c) => c.value === picked[0])?.label ?? mode
         decisions.push({ stageKey: 'S8', kind: 'scope', summary: `AX 구현 방식 · ${label}`, reason: mode === 'ml' || mode === 'rag' || mode === 'llm' ? 'AI 라고 표현 가능' : '규칙·점수 기반 — AI 라고 부르지 않는다' })
       } else {
-        const value = picked[0] ?? ''
+        const raw = picked[0] ?? ''
+        // 고른 보기를 사업계획서·특허가 그대로 쓸 수 있는 문장으로 늘린다 (§9)
+        const value = task.composeKind === 'coreProblem' ? (composeProblemSentence(raw, cur).text || raw) : raw
         cur = writeTarget(cur, target, value, at, '대표 선택')
+        /*
+         * 핵심 줄기에는 늘린 문장이 아니라 고른 그대로의 짧은 이름을 넣는다.
+         * 줄기는 특허·MVP·사업계획서가 같은 이름으로 부를 '이름' 이지 설명문이 아니다.
+         * (긴 문장을 넣으면 뒤의 초안들이 그 문장을 다시 끼워 넣어 말이 겹친다.)
+         */
+        if (task.composeKind === 'coreProblem') cur = { ...cur, coreThread: { ...cur.coreThread, fieldProblem: raw } }
         decisions.push({ stageKey: stage, kind: 'scope', summary: value.slice(0, 160), reason: '' })
       }
       break
@@ -266,7 +313,7 @@ export function applyTask(p: ConsultingProject, task: CurrentTask, sub: TaskSubm
       break
   }
 
-  cur = syncCoreThread(cur)
+  cur = syncCoreThread(pruneDeferred(cur))
   const advanced = autoAdvance(cur, ctx, at)
   return { project: advanced.project, decisions: [...decisions, ...advanced.decisions] }
 }

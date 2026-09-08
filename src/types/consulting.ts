@@ -439,8 +439,24 @@ export interface ConsultingProject {
   mvp: MvpWorkspace
   venture: VentureWorkspace
   fieldReview: FieldReviewWorkspace
+  /**
+   * '나중에 확인' 으로 미뤄 둔 것들. 모른다는 이유로 일이 멈추지 않게 하기 위한 장치다.
+   * 기획 단계에서는 건너뛰고, 제출에 가까운 단계에서는 다시 묻는다.
+   */
+  deferred: DeferredItem[]
   createdAt: string
   updatedAt: string
+}
+
+/** 미뤄 둔 확인 항목 — 사람이 기억할 필요가 없게 시스템이 들고 있는다 */
+export interface DeferredItem {
+  /** 사실표 항목 키 또는 작업공간 항목 이름 */
+  key: string
+  /** 화면에 보일 이름 — '최근 3개년 매출' */
+  label: string
+  /** 어느 단계에서 미뤘나 */
+  stageKey: StageKey
+  deferredAt: string
 }
 
 export interface CreateConsultingProjectInput {

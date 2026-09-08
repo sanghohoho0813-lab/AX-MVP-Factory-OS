@@ -188,11 +188,20 @@ const consultingProjects = [
     factsheet: {},
     createdAt: '2026-09-03T00:00:00.000Z', updatedAt: '2026-09-03T00:00:00.000Z',
   },
+  {
+    id: 'proj_doc', workspaceId: null, clientId: 'cli_hansol', clientName: '한솔테크(주)', moduleKey: 'patent_venture_mvp',
+    title: '서류로 시작하는 프로젝트', status: 'active', currentStage: 'S0',
+    stages: { S0: { status: 'in_progress' } },
+    factsheet: {},
+    createdAt: '2026-09-03T00:00:00.000Z', updatedAt: '2026-09-03T00:00:00.000Z',
+  },
 ]
 
 export const SEED_PROJECT_ID = 'proj_hansol'
 /** 회사 기본정보가 비어 있는 프로젝트 — S0 */
 export const SEED_NEW_PROJECT_ID = 'proj_new'
+/** 같은 상태의 두 번째 빈 프로젝트 — 서류 채우기 시험이 앞 시험에 영향받지 않게 */
+export const SEED_DOC_PROJECT_ID = 'proj_doc'
 
 export function seedScript() {
   return `

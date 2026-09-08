@@ -136,6 +136,9 @@ export function normalizeProject(raw: Partial<ConsultingProject> & { id: string;
     gate: { items: {}, decision: null, reason: '', decidedAt: null, ...(raw.gate ?? {}) },
     freshness: Array.isArray(raw.freshness) ? raw.freshness : [],
     kipo: Array.isArray(raw.kipo) ? raw.kipo.map((s) => ({ code: str(s.code), reason: str(s.reason), pdfAttached: s.pdfAttached === true })) : [],
+    deferred: Array.isArray(raw.deferred)
+      ? raw.deferred.filter((d) => d && typeof d.key === 'string' && d.key !== '').map((d) => ({ key: str(d.key), label: str(d.label), stageKey: isStageKey(d.stageKey) ? d.stageKey : 'S0', deferredAt: str(d.deferredAt) }))
+      : [],
     patent: { ...emptyPatent(), ...(raw.patent ?? {}) },
     mvp: { ...emptyMvp(), ...(raw.mvp ?? {}) },
     venture: {
@@ -160,6 +163,7 @@ export function projectPayload(p: ConsultingProject) {
     gate: p.gate,
     freshness: p.freshness,
     kipo: p.kipo,
+    deferred: p.deferred,
     patent: p.patent,
     mvp: p.mvp,
     venture: p.venture,

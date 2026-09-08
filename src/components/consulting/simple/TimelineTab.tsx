@@ -57,10 +57,10 @@ export function TimelineTab() {
           <ul className="mt-2 flex flex-col">
             {d.items.map((r, i) => (
               <li key={`${r.at}-${i}`} className="flex gap-3 border-l-2 border-slate-100 py-2 pl-4">
-                <span className="t-meta w-11 shrink-0 pt-0.5 tabular-nums text-slate-400">{r.at.slice(11, 16)}</span>
+                <span className="t-sub w-11 shrink-0 pt-0.5 tabular-nums text-slate-500">{r.at.slice(11, 16)}</span>
                 <span className="min-w-0 flex-1">
                   <span className="t-body block break-keep text-slate-800">{r.text}</span>
-                  <span className="t-meta text-slate-400">{r.kind}</span>
+                  <span className="t-sub text-slate-500">{r.kind}</span>
                 </span>
               </li>
             ))}
