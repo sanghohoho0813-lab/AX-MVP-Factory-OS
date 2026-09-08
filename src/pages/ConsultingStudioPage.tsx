@@ -1,27 +1,25 @@
 /**
- * 컨설팅 작업실 — 특허 × 벤처 × MVP 프로젝트 목록.
+ * 컨설팅 작업실 — 프로젝트 목록.
  *
- * 카드 하나 = 회사 · 제목 · 현재 단계 · 진행도 · 막힘 · 다음 행동 1개.
- * 고객은 고객 운영 기록에서 고른다(새 CRM 없음). 한 고객에 여러 프로젝트를 둘 수 있다.
+ * 관리자 표가 아니다. 대표가 보고 싶은 것은 셋뿐이다 (§22):
+ *   누구 / 어디까지 왔나 / 지금 무엇을 하면 되나 → [계속하기]
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Workflow } from 'lucide-react'
+import { ArrowRight, Plus, Workflow } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
-import { Badge, Blank, BottomSheet, ScreenTitle, Surface } from '../components/ui/primitives'
+import { Badge, Blank, BottomSheet, ScreenTitle } from '../components/ui/primitives'
 import { Button } from '../components/ui/Button'
 import { useToast } from '../components/ui/toastContext'
 import { listClients } from '../services/clientOpsService'
 import { createProject, isTablesMissing, listArtifacts, listEvidence, listProjects, listPromptPackages } from '../services/consultingStudioService'
-import { resolveNextActions } from '../domain/consulting/nextActionResolver'
-import { blockedStages, projectProgress } from '../domain/consulting/projectModel'
-import { stageDef } from '../domain/consulting/workflowDefinition'
+import { overallPercent, resolveCurrentTask } from '../domain/consulting/currentTask'
 import { todayLocalDate } from '../lib/appClock'
+import { contractStageOf } from '../types/clientOps'
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { ConsultingArtifact, ConsultingEvidence, ConsultingProject, ConsultingPromptPackage } from '../types/consulting'
-import { MiniProgress, StageBadge, TablesMissingNotice, stageTitle } from '../components/consulting/studioParts'
-import { contractStageOf } from '../types/clientOps'
+import { TablesMissingNotice } from '../components/consulting/studioParts'
 
 function StudioContent({ workspaceId }: { workspaceId: string | null }) {
   const navigate = useNavigate()
@@ -36,15 +34,13 @@ function StudioContent({ workspaceId }: { workspaceId: string | null }) {
   const [missing, setMissing] = useState(false)
   const [creating, setCreating] = useState(false)
   const [newClientId, setNewClientId] = useState('')
-  const [newTitle, setNewTitle] = useState('')
   const [busy, setBusy] = useState(false)
   const [showDone, setShowDone] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const cl = await listClients(workspaceId)
-      setClients(cl)
+      setClients(await listClients(workspaceId))
       const [ps, arts, pks, evs] = await Promise.all([
         listProjects(workspaceId),
         listArtifacts(workspaceId),
@@ -74,20 +70,22 @@ function StudioContent({ workspaceId }: { workspaceId: string | null }) {
     [clients],
   )
 
-  const visible = projects.filter((p) => showDone || (p.status !== 'done' && p.status !== 'archived'))
-  const doneCount = projects.length - projects.filter((p) => p.status !== 'done' && p.status !== 'archived').length
+  const rows = useMemo(
+    () =>
+      projects
+        .filter((p) => showDone || (p.status !== 'done' && p.status !== 'archived'))
+        .map((p) => ({ p, task: resolveCurrentTask(p, { artifacts, prompts, evidence, today }), percent: overallPercent(p) })),
+    [projects, artifacts, prompts, evidence, today, showDone],
+  )
+  const doneCount = projects.filter((p) => p.status === 'done' || p.status === 'archived').length
 
+  /** §23 — 고객만 고르면 시작한다. 이름·workflow·owner 는 기본값 */
   const create = async () => {
-    if (!newClientId) {
-      showToast('고객을 골라 주세요.')
-      return
-    }
+    if (!newClientId) return
     setBusy(true)
     try {
       const client = clients.find((c) => c.id === newClientId) ?? null
-      const p = await createProject(workspaceId, { clientId: newClientId, clientName: client?.companyName ?? '', title: newTitle }, client)
-      setCreating(false)
-      setNewTitle('')
+      const p = await createProject(workspaceId, { clientId: newClientId, clientName: client?.companyName ?? '' }, client)
       navigate(`/studio/${p.id}`)
     } catch (cause) {
       showToast(cause instanceof Error ? cause.message : '만들지 못했습니다.')
@@ -100,7 +98,7 @@ function StudioContent({ workspaceId }: { workspaceId: string | null }) {
     <div className="flex flex-col gap-5">
       <ScreenTitle
         title="컨설팅 작업실"
-        sub="특허 → MVP → 벤처인증 → 실사를 한 줄기로. 다음에 무엇을 할지 규칙이 알려 줍니다."
+        sub="특허 → MVP → 벤처인증 → 실사. 다음에 무엇을 할지는 시스템이 정합니다."
         actions={
           !missing && (
             <Button variant="primary" onClick={() => setCreating(true)}>
@@ -112,13 +110,12 @@ function StudioContent({ workspaceId }: { workspaceId: string | null }) {
       />
 
       {missing && <TablesMissingNotice />}
-
       {!missing && loading && <p className="t-sub py-6 text-center text-slate-500">불러오는 중…</p>}
 
-      {!missing && !loading && visible.length === 0 && (
+      {!missing && !loading && rows.length === 0 && (
         <Blank
           icon={<Workflow className="size-8" />}
-          title={projects.length === 0 ? '아직 프로젝트가 없습니다. 고객을 골라 시작합니다.' : '진행 중인 프로젝트가 없습니다.'}
+          title={projects.length === 0 ? '고객을 골라 시작하면 됩니다.' : '진행 중인 프로젝트가 없습니다.'}
           action={
             <Button variant="primary" onClick={() => setCreating(true)}>
               <Plus aria-hidden="true" className="size-4" />
@@ -128,46 +125,43 @@ function StudioContent({ workspaceId }: { workspaceId: string | null }) {
         />
       )}
 
-      {!missing && visible.length > 0 && (
+      {!missing && rows.length > 0 && (
         <ul className="ax-stagger flex flex-col gap-2.5 xl:grid xl:grid-cols-2">
-          {visible.map((p) => {
-            const progress = projectProgress(p)
-            const blocked = blockedStages(p)
-            const next = resolveNextActions(p, { artifacts, prompts, evidence, today })[0]
-            const stage = p.stages[p.currentStage]
-            return (
-              <Surface key={p.id} as="li" edge={blocked.length > 0 ? 'danger' : 'brand'} showEdge padded={false}>
-                <button type="button" onClick={() => navigate(`/studio/${p.id}`)} className="tap block w-full p-4 text-left sm:p-5">
+          {rows.map(({ p, task, percent }) => (
+            <li key={p.id}>
+              <button
+                type="button"
+                onClick={() => navigate(`/studio/${p.id}`)}
+                className="tap flex w-full flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-5 text-left hover:border-brand-300"
+              >
+                <div>
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="t-card break-keep text-slate-900">{clientName.get(p.clientId) ?? p.clientName}</span>
-                    <span className="t-sub break-keep text-slate-500">{p.title}</span>
-                    {p.gate.decision && (
-                      <Badge tone={p.gate.decision === 'go' ? 'success' : p.gate.decision === 'hold' ? 'warning' : 'danger'}>
-                        {p.gate.decision.toUpperCase().replace('_', '-')}
-                      </Badge>
-                    )}
                     {p.status === 'on_hold' && <Badge tone="warning">보류</Badge>}
                     {p.status === 'done' && <Badge tone="success">끝남</Badge>}
                   </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <span className="t-body font-semibold text-slate-800">{stageTitle(p.currentStage)}</span>
-                    <StageBadge status={stage.status} />
-                    {blocked.length > 0 && <Badge tone="danger">막힘 {blocked.length}</Badge>}
+                  {/* 같은 고객에 프로젝트가 둘 이상일 수 있으므로 이름은 작게 남긴다 */}
+                  <p className="t-meta mt-0.5 break-keep text-slate-400">{p.title}</p>
+                </div>
+
+                <div>
+                  <p className="t-body break-keep font-semibold text-slate-900">{task.headline}</p>
+                  {task.nextPreview && <p className="t-sub mt-0.5 text-slate-500">{task.nextPreview}</p>}
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div aria-hidden="true" className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-full rounded-full bg-brand-500" style={{ width: `${percent}%` }} />
                   </div>
-                  <div className="mt-3">
-                    <MiniProgress value={progress.done} max={progress.total} label="단계 진행" />
-                  </div>
-                  {next && (
-                    <p className="t-sub mt-3 break-keep text-slate-600">
-                      <span className="font-semibold text-brand-700">다음 · </span>
-                      {next.title}
-                    </p>
-                  )}
-                  <p className="t-meta mt-1 text-slate-400">{stageDef(p.currentStage).purpose}</p>
-                </button>
-              </Surface>
-            )
-          })}
+                  <span className="t-meta shrink-0 tabular-nums text-slate-500">{percent}%</span>
+                </div>
+
+                <span className="t-body inline-flex items-center gap-1.5 font-semibold text-brand-700">
+                  계속하기 <ArrowRight aria-hidden="true" className="size-4" />
+                </span>
+              </button>
+            </li>
+          ))}
         </ul>
       )}
 
@@ -179,27 +173,25 @@ function StudioContent({ workspaceId }: { workspaceId: string | null }) {
 
       {creating && (
         <BottomSheet
-          title="새 컨설팅 프로젝트"
+          title="새 프로젝트"
           onClose={() => setCreating(false)}
           footer={
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => setCreating(false)}>
-                취소
-              </Button>
+              <Button onClick={() => setCreating(false)}>취소</Button>
               <Button variant="primary" disabled={busy || !newClientId} onClick={() => void create()}>
-                {busy ? '만드는 중…' : '만들기'}
+                {busy ? '만드는 중…' : '시작'}
               </Button>
             </div>
           }
         >
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             <label className="block">
-              <span className="t-sub block font-medium text-slate-600">고객 (고객 운영 기록에서)</span>
+              <span className="t-sub block font-medium text-slate-600">어느 고객인가요?</span>
               <select
                 aria-label="고객"
                 value={newClientId}
                 onChange={(e) => setNewClientId(e.target.value)}
-                className="t-body mt-1 h-11 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3"
+                className="t-body mt-1 h-12 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3"
               >
                 <option value="">고객을 고르세요</option>
                 {activeClients.map((c) => (
@@ -210,18 +202,8 @@ function StudioContent({ workspaceId }: { workspaceId: string | null }) {
               </select>
               {activeClients.length === 0 && <span className="t-meta mt-1 block text-slate-500">고객 운영에 업체를 먼저 등록해 주세요.</span>}
             </label>
-            <label className="block">
-              <span className="t-sub block font-medium text-slate-600">프로젝트 이름 (선택)</span>
-              <input
-                aria-label="프로젝트 이름"
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                placeholder="예: 2026 벤처인증 · 작업지연 특허"
-                className="t-body mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2.5"
-              />
-            </label>
             <p className="t-meta break-keep text-slate-500">
-              회사 기본 정보(대표자·설립일·주소·번호·업종)는 고객 기록에서 사실표로 가져옵니다. 출처는 "고객 운영 기록", 상태는 "미확인" 으로 표시되며 서류로 확인한 뒤 "확정" 으로 바꿉니다.
+              회사 기본정보는 고객 기록에서 자동으로 가져옵니다. 나머지는 진행하면서 필요한 것만 물어봅니다.
             </p>
           </div>
         </BottomSheet>

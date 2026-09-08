@@ -138,5 +138,17 @@ npm run qa:squeeze -- <url> --all        # 짜부라진 글자 자동 탐지 (36
 npm run qa:shots -- <url> <dir> --wide   # 8개 화면폭 스크린샷 + 넘침 검사
 npm run qa:themes -- <url> <dir>         # 테마 9종
 npm run e2e:mobile -- <url>              # 390px 한 바퀴 여정
-npm run qa:studio -- <url>               # 컨설팅 작업실 20단계 E2E
+npm run qa:studio -- <url>               # 컨설팅 작업실 20단계 E2E (고급 보기)
+npm run qa:simple -- <url>               # 간단 모드 인수 시험 (390 + 1024/1440/1920)
+npm run test:operator                    # 지금 할 일 resolver·클릭 수 단위 시험
 ```
+
+## 11. 간단 모드 (컨설팅 작업실)
+
+`/studio/:id` 는 기본이 **간단 모드**다. 화면은 `CurrentTask` 하나만 그리고 단계·프롬프트 종류를 모른다.
+
+- 강조 버튼(`variant="primary"`)은 **화면당 하나**. 위에 강조 블록이 이미 있으면 카드는 `quiet` 로 낮춘다.
+- 간단 모드 본문은 `max-w-3xl`. 고급 보기(`?adv=1`)만 전폭을 쓴다(표·2단이 있으므로).
+- 단계별 색을 만들지 않는다. brand + 무채색, 급할 때만 danger/warning/success.
+- 개발자 낱말을 화면에 쓰지 않는다: `draft`·`superseded`·`GO/HOLD`·`Block`·`Skip`·`S0~S16`.
+  E2E 가 이 낱말들이 간단 모드에 나타나지 않는지 확인한다.

@@ -9,7 +9,16 @@
 - 엔진: S0~S16 · 사실표 45항목 · One Core Thread 규칙 경고 · 게이트 6종 · 다음 행동 resolver · 프롬프트 13종×4대상 · 개인정보 필터 · 결과 들여오기(버전) · KIPO 118종
 - 화면: `/studio`, `/studio/:id` 12탭 · 고객 상세 '컨설팅' 탭 · 오늘 '컨설팅 다음 행동' · 전역 검색 그룹
 - LLM API 호출 0. 규칙 계산을 AI 라 부르지 않는다.
-- 사람이 할 일: Supabase SQL Editor 에서 `20260908000012_consulting_studio.sql` 실행 (이걸 해야 실제로 쓸 수 있다)
+- 마이그레이션 3건은 2026-09-08 대표가 Supabase SQL Editor 에서 실행 완료(표 5개 × 정책 2 확인).
+
+## 간단 모드(운영자 UX) — feature 브랜치 `claude/simple-operator-ux-v1` (2026-09-08)
+- **Preview 까지. main 병합·Production 배포 없음** (대표 지시 §54).
+- `/studio/:id` 기본이 3탭(진행하기·결과물·기록)으로 바뀌었다. 기존 12탭은 `?adv=1` 로 그대로 살아 있다 — 지운 것 없음.
+- 화면은 `CurrentTask` 하나만 그린다(`src/domain/consulting/currentTask.ts` · `applyTask.ts`). 행동 7종.
+  프롬프트 종류·산출물 종류·버전·단계를 사용자가 고르지 않는다.
+- 결과는 `--- MIRAE_OS_RETURN ---` 블록으로 돌아오고, 못 알아봐도 원문은 그대로 저장된다.
+- 실측: 새 프로젝트 → 첫 프롬프트 **7클릭**, 결과 저장 → 다음 프롬프트 **1클릭**. E2E 59 + 단위 59 녹색.
+- 사람이 할 일: Preview 에서 프로젝트 하나를 끝까지 밀어 보고, 괜찮으면 main 병합 여부를 대표가 정한다.
 
 ## STRATEGIC GATES
 

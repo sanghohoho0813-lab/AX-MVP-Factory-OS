@@ -40,19 +40,21 @@ check('1 씨앗 프로젝트 카드', (await page.getByText('작업지연 위험
 await page.getByRole('button', { name: '새 프로젝트' }).first().click()
 await wait(400)
 await page.getByRole('dialog').getByLabel('고객').selectOption(SEED_CLIENT_ID)
-await page.getByRole('dialog').getByLabel('프로젝트 이름').fill('작업지연 특허 · 벤처인증')
-await page.getByRole('button', { name: '만들기', exact: true }).click()
+// §23 빠른 생성 — 고객만 고르면 된다(이름·workflow·owner 는 기본값)
+await page.getByRole('button', { name: '시작', exact: true }).click()
 await wait(1200)
 check('2 프로젝트 생성 후 상세로 이동', /\/studio\/[^/]+$/.test(page.url()), page.url())
 const projectUrl = page.url()
 
 // 3) 개요 — 다음 행동이 있고, 첫 행동이 사실표 채우기다
-check('3 다음 행동 표시', (await page.getByText('다음 행동').count()) > 0)
+await page.goto(projectUrl + '?adv=1', { waitUntil: 'networkidle' })
+await wait(600)
+check('3 고급 개요에 다음 행동 표시', (await page.getByText('다음 행동').count()) > 0)
 const first = await page.locator('button:has-text("사실표 ·")').first().textContent().catch(() => '')
 check('3 첫 행동은 사실표 채우기', (first ?? '').includes('사실표'), first ?? '')
 
 // 4) 사실표 — 고객 기록에서 회사 기본값이 들어와 있다 (미확인 상태)
-await page.goto(projectUrl + '?tab=factsheet', { waitUntil: 'networkidle' })
+await page.goto(projectUrl + '?adv=1&tab=factsheet', { waitUntil: 'networkidle' })
 await wait(600)
 check('4 회사명 자동 채움', (await page.getByText('한솔테크').count()) > 0)
 check('4 상태 = 미확인', (await page.getByText('미확인').count()) > 0)
@@ -77,7 +79,7 @@ const after = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v
 check('5 자동저장 — 네 항목이 저장됨', after[0]?.factsheet?.mainProducts?.value === '간판 및 광고물 제작' && after[0]?.factsheet?.representative?.value === '김대표' && after[0]?.factsheet?.headOffice?.value?.includes('남양주'))
 
 // 6) 단계 — S0 완료 조건: 필요 사실은 있으나 체크리스트 전이면 버튼 비활성
-await page.goto(projectUrl + '?tab=stages&focus=S0', { waitUntil: 'networkidle' })
+await page.goto(projectUrl + '?adv=1&tab=stages&focus=S0', { waitUntil: 'networkidle' })
 await wait(600)
 check('6 S0 완료 조건 통과 문구', (await page.getByText('필요한 사실·산출물이 모두 있습니다').count()) > 0)
 const completeBtn = page.getByRole('button', { name: '완료로 넘기기' })
@@ -91,7 +93,7 @@ const afterS0 = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp
 check('6 S0 완료 · 현재 단계 S1', afterS0.stages.S0.status === 'completed' && afterS0.currentStage === 'S1')
 
 // 7) 게이트 — 이유 없이 결정 버튼 잠김 → 이유 적고 GO
-await page.goto(projectUrl + '?tab=stages&focus=S1', { waitUntil: 'networkidle' })
+await page.goto(projectUrl + '?adv=1&tab=stages&focus=S1', { waitUntil: 'networkidle' })
 await wait(600)
 check('7 GO 버튼은 이유 전에 비활성', await page.getByRole('button', { name: 'GO', exact: true }).isDisabled())
 const reason = page.getByLabel('결정 이유')
@@ -108,7 +110,7 @@ const journal1 = await page.evaluate(() => JSON.parse(localStorage.getItem('axmv
 check('7 업무 일기에도 결정으로 남음', journal1.some((j) => j.entryType === 'decision' && j.clientId === 'cli_hansol'))
 
 // 8) 핵심 줄기 — 서로 다른 기술 → p1 경고
-await page.goto(projectUrl + '?tab=thread', { waitUntil: 'networkidle' })
+await page.goto(projectUrl + '?adv=1&tab=thread', { waitUntil: 'networkidle' })
 await wait(600)
 const fillThread = async (key, text) => {
   const box = page.locator(`#thread-input-${key}`)
@@ -130,7 +132,7 @@ await page.evaluate(() => {
   list[0].factsheet.ceoCareer = { value: '주민 900101-1234567 · 계좌번호 110-123-456789 · 010-1234-5678', status: 'confirmed', source: '', asOfDate: '', note: '', updatedAt: null }
   localStorage.setItem('axmvp.v1.consulting_projects', JSON.stringify(list))
 })
-await page.goto(projectUrl + '?tab=prompts&focus=GENERAL_PROJECT_REVIEW', { waitUntil: 'networkidle' })
+await page.goto(projectUrl + '?adv=1&tab=prompts&focus=GENERAL_PROJECT_REVIEW', { waitUntil: 'networkidle' })
 await wait(800)
 const preview = await page.getByLabel('프롬프트 미리보기').inputValue()
 check('9 프롬프트에 [ARTIFACT] 머리줄 요구', preview.includes('[ARTIFACT] type=GENERAL_REVIEW stage=S0'))
@@ -160,7 +162,7 @@ check('11 본문에서 머리줄 제거', arts[0]?.content.startsWith('## 현재
 check('11 출처 = llm_paste · 꾸러미 연결', arts[0]?.source === 'llm_paste' && arts[0]?.promptPackageId === pkgs[0].id)
 
 // 12) 두 번째 들여오기 → v2, v1 은 대체됨
-await page.goto(projectUrl + '?tab=artifacts', { waitUntil: 'networkidle' })
+await page.goto(projectUrl + '?adv=1&tab=artifacts', { waitUntil: 'networkidle' })
 await wait(600)
 await page.getByRole('button', { name: '이 종류 새 버전 적기' }).first().click()
 await wait(400)
@@ -171,7 +173,7 @@ const arts2 = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v
 check('12 v2 생성 · v1 대체됨', arts2.length === 2 && arts2.some((a) => a.version === 2 && a.status === 'draft') && arts2.some((a) => a.version === 1 && a.status === 'superseded'))
 
 // 13) 특허 — KIPO 참고자료 검색·선정 규칙
-await page.goto(projectUrl + '?tab=patent&focus=kipo', { waitUntil: 'networkidle' })
+await page.goto(projectUrl + '?adv=1&tab=patent&focus=kipo', { waitUntil: 'networkidle' })
 await wait(600)
 await page.getByLabel('참고자료 검색').fill('머신 러닝')
 await wait(400)
@@ -182,13 +184,13 @@ check('13 1종이면 부족 안내', (await page.getByText(/최소 2종/).count(
 check('13 PDF 미첨부 안내', (await page.getByText(/PDF 를 아직 받지 않은/).count()) > 0)
 
 // 14) 벤처 — P0 Red Flag 12개 · Judge
-await page.goto(projectUrl + '?tab=venture&focus=redflags', { waitUntil: 'networkidle' })
+await page.goto(projectUrl + '?adv=1&tab=venture&focus=redflags', { waitUntil: 'networkidle' })
 await wait(600)
 check('14 P0 12개 표시', (await page.getByText(/남은 것 12\/12/).count()) > 0)
 check('14 Judge 10축', (await page.locator('input[type=number]').count()) === 10)
 
 // 15) 증빙 — 10슬롯
-await page.goto(projectUrl + '?tab=evidence', { waitUntil: 'networkidle' })
+await page.goto(projectUrl + '?adv=1&tab=evidence', { waitUntil: 'networkidle' })
 await wait(600)
 check('15 빈 슬롯 10', (await page.getByText('빈 슬롯 10').count()) > 0)
 await page.getByRole('button', { name: /이 슬롯에 주장·첨부 추가/ }).first().click()
@@ -196,7 +198,7 @@ await wait(900)
 check('15 슬롯 1에 항목 추가 → 빈 슬롯 9', (await page.getByText('빈 슬롯 9').count()) > 0)
 
 // 16) 실사 — 질문 풀에서 고르기 · 금지어 탐지
-await page.goto(projectUrl + '?tab=review&focus=qa', { waitUntil: 'networkidle' })
+await page.goto(projectUrl + '?adv=1&tab=review&focus=qa', { waitUntil: 'networkidle' })
 await wait(600)
 await page.getByText('기본 질문 풀 15개에서 고르기').click()
 await wait(300)
@@ -217,27 +219,27 @@ check('17 오늘 화면에 컨설팅 다음 행동', (await page.getByText('컨�
 // 18) 고객 상세 — 컨설팅 탭
 await page.goto(BASE + `/ops/clients/${SEED_CLIENT_ID}?tab=consulting`, { waitUntil: 'networkidle' })
 await wait(900)
-check('18 고객 상세 컨설팅 탭에 프로젝트', (await page.getByText('작업지연 특허 · 벤처인증').count()) > 0)
+check('18 고객 상세 컨설팅 탭에 프로젝트', (await page.getByText('특허 · 벤처 · MVP').count()) > 0)
 
 // 19) 전역 검색
 await page.goto(BASE + '/studio', { waitUntil: 'networkidle' })
 await wait(700)
 await page.keyboard.press('Control+K')
 await wait(400)
-await page.keyboard.type('작업지연')
+await page.keyboard.type('한솔')
 await wait(400)
 check('19 검색에 컨설팅 작업실 그룹', (await page.getByText('컨설팅 작업실').count()) >= 2)
 await page.keyboard.press('Escape')
 
 // 20) 모바일 390 — 새 화면들 가로 넘침 0 · JS 오류 0
 let overflow = 0
-for (const tab of ['', '?tab=stages', '?tab=factsheet', '?tab=thread', '?tab=patent', '?tab=mvp', '?tab=venture', '?tab=evidence', '?tab=prompts', '?tab=artifacts', '?tab=decisions', '?tab=review']) {
+for (const tab of ['', '?adv=1', '?adv=1&tab=stages', '?adv=1&tab=factsheet', '?adv=1&tab=thread', '?adv=1&tab=patent', '?adv=1&tab=mvp', '?adv=1&tab=venture', '?adv=1&tab=evidence', '?adv=1&tab=prompts', '?adv=1&tab=artifacts', '?adv=1&tab=decisions', '?adv=1&tab=review']) {
   await page.goto(projectUrl + tab, { waitUntil: 'networkidle' })
   await wait(500)
   const w = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   if (w > 2) { overflow++; console.log('   overflow', tab, w) }
 }
-check('20 390px 가로 넘침 0 (12탭)', overflow === 0)
+check('20 390px 가로 넘침 0 (간단+고급 13화면)', overflow === 0)
 check('20 JS 오류 0', errors.length === 0, errors.join(' | '))
 
 await browser.close()

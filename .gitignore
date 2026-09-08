@@ -45,3 +45,4 @@ dist-ssr
 .mirae-os-out
 dist-qa*/
 .consulting-out
+.operator-out

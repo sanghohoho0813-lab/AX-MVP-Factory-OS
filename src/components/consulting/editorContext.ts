@@ -6,6 +6,8 @@
  */
 
 import { createContext, useContext } from 'react'
+import type { CurrentTask } from '../../domain/consulting/currentTask'
+import type { TaskSubmission } from '../../domain/consulting/applyTask'
 import type {
   ConsultingArtifact,
   ConsultingDecision,
@@ -31,6 +33,15 @@ export interface EditorValue {
   refresh: () => Promise<void>
   /** 결정 한 줄 기록 (일기에도 남긴다) */
   decide: (input: { stageKey: StageKey; kind: DecisionKind; summary: string; reason?: string }) => Promise<void>
+  /**
+   * 지금 할 일을 마쳤을 때 — 값 저장 · 결정 기록 · 단계 전환을 한 번에 처리한다.
+   * extra 는 방금 만들었지만 아직 목록에 반영되지 않은 것 (결과 가져오기 직후의 산출물 등).
+   */
+  submitTask: (
+    task: CurrentTask,
+    sub: TaskSubmission,
+    extra?: { extraArtifacts?: ConsultingArtifact[]; extraPrompts?: ConsultingPromptPackage[] },
+  ) => Promise<void>
   /** 탭 이동 (focus 는 탭 안의 항목) */
   goTo: (tab: string, focus?: string) => void
   toast: (msg: string) => void

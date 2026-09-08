@@ -22,6 +22,7 @@ import type {
 import { factsheetToText } from './factsheetSchema'
 import { coreThreadToText } from './coreThread'
 import { artifactHeaderLine } from './resultImport'
+import { returnBlockInstruction } from './returnBlock'
 import { artifactTypeForPrompt } from './artifactDefinitions'
 import { stageDef } from './workflowDefinition'
 import { mergeReports, redactSensitive } from './privacyFilter'
@@ -130,14 +131,20 @@ function globalBlock(): string {
   return ['## 항상 지킬 것', ...GLOBAL_RULES.map((r) => `- ${r}`)].join('\n')
 }
 
+/** 사람이 고를 후보를 돌려받아야 하는 종류 — 결과가 오면 바로 선택 화면이 뜬다 */
+const WANTS_OPTIONS: PromptPackageType[] = ['PATENT_IDEA', 'PRIOR_ART_REVIEW', 'MVP_STRATEGY']
+
 function outputBlock(type: PromptPackageType, stage: StageKey, title: string, sections: string[]): string {
+  const artifactType = artifactTypeForPrompt(type)
   return [
     '## 출력 형식',
     `결과의 첫 줄은 정확히 다음 한 줄로 시작한다:`,
-    artifactHeaderLine(artifactTypeForPrompt(type), stage, title),
+    artifactHeaderLine(artifactType, stage, title),
     '그 아래는 마크다운으로, 다음 순서의 제목을 쓴다:',
     ...sections.map((s, i) => `${i + 1}. ${s}`),
     '마지막에 "## 확인 필요" 절을 두고, 지어내지 않고 남겨 둔 항목을 적는다.',
+    '',
+    returnBlockInstruction(artifactType, WANTS_OPTIONS.includes(type)),
   ].join('\n')
 }
 
