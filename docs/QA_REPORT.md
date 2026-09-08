@@ -180,7 +180,7 @@ npm run e2e:mobile -- http://localhost:4390
 
 ## 14. 간단 모드(운영자 UX) — 2026-09-08 · 브랜치 `claude/simple-operator-ux-v1`
 
-Preview 까지만. main 병합·Production 배포 없음.
+원 지시는 "Preview 까지만" 이었으나, 대표가 QA 결과를 보고 main 병합을 지시해 병합·배포했다.
 
 ### 14-1. 실행 결과
 

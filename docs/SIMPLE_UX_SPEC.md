@@ -1,6 +1,6 @@
 # SIMPLE_UX_SPEC — 컨설팅 작업실 운영자 UX v1
 
-기준 커밋 `d42fe3d` · 브랜치 `claude/simple-operator-ux-v1` · 2026-09-08
+기준 커밋 `d42fe3d` · 브랜치 `claude/simple-operator-ux-v1` → main 병합 (대표 지시) · 2026-09-08
 
 한 문장: **17단계를 사람이 관리하는 것이 아니라, 17단계가 사람을 안내한다.**
 
