@@ -1,6 +1,6 @@
 # ZERO_FRICTION_UX_SPEC — 처음 쓰는 50대 컨설턴트 기준
 
-기준 커밋 `22cfe5f` · 브랜치 `claude/zero-friction-ux-v2` · 2026-09-08
+기준 커밋 `22cfe5f` · 브랜치 `claude/zero-friction-ux-v2` → main 병합 (대표 지시) · 2026-09-08
 
 한 문장: **사용자에게 입력시키기 전에 시스템이 먼저 제안한다.**
 

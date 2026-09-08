@@ -242,7 +242,7 @@ P2 → RECOMMENDATIONS: 간단 모드 안에서 되돌리기 · 프롬프트 패
 
 ## 15. 마찰 제거 (처음 쓰는 50대 기준) — 2026-09-08 · 브랜치 `claude/zero-friction-ux-v2`
 
-Preview 까지. main 병합·Production 배포 없음.
+원 지시는 "Preview 까지" 였으나, 대표가 QA 결과를 보고 main 병합을 지시해 병합·배포했다.
 
 ### 15-1. 실행 결과
 
