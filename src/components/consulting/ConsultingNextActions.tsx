@@ -9,7 +9,7 @@ import { ArrowRight } from 'lucide-react'
 import type { ConsultingProject, NextAction } from '../../types/consulting'
 import { listArtifacts, listEvidence, listProjects, listPromptPackages } from '../../services/consultingStudioService'
 import { resolveNextActions } from '../../domain/consulting/nextActionResolver'
-import { stageTitle } from './studioParts'
+import { plainStageLabel } from '../../domain/consulting/currentTask'
 
 export function ConsultingNextActions({ workspaceId, today, onCount }: { workspaceId: string | null; today: string; onCount?: (n: number) => void }) {
   const navigate = useNavigate()
@@ -51,7 +51,9 @@ export function ConsultingNextActions({ workspaceId, today, onCount }: { workspa
 
   return (
     <ol className="flex flex-col gap-2">
-      {rows.map(({ project, action }) => (
+      {rows.map(({ project, action }) => {
+        const sameClientTwice = rows.filter((r) => r.project.clientId === project.clientId).length > 1
+        return (
         <li key={project.id}>
           <button
             type="button"
@@ -60,12 +62,23 @@ export function ConsultingNextActions({ workspaceId, today, onCount }: { workspa
           >
             <span className="min-w-0 flex-1">
               <span className="t-card block break-keep text-slate-900">{action.title}</span>
-              <span className="t-sub mt-0.5 block break-keep text-slate-500">{project.clientName} · {stageTitle(action.stageKey)}</span>
+              {/*
+                한 고객에 프로젝트가 둘 이상이면 '한솔테크(주) · S0 회사 이해' 가 두 줄 똑같이 나온다.
+                같은 줄이 두 번 보이면 사용자는 고장이라고 생각한다 — 프로젝트 이름으로 구별한다.
+                단계 이름은 간단 모드와 같은 쉬운 말로 쓴다.
+              */}
+              <span className="t-sub mt-0.5 block break-keep text-slate-500">
+                {project.clientName}
+                {sameClientTwice && project.title ? ` · ${project.title}` : ''}
+                {' · '}
+                {plainStageLabel(action.stageKey)}
+              </span>
             </span>
-            <ArrowRight aria-hidden="true" className="mt-1 size-4 shrink-0 text-slate-300" />
+            <ArrowRight aria-hidden="true" className="mt-1 size-4 shrink-0 text-slate-400" />
           </button>
         </li>
-      ))}
+        )
+      })}
     </ol>
   )
 }

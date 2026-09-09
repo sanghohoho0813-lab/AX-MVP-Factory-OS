@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, ClipboardCopy, Copy, FileUp, Pencil, Pin, PinOff, Plus, Trash2 } from 'lucide-react'
+import { Check, ChevronDown, ChevronUp, ClipboardCopy, Copy, FileUp, Pencil, Pin, PinOff, Plus, Trash2 } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import {
   profileAsText,
@@ -45,8 +45,21 @@ export function CompanyProfileCard({
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const fields = profileFields(record, today)
-  const groups = profileFieldsByGroup(record, today)
+  const allGroups = profileFieldsByGroup(record, today)
   const filled = fields.filter((f) => !f.empty).length
+  const emptyCount = fields.length - filled
+
+  /*
+   * 아직 안 적은 칸을 늘어놓지 않는다.
+   *
+   * 17칸 중 6칸만 채워진 업체를 열면 '+ 입력' 이 열한 줄 나오고, 정작 적혀 있는 값이
+   * 그 사이에 묻힌다. 기본은 **적힌 것만** 보여 주고, 빈 칸은 아래 한 줄로 접는다.
+   * 아무것도 안 적혀 있으면 접을 것이 없으므로 그때는 전부 편다.
+   */
+  const [showEmpty, setShowEmpty] = useState(filled === 0)
+  const groups = showEmpty
+    ? allGroups
+    : allGroups.map((g) => ({ ...g, fields: g.fields.filter((f) => !f.empty) })).filter((g) => g.fields.length > 0)
 
   const copy = async (key: string, value: string) => {
     await copyText(value)
@@ -90,7 +103,7 @@ export function CompanyProfileCard({
           </Button>
         </div>
       </div>
-      <p className="t-meta mt-0.5 break-keep text-slate-500">번호·주소는 눌러서 바로 복사할 수 있습니다.</p>
+      <p className="t-sub mt-0.5 break-keep text-slate-500">번호·주소는 눌러서 바로 복사할 수 있습니다.</p>
 
       {groups.map((g) => (
         <div key={g.group} className="mt-4 first:mt-3">
@@ -167,14 +180,23 @@ export function CompanyProfileCard({
             ))}
           </dl>
           {g.group === 'credential' && (
-            <p className="t-meta mt-1.5 break-keep text-slate-500">
-              공동인증서 <strong className="font-semibold">비밀번호는 저장하지 않습니다.</strong> 받았는지와 어디에
-              두었는지만 적습니다 — 비밀번호를 여기 두면 이 화면을 여는 사람이 곧 고객사 계정을 쓸 수 있는 사람이 되고,
-              내려받은 백업 파일에도 그대로 남습니다.
+            <p className="t-sub mt-1.5 break-keep text-slate-500">
+              <strong className="font-semibold">비밀번호는 여기에 적지 않습니다.</strong> 받았는지와 어디에 두었는지만 적습니다.
             </p>
           )}
         </div>
       ))}
+
+      {emptyCount > 0 && filled > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowEmpty((v) => !v)}
+          className="tap t-sub mt-4 inline-flex items-center gap-1.5 font-medium text-slate-600 hover:text-brand-700"
+        >
+          {showEmpty ? <ChevronUp aria-hidden="true" className="size-4" /> : <ChevronDown aria-hidden="true" className="size-4" />}
+          {showEmpty ? '아직 안 적은 칸 접기' : `아직 안 적은 ${emptyCount}칸 채우기`}
+        </button>
+      )}
     </section>
   )
 }

@@ -14,6 +14,7 @@
  *   둘 다 실제 업체 기록에 그대로 저장된다 — 화면용 사본이 아니다.
  */
 
+import { useState } from 'react'
 import { ArrowRight, ChevronRight } from 'lucide-react'
 import { CONTRACT_STAGE_LABEL, contractStageOf } from '../../types/clientOps'
 import type { ClientOpsRecord, ServiceKey, ServiceStatus } from '../../types/clientOps'
@@ -120,12 +121,18 @@ function ServiceChip({ chip, onClick }: { chip: ChipState; onClick: () => void }
 /* 업체 한 장                                                           */
 /* ------------------------------------------------------------------ */
 
+/*
+ * 급한 카드도 바탕을 칠하지 않는다 (화면 규칙 §2). 왼쪽 3px 선만으로 말한다.
+ *
+ * 바탕을 칠하면 목록의 다섯 장 중 네 장이 물들어 정작 제일 급한 한 장이 안 보인다.
+ * 카드가 모두 흰색이면 왼쪽 선 네 개도 눈에 들어온다 — 순서가 이미 급한 순이기 때문이다.
+ */
 const CARD_FILL: Record<Tone, string> = {
-  danger: 'border-danger-200 bg-danger-50/50',
-  warning: 'border-warning-200 bg-warning-50/50',
+  danger: 'border-slate-200 bg-white',
+  warning: 'border-slate-200 bg-white',
   success: 'border-slate-200 bg-white',
   neutral: 'border-slate-200 bg-white',
-  brand: 'border-brand-200 bg-brand-50/50',
+  brand: 'border-slate-200 bg-white',
 }
 
 const CARD_EDGE: Record<Tone, string> = {
@@ -157,8 +164,14 @@ export function ClientBoardCard({
   onChip: (key: ServiceKey) => void
   onMoney: () => void
 }) {
+  const [allChips, setAllChips] = useState(false)
   const p = clientOpsProgress(record, today)
   const chips = SERVICES.map((s) => chipStateFor(record, s.key, s.shortLabel, today, dueSoonDays))
+  /** 지금 손이 가야 하는 조각 — 마감이 걸렸거나, 진행 중이거나, 고객 회신을 기다리는 것 */
+  const needsEye = (c: ChipState) =>
+    c.status !== 'not_applicable' && (c.overdue || c.dueSoon || c.status === 'in_progress' || c.status === 'waiting_client')
+  const shown = allChips ? chips : chips.filter(needsEye)
+  const hidden = allChips ? [] : chips.filter((c) => !needsEye(c))
   const dLeft = record.nextActionDueDate ? daysLeftFrom(today, record.nextActionDueDate) : null
   const stage = contractStageOf(record.status)
 
@@ -226,32 +239,60 @@ export function ClientBoardCard({
           )}
         </p>
 
-        {/* 업무 조각 — 줄바꿈된다. 가로로 밀 일이 없다 */}
+        {/*
+          업무 조각 — 기본은 '지금 걸린 것' 만.
+          일곱 조각을 다 펴면 한 장에 배지가 열 개가 되어(규칙 §6 은 두 개) 무엇이 급한지 사라진다.
+          완료·시작 전·해당 없음은 접어 두고, 누르면 전부 편다. 지워지는 것은 없다.
+        */}
         <ul className="flex flex-wrap gap-1">
-          {chips.map((c) => (
+          {shown.map((c) => (
             <li key={c.key}>
-              <ServiceChip chip={c} onClick={() => onChip(c.key)} />
+              {/*
+                조각을 건드리면 카드를 펴 둔다.
+                '해당 없음' 으로 바꾸면 그 조각은 접힘 대상이 되는데, 방금 누른 것이 눈앞에서
+                사라지면 무엇이 바뀐 건지 알 수 없다. 바뀐 결과를 그 자리에서 보여 준다.
+              */}
+              <ServiceChip chip={c} onClick={() => { setAllChips(true); onChip(c.key) }} />
             </li>
           ))}
+          {hidden.length > 0 && (
+            <li>
+              <button
+                type="button"
+                onClick={() => setAllChips((v) => !v)}
+                className="tap inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[0.85rem] font-medium text-slate-600 hover:border-brand-300 hover:text-brand-700"
+              >
+                {allChips ? '접기' : `그 외 ${hidden.length}`}
+              </button>
+            </li>
+          )}
         </ul>
 
-        {/* 돈·서류 */}
+        {/*
+          돈·서류 — 0 이면 그리지 않는다.
+          '미수금 없음' · '서류 0/10' 은 아무 일도 없다는 뜻인데 카드마다 두 칸을 차지한다.
+          받을 돈이 있을 때만, 받은 서류가 있을 때만 보여 준다.
+        */}
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={onMoney}
-            className={`tap inline-flex items-center gap-1.5 rounded-(--radius-control) border px-2.5 py-1.5 text-[0.88rem] font-medium hover:border-brand-300 ${
-              p.overduePayments > 0
-                ? 'border-danger-200 bg-danger-50 text-danger-700'
-                : 'border-slate-200 bg-white text-slate-700'
-            }`}
-          >
-            미수금 {p.unpaidAmount > 0 ? formatKrw(p.unpaidAmount) : '없음'}
-            {p.overduePayments > 0 && ` · 예정일 지남 ${p.overduePayments}`}
-          </button>
-          <span className="t-meta rounded-(--radius-control) border border-slate-200 bg-white px-2.5 py-1.5 text-slate-600">
-            서류 {p.documentsUsable}/{p.documentsTotal}
-          </span>
+          {p.unpaidAmount > 0 && (
+            <button
+              type="button"
+              onClick={onMoney}
+              className={`tap inline-flex items-center gap-1.5 rounded-(--radius-control) border px-2.5 py-1.5 text-[0.88rem] font-medium hover:border-brand-300 ${
+                p.overduePayments > 0
+                  ? 'border-danger-200 bg-danger-50 text-danger-700'
+                  : 'border-slate-200 bg-white text-slate-700'
+              }`}
+            >
+              미수금 {formatKrw(p.unpaidAmount)}
+              {p.overduePayments > 0 && ` · 예정일 지남 ${p.overduePayments}`}
+            </button>
+          )}
+          {p.documentsUsable > 0 && (
+            <span className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-2.5 py-1.5 text-slate-600">
+              서류 {p.documentsUsable}/{p.documentsTotal}
+            </span>
+          )}
           <button
             type="button"
             onClick={onOpen}

@@ -66,7 +66,16 @@ const stored = await page.evaluate(() => {
 })
 check('새로고침 뒤에도 저장돼 있다', stored === 'not_applicable', String(stored))
 
-// 다시 되돌릴 수 있는지
+/*
+ * 다시 되돌릴 수 있는지.
+ * '해당 없음' 은 앞으로 볼 일 없는 항목이라 카드에서 접힌다. 되돌리려면 [그 외 N] 을 펴야 하는데,
+ * 그 단추가 카드 안에 바로 있어서 한 번이면 닿는다 — 그 경로가 실제로 열리는지 확인한다.
+ */
+const more = page.getByRole('button', { name: /^그 외 \d+$/ }).first()
+check('접힌 조각을 펼 수 있는 단추가 있다', (await more.count()) > 0)
+await more.click()
+await page.waitForTimeout(400)
+check('펴면 해당 없음 조각이 다시 보인다', (await page.getByRole('button', { name: /^특허/ }).count()) > 0)
 await page.getByRole('button', { name: /^특허/ }).first().click()
 await page.waitForTimeout(400)
 await page.getByRole('button', { name: /진행 중/ }).first().click()

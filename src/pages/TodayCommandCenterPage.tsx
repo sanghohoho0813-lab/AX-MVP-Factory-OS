@@ -74,13 +74,16 @@ function greeting(hour: number): string {
 }
 
 function ActionRow({ action, rank }: { action: BriefAction; rank: number }) {
-  // 급한 정도를 선 하나로만 말하면 세 장이 다 똑같아 보인다. 바탕도 아주 옅게 물들여
-  // 1·2·3번이 서로 다른 무게로 읽히게 한다.
+  /*
+   * 바탕은 칠하지 않는다 (화면 규칙 §2). 왼쪽 선과 순번 원의 색으로만 말한다.
+   * 세 장이 모두 '마감 지남' 인 날이 흔한데, 그때 바탕까지 칠하면 화면 위쪽이 통째로
+   * 빨간 덩어리가 되어 1·2·3 의 차이가 오히려 사라진다. 무게는 순번이 말한다.
+   */
   const look =
     action.severity === 'critical'
-      ? { edge: 'bg-danger-500', fill: 'border-danger-200 bg-danger-50/50', rank: 'bg-danger-600' }
+      ? { edge: 'bg-danger-500', fill: 'border-slate-200 bg-white', rank: 'bg-danger-600' }
       : action.severity === 'warning'
-        ? { edge: 'bg-warning-500', fill: 'border-warning-200 bg-warning-50/50', rank: 'bg-warning-600' }
+        ? { edge: 'bg-warning-500', fill: 'border-slate-200 bg-white', rank: 'bg-warning-600' }
         : { edge: 'bg-slate-300', fill: 'border-slate-200 bg-white', rank: 'bg-slate-700' }
   return (
     <li>
@@ -374,9 +377,6 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               <ListTodo className="size-5" />
             </span>
             오늘 할 일
-            {openTodos.length > 0 && (
-              <span className="t-section font-bold text-brand-700">{openTodos.length}</span>
-            )}
           </h2>
           <Link to="/journal" className="t-sub shrink-0 font-medium text-brand-700 hover:underline">
             모두 보기

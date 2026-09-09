@@ -451,7 +451,6 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
             업체별 현황표
           </h2>
           <div className="flex items-center gap-3">
-            <p className="t-sub hidden text-slate-500 lg:block">업무 조각을 누르면 여기서 바로 상태를 바꿉니다.</p>
             <button
               type="button"
               onClick={() => setCatalogOpen(true)}
@@ -508,14 +507,12 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
           </>
         )}
 
-        {/* 보는 법 — 업무 조각을 처음 보면 무슨 뜻인지 모른다 */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.85rem] text-slate-500">
-          <span className="font-medium text-slate-600">업무 조각 보는 법:</span>
-          <span>눌러서 상태를 바로 바꿉니다</span>
-          <span className="text-danger-700">빨강 = 마감 지남</span>
-          <span className="text-warning-800">노랑 = 마감 임박</span>
-          <span className="line-through decoration-slate-300">가로선 = 이 회사에는 해당 없음</span>
-        </div>
+        {/*
+          색 설명을 적어 두지 않는다.
+          조각에 이미 '7일 지남' 이라고 글자로 쓰여 있으므로 빨강이 무슨 뜻인지 물어볼 일이 없다.
+          범례가 필요하다는 것은 화면이 스스로 설명하지 못한다는 뜻이다.
+        */}
+        <p className="t-sub text-slate-500">업무 조각을 누르면 상태가 바로 바뀝니다.</p>
       </section>
 
       {/* A. 지금 챙길 것 */}

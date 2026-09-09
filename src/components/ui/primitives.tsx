@@ -295,8 +295,11 @@ export function MetricTile({
 }) {
   const valueColor =
     tone === 'danger' ? 'text-danger-700' : tone === 'warning' ? 'text-warning-700' : 'text-slate-900'
-  // 0 이 아닐 때만 아주 옅게 물들인다 — 숫자 칸끼리 급한 정도가 한눈에 갈린다
-  const fill = tone === 'danger' ? 'bg-danger-50/60' : tone === 'warning' ? 'bg-warning-50/60' : 'bg-white'
+  /*
+   * 바탕은 칠하지 않는다 (화면 규칙 §2). 위쪽 3px 선과 숫자 색만으로 급한 정도를 말한다.
+   * 네 칸 중 세 칸이 물들면 어느 칸이 제일 급한지 오히려 안 보인다.
+   */
+  const fill = 'bg-white'
   const Tag = onClick ? 'button' : 'div'
   return (
     <Tag
