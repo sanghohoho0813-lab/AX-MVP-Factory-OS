@@ -6,9 +6,21 @@
 import type { ClientOpsRecord } from '../types/clientOps'
 import { todayLocalDate } from '../lib/appClock'
 
+/**
+ * 날짜 읽기 — 실제로 들어오는 모양을 모두 받는다.
+ *
+ * 등기부·홈택스에서 옮겨 적은 값은 `2002-02-16` 만이 아니라 `20020216` · `2002.02.16` ·
+ * `2002/2/16` 로도 들어온다. 예전에는 하이픈 형식만 읽어서 나머지는 "업력을 알 수 없음" 이 되고,
+ * 화면에는 `20020216` 이라는 날것이 그대로 찍혔다.
+ */
 function ymd(s: string): [number, number, number] | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s.trim())
-  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null
+  const t = s.trim()
+  let m = /^(\d{4})[-./](\d{1,2})[-./](\d{1,2})$/.exec(t)
+  if (!m) m = /^(\d{4})(\d{2})(\d{2})$/.exec(t)
+  if (!m) return null
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])]
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null
+  return [y, mo, d]
 }
 
 /** 만 나이 (생일 안 지났으면 -1) */

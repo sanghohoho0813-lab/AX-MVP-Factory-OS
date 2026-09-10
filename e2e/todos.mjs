@@ -40,7 +40,7 @@ check('반드시 처리할 것 문구가 없다', !h1.includes('반드시 처리
 await page.getByRole('button', { name: '할 일 적기' }).first().click()
 await page.waitForTimeout(300)
 await page.getByLabel('할 일 내용').fill('테스트 할 일 하나')
-await page.getByRole('button', { name: '넣기' }).click()
+await page.getByRole('button', { name: '넣기', exact: true }).click()
 await page.waitForTimeout(800)
 check('오늘에 할 일이 추가된다', await page.getByText('테스트 할 일 하나').first().isVisible())
 
@@ -53,7 +53,7 @@ check('일정 화면에도 같은 할 일이 보인다', await page.getByText('�
 await page.getByRole('button', { name: '할 일 적기' }).first().click()
 await page.waitForTimeout(300)
 await page.getByLabel('할 일 내용').fill('일정에서 적은 할 일')
-await page.getByRole('button', { name: '넣기' }).click()
+await page.getByRole('button', { name: '넣기', exact: true }).click()
 await page.waitForTimeout(800)
 check('일정에서 할 일이 추가된다', await page.getByText('일정에서 적은 할 일').first().isVisible())
 

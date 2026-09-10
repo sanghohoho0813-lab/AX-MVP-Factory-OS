@@ -17,6 +17,7 @@
 import { useState } from 'react'
 import { ArrowRight, ChevronRight } from 'lucide-react'
 import { CONTRACT_STAGE_LABEL, contractStageOf } from '../../types/clientOps'
+import { formatBusinessNumber } from '../../services/koreanDocParser'
 import type { ClientOpsRecord, ServiceKey, ServiceStatus } from '../../types/clientOps'
 import { SERVICES, SERVICE_STATUS_LABEL, isServiceOpen } from '../../content/clientOpsCatalog'
 import { clientOpsProgress, daysLeftFrom, dueText } from '../../services/clientOpsAlerts'
@@ -167,28 +168,51 @@ export function ClientBoardCard({
   const [allChips, setAllChips] = useState(false)
   const p = clientOpsProgress(record, today)
   const chips = SERVICES.map((s) => chipStateFor(record, s.key, s.shortLabel, today, dueSoonDays))
-  /** 지금 손이 가야 하는 조각 — 마감이 걸렸거나, 진행 중이거나, 고객 회신을 기다리는 것 */
+  /*
+   * 접는 기준은 한 문장이다: **손이 갈 일이 남았으면 보이고, 끝났거나 아직 시작 안 했으면 접힌다.**
+   *   보인다 — 마감 지남 · 마감 임박 · 진행 중 · 고객 대기 · 보류(사람이 멈춰 둔 것, 왜 멈췄는지 봐야 한다)
+   *   접힌다 — 완료 · 시작 전 · 해당 없음
+   * 그리고 접힌 것이 무엇인지 단추 글자로 밝힌다. '그 외 6' 만 쓰면 기준을 사용자가 추측해야 한다.
+   */
   const needsEye = (c: ChipState) =>
-    c.status !== 'not_applicable' && (c.overdue || c.dueSoon || c.status === 'in_progress' || c.status === 'waiting_client')
+    c.status !== 'not_applicable' &&
+    (c.overdue || c.dueSoon || c.status === 'in_progress' || c.status === 'waiting_client' || c.status === 'on_hold')
   const shown = allChips ? chips : chips.filter(needsEye)
   const hidden = allChips ? [] : chips.filter((c) => !needsEye(c))
+  /** 접힌 것들을 상태 이름으로 요약 — '완료 3 · 시작 전 2' */
+  const hiddenLabel = (() => {
+    const order: ServiceStatus[] = ['done', 'not_started', 'not_applicable']
+    const counted = order
+      .map((st) => ({ st, n: hidden.filter((c) => c.status === st).length }))
+      .filter((x) => x.n > 0)
+    if (counted.length === 0) return ''
+    const head = counted.slice(0, 2).map((x) => `${SHORT[x.st]} ${x.n}`)
+    const restN = counted.slice(2).reduce((sum, x) => sum + x.n, 0)
+    return restN > 0 ? `${head.join(' · ')} 외 ${restN}` : head.join(' · ')
+  })()
   const dLeft = record.nextActionDueDate ? daysLeftFrom(today, record.nextActionDueDate) : null
   const stage = contractStageOf(record.status)
 
   const y = yearsInBusiness(record.establishedAt, today)
   const region = regionOf(record.businessAddress)
   const repName = record.representativeName.trim() || record.contactName.trim()
-  // 한 줄 요약 — 복사해서 쓰는 값(사업자번호)과 상담에서 바로 쓰는 값만
-  // 계약 단계는 이름 옆이 아니라 이 줄에 둔다 — 이름 옆에 두면 좁은 폭에서 이름을 밀어낸다.
-  // '계약 완료' 는 보통 상태라 굳이 쓰지 않는다(써 봐야 모든 카드에 붙는다).
-  const meta = [
-    stage === 'signed' ? '' : CONTRACT_STAGE_LABEL[stage],
-    record.businessNumber,
-    y ? `${y.nthYear}년차` : record.establishedAt,
+
+  /*
+   * 회사 정보는 한 덩어리 회색 줄이 아니라 두 무게로 나눈다.
+   *
+   *   진하게 — 대표자 · N년차 · 계약 단계.  전화를 걸거나 자격을 판단할 때 쓰는 값이다.
+   *   흐리게 — 지역 · 업종.                 어느 회사인지 떠올리는 배경이다.
+   *   숫자   — 사업자등록번호.              서류에 옮겨 적는 값이라 자릿수가 흔들리면 안 된다.
+   *
+   * 업력을 못 읽으면 설립일 원본(20020216)을 그대로 찍지 않는다 — 날것을 보여 주느니 비운다.
+   */
+  const bizNo = formatBusinessNumber(record.businessNumber) ?? record.businessNumber.trim()
+  const strongMeta = [
     repName,
-    region,
-    record.businessCategory || record.industry,
-  ].filter((v) => v && v.trim() !== '')
+    y ? `${y.nthYear}년차` : '',
+    stage === 'signed' ? '' : CONTRACT_STAGE_LABEL[stage],
+  ].filter((v) => v.trim() !== '')
+  const mutedMeta = [region, record.businessCategory || record.industry].filter((v) => v && v.trim() !== '')
 
   return (
     <li className={`relative overflow-hidden rounded-(--radius-panel) border ${CARD_FILL[tone]}`}>
@@ -215,17 +239,31 @@ export function ClientBoardCard({
           </div>
         </div>
 
-        {/* 회사 요약 — 사업자번호 · 업력 · 대표자 · 지역 · 업종 */}
-        {meta.length > 0 && (
-          <p className="t-meta flex flex-wrap items-center gap-x-2 gap-y-0.5 text-slate-500">
-            {meta.map((m, i) => (
-              <span key={`${m}-${i}`} className="whitespace-nowrap">
-                {i > 0 && <span aria-hidden="true" className="mr-2 text-slate-300">·</span>}
+        {/* 회사 요약 — 대표자·업력은 진하게, 지역·업종은 흐리게, 사업자번호는 숫자 그대로 */}
+        {(strongMeta.length > 0 || mutedMeta.length > 0 || bizNo !== '') && (
+          <p className="t-sub flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            {strongMeta.map((m, i) => (
+              <span key={`s-${m}-${i}`} className="font-semibold whitespace-nowrap text-slate-800">
+                {i > 0 && <span aria-hidden="true" className="mr-2 font-normal text-slate-300">·</span>}
+                {m}
+              </span>
+            ))}
+            {mutedMeta.map((m, i) => (
+              <span key={`m-${m}-${i}`} className="whitespace-nowrap text-slate-500">
+                {(i > 0 || strongMeta.length > 0) && <span aria-hidden="true" className="mr-2 text-slate-300">·</span>}
                 {m}
               </span>
             ))}
           </p>
         )}
+
+        {/*
+          사업자등록번호는 자체 줄에 둔다.
+          읽는 값이 아니라 서류에 옮겨 적는 값이라, 카드마다 같은 자리에 같은 자릿수로 있어야
+          여러 장을 훑을 때 눈이 바로 찾는다. 메타 줄에 이어 붙이면 좁은 폭에서 줄이 넘어가며
+          구분점이 줄머리에 남는다.
+        */}
+        {bizNo !== '' && <p className="t-sub tabular-nums text-slate-500">{bizNo}</p>}
 
         {/* 다음 할 일 */}
         <p className="t-sub break-keep text-slate-700">
@@ -262,7 +300,7 @@ export function ClientBoardCard({
                 onClick={() => setAllChips((v) => !v)}
                 className="tap inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[0.85rem] font-medium text-slate-600 hover:border-brand-300 hover:text-brand-700"
               >
-                {allChips ? '접기' : `그 외 ${hidden.length}`}
+                {allChips ? '접기' : hiddenLabel}
               </button>
             </li>
           )}
