@@ -4,6 +4,7 @@ import {
   Banknote,
   CalendarClock,
   FileCheck2,
+  FileSignature,
   History,
   Landmark,
   ListChecks,
@@ -29,6 +30,7 @@ const KIND_ICON: Record<ActivityKind, LucideIcon> = {
   funding_added: Landmark,
   funding_status: Landmark,
   profile: UserPen,
+  contract: FileSignature,
   archive: Archive,
 }
 
@@ -43,6 +45,7 @@ const KIND_CLASS: Record<ActivityKind, string> = {
   funding_added: 'bg-slate-100 text-slate-600',
   funding_status: 'bg-slate-100 text-slate-600',
   profile: 'bg-slate-100 text-slate-600',
+  contract: 'bg-slate-100 text-slate-600',
   archive: 'bg-slate-100 text-slate-600',
 }
 

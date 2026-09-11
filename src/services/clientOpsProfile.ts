@@ -34,6 +34,16 @@ export function ageFrom(birth: string, today: string = todayLocalDate()): number
   return age >= 0 && age < 150 ? age : null
 }
 
+/**
+ * 기록에 어떤 모양으로 들어와 있든 화면에는 `2002-02-16` 으로 보여 준다.
+ * 못 읽으면 원문 그대로 둔다 — 날짜를 지어내지 않는다. (D-62 · D-64 와 같은 규칙)
+ */
+export function formatYmd(value: string): string {
+  const p = ymd(value)
+  if (!p) return value.trim()
+  return `${p[0]}-${String(p[1]).padStart(2, '0')}-${String(p[2]).padStart(2, '0')}`
+}
+
 /** 업력 — 만 몇 년, 그리고 "N년차" 표기 */
 export function yearsInBusiness(
   establishedAt: string,
@@ -199,7 +209,7 @@ export function profileFields(
     f(
       'establishedAt',
       '설립일 · 업력',
-      record.establishedAt ? `${record.establishedAt}${y ? ` · ${y.nthYear}년차 (만 ${y.fullYears}년)` : ''}` : '',
+      record.establishedAt ? `${formatYmd(record.establishedAt)}${y ? ` · ${y.nthYear}년차 (만 ${y.fullYears}년)` : ''}` : '',
       'identity',
       { edit: 'establishedAt', placeholder: '2019-03-05' },
     ),

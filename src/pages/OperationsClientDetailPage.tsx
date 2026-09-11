@@ -24,6 +24,7 @@ import {
   listClients,
   saveClient,
   uploadDocumentFile,
+  withContract,
   withDocument,
   withFee,
   withNewFee,
@@ -99,6 +100,8 @@ import { FundingSection } from '../components/ops/FundingSection'
 import { DocImportModal } from '../components/ops/DocImportModal'
 import { withActivity } from '../services/clientOpsActivity'
 import { ActivityLog } from '../components/ops/ActivityLog'
+import { ContractCard } from '../components/ops/ContractCard'
+import { WorkHistoryCard } from '../components/ops/WorkHistoryCard'
 import { PortalTab } from '../components/ops/PortalTab'
 import {
   Badge,
@@ -557,6 +560,19 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           bare
         />
       </Surface>
+
+      {/*
+        2단계 — 계약과 해 드린 일.
+        "이 회사 언제 계약했지, 얼마짜리였지, 우리가 뭘 해 줬더라" 는 상담 중에
+        가장 자주 나오는 질문이다. 접어 두면 매번 카톡을 뒤지게 된다.
+      */}
+      <ContractCard
+        record={record}
+        today={today}
+        onSave={(next) => void commit(withContract(record, next))}
+      />
+
+      <WorkHistoryCard record={record} onOpen={(key) => setTab('work', key)} />
 
       {/* 3단계 — 막힘 / 돈 / 고객 연결 */}
       <section aria-label="현재 상태" className="ax-stagger grid grid-cols-2 gap-2.5 lg:grid-cols-3">

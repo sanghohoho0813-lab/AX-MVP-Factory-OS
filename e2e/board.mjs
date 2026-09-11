@@ -120,6 +120,68 @@ const chips = await page.evaluate(() => document.querySelectorAll('button').leng
 const of2 = await page.evaluate(() => ({ d: document.documentElement.scrollWidth, w: window.innerWidth }))
 check('업무 15개에서도 가로 스크롤 없음', of2.d <= of2.w + 1, `${of2.d} > ${of2.w} (버튼 ${chips}개)`)
 
+/* ---------------- 계약 정보 · 해 드린 일 ---------------- */
+{
+  // 한솔테크 — 현금 + 보험 혼합, 2025-03-15 계약
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const main = (await page.locator('main').innerText()) ?? ''
+  check('계약: 언제 계약했는지 보인다', main.includes('2025-03-15'), main.slice(0, 200))
+  // 오늘 날짜에 따라 달라지므로 모양만 확인한다
+  check('계약: 몇 달째인지 보인다', /\d+년 \d+개월째 \(\d+개월\)|\d+개월째/.test(main))
+  check('계약: 어떤 방식인지 보인다', main.includes('현금 + 보험'))
+  check('계약: 얼마인지 보인다', main.includes('현금 3,000,000원') && main.includes('월납 750,000원'), main.slice(0, 300))
+
+  // 보험 건별은 눌러야 나온다 — 한눈에 보는 줄을 길게 만들지 않기 위해서다
+  check('계약: 보험 자세히는 접혀 있다', !main.includes('CEO플랜 종신'))
+  const detail = page.getByRole('button', { name: /보험 2건 자세히/ }).first()
+  check('계약: [보험 2건 자세히] 가 있다', (await detail.count()) > 0)
+  await detail.click()
+  await page.waitForTimeout(300)
+  const opened = (await page.locator('main').innerText()) ?? ''
+  check('계약: 보험사·상품명이 나온다', opened.includes('삼성생명') && opened.includes('CEO플랜 종신'))
+  check('계약: 월납보험료가 건별로 나온다', opened.includes('500,000원') && opened.includes('250,000원'))
+  check('계약: 언제 가입했는지 나온다', opened.includes('2025-04-01'))
+  check('계약: 납입기간이 나온다', opened.includes('10년납'))
+
+  // 고쳐 쓰면 저장된다
+  await page.getByRole('button', { name: '계약 고치기' }).first().click()
+  await page.waitForTimeout(500)
+  check('계약 고치기: 시트가 열린다', (await page.getByRole('dialog').count()) > 0)
+  // 적는 동안 자리점이 찍힌다 — 숫자만 쳐도 4,500,000 으로 보인다
+  await page.getByLabel('현금 계약 금액').fill('4500000')
+  await page.waitForTimeout(200)
+  check('계약 고치기: 금액에 자리점이 찍힌다', (await page.getByLabel('현금 계약 금액').inputValue()) === '4,500,000', await page.getByLabel('현금 계약 금액').inputValue())
+  await page.getByRole('button', { name: '저장', exact: true }).first().click()
+  await page.waitForTimeout(900)
+  const after = (await page.locator('main').innerText()) ?? ''
+  check('계약 수정: 화면에 바로 반영된다', after.includes('현금 4,500,000원'), after.slice(0, 200))
+  const saved = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_hansol'),
+  )
+  const savedContract = saved?.contract ?? saved?.payload?.contract
+  check('계약 수정: 저장된다', savedContract?.cashAmount === 4_500_000, JSON.stringify(savedContract))
+  check('계약 수정: 활동 기록에 남는다', (saved?.activity ?? saved?.payload?.activity ?? []).some((a) => a.kind === 'contract'))
+
+  // 우일산업 — 해 드린 일 4건, 최근 것이 위로
+  await page.goto(BASE + '/ops/clients/cli_wooil', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const w = (await page.locator('main').innerText()) ?? ''
+  check('해 드린 일: 카드가 있다', w.includes('해 드린 일'))
+  check('해 드린 일: 끝낸 건수를 센다', w.includes('끝낸 일 4건'), w.slice(0, 300))
+  check('해 드린 일: 언제 끝냈는지 보인다', w.includes('2026-09-02') && w.includes('2024-11-08'))
+  check('해 드린 일: 최근 것이 위', w.indexOf('2026-09-02') < w.indexOf('2024-11-08'))
+  // '지금 하는 일' 은 맨 위 '지금 할 일' 카드에 이미 있다 — 여기서 되풀이하지 않는다
+  check('해 드린 일: 지금 하는 일을 되풀이하지 않는다', !w.includes('지금 하는 일'))
+  check('계약: 현금만이면 월납 줄이 없다', w.includes('현금 8,000,000원') && !w.includes('월납'))
+
+  // 목록에서도 계약한 지 얼마나 됐는지 보인다
+  await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  const list = (await page.locator('main').innerText()) ?? ''
+  check('목록: 계약 개월수가 보인다', /계약 \d+년 \d+개월째|계약 \d+개월째/.test(list), list.slice(0, 300))
+}
+
 /* ---------------- 계약 단계 · 업체 삭제 ---------------- */
 await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
 await page.waitForTimeout(800)
@@ -174,6 +236,8 @@ check('실제로 지워졌다', left === false)
   await page.waitForTimeout(800)
   const shown = await page.getByRole('button', { name: /313-81-12508/ }).first()
   check('상세: 번호가 하이픈 모양으로 보인다', (await shown.count()) > 0)
+  const profile = (await page.locator('main').innerText()) ?? ''
+  check('상세: 날것 설립일을 찍지 않는다', !profile.includes('20020216') && profile.includes('2002-02-16'), profile.slice(0, 120))
 
   // 보이는 그대로 복사
   await shown.click()

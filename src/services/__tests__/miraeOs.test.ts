@@ -26,7 +26,15 @@ import {
   daySummaryText,
 } from '../dailyBriefService'
 import { buildProjection, eventSummary, isOpenEvent, sortEvents } from '../customerBridgeService'
-import { normalizeClientOps, withFee, withNewFee, withNewFunding, withService } from '../clientOpsService'
+import { normalizeClientOps, withContract, withFee, withNewFee, withNewFunding, withService } from '../clientOpsService'
+import {
+  contractAgeShort,
+  contractAgeText,
+  doneWorks,
+  monthlyPremiumTotal,
+  monthsSinceContract,
+  summarizeContract,
+} from '../contractSummary'
 import type { ClientOpsRecord, OpsAlert } from '../../types/clientOps'
 import { mergeServices, normalizeCustomService, toServiceMeta } from '../customServiceService'
 import { buildKpis, kpisByGroup, kpiStatusSummary } from '../kpiService'
@@ -35,7 +43,7 @@ import { CONTRACT_STAGE_ORDER, CONTRACT_STAGE_LABEL, contractStageOf, statusForS
 import type { ClientOpsStatus, ContractStage } from '../../types/clientOps'
 import { clientOpsProgress } from '../clientOpsAlerts'
 import { digitsOf, formatNumberOf } from '../../lib/format'
-import { profileAsText, yearsInBusiness } from '../clientOpsProfile'
+import { formatYmd, profileAsText, yearsInBusiness } from '../clientOpsProfile'
 import { SERVICE_STATUS_ORDER, isServiceOpen, isServiceNotApplicable, normalizeServiceStatus } from '../../content/clientOpsCatalog'
 import { BUILTIN_SERVICES, SERVICES, registerCustomServices } from '../../content/clientOpsCatalog'
 import type { CustomerEvent, JournalEntry, PortalClientLink, PortalDocument, PortalRequest, PortalUpdate } from '../../types/bridge'
@@ -514,6 +522,99 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
   check('전체 복사: 기본은 하이픈 포함', asIs.includes('313-81-12508') && asIs.includes('010-2345-6789'), asIs)
   check('전체 복사: 숫자만 판', plain.includes('3138112508') && plain.includes('01023456789') && !plain.includes('313-81-12508'), plain)
   check('전체 복사: 번호가 아닌 값은 그대로', plain.includes('서식테스트'))
+
+  // 날짜도 서류 모양으로 — 20020216 을 그대로 찍지 않는다
+  check('날짜 서식: 8자리', formatYmd('20020216') === '2002-02-16')
+  check('날짜 서식: 점 구분자', formatYmd('2002.2.16') === '2002-02-16')
+  check('날짜 서식: 이미 맞는 모양', formatYmd('2002-02-16') === '2002-02-16')
+  check('날짜 서식: 못 읽으면 원문 그대로', formatYmd('언젠가') === '언젠가')
+  const dated = normalizeClientOps({ id: 'c-date', companyName: '설립일', establishedAt: '20020216' })
+  check('설립일 칸: 날것을 찍지 않는다', !profileAsText(dated, '2026-09-11').includes('20020216'), profileAsText(dated, '2026-09-11'))
+}
+
+/* ------------------------------------------------------------------ */
+/* 계약 — 언제 · 어떤 방식 · 얼마 · 몇 달째                                */
+/* ------------------------------------------------------------------ */
+{
+  const T = '2026-09-11'
+
+  // 사람이 세는 방식 — 계약한 달이 1개월째다
+  check('계약 개월: 같은 달', monthsSinceContract('2026-09-01', T) === 1)
+  check('계약 개월: 계약일 당일', monthsSinceContract('2026-09-11', T) === 1)
+  check('계약 개월: 그 달 계약일 전이면 한 달 덜', monthsSinceContract('2026-08-20', T) === 1)
+  check('계약 개월: 그 달 계약일 지나면', monthsSinceContract('2026-08-05', T) === 2)
+  check('계약 개월: 해를 넘어', monthsSinceContract('2025-03-15', T) === 18)
+  check('계약 개월: 앞날이면 null', monthsSinceContract('2026-12-01', T) === null)
+  check('계약 개월: 못 읽으면 null', monthsSinceContract('작년쯤', T) === null)
+  check('계약 개월: 빈 칸이면 null', monthsSinceContract('', T) === null)
+  check('계약 개월: 8자리도 읽는다', monthsSinceContract('20250315', T) === 18)
+
+  check('계약 표기: 1년 미만', contractAgeText('2026-05-20', T) === '4개월째')
+  check('계약 표기: 1년 넘으면 총 개월수 병기', contractAgeText('2025-03-15', T) === '1년 6개월째 (18개월)')
+  // 12개월째가 '1년째' 다 — 2025-10-01 계약은 2026-09-11 에 12개월째
+  check('계약 표기: 딱 떨어지는 해', contractAgeText('2025-10-01', T) === '1년째 (12개월)', contractAgeText('2025-10-01', T))
+  check('계약 표기: 좁은 칸은 괄호 없이', contractAgeShort('2025-03-15', T) === '1년 6개월째')
+  check('계약 표기: 못 읽으면 빈 칸', contractAgeText('', T) === '' && contractAgeShort('', T) === '')
+
+  // 요약 — 없는 값을 지어내지 않는다
+  const mixed = normalizeClientOps({
+    id: 'c-ct1', companyName: '혼합계약',
+    contract: {
+      signedAt: '2025-03-15', kind: 'mixed', cashAmount: 3_000_000,
+      policies: [
+        { id: 'p1', insurer: '삼성생명', productName: 'CEO플랜', monthlyPremium: 500_000, startedAt: '2025-04-01', payTerm: '10년납', note: '' },
+        { id: 'p2', insurer: '한화손보', productName: '', monthlyPremium: 250_000, startedAt: '', payTerm: '', note: '' },
+      ],
+      note: '',
+    },
+  })
+  const sm = summarizeContract(mixed.contract, T)
+  check('계약 요약: 방식 이름', sm.kindLabel === '현금 + 보험', sm.kindLabel)
+  check('계약 요약: 현금과 월납 합계를 한 줄로', sm.moneyText === '현금 3,000,000원 · 월납 750,000원', sm.moneyText)
+  check('계약 요약: 보험 건수', sm.policyCount === 2)
+  check('계약 요약: 개월수', sm.ageText === '1년 6개월째 (18개월)', sm.ageText)
+  check('계약 요약: 월납 합계', monthlyPremiumTotal(mixed.contract) === 750_000)
+
+  const cashOnly = normalizeClientOps({
+    id: 'c-ct2', companyName: '현금계약',
+    contract: { signedAt: '2024-07-10', kind: 'cash', cashAmount: 8_000_000, policies: [], note: '' },
+  })
+  const sc = summarizeContract(cashOnly.contract, T)
+  check('계약 요약: 현금만이면 월납 줄이 없다', sc.moneyText === '현금 8,000,000원', sc.moneyText)
+  check('계약 요약: 보험 없으면 합계 null', monthlyPremiumTotal(cashOnly.contract) === null)
+
+  const empty = normalizeClientOps({ id: 'c-ct3', companyName: '계약없음' })
+  const se = summarizeContract(empty.contract, T)
+  check('계약 없음: hasAny false', se.hasAny === false)
+  check('계약 없음: 모든 줄이 비어 있다', se.ageText === '' && se.kindLabel === '' && se.moneyText === '')
+  check('계약 없음: 옛 기록도 빈 계약으로 채워진다', Array.isArray(empty.contract.policies))
+  check('계약 있음: hasAny true', sm.hasAny === true)
+
+  // 고쳐 쓰면 활동 기록에 한 줄 남는다
+  const changed = withContract(cashOnly, { ...cashOnly.contract, cashAmount: 9_000_000 })
+  check('계약 수정: 활동 기록에 남는다', changed.activity[0]?.kind === 'contract', changed.activity[0]?.text)
+  const cleared = withContract(cashOnly, { ...cashOnly.contract, cashAmount: null })
+  check('계약 수정: 값을 지워도 기록에 남는다', cleared.activity[0]?.kind === 'contract', cleared.activity[0]?.text)
+  const untouched = withContract(cashOnly, { ...cashOnly.contract })
+  check('계약 수정: 안 바꾸면 기록을 만들지 않는다', untouched.activity.length === cashOnly.activity.length)
+
+  // 해 드린 일 — 이미 저장된 완료 상태를 모아 보여 줄 뿐이다
+  const worked = normalizeClientOps({
+    id: 'c-ct4', companyName: '이력테스트',
+    services: {
+      incorporation: { status: 'done', completedAt: '2024-11-08T00:00:00.000Z' },
+      patent: { status: 'done', completedAt: '2025-12-03T00:00:00.000Z' },
+      venture: { status: 'in_progress' },
+      ax: { status: 'waiting_client' },
+      policyFund: { status: 'not_started' },
+    },
+  })
+  const dw = doneWorks(worked)
+  check('해 드린 일: 끝낸 것만', dw.length === 2, JSON.stringify(dw))
+  check('해 드린 일: 최근 것이 위로', dw[0]?.key === 'patent' && dw[1]?.key === 'incorporation')
+  check('해 드린 일: 완료 날짜', dw[0]?.at === '2025-12-03', dw[0]?.at)
+  check('해 드린 일: 끝나지 않은 것은 빼고', !dw.some((w) => w.key === 'venture' || w.key === 'ax' || w.key === 'policyFund'))
+  check('해 드린 일: 아무것도 없으면 빈 목록', doneWorks(empty).length === 0)
 }
 
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)

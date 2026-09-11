@@ -217,6 +217,72 @@ export function statusForStage(stage: ContractStage): ClientOpsStatus {
 }
 
 /* ------------------------------------------------------------------ */
+/* 계약 — 언제 · 어떤 방식으로 · 얼마에                                   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 계약 방식.
+ *   cash      수수료를 현금으로 받는 계약
+ *   insurance 보험 계약으로 갈음하는 계약 (월납보험료가 곧 보수)
+ *   mixed     둘 다 — 일부는 현금, 일부는 보험
+ */
+export type ContractKind = 'cash' | 'insurance' | 'mixed'
+
+export const CONTRACT_KIND_ORDER: ContractKind[] = ['cash', 'insurance', 'mixed']
+
+export const CONTRACT_KIND_LABEL: Record<ContractKind, string> = {
+  cash: '현금',
+  insurance: '보험',
+  mixed: '현금 + 보험',
+}
+
+export const CONTRACT_KIND_HINT: Record<ContractKind, string> = {
+  cash: '수수료를 현금으로 받는 계약',
+  insurance: '보험 계약으로 갈음하는 계약',
+  mixed: '일부는 현금, 일부는 보험',
+}
+
+/**
+ * 보험 계약 한 건.
+ *
+ * 여러 건일 수 있다 — 대표 개인 종신 + 법인 CEO플랜처럼 나뉘어 들어간다.
+ * 계약자·피보험자 주민등록번호는 **넣지 않는다**(CLAUDE.md). 증권번호도 여기 두지 않는다.
+ */
+export interface InsurancePolicy {
+  id: string
+  /** 보험사 */
+  insurer: string
+  /** 상품명 */
+  productName: string
+  /** 월납보험료(원). 모르면 null */
+  monthlyPremium: number | null
+  /** 가입일 (YYYY-MM-DD) */
+  startedAt: string
+  /** 납입기간 — '10년납' · '전기납' 처럼 말이 붙으므로 글자로 둔다 */
+  payTerm: string
+  /** 계약자·피보험자 구분 같은 메모 */
+  note: string
+}
+
+/** 계약 정보 — 없으면 전부 빈 값이다(계약 전 업체) */
+export interface ContractInfo {
+  /** 계약일 (YYYY-MM-DD) */
+  signedAt: string
+  /** 방식. 아직 안 정했으면 '' */
+  kind: ContractKind | ''
+  /** 현금 계약 금액(원). 미정이면 null */
+  cashAmount: number | null
+  /** 보험 계약들 */
+  policies: InsurancePolicy[]
+  /** 계약 조건 메모 */
+  note: string
+}
+
+export function emptyContract(): ContractInfo {
+  return { signedAt: '', kind: '', cashAmount: null, policies: [], note: '' }
+}
+
+/* ------------------------------------------------------------------ */
 /* 메모                                                                 */
 /* ------------------------------------------------------------------ */
 
@@ -248,6 +314,7 @@ export type ActivityKind =
   | 'funding_added' // 지원사업 신청 건 추가
   | 'funding_status' // 지원사업 상태 변경
   | 'profile' // 기업 기본 정보 변경
+  | 'contract' // 계약 정보 변경 (계약일·방식·금액·보험)
   | 'archive' // 보관·보관 해제
 
 export interface ActivityEntry {
@@ -317,6 +384,8 @@ export interface ClientOpsRecord {
 
   services: Record<ServiceKey, ServiceState>
   documents: Record<DocumentKey, DocumentState>
+  /** 계약 — 언제 · 어떤 방식으로 · 얼마에 (payload 에 함께 저장된다) */
+  contract: ContractInfo
   fees: FeeItem[]
   notes_list: ClientNote[]
   fundingApplications: FundingApplication[]

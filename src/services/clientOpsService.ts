@@ -32,6 +32,7 @@ import type {
   ActivityEntry,
   ClientNote,
   ClientOpsRecord,
+  ContractInfo,
   FundingApplication,
   FundingStatus,
   ClientOpsStatus,
@@ -42,7 +43,7 @@ import type {
   ServiceKey,
   ServiceState,
 } from '../types/clientOps'
-import { isCustomServiceKey } from '../types/clientOps'
+import { CONTRACT_KIND_LABEL, emptyContract, isCustomServiceKey } from '../types/clientOps'
 
 /* ------------------------------------------------------------------ */
 /* 기본값 · 정규화 (예전 형식 자동 승격 포함)                            */
@@ -138,6 +139,33 @@ function upgradeServices(
   return base
 }
 
+/**
+ * 계약 정보 정규화.
+ * 계약 칸이 없던 시절의 기록에는 아예 없으므로 빈 계약으로 채운다(기존 데이터 영향 0).
+ */
+function normalizeContract(raw: unknown): ContractInfo {
+  if (raw === null || typeof raw !== 'object') return emptyContract()
+  const c = raw as Partial<ContractInfo>
+  const kind = c.kind === 'cash' || c.kind === 'insurance' || c.kind === 'mixed' ? c.kind : ''
+  return {
+    signedAt: typeof c.signedAt === 'string' ? c.signedAt : '',
+    kind,
+    cashAmount: typeof c.cashAmount === 'number' && Number.isFinite(c.cashAmount) ? c.cashAmount : null,
+    policies: Array.isArray(c.policies)
+      ? c.policies.map((p) => ({
+          id: typeof p?.id === 'string' && p.id !== '' ? p.id : generateId(),
+          insurer: typeof p?.insurer === 'string' ? p.insurer : '',
+          productName: typeof p?.productName === 'string' ? p.productName : '',
+          monthlyPremium: typeof p?.monthlyPremium === 'number' && Number.isFinite(p.monthlyPremium) ? p.monthlyPremium : null,
+          startedAt: typeof p?.startedAt === 'string' ? p.startedAt : '',
+          payTerm: typeof p?.payTerm === 'string' ? p.payTerm : '',
+          note: typeof p?.note === 'string' ? p.note : '',
+        }))
+      : [],
+    note: typeof c.note === 'string' ? c.note : '',
+  }
+}
+
 function upgradeFees(raw: Partial<ClientOpsRecord> & LegacyShape): FeeItem[] {
   if (Array.isArray(raw.fees)) {
     return raw.fees.map((f) => ({
@@ -220,6 +248,7 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
     notes: value.notes ?? '',
     services: upgradeServices(value),
     documents,
+    contract: normalizeContract(value.contract),
     fees: upgradeFees(value),
     notes_list: Array.isArray(value.notes_list)
       ? value.notes_list.map((n) => ({
@@ -546,6 +575,27 @@ export function withDocument(
     out = withActivity(out, 'document', documentFileText(key, patch.fileName))
   }
   return out
+}
+
+/**
+ * 계약 정보 저장.
+ * 무엇이 바뀌었는지 활동 기록에 한 줄 남긴다 — 계약 조건은 나중에 반드시 다시 확인하게 된다.
+ */
+export function withContract(record: ClientOpsRecord, next: ContractInfo): ClientOpsRecord {
+  const prev = record.contract
+  const changed: string[] = []
+  if (prev.signedAt !== next.signedAt && next.signedAt !== '') changed.push(`계약일 ${next.signedAt}`)
+  if (prev.kind !== next.kind && next.kind !== '') changed.push(`방식 ${CONTRACT_KIND_LABEL[next.kind]}`)
+  if (prev.cashAmount !== next.cashAmount && next.cashAmount !== null) changed.push(`현금 ${next.cashAmount.toLocaleString('ko-KR')}원`)
+  if (prev.policies.length !== next.policies.length) changed.push(`보험 ${next.policies.length}건`)
+
+  const out: ClientOpsRecord = { ...record, contract: next }
+  // 위 네 가지에 안 걸리는 수정(금액을 지움 · 보험 내용만 고침 · 메모)도 바뀐 건 바뀐 것이다
+  if (changed.length === 0) {
+    const same = JSON.stringify(prev) === JSON.stringify(next)
+    return same ? out : withActivity(out, 'contract', '계약 — 내용 수정')
+  }
+  return withActivity(out, 'contract', `계약 — ${changed.join(' · ')}`)
 }
 
 export function withNewFee(record: ClientOpsRecord, fee: Partial<FeeItem>): ClientOpsRecord {

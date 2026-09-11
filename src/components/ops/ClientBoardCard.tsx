@@ -22,6 +22,7 @@ import type { ClientOpsRecord, ServiceKey, ServiceStatus } from '../../types/cli
 import { SERVICES, SERVICE_STATUS_LABEL, isServiceOpen } from '../../content/clientOpsCatalog'
 import { clientOpsProgress, daysLeftFrom, dueText } from '../../services/clientOpsAlerts'
 import { yearsInBusiness, regionOf } from '../../services/clientOpsProfile'
+import { contractAgeShort } from '../../services/contractSummary'
 import { formatKrw } from '../../lib/format'
 import { Badge, type Tone } from '../ui/primitives'
 
@@ -207,7 +208,10 @@ export function ClientBoardCard({
    * 업력을 못 읽으면 설립일 원본(20020216)을 그대로 찍지 않는다 — 날것을 보여 주느니 비운다.
    */
   const bizNo = formatNumberOf('business', record.businessNumber)
-  const strongMeta = [repName, stage === 'signed' ? '' : CONTRACT_STAGE_LABEL[stage]].filter((v) => v.trim() !== '')
+  /* 계약한 지 얼마나 됐는지 — 계약 전이면 단계를, 계약했으면 개월수를 보여 준다 */
+  const age = contractAgeShort(record.contract.signedAt, today)
+  const contractMeta = stage === 'signed' ? (age === '' ? '' : `계약 ${age}`) : CONTRACT_STAGE_LABEL[stage]
+  const strongMeta = [repName, contractMeta].filter((v) => v.trim() !== '')
   const mutedMeta = [region, record.businessCategory || record.industry].filter((v) => v && v.trim() !== '')
 
   return (

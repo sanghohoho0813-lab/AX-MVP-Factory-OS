@@ -15,6 +15,7 @@
 | Service Work | `operations_clients.payload.services[6]` | 내부 OS | 내부 | 내부 | N — 고객 단계 6종(`portal_client_links.customer_stage`)만 P | M | — | 내부 상태→고객 단계는 추천만(D-09) |
 | Document (내부 서류함) | `operations_clients.payload.documents[10]` + Storage `client-documents/{ws}/{client}/…` | 내부 OS | 내부 | 내부(서명 URL) | N | **H**(신분증·인증서 보관 위치) | — | 공유 시 `portal_documents(visibility=shared)` 행으로만 |
 | Portal Document | `portal_documents` + Storage `{ws}/portal/{link}/…` | **브릿지** | 내부(요청·검토·공유) · 고객(업로드, RPC) | 내부 · 고객은 RPC | P(requested/customer_uploaded/shared) | H | — | `internal_note` 는 절대 투영 안 함 |
+| Contract (계약) | `operations_clients.payload.contract` | 내부 OS | 내부 | 내부 | **N — 고객에게 절대 투영하지 않는다** | **H**(계약 금액·월납보험료) | — | 계약일·방식(현금/보험/혼합)·현금 금액·보험 건별. 주민등록번호·증권번호 칸 없음(D-66) |
 | Payment / Fee | `operations_clients.payload.fees[]` | 내부 OS | 내부 | 내부 | **N** | **H** | — | 고객 결제(`product_payments`)와 별개 — 자동 대사 없음 |
 | Funding Application | `operations_clients.payload.fundingApplications[]` | 내부 OS | 내부 | 내부 | N | M | — | 홈 "지원사업 마감" 신호 |
 | Activity (활동 기록) | `operations_clients.payload.activity[]` (≤200) | 내부 OS | 시스템(with* 헬퍼) | 내부 | N | M | 200건 순환 | 하루 정리의 "오늘 처리" |

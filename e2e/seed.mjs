@@ -43,6 +43,17 @@ const clients = [
     fundingApplications: [
       { id: 'fa1', programName: '창업성장기술개발사업', status: 'preparing', applyDueDate: d(6), amount: 200_000_000 },
     ],
+    // 현금 + 보험 혼합 — 계약 카드가 두 금액을 한 줄로 합쳐 보여 주는지 확인한다
+    contract: {
+      signedAt: '2025-03-15',
+      kind: 'mixed',
+      cashAmount: 3_000_000,
+      policies: [
+        { id: 'pol1', insurer: '삼성생명', productName: 'CEO플랜 종신', monthlyPremium: 500_000, startedAt: '2025-04-01', payTerm: '10년납', note: '계약자 법인 · 피보험자 대표' },
+        { id: 'pol2', insurer: '한화손해보험', productName: '경영인정기보험', monthlyPremium: 250_000, startedAt: '2025-09-01', payTerm: '20년납', note: '' },
+      ],
+      note: '벤처인증 성공 시 성공보수 550만원 별도',
+    },
   },
   {
     id: 'cli_daum',
@@ -67,6 +78,16 @@ const clients = [
       { id: 'fa2', programName: '중소기업 정책자금(운전)', status: 'submitted', applyDueDate: d(-5), amount: 300_000_000 },
       { id: 'fa3', programName: '지역혁신 바우처', status: 'watching', applyDueDate: d(11) },
     ],
+    // 보험만 — 현금 줄이 없어야 한다
+    contract: {
+      signedAt: '2026-06-20',
+      kind: 'insurance',
+      cashAmount: null,
+      policies: [
+        { id: 'pol3', insurer: '교보생명', productName: '', monthlyPremium: 300_000, startedAt: '2026-07-01', payTerm: '전기납', note: '' },
+      ],
+      note: '',
+    },
   },
   {
     id: 'cli_mirae',
@@ -118,14 +139,22 @@ const clients = [
     status: 'active',
     nextAction: '',
     services: {
-      incorporation: { status: 'done' },
-      businessScope: { status: 'done' },
-      patent: { status: 'done' },
-      venture: { status: 'done' },
+      incorporation: { status: 'done', completedAt: '2024-11-08T00:00:00.000Z' },
+      businessScope: { status: 'done', completedAt: '2025-02-19T00:00:00.000Z' },
+      patent: { status: 'done', completedAt: '2025-12-03T00:00:00.000Z' },
+      venture: { status: 'done', completedAt: '2026-09-02T00:00:00.000Z' },
       ax: { status: 'waiting_client' },
       policyFund: { status: 'on_hold' },
     },
     fees: [],
+    // 현금만 · 오래된 계약 — '2년 2개월째' 처럼 해가 넘어가는 표기를 확인한다
+    contract: {
+      signedAt: '2024-07-10',
+      kind: 'cash',
+      cashAmount: 8_000_000,
+      policies: [],
+      note: '',
+    },
   },
 ]
 
