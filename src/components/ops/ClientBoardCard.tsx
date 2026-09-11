@@ -17,7 +17,7 @@
 import { useState } from 'react'
 import { ArrowRight, ChevronRight } from 'lucide-react'
 import { CONTRACT_STAGE_LABEL, contractStageOf } from '../../types/clientOps'
-import { formatBusinessNumber } from '../../services/koreanDocParser'
+import { formatNumberOf } from '../../lib/format'
 import type { ClientOpsRecord, ServiceKey, ServiceStatus } from '../../types/clientOps'
 import { SERVICES, SERVICE_STATUS_LABEL, isServiceOpen } from '../../content/clientOpsCatalog'
 import { clientOpsProgress, daysLeftFrom, dueText } from '../../services/clientOpsAlerts'
@@ -206,12 +206,8 @@ export function ClientBoardCard({
    *
    * 업력을 못 읽으면 설립일 원본(20020216)을 그대로 찍지 않는다 — 날것을 보여 주느니 비운다.
    */
-  const bizNo = formatBusinessNumber(record.businessNumber) ?? record.businessNumber.trim()
-  const strongMeta = [
-    repName,
-    y ? `${y.nthYear}년차` : '',
-    stage === 'signed' ? '' : CONTRACT_STAGE_LABEL[stage],
-  ].filter((v) => v.trim() !== '')
+  const bizNo = formatNumberOf('business', record.businessNumber)
+  const strongMeta = [repName, stage === 'signed' ? '' : CONTRACT_STAGE_LABEL[stage]].filter((v) => v.trim() !== '')
   const mutedMeta = [region, record.businessCategory || record.industry].filter((v) => v && v.trim() !== '')
 
   return (
@@ -222,7 +218,7 @@ export function ClientBoardCard({
         {/* 이름 줄 */}
         <div className="flex items-start justify-between gap-2">
           <button type="button" onClick={onOpen} className="flex min-w-0 items-center gap-2 text-left">
-            <span className="t-card truncate text-slate-900 hover:text-brand-700 hover:underline">
+            <span className="t-card truncate font-bold text-slate-900 hover:text-brand-700 hover:underline">
               {record.companyName || '(이름 없음)'}
             </span>
             <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
@@ -242,6 +238,16 @@ export function ClientBoardCard({
         {/* 회사 요약 — 대표자·업력은 진하게, 지역·업종은 흐리게, 사업자번호는 숫자 그대로 */}
         {(strongMeta.length > 0 || mutedMeta.length > 0 || bizNo !== '') && (
           <p className="t-sub flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            {/*
+              업력은 색을 쓴다.
+              정책자금·벤처인증 자격이 '몇 년차' 에서 갈리므로, 목록을 훑을 때 가장 먼저
+              찾는 숫자다. 색을 쓰는 자리는 여기 하나로 제한한다 — 늘리면 다시 알록달록해진다.
+            */}
+            {y && (
+              <span className="mr-1 inline-flex shrink-0 items-center rounded-full bg-brand-50 px-2 py-0.5 font-bold text-brand-700 tabular-nums">
+                {y.nthYear}년차
+              </span>
+            )}
             {strongMeta.map((m, i) => (
               <span key={`s-${m}-${i}`} className="font-semibold whitespace-nowrap text-slate-800">
                 {i > 0 && <span aria-hidden="true" className="mr-2 font-normal text-slate-300">·</span>}
@@ -263,7 +269,13 @@ export function ClientBoardCard({
           여러 장을 훑을 때 눈이 바로 찾는다. 메타 줄에 이어 붙이면 좁은 폭에서 줄이 넘어가며
           구분점이 줄머리에 남는다.
         */}
-        {bizNo !== '' && <p className="t-sub tabular-nums text-slate-500">{bizNo}</p>}
+        {bizNo !== '' && (
+          <p className="t-sub flex items-baseline gap-1.5 text-slate-500">
+            {/* 아이콘 대신 낱말로 — 체크 표시를 붙이면 '확인된 번호' 라는 다른 뜻이 된다 */}
+            <span className="shrink-0 text-slate-400">사업자</span>
+            <span className="tabular-nums">{bizNo}</span>
+          </p>
+        )}
 
         {/* 다음 할 일 */}
         <p className="t-sub break-keep text-slate-700">

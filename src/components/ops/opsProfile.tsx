@@ -9,6 +9,7 @@ import {
   type ProfileField,
 } from '../../services/clientOpsProfile'
 import { sortedNotes } from '../../services/clientOpsService'
+import { digitsOf } from '../../lib/format'
 import { Button } from '../ui/Button'
 
 async function copyText(text: string): Promise<void> {
@@ -101,6 +102,16 @@ export function CompanyProfileCard({
             <ClipboardCopy aria-hidden="true" className="size-3.5" />
             {copiedKey === '__all' ? '복사됨' : '전체 복사'}
           </Button>
+          {/* 신청서에 그대로 붙일 때는 번호에 하이픈이 없어야 하는 곳이 많다 */}
+          <Button
+            variant="secondary"
+            size="sm"
+            title="번호에서 하이픈을 뺀 채로 전체 복사"
+            onClick={() => void copy('__all_digits', profileAsText(record, today, { plainNumbers: true }))}
+          >
+            <ClipboardCopy aria-hidden="true" className="size-3.5" />
+            {copiedKey === '__all_digits' ? '복사됨' : '숫자만'}
+          </Button>
         </div>
       </div>
       <p className="t-sub mt-0.5 break-keep text-slate-500">번호·주소는 눌러서 바로 복사할 수 있습니다.</p>
@@ -144,21 +155,39 @@ export function CompanyProfileCard({
                   ) : (
                     <span className="inline-flex max-w-full items-center gap-1.5">
                       {f.copyable ? (
-                        <button
-                          type="button"
-                          onClick={() => void copy(f.key, f.value)}
-                          title="눌러서 복사"
-                          className="group inline-flex min-w-0 items-center gap-1 text-right"
-                        >
-                          <span className="truncate text-[0.98rem] font-semibold text-slate-800 group-hover:text-brand-700 group-hover:underline">
-                            {f.value}
-                          </span>
-                          {copiedKey === f.key ? (
-                            <Check aria-hidden="true" className="size-3.5 shrink-0 text-success-600" />
-                          ) : (
-                            <Copy aria-hidden="true" className="size-3.5 shrink-0 text-slate-400 group-hover:text-brand-600" />
+                        <span className="inline-flex min-w-0 items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => void copy(f.key, f.value)}
+                            title="눌러서 복사 — 보이는 그대로"
+                            className="group inline-flex min-w-0 items-center gap-1 text-right"
+                          >
+                            <span className={`truncate text-[0.98rem] font-semibold text-slate-800 group-hover:text-brand-700 group-hover:underline ${f.numberKind ? 'tabular-nums' : ''}`}>
+                              {f.value}
+                            </span>
+                            {copiedKey === f.key ? (
+                              <Check aria-hidden="true" className="size-3.5 shrink-0 text-success-600" />
+                            ) : (
+                              <Copy aria-hidden="true" className="size-3.5 shrink-0 text-slate-400 group-hover:text-brand-600" />
+                            )}
+                          </button>
+                          {/*
+                            번호는 쓰는 곳마다 모양이 다르다 — 서류에는 하이픈을 넣고,
+                            홈택스·공공 신청서 입력칸은 숫자만 받는 곳이 많다.
+                            값을 누르면 보이는 그대로, 옆의 [숫자만] 을 누르면 하이픈 없이 복사한다.
+                          */}
+                          {f.numberKind && digitsOf(f.value) !== f.value && (
+                            <button
+                              type="button"
+                              onClick={() => void copy(`${f.key}__digits`, digitsOf(f.value))}
+                              title={`숫자만 복사 — ${digitsOf(f.value)}`}
+                              aria-label={`${f.label} 숫자만 복사`}
+                              className="t-meta shrink-0 rounded-(--radius-control) border border-slate-200 px-1.5 py-0.5 font-medium text-slate-500 hover:border-brand-300 hover:text-brand-700"
+                            >
+                              {copiedKey === `${f.key}__digits` ? '복사됨' : '숫자만'}
+                            </button>
                           )}
-                        </button>
+                        </span>
                       ) : (
                         <span className="min-w-0 text-[0.98rem] font-semibold break-keep text-slate-800">{f.value}</span>
                       )}

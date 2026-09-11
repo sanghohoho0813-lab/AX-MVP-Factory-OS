@@ -34,6 +34,8 @@ import { profileFields, profileFieldsByGroup, regionOf } from '../clientOpsProfi
 import { CONTRACT_STAGE_ORDER, CONTRACT_STAGE_LABEL, contractStageOf, statusForStage } from '../../types/clientOps'
 import type { ClientOpsStatus, ContractStage } from '../../types/clientOps'
 import { clientOpsProgress } from '../clientOpsAlerts'
+import { digitsOf, formatNumberOf } from '../../lib/format'
+import { profileAsText, yearsInBusiness } from '../clientOpsProfile'
 import { SERVICE_STATUS_ORDER, isServiceOpen, isServiceNotApplicable, normalizeServiceStatus } from '../../content/clientOpsCatalog'
 import { BUILTIN_SERVICES, SERVICES, registerCustomServices } from '../../content/clientOpsCatalog'
 import type { CustomerEvent, JournalEntry, PortalClientLink, PortalDocument, PortalRequest, PortalUpdate } from '../../types/bridge'
@@ -477,6 +479,41 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
     '계약: 단계 → 저장 → 단계 왕복',
     CONTRACT_STAGE_ORDER.every((s: ContractStage) => contractStageOf(statusForStage(s)) === s),
   )
+}
+
+/* ------------------------------------------------------------------ */
+/* 번호 서식 — 화면에는 하이픈, 복사는 고를 수 있게                         */
+/* ------------------------------------------------------------------ */
+{
+  // 기록에 어떤 모양으로 들어와 있든 화면은 서류에 적히는 모양으로 보여 준다
+  check('번호: 붙은 사업자번호에 하이픈', formatNumberOf('business', '3138112508') === '313-81-12508')
+  check('번호: 이미 하이픈이면 그대로', formatNumberOf('business', '313-81-12508') === '313-81-12508')
+  check('번호: 법인등록번호 6-7', formatNumberOf('corporate', '1101111234567') === '110111-1234567')
+  check('번호: 휴대폰', formatNumberOf('phone', '01023456789') === '010-2345-6789')
+  check('번호: 서울 지역번호', formatNumberOf('phone', '0212345678') === '02-1234-5678')
+  // 자릿수가 안 맞으면 지어내지 않는다 — 원문 그대로 둔다
+  check('번호: 자릿수가 다르면 원문', formatNumberOf('business', '12345') === '12345')
+  check('번호: 빈 값은 빈 값', formatNumberOf('phone', '  ') === '')
+
+  check('복사: 숫자만 뽑는다', digitsOf('313-81-12508') === '3138112508')
+  check('복사: 숫자가 없으면 원문', digitsOf('없음') === '없음')
+
+  // 설립일이 날것이어도 업력을 읽는다 (날것을 화면에 찍지 않기 위한 전제)
+  check('업력: 8자리 설립일', yearsInBusiness('20020216', '2026-09-11')?.nthYear === 25)
+  check('업력: 점 구분자', yearsInBusiness('2002.02.16', '2026-09-11')?.nthYear === 25)
+  check('업력: 하이픈', yearsInBusiness('2002-02-16', '2026-09-11')?.nthYear === 25)
+  check('업력: 못 읽으면 null', yearsInBusiness('언젠가', '2026-09-11') === null)
+  check('업력: 말이 안 되는 달은 null', yearsInBusiness('20021316', '2026-09-11') === null)
+
+  // 전체 복사 — 번호에서 하이픈을 뺀 판이 따로 있다
+  const rec = normalizeClientOps({
+    id: 'c-fmt', companyName: '서식테스트', businessNumber: '3138112508', contactPhone: '01023456789',
+  })
+  const asIs = profileAsText(rec, '2026-09-11')
+  const plain = profileAsText(rec, '2026-09-11', { plainNumbers: true })
+  check('전체 복사: 기본은 하이픈 포함', asIs.includes('313-81-12508') && asIs.includes('010-2345-6789'), asIs)
+  check('전체 복사: 숫자만 판', plain.includes('3138112508') && plain.includes('01023456789') && !plain.includes('313-81-12508'), plain)
+  check('전체 복사: 번호가 아닌 값은 그대로', plain.includes('서식테스트'))
 }
 
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)

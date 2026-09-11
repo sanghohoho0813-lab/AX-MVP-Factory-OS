@@ -64,6 +64,44 @@ export function formatBusinessNumber(value: string): string {
   return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`
 }
 
+/** 법인등록번호 — 000000-0000000 */
+export function formatCorporateNumber(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 13)
+  if (digits.length <= 6) return digits
+  return `${digits.slice(0, 6)}-${digits.slice(6)}`
+}
+
+/* ------------------------------------------------------------------ */
+/* 번호 서식 — 화면에는 하이픈, 복사할 때는 고를 수 있게                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 서식이 정해진 번호의 종류.
+ * 기록에 어떤 모양으로 들어와 있든(하이픈 있든 없든) 화면에는 서류에 적히는 모양으로 보여 준다.
+ */
+export type NumberKind = 'business' | 'corporate' | 'phone'
+
+/** 보이는 모양 — 하이픈 포함. 자릿수가 안 맞으면 원문을 그대로 둔다(지어내지 않는다) */
+export function formatNumberOf(kind: NumberKind, value: string): string {
+  const raw = value.trim()
+  if (raw === '') return ''
+  const n = raw.replace(/\D/g, '').length
+  switch (kind) {
+    case 'business':
+      return n === 10 ? formatBusinessNumber(raw) : raw
+    case 'corporate':
+      return n === 13 ? formatCorporateNumber(raw) : raw
+    case 'phone':
+      return n === 10 || n === 11 ? formatPhone(raw) : raw
+  }
+}
+
+/** 복사용 — 하이픈을 뺀 숫자만. 숫자가 없으면 원문 */
+export function digitsOf(value: string): string {
+  const d = value.replace(/\D/g, '')
+  return d === '' ? value.trim() : d
+}
+
 export interface DDayInfo {
   /** "D-3" | "D-Day" | "D+2" */
   label: string

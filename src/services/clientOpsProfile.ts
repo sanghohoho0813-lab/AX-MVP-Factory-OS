@@ -5,6 +5,7 @@
 
 import type { ClientOpsRecord } from '../types/clientOps'
 import { todayLocalDate } from '../lib/appClock'
+import { digitsOf, formatNumberOf, type NumberKind } from '../lib/format'
 
 /**
  * 날짜 읽기 — 실제로 들어오는 모양을 모두 받는다.
@@ -128,6 +129,11 @@ export interface ProfileField {
   /** 한 줄을 다 쓰는 긴 값 (주소·지분 구성) */
   wide?: boolean
   /**
+   * 서식이 정해진 번호인가 (사업자등록번호·법인등록번호·전화).
+   * 있으면 화면에는 하이픈을 넣어 보여 주고, 복사할 때 '그대로 / 숫자만' 을 고를 수 있다.
+   */
+  numberKind?: NumberKind
+  /**
    * 눌러서 바로 고칠 수 있는 칸이면 고칠 값의 이름.
    * 서류를 첨부해야만 채워지는 일이 없도록, 거의 모든 칸이 여기에 해당한다.
    * '대표자' 처럼 여러 값을 합쳐 보여 주는 칸은 대표 값 하나만 고친다.
@@ -168,18 +174,24 @@ export function profileFields(
     label: string,
     value: string,
     group: ProfileGroup,
-    opts: { copyable?: boolean; wide?: boolean; edit?: ProfileEditKey; placeholder?: string } = {},
-  ): ProfileField => ({
-    key,
-    label,
-    value: value.trim(),
-    empty: value.trim() === '',
-    copyable: opts.copyable === true,
-    group,
-    wide: opts.wide,
-    edit: opts.edit,
-    placeholder: opts.placeholder,
-  })
+    opts: { copyable?: boolean; wide?: boolean; edit?: ProfileEditKey; placeholder?: string; numberKind?: NumberKind } = {},
+  ): ProfileField => {
+    const raw = value.trim()
+    // 기록에 하이픈이 없어도(3138112508) 화면에는 서류에 적히는 모양(313-81-12508)으로 보여 준다
+    const shown = opts.numberKind ? formatNumberOf(opts.numberKind, raw) : raw
+    return {
+      key,
+      label,
+      value: shown,
+      empty: raw === '',
+      copyable: opts.copyable === true,
+      group,
+      wide: opts.wide,
+      edit: opts.edit,
+      placeholder: opts.placeholder,
+      numberKind: opts.numberKind,
+    }
+  }
 
   const out: ProfileField[] = [
     // 회사 — 서류에 그대로 옮겨 적는 값들
@@ -193,11 +205,13 @@ export function profileFields(
     ),
     f('businessNumber', '사업자등록번호', record.businessNumber, 'identity', {
       copyable: true,
+      numberKind: 'business',
       edit: 'businessNumber',
       placeholder: '000-00-00000',
     }),
     f('corporateNumber', '법인등록번호', record.corporateNumber, 'identity', {
       copyable: true,
+      numberKind: 'corporate',
       edit: 'corporateNumber',
       placeholder: '000000-0000000',
     }),
@@ -257,10 +271,11 @@ export function profileFields(
     // 연락처
     f('contactPhone', '담당자 휴대폰', record.contactPhone, 'contact', {
       copyable: true,
+      numberKind: 'phone',
       edit: 'contactPhone',
       placeholder: '010-0000-0000',
     }),
-    f('companyPhone', '회사 대표번호', record.companyPhone, 'contact', { copyable: true, edit: 'companyPhone' }),
+    f('companyPhone', '회사 대표번호', record.companyPhone, 'contact', { copyable: true, edit: 'companyPhone', numberKind: 'phone' }),
     f('contactEmail', '이메일', record.contactEmail, 'contact', { copyable: true, edit: 'contactEmail' }),
     f('homepage', '홈페이지', record.homepage, 'contact', { copyable: true, edit: 'homepage' }),
 
@@ -287,10 +302,18 @@ export function profileFieldsByGroup(
 }
 
 /** 전체 정보를 한 번에 복사할 수 있는 텍스트 */
-export function profileAsText(record: ClientOpsRecord, today: string = todayLocalDate()): string {
+/**
+ * 전체 복사용 텍스트.
+ * `plainNumbers` 를 켜면 번호에서 하이픈을 뺀다 — 신청서 입력칸이 숫자만 받는 곳이 많다.
+ */
+export function profileAsText(
+  record: ClientOpsRecord,
+  today: string = todayLocalDate(),
+  opts: { plainNumbers?: boolean } = {},
+): string {
   return profileFields(record, today)
     .filter((x) => !x.empty)
-    .map((x) => `${x.label}: ${x.value}`)
+    .map((x) => `${x.label}: ${opts.plainNumbers && x.numberKind ? digitsOf(x.value) : x.value}`)
     .join('\n')
 }
 

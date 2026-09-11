@@ -21,7 +21,13 @@ const check = (name, cond, detail) => {
 }
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
-const ctx = await browser.newContext({ viewport: { width: 390, height: 900 }, isMobile: true, hasTouch: true })
+const ctx = await browser.newContext({
+  viewport: { width: 390, height: 900 },
+  isMobile: true,
+  hasTouch: true,
+  // 복사한 내용을 실제로 읽어 확인하기 위해
+  permissions: ['clipboard-read', 'clipboard-write'],
+})
 const page = await ctx.newPage()
 page.on('pageerror', (e) => check('JS 오류 없음', false, String(e).slice(0, 160)))
 
@@ -153,6 +159,46 @@ check('목록으로 돌아온다', page.url().endsWith('/ops/clients'))
 const left = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').some((r) => r.id === 'cli_hansol'))
 check('실제로 지워졌다', left === false)
 
+
+/* ── 번호 서식과 복사 선택 ── */
+{
+  // 기록에 하이픈 없이 들어 있는 업체(우일산업: 3138112508 · 설립일 20020216)
+  await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  const board = (await page.locator('main').innerText()) ?? ''
+  check('목록: 사업자번호에 하이픈이 붙는다', board.includes('313-81-12508'), board.includes('3138112508') ? '날것이 그대로 보임' : '')
+  check('목록: 날것 설립일을 찍지 않는다', !board.includes('20020216'))
+  check('목록: 업력을 읽어 보여 준다', /25년차/.test(board))
+
+  await page.goto(BASE + '/ops/clients/cli_wooil', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const shown = await page.getByRole('button', { name: /313-81-12508/ }).first()
+  check('상세: 번호가 하이픈 모양으로 보인다', (await shown.count()) > 0)
+
+  // 보이는 그대로 복사
+  await shown.click()
+  await page.waitForTimeout(400)
+  const asIs = await page.evaluate(() => navigator.clipboard.readText())
+  check('복사: 값을 누르면 보이는 그대로', asIs === '313-81-12508', asIs)
+
+  // 숫자만 복사
+  const digitsBtn = page.getByRole('button', { name: /사업자등록번호 숫자만 복사/ }).first()
+  check('복사: [숫자만] 선택지가 있다', (await digitsBtn.count()) > 0)
+  await digitsBtn.click()
+  await page.waitForTimeout(400)
+  const plain = await page.evaluate(() => navigator.clipboard.readText())
+  check('복사: 숫자만 고르면 하이픈이 빠진다', plain === '3138112508', plain)
+
+  // 전체 복사도 두 가지
+  await page.getByRole('button', { name: '전체 복사' }).first().click()
+  await page.waitForTimeout(400)
+  const allAsIs = await page.evaluate(() => navigator.clipboard.readText())
+  check('전체 복사: 기본은 하이픈 포함', allAsIs.includes('313-81-12508'), allAsIs.slice(0, 80))
+  await page.getByRole('button', { name: '숫자만' }).first().click()
+  await page.waitForTimeout(400)
+  const allPlain = await page.evaluate(() => navigator.clipboard.readText())
+  check('전체 복사: 숫자만 판도 있다', allPlain.includes('3138112508') && !allPlain.includes('313-81-12508'), allPlain.slice(0, 80))
+}
 
 await browser.close()
 console.log(`\n목록 바로 고치기 · 계약 단계 · 삭제: ${pass} passed, ${fail} failed`)
