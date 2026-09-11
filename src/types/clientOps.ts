@@ -283,6 +283,37 @@ export function emptyContract(): ContractInfo {
 }
 
 /* ------------------------------------------------------------------ */
+/* 회사 기본 정보 — 직접 만든 칸                                          */
+/* ------------------------------------------------------------------ */
+
+/** 회사 기본 정보의 묶음 — 화면에서 이 순서·이 제목으로 나눈다 */
+export type ProfileGroupKey = 'identity' | 'people' | 'contact' | 'credential'
+
+export const PROFILE_GROUP_KEYS: ProfileGroupKey[] = ['identity', 'people', 'contact', 'credential']
+
+export function isProfileGroupKey(v: unknown): v is ProfileGroupKey {
+  return typeof v === 'string' && (PROFILE_GROUP_KEYS as string[]).includes(v)
+}
+
+/**
+ * 대표가 직접 만든 칸.
+ *
+ * 업종마다 챙겨야 하는 값이 다르다 — 어떤 업체는 공장 등록번호가, 어떤 업체는
+ * 세무사 연락처가 매번 필요하다. 그때마다 개발을 기다리는 대신 그 자리에서 칸을 만든다.
+ * 네 묶음(회사·사람·연락처·인증서) 중 어디에 둘지 고른다.
+ *
+ * 비밀번호·주민등록번호는 여기에도 적지 않는다(CLAUDE.md). 화면에 그렇게 적어 둔다.
+ */
+export interface CustomProfileField {
+  id: string
+  group: ProfileGroupKey
+  /** 칸 이름 — 예: '공장 등록번호' */
+  label: string
+  /** 적어 둔 값 */
+  value: string
+}
+
+/* ------------------------------------------------------------------ */
 /* 메모                                                                 */
 /* ------------------------------------------------------------------ */
 
@@ -386,6 +417,8 @@ export interface ClientOpsRecord {
   documents: Record<DocumentKey, DocumentState>
   /** 계약 — 언제 · 어떤 방식으로 · 얼마에 (payload 에 함께 저장된다) */
   contract: ContractInfo
+  /** 회사 기본 정보에 직접 만든 칸 (payload 에 함께 저장된다) */
+  customFields: CustomProfileField[]
   fees: FeeItem[]
   notes_list: ClientNote[]
   fundingApplications: FundingApplication[]

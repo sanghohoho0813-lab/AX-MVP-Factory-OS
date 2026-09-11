@@ -33,6 +33,7 @@ import type {
   ClientNote,
   ClientOpsRecord,
   ContractInfo,
+  CustomProfileField,
   FundingApplication,
   FundingStatus,
   ClientOpsStatus,
@@ -40,10 +41,11 @@ import type {
   DocumentKey,
   DocumentState,
   FeeItem,
+  ProfileGroupKey,
   ServiceKey,
   ServiceState,
 } from '../types/clientOps'
-import { CONTRACT_KIND_LABEL, emptyContract, isCustomServiceKey } from '../types/clientOps'
+import { CONTRACT_KIND_LABEL, emptyContract, isCustomServiceKey, isProfileGroupKey } from '../types/clientOps'
 
 /* ------------------------------------------------------------------ */
 /* 기본값 · 정규화 (예전 형식 자동 승격 포함)                            */
@@ -166,6 +168,23 @@ function normalizeContract(raw: unknown): ContractInfo {
   }
 }
 
+/**
+ * 직접 만든 칸 정규화.
+ * 이 기능이 없던 시절의 기록에는 아예 없으므로 빈 배열이 된다(기존 데이터 영향 0).
+ * 묶음 이름이 이상하면 '회사' 로 보낸다 — 칸을 잃어버리느니 자리를 옮긴다.
+ */
+function normalizeCustomFields(raw: unknown): CustomProfileField[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((f) => ({
+      id: typeof f?.id === 'string' && f.id !== '' ? f.id : generateId(),
+      group: isProfileGroupKey(f?.group) ? f.group : ('identity' as const),
+      label: typeof f?.label === 'string' ? f.label : '',
+      value: typeof f?.value === 'string' ? f.value : '',
+    }))
+    .filter((f) => f.label.trim() !== '')
+}
+
 function upgradeFees(raw: Partial<ClientOpsRecord> & LegacyShape): FeeItem[] {
   if (Array.isArray(raw.fees)) {
     return raw.fees.map((f) => ({
@@ -249,6 +268,7 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
     services: upgradeServices(value),
     documents,
     contract: normalizeContract(value.contract),
+    customFields: normalizeCustomFields(value.customFields),
     fees: upgradeFees(value),
     notes_list: Array.isArray(value.notes_list)
       ? value.notes_list.map((n) => ({
@@ -596,6 +616,42 @@ export function withContract(record: ClientOpsRecord, next: ContractInfo): Clien
     return same ? out : withActivity(out, 'contract', '계약 — 내용 수정')
   }
   return withActivity(out, 'contract', `계약 — ${changed.join(' · ')}`)
+}
+
+/**
+ * 직접 만든 칸을 넣거나 고친다.
+ * `id` 가 있으면 그 칸을 고치고, 없으면 새로 만든다.
+ */
+export function withCustomField(
+  record: ClientOpsRecord,
+  field: { id?: string; group: ProfileGroupKey; label: string; value: string },
+): ClientOpsRecord {
+  const label = field.label.trim()
+  const value = field.value.trim()
+  if (label === '') return record
+
+  const existing = field.id ? record.customFields.find((f) => f.id === field.id) : undefined
+  if (existing) {
+    if (existing.label === label && existing.value === value && existing.group === field.group) return record
+    const next = record.customFields.map((f) =>
+      f.id === existing.id ? { ...f, group: field.group, label, value } : f,
+    )
+    return withActivity({ ...record, customFields: next }, 'profile', `${label} · 고침`)
+  }
+
+  const made: CustomProfileField = { id: generateId(), group: field.group, label, value }
+  return withActivity({ ...record, customFields: [...record.customFields, made] }, 'profile', `${label} 칸을 만듦`)
+}
+
+/** 직접 만든 칸을 지운다 (표준 칸은 지워지지 않는다 — 값만 비운다) */
+export function withoutCustomField(record: ClientOpsRecord, id: string): ClientOpsRecord {
+  const gone = record.customFields.find((f) => f.id === id)
+  if (!gone) return record
+  return withActivity(
+    { ...record, customFields: record.customFields.filter((f) => f.id !== id) },
+    'profile',
+    `${gone.label} 칸을 지움`,
+  )
 }
 
 export function withNewFee(record: ClientOpsRecord, fee: Partial<FeeItem>): ClientOpsRecord {

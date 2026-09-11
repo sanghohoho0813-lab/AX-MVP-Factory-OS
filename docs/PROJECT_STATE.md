@@ -60,7 +60,7 @@
 목표치: DO NOT INVENT — 어디에도 없음. 개선율: 12주 실증 후에만.
 
 ## DATA FOUNDATION
-- SSOT: `docs/DATA_DICTIONARY.md` (20 엔티티). 내부 SoR `operations_clients`, 고객 SoR `profiles`, 연결 `portal_client_links`, 왕복 `customer_events` / `portal_updates`.
+- SSOT: `docs/DATA_DICTIONARY.md` (21 엔티티). 내부 SoR `operations_clients`, 고객 SoR `profiles`, 연결 `portal_client_links`, 왕복 `customer_events` / `portal_updates`.
 - 브릿지 0006~0009 Production 적용 완료. 0010(업무 항목 직접 추가) **미적용** — 적용 전까지 클라우드에서는 READY.
 - **계약 정보는 컬럼을 늘리지 않았다** (D-66). `operations_clients` 의 `payloadOf()` 가 컬럼으로 빼놓은
   몇 칸 외 나머지를 통째로 `payload` 에 넣으므로, `ClientOpsRecord.contract`(계약일·방식·현금·보험 건별)는

@@ -294,6 +294,74 @@ check('실제로 지워졌다', left === false)
   check('전체 복사: 숫자만 판도 있다', allPlain.includes('3138112508') && !allPlain.includes('313-81-12508'), allPlain.slice(0, 80))
 }
 
+/* ---------------- 회사 기본 정보: 칸 직접 만들기 · 지우기 ---------------- */
+{
+  await page.goto(BASE + '/ops/clients/cli_wooil', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+
+  // 네 묶음 모두에 칸을 만들 수 있다 — 아직 아무것도 안 적은 묶음(연락처)도
+  for (const g of ['회사', '사람', '연락처', '인증서']) {
+    check(`칸 추가: ${g} 묶음에 만들 수 있다`, (await page.getByRole('button', { name: `${g}에 칸 추가` }).count()) > 0)
+  }
+
+  // 만들기
+  await page.getByRole('button', { name: '회사에 칸 추가' }).first().click()
+  await page.waitForTimeout(300)
+  await page.getByLabel('새 칸 이름').fill('공장 등록번호')
+  await page.getByLabel('새 칸 내용').fill('충남-2019-0042')
+  await page.getByRole('button', { name: '넣기' }).first().click()
+  await page.waitForTimeout(800)
+  const made = (await page.locator('main').innerText()) ?? ''
+  check('칸 추가: 화면에 바로 보인다', made.includes('공장 등록번호') && made.includes('충남-2019-0042'), made.slice(0, 200))
+  const savedNew = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_wooil'),
+  )
+  const cf = savedNew?.customFields ?? savedNew?.payload?.customFields ?? []
+  check('칸 추가: 저장된다', cf.length === 1 && cf[0]?.label === '공장 등록번호' && cf[0]?.group === 'identity', JSON.stringify(cf))
+
+  // 이름까지 고칠 수 있다 — 잘못 적은 이름 때문에 지웠다 다시 만들지 않게
+  await page.getByRole('button', { name: '공장 등록번호 고치기' }).first().click()
+  await page.waitForTimeout(300)
+  await page.getByLabel('칸 이름').fill('공장등록번호')
+  await page.getByRole('button', { name: '저장', exact: true }).first().click()
+  await page.waitForTimeout(700)
+  check('칸 고치기: 이름이 바뀐다', ((await page.locator('main').innerText()) ?? '').includes('공장등록번호'))
+
+  // 없애기 — 한 번 더 묻는다
+  await page.getByRole('button', { name: '공장등록번호 고치기' }).first().click()
+  await page.waitForTimeout(300)
+  await page.getByRole('button', { name: '칸 없애기' }).first().click()
+  await page.waitForTimeout(250)
+  check('칸 없애기: 한 번 더 묻는다', ((await page.locator('main').innerText()) ?? '').includes('칸을 없앨까요?'))
+  await page.getByRole('button', { name: '네, 없앱니다' }).first().click()
+  await page.waitForTimeout(800)
+  check('칸 없애기: 화면에서 사라진다', !((await page.locator('main').innerText()) ?? '').includes('공장등록번호'))
+  const afterGone = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_wooil'),
+  )
+  check('칸 없애기: 저장에서도 빠진다', (afterGone?.customFields ?? afterGone?.payload?.customFields ?? []).length === 0)
+
+  /*
+   * 표준 칸은 값만 비운다.
+   * 담당자가 대표일 수도 있으니 담당자를 지울 수 있어야 한다 — 다만 칸까지 없애면
+   * 나중에 담당자가 생겼을 때 다시 만들 길이 없다.
+   */
+  await page.getByRole('button', { name: '담당자 고치기' }).first().click()
+  await page.waitForTimeout(300)
+  check('표준 칸: [값 지우기] 가 있다', (await page.getByRole('button', { name: '값 지우기' }).count()) > 0)
+  check('표준 칸: [칸 없애기] 는 없다', (await page.getByRole('button', { name: '칸 없애기' }).count()) === 0)
+  await page.getByRole('button', { name: '값 지우기' }).first().click()
+  await page.waitForTimeout(800)
+  const wiped = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_wooil'),
+  )
+  check('표준 칸: 값이 비워진다', (wiped?.contactName ?? wiped?.payload?.contactName ?? '') === '', JSON.stringify(wiped?.contactName))
+  // 빈 칸이 접혀 있으므로 펴야 다시 보인다 — 칸 자체는 살아 있다
+  const expand = page.getByRole('button', { name: /아직 안 적은/ }).first()
+  if (await expand.count()) { await expand.click(); await page.waitForTimeout(400) }
+  check('표준 칸: 칸은 남아 다시 적을 수 있다', ((await page.locator('main').innerText()) ?? '').includes('담당자'))
+}
+
 await browser.close()
 console.log(`\n목록 바로 고치기 · 계약 단계 · 삭제: ${pass} passed, ${fail} failed`)
 process.exit(fail > 0 ? 1 : 0)

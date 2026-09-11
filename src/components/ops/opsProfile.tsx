@@ -7,6 +7,7 @@ import {
   profileFieldsByGroup,
   type ProfileEditKey,
   type ProfileField,
+  type ProfileGroup,
 } from '../../services/clientOpsProfile'
 import { sortedNotes } from '../../services/clientOpsService'
 import { digitsOf, numberSegments } from '../../lib/format'
@@ -37,6 +38,8 @@ export function CompanyProfileCard({
   today,
   onImport,
   onEdit,
+  onCustomField,
+  onRemoveCustomField,
   /** 접이식 구역 안에 들어갈 때 — 카드 안 카드가 되지 않도록 테두리·제목을 뺀다 */
   bare = false,
 }: {
@@ -45,11 +48,23 @@ export function CompanyProfileCard({
   onImport: () => void
   /** 칸을 고쳤을 때. 없으면 읽기 전용으로 그린다 */
   onEdit?: (key: ProfileEditKey, value: string) => void
+  /** 직접 만든 칸을 넣거나 고쳤을 때 */
+  onCustomField?: (field: { id?: string; group: ProfileGroup; label: string; value: string }) => void
+  /** 직접 만든 칸을 지웠을 때 */
+  onRemoveCustomField?: (id: string) => void
   bare?: boolean
 }) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
+  /** 이름까지 함께 고치는 칸(직접 만든 칸)의 이름 초안 */
+  const [labelDraft, setLabelDraft] = useState('')
+  /** 지금 새 칸을 만들고 있는 묶음 */
+  const [addingGroup, setAddingGroup] = useState<ProfileGroup | null>(null)
+  const [newLabel, setNewLabel] = useState('')
+  const [newValue, setNewValue] = useState('')
+  /** 지우기를 한 번 더 확인받는 칸 */
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null)
   const fields = profileFields(record, today)
   const allGroups = profileFieldsByGroup(record, today)
   const filled = fields.filter((f) => !f.empty).length
@@ -63,9 +78,16 @@ export function CompanyProfileCard({
    * 아무것도 안 적혀 있으면 접을 것이 없으므로 그때는 전부 편다.
    */
   const [showEmpty, setShowEmpty] = useState(filled === 0)
+  /*
+   * 묶음 머리는 칸을 만들 수 있을 때 남겨 둔다.
+   * 빈 칸을 접으면 '연락처' 처럼 아직 아무것도 안 적은 묶음이 통째로 사라지는데,
+   * 그러면 그 묶음에 칸을 만들 길이 없어진다 — 머리 한 줄을 남기는 편이 낫다.
+   */
   const groups = showEmpty
     ? allGroups
-    : allGroups.map((g) => ({ ...g, fields: g.fields.filter((f) => !f.empty) })).filter((g) => g.fields.length > 0)
+    : allGroups
+        .map((g) => ({ ...g, fields: g.fields.filter((f) => !f.empty) }))
+        .filter((g) => g.fields.length > 0 || Boolean(onCustomField))
 
   const copy = async (key: string, value: string) => {
     await copyText(value)
@@ -75,14 +97,44 @@ export function CompanyProfileCard({
 
   /** 고칠 때는 합쳐 보여 주던 값이 아니라 원래 값을 넣는다 */
   const startEdit = (f: ProfileField) => {
-    if (!onEdit || !f.edit) return
+    if (!canEdit(f)) return
     setEditingKey(f.key)
-    setDraft(record[f.edit] ?? '')
+    setConfirmRemove(null)
+    if (f.custom) {
+      const c = record.customFields.find((x) => x.id === f.custom)
+      setLabelDraft(c?.label ?? f.label)
+      setDraft(c?.value ?? '')
+      return
+    }
+    setDraft(f.edit ? (record[f.edit] ?? '') : '')
   }
 
   const saveEdit = (f: ProfileField) => {
+    if (f.custom) {
+      // 직접 만든 칸은 이름도 함께 고친다 — 이름을 다 지우면 고치지 않고 닫는다
+      if (onCustomField && labelDraft.trim() !== '') {
+        onCustomField({ id: f.custom, group: f.group, label: labelDraft, value: draft })
+      }
+      setEditingKey(null)
+      return
+    }
     if (onEdit && f.edit && draft !== (record[f.edit] ?? '')) onEdit(f.edit, draft.trim())
     setEditingKey(null)
+  }
+
+  /** 표준 칸은 값만 비운다. 칸 자체는 남는다 — 나중에 다시 적을 수 있어야 한다 */
+  const clearValue = (f: ProfileField) => {
+    if (onEdit && f.edit) onEdit(f.edit, '')
+    setEditingKey(null)
+  }
+
+  const canEdit = (f: ProfileField) => (f.custom ? Boolean(onCustomField) : Boolean(onEdit && f.edit))
+
+  const addField = (group: ProfileGroup) => {
+    if (onCustomField && newLabel.trim() !== '') onCustomField({ group, label: newLabel, value: newValue })
+    setAddingGroup(null)
+    setNewLabel('')
+    setNewValue('')
   }
 
   return (
@@ -142,27 +194,96 @@ export function CompanyProfileCard({
                 */}
                 <dd className={`flex-1 text-right ${segmentsOf(f).length > 0 ? 'min-w-[9.5rem]' : 'min-w-0'}`}>
                   {editingKey === f.key ? (
-                    <input
-                      autoFocus
-                      value={draft}
-                      placeholder={f.placeholder}
-                      onChange={(e) => setDraft(e.target.value)}
-                      onBlur={() => saveEdit(f)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') saveEdit(f)
-                        if (e.key === 'Escape') setEditingKey(null)
-                      }}
-                      className="w-full rounded-(--radius-control) border border-brand-400 px-2 py-1 text-right text-[0.98rem] font-semibold text-slate-900 focus:outline-none"
-                    />
+                    <div className="flex flex-col gap-1.5">
+                      {/* 직접 만든 칸은 이름도 고칠 수 있다 — 잘못 적은 이름 때문에 지웠다 다시 만들지 않게 */}
+                      {f.custom && (
+                        <input
+                          aria-label="칸 이름"
+                          value={labelDraft}
+                          placeholder="칸 이름"
+                          onChange={(e) => setLabelDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveEdit(f)
+                            if (e.key === 'Escape') setEditingKey(null)
+                          }}
+                          className="w-full rounded-(--radius-control) border border-slate-300 px-2 py-1 text-right text-[0.9rem] text-slate-700 focus:border-brand-400 focus:outline-none"
+                        />
+                      )}
+                      <input
+                        autoFocus
+                        aria-label={`${f.label} 값`}
+                        value={draft}
+                        placeholder={f.placeholder}
+                        onChange={(e) => setDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveEdit(f)
+                          if (e.key === 'Escape') setEditingKey(null)
+                        }}
+                        className="w-full rounded-(--radius-control) border border-brand-400 px-2 py-1 text-right text-[0.98rem] font-semibold text-slate-900 focus:outline-none"
+                      />
+                      <div className="flex flex-wrap justify-end gap-x-3 gap-y-1">
+                        {/*
+                          지우기는 두 가지다.
+                          표준 칸(담당자·업태…)은 **값만** 비운다 — 칸은 남아서 나중에 다시 적을 수 있다.
+                          직접 만든 칸은 **칸째** 없앤다. 없애면 되돌릴 수 없으니 한 번 더 묻는다.
+                        */}
+                        {f.custom
+                          ? onRemoveCustomField && (
+                              confirmRemove === f.key ? (
+                                <span className="t-sub flex items-center gap-2">
+                                  <span className="text-slate-600">칸을 없앨까요?</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      onRemoveCustomField(f.custom ?? '')
+                                      setConfirmRemove(null)
+                                      setEditingKey(null)
+                                    }}
+                                    className="font-semibold text-danger-700 hover:underline"
+                                  >
+                                    네, 없앱니다
+                                  </button>
+                                  <button type="button" onClick={() => setConfirmRemove(null)} className="text-slate-500 hover:underline">
+                                    아니요
+                                  </button>
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmRemove(f.key)}
+                                  className="t-sub font-medium text-danger-700 hover:underline"
+                                >
+                                  칸 없애기
+                                </button>
+                              )
+                            )
+                          : !f.empty && (
+                              <button
+                                type="button"
+                                onClick={() => clearValue(f)}
+                                title="적어 둔 값만 지웁니다. 칸은 남습니다."
+                                className="t-sub font-medium text-danger-700 hover:underline"
+                              >
+                                값 지우기
+                              </button>
+                            )}
+                        <button type="button" onClick={() => setEditingKey(null)} className="t-sub text-slate-500 hover:underline">
+                          취소
+                        </button>
+                        <button type="button" onClick={() => saveEdit(f)} className="t-sub font-semibold text-brand-700 hover:underline">
+                          저장
+                        </button>
+                      </div>
+                    </div>
                   ) : f.empty ? (
                     // 비어 있어도 누르면 바로 적을 수 있다 — 서류가 없어도 채울 수 있어야 한다
                     <button
                       type="button"
-                      disabled={!onEdit || !f.edit}
+                      disabled={!canEdit(f)}
                       onClick={() => startEdit(f)}
                       className="text-[0.95rem] text-slate-500 hover:text-brand-700 hover:underline disabled:hover:text-slate-500 disabled:hover:no-underline"
                     >
-                      {onEdit && f.edit ? '+ 입력' : '미입력'}
+                      {canEdit(f) ? '+ 입력' : '미입력'}
                     </button>
                   ) : (
                     <span className="inline-flex max-w-full items-center gap-1.5">
@@ -250,7 +371,7 @@ export function CompanyProfileCard({
                       ) : (
                         <span className="min-w-0 text-[0.98rem] font-semibold break-keep text-slate-800">{f.value}</span>
                       )}
-                      {onEdit && f.edit && (
+                      {canEdit(f) && (
                         <button
                           type="button"
                           aria-label={`${f.label} 고치기`}
@@ -271,6 +392,63 @@ export function CompanyProfileCard({
             <p className="t-sub mt-1.5 break-keep text-slate-500">
               <strong className="font-semibold">비밀번호는 여기에 적지 않습니다.</strong> 받았는지와 어디에 두었는지만 적습니다.
             </p>
+          )}
+
+          {/*
+            묶음마다 칸을 직접 만든다.
+            업종마다 챙길 값이 다르다 — 어떤 업체는 공장 등록번호가, 어떤 업체는 세무사
+            연락처가 매번 필요하다. 개발을 기다리는 대신 그 자리에서 칸을 만든다.
+          */}
+          {onCustomField && (
+            addingGroup === g.group ? (
+              <div className="mt-2 rounded-(--radius-card) border border-brand-200 bg-brand-50/50 p-3">
+                <p className="t-sub font-semibold text-slate-700">{g.label}에 칸 만들기</p>
+                <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
+                  <input
+                    autoFocus
+                    aria-label="새 칸 이름"
+                    value={newLabel}
+                    placeholder="칸 이름 — 예: 공장 등록번호"
+                    onChange={(e) => setNewLabel(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Escape') setAddingGroup(null) }}
+                    className="t-body h-11 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 sm:w-2/5"
+                  />
+                  <input
+                    aria-label="새 칸 내용"
+                    value={newValue}
+                    placeholder="내용"
+                    onChange={(e) => setNewValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') addField(g.group)
+                      if (e.key === 'Escape') setAddingGroup(null)
+                    }}
+                    className="t-body h-11 w-full min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 bg-white px-3"
+                  />
+                </div>
+                <div className="mt-2 flex justify-end gap-2">
+                  <Button variant="secondary" size="sm" onClick={() => setAddingGroup(null)}>
+                    취소
+                  </Button>
+                  <Button variant="primary" size="sm" disabled={newLabel.trim() === ''} onClick={() => addField(g.group)}>
+                    넣기
+                  </Button>
+                </div>
+                <p className="t-sub mt-2 break-keep text-slate-500">비밀번호·주민등록번호는 여기에도 적지 않습니다.</p>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setAddingGroup(g.group)
+                  setNewLabel('')
+                  setNewValue('')
+                }}
+                className="tap t-sub mt-2 inline-flex items-center gap-1 font-medium text-slate-500 hover:text-brand-700"
+              >
+                <Plus aria-hidden="true" className="size-3.5" />
+                {g.label}에 칸 추가
+              </button>
+            )
           )}
         </div>
       ))}

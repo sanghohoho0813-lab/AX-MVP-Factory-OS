@@ -26,7 +26,7 @@ import {
   daySummaryText,
 } from '../dailyBriefService'
 import { buildProjection, eventSummary, isOpenEvent, sortEvents } from '../customerBridgeService'
-import { normalizeClientOps, withContract, withFee, withNewFee, withNewFunding, withService } from '../clientOpsService'
+import { normalizeClientOps, withContract, withCustomField, withFee, withNewFee, withNewFunding, withService, withoutCustomField } from '../clientOpsService'
 import {
   contractAgeShort,
   contractAgeText,
@@ -626,6 +626,72 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
   check('해 드린 일: 완료 날짜', dw[0]?.at === '2025-12-03', dw[0]?.at)
   check('해 드린 일: 끝나지 않은 것은 빼고', !dw.some((w) => w.key === 'venture' || w.key === 'ax' || w.key === 'policyFund'))
   check('해 드린 일: 아무것도 없으면 빈 목록', doneWorks(empty).length === 0)
+}
+
+/* ------------------------------------------------------------------ */
+/* 회사 기본 정보 — 직접 만든 칸                                          */
+/* ------------------------------------------------------------------ */
+{
+  const T = '2026-09-11'
+  const base = normalizeClientOps({ id: 'c-cf', companyName: '칸테스트', contactName: '김담당' })
+  check('직접 만든 칸: 옛 기록은 빈 배열로 채워진다', Array.isArray(base.customFields) && base.customFields.length === 0)
+
+  // 만들기
+  const one = withCustomField(base, { group: 'identity', label: '공장 등록번호', value: '충남-2019-0042' })
+  check('칸 만들기: 하나 생긴다', one.customFields.length === 1)
+  check('칸 만들기: 묶음이 지켜진다', one.customFields[0]?.group === 'identity')
+  check('칸 만들기: 활동 기록에 남는다', one.activity[0]?.kind === 'profile' && /공장 등록번호/.test(one.activity[0]?.text ?? ''), one.activity[0]?.text)
+  check('칸 만들기: 이름이 비면 만들지 않는다', withCustomField(base, { group: 'people', label: '  ', value: 'x' }).customFields.length === 0)
+  check('칸 만들기: 앞뒤 공백은 떼어 낸다', withCustomField(base, { group: 'people', label: ' 세무사 ', value: ' 박세무 ' }).customFields[0]?.label === '세무사')
+
+  // 값이 비어 있어도 칸은 만들어진다 — '아직 안 적은 칸' 으로 남는다
+  const blank = withCustomField(base, { group: 'contact', label: '비상 연락처', value: '' })
+  check('칸 만들기: 값이 비어도 칸은 남는다', blank.customFields.length === 1 && blank.customFields[0]?.value === '')
+
+  // 고치기 — 이름도 함께
+  const id = one.customFields[0]?.id ?? ''
+  const fixed = withCustomField(one, { id, group: 'identity', label: '공장등록번호', value: '충남-2019-0043' })
+  check('칸 고치기: 새로 만들지 않고 고친다', fixed.customFields.length === 1)
+  check('칸 고치기: 이름도 바뀐다', fixed.customFields[0]?.label === '공장등록번호')
+  check('칸 고치기: 값도 바뀐다', fixed.customFields[0]?.value === '충남-2019-0043')
+  check('칸 고치기: 안 바꾸면 기록을 만들지 않는다', withCustomField(one, { id, group: 'identity', label: '공장 등록번호', value: '충남-2019-0042' }).activity.length === one.activity.length)
+  const moved = withCustomField(one, { id, group: 'people', label: '공장 등록번호', value: '충남-2019-0042' })
+  check('칸 고치기: 묶음을 옮길 수 있다', moved.customFields[0]?.group === 'people')
+
+  // 지우기
+  const gone = withoutCustomField(one, id)
+  check('칸 없애기: 사라진다', gone.customFields.length === 0)
+  check('칸 없애기: 활동 기록에 남는다', gone.activity[0]?.kind === 'profile' && /지움/.test(gone.activity[0]?.text ?? ''), gone.activity[0]?.text)
+  check('칸 없애기: 없는 id 는 아무 일도 없다', withoutCustomField(one, 'nope').customFields.length === 1)
+
+  // 화면 목록에 섞여 나온다
+  const shown = profileFields(one, T)
+  const mine = shown.find((x) => x.label === '공장 등록번호')
+  check('직접 만든 칸: 목록에 나온다', mine !== undefined)
+  check('직접 만든 칸: 지울 수 있는 칸으로 표시된다', mine?.custom === id)
+  check('직접 만든 칸: 복사할 수 있다', mine?.copyable === true)
+  check('직접 만든 칸: 제 묶음에 들어간다', profileFieldsByGroup(one, T).find((g) => g.group === 'identity')?.fields.some((f) => f.custom === id) === true)
+  check('직접 만든 칸: 전체 복사에도 들어간다', profileAsText(one, T).includes('공장 등록번호: 충남-2019-0042'))
+  check('직접 만든 칸: 값이 비면 아직 안 적은 칸으로 센다', profileFields(blank, T).find((x) => x.label === '비상 연락처')?.empty === true)
+
+  // 표준 칸은 값만 비운다 — 칸 자체는 남는다 (담당자가 대표일 때)
+  const cleared = normalizeClientOps({ ...base, contactName: '' })
+  const contact = profileFields(cleared, T).find((x) => x.key === 'contactName')
+  check('표준 칸: 값을 비우면 빈 칸이 된다', contact?.empty === true)
+  check('표준 칸: 비워도 칸은 남는다', contact !== undefined)
+  check('표준 칸: 비운 값은 전체 복사에서 빠진다', !profileAsText(cleared, T).includes('담당자:'))
+
+  // 저장된 값이 망가져 있어도 칸을 잃지 않는다
+  const messy = normalizeClientOps({
+    id: 'c-cf2', companyName: '이상한기록',
+    customFields: [
+      { id: '', group: 'nowhere', label: '이상한묶음', value: 'v' },
+      { id: 'k2', group: 'contact', label: '', value: '이름없음' },
+    ] as never,
+  })
+  check('직접 만든 칸: 묶음이 이상하면 회사로 보낸다', messy.customFields.find((f) => f.label === '이상한묶음')?.group === 'identity')
+  check('직접 만든 칸: id 가 없으면 만들어 준다', (messy.customFields.find((f) => f.label === '이상한묶음')?.id ?? '') !== '')
+  check('직접 만든 칸: 이름 없는 칸은 버린다', !messy.customFields.some((f) => f.label === ''))
 }
 
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)

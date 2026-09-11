@@ -3,7 +3,7 @@
  * 매번 계산해서 보여주므로 저장하지 않는다(날짜가 지나면 자동으로 바뀐다).
  */
 
-import type { ClientOpsRecord } from '../types/clientOps'
+import type { ClientOpsRecord, ProfileGroupKey } from '../types/clientOps'
 import { todayLocalDate } from '../lib/appClock'
 import { digitsOf, formatNumberOf, type NumberKind } from '../lib/format'
 
@@ -96,8 +96,8 @@ export function regionOf(address: string): string {
   return /[시군구]$/.test(city) ? `${wide} ${city}` : wide
 }
 
-/** 정보 묶음 — 화면에서 이 순서·이 제목으로 나눈다 */
-export type ProfileGroup = 'identity' | 'people' | 'contact' | 'credential'
+/** 정보 묶음 — 화면에서 이 순서·이 제목으로 나눈다 (정본은 types/clientOps) */
+export type ProfileGroup = ProfileGroupKey
 
 export const PROFILE_GROUP_LABEL: Record<ProfileGroup, string> = {
   identity: '회사',
@@ -151,6 +151,11 @@ export interface ProfileField {
   edit?: ProfileEditKey
   /** 입력칸에 넣을 예시 */
   placeholder?: string
+  /**
+   * 대표가 직접 만든 칸이면 그 칸의 id.
+   * 표준 칸과 달리 **칸 자체를 지울 수 있다** — 표준 칸은 값만 비운다.
+   */
+  custom?: string
 }
 
 /**
@@ -293,6 +298,21 @@ export function profileFields(
     // 여기만 직접 고칠 수 없다: 값이 '서류' 탭의 받음 표시에서 나오기 때문이다.
     f('jointCertificate', '공동인증서', certificateValue(record), 'credential', { wide: true }),
   )
+
+  // 대표가 직접 만든 칸은 각 묶음 끝에 붙는다 (표준 칸 사이에 끼우지 않는다)
+  for (const c of record.customFields) {
+    const raw = c.value.trim()
+    out.push({
+      key: `custom:${c.id}`,
+      label: c.label,
+      value: raw,
+      empty: raw === '',
+      copyable: true,
+      group: c.group,
+      wide: raw.length > 24,
+      custom: c.id,
+    })
+  }
 
   return out
 }

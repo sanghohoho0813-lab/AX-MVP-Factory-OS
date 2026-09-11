@@ -25,6 +25,7 @@ import {
   saveClient,
   uploadDocumentFile,
   withContract,
+  withCustomField,
   withDocument,
   withFee,
   withNewFee,
@@ -36,6 +37,7 @@ import {
   withNotePinned,
   withNoteText,
   withService,
+  withoutCustomField,
   withoutFee,
   withoutFunding,
   withoutNote,
@@ -557,6 +559,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           today={today}
           onImport={() => setImportOpen(true)}
           onEdit={(key, value) => void commit({ ...record, [key]: value })}
+          onCustomField={(field) => void commit(withCustomField(record, field))}
+          onRemoveCustomField={(id) => void commit(withoutCustomField(record, id))}
           bare
         />
       </Surface>
