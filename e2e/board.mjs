@@ -234,16 +234,46 @@ check('실제로 지워졌다', left === false)
 
   await page.goto(BASE + '/ops/clients/cli_wooil', { waitUntil: 'networkidle' })
   await page.waitForTimeout(800)
-  const shown = await page.getByRole('button', { name: /313-81-12508/ }).first()
-  check('상세: 번호가 하이픈 모양으로 보인다', (await shown.count()) > 0)
   const profile = (await page.locator('main').innerText()) ?? ''
+  check('상세: 번호가 하이픈 모양으로 보인다', /313\s*-\s*81\s*-\s*12508/.test(profile), profile.slice(0, 160))
   check('상세: 날것 설립일을 찍지 않는다', !profile.includes('20020216') && profile.includes('2002-02-16'), profile.slice(0, 120))
 
-  // 보이는 그대로 복사
+  /*
+   * 조각마다 따로 복사.
+   * 신청서 입력칸이 [ ]-[ ]-[ ] 로 나뉘어 있으면 조각을 하나씩 붙여야 한다.
+   * 세 조각이 각각 제 값만 복사하는지 클립보드를 실제로 읽어 확인한다.
+   */
+  for (const [seg, label] of [['313', '앞'], ['81', '가운데'], ['12508', '뒤']]) {
+    const btn = page.getByRole('button', { name: `사업자등록번호 ${seg} 만 복사` }).first()
+    check(`조각 복사: ${label} 조각 단추가 있다`, (await btn.count()) > 0)
+    await btn.click()
+    await page.waitForTimeout(350)
+    const got = await page.evaluate(() => navigator.clipboard.readText())
+    check(`조각 복사: ${label} 조각만 들어간다`, got === seg, got)
+  }
+
+  /*
+   * 법인등록번호는 앞 6자리·뒤 7자리 두 조각이다 — 주민등록번호와 같은 모양이고,
+   * 신청서 칸도 그렇게 나뉘어 있다. 두 조각이 따로 복사되는지 본다.
+   */
+  const corp = (await page.locator('main').innerText()) ?? ''
+  check('법인등록번호: 앞뒤로 나뉘어 보인다', /110111\s*-\s*1234567/.test(corp), corp.slice(0, 160))
+  for (const [seg, label] of [['110111', '앞 6자리'], ['1234567', '뒤 7자리']]) {
+    const btn = page.getByRole('button', { name: `법인등록번호 ${seg} 만 복사` }).first()
+    check(`법인등록번호: ${label} 단추가 있다`, (await btn.count()) > 0)
+    await btn.click()
+    await page.waitForTimeout(350)
+    const got = await page.evaluate(() => navigator.clipboard.readText())
+    check(`법인등록번호: ${label}만 들어간다`, got === seg, got)
+  }
+
+  // 보이는 그대로 전체 복사
+  const shown = page.getByRole('button', { name: '사업자등록번호 전체 복사' }).first()
+  check('복사: [전체] 선택지가 있다', (await shown.count()) > 0)
   await shown.click()
   await page.waitForTimeout(400)
   const asIs = await page.evaluate(() => navigator.clipboard.readText())
-  check('복사: 값을 누르면 보이는 그대로', asIs === '313-81-12508', asIs)
+  check('복사: 전체는 보이는 그대로', asIs === '313-81-12508', asIs)
 
   // 숫자만 복사
   const digitsBtn = page.getByRole('button', { name: /사업자등록번호 숫자만 복사/ }).first()

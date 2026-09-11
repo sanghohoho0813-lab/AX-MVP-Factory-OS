@@ -132,6 +132,8 @@ const clients = [
     // 실제 기록에는 하이픈 없는 사업자번호·8자리 설립일이 그대로 들어와 있다.
     // 화면이 이것을 날것으로 찍지 않는지 확인하기 위해 일부러 이 모양으로 둔다.
     businessNumber: '3138112508',
+    // 법인등록번호는 앞 6자리·뒤 7자리 두 조각이다 — 신청서 칸도 그렇게 나뉘어 있다
+    corporateNumber: '1101111234567',
     establishedAt: '20020216',
     representativeName: '장정순',
     businessAddress: '충청남도 보령시 대해로 10',

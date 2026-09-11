@@ -102,6 +102,20 @@ export function digitsOf(value: string): string {
   return d === '' ? value.trim() : d
 }
 
+/**
+ * 하이픈으로 나뉜 조각들 — `313-81-12508` → `['313', '81', '12508']`.
+ *
+ * 신청서 입력칸이 `[  ] - [  ] - [  ]` 로 나뉘어 있는 곳이 많다. 그때는 전체를 복사해서
+ * 붙인 뒤 손으로 지우는 것이 아니라, 조각 하나씩 복사해 칸을 옮겨 가며 붙이는 것이 맞다.
+ *
+ * 나눌 것이 없거나(하이픈 없음) 숫자가 아닌 조각이 섞이면 빈 배열 — 그때는 나누지 않는다.
+ */
+export function numberSegments(value: string): string[] {
+  const parts = value.trim().split('-')
+  if (parts.length < 2) return []
+  return parts.every((p) => /^\d+$/.test(p)) ? parts : []
+}
+
 export interface DDayInfo {
   /** "D-3" | "D-Day" | "D+2" */
   label: string

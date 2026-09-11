@@ -42,7 +42,7 @@ import { profileFields, profileFieldsByGroup, regionOf } from '../clientOpsProfi
 import { CONTRACT_STAGE_ORDER, CONTRACT_STAGE_LABEL, contractStageOf, statusForStage } from '../../types/clientOps'
 import type { ClientOpsStatus, ContractStage } from '../../types/clientOps'
 import { clientOpsProgress } from '../clientOpsAlerts'
-import { digitsOf, formatNumberOf } from '../../lib/format'
+import { digitsOf, formatNumberOf, numberSegments } from '../../lib/format'
 import { formatYmd, profileAsText, yearsInBusiness } from '../clientOpsProfile'
 import { SERVICE_STATUS_ORDER, isServiceOpen, isServiceNotApplicable, normalizeServiceStatus } from '../../content/clientOpsCatalog'
 import { BUILTIN_SERVICES, SERVICES, registerCustomServices } from '../../content/clientOpsCatalog'
@@ -522,6 +522,17 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
   check('전체 복사: 기본은 하이픈 포함', asIs.includes('313-81-12508') && asIs.includes('010-2345-6789'), asIs)
   check('전체 복사: 숫자만 판', plain.includes('3138112508') && plain.includes('01023456789') && !plain.includes('313-81-12508'), plain)
   check('전체 복사: 번호가 아닌 값은 그대로', plain.includes('서식테스트'))
+
+  // 조각마다 따로 복사 — 칸이 나뉜 신청서용
+  check('조각: 사업자등록번호 3조각', JSON.stringify(numberSegments('313-81-12508')) === JSON.stringify(['313', '81', '12508']))
+  check('조각: 법인등록번호 앞뒤 2조각', JSON.stringify(numberSegments('110111-1234567')) === JSON.stringify(['110111', '1234567']))
+  check('조각: 휴대폰 3조각', JSON.stringify(numberSegments('010-2345-6789')) === JSON.stringify(['010', '2345', '6789']))
+  check('조각: 나눌 것이 없으면 빈 배열', numberSegments('3138112508').length === 0)
+  check('조각: 빈 값', numberSegments('').length === 0 && numberSegments('-').length === 0)
+  // 자릿수가 안 맞아 원문 그대로 둔 값은 나누지 않는다 — 조각이 숫자가 아니면 안 나눈다
+  check('조각: 숫자가 아닌 조각이 섞이면 안 나눈다', numberSegments('가-나').length === 0 && numberSegments('313-8a-12508').length === 0)
+  check('조각: 합치면 보이는 값 그대로', numberSegments('313-81-12508').join('-') === '313-81-12508')
+  check('조각: 조각을 이으면 숫자만 판이 된다', numberSegments('313-81-12508').join('') === digitsOf('313-81-12508'))
 
   // 날짜도 서류 모양으로 — 20020216 을 그대로 찍지 않는다
   check('날짜 서식: 8자리', formatYmd('20020216') === '2002-02-16')

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Check, ChevronDown, ChevronUp, ClipboardCopy, Copy, FileUp, Pencil, Pin, PinOff, Plus, Trash2 } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import {
@@ -9,8 +9,13 @@ import {
   type ProfileField,
 } from '../../services/clientOpsProfile'
 import { sortedNotes } from '../../services/clientOpsService'
-import { digitsOf } from '../../lib/format'
+import { digitsOf, numberSegments } from '../../lib/format'
 import { Button } from '../ui/Button'
+
+/** 번호 칸만 조각으로 나눈다 — 주소·회사명 같은 글자는 나누지 않는다 */
+function segmentsOf(f: ProfileField): string[] {
+  return f.numberKind ? numberSegments(f.value) : []
+}
 
 async function copyText(text: string): Promise<void> {
   try {
@@ -114,7 +119,9 @@ export function CompanyProfileCard({
           </Button>
         </div>
       </div>
-      <p className="t-sub mt-0.5 break-keep text-slate-500">번호·주소는 눌러서 바로 복사할 수 있습니다.</p>
+      <p className="t-sub mt-0.5 break-keep text-slate-500">
+        번호는 <strong className="font-semibold">조각마다 따로</strong> 복사됩니다 — 칸이 나뉜 신청서에 하나씩 붙이세요.
+      </p>
 
       {groups.map((g) => (
         <div key={g.group} className="mt-4 first:mt-3">
@@ -123,12 +130,17 @@ export function CompanyProfileCard({
             {g.fields.map((f) => (
               <div
                 key={f.key}
-                className={`flex items-baseline justify-between gap-2 border-b border-slate-200/70 py-2 ${
+                className={`flex flex-wrap items-baseline justify-between gap-x-2 border-b border-slate-200/70 py-2 ${
                   f.wide ? 'sm:col-span-2 xl:col-span-3' : ''
                 }`}
               >
                 <dt className="t-sub shrink-0 text-slate-500">{f.label}</dt>
-                <dd className="min-w-0 flex-1 text-right">
+                {/*
+                  조각으로 나뉜 번호는 한 줄에 다 들어가야 한다 — 조각이 세로로 쌓이면
+                  번호가 아니라 숫자 기둥이 된다(D-23). 남는 폭이 모자라면 값 전체가
+                  라벨 아래 줄로 내려가 제 폭을 갖는다.
+                */}
+                <dd className={`flex-1 text-right ${segmentsOf(f).length > 0 ? 'min-w-[9.5rem]' : 'min-w-0'}`}>
                   {editingKey === f.key ? (
                     <input
                       autoFocus
@@ -155,26 +167,73 @@ export function CompanyProfileCard({
                   ) : (
                     <span className="inline-flex max-w-full items-center gap-1.5">
                       {f.copyable ? (
-                        <span className="inline-flex min-w-0 items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => void copy(f.key, f.value)}
-                            title="눌러서 복사 — 보이는 그대로"
-                            className="group inline-flex min-w-0 items-center gap-1 text-right"
-                          >
-                            <span className={`truncate text-[0.98rem] font-semibold text-slate-800 group-hover:text-brand-700 group-hover:underline ${f.numberKind ? 'tabular-nums' : ''}`}>
-                              {f.value}
+                        <span className="inline-flex min-w-0 flex-wrap items-center justify-end gap-1">
+                          {/*
+                            번호는 조각마다 따로 복사된다.
+                            신청서 입력칸이 [ ]-[ ]-[ ] 로 나뉘어 있으면 전체를 붙이고 손으로
+                            지우는 것이 아니라, 조각을 하나씩 복사해 칸을 옮겨 가며 붙여야 한다.
+                            주민등록번호를 앞자리·뒷자리 따로 넣는 것과 같은 일이다.
+                          */}
+                          {segmentsOf(f).length > 0 ? (
+                            <span className="inline-flex shrink-0 flex-nowrap items-baseline whitespace-nowrap">
+                              {segmentsOf(f).map((seg, i) => (
+                                <Fragment key={`${f.key}-seg-${i}`}>
+                                  {/* 하이픈도 조각과 같은 글자 크기·줄높이로 — 다르면 글자가 서로 다른 줄에 앉는다 */}
+                                  {i > 0 && (
+                                    <span aria-hidden="true" className="inline-block py-1 text-[0.98rem] font-semibold tabular-nums text-slate-400">
+                                      -
+                                    </span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => void copy(`${f.key}__s${i}`, seg)}
+                                    aria-label={`${f.label} ${seg} 만 복사`}
+                                    title={`${seg} 만 복사 — 칸이 나뉜 신청서용`}
+                                    className={`rounded px-1 py-1 text-[0.98rem] font-semibold tabular-nums ${
+                                      copiedKey === `${f.key}__s${i}`
+                                        ? 'bg-success-50 text-success-700'
+                                        : 'text-slate-800 hover:bg-brand-50 hover:text-brand-700'
+                                    }`}
+                                  >
+                                    {seg}
+                                  </button>
+                                </Fragment>
+                              ))}
+                              {/* 조각 옆의 아이콘 하나가 '보이는 그대로 전체' 다 */}
+                              <button
+                                type="button"
+                                onClick={() => void copy(f.key, f.value)}
+                                aria-label={`${f.label} 전체 복사`}
+                                title={`전체 복사 — ${f.value}`}
+                                className="ml-0.5 shrink-0 rounded p-1 hover:bg-slate-100"
+                              >
+                                {copiedKey === f.key ? (
+                                  <Check aria-hidden="true" className="size-3.5 text-success-600" />
+                                ) : (
+                                  <Copy aria-hidden="true" className="size-3.5 text-slate-400" />
+                                )}
+                              </button>
                             </span>
-                            {copiedKey === f.key ? (
-                              <Check aria-hidden="true" className="size-3.5 shrink-0 text-success-600" />
-                            ) : (
-                              <Copy aria-hidden="true" className="size-3.5 shrink-0 text-slate-400 group-hover:text-brand-600" />
-                            )}
-                          </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => void copy(f.key, f.value)}
+                              title="눌러서 복사 — 보이는 그대로"
+                              className="group inline-flex min-w-0 items-center gap-1 text-right"
+                            >
+                              <span className={`truncate text-[0.98rem] font-semibold text-slate-800 group-hover:text-brand-700 group-hover:underline ${f.numberKind ? 'tabular-nums' : ''}`}>
+                                {f.value}
+                              </span>
+                              {copiedKey === f.key ? (
+                                <Check aria-hidden="true" className="size-3.5 shrink-0 text-success-600" />
+                              ) : (
+                                <Copy aria-hidden="true" className="size-3.5 shrink-0 text-slate-400 group-hover:text-brand-600" />
+                              )}
+                            </button>
+                          )}
                           {/*
                             번호는 쓰는 곳마다 모양이 다르다 — 서류에는 하이픈을 넣고,
                             홈택스·공공 신청서 입력칸은 숫자만 받는 곳이 많다.
-                            값을 누르면 보이는 그대로, 옆의 [숫자만] 을 누르면 하이픈 없이 복사한다.
                           */}
                           {f.numberKind && digitsOf(f.value) !== f.value && (
                             <button
