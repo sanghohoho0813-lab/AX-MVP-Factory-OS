@@ -193,6 +193,8 @@ function upgradeFees(raw: Partial<ClientOpsRecord> & LegacyShape): FeeItem[] {
       kind: f.kind ?? 'deposit',
       label: f.label ?? FEE_KIND_LABEL[f.kind ?? 'deposit'],
       amount: typeof f.amount === 'number' ? f.amount : null,
+      // 영업자 수수료 칸이 없던 시절의 기록에는 아예 없다 — null 이면 '수수료 없음' 이다
+      agentFee: typeof f.agentFee === 'number' && Number.isFinite(f.agentFee) ? f.agentFee : null,
       dueDate: typeof f.dueDate === 'string' ? f.dueDate : '',
       receivedAt: typeof f.receivedAt === 'string' ? f.receivedAt : null,
       note: f.note ?? '',
@@ -209,6 +211,7 @@ function upgradeFees(raw: Partial<ClientOpsRecord> & LegacyShape): FeeItem[] {
       kind: 'deposit',
       label: '계약금',
       amount: raw.contractDepositAmount ?? null,
+      agentFee: null,
       dueDate: '',
       receivedAt: raw.contractDepositReceived ? today : null,
       note: '',
@@ -221,6 +224,7 @@ function upgradeFees(raw: Partial<ClientOpsRecord> & LegacyShape): FeeItem[] {
       kind: 'success',
       label: '성공보수',
       amount: raw.successFeeAmount ?? null,
+      agentFee: null,
       dueDate: '',
       receivedAt: raw.successFeeReceived ? today : null,
       note: '',
@@ -664,6 +668,7 @@ export function withNewFee(record: ClientOpsRecord, fee: Partial<FeeItem>): Clie
       fee.label ??
       (fee.serviceKey ? `${serviceMeta(fee.serviceKey).shortLabel} ${FEE_KIND_LABEL[kind]}` : FEE_KIND_LABEL[kind]),
     amount: fee.amount ?? null,
+    agentFee: fee.agentFee ?? null,
     dueDate: fee.dueDate ?? '',
     receivedAt: fee.receivedAt ?? null,
     note: fee.note ?? '',

@@ -44,6 +44,56 @@ await page.getByRole('button', { name: '넣기', exact: true }).click()
 await page.waitForTimeout(800)
 check('오늘에 할 일이 추가된다', await page.getByText('테스트 할 일 하나').first().isVisible())
 
+/*
+ * 적고 나서 고칠 수 있어야 한다.
+ * 통화 중에 급히 적은 한 줄은 대개 나중에 다듬게 된다 — 고칠 수 없으면 지우고 다시
+ * 적게 되고, 그러면 언제 적었는지가 사라진다.
+ *
+ * 뒤따르는 시험들이 '테스트 할 일 하나' 를 계속 쓰므로, 고치기 시험은 따로 만든
+ * 할 일로 한다. 기한을 바꾸면 오늘 목록에서 빠지기 때문이다.
+ */
+// 앞서 하나를 적어 둔 뒤라 적는 칸이 이미 펴져 있을 수 있다
+const opener = page.getByRole('button', { name: '할 일 적기' }).first()
+if ((await opener.count()) > 0) {
+  await opener.click()
+  await page.waitForTimeout(300)
+}
+await page.getByLabel('할 일 내용').fill('고칠 할 일')
+await page.getByRole('button', { name: '넣기', exact: true }).click()
+await page.waitForTimeout(800)
+
+await page.getByText('고칠 할 일').first().click()
+await page.waitForTimeout(400)
+check('할 일 시트가 열린다', (await page.getByRole('dialog').count()) > 0)
+const editBtn = page.getByRole('button', { name: '내용 고치기' }).first()
+check('할 일: [내용 고치기] 가 있다', (await editBtn.count()) > 0)
+await editBtn.click()
+await page.waitForTimeout(350)
+await page.getByLabel('할 일 내용 고치기').fill('고쳐 적은 할 일')
+await page.getByRole('button', { name: '저장', exact: true }).first().click()
+await page.waitForTimeout(900)
+const edited = (await page.locator('main').innerText()) ?? ''
+check('할 일: 내용이 바뀐다', edited.includes('고쳐 적은 할 일'), edited.slice(0, 200))
+check('할 일: 옛 내용은 사라진다', !edited.includes('고칠 할 일'))
+
+// 한 번 더 고칠 수 있다 — 고친 것을 또 고치는 것이 실제 쓰임새다
+await page.getByText('고쳐 적은 할 일').first().click()
+await page.waitForTimeout(400)
+await page.getByRole('button', { name: '내용 고치기' }).first().click()
+await page.waitForTimeout(350)
+await page.getByLabel('할 일 내용 고치기').fill('두 번 고친 할 일')
+await page.getByLabel('할 일 기한 고치기').fill('2026-12-24')
+await page.getByRole('button', { name: '저장', exact: true }).first().click()
+await page.waitForTimeout(900)
+const movedDue = await page.evaluate(() =>
+  JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]').find((x) => x.content === '두 번 고친 할 일'),
+)
+check('할 일: 다시 고칠 수 있다', movedDue !== undefined)
+check('할 일: 기한도 고칠 수 있다', movedDue?.dueDate === '2026-12-24', JSON.stringify(movedDue?.dueDate))
+// '오늘 할 일' 목록에서만 빠진다 — 오늘 적은 기록이므로 '무슨 일이 있었나요' 에는 남는다
+const todoBox = (await page.getByRole('region', { name: '오늘 할 일' }).first().innerText()) ?? ''
+check('할 일: 기한을 옮기면 오늘 할 일에서 빠진다', !todoBox.includes('두 번 고친 할 일'), todoBox.slice(0, 160))
+
 // 3) 일정 화면에서도 같은 것이 보인다
 await page.goto(BASE + '/ops/calendar', { waitUntil: 'networkidle' })
 await page.waitForTimeout(900)

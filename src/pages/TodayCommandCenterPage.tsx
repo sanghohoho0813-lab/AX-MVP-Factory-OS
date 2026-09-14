@@ -2,21 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
-  Building2,
   ClipboardCheck,
   Clock,
   Copy,
   Inbox,
-  Landmark,
-  ListTodo,
   Moon,
   NotebookPen,
-  Wallet,
-  Workflow,
 } from 'lucide-react'
-import { ConsultingNextActions } from '../components/consulting/ConsultingNextActions'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
-import { Badge, Blank, Disclosure, ListRow, ListSurface, MetricTile } from '../components/ui/primitives'
+import { Blank, Disclosure, MetricTile } from '../components/ui/primitives'
 import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
 import { useToast } from '../components/ui/toastContext'
@@ -27,7 +21,7 @@ import { EventCard } from '../components/ops/EventCard'
 import { LinkCustomerModal } from '../components/ops/LinkCustomerModal'
 import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { listClients } from '../services/clientOpsService'
-import { buildAllAlerts, dueText } from '../services/clientOpsAlerts'
+import { buildAllAlerts } from '../services/clientOpsAlerts'
 import { buildAllSchedule, upcomingWithin } from '../services/clientOpsSchedule'
 import {
   applyJournalFilter,
@@ -40,14 +34,13 @@ import {
 import { isOpenEvent, listEvents, updateEvent } from '../services/customerBridgeService'
 import {
   buildDaySummary,
-  buildFundingDeadlines,
   buildMoneySignals,
   buildTopActions,
   daySummaryText,
   type BriefAction,
 } from '../services/dailyBriefService'
 import { nowDate, todayLocalDate } from '../lib/appClock'
-import { formatKrw, krwTile } from '../lib/format'
+import { krwTile } from '../lib/format'
 import { getDataModeConfig } from '../data/dataMode'
 import { brand } from '../brand/brand.config'
 import { contractStageOf } from '../types/clientOps'
@@ -183,7 +176,6 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const [journal, setJournal] = useState<JournalEntry[]>([])
   const [events, setEvents] = useState<CustomerEvent[]>([])
   const [loading, setLoading] = useState(true)
-  const [consultingCount, setConsultingCount] = useState(0)
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [linking, setLinking] = useState<{ event: CustomerEvent; tab: 'existing' | 'new' } | null>(null)
   /** 눌러서 연 할 일 — 무엇을 할지 시트에서 고른다 */
@@ -227,7 +219,6 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     [alerts],
   )
   const money = useMemo(() => buildMoneySignals(clients, today), [clients, today])
-  const funding = useMemo(() => buildFundingDeadlines(clients, today), [clients, today])
   const openEvents = useMemo(() => events.filter(isOpenEvent), [events])
   const followUps = useMemo(() => journal.filter((j) => j.entryType === 'follow_up' && !j.completed), [journal])
   /**
@@ -243,18 +234,6 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     [alerts, events, followUps, clientNames, today],
   )
   const todayJournal = useMemo(() => applyJournalFilter(journal, { range: 'today' }, today), [journal, today])
-  const attention = useMemo(() => {
-    const byClient = new Map<string, { record: ClientOpsRecord; critical: number; warning: number; first: string }>()
-    for (const a of alerts) {
-      const r = clients.find((c) => c.id === a.clientId)
-      if (!r) continue
-      const cur = byClient.get(a.clientId) ?? { record: r, critical: 0, warning: 0, first: a.title }
-      if (a.severity === 'critical') cur.critical += 1
-      else if (a.severity === 'warning') cur.warning += 1
-      byClient.set(a.clientId, cur)
-    }
-    return [...byClient.values()].sort((x, y) => y.critical - x.critical || y.warning - x.warning).slice(0, 5)
-  }, [alerts, clients])
   const daySummary = useMemo(
     () => buildDaySummary({ today, journal, clients, alerts, events, clientNames }),
     [today, journal, clients, alerts, events, clientNames],
@@ -338,12 +317,15 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             <p className="t-sub font-medium text-slate-500">
               <time dateTime={now.toISOString()}>{timeText}</time> · {greeting(now.getHours())}
             </p>
-            <h1 className="t-page mt-0.5 break-keep text-slate-900">
+            <h1 className="t-page mt-0.5 flex flex-wrap items-baseline gap-x-3 break-keep text-slate-900">
               {loading
                 ? '오늘 할 일을 불러오는 중…'
                 : todoCount > 0
                   ? `오늘 할 일 ${todoCount}건`
                   : '오늘 할 일을 적어 보세요'}
+              <Link to="/journal" className="t-sub font-medium text-brand-700 hover:underline">
+                모두 보기
+              </Link>
             </h1>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2 self-start sm:self-auto">
@@ -368,21 +350,13 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         aria-labelledby="todos"
         className="flex flex-col gap-3 rounded-(--radius-panel) border-2 border-brand-200 bg-brand-50/30 p-4 sm:p-5"
       >
-        <div className="flex items-center justify-between gap-2">
-          <h2 id="todos" className="t-page flex items-center gap-2 break-keep text-slate-900">
-            <span
-              aria-hidden="true"
-              className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-white"
-            >
-              <ListTodo className="size-5" />
-            </span>
-            오늘 할 일
-          </h2>
-          <Link to="/journal" className="t-sub shrink-0 font-medium text-brand-700 hover:underline">
-            모두 보기
-          </Link>
-        </div>
-
+        {/*
+          카드 안에 '오늘 할 일' 제목을 또 두지 않는다 — 바로 위 h1 이 이미 그 말이다.
+          제목 줄을 없앤 자리를 적는 칸이 가져간다. 이 화면에서 제일 많이 누르는 곳이다.
+        */}
+        <h2 id="todos" className="sr-only">
+          오늘 할 일
+        </h2>
         <TodoComposer date={today} clients={active} onAdd={addTodo} />
 
         {/* 밀린 것 — 어제까지가 기한인데 아직 안 끝난 것 */}
@@ -451,14 +425,6 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             </ol>
           )}
 
-          {/* 컨설팅 작업실 — 진행 중인 특허·벤처·MVP 프로젝트의 다음 행동 (없으면 통째로 숨긴다) */}
-          {consultingCount > 0 && (
-            <div className="mt-2 flex flex-col gap-2">
-              <SectionTitle title="컨설팅 다음 행동" icon={Workflow} to="/studio" count={consultingCount} accent="todo" />
-            </div>
-          )}
-          <ConsultingNextActions workspaceId={workspaceId} today={today} onCount={setConsultingCount} />
-
           {/* 오늘의 숫자 — 위가 아니라 할 일 아래에 둔다. 숫자는 판단의 근거이지 할 일이 아니다 */}
           <div className="ax-stagger mt-1 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             <MetricTile
@@ -489,9 +455,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             />
           </div>
 
-          <p className="t-meta text-slate-500">
-            순서 규칙: 마감 지남·막힘 → 결제된 주문 → 지난 후속조치 → 고객 서류·요청 → 임박 마감. 규칙 기반이며 AI 판단이 아닙니다.
-          </p>
+          <p className="t-meta break-keep text-slate-500">급한 순서대로 셋만 — 규칙으로 고른 것이며 AI 판단이 아닙니다.</p>
         </section>
 
         {/* 3단계 — 빠른 기록 */}
@@ -556,114 +520,6 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           )}
         </section>
 
-        {/* 4단계 — 챙겨야 할 업체 */}
-        <section aria-labelledby="attention" className="flex min-w-0 flex-col gap-3">
-          <SectionTitle title="챙겨야 할 업체" icon={Building2} to="/ops/clients" count={attention.length} accent="client" />
-          {attention.length === 0 ? (
-            <Blank
-              title={active.length === 0 ? '아직 등록된 업체가 없습니다.' : '경고가 있는 업체가 없습니다.'}
-              icon={<Building2 className="size-7" />}
-              action={
-                active.length === 0 ? (
-                  <Link to="/ops/clients" className="t-sub font-medium text-brand-700 hover:underline">
-                    첫 업체 등록
-                  </Link>
-                ) : undefined
-              }
-            />
-          ) : (
-            <ListSurface>
-              {attention.slice(0, 4).map(({ record, critical, warning, first }) => (
-                <ListRow
-                  key={record.id}
-                  title={record.companyName}
-                  meta={first}
-                  badge={
-                    critical > 0 ? (
-                      <Badge tone="danger">지금 {critical}</Badge>
-                    ) : warning > 0 ? (
-                      <Badge tone="warning">곧 {warning}</Badge>
-                    ) : undefined
-                  }
-                  onClick={() => navigate(`/ops/clients/${record.id}`)}
-                />
-              ))}
-            </ListSurface>
-          )}
-          {attention.length > 4 && (
-            <Link to="/ops/clients" className="t-sub font-medium text-brand-700 hover:underline">
-              {attention.length - 4}곳 더 보기
-            </Link>
-          )}
-        </section>
-
-        {/* 5단계 — 돈. 숫자만 먼저 보이고 상세는 펼친다 */}
-        <section aria-labelledby="money" className="flex min-w-0 flex-col gap-3">
-          <SectionTitle title="돈" icon={Wallet} accent="money" />
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-            <MetricTile label="예정 수금" value={krwTile(money.scheduled.total)} hint={`${money.scheduled.count}건`} />
-            <MetricTile
-              label="연체"
-              value={krwTile(money.overdue.total)}
-              tone={money.overdue.count > 0 ? 'danger' : 'neutral'}
-              hint={`${money.overdue.count}건`}
-            />
-            <MetricTile label="금액 미정" value={`${money.unknownAmount}건`} hint="합산 제외" />
-          </div>
-          {money.overdue.items.length > 0 && (
-            <Disclosure title="연체 상세" hint={`${money.overdue.items.length}건`}>
-              <ul className="divide-y divide-slate-100">
-                {money.overdue.items.slice(0, 6).map((m) => (
-                  <li key={`${m.clientId}-${m.label}-${m.dueDate}`}>
-                    <Link
-                      to={`/ops/clients/${m.clientId}`}
-                      className="t-sub flex items-center justify-between gap-2 py-2.5 hover:text-brand-700"
-                    >
-                      <span className="min-w-0 truncate">
-                        <span className="font-semibold text-slate-800">{m.clientName}</span> · {m.label}
-                      </span>
-                      <span className="shrink-0 font-semibold text-danger-700">
-                        {formatKrw(m.amount)} · {m.dueDate}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </Disclosure>
-          )}
-        </section>
-
-        {/* 5단계 — 지원사업 마감 */}
-        <section aria-labelledby="funding" className="flex min-w-0 flex-col gap-3">
-          <SectionTitle title="지원사업 마감" icon={Landmark} to="/funding" count={funding.length} accent="fund" />
-          {funding.length === 0 ? (
-            <Blank title="14일 안에 마감되는 신청 건이 없습니다." icon={<Landmark className="size-7" />} />
-          ) : (
-            <ListSurface>
-              {funding.slice(0, 4).map((f) => (
-                <ListRow
-                  key={`${f.clientId}-${f.programName}-${f.applyDueDate}`}
-                  title={f.programName}
-                  meta={`${f.clientName}${f.institution ? ` · ${f.institution}` : ''}`}
-                  right={
-                    <span
-                      className={
-                        f.daysLeft < 0
-                          ? 'font-semibold text-danger-700'
-                          : f.daysLeft <= 3
-                            ? 'font-semibold text-warning-700'
-                            : ''
-                      }
-                    >
-                      {dueText(f.daysLeft)}
-                    </span>
-                  }
-                  onClick={() => navigate(`/ops/clients/${f.clientId}`)}
-                />
-              ))}
-            </ListSurface>
-          )}
-        </section>
       </div>
 
       {/* 하루의 끝에 누르는 버튼이라 모바일에서는 화면 맨 아래에 둔다 */}
@@ -717,6 +573,10 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           entry={todoPick}
           clientName={todoPick.clientId ? clientNameOf(todoPick.clientId) : undefined}
           onPick={(action) => applyTodoAction(todoPick, action)}
+          onSave={(patch) => {
+            setTodoPick(null)
+            void journalMutate(() => updateJournalEntry(todoPick, patch), '고쳤습니다.')
+          }}
           onOpenClient={
             todoPick.clientId ? () => navigate(`/ops/clients/${todoPick.clientId}`) : undefined
           }

@@ -13,7 +13,7 @@
  */
 
 import { useState } from 'react'
-import { ArrowRight, Check, ChevronDown, Plus, X } from 'lucide-react'
+import { ArrowRight, Check, ChevronDown, Pencil, Plus, X } from 'lucide-react'
 import type { JournalEntry } from '../../types/bridge'
 import { TODO_PRESETS } from '../../services/journalService'
 import { dueText } from '../../services/clientOpsAlerts'
@@ -211,16 +211,33 @@ export function TodoActionSheet({
   entry,
   clientName,
   onPick,
+  onSave,
   onOpenClient,
   onClose,
 }: {
   entry: JournalEntry
   clientName?: string
   onPick: (action: TodoAction) => void
+  /** 적어 둔 내용·기한을 고칠 때 */
+  onSave?: (patch: { content: string; dueDate: string }) => void
   /** 관련 업체가 있을 때만 */
   onOpenClient?: () => void
   onClose: () => void
 }) {
+  /*
+   * 적고 나서 고칠 수 있어야 한다.
+   * 통화 중에 급히 적은 한 줄은 대개 나중에 다듬게 된다 — 고칠 수 없으면
+   * 지우고 다시 적게 되고, 그러면 언제 적었는지가 사라진다.
+   */
+  const [editing, setEditing] = useState(false)
+  const [content, setContent] = useState(entry.content)
+  const [dueDate, setDueDate] = useState(entry.dueDate)
+
+  const save = () => {
+    if (onSave && content.trim() !== '') onSave({ content: content.trim(), dueDate })
+    setEditing(false)
+  }
+
   const rows: { action: TodoAction; label: string; hint: string; tone?: 'danger' }[] = [
     { action: 'open', label: '진행 중', hint: '아직 안 끝났습니다 (목록에 남습니다)' },
     { action: 'done', label: '완료', hint: '끝났습니다 (아래로 접힙니다)' },
@@ -228,8 +245,68 @@ export function TodoActionSheet({
     { action: 'delete', label: '삭제', hint: '기록에서 지웁니다 — 되돌릴 수 없습니다', tone: 'danger' },
   ]
 
+  if (editing) {
+    return (
+      <BottomSheet
+        title="할 일 고치기"
+        onClose={onClose}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button onClick={() => { setContent(entry.content); setDueDate(entry.dueDate); setEditing(false) }}>취소</Button>
+            <Button variant="primary" disabled={content.trim() === ''} onClick={save}>
+              저장
+            </Button>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <label className="block">
+            <span className="t-sub font-medium text-slate-700">할 일</span>
+            <textarea
+              autoFocus
+              aria-label="할 일 내용 고치기"
+              value={content}
+              rows={3}
+              onChange={(e) => setContent(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) save()
+              }}
+              className="t-body mt-1 w-full resize-y rounded-(--radius-control) border border-slate-300 px-3 py-2.5 focus:border-brand-500 focus:outline-none"
+            />
+          </label>
+          <label className="block">
+            <span className="t-sub font-medium text-slate-700">언제까지</span>
+            <input
+              type="date"
+              aria-label="할 일 기한 고치기"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="t-body mt-1 h-12 w-full rounded-(--radius-control) border border-slate-300 px-3"
+            />
+            {dueDate !== '' && (
+              <button
+                type="button"
+                onClick={() => setDueDate('')}
+                className="t-sub mt-1 font-medium text-slate-500 hover:text-brand-700 hover:underline"
+              >
+                기한 없애기
+              </button>
+            )}
+          </label>
+        </div>
+      </BottomSheet>
+    )
+  }
+
   return (
     <BottomSheet title={entry.content} onClose={onClose}>
+      {/* 고치기를 맨 위에 둔다 — 목록에서 누르는 이유의 절반은 '뭐라고 적었더라' 다 */}
+      {onSave && (
+        <Button variant="secondary" className="mb-3 w-full" onClick={() => setEditing(true)}>
+          <Pencil aria-hidden="true" className="size-4" />
+          내용 고치기
+        </Button>
+      )}
       <div className="flex flex-col gap-1">
         {rows.map((r) => {
           const active = (r.action === 'done' && entry.completed) || (r.action === 'open' && !entry.completed)

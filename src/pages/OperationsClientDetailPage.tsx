@@ -100,6 +100,7 @@ import { TodoComposer } from '../components/journal/TodoBoard'
 import { createJournalEntry } from '../services/journalService'
 import { FundingSection } from '../components/ops/FundingSection'
 import { DocImportModal } from '../components/ops/DocImportModal'
+import { feeMathOf, feeTotals, marginPct, marginText } from '../services/feeMath'
 import { withActivity } from '../services/clientOpsActivity'
 import { ActivityLog } from '../components/ops/ActivityLog'
 import { ContractCard } from '../components/ops/ContractCard'
@@ -1390,9 +1391,13 @@ function FeesSection({
   const [amount, setAmount] = useState(0)
   const [dueDate, setDueDate] = useState('')
 
-  const unpaid = record.fees.filter((f) => f.receivedAt === null)
-  const unpaidTotal = unpaid.reduce((s, f) => s + (f.amount ?? 0), 0)
-  const paidTotal = record.fees.filter((f) => f.receivedAt !== null).reduce((s, f) => s + (f.amount ?? 0), 0)
+  const [agentFee, setAgentFee] = useState(0)
+  /*
+   * 청구액과 '진짜 내 돈' 은 다르다.
+   * 성공보수 2,000만원을 받아도 일부는 소개해 준 영업자에게 나간다. 청구액만 보고
+   * 있으면 실제로 남는 돈을 늘 다시 계산하게 된다 — 그래서 둘을 나란히 둔다.
+   */
+  const totals = feeTotals(record.fees)
 
   const add = () => {
     onChange(
@@ -1400,12 +1405,17 @@ function FeesSection({
         kind,
         serviceKey: serviceKey === '' ? null : serviceKey,
         amount: amount > 0 ? amount : null,
+        agentFee: agentFee > 0 ? agentFee : null,
         dueDate,
       }),
     )
     setAmount(0)
+    setAgentFee(0)
     setDueDate('')
   }
+
+  /** 새로 넣을 항목의 이익률 — 적는 동안 계산기처럼 따라 움직인다 */
+  const draftMargin = marginPct(amount > 0 ? amount : null, agentFee)
 
   return (
     <section aria-labelledby="fees" className="flex flex-col gap-3">
@@ -1413,10 +1423,23 @@ function FeesSection({
         <h2 id="fees" className="text-[1.3rem] font-bold text-slate-900">
           계약금 · 성공보수
         </h2>
-        <p className="text-[0.95rem] text-slate-600">
-          받은 돈 <strong className="text-slate-900">{formatKrw(paidTotal)}</strong> · 못 받은 돈{' '}
-          <strong className={unpaidTotal > 0 ? 'text-danger-700' : 'text-slate-900'}>{formatKrw(unpaidTotal)}</strong>
-        </p>
+      </div>
+
+      {/* 돈 세 줄 — 청구액 · 영업자 수수료 · 진짜 내 돈. 이익률은 매번 계산한다 */}
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        <MetricTile label="청구 합계" value={krwTile(totals.gross)} hint={totals.unknownCount > 0 ? `금액 미정 ${totals.unknownCount}건` : undefined} />
+        <MetricTile label="영업자 수수료" value={krwTile(totals.agent)} />
+        <MetricTile
+          label="내가 받는 돈"
+          value={krwTile(totals.net)}
+          hint={totals.marginPct !== null ? `이익률 ${marginText(totals.marginPct)}` : undefined}
+        />
+        <MetricTile
+          label="못 받은 내 돈"
+          value={krwTile(totals.unpaidNet)}
+          tone={totals.unpaidNet > 0 ? 'danger' : 'neutral'}
+          hint={totals.unpaidGross !== totals.unpaidNet ? `청구 기준 ${krwTile(totals.unpaidGross)}` : undefined}
+        />
       </div>
 
       <Panel flush>
@@ -1508,6 +1531,41 @@ function FeesSection({
                       +100만
                     </button>
                   </div>
+
+                  {/*
+                    영업자 수수료 줄 — 청구액 바로 아래.
+                    이익률은 저장하지 않고 매번 계산한다. 금액을 고치면 그 자리에서 따라 바뀐다.
+                  */}
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pl-[1.9rem] sm:order-7 sm:w-full sm:pl-0">
+                    <label className="t-sub flex items-center gap-1.5 text-slate-500">
+                      영업자 수수료
+                      <input
+                        aria-label={`${fee.label} 영업자 수수료`}
+                        value={fee.agentFee === null ? '' : fee.agentFee.toLocaleString('ko-KR')}
+                        onChange={(e) => {
+                          const n = parseAmount(e.target.value)
+                          onChange(withFee(record, fee.id, { agentFee: n > 0 ? n : null }))
+                        }}
+                        inputMode="numeric"
+                        placeholder="없음"
+                        className="w-24 rounded-(--radius-control) border border-slate-300 px-2 py-1 text-right text-[0.92rem] font-semibold tabular-nums text-slate-700"
+                      />
+                    </label>
+                    {(() => {
+                      const m = feeMathOf(fee)
+                      if (m.net === null || m.agent === 0) return null
+                      return (
+                        <span className="t-sub text-slate-600">
+                          → 내 몫 <strong className="font-semibold text-slate-900 tabular-nums">{formatKrw(m.net)}</strong>
+                          {m.marginPct !== null && (
+                            <span className="ml-1.5 rounded-full bg-brand-50 px-2 py-0.5 font-bold text-brand-700 tabular-nums">
+                              {marginText(m.marginPct)}
+                            </span>
+                          )}
+                        </span>
+                      )
+                    })()}
+                  </div>
                 </li>
               )
             })}
@@ -1545,6 +1603,13 @@ function FeesSection({
             </select>
           </label>
           <AmountField id="fee-new-amount" value={amount} onChange={setAmount} />
+          <AmountField id="fee-new-agent" label="영업자 수수료" value={agentFee} onChange={setAgentFee} />
+          {/* 적는 동안 이익률이 따라 움직인다 — 계산기를 따로 두드리지 않게 */}
+          {draftMargin !== null && (
+            <span className="t-sub self-center rounded-full bg-brand-50 px-2.5 py-1 font-bold text-brand-700 tabular-nums">
+              이익률 {marginText(draftMargin)}
+            </span>
+          )}
           <label className="text-[0.88rem] font-medium text-slate-600">
             받기로 한 날
             <input

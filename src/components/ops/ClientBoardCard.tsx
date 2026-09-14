@@ -147,6 +147,7 @@ const CARD_EDGE: Record<Tone, string> = {
 
 export function ClientBoardCard({
   record,
+  rank,
   today,
   dueSoonDays,
   tone,
@@ -157,6 +158,8 @@ export function ClientBoardCard({
   onMoney,
 }: {
   record: ClientOpsRecord
+  /** 목록에서 몇 번째인가 — 정렬을 바꿨을 때 순서가 바뀐 것이 눈에 보이게 한다 */
+  rank?: number
   today: string
   dueSoonDays: number
   tone: Tone
@@ -221,7 +224,18 @@ export function ClientBoardCard({
       <div className="flex flex-col gap-2 p-3.5 pl-[1.15rem] sm:p-4 sm:pl-[1.15rem]">
         {/* 이름 줄 */}
         <div className="flex items-start justify-between gap-2">
-          <button type="button" onClick={onOpen} className="flex min-w-0 items-center gap-2 text-left">
+          {/*
+            번호는 옅게, 그리고 이름 단추 **밖**에 둔다.
+            단추 안에 넣으면 글자 크기가 다른 상자가 한 줄에 셋(번호·이름·화살표)이 되어
+            큰 글자 설정에서 좁은 칸이 세로로 쌓인 것처럼 읽힌다(D-23). 읽는 값이 아니라
+            '몇 번째인지' 를 세는 눈금이라 단추에서 빠져도 된다.
+          */}
+          {rank !== undefined && (
+            <span aria-hidden="true" className="t-card shrink-0 font-normal tabular-nums text-slate-400">
+              {rank}
+            </span>
+          )}
+          <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-2 text-left">
             <span className="t-card truncate font-bold text-slate-900 hover:text-brand-700 hover:underline">
               {record.companyName || '(이름 없음)'}
             </span>

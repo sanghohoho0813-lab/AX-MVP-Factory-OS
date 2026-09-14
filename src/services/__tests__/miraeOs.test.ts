@@ -43,6 +43,8 @@ import { CONTRACT_STAGE_ORDER, CONTRACT_STAGE_LABEL, contractStageOf, statusForS
 import type { ClientOpsStatus, ContractStage } from '../../types/clientOps'
 import { clientOpsProgress } from '../clientOpsAlerts'
 import { digitsOf, formatNumberOf, numberSegments } from '../../lib/format'
+import { feeMathOf, feeTotals, marginPct, marginText } from '../feeMath'
+import { CLIENT_SORT_ORDER, isClientSortKey, sortClients } from '../clientOpsSort'
 import { formatYmd, profileAsText, yearsInBusiness } from '../clientOpsProfile'
 import { SERVICE_STATUS_ORDER, isServiceOpen, isServiceNotApplicable, normalizeServiceStatus } from '../../content/clientOpsCatalog'
 import { BUILTIN_SERVICES, SERVICES, registerCustomServices } from '../../content/clientOpsCatalog'
@@ -692,6 +694,78 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
   check('직접 만든 칸: 묶음이 이상하면 회사로 보낸다', messy.customFields.find((f) => f.label === '이상한묶음')?.group === 'identity')
   check('직접 만든 칸: id 가 없으면 만들어 준다', (messy.customFields.find((f) => f.label === '이상한묶음')?.id ?? '') !== '')
   check('직접 만든 칸: 이름 없는 칸은 버린다', !messy.customFields.some((f) => f.label === ''))
+}
+
+/* ------------------------------------------------------------------ */
+/* 수금 — 청구액 · 영업자 수수료 · 내 몫 · 이익률                          */
+/* ------------------------------------------------------------------ */
+{
+  // 대표가 든 예시: 2,000만원 중 200만원이 영업자에게 → 내 몫 1,800만원 = 90%
+  const m = feeMathOf({ amount: 20_000_000, agentFee: 2_000_000 })
+  check('이익률: 2000만 중 200만 나가면 90%', m.marginPct === 90, String(m.marginPct))
+  check('내 몫: 1,800만원', m.net === 18_000_000)
+  check('이익률 표기: 정수면 소수점 없이', marginText(90) === '90%')
+  check('이익률 표기: 소수점 한 자리', marginText(63.6) === '63.6%')
+
+  check('이익률: 수수료가 없으면 100%', feeMathOf({ amount: 5_000_000, agentFee: null }).marginPct === 100)
+  check('이익률: 수수료가 0이어도 100%', feeMathOf({ amount: 5_000_000, agentFee: 0 }).marginPct === 100)
+  check('이익률: 청구액이 미정이면 null', feeMathOf({ amount: null, agentFee: 1_000_000 }).marginPct === null)
+  check('내 몫: 청구액이 미정이면 null', feeMathOf({ amount: null, agentFee: 1_000_000 }).net === null)
+  check('이익률: 청구액 0이면 null — 0으로 나누지 않는다', marginPct(0, 100) === null)
+  check('이익률: 수수료가 더 크면 음수 그대로', feeMathOf({ amount: 1_000_000, agentFee: 1_500_000 }).marginPct === -50)
+  check('이익률: 반올림은 소수점 한 자리', feeMathOf({ amount: 5_500_000, agentFee: 2_000_000 }).marginPct === 63.6)
+  check('수수료: 음수는 없는 것으로 본다', feeMathOf({ amount: 1_000_000, agentFee: -5 }).agent === 0)
+
+  // 합계 — 받은 것과 못 받은 것을 '내 몫' 기준으로도 센다
+  const rec = normalizeClientOps({
+    id: 'c-fee', companyName: '수금테스트',
+    fees: [
+      { id: 'f1', kind: 'deposit', label: '계약금', amount: 3_000_000, agentFee: null, dueDate: '', receivedAt: '2026-08-25' },
+      { id: 'f2', kind: 'success', label: '성공보수', amount: 5_500_000, agentFee: 2_000_000, dueDate: '', receivedAt: null },
+      { id: 'f3', kind: 'interim', label: '중도금', amount: null, agentFee: null, dueDate: '', receivedAt: null },
+    ] as never,
+  })
+  const t = feeTotals(rec.fees)
+  check('합계: 청구액', t.gross === 8_500_000, String(t.gross))
+  check('합계: 영업자 수수료', t.agent === 2_000_000)
+  check('합계: 내가 받는 돈', t.net === 6_500_000)
+  check('합계: 못 받은 청구액', t.unpaidGross === 5_500_000)
+  check('합계: 못 받은 내 돈 — 수수료를 뺀 것', t.unpaidNet === 3_500_000, String(t.unpaidNet))
+  check('합계: 이미 받은 내 돈', t.receivedNet === 3_000_000)
+  check('합계: 금액 미정은 세되 합산하지 않는다', t.unknownCount === 1)
+  check('합계: 전체 이익률', t.marginPct !== null && Math.abs(t.marginPct - 76.5) < 0.05, String(t.marginPct))
+  check('합계: 항목이 없으면 0', feeTotals([]).gross === 0 && feeTotals([]).marginPct === null)
+  check('수수료: 옛 기록에 칸이 없어도 읽힌다', rec.fees[0]?.agentFee === null)
+}
+
+/* ------------------------------------------------------------------ */
+/* 고객 목록 정렬                                                        */
+/* ------------------------------------------------------------------ */
+{
+  const T = '2026-09-14'
+  const mk = (id: string, name: string, est: string, signed: string) =>
+    normalizeClientOps({ id, companyName: name, establishedAt: est, contract: { signedAt: signed, kind: 'cash', cashAmount: null, policies: [], note: '' } as never })
+  const list = [
+    mk('a', '하늘기업', '2019-01-01', '2026-01-10'),
+    mk('b', '가나테크', '2002-02-16', '2024-07-10'),
+    mk('c', '나라산업', '', ''),
+  ]
+
+  check('정렬: 네 가지', CLIENT_SORT_ORDER.length === 4)
+  check('정렬: 모르는 값은 거른다', isClientSortKey('name') && !isClientSortKey('아무거나'))
+  check('정렬: 원본을 건드리지 않는다', sortClients(list, 'name', T) !== list && list[0]?.id === 'a')
+
+  const byName = sortClients(list, 'name', T).map((r) => r.companyName)
+  check('정렬: 가나다순', JSON.stringify(byName) === JSON.stringify(['가나테크', '나라산업', '하늘기업']), JSON.stringify(byName))
+
+  const byYears = sortClients(list, 'years', T).map((r) => r.id)
+  check('정렬: 업력순 — 오래된 회사가 위로', byYears[0] === 'b' && byYears[1] === 'a', JSON.stringify(byYears))
+  check('정렬: 업력을 모르는 업체는 맨 뒤', byYears[2] === 'c')
+
+  const byContract = sortClients(list, 'contract', T).map((r) => r.id)
+  check('정렬: 계약 오래된 순', byContract[0] === 'b' && byContract[1] === 'a', JSON.stringify(byContract))
+  check('정렬: 계약일이 없으면 맨 뒤', byContract[2] === 'c')
+  check('정렬: 급한 순도 모두 돌려준다', sortClients(list, 'urgency', T).length === 3)
 }
 
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)

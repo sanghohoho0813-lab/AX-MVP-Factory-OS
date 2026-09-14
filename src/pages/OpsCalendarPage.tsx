@@ -379,6 +379,10 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
           entry={todoPick}
           clientName={todoPick.clientId ? clientNameOf(todoPick.clientId) : undefined}
           onPick={(action) => applyTodoAction(todoPick, action)}
+          onSave={(patch) => {
+            setTodoPick(null)
+            void mutate(() => updateJournalEntry(todoPick, patch), '고쳤습니다.')
+          }}
           onOpenClient={
             todoPick.clientId ? () => navigate(`/ops/clients/${todoPick.clientId}`) : undefined
           }

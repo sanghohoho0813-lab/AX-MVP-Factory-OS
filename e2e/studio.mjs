@@ -211,10 +211,17 @@ await script.blur()
 await wait(900)
 check('16 금지 표현 탐지', (await page.getByText('금지 표현이 들어 있습니다').count()) > 0)
 
-// 17) 오늘 화면 — 컨설팅 다음 행동
+/*
+ * 17) 오늘 화면에는 '컨설팅 다음 행동' 을 두지 않는다 (D-70).
+ * 대표 지시로 오늘 화면을 네 구역으로 줄였다 — 컨설팅은 왼쪽 메뉴의 작업실에서 본다.
+ * 정보가 사라진 것이 아니라 자리를 옮긴 것이므로, 가는 길이 살아 있는지도 함께 본다.
+ */
 await page.goto(BASE + '/', { waitUntil: 'networkidle' })
 await wait(1200)
-check('17 오늘 화면에 컨설팅 다음 행동', (await page.getByText('컨설팅 다음 행동').count()) > 0)
+check('17 오늘 화면에 컨설팅 다음 행동이 없다', (await page.getByText('컨설팅 다음 행동').count()) === 0)
+await page.goto(BASE + '/studio', { waitUntil: 'networkidle' })
+await wait(900)
+check('17 컨설팅 작업실로 가는 길은 살아 있다', !page.url().includes('/404') && (await page.locator('main').innerText()).length > 0)
 
 // 18) 고객 상세 — 컨설팅 탭
 await page.goto(BASE + `/ops/clients/${SEED_CLIENT_ID}?tab=consulting`, { waitUntil: 'networkidle' })

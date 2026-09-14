@@ -16,7 +16,17 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { ServiceCatalogModal } from '../components/ops/ServiceCatalogModal'
+const SORT_KEY = 'axmvp.clients.sort'
+
 import { ClientBoardCard } from '../components/ops/ClientBoardCard'
+import {
+  CLIENT_SORT_HINT,
+  CLIENT_SORT_LABEL,
+  CLIENT_SORT_ORDER,
+  isClientSortKey,
+  sortClients,
+  type ClientSortKey,
+} from '../services/clientOpsSort'
 import { ClientMoneySheet, ServiceStatusSheet } from '../components/ops/ClientQuickSheets'
 import { BottomSheet, MetricTile, ScreenTitle, type Tone } from '../components/ui/primitives'
 import { loadCustomServicesIntoCatalog } from '../services/customServiceService'
@@ -35,7 +45,6 @@ import {
   buildAllAlerts,
   clientOpsProgress,
   daysLeftFrom,
-  sortClientsByUrgency,
   summarizeAlerts,
 } from '../services/clientOpsAlerts'
 import { DUE_SOON_DAYS } from '../content/clientOpsCatalog'
@@ -152,7 +161,26 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   }, [records, query, showArchived])
   const archivedCount = records.filter((r) => r.archivedAt !== null).length
 
-  const ordered = useMemo(() => sortClientsByUrgency(visible, today), [visible, today])
+  /*
+   * 정렬 기준은 기억한다 — 매번 다시 고르게 하면 결국 기본값만 쓰게 된다.
+   * 전화를 받으면 가나다순, 정책자금을 보면 업력순으로 두고 그대로 일한다.
+   */
+  const [sortKey, setSortKey] = useState<ClientSortKey>(() => {
+    try {
+      const v = localStorage.getItem(SORT_KEY)
+      return isClientSortKey(v) ? v : 'urgency'
+    } catch {
+      return 'urgency'
+    }
+  })
+  useEffect(() => {
+    try {
+      localStorage.setItem(SORT_KEY, sortKey)
+    } catch {
+      /* 저장을 막아 둔 브라우저도 화면은 돌아가야 한다 */
+    }
+  }, [sortKey])
+  const ordered = useMemo(() => sortClients(visible, sortKey, today), [visible, sortKey, today])
   const alerts = useMemo(() => buildAllAlerts(records, today), [records, today])
   const summary = useMemo(() => summarizeAlerts(alerts), [alerts])
   const visibleAlerts = useMemo(
@@ -413,6 +441,26 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
               보관함 {archivedCount}
             </button>
           )}
+          {/*
+            정렬은 고르는 칸 하나로 둔다. 단추 네 개를 늘어놓으면 검색줄이 두 줄이 되고,
+            좁은 화면에서 제일 많이 쓰는 검색칸이 밀린다.
+          */}
+          <label className="flex shrink-0 items-center gap-1.5">
+            <span className="t-sub text-slate-500">정렬</span>
+            <select
+              value={sortKey}
+              aria-label="업체 정렬 기준"
+              onChange={(e) => setSortKey(isClientSortKey(e.target.value) ? e.target.value : 'urgency')}
+              className="rounded-(--radius-control) border border-slate-300 bg-white px-2 py-2 text-[0.92rem] font-medium text-slate-700 focus:border-brand-500 focus:outline-none sm:py-1.5"
+            >
+              {CLIENT_SORT_ORDER.map((k) => (
+                <option key={k} value={k}>
+                  {CLIENT_SORT_LABEL[k]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <span className="t-sub shrink-0 text-slate-500">{CLIENT_SORT_HINT[sortKey]}</span>
           {query !== '' && (
             <span className="text-[0.9rem] text-slate-500">{visible.length}곳 찾음</span>
           )}
@@ -483,7 +531,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
             휴대폰과 데스크톱이 같은 부품을 쓴다 — 한쪽만 어긋날 일이 없다.
           */}
           <ul className="ax-stagger flex flex-col gap-2.5 xl:grid xl:grid-cols-2">
-            {ordered.map((record) => {
+            {ordered.map((record, i) => {
               const p = clientOpsProgress(record, today)
               const critical = summary.criticalByClient[record.id] ?? 0
               const warning = summary.warningByClient[record.id] ?? 0
@@ -491,6 +539,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
               return (
                 <ClientBoardCard
                   key={record.id}
+                  rank={i + 1}
                   record={record}
                   today={today}
                   dueSoonDays={DUE_SOON_DAYS}

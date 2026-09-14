@@ -124,8 +124,13 @@ export interface FeeItem {
   kind: FeeKind
   /** 표시용 이름 (예: "벤처인증 성공보수") */
   label: string
-  /** 금액(원). 미정이면 null */
+  /** 청구 금액(원). 미정이면 null */
   amount: number | null
+  /**
+   * 이 건에서 영업자에게 나갈 수수료(원). 없으면 null.
+   * 청구액에서 이것을 뺀 것이 '진짜 내가 받는 돈' 이다 — 이익률은 저장하지 않고 매번 계산한다.
+   */
+  agentFee: number | null
   /** 받기로 한 날 (YYYY-MM-DD, 미정이면 '') */
   dueDate: string
   /** 실제 입금 확인일 (YYYY-MM-DD). 미수금이면 null */

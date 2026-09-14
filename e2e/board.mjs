@@ -362,6 +362,66 @@ check('실제로 지워졌다', left === false)
   check('표준 칸: 칸은 남아 다시 적을 수 있다', ((await page.locator('main').innerText()) ?? '').includes('담당자'))
 }
 
+/* ---------------- 목록 정렬 · 번호 ---------------- */
+{
+  await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const picker = page.locator('select[aria-label="업체 정렬 기준"]')
+  check('정렬: 고르는 칸이 있다', (await picker.count()) > 0)
+  const opts = await picker.locator('option').allInnerTexts()
+  check('정렬: 네 가지', opts.length === 4 && opts.includes('가나다순') && opts.includes('업력순') && opts.includes('계약 오래된 순'), JSON.stringify(opts))
+
+  const names = async () =>
+    page.evaluate(() =>
+      Array.from(document.querySelectorAll('main li'))
+        .map((li) => (li.querySelector('button span.truncate')?.textContent ?? '').trim())
+        .filter((t) => t !== ''),
+    )
+  await picker.selectOption('name')
+  await page.waitForTimeout(600)
+  const sorted = await names()
+  const expected = [...sorted].sort((a, b) => a.localeCompare(b, 'ko'))
+  check('정렬: 가나다순으로 실제로 바뀐다', JSON.stringify(sorted) === JSON.stringify(expected), JSON.stringify(sorted))
+
+  // 번호가 붙어 순서가 눈에 보인다
+  const board = (await page.locator('main').innerText()) ?? ''
+  check('정렬: 번호가 붙는다', /(^|\n)\s*1\s/.test(board) || board.includes('1 '), board.slice(0, 120))
+
+  // 새로고침해도 고른 기준이 남는다
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check('정렬: 새로고침해도 기억한다', (await picker.inputValue()) === 'name')
+  await picker.selectOption('urgency')
+  await page.waitForTimeout(500)
+}
+
+/* ---------------- 수금: 영업자 수수료 · 내 몫 · 이익률 ---------------- */
+{
+  await page.goto(BASE + '/ops/clients/cli_wooil?tab=fees', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  // 우일산업에는 수금 항목이 없으니 하나 넣는다 (2,000만원 · 영업자 200만 → 90%)
+  await page.getByLabel('금액(원)').first().fill('20,000,000')
+  await page.getByLabel('영업자 수수료').first().fill('2,000,000')
+  await page.waitForTimeout(300)
+  const live = (await page.locator('main').innerText()) ?? ''
+  check('수금: 적는 동안 이익률이 보인다', live.includes('이익률 90%'), live.slice(0, 300))
+
+  await page.getByRole('button', { name: '추가' }).first().click()
+  await page.waitForTimeout(900)
+  const after = (await page.locator('main').innerText()) ?? ''
+  check('수금: 청구 합계', after.includes('2,000만원'), after.slice(0, 300))
+  check('수금: 영업자 수수료 합계', after.includes('200만원'))
+  check('수금: 내가 받는 돈', after.includes('1,800만원'))
+  check('수금: 항목에 내 몫과 이익률', after.includes('18,000,000원') && after.includes('90%'))
+
+  const saved = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_wooil'),
+  )
+  const fees = saved?.fees ?? saved?.payload?.fees ?? []
+  check('수금: 수수료가 저장된다', fees[0]?.agentFee === 2_000_000, JSON.stringify(fees[0]))
+  check('수금: 이익률은 저장하지 않는다 — 매번 계산한다', !JSON.stringify(fees[0] ?? {}).includes('margin'))
+}
+
 await browser.close()
 console.log(`\n목록 바로 고치기 · 계약 단계 · 삭제: ${pass} passed, ${fail} failed`)
 process.exit(fail > 0 ? 1 : 0)
