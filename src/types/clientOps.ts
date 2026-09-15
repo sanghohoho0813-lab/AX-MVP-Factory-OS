@@ -133,6 +133,8 @@ export interface FeeItem {
   agentFee: number | null
   /** 그 수수료를 받아 갈 영업자 이름. 없으면 '' — 누구한테 얼마 나가는지 한 줄에 보이게 */
   agentName: string
+  /** 영업자에게 수수료를 실제로 준 날 (YYYY-MM-DD). 아직이면 null — 고객이 입금한 뒤에야 줄 돈이 된다 */
+  agentPaidAt: string | null
   /** 받기로 한 날 (YYYY-MM-DD, 미정이면 '') */
   dueDate: string
   /** 실제 입금 확인일 (YYYY-MM-DD). 미수금이면 null */

@@ -35,6 +35,7 @@ const TodayOpsPage = lazy(() =>
 const OperationsHubPage = lazy(() => import('../pages/OperationsHubPage').then((m) => ({ default: m.OperationsHubPage })))
 const OperationsClientDetailPage = lazy(() => import('../pages/OperationsClientDetailPage').then((m) => ({ default: m.OperationsClientDetailPage })))
 const OpsCalendarPage = lazy(() => import('../pages/OpsCalendarPage').then((m) => ({ default: m.OpsCalendarPage })))
+const AgentSettlementPage = lazy(() => import('../pages/AgentSettlementPage').then((m) => ({ default: m.AgentSettlementPage })))
 const ToolsHubPage = lazy(() => import('../pages/ToolsHubPage').then((m) => ({ default: m.ToolsHubPage })))
 const TodayCommandCenterPage = lazy(() => import('../pages/TodayCommandCenterPage').then((m) => ({ default: m.TodayCommandCenterPage })))
 const WhyAxPage = lazy(() => import('../pages/WhyAxPage').then((m) => ({ default: m.WhyAxPage })))
@@ -353,6 +354,8 @@ export const appRouteChildren = [
       { path: 'ops/inbox', element: <CustomerInboxPage /> },
       { path: 'ops/clients', element: <OperationsHubPage /> },
       { path: 'ops/calendar', element: <OpsCalendarPage /> },
+      // 영업자 정산 — 누구한테 지금 얼마를 줘야 하는가 (D-78)
+      { path: 'ops/agents', element: <AgentSettlementPage /> },
       { path: 'ops/clients/:clientId', element: <OperationsClientDetailPage /> },
       // 컨설팅 작업실 — 특허 × 벤처 × MVP 단계 엔진
       { path: 'studio', element: <ConsultingStudioPage /> },

@@ -9,6 +9,7 @@ import {
   FileCheck2,
   Filter,
   FlaskConical,
+  Handshake,
   Inbox,
   Landmark,
   LayoutGrid,
@@ -94,6 +95,7 @@ export const MODULES: ModuleDefinition[] = [
 
   { key: 'client-ops', label: '고객 운영', path: '/ops/clients', icon: ListChecks, group: 'clients', accent: 'ops', enabled: true },
   { key: 'inbox', label: '고객 이벤트함', path: '/ops/inbox', icon: Inbox, group: 'clients', accent: 'alert', enabled: true },
+  { key: 'agents', label: '영업자 정산', path: '/ops/agents', icon: Handshake, group: 'clients', accent: 'revenue', enabled: true, hint: '누구한테 지금 얼마를 줘야 하는가' },
 
   { key: 'consulting-studio', label: '컨설팅 작업실', path: '/studio', icon: Workflow, group: 'consulting', accent: 'ai', enabled: true, hint: '특허 · 벤처인증 · MVP 단계 관리' },
 

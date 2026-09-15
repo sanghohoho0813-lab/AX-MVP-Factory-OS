@@ -43,9 +43,10 @@ import { CONTRACT_STAGE_ORDER, CONTRACT_STAGE_LABEL, contractStageOf, statusForS
 import type { ClientOpsStatus, ContractStage } from '../../types/clientOps'
 import { clientOpsProgress } from '../clientOpsAlerts'
 import { digitsOf, formatNumberOf, numberSegments } from '../../lib/format'
-import { agentShares, feeMathOf, feeTotals, marginPct, marginText, netAmountOf } from '../feeMath'
+import { agentLedger, agentLedgerTotals, agentShares, feeMathOf, feeTotals, marginPct, marginText, netAmountOf } from '../feeMath'
+import { CLIENT_FILTER_ORDER, filterClients, isClientFilterKey, matchesClientFilter } from '../clientOpsFilter'
 import { CLIENT_SORT_ORDER, isClientSortKey, sortClients } from '../clientOpsSort'
-import { clientSearchText, matchesClientSearch } from '../clientOpsSearch'
+import { clientSearchText, matchesClientSearch, searchHit } from '../clientOpsSearch'
 import { formatYmd, profileAsText, yearsInBusiness } from '../clientOpsProfile'
 import { SERVICE_STATUS_ORDER, isServiceOpen, isServiceNotApplicable, normalizeServiceStatus } from '../../content/clientOpsCatalog'
 import { BUILTIN_SERVICES, SERVICES, registerCustomServices } from '../../content/clientOpsCatalog'
@@ -788,6 +789,75 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
   check('검색: 없는 말은 안 맞는다', matchesClientSearch(r, '없는회사') === false)
   check('검색: 없는 번호는 안 맞는다', matchesClientSearch(r, '9999') === false)
   check('검색 문자열: 업무 일기 내용은 넣지 않는다', !clientSearchText(r).includes('활동'))
+
+  // 검색 근거 — 어느 칸이 맞았는지 (D-80)
+  check('검색 근거: 회사명이 맞으면 말하지 않는다', searchHit(r, '한솔') === null)
+  check('검색 근거: 직접 만든 칸', JSON.stringify(searchHit(r, '김세무')) === JSON.stringify({ label: '담당 세무사', value: '김세무' }))
+  check('검색 근거: 전화 뒷자리', searchHit(r, '5678')?.label === '담당자 휴대폰')
+  check('검색 근거: 영업자', searchHit(r, '최영업')?.label === '영업자')
+  check('검색 근거: 안 맞으면 null', searchHit(r, '없음') === null)
+  check('검색 근거: 빈 검색어는 null', searchHit(r, '') === null)
+}
+
+/* ------------------------------------------------------------------ */
+/* 영업자 정산 — 누구한테 지금 얼마 (D-78)                               */
+/* ------------------------------------------------------------------ */
+{
+  const fee = (id: string, agentFee: number | null, agentName: string, receivedAt: string | null, agentPaidAt: string | null, label = '성공보수') => ({
+    id, label, amount: 1_000_000, agentFee, agentName, receivedAt, agentPaidAt,
+  })
+  const rows = agentLedger([
+    { id: 'a', companyName: '가나', archivedAt: null, fees: [fee('f1', 300_000, '김영업', '2026-09-01', null), fee('f2', 100_000, '김영업', null, null)] },
+    { id: 'b', companyName: '다라', archivedAt: null, fees: [fee('f3', 500_000, ' 김영업 ', '2026-08-01', '2026-08-05'), fee('f4', 200_000, '', '2026-09-02', null)] },
+    { id: 'c', companyName: '보관', archivedAt: '2026-01-01T00:00:00.000Z', fees: [fee('f5', 900_000, '김영업', '2026-09-01', null)] },
+    { id: 'd', companyName: '수수료 없음', archivedAt: null, fees: [fee('f6', null, '박영업', '2026-09-01', null)] },
+  ])
+  const kim = rows.find((r) => r.name === '김영업')
+  check('정산: 같은 이름은 공백을 무시하고 합친다', kim?.total === 900_000, JSON.stringify(kim))
+  check('정산: 지금 줄 돈 = 고객 입금됨 · 미지급', kim?.payable === 300_000)
+  check('정산: 고객 입금 전은 줄 돈이 아니다', kim?.waiting === 100_000)
+  check('정산: 준 돈', kim?.paid === 500_000)
+  check('정산: 보관한 업체는 넣지 않는다', !kim?.items.some((i) => i.clientId === 'c'))
+  check('정산: 수수료 없는 항목은 넣지 않는다', !rows.some((r) => r.name === '박영업'))
+  check('정산: 이름 없는 수수료는 "이름 없음"', rows.find((r) => r.name === '이름 없음')?.payable === 200_000)
+  check('정산: 줄 돈 많은 사람이 위', rows[0]?.name === '김영업')
+  check('정산: 항목은 줄 돈 → 입금 전 → 준 돈 순', kim?.items.map((i) => i.feeId).join() === 'f1,f2,f3', kim?.items.map((i) => i.feeId).join())
+  const t = agentLedgerTotals(rows)
+  check('정산 합계: 줄 돈 · 입금 전 · 준 돈 · 전체', t.payable === 500_000 && t.waiting === 100_000 && t.paid === 500_000 && t.total === 1_100_000 && t.agents === 2, JSON.stringify(t))
+  check('정산: 비어 있으면 0', agentLedgerTotals(agentLedger([])).agents === 0)
+  // 정규화 — 옛 기록에 지급일 칸이 없어도 null
+  const old = normalizeClientOps({ id: 'o', companyName: '옛', fees: [{ id: 'x', kind: 'deposit', label: '계약금', amount: 1, dueDate: '', receivedAt: null }] as never })
+  check('정산: 옛 기록의 지급일은 null', old.fees[0]?.agentPaidAt === null)
+  const paid = withFee(old, 'x', { agentPaidAt: '2026-09-10' })
+  check('정산: 지급일을 적으면 남는다', paid.fees[0]?.agentPaidAt === '2026-09-10')
+}
+
+/* ------------------------------------------------------------------ */
+/* 고객 목록 보기 (D-79)                                                 */
+/* ------------------------------------------------------------------ */
+{
+  const T = '2026-09-14'
+  const base = (id: string, extra: Record<string, unknown>) => normalizeClientOps({ id, companyName: id, ...extra } as never)
+  const cash = base('현금', { status: 'active', contract: { signedAt: '2026-01-01', kind: 'cash', cashAmount: 1, policies: [], note: '' } })
+  const ins = base('보험', { status: 'active', contract: { signedAt: '2026-01-01', kind: 'insurance', cashAmount: null, policies: [], note: '' } })
+  const mixed = base('혼합', { status: 'active', contract: { signedAt: '2026-01-01', kind: 'mixed', cashAmount: 1, policies: [], note: '' } })
+  const lead = base('계약전', { status: 'waiting' })
+  const closed = base('종료', { status: 'completed' })
+  let unpaid = base('미수', { status: 'active' })
+  unpaid = withNewFee(unpaid, { kind: 'success', amount: 2_000_000, agentFee: 500_000, dueDate: '2026-09-01' })
+  let paidAll = base('완납', { status: 'active' })
+  paidAll = withNewFee(paidAll, { kind: 'deposit', amount: 1_000_000, receivedAt: '2026-09-01' })
+  const all = [cash, ins, mixed, lead, closed, unpaid, paidAll]
+  const names = (k: Parameters<typeof filterClients>[1]) => filterClients(all, k, T).map((r) => r.companyName).join()
+  check('보기: 전체는 그대로', filterClients(all, 'all', T).length === 7)
+  check('보기: 현금 계약', names('cash') === '현금')
+  check('보기: 보험 계약', names('insurance') === '보험')
+  check('보기: 현금 + 보험', names('mixed') === '혼합')
+  check('보기: 계약 전 — 계약 단계 기준, 종료는 빠진다', names('unsigned') === '계약전', names('unsigned'))
+  check('보기: 못 받은 돈 있음 — 내 몫 기준', names('unpaid') === '미수')
+  check('보기: 연체 있음 — 예정일 지난 미수금', names('overdue') === '미수')
+  check('보기: 완납은 못 받은 돈에 안 나온다', !matchesClientFilter(paidAll, 'unpaid', T))
+  check('보기: 키 검사', isClientFilterKey('overdue') && !isClientFilterKey('x') && CLIENT_FILTER_ORDER[0] === 'all')
 }
 
 /* ------------------------------------------------------------------ */

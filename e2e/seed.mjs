@@ -40,6 +40,8 @@ const clients = [
       { id: 'fee1', kind: 'deposit', label: '계약금', amount: 3_000_000, dueDate: d(-12), receivedAt: d(-10) },
       // 영업자 몫이 있는 항목 — 화면 어디서든 '내 몫'(400만) 과 '청구'(550만) 가 갈라져야 한다 (D-74)
       { id: 'fee2', kind: 'success', label: '성공보수', amount: 5_500_000, agentFee: 1_500_000, agentName: '최영업', dueDate: d(-3), receivedAt: null },
+      // 고객이 이미 입금한 항목의 수수료 — 정산 화면에서 '지금 줄 돈' 이 되어야 한다 (D-78)
+      { id: 'fee0', kind: 'interim', label: '중도금', amount: 2_000_000, agentFee: 500_000, agentName: '최영업', dueDate: d(-7), receivedAt: d(-5), agentPaidAt: null },
     ],
     // 직접 만든 칸 — 검색이 여기까지 닿는지 확인한다 (D-76)
     customFields: [{ id: 'cf1', group: 'contact', label: '담당 세무사', value: '김세무' }],

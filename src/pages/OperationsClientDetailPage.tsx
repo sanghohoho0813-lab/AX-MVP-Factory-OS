@@ -1411,6 +1411,7 @@ function FeesSection({
 
   const [agentFee, setAgentFee] = useState(0)
   const [agentName, setAgentName] = useState('')
+  const navigate = useNavigate()
   /*
    * 청구액과 '진짜 내 돈' 은 다르다.
    * 성공보수 2,000만원을 받아도 일부는 소개해 준 영업자에게 나간다. 청구액만 보고
@@ -1455,6 +1456,7 @@ function FeesSection({
           label="영업자 수수료"
           value={krwTile(totals.agent)}
           hint={shares.length > 0 ? shares.map((s) => `${s.name} ${formatKrw(s.amount)}`).join(' · ') : undefined}
+          onClick={() => navigate('/ops/agents')}
         />
         <MetricTile
           label="내가 받는 돈"
@@ -1512,9 +1514,19 @@ function FeesSection({
                         </span>
                       )}
                       {fee.receivedAt && (
-                        <span className="rounded-full border border-success-200 bg-success-50 px-1.5 py-0.5 t-meta font-semibold text-success-700">
-                          {fee.receivedAt} 입금
-                        </span>
+                        // 입금일은 고칠 수 있어야 한다 — 체크한 날이 아니라 실제 들어온 날이 기록이다 (D-81)
+                        <label className="inline-flex items-center gap-1 rounded-full border border-success-200 bg-success-50 px-1.5 py-0.5 t-meta font-semibold text-success-700">
+                          입금
+                          <input
+                            type="date"
+                            aria-label={`${fee.label} 입금일`}
+                            value={fee.receivedAt}
+                            onChange={(e) => {
+                              if (e.target.value) onChange(withFee(record, fee.id, { receivedAt: e.target.value }))
+                            }}
+                            className="bg-transparent t-meta font-semibold text-success-700 tabular-nums"
+                          />
+                        </label>
                       )}
                     </span>
                     </span>
@@ -1589,6 +1601,40 @@ function FeesSection({
                         placeholder="영업자 이름"
                         className="w-24 rounded-(--radius-control) border border-slate-300 px-2 py-1 text-[0.92rem] text-slate-700"
                       />
+                    )}
+                    {/*
+                      영업자에게 줬는지. 고객이 입금하기 전에는 줄 돈이 아니므로 잠가 둔다 —
+                      먼저 주고 고객이 안 주면 내 돈이 나간다 (D-78).
+                    */}
+                    {fee.agentFee !== null && fee.agentFee > 0 && (
+                      <label className="t-sub inline-flex items-center gap-1.5 text-slate-600">
+                        <input
+                          type="checkbox"
+                          aria-label={`${fee.label} 영업자 지급 완료`}
+                          checked={fee.agentPaidAt !== null}
+                          disabled={fee.receivedAt === null}
+                          onChange={(e) => onChange(withFee(record, fee.id, { agentPaidAt: e.target.checked ? today : null }))}
+                          className="size-4 accent-brand-600 disabled:opacity-40"
+                        />
+                        {fee.receivedAt === null ? (
+                          <span className="text-slate-400">고객 입금 전</span>
+                        ) : fee.agentPaidAt ? (
+                          <span className="inline-flex items-center gap-1">
+                            지급
+                            <input
+                              type="date"
+                              aria-label={`${fee.label} 영업자 지급일`}
+                              value={fee.agentPaidAt}
+                              onChange={(e) => {
+                                if (e.target.value) onChange(withFee(record, fee.id, { agentPaidAt: e.target.value }))
+                              }}
+                              className="bg-transparent t-sub tabular-nums"
+                            />
+                          </span>
+                        ) : (
+                          <span className="font-semibold text-warning-700">영업자에게 줄 돈</span>
+                        )}
+                      </label>
                     )}
                     {(() => {
                       const m = feeMathOf(fee)

@@ -137,3 +137,109 @@ export function agentShares(fees: Pick<FeeItem, 'agentFee' | 'agentName'>[]): Ag
     .map(([name, amount]) => ({ name, amount }))
     .sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name, 'ko'))
 }
+
+/* ------------------------------------------------------------------ */
+/* 영업자 정산 — 누구한테 지금 얼마를 줘야 하는가 (D-78)                  */
+/* ------------------------------------------------------------------ */
+
+/** 영업자 이름을 안 적은 수수료를 묶는 이름 */
+export const UNNAMED_AGENT = '이름 없음'
+
+export interface AgentLedgerItem {
+  clientId: string
+  clientName: string
+  feeId: string
+  /** 수금 항목 이름 (예: 성공보수) */
+  label: string
+  /** 청구액 — 미정이면 null */
+  amount: number | null
+  /** 이 항목에서 영업자에게 나갈 돈 */
+  agentFee: number
+  /** 고객이 입금한 날. 아직이면 null — 그 전에는 줄 돈이 아니다 */
+  receivedAt: string | null
+  /** 영업자에게 준 날. 아직이면 null */
+  agentPaidAt: string | null
+}
+
+export interface AgentLedgerRow {
+  name: string
+  /** 이 사람에게 나갈 수수료 전부 */
+  total: number
+  /** 지금 줘야 할 돈 — 고객이 입금했는데 아직 안 준 것 */
+  payable: number
+  /** 이미 준 돈 */
+  paid: number
+  /** 아직 고객이 입금하지 않아 줄 때가 안 된 돈 */
+  waiting: number
+  items: AgentLedgerItem[]
+}
+
+/**
+ * 영업자별 정산 장부.
+ *
+ * 돈이 나가는 순서는 하나다: 고객이 입금한다 → 영업자에게 준다.
+ * 그래서 '줄 돈' 은 **고객 입금이 확인된 항목** 에서만 센다. 고객이 아직 안 준 돈을
+ * 영업자에게 먼저 주는 일은 없어야 하므로, 그 몫은 `waiting` 으로 따로 둔다.
+ *
+ * 보관한 업체는 넣지 않는다. 수수료 0 인 항목도 넣지 않는다.
+ * 줄 돈이 많은 사람이 위, 같으면 전체 수수료가 많은 사람, 그래도 같으면 가나다순.
+ */
+export function agentLedger(
+  records: Pick<ClientOpsRecordLike, 'id' | 'companyName' | 'fees' | 'archivedAt'>[],
+): AgentLedgerRow[] {
+  const rows = new Map<string, AgentLedgerRow>()
+  for (const r of records) {
+    if (r.archivedAt !== null) continue
+    for (const f of r.fees) {
+      const agent = typeof f.agentFee === 'number' && Number.isFinite(f.agentFee) && f.agentFee > 0 ? f.agentFee : 0
+      if (agent === 0) continue
+      const name = (f.agentName ?? '').trim() || UNNAMED_AGENT
+      const row = rows.get(name) ?? { name, total: 0, payable: 0, paid: 0, waiting: 0, items: [] }
+      row.total += agent
+      if (f.agentPaidAt) row.paid += agent
+      else if (f.receivedAt) row.payable += agent
+      else row.waiting += agent
+      row.items.push({
+        clientId: r.id,
+        clientName: r.companyName,
+        feeId: f.id,
+        label: f.label,
+        amount: f.amount,
+        agentFee: agent,
+        receivedAt: f.receivedAt,
+        agentPaidAt: f.agentPaidAt,
+      })
+      rows.set(name, row)
+    }
+  }
+  const stage = (i: AgentLedgerItem) => (i.agentPaidAt ? 2 : i.receivedAt ? 0 : 1)
+  return [...rows.values()]
+    .map((row) => ({
+      ...row,
+      // 줄 돈 → 기다리는 돈 → 준 돈 순. 같은 단계면 업체 이름순
+      items: [...row.items].sort((a, b) => stage(a) - stage(b) || a.clientName.localeCompare(b.clientName, 'ko')),
+    }))
+    .sort((a, b) => b.payable - a.payable || b.total - a.total || a.name.localeCompare(b.name, 'ko'))
+}
+
+/** 장부 전체 합계 — 위 칸 네 개 */
+export function agentLedgerTotals(rows: AgentLedgerRow[]): { total: number; payable: number; paid: number; waiting: number; agents: number } {
+  return rows.reduce(
+    (acc, r) => ({
+      total: acc.total + r.total,
+      payable: acc.payable + r.payable,
+      paid: acc.paid + r.paid,
+      waiting: acc.waiting + r.waiting,
+      agents: acc.agents + 1,
+    }),
+    { total: 0, payable: 0, paid: 0, waiting: 0, agents: 0 },
+  )
+}
+
+/** 장부가 필요한 만큼만 — 화면·시험이 통째 레코드를 만들지 않아도 되게 */
+interface ClientOpsRecordLike {
+  id: string
+  companyName: string
+  fees: Pick<FeeItem, 'id' | 'label' | 'amount' | 'agentFee' | 'agentName' | 'agentPaidAt' | 'receivedAt'>[]
+  archivedAt: string | null
+}

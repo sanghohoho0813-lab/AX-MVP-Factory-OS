@@ -16,7 +16,7 @@
 
 import { useState } from 'react'
 import { ArrowRight, ChevronRight } from 'lucide-react'
-import { CONTRACT_STAGE_LABEL, contractStageOf } from '../../types/clientOps'
+import { CONTRACT_KIND_LABEL, CONTRACT_STAGE_LABEL, contractStageOf } from '../../types/clientOps'
 import { formatNumberOf } from '../../lib/format'
 import type { ClientOpsRecord, ServiceKey, ServiceStatus } from '../../types/clientOps'
 import { SERVICES, SERVICE_STATUS_LABEL, isServiceOpen } from '../../content/clientOpsCatalog'
@@ -156,8 +156,11 @@ export function ClientBoardCard({
   onOpen,
   onChip,
   onMoney,
+  hit = null,
 }: {
   record: ClientOpsRecord
+  /** 검색이 회사명이 아닌 칸에서 맞았을 때 — 왜 나왔는지 한 줄 (D-80) */
+  hit?: { label: string; value: string } | null
   /** 목록에서 몇 번째인가 — 정렬을 바꿨을 때 순서가 바뀐 것이 눈에 보이게 한다 */
   rank?: number
   today: string
@@ -215,7 +218,9 @@ export function ClientBoardCard({
   const age = contractAgeShort(record.contract.signedAt, today)
   const contractMeta = stage === 'signed' ? (age === '' ? '' : `계약 ${age}`) : CONTRACT_STAGE_LABEL[stage]
   const strongMeta = [repName, contractMeta].filter((v) => v.trim() !== '')
-  const mutedMeta = [region, record.businessCategory || record.industry].filter((v) => v && v.trim() !== '')
+  /* 계약 종류(현금·보험·혼합)는 배경 정보다 — 흐린 쪽에 둔다 (D-79) */
+  const kindMeta = record.contract.kind !== '' ? CONTRACT_KIND_LABEL[record.contract.kind] : ''
+  const mutedMeta = [kindMeta, region, record.businessCategory || record.industry].filter((v) => v && v.trim() !== '')
 
   return (
     <li className={`relative overflow-hidden rounded-(--radius-panel) border ${CARD_FILL[tone]}`}>
@@ -253,6 +258,14 @@ export function ClientBoardCard({
           </div>
         </div>
 
+        {/* 검색 근거 — 회사명이 아니라 다른 칸이 맞았으면 어느 칸인지 밝힌다 (D-80) */}
+        {hit && (
+          <p className="t-sub flex flex-wrap items-baseline gap-x-1.5 text-brand-700">
+            <span className="text-slate-400">찾은 곳</span>
+            <span className="font-medium">{hit.label}</span>
+            <span className="font-semibold break-all">{hit.value}</span>
+          </p>
+        )}
         {/* 회사 요약 — 대표자·업력은 진하게, 지역·업종은 흐리게, 사업자번호는 숫자 그대로 */}
         {(strongMeta.length > 0 || mutedMeta.length > 0 || bizNo !== '') && (
           <p className="t-sub flex flex-wrap items-center gap-x-2 gap-y-0.5">

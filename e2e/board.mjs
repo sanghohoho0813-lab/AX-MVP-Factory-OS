@@ -229,7 +229,7 @@ check('업무 15개에서도 가로 스크롤 없음', of2.d <= of2.w + 1, `${of
   const feesTab = (await page.locator('main').innerText()) ?? ''
   const feesAll = (await page.locator('main').evaluate((el) => el.textContent)) ?? ''
   check('수금 탭: 영업자 이름이 항목에 보인다', feesTab.includes('최영업 몫 빼고'), feesTab.slice(0, 400))
-  check('수금 탭: 영업자 수수료 칸 아래 누구에게 얼마', feesAll.includes('최영업 1,500,000원'), feesAll.slice(0, 300))
+  check('수금 탭: 영업자 수수료 칸 아래 누구에게 얼마', feesAll.includes('최영업 2,000,000원'), feesAll.slice(0, 300))
   const nameInput = page.getByLabel('성공보수 영업자 이름')
   check('수금 탭: 영업자 이름을 고칠 수 있다', (await nameInput.count()) === 1)
   await nameInput.fill('박영업')
@@ -247,6 +247,87 @@ check('업무 15개에서도 가로 스크롤 없음', of2.d <= of2.w + 1, `${of
   await page.waitForTimeout(800)
   const todayText = (await page.locator('main').innerText()) ?? ''
   check('오늘: 받아야 할 내 돈 칸이 내 몫(750만)', todayText.includes('받아야 할 내 돈') && todayText.includes('750만원'), todayText.slice(0, 400))
+}
+
+/* ---------------- 보기 필터 · 검색 근거 · 영업자 정산 · 입금일 고치기 (D-78~81) ---------------- */
+{
+  await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const names = async () => {
+    const t = (await page.locator('main').innerText()) ?? ''
+    return ['한솔테크', '다움에너지', '미래바이오랩', '선한식품', '우일산업'].filter((n) => t.includes(n))
+  }
+  const hubText = (await page.locator('main').innerText()) ?? ''
+  check('카드: 계약 종류가 보인다', hubText.includes('현금 + 보험'), hubText.slice(0, 400))
+
+  // 보기 — 무엇을 보일지
+  const view = page.getByLabel('업체 보기 조건')
+  check('보기: 고르는 칸이 있다', (await view.count()) === 1)
+  await view.selectOption('insurance')
+  await page.waitForTimeout(500)
+  check('보기: 보험 계약만', JSON.stringify(await names()) === '["다움에너지"]', JSON.stringify(await names()))
+  await view.selectOption('overdue')
+  await page.waitForTimeout(500)
+  // 시드의 예정일은 2026-09-04 기준이라 오늘(실제 날짜) 기준으로는 셋 다 지났다 — 연체 = 미수 셋
+  const overdueNames = await names()
+  check('보기: 연체 있음 — 예정일 지난 미수금이 있는 곳만', overdueNames.length === 3 && !overdueNames.includes('우일산업') && !overdueNames.includes('미래바이오랩'), JSON.stringify(overdueNames))
+  await view.selectOption('unpaid')
+  await page.waitForTimeout(500)
+  const unpaidNames = await names()
+  check('보기: 못 받은 돈 있음 — 셋', unpaidNames.length === 3 && unpaidNames.includes('선한식품'), JSON.stringify(unpaidNames))
+  check('보기: 몇 곳인지 말한다', ((await page.locator('main').innerText()) ?? '').includes('3곳 찾음'))
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check('보기: 새로고침해도 기억한다', (await view.inputValue()) === 'unpaid')
+  await view.selectOption('all')
+  await page.waitForTimeout(400)
+
+  // 검색 근거 — 왜 나왔는지
+  await page.getByLabel('업체 검색').fill('김세무')
+  await page.waitForTimeout(500)
+  const hitText = (await page.locator('main').innerText()) ?? ''
+  check('검색 근거: 어느 칸이 맞았는지 카드에 보인다', hitText.includes('찾은 곳') && hitText.includes('담당 세무사') && hitText.includes('김세무'), hitText.slice(0, 400))
+  await page.getByLabel('업체 검색').fill('한솔')
+  await page.waitForTimeout(500)
+  check('검색 근거: 회사명이 맞으면 말하지 않는다', !((await page.locator('main').innerText()) ?? '').includes('찾은 곳'))
+  await page.getByLabel('업체 검색').fill('')
+  await page.waitForTimeout(300)
+
+  // 영업자 정산 — 최영업: 중도금 50만(고객 입금됨 → 줄 돈) · 성공보수 150만(입금 전)
+  await page.goto(BASE + '/ops/agents', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const led = (await page.locator('main').innerText()) ?? ''
+  check('정산: 화면이 열린다', led.includes('영업자 정산') && led.includes('최영업'), led.slice(0, 300))
+  check('정산: 지금 줄 돈 50만', led.includes('지금 줄 돈') && led.includes('50만원'), led.slice(0, 400))
+  check('정산: 고객 입금 전 150만', led.includes('150만원'))
+  const payBox = page.getByLabel('한솔테크(주) 중도금 영업자 지급 완료')
+  check('정산: 줄 돈 항목에 지급 체크가 있다', (await payBox.count()) === 1)
+  check('정산: 입금 전 항목은 체크할 수 없다', await page.getByLabel('한솔테크(주) 성공보수 영업자 지급 완료').isDisabled())
+  await payBox.check()
+  await page.waitForTimeout(700)
+  const afterPay = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_hansol'),
+  )
+  const fee0 = (afterPay?.fees ?? afterPay?.payload?.fees ?? []).find((f) => f.id === 'fee0')
+  check('정산: 지급 완료가 저장된다', typeof fee0?.agentPaidAt === 'string' && fee0.agentPaidAt.length === 10, JSON.stringify(fee0))
+  const ledAfter = (await page.locator('main').innerText()) ?? ''
+  check('정산: 지급하면 줄 돈이 0', ledAfter.includes('지급 ') && ledAfter.includes('0원'), ledAfter.slice(0, 300))
+
+  // 입금일 고치기 — 체크한 날이 아니라 실제 들어온 날
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=fees', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const recvInput = page.getByLabel('계약금 입금일')
+  check('입금일: 고치는 칸이 있다', (await recvInput.count()) === 1)
+  await recvInput.fill('2026-08-20')
+  await page.waitForTimeout(600)
+  const fixed = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_hansol'),
+  )
+  const fee1 = (fixed?.fees ?? fixed?.payload?.fees ?? []).find((f) => f.id === 'fee1')
+  check('입금일: 고친 날짜가 저장된다', fee1?.receivedAt === '2026-08-20', JSON.stringify(fee1?.receivedAt))
+  check('수금 탭: 정산에서 체크한 지급이 여기서도 보인다', await page.getByLabel('중도금 영업자 지급 완료').isChecked())
+  check('수금 탭: 입금 전 항목의 지급 체크는 잠겨 있다', await page.getByLabel('성공보수 영업자 지급 완료').isDisabled())
+  check('수금 탭: 지급일 칸이 있다', (await page.getByLabel('중도금 영업자 지급일').count()) === 1)
 }
 
 /* ---------------- 계약 단계 · 업체 삭제 ---------------- */

@@ -17,9 +17,17 @@ import {
 import { useAuth } from '../auth/AuthProvider'
 import { ServiceCatalogModal } from '../components/ops/ServiceCatalogModal'
 const SORT_KEY = 'axmvp.clients.sort'
+const FILTER_KEY = 'axmvp.clients.filter'
 
 import { ClientBoardCard } from '../components/ops/ClientBoardCard'
-import { matchesClientSearch } from '../services/clientOpsSearch'
+import { matchesClientSearch, searchHit } from '../services/clientOpsSearch'
+import {
+  CLIENT_FILTER_LABEL,
+  CLIENT_FILTER_ORDER,
+  isClientFilterKey,
+  matchesClientFilter,
+  type ClientFilterKey,
+} from '../services/clientOpsFilter'
 import {
   CLIENT_SORT_HINT,
   CLIENT_SORT_LABEL,
@@ -32,7 +40,7 @@ import { ClientMoneySheet, ServiceStatusSheet } from '../components/ops/ClientQu
 import { BottomSheet, MetricTile, ScreenTitle, type Tone } from '../components/ui/primitives'
 import { loadCustomServicesIntoCatalog } from '../services/customServiceService'
 import { getDataModeConfig } from '../data/dataMode'
-import { CloudUpload } from 'lucide-react'
+import { CloudUpload, Handshake } from 'lucide-react'
 import {
   createClient,
   dismissLocalMigration,
@@ -148,14 +156,35 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     }
   }, [records])
 
+  /*
+   * 보기 조건도 기억한다(D-79). '못 받은 돈 있음' 으로 두고 수금 전화를 도는 날은
+   * 하루 종일 그 보기로 일한다 — 새로고침마다 되돌아가면 결국 안 쓴다.
+   */
+  const [filterKey, setFilterKey] = useState<ClientFilterKey>(() => {
+    try {
+      const v = localStorage.getItem(FILTER_KEY)
+      return isClientFilterKey(v) ? v : 'all'
+    } catch {
+      return 'all'
+    }
+  })
+  useEffect(() => {
+    try {
+      localStorage.setItem(FILTER_KEY, filterKey)
+    } catch {
+      /* 저장 못 해도 화면은 돈다 */
+    }
+  }, [filterKey])
+
   const visible = useMemo(() => {
     return records.filter((r) => {
       if (!showArchived && r.archivedAt !== null) return false
       if (showArchived && r.archivedAt === null) return false
+      if (!matchesClientFilter(r, filterKey, today)) return false
       // 회사명뿐 아니라 담당자·번호·직접 만든 칸·영업자 이름까지 (D-76)
       return matchesClientSearch(r, query)
     })
-  }, [records, query, showArchived])
+  }, [records, query, showArchived, filterKey, today])
   const archivedCount = records.filter((r) => r.archivedAt !== null).length
 
   /*
@@ -314,6 +343,10 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
               <CalendarDays aria-hidden="true" className="size-4" />
               일정 보기
             </Button>
+            <Button variant="secondary" className="w-full justify-start" onClick={() => { setMoreOpen(false); navigate('/ops/agents') }}>
+              <Handshake aria-hidden="true" className="size-4" />
+              영업자 정산
+            </Button>
             <Button
               variant="secondary"
               className="w-full justify-start"
@@ -444,6 +477,24 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
             정렬은 고르는 칸 하나로 둔다. 단추 네 개를 늘어놓으면 검색줄이 두 줄이 되고,
             좁은 화면에서 제일 많이 쓰는 검색칸이 밀린다.
           */}
+          {/* 보기 — 무엇을 보일지. 정렬은 그 다음에 순서를 정한다 (D-79) */}
+          <label className="flex shrink-0 items-center gap-1.5">
+            <span className="t-sub text-slate-500">보기</span>
+            <select
+              value={filterKey}
+              aria-label="업체 보기 조건"
+              onChange={(e) => setFilterKey(isClientFilterKey(e.target.value) ? e.target.value : 'all')}
+              className={`rounded-(--radius-control) border bg-white px-2 py-2 text-[0.92rem] font-medium focus:border-brand-500 focus:outline-none sm:py-1.5 ${
+                filterKey === 'all' ? 'border-slate-300 text-slate-700' : 'border-brand-300 text-brand-700'
+              }`}
+            >
+              {CLIENT_FILTER_ORDER.map((k) => (
+                <option key={k} value={k}>
+                  {CLIENT_FILTER_LABEL[k]}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="flex shrink-0 items-center gap-1.5">
             <span className="t-sub text-slate-500">정렬</span>
             <select
@@ -460,7 +511,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
             </select>
           </label>
           <span className="t-sub shrink-0 text-slate-500">{CLIENT_SORT_HINT[sortKey]}</span>
-          {query !== '' && (
+          {(query !== '' || filterKey !== 'all') && (
             <span className="text-[0.9rem] text-slate-500">{visible.length}곳 찾음</span>
           )}
         </div>
@@ -556,6 +607,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                   onOpen={() => navigate(`/ops/clients/${record.id}`)}
                   onChip={(key) => setQuick({ id: record.id, kind: 'service', serviceKey: key })}
                   onMoney={() => setQuick({ id: record.id, kind: 'money' })}
+                  hit={query.trim() !== '' ? searchHit(record, query) : null}
                 />
               )
             })}
