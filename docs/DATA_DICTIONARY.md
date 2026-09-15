@@ -17,7 +17,7 @@
 | Portal Document | `portal_documents` + Storage `{ws}/portal/{link}/…` | **브릿지** | 내부(요청·검토·공유) · 고객(업로드, RPC) | 내부 · 고객은 RPC | P(requested/customer_uploaded/shared) | H | — | `internal_note` 는 절대 투영 안 함 |
 | Custom Profile Field | `operations_clients.payload.customFields[]` | 내부 OS | 내부 | 내부 | **N** | M — 대표가 무엇을 적느냐에 달렸다 | — | 대표가 직접 만든 칸 `{id, group, label, value}`. 비밀번호·주민등록번호 금지(D-69) |
 | Contract (계약) | `operations_clients.payload.contract` | 내부 OS | 내부 | 내부 | **N — 고객에게 절대 투영하지 않는다** | **H**(계약 금액·월납보험료) | — | 계약일·방식(현금/보험/혼합)·현금 금액·보험 건별. 주민등록번호·증권번호 칸 없음(D-66) |
-| Payment / Fee | `operations_clients.payload.fees[]` | 내부 OS | 내부 | 내부 | **N** | **H** | — | 고객 결제(`product_payments`)와 별개 — 자동 대사 없음 |
+| Payment / Fee | `operations_clients.payload.fees[]` | 내부 OS | 내부 | 내부 | **N** | **H** | — | 고객 결제(`product_payments`)와 별개 — 자동 대사 없음. `agentFee`(영업자 수수료)·`agentName`(영업자 이름)도 payload 안 — 내 몫·이익률은 저장하지 않고 계산(D-73·D-75) |
 | Funding Application | `operations_clients.payload.fundingApplications[]` | 내부 OS | 내부 | 내부 | N | M | — | 홈 "지원사업 마감" 신호 |
 | Activity (활동 기록) | `operations_clients.payload.activity[]` (≤200) | 내부 OS | 시스템(with* 헬퍼) | 내부 | N | M | 200건 순환 | 하루 정리의 "오늘 처리" |
 | Journal Entry | `ops_journal_entries` / `axmvp.v1.ops_journal_entries` | 내부 OS | owner 본인 | **owner 본인만** | **N** | **H** | — | 홈 Top 3(후속조치)·하루 정리 |

@@ -83,6 +83,10 @@ await page.getByRole('button', { name: '내용 고치기' }).first().click()
 await page.waitForTimeout(350)
 await page.getByLabel('할 일 내용 고치기').fill('두 번 고친 할 일')
 await page.getByLabel('할 일 기한 고치기').fill('2026-12-24')
+// 업체도 그 자리에서 바꾼다 — 잘못 붙였다고 지우고 다시 적지 않는다
+const clientPick = page.getByLabel('할 일 업체 고치기')
+check('할 일: 업체 고르는 칸이 있다', (await clientPick.count()) === 1)
+await clientPick.selectOption('cli_daum')
 await page.getByRole('button', { name: '저장', exact: true }).first().click()
 await page.waitForTimeout(900)
 const movedDue = await page.evaluate(() =>
@@ -90,6 +94,7 @@ const movedDue = await page.evaluate(() =>
 )
 check('할 일: 다시 고칠 수 있다', movedDue !== undefined)
 check('할 일: 기한도 고칠 수 있다', movedDue?.dueDate === '2026-12-24', JSON.stringify(movedDue?.dueDate))
+check('할 일: 업체도 고칠 수 있다', movedDue?.clientId === 'cli_daum', JSON.stringify(movedDue?.clientId))
 // '오늘 할 일' 목록에서만 빠진다 — 오늘 적은 기록이므로 '무슨 일이 있었나요' 에는 남는다
 const todoBox = (await page.getByRole('region', { name: '오늘 할 일' }).first().innerText()) ?? ''
 check('할 일: 기한을 옮기면 오늘 할 일에서 빠진다', !todoBox.includes('두 번 고친 할 일'), todoBox.slice(0, 160))

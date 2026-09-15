@@ -19,6 +19,7 @@ import { ServiceCatalogModal } from '../components/ops/ServiceCatalogModal'
 const SORT_KEY = 'axmvp.clients.sort'
 
 import { ClientBoardCard } from '../components/ops/ClientBoardCard'
+import { matchesClientSearch } from '../services/clientOpsSearch'
 import {
   CLIENT_SORT_HINT,
   CLIENT_SORT_LABEL,
@@ -148,15 +149,11 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   }, [records])
 
   const visible = useMemo(() => {
-    const q = query.trim().toLowerCase()
     return records.filter((r) => {
       if (!showArchived && r.archivedAt !== null) return false
       if (showArchived && r.archivedAt === null) return false
-      if (q === '') return true
-      return [r.companyName, r.contactName, r.businessNumber, r.industry, r.businessAddress]
-        .join(' ')
-        .toLowerCase()
-        .includes(q)
+      // 회사명뿐 아니라 담당자·번호·직접 만든 칸·영업자 이름까지 (D-76)
+      return matchesClientSearch(r, query)
     })
   }, [records, query, showArchived])
   const archivedCount = records.filter((r) => r.archivedAt !== null).length
@@ -191,13 +188,15 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
 
   const money = useMemo(() => {
     let unpaid = 0
+    let unpaidGross = 0
     let overdueCount = 0
     for (const r of records) {
       const p = clientOpsProgress(r, today)
-      unpaid += p.unpaidAmount
+      unpaid += p.unpaidNet
+      unpaidGross += p.unpaidAmount
       overdueCount += p.overduePayments
     }
-    return { unpaid, overdueCount }
+    return { unpaid, unpaidGross, overdueCount }
   }, [records, today])
 
   // 계약 종료만 뺀다 — 계약 전도 챙겨야 할 업체다
@@ -420,7 +419,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="업체명·대표자·사업자번호로 찾기"
+              placeholder="업체명·담당자·번호·직접 만든 칸으로 찾기"
               aria-label="업체 검색"
               className="w-full rounded-(--radius-control) border border-slate-300 py-2.5 pr-3 pl-9 text-[0.98rem] focus:border-brand-500 focus:outline-none sm:py-2"
             />
@@ -485,10 +484,18 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
         />
         <MetricTile label="관리 중인 업체" value={`${activeCount}곳`} hint={`전체 ${records.length}곳`} />
         <MetricTile
-          label="아직 못 받은 돈"
+          label="못 받은 내 돈"
           value={krwTile(money.unpaid)}
           tone={money.overdueCount > 0 ? 'danger' : 'neutral'}
-          hint={money.overdueCount > 0 ? `예정일 지난 건 ${money.overdueCount}건` : '연체 없음'}
+          hint={
+            // 연체 건수와 청구 기준은 둘 다 사실이라 둘 다 적는다 — 하나만 고르면 다른 하나를 잃는다
+            [
+              money.overdueCount > 0 ? `예정일 지난 건 ${money.overdueCount}건` : '',
+              money.unpaidGross !== money.unpaid ? `청구 기준 ${krwTile(money.unpaidGross)}` : '',
+            ]
+              .filter((v) => v !== '')
+              .join(' · ') || '연체 없음'
+          }
         />
       </section>
 

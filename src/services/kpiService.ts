@@ -16,6 +16,7 @@ import type { ClientOpsRecord } from '../types/clientOps'
 import type { CustomerEvent, JournalEntry } from '../types/bridge'
 import { SERVICES, isServiceStarted } from '../content/clientOpsCatalog'
 import { daysLeftFrom } from './clientOpsAlerts'
+import { netAmountOf } from './feeMath'
 import { formatKrw } from '../lib/format'
 
 export type KpiGroup = 'cost' | 'revenue' | 'scale' | 'adoption'
@@ -146,7 +147,8 @@ function revenueMetrics(input: KpiInput): KpiMetric[] {
     const left = daysLeftFrom(input.today, f.dueDate)
     return left !== null && left < 0
   })
-  const overdueAmount = overdue.reduce((s, f) => s + (f.amount ?? 0), 0)
+  // 내 몫 기준 — 영업자에게 나갈 돈은 내 미수금이 아니다 (D-74)
+  const overdueAmount = overdue.reduce((s, f) => s + netAmountOf(f), 0)
   const overdueNow: KpiMetric = {
     key: 'overdue_receivables_now',
     group: 'revenue',
@@ -154,7 +156,7 @@ function revenueMetrics(input: KpiInput): KpiMetric[] {
     value: unpaid.length === 0 ? null : `${overdue.length}건 · ${formatKrw(overdueAmount)}`,
     basis: unpaid.length,
     status: statusFor(unpaid.length),
-    method: '받기로 한 날이 지났는데 입금 확인이 안 된 수금 항목. 금액이 비어 있는 항목은 건수에만 들어간다.',
+    method: '받기로 한 날이 지났는데 입금 확인이 안 된 수금 항목. 금액은 영업자 수수료를 뺀 내 몫이고, 비어 있는 항목은 건수에만 들어간다.',
   }
 
   // 회수 지연 — 실제로 받은 돈이 예정일보다 며칠 늦게 들어왔는가

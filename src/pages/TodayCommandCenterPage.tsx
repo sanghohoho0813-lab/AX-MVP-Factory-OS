@@ -440,10 +440,19 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               onClick={() => navigate('/ops/clients')}
             />
             <MetricTile
-              label="받아야 할 돈"
+              label="받아야 할 내 돈"
               value={krwTile(money.scheduled.total + money.overdue.total)}
               tone={money.overdue.count > 0 ? 'danger' : 'neutral'}
-              hint={money.overdue.count > 0 ? `연체 ${money.overdue.count}건` : undefined}
+              hint={
+                [
+                  money.overdue.count > 0 ? `연체 ${money.overdue.count}건` : '',
+                  money.scheduled.gross + money.overdue.gross !== money.scheduled.total + money.overdue.total
+                    ? `청구 기준 ${krwTile(money.scheduled.gross + money.overdue.gross)}`
+                    : '',
+                ]
+                  .filter((v) => v !== '')
+                  .join(' · ') || undefined
+              }
               onClick={() => navigate('/ops/clients')}
             />
             {/* 새 요청은 '급한 일' 이 아니라 '새로 온 것' 이다 — 빨강 대신 브랜드색 */}
@@ -572,6 +581,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         <TodoActionSheet
           entry={todoPick}
           clientName={todoPick.clientId ? clientNameOf(todoPick.clientId) : undefined}
+          clients={active}
           onPick={(action) => applyTodoAction(todoPick, action)}
           onSave={(patch) => {
             setTodoPick(null)

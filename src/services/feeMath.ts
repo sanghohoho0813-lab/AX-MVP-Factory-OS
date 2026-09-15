@@ -27,6 +27,15 @@ export interface FeeMath {
   marginPct: number | null
 }
 
+/**
+ * 항목 하나의 '내 몫' — 합계에 더할 때 쓴다.
+ * 청구액이 미정이면 0 (세지 않는다). 화면 어디서든 돈을 더할 때는 이것을 쓴다 —
+ * 청구액(`amount`)을 직접 더하면 영업자에게 나갈 돈까지 내 돈으로 센다.
+ */
+export function netAmountOf(fee: Pick<FeeItem, 'amount' | 'agentFee'>): number {
+  return feeMathOf(fee).net ?? 0
+}
+
 /** 한 항목의 계산 */
 export function feeMathOf(fee: Pick<FeeItem, 'amount' | 'agentFee'>): FeeMath {
   const gross = typeof fee.amount === 'number' && Number.isFinite(fee.amount) ? fee.amount : null
@@ -103,4 +112,28 @@ export function feeTotals(fees: FeeItem[]): FeeTotals {
     receivedNet,
     unknownCount,
   }
+}
+
+export interface AgentShare {
+  /** 영업자 이름. 이름을 안 적은 수수료는 '이름 없음' 으로 묶인다 */
+  name: string
+  /** 그 사람에게 나갈 수수료 합계 */
+  amount: number
+}
+
+/**
+ * 영업자별로 나갈 돈 — "누구한테 얼마" 를 한 줄로.
+ * 같은 이름(앞뒤 공백 무시)은 합치고, 많이 나가는 순으로 정렬한다. 수수료 0인 항목은 세지 않는다.
+ */
+export function agentShares(fees: Pick<FeeItem, 'agentFee' | 'agentName'>[]): AgentShare[] {
+  const map = new Map<string, number>()
+  for (const f of fees) {
+    const amount = typeof f.agentFee === 'number' && Number.isFinite(f.agentFee) && f.agentFee > 0 ? f.agentFee : 0
+    if (amount === 0) continue
+    const name = (f.agentName ?? '').trim() || '이름 없음'
+    map.set(name, (map.get(name) ?? 0) + amount)
+  }
+  return [...map.entries()]
+    .map(([name, amount]) => ({ name, amount }))
+    .sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name, 'ko'))
 }

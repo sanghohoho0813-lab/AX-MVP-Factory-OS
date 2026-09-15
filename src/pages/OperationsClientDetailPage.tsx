@@ -68,11 +68,13 @@ import {
 import { todayLocalDate } from '../lib/appClock'
 import { formatFileSize, formatKrw, krwTile } from '../lib/format'
 import {
+  CONTRACT_KIND_LABEL,
   CONTRACT_STAGE_LABEL,
   CONTRACT_STAGE_ORDER,
   contractStageOf,
   statusForStage,
 } from '../types/clientOps'
+import { contractAgeShort } from '../services/contractSummary'
 import type {
   ClientOpsRecord,
   ContractStage,
@@ -100,7 +102,7 @@ import { TodoComposer } from '../components/journal/TodoBoard'
 import { createJournalEntry } from '../services/journalService'
 import { FundingSection } from '../components/ops/FundingSection'
 import { DocImportModal } from '../components/ops/DocImportModal'
-import { feeMathOf, feeTotals, marginPct, marginText } from '../services/feeMath'
+import { agentShares, feeMathOf, feeTotals, marginPct, marginText, netAmountOf } from '../services/feeMath'
 import { withActivity } from '../services/clientOpsActivity'
 import { ActivityLog } from '../components/ops/ActivityLog'
 import { ContractCard } from '../components/ops/ContractCard'
@@ -183,6 +185,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const [deleting, setDeleting] = useState(false)
 
   const today = todayLocalDate()
+  const contractAge = contractAgeShort(record?.contract.signedAt ?? '', today)
 
   const load = useCallback(async () => {
     try {
@@ -275,7 +278,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   }, [record, today])
 
   const paidAmount = useMemo(
-    () => (record ? record.fees.filter((f) => f.receivedAt !== null).reduce((s, f) => s + (f.amount ?? 0), 0) : 0),
+    // 받은 돈도 내 몫으로 센다 (D-74)
+    () => (record ? record.fees.filter((f) => f.receivedAt !== null).reduce((s, f) => s + netAmountOf(f), 0) : 0),
     [record],
   )
   const progress = useMemo(() => (record ? clientOpsProgress(record, today) : null), [record, today])
@@ -360,6 +364,13 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             <p className="t-sub mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-slate-500">
               <PhoneLink phone={record.contactPhone} />
               {record.contactName && <span>{record.contactName}</span>}
+              {/* 계약한 지 얼마나 됐는지 — 계약 카드까지 내려가지 않아도 머리말에서 보인다 */}
+              {contractAge !== '' && (
+                <button type="button" onClick={() => setTab('overview')} className="font-medium text-brand-700">
+                  {record.contract.kind !== '' ? `${CONTRACT_KIND_LABEL[record.contract.kind]} · ` : '계약 · '}
+                  {contractAge}
+                </button>
+              )}
               {portalLinked !== null && (
                 <button
                   type="button"
@@ -588,10 +599,17 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           onClick={() => setTab('docs')}
         />
         <MetricTile
-          label="못 받은 돈"
-          value={krwTile(progress.unpaidAmount)}
+          label="못 받은 내 돈"
+          value={krwTile(progress.unpaidNet)}
           tone={progress.overduePayments > 0 ? 'danger' : 'neutral'}
-          hint={progress.overduePayments > 0 ? `예정일 지난 건 ${progress.overduePayments}건` : undefined}
+          hint={
+            [
+              progress.overduePayments > 0 ? `예정일 지난 건 ${progress.overduePayments}건` : '',
+              progress.unpaidAmount !== progress.unpaidNet ? `청구 기준 ${krwTile(progress.unpaidAmount)}` : '',
+            ]
+              .filter((v) => v !== '')
+              .join(' · ') || undefined
+          }
           onClick={() => setTab('fees')}
         />
         <MetricTile
@@ -637,7 +655,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             value={`${progress.documentsUsable}/${progress.documentsTotal}`}
             tone={progress.documentsUsable < progress.documentsTotal ? 'warning' : 'success'}
           />
-          <MetricTile label="받은 돈" value={krwTile(paidAmount)} />
+          <MetricTile label="받은 내 돈" value={krwTile(paidAmount)} />
         </div>
       </Disclosure>
 
@@ -1392,12 +1410,15 @@ function FeesSection({
   const [dueDate, setDueDate] = useState('')
 
   const [agentFee, setAgentFee] = useState(0)
+  const [agentName, setAgentName] = useState('')
   /*
    * 청구액과 '진짜 내 돈' 은 다르다.
    * 성공보수 2,000만원을 받아도 일부는 소개해 준 영업자에게 나간다. 청구액만 보고
    * 있으면 실제로 남는 돈을 늘 다시 계산하게 된다 — 그래서 둘을 나란히 둔다.
    */
   const totals = feeTotals(record.fees)
+  /** 누구한테 얼마 나가는지 — 수수료 칸 아래 한 줄 */
+  const shares = agentShares(record.fees)
 
   const add = () => {
     onChange(
@@ -1406,11 +1427,13 @@ function FeesSection({
         serviceKey: serviceKey === '' ? null : serviceKey,
         amount: amount > 0 ? amount : null,
         agentFee: agentFee > 0 ? agentFee : null,
+        agentName,
         dueDate,
       }),
     )
     setAmount(0)
     setAgentFee(0)
+    setAgentName('')
     setDueDate('')
   }
 
@@ -1428,7 +1451,11 @@ function FeesSection({
       {/* 돈 세 줄 — 청구액 · 영업자 수수료 · 진짜 내 돈. 이익률은 매번 계산한다 */}
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         <MetricTile label="청구 합계" value={krwTile(totals.gross)} hint={totals.unknownCount > 0 ? `금액 미정 ${totals.unknownCount}건` : undefined} />
-        <MetricTile label="영업자 수수료" value={krwTile(totals.agent)} />
+        <MetricTile
+          label="영업자 수수료"
+          value={krwTile(totals.agent)}
+          hint={shares.length > 0 ? shares.map((s) => `${s.name} ${formatKrw(s.amount)}`).join(' · ') : undefined}
+        />
         <MetricTile
           label="내가 받는 돈"
           value={krwTile(totals.net)}
@@ -1456,7 +1483,9 @@ function FeesSection({
                 // 휴대폰: 제목 줄(체크·이름·지우기) → 입력 줄(날짜·금액·+100만) 두 단으로 쌓는다.
                 // 한 줄에 여섯 칸을 밀어 넣으면 이름 칸이 20px 로 짜부라져 글자가 세로로 흐른다.
                 // 데스크톱은 sm:contents 로 감싼 칸을 없애고 order 로 원래 한 줄 순서를 되돌린다.
-                <li key={fee.id} className="flex flex-col gap-2.5 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-3 sm:px-5">
+                // 데스크톱에서는 줄바꿈을 허용해야 한다 — 영업자 수수료 줄(sm:w-full)이 같은 줄에 끼면
+                // 이름 칸이 0px 로 짜부라져 '08-25 입금' 조각이 날짜 칸 위로 올라탄다(§20-3).
+                <li key={fee.id} className="flex flex-col gap-2.5 px-4 py-3.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:px-5">
                   <div className="flex min-w-0 items-start gap-2.5 sm:contents">
                     <label className="order-1 flex shrink-0 items-center gap-2 pt-0.5 sm:pt-0">
                       <input
@@ -1551,11 +1580,22 @@ function FeesSection({
                         className="w-24 rounded-(--radius-control) border border-slate-300 px-2 py-1 text-right text-[0.92rem] font-semibold tabular-nums text-slate-700"
                       />
                     </label>
+                    {/* 누구한테 나가는 돈인지 — 수수료가 있을 때만 이름 칸을 연다 */}
+                    {(fee.agentFee !== null || fee.agentName !== '') && (
+                      <input
+                        aria-label={`${fee.label} 영업자 이름`}
+                        value={fee.agentName}
+                        onChange={(e) => onChange(withFee(record, fee.id, { agentName: e.target.value }))}
+                        placeholder="영업자 이름"
+                        className="w-24 rounded-(--radius-control) border border-slate-300 px-2 py-1 text-[0.92rem] text-slate-700"
+                      />
+                    )}
                     {(() => {
                       const m = feeMathOf(fee)
                       if (m.net === null || m.agent === 0) return null
                       return (
                         <span className="t-sub text-slate-600">
+                          {fee.agentName.trim() !== '' && <span className="mr-1.5">{fee.agentName.trim()} 몫 빼고</span>}
                           → 내 몫 <strong className="font-semibold text-slate-900 tabular-nums">{formatKrw(m.net)}</strong>
                           {m.marginPct !== null && (
                             <span className="ml-1.5 rounded-full bg-brand-50 px-2 py-0.5 font-bold text-brand-700 tabular-nums">
@@ -1604,6 +1644,17 @@ function FeesSection({
           </label>
           <AmountField id="fee-new-amount" value={amount} onChange={setAmount} />
           <AmountField id="fee-new-agent" label="영업자 수수료" value={agentFee} onChange={setAgentFee} />
+          {agentFee > 0 && (
+            <label className="text-[0.88rem] font-medium text-slate-600">
+              영업자 이름
+              <input
+                value={agentName}
+                onChange={(e) => setAgentName(e.target.value)}
+                placeholder="누구에게"
+                className="mt-1 block w-28 rounded-(--radius-control) border border-slate-300 px-2 py-2 text-[0.95rem]"
+              />
+            </label>
+          )}
           {/* 적는 동안 이익률이 따라 움직인다 — 계산기를 따로 두드리지 않게 */}
           {draftMargin !== null && (
             <span className="t-sub self-center rounded-full bg-brand-50 px-2.5 py-1 font-bold text-brand-700 tabular-nums">

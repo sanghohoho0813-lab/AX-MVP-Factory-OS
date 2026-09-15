@@ -38,8 +38,11 @@ const clients = [
     },
     fees: [
       { id: 'fee1', kind: 'deposit', label: '계약금', amount: 3_000_000, dueDate: d(-12), receivedAt: d(-10) },
-      { id: 'fee2', kind: 'success', label: '성공보수', amount: 5_500_000, dueDate: d(-3), receivedAt: null },
+      // 영업자 몫이 있는 항목 — 화면 어디서든 '내 몫'(400만) 과 '청구'(550만) 가 갈라져야 한다 (D-74)
+      { id: 'fee2', kind: 'success', label: '성공보수', amount: 5_500_000, agentFee: 1_500_000, agentName: '최영업', dueDate: d(-3), receivedAt: null },
     ],
+    // 직접 만든 칸 — 검색이 여기까지 닿는지 확인한다 (D-76)
+    customFields: [{ id: 'cf1', group: 'contact', label: '담당 세무사', value: '김세무' }],
     fundingApplications: [
       { id: 'fa1', programName: '창업성장기술개발사업', status: 'preparing', applyDueDate: d(6), amount: 200_000_000 },
     ],

@@ -95,7 +95,7 @@ const back = await page.evaluate(() => {
 check('해당 없음에서 다시 바꿀 수 있다', back === 'in_progress', String(back))
 
 // 수금 시트
-await page.getByRole('button', { name: /^미수금/ }).first().click()
+await page.getByRole('button', { name: /^못 받은 내 돈/ }).first().click()
 await page.waitForTimeout(400)
 check('수금 시트가 열린다', await page.getByRole('dialog').isVisible())
 check('수금 항목 넣기 칸이 있다', await page.getByRole('button', { name: '넣기' }).isVisible())
@@ -180,6 +180,73 @@ check('업무 15개에서도 가로 스크롤 없음', of2.d <= of2.w + 1, `${of
   await page.waitForTimeout(700)
   const list = (await page.locator('main').innerText()) ?? ''
   check('목록: 계약 개월수가 보인다', /계약 \d+년 \d+개월째|계약 \d+개월째/.test(list), list.slice(0, 300))
+}
+
+/* ---------------- 내 몫 통일 · 검색 · 계약 개월수 · 영업자 이름 (D-74~77) ---------------- */
+{
+  // 한솔 성공보수 550만 중 영업자 150만 → 내 몫 400만. 미수금 합계: 한솔 400 + 다움 200 + 선한 150 = 750만 (청구 900만)
+  await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const hub = (await page.locator('main').innerText()) ?? ''
+  const hubAll = (await page.locator('main').evaluate((el) => el.textContent)) ?? ''
+  check('내 몫: 목록 카드가 청구액이 아니라 내 몫을 보여 준다', hub.includes('못 받은 내 돈 4,000,000원'), hub.slice(0, 400))
+  check('내 몫: 목록 카드에 청구액 550만이 그대로 찍히지 않는다', !hub.includes('5,500,000원'))
+  check('내 몫: 고객 운영 위 칸 합계도 내 몫(750만)', hub.includes('750만원'), hub.slice(0, 400))
+  check('내 몫: 청구 기준(900만)은 힌트로 남긴다', hubAll.includes('청구 기준 900만원'), hubAll.slice(0, 300))
+
+  // 검색 — 회사명 말고 직접 만든 칸 · 전화 뒷자리 · 법인번호
+  const box = page.getByLabel('업체 검색')
+  const visibleNames = async () => {
+    const t = (await page.locator('main').innerText()) ?? ''
+    return ['한솔테크', '다움에너지', '미래바이오랩', '선한식품', '우일산업'].filter((n) => t.includes(n))
+  }
+  await box.fill('김세무')
+  await page.waitForTimeout(500)
+  check('검색: 직접 만든 칸의 값으로 찾는다', JSON.stringify(await visibleNames()) === '["한솔테크"]', JSON.stringify(await visibleNames()))
+  await box.fill('6789')
+  await page.waitForTimeout(500)
+  check('검색: 전화 뒷자리로 찾는다', JSON.stringify(await visibleNames()) === '["한솔테크"]', JSON.stringify(await visibleNames()))
+  await box.fill('110111')
+  await page.waitForTimeout(500)
+  check('검색: 법인번호로 찾는다', JSON.stringify(await visibleNames()) === '["우일산업"]', JSON.stringify(await visibleNames()))
+  await box.fill('최영업')
+  await page.waitForTimeout(500)
+  check('검색: 영업자 이름으로 찾는다', JSON.stringify(await visibleNames()) === '["한솔테크"]', JSON.stringify(await visibleNames()))
+  await box.fill('')
+  await page.waitForTimeout(400)
+
+  // 상세 — 머리말에 계약 개월수, 개요에 내 몫, 수금 탭에 영업자 이름
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const head = (await page.locator('main').innerText()) ?? ''
+  const headAll = (await page.locator('main').evaluate((el) => el.textContent)) ?? ''
+  check('상세 머리말: 계약 종류와 개월수가 보인다', /현금 \+ 보험 · 1년( \d+개월)?째/.test(head), head.slice(0, 300))
+  check('상세 개요: 못 받은 내 돈 400만', head.includes('못 받은 내 돈') && head.includes('400만원'), head.slice(0, 600))
+  check('상세 개요: 청구 기준 550만 힌트', headAll.includes('청구 기준 550만원'), headAll.slice(0, 300))
+
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=fees', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const feesTab = (await page.locator('main').innerText()) ?? ''
+  const feesAll = (await page.locator('main').evaluate((el) => el.textContent)) ?? ''
+  check('수금 탭: 영업자 이름이 항목에 보인다', feesTab.includes('최영업 몫 빼고'), feesTab.slice(0, 400))
+  check('수금 탭: 영업자 수수료 칸 아래 누구에게 얼마', feesAll.includes('최영업 1,500,000원'), feesAll.slice(0, 300))
+  const nameInput = page.getByLabel('성공보수 영업자 이름')
+  check('수금 탭: 영업자 이름을 고칠 수 있다', (await nameInput.count()) === 1)
+  await nameInput.fill('박영업')
+  await page.waitForTimeout(600)
+  const renamed = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_hansol'),
+  )
+  const f2 = (renamed?.fees ?? renamed?.payload?.fees ?? []).find((f) => f.id === 'fee2')
+  check('수금 탭: 영업자 이름이 저장된다', f2?.agentName === '박영업', JSON.stringify(f2))
+  await nameInput.fill('최영업')
+  await page.waitForTimeout(400)
+
+  // 오늘 — 위 칸도 내 몫
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const todayText = (await page.locator('main').innerText()) ?? ''
+  check('오늘: 받아야 할 내 돈 칸이 내 몫(750만)', todayText.includes('받아야 할 내 돈') && todayText.includes('750만원'), todayText.slice(0, 400))
 }
 
 /* ---------------- 계약 단계 · 업체 삭제 ---------------- */

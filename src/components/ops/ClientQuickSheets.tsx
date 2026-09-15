@@ -20,6 +20,7 @@ import {
 } from '../../content/clientOpsCatalog'
 import { withFee, withNewFee, withoutFee, withService } from '../../services/clientOpsService'
 import { daysLeftFrom, dueText } from '../../services/clientOpsAlerts'
+import { netAmountOf } from '../../services/feeMath'
 import { formatKrw } from '../../lib/format'
 import { BottomSheet } from '../ui/primitives'
 import { Button } from '../ui/Button'
@@ -119,7 +120,8 @@ export function ClientMoneySheet({
   const [amount, setAmount] = useState(0)
   const [due, setDue] = useState('')
 
-  const unpaid = record.fees.filter((f) => f.receivedAt === null).reduce((n, f) => n + (f.amount ?? 0), 0)
+  // 내 몫 기준 (D-74) — 영업자에게 나갈 돈은 여기서 빼고 센다
+  const unpaid = record.fees.filter((f) => f.receivedAt === null).reduce((n, f) => n + netAmountOf(f), 0)
 
   const add = () => {
     onSave(withNewFee(record, { kind, label: FEE_KIND_LABEL[kind], amount: amount > 0 ? amount : null, dueDate: due }))

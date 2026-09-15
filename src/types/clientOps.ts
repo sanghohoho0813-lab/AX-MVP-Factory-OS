@@ -131,6 +131,8 @@ export interface FeeItem {
    * 청구액에서 이것을 뺀 것이 '진짜 내가 받는 돈' 이다 — 이익률은 저장하지 않고 매번 계산한다.
    */
   agentFee: number | null
+  /** 그 수수료를 받아 갈 영업자 이름. 없으면 '' — 누구한테 얼마 나가는지 한 줄에 보이게 */
+  agentName: string
   /** 받기로 한 날 (YYYY-MM-DD, 미정이면 '') */
   dueDate: string
   /** 실제 입금 확인일 (YYYY-MM-DD). 미수금이면 null */

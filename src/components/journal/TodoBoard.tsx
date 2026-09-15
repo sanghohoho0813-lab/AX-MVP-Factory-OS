@@ -210,6 +210,7 @@ export type TodoAction = 'open' | 'done' | 'tomorrow' | 'delete'
 export function TodoActionSheet({
   entry,
   clientName,
+  clients = [],
   onPick,
   onSave,
   onOpenClient,
@@ -217,9 +218,11 @@ export function TodoActionSheet({
 }: {
   entry: JournalEntry
   clientName?: string
+  /** 고치기 화면에서 업체를 바꿀 수 있게 — 없으면 업체 칸을 숨긴다 */
+  clients?: { id: string; companyName: string }[]
   onPick: (action: TodoAction) => void
-  /** 적어 둔 내용·기한을 고칠 때 */
-  onSave?: (patch: { content: string; dueDate: string }) => void
+  /** 적어 둔 내용·기한·업체를 고칠 때 */
+  onSave?: (patch: { content: string; dueDate: string; clientId: string | null }) => void
   /** 관련 업체가 있을 때만 */
   onOpenClient?: () => void
   onClose: () => void
@@ -232,9 +235,18 @@ export function TodoActionSheet({
   const [editing, setEditing] = useState(false)
   const [content, setContent] = useState(entry.content)
   const [dueDate, setDueDate] = useState(entry.dueDate)
+  const [clientId, setClientId] = useState(entry.clientId ?? '')
+  /*
+   * 지금 붙어 있는 업체가 목록(보관·종료 제외)에 없어도 고르는 칸에서 사라지면 안 된다 —
+   * 저장하는 순간 소리 없이 '업체 없음' 이 된다. 그래서 목록 맨 위에 그대로 남겨 둔다.
+   */
+  const clientOptions =
+    entry.clientId && clientName && !clients.some((c) => c.id === entry.clientId)
+      ? [{ id: entry.clientId, companyName: clientName }, ...clients]
+      : clients
 
   const save = () => {
-    if (onSave && content.trim() !== '') onSave({ content: content.trim(), dueDate })
+    if (onSave && content.trim() !== '') onSave({ content: content.trim(), dueDate, clientId: clientId === '' ? null : clientId })
     setEditing(false)
   }
 
@@ -252,7 +264,7 @@ export function TodoActionSheet({
         onClose={onClose}
         footer={
           <div className="flex justify-end gap-2">
-            <Button onClick={() => { setContent(entry.content); setDueDate(entry.dueDate); setEditing(false) }}>취소</Button>
+            <Button onClick={() => { setContent(entry.content); setDueDate(entry.dueDate); setClientId(entry.clientId ?? ''); setEditing(false) }}>취소</Button>
             <Button variant="primary" disabled={content.trim() === ''} onClick={save}>
               저장
             </Button>
@@ -293,6 +305,25 @@ export function TodoActionSheet({
               </button>
             )}
           </label>
+          {/* 업체를 잘못 붙였거나 안 붙였을 때 — 지우고 다시 적지 않아도 된다 */}
+          {(clientOptions.length > 0 || clientId !== '') && (
+            <label className="block">
+              <span className="t-sub font-medium text-slate-700">업체</span>
+              <select
+                aria-label="할 일 업체 고치기"
+                value={clientId}
+                onChange={(e) => setClientId(e.target.value)}
+                className="t-body mt-1 h-12 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3"
+              >
+                <option value="">업체 없음</option>
+                {clientOptions.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.companyName}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
       </BottomSheet>
     )

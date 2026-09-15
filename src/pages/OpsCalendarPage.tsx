@@ -378,6 +378,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
         <TodoActionSheet
           entry={todoPick}
           clientName={todoPick.clientId ? clientNameOf(todoPick.clientId) : undefined}
+          clients={activeClients}
           onPick={(action) => applyTodoAction(todoPick, action)}
           onSave={(patch) => {
             setTodoPick(null)

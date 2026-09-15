@@ -33,6 +33,7 @@ import {
   isServiceOpen,
   serviceMeta,
 } from '../content/clientOpsCatalog'
+import { netAmountOf } from './feeMath'
 import { todayLocalDate } from '../lib/appClock'
 
 /* ------------------------------------------------------------------ */
@@ -147,7 +148,10 @@ export interface ClientOpsProgress {
   documentsUsable: number
   documentsTotal: number
   /** 미수금 합계(원) */
+  /** 못 받은 청구액 합계 — 영업자 수수료를 빼기 전 */
   unpaidAmount: number
+  /** 못 받은 '내 몫' 합계 — 화면에 보여 주는 값은 이것이다 (D-74) */
+  unpaidNet: number
   /** 예정일이 지난 미수금 건수 */
   overduePayments: number
   percent: number
@@ -166,6 +170,7 @@ export function clientOpsProgress(record: ClientOpsRecord, today: string): Clien
 
   const unpaid = record.fees.filter((f) => f.receivedAt === null)
   const unpaidAmount = unpaid.reduce((sum, f) => sum + (f.amount ?? 0), 0)
+  const unpaidNet = unpaid.reduce((sum, f) => sum + netAmountOf(f), 0)
   const overduePayments = unpaid.filter((f) => {
     const d = f.dueDate ? daysLeftFrom(today, f.dueDate) : null
     return d !== null && d < 0
@@ -182,6 +187,7 @@ export function clientOpsProgress(record: ClientOpsRecord, today: string): Clien
     documentsUsable,
     documentsTotal,
     unpaidAmount,
+    unpaidNet,
     overduePayments,
     percent,
   }

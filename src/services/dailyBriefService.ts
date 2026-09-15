@@ -9,6 +9,7 @@
 import type { ClientOpsRecord, OpsAlert } from '../types/clientOps'
 import type { CustomerEvent, JournalEntry } from '../types/bridge'
 import { daysLeftFrom } from './clientOpsAlerts'
+import { netAmountOf } from './feeMath'
 import { eventSummary, isOpenEvent, EVENT_TYPE_LABEL } from './customerBridgeService'
 
 export type BriefActionKind = 'alert' | 'event' | 'follow_up' | 'funding' | 'payment'
@@ -247,16 +248,19 @@ export function daySummaryText(s: DaySummary): string {
 /* ------------------------------------------------------------------ */
 
 export interface MoneySignals {
-  /** 예정일이 있고 아직 안 온 돈 (금액 있는 것만 합산) */
-  scheduled: { total: number; count: number }
-  /** 예정일이 지난 돈 */
-  overdue: { total: number; count: number; items: { clientId: string; clientName: string; label: string; amount: number | null; dueDate: string }[] }
+  /**
+   * 예정일이 있고 아직 안 온 돈 (금액 있는 것만 합산).
+   * `total` 은 영업자 수수료를 뺀 **내 몫**, `gross` 는 청구액 (D-74).
+   */
+  scheduled: { total: number; gross: number; count: number }
+  /** 예정일이 지난 돈 — 같은 규칙 */
+  overdue: { total: number; gross: number; count: number; items: { clientId: string; clientName: string; label: string; amount: number | null; dueDate: string }[] }
   /** 금액이 비어 있어 합산에서 빠진 건수 */
   unknownAmount: number
 }
 
 export function buildMoneySignals(clients: ClientOpsRecord[], today: string): MoneySignals {
-  const out: MoneySignals = { scheduled: { total: 0, count: 0 }, overdue: { total: 0, count: 0, items: [] }, unknownAmount: 0 }
+  const out: MoneySignals = { scheduled: { total: 0, gross: 0, count: 0 }, overdue: { total: 0, gross: 0, count: 0, items: [] }, unknownAmount: 0 }
   for (const c of clients) {
     if (c.archivedAt !== null) continue
     for (const f of c.fees) {
@@ -266,11 +270,13 @@ export function buildMoneySignals(clients: ClientOpsRecord[], today: string): Mo
         continue
       }
       if (f.dueDate && f.dueDate < today) {
-        out.overdue.total += f.amount
+        out.overdue.total += netAmountOf(f)
+        out.overdue.gross += f.amount
         out.overdue.count += 1
         out.overdue.items.push({ clientId: c.id, clientName: c.companyName, label: f.label, amount: f.amount, dueDate: f.dueDate })
       } else {
-        out.scheduled.total += f.amount
+        out.scheduled.total += netAmountOf(f)
+        out.scheduled.gross += f.amount
         out.scheduled.count += 1
       }
     }

@@ -43,8 +43,9 @@ import { CONTRACT_STAGE_ORDER, CONTRACT_STAGE_LABEL, contractStageOf, statusForS
 import type { ClientOpsStatus, ContractStage } from '../../types/clientOps'
 import { clientOpsProgress } from '../clientOpsAlerts'
 import { digitsOf, formatNumberOf, numberSegments } from '../../lib/format'
-import { feeMathOf, feeTotals, marginPct, marginText } from '../feeMath'
+import { agentShares, feeMathOf, feeTotals, marginPct, marginText, netAmountOf } from '../feeMath'
 import { CLIENT_SORT_ORDER, isClientSortKey, sortClients } from '../clientOpsSort'
+import { clientSearchText, matchesClientSearch } from '../clientOpsSearch'
 import { formatYmd, profileAsText, yearsInBusiness } from '../clientOpsProfile'
 import { SERVICE_STATUS_ORDER, isServiceOpen, isServiceNotApplicable, normalizeServiceStatus } from '../../content/clientOpsCatalog'
 import { BUILTIN_SERVICES, SERVICES, registerCustomServices } from '../../content/clientOpsCatalog'
@@ -736,6 +737,57 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
   check('합계: 전체 이익률', t.marginPct !== null && Math.abs(t.marginPct - 76.5) < 0.05, String(t.marginPct))
   check('합계: 항목이 없으면 0', feeTotals([]).gross === 0 && feeTotals([]).marginPct === null)
   check('수수료: 옛 기록에 칸이 없어도 읽힌다', rec.fees[0]?.agentFee === null)
+
+  // 내 몫 한 줄 — 모든 화면이 같은 함수를 쓴다 (D-74)
+  check('내 몫: 청구액 − 수수료', netAmountOf({ amount: 5_500_000, agentFee: 2_000_000 }) === 3_500_000)
+  check('내 몫: 수수료가 없으면 청구액 그대로', netAmountOf({ amount: 5_500_000, agentFee: null }) === 5_500_000)
+  check('내 몫: 금액 미정은 0 — 합산에서 빠진다', netAmountOf({ amount: null, agentFee: 1_000_000 }) === 0)
+  const prog = clientOpsProgress(rec, '2026-09-14')
+  check('진행 요약: 못 받은 청구액은 그대로', prog.unpaidAmount === 5_500_000)
+  check('진행 요약: 못 받은 내 돈은 수수료를 뺀 것', prog.unpaidNet === 3_500_000, String(prog.unpaidNet))
+  const withDue = { ...rec, fees: rec.fees.map((f) => (f.id === 'f2' ? { ...f, dueDate: '2026-09-01' } : f)) }
+  const sig = buildMoneySignals([withDue], '2026-09-14')
+  check('오늘 돈: 연체 합계는 내 몫', sig.overdue.total === 3_500_000, String(sig.overdue.total))
+  check('오늘 돈: 청구 기준은 따로 남긴다', sig.overdue.gross === 5_500_000)
+  check('오늘 돈: 수수료가 없는 곳은 내 몫 = 청구', ms.overdue.total === ms.overdue.gross && ms.scheduled.total === ms.scheduled.gross)
+  const kpi = buildKpis({ today: '2026-09-14', records: [withDue], journal: [], events: [] }).find((k) => k.key === 'overdue_receivables_now')
+  check('KPI: 연체 금액도 내 몫', kpi?.value === '1건 · 3,500,000원', JSON.stringify(kpi))
+
+  // 영업자 이름 — 누구한테 얼마
+  const named = withNewFee(rec, { kind: 'success', amount: 4_000_000, agentFee: 1_000_000, agentName: ' 김영업 ' })
+  check('영업자 이름: 앞뒤 공백을 지우고 저장', named.fees.at(-1)?.agentName === '김영업')
+  check('영업자 이름: 옛 기록에 칸이 없어도 빈 문자열', rec.fees[0]?.agentName === '')
+  const named2 = withNewFee(named, { kind: 'interim', amount: 2_000_000, agentFee: 500_000, agentName: '김영업' })
+  const shares = agentShares(named2.fees)
+  check('영업자별 합계: 같은 이름은 합친다', shares.find((s) => s.name === '김영업')?.amount === 1_500_000, JSON.stringify(shares))
+  check('영업자별 합계: 이름 없는 수수료는 "이름 없음"', shares.find((s) => s.name === '이름 없음')?.amount === 2_000_000)
+  check('영업자별 합계: 많이 나가는 순', shares[0]?.name === '이름 없음' && shares[1]?.name === '김영업')
+  check('영업자별 합계: 수수료 없는 항목은 세지 않는다', agentShares([{ agentFee: null, agentName: '아무개' }]).length === 0)
+}
+
+/* ------------------------------------------------------------------ */
+/* 업체 검색 — 회사명 말고도 내가 적어 둔 것 전부에서 (D-76)               */
+/* ------------------------------------------------------------------ */
+{
+  let r = normalizeClientOps({
+    id: 's1', companyName: '한솔테크', contactName: '박담당', contactPhone: '010-1234-5678',
+    corporateNumber: '110111-1234567', businessNumber: '123-45-67890',
+  })
+  r = withCustomField(r, { group: 'contact', label: '담당 세무사', value: '김세무' })
+  r = withNewFee(r, { kind: 'success', amount: 1_000_000, agentFee: 100_000, agentName: '최영업' })
+  check('검색: 회사명', matchesClientSearch(r, '한솔'))
+  check('검색: 대소문자 무시', matchesClientSearch(r, 'ㅎ') === false && matchesClientSearch(normalizeClientOps({ id: 'x', companyName: 'Acme' }), 'acme'))
+  check('검색: 빈 검색어는 전부', matchesClientSearch(r, '  '))
+  check('검색: 직접 만든 칸의 값', matchesClientSearch(r, '김세무'))
+  check('검색: 직접 만든 칸의 이름', matchesClientSearch(r, '세무사'))
+  check('검색: 영업자 이름', matchesClientSearch(r, '최영업'))
+  check('검색: 법인번호', matchesClientSearch(r, '110111'))
+  check('검색: 전화 뒷자리 — 하이픈 없이', matchesClientSearch(r, '5678'))
+  check('검색: 사업자번호 — 하이픈 있게 적어도', matchesClientSearch(r, '123-45'))
+  check('검색: 사업자번호 — 하이픈 없이 적어도', matchesClientSearch(r, '12345'))
+  check('검색: 없는 말은 안 맞는다', matchesClientSearch(r, '없는회사') === false)
+  check('검색: 없는 번호는 안 맞는다', matchesClientSearch(r, '9999') === false)
+  check('검색 문자열: 업무 일기 내용은 넣지 않는다', !clientSearchText(r).includes('활동'))
 }
 
 /* ------------------------------------------------------------------ */
