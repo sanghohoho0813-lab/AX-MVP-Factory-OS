@@ -8,6 +8,7 @@ import {
   ChevronRight,
   MoreHorizontal,
   ClipboardCopy,
+  Download,
   FileWarning,
   Lock,
   Paperclip,
@@ -21,10 +22,12 @@ import { useAuth } from '../auth/AuthProvider'
 import { getDataModeConfig } from '../data/dataMode'
 import {
   canUploadFiles,
+  downloadDocumentFile,
   listClients,
   saveClient,
   uploadDocumentFile,
   withContract,
+  withCustomDocument,
   withCustomField,
   withDocument,
   withFee,
@@ -37,6 +40,7 @@ import {
   withNotePinned,
   withNoteText,
   withService,
+  withoutCustomDocument,
   withoutCustomField,
   withoutFee,
   withoutFunding,
@@ -104,6 +108,7 @@ import { FundingSection } from '../components/ops/FundingSection'
 import { DocImportModal } from '../components/ops/DocImportModal'
 import { agentShares, feeMathOf, feeTotals, marginPct, marginText, netAmountOf } from '../services/feeMath'
 import { withActivity } from '../services/clientOpsActivity'
+import { allDocumentMetas, emptyDocumentState } from '../services/clientOpsDocuments'
 import { ActivityLog } from '../components/ops/ActivityLog'
 import { ContractCard } from '../components/ops/ContractCard'
 import { WorkHistoryCard } from '../components/ops/WorkHistoryCard'
@@ -182,6 +187,11 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
    */
   const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0)
   const [deleteTyped, setDeleteTyped] = useState('')
+  /* 직접 만든 서류 칸 (D-82) — 적는 중인 새 칸과, 이름을 고치는 중인 칸 */
+  const [newDocLabel, setNewDocLabel] = useState('')
+  const [newDocMonths, setNewDocMonths] = useState('')
+  const [renamingDoc, setRenamingDoc] = useState<string | null>(null)
+  const [renameDraft, setRenameDraft] = useState('')
   const [deleting, setDeleting] = useState(false)
 
   const today = todayLocalDate()
@@ -330,6 +340,15 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       showToast('파일을 보관했습니다.')
     } catch (cause) {
       showToast(cause instanceof Error ? cause.message : '파일을 보관하지 못했습니다.')
+    }
+  }
+
+  /** 올려 둔 파일 다시 받기 (D-83) */
+  const onDownload = async (state: { storagePath: string; fileName: string }) => {
+    try {
+      await downloadDocumentFile(state)
+    } catch (cause) {
+      showToast(cause instanceof Error ? cause.message : '파일을 내려받지 못했습니다.')
     }
   }
 
@@ -905,13 +924,15 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         )}
 
         <div className="grid gap-3 lg:grid-cols-2">
-          {[...DOCUMENTS]
+          {allDocumentMetas(record)
             .sort((a, b) => Number(urgentDocs.has(b.key)) - Number(urgentDocs.has(a.key)))
             .map((meta) => {
-              const state = record.documents[meta.key]
-              const view = documentStatus(meta.key, state, today)
+              const state = record.documents[meta.key] ?? emptyDocumentState()
+              const view = documentStatus(meta.key, state, today, meta)
               const needed = servicesNeeding(meta.key)
               const urgent = urgentDocs.has(meta.key)
+              /* 직접 만든 칸이면 이름을 고치고 없앨 수 있다 (D-82) */
+              const custom = record.customDocuments.find((d) => d.key === meta.key)
               return (
                 <div
                   key={meta.key}
@@ -929,6 +950,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                     <label className="flex min-w-0 items-start gap-2.5">
                       <input
                         type="checkbox"
+                        aria-label={`${meta.label} 받음`}
                         checked={state.received}
                         onChange={(e) => void commit(withDocument(record, meta.key, { received: e.target.checked }))}
                         className="mt-1 size-5 shrink-0 accent-brand-600"
@@ -957,6 +979,11 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                             <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 t-meta font-medium text-slate-500">
                               <ShieldAlert aria-hidden="true" className="size-3" />
                               민감
+                            </span>
+                          )}
+                          {custom && (
+                            <span className="rounded-full border border-brand-200 bg-brand-50 px-1.5 py-0.5 t-meta font-medium text-brand-700">
+                              직접 만든 칸
                             </span>
                           )}
                         </span>
@@ -1027,12 +1054,30 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                       <Button
                         variant="secondary"
                         size="sm"
+                        aria-label={`${meta.label} ${state.fileName ? '파일 교체' : '파일 첨부'}`}
                         disabled={!uploadable}
                         onClick={() => fileInputs.current[meta.key]?.click()}
                       >
                         <Upload aria-hidden="true" className="size-3.5" />
                         {state.fileName ? '파일 교체' : '파일 첨부'}
                       </Button>
+                      {/*
+                        올린 파일은 다시 받을 수 있어야 한다 (D-83).
+                        저장소가 attachment 헤더를 붙여 주므로 새 탭이 아니라 바로 내려받는다.
+                      */}
+                      {state.storagePath !== '' && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          aria-label={`${meta.label} 내려받기`}
+                          disabled={!uploadable}
+                          title={uploadable ? undefined : '클라우드(Supabase)를 연결하면 내려받을 수 있습니다.'}
+                          onClick={() => void onDownload(state)}
+                        >
+                          <Download aria-hidden="true" className="size-3.5" />
+                          내려받기
+                        </Button>
+                      )}
                       {state.fileName && (
                         <span className="t-sub inline-flex min-w-0 items-center gap-1 text-slate-600">
                           <Paperclip aria-hidden="true" className="size-3.5 shrink-0" />
@@ -1050,9 +1095,110 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                       필요한 업무: {needed.map((s) => s.shortLabel).join(', ')}
                     </p>
                   )}
+
+                  {custom &&
+                    (renamingDoc === custom.id ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          autoFocus
+                          aria-label={`${meta.label} 이름 고치기`}
+                          value={renameDraft}
+                          onChange={(e) => setRenameDraft(e.target.value)}
+                          className={inputCls}
+                        />
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          disabled={renameDraft.trim() === ''}
+                          onClick={() => {
+                            void commit(withCustomDocument(record, { id: custom.id, label: renameDraft }))
+                            setRenamingDoc(null)
+                          }}
+                        >
+                          저장
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setRenamingDoc(null)}>
+                          취소
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRenamingDoc(custom.id)
+                            setRenameDraft(custom.label)
+                          }}
+                          className="t-sub font-medium text-slate-500 hover:text-brand-700 hover:underline"
+                        >
+                          이름 고치기
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void commit(withoutCustomDocument(record, custom.id))
+                            showToast('서류 칸을 없앴습니다. 올린 파일은 파일 탭에 남아 있습니다.')
+                          }}
+                          className="t-sub font-medium text-slate-500 hover:text-danger-700 hover:underline"
+                        >
+                          칸 없애기
+                        </button>
+                      </div>
+                    ))}
                 </div>
               )
             })}
+        </div>
+
+        {/*
+          서류 칸 직접 만들기 (D-82).
+          기본 10종으로 안 되는 서류가 늘 있다 — 법인인감증명서·국세완납증명서·재무제표.
+          만든 칸은 기본 서류와 똑같이 받았는지·발급일·메모·파일을 쓴다.
+        */}
+        <div className="flex flex-wrap items-end gap-2 rounded-(--radius-panel) border border-dashed border-slate-300 bg-white p-4">
+          {/* 휴대폰에서는 이름 칸이 한 줄을 다 쓴다 — 유효기간·단추와 나눠 쓰면 이름 칸이 짜부라진다(화면 규칙 §9) */}
+          <label className="w-full text-[0.88rem] font-medium text-slate-600 sm:w-auto sm:max-w-xs sm:flex-1">
+            서류 이름
+            <input
+              aria-label="새 서류 칸 이름"
+              value={newDocLabel}
+              onChange={(e) => setNewDocLabel(e.target.value)}
+              placeholder="예: 법인인감증명서"
+              className={`mt-1 ${inputCls}`}
+            />
+          </label>
+          <label className="w-28 text-[0.88rem] font-medium text-slate-600">
+            유효기간(개월)
+            <input
+              aria-label="새 서류 칸 유효기간"
+              value={newDocMonths}
+              onChange={(e) => setNewDocMonths(e.target.value.replace(/\D/g, ''))}
+              inputMode="numeric"
+              placeholder="없음"
+              className={`mt-1 ${inputCls}`}
+            />
+          </label>
+          <Button
+            variant="secondary"
+            disabled={newDocLabel.trim() === ''}
+            onClick={() => {
+              void commit(
+                withCustomDocument(record, {
+                  label: newDocLabel,
+                  validMonths: newDocMonths === '' ? null : Number(newDocMonths),
+                }),
+              )
+              setNewDocLabel('')
+              setNewDocMonths('')
+              showToast('서류 칸을 만들었습니다.')
+            }}
+          >
+            <Plus aria-hidden="true" className="size-4" />
+            서류 칸 추가
+          </Button>
+          <p className="t-sub w-full break-keep text-slate-500">
+            기본 10종에 없는 서류를 만들어 둡니다. 유효기간을 넣으면 발급일 기준으로 만료를 알려드립니다.
+          </p>
         </div>
       </section>
 

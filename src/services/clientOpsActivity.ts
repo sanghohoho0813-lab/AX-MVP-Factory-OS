@@ -61,12 +61,16 @@ export function serviceDueText(key: ServiceKey, dueDate: string): string {
     : `${serviceMeta(key).shortLabel} · 마감일 지움`
 }
 
-export function documentReceivedText(key: DocumentKey, received: boolean): string {
-  return received ? `${documentLabel(key)} 받음` : `${documentLabel(key)} 받음 표시 해제`
+/**
+ * 직접 만든 서류 칸은 코드가 이름을 모른다(D-82) — 부르는 쪽이 이름을 넘긴다.
+ * 안 넘기면 기본 10종에서 찾고, 그래도 없으면 키를 그대로 쓴다.
+ */
+export function documentReceivedText(key: DocumentKey, received: boolean, label = documentLabel(key)): string {
+  return received ? `${label} 받음` : `${label} 받음 표시 해제`
 }
 
-export function documentFileText(key: DocumentKey, fileName: string): string {
-  return `${documentLabel(key)} 파일 첨부 — ${fileName}`
+export function documentFileText(key: DocumentKey, fileName: string, label = documentLabel(key)): string {
+  return `${label} 파일 첨부 — ${fileName}`
 }
 
 export function feeReceivedText(label: string, amount: number | null): string {

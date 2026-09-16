@@ -47,6 +47,11 @@ import { agentLedger, agentLedgerTotals, agentShares, feeMathOf, feeTotals, marg
 import { CLIENT_FILTER_ORDER, filterClients, isClientFilterKey, matchesClientFilter } from '../clientOpsFilter'
 import { CLIENT_SORT_ORDER, isClientSortKey, sortClients } from '../clientOpsSort'
 import { clientSearchText, matchesClientSearch, searchHit } from '../clientOpsSearch'
+import { allDocumentMetas, customDocumentMeta, documentMetaOf, makeCustomDocumentKey } from '../clientOpsDocuments'
+import { withCustomDocument, withDocument, withoutCustomDocument } from '../clientOpsService'
+import { documentStatus } from '../clientOpsAlerts'
+import { DOCUMENTS } from '../../content/clientOpsCatalog'
+import { isCustomDocumentKey } from '../../types/clientOps'
 import { formatYmd, profileAsText, yearsInBusiness } from '../clientOpsProfile'
 import { SERVICE_STATUS_ORDER, isServiceOpen, isServiceNotApplicable, normalizeServiceStatus } from '../../content/clientOpsCatalog'
 import { BUILTIN_SERVICES, SERVICES, registerCustomServices } from '../../content/clientOpsCatalog'
@@ -797,6 +802,59 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
   check('검색 근거: 영업자', searchHit(r, '최영업')?.label === '영업자')
   check('검색 근거: 안 맞으면 null', searchHit(r, '없음') === null)
   check('검색 근거: 빈 검색어는 null', searchHit(r, '') === null)
+}
+
+/* ------------------------------------------------------------------ */
+/* 서류 칸 직접 만들기 (D-82)                                            */
+/* ------------------------------------------------------------------ */
+{
+  const T = '2026-09-14'
+  let r = normalizeClientOps({ id: 'doc1', companyName: '서류테스트' })
+  check('서류 칸: 처음에는 없다', r.customDocuments.length === 0)
+  check('서류 칸: 기본 10종', allDocumentMetas(r).length === DOCUMENTS.length)
+
+  r = withCustomDocument(r, { label: ' 법인인감증명서 ', validMonths: 3 })
+  const made = r.customDocuments[0]
+  check('서류 칸: 앞뒤 공백을 지우고 만든다', made?.label === '법인인감증명서')
+  check('서류 칸: 키는 customdoc_ 로 시작한다', isCustomDocumentKey(made?.key ?? ''))
+  check('서류 칸: 유효기간이 남는다', made?.validMonths === 3)
+  check('서류 칸: 기본 10종 뒤에 붙는다', allDocumentMetas(r).length === DOCUMENTS.length + 1 && allDocumentMetas(r).at(-1)?.label === '법인인감증명서')
+  check('서류 칸: 만들면 상태 칸도 생긴다', r.documents[made.key]?.received === false)
+  check('서류 칸: 파일을 받는 칸이다', customDocumentMeta(made).needsFile === true)
+  check('서류 칸: 이름 없는 칸은 만들지 않는다', withCustomDocument(r, { label: '   ' }).customDocuments.length === 1)
+  check('서류 칸: 만든 것이 활동 기록에 남는다', r.activity[0]?.text === '서류 칸 추가 — 법인인감증명서')
+
+  // 진행률·만료가 기본 서류와 똑같이 돈다
+  r = withDocument(r, made.key, { received: true, issuedAt: '2026-01-01' })
+  const view = documentStatus(made.key, r.documents[made.key], T, documentMetaOf(r, made.key))
+  check('서류 칸: 유효기간이 지나면 만료로 본다', view.expired === true && view.expiresOn === '2026-04-01', JSON.stringify(view.expiresOn))
+  check('서류 칸: 이름으로 활동 기록', r.activity[0]?.text === '법인인감증명서 받음')
+  check('서류 칸: 진행률 분모에 들어간다', clientOpsProgress(r, T).documentsTotal === DOCUMENTS.length + 1)
+  r = withDocument(r, made.key, { issuedAt: '2026-09-01' })
+  check('서류 칸: 유효하면 보유로 센다', clientOpsProgress(r, T).documentsUsable === 1)
+
+  // 이름 고치기 — 키는 그대로여야 파일이 떨어지지 않는다
+  const renamed = withCustomDocument(r, { id: made.id, label: '법인 인감증명서(최신)' })
+  check('서류 칸: 이름을 고쳐도 키는 그대로', renamed.customDocuments[0]?.key === made.key)
+  check('서류 칸: 이름 변경이 기록에 남는다', renamed.activity[0]?.text.includes('서류 칸 이름 변경'))
+
+  // 없애기 — 정의만 지우고 상태는 남긴다
+  const gone = withoutCustomDocument(renamed, made.id)
+  check('서류 칸: 없애면 목록에서 빠진다', gone.customDocuments.length === 0)
+  check('서류 칸: 없애도 올린 파일 경로는 남는다', gone.documents[made.key]?.received === true)
+  check('서류 칸: 없앤 것이 기록에 남는다', gone.activity[0]?.text.includes('서류 칸 없앰'))
+  check('서류 칸: 지운 칸의 이름은 기본 서류로 떨어지지 않는다', documentMetaOf(gone, made.key).label === '(지운 서류 칸)')
+  check('서류 칸: 없는 id 는 아무 일도 없다', withoutCustomDocument(gone, 'nope') === gone)
+
+  // 다시 읽어도 살아남는다 (payload 저장 — 마이그레이션 없음)
+  const round = normalizeClientOps(JSON.parse(JSON.stringify(renamed)))
+  check('서류 칸: 저장했다 읽어도 남는다', round.customDocuments[0]?.label === '법인 인감증명서(최신)')
+  check('서류 칸: 상태도 함께 남는다', round.documents[made.key]?.issuedAt === '2026-09-01')
+  const orphan = normalizeClientOps({ id: 'o', companyName: '고아', documents: { customdoc_zzz: { received: true, storagePath: 'p' } } as never })
+  check('서류 칸: 정의가 없어진 상태도 버리지 않는다', orphan.documents.customdoc_zzz?.storagePath === 'p')
+  check('서류 칸: 이름 없는 정의는 버린다', normalizeClientOps({ id: 'x', companyName: 'x', customDocuments: [{ label: '  ' }] as never }).customDocuments.length === 0)
+  check('서류 칸: 유효기간이 0 이하면 없는 것으로', withCustomDocument(normalizeClientOps({ id: 'y', companyName: 'y' }), { label: 'ㄱ', validMonths: 0 }).customDocuments[0]?.validMonths === null)
+  check('서류 칸: 키는 매번 다르다', makeCustomDocumentKey() !== makeCustomDocumentKey())
 }
 
 /* ------------------------------------------------------------------ */

@@ -3,8 +3,8 @@ import { Download, FileText, Paperclip } from 'lucide-react'
 import type { ClientOpsRecord, DocumentKey } from '../../types/clientOps'
 import type { PortalDocument } from '../../types/bridge'
 import { useToast } from '../ui/toastContext'
-import { DOCUMENTS } from '../../content/clientOpsCatalog'
-import { canUploadFiles, documentFileUrl } from '../../services/clientOpsService'
+import { canUploadFiles, documentFileUrl, downloadDocumentFile } from '../../services/clientOpsService'
+import { documentMetaOf } from '../../services/clientOpsDocuments'
 import { DOCUMENT_STATUS_LABEL, listDocuments, listLinksForClient } from '../../services/customerBridgeService'
 import { activityTimeText } from '../../services/clientOpsActivity'
 import { formatFileSize } from '../../lib/format'
@@ -45,6 +45,15 @@ export function FilesTab({ record, workspaceId }: { record: ClientOpsRecord; wor
     }
   }
 
+  /** 열기 말고 실제로 받아 두기 (D-83) */
+  const save = async (state: { storagePath: string; fileName: string }) => {
+    try {
+      await downloadDocumentFile(state)
+    } catch (cause) {
+      showToast(cause instanceof Error ? cause.message : '파일을 내려받지 못했습니다.')
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {!uploadable && (
@@ -64,7 +73,7 @@ export function FilesTab({ record, workspaceId }: { record: ClientOpsRecord; wor
               <li key={key} className="flex items-center gap-3 py-2.5">
                 <FileText aria-hidden="true" className="size-5 shrink-0 text-slate-400" />
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[0.95rem] font-semibold text-slate-800">{DOCUMENTS.find((d) => d.key === key)?.label ?? key}</span>
+                  <span className="block text-[0.95rem] font-semibold text-slate-800">{documentMetaOf(record, key).label}</span>
                   <span className="block truncate text-[0.85rem] text-slate-500">
                     {v.fileName}
                     {v.fileSize > 0 ? ` · ${formatFileSize(v.fileSize)}` : ''}
@@ -72,9 +81,14 @@ export function FilesTab({ record, workspaceId }: { record: ClientOpsRecord; wor
                   </span>
                 </span>
                 {v.storagePath && uploadable && (
-                  <button type="button" onClick={() => void open(v.storagePath)} className="inline-flex h-9 items-center gap-1 rounded-(--radius-control) border border-slate-200 px-3 text-[0.88rem] font-medium text-slate-700 hover:bg-slate-50">
-                    <Download aria-hidden="true" className="size-4" /> 열기
-                  </button>
+                  <span className="flex shrink-0 items-center gap-1.5">
+                    <button type="button" onClick={() => void open(v.storagePath)} className="inline-flex h-9 items-center gap-1 rounded-(--radius-control) border border-slate-200 px-3 text-[0.88rem] font-medium text-slate-700 hover:bg-slate-50">
+                      <FileText aria-hidden="true" className="size-4" /> 열기
+                    </button>
+                    <button type="button" onClick={() => void save(v)} className="inline-flex h-9 items-center gap-1 rounded-(--radius-control) border border-slate-200 px-3 text-[0.88rem] font-medium text-slate-700 hover:bg-slate-50">
+                      <Download aria-hidden="true" className="size-4" /> 내려받기
+                    </button>
+                  </span>
                 )}
               </li>
             ))}

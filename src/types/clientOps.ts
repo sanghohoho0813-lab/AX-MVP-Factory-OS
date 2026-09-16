@@ -80,17 +80,52 @@ export interface ServiceState {
 /* 서류                                                                 */
 /* ------------------------------------------------------------------ */
 
-export type DocumentKey =
-  | 'businessRegistration' // 사업자등록증
-  | 'corporateRegistry' // 법인등기부등본
-  | 'representativeId' // 대표자 신분증 사본
-  | 'representativePhone' // 대표자 휴대폰번호
-  | 'businessNumber' // 사업자등록번호
-  | 'corporateNumber' // 법인번호
-  | 'jointCertificate' // 공동인증서 전달
-  | 'businessAddress' // 사업장 주소
-  | 'smeCertificate' // 중소기업 확인서
-  | 'healthInsurance' // 대표자 건강보험 득실확인서
+/**
+ * 서류 키.
+ *
+ * 기본 10종은 코드가 이름으로 알고, 그 밖은 대표가 직접 만든다(D-82).
+ * 업무 키(ServiceKey)와 같은 이유로 문자열로 연다 — 직접 만든 칸의 키를 미리 알 수 없다.
+ */
+export type DocumentKey = string
+
+/** 코드가 이름으로 아는 기본 서류 10종 */
+export const BUILTIN_DOCUMENT_KEYS = [
+  'businessRegistration', // 사업자등록증
+  'corporateRegistry', // 법인등기부등본
+  'representativeId', // 대표자 신분증 사본
+  'representativePhone', // 대표자 휴대폰번호
+  'businessNumber', // 사업자등록번호
+  'corporateNumber', // 법인번호
+  'jointCertificate', // 공동인증서 전달
+  'businessAddress', // 사업장 주소
+  'smeCertificate', // 중소기업 확인서
+  'healthInsurance', // 대표자 건강보험 득실확인서
+] as const
+
+export type BuiltinDocumentKey = (typeof BUILTIN_DOCUMENT_KEYS)[number]
+
+/** 대표가 직접 만든 서류 칸인지 */
+export function isCustomDocumentKey(key: DocumentKey): boolean {
+  return key.startsWith('customdoc_')
+}
+
+/**
+ * 대표가 직접 만든 서류 칸 (업체마다 다르다).
+ *
+ * 기본 10종으로 안 되는 서류가 늘 있다 — 법인인감증명서·국세완납증명서·재무제표처럼
+ * 기관이나 업종에 따라 달라진다. 칸을 만들면 기본 서류와 **똑같이** 받았는지·발급일·
+ * 메모·파일 첨부를 쓴다. 상태는 `documents[key]` 에 함께 들어간다.
+ */
+export interface CustomDocument {
+  id: string
+  /** `customdoc_` 로 시작한다. 한 번 정해지면 바꾸지 않는다 — 상태와 파일이 이 키로 붙어 있다 */
+  key: DocumentKey
+  label: string
+  /** 유효기간(개월). 없으면 null — 만료를 따지지 않는다 */
+  validMonths: number | null
+  /** 민감 정보라 취급에 주의가 필요한지 */
+  sensitive: boolean
+}
 
 export interface DocumentState {
   /** 받았는지 여부 */
@@ -428,6 +463,8 @@ export interface ClientOpsRecord {
   contract: ContractInfo
   /** 회사 기본 정보에 직접 만든 칸 (payload 에 함께 저장된다) */
   customFields: CustomProfileField[]
+  /** 서류함에 직접 만든 칸 (payload 에 함께 저장된다) */
+  customDocuments: CustomDocument[]
   fees: FeeItem[]
   notes_list: ClientNote[]
   fundingApplications: FundingApplication[]

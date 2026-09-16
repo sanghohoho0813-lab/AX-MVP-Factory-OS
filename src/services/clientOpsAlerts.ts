@@ -21,6 +21,7 @@ import type {
   OpsAlert,
   ServiceKey,
 } from '../types/clientOps'
+import type { DocumentMeta } from '../content/clientOpsCatalog'
 import {
   DOCUMENTS,
   DOC_EXPIRING_DAYS,
@@ -34,6 +35,7 @@ import {
   serviceMeta,
 } from '../content/clientOpsCatalog'
 import { netAmountOf } from './feeMath'
+import { allDocumentMetas, emptyDocumentState } from './clientOpsDocuments'
 import { todayLocalDate } from '../lib/appClock'
 
 /* ------------------------------------------------------------------ */
@@ -108,8 +110,10 @@ export function documentStatus(
   key: DocumentKey,
   state: DocumentState,
   today: string,
+  /** 직접 만든 칸은 코드가 모른다(D-82) — 그 업체의 정의를 넘겨받는다 */
+  metaOverride?: DocumentMeta,
 ): DocumentStatusView {
-  const meta = documentMeta(key)
+  const meta = metaOverride ?? documentMeta(key)
   const expiresOn = state.received ? expiryDate(state.issuedAt, meta.validMonths) : null
   const daysLeft = expiresOn ? daysLeftFrom(today, expiresOn) : null
   const expired = daysLeft !== null && daysLeft < 0
@@ -164,8 +168,10 @@ export function clientOpsProgress(record: ClientOpsRecord, today: string): Clien
     (s) => record.services[s.key].status !== 'on_hold' && record.services[s.key].status !== 'not_applicable',
   )
   const servicesDone = applicable.filter((s) => record.services[s.key].status === 'done').length
-  const documentsUsable = DOCUMENTS.filter(
-    (d) => documentStatus(d.key, record.documents[d.key], today).usable,
+  // 직접 만든 칸도 함께 센다 — 그 업체에 필요해서 만든 칸이다 (D-82)
+  const documentMetas = allDocumentMetas(record)
+  const documentsUsable = documentMetas.filter(
+    (d) => documentStatus(d.key, record.documents[d.key] ?? emptyDocumentState(), today, d).usable,
   ).length
 
   const unpaid = record.fees.filter((f) => f.receivedAt === null)
@@ -177,7 +183,7 @@ export function clientOpsProgress(record: ClientOpsRecord, today: string): Clien
   }).length
 
   const servicesTotal = applicable.length
-  const documentsTotal = DOCUMENTS.length
+  const documentsTotal = documentMetas.length
   const denom = servicesTotal + documentsTotal
   const percent = denom === 0 ? 0 : Math.round(((servicesDone + documentsUsable) / denom) * 100)
 

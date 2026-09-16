@@ -33,9 +33,20 @@ const clients = [
       policyFund: { status: 'not_started' },
     },
     documents: {
-      businessLicense: { received: true, issuedAt: d(-40), fileName: '사업자등록증.pdf' },
+      businessRegistration: { received: true, issuedAt: d(-40) },
       representativeId: { received: true, issuedAt: d(-40) },
+      // 직접 만든 칸 + 이미 올려 둔 파일 — 내려받기 단추가 보여야 한다 (D-82 · D-83)
+      customdoc_seed1: {
+        received: true,
+        issuedAt: d(-10),
+        fileName: '법인인감증명서.pdf',
+        fileSize: 120_000,
+        storagePath: 'ws-demo/cli_hansol/customdoc_seed1/seed-seal.pdf',
+      },
     },
+    customDocuments: [
+      { id: 'cd_seed1', key: 'customdoc_seed1', label: '법인인감증명서', validMonths: 3, sensitive: false },
+    ],
     fees: [
       { id: 'fee1', kind: 'deposit', label: '계약금', amount: 3_000_000, dueDate: d(-12), receivedAt: d(-10) },
       // 영업자 몫이 있는 항목 — 화면 어디서든 '내 몫'(400만) 과 '청구'(550만) 가 갈라져야 한다 (D-74)

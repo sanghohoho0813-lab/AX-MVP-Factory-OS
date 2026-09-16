@@ -33,6 +33,7 @@ import type {
   ClientNote,
   ClientOpsRecord,
   ContractInfo,
+  CustomDocument,
   CustomProfileField,
   FundingApplication,
   FundingStatus,
@@ -45,7 +46,8 @@ import type {
   ServiceKey,
   ServiceState,
 } from '../types/clientOps'
-import { CONTRACT_KIND_LABEL, emptyContract, isCustomServiceKey, isProfileGroupKey } from '../types/clientOps'
+import { CONTRACT_KIND_LABEL, emptyContract, isCustomDocumentKey, isCustomServiceKey, isProfileGroupKey } from '../types/clientOps'
+import { documentMetaOf, makeCustomDocumentKey } from './clientOpsDocuments'
 
 /* ------------------------------------------------------------------ */
 /* 기본값 · 정규화 (예전 형식 자동 승격 포함)                            */
@@ -185,6 +187,27 @@ function normalizeCustomFields(raw: unknown): CustomProfileField[] {
     .filter((f) => f.label.trim() !== '')
 }
 
+/**
+ * 직접 만든 서류 칸 정규화 (D-82).
+ * 이 기능이 없던 시절의 기록에는 아예 없으므로 빈 배열이 된다(기존 데이터 영향 0).
+ * 이름이 비어 있으면 버린다 — 이름 없는 칸은 화면에서 구분할 수 없다.
+ */
+function normalizeCustomDocuments(raw: unknown): CustomDocument[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((d) => ({
+      id: typeof d?.id === 'string' && d.id !== '' ? d.id : generateId(),
+      key: typeof d?.key === 'string' && d.key !== '' ? d.key : makeCustomDocumentKey(),
+      label: typeof d?.label === 'string' ? d.label.trim() : '',
+      validMonths:
+        typeof d?.validMonths === 'number' && Number.isFinite(d.validMonths) && d.validMonths > 0
+          ? Math.round(d.validMonths)
+          : null,
+      sensitive: d?.sensitive === true,
+    }))
+    .filter((d) => d.label !== '')
+}
+
 function upgradeFees(raw: Partial<ClientOpsRecord> & LegacyShape): FeeItem[] {
   if (Array.isArray(raw.fees)) {
     return raw.fees.map((f) => ({
@@ -241,13 +264,28 @@ function upgradeFees(raw: Partial<ClientOpsRecord> & LegacyShape): FeeItem[] {
 
 export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape): ClientOpsRecord {
   const now = nowIso()
+  const customDocuments = normalizeCustomDocuments(value.customDocuments)
   const documents = defaultDocuments()
   if (value.documents && typeof value.documents === 'object') {
-    for (const d of DOCUMENTS) {
-      const v = (value.documents as Record<string, Partial<DocumentState>>)[d.key]
+    const stored = value.documents as Record<string, Partial<DocumentState>>
+    /*
+     * 기본 10종 + 직접 만든 칸(D-82).
+     * 저장돼 있던 customdoc_ 상태는 정의가 사라졌어도 그대로 지킨다 — 칸을 지웠다고
+     * 올려 둔 파일의 경로까지 잃으면 되돌릴 방법이 없다.
+     */
+    const keys = new Set<DocumentKey>([
+      ...DOCUMENTS.map((d) => d.key),
+      ...customDocuments.map((d) => d.key),
+      ...Object.keys(stored).filter(isCustomDocumentKey),
+    ])
+    for (const key of keys) {
+      const v = stored[key]
+      documents[key] ??= defaultDocument()
       if (!v) continue
-      documents[d.key] = { ...documents[d.key], ...v }
+      documents[key] = { ...documents[key], ...v }
     }
+  } else {
+    for (const d of customDocuments) documents[d.key] ??= defaultDocument()
   }
   return {
     id: value.id ?? generateId(),
@@ -279,6 +317,7 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
     documents,
     contract: normalizeContract(value.contract),
     customFields: normalizeCustomFields(value.customFields),
+    customDocuments,
     fees: upgradeFees(value),
     notes_list: Array.isArray(value.notes_list)
       ? value.notes_list.map((n) => ({
@@ -598,13 +637,73 @@ export function withDocument(
       [key]: { ...prev, ...patch, updatedAt: nowIso() },
     },
   }
+  const label = documentMetaOf(record, key).label
   if (patch.received !== undefined && patch.received !== prev.received) {
-    out = withActivity(out, 'document', documentReceivedText(key, patch.received))
+    out = withActivity(out, 'document', documentReceivedText(key, patch.received, label))
   }
   if (patch.fileName && patch.fileName !== prev.fileName) {
-    out = withActivity(out, 'document', documentFileText(key, patch.fileName))
+    out = withActivity(out, 'document', documentFileText(key, patch.fileName, label))
   }
   return out
+}
+
+/**
+ * 서류 칸 직접 만들기 · 이름 고치기 (D-82).
+ * `id` 를 주면 고치고, 없으면 새로 만든다. 키는 만들 때 한 번만 정한다 —
+ * 이름을 고쳤다고 키가 바뀌면 이미 올려 둔 파일이 떨어져 나간다.
+ */
+export function withCustomDocument(
+  record: ClientOpsRecord,
+  input: { id?: string; label: string; validMonths?: number | null; sensitive?: boolean },
+): ClientOpsRecord {
+  const label = input.label.trim()
+  if (label === '') return record
+  const validMonths =
+    typeof input.validMonths === 'number' && Number.isFinite(input.validMonths) && input.validMonths > 0
+      ? Math.round(input.validMonths)
+      : null
+  const prev = input.id ? record.customDocuments.find((d) => d.id === input.id) : undefined
+  if (prev) {
+    const next: ClientOpsRecord = {
+      ...record,
+      customDocuments: record.customDocuments.map((d) =>
+        d.id === prev.id ? { ...d, label, validMonths, sensitive: input.sensitive ?? d.sensitive } : d,
+      ),
+    }
+    if (prev.label === label) return next
+    return withActivity(next, 'document', `서류 칸 이름 변경 — ${prev.label} → ${label}`)
+  }
+  const doc: CustomDocument = {
+    id: generateId(),
+    key: makeCustomDocumentKey(),
+    label,
+    validMonths,
+    sensitive: input.sensitive === true,
+  }
+  return withActivity(
+    {
+      ...record,
+      customDocuments: [...record.customDocuments, doc],
+      documents: { ...record.documents, [doc.key]: defaultDocument() },
+    },
+    'document',
+    `서류 칸 추가 — ${label}`,
+  )
+}
+
+/**
+ * 서류 칸 없애기.
+ * 정의만 지우고 **상태는 남긴다** — 올려 둔 파일의 경로까지 지우면 되돌릴 수 없다.
+ * 같은 이름으로 다시 만들면 새 칸이 되므로, 정말 지우는 것은 사람이 파일을 정리한 뒤다.
+ */
+export function withoutCustomDocument(record: ClientOpsRecord, id: string): ClientOpsRecord {
+  const gone = record.customDocuments.find((d) => d.id === id)
+  if (!gone) return record
+  return withActivity(
+    { ...record, customDocuments: record.customDocuments.filter((d) => d.id !== id) },
+    'document',
+    `서류 칸 없앰 — ${gone.label}`,
+  )
 }
 
 /**
@@ -871,12 +970,39 @@ export async function uploadDocumentFile(
   )
 }
 
-/** 첨부 파일 서명 URL (보기·내려받기) */
-export async function documentFileUrl(storagePath: string): Promise<string | null> {
+/**
+ * 첨부 파일 서명 URL (5분).
+ *
+ * `downloadName` 을 주면 저장소가 `Content-Disposition: attachment` 를 붙여 준다 —
+ * 브라우저가 새 탭에서 열지 않고 **바로 내려받는다**. 안 주면 열어서 보는 주소다.
+ * 올릴 때 경로에서 한글을 지웠으므로(파일명은 fileName 에 보관), 내려받는 이름은 원래 이름으로 준다.
+ */
+export async function documentFileUrl(storagePath: string, downloadName?: string): Promise<string | null> {
   if (!canUploadFiles() || !storagePath) return null
   const { data, error } = await getSupabaseClient()
     .storage.from('client-documents')
-    .createSignedUrl(storagePath, 60 * 5)
+    .createSignedUrl(storagePath, 60 * 5, downloadName ? { download: downloadName } : undefined)
   if (error) return null
   return data?.signedUrl ?? null
+}
+
+/**
+ * 첨부 파일 내려받기.
+ *
+ * 저장소가 붙여 준 attachment 헤더 덕분에 링크를 누르면 바로 저장된다.
+ * 새 탭으로 열지 않는다 — 열어 두면 PDF 미리보기가 떠서 '받았다' 는 느낌이 나지 않는다.
+ */
+export async function downloadDocumentFile(state: Pick<DocumentState, 'storagePath' | 'fileName'>): Promise<void> {
+  if (!canUploadFiles()) {
+    throw new Error('파일 내려받기는 Supabase 클라우드 저장을 연결한 뒤 사용할 수 있습니다.')
+  }
+  const url = await documentFileUrl(state.storagePath, state.fileName || undefined)
+  if (!url) throw new Error('파일 주소를 만들지 못했습니다.')
+  const a = document.createElement('a')
+  a.href = url
+  a.download = state.fileName || ''
+  a.rel = 'noopener'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
 }

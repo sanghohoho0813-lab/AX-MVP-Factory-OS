@@ -330,6 +330,70 @@ check('업무 15개에서도 가로 스크롤 없음', of2.d <= of2.w + 1, `${of
   check('수금 탭: 지급일 칸이 있다', (await page.getByLabel('중도금 영업자 지급일').count()) === 1)
 }
 
+/* ---------------- 서류함: 내려받기 · 직접 만든 칸 (D-82 · D-83) ---------------- */
+{
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=docs', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const docs = (await page.locator('main').innerText()) ?? ''
+  check('서류함: 직접 만든 칸이 기본 10종과 같이 보인다', docs.includes('법인인감증명서') && docs.includes('직접 만든 칸'), docs.slice(0, 400))
+
+  // 내려받기 — 로컬 모드에서는 잠겨 있다(클라우드 연결 후 켜진다)
+  const dl = page.getByRole('button', { name: '법인인감증명서 내려받기' })
+  check('서류함: 올린 파일에 내려받기 단추가 있다', (await dl.count()) === 1)
+  check('서류함: 로컬 모드에서는 내려받기가 잠긴다', await dl.isDisabled())
+  check('서류함: 파일 없는 서류에는 내려받기가 없다', (await page.getByRole('button', { name: '중소기업 확인서 내려받기' }).count()) === 0)
+
+  // 칸 만들기
+  await page.getByLabel('새 서류 칸 이름').fill('국세완납증명서')
+  await page.getByLabel('새 서류 칸 유효기간').fill('1')
+  await page.getByRole('button', { name: '서류 칸 추가' }).click()
+  await page.waitForTimeout(800)
+  const added = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_hansol'),
+  )
+  const cds = added?.customDocuments ?? added?.payload?.customDocuments ?? []
+  const made = cds.find((d) => d.label === '국세완납증명서')
+  check('서류함: 만든 칸이 저장된다', made !== undefined, JSON.stringify(cds))
+  check('서류함: 유효기간도 저장된다', made?.validMonths === 1)
+  check('서류함: 키는 customdoc_ 로 시작한다', String(made?.key ?? '').startsWith('customdoc_'))
+  check('서류함: 적는 칸이 비워진다', (await page.getByLabel('새 서류 칸 이름').inputValue()) === '')
+
+  // 기본 서류와 똑같이 — 받음 체크 → 발급일·메모·파일 첨부
+  await page.getByLabel('국세완납증명서 받음').check()
+  await page.waitForTimeout(700)
+  check('서류함: 만든 칸도 파일을 받는다', (await page.getByRole('button', { name: '국세완납증명서 파일 첨부' }).count()) === 1)
+  const afterCheck = (await page.locator('main').innerText()) ?? ''
+  check('서류함: 만든 칸에도 유효기간 안내가 나온다', afterCheck.includes('유효 1개월'), afterCheck.slice(0, 300))
+
+  // 이름 고치기 — 키는 그대로
+  await page.getByRole('button', { name: '이름 고치기' }).last().click()
+  await page.waitForTimeout(400)
+  await page.getByLabel('국세완납증명서 이름 고치기').fill('국세 완납증명서(최신)')
+  await page.getByRole('button', { name: '저장', exact: true }).first().click()
+  await page.waitForTimeout(800)
+  const renamed = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_hansol'),
+  )
+  const rcds = renamed?.customDocuments ?? renamed?.payload?.customDocuments ?? []
+  const after = rcds.find((d) => d.id === made.id)
+  check('서류함: 이름이 바뀐다', after?.label === '국세 완납증명서(최신)', JSON.stringify(after))
+  check('서류함: 이름을 고쳐도 키는 그대로', after?.key === made.key)
+
+  // 칸 없애기 — 정의만 지우고 올린 것은 남긴다
+  const beforeDelete = (await page.locator('main').innerText()) ?? ''
+  check('서류함: 고친 이름이 화면에 보인다', beforeDelete.includes('국세 완납증명서(최신)'))
+  await page.getByRole('button', { name: '칸 없애기' }).last().click()
+  await page.waitForTimeout(800)
+  const afterDelete = (await page.locator('main').innerText()) ?? ''
+  check('서류함: 없애면 목록에서 빠진다', !afterDelete.includes('국세 완납증명서(최신)'), afterDelete.slice(0, 300))
+  check('서류함: 다른 칸은 그대로 있다', afterDelete.includes('법인인감증명서'))
+  const kept = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_hansol'),
+  )
+  const keptDocs = kept?.documents ?? kept?.payload?.documents ?? {}
+  check('서류함: 없애도 그 칸에 적어 둔 것은 남는다', keptDocs[made.key]?.received === true, JSON.stringify(keptDocs[made.key]))
+}
+
 /* ---------------- 계약 단계 · 업체 삭제 ---------------- */
 await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
 await page.waitForTimeout(800)
