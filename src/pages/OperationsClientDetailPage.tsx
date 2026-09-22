@@ -9,6 +9,7 @@ import {
   MoreHorizontal,
   ClipboardCopy,
   Download,
+  FileUp,
   FileWarning,
   Lock,
   Paperclip,
@@ -106,6 +107,7 @@ import { TodoComposer } from '../components/journal/TodoBoard'
 import { createJournalEntry } from '../services/journalService'
 import { FundingSection } from '../components/ops/FundingSection'
 import { DocImportModal } from '../components/ops/DocImportModal'
+import { BulkDocUploadSheet } from '../components/ops/BulkDocUploadSheet'
 import { agentShares, feeMathOf, feeTotals, marginPct, marginText, netAmountOf } from '../services/feeMath'
 import { withActivity } from '../services/clientOpsActivity'
 import { allDocumentMetas, emptyDocumentState } from '../services/clientOpsDocuments'
@@ -192,6 +194,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const [newDocMonths, setNewDocMonths] = useState('')
   const [renamingDoc, setRenamingDoc] = useState<string | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
+  /* 서류 한꺼번에 올리기 시트 (D-84) */
+  const [bulkOpen, setBulkOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
   const today = todayLocalDate()
@@ -914,8 +918,25 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           <h2 id="docs" className="text-[1.3rem] font-bold text-slate-900">
             서류함
           </h2>
-          <p className="text-[0.9rem] text-slate-500">발급일을 넣으면 유효기간이 지났는지 자동으로 알려드립니다.</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-[0.9rem] text-slate-500">발급일을 넣으면 유효기간이 지났는지 자동으로 알려드립니다.</p>
+            <Button variant="secondary" size="sm" onClick={() => setBulkOpen(true)}>
+              <FileUp aria-hidden="true" className="size-3.5" />
+              한꺼번에 올리기
+            </Button>
+          </div>
         </div>
+
+        {bulkOpen && (
+          <BulkDocUploadSheet
+            record={record}
+            onClose={() => setBulkOpen(false)}
+            onSaved={(saved) => {
+              setRecord(saved)
+              setSavedAt(Date.now())
+            }}
+          />
+        )}
 
         {!uploadable && (
           <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-4 py-3 text-[0.92rem] break-keep text-slate-600">

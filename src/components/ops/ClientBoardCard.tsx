@@ -15,7 +15,7 @@
  */
 
 import { useState } from 'react'
-import { ArrowRight, ChevronRight } from 'lucide-react'
+import { ArrowRight, ChevronRight, FileUp } from 'lucide-react'
 import { CONTRACT_KIND_LABEL, CONTRACT_STAGE_LABEL, contractStageOf } from '../../types/clientOps'
 import { formatNumberOf } from '../../lib/format'
 import type { ClientOpsRecord, ServiceKey, ServiceStatus } from '../../types/clientOps'
@@ -156,6 +156,7 @@ export function ClientBoardCard({
   onOpen,
   onChip,
   onMoney,
+  onBulkDocs,
   hit = null,
 }: {
   record: ClientOpsRecord
@@ -171,6 +172,8 @@ export function ClientBoardCard({
   onOpen: () => void
   onChip: (key: ServiceKey) => void
   onMoney: () => void
+  /** 서류를 한꺼번에 올리는 시트 열기 (D-84) — 없으면 단추를 그리지 않는다 */
+  onBulkDocs?: () => void
 }) {
   const [allChips, setAllChips] = useState(false)
   const p = clientOpsProgress(record, today)
@@ -376,10 +379,22 @@ export function ClientBoardCard({
               서류 {p.documentsUsable}/{p.documentsTotal}
             </span>
           )}
+          {/* 서류는 목록에서 바로 올린다 — 업체를 열고 서류 탭까지 가는 두 번을 줄인다 (D-84) */}
+          {onBulkDocs && (
+            <button
+              type="button"
+              onClick={onBulkDocs}
+              aria-label={`${record.companyName} 서류 올리기`}
+              className="tap t-meta ml-auto inline-flex items-center gap-1 rounded-(--radius-control) px-2 py-1.5 font-medium text-slate-600 hover:text-brand-700 hover:underline"
+            >
+              <FileUp aria-hidden="true" className="size-3.5" />
+              서류 올리기
+            </button>
+          )}
           <button
             type="button"
             onClick={onOpen}
-            className="tap t-meta ml-auto inline-flex items-center gap-1 rounded-(--radius-control) px-2 py-1.5 font-medium text-brand-700 hover:underline"
+            className={`tap t-meta inline-flex items-center gap-1 rounded-(--radius-control) px-2 py-1.5 font-medium text-brand-700 hover:underline ${onBulkDocs ? '' : 'ml-auto'}`}
           >
             업체 열기
             <ArrowRight aria-hidden="true" className="size-3.5" />

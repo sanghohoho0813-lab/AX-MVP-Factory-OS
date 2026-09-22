@@ -52,6 +52,7 @@ import { withCustomDocument, withDocument, withoutCustomDocument } from '../clie
 import { documentStatus } from '../clientOpsAlerts'
 import { DOCUMENTS } from '../../content/clientOpsCatalog'
 import { isCustomDocumentKey } from '../../types/clientOps'
+import { classifyDocument, findIssuedDate, KNOWN_EXTRA_DOCS } from '../docClassify'
 import { formatYmd, profileAsText, yearsInBusiness } from '../clientOpsProfile'
 import { SERVICE_STATUS_ORDER, isServiceOpen, isServiceNotApplicable, normalizeServiceStatus } from '../../content/clientOpsCatalog'
 import { BUILTIN_SERVICES, SERVICES, registerCustomServices } from '../../content/clientOpsCatalog'
@@ -855,6 +856,86 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
   check('서류 칸: 이름 없는 정의는 버린다', normalizeClientOps({ id: 'x', companyName: 'x', customDocuments: [{ label: '  ' }] as never }).customDocuments.length === 0)
   check('서류 칸: 유효기간이 0 이하면 없는 것으로', withCustomDocument(normalizeClientOps({ id: 'y', companyName: 'y' }), { label: 'ㄱ', validMonths: 0 }).customDocuments[0]?.validMonths === null)
   check('서류 칸: 키는 매번 다르다', makeCustomDocumentKey() !== makeCustomDocumentKey())
+}
+
+/* ------------------------------------------------------------------ */
+/* 서류 종류 판별 — 한꺼번에 올리기 (D-84)                                */
+/* ------------------------------------------------------------------ */
+{
+  const base = normalizeClientOps({ id: 'cls', companyName: '판별' })
+  const withSeal = withCustomDocument(base, { label: '법인인감증명서', validMonths: 3 })
+  const metas = allDocumentMetas(base)
+  const metasSeal = allDocumentMetas(withSeal)
+  const biz = `사업자등록증 ( 법인사업자 )
+등록번호 : 123-45-67890
+법인명(단체명) : 주식회사 한솔테크
+개업연월일 : 2020 년 03 월 02 일
+사업장 소재지 : 서울특별시 강남구
+업 태 : 정보통신업   종 목 : 소프트웨어 개발
+교부일자 : 2026 년 08 월 20 일`
+  const reg = `등기사항전부증명서(말소사항 포함) - 법인
+등기번호 012345   등록번호 110111-1234567
+상호 주식회사 한솔테크
+회사성립연월일 2020 년 02 월 28 일
+1주의 금액 금 5,000 원
+임원에 관한 사항  사내이사 김대표  대표이사 김대표
+2026년 09월 01일  서울중앙지방법원 등기국`
+  const idc = `주민등록증
+홍 길 동
+900101-1234567
+서울특별시 종로구
+2015. 03. 02.  서울특별시 종로구청장`
+  const sme = `중소기업확인서
+확인서 번호 제 2026-1234 호   기업구분 소기업
+유효기간 2026.04.01 ~ 2027.03.31
+중소벤처기업부장관`
+  const hi = `건강보험 자격득실 확인서
+가입자 구분 직장가입자  사업장명칭 주식회사 한솔테크
+자격취득일 2020.03.02
+발급일자 2026년 09월 10일  국민건강보험공단`
+  const seal = `법인인감증명서
+상호 주식회사 한솔테크   인감 (인)
+발급일자 2026년 09월 12일`
+
+  const c1 = classifyDocument({ text: biz, fileName: 'scan001.pdf' }, metas)
+  check('판별: 사업자등록증 — 확실', c1.key === 'businessRegistration' && c1.confidence === 'sure', JSON.stringify(c1))
+  check('판별: 교부일자를 발급일로 읽는다', c1.issuedAt === '2026-08-20', String(c1.issuedAt))
+  check('판별: 근거를 사람 말로', c1.reason.includes('사업자등록증'))
+  const c2 = classifyDocument({ text: reg, fileName: 'x.pdf' }, metas)
+  check('판별: 등기부등본 — 확실', c2.key === 'corporateRegistry' && c2.confidence === 'sure', JSON.stringify(c2.scores))
+  check('판별: 등기부의 마지막 날짜가 발급일', c2.issuedAt === '2026-09-01', String(c2.issuedAt))
+  const c3 = classifyDocument({ text: idc, fileName: 'IMG_0001.jpg' }, metas)
+  check('판별: 신분증 — 확실', c3.key === 'representativeId' && c3.confidence === 'sure', JSON.stringify(c3.scores))
+  const c4 = classifyDocument({ text: sme, fileName: 'a.pdf' }, metas)
+  check('판별: 중소기업확인서 — 확실', c4.key === 'smeCertificate' && c4.confidence === 'sure', JSON.stringify(c4.scores))
+  const c5 = classifyDocument({ text: hi, fileName: 'b.pdf' }, metas)
+  check('판별: 건강보험 득실확인서 — 확실 + 발급일', c5.key === 'healthInsurance' && c5.confidence === 'sure' && c5.issuedAt === '2026-09-10', JSON.stringify(c5))
+
+  // 칸이 없는 알려진 서류 → 이름을 제안한다
+  const c6 = classifyDocument({ text: seal, fileName: 'seal.pdf' }, metas)
+  check('판별: 칸이 없는 인감증명서는 새 칸을 제안한다', c6.key === null && c6.suggestedLabel === '법인인감증명서' && c6.confidence === 'maybe', JSON.stringify(c6))
+  // 같은 이름의 칸이 있으면 그 칸으로
+  const c7 = classifyDocument({ text: seal, fileName: 'seal.pdf' }, metasSeal)
+  check('판별: 인감증명서 칸이 있으면 그 칸으로 확실', c7.key === withSeal.customDocuments[0].key && c7.confidence === 'sure', JSON.stringify(c7))
+
+  // 글자를 못 읽었을 때 — 파일 이름만으로는 확인 필요
+  const c8 = classifyDocument({ text: '', fileName: '한솔 사업자등록증.hwp' }, metas)
+  check('판별: 이름만 맞으면 확인 필요', c8.key === 'businessRegistration' && c8.confidence === 'maybe', JSON.stringify(c8))
+  const c9 = classifyDocument({ text: '', fileName: 'scan_0042.jpg' }, metas)
+  check('판별: 아무 힌트도 없으면 모름', c9.key === null && c9.confidence === 'unknown')
+  // 문구가 한둘만 겹치면 확인 필요
+  const c10 = classifyDocument({ text: '대표이사 김대표 귀하. 업태 서비스업.', fileName: 'memo.txt' }, metas)
+  check('판별: 약한 근거는 확실로 올리지 않는다', c10.confidence !== 'sure', JSON.stringify(c10))
+  // 파일을 받지 않는 칸은 후보가 아니다
+  check('판별: 휴대폰번호 칸은 후보가 아니다', !Object.keys(c1.scores).includes('representativePhone'))
+  // 직접 만든 칸 이름 그대로도 맞춘다
+  const withTax = withCustomDocument(base, { label: '국세완납증명서' })
+  const c11 = classifyDocument({ text: '국세완납증명서 발급 — 체납액 없음', fileName: 'x.txt' }, allDocumentMetas(withTax))
+  check('판별: 직접 만든 칸 이름이 본문에 있으면 그 칸', c11.key === withTax.customDocuments[0].key, JSON.stringify(c11))
+  check('발급일: 라벨 뒤 날짜', findIssuedDate('발급일자: 2026.09.10') === '2026-09-10')
+  check('발급일: 말이 안 되는 해는 버린다', findIssuedDate('발급일자 1850년 1월 1일') === null)
+  check('발급일: 없으면 null', findIssuedDate('아무 날짜 없음') === null)
+  check('판별: 알려진 추가 서류 목록에 중복 이름이 없다', new Set(KNOWN_EXTRA_DOCS.map((k) => k.label)).size === KNOWN_EXTRA_DOCS.length)
 }
 
 /* ------------------------------------------------------------------ */

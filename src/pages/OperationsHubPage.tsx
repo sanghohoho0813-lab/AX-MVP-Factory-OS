@@ -37,6 +37,7 @@ import {
   type ClientSortKey,
 } from '../services/clientOpsSort'
 import { ClientMoneySheet, ServiceStatusSheet } from '../components/ops/ClientQuickSheets'
+import { BulkDocUploadSheet } from '../components/ops/BulkDocUploadSheet'
 import { BottomSheet, MetricTile, ScreenTitle, type Tone } from '../components/ui/primitives'
 import { loadCustomServicesIntoCatalog } from '../services/customServiceService'
 import { getDataModeConfig } from '../data/dataMode'
@@ -108,6 +109,9 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
    */
   const [quick, setQuick] = useState<{ id: string; kind: 'service'; serviceKey: ServiceKey } | { id: string; kind: 'money' } | null>(null)
   const quickRecord = quick ? (records.find((r) => r.id === quick.id) ?? null) : null
+  /** 서류 한꺼번에 올리기 시트 — 업체 id 만 든다 (D-84) */
+  const [bulkDocsFor, setBulkDocsFor] = useState<string | null>(null)
+  const bulkRecord = bulkDocsFor ? (records.find((r) => r.id === bulkDocsFor) ?? null) : null
   const [showAllAlerts, setShowAllAlerts] = useState(false)
   const [form, setForm] = useState({ companyName: '', contactName: '', contactPhone: '', businessNumber: '' })
   const [query, setQuery] = useState('')
@@ -607,6 +611,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                   onOpen={() => navigate(`/ops/clients/${record.id}`)}
                   onChip={(key) => setQuick({ id: record.id, kind: 'service', serviceKey: key })}
                   onMoney={() => setQuick({ id: record.id, kind: 'money' })}
+                  onBulkDocs={() => setBulkDocsFor(record.id)}
                   hit={query.trim() !== '' ? searchHit(record, query) : null}
                 />
               )
@@ -718,6 +723,14 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
         저장은 상세 화면과 같은 함수를 쓰므로 여기서 바꾼 값이 업체 기록에 그대로
         들어간다 — 목록용 사본을 따로 두지 않는다.
       */}
+      {bulkRecord && (
+        <BulkDocUploadSheet
+          record={bulkRecord}
+          onClose={() => setBulkDocsFor(null)}
+          onSaved={(saved) => setRecords((list) => list.map((r) => (r.id === saved.id ? saved : r)))}
+        />
+      )}
+
       {quick?.kind === 'service' && quickRecord && (
         <ServiceStatusSheet
           record={quickRecord}

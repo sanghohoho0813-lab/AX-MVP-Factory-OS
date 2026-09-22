@@ -394,6 +394,65 @@ check('업무 15개에서도 가로 스크롤 없음', of2.d <= of2.w + 1, `${of
   check('서류함: 없애도 그 칸에 적어 둔 것은 남는다', keptDocs[made.key]?.received === true, JSON.stringify(keptDocs[made.key]))
 }
 
+/* ---------------- 서류 한꺼번에 올리기 — 판별 · 재배치 · 새 칸 (D-84) ---------------- */
+{
+  await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const bulkBtn = page.getByRole('button', { name: '다움에너지 서류 올리기' })
+  check('한꺼번에: 목록 카드에 서류 올리기 단추가 있다', (await bulkBtn.count()) === 1)
+  await bulkBtn.click()
+  await page.waitForTimeout(500)
+  check('한꺼번에: 시트가 열린다', await page.getByRole('dialog').isVisible())
+
+  const mk = (name, text) => ({ name, mimeType: 'text/plain', buffer: Buffer.from(text, 'utf8') })
+  await page.getByLabel('서류 파일 고르기').setInputFiles([
+    mk('scan001.txt', '사업자등록증 (법인사업자)\n등록번호 : 123-45-67890\n법인명(단체명) : 다움에너지\n개업연월일 : 2021년 05월 01일\n사업장 소재지 : 대전\n업 태 : 제조업\n교부일자 : 2026년 08월 20일'),
+    mk('등기부.txt', '등기사항전부증명서(말소사항 포함) - 법인\n등기번호 000123\n회사성립연월일 2021년 04월 28일\n임원에 관한 사항 대표이사 박대표\n2026년 09월 01일'),
+    mk('seal.txt', '법인인감증명서\n상호 다움에너지\n발급일자 2026년 09월 12일'),
+    mk('photo_7.txt', '아무 관계 없는 글자'),
+  ])
+  await page.waitForTimeout(2500)
+  const sheet = (await page.getByRole('dialog').innerText()) ?? ''
+  check('한꺼번에: 사업자등록증을 확실로 가린다', /scan001\.txt[\s\S]*확실/.test(sheet), sheet.slice(0, 400))
+  check('한꺼번에: 발급일을 읽어 채운다', (await page.getByLabel('scan001.txt 발급일').inputValue()) === '2026-08-20')
+  check('한꺼번에: 등기부등본 칸으로', (await page.getByLabel('등기부.txt 칸 고르기').inputValue()) === 'corporateRegistry')
+  check('한꺼번에: 칸이 없는 인감증명서는 새 칸을 제안한다', (await page.getByLabel('seal.txt 칸 고르기').inputValue()) === '__new__' && (await page.getByLabel('seal.txt 새 칸 이름').inputValue()) === '법인인감증명서')
+  check('한꺼번에: 모르는 파일은 안 고른 채로 둔다', (await page.getByLabel('photo_7.txt 칸 고르기').inputValue()) === '')
+  check('한꺼번에: 확실 2 · 고른 것 3', sheet.includes('확실 2') && sheet.includes('고른 것 3'), sheet.slice(-200))
+
+  // 모르는 파일을 사람이 재배치한다
+  await page.getByLabel('photo_7.txt 칸 고르기').selectOption('representativeId')
+  await page.waitForTimeout(300)
+  check('한꺼번에: 재배치하면 고른 것이 4', ((await page.getByRole('dialog').innerText()) ?? '').includes('고른 것 4'))
+
+  await page.getByRole('button', { name: /^고른 것 전부 올리기/ }).click()
+  await page.waitForTimeout(1500)
+  const saved = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_daum'),
+  )
+  const docs = saved?.documents ?? saved?.payload?.documents ?? {}
+  const cds = saved?.customDocuments ?? saved?.payload?.customDocuments ?? []
+  check('한꺼번에: 사업자등록증 칸에 받음·이름·발급일', docs.businessRegistration?.received === true && docs.businessRegistration?.fileName === 'scan001.txt' && docs.businessRegistration?.issuedAt === '2026-08-20', JSON.stringify(docs.businessRegistration))
+  check('한꺼번에: 등기부등본 칸에 발급일', docs.corporateRegistry?.issuedAt === '2026-09-01', JSON.stringify(docs.corporateRegistry))
+  const sealCell = cds.find((d) => d.label === '법인인감증명서')
+  check('한꺼번에: 새 칸이 만들어졌다', sealCell !== undefined, JSON.stringify(cds))
+  check('한꺼번에: 새 칸에 파일이 붙었다', sealCell && docs[sealCell.key]?.fileName === 'seal.txt' && docs[sealCell.key]?.issuedAt === '2026-09-12', JSON.stringify(sealCell && docs[sealCell.key]))
+  check('한꺼번에: 재배치한 파일도 그 칸에', docs.representativeId?.fileName === 'photo_7.txt')
+  const done = (await page.getByRole('dialog').innerText()) ?? ''
+  check('한꺼번에: 올린 것은 올림 표시', (done.match(/올림 ·/g) ?? []).length === 4, done.slice(-300))
+  // 배경의 '모달 닫기' 가 아니라 아래 단추 (D-63: 이름은 부분 일치라 exact)
+  await page.getByRole('button', { name: '닫기', exact: true }).last().click()
+  await page.waitForTimeout(400)
+
+  // 상세 서류함에서도 같은 단추 · 결과가 보인다
+  await page.goto(BASE + '/ops/clients/cli_daum?tab=docs', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const docTab = (await page.locator('main').innerText()) ?? ''
+  check('한꺼번에: 서류함에 한꺼번에 올리기 단추', (await page.getByRole('button', { name: '한꺼번에 올리기' }).count()) === 1)
+  check('한꺼번에: 서류함에 올린 파일 이름이 보인다', docTab.includes('scan001.txt') && docTab.includes('seal.txt'), docTab.slice(0, 500))
+  check('한꺼번에: 만든 칸이 서류함에 있다', docTab.includes('법인인감증명서') && docTab.includes('직접 만든 칸'))
+}
+
 /* ---------------- 계약 단계 · 업체 삭제 ---------------- */
 await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
 await page.waitForTimeout(800)
