@@ -1,8 +1,9 @@
 /**
  * AX Partner OS 전달 패킷(partner_handoffs) 읽기 — 파트너 컨설턴트가 1차 미팅을 마치고 보낸 구조화 데이터.
  *
- * 쓰기는 Partner OS 의 RPC(partner_submit_handoff)만 한다. 이 앱은 읽고, 이벤트(customer_events)를
- * 처리(연결·처리 중·처리 완료)하면 DB 트리거가 파트너 쪽 상태를 따라 올린다 — 여기서 따로 쓸 것이 없다.
+ * 쓰기는 Partner OS 의 RPC(partner_submit_handoff / partner_withdraw_handoff)만 한다. 이 앱은 읽고, 이벤트(customer_events)를
+ * 처리(연결·처리 중·처리 완료·보류)하면 DB 트리거가 파트너 쪽 상태를 따라 올린다 — 여기서 따로 쓸 것이 없다.
+ * 파트너가 철회하면 이 이벤트는 'ignored' 로 바뀌고 payload 에 withdrawn=true 가 붙는다(Partner OS 0005). 다시 전달하면 같은 이벤트가 'new' 로 다시 열린다.
  * local 모드에는 파트너 OS 가 없으므로 항상 null(READY 안내).
  * 계약 원문: miraeailab-ax-sales-os/supabase/migrations/20260922000002_partner_os_bridge.sql · docs/INTEGRATION.md
  */
@@ -53,7 +54,7 @@ export interface PartnerHandoff {
   meetingId: string
   companyId: string
   consultantId: string
-  status: 'draft' | 'submitted' | 'received' | 'reviewing' | 'proposal_ready'
+  status: 'draft' | 'submitted' | 'received' | 'reviewing' | 'proposal_ready' | 'withdrawn'
   payload: PartnerHandoffPayload
   customerEventId: string | null
   operationsClientId: string | null
@@ -68,6 +69,7 @@ export const HANDOFF_STATUS_LABEL: Record<PartnerHandoff['status'], string> = {
   received: '수신',
   reviewing: '검토 중',
   proposal_ready: '2차 제안 준비 완료',
+  withdrawn: '파트너가 철회함 (이벤트 보류)',
 }
 
 export const VALUE_AREA_LABEL: Record<string, string> = {
