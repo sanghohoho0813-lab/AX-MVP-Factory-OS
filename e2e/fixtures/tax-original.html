@@ -1,0 +1,1520 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>세무 컨설팅 계산기 모음 — 대조용 원본</title>
+<!--
+  중기이코노미 기업지원단 배포본(HTML)에서 계산 부분만 남긴 대조용 사본 (D-85).
+  지운 것: 사내 접근 코드(공통 코드 잠금), PWA 설치·아이콘·manifest, 글꼴, 스타일.
+  계산 자바스크립트와 입력 칸의 기본값은 한 글자도 바꾸지 않았다 — e2e/tax-parity.mjs 가
+  이 파일과 /tools/tax 의 결과 글자를 같은 입력으로 대조한다.
+-->
+</head>
+<body>
+<div class="app" id="appRoot">
+  <aside class="sidebar">
+    <nav class="tabs" id="navTabs">
+      <button class="active" data-tab="t2"><span class="num">01</span>대표이사 급여 최적화</button>
+      <button data-tab="t6"><span class="num">02</span>퇴직급여 계산</button>
+      <button data-tab="t9"><span class="num">03</span>2026 소득세 계산기</button>
+      <button data-tab="t5"><span class="num">04</span>주식양수도·증여세</button>
+      <button data-tab="t7"><span class="num">05</span>특정법인 증여의제</button>
+      <button data-tab="t8"><span class="num">06</span>불균등 유상증자·감자</button>
+      <button data-tab="t1"><span class="num">07</span>가지급금 손실계산기</button>
+      <button data-tab="t4"><span class="num">08</span>상속세 계산기</button>
+      <button data-tab="t3"><span class="num">09</span>비상장주식 가치평가</button>
+    </nav>
+  </aside>
+
+  <main id="mainArea">
+    <button id="printBtn" class="print-btn" type="button" title="현재 계산기 화면 인쇄">🖨 인쇄</button>
+    <!-- ============ 1. 가지급금 손실계산기 ============ -->
+    <section class="panel" id="t1">
+      <div class="grid">
+        <div class="card">
+          <div class="field"><label>가지급금 원금 (원)</label><input type="text" inputmode="decimal" class="amt" id="g_principal" value="1000000000"></div>
+          <div class="row2">
+            <div class="field"><label>인정이자율 (당좌대출이자율)</label><input type="number" id="g_rate" value="4.6" step="0.01"><div class="hint">% 단위</div></div>
+            <div class="field"><label>분석 기간 (년, 1~10)</label><input type="number" id="g_years" value="5" min="1" max="10"></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label>법인세 적용세율</label><input type="number" id="g_corp" value="20" step="0.1"><div class="hint">%</div></div>
+            <div class="field"><label>대표이사 소득세 한계세율(지방소득세 포함)</label><input type="number" id="g_inc" value="41.8" step="0.1"><div class="hint">%</div></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label>4대보험 추가부담률(회사분)</label><input type="number" id="g_ins" value="9" step="0.1"><div class="hint">%</div></div>
+            <div class="field"><label>회사 차입금 존재 여부</label>
+              <select id="g_debt"><option value="있음">있음</option><option value="없음">없음</option></select>
+            </div>
+          </div>
+          <div class="field"><label>가중평균차입이자율(지급이자 손금불산입 계산용)</label><input type="number" id="g_borrow" value="4.6" step="0.01"><div class="hint">%</div></div>
+        </div>
+        <div class="results" id="g_results">
+          <h3>결과 요약</h3>
+          <div id="g_out"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div style="overflow-x:auto"><table class="datatable" id="g_table"></table></div>
+      </div>
+    </section>
+
+    <!-- ============ 2. 대표이사 급여 최적화 ============ -->
+    <section class="panel active" id="t2">
+      <div class="card">
+        <div class="field" style="max-width:280px;"><label>월 급여 (원)</label><input type="text" inputmode="decimal" class="amt" id="s_monthly" value="10000000"></div>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <div id="s_personal"></div>
+        </div>
+        <div class="results">
+          <div id="s_corp"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="scroll-table"><table class="datatable" id="s_table"></table></div>
+      </div>
+    </section>
+
+    <!-- ============ 3. 비상장주식 가치평가 ============ -->
+    <section class="panel" id="t3">
+      <div class="grid">
+        <div class="card">
+          <div class="field"><label>법인명</label><input type="text" id="v_name" value="ㅇㅇㅇ"></div>
+          <div class="row2">
+            <div class="field"><label>평가일 현재 발행주식수(주)</label><input type="text" inputmode="decimal" class="amt" id="v_shares" value="138000"></div>
+            <div class="field"><label>액면가(원)</label><input type="text" inputmode="decimal" class="amt" id="v_par" value="5000"></div>
+          </div>
+          <div class="field"><label>적용이자율(순손익가치환원율)</label><input type="number" id="v_rate" value="10" step="0.1"><div class="hint">% · 기획재정부 고시 이자율</div></div>
+          <div class="row2">
+            <div class="field"><label>자산총액(원)</label><input type="text" inputmode="decimal" class="amt" id="v_asset" value="3000000000"></div>
+            <div class="field"><label>부채총계(원)</label><input type="text" inputmode="decimal" class="amt" id="v_debt" value="1000000000"></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label>부동산 장부가(원)</label><input type="text" inputmode="decimal" class="amt" id="v_re_book" value="600000000"></div>
+            <div class="field"><label>부동산 시가(원)</label><input type="text" inputmode="decimal" class="amt" id="v_re_fair" value="800000000"></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label>미반영 퇴직급여추계액(원)</label><input type="text" inputmode="decimal" class="amt" id="v_severance" value="0"></div>
+            <div class="field"><label>영업권 상당액(원)</label><input type="text" inputmode="decimal" class="amt" id="v_goodwill" value="0"></div>
+          </div>
+          <div class="field"><label>법인 구분 직접 선택</label>
+            <select id="v_type"><option value="일반법인">일반법인 (순자산40% / 순손익60%)</option><option value="부동산과다보유법인">부동산과다보유법인 (순자산60% / 순손익40%)</option><option value="특수법인">특수법인 (순자산100%)</option></select>
+          </div>
+          <div class="hint" id="v_auto_hint" style="margin-top:-6px;margin-bottom:10px;"></div>
+        </div>
+
+        <div class="card">
+          <table class="datatable" id="v_income_table" style="margin-bottom:10px;">
+            <thead><tr><th style="text-align:left">구분</th><th>1년전</th><th>2년전(직전)</th><th>결산연도</th></tr></thead>
+            <tbody>
+              <tr><td>각 사업연도 순손익액(원)</td>
+                <td><input type="text" inputmode="decimal" class="amt" id="v_inc0" value="250000000"></td>
+                <td><input type="text" inputmode="decimal" class="amt" id="v_inc1" value="500000000"></td>
+                <td><input type="text" inputmode="decimal" class="amt" id="v_inc2" value="420000000"></td></tr>
+              <tr><td>유상증(감)자 실시월(1~12)</td>
+                <td><input type="number" id="v_month0" value="8"></td>
+                <td><input type="number" id="v_month1" value="3"></td>
+                <td><input type="number" id="v_month2" value="10"></td></tr>
+              <tr><td>유상증(감)자 금액(감자는 -)</td>
+                <td><input type="text" inputmode="decimal" class="amt" id="v_cap0" value="0"></td>
+                <td><input type="text" inputmode="decimal" class="amt" id="v_cap1" value="-200000000"></td>
+                <td><input type="text" inputmode="decimal" class="amt" id="v_cap2" value="0"></td></tr>
+            </tbody>
+          </table>
+          <div class="results" style="margin-top:20px;">
+            <div id="v_out"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 4. 상속세 계산기 ============ -->
+    <section class="panel" id="t4">
+      <div class="subtabs">
+        <button class="active" data-sub="i1">상속세 계산</button>
+        <button data-sub="i2">상속인별 세액안분</button>
+      </div>
+
+      <div class="sub active" id="i1">
+        <div class="grid">
+          <div class="card">
+            <div class="field"><label>부동산 (시가 또는 보충적 평가액)</label><input type="text" inputmode="decimal" class="amt" id="h_re" value="1000000000"></div>
+            <div class="field"><label>금융재산 (예금·주식·보험금 등)</label><input type="text" inputmode="decimal" class="amt" id="h_fin" value="300000000"></div>
+            <div class="field"><label>기타재산</label><input type="text" inputmode="decimal" class="amt" id="h_etc" value="50000000"></div>
+            <div class="field"><label>사전증여재산 가산액</label><input type="text" inputmode="decimal" class="amt" id="h_gift" value="100000000"></div>
+            <div class="field"><label>비과세·과세가액불산입 재산</label><input type="text" inputmode="decimal" class="amt" id="h_exempt" value="0"></div>
+            <div class="row3">
+              <div class="field"><label>공과금</label><input type="text" inputmode="decimal" class="amt" id="h_due" value="5000000"></div>
+              <div class="field"><label>장례비용(500만~1500만)</label><input type="text" inputmode="decimal" class="amt" id="h_funeral" value="15000000"></div>
+              <div class="field"><label>채무</label><input type="text" inputmode="decimal" class="amt" id="h_debt" value="200000000"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="row2">
+              <div class="field"><label>배우자 생존 여부</label><select id="h_spouse"><option value="예">예</option><option value="아니오">아니오</option></select></div>
+              <div class="field"><label>자녀 수</label><input type="number" id="h_children" value="2"></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label>미성년 자녀·직계비속 수</label><input type="number" id="h_minor" value="0"></div>
+              <div class="field"><label>미성년자 평균 잔여연수(19세까지)</label><input type="number" id="h_minor_yr" value="0"></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label>연로자 수(65세이상,배우자제외)</label><input type="number" id="h_old" value="0"></div>
+              <div class="field"><label>장애인 수 / 기대여명연수</label><div class="row2"><input type="number" id="h_disabled" value="0"><input type="number" id="h_disabled_yr" value="0"></div></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label>배우자 실제 상속받은 재산가액</label><input type="text" inputmode="decimal" class="amt" id="h_spouse_actual" value="500000000"></div>
+              <div class="field"><label>배우자 법정상속분 상당액</label><input type="text" inputmode="decimal" class="amt" id="h_spouse_legal" value="700000000"></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label>동거주택 요건 충족</label><select id="h_house_ok"><option value="아니오">아니오</option><option value="예">예</option></select></div>
+              <div class="field"><label>동거주택가액</label><input type="text" inputmode="decimal" class="amt" id="h_house_val" value="0"></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label>세대생략상속 여부</label>
+                <select id="h_skip"><option value="해당없음">해당없음</option><option value="할증30%">할증30%</option><option value="할증40%(미성년20억초과)">할증40%(미성년20억초과)</option></select>
+              </div>
+              <div class="field"><label>증여세액공제(기납부)</label><input type="text" inputmode="decimal" class="amt" id="h_gift_credit" value="20000000"></div>
+            </div>
+          </div>
+        </div>
+        <div class="results"><div id="h_out"></div></div>
+      </div>
+
+      <div class="sub" id="i2">
+        <div class="card">
+          <table class="datatable" id="h2_table">
+            <thead><tr><th style="text-align:left">상속인</th><th style="text-align:left">관계</th><th>상속지분율(%)</th></tr></thead>
+            <tbody id="h2_body"></tbody>
+          </table>
+        </div>
+        <div class="results"><div id="h2_out"></div></div>
+      </div>
+    </section>
+
+    <!-- ============ 5. 주식양수도·증여세 ============ -->
+    <section class="panel" id="t5">
+      <div class="subtabs">
+        <button class="active" data-sub="j1">비상장주식 양수도 계산기</button>
+        <button data-sub="j2">증여세 비교 계산기</button>
+      </div>
+
+      <div class="sub active" id="j1">
+        <div class="grid">
+          <div class="card">
+            <div class="row2">
+              <div class="field"><label>1주당 시가(원)</label><input type="text" inputmode="decimal" class="amt" id="j_fair" value="100000"></div>
+              <div class="field"><label>1주당 취득가(원)</label><input type="text" inputmode="decimal" class="amt" id="j_cost" value="10000"></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label>양도주식 수</label><input type="text" inputmode="decimal" class="amt" id="j_qty" value="10000"></div>
+              <div class="field"><label>실제 양도가액(총 거래가, 원)</label><input type="text" inputmode="decimal" class="amt" id="j_price" value="300000000"></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label>거래당사자간 관계</label>
+                <select id="j_rel"><option value="상증세법상 특수관계인">상증세법상 특수관계인</option><option value="특수관계없는자(타인)">특수관계없는자(타인)</option></select>
+              </div>
+              <div class="field"><label>대주주 여부</label><select id="j_major"><option value="대주주">대주주</option><option value="대주주 외(소액주주)">대주주 외(소액주주)</option></select></div>
+            </div>
+          </div>
+          <div class="results"><div id="j_out"></div></div>
+        </div>
+      </div>
+
+      <div class="sub" id="j2">
+        <div class="card">
+          <table class="datatable" id="k_table">
+            <thead><tr><th style="text-align:left">구분</th><th>예시1</th><th>예시2</th></tr></thead>
+            <tbody>
+              <tr><td>1주당 시가(원)</td><td><input type="text" inputmode="decimal" class="amt" id="k_fair1" value="120000"></td><td><input type="text" inputmode="decimal" class="amt" id="k_fair2" value="500000"></td></tr>
+              <tr><td>증여주식 수</td><td><input type="text" inputmode="decimal" class="amt" id="k_qty1" value="1000"></td><td><input type="text" inputmode="decimal" class="amt" id="k_qty2" value="1000"></td></tr>
+              <tr><td>10년 내 기증여액(원)</td><td><input type="text" inputmode="decimal" class="amt" id="k_prior1" value="100000000"></td><td><input type="text" inputmode="decimal" class="amt" id="k_prior2" value="200000000"></td></tr>
+              <tr><td>증여자와의 관계</td>
+                <td><select id="k_rel1"><option>타인</option><option>배우자</option><option>직계존속(성년)</option><option selected>직계존속(미성년)</option><option>직계비속</option><option>기타친족</option></select></td>
+                <td><select id="k_rel2"><option>타인</option><option>배우자</option><option>직계존속(성년)</option><option selected>직계존속(미성년)</option><option>직계비속</option><option>기타친족</option></select></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="results"><div id="k_out"></div></div>
+      </div>
+    </section>
+
+    <!-- ============ 6. 퇴직급여 계산 ============ -->
+    <section class="panel" id="t6">
+      <div class="subtabs">
+        <button class="active" data-sub="p1">적정보수검토</button>
+        <button data-sub="p2">임원퇴직급여산출액</button>
+        <button data-sub="p3">퇴직소득세</button>
+      </div>
+
+      <div class="sub active" id="p1">
+        <div class="grid">
+          <div class="card">
+            <div class="field"><label>현재보수(상여포함, 연, 원)</label><input type="text" inputmode="decimal" class="amt" id="q_pay" value="120000000"></div>
+            <div class="field"><label>기본공제(연, 원)</label><input type="text" inputmode="decimal" class="amt" id="q_basic" value="12000000"></div>
+            <div class="field"><label>세액공제(원)</label><input type="text" inputmode="decimal" class="amt" id="q_credit" value="1000000"></div>
+            <div class="field"><label>건강보험료(연, 원)</label><input type="text" inputmode="decimal" class="amt" id="q_health" value="4800000"></div>
+            <div class="field"><label>법인세 과세표준(원)</label><input type="text" inputmode="decimal" class="amt" id="q_corptax_base" value="300000000"></div>
+            <div class="row2">
+              <div class="field"><label>중소기업특별세액감면율</label><input type="number" id="q_sme" value="20" step="0.1"><div class="hint">%</div></div>
+              <div class="field"><label>R&amp;D 등 최저한세적용배제 세액공제</label><input type="text" inputmode="decimal" class="amt" id="q_rnd" value="0"></div>
+            </div>
+            <div class="field"><label>최저한세적용 세액공제</label><input type="text" inputmode="decimal" class="amt" id="q_mintax" value="0"></div>
+          </div>
+          <div class="results"><div id="q_out"></div></div>
+        </div>
+      </div>
+
+      <div class="sub" id="p2">
+        <div class="grid">
+          <div class="card">
+            <div class="row2">
+              <div class="field"><label>기산일(입사일)</label><input type="date" id="r_start" value="2011-01-01"></div>
+              <div class="field"><label>퇴직일</label><input type="date" id="r_end" value="2021-01-01"></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label>소득세법상 지급배수 (~2019.12.31, 최대3배)</label><input type="number" id="r_mult_pre" value="3" step="0.1" max="3"></div>
+              <div class="field"><label>소득세법상 지급배수 (2020.1.1~, 최대2배)</label><input type="number" id="r_mult_post" value="2" step="0.1" max="2"></div>
+            </div>
+            <div class="field"><label>2017~2019년 총급여의 연평균 환산액(원)</label><input type="text" inputmode="decimal" class="amt" id="r_avg1" value="5000000"></div>
+            <div class="field"><label>퇴직일 소급 3년 총급여의 연평균 환산액(원)</label><input type="text" inputmode="decimal" class="amt" id="r_avg2" value="60000000"></div>
+            <div class="field"><label>퇴직일 소급 1년 총급여액 (정관 규정 없을 시, 원)</label><input type="text" inputmode="decimal" class="amt" id="r_avg3" value="60000000"></div>
+          </div>
+          <div class="results"><div id="r_out"></div></div>
+        </div>
+      </div>
+
+      <div class="sub" id="p3">
+        <div class="grid">
+          <div class="card">
+            <div class="row2">
+              <div class="field"><label>기산일</label><input type="date" id="t_start" value="1998-05-25"></div>
+              <div class="field"><label>퇴사일</label><input type="date" id="t_end" value="2022-12-31"></div>
+            </div>
+            <div class="field"><label>퇴직급여액(원)</label><input type="text" inputmode="decimal" class="amt" id="t_amount" value="1200000000"></div>
+          </div>
+          <div class="results"><div id="t_out"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 7. 특정법인 증여의제 ============ -->
+    <section class="panel" id="t7">
+      <div class="card">
+        <table class="datatable shareholder-table" id="w_share_table">
+          <thead><tr><th style="text-align:left">주주</th><th style="text-align:left">구분</th><th>주식수</th><th>지분율</th></tr></thead>
+          <tbody id="w_share_body"></tbody>
+        </table>
+        <div class="rline highlight" style="margin-top:10px;"><span class="k">지배주주(최대주주) 지분율</span><span class="v" id="w_max_ratio">-</span></div>
+      </div>
+
+      <div class="subtabs">
+        <button class="active" data-sub="w1">① 금전무상대여</button>
+        <button data-sub="w2">② 채무면제</button>
+        <button data-sub="w3">③ 증여</button>
+        <button data-sub="w4">④ 초과배당</button>
+      </div>
+
+      <div class="sub active" id="w1">
+        <div class="grid">
+          <div class="card">
+            <div class="field"><label>대여원금(원)</label><input type="text" inputmode="decimal" class="amt" id="w1_principal" value="5000000000"></div>
+            <div class="field"><label>적정이자율(당좌대출이자율, %)</label><input type="number" id="w1_rate" value="4.6" step="0.01"></div>
+          </div>
+          <div class="results"><div id="w1_out"></div></div>
+        </div>
+        <div class="card"><table class="datatable" id="w1_table"></table></div>
+      </div>
+
+      <div class="sub" id="w2">
+        <div class="grid">
+          <div class="card">
+            <div class="field"><label>채무면제 전 특정법인 사업연도 소득금액(원)</label><input type="text" inputmode="decimal" class="amt" id="w2_income" value="200000000"></div>
+            <div class="field"><label>채무면제액(원)</label><input type="text" inputmode="decimal" class="amt" id="w2_amount" value="350000000"></div>
+          </div>
+          <div class="results"><div id="w2_out"></div></div>
+        </div>
+        <div class="card"><table class="datatable" id="w2_table"></table></div>
+      </div>
+
+      <div class="sub" id="w3">
+        <div class="grid">
+          <div class="card">
+            <div class="field"><label>증여 전 특정법인 사업연도 소득금액(원)</label><input type="text" inputmode="decimal" class="amt" id="w3_income" value="1500000000"></div>
+            <div class="field"><label>증여가액(금전·주식·현물 등, 원)</label><input type="text" inputmode="decimal" class="amt" id="w3_amount" value="200000000"></div>
+          </div>
+          <div class="results"><div id="w3_out"></div></div>
+        </div>
+        <div class="card"><table class="datatable" id="w3_table"></table></div>
+      </div>
+
+      <div class="sub" id="w4">
+        <div class="grid">
+          <div class="card">
+            <div class="field"><label>배당 전 특정법인 사업연도 소득금액(원)</label><input type="text" inputmode="decimal" class="amt" id="w4_income" value="400000000"></div>
+            <div class="field"><label>특정법인이 수령한 배당금액(원)</label><input type="text" inputmode="decimal" class="amt" id="w4_div" value="400000000"></div>
+            <div class="field"><label>배당지급법인(피출자법인)에 대한 지분율(%)</label><input type="number" id="w4_ratio" value="50" step="0.1"></div>
+          </div>
+          <div class="results"><div id="w4_out"></div></div>
+        </div>
+        <div class="card"><table class="datatable" id="w4_table"></table></div>
+      </div>
+    </section>
+
+    <!-- ============ 8. 불균등 유상증자·감자 ============ -->
+    <section class="panel" id="t8">
+      <div class="subtabs">
+        <button class="active" data-sub="x1">유상증자</button>
+        <button data-sub="x2">유상감자</button>
+      </div>
+
+      <div class="sub active" id="x1">
+        <div class="card">
+          <div class="row2">
+            <div class="field"><label>증자 전 1주당 시가(원)</label><input type="text" inputmode="decimal" class="amt" id="x1_fair" value="220000"></div>
+            <div class="field"><label>신주 1주당 인수가(원)</label><input type="text" inputmode="decimal" class="amt" id="x1_issue" value="5000"></div>
+          </div>
+        </div>
+        <div class="card">
+          <table class="datatable shareholder-table" id="x1_table">
+            <thead><tr><th style="text-align:left">주주명</th><th style="text-align:left">구분</th><th>기존주식수</th><th>실제 인수주식수(신주)</th></tr></thead>
+            <tbody id="x1_body"></tbody>
+          </table>
+          <button class="add-btn" id="x1_add" type="button" style="margin-top:10px;">+ 주주 추가</button>
+        </div>
+        <div class="results"><div id="x1_summary"></div></div>
+        <div class="card"><table class="datatable" id="x1_judge"></table></div>
+      </div>
+
+      <div class="sub" id="x2">
+        <div class="card">
+          <div class="row2">
+            <div class="field"><label>감자 전 1주당 가치(원)</label><input type="text" inputmode="decimal" class="amt" id="x2_fair" value="48000"></div>
+            <div class="field"><label>1주당 감자대가(원)</label><input type="text" inputmode="decimal" class="amt" id="x2_redeem" value="5000"></div>
+          </div>
+        </div>
+        <div class="card">
+          <table class="datatable shareholder-table" id="x2_table">
+            <thead><tr><th style="text-align:left">주주명</th><th style="text-align:left">구분</th><th>기존주식수</th><th>실제 감자주식수</th></tr></thead>
+            <tbody id="x2_body"></tbody>
+          </table>
+          <button class="add-btn" id="x2_add" type="button" style="margin-top:10px;">+ 주주 추가</button>
+        </div>
+        <div class="results"><div id="x2_summary"></div></div>
+        <div class="card"><table class="datatable" id="x2_judge"></table></div>
+      </div>
+    </section>
+
+    <!-- ============ 9. 2026 소득세 계산기 (주식양도·퇴직·종합) ============ -->
+    <section class="panel" id="t9">
+      <div class="subtabs">
+        <button class="active" data-sub="inc_a">1안</button>
+        <button data-sub="inc_b">2안</button>
+        <button data-sub="inc_cmp">요약비교</button>
+      </div>
+
+      <div class="sub active" id="inc_a"></div>
+      <div class="sub" id="inc_b"></div>
+
+      <div class="sub" id="inc_cmp">
+        <div class="card">
+          <table class="datatable" id="inc_cmp_table"></table>
+        </div>
+        <div class="results"><div id="inc_cmp_out"></div></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+/* ============ Utility ============ */
+document.getElementById('printBtn').addEventListener('click', ()=>{ window.print(); });
+function won(n){
+  if(n===null||n===undefined||isNaN(n)) return '-';
+  const sign = n<0?'-':'';
+  n = Math.round(Math.abs(n));
+  return sign + n.toLocaleString('ko-KR') + '원';
+}
+function pct(n,d){ if(n===null||n===undefined||isNaN(n)) return '-'; return (n*100).toFixed(d===undefined?1:d)+'%'; }
+function cleanNum(v){ const n = parseFloat(String(v).replace(/,/g,'')); return isNaN(n)?0:n; }
+function num(id){ const el=document.getElementById(id); return cleanNum(el.value); }
+function formatAmt(el){
+  const n = cleanNum(el.value);
+  el.value = el.value===''? '' : n.toLocaleString('en-US', {maximumFractionDigits:4});
+}
+function formatAllAmt(){ document.querySelectorAll('input.amt').forEach(formatAmt); }
+document.addEventListener('blur', e=>{ if(e.target && e.target.matches && e.target.matches('input.amt')){ formatAmt(e.target); } }, true);
+function str(id){ return document.getElementById(id).value; }
+function setHTML(id, html){ document.getElementById(id).innerHTML = html; }
+function rline(k,v,opts){ opts=opts||{}; return `<div class="rline ${opts.cls||''}"><span class="k">${k}</span><span class="v">${v}</span></div>`; }
+
+/* ============ Nav ============ */
+document.getElementById('navTabs').addEventListener('click', e=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  document.querySelectorAll('#navTabs button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById(btn.dataset.tab).classList.add('active');
+});
+document.querySelectorAll('.subtabs').forEach(bar=>{
+  bar.addEventListener('click', e=>{
+    const btn=e.target.closest('button'); if(!btn) return;
+    bar.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const parent = bar.parentElement;
+    parent.querySelectorAll(':scope > .sub').forEach(s=>s.classList.remove('active'));
+    document.getElementById(btn.dataset.sub).classList.add('active');
+  });
+});
+
+/* ============ 1. 가지급금 손실계산기 ============ */
+function calc1(){
+  const principal = num('g_principal');
+  const rate = num('g_rate')/100;
+  const corp = num('g_corp')/100;
+  const inc = num('g_inc')/100;
+  const ins = num('g_ins')/100;
+  const hasDebt = str('g_debt')==='있음';
+  const borrow = num('g_borrow')/100;
+  const years = Math.max(1, Math.min(10, Math.round(num('g_years'))));
+
+  let rows=[]; let cum=0;
+  for(let y=1;y<=10;y++){
+    const interest = principal*rate;
+    const corpTax = interest*corp;
+    const incTax = interest*inc;
+    const insBurden = interest*ins;
+    const nonDeduct = hasDebt ? principal*borrow*corp : 0;
+    const annual = corpTax+incTax+insBurden+nonDeduct;
+    cum += annual;
+    rows.push({y, principal, interest, corpTax, incTax, insBurden, nonDeduct, annual, cum});
+  }
+  const year1Loss = rows[0].annual;
+  const periodLoss = rows[years-1].cum;
+  const tenYearLoss = rows[9].cum;
+
+  setHTML('g_out',
+    rline('연간 손실액 (1년차 기준)', won(year1Loss)) +
+    rline(`분석기간(${years}년) 누적손실`, won(periodLoss), {cls:'highlight'}) +
+    rline('10년 방치 시 누적손실', won(tenYearLoss), {cls:'big'}) +
+    rline('10년 누적손실 / 원금 비율', pct(tenYearLoss/principal))
+  );
+
+  let th = `<thead><tr><th>연차</th><th>가지급금 잔액</th><th>인정이자</th><th>법인세추가부담</th><th>대표이사 소득세</th><th>4대보험 추가</th><th>지급이자 손금불산입</th><th>연간손실합계</th><th>누적손실</th></tr></thead>`;
+  let tb = '<tbody>';
+  rows.forEach(r=>{
+    tb += `<tr${r.y===years?' class="best"':''}><td>${r.y}</td><td>${won(r.principal)}</td><td>${won(r.interest)}</td><td>${won(r.corpTax)}</td><td>${won(r.incTax)}</td><td>${won(r.insBurden)}</td><td>${won(r.nonDeduct)}</td><td>${won(r.annual)}</td><td>${won(r.cum)}</td></tr>`;
+  });
+  tb+='</tbody>';
+  document.getElementById('g_table').innerHTML = th+tb;
+}
+document.getElementById('t1').addEventListener('input', calc1);
+
+/* ============ 2. 대표이사 급여 최적화 ============ */
+const S_RATE = {
+  natPension: 0.0475, natPensionCap: 6590000,
+  health: 0.03595, ltc: 0.1314,
+  local: 0.10, basicDeduct: 1500000, stdCredit: 130000, earnedCap: 20000000,
+  corpLow: 0.11, corpHigh: 0.22
+};
+function earnedIncomeDeduction(annual){
+  let ded;
+  if(annual<=5000000) ded = annual*0.7;
+  else if(annual<=15000000) ded = 3500000+(annual-5000000)*0.4;
+  else if(annual<=45000000) ded = 7500000+(annual-15000000)*0.15;
+  else if(annual<=100000000) ded = 12000000+(annual-45000000)*0.05;
+  else ded = 14750000+(annual-100000000)*0.02;
+  return Math.min(ded, S_RATE.earnedCap);
+}
+function salaryBracketTax(base){
+  if(base<=14000000) return base*0.06;
+  if(base<=50000000) return base*0.15-1260000;
+  if(base<=88000000) return base*0.24-5760000;
+  if(base<=150000000) return base*0.35-15440000;
+  if(base<=300000000) return base*0.38-19940000;
+  if(base<=500000000) return base*0.40-25940000;
+  if(base<=1000000000) return base*0.42-35940000;
+  return base*0.45-65940000;
+}
+function earnedTaxCreditLimit(annual){
+  if(annual<=33000000) return 740000;
+  if(annual<=70000000) return Math.max(740000-(annual-33000000)*0.008, 660000);
+  if(annual<=120000000) return Math.max(660000-(annual-70000000)*0.5, 500000);
+  return Math.max(500000-(annual-120000000)*0.5, 200000);
+}
+function computeSalary(monthly){
+  const annual = monthly*12;
+  const pension = Math.round(Math.min(monthly, S_RATE.natPensionCap)*S_RATE.natPension)*12;
+  const health = Math.round(monthly*S_RATE.health)*12;
+  const ltc = Math.round(Math.round(monthly*S_RATE.health)*S_RATE.ltc)*12;
+  const insTotal = pension+health+ltc;
+  const earnedDed = earnedIncomeDeduction(annual);
+  const totalDed = earnedDed + S_RATE.basicDeduct + insTotal;
+  const base = Math.max(annual-totalDed, 0);
+  const grossTax = Math.round(Math.max(salaryBracketTax(base),0));
+  let credit = grossTax<=1300000 ? grossTax*0.55 : 715000+(grossTax-1300000)*0.3;
+  credit = Math.min(credit, earnedTaxCreditLimit(annual));
+  const finalTax = Math.max(grossTax-credit-S_RATE.stdCredit, 0);
+  const localTax = Math.round(finalTax*S_RATE.local);
+  const personalTotal = finalTax+localTax+insTotal;
+  const corpSaveLow = Math.round(annual*S_RATE.corpLow);
+  const corpSaveHigh = Math.round(annual*S_RATE.corpHigh);
+  const netOutLow = personalTotal-corpSaveLow;
+  const netOutHigh = personalTotal-corpSaveHigh;
+  return {annual, pension, health, ltc, insTotal, earnedDed, totalDed, base, grossTax, credit, finalTax, localTax, personalTotal, corpSaveLow, corpSaveHigh, netOutLow, netOutHigh, afterTax:annual-personalTotal, effRate:personalTotal/annual};
+}
+function calc2(){
+  const monthly = num('s_monthly');
+  const r = computeSalary(monthly);
+  setHTML('s_personal',
+    rline('연간 총급여', won(r.annual)) +
+    rline('국민연금(연)', won(r.pension)) +
+    rline('건강보험(연)', won(r.health)) +
+    rline('장기요양(연)', won(r.ltc)) +
+    rline('4대보험 합계', won(r.insTotal)) +
+    rline('근로소득공제', won(r.earnedDed)) +
+    rline('과세표준', won(r.base)) +
+    rline('산출세액', won(r.grossTax)) +
+    rline('근로소득세액공제', won(r.credit)) +
+    rline('결정세액(소득세)', won(r.finalTax)) +
+    rline('지방소득세', won(r.localTax)) +
+    rline('개인 부담 총액', won(r.personalTotal), {cls:'highlight'})
+  );
+  setHTML('s_corp',
+    `<div class="section-divider">과표 2억 이하 법인 (11%)</div>` +
+    rline('법인세 절감액', won(r.corpSaveLow)) +
+    rline('실질 순유출액', won(r.netOutLow), {cls:'big'}) +
+    `<div class="section-divider">과표 2억 초과 법인 (22%)</div>` +
+    rline('법인세 절감액', won(r.corpSaveHigh)) +
+    rline('실질 순유출액', won(r.netOutHigh), {cls:'big'}) +
+    `<div class="section-divider">법인세율 무관</div>` +
+    rline('세후 실수령액', won(r.afterTax)) +
+    rline('개인 실효부담률', pct(r.effRate))
+  );
+
+  // range table
+  let rows=[];
+  for(let m=1000000;m<=20000000;m+=1000000){ rows.push({m, r:computeSalary(m)}); }
+  let minLow = rows[0], minHigh = rows[0];
+  rows.forEach(row=>{
+    if(row.r.netOutLow < minLow.r.netOutLow) minLow = row;
+    if(row.r.netOutHigh < minHigh.r.netOutHigh) minHigh = row;
+  });
+  let th = '<thead><tr><th>월급여</th><th>연간총급여</th><th>4대보험계</th><th>결정세액</th><th>개인부담총액</th><th>순유출액(11%)</th><th>순유출액(22%)</th><th>세후실수령액</th><th>실효부담률</th></tr></thead>';
+  let tb='<tbody>';
+  rows.forEach(row=>{
+    const isBest = row.m===minLow.m || row.m===minHigh.m;
+    tb+=`<tr${isBest?' class="best"':''}><td>${won(row.m)}</td><td>${won(row.r.annual)}</td><td>${won(row.r.insTotal)}</td><td>${won(row.r.finalTax)}</td><td>${won(row.r.personalTotal)}</td><td>${won(row.r.netOutLow)}</td><td>${won(row.r.netOutHigh)}</td><td>${won(row.r.afterTax)}</td><td>${pct(row.r.effRate)}</td></tr>`;
+  });
+  tb+='</tbody>';
+  document.getElementById('s_table').innerHTML = th+tb;
+}
+document.getElementById('t2').addEventListener('input', calc2);
+
+/* ============ 3. 비상장주식 가치평가 ============ */
+function calc3(){
+  const shares = num('v_shares');
+  const rate = num('v_rate')/100;
+  const asset = num('v_asset');
+  const debt = num('v_debt');
+  const reBook = num('v_re_book');
+  const reFair = num('v_re_fair');
+  const severance = num('v_severance');
+  const goodwill = num('v_goodwill');
+
+  const netAssetBook = asset-debt;
+  const reDiff = reFair-reBook;
+  const netAssetValue = netAssetBook + reDiff - severance + goodwill;
+  const perShareNetAsset = shares>0 ? netAssetValue/shares : 0;
+  const reRatio = (asset+reFair-reBook)>0 ? reFair/(asset+reFair-reBook) : 0;
+
+  const inc = [num('v_inc0'), num('v_inc1'), num('v_inc2')];
+  const mon = [num('v_month0'), num('v_month1'), num('v_month2')];
+  const cap = [num('v_cap0'), num('v_cap1'), num('v_cap2')];
+  let adj=[0,0,0];
+  for(let k=0;k<3;k++){
+    let a = cap[k]*rate*mon[k]/12;
+    for(let j=k+1;j<3;j++){ a += cap[j]*rate; }
+    adj[k]=a;
+  }
+  const netIncome = [inc[0]+adj[0], inc[1]+adj[1], inc[2]+adj[2]];
+  const perShareIncome = netIncome.map(v=> shares>0? v/shares:0);
+  const weights=[1,2,3];
+  const weightedAvg = (perShareIncome[0]*weights[0]+perShareIncome[1]*weights[1]+perShareIncome[2]*weights[2])/6;
+  const perShareIncomeValue = rate>0 ? weightedAvg/rate : 0;
+
+  // auto classify
+  const businessAgeUnder3 = false; // date fields omitted from simplified UI; treat as N
+  const specialCorp = reRatio>=0.8; // simplified (stock ratio omitted)
+  const realEstateHeavy = !specialCorp && reRatio>=0.5 && reRatio<0.8;
+  const autoType = specialCorp ? '특수법인' : (realEstateHeavy ? '부동산과다보유법인' : '일반법인');
+  document.getElementById('v_auto_hint').textContent = `참고 자동판정 결과: ${autoType} (부동산비율 ${pct(reRatio)} 기준, 실제 반영값은 아래 직접 선택입니다)`;
+
+  const corpType = str('v_type');
+  const wNetAsset = corpType==='특수법인'?1:(corpType==='부동산과다보유법인'?0.6:0.4);
+  const wIncome = 1-wNetAsset;
+
+  const weightedValue = perShareNetAsset*wNetAsset + perShareIncomeValue*wIncome;
+  const minFloor = perShareNetAsset*0.8;
+  const finalPerShare = Math.max(weightedValue, minFloor);
+  const totalValue = finalPerShare*shares;
+  const priceRatio = netAssetValue!==0 ? totalValue/netAssetValue : 0;
+
+  setHTML('v_out',
+    rline('순자산가액', won(netAssetValue)) +
+    rline('1주당 순자산가치', won(perShareNetAsset)) +
+    rline('1주당 순손익가치', won(perShareIncomeValue)) +
+    rline('법인구분 (반영값)', corpType) +
+    rline('가중치 (순자산/순손익)', `${pct(wNetAsset,0)} / ${pct(wIncome,0)}`) +
+    rline('A. 가중평균액', won(weightedValue)) +
+    rline('B. 최저시가기준 (순자산×80%)', won(minFloor)) +
+    rline('1주당 평가액 (Max A,B)', won(finalPerShare), {cls:'big'}) +
+    rline('기업가치 평가액', won(totalValue), {cls:'highlight'}) +
+    rline('순자산대비 주가비율', pct(priceRatio))
+  );
+}
+document.getElementById('t3').addEventListener('input', calc3);
+
+/* ============ 4. 상속세 계산기 ============ */
+function inheritGiftTax(base){
+  if(base<=100000000) return base*0.1;
+  if(base<=500000000) return base*0.2-10000000;
+  if(base<=1000000000) return base*0.3-60000000;
+  if(base<=3000000000) return base*0.4-160000000;
+  return base*0.5-460000000;
+}
+function calc4(){
+  const re=num('h_re'), fin=num('h_fin'), etc=num('h_etc'), gift=num('h_gift'), exempt=num('h_exempt');
+  const due=num('h_due'), funeral=num('h_funeral'), debt=num('h_debt');
+  const funeralCapped = Math.min(Math.max(funeral,5000000),15000000);
+  const taxBase0 = (re+fin+etc+gift-exempt)-(due+funeralCapped+debt);
+
+  const spouseAlive = str('h_spouse')==='예';
+  const children=num('h_children'), minor=num('h_minor'), minorYr=num('h_minor_yr');
+  const old=num('h_old'), disabled=num('h_disabled'), disabledYr=num('h_disabled_yr');
+
+  const basicDed=200000000;
+  const childDed=children*50000000;
+  const minorDed=minor*10000000*minorYr;
+  const oldDed=old*50000000;
+  const disabledDed=disabled*10000000*disabledYr;
+  const personalSum = basicDed+childDed+minorDed+oldDed+disabledDed;
+  const lumpDed = Math.max(500000000, personalSum);
+
+  const spouseActual=num('h_spouse_actual'), spouseLegal=num('h_spouse_legal');
+  const spouseDed = !spouseAlive ? 0 : Math.min(Math.max(Math.min(spouseActual,spouseLegal),500000000),3000000000);
+
+  const netFin = fin;
+  const finDed = netFin<=20000000 ? netFin : Math.min(Math.max(netFin*0.2,20000000),200000000);
+
+  const houseOk = str('h_house_ok')==='예';
+  const houseVal = num('h_house_val');
+  const houseDed = houseOk ? Math.min(houseVal,600000000) : 0;
+
+  const totalDed = lumpDed+spouseDed+finDed+houseDed;
+  const taxBase = Math.max(taxBase0-totalDed,0);
+  const grossTax = inheritGiftTax(taxBase);
+
+  const skip = str('h_skip');
+  const skipRate = skip==='할증30%'?0.3:(skip==='할증40%(미성년20억초과)'?0.4:0);
+  const skipTax = grossTax*skipRate;
+
+  const giftCredit = num('h_gift_credit');
+  const subtotal = grossTax+skipTax-giftCredit;
+  const reportCredit = subtotal*0.03;
+  const finalTax = Math.max(subtotal-reportCredit,0);
+
+  setHTML('h_out',
+    rline('상속세 과세가액', won(taxBase0)) +
+    rline('일괄공제(기초+인적 vs 5억)', won(lumpDed)) +
+    rline('배우자상속공제', won(spouseDed)) +
+    rline('금융재산상속공제', won(finDed)) +
+    rline('동거주택상속공제', won(houseDed)) +
+    rline('상속공제 합계', won(totalDed)) +
+    rline('상속세 과세표준', won(taxBase)) +
+    rline('산출세액', won(grossTax)) +
+    rline('세대생략 할증세액', won(skipTax)) +
+    rline('신고세액공제(3%)', won(reportCredit)) +
+    rline('납부할 상속세', won(finalTax), {cls:'big'})
+  );
+  window._h4 = {re,fin,etc,finalTax};
+  calc4b();
+}
+function calc4b(){
+  if(!window._h4) return;
+  const total = window._h4.re+window._h4.fin+window._h4.etc;
+  const tax = window._h4.finalTax;
+  const body = document.getElementById('h2_body');
+  const rows = [...body.querySelectorAll('tr')];
+  let sumRatio=0;
+  const data = rows.map(tr=>{
+    const name = tr.children[0].querySelector('input').value;
+    const rel = tr.children[1].querySelector('input,select').value;
+    const ratio = cleanNum(tr.children[2].querySelector('input').value)/100 || 0;
+    sumRatio+=ratio;
+    return {name, rel, ratio};
+  });
+  let out = rline('총 상속재산가액', won(total)) + rline('납부할 상속세', won(tax)) + rline('지분율 합계', pct(sumRatio));
+  out += '<div class="section-divider">상속인별 배분</div>';
+  let sumAsset=0, sumTax=0;
+  data.forEach(d=>{
+    const asset = d.ratio*total; const t = d.ratio*tax;
+    sumAsset+=asset; sumTax+=t;
+    out += rline(`${d.name} (${d.rel})`, `${won(asset)} / 세액 ${won(t)}`);
+  });
+  out += rline('합계', `${won(sumAsset)} / ${won(sumTax)}`, {cls:'highlight'});
+  setHTML('h2_out', out);
+}
+function initH2Table(){
+  const body = document.getElementById('h2_body');
+  const init = [['배우자','배우자',42.86],['자녀1','자녀',28.57],['자녀2','자녀',28.57]];
+  body.innerHTML='';
+  init.forEach(([name,rel,ratio])=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><input type="text" value="${name}"></td><td><input type="text" value="${rel}"></td><td><input type="number" value="${ratio}" step="0.01"></td>`;
+    body.appendChild(tr);
+  });
+}
+document.getElementById('t4').addEventListener('input', ()=>{ calc4(); });
+initH2Table();
+
+/* ============ 5. 주식양수도 / 증여세 ============ */
+function calc5j(){
+  const fair=num('j_fair'), cost=num('j_cost'), qty=num('j_qty'), price=num('j_price');
+  const rel = str('j_rel'); const major = str('j_major');
+  const fairTotal = fair*qty;
+  const costTotal = cost*qty;
+  const threshold = rel==='상증세법상 특수관계인' ? Math.min(fairTotal*0.3,300000000) : 300000000;
+  const lowBound = fairTotal-threshold;
+  const highBound = fairTotal+threshold;
+  let judge = '정상거래';
+  if(price<lowBound) judge='저가거래'; else if(price>highBound) judge='고가거래';
+  const gain = price-costTotal;
+  let capGainTax=0;
+  if(gain>0){
+    if(major==='대주주'){
+      capGainTax = gain<=300000000 ? gain*0.2 : 300000000*0.2+(gain-300000000)*0.25;
+    } else { capGainTax = gain*0.1; }
+  }
+  const secTaxBase = judge==='정상거래' ? price : fairTotal;
+  const secTax = secTaxBase*0.0035;
+  const lowGift = judge==='저가거래' ? fairTotal-price-threshold : 0;
+  const highGift = judge==='고가거래' ? price-fairTotal-threshold : 0;
+  const wrongfulThreshold = Math.min(fairTotal*0.05,300000000);
+  const wrongful = Math.abs(fairTotal-price)>=wrongfulThreshold ? '해당 (시가로 재계산 과세)' : '해당없음';
+
+  setHTML('j_out',
+    rline('양도주식 가액(시가총액)', won(fairTotal)) +
+    rline('취득가액', won(costTotal)) +
+    rline('이익증여 판정 기준금액', won(threshold)) +
+    rline('정상거래가 범위', `${won(lowBound)} ~ ${won(highBound)}`) +
+    rline('거래가 판정', judge, {cls:'highlight'}) +
+    rline('양도차익(과세표준)', won(gain)) +
+    rline('양도세', won(capGainTax)) +
+    rline('증권거래세', won(secTax)) +
+    rline('저가거래 이익증여(양수자)', won(lowGift)) +
+    rline('고가거래 이익증여(양도자)', won(highGift)) +
+    rline('소득세법 부당행위계산 판정', wrongful)
+  );
+}
+function giftDeduction(rel){
+  if(rel==='배우자') return 600000000;
+  if(rel==='직계존속(성년)') return 50000000;
+  if(rel==='직계존속(미성년)') return 20000000;
+  if(rel==='직계비속') return 50000000;
+  if(rel==='기타친족') return 10000000;
+  return 0;
+}
+function calc5k(){
+  ['1','2'].forEach(i=>{
+    const fair=num('k_fair'+i), qty=num('k_qty'+i), prior=num('k_prior'+i), rel=str('k_rel'+i);
+    const giftValue = fair*qty;
+    const total = giftValue+prior;
+    const ded = giftDeduction(rel);
+    const base = Math.max(total-ded,0);
+    const grossTax = inheritGiftTax(base);
+    const priorBase = Math.max(prior-ded,0);
+    const priorTax = inheritGiftTax(priorBase);
+    const finalTax = grossTax-priorTax;
+    setHTML('k_out'+ (i==='1'?'':''), ''); // placeholder
+    window['_k'+i] = {giftValue,total,ded,base,grossTax,priorTax,finalTax};
+  });
+  const out = `
+    <div class="section-divider">예시1</div>
+    ${rline('증여재산가액', won(window._k1.total))}
+    ${rline('증여공제', won(window._k1.ded))}
+    ${rline('과세표준', won(window._k1.base))}
+    ${rline('산출증여세', won(window._k1.grossTax))}
+    ${rline('기납부증여세공제', won(window._k1.priorTax))}
+    ${rline('납부할 증여세', won(window._k1.finalTax), {cls:'big'})}
+    <div class="section-divider" style="margin-top:16px;">예시2</div>
+    ${rline('증여재산가액', won(window._k2.total))}
+    ${rline('증여공제', won(window._k2.ded))}
+    ${rline('과세표준', won(window._k2.base))}
+    ${rline('산출증여세', won(window._k2.grossTax))}
+    ${rline('기납부증여세공제', won(window._k2.priorTax))}
+    ${rline('납부할 증여세', won(window._k2.finalTax), {cls:'big'})}
+  `;
+  setHTML('k_out', out);
+}
+document.getElementById('t5').addEventListener('input', ()=>{ calc5j(); calc5k(); });
+
+/* ============ 6. 퇴직급여 계산 ============ */
+function oldBracketTax(base){
+  if(base<=12000000) return base*0.06;
+  if(base<=46000000) return base*0.15-1080000;
+  if(base<=88000000) return base*0.24-5220000;
+  if(base<=150000000) return base*0.35-14900000;
+  if(base<=300000000) return base*0.38-19400000;
+  if(base<=500000000) return base*0.40-25400000;
+  if(base<=1000000000) return base*0.42-35400000;
+  return base*0.45-65400000;
+}
+function calc6p1(){
+  const pay=num('q_pay'), basic=num('q_basic'), credit=num('q_credit'), health=num('q_health');
+  const earnedDed = earnedIncomeDeduction(pay); // reuse same earned income deduction table (identical to salary opt file)
+  const base = pay-earnedDed-basic;
+  const grossTax = Math.max(oldBracketTax(base),0);
+  const finalTax = grossTax-credit;
+  const localTax = finalTax*0.1;
+  const payTax = finalTax+localTax;
+  const burden = payTax+health;
+  const burdenRate = burden/pay;
+
+  const corpBase = num('q_corptax_base');
+  const corpGross = Math.min(corpBase,200000000)*0.1 + Math.max(corpBase-200000000,0)*0.2;
+  const sme = num('q_sme')/100;
+  const smeAmt = corpGross*sme;
+  const mintax = num('q_mintax');
+  const afterMin = corpGross-smeAmt-mintax;
+  const rnd = num('q_rnd');
+  const corpFinal = afterMin-rnd;
+  const localCorp = Math.min(corpBase,200000000)*0.01 + Math.max(corpBase-200000000,0)*0.02;
+  const corpPay = corpFinal+localCorp;
+  const corpRate = corpPay/corpBase;
+
+  setHTML('q_out',
+    '<div class="section-divider">대표 개인 부담</div>' +
+    rline('근로소득공제', won(earnedDed)) +
+    rline('과세표준', won(base)) +
+    rline('산출세액', won(grossTax)) +
+    rline('납부소득세(지방세포함)', won(payTax)) +
+    rline('담세액 계(소득세+건보료)', won(burden), {cls:'highlight'}) +
+    rline('부담률', pct(burdenRate)) +
+    '<div class="section-divider">법인 부담</div>' +
+    rline('법인세 산출세액', won(corpGross)) +
+    rline('중소기업특별세액감면액', won(smeAmt)) +
+    rline('납부법인세', won(corpPay), {cls:'highlight'}) +
+    rline('부담률(납부법인세/과표)', pct(corpRate))
+  );
+}
+function monthsBetween(d1,d2){
+  return (d2.getFullYear()-d1.getFullYear())*12 + (d2.getMonth()-d1.getMonth());
+}
+function calc6p2(){
+  const start = new Date(str('r_start'));
+  const end = new Date(str('r_end'));
+  const multPre = num('r_mult_pre');
+  const multPost = num('r_mult_post');
+  const avg1=num('r_avg1'), avg2=num('r_avg2'), avg3=num('r_avg3');
+
+  // 근속월수 2019.12.31까지 (from start to 2019-12-31 inclusive)
+  const cutoff = new Date(2019,11,31);
+  let monthsC = (2019-start.getFullYear())*12 + (12-(start.getMonth()+1)) + 1;
+  if(start>cutoff) monthsC = 0;
+  // 근속월수 2020.1.1 이후
+  let monthsD = (end.getFullYear()-2020)*12 + ((end.getMonth()+1)-1) + 1;
+  if(end < new Date(2020,0,1)) monthsD = 0;
+  const totalMonths = monthsC+monthsD;
+
+  const capC = Math.min(multPre,3);
+  const capD = Math.min(multPost,2);
+  const amountC = avg1*0.1*(monthsC/12)*capC;
+  const amountD = avg2*0.1*(monthsD/12)*capD;
+  const totalStatute = amountC+amountD;
+
+  const noRuleLimit = avg3*0.1*(totalMonths/12);
+
+  setHTML('r_out',
+    rline('근속월수 (~2019.12.31)', totalMonths + '개월 중 ' + monthsC + '개월') +
+    rline('근속월수 (2020.1.1~)', monthsD + '개월') +
+    rline('2019년까지분 퇴직소득금액', won(amountC)) +
+    rline('2020년이후분 퇴직소득금액', won(amountD)) +
+    rline('정관 규정 있을 시 퇴직소득한도', won(totalStatute), {cls:'big'}) +
+    rline('정관 규정 없을 시 퇴직소득한도', won(noRuleLimit), {cls:'highlight'})
+  );
+}
+function calc6p3(){
+  const start = new Date(str('t_start'));
+  const end = new Date(str('t_end'));
+  const amount = num('t_amount');
+  const years = Math.ceil(((end.getFullYear()-start.getFullYear())*12+(end.getMonth()-start.getMonth()))/12);
+  let serviceDed;
+  if(years<=5) serviceDed = years*1000000;
+  else if(years<=10) serviceDed = (years-5)*2000000+5000000;
+  else if(years<=20) serviceDed = (years-10)*2500000+15000000;
+  else serviceDed = (years-20)*3000000+40000000;
+
+  const afterService = amount-serviceDed;
+  const converted = years>0 ? afterService*12/years : 0;
+  let convDed;
+  if(converted<8000000) convDed = converted;
+  else if(converted<70000000) convDed = (converted-8000000)*0.6+8000000;
+  else if(converted<100000000) convDed = (converted-70000000)*0.55+45200000;
+  else if(converted<300000000) convDed = (converted-100000000)*0.45+61700000;
+  else convDed = (converted-300000000)*0.35+151700000;
+
+  const base = converted-convDed;
+  const convTax = Math.max(oldBracketTax(base),0);
+  const retireTax = Math.floor(convTax*years/12/10)*10;
+  const localTax = Math.floor(retireTax*0.1/10)*10;
+  const totalTax = retireTax+localTax;
+  const effRate = amount>0 ? totalTax/amount : 0;
+
+  setHTML('t_out',
+    rline('근속연수', years+'년') +
+    rline('근속공제', won(serviceDed)) +
+    rline('근속공제 후 산출액', won(afterService)) +
+    rline('환산급여액', won(converted)) +
+    rline('환산급여 차등공제', won(convDed)) +
+    rline('퇴직소득 과세표준', won(base)) +
+    rline('환산산출세액', won(convTax)) +
+    rline('퇴직소득세액', won(retireTax)) +
+    rline('지방소득세', won(localTax)) +
+    rline('납부 세액', won(totalTax), {cls:'big'}) +
+    rline('실세율', pct(effRate))
+  );
+}
+document.getElementById('t6').addEventListener('input', ()=>{ calc6p1(); calc6p2(); calc6p3(); });
+
+/* ============ 7. 특정법인 증여의제 ============ */
+function corpTaxNational(x){
+  if(x<=200000000) return x*0.09;
+  if(x<=20000000000) return x*0.19-20000000;
+  if(x<=300000000000) return x*0.21-420000000;
+  return x*0.24-9420000000;
+}
+function corpTaxLocal(x){
+  if(x<=200000000) return x*0.10;
+  if(x<=20000000000) return x*0.20-20000000;
+  if(x<=300000000000) return x*0.22-420000000;
+  return x*0.25-9420000000;
+}
+function initShareTable(){
+  const body = document.getElementById('w_share_body');
+  const init = [
+    ['A','지배주주',3000],['B','지배주주의 특수관계인',4000],['C','지배주주의 특수관계인',1000],
+    ['D','지배주주의 특수관계인',4000],['E','',0],['F','',0],['G','',0],['H','',0],['I','',0],['J','',0]
+  ];
+  body.innerHTML='';
+  init.forEach(([name,cat,qty])=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML = `<td>${name}</td><td><input type="text" value="${cat}"></td><td><input type="text" inputmode="decimal" class="amt" value="${qty}"></td><td class="w-ratio">-</td>`;
+    body.appendChild(tr);
+  });
+}
+function getShareholders(){
+  const body = document.getElementById('w_share_body');
+  const rows = [...body.querySelectorAll('tr')];
+  const names = rows.map(tr=>tr.children[0].textContent);
+  const cats = rows.map(tr=>tr.children[1].querySelector('input').value);
+  const qtys = rows.map(tr=>cleanNum(tr.children[2].querySelector('input').value)||0);
+  const total = qtys.reduce((a,b)=>a+b,0);
+  const ratios = qtys.map(q=> total>0? q/total:0);
+  rows.forEach((tr,i)=>{ tr.children[3].textContent = pct(ratios[i]); });
+  return {names,cats,qtys,ratios,maxRatio: Math.max(...ratios), total};
+}
+function solveLimit(fn, target, lo, hi){
+  for(let i=0;i<80;i++){
+    const mid=(lo+hi)/2;
+    if(fn(mid)<target) lo=mid; else hi=mid;
+  }
+  return (lo+hi)/2;
+}
+function judgeTable(elId, ratios, names, cats, unitGiftAmount){
+  let th='<thead><tr><th style="text-align:left">주주</th><th style="text-align:left">구분</th><th>지분율</th><th>증여의제이익</th><th>판정</th></tr></thead>';
+  let tb='<tbody>';
+  names.forEach((n,i)=>{
+    if(ratios[i]<=0) return;
+    const gift = unitGiftAmount*ratios[i];
+    const taxed = gift>=100000000;
+    tb += `<tr${taxed?' class="best"':''}><td>${n}</td><td>${cats[i]||'-'}</td><td>${pct(ratios[i])}</td><td>${won(gift)}</td><td><span class="badge ${taxed?'tax':'free'}">${taxed?'O 과세':'X 비과세'}</span></td></tr>`;
+  });
+  tb+='</tbody>';
+  document.getElementById(elId).innerHTML = th+tb;
+}
+function calc7(){
+  const sh = getShareholders();
+  document.getElementById('w_max_ratio').textContent = pct(sh.maxRatio);
+
+  // 1. 금전무상대여
+  const principal = num('w1_principal'), rate=num('w1_rate')/100;
+  const benefit1 = principal*rate;
+  const deemGift1 = benefit1*sh.maxRatio;
+  setHTML('w1_out',
+    rline('특정법인의 이익(대여원금×적정이자율)', won(benefit1)) +
+    rline('산출액(이익×지배주주지분율)', won(deemGift1)) +
+    rline('1억원 이상 여부', deemGift1>=100000000?'O (과세대상)':'X (비과세)', {cls:'highlight'}) +
+    rline('과세되지 않는 대여원금 한도', won(rate*sh.maxRatio>0? 100000000/(rate*sh.maxRatio):0))
+  );
+  judgeTable('w1_table', sh.ratios, sh.names, sh.cats, benefit1);
+
+  // 2. 채무면제
+  const w2income=num('w2_income'), w2amount=num('w2_amount');
+  const w2after = w2income+w2amount;
+  const w2taxBefore = corpTaxLocal(w2income);
+  const w2taxAfter = corpTaxLocal(w2after);
+  const w2taxIncrease = w2taxAfter-w2taxBefore;
+  const w2corpEquiv = w2taxAfter*Math.min(w2amount/w2after,1);
+  const w2net = w2amount-w2corpEquiv;
+  const w2limit = sh.maxRatio>0 ? solveLimit(a=>{
+    const after=w2income+a; const tax=corpTaxLocal(after); const equiv=tax*Math.min(a/after,1);
+    return (a-equiv)*sh.maxRatio;
+  }, 100000000, 0, 1e13) : NaN;
+  setHTML('w2_out',
+    rline('채무면제 반영 후 소득금액', won(w2after)) +
+    rline('채무면제 전 법인세 산출세액', won(w2taxBefore)) +
+    rline('채무면제 후 법인세 산출세액', won(w2taxAfter)) +
+    rline('법인세 증가액 (참고)', won(w2taxIncrease)) +
+    rline('법인세상당액', won(w2corpEquiv)) +
+    rline('정산증여액', won(w2net), {cls:'highlight'}) +
+    rline('과세되지 않는 채무면제액 한도(지배주주 기준)', won(w2limit))
+  );
+  judgeTable('w2_table', sh.ratios, sh.names, sh.cats, w2net);
+
+  // 3. 증여
+  const w3income=num('w3_income'), w3amount=num('w3_amount');
+  const w3after = w3income+w3amount;
+  const w3taxBefore = corpTaxLocal(w3income);
+  const w3taxAfter = corpTaxLocal(w3after);
+  const w3taxIncrease = w3taxAfter-w3taxBefore;
+  const w3corpEquiv = w3taxAfter*Math.min(w3amount/w3after,1);
+  const w3net = w3amount-w3corpEquiv;
+  const w3limit = sh.maxRatio>0 ? solveLimit(a=>{
+    const after=w3income+a; const tax=corpTaxLocal(after); const equiv=tax*Math.min(a/after,1);
+    return (a-equiv)*sh.maxRatio;
+  }, 100000000, 0, 1e13) : NaN;
+  setHTML('w3_out',
+    rline('증여 반영 후 소득금액', won(w3after)) +
+    rline('증여 전 법인세 산출세액', won(w3taxBefore)) +
+    rline('증여 후 법인세 산출세액', won(w3taxAfter)) +
+    rline('법인세 증가액 (참고)', won(w3taxIncrease)) +
+    rline('법인세상당액', won(w3corpEquiv)) +
+    rline('정산증여액', won(w3net), {cls:'highlight'}) +
+    rline('과세되지 않는 증여가액 한도(지배주주 기준)', won(w3limit))
+  );
+  judgeTable('w3_table', sh.ratios, sh.names, sh.cats, w3net);
+
+  // 4. 초과배당
+  const w4income=num('w4_income'), w4div=num('w4_div'), w4ratio=num('w4_ratio')/100;
+  const exemptRate = w4ratio<0.2?0.3:(w4ratio<0.5?0.8:1);
+  const exemptAmt = w4div*exemptRate;
+  const taxableDiv = w4div-exemptAmt;
+  const afterIncome = w4income+taxableDiv;
+  const afterTax = corpTaxLocal(afterIncome);
+  const excessDiv = w4div*(1-w4ratio);
+  const corpEquiv = afterTax;
+  const netExcess = excessDiv-corpEquiv;
+  const w4limit = sh.maxRatio>0 ? solveLimit(d=>{
+    const taxableD = d*(1-exemptRate); const after=w4income+taxableD; const tax=corpTaxLocal(after);
+    const excess=d*(1-w4ratio); const net=excess-tax;
+    return net*sh.maxRatio;
+  }, 100000000, 0, 1e13) : NaN;
+  setHTML('w4_out',
+    rline('익금불산입률', pct(exemptRate,0)) +
+    rline('익금불산입금액', won(exemptAmt)) +
+    rline('배당 반영 후 소득금액', won(afterIncome)) +
+    rline('배당 반영 후 법인세 산출세액', won(afterTax)) +
+    rline('초과배당금액', won(excessDiv)) +
+    rline('정산초과배당액', won(netExcess), {cls:'highlight'}) +
+    rline('과세되지 않는 배당금액 한도(지배주주 기준)', won(w4limit))
+  );
+  judgeTable('w4_table', sh.ratios, sh.names, sh.cats, netExcess);
+}
+document.getElementById('t7').addEventListener('input', calc7);
+initShareTable();
+
+/* ============ 8. 불균등 유상증자·감자 ============ */
+function makeShareRow(name, cat, qty, extra){
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td><input type="text" value="${name}" style="width:70px;"></td>
+    <td><select><option${cat==='개인'?' selected':''}>개인</option><option${cat==='법인'?' selected':''}>법인</option></select></td>
+    <td><input type="text" inputmode="decimal" class="amt" value="${qty}"></td>
+    <td><input type="text" inputmode="decimal" class="amt" value="${extra}"></td>`;
+  return tr;
+}
+function initX1(){
+  const body = document.getElementById('x1_body');
+  body.innerHTML='';
+  [['김XX(부)','개인',15000,0],['김XX(모)','개인',5000,0],['ㅇㅇㅇ','법인',0,80000]].forEach(r=>body.appendChild(makeShareRow(...r)));
+}
+function initX2(){
+  const body = document.getElementById('x2_body');
+  body.innerHTML='';
+  [['김XX(부)','개인',15000,15000],['김XX(모)','개인',5000,5000],['ㅇㅇㅇ','법인',80000,0]].forEach(r=>body.appendChild(makeShareRow(...r)));
+}
+function readShareRows(bodyId){
+  const body = document.getElementById(bodyId);
+  return [...body.querySelectorAll('tr')].map(tr=>{
+    const inputs = tr.querySelectorAll('input');
+    const sel = tr.querySelector('select');
+    return {name: inputs[0].value, cat: sel.value, qty: cleanNum(inputs[1].value)||0, extra: cleanNum(inputs[2].value)||0};
+  });
+}
+function giftThreshold(fairPrice, totalQtyValue){
+  return Math.min(300000000, totalQtyValue*0.3);
+}
+function calc8x1(){
+  const fair = num('x1_fair'), issue = num('x1_issue');
+  const rows = readShareRows('x1_body');
+  const sumC = rows.reduce((a,r)=>a+r.qty,0);
+  const sumH = rows.reduce((a,r)=>a+r.extra,0);
+  const N = (sumC>0||sumH>0) ? (sumC*fair + sumH*issue)/(sumC+sumH) : 0;
+  const threshold = giftThreshold(fair, sumC*fair);
+
+  let summary = rline('기존주식수 합계', sumC.toLocaleString()+'주') +
+    rline('증자(실제인수) 주식수 합계', sumH.toLocaleString()+'주') +
+    rline('증자 후 1주당 정상가', won(N), {cls:'big'}) +
+    rline('1주당 이익(정상가-인수가)', won(N-issue));
+  setHTML('x1_summary', summary);
+
+  let th='<thead><tr><th style="text-align:left">주주</th><th style="text-align:left">구분</th><th>인수주식수</th><th>이익증여금액</th><th>법인세상당액</th><th>정산이익</th><th>판정</th></tr></thead>';
+  let tb='<tbody>';
+  rows.forEach(r=>{
+    if(r.extra<=0){ return; }
+    const gain = (N-issue)*r.extra;
+    const corpEquiv = r.cat==='법인' ? corpTaxNational(Math.max(gain,0)) : 0;
+    const net = gain-corpEquiv;
+    const taxed = net>=threshold;
+    tb += `<tr${taxed?' class="best"':''}><td>${r.name}</td><td>${r.cat}</td><td>${r.extra.toLocaleString()}</td><td>${won(gain)}</td><td>${won(corpEquiv)}</td><td>${won(net)}</td><td><span class="badge ${taxed?'tax':'free'}">${taxed?'O 과세':'X 비과세'}</span></td></tr>`;
+  });
+  tb+='</tbody>';
+  document.getElementById('x1_judge').innerHTML = th+tb;
+}
+function calc8x2(){
+  const fair = num('x2_fair'), redeem = num('x2_redeem');
+  const rows = readShareRows('x2_body');
+  const sumC = rows.reduce((a,r)=>a+r.qty,0);
+  const sumH = rows.reduce((a,r)=>a+r.extra,0);
+  const remain = sumC-sumH;
+  const N = remain>0 ? (sumC*fair - sumH*redeem)/remain : 0;
+  const threshold = giftThreshold(fair, sumC*fair);
+
+  let summary = rline('기존주식수 합계', sumC.toLocaleString()+'주') +
+    rline('감자(실제상환) 주식수 합계', sumH.toLocaleString()+'주') +
+    rline('감자 후 잔여주식수', remain.toLocaleString()+'주') +
+    rline('감자 후 1주당 정상가', won(N), {cls:'big'}) +
+    rline('1주당 가치증가(정상가-감자전가)', won(N-fair));
+  setHTML('x2_summary', summary);
+
+  let th='<thead><tr><th style="text-align:left">주주</th><th style="text-align:left">구분</th><th>사후보유주식수</th><th>지분율 변동</th><th>이익증여금액</th><th>법인세상당액</th><th>정산이익</th><th>판정</th></tr></thead>';
+  let tb='<tbody>';
+  rows.forEach(r=>{
+    const after = r.qty-r.extra;
+    const beforeRatio = sumC>0? r.qty/sumC:0;
+    const afterRatio = remain>0? after/remain:0;
+    if(afterRatio<=beforeRatio || after<=0){ return; }
+    const gain = (N-fair)*after;
+    const corpEquiv = r.cat==='법인' ? corpTaxNational(Math.max(gain,0)) : 0;
+    const net = gain-corpEquiv;
+    const taxed = net>=threshold;
+    tb += `<tr${taxed?' class="best"':''}><td>${r.name}</td><td>${r.cat}</td><td>${after.toLocaleString()}</td><td>${pct(beforeRatio)} → ${pct(afterRatio)}</td><td>${won(gain)}</td><td>${won(corpEquiv)}</td><td>${won(net)}</td><td><span class="badge ${taxed?'tax':'free'}">${taxed?'O 과세':'X 비과세'}</span></td></tr>`;
+  });
+  tb+='</tbody>';
+  document.getElementById('x2_judge').innerHTML = th+tb;
+}
+function calc8(){ calc8x1(); calc8x2(); }
+document.getElementById('t8').addEventListener('input', calc8);
+document.getElementById('x1_add').addEventListener('click', ()=>{ document.getElementById('x1_body').appendChild(makeShareRow('신규주주','개인',0,0)); formatAllAmt(); calc8x1(); });
+document.getElementById('x2_add').addEventListener('click', ()=>{ document.getElementById('x2_body').appendChild(makeShareRow('신규주주','개인',0,0)); formatAllAmt(); calc8x2(); });
+initX1(); initX2();
+
+/* ============ 9. 2026 소득세 계산기 (양도·퇴직·종합) ============ */
+function vlookupBracket(x, table){ let r=table[0]; for(const row of table){ if(row[0]<=x) r=row; else break; } return r; }
+const INC9_BRACKETS = [[0,0,0.06],[14000000,1260000,0.15],[50000000,5760000,0.24],[88000000,15440000,0.35],[150000000,19940000,0.38],[300000000,25940000,0.40],[500000000,35940000,0.42],[1000000000,65940000,0.45]];
+function incomeTax9(base){ const r=vlookupBracket(base,INC9_BRACKETS); return base*r[2]-r[1]; }
+const EARNED_DED9=[[0,0,0.7],[5000000,3500000,0.4],[15000000,7500000,0.15],[45000000,12000000,0.05],[100000000,14750000,0.02]];
+function earnedDeduction9(pay){ if(pay<=5000000) return pay*0.7; const r=vlookupBracket(pay,EARNED_DED9); return r[1]+r[2]*(pay-r[0]); }
+const PENSION_DED9=[[0,0,1],[3500000,3500000,0.4],[7000000,4900000,0.2],[14000000,6300000,0.1]];
+function pensionDeduction9(p){ if(p<=3500000) return p; const r=vlookupBracket(p,PENSION_DED9); return Math.min(9000000, r[1]+r[2]*(p-r[0])); }
+const SERVICE_DED9=[[0,0,1000000],[5,5000000,2000000],[10,15000000,2500000],[20,40000000,3000000]];
+function serviceDeduction9(years){ if(years<=5) return 1000000*years; const r=vlookupBracket(years,SERVICE_DED9); return r[1]+r[2]*(years-r[0]); }
+const CONV_DED9=[[0,0,1],[8000000,8000000,0.6],[70000000,45200000,0.55],[100000000,61700000,0.45],[300000000,151700000,0.35]];
+function convertedDeduction9(x){ if(x<=8000000) return x; const r=vlookupBracket(x,CONV_DED9); return r[1]+r[2]*(x-r[0]); }
+function yearsRoundUp9(startStr, endStr){
+  const start = new Date(startStr), end = new Date(endStr);
+  if(isNaN(start)||isNaN(end)||end<start) return 0;
+  let y = end.getFullYear()-start.getFullYear();
+  const anniv = new Date(start.getFullYear()+y, start.getMonth(), start.getDate());
+  let yy = y;
+  if(anniv>end){ yy--; }
+  const anniv2 = new Date(start.getFullYear()+yy, start.getMonth(), start.getDate());
+  if(anniv2.getTime() !== end.getTime()) yy++;
+  return Math.max(yy,1);
+}
+
+function scenarioHTML(p, d){
+  return `
+    <div class="grid">
+      <div class="card">
+        <div class="row2">
+          <div class="field"><label>양도 주식수 (주)</label><input type="text" inputmode="decimal" class="amt" id="${p}_qty" value="${d.qty}"></div>
+          <div class="field"><label>1주당 양도가액 (원)</label><input type="text" inputmode="decimal" class="amt" id="${p}_transferPrice" value="${d.transferPrice}"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>1주당 취득가액 (원)</label><input type="text" inputmode="decimal" class="amt" id="${p}_acquirePrice" value="${d.acquirePrice}"></div>
+          <div class="field"><label>양도시기</label><input type="date" id="${p}_transferDate" value="${d.transferDate}"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>발행주식총수 (주)</label><input type="text" inputmode="decimal" class="amt" id="${p}_totalShares" value="${d.totalShares}"></div>
+          <div class="field"><label>보유 주식수 (주)</label><input type="text" inputmode="decimal" class="amt" id="${p}_heldShares" value="${d.heldShares}"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>중소기업 여부</label><select id="${p}_isSme"><option${d.isSme==='중소기업'?' selected':''}>중소기업</option><option${d.isSme==='비중소기업'?' selected':''}>비중소기업</option></select></div>
+          <div class="field"><label>1년 미만 보유 여부</label><select id="${p}_under1yr"><option${d.under1yr==='1년이상'?' selected':''}>1년이상</option><option${d.under1yr==='1년미만'?' selected':''}>1년미만</option></select></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>대주주 여부 (아래 참고값 확인 후 입력)</label><select id="${p}_isMajor"><option${d.isMajor==='대주주'?' selected':''}>대주주</option><option${d.isMajor==='소액주주'?' selected':''}>소액주주</option></select></div>
+          <div class="field"><label>양도소득기본공제(250만원) 적용</label><select id="${p}_basicDed"><option${d.basicDed==='여'?' selected':''}>여</option><option${d.basicDed==='부'?' selected':''}>부</option></select></div>
+        </div>
+      </div>
+      <div class="results"><div id="${p}_out1"></div></div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="field"><label>퇴직금액 (원)</label><input type="text" inputmode="decimal" class="amt" id="${p}_retireAmt" value="${d.retireAmt}"></div>
+        <div class="row2">
+          <div class="field"><label>기산일(입사일)</label><input type="date" id="${p}_startDate" value="${d.startDate}"></div>
+          <div class="field"><label>중간정산일/퇴직일</label><input type="date" id="${p}_endDate" value="${d.endDate}"></div>
+        </div>
+      </div>
+      <div class="results"><div id="${p}_out2"></div></div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="row2">
+          <div class="field"><label>이자소득 총수입금액</label><input type="text" inputmode="decimal" class="amt" id="${p}_interest" value="${d.interest}"></div>
+          <div class="field"><label>배당소득 총수입금액</label><input type="text" inputmode="decimal" class="amt" id="${p}_dividend" value="${d.dividend}"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>사업소득금액(필요경비 차감후)</label><input type="text" inputmode="decimal" class="amt" id="${p}_business" value="${d.business}"></div>
+          <div class="field"><label>총급여액(근로소득)</label><input type="text" inputmode="decimal" class="amt" id="${p}_salary" value="${d.salary}"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>총연금액(연금소득)</label><input type="text" inputmode="decimal" class="amt" id="${p}_pension" value="${d.pension}"></div>
+          <div class="field"><label>기타소득금액(필요경비 차감후)</label><input type="text" inputmode="decimal" class="amt" id="${p}_other" value="${d.other}"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>인적공제 합계</label><input type="text" inputmode="decimal" class="amt" id="${p}_personalDed" value="${d.personalDed}"></div>
+          <div class="field"><label>그 외 소득공제(국민연금 등)</label><input type="text" inputmode="decimal" class="amt" id="${p}_otherDed" value="${d.otherDed}"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>특별세액공제(보험료·의료비 등)</label><input type="text" inputmode="decimal" class="amt" id="${p}_specialCredit" value="${d.specialCredit}"></div>
+          <div class="field"><label>자녀·연금·정치자금 등 세액공제</label><input type="text" inputmode="decimal" class="amt" id="${p}_otherCredit" value="${d.otherCredit}"></div>
+        </div>
+      </div>
+      <div class="results"><div id="${p}_out3"></div></div>
+    </div>
+
+    <div class="results">
+      <div id="${p}_out4"></div>
+    </div>
+  `;
+}
+
+function calcScenario(p){
+  const qty=num(`${p}_qty`), transferPrice=num(`${p}_transferPrice`), acquirePrice=num(`${p}_acquirePrice`);
+  const totalShares=num(`${p}_totalShares`), heldShares=num(`${p}_heldShares`);
+  const isSme = str(`${p}_isSme`)==='중소기업';
+  const under1yr = str(`${p}_under1yr`)==='1년미만';
+  const isMajor = str(`${p}_isMajor`)==='대주주';
+  const applyBasicDed = str(`${p}_basicDed`)==='여';
+
+  const ratio = totalShares>0 ? heldShares/totalShares : 0;
+  const marketCap = heldShares*transferPrice;
+  const autoMajor = (ratio>=0.04 || marketCap>=1000000000) ? '대주주' : '소액주주';
+
+  const transferAmt = qty*transferPrice;
+  const acquireAmt = qty*acquirePrice;
+  const secTax = transferAmt*0.0035;
+  const gain = transferAmt-acquireAmt-secTax;
+  const gainAmt = Math.max(gain,0);
+  const basicDed = applyBasicDed ? Math.min(gainAmt,2500000) : 0;
+  const taxBase1 = Math.max(gainAmt-basicDed,0);
+  const rate1 = isMajor ? (under1yr && !isSme ? 0.3 : (taxBase1<=300000000?0.2:0.25)) : (isSme?0.1:0.2);
+  const calcTax1 = (isMajor && !(under1yr && !isSme) && taxBase1>300000000) ? taxBase1*0.25-15000000 : taxBase1*rate1;
+  const localTax1 = calcTax1*0.1;
+  const subtotal1 = calcTax1+localTax1;
+  const total1 = subtotal1+secTax;
+
+  setHTML(`${p}_out1`,
+    rline('지분율(보유/발행주식총수)', pct(ratio)) +
+    rline('보유주식 시가총액', won(marketCap)) +
+    rline('자동판정 참고값', autoMajor) +
+    rline('① 양도가액', won(transferAmt)) +
+    rline('② 취득가액', won(acquireAmt)) +
+    rline('③ 증권거래세', won(secTax)) +
+    rline('④ 양도차익', won(gain)) +
+    rline('⑤ 양도소득금액', won(gainAmt)) +
+    rline('⑥ 양도소득기본공제', won(basicDed)) +
+    rline('⑦ 과세표준', won(taxBase1)) +
+    rline('⑧ 적용세율', pct(rate1)) +
+    rline('⑨ 산출세액', won(calcTax1)) +
+    rline('⑩ 지방소득세', won(localTax1)) +
+    rline('⑪ 양도소득세 등 합계', won(subtotal1)) +
+    rline('⑫ 양도소득세 총부담액', won(total1), {cls:'big'})
+  );
+
+  const retireAmt = num(`${p}_retireAmt`);
+  const startDate = document.getElementById(`${p}_startDate`).value;
+  const endDate = document.getElementById(`${p}_endDate`).value;
+  const years = yearsRoundUp9(startDate, endDate);
+  const svcDed = serviceDeduction9(years);
+  const afterDed = Math.max(retireAmt-svcDed,0);
+  const converted = years>0 ? afterDed/years*12 : 0;
+  const convDed = convertedDeduction9(converted);
+  const taxBase2 = Math.max(converted-convDed,0);
+  const convTax = incomeTax9(taxBase2);
+  const calcTax2 = years>0 ? convTax/12*years : 0;
+  const localTax2 = calcTax2*0.1;
+  const total2 = calcTax2+localTax2;
+
+  setHTML(`${p}_out2`,
+    rline('① 근속연수(1년미만 절상)', years+'년') +
+    rline('② 근속연수공제', won(svcDed)) +
+    rline('③ 공제후금액', won(afterDed)) +
+    rline('④ 환산급여', won(converted)) +
+    rline('⑤ 환산급여공제', won(convDed)) +
+    rline('⑥ 퇴직소득 과세표준', won(taxBase2)) +
+    rline('⑦ 환산산출세액', won(convTax)) +
+    rline('⑧ 퇴직소득 산출세액(연분연승)', won(calcTax2)) +
+    rline('⑨ 지방소득세', won(localTax2)) +
+    rline('⑩ 퇴직소득세 총부담액', won(total2), {cls:'big'})
+  );
+
+  const interest=num(`${p}_interest`), dividend=num(`${p}_dividend`), business=num(`${p}_business`);
+  const salary=num(`${p}_salary`), pension=num(`${p}_pension`), other=num(`${p}_other`);
+  const personalDed=num(`${p}_personalDed`), otherDed=num(`${p}_otherDed`);
+  const specialCredit=num(`${p}_specialCredit`), otherCredit=num(`${p}_otherCredit`);
+
+  const interestAmt=interest;
+  const finTotal=interest+dividend;
+  const grossup = Math.max(0, Math.min(finTotal-20000000, dividend))*0.11;
+  const dividendAmt = dividend+grossup;
+  const businessAmt = business;
+  const earnedDed = earnedDeduction9(salary);
+  const earnedAmt = Math.max(salary-earnedDed,0);
+  const pensionDed = pensionDeduction9(pension);
+  const pensionAmt = Math.max(pension-pensionDed,0);
+  const otherAmt = other;
+  const totalIncomeAmt = interestAmt+dividendAmt+businessAmt+earnedAmt+pensionAmt+otherAmt;
+
+  const compDed = personalDed+otherDed;
+  const taxBase3 = Math.max(totalIncomeAmt-compDed,0);
+  const taxA = incomeTax9(taxBase3);
+  const taxB = Math.min(finTotal,20000000)*0.14 + incomeTax9(Math.max(taxBase3-grossup-Math.min(finTotal,20000000),0));
+  const calcTax3 = Math.max(taxA,taxB);
+  const dividendCredit = calcTax3===taxA ? Math.min(grossup, Math.max(taxA-taxB,0)) : 0;
+  const earnedCreditLimit = salary<=33000000?740000:(salary<=70000000?Math.max(740000-(salary-33000000)*0.008,660000):Math.max(660000-(salary-70000000)*0.5,500000));
+  const earnedAllocTax = totalIncomeAmt===0?0: calcTax3*earnedAmt/totalIncomeAmt;
+  const earnedCredit = Math.min(earnedCreditLimit, earnedAllocTax<=1300000?earnedAllocTax*0.55:715000+(earnedAllocTax-1300000)*0.3);
+  const totalCredit = dividendCredit+earnedCredit+specialCredit+otherCredit;
+  const decidedTax3 = Math.max(calcTax3-totalCredit,0);
+  const localTax3 = decidedTax3*0.1;
+  const total3 = decidedTax3+localTax3;
+  const burdenRate = totalIncomeAmt===0?0: total3/totalIncomeAmt;
+
+  setHTML(`${p}_out3`,
+    rline('금융소득 합계(이자+배당)', won(finTotal)) +
+    rline('배당가산액(Gross-up)', won(grossup)) +
+    rline('종합소득금액 합계', won(totalIncomeAmt)) +
+    rline('종합소득공제', won(compDed)) +
+    rline('종합소득과세표준', won(taxBase3)) +
+    rline('일반산출세액 ⓐ', won(taxA)) +
+    rline('비교산출세액 ⓑ(금융소득 분리과세)', won(taxB)) +
+    rline('종합소득산출세액(Max)', won(calcTax3)) +
+    rline('배당세액공제', won(dividendCredit)) +
+    rline('근로소득세액공제', won(earnedCredit)) +
+    rline('세액공제 합계', won(totalCredit)) +
+    rline('종합소득 결정세액', won(decidedTax3)) +
+    rline('종합소득지방세액', won(localTax3)) +
+    rline('종합소득세 총부담세액', won(total3), {cls:'big'}) +
+    rline('부담률', pct(burdenRate))
+  );
+
+  const taxSum = total1+total2+total3;
+  const incomeSum = gainAmt+retireAmt+totalIncomeAmt;
+  const afterTaxAmt = incomeSum-taxSum;
+
+  setHTML(`${p}_out4`,
+    rline('양도소득세 총부담액', won(total1)) +
+    rline('퇴직소득세 총부담액', won(total2)) +
+    rline('종합소득세 총부담세액', won(total3)) +
+    rline('세금 합계', won(taxSum), {cls:'highlight'}) +
+    rline('소득 합계', won(incomeSum)) +
+    rline('세후 실수령액', won(afterTaxAmt), {cls:'big'})
+  );
+
+  return {gainAmt, total1, retireAmt, total2, interestAmt, dividendAmt, businessAmt, earnedAmt, pensionAmt, otherAmt, total3, taxSum, incomeSum, afterTaxAmt};
+}
+
+function calcIncomeCmp(){
+  const a = calcScenario('inc_a');
+  const b = calcScenario('inc_b');
+
+  let th = '<thead><tr><th style="text-align:left">소득 구분</th><th>1안 금액</th><th>1안 세금</th><th>2안 금액</th><th>2안 세금</th></tr></thead>';
+  let tb = '<tbody>';
+  tb += `<tr><td>이자소득</td><td>${won(a.interestAmt)}</td><td></td><td>${won(b.interestAmt)}</td><td></td></tr>`;
+  tb += `<tr><td>배당소득</td><td>${won(a.dividendAmt)}</td><td></td><td>${won(b.dividendAmt)}</td><td></td></tr>`;
+  tb += `<tr><td>사업소득</td><td>${won(a.businessAmt)}</td><td></td><td>${won(b.businessAmt)}</td><td></td></tr>`;
+  tb += `<tr><td>근로소득</td><td>${won(a.earnedAmt)}</td><td></td><td>${won(b.earnedAmt)}</td><td></td></tr>`;
+  tb += `<tr><td>연금소득</td><td>${won(a.pensionAmt)}</td><td></td><td>${won(b.pensionAmt)}</td><td></td></tr>`;
+  tb += `<tr><td>기타소득</td><td>${won(a.otherAmt)}</td><td></td><td>${won(b.otherAmt)}</td><td></td></tr>`;
+  tb += `<tr><td>종합소득세 합계</td><td></td><td>${won(a.total3)}</td><td></td><td>${won(b.total3)}</td></tr>`;
+  tb += `<tr><td>양도소득</td><td>${won(a.gainAmt)}</td><td>${won(a.total1)}</td><td>${won(b.gainAmt)}</td><td>${won(b.total1)}</td></tr>`;
+  tb += `<tr><td>퇴직소득</td><td>${won(a.retireAmt)}</td><td>${won(a.total2)}</td><td>${won(b.retireAmt)}</td><td>${won(b.total2)}</td></tr>`;
+  tb += '</tbody>';
+  document.getElementById('inc_cmp_table').innerHTML = th+tb;
+
+  const savings = a.taxSum-b.taxSum;
+  setHTML('inc_cmp_out',
+    rline('1안 소득 합계 / 세금 합계', `${won(a.incomeSum)} / ${won(a.taxSum)}`) +
+    rline('2안 소득 합계 / 세금 합계', `${won(b.incomeSum)} / ${won(b.taxSum)}`) +
+    rline('1안 세후금액', won(a.afterTaxAmt)) +
+    rline('2안 세후금액', won(b.afterTaxAmt)) +
+    rline('절세액 (1안 세금합계 - 2안 세금합계)', won(savings), {cls:'big'})
+  );
+}
+
+const INC9_DEFAULTS_A = {
+  qty:10000, transferPrice:10000, acquirePrice:5000, transferDate:'2026-03-02',
+  totalShares:100000, heldShares:30000, isSme:'중소기업', under1yr:'1년이상', isMajor:'대주주', basicDed:'부',
+  retireAmt:100000000, startDate:'2016-01-01', endDate:'2026-03-02',
+  interest:0, dividend:100000000, business:0, salary:60000000, pension:0, other:0,
+  personalDed:1500000, otherDed:0, specialCredit:0, otherCredit:0
+};
+const INC9_DEFAULTS_B = {
+  qty:10000, transferPrice:5000, acquirePrice:5000, transferDate:'2025-05-03',
+  totalShares:100000, heldShares:30000, isSme:'중소기업', under1yr:'1년이상', isMajor:'대주주', basicDed:'부',
+  retireAmt:100000000, startDate:'2010-01-01', endDate:'2020-03-02',
+  interest:0, dividend:100000000, business:0, salary:60000000, pension:0, other:0,
+  personalDed:1500000, otherDed:0, specialCredit:0, otherCredit:0
+};
+
+document.getElementById('inc_a').innerHTML = scenarioHTML('inc_a', INC9_DEFAULTS_A);
+document.getElementById('inc_b').innerHTML = scenarioHTML('inc_b', INC9_DEFAULTS_B);
+document.getElementById('t9').addEventListener('input', ()=>{ calcIncomeCmp(); formatAllAmt(); });
+
+/* ============ Init all ============ */
+calc1(); calc2(); calc3(); calc4(); calc5j(); calc5k();
+calc6p1(); calc6p2(); calc6p3(); calc7(); calc8();
+calcIncomeCmp();
+formatAllAmt();
+</script>
+</body>
+</html>

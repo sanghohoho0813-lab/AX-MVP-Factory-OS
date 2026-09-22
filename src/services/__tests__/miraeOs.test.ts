@@ -53,6 +53,7 @@ import { documentStatus } from '../clientOpsAlerts'
 import { DOCUMENTS } from '../../content/clientOpsCatalog'
 import { isCustomDocumentKey } from '../../types/clientOps'
 import { classifyDocument, findIssuedDate, KNOWN_EXTRA_DOCS } from '../docClassify'
+import { TAX_CALCULATORS, computeSalary, corpTaxLocal, defaultValues, giftDeduction, incomeTax9, inheritGiftTax, oldBracketTax, pct, salaryBracketTax, won, yearsRoundUp9 } from '../taxCalc'
 import { formatYmd, profileAsText, yearsInBusiness } from '../clientOpsProfile'
 import { SERVICE_STATUS_ORDER, isServiceOpen, isServiceNotApplicable, normalizeServiceStatus } from '../../content/clientOpsCatalog'
 import { BUILTIN_SERVICES, SERVICES, registerCustomServices } from '../../content/clientOpsCatalog'
@@ -936,6 +937,37 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
   check('발급일: 말이 안 되는 해는 버린다', findIssuedDate('발급일자 1850년 1월 1일') === null)
   check('발급일: 없으면 null', findIssuedDate('아무 날짜 없음') === null)
   check('판별: 알려진 추가 서류 목록에 중복 이름이 없다', new Set(KNOWN_EXTRA_DOCS.map((k) => k.label)).size === KNOWN_EXTRA_DOCS.length)
+}
+
+/* ------------------------------------------------------------------ */
+/* 세금 계산기 — 원본 계산식 그대로 (D-85). 화면 대조는 e2e/tax-parity.mjs */
+/* ------------------------------------------------------------------ */
+{
+  check('세금: won 은 원본 모양', won(1234567.6) === '1,234,568원' && won(-5) === '-5원' && won(NaN) === '-')
+  check('세금: pct 는 소수 한 자리', pct(0.123456) === '12.3%' && pct(0.4, 0) === '40%')
+  check('세금: 근로소득 누진세율 — 1억 4천만 원 경계', salaryBracketTax(14000000) === 840000 && Math.round(salaryBracketTax(50000000)) === 6240000)
+  check('세금: 상속·증여 세율 — 10억 경계', inheritGiftTax(1000000000) === 240000000)
+  check('세금: 증여공제 — 배우자 6억', giftDeduction('배우자') === 600000000 && giftDeduction('타인') === 0)
+  check('세금: 예전 누진세율표(퇴직) — 4,600만 경계', Math.round(oldBracketTax(46000000)) === 5820000)
+  check('세금: 법인세(지방세 포함) — 2억 경계', corpTaxLocal(200000000) === 20000000)
+  check('세금: 2026 종합소득세 — 5천만 원', Math.round(incomeTax9(50000000)) === 6240000)
+  check('세금: 근속연수 1년 미만 절상', yearsRoundUp9('2016-01-01', '2026-03-02') === 11 && yearsRoundUp9('2020-01-01', '2020-06-01') === 1)
+  const s = computeSalary(10000000)
+  check('세금: 월 1,000만 급여의 4대보험(연)', s.insTotal === s.pension + s.health + s.ltc && s.pension === 3756300, String(s.pension))
+  check('세금: 계산기 9종, 번호 01~09', TAX_CALCULATORS.length === 9 && TAX_CALCULATORS.map((c) => c.no).join() === '01,02,03,04,05,06,07,08,09')
+  for (const c of TAX_CALCULATORS) {
+    const v = defaultValues(c)
+    for (const sub of c.subs) {
+      const out = sub.compute(v)
+      check(`세금: ${c.key}/${sub.key} 기본값으로 결과가 나온다`, out.blocks.length > 0 && out.blocks.every((b) => b.lines.length > 0))
+      const bad = out.blocks.flatMap((b) => b.lines).filter((l) => l.cls !== 'divider' && (l.v === '' || l.v.includes('NaN') || l.v.includes('undefined')))
+      check(`세금: ${c.key}/${sub.key} 값이 비거나 NaN 이 없다`, bad.length === 0, JSON.stringify(bad.slice(0, 2)))
+    }
+  }
+  const ids = new Set<string>()
+  let dup = ''
+  for (const c of TAX_CALCULATORS) for (const g of [...(c.shared ?? []), ...c.subs.flatMap((s) => s.groups)]) for (const f of g.fields) { if (ids.has(f.id)) dup = f.id; ids.add(f.id) }
+  check('세금: 입력 칸 id 가 겹치지 않는다', dup === '', dup)
 }
 
 /* ------------------------------------------------------------------ */

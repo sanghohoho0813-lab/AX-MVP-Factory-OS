@@ -45,4 +45,4 @@
 
 ## 로컬 모드 키 (localStorage)
 
-`axmvp.v1.{operations_clients, ops_journal_entries, customer_events, portal_client_links, portal_updates, portal_requests, portal_documents}` — 로컬 백업(설정 > 데이터)에 함께 포함된다. 로컬 모드의 고객 이벤트는 "샘플 만들기"로만 생기며 payload 에 `demo:true` 가 붙는다.
+`axmvp.v1.{operations_clients, ops_journal_entries, customer_events, portal_client_links, portal_updates, portal_requests, portal_documents}` — 로컬 백업(설정 > 데이터)에 함께 포함된다. 세금 계산기 입력은 `axmvp.tax.<계산기>` 에 따로 남는다(백업 대상 아님 — 참고용 계산 입력이지 고객 기록이 아니다, D-85). 로컬 모드의 고객 이벤트는 "샘플 만들기"로만 생기며 payload 에 `demo:true` 가 붙는다.

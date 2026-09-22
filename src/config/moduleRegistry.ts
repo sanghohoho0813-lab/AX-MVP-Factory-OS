@@ -9,6 +9,7 @@ import {
   FileCheck2,
   Filter,
   FlaskConical,
+  Calculator,
   Handshake,
   Inbox,
   Landmark,
@@ -122,6 +123,7 @@ export const MODULES: ModuleDefinition[] = [
   { key: 'kpi', label: '성과 지표', path: '/kpi', icon: Gauge, group: 'about', accent: 'system', enabled: true, hint: '돈·시간·규모·사용 지표' },
   { key: 'roadmap', label: '향후 확장', path: '/roadmap', icon: Compass, group: 'about', accent: 'system', enabled: true, status: 'next', hint: '아직 없는 기능과 계획' },
 
+  { key: 'tax-calc', label: '세금 계산기', path: '/tools/tax', icon: Calculator, group: 'tools', accent: 'system', enabled: true, hint: '급여·퇴직·주식·상속·가지급금 9종' },
   { key: 'tools', label: '전체 기능', path: '/tools', icon: LayoutGrid, group: 'tools', accent: 'system', enabled: true },
   { key: 'settings', label: '설정', path: '/settings', icon: Settings, group: 'settings', accent: 'system', enabled: true },
 ]

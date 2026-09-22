@@ -29,6 +29,7 @@
     "test:all": "npm run test:contract && npm run test:client-ops && npm run test:client-operations && npm run test:progress && npm run test:persistence && npm run test:onboarding && npm run test:client-ops-alerts && npm run test:doc-parser && npm run test:client-ops-stage2 && npm run test:datamode && npm run test:autherrors && npm run test:mirae-os && npm run test:consulting && npm run test:operator",
     "e2e:mobile": "node e2e/mobile-journey.mjs",
     "qa:board": "node e2e/board.mjs",
+    "qa:tax": "node e2e/tax-parity.mjs",
     "qa:todos": "node e2e/todos.mjs",
     "qa:studio": "node e2e/studio.mjs",
     "qa:simple": "node e2e/simple.mjs",

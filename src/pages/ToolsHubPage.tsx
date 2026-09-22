@@ -1,4 +1,4 @@
-import { ArrowRight, BarChart3, FileCheck2, FlaskConical, FolderKanban, Lightbulb, Users } from 'lucide-react'
+import { ArrowRight, BarChart3, Calculator, FileCheck2, FlaskConical, FolderKanban, Lightbulb, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { PageHeader } from '../components/ui/PageHeader'
 import { ListSurface, Section } from '../components/ui/primitives'
@@ -42,6 +42,7 @@ const groups = [
 ] as const
 
 const SHORTCUTS = [
+  { label: '세금 계산기', to: '/tools/tax', icon: Calculator },
   { label: '자금·지원사업', to: '/funding', icon: FolderKanban },
   { label: '결과자료', to: '/deliverables/results', icon: FileCheck2 },
   { label: '전체 진행 현황', to: '/reports', icon: BarChart3 },

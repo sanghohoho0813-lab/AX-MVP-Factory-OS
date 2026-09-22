@@ -36,6 +36,7 @@ const OperationsHubPage = lazy(() => import('../pages/OperationsHubPage').then((
 const OperationsClientDetailPage = lazy(() => import('../pages/OperationsClientDetailPage').then((m) => ({ default: m.OperationsClientDetailPage })))
 const OpsCalendarPage = lazy(() => import('../pages/OpsCalendarPage').then((m) => ({ default: m.OpsCalendarPage })))
 const AgentSettlementPage = lazy(() => import('../pages/AgentSettlementPage').then((m) => ({ default: m.AgentSettlementPage })))
+const TaxCalculatorsPage = lazy(() => import('../pages/TaxCalculatorsPage').then((m) => ({ default: m.TaxCalculatorsPage })))
 const ToolsHubPage = lazy(() => import('../pages/ToolsHubPage').then((m) => ({ default: m.ToolsHubPage })))
 const TodayCommandCenterPage = lazy(() => import('../pages/TodayCommandCenterPage').then((m) => ({ default: m.TodayCommandCenterPage })))
 const WhyAxPage = lazy(() => import('../pages/WhyAxPage').then((m) => ({ default: m.WhyAxPage })))
@@ -361,6 +362,8 @@ export const appRouteChildren = [
       { path: 'studio', element: <ConsultingStudioPage /> },
       { path: 'studio/:projectId', element: <ConsultingProjectPage /> },
       { path: 'tools', element: <ToolsHubPage /> },
+      // 세금 계산기 9종 — 배포본 HTML 의 계산식을 그대로 옮긴 것 (D-85)
+      { path: 'tools/tax', element: <TaxCalculatorsPage /> },
       { path: 'why', element: <WhyAxPage /> },
       { path: 'kpi', element: <KpiPage /> },
       { path: 'roadmap', element: <RoadmapPage /> },
