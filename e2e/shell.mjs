@@ -62,7 +62,10 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const search = page.getByRole('button', { name: /검색/ }).first()
   const sBox = await search.boundingBox()
   const hBox = await page.locator('header').boundingBox()
-  check('검색: 머리띠 왼쪽 절반에 있다', sBox && hBox && sBox.x + sBox.width / 2 < hBox.width / 2, JSON.stringify(sBox))
+  // 머리띠는 사이드바 오른쪽에서 시작하므로 가운데는 hBox.x + hBox.width / 2 다 (x 를 빼먹으면 늘 실패한다)
+  check('검색: 머리띠 왼쪽 절반에 있다',
+    sBox && hBox && sBox.x + sBox.width / 2 < hBox.x + hBox.width / 2,
+    JSON.stringify({ search: sBox, headerMid: hBox && Math.round(hBox.x + hBox.width / 2) }))
   check('검색: 폭이 352px 이하', sBox && sBox.width <= 352, String(sBox?.width))
 
   // 도구함

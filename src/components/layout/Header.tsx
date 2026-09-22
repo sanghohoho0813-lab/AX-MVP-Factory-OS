@@ -187,8 +187,11 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
         가운데에 크게 두었더니 화면 폭의 절반을 먹으면서도 1560px 아래에서는 아예 사라졌다.
         이제 폭을 정해(15rem, 아주 넓은 화면에서 19rem) 왼쪽에 두고, 남는 자리는 오른쪽 시계·단추에 준다.
         폭을 정하는 이유는 D-87 — 전부 shrink 로 두면 좁아질 때 이 칸이 먼저 무너진다.
+
+        1360px 부터 보인다. 1280 에서는 머리띠 내용이 1008px 인데 자리가 977px 뿐이라 화면이 옆으로
+        밀렸다(실측). 그 아래에서는 감추고 Ctrl+K 로 연다 — 억지로 줄이면 안내 문구가 잘린다.
       */}
-      <div className="hidden w-[15rem] shrink-0 xl:block 2xl:w-[19rem]">
+      <div className="hidden w-[15rem] shrink-0 min-[1360px]:block 2xl:w-[19rem]">
         <GlobalSearch />
       </div>
 
