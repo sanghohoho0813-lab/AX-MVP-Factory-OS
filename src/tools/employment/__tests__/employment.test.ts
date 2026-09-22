@@ -4,6 +4,7 @@
  * 원본(고용지원금 매니저 Pro)의 표·계산식이 옮기는 동안 한 글자도 안 바뀌었는지 못 박는다.
  * 실행: npm run test:employment
  */
+import { makeSimpleXlsx } from '../../../services/__tests__/xlsxFixture'
 import { BOSU_FLOOR_2026, DIAG_CATS, ELIG, EXCL, MIN_WAGE_2026, MIN_WAGE_MONTH_2026, STS } from '../lib/constants'
 import { COMPANY_DEFAULT_DOCS, DEFAULT_PROGRAMS, PROGRAM_CHECKLISTS, PROGRAM_ENABLED_DEFAULTS, PROGRAM_LIST, type Program } from '../lib/programs'
 import { addMo, calcAgeDetailed, calcMilitaryLimit, formatDday, getDdayFrom, parseJumin } from '../lib/dates'
@@ -23,6 +24,7 @@ import {
   estimateTaxCredit,
   LEVELS,
   maskRRN,
+  parseRosterFile,
   parseRosterText,
   ROSTER_FIELDS,
   rosterStaleness,
@@ -385,6 +387,26 @@ check('SUBSIDY_DEFS 6 · parental limited', SUBSIDY_DEFS.length === 6 && SUBSIDY
 check('SUBSIDY_MAX_PER_PERSON', SUBSIDY_MAX_PER_PERSON.youth_jump === 1200 && SUBSIDY_MAX_PER_PERSON.saeil_women === 380 && SUBSIDY_MAX_PER_PERSON.parental === 0)
 check('EMP_DOC_CHECKLIST 7 · TAX_CHECKLIST 7', EMP_DOC_CHECKLIST.length === 7 && TAX_CHECKLIST.length === 7 && TAX_CHECKLIST[6] === '세무대리인(세무사) 최종 검토 필요')
 check('ROSTER_FIELDS 9', ROSTER_FIELDS.length === 9 && ROSTER_FIELDS[0].key === 'name' && ROSTER_FIELDS[1].aliases.indexOf('주민(앞)') >= 0)
+
+// ── 엑셀(.xlsx) 명부 (D-89) ─────────────────────────────
+// "엑셀은 CSV 로 저장해 주세요" 를 없앴다. 엑셀 파일 그대로 올려서 직원이 잡히는지 본다.
+{
+  const buf = await makeSimpleXlsx([
+    ['사업장명', '한솔테크(주)'],
+    [],
+    ['연번', '성명', '주민등록번호', '자격취득일'],
+    ['1', '김철수', '900101-1234567', '2026-01-15'],
+    ['2', '박영희', '880202-2345678', '2025-07-01'],
+  ])
+  const file = new File([buf], '4대보험 가입자명부.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  const r = await parseRosterFile(file)
+  check('엑셀 명부: 그대로 읽는다', r.ok === true && r.method === 'xlsx', JSON.stringify({ ok: r.ok, error: r.error, method: r.method }))
+  check('엑셀 명부: 두 명을 찾는다', (r.employees?.length ?? 0) === 2, JSON.stringify(r.employees?.map((e) => e.name)))
+  check('엑셀 명부: 이름·입사일을 읽는다', r.employees?.[0].name === '김철수' && r.employees?.[0].hireDate === '2026-01-15', JSON.stringify(r.employees?.[0]))
+  check('엑셀 명부: 주민번호 원본은 보관하지 않는다', JSON.stringify(r.employees).indexOf('900101-1234567') < 0 && r.employees?.[0].rrnMasked === '900101-1******' && r.employees?.[0].birthDate === '1990-01-01')
+  const bad = await parseRosterFile(new File([new TextEncoder().encode('hwp 인 척')], '명부.hwp', { type: '' }))
+  check('엑셀 아닌 파일: 안 읽는 것은 그대로 안 읽는다', bad.ok === false && bad.error === 'unsupported')
+}
 
 console.log(`\nemployment: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

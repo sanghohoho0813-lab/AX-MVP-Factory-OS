@@ -1,6 +1,6 @@
 /**
  * 전역 빠른 이동 검색. 상단 검색을 누르거나 Ctrl/Cmd+K, `/` 로 연다.
- * 고객사·프로젝트·지금 해야 할 일·결과 자료를 그룹으로 찾아 실제 화면으로 이동한다.
+ * 고객사·프로젝트·지금 해야 할 일·도구함·결과 자료를 그룹으로 찾아 실제 화면으로 이동한다.
  * 외부 라이브러리 없이 구현한다.
  */
 
@@ -12,9 +12,10 @@ import { normalizeQuery } from '../../lib/format'
 import { computeProjectJourney } from '../../services/journeyService'
 import { useActiveProject } from '../../context/activeProject'
 import { peekProjectCache } from '../../domain/consulting/projectCache'
+import { searchTools } from '../../config/toolRegistry'
 
 interface Hit {
-  group: '고객사' | '프로젝트' | '컨설팅 작업실' | '지금 해야 할 일' | '결과·자료'
+  group: '고객사' | '프로젝트' | '컨설팅 작업실' | '지금 해야 할 일' | '도구함' | '결과·자료'
   label: string
   sublabel?: string
   onSelect: () => void
@@ -90,6 +91,12 @@ export function GlobalSearch() {
         out.push({ group: '지금 해야 할 일', label: j.actionText, sublabel: `${j.orgName} · ${p.name}`, onSelect: () => { setActiveProject(p.id); navigate(j.actionPath); close() } })
       }
     }
+    // 도구함 — "부채비율" 처럼 도구 이름이 아닌 말로도 찾게 한다 (D-89)
+    for (const t of searchTools(query)) {
+      if (!t.path) continue
+      const path = t.path
+      out.push({ group: '도구함', label: t.label, sublabel: t.navHint ?? t.desc.slice(0, 40), onSelect: () => { navigate(path); close() } })
+    }
     for (const s of RESULT_SHORTCUTS) {
       if (!q || s.keywords.includes(q) || s.label.toLowerCase().includes(q)) {
         out.push({ group: '결과·자료', label: s.label, onSelect: () => { navigate(s.path); close() } })
@@ -124,7 +131,7 @@ export function GlobalSearch() {
       >
         <Search aria-hidden="true" className="size-4 shrink-0" />
         {/* min-w-0 이 없으면 좁은 화면에서 글자가 칸 밖으로 삐져나와 옆 버튼을 덮는다 */}
-        <span className="min-w-0 truncate">고객사·프로젝트 검색</span>
+        <span className="min-w-0 truncate">고객사·프로젝트·도구 검색</span>
         <kbd className="ml-auto hidden shrink-0 rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[0.75rem] font-medium text-slate-400 2xl:inline">Ctrl K</kbd>
       </button>
 
@@ -139,7 +146,7 @@ export function GlobalSearch() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={onKeyDown}
-                placeholder="고객사·프로젝트·할 일·자료 검색"
+                placeholder="고객사·프로젝트·할 일·도구 검색"
                 className="h-14 w-full bg-transparent text-[1.05rem] text-slate-900 outline-none placeholder:text-slate-400"
               />
             </div>

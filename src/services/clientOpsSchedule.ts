@@ -15,7 +15,7 @@ import {
 import { documentStatus, daysLeftFrom } from './clientOpsAlerts'
 import { todayLocalDate } from '../lib/appClock'
 
-export type ScheduleKind = 'task' | 'funding' | 'payment' | 'document'
+export type ScheduleKind = 'task' | 'funding' | 'payment' | 'document' | 'tool'
 
 export interface ScheduleEvent {
   id: string
@@ -38,6 +38,7 @@ export const SCHEDULE_KIND_LABEL: Record<ScheduleKind, string> = {
   funding: '정책자금 신청',
   payment: '수금 예정',
   document: '서류 만료',
+  tool: '도구 기한',
 }
 
 /** 종류별 색 (달력 점·칩) */
@@ -52,6 +53,7 @@ export const SCHEDULE_KIND_CLASS: Record<ScheduleKind, { dot: string; chip: stri
   funding: { dot: 'bg-cat-fund-500', chip: 'border-slate-200 bg-white text-slate-600' },
   payment: { dot: 'bg-cat-money-500', chip: 'border-slate-200 bg-white text-slate-600' },
   document: { dot: 'bg-cat-doc-500', chip: 'border-slate-200 bg-white text-slate-600' },
+  tool: { dot: 'bg-cat-client-500', chip: 'border-slate-200 bg-white text-slate-600' },
 }
 
 /** 한 업체의 일정 */
@@ -130,6 +132,24 @@ export function buildClientSchedule(record: ClientOpsRecord, today: string): Sch
       done: false,
       daysLeft: view.daysLeft,
     })
+  }
+
+  // 도구가 계산한 기한 (D-89) — 고용지원금 회차 신청일 · 연구소 사후관리 기한 …
+  for (const result of record.toolResults) {
+    for (const [i, d] of result.deadlines.entries()) {
+      out.push({
+        id: `${record.id}:tool:${result.id}:${i}`,
+        date: d.date,
+        kind: 'tool',
+        clientId: record.id,
+        clientName: name,
+        title: d.title,
+        detail: d.note || result.title,
+        serviceKey: null,
+        done: d.date < today,
+        daysLeft: daysLeftFrom(today, d.date),
+      })
+    }
   }
 
   return out

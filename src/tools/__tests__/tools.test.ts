@@ -31,8 +31,11 @@ import {
 } from '../salesKit/lib/salesData.js'
 import { buildCretopMeetingPoints, cretopGradeIsLow } from '../cretop/lib/meetingPoints'
 import { buildCretopParsedForUi, extractCretopCore } from '../cretop/engine/index.js'
-import { normalizeClientOps, withToolResult, withToolResultPublished, withoutToolResult, TOOL_RESULT_LIMIT } from '../../services/clientOpsService'
-import { TOOLS, liveTools, plannedTools, reviewTools, toolOf } from '../../config/toolRegistry'
+import { normalizeClientOps, withToolResult, withToolResultPublished, withoutToolResult, TOOL_RESULT_LIMIT, TOOL_DEADLINE_LIMIT } from '../../services/clientOpsService'
+import { buildClientSchedule, SCHEDULE_KIND_LABEL } from '../../services/clientOpsSchedule'
+import { roundDeadlines } from '../employment/lib/toolDeadlines'
+import { changeDeadlines, surveyDeadlineDate } from '../labcare/lib/toolDeadlines'
+import { TOOLS, liveTools, plannedTools, reviewTools, searchTools, toolOf } from '../../config/toolRegistry'
 import { judge } from '../startupTax/lib/judgement'
 import { EMPTY_FORM } from '../startupTax/lib/formDefaults'
 
@@ -166,6 +169,59 @@ function check(name: string, cond: boolean, detail?: string): void {
   check('도구결과: 상한을 넘으면 오래된 것부터 잘린다', many.toolResults.length === TOOL_RESULT_LIMIT && many.toolResults[0].title === `t${TOOL_RESULT_LIMIT + 4}`)
 }
 
+/* ---- 4-2. 도구가 심은 기한 → 달력 (D-89) ---- */
+{
+  const base = normalizeClientOps({ id: 'c3', companyName: '한솔테크(주)', workspaceId: null })
+  const withDeadlines = withToolResult(base, {
+    toolKey: 'employment',
+    title: '고용지원금 회차 일정',
+    verdict: null,
+    verdictLabel: '청년일자리도약장려금',
+    summary: '요약',
+    data: null,
+    deadlines: [
+      { date: '2026-10-01', title: '1회차 신청', note: '예상 240만원' },
+      { date: '2027-04-01', title: '2회차 신청', note: '' },
+      { date: '날짜아님', title: '버려야 한다', note: '' },
+    ],
+  })
+  check('기한: 날짜 모양이 아닌 것은 버린다', withDeadlines.toolResults[0].deadlines.length === 2)
+  check('기한: 저장 → 다시 읽어도 남는다', normalizeClientOps(JSON.parse(JSON.stringify(withDeadlines)) as Record<string, unknown>).toolResults[0].deadlines[0].note === '예상 240만원')
+  const events = buildClientSchedule(withDeadlines, '2026-09-22')
+  const toolEvents = events.filter((e) => e.kind === 'tool')
+  check('기한: 달력 일정으로 나온다', toolEvents.length === 2 && toolEvents[0].title === '1회차 신청', JSON.stringify(toolEvents.map((e) => e.title)))
+  check('기한: 남은 날짜를 센다', toolEvents[0].daysLeft === 9, String(toolEvents[0].daysLeft))
+  check('기한: 지난 것은 지난 일로 표시', buildClientSchedule(withDeadlines, '2026-10-02').filter((e) => e.kind === 'tool')[0].done === true)
+  check('기한: 종류 이름이 있다', SCHEDULE_KIND_LABEL.tool === '도구 기한')
+  const overflow = withToolResult(base, {
+    toolKey: 'employment', title: 't', verdict: null, verdictLabel: '', summary: '', data: null,
+    deadlines: Array.from({ length: TOOL_DEADLINE_LIMIT + 5 }, (_, i) => ({ date: `2026-10-${String((i % 28) + 1).padStart(2, '0')}`, title: `r${i}`, note: '' })),
+  })
+  check('기한: 상한을 넘기지 않는다', overflow.toolResults[0].deadlines.length === TOOL_DEADLINE_LIMIT)
+  check('기한: 결과에 기한이 없으면 달력에도 없다', buildClientSchedule(withToolResult(base, { toolKey: 'cretop', title: 'x', verdict: null, verdictLabel: '', summary: '', data: null }), '2026-09-22').filter((e) => e.kind === 'tool').length === 0)
+
+  // 고용지원금: 받은 회차는 심지 않는다
+  const rows = [
+    { index: 0, label: '1회차', month: 3, amount: 2_400_000, date: '2026-10-01', dday: 9, ddayLabel: 'D-9', kind: '신청 예정' as const, isPaid: false },
+    { index: 1, label: '2회차', month: 6, amount: 2_400_000, date: '2027-01-01', dday: 101, ddayLabel: 'D-101', kind: '신청 예정' as const, isPaid: true },
+  ]
+  const rd = roundDeadlines('청년일자리도약장려금', rows)
+  check('고용지원금: 아직 안 받은 회차만 기한이 된다', rd.length === 1 && rd[0].title === '청년일자리도약장려금 1회차 신청', JSON.stringify(rd))
+  check('고용지원금: 예상액을 한 줄로 적는다', rd[0].note.includes('240'), rd[0].note)
+
+  // 연구소: 신고 완료는 빼고, 활동조사 마감은 항상 붙는다
+  const cd = changeDeadlines(
+    [
+      { id: 'a', reasons: ['연구소장 변경'], memo: '', status: '확인 필요', occurredDate: '2026-09-01', deadline: '2026-10-01' },
+      { id: 'b', reasons: ['주소 변경'], memo: '', status: '신고 완료', occurredDate: '2026-08-01', deadline: '2026-08-31' },
+    ],
+    new Date('2026-09-22T00:00:00'),
+  )
+  check('연구소: 신고 완료한 건은 기한에서 빠진다', cd.length === 2 && cd[0].title.includes('연구소장 변경'), JSON.stringify(cd.map((d) => d.title)))
+  check('연구소: 활동조사 마감이 늘 붙는다', cd[1].date === '2027-04-30' && cd[1].title.includes('연구개발활동조사'), cd[1].date)
+  check('연구소: 4월 안이면 올해 마감', surveyDeadlineDate(new Date('2027-02-01T00:00:00')) === '2027-04-30')
+}
+
 /* ---- 5. 도구 목록 ---- */
 {
   check('도구목록: 쓸 수 있는 도구 6개 (세금·창업감면·크레탑·고용지원금·연구소·정책자금)', liveTools().length === 6, liveTools().map((t) => t.key).join())
@@ -173,6 +229,15 @@ function check(name: string, cond: boolean, detail?: string): void {
   check('도구목록: 키가 겹치지 않는다', new Set(TOOLS.map((t) => t.key)).size === TOOLS.length)
   check('도구목록: 옮겨 온 것은 원본을 적는다', TOOLS.filter((t) => t.status !== 'planned').every((t) => !!t.origin))
   check('도구목록: toolOf 로 찾는다', toolOf('cretop')?.path === '/tools/cretop' && toolOf('nope') === undefined)
+
+  // 검색 (D-89) — 대표는 도구 이름이 아니라 하고 싶은 일로 찾는다
+  check('도구검색: 빈 말이면 쓸 수 있는 것 + 검토중 (자리만 잡은 것은 빼고)', searchTools('').length === 7 && searchTools('').every((t) => t.path !== null))
+  check('도구검색: 이름으로', searchTools('크레탑').map((t) => t.key).join() === 'cretop')
+  check('도구검색: 이름에 없는 말로도 — 부채비율 → 크레탑', searchTools('부채비율').map((t) => t.key).join() === 'cretop')
+  check('도구검색: 지원금 → 고용지원금', searchTools('장려금').map((t) => t.key).join() === 'employment')
+  check('도구검색: 보증 → 정책자금', searchTools('기술보증').map((t) => t.key).join() === 'policy-funding')
+  check('도구검색: 퇴직금 → 세금 계산기', searchTools('퇴직금').map((t) => t.key).join() === 'tax')
+  check('도구검색: 없는 말이면 빈 목록', searchTools('없는말입니다').length === 0)
 }
 
 /* ---- 6. 창업감면 — 화면 기본값이 판정기와 맞물린다 ---- */

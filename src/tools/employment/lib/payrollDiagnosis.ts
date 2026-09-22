@@ -14,6 +14,7 @@
 // ============================================================
 
 import { extractTextFromFile } from '../../../services/docTextExtract'
+import { isXlsxFile, readXlsxText } from '../../../services/xlsxText'
 
 // ── 결과 단계(레벨) 정의 ──────────────────────────────────
 export type LevelKey = 'likely' | 'check' | 'more' | 'unknown'
@@ -417,18 +418,32 @@ export interface RosterFileResult {
   missingCount?: number
   error?: RosterFileError
   message?: string
-  /** PDF 일 때 글자를 어떻게 뽑았는지 (pdf_text | ocr | text) */
+  /** 글자를 어떻게 뽑았는지 (pdf_text | ocr | text | xlsx) */
   method?: string
 }
 
-// ── 파일 파싱 (CSV/TSV 글자 · PDF) — 브라우저 메모리에서만 ──────────
-// xlsx 는 이 OS 에 없다. 엑셀은 "다른 이름으로 저장 → CSV" 로 받는다.
+// ── 파일 파싱 (엑셀 · CSV/TSV 글자 · PDF) — 브라우저 메모리에서만 ──────────
+// 엑셀(.xlsx)은 D-89 부터 그대로 읽는다 (services/xlsxText.ts, 라이브러리 없이).
 export async function parseRosterFile(file: File): Promise<RosterFileResult> {
   const ext = (file.name.split('.').pop() || '').toLowerCase()
   const isText = file.type.startsWith('text/') || ['csv', 'tsv', 'txt'].indexOf(ext) >= 0
   const isPdf = file.type === 'application/pdf' || ext === 'pdf'
-  if (!isText && !isPdf) return { ok: false, error: 'unsupported' }
+  const isXlsx = isXlsxFile(file)
+  if (!isText && !isPdf && !isXlsx) return { ok: false, error: 'unsupported' }
   try {
+    if (isXlsx) {
+      const text = await readXlsxText(await file.arrayBuffer())
+      const grid = textToGrid(text)
+      if (!grid || grid.length < 2) return { ok: false, error: 'empty' }
+      const det = detectRoster(grid)
+      const emps = extractEmployees(grid, det)
+      if (!emps.length) {
+        const res = parseRosterText(text)
+        if (res.employees.length) return { ok: true, employees: res.employees, meta: res.meta, missingCount: res.missingCount, method: 'xlsx' }
+        return { ok: false, error: 'no_rows', headerIdx: det.headerIdx }
+      }
+      return { ok: true, employees: emps, meta: det.meta, headerIdx: det.headerIdx, method: 'xlsx' }
+    }
     if (isPdf) {
       const ex = await extractTextFromFile(file)
       const textLen = ex.text.replace(/\s/g, '').length

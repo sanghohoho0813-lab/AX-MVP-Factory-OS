@@ -6,9 +6,12 @@
  *  - 이미지: 한국어 OCR(tesseract).
  *
  * 두 라이브러리 모두 실제로 쓸 때만 내려받도록 동적 import 한다.
+ *  - 엑셀(.xlsx): 칸 안의 글자를 그대로 뽑는다 (D-89). 라이브러리를 쓰지 않는다.
  */
 
-export type ExtractMethod = 'pdf_text' | 'ocr' | 'text'
+import { isXlsxFile, readXlsxText } from './xlsxText'
+
+export type ExtractMethod = 'pdf_text' | 'ocr' | 'text' | 'xlsx'
 
 export interface ExtractResult {
   text: string
@@ -87,6 +90,13 @@ function hasEnoughText(text: string): boolean {
 
 export async function extractTextFromFile(file: File, onProgress?: ProgressFn): Promise<ExtractResult> {
   const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name)
+  // 엑셀 — 칸 안의 글자만 뽑는다 (라이브러리 없이, D-89)
+  if (isXlsxFile(file)) {
+    onProgress?.(0.2, '엑셀 여는 중')
+    const text = await readXlsxText(await file.arrayBuffer())
+    onProgress?.(1, '엑셀 읽음')
+    return { text, method: 'xlsx' }
+  }
   // 글자 파일은 그대로 읽는다 — 홈택스 텍스트 저장본, 복사해 둔 메모
   if (file.type.startsWith('text/') || /\.(txt|md|csv)$/i.test(file.name)) {
     onProgress?.(1, '글자 파일 읽는 중')
@@ -112,11 +122,13 @@ export const EXTRACT_METHOD_LABEL: Record<ExtractMethod, string> = {
   pdf_text: 'PDF 글자 추출',
   ocr: '이미지 글자 인식(OCR)',
   text: '글자 파일',
+  xlsx: '엑셀 표',
 }
 
 /** 판독기가 읽을 수 있는 파일인지 — 아니면 파일 이름만으로 판별한다 */
 export function canExtractText(file: File): boolean {
   return (
+    isXlsxFile(file) ||
     file.type === 'application/pdf' ||
     /\.pdf$/i.test(file.name) ||
     file.type.startsWith('image/') ||

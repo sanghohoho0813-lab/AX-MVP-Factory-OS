@@ -10,7 +10,14 @@ import { normalizeClientOps } from './clientOpsService'
 import { nowIso } from '../lib/appClock'
 
 export const BACKUP_FORMAT = 'ax-client-ops'
-export const BACKUP_VERSION = 1
+/**
+ * 2 판부터 도구함 입력값(`axmvp.tools.*`)도 함께 담는다 (D-89).
+ * 1 판 파일(도구 입력값이 없는 것)도 그대로 읽힌다 — 없으면 없는 대로 둔다.
+ */
+export const BACKUP_VERSION = 2
+
+/** 도구 입력값이 사는 곳 — 창업감면 폼, 크레탑 붙여넣기, 연구소 체크 … */
+export const TOOL_INPUT_PREFIX = 'axmvp.tools.'
 
 export interface BackupFile {
   format: string
@@ -18,22 +25,56 @@ export interface BackupFile {
   exportedAt: string
   count: number
   clients: ClientOpsRecord[]
+  /** 도구함 입력값 (키 → 저장된 글자). 2 판부터 */
+  toolInputs?: Record<string, string>
 }
 
-export function buildBackup(records: ClientOpsRecord[]): BackupFile {
+/** 이 브라우저에 남아 있는 도구 입력값을 모은다 */
+export function readToolInputs(): Record<string, string> {
+  const out: Record<string, string> = {}
+  try {
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i)
+      if (!key || !key.startsWith(TOOL_INPUT_PREFIX)) continue
+      const value = localStorage.getItem(key)
+      if (typeof value === 'string') out[key] = value
+    }
+  } catch {
+    // 사생활 보호 모드 등으로 못 읽으면 도구 입력값 없이 백업한다
+  }
+  return out
+}
+
+/** 백업에서 꺼낸 도구 입력값을 이 브라우저에 되돌린다. 돌려준 수만큼 실제로 썼다. */
+export function writeToolInputs(inputs: Record<string, string> | undefined): number {
+  if (!inputs) return 0
+  let count = 0
+  try {
+    for (const [key, value] of Object.entries(inputs)) {
+      if (!key.startsWith(TOOL_INPUT_PREFIX) || typeof value !== 'string') continue
+      localStorage.setItem(key, value)
+      count += 1
+    }
+  } catch {
+    return count
+  }
+  return count
+}
+
+export function buildBackup(records: ClientOpsRecord[], toolInputs: Record<string, string> = readToolInputs()): BackupFile {
   return {
     format: BACKUP_FORMAT,
     version: BACKUP_VERSION,
     exportedAt: nowIso(),
     count: records.length,
     clients: records,
+    toolInputs,
   }
 }
 
 export class BackupError extends Error {}
 
-/** 파일 내용을 검증해 고객 목록을 꺼낸다 */
-export function parseBackup(text: string): ClientOpsRecord[] {
+function readBackupFile(text: string): Partial<BackupFile> {
   let raw: unknown
   try {
     raw = JSON.parse(text)
@@ -46,7 +87,26 @@ export function parseBackup(text: string): ClientOpsRecord[] {
     throw new BackupError('이 시스템에서 내보낸 백업 파일이 아닙니다.')
   }
   if (!Array.isArray(file.clients)) throw new BackupError('백업 파일에 고객 정보가 없습니다.')
-  return file.clients.map((c) => normalizeClientOps(c as Partial<ClientOpsRecord>))
+  return file
+}
+
+/** 파일 내용을 검증해 고객 목록을 꺼낸다 */
+export function parseBackup(text: string): ClientOpsRecord[] {
+  return (readBackupFile(text).clients ?? []).map((c) => normalizeClientOps(c as Partial<ClientOpsRecord>))
+}
+
+/**
+ * 백업에 담긴 도구 입력값 (1 판 파일이면 빈 것).
+ * 도구 입력값만 따로 꺼내는 이유: 복원 화면에서 "고객 N곳 · 도구 입력값 M개" 로 먼저 보여 주기 때문이다.
+ */
+export function parseBackupToolInputs(text: string): Record<string, string> {
+  const inputs = readBackupFile(text).toolInputs
+  if (!inputs || typeof inputs !== 'object') return {}
+  const out: Record<string, string> = {}
+  for (const [key, value] of Object.entries(inputs)) {
+    if (key.startsWith(TOOL_INPUT_PREFIX) && typeof value === 'string') out[key] = value
+  }
+  return out
 }
 
 export type MergeMode = 'merge' | 'replace'

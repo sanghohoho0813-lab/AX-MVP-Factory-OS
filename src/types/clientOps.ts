@@ -400,6 +400,22 @@ export type ActivityKind =
  * `summary` 는 고객에게 보여 줘도 되는 글(도구가 그렇게 만든 것만), `data` 는 다시 열어 볼 입력값.
  * 내부 메모·수수료·업무 일기는 여기 들어오지 않는다 — 고객 플랫폼 발행은 `summary` 만 나간다.
  */
+/**
+ * 도구가 계산해 낸 기한 한 줄 (D-89).
+ *
+ * 고용지원금 회차 신청일, 연구소 사후관리 기한처럼 "언제까지" 가 결과의 핵심인 것들이 있다.
+ * 결과에 함께 붙여 두면 달력·오늘 화면이 업무 마감·수금과 나란히 보여 준다.
+ * 도구가 만든 것이므로 사람이 고치지 않는다 — 다시 판정하면 새 결과에 새 기한이 붙는다.
+ */
+export interface ToolDeadline {
+  /** YYYY-MM-DD */
+  date: string
+  /** 달력에 보일 한 줄 (예: "1회차 신청 (2026-04-01 ~ 2026-04-30)") */
+  title: string
+  /** 한 줄 더 — 없으면 빈 글자 */
+  note: string
+}
+
 export interface ToolResult {
   id: string
   /** toolRegistry 의 key (startup-tax · cretop · policy-funding …) */
@@ -414,6 +430,8 @@ export interface ToolResult {
   summary: string
   /** 다시 열어 볼 입력값·결과 (도구마다 모양이 다르다) */
   data: unknown
+  /** 도구가 계산한 기한들 — 달력·오늘 화면에 그대로 뜬다 (D-89). 없으면 빈 배열 */
+  deadlines: ToolDeadline[]
   createdAt: string
   /** 고객 플랫폼에 발행했으면 그 update id */
   publishedUpdateId: string | null

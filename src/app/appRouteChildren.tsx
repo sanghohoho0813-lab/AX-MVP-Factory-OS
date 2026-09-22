@@ -2,9 +2,10 @@
  * 공유 라우트 정의 — local·supabase 두 라우터가 재사용한다.
  * (App.tsx 에서 추출; 도메인 페이지는 route-level lazy loading 유지)
  */
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, type ReactElement } from 'react'
 import { Navigate } from 'react-router-dom'
 import { MODULE_PAGES } from '../data/modules'
+import { ToolClientFrame } from '../tools/shared/toolClientContext'
 import { EmptyModulePage } from '../pages/EmptyModulePage'
 import { ReportsRedirectPage } from '../pages/ReportsRedirectPage'
 
@@ -344,6 +345,14 @@ export function RouteFallback() {
   )
 }
 
+/**
+ * 도구 화면 한 벌을 같은 틀로 감싼다 (D-89).
+ * 새 도구를 더할 때도 이 함수로 감싸면 '업체에서 열기' 가 그냥 따라온다.
+ */
+function toolRoute(element: ReactElement): ReactElement {
+  return <ToolClientFrame>{element}</ToolClientFrame>
+}
+
 export const appRouteChildren = [
       // 홈 = 오늘의 Command Center. 예전 /today 는 홈으로 안내한다(주소 호환).
       { index: true, element: <TodayCommandCenterPage /> },
@@ -371,14 +380,15 @@ export const appRouteChildren = [
       { path: 'studio/:projectId', element: <ConsultingProjectPage /> },
       { path: 'tools', element: <ToolsHubPage /> },
       // 세금 계산기 9종 — 배포본 HTML 의 계산식을 그대로 옮긴 것 (D-85)
-      { path: 'tools/tax', element: <TaxCalculatorsPage /> },
+      // 도구 화면은 모두 같은 틀로 감싼다 — 업체에서 열었으면(`?client=`) 띠가 뜨고 결과가 그 업체로 간다 (D-89)
+      { path: 'tools/tax', element: toolRoute(<TaxCalculatorsPage />) },
       { path: 'tools/review', element: <ToolsReviewPage /> },
-      { path: 'tools/startup-tax', element: <StartupTaxPage /> },
-      { path: 'tools/cretop', element: <CretopPage /> },
-      { path: 'tools/employment', element: <EmploymentPage /> },
-      { path: 'tools/labcare', element: <LabcarePage /> },
-      { path: 'tools/policy-funding', element: <PolicyFundingPage /> },
-      { path: 'tools/sales-kit', element: <SalesKitPage /> },
+      { path: 'tools/startup-tax', element: toolRoute(<StartupTaxPage />) },
+      { path: 'tools/cretop', element: toolRoute(<CretopPage />) },
+      { path: 'tools/employment', element: toolRoute(<EmploymentPage />) },
+      { path: 'tools/labcare', element: toolRoute(<LabcarePage />) },
+      { path: 'tools/policy-funding', element: toolRoute(<PolicyFundingPage />) },
+      { path: 'tools/sales-kit', element: toolRoute(<SalesKitPage />) },
       { path: 'why', element: <WhyAxPage /> },
       { path: 'kpi', element: <KpiPage /> },
       { path: 'roadmap', element: <RoadmapPage /> },

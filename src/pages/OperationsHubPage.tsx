@@ -50,7 +50,7 @@ import {
   replaceAllClients,
   saveClient,
 } from '../services/clientOpsService'
-import { downloadBackup, mergeBackup, parseBackup, type MergeMode } from '../services/clientOpsBackup'
+import { downloadBackup, mergeBackup, parseBackup, parseBackupToolInputs, writeToolInputs, type MergeMode } from '../services/clientOpsBackup'
 import {
   buildAllAlerts,
   clientOpsProgress,
@@ -120,7 +120,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const [leftover, setLeftover] = useState<ClientOpsRecord[]>([])
   const [migrating, setMigrating] = useState(false)
   /** 백업 파일을 읽은 뒤 합칠지/바꿀지 묻는 단계 */
-  const [restorePrompt, setRestorePrompt] = useState<ClientOpsRecord[] | null>(null)
+  const [restorePrompt, setRestorePrompt] = useState<{ clients: ClientOpsRecord[]; toolInputs: Record<string, string> } | null>(null)
   const { showToast } = useToast()
   const restoreRef = useRef<HTMLInputElement>(null)
 
@@ -260,7 +260,8 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     if (!file) return
     setError('')
     try {
-      setRestorePrompt(parseBackup(await file.text()))
+      const text = await file.text()
+      setRestorePrompt({ clients: parseBackup(text), toolInputs: parseBackupToolInputs(text) })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '백업을 불러오지 못했습니다.')
     } finally {
@@ -269,19 +270,22 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   }
 
   const applyRestore = async (mode: MergeMode) => {
-    const incoming = restorePrompt
+    const incoming = restorePrompt?.clients
     if (!incoming) return
     setRestoring(true)
     setError('')
     try {
       const result = mergeBackup(records, incoming, mode)
       await replaceAllClients(workspaceId, result.records)
+      // 도구함 입력값도 되돌린다 (D-89) — 창업감면 폼·크레탑 붙여넣기 같은 것
+      const toolCount = writeToolInputs(restorePrompt?.toolInputs)
       await load()
       setRestorePrompt(null)
+      const toolNote = toolCount > 0 ? ` · 도구 입력값 ${toolCount}개` : ''
       showToast(
         mode === 'merge'
-          ? `복원했습니다. 추가 ${result.added}곳 · 갱신 ${result.updated}곳 · 유지 ${result.kept}곳`
-          : `백업 내용으로 바꿨습니다. 고객 ${result.records.length}곳`,
+          ? `복원했습니다. 추가 ${result.added}곳 · 갱신 ${result.updated}곳 · 유지 ${result.kept}곳${toolNote}`
+          : `백업 내용으로 바꿨습니다. 고객 ${result.records.length}곳${toolNote}`,
       )
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '백업을 불러오지 못했습니다.')
@@ -439,7 +443,10 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
           </>
         }
       >
-        <p className="text-[0.98rem] break-keep text-slate-700">백업에 고객 {restorePrompt?.length ?? 0}곳이 들어 있습니다.</p>
+        <p className="text-[0.98rem] break-keep text-slate-700">
+          백업에 고객 {restorePrompt?.clients.length ?? 0}곳
+          {Object.keys(restorePrompt?.toolInputs ?? {}).length > 0 && ` · 도구 입력값 ${Object.keys(restorePrompt?.toolInputs ?? {}).length}개`} 가 들어 있습니다.
+        </p>
         <ul className="mt-3 list-disc space-y-1 pl-5 text-[0.92rem] break-keep text-slate-600">
           <li><strong>합치기</strong> — 같은 업체는 최근에 수정한 쪽을 남기고, 없던 업체는 추가합니다.</li>
           <li><strong>전부 바꾸기</strong> — 지금 목록을 지우고 백업 내용으로 채웁니다. 되돌릴 수 없습니다.</li>

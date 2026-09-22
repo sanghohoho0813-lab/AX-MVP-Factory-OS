@@ -30,6 +30,11 @@ export interface ToolDefinition {
   status: ToolStatus
   /** 어디서 가져왔는가 — 원본 저장소·브랜치. 도구함 카드 아래에 작게 적는다 */
   origin?: string
+  /**
+   * 검색에서 이 도구를 부르는 다른 말 (D-89).
+   * 대표는 "부채비율" 을 찾지 "크레탑 분석기" 를 찾지 않는다. 이름에 없는 말을 여기 적어 둔다.
+   */
+  keywords?: string
 }
 
 export const TOOLS: ToolDefinition[] = [
@@ -42,6 +47,7 @@ export const TOOLS: ToolDefinition[] = [
     icon: Calculator,
     status: 'live',
     origin: '기업지원단 배포 HTML',
+    keywords: '계산기 퇴직금 퇴직소득 상속 증여 가지급금 주식 양수도 급여 세금',
   },
   {
     key: 'startup-tax',
@@ -52,6 +58,7 @@ export const TOOLS: ToolDefinition[] = [
     icon: Sparkles,
     status: 'live',
     origin: 'startup-tax-checker',
+    keywords: '창업 감면 세액감면 청년창업 과밀억제권역 조특법 창업중소기업',
   },
   {
     key: 'cretop',
@@ -62,6 +69,7 @@ export const TOOLS: ToolDefinition[] = [
     icon: LineChart,
     status: 'live',
     origin: 'corp-consult-sales-os · cretop-engine',
+    keywords: '재무제표 신용평가 부채비율 유동비율 이자보상배수 기업보고서 재무분석',
   },
   {
     key: 'employment',
@@ -72,6 +80,7 @@ export const TOOLS: ToolDefinition[] = [
     icon: Users,
     status: 'live',
     origin: 'git-test · kind-cori (고용지원금 매니저 Pro)',
+    keywords: '지원금 장려금 채용 청년 고용보험 명부 엑셀 4대보험 일자리도약',
   },
   {
     key: 'labcare',
@@ -82,6 +91,7 @@ export const TOOLS: ToolDefinition[] = [
     icon: FlaskConical,
     status: 'live',
     origin: 'corp-consult-sales-os · LabCare 브랜치',
+    keywords: '연구소 부설연구소 기업부설연구소 연구전담 세액공제 활동조사 변경신고',
   },
   {
     key: 'policy-funding',
@@ -92,6 +102,7 @@ export const TOOLS: ToolDefinition[] = [
     icon: Landmark,
     status: 'live',
     origin: 'policy-funding-os',
+    keywords: '정책자금 융자 보증 기술보증 신용보증 중진공 소진공 대출 자금',
   },
   {
     key: 'sales-kit',
@@ -102,6 +113,7 @@ export const TOOLS: ToolDefinition[] = [
     icon: Briefcase,
     status: 'review',
     origin: 'corp-consult-sales-os · main (법인컨설팅 세일즈 OS)',
+    keywords: '영업 미팅 대본 상담 전략 가격표 제안 컨설팅 상품',
   },
   {
     key: 'cert-os',
@@ -129,6 +141,19 @@ export function plannedTools(): ToolDefinition[] {
 
 export function toolOf(key: string): ToolDefinition | undefined {
   return TOOLS.find((t) => t.key === key)
+}
+
+/**
+ * 전역 검색(Ctrl+K)에서 도구 찾기 (D-89).
+ * 쓸 수 있는 것과 검토중인 것만 — 자리만 잡아 둔 것은 눌러도 갈 곳이 없으므로 나오지 않는다.
+ */
+export function searchTools(query: string): ToolDefinition[] {
+  const usable = TOOLS.filter((t) => t.path !== null && t.status !== 'planned')
+  const q = query.trim().toLowerCase()
+  if (!q) return usable
+  return usable.filter((t) =>
+    `${t.label} ${t.desc} ${t.navHint ?? ''} ${t.keywords ?? ''} ${t.key} ${t.origin ?? ''}`.toLowerCase().includes(q),
+  )
 }
 
 /** 도입 검토중 목차가 가리키는 주소 */

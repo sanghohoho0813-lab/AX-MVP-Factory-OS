@@ -29,6 +29,7 @@ import {
   withActivity,
 } from './clientOpsActivity'
 import type {
+  ToolDeadline,
   ToolResult,
   ActivityEntry,
   ClientNote,
@@ -922,6 +923,23 @@ export function withArchived(record: ClientOpsRecord, archived: boolean): Client
 /* 도구함 결과 (D-88)                                                    */
 /* ------------------------------------------------------------------ */
 
+/** 도구가 계산한 기한 목록 (D-89). 날짜 모양이 아니면 버린다 — 달력에 이상한 칸을 만들지 않기 위해. */
+function normalizeToolDeadlines(value: unknown): ToolDeadline[] {
+  if (!Array.isArray(value)) return []
+  const out: ToolDeadline[] = []
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') continue
+    const d = raw as Partial<ToolDeadline>
+    if (typeof d.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(d.date)) continue
+    out.push({
+      date: d.date,
+      title: typeof d.title === 'string' && d.title ? d.title : '기한',
+      note: typeof d.note === 'string' ? d.note : '',
+    })
+  }
+  return out.slice(0, TOOL_DEADLINE_LIMIT)
+}
+
 /** 저장된 도구 결과를 지금 모양으로. 모르는 값은 버리지 않고 빈 값으로 채운다. */
 function normalizeToolResults(value: unknown): ToolResult[] {
   if (!Array.isArray(value)) return []
@@ -938,6 +956,7 @@ function normalizeToolResults(value: unknown): ToolResult[] {
       verdictLabel: typeof r.verdictLabel === 'string' ? r.verdictLabel : '',
       summary: typeof r.summary === 'string' ? r.summary : '',
       data: r.data ?? null,
+      deadlines: normalizeToolDeadlines(r.deadlines),
       createdAt: typeof r.createdAt === 'string' ? r.createdAt : nowIso(),
       publishedUpdateId: typeof r.publishedUpdateId === 'string' ? r.publishedUpdateId : null,
     })
@@ -946,11 +965,14 @@ function normalizeToolResults(value: unknown): ToolResult[] {
 }
 
 export const TOOL_RESULT_LIMIT = 50
+/** 결과 한 건이 심을 수 있는 기한 수 — 회차가 스무 번이 넘는 지원금도 있어 넉넉히 둔다 */
+export const TOOL_DEADLINE_LIMIT = 24
 
 /** 도구 결과 한 건을 붙인다 — 최신이 앞, 상한을 넘으면 오래된 것부터 잘린다. */
 export function withToolResult(
   record: ClientOpsRecord,
-  input: Omit<ToolResult, 'id' | 'createdAt' | 'publishedUpdateId'> & Partial<Pick<ToolResult, 'id' | 'createdAt' | 'publishedUpdateId'>>,
+  input: Omit<ToolResult, 'id' | 'createdAt' | 'publishedUpdateId' | 'deadlines'> &
+    Partial<Pick<ToolResult, 'id' | 'createdAt' | 'publishedUpdateId' | 'deadlines'>>,
 ): ClientOpsRecord {
   const item: ToolResult = {
     id: input.id ?? generateId(),
@@ -960,6 +982,7 @@ export function withToolResult(
     verdictLabel: input.verdictLabel,
     summary: input.summary,
     data: input.data,
+    deadlines: normalizeToolDeadlines(input.deadlines),
     createdAt: input.createdAt ?? nowIso(),
     publishedUpdateId: input.publishedUpdateId ?? null,
   }

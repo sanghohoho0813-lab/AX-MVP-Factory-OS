@@ -64,6 +64,7 @@ import {
   type SetupPackage,
 } from './lib/documents'
 import { changeDeadlineOf, ddayOf, isCheckDue, isSurveySeason, nextCheckDate, surveyDeadlineLabel, ymdLocal, type DdayInfo } from './lib/deadlines'
+import { changeDeadlines } from './lib/toolDeadlines'
 import { CYCLES, DEFAULT_ANSWERS, REASONS, STATUSES, defaultRequestText, mapChangeStatus, type ChangeRecStatus, type ChangeRecord } from './lib/changes'
 import { INSPECTION_ITEMS, INSPECTION_POINTS } from './lib/inspection'
 import { RESOURCE_CATEGORIES, RESOURCE_TEMPLATES, fillTemplate, type ResourceCategory } from './lib/templates'
@@ -1248,12 +1249,20 @@ function ChangesTab() {
 
   const sorted = [...state.records].sort((a, b) => a.deadline.localeCompare(b.deadline))
   const openCount = sorted.filter((r) => r.status !== '신고 완료').length
+  // 업체 달력에 심을 기한 (D-89)
+  const deadlines = useMemo(() => changeDeadlines(sorted, new Date()), [sorted])
+  const deadlineSummary = [
+    '[기업부설연구소 기한 안내]',
+    ...deadlines.map((d) => `· ${d.date.replace(/-/g, '.')} — ${d.title}${d.note ? ` (${d.note})` : ''}`),
+    '',
+    '변경신고는 사유 발생일부터 30일 이내입니다. 기한을 넘기면 인정취소 사유가 될 수 있습니다.',
+  ].join('\n')
   const toggleInspection = (key: string) => setState((s) => ({ ...s, inspection: { ...s.inspection, [key]: !s.inspection[key] } }))
   const inspectionDone = INSPECTION_ITEMS.filter((i) => state.inspection[i.key]).length
 
   return (
     <div className="flex flex-col gap-4">
-      <Surface edge={season ? 'warning' : 'neutral'} showEdge={season} className="flex flex-col gap-1">
+      <Surface edge={season ? 'warning' : 'neutral'} showEdge={season} className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <span className="t-card font-bold text-slate-900">연구개발활동조사</span>
           <Badge tone={season ? 'warning' : 'neutral'}>{season ? '제출 시즌 (1~4월)' : '시즌 아님'}</Badge>
@@ -1261,6 +1270,18 @@ function ChangesTab() {
         <p className="t-sub break-keep text-slate-600">
           다음 제출 마감 <b className="text-slate-900">{surveyDeadlineLabel()}</b> — 연구소 보유 기업은 매년 4월 30일까지 연구개발활동조사표를 제출합니다. 미제출은 인정취소 사유가 될 수 있습니다.
         </p>
+        {/* 기한을 업체 달력으로 보낸다 (D-89) — 아직 신고 안 한 변경건 + 다음 활동조사 마감 */}
+        <div className="flex flex-wrap gap-2">
+          <ToolResultAttach
+            toolKey="labcare"
+            title="연구소 기한"
+            verdict={null}
+            verdictLabel={openCount > 0 ? `변경신고 ${openCount}건 · 활동조사 ${surveyDeadlineLabel()}` : `활동조사 ${surveyDeadlineLabel()}`}
+            summary={deadlineSummary}
+            data={{ kind: 'deadlines', records: sorted }}
+            deadlines={deadlines}
+          />
+        </div>
       </Surface>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">

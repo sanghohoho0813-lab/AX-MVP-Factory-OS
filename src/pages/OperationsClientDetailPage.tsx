@@ -115,6 +115,7 @@ import { ActivityLog } from '../components/ops/ActivityLog'
 import { ContractCard } from '../components/ops/ContractCard'
 import { WorkHistoryCard } from '../components/ops/WorkHistoryCard'
 import { ToolResultsCard } from '../components/ops/ToolResultsCard'
+import { ClientToolsCard } from '../components/ops/ClientToolsCard'
 import { PortalTab } from '../components/ops/PortalTab'
 import {
   Badge,
@@ -616,6 +617,9 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
       {/* 도구함에서 붙인 결과 — 창업감면 판정·크레탑 분석·정책자금 진단 … (D-88) */}
       <ToolResultsCard record={record} onChange={(next) => void commit(next)} />
+
+      {/* 이 업체로 도구 열기 — 결과가 다시 여기로 돌아온다 (D-89) */}
+      <ClientToolsCard clientId={record.id} />
 
       {/* 3단계 — 막힘 / 돈 / 고객 연결 */}
       <section aria-label="현재 상태" className="ax-stagger grid grid-cols-2 gap-2.5 lg:grid-cols-3">

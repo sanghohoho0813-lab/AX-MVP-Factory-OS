@@ -22,6 +22,7 @@ import { fMan, fProgramAmt } from './lib/format'
 import { buildAnswers, diagnoseHiring, youthGate, type DiagnosisRow, type DiagnosisStatus, type Region, type Situation } from './lib/eligibility'
 import { computePayroll, type PayrollResult } from './lib/payroll'
 import { roundSchedule, type RoundKind } from './lib/schedule'
+import { roundDeadlines } from './lib/toolDeadlines'
 import {
   analyzeRoster,
   buildCopyText,
@@ -623,6 +624,7 @@ function ScheduleTab() {
                   verdictLabel={`${program.name} · 총 ${fMan(sch.total)}`}
                   summary={summary}
                   data={{ tab: 'schedule', programId: program.id, startDate: form.startDate, rows: sch.rows, total: sch.total, received: sch.received, remaining: sch.remaining }}
+                  deadlines={roundDeadlines(program.name, sch.rows)}
                 />
               </div>
             </Surface>
@@ -923,7 +925,7 @@ function RosterTab() {
         setMeta(null)
         setNotice(
           r.error === 'unsupported'
-            ? 'PDF 또는 CSV/TSV 글자 파일만 읽습니다. 엑셀은 "다른 이름으로 저장 → CSV" 로 바꿔 주세요.'
+            ? '엑셀(.xlsx) · PDF · CSV/TSV 글자 파일을 읽습니다. 오래된 엑셀(.xls)은 "다른 이름으로 저장 → xlsx 또는 CSV" 로 바꿔 주세요.'
             : r.error === 'no_text'
               ? 'PDF 에서 글자를 찾지 못했습니다. 스캔본이면 글자를 복사해 아래 칸에 붙여 넣어 주세요.'
               : r.error === 'no_rows' || r.error === 'empty'
@@ -977,11 +979,11 @@ function RosterTab() {
         <Field label="① 업체명 (요약 문구용 · 선택)">
           <input type="text" aria-label="업체명" value={form.company} onChange={(e) => set('company', e.target.value)} className={inputCls} placeholder="예: 미래상사" />
         </Field>
-        <Field label="② 4대보험 가입자 명부 파일 (PDF · CSV/TSV)" hint="엑셀은 CSV 로 저장해서 올려 주세요. 스캔 PDF 는 글자 인식으로 넘어가며 처음 한 번은 다소 걸립니다.">
+        <Field label="② 4대보험 가입자 명부 파일 (엑셀 · PDF · CSV/TSV)" hint="엑셀(.xlsx)은 그대로 올리면 됩니다. 스캔 PDF 는 글자 인식으로 넘어가며 처음 한 번은 다소 걸립니다.">
           <input
             ref={fileRef}
             type="file"
-            accept=".pdf,.csv,.tsv,.txt,application/pdf,text/csv,text/plain"
+            accept=".xlsx,.pdf,.csv,.tsv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/pdf,text/csv,text/plain"
             aria-label="명부 파일"
             disabled={busy}
             onChange={(e) => {

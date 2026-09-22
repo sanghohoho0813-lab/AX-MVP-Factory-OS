@@ -19,6 +19,9 @@ import {
   backupFileName,
   mergeBackup,
   parseBackup,
+  parseBackupToolInputs,
+  readToolInputs,
+  writeToolInputs,
 } from '../clientOpsBackup'
 import {
   normalizeClientOps,
@@ -195,6 +198,45 @@ function withDocs(r: ClientOpsRecord, keys: DocumentKey[], issuedAt = TODAY): Cl
 
   const r4 = mergeBackup([mine, other], [newer], 'replace')
   check('교체: 백업 내용만 남음', r4.records.length === 1 && r4.records[0].companyName === '새것')
+}
+
+/* ---------------- 백업 2판: 도구함 입력값 (D-89) ---------------- */
+{
+  // node 에는 localStorage 가 없다 — 최소한의 흉내만 낸다
+  const store = new Map<string, string>()
+  ;(globalThis as unknown as { localStorage: unknown }).localStorage = {
+    get length() {
+      return store.size
+    },
+    key: (i: number) => [...store.keys()][i] ?? null,
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => void store.set(k, v),
+    removeItem: (k: string) => void store.delete(k),
+    clear: () => store.clear(),
+  }
+  store.set('axmvp.tools.startupTax', '{"businessType":"corporation"}')
+  store.set('axmvp.tools.cretop', '{"raw":"붙여넣은 글"}')
+  store.set('axmvp.ui.nav.collapsed', 'true')
+
+  const inputs = readToolInputs()
+  check('백업2: 도구 입력값만 모은다 (화면 설정은 빼고)', Object.keys(inputs).length === 2 && !('axmvp.ui.nav.collapsed' in inputs), Object.keys(inputs).join())
+
+  const file = buildBackup([client({ id: 'a', companyName: 'A사' })])
+  check('백업2: 판이 2', file.version === 2, String(file.version))
+  check('백업2: 파일에 도구 입력값이 담긴다', Object.keys(file.toolInputs ?? {}).length === 2)
+  const text = JSON.stringify(file)
+  check('백업2: 다시 꺼내도 그대로', parseBackupToolInputs(text)['axmvp.tools.cretop'] === '{"raw":"붙여넣은 글"}')
+  check('백업2: 고객도 그대로 읽힌다', parseBackup(text).length === 1)
+
+  // 1판 파일 — 도구 입력값이 없다
+  const v1 = JSON.stringify({ format: 'ax-client-ops', version: 1, exportedAt: TODAY, count: 1, clients: [client({ id: 'a', companyName: 'A사' })] })
+  check('백업2: 옛 백업(1판)도 그대로 읽힌다', parseBackup(v1).length === 1 && Object.keys(parseBackupToolInputs(v1)).length === 0)
+
+  // 되돌리기 — 도구 키만 쓴다
+  store.clear()
+  const wrote = writeToolInputs({ 'axmvp.tools.startupTax': 'x', 'axmvp.secret': 'y', 'axmvp.tools.bad': 1 as unknown as string })
+  check('백업2: 되돌릴 때 도구 키만 쓴다', wrote === 1 && store.size === 1 && store.get('axmvp.tools.startupTax') === 'x', JSON.stringify([...store.entries()]))
+  check('백업2: 도구 입력값이 없어도 조용히 지나간다', writeToolInputs(undefined) === 0)
 }
 
 console.log(`\nclient-ops-stage2: ${passed} passed, ${failed} failed`)

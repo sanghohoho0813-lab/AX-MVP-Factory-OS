@@ -1,25 +1,25 @@
 /**
- * 도구 결과를 업체 기록에 붙이는 단추 (D-88).
+ * 도구 결과를 업체 기록에 붙이는 단추 (D-88 · D-89).
  *
  * 어느 도구든 같은 단추 하나로 끝난다: 누르면 업체 목록이 뜨고, 고르면 그 업체의
  * `toolResults` 에 한 줄 붙고 활동 기록에 남는다. 원하면 같은 자리에서 고객 플랫폼에
  * 요약을 발행한다 — 나가는 것은 도구가 만든 `summary` 글뿐이다.
  *
+ * 업체 상세에서 도구를 열었으면(`?client=`) 고르는 단계가 없다 — 단추 한 번이면 그 업체로 간다.
  * 마이그레이션이 없다: 결과는 업체 레코드의 payload 에 들어간다.
  */
 
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Building2, Check, Paperclip, Search } from 'lucide-react'
-import { useAuth } from '../../auth/AuthProvider'
-import { getDataModeConfig } from '../../data/dataMode'
 import { useToast } from '../../components/ui/toastContext'
 import { Button } from '../../components/ui/Button'
 import { BottomSheet } from '../../components/ui/primitives'
-import type { ClientOpsRecord } from '../../types/clientOps'
-import { listClients, saveClient, withToolResult, withToolResultPublished } from '../../services/clientOpsService'
+import type { ClientOpsRecord, ToolDeadline } from '../../types/clientOps'
+import { saveClient, withToolResult, withToolResultPublished } from '../../services/clientOpsService'
 import { listLinksForClient, publishUpdate } from '../../services/customerBridgeService'
 import { matchesClientSearch } from '../../services/clientOpsSearch'
+import { useToolClient } from './toolClientContext'
 
 export interface ToolResultAttachProps {
   toolKey: string
@@ -28,40 +28,34 @@ export interface ToolResultAttachProps {
   verdictLabel: string
   summary: string
   data: unknown
-  /** 미리 골라 둘 업체 (업체 화면에서 도구를 열었을 때) */
+  /** 도구가 계산한 기한 — 붙이면 달력·오늘 화면에 뜬다 (D-89) */
+  deadlines?: ToolDeadline[]
+  /** 미리 골라 둘 업체 (주소의 `?client=` 보다 우선한다) */
   presetClientId?: string
 }
 
-/**
- * 로컬 모드에는 AuthProvider 가 없다 — 다른 화면(OperationsHubPage)처럼 모드에 따라 나눠 부른다.
- * useAuth 를 로컬에서 부르면 화면이 통째로 죽는다.
- */
 export function ToolResultAttach(props: ToolResultAttachProps) {
-  return getDataModeConfig().mode === 'supabase' ? <CloudAttach {...props} /> : <AttachInner {...props} workspaceId={null} />
-}
-
-function CloudAttach(props: ToolResultAttachProps) {
-  const { currentWorkspaceId } = useAuth()
-  return <AttachInner {...props} workspaceId={currentWorkspaceId} />
-}
-
-function AttachInner(props: ToolResultAttachProps & { workspaceId: string | null }) {
-  const currentWorkspaceId = props.workspaceId
+  const { clientId, clientName, workspaceId, loadClients } = useToolClient()
+  const presetId = props.presetClientId ?? clientId ?? ''
   const { showToast } = useToast()
   const [open, setOpen] = useState(false)
   const [clients, setClients] = useState<ClientOpsRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [query, setQuery] = useState('')
-  const [pickedId, setPickedId] = useState<string>(props.presetClientId ?? '')
+  const [pickedId, setPickedId] = useState<string>(presetId)
   const [publish, setPublish] = useState(false)
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState<{ id: string; name: string } | null>(null)
 
   useEffect(() => {
+    setPickedId((prev) => prev || presetId)
+  }, [presetId])
+
+  useEffect(() => {
     if (!open) return
     let alive = true
     setLoading(true)
-    listClients(currentWorkspaceId)
+    loadClients()
       .then((list) => {
         if (alive) setClients(list.filter((c) => !c.archivedAt))
       })
@@ -74,7 +68,7 @@ function AttachInner(props: ToolResultAttachProps & { workspaceId: string | null
     return () => {
       alive = false
     }
-  }, [open, currentWorkspaceId])
+  }, [open, loadClients])
 
   const filtered = useMemo(() => {
     const q = query.trim()
@@ -82,9 +76,14 @@ function AttachInner(props: ToolResultAttachProps & { workspaceId: string | null
     return list.slice(0, 30)
   }, [clients, query])
 
-  const attach = async () => {
-    const target = clients.find((c) => c.id === pickedId)
-    if (!target) return
+  /** 실제로 붙이는 일 — 시트에서 고른 업체든, 주소로 물고 온 업체든 같은 길을 쓴다 */
+  const attachTo = async (targetId: string, alsoPublish: boolean) => {
+    const list = clients.length > 0 ? clients : await loadClients()
+    const target = list.find((c) => c.id === targetId)
+    if (!target) {
+      showToast('업체를 찾지 못했습니다.')
+      return
+    }
     setBusy(true)
     try {
       let next = withToolResult(target, {
@@ -94,15 +93,16 @@ function AttachInner(props: ToolResultAttachProps & { workspaceId: string | null
         verdictLabel: props.verdictLabel,
         summary: props.summary,
         data: props.data,
+        deadlines: props.deadlines ?? [],
       })
       const saved = await saveClient(next)
       next = saved
       let publishedNote = ''
-      if (publish) {
-        const links = await listLinksForClient(currentWorkspaceId, target.id)
+      if (alsoPublish) {
+        const links = await listLinksForClient(workspaceId, target.id)
         const link = links.find((l) => l.status === 'active') ?? links[0]
         if (link) {
-          const update = await publishUpdate(currentWorkspaceId, {
+          const update = await publishUpdate(workspaceId, {
             linkId: link.id,
             category: 'result',
             title: `${props.title} 결과`,
@@ -116,9 +116,10 @@ function AttachInner(props: ToolResultAttachProps & { workspaceId: string | null
           publishedNote = ' · 연결된 고객 계정이 없어 발행은 건너뛰었습니다'
         }
       }
+      const deadlineNote = (props.deadlines?.length ?? 0) > 0 ? ` · 기한 ${props.deadlines?.length}건이 달력에 올라갔습니다` : ''
       setDone({ id: target.id, name: target.companyName })
       setOpen(false)
-      showToast(`${target.companyName} 기록에 붙였습니다${publishedNote}`)
+      showToast(`${target.companyName} 기록에 붙였습니다${deadlineNote}${publishedNote}`)
     } catch (cause) {
       showToast(cause instanceof Error ? cause.message : '붙이지 못했습니다.')
     } finally {
@@ -126,11 +127,24 @@ function AttachInner(props: ToolResultAttachProps & { workspaceId: string | null
     }
   }
 
+  const quickName = clientName || '이 업체'
+
   return (
     <>
-      <Button size="sm" onClick={() => setOpen(true)} data-testid="tool-attach-open">
-        <Paperclip aria-hidden="true" className="size-4" /> 업체 기록에 붙이기
-      </Button>
+      {presetId ? (
+        <>
+          <Button size="sm" variant="primary" disabled={busy} onClick={() => void attachTo(presetId, false)} data-testid="tool-attach-quick">
+            <Paperclip aria-hidden="true" className="size-4" /> {busy ? '붙이는 중…' : `${quickName} 기록에 붙이기`}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setOpen(true)} data-testid="tool-attach-open">
+            다른 업체 · 발행까지
+          </Button>
+        </>
+      ) : (
+        <Button size="sm" onClick={() => setOpen(true)} data-testid="tool-attach-open">
+          <Paperclip aria-hidden="true" className="size-4" /> 업체 기록에 붙이기
+        </Button>
+      )}
       {done && (
         <Link to={`/ops/clients/${done.id}?tab=files`} className="t-sub inline-flex items-center gap-1 self-center font-medium text-brand-700 hover:underline">
           <Check aria-hidden="true" className="size-4" /> {done.name} 에 붙음 — 보러 가기
@@ -150,7 +164,13 @@ function AttachInner(props: ToolResultAttachProps & { workspaceId: string | null
                 <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
                   닫기
                 </Button>
-                <Button size="sm" variant="primary" disabled={!pickedId || busy} onClick={attach} data-testid="tool-attach-confirm">
+                <Button
+                  size="sm"
+                  variant="primary"
+                  disabled={!pickedId || busy}
+                  onClick={() => void attachTo(pickedId, publish)}
+                  data-testid="tool-attach-confirm"
+                >
                   {busy ? '붙이는 중…' : '이 업체에 붙이기'}
                 </Button>
               </div>
