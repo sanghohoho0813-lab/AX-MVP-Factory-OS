@@ -17,6 +17,7 @@ import { GuideButton } from '../onboarding/GuideButton'
 import { getDataModeConfig } from '../../data/dataMode'
 import { CloudSaveStatus } from '../cloud/CloudSaveStatus'
 import { SignalBell } from './SignalBell'
+import { HeaderClock } from './HeaderClock'
 import { brand } from '../../brand/brand.config'
 import { moduleForPath } from '../../config/moduleRegistry'
 
@@ -37,7 +38,7 @@ function WorkspaceSelector() {
   const [workspace, setWorkspace] = useState<string>(WORKSPACES[0])
 
   return (
-    <div ref={containerRef} className="relative min-w-0 max-w-[34vw] shrink">
+    <div ref={containerRef} className="relative w-[12.5rem] shrink-0 2xl:w-[15rem]">
       <button
         type="button"
         aria-haspopup="listbox"
@@ -166,10 +167,14 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
         정작 화면 제목이 안 보인다.
       */}
       <span className="t-card min-w-0 flex-1 truncate text-slate-900 lg:hidden">{screenTitle}</span>
+      {/* 휴대폰에서도 지금 몇 시인지는 보인다 (D-87) */}
+      <span className="lg:hidden">
+        <HeaderClock />
+      </span>
 
       <span className="hidden lg:contents">
         {isSupabase ? (
-          <Suspense fallback={<div className="h-10 min-w-0 max-w-[34vw] shrink" />}>
+          <Suspense fallback={<div className="h-10 w-[12.5rem] shrink-0 2xl:w-[15rem]" />}>
             <SupabaseWorkspaceSelector />
           </Suspense>
         ) : (
@@ -177,15 +182,23 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
         )}
       </span>
 
-      <div className="hidden min-w-0 flex-1 items-center justify-center px-1 sm:px-4 lg:flex">
-        {/* 이 폭 아래에서는 검색 칸이 아이콘만 겨우 들어갈 만큼 좁아진다.
-            그때는 감추고 Ctrl+K 로 연다. */}
-        <div className="hidden w-full max-w-xl min-[1560px]:block">
-          <GlobalSearch />
-        </div>
+      {/*
+        검색은 작업공간 바로 옆, 왼쪽에 붙인다 (D-87).
+        가운데에 크게 두었더니 화면 폭의 절반을 먹으면서도 1560px 아래에서는 아예 사라졌다.
+        이제 폭을 정해(15rem, 아주 넓은 화면에서 19rem) 왼쪽에 두고, 남는 자리는 오른쪽 시계·단추에 준다.
+        폭을 정하는 이유는 D-87 — 전부 shrink 로 두면 좁아질 때 이 칸이 먼저 무너진다.
+      */}
+      <div className="hidden w-[15rem] shrink-0 xl:block 2xl:w-[19rem]">
+        <GlobalSearch />
       </div>
 
-      <div className="flex shrink-0 items-center gap-1.5">
+      <div className="hidden flex-1 lg:block" />
+
+      <div className="flex shrink-0 items-center gap-1.5 lg:gap-2.5">
+        {/* 오늘이 며칠이고 지금 몇 시인지 — 고객 플랫폼 단추 왼쪽에 크게 (D-87) */}
+        <span className="hidden lg:inline-flex">
+          <HeaderClock />
+        </span>
         {/* 고객이 보는 표면으로 건너가는 문 — 새 탭. 로그인 세션은 공유하지 않는다(가짜 SSO 금지). */}
         <a
           href={brand.customerPlatformUrl}
@@ -197,10 +210,10 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
           {brand.customerPlatformLabel}
         </a>
         {/* 가이드·저장상태·설정·계정은 모바일에서 서랍/더보기 로 옮겼다 */}
-        <span className="hidden lg:inline-flex">
+        <span className="hidden 2xl:inline-flex">
           <GuideButton />
         </span>
-        <span className="hidden xl:inline-flex">
+        <span className="hidden min-[1700px]:inline-flex">
           <CloudSaveStatus state={isSupabase ? 'saved' : 'local'} compact={false} />
         </span>
         <SignalBell />

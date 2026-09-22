@@ -94,7 +94,8 @@ function SidebarContent({
 
   return (
     <div className="flex h-full flex-col bg-navy-900 text-navy-200">
-      <div className={`flex h-16 shrink-0 items-center border-b border-navy-800 ${collapsed ? 'justify-center px-2' : 'justify-between px-4'}`}>
+      {/* 로고를 1.5배로 키우면서 머리 칸도 함께 키운다 — 안 키우면 제품명 줄이 눌린다 (D-87) */}
+      <div className={`flex h-20 shrink-0 items-center border-b border-navy-800 ${collapsed ? 'justify-center px-2' : 'justify-between px-4'}`}>
         <button
           type="button"
           onClick={() => { navigate('/'); onNavigate?.() }}
@@ -102,12 +103,12 @@ function SidebarContent({
           className="flex min-w-0 cursor-pointer items-center gap-2.5"
         >
           {collapsed ? (
-            <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/10 text-[0.9rem] font-black text-white">
+            <span aria-hidden="true" className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-white/10 text-[1.15rem] font-black text-white">
               M
             </span>
           ) : (
             <span className="flex min-w-0 flex-col items-start gap-0.5">
-              <BrandLogo tone="dark" imgClassName="h-8 max-w-[164px]" />
+              <BrandLogo tone="dark" imgClassName="h-12 max-w-[200px]" />
               <span className="truncate text-[0.72rem] font-semibold tracking-wide text-navy-300">
                 {brand.productName}
               </span>

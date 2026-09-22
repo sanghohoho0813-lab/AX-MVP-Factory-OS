@@ -10,6 +10,8 @@
 import { brand, documentTitle } from '../../brand/brand.config'
 import { UI_THEMES, isThemeKey } from '../../lib/uiTheme'
 import { MODULES, MODULE_GROUPS, enabledModulesByGroup, moduleForPath } from '../../config/moduleRegistry'
+import { TOOLS, liveTools, plannedTools } from '../../config/toolRegistry'
+import { formatClockDate, formatClockTime } from '../../components/layout/HeaderClock'
 import {
   CUSTOMER_STAGE_ORDER,
   SERVICE_REGISTRY,
@@ -92,6 +94,44 @@ check('modules: 모든 모듈의 group 이 정의된 그룹', MODULES.every((m) 
 const grouped = enabledModulesByGroup()
 check('modules: 첫 그룹은 오늘', grouped[0]?.group.key === 'today')
 check('modules: AX STUDIO 는 접을 수 있고 기본 접힘', MODULE_GROUPS.find((g) => g.key === 'studio')?.collapsible === true && MODULE_GROUPS.find((g) => g.key === 'studio')?.defaultCollapsed === true)
+
+/* 메뉴 재분류 — 자주 쓰는 것이 위, 가끔 쓰는 것이 아래 (D-86) */
+{
+  const order = MODULE_GROUPS.map((g) => g.key)
+  check('메뉴: 순서는 오늘 → 고객 → 도구함 → 가끔 → STUDIO → 이 시스템 → 설정',
+    order.join() === 'today,clients,tools,occasional,studio,about,settings', order.join())
+  const inGroup = (g: string) => MODULES.filter((m) => m.group === g).map((m) => m.key)
+  check('메뉴: 오늘과 일정이 한 묶음', inGroup('today').join() === 'today,calendar')
+  check('메뉴: 잘 안 쓰는 넷이 가끔 쓰는 것으로 내려갔다',
+    inGroup('occasional').join() === 'consulting-studio,funding,journal-today,journal-week,journal-all', inGroup('occasional').join())
+  check('메뉴: 가끔 쓰는 것은 접혀 있다', MODULE_GROUPS.find((g) => g.key === 'occasional')?.defaultCollapsed === true)
+  check('메뉴: 도구함은 고객 다음, 가끔 쓰는 것보다 위', order.indexOf('tools') === order.indexOf('clients') + 1 && order.indexOf('tools') < order.indexOf('occasional'))
+  check('메뉴: 도구함에 세금 계산기', inGroup('tools').includes('tool-tax'))
+  // 도구를 목록에만 더하고 사이드바에 거는 것을 빠뜨리는 일이 없어야 한다 (D-86)
+  check('메뉴: 쓸 수 있는 도구는 전부 사이드바 도구함에 걸린다',
+    liveTools().every((t) => MODULES.some((m) => m.group === 'tools' && m.path === t.path)))
+  check('메뉴: 아직 없는 도구는 사이드바에 걸리지 않는다',
+    plannedTools().every((t) => !MODULES.some((m) => m.key === `tool-${t.key}`)))
+  check('메뉴: 없어진 그룹을 가리키는 모듈이 없다', MODULES.every((m) => MODULE_GROUPS.some((g) => g.key === m.group)))
+  check('메뉴: 모든 모듈 주소가 겹치지 않는다', new Set(MODULES.map((m) => m.path)).size === MODULES.length)
+}
+
+/* 도구함 — 앞으로 붙을 것까지 목록 하나로 (D-86) */
+{
+  check('도구함: 세금 계산기는 지금 쓸 수 있다', liveTools().some((t) => t.path === '/tools/tax'))
+  check('도구함: 자리만 잡아 둔 것은 주소가 없다', plannedTools().every((t) => t.path === null))
+  check('도구함: 자리만 잡아 둔 것은 그렇게 적는다', plannedTools().every((t) => t.desc.includes('아직 없습니다')))
+  check('도구함: 기업인증 OS · 크레탑 OS 자리', plannedTools().map((t) => t.label).join() === '기업인증 OS,크레탑 OS')
+  check('도구함: 키가 겹치지 않는다', new Set(TOOLS.map((t) => t.key)).size === TOOLS.length)
+}
+
+/* 최상단 시계 — 초까지 (D-87) */
+{
+  const d = new Date(2026, 8, 22, 9, 5, 7)
+  check('시계: 날짜는 요일까지', formatClockDate(d) === '2026년 9월 22일 (화)', formatClockDate(d))
+  check('시계: 시각은 초까지 두 자리', formatClockTime(d) === '09:05:07', formatClockTime(d))
+  check('시계: 자정', formatClockTime(new Date(2026, 0, 1, 0, 0, 0)) === '00:00:00')
+}
 check('modules: 일기 그룹이 AX STUDIO 보다 앞', grouped.findIndex((g) => g.group.key === 'journal') < grouped.findIndex((g) => g.group.key === 'studio'))
 check('moduleForPath: 정확 일치 홈', moduleForPath('/')?.key === 'today')
 check('moduleForPath: 하위 경로 → 가장 긴 접두', moduleForPath('/funding/catalog/programs/x')?.key === 'institutions')

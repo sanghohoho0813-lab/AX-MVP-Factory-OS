@@ -254,7 +254,8 @@ check('qa: judge 합계는 10축 다 있어야', judgeTotal({ A: 9 }) === null &
   check('model: 기본 제출서류 8종', Object.keys(raw.venture.documents).length === 8)
 }
 check('registry: 컨설팅 작업실 모듈이 /studio 로 켜져 있다', MODULES.some((m) => m.path === '/studio' && m.enabled))
-check('registry: 그룹 정의', MODULE_GROUPS.some((g) => g.key === 'consulting'))
+// 컨설팅 작업실은 '가끔 쓰는 것' 묶음으로 내려갔다 (D-86)
+check('registry: 컨설팅 작업실이 가끔 쓰는 것 묶음에', MODULES.find((m) => m.path === '/studio')?.group === 'occasional' && MODULE_GROUPS.some((g) => g.key === 'occasional'))
 check('registry: /studio/abc → 컨설팅 작업실', moduleForPath('/studio/abc')?.path === '/studio')
 
 console.log(`\n컨설팅 엔진: ${passed} passed, ${failed} failed`)

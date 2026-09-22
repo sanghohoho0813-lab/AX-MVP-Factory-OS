@@ -30,6 +30,7 @@
     "e2e:mobile": "node e2e/mobile-journey.mjs",
     "qa:board": "node e2e/board.mjs",
     "qa:tax": "node e2e/tax-parity.mjs",
+    "qa:shell": "node e2e/shell.mjs",
     "qa:todos": "node e2e/todos.mjs",
     "qa:studio": "node e2e/studio.mjs",
     "qa:simple": "node e2e/simple.mjs",
