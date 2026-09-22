@@ -34,7 +34,7 @@ import { buildCretopParsedForUi, extractCretopCore } from '../cretop/engine/inde
 import { normalizeClientOps, withToolResult, withToolResultPublished, withoutToolResult, TOOL_RESULT_LIMIT } from '../../services/clientOpsService'
 import { TOOLS, liveTools, plannedTools, reviewTools, toolOf } from '../../config/toolRegistry'
 import { judge } from '../startupTax/lib/judgement'
-import { EMPTY_FORM } from '../startupTax/StartupTaxPage'
+import { EMPTY_FORM } from '../startupTax/lib/formDefaults'
 
 let passed = 0
 let failed = 0

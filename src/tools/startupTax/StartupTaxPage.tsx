@@ -11,9 +11,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { Check, Copy, RotateCcw } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
-import { Badge, Disclosure, Section, Surface, type Tone } from '../../components/ui/primitives'
+import { Badge, Disclosure, Section, Surface } from '../../components/ui/primitives'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
 import type { AdvancedInput, ExemptionKey, FormData as StartupTaxForm, JudgementResult, Verdict } from './types'
+import { EMPTY_ADVANCED, EMPTY_FORM, VERDICT_TONE } from './lib/formDefaults'
 import { judge, VERDICT_EMOJI, VERDICT_LABEL, DISCLAIMER, DISCLAIMER_FRAMEWORK } from './lib/judgement'
 import { buildSummaryText } from './lib/summary'
 import {
@@ -31,34 +32,6 @@ import { formatAge } from './lib/lineage'
 
 const STORAGE_KEY = 'axmvp.tools.startupTax'
 
-export const EMPTY_ADVANCED: AdvancedInput = {
-  originalStartDate: '',
-  hasExistingSole: '',
-  hasExistingCorp: '',
-  isExistingExec: '',
-  newOwnerShare: '',
-  familyShare: '',
-  existingCorpExecShare: '',
-  isOligopoly: '',
-  prevIndustryRelation: '',
-  assetTakeoverRatio: '',
-  employeeMoved: '',
-  reuseIdentity: '',
-  sameAddress: '',
-}
-
-export const EMPTY_FORM: StartupTaxForm = {
-  businessType: '',
-  birthDate: '',
-  startupDate: '',
-  region: '',
-  overconcentration: '',
-  industry: '',
-  startupForm: '',
-  checkItems: { incomeTax: false, acquisitionTax: false, propertyTax: false, registrationTax: false },
-  advanced: { ...EMPTY_ADVANCED },
-}
-
 function loadForm(): StartupTaxForm {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -73,14 +46,6 @@ function loadForm(): StartupTaxForm {
   } catch {
     return EMPTY_FORM
   }
-}
-
-/** 판정 4단계 → OS 색 (초록·노랑·주황·빨강 그대로) */
-export const VERDICT_TONE: Record<Verdict, Tone> = {
-  good: 'success',
-  caution: 'warning',
-  conditional: 'warning',
-  bad: 'danger',
 }
 
 const inputCls =

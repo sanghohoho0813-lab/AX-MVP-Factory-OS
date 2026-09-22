@@ -73,7 +73,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(500)
   const tools = (await page.locator('main').innerText()) ?? ''
   check('도구함: 세금 계산기가 먼저', tools.indexOf('세금 계산기') > 0 && tools.indexOf('세금 계산기') < tools.indexOf('기업인증 OS'), tools.slice(0, 260))
-  check('도구함: 앞으로 붙을 것을 적어 둔다', tools.includes('기업인증 OS') && tools.includes('크레탑 OS') && tools.includes('아직 없음'))
+  check('도구함: 앞으로 붙을 것을 적어 둔다 (크레탑은 들어와서 빠짐)', tools.includes('기업인증 OS') && tools.includes('아직 없음') && tools.includes('크레탑 분석기'))
   check('도구함: 아직 없는 것은 누를 수 없다', (await page.getByRole('link', { name: /기업인증 OS/ }).count()) === 0)
   await page.getByRole('link', { name: /세금 계산기/ }).first().click()
   await page.waitForTimeout(700)
