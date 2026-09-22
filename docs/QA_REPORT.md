@@ -932,3 +932,19 @@ npm run qa:shots --wide                   반응형 문제 없음
 - 고객 플랫폼 발행은 **연결된 고객 계정이 있을 때만** 나간다. 프로덕션에서 실제 고객 계정으로 발행해 보는 것은
   외부로 나가는 일이라 하지 않았다 — 로컬 모드 E2E 로 붙이기까지만 확인했다.
 - 프로덕션 화면 스크린샷은 로그인이 필요해 찍지 못했다. 배포 확인은 배포된 번들 안의 문자열로 했다(§26-5).
+
+### 26-5. 배포 확인 (2026-09-22, main `453a6b8` 이후)
+
+프로덕션 `https://ax-mvp-factory-os.vercel.app` 의 진입 번들 `index-DTAg3oxO.js` 가 가리키는 조각을 내려받아 문자열로 확인했다
+(빌드 해시 비교는 Vercel 이 다른 해시를 만들어 무효다):
+
+```
+moduleRegistry-C4eAJBKU.js      '도입 검토중' · '크레탑 분석기' · '정책자금 진단'
+StartupTaxPage-CeQTR-GM.js      '1분 판정하기'
+CretopPage-BJWruO5s.js          '크레탑 원문'
+ToolResultAttach-CLDBQlmr.js    '업체 기록에 붙이기'
+ToolsReviewPage-Deh7f0vT.js     '왜 검토중인가'
+/tools/startup-tax              HTTP 200
+```
+
+첫 조회에서는 옛 진입 번들(`index-og6WJJOe.js`)이 나왔고, 20초 뒤 두 번째 조회에서 새 번들로 바뀌어 있었다.
