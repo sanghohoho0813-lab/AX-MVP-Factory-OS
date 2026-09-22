@@ -792,9 +792,32 @@ npm run qa:shots --wide                   반응형 문제 없음
 | 검색칸 | 가운데, 최대 576px, 1560px 아래에서는 사라짐 | 왼쪽(작업실 옆), 240px(아주 넓으면 304px), **1360px 부터 보임** |
 | 새 도구 붙이기 | 사이드바 + 도구함 화면 두 군데 고침 | `toolRegistry.ts` 한 줄 |
 
-### 25-2. 게이트 결과
+### 25-2. 게이트 결과 (2026-09-22, 고친 빌드로 전부 다시 실행)
 
-(아래 숫자는 실제 실행 결과다)
+```
+npx tsc --noEmit -p tsconfig.app.json     오류 0
+npx oxlint src                            오류 0 (경고 3, 이전부터 있던 것)
+npm run build                             성공 (1.92s)
+npm run test:all                          14묶음 1,015 passed, 0 failed
+npm run qa:board                          163 passed, 0 failed
+npm run qa:todos                           25 passed, 0 failed
+npm run qa:simple                          88 passed, 0 failed
+npm run qa:studio                          46 passed, 0 failed
+npm run e2e:mobile                         15 passed, 0 failed
+npm run qa:tax                             74 passed, 0 failed
+npm run qa:shell   (새로 만든 것)           24 passed, 0 failed
+npm run qa:squeeze --all                  짜부라진 글자 0
+npm run qa:shots --wide                   반응형 문제 없음
+```
+
+머리띠 폭 실측(`header` 의 `scrollWidth` 대 실제 폭) — 고친 뒤 여섯 폭 모두 넘침 0:
+
+```
+1280  977 / 977      1359  1056 / 1056     1360  1057 / 1057
+1366 1063 / 1063     1440  1137 / 1137     1920  1617 / 1617
+```
+
+스크린샷: `docs/qa/nav/` (390·1440 × 오늘 화면 · 메뉴 · 도구함, 6장)
 
 ### 25-3. QA 가 잡아낸 것
 
