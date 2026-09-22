@@ -387,7 +387,7 @@ export function LabcarePage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="연구소 사후관리"
+        title="기업부설연구소 OS"
         description="기업부설연구소·연구개발전담부서의 설립 가능성부터 서류·월간 점검·변경신고·안내문까지 한 곳에서 봅니다. 상담용 1차 검토이며 신고 기관 심사와 세무 대리인 검토를 대신하지 않습니다."
       />
       <div role="tablist" aria-label="연구소 사후관리 도구" className="-mx-4 flex gap-1 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0 [&::-webkit-scrollbar]:hidden">

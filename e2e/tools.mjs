@@ -55,7 +55,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByLabel('③ 창업일').fill('2025-01-15')
   await page.getByRole('button', { name: '아니오', exact: true }).first().click()
   await page.getByRole('button', { name: '제조업', exact: true }).click()
-  await page.getByRole('button', { name: '신규 창업', exact: true }).click()
+  await page.getByRole('button', { name: '완전 신규 창업', exact: true }).click()
   await page.getByRole('button', { name: '1분 판정하기' }).click()
   await page.waitForTimeout(400)
   const oneline = page.getByTestId('startup-tax-oneline')
@@ -72,7 +72,9 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(600)
   const tr = page.getByTestId('tool-results')
   check('업체 상세: 도구 결과 칸에 창업감면 판정', (await tr.count()) === 1 && (await tr.innerText()).includes('창업감면 판정'))
-  check('업체 상세: 활동 기록에도 남는다', (await page.locator('body').innerText()).includes('창업감면 판정 ·'))
+  await tr.getByRole('button', { name: '요약 보기' }).first().click()
+  await page.waitForTimeout(200)
+  check('업체 상세: 요약을 펴면 카톡용 요약이 보인다', (await tr.innerText()).includes('[창업감면 사전진단 결과]'))
 
   // 크레탑
   await page.goto(BASE + '/tools/cretop', { waitUntil: 'networkidle' })
@@ -89,7 +91,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.goto(BASE + '/tools/policy-funding?sample=1', { waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
   check('정책자금: 샘플로 결론이 나온다', (await page.getByTestId('pf-conclusion').innerText()).includes('검토하는 것이'))
-  check('정책자금: 추천 기관 3곳', (await page.getByTestId('pf-agencies').locator('> div').count()) === 3)
+  check('정책자금: 추천 기관 3곳', (await page.getByTestId('pf-agencies').locator('span', { hasText: /^[123]순위 / }).count()) === 3)
 
   // 영업 도구
   await page.goto(BASE + '/tools/sales-kit', { waitUntil: 'networkidle' })

@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Building2, Check, Paperclip, Search } from 'lucide-react'
 import { useAuth } from '../../auth/AuthProvider'
+import { getDataModeConfig } from '../../data/dataMode'
 import { useToast } from '../../components/ui/toastContext'
 import { Button } from '../../components/ui/Button'
 import { BottomSheet } from '../../components/ui/primitives'
@@ -31,8 +32,21 @@ export interface ToolResultAttachProps {
   presetClientId?: string
 }
 
+/**
+ * 로컬 모드에는 AuthProvider 가 없다 — 다른 화면(OperationsHubPage)처럼 모드에 따라 나눠 부른다.
+ * useAuth 를 로컬에서 부르면 화면이 통째로 죽는다.
+ */
 export function ToolResultAttach(props: ToolResultAttachProps) {
+  return getDataModeConfig().mode === 'supabase' ? <CloudAttach {...props} /> : <AttachInner {...props} workspaceId={null} />
+}
+
+function CloudAttach(props: ToolResultAttachProps) {
   const { currentWorkspaceId } = useAuth()
+  return <AttachInner {...props} workspaceId={currentWorkspaceId} />
+}
+
+function AttachInner(props: ToolResultAttachProps & { workspaceId: string | null }) {
+  const currentWorkspaceId = props.workspaceId
   const { showToast } = useToast()
   const [open, setOpen] = useState(false)
   const [clients, setClients] = useState<ClientOpsRecord[]>([])

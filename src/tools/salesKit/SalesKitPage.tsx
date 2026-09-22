@@ -310,7 +310,8 @@ export function SalesKitPage() {
               </button>
             ))}
           </div>
-          <Surface className="flex flex-col gap-4 p-4" data-testid="sales-plan">
+          <Surface className="flex flex-col gap-4 p-4">
+            <div data-testid="sales-plan" className="contents">
             {Object.entries(plan as unknown as Record<string, unknown>).map(([k, v]) => {
               if (k === 'title') return <span key={k} className="t-card font-bold text-slate-900">{String(v)}</span>
               const LABEL: Record<string, string> = {
@@ -329,6 +330,7 @@ export function SalesKitPage() {
                 </div>
               )
             })}
+            </div>
           </Surface>
           <Disclosure title="콜드콜 스크립트 · 후킹" hint={`리드 ${score}점 · ${band.label}`}>
             <div className="flex flex-col gap-3">
