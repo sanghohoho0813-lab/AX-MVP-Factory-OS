@@ -38,6 +38,14 @@ const OpsCalendarPage = lazy(() => import('../pages/OpsCalendarPage').then((m) =
 const AgentSettlementPage = lazy(() => import('../pages/AgentSettlementPage').then((m) => ({ default: m.AgentSettlementPage })))
 const TaxCalculatorsPage = lazy(() => import('../pages/TaxCalculatorsPage').then((m) => ({ default: m.TaxCalculatorsPage })))
 const ToolsHubPage = lazy(() => import('../pages/ToolsHubPage').then((m) => ({ default: m.ToolsHubPage })))
+const ToolsReviewPage = lazy(() => import('../pages/ToolsReviewPage').then((m) => ({ default: m.ToolsReviewPage })))
+// 도구함 — 대표가 따로 만들어 둔 OS 들에서 핵심만 옮긴 것 (D-88). 규칙은 원본 그대로, 화면만 이 OS 것.
+const StartupTaxPage = lazy(() => import('../tools/startupTax/StartupTaxPage').then((m) => ({ default: m.StartupTaxPage })))
+const CretopPage = lazy(() => import('../tools/cretop/CretopPage').then((m) => ({ default: m.CretopPage })))
+const EmploymentPage = lazy(() => import('../tools/employment/EmploymentPage').then((m) => ({ default: m.EmploymentPage })))
+const LabcarePage = lazy(() => import('../tools/labcare/LabcarePage').then((m) => ({ default: m.LabcarePage })))
+const PolicyFundingPage = lazy(() => import('../tools/policyFunding/PolicyFundingPage').then((m) => ({ default: m.PolicyFundingPage })))
+const SalesKitPage = lazy(() => import('../tools/salesKit/SalesKitPage').then((m) => ({ default: m.SalesKitPage })))
 const TodayCommandCenterPage = lazy(() => import('../pages/TodayCommandCenterPage').then((m) => ({ default: m.TodayCommandCenterPage })))
 const WhyAxPage = lazy(() => import('../pages/WhyAxPage').then((m) => ({ default: m.WhyAxPage })))
 const KpiPage = lazy(() => import('../pages/KpiPage').then((m) => ({ default: m.KpiPage })))
@@ -364,6 +372,13 @@ export const appRouteChildren = [
       { path: 'tools', element: <ToolsHubPage /> },
       // 세금 계산기 9종 — 배포본 HTML 의 계산식을 그대로 옮긴 것 (D-85)
       { path: 'tools/tax', element: <TaxCalculatorsPage /> },
+      { path: 'tools/review', element: <ToolsReviewPage /> },
+      { path: 'tools/startup-tax', element: <StartupTaxPage /> },
+      { path: 'tools/cretop', element: <CretopPage /> },
+      { path: 'tools/employment', element: <EmploymentPage /> },
+      { path: 'tools/labcare', element: <LabcarePage /> },
+      { path: 'tools/policy-funding', element: <PolicyFundingPage /> },
+      { path: 'tools/sales-kit', element: <SalesKitPage /> },
       { path: 'why', element: <WhyAxPage /> },
       { path: 'kpi', element: <KpiPage /> },
       { path: 'roadmap', element: <RoadmapPage /> },

@@ -1,0 +1,98 @@
+{
+  "meta": {
+    "title": "기관별 후순위/제외 규칙",
+    "source": "인콜 실무 기준 (연매출 체급 기반 기관 선택) + 김팀장 전자책 기관 전략",
+    "description": "기관 추천 시 현실과 맞지 않는 추천을 막기 위한 감점/제외/우선 규칙. agencySelector 가 이 파일을 읽어 보정한다. penalty/boost 는 0~100 점 스케일 기준."
+  },
+  "revenueTierRules": [
+    {
+      "agencyKey": "kodit",
+      "agencyName": "신용보증기금",
+      "description": "신보는 기업 체급(연매출) 기준이 핵심. 매출 5억 미만은 우선순위를 크게 낮추고, 1억 미만은 원칙적 제외에 가깝게 처리.",
+      "tiers": [
+        {
+          "maxEok": 1,
+          "penalty": 45,
+          "label": "원칙적 제외",
+          "reason": "전년도 매출 1억 미만은 기업 체급상 신용보증기금 대상이 아닙니다. 소진공·지역신보·미소금융부터 검토하세요."
+        },
+        {
+          "maxEok": 3,
+          "penalty": 30,
+          "label": "사실상 후순위",
+          "reason": "전년도 매출 3억 미만은 특별한 강점 없이는 신보 승인 실익이 낮습니다. 지역신보·소진공이 현실적입니다."
+        },
+        {
+          "maxEok": 5,
+          "penalty": 18,
+          "label": "후순위",
+          "reason": "전년도 매출 5억 미만으로 기업 체급상 신보보다 지역신보·소진공이 현실적입니다."
+        }
+      ],
+      "exception": {
+        "minSignals": 4,
+        "signals": ["고신용(800점대 이상)", "법인사업자", "직원 5명 이상", "매출 성장세", "주요 거래처 보유", "인증·특허·연구소 보유"],
+        "effect": "감점 절반 완화 — 3순위 정도 노출 가능",
+        "label": "예외 검토",
+        "note": "강점이 많아 예외적으로 검토 가능하나, 신보는 여전히 신중 접근이 필요합니다."
+      }
+    }
+  ],
+  "agencyAdjustRules": [
+    {
+      "agencyKey": "kibo",
+      "agencyName": "기술보증기금",
+      "boosts": [
+        { "condition": "제조/IT업종 또는 기술·특허·연구소·기계설비 보유", "score": 10, "reason": "기술평가 기반 기관과 궁합이 좋습니다." },
+        { "condition": "시설자금(기계구입·설비교체) 목적", "score": 6, "reason": "설비·시설 투자 논리가 기술평가와 연결됩니다." }
+      ],
+      "cautions": [
+        { "condition": "매출 1억 미만", "penalty": 10, "reason": "매출이 너무 낮으면 기술평가가 좋아도 한도가 제한됩니다." },
+        { "condition": "기술성 증빙(특허·연구소·인증) 없음", "penalty": 12, "reason": "기술성 증빙이 부족합니다. 특허·연구소·인증 없이 기보 접근은 리스크가 큽니다." }
+      ]
+    },
+    {
+      "agencyKey": "kosme",
+      "agencyName": "중소벤처기업진흥공단",
+      "boosts": [
+        { "condition": "제조/시설투자/성장세/고용/수출/R&D/법인", "score": 6, "reason": "성장성·시설투자 중심 직접대출과 맞습니다." }
+      ],
+      "cautions": [
+        { "condition": "소액(3천 이하) 운전자금만 필요", "penalty": 12, "reason": "단순 소액 운전자금은 중진공보다 소진공·지역신보가 빠르고 현실적입니다." }
+      ]
+    },
+    {
+      "agencyKey": "semas",
+      "agencyName": "소상공인시장진흥공단",
+      "boosts": [
+        { "condition": "연매출 5억 미만 소상공인", "score": 10, "reason": "소상공인 체급에 가장 현실적인 1순위 창구입니다." },
+        { "condition": "창업 초기/음식점·카페/서비스/도소매/직원 0~4명", "score": 6, "reason": "소상공인 특화·특례 자금 접근성이 좋습니다." }
+      ],
+      "cautions": []
+    },
+    {
+      "agencyKey": "regional",
+      "agencyName": "지역신용보증재단",
+      "boosts": [
+        { "condition": "연매출 5억 미만 소상공인", "score": 8, "reason": "소액 보증·특례보증으로 소진공과 병행하기 좋습니다." },
+        { "condition": "저신용/2금융권·카드론 사용", "score": 8, "reason": "저신용 대상 특례 상품이 있어 현실적인 경로입니다." }
+      ],
+      "cautions": []
+    },
+    {
+      "agencyKey": "misaeng",
+      "agencyName": "미소금융",
+      "boosts": [
+        { "condition": "저신용(600점대 이하)/신용회복·회생 이력", "score": 14, "reason": "초저신용 계층의 진입 창구로 가장 우선 검토합니다." },
+        { "condition": "카드론·현금서비스·2금융권 많음", "score": 10, "reason": "고금리부터 정리하고 다음 기관으로 가는 징검다리 전략이 필요합니다." }
+      ],
+      "cautions": [
+        { "condition": "정상 신용·매출 5억 이상", "penalty": 15, "reason": "정상 신용·규모 기업은 더 큰 기관이 유리합니다." }
+      ]
+    }
+  ],
+  "hardBlockers": [
+    { "condition": "국세/지방세 체납 있음", "effect": "모든 기관 접수 불가 — 완납 정리 후 진행", "severity": "blocker" },
+    { "condition": "4대보험 체납 있음", "effect": "대부분 기관 접수 제한 — 완납 정리 우선", "severity": "blocker" }
+  ]
+}

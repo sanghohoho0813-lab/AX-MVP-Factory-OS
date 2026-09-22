@@ -1,0 +1,109 @@
+{
+  "meta": {
+    "title": "탈락 원인 진단 · 담당자 대응법",
+    "source": "김팀장 정책자금 전자책 PART 1 + 부록 승인 케이스 패턴",
+    "description": "'조건은 맞는데 왜 떨어졌죠?'에 답하기 위한 탈락 원인 목록과, 담당자가 '안 된다'고 할 때의 대응 흐름. 리포트·상담 멘트에 활용."
+  },
+  "rejectionReasons": [
+    {
+      "key": "wrongAgency",
+      "label": "기관 선택 오류",
+      "detail": "체급·업종·자금목적에 맞지 않는 기관에 접수.",
+      "fixable": true,
+      "remedy": "적합 기관으로 전환(체급↑ 시 신보, 기술 시 기보/중진공)."
+    },
+    {
+      "key": "weakPurpose",
+      "label": "자금 목적 설명 부족",
+      "detail": "'돈이 필요하다' 수준의 모호한 목적.",
+      "fixable": true,
+      "remedy": "'이 돈으로 이렇게 바뀐다'를 숫자·인과로 재작성."
+    },
+    {
+      "key": "weakBusinessPlan",
+      "label": "사업계획서 논리 부족",
+      "detail": "왜 지금·얼마·어디에·상환재원 논리가 약함.",
+      "fixable": true,
+      "remedy": "business-plan-questions.json 질문으로 논리 보강, 업종 특성 반영."
+    },
+    {
+      "key": "excessiveDebtVsRevenue",
+      "label": "매출 대비 기대출 과다",
+      "detail": "부채가 매출 대비 과도.",
+      "fixable": true,
+      "remedy": "대환·정리 후 순서 설계, 특례 자금 분할 접근."
+    },
+    {
+      "key": "arrearsOrDelinquency",
+      "label": "체납·연체",
+      "detail": "세금 체납·금융 연체.",
+      "fixable": true,
+      "remedy": "완납·정리 후 재신청(90일 관리 전환)."
+    },
+    {
+      "key": "industryCodeIssue",
+      "label": "업종 코드 문제",
+      "detail": "실제 업종과 코드 불일치·취급 제한.",
+      "fixable": true,
+      "remedy": "업종 코드 정비 후 특화자금 대상 전환."
+    },
+    {
+      "key": "poorFieldReview",
+      "label": "실사 대응 부족",
+      "detail": "사업장 정리·증빙·답변 준비 미흡.",
+      "fixable": true,
+      "remedy": "실사 체크리스트·예상 질문·방어 논리 준비."
+    },
+    {
+      "key": "lowCeoTrust",
+      "label": "대표자 신뢰 부족",
+      "detail": "답변 불일치·준비 부족으로 신뢰 저하.",
+      "fixable": true,
+      "remedy": "대표 답변 스크립트·리허설, 일관된 논리."
+    },
+    {
+      "key": "overlappingLimit",
+      "label": "정책자금 중복 한도 초과",
+      "detail": "기존 보증·정책자금 한도 소진.",
+      "fixable": true,
+      "remedy": "타 기관 병행·특례 분할·대환으로 한도 확보."
+    },
+    {
+      "key": "timingError",
+      "label": "신청 타이밍 오류",
+      "detail": "예산 소진·부적절한 시기.",
+      "fixable": true,
+      "remedy": "예산·공고 시기에 맞춰 재신청(연초·분기 특례 공략)."
+    },
+    {
+      "key": "officerPersuasionFail",
+      "label": "담당자 설득 실패",
+      "detail": "담당자의 첫 통보를 뒤집지 못함.",
+      "fixable": true,
+      "remedy": "방어 논리·자료·대표 어필로 재도전(첫 통보=최종 아님)."
+    },
+    {
+      "key": "unsettledTaxInsurance",
+      "label": "세금/4대보험 미정리",
+      "detail": "체납·미납 미해결.",
+      "fixable": true,
+      "remedy": "완납 후 진행."
+    }
+  ],
+  "officerResponsePlaybook": {
+    "description": "담당자가 '안 된다'고 할 때의 대응 흐름 — 바로 포기하지 않는다",
+    "flow": [
+      "1) 바로 포기하지 않는다(첫 통보는 최종 결과가 아님).",
+      "2) 거절 사유를 항목별로 정확히 기록한다.",
+      "3) 각 사유를 보완 가능/불가능으로 분류한다.",
+      "4) 재도전 가능 시점을 산정한다(예산·서류 정리 기간).",
+      "5) 담당자에게 부드럽지만 명확하게 보완·재검토를 요청한다."
+    ],
+    "sampleLines": [
+      "담당자님, 오늘 말씀 주신 사유를 정확히 이해하고 싶습니다. 어떤 부분이 보완되면 재검토가 가능할까요?",
+      "말씀하신 부분은 이렇게 보완하겠습니다. 보완 후 현장 평가(실사) 기회를 한 번만 주실 수 있을까요?",
+      "지금 통보가 최종은 아니라고 이해합니다. 보완 자료를 준비해 다시 정식으로 요청드리겠습니다."
+    ],
+    "note": "거절 원인이 대표 개인·구조 문제(임원 등재 등)면 보완이 아니라 기관 전환이 답일 수 있음."
+  }
+}

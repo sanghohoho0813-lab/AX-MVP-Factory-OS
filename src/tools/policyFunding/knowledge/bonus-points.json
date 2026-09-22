@@ -1,0 +1,44 @@
+{
+  "meta": {
+    "title": "정책자금 가점 리스트 (31개)",
+    "source": "종합+인콜+가점_250117.pdf — 가점 리스트",
+    "description": "심사 가점으로 어필할 수 있는 항목 31개. 진단 폼의 가점/강점 선택지와 기관 추천·리포트의 가점 요소 표시에 사용."
+  },
+  "bonusPoints": [
+    { "no": 1, "label": "벤처기업 인증 보유", "category": "인증", "formKey": "벤처기업" },
+    { "no": 2, "label": "이노비즈 인증 보유", "category": "인증", "formKey": "이노비즈" },
+    { "no": 3, "label": "메인비즈 인증 보유", "category": "인증", "formKey": "메인비즈" },
+    { "no": 4, "label": "NET, NEP 인증", "category": "인증", "formKey": null },
+    { "no": 5, "label": "사회적경제기업 (인증서 보유)", "category": "인증", "formKey": "사회적기업" },
+    { "no": 6, "label": "여성기업 (인증서 보유)", "category": "인증", "formKey": "여성기업" },
+    { "no": 7, "label": "정부 R&D 성공기업", "category": "기술", "formKey": "정부 R&D 성공" },
+    { "no": 8, "label": "특허보유 기업", "category": "기술", "formKey": "특허 보유" },
+    { "no": 9, "label": "기업부설연구소 보유", "category": "기술", "formKey": "기업부설연구소 보유" },
+    { "no": 10, "label": "성과공유협약 체결 (사업주–근로자)", "category": "고용", "formKey": null },
+    { "no": 11, "label": "청년내일채움공제 또는 내일채움공제 가입 기업", "category": "고용", "formKey": null },
+    { "no": 12, "label": "근로시간 단축(확약)기업", "category": "고용", "formKey": null },
+    { "no": 13, "label": "법인 전환기업", "category": "구조", "formKey": "법인전환 기업" },
+    { "no": 14, "label": "만 39세 미만 청년 기업", "category": "대표자", "formKey": "만39세 이하 청년기업" },
+    { "no": 15, "label": "매출액 대비 연구개발 비중이 5% 이상인 기업", "category": "기술", "formKey": "연구개발비 비중 5% 이상" },
+    { "no": 16, "label": "녹색기술인증기업", "category": "인증", "formKey": null },
+    { "no": 17, "label": "뿌리기술전문기업", "category": "기술", "formKey": null },
+    { "no": 18, "label": "매출액 또는 영업이익이 동종업계 중소기업 평균 2배인 기업", "category": "재무", "formKey": null },
+    { "no": 19, "label": "수출유망중소기업 지정기업", "category": "수출", "formKey": "수출 실적" },
+    { "no": 20, "label": "우수 Green-Biz 선정기업", "category": "인증", "formKey": null },
+    { "no": 21, "label": "특성화고·마이스터고 산학협력기업(채용협약 체결)", "category": "고용", "formKey": null },
+    { "no": 22, "label": "우수 물류기업", "category": "인증", "formKey": null },
+    { "no": 23, "label": "인재육성형 중소기업 (중소벤처기업부 인증)", "category": "고용", "formKey": null },
+    { "no": 24, "label": "농어촌사회공헌인증기업 (농림축산부)", "category": "인증", "formKey": null },
+    { "no": 25, "label": "가족친화인증기업", "category": "인증", "formKey": null },
+    { "no": 26, "label": "직전 연도 정책자금 지원 후 10인 이상 고용창출기업", "category": "고용", "formKey": null },
+    { "no": 27, "label": "중소벤처기업부 인증 명문장수기업", "category": "인증", "formKey": null },
+    { "no": 28, "label": "일자리 안정자금 가입 기업", "category": "고용", "formKey": null },
+    { "no": 29, "label": "청년고용지원금 참여 기업", "category": "고용", "formKey": "고용지원금 참여" },
+    { "no": 30, "label": "작년 대비 매출액과 당기순이익 10% 이상 상승기업", "category": "재무", "formKey": "매출 또는 영업이익 10% 이상 증가" },
+    { "no": 31, "label": "창업 7년 미만 기업 (법인전환 기업은 처음 개인사업자 시점 기준 7년)", "category": "구조", "formKey": null }
+  ],
+  "usage": {
+    "formSelectable": "formKey 가 있는 항목은 진단 폼의 가점/강점 복수 선택지로 노출",
+    "coachAppeal": "면담 시 가점현황·증빙(특허출원증·인증서)을 눈으로 보여주는 것이 핵심 (인콜 스크립트 면담 포인트 6)"
+  }
+}

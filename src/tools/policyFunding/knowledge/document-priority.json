@@ -1,0 +1,31 @@
+{
+  "meta": {
+    "title": "자료 우선순위 (중요도 등급)",
+    "source": "김팀장 전자책 서류 준비 + 종합진단표 준비서류 + 승인 케이스 첨부자료 패턴",
+    "description": "documentPriorityEngine 이 고객 조건에 맞는 자료를 중요도 등급으로 묶어 '무엇을 반드시 준비해야 하는가'를 코칭한다. tier 5=반드시 필요, 4=있으면 매우 좋음, 3=보완 자료. condition 은 documentEngine 과 동일한 프로필 신호 키.",
+    "tierLegend": "★★★★★ 반드시 필요(없으면 접수·심사 불가) / ★★★★ 있으면 매우 좋음(승인률·한도 상승) / ★★★ 보완 자료(가점·설득력)"
+  },
+  "documents": [
+    { "key": "bizReg", "label": "사업자등록증", "tier": 5, "condition": "always", "why": "접수 기본 서류" },
+    { "key": "financial", "label": "표준재무제표 (3개년)", "tier": 5, "condition": "always", "why": "재무·상환 능력 판단의 근거" },
+    { "key": "vat", "label": "부가세과세표준증명원", "tier": 5, "condition": "always", "why": "실제 매출 규모 확인" },
+    { "key": "taxClear", "label": "국세/지방세 납세증명서", "tier": 5, "condition": "always", "why": "체납 시 사업성 이전에 접수가 막힘" },
+    { "key": "salesEvidence", "label": "매출 증빙 (POS·정산·세금계산서)", "tier": 5, "condition": "always", "why": "매출 논리의 실제 근거" },
+    { "key": "bizPlan", "label": "사업계획서", "tier": 5, "condition": "planCritical", "why": "직접대출·기술평가는 사업계획서가 승인을 좌우" },
+    { "key": "quote", "label": "설비 견적서", "tier": 5, "condition": "facility", "why": "시설자금 사용처 증빙의 핵심" },
+    { "key": "clientContract", "label": "거래처 계약서·발주서", "tier": 4, "condition": "majorClients", "why": "매출 증가분을 '예약된 수요'로 증명" },
+    { "key": "machinePhoto", "label": "기계·설비 사진", "tier": 4, "condition": "facility", "why": "심사관이 눈으로 확인하는 실체 자료" },
+    { "key": "factoryPhoto", "label": "공장·사업장 사진", "tier": 4, "condition": "manufacturingOrFacility", "why": "생산 실체와 투자 필요성 시각화" },
+    { "key": "patentCert", "label": "특허증·출원서", "tier": 4, "condition": "patent", "why": "기술 가점의 직접 증빙" },
+    { "key": "labCert", "label": "기업부설연구소 인정서", "tier": 4, "condition": "lab", "why": "R&D 역량 가점" },
+    { "key": "bizCert", "label": "기업인증서 (벤처·이노비즈·메인비즈)", "tier": 4, "condition": "certs", "why": "보증기관 우대·가점" },
+    { "key": "adData", "label": "광고 성과 데이터 (ROAS·전환)", "tier": 4, "condition": "advertising", "why": "광고비 투입의 매출 회수 근거" },
+    { "key": "inventoryData", "label": "재고 회전·정산 데이터", "tier": 4, "condition": "inventory", "why": "재고 매입 자금의 회전 근거" },
+    { "key": "exportProof", "label": "수출실적증명원", "tier": 4, "condition": "export", "why": "수출기업 우대 트랙 근거" },
+    { "key": "insuranceList", "label": "4대보험 가입자 명부", "tier": 3, "condition": "hasEmployees", "why": "고용 규모·고용 논리 뒷받침" },
+    { "key": "lease", "label": "사업장 임대차계약서", "tier": 3, "condition": "leased", "why": "사업장 실체 확인" },
+    { "key": "loanStatus", "label": "기대출 내역 (기관·시기·금액)", "tier": 3, "condition": "hasDebt", "why": "부채 관리·상환 계획의 근거" },
+    { "key": "selfFundProof", "label": "자기자금 증빙 (통장·예적금)", "tier": 3, "condition": "facility", "why": "자기자금 투입은 신뢰도를 크게 높임" },
+    { "key": "careerProof", "label": "대표 경력 증빙 (경력증명·이력)", "tier": 3, "condition": "always", "why": "대표 역량·사업 지속성 설득" }
+  ]
+}

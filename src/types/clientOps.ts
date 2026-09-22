@@ -391,6 +391,33 @@ export type ActivityKind =
   | 'profile' // 기업 기본 정보 변경
   | 'contract' // 계약 정보 변경 (계약일·방식·금액·보험)
   | 'archive' // 보관·보관 해제
+  | 'tool' // 도구함 결과를 붙임 (창업감면 판정 · 크레탑 분석 · 정책자금 진단 …)
+
+/**
+ * 도구함 결과 한 건 (D-88).
+ *
+ * 도구(창업감면 판정기·크레탑 분석기·정책자금 진단 …)에서 나온 판정을 업체 기록에 붙여 둔다.
+ * `summary` 는 고객에게 보여 줘도 되는 글(도구가 그렇게 만든 것만), `data` 는 다시 열어 볼 입력값.
+ * 내부 메모·수수료·업무 일기는 여기 들어오지 않는다 — 고객 플랫폼 발행은 `summary` 만 나간다.
+ */
+export interface ToolResult {
+  id: string
+  /** toolRegistry 의 key (startup-tax · cretop · policy-funding …) */
+  toolKey: string
+  /** 화면에 보일 이름 (예: "창업감면 판정") */
+  title: string
+  /** 도구가 정한 판정 키 (good/caution … 도구마다 다름). 없으면 null */
+  verdict: string | null
+  /** 판정을 사람 말로 (예: "🟢 감면 가능성 높음") */
+  verdictLabel: string
+  /** 고객에게도 보여 줄 수 있는 요약 글 */
+  summary: string
+  /** 다시 열어 볼 입력값·결과 (도구마다 모양이 다르다) */
+  data: unknown
+  createdAt: string
+  /** 고객 플랫폼에 발행했으면 그 update id */
+  publishedUpdateId: string | null
+}
 
 export interface ActivityEntry {
   id: string
@@ -468,6 +495,8 @@ export interface ClientOpsRecord {
   fees: FeeItem[]
   notes_list: ClientNote[]
   fundingApplications: FundingApplication[]
+  /** 도구함에서 붙인 결과들 — 최신이 앞 (D-88) */
+  toolResults: ToolResult[]
   /** 자동 활동 기록 — 최신순. 오래된 것은 잘라낸다. */
   activity: ActivityEntry[]
   /** 보관 처리 시각 (보관하면 목록·경고에서 빠진다) */

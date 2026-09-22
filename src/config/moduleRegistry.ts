@@ -9,6 +9,7 @@ import {
   FileCheck2,
   Filter,
   FlaskConical,
+  FlaskRound,
   Handshake,
   Inbox,
   Landmark,
@@ -22,7 +23,7 @@ import {
   Sun,
   Workflow,
 } from 'lucide-react'
-import { type ToolDefinition, liveTools } from './toolRegistry'
+import { REVIEW_HUB_PATH, type ToolDefinition, liveTools, reviewTools } from './toolRegistry'
 
 /**
  * 모듈 레지스트리 — 이 제품이 어떤 화면 묶음으로 구성되는지의 목록.
@@ -141,6 +142,10 @@ export const MODULES: ModuleDefinition[] = [
   { key: 'roadmap', label: '향후 확장', path: '/roadmap', icon: Compass, group: 'about', accent: 'system', enabled: true, status: 'next', hint: '아직 없는 기능과 계획' },
 
   ...toolModules(),
+  // 도입 검토중 — 검토중인 도구가 하나라도 있을 때만 한 줄 (D-88)
+  ...(reviewTools().length > 0
+    ? [{ key: 'tools-review', label: '도입 검토중', path: REVIEW_HUB_PATH, icon: FlaskRound, group: 'tools' as const, accent: 'system' as const, enabled: true, hint: '쓸 수는 있지만 아직 정식으로 들이지 않은 것' }]
+    : []),
   { key: 'tools', label: '도구함 전체', path: '/tools', icon: LayoutGrid, group: 'tools', accent: 'system', enabled: true, hint: '앞으로 붙을 것까지 한눈에' },
   { key: 'settings', label: '설정', path: '/settings', icon: Settings, group: 'settings', accent: 'system', enabled: true },
 ]

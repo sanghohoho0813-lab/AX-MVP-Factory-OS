@@ -1,0 +1,126 @@
+{
+  "meta": {
+    "title": "업셀링 항목 카탈로그",
+    "source": "김팀장 정책자금 전자책 PART 1 + 컨설팅 확장 로직",
+    "description": "정책자금 이후 자연스럽게 연결할 수 있는 추가 컨설팅 항목. 각 항목별 추천 조건·상담 멘트·필요 자료·정책자금과의 연결 이유·주의사항을 정리."
+  },
+  "upsells": [
+    {
+      "key": "employmentSubsidy",
+      "name": "고용지원금",
+      "recommendCondition": "직원(상시근로자)이 있거나 채용 예정인 경우",
+      "consultingScript": "직원을 고용 중이시면 청년내일채움·고용촉진장려금·두루누리 등 받을 수 있는 인건비 지원이 있는지 함께 점검해 드릴게요.",
+      "requiredDocuments": ["4대보험 가입자명부", "근로계약서", "급여대장"],
+      "linkReason": "정책자금(융자)로는 채용 후 인건비 부담이 남는데, 고용지원금으로 상환 없는 인건비 절감을 병행할 수 있음.",
+      "cautions": ["지원 요건·기간 확인", "고용 유지 조건 준수 필요"]
+    },
+    {
+      "key": "corporateResearchLab",
+      "name": "기업부설연구소",
+      "recommendCondition": "R&D·기술 인력 보유(제조·IT·기술 기업)",
+      "consultingScript": "연구·개발 인력이 있으시면 부설연구소(또는 연구개발전담부서) 인정으로 R&D 세액공제와 정책자금 가점을 동시에 확보할 수 있어요.",
+      "requiredDocuments": ["연구인력 명단·학력/경력", "연구 공간 도면", "연구개발 활동 자료"],
+      "linkReason": "기보·중진공 기술평가 가점과 연결되고, 세액공제로 절세 효과까지.",
+      "cautions": ["인정 요건(인력·공간) 충족 필요", "사후 관리 의무"]
+    },
+    {
+      "key": "venture",
+      "name": "벤처기업 확인",
+      "recommendCondition": "기술력·특허·연구소·R&D 요건 충족 기업",
+      "consultingScript": "기술 요건을 갖추셨다면 벤처기업 확인으로 법인세·취득세 감면과 기보·중진공 우대까지 연결됩니다.",
+      "requiredDocuments": ["기술 관련 증빙", "특허·인증서", "재무자료"],
+      "linkReason": "정책자금 심사 가점 + 세제 혜택 동시.",
+      "cautions": ["유형별(벤처투자·연구개발·혁신성장) 요건 상이"]
+    },
+    {
+      "key": "innobiz",
+      "name": "이노비즈(기술혁신형)",
+      "recommendCondition": "기술혁신 역량 보유 중소기업",
+      "consultingScript": "기술혁신 역량이 있으시면 이노비즈 인증으로 정책자금·판로·R&D에서 가점을 받을 수 있습니다.",
+      "requiredDocuments": ["기술혁신 활동 자료", "재무제표", "기술 인력 현황"],
+      "linkReason": "정책자금·정부지원사업 가점, 신뢰도 상승.",
+      "cautions": ["평가 지표 충족 필요", "3년 주기 재평가"]
+    },
+    {
+      "key": "mainbiz",
+      "name": "메인비즈(경영혁신형)",
+      "recommendCondition": "경영혁신 역량 보유(비기술 혁신 포함)",
+      "consultingScript": "기술보다 경영·마케팅 혁신 강점이 있으시면 메인비즈 인증으로 정책자금 우대를 받을 수 있어요.",
+      "requiredDocuments": ["경영혁신 활동 자료", "재무제표"],
+      "linkReason": "기술 요건이 약한 기업의 인증 대안, 정책자금 가점.",
+      "cautions": ["평가 지표 충족 필요"]
+    },
+    {
+      "key": "taxCredit",
+      "name": "세액공제",
+      "recommendCondition": "고용 증가·R&D·설비 투자가 있는 경우",
+      "consultingScript": "고용 증가·연구개발·설비 투자가 있으시면 통합고용세액공제·연구인력개발비 공제·통합투자세액공제를 놓치지 않게 챙겨드릴게요.",
+      "requiredDocuments": ["고용 증감 자료", "R&D 비용 내역", "투자 자산 내역", "재무제표"],
+      "linkReason": "정책자금으로 투자·고용한 결과를 세액공제로 회수.",
+      "cautions": ["요건·한도 확인", "사후 추징 요건 주의"]
+    },
+    {
+      "key": "corporateTaxSaving",
+      "name": "법인 절세",
+      "recommendCondition": "매출 규모 있는 법인(예: 매출 10억 이상)",
+      "consultingScript": "규모 있는 법인은 가지급금 정리·대표 급여/상여 설계·정관·임원보수 규정 정비로 법인세를 줄일 여지가 큽니다.",
+      "requiredDocuments": ["재무제표", "정관·임원보수 규정", "가지급금 내역"],
+      "linkReason": "정책자금 상담으로 확보한 재무 데이터를 절세 설계로 확장.",
+      "cautions": ["세무 전문가 협업 필요", "법적 요건 준수"]
+    },
+    {
+      "key": "corporateConversion",
+      "name": "법인전환",
+      "recommendCondition": "매출이 커진 개인사업자",
+      "consultingScript": "매출이 커진 개인사업자는 법인전환으로 세율 구조·대외 신뢰도·정책자금 한도 면에서 유리해질 수 있어요.",
+      "requiredDocuments": ["개인사업 재무자료", "자산·부채 현황"],
+      "linkReason": "법인 전환 후 정책자금 한도·신용도 상승.",
+      "cautions": ["전환 비용·양도세 등 사전 검토", "전환 시점 판단 중요"]
+    },
+    {
+      "key": "taxReclaim",
+      "name": "경정청구",
+      "recommendCondition": "과거 과다 납부 세금이 의심되는 경우(재무제표 오류 이력 포함)",
+      "consultingScript": "과거에 놓친 공제·과다 납부가 있으면 경정청구로 환급을 받을 수 있어요. 재무·세무 자료를 함께 점검해 드릴게요.",
+      "requiredDocuments": ["과거 재무제표·세무신고 자료"],
+      "linkReason": "정책자금 상담 중 발견한 재무·회계 이슈를 환급 기회로 연결.",
+      "cautions": ["청구 기한(통상 5년) 확인", "세무 전문가 검토"]
+    },
+    {
+      "key": "govProject",
+      "name": "정부지원사업/R&D",
+      "recommendCondition": "기술·아이디어·창업 초기·수출 등 무상지원 가능성",
+      "consultingScript": "기술·아이디어가 있으시면 창업패키지·스마트공장·R&D 과제 등 상환 부담 없는 정부지원사업을 함께 제안드릴게요.",
+      "requiredDocuments": ["사업/기술 개발 계획", "기술 자료", "재무자료"],
+      "linkReason": "대출(정책자금) 부담을 무상지원으로 일부 대체.",
+      "cautions": ["경쟁·정산 까다로움", "수행 역량 필요"]
+    },
+    {
+      "key": "exportVoucher",
+      "name": "수출바우처·무역금융",
+      "recommendCondition": "수출 실적·계획이 있는 경우",
+      "consultingScript": "수출 실적·계획이 있으시면 수출바우처와 무역보험·무역금융 연계로 다음 상담 주제를 만들 수 있어요.",
+      "requiredDocuments": ["수출 실적 자료", "거래처·계약 자료"],
+      "linkReason": "수출 기업의 마케팅·물류 비용을 바우처로 지원.",
+      "cautions": ["지원 분야·한도 확인"]
+    },
+    {
+      "key": "startupTaxRelief",
+      "name": "창업감면·청년창업 지원",
+      "recommendCondition": "창업 초기·청년 대표",
+      "consultingScript": "창업 초기·청년 대표시면 창업중소기업 세액감면과 청년창업 지원, 소진공·재단 창업 자금을 함께 챙길 수 있어요.",
+      "requiredDocuments": ["사업자등록증", "대표 나이·창업일 확인 자료"],
+      "linkReason": "창업 자금(정책자금)과 세액감면·지원사업을 묶어 초기 부담 최소화.",
+      "cautions": ["업종·지역·연령 요건 확인"]
+    },
+    {
+      "key": "businessSuccession",
+      "name": "가업승계·자산 컨설팅",
+      "recommendCondition": "규모 있는 법인·장업력 기업",
+      "consultingScript": "규모 있는 법인은 가업승계 준비·대표 자산 설계까지 장기 파트너십으로 발전시킬 수 있어요.",
+      "requiredDocuments": ["재무제표", "지분·자산 현황"],
+      "linkReason": "정책자금 관계를 장기 자산·승계 컨설팅으로 확장.",
+      "cautions": ["장기 설계·세무 전문가 협업 필요"]
+    }
+  ]
+}

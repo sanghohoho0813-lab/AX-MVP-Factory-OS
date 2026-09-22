@@ -1,0 +1,26 @@
+{
+  "meta": {
+    "title": "업셀링 판단 로직(트리거 규칙)",
+    "source": "김팀장 정책자금 전자책 PART 1 + 컨설팅 확장 로직",
+    "description": "고객 입력값·상태에 따라 어떤 업셀링을 언제 제안할지 자동 판단하는 트리거 규칙. funding-upsells.json 카탈로그의 key 를 참조."
+  },
+  "rules": [
+    { "trigger": "직원 있음(상시근로자 ≥ 1)", "recommendKeys": ["employmentSubsidy"], "note": "채용 인건비 지원 병행" },
+    { "trigger": "직원 증가(고용 증가 실적)", "recommendKeys": ["taxCredit"], "note": "통합고용세액공제" },
+    { "trigger": "제조·기술·특허 보유", "recommendKeys": ["corporateResearchLab", "venture", "innobiz"], "note": "연구소·벤처·이노비즈 인증" },
+    { "trigger": "매출 10억 이상 법인", "recommendKeys": ["corporateTaxSaving", "businessSuccession"], "note": "절세·정관·임원보수·법인 리스크 관리" },
+    { "trigger": "창업 초기·청년 대표", "recommendKeys": ["startupTaxRelief", "govProject"], "note": "창업감면·청년창업·소진공/재단" },
+    { "trigger": "수출 실적/계획 있음", "recommendKeys": ["exportVoucher"], "note": "수출바우처·무역금융" },
+    { "trigger": "R&D 가능성(기술 개발)", "recommendKeys": ["govProject", "corporateResearchLab"], "note": "무상지원금/R&D 우선 검토" },
+    { "trigger": "개인사업자 매출 증가", "recommendKeys": ["corporateConversion"], "note": "법인전환 검토" },
+    { "trigger": "재무제표 오류·과다 납부 의심", "recommendKeys": ["taxReclaim"], "note": "경정청구 환급 검토" },
+    { "trigger": "자금 승인 후 6~12개월 경과", "recommendKeys": ["employmentSubsidy", "taxCredit", "venture", "innobiz"], "note": "추가 자금·인증·세액공제 재접촉 타이밍" }
+  ],
+  "reContactTiming": {
+    "description": "자금 승인 후 재접촉 스케줄",
+    "windows": [
+      { "afterMonths": 6, "action": "성실 상환 확인 + 추가 자금·인증 가능성 점검" },
+      { "afterMonths": 12, "action": "재조달(더 좋은 조건) + 세액공제·절세 정산" }
+    ]
+  }
+}

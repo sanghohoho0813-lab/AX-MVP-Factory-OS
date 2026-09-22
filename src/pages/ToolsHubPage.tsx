@@ -1,14 +1,17 @@
 import { ArrowRight, BarChart3, FileCheck2, FlaskConical, FolderKanban, Lightbulb, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { PageHeader } from '../components/ui/PageHeader'
-import { ListSurface, Section } from '../components/ui/primitives'
-import { TOOLS } from '../config/toolRegistry'
+import { Badge, ListSurface, Section } from '../components/ui/primitives'
+import { REVIEW_HUB_PATH, TOOLS, type ToolDefinition } from '../config/toolRegistry'
 
 /**
- * 도구함 — 고객 기록과 상관없이 혼자 도는 것들이 모이는 곳 (D-86).
+ * 도구함 — 고객 기록과 상관없이 혼자 도는 것들이 모이는 곳 (D-86 · D-88).
  *
- * 앞으로 대표가 따로 만들어 둔 작은 OS 들이 여기로 들어온다. 그때 화면을 고치지 않도록
- * 목록은 `toolRegistry.ts` 한 곳에서 읽는다. 아직 없는 것은 **없다고 적고 누를 수 없게** 둔다.
+ * 대표가 따로 만들어 둔 작은 OS 들이 여기로 들어온다. 그때 화면을 고치지 않도록
+ * 목록은 `toolRegistry.ts` 한 곳에서 읽는다.
+ *   - 쓸 수 있는 것 → 카드, 누르면 들어간다
+ *   - 도입 검토중 → 따로 묶어 '검토중' 배지. 쓸 수는 있다
+ *   - 아직 없는 것 → **없다고 적고 누를 수 없게** 둔다
  *
  * 아래의 설계·진단·검증 목록은 AX STUDIO 로 가는 길이다 — 자주 쓰지 않으므로 도구 아래에 둔다.
  */
@@ -51,46 +54,88 @@ const SHORTCUTS = [
   { label: '전체 진행 현황', to: '/reports', icon: BarChart3 },
 ] as const
 
+export function ToolCard({ t }: { t: ToolDefinition }) {
+  const live = t.status !== 'planned' && t.path
+  const body = (
+    <>
+      <span className="flex items-center gap-2.5">
+        <t.icon aria-hidden="true" className={`size-5 shrink-0 ${live ? 'text-brand-600' : 'text-slate-300'}`} />
+        <span className={`t-card font-bold ${live ? 'text-slate-900' : 'text-slate-500'}`}>{t.label}</span>
+        {t.status === 'planned' && <Badge>아직 없음</Badge>}
+        {t.status === 'review' && <Badge tone="warning">검토중</Badge>}
+        {live && <ArrowRight aria-hidden="true" className="ml-auto size-4 shrink-0 text-slate-300" />}
+      </span>
+      <span className="t-sub mt-1.5 block break-keep text-slate-500">{t.desc}</span>
+      {t.origin && <span className="t-meta mt-1.5 block truncate text-slate-400">원본 {t.origin}</span>}
+    </>
+  )
+  return live ? (
+    <Link
+      to={t.path as string}
+      className="ax-lift tap flex flex-col rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3.5 hover:border-brand-300"
+      data-tool={t.key}
+    >
+      {body}
+    </Link>
+  ) : (
+    <div className="flex flex-col rounded-(--radius-panel) border border-dashed border-slate-300 bg-slate-50/60 px-4 py-3.5" data-tool={t.key}>
+      {body}
+    </div>
+  )
+}
+
 export function ToolsHubPage() {
+  const live = TOOLS.filter((t) => t.status === 'live')
+  const review = TOOLS.filter((t) => t.status === 'review')
+  const planned = TOOLS.filter((t) => t.status === 'planned')
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="도구함" description="계산기처럼 혼자 도는 것들이 모이는 곳입니다. 새로 만든 것도 여기로 들어옵니다." />
+      <PageHeader
+        title="도구함"
+        description="계산기·판정기·분석기처럼 혼자 도는 것들이 모이는 곳입니다. 대표가 따로 만들어 둔 OS 들의 핵심이 여기로 들어왔습니다. 전부 규칙 계산이고 외부 호출이 없습니다."
+      />
 
       <section aria-labelledby="tools-list" className="flex flex-col gap-3">
         <h2 id="tools-list" className="t-section text-slate-900">
-          도구
+          도구 <span className="t-meta font-medium text-slate-500">{live.length}개</span>
         </h2>
         <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-          {TOOLS.map((t) => {
-            const body = (
-              <>
-                <span className="flex items-center gap-2.5">
-                  <t.icon aria-hidden="true" className={`size-5 shrink-0 ${t.status === 'live' ? 'text-brand-600' : 'text-slate-300'}`} />
-                  <span className={`t-card font-bold ${t.status === 'live' ? 'text-slate-900' : 'text-slate-500'}`}>{t.label}</span>
-                  {t.status === 'planned' && (
-                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 t-meta font-medium text-slate-500">아직 없음</span>
-                  )}
-                  {t.status === 'live' && <ArrowRight aria-hidden="true" className="ml-auto size-4 shrink-0 text-slate-300" />}
-                </span>
-                <span className="t-sub mt-1.5 block break-keep text-slate-500">{t.desc}</span>
-              </>
-            )
-            return t.status === 'live' && t.path ? (
-              <Link
-                key={t.key}
-                to={t.path}
-                className="ax-lift tap flex flex-col rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3.5 hover:border-brand-300"
-              >
-                {body}
-              </Link>
-            ) : (
-              <div key={t.key} className="flex flex-col rounded-(--radius-panel) border border-dashed border-slate-300 bg-slate-50/60 px-4 py-3.5">
-                {body}
-              </div>
-            )
-          })}
+          {live.map((t) => (
+            <ToolCard key={t.key} t={t} />
+          ))}
         </div>
       </section>
+
+      {review.length > 0 && (
+        <section aria-labelledby="tools-review" className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-2">
+            <h2 id="tools-review" className="t-section text-slate-900">
+              도입 검토중 <span className="t-meta font-medium text-slate-500">{review.length}개</span>
+            </h2>
+            <Link to={REVIEW_HUB_PATH} className="t-sub font-medium text-brand-700 hover:underline">
+              왜 검토중인가
+            </Link>
+          </div>
+          <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+            {review.map((t) => (
+              <ToolCard key={t.key} t={t} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {planned.length > 0 && (
+        <section aria-labelledby="tools-planned" className="flex flex-col gap-3">
+          <h2 id="tools-planned" className="t-section text-slate-900">
+            자리만 잡아 둔 것
+          </h2>
+          <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+            {planned.map((t) => (
+              <ToolCard key={t.key} t={t} />
+            ))}
+          </div>
+        </section>
+      )}
 
       <section aria-labelledby="studio-links" className="flex flex-col gap-3">
         <h2 id="studio-links" className="t-section text-slate-900">

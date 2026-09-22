@@ -9,7 +9,7 @@ import {
   Landmark,
   ListChecks,
   UserPen,
-} from 'lucide-react'
+ Wrench } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { ActivityEntry, ActivityKind } from '../../types/clientOps'
 import { activityTimeText } from '../../services/clientOpsActivity'
@@ -32,6 +32,7 @@ const KIND_ICON: Record<ActivityKind, LucideIcon> = {
   profile: UserPen,
   contract: FileSignature,
   archive: Archive,
+  tool: Wrench,
 }
 
 /** 종류별 색 — 화면 테마와 분리된 고정 분류색을 쓴다 */
@@ -47,6 +48,7 @@ const KIND_CLASS: Record<ActivityKind, string> = {
   profile: 'bg-slate-100 text-slate-600',
   contract: 'bg-slate-100 text-slate-600',
   archive: 'bg-slate-100 text-slate-600',
+  tool: 'bg-slate-100 text-slate-600',
 }
 
 const PAGE = 12

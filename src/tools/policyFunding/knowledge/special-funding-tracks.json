@@ -1,0 +1,153 @@
+{
+  "meta": {
+    "title": "세부 자금 트랙 (특화·우대 자금)",
+    "source": "김팀장 전자책 승인 케이스(혁신성장촉진자금·스마트자금 등) + 소진공/중진공 특화자금 실무 패턴",
+    "description": "일반 기관 추천 위에, 고객 조건에 맞는 세부 트랙(우대 자금) 가능성을 판정한다. trackEngine 이 conditions 를 프로필 신호로 평가한다."
+  },
+  "tracks": [
+    {
+      "key": "innovation-growth",
+      "name": "혁신성장촉진자금",
+      "agencies": ["소상공인시장진흥공단"],
+      "recommendConditions": ["자동화 기기(서빙로봇·테이블오더 등) 도입/도입 예정", "생산성 향상 목적의 시설투자", "제조·음식·서비스 소상공인"],
+      "signals": { "any": ["automation", "facilityIntent"], "boost": ["manufacturing", "smallBiz"] },
+      "checkQuestions": ["자동화 기기(테이블오더·서빙로봇·키오스크 등)를 도입했거나 도입 예정인가요?", "도입 후 생산성(회전율) 변화를 숫자로 설명할 수 있나요?"],
+      "requiredDocuments": ["기기 견적서 또는 도입 계약", "도입 목적·효과 설명 자료"],
+      "favorableIndustries": ["음식/외식", "제조", "서비스"],
+      "cautions": ["세부 공고와 접수 시점 확인 필요", "일반 자금 대비 요건 확인 필수"],
+      "consultingScript": "자동화 기기를 도입하셨다면 일반 자금보다 한도·금리가 유리한 혁신성장촉진자금을 먼저 확인하겠습니다. 실제로 테이블오더 하나로 자금 요건이 바뀐 사례가 있습니다."
+    },
+    {
+      "key": "smart-factory",
+      "name": "스마트공장/자동화",
+      "agencies": ["중소벤처기업진흥공단", "정부지원사업"],
+      "recommendConditions": ["제조업", "설비 자동화·공정 개선 계획", "생산 데이터 관리 의지"],
+      "signals": { "all": ["manufacturing"], "any": ["facilityIntent", "automation"] },
+      "checkQuestions": ["자동화하려는 공정이 무엇인가요?", "현재 생산 병목·불량률을 숫자로 알고 있나요?"],
+      "requiredDocuments": ["설비 견적서", "공정도·생산 현황 자료"],
+      "favorableIndustries": ["제조"],
+      "cautions": ["스마트공장 지원사업은 공고 기간이 정해져 있음", "자부담 비율 확인"],
+      "consultingScript": "제조 설비 투자라면 스마트공장 지원사업과 중진공 시설자금을 병행 검토하면 무상+융자 조합이 가능합니다."
+    },
+    {
+      "key": "digital-transform",
+      "name": "디지털전환",
+      "agencies": ["소상공인시장진흥공단", "정부지원사업"],
+      "recommendConditions": ["오프라인 중심 사업의 온라인 확장", "스마트 기기·시스템 도입"],
+      "signals": { "any": ["onlineSales", "automation", "itService"] },
+      "checkQuestions": ["온라인 판매나 예약·주문 시스템 도입 계획이 있나요?"],
+      "requiredDocuments": ["도입 시스템 견적/계획", "현재 매출 구조 자료"],
+      "favorableIndustries": ["도소매", "서비스", "음식/외식"],
+      "cautions": ["단순 장비 구입이 아닌 '전환 스토리'가 필요"],
+      "consultingScript": "디지털 전환(온라인·스마트화) 계획이 있으면 스마트 자금 계열 우대 트랙을 노릴 수 있습니다."
+    },
+    {
+      "key": "online-platform",
+      "name": "온라인 판매/플랫폼",
+      "agencies": ["소상공인시장진흥공단", "중소벤처기업진흥공단"],
+      "recommendConditions": ["온라인 쇼핑몰·플랫폼 매출 보유", "온라인 매출 성장세"],
+      "signals": { "any": ["onlineSales"], "boost": ["growth"] },
+      "checkQuestions": ["온라인 매출 비중과 정산 데이터를 확보할 수 있나요?", "판매 채널(스마트스토어·쿠팡 등)은 어디인가요?"],
+      "requiredDocuments": ["플랫폼 정산 내역", "온라인 매출 증빙"],
+      "favorableIndustries": ["도소매"],
+      "cautions": ["정산 주기로 인한 현금 공백을 논리로 설명"],
+      "consultingScript": "온라인 매출 데이터 자체가 무기입니다. 정산 내역을 정리하면 온라인 판매 이력을 확장성으로 어필할 수 있습니다."
+    },
+    {
+      "key": "export",
+      "name": "수출/해외진출",
+      "agencies": ["수출바우처", "중소벤처기업진흥공단"],
+      "recommendConditions": ["수출 실적 또는 구체적 수출 계획"],
+      "signals": { "all": ["export"] },
+      "checkQuestions": ["수출실적증명원을 발급받을 수 있나요?", "해외 바이어·계약이 있나요?"],
+      "requiredDocuments": ["수출실적증명원", "해외 거래 계약/인보이스"],
+      "favorableIndustries": ["제조", "도소매"],
+      "cautions": ["실적 없으면 '계획'만으로는 약함 — 바이어 근거 필요"],
+      "consultingScript": "수출 실적이 있으면 수출바우처와 무역금융까지 연계해 다음 단계 자금을 설계할 수 있습니다."
+    },
+    {
+      "key": "esg",
+      "name": "탄소중립/ESG",
+      "agencies": ["중소벤처기업진흥공단", "정부지원사업"],
+      "recommendConditions": ["에너지 절감·친환경 설비 교체", "제조업 노후설비 교체"],
+      "signals": { "all": ["manufacturing", "facilityIntent"] },
+      "checkQuestions": ["교체 설비가 에너지 절감형인가요?", "전기료·연료비 절감 효과를 계산할 수 있나요?"],
+      "requiredDocuments": ["설비 사양서(에너지 효율)", "전기료 고지서"],
+      "favorableIndustries": ["제조"],
+      "cautions": ["친환경 요건 해당 여부를 견적 단계에서 확인"],
+      "consultingScript": "노후설비를 고효율 설비로 바꾸는 거라면 탄소중립 관련 우대 트랙 해당 여부를 함께 확인하겠습니다."
+    },
+    {
+      "key": "rnd",
+      "name": "R&D/기술개발",
+      "agencies": ["정부 R&D 무상 지원금", "기술보증기금"],
+      "recommendConditions": ["기술개발 아이템 보유", "특허·연구소·기술인력"],
+      "signals": { "any": ["tech"] },
+      "checkQuestions": ["개발하려는 기술·과제 아이템이 있나요?", "연구 인력이 있나요?"],
+      "requiredDocuments": ["기술개발 계획", "특허·연구소 증빙"],
+      "favorableIndustries": ["제조", "IT/지식서비스"],
+      "cautions": ["무상 R&D는 경쟁·정산이 까다로움 — 수행 역량 필요"],
+      "consultingScript": "기술 개발 요소가 있으면 갚는 돈(융자) 전에 안 갚는 돈(R&D 무상)을 먼저 확인하는 게 순서입니다."
+    },
+    {
+      "key": "youth-startup",
+      "name": "청년창업",
+      "agencies": ["중소벤처기업진흥공단", "소상공인시장진흥공단"],
+      "recommendConditions": ["만 39세 이하 대표", "창업 초기(7년 미만, 특히 3년 미만)"],
+      "signals": { "all": ["youth"], "boost": ["earlyStage"] },
+      "checkQuestions": ["대표님이 만 39세 이하인가요?", "관련 업종 경력이 있나요? (매출 없어도 경력으로 승부 가능)"],
+      "requiredDocuments": ["대표 신분증", "경력 증빙"],
+      "favorableIndustries": ["전 업종"],
+      "cautions": ["청년전용자금은 사업계획서·발표 완성도가 관건"],
+      "consultingScript": "만 39세 이하시면 청년전용자금이 열립니다. 매출 0원이어도 경력과 사업계획서로 최대 한도를 받은 사례가 있습니다."
+    },
+    {
+      "key": "women",
+      "name": "여성기업",
+      "agencies": ["소상공인시장진흥공단", "신용보증기금"],
+      "recommendConditions": ["여성기업 인증 보유 또는 여성 대표"],
+      "signals": { "all": ["womenCert"] },
+      "checkQuestions": ["여성기업 확인서를 보유하고 있나요?"],
+      "requiredDocuments": ["여성기업 확인서"],
+      "favorableIndustries": ["전 업종"],
+      "cautions": ["인증이 없으면 발급부터 (요건 충족 시 무료)"],
+      "consultingScript": "여성기업 확인서가 있으면 가점과 우대 트랙이 함께 열립니다."
+    },
+    {
+      "key": "restart",
+      "name": "재창업",
+      "agencies": ["중소벤처기업진흥공단", "소상공인시장진흥공단"],
+      "recommendConditions": ["폐업·회생 이후 재창업", "신용회복 이력"],
+      "signals": { "any": ["reliefHistory"] },
+      "checkQuestions": ["과거 폐업·회생 이력이 있나요?", "현재 신용 회복 상태는 어떤가요?"],
+      "requiredDocuments": ["신용회복 관련 서류", "재창업 사업계획"],
+      "favorableIndustries": ["전 업종"],
+      "cautions": ["재창업 전용 트랙은 일반 자금과 요건이 다름 — 이력을 숨기지 말 것"],
+      "consultingScript": "재기 이력이 있다면 오히려 재창업 전용 트랙이 있습니다. 이력을 숨기기보다 전용 경로로 접근하는 게 빠릅니다."
+    },
+    {
+      "key": "employment",
+      "name": "고용창출",
+      "agencies": ["중소벤처기업진흥공단", "고용지원금"],
+      "recommendConditions": ["추가 채용 계획", "최근 고용 증가"],
+      "signals": { "any": ["hiring"] },
+      "checkQuestions": ["몇 명을 언제 채용할 계획인가요?", "청년 채용이 포함되나요?"],
+      "requiredDocuments": ["채용 계획", "4대보험 가입자 명부"],
+      "favorableIndustries": ["전 업종"],
+      "cautions": ["고용 계획은 심사 가점 + 고용지원금 병행 포인트"],
+      "consultingScript": "채용 계획이 있으면 정책자금 가점과 고용지원금을 동시에 잡을 수 있습니다."
+    },
+    {
+      "key": "regional",
+      "name": "지역특화",
+      "agencies": ["지역신용보증재단", "지자체"],
+      "recommendConditions": ["지자체·지역재단의 분기별 한시 특례자금 대상"],
+      "signals": { "any": ["smallBiz"] },
+      "checkQuestions": ["사업장 소재지(관할 재단)가 어디인가요?"],
+      "requiredDocuments": ["사업자등록증(소재지 확인)"],
+      "favorableIndustries": ["전 업종(소상공인)"],
+      "cautions": ["지역별·분기별 한시 상품이라 타이밍이 전부 — 관할 재단 공고 확인"],
+      "consultingScript": "매출이 없어도 지역별·분기별 한시 특례자금 경로가 있습니다. 관할 재단 공고를 제가 확인하겠습니다."
+    }
+  ]
+}

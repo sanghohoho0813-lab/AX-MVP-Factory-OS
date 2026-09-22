@@ -1,0 +1,145 @@
+{
+  "meta": {
+    "title": "심사 체크포인트",
+    "source": "김팀장 정책자금 전자책 PART 1 + 부록 승인 케이스 패턴",
+    "description": "심사·실사에서 기관이 실제로 보는 항목을 구조화. 각 항목별로 심사 관점, 유리/불리 신호, 코치가 취할 액션을 정리. 진단 폼·고객 상세·리포트의 판단 근거로 활용."
+  },
+  "checkpoints": [
+    {
+      "key": "businessAge",
+      "label": "업력",
+      "whatReviewersSee": "사업 지속성·안정성. 업력이 짧으면 실적 부족으로 한도가 낮아질 수 있음.",
+      "favorable": ["업력 3년 이상", "동일 업종 경력 보유(창업 초기라도 강점)"],
+      "unfavorable": ["업력 1년 미만·창업 극초기", "업력 기준 미달 자금에 무리하게 접근"],
+      "coachAction": "업력이 짧으면 대표 경력·성장 스토리·창업 특화자금으로 보완. (사례: 매출 0원이어도 10년 경력 기반 청년창업 2억)"
+    },
+    {
+      "key": "revenue",
+      "label": "매출",
+      "whatReviewersSee": "상환 능력·사업 규모. 신보는 '연 매출의 약 1/6' 보증 공식을 사용.",
+      "favorable": ["매출 우상향 성장세", "안정적 매출 흐름"],
+      "unfavorable": ["매출 급락(반토막)", "현금 매출 위주로 신고 매출이 낮음"],
+      "coachAction": "매출이 낮거나 하락해도 '왜 그런지'와 '운영 지속'을 설명. 현금 매출은 스마트 자금 요건으로 보완."
+    },
+    {
+      "key": "credit",
+      "label": "신용(대표자 신용점수)",
+      "whatReviewersSee": "연체·대부업·저신용 여부. 상품·기관 선택이 갈림.",
+      "favorable": ["신용 우수(800~900점대)", "무연체 이력"],
+      "unfavorable": ["600점대 이하 저신용", "대부업·다중 연체 이력"],
+      "coachAction": "저신용은 미소금융·지역신보·소진공 특화 자금부터 단계 접근. 신용 회복 직후·기대출 0원은 오히려 강점으로 활용."
+    },
+    {
+      "key": "existingDebt",
+      "label": "기대출(기존 대출·보증 한도)",
+      "whatReviewersSee": "이미 소진된 보증·대출 한도, 매출 대비 부채비율.",
+      "favorable": ["기대출 0원(강점)", "기대출이 매출 대비 낮음"],
+      "unfavorable": ["보증 한도 소진", "기대출이 매출의 수 배(5배·8배 등)"],
+      "coachAction": "기관·시기·순서를 설계해 순차 신청. 고금리 2금융권·캐피탈은 대환으로 정리. 특례 자금 분할 접근."
+    },
+    {
+      "key": "taxArrears",
+      "label": "세금 체납",
+      "whatReviewersSee": "국세·지방세 체납은 대부분 기관에서 접수 자체를 막는 강한 결격 사유.",
+      "favorable": ["국세·지방세 완납"],
+      "unfavorable": ["세금 체납(1원이라도)"],
+      "coachAction": "체납은 신청 전 최우선 정리. 체납이 있으면 '문제없이 된다'고 절대 약속하지 말고 정리부터 안내."
+    },
+    {
+      "key": "socialInsurance",
+      "label": "4대보험",
+      "whatReviewersSee": "4대보험 가입·완납 상태, 상시근로자 수(소상공인 기준 판단).",
+      "favorable": ["4대보험 완납", "고용 인원 명확"],
+      "unfavorable": ["4대보험 미납", "상시근로자 수가 소상공인 기준 초과/불명확"],
+      "coachAction": "완납 확인 + 상시근로자 수로 소상공인 기준 충족 여부 판단. 직원 있으면 고용지원금 병행."
+    },
+    {
+      "key": "workplace",
+      "label": "사업장(실체)",
+      "whatReviewersSee": "실제 영업 여부·사업장 실체. 자택 사업장은 실사 리스크.",
+      "favorable": ["실제 영업 명확", "정돈된 사업장"],
+      "unfavorable": ["자택 사업장", "실체 불명확·영업 흔적 부족"],
+      "coachAction": "자택이라도 실사 대비를 철저히 하면 가능. 실사 전 사업장 정리·매출 증빙·거래처 자료 준비."
+    },
+    {
+      "key": "ceoHistory",
+      "label": "대표자 이력·구조",
+      "whatReviewersSee": "대표·임원 등재 구조, 타 회사 대출 제한 여부, 지분율.",
+      "favorable": ["관련 업종 경력", "깨끗한 임원 구조"],
+      "unfavorable": ["감사·등재 임원이 대출 제한 대상", "지분 구조 문제"],
+      "coachAction": "거절 원인이 대표 개인·구조 문제일 수 있음. 원인 파악 후 기관 전환·구조 정비."
+    },
+    {
+      "key": "industryCode",
+      "label": "업종(업종 코드)",
+      "whatReviewersSee": "사업자등록 업종 코드와 실제 업종 일치 여부, 업종별 취급 제한.",
+      "favorable": ["실제 업종과 코드 일치", "특화자금 대상 업종"],
+      "unfavorable": ["업종 코드 불일치(예: 실제 제조인데 도소매)", "생소·취급 거부 업종"],
+      "coachAction": "실제 제조면 업종 코드를 제조업으로 변경만 해도 조건 개선. 생소 업종은 실제 업무 범위 내 코드 전략적 정비."
+    },
+    {
+      "key": "employment",
+      "label": "고용",
+      "whatReviewersSee": "고용 인원·고용 증가 실적. 정책자금 가점·고용지원금 연계.",
+      "favorable": ["고용 증가 실적", "채용 계획"],
+      "unfavorable": ["1인 사업장(편견 리스크, 단 극복 가능)"],
+      "coachAction": "고용 증가는 가점·통합고용세액공제 연계. 1인 사업장도 생산성 개선 논리로 승인 가능."
+    },
+    {
+      "key": "certification",
+      "label": "인증(벤처·이노비즈·메인비즈)",
+      "whatReviewersSee": "벤처·이노비즈·메인비즈 등 인증 보유 시 가점·우대.",
+      "favorable": ["벤처·이노비즈·메인비즈 인증"],
+      "unfavorable": ["인증 전무(가점 부재)"],
+      "coachAction": "인증이 없으면 발표·실사 완성도로 보완하되, 사후 인증 취득을 업셀링으로 제안."
+    },
+    {
+      "key": "patent",
+      "label": "특허",
+      "whatReviewersSee": "특허 보유 시 기술평가 가점(특히 기보).",
+      "favorable": ["특허 보유·출원"],
+      "unfavorable": ["기술 근거 자료 부재"],
+      "coachAction": "특허·기술을 매출과 연결하는 자료 준비. 특허 있으면 기보 우선."
+    },
+    {
+      "key": "researchLab",
+      "label": "부설연구소",
+      "whatReviewersSee": "기업부설연구소·연구개발전담부서 인정 여부(기술기업 인정 강력 근거).",
+      "favorable": ["부설연구소 인정서 보유"],
+      "unfavorable": ["연구 인력 있으나 미인정"],
+      "coachAction": "연구 인력이 있으면 부설연구소 설립을 업셀링으로 제안(세액공제+가점)."
+    },
+    {
+      "key": "facilityFund",
+      "label": "시설투자(시설자금)",
+      "whatReviewersSee": "설비·시설 투자 계획의 구체성, 투자 후 생산성·매출 변화.",
+      "favorable": ["설비 견적·계약 근거", "투자 후 매출 시뮬레이션"],
+      "unfavorable": ["투자 근거·견적 부재"],
+      "coachAction": "'기계 사면 생산량/회전율 이만큼' 인과관계를 숫자로. 견적서·납품 독촉 등 객관 증거 확보."
+    },
+    {
+      "key": "workingCapital",
+      "label": "운전자금",
+      "whatReviewersSee": "매출·사업 지속성, 자금 사용처의 타당성.",
+      "favorable": ["매출 흐름·거래처 명확", "자금 사용처 구체적"],
+      "unfavorable": ["'그냥 돈이 필요' 식의 모호한 목적"],
+      "coachAction": "운전자금은 재무자료 정리 + '이 돈으로 이렇게 바뀐다'를 명확히."
+    },
+    {
+      "key": "businessPlan",
+      "label": "사업계획서",
+      "whatReviewersSee": "'왜 지금 이 돈이 필요한지'의 논리, 자금 투입 후 숫자 변화.",
+      "favorable": ["명확한 인과 논리", "업종 특성 반영"],
+      "unfavorable": ["논리 부족·일반론"],
+      "coachAction": "business-plan-questions.json의 질문으로 논리 구성. 업종별 포인트 반영."
+    },
+    {
+      "key": "fieldReview",
+      "label": "실사/면담 대응",
+      "whatReviewersSee": "실제 영업·자금 사용처·대표 답변의 신뢰성.",
+      "favorable": ["정돈된 사업장·증빙", "일관된 대표 답변 스크립트"],
+      "unfavorable": ["준비 부족·불리 요소 노출"],
+      "coachAction": "field-review-playbook.json으로 실사 전 체크·예상 질문·방어 논리 준비."
+    }
+  ]
+}

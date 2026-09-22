@@ -45,4 +45,7 @@
 
 ## 로컬 모드 키 (localStorage)
 
+- `axmvp.tools.<key>` — 도구함 입력값(창업감면 `startupTax` · 크레탑 `cretop` · 고용지원금 `employment.*` · 연구소 `labcare.*` · 정책자금 `policyFunding` · 영업 도구 `salesKit`). 참고용 입력이라 백업에 넣지 않는다 (D-88).
+- 도구 결과는 localStorage 가 아니라 업체 레코드 `operations_clients.payload.toolResults[]` 에 붙는다 — `{id, toolKey, title, verdict, verdictLabel, summary, data, createdAt, publishedUpdateId}`. 고객 노출 **P**(요약 `summary` 만, 발행했을 때만) · 민감도 M · 상한 50건 (D-88).
+
 `axmvp.v1.{operations_clients, ops_journal_entries, customer_events, portal_client_links, portal_updates, portal_requests, portal_documents}` — 로컬 백업(설정 > 데이터)에 함께 포함된다. 세금 계산기 입력은 `axmvp.tax.<계산기>` 에 따로 남는다(백업 대상 아님 — 참고용 계산 입력이지 고객 기록이 아니다, D-85). 로컬 모드의 고객 이벤트는 "샘플 만들기"로만 생기며 payload 에 `demo:true` 가 붙는다.

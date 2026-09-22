@@ -46,3 +46,7 @@ dist-ssr
 dist-qa*/
 .consulting-out
 .operator-out
+.startup-tax-out
+.tools-out
+.employment-out
+.labcare-out

@@ -10,7 +10,7 @@
 import { brand, documentTitle } from '../../brand/brand.config'
 import { UI_THEMES, isThemeKey } from '../../lib/uiTheme'
 import { MODULES, MODULE_GROUPS, enabledModulesByGroup, moduleForPath } from '../../config/moduleRegistry'
-import { TOOLS, liveTools, plannedTools } from '../../config/toolRegistry'
+import { REVIEW_HUB_PATH, TOOLS, liveTools, plannedTools, reviewTools } from '../../config/toolRegistry'
 import { formatClockDate, formatClockTime } from '../../components/layout/HeaderClock'
 import {
   CUSTOMER_STAGE_ORDER,
@@ -121,7 +121,12 @@ check('modules: AX STUDIO 는 접을 수 있고 기본 접힘', MODULE_GROUPS.fi
   check('도구함: 세금 계산기는 지금 쓸 수 있다', liveTools().some((t) => t.path === '/tools/tax'))
   check('도구함: 자리만 잡아 둔 것은 주소가 없다', plannedTools().every((t) => t.path === null))
   check('도구함: 자리만 잡아 둔 것은 그렇게 적는다', plannedTools().every((t) => t.desc.includes('아직 없습니다')))
-  check('도구함: 기업인증 OS · 크레탑 OS 자리', plannedTools().map((t) => t.label).join() === '기업인증 OS,크레탑 OS')
+  check('도구함: 자리만 잡아 둔 것은 기업인증 OS 하나 (크레탑은 들어왔다)', plannedTools().map((t) => t.label).join() === '기업인증 OS')
+  check('도구함: 옮겨 온 다섯 도구가 전부 쓸 수 있다', ['startup-tax', 'cretop', 'employment', 'labcare', 'policy-funding'].every((k) => liveTools().some((t) => t.key === k)))
+  check('도구함: 영업 도구 모음은 도입 검토중', reviewTools().map((t) => t.key).join() === 'sales-kit')
+  check('메뉴: 도입 검토중 한 줄이 도구함에 걸린다', MODULES.some((m) => m.key === 'tools-review' && m.group === 'tools' && m.path === REVIEW_HUB_PATH))
+  check('메뉴: 검토중 도구는 사이드바에 이름이 따로 안 걸린다', !MODULES.some((m) => m.path === '/tools/sales-kit'))
+  check('도구함: 모든 도구 주소가 /tools/ 아래', TOOLS.every((t) => t.path === null || t.path.startsWith('/tools/')))
   check('도구함: 키가 겹치지 않는다', new Set(TOOLS.map((t) => t.key)).size === TOOLS.length)
 }
 

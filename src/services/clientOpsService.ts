@@ -29,6 +29,7 @@ import {
   withActivity,
 } from './clientOpsActivity'
 import type {
+  ToolResult,
   ActivityEntry,
   ClientNote,
   ClientOpsRecord,
@@ -344,6 +345,7 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
           updatedAt: a.updatedAt ?? now,
         }))
       : [],
+    toolResults: normalizeToolResults(value.toolResults),
     activity: Array.isArray(value.activity)
       ? value.activity
           .filter((a) => a && typeof a.text === 'string' && typeof a.at === 'string')
@@ -913,6 +915,73 @@ export function withArchived(record: ClientOpsRecord, archived: boolean): Client
     { ...record, archivedAt: archived ? nowIso() : null },
     'archive',
     archived ? '보관 처리' : '보관 해제',
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* 도구함 결과 (D-88)                                                    */
+/* ------------------------------------------------------------------ */
+
+/** 저장된 도구 결과를 지금 모양으로. 모르는 값은 버리지 않고 빈 값으로 채운다. */
+function normalizeToolResults(value: unknown): ToolResult[] {
+  if (!Array.isArray(value)) return []
+  const out: ToolResult[] = []
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') continue
+    const r = raw as Partial<ToolResult>
+    if (typeof r.toolKey !== 'string' || !r.toolKey) continue
+    out.push({
+      id: typeof r.id === 'string' && r.id ? r.id : generateId(),
+      toolKey: r.toolKey,
+      title: typeof r.title === 'string' ? r.title : r.toolKey,
+      verdict: typeof r.verdict === 'string' ? r.verdict : null,
+      verdictLabel: typeof r.verdictLabel === 'string' ? r.verdictLabel : '',
+      summary: typeof r.summary === 'string' ? r.summary : '',
+      data: r.data ?? null,
+      createdAt: typeof r.createdAt === 'string' ? r.createdAt : nowIso(),
+      publishedUpdateId: typeof r.publishedUpdateId === 'string' ? r.publishedUpdateId : null,
+    })
+  }
+  return out
+}
+
+export const TOOL_RESULT_LIMIT = 50
+
+/** 도구 결과 한 건을 붙인다 — 최신이 앞, 상한을 넘으면 오래된 것부터 잘린다. */
+export function withToolResult(
+  record: ClientOpsRecord,
+  input: Omit<ToolResult, 'id' | 'createdAt' | 'publishedUpdateId'> & Partial<Pick<ToolResult, 'id' | 'createdAt' | 'publishedUpdateId'>>,
+): ClientOpsRecord {
+  const item: ToolResult = {
+    id: input.id ?? generateId(),
+    toolKey: input.toolKey,
+    title: input.title,
+    verdict: input.verdict ?? null,
+    verdictLabel: input.verdictLabel,
+    summary: input.summary,
+    data: input.data,
+    createdAt: input.createdAt ?? nowIso(),
+    publishedUpdateId: input.publishedUpdateId ?? null,
+  }
+  const text = item.verdictLabel ? `${item.title} · ${item.verdictLabel}` : item.title
+  return withActivity({ ...record, toolResults: [item, ...record.toolResults].slice(0, TOOL_RESULT_LIMIT) }, 'tool', text)
+}
+
+/** 고객 플랫폼에 발행한 뒤 그 update id 를 기억해 둔다 (두 번 발행하지 않기 위해) */
+export function withToolResultPublished(record: ClientOpsRecord, resultId: string, updateId: string | null): ClientOpsRecord {
+  return {
+    ...record,
+    toolResults: record.toolResults.map((r) => (r.id === resultId ? { ...r, publishedUpdateId: updateId } : r)),
+  }
+}
+
+export function withoutToolResult(record: ClientOpsRecord, resultId: string): ClientOpsRecord {
+  const prev = record.toolResults.find((r) => r.id === resultId)
+  if (!prev) return record
+  return withActivity(
+    { ...record, toolResults: record.toolResults.filter((r) => r.id !== resultId) },
+    'tool',
+    `${prev.title} 결과 지움`,
   )
 }
 
