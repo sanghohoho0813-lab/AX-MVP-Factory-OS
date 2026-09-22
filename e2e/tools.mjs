@@ -121,6 +121,60 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(400)
   check('연구소: 화면이 열린다', (await page.getByRole('heading', { level: 1 }).innerText()).includes('연구소'))
 
+  /* ---- D-89: 업체에서 도구 열기 → 결과·기한이 그 업체로 ---- */
+  // 업체 상세에 '이 업체로 도구 열기' 줄이 있고, 거기서 연 도구에는 업체 띠가 뜬다
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  check('업체 상세: 이 업체로 도구 열기 줄', (await page.getByTestId('client-tools').locator('a[data-tool]').count()) >= 5)
+  await page.getByTestId('client-tools').locator('a[data-tool="employment"]').click()
+  await page.waitForTimeout(900)
+  check('업체에서 연 도구: 주소에 업체가 붙는다', page.url().includes('/tools/employment?client=cli_hansol'), page.url())
+  const banner = page.getByTestId('tool-client-banner')
+  check('업체에서 연 도구: 업체 띠가 뜬다', (await banner.count()) === 1 && (await banner.innerText()).includes('한솔테크'), (await banner.innerText().catch(() => '없음')).slice(0, 80))
+  check('업체에서 연 도구: 업체로 돌아가는 길', (await banner.getByRole('link', { name: /업체로 돌아가기/ }).count()) === 1)
+
+  // 회차 일정 → 한 번 눌러 붙이고, 기한이 달력에 뜨는지
+  await page.getByRole('tab', { name: /회차 일정/ }).click()
+  await page.waitForTimeout(300)
+  await page.getByLabel('입사일').fill('2026-03-02')
+  await page.waitForTimeout(400)
+  const quick = page.getByTestId('tool-attach-quick').first()
+  check('업체에서 연 도구: 고르는 단계 없이 그 업체로', (await quick.innerText()).includes('한솔테크'), await quick.innerText())
+  await quick.click()
+  await page.waitForTimeout(800)
+  check('붙인 뒤: 보러 가기 링크', (await page.getByRole('link', { name: /한솔테크\(주\) 에 붙음/ }).count()) === 1)
+
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  const results = (await page.getByTestId('tool-results').innerText()) ?? ''
+  check('업체 상세: 회차 일정 결과가 붙었다', results.includes('회차 일정'))
+  check('업체 상세: 기한이 달력에 올라갔다고 알려 준다', /기한 \d+건이 달력에 있습니다/.test(results), results.slice(0, 160))
+  await page.goto(BASE + '/ops/calendar', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  const calText = (await page.locator('main').innerText()) ?? ''
+  check('달력: 도구 기한 종류가 생겼다', calText.includes('도구 기한'), calText.slice(0, 200))
+
+  // 세금 계산기도 같은 단추로 붙는다 (D-89)
+  await page.goto(BASE + '/tools/tax?c=t6&client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const taxQuick = page.getByTestId('tool-attach-quick').first()
+  check('세금 계산기: 업체를 물고 오면 붙이기 단추', (await taxQuick.count()) === 1 && (await taxQuick.innerText()).includes('한솔테크'), await taxQuick.innerText().catch(() => '없음'))
+  await taxQuick.click()
+  await page.waitForTimeout(800)
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  check('업체 상세: 세금 계산 결과도 붙는다', (await page.getByTestId('tool-results').innerText()).includes('퇴직'), (await page.getByTestId('tool-results').innerText()).slice(0, 120))
+
+  // 전역 검색에서 도구 찾기 (이름이 아닌 말로)
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  await page.keyboard.press('Control+k')
+  await page.waitForTimeout(300)
+  await page.getByPlaceholder(/검색/).fill('부채비율')
+  await page.waitForTimeout(400)
+  check('검색: 부채비율 → 크레탑 분석기', (await page.locator('body').innerText()).includes('크레탑 분석기'))
+  await page.keyboard.press('Escape')
+
   // 도입 검토중
   await page.goto(BASE + '/tools/review', { waitUntil: 'networkidle' })
   await page.waitForTimeout(300)
@@ -136,7 +190,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const page = await ctx.newPage()
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
-  for (const p of ['/tools', '/tools/startup-tax', '/tools/cretop', '/tools/policy-funding?sample=1', '/tools/sales-kit', '/tools/employment', '/tools/labcare', '/tools/review']) {
+  for (const p of ['/tools', '/tools/startup-tax', '/tools/cretop', '/tools/policy-funding?sample=1', '/tools/sales-kit', '/tools/employment', '/tools/labcare', '/tools/review', '/tools/cretop?client=cli_hansol']) {
     await page.goto(BASE + p, { waitUntil: 'networkidle' })
     await page.waitForTimeout(500)
     const w = await page.evaluate(() => document.documentElement.scrollWidth)
@@ -146,5 +200,5 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 }
 
 await browser.close()
-console.log(`\n도구함 이식(여섯 도구·붙이기·검토중): ${pass} passed, ${fail} failed`)
+console.log(`\n도구함(여섯 도구·붙이기·업체에서 열기·기한·검색): ${pass} passed, ${fail} failed`)
 process.exit(fail > 0 ? 1 : 0)

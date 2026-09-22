@@ -987,7 +987,16 @@ export function withToolResult(
     publishedUpdateId: input.publishedUpdateId ?? null,
   }
   const text = item.verdictLabel ? `${item.title} · ${item.verdictLabel}` : item.title
-  return withActivity({ ...record, toolResults: [item, ...record.toolResults].slice(0, TOOL_RESULT_LIMIT) }, 'tool', text)
+  // 같은 도구의 같은 결과를 다시 붙이면, 먼저 붙였던 기한은 달력에서 내린다 (D-89).
+  // 입사일을 고쳐 다시 판정했는데 옛 회차 날짜가 달력에 함께 남아 있으면 무엇이 맞는지 알 수 없다.
+  // 옛 결과 자체는 기록으로 남는다 — 기한만 비운다.
+  const prior =
+    item.deadlines.length > 0
+      ? record.toolResults.map((r) =>
+          r.toolKey === item.toolKey && r.title === item.title && r.deadlines.length > 0 ? { ...r, deadlines: [] } : r,
+        )
+      : record.toolResults
+  return withActivity({ ...record, toolResults: [item, ...prior].slice(0, TOOL_RESULT_LIMIT) }, 'tool', text)
 }
 
 /** 고객 플랫폼에 발행한 뒤 그 update id 를 기억해 둔다 (두 번 발행하지 않기 위해) */

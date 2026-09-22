@@ -18,6 +18,7 @@ import { BottomSheet } from '../../components/ui/primitives'
 import type { ClientOpsRecord, ToolDeadline } from '../../types/clientOps'
 import { saveClient, withToolResult, withToolResultPublished } from '../../services/clientOpsService'
 import { listLinksForClient, publishUpdate } from '../../services/customerBridgeService'
+import { buildToolPublishInput } from '../../services/toolPublish'
 import { matchesClientSearch } from '../../services/clientOpsSearch'
 import { useToolClient } from './toolClientContext'
 
@@ -102,13 +103,8 @@ export function ToolResultAttach(props: ToolResultAttachProps) {
         const links = await listLinksForClient(workspaceId, target.id)
         const link = links.find((l) => l.status === 'active') ?? links[0]
         if (link) {
-          const update = await publishUpdate(workspaceId, {
-            linkId: link.id,
-            category: 'result',
-            title: `${props.title} 결과`,
-            body: props.summary,
-            customerActionRequired: false,
-          })
+          // 고객에게 나가는 것은 이 함수 하나가 정한다 (D-89) — 제목과 요약 글뿐
+          const update = await publishUpdate(workspaceId, buildToolPublishInput(link.id, { title: props.title, summary: props.summary }))
           const resultId = next.toolResults[0]?.id
           if (resultId) next = await saveClient(withToolResultPublished(next, resultId, update.id))
           publishedNote = ' · 고객 플랫폼에도 발행했습니다'

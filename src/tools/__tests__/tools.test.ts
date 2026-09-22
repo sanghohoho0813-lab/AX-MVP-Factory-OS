@@ -36,6 +36,8 @@ import { buildClientSchedule, SCHEDULE_KIND_LABEL } from '../../services/clientO
 import { roundDeadlines } from '../employment/lib/toolDeadlines'
 import { changeDeadlines, surveyDeadlineDate } from '../labcare/lib/toolDeadlines'
 import { TOOLS, liveTools, plannedTools, reviewTools, searchTools, toolOf } from '../../config/toolRegistry'
+import { buildToolPublishInput, isToolResultPublished } from '../../services/toolPublish'
+import { listUpdates, publishUpdate } from '../../services/customerBridgeService'
 import { judge } from '../startupTax/lib/judgement'
 import { EMPTY_FORM } from '../startupTax/lib/formDefaults'
 
@@ -198,6 +200,24 @@ function check(name: string, cond: boolean, detail?: string): void {
     deadlines: Array.from({ length: TOOL_DEADLINE_LIMIT + 5 }, (_, i) => ({ date: `2026-10-${String((i % 28) + 1).padStart(2, '0')}`, title: `r${i}`, note: '' })),
   })
   check('기한: 상한을 넘기지 않는다', overflow.toolResults[0].deadlines.length === TOOL_DEADLINE_LIMIT)
+  // 다시 판정해 붙이면 옛 기한은 달력에서 내린다 (결과 자체는 남는다)
+  {
+    const again = withToolResult(withDeadlines, {
+      toolKey: 'employment',
+      title: '고용지원금 회차 일정',
+      verdict: null,
+      verdictLabel: '청년일자리도약장려금',
+      summary: '다시 판정',
+      data: null,
+      deadlines: [{ date: '2026-11-01', title: '1회차 신청(고친 입사일)', note: '' }],
+    })
+    const ev = buildClientSchedule(again, '2026-09-22').filter((e) => e.kind === 'tool')
+    check('기한: 다시 붙이면 옛 기한은 달력에서 내려간다', ev.length === 1 && ev[0].title.includes('고친 입사일'), JSON.stringify(ev.map((e) => e.title)))
+    check('기한: 옛 결과 자체는 기록에 남는다', again.toolResults.length === 2 && again.toolResults[1].summary === '요약')
+    const other = withToolResult(again, { toolKey: 'labcare', title: '연구소 기한', verdict: null, verdictLabel: '', summary: '', data: null, deadlines: [{ date: '2027-04-30', title: '활동조사', note: '' }] })
+    check('기한: 다른 도구의 기한은 건드리지 않는다', buildClientSchedule(other, '2026-09-22').filter((e) => e.kind === 'tool').length === 2)
+  }
+
   check('기한: 결과에 기한이 없으면 달력에도 없다', buildClientSchedule(withToolResult(base, { toolKey: 'cretop', title: 'x', verdict: null, verdictLabel: '', summary: '', data: null }), '2026-09-22').filter((e) => e.kind === 'tool').length === 0)
 
   // 고용지원금: 받은 회차는 심지 않는다
@@ -245,6 +265,51 @@ function check(name: string, cond: boolean, detail?: string): void {
   const r = judge({ ...EMPTY_FORM, businessType: 'corporation', birthDate: '1995-03-01', startupDate: '2025-01-15', overconcentration: 'no', industry: 'manufacturing', startupForm: 'brand_new' }, new Date('2026-09-22'))
   check('창업감면: 청년·비과밀·제조·신규 → 종합 good', r.overall === 'good', r.overall)
   check('창업감면: 기본 폼(빈칸)도 판정기가 죽지 않는다', typeof judge(EMPTY_FORM, new Date('2026-09-22')).overall === 'string')
+}
+
+/* ---- 7. 고객 플랫폼으로 나가는 것 (D-89) ---- */
+// "도구 결과를 발행하면 고객이 무엇을 보는가" 를 못 박는다.
+// 나가는 것은 제목과 요약뿐 — 입력값·기한·판정 키·내부 메모·수수료는 나가지 않는다.
+{
+  const store = new Map<string, string>()
+  ;(globalThis as unknown as { localStorage: unknown }).localStorage = {
+    get length() {
+      return store.size
+    },
+    key: (i: number) => [...store.keys()][i] ?? null,
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => void store.set(k, v),
+    removeItem: (k: string) => void store.delete(k),
+    clear: () => store.clear(),
+  }
+
+  const summary = '[창업감면 사전진단 결과]\n· 판정: 감면 가능성 높음\n· 근거: 청년 · 비과밀 · 제조업'
+  const input = buildToolPublishInput('link-1', { title: '창업감면 판정', summary })
+  check('발행: 갈래는 결과(result)', input.category === 'result')
+  check('발행: 제목은 도구 이름 + 결과', input.title === '창업감면 판정 결과', input.title)
+  check('발행: 본문은 요약 글 그대로', input.body === summary)
+  check('발행: 고객이 할 일은 없다', input.customerActionRequired === false)
+  const keys = Object.keys(input).sort().join()
+  check('발행: 그 밖의 것은 담지 않는다', keys === 'body,category,customerActionRequired,linkId,title', keys)
+
+  // 실제로 내보내 본다 (로컬 모드) — 저장된 글에 내부 정보가 없어야 한다
+  const published = await publishUpdate(null, input)
+  check('발행: 저장된 글이 공개 상태', published.status === 'published')
+  const stored = await listUpdates(null, 'link-1')
+  const raw = JSON.stringify(stored)
+  check('발행: 고객이 보는 목록에 한 줄 생긴다', stored.length === 1 && stored[0].title === '창업감면 판정 결과', raw.slice(0, 120))
+  check('발행: 저장본에 요약이 그대로', raw.includes('감면 가능성 높음'))
+  for (const secret of ['수수료', '내부 메모', 'businessNumber', 'startupDate', '입력값']) {
+    check(`발행: 저장본에 '${secret}' 가 없다`, !raw.includes(secret))
+  }
+
+  const once = withToolResult(normalizeClientOps({ id: 'p1', companyName: 'P사', workspaceId: null }), {
+    toolKey: 'startup-tax', title: '창업감면 판정', verdict: 'good', verdictLabel: '높음', summary, data: { birthDate: '1995-03-01' },
+  })
+  check('발행: 붙인 직후에는 아직 안 보냈다', isToolResultPublished(once.toolResults[0]) === false)
+  const marked = withToolResultPublished(once, once.toolResults[0].id, published.id)
+  check('발행: 한 번 보내면 그렇게 기억한다 (두 번 안 보낸다)', isToolResultPublished(marked.toolResults[0]) === true)
+  check('발행: 입력값은 우리 기록에만 남는다', JSON.stringify(marked.toolResults[0].data).includes('1995-03-01') && !raw.includes('1995-03-01'))
 }
 
 console.log(`\ntools: ${passed} passed, ${failed} failed`)

@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { PageHeader } from '../components/ui/PageHeader'
+import { ToolResultAttach } from '../tools/shared/ToolResultAttach'
 import { Button } from '../components/ui/Button'
 import {
   TAX_CALCULATORS,
@@ -49,6 +50,30 @@ function withCommas(raw: string): string {
   if (raw.trim() === '') return ''
   const n = cleanNum(raw)
   return n.toLocaleString('en-US', { maximumFractionDigits: 4 })
+}
+
+/** 결과에서 가장 큰 줄 하나 — 배지에 그대로 쓴다 */
+function headlineOf(blocks: Block[]): string {
+  for (const b of blocks) {
+    const big = b.lines.find((l) => l.cls === 'big') ?? b.lines.find((l) => l.cls === 'highlight')
+    if (big) return `${big.k} ${big.v}`
+  }
+  const first = blocks[0]?.lines.find((l) => l.cls !== 'divider')
+  return first ? `${first.k} ${first.v}` : ''
+}
+
+/** 업체 기록·카톡에 그대로 붙일 글 — 화면에 보이는 줄을 그대로 옮긴다 */
+function summaryOf(title: string, subLabel: string, blocks: Block[]): string {
+  const out: string[] = [`[${title}${subLabel ? ` · ${subLabel}` : ''} 계산 결과]`]
+  for (const b of blocks) {
+    out.push('', `■ ${b.title}`)
+    for (const l of b.lines) {
+      if (l.cls === 'divider') out.push(`· ${l.k}`)
+      else out.push(`  ${l.k}: ${l.v}`)
+    }
+  }
+  out.push('', '기업지원단 배포본과 같은 계산식입니다. 실제 신고·집행 전에는 담당 세무사 검토가 필요합니다.')
+  return out.join('\n')
 }
 
 const inputCls =
@@ -312,6 +337,19 @@ export function TaxCalculatorsPage() {
               </div>
             ))}
             {sub.note && <p className="t-sub rounded-(--radius-control) border-l-4 border-amber-400 bg-amber-50 px-3 py-2 break-keep text-slate-600">{sub.note}</p>}
+            {/* 계산 결과도 업체 기록에 붙는다 (D-89) — 다른 도구와 같은 단추 */}
+            {out.blocks.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <ToolResultAttach
+                  toolKey="tax"
+                  title={`${calc.title}${calc.subs.length > 1 ? ` · ${sub.label}` : ''}`}
+                  verdict={null}
+                  verdictLabel={headlineOf(out.blocks)}
+                  summary={summaryOf(calc.title, calc.subs.length > 1 ? sub.label : '', out.blocks)}
+                  data={{ calc: calc.key, sub: sub.key, values }}
+                />
+              </div>
+            )}
           </div>
         </div>
 
