@@ -43,6 +43,7 @@ const KpiPage = lazy(() => import('../pages/KpiPage').then((m) => ({ default: m.
 const RoadmapPage = lazy(() => import('../pages/RoadmapPage').then((m) => ({ default: m.RoadmapPage })))
 const JournalPage = lazy(() => import('../pages/JournalPage').then((m) => ({ default: m.JournalPage })))
 const CustomerInboxPage = lazy(() => import('../pages/CustomerInboxPage').then((m) => ({ default: m.CustomerInboxPage })))
+const PartnerHandoffPage = lazy(() => import('../pages/PartnerHandoffPage').then((m) => ({ default: m.PartnerHandoffPage })))
 const ConsultingStudioPage = lazy(() => import('../pages/ConsultingStudioPage').then((m) => ({ default: m.ConsultingStudioPage })))
 const ConsultingProjectPage = lazy(() => import('../pages/ConsultingProjectPage').then((m) => ({ default: m.ConsultingProjectPage })))
 
@@ -352,6 +353,7 @@ export const appRouteChildren = [
       { path: 'journal', element: <JournalPage /> },
       { path: 'journal/:range', element: <JournalPage /> },
       { path: 'ops/inbox', element: <CustomerInboxPage /> },
+      { path: 'ops/inbox/handoff/:handoffId', element: <PartnerHandoffPage /> },
       { path: 'ops/clients', element: <OperationsHubPage /> },
       { path: 'ops/calendar', element: <OpsCalendarPage /> },
       // 영업자 정산 — 누구한테 지금 얼마를 줘야 하는가 (D-78)

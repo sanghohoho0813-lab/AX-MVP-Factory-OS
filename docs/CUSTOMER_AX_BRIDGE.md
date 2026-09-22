@@ -66,3 +66,17 @@
 - SQL·RLS·RPC·트리거·테스트: **작성 완료, 로컬 PostgreSQL 16 에서 녹색**.
 - Production Supabase(`mirae-ai-lab`) 적용: **미적용 (READY)** — Claude 환경에서 project 자격증명·CLI 가 없어 임의 apply 하지 않았다. 적용 절차는 `docs/SETUP.md`.
 - 적용 전 화면 동작: 내부 이벤트함·고객 플랫폼 탭은 "준비 중(READY)" 안내, 고객 `/my-projects` 는 "준비하고 있습니다" 안내. 나머지 기능 정상.
+
+## 부록 — AX Partner OS 에서 오는 이벤트 (`ax_proposal_requested`)
+
+파트너 컨설턴트용 앱(`miraeailab-ax-sales-os`)이 1차 미팅을 마치고 보내는 "2차 AX 제안 요청" 이다. 같은 Supabase 프로젝트를 쓰며, 이 앱은 **읽기만** 한다.
+
+| 항목 | 값 |
+|---|---|
+| event_type | `ax_proposal_requested` (priority high) — `20260922000002_partner_os_bridge.sql` 이 check 제약에 추가 |
+| source | `source_type='partner_handoff'`, `source_id=<partner_handoffs.id>` |
+| customer_safe_payload | `company_name, representative_name?, phone?, industry, headcount, trade_type, consultant_name, meeting_date, ax_need, scope_level, scope_label, top_problems, followup_count, key_quote, source, handoff_id, meeting_id` — 내부 메모 없음 |
+| 상세 패킷 | `partner_handoffs.payload` (워크스페이스 owner/admin 이 읽을 수 있다) → `/ops/inbox/handoff/:handoff_id` |
+| 역방향 | 이 앱에서 이벤트를 `linked`/`in_progress` 로 바꾸면 파트너 화면이 "검토 중", `resolved` 면 "2차 제안 준비 완료" 가 된다(DB 트리거). 별도 호출 없음 |
+
+화면: 이벤트함 카드에 "제안 요청 내용 보기" 링크 → 상세 페이지의 **[2차 제안 만들기]** 가 이벤트를 처리 중으로 바꾸고 고객사 운영 화면으로 보낸다(연결 전이면 먼저 고객사 연결 — 자동 병합 없음).

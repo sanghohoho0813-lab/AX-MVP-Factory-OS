@@ -41,6 +41,7 @@ export const EVENT_TYPE_LABEL: Record<CustomerEventType, string> = {
   customer_action_completed: '요청 조치 완료',
   customer_reply: '고객 답변',
   profile_updated: '고객 정보 변경',
+  ax_proposal_requested: '신규 2차 AX 제안 요청',
 }
 
 export const EVENT_STATUS_LABEL: Record<CustomerEventStatus, string> = {
@@ -115,6 +116,14 @@ export function eventSummary(e: CustomerEvent): { who: string; what: string } {
       return { who, what: '답변을 남겼습니다' }
     case 'profile_updated':
       return { who, what: '계정 정보를 바꿨습니다' }
+    case 'ax_proposal_requested':
+      return {
+        who,
+        what: `1차 AX 미팅 후 2차 제안 요청 · 담당 ${str('consultant_name') || '파트너'}${str('scope_label') ? ` · 예상 구축 ${str('scope_label')}` : ''}${str('top_problems') ? ` · ${str('top_problems')}` : ''}`,
+      }
+    default:
+      // 아직 모르는 이벤트 종류가 와도 이벤트함이 깨지지 않게 한다
+      return { who, what: `${EVENT_TYPE_LABEL[e.eventType] ?? e.eventType}` }
   }
 }
 

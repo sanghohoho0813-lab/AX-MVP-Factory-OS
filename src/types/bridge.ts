@@ -45,6 +45,8 @@ export type CustomerEventType =
   | 'customer_action_completed'
   | 'customer_reply'
   | 'profile_updated'
+  /** AX Partner OS — 파트너 컨설턴트가 1차 미팅을 마치고 보낸 2차 제안 요청 (partner_handoffs) */
+  | 'ax_proposal_requested'
 
 export type CustomerEventStatus = 'new' | 'linked' | 'in_progress' | 'resolved' | 'ignored'
 export type CustomerEventPriority = 'high' | 'medium' | 'low'

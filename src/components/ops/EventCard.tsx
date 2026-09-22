@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Building2, ChevronDown, ChevronUp, Link2, Plus, RotateCcw } from 'lucide-react'
+import { Building2, ChevronDown, ChevronUp, FileText, Link2, Plus, RotateCcw } from 'lucide-react'
 import type { CustomerEvent, CustomerEventStatus } from '../../types/bridge'
 import {
   EVENT_STATUS_LABEL,
@@ -53,6 +53,17 @@ const FIELD_LABEL: Record<string, string> = {
   document_type: '서류 종류',
   file_name: '파일',
   source: '유입 경로',
+  // AX Partner OS 전달 (ax_proposal_requested)
+  consultant_name: '담당 파트너',
+  meeting_date: '미팅 일시',
+  headcount: '인원',
+  trade_type: '거래형태',
+  ax_need: 'AX 필요도',
+  scope_level: '예상 구축 등급',
+  scope_label: '예상 구축',
+  top_problems: '핵심 문제',
+  followup_count: '추가 확인',
+  key_quote: '대표 핵심발언',
 }
 
 /**
@@ -81,7 +92,8 @@ export function EventCard({
     event.eventType === 'service_order_created' && typeof event.payload.product_slug === 'string'
       ? suggestServiceForProduct(event.payload.product_slug)
       : null
-  const fields = Object.entries(event.payload).filter(([k, v]) => k !== 'demo' && k !== 'intake' && typeof v === 'string' && v !== '')
+  const fields = Object.entries(event.payload).filter(([k, v]) => k !== 'demo' && k !== 'intake' && k !== 'handoff_id' && k !== 'meeting_id' && typeof v === 'string' && v !== '')
+  const handoffId = event.eventType === 'ax_proposal_requested' && typeof event.payload.handoff_id === 'string' ? event.payload.handoff_id : null
 
   return (
     <article
@@ -124,6 +136,11 @@ export function EventCard({
           </span>
         )}
         {suggestion && <span className="text-slate-500">· 추천: {suggestion.shortLabel}</span>}
+        {handoffId && (
+          <Link to={`/ops/inbox/handoff/${handoffId}`} className="inline-flex items-center gap-1 font-medium text-brand-700 hover:underline">
+            <FileText aria-hidden="true" className="size-3.5" /> 제안 요청 내용 보기
+          </Link>
+        )}
       </div>
 
       {!compact && fields.length > 0 && (
