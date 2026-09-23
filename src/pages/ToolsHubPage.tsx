@@ -1,6 +1,9 @@
 import { ArrowRight, BarChart3, FileCheck2, FlaskConical, FolderKanban, Lightbulb, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { PageHeader } from '../components/ui/PageHeader'
+import { ModuleAccessPanel } from '../components/tools/ModuleAccessPanel'
+import { getDataModeConfig } from '../data/dataMode'
+import { useAuth } from '../auth/AuthProvider'
 import { Badge, ListSurface, Section } from '../components/ui/primitives'
 import { REVIEW_HUB_PATH, TOOLS, type ToolDefinition } from '../config/toolRegistry'
 
@@ -84,6 +87,17 @@ export function ToolCard({ t }: { t: ToolDefinition }) {
   )
 }
 
+function ModuleAccessSection() {
+  // 로컬 모드에는 작업실이 없다 — 다른 화면과 같은 방식으로 가른다
+  const mode = getDataModeConfig().mode
+  return mode === 'supabase' ? <CloudAccess /> : <ModuleAccessPanel workspaceId={null} />
+}
+
+function CloudAccess() {
+  const { currentWorkspaceId } = useAuth()
+  return <ModuleAccessPanel workspaceId={currentWorkspaceId} />
+}
+
 export function ToolsHubPage() {
   const live = TOOLS.filter((t) => t.status === 'live')
   const review = TOOLS.filter((t) => t.status === 'review')
@@ -136,6 +150,8 @@ export function ToolsHubPage() {
           </div>
         </section>
       )}
+
+      <ModuleAccessSection />
 
       <section aria-labelledby="studio-links" className="flex flex-col gap-3">
         <h2 id="studio-links" className="t-section text-slate-900">

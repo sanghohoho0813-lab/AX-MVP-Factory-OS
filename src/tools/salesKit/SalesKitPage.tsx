@@ -17,8 +17,16 @@ import { Check, Copy } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
 import { ModuleDashboard } from '../shared/ModuleDashboard'
-import { ModulePending } from '../shared/ModulePending'
 import { useModuleSection } from '../shared/ModuleRoute'
+import {
+  AnalyticsScreen,
+  FollowUpScreen,
+  PipelineScreen,
+  ProspectingScreen,
+  SalesCompaniesScreen,
+  SalesDashboardExtra,
+} from './screens/AccountsScreens'
+import { ContentScreen, EducationScreen, SalesSettingsScreen, UpdatesScreen } from './screens/LibraryScreens'
 import { Button } from '../../components/ui/Button'
 import { Badge, Disclosure, Section, Surface, type Tone } from '../../components/ui/primitives'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
@@ -261,8 +269,20 @@ export function SalesKitPage() {
         }
       />
 
-      {section === 'briefing' && <ModuleDashboard toolKey="sales-kit" />}
-      {tab === null && section !== 'briefing' && <ModulePending label={meta?.label ?? '이 화면'} />}
+      {section === 'briefing' && (
+        <ModuleDashboard toolKey="sales-kit">
+          <SalesDashboardExtra />
+        </ModuleDashboard>
+      )}
+      {section === 'prospecting' && <ProspectingScreen />}
+      {section === 'companies' && <SalesCompaniesScreen />}
+      {section === 'followup' && <FollowUpScreen />}
+      {section === 'pipeline' && <PipelineScreen />}
+      {section === 'analytics' && <AnalyticsScreen />}
+      {section === 'content' && <ContentScreen />}
+      {section === 'education' && <EducationScreen />}
+      {section === 'updates' && <UpdatesScreen />}
+      {section === 'settings' && <SalesSettingsScreen />}
 
       {FORM_SECTIONS.includes(section) && (
       <Surface className="flex flex-col gap-4 p-4 sm:p-5">

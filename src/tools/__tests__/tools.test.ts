@@ -41,6 +41,13 @@ import { ageOf, businessTypeOf, clientFacts, employeeCountOf, industryValueOf, p
 import { buildToolPublishInput, isToolResultPublished } from '../../services/toolPublish'
 import { listUpdates, publishUpdate } from '../../services/customerBridgeService'
 import { summarizeModule } from '../shared/ModuleDashboard'
+import { accessLabel, canUse, defaultAccess, trialDaysLeft, trialEndDate, trialExpired, TRIAL_DAYS } from '../../services/moduleAccess'
+import { daysSinceContact, emptyConsult, isOpenStage, isStage, summarizeConsults } from '../policyFunding/lib/consultRecord'
+import { buildReportModel } from '../policyFunding/report'
+import { PIPE6, SALES_STAGES, conversionRate, funnelOf, normalizeSalesStage, pipe6Of } from '../salesKit/lib/pipeline'
+import { accountsCsv, emptyAccount, followUpOf, summarizeAccounts } from '../salesKit/lib/salesAccounts'
+import { CONTENT_SEEDS, benchmarkTitles, channelTexts } from '../salesKit/lib/contentSeeds'
+import type { Customer } from '../policyFunding/types'
 import { listRows, saveRow, deleteRow, replaceRows, rowData } from '../../services/moduleData'
 import { judge } from '../startupTax/lib/judgement'
 import { EMPTY_FORM } from '../startupTax/lib/formDefaults'
@@ -474,6 +481,113 @@ function check(name: string, cond: boolean, detail?: string): void {
   }
   await run()
 }
+
+/* ---- 11. D-91 4단계: 정책자금 상담 기록 · 인쇄 리포트 ---- */
+{
+  const T = new Date('2026-09-23T00:00:00')
+  const base = emptyConsult()
+  check('상담: 처음은 신규 DB', base.stage === '신규 DB' && base.score === null)
+  check('상담: 단계 이름을 검사한다', isStage('승인') && !isStage('없는단계'))
+  check('상담: 승인·실패는 끝난 것', !isOpenStage('승인') && !isOpenStage('실패') && isOpenStage('서류 요청'))
+  check('상담: 며칠 전 연락인지 센다', daysSinceContact('2026-09-09', T) === 14 && daysSinceContact('', T) === null)
+
+  const sum = summarizeConsults(
+    [
+      { stage: '서류 요청', lastContactedAt: '2026-09-22' },
+      { stage: '서류 요청', lastContactedAt: '2026-09-01' },
+      { stage: '승인', lastContactedAt: '2026-08-01' },
+      { stage: '실패', lastContactedAt: '2026-07-01' },
+      { stage: '신규 DB', lastContactedAt: '' },
+    ],
+    T,
+  )
+  check('상담: 살아 있는 것·승인·실패를 나눠 센다', sum.open === 3 && sum.approved === 1 && sum.failed === 1, JSON.stringify(sum))
+  check('상담: 2주 넘게 연락 없는 것만 센다', sum.stale === 2, String(sum.stale))
+
+  // 인쇄 리포트 — 진단 없이도 1순위 기관으로 한 장이 나온다
+  const customer = {
+    id: 'c1',
+    companyName: '한솔테크(주)',
+    industry: '자동차부품 제조',
+    businessType: '법인사업자',
+    recommendedAgency: '기술보증기금',
+    score: 72,
+    stage: '서류 요청',
+    nextAction: '재무제표 받기',
+    lastContactedAt: '2026-09-20',
+    updatedAt: '2026-09-20T00:00:00.000Z',
+    upsellOpportunities: [],
+    memo: '',
+  } as unknown as Customer
+  const model = buildReportModel(customer)
+  check('리포트: 업체·기관·점수가 들어간다', model.companyName === '한솔테크(주)' && model.topAgency === '기술보증기금' && model.score === 72)
+  check('리포트: 진단이 없으면 기본 서류 목록', model.documents.length >= 5 && model.documents.includes('사업자등록증'))
+  check('리포트: 90일 로드맵이 붙는다', model.roadmap.length > 0)
+  check('리포트: 면책 문구가 붙는다', model.disclaimer.length > 10)
+}
+
+
+/* ---- 12. D-91 5단계: 영업 단계 · 다음 연락 · 퍼널 · 콘텐츠 ---- */
+{
+  check('영업 단계: 원본 15단계 그대로', SALES_STAGES.length === 15 && SALES_STAGES[0].key === 'lead' && SALES_STAGES[14].key === 'lost')
+  check('영업 단계: 보드는 6칸', PIPE6.length === 6 && PIPE6[5].key === 'contracted')
+  check('영업 단계: 모르는 값은 발굴대상', normalizeSalesStage('없음') === 'lead')
+  check('영업 단계: 15단계가 6칸으로 접힌다', pipe6Of('docs_received') === 'm1done' && pipe6Of('proposal_sent') === 'm2' && pipe6Of('lost') === 'hold')
+
+  const T = '2026-09-23'
+  const acc = emptyAccount()
+  check('영업 기록: 처음은 발굴대상', acc.stage === 'lead' && acc.interests.length === 0)
+  check('다음 연락: 지난 것·오늘·예정을 가른다',
+    followUpOf('c1', { ...acc, nextContactAt: '2026-09-20' }, T).kind === '지남' &&
+    followUpOf('c1', { ...acc, nextContactAt: T }, T).kind === '오늘' &&
+    followUpOf('c1', { ...acc, nextContactAt: '2026-09-30' }, T).kind === '예정' &&
+    followUpOf('c1', acc, T).kind === '날짜 없음')
+
+  const rows = [
+    { clientId: 'a', data: { ...acc, stage: 'contracted' as const, expectedFee: 3000000 } },
+    { clientId: 'b', data: { ...acc, stage: 'proposal_sent' as const, expectedFee: 2000000, nextContactAt: '2026-09-20' } },
+    { clientId: 'c', data: { ...acc, stage: 'lost' as const, expectedFee: 5000000 } },
+  ]
+  const sum = summarizeAccounts(rows, T)
+  check('영업 모아보기: 이탈은 진행에서 뺀다', sum.live === 2 && sum.contracted === 1, JSON.stringify(sum))
+  check('영업 모아보기: 예상 수수료는 계약 전 건만', sum.pipelineFee === 2000000, String(sum.pipelineFee))
+  check('영업 모아보기: 지난 연락을 센다', sum.overdue === 1, String(sum.overdue))
+
+  const funnel = funnelOf(rows.map((r) => r.data.stage))
+  check('퍼널: 앞 칸이 뒤 칸보다 크거나 같다', funnel.every((f, i) => i === 0 || f.count <= funnel[i - 1].count), JSON.stringify(funnel.map((f) => f.count)))
+  check('퍼널: 첫 칸은 100%', funnel[0].rate === 100)
+  check('전환율: 이탈을 뺀 진행 건 기준', conversionRate(rows.map((r) => r.data.stage)) === 50, String(conversionRate(rows.map((r) => r.data.stage))))
+
+  const csv = accountsCsv([{ name: '한솔테크(주)', data: { ...acc, memo: '줄바꿈\n포함' } }])
+  check('CSV: 머리줄과 한 줄', csv.split('\n').length === 2 && csv.startsWith('업체,단계'))
+  check('CSV: 줄바꿈은 한 칸으로 눌러 쓴다', !csv.split('\n')[1].includes('\n') && csv.includes('줄바꿈 포함'))
+
+  check('콘텐츠: 원본 주제 8개', CONTENT_SEEDS.length === 8)
+  const ch = channelTexts(CONTENT_SEEDS[0])
+  check('콘텐츠: 채널 네 가지 문구', ch.length === 4 && ch[0].text === CONTENT_SEEDS[0].title)
+  check('콘텐츠: 콜드콜 문장에 주제가 들어간다', ch[3].text.includes(CONTENT_SEEDS[0].cat))
+  check('콘텐츠: 벤치마킹은 단정하는 말을 누른다', benchmarkTitles('무조건 해야 합니다')[0] === '먼저 확인해야 할 해야 합니다', benchmarkTitles('무조건 해야 합니다')[0])
+  check('콘텐츠: 빈 글은 아무것도 안 만든다', benchmarkTitles('   ').length === 0)
+}
+
+
+/* ---- 13. D-91 6단계: 모듈 잠금 (잠김 · 체험 · 열림) ---- */
+{
+  const T = '2026-09-23'
+  const open = defaultAccess('employment')
+  check('잠금: 기본은 열림', open.state === 'open' && canUse(open, T))
+  const locked = { ...open, state: 'locked' as const }
+  check('잠금: 잠그면 못 쓴다', !canUse(locked, T) && accessLabel(locked, T) === '잠김')
+
+  const trial = { ...open, state: 'trial' as const, trialEndsAt: trialEndDate(T) }
+  check('체험: 오늘부터 14일', trial.trialEndsAt === '2026-10-07' && TRIAL_DAYS === 14, trial.trialEndsAt)
+  check('체험: 기간 안이면 쓴다', canUse(trial, T) && trialDaysLeft(trial, T) === 14)
+  check('체험: 남은 날을 말로 적는다', accessLabel(trial, T).includes('14일 남음'), accessLabel(trial, T))
+
+  const over = { ...open, state: 'trial' as const, trialEndsAt: '2026-09-01' }
+  check('체험: 끝나면 못 쓴다', trialExpired(over, T) && !canUse(over, T) && accessLabel(over, T) === '체험 끝남')
+}
+
 
 console.log(`\ntools: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

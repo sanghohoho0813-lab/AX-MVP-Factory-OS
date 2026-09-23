@@ -11,6 +11,7 @@ import { createContext, useContext, type ReactNode } from 'react'
 import { useParams } from 'react-router-dom'
 import { toolOf } from '../../config/toolRegistry'
 import { ModuleShell } from './ModuleShell'
+import { ModuleGate } from './ModuleGate'
 
 const ModuleSectionContext = createContext<string>('')
 
@@ -32,7 +33,9 @@ export function ModuleRoute({ toolKey, children }: { toolKey: string; children: 
   return (
     <ModuleSectionContext.Provider value={section}>
       <ModuleShell tool={tool} section={section}>
-        {children}
+        <ModuleGate tool={tool} section={section}>
+          {children}
+        </ModuleGate>
       </ModuleShell>
     </ModuleSectionContext.Provider>
   )

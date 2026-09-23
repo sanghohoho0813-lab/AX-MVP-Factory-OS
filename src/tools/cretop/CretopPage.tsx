@@ -13,8 +13,9 @@ import { AlertTriangle, FileUp, FolderOpen, RotateCcw, Copy, Check } from 'lucid
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
 import { ModuleDashboard } from '../shared/ModuleDashboard'
-import { ModulePending } from '../shared/ModulePending'
 import { useModuleSection } from '../shared/ModuleRoute'
+import { ExtractorScreen } from './screens/ExtractorScreen'
+import { CoreCheckScreen } from './screens/CoreCheckScreen'
 import { Button } from '../../components/ui/Button'
 import { Badge, Disclosure, Section, Surface, type Tone } from '../../components/ui/primitives'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
@@ -461,7 +462,9 @@ export function CretopPage() {
         title="크레탑 분석기"
         description={meta?.hint ? `${meta.label} — ${meta.hint}` : '크레탑 기업종합보고서를 넣으면 핵심 재무와 미팅 포인트를 뽑습니다.'}
       />
-      {section === 'dashboard' ? <ModuleDashboard toolKey="cretop" /> : <ModulePending label={meta?.label ?? '이 화면'} />}
+      {section === 'core-check' && <CoreCheckScreen />}
+      {section === 'extractor' && <ExtractorScreen />}
+      {section !== 'core-check' && section !== 'extractor' && <ModuleDashboard toolKey="cretop" />}
     </div>
   )
 }

@@ -14,11 +14,17 @@ import { Check, Copy, RotateCcw } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
 import { ModuleDashboard } from '../shared/ModuleDashboard'
-import { ModulePending } from '../shared/ModulePending'
 import { useModuleSection } from '../shared/ModuleRoute'
 import { Button } from '../../components/ui/Button'
 import { Badge, Disclosure, MetricTile, Section, Surface, type Tone } from '../../components/ui/primitives'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
+import { useModuleBucket } from '../shared/useModuleBucket'
+import { useToolClient } from '../shared/toolClientContext'
+import { useToast } from '../../components/ui/toastContext'
+import { emptyConsult, type ConsultData } from './lib/consultRecord'
+import { CustomersScreen } from './screens/CustomersScreen'
+import { PrintReportScreen } from './screens/PrintReportScreen'
+import { PolicyDashboardExtra } from './screens/DashboardExtra'
 import { usePrefillFromClient } from '../shared/usePrefill'
 import { PrefillNote } from '../shared/PrefillNote'
 import { DEFAULT_INPUT, SAMPLE_INPUT, runDiagnosis } from './diagnosis'
@@ -212,6 +218,10 @@ function buildSummary(input: DiagnosisInput, r: DiagnosisResult): string {
 
 function DiagnosisScreen() {
   const [params] = useSearchParams()
+  const { clientId, clientName } = useToolClient()
+  const { showToast } = useToast()
+  const consults = useModuleBucket<ConsultData>('policy-funding', 'consults')
+  const diagnoses = useModuleBucket<Record<string, unknown>>('policy-funding', 'diagnoses')
   const [input, setInput] = useState<DiagnosisInput>(() => (params.get('sample') === '1' ? SAMPLE_INPUT : loadInput()))
   const [submitted, setSubmitted] = useState(params.get('sample') === '1')
   const [deepOpen, setDeepOpen] = useState(false)
@@ -397,6 +407,36 @@ function DiagnosisScreen() {
                     summary={buildSummary(input, result)}
                     data={{ input, agencies: result.agencies, tracks: result.specialTracks, documents: result.documents }}
                   />
+                  {clientId && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      data-testid="pf-save-consult"
+                      onClick={async () => {
+                        const curConsult = (consults.rows ?? []).find((r) => r.clientId === clientId)
+                        await consults.save({
+                          id: curConsult?.id,
+                          clientId,
+                          data: {
+                            ...(curConsult?.data ?? emptyConsult()),
+                            topAgency: top.name,
+                            score: result.overallScore,
+                            stage: curConsult?.data.stage ?? '1차 상담 완료',
+                            lastContactedAt: new Date().toISOString().slice(0, 10),
+                          },
+                        })
+                        const curDx = (diagnoses.rows ?? []).find((r) => r.clientId === clientId)
+                        await diagnoses.save({
+                          id: curDx?.id,
+                          clientId,
+                          data: { input: input as unknown as Record<string, unknown>, result: result as unknown as Record<string, unknown>, savedAt: new Date().toISOString() },
+                        })
+                        showToast(`${clientName || '이 업체'} 상담으로 저장했습니다. 상담 고객 관리에서 이어서 보세요.`)
+                      }}
+                    >
+                      이 업체 상담으로 저장
+                    </Button>
+                  )}
                 </div>
               </Surface>
 
@@ -630,6 +670,22 @@ export function PolicyFundingPage() {
   const meta = toolOf('policy-funding')?.sections?.find((s) => s.key === section)
 
   if (section === 'diagnosis') return <DiagnosisScreen />
+  if (section === 'customers') {
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader title="정책자금 진단" description="상담 고객 관리 — 단계·다음 액션·마지막 연락. 규칙과 사례로 계산하며, 승인을 보장하지 않습니다." />
+        <CustomersScreen />
+      </div>
+    )
+  }
+  if (section === 'report') {
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader title="정책자금 진단" description="인쇄 리포트 — 대표님 한 페이지 요약. 규칙과 사례로 계산하며, 승인을 보장하지 않습니다." />
+        <PrintReportScreen />
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -641,11 +697,9 @@ export function PolicyFundingPage() {
             : '추천 기관 TOP3·서류·로드맵·상담 대본. 규칙과 사례로 계산하며, 승인을 보장하지 않습니다.'
         }
       />
-      {section === 'dashboard' ? (
-        <ModuleDashboard toolKey="policy-funding" />
-      ) : (
-        <ModulePending label={meta?.label ?? '이 화면'} />
-      )}
+      <ModuleDashboard toolKey="policy-funding">
+        <PolicyDashboardExtra />
+      </ModuleDashboard>
     </div>
   )
 }

@@ -12,8 +12,8 @@ import { Check, Copy, RotateCcw } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
 import { ModuleDashboard } from '../shared/ModuleDashboard'
-import { ModulePending } from '../shared/ModulePending'
 import { useModuleSection } from '../shared/ModuleRoute'
+import { StartupTaxReportScreen } from './screens/ReportScreen'
 import { Button } from '../../components/ui/Button'
 import { Badge, Disclosure, Section, Surface } from '../../components/ui/primitives'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
@@ -537,7 +537,7 @@ export function StartupTaxPage() {
         title="창업감면 판정기"
         description={meta?.hint ? `${meta.label} — ${meta.hint}` : '여덟 가지만 고르면 창업중소기업 세액감면 가능성을 네 단계로 판정합니다.'}
       />
-      {section === 'dashboard' ? <ModuleDashboard toolKey="startup-tax" /> : <ModulePending label={meta?.label ?? '이 화면'} />}
+      {section === 'report' ? <StartupTaxReportScreen /> : <ModuleDashboard toolKey="startup-tax" />}
     </div>
   )
 }

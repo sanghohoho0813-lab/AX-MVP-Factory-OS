@@ -141,10 +141,24 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('모듈 목차: 누르면 그 화면 주소로 간다', page.url().includes('/tools/employment/wage'), page.url())
   check('모듈 목차: 급여 계산기 화면이 뜬다', (await page.locator('main').innerText()).includes('급여'))
 
-  // 아직 안 옮긴 화면은 그렇게 적는다 (없는 기능을 있는 척하지 않는다)
-  await page.goto(BASE + '/tools/sales-kit/prospecting', { waitUntil: 'networkidle' })
-  await page.waitForTimeout(500)
-  check('모듈 목차: 아직 안 옮긴 화면은 그렇게 적는다', (await page.getByTestId('module-pending').count()) === 1)
+  // 목차의 모든 화면이 진짜 화면이다 (자리만 잡아 둔 칸이 없다)
+  await page.goto(BASE + '/tools/cretop/core-check', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  await page.getByTestId('cretop-core-sample').click()
+  await page.waitForTimeout(600)
+  check('크레탑 핵심지표 검수: 샘플로 지표가 뜬다', (await page.getByTestId('cretop-core-rows').locator('li').count()) >= 3, String(await page.getByTestId('cretop-core-rows').locator('li').count()))
+  await page.goto(BASE + '/tools/cretop/extractor', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  await page.getByTestId('cretop-extract-sample').click()
+  await page.waitForTimeout(600)
+  check('크레탑 숫자 추출기: 샘플에서 줄을 뽑는다', (await page.getByTestId('cretop-extract-rows').locator('li').count()) >= 5, String(await page.getByTestId('cretop-extract-rows').locator('li').count()))
+  check('크레탑 숫자 추출기: CSV 단추', (await page.getByTestId('cretop-extract-csv').count()) === 1)
+
+  // 창업감면 결과서 — 판정 화면에서 적은 것으로 만들어진다
+  await page.goto(BASE + '/tools/startup-tax/report', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  const stReport = (await page.getByTestId('startup-report').count()) === 1
+  check('창업감면 결과서: 판정이 있으면 결과서, 없으면 그렇게 말한다', stReport || (await page.getByTestId('startup-report-empty').count()) === 1)
 
   // 모르는 화면 키 → 첫 화면
   await page.goto(BASE + '/tools/employment/없는화면', { waitUntil: 'networkidle' })
@@ -304,6 +318,123 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(800)
   check('조직도: 적어 둔 연구소장이 그려진다', (await page.getByTestId('lab-org').innerText()).includes('박연구'), (await page.getByTestId('lab-org').innerText()).slice(0, 200))
   check('조직도: 도면 편집기는 아직 없다고 적는다', (await page.getByTestId('lab-floorplan-note').count()) === 1)
+
+  /* ---- D-91 4단계: 정책자금 상담 고객 관리 · 인쇄 리포트 ---- */
+  await page.goto(BASE + '/tools/policy-funding/diagnosis?client=cli_hansol&sample=1', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  await page.getByTestId('pf-save-consult').click()
+  await page.waitForTimeout(900)
+  await page.goto(BASE + '/tools/policy-funding/customers', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const pfList = page.getByTestId('pf-customer-list')
+  check('정책자금 상담: 업체가 1차 상담 완료로 올라온다', (await pfList.innerText()).includes('한솔테크'), (await pfList.innerText()).slice(0, 160))
+  check('정책자금 상담: 1순위 기관이 붙는다', /기술보증기금|중소벤처기업진흥공단|신용보증기금/.test(await pfList.innerText()), (await pfList.innerText()).slice(0, 200))
+  await page.locator('select[data-stage-for="cli_hansol"]').selectOption('서류 요청')
+  await page.waitForTimeout(700)
+  await page.goto(BASE + '/tools/policy-funding/customers', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  check('정책자금 상담: 단계가 남는다', (await page.getByTestId('pf-customer-list').innerText()).includes('서류 요청'))
+
+  await page.goto(BASE + '/tools/policy-funding/report', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  const pfReport = page.getByTestId('pf-report')
+  check('정책자금 리포트: 저장한 진단으로 한 장이 나온다', (await pfReport.count()) === 1)
+  check('정책자금 리포트: 추천 기관 3곳', (await page.getByTestId('pf-report-agencies').locator('> li').count()) === 3, String(await page.getByTestId('pf-report-agencies').locator('> li').count()))
+  check('정책자금 리포트: 필요 서류가 나온다', (await page.getByTestId('pf-report-docs').locator('li').count()) >= 5)
+
+  await page.goto(BASE + '/tools/policy-funding', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check('정책자금 대시보드: 상담 칸이 붙는다', (await page.getByTestId('pf-dashboard-extra').count()) === 1)
+
+  /* ---- D-91 5단계: 영업 발굴·고객사·다음 연락·파이프라인·성과·자료 ---- */
+  await page.goto(BASE + '/tools/sales-kit/prospecting', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check('영업 발굴: 아직 안 만난 업체가 선다', (await page.getByTestId('sales-prospect-list').locator('li').count()) === 5, String(await page.getByTestId('sales-prospect-list').locator('li').count()))
+  await page.locator('button[data-start="cli_hansol"]').click()
+  await page.waitForTimeout(900)
+  check('영업 발굴: 시작하면 목록에서 빠진다', (await page.getByTestId('sales-prospect-list').locator('li').count()) === 4, String(await page.getByTestId('sales-prospect-list').locator('li').count()))
+
+  await page.goto(BASE + '/tools/sales-kit/companies', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check('영업 고객사: 첫 연락 단계로 뜬다', (await page.getByTestId('sales-company-list').innerText()).includes('첫 연락'), (await page.getByTestId('sales-company-list').innerText()).slice(0, 160))
+  await page.locator('div[data-client="cli_hansol"] button').first().click()
+  await page.waitForTimeout(400)
+  await page.getByLabel('한솔테크(주) 예상 수수료').fill('3000000')
+  await page.getByLabel('한솔테크(주) 다음 연락').fill('2026-09-01')
+  await page.locator('body').click()
+  await page.waitForTimeout(900)
+
+  await page.goto(BASE + '/tools/sales-kit/followup', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check('영업 다음 연락: 지난 연락으로 잡힌다', (await page.locator('[data-group="over"]').innerText()).includes('한솔테크'), (await page.locator('[data-group="over"]').innerText()).slice(0, 120))
+
+  await page.goto(BASE + '/tools/sales-kit/pipeline', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const pipe = page.getByTestId('sales-pipeline')
+  check('영업 보드: 6단계 + 보류 칸', (await pipe.locator('[data-column]').count()) === 7, String(await pipe.locator('[data-column]').count()))
+  check('영업 보드: 잠재 고객 칸에 있다', (await pipe.locator('[data-column="lead"]').innerText()).includes('한솔테크'))
+  check('영업 보드: 예상 수수료가 합쳐진다', (await pipe.innerText()).includes('300만'), (await pipe.innerText()).slice(0, 200))
+
+  await page.goto(BASE + '/tools/sales-kit/analytics', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check('영업 성과: 퍼널 6칸', (await page.getByTestId('sales-funnel').locator('li').count()) === 6)
+  check('영업 성과: CSV 단추', (await page.getByTestId('sales-csv').count()) === 1)
+
+  await page.goto(BASE + '/tools/sales-kit/content', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  await page.locator('button[data-topic="고용지원금"]').click()
+  await page.waitForTimeout(300)
+  check('영업 콘텐츠: 주제를 고르면 제목이 바뀐다', (await page.getByTestId('sales-content-title').innerText()).includes('지원금'), await page.getByTestId('sales-content-title').innerText())
+  await page.getByLabel('벤치마킹 문구').fill('무조건 해야 합니다')
+  await page.waitForTimeout(300)
+  check('영업 콘텐츠: 벤치마킹 제목 후보', (await page.getByTestId('sales-bench').innerText()).includes('먼저 확인해야 할'))
+
+  await page.goto(BASE + '/tools/sales-kit/education', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  await page.getByLabel('교육 제목').fill('가업승계 실무 교육')
+  await page.getByTestId('sales-education-save').click()
+  await page.waitForTimeout(800)
+  check('영업 교육: 기록이 남는다', (await page.getByTestId('sales-education-list').innerText()).includes('가업승계 실무 교육'))
+
+  await page.goto(BASE + '/tools/sales-kit/updates', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  await page.getByLabel('공고 제목').fill('2026년 정책자금 공고')
+  await page.getByLabel('주제').selectOption('정책자금')
+  await page.getByTestId('sales-update-save').click()
+  await page.waitForTimeout(800)
+  check('영업 법령·공고: 기록과 연락 문구', (await page.getByTestId('sales-update-list').innerText()).includes('2026년 정책자금 공고') && (await page.getByTestId('sales-update-list').innerText()).includes('연락 문구'))
+
+  await page.goto(BASE + '/tools/sales-kit', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check('영업 브리핑: 영업 칸이 붙는다', (await page.getByTestId('sales-dashboard-extra').count()) === 1)
+
+  /* ---- D-91 6단계: 모듈 잠금 (잠김 · 체험 · 열림) ---- */
+  await page.goto(BASE + '/tools', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  const accessList = page.getByTestId('module-access-list')
+  check('모듈 잠금: 목차가 여러 칸인 모듈만 판다', (await accessList.locator('[data-module]').count()) >= 5, String(await accessList.locator('[data-module]').count()))
+  await accessList.locator('[data-module="labcare"] button[data-act="lock"]').click()
+  await page.waitForTimeout(700)
+  check('모듈 잠금: 잠그면 잠김으로 바뀐다', (await accessList.locator('[data-module="labcare"]').innerText()).includes('잠김'), (await accessList.locator('[data-module="labcare"]').innerText()).slice(0, 80))
+
+  await page.goto(BASE + '/tools/labcare', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check('모듈 잠금: 잠겨도 첫 화면은 보인다', (await page.getByTestId('module-dashboard').count()) === 1)
+  check('모듈 잠금: 잠겼다고 띠로 알려 준다', (await page.getByTestId('module-locked-banner').count()) === 1)
+
+  await page.goto(BASE + '/tools/labcare/notes', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check('모듈 잠금: 다른 화면은 승인 화면이 대신 선다', (await page.getByTestId('module-locked').count()) === 1)
+  check('모듈 잠금: 결제가 없다고 적는다', (await page.getByTestId('module-locked').innerText()).includes('결제는 아직'), (await page.getByTestId('module-locked').innerText()).slice(0, 120))
+  await page.getByTestId('module-trial').click()
+  await page.waitForTimeout(900)
+  check('모듈 잠금: 체험을 시작하면 화면이 열린다', (await page.getByTestId('lab-notes').count()) === 1)
+
+  await page.goto(BASE + '/tools', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  check('모듈 잠금: 체험 남은 날을 적는다', /체험 \d+일 남음/.test(await page.getByTestId('module-access-list').locator('[data-module="labcare"]').innerText()), (await page.getByTestId('module-access-list').locator('[data-module="labcare"]').innerText()).slice(0, 80))
+  await page.getByTestId('module-access-list').locator('[data-module="labcare"] button[data-act="open"]').click()
+  await page.waitForTimeout(700)
 
   /* ---- D-89: 업체에서 도구 열기 → 결과·기한이 그 업체로 ---- */
   // 업체 상세에 '이 업체로 도구 열기' 줄이 있고, 거기서 연 도구에는 업체 띠가 뜬다

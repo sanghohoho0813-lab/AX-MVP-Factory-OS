@@ -150,3 +150,35 @@ export const CORE_PREVIEW_ORDER: string[]
 export const CRETOP_CORE6: string[]
 export const CORE_LABELS: Record<string, string>
 export const EXTRACT_STATUS: string[]
+
+/* 숫자 추출기 (D-91 에서 화면을 붙일 때 쓰는 것) */
+export interface CretopExtractedRow {
+  id: string
+  accountKey: string
+  account: string
+  rawLabel: string
+  year: number | null
+  values: Array<number | null>
+  rawValue: number | null
+  unit: string
+  section: string
+  rowText: string
+  confidence: string
+  status: string
+  isRatio: boolean
+  sel: boolean
+}
+export interface CretopExtractResult {
+  rows: CretopExtractedRow[]
+  detectedYears: number[]
+  sections: string[]
+  queryDate: string | null
+}
+export function extractCretopNumbers(rawText: string): CretopExtractResult
+export function extractRowsToCsv(rows: CretopExtractedRow[]): string
+export function extractRowsToText(rows: CretopExtractedRow[]): string
+export function extractEokText(row: CretopExtractedRow): string
+export const CRETOP_EXTRACT_SAMPLE: string
+export const CRETOP_CORE_SAMPLE: string
+export const EXTRACT_ORDER: string[]
+export const EXTRACT_LABEL_KR: Record<string, string>
