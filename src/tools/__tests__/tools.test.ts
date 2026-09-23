@@ -9,6 +9,9 @@
 
 import { DEFAULT_INPUT, SAMPLE_INPUT, runDiagnosis } from '../policyFunding/diagnosis'
 import { changeColor, CRETOP_C, TREND_COMMENT_TONE } from '../cretop/lib/tones'
+import { mapHref as labHref } from '../labcare/orig/nav'
+import { mapHref as pfHref } from '../policyFunding/orig/nav'
+import { buildCustomerFromDiagnosis, customerFromRow, getStoredCustomerById, resetPolicyStoreForTest } from '../policyFunding/orig/storage'
 import { oneLineConclusion, todayTasks } from '../policyFunding/coach'
 import { REPORT_DISCLAIMER } from '../policyFunding/report'
 import type { DiagnosisInput } from '../policyFunding/types'
@@ -618,6 +621,32 @@ function check(name: string, cond: boolean, detail?: string): void {
   check('크레탑 색: 차입금 늘면 빨강', changeColor('shortTermBorrowings', '상승') === CRETOP_C.err)
   check('크레탑 색: 그대로면 회색', changeColor('revenue', '유지') === CRETOP_C.textM)
   check('크레탑 색: 한 줄 평 글상자는 빨강·초록 바탕', TREND_COMMENT_TONE.red.bg === '#FEF2F2' && TREND_COMMENT_TONE.green.bg === '#F0FDF4')
+}
+
+/* ---- 15. D-92 원본 화면 대역 — 주소 바꾸기 · 상담 기록 = 고객 운영 업체 ---- */
+{
+  check('연구소 주소: 고객사 상세는 ?cid=', labHref('/clients/c1') === '/tools/labcare/clients?cid=c1')
+  check('연구소 주소: 점검·리포트', labHref('/clients/c1/check') === '/tools/labcare/check?cid=c1' && labHref('/clients/c1/report?month=2026-09').startsWith('/tools/labcare/reports?'))
+  check('연구소 주소: 원본 ?client= 는 lab 으로 (OS 의 업체 열기와 안 겹치게)', labHref('/notes?client=c1') === '/tools/labcare/notes?lab=c1')
+  check('연구소 주소: 설립서류·활동조사 이름 맞추기', labHref('/setup-documents') === '/tools/labcare/setup-docs' && labHref('/activity-survey') === '/tools/labcare/survey')
+  check('정책자금 주소: 대시보드 → 상담 고객 관리', pfHref('/dashboard') === '/tools/policy-funding/customers')
+  check('정책자금 주소: 고객 상세·리포트는 ?cid=', pfHref('/customers/x') === '/tools/policy-funding/customers?cid=x' && pfHref('/customers/x/report') === '/tools/policy-funding/report?cid=x')
+  check('정책자금 주소: 진단은 ?client= 를 그대로 (업체로 열기)', pfHref('/diagnosis?client=x') === '/tools/policy-funding/diagnosis?client=x')
+
+  const os = { id: 'cli_a', companyName: '가나(주)', industry: '제조업', corporateNumber: '110111-1234567' } as never
+  const old = customerFromRow('cli_a', { stage: '서류 요청', nextAction: '서류 받기', lastContactedAt: '2026-09-01', memo: 'm', topAgency: '기술보증기금', score: 71 }, os)
+  check('상담 기록: D-91 기록도 원본 고객 모양으로 읽힌다', old.id === 'cli_a' && old.companyName === '가나(주)' && old.recommendedAgency === '기술보증기금' && old.stage === '서류 요청' && old.score === 71)
+  check('상담 기록: 법인번호가 있으면 법인사업자', old.businessType === '법인사업자')
+  check('상담 기록: 모르는 단계는 신규 DB', customerFromRow('cli_a', { stage: '???' }, os).stage === '신규 DB')
+
+  resetPolicyStoreForTest([old], [os])
+  const r = runDiagnosis(SAMPLE_INPUT)
+  const c = buildCustomerFromDiagnosis(SAMPLE_INPUT, r, { clientId: 'cli_a' })
+  check('진단 저장: 고객 id 는 고객 운영 업체 id', c.id === 'cli_a' && c.companyName === '가나(주)')
+  check('진단 저장: 이미 상담 중이면 단계·메모를 이어 간다', c.stage === '서류 요청' && c.memo === 'm')
+  check('진단 저장: 1순위 기관·점수가 새로 붙는다', c.recommendedAgency === r.topAgency && c.score === r.overallScore)
+  check('진단 저장: 저장 전에는 명단이 그대로', getStoredCustomerById('cli_a')?.stage === '서류 요청')
+  resetPolicyStoreForTest([], [])
 }
 
 console.log(`\ntools: ${passed} passed, ${failed} failed`)

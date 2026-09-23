@@ -16,6 +16,7 @@ import { judge, VERDICT_EMOJI, VERDICT_LABEL } from '../lib/judgement'
 import { buildSummaryText } from '../lib/summary'
 import { EMPTY_FORM } from '../lib/formDefaults'
 import type { FormData, Verdict } from '../types'
+import PrintSheet from '../orig/components/PrintSheet'
 
 const STORAGE_KEY = 'axmvp.tools.startupTax'
 
@@ -141,6 +142,13 @@ export function StartupTaxReportScreen() {
             </li>
           ))}
         </ul>
+      </Section>
+
+      {/* 원본 A4 결과서 — 화면에서도 미리 보고, 인쇄하면 이것만 나온다 */}
+      <Section title="결과서 미리보기 (인쇄되는 모양)">
+        <div className="st-sheet-preview print-document overflow-x-auto rounded-(--radius-card) border border-slate-200 bg-white p-4" data-testid="startup-print-sheet">
+          <PrintSheet form={form} result={result} baseDate={new Date()} />
+        </div>
       </Section>
 
       <p className="t-meta break-keep text-slate-400">

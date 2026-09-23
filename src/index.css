@@ -113,6 +113,64 @@
   /* Very subtle elevation */
   --shadow-card: 0 1px 2px 0 rgb(15 26 56 / 0.04);
   --shadow-overlay: 0 8px 24px -6px rgb(15 26 56 / 0.16);
+
+  /* 기업부설연구소 OS 원본 색 (D-92) — 원본 화면을 그대로 옮기면서 같이 가져온 이름들 */
+  --color-navy-50: #f1f5f9;
+  --color-navy-100: #e2e8f0;
+  --color-navy-400: #5f7394;
+  --color-navy-500: #475d82;
+  --color-status-normal: #16a34a;
+  --color-status-normalBg: #dcfce7;
+  --color-status-warning: #ca8a04;
+  --color-status-warningBg: #fef9c3;
+  --color-status-danger: #dc2626;
+  --color-status-dangerBg: #fee2e2;
+
+  /* 창업감면 판정기 원본 브랜드 색 (D-92) */
+  --color-brand: #3182f6;
+  --color-brand-dark: #1b64da;
+}
+
+/*
+ * 창업감면 판정기 원본 화면 (D-92) — 원본은 루트 글자를 20px(기본의 1.25배)로 키워 모든 rem 을 함께 키웠다.
+ * 이 OS 의 다른 화면은 그대로 두고, 판정기 화면만 1.25배로 그린다.
+ */
+.st-orig {
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+/* 넓은 화면에서만 1.25배 — 휴대폰 폭에서 키우면 칸이 좁아져 글자가 잘린다 */
+@media screen and (min-width: 1024px) {
+  .st-zoom {
+    zoom: 1.25;
+  }
+}
+@media screen {
+  /* 결과서 미리보기 — 원본은 인쇄할 때만 보였다 */
+  .st-sheet-preview .print-area {
+    display: block;
+  }
+}
+
+/*
+ * 기업부설연구소 OS 원본 화면 (D-92) — 원본은 50대 컨설턴트 기준으로 글자 단계를 크게 잡았다(본문 19px).
+ * 원본과 같은 크기로 보이도록, 연구소 화면 안에서만 글자 단계를 원본 값으로 바꾼다.
+ */
+.lab-orig {
+  --text-xs: 0.875rem;
+  --text-xs--line-height: 1.35rem;
+  --text-sm: 1rem;
+  --text-sm--line-height: 1.55rem;
+  --text-base: 1.1875rem;
+  --text-base--line-height: 1.8rem;
+  --text-lg: 1.3125rem;
+  --text-lg--line-height: 1.9rem;
+  --text-xl: 1.5rem;
+  --text-xl--line-height: 2.05rem;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 2.25rem;
+  --text-3xl: 2.25rem;
+  --text-3xl--line-height: 2.6rem;
+  --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 html {
