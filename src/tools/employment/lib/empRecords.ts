@@ -61,6 +61,8 @@ export function normalizeStage(v: unknown): EmpStage {
 export interface EmpDoc {
   name: string
   done: boolean
+  /** 원본 5단계 상태 (없으면 done 으로 본다) — D-92 */
+  status?: 'none' | 'requested' | 'submitted' | 'revise' | 'confirmed'
 }
 
 export interface EmpRecord {
@@ -80,7 +82,16 @@ export interface EmpRecord {
   rounds: EmployeeRound[]
   docs: EmpDoc[]
   memo: string
+  /** 월 급여(원) — 원본 '필수 정보' (D-92). 없으면 0 */
+  salary?: number
+  /** 원본 직원 편집 칸 (D-92) — 성별 · 군복무 개월(청년 나이 상한 연장) · 신청 전 확인 6가지 */
+  gender?: '' | '남' | '여'
+  militaryMonths?: number
+  eligChecks?: Record<string, boolean>
 }
+
+/** 원본 EmpModal 의 '신청 전 확인' 여섯 가지 */
+export const ELIG_CHECKS: readonly string[] = ['대상 근로자 요건 확인', '고용보험 가입 여부 확인', '신청 대상 사업장 여부 확인', '중복 지원 제한 여부 확인', '필수 서류 준비 여부 확인', '신청 기한 확인']
 
 export function emptyEmpRecord(clientId: string): Omit<EmpRecord, 'id'> {
   return {
@@ -113,6 +124,10 @@ export function toEmpRecord(id: string, clientId: string, data: Record<string, u
     rounds: rounds.filter((r) => r && typeof r.month === 'number'),
     docs: docs.filter((d) => d && typeof d.name === 'string'),
     memo: typeof data.memo === 'string' ? data.memo : '',
+    salary: typeof data.salary === 'number' ? data.salary : 0,
+    gender: data.gender === '남' || data.gender === '여' ? data.gender : '',
+    militaryMonths: typeof data.militaryMonths === 'number' ? data.militaryMonths : 0,
+    eligChecks: data.eligChecks && typeof data.eligChecks === 'object' ? (data.eligChecks as Record<string, boolean>) : {},
   }
 }
 

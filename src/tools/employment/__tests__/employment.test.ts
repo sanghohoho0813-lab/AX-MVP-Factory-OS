@@ -27,6 +27,8 @@ import {
   type EmpRecord,
 } from '../lib/empRecords'
 import { simulate, simulationText } from '../lib/simulator'
+import { agencyAutoComment, agencyDocRequestText, agencyReportData, agencySummaryText, commissionSummary, companyRanking, companyRiskRanking, ddayAlerts, emptyCompanyMeta, monthlyReceived, pendingPayments, programPipeline } from '../lib/companyMeta'
+import { buildImportPreview, xlAutoMap, xlBizNoCheck, xlDetectHeader, xlNormDate } from '../lib/excelImport'
 import {
   analyzeRoster,
   buildCopyText,
@@ -484,6 +486,72 @@ check('ROSTER_FIELDS 9', ROSTER_FIELDS.length === 9 && ROSTER_FIELDS[0].key === 
   check('시뮬레이터: 상담 문구에 금액과 기간', simulationText('청년일자리도약장려금', 2, sim).includes('예상 총 수령액') && simulationText('청년일자리도약장려금', 2, sim).includes('~'))
 }
 
+
+/* ---- D-92: 업체 관리 기록 · 기관 보고서 · 대시보드 · 엑셀 마법사 ---- */
+{
+  const T = new Date('2026-09-23T00:00:00')
+  const base = (over: Partial<EmpRecord>): EmpRecord => ({
+    id: 'x',
+    clientId: 'c1',
+    name: '박청년',
+    hireDate: '2026-01-05',
+    birthDate: '2000-01-01',
+    empType: '정규직',
+    programId: 'youth_jump',
+    stage: 'inprogress',
+    rounds: buildRounds(DEFAULT_PROGRAMS.youth_jump),
+    docs: [{ name: '근로계약서', done: false }],
+    memo: '',
+    salary: 2800000,
+    ...over,
+  })
+  const paid = base({ id: 'p', rounds: buildRounds(DEFAULT_PROGRAMS.youth_jump).map((r, i) => (i === 0 ? { ...r, isPaid: true, received: 3000000, paidDate: '2026-07-10' } : r)) })
+  const cs = commissionSummary({ rate: 20, retainer: 500000 }, [paid])
+  check('수수료: 청구 가능액 = 착수금 + 수령액×율', cs.billable === 500000 + 600000, String(cs.billable))
+  check('수수료: 청구 전에는 미수금 0', cs.receivable === 0 && cs.state === '미청구')
+  check('수수료: 청구하고 입금 전이면 미수금', commissionSummary({ rate: 20, retainer: 500000, billed: true }, [paid]).receivable === 1100000)
+  check('수수료: 입금하면 미수금 0', commissionSummary({ rate: 20, billed: true, paid: true }, [paid]).receivable === 0)
+  check('수수료: 성공보수 끄면 착수금만', commissionSummary({ rate: 20, retainer: 300000, successFee: false }, [paid]).billable === 300000)
+  check('수수료: 기본 수수료율 20%', commissionSummary({}, [paid]).rate === 20)
+
+  const meta = { ...emptyCompanyMeta(), companyDocs: [{ id: 'd', label: '사업자등록증', done: false }] }
+  const rd = agencyReportData('한솔테크', meta, [paid, base({ id: 'n', name: '무급여', salary: 0 })], () => '청년일자리도약장려금', T)
+  check('기관 보고서: 급여일 미입력을 위험으로 잡는다', rd.riskItems.some((r) => r.problem === '급여일 미입력'))
+  check('기관 보고서: 급여 누락을 필수 정보 누락으로', rd.riskItems.some((r) => r.problem.includes('필수 정보 누락') && r.problem.includes('급여')))
+  check('기관 보고서: 업체 서류 + 직원 서류를 센다', rd.missingDocsCount === 3, String(rd.missingDocsCount))
+  check('기관 보고서: 이번 주 계획 맨 앞은 서류 회수', rd.planWeek[0]?.startsWith('미제출 서류'))
+  check('기관 보고서: 코멘트에 예상 총액', agencyAutoComment(rd).includes('예상 총액'))
+  check('기관 보고서: 서류 요청 문구 번호 매김', agencyDocRequestText(rd).includes('1. 사업자등록증'))
+  check('기관 보고서: 대표 요약에 미제출 서류', agencySummaryText(rd).includes('미제출 서류 3건'))
+
+  const comps = [{ id: 'c1', name: '한솔테크', meta }]
+  const tasks = ddayAlerts([base({ id: 'late', stage: 'preparing' })], comps, T)
+  check('오늘 할 일: 지난 회차는 신청 지연', tasks[0]?.kind === '신청 지연', tasks[0]?.kind)
+  check('오늘 할 일: 급여일 미입력 알림', tasks.some((t) => t.kind === '정보 누락'))
+  check('오늘 할 일: 서류 미완료 알림', tasks.some((t) => t.kind === '서류'))
+  check('월별 수령: 지급일 달에 들어간다', monthlyReceived([paid], 2026)[6].received === 3000000)
+  check('순위: 받은 돈 순', companyRanking([paid], [{ id: 'c1', name: '한솔테크' }])[0].total === 3000000)
+  check('미지급: 회차가 남으면 목록에', pendingPayments([paid], T).length === 1)
+  check('위험도: 지난 회차가 있으면 지연', companyRiskRanking([base({ id: 'r' })], comps, T)[0].level.t === '지연')
+  check('파이프라인: 지원금별 진행률', programPipeline([paid], () => '청년').length === 1)
+
+  // 엑셀 마법사
+  const grid = [['고객 명단'], ['업체명', '사업자번호', '성명', '입사일자', '생년월일', '지원금', '상태'], ['한솔테크(주)', '123-45-67890', '김하나', '2026.3.2', '19990101', '청년일자리도약장려금', '지급중'], ['합계', '', '', '', '', '', ''], ['모르는회사', '', '이둘', '2026-04-01', '', '', '']]
+  const h = xlDetectHeader(grid)
+  check('엑셀: 헤더 행을 스스로 찾는다', h === 1, String(h))
+  const am = xlAutoMap(grid[h])
+  check('엑셀: 성명 → 직원명 (완전 일치)', am.map.empName === 2 && am.conf.empName === 'high')
+  check('엑셀: 입사일자 → 입사일', am.map.startDate === 3)
+  check('엑셀: 날짜 모양 여러 가지', xlNormDate('2026.3.2').value === '2026-03-02' && xlNormDate('19990101').value === '1999-01-01' && xlNormDate('45000').ok)
+  check('엑셀: 사업자번호 하이픈 위치', !xlBizNoCheck('12-345-67890').ok && xlBizNoCheck('123-45-67890').ok)
+  const pv = buildImportPreview({ grid, headerRow: h, map: am.map, clients: [{ id: 'c1', companyName: '(주)한솔테크', businessNumber: '1234567890' }], programs: [{ id: 'youth_jump', name: '청년일자리도약장려금' }], existing: [] })
+  check('엑셀: 합계 줄은 건너뛴다', pv.junk === 1, String(pv.junk))
+  check('엑셀: 사업자번호로 업체를 맞춘다', pv.toSave.length === 1 && pv.toSave[0].clientId === 'c1')
+  check('엑셀: 고객 운영에 없는 업체는 뺀다', pv.excluded === 1)
+  check('엑셀: 상태 말을 단계로', pv.toSave[0].stage === 'inprogress')
+  const dup = buildImportPreview({ grid, headerRow: h, map: am.map, clients: [{ id: 'c1', companyName: '한솔테크', businessNumber: '' }], programs: [], existing: [{ clientId: 'c1', name: '김하나', hireDate: '2026-03-02' }] })
+  check('엑셀: 이미 있는 사람은 중복', dup.duplicates === 1 && dup.toSave.length === 0)
+}
 
 console.log(`\nemployment: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

@@ -22,7 +22,9 @@ import type { EmpType } from '../lib/programs'
 import { buildRounds } from '../lib/schedule'
 import { addMo, fD, formatDday, getDdayFrom } from '../lib/dates'
 import { fMan } from '../lib/format'
+import { MIN_WAGE_MONTH_2026 } from '../lib/constants'
 import {
+  ELIG_CHECKS,
   EMP_STAGES,
   empRemaining,
   empNextDate,
@@ -38,6 +40,25 @@ import { parseRosterFile } from '../lib/payrollDiagnosis'
 import { fetchClientDocFile, hasDocFile } from '../../shared/clientDocFile'
 import { ToolResultAttach } from '../../shared/ToolResultAttach'
 import { clientReportText } from '../lib/clientReport'
+import { useModuleBucket } from '../../shared/useModuleBucket'
+import { toCompanyMeta, type CompanyMeta } from '../lib/companyMeta'
+import { AgencyReportTab, CommissionTab, CompanyDocsTab, NotesTab, OverviewTab } from './CompanyTabs'
+import { ExcelImportWizard } from './ExcelImportWizard'
+
+function todayYmd(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+const DETAIL_TABS = [
+  { key: 'overview', label: '📋 개요' },
+  { key: 'employees', label: '👤 직원' },
+  { key: 'docs', label: '📁 업체 서류' },
+  { key: 'commission', label: '🧾 수수료 정산' },
+  { key: 'notes', label: '📝 업무 일지' },
+  { key: 'agency', label: '📊 기관 보고서' },
+] as const
+type DetailTab = (typeof DETAIL_TABS)[number]['key']
 
 const inputCls =
   'w-full rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-2 text-[0.95rem] text-slate-900 focus:border-brand-500 focus:outline-none'
@@ -50,6 +71,7 @@ export function CompaniesScreen() {
   const { programs, enabled } = usePrograms()
   const [clients, setClients] = useState<ClientOpsRecord[] | null>(null)
   const [openId, setOpenId] = useState<string | null>(clientId)
+  const [wizard, setWizard] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -117,6 +139,16 @@ export function CompaniesScreen() {
         </Surface>
       )}
 
+      {wizard ? (
+        <ExcelImportWizard clients={clients} programs={programs} employees={employees} onSave={save} onClose={() => setWizard(false)} />
+      ) : (
+        <div>
+          <Button variant="ghost" size="sm" onClick={() => setWizard(true)} data-testid="emp-excel-open">
+            📥 엑셀로 여러 업체 대상자 한 번에 넣기
+          </Button>
+        </div>
+      )}
+
       <Section title="업체" count={clients.length}>
         <ul className="flex flex-col gap-2">
           {clients.map((c) => {
@@ -167,10 +199,14 @@ interface EditForm {
   programId: string
   stage: EmpStage
   memo: string
+  salary: string
+  gender: '' | '남' | '여'
+  militaryMonths: string
+  eligChecks: Record<string, boolean>
 }
 
 function emptyForm(programId: string): EditForm {
-  return { name: '', hireDate: '', birthDate: '', empType: '정규직', programId, stage: 'preparing', memo: '' }
+  return { name: '', hireDate: '', birthDate: '', empType: '정규직', programId, stage: 'preparing', memo: '', salary: '', gender: '', militaryMonths: '', eligChecks: {} }
 }
 
 function ClientEmployees({
@@ -200,6 +236,17 @@ function ClientEmployees({
   const set = <K extends keyof EditForm>(k: K, v: EditForm[K]) => setForm((f) => (f ? { ...f, [k]: v } : f))
 
   const sum = summarizeEmployees(employees, today)
+  const [tab, setTab] = useState<DetailTab>('employees')
+  const metaBucket = useModuleBucket<CompanyMeta>('employment', 'companies')
+  const metaRow = metaBucket.rows?.find((r) => r.clientId === client.id)
+  const meta = toCompanyMeta(metaRow?.data)
+  const patchMeta = async (next: Partial<CompanyMeta>) => {
+    await metaBucket.save({ id: metaRow?.id, clientId: client.id, data: { ...meta, ...next } })
+  }
+  const [view, setView] = useState<'card' | 'table'>('card')
+  const [wizard, setWizard] = useState(false)
+  const [roundEdit, setRoundEdit] = useState<{ empId: string; index: number; received: string; paidDate: string; note: string } | null>(null)
+  const [selected, setSelected] = useState<string[]>([])
   const fileRef = useRef<HTMLInputElement | null>(null)
   const [busy, setBusy] = useState('')
   const [copied, setCopied] = useState(false)
@@ -297,6 +344,10 @@ function ClientEmployees({
       rounds,
       docs: prev?.docs ?? (program?.employeeDocs ?? []).map((name) => ({ name, done: false })),
       memo: form.memo,
+      salary: Number(form.salary.replace(/[^\d]/g, '')) || 0,
+      gender: form.gender,
+      militaryMonths: Number(form.militaryMonths) || 0,
+      eligChecks: form.eligChecks,
     })
     showToast(form.id ? '대상자를 고쳤습니다.' : '대상자를 넣었습니다.')
     setForm(null)
@@ -304,7 +355,7 @@ function ClientEmployees({
 
   const toggleRound = async (emp: EmpRecord, index: number) => {
     const rounds = emp.rounds.map((r, i) =>
-      i === index ? { ...r, isPaid: !r.isPaid, received: !r.isPaid ? r.amount : 0 } : r,
+      i === index ? { ...r, isPaid: !r.isPaid, received: !r.isPaid ? r.amount : 0, paidDate: !r.isPaid ? todayYmd() : '' } : r,
     )
     await onSave({ ...emp, rounds })
   }
@@ -349,6 +400,9 @@ function ClientEmployees({
               e.target.value = ''
             }}
           />
+          <Button variant="ghost" size="sm" onClick={() => { setTab('employees'); setWizard(true) }}>
+            📥 엑셀 마법사
+          </Button>
           <Button size="sm" onClick={() => setForm(emptyForm(choices[0]?.id ?? ''))} data-testid="emp-add">
             <UserPlus aria-hidden="true" className="size-4" /> 대상자 넣기
           </Button>
@@ -367,7 +421,38 @@ function ClientEmployees({
         />
       </div>
 
-      {form && (
+      <div className="flex flex-wrap gap-1.5 border-b border-slate-200 pb-2" role="tablist" data-testid="emp-detail-tabs">
+        {DETAIL_TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.key}
+            data-tab={t.key}
+            onClick={() => setTab(t.key)}
+            className={`tap t-sub rounded-(--radius-control) px-3 py-1.5 font-bold ${tab === t.key ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+          >
+            {t.label}
+            {t.key === 'employees' ? ` (${employees.length})` : t.key === 'notes' && meta.notes.length ? ` (${meta.notes.length})` : ''}
+          </button>
+        ))}
+      </div>
+
+      {tab !== 'employees' && metaBucket.rows === null && <p className="t-sub text-slate-400">읽는 중…</p>}
+      {tab !== 'employees' && metaBucket.rows !== null && (() => {
+        const props = { client, meta, patch: patchMeta, employees, programs, today }
+        if (tab === 'overview') return <OverviewTab {...props} />
+        if (tab === 'docs') return <CompanyDocsTab {...props} />
+        if (tab === 'commission') return <CommissionTab {...props} />
+        if (tab === 'notes') return <NotesTab {...props} />
+        return <AgencyReportTab {...props} />
+      })()}
+
+      {tab === 'employees' && wizard && (
+        <ExcelImportWizard clients={[{ id: client.id, companyName: client.companyName, businessNumber: client.businessNumber }]} programs={programs} employees={employees} onSave={onSave} fixedClientId={client.id} onClose={() => setWizard(false)} />
+      )}
+
+      {tab === 'employees' && form && (
         <Surface>
           <div className="flex flex-col gap-3">
             <span className="t-section text-slate-900">{form.id ? '대상자 고치기' : '대상자 넣기'}</span>
@@ -405,6 +490,10 @@ function ClientEmployees({
                 </select>
               </label>
               <label className="block">
+                <span className="t-sub font-medium text-slate-600">월 급여 (원)</span>
+                <input aria-label="월 급여" inputMode="numeric" value={form.salary} onChange={(e) => set('salary', e.target.value)} className={`mt-1 ${inputCls}`} />
+              </label>
+              <label className="block">
                 <span className="t-sub font-medium text-slate-600">단계</span>
                 <select aria-label="단계" value={form.stage} onChange={(e) => set('stage', e.target.value as EmpStage)} className={`mt-1 ${inputCls}`}>
                   {EMP_STAGES.map((s) => (
@@ -414,6 +503,52 @@ function ClientEmployees({
                   ))}
                 </select>
               </label>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="t-sub font-medium text-slate-600">성별</span>
+                <select aria-label="성별" value={form.gender} onChange={(e) => set('gender', e.target.value as EditForm['gender'])} className={`mt-1 ${inputCls}`}>
+                  <option value="">선택 안 함</option>
+                  <option value="남">남</option>
+                  <option value="여">여</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="t-sub font-medium text-slate-600">군복무 (개월 · 청년 나이 상한 연장)</span>
+                <input aria-label="군복무 개월" inputMode="numeric" value={form.militaryMonths} onChange={(e) => set('militaryMonths', e.target.value.replace(/[^\d]/g, ''))} className={`mt-1 ${inputCls}`} />
+              </label>
+            </div>
+            {Number(form.salary.replace(/[^\d]/g, '')) > 0 && Number(form.salary.replace(/[^\d]/g, '')) < MIN_WAGE_MONTH_2026 && (
+              <p className="t-sub rounded-(--radius-control) bg-rose-50 px-3 py-2 break-keep text-danger-700" data-testid="emp-minwage-warn">
+                ⚠️ 최저임금 미달 가능성이 있습니다. {programOf(form.programId)?.name?.includes('청년일자리도약') ? '최저임금 미달 가능성이 있어 청년일자리도약장려금 진행이 어려울 수 있습니다. ' : ''}(2026 월 환산 {MIN_WAGE_MONTH_2026.toLocaleString()}원)
+              </p>
+            )}
+            {(() => {
+              const info = meta.programInfos.find((x) => x.programId === form.programId)
+              if (!info) return null
+              const quota = Number(info.quota) || 0
+              const cur = employees.filter((e) => e.programId === form.programId && e.stage !== 'resigned' && e.id !== form.id).length
+              return (
+                <p className={`t-sub rounded-(--radius-control) px-3 py-2 break-keep ${quota > 0 && cur + 1 > quota ? 'bg-rose-50 text-danger-700' : 'bg-slate-50 text-slate-600'}`}>
+                  👥 {quota > 0 ? `지원한도: ${quota}명 (현재 ${cur}명 → 추가시 ${cur + 1}명)` : '지원한도 미입력'} · {info.agreementDate ? `협약 체결됨 ${fD(info.agreementDate)}` : '⚠️ 협약 미체결 — 신청 전 협약 필요'}
+                  {info.applyDate && form.hireDate && (() => {
+                    const diff = Math.abs((new Date(form.hireDate).getTime() - new Date(info.applyDate).getTime()) / (30.44 * 86400000))
+                    return diff <= 3 ? ' · ✅ 참여신청일 기준 전후 3개월 이내' : ' · ⚠️ 참여신청일 기준 전후 3개월 범위 벗어남 — 운영기관 확인'
+                  })()}
+                </p>
+              )
+            })()}
+            <div className="flex flex-col gap-1">
+              <span className="t-sub font-medium text-slate-600">신청 전 확인</span>
+              <div className="grid gap-1 sm:grid-cols-2">
+                {ELIG_CHECKS.map((c) => (
+                  <label key={c} className="t-sub flex items-center gap-2 text-slate-700">
+                    <input type="checkbox" checked={!!form.eligChecks[c]} onChange={() => set('eligChecks', { ...form.eligChecks, [c]: !form.eligChecks[c] })} className="size-4" />
+                    {c}
+                  </label>
+                ))}
+              </div>
+              <span className="t-meta text-slate-400">운영기관 또는 공고문 기준 추가 확인 필요</span>
             </div>
             <label className="block">
               <span className="t-sub font-medium text-slate-600">메모</span>
@@ -432,7 +567,7 @@ function ClientEmployees({
         </Surface>
       )}
 
-      {employees.length === 0 ? (
+      {tab === 'employees' && (employees.length === 0 ? (
         <Surface>
           <p className="t-sub break-keep text-slate-600">
             이 업체에는 아직 지원금 대상자가 없습니다. 위의 <b>대상자 넣기</b> 로 한 사람을 넣으면
@@ -440,8 +575,102 @@ function ClientEmployees({
           </p>
         </Surface>
       ) : (
-        <Section title="대상자" count={employees.length}>
-          <ul className="flex flex-col gap-3" data-testid="emp-list">
+        <Section
+          title="대상자"
+          count={employees.length}
+          action={
+            <span className="flex gap-1">
+              <Button size="sm" variant={view === 'card' ? 'primary' : 'ghost'} onClick={() => setView('card')}>
+                🗃️ 카드
+              </Button>
+              <Button size="sm" variant={view === 'table' ? 'primary' : 'ghost'} onClick={() => setView('table')} data-testid="emp-view-table">
+                📋 표
+              </Button>
+            </span>
+          }
+        >
+          {view === 'table' && (
+            <div className="flex flex-col gap-2" data-testid="emp-table-wrap">
+              {selected.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) bg-brand-50 px-3 py-2">
+                  <span className="t-sub font-bold">{selected.length}명 선택</span>
+                  <span className="t-meta text-slate-500">상태 일괄 변경</span>
+                  {EMP_STAGES.map((st) => (
+                    <Button
+                      key={st.key}
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        void Promise.all(employees.filter((e) => selected.includes(e.id)).map((e) => onSave({ ...e, stage: st.key }))).then(() => {
+                          showToast(`${selected.length}명 상태가 변경되었습니다.`)
+                          setSelected([])
+                        })
+                      }}
+                    >
+                      {st.label}
+                    </Button>
+                  ))}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      const rows = employees.filter((e) => selected.includes(e.id)).map((e) => [e.name, EMP_STAGES.find((x) => x.key === e.stage)?.label ?? '', programOf(e.programId)?.name ?? '', e.hireDate].join('\t'))
+                      void navigator.clipboard?.writeText(rows.join('\n')).catch(() => undefined)
+                      showToast('표로 복사했습니다.')
+                    }}
+                  >
+                    표로 복사
+                  </Button>
+                </div>
+              )}
+              <div className="overflow-x-auto rounded-(--radius-panel) border border-slate-200">
+                <table className="w-full min-w-[44rem] t-sub" data-testid="emp-table">
+                  <thead className="bg-slate-50 text-left text-slate-500">
+                    <tr>
+                      <th className="px-2 py-2">
+                        <input
+                          type="checkbox"
+                          aria-label="모두 고르기"
+                          checked={selected.length === employees.length && employees.length > 0}
+                          onChange={() => setSelected(selected.length === employees.length ? [] : employees.map((e) => e.id))}
+                        />
+                      </th>
+                      <th className="px-2 py-2">이름</th>
+                      <th className="px-2 py-2">지원금</th>
+                      <th className="px-2 py-2">상태</th>
+                      <th className="px-2 py-2">입사일</th>
+                      <th className="px-2 py-2">나이</th>
+                      <th className="px-2 py-2">다음 신청</th>
+                      <th className="px-2 py-2 text-right">받은 돈</th>
+                      <th className="px-2 py-2 text-right">남은 예정</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {employees.map((e) => {
+                      const dd = empNextDday(e, today)
+                      const age = e.birthDate ? Math.floor((new Date(e.hireDate || todayYmd()).getTime() - new Date(e.birthDate).getTime()) / (365.25 * 86400000)) : null
+                      return (
+                        <tr key={e.id} className="border-t border-slate-100">
+                          <td className="px-2 py-2">
+                            <input type="checkbox" aria-label={`${e.name} 고르기`} checked={selected.includes(e.id)} onChange={() => setSelected((cur) => (cur.includes(e.id) ? cur.filter((x) => x !== e.id) : [...cur, e.id]))} />
+                          </td>
+                          <td className="px-2 py-2 font-bold">{e.name}</td>
+                          <td className="px-2 py-2">{programOf(e.programId)?.name ?? '-'}</td>
+                          <td className="px-2 py-2">{EMP_STAGES.find((x) => x.key === e.stage)?.label}</td>
+                          <td className="px-2 py-2">{e.hireDate ? fD(e.hireDate) : '-'}</td>
+                          <td className="px-2 py-2">{age !== null && !Number.isNaN(age) ? `${age}세` : '-'}</td>
+                          <td className="px-2 py-2">{dd !== null ? <Badge tone={dd < 0 ? 'danger' : dd <= 7 ? 'warning' : 'neutral'}>{formatDday(dd)}</Badge> : '-'}</td>
+                          <td className="px-2 py-2 text-right tabular-nums">{fMan(e.rounds.reduce((x, r) => x + (r.isPaid ? r.received || r.amount || 0 : 0), 0))}</td>
+                          <td className="px-2 py-2 text-right tabular-nums">{fMan(empRemaining(e))}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          <ul className={`flex flex-col gap-3 ${view === 'table' ? 'hidden' : ''}`} data-testid="emp-list">
             {employees.map((emp) => {
               const program = programOf(emp.programId)
               const dd = empNextDday(emp, today)
@@ -487,6 +716,10 @@ function ClientEmployees({
                                 programId: emp.programId || choices[0]?.id || '',
                                 stage: emp.stage,
                                 memo: emp.memo,
+                                salary: emp.salary ? String(emp.salary) : '',
+                                gender: emp.gender ?? '',
+                                militaryMonths: emp.militaryMonths ? String(emp.militaryMonths) : '',
+                                eligChecks: emp.eligChecks ?? {},
                               })
                             }
                           >
@@ -518,10 +751,70 @@ function ClientEmployees({
                                       : 'border-slate-300 bg-white text-slate-600'
                                 }`}
                               >
-                                {r.label} {date ? fD(date) : ''} {r.isPaid ? '· 받음' : `· ${fMan(r.amount)}`}
+                                {r.label} {date ? fD(date) : ''} {r.isPaid ? `· 받음${r.received && r.received !== r.amount ? ` ${fMan(r.received)}` : ''}` : `· ${fMan(r.amount)}`}
                               </button>
                             )
                           })}
+                        </div>
+                      )}
+
+                      {emp.rounds.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="t-meta text-slate-400">💳 수령 확인</span>
+                          {emp.rounds.map((r, i) => (
+                            <button
+                              key={`e-${r.label}-${i}`}
+                              type="button"
+                              className="t-meta rounded border border-slate-200 px-1.5 py-0.5 text-slate-500 hover:bg-slate-50"
+                              onClick={() => setRoundEdit({ empId: emp.id, index: i, received: String(r.received || r.expectedAmount || r.amount || 0), paidDate: r.paidDate || todayYmd(), note: r.note ?? '' })}
+                            >
+                              {r.label} ✎
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {roundEdit && roundEdit.empId === emp.id && (
+                        <div className="flex flex-wrap items-end gap-2 rounded-(--radius-control) bg-slate-50 p-2.5" data-testid="emp-round-editor">
+                          <span className="t-sub font-bold">💳 {emp.name} · {emp.rounds[roundEdit.index]?.label}</span>
+                          <label className="block">
+                            <span className="t-meta text-slate-500">실제 수령액(원)</span>
+                            <input aria-label="실제 수령액" inputMode="numeric" value={roundEdit.received} onChange={(e) => setRoundEdit({ ...roundEdit, received: e.target.value.replace(/[^\d]/g, '') })} className={inputCls} />
+                          </label>
+                          <label className="block">
+                            <span className="t-meta text-slate-500">수령일</span>
+                            <input type="date" aria-label="수령일" value={roundEdit.paidDate} onChange={(e) => setRoundEdit({ ...roundEdit, paidDate: e.target.value })} className={inputCls} />
+                          </label>
+                          <label className="block min-w-40 flex-1">
+                            <span className="t-meta text-slate-500">메모</span>
+                            <input aria-label="입금 메모" value={roundEdit.note} onChange={(e) => setRoundEdit({ ...roundEdit, note: e.target.value })} placeholder="입금 메모..." className={inputCls} />
+                          </label>
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            onClick={() => {
+                              const rounds = emp.rounds.map((r, i) => (i === roundEdit.index ? { ...r, isPaid: true, received: Number(roundEdit.received) || 0, paidDate: roundEdit.paidDate, note: roundEdit.note } : r))
+                              void onSave({ ...emp, rounds }).then(() => showToast('회차 지급 상태가 저장되었습니다.'))
+                              setRoundEdit(null)
+                            }}
+                          >
+                            ✅ 수령 확인
+                          </Button>
+                          {emp.rounds[roundEdit.index]?.isPaid && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                const rounds = emp.rounds.map((r, i) => (i === roundEdit.index ? { ...r, isPaid: false, received: 0, paidDate: '' } : r))
+                                void onSave({ ...emp, rounds })
+                                setRoundEdit(null)
+                              }}
+                            >
+                              ❌ 미수령으로
+                            </Button>
+                          )}
+                          <Button size="sm" variant="ghost" onClick={() => setRoundEdit(null)}>
+                            취소
+                          </Button>
                         </div>
                       )}
 
@@ -552,11 +845,11 @@ function ClientEmployees({
             })}
           </ul>
         </Section>
-      )}
+      ))}
 
       {busy !== '' && <p className="t-sub text-slate-500">{busy}</p>}
 
-      {employees.length > 0 && (
+      {tab === 'employees' && employees.length > 0 && (
         <Section
           title="고객 보고서"
           action={

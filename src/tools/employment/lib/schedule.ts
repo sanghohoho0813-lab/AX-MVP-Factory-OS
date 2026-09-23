@@ -12,6 +12,10 @@ export interface EmployeeRound extends ProgramRound {
   isPaid: boolean
   received: number
   expectedAmount?: number
+  /** 지급 확인한 날 YYYY-MM-DD — 월별 수령 집계에 쓴다 (D-92) */
+  paidDate?: string
+  /** 입금 메모 (D-92) */
+  note?: string
 }
 
 /** 프로그램 회차표를 직원 회차로 복사 (원본 save() 와 같이 isPaid:false, received:0) */

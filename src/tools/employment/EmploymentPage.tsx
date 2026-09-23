@@ -19,6 +19,7 @@ import { CompaniesScreen } from './screens/CompaniesScreen'
 import { BoardScreen } from './screens/BoardScreen'
 import { SimulatorScreen } from './screens/SimulatorScreen'
 import { ProgramsScreen } from './screens/ProgramsScreen'
+import { SubsidyGuide } from './screens/SubsidyGuide'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { Button } from '../../components/ui/Button'
 import { Badge, Disclosure, MetricTile, Section, Surface, type Tone } from '../../components/ui/primitives'
@@ -223,7 +224,12 @@ export function EmploymentPage() {
       {section === 'wage' && <WageTab />}
       {section === 'roster' && <RosterTab />}
       {section === 'simulator' && <SimulatorScreen />}
-      {section === 'programs' && <ProgramsScreen />}
+      {section === 'programs' && (
+        <>
+          <SubsidyGuide />
+          <ProgramsScreen />
+        </>
+      )}
       {section === 'settings' && <SettingsScreen />}
       <p className="t-meta break-keep text-slate-400">{DISCLAIMER}</p>
     </div>

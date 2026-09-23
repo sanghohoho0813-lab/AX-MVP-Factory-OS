@@ -13,6 +13,7 @@ import { addMo, fD, formatDday, getDdayFrom } from '../lib/dates'
 import { fMan } from '../lib/format'
 import { summarizeEmployees, type EmpRecord } from '../lib/empRecords'
 import { useEmployees } from '../lib/useEmployees'
+import { EmploymentDashboardMore } from './DashboardMore'
 
 interface DueRow {
   empId: string
@@ -99,6 +100,8 @@ export function EmploymentDashboardExtra() {
           </ul>
         </Section>
       )}
+
+      <EmploymentDashboardMore employees={emps} today={today} />
 
       {sum.docsPending > 0 && (
         <Surface edge="warning" showEdge>

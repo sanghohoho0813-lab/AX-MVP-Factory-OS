@@ -19,7 +19,7 @@ import { useEmployees } from '../lib/useEmployees'
 import { usePrograms } from '../lib/usePrograms'
 
 const MODULE = 'employment'
-const BUCKETS = ['employees', 'programs'] as const
+const BUCKETS = ['employees', 'programs', 'companies', 'calendar'] as const
 
 interface BackupFile {
   kind: 'axmvp.module.employment'
