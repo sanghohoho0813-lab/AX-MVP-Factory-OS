@@ -20,6 +20,7 @@ import { todayLocalDate } from '../../../lib/appClock'
 import { CONTENT_SEEDS, benchmarkTitles, channelTexts, type ContentSeed } from '../lib/contentSeeds'
 import { INTERESTS, toAccount, type AccountData } from '../lib/salesAccounts'
 import { STAGE_LABEL } from '../lib/pipeline'
+import { getAffordSettings, getReportProfile, type SalesDocsData } from '../lib/salesDocs.js'
 
 const inputCls =
   'w-full rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-2 text-[0.95rem] text-slate-900 focus:border-brand-500 focus:outline-none'
@@ -423,12 +424,21 @@ export function UpdatesScreen() {
 /* ⑤ 설정·백업                                                          */
 /* ------------------------------------------------------------------ */
 
-const SALES_BUCKETS = ['accounts', 'education', 'updates'] as const
+const SALES_BUCKETS = ['accounts', 'education', 'updates', 'profile'] as const
 
 export function SalesSettingsScreen() {
   const accounts = useModuleBucket<AccountData>('sales-kit', 'accounts')
   const education = useModuleBucket<EducationData>('sales-kit', 'education')
   const updates = useModuleBucket<UpdateData>('sales-kit', 'updates')
+  const profileBucket = useModuleBucket<SalesDocsData>('sales-kit', 'profile')
+  const { showToast } = useToast()
+  const row = profileBucket.rows?.[0]
+  const cur: SalesDocsData = row?.data ?? {}
+  const prof = getReportProfile(cur)
+  const aff = getAffordSettings(cur)
+  const saveProfile = (patch: SalesDocsData) => {
+    void profileBucket.save({ id: row?.id, clientId: '', data: { ...cur, ...patch } }).then(() => showToast('저장했습니다.'))
+  }
 
   return (
     <div className="flex flex-col gap-5" data-testid="sales-settings">
@@ -437,6 +447,53 @@ export function SalesSettingsScreen() {
         <MetricTile label="교육 기록" value={`${education.rows?.length ?? 0}건`} />
         <MetricTile label="법령·공고" value={`${updates.rows?.length ?? 0}건`} />
       </div>
+
+      <Section title="리포트 담당자 정보" action={<span className="t-meta text-slate-500">방문 리포트·제안서·업무범위서 아래에 찍힙니다</span>}>
+        {profileBucket.rows === null ? (
+          <p className="t-sub text-slate-400">읽는 중…</p>
+        ) : (
+          <Surface className="grid gap-2 sm:grid-cols-2" data-testid="sales-profile">
+            {(
+              [
+                ['consultant', '담당자 이름'],
+                ['title', '직함'],
+                ['org', '회사·브랜드'],
+                ['phone', '연락처'],
+                ['email', '이메일'],
+              ] as const
+            ).map(([k, label]) => (
+              <label key={k} className="block">
+                <span className="t-meta text-slate-500">{label}</span>
+                <input aria-label={label} defaultValue={prof[k]} onBlur={(e) => saveProfile({ reportProfile: { ...(cur.reportProfile ?? {}), [k]: e.target.value } })} className={inputCls} />
+              </label>
+            ))}
+            <label className="block sm:col-span-2">
+              <span className="t-meta text-slate-500">맺음말</span>
+              <textarea aria-label="맺음말" rows={2} defaultValue={prof.footer} onBlur={(e) => saveProfile({ reportProfile: { ...(cur.reportProfile ?? {}), footer: e.target.value } })} className={inputCls} />
+            </label>
+          </Surface>
+        )}
+      </Section>
+
+      <Section title="월납 적정성 기준" action={<span className="t-meta text-slate-500">직전년도 순이익 1억원당 월납 한도(만원)</span>}>
+        {profileBucket.rows !== null && (
+          <Surface className="grid gap-2 sm:grid-cols-4">
+            {(
+              [
+                ['greenPerEok', '초록 한도'],
+                ['yellowPerEok', '노랑 한도'],
+                ['defMonths', '기본 납입(개월)'],
+                ['defRate', '기본 환급률(%)'],
+              ] as const
+            ).map(([k, label]) => (
+              <label key={k} className="block">
+                <span className="t-meta text-slate-500">{label}</span>
+                <input aria-label={label} inputMode="numeric" defaultValue={String(aff[k])} onBlur={(e) => saveProfile({ affordSettings: { ...(cur.affordSettings ?? {}), [k]: Number(e.target.value) || 0 } })} className={inputCls} />
+              </label>
+            ))}
+          </Surface>
+        )}
+      </Section>
 
       <Section title="백업">
         <ModuleBackup
@@ -447,6 +504,7 @@ export function SalesSettingsScreen() {
             void accounts.reload()
             void education.reload()
             void updates.reload()
+            void profileBucket.reload()
           }}
         />
       </Section>

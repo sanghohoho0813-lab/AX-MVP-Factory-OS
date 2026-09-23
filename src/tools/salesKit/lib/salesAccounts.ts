@@ -51,8 +51,10 @@ export function emptyAccount(): AccountData {
   return { stage: 'lead', source: '', interests: [], nextContactAt: '', lastContactedAt: '', expectedFee: 0, memo: '' }
 }
 
+/** 원본 영업 카드의 나머지 칸(업종·매출·연락 이력·제안 상태·로드맵…)은 그대로 들고 다닌다 (D-92) */
 export function toAccount(data: Record<string, unknown>): AccountData {
   return {
+    ...data,
     stage: normalizeSalesStage(data.stage),
     source: typeof data.source === 'string' ? data.source : '',
     interests: Array.isArray(data.interests) ? (data.interests as string[]) : [],

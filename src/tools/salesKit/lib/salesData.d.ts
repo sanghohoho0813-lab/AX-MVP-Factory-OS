@@ -128,6 +128,10 @@ export interface ScoreBand {
 
 export interface FinanceSignal {
   level: string
+  label?: string
+  color?: string
+  bg?: string
+  advice?: string
   icon?: string
   reasons: string[]
   opportunities?: string[]
@@ -165,4 +169,6 @@ export function manageMessage(item: SalesItem, kind: string): string
 export function referralAdvice(item: SalesItem): string
 export function referralMessage(item: SalesItem): string
 export function financeSignal(item: SalesItem): FinanceSignal
+export const DEAL_STAGES: Array<{ key: string; label: string; icon: string; color: string; bg: string }>
+export function stageOf(key: string): { key: string; label: string; icon: string; color: string; bg: string }
 export function missedConsultItems(item: SalesItem): string[]

@@ -604,6 +604,24 @@ export function scoreBand(score) {
   if (score >= 40) return { label: "장기 육성", short: "장기육성", color: C.blue, bg: C.blueBg };
   return { label: "낮음", short: "낮음", color: C.textM, bg: "#EEF2F7" };
 }
+// 원본 App.jsx 228-244 (색 상수는 값으로 풀어 적었다)
+export const DEAL_STAGES = [
+  { key: "lead", label: "발굴대상", icon: "🔎", color: "#64748B", bg: "#EEF2F7" },
+  { key: "contacted", label: "첫 연락", icon: "📞", color: "#0284C7", bg: "#E0F2FE" },
+  { key: "meeting_proposed", label: "미팅제안", icon: "💬", color: "#2563EB", bg: "#E8F1FE" },
+  { key: "meeting1_scheduled", label: "1차예정", icon: "📅", color: "#D97706", bg: "#FDF1E1" },
+  { key: "meeting1_done", label: "1차완료", icon: "✅", color: "#D97706", bg: "#FDF1E1" },
+  { key: "docs_requested", label: "자료요청", icon: "📂", color: "#7C3AED", bg: "#F2ECFE" },
+  { key: "docs_received", label: "자료수령", icon: "📥", color: "#0284C7", bg: "#E0F2FE" },
+  { key: "meeting2_scheduled", label: "2차예정", icon: "📊", color: "#2563EB", bg: "#E8F1FE" },
+  { key: "meeting2_done", label: "2차완료", icon: "📋", color: "#2563EB", bg: "#E8F1FE" },
+  { key: "proposal_sent", label: "제안발송", icon: "📨", color: "#7C3AED", bg: "#F2ECFE" },
+  { key: "closing_scheduled", label: "클로징", icon: "🎯", color: "#B45309", bg: "#FCEFDA" },
+  { key: "decision_pending", label: "검토중", icon: "⏳", color: "#D97706", bg: "#FDF1E1" },
+  { key: "contracted", label: "계약완료", icon: "🏆", color: "#059669", bg: "#E7F6EF" },
+  { key: "hold", label: "보류", icon: "⏸️", color: "#64748B", bg: "#EEF2F7" },
+  { key: "lost", label: "이탈", icon: "🚪", color: "#DC2626", bg: "#FDECEC" },
+];
 export function stageOf(key) {
   return DEAL_STAGES.find((s) => s.key === key) || DEAL_STAGES[0];
 }

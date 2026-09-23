@@ -25,7 +25,9 @@ import {
   ProspectingScreen,
   SalesCompaniesScreen,
   SalesDashboardExtra,
+  SalesReportsSection,
 } from './screens/AccountsScreens'
+import { PackagesManager } from './screens/PackagesManager'
 import { ContentScreen, EducationScreen, SalesSettingsScreen, UpdatesScreen } from './screens/LibraryScreens'
 import { Button } from '../../components/ui/Button'
 import { Badge, Disclosure, Section, Surface, type Tone } from '../../components/ui/primitives'
@@ -69,7 +71,7 @@ const SECTION_TAB: Record<string, Tab> = {
 }
 
 /** '이 고객' 입력칸이 필요한 화면들 — 네 화면이 같은 고객을 본다 */
-const FORM_SECTIONS = Object.keys(SECTION_TAB)
+const FORM_SECTIONS = ['meeting', 'strategies', 'packages']
 
 interface KitForm {
   name: string
@@ -276,6 +278,8 @@ export function SalesKitPage() {
       )}
       {section === 'prospecting' && <ProspectingScreen />}
       {section === 'companies' && <SalesCompaniesScreen />}
+      {section === 'reports' && <SalesReportsSection />}
+      {section === 'packages' && <PackagesManager />}
       {section === 'followup' && <FollowUpScreen />}
       {section === 'pipeline' && <PipelineScreen />}
       {section === 'analytics' && <AnalyticsScreen />}

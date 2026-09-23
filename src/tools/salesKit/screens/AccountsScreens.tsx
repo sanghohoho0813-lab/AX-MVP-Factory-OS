@@ -6,7 +6,13 @@
  */
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
+import { SalesReportsScreen } from './SalesCardScreen'
+import { toSalesItem } from '../lib/salesItem'
+import { followUpKakao, focusCustomersOf, manToText, recontactListOf, riskSignalsOf, todayProposalRows, topicKakao } from '../lib/salesDocs.js'
+import { PERIOD_OPTIONS, analyticsFunnel, buildCSV, csvAnalytics, csvCustomers, csvFollowups, csvProducts, deltaInfo, feeMoney, filterDataByPeriod, getGoals, monthCompare, monthLabel, monthlyTrend, periodLabel, periodRange, productMonthlyCompare, productPerformance, salesMetrics, type AnalyticsData } from '../lib/salesAnalytics.js'
+import { PKG_CATEGORIES, recommendedStrategiesFor, scoreLead, type SalesItem } from '../lib/salesData.js'
+import type { SalesDocsData } from '../lib/salesDocs.js'
 import { Building2, Clock, Download, Target } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
 import { Badge, MetricTile, Section, Surface, type Tone } from '../../../components/ui/primitives'
@@ -102,6 +108,20 @@ function StageSelect({ value, onChange, label }: { value: SalesStage; onChange: 
       ))}
     </select>
   )
+}
+
+/* ------------------------------------------------------------------ */
+/* 리포트·제안서 — 업체별 영업 카드 (D-92)                                */
+/* ------------------------------------------------------------------ */
+
+export function SalesReportsSection() {
+  const d = useSalesAccounts()
+  const { clientId } = useToolClient()
+  const [params] = useSearchParams()
+  const profile = useModuleBucket<SalesDocsData>('sales-kit', 'profile')
+  if (!d.ready) return <Loading />
+  const docsData: SalesDocsData = profile.rows?.[0]?.data ?? {}
+  return <SalesReportsScreen clients={d.clients} accountOf={d.accountOf} saveFor={d.save} data={docsData} initialId={params.get('card') ?? clientId} />
 }
 
 /* ------------------------------------------------------------------ */
@@ -220,9 +240,14 @@ export function SalesCompaniesScreen() {
                           placeholder="통화 내용·다음에 할 말"
                           className={inputCls}
                         />
-                        <Link to={`/ops/clients/${c.id}`} className="t-meta text-brand-700 hover:underline">
-                          업체 기록 보기
-                        </Link>
+                        <div className="flex flex-wrap gap-3">
+                          <Link to={`/tools/sales-kit/reports?card=${c.id}`} className="t-sub font-bold text-brand-700 hover:underline" data-testid="sales-open-card">
+                            영업 카드 열기 — 방문 리포트·제안서·견적·계약 준비
+                          </Link>
+                          <Link to={`/ops/clients/${c.id}`} className="t-meta text-brand-700 hover:underline">
+                            업체 기록 보기
+                          </Link>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -356,12 +381,56 @@ export function FollowUpScreen() {
                         오늘 연락함
                       </Button>
                     </div>
+                    {(() => {
+                      const client = d.clients.find((c) => c.id === r.clientId)
+                      if (!client) return null
+                      const it = toSalesItem(client, r.data)
+                      return (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <span className="t-meta text-slate-500">
+                            점수 {scoreLead(it)} · {(it.interests ?? []).slice(0, 2).join(', ') || '니즈 미입력'} · 다음 액션: {String(it.nextAction || recommendedStrategiesFor(it)[0]?.name || '점검')}
+                          </span>
+                          <button type="button" className="t-meta font-bold text-brand-700 hover:underline" onClick={() => void navigator.clipboard?.writeText(followUpKakao(it)).catch(() => undefined)}>
+                            💬 다음 연락 문구 복사
+                          </button>
+                          <Link to={`/tools/sales-kit/reports?card=${r.clientId}`} className="t-meta text-brand-700 hover:underline">
+                            영업 카드
+                          </Link>
+                        </div>
+                      )
+                    })()}
                   </Surface>
                 </li>
               ))}
             </ul>
           </Section>
         ))}
+
+      {(() => {
+        const recent = [...d.accountOf.entries()]
+          .map(([clientId, v]) => ({ clientId, name: d.clients.find((c) => c.id === clientId)?.companyName ?? '업체', contacts: (v.data.contacts as Array<{ date: string; type: string; memo: string }> | undefined) ?? [] }))
+          .filter((x) => x.contacts.length > 0)
+          .sort((a, b) => (b.contacts[0]?.date ?? '').localeCompare(a.contacts[0]?.date ?? ''))
+          .slice(0, 12)
+        if (!recent.length) return null
+        return (
+          <Section title="📒 최근 연락 이력 있는 고객" count={recent.length}>
+            <ul className="flex flex-col gap-1.5" data-group="recent">
+              {recent.map((x) => (
+                <li key={x.clientId} className="t-sub flex flex-wrap gap-2 text-slate-700">
+                  <Link to={`/tools/sales-kit/reports?card=${x.clientId}`} className="font-bold text-slate-900 hover:underline">
+                    {x.name}
+                  </Link>
+                  <span className="text-slate-500">
+                    {x.contacts[0].date.replace(/-/g, '.')} · {x.contacts[0].type}
+                    {x.contacts[0].memo ? ` — ${x.contacts[0].memo}` : ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )
+      })()}
 
       {rows.length === 0 && (
         <Surface>
@@ -448,6 +517,13 @@ export function PipelineScreen() {
 export function AnalyticsScreen() {
   const d = useSalesAccounts()
   const { showToast } = useToast()
+  const profile = useModuleBucket<SalesDocsData>('sales-kit', 'profile')
+  const [period, setPeriod] = useState('all')
+  const [cs, setCs] = useState('')
+  const [ce, setCe] = useState('')
+  const [applied, setApplied] = useState({ s: '', e: '' })
+  const [sortBy, setSortBy] = useState<'contFee' | 'propFee' | 'conv' | 'proposed'>('contFee')
+  const [catF, setCatF] = useState('전체')
   if (!d.ready) return <Loading />
 
   const rows = [...d.accountOf.entries()].map(([clientId, v]) => ({
@@ -463,17 +539,71 @@ export function AnalyticsScreen() {
   const bySource = new Map<string, number>()
   for (const r of rows) bySource.set(r.data.source || '미입력', (bySource.get(r.data.source || '미입력') ?? 0) + 1)
 
-  const download = () => {
-    const csv = accountsCsv(rows.map((r) => ({ name: r.name, data: r.data })))
-    const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' })
+  // 원본 성과 분석 — 영업을 시작한 업체만 (D-92)
+  const profRow = profile.rows?.[0]
+  const profData: SalesDocsData = profRow?.data ?? {}
+  const list = d.clients.filter((c) => d.accountOf.has(c.id)).map((c) => toSalesItem(c, d.accountOf.get(c.id)!.data))
+  const all: AnalyticsData = { list, goals: (profData.goals as AnalyticsData['goals']) ?? undefined }
+  const range = period === 'custom' ? periodRange('custom', applied.s, applied.e) : periodRange(period)
+  const fdata = filterDataByPeriod(all, range)
+  const m = salesMetrics(fdata)
+  const funnel11 = analyticsFunnel(fdata)
+  const maxCount = Math.max(1, ...funnel11.map((f) => f.count))
+  const goals = getGoals(all)
+  const cmp = monthCompare(all)
+  const trend = monthlyTrend(all, 6)
+  const maxFee = Math.max(1, ...trend.map((t) => t.contractFee))
+  const pmc = productMonthlyCompare(all)
+  let perf = productPerformance(fdata).filter((p) => catF === '전체' || p.cat === catF)
+  perf = perf.sort((a, b) => (sortBy === 'contFee' ? b.contFee - a.contFee : sortBy === 'propFee' ? b.propFee - a.propFee : sortBy === 'conv' ? b.conv - a.conv : b.proposed - a.proposed))
+  const perfShown = perf.filter((p) => p.proposed > 0)
+  const focus = focusCustomersOf(fdata.list, scoreLead)
+  const risks = riskSignalsOf(fdata.list, scoreLead)
+  const pct = (cur: number, goal: number) => (goal > 0 ? Math.min(100, Math.round((cur / goal) * 100)) : 0)
+  const saveGoal = (k: 'feeGoal' | 'contractGoal' | 'proposalGoal', v: number) => {
+    void profile.save({ id: profRow?.id, clientId: '', data: { ...profData, goals: { ...goals, [k]: v } } }).then(() => showToast('목표를 저장했습니다.'))
+  }
+  const dl = (name: string, t: { headers: string[]; rows: Array<Array<string | number>> }) => {
+    if (!t.rows.length) {
+      showToast('내보낼 데이터가 없습니다.')
+      return
+    }
+    const blob = new Blob([buildCSV(t.headers, t.rows)], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `영업현황-${d.today}.csv`
+    a.download = `corp-sales-${name}-${d.today.replace(/-/g, '')}.csv`
     a.click()
     URL.revokeObjectURL(url)
-    showToast('영업 현황을 CSV 로 내보냈습니다.')
+    showToast('CSV 파일을 내려받습니다.')
   }
+  const cmpRows = [
+    { label: '신규 고객', cur: cmp.cur.newCust, prev: cmp.prev.newCust, unit: '곳', col: '#2563EB', inverse: false },
+    { label: '제안', cur: cmp.cur.proposed, prev: cmp.prev.proposed, unit: '곳', col: '#0284C7', inverse: false },
+    { label: '견적', cur: cmp.cur.quote, prev: cmp.prev.quote, unit: '곳', col: '#7C3AED', inverse: false },
+    { label: '계약', cur: cmp.cur.contracted, prev: cmp.prev.contracted, unit: '건', col: '#059669', inverse: false },
+    { label: '계약 수임료', cur: cmp.cur.contractFee, prev: cmp.prev.contractFee, unit: 'fee', col: '#B45309', inverse: false },
+    { label: '다음 연락 지연', cur: cmp.cur.followLate, prev: cmp.prev.followLate, unit: '건', col: '#DC2626', inverse: true },
+  ]
+  const metricCards: Array<[string, string, string]> = [
+    ['전체 고객', `${m.total}곳`, '#0F172A'],
+    ['이번 주 다음 연락', `${m.thisWeek}곳`, '#2563EB'],
+    ['다음 연락 지연', `${m.overdue}곳`, '#DC2626'],
+    ['제안 완료', `${m.proposed}곳`, '#0284C7'],
+    ['견적 전달', `${m.quoteSent}곳`, '#7C3AED'],
+    ['조건 조율', `${m.negotiating}곳`, '#D97706'],
+    ['계약 예정', `${m.preContract}곳`, '#B45309'],
+    ['계약 완료', `${m.done}곳`, '#059669'],
+    ['보류', `${m.onhold}곳`, '#64748B'],
+    ['예상 수임료 합계', feeMoney(m.feeSum), '#B45309'],
+    ['제안 수임료 합계', feeMoney(m.proposedFeeSum), '#0284C7'],
+    ['계약 수임료 합계', feeMoney(m.contractedFeeSum), '#059669'],
+  ]
+  const monthlyCards: Array<[string, string, string]> = [
+    ['월납 제안 고객', `${m.monthlyPropCount}곳`, '#2563EB'],
+    ['월납 제안액 합계(월)', feeMoney(m.monthlyPremiumSum), '#2563EB'],
+    ['84개월 목적자금 합계', manToText(m.projectedSum), '#B45309'],
+  ]
 
   return (
     <div className="flex flex-col gap-5" data-testid="sales-analytics">
@@ -484,10 +614,169 @@ export function AnalyticsScreen() {
         <MetricTile label="계약 완료" value={`${sum.contracted}곳`} tone={sum.contracted > 0 ? 'success' : 'neutral'} />
       </div>
 
+      <Section title="🗓️ 기간 · 내보내기" action={<span className="t-meta text-slate-500">{periodLabel(range)}</span>}>
+        <Surface className="flex flex-col gap-3">
+          <div className="flex flex-wrap gap-1.5" data-testid="sales-period">
+            {PERIOD_OPTIONS.map(([k, l]) => (
+              <button key={k} type="button" aria-pressed={period === k} onClick={() => setPeriod(k)} className={`tap t-meta rounded-full border px-3 py-1 font-bold ${period === k ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white text-slate-600'}`}>
+                {l}
+              </button>
+            ))}
+          </div>
+          {period === 'custom' && (
+            <div className="flex flex-wrap items-end gap-2">
+              <input type="date" aria-label="시작일" value={cs} onChange={(e) => setCs(e.target.value)} className={`${inputCls} w-auto`} />
+              <input type="date" aria-label="종료일" value={ce} onChange={(e) => setCe(e.target.value)} className={`${inputCls} w-auto`} />
+              <Button size="sm" onClick={() => setApplied({ s: cs, e: ce })}>
+                적용
+              </Button>
+            </div>
+          )}
+          <div className="flex flex-wrap gap-1.5 border-t border-slate-100 pt-2.5">
+            <span className="t-meta self-center font-bold text-slate-500">엑셀로 내보내기(CSV)</span>
+            <Button size="sm" variant="ghost" onClick={() => dl('customers', csvCustomers(fdata))}>
+              <Download aria-hidden="true" className="size-4" /> 고객 목록
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => dl('analytics', csvAnalytics(fdata))}>
+              <Download aria-hidden="true" className="size-4" /> 성과 분석
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => dl('products', csvProducts(fdata))}>
+              <Download aria-hidden="true" className="size-4" /> 상품별 성과
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => dl('followups', csvFollowups(fdata))}>
+              <Download aria-hidden="true" className="size-4" /> 다음 연락 대상
+            </Button>
+          </div>
+        </Surface>
+      </Section>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4" data-testid="sales-metrics">
+        {metricCards.map(([l, v, c]) => (
+          <Surface key={l} className="p-3">
+            <div className="t-meta font-bold text-slate-500">{l}</div>
+            <div className="t-card mt-1 font-black" style={{ color: c }}>
+              {v}
+            </div>
+          </Surface>
+        ))}
+      </div>
+      <div className="flex flex-col gap-2">
+        <span className="t-sub font-bold text-[#2563EB]">📅 월납 보험료 제안 지표 <span className="t-meta font-medium text-slate-500">(컨설팅 수임료와 구분된 지표입니다)</span></span>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {monthlyCards.map(([l, v, c]) => (
+            <Surface key={l} className="p-3">
+              <div className="t-meta font-bold text-slate-500">{l}</div>
+              <div className="t-card mt-1 font-black" style={{ color: c }}>
+                {v}
+              </div>
+            </Surface>
+          ))}
+          <Surface className="p-3">
+            <div className="t-meta font-bold text-slate-500">적정성 초록/노랑/빨강</div>
+            <div className="t-card mt-1 font-black">
+              <span className="text-[#059669]">{m.affordN.green}</span> / <span className="text-[#D97706]">{m.affordN.yellow}</span> / <span className="text-[#DC2626]">{m.affordN.red}</span>
+            </div>
+          </Surface>
+        </div>
+      </div>
+
+      <Section title="📊 이번 달 vs 지난 달">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" data-testid="sales-month-compare">
+          {cmpRows.map((r) => {
+            const dI = deltaInfo(r.cur, r.prev)
+            const dcol = r.inverse ? (dI.col === '#059669' ? '#DC2626' : dI.col === '#DC2626' ? '#059669' : dI.col) : dI.col
+            const txt = (v: number) => (r.unit === 'fee' ? feeMoney(v) : `${v}${r.unit}`)
+            return (
+              <Surface key={r.label} className="p-3">
+                <div className="t-meta font-bold text-slate-500">{r.label}</div>
+                <div className="t-card mt-1 font-black" style={{ color: r.col }}>
+                  {txt(r.cur)}
+                </div>
+                <div className="t-meta mt-1 text-slate-500">
+                  지난달 {txt(r.prev)} · <b style={{ color: dcol }}>{dI.txt}</b>
+                </div>
+              </Surface>
+            )
+          })}
+        </div>
+        <p className="t-meta mt-2 text-slate-500">
+          현재 시점 기준 · 위험 신호 <b className="text-danger-700">{riskSignalsOf(all.list, scoreLead).length}건</b> · 이번 주 집중 고객 <b className="text-brand-700">{focusCustomersOf(all.list, scoreLead).length}곳</b>
+        </p>
+      </Section>
+
+      <Section title="📈 월별 추이 (최근 6개월)">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6" data-testid="sales-trend">
+          {trend.map((t) => (
+            <Surface key={t.mkey} className="p-3">
+              <div className="flex items-center justify-between gap-2">
+                <b className="t-sub">{monthLabel(t.mkey)}</b>
+                <Badge tone={t.contracted > 0 ? 'success' : 'neutral'}>{t.contracted}건</Badge>
+              </div>
+              <div className="t-card mt-1 font-black text-[#B45309]">{feeMoney(t.contractFee)}</div>
+              <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full rounded-full bg-[#B45309]" style={{ width: `${Math.round((t.contractFee / maxFee) * 100)}%` }} />
+              </div>
+              <div className="t-meta mt-1.5 text-slate-500">
+                신규 {t.newCust} · 제안 {t.proposed} · 견적 {t.quote}
+              </div>
+            </Surface>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="🎯 이번 달 목표">
+        <div className="grid gap-2 sm:grid-cols-3" data-testid="sales-goals">
+          {(
+            [
+              ['feeGoal', '계약 수임료 목표(만원)', cmp.cur.contractFee, feeMoney(cmp.cur.contractFee), '#B45309'],
+              ['contractGoal', '계약 건수 목표', cmp.cur.contracted, `${cmp.cur.contracted}건`, '#059669'],
+              ['proposalGoal', '제안 건수 목표', cmp.cur.proposed, `${cmp.cur.proposed}건`, '#0284C7'],
+            ] as const
+          ).map(([k, label, cur, curTxt, col]) => (
+            <Surface key={k} className="flex flex-col gap-1.5 p-3">
+              <span className="t-meta font-bold text-slate-500">{label}</span>
+              <input aria-label={label} inputMode="numeric" defaultValue={String(goals[k])} onBlur={(e) => saveGoal(k, Number(e.target.value) || 0)} className={inputCls} />
+              <span className="t-sub font-bold" style={{ color: col }}>
+                {curTxt} · {pct(cur, goals[k])}%
+              </span>
+              <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full rounded-full" style={{ width: `${pct(cur, goals[k])}%`, background: col }} />
+              </div>
+            </Surface>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="🔻 단계 퍼널 (11단계)">
+        <Surface>
+          <ul className="flex flex-col gap-2" data-testid="sales-funnel11">
+            {funnel11.map((f) => (
+              <li key={f.key} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="t-sub w-36 shrink-0 font-medium text-slate-700">{f.label}</span>
+                <span className="h-3 min-w-1 rounded-full bg-[#2563EB]" style={{ width: `${Math.max(2, Math.round((f.count / maxCount) * 60))}%` }} aria-hidden="true" />
+                <span className="t-meta tabular-nums text-slate-500">
+                  {f.count}곳 · {f.share}%{f.conv !== null ? ` · 전환 ${f.conv}%` : ''} · {feeMoney(f.fee)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Surface>
+      </Section>
+
       <Section
         title="퍼널"
         action={
-          <Button size="sm" variant="ghost" onClick={download} data-testid="sales-csv">
+          <Button size="sm" variant="ghost" onClick={() => {
+            const csv = accountsCsv(rows.map((r) => ({ name: r.name, data: r.data })))
+            const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `영업현황-${d.today}.csv`
+            a.click()
+            URL.revokeObjectURL(url)
+            showToast('영업 현황을 CSV 로 내보냈습니다.')
+          }} data-testid="sales-csv">
             <Download aria-hidden="true" className="size-4" /> CSV
           </Button>
         }
@@ -507,7 +796,101 @@ export function AnalyticsScreen() {
         </Surface>
       </Section>
 
-      <Section title="유입 경로" count={bySource.size}>
+      <Section title="📦 상품별 성과" action={<span className="t-meta text-slate-500">제안 기록 기준</span>}>
+        <div className="flex flex-wrap gap-1.5">
+          {(['전체', ...PKG_CATEGORIES] as string[]).map((c) => (
+            <button key={c} type="button" aria-pressed={catF === c} onClick={() => setCatF(c)} className={`tap t-meta rounded-full border px-2.5 py-1 ${catF === c ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white text-slate-600'}`}>
+              {c}
+            </button>
+          ))}
+          <select aria-label="상품 정렬" value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className="t-meta ml-auto rounded border border-slate-300 bg-white px-2 py-1">
+            <option value="contFee">계약 수임료순</option>
+            <option value="propFee">제안 수임료순</option>
+            <option value="conv">계약 준비율순</option>
+            <option value="proposed">제안 건수순</option>
+          </select>
+        </div>
+        {perfShown.length === 0 ? (
+          <p className="t-sub mt-2 text-slate-500">아직 제안 기록이 없습니다. 영업 카드에서 '제안 기록 남기기' 를 누르면 여기 쌓입니다.</p>
+        ) : (
+          <Surface className="mt-2 overflow-x-auto p-0">
+            <table className="w-full min-w-[40rem] t-sub" data-testid="sales-products">
+              <thead className="bg-slate-50 text-left text-slate-500">
+                <tr>
+                  <th className="px-3 py-2">상품</th>
+                  <th className="px-3 py-2">제안</th>
+                  <th className="px-3 py-2">견적</th>
+                  <th className="px-3 py-2">계약</th>
+                  <th className="px-3 py-2">제안 수임료</th>
+                  <th className="px-3 py-2">계약 수임료</th>
+                  <th className="px-3 py-2">계약 준비율</th>
+                </tr>
+              </thead>
+              <tbody>
+                {perfShown.map((p) => (
+                  <tr key={p.name} className="border-t border-slate-100">
+                    <td className="px-3 py-2 font-medium">{p.name}</td>
+                    <td className="px-3 py-2 tabular-nums">{p.proposed}</td>
+                    <td className="px-3 py-2 tabular-nums">{p.quote}</td>
+                    <td className="px-3 py-2 tabular-nums">{p.contracted}</td>
+                    <td className="px-3 py-2 tabular-nums">{feeMoney(p.propFee)}</td>
+                    <td className="px-3 py-2 tabular-nums">{feeMoney(p.contFee)}</td>
+                    <td className="px-3 py-2 tabular-nums">{p.conv}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Surface>
+        )}
+        {pmc.length > 0 && (
+          <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
+            {pmc.map((r) => (
+              <li key={r.name} className="t-sub flex flex-wrap items-center gap-2 rounded-(--radius-control) bg-slate-50 px-3 py-2">
+                <b>{r.name}</b>
+                {r.badge && (
+                  <span className="t-meta rounded-md px-1.5 font-bold" style={{ color: r.badge.col, background: r.badge.bg }}>
+                    {r.badge.t}
+                  </span>
+                )}
+                <span className="t-meta text-slate-500">
+                  제안 {r.propPrev}→{r.propCur} · 계약 {r.contPrev}→{r.contCur}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
+
+      {(focus.length > 0 || risks.length > 0) && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Section title="🎯 이번 주 집중 고객" count={focus.length}>
+            <ul className="flex flex-col gap-1.5">
+              {focus.map((f) => (
+                <li key={String(f.c.id)} className="t-sub">
+                  <Link to={`/tools/sales-kit/reports?card=${String(f.c.id)}`} className="font-bold text-slate-900 hover:underline">
+                    {f.c.companyName}
+                  </Link>{' '}
+                  <span className="t-meta text-slate-500">{f.why}</span>
+                </li>
+              ))}
+            </ul>
+          </Section>
+          <Section title="⚠️ 위험 신호" count={risks.length}>
+            <ul className="flex flex-col gap-1.5">
+              {risks.map((r) => (
+                <li key={String(r.c.id)} className="t-sub">
+                  <Link to={`/tools/sales-kit/reports?card=${String(r.c.id)}`} className="font-bold text-slate-900 hover:underline">
+                    {r.c.companyName}
+                  </Link>{' '}
+                  <span className="text-danger-700">{r.reason}</span> <span className="t-meta text-slate-500">→ {r.action}</span>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        </div>
+      )}
+
+      <Section title="유입 경로">
         <Surface>
           <ul className="flex flex-col gap-1.5">
             {[...bySource.entries()]
@@ -550,11 +933,111 @@ export function SalesDashboardExtra(): ReactNode {
 
   const sum = summarizeAccounts(rows, d.today)
   return (
-    <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4" data-testid="sales-dashboard-extra">
-      <MetricTile label="영업 중" value={`${sum.live}곳`} tone="brand" />
-      <MetricTile label="오늘 연락" value={`${sum.today}곳`} tone={sum.today > 0 ? 'warning' : 'neutral'} />
-      <MetricTile label="지난 연락" value={`${sum.overdue}곳`} tone={sum.overdue > 0 ? 'danger' : 'neutral'} />
-      <MetricTile label="예상 수수료" value={krwTile(sum.pipelineFee)} />
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4" data-testid="sales-dashboard-extra">
+        <MetricTile label="영업 중" value={`${sum.live}곳`} tone="brand" />
+        <MetricTile label="오늘 연락" value={`${sum.today}곳`} tone={sum.today > 0 ? 'warning' : 'neutral'} />
+        <MetricTile label="지난 연락" value={`${sum.overdue}곳`} tone={sum.overdue > 0 ? 'danger' : 'neutral'} />
+        <MetricTile label="예상 수수료" value={krwTile(sum.pipelineFee)} />
+      </div>
+      <BriefingBlocks clients={d.clients} accountOf={d.accountOf} />
+    </div>
+  )
+}
+
+/** 원본 '오늘의 브리핑' 의 네 칸 — 오늘의 제안거리 · 집중 고객 · 위험 신호 · 재접촉 명분 (D-92) */
+function BriefingBlocks({ clients, accountOf }: { clients: ClientOpsRecord[]; accountOf: Map<string, { id: string; data: AccountData }> }) {
+  const copy = async (t: string) => {
+    try {
+      await navigator.clipboard.writeText(t)
+    } catch {
+      /* 화면에서 긁는다 */
+    }
+  }
+  const items = clients.map((c) => toSalesItem(c, accountOf.get(c.id)?.data ?? emptyAccount()))
+  const rows = todayProposalRows(items)
+  const focus = focusCustomersOf(items.filter((x) => accountOf.has(String(x.id))), scoreLead)
+  const risks = riskSignalsOf(items.filter((x) => accountOf.has(String(x.id))), scoreLead)
+  const recontact = recontactListOf(items.filter((x) => accountOf.has(String(x.id))))
+  const cardLink = (it: SalesItem) => (
+    <Link to={`/tools/sales-kit/reports?card=${String(it.id)}`} className="t-sub font-bold text-slate-900 hover:underline">
+      {it.companyName}
+    </Link>
+  )
+  return (
+    <div className="flex flex-col gap-4" data-testid="sales-briefing-blocks">
+      {rows.length > 0 && (
+        <Section title="💡 오늘의 제안거리" action={<span className="t-meta text-slate-500">콘텐츠·교육·법령·절세전략 기반</span>}>
+          <ul className="flex flex-col gap-2" data-testid="sales-today-ideas">
+            {rows.map((r) => (
+              <li key={r.key}>
+                <Surface className="flex flex-col gap-1 p-3">
+                  <span className="t-sub text-slate-800">
+                    <b className="text-[#2563EB]">{r.name}</b> 점검 주제와 관련 가능성 있는 고객 <b>{r.list.length}</b>곳
+                  </span>
+                  <span className="t-meta text-slate-500">우선 연락: {r.list.slice(0, 3).map((x) => x.c.companyName).join(', ')}</span>
+                  <span className="flex flex-wrap gap-2">
+                    {r.list.slice(0, 3).map((x) => (
+                      <Link key={String(x.c.id)} to={`/tools/sales-kit/reports?card=${String(x.c.id)}`} className="t-meta text-brand-700 hover:underline">
+                        {x.c.companyName} 영업 카드
+                      </Link>
+                    ))}
+                    <button type="button" className="t-meta text-slate-500 hover:underline" onClick={() => void copy(topicKakao(r.list[0].c, r.tp))}>
+                      카톡 복사
+                    </button>
+                  </span>
+                </Surface>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+      {focus.length > 0 && (
+        <Section title="🎯 이번 주 집중 고객" count={focus.length}>
+          <ul className="grid gap-2 sm:grid-cols-2" data-testid="sales-focus">
+            {focus.map((f) => (
+              <li key={String(f.c.id)}>
+                <Surface className="flex flex-col gap-0.5 p-3">
+                  {cardLink(f.c)}
+                  <span className="t-meta text-slate-500">{f.why}</span>
+                </Surface>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+      {risks.length > 0 && (
+        <Section title="⚠️ 놓치면 안 되는 신호" count={risks.length}>
+          <ul className="flex flex-col gap-2" data-testid="sales-risks">
+            {risks.map((r) => (
+              <li key={String(r.c.id)}>
+                <Surface edge="danger" showEdge className="flex flex-wrap items-center gap-x-3 gap-y-1 p-3">
+                  {cardLink(r.c)}
+                  <span className="t-sub text-danger-700">{r.reason}</span>
+                  <span className="t-meta text-slate-500">마지막 활동 {r.last} · 할 일: {r.action}</span>
+                </Surface>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+      {recontact.length > 0 && (
+        <Section title="📞 재접촉 명분" count={recontact.length}>
+          <ul className="flex flex-col gap-2" data-testid="sales-recontact">
+            {recontact.map((r) => (
+              <li key={String(r.c.id)}>
+                <Surface className="flex flex-col gap-1 p-3">
+                  {cardLink(r.c)}
+                  <span className="t-meta break-keep text-slate-600">{r.reasons.join(' ')}</span>
+                  <button type="button" className="t-meta w-fit text-brand-700 hover:underline" onClick={() => void copy(r.ment)}>
+                    연락 문구 복사
+                  </button>
+                </Surface>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
     </div>
   )
 }
