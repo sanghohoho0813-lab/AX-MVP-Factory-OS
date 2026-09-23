@@ -1910,7 +1910,7 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
       {rawViewOpen ? <RawTextModal text={text} pages={pdfPages} onClose={() => setRawViewOpen(false)} /> : null}
 
       {/* 콘텐츠(main)만 --fs로 글자 확대 → 박스는 그대로, 헤더/하단탭/사이드바는 정상 크기 */}
-      <main style={{ maxWidth: tab === "reco" ? 980 : 720, margin: "0 auto", padding: "16px 14px 16px", width: "100%", boxSizing: "border-box", overflowX: "hidden", "--fs": fontScale }}>
+      <div style={{ maxWidth: tab === "reco" ? 980 : 720, margin: "0 auto", padding: "16px 14px 16px", width: "100%", boxSizing: "border-box", overflowX: "hidden", "--fs": fontScale }}>
         {/* 앱 내부 뒤로/앞으로 — 화면 이동 이력 기준(브라우저 history와 무관) */}
         <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
           <button onClick={goBack} disabled={!canBack} style={{ border: `1px solid ${T.line}`, background: "#fff", color: canBack ? T.sub : T.mute, borderRadius: 8, padding: "6px 11px", fontSize: "calc(12px * var(--fs,1))", fontWeight: 700, fontFamily: FF, cursor: canBack ? "pointer" : "default", opacity: canBack ? 1 : 0.5 }}>← 뒤로</button>
@@ -1951,7 +1951,7 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
         <div id="mini-results">
           <MiniResults ui={ui} tab={tab} grade={grade} manualGrade={manualGrade} setGrade={setManualGrade} lastY={lastY} isAdmin={isAdmin} onTab={goTab} />
         </div>
-      </main>
+      </div>
 
       <BottomNav tab={tab} onTab={goTab} />
     </div>
