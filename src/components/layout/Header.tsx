@@ -151,7 +151,7 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
   const { pathname } = useLocation()
   const screenTitle = screenTitleForPath(pathname) ?? brand.brandNameKo
   return (
-    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-[16px] sm:gap-3 lg:px-[24px]">
+    <header className="no-print sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-[16px] sm:gap-3 lg:px-[24px]">
       <button
         type="button"
         aria-label="메뉴 열기"

@@ -23,6 +23,7 @@ import { ForgotPasswordPage } from '../auth/ui/ForgotPasswordPage'
 import { ResetPasswordPage } from '../auth/ui/ResetPasswordPage'
 import { JoinPage } from '../auth/ui/JoinPage'
 import { appRouteChildren, publicSurveyRoute, publicTestRoute } from './appRouteChildren'
+import { RouteErrorScreen } from '../components/layout/RouteErrorScreen'
 
 /** 로그인·회원가입 등 게스트 전용 라우트 가드 (로그인 상태면 홈으로) */
 function GuestOnly({ children }: { children: ReactNode }) {
@@ -64,7 +65,7 @@ const supabaseRouter = createBrowserRouter([
   { path: '/forgot-password', element: <GuestOnly><ForgotPasswordPage /></GuestOnly> },
   { path: '/reset-password', element: <ResetPasswordPage /> },
   { path: '/join/:inviteToken', element: <JoinPage /> },
-  { element: <ProtectedShell />, children: appRouteChildren },
+  { element: <ProtectedShell />, errorElement: <RouteErrorScreen />, children: appRouteChildren },
 ])
 
 function SupabaseAppInner() {

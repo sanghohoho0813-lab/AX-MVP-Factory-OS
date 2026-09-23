@@ -107,7 +107,7 @@ function FrameInner({ workspaceId, children }: { workspaceId: string | null; chi
         <div className="flex flex-col gap-4">
           <div
             data-testid="tool-client-banner"
-            className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-(--radius-panel) border border-brand-200 bg-brand-50 px-3 py-2"
+            className="no-print flex flex-wrap items-center gap-x-3 gap-y-1 rounded-(--radius-panel) border border-brand-200 bg-brand-50 px-3 py-2"
           >
             <Building2 aria-hidden="true" className="size-4 shrink-0 text-brand-600" />
             <span className="t-sub break-keep text-slate-700">

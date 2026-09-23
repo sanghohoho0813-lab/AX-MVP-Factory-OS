@@ -37,7 +37,7 @@ export function MobileNav({ onOpenMore }: { onOpenMore: () => void }) {
   return (
     <nav
       aria-label="주요 화면"
-      className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur lg:hidden"
+      className="no-print pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur lg:hidden"
     >
       <ul className="flex items-stretch">
         {ITEMS.map((item) => {

@@ -32,7 +32,10 @@ export default function ActivitySurveyPage() {
     const list = getClients();
     setClients(list);
     const stored = getSession("survey:active");
-    if (stored && list.some((c) => c.id === stored)) setActiveId(stored);
+    // D-95: 업체에서 열었으면(?client=) 그 고객사부터 — 변경사항 화면과 같게
+    const focus = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("client") : null;
+    if (focus && list.some((c) => c.id === focus)) setActiveId(focus);
+    else if (stored && list.some((c) => c.id === stored)) setActiveId(stored);
     else if (list[0]) setActiveId(list[0].id);
   }, []);
 

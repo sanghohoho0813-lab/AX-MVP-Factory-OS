@@ -14,6 +14,7 @@
  */
 
 import { getDataModeConfig } from '../data/dataMode'
+import { announceStorageFull, isQuotaError, StorageFullError } from '../storage/storageFull'
 import { getSupabaseClient } from '../lib/supabase/client'
 import { generateId } from '../storage/localStore'
 import { nowIso } from '../lib/appClock'
@@ -44,10 +45,12 @@ function isCloud(): boolean {
 
 /** localStorage 가 없는 곳(시험·서버)에서는 이 세션 메모리에만 담는다 */
 const memory = new Map<string, string>()
+/** 저장 공간이 차서 메모리에만 들고 있는 칸 — 읽을 때 메모리 것이 최신이다 */
+const overflowKeys = new Set<string>()
 
 function rawGet(key: string): string | null {
   try {
-    if (typeof localStorage === 'undefined') return memory.get(key) ?? null
+    if (typeof localStorage === 'undefined' || overflowKeys.has(key)) return memory.get(key) ?? null
     return localStorage.getItem(key)
   } catch {
     return memory.get(key) ?? null
@@ -55,11 +58,23 @@ function rawGet(key: string): string | null {
 }
 
 function rawSet(key: string, value: string): void {
-  try {
-    if (typeof localStorage === 'undefined') memory.set(key, value)
-    else localStorage.setItem(key, value)
-  } catch {
+  if (typeof localStorage === 'undefined') {
     memory.set(key, value)
+    return
+  }
+  try {
+    localStorage.setItem(key, value)
+    overflowKeys.delete(key)
+  } catch (cause) {
+    // D-95: 전에는 여기서 조용히 메모리에만 담아 '저장된 척' 했다 — 새로고침하면 사라졌다.
+    // 지금 창에서는 계속 쓰게 메모리에 두되, 저장 못 한 것은 알린다(OS 띠 + 부른 쪽에 오류).
+    memory.set(key, value)
+    overflowKeys.add(key)
+    if (isQuotaError(cause)) {
+      announceStorageFull(key)
+      throw new StorageFullError()
+    }
+    throw cause
   }
 }
 

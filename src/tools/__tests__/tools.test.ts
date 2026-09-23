@@ -9,6 +9,8 @@
 
 import { DEFAULT_INPUT, SAMPLE_INPUT, runDiagnosis } from '../policyFunding/diagnosis'
 import { subjectMismatch } from '../shared/toolSubject'
+import { isStaleChunkError, reloadOnceForNewVersion } from '../../lib/staleChunk'
+import { isQuotaError } from '../../storage/storageFull'
 import { loadStartupTaxForm, saveStartupTaxForm, startupTaxKey, STARTUP_TAX_STORAGE_KEY } from '../startupTax/lib/formStore'
 import { moduleForPath, moduleMatchLength, screenTitleForPath } from '../../config/moduleRegistry'
 import { changeColor, CRETOP_C, TREND_COMMENT_TONE } from '../cretop/lib/tones'
@@ -680,6 +682,55 @@ function check(name: string, cond: boolean, detail?: string): void {
   check('메뉴: 도구함 전체는 /tools 에서만 켜진다', moduleMatchLength({ path: '/tools', exact: true }, '/tools/cretop') === 0 && moduleForPath('/tools')?.key === 'tools')
   check('메뉴: 크레탑은 크레탑 줄', moduleForPath('/tools/cretop/core-check')?.path === '/tools/cretop')
 }
+
+/* ---- D-95: 배포 뒤 옛 조각 — 한 번만 새로고침 ---- */
+{
+  check('옛 조각 오류를 알아본다', isStaleChunkError(new TypeError('Failed to fetch dynamically imported module: https://x/assets/CretopPage-a.js')))
+  check('옛 조각 오류: 사파리 문구도', isStaleChunkError(new TypeError('Importing a module script failed.')))
+  check('보통 오류는 옛 조각이 아니다', !isStaleChunkError(new Error('Cannot read properties of undefined')) && !isStaleChunkError(null))
+  const mem = new Map<string, string>()
+  const store = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v) }
+  let reloads = 0
+  const r = () => void (reloads += 1)
+  check('처음이면 새로고침한다', reloadOnceForNewVersion(1_000_000, r, store) && reloads === 1)
+  check('30초 안에 또 실패하면 다시 하지 않는다 (무한 새로고침 없음)', !reloadOnceForNewVersion(1_010_000, r, store) && reloads === 1)
+  check('30초가 지나면 다시 한 번', reloadOnceForNewVersion(1_040_001, r, store) && reloads === 2)
+}
+
+/* ---- D-95: 브라우저 저장 공간이 가득 차도 '저장된 척' 하지 않는다 ---- */
+await (async () => {
+  const quota = Object.assign(new Error('The quota has been exceeded.'), { name: 'QuotaExceededError', code: 22 })
+  check('저장 공간 초과 오류를 알아본다', isQuotaError(quota) && !isQuotaError(new Error('x')))
+  const mem = new Map<string, string>()
+  let full = false
+  ;(globalThis as unknown as { localStorage: unknown }).localStorage = {
+    get length() {
+      return mem.size
+    },
+    key: (i: number) => [...mem.keys()][i] ?? null,
+    getItem: (k: string) => mem.get(k) ?? null,
+    setItem: (k: string, v: string) => {
+      if (full) throw quota
+      mem.set(k, v)
+    },
+    removeItem: (k: string) => void mem.delete(k),
+  }
+  await saveRow(null, 'd95test', 'rows', { clientId: 'c1', data: { n: 1 } })
+  full = true
+  let err: unknown = null
+  try {
+    await saveRow(null, 'd95test', 'rows', { clientId: 'c2', data: { n: 2 } })
+  } catch (e) {
+    err = e
+  }
+  check('가득 차면 저장이 실패로 돌아온다 (예전: 조용히 성공한 척)', err instanceof Error && (err as Error).name === 'StorageFullError', String(err))
+  const rows = await listRows(null, 'd95test', 'rows')
+  check('실패해도 이 창에서는 방금 것까지 보인다 (백업 받을 틈)', rows.length === 2, String(rows.length))
+  full = false
+  await saveRow(null, 'd95test', 'rows', { clientId: 'c3', data: { n: 3 } })
+  const after = await listRows(null, 'd95test', 'rows')
+  check('공간이 나면 다음 저장에 한꺼번에 다시 적힌다', after.length === 3 && JSON.parse(mem.get([...mem.keys()].find((k) => k.includes('d95test')) ?? '') ?? '[]').length === 3, String(after.length))
+})()
 
 console.log(`\ntools: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

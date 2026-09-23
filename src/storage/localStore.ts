@@ -2,6 +2,7 @@
  * localStorage 접근을 한곳에 모은 저장 계층.
  * UI 컴포넌트는 이 모듈을 직접 사용하지 않고 Repository를 통해 접근한다.
  */
+import { announceStorageFull, isQuotaError } from './storageFull'
 
 const KEY_PREFIX = 'axmvp'
 /**
@@ -108,7 +109,8 @@ function rawSet(key: string, value: string): void {
   }
   try {
     window.localStorage.setItem(key, value)
-  } catch {
+  } catch (cause) {
+    if (isQuotaError(cause)) announceStorageFull(key) // D-95: OS 띠가 듣는다
     throw new StorageWriteError()
   }
 }

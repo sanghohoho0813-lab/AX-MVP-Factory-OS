@@ -6,6 +6,7 @@ import { TextScaleProvider } from './components/ui/TextScaleProvider'
 import { AppearanceProvider } from './components/ui/AppearanceProvider'
 import { getDataModeConfig } from './data/dataMode'
 import { appRouteChildren, publicSurveyRoute, publicTestRoute } from './app/appRouteChildren'
+import { RouteErrorScreen } from './components/layout/RouteErrorScreen'
 
 // supabase 모드 앱(및 Supabase SDK)은 지연 로딩해 local 모드 entry 번들에 포함되지 않게 한다.
 const SupabaseApp = lazy(() =>
@@ -16,6 +17,7 @@ const SupabaseApp = lazy(() =>
 const localRouter = createBrowserRouter([
   {
     element: <AppShell />,
+    errorElement: <RouteErrorScreen />,
     children: appRouteChildren,
   },
   publicSurveyRoute,

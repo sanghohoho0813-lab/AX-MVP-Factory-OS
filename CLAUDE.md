@@ -26,6 +26,7 @@ npm run qa:board  -- http://localhost:4390
 npm run qa:todos  -- http://localhost:4390
 npm run e2e:mobile -- http://localhost:4390
 npm run qa:squeeze -- http://localhost:4390 --all  # 짜부라진 글자 0
+npm run qa:modules -- http://localhost:4390       # 모듈 전 화면 오류·넘침 0 · 오류 울타리 · 인쇄 · 저장 공간 가득 참
 ```
 
 화면을 손댔으면 **실제로 찍어서 눈으로 본다**(`npm run qa:shots -- <url> <dir> --wide`).

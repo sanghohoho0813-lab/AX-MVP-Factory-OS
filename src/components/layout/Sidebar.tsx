@@ -270,7 +270,7 @@ function SidebarContent({
 export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobile }: SidebarProps) {
   return (
     <>
-      <aside className={`sticky top-0 hidden h-screen shrink-0 transition-[width] duration-200 lg:block ${collapsed ? 'w-[80px]' : 'w-64 xl:w-72'}`}>
+      <aside className={`no-print sticky top-0 hidden h-screen shrink-0 transition-[width] duration-200 lg:block ${collapsed ? 'w-[80px]' : 'w-64 xl:w-72'}`}>
         <SidebarContent collapsed={collapsed} onToggleCollapsed={onToggleCollapsed} />
       </aside>
       {mobileOpen && (

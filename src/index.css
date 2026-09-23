@@ -420,12 +420,15 @@ textarea {
   body {
     background: #fff !important;
   }
-  /* 인쇄 격리: 문서 영역만 보이게 한다 (사이드바·헤더·버튼 숨김) */
-  body * {
+  /* 인쇄 격리: 문서 영역(.print-document)이 있으면 그것만 보이게 한다 (사이드바·헤더·버튼 숨김).
+     D-95: 문서 영역이 없는 화면(정책자금 리포트·연구소 리포트 등 원본 화면)은 전에 통째로 빈 종이가 나왔다 —
+     그때는 OS 틀(.no-print: 사이드바·머리줄·모듈 목차·업체 띠)만 빼고 본문을 그대로 찍는다. */
+  body:has(.print-document) * {
     visibility: hidden !important;
   }
-  .print-document,
-  .print-document * {
+  /* 위 :has() 규칙과 같은 세기로 적어야 이긴다 */
+  body:has(.print-document) .print-document,
+  body:has(.print-document) .print-document * {
     visibility: visible !important;
   }
   .print-document {
@@ -477,5 +480,13 @@ textarea {
   /* D-94: OS 하단 메뉴(높이 약 57px) 바로 위에 붙인다 */
   .cretop-mini-tabs {
     bottom: calc(3.6rem + env(safe-area-inset-bottom)) !important;
+  }
+  /* D-95: OS 하단 메뉴와 두 줄로 쌓이니 크레탑 탭은 얇게 (약 60px → 44px) — 본문이 한 줄이라도 더 보이게 */
+  .cretop-mini-tabs button[data-tab] {
+    padding: 5px 1px 6px !important;
+    gap: 1px !important;
+  }
+  .cretop-mini-tabs button[data-tab] > span:first-child {
+    font-size: 15px !important;
   }
 }

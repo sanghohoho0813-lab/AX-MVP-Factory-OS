@@ -89,7 +89,7 @@ export function ModuleShell({ tool, section, children }: ModuleShellProps) {
   return (
     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:gap-5">
       {/* 좁은 화면 — 모듈 햄버거 한 줄 */}
-      <div className="flex items-center gap-2 xl:hidden">
+      <div className="no-print flex items-center gap-2 xl:hidden">
         <button
           type="button"
           onClick={() => setDrawer(true)}
@@ -107,7 +107,7 @@ export function ModuleShell({ tool, section, children }: ModuleShellProps) {
       <nav
         aria-label={`${tool.label} 목차`}
         data-testid="module-nav"
-        className="hidden w-56 shrink-0 flex-col gap-3 xl:sticky xl:top-20 xl:flex xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto" /* D-94: 긴 화면을 내려도 목차가 따라온다 */
+        className="no-print hidden w-56 shrink-0 flex-col gap-3 xl:sticky xl:top-20 xl:flex xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto" /* D-94: 긴 화면을 내려도 목차가 따라온다 */
       >
         <div className="flex items-center gap-2 px-1">
           <ModuleIcon aria-hidden="true" className="size-4 shrink-0 text-brand-600" />

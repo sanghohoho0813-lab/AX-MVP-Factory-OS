@@ -101,7 +101,8 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const [alertsOpen, setAlertsOpen] = useState(false)
   const [catalogOpen, setCatalogOpen] = useState(false)
   /** 자주 쓰지 않는 도구(백업·일정·항목관리)를 담는 시트 */
-  const [moreOpen, setMoreOpen] = useState(false)
+  // D-95: 저장 공간 가득 참 띠의 '백업 내려받기' 가 ?more=1 로 이 창을 바로 연다
+  const [moreOpen, setMoreOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('more') === '1')
   /**
    * 목록에서 바로 고치는 시트 — 업무 상태 / 수금.
    * 업체 id 만 들고 있고 기록은 records 에서 다시 찾는다. 저장하면 records 가

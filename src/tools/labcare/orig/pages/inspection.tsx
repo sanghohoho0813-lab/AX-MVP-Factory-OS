@@ -18,7 +18,10 @@ export default function InspectionPage() {
     ensureSeeded();
     const list = getClients();
     setClients(list);
-    if (list[0]) setClientId(list[0].id);
+    // D-95: 업체에서 열었으면(?client=) 그 고객사부터
+    const focus = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("client") : null;
+    if (focus && list.some((c) => c.id === focus)) setClientId(focus);
+    else if (list[0]) setClientId(list[0].id);
   }, []);
 
   function toggle(key: string) {
