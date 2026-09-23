@@ -466,3 +466,10 @@ textarea {
     margin: 16mm 14mm;
   }
 }
+
+/* 크레탑 원본 분석 앱(D-93) — 하단 탭은 화면 안에 붙는다. 휴대폰에서는 OS 하단 메뉴 위로 */
+@media (max-width: 1023px) {
+  .cretop-mini-tabs {
+    bottom: calc(4.75rem + env(safe-area-inset-bottom)) !important;
+  }
+}

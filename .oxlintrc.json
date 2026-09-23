@@ -16,6 +16,7 @@
   },
   "ignorePatterns": [
     "src/tools/cretop/engine/index.js",
-    "src/tools/salesKit/lib/salesData.js"
+    "src/tools/salesKit/lib/salesData.js",
+    "src/tools/cretop/mini/**"
   ]
 }

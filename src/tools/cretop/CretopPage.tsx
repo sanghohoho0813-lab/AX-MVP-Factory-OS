@@ -8,8 +8,8 @@
  * 골든 회귀 3벌(`npm run test:cretop`)이 원본과 같은 숫자를 지킨다. OCR 은 하지 않는다.
  */
 
-import { useMemo, useRef, useState } from 'react'
-import { AlertTriangle, FileUp, FolderOpen, RotateCcw, Copy, Check } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { AlertTriangle, FolderOpen, Copy, Check } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
 import { ModuleDashboard } from '../shared/ModuleDashboard'
@@ -17,286 +17,140 @@ import { useModuleSection } from '../shared/ModuleRoute'
 import { ExtractorScreen } from './screens/ExtractorScreen'
 import { CoreCheckScreen } from './screens/CoreCheckScreen'
 import { Button } from '../../components/ui/Button'
-import { Surface } from '../../components/ui/primitives'
-import { AnalysisView } from './screens/AnalysisView'
-import { CRETOP_WEAPON_MAP } from '../salesKit/lib/salesData.js'
+import { CretopMiniApp, buildOneLiner, oneLinerText, type CretopMiniHistoryItem, type CretopMiniUi } from './mini/MiniApp.jsx'
+import { useModuleBucket } from '../shared/useModuleBucket'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
 import { useToolClient } from '../shared/toolClientContext'
 import { fetchClientDocFile, hasDocFile } from '../shared/clientDocFile'
-import { buildCretopParsedForUi, extractCretopCore } from './engine/index.js'
-import type { CretopAmount, CretopParsedForUi } from './engine/index.js'
-import { buildCretopMeetingPoints, type MeetingPoints } from './lib/meetingPoints'
-import { extractPdfLayout } from './lib/pdfLayout'
 
-const STORAGE_KEY = 'axmvp.tools.cretop'
-
-function loadText(): string {
-  try {
-    return localStorage.getItem(STORAGE_KEY) ?? ''
-  } catch {
-    return ''
-  }
+/** 분석 이력 한 줄 — 원본은 Supabase analyses 에, 이 OS 는 모듈 기록(cretop/analyses)에 */
+interface AnalysisRow extends Record<string, unknown> {
+  company: string
+  bizNo: string
+  ts: string
+  ui: CretopMiniUi
 }
 
-function previewValue(k: string, p: CretopAmount | null | undefined): { text: string; year: number | null } {
-  if (!p) return { text: '원문 확인 필요', year: null }
-  if (k === 'creditGrade') return { text: p.value != null ? String(p.value) : '원문 확인 필요', year: null }
-  if (k === 'cashflowGrade') {
-    const latest = (p as unknown as { latest?: string }).latest
-    return { text: latest || '원문 확인 필요', year: null }
-  }
-  if (p.isRatio) {
-    return { text: p.value != null ? `${Math.round(p.value * 100) / 100}${p.unit || ''}` : '원문 확인 필요', year: p.year ?? null }
-  }
-  if (p.absent) return { text: '0원', year: null }
-  if (p.eok != null) return { text: Math.abs(p.eok) < 0.005 ? '0.01억 미만' : `${p.eok.toLocaleString()}억`, year: p.year ?? null }
-  return { text: '원문 확인 필요', year: null }
-}
-
+/** 원본 크레탑 분석 앱(D-93) + 이 OS 의 업체 연결(서류함 보고서 · 업체 기록에 붙이기 · 이력) */
 function CretopScreen() {
-  const [text, setText] = useState<string>(() => loadText())
-  const [fileName, setFileName] = useState('')
-  const [progress, setProgress] = useState('')
+  const { clientRecord, clientName, clientId, loadClients } = useToolClient()
+  const [names, setNames] = useState<Record<string, string>>({})
+  useEffect(() => {
+    let alive = true
+    void loadClients().then((list) => {
+      if (alive) setNames(Object.fromEntries(list.map((c) => [c.id, c.companyName])))
+    })
+    return () => {
+      alive = false
+    }
+  }, [loadClients])
+  const clientNameOf = (id: string) => names[id] ?? ''
+  const bucket = useModuleBucket<AnalysisRow>('cretop', 'analyses')
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [docBusy, setDocBusy] = useState(false)
-  const { clientRecord, clientName } = useToolClient()
-  const [error, setError] = useState('')
-  const [submitted, setSubmitted] = useState(false)
+  const [docError, setDocError] = useState('')
   const [copied, setCopied] = useState(false)
-  /** 신용등급이 그림이라 못 읽었을 때 대표가 골라 넣는 등급 (원본 그대로) */
-  const [manualGrade, setManualGrade] = useState('')
-  /** 1차 미팅 추가 제안 포인트 */
-  const [weapons, setWeapons] = useState<string[]>([])
-  const fileRef = useRef<HTMLInputElement | null>(null)
 
-  const ui: CretopParsedForUi | null = useMemo(() => {
-    if (!submitted || !text.trim()) return null
-    try {
-      return buildCretopParsedForUi(text)
-    } catch {
-      return null
-    }
-  }, [submitted, text])
+  const history: CretopMiniHistoryItem[] = useMemo(
+    () =>
+      [...(bucket.rows ?? [])]
+        .sort((a, b) => String(b.data.ts).localeCompare(String(a.data.ts)))
+        .map((r) => ({ id: r.id, company: r.data.company, ts: r.data.ts, ui: r.data.ui, clientName: r.clientId ? clientNameOf(r.clientId) : '' })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [bucket.rows, names],
+  )
 
-  const points: MeetingPoints | null = useMemo(() => {
-    if (!ui || !text.trim()) return null
-    try {
-      const core = extractCretopCore(text)
-      return buildCretopMeetingPoints({
-        rows: core.rows,
-        company: { industry: ui.companyInfo.standardIndustry || ui.companyInfo.industry || '', employees: ui.companyInfo.employees },
-        computed: ui.corePreview,
-      })
-    } catch {
-      return null
-    }
-  }, [ui, text])
-
-  const persist = (next: string) => {
-    setText(next)
-    try {
-      localStorage.setItem(STORAGE_KEY, next)
-    } catch {
-      /* 저장 못 해도 분석은 된다 */
-    }
-  }
-
-  const onFile = async (file: File | undefined) => {
-    if (!file) return
-    setError('')
-    setFileName(file.name)
-    if (!/\.pdf$/i.test(file.name)) {
-      // 글자 파일이면 그대로 읽는다
-      const t = await file.text()
-      persist(t)
-      setSubmitted(true)
-      return
-    }
-    try {
-      setProgress('PDF 읽는 중…')
-      const r = await extractPdfLayout(file, (p, n) => setProgress(`PDF ${p}/${n}쪽 읽는 중`))
-      setProgress('')
-      if (r.chars < 200) {
-        setError('PDF 에서 글자를 거의 읽지 못했습니다. 스캔본이면 원문 텍스트를 붙여넣어 주세요 — 이 도구는 OCR 을 하지 않습니다.')
-        return
-      }
-      persist(r.layoutText || r.rawText)
-      setSubmitted(true)
-    } catch (cause) {
-      setProgress('')
-      setError(cause instanceof Error ? cause.message : 'PDF 를 읽지 못했습니다.')
-    }
+  const onSaved = (ui: CretopMiniUi) => {
+    const co = ui.companyInfo ?? {}
+    const company = co.companyName || '기업명 미상'
+    const bizNo = co.businessNo || ''
+    // 같은 회사(사업자번호·이름)의 이전 이력은 새 것으로 바꾼다 — 원본 비회원 이력과 같은 규칙
+    const prev = (bucket.rows ?? []).find((r) => (bizNo && r.data.bizNo === bizNo) || r.data.company === company)
+    void bucket.save({ id: prev?.id, clientId: clientId ?? prev?.clientId ?? '', data: { company, bizNo, ts: new Date().toISOString(), ui } })
   }
 
   /** 업체 서류함에 올려 둔 크레탑 보고서로 바로 분석 (D-90) */
   const runFromDocbox = async () => {
-    setError('')
+    setDocError('')
     setDocBusy(true)
     try {
       const got = await fetchClientDocFile(clientRecord, 'cretopReport')
       if (!got) {
-        setError('서류함에 올려 둔 파일이 없습니다. 파일을 먼저 올려 주세요.')
+        setDocError('서류함에 올려 둔 파일이 없습니다. 파일을 먼저 올려 주세요.')
         return
       }
-      await onFile(got.file)
+      setPendingFile(got.file)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '서류함 파일을 읽지 못했습니다.')
+      setDocError(cause instanceof Error ? cause.message : '서류함 파일을 읽지 못했습니다.')
     } finally {
       setDocBusy(false)
     }
   }
 
-  const summaryText = useMemo(() => {
-    if (!ui) return ''
-    const co = ui.companyInfo
-    const cp = ui.corePreview
-    const line = (k: string, label: string) => {
-      const v = previewValue(k, cp[k])
-      return `${label} ${v.text}${v.year ? `(${v.year})` : ''}`
-    }
-    const lines = [
-      `[크레탑 분석 요약] ${co.companyName ?? ''}`.trim(),
-      [line('revenue', '매출'), line('operatingProfit', '영업이익'), line('netIncome', '당기순이익')].join(' · '),
-      [line('debtRatio', '부채비율'), line('currentRatio', '유동비율'), line('interestCoverageRatio', '이자보상배수')].join(' · '),
-    ]
-    if (points && points.topPoints.length) {
-      lines.push('[1차 미팅 포인트]')
-      points.topPoints.forEach((p, i) => lines.push(`${i + 1}. ${p}`))
-    }
-    const selW = weapons.map((nm) => CRETOP_WEAPON_MAP[nm]).filter(Boolean)
-    if (selW.length) {
-      lines.push('[선택한 추가 제안 포인트]')
-      selW.forEach((w, i) => lines.push(`${i + 1}. ${w.name} — ${w.q}`))
-    }
-    if (manualGrade) lines.push(`신용등급(직접 입력) ${manualGrade}`)
-    lines.push('※ 모든 수치는 후보이며 원문 기준 확인이 필요합니다.')
-    return lines.join('\n')
-  }, [ui, points, weapons, manualGrade])
+  const extraInput = clientRecord ? (
+    <div className="flex flex-col gap-1.5">
+      {hasDocFile(clientRecord, 'cretopReport') ? (
+        <Button variant="secondary" onClick={() => void runFromDocbox()} disabled={docBusy} className="w-full sm:w-auto" data-testid="cretop-from-docbox">
+          <FolderOpen aria-hidden="true" className="size-4" />
+          {docBusy ? '서류함에서 읽는 중…' : `${clientName} 서류함의 보고서로 분석`}
+        </Button>
+      ) : (
+        <span className="t-sub flex items-center gap-1.5 break-keep text-danger-700" data-testid="cretop-docbox-missing">
+          <AlertTriangle aria-hidden="true" className="size-4 shrink-0" />
+          서류함에 크레탑 기업종합보고서가 없습니다 — 올려 두면 여기서 바로 분석합니다
+        </span>
+      )}
+      {docError && <span className="t-sub text-danger-700">{docError}</span>}
+    </div>
+  ) : null
 
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(summaryText)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1800)
-    } catch {
-      /* 아래 미리보기에서 손으로 */
+  const resultBar = (ui: CretopMiniUi, selected: string[]) => {
+    const one = buildOneLiner(ui)
+    const summary = [
+      oneLinerText(one),
+      ...(selected.length ? ['', '■ 최종 선택 컨설팅 항목', ...selected.map((n, i) => `${i + 1}. ${n}`)] : []),
+      '',
+      '※ 크레탑 원문 기준 참고용 분석이며, 실제 상담 전 원문 확인이 필요합니다.',
+    ].join('\n')
+    const copy = async () => {
+      try {
+        await navigator.clipboard.writeText(summary)
+        setCopied(true)
+        window.setTimeout(() => setCopied(false), 1800)
+      } catch {
+        /* 요약 탭에서 손으로 */
+      }
     }
+    return (
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3" data-testid="cretop-result-bar">
+        <Button size="sm" onClick={() => void copy()}>
+          {copied ? <Check aria-hidden="true" className="size-4" /> : <Copy aria-hidden="true" className="size-4" />}
+          {copied ? '복사됨' : '1장 요약 복사'}
+        </Button>
+        <ToolResultAttach
+          toolKey="cretop"
+          title="크레탑 분석"
+          verdict={null}
+          verdictLabel={one.risks[0] ?? ''}
+          summary={summary}
+          data={{ companyInfo: ui.companyInfo, corePreview: ui.corePreview, oneLiner: one, selected }}
+        />
+        <span className="t-meta text-slate-500">분석 결과를 고객 운영 업체 기록에 붙입니다.</span>
+      </div>
+    )
   }
-
-  const reset = () => {
-    persist('')
-    setFileName('')
-    setSubmitted(false)
-    setError('')
-    setManualGrade('')
-    setWeapons([])
-  }
-
-  const reportName = ui?.companyInfo.companyName || fileName || '크레탑 보고서'
 
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader
-        title="크레탑 분석기"
-        description="크레탑 기업종합보고서를 넣으면 핵심 재무·3개년 추이·재무비율 5영역과 1차 미팅 포인트를 뽑습니다. 숫자는 전부 후보이고 원문 확인이 필요합니다."
-        actions={
-          <Button variant="ghost" size="sm" onClick={reset}>
-            <RotateCcw aria-hidden="true" className="size-4" /> 비우기
-          </Button>
-        }
+    <div className="flex flex-col gap-4">
+      <CretopMiniApp
+        history={history}
+        onSaved={onSaved}
+        onDelete={(h) => void bucket.remove(h.id)}
+        extraInput={extraInput}
+        resultBar={resultBar}
+        pendingFile={pendingFile}
+        onPendingDone={() => setPendingFile(null)}
       />
-
-      <Surface className="flex flex-col gap-3 p-4 sm:p-5">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".pdf,.txt,.csv,text/plain,application/pdf"
-            className="sr-only"
-            aria-label="크레탑 보고서 파일"
-            onChange={(e) => void onFile(e.target.files?.[0])}
-          />
-          <Button variant="primary" onClick={() => fileRef.current?.click()} className="w-full sm:w-auto">
-            <FileUp aria-hidden="true" className="size-4" /> PDF·텍스트 파일 넣기
-          </Button>
-          {/* 업체 서류함에 올려 둔 보고서로 바로 (D-90) */}
-          {clientRecord && (
-            hasDocFile(clientRecord, 'cretopReport') ? (
-              <Button variant="secondary" onClick={() => void runFromDocbox()} disabled={docBusy} className="w-full sm:w-auto" data-testid="cretop-from-docbox">
-                <FolderOpen aria-hidden="true" className="size-4" />
-                {docBusy ? '서류함에서 읽는 중…' : `${clientName} 서류함의 보고서로 분석`}
-              </Button>
-            ) : (
-              <span className="t-sub flex items-center gap-1.5 break-keep text-danger-700" data-testid="cretop-docbox-missing">
-                <AlertTriangle aria-hidden="true" className="size-4 shrink-0" />
-                서류함에 크레탑 기업종합보고서가 없습니다 — 올려 두면 여기서 바로 분석합니다
-              </span>
-            )
-          )}
-          <span className="t-sub text-slate-500">{progress || (fileName ? `읽은 파일: ${fileName}` : '또는 아래에 원문을 붙여넣으세요')}</span>
-        </div>
-        <textarea
-          aria-label="크레탑 원문"
-          value={text}
-          onChange={(e) => {
-            persist(e.target.value)
-            setSubmitted(false)
-          }}
-          rows={6}
-          placeholder="크레탑 보고서 원문을 붙여넣으세요 — 요약 손익계산서 · 요약 재무상태표 · 재무비율 표가 있으면 가장 정확합니다."
-          className="w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 t-sub text-slate-900 focus:border-brand-500 focus:outline-none"
-        />
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Button variant="primary" disabled={!text.trim()} onClick={() => setSubmitted(true)} className="w-full sm:w-auto" data-testid="cretop-run">
-            분석하기
-          </Button>
-          <span className="t-meta text-slate-400">글자 {text.length.toLocaleString()}자 · 스캔본(그림) PDF 는 읽지 못합니다</span>
-        </div>
-        {error && <p className="t-sub break-keep text-danger-700">{error}</p>}
-      </Surface>
-
-      {ui && (
-        <>
-          <Surface className="flex flex-col gap-2 p-4 sm:p-5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="t-card font-bold text-slate-900">분석 결과 — {reportName}</p>
-                <p className="t-sub break-keep text-slate-500">
-                  {ui.financialYears.length ? `재무 ${ui.financialYears.join('·')}년 · ` : ''}요약을 복사하거나 업체 기록에 붙입니다.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" onClick={copy}>
-                  {copied ? <Check aria-hidden="true" className="size-4" /> : <Copy aria-hidden="true" className="size-4" />}
-                  {copied ? '복사됨' : '요약 복사'}
-                </Button>
-                <ToolResultAttach
-                  toolKey="cretop"
-                  title="크레탑 분석"
-                  verdict={null}
-                  verdictLabel={points?.topPoints[0] ?? ''}
-                  summary={summaryText}
-                  data={{ companyInfo: ui.companyInfo, corePreview: ui.corePreview, topPoints: points?.topPoints ?? [], weapons, creditGradeManual: manualGrade, fileName }}
-                />
-              </div>
-            </div>
-          </Surface>
-
-          <AnalysisView
-            ui={ui}
-            points={points}
-            reportName={reportName}
-            manualGrade={manualGrade}
-            setManualGrade={setManualGrade}
-            weapons={weapons}
-            setWeapons={(fn) => setWeapons(fn)}
-          />
-
-          <p className="t-meta break-keep text-slate-400">
-            연도 근거: 재무제표 {ui.financialYears.join('·') || '—'} / 비율표 {ui.reportRatioYears.join('·') || '—'} ({ui.ratioYearSource}, {ui.ratioYearConfidence}). 모든
-            수치는 후보이며 원문 기준 확인이 필요합니다. 외부 호출 없음.
-          </p>
-        </>
-      )}
     </div>
   )
 }
