@@ -51,7 +51,8 @@ function ReportDocument({ customer }: { customer: Customer }) {
               PF
             </span>
             <span className="text-sm font-semibold text-slate-500">
-              Policy Funding OS · 정책자금 상담 리포트
+              {/* [D-94] 고객이 받는 리포트 — 원본 앱 이름 대신 회사 이름 */}
+              미래에이아이랩 · 정책자금 상담 리포트
             </span>
           </div>
 

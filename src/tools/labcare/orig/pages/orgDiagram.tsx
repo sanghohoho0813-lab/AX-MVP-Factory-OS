@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useToolClient } from "../../../shared/toolClientContext";
 import Link from "../next";
 import Layout from "../components/Layout";
 import PageGuide from "../components/PageGuide";
@@ -46,6 +47,13 @@ export default function OrgDiagramPage() {
   const [assistants, setAssistants] = useState("정나래");
   const [managers, setManagers] = useState("");
   const [insuranceFile, setInsuranceFile] = useState<string | null>(null);
+  // [D-94] 업체에서 열었으면(?client=) 원본 예시 회사 대신 그 업체 이름·대표로 시작한다
+  const { clientRecord } = useToolClient();
+  useEffect(() => {
+    if (!clientRecord) return;
+    setCompany(clientRecord.companyName);
+    setCeo(clientRecord.representativeName || clientRecord.contactName || "");
+  }, [clientRecord]);
 
   const orgRef = useRef<SVGSVGElement>(null);
 

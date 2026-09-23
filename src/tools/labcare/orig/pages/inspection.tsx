@@ -1,17 +1,18 @@
 import { useEffect, useState } from "react";
 import Layout from "../components/Layout";
 import PageGuide from "../components/PageGuide";
-import { ensureSeeded, getClients } from "../lib/storage";
+import { ensureSeeded, getClients, getInspectionChecks, setInspectionChecks } from "../lib/storage";
 import { INSPECTION_ITEMS, INSPECTION_POINTS } from "../lib/mockStage1";
 import type { Client } from "../../types";
 
 export default function InspectionPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [clientId, setClientId] = useState("");
-  // 데모: 체크 상태는 화면 내 로컬 (저장은 3단계 구현)
-  const [checked, setChecked] = useState<Set<string>>(
-    new Set(["namecard", "appoint", "sign", "space", "seat", "equipment", "notes", "relevance"]),
-  );
+  // D-94: 고객사마다 저장한다 (원본은 화면 안 ‘데모 체크’ — 나가면 사라졌다)
+  const [checked, setChecked] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    setChecked(new Set(getInspectionChecks(clientId)));
+  }, [clientId]);
 
   useEffect(() => {
     ensureSeeded();
@@ -25,6 +26,7 @@ export default function InspectionPage() {
       const next = new Set(s);
       if (next.has(key)) next.delete(key);
       else next.add(key);
+      setInspectionChecks(clientId, [...next]);
       return next;
     });
   }
@@ -84,7 +86,7 @@ export default function InspectionPage() {
             </div>
             <div>
               <p className="text-base font-bold text-slate-800">실사 대비 준비도</p>
-              <p className="text-sm text-slate-500">{done}/{total} 항목 준비됨 (데모 체크)</p>
+              <p className="text-sm text-slate-500">{done}/{total} 항목 준비됨</p>
               <p className="mt-1 text-sm font-medium text-navy-600">
                 {rate >= 80 ? "현장조사 대응 준비가 양호합니다" : rate >= 50 ? "일부 항목 보완을 권장합니다" : "보완 필요 항목이 많습니다"}
               </p>

@@ -270,13 +270,13 @@ function CustomerEditor({
           </div>
         </div>
 
-        <div className="mt-6 grid gap-3 @min-[640px]:grid-cols-3">
+        <div className="mt-6 grid gap-3 @min-[640px]:grid-cols-2">
           <InfoTile label="추천 기관" value={customer.recommendedAgency} />
           <InfoTile
             label="최근 연락 / 업데이트"
             value={`${customer.lastContactedAt} / ${customer.updatedAt}`}
           />
-          <InfoTile label="고객 ID" value={customer.id} />
+          {/* [D-94] 고객 ID(내부 번호)는 보이지 않는다 — 업체는 고객 운영 업체로 이어진다 */}
         </div>
       </div>
 

@@ -220,10 +220,11 @@ export function EmploymentPage() {
     const cid = params.get('cid') ?? (section === 'companies' ? clientId : null)
     return (
       <div className="flex flex-col gap-4">
-        <h1 className="t-meta font-bold tracking-wide text-slate-400" data-testid="emp-module-eyebrow">
+        {/* D-94: 위 OS 모듈 머리줄이 이미 이름을 보여 준다 — 화면에는 숨기고 읽기 도구용 제목으로만 둔다 */}
+        <h1 className="sr-only" data-testid="emp-module-eyebrow">
           고용지원금 매니저 Pro
         </h1>
-        <EmploymentOrig view={TO_VIEW[section] ?? section} companyId={cid} onNav={onNav} />
+        <EmploymentOrig view={TO_VIEW[section] ?? section} companyId={cid} onNav={onNav} focusClient={clientId} />
         {section === 'dashboard' && (
           <section className="flex flex-col gap-3" aria-label="고객 운영 업체와 연결">
             <h2 className="t-section text-slate-900">고객 운영 업체와 연결</h2>
@@ -347,7 +348,8 @@ function ScheduleTab() {
                 />
               </div>
             </Surface>
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+            {/* D-94: 넓은 화면에서는 오른쪽 칸(7/12)에 서므로 네 칸이면 금액이 잘린다 — 그때는 두 칸씩 */}
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 xl:grid-cols-2 2xl:grid-cols-4">
               <MetricTile label="총 예정" value={fMan(sch.total)} />
               <MetricTile label="받음" value={fMan(sch.received)} />
               <MetricTile label="남음" value={fMan(sch.remaining)} />

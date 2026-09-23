@@ -96,9 +96,9 @@ export default function ActivitySurveyPage() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-5 @2xl:grid-cols-3" key={tick}>
+      <div className="grid grid-cols-1 gap-5 @4xl:grid-cols-3" key={tick}>
         {/* 좌: 고객사 선택 + 연도별 상태 */}
-        <section className="rounded-2xl border border-slate-200 bg-white shadow-card @2xl:col-span-2">
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-card @4xl:col-span-2">
           <div className="border-b border-slate-200 px-5 py-4">
             <h2 className="text-lg font-bold text-slate-900">업체별 연도 상태</h2>
             <p className="mt-0.5 text-sm text-slate-500">고객사를 선택하고, 연도별 상태를 클릭으로 선택하세요</p>

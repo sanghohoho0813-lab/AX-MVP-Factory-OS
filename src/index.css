@@ -467,6 +467,11 @@ textarea {
   }
 }
 
+/* D-94: 크레탑 화면 글자는 단어 단위로 줄바꿈 — '기업 개/요' 처럼 낱말 중간에서 끊기지 않게 */
+.cretop-mini {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
 /* 크레탑 원본 분석 앱(D-93) — 하단 탭은 화면 안에 붙는다. 휴대폰에서는 OS 하단 메뉴 위로 */
 @media (max-width: 1023px) {
   /* D-94: OS 하단 메뉴(높이 약 57px) 바로 위에 붙인다 */

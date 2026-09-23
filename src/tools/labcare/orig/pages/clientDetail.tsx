@@ -82,9 +82,9 @@ export default function ClientDetailPage() {
         </div>
       }
     >
-      <div className="grid grid-cols-1 gap-5 @2xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 @4xl:grid-cols-3">
         {/* 좌측: 기본정보 + 연구소 정보 */}
-        <div className="space-y-5 @2xl:col-span-2">
+        <div className="space-y-5 @4xl:col-span-2">
           <InfoCard title="회사 기본정보">
             <InfoRow label="상호" value={client.name} />
             <InfoRow label="대표자" value={client.ceoName || "—"} />

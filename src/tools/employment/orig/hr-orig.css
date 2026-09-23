@@ -218,6 +218,8 @@ html[data-fontscale="xlarge"] .hr-app, html[data-fontscale="xlarge"] .hr-portal 
 
 /* ── 좁은 칸 (원본 모바일) ── */
 @container hr (max-width: 640px) {
+  /* [D-94] 원본의 '최소 290px 칸 채우기' 격자는 휴대폰 칸(약 290px)보다 넓어 화면 밖으로 밀렸다 — 한 줄로 */
+  .hr-orig [style*="auto-fill"], .hr-orig [style*="auto-fit"] { grid-template-columns: minmax(0, 1fr) !important; }
   .hr-orig .guide-flow { flex-direction: column; gap: 2px; }
   .hr-orig .guide-step { width: 100%; }
   .hr-orig .guide-arrow { transform: rotate(90deg); padding: 4px 0; }
@@ -248,6 +250,7 @@ html[data-fontscale="xlarge"] .hr-app, html[data-fontscale="xlarge"] .hr-portal 
 /* ── 원본 창(모달)은 화면 폭으로 (원본 그대로) ── */
 @media (max-width: 860px) {
   .hr-portal .card { border-radius: 16px; }
+  .hr-portal [style*="auto-fill"], .hr-portal [style*="auto-fit"] { grid-template-columns: minmax(0, 1fr) !important; }
   .hr-portal .grid-2-mobile { grid-template-columns: 1fr !important; }
   .hr-portal .hide-mobile { display: none !important; }
   .hr-portal .show-mobile { display: inline-flex !important; }

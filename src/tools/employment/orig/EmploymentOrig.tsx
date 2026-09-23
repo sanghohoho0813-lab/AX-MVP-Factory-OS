@@ -91,7 +91,18 @@ async function loadAll(workspaceId: string | null, clients: ClientOpsRecord[]): 
   }
 }
 
-export function EmploymentOrig({ view, companyId, onNav }: { view: string; companyId: string | null; onNav: (next: { view?: string; company?: string | null }) => void }) {
+export function EmploymentOrig({
+  view,
+  companyId,
+  onNav,
+  focusClient,
+}: {
+  view: string
+  companyId: string | null
+  onNav: (next: { view?: string; company?: string | null }) => void
+  /** 업체 상세에서 연 도구(?client=) — 등록된 업체면 그 업체 화면으로, 아니면 추가 창에 골라 둔다 (D-94) */
+  focusClient?: string | null
+}) {
   const { loadClients, workspaceId } = useToolClient()
   const { showToast } = useToast()
   const navigate = useNavigate()
@@ -322,6 +333,21 @@ export function EmploymentOrig({ view, companyId, onNav }: { view: string; compa
   )
   const getUrlFn = useCallback((path: string) => documentFileUrl(path), [])
 
+  // D-94: 업체 상세에서 열었으면 그 업체로 바로 — 한 번만(그 뒤에는 사용자가 옮긴 화면을 존중한다)
+  const focused = useRef<string | null>(null)
+  const [openAddFor, setOpenAddFor] = useState<string | null>(null)
+  useEffect(() => {
+    if (!data || !focusClient || focused.current === focusClient) return
+    focused.current = focusClient
+    // 주소가 다른 업체를 가리키면 그쪽이 우선. ‘업체 관리’ 는 업체 id 를 그대로 넘기므로 같은 업체면 계속 간다
+    if (companyId && companyId !== focusClient) return
+    if (data.companies.some((c) => c.id === focusClient)) {
+      if (view === 'dashboard' || view === 'company') onNav({ view: 'company', company: focusClient })
+    } else if (data.clients.some((c) => c.id === focusClient && !c.archivedAt)) {
+      setOpenAddFor(focusClient)
+    }
+  }, [data, focusClient, companyId, view, onNav])
+
   const call = useCallback(
     <A extends unknown[]>(fn: (...a: A) => Promise<void>) =>
       (...a: A) => {
@@ -341,6 +367,8 @@ export function EmploymentOrig({ view, companyId, onNav }: { view: string; compa
         companyId={companyId && registered.has(companyId) ? companyId : null}
         onNav={onNav}
         onBack={() => void navigate(-1)}
+        openAddFor={openAddFor}
+        onOpenAddDone={() => setOpenAddFor(null)}
         osClients={osPickList(data.clients, registered)}
         companies={data.companies}
         employees={data.employees}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, createContext, useContext } from "react";
+import { useSearchParams } from "react-router-dom"; // [D-94] 하단 탭 = 주소(?view=) → 브라우저 뒤로 가기로 탭을 오간다
 import { buildCretopParsedForUi, CORE_LABELS, cretopTrendCommentRich, cretopCashflowGradeInfo, cretopRowTrend, cretopPreviewTone, CRETOP_PREVIEW_TONES } from "../engine/index.js";
 import { extractPdfText } from "./pdf.js";
 import { cretopYearPool, cretopFillYears } from "./years.js"; // [D-94]
@@ -1028,7 +1029,7 @@ function CompanyHeader({ ui, grade, manualGrade, setGrade, isAdmin, compact }) {
         <button onClick={() => setPopup("workplace")} style={popBtn}>🏢 사업장 현황</button>
         <button onClick={() => setPopup("affil")} style={popBtn}>🧩 관계회사 현황</button>
         <button onClick={() => setPopup("trade")} style={popBtn}>🤝 거래처 현황</button>
-        {isAdmin && dbg ? <button onClick={() => setPopup("debug")} style={{ ...popBtn, color: T.mute, borderColor: T.line }}>🐞 원문 추출 상태</button> : null}
+        {isAdmin && dbg ? <button onClick={() => setPopup("debug")} style={{ ...popBtn, color: T.mute, borderColor: T.line }}>원문 추출 상태</button> : null}
       </div> : null}
 
       {/* 기본 정보 — 라벨 위·값 아래(스택)로 큰 글자에서도 안 눌리게 */}
@@ -1106,7 +1107,7 @@ function CompanyHeader({ ui, grade, manualGrade, setGrade, isAdmin, compact }) {
         { label: "주요구매처", source: sh.purchaseSuppliers && sh.purchaseSuppliers.source, noData: !!(sh.purchaseSuppliers && sh.purchaseSuppliers.noData), note: sh.purchaseSuppliers && sh.purchaseSuppliers.note, rows: (sh.purchaseSuppliers && sh.purchaseSuppliers.rows) || [] },
         { label: "주요판매처", source: sh.salesCustomers && sh.salesCustomers.source, noData: !!(sh.salesCustomers && sh.salesCustomers.noData), note: sh.salesCustomers && sh.salesCustomers.note, rows: (sh.salesCustomers && sh.salesCustomers.rows) || [] },
       ]} /> : null}
-      {popup === "debug" && isAdmin && dbg ? <InfoModal title="🐞 원문 추출 상태 (관리자)" subtitle={dbg.hasPages ? `PDF ${dbg.pageCount}쪽 · 페이지 기반` : "전체 raw 기반(페이지 정보 없음)"} onClose={() => setPopup(null)} sections={dbg.sections.map((s) => ({ label: `${s.ok ? "✅" : "❌"} ${s.label}`, value: s.preview ? `[매칭 미리보기 300자]\n${s.preview}` : "(매칭 실패 — 추출 안 됨)" }))} /> : null}
+      {popup === "debug" && isAdmin && dbg ? <InfoModal title="원문 추출 상태" subtitle={dbg.hasPages ? `PDF ${dbg.pageCount}쪽 · 페이지 기반` : "전체 raw 기반(페이지 정보 없음)"} onClose={() => setPopup(null)} sections={dbg.sections.map((s) => ({ label: `${s.ok ? "✅" : "❌"} ${s.label}`, value: s.preview ? `[매칭 미리보기 300자]\n${s.preview}` : "(매칭 실패 — 추출 안 됨)" }))} /> : null}
     </div>
   );
 }
@@ -1770,6 +1771,10 @@ function Sidebar({ history, onClose, onOpen, onNew, onDelete }) {
 //  extraInput: 입력 카드 아래(업체 서류함 보고서로 분석 등) · resultBar(ui): 결과 위(복사·업체 기록에 붙이기)
 //  history / onSaved / onDelete: 분석 이력(모듈 기록) · initial: 화면을 옮겼다 돌아왔을 때 이어 보기
 let lastSession = null;
+/** [D-94] 방금 분석한 보고서 원문 — 핵심지표 검수·숫자 추출기가 같은 글로 바로 시작하게 */
+export function lastCretopSource() {
+  return lastSession && lastSession.text ? { text: lastSession.text, fileName: lastSession.fileName || "" } : null;
+}
 export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, resultBar, pendingFile, onPendingDone }) {
   const [mode, setMode] = useState("pdf"); // pdf | text
   const [text, setText] = useState(() => (lastSession ? lastSession.text : ""));
@@ -1779,7 +1784,22 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
   const [busy, setBusy] = useState(false);
   const [ui, setUi] = useState(() => (lastSession ? lastSession.ui : null));
   const [err, setErr] = useState("");
-  const [tab, setTab] = useState(() => (lastSession ? lastSession.tab : "overview"));        // 하단 탭 화면
+  // [D-94] 하단 탭 화면은 주소에 둔다 — 원본의 앱 안 ‘← 뒤로 / 앞으로 →’ 단추 대신 브라우저 뒤로 가기가 탭을 오간다
+  const [searchParams, setSearchParams] = useSearchParams();
+  const viewParam = searchParams.get("view");
+  const tab = TABS.some(([k]) => k === viewParam) ? viewParam : "overview";
+  const setTab = useCallback((t, replace = false) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (t === "overview") next.delete("view"); else next.set("view", t);
+      return next;
+    }, { replace });
+  }, [setSearchParams]);
+  // 화면을 옮겼다 돌아왔을 때(주소에 view 가 없을 때) 보던 탭으로 이어 보기 — 원본 동작
+  useEffect(() => {
+    if (!viewParam && lastSession && lastSession.ui && lastSession.tab && lastSession.tab !== "overview") setTab(lastSession.tab, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [manualGrade, setManualGrade] = useState(null); // 신용등급 직접 선택
   const [sidebar, setSidebar] = useState(false);     // 햄버거 사이드 패널
   // 글자 크기 — 2단계 폰트 배율(박스 X, 글자만). 기본 1.3 / 크게 1.55. localStorage 저장.
@@ -1797,25 +1817,15 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
   useEffect(() => { setManualGrade(null); }, [ui]); // 새 분석/이력 열람 시 직접선택 초기화
   const scrollTop = () => { try { window.scrollTo({ top: 0, behavior: "auto" }); } catch (e) {} };
 
-  // ── 앱 내부 뒤로/앞으로 — 브라우저 history 미사용(충돌 없음). 화면={tab, ui} 스냅샷 스택 ──
-  const [nav, setNav] = useState({ stack: [{ tab: "overview", ui: null }], idx: 0 });
-  const recordNav = (t, u) => setNav((n) => {
-    const base = n.stack.slice(0, n.idx + 1); const top = base[base.length - 1];
-    if (top && top.tab === t && top.ui === u) return n;   // 동일 화면 중복 제거
-    base.push({ tab: t, ui: u }); const trimmed = base.slice(-30); return { stack: trimmed, idx: trimmed.length - 1 };
-  });
-  const applyNav = (e) => { setTab(e.tab); setUi(e.ui); scrollTop(); };
-  const canBack = nav.idx > 0, canForward = nav.idx < nav.stack.length - 1;
-  const goBack = () => { if (nav.idx <= 0) return; const idx = nav.idx - 1; applyNav(nav.stack[idx]); setNav({ stack: nav.stack, idx }); };
-  const goForward = () => { if (nav.idx >= nav.stack.length - 1) return; const idx = nav.idx + 1; applyNav(nav.stack[idx]); setNav({ stack: nav.stack, idx }); };
-
-  const goTab = (t) => { setTab(t); scrollTop(); recordNav(t, ui); };  // 탭 전환 = 화면 전환 + 이력 기록
+  // [D-94] 원본의 앱 안 뒤로/앞으로(스냅샷 스택)는 뺐다 — OS 안에서는 브라우저 뒤로 가기와 두 갈래가 되어 헷갈렸다
+  const goTab = (t) => { if (t !== tab) setTab(t); scrollTop(); };  // 탭 전환 = 화면 전환 + 주소 기록
+  useEffect(() => { scrollTop(); }, [tab]); // 브라우저 뒤로 가기로 탭이 바뀌어도 맨 위부터
   // 저장된 분석 다시 열기 — 재분석 없음
   const openHistory = (h) => {
     setSidebar(false); setErr("");
-    setUi(h.ui); setTab("overview"); scrollTop(); recordNav("overview", h.ui);
+    setUi(h.ui); setTab("overview"); scrollTop();
   };
-  const newAnalysis = () => { setUi(null); setText(""); setFileName(""); setPdfPages(null); setStatus(""); setErr(""); setSidebar(false); setTab("overview"); scrollTop(); recordNav("overview", null); };
+  const newAnalysis = () => { setUi(null); setText(""); setFileName(""); setPdfPages(null); setStatus(""); setErr(""); setSidebar(false); setTab("overview"); scrollTop(); };
   const parsedGrade = (ui && ui.companyInfo && ui.companyInfo.creditGrade) || null;
   const grade = manualGrade || gradeToOption(parsedGrade);
   const fy = ui ? (ui.financialYears || []).filter((y) => typeof y === "number") : [];
@@ -1835,7 +1845,10 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
     try {
       const { text: extracted, pages } = await extractPdfText(file, (p, total) => setStatus(`PDF 텍스트 추출 중… (${p}/${total}쪽)`));
       setText(extracted); setPdfPages(pages || null);
-      setStatus(`추출 완료 · ${extracted.length.toLocaleString()}자 · ${pages ? pages.length : 0}쪽. '재무진단 실행'을 눌러주세요.`);
+      setStatus(`추출 완료 · ${extracted.length.toLocaleString()}자 · ${pages ? pages.length : 0}쪽.`);
+      setBusy(false);
+      // [D-94] 추출이 끝나면 바로 진단한다 — 원본은 ‘재무진단 실행’ 을 한 번 더 눌러야 했다. 엔진·입력은 같다(buildResult 그대로)
+      await runDiagnosis(extracted, pages || null);
     } catch (e2) {
       setErr("PDF에서 텍스트를 읽지 못했습니다. 텍스트 붙여넣기로 시도해보세요. (" + (e2 && e2.message ? e2.message : "오류") + ")");
       setStatus("");
@@ -1867,20 +1880,22 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
     result.bizForm = detectBizForm(result);   // 개인사업자 감지
     return result;
   };
-  async function runDiagnosis() {
+  async function runDiagnosis(rawArg, pagesArg) {
     setErr("");
-    const raw = (text || "").trim();
+    const fromArg = typeof rawArg === "string";   // [D-94] 막 추출한 글을 바로 넘겨받을 때(상태 반영 전)
+    const raw = ((fromArg ? rawArg : text) || "").trim();
+    const pagesIn = fromArg ? pagesArg : pdfPages;
     if (!raw) { setErr("크레탑 PDF를 업로드하거나 보고서 텍스트를 붙여넣어 주세요."); return; }
     setBusy(true); setStatus("재무진단 분석 중…");
     await new Promise((r) => setTimeout(r, 20)); // 동기 엔진 — UI 끊김 방지용 한 틱
     let result;
     try {
-      result = buildResult(raw, pdfPages);
+      result = buildResult(raw, pagesIn);
     } catch (e) {
       setErr("분석 중 오류가 발생했습니다: " + (e && e.message ? e.message : "알 수 없는 오류"));
       setBusy(false); setStatus(""); return;
     }
-    setUi(result); setStatus(""); setBusy(false); setTab("overview"); scrollTop(); recordNav("overview", result);
+    setUi(result); setStatus(""); setBusy(false); setTab("overview"); scrollTop();
     if (onSaved) onSaved(result);
   }
 
@@ -1889,12 +1904,8 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
       {/* 상단: 햄버거 + 서비스명 + 글자 크기 (정상 크기 — 콘텐츠만 확대) */}
       <header style={{ background: T.surface, borderBottom: `1px solid ${T.line}`, borderRadius: "16px 16px 0 0" }}>
         <div style={{ maxWidth: 1040, margin: "0 auto", padding: "10px 12px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <button onClick={() => setSidebar(true)} title="분석 이력" data-testid="cretop-mini-menu" style={{ border: `1px solid ${T.line}`, background: "#fff", cursor: "pointer", borderRadius: 9, width: 36, height: 36, fontSize: "calc(17px * var(--fs,1))", color: T.ink, flexShrink: 0 }}>☰</button>
-          <div style={{ width: 30, height: 30, borderRadius: 8, background: `linear-gradient(135deg,${T.brand},${T.teal})`, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 900, fontSize: "calc(14px * var(--fs,1))", flexShrink: 0 }}>재</div>
-          <div style={{ minWidth: 0 }}>
-            <h1 style={{ margin: 0, fontSize: "calc(15px * var(--fs,1))", fontWeight: 900, letterSpacing: -0.3, whiteSpace: "nowrap" }}>법인 재무진단</h1>
-            {!isMobile ? <div style={{ fontSize: "calc(10.5px * var(--fs,1))", color: T.mute, whiteSpace: "nowrap" }}>크레탑 기반 자동 재무 분석</div> : null}
-          </div>
+          {/* [D-94] OS 모듈 머리줄이 이미 '크레탑 분석기' 를 보여 준다 — 원본의 로고·'법인 재무진단' 제목은 겹쳐서 뺐다. ☰ 는 무엇을 여는지 글로 적는다 */}
+          <button onClick={() => setSidebar(true)} title="분석 이력" data-testid="cretop-mini-menu" style={{ border: `1px solid ${T.line}`, background: "#fff", cursor: "pointer", borderRadius: 9, height: 36, padding: "0 12px", fontSize: "calc(13px * var(--fs,1))", fontWeight: 800, fontFamily: FF, color: T.ink, flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}><span aria-hidden="true" style={{ fontSize: "calc(16px * var(--fs,1))" }}>☰</span>분석 이력{history.length ? ` ${history.length}` : ""}</button>
           <div style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6 }}>
             {!isMobile ? <span style={{ fontSize: "calc(11px * var(--fs,1))", color: T.mute, fontWeight: 700 }}>글자크기</span> : null}
             <div style={{ display: "inline-flex", background: T.lineSoft, borderRadius: 9, padding: 2 }}>
@@ -1920,19 +1931,14 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
 
       {/* 콘텐츠(main)만 --fs로 글자 확대 → 박스는 그대로, 헤더/하단탭/사이드바는 정상 크기 */}
       <div style={{ maxWidth: tab === "reco" ? 980 : 720, margin: "0 auto", padding: "16px 14px 16px", width: "100%", boxSizing: "border-box", overflowX: "hidden", "--fs": fontScale }}>
-        {/* 앱 내부 뒤로/앞으로 — 화면 이동 이력 기준(브라우저 history와 무관) */}
-        <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-          <button onClick={goBack} disabled={!canBack} style={{ border: `1px solid ${T.line}`, background: "#fff", color: canBack ? T.sub : T.mute, borderRadius: 8, padding: "6px 11px", fontSize: "calc(12px * var(--fs,1))", fontWeight: 700, fontFamily: FF, cursor: canBack ? "pointer" : "default", opacity: canBack ? 1 : 0.5 }}>← 뒤로</button>
-          <button onClick={goForward} disabled={!canForward} style={{ border: `1px solid ${T.line}`, background: "#fff", color: canForward ? T.sub : T.mute, borderRadius: 8, padding: "6px 11px", fontSize: "calc(12px * var(--fs,1))", fontWeight: 700, fontFamily: FF, cursor: canForward ? "pointer" : "default", opacity: canForward ? 1 : 0.5 }}>앞으로 →</button>
-        </div>
         {/* 개요 탭에서만 입력/업로드 영역 노출 */}
         {tab === "overview" ? (
           <div style={{ ...card, padding: 22, marginBottom: 8, "--fs": fontScale * 1.3 }}>
             <div style={{ fontSize: "calc(14.5px * var(--fs,1))", fontWeight: 800, marginBottom: 6 }}>{ui ? "새 분석 / 다시 분석" : "크레탑 보고서로 재무진단 시작"}</div>
             <div style={{ fontSize: "calc(12px * var(--fs,1))", color: T.sub, marginBottom: 16, lineHeight: 1.5 }}>크레탑(KRD) 기업종합보고서 PDF를 올리거나 텍스트를 붙여넣고 진단을 실행하세요. 데이터는 브라우저에서만 처리됩니다.</div>
-            <div style={{ display: "inline-flex", background: T.lineSoft, borderRadius: 10, padding: 4, marginBottom: 16 }}>
+            <div style={{ display: "flex", width: "100%", maxWidth: 380, background: T.lineSoft, borderRadius: 10, padding: 4, marginBottom: 16 }}>{/* [D-94] 좁은 칸에서도 두 단추가 한 줄에 반씩 */}
               {[["pdf", "PDF 업로드"], ["text", "텍스트 붙여넣기"]].map(([k, label]) => (
-                <button key={k} onClick={() => setMode(k)} style={{ border: "none", cursor: "pointer", borderRadius: 8, padding: "9px 18px", fontSize: "calc(12.5px * var(--fs,1))", fontWeight: 700, fontFamily: FF, whiteSpace: "nowrap", background: mode === k ? T.surface : "transparent", color: mode === k ? T.brand : T.sub, boxShadow: mode === k ? "0 1px 2px rgba(15,23,42,.08)" : "none" }}>{label}</button>
+                <button key={k} onClick={() => setMode(k)} style={{ flex: "1 1 0", minWidth: 0, border: "none", cursor: "pointer", borderRadius: 8, padding: "9px 10px", fontSize: "calc(12.5px * var(--fs,1))", fontWeight: 700, fontFamily: FF, wordBreak: "keep-all", background: mode === k ? T.surface : "transparent", color: mode === k ? T.brand : T.sub, boxShadow: mode === k ? "0 1px 2px rgba(15,23,42,.08)" : "none" }}>{label}</button>
               ))}
             </div>
             {mode === "pdf" ? (
@@ -1951,7 +1957,7 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
               {status ? <span style={{ fontSize: "calc(12px * var(--fs,1))", color: T.sub }}>{status}</span> : null}
             </div>
             {err ? <div style={{ marginTop: 12, fontSize: "calc(12px * var(--fs,1))", color: T.warnInk, background: T.warnBg, border: `1px solid ${T.warnInk}22`, borderRadius: 8, padding: "10px 12px" }}>{err}</div> : null}
-            {(text || (pdfPages && pdfPages.length)) ? <button onClick={() => setRawViewOpen(true)} style={{ marginTop: 12, border: `1px solid ${T.line}`, background: "#fff", color: T.mute, borderRadius: 8, padding: "7px 12px", fontSize: "calc(11.5px * var(--fs,1))", fontWeight: 700, fontFamily: FF, cursor: "pointer" }}>🔎 원문 텍스트 보기(추출 디버그)</button> : null}
+            {(text || (pdfPages && pdfPages.length)) ? <button onClick={() => setRawViewOpen(true)} style={{ marginTop: 12, border: `1px solid ${T.line}`, background: "#fff", color: T.mute, borderRadius: 8, padding: "7px 12px", fontSize: "calc(11.5px * var(--fs,1))", fontWeight: 700, fontFamily: FF, cursor: "pointer" }}>🔎 PDF 에서 읽은 원문 보기</button> : null}
           </div>
         ) : null}
 

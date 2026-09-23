@@ -228,13 +228,13 @@ function NotesWorkspace() {
         </ul>
       </section>
 
-      <div className="grid grid-cols-1 gap-5 @2xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 @4xl:grid-cols-2">{/* [D-94] OS 목차 옆 칸에서는 좌우로 나누면 칸이 너무 좁다 */}
         {/* 좌: 입력 */}
         <div className="space-y-5">
           {/* 1. 대상 선택 */}
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-card">
             <h3 className="text-base font-bold text-slate-800">① 대상 선택</h3>
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="mt-3 grid grid-cols-1 gap-3 @2xl:grid-cols-3 @4xl:grid-cols-1 @6xl:grid-cols-3">
               <div>
                 <label className={labelCls}>고객사</label>
                 <select
@@ -424,12 +424,12 @@ function NotesWorkspace() {
         </div>
 
         {/* 우: 초안 미리보기 + 액션 (sticky) */}
-        <div className="@2xl:col-span-1">
-          <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-card sm:p-6 @2xl:sticky @2xl:top-24">
+        <div className="@4xl:col-span-1">
+          <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-card sm:p-6 @4xl:sticky @4xl:top-24">
             {/* 탭: 앱 내 초안 / GPT 프롬프트 */}
             <div className="flex gap-2 rounded-xl bg-slate-100 p-1">
-              <button type="button" onClick={() => setTab("app")} className={`flex-1 rounded-lg px-3 py-2.5 text-base font-bold ${tab === "app" ? "bg-white text-navy-700 shadow-sm" : "text-slate-500"}`}>앱 내 초안 (업데이트 예정)</button>
-              <button type="button" onClick={() => setTab("gpt")} className={`flex-1 rounded-lg px-3 py-2.5 text-base font-bold ${tab === "gpt" ? "bg-white text-navy-700 shadow-sm" : "text-slate-500"}`}>GPT 프롬프트 (업데이트 예정)</button>
+              <button type="button" onClick={() => setTab("app")} className={`flex-1 rounded-lg px-3 py-2.5 text-base font-bold ${tab === "app" ? "bg-white text-navy-700 shadow-sm" : "text-slate-500"}`}>앱 내 초안</button>
+              <button type="button" onClick={() => setTab("gpt")} className={`flex-1 rounded-lg px-3 py-2.5 text-base font-bold ${tab === "gpt" ? "bg-white text-navy-700 shadow-sm" : "text-slate-500"}`}>GPT 프롬프트</button>
             </div>
 
             {tab === "gpt" ? (

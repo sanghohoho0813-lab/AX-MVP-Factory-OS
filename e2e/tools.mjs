@@ -112,9 +112,13 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.goto(BASE + '/tools/cretop', { waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
   await page.getByLabel('크레탑 보고서 파일').setInputFiles(new URL('./fixtures/cretop-sample.pdf', import.meta.url).pathname)
-  await page.waitForTimeout(2500)
-  await page.getByTestId('cretop-run').click()
-  await page.waitForTimeout(1200)
+  // D-94: 추출이 끝나면 ‘재무진단 실행’ 을 누르지 않아도 바로 진단된다
+  const autoRan = await page
+    .waitForFunction(() => (document.querySelector('#mini-results')?.textContent ?? '').trim().length > 40, null, { timeout: 20000 })
+    .then(() => true)
+    .catch(() => false)
+  check('크레탑 PDF: 올리면 실행 단추 없이 바로 진단된다', autoRan)
+  await page.waitForTimeout(600)
   const pdfDetail = await miniTab('detail')
   const qYears = (pdfDetail.match(/(^|\n)\?(\n|$)/g) || []).length
   check('크레탑 PDF: 재무 상세에 연도 ? 가 없다', qYears === 0 && pdfDetail.includes('2024년') && pdfDetail.includes('2022년'), `?=${qYears}`)
@@ -258,11 +262,11 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(200)
   await page.getByRole('button', { name: '저장', exact: true }).click()
   await page.waitForTimeout(900)
-  check('연구소 고객사: 고른 업체가 목록에 선다', (await page.locator('tr[data-client="cli_hansol"]').count()) === 1)
+  check('연구소 고객사: 고른 업체가 목록에 선다', (await page.locator('[data-client="cli_hansol"]:visible').count()) === 1)
   await page.goto(BASE + '/tools/labcare/clients', { waitUntil: 'networkidle' })
   await page.waitForTimeout(1200)
-  check('연구소 고객사: 새로고침해도 남는다 (모듈 기록)', (await page.locator('tr[data-client="cli_hansol"]').count()) === 1)
-  await page.locator('tr[data-client="cli_hansol"] a').first().click()
+  check('연구소 고객사: 새로고침해도 남는다 (모듈 기록)', (await page.locator('[data-client="cli_hansol"]:visible').count()) === 1)
+  await page.locator('[data-client="cli_hansol"]:visible a').first().click()
   await page.waitForTimeout(900)
   check('연구소 고객사 상세: 원본 상세 화면이 ?cid= 로 열린다', page.url().includes('cid=cli_hansol') && (await page.getByRole('heading', { level: 1 }).innerText()).includes('한솔테크'), page.url())
 
@@ -345,7 +349,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('영업 고객 등록: 저장하면 신규 고객 발굴 화면으로', page.url().includes('/tools/sales-kit/prospecting') && (await page.getByTestId('sales-orig').innerText()).includes('한솔테크'), page.url())
   await page.goto(BASE + '/tools/sales-kit/briefing', { waitUntil: 'networkidle' })
   await page.waitForTimeout(900)
-  check('영업: 새로고침해도 남는다 (모듈 기록) · 브리핑 실제 고객 1명', /실제 고객\s*1\s*명/.test(await page.getByTestId('sales-orig').innerText()))
+  // D-94: 샘플 고객이 없으니 브리핑 칸은 '고객' 하나 (예전 '실제 고객 · 샘플 고객')
+  check('영업: 새로고침해도 남는다 (모듈 기록) · 브리핑 고객 1명', /고객\s*1\s*명/.test(await page.getByTestId('sales-orig').innerText()) && !(await page.getByTestId('sales-orig').innerText()).includes('샘플 고객'))
   check('영업 브리핑: 고객 운영 업체와 연결된 대시보드', (await page.getByTestId('module-dashboard').count()) === 1)
   await page.goto(BASE + '/tools/sales-kit/strategies', { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)
@@ -380,6 +385,11 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('모듈 잠금: 체험 남은 날을 적는다', /체험 \d+일 남음/.test(await page.getByTestId('module-access-list').locator('[data-module="labcare"]').innerText()), (await page.getByTestId('module-access-list').locator('[data-module="labcare"]').innerText()).slice(0, 80))
   await page.getByTestId('module-access-list').locator('[data-module="labcare"] button[data-act="open"]').click()
   await page.waitForTimeout(700)
+  {
+    // D-94: 열린 모듈에는 ‘체험’(열림 → 체험으로 내려감)·‘열기’(아무 일 없음) 단추가 없다
+    const row = page.getByTestId('module-access-list').locator('[data-module="labcare"]')
+    check('모듈 잠금: 열린 모듈에는 체험·열기 단추가 없고 모듈로 가기가 있다', (await row.locator('button[data-act="trial"], button[data-act="open"]').count()) === 0 && (await row.locator('[data-act="go"]').count()) === 1)
+  }
 
   /* ---- D-89: 업체에서 도구 열기 → 결과·기한이 그 업체로 ---- */
   // 업체 상세에 '이 업체로 도구 열기' 줄이 있고, 거기서 연 도구에는 업체 띠가 뜬다
@@ -388,7 +398,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('업체 상세: 이 업체로 도구 열기 줄', (await page.getByTestId('client-tools').locator('a[data-tool]').count()) >= 5)
   await page.getByTestId('client-tools').locator('a[data-tool="employment"]').click()
   await page.waitForTimeout(900)
-  check('업체에서 연 도구: 주소에 업체가 붙는다', page.url().includes('/tools/employment?client=cli_hansol'), page.url())
+  // D-94: 이미 고용지원금에 있는 업체면 그 업체 화면으로 바로 간다
+  check('업체에서 연 도구: 주소에 업체가 붙고 그 업체 화면으로 간다', page.url().includes('client=cli_hansol') && page.url().includes('cid=cli_hansol'), page.url())
   const banner = page.getByTestId('tool-client-banner')
   check('업체에서 연 도구: 업체 띠가 뜬다', (await banner.count()) === 1 && (await banner.innerText()).includes('한솔테크'), (await banner.innerText().catch(() => '없음')).slice(0, 80))
   check('업체에서 연 도구: 업체로 돌아가는 길', (await banner.getByRole('link', { name: /업체로 돌아가기/ }).count()) === 1)

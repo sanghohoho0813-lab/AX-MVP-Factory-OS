@@ -8,6 +8,9 @@ export interface SubsidyAppProps {
   companyId: string | null
   onNav: (next: { view?: string; company?: string | null }) => void
   onBack: () => void
+  /** 이 고객 운영 업체를 골라 둔 채로 '업체 추가' 창을 연다 (D-94) */
+  openAddFor?: string | null
+  onOpenAddDone?: () => void
   osClients: Rec[]
   companies: Rec[]
   employees: Rec[]

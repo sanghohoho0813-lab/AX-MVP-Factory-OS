@@ -19,7 +19,7 @@ import type { ReactNode } from 'react'
 import { useEffect, useId, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ChevronRight, X } from 'lucide-react'
-import { moduleForPath } from '../../config/moduleRegistry'
+import { screenTitleForPath } from '../../config/moduleRegistry'
 
 /* ------------------------------------------------------------------ */
 /* 색 계약                                                              */
@@ -138,7 +138,7 @@ export function ScreenTitle({
   back?: ReactNode
 }) {
   const { pathname } = useLocation()
-  const sameAsHeader = moduleForPath(pathname)?.label === title
+  const sameAsHeader = screenTitleForPath(pathname) === title
 
   return (
     <div className="flex flex-col gap-2">

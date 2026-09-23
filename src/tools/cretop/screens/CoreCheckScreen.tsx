@@ -8,6 +8,7 @@
  */
 
 import { useMemo, useState } from 'react'
+import { lastCretopSource } from '../mini/MiniApp.jsx'
 import { RotateCcw } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
 import { Badge, MetricTile, Section, Surface, type Tone } from '../../../components/ui/primitives'
@@ -24,7 +25,9 @@ const STATUS_TONE: Record<string, Tone> = {
 }
 
 export function CoreCheckScreen() {
-  const [text, setText] = useState('')
+  // D-94: 보고서 분석에서 방금 읽은 글이 있으면 그것으로 시작한다 — 같은 보고서를 다시 붙여 넣지 않게
+  const last = lastCretopSource()
+  const [text, setText] = useState(() => last?.text ?? '')
   const [checked, setChecked] = useState<Set<string>>(new Set())
 
   const core = useMemo(() => {
@@ -59,6 +62,11 @@ export function CoreCheckScreen() {
             className="w-full rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-2 text-[0.95rem] text-slate-900"
           />
           <div className="flex flex-wrap gap-2">
+            {last && (
+              <Button variant="ghost" size="sm" onClick={() => setText(last.text)} data-testid="cretop-core-last">
+                방금 분석한 보고서 넣기{last.fileName ? ` (${last.fileName})` : ''}
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={() => setText(CRETOP_CORE_SAMPLE)} data-testid="cretop-core-sample">
               샘플 넣기
             </Button>

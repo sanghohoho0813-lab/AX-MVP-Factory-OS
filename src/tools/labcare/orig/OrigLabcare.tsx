@@ -8,8 +8,8 @@
  *   3) 목차의 화면 키 → 원본 화면 (고객사 상세·점검·리포트는 ?cid= 로 고른다)
  */
 
-import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { listRows } from '../../../services/moduleData'
 import { useToolClient } from '../../shared/toolClientContext'
 import { hydrateLabStore } from './store'
@@ -112,10 +112,27 @@ function CheckPicker() {
 }
 
 export function OrigLabcare({ section }: { section: string }) {
-  const { loadClients, workspaceId } = useToolClient()
+  const { loadClients, workspaceId, clientId: osFocus } = useToolClient()
   const [ready, setReady] = useState(false)
   const [params] = useSearchParams()
   const cid = params.get('cid')
+  const navigate = useNavigate()
+  const focused = useRef<string | null>(null)
+
+  // D-94: 업체 상세에서 연 연구소(?client=) — 연구소 고객사면 그 고객사 화면으로, 아니면 추가 창에 골라 둔 채로. 한 번만
+  useEffect(() => {
+    if (!ready || !osFocus || cid || focused.current === osFocus) return
+    focused.current = osFocus
+    const registered = getClients().some((c) => c.id === osFocus)
+    const qs = new URLSearchParams(params)
+    if (section === 'dashboard' || section === 'clients') {
+      qs.set(registered ? 'cid' : 'add', osFocus)
+      void navigate(`/tools/labcare/clients?${qs.toString()}`, { replace: true })
+    } else if (registered && (section === 'check' || section === 'reports')) {
+      qs.set('cid', osFocus)
+      void navigate(`/tools/labcare/${section}?${qs.toString()}`, { replace: true })
+    }
+  }, [ready, osFocus, cid, section, params, navigate])
 
   useEffect(() => {
     let alive = true

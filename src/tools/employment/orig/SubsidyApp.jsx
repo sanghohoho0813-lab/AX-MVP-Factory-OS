@@ -266,12 +266,28 @@ function planTier(planType,isTrial){ return PLAN_TIERS[effPlanKey(planType,isTri
 function PlanBadge(props){ return <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:6,background:"#DBEAFE",color:"#1D4ED8",marginLeft:6,verticalAlign:"middle"}}>{props.label||"PRO"}</span>; }
 
 // ── 기본 UI 컴포넌트 ─────────────────────────────────────
+// [D-94] Esc 로 닫기 — 창이 겹치면 맨 위 창만 닫는다(원본에는 없었다)
+var _hrModalStack=[];
 function Modal(props){
   // 부모(.page-enter 등)의 transform 영향을 받지 않도록 body로 포탈 + 화면 전체 기준 fixed
   useEffect(function(){
     if(!props.open||typeof document==="undefined")return;
     document.body.classList.add("no-scroll");
     return function(){document.body.classList.remove("no-scroll");};
+  },[props.open]);
+  var closeRef=useRef(props.onClose); closeRef.current=props.onClose;
+  useEffect(function(){
+    if(!props.open||typeof window==="undefined")return;
+    var entry={};
+    _hrModalStack.push(entry);
+    function onKey(e){
+      if(e.key!=="Escape"||_hrModalStack[_hrModalStack.length-1]!==entry)return;
+      var t=e.target; var tag=t&&t.tagName?t.tagName.toLowerCase():"";
+      if(tag==="textarea"||(t&&t.isContentEditable))return; // 긴 글을 쓰다 Esc 로 날리지 않게
+      if(closeRef.current)closeRef.current();
+    }
+    window.addEventListener("keydown",onKey);
+    return function(){ window.removeEventListener("keydown",onKey); var i=_hrModalStack.indexOf(entry); if(i>=0)_hrModalStack.splice(i,1); };
   },[props.open]);
   if(!props.open||typeof document==="undefined")return null;
   return createPortal(
@@ -3514,7 +3530,7 @@ function Dashboard(props){
           <option value="upcoming">임박 있음</option>
           <option value="noprog">지원금 미지정</option>
           <option value="zero">대상자 0명</option>
-          <option value="sample">샘플 데이터</option>
+          {(props.companies||[]).some(function(c){return c.isSample;})?<option value="sample">샘플 데이터</option>:null}{/* [D-94] 샘플이 남아 있을 때만 */}
         </select>
         <ExcelImport companies={props.companies} employees={props.employees} programs={props.programs} io={props.excelImport}/>
         <PayrollDiagnosis/>
@@ -4383,7 +4399,7 @@ function CompDet(props){
               </div>
             )}
           </div>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",flexShrink:0}}>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",minWidth:0,maxWidth:"100%"}}>{/* [D-94] flexShrink:0 → 좁은 폭에서 단추 줄이 줄바꿈되게 */}
             <AgencyReport company={company} employees={compEmps} programs={programs} profile={props.profile} onLog={props.onLog}/>
             <PDFReport company={company} employees={compEmps} programs={programs} profile={props.profile} onLog={props.onLog}/>
             <CommissionReport company={company} employees={compEmps} programs={programs} profile={props.profile} onLog={props.onLog}/>
@@ -4410,7 +4426,8 @@ function CompDet(props){
       </Card>
 
       {/* 탭 바 */}
-      <div style={{display:"flex",gap:6,borderBottom:"2px solid #E2E8F0",marginBottom:20,overflowX:"auto"}}>
+      {/* [D-94] 옆으로 밀어야 보이던 탭(“업무 일지 (1” 에서 잘림) → 줄바꿈해서 전부 보이게 */}
+      <div style={{display:"flex",flexWrap:"wrap",gap:6,borderBottom:"2px solid #E2E8F0",marginBottom:20}}>
         {TABS.map(function(t){var on=stTab[0]===t.key;return(
           <button key={t.key} className="prog-tap" onClick={function(){stTab[1](t.key);}} style={{padding:"13px 22px",fontSize:18,fontWeight:on?800:600,color:on?"#2563EB":"#64748B",background:on?"#EFF6FF":"none",border:"none",borderRadius:"10px 10px 0 0",borderBottom:on?"3px solid #2563EB":"3px solid transparent",marginBottom:-2,cursor:"pointer",fontFamily:FF,whiteSpace:"nowrap",flexShrink:0}}>
             {t.icon} {t.label}
@@ -4744,7 +4761,7 @@ function CompanyEditModal(props){
   var stAdv=useState(false);
   var stBizTypeCustom=useState(INDUSTRY_OPTIONS.indexOf(c.bizType||"")>=0?false:(c.bizType?true:false));
   var st={
-    osId:useState(c.osId||""), // [D-93] 고객 운영 업체 id
+    osId:useState(c.osId||props.presetOsId||""), // [D-93] 고객 운영 업체 id · [D-94] 업체에서 열었으면 골라 둔다
     name:useState(c.name||""),
     bizNo:useState(c.bizNo||""),
     ceoName:useState(c.ceoName||""),
@@ -4793,6 +4810,7 @@ function CompanyEditModal(props){
     var oc=(props.osClients||[]).find(function(x){return x.id===id;}); if(!oc)return;
     ["name","bizNo","ceoName","addr","phone","email","managerName","managerTitle","managerEmail","corpType","establishedDate","bizType","empCount","region"].forEach(function(k){if(oc[k]!==undefined&&oc[k]!=="")st[k][1](oc[k]);});
   }
+  useEffect(function(){ if(isNew&&props.presetOsId)pickOs(props.presetOsId); },[]); // [D-94] 골라 둔 업체의 기록으로 칸 채우기
   function save(){
     if(isNew&&!st.osId[0]){toast("고객 운영 업체를 고르세요","warn");return;}
     if(!st.name[0].trim()){toast("업체명을 입력하세요","warn");return;}
@@ -5905,13 +5923,7 @@ function StarterGuide(props){
       </div>
       {/* 안내 영상 자리 + 하루 동안 다시 보지 않기 */}
       <div style={{display:"flex",alignItems:"center",gap:12,marginTop:12,flexWrap:"wrap"}}>
-        <div style={{display:"flex",alignItems:"center",gap:11,background:"#F8FAFC",border:"1px dashed #D7DEE8",borderRadius:13,padding:"13px 16px",flex:1,minWidth:240}}>
-          <span style={{fontSize:20,flexShrink:0}}>🎬</span>
-          <div style={{minWidth:0}}>
-            <div style={{fontSize:14.5,fontWeight:700,color:"#475569"}}>3분 사용법 영상 준비 중</div>
-            <div style={{fontSize:12.5,color:"#94A3B8",marginTop:1}}>영상이 추가되면 이곳에서 바로 확인할 수 있습니다.</div>
-          </div>
-        </div>
+        <div style={{flex:1}}/>{/* [D-94] ‘3분 사용법 영상 준비 중’ 빈 자리는 뺐다 — 없는 영상을 약속하지 않는다 */}
         <button className="prog-tap" onClick={hideForDay} style={{background:"none",border:"none",color:"#94A3B8",fontSize:13.5,cursor:"pointer",fontFamily:FF,whiteSpace:"nowrap",padding:"6px 4px"}}>하루 동안 다시 보지 않기</button>
       </div>
     </div>
@@ -6135,14 +6147,7 @@ function ScreenGuide(props){
             <div style={{fontSize:15,fontWeight:800,color:"#166534",marginBottom:9}}>🎯 이 화면을 쓰면</div>
             <div style={{fontSize:16,color:"#15803D",lineHeight:1.55,fontWeight:600,wordBreak:"keep-all"}}>{g.result}</div>
           </div>
-          {/* 안내 영상 자리 (추후 URL 연결) */}
-          <div style={{display:"flex",alignItems:"center",gap:11,background:"#F8FAFC",border:"1px dashed #D7DEE8",borderRadius:13,padding:"13px 16px"}}>
-            <span style={{fontSize:20,flexShrink:0}}>🎬</span>
-            <div style={{minWidth:0}}>
-              <div style={{fontSize:14.5,fontWeight:700,color:"#475569"}}>3분 사용법 영상 준비 중</div>
-              <div style={{fontSize:12.5,color:"#94A3B8",marginTop:1}}>영상이 추가되면 이곳에서 바로 확인할 수 있습니다.</div>
-            </div>
-          </div>
+          {/* [D-94] ‘3분 사용법 영상 준비 중’ 빈 자리는 뺐다 */}
         </div>
       </div>
       {/* CTA + 하루 동안 다시 보지 않기 */}
@@ -6790,6 +6795,8 @@ export default function SubsidyApp(props){
   useEffect(function(){ try{applyFontScale(localStorage.getItem("hrSubsidyPro_fontScale"));}catch(e){} },[]);
   var stFocusEmp=useState(null); // 진행보드 등에서 '처리하기'로 넘어온 직원 id
   var stAddComp=useState(false);
+  // [D-94] 업체 상세에서 열었는데 아직 고용지원금 업체가 아니면 — 그 업체를 골라 둔 채 '업체 추가' 창을 연다
+  useEffect(function(){ if(props.openAddFor){ stAddComp[1](true); } },[props.openAddFor]);
   var stProfileOpen=useState(false);
   var stMobileNav=useState(false);
   var stFbOpen=useState(false); // 피드백 설문 모달
@@ -7087,7 +7094,7 @@ export default function SubsidyApp(props){
             <button className="app-hamburger" onClick={function(){stMobileNav[1](true);}} title="메뉴" style={{display:"none",alignItems:"center",justifyContent:"center",width:44,height:44,borderRadius:10,border:"1px solid #E2E8F0",background:"#F8FAFC",fontSize:22,cursor:"pointer",flexShrink:0}}>☰</button>
             {stView[0]==="company"&&selectedCompany?(
               <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
-                <button onClick={goBack} className="prog-tap" style={{display:"inline-flex",alignItems:"center",gap:5,background:"#F1F5F9",border:"1px solid #E2E8F0",color:"#475569",cursor:"pointer",fontSize:14.5,fontWeight:700,padding:"8px 14px",borderRadius:10,whiteSpace:"nowrap",fontFamily:FF}}>← 이전</button>
+                <button onClick={function(){stCompany[1](null);stView[1]("companies");}} title="업체 목록으로" className="prog-tap" style={{display:"inline-flex",alignItems:"center",gap:5,background:"#F1F5F9",border:"1px solid #E2E8F0",color:"#475569",cursor:"pointer",fontSize:14.5,fontWeight:700,padding:"8px 14px",borderRadius:10,whiteSpace:"nowrap",fontFamily:FF}}>← 업체 목록</button>
                 <div style={{display:"flex",alignItems:"center",gap:7,minWidth:0}}>
                   <span style={{fontSize:14.5,color:"#94A3B8",fontWeight:600,whiteSpace:"nowrap"}} className="hide-mobile">업체 관리</span>
                   <span style={{color:"#CBD5E1",fontSize:16}} className="hide-mobile">›</span>
@@ -7096,9 +7103,7 @@ export default function SubsidyApp(props){
               </div>
             ):(
               <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
-                {stView[0]!=="dashboard"&&(
-                  <button onClick={goBack} className="prog-tap" style={{display:"inline-flex",alignItems:"center",gap:5,background:"#F1F5F9",border:"1px solid #E2E8F0",color:"#475569",cursor:"pointer",fontSize:14.5,fontWeight:700,padding:"8px 14px",borderRadius:10,whiteSpace:"nowrap",fontFamily:FF}}>← 이전</button>
-                )}
+                {/* [D-94] 목차 화면의 ‘← 이전’ 은 뺐다 — OS 목차·브라우저 뒤로 가기와 겹쳤다. 업체 상세에서는 ‘← 업체 목록’ 으로 남긴다 */}
                 <span className="app-title" style={{fontSize:27,fontWeight:800,color:"#0F172A",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",letterSpacing:"-0.5px"}}>
                   {(SIDEBAR_NAV.find(function(n){return n.key===activeKey;})||{label:"대시보드"}).icon}&nbsp;
                   {(SIDEBAR_NAV.find(function(n){return n.key===activeKey;})||{label:"대시보드"}).label}
@@ -7282,13 +7287,13 @@ export default function SubsidyApp(props){
 
       {/* Add Company Modal */}
       {stAddComp[0]&&(
-        <CompanyEditModal open={true} onClose={function(){stAddComp[1](false);}} company={null} programs={programs} osClients={props.osClients}
+        <CompanyEditModal open={true} onClose={function(){stAddComp[1](false);if(props.onOpenAddDone)props.onOpenAddDone();}} company={null} programs={programs} osClients={props.osClients} presetOsId={props.openAddFor}
           onSave={function(data){
             var prog=Object.values(DEFAULT_PROGRAMS)[0];
             var defaultDocs=COMPANY_DEFAULT_DOCS.reduce(function(acc,cat){return acc.concat(cat.docs.map(function(d){return{id:uid(),label:d,done:false,files:[]};}));},[]);
             var newComp=Object.assign({id:data.osId||ruuid(),createdAt:new Date().toISOString(),companyDocs:defaultDocs},data);
             onSaveCompany(newComp);
-            stAddComp[1](false);
+            stAddComp[1](false); if(props.onOpenAddDone)props.onOpenAddDone();
             goCompany(newComp.id);
             toast("업체가 등록되었습니다.","success");
           }}

@@ -8,6 +8,9 @@
  */
 
 import { DEFAULT_INPUT, SAMPLE_INPUT, runDiagnosis } from '../policyFunding/diagnosis'
+import { subjectMismatch } from '../shared/toolSubject'
+import { loadStartupTaxForm, saveStartupTaxForm, startupTaxKey, STARTUP_TAX_STORAGE_KEY } from '../startupTax/lib/formStore'
+import { moduleForPath, moduleMatchLength, screenTitleForPath } from '../../config/moduleRegistry'
 import { changeColor, CRETOP_C, TREND_COMMENT_TONE } from '../cretop/lib/tones'
 import { mapHref as labHref } from '../labcare/orig/nav'
 import { mapHref as pfHref } from '../policyFunding/orig/nav'
@@ -630,7 +633,7 @@ function check(name: string, cond: boolean, detail?: string): void {
   check('연구소 주소: 원본 ?client= 는 lab 으로 (OS 의 업체 열기와 안 겹치게)', labHref('/notes?client=c1') === '/tools/labcare/notes?lab=c1')
   check('연구소 주소: 설립서류·활동조사 이름 맞추기', labHref('/setup-documents') === '/tools/labcare/setup-docs' && labHref('/activity-survey') === '/tools/labcare/survey')
   check('정책자금 주소: 대시보드 → 상담 고객 관리', pfHref('/dashboard') === '/tools/policy-funding/customers')
-  check('정책자금 주소: 고객 상세·리포트는 ?cid=', pfHref('/customers/x') === '/tools/policy-funding/customers?cid=x' && pfHref('/customers/x/report') === '/tools/policy-funding/report?cid=x')
+  check('정책자금 주소: 고객 상세·리포트는 ?cid= (+ 업체 띠용 client, D-94)', pfHref('/customers/x') === '/tools/policy-funding/customers?cid=x&client=x' && pfHref('/customers/x/report') === '/tools/policy-funding/report?cid=x&client=x')
   check('정책자금 주소: 진단은 ?client= 를 그대로 (업체로 열기)', pfHref('/diagnosis?client=x') === '/tools/policy-funding/diagnosis?client=x')
 
   const os = { id: 'cli_a', companyName: '가나(주)', industry: '제조업', corporateNumber: '110111-1234567' } as never
@@ -647,6 +650,35 @@ function check(name: string, cond: boolean, detail?: string): void {
   check('진단 저장: 1순위 기관·점수가 새로 붙는다', c.recommendedAgency === r.topAgency && c.score === r.overallScore)
   check('진단 저장: 저장 전에는 명단이 그대로', getStoredCustomerById('cli_a')?.stage === '서류 요청')
   resetPolicyStoreForTest([], [])
+}
+
+/* ---- D-94: OS 안에서 자연스럽게 이어지게 ---- */
+{
+  // 다른 회사 보고서를 잘못 붙이지 않게
+  const t = { companyName: '한솔테크(주)', businessNumber: '123-45-67890' }
+  check('결과 회사: 사업자번호가 같으면 같은 회사', !subjectMismatch({ name: '다른이름', bizNo: '1234567890' }, t))
+  check('결과 회사: 사업자번호가 다르면 다른 회사', subjectMismatch({ name: '한솔테크', bizNo: '9999999999' }, t))
+  check('결과 회사: 번호가 없으면 (주)·㈜·띄어쓰기를 빼고 이름으로', !subjectMismatch({ name: '㈜ 한솔테크' }, t) && subjectMismatch({ name: '세방형(주)' }, t))
+  check('결과 회사: 결과에 회사가 없으면 묻지 않는다', !subjectMismatch(undefined, t) && !subjectMismatch({}, t))
+
+  // 창업감면 판정은 업체마다 따로 적힌다
+  const store = new Map<string, string>()
+  ;(globalThis as unknown as { localStorage: unknown }).localStorage = {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => void store.set(k, v),
+    removeItem: (k: string) => void store.delete(k),
+  }
+  check('창업감면 저장: 업체 없이 쓰면 예전 칸 그대로', startupTaxKey(null) === STARTUP_TAX_STORAGE_KEY)
+  check('창업감면 저장: 업체마다 다른 칸', startupTaxKey('cli_a') !== startupTaxKey('cli_b') && startupTaxKey('cli_a').startsWith('axmvp.tools.'))
+  saveStartupTaxForm('cli_a', { ...EMPTY_FORM, businessType: '법인사업자' as typeof EMPTY_FORM.businessType })
+  check('창업감면 저장: 한 업체의 답이 다른 업체로 새지 않는다', loadStartupTaxForm('cli_a')?.businessType === '법인사업자' && loadStartupTaxForm('cli_b') === null && loadStartupTaxForm(null) === null)
+
+  // 도입 검토중 도구(영업 도구 모음)에 있어도 메뉴 줄에 불이 켜지고, 머리줄에 도구 이름이 뜬다
+  const review = moduleForPath('/tools/sales-kit/briefing')
+  check('메뉴: 영업 도구 주소는 도입 검토중 줄이 맡는다', review?.key === 'tools-review', review?.key)
+  check('메뉴: 머리줄 이름은 영업 도구 모음', screenTitleForPath('/tools/sales-kit/briefing') === '영업 도구 모음', String(screenTitleForPath('/tools/sales-kit/briefing')))
+  check('메뉴: 도구함 전체는 /tools 에서만 켜진다', moduleMatchLength({ path: '/tools', exact: true }, '/tools/cretop') === 0 && moduleForPath('/tools')?.key === 'tools')
+  check('메뉴: 크레탑은 크레탑 줄', moduleForPath('/tools/cretop/core-check')?.path === '/tools/cretop')
 }
 
 console.log(`\ntools: ${passed} passed, ${failed} failed`)

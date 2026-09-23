@@ -66,6 +66,8 @@ export interface ModuleDefinition {
   enabled: boolean
   /** 메뉴 활성 판정을 정확히 경로 일치로만 할지 (홈처럼 모든 경로의 접두가 되는 경우) */
   exact?: boolean
+  /** 이 메뉴가 함께 맡는 다른 경로 (D-94: ‘도입 검토중’ 한 줄이 그 안의 도구 주소까지 맡는다) */
+  alsoPaths?: string[]
   /** 툴팁·도움말용 예전 이름 */
   hint?: string
   /**
@@ -144,9 +146,9 @@ export const MODULES: ModuleDefinition[] = [
   ...toolModules(),
   // 도입 검토중 — 검토중인 도구가 하나라도 있을 때만 한 줄 (D-88)
   ...(reviewTools().length > 0
-    ? [{ key: 'tools-review', label: '도입 검토중', path: REVIEW_HUB_PATH, icon: FlaskRound, group: 'tools' as const, accent: 'system' as const, enabled: true, hint: '쓸 수는 있지만 아직 정식으로 들이지 않은 것' }]
+    ? [{ key: 'tools-review', label: '도입 검토중', path: REVIEW_HUB_PATH, icon: FlaskRound, group: 'tools' as const, accent: 'system' as const, enabled: true, hint: '쓸 수는 있지만 아직 정식으로 들이지 않은 것', alsoPaths: reviewTools().flatMap((t) => (t.path ? [t.path] : [])) }]
     : []),
-  { key: 'tools', label: '도구함 전체', path: '/tools', icon: LayoutGrid, group: 'tools', accent: 'system', enabled: true, hint: '앞으로 붙을 것까지 한눈에' },
+  { key: 'tools', label: '도구함 전체', path: '/tools', icon: LayoutGrid, group: 'tools', accent: 'system', enabled: true, hint: '앞으로 붙을 것까지 한눈에', exact: true },
   { key: 'settings', label: '설정', path: '/settings', icon: Settings, group: 'settings', accent: 'system', enabled: true },
 ]
 
@@ -158,15 +160,38 @@ export function enabledModulesByGroup(): { group: ModuleGroup; items: ModuleDefi
   })).filter((g) => g.items.length > 0)
 }
 
+const underPath = (pathname: string, base: string) => pathname === base || pathname.startsWith(`${base}/`)
+
+/** 이 메뉴가 지금 주소를 맡는가 — 맡으면 맞은 경로의 길이(가장 긴 것이 이긴다), 아니면 0 */
+export function moduleMatchLength(m: Pick<ModuleDefinition, 'path' | 'exact' | 'alsoPaths'>, pathname: string): number {
+  if (m.exact ? pathname === m.path : underPath(pathname, m.path)) return m.path.length
+  const also = (m.alsoPaths ?? []).filter((p) => underPath(pathname, p))
+  return also.length > 0 ? Math.max(...also.map((p) => p.length)) : 0
+}
+
 /** 경로에 해당하는 모듈 — 가장 긴 접두가 일치하는 것을 고른다 */
 export function moduleForPath(pathname: string): ModuleDefinition | null {
   let best: ModuleDefinition | null = null
+  let bestLen = 0
   for (const m of MODULES) {
     if (!m.enabled) continue
-    const hit = m.exact ? pathname === m.path : pathname === m.path || pathname.startsWith(`${m.path}/`)
-    if (hit && (best === null || m.path.length > best.path.length)) best = m
+    const len = moduleMatchLength(m, pathname)
+    if (len > bestLen) {
+      best = m
+      bestLen = len
+    }
   }
   return best
+}
+
+/**
+ * 머리줄에 쓸 화면 이름 (D-94) — 검토중 도구(영업 도구 모음 등)는 메뉴 줄 이름(‘도입 검토중’)이 아니라 도구 이름을 쓴다.
+ * 예전에는 이 주소를 맡는 메뉴가 없어 휴대폰 머리줄에 회사 이름만 떴다.
+ */
+export function screenTitleForPath(pathname: string): string | null {
+  const review = reviewTools().find((t) => t.path && underPath(pathname, t.path))
+  if (review) return review.label
+  return moduleForPath(pathname)?.label ?? null
 }
 
 /*

@@ -7,7 +7,7 @@
  * 적은 값은 이 브라우저에 남는다 — 상담 중 화면을 옮겨도 다시 적지 않는다.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
 import { ModuleDashboard } from '../shared/ModuleDashboard'
@@ -16,6 +16,8 @@ import { StartupTaxReportScreen } from './screens/ReportScreen'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
 import { usePrefillFromClient } from '../shared/usePrefill'
 import { PrefillNote } from '../shared/PrefillNote'
+import { useToolClient } from '../shared/toolClientContext'
+import { loadStartupTaxForm, saveStartupTaxForm } from './lib/formStore'
 import type { FormData as StartupTaxForm, JudgementResult } from './types'
 import { EMPTY_ADVANCED, EMPTY_FORM } from './lib/formDefaults'
 import { judge, VERDICT_EMOJI, VERDICT_LABEL } from './lib/judgement'
@@ -24,45 +26,42 @@ import InputForm from './orig/components/InputForm'
 import ResultCards from './orig/components/ResultCards'
 import PrintSheet from './orig/components/PrintSheet'
 
-const STORAGE_KEY = 'axmvp.tools.startupTax'
-
-function loadForm(): StartupTaxForm {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return EMPTY_FORM
-    const saved = JSON.parse(raw) as Partial<StartupTaxForm>
-    return {
-      ...EMPTY_FORM,
-      ...saved,
-      checkItems: { ...EMPTY_FORM.checkItems, ...(saved.checkItems ?? {}) },
-      advanced: { ...EMPTY_ADVANCED, ...(saved.advanced ?? {}) },
-    }
-  } catch {
-    return EMPTY_FORM
-  }
-}
-
 /** 원본 기본값 (요청 사양: 생년월일 1980-01-01, 창업일 2020-01-01) — 업체 정보로 채울 때 이 값은 '안 적은 것' 으로 본다 */
 const ORIG_BIRTH = '1980-01-01'
 const ORIG_STARTUP = '2020-01-01'
 
+function freshForm(): StartupTaxForm {
+  return { ...EMPTY_FORM, birthDate: ORIG_BIRTH, startupDate: ORIG_STARTUP, checkItems: { ...EMPTY_FORM.checkItems }, advanced: { ...EMPTY_ADVANCED } }
+}
+
+function formFor(clientId: string | null): StartupTaxForm {
+  const f = loadStartupTaxForm(clientId)
+  if (!f) return freshForm()
+  return { ...f, birthDate: f.birthDate || ORIG_BIRTH, startupDate: f.startupDate || ORIG_STARTUP }
+}
+
 function StartupTaxScreen() {
-  const [form, setForm] = useState<StartupTaxForm>(() => {
-    const f = loadForm()
-    return { ...f, birthDate: f.birthDate || ORIG_BIRTH, startupDate: f.startupDate || ORIG_STARTUP }
-  })
+  // 업체마다 따로 적어 둔다 (D-94) — 다른 업체로 열면 그 업체의 답(없으면 빈 폼)으로 바뀐다
+  const { clientId } = useToolClient()
+  const [form, setForm] = useState<StartupTaxForm>(() => formFor(clientId))
+  const loadedFor = useRef<string | null>(clientId)
   const [submitted, setSubmitted] = useState(false)
   // 진단 기준일 (오늘) — 마운트 시 1회 고정
   const [baseDate] = useState(() => new Date())
   const currentYear = baseDate.getFullYear()
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(form))
-    } catch {
-      /* 저장 못 해도 판정은 된다 */
-    }
-  }, [form])
+    if (loadedFor.current === clientId) return
+    loadedFor.current = clientId
+    setForm(formFor(clientId))
+    setSubmitted(false)
+  }, [clientId])
+
+  useEffect(() => {
+    // 업체가 막 바뀐 순간(아직 새 업체 폼을 읽기 전)에는 쓰지 않는다 — 앞 업체 답이 뒤 업체 칸에 들어가지 않게
+    if (loadedFor.current !== clientId) return
+    saveStartupTaxForm(clientId, form)
+  }, [form, clientId])
 
   const result: JudgementResult | null = useMemo(() => (submitted ? judge(form, baseDate) : null), [submitted, form, baseDate])
   const summaryText = useMemo(() => (result ? buildSummaryText(result) : ''), [result])
@@ -92,12 +91,13 @@ function StartupTaxScreen() {
   })
 
   const top = () => window.scrollTo({ top: 0, behavior: 'smooth' })
+  // D-94: 판정하면 결과 첫 칸으로 — 위의 업체 띠·안내·제목을 건너뛴다(휴대폰에서 결과가 화면 아래로 밀리던 것)
   const handleSubmit = () => {
     setSubmitted(true)
-    top()
+    window.setTimeout(() => document.getElementById('startup-result')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0)
   }
   const handleReset = () => {
-    setForm({ ...EMPTY_FORM, birthDate: ORIG_BIRTH, startupDate: ORIG_STARTUP, checkItems: { ...EMPTY_FORM.checkItems }, advanced: { ...EMPTY_ADVANCED } })
+    setForm(freshForm())
     setSubmitted(false)
     top()
   }
@@ -122,6 +122,7 @@ function StartupTaxScreen() {
             </p>
           </header>
 
+          <div id="startup-result" className="scroll-mt-20" />
           {submitted && result ? (
             <ResultCards
               result={result}

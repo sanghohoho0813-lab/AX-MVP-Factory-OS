@@ -45,6 +45,8 @@ export function toSalesRecord(os: ClientOpsRecord, d: Rec): Rec {
     name: os.companyName,
     ceoName: s('ceoName') || os.representativeName || os.contactName || '',
     industry: s('industry') || os.industry || '기타',
+    // D-94: 영업 쪽에 안 적었으면 고객 운영 기록으로 (카드에 '- · -명' 으로 비던 것)
+    empCount: s('empCount') || String(os.employeeCount ?? '').replace(/[^0-9]/g, ''),
     nextDate: s('nextDate') || s('nextContactAt'),
     stage: s('stage') || 'lead',
     interests: Array.isArray(d.interests) ? d.interests : [],

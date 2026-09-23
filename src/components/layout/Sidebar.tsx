@@ -7,7 +7,9 @@ import { BrandLogo } from '../brand/BrandLogo'
 import {
   enabledModulesByGroup,
   groupAccentClass,
+  moduleMatchLength,
   navAccentClass,
+  type ModuleDefinition,
   type ModuleGroupKey,
 } from '../../config/moduleRegistry'
 import { readRaw, writeRaw } from '../../storage/localStore'
@@ -60,6 +62,8 @@ function SidebarContent({
 }) {
   const navigate = useNavigate()
   const location = useLocation()
+  // D-94: 메뉴 줄이 함께 맡는 다른 주소(도입 검토중 → 영업 도구 모음)에 있어도 불을 켠다
+  const alsoActive = (m: ModuleDefinition) => (m.alsoPaths ?? []).some((p) => location.pathname === p || location.pathname.startsWith(`${p}/`))
   const groups = enabledModulesByGroup()
   const [userCollapsed, setUserCollapsed] = useState<Set<ModuleGroupKey> | null>(null)
 
@@ -125,9 +129,7 @@ function SidebarContent({
       <nav aria-label="주 메뉴" className="flex-1 overflow-y-auto px-3 py-4">
         <ul className="flex flex-col gap-4">
           {groups.map(({ group, items }) => {
-            const containsActive = items.some((m) =>
-              m.exact ? location.pathname === m.path : location.pathname === m.path || location.pathname.startsWith(`${m.path}/`),
-            )
+            const containsActive = items.some((m) => moduleMatchLength(m, location.pathname) > 0)
             const isCollapsed = group.collapsible
               ? isGroupCollapsed(group.key, group.defaultCollapsed ?? false, containsActive)
               : false
@@ -170,11 +172,13 @@ function SidebarContent({
                           title={collapsed ? item.label : item.hint}
                           className={({ isActive }) =>
                             `relative flex min-h-11 items-center gap-3 rounded-(--radius-control) px-3 py-2.5 text-[0.95rem] font-medium transition-colors ${collapsed ? 'justify-center px-0' : ''} ${
-                              isActive ? 'bg-brand-600 text-white' : 'text-navy-200 hover:bg-navy-800 hover:text-white'
+                              isActive || alsoActive(item) ? 'bg-brand-600 text-white' : 'text-navy-200 hover:bg-navy-800 hover:text-white'
                             }`
                           }
                         >
-                          {({ isActive }: { isActive: boolean }) => (
+                          {({ isActive: linkActive }: { isActive: boolean }) => {
+                            const isActive = linkActive || alsoActive(item)
+                            return (
                             <>
                               {isActive && !collapsed && (
                                 <span
@@ -197,7 +201,8 @@ function SidebarContent({
                                 </span>
                               )}
                             </>
-                          )}
+                            )
+                          }}
                         </NavLink>
                       </li>
                     ))}

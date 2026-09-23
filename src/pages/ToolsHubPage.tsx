@@ -69,7 +69,7 @@ export function ToolCard({ t }: { t: ToolDefinition }) {
         {live && <ArrowRight aria-hidden="true" className="ml-auto size-4 shrink-0 text-slate-300" />}
       </span>
       <span className="t-sub mt-1.5 block break-keep text-slate-500">{t.desc}</span>
-      {t.origin && <span className="t-meta mt-1.5 block truncate text-slate-400">원본 {t.origin}</span>}
+      {/* D-94: 원본 저장소 이름(git-test · kind-cori 등)은 대표에게 뜻이 없어 카드에서 뺐다 — toolRegistry.origin 에는 남아 있다 */}
     </>
   )
   return live ? (

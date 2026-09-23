@@ -361,9 +361,9 @@ export default function AssessmentPage() {
         result="추천 유형, 부족 요건, 보완 항목, 설립 가능성 검토 결과서를 얻습니다."
         steps={["기업정보 입력", "연구전담요원 후보 수 선택", "물적요건 확인", "결과서 확인", "설립서류 관리로 임시 저장"]}
       />
-      <div className="grid grid-cols-1 gap-5 @2xl:grid-cols-3 print-hide">
+      <div className="grid grid-cols-1 gap-5 @4xl:grid-cols-3 print-hide">
         {/* ───────── 입력 (좌측 2/3) ───────── */}
-        <div className="space-y-5 @2xl:col-span-2">
+        <div className="space-y-5 @4xl:col-span-2">
           {/* ① 기업 기본요건 */}
           <Card title="① 기업 기본요건">
             {/* 기업명 — 기본요건 시작 */}

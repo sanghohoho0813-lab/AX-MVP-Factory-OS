@@ -19,7 +19,7 @@ import { CloudSaveStatus } from '../cloud/CloudSaveStatus'
 import { SignalBell } from './SignalBell'
 import { HeaderClock } from './HeaderClock'
 import { brand } from '../../brand/brand.config'
-import { moduleForPath } from '../../config/moduleRegistry'
+import { screenTitleForPath } from '../../config/moduleRegistry'
 
 // supabase 전용 헤더 조각은 lazy 로 불러와 local entry 번들에 Supabase SDK 가 섞이지 않게 한다.
 const SupabaseWorkspaceSelector = lazy(() =>
@@ -149,7 +149,7 @@ function UserMenu() {
 export function Header({ onOpenMobileMenu }: HeaderProps) {
   const isSupabase = getDataModeConfig().mode === 'supabase'
   const { pathname } = useLocation()
-  const screenTitle = moduleForPath(pathname)?.label ?? brand.brandNameKo
+  const screenTitle = screenTitleForPath(pathname) ?? brand.brandNameKo
   return (
     <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-[16px] sm:gap-3 lg:px-[24px]">
       <button

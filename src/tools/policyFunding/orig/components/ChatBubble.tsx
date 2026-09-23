@@ -16,7 +16,7 @@ function ChatBubbleBase({ item }: { item: CoachChatItem }) {
   return (
     <div className="flex items-start gap-2.5">
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-base">
-        🤖
+        🧭
       </span>
       <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-blue-50 px-4 py-2.5 text-sm leading-6 text-slate-800">
         {item.text}

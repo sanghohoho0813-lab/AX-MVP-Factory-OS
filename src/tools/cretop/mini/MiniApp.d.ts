@@ -28,3 +28,5 @@ export function oneLinerText(o: CretopOneLiner): string
 export function buildDiagnosisSummary(ui: CretopMiniUi): { text: string; tone: string }[]
 export function rankStrategies(ui: CretopMiniUi): { s: { name: string; cat: string }; score: number }[]
 export function estCorpTaxWon(niEok: number): number | null
+/** [D-94] 방금 분석한 보고서 원문 (없으면 null) */
+export function lastCretopSource(): { text: string; fileName: string } | null

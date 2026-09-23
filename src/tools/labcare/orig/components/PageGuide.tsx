@@ -69,13 +69,7 @@ export default function PageGuide({
             {open ? "안내 접기" : "처음 쓰는 분 안내"}
             <span className="text-slate-400">{open ? "▲" : "▼"}</span>
           </button>
-          <button
-            type="button"
-            onClick={() => alert("안내 영상은 추후 연결 예정입니다.")}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-50"
-          >
-            ▶ 1분 사용법 영상
-          </button>
+          {/* [D-94] ‘▶ 1분 사용법 영상’ 단추(누르면 ‘추후 연결 예정’ 알림만 뜨던 것)는 뺐다 */}
         </div>
 
         {open ? (

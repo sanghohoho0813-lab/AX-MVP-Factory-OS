@@ -191,7 +191,7 @@ export function buildReportModel(customer: Customer): ReportModel {
           score: null,
           reasons: ["현재 정보 기준 1순위로 추천되는 기관입니다."],
           cautions: [
-            "상세 적합도 점수와 기관별 비교는 AI 진단을 실행하면 산출됩니다.",
+            "상세 적합도 점수와 기관별 비교는 진단을 실행하면 산출됩니다.", // [D-94] 규칙 계산 — "AI" 라 부르지 않는다
           ],
         },
       ];

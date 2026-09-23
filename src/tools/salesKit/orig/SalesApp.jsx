@@ -485,7 +485,8 @@ function PillButton({ active, children, onClick, color }) {
   return <button onClick={onClick} style={{ ...btnSm, background: active ? (color || C.gold) + "25" : C.input, color: active ? color || C.gold : C.textM, border: active ? `1px solid ${color || C.gold}` : "1px solid " + C.bdr }}>{children}</button>;
 }
 // 초보자 안내 모드: beginnerMode가 false가 아니면 ON(처음 사용자 배려). '오늘 하루 숨기기'는 별도 처리.
-function beginnerOn(data) { return !data || data.beginnerMode !== false; }
+// [D-94] 이 OS 에서는 기본 꺼짐 — 목차에서 화면을 고르면 안내·‘시작하기’ 없이 바로 본문. 설정에서 ‘안내 켜기’ 를 누른 사람만 켜진다
+function beginnerOn(data) { return !!data && data.beginnerMode === true; }
 // 실제로 안내(설명 박스·접힘 구조)를 보여줄지 — 켜짐이면서 오늘 숨김이 아닐 때
 function guideActive(data) { return beginnerOn(data) && !(data && data.beginnerGuideHiddenDate === todayISO()); }
 // 화면별 안내 숨김 상태: "off"=계속 숨김, "YYYY-MM-DD"=그 날짜만 숨김
@@ -540,14 +541,8 @@ function TabFrame({ data, setData, cfg, screenKey, children, autoOpen }) {
   if (introVis) {
     return <ScreenIntro data={data} setData={setData} screenKey={screenKey} icon={cfg.icon} title={cfg.title} desc={cfg.desc} tone={cfg.tone} steps={cfg.steps} actions={<>{startBtn}{extraBtn}</>} footer={setData && cfg.sample !== false ? <SampleMini data={data} setData={setData} /> : null} />;
   }
-  // 안내 카드를 숨긴 상태에서도 시작 게이트는 유지(컴팩트 카드)
-  return <Card style={{ padding: "14px 18px", marginBottom: 12, background: C.blueBg, border: `1px solid ${C.blue}40` }}>
-    <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-      <span style={{ fontSize: "calc(var(--s,1.3)*22px)" }}>{cfg.icon || "💡"}</span>
-      <div style={{ flex: 1, minWidth: 150 }}><div style={{ fontWeight: 900, fontSize: "calc(var(--s,1.3)*16px)", color: C.text }}>{cfg.title}</div><div style={{ color: C.textM, fontSize: "calc(var(--s,1.3)*12px)", marginTop: 1 }}>시작하기를 누르면 기능이 나타납니다.</div></div>
-      {startBtn}{extraBtn}
-    </div>
-  </Card>;
+  // [D-94] 안내를 끈 상태면 게이트 없이 바로 본문 — 원본은 여기서도 ‘시작하기’ 작은 카드를 한 번 더 세웠다
+  return <>{children}</>;
 }
 // 초보자 안내 ON: 화면 본문을 기본 접고 대표 버튼 + "펼쳐보기"만 노출. 안내 OFF면 본문을 그대로 표시.
 function GuideExpand({ data, expandLabel, primary, children }) {
@@ -1000,7 +995,7 @@ function currentIssueSummary(item) {
   return `${f}${main.name}이(가) 우선 점검 포인트로 보입니다.${concern} 단정하기보다 자료 확인 후 검토 가능성을 판단하는 흐름을 권합니다.`;
 }
 // ── 방문용 1페이지 리포트 ─────────────────────────────────────────
-const REPORT_PROFILE_DEFAULT = { consultant: "김팀장", org: "기업컨설팅 세일즈 OS", title: "컨설턴트", phone: "", email: "", footer: "본 리포트는 상담 전 사전 점검용 자료이며, 실제 적용 여부는 회사의 세부 자료 확인과 세무사·노무사·전문가 검토가 필요합니다." };
+const REPORT_PROFILE_DEFAULT = { consultant: "김팀장", org: "미래에이아이랩", /* [D-94] 고객에게 나가는 리포트 머리 — 원본 앱 이름 대신 회사 이름 */ title: "컨설턴트", phone: "", email: "", footer: "본 리포트는 상담 전 사전 점검용 자료이며, 실제 적용 여부는 회사의 세부 자료 확인과 세무사·노무사·전문가 검토가 필요합니다." };
 function getReportProfile(data) { return { ...REPORT_PROFILE_DEFAULT, ...(data && data.reportProfile ? data.reportProfile : {}) }; }
 const VISIT_BASE_DOCS = ["재무제표(최근 3개년)", "법인등기부등본", "사업자등록증", "정관", "주주명부", "4대보험 사업장 가입자명부", "대출/보증 내역"];
 const EXTRA_CHECK_MAP = { "정관정비": "정관·임원보수 규정", "임원퇴직금": "임원퇴직금 규정", "가지급금": "가지급금/가수금 정리", "연구소": "기업부설연구소/벤처", "벤처인증": "벤처·이노비즈 인증", "고용지원금": "고용지원금/통합고용세액공제", "법인세": "연구·인력개발비 세액공제", "정책자금": "정책자금", "사내근로복지기금": "사내근로복지기금", "가업승계": "가업승계/주식가치평가", "미처분이익잉여금": "미처분이익잉여금/이익소각", "주식이동": "주식가치평가" };
@@ -2724,6 +2719,18 @@ const CUST_ISSUE_CATS = [
   ["고용·노무", ["고용지원금", "통합고용세액공제", "청년고용/인건비 지원", "사내근로복지기금", "4대보험/급여대장 점검", "근로계약서/취업규칙 점검"]],
   ["승계·지분", ["가업승계", "지분구조 정리", "자녀법인/관계회사 구조", "주주간 리스크", "법인보험/목적자금", "대표자 유고/상속재원"]],
 ];
+// [D-94] 고객 운영 업체 기록으로 고객 칸 채우기 — 빈 칸만(적어 둔 값은 덮지 않는다)
+function osToCust(os, p) {
+  const yr = new Date().getFullYear();
+  const y4 = (d) => { const n = Number(String(d || "").slice(0, 4)); return n > 1900 ? n : null; };
+  const emp = String(os.employeeCount || "").replace(/[^0-9]/g, "");
+  const est = y4(os.establishedAt); const birth = y4(os.representativeBirth);
+  return { ...p, osId: os.id, name: os.companyName,
+    ceoName: p.ceoName || os.representativeName || os.contactName || "",
+    empCount: p.empCount || emp, estYears: p.estYears || (est ? String(Math.max(0, yr - est)) : ""), ceoAge: p.ceoAge || (birth ? String(yr - birth) : ""),
+    managerName: p.managerName || (os.representativeName && os.contactName !== os.representativeName ? os.contactName || "" : ""),
+    managerPhone: p.managerPhone || os.contactPhone || "", homepage: p.homepage || os.homepage || "" };
+}
 const CUST_EMPTY = { name: "", industry: "제조업", ceoName: "", empCount: "", revenue: "", netIncome: "", estYears: "", ceoAge: "", stage: "lead", concern: "", nextAction: "자료 요청", nextDate: todayISO(), memo: "", expectedFee: "", expectedPremium: "", premiumFeeRate: "", issues: [], flags: {}, interests: [], dbSource: "", referrer: "", referrerPhone: "", dbDate: "", firstContactDate: "", ceoPhone: "", managerName: "", managerPhone: "", homepage: "", cretopChecked: false, financialSecured: false };
 // ── 크레탑 숫자 추출기 전용 큰 화면(오버레이) — 원문 확인 → 후보 추출 → 검수 → 미리보기 ──
 // ── 실전 검증 모드 — 실패 원인 수집용 디버그·체크리스트 보조 ──────────────
@@ -2956,7 +2963,7 @@ function CretopExtractorScreen({ open, seedRaw, seedName, source, onClose, onSen
   if (typeof window !== "undefined" && typeof document !== "undefined" && document.body && document.body.nodeType === 1) return createPortal(content, document.body);
   return content;
 }
-function CustomerForm({ open, initial, mode, defaultDest, data, onSave, onClose }) {
+function CustomerForm({ open, initial, mode, defaultDest, data, onSave, onClose, presetOsId }) {
   const [f, setF] = useState(CUST_EMPTY);
   const [dest, setDest] = useState(defaultDest || "lead");
   const [paste, setPaste] = useState("");
@@ -2965,7 +2972,8 @@ function CustomerForm({ open, initial, mode, defaultDest, data, onSave, onClose 
   const [fin, setFin] = useState(FIN_INIT);
   const [coreOpen, setCoreOpen] = useState(false);
   const [extHideErr, setExtHideErr] = useState(false);
-  useEffect(() => { if (open) { setF(initial ? { ...CUST_EMPTY, ...initial, flags: initial.flags || {} } : CUST_EMPTY); setDest(defaultDest || "lead"); setPaste(""); setFin(FIN_INIT); setExtHideErr(false); } }, [open, initial, defaultDest]);
+  // [D-94] 업체에서 열었으면(?client=) 그 업체를 골라 둔 채로 연다
+  useEffect(() => { if (open) { const presetOs = !initial && presetOsId ? salesOsClientOf(presetOsId) : null; setF(initial ? { ...CUST_EMPTY, ...initial, flags: initial.flags || {} } : presetOs ? osToCust(presetOs, CUST_EMPTY) : CUST_EMPTY); setDest(defaultDest || "lead"); setPaste(""); setFin(FIN_INIT); setExtHideErr(false); } }, [open, initial, defaultDest, presetOsId]);
   if (!open) return null;
   const upd = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const toggleFlag = (k) => setF((p) => ({ ...p, flags: { ...p.flags, [k]: !p.flags?.[k] } }));
@@ -3027,7 +3035,7 @@ function CustomerForm({ open, initial, mode, defaultDest, data, onSave, onClose 
   const save = () => { if (!f.name.trim()) { showToast("업체명을 입력해주세요."); return; } let extra = {}; if (fin.parsed) { const sum = buildFinancialSummary(fin.parsed, fin.source); extra = { financialExtracted: fin.parsed.items.map((it) => ({ key: it.key, label: it.label, display: it.display, confidence: it.confidence })), financialStructured: fin.parsed.structured || null, financialNumbers: fin.parsed.numbers, financialSummary: sum, financialWarnings: [sum.warning], financialSourceType: fin.source, financialAnalyzedAt: todayISO(), financialRawText: fin.saveRaw ? fin.text.slice(0, 20000) : "", financialRawTruncated: fin.saveRaw && fin.text.length > 20000 }; } const rec = { ...f, ...extra, name: f.name.trim(), interests: deriveInterests(f), source: "manual", sample: false }; onSave(rec, dest); };
   const lab = (t) => <div style={{ fontSize: "calc(var(--s,1.3)*17px)", fontWeight: 900, color: C.gold, margin: "6px 0 10px" }}>{t}</div>;
   return <Modal open={open} onClose={onClose} title={mode === "edit" ? "고객 정보 수정" : "+ 고객 등록"} width={760}>
-    <div style={{ display: "grid", gap: 16 }}>
+    <div style={{ display: "grid", gap: 16, gridTemplateColumns: "minmax(0,1fr)" }}>{/* [D-94] 좁은 화면에서 칸이 창보다 넓어지지 않게 */}
       <Card style={{ padding: 14, background: C.bg }}><Label>① 메모 붙여넣기 (선택) — 받아온 텍스트로 자동 채우기</Label><textarea style={{ ...inp, height: 80, resize: "vertical" }} value={paste} onChange={(e) => setPaste(e.target.value)} placeholder="예: 제조업, 매출 35억, 직원 12명, 대표 58세, 자녀 근무, 연구소 없음, 가지급금 있음, 정관 미점검" /><button style={{ ...btnS, marginTop: 8 }} onClick={autofill}>🪄 메모에서 자동 채우기</button></Card>
       <Card style={{ padding: 0, background: C.blueBg, border: `2px solid ${C.blue}55`, overflow: "hidden" }}>
         <button onClick={() => setFin((s) => ({ ...s, open: !s.open }))} aria-expanded={fin.open} style={{ width: "100%", textAlign: "left", display: "block", background: "transparent", border: "none", cursor: "pointer", fontFamily: FF, padding: "16px 18px" }}>
@@ -3170,7 +3178,7 @@ function CustomerForm({ open, initial, mode, defaultDest, data, onSave, onClose 
       </Card>
       {/* 숫자 추출기(보조) 전용 화면 제거 — 내부 컴포넌트는 유지하되 화면에서는 노출하지 않음 */}
       <div>{lab("② 기본정보")}<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <div><Label>업체명 * <span style={{ fontWeight: 600, color: C.textM }}>(고객 운영 업체에서 고르기)</span></Label>{mode === "edit" ? <input style={{ ...inp, background: C.bg }} value={f.name} readOnly /> : <select style={inp} data-testid="sales-client-pick" value={f.osId || ""} onChange={(e) => { const os = salesOsClientOf(e.target.value); if (!os) { setF((p) => ({ ...p, osId: "", name: "" })); return; } setF((p) => ({ ...p, osId: os.id, name: os.companyName, ceoName: p.ceoName || os.representativeName || os.contactName || "" })); }}><option value="">업체 고르기</option>{salesOsClients().map((c) => <option key={c.id} value={c.id}>{c.companyName}</option>)}</select>}{mode !== "edit" && salesOsClients().length === 0 ? <div style={{ color: C.warn, fontSize: "calc(var(--s,1.3)*14px)", marginTop: 4 }}>고객 운영에 업체가 없습니다. 먼저 <a href="/ops/clients" style={{ color: C.blue, fontWeight: 800 }}>고객 운영</a>에 업체를 등록하세요.</div> : null}{dupName && <div style={{ color: C.warn, fontSize: "calc(var(--s,1.3)*14px)", marginTop: 4 }}>같은 이름의 고객이 이미 있습니다. 저장하면 기존 고객을 수정합니다.</div>}</div>
+        <div style={{ gridColumn: "1 / -1" }}>{/* [D-94] 업체 고르기는 한 줄 전체 — 좁은 폭에서 이름표가 세 줄로 찌그러지던 것 */}<Label>업체명 * <span style={{ fontWeight: 600, color: C.textM }}>(고객 운영 업체에서 고르기)</span></Label>{mode === "edit" ? <input style={{ ...inp, background: C.bg }} value={f.name} readOnly /> : <select style={inp} data-testid="sales-client-pick" value={f.osId || ""} onChange={(e) => { const os = salesOsClientOf(e.target.value); if (!os) { setF((p) => ({ ...p, osId: "", name: "" })); return; } setF((p) => osToCust(os, p)); }}><option value="">업체 고르기</option>{salesOsClients().map((c) => <option key={c.id} value={c.id}>{c.companyName}</option>)}</select>}{mode !== "edit" && salesOsClients().length === 0 ? <div style={{ color: C.warn, fontSize: "calc(var(--s,1.3)*14px)", marginTop: 4 }}>고객 운영에 업체가 없습니다. 먼저 <a href="/ops/clients" style={{ color: C.blue, fontWeight: 800 }}>고객 운영</a>에 업체를 등록하세요.</div> : null}{dupName && <div style={{ color: C.warn, fontSize: "calc(var(--s,1.3)*14px)", marginTop: 4 }}>같은 이름의 고객이 이미 있습니다. 저장하면 기존 고객을 수정합니다.</div>}</div>
         <div><Label>업종</Label><select style={inp} value={f.industry} onChange={(e) => upd("industry", e.target.value)}>{INDUSTRIES.map((x) => <option key={x}>{x}</option>)}</select></div>
         <div><Label>대표자명</Label><input style={inp} value={f.ceoName} onChange={(e) => upd("ceoName", e.target.value)} /></div>
         <div><Label>대표 나이</Label><input type="number" style={inp} value={f.ceoAge} onChange={(e) => upd("ceoAge", e.target.value)} /></div>
@@ -3725,7 +3733,7 @@ function Onboarding({ onDone }) {
       <Card style={{ width: "100%", maxWidth: 480, borderColor: C.gold + "80", overflow: "hidden" }}>
         <div style={{ padding: 42, textAlign: "center", background: `linear-gradient(135deg,${C.bg},${C.gold}18)` }}>
           <div style={{ letterSpacing: 5, fontSize: 12, color: C.gold, fontWeight: 900, marginBottom: 10 }}>SALES OS</div>
-          <h1 style={{ margin: 0, fontSize: 28 }}>기업컨설팅 세일즈 OS</h1>
+          <h1 style={{ margin: 0, fontSize: 28 }}>영업 도구 모음</h1>
           <p style={{ color: C.textM, marginTop: 10, fontSize: "calc(var(--s,1.3)*16px)" }}>신규 고객 발굴 · 미팅전략 · 교육/법령 업데이트 · 클로징</p>
         </div>
         <div style={{ padding: 32 }}>
@@ -3789,7 +3797,7 @@ function Briefing({ data, setData, setTab, selectCompany, goMeeting, openAdd }) 
         <p style={{ color: C.textS, fontSize: "calc(var(--s,1.3)*17px)", margin: 0, lineHeight: 1.6 }}>법인컨설턴트가 <b>DB를 받은 순간부터 1차 미팅 준비·제안·계약/보류 후속관리까지</b> 놓치지 않게 도와주는 영업 운영 도구입니다.<span className="pcOnly"> 아래 5단계 순서대로 따라가 보세요.</span></p>
         <div style={{ marginTop: 8, padding: "8px 12px", background: C.card, border: `1px solid ${C.bdr}`, borderRadius: 10, color: C.textM, fontSize: "calc(var(--s,1.3)*14px)", lineHeight: 1.6 }}>이 도구는 컨설팅 판단을 대신하지 않습니다. 고객 자료를 빠르게 정리하고, 미팅 전 놓치기 쉬운 포인트를 점검하는 용도이며, 재무 숫자는 반드시 원문 확인이 필요합니다.</div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
-          {[["실제 고객", realN, C.sky], ["샘플 고객", sampleN, C.textM], ["보류", holdN, C.warn], ["계약", contractedN, C.ok]].map((x) => <div key={x[0]} style={{ display: "flex", alignItems: "baseline", gap: 6, background: C.card, border: `1px solid ${C.bdr}`, borderRadius: 999, padding: "6px 14px" }}><span style={{ color: C.textM, fontSize: "calc(var(--s,1.3)*13px)", fontWeight: 700 }}>{x[0]}</span><span style={{ color: x[2], fontWeight: 900, fontSize: "calc(var(--s,1.3)*17px)" }}>{x[1]}</span><span style={{ color: C.textM, fontSize: "calc(var(--s,1.3)*13px)" }}>명</span></div>)}
+          {/* [D-94] 샘플 고객은 없다 — 칸에서 뺐다 */}{[["고객", realN, C.sky], ["보류", holdN, C.warn], ["계약", contractedN, C.ok]].map((x) => <div key={x[0]} style={{ display: "flex", alignItems: "baseline", gap: 6, background: C.card, border: `1px solid ${C.bdr}`, borderRadius: 999, padding: "6px 14px" }}><span style={{ color: C.textM, fontSize: "calc(var(--s,1.3)*13px)", fontWeight: 700 }}>{x[0]}</span><span style={{ color: x[2], fontWeight: 900, fontSize: "calc(var(--s,1.3)*17px)" }}>{x[1]}</span><span style={{ color: C.textM, fontSize: "calc(var(--s,1.3)*13px)" }}>명</span></div>)}
         </div>
         <div className="heroBtns" style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
           <button style={btnP} onClick={() => setPrep(true)}>🎁 계약 준비팩 만들기</button>
@@ -3801,7 +3809,7 @@ function Briefing({ data, setData, setTab, selectCompany, goMeeting, openAdd }) 
       <ContractPrepPack open={prep} initialId={null} data={data} setData={setData} goMeeting={goMeeting} setTab={setTab} onClose={() => setPrep(false)} />
       {(() => { const ps = getPrepStats(data); const m3 = data.mission3 || {}; const allCust2 = getUniqueCustomers(data); const d1 = allCust2.length > 0; const d2 = (ps.packs || 0) > 0 || m3.d2; const d3 = ((ps.kakao || 0) > 0 && (ps.nextSaved || 0) > 0) || m3.d3; const rc = recontactList(data); const missions = [["Day 1", "고객 1명 등록하기", d1], ["Day 2", "계약 준비팩 만들기", d2], ["Day 3", "후속 카톡 복사 + 다음 연락일 저장", d3]]; const doneN = missions.filter((x) => x[2]).length; return <>
         <Card style={{ padding: 18, marginBottom: 16, border: `1px solid ${C.gold}55` }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}><h3 style={{ margin: 0, fontSize: "calc(var(--s,1.3)*18px)" }}>🚀 3일 계약 준비 체험 ({doneN}/3)</h3><span style={{ color: C.textM, fontSize: "calc(var(--s,1.3)*13px)" }}>고객 1명만 등록해도 이 프로그램이 왜 필요한지 바로 확인할 수 있습니다.</span></div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}><h3 style={{ margin: 0, fontSize: "calc(var(--s,1.3)*18px)" }}>✅ 시작 점검 ({doneN}/3)</h3><span style={{ color: C.textM, fontSize: "calc(var(--s,1.3)*13px)" }}>고객 등록 → 계약 준비팩 → 후속 연락까지 한 번 해 보면 흐름이 잡힙니다.</span></div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 8 }}>{missions.map((mi, i) => <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: mi[2] ? C.greenBg : C.bg, borderRadius: 10, border: `1px solid ${mi[2] ? C.ok + "40" : C.bdr}` }}><span style={{ fontSize: "calc(var(--s,1.3)*20px)" }}>{mi[2] ? "✅" : "⬜"}</span><div><div style={{ fontWeight: 800, color: mi[2] ? C.ok : C.text, fontSize: "calc(var(--s,1.3)*14px)" }}>{mi[0]}</div><div style={{ color: C.textM, fontSize: "calc(var(--s,1.3)*13px)" }}>{mi[1]}</div></div></div>)}</div>
         </Card>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>{[["이번 주 계약 준비팩", ps.packs || 0, C.gold], ["복사한 후속 카톡", ps.kakao || 0, C.blue], ["다음 액션 저장", ps.nextSaved || 0, C.ok], ["재접촉 명분 고객", rc.length, C.purple]].map((x) => <div key={x[0]} style={{ flex: "1 1 150px", background: C.card, border: `1px solid ${C.bdr}`, borderRadius: 12, padding: "12px 16px" }}><div style={{ color: C.textM, fontSize: "calc(var(--s,1.3)*13px)", fontWeight: 700 }}>{x[0]}</div><div style={{ color: x[2], fontWeight: 900, fontSize: "calc(var(--s,1.3)*24px)", marginTop: 2 }}>{x[1]}</div></div>)}</div>
@@ -5163,17 +5171,12 @@ function Settings({ data, setData, reset, pinSet, applyLock, removePin, onLockNo
       </div>
       <button style={{ ...btnP, marginTop: 14 }} onClick={() => { setData({ ...data, affordSettings: { greenPerEok: Number(aff.greenPerEok) || 300, yellowPerEok: Number(aff.yellowPerEok) || 600, defMonths: Number(aff.defMonths) || 84, defRate: isFinite(Number(aff.defRate)) ? Number(aff.defRate) : 100 } }); showToast("월납 적정성 기준을 저장했습니다."); }}>저장</button>
     </Card>
-    <Card style={{ padding: 20 }}><h3 style={h3}>④ 데이터 백업 / 복원<Help text="이 앱의 데이터는 이 브라우저에만 저장됩니다. 백업은 데이터를 파일로 내려받아 보관하는 기능, 복원은 그 파일로 데이터를 되돌리는 기능입니다." /></h3><p style={{ color: C.textM, fontSize: "calc(var(--s,1.3)*15px)", lineHeight: 1.6, margin: "0 0 10px" }}>샘플·직접등록·오늘 할 일·설정값까지 포함한 JSON 파일로 백업합니다. 서버 업로드 없이 브라우저에서만 처리됩니다.</p><div style={{ background: C.warnBg, border: `1px solid ${C.warn}40`, borderRadius: 11, padding: "12px 14px", marginBottom: 12, fontSize: "calc(var(--s,1.3)*14px)", color: C.textS, lineHeight: 1.7 }}><b style={{ color: C.text }}>안전하게 쓰는 법</b><div style={{ marginTop: 4 }}>• 데이터는 <b>이 브라우저에만</b> 저장됩니다. 캐시 삭제·다른 PC에서는 보이지 않습니다.</div><div>• <b>주 1회 백업</b>을 권장합니다(위 ‘백업 다운로드’).</div><div>• <b>공용 PC</b> 사용 시 PIN 잠금을 켜고, 사용 후 백업·초기화하세요.</div><div>• 실제 <b>민감정보(주민번호·계좌 등) 입력은 최소화</b>하시길 권합니다.</div></div><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><button style={btnP} onClick={download}>⬇️ 데이터 백업 다운로드</button><label style={{ ...btnS, display: "inline-flex", alignItems: "center", cursor: "pointer" }}>📂 백업 파일 불러오기<input type="file" accept="application/json,.json" onChange={onFile} style={{ display: "none" }} /></label><button style={btnS} onClick={() => copyText(JSON.stringify(data, null, 2), () => showToast("백업을 클립보드에 복사했습니다."))}>백업 클립보드 복사</button></div><div style={{ marginTop: 12 }}><Label>또는 백업 JSON 붙여넣기로 복원</Label><textarea style={{ ...inp, height: 110, resize: "vertical" }} value={backup} onChange={(e) => setBackup(e.target.value)} placeholder="백업 JSON을 붙여넣으세요." /><button style={{ ...btnS, marginTop: 8 }} onClick={() => { try { applyRestore(JSON.parse(backup)); } catch (e) { alert("백업 파일 형식이 올바르지 않습니다."); } }}>붙여넣기 복원</button></div></Card>
-    <Card style={{ padding: 20 }}><h3 style={h3}>⑥ 저장 방식 안내</h3><div style={{ fontSize: "calc(var(--s,1.3)*16px)", color: C.textS, lineHeight: 1.8 }}><div>• [이 OS] 영업 기록은 <b>미래에이아이랩 OS 의 모듈 기록</b>에 저장됩니다. 클라우드 모드면 작업실 안 다른 기기에서도 보입니다.</div><div>• 업체(업체명·대표자)는 <b>고객 운영</b> 업체를 그대로 씁니다. 여기서 지워도 고객 운영 업체는 남습니다.</div><div>• <b>공용 PC에서는 로그아웃에 주의하고</b>, 중요한 고객자료는 정기적으로 백업해주세요. (고객 운영 → 더보기 → 백업 내려받기 — 영업 기록도 함께 담깁니다)</div></div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
-        <button style={btnP} onClick={download}>⬇️ 백업 파일 다운로드</button>
-        <label style={{ ...btnS, display: "inline-flex", alignItems: "center", cursor: "pointer" }}>📂 백업 파일 복원<input type="file" accept="application/json,.json" onChange={onFile} style={{ display: "none" }} /></label>
-      </div>
+    <Card style={{ padding: 20 }}><h3 style={h3}>③ 영업 기록 백업 / 복원<Help text="영업 기록만 파일로 내려받아 보관하거나, 그 파일로 되돌립니다. OS 전체 백업(고객 운영 → 더보기 → 백업 내려받기)에도 영업 기록이 함께 담깁니다." /></h3><p style={{ color: C.textM, fontSize: "calc(var(--s,1.3)*15px)", lineHeight: 1.6, margin: "0 0 10px" }}>영업 기록(고객·오늘 할 일·설정값)만 JSON 파일로 내려받습니다. 파일은 이 컴퓨터로만 내려받아지고 어디에도 올라가지 않습니다.</p><div style={{ background: C.warnBg, border: `1px solid ${C.warn}40`, borderRadius: 11, padding: "12px 14px", marginBottom: 12, fontSize: "calc(var(--s,1.3)*14px)", color: C.textS, lineHeight: 1.7 }}><b style={{ color: C.text }}>안전하게 쓰는 법</b><div style={{ marginTop: 4 }}>• <b>주 1회 백업</b>을 권장합니다 — OS 전체 백업 하나면 영업 기록도 함께 담깁니다.</div><div>• <b>공용 PC</b>에서는 쓰고 나서 로그아웃하세요.</div><div>• 실제 <b>민감정보(주민번호·계좌 등) 입력은 최소화</b>하시길 권합니다.</div></div><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><button style={btnP} onClick={download}>⬇️ 데이터 백업 다운로드</button><label style={{ ...btnS, display: "inline-flex", alignItems: "center", cursor: "pointer" }}>📂 백업 파일 불러오기<input type="file" accept="application/json,.json" onChange={onFile} style={{ display: "none" }} /></label><button style={btnS} onClick={() => copyText(JSON.stringify(data, null, 2), () => showToast("백업을 클립보드에 복사했습니다."))}>백업 클립보드 복사</button></div><div style={{ marginTop: 12 }}><Label>또는 백업 JSON 붙여넣기로 복원</Label><textarea style={{ ...inp, height: 110, resize: "vertical" }} value={backup} onChange={(e) => setBackup(e.target.value)} placeholder="백업 JSON을 붙여넣으세요." /><button style={{ ...btnS, marginTop: 8 }} onClick={() => { try { applyRestore(JSON.parse(backup)); } catch (e) { alert("백업 파일 형식이 올바르지 않습니다."); } }}>붙여넣기 복원</button></div></Card>
+    <Card style={{ padding: 20 }}><h3 style={h3}>④ 저장 방식 안내</h3><div style={{ fontSize: "calc(var(--s,1.3)*16px)", color: C.textS, lineHeight: 1.8 }}><div>• [이 OS] 영업 기록은 <b>미래에이아이랩 OS 의 모듈 기록</b>에 저장됩니다. 클라우드 모드면 작업실 안 다른 기기에서도 보입니다.</div><div>• 업체(업체명·대표자)는 <b>고객 운영</b> 업체를 그대로 씁니다. 여기서 지워도 고객 운영 업체는 남습니다.</div><div>• <b>공용 PC에서는 로그아웃에 주의하고</b>, 중요한 고객자료는 정기적으로 백업해주세요. (고객 운영 → 더보기 → 백업 내려받기 — 영업 기록도 함께 담깁니다)</div></div>
     </Card>
-    <ReleaseChecklist data={data} setData={setData} />
-    <ProblemReport data={data} />
-    <VersionCard />
-    <Card style={{ padding: 20, background: "#2A1515", border: `1px solid ${C.err}66` }}><h3 style={{ ...h3, color: C.err }}>⚠️ 위험 구역</h3><p style={{ color: C.textM, fontSize: "calc(var(--s,1.3)*15px)", lineHeight: 1.6, margin: "0 0 12px" }}>아래 작업은 되돌리기 어렵습니다. 먼저 백업을 받아두시길 권합니다. (샘플만 삭제하려면 위 ‘③ 샘플 데이터 관리’를 이용하세요.)</p><div style={{ background: C.redBg, border: `1px solid ${C.err}40`, borderRadius: 11, padding: 14 }}><div style={{ fontWeight: 800, color: C.err, fontSize: "calc(var(--s,1.3)*15px)", marginBottom: 6 }}>🗑️ 전체 데이터 초기화</div><div style={{ color: C.textS, fontSize: "calc(var(--s,1.3)*14px)", lineHeight: 1.6, marginBottom: 8 }}>모든 고객·설정·PIN이 삭제되며 복구할 수 없습니다. 실행하려면 아래 칸에 <b>초기화</b> 라고 입력하세요.</div><div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}><input style={{ ...inp, width: "auto", marginBottom: 0, maxWidth: 200 }} value={resetText} onChange={(e) => setResetText(e.target.value)} placeholder="초기화" aria-label="초기화 확인 입력" /><button style={{ ...btnP, background: resetText.trim() === "초기화" ? C.err : C.bdrL, color: "#fff", cursor: resetText.trim() === "초기화" ? "pointer" : "not-allowed" }} disabled={resetText.trim() !== "초기화"} onClick={() => { setResetText(""); reset(); }}>전체 초기화 실행</button></div></div></Card>
+    {/* [D-94] 원본의 ‘출시 전 점검(QA 체크리스트)’ · ‘🐞 문제 제보용 정보’ · ‘앱 버전(Release Candidate v0.9)’ 카드와
+        위와 겹치던 백업 단추 한 벌은 뺐다 — 개발 중에 쓰던 것이라 대표 화면에는 뜻이 없다 */}
+    <Card style={{ padding: 20, background: "#2A1515", border: `1px solid ${C.err}66` }}><h3 style={{ ...h3, color: C.err }}>⚠️ 위험 구역</h3><p style={{ color: C.textM, fontSize: "calc(var(--s,1.3)*15px)", lineHeight: 1.6, margin: "0 0 12px" }}>아래 작업은 되돌리기 어렵습니다. 먼저 백업을 받아두시길 권합니다.</p><div style={{ background: C.redBg, border: `1px solid ${C.err}40`, borderRadius: 11, padding: 14 }}><div style={{ fontWeight: 800, color: C.err, fontSize: "calc(var(--s,1.3)*15px)", marginBottom: 6 }}>🗑️ 전체 데이터 초기화</div><div style={{ color: C.textS, fontSize: "calc(var(--s,1.3)*14px)", lineHeight: 1.6, marginBottom: 8 }}>이 영업 도구의 모든 기록·설정이 삭제되며 복구할 수 없습니다(고객 운영 업체는 남습니다). 실행하려면 아래 칸에 <b>초기화</b> 라고 입력하세요.</div><div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}><input style={{ ...inp, width: "auto", marginBottom: 0, maxWidth: 200 }} value={resetText} onChange={(e) => setResetText(e.target.value)} placeholder="초기화" aria-label="초기화 확인 입력" /><button style={{ ...btnP, background: resetText.trim() === "초기화" ? C.err : C.bdrL, color: "#fff", cursor: resetText.trim() === "초기화" ? "pointer" : "not-allowed" }} disabled={resetText.trim() !== "초기화"} onClick={() => { setResetText(""); reset(); }}>전체 초기화 실행</button></div></div></Card>
     <Card style={{ padding: 20, background: C.bg }}><h3 style={{ ...h3, color: C.warn }}>신뢰/리스크 원칙</h3><p style={{ color: C.textS, lineHeight: 1.8, fontSize: "calc(var(--s,1.3)*16px)", margin: 0 }}>세무·절세·가업승계·판례 관련 문구는 항상 “검토 가능성”, “자료 확인 후 판단”, “세무사 검토 권장” 표현을 사용합니다. 고객에게 절세액·감면 여부·지원금 적용 여부를 단정하지 않는 것을 기본 원칙으로 합니다.</p></Card>
   </div>;
 }
@@ -5360,6 +5363,13 @@ export default function App({ tab: tabProp = "briefing", onTab, focus }) {
   return <div className={"appRoot" + (drawerOpen ? " drawer-open" : "")} data-scale={scaleName} data-testid="sales-orig" style={{ background: C.bg, color: C.text, fontFamily: FF, fontSize: "calc(var(--s) * 18px)", borderRadius: 16, overflow: "hidden" }}>
     <style>{`
       .appRoot *{box-sizing:border-box}
+      .appRoot{container:sales / inline-size}
+      /* [D-94] 이 OS 에서는 영업 화면이 OS 목차 옆 칸에 선다 — 원본 휴대폰 규칙(칸 나눔 → 한 줄)을 화면 폭이 아니라 칸 폭으로도 건다 */
+      @container sales (max-width:860px){
+        .appRoot [style*="minmax("],.appRoot [style*="px 1fr"],.appRoot [style*="1.1fr"],.appRoot [style*="repeat(5"],.appRoot [style*="2fr 1fr 1fr"],.appRoot [style*="repeat(4"]{grid-template-columns:1fr !important}
+        .heroBtns{flex-direction:column !important}
+        .heroBtns > *{width:100% !important}
+      }
       .appRoot ::-webkit-scrollbar{width:11px;height:11px}
       .appRoot ::-webkit-scrollbar-thumb{background:${C.bdrL};border-radius:999px;border:2px solid ${C.bg}}
       .appRoot ::-webkit-scrollbar-thumb:hover{background:#94A3B8}
@@ -5449,9 +5459,8 @@ export default function App({ tab: tabProp = "briefing", onTab, focus }) {
         <div className="mobileHeader">
           <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
             <button onClick={() => setDrawerOpen(true)} aria-label="메뉴 열기" title="메뉴" style={{ background: C.bg, border: `1px solid ${C.bdr}`, borderRadius: 10, width: 46, height: 46, color: C.text, fontSize: 24, cursor: "pointer", lineHeight: 1 }}>☰</button>
-            <button onClick={() => histGo(-1)} disabled={!canBack} aria-label="뒤로" title="뒤로" style={{ ...navBtn(canBack), height: 40, minWidth: 40, padding: 0 }}>←</button>
-            <button onClick={() => histGo(1)} disabled={!canFwd} aria-label="앞으로" title="앞으로" style={{ ...navBtn(canFwd), height: 40, minWidth: 40, padding: 0 }}>→</button>
-            <div onClick={() => { setTab("briefing"); setDrawerOpen(false); }} style={{ fontSize: 17, fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>기업컨설팅 세일즈 OS</div>
+            {/* [D-94] 앱 안 ←/→ 는 뺐다 — 화면마다 주소가 있어 브라우저·휴대폰 뒤로 가기가 같은 일을 한다 */}
+            <div onClick={() => { setTab("briefing"); setDrawerOpen(false); }} style={{ fontSize: 17, fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{pageTitle}</div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={() => openAdd("lead")} title="고객 등록" style={{ background: C.blue, border: "none", borderRadius: 10, height: 46, padding: "0 14px", color: "#FFFFFF", fontSize: 16, fontWeight: 800, cursor: "pointer" }}>+ 등록</button>
@@ -5459,10 +5468,7 @@ export default function App({ tab: tabProp = "briefing", onTab, focus }) {
         </div>
         <header className="pcHeader" style={{ position: "sticky", top: 0, zIndex: 40, background: "rgba(255,255,255,.9)", backdropFilter: "blur(8px)", borderBottom: `1px solid ${C.bdr}`, padding: "14px 28px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-            <div style={{ display: "flex", gap: 5 }}>
-              <button onClick={() => histGo(-1)} disabled={!canBack} title="이전 화면으로" aria-label="뒤로" style={navBtn(canBack)}>←<span className="pcOnly" style={{ marginLeft: 4 }}>뒤로</span></button>
-              <button onClick={() => histGo(1)} disabled={!canFwd} title="다음 화면으로" aria-label="앞으로" style={navBtn(canFwd)}><span className="pcOnly" style={{ marginRight: 4 }}>앞으로</span>→</button>
-            </div>
+            {/* [D-94] ‘← 뒤로 / 앞으로 →’ 는 뺐다 — OS 목차와 브라우저 뒤로 가기가 같은 일을 해 두 갈래가 되었다 */}
             <h1 style={{ margin: 0, fontSize: "calc(var(--s,1.3)*30px)" }}>{pageTitle}</h1>
           </div>
         </header>
@@ -5484,10 +5490,10 @@ export default function App({ tab: tabProp = "briefing", onTab, focus }) {
       {tab === "settings" && <TabFrame data={data} setData={setData} screenKey="settings" cfg={GUIDE.settings}><Settings data={data} setData={setData} reset={reset} pinSet={pinSet} applyLock={applyLock} removePin={removePin} onLockNow={() => setLocked(true)} /></TabFrame>}
       </div>
         </div>
-        <footer style={{ borderTop: "1px solid " + C.bdr, padding: 20, textAlign: "center", color: C.textM, fontSize: "calc(var(--s,1.3)*15px)", marginTop: "auto" }}><div style={{ fontSize: "calc(var(--s,1.3)*13px)", color: C.textM, marginBottom: 4 }}>🔒 영업 기록은 미래에이아이랩 OS 의 모듈 기록에 저장됩니다. 업체는 고객 운영 업체를 그대로 씁니다.</div>© 2026 기업컨설팅 세일즈 OS · 미래에이아이랩 OS 모듈</footer>
+        <footer style={{ borderTop: "1px solid " + C.bdr, padding: 20, textAlign: "center", color: C.textM, fontSize: "calc(var(--s,1.3)*15px)", marginTop: "auto" }}><div style={{ fontSize: "calc(var(--s,1.3)*13px)", color: C.textM, marginBottom: 4 }}>🔒 영업 기록은 미래에이아이랩 OS 의 모듈 기록에 저장됩니다. 업체는 고객 운영 업체를 그대로 씁니다.</div></footer>
       </div>
     </div>
-    <CustomerForm open={!!addState} initial={addState?.initial} mode={addState?.mode} defaultDest={addState?.dest} data={data} onSave={registerCustomer} onClose={() => setAddState(null)} />
+    <CustomerForm open={!!addState} initial={addState?.initial} mode={addState?.mode} defaultDest={addState?.dest} data={data} onSave={registerCustomer} onClose={() => setAddState(null)} presetOsId={focus && ![...(data?.leads || []), ...(data?.companies || [])].some((c) => c.id === focus) ? focus : null} />
     <PinSetup open={setupOpen} firstTime onSet={(rec) => { applyLock(rec); setSetupOpen(false); }} onClose={() => { applyLock({ ...lock, prompted: true }); setSetupOpen(false); }} />
   </div>;
 }

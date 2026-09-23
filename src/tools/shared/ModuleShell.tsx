@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState, type ReactNode } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, Menu, X } from 'lucide-react'
 import { sectionAccent, type ToolDefinition } from '../../config/toolRegistry'
 import type { NavAccent } from '../../config/moduleRegistry'
@@ -107,7 +107,7 @@ export function ModuleShell({ tool, section, children }: ModuleShellProps) {
       <nav
         aria-label={`${tool.label} 목차`}
         data-testid="module-nav"
-        className="hidden w-56 shrink-0 flex-col gap-3 xl:flex"
+        className="hidden w-56 shrink-0 flex-col gap-3 xl:sticky xl:top-20 xl:flex xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto" /* D-94: 긴 화면을 내려도 목차가 따라온다 */
       >
         <div className="flex items-center gap-2 px-1">
           <ModuleIcon aria-hidden="true" className="size-4 shrink-0 text-brand-600" />
@@ -153,6 +153,10 @@ function ModuleNavList({
   groups: { name: string; items: NonNullable<ToolDefinition['sections']> }[]
   section: string
 }) {
+  // D-94: 업체에서 연 도구면(?client=) 화면을 옮겨도 그 업체를 놓지 않는다
+  const [params] = useSearchParams()
+  const client = params.get('client')
+  const withClient = (path: string) => (client ? `${path}?client=${encodeURIComponent(client)}` : path)
   return (
     <div className="flex flex-col gap-3">
       {groups.map((g, gi) => (
@@ -170,7 +174,7 @@ function ModuleNavList({
             return (
               <Link
                 key={item.key}
-                to={`${tool.path}/${item.key}`}
+                to={withClient(`${tool.path}/${item.key}`)}
                 data-section={item.key}
                 data-accent={accent}
                 aria-current={on ? 'page' : undefined}

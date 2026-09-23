@@ -21,6 +21,8 @@ import { listLinksForClient, publishUpdate } from '../../services/customerBridge
 import { buildToolPublishInput } from '../../services/toolPublish'
 import { matchesClientSearch } from '../../services/clientOpsSearch'
 import { useToolClient } from './toolClientContext'
+import { ConfirmModal } from '../../components/ui/ConfirmModal'
+import { subjectMismatch, type ToolSubject } from './toolSubject'
 
 export interface ToolResultAttachProps {
   toolKey: string
@@ -33,6 +35,11 @@ export interface ToolResultAttachProps {
   deadlines?: ToolDeadline[]
   /** 미리 골라 둘 업체 (주소의 `?client=` 보다 우선한다) */
   presetClientId?: string
+  /**
+   * 결과가 말하는 회사 (D-94) — 크레탑 보고서처럼 결과 안에 회사가 적혀 있으면 넘긴다.
+   * 붙일 업체와 이름·사업자번호가 다르면 한 번 더 묻는다(다른 회사 보고서를 잘못 붙이지 않게).
+   */
+  subject?: ToolSubject
 }
 
 export function ToolResultAttach(props: ToolResultAttachProps) {
@@ -77,12 +84,18 @@ export function ToolResultAttach(props: ToolResultAttachProps) {
     return list.slice(0, 30)
   }, [clients, query])
 
+  const [mismatch, setMismatch] = useState<{ target: ClientOpsRecord; alsoPublish: boolean } | null>(null)
+
   /** 실제로 붙이는 일 — 시트에서 고른 업체든, 주소로 물고 온 업체든 같은 길을 쓴다 */
-  const attachTo = async (targetId: string, alsoPublish: boolean) => {
+  const attachTo = async (targetId: string, alsoPublish: boolean, confirmed = false) => {
     const list = clients.length > 0 ? clients : await loadClients()
     const target = list.find((c) => c.id === targetId)
     if (!target) {
       showToast('업체를 찾지 못했습니다.')
+      return
+    }
+    if (!confirmed && subjectMismatch(props.subject, target)) {
+      setMismatch({ target, alsoPublish })
       return
     }
     setBusy(true)
@@ -127,6 +140,19 @@ export function ToolResultAttach(props: ToolResultAttachProps) {
 
   return (
     <>
+      <ConfirmModal
+        open={mismatch !== null}
+        title="다른 회사 결과 같습니다"
+        message={`이 결과는 '${props.subject?.name || '다른 회사'}' 의 것으로 보입니다. 그래도 '${mismatch?.target.companyName ?? ''}' 기록에 붙일까요?`}
+        warning="회사명·사업자번호가 붙일 업체와 다릅니다. 보고서를 잘못 올리지 않았는지 확인하세요."
+        confirmLabel="그래도 붙이기"
+        onCancel={() => setMismatch(null)}
+        onConfirm={() => {
+          const m = mismatch
+          setMismatch(null)
+          if (m) void attachTo(m.target.id, m.alsoPublish, true)
+        }}
+      />
       {presetId ? (
         <>
           <Button size="sm" variant="primary" disabled={busy} onClick={() => void attachTo(presetId, false)} data-testid="tool-attach-quick">

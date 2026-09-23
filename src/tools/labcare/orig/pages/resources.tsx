@@ -58,9 +58,9 @@ export default function ResourcesPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-5 @2xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 @4xl:grid-cols-3">
         {/* 템플릿 목록 */}
-        <section className="@2xl:col-span-2">
+        <section className="@4xl:col-span-2">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {visible.map((t) => (
               <button

@@ -156,7 +156,7 @@ export default function ResultCard({
       {/* 코치의 한 줄 결론 */}
       <div className="rounded-3xl bg-gradient-to-br from-blue-600 to-blue-700 p-6 text-white shadow-sm @min-[640px]:p-8">
         <div className="flex items-center gap-2 text-sm font-medium text-blue-100">
-          <span className="text-lg">🤖</span> 코치의 한 줄 결론
+          <span className="text-lg">🧭</span> 코치의 한 줄 결론
         </div>
         <p className="mt-3 text-2xl font-bold leading-snug @min-[640px]:text-3xl" data-testid="pf-conclusion">
           “{conclusion}”
@@ -191,7 +191,7 @@ export default function ResultCard({
       {result.coachMessage && (
         <div className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50/60 p-5">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-lg">
-            🤖
+            🧭
           </span>
           <div>
             <p className="text-xs font-bold text-blue-700">김팀장 한마디</p>

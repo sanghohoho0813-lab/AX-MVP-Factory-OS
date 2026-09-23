@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Lock, Sparkles, Unlock } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { Badge, Section, Surface, type Tone } from '../ui/primitives'
@@ -42,6 +43,7 @@ export function ModuleAccessPanel({ workspaceId }: { workspaceId: string | null 
 
   // 목차가 여러 칸인 모듈만 판다 — 계산기 한 장짜리는 잠그지 않는다
   const modules = TOOLS.filter((t) => t.path !== null && (t.sections?.length ?? 0) > 1)
+  const alwaysOpen = TOOLS.filter((t) => t.path !== null && (t.sections?.length ?? 0) <= 1)
 
   const change = async (key: string, label: string, state: ModuleAccessState) => {
     const next = await setAccess(workspaceId, key, state, today)
@@ -57,6 +59,12 @@ export function ModuleAccessPanel({ workspaceId }: { workspaceId: string | null 
         <p className="t-sub break-keep pb-3 text-slate-600">
           모듈은 따로 열고 닫을 수 있습니다. 잠긴 모듈도 <b>첫 화면은 보입니다</b> — 무엇이 들어 있는지 보여야 하기 때문입니다.
           결제는 아직 붙어 있지 않습니다.
+          {alwaysOpen.length > 0 && (
+            <>
+              {' '}
+              {alwaysOpen.map((t) => t.label).join(' · ')}는 한 장짜리라 잠그지 않고 늘 열려 있습니다.
+            </>
+          )}
         </p>
         <ul className="flex flex-col gap-2" data-testid="module-access-list">
           {modules.map((t) => {
@@ -75,16 +83,28 @@ export function ModuleAccessPanel({ workspaceId }: { workspaceId: string | null 
                     <span className="t-sub font-bold text-slate-900">{t.label}</span>
                     <Badge tone={tone}>{accessLabel(access, today)}</Badge>
                     <span className="t-meta min-w-0 flex-1 truncate text-slate-500">{t.sections?.length ?? 0}화면</span>
+                    {/* D-94: 지금 상태에서 뜻이 있는 단추만 — 열린 모듈에 ‘체험’(열림 → 체험으로 내려감)·‘열기’(아무 일 없음)를 두지 않는다 */}
                     <span className="flex flex-wrap gap-1.5">
-                      <Button variant="ghost" size="sm" data-act="open" onClick={() => void change(t.key, t.label, 'open')}>
-                        열기
-                      </Button>
-                      <Button variant="ghost" size="sm" data-act="trial" onClick={() => void change(t.key, t.label, 'trial')}>
-                        <Sparkles aria-hidden="true" className="size-4" /> 체험
-                      </Button>
-                      <Button variant="ghost" size="sm" data-act="lock" onClick={() => void change(t.key, t.label, 'locked')}>
-                        잠그기
-                      </Button>
+                      {access.state !== 'open' && (
+                        <Button variant={usable ? 'ghost' : 'primary'} size="sm" data-act="open" onClick={() => void change(t.key, t.label, 'open')}>
+                          {access.state === 'trial' && usable ? '정식으로 열기' : '열기'}
+                        </Button>
+                      )}
+                      {access.state === 'locked' && (
+                        <Button variant="ghost" size="sm" data-act="trial" onClick={() => void change(t.key, t.label, 'trial')}>
+                          <Sparkles aria-hidden="true" className="size-4" /> 체험 {TRIAL_DAYS}일
+                        </Button>
+                      )}
+                      {access.state !== 'locked' && (
+                        <Button variant="ghost" size="sm" data-act="lock" onClick={() => void change(t.key, t.label, 'locked')}>
+                          잠그기
+                        </Button>
+                      )}
+                      {usable && t.path && (
+                        <Link to={t.path} className="t-sub inline-flex items-center self-center px-2 font-medium text-brand-700 hover:underline" data-act="go">
+                          모듈로 가기 →
+                        </Link>
+                      )}
                     </span>
                   </div>
                 </Surface>

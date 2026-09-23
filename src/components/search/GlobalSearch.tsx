@@ -5,6 +5,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Search, CornerDownLeft } from 'lucide-react'
 import { organizationRepository, projectRepository } from '../../repositories'
@@ -39,19 +40,27 @@ export function GlobalSearch() {
   const close = useCallback(() => { setOpen(false); setQuery(''); setActive(0) }, [])
 
   // 전역 단축키
+  // D-94: 붙잡는 단계(capture)에서 먼저 듣는다 — 검색 창이 열려 있을 때 Esc 는 검색 창만 닫고,
+  // 그 아래 모듈 창(영업 고객 등록 등)까지 같이 닫히지 않게 전파를 멈춘다.
+  const openRef = useRef(open)
+  useEffect(() => {
+    openRef.current = open
+  }, [open])
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const cmdK = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k'
       const slash = e.key === '/' && !/input|textarea|select/i.test((e.target as HTMLElement)?.tagName ?? '')
       if (cmdK || slash) {
         e.preventDefault()
+        e.stopImmediatePropagation()
         setOpen(true)
-      } else if (e.key === 'Escape') {
+      } else if (e.key === 'Escape' && openRef.current) {
+        e.stopImmediatePropagation()
         close()
       }
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [close])
 
   useEffect(() => {
@@ -135,8 +144,9 @@ export function GlobalSearch() {
         <kbd className="ml-auto hidden shrink-0 rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[0.75rem] font-medium text-slate-400 2xl:inline">Ctrl K</kbd>
       </button>
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-navy-950/40 p-4 pt-[10vh]" role="dialog" aria-modal="true" aria-label="빠른 이동 검색">
+      {/* D-94: body 로 띄운다 — 머리줄 안에 있으면 머리줄 층(z) 에 갇혀 모듈 창(영업 고객 등록 등) 뒤에 깔렸다 */}
+      {open && createPortal(
+        <div className="fixed inset-0 z-[10000] flex items-start justify-center bg-navy-950/40 p-4 pt-[10vh]" role="dialog" aria-modal="true" aria-label="빠른 이동 검색">
           <button type="button" aria-label="검색 닫기" className="absolute inset-0 cursor-default" onClick={close} />
           <div className="relative flex max-h-[70vh] w-full max-w-xl flex-col overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white shadow-(--shadow-overlay)">
             <div className="flex items-center gap-2 border-b border-slate-100 px-4">
@@ -180,7 +190,8 @@ export function GlobalSearch() {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   )

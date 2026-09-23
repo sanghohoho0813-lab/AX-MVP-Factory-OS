@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
-import { moduleForPath } from '../../config/moduleRegistry'
+import { screenTitleForPath } from '../../config/moduleRegistry'
 
 interface PageHeaderProps {
   title: string
@@ -20,7 +20,7 @@ interface PageHeaderProps {
  */
 export function PageHeader({ title, description, actions }: PageHeaderProps) {
   const { pathname } = useLocation()
-  const sameAsHeader = moduleForPath(pathname)?.label === title
+  const sameAsHeader = screenTitleForPath(pathname) === title
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">

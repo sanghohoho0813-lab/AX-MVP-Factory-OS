@@ -50,7 +50,7 @@ export function ToolResultsCard({ record, onChange }: { record: ClientOpsRecord;
                   {isOpen ? '접기' : '요약 보기'}
                 </Button>
                 {tool?.path && (
-                  <Link to={tool.path} className="t-sub font-medium text-brand-700 hover:underline">
+                  <Link to={`${tool.path}?client=${encodeURIComponent(record.id)}`} className="t-sub font-medium text-brand-700 hover:underline">
                     {tool.label} 열기
                   </Link>
                 )}

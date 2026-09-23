@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "../next";
 import Layout from "../components/Layout";
 import { osClientList } from "../store";
+import { useSearchParams } from "../nav";
 import PageGuide from "../components/PageGuide";
 import StatusBadge from "../components/StatusBadge";
 import {
@@ -27,7 +28,7 @@ const EMPTY_FORM = {
   name: "", industry: "", labType: "연구개발전담부서" as LabType,
   businessType: "법인사업자" as "법인사업자" | "개인사업자", ceoName: "",
   address: "", foundedDate: "", certifiedDate: "", employeeCount: 10,
-  researcherCount: 1, labName: "", consultant: "김상호", coreIssue: "",
+  researcherCount: 1, labName: "", consultant: "", coreIssue: "", // [D-94] 원본 기본 담당자(김상호)는 비운다
   labRegistrationNumber: "", osId: "",
   researchersPayrollTotal: 0, rndMaterialCost: 0, rndOtherCost: 0,
   priorYearRndCost: 0, currentYearRndCost: 0,
@@ -35,6 +36,14 @@ const EMPTY_FORM = {
   businessTaxType: "" as "" | "법인세" | "종합소득세",
   estimatedTaxCreditRate: 0, taxMemo: "",
 };
+
+/** [D-94] 고객 운영 업체 하나로 추가 폼 칸 채우기 (고르기 칸 · 업체에서 연 경우 공용) */
+function fillFromOs<F extends typeof EMPTY_FORM>(f: F, id: string): F {
+  const os = osClientList().find((c) => c.id === id);
+  if (!os) return { ...f, osId: "", name: "" };
+  const emp = Number(String(os.employeeCount || "").replace(/[^0-9]/g, "")) || 0;
+  return { ...f, osId: os.id, name: os.companyName, ceoName: os.representativeName || os.contactName || f.ceoName, industry: f.industry || os.industry || "", foundedDate: os.establishedAt || f.foundedDate, employeeCount: emp || f.employeeCount, businessType: os.corporateNumber ? "법인사업자" : f.businessType, address: os.businessAddress || f.address };
+}
 
 function findOsClientByName(name: string) {
   const norm = (x: string) => x.replace(/\(주\)|㈜|주식회사|\s+/g, "");
@@ -47,6 +56,14 @@ export default function ClientsPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  // [D-94] 업체 상세에서 열었는데 아직 연구소 고객사가 아니면 — 그 업체를 골라 둔 채 추가 창을 연다
+  const sp = useSearchParams();
+  const addId = sp.get("add");
+  useEffect(() => {
+    if (!addId || getClients().some((c) => c.id === addId)) return;
+    setForm((f) => fillFromOs(f, addId));
+    setOpen(true);
+  }, [addId]);
   const [search, setSearch] = useState("");
   const [fIndustry, setFIndustry] = useState("전체");
   const [fType, setFType] = useState<"전체" | LabType>("전체");
@@ -223,11 +240,11 @@ export default function ClientsPage() {
       </section>
 
       {/* 데스크톱 테이블 */}
-      <section className="hidden rounded-2xl border border-slate-200 bg-white shadow-card @2xl:block">
+      <section className="hidden rounded-2xl border border-slate-200 bg-white shadow-card @min-[1024px]:block">{/* [D-94] OS 목차 옆 칸이 표(1150px)보다 좁으면 카드로 */}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1150px] text-base">
             <thead>
-              <tr className="border-b border-slate-100 text-left text-sm font-bold uppercase tracking-wide text-slate-500">
+              <tr className="whitespace-nowrap border-b border-slate-100 text-left text-sm font-bold uppercase tracking-wide text-slate-500">
                 <th className="px-5 py-3.5">고객사 / 대표자</th>
                 <th className="px-5 py-3.5">업종</th>
                 <th className="px-5 py-3.5">유형 / 연구원</th>
@@ -244,7 +261,7 @@ export default function ClientsPage() {
                 <tr key={c.id} data-client={c.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60">
                   <td className="px-5 py-4">
                     <Link href={`/clients/${c.id}`} className="whitespace-nowrap text-lg font-bold text-slate-900 hover:text-navy-700">{c.name}</Link>
-                    <div className="flex items-center gap-1.5 text-sm text-slate-500">
+                    <div className="flex items-center gap-1.5 whitespace-nowrap text-sm text-slate-500">
                       <span className={`whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-bold ${c.businessType === "개인사업자" ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-500"}`}>{c.businessType ?? "법인사업자"}</span>
                       {c.ceoName} 대표
                     </div>
@@ -295,9 +312,9 @@ export default function ClientsPage() {
       </section>
 
       {/* 모바일 카드 */}
-      <section className="space-y-3 @2xl:hidden">
+      <section className="space-y-3 @min-[1024px]:hidden">
         {filtered.map((c) => (
-          <div key={c.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-card">
+          <div key={c.id} data-client={c.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-card">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <Link href={`/clients/${c.id}`} className="text-lg font-bold text-slate-900">{c.name}</Link>
@@ -363,12 +380,7 @@ function AddClientModal({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div><label className={labelCls}>회사명 * (고객 운영 업체에서 고르기)</label>
               <select className={field} value={form.osId} required data-testid="lab-client-pick"
-                onChange={(e) => {
-                  const os = osClientList().find((c) => c.id === e.target.value);
-                  if (!os) { setForm((f) => ({ ...f, osId: "", name: "" })); return; }
-                  const emp = Number(String(os.employeeCount || "").replace(/[^0-9]/g, "")) || 0;
-                  setForm((f) => ({ ...f, osId: os.id, name: os.companyName, ceoName: os.representativeName || os.contactName || f.ceoName, industry: f.industry || os.industry || "", foundedDate: os.establishedAt || f.foundedDate, employeeCount: emp || f.employeeCount, businessType: os.corporateNumber ? "법인사업자" : f.businessType, address: os.businessAddress || f.address }));
-                }}>
+                onChange={(e) => setForm((f) => fillFromOs(f, e.target.value))}>
                 <option value="">업체 고르기</option>
                 {osClientList().filter((c) => c.archivedAt === null && !getClients().some((x) => x.id === c.id)).map((c) => (
                   <option key={c.id} value={c.id}>{c.companyName}</option>
@@ -396,7 +408,7 @@ function AddClientModal({
               </select>
             </div>
             <div><label className={labelCls}>고용지원금 Tip (자동)</label>
-              <p className="mt-1 whitespace-nowrap rounded-lg bg-sky-50 px-3.5 py-2.5 text-base font-bold text-sky-700 ring-1 ring-inset ring-sky-200">
+              <p className="mt-1 break-keep rounded-lg bg-sky-50 px-3.5 py-2.5 text-base font-bold text-sky-700 ring-1 ring-inset ring-sky-200">{/* [D-94] 옆 칸으로 넘치던 것 — 줄바꿈 허용 */}
                 💼 {getHiringSupportTip({ employeeCount: Number(form.employeeCount) || 0, researcherCount: Number(form.researcherCount) || 0, coreIssue: form.coreIssue })}
               </p>
             </div>

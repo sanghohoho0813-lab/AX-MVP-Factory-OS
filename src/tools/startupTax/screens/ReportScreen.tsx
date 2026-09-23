@@ -14,11 +14,11 @@ import { Button } from '../../../components/ui/Button'
 import { Badge, MetricTile, Section, Surface, type Tone } from '../../../components/ui/primitives'
 import { judge, VERDICT_EMOJI, VERDICT_LABEL } from '../lib/judgement'
 import { buildSummaryText } from '../lib/summary'
-import { EMPTY_FORM } from '../lib/formDefaults'
-import type { FormData, Verdict } from '../types'
+import type { Verdict } from '../types'
+import { loadStartupTaxForm } from '../lib/formStore'
+import { useToolClient } from '../../shared/toolClientContext'
+import { ToolResultAttach } from '../../shared/ToolResultAttach'
 import PrintSheet from '../orig/components/PrintSheet'
-
-const STORAGE_KEY = 'axmvp.tools.startupTax'
 
 const VERDICT_TONE: Record<Verdict, Tone> = {
   good: 'success',
@@ -27,19 +27,11 @@ const VERDICT_TONE: Record<Verdict, Tone> = {
   bad: 'danger',
 }
 
-function loadForm(): FormData | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    return { ...EMPTY_FORM, ...(JSON.parse(raw) as Partial<FormData>) }
-  } catch {
-    return null
-  }
-}
-
 export function StartupTaxReportScreen() {
   const [copied, setCopied] = useState(false)
-  const form = useMemo(() => loadForm(), [])
+  // 업체에서 열었으면 그 업체의 판정만 (D-94) — 다른 업체 판정이 섞여 나오지 않게
+  const { clientId, clientName } = useToolClient()
+  const form = useMemo(() => loadStartupTaxForm(clientId), [clientId])
   const result = useMemo(() => (form ? judge(form) : null), [form])
 
   if (!form || !result) {
@@ -47,7 +39,7 @@ export function StartupTaxReportScreen() {
       <Surface edge="brand" showEdge>
         <p className="t-sub break-keep text-slate-600" data-testid="startup-report-empty">
           아직 판정한 내용이 없습니다.{' '}
-          <Link to="/tools/startup-tax/judge" className="font-bold text-brand-700 hover:underline">
+          <Link to={clientId ? `/tools/startup-tax/judge?client=${encodeURIComponent(clientId)}` : '/tools/startup-tax/judge'} className="font-bold text-brand-700 hover:underline">
             1분 판정
           </Link>{' '}
           에서 여덟 가지를 고르면 여기에 결과서가 만들어집니다.
@@ -70,6 +62,17 @@ export function StartupTaxReportScreen() {
 
   return (
     <div className="flex flex-col gap-5" data-testid="startup-report">
+      <div className="flex flex-wrap items-center justify-between gap-2" data-testid="startup-report-head">
+        <p className="t-sub font-bold text-slate-800">{clientName ? `${clientName} 창업감면 판정 결과서` : '창업감면 판정 결과서 (업체를 고르지 않은 판정)'}</p>
+        <ToolResultAttach
+          toolKey="startup-tax"
+          title="창업감면 판정"
+          verdict={result.overall}
+          verdictLabel={`${VERDICT_EMOJI[result.overall]} ${VERDICT_LABEL[result.overall]}`}
+          summary={summary}
+          data={{ form }}
+        />
+      </div>
       <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         <MetricTile
           label="종합 판정"

@@ -91,7 +91,8 @@ export function ModuleGate({ tool, section, children }: ModuleGateProps) {
             {tool.desc}
           </p>
           <p className="t-meta break-keep text-slate-500">
-            이 모듈의 첫 화면(대시보드)은 잠겨 있어도 볼 수 있습니다. 나머지 화면은 열어야 씁니다.
+            {/* D-94: 첫 화면 이름은 모듈마다 다르다(크레탑은 ‘보고서 분석’) — ‘대시보드’ 로 박아 두지 않는다 */}
+            이 모듈의 첫 화면(‘{tool.sections?.[0]?.label ?? '첫 화면'}’)은 잠겨 있어도 볼 수 있습니다. 나머지 화면은 열어야 씁니다.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="primary" onClick={() => void open('open')} data-testid="module-unlock">

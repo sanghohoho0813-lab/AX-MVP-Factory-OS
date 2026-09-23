@@ -85,9 +85,9 @@ export default function CheckPage() {
         </Link>
       }
     >
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 @2xl:grid-cols-3">
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 @4xl:grid-cols-3">
         {/* 체크리스트 */}
-        <div className="space-y-5 @2xl:col-span-2">
+        <div className="space-y-5 @4xl:col-span-2">
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-card">
             <label className="text-sm font-semibold text-slate-700">점검 대상 월</label>
             <input

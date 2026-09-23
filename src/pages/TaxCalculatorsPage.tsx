@@ -29,8 +29,30 @@ import {
 
 const STORAGE_PREFIX = 'axmvp.tax.'
 
+/** D-94: 기본값도 금액 칸은 처음부터 쉼표로 (예전에는 칸을 한 번 눌렀다 떼야 쉼표가 붙었다) */
+function displayDefaults(calc: Calculator): Values {
+  const out = defaultValues(calc)
+  const fields = [...(calc.shared ?? []), ...calc.subs.flatMap((s) => s.groups)].flatMap((g) => g.fields)
+  for (const f of fields) {
+    if (isRowsField(f)) {
+      const amountCols = f.columns.filter((c) => c.type === 'amount').map((c) => c.key)
+      const rows = out[f.id]
+      if (amountCols.length > 0 && Array.isArray(rows)) {
+        out[f.id] = rows.map((r) => {
+          const next = { ...r }
+          for (const k of amountCols) if (typeof next[k] === 'string') next[k] = withCommas(next[k])
+          return next
+        })
+      }
+    } else if (f.type === 'amount' && typeof out[f.id] === 'string') {
+      out[f.id] = withCommas(out[f.id] as string)
+    }
+  }
+  return out
+}
+
 function loadValues(calc: Calculator): Values {
-  const base = defaultValues(calc)
+  const base = displayDefaults(calc)
   try {
     const raw = localStorage.getItem(STORAGE_PREFIX + calc.key)
     if (!raw) return base
@@ -108,6 +130,9 @@ export function TaxCalculatorsPage() {
 
   const pick = (c: string, s?: string) => {
     const next = new URLSearchParams()
+    // D-94: 업체에서 연 계산기면(?client=) 계산기를 바꿔도 그 업체를 놓지 않는다
+    const client = params.get('client')
+    if (client) next.set('client', client)
     next.set('c', c)
     if (s) next.set('s', s)
     setParams(next)
@@ -123,7 +148,7 @@ export function TaxCalculatorsPage() {
     setValues((cur) => ({ ...cur, [f.id]: [...((cur[f.id] as RowValues[]) ?? []), { ...(f.newRow ?? {}) }] }))
   const removeRow = (id: string, i: number) =>
     setValues((cur) => ({ ...cur, [id]: ((cur[id] as RowValues[]) ?? []).filter((_, j) => j !== i) }))
-  const reset = () => setValues(defaultValues(calc))
+  const reset = () => setValues(displayDefaults(calc))
 
   const renderField = (f: AnyField) => {
     if (isRowsField(f)) return renderRows(f)

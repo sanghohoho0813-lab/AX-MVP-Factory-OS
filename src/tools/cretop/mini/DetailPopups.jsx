@@ -1,16 +1,26 @@
 // 크레탑 미니앱 — 상세정보/대표자/사업장/관계회사/거래처 팝업. 크레탑 원문 추출값 표시.
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { T, FF } from "./theme.js";
 
 const FZ = (n) => Math.round(n * 1.35 * 10) / 10;   // 팝업 글씨 약 +35%(가독성)
 const overlay = { position: "fixed", inset: 0, background: "rgba(15,23,42,.5)", zIndex: 80, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "0 14px", overflowY: "auto" };
 const panel = { width: "100%", maxWidth: 680, margin: "6vh 0 40px", background: "#fff", borderRadius: 16, boxShadow: "0 12px 40px rgba(15,23,42,.25)", fontFamily: FF, color: T.ink };
 
+// [D-94] Esc 로 닫기 — 원본 팝업은 바깥 누르기·✕ 로만 닫혔다
+function useEscClose(onClose) {
+  useEffect(() => {
+    const f = (e) => { if (e.key === "Escape" && onClose) onClose(); };
+    window.addEventListener("keydown", f);
+    return () => window.removeEventListener("keydown", f);
+  }, [onClose]);
+}
+
 // sections: [{ label, value }]  value=null/"" → '크레탑 정보 없음'
 export function InfoModal({ title, subtitle, sections, onClose }) {
+  useEscClose(onClose);
   return (
     <div style={overlay} onClick={onClose}>
-      <div style={panel} onClick={(e) => e.stopPropagation()}>
+      <div style={panel} role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div style={{ padding: "15px 18px", borderBottom: `1px solid ${T.line}`, position: "sticky", top: 0, background: "#fff", borderTopLeftRadius: 16, borderTopRightRadius: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <div style={{ fontSize: FZ(16), fontWeight: 900 }}>{title}</div>
@@ -43,12 +53,13 @@ export function RawTextModal({ text, pages, onClose }) {
   const [copied, setCopied] = useState("");
   const copy = (key, val) => { try { if (typeof navigator !== "undefined" && navigator.clipboard) navigator.clipboard.writeText(val || "").then(() => { setCopied(key); setTimeout(() => setCopied(""), 1500); }); } catch (e) {} };
   const full = text || (pages || []).map((p) => `===== page ${p.pageNo} =====\n${p.text}`).join("\n\n");
+  useEscClose(onClose);
   return (
     <div style={overlay} onClick={onClose}>
-      <div style={{ ...panel, maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
+      <div style={{ ...panel, maxWidth: 560 }} role="dialog" aria-modal="true" aria-label="원문 텍스트" onClick={(e) => e.stopPropagation()}>
         <div style={{ padding: "15px 18px", borderBottom: `1px solid ${T.line}`, position: "sticky", top: 0, background: "#fff", borderTopLeftRadius: 16, borderTopRightRadius: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ fontSize: FZ(16), fontWeight: 900 }}>🔎 원문 텍스트(추출 디버그)</div>
+            <div style={{ fontSize: FZ(16), fontWeight: 900 }}>🔎 원문 텍스트 (PDF 에서 읽은 글)</div>
             <div style={{ fontSize: FZ(11.5), color: T.mute, marginTop: 2 }}>{pages && pages.length ? `${pages.length}쪽` : "텍스트 입력"} · 추출이 비면 이 내용을 복사해 전달해주세요</div>
           </div>
           <button onClick={onClose} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: FZ(20), color: T.mute }}>✕</button>
@@ -149,9 +160,10 @@ function SectionBody({ fmt, raw }) {
 // 이해관계자 목록 팝업(관계회사/거래처) — groups:[{ label, source, noData, note, rows:["이름 12.3%", …] }]
 export function StakeModal({ title, subtitle, groups, onClose }) {
   const splitRow = (r) => { const m = String(r).match(/^(.*?)[\s]*(\d{1,3}(?:\.\d+)?\s*%)\s*$/); return m ? [m[1].trim(), m[2].replace(/\s+/g, "")] : [String(r).trim(), null]; };
+  useEscClose(onClose);
   return (
     <div style={overlay} onClick={onClose}>
-      <div style={panel} onClick={(e) => e.stopPropagation()}>
+      <div style={panel} role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div style={{ padding: "15px 18px", borderBottom: `1px solid ${T.line}`, position: "sticky", top: 0, background: "#fff", borderTopLeftRadius: 16, borderTopRightRadius: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <div style={{ fontSize: FZ(16), fontWeight: 900 }}>{title}</div>
@@ -194,9 +206,10 @@ export function StakeModal({ title, subtitle, groups, onClose }) {
 }
 
 export function DetailModal({ title, subtitle, sections, onClose }) {
+  useEscClose(onClose);
   return (
     <div style={overlay} onClick={onClose}>
-      <div style={panel} onClick={(e) => e.stopPropagation()}>
+      <div style={panel} role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div style={{ padding: "15px 18px", borderBottom: `1px solid ${T.line}`, position: "sticky", top: 0, background: "#fff", borderTopLeftRadius: 16, borderTopRightRadius: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <div style={{ fontSize: FZ(16), fontWeight: 900 }}>{title}</div>

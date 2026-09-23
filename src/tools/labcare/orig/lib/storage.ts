@@ -983,3 +983,21 @@ export function generateSampleData(count: number): void {
   write(NOTES_KEY, [...getNotes(), ...newNotes]);
   write(CHANGEREC_KEY, [...getChangeRecords(), ...newChanges]);
 }
+
+/* ───────────────── 현장조사 대비 체크 (D-94) ─────────────────
+ * 원본은 ‘데모 체크’ 로 화면 안에서만 들고 있었다(나가면 사라지고, 처음부터 8개가 체크돼 있었다).
+ * 이 OS 에서는 고객사마다 모듈 기록에 남긴다 — 처음은 빈 체크.
+ */
+const INSPECTION_KEY = "pmsaas:inspection:v1";
+
+export function getInspectionChecks(clientId: string): string[] {
+  if (!clientId) return [];
+  const all = read<Record<string, string[]>>(INSPECTION_KEY, {});
+  return Array.isArray(all[clientId]) ? all[clientId] : [];
+}
+
+export function setInspectionChecks(clientId: string, keys: string[]): void {
+  if (!clientId) return;
+  const all = read<Record<string, string[]>>(INSPECTION_KEY, {});
+  write(INSPECTION_KEY, { ...all, [clientId]: keys });
+}
