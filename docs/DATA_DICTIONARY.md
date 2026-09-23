@@ -48,6 +48,7 @@
 - `axmvp.tools.<key>` — 도구함 입력값(창업감면 `startupTax` · 크레탑 `cretop` · 고용지원금 `employment.*` · 연구소 `labcare.*` · 정책자금 `policyFunding` · 영업 도구 `salesKit`). 참고용 입력이라 백업에 넣지 않는다 (D-88).
 - 도구 결과는 localStorage 가 아니라 업체 레코드 `operations_clients.payload.toolResults[]` 에 붙는다 — `{id, toolKey, title, verdict, verdictLabel, summary, data, deadlines, createdAt, publishedUpdateId}`. 고객 노출 **P**(요약 `summary` 만, 발행했을 때만) · 민감도 M · 상한 50건 (D-88).
 - `toolResults[].deadlines[]` — 도구가 계산한 기한 `{date, title, note}`. 달력·오늘 화면이 종류 `tool` 로 함께 보여 준다. 고객 노출 **N** · 결과 한 건당 24개까지 (D-89).
+- 서류 칸 3종이 늘었다 (D-90) — `payrollRoster`(4대보험 가입자 명부, 3개월) · `cretopReport`(크레탑 기업종합보고서, 6개월) · `financialStatements`(최근 3개년 재무제표, 12개월). 셋 다 파일이 필요하고, 명부는 민감 자료다. 고객 노출 **N**.
 - 백업 파일(`client-ops-backup-*.json`) 2판에는 `toolInputs` 가 들어간다 — `axmvp.tools.*` 키와 그 값. 고객 노출 **N**. 1판 파일(없는 것)도 그대로 읽힌다 (D-89).
 
 `axmvp.v1.{operations_clients, ops_journal_entries, customer_events, portal_client_links, portal_updates, portal_requests, portal_documents}` — 로컬 백업(설정 > 데이터)에 함께 포함된다. 세금 계산기 입력은 `axmvp.tax.<계산기>` 에 따로 남는다(백업 대상 아님 — 참고용 계산 입력이지 고객 기록이 아니다, D-85). 로컬 모드의 고객 이벤트는 "샘플 만들기"로만 생기며 payload 에 `demo:true` 가 붙는다.
