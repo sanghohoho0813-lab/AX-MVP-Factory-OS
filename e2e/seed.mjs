@@ -20,7 +20,7 @@ const clients = [
     contactName: '김대표',
     contactPhone: '010-2345-6789',
     businessNumber: '123-45-67890',
-    corporateNumber: '110111-1234567',
+    corporateNumber: '134511-0022334',
     representativeName: '김대표',
     representativeBirth: '1978-05-10',
     establishedAt: '2019-03-02',
