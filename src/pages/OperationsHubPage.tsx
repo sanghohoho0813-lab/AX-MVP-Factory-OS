@@ -50,7 +50,7 @@ import {
   replaceAllClients,
   saveClient,
 } from '../services/clientOpsService'
-import { downloadBackup, mergeBackup, parseBackup, parseBackupToolInputs, writeToolInputs, type MergeMode } from '../services/clientOpsBackup'
+import { downloadBackup, MODULE_DATA_PREFIX, mergeBackup, parseBackup, parseBackupToolInputs, writeToolInputs, type MergeMode } from '../services/clientOpsBackup'
 import {
   buildAllAlerts,
   clientOpsProgress,
@@ -281,12 +281,16 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       const toolCount = writeToolInputs(restorePrompt?.toolInputs)
       await load()
       setRestorePrompt(null)
-      const toolNote = toolCount > 0 ? ` · 도구 입력값 ${toolCount}개` : ''
+      const toolNote = toolCount > 0 ? ` · 도구·모듈 기록 ${toolCount}개` : ''
       showToast(
         mode === 'merge'
           ? `복원했습니다. 추가 ${result.added}곳 · 갱신 ${result.updated}곳 · 유지 ${result.kept}곳${toolNote}`
           : `백업 내용으로 바꿨습니다. 고객 ${result.records.length}곳${toolNote}`,
       )
+      // D-94: 모듈 기록까지 되돌렸으면 한 번 새로 연다 — 열려 있던 모듈이 옛 기록을 들고 있다가 덮어쓰지 않게
+      if (Object.keys(restorePrompt?.toolInputs ?? {}).some((k) => k.startsWith(MODULE_DATA_PREFIX))) {
+        window.setTimeout(() => window.location.reload(), 1500)
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '백업을 불러오지 못했습니다.')
     } finally {
@@ -445,7 +449,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       >
         <p className="text-[0.98rem] break-keep text-slate-700">
           백업에 고객 {restorePrompt?.clients.length ?? 0}곳
-          {Object.keys(restorePrompt?.toolInputs ?? {}).length > 0 && ` · 도구 입력값 ${Object.keys(restorePrompt?.toolInputs ?? {}).length}개`} 가 들어 있습니다.
+          {Object.keys(restorePrompt?.toolInputs ?? {}).length > 0 && ` · 도구·모듈 기록 ${Object.keys(restorePrompt?.toolInputs ?? {}).length}개`} 가 들어 있습니다.
         </p>
         <ul className="mt-3 list-disc space-y-1 pl-5 text-[0.92rem] break-keep text-slate-600">
           <li><strong>합치기</strong> — 같은 업체는 최근에 수정한 쪽을 남기고, 없던 업체는 추가합니다.</li>

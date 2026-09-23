@@ -107,6 +107,18 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(400)
   check('크레탑: 분석 이력에 남는다(모듈 기록)', (await page.getByTestId('cretop-mini-history').innerText()).includes('세방형'))
   await page.keyboard.press('Escape')
+
+  // D-94: PDF 로 올려도 재무제표 연도가 '?' 없이 뜬다 (원본과 같은 pdf.js 4 계열로 글자를 뽑는다)
+  await page.goto(BASE + '/tools/cretop', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  await page.getByLabel('크레탑 보고서 파일').setInputFiles(new URL('./fixtures/cretop-sample.pdf', import.meta.url).pathname)
+  await page.waitForTimeout(2500)
+  await page.getByTestId('cretop-run').click()
+  await page.waitForTimeout(1200)
+  const pdfDetail = await miniTab('detail')
+  const qYears = (pdfDetail.match(/(^|\n)\?(\n|$)/g) || []).length
+  check('크레탑 PDF: 재무 상세에 연도 ? 가 없다', qYears === 0 && pdfDetail.includes('2024년') && pdfDetail.includes('2022년'), `?=${qYears}`)
+  check('크레탑 PDF: 제조원가·이익잉여금 표도 읽힌다', /제조원가/.test(pdfDetail) && /이익잉여금/.test(pdfDetail))
   await page.goto(BASE + '/tools', { waitUntil: 'networkidle' })
 
   // 정책자금
@@ -226,6 +238,13 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     check(`원본 화면: ${sec}`, (await page.getByTestId('emp-orig').innerText()).includes(word), (await page.getByTestId('emp-orig').innerText()).slice(0, 120))
   }
   check('설정: 화면 잠금(PIN)은 없다', !(await page.getByTestId('emp-orig').innerText()).includes('화면 잠금'))
+  // D-94: Ctrl+K 는 OS 전체 검색 하나만 연다 (원본 검색창이 같이 열리지 않는다)
+  await page.goto(BASE + '/tools/employment', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  await page.keyboard.press('Control+k')
+  await page.waitForTimeout(500)
+  check('Ctrl+K: OS 검색만 뜬다', (await page.getByPlaceholder('고객사·프로젝트·할 일·도구 검색').count()) === 1 && (await page.getByPlaceholder('업체명, 직원명, 지원금명으로 검색…').count()) === 0)
+  await page.keyboard.press('Escape')
 
   /* ---- D-92: 연구소 — 원본 화면 그대로 · 고객사는 고객 운영 업체에서 고른다 ---- */
   await page.goto(BASE + '/tools/labcare/clients', { waitUntil: 'networkidle' })
@@ -469,6 +488,20 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     const w = await page.evaluate(() => document.documentElement.scrollWidth)
     check(`390 ${p}: 가로 넘침 없음`, w <= 390, `${w}px`)
   }
+  // D-94: 크레탑 하단 탭이 화면에 붙어 따라오고, 맨 아래 내용을 가리지 않는다
+  await page.goto(BASE + '/tools/cretop', { waitUntil: 'networkidle' })
+  await page.getByRole('button', { name: '텍스트 붙여넣기' }).click()
+  await page.getByLabel('크레탑 원문').fill(SEBANG)
+  await page.getByTestId('cretop-run').click()
+  await page.waitForTimeout(900)
+  await page.locator('[data-testid="cretop-mini-tabs"] button[data-tab="summary"]').click()
+  await page.waitForTimeout(400)
+  const tabsTopAtStart = await page.evaluate(() => document.querySelector('[data-testid="cretop-mini-tabs"]').getBoundingClientRect().top)
+  check('390 크레탑: 하단 탭이 처음부터 화면 안에 보인다', tabsTopAtStart < 844, String(Math.round(tabsTopAtStart)))
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+  await page.waitForTimeout(300)
+  const gap = await page.evaluate(() => { const t = document.querySelector('[data-testid="cretop-mini-tabs"]').getBoundingClientRect(); const r = document.querySelector('#mini-results'); const last = (r.lastElementChild || r).getBoundingClientRect(); return Math.round(t.top - last.bottom) })
+  check('390 크레탑: 맨 아래까지 내리면 마지막 내용이 탭 위에 온전히 보인다', gap >= 0, `${gap}px`)
   await ctx.close()
 }
 

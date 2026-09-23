@@ -248,10 +248,10 @@ export async function parseRosterFile(file) {
 // ── PDF 텍스트 추출 (브라우저 워커, 서버 업로드 없음) ──────
 // pdfjs 본체는 사용 시점에만 동적 import. OCR 없음(텍스트 PDF 전용).
 async function loadPdfDoc(file) {
-  var pdfjs = await import("pdfjs-dist");
+  var pdfjs = await import("pdfjs-dist-v4"); // [D-94] 원본과 같은 pdf.js 4.10.38
   // 워커 URL 도 사용 시점에만 로드(Vite 가 별도 에셋으로 방출). 본체/워커 모두 lazy.
   try {
-    var workerUrl = (await import("pdfjs-dist/build/pdf.worker.min.mjs?url")).default;
+    var workerUrl = (await import("pdfjs-dist-v4/build/pdf.worker.min.mjs?url")).default;
     pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
   } catch { /* worker 미설정 시 pdfjs 기본값 */ }
   var buf = await file.arrayBuffer();

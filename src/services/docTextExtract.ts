@@ -30,7 +30,9 @@ async function extractPdfText(file: File, onProgress?: ProgressFn): Promise<stri
   pdfjs.GlobalWorkerOptions.workerSrc = workerSrc
 
   const buf = await file.arrayBuffer()
-  const doc = await pdfjs.getDocument({ data: buf }).promise
+  // pdf.js 6: 문서 닫기는 불러오기 작업(task)이 맡는다 (6 판부터 글꼴 코드 실행 자체가 없다)
+  const task = pdfjs.getDocument({ data: buf })
+  const doc = await task.promise
   const maxPages = Math.min(doc.numPages, 10)
   const chunks: string[] = []
   for (let i = 1; i <= maxPages; i += 1) {
@@ -42,7 +44,7 @@ async function extractPdfText(file: File, onProgress?: ProgressFn): Promise<stri
       .join(' ')
     chunks.push(line)
   }
-  await doc.destroy()
+  await task.destroy()
   return chunks.join('\n')
 }
 
@@ -52,7 +54,9 @@ async function renderPdfFirstPage(file: File): Promise<Blob | null> {
   const workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default
   pdfjs.GlobalWorkerOptions.workerSrc = workerSrc
   const buf = await file.arrayBuffer()
-  const doc = await pdfjs.getDocument({ data: buf }).promise
+  // pdf.js 6: 문서 닫기는 불러오기 작업(task)이 맡는다 (6 판부터 글꼴 코드 실행 자체가 없다)
+  const task = pdfjs.getDocument({ data: buf })
+  const doc = await task.promise
   const page = await doc.getPage(1)
   const viewport = page.getViewport({ scale: 2 })
   const canvas = document.createElement('canvas')
@@ -61,7 +65,7 @@ async function renderPdfFirstPage(file: File): Promise<Blob | null> {
   const ctx = canvas.getContext('2d')
   if (!ctx) return null
   await page.render({ canvas, canvasContext: ctx, viewport }).promise
-  await doc.destroy()
+  await task.destroy()
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/png'))
 }
 

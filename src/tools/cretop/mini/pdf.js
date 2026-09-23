@@ -6,8 +6,8 @@ import { groupItemsIntoLines } from "../engine/index.js";
 // File → 레이아웃 복원 텍스트(엔진 입력용). onProgress(page, total)로 진행률 통지.
 // 반환: { text, pages } — pages=[{pageNo, text}] (페이지별 보존 → 섹션 추출 정확도 향상).
 export async function extractPdfText(file, onProgress) {
-  const pdfjsLib = await import("pdfjs-dist");
-  const pdfWorkerUrl = (await import("pdfjs-dist/build/pdf.worker.min.mjs?url")).default;
+  const pdfjsLib = await import("pdfjs-dist-v4"); // [D-94] 원본과 같은 pdf.js 4 계열(원본 4.7.76 → 보안 수정판 4.10.38)
+  const pdfWorkerUrl = (await import("pdfjs-dist-v4/build/pdf.worker.min.mjs?url")).default;
   try {
     if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
   } catch (e) {}

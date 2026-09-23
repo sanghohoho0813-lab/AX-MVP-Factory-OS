@@ -237,6 +237,12 @@ function withDocs(r: ClientOpsRecord, keys: DocumentKey[], issuedAt = TODAY): Cl
   const wrote = writeToolInputs({ 'axmvp.tools.startupTax': 'x', 'axmvp.secret': 'y', 'axmvp.tools.bad': 1 as unknown as string })
   check('백업2: 되돌릴 때 도구 키만 쓴다', wrote === 1 && store.size === 1 && store.get('axmvp.tools.startupTax') === 'x', JSON.stringify([...store.entries()]))
   check('백업2: 도구 입력값이 없어도 조용히 지나간다', writeToolInputs(undefined) === 0)
+  // D-94: 모듈 기록(영업·고용지원금·연구소·크레탑 이력)도 백업에 담기고 되돌아온다
+  localStorage.setItem('axmvp.module.sales-kit.accounts.local', '[{"id":"r1"}]')
+  const withModule = readToolInputs()
+  check('백업(D-94): 모듈 기록도 담긴다', withModule['axmvp.module.sales-kit.accounts.local'] === '[{"id":"r1"}]')
+  localStorage.removeItem('axmvp.module.sales-kit.accounts.local')
+  check('백업(D-94): 모듈 기록도 되돌아온다', writeToolInputs({ 'axmvp.module.employment.employees.local': '[]' }) === 1 && localStorage.getItem('axmvp.module.employment.employees.local') === '[]')
 }
 
 console.log(`\nclient-ops-stage2: ${passed} passed, ${failed} failed`)

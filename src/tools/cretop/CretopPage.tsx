@@ -19,6 +19,7 @@ import { CoreCheckScreen } from './screens/CoreCheckScreen'
 import { Button } from '../../components/ui/Button'
 import { CretopMiniApp, buildOneLiner, oneLinerText, type CretopMiniHistoryItem, type CretopMiniUi } from './mini/MiniApp.jsx'
 import { useModuleBucket } from '../shared/useModuleBucket'
+import { useToast } from '../../components/ui/toastContext'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
 import { useToolClient } from '../shared/toolClientContext'
 import { fetchClientDocFile, hasDocFile } from '../shared/clientDocFile'
@@ -46,6 +47,7 @@ function CretopScreen() {
   }, [loadClients])
   const clientNameOf = (id: string) => names[id] ?? ''
   const bucket = useModuleBucket<AnalysisRow>('cretop', 'analyses')
+  const { showToast } = useToast()
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [docBusy, setDocBusy] = useState(false)
   const [docError, setDocError] = useState('')
@@ -66,7 +68,10 @@ function CretopScreen() {
     const bizNo = co.businessNo || ''
     // 같은 회사(사업자번호·이름)의 이전 이력은 새 것으로 바꾼다 — 원본 비회원 이력과 같은 규칙
     const prev = (bucket.rows ?? []).find((r) => (bizNo && r.data.bizNo === bizNo) || r.data.company === company)
-    void bucket.save({ id: prev?.id, clientId: clientId ?? prev?.clientId ?? '', data: { company, bizNo, ts: new Date().toISOString(), ui } })
+    // 원본처럼 저장이 안 되면 알려 준다 ('분석 저장 실패') — 결과 화면은 그대로 남는다
+    bucket.save({ id: prev?.id, clientId: clientId ?? prev?.clientId ?? '', data: { company, bizNo, ts: new Date().toISOString(), ui } }).catch((e: unknown) => {
+      showToast(`분석 저장 실패: ${e instanceof Error ? e.message : '오류'} — 연결을 확인하세요. 결과는 화면에 그대로 있습니다.`)
+    })
   }
 
   /** 업체 서류함에 올려 둔 크레탑 보고서로 바로 분석 (D-90) */

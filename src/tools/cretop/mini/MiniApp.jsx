@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, createContext, useContext } from "react";
 import { buildCretopParsedForUi, CORE_LABELS, cretopTrendCommentRich, cretopCashflowGradeInfo, cretopRowTrend, cretopPreviewTone, CRETOP_PREVIEW_TONES } from "../engine/index.js";
 import { extractPdfText } from "./pdf.js";
+import { cretopYearPool, cretopFillYears } from "./years.js"; // [D-94]
 import { StockValue } from "./StockValue.jsx";
 import { InfoModal, RawTextModal, DetailModal, StakeModal } from "./DetailPopups.jsx";
 import { extractAll, detectBizForm, isCorpOnlyStrategy } from "./extract.js";
@@ -626,6 +627,8 @@ function fmtTrendVal(v, unit) {
   return `${(Math.round(v * 100) / 100).toLocaleString()}${unit || ""}`;
 }
 const y2 = (y) => String(y == null ? "?" : y).slice(-2);
+// [D-94] 이 보고서의 결산 연도 — 연도가 빈 칸을 표시할 때만 쓴다(years.js). 값·계산은 그대로.
+const YearPoolCtx = createContext([]);
 
 // 연도별 값 박스 — 타임라인의 메인(크게). 연도 + 실제 값.
 function YearBox({ yr, body, neg, compact }) {
@@ -668,6 +671,7 @@ function TrendStack({ trend, semKey, semLabel, compact }) {
   const t = trend; if (!t || !t.series || !t.series.length) return null;
   const unit = t.unit; const isRatio = !!t.isRatio;
   const n = t.series.length;
+  const shownYears = cretopFillYears(t.series.map((s) => s.year), n, useContext(YearPoolCtx)); // [D-94]
   return (
     <div style={{ display: "grid", gridTemplateColumns: `repeat(${n}, minmax(0,1fr))`, gap: 6 }}>
       {t.series.map((s, i) => {
@@ -692,7 +696,7 @@ function TrendStack({ trend, semKey, semLabel, compact }) {
         const tinted = !!st; // 전년 대비 변화가 있으면 박스 전체를 의미색으로
         return (
           <div key={i} style={{ minWidth: 0, textAlign: "center", background: tinted ? col + "1A" : "#F1F5F9", border: `1.5px solid ${tinted ? col + "66" : T.line}`, borderRadius: 10, padding: compact ? "7px 4px" : "9px 6px" }}>
-            <div style={{ color: tinted ? col : T.sub, fontSize: "calc(11px * var(--fs,1))", fontWeight: 900 }}>{s.year == null ? "?" : s.year + "년"}</div>
+            <div style={{ color: tinted ? col : T.sub, fontSize: "calc(11px * var(--fs,1))", fontWeight: 900 }}>{shownYears[i] == null ? "?" : shownYears[i] + "년"}</div>
             <div style={{ fontWeight: 900, fontSize: `calc(${compact ? 14 : 17}px * var(--fs,1))`, color: neg ? SEM.bad : T.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{fmtTrendVal(s.val, unit)}</div>
             <div style={{ marginTop: 2, minHeight: 13, fontSize: "calc(9px * var(--fs,1))", fontWeight: 800, color: st ? col : "transparent", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{st ? `${arrow} ${txt}` : "·"}</div>
           </div>
@@ -725,7 +729,7 @@ function MetricRow({ row }) {
 }
 // 현금흐름등급 행 — 연도별 등급 + 개선/악화(보조)
 function GradeRow({ row }) {
-  const ser = row.gradeSeries || []; const yrs = row.years || [];
+  const ser = row.gradeSeries || []; const yrs = cretopFillYears(row.years || [], ser.length, useContext(YearPoolCtx)); // [D-94]
   const gi = cretopCashflowGradeInfo(ser[ser.length - 1]);
   const gnum = (g) => { const n = parseInt(String(g).replace(/\D/g, ""), 10); return isNaN(n) ? null : n; };
   return (
@@ -802,6 +806,7 @@ function ratioFrameYears(ui) {
           : (ui.financialYears || [])).filter((y) => typeof y === "number");
   ys = Array.from(new Set(ys)).sort((a, b) => a - b).slice(-3);
   while (ys.length < 3) ys.unshift(ys.length ? ys[0] - 1 : null);
+  if (ys.every((y) => y == null)) { const pool = cretopYearPool(ui); if (pool.length) return cretopFillYears([], 3, pool); } // [D-94] 비율표 연도가 없으면 결산 연도로
   return ys;
 }
 // ui.ratioAreas(엔진) → 지표 key별 metric 평탄화(트렌드 포함)
@@ -1694,7 +1699,11 @@ function BottomNav({ tab, onTab }) {
 }
 
 // 결과 영역 — 컨트롤드(현재 탭만 렌더). 탭 상태·입력영역·하단네비는 MiniApp이 소유.
-export function MiniResults({ ui, tab = "overview", grade, manualGrade, setGrade, lastY, isAdmin, onTab }) {
+export function MiniResults(props) {
+  // [D-94] 이 보고서의 결산 연도 — 연도가 빈 칸을 채우는 데만 쓴다
+  return <YearPoolCtx.Provider value={cretopYearPool(props.ui)}><MiniResultsInner {...props} /></YearPoolCtx.Provider>;
+}
+function MiniResultsInner({ ui, tab = "overview", grade, manualGrade, setGrade, lastY, isAdmin, onTab }) {
   if (!ui) {
     if (tab === "overview") return null; // 개요 탭은 상단 입력 카드만(부모가 렌더)
     return <div style={{ ...card, padding: 22, color: T.mute, fontSize: "calc(13px * var(--fs,1))", textAlign: "center", lineHeight: 1.6 }}>먼저 <b style={{ color: T.brand }}>🏢 개요</b> 탭에서 크레탑 보고서를 업로드해 분석을 실행하세요.</div>;
@@ -1876,7 +1885,7 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
   }
 
   return (
-    <div className="cretop-mini" data-testid="cretop-mini" style={{ fontFamily: FF, background: T.bg, color: T.ink, overflowX: "hidden", "--fs": 1, borderRadius: 16, border: `1px solid ${T.line}` }}>
+    <div className="cretop-mini" data-testid="cretop-mini" style={{ fontFamily: FF, background: T.bg, color: T.ink, overflowX: "clip", "--fs": 1, borderRadius: 16, border: `1px solid ${T.line}` }}>{/* [D-94] hidden → clip: hidden 이면 이 상자가 스크롤 상자가 되어 하단 탭이 화면에 붙지 않고 맨 끝 내용을 가렸다 */}
       {/* 상단: 햄버거 + 서비스명 + 글자 크기 (정상 크기 — 콘텐츠만 확대) */}
       <header style={{ background: T.surface, borderBottom: `1px solid ${T.line}`, borderRadius: "16px 16px 0 0" }}>
         <div style={{ maxWidth: 1040, margin: "0 auto", padding: "10px 12px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>

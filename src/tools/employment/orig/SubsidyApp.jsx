@@ -6926,10 +6926,7 @@ export default function SubsidyApp(props){
 
   useEffect(function(){
     function handler(e){
-      if((e.metaKey||e.ctrlKey)&&e.key==="k"){
-        e.preventDefault();
-        stCmdK[1](function(o){return !o;});
-      }
+      // [D-94] Ctrl/⌘+K 는 OS 전체 검색이 맡는다 — 원본 검색창까지 같이 열리던 것을 뺐다(원본 검색은 머리줄 🔍 검색 단추로)
       if(e.key==="Escape"){ stMobileNav[1](false); }
     }
     window.addEventListener("keydown",handler);
@@ -7110,11 +7107,11 @@ export default function SubsidyApp(props){
             )}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-            <button onClick={function(){stCmdK[1](true);}} title="통합 검색 (Ctrl+K)"
+            <button onClick={function(){stCmdK[1](true);}} title="업체·직원 검색"
               style={{display:"flex",alignItems:"center",gap:7,padding:"9px 16px",borderRadius:10,border:"1.5px solid #E2E8F0",background:"#F8FAFC",color:"#64748B",fontSize:15,cursor:"pointer",fontFamily:FF,whiteSpace:"nowrap"}}>
               <span>🔍</span>
               <span className="hide-mobile">검색</span>
-              <kbd style={{fontSize:12,background:"#E2E8F0",border:"1px solid #CBD5E1",borderRadius:4,padding:"1px 5px",color:"#94A3B8",fontFamily:"monospace"}} className="hide-mobile">⌘K</kbd>
+              
             </button>
             <NotifBell employees={employees} companies={companies} programs={programs} goCompany={goCompany} settings={profile.settings||{}} tier={tier}/>
             {(stView[0]==="dashboard"||stView[0]==="company")&&!selectedCompany&&(

@@ -18,6 +18,14 @@ export const BACKUP_VERSION = 2
 
 /** 도구 입력값이 사는 곳 — 창업감면 폼, 크레탑 붙여넣기, 연구소 체크 … */
 export const TOOL_INPUT_PREFIX = 'axmvp.tools.'
+/**
+ * 모듈 기록이 사는 곳 (D-94) — 영업 고객·고용지원금 직원·연구소 기록·크레탑 분석 이력 …
+ * 이 브라우저에만 저장하는 모드일 때만 여기 쌓인다(클라우드 모드면 서버 표 `module_data` 에 있다).
+ * 같은 `toolInputs` 칸에 함께 담는다 — 옛 파일과 모양이 같다.
+ */
+export const MODULE_DATA_PREFIX = 'axmvp.module.'
+const BACKUP_PREFIXES = [TOOL_INPUT_PREFIX, MODULE_DATA_PREFIX]
+const isBackupKey = (key: string) => BACKUP_PREFIXES.some((p) => key.startsWith(p))
 
 export interface BackupFile {
   format: string
@@ -35,7 +43,7 @@ export function readToolInputs(): Record<string, string> {
   try {
     for (let i = 0; i < localStorage.length; i += 1) {
       const key = localStorage.key(i)
-      if (!key || !key.startsWith(TOOL_INPUT_PREFIX)) continue
+      if (!key || !isBackupKey(key)) continue
       const value = localStorage.getItem(key)
       if (typeof value === 'string') out[key] = value
     }
@@ -51,7 +59,7 @@ export function writeToolInputs(inputs: Record<string, string> | undefined): num
   let count = 0
   try {
     for (const [key, value] of Object.entries(inputs)) {
-      if (!key.startsWith(TOOL_INPUT_PREFIX) || typeof value !== 'string') continue
+      if (!isBackupKey(key) || typeof value !== 'string') continue
       localStorage.setItem(key, value)
       count += 1
     }
@@ -104,7 +112,7 @@ export function parseBackupToolInputs(text: string): Record<string, string> {
   if (!inputs || typeof inputs !== 'object') return {}
   const out: Record<string, string> = {}
   for (const [key, value] of Object.entries(inputs)) {
-    if (key.startsWith(TOOL_INPUT_PREFIX) && typeof value === 'string') out[key] = value
+    if (isBackupKey(key) && typeof value === 'string') out[key] = value
   }
   return out
 }

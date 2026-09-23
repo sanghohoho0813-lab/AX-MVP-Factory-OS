@@ -1,5 +1,6 @@
 // 크레탑 엔진 골든 회귀 테스트 — 순수 엔진을 직접 import(번들러 불필요). `node packages/cretop-engine/golden.test.mjs`
 import { buildCretopParsedForUi } from "../engine/index.js";
+import { cretopYearPool, cretopFillYears } from "../mini/years.js";
 const near = (a, b, e = 0.3) => typeof a === "number" && Math.abs(a - b) <= e;
 let pass = 0, fail = 0, fails = [];
 const ok = (c, m) => { if (c) pass++; else { fail++; fails.push(m); } };
@@ -27,5 +28,18 @@ const HYO = ["기업명 효성형(주)","요약 손익계산서 단위:백만원
   ok(JSON.stringify(ui.reportRatioYears) === JSON.stringify([2022, 2023, 2024]), "효성 ratioYears");
   const fa = (ak, mk) => { const a = ui.ratioAreas.find(x => x.key === ak); return a && a.metrics.find(m => m.key === mk); };
   ok(fa("structure", "currentRatio") && fa("coverage", "ebitdaToDebt") && fa("activity", "equityTurnover"), "효성 5영역 보강 유지"); }
+
+// [D-94] 연도 칸 채우기 — 표시 전용(엔진 결과는 그대로)
+{ const ui = buildCretopParsedForUi(HYO);
+  const pool = cretopYearPool(ui);
+  ok(JSON.stringify(pool) === JSON.stringify([2022, 2023, 2024]), "연도풀: 효성 결산연도 2022~2024");
+  ok(JSON.stringify(cretopFillYears([], 3, pool)) === JSON.stringify([2022, 2023, 2024]), "연도 없는 표: 최근 3개년으로");
+  ok(JSON.stringify(cretopFillYears([null, 2023, null], 3, pool)) === JSON.stringify([2022, 2023, 2024]), "연도 하나 있으면 그 자리에 맞춤");
+  ok(JSON.stringify(cretopFillYears([2021, null, null], 3, pool)) === JSON.stringify([2021, null, null]), "풀에 없는 연도면 건드리지 않음");
+  ok(JSON.stringify(cretopFillYears([2022, 2023, 2024], 3, pool)) === JSON.stringify([2022, 2023, 2024]), "이미 있으면 그대로");
+  ok(JSON.stringify(cretopFillYears([], 2, pool)) === JSON.stringify([2023, 2024]), "2칸이면 최근 2개년");
+  ok(JSON.stringify(cretopFillYears([], 3, [])) === JSON.stringify([null, null, null]), "풀이 없으면 비운 채로");
+  const e = buildCretopParsedForUi(ENE);
+  ok(JSON.stringify(cretopYearPool(e)) === JSON.stringify([2018, 2019, 2021]), "연도풀: 불규칙 결산연도 그대로(2020 끼워 넣지 않음)"); }
 console.log(`크레탑 엔진 골든 ${pass} PASS / ${fail} FAIL`);
 if (fail) { fails.forEach(f => console.log("  ✗ " + f)); process.exit(1); }
