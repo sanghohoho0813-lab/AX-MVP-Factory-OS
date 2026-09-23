@@ -1,0 +1,260 @@
+/*
+ * [D-93] 원본 고용지원금 매니저 Pro 의 src/index.css — 원본 화면 안(.hr-orig)과 원본 창(.hr-portal)에만 걸리게 옮겼다.
+ *
+ * 원본은 화면 폭(@media)으로 모바일/PC 를 나눴다. 이 OS 에서는 원본이 OS 목차 옆 좁은 칸에 서므로,
+ * 원본 화면 안은 **칸 폭**(@container hr)으로 나눈다. 원본 창(모달)은 화면 전체에 뜨므로 원본처럼 화면 폭으로 나눈다.
+ *   - 원본 ≤860px(모바일)  → 칸 폭 ≤640px   (원본 PC 는 사이드바 270px 을 빼면 본문이 590px 부터였다)
+ *   - 원본 ≤760px          → 칸 폭 ≤640px
+ *   - 원본 ≤1200px(진행 보드) → 칸 폭 ≤930px
+ *   - 원본 ≤1180px(체험 패널) → 칸 폭 ≤910px
+ * 원본 사이드바·햄버거는 이 OS 목차가 대신하므로 숨긴다. 글자·색·배치 값은 원본 그대로.
+ */
+
+.hr-orig {
+  container: hr / inline-size;
+  --ff: 'Pretendard', 'Pretendard Variable', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+  font-family: var(--ff);
+  color: #1E293B;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.hr-orig *, .hr-orig *::before, .hr-orig *::after { box-sizing: border-box; }
+.hr-orig input, .hr-orig select, .hr-orig textarea, .hr-orig button { font-family: inherit; }
+
+/* ── 반응형 폰트 스케일 (모바일 기준값) · --fsm = 전체 글자 크기 배율(설정) ── */
+.hr-app, .hr-portal {
+  --fsm: 1;
+  --fs-meta: calc(12px * var(--fsm));
+  --fs-sub: calc(13px * var(--fsm));
+  --fs-name: calc(14px * var(--fsm));
+  --fs-row: calc(14px * var(--fsm));
+  --fs-badge: calc(12px * var(--fsm));
+  --fs-btn: calc(13px * var(--fsm));
+  --fs-tab: calc(15px * var(--fsm));
+  --fs-label: calc(13px * var(--fsm));
+  --fs-dday: calc(12px * var(--fsm));
+  --fs-body: calc(14px * var(--fsm));
+  --fs-list: calc(14px * var(--fsm));
+  --fs-mini: calc(10px * var(--fsm));
+}
+html[data-fontscale="large"] .hr-app, html[data-fontscale="large"] .hr-portal { --fsm: 1.1; }
+html[data-fontscale="xlarge"] .hr-app, html[data-fontscale="xlarge"] .hr-portal { --fsm: 1.22; }
+
+/* ── PC 전용 타이포 상향 ── */
+@container hr (min-width: 641px) {
+  .hr-app {
+    --fs-meta: calc(15px * var(--fsm));
+    --fs-sub: calc(15.5px * var(--fsm));
+    --fs-name: calc(18px * var(--fsm));
+    --fs-row: calc(16.5px * var(--fsm));
+    --fs-badge: calc(14.5px * var(--fsm));
+    --fs-btn: calc(16px * var(--fsm));
+    --fs-tab: calc(17.5px * var(--fsm));
+    --fs-label: calc(15px * var(--fsm));
+    --fs-dday: calc(15px * var(--fsm));
+    --fs-body: calc(16.5px * var(--fsm));
+    --fs-list: calc(17.5px * var(--fsm));
+    --fs-mini: calc(12.5px * var(--fsm));
+  }
+}
+@media (min-width: 861px) {
+  .hr-portal {
+    --fs-meta: calc(15px * var(--fsm));
+    --fs-sub: calc(15.5px * var(--fsm));
+    --fs-name: calc(18px * var(--fsm));
+    --fs-row: calc(16.5px * var(--fsm));
+    --fs-badge: calc(14.5px * var(--fsm));
+    --fs-btn: calc(16px * var(--fsm));
+    --fs-tab: calc(17.5px * var(--fsm));
+    --fs-label: calc(15px * var(--fsm));
+    --fs-dday: calc(15px * var(--fsm));
+    --fs-body: calc(16.5px * var(--fsm));
+    --fs-list: calc(17.5px * var(--fsm));
+    --fs-mini: calc(12.5px * var(--fsm));
+  }
+}
+
+/* ── 이 OS 안에 서는 자리 — 원본 사이드바·햄버거는 OS 목차가 대신한다 ── */
+.hr-orig .hr-app { border-radius: 18px; border: 1px solid #E2E8F0; }
+.hr-orig .app-sidebar, .hr-orig .app-backdrop, .hr-orig .app-hamburger { display: none !important; }
+.hr-orig .app-header { border-radius: 18px 18px 0 0; }
+.hr-orig .app-page { padding: 28px 28px !important; }
+
+.hr-orig ::-webkit-scrollbar, .hr-portal ::-webkit-scrollbar { width: 6px; height: 6px; }
+.hr-orig ::-webkit-scrollbar-track, .hr-portal ::-webkit-scrollbar-track { background: #F1F5F9; }
+.hr-orig ::-webkit-scrollbar-thumb, .hr-portal ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+
+/* 피드백 버튼 — 7일 주기 반짝임 */
+@keyframes fbGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(96,165,250,0.0); border-color: rgba(96,165,250,0.4); background: rgba(59,130,246,0.12); }
+  50% { box-shadow: 0 0 20px 5px rgba(96,165,250,0.62), 0 0 0 3px rgba(96,165,250,0.22); border-color: rgba(96,165,250,1); background: rgba(59,130,246,0.26); }
+}
+@keyframes fbFadeOut {
+  from { opacity: 1; max-height: 80px; }
+  to   { opacity: 0; max-height: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; }
+}
+.hr-orig .fb-glow, .hr-portal .fb-glow { animation: fbGlow 2.6s ease-in-out infinite; }
+.hr-orig .fb-fadeout, .hr-portal .fb-fadeout { animation: fbFadeOut 0.45s ease forwards; }
+
+/* ── 애니메이션 ── */
+@keyframes hrShimmer { 0% { background-position: -800px 0; } 100% { background-position: 800px 0; } }
+@keyframes hrFadeInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes hrFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes hrSpin { to { transform: rotate(360deg); } }
+@keyframes hrSlideInRight { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes hrPageEnter { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+
+.hr-orig .spin, .hr-portal .spin { animation: hrSpin 0.8s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .hr-orig .spin, .hr-portal .spin { animation-duration: 1.6s; } }
+.hr-orig .skeleton, .hr-portal .skeleton {
+  background: linear-gradient(90deg, #EEF2F6 25%, #E2E8F0 37%, #EEF2F6 63%);
+  background-size: 800px 100%;
+  animation: hrShimmer 1.4s ease-in-out infinite;
+  border-radius: 8px;
+}
+.hr-orig .fade-in-up, .hr-portal .fade-in-up { animation: hrFadeInUp 0.35s ease both; }
+.hr-orig .fade-in, .hr-portal .fade-in { animation: hrFadeIn 0.3s ease both; }
+.hr-orig .slide-in, .hr-portal .slide-in { animation: hrSlideInRight 0.2s ease both; }
+.hr-orig .page-enter { animation: hrPageEnter 0.22s cubic-bezier(0.22,1,0.36,1) both; }
+
+/* ── 카드 디자인 시스템 ── */
+.hr-orig .card, .hr-portal .card { background: #fff; border: 1px solid #E5EAF0; border-radius: 20px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
+
+/* 진행 보드 가로 스크롤바를 항상 보이게 */
+.hr-orig .kanban-grid { scrollbar-width: thin; scrollbar-color: #CBD5E1 #EEF2F6; }
+.hr-orig .kanban-grid::-webkit-scrollbar { height: 10px; }
+.hr-orig .kanban-grid::-webkit-scrollbar-track { background: #EEF2F6; border-radius: 5px; }
+.hr-orig .kanban-grid::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 5px; }
+.hr-orig .kanban-grid::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+/* ── 카드 호버/탭 폴리시 ── */
+.hr-orig .hover-card, .hr-orig .hover-lift, .hr-orig .kpi-card, .hr-portal .hover-lift { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+@media (hover: hover) and (pointer: fine) {
+  .hr-orig .hover-card:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(15, 23, 42, 0.10); border-color: #C7D2FE !important; }
+  .hr-orig .hover-lift:hover, .hr-portal .hover-lift:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(37,99,235,0.28); }
+  .hr-orig .kpi-card:hover { transform: translateY(-3px); box-shadow: 0 12px 30px rgba(15,23,42,0.10); }
+}
+.hr-orig .hover-card:active, .hr-orig .kpi-card:active, .hr-orig .brief-card:active, .hr-orig .tap:active { transform: scale(0.985); }
+
+/* ── 대시보드 섹션(아코디언) ── */
+.hr-orig .dash-sec-body { animation: hrFadeIn 0.22s ease both; }
+.hr-orig .dash-group { transition: box-shadow 0.18s ease; }
+.hr-orig .dash-group:hover { box-shadow: 0 3px 14px rgba(15, 23, 42, 0.09); }
+.hr-orig .dash-group-head:hover { background: #F1F5F9 !important; }
+
+/* ── 지원금 관리(ProgramsList) ── */
+@keyframes hrProgSectionIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes hrProgCardIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.hr-orig .prog-section { animation: hrProgSectionIn 0.34s cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: calc(var(--si, 0) * 70ms); }
+.hr-orig .prog-card {
+  animation: hrProgCardIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--ci, 0) * 45ms);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .hr-orig .prog-card:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(15, 23, 42, 0.10); border-color: #C7D2FE; }
+}
+.hr-orig .prog-tap, .hr-portal .prog-tap { transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease; }
+@media (hover: hover) and (pointer: fine) { .hr-orig .prog-tap:hover, .hr-portal .prog-tap:hover { filter: brightness(0.96); } }
+.hr-orig .prog-tap:active, .hr-portal .prog-tap:active { transform: scale(0.95); }
+@media (prefers-reduced-motion: reduce) {
+  .hr-orig .prog-section, .hr-orig .prog-card { animation: none !important; }
+  .hr-orig .prog-card:hover, .hr-orig .prog-tap:hover, .hr-orig .prog-tap:active { transform: none !important; }
+}
+
+/* ── 모달 진입 모션 ── */
+@keyframes hrModalOverlayIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes hrModalPopIn { from { opacity: 0; transform: translateY(12px) scale(0.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.hr-portal .modal-overlay { animation: hrModalOverlayIn 0.18s ease both; }
+.hr-portal .modal-pop { animation: hrModalPopIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@media (prefers-reduced-motion: reduce) { .hr-portal .modal-overlay, .hr-portal .modal-pop { animation: none !important; } }
+.hr-portal { font-family: var(--ff); color: #1E293B; }
+.hr-portal *, .hr-portal *::before, .hr-portal *::after { box-sizing: border-box; }
+.hr-portal input, .hr-portal select, .hr-portal textarea, .hr-portal button { font-family: inherit; }
+
+/* ── 사용 흐름 타임라인 ── */
+.hr-orig .guide-flow { display: flex; align-items: stretch; gap: 6px; }
+.hr-orig .guide-step { flex: 1 1 0; min-width: 0; }
+.hr-orig .guide-arrow { display: flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 22px; flex-shrink: 0; }
+
+/* ── 핵심 브리핑 그리드 ── */
+.hr-orig .brief-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 14px; }
+/* 원본 PC 본문은 가장 좁아도 590px 에 사이드바 없이 넓게 섰다 — OS 목차 옆 칸이 860px 보다 좁으면 원본 모바일처럼 두 줄로 (글자가 한 자씩 꺾이지 않게) */
+@container hr (max-width: 860px) {
+  .hr-orig .brief-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* ── 대시보드 병렬 2단 ── */
+.hr-orig .dash-parallel { display: grid; gap: 14px; grid-template-columns: 1fr; }
+@container hr (min-width: 641px) {
+  .hr-orig .dash-parallel.two { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); align-items: start; }
+}
+
+/* ── 무료체험 요약 ── */
+.hr-orig .trial-aside { display: block; animation: hrFadeIn 0.25s ease both; }
+@container hr (max-width: 910px) {
+  .hr-orig .trial-aside { display: none !important; }
+  .hr-orig .trial-inline { display: flex !important; }
+}
+
+/* ── '오늘 바로 해야 할 일' 항목 그리드 ── */
+.hr-orig .dday-grid { display: grid; grid-template-columns: 1fr; gap: 1px; }
+@container hr (min-width: 641px) {
+  .hr-orig .dday-grid { grid-template-columns: 1fr 1fr; gap: 1px 12px; }
+}
+
+/* ── 진행 보드 ── */
+.hr-orig .kanban-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; align-items: start; }
+@container hr (max-width: 930px) {
+  .hr-orig .kanban-grid { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 12px; align-items: flex-start; }
+  .hr-orig .kanban-grid > .kanban-col { width: 240px; flex-shrink: 0; }
+}
+
+/* 긴 단어/금액이 줄을 깨지 않도록 한국어 단어 단위 줄바꿈 */
+.hr-orig h1, .hr-orig h2, .hr-orig h3, .hr-orig h4, .hr-orig .keep-word,
+.hr-portal h1, .hr-portal h2, .hr-portal h3, .hr-portal h4, .hr-portal .keep-word { word-break: keep-all; }
+
+.hr-orig .show-mobile, .hr-portal .show-mobile { display: none; }
+
+/* ── 좁은 칸 (원본 모바일) ── */
+@container hr (max-width: 640px) {
+  .hr-orig .guide-flow { flex-direction: column; gap: 2px; }
+  .hr-orig .guide-step { width: 100%; }
+  .hr-orig .guide-arrow { transform: rotate(90deg); padding: 4px 0; }
+  .hr-orig .sim-grid { grid-template-columns: 1fr !important; gap: 16px !important; }
+  .hr-orig .wage-input-grid { grid-template-columns: 1fr 1fr !important; }
+  .hr-orig .wage-input-grid > div:first-child { grid-column: 1 / -1; }
+
+  .hr-orig .app-header { padding: 0 14px !important; height: 60px !important; }
+  .hr-orig .app-title { font-size: 19px !important; }
+  .hr-orig .app-page { padding: 14px 12px !important; }
+  .hr-orig .card { border-radius: 16px; }
+  .hr-orig .add-co-btn { padding: 9px 13px !important; font-size: 18px !important; }
+  .hr-orig .grid-2-mobile { grid-template-columns: 1fr !important; }
+  .hr-orig .hide-mobile { display: none !important; }
+  .hr-orig .show-mobile { display: inline-flex !important; }
+
+  .hr-orig .brief-grid { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
+  .hr-orig .brief-card { padding: 15px 15px !important; min-height: 118px !important; border-radius: 14px !important; }
+  .hr-orig .brief-icon { width: 28px !important; height: 28px !important; font-size: 15px !important; }
+  .hr-orig .brief-label { font-size: 12px !important; }
+  .hr-orig .brief-num { font-size: 29px !important; }
+  .hr-orig .brief-num-unit { font-size: 15px !important; }
+  .hr-orig .brief-sub { font-size: 11.5px !important; margin-top: 5px !important; }
+  .hr-orig .brief-btn { margin-top: 10px !important; padding: 7px 12px !important; font-size: 12.5px !important; }
+  .hr-orig .brief-spark { display: none !important; }
+}
+
+/* ── 원본 창(모달)은 화면 폭으로 (원본 그대로) ── */
+@media (max-width: 860px) {
+  .hr-portal .card { border-radius: 16px; }
+  .hr-portal .grid-2-mobile { grid-template-columns: 1fr !important; }
+  .hr-portal .hide-mobile { display: none !important; }
+  .hr-portal .show-mobile { display: inline-flex !important; }
+}
+@media (max-width: 760px) {
+  .hr-portal .sim-grid { grid-template-columns: 1fr !important; gap: 16px !important; }
+  .hr-portal .wage-input-grid { grid-template-columns: 1fr 1fr !important; }
+  .hr-portal .wage-input-grid > div:first-child { grid-column: 1 / -1; }
+  .hr-portal .guide-flow { flex-direction: column; gap: 2px; }
+}

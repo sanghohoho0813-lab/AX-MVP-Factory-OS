@@ -26,6 +26,8 @@ import {
   toEmpRecord,
   type EmpRecord,
 } from '../lib/empRecords'
+import { companyMetaOf, employeeRowData, matchOsClient, memosFromRow, osCompanyDefaults, osPickList, programsFromD91, regionOfAddress, toOrigCompany, toOrigEmployee } from '../orig/store'
+import type { ClientOpsRecord } from '../../../types/clientOps'
 import { simulate, simulationText } from '../lib/simulator'
 import { agencyAutoComment, agencyDocRequestText, agencyReportData, agencySummaryText, commissionSummary, companyRanking, companyRiskRanking, ddayAlerts, emptyCompanyMeta, monthlyReceived, pendingPayments, programPipeline } from '../lib/companyMeta'
 import { buildImportPreview, xlAutoMap, xlBizNoCheck, xlDetectHeader, xlNormDate } from '../lib/excelImport'
@@ -551,6 +553,50 @@ check('ROSTER_FIELDS 9', ROSTER_FIELDS.length === 9 && ROSTER_FIELDS[0].key === 
   check('엑셀: 상태 말을 단계로', pv.toSave[0].stage === 'inprogress')
   const dup = buildImportPreview({ grid, headerRow: h, map: am.map, clients: [{ id: 'c1', companyName: '한솔테크', businessNumber: '' }], programs: [], existing: [{ clientId: 'c1', name: '김하나', hireDate: '2026-03-02' }] })
   check('엑셀: 이미 있는 사람은 중복', dup.duplicates === 1 && dup.toSave.length === 0)
+}
+
+
+/* ═══ D-93 원본 화면 저장 자리 (orig/store.ts) ═══ */
+{
+  const os = {
+    id: 'cli_a', workspaceId: null, companyName: '(주)한솔테크', contactName: '이과장', contactPhone: '010-1111-2222', contactEmail: 'a@b.kr',
+    businessNumber: '123-45-67890', corporateNumber: '110111-1234567', businessAddress: '경기 성남시 분당구', industry: '제조업',
+    representativeName: '김대표', employeeCount: '12명(대표 포함)', establishedAt: '2019-03-02', contactTitle: '과장', companyPhone: '031-000-0000',
+    businessCategory: '', archivedAt: null, createdAt: '2026-01-01T00:00:00Z',
+  } as unknown as ClientOpsRecord
+  const other = { ...os, id: 'cli_b', companyName: '바른상사', businessNumber: '987-65-43210', businessAddress: '부산 해운대구', corporateNumber: '' } as unknown as ClientOpsRecord
+  const def = osCompanyDefaults(os)
+  check('원본 업체: 고객 운영 기록으로 칸을 채운다', def.name === '(주)한솔테크' && def.bizNo === '123-45-67890' && def.ceoName === '김대표' && def.managerName === '이과장' && def.corpType === '법인' && def.empCount === '12')
+  check('원본 업체: 주소로 수도권·비수도권', regionOfAddress('서울 강남구') === '수도권' && regionOfAddress('부산 해운대구') === '비수도권' && regionOfAddress('') === '')
+  const comp = toOrigCompany(os, { payday: '25', commission: { rate: 20 }, companyDocs: [{ id: 'd1', label: '사업자등록증', done: false }], name: '옛 이름' })
+  check('원본 업체: 이름은 늘 고객 운영 그대로 · id = 업체 id', comp.name === '(주)한솔테크' && comp.id === 'cli_a' && comp.osId === 'cli_a')
+  check('원본 업체: 고용지원금 쪽 기록(급여일·수수료)이 붙는다', comp.payday === '25' && (comp.commission as { rate: number }).rate === 20)
+  check('원본 업체: 서류에 파일 칸이 생긴다', Array.isArray((comp.companyDocs as Array<{ files: unknown[] }>)[0].files))
+  const meta = companyMetaOf({ ...comp, phone: '031-000-0000', addr: '서울 새 주소' }, os)
+  check('원본 업체 저장: 고객 운영과 같은 값은 적지 않는다', !('phone' in meta) && !('bizNo' in meta) && !('name' in meta) && !('id' in meta))
+  check('원본 업체 저장: 고친 값·고용지원금 기록은 적는다', meta.addr === '서울 새 주소' && meta.payday === '25')
+  const pick = osPickList([os, other, { ...other, id: 'cli_x', archivedAt: '2026-01-01' } as unknown as ClientOpsRecord], new Set(['cli_a']))
+  check('업체 고르기: 보관한 업체는 빼고, 등록된 업체는 표시', pick.length === 2 && pick[0].taken === true && pick[1].taken === false)
+  check('엑셀 업체 맞추기: 사업자번호로', matchOsClient({ name: '아무개', bizNo: '9876543210' }, [os, other])?.id === 'cli_b')
+  check('엑셀 업체 맞추기: (주) 떼고 이름으로', matchOsClient({ name: '한솔테크', bizNo: '' }, [os, other])?.id === 'cli_a')
+  check('엑셀 업체 맞추기: 없으면 없다', matchOsClient({ name: '없는회사', bizNo: '' }, [os, other]) === undefined)
+
+  // D-91 모양 직원 → 원본 직원
+  const old = toOrigEmployee({ id: 'e1', clientId: 'cli_a', data: { name: '김청년', hireDate: '2026-03-02', stage: 'approved', gender: '여', militaryMonths: 0, rounds: [{ month: 6, amount: 3600000, label: '1차', isPaid: false, received: 0 }], docs: [{ name: '근로계약서', done: true }] } })
+  check('옛 직원(D-91): 입사일·단계·성별을 원본 이름으로', old.startDate === '2026-03-02' && old.status === 'approved' && old.gender === 'female' && old.companyId === 'cli_a')
+  check('옛 직원(D-91): 서류가 원본 모양으로', (old.employeeDocs as Array<{ label: string; done: boolean }>)[0].label === '근로계약서' && (old.employeeDocs as Array<{ done: boolean }>)[0].done)
+  check('옛 직원(D-91): 회차 합계가 총 예정액', old.totalExpected === 3600000)
+  const row = employeeRowData({ ...old, status: 'inprogress' })
+  check('직원 저장: 원본 표시 + D-91 이름도 같이', row._v === 'orig' && row.hireDate === '2026-03-02' && row.stage === 'inprogress' && !('id' in row) && !('companyId' in row))
+  const back = toOrigEmployee({ id: 'e1', clientId: 'cli_a', data: row })
+  check('직원 저장 → 다시 읽기: 그대로', back.status === 'inprogress' && back.name === '김청년' && back.id === 'e1')
+
+  // 지원금 표 · 달력 메모
+  check('지원금 표: D-91 기록이 없으면 원본 기본 표', programsFromD91([], {}, {}) === undefined)
+  const pm = programsFromD91([{ data: { programId: 'youth_jump', enabled: false } }, { data: { programId: 'my1', enabled: true, custom: { id: 'my1', name: '우리 지원금' } } }], { youth_jump: { id: 'youth_jump' }, work_exp: { id: 'work_exp' } }, { youth_jump: true })
+  check('지원금 표: 끈 것은 끈 채로 · 기본값은 원본대로 · 더한 것도', pm?.youth_jump.enabled === false && pm?.work_exp.enabled === false && pm?.my1.enabled === true)
+  const memos = memosFromRow({ memos: { '2026-09-05': [{ id: 'a', text: 'x' }], '2026-9-5': [{ id: 'b', text: 'y' }] } })
+  check('달력 메모: D-92 날짜 열쇠를 원본 모양으로 모은다', Object.keys(memos).join() === '2026-9-5' && memos['2026-9-5'].length === 2)
 }
 
 console.log(`\nemployment: ${passed} passed, ${failed} failed`)

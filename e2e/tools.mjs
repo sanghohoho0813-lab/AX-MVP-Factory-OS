@@ -118,7 +118,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   // 고용지원금 · 연구소 — 열리고 제목이 맞는지 (세부는 각자의 단위 테스트가 지킨다)
   await page.goto(BASE + '/tools/employment', { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)
-  check('고용지원금: 화면이 열린다', (await page.getByRole('heading', { level: 1 }).innerText()).includes('고용지원금'))
+  check('고용지원금: 화면이 열린다 (원본 고용지원금 Pro 화면)', (await page.getByRole('heading', { level: 1 }).innerText()).includes('고용지원금') && (await page.getByTestId('emp-orig').count()) === 1)
   await page.goto(BASE + '/tools/labcare', { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)
   check('연구소: 화면이 열린다 (원본 대시보드 + 고객 운영 연결)', (await page.getByTestId('lab-module-eyebrow').innerText()).includes('연구소') && (await page.getByTestId('lab-orig').count()) === 1 && (await page.getByTestId('module-dashboard').count()) === 1)
@@ -167,79 +167,65 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(500)
   check('모듈 목차: 모르는 주소는 첫 화면으로', (await page.getByTestId('module-dashboard').count()) === 1)
 
-  /* ---- D-91 2단계: 고용지원금 업체 관리 · 진행 보드 · 시뮬레이터 · 지원금 관리 ---- */
+  /* ---- D-93: 고용지원금 — 원본 고용지원금 Pro 화면 그대로 · 업체는 고객 운영 업체에서 고른다 ---- */
   await page.goto(BASE + '/tools/employment/companies', { waitUntil: 'networkidle' })
-  await page.waitForTimeout(700)
-  const empCos = page.getByTestId('emp-companies')
-  check('고용지원금 업체 관리: OS 업체가 그대로 선다', (await empCos.locator('button[data-client]').count()) === 5, String(await empCos.locator('button[data-client]').count()))
-
-  await empCos.locator('button[data-client="cli_hansol"]').click()
-  await page.waitForTimeout(500)
-  check('업체 한 곳: 대상자 화면으로 들어간다', (await page.getByTestId('emp-company-detail').count()) === 1)
-  await page.getByTestId('emp-add').click()
+  await page.waitForTimeout(800)
+  check('고용지원금 업체 관리: 처음에는 업체를 고르라고 한다 (샘플 없음)', (await page.getByTestId('emp-empty').count()) === 1)
+  await page.getByTestId('emp-add-company').click()
   await page.waitForTimeout(300)
-  await page.getByLabel('이름').fill('김청년')
-  await page.getByLabel('입사일').fill('2026-03-02')
-  await page.getByTestId('emp-save').click()
-  await page.waitForTimeout(800)
-  const empList = page.getByTestId('emp-list')
-  check('대상자 넣기: 목록에 뜬다', (await empList.innerText()).includes('김청년'), (await empList.innerText()).slice(0, 120))
-  check('대상자 넣기: 지원금 회차표가 붙는다', (await page.getByTestId('emp-rounds').locator('button').count()) === 3, String(await page.getByTestId('emp-rounds').locator('button').count()))
-  check('대상자 넣기: 회차 신청일은 입사일 + 개월', (await page.getByTestId('emp-rounds').innerText()).includes('2026.9.2'), (await page.getByTestId('emp-rounds').innerText()).slice(0, 120))
+  const empPickOpts = await page.getByTestId('emp-client-pick').locator('option').allInnerTexts()
+  check('업체 추가: 고객 운영 업체 5곳에서 고른다', empPickOpts.length === 6 && empPickOpts.some((o) => o.includes('한솔테크')), empPickOpts.join(','))
+  await page.getByTestId('emp-client-pick').selectOption('cli_hansol')
+  await page.getByRole('button', { name: '업체 저장' }).click()
+  await page.waitForTimeout(900)
+  check('업체 추가: 그 업체 화면으로 (주소에 업체)', page.url().includes('/tools/employment/companies?cid=cli_hansol'), page.url())
+  const empApp = page.getByTestId('emp-orig')
+  check('업체 화면: 고객 운영 기록의 이름·사업자번호가 보인다', (await empApp.innerText()).includes('한솔테크') && (await empApp.innerText()).includes('123-45-67890'))
+  check('업체 화면: 원본 버튼(고객 보고서·내부 보고서·수수료 정산)', (await empApp.getByRole('button', { name: /고객 보고서/ }).count()) >= 1 && (await empApp.getByRole('button', { name: /수수료 정산/ }).count()) >= 1)
+  await empApp.getByRole('button', { name: /직원 \(0\)/ }).click()
+  await page.waitForTimeout(300)
+  await empApp.getByRole('button', { name: '+ 직원 추가' }).first().click()
+  await page.waitForTimeout(400)
+  const empModal = page.locator('#hr-orig-portal')
+  await empModal.getByPlaceholder('홍길동').fill('김청년')
+  await empModal.locator('input[type=date]').first().fill('2026-03-02')
+  await empModal.getByRole('button', { name: '직원 저장' }).click()
+  await page.waitForTimeout(900)
+  const detailText = await empApp.innerText()
+  check('직원 추가: 목록에 뜬다', detailText.includes('김청년'), detailText.slice(0, 160))
+  check('직원 추가: 청년도약 회차표가 붙어 예상 잔여액 720만 원', detailText.includes('720만'), detailText.slice(0, 300))
 
-  // 회차 지급 체크 → 남은 예정액이 줄어든다
-  const beforeRemain = await page.getByTestId('emp-company-detail').innerText()
-  await page.getByTestId('emp-rounds').locator('button').first().click()
-  await page.waitForTimeout(700)
-  const afterRemain = await page.getByTestId('emp-company-detail').innerText()
-  check('회차 받음 체크: 받은 돈이 늘고 남은 돈이 준다', beforeRemain !== afterRemain && afterRemain.includes('360만'), afterRemain.slice(0, 160))
-
-  // 고객 보고서 — 대상자 현황이 글로 나온다
-  const rep = await page.getByTestId('emp-report').innerText()
-  check('고객 보고서: 업체·대상자·회차가 글로 나온다', rep.includes('한솔테크') && rep.includes('김청년') && rep.includes('1차'), rep.slice(0, 160))
-
-  // 진행 보드 — 같은 대상자가 단계 칸에 선다
+  // 진행 보드 — 같은 사람이 준비중 칸에
   await page.goto(BASE + '/tools/employment/board', { waitUntil: 'networkidle' })
-  await page.waitForTimeout(700)
-  const board = page.getByTestId('emp-board')
-  check('진행 보드: 7단계 칸', (await board.locator('[data-column]').count()) === 7, String(await board.locator('[data-column]').count()))
-  check('진행 보드: 준비중 칸에 그 사람이 있다', (await board.locator('[data-column="preparing"]').innerText()).includes('김청년'))
-  await board.locator('[data-column="preparing"]').getByLabel('김청년 단계 옮기기').selectOption('submitted')
-  await page.waitForTimeout(800)
-  check('진행 보드: 단계를 옮기면 그 칸으로 간다', (await board.locator('[data-column="submitted"]').innerText()).includes('김청년'), (await board.locator('[data-column="submitted"]').innerText()).slice(0, 80))
+  await page.waitForTimeout(900)
+  check('진행 보드: 원본 보드에 그 사람이 선다', (await page.getByTestId('emp-orig').innerText()).includes('김청년'))
 
-  // 대시보드에 이 모듈의 대상자 칸이 붙는다
+  // 다시 열어도 남아 있다 (모듈 기록에 저장)
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  check('저장: 새로고침해도 직원이 남는다', (await page.getByTestId('emp-orig').innerText()).includes('김청년'))
+  await page.goto(BASE + '/tools/employment/companies', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  check('저장: 업체 목록에 한솔테크가 남는다', (await page.getByTestId('emp-orig').innerText()).includes('한솔테크') && (await page.getByTestId('emp-empty').count()) === 0)
+
+  // 대시보드 — 원본 '이번 달 업무 현황' + 고객 운영 연결
   await page.goto(BASE + '/tools/employment', { waitUntil: 'networkidle' })
-  await page.waitForTimeout(800)
-  const extra = page.getByTestId('emp-dashboard-extra')
-  check('모듈 대시보드: 고용지원금 칸이 붙는다', (await extra.count()) === 1)
-  check('모듈 대시보드: 대상자 수를 센다', (await extra.innerText()).includes('1명'), (await extra.innerText()).slice(0, 160))
+  await page.waitForTimeout(900)
+  check('대시보드: 원본 이번 달 업무 현황', (await page.getByTestId('emp-orig').innerText()).includes('이번 달 업무 현황'))
+  check('대시보드: 고객 운영 업체와 연결 칸', (await page.getByTestId('module-dashboard').count()) === 1)
 
-  // 수령액 시뮬레이터
-  await page.goto(BASE + '/tools/employment/simulator', { waitUntil: 'networkidle' })
+  // 원본 화면 안에서 화면을 옮기면 주소가 따라 바뀐다
+  await page.getByTestId('emp-orig').getByRole('button', { name: /진행 보드 보기/ }).first().click()
   await page.waitForTimeout(700)
-  await page.getByLabel('채용 인원').fill('2')
-  await page.getByLabel('입사일').fill('2026-03-02')
-  await page.waitForTimeout(500)
-  const sim = page.getByTestId('emp-simulator')
-  check('시뮬레이터: 2명이면 1440만 원', (await sim.innerText()).includes('1,440만'), (await sim.innerText()).slice(0, 200))
-  check('시뮬레이터: 월별로 나눠 보여 준다', (await page.getByTestId('emp-sim-months').locator('li').count()) === 3, String(await page.getByTestId('emp-sim-months').locator('li').count()))
+  check('원본 안 이동: 주소가 진행 보드로', page.url().includes('/tools/employment/board'), page.url())
 
-  // 지원금 관리 — 끄면 고르는 칸에서 빠진다
-  await page.goto(BASE + '/tools/employment/programs', { waitUntil: 'networkidle' })
-  await page.waitForTimeout(700)
-  check('지원금 관리: 기본 15종', (await page.getByTestId('emp-program-list').locator('li').count()) === 15, String(await page.getByTestId('emp-program-list').locator('li').count()))
-  await page.locator('button[data-program="youth_jump"]').click()
-  await page.waitForTimeout(700)
-  check('지원금 관리: 끄면 안 쓴다로 바뀐다', (await page.locator('button[data-program="youth_jump"]').innerText()).includes('안 쓴다'))
-  await page.goto(BASE + '/tools/employment/simulator', { waitUntil: 'networkidle' })
-  await page.waitForTimeout(700)
-  const opts = await page.getByLabel('지원금 종류').locator('option').allInnerTexts()
-  check('지원금 관리: 끈 지원금은 고르는 칸에서 빠진다', !opts.includes('청년일자리도약장려금'), opts.slice(0, 3).join(','))
-  await page.goto(BASE + '/tools/employment/programs', { waitUntil: 'networkidle' })
-  await page.waitForTimeout(600)
-  await page.locator('button[data-program="youth_jump"]').click()
-  await page.waitForTimeout(600)
+  // 채용 진단 · 급여 계산기 · 시뮬레이터 · 지원금 관리 · 설정 — 원본 화면
+  for (const [sec, word] of [['diagnosis', '채용 예정 진단'], ['wage', '급여'], ['simulator', '시뮬레이터'], ['programs', '청년일자리도약장려금'], ['settings', '전체 글자 크기']]) {
+    await page.goto(BASE + '/tools/employment/' + sec, { waitUntil: 'networkidle' })
+    await page.waitForTimeout(600)
+    check(`원본 화면: ${sec}`, (await page.getByTestId('emp-orig').innerText()).includes(word), (await page.getByTestId('emp-orig').innerText()).slice(0, 120))
+  }
+  check('설정: 화면 잠금(PIN)은 없다', !(await page.getByTestId('emp-orig').innerText()).includes('화면 잠금'))
 
   /* ---- D-92: 연구소 — 원본 화면 그대로 · 고객사는 고객 운영 업체에서 고른다 ---- */
   await page.goto(BASE + '/tools/labcare/clients', { waitUntil: 'networkidle' })

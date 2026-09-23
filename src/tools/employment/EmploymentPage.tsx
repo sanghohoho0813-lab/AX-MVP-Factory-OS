@@ -1,26 +1,22 @@
 /**
- * 고용지원금 진단 — 고용지원금 매니저 Pro 의 핵심 계산을 도구로 옮긴 것.
+ * 고용지원금 매니저 — 원본 고용지원금 매니저 Pro(git-test-kind-cori)를 옮긴 것.
  *
- * 규칙표·계산식은 전부 `lib/` 에 있고(원본 그대로), 이 파일은 묻고 보여 주기만 한다.
- * 네 화면: 채용 진단 · 회차 일정 · 급여 계산기 · 4대보험 명부 진단 (`?t=` 로 고른다).
+ * D-93 부터 화면은 원본 SubsidyApp.jsx 를 그대로 쓴다(`orig/`) — 대시보드 · 업체 관리 · 진행 보드 ·
+ * 채용 진단 · 급여 계산기 · 수령액 시뮬레이터 · 지원금 관리 · 설정. 원본 안에서 화면을 옮기면 주소가 따라 바뀐다.
+ * 업체는 고객 운영 하나뿐이다 — 업체를 추가할 때 고객 운영 업체를 고른다(orig/store.ts).
  *
- * 적은 값은 이 브라우저에 남는다. 단, 명부에 붙여 넣은 글자는 남기지 않는다 —
- * 주민등록번호 원본은 어디에도 저장하지 않는다는 원본의 약속을 그대로 지킨다.
+ * 이 파일에 남은 두 화면(회차 일정 · 4대보험 명부 진단)은 이 OS 에서 더한 것이다 —
+ * 업체 서류함 파일로 바로 돌리고, 결과를 업체 기록·달력에 붙인다. 명부에 붙여 넣은 글자는 남기지 않는다.
  */
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, Check, Copy, FolderOpen, RotateCcw, Upload } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
 import { ModuleDashboard } from '../shared/ModuleDashboard'
 import { useModuleSection } from '../shared/ModuleRoute'
-import { EmploymentDashboardExtra } from './screens/DashboardExtra'
-import { CompaniesScreen } from './screens/CompaniesScreen'
-import { BoardScreen } from './screens/BoardScreen'
-import { SimulatorScreen } from './screens/SimulatorScreen'
-import { ProgramsScreen } from './screens/ProgramsScreen'
-import { SubsidyGuide } from './screens/SubsidyGuide'
-import { SettingsScreen } from './screens/SettingsScreen'
+import { EmploymentOrig } from './orig/EmploymentOrig'
 import { Button } from '../../components/ui/Button'
 import { Badge, Disclosure, MetricTile, Section, Surface, type Tone } from '../../components/ui/primitives'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
@@ -28,12 +24,9 @@ import { usePrefillFromClient } from '../shared/usePrefill'
 import { useToolClient } from '../shared/toolClientContext'
 import { fetchClientDocFile, hasDocFile } from '../shared/clientDocFile'
 import { PrefillNote } from '../shared/PrefillNote'
-import { BOSU_FLOOR_2026, DIAG_CATS, ELIG, EXCL, MIN_WAGE_2026, MIN_WAGE_MONTH_2026, SPECIAL_OPTIONS_CHILDCARE, SPECIAL_OPTIONS_RETAIN } from './lib/constants'
-import { DEFAULT_PROGRAMS, PROGRAM_CHECKLISTS, PROGRAM_LIST, type EmpType, type Gender } from './lib/programs'
+import { DEFAULT_PROGRAMS, PROGRAM_LIST } from './lib/programs'
 import { fD, fDFull } from './lib/dates'
 import { fMan, fProgramAmt } from './lib/format'
-import { buildAnswers, diagnoseHiring, youthGate, type DiagnosisRow, type DiagnosisStatus, type Region, type Situation } from './lib/eligibility'
-import { computePayroll, type PayrollResult } from './lib/payroll'
 import { roundSchedule, type RoundKind } from './lib/schedule'
 import { roundDeadlines } from './lib/toolDeadlines'
 import {
@@ -123,22 +116,6 @@ function ChoiceGroup<T extends string>({ label, value, options, onChange, hint }
   )
 }
 
-function ToggleChip({ on, label, onToggle }: { on: boolean; label: string; onToggle: () => void }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={onToggle}
-      className={`tap rounded-(--radius-control) border px-3 py-2 t-sub font-medium break-keep ${
-        on ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-      }`}
-    >
-      {on && <Check aria-hidden="true" className="mr-1 inline size-3.5" />}
-      {label}
-    </button>
-  )
-}
-
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <label className="block min-w-0">
@@ -197,334 +174,77 @@ function CopyButton({ text }: { text: string }) {
 /* 화면 뼈대                                                            */
 /* ------------------------------------------------------------------ */
 
+/** 이 OS 목차 키 ↔ 원본 화면 키 (D-93) */
+const TO_VIEW: Record<string, string> = { companies: 'company', board: 'kanban' }
+const TO_SECTION: Record<string, string> = { company: 'companies', kanban: 'board' }
+/** 원본 화면으로 서는 목차 — 회차 일정 · 4대보험 명부 진단은 이 OS 에서 더한 화면이다 */
+const ORIG_SECTIONS = new Set(['dashboard', 'companies', 'board', 'diagnosis', 'wage', 'simulator', 'programs', 'settings'])
+
 /** 목차에서 고른 화면 → 이 자리에 선다. 목차 자체는 `toolRegistry` 의 sections 가 정한다. */
 export function EmploymentPage() {
   const section = useModuleSection()
   const meta = toolOf('employment')?.sections?.find((s) => s.key === section)
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [params] = useSearchParams()
+  const { clientId } = useToolClient()
+  const here = useRef({ section, search: location.search })
+  here.current = { section, search: location.search }
+  const pending = useRef<{ view?: string; company?: string | null } | null>(null)
+
+  // 원본이 화면·업체를 옮기면 주소를 바꾼다. 원본은 한 번에 두 번(업체 → 화면) 부르므로 모아서 한 번에
+  const onNav = useCallback(
+    (next: { view?: string; company?: string | null }) => {
+      const queued = pending.current !== null
+      pending.current = { ...(pending.current ?? {}), ...next }
+      if (queued) return
+      queueMicrotask(() => {
+        const p = pending.current ?? {}
+        pending.current = null
+        const cur = here.current
+        const view = p.view ?? TO_VIEW[cur.section] ?? cur.section
+        const target = TO_SECTION[view] ?? (toolOf('employment')?.sections?.some((s) => s.key === view) ? view : 'dashboard')
+        const qs = new URLSearchParams(cur.search)
+        const company = 'company' in p ? p.company : qs.get('cid')
+        if (company && target === 'companies') qs.set('cid', company)
+        else qs.delete('cid')
+        const q = qs.toString()
+        void navigate(`/tools/employment/${target}${q ? `?${q}` : ''}`)
+      })
+    },
+    [navigate],
+  )
+
+  if (ORIG_SECTIONS.has(section)) {
+    // 업체에서 열었으면(?client=) 그 업체 화면으로
+    const cid = params.get('cid') ?? (section === 'companies' ? clientId : null)
+    return (
+      <div className="flex flex-col gap-4">
+        <h1 className="t-meta font-bold tracking-wide text-slate-400" data-testid="emp-module-eyebrow">
+          고용지원금 매니저 Pro
+        </h1>
+        <EmploymentOrig view={TO_VIEW[section] ?? section} companyId={cid} onNav={onNav} />
+        {section === 'dashboard' && (
+          <section className="flex flex-col gap-3" aria-label="고객 운영 업체와 연결">
+            <h2 className="t-section text-slate-900">고객 운영 업체와 연결</h2>
+            <ModuleDashboard toolKey="employment" />
+          </section>
+        )}
+        <p className="t-meta break-keep text-slate-400">{DISCLAIMER}</p>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="고용지원금 매니저"
-        description={
-          meta?.hint
-            ? `${meta.label} — ${meta.hint}. 상담용 1차 검토이며 운영기관 심사와 세무 대리인 검토를 대신하지 않습니다.`
-            : '채용 조건으로 가능성 있는 고용지원금을 고르고, 회차별 신청일과 급여·4대보험을 셈합니다. 상담용 1차 검토이며 운영기관 심사와 세무 대리인 검토를 대신하지 않습니다.'
-        }
+        description={`${meta?.label ?? ''} — ${meta?.hint ?? ''}. 상담용 1차 검토이며 운영기관 심사와 세무 대리인 검토를 대신하지 않습니다.`}
       />
-      {section === 'dashboard' && (
-        <ModuleDashboard toolKey="employment">
-          <EmploymentDashboardExtra />
-        </ModuleDashboard>
-      )}
-      {section === 'companies' && <CompaniesScreen />}
-      {section === 'board' && <BoardScreen />}
-      {section === 'diagnosis' && <DiagnosisTab />}
       {section === 'schedule' && <ScheduleTab />}
-      {section === 'wage' && <WageTab />}
       {section === 'roster' && <RosterTab />}
-      {section === 'simulator' && <SimulatorScreen />}
-      {section === 'programs' && (
-        <>
-          <SubsidyGuide />
-          <ProgramsScreen />
-        </>
-      )}
-      {section === 'settings' && <SettingsScreen />}
       <p className="t-meta break-keep text-slate-400">{DISCLAIMER}</p>
     </div>
-  )
-}
-
-/* ═════════════════ ① 채용 진단 ═════════════════ */
-
-interface DiagnosisForm {
-  situation: Situation
-  cats: string[]
-  specials: string[]
-  age: string
-  gender: Gender | ''
-  milMonths: string
-  region: Region
-  companySize: string
-  empType: EmpType
-  preApply: boolean
-  noLayoff: boolean
-  aboveFloor: boolean
-  youthEligible: boolean
-  /** 청년도약 자격요건 — 생년월일·입사예정일·취업애로·제외요건 (선택) */
-  birthDate: string
-  hireDate: string
-  elig: Record<string, boolean>
-  excl: Record<string, boolean>
-}
-
-const EMPTY_DIAGNOSIS: DiagnosisForm = {
-  situation: 'new',
-  cats: [],
-  specials: [],
-  age: '',
-  gender: '',
-  milMonths: '',
-  region: '수도권',
-  companySize: '',
-  empType: '정규직',
-  preApply: true,
-  noLayoff: true,
-  aboveFloor: true,
-  youthEligible: true,
-  birthDate: '',
-  hireDate: '',
-  elig: {},
-  excl: {},
-}
-
-const SITUATIONS: readonly Option<Situation>[] = [
-  { value: 'new', label: '신규 채용' },
-  { value: 'retain', label: '재직자 처우개선' },
-  { value: 'childcare', label: '출산·육아' },
-]
-const GENDERS: readonly Option<Gender>[] = [
-  { value: 'male', label: '남' },
-  { value: 'female', label: '여' },
-]
-const REGIONS: readonly Option<Region>[] = [
-  { value: '수도권', label: '수도권' },
-  { value: '비수도권', label: '비수도권' },
-]
-const EMP_TYPES: readonly Option<EmpType>[] = [
-  { value: '정규직', label: '정규직' },
-  { value: '계약직', label: '계약직' },
-  { value: '인턴', label: '인턴' },
-  { value: '대체인력', label: '대체인력' },
-]
-
-const STATUS_TONE: Record<DiagnosisStatus, Tone> = { recommend: 'success', maybe: 'warning', exclude: 'neutral' }
-const STATUS_LABEL: Record<DiagnosisStatus, string> = { recommend: '가능성 높음', maybe: '조건 확인 필요', exclude: '해당 낮음' }
-
-function toggleIn(list: string[], v: string): string[] {
-  return list.indexOf(v) >= 0 ? list.filter((x) => x !== v) : list.concat([v])
-}
-
-function DiagnosisTab() {
-  const [form, setForm] = useStored<DiagnosisForm>('diagnosis', EMPTY_DIAGNOSIS)
-  const [submitted, setSubmitted] = useState(false)
-  const set = <K extends keyof DiagnosisForm>(k: K, v: DiagnosisForm[K]) => setForm((f) => ({ ...f, [k]: v }))
-
-  const specialOptions = form.situation === 'retain' ? SPECIAL_OPTIONS_RETAIN : form.situation === 'childcare' ? SPECIAL_OPTIONS_CHILDCARE : []
-  const answers = useMemo(() => buildAnswers(form), [form])
-  const rows: DiagnosisRow[] | null = useMemo(() => (submitted ? diagnoseHiring(answers, PROGRAM_LIST) : null), [submitted, answers])
-  const recommend = rows ? rows.filter((r) => r.status === 'recommend') : []
-  const maybe = rows ? rows.filter((r) => r.status === 'maybe') : []
-  const exclude = rows ? rows.filter((r) => r.status === 'exclude') : []
-
-  const showYouth = form.cats.indexOf('청년') >= 0 && form.situation === 'new'
-  const gate = useMemo(
-    () => (showYouth && form.birthDate ? youthGate({ birthDate: form.birthDate, gender: form.gender, milMonths: Number(form.milMonths) || 0, elig: form.elig, excl: form.excl, hireDate: form.hireDate || undefined }) : null),
-    [showYouth, form.birthDate, form.gender, form.milMonths, form.elig, form.excl, form.hireDate],
-  )
-
-  const summary = rows
-    ? [
-        `고용지원금 채용 진단 (${form.situation === 'new' ? '신규 채용' : form.situation === 'retain' ? '재직자 처우개선' : '출산·육아'} · ${form.region} · ${form.empType})`,
-        `가능성 높음 ${recommend.length}건 · 조건 확인 필요 ${maybe.length}건`,
-        ...recommend.map((r) => `✅ ${r.program.name} — ${r.reasons.join(' · ')}`),
-        ...maybe.map((r) => `⚠️ ${r.program.name} — ${r.blockers.join(' · ') || r.reasons.join(' · ')}`),
-        '진단 결과는 가능성 안내이며 확정이 아닙니다. 실제 신청 전 최신 공고를 확인하세요.',
-      ].join('\n')
-    : ''
-
-  const reset = () => {
-    setForm(EMPTY_DIAGNOSIS)
-    setSubmitted(false)
-  }
-
-  return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-      <Surface className="flex flex-col gap-5 p-4 sm:p-5">
-        <ChoiceGroup label="① 상황" value={form.situation} options={SITUATIONS} onChange={(v) => set('situation', v)} />
-        {form.situation === 'new' && (
-          <fieldset>
-            <legend className="t-sub font-medium text-slate-600">② 채용 대상자 (여럿 가능)</legend>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {DIAG_CATS.map((c) => (
-                <ToggleChip key={c.id} on={form.cats.indexOf(c.id) >= 0} label={`${c.icon} ${c.label}`} onToggle={() => set('cats', toggleIn(form.cats, c.id))} />
-              ))}
-            </div>
-          </fieldset>
-        )}
-        {specialOptions.length > 0 && (
-          <fieldset>
-            <legend className="t-sub font-medium text-slate-600">② 구체적 상황 (여럿 가능)</legend>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {specialOptions.map((c) => (
-                <ToggleChip key={c.id} on={form.specials.indexOf(c.id) >= 0} label={c.label} onToggle={() => set('specials', toggleIn(form.specials, c.id))} />
-              ))}
-            </div>
-          </fieldset>
-        )}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <NumberField label="③ 나이(만)" value={form.age} onChange={(v) => set('age', v)} placeholder="29" unit="세" />
-          <ChoiceGroup label="④ 성별" value={form.gender} options={GENDERS} onChange={(v) => set('gender', v)} />
-          {form.gender === 'male' && <NumberField label="⑤ 군복무 개월" value={form.milMonths} onChange={(v) => set('milMonths', v)} placeholder="18" unit="개월" hint="청년 상한(만 34세)이 복무 기간만큼 늘어납니다 (최대 만 39세)" />}
-          <NumberField label="⑥ 회사 규모(고용보험 피보험자)" value={form.companySize} onChange={(v) => set('companySize', v)} placeholder="피보험자 수" unit="명" />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <ChoiceGroup label="⑦ 지역" value={form.region} options={REGIONS} onChange={(v) => set('region', v)} />
-          <ChoiceGroup label="⑧ 채용형태" value={form.empType} options={EMP_TYPES} onChange={(v) => set('empType', v)} />
-        </div>
-        <fieldset>
-          <legend className="t-sub font-medium text-slate-600">⑨ 확인 사항 (해당하면 켠다)</legend>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            <ToggleChip on={form.preApply} label="채용 전(사전신청 가능)" onToggle={() => set('preApply', !form.preApply)} />
-            <ToggleChip on={form.noLayoff} label="최근 감원 이력 없음" onToggle={() => set('noLayoff', !form.noLayoff)} />
-            <ToggleChip on={form.aboveFloor} label="월보수 124만원 이상" onToggle={() => set('aboveFloor', !form.aboveFloor)} />
-            {showYouth && form.region === '수도권' && <ToggleChip on={form.youthEligible} label="취업애로요건 해당(청년·수도권)" onToggle={() => set('youthEligible', !form.youthEligible)} />}
-          </div>
-        </fieldset>
-
-        {showYouth && (
-          <Disclosure title="청년도약 자격요건 정밀 확인 (선택)" hint="생년월일·취업애로·제외요건으로 나이 경계와 자격을 다시 봅니다">
-            <div className="flex flex-col gap-4 pt-2">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="생년월일">
-                  <input type="date" aria-label="생년월일" value={form.birthDate} onChange={(e) => set('birthDate', e.target.value)} className={inputCls} />
-                </Field>
-                <Field label="입사(예정)일" hint="비우면 오늘 기준으로 나이를 셉니다">
-                  <input type="date" aria-label="입사(예정)일" value={form.hireDate} onChange={(e) => set('hireDate', e.target.value)} className={inputCls} />
-                </Field>
-              </div>
-              <fieldset>
-                <legend className="t-sub font-medium text-slate-600">취업애로요건 (1개 이상)</legend>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {ELIG.map((e) => (
-                    <ToggleChip key={e.id} on={!!form.elig[e.id]} label={e.label} onToggle={() => set('elig', { ...form.elig, [e.id]: !form.elig[e.id] })} />
-                  ))}
-                </div>
-              </fieldset>
-              <fieldset>
-                <legend className="t-sub font-medium text-slate-600">제외요건 — 확인한 것만 켠다</legend>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {EXCL.map((x) => (
-                    <ToggleChip key={x.id} on={form.excl[x.id] === true} label={x.label} onToggle={() => set('excl', { ...form.excl, [x.id]: form.excl[x.id] === true ? false : true })} />
-                  ))}
-                </div>
-              </fieldset>
-              {gate && (
-                <Surface edge={gate.ok ? 'success' : 'warning'} showEdge className="flex flex-col gap-1 p-3">
-                  <span className="t-body font-medium text-slate-800">
-                    {gate.age !== null ? `만 ${gate.age}세 (상한 ${gate.maxLabel})` : '나이 확인 불가'} · {gate.ageOk ? '나이 요건 충족' : '나이 요건 미충족'}
-                  </span>
-                  <span className="t-sub text-slate-600">
-                    취업애로요건 {gate.anyElig ? '1개 이상 해당' : '해당 없음'} · 제외요건 {gate.allExclOk ? '전부 확인' : gate.failedExcl.length > 0 ? `${gate.failedExcl.length}개 해당 가능` : '확인 안 됨'}
-                  </span>
-                  {gate.nearBorder && <span className="t-meta text-warning-700">경계선 — 관할기관 확인 필요</span>}
-                  <span className={`t-sub font-medium ${gate.ok ? 'text-success-700' : 'text-slate-500'}`}>{gate.ok ? '대상자 예상' : '일부 요건 확인 필요'}</span>
-                </Surface>
-              )}
-            </div>
-          </Disclosure>
-        )}
-
-        <div className="flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center">
-          <Button variant="primary" onClick={() => setSubmitted(true)} className="w-full sm:w-auto">
-            지원금 가능성 진단
-          </Button>
-          <Button variant="ghost" size="sm" onClick={reset}>
-            <RotateCcw aria-hidden="true" className="size-4" /> 다시 입력
-          </Button>
-        </div>
-      </Surface>
-
-      <div className="flex min-w-0 flex-col gap-4" aria-live="polite">
-        {!rows ? (
-          <Surface className="flex flex-col items-center justify-center gap-2 p-8 text-center">
-            <span className="t-card font-bold text-slate-700">채용 조건을 고르고 진단을 누르면 여기에 결과가 나옵니다</span>
-            <span className="t-sub break-keep text-slate-500">15개 고용지원금을 규칙표에 대어 가능성 높음 · 조건 확인 필요 · 해당 낮음으로 나눕니다.</span>
-          </Surface>
-        ) : (
-          <>
-            <Surface edge={recommend.length > 0 ? 'success' : maybe.length > 0 ? 'warning' : 'neutral'} showEdge className="flex flex-col gap-2 p-4 sm:p-5">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="t-meta font-medium text-slate-500">진단 결과</span>
-                <Badge tone="success">가능성 높음 {recommend.length}</Badge>
-                <Badge tone="warning">조건 확인 필요 {maybe.length}</Badge>
-                <Badge>해당 낮음 {exclude.length}</Badge>
-              </div>
-              <p className="t-card font-bold break-keep text-slate-900" data-testid="employment-diagnosis-oneline">
-                {recommend.length > 0 ? `${recommend.map((r) => r.program.name).join(' · ')} 검토 가능성이 있습니다` : maybe.length > 0 ? '조건을 확인하면 검토 가능한 지원금이 있습니다' : '입력 조건에 뚜렷하게 맞는 지원금이 없습니다'}
-              </p>
-              <div className="mt-1 flex flex-wrap gap-2">
-                <CopyButton text={summary} />
-                <ToolResultAttach
-                  toolKey="employment"
-                  title="고용지원금 진단"
-                  verdict={recommend.length > 0 ? 'recommend' : maybe.length > 0 ? 'maybe' : 'exclude'}
-                  verdictLabel={`가능성 높음 ${recommend.length}건 · 확인 필요 ${maybe.length}건`}
-                  summary={summary}
-                  data={{ tab: 'diagnosis', answers, results: rows.map((r) => ({ id: r.program.id, name: r.program.name, status: r.status, score: r.score, reasons: r.reasons, blockers: r.blockers })) }}
-                />
-              </div>
-            </Surface>
-
-            {recommend.length > 0 && (
-              <Section title="가능성 높음" count={recommend.length}>
-                {recommend.map((r) => (
-                  <DiagnosisCard key={r.program.id} row={r} withChecklist />
-                ))}
-              </Section>
-            )}
-            {maybe.length > 0 && (
-              <Section title="조건 확인 필요" count={maybe.length}>
-                {maybe.map((r) => (
-                  <DiagnosisCard key={r.program.id} row={r} />
-                ))}
-              </Section>
-            )}
-            {exclude.length > 0 && (
-              <Disclosure title="해당 낮음" hint={`${exclude.length}개`}>
-                <ul className="flex flex-col gap-1.5">
-                  {exclude.map((r) => (
-                    <li key={r.program.id} className="flex flex-wrap items-baseline gap-x-2 t-sub break-keep text-slate-500">
-                      <span className="font-medium text-slate-700">{r.program.name}</span>
-                      <span>{r.blockers.length > 0 ? r.blockers.join(' · ') : r.reasons.join(' · ') || '대상 유형 불일치'}</span>
-                    </li>
-                  ))}
-                </ul>
-              </Disclosure>
-            )}
-            <Disclosure title="요약 미리보기">
-              <pre className="t-sub whitespace-pre-wrap break-keep text-slate-600">{summary}</pre>
-            </Disclosure>
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function DiagnosisCard({ row, withChecklist = false }: { row: DiagnosisRow; withChecklist?: boolean }) {
-  const p = row.program
-  const checklist = PROGRAM_CHECKLISTS[p.id] ?? []
-  return (
-    <Surface edge={STATUS_TONE[row.status]} showEdge className="flex flex-col gap-2 p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="t-card font-bold break-keep text-slate-900">{p.name}</span>
-        <Badge tone={STATUS_TONE[row.status]}>{STATUS_LABEL[row.status]}</Badge>
-        <Badge>{p.group}</Badge>
-        <Badge tone="brand">{fProgramAmt(p)}</Badge>
-      </div>
-      {row.reasons.length > 0 && <p className="t-sub break-keep text-success-700">👍 {row.reasons.join(' · ')}</p>}
-      {row.blockers.length > 0 && <p className="t-sub break-keep text-danger-700">⚠️ {row.blockers.join(' · ')}</p>}
-      <p className="t-sub break-keep text-slate-600">{p.note}</p>
-      <p className="t-meta text-slate-500">신청: {p.applyUrl}</p>
-      {withChecklist && checklist.length > 0 && (
-        <div className="border-t border-slate-100 pt-2">
-          <span className="t-meta font-medium text-slate-500">신청 전 확인할 것 ({checklist.length})</span>
-          <Bullets items={checklist} tone="muted" />
-        </div>
-      )}
-    </Surface>
   )
 }
 
@@ -667,171 +387,6 @@ function ScheduleTab() {
               </table>
             </Surface>
             <p className="t-meta break-keep text-slate-400">신청 가능일은 입사일에 회차 개월을 더한 날입니다. 실제 신청 기한은 공고마다 다르니 운영기관 안내를 함께 보세요.</p>
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
-/* ═════════════════ ③ 급여 계산기 ═════════════════ */
-
-interface WageForm {
-  monthly: string
-  weeklyHours: string
-  dependents: string
-  annual: string
-}
-
-const EMPTY_WAGE: WageForm = { monthly: '', weeklyHours: '40', dependents: '1', annual: '' }
-
-function won(n: number): string {
-  return n.toLocaleString() + '원'
-}
-
-function WageTab() {
-  const [form, setForm] = useStored<WageForm>('wage', EMPTY_WAGE)
-  const set = <K extends keyof WageForm>(k: K, v: WageForm[K]) => setForm((f) => ({ ...f, [k]: v }))
-  const monthly = Number(form.monthly) || 0
-  const result: PayrollResult | null = useMemo(() => computePayroll(monthly, Number(form.weeklyHours) || 40, Number(form.dependents) || 1), [monthly, form.weeklyHours, form.dependents])
-
-  const applyAnnual = () => {
-    const a = Number(form.annual) || 0
-    if (a > 0) set('monthly', String(Math.round(a / 12)))
-  }
-
-  const summary = result
-    ? [
-        `급여 계산 (2026 · 월급 ${won(monthly)} · 주 ${form.weeklyHours || 40}시간 · 부양가족 ${form.dependents || 1}명)`,
-        `시급 환산 ${won(result.hourlyWage)} (${result.isAboveMin ? '최저임금 이상' : '최저임금 미달'}) · 월 ${result.monthlyHours}시간`,
-        `근로자 공제 합계 ${won(result.totalDeduct)} → 실수령 ${won(result.netPay)}`,
-        `사업주 부담 4대보험 ${won(result.total4_er)} → 총 인건비 ${won(result.totalEmployerCost)}`,
-        '소득세는 간이세액표 근사이며 실제 원천징수액과 다를 수 있습니다.',
-      ].join('\n')
-    : ''
-
-  const eeRows: [string, string, number][] = result
-    ? [
-        ['국민연금', '4.5% (상한 590만)', result.pension_ee],
-        ['건강보험', '3.545%', result.health_ee],
-        ['장기요양', '건강보험의 12.95%', result.care_ee],
-        ['고용보험', '0.9%', result.employ_ee],
-        ['근로소득세', '간이세액 근사', result.incomeTax],
-        ['지방소득세', '소득세의 10%', result.localTax],
-      ]
-    : []
-  const erRows: [string, string, number][] = result
-    ? [
-        ['국민연금', '4.5% (상한 590만)', result.pension_er],
-        ['건강보험', '3.545%', result.health_er],
-        ['장기요양', '건강보험의 12.95%', result.care_er],
-        ['고용보험', '0.9%', result.employ_er],
-        ['산재보험', '1.43% (업종 평균 예시)', result.injury_er],
-      ]
-    : []
-
-  return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-      <Surface className="flex flex-col gap-5 p-4 sm:p-5">
-        <p className="t-sub break-keep text-slate-500">
-          2026년 기준 · 최저임금 시급 <b className="text-slate-900">{MIN_WAGE_2026.toLocaleString()}원</b> · 월환산 <b className="text-slate-900">{MIN_WAGE_MONTH_2026.toLocaleString()}원</b>(209h) · 지원금 보수 하한{' '}
-          <b className="text-slate-900">{BOSU_FLOOR_2026.toLocaleString()}원</b>
-        </p>
-        <NumberField label="① 월급 (세전)" value={form.monthly} onChange={(v) => set('monthly', v)} unit="원" placeholder="3000000" />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <NumberField label="② 주 소정근로시간" value={form.weeklyHours} onChange={(v) => set('weeklyHours', v)} unit="시간" hint="40시간이면 월 209시간, 15시간 이상이면 주휴 포함" />
-          <NumberField label="③ 부양가족 수 (본인 포함)" value={form.dependents} onChange={(v) => set('dependents', v)} unit="명" />
-        </div>
-        <Disclosure title="연봉으로 넣기" hint="연봉 ÷ 12">
-          <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-end">
-            <NumberField label="연봉" value={form.annual} onChange={(v) => set('annual', v)} unit="원" placeholder="36000000" />
-            <Button size="sm" onClick={applyAnnual} className="shrink-0">
-              월급에 반영
-            </Button>
-          </div>
-        </Disclosure>
-      </Surface>
-
-      <div className="flex min-w-0 flex-col gap-4" aria-live="polite">
-        {!result ? (
-          <Surface className="flex flex-col items-center justify-center gap-2 p-8 text-center">
-            <span className="t-card font-bold text-slate-700">월급을 적으면 4대보험·세금·실수령액이 나옵니다</span>
-            <span className="t-sub break-keep text-slate-500">근로자 공제와 사업주 부담을 따로 보여 주고, 최저임금·지원금 보수 하한도 같이 확인합니다.</span>
-          </Surface>
-        ) : (
-          <>
-            <Surface edge={result.isAboveMin ? 'success' : 'danger'} showEdge className="flex flex-col gap-2 p-4 sm:p-5">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="t-meta font-medium text-slate-500">급여 계산</span>
-                <Badge tone={result.isAboveMin ? 'success' : 'danger'}>{result.isAboveMin ? '최저임금 이상' : '최저임금 미달'}</Badge>
-                <Badge tone={result.isAboveFloor ? 'success' : 'warning'}>{result.isAboveFloor ? '보수 하한 124만 충족' : '보수 하한 124만 미달'}</Badge>
-              </div>
-              <p className="t-card font-bold break-keep text-slate-900">
-                실수령 <span className="text-brand-700">{won(result.netPay)}</span> · 사업주 총 인건비 {won(result.totalEmployerCost)}
-              </p>
-              <p className="t-sub text-slate-600">
-                시급 환산 <b className="text-slate-900">{won(result.hourlyWage)}</b> (월 {result.monthlyHours}시간) · 최저 월급 {won(result.minMonthly)} · 시급 차이 {result.gap >= 0 ? '+' : ''}
-                {result.gap.toLocaleString()}원
-              </p>
-              <div className="mt-1 flex flex-wrap gap-2">
-                <CopyButton text={summary} />
-                <ToolResultAttach
-                  toolKey="employment"
-                  title="급여 계산"
-                  verdict={result.isAboveMin ? 'above_min' : 'below_min'}
-                  verdictLabel={result.isAboveMin ? '최저임금 이상' : '최저임금 미달'}
-                  summary={summary}
-                  data={{ tab: 'wage', monthly, weeklyHours: form.weeklyHours, dependents: form.dependents, ...result }}
-                />
-              </div>
-            </Surface>
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-              <MetricTile label="근로자 4대보험" value={won(result.total4_ee)} />
-              <MetricTile label="소득세+지방세" value={won(result.incomeTax + result.localTax)} />
-              <MetricTile label="공제 합계" value={won(result.totalDeduct)} />
-              <MetricTile label="사업주 4대보험" value={won(result.total4_er)} />
-            </div>
-            <div className="grid gap-2.5 sm:grid-cols-2">
-              <Surface padded={false} className="overflow-x-auto">
-                <div className="border-b border-slate-100 px-3 py-2 t-body font-medium text-slate-800">근로자 공제</div>
-                <table className="w-full min-w-[300px] text-left">
-                  <tbody>
-                    {eeRows.map(([label, pct, amt]) => (
-                      <tr key={label} className="border-b border-slate-100 t-sub">
-                        <td className="px-3 py-2 text-slate-700">
-                          {label} <span className="t-meta text-slate-400">{pct}</span>
-                        </td>
-                        <td className="px-3 py-2 text-right t-num text-danger-700">−{amt.toLocaleString()}원</td>
-                      </tr>
-                    ))}
-                    <tr className="t-sub font-medium">
-                      <td className="px-3 py-2 text-slate-900">실수령액</td>
-                      <td className="px-3 py-2 text-right t-num text-slate-900">{won(result.netPay)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </Surface>
-              <Surface padded={false} className="overflow-x-auto">
-                <div className="border-b border-slate-100 px-3 py-2 t-body font-medium text-slate-800">사업주 부담</div>
-                <table className="w-full min-w-[300px] text-left">
-                  <tbody>
-                    {erRows.map(([label, pct, amt]) => (
-                      <tr key={label} className="border-b border-slate-100 t-sub">
-                        <td className="px-3 py-2 text-slate-700">
-                          {label} <span className="t-meta text-slate-400">{pct}</span>
-                        </td>
-                        <td className="px-3 py-2 text-right t-num text-success-700">+{amt.toLocaleString()}원</td>
-                      </tr>
-                    ))}
-                    <tr className="t-sub font-medium">
-                      <td className="px-3 py-2 text-slate-900">총 인건비</td>
-                      <td className="px-3 py-2 text-right t-num text-slate-900">{won(result.totalEmployerCost)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </Surface>
-            </div>
-            <p className="t-meta break-keep text-slate-400">근로소득세는 간이세액표 근사식이라 실제 원천징수액과 차이가 날 수 있습니다. 산재보험 요율은 업종마다 다릅니다.</p>
           </>
         )}
       </div>

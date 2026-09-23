@@ -1072,6 +1072,29 @@ export async function uploadDocumentFile(
 }
 
 /**
+ * 모듈 화면(고용지원금 원본 등)에서 올리는 파일 (D-93).
+ * 같은 보관함(client-documents)에 `워크스페이스/업체/모듈폴더/` 아래로 둔다 — 첫 폴더가 워크스페이스라 저장소 권한 규칙을 그대로 따른다.
+ */
+export async function uploadModuleFile(
+  workspaceId: string | null,
+  clientId: string,
+  folder: string,
+  file: File,
+): Promise<{ storagePath: string }> {
+  if (!canUploadFiles()) {
+    throw new Error('파일 보관은 Supabase 클라우드 저장을 연결한 뒤 사용할 수 있습니다.')
+  }
+  if (!workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const path = `${workspaceId}/${clientId}/${folder}/${generateId()}-${safeName}`
+  const { error } = await getSupabaseClient()
+    .storage.from('client-documents')
+    .upload(path, file, { contentType: file.type || 'application/octet-stream' })
+  if (error) throw new Error(uploadErrorMessage(error.message, file))
+  return { storagePath: path }
+}
+
+/**
  * 첨부 파일 서명 URL (5분).
  *
  * `downloadName` 을 주면 저장소가 `Content-Disposition: attachment` 를 붙여 준다 —

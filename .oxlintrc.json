@@ -18,6 +18,8 @@
     "src/tools/cretop/engine/index.js",
     "src/tools/salesKit/lib/salesData.js",
     "src/tools/cretop/mini/**",
-    "src/tools/salesKit/orig/SalesApp.jsx"
+    "src/tools/salesKit/orig/SalesApp.jsx",
+    "src/tools/employment/orig/SubsidyApp.jsx",
+    "src/tools/employment/orig/payrollDiagnosis.js"
   ]
 }
