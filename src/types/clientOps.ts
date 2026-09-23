@@ -100,6 +100,10 @@ export const BUILTIN_DOCUMENT_KEYS = [
   'businessAddress', // 사업장 주소
   'smeCertificate', // 중소기업 확인서
   'healthInsurance', // 대표자 건강보험 득실확인서
+  /* 도구함이 쓰는 서류 (D-90) */
+  'payrollRoster', // 4대보험 가입자 명부 — 고용지원금 진단
+  'cretopReport', // 크레탑 기업종합보고서 — 크레탑 분석
+  'financialStatements', // 최근 3개년 재무제표 — 정책자금 진단
 ] as const
 
 export type BuiltinDocumentKey = (typeof BUILTIN_DOCUMENT_KEYS)[number]

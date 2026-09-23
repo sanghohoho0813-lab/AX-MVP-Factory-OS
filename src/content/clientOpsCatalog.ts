@@ -323,6 +323,35 @@ export const DOCUMENTS: DocumentMeta[] = [
     sensitive: true,
     hint: '정책자금 신청 시 최근 발급본을 요구하는 경우가 많습니다.',
   },
+  /*
+   * 아래 셋은 도구함이 쓰는 서류다 (D-90).
+   * 도구를 돌리려면 이 파일들이 있어야 하므로, 다른 서류와 같은 자리에서 '있다/없다' 를 관리한다.
+   * 칸을 더하기만 한다 — 기존 서류는 그대로다.
+   */
+  {
+    key: 'payrollRoster',
+    label: '4대보험 가입자 명부',
+    validMonths: 3,
+    needsFile: true,
+    sensitive: true,
+    hint: '고용지원금 진단에 쓰입니다. 엑셀·PDF·CSV 모두 읽습니다. 주민등록번호는 생년월일·성별만 뽑고 원본은 저장하지 않습니다.',
+  },
+  {
+    key: 'cretopReport',
+    label: '크레탑 기업종합보고서',
+    validMonths: 6,
+    needsFile: true,
+    sensitive: false,
+    hint: '크레탑 분석기가 읽습니다. PDF 를 올려 두면 업체 화면에서 바로 분석할 수 있습니다.',
+  },
+  {
+    key: 'financialStatements',
+    label: '최근 3개년 재무제표',
+    validMonths: 12,
+    needsFile: true,
+    sensitive: false,
+    hint: '정책자금 진단·크레탑 분석의 근거 자료입니다. 표준재무제표증명 또는 결산보고서.',
+  },
 ]
 
 export const DOCUMENT_KEYS: DocumentKey[] = DOCUMENTS.map((d) => d.key)

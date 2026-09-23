@@ -13,6 +13,7 @@
  */
 
 import type { LucideIcon } from 'lucide-react'
+import type { DocumentKey } from '../types/clientOps'
 import { BadgeCheck, Briefcase, Calculator, FlaskConical, Landmark, LineChart, Sparkles, Users } from 'lucide-react'
 
 export type ToolStatus = 'live' | 'review' | 'planned'
@@ -35,6 +36,14 @@ export interface ToolDefinition {
    * 대표는 "부채비율" 을 찾지 "크레탑 분석기" 를 찾지 않는다. 이름에 없는 말을 여기 적어 둔다.
    */
   keywords?: string
+  /**
+   * 이 도구를 제대로 돌리려면 **꼭 있어야 하는** 업체 서류 (D-90).
+   * 없으면 업체 화면에서 빨갛게 이름을 적어 알려 준다. 도구 자체는 막지 않는다 —
+   * 손으로 붙여넣어 쓰는 길이 늘 있기 때문이다.
+   */
+  requiredDocs?: DocumentKey[]
+  /** 있으면 더 정확해지는 서류 — 없어도 경고하지 않고 '있으면 좋음' 으로만 적는다 */
+  recommendedDocs?: DocumentKey[]
 }
 
 export const TOOLS: ToolDefinition[] = [
@@ -48,6 +57,7 @@ export const TOOLS: ToolDefinition[] = [
     status: 'live',
     origin: '기업지원단 배포 HTML',
     keywords: '계산기 퇴직금 퇴직소득 상속 증여 가지급금 주식 양수도 급여 세금',
+    recommendedDocs: ['corporateRegistry'],
   },
   {
     key: 'startup-tax',
@@ -59,6 +69,8 @@ export const TOOLS: ToolDefinition[] = [
     status: 'live',
     origin: 'startup-tax-checker',
     keywords: '창업 감면 세액감면 청년창업 과밀억제권역 조특법 창업중소기업',
+    requiredDocs: ['businessRegistration'],
+    recommendedDocs: ['corporateRegistry'],
   },
   {
     key: 'cretop',
@@ -70,6 +82,8 @@ export const TOOLS: ToolDefinition[] = [
     status: 'live',
     origin: 'corp-consult-sales-os · cretop-engine',
     keywords: '재무제표 신용평가 부채비율 유동비율 이자보상배수 기업보고서 재무분석',
+    requiredDocs: ['cretopReport'],
+    recommendedDocs: ['financialStatements'],
   },
   {
     key: 'employment',
@@ -81,6 +95,8 @@ export const TOOLS: ToolDefinition[] = [
     status: 'live',
     origin: 'git-test · kind-cori (고용지원금 매니저 Pro)',
     keywords: '지원금 장려금 채용 청년 고용보험 명부 엑셀 4대보험 일자리도약',
+    requiredDocs: ['payrollRoster'],
+    recommendedDocs: ['businessRegistration'],
   },
   {
     key: 'labcare',
@@ -92,6 +108,8 @@ export const TOOLS: ToolDefinition[] = [
     status: 'live',
     origin: 'corp-consult-sales-os · LabCare 브랜치',
     keywords: '연구소 부설연구소 기업부설연구소 연구전담 세액공제 활동조사 변경신고',
+    requiredDocs: ['businessRegistration'],
+    recommendedDocs: ['corporateRegistry'],
   },
   {
     key: 'policy-funding',
@@ -103,6 +121,8 @@ export const TOOLS: ToolDefinition[] = [
     status: 'live',
     origin: 'policy-funding-os',
     keywords: '정책자금 융자 보증 기술보증 신용보증 중진공 소진공 대출 자금',
+    requiredDocs: ['businessRegistration', 'financialStatements'],
+    recommendedDocs: ['smeCertificate', 'corporateRegistry', 'healthInsurance'],
   },
   {
     key: 'sales-kit',
@@ -114,6 +134,7 @@ export const TOOLS: ToolDefinition[] = [
     status: 'review',
     origin: 'corp-consult-sales-os · main (법인컨설팅 세일즈 OS)',
     keywords: '영업 미팅 대본 상담 전략 가격표 제안 컨설팅 상품',
+    recommendedDocs: ['cretopReport'],
   },
   {
     key: 'cert-os',
@@ -154,6 +175,16 @@ export function searchTools(query: string): ToolDefinition[] {
   return usable.filter((t) =>
     `${t.label} ${t.desc} ${t.navHint ?? ''} ${t.keywords ?? ''} ${t.key} ${t.origin ?? ''}`.toLowerCase().includes(q),
   )
+}
+
+/** 이 서류를 쓰는 도구들 (서류함에서 "왜 필요한지" 에 함께 적는다, D-90) */
+export function toolsNeeding(doc: DocumentKey): ToolDefinition[] {
+  return TOOLS.filter((t) => t.status !== 'planned' && (t.requiredDocs ?? []).includes(doc))
+}
+
+/** 도구가 쓰는 서류 전부 (필요 + 있으면 좋음) */
+export function toolDocs(tool: ToolDefinition): DocumentKey[] {
+  return [...(tool.requiredDocs ?? []), ...(tool.recommendedDocs ?? [])]
 }
 
 /** 도입 검토중 목차가 가리키는 주소 */

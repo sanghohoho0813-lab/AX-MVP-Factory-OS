@@ -291,7 +291,7 @@ check('문구: 미정', dueText(null) === '기한 미정')
 /* ---------------- 카탈로그 일관성 ---------------- */
 {
   check('카탈로그: 업무 6종', SERVICES.length === 6, String(SERVICES.length))
-  check('카탈로그: 서류 10종', DOCUMENTS.length === 10, String(DOCUMENTS.length))
+  check('카탈로그: 서류 13종 (도구용 3종 포함, D-90)', DOCUMENTS.length === 13, String(DOCUMENTS.length))
   const docKeys = new Set(DOCUMENTS.map((d) => d.key))
   const badRefs = SERVICES.flatMap((s) => s.requiredDocuments.filter((d) => !docKeys.has(d)))
   check('카탈로그: 필요서류가 모두 실제 서류를 가리킴', badRefs.length === 0, badRefs.join(','))

@@ -858,14 +858,14 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
   const T = '2026-09-14'
   let r = normalizeClientOps({ id: 'doc1', companyName: '서류테스트' })
   check('서류 칸: 처음에는 없다', r.customDocuments.length === 0)
-  check('서류 칸: 기본 10종', allDocumentMetas(r).length === DOCUMENTS.length)
+  check('서류 칸: 기본 13종', allDocumentMetas(r).length === DOCUMENTS.length)
 
   r = withCustomDocument(r, { label: ' 법인인감증명서 ', validMonths: 3 })
   const made = r.customDocuments[0]
   check('서류 칸: 앞뒤 공백을 지우고 만든다', made?.label === '법인인감증명서')
   check('서류 칸: 키는 customdoc_ 로 시작한다', isCustomDocumentKey(made?.key ?? ''))
   check('서류 칸: 유효기간이 남는다', made?.validMonths === 3)
-  check('서류 칸: 기본 10종 뒤에 붙는다', allDocumentMetas(r).length === DOCUMENTS.length + 1 && allDocumentMetas(r).at(-1)?.label === '법인인감증명서')
+  check('서류 칸: 기본 칸 뒤에 붙는다', allDocumentMetas(r).length === DOCUMENTS.length + 1 && allDocumentMetas(r).at(-1)?.label === '법인인감증명서')
   check('서류 칸: 만들면 상태 칸도 생긴다', r.documents[made.key]?.received === false)
   check('서류 칸: 파일을 받는 칸이다', customDocumentMeta(made).needsFile === true)
   check('서류 칸: 이름 없는 칸은 만들지 않는다', withCustomDocument(r, { label: '   ' }).customDocuments.length === 1)

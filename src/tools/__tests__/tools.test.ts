@@ -31,11 +31,12 @@ import {
 } from '../salesKit/lib/salesData.js'
 import { buildCretopMeetingPoints, cretopGradeIsLow } from '../cretop/lib/meetingPoints'
 import { buildCretopParsedForUi, extractCretopCore } from '../cretop/engine/index.js'
-import { normalizeClientOps, withToolResult, withToolResultPublished, withoutToolResult, TOOL_RESULT_LIMIT, TOOL_DEADLINE_LIMIT } from '../../services/clientOpsService'
+import { normalizeClientOps, withDocument, withToolResult, withToolResultPublished, withoutToolResult, TOOL_RESULT_LIMIT, TOOL_DEADLINE_LIMIT } from '../../services/clientOpsService'
 import { buildClientSchedule, SCHEDULE_KIND_LABEL } from '../../services/clientOpsSchedule'
 import { roundDeadlines } from '../employment/lib/toolDeadlines'
 import { changeDeadlines, surveyDeadlineDate } from '../labcare/lib/toolDeadlines'
-import { TOOLS, liveTools, plannedTools, reviewTools, searchTools, toolOf } from '../../config/toolRegistry'
+import { TOOLS, liveTools, plannedTools, reviewTools, searchTools, toolOf, toolsNeeding } from '../../config/toolRegistry'
+import { missingDocsForTools, missingDocsText, missingReason, toolReadiness } from '../../services/toolReadiness'
 import { buildToolPublishInput, isToolResultPublished } from '../../services/toolPublish'
 import { listUpdates, publishUpdate } from '../../services/customerBridgeService'
 import { judge } from '../startupTax/lib/judgement'
@@ -310,6 +311,57 @@ function check(name: string, cond: boolean, detail?: string): void {
   const marked = withToolResultPublished(once, once.toolResults[0].id, published.id)
   check('발행: 한 번 보내면 그렇게 기억한다 (두 번 안 보낸다)', isToolResultPublished(marked.toolResults[0]) === true)
   check('발행: 입력값은 우리 기록에만 남는다', JSON.stringify(marked.toolResults[0].data).includes('1995-03-01') && !raw.includes('1995-03-01'))
+}
+
+/* ---- 8. 도구가 쓰는 서류 · 업체 준비 상태 (D-90) ---- */
+{
+  const TODAY = '2026-09-23'
+  const base = normalizeClientOps({ id: 'r1', companyName: '한솔테크(주)', workspaceId: null })
+
+  const employment = toolOf('employment')!
+  const cretop = toolOf('cretop')!
+  const tax = toolOf('tax')!
+  const policy = toolOf('policy-funding')!
+
+  check('서류: 도구마다 필요한 서류가 정해져 있다', (employment.requiredDocs ?? []).join() === 'payrollRoster' && (cretop.requiredDocs ?? []).join() === 'cretopReport')
+  check('서류: 세금 계산기는 서류가 필요 없다', (tax.requiredDocs ?? []).length === 0)
+  check('서류: 정책자금은 둘이 필요하다', (policy.requiredDocs ?? []).join() === 'businessRegistration,financialStatements')
+  check('서류: 이 서류를 쓰는 도구를 거꾸로 찾는다', toolsNeeding('payrollRoster').map((t) => t.key).join() === 'employment')
+  check('서류: 아무 도구도 안 쓰는 서류도 있다', toolsNeeding('jointCertificate').length === 0)
+
+  // 아무 서류도 없는 업체 — 이름이 그대로 나와야 한다
+  const empty = toolReadiness(base, employment, TODAY)
+  check('준비상태: 없으면 준비 안 됨', empty.ready === false && empty.missing.length === 1)
+  check('준비상태: 없는 서류를 이름으로 알려 준다', empty.missing[0].label === '4대보험 가입자 명부', empty.missing[0].label)
+  check('준비상태: 왜 못 쓰는지 한 줄', missingReason(empty.missing[0]) === '아직 안 받음')
+  check('준비상태: 서류가 필요 없는 도구는 늘 준비됨', toolReadiness(base, tax, TODAY).ready === true && toolReadiness(base, tax, TODAY).needsNothing === true)
+
+  // 받았다고 체크만 하고 파일이 없으면 — 도구는 읽을 수 없다
+  const checkedOnly = withDocument(base, 'payrollRoster', { received: true, issuedAt: '2026-09-01' })
+  const half = toolReadiness(checkedOnly, employment, TODAY)
+  check('준비상태: 받음 표시만으로는 부족하다 (파일이 있어야 읽는다)', half.ready === false && missingReason(half.missing[0]).includes('파일이 없음'), missingReason(half.missing[0]))
+
+  // 파일까지 올라오면 준비됨
+  const withFile = withDocument(checkedOnly, 'payrollRoster', { fileName: '명부.xlsx', fileSize: 1024 })
+  check('준비상태: 파일까지 있으면 준비됨', toolReadiness(withFile, employment, TODAY).ready === true)
+
+  // 유효기간이 지난 것은 없는 것으로 본다 (명부는 3개월)
+  const stale = withDocument(base, 'payrollRoster', { received: true, issuedAt: '2026-01-02', fileName: '명부.xlsx' })
+  const staleR = toolReadiness(stale, employment, TODAY)
+  check('준비상태: 기한 지난 서류는 없는 것으로 본다', staleR.ready === false && missingReason(staleR.missing[0]) === '유효기간 지남')
+
+  // 있으면 좋은 서류는 막지 않는다
+  const cretopOk = withDocument(base, 'cretopReport', { received: true, issuedAt: '2026-09-01', fileName: '크레탑.pdf' })
+  const cr = toolReadiness(cretopOk, cretop, TODAY)
+  check('준비상태: 권장 서류가 없어도 막지 않는다', cr.ready === true && cr.missingOptional.length === 1 && cr.missingOptional[0].label === '최근 3개년 재무제표')
+
+  // 업체 전체 — 없는 서류를 한 줄로, 많이 쓰는 것부터
+  const all = missingDocsForTools(base, liveTools(), TODAY)
+  check('준비상태: 업체에서 빠진 서류를 모아 준다', all.length === 4, missingDocsText(all))
+  check('준비상태: 사업자등록증이 맨 앞 (도구 셋이 쓴다)', all[0].label === '사업자등록증', missingDocsText(all))
+  check('준비상태: 같은 서류를 두 번 세지 않는다', new Set(all.map((n) => n.key)).size === all.length)
+  const ready = liveTools().map((t) => toolReadiness(withFile, t, TODAY)).filter((r) => r.ready).length
+  check('준비상태: 명부만 있으면 고용지원금·세금 계산기가 열린다', ready === 2, String(ready))
 }
 
 console.log(`\ntools: ${passed} passed, ${failed} failed`)

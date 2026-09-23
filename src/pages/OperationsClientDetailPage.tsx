@@ -18,6 +18,7 @@ import {
   ShieldAlert,
   Trash2,
   Upload,
+  Wrench,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { getDataModeConfig } from '../data/dataMode'
@@ -116,6 +117,7 @@ import { ContractCard } from '../components/ops/ContractCard'
 import { WorkHistoryCard } from '../components/ops/WorkHistoryCard'
 import { ToolResultsCard } from '../components/ops/ToolResultsCard'
 import { ClientToolsCard } from '../components/ops/ClientToolsCard'
+import { toolsNeeding } from '../config/toolRegistry'
 import { PortalTab } from '../components/ops/PortalTab'
 import {
   Badge,
@@ -618,8 +620,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       {/* 도구함에서 붙인 결과 — 창업감면 판정·크레탑 분석·정책자금 진단 … (D-88) */}
       <ToolResultsCard record={record} onChange={(next) => void commit(next)} />
 
-      {/* 이 업체로 도구 열기 — 결과가 다시 여기로 돌아온다 (D-89) */}
-      <ClientToolsCard clientId={record.id} />
+      {/* 이 업체로 도구 열기 — 결과가 다시 여기로 돌아온다 (D-89). 없는 서류는 여기서 빨갛게 (D-90) */}
+      <ClientToolsCard record={record} today={today} onOpenDocs={() => setTab('docs')} />
 
       {/* 3단계 — 막힘 / 돈 / 고객 연결 */}
       <section aria-label="현재 상태" className="ax-stagger grid grid-cols-2 gap-2.5 lg:grid-cols-3">
@@ -1122,6 +1124,14 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                   {needed.length > 0 && (
                     <p className="text-[0.82rem] break-keep text-slate-400">
                       필요한 업무: {needed.map((s) => s.shortLabel).join(', ')}
+                    </p>
+                  )}
+
+                  {/* 이 서류를 쓰는 도구 (D-90) — 올려 두면 그 도구가 바로 돈다 */}
+                  {toolsNeeding(meta.key).length > 0 && (
+                    <p className="text-[0.82rem] break-keep text-brand-700" data-testid={`doc-tools-${meta.key}`}>
+                      <Wrench aria-hidden="true" className="mr-1 inline size-3.5 align-[-2px]" />
+                      이 서류를 쓰는 도구: {toolsNeeding(meta.key).map((t) => t.label).join(' · ')}
                     </p>
                   )}
 
