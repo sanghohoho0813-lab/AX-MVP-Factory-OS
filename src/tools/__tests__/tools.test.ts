@@ -8,6 +8,7 @@
  */
 
 import { DEFAULT_INPUT, SAMPLE_INPUT, runDiagnosis } from '../policyFunding/diagnosis'
+import { changeColor, CRETOP_C, TREND_COMMENT_TONE } from '../cretop/lib/tones'
 import { oneLineConclusion, todayTasks } from '../policyFunding/coach'
 import { REPORT_DISCLAIMER } from '../policyFunding/report'
 import type { DiagnosisInput } from '../policyFunding/types'
@@ -35,7 +36,7 @@ import { normalizeClientOps, withDocument, withToolResult, withToolResultPublish
 import { buildClientSchedule, SCHEDULE_KIND_LABEL } from '../../services/clientOpsSchedule'
 import { roundDeadlines } from '../employment/lib/toolDeadlines'
 import { changeDeadlines, surveyDeadlineDate } from '../labcare/lib/toolDeadlines'
-import { TOOLS, liveTools, plannedTools, reviewTools, searchTools, toolOf, toolsNeeding } from '../../config/toolRegistry'
+import { sectionAccent, TOOLS, liveTools, plannedTools, reviewTools, searchTools, toolOf, toolsNeeding } from '../../config/toolRegistry'
 import { missingDocsForTools, missingDocsText, missingReason, toolReadiness } from '../../services/toolReadiness'
 import { ageOf, businessTypeOf, clientFacts, employeeCountOf, industryValueOf, prefilledText, yearsInBusiness } from '../shared/clientPrefill'
 import { buildToolPublishInput, isToolResultPublished } from '../../services/toolPublish'
@@ -588,6 +589,36 @@ function check(name: string, cond: boolean, detail?: string): void {
   check('체험: 끝나면 못 쓴다', trialExpired(over, T) && !canUse(over, T) && accessLabel(over, T) === '체험 끝남')
 }
 
+
+/* ---- 14. D-92 목차 색 · 크레탑 좋아짐/나빠짐 색 ---- */
+{
+  for (const t of TOOLS.filter((x) => (x.sections?.length ?? 0) > 1)) {
+    const secs = t.sections ?? []
+    // 같은 묶음은 같은 색
+    const byGroup = new Map<string, Set<string>>()
+    for (const s of secs) {
+      const g = s.group ?? '(없음)'
+      if (!byGroup.has(g)) byGroup.set(g, new Set())
+      byGroup.get(g)!.add(sectionAccent(s))
+    }
+    const one = [...byGroup.values()].every((v) => v.size === 1)
+    check(`목차 색: ${t.label} — 같은 묶음은 한 색`, !secs.some((s) => s.group) || one)
+    // 묶음끼리는 다른 색
+    if (secs.some((s) => s.group)) {
+      const colors = [...byGroup.values()].map((v) => [...v][0])
+      check(`목차 색: ${t.label} — 묶음끼리 겹치지 않는다`, new Set(colors).size === colors.length, colors.join(','))
+    }
+    check(`목차 색: ${t.label} — 두 가지 색 이상`, new Set(secs.map(sectionAccent)).size >= 2)
+  }
+  check('목차 색: 설정은 늘 회색', TOOLS.flatMap((t) => t.sections ?? []).filter((s) => s.key === 'settings').every((s) => sectionAccent(s) === 'system'))
+
+  check('크레탑 색: 매출 오르면 초록', changeColor('revenue', '상승') === CRETOP_C.ok)
+  check('크레탑 색: 매출 내리면 빨강', changeColor('revenue', '하락') === CRETOP_C.err)
+  check('크레탑 색: 부채비율 내리면 초록', changeColor('debtRatio', '하락') === CRETOP_C.ok)
+  check('크레탑 색: 차입금 늘면 빨강', changeColor('shortTermBorrowings', '상승') === CRETOP_C.err)
+  check('크레탑 색: 그대로면 회색', changeColor('revenue', '유지') === CRETOP_C.textM)
+  check('크레탑 색: 한 줄 평 글상자는 빨강·초록 바탕', TREND_COMMENT_TONE.red.bg === '#FEF2F2' && TREND_COMMENT_TONE.green.bg === '#F0FDF4')
+}
 
 console.log(`\ntools: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

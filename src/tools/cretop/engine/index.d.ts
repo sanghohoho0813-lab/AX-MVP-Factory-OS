@@ -182,3 +182,24 @@ export const CRETOP_EXTRACT_SAMPLE: string
 export const CRETOP_CORE_SAMPLE: string
 export const EXTRACT_ORDER: string[]
 export const EXTRACT_LABEL_KR: Record<string, string>
+
+/* 원본 분석 화면을 그대로 세울 때 쓰는 것 (D-92) */
+export const CRETOP_PREVIEW_TONES: Record<string, { bg: string; bd: string; fg: string; tag: string }>
+/** 단위 → 억원 배율 */
+export const CRETOP_UF: Record<string, number>
+/** 상세 재무제표 한 줄 */
+export interface CretopDetailItem {
+  id: string
+  account?: string
+  rawLabel?: string | null
+  unit?: string
+  numberCandidates?: Array<number | null>
+  yearCandidates?: Array<number | null>
+  [k: string]: unknown
+}
+export interface CretopDetailStatement {
+  name?: string
+  items: CretopDetailItem[]
+  years: Array<number | null>
+  noData: boolean
+}

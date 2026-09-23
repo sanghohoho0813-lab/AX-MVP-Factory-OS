@@ -14,7 +14,47 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { ChevronLeft, Menu, X } from 'lucide-react'
-import type { ToolDefinition } from '../../config/toolRegistry'
+import { sectionAccent, type ToolDefinition } from '../../config/toolRegistry'
+import type { NavAccent } from '../../config/moduleRegistry'
+
+/**
+ * 목차 아이콘 색 (D-92) — OS 왼쪽 메뉴와 같은 8색.
+ * 같은 묶음은 같은 색이다. 아이콘은 옅은 색 칸 안에 앉아 한눈에 묶음이 갈린다.
+ * (Tailwind 가 찾을 수 있게 클래스 이름을 통째로 적는다)
+ */
+const ICON_CHIP: Record<NavAccent, string> = {
+  overview: 'bg-nav-overview/20 text-nav-overview',
+  ops: 'bg-nav-ops/20 text-nav-ops',
+  revenue: 'bg-nav-revenue/20 text-nav-revenue',
+  customer: 'bg-nav-customer/20 text-nav-customer',
+  ai: 'bg-nav-ai/20 text-nav-ai',
+  evidence: 'bg-nav-evidence/20 text-nav-evidence',
+  alert: 'bg-nav-alert/20 text-nav-alert',
+  system: 'bg-slate-200/70 text-slate-500',
+}
+
+/** 고른 줄은 파란 바탕이라, 아이콘 칸은 흰 바탕에 같은 색 그대로 */
+const ICON_CHIP_ON: Record<NavAccent, string> = {
+  overview: 'bg-white text-nav-overview',
+  ops: 'bg-white text-nav-ops',
+  revenue: 'bg-white text-nav-revenue',
+  customer: 'bg-white text-nav-customer',
+  ai: 'bg-white text-nav-ai',
+  evidence: 'bg-white text-nav-evidence',
+  alert: 'bg-white text-nav-alert',
+  system: 'bg-white text-slate-500',
+}
+
+const GROUP_BAR: Record<NavAccent, string> = {
+  overview: 'bg-nav-overview',
+  ops: 'bg-nav-ops',
+  revenue: 'bg-nav-revenue',
+  customer: 'bg-nav-customer',
+  ai: 'bg-nav-ai',
+  evidence: 'bg-nav-evidence',
+  alert: 'bg-nav-alert',
+  system: 'bg-nav-system',
+}
 
 export interface ModuleShellProps {
   tool: ToolDefinition
@@ -117,22 +157,31 @@ function ModuleNavList({
     <div className="flex flex-col gap-3">
       {groups.map((g, gi) => (
         <div key={g.name || `g${gi}`} className="flex flex-col gap-0.5">
-          {g.name && <span className="t-meta px-2 pt-1 font-bold tracking-wide text-slate-400">{g.name}</span>}
+          {g.name && (
+            <span className="t-meta flex items-center gap-1.5 px-2 pt-1 font-bold tracking-wide text-slate-500" data-group-accent={sectionAccent(g.items[0])}>
+              <span aria-hidden="true" className={`h-3 w-1 shrink-0 rounded-full ${GROUP_BAR[sectionAccent(g.items[0])]}`} />
+              {g.name}
+            </span>
+          )}
           {g.items.map((item) => {
             const Icon = item.icon
             const on = item.key === section
+            const accent = sectionAccent(item)
             return (
               <Link
                 key={item.key}
                 to={`${tool.path}/${item.key}`}
                 data-section={item.key}
+                data-accent={accent}
                 aria-current={on ? 'page' : undefined}
                 title={item.hint}
-                className={`tap flex items-center gap-2 rounded-(--radius-control) px-2.5 py-2 text-[0.94rem] ${
+                className={`tap flex items-center gap-2.5 rounded-(--radius-control) px-2 py-1.5 text-[0.94rem] ${
                   on ? 'bg-brand-600 font-bold text-white' : 'font-medium text-slate-700 hover:bg-slate-100'
                 }`}
               >
-                <Icon aria-hidden="true" className={`size-4 shrink-0 ${on ? 'text-white' : 'text-slate-400'}`} />
+                <span aria-hidden="true" className={`flex size-7 shrink-0 items-center justify-center rounded-md ${on ? ICON_CHIP_ON[accent] : ICON_CHIP[accent]}`}>
+                  <Icon className="size-4" />
+                </span>
                 <span className="min-w-0 truncate">{item.label}</span>
               </Link>
             )

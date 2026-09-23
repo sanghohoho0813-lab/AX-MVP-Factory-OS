@@ -17,20 +17,14 @@ import { useModuleSection } from '../shared/ModuleRoute'
 import { ExtractorScreen } from './screens/ExtractorScreen'
 import { CoreCheckScreen } from './screens/CoreCheckScreen'
 import { Button } from '../../components/ui/Button'
-import { Badge, Disclosure, Section, Surface, type Tone } from '../../components/ui/primitives'
+import { Surface } from '../../components/ui/primitives'
+import { AnalysisView } from './screens/AnalysisView'
+import { CRETOP_WEAPON_MAP } from '../salesKit/lib/salesData.js'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
 import { useToolClient } from '../shared/toolClientContext'
 import { fetchClientDocFile, hasDocFile } from '../shared/clientDocFile'
-import {
-  buildCretopParsedForUi,
-  cretopCashflowGradeInfo,
-  cretopPreviewTone,
-  cretopTrendCommentRich,
-  extractCretopCore,
-  CORE_LABELS,
-  CORE_PREVIEW_ORDER,
-} from './engine/index.js'
-import type { CretopAmount, CretopParsedForUi, CretopTrendRow } from './engine/index.js'
+import { buildCretopParsedForUi, extractCretopCore } from './engine/index.js'
+import type { CretopAmount, CretopParsedForUi } from './engine/index.js'
 import { buildCretopMeetingPoints, type MeetingPoints } from './lib/meetingPoints'
 import { extractPdfLayout } from './lib/pdfLayout'
 
@@ -43,9 +37,6 @@ function loadText(): string {
     return ''
   }
 }
-
-/** 엔진의 카드 색(red/green) → OS 색 */
-const TONE_MAP: Record<string, Tone> = { red: 'danger', green: 'success', amber: 'warning', blue: 'brand', purple: 'brand' }
 
 function previewValue(k: string, p: CretopAmount | null | undefined): { text: string; year: number | null } {
   if (!p) return { text: '원문 확인 필요', year: null }
@@ -62,70 +53,6 @@ function previewValue(k: string, p: CretopAmount | null | undefined): { text: st
   return { text: '원문 확인 필요', year: null }
 }
 
-function fmtTrend(v: number | null, unit: string): string {
-  if (v == null) return '—'
-  if (unit === '%' || unit === '배' || unit === '회') return `${Math.round(v * 100) / 100}${unit}`
-  return `${Math.round(v * 100) / 100}억`
-}
-
-function TrendCard({ row }: { row: CretopTrendRow }) {
-  if (row.isGrade) {
-    const ser = row.gradeSeries ?? []
-    if (!ser.length) return null
-    const info = cretopCashflowGradeInfo(ser[ser.length - 1])
-    return (
-      <Surface className="flex flex-col gap-2 p-4">
-        <div className="flex items-center justify-between gap-2">
-          <span className="t-card font-bold text-slate-900">현금흐름등급</span>
-          <Badge tone={info.level === '현금흐름 주의' ? 'danger' : info.level === '현금흐름 양호' ? 'success' : 'neutral'}>
-            {ser[ser.length - 1]} · {info.level}
-          </Badge>
-        </div>
-        <div className="flex flex-wrap gap-1.5 t-meta text-slate-600">
-          {ser.map((g, i) => (
-            <span key={i} className="rounded-(--radius-control) border border-slate-200 px-2 py-0.5">
-              {row.years?.[i] ?? ''} {g}
-            </span>
-          ))}
-        </div>
-        <p className="t-sub break-keep text-slate-600">{info.text}</p>
-      </Surface>
-    )
-  }
-  const t = row.trend
-  if (!t || !t.series.length) return null
-  const rc = cretopTrendCommentRich(row.key, t)
-  const tone: Tone = rc.tone === 'red' ? 'danger' : rc.tone === 'green' ? 'success' : 'neutral'
-  const latestNeg = t.latest && typeof t.latest.val === 'number' && t.latest.val < 0
-  return (
-    <Surface edge={tone} className="flex flex-col gap-2 p-4">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="t-card font-bold text-slate-900">{row.label}</span>
-        <span className={`t-num ${latestNeg ? 'text-danger-700' : 'text-slate-900'}`}>{t.latest ? fmtTrend(t.latest.val, t.unit) : '—'}</span>
-      </div>
-      <div className="flex flex-wrap items-center gap-1.5 t-meta text-slate-600">
-        {t.series.map((s, i) => {
-          const st = t.steps[i]
-          return (
-            <span key={i} className="inline-flex items-center gap-1.5">
-              <span className={`rounded-(--radius-control) border px-2 py-0.5 ${typeof s.val === 'number' && s.val < 0 ? 'border-danger-200 text-danger-700' : 'border-slate-200'}`}>
-                {s.year ?? ''} {fmtTrend(s.val, t.unit)}
-              </span>
-              {st && (
-                <span className={`${st.dir === '상승' ? 'text-success-700' : st.dir === '하락' ? 'text-danger-700' : 'text-slate-400'}`}>
-                  {st.dir}
-                  {st.deltaPct != null ? ` ${st.deltaPct > 0 ? '+' : ''}${Math.round(st.deltaPct * 10) / 10}%` : ''}
-                </span>
-              )}
-            </span>
-          )
-        })}
-      </div>
-      <p className={`t-sub break-keep ${tone === 'danger' ? 'text-danger-700' : tone === 'success' ? 'text-success-700' : 'text-slate-600'}`}>{rc.text}</p>
-    </Surface>
-  )
-}
-
 function CretopScreen() {
   const [text, setText] = useState<string>(() => loadText())
   const [fileName, setFileName] = useState('')
@@ -135,6 +62,10 @@ function CretopScreen() {
   const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [copied, setCopied] = useState(false)
+  /** 신용등급이 그림이라 못 읽었을 때 대표가 골라 넣는 등급 (원본 그대로) */
+  const [manualGrade, setManualGrade] = useState('')
+  /** 1차 미팅 추가 제안 포인트 */
+  const [weapons, setWeapons] = useState<string[]>([])
   const fileRef = useRef<HTMLInputElement | null>(null)
 
   const ui: CretopParsedForUi | null = useMemo(() => {
@@ -231,9 +162,15 @@ function CretopScreen() {
       lines.push('[1차 미팅 포인트]')
       points.topPoints.forEach((p, i) => lines.push(`${i + 1}. ${p}`))
     }
+    const selW = weapons.map((nm) => CRETOP_WEAPON_MAP[nm]).filter(Boolean)
+    if (selW.length) {
+      lines.push('[선택한 추가 제안 포인트]')
+      selW.forEach((w, i) => lines.push(`${i + 1}. ${w.name} — ${w.q}`))
+    }
+    if (manualGrade) lines.push(`신용등급(직접 입력) ${manualGrade}`)
     lines.push('※ 모든 수치는 후보이며 원문 기준 확인이 필요합니다.')
     return lines.join('\n')
-  }, [ui, points])
+  }, [ui, points, weapons, manualGrade])
 
   const copy = async () => {
     try {
@@ -250,6 +187,8 @@ function CretopScreen() {
     setFileName('')
     setSubmitted(false)
     setError('')
+    setManualGrade('')
+    setWeapons([])
   }
 
   const reportName = ui?.companyInfo.companyName || fileName || '크레탑 보고서'
@@ -320,19 +259,9 @@ function CretopScreen() {
           <Surface className="flex flex-col gap-2 p-4 sm:p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
-                <p className="t-card font-bold text-slate-900" data-testid="cretop-company">
-                  {reportName}
-                </p>
+                <p className="t-card font-bold text-slate-900">분석 결과 — {reportName}</p>
                 <p className="t-sub break-keep text-slate-500">
-                  {[
-                    ui.companyInfo.ceoName ? `대표 ${ui.companyInfo.ceoName}` : '',
-                    ui.companyInfo.standardIndustry || ui.companyInfo.industry || '',
-                    ui.companyInfo.employees ? `직원 ${ui.companyInfo.employees}` : '',
-                    ui.companyInfo.established ? `설립 ${ui.companyInfo.established}` : '',
-                    ui.financialYears.length ? `재무 ${ui.financialYears.join('·')}년` : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' · ') || '회사 정보를 원문에서 찾지 못했습니다'}
+                  {ui.financialYears.length ? `재무 ${ui.financialYears.join('·')}년 · ` : ''}요약을 복사하거나 업체 기록에 붙입니다.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -346,94 +275,21 @@ function CretopScreen() {
                   verdict={null}
                   verdictLabel={points?.topPoints[0] ?? ''}
                   summary={summaryText}
-                  data={{ companyInfo: ui.companyInfo, corePreview: ui.corePreview, topPoints: points?.topPoints ?? [], fileName }}
+                  data={{ companyInfo: ui.companyInfo, corePreview: ui.corePreview, topPoints: points?.topPoints ?? [], weapons, creditGradeManual: manualGrade, fileName }}
                 />
               </div>
             </div>
           </Surface>
 
-          <Section title="핵심 재무 미리보기" count={CORE_PREVIEW_ORDER.length}>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5" data-testid="cretop-preview">
-              {CORE_PREVIEW_ORDER.map((k) => {
-                const p = ui.corePreview[k]
-                const v = previewValue(k, p)
-                const tn = cretopPreviewTone(k, p ?? null, null)
-                const tone: Tone | null = tn ? (TONE_MAP[tn] ?? 'neutral') : null
-                const label = k === 'creditGrade' ? '신용등급' : k === 'cashflowGrade' ? '현금흐름등급' : (CORE_LABELS[k] ?? k)
-                return (
-                  <Surface key={k} edge={tone ?? 'neutral'} showEdge={tone !== null} className="flex flex-col gap-0.5 p-3">
-                    <span className="t-meta truncate text-slate-500">
-                      {label}
-                      {v.year ? ` (${v.year})` : ''}
-                    </span>
-                    <span className={`t-body font-bold break-keep ${tone === 'danger' ? 'text-danger-700' : tone === 'success' ? 'text-success-700' : v.text === '원문 확인 필요' ? 'text-slate-400' : 'text-slate-900'}`} data-k={k}>
-                      {v.text}
-                    </span>
-                    {k === 'debtRatio' && p && p.capitalErosion && <span className="t-meta text-danger-700">자본잠식 위험 — 원문 확인 필요</span>}
-                  </Surface>
-                )
-              })}
-            </div>
-          </Section>
-
-          {points && points.topPoints.length > 0 && (
-            <Section title="1차 미팅 포인트" count={points.topPoints.length}>
-              <Surface className="flex flex-col gap-3 p-4">
-                <ol className="flex flex-col gap-2" data-testid="cretop-points">
-                  {points.pointPairs.map((p, i) => (
-                    <li key={p.title} className="flex gap-2.5">
-                      <span className="t-meta mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-slate-900 font-bold text-white">{i + 1}</span>
-                      <span className="min-w-0">
-                        <span className="t-body block font-medium break-keep text-slate-800">{p.title}</span>
-                        {p.q && <span className="t-sub block break-keep text-slate-500">질문: {p.q}</span>}
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-                {points.docs.length > 0 && (
-                  <p className="t-sub break-keep border-t border-slate-100 pt-2 text-slate-600">
-                    <b>요청 자료</b> {points.docs.join(' · ')}
-                  </p>
-                )}
-                {points.proposals.length > 0 && (
-                  <p className="t-sub break-keep text-slate-600">
-                    <b>제안 후보</b> {points.proposals.join(' / ')}
-                  </p>
-                )}
-              </Surface>
-            </Section>
-          )}
-
-          <Section title="3개년 추이">
-            <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-              {ui.trendRows
-                .filter((r) => (r.isGrade ? (r.gradeSeries?.length ?? 0) > 0 : (r.trend?.series.length ?? 0) > 0))
-                .map((r) => (
-                  <TrendCard key={r.key} row={r} />
-                ))}
-            </div>
-          </Section>
-
-          <Section title="재무비율 5영역">
-            <div className="flex flex-col gap-2.5">
-              {ui.ratioAreas.map((a) => (
-                <Disclosure key={a.key} title={a.name} hint={a.hint}>
-                  <div className="grid gap-2.5 sm:grid-cols-2">
-                    {a.metrics.map((m) =>
-                      m.missing ? (
-                        <Surface key={m.key} className="p-3">
-                          <span className="t-sub font-medium text-slate-700">{m.label}</span>
-                          <span className="t-meta block text-slate-400">원문 확인 필요</span>
-                        </Surface>
-                      ) : (
-                        <TrendCard key={m.key} row={m} />
-                      ),
-                    )}
-                  </div>
-                </Disclosure>
-              ))}
-            </div>
-          </Section>
+          <AnalysisView
+            ui={ui}
+            points={points}
+            reportName={reportName}
+            manualGrade={manualGrade}
+            setManualGrade={setManualGrade}
+            weapons={weapons}
+            setWeapons={(fn) => setWeapons(fn)}
+          />
 
           <p className="t-meta break-keep text-slate-400">
             연도 근거: 재무제표 {ui.financialYears.join('·') || '—'} / 비율표 {ui.reportRatioYears.join('·') || '—'} ({ui.ratioYearSource}, {ui.ratioYearConfidence}). 모든

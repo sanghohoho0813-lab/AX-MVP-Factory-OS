@@ -14,6 +14,7 @@
 
 import type { LucideIcon } from 'lucide-react'
 import type { DocumentKey } from '../types/clientOps'
+import type { NavAccent } from './moduleRegistry'
 import {
   BadgeCheck,
   Briefcase,
@@ -91,6 +92,36 @@ export interface ModuleSection {
   group?: string
   /** 한 줄 설명 — 목차 툴팁·모듈 홈 카드에 쓴다 */
   hint?: string
+  /**
+   * 목차 아이콘 색 (D-92). 적지 않으면 묶음(group) 색을 따른다 — 같은 묶음은 같은 색.
+   * 묶음 제목 없이 색만 나눌 때(화면이 몇 개 안 되는 모듈) 쓴다.
+   */
+  accent?: NavAccent
+}
+
+/**
+ * 목차 묶음 → 색 (D-92). OS 왼쪽 메뉴와 같은 색 8가지를 쓴다.
+ * 모든 모듈이 같은 표를 본다 — '고객' 은 어느 모듈에서든 같은 색, '설정' 은 늘 회색.
+ * 한 모듈 안에서는 묶음끼리 겹치지 않게 골랐다.
+ */
+export const SECTION_GROUP_ACCENT: Record<string, NavAccent> = {
+  판정: 'ai',
+  설립: 'ai',
+  계산: 'revenue',
+  성과: 'revenue',
+  '계약·성과': 'revenue',
+  고객: 'ops',
+  '미팅·제안': 'customer',
+  사후관리: 'evidence',
+  자료: 'evidence',
+  설정: 'system',
+}
+
+/** 목차 한 줄의 색 — 직접 적은 색 → 묶음 색 → 첫 묶음(한눈에 보기) 파랑 */
+export function sectionAccent(section: ModuleSection): NavAccent {
+  if (section.accent) return section.accent
+  if (section.group && SECTION_GROUP_ACCENT[section.group]) return SECTION_GROUP_ACCENT[section.group]
+  return 'overview'
 }
 
 export const TOOLS: ToolDefinition[] = [
@@ -123,7 +154,7 @@ export const TOOLS: ToolDefinition[] = [
     recommendedDocs: ['corporateRegistry'],
     sections: [
       { key: 'judge', label: '1분 판정', icon: Target, hint: '여덟 가지로 감면 가능성 판정' },
-      { key: 'report', label: '판정 결과서', icon: FileText, hint: '상담용 결과서 인쇄·저장' },
+      { key: 'report', label: '판정 결과서', icon: FileText, accent: 'customer', hint: '상담용 결과서 인쇄·저장' },
     ],
   },
   {
@@ -140,8 +171,8 @@ export const TOOLS: ToolDefinition[] = [
     recommendedDocs: ['financialStatements'],
     sections: [
       { key: 'analyze', label: '보고서 분석', icon: LineChart, hint: 'PDF·붙여넣기 → 핵심 재무·미팅 포인트' },
-      { key: 'core-check', label: '핵심지표 검수', icon: ClipboardCheck, hint: '뽑아낸 숫자를 줄 단위로 검수' },
-      { key: 'extractor', label: '숫자 추출기', icon: FileSpreadsheet, hint: '표 텍스트에서 숫자만 골라내기' },
+      { key: 'core-check', label: '핵심지표 검수', icon: ClipboardCheck, accent: 'evidence', hint: '뽑아낸 숫자를 줄 단위로 검수' },
+      { key: 'extractor', label: '숫자 추출기', icon: FileSpreadsheet, accent: 'evidence', hint: '표 텍스트에서 숫자만 골라내기' },
     ],
   },
   {
@@ -196,7 +227,7 @@ export const TOOLS: ToolDefinition[] = [
       { key: 'tax', label: '세액공제', icon: Wallet, group: '성과', hint: '연구·인력개발비 세액공제 예상' },
       { key: 'reports', label: '고객 리포트', icon: FileText, group: '성과', hint: '월간·상세·절세·방문용 4종' },
       { key: 'resources', label: '안내문·자료실', icon: Megaphone, group: '성과', hint: '템플릿 11종' },
-      { key: 'settings', label: '설정·백업', icon: Wrench, group: '성과', hint: '백업 내보내기·불러오기' },
+      { key: 'settings', label: '설정·백업', icon: Wrench, group: '설정', hint: '백업 내보내기·불러오기' },
     ],
   },
   {
@@ -213,9 +244,9 @@ export const TOOLS: ToolDefinition[] = [
     recommendedDocs: ['smeCertificate', 'corporateRegistry', 'healthInsurance'],
     sections: [
       { key: 'dashboard', label: '대시보드', icon: LayoutDashboard, hint: '상담 단계별 현황·오늘 할 일' },
-      { key: 'diagnosis', label: '진단하기', icon: Target, hint: '8문항 빠른 진단 + 심층 진단' },
-      { key: 'customers', label: '상담 고객 관리', icon: Building2, hint: '단계·다음 액션·체크리스트' },
-      { key: 'report', label: '인쇄 리포트', icon: FileText, hint: '대표님 한 페이지 요약 + 11섹션' },
+      { key: 'diagnosis', label: '진단하기', icon: Target, accent: 'ai', hint: '8문항 빠른 진단 + 심층 진단' },
+      { key: 'customers', label: '상담 고객 관리', icon: Building2, accent: 'ops', hint: '단계·다음 액션·체크리스트' },
+      { key: 'report', label: '인쇄 리포트', icon: FileText, accent: 'customer', hint: '대표님 한 페이지 요약 + 11섹션' },
     ],
   },
   {
@@ -243,7 +274,7 @@ export const TOOLS: ToolDefinition[] = [
       { key: 'education', label: '교육 아카이브', icon: Notebook, group: '자료', hint: '교육 기록 → 상담 활용' },
       { key: 'strategies', label: '절세전략', icon: Sparkles, group: '자료', hint: '절세전략 라이브러리' },
       { key: 'updates', label: '법령·공고', icon: Scale, group: '자료', hint: '법령 입력 → 영향 고객' },
-      { key: 'settings', label: '설정·백업', icon: Wrench, group: '자료', hint: '백업·샘플·표시 설정' },
+      { key: 'settings', label: '설정·백업', icon: Wrench, group: '설정', hint: '백업·샘플·표시 설정' },
     ],
   },
   {
