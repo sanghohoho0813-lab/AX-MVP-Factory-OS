@@ -142,7 +142,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('모듈 목차: 급여 계산기 화면이 뜬다', (await page.locator('main').innerText()).includes('급여'))
 
   // 아직 안 옮긴 화면은 그렇게 적는다 (없는 기능을 있는 척하지 않는다)
-  await page.goto(BASE + '/tools/labcare/notes', { waitUntil: 'networkidle' })
+  await page.goto(BASE + '/tools/sales-kit/prospecting', { waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
   check('모듈 목차: 아직 안 옮긴 화면은 그렇게 적는다', (await page.getByTestId('module-pending').count()) === 1)
 
@@ -224,6 +224,86 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(600)
   await page.locator('button[data-program="youth_jump"]').click()
   await page.waitForTimeout(600)
+
+  /* ---- D-91 3단계: 연구소 고객사 · 오늘 할 일 · 연구노트 · 활동조사 · 현장조사 · 리포트 ---- */
+  await page.goto(BASE + '/tools/labcare/clients', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  check('연구소 고객사: OS 업체가 그대로 선다', (await page.getByTestId('lab-clients').locator('button[data-client]').count()) === 5)
+  await page.getByTestId('lab-clients').locator('button[data-client="cli_hansol"]').click()
+  await page.waitForTimeout(500)
+  await page.getByLabel('연구소 이름').fill('한솔기술연구소')
+  await page.getByLabel('인정일').fill('2024-05-02')
+  await page.getByTestId('lab-researcher-add').click()
+  await page.waitForTimeout(200)
+  await page.getByLabel('1번째 연구원 이름').fill('박연구')
+  await page.getByLabel('1번째 연구원 직책').fill('연구소장')
+  check('연구소 고객사: 전담 1명이면 모자란다고 말한다', (await page.getByTestId('lab-researcher-warn').innerText()).includes('2명'), await page.getByTestId('lab-researcher-warn').innerText())
+  await page.getByTestId('lab-info-save').click()
+  await page.waitForTimeout(800)
+  await page.goto(BASE + '/tools/labcare/clients', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  check('연구소 고객사: 적은 것이 목록에 남는다', (await page.getByTestId('lab-clients').innerText()).includes('기업부설연구소'), (await page.getByTestId('lab-clients').innerText()).slice(0, 200))
+
+  await page.goto(BASE + '/tools/labcare/tasks', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  const labTasks = page.getByTestId('lab-task-list')
+  check('연구소 오늘 할 일: 노트 없음이 맨 앞', (await labTasks.locator('li').first().innerText()).includes('연구노트'), (await labTasks.locator('li').first().innerText()).slice(0, 80))
+  check('연구소 오늘 할 일: 활동조사도 잡힌다', (await labTasks.innerText()).includes('활동조사'))
+
+  // 연구노트 — 과제 만들고 초안까지
+  await page.goto(BASE + '/tools/labcare/notes?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  await page.getByTestId('lab-project-add').click()
+  await page.waitForTimeout(300)
+  await page.getByLabel('과제명').fill('열처리 공정 개선')
+  await page.getByLabel('제품 서비스').fill('자동차 부품 열처리')
+  await page.getByTestId('lab-project-save').click()
+  await page.waitForTimeout(800)
+  await page.getByLabel('연구활동').fill('열처리 온도 구간을 세 단계로 나누어 시험하고 경도 변화를 측정했다')
+  await page.getByLabel('관련성').fill('자동차 부품 열처리 공정의 불량률을 낮추기 위한 활동')
+  await page.waitForTimeout(300)
+  await page.getByTestId('lab-note-draft').click()
+  await page.waitForTimeout(600)
+  const noteText = await page.getByTestId('lab-note-text').innerText()
+  check('연구노트: 초안이 만들어진다', noteText.includes('열처리 공정 개선') && noteText.includes('1. 이번 달 연구개발 활동'), noteText.slice(0, 120))
+  await page.getByTestId('lab-note-audit').click()
+  await page.waitForTimeout(500)
+  check('연구노트: 실사 보완이 붙는다', (await page.getByTestId('lab-note-text').innerText()).includes('[실사 대응 보완]'))
+  await page.getByTestId('lab-note-save').click()
+  await page.waitForTimeout(800)
+  check('연구노트: 저장하면 목록에 남는다', (await page.getByTestId('lab-note-list').innerText()).includes('한솔테크'), (await page.getByTestId('lab-note-list').innerText()).slice(0, 120))
+
+  // 활동조사 — 제출 완료로 바꾸면 오늘 할 일에서 빠진다
+  await page.goto(BASE + '/tools/labcare/survey', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  check('활동조사: 연구소 정보를 적은 업체만 나온다', (await page.getByTestId('lab-survey-list').locator('li').count()) === 1, String(await page.getByTestId('lab-survey-list').locator('li').count()))
+  await page.locator('select[data-client="cli_hansol"]').selectOption('제출 완료')
+  await page.waitForTimeout(800)
+  await page.goto(BASE + '/tools/labcare/tasks', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check('활동조사: 제출하면 오늘 할 일에서 빠진다', !(await page.getByTestId('lab-task-list').innerText()).includes('활동조사 미제출'), (await page.getByTestId('lab-task-list').innerText()).slice(0, 200))
+
+  // 현장조사 — 체크가 업체별로 남는다
+  await page.goto(BASE + '/tools/labcare/inspection?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  check('현장조사: 핵심 항목이 빠졌다고 알려 준다', (await page.getByTestId('lab-inspection-urgent').count()) === 1)
+  await page.locator('input[data-item="namecard"]').check()
+  await page.waitForTimeout(700)
+  await page.goto(BASE + '/tools/labcare/inspection?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check('현장조사: 체크가 그 업체에 남는다', await page.locator('input[data-item="namecard"]').isChecked())
+
+  // 고객 리포트 — 이 모듈이 아는 것이 글로 모인다
+  await page.goto(BASE + '/tools/labcare/reports?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  const labReport = await page.getByTestId('lab-report-text').innerText()
+  check('연구소 리포트: 업체·연구소·노트·현장조사가 한 장에', labReport.includes('한솔기술연구소') && labReport.includes('열처리 공정 개선') && labReport.includes('/12'), labReport.slice(0, 200))
+
+  // 조직도 — 연구소 고객사에 적어 둔 사람이 그려진다
+  await page.goto(BASE + '/tools/labcare/org-diagram?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check('조직도: 적어 둔 연구소장이 그려진다', (await page.getByTestId('lab-org').innerText()).includes('박연구'), (await page.getByTestId('lab-org').innerText()).slice(0, 200))
+  check('조직도: 도면 편집기는 아직 없다고 적는다', (await page.getByTestId('lab-floorplan-note').count()) === 1)
 
   /* ---- D-89: 업체에서 도구 열기 → 결과·기한이 그 업체로 ---- */
   // 업체 상세에 '이 업체로 도구 열기' 줄이 있고, 거기서 연 도구에는 업체 띠가 뜬다

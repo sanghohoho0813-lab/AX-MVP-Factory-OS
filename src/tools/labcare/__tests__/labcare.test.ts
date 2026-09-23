@@ -12,6 +12,11 @@ import { changeDeadlineOf, ddayOf, nextCheckDate, ymdLocal } from '../lib/deadli
 import { DOC_MASTER, buildTempPackage, docProgressOf, missingDocs, stageOf, type SetupDoc } from '../lib/documents'
 import { RESOURCE_TEMPLATES, fillTemplate } from '../lib/templates'
 import { INSPECTION_ITEMS, INSPECTION_POINTS } from '../lib/inspection'
+import { checkRelevance, currentMonth, enhanceForAudit, generateNoteDraft, NOTE_STATUSES } from '../lib/noteDraft'
+import { dedicatedCount, emptyLabInfo, minResearchers, researcherWarning } from '../lib/labInfo'
+import { buildLabTasks, currentYear } from '../lib/labTasks'
+import { monthlyReportText } from '../lib/monthlyReport'
+import { surveyRequestText } from '../lib/surveyText'
 import { BENEFIT_OPTIONS, composeBenefitText } from '../lib/report'
 import { DEFAULT_ANSWERS, REASONS, mapChangeStatus } from '../lib/changes'
 import { newCandidate } from '../lib/assessmentOptions'
@@ -224,6 +229,92 @@ check('추가 혜택 11종', BENEFIT_OPTIONS.length === 11)
 check('혜택 문장은 검토 톤 (됩니다 단정 없음)', BENEFIT_OPTIONS.every((o) => o.sentence.includes('검토') || o.sentence.includes('점검') || o.sentence.includes('확인') || o.sentence.includes('활용')))
 const composed = composeBenefitText(['patent', 'welfareFund'])
 check('혜택 문장 조합은 표 순서 유지', composed.split('\n').length === 2 && composed.startsWith('사내근로복지기금'))
+
+/* ---- D-91 3단계: 연구노트 · 연구소 정보 · 오늘 할 일 · 리포트 ---- */
+{
+  const project = { name: '열처리 공정 개선', productService: '자동차 부품 열처리' }
+  const input = {
+    month: '2026-09',
+    activities: '열처리 온도 구간을 3단계로 나누어 시험하고 경도 변화를 측정했다',
+    tests: '샘플 12개 경도 측정',
+    problems: '고온 구간에서 변형 발생',
+    nextPlan: '냉각 속도 조절 시험',
+    roles: [{ name: '박연구', role: '시험 설계' }],
+    relevance: '자동차 부품 열처리 공정의 불량률을 낮추기 위한 활동',
+  }
+  const draft = generateNoteDraft(input, '한솔테크(주)', project)
+  check('연구노트: 여섯 칸이 순서대로 들어간다', ['1. 이번 달 연구개발 활동', '2. 테스트 및 개선', '3. 확인된 문제점', '4. 참여 연구원별 역할', '5. 업종·제품·서비스와의 직접 관련성', '6. 다음 달 연구 계획'].every((h) => draft.includes(h)))
+  check('연구노트: 업체·과제가 머리에 붙는다', draft.includes('한솔테크(주)') && draft.includes('열처리 공정 개선'))
+  check('연구노트: 빈 칸은 미입력이라고 적는다', generateNoteDraft({ ...input, tests: '' }, '한솔테크(주)', project).includes('(테스트/개선 미입력)'))
+  const audited = enhanceForAudit(draft, project)
+  check('연구노트: 실사 보완이 뒤에 붙는다', audited.includes('[실사 대응 보완]') && audited.length > draft.length)
+  check('연구노트: 상태 다섯 가지', NOTE_STATUSES.length === 5 && NOTE_STATUSES[0] === '작성 필요')
+  check('연구노트: 이번 달은 YYYY-MM', /^\d{4}-\d{2}$/.test(currentMonth(new Date('2026-09-23T00:00:00'))))
+
+  const weak = checkRelevance({ activities: '연구함', relevance: '짧음' }, project)
+  check('연구노트: 일반적인 서술은 짚어 준다', !weak.ok && weak.hints.length >= 2, JSON.stringify(weak.hints))
+  const strong = checkRelevance({ activities: input.activities, relevance: input.relevance }, project)
+  check('연구노트: 구체적이면 아무 말 안 한다', strong.ok, JSON.stringify(strong.hints))
+
+  // 연구소 정보
+  const info = emptyLabInfo()
+  check('연구소: 기본은 기업부설연구소 · 최소 2명', info.labType === '기업부설연구소' && minResearchers('기업부설연구소') === 2 && minResearchers('연구개발전담부서') === 1)
+  check('연구소: 비밀번호 칸이 없다', Object.keys(info).every((k) => !/password|비밀번호/i.test(k)))
+  check('연구소: 사람이 없으면 그렇게 말한다', researcherWarning(info).includes('아직 적지 않았습니다'))
+  const one = { ...info, researchers: [{ name: '박연구', role: '연구전담요원', joinDate: '2026-01-02', dedicated: true }] }
+  check('연구소: 전담 1명이면 모자란다고 말한다', researcherWarning(one).includes('2명 이상') && dedicatedCount(one) === 1)
+  const two = { ...one, researchers: one.researchers.concat([{ name: '최연구', role: '연구전담요원', joinDate: '2026-02-02', dedicated: true }]) }
+  check('연구소: 전담 2명이면 아무 말 안 한다', researcherWarning(two) === '')
+  const mixed = { ...one, researchers: one.researchers.concat([{ name: '겸직', role: '연구전담요원', joinDate: '2026-02-02', dedicated: false }]) }
+  check('연구소: 겸직은 전담 수에 안 센다', dedicatedCount(mixed) === 1)
+
+  // 오늘 할 일
+  const tasks = buildLabTasks({
+    clients: [{ id: 'c1', name: '한솔테크' }, { id: 'c2', name: '연구소 없는 곳' }],
+    labInfo: new Map([['c1', one]]),
+    notedThisMonth: new Set<string>(),
+    surveyedThisYear: new Set<string>(),
+    inspectionChecked: new Map(),
+    urgentInspectionKeys: INSPECTION_ITEMS.filter((i) => i.emphasis).map((i) => i.key),
+    month: '2026-09',
+    year: 2026,
+  })
+  check('할 일: 연구소 정보가 없는 업체는 건드리지 않는다', tasks.every((t) => t.clientId === 'c1'))
+  check('할 일: 노트 없음이 가장 급하다', tasks[0].kind === 'note', tasks.map((t) => t.kind).join(','))
+  check('할 일: 활동조사·인원·현장조사도 같이 잡는다', ['survey', 'researcher', 'inspection'].every((k) => tasks.some((t) => t.kind === k)), tasks.map((t) => t.kind).join(','))
+  const clean = buildLabTasks({
+    clients: [{ id: 'c1', name: '한솔테크' }],
+    labInfo: new Map([['c1', two]]),
+    notedThisMonth: new Set(['c1']),
+    surveyedThisYear: new Set(['c1']),
+    inspectionChecked: new Map([['c1', INSPECTION_ITEMS.map((i) => i.key)]]),
+    urgentInspectionKeys: INSPECTION_ITEMS.filter((i) => i.emphasis).map((i) => i.key),
+    month: '2026-09',
+    year: 2026,
+  })
+  check('할 일: 다 챙겼으면 비어 있다', clean.length === 0, JSON.stringify(clean))
+  check('할 일: 올해는 숫자', currentYear(new Date('2026-09-23T00:00:00')) === 2026)
+
+  // 월간 리포트
+  const report = monthlyReportText({
+    companyName: '한솔테크(주)',
+    month: '2026-09',
+    info: two,
+    notes: [{ projectName: '열처리 공정 개선', status: '저장 완료' }],
+    inspection: { done: 9, total: 12 },
+    surveyStatus: '2026년 제출 완료',
+    benefitKeys: ['policyFund'],
+  })
+  check('리포트: 업체·달·연구소 유형이 들어간다', report.includes('한솔테크(주)') && report.includes('2026-09') && report.includes('기업부설연구소'))
+  check('리포트: 이번 달 노트를 적는다', report.includes('열처리 공정 개선') && report.includes('저장 완료'))
+  check('리포트: 현장조사 준비도를 적는다', report.includes('9/12'))
+  check('리포트: 고른 혜택 문장이 들어간다', report.includes('정책자금'))
+  const empty = monthlyReportText({ companyName: 'A', month: '2026-09', info: two, notes: [], inspection: { done: 0, total: 12 }, surveyStatus: '미제출', benefitKeys: [] })
+  check('리포트: 노트가 없으면 없다고 적는다', empty.includes('아직 작성된 연구노트가 없습니다'))
+
+  check('활동조사 요청: 연도와 세 가지 요청', surveyRequestText('한솔테크(주)', 2026).includes('2026년') && surveyRequestText('한솔테크(주)', 2026).includes('연구전담요원 명단'))
+}
+
 
 console.log(`\nlabcare: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

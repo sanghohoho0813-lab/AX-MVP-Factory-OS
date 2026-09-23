@@ -14,8 +14,15 @@ import { Check, Copy, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
 import { ModuleDashboard } from '../shared/ModuleDashboard'
-import { ModulePending } from '../shared/ModulePending'
 import { useModuleSection } from '../shared/ModuleRoute'
+import { TasksScreen } from './screens/TasksScreen'
+import { LabClientsScreen } from './screens/LabClientsScreen'
+import { OrgDiagramScreen } from './screens/OrgDiagramScreen'
+import { NotesScreen } from './screens/NotesScreen'
+import { SurveyScreen } from './screens/SurveyScreen'
+import { InspectionScreen } from './screens/InspectionScreen'
+import { ReportsScreen } from './screens/ReportsScreen'
+import { LabSettingsScreen } from './screens/LabSettingsScreen'
 import { Button } from '../../components/ui/Button'
 import { Badge, Disclosure, MetricTile, Section, Surface, type Tone } from '../../components/ui/primitives'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
@@ -379,21 +386,29 @@ export function LabcarePage() {
             : '설립 가능성부터 서류·월간 점검·변경신고·안내문까지 한 곳에서 봅니다. 상담용 1차 검토이며 신고 기관 심사와 세무 대리인 검토를 대신하지 않습니다.'
         }
       />
-      {section === 'dashboard' && <ModuleDashboard toolKey="labcare" />}
+      {section === 'dashboard' && (
+        <ModuleDashboard toolKey="labcare">
+          <TasksScreen />
+        </ModuleDashboard>
+      )}
+      {section === 'tasks' && <TasksScreen />}
+      {section === 'clients' && <LabClientsScreen />}
       {section === 'assessment' && <AssessTab />}
       {section === 'setup-docs' && <DocsTab />}
-      {section === 'check' && <CheckTab />}
-      {section === 'tax' && <TaxTab />}
+      {section === 'org-diagram' && <OrgDiagramScreen />}
+      {section === 'notes' && <NotesScreen />}
       {section === 'changes' && <ChangesTab />}
+      {section === 'survey' && <SurveyScreen />}
+      {section === 'check' && <CheckTab />}
+      {section === 'inspection' && <InspectionScreen />}
+      {section === 'tax' && <TaxTab />}
+      {section === 'reports' && <ReportsScreen />}
       {section === 'resources' && <TemplatesTab />}
-      {PENDING_SECTIONS.includes(section) && <ModulePending label={meta?.label ?? '이 화면'} />}
+      {section === 'settings' && <LabSettingsScreen />}
       <p className="t-meta break-keep text-slate-400">{DISCLAIMER}</p>
     </div>
   )
 }
-
-/** 아직 옮기지 않은 화면들 — 옮기는 대로 위의 목록으로 올라온다 */
-const PENDING_SECTIONS = ['tasks', 'clients', 'org-diagram', 'notes', 'survey', 'inspection', 'reports', 'settings']
 
 /* ═════════════════ ① 설립 가능성 체크 ═════════════════ */
 
