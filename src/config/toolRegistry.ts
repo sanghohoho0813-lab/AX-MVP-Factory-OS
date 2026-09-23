@@ -14,7 +14,35 @@
 
 import type { LucideIcon } from 'lucide-react'
 import type { DocumentKey } from '../types/clientOps'
-import { BadgeCheck, Briefcase, Calculator, FlaskConical, Landmark, LineChart, Sparkles, Users } from 'lucide-react'
+import {
+  BadgeCheck,
+  Briefcase,
+  Building2,
+  CalendarCheck,
+  Calculator,
+  ClipboardCheck,
+  ClipboardList,
+  FileSpreadsheet,
+  FileText,
+  FlaskConical,
+  Gauge,
+  Handshake,
+  Landmark,
+  LayoutDashboard,
+  LineChart,
+  ListChecks,
+  Megaphone,
+  Notebook,
+  PieChart,
+  Scale,
+  Settings2,
+  Sparkles,
+  Target,
+  TrendingUp,
+  Users,
+  Wallet,
+  Wrench,
+} from 'lucide-react'
 
 export type ToolStatus = 'live' | 'review' | 'planned'
 
@@ -44,6 +72,25 @@ export interface ToolDefinition {
   requiredDocs?: DocumentKey[]
   /** 있으면 더 정확해지는 서류 — 없어도 경고하지 않고 '있으면 좋음' 으로만 적는다 */
   recommendedDocs?: DocumentKey[]
+  /**
+   * 모듈 안의 화면들 (D-91). 원본 OS 의 왼쪽 목차를 그대로 옮긴 것.
+   * 있으면 도구 화면에 **2단 목차**가 선다 — 넓은 화면은 왼쪽 한 칸, 휴대폰은 모듈 햄버거.
+   * 주소는 `/tools/<key>/<section>` 이다. 첫 화면이 기본이다.
+   */
+  sections?: ModuleSection[]
+}
+
+/** 모듈 안의 화면 하나 */
+export interface ModuleSection {
+  /** 주소 조각 — `/tools/employment/dashboard` 의 `dashboard` */
+  key: string
+  /** 목차에 보일 이름 */
+  label: string
+  icon: LucideIcon
+  /** 목차에서 묶는 이름 (없으면 묶지 않는다) */
+  group?: string
+  /** 한 줄 설명 — 목차 툴팁·모듈 홈 카드에 쓴다 */
+  hint?: string
 }
 
 export const TOOLS: ToolDefinition[] = [
@@ -58,6 +105,9 @@ export const TOOLS: ToolDefinition[] = [
     origin: '기업지원단 배포 HTML',
     keywords: '계산기 퇴직금 퇴직소득 상속 증여 가지급금 주식 양수도 급여 세금',
     recommendedDocs: ['corporateRegistry'],
+    sections: [
+      { key: 'calculators', label: '계산기 9종', icon: Calculator, hint: '급여·퇴직·주식·상속·가지급금' },
+    ],
   },
   {
     key: 'startup-tax',
@@ -71,6 +121,10 @@ export const TOOLS: ToolDefinition[] = [
     keywords: '창업 감면 세액감면 청년창업 과밀억제권역 조특법 창업중소기업',
     requiredDocs: ['businessRegistration'],
     recommendedDocs: ['corporateRegistry'],
+    sections: [
+      { key: 'judge', label: '1분 판정', icon: Target, hint: '여덟 가지로 감면 가능성 판정' },
+      { key: 'report', label: '판정 결과서', icon: FileText, hint: '상담용 결과서 인쇄·저장' },
+    ],
   },
   {
     key: 'cretop',
@@ -84,6 +138,11 @@ export const TOOLS: ToolDefinition[] = [
     keywords: '재무제표 신용평가 부채비율 유동비율 이자보상배수 기업보고서 재무분석',
     requiredDocs: ['cretopReport'],
     recommendedDocs: ['financialStatements'],
+    sections: [
+      { key: 'analyze', label: '보고서 분석', icon: LineChart, hint: 'PDF·붙여넣기 → 핵심 재무·미팅 포인트' },
+      { key: 'core-check', label: '핵심지표 검수', icon: ClipboardCheck, hint: '뽑아낸 숫자를 줄 단위로 검수' },
+      { key: 'extractor', label: '숫자 추출기', icon: FileSpreadsheet, hint: '표 텍스트에서 숫자만 골라내기' },
+    ],
   },
   {
     key: 'employment',
@@ -97,6 +156,18 @@ export const TOOLS: ToolDefinition[] = [
     keywords: '지원금 장려금 채용 청년 고용보험 명부 엑셀 4대보험 일자리도약',
     requiredDocs: ['payrollRoster'],
     recommendedDocs: ['businessRegistration'],
+    sections: [
+      { key: 'dashboard', label: '대시보드', icon: LayoutDashboard, hint: '이번 달 신청 가능·지연·서류·수령 한눈에' },
+      { key: 'companies', label: '업체 관리', icon: Building2, hint: '업체별 직원·회차·서류·수수료·업무 일지' },
+      { key: 'board', label: '진행 보드', icon: ClipboardList, hint: '준비중 → 최종 지급까지 7단계' },
+      { key: 'diagnosis', label: '채용 진단', icon: Target, group: '판정', hint: '채용 조건으로 가능한 지원금 가려내기' },
+      { key: 'roster', label: '4대보험 명부 진단', icon: FileSpreadsheet, group: '판정', hint: '명부 파일로 직원별 후보 1차 검토' },
+      { key: 'schedule', label: '회차 일정', icon: CalendarCheck, group: '계산', hint: '입사일로 회차별 신청일·D-day' },
+      { key: 'wage', label: '급여 계산기', icon: Calculator, group: '계산', hint: '실수령액·사업주 부담·최저임금 판정' },
+      { key: 'simulator', label: '수령액 시뮬레이터', icon: TrendingUp, group: '계산', hint: '인원×입사일로 월별 현금흐름' },
+      { key: 'programs', label: '지원금 관리', icon: Settings2, group: '설정', hint: '지원금 15종 켜기·끄기·회차 편집' },
+      { key: 'settings', label: '설정·백업', icon: Wrench, group: '설정', hint: '백업 내보내기·불러오기' },
+    ],
   },
   {
     key: 'labcare',
@@ -110,6 +181,23 @@ export const TOOLS: ToolDefinition[] = [
     keywords: '연구소 부설연구소 기업부설연구소 연구전담 세액공제 활동조사 변경신고',
     requiredDocs: ['businessRegistration'],
     recommendedDocs: ['corporateRegistry'],
+    sections: [
+      { key: 'dashboard', label: '대시보드', icon: LayoutDashboard, hint: '오늘 할 일·설립 진행·연구노트·변경 D-day' },
+      { key: 'tasks', label: '오늘 할 일', icon: ListChecks, hint: '서류·노트·변경신고·리포트를 한 줄로' },
+      { key: 'clients', label: '연구소 고객사', icon: Building2, hint: '연구소 관점의 업체 현황' },
+      { key: 'assessment', label: '설립 가능성 체크', icon: ClipboardCheck, group: '설립', hint: '인원·자격·물적요건 판정' },
+      { key: 'setup-docs', label: '설립서류 관리', icon: FileText, group: '설립', hint: '서류 26종 체크 + 요청문·프롬프트' },
+      { key: 'org-diagram', label: '조직도·도면', icon: Gauge, group: '설립', hint: '조직도 SVG · 도면 편집기 · 촬영 가이드' },
+      { key: 'notes', label: '연구노트', icon: Notebook, group: '사후관리', hint: '월별 활동 → 노트 초안 → 보강' },
+      { key: 'changes', label: '변경사항 관리', icon: CalendarCheck, group: '사후관리', hint: '발생일+30일 신고기한·확인주기' },
+      { key: 'survey', label: '활동조사 관리', icon: ClipboardList, group: '사후관리', hint: '연도별 제출 상태·이력' },
+      { key: 'check', label: '월간 점검', icon: ListChecks, group: '사후관리', hint: '8문항 점검 → 위험도' },
+      { key: 'inspection', label: '현장조사 대비', icon: ClipboardCheck, group: '사후관리', hint: '사람·공간·활동 12항목' },
+      { key: 'tax', label: '세액공제', icon: Wallet, group: '성과', hint: '연구·인력개발비 세액공제 예상' },
+      { key: 'reports', label: '고객 리포트', icon: FileText, group: '성과', hint: '월간·상세·절세·방문용 4종' },
+      { key: 'resources', label: '안내문·자료실', icon: Megaphone, group: '성과', hint: '템플릿 11종' },
+      { key: 'settings', label: '설정·백업', icon: Wrench, group: '성과', hint: '백업 내보내기·불러오기' },
+    ],
   },
   {
     key: 'policy-funding',
@@ -123,6 +211,12 @@ export const TOOLS: ToolDefinition[] = [
     keywords: '정책자금 융자 보증 기술보증 신용보증 중진공 소진공 대출 자금',
     requiredDocs: ['businessRegistration', 'financialStatements'],
     recommendedDocs: ['smeCertificate', 'corporateRegistry', 'healthInsurance'],
+    sections: [
+      { key: 'dashboard', label: '대시보드', icon: LayoutDashboard, hint: '상담 단계별 현황·오늘 할 일' },
+      { key: 'diagnosis', label: '진단하기', icon: Target, hint: '8문항 빠른 진단 + 심층 진단' },
+      { key: 'customers', label: '상담 고객 관리', icon: Building2, hint: '단계·다음 액션·체크리스트' },
+      { key: 'report', label: '인쇄 리포트', icon: FileText, hint: '대표님 한 페이지 요약 + 11섹션' },
+    ],
   },
   {
     key: 'sales-kit',
@@ -135,6 +229,22 @@ export const TOOLS: ToolDefinition[] = [
     origin: 'corp-consult-sales-os · main (법인컨설팅 세일즈 OS)',
     keywords: '영업 미팅 대본 상담 전략 가격표 제안 컨설팅 상품',
     recommendedDocs: ['cretopReport'],
+    sections: [
+      { key: 'briefing', label: '오늘의 브리핑', icon: LayoutDashboard, hint: '업무 흐름·할 일·KPI' },
+      { key: 'prospecting', label: '신규 고객 발굴', icon: Target, group: '고객', hint: '리드 점수·공략 순서·콜드콜 대본' },
+      { key: 'companies', label: '고객사 관리', icon: Building2, group: '고객', hint: '상담 개시·계약 고객사' },
+      { key: 'followup', label: '다음 연락 관리', icon: CalendarCheck, group: '고객', hint: '오늘·지연·예정 연락' },
+      { key: 'meeting', label: '미팅 준비', icon: Handshake, group: '미팅·제안', hint: '1·2·3차 미팅 대본' },
+      { key: 'reports', label: '리포트·제안서', icon: FileText, group: '미팅·제안', hint: '방문용 리포트·견적·제안서' },
+      { key: 'packages', label: '컨설팅 상품', icon: Wallet, group: '미팅·제안', hint: '상품 40종 가격표·제안' },
+      { key: 'pipeline', label: '영업 진행 현황', icon: ClipboardList, group: '계약·성과', hint: '6단계 파이프라인' },
+      { key: 'analytics', label: '성과 분석', icon: PieChart, group: '계약·성과', hint: '퍼널·추이·상품별·CSV' },
+      { key: 'content', label: '콘텐츠 전략', icon: Megaphone, group: '자료', hint: '주제 → 채널별 문구' },
+      { key: 'education', label: '교육 아카이브', icon: Notebook, group: '자료', hint: '교육 기록 → 상담 활용' },
+      { key: 'strategies', label: '절세전략', icon: Sparkles, group: '자료', hint: '절세전략 라이브러리' },
+      { key: 'updates', label: '법령·공고', icon: Scale, group: '자료', hint: '법령 입력 → 영향 고객' },
+      { key: 'settings', label: '설정·백업', icon: Wrench, group: '자료', hint: '백업·샘플·표시 설정' },
+    ],
   },
   {
     key: 'cert-os',

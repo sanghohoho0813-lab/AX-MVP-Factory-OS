@@ -6,6 +6,7 @@ import { Suspense, lazy, type ReactElement } from 'react'
 import { Navigate } from 'react-router-dom'
 import { MODULE_PAGES } from '../data/modules'
 import { ToolClientFrame } from '../tools/shared/toolClientContext'
+import { ModuleRoute } from '../tools/shared/ModuleRoute'
 import { EmptyModulePage } from '../pages/EmptyModulePage'
 import { ReportsRedirectPage } from '../pages/ReportsRedirectPage'
 
@@ -353,6 +354,19 @@ function toolRoute(element: ReactElement): ReactElement {
   return <ToolClientFrame>{element}</ToolClientFrame>
 }
 
+/**
+ * 모듈 한 벌 = 주소 두 줄 (D-91).
+ * `/tools/<key>` 는 그 모듈의 첫 화면, `/tools/<key>/<화면>` 은 목차에서 고른 화면이다.
+ * 2단 목차는 여기서 한 번만 붙는다 — 모듈 화면마다 다시 짜지 않는다.
+ */
+function moduleRoutes(toolKey: string, element: ReactElement): { path: string; element: ReactElement }[] {
+  const wrapped = toolRoute(<ModuleRoute toolKey={toolKey}>{element}</ModuleRoute>)
+  return [
+    { path: `tools/${toolKey}`, element: wrapped },
+    { path: `tools/${toolKey}/:section`, element: wrapped },
+  ]
+}
+
 export const appRouteChildren = [
       // 홈 = 오늘의 Command Center. 예전 /today 는 홈으로 안내한다(주소 호환).
       { index: true, element: <TodayCommandCenterPage /> },
@@ -383,12 +397,12 @@ export const appRouteChildren = [
       // 도구 화면은 모두 같은 틀로 감싼다 — 업체에서 열었으면(`?client=`) 띠가 뜨고 결과가 그 업체로 간다 (D-89)
       { path: 'tools/tax', element: toolRoute(<TaxCalculatorsPage />) },
       { path: 'tools/review', element: <ToolsReviewPage /> },
-      { path: 'tools/startup-tax', element: toolRoute(<StartupTaxPage />) },
-      { path: 'tools/cretop', element: toolRoute(<CretopPage />) },
-      { path: 'tools/employment', element: toolRoute(<EmploymentPage />) },
-      { path: 'tools/labcare', element: toolRoute(<LabcarePage />) },
-      { path: 'tools/policy-funding', element: toolRoute(<PolicyFundingPage />) },
-      { path: 'tools/sales-kit', element: toolRoute(<SalesKitPage />) },
+      ...moduleRoutes('startup-tax', <StartupTaxPage />),
+      ...moduleRoutes('cretop', <CretopPage />),
+      ...moduleRoutes('employment', <EmploymentPage />),
+      ...moduleRoutes('labcare', <LabcarePage />),
+      ...moduleRoutes('policy-funding', <PolicyFundingPage />),
+      ...moduleRoutes('sales-kit', <SalesKitPage />),
       { path: 'why', element: <WhyAxPage /> },
       { path: 'kpi', element: <KpiPage /> },
       { path: 'roadmap', element: <RoadmapPage /> },

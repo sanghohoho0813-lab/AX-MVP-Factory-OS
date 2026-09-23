@@ -9,9 +9,12 @@
  */
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { AlertTriangle, Check, Copy, FolderOpen, RotateCcw, Upload } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { toolOf } from '../../config/toolRegistry'
+import { ModuleDashboard } from '../shared/ModuleDashboard'
+import { ModulePending } from '../shared/ModulePending'
+import { useModuleSection } from '../shared/ModuleRoute'
 import { Button } from '../../components/ui/Button'
 import { Badge, Disclosure, MetricTile, Section, Surface, type Tone } from '../../components/ui/primitives'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
@@ -188,58 +191,34 @@ function CopyButton({ text }: { text: string }) {
 /* 화면 뼈대                                                            */
 /* ------------------------------------------------------------------ */
 
-const TABS = [
-  { key: 'diagnosis', label: '채용 진단' },
-  { key: 'schedule', label: '회차 일정' },
-  { key: 'wage', label: '급여 계산기' },
-  { key: 'roster', label: '4대보험 명부 진단' },
-] as const
-type TabKey = (typeof TABS)[number]['key']
-
-function isTabKey(v: string | null): v is TabKey {
-  return TABS.some((t) => t.key === v)
-}
-
+/** 목차에서 고른 화면 → 이 자리에 선다. 목차 자체는 `toolRegistry` 의 sections 가 정한다. */
 export function EmploymentPage() {
-  const [params, setParams] = useSearchParams()
-  const raw = params.get('t')
-  const tab: TabKey = isTabKey(raw) ? raw : 'diagnosis'
-  const setTab = (k: TabKey) => {
-    const next = new URLSearchParams(params)
-    next.set('t', k)
-    setParams(next, { replace: true })
-  }
+  const section = useModuleSection()
+  const meta = toolOf('employment')?.sections?.find((s) => s.key === section)
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="고용지원금 매니저"
-        description="채용 조건으로 가능성 있는 고용지원금을 고르고, 회차별 신청일과 급여·4대보험을 셈하고, 4대보험 명부로 직원별 후보를 1차 검토합니다. 상담용 1차 검토이며 운영기관 심사와 세무 대리인 검토를 대신하지 않습니다."
+        description={
+          meta?.hint
+            ? `${meta.label} — ${meta.hint}. 상담용 1차 검토이며 운영기관 심사와 세무 대리인 검토를 대신하지 않습니다.`
+            : '채용 조건으로 가능성 있는 고용지원금을 고르고, 회차별 신청일과 급여·4대보험을 셈합니다. 상담용 1차 검토이며 운영기관 심사와 세무 대리인 검토를 대신하지 않습니다.'
+        }
       />
-      <div role="tablist" aria-label="고용지원금 도구" className="-mx-4 flex gap-1 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0 [&::-webkit-scrollbar]:hidden">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.key}
-            onClick={() => setTab(t.key)}
-            className={`tap shrink-0 rounded-(--radius-control) border px-3 py-2 t-sub font-medium break-keep ${
-              tab === t.key ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-      {tab === 'diagnosis' && <DiagnosisTab />}
-      {tab === 'schedule' && <ScheduleTab />}
-      {tab === 'wage' && <WageTab />}
-      {tab === 'roster' && <RosterTab />}
+      {section === 'dashboard' && <ModuleDashboard toolKey="employment" />}
+      {section === 'diagnosis' && <DiagnosisTab />}
+      {section === 'schedule' && <ScheduleTab />}
+      {section === 'wage' && <WageTab />}
+      {section === 'roster' && <RosterTab />}
+      {PENDING_SECTIONS.includes(section) && <ModulePending label={meta?.label ?? '이 화면'} />}
       <p className="t-meta break-keep text-slate-400">{DISCLAIMER}</p>
     </div>
   )
 }
+
+/** 아직 옮기지 않은 화면들 — 옮기는 대로 위의 목록으로 올라온다 */
+const PENDING_SECTIONS = ['companies', 'board', 'simulator', 'programs', 'settings']
 
 /* ═════════════════ ① 채용 진단 ═════════════════ */
 

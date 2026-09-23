@@ -12,6 +12,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Check, Copy, RotateCcw } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { toolOf } from '../../config/toolRegistry'
+import { ModuleDashboard } from '../shared/ModuleDashboard'
+import { ModulePending } from '../shared/ModulePending'
+import { useModuleSection } from '../shared/ModuleRoute'
 import { Button } from '../../components/ui/Button'
 import { Badge, Disclosure, MetricTile, Section, Surface, type Tone } from '../../components/ui/primitives'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
@@ -206,7 +210,7 @@ function buildSummary(input: DiagnosisInput, r: DiagnosisResult): string {
   return lines.join('\n')
 }
 
-export function PolicyFundingPage() {
+function DiagnosisScreen() {
   const [params] = useSearchParams()
   const [input, setInput] = useState<DiagnosisInput>(() => (params.get('sample') === '1' ? SAMPLE_INPUT : loadInput()))
   const [submitted, setSubmitted] = useState(params.get('sample') === '1')
@@ -612,6 +616,36 @@ export function PolicyFundingPage() {
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* 목차                                                                 */
+/* ------------------------------------------------------------------ */
+
+/** 목차에서 고른 화면 → 이 자리에 선다. 목차 자체는 `toolRegistry` 의 sections 가 정한다. */
+export function PolicyFundingPage() {
+  const section = useModuleSection()
+  const meta = toolOf('policy-funding')?.sections?.find((s) => s.key === section)
+
+  if (section === 'diagnosis') return <DiagnosisScreen />
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="정책자금 진단"
+        description={
+          meta?.hint
+            ? `${meta.label} — ${meta.hint}. 규칙과 사례로 계산하며, 승인을 보장하지 않습니다.`
+            : '추천 기관 TOP3·서류·로드맵·상담 대본. 규칙과 사례로 계산하며, 승인을 보장하지 않습니다.'
+        }
+      />
+      {section === 'dashboard' ? (
+        <ModuleDashboard toolKey="policy-funding" />
+      ) : (
+        <ModulePending label={meta?.label ?? '이 화면'} />
+      )}
     </div>
   )
 }

@@ -11,6 +11,10 @@
 import { useMemo, useRef, useState } from 'react'
 import { AlertTriangle, FileUp, FolderOpen, RotateCcw, Copy, Check } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { toolOf } from '../../config/toolRegistry'
+import { ModuleDashboard } from '../shared/ModuleDashboard'
+import { ModulePending } from '../shared/ModulePending'
+import { useModuleSection } from '../shared/ModuleRoute'
 import { Button } from '../../components/ui/Button'
 import { Badge, Disclosure, Section, Surface, type Tone } from '../../components/ui/primitives'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
@@ -121,7 +125,7 @@ function TrendCard({ row }: { row: CretopTrendRow }) {
   )
 }
 
-export function CretopPage() {
+function CretopScreen() {
   const [text, setText] = useState<string>(() => loadText())
   const [fileName, setFileName] = useState('')
   const [progress, setProgress] = useState('')
@@ -436,6 +440,28 @@ export function CretopPage() {
           </p>
         </>
       )}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* 목차                                                                 */
+/* ------------------------------------------------------------------ */
+
+/** 목차에서 고른 화면 → 이 자리에 선다. 목차 자체는 `toolRegistry` 의 sections 가 정한다. */
+export function CretopPage() {
+  const section = useModuleSection()
+  const meta = toolOf('cretop')?.sections?.find((s) => s.key === section)
+
+  if (section === 'analyze') return <CretopScreen />
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="크레탑 분석기"
+        description={meta?.hint ? `${meta.label} — ${meta.hint}` : '크레탑 기업종합보고서를 넣으면 핵심 재무와 미팅 포인트를 뽑습니다.'}
+      />
+      {section === 'dashboard' ? <ModuleDashboard toolKey="cretop" /> : <ModulePending label={meta?.label ?? '이 화면'} />}
     </div>
   )
 }

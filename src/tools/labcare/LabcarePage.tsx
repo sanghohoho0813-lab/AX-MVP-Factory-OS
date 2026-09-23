@@ -10,9 +10,12 @@
  */
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { Check, Copy, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { toolOf } from '../../config/toolRegistry'
+import { ModuleDashboard } from '../shared/ModuleDashboard'
+import { ModulePending } from '../shared/ModulePending'
+import { useModuleSection } from '../shared/ModuleRoute'
 import { Button } from '../../components/ui/Button'
 import { Badge, Disclosure, MetricTile, Section, Surface, type Tone } from '../../components/ui/primitives'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
@@ -361,62 +364,36 @@ const STATUS_TONE: Record<ChangeRecStatus, Tone> = { '확인 필요': 'warning',
 
 /* ───────────────── 탭 ───────────────── */
 
-const TABS = [
-  { key: 'assess', label: '설립 가능성 체크' },
-  { key: 'docs', label: '설립서류' },
-  { key: 'check', label: '월간 점검' },
-  { key: 'tax', label: '세액공제 예상' },
-  { key: 'changes', label: '변경신고 D-day' },
-  { key: 'templates', label: '안내문 11종' },
-] as const
-type TabKey = (typeof TABS)[number]['key']
-
-function isTabKey(v: string | null): v is TabKey {
-  return TABS.some((t) => t.key === v)
-}
-
+/** 목차에서 고른 화면 → 이 자리에 선다. 목차 자체는 `toolRegistry` 의 sections 가 정한다. */
 export function LabcarePage() {
-  const [params, setParams] = useSearchParams()
-  const raw = params.get('t')
-  const tab: TabKey = isTabKey(raw) ? raw : 'assess'
-  const setTab = (k: TabKey) => {
-    const next = new URLSearchParams(params)
-    next.set('t', k)
-    setParams(next, { replace: true })
-  }
+  const section = useModuleSection()
+  const meta = toolOf('labcare')?.sections?.find((s) => s.key === section)
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="기업부설연구소 OS"
-        description="기업부설연구소·연구개발전담부서의 설립 가능성부터 서류·월간 점검·변경신고·안내문까지 한 곳에서 봅니다. 상담용 1차 검토이며 신고 기관 심사와 세무 대리인 검토를 대신하지 않습니다."
+        description={
+          meta?.hint
+            ? `${meta.label} — ${meta.hint}. 상담용 1차 검토이며 신고 기관 심사와 세무 대리인 검토를 대신하지 않습니다.`
+            : '설립 가능성부터 서류·월간 점검·변경신고·안내문까지 한 곳에서 봅니다. 상담용 1차 검토이며 신고 기관 심사와 세무 대리인 검토를 대신하지 않습니다.'
+        }
       />
-      <div role="tablist" aria-label="연구소 사후관리 도구" className="-mx-4 flex gap-1 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0 [&::-webkit-scrollbar]:hidden">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.key}
-            onClick={() => setTab(t.key)}
-            className={`tap shrink-0 rounded-(--radius-control) border px-3 py-2 t-sub font-medium break-keep ${
-              tab === t.key ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-      {tab === 'assess' && <AssessTab />}
-      {tab === 'docs' && <DocsTab />}
-      {tab === 'check' && <CheckTab />}
-      {tab === 'tax' && <TaxTab />}
-      {tab === 'changes' && <ChangesTab />}
-      {tab === 'templates' && <TemplatesTab />}
+      {section === 'dashboard' && <ModuleDashboard toolKey="labcare" />}
+      {section === 'assessment' && <AssessTab />}
+      {section === 'setup-docs' && <DocsTab />}
+      {section === 'check' && <CheckTab />}
+      {section === 'tax' && <TaxTab />}
+      {section === 'changes' && <ChangesTab />}
+      {section === 'resources' && <TemplatesTab />}
+      {PENDING_SECTIONS.includes(section) && <ModulePending label={meta?.label ?? '이 화면'} />}
       <p className="t-meta break-keep text-slate-400">{DISCLAIMER}</p>
     </div>
   )
 }
+
+/** 아직 옮기지 않은 화면들 — 옮기는 대로 위의 목록으로 올라온다 */
+const PENDING_SECTIONS = ['tasks', 'clients', 'org-diagram', 'notes', 'survey', 'inspection', 'reports', 'settings']
 
 /* ═════════════════ ① 설립 가능성 체크 ═════════════════ */
 

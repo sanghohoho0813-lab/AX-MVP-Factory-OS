@@ -10,6 +10,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Check, Copy, RotateCcw } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { toolOf } from '../../config/toolRegistry'
+import { ModuleDashboard } from '../shared/ModuleDashboard'
+import { ModulePending } from '../shared/ModulePending'
+import { useModuleSection } from '../shared/ModuleRoute'
 import { Button } from '../../components/ui/Button'
 import { Badge, Disclosure, Section, Surface } from '../../components/ui/primitives'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
@@ -145,7 +149,7 @@ function VerdictBadge({ verdict }: { verdict: Verdict }) {
   )
 }
 
-export function StartupTaxPage() {
+function StartupTaxScreen() {
   const [form, setForm] = useState<StartupTaxForm>(() => loadForm())
   const [submitted, setSubmitted] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -512,6 +516,28 @@ export function StartupTaxPage() {
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* 목차                                                                 */
+/* ------------------------------------------------------------------ */
+
+/** 목차에서 고른 화면 → 이 자리에 선다. 목차 자체는 `toolRegistry` 의 sections 가 정한다. */
+export function StartupTaxPage() {
+  const section = useModuleSection()
+  const meta = toolOf('startup-tax')?.sections?.find((s) => s.key === section)
+
+  if (section === 'judge') return <StartupTaxScreen />
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="창업감면 판정기"
+        description={meta?.hint ? `${meta.label} — ${meta.hint}` : '여덟 가지만 고르면 창업중소기업 세액감면 가능성을 네 단계로 판정합니다.'}
+      />
+      {section === 'dashboard' ? <ModuleDashboard toolKey="startup-tax" /> : <ModulePending label={meta?.label ?? '이 화면'} />}
     </div>
   )
 }

@@ -88,13 +88,13 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('크레탑: 1차 미팅 포인트가 나온다', (await page.getByTestId('cretop-points').locator('li').count()) >= 3)
 
   // 정책자금
-  await page.goto(BASE + '/tools/policy-funding?sample=1', { waitUntil: 'networkidle' })
+  await page.goto(BASE + '/tools/policy-funding/diagnosis?sample=1', { waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
   check('정책자금: 샘플로 결론이 나온다', (await page.getByTestId('pf-conclusion').innerText()).includes('검토하는 것이'))
   check('정책자금: 추천 기관 3곳', (await page.getByTestId('pf-agencies').locator('span', { hasText: /^[123]순위 / }).count()) === 3)
 
   // 영업 도구
-  await page.goto(BASE + '/tools/sales-kit', { waitUntil: 'networkidle' })
+  await page.goto(BASE + '/tools/sales-kit/meeting', { waitUntil: 'networkidle' })
   await page.waitForTimeout(300)
   await page.getByLabel('회사명').fill('한솔테크')
   await page.getByLabel('업종').selectOption('제조업')
@@ -103,14 +103,14 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByRole('button', { name: '가지급금 있음' }).click()
   await page.waitForTimeout(200)
   check('영업: 1차 미팅 대본이 가지급금 테마', (await page.getByTestId('sales-plan').innerText()).includes('가지급금'))
-  await page.getByRole('tab', { name: '전략 추천' }).click()
-  await page.waitForTimeout(200)
+  await page.goto(BASE + '/tools/sales-kit/strategies', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
   check('영업: 대표 58세·업력 18년 → 가업승계 전략 1순위', (await page.getByTestId('sales-strategies').locator('> div').first().innerText()).includes('가업승계'))
-  await page.getByRole('tab', { name: '상품 가격표' }).click()
-  await page.waitForTimeout(200)
+  await page.goto(BASE + '/tools/sales-kit/packages', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
   check('영업: 가격표 40줄', (await page.getByTestId('sales-packages').locator('tbody tr').count()) === 40)
-  await page.getByRole('tab', { name: /제안 주제/ }).click()
-  await page.waitForTimeout(200)
+  await page.goto(BASE + '/tools/sales-kit/reports', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
   check('영업: 제안 주제 5분류', (await page.getByTestId('sales-weapons').locator('> div').count()) === 5)
 
   // 고용지원금 · 연구소 — 열리고 제목이 맞는지 (세부는 각자의 단위 테스트가 지킨다)
@@ -120,6 +120,36 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.goto(BASE + '/tools/labcare', { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)
   check('연구소: 화면이 열린다', (await page.getByRole('heading', { level: 1 }).innerText()).includes('연구소'))
+
+  /* ---- D-91: 모듈 2단 목차 · 모듈 대시보드가 OS 업체를 본다 ---- */
+  await page.goto(BASE + '/tools/employment', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  const modNav = page.getByTestId('module-nav')
+  check('모듈 목차: 넓은 화면에 모듈 목차가 선다', (await modNav.count()) === 1)
+  check('모듈 목차: 고용지원금 10화면이 다 걸린다', (await modNav.locator('a[data-section]').count()) === 10, String(await modNav.locator('a[data-section]').count()))
+  check('모듈 목차: 지금 보는 화면이 표시된다', (await modNav.locator('a[aria-current="page"]').getAttribute('data-section')) === 'dashboard')
+  const dash = page.getByTestId('module-dashboard')
+  check('모듈 대시보드: 첫 화면이 대시보드', (await dash.count()) === 1)
+  const dashText = await dash.innerText()
+  check('모듈 대시보드: OS 업체 수를 센다(모듈이 명단을 따로 갖지 않는다)', /업체[\s\S]{0,40}5곳/.test(dashText), dashText.slice(0, 200))
+  check('모듈 대시보드: 서류가 빠진 업체를 이름으로 알려 준다', dashText.includes('4대보험 가입자 명부'), dashText.slice(0, 300))
+  check('모듈 대시보드: 업체 이름이 실제 OS 업체다', dashText.includes('한솔테크'), dashText.slice(0, 300))
+
+  // 목차에서 다른 화면으로 — 주소가 바뀌고 내용도 바뀐다
+  await modNav.locator('a[data-section="wage"]').click()
+  await page.waitForTimeout(600)
+  check('모듈 목차: 누르면 그 화면 주소로 간다', page.url().includes('/tools/employment/wage'), page.url())
+  check('모듈 목차: 급여 계산기 화면이 뜬다', (await page.locator('main').innerText()).includes('급여'))
+
+  // 아직 안 옮긴 화면은 그렇게 적는다 (없는 기능을 있는 척하지 않는다)
+  await page.goto(BASE + '/tools/employment/board', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  check('모듈 목차: 아직 안 옮긴 화면은 그렇게 적는다', (await page.getByTestId('module-pending').count()) === 1)
+
+  // 모르는 화면 키 → 첫 화면
+  await page.goto(BASE + '/tools/employment/없는화면', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  check('모듈 목차: 모르는 주소는 첫 화면으로', (await page.getByTestId('module-dashboard').count()) === 1)
 
   /* ---- D-89: 업체에서 도구 열기 → 결과·기한이 그 업체로 ---- */
   // 업체 상세에 '이 업체로 도구 열기' 줄이 있고, 거기서 연 도구에는 업체 띠가 뜬다
@@ -134,8 +164,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('업체에서 연 도구: 업체로 돌아가는 길', (await banner.getByRole('link', { name: /업체로 돌아가기/ }).count()) === 1)
 
   // 회차 일정 → 한 번 눌러 붙이고, 기한이 달력에 뜨는지
-  await page.getByRole('tab', { name: /회차 일정/ }).click()
-  await page.waitForTimeout(300)
+  await page.goto(BASE + '/tools/employment/schedule?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
   await page.getByLabel('입사일').fill('2026-03-02')
   await page.waitForTimeout(400)
   const quick = page.getByTestId('tool-attach-quick').first()
@@ -221,7 +251,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const page = await ctx.newPage()
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
-  for (const p of ['/tools', '/tools/startup-tax', '/tools/cretop', '/tools/policy-funding?sample=1', '/tools/sales-kit', '/tools/employment', '/tools/labcare', '/tools/review', '/tools/cretop?client=cli_hansol']) {
+  for (const p of ['/tools', '/tools/startup-tax', '/tools/cretop', '/tools/policy-funding/diagnosis?sample=1', '/tools/sales-kit/meeting', '/tools/employment', '/tools/employment/roster', '/tools/labcare', '/tools/labcare/notes', '/tools/review', '/tools/cretop?client=cli_hansol']) {
     await page.goto(BASE + p, { waitUntil: 'networkidle' })
     await page.waitForTimeout(500)
     const w = await page.evaluate(() => document.documentElement.scrollWidth)

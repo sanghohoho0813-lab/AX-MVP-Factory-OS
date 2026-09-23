@@ -13,9 +13,12 @@
  */
 
 import { useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { Check, Copy } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { toolOf } from '../../config/toolRegistry'
+import { ModuleDashboard } from '../shared/ModuleDashboard'
+import { ModulePending } from '../shared/ModulePending'
+import { useModuleSection } from '../shared/ModuleRoute'
 import { Button } from '../../components/ui/Button'
 import { Badge, Disclosure, Section, Surface, type Tone } from '../../components/ui/primitives'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
@@ -46,12 +49,19 @@ import type { SalesItem } from './lib/salesData.js'
 
 const STORAGE_KEY = 'axmvp.tools.salesKit'
 type Tab = 'meeting' | 'strategy' | 'packages' | 'weapons'
-const TABS: { key: Tab; label: string }[] = [
-  { key: 'meeting', label: '미팅 대본' },
-  { key: 'strategy', label: '전략 추천' },
-  { key: 'packages', label: '상품 가격표' },
-  { key: 'weapons', label: '제안 주제 34' },
-]
+/**
+ * 목차의 화면 키 → 이미 옮겨 둔 네 화면 (D-91).
+ * 제안 주제 34 는 제안서를 만들 때 고르는 것이라 '리포트·제안서' 자리에 둔다.
+ */
+const SECTION_TAB: Record<string, Tab> = {
+  meeting: 'meeting',
+  strategies: 'strategy',
+  packages: 'packages',
+  reports: 'weapons',
+}
+
+/** '이 고객' 입력칸이 필요한 화면들 — 네 화면이 같은 고객을 본다 */
+const FORM_SECTIONS = Object.keys(SECTION_TAB)
 
 interface KitForm {
   name: string
@@ -135,8 +145,9 @@ function Lines({ items }: { items: string[] }) {
 const LEVEL_TONE: Record<string, Tone> = { 낮음: 'success', 보통: 'warning', 높음: 'danger' }
 
 export function SalesKitPage() {
-  const [params, setParams] = useSearchParams()
-  const tab = (TABS.find((t) => t.key === params.get('t'))?.key ?? 'meeting') as Tab
+  const section = useModuleSection()
+  const meta = toolOf('sales-kit')?.sections?.find((s) => s.key === section)
+  const tab: Tab | null = SECTION_TAB[section] ?? null
   const [form, setForm] = useState<KitForm>(() => loadForm())
   const [stage, setStage] = useState<'m1' | 'm2' | 'm3'>('m1')
 
@@ -243,13 +254,21 @@ export function SalesKitPage() {
       <PrefillNote note={prefillNote} />
       <PageHeader
         title="영업 도구 모음"
-        description="기업컨설팅 OS 에서 골라 온 네 가지 — 미팅 대본, 절세전략 추천, 상품 가격표, 제안 주제. 도입 검토중이라 사이드바에는 '도입 검토중' 아래에만 있습니다."
+        description={
+          meta?.hint
+            ? `${meta.label} — ${meta.hint}. 도입 검토중이라 사이드바에는 '도입 검토중' 아래에만 있습니다.`
+            : "미팅 대본·절세전략 추천·상품 가격표·제안 주제. 도입 검토중이라 사이드바에는 '도입 검토중' 아래에만 있습니다."
+        }
       />
 
+      {section === 'briefing' && <ModuleDashboard toolKey="sales-kit" />}
+      {tab === null && section !== 'briefing' && <ModulePending label={meta?.label ?? '이 화면'} />}
+
+      {FORM_SECTIONS.includes(section) && (
       <Surface className="flex flex-col gap-4 p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="t-section text-slate-900">이 고객</span>
-          <span className="t-meta text-slate-500">한 번 적으면 네 탭이 모두 이 고객 기준으로 바뀝니다</span>
+          <span className="t-meta text-slate-500">한 번 적으면 목차의 네 화면이 모두 이 고객 기준으로 바뀝니다</span>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
           <label className="block">
@@ -328,23 +347,7 @@ export function SalesKitPage() {
           {missed.length > 0 && <span className="t-meta text-slate-500">놓치기 쉬운 점검 {missed.length}건</span>}
         </div>
       </Surface>
-
-      <div role="tablist" aria-label="영업 도구" className="-mx-4 flex gap-1 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.key}
-            onClick={() => setParams({ t: t.key }, { replace: true })}
-            className={`tap shrink-0 rounded-(--radius-control) border px-3 py-2 t-sub font-medium ${
-              tab === t.key ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      )}
 
       {tab === 'meeting' && (
         <Section title="미팅 대본" action={<CopyButton text={planText} />}>

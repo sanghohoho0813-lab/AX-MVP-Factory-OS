@@ -40,6 +40,8 @@ import { missingDocsForTools, missingDocsText, missingReason, toolReadiness } fr
 import { ageOf, businessTypeOf, clientFacts, employeeCountOf, industryValueOf, prefilledText, yearsInBusiness } from '../shared/clientPrefill'
 import { buildToolPublishInput, isToolResultPublished } from '../../services/toolPublish'
 import { listUpdates, publishUpdate } from '../../services/customerBridgeService'
+import { summarizeModule } from '../shared/ModuleDashboard'
+import { listRows, saveRow, deleteRow, replaceRows, rowData } from '../../services/moduleData'
 import { judge } from '../startupTax/lib/judgement'
 import { EMPTY_FORM } from '../startupTax/lib/formDefaults'
 
@@ -396,6 +398,81 @@ function check(name: string, cond: boolean, detail?: string): void {
   const bare = normalizeClientOps({ id: 'p3', companyName: '이름만', workspaceId: null })
   const bf = clientFacts(bare, T)
   check('채우기: 모르는 것은 비워 둔다 (짐작 안 함)', bf.businessType === '' && bf.industry === '' && bf.employeeCount === null && bf.years === null && bf.representativeAge === null)
+}
+
+
+/* ---- 9. D-91 모듈 틀 — 목차 · 대시보드 · 모듈 기록 ---- */
+{
+  // 목차: 모든 도구가 목차를 갖고, 키가 겹치지 않고, 화면 키는 주소에 쓸 수 있는 글자만
+  const withSections = TOOLS.filter((t) => t.path !== null)
+  check('모듈 목차: 주소가 있는 도구는 전부 목차를 갖는다', withSections.every((t) => (t.sections ?? []).length >= 1), withSections.filter((t) => !t.sections).map((t) => t.key).join(','))
+  const dupes = withSections.filter((t) => new Set((t.sections ?? []).map((s) => s.key)).size !== (t.sections ?? []).length)
+  check('모듈 목차: 한 모듈 안에서 화면 키가 겹치지 않는다', dupes.length === 0, dupes.map((t) => t.key).join(','))
+  const badKey = withSections.flatMap((t) => (t.sections ?? []).map((s) => s.key)).filter((k) => !/^[a-z0-9-]+$/.test(k))
+  check('모듈 목차: 화면 키는 주소에 쓸 수 있는 글자만', badKey.length === 0, badKey.join(','))
+  check('모듈 목차: 고용지원금 10화면 · 연구소 15화면 · 영업 14화면',
+    (toolOf('employment')?.sections?.length === 10) && (toolOf('labcare')?.sections?.length === 15) && (toolOf('sales-kit')?.sections?.length === 14),
+    `${toolOf('employment')?.sections?.length}/${toolOf('labcare')?.sections?.length}/${toolOf('sales-kit')?.sections?.length}`)
+
+  // 대시보드: 업체 명단(고객 운영)을 그대로 읽는다 — 모듈이 명단을 따로 갖지 않는다
+  const TODAY = '2026-09-23'
+  const ready = withDocument(
+    normalizeClientOps({ id: 'm1', companyName: '준비된곳', workspaceId: null }),
+    'payrollRoster',
+    { received: true, fileName: '명부.xlsx', storagePath: 'x/명부.xlsx' },
+  )
+  const readyWithResult = withToolResult(ready, {
+    toolKey: 'employment',
+    title: '회차 일정',
+    verdict: null,
+    verdictLabel: '1회차',
+    summary: '',
+    data: {},
+    deadlines: [{ date: '2026-09-30', title: '1회차 신청', note: '' }],
+  })
+  const bare = normalizeClientOps({ id: 'm2', companyName: '서류없는곳', workspaceId: null })
+  const otherTool = withToolResult(normalizeClientOps({ id: 'm3', companyName: '딴도구', workspaceId: null }), {
+    toolKey: 'cretop',
+    title: '크레탑 분석',
+    verdict: null,
+    verdictLabel: '',
+    summary: '',
+    data: {},
+  })
+
+  const sum = summarizeModule([readyWithResult, bare, otherTool], 'employment', TODAY)
+  check('모듈 대시보드: 업체는 고객 운영 명단 그대로', sum.clients.length === 3, String(sum.clients.length))
+  check('모듈 대시보드: 서류가 다 있는 업체만 바로 돌릴 수 있다', sum.ready.length === 1 && sum.ready[0].id === 'm1', sum.ready.map((c) => c.id).join(','))
+  check('모듈 대시보드: 빠진 서류는 이름으로 말한다', sum.gaps.some((g) => g.clientId === 'm2' && g.missing.some((m) => m.includes('명부'))), JSON.stringify(sum.gaps))
+  check('모듈 대시보드: 다른 도구의 결과는 세지 않는다', sum.results.length === 1 && sum.results[0].clientId === 'm1', String(sum.results.length))
+  check('모듈 대시보드: 도구가 만든 기한을 업체와 함께 모은다', sum.dues.length === 1 && sum.dues[0].clientName === '준비된곳' && sum.dues[0].daysLeft === 7, JSON.stringify(sum.dues))
+
+  const archived = { ...bare, archivedAt: '2026-01-01T00:00:00.000Z' }
+  check('모듈 대시보드: 보관한 업체는 빼고 센다', summarizeModule([readyWithResult, archived], 'employment', TODAY).clients.length === 1)
+}
+
+/* ---- 10. D-91 모듈 기록 저장소 (업체는 만들지 않고 clientId 로 가리킨다) ---- */
+{
+  const run = async () => {
+    await replaceRows(null, 'employment', 'employees', [])
+    const saved = await saveRow(null, 'employment', 'employees', { clientId: 'm1', data: { name: '김직원', hireDate: '2026-03-02' } })
+    check('모듈 기록: 저장하면 id 와 시각이 붙는다', Boolean(saved.id) && Boolean(saved.createdAt) && saved.clientId === 'm1')
+    const rows = await listRows(null, 'employment', 'employees')
+    check('모듈 기록: 저장한 것을 그대로 읽는다', rows.length === 1 && rowData<{ name: string }>(rows[0]).name === '김직원', JSON.stringify(rows))
+
+    const other = await listRows(null, 'labcare', 'employees')
+    check('모듈 기록: 모듈이 다르면 섞이지 않는다', other.length === 0, String(other.length))
+    const otherBucket = await listRows(null, 'employment', 'notes')
+    check('모듈 기록: 갈래가 다르면 섞이지 않는다', otherBucket.length === 0, String(otherBucket.length))
+
+    await saveRow(null, 'employment', 'employees', { id: saved.id, clientId: 'm1', data: { name: '김직원', hireDate: '2026-04-01' } })
+    const after = await listRows(null, 'employment', 'employees')
+    check('모듈 기록: 같은 id 로 저장하면 덮어쓴다(늘어나지 않는다)', after.length === 1 && rowData<{ hireDate: string }>(after[0]).hireDate === '2026-04-01', JSON.stringify(after))
+
+    await deleteRow(null, 'employment', 'employees', saved.id)
+    check('모듈 기록: 지우면 사라진다', (await listRows(null, 'employment', 'employees')).length === 0)
+  }
+  await run()
 }
 
 console.log(`\ntools: ${passed} passed, ${failed} failed`)
