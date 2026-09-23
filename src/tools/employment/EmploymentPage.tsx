@@ -13,8 +13,13 @@ import { AlertTriangle, Check, Copy, FolderOpen, RotateCcw, Upload } from 'lucid
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
 import { ModuleDashboard } from '../shared/ModuleDashboard'
-import { ModulePending } from '../shared/ModulePending'
 import { useModuleSection } from '../shared/ModuleRoute'
+import { EmploymentDashboardExtra } from './screens/DashboardExtra'
+import { CompaniesScreen } from './screens/CompaniesScreen'
+import { BoardScreen } from './screens/BoardScreen'
+import { SimulatorScreen } from './screens/SimulatorScreen'
+import { ProgramsScreen } from './screens/ProgramsScreen'
+import { SettingsScreen } from './screens/SettingsScreen'
 import { Button } from '../../components/ui/Button'
 import { Badge, Disclosure, MetricTile, Section, Surface, type Tone } from '../../components/ui/primitives'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
@@ -206,19 +211,24 @@ export function EmploymentPage() {
             : '채용 조건으로 가능성 있는 고용지원금을 고르고, 회차별 신청일과 급여·4대보험을 셈합니다. 상담용 1차 검토이며 운영기관 심사와 세무 대리인 검토를 대신하지 않습니다.'
         }
       />
-      {section === 'dashboard' && <ModuleDashboard toolKey="employment" />}
+      {section === 'dashboard' && (
+        <ModuleDashboard toolKey="employment">
+          <EmploymentDashboardExtra />
+        </ModuleDashboard>
+      )}
+      {section === 'companies' && <CompaniesScreen />}
+      {section === 'board' && <BoardScreen />}
       {section === 'diagnosis' && <DiagnosisTab />}
       {section === 'schedule' && <ScheduleTab />}
       {section === 'wage' && <WageTab />}
       {section === 'roster' && <RosterTab />}
-      {PENDING_SECTIONS.includes(section) && <ModulePending label={meta?.label ?? '이 화면'} />}
+      {section === 'simulator' && <SimulatorScreen />}
+      {section === 'programs' && <ProgramsScreen />}
+      {section === 'settings' && <SettingsScreen />}
       <p className="t-meta break-keep text-slate-400">{DISCLAIMER}</p>
     </div>
   )
 }
-
-/** 아직 옮기지 않은 화면들 — 옮기는 대로 위의 목록으로 올라온다 */
-const PENDING_SECTIONS = ['companies', 'board', 'simulator', 'programs', 'settings']
 
 /* ═════════════════ ① 채용 진단 ═════════════════ */
 

@@ -13,6 +13,21 @@ import { buildAnswers, checkWage, diagnoseHiring, youthGate, type HiringAnswers 
 import { computePayroll } from '../lib/payroll'
 import { buildRounds, roundDate, roundSchedule, sumReceived, sumRemaining } from '../lib/schedule'
 import {
+  EMP_STAGES,
+  boardColumns,
+  empNextDate,
+  empNextDday,
+  empReceived,
+  empRemaining,
+  empUrgency,
+  normalizeStage,
+  rollupByClient,
+  summarizeEmployees,
+  toEmpRecord,
+  type EmpRecord,
+} from '../lib/empRecords'
+import { simulate, simulationText } from '../lib/simulator'
+import {
   analyzeRoster,
   buildCopyText,
   classifyEmployee,
@@ -407,6 +422,68 @@ check('ROSTER_FIELDS 9', ROSTER_FIELDS.length === 9 && ROSTER_FIELDS[0].key === 
   const bad = await parseRosterFile(new File([new TextEncoder().encode('hwp 인 척')], '명부.hwp', { type: '' }))
   check('엑셀 아닌 파일: 안 읽는 것은 그대로 안 읽는다', bad.ok === false && bad.error === 'unsupported')
 }
+
+/* ---- D-91 모듈 기록: 대상자 · 진행 보드 · 시뮬레이터 ---- */
+{
+  const T = new Date('2026-09-23T00:00:00')
+  const mk = (over: Partial<EmpRecord>): EmpRecord =>
+    ({
+      id: over.id ?? 'e1',
+      clientId: over.clientId ?? 'c1',
+      name: over.name ?? '김직원',
+      hireDate: over.hireDate ?? '2026-03-02',
+      birthDate: '',
+      empType: '정규직',
+      programId: 'youth_jump',
+      stage: over.stage ?? 'preparing',
+      rounds: over.rounds ?? buildRounds(DEFAULT_PROGRAMS.youth_jump),
+      docs: over.docs ?? [],
+      memo: '',
+    })
+
+  check('단계: 7단계 그대로', EMP_STAGES.length === 7 && EMP_STAGES[0].key === 'preparing' && EMP_STAGES[6].key === 'resigned')
+  check('단계: 모르는 값은 준비중', normalizeStage('없는단계') === 'preparing' && normalizeStage('approved') === 'approved')
+  check('기록: 빠진 칸이 있어도 한 줄로 읽는다', toEmpRecord('x', 'c1', { name: '박직원' }).stage === 'preparing' && toEmpRecord('x', 'c1', {}).rounds.length === 0)
+  check('기록: 주민등록번호 칸은 아예 없다', Object.keys(toEmpRecord('x', 'c1', { rrn: '900101-1234567' })).indexOf('rrn') < 0)
+
+  const e = mk({})
+  const first = DEFAULT_PROGRAMS.youth_jump.rounds[0]
+  check('돈: 아직 못 받은 예정액은 회차 합', empRemaining(e) === DEFAULT_PROGRAMS.youth_jump.rounds.reduce((s, r) => s + r.amount, 0), String(empRemaining(e)))
+  check('돈: 받은 돈 0 에서 시작', empReceived(e) === 0)
+  const paid = mk({ rounds: buildRounds(DEFAULT_PROGRAMS.youth_jump).map((r, i) => (i === 0 ? { ...r, isPaid: true, received: r.amount } : r)) })
+  check('돈: 한 회차 받으면 그만큼', empReceived(paid) === first.amount, String(empReceived(paid)))
+  check('기한: 다음 회차는 입사일 + n개월', empNextDate(e) === addMo('2026-03-02', first.month), empNextDate(e))
+  check('기한: D-day 는 그 날짜 기준', empNextDday(e, T) === getDdayFrom(addMo('2026-03-02', first.month), T))
+
+  const late = mk({ id: 'late', hireDate: '2025-01-02' })
+  const soonRounds = buildRounds(DEFAULT_PROGRAMS.youth_jump)
+  check('급한 순: 지난 것이 0', empUrgency(late, T) === 0, String(empUrgency(late, T)))
+  const docsLeft = mk({ id: 'docs', hireDate: '2026-09-01', rounds: soonRounds.map((r) => ({ ...r, isPaid: true })), docs: [{ name: '재직증명서', done: false }] })
+  check('급한 순: 서류가 덜 차면 2', empUrgency(docsLeft, T) === 2, String(empUrgency(docsLeft, T)))
+  const plain = mk({ id: 'plain', hireDate: '2026-09-01', rounds: soonRounds.map((r) => ({ ...r, isPaid: true })), docs: [{ name: '재직증명서', done: true }] })
+  check('급한 순: 남은 것도 없고 서류도 다 되면 3', empUrgency(plain, T) === 3, String(empUrgency(plain, T)))
+
+  const cols = boardColumns([e, mk({ id: 'e2', stage: 'completed' }), late], T)
+  check('보드: 단계별로 나뉜다', cols.length === 7 && cols[0].items.length === 2 && cols[5].items.length === 1, JSON.stringify(cols.map((c) => c.items.length)))
+  check('보드: 지연이 맨 앞', cols[0].items[0].id === 'late', cols[0].items.map((i) => i.id).join(','))
+
+  const sum = summarizeEmployees([e, late, mk({ id: 'out', stage: 'resigned' })], T)
+  check('모아보기: 퇴사는 빼고 센다', sum.active === 2, String(sum.active))
+  check('모아보기: 지난 회차를 센다', sum.overdue > 0 && sum.overdueAmount > 0, JSON.stringify({ o: sum.overdue, a: sum.overdueAmount }))
+
+  const roll = rollupByClient([e, mk({ id: 'e3', clientId: 'c2' })], T)
+  check('업체별: 업체마다 따로 센다', roll.size === 2 && roll.get('c1')?.active === 1 && roll.get('c2')?.active === 1)
+
+  // 시뮬레이터 — 원본과 같은 계산
+  const sim = simulate(DEFAULT_PROGRAMS.youth_jump, 2, '2026-03-02')
+  const perPerson = DEFAULT_PROGRAMS.youth_jump.rounds.reduce((s, r) => s + r.amount, 0)
+  check('시뮬레이터: 인원만큼 곱한다', sim.total === perPerson * 2, String(sim.total))
+  check('시뮬레이터: 같은 달은 한 줄로 합친다', sim.monthly.every((m, i) => i === 0 || m.month > sim.monthly[i - 1].month))
+  check('시뮬레이터: 첫 달은 입사 + 1회차', sim.monthly[0].month === addMo('2026-03-02', DEFAULT_PROGRAMS.youth_jump.rounds[0].month).substring(0, 7), sim.monthly[0].month)
+  check('시뮬레이터: 인원 0 이면 아무것도 없다', simulate(DEFAULT_PROGRAMS.youth_jump, 0, '2026-03-02').total === 0)
+  check('시뮬레이터: 상담 문구에 금액과 기간', simulationText('청년일자리도약장려금', 2, sim).includes('예상 총 수령액') && simulationText('청년일자리도약장려금', 2, sim).includes('~'))
+}
+
 
 console.log(`\nemployment: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
