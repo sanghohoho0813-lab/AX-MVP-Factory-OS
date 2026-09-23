@@ -154,6 +154,37 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const calText = (await page.locator('main').innerText()) ?? ''
   check('달력: 도구 기한 종류가 생겼다', calText.includes('도구 기한'), calText.slice(0, 200))
 
+  /* ---- D-90: 업체별 도구 연동 · 없는 서류 표시 ---- */
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  const toolsBox = page.getByTestId('client-tools')
+  check('업체 상세: 도구별 카드로 보인다', (await toolsBox.locator('a[data-tool]').count()) >= 6)
+  const missingBanner = page.getByTestId('client-tools-missing')
+  check('업체 상세: 없는 서류를 이름으로 알려 준다', (await missingBanner.count()) === 1 && (await missingBanner.innerText()).includes('4대보험 가입자 명부'), (await missingBanner.innerText().catch(() => '없음')).slice(0, 120))
+  check('업체 상세: 막힌 도구는 빨갛게 표시된다', (await toolsBox.locator('a[data-tool][data-ready="no"]').count()) >= 3)
+  check('업체 상세: 세금 계산기는 서류 없이도 준비됨', (await toolsBox.locator('a[data-tool="tax"][data-ready="yes"]').count()) === 1)
+  check('업체 상세: 고용지원금 카드에 무엇이 없는지 적혀 있다', (await toolsBox.locator('a[data-tool="employment"]').innerText()).includes('4대보험 가입자 명부'))
+
+  // 서류함 탭 — 이 서류를 쓰는 도구
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=docs', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  const docTools = page.getByTestId('doc-tools-payrollRoster')
+  check('서류함: 4대보험 명부 칸에 쓰는 도구를 적는다', (await docTools.count()) === 1 && (await docTools.innerText()).includes('고용지원금'), (await docTools.innerText().catch(() => '없음')).slice(0, 80))
+
+  // 업체 정보로 폼이 채워지는지 (창업감면) — 앞 단계에서 적어 둔 값은 비우고 본다
+  await page.evaluate(() => localStorage.removeItem('axmvp.tools.startupTax'))
+  await page.goto(BASE + '/tools/startup-tax?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  const note = page.getByTestId('tool-prefill-note')
+  check('창업감면: 업체 기록에서 채웠다고 알려 준다', (await note.count()) === 1 && (await note.innerText()).includes('업체 기록에서 채웠습니다'), (await note.innerText().catch(() => '없음')).slice(0, 120))
+  check('창업감면: 창업일이 설립일(2019-03-02)로 채워졌다', (await page.getByLabel('③ 창업일').inputValue()) === '2019-03-02', await page.getByLabel('③ 창업일').inputValue())
+  check('창업감면: 대표 생년월일도 채워졌다', (await page.getByLabel('② 대표자 생년월일').inputValue()) === '1978-05-10', await page.getByLabel('② 대표자 생년월일').inputValue())
+  check('창업감면: 법인번호가 있으니 법인사업자로', (await page.getByRole('button', { name: '법인사업자', exact: true }).getAttribute('aria-pressed')) === 'true')
+  // 서류함에 파일이 없으면 크레탑이 그렇게 말한다
+  await page.goto(BASE + '/tools/cretop?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check('크레탑: 서류함에 보고서가 없으면 그렇게 말한다', (await page.getByTestId('cretop-docbox-missing').count()) === 1)
+
   // 세금 계산기도 같은 단추로 붙는다 (D-89)
   await page.goto(BASE + '/tools/tax?c=t6&client=cli_hansol', { waitUntil: 'networkidle' })
   await page.waitForTimeout(800)
@@ -200,5 +231,5 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 }
 
 await browser.close()
-console.log(`\n도구함(여섯 도구·붙이기·업체에서 열기·기한·검색): ${pass} passed, ${fail} failed`)
+console.log(`\n도구함(도구·붙이기·업체 연동·서류 부족·기한·검색): ${pass} passed, ${fail} failed`)
 process.exit(fail > 0 ? 1 : 0)

@@ -19,6 +19,8 @@ import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Badge, Disclosure, Section, Surface, type Tone } from '../../components/ui/primitives'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
+import { usePrefillFromClient } from '../shared/usePrefill'
+import { PrefillNote } from '../shared/PrefillNote'
 import {
   CRETOP_WEAPONS,
   CUST_FLAGS,
@@ -78,6 +80,24 @@ const inputCls =
 
 const INDUSTRIES = ['제조업', 'IT/소프트웨어', '도소매업', '건설업', '운송업', '음식/숙박', '병의원', '서비스업', '기타']
 
+/** 업체가 적어 둔 업종 글에서 이 도구의 업종을 찾는다 (못 찾으면 빈 글자) */
+function industryFromText(text: string): string {
+  const t = (text ?? '').replace(/\s/g, '')
+  if (!t) return ''
+  const rules: [string, string[]][] = [
+    ['제조업', ['제조', '생산', '가공', '공장']],
+    ['IT/소프트웨어', ['정보통신', 'IT', '소프트웨어', 'SW', '플랫폼', '앱', '시스템']],
+    ['도소매업', ['도소매', '도매', '소매', '유통', '무역']],
+    ['건설업', ['건설', '시공', '토목']],
+    ['운송업', ['운송', '물류', '택배']],
+    ['음식/숙박', ['음식', '식당', '외식', '카페', '숙박', '호텔']],
+    ['병의원', ['병원', '의원', '치과', '한의']],
+    ['서비스업', ['서비스', '컨설팅', '교육']],
+  ]
+  for (const [label, words] of rules) if (words.some((w) => t.includes(w))) return label
+  return ''
+}
+
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
   return (
@@ -119,6 +139,36 @@ export function SalesKitPage() {
   const tab = (TABS.find((t) => t.key === params.get('t'))?.key ?? 'meeting') as Tab
   const [form, setForm] = useState<KitForm>(() => loadForm())
   const [stage, setStage] = useState<'m1' | 'm2' | 'm3'>('m1')
+
+  // 업체에서 열었으면 아는 것부터 채운다 (D-90)
+  const { note: prefillNote } = usePrefillFromClient((facts) => {
+    const filled: string[] = []
+    const next = { ...form }
+    if (!next.name && facts.companyName) {
+      next.name = facts.companyName
+      filled.push('회사명')
+    }
+    const ind = industryFromText(facts.industryText)
+    if (!next.industry && ind) {
+      next.industry = ind
+      filled.push('업종')
+    }
+    if (!next.ceoAge && facts.representativeAge !== null) {
+      next.ceoAge = String(facts.representativeAge)
+      filled.push('대표 나이')
+    }
+    if (!next.estYears && facts.years !== null) {
+      next.estYears = String(facts.years)
+      filled.push('업력')
+    }
+    if (!next.empCount && facts.employeeCount !== null) {
+      next.empCount = String(facts.employeeCount)
+      filled.push('직원 수')
+    }
+    if (filled.length > 0) setForm(next)
+    return filled
+  })
+
   const [pkgCat, setPkgCat] = useState<string>('전체')
   const [weaponQ, setWeaponQ] = useState('')
 
@@ -190,6 +240,7 @@ export function SalesKitPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <PrefillNote note={prefillNote} />
       <PageHeader
         title="영업 도구 모음"
         description="기업컨설팅 OS 에서 골라 온 네 가지 — 미팅 대본, 절세전략 추천, 상품 가격표, 제안 주제. 도입 검토중이라 사이드바에는 '도입 검토중' 아래에만 있습니다."

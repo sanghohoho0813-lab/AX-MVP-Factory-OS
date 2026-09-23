@@ -15,6 +15,8 @@ import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Badge, Disclosure, MetricTile, Section, Surface, type Tone } from '../../components/ui/primitives'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
+import { usePrefillFromClient } from '../shared/usePrefill'
+import { PrefillNote } from '../shared/PrefillNote'
 import { DEFAULT_INPUT, SAMPLE_INPUT, runDiagnosis } from './diagnosis'
 import { oneLineConclusion, starString, todayTasks } from './coach'
 import { REPORT_DISCLAIMER } from './report'
@@ -59,6 +61,30 @@ const LIKELIHOOD_TONE: Record<LikelihoodLevel, Tone> = { 높음: 'success', 보�
 
 const inputCls =
   'w-full rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-2 text-[0.95rem] text-slate-900 focus:border-brand-500 focus:outline-none'
+
+/* 업체 기록의 숫자 → 이 도구가 쓰는 구간 (모르면 null — 짐작하지 않는다, D-90) */
+function yearsBand(years: number | null): DiagnosisInput['years'] | null {
+  if (years === null) return null
+  if (years < 1) return '1년 미만'
+  if (years < 3) return '1~3년'
+  if (years < 7) return '3~7년'
+  return '7년 이상'
+}
+
+function employeesBand(n: number | null): DiagnosisInput['employees'] | null {
+  if (n === null) return null
+  if (n <= 0) return '0명'
+  if (n <= 4) return '1~4명'
+  if (n <= 9) return '5~9명'
+  return '10명 이상'
+}
+
+function ceoAgeBand(age: number | null): NonNullable<DiagnosisInput['ceoAge']> | null {
+  if (age === null) return null
+  if (age <= 39) return '만 39세 이하'
+  if (age <= 49) return '40~49세'
+  return '50세 이상'
+}
 
 function Chips<T extends string>({
   label,
@@ -203,6 +229,42 @@ export function PolicyFundingPage() {
     }
   }, [submitted, input])
 
+  // 업체에서 열었으면 아는 것을 채운다 (D-90).
+  // 이 도구는 기본값이 빈 값이 아니라서(개인사업자·1~3년 …), **아직 손대지 않은 칸만** 바꾼다.
+  const { note: prefillNote } = usePrefillFromClient((facts) => {
+    const filled: string[] = []
+    const next = { ...input }
+    if (!next.companyName && facts.companyName) {
+      next.companyName = facts.companyName
+      filled.push('업체명')
+    }
+    if (!next.industry && facts.industryText) {
+      next.industry = facts.industryText
+      filled.push('업종')
+    }
+    if (next.businessType === DEFAULT_INPUT.businessType && facts.businessType === 'corporation') {
+      next.businessType = '법인사업자'
+      filled.push('사업자 유형')
+    }
+    const years = yearsBand(facts.years)
+    if (next.years === DEFAULT_INPUT.years && years) {
+      next.years = years
+      filled.push('업력')
+    }
+    const emp = employeesBand(facts.employeeCount)
+    if (next.employees === DEFAULT_INPUT.employees && emp) {
+      next.employees = emp
+      filled.push('직원 수')
+    }
+    const age = ceoAgeBand(facts.representativeAge)
+    if ((next.ceoAge ?? '미확인') === '미확인' && age) {
+      next.ceoAge = age
+      filled.push('대표 나이')
+    }
+    if (filled.length > 0) setInput(next)
+    return filled
+  })
+
   const set = <K extends keyof DiagnosisInput>(k: K, v: DiagnosisInput[K]) => setInput((cur) => ({ ...cur, [k]: v }))
   const reset = () => {
     setInput(DEFAULT_INPUT)
@@ -216,6 +278,7 @@ export function PolicyFundingPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <PrefillNote note={prefillNote} />
       <PageHeader
         title="정책자금 진단"
         description="8문항이면 추천 기관 TOP3 와 세부 트랙, 리스크, 필요 서류, 90일 로드맵, 상담 대본이 나옵니다. 64건 사례와 규칙 지식으로 계산하며, 승인을 보장하지 않습니다."

@@ -13,6 +13,8 @@ import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Badge, Disclosure, Section, Surface } from '../../components/ui/primitives'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
+import { usePrefillFromClient } from '../shared/usePrefill'
+import { PrefillNote } from '../shared/PrefillNote'
 import type { AdvancedInput, ExemptionKey, FormData as StartupTaxForm, JudgementResult, Verdict } from './types'
 import { EMPTY_ADVANCED, EMPTY_FORM, VERDICT_TONE } from './lib/formDefaults'
 import { judge, VERDICT_EMOJI, VERDICT_LABEL, DISCLAIMER, DISCLAIMER_FRAMEWORK } from './lib/judgement'
@@ -161,6 +163,31 @@ export function StartupTaxPage() {
 
   const result: JudgementResult | null = useMemo(() => (submitted ? judge(form, baseDate) : null), [submitted, form, baseDate])
 
+  // 업체에서 열었으면 아는 것은 다시 묻지 않는다 (D-90) — 빈 칸만 채운다
+  const { note: prefillNote } = usePrefillFromClient((facts) => {
+    // 지금 화면에 있는 값에서 시작한다 — 빈 칸만 채우고, 채운 것이 있을 때만 폼을 바꾼다
+    const filled: string[] = []
+    const next = { ...form }
+    if (!next.businessType && facts.businessType) {
+      next.businessType = facts.businessType
+      filled.push('사업자 유형')
+    }
+    if (!next.birthDate && facts.representativeBirth) {
+      next.birthDate = facts.representativeBirth
+      filled.push('대표자 생년월일')
+    }
+    if (!next.startupDate && facts.establishedAt) {
+      next.startupDate = facts.establishedAt
+      filled.push('창업일')
+    }
+    if (!next.industry && facts.industry) {
+      next.industry = facts.industry as StartupTaxForm['industry']
+      filled.push('업종')
+    }
+    if (filled.length > 0) setForm(next)
+    return filled
+  })
+
   const set = <K extends keyof StartupTaxForm>(k: K, v: StartupTaxForm[K]) => setForm((f) => ({ ...f, [k]: v }))
   const setAdv = <K extends keyof AdvancedInput>(k: K, v: AdvancedInput[K]) => setForm((f) => ({ ...f, advanced: { ...f.advanced, [k]: v } }))
   const toggleCheck = (k: ExemptionKey) => setForm((f) => ({ ...f, checkItems: { ...f.checkItems, [k]: !f.checkItems[k] } }))
@@ -193,6 +220,7 @@ export function StartupTaxPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <PrefillNote note={prefillNote} />
       <PageHeader
         title="창업감면 판정기"
         description="여덟 가지만 고르면 창업중소기업 세액감면 가능성을 네 단계로 판정합니다. 상담용 1차 판정이며 세무 대리인의 최종 검토를 대신하지 않습니다."

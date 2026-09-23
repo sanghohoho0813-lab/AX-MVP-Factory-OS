@@ -9,11 +9,13 @@
  */
 
 import { useMemo, useRef, useState } from 'react'
-import { FileUp, RotateCcw, Copy, Check } from 'lucide-react'
+import { AlertTriangle, FileUp, FolderOpen, RotateCcw, Copy, Check } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Badge, Disclosure, Section, Surface, type Tone } from '../../components/ui/primitives'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
+import { useToolClient } from '../shared/toolClientContext'
+import { fetchClientDocFile, hasDocFile } from '../shared/clientDocFile'
 import {
   buildCretopParsedForUi,
   cretopCashflowGradeInfo,
@@ -123,6 +125,8 @@ export function CretopPage() {
   const [text, setText] = useState<string>(() => loadText())
   const [fileName, setFileName] = useState('')
   const [progress, setProgress] = useState('')
+  const [docBusy, setDocBusy] = useState(false)
+  const { clientRecord, clientName } = useToolClient()
   const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -184,6 +188,24 @@ export function CretopPage() {
     } catch (cause) {
       setProgress('')
       setError(cause instanceof Error ? cause.message : 'PDF 를 읽지 못했습니다.')
+    }
+  }
+
+  /** 업체 서류함에 올려 둔 크레탑 보고서로 바로 분석 (D-90) */
+  const runFromDocbox = async () => {
+    setError('')
+    setDocBusy(true)
+    try {
+      const got = await fetchClientDocFile(clientRecord, 'cretopReport')
+      if (!got) {
+        setError('서류함에 올려 둔 파일이 없습니다. 파일을 먼저 올려 주세요.')
+        return
+      }
+      await onFile(got.file)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '서류함 파일을 읽지 못했습니다.')
+    } finally {
+      setDocBusy(false)
     }
   }
 
@@ -252,6 +274,20 @@ export function CretopPage() {
           <Button variant="primary" onClick={() => fileRef.current?.click()} className="w-full sm:w-auto">
             <FileUp aria-hidden="true" className="size-4" /> PDF·텍스트 파일 넣기
           </Button>
+          {/* 업체 서류함에 올려 둔 보고서로 바로 (D-90) */}
+          {clientRecord && (
+            hasDocFile(clientRecord, 'cretopReport') ? (
+              <Button variant="secondary" onClick={() => void runFromDocbox()} disabled={docBusy} className="w-full sm:w-auto" data-testid="cretop-from-docbox">
+                <FolderOpen aria-hidden="true" className="size-4" />
+                {docBusy ? '서류함에서 읽는 중…' : `${clientName} 서류함의 보고서로 분석`}
+              </Button>
+            ) : (
+              <span className="t-sub flex items-center gap-1.5 break-keep text-danger-700" data-testid="cretop-docbox-missing">
+                <AlertTriangle aria-hidden="true" className="size-4 shrink-0" />
+                서류함에 크레탑 기업종합보고서가 없습니다 — 올려 두면 여기서 바로 분석합니다
+              </span>
+            )
+          )}
           <span className="t-sub text-slate-500">{progress || (fileName ? `읽은 파일: ${fileName}` : '또는 아래에 원문을 붙여넣으세요')}</span>
         </div>
         <textarea

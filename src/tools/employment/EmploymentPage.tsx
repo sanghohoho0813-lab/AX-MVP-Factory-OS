@@ -10,11 +10,15 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Check, Copy, RotateCcw, Upload } from 'lucide-react'
+import { AlertTriangle, Check, Copy, FolderOpen, RotateCcw, Upload } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Badge, Disclosure, MetricTile, Section, Surface, type Tone } from '../../components/ui/primitives'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
+import { usePrefillFromClient } from '../shared/usePrefill'
+import { useToolClient } from '../shared/toolClientContext'
+import { fetchClientDocFile, hasDocFile } from '../shared/clientDocFile'
+import { PrefillNote } from '../shared/PrefillNote'
 import { BOSU_FLOOR_2026, DIAG_CATS, ELIG, EXCL, MIN_WAGE_2026, MIN_WAGE_MONTH_2026, SPECIAL_OPTIONS_CHILDCARE, SPECIAL_OPTIONS_RETAIN } from './lib/constants'
 import { DEFAULT_PROGRAMS, PROGRAM_CHECKLISTS, PROGRAM_LIST, type EmpType, type Gender } from './lib/programs'
 import { fD, fDFull } from './lib/dates'
@@ -878,6 +882,13 @@ function numOrNull(v: string): number | null {
 function RosterTab() {
   const [form, setForm] = useStored<RosterForm>('roster', EMPTY_ROSTER)
   const set = <K extends keyof RosterForm>(k: K, v: RosterForm[K]) => setForm((f) => ({ ...f, [k]: v }))
+  const { clientRecord, clientName } = useToolClient()
+  // 업체에서 열었으면 업체명은 이미 안다 (D-90)
+  const { note: prefillNote } = usePrefillFromClient((facts) => {
+    if (form.company || !facts.companyName) return []
+    setForm((f) => ({ ...f, company: facts.companyName }))
+    return ['업체명']
+  })
   // 붙여 넣은 명부 글자와 직원 목록은 저장하지 않는다 — 주민등록번호가 섞여 있을 수 있다
   const [text, setText] = useState('')
   const [employees, setEmployees] = useState<RosterEmployee[] | null>(null)
@@ -913,6 +924,21 @@ function RosterTab() {
     setMeta(r.meta)
     if (!form.curTotal) set('curTotal', String(r.employees.length))
     setNotice(r.missingCount > 0 ? `${r.employees.length}명 후보 · 이름·생년월일·입사일이 빈 ${r.missingCount}명은 확인이 필요합니다.` : `${r.employees.length}명 후보를 찾았습니다.`)
+  }
+
+  /** 업체 서류함에 올려 둔 명부로 바로 진단 (D-90) */
+  const runFromDocbox = async () => {
+    setNotice('')
+    try {
+      const got = await fetchClientDocFile(clientRecord, 'payrollRoster')
+      if (!got) {
+        setNotice('서류함에 올려 둔 명부 파일이 없습니다. 파일을 먼저 올려 주세요.')
+        return
+      }
+      await runFile(got.file)
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : '서류함 파일을 읽지 못했습니다.')
+    }
   }
 
   const runFile = async (file: File) => {
@@ -976,6 +1002,7 @@ function RosterTab() {
             명부는 이 브라우저 안에서만 읽습니다. 주민등록번호는 생년월일·성별만 뽑고 원본은 어디에도 저장하지 않으며, 화면에는 마스킹값(900101-1******)만 보입니다. 붙여 넣은 글자도 화면을 떠나면 남지 않습니다.
           </p>
         </Surface>
+        <PrefillNote note={prefillNote} />
         <Field label="① 업체명 (요약 문구용 · 선택)">
           <input type="text" aria-label="업체명" value={form.company} onChange={(e) => set('company', e.target.value)} className={inputCls} placeholder="예: 미래상사" />
         </Field>
@@ -993,6 +1020,20 @@ function RosterTab() {
             className="t-sub block w-full text-slate-600 file:mr-3 file:rounded-(--radius-control) file:border file:border-slate-300 file:bg-white file:px-3 file:py-2 file:t-sub file:font-medium file:text-slate-700"
           />
         </Field>
+        {/* 업체 서류함에 올려 둔 명부로 바로 (D-90) */}
+        {clientRecord && (
+          hasDocFile(clientRecord, 'payrollRoster') ? (
+            <Button variant="secondary" disabled={busy} onClick={() => void runFromDocbox()} data-testid="employment-from-docbox">
+              <FolderOpen aria-hidden="true" className="size-4" />
+              {busy ? '서류함에서 읽는 중…' : `${clientName} 서류함의 4대보험 명부로 진단`}
+            </Button>
+          ) : (
+            <p className="t-sub flex items-start gap-1.5 break-keep text-danger-700" data-testid="employment-docbox-missing">
+              <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+              서류함에 4대보험 가입자 명부가 없습니다 — 올려 두면 여기서 바로 진단합니다.
+            </p>
+          )
+        )}
         <Field label="③ 또는 명부 글자 붙여넣기" hint="PDF 에서 복사한 글자, 홈택스·고용24 화면 복사본 모두 됩니다">
           <textarea aria-label="명부 글자" value={text} onChange={(e) => setText(e.target.value)} rows={7} className={`${inputCls} font-mono text-[0.85rem]`} placeholder={'성명 주민등록번호 국민연금 건강보험 산재보험 고용보험\n홍길동 980310-1****** 2026-01-05 2026-01-05 2026-01-05 2026-01-05'} />
         </Field>

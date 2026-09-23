@@ -37,6 +37,7 @@ import { roundDeadlines } from '../employment/lib/toolDeadlines'
 import { changeDeadlines, surveyDeadlineDate } from '../labcare/lib/toolDeadlines'
 import { TOOLS, liveTools, plannedTools, reviewTools, searchTools, toolOf, toolsNeeding } from '../../config/toolRegistry'
 import { missingDocsForTools, missingDocsText, missingReason, toolReadiness } from '../../services/toolReadiness'
+import { ageOf, businessTypeOf, clientFacts, employeeCountOf, industryValueOf, prefilledText, yearsInBusiness } from '../shared/clientPrefill'
 import { buildToolPublishInput, isToolResultPublished } from '../../services/toolPublish'
 import { listUpdates, publishUpdate } from '../../services/customerBridgeService'
 import { judge } from '../startupTax/lib/judgement'
@@ -362,6 +363,39 @@ function check(name: string, cond: boolean, detail?: string): void {
   check('준비상태: 같은 서류를 두 번 세지 않는다', new Set(all.map((n) => n.key)).size === all.length)
   const ready = liveTools().map((t) => toolReadiness(withFile, t, TODAY)).filter((r) => r.ready).length
   check('준비상태: 명부만 있으면 고용지원금·세금 계산기가 열린다', ready === 2, String(ready))
+}
+
+/* ---- 9. 업체 기록 → 도구 입력값 (D-90) ---- */
+{
+  const T = new Date('2026-09-23T00:00:00')
+  const rec = normalizeClientOps({
+    id: 'p2',
+    companyName: '한솔테크(주)',
+    workspaceId: null,
+    corporateNumber: '110111-1234567',
+    representativeBirth: '1978-05-10',
+    establishedAt: '2019-03-02',
+    industry: '자동차 부품 제조',
+    employeeCount: '12명(대표 포함)',
+  } as Record<string, unknown>)
+  const f = clientFacts(rec, T)
+
+  check('채우기: 법인번호가 있으면 법인사업자', f.businessType === 'corporation')
+  check('채우기: 법인번호가 없으면 비워 둔다', businessTypeOf({ corporateNumber: '' }) === '')
+  check('채우기: 업종 글에서 제조업을 알아본다', f.industry === 'manufacturing', f.industry)
+  check('채우기: 모르는 업종은 비워 둔다', industryValueOf('우주선 조종') === '')
+  check('채우기: 직원 수는 숫자만 뽑는다', f.employeeCount === 12, String(f.employeeCount))
+  check('채우기: 직원 수를 못 읽으면 null', employeeCountOf('여러 명') === null)
+  check('채우기: 업력 계산', f.years === 7, String(f.years))
+  check('채우기: 설립일이 없으면 null', yearsInBusiness('', T) === null)
+  check('채우기: 대표 나이 계산 (생일 전)', f.representativeAge === 48, String(f.representativeAge))
+  check('채우기: 생일이 지나면 한 살 더', ageOf('1978-01-10', T) === 48 && ageOf('1978-12-10', T) === 47)
+  check('채우기: 채운 칸을 말로 적는다', prefilledText(['대표자 생년월일', '창업일']).includes('업체 기록에서 채웠습니다'))
+  check('채우기: 아무것도 못 채웠으면 아무 말도 안 한다', prefilledText([]) === '')
+
+  const bare = normalizeClientOps({ id: 'p3', companyName: '이름만', workspaceId: null })
+  const bf = clientFacts(bare, T)
+  check('채우기: 모르는 것은 비워 둔다 (짐작 안 함)', bf.businessType === '' && bf.industry === '' && bf.employeeCount === null && bf.years === null && bf.representativeAge === null)
 }
 
 console.log(`\ntools: ${passed} passed, ${failed} failed`)

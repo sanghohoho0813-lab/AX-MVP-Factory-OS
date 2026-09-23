@@ -22,6 +22,8 @@ export interface ToolClientValue {
   clientId: string | null
   /** 그 업체 이름 (아직 못 읽었으면 빈 글자) */
   clientName: string
+  /** 그 업체 기록 전체 — 도구가 아는 것을 미리 채울 때 쓴다 (D-90) */
+  clientRecord: ClientOpsRecord | null
   workspaceId: string | null
   /** 업체 목록을 한 번만 읽어 돌려준다 (붙이기 시트와 공유) */
   loadClients: () => Promise<ClientOpsRecord[]>
@@ -34,6 +36,7 @@ export interface ToolClientValue {
 const EMPTY: ToolClientValue = {
   clientId: null,
   clientName: '',
+  clientRecord: null,
   workspaceId: null,
   loadClients: () => listClients(null).catch(() => [] as ClientOpsRecord[]),
 }
@@ -61,7 +64,7 @@ function CloudFrame({ children }: { children: ReactNode }) {
 function FrameInner({ workspaceId, children }: { workspaceId: string | null; children: ReactNode }) {
   const [params] = useSearchParams()
   const clientId = params.get('client')
-  const [clientName, setClientName] = useState('')
+  const [client, setClient] = useState<ClientOpsRecord | null>(null)
   const cache = useRef<Promise<ClientOpsRecord[]> | null>(null)
 
   // 작업실이 바뀌면 읽어 둔 목록을 버린다
@@ -78,22 +81,23 @@ function FrameInner({ workspaceId, children }: { workspaceId: string | null; chi
 
   useEffect(() => {
     if (!clientId) {
-      setClientName('')
+      setClient(null)
       return
     }
     let alive = true
     void loadClients().then((list) => {
       if (!alive) return
-      setClientName(list.find((c) => c.id === clientId)?.companyName ?? '')
+      setClient(list.find((c) => c.id === clientId) ?? null)
     })
     return () => {
       alive = false
     }
   }, [clientId, loadClients])
 
+  const clientName = client?.companyName ?? ''
   const value = useMemo<ToolClientValue>(
-    () => ({ clientId, clientName, workspaceId, loadClients }),
-    [clientId, clientName, workspaceId, loadClients],
+    () => ({ clientId, clientName, clientRecord: client, workspaceId, loadClients }),
+    [clientId, clientName, client, workspaceId, loadClients],
   )
 
   // 업체를 물고 온 때만 띠를 얹는다 — 그냥 연 도구 화면은 예전과 한 픽셀도 다르지 않다.
