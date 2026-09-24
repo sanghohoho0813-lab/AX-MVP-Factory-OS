@@ -270,7 +270,7 @@ export function TaxCalculatorsPage() {
       <PageHeader title="세금 계산기" description="대표이사 급여·퇴직급여·주식·상속·가지급금 등 9종. 규칙 계산이며 참고용입니다 — 실제 신고는 세무사와 상담하세요." />
 
       {/* 계산기 고르기 — 휴대폰에서는 가로로 넘기는 조각, 넓으면 한 줄 감싸기 */}
-      <nav aria-label="계산기 목록" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:flex-wrap">
+      <nav aria-label="계산기 목록" className="no-print -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:flex-wrap">
         {TAX_CALCULATORS.map((c) => (
           <button
             key={c.key}
@@ -287,14 +287,15 @@ export function TaxCalculatorsPage() {
         ))}
       </nav>
 
+      {/* D-102: 예전에는 짙은 남색(slate-900)을 박아 두어 테마를 바꿔도 그대로였다 — 테마의 짙은 색(navy-900·800, 사이드바와 같은 색)으로 */}
       <section className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-end justify-between gap-2 border-b-2 border-slate-900 pb-3">
+        <div className="flex flex-wrap items-end justify-between gap-2 border-b-2 border-navy-900 pb-3">
           <div className="min-w-0">
             <p className="t-meta font-bold tracking-wide text-brand-700 uppercase">{calc.eyebrow}</p>
             <h2 className="t-section mt-0.5 text-slate-900">{calc.title}</h2>
             <p className="t-sub mt-1 break-keep text-slate-500">{calc.desc}</p>
           </div>
-          <Button variant="ghost" size="sm" onClick={reset} title="이 계산기의 입력을 기본값으로 되돌립니다">
+          <Button variant="ghost" size="sm" className="no-print" onClick={reset} title="이 계산기의 입력을 기본값으로 되돌립니다">
             <RotateCcw aria-hidden="true" className="size-4" />
             기본값으로
           </Button>
@@ -310,7 +311,7 @@ export function TaxCalculatorsPage() {
                 aria-selected={s.key === sub.key}
                 onClick={() => pick(calc.key, s.key)}
                 className={`tap rounded-full border px-3.5 py-1.5 text-[0.9rem] font-medium ${
-                  s.key === sub.key ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  s.key === sub.key ? 'border-navy-900 bg-navy-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                 }`}
               >
                 {s.label}
@@ -336,9 +337,9 @@ export function TaxCalculatorsPage() {
               <div
                 key={b.id}
                 data-block={b.id}
-                className={`rounded-(--radius-panel) border p-4 ${b.tone === 'light' ? 'border-slate-200 bg-white' : 'border-slate-900 bg-slate-900 text-slate-100'}`}
+                className={`rounded-(--radius-panel) border p-4 ${b.tone === 'light' ? 'border-slate-200 bg-white' : 'border-navy-900 bg-navy-900 text-slate-100'}`}
               >
-                <h3 className={`mb-2 border-b pb-2 text-[0.98rem] font-bold ${b.tone === 'light' ? 'border-slate-100 text-slate-900' : 'border-slate-700 text-amber-200'}`}>{b.title}</h3>
+                <h3 className={`mb-2 border-b pb-2 text-[0.98rem] font-bold ${b.tone === 'light' ? 'border-slate-100 text-slate-900' : 'border-white/15 text-amber-200'}`}>{b.title}</h3>
                 {b.lines.map((l, i) =>
                   l.cls === 'divider' ? (
                     <p key={i} className={`mt-3 mb-1 t-meta font-bold tracking-wide uppercase ${b.tone === 'light' ? 'text-brand-700' : 'text-amber-300'}`}>
@@ -351,7 +352,7 @@ export function TaxCalculatorsPage() {
                       data-k={l.k}
                       data-v={l.v}
                       className={`flex items-baseline justify-between gap-3 py-1.5 text-[0.9rem] ${
-                        l.cls === 'highlight' ? `-mx-2 rounded-(--radius-control) px-2 ${b.tone === 'light' ? 'bg-brand-50' : 'bg-amber-200/15'}` : `border-b border-dashed ${b.tone === 'light' ? 'border-slate-200' : 'border-slate-700'}`
+                        l.cls === 'highlight' ? `-mx-2 rounded-(--radius-control) px-2 ${b.tone === 'light' ? 'bg-brand-50' : 'bg-amber-200/15'}` : `border-b border-dashed ${b.tone === 'light' ? 'border-slate-200' : 'border-white/15'}`
                       }`}
                     >
                       <span className={b.tone === 'light' ? 'text-slate-500' : 'text-slate-300'}>{l.k}</span>
@@ -364,7 +365,7 @@ export function TaxCalculatorsPage() {
             {sub.note && <p className="t-sub rounded-(--radius-control) border-l-4 border-amber-400 bg-amber-50 px-3 py-2 break-keep text-slate-600">{sub.note}</p>}
             {/* 계산 결과도 업체 기록에 붙는다 (D-89) — 다른 도구와 같은 단추 */}
             {out.blocks.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="no-print flex flex-wrap items-center gap-2">
                 <ToolResultAttach
                   toolKey="tax"
                   title={`${calc.title}${calc.subs.length > 1 ? ` · ${sub.label}` : ''}`}
@@ -381,12 +382,13 @@ export function TaxCalculatorsPage() {
         {(out.tables ?? []).map((t) => (
           <div key={t.id} className="rounded-(--radius-panel) border border-slate-200 bg-white p-4">
             <h3 className="mb-3 border-b border-slate-100 pb-2 text-[0.98rem] font-bold text-slate-900">{t.title}</h3>
-            <div className="overflow-x-auto">
-              <table data-table={t.id} className="w-full min-w-[640px] text-[0.85rem]">
+            {/* D-102: 인쇄하면 오른쪽 칸이 잘렸다 — 종이에서는 가로 넘김 대신 글자를 줄여 한 폭에 */}
+            <div className="overflow-x-auto print:overflow-visible">
+              <table data-table={t.id} className="w-full min-w-[640px] text-[0.85rem] print:min-w-0 print:text-[7pt]">
                 <thead>
                   <tr>
                     {t.head.map((h, i) => (
-                      <th key={i} className={`bg-slate-800 px-2 py-1.5 font-medium text-white ${i === 0 ? 'text-left' : 'text-right'}`}>
+                      <th key={i} className={`bg-navy-800 px-2 py-1.5 font-medium text-white print:px-1 ${i === 0 ? 'text-left' : 'text-right'}`}>
                         {h}
                       </th>
                     ))}
@@ -396,7 +398,7 @@ export function TaxCalculatorsPage() {
                   {t.rows.map((r, i) => (
                     <tr key={i} className={r.best ? 'bg-amber-100 font-bold' : i % 2 === 1 ? 'bg-slate-50' : ''}>
                       {r.cells.map((c, j) => (
-                        <td key={j} className={`border-b border-slate-100 px-2 py-1.5 tabular-nums ${j === 0 ? 'text-left' : 'text-right'}`}>
+                        <td key={j} className={`border-b border-slate-100 px-2 py-1.5 tabular-nums print:px-1 print:whitespace-nowrap ${j === 0 ? 'text-left' : 'text-right'}`}>
                           {c}
                         </td>
                       ))}

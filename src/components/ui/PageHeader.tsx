@@ -17,6 +17,7 @@ interface PageHeaderProps {
  *
  * 휴대폰의 위쪽 띠가 이미 화면 이름을 말하고 있을 때는 같은 이름을 큰 글자로
  * 한 번 더 쓰지 않는다(읽어 주는 기계에는 남긴다). 이름이 다를 때는 그대로 둔다.
+ * 종이에는 위쪽 띠가 없으니 인쇄할 때는 늘 보인다 (D-102 — 전에는 A4 폭에서 제목 없이 찍혔다).
  */
 export function PageHeader({ title, description, actions }: PageHeaderProps) {
   const { pathname } = useLocation()
@@ -25,7 +26,7 @@ export function PageHeader({ title, description, actions }: PageHeaderProps) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
       <div className="min-w-0">
-        <h1 className={`t-page break-keep text-slate-900 ${sameAsHeader ? 'sr-only lg:not-sr-only' : ''}`}>
+        <h1 className={`t-page break-keep text-slate-900 ${sameAsHeader ? 'sr-only lg:not-sr-only print:not-sr-only' : ''}`}>
           {title}
         </h1>
         {description && (

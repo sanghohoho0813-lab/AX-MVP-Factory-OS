@@ -1,11 +1,7 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Sparkles, X } from 'lucide-react'
-import {
-  GuidedDemoError,
-  getGuidedDemoStatus,
-  prepareGuidedDemo,
-} from '../../services/guidedDemo/guidedDemoService'
+import { isGuidedDemoBaseReady } from '../../services/guidedDemo/demoBase'
 import { useToast } from '../ui/toastContext'
 import { DEMO_TOUR_STEPS, DemoTourContext } from './demoTour'
 
@@ -15,15 +11,17 @@ export function DemoTourProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState(false)
   const [available] = useState(() => {
     try {
-      return getGuidedDemoStatus().baseReady
+      return isGuidedDemoBaseReady()
     } catch {
       return false
     }
   })
   const [stepIndex, setStepIndex] = useState(0)
 
-  const start = useCallback(() => {
+  const start = useCallback(async () => {
     try {
+      // D-102: 무거운 준비 코드는 누를 때 불러온다 (첫 화면 파일에서 뺐다)
+      const { prepareGuidedDemo } = await import('../../services/guidedDemo/guidedDemoService')
       prepareGuidedDemo()
       setActive(true)
       setStepIndex(0)
@@ -31,7 +29,7 @@ export function DemoTourProvider({ children }: { children: ReactNode }) {
       showToast('샘플 데이터를 준비했습니다. 전체 흐름을 둘러보세요.')
     } catch (error) {
       showToast(
-        error instanceof GuidedDemoError
+        error instanceof Error && error.name === 'GuidedDemoError'
           ? error.message
           : '샘플 데이터를 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.',
       )

@@ -379,6 +379,87 @@ for (const [w, h, mob] of [[1440, 900, false], [390, 844, true]]) {
   await ctx.close()
 }
 
+/* ---- D-102: 도구함 아이콘 색 사다리 · 세금 계산기 짙은 색이 테마를 따라감 · 인쇄 · 첫 화면 파일 ---- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  const seen = []
+  page.on('response', async (res) => {
+    if (res.url().endsWith('.js')) seen.push({ url: res.url(), text: await res.text().catch(() => '') })
+  })
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  // 모든 화면이 먼저 받는 첫 파일(index-*.js)에 샘플 체험 준비 코드·안내창이 없다 (전에는 862KB 중 약 230KB 가 이것이었다)
+  const entry = seen.find((r) => /\/assets\/index-[^/]*\.js$/.test(r.url))
+  check('첫 파일: 받았다(시험이 제 구실을 하는지)', !!entry && entry.text.length > 1000, entry && entry.url)
+  check('첫 파일: 샘플 체험 준비 코드(작업실 서비스 묶음)가 없다', !!entry && !entry.text.includes('시연용 진단 질문을 찾을 수 없습니다'))
+  check('첫 화면: 샘플 체험 준비 코드를 아예 받지 않는다', !seen.some((r) => r.text.includes('시연용 진단 질문을 찾을 수 없습니다')))
+  check('첫 파일: 처음 사용 안내창 글이 없다', !!entry && !entry.text.includes('가이드 챕터'))
+  await page.goto(BASE + '/getting-started', { waitUntil: 'networkidle' })
+  await page.getByRole('main').getByRole('button', { name: /안내 다시 보기/ }).first().click()
+  await page.waitForTimeout(800)
+  check('처음 사용 가이드: 누르면 그때 불러와 열린다', (await page.getByRole('dialog').count()) >= 1)
+  await page.keyboard.press('Escape')
+  await page.evaluate(seedScript())
+
+  const hues = []
+  for (const theme of ['navy-blue', 'burgundy']) {
+    await page.evaluate((t) => localStorage.setItem('axmvp.ui.preferences', JSON.stringify({ theme: t })), theme)
+    await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+    const ramp = await page.evaluate(() =>
+      [...document.querySelectorAll('aside svg.nav-ramp')].map((el) => {
+        const m = getComputedStyle(el).color.match(/oklch\(([\d.]+) ([\d.]+) ([\d.]+)/)
+        return m ? m.slice(1).map(Number) : null
+      }),
+    )
+    const ok = ramp.length >= 7 && ramp.every(Boolean)
+    const sameTone = ok && ramp.every((c) => c[0] === ramp[0][0] && c[1] === ramp[0][1])
+    const steps = ok ? ramp.slice(1).map((c, i) => (c[2] - ramp[i][2] + 360) % 360) : []
+    check(`${theme}: 도구함 아이콘 ${ramp.length}개가 밝기·채도는 같고`, sameTone, JSON.stringify(ramp[0]))
+    check(`${theme}: 위에서 아래로 색상만 조금씩(한 칸 8~20°) 옮겨 간다`, steps.length > 0 && steps.every((d) => d >= 8 && d <= 20), steps.map((d) => d.toFixed(0)).join(','))
+    hues.push(ok ? ramp[0][2] : -1)
+
+    await page.goto(BASE + '/tools/tax', { waitUntil: 'networkidle' })
+    await page.locator('button', { hasText: '특정법인' }).first().click()
+    await page.waitForTimeout(300)
+    const col = await page.evaluate(() => {
+      const probe = document.createElement('i')
+      document.body.appendChild(probe)
+      probe.style.color = 'var(--color-navy-900)'
+      const navy = getComputedStyle(probe).color
+      probe.remove()
+      const dark = [...document.querySelectorAll('[data-block]')].find((e) => getComputedStyle(e).color !== 'rgb(15, 23, 42)' && getComputedStyle(e).backgroundColor !== 'rgb(255, 255, 255)')
+      const th = document.querySelector('table[data-table] th')
+      const tab = document.querySelector('button[role="tab"][aria-selected="true"]')
+      return { navy, dark: dark && getComputedStyle(dark).backgroundColor, th: th && getComputedStyle(th).backgroundColor, tab: tab && getComputedStyle(tab).backgroundColor }
+    })
+    check(`${theme}: 세금 계산기 짙은 결과 칸 = 사이드바와 같은 테마 짙은 색`, col.dark === col.navy, JSON.stringify(col))
+    check(`${theme}: 고른 세부 탭도 같은 색`, col.tab === col.navy, JSON.stringify(col))
+    check(`${theme}: 표 머리는 테마 짙은 색 계열(투명·옛 남색 아님)`, !!col.th && col.th !== 'rgba(0, 0, 0, 0)' && col.th !== 'rgb(30, 41, 59)', col.th)
+    hues.push(col.dark)
+  }
+  check('테마를 바꾸면 아이콘 색·세금 계산기 짙은 색이 함께 바뀐다', hues[0] !== hues[2] && hues[1] !== hues[3], JSON.stringify(hues))
+
+  // 인쇄 (A4 폭) — 제목이 찍히고, 짙은 바탕이 빠지지 않고, 긴 표가 오른쪽에서 잘리지 않는다
+  await page.setViewportSize({ width: 794, height: 1123 })
+  await page.emulateMedia({ media: 'print' })
+  await page.waitForTimeout(200)
+  const pr = await page.evaluate(() => {
+    const h1 = document.querySelector('main h1')
+    const t = document.querySelector('table[data-table]')
+    return {
+      title: h1 ? h1.getBoundingClientRect().width : 0,
+      adjust: getComputedStyle(document.documentElement).printColorAdjust,
+      tableFits: t ? t.scrollWidth <= t.parentElement.getBoundingClientRect().width + 1 : false,
+      buttons: [...document.querySelectorAll('main button')].filter((b) => /기본값으로|업체 기록에 붙이기/.test(b.innerText) && b.getBoundingClientRect().width > 0).length,
+    }
+  })
+  check('인쇄(세금 계산기): 화면 제목이 찍힌다', pr.title > 20, String(pr.title))
+  check('인쇄: 바탕색을 빼지 않는다(짙은 칸 흰 글이 흰 종이에 사라지지 않게)', pr.adjust === 'exact', pr.adjust)
+  check('인쇄(세금 계산기): 긴 표가 종이 폭 안에 들어온다', pr.tableFits)
+  check('인쇄(세금 계산기): 화면용 단추(기본값으로·업체 기록에 붙이기)는 안 찍힌다', pr.buttons === 0, String(pr.buttons))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n모듈 전 화면: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

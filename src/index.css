@@ -472,6 +472,12 @@ textarea {
   body {
     background: #fff !important;
   }
+  /* D-102: 브라우저는 기본값으로 바탕색을 빼고 인쇄한다 — 짙은 바탕 위 흰 글(세금 계산 결과·표 머리)이
+     흰 종이 위 흰 글이 되어 읽을 수 없었다. 화면에 보이는 색 그대로 찍는다. */
+  html {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   /* 인쇄 격리: 문서 영역(.print-document)이 있으면 그것만 보이게 한다 (사이드바·헤더·버튼 숨김).
      D-95: 문서 영역이 없는 화면(정책자금 리포트·연구소 리포트 등 원본 화면)은 전에 통째로 빈 종이가 나왔다 —
      그때는 OS 틀(.no-print: 사이드바·머리줄·모듈 목차·업체 띠)만 빼고 본문을 그대로 찍는다. */
@@ -529,6 +535,12 @@ textarea {
 .cretop-mini {
   word-break: keep-all;
   overflow-wrap: anywhere;
+}
+/* D-102: 사이드바 도구함 아이콘 — 테마 강조색에서 출발해 아래로 갈수록 색상만 조금씩 옮겨 간다.
+   밝기 0.72 · 채도 0.11 은 다른 메뉴 아이콘(--color-nav-*)과 같은 톤. 상대 색 문법이 없는 브라우저는 예전 회색 */
+.nav-ramp {
+  color: var(--color-nav-system);
+  color: oklch(from var(--color-brand-500) 0.72 0.11 calc(h + var(--ramp-shift, 0)));
 }
 /* D-101: fieldset 은 브라우저 기본 min-width 가 '안 내용만큼(min-content)' 이다 — 고객 설문의 반복 표(최소 480px)가
    옆으로 밀리는 칸 안에 있는데도 fieldset 이 따라 넓어져 휴대폰(390)에서 설문 화면 전체가 523px 로 옆으로 밀렸다 */

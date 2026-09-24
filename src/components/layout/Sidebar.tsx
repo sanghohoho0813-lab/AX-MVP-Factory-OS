@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { useEffect, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { ChevronDown, ChevronsLeft, ChevronsRight, ExternalLink, LifeBuoy, X } from 'lucide-react'
@@ -163,7 +164,7 @@ function SidebarContent({
                     aria-label={collapsed || group.collapsible ? group.title : undefined}
                     className="flex flex-col gap-1"
                   >
-                    {items.map((item) => (
+                    {items.map((item, idx) => (
                       <li key={item.key}>
                         <NavLink
                           to={item.path}
@@ -188,7 +189,8 @@ function SidebarContent({
                               )}
                               <item.icon
                                 aria-hidden="true"
-                                className={`size-5 shrink-0 ${isActive ? 'text-white' : navAccentClass(item.accent)}`}
+                                className={`size-5 shrink-0 ${isActive ? 'text-white' : group.key === 'tools' ? 'nav-ramp' : navAccentClass(item.accent)}`}
+                                style={!isActive && group.key === 'tools' ? rampStyle(idx, items.length) : undefined}
                               />
                               {!collapsed && <span className="truncate">{item.label}</span>}
                               {!collapsed && item.status === 'next' && (
@@ -283,4 +285,14 @@ export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobil
       )}
     </>
   )
+}
+
+/**
+ * D-102: 도구함 아이콘 색 — 맨 위(세금 계산기)부터 아래로 색상(hue)만 조금씩 옮겨 간다.
+ * 밝기·채도는 한 가지로 묶어(톤 일정) 튀지 않게 하고, 시작 색상은 지금 테마의 강조색에서 잡는다(테마를 바꾸면 같이 옮겨 간다).
+ * 전체 폭은 84° — 한 칸에 84/(n-1)° 씩(8칸이면 12°). 더 넓히면 맨 아래가 딴 색처럼 튄다.
+ */
+function rampStyle(index: number, count: number): CSSProperties {
+  const step = count > 1 ? 84 / (count - 1) : 0
+  return { ['--ramp-shift' as string]: String(Math.round(index * step)) }
 }
