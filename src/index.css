@@ -522,7 +522,10 @@ textarea {
   }
 }
 
-/* D-94: 크레탑 화면 글자는 단어 단위로 줄바꿈 — '기업 개/요' 처럼 낱말 중간에서 끊기지 않게 */
+/* D-94: 크레탑 화면 글자는 단어 단위로 줄바꿈 — '기업 개/요' 처럼 낱말 중간에서 끊기지 않게
+   D-99: 나머지 원본 모듈도 같게 — 연구소 '4대보험 가/입' · 창업감면 '법인세/소/득세' 처럼 좁은 칸에서 낱말이 쪼개졌다.
+   너무 긴 한 덩어리(주소·URL)는 anywhere 로 칸 안에서 끊어 넘치지 않게 한다 */
+.pf-orig, .st-orig, .lab-orig, .hr-app, .hr-portal, [data-testid="sales-orig"], .ui-modal,
 .cretop-mini {
   word-break: keep-all;
   overflow-wrap: anywhere;

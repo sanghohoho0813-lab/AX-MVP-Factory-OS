@@ -631,7 +631,7 @@ function Modal({ open, title, children, onClose, width = 720 }) {
   if (!open) return null;
   const content = (
     <div className="ui-modal-bg" style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(15,23,42,.4)", backdropFilter: "blur(3px)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "clamp(12px,3vw,18px)", paddingTop: "clamp(16px,6vh,64px)", overflowY: "auto" }} onClick={onClose}>
-      <div ref={ref} className="ui-modal" style={{ width: "100%", maxWidth: width, maxHeight: "calc(100vh - 80px)", overflow: "auto", background: C.card, border: "1px solid " + C.bdr, borderRadius: 18, boxShadow: "0 24px 60px rgba(15,23,42,.22)" }} onClick={(e) => e.stopPropagation()}>
+      <div ref={ref} className="ui-modal" style={{ width: "100%", maxWidth: width, maxHeight: "calc(100vh - 80px)", overflow: "auto", background: C.card, border: "1px solid " + C.bdr, borderRadius: "var(--radius-panel)", boxShadow: "0 24px 60px rgba(15,23,42,.22)" }} onClick={(e) => e.stopPropagation()}>
         <div style={{ position: "sticky", top: 0, zIndex: 2, background: C.card, borderBottom: "1px solid " + C.bdr, padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
             <button onClick={onClose} aria-label="뒤로" title="뒤로" style={{ background: C.bg, border: "1px solid " + C.bdr, borderRadius: 10, width: 44, height: 44, color: C.textS, fontSize: 22, cursor: "pointer", lineHeight: 1, flexShrink: 0 }}>←</button>
@@ -5384,6 +5384,10 @@ export default function App({ tab: tabProp = "briefing", onTab, focus }) {
       }
       /* [D-98] 휴대폰 폭 칸에서: ‘고르기 칸 | 단추들’ 두 칸 줄은 위아래로(고르기 칸이 화살표만 남게 찌그러졌다),
          ‘제목 | 단추’ 줄은 단추가 글자 한두 자씩 세 줄로 꺾이지 않게 아랫줄로 내린다 */
+      /* [D-99] 영업 창(.ui-modal)은 body 로 따로 떠서 위 칸 폭 규칙이 닿지 않았다 — 휴대폰에서 날짜 칸 두 개가 창보다 넓어 창 전체가 옆으로 밀렸다.
+         창 안 여러 칸 줄은 줄어들 수 있게, 좁은 화면에서는 한 줄에 하나 */
+      .ui-modal [style*="grid-template-columns"] > *{min-width:0}
+      @media (max-width:560px){ .ui-modal [style*="grid-template-columns"]{grid-template-columns:minmax(0,1fr) !important} }
       /* [D-99] 넓은 화면에서도 ‘제목 | 단추’ 줄의 단추가 ‘등/록’ 처럼 꺾였다 — 단추는 줄지 않고 한 줄, 대신 설명 글이 줄어든다 */
       .appRoot [style*="justify-content: space-between"] > button{flex-shrink:0;white-space:nowrap}
       @container sales (max-width:560px){

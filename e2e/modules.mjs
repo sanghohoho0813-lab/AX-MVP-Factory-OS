@@ -221,6 +221,28 @@ for (const [w, h, mob] of [[1440, 900, false], [390, 844, true]]) {
   await ctx.close()
 }
 
+/* ---- 휴대폰 모듈 목차 서랍: Esc 로 닫히고 초점이 목차 단추로 돌아온다 (D-99) ---- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', isMobile: true, hasTouch: true })
+  const page = await ctx.newPage()
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  for (const path of ['/tools/employment/dashboard', '/tools/sales-kit/briefing']) {
+    await page.goto(BASE + path, { waitUntil: 'networkidle' })
+    await page.getByTestId('module-menu-open').click()
+    const sheet = page.locator('[role="dialog"][aria-label$="목차"]')
+    const opened = (await sheet.count()) === 1
+    const focusInSheet = await page.evaluate(() => !!document.activeElement?.closest('[role="dialog"]'))
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(150)
+    const closed = (await sheet.count()) === 0
+    const back = await page.evaluate(() => document.activeElement?.getAttribute('data-testid'))
+    check(`${path}: 목차 서랍이 열리면 초점이 서랍 안으로`, opened && focusInSheet)
+    check(`${path}: Esc 로 닫히고 초점이 목차 단추로 돌아온다`, closed && back === 'module-menu-open', `${closed} ${back}`)
+  }
+  await ctx.close()
+}
+
 /* ---- 테마를 바꾸면 영업·크레탑이 새로고침 없이 따라간다 (D-98) ----
  * 모듈을 한 번 연 뒤(옛 테마로 팔레트를 읽음) 설정에서 테마를 바꾸고, 새로고침 없이(뒤로 가기) 돌아와
  * 화면에 옛 테마 강조색이 남았는지 센다. D-96·97 에서는 새로고침해야 바뀌었다 */

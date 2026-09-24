@@ -11,7 +11,7 @@
  * 주소는 `/tools/<key>/<section>`. 화면을 더하려면 `toolRegistry` 의 `sections` 에 한 줄 적는다.
  */
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, Menu, X } from 'lucide-react'
 import { sectionAccent, type ToolDefinition } from '../../config/toolRegistry'
@@ -73,6 +73,23 @@ export function ModuleShell({ tool, section, children }: ModuleShellProps) {
     setDrawer(false)
   }, [location.pathname])
 
+  // D-99: 서랍은 Esc 로 닫히고, 열면 닫기 단추에 · 닫으면 목차 단추로 초점이 돌아간다 (전에는 Esc 가 먹지 않았다)
+  const openerRef = useRef<HTMLButtonElement>(null)
+  const closeRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (!drawer) return
+    closeRef.current?.focus()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDrawer(false)
+    }
+    window.addEventListener('keydown', onKey)
+    const opener = openerRef.current
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      opener?.focus()
+    }
+  }, [drawer])
+
   if (sections.length <= 1) return <>{children}</>
 
   const current = sections.find((s) => s.key === section) ?? sections[0]
@@ -91,6 +108,7 @@ export function ModuleShell({ tool, section, children }: ModuleShellProps) {
       {/* 좁은 화면 — 모듈 햄버거 한 줄 */}
       <div className="no-print flex items-center gap-2 xl:hidden">
         <button
+          ref={openerRef}
           type="button"
           onClick={() => setDrawer(true)}
           data-testid="module-menu-open"
@@ -127,7 +145,7 @@ export function ModuleShell({ tool, section, children }: ModuleShellProps) {
             <div className="flex items-center gap-2">
               <ModuleIcon aria-hidden="true" className="size-4 shrink-0 text-brand-600" />
               <span className="t-card min-w-0 flex-1 truncate font-bold text-slate-900">{tool.label}</span>
-              <button type="button" aria-label="목차 닫기" onClick={() => setDrawer(false)} className="tap rounded-(--radius-control) p-1 text-slate-400 hover:bg-slate-100">
+              <button ref={closeRef} type="button" aria-label="목차 닫기" onClick={() => setDrawer(false)} className="tap rounded-(--radius-control) p-1 text-slate-400 hover:bg-slate-100">
                 <X aria-hidden="true" className="size-5" />
               </button>
             </div>
