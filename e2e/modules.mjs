@@ -243,6 +243,40 @@ for (const [w, h, mob] of [[1440, 900, false], [390, 844, true]]) {
   await ctx.close()
 }
 
+/* ---- 맨 위로 (D-100): 두 화면 넘게 내려가면 뜨고, 하단 메뉴·크레탑 하단 탭을 가리지 않으며, 누르면 맨 위 ---- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', isMobile: true, hasTouch: true })
+  const page = await ctx.newPage()
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  for (const path of ['/ops/clients', '/tools/cretop/analyze']) {
+    await page.goto(BASE + path, { waitUntil: 'networkidle' })
+    // 업체 100곳·긴 크레탑 보고서처럼 긴 화면을 흉내 낸다 (크레탑은 하단 탭이 붙은 칸 안을 길게)
+    await page.evaluate(() => {
+      const mini = document.querySelector('.cretop-mini')
+      if (mini) mini.insertAdjacentHTML('afterbegin', '<div style="height:9000px"></div>')
+      else document.body.style.minHeight = '9000px'
+    })
+    const atTop = await page.getByTestId('scroll-top').count()
+    await page.evaluate(() => window.scrollTo(0, 5000))
+    await page.waitForTimeout(250)
+    const btn = page.getByTestId('scroll-top')
+    const shown = (await btn.count()) === 1
+    const box = shown ? await btn.boundingBox() : null
+    const below = await page.evaluate(() => {
+      const tops = [...document.querySelectorAll('.cretop-mini-tabs, nav.fixed')].map((e) => e.getBoundingClientRect()).filter((r) => r.top < window.innerHeight && r.bottom > window.innerHeight - 160).map((r) => r.top)
+      return tops.length ? Math.min(...tops) : window.innerHeight
+    })
+    check(`${path}: 맨 위에서는 '맨 위로' 가 없다`, atTop === 0)
+    check(`${path}: 내려가면 '맨 위로' 가 뜨고 하단 메뉴·탭을 가리지 않는다`, shown && box !== null && box.y + box.height <= below - 4, `${box && Math.round(box.y + box.height)} / ${Math.round(below)}`)
+    if (shown) await btn.click()
+    await page.waitForTimeout(900)
+    if (path.includes('cretop')) check(`${path}: 크레탑 하단 탭이 화면 아래에 붙어 있다(시험이 제 구실을 하는지)`, below < 844 - 60, String(Math.round(below)))
+    check(`${path}: 누르면 맨 위로 간다`, (await page.evaluate(() => window.scrollY)) === 0)
+  }
+  await ctx.close()
+}
+
 /* ---- 테마를 바꾸면 영업·크레탑이 새로고침 없이 따라간다 (D-98) ----
  * 모듈을 한 번 연 뒤(옛 테마로 팔레트를 읽음) 설정에서 테마를 바꾸고, 새로고침 없이(뒤로 가기) 돌아와
  * 화면에 옛 테마 강조색이 남았는지 센다. D-96·97 에서는 새로고침해야 바뀌었다 */

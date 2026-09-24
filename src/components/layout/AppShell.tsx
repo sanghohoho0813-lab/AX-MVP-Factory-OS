@@ -9,6 +9,7 @@ import { ActiveProjectProvider } from '../../context/ActiveProjectProvider'
 import { RouteProjectSync } from '../../context/RouteProjectSync'
 import { ContentErrorBoundary } from './ContentErrorBoundary'
 import { StorageFullNotice } from './StorageFullNotice'
+import { ScrollTopButton } from './ScrollTopButton'
 
 function ShellFallback() {
   return (
@@ -60,6 +61,7 @@ export function AppShell() {
           </main>
         </div>
         <MobileNav onOpenMore={() => setMobileOpen(true)} />
+        <ScrollTopButton />
       </div>
       </OnboardingProvider>
       </DemoTourProvider>
