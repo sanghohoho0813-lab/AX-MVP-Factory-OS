@@ -24,14 +24,14 @@ import { meetingQuestionFlow, meetingDocs, meetingShort, meetingEffect } from ".
 
 const FF = "'Pretendard Variable','Pretendard',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
 const T = {
-  bg: "#F4F6FA", surface: "#FFFFFF", ink: "#0F172A", sub: "#475569", mute: "#94A3B8",
+  bg: "#F8FAFC", surface: "#FFFFFF", ink: "#0F172A", sub: "#475569", mute: "#94A3B8",
   // [D-96] 강조색은 OS 테마를 따른다(원본 #1D4ED8·#EFF4FF). 등급·단계 색은 뜻이 있어 그대로 둔다
   line: "#E2E8F0", lineSoft: "#EEF2F7", brand: brandHex("700", "#1D4ED8"), brandSoft: brandHex("50", "#EFF4FF"),
   teal: "#0D9488", up: "#0F766E", down: "#B91C1C", flat: "#64748B",
   warnBg: "#FEF2F2", warnInk: "#B91C1C", okBg: "#ECFDF5", okInk: "#047857",
 };
 
-const card = { background: T.surface, border: `1px solid ${T.line}`, borderRadius: 14, boxShadow: "0 1px 2px rgba(15,23,42,.04)" };
+const card = { background: T.surface, border: `1px solid ${T.line}`, borderRadius: "var(--radius-panel)", boxShadow: "var(--shadow-card)" }; // [D-97] OS 카드 규격
 const ratioKeys = new Set(["netIncomeMargin", "debtRatio", "currentRatio", "interestCoverageRatio"]);
 
 function num(n) {
@@ -585,7 +585,7 @@ function CoreGrid({ ui, grade, lastY, compact }) {
       {!compact ? <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         <span style={{ fontSize: "calc(12.5px * var(--fs,1))", fontWeight: 800, color: T.brand, background: T.brandSoft, border: `1px solid ${T.brand}22`, borderRadius: 999, padding: "5px 12px" }}>📅 크레탑 상 최신 자료: {lastY ? `${lastY}년 결산 기준` : "최근 결산 기준"}</span>
         <div style={{ flexBasis: "100%", height: 0 }} />
-        <span style={{ fontSize: "calc(11.5px * var(--fs,1))", fontWeight: 700, color: "#3B5BA9", background: "#EFF4FF", border: `1px solid ${T.brand}1A`, borderRadius: 8, padding: "5px 11px", lineHeight: 1.5 }}>각 지표는 <b>최신 연도 기준</b>이며, 직전연도 대비 <b style={{ color: T.up }}>증가</b>·<b style={{ color: T.down }}>감소</b>·<b style={{ color: T.flat }}>변동없음</b>을 표시합니다. 부채비율·유동비율·이자보상배수·현금흐름등급은 <b>양호/주의/위험</b> 판정도 함께 표시합니다.</span>
+        <span style={{ fontSize: "calc(11.5px * var(--fs,1))", fontWeight: 700, color: "#3B5BA9", background: T.brandSoft, border: `1px solid ${T.brand}1A`, borderRadius: 8, padding: "5px 11px", lineHeight: 1.5 }}>각 지표는 <b>최신 연도 기준</b>이며, 직전연도 대비 <b style={{ color: T.up }}>증가</b>·<b style={{ color: T.down }}>감소</b>·<b style={{ color: T.flat }}>변동없음</b>을 표시합니다. 부채비율·유동비율·이자보상배수·현금흐름등급은 <b>양호/주의/위험</b> 판정도 함께 표시합니다.</span>
       </div> : null}
       {/* 회사 한눈에 — 기업유형 · 업력 · 업종(요약 브리핑에서는 숨김) */}
       {!compact ? <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -1393,7 +1393,7 @@ function RecommendationBoard({ ui }) {
         </div>
       </div>
       {/* ✅ 최종 선택한 미팅 제안 항목 — 제안 탭 최상단(추천 후보보다 위) */}
-      <div style={{ ...card, padding: "13px 15px", borderColor: T.brand + "66", background: selected.length ? "#F5F8FF" : "#fff" }}>
+      <div style={{ ...card, padding: "13px 15px", borderColor: T.brand + "66", background: selected.length ? T.brandSoft : "#fff" }}>
         <div style={{ fontSize: "calc(14.5px * var(--fs,1))", fontWeight: 900, color: T.brand }}>✅ 최종 선택한 미팅 제안 항목 {selected.length ? `(${selected.length})` : ""}</div>
         {selectedRanked.length
           ? <div style={{ fontSize: "calc(11.5px * var(--fs,1))", color: T.sub, marginTop: 2, marginBottom: 9 }}>대표님과 실제로 논의할 항목입니다. ‘상세 보기’로 질문지를 확인할 수 있습니다.</div>
@@ -1689,7 +1689,7 @@ function OneLinerSummary({ ui, onTab, grade, manualGrade }) {
 const TABS = [["overview", "개요", "🏢"], ["detail", "재무상세", "📊"], ["value", "주식가치", "💎"], ["reco", "제안", "🎯"], ["summary", "요약", "📝"]];
 function BottomNav({ tab, onTab }) {
   return (
-    <nav className="cretop-mini-tabs" data-testid="cretop-mini-tabs" style={{ position: "sticky", bottom: 0, background: "#fff", borderTop: `1px solid ${T.line}`, boxShadow: "0 -2px 12px rgba(15,23,42,.08)", zIndex: 30, borderRadius: "0 0 16px 16px" }}>
+    <nav className="cretop-mini-tabs" data-testid="cretop-mini-tabs" style={{ position: "sticky", bottom: 0, background: "#fff", borderTop: `1px solid ${T.line}`, boxShadow: "0 -2px 12px rgba(15,23,42,.08)", zIndex: 30, borderRadius: "0 0 var(--radius-panel) var(--radius-panel)" }}>
       <div style={{ maxWidth: 760, margin: "0 auto", display: "flex" }}>
         {TABS.map(([k, label, icon]) => (
           <button key={k} data-tab={k} aria-current={tab === k ? "page" : undefined} onClick={() => onTab(k)} style={{ flex: "1 1 20%", minWidth: 0, border: "none", background: tab === k ? T.brandSoft : "transparent", cursor: "pointer", padding: "9px 1px 11px", fontFamily: FF, color: tab === k ? T.brand : T.sub, fontWeight: tab === k ? 800 : 600, fontSize: "calc(11.5px * var(--fs,1))", borderTop: `2px solid ${tab === k ? T.brand : "transparent"}`, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, whiteSpace: "nowrap" }}>
@@ -1902,9 +1902,9 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
   }
 
   return (
-    <div className="cretop-mini" data-testid="cretop-mini" style={{ fontFamily: FF, background: T.bg, color: T.ink, overflowX: "clip", "--fs": 1, borderRadius: 16, border: `1px solid ${T.line}` }}>{/* [D-94] hidden → clip: hidden 이면 이 상자가 스크롤 상자가 되어 하단 탭이 화면에 붙지 않고 맨 끝 내용을 가렸다 */}
+    <div className="cretop-mini" data-testid="cretop-mini" style={{ fontFamily: FF, background: T.bg, color: T.ink, overflowX: "clip", "--fs": 1, borderRadius: "var(--radius-panel)", border: `1px solid ${T.line}` }}>{/* [D-94] hidden → clip: hidden 이면 이 상자가 스크롤 상자가 되어 하단 탭이 화면에 붙지 않고 맨 끝 내용을 가렸다 */}
       {/* 상단: 햄버거 + 서비스명 + 글자 크기 (정상 크기 — 콘텐츠만 확대) */}
-      <header style={{ background: T.surface, borderBottom: `1px solid ${T.line}`, borderRadius: "16px 16px 0 0" }}>
+      <header style={{ background: T.surface, borderBottom: `1px solid ${T.line}`, borderRadius: "var(--radius-panel) var(--radius-panel) 0 0" }}>
         <div style={{ maxWidth: 1040, margin: "0 auto", padding: "10px 12px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           {/* [D-94] OS 모듈 머리줄이 이미 '크레탑 분석기' 를 보여 준다 — 원본의 로고·'법인 재무진단' 제목은 겹쳐서 뺐다. ☰ 는 무엇을 여는지 글로 적는다 */}
           <button onClick={() => setSidebar(true)} title="분석 이력" data-testid="cretop-mini-menu" style={{ border: `1px solid ${T.line}`, background: "#fff", cursor: "pointer", borderRadius: 9, height: 36, padding: "0 12px", fontSize: "calc(13px * var(--fs,1))", fontWeight: 800, fontFamily: FF, color: T.ink, flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}><span aria-hidden="true" style={{ fontSize: "calc(16px * var(--fs,1))" }}>☰</span>분석 이력{history.length ? ` ${history.length}` : ""}</button>
