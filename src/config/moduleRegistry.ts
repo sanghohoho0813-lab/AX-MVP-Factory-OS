@@ -3,6 +3,7 @@ import {
   BookOpenText,
   Building2,
   CalendarDays,
+  ClipboardCheck,
   Compass,
   Gauge,
   ClipboardList,
@@ -15,8 +16,8 @@ import {
   Landmark,
   LayoutGrid,
   Library,
+  LifeBuoy,
   ListChecks,
-  NotebookPen,
   Palette,
   PencilRuler,
   Settings,
@@ -39,6 +40,7 @@ export type NavAccent = 'overview' | 'ops' | 'revenue' | 'customer' | 'ai' | 'ev
 export type ModuleGroupKey =
   | 'today'
   | 'clients'
+  | 'sales'
   | 'tools'
   | 'occasional'
   | 'studio'
@@ -73,8 +75,14 @@ export interface ModuleDefinition {
   /**
    * 기능 상태. 'next' 는 아직 없는 기능이다 — 메뉴에는 NEXT 배지로 보이고,
    * 누르면 404 대신 무엇을 만들 계획인지 설명하는 화면으로 간다. (규격 U-3)
+   * 'soon' 은 만들고 있어 곧 들어올 것 — '준비 중' 배지, 누르면 자리 화면(D-103).
    */
-  status?: 'live' | 'next'
+  status?: 'live' | 'next' | 'soon'
+  /**
+   * 'future-items' — 누르면 화면을 옮기지 않고 메뉴 안에서 아직 없는 기능 목록이 펼쳐지고,
+   * 하나를 누르면 가운데 안내창이 뜬다 (D-103 · 향후 확장).
+   */
+  expand?: 'future-items'
 }
 
 /*
@@ -86,6 +94,8 @@ export const MODULE_GROUPS: ModuleGroup[] = [
   // 하루가 여기서 시작한다 — 오늘 할 일과 일정은 같은 질문("오늘 뭐 하지")이라 한 묶음이다
   { key: 'today', title: '오늘', accent: 'overview' },
   { key: 'clients', title: '고객', accent: 'ops' },
+  // D-103: 영업자 일(정산 · 1차 미팅 체크리스트)을 고객 운영과 나눈다
+  { key: 'sales', title: '영업', accent: 'revenue' },
   // 고객 기록과 상관없이 혼자 도는 것들 — 앞으로 여기로 계속 들어온다 (toolRegistry.ts)
   { key: 'tools', title: '도구함', accent: 'system' },
   { key: 'occasional', title: '가끔 쓰는 것', accent: 'ai', collapsible: true, defaultCollapsed: true },
@@ -116,17 +126,18 @@ function toolModules(): ModuleDefinition[] {
 
 export const MODULES: ModuleDefinition[] = [
   { key: 'today', label: '오늘', path: '/', icon: Sun, group: 'today', accent: 'overview', enabled: true, exact: true },
-  { key: 'calendar', label: '일정', path: '/ops/calendar', icon: CalendarDays, group: 'today', accent: 'evidence', enabled: true },
+  // D-103: 오늘 기록 · 주간 돌아보기 · 전체 기록은 일정 안의 탭이다 — 그 주소에서도 '일정' 에 불이 켜진다
+  { key: 'calendar', label: '일정', path: '/ops/calendar', icon: CalendarDays, group: 'today', accent: 'evidence', enabled: true, alsoPaths: ['/journal'], hint: '달력 · 오늘 기록 · 주간 돌아보기 · 전체 기록' },
 
   { key: 'client-ops', label: '고객 운영', path: '/ops/clients', icon: ListChecks, group: 'clients', accent: 'ops', enabled: true },
   { key: 'inbox', label: '고객 이벤트함', path: '/ops/inbox', icon: Inbox, group: 'clients', accent: 'alert', enabled: true },
-  { key: 'agents', label: '영업자 정산', path: '/ops/agents', icon: Handshake, group: 'clients', accent: 'revenue', enabled: true, hint: '누구한테 지금 얼마를 줘야 하는가' },
+
+  { key: 'agents', label: '영업자 정산', path: '/ops/agents', icon: Handshake, group: 'sales', accent: 'revenue', enabled: true, hint: '누구한테 지금 얼마를 줘야 하는가' },
+  // 만들고 있는 프로그램이 들어올 자리 — 들어오면 status 를 지우고 화면만 바꾼다 (docs/DECISIONS D-103)
+  { key: 'first-meeting', label: '1차 미팅 체크리스트', path: '/sales/first-meeting', icon: ClipboardCheck, group: 'sales', accent: 'revenue', enabled: true, status: 'soon', hint: '영업자용 AX 1차 미팅 체크리스트 — 만드는 중' },
 
   { key: 'consulting-studio', label: '컨설팅 작업실', path: '/studio', icon: Workflow, group: 'occasional', accent: 'ai', enabled: true, hint: '특허 · 벤처인증 · MVP 단계 관리' },
   { key: 'funding', label: '자금·지원사업', path: '/funding', icon: Landmark, group: 'occasional', accent: 'revenue', enabled: true },
-  { key: 'journal-today', label: '오늘 기록', path: '/journal', icon: NotebookPen, group: 'occasional', accent: 'customer', enabled: true, exact: true },
-  { key: 'journal-week', label: '주간 돌아보기', path: '/journal/week', icon: NotebookPen, group: 'occasional', accent: 'customer', enabled: true },
-  { key: 'journal-all', label: '전체 기록', path: '/journal/all', icon: NotebookPen, group: 'occasional', accent: 'customer', enabled: true },
 
   { key: 'diagnosis', label: '기업 진단', path: '/diagnosis', icon: ClipboardList, group: 'studio', accent: 'ai', enabled: true, hint: '진단 스튜디오' },
   { key: 'selection', label: '만들 업무', path: '/selection', icon: Filter, group: 'studio', accent: 'ai', enabled: true, hint: '과제 선별' },
@@ -139,9 +150,10 @@ export const MODULES: ModuleDefinition[] = [
   { key: 'clients', label: '고객사·프로젝트', path: '/clients', icon: Building2, group: 'studio', accent: 'ai', enabled: true, hint: 'AX 프로젝트 단위 관리' },
 
   // 이 시스템이 왜 있는지 · 성과를 어떻게 재는지 · 다음에 무엇을 만들지 — 규격이 요구하는 '찾을 수 있는 이야기'
+  { key: 'guide', label: '처음 사용 가이드', path: '/getting-started', icon: LifeBuoy, group: 'about', accent: 'system', enabled: true, hint: '처음 쓰는 순서 · 화면별 안내' },
   { key: 'why', label: '기획의도', path: '/why', icon: BookOpenText, group: 'about', accent: 'system', enabled: true, hint: '이 시스템을 왜 만들었는가' },
   { key: 'kpi', label: '성과 지표', path: '/kpi', icon: Gauge, group: 'about', accent: 'system', enabled: true, hint: '돈·시간·규모·사용 지표' },
-  { key: 'roadmap', label: '향후 확장', path: '/roadmap', icon: Compass, group: 'about', accent: 'system', enabled: true, status: 'next', hint: '아직 없는 기능과 계획' },
+  { key: 'roadmap', label: '향후 확장', path: '/roadmap', icon: Compass, group: 'about', accent: 'system', enabled: true, status: 'next', expand: 'future-items', hint: '아직 없는 기능과 계획 — 눌러서 펼치기' },
 
   ...toolModules(),
   // 도입 검토중 — 검토중인 도구가 하나라도 있을 때만 한 줄 (D-88)

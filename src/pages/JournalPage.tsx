@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { SlidersHorizontal } from 'lucide-react'
-import { ScreenTitle } from '../components/ui/primitives'
+import { PageHeader } from '../components/ui/PageHeader'
+import { ScheduleTabs } from '../components/journal/ScheduleTabs'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { useToast } from '../components/ui/toastContext'
 import { QuickCapture } from '../components/journal/QuickCapture'
@@ -23,7 +24,7 @@ import { todayLocalDate } from '../lib/appClock'
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { JournalEntry, JournalEntryType } from '../types/bridge'
 
-const RANGE_LABEL: Record<JournalRange, string> = { today: '오늘', week: '이번 주', all: '전체' }
+const RANGE_TITLE: Record<JournalRange, string> = { today: '오늘 기록', week: '주간 돌아보기', all: '전체 기록' }
 
 function isRange(v: string | undefined): v is JournalRange {
   return v === 'today' || v === 'week' || v === 'all'
@@ -35,7 +36,6 @@ function isRange(v: string | undefined): v is JournalRange {
  */
 function JournalContent({ workspaceId, userId }: { workspaceId: string | null; userId: string | null }) {
   const { range: rangeParam } = useParams()
-  const navigate = useNavigate()
   const { showToast } = useToast()
   const range: JournalRange = isRange(rangeParam) ? rangeParam : 'today'
   const today = todayLocalDate()
@@ -97,39 +97,25 @@ function JournalContent({ workspaceId, userId }: { workspaceId: string | null; u
 
   return (
     <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-5">
-      <ScreenTitle
-        title="업무 일기"
-        sub="고객에게는 보이지 않는 나만의 기록입니다."
+      {/* D-103: 기록은 '일정' 안의 탭 — 제목도 일정, 아래 탭으로 달력과 오간다 */}
+      <PageHeader
+        title="일정"
+        description={`${RANGE_TITLE[range]} — 고객에게는 보이지 않는 나만의 기록입니다.`}
         actions={
           <span className="hidden lg:inline-flex">
             <ScreenGuide screenKey="journal" />
           </span>
         }
       />
+      <ScheduleTabs />
 
       <QuickCapture
         clients={clients}
         onCreate={(input) => mutate(() => createJournalEntry(workspaceId, userId, input), '기록했습니다.')}
       />
 
-      {/* 범위 · 필터 */}
+      {/* 거르기 · 건수 (기간은 위 일정 탭) */}
       <div className="flex flex-wrap items-center gap-2">
-        <div role="tablist" aria-label="기간" className="flex rounded-(--radius-control) border border-slate-200 bg-white p-0.5">
-          {(['today', 'week', 'all'] as JournalRange[]).map((r) => (
-            <button
-              key={r}
-              type="button"
-              role="tab"
-              aria-selected={range === r}
-              onClick={() => navigate(r === 'today' ? '/journal' : `/journal/${r}`)}
-              className={`t-sub tap rounded-[8px] px-3.5 py-2 font-semibold ${
-                range === r ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              {RANGE_LABEL[r]}
-            </button>
-          ))}
-        </div>
         <button
           type="button"
           aria-expanded={filterOpen}

@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react'
 import { useEffect, useState } from 'react'
-import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { ChevronDown, ChevronsLeft, ChevronsRight, ExternalLink, LifeBuoy, X } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { ChevronDown, ChevronsLeft, ChevronsRight, ExternalLink, X } from 'lucide-react'
 import { APP_VERSION } from '../../data/navigation'
 import { brand } from '../../brand/brand.config'
 import { BrandLogo } from '../brand/BrandLogo'
@@ -14,7 +14,10 @@ import {
   type ModuleGroupKey,
 } from '../../config/moduleRegistry'
 import { readRaw, writeRaw } from '../../storage/localStore'
-import { TextScaleControl } from '../ui/TextScaleControl'
+import { FUTURE_ITEMS, type FutureItem } from '../../config/capabilityStatus'
+import { FutureItemDialog } from './FutureItemDialog'
+import { futureIcon } from './futureIcons'
+import { useCurrentUser } from './useCurrentUser'
 
 interface SidebarProps {
   collapsed: boolean
@@ -63,8 +66,6 @@ function SidebarContent({
 }) {
   const navigate = useNavigate()
   const location = useLocation()
-  // D-94: 메뉴 줄이 함께 맡는 다른 주소(도입 검토중 → 영업 도구 모음)에 있어도 불을 켠다
-  const alsoActive = (m: ModuleDefinition) => (m.alsoPaths ?? []).some((p) => location.pathname === p || location.pathname.startsWith(`${p}/`))
   const groups = enabledModulesByGroup()
   const [userCollapsed, setUserCollapsed] = useState<Set<ModuleGroupKey> | null>(null)
 
@@ -166,21 +167,22 @@ function SidebarContent({
                   >
                     {items.map((item, idx) => (
                       <li key={item.key}>
-                        <NavLink
+                        {item.expand === 'future-items' ? (
+                          <FutureExpandRow item={item} collapsed={collapsed} />
+                        ) : (
+                        (() => {
+                          // D-103: 불 켜짐과 '지금 화면'(aria-current)을 같은 규칙으로 — 함께 맡는 주소(일정 ↔ 기록)에서도 읽는 기계가 알게
+                          const isActive = moduleMatchLength(item, location.pathname) > 0
+                          return (
+                        <Link
                           to={item.path}
-                          end={item.exact === true}
                           onClick={onNavigate}
                           title={collapsed ? item.label : item.hint}
-                          className={({ isActive }) =>
-                            `relative flex min-h-11 items-center gap-3 rounded-(--radius-control) px-3 py-2.5 text-[0.95rem] font-medium transition-colors ${collapsed ? 'justify-center px-0' : ''} ${
-                              isActive || alsoActive(item) ? 'bg-brand-600 text-white' : 'text-navy-200 hover:bg-navy-800 hover:text-white'
-                            }`
-                          }
+                          aria-current={isActive ? 'page' : undefined}
+                          className={`relative flex min-h-11 items-center gap-3 rounded-(--radius-control) px-3 py-2.5 text-[0.95rem] font-medium transition-colors ${collapsed ? 'justify-center px-0' : ''} ${
+                            isActive ? 'active bg-brand-600 text-white' : 'text-navy-200 hover:bg-navy-800 hover:text-white'
+                          }`}
                         >
-                          {({ isActive: linkActive }: { isActive: boolean }) => {
-                            const isActive = linkActive || alsoActive(item)
-                            return (
-                            <>
                               {isActive && !collapsed && (
                                 <span
                                   aria-hidden="true"
@@ -193,6 +195,15 @@ function SidebarContent({
                                 style={!isActive && group.key === 'tools' ? rampStyle(idx, items.length) : undefined}
                               />
                               {!collapsed && <span className="truncate">{item.label}</span>}
+                              {!collapsed && item.status === 'soon' && (
+                                <span
+                                  className={`t-meta ml-auto shrink-0 rounded-full px-1.5 py-0.5 font-semibold ${
+                                    isActive ? 'bg-white/20 text-white' : 'bg-navy-800 text-navy-200'
+                                  }`}
+                                >
+                                  준비 중
+                                </span>
+                              )}
                               {!collapsed && item.status === 'next' && (
                                 <span
                                   className={`t-meta ml-auto shrink-0 rounded-full border px-1.5 py-0.5 font-semibold tracking-wide ${
@@ -202,10 +213,10 @@ function SidebarContent({
                                   NEXT
                                 </span>
                               )}
-                            </>
-                            )
-                          }}
-                        </NavLink>
+                        </Link>
+                          )
+                        })()
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -217,41 +228,15 @@ function SidebarContent({
       </nav>
 
       {/*
-        모바일 서랍 전용 — 상단에서 내린 것들(작업공간·가이드·글자 크기·계정)이
-        갈 곳. 데스크톱에서는 헤더에 그대로 있으므로 그리지 않는다.
+        D-103: 아래 한 줄 — 지금 쓰는 사람(로그인한 사람 이름, 없으면 대표 이름) · 고객 플랫폼은 작은 아이콘.
+        예전 서랍의 '이 기기 · 계정' 칸(고객 플랫폼 열기 · 처음 사용 가이드 · 글자 크기)은 없앴다 —
+        가이드는 '이 시스템' 묶음으로, 글자 크기는 설정으로 갔다.
       */}
-      {onCloseMobile && (
-        <div className="shrink-0 border-t border-navy-800 px-3 py-3">
-          <p className="px-3 pb-1.5 t-meta font-semibold tracking-wide text-navy-300">이 기기 · 계정</p>
-          <a
-            href={brand.customerPlatformUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="t-sub flex min-h-11 w-full items-center gap-3 rounded-(--radius-control) px-3 text-navy-200 hover:bg-navy-800 hover:text-white"
-          >
-            <ExternalLink aria-hidden="true" className="size-[18px] shrink-0" />
-            {brand.customerPlatformLabel} 열기
-          </a>
-          <button
-            type="button"
-            onClick={() => { navigate('/getting-started'); onNavigate?.() }}
-            className="t-sub flex min-h-11 w-full items-center gap-3 rounded-(--radius-control) px-3 text-navy-200 hover:bg-navy-800 hover:text-white"
-          >
-            <LifeBuoy aria-hidden="true" className="size-[18px] shrink-0" />
-            처음 사용 가이드
-          </button>
-          {/* 글자 크기 조절은 밝은 바탕 기준으로 만든 부품이라 흰 칸 위에 올린다 */}
-          <div className="mx-1 mt-2 rounded-(--radius-control) bg-white p-3">
-            <p className="t-meta mb-1.5 font-semibold text-slate-500">글자 크기</p>
-            <TextScaleControl compact />
-          </div>
-        </div>
-      )}
-
       <div className="shrink-0 border-t border-navy-800 px-3 py-3">
+        <SidebarAccount collapsed={collapsed} />
         {!collapsed && (
-          <p className="px-3 pb-2 text-[0.8rem] text-navy-300">
-            {brand.productSubtitle} · <span className="font-medium text-navy-200">{APP_VERSION}</span>
+          <p className="t-meta truncate px-3 pt-2 pb-1 text-navy-300" title={`${brand.productSubtitle} · ${APP_VERSION}`}>
+            {brand.productSubtitle} · <span className="text-navy-200">{APP_VERSION}</span>
           </p>
         )}
         {onToggleCollapsed && (
@@ -295,4 +280,96 @@ export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobil
 function rampStyle(index: number, count: number): CSSProperties {
   const step = count > 1 ? 84 / (count - 1) : 0
   return { ['--ramp-shift' as string]: String(Math.round(index * step)) }
+}
+
+/** D-103: 사이드바 아래 — 이름 · 직함 + 고객 플랫폼 아이콘 */
+function SidebarAccount({ collapsed }: { collapsed: boolean }) {
+  const me = useCurrentUser()
+  const portal = (
+    <a
+      href={brand.customerPlatformUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`${brand.customerPlatformLabel} 열기 (새 창)`}
+      title={`${brand.customerPlatformLabel} 열기`}
+      data-testid="sidebar-portal-link"
+      className="flex size-9 shrink-0 items-center justify-center rounded-(--radius-control) text-navy-300 hover:bg-navy-800 hover:text-white"
+    >
+      <ExternalLink aria-hidden="true" className="size-[18px]" />
+    </a>
+  )
+  if (collapsed) {
+    return (
+      <div className="flex flex-col items-center gap-1.5">
+        <span title={`${me.name} ${me.title}`} aria-label={`${me.name} ${me.title}`} role="img" className="flex size-9 items-center justify-center rounded-full bg-white/10 text-[0.9rem] font-bold text-white">
+          {me.initial}
+        </span>
+        {portal}
+      </div>
+    )
+  }
+  return (
+    <div data-testid="sidebar-account" className="flex items-center gap-2.5 px-1.5">
+      <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-[0.9rem] font-bold text-white">
+        {me.initial}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-[0.95rem] text-navy-100">
+        <b className="font-bold text-white">{me.name}</b> {me.title}
+      </span>
+      {portal}
+    </div>
+  )
+}
+
+/**
+ * D-103: '향후 확장' — 눌러도 화면을 옮기지 않는다. 메뉴 안에서 아직 없는 기능 목록이 펼쳐지고,
+ * 하나를 누르면 화면 가운데 안내창(어떻게 돌아갈 수 있는지 + 예시)이 뜬다.
+ */
+function FutureExpandRow({ item, collapsed }: { item: ModuleDefinition; collapsed: boolean }) {
+  const [open, setOpen] = useState(false)
+  const [picked, setPicked] = useState<FutureItem | null>(null)
+  const listId = `future-list-${item.key}`
+  return (
+    <>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={listId}
+        onClick={() => setOpen((v) => !v)}
+        title={collapsed ? item.label : item.hint}
+        className={`relative flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-(--radius-control) px-3 py-2.5 text-left text-[0.95rem] font-medium text-navy-200 transition-colors hover:bg-navy-800 hover:text-white ${collapsed ? 'justify-center px-0' : ''}`}
+      >
+        <item.icon aria-hidden="true" className={`size-5 shrink-0 ${navAccentClass(item.accent)}`} />
+        {!collapsed && <span className="truncate">{item.label}</span>}
+        {!collapsed && (
+          <span className="ml-auto flex shrink-0 items-center gap-1.5">
+            <span className="t-meta rounded-full border border-navy-600 px-1.5 py-0.5 font-semibold tracking-wide text-navy-300">NEXT</span>
+            <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${open ? '' : '-rotate-90'}`} />
+          </span>
+        )}
+      </button>
+      {open && (
+        <ul id={listId} aria-label={`${item.label} 목록`} className={`mt-1 flex flex-col gap-0.5 ${collapsed ? '' : 'ml-5 border-l border-navy-700 pl-2'}`}>
+          {FUTURE_ITEMS.map((f) => {
+            const Icon = futureIcon(f.key)
+            return (
+              <li key={f.key}>
+                <button
+                  type="button"
+                  onClick={() => setPicked(f)}
+                  title={collapsed ? f.short : f.label}
+                  data-future={f.key}
+                  className={`flex min-h-10 w-full cursor-pointer items-center gap-2.5 rounded-(--radius-control) px-2.5 py-2 text-left text-[0.9rem] text-navy-200 hover:bg-navy-800 hover:text-white ${collapsed ? 'justify-center px-0' : ''}`}
+                >
+                  <Icon aria-hidden="true" className="size-4 shrink-0 text-navy-300" />
+                  {collapsed ? <span className="sr-only">{f.short}</span> : <span className="truncate">{f.short}</span>}
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      <FutureItemDialog item={picked} onClose={() => setPicked(null)} onPick={setPicked} />
+    </>
+  )
 }

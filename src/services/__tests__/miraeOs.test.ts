@@ -10,6 +10,8 @@
 import { brand, documentTitle } from '../../brand/brand.config'
 import { UI_THEMES, isThemeKey } from '../../lib/uiTheme'
 import { MODULES, MODULE_GROUPS, enabledModulesByGroup, moduleForPath } from '../../config/moduleRegistry'
+import { identityFromSession } from '../../auth/currentUser'
+import { FUTURE_ITEMS } from '../../config/capabilityStatus'
 import { REVIEW_HUB_PATH, TOOLS, liveTools, plannedTools, reviewTools } from '../../config/toolRegistry'
 import { formatClockDate, formatClockTime } from '../../components/layout/HeaderClock'
 import {
@@ -89,7 +91,9 @@ check('theme: 9종', UI_THEMES.length === 9 && new Set(UI_THEMES.map((t) => t.ke
 /* ------------------------------------------------------------------ */
 const paths = MODULES.map((m) => m.path)
 check('modules: 경로 중복 없음', new Set(paths).size === paths.length)
-check('modules: 홈 /, 이벤트함, 일기, 고객 운영이 켜져 있다', ['/', '/ops/inbox', '/journal', '/ops/clients'].every((p) => MODULES.some((m) => m.path === p && m.enabled)))
+check('modules: 홈 /, 이벤트함, 고객 운영이 켜져 있다', ['/', '/ops/inbox', '/ops/clients'].every((p) => MODULES.some((m) => m.path === p && m.enabled)))
+// D-103: 기록은 일정 안의 탭 — /journal 주소도 '일정' 메뉴가 맡는다
+check('modules: /journal · /journal/week · /journal/all 은 일정이 맡는다', ['/journal', '/journal/week', '/journal/all'].every((p) => moduleForPath(p)?.key === 'calendar'))
 check('modules: 모든 모듈의 group 이 정의된 그룹', MODULES.every((m) => MODULE_GROUPS.some((g) => g.key === m.group)))
 const grouped = enabledModulesByGroup()
 check('modules: 첫 그룹은 오늘', grouped[0]?.group.key === 'today')
@@ -98,14 +102,19 @@ check('modules: AX STUDIO 는 접을 수 있고 기본 접힘', MODULE_GROUPS.fi
 /* 메뉴 재분류 — 자주 쓰는 것이 위, 가끔 쓰는 것이 아래 (D-86) */
 {
   const order = MODULE_GROUPS.map((g) => g.key)
-  check('메뉴: 순서는 오늘 → 고객 → 도구함 → 가끔 → STUDIO → 이 시스템 → 설정',
-    order.join() === 'today,clients,tools,occasional,studio,about,settings', order.join())
+  check('메뉴: 순서는 오늘 → 고객 → 영업 → 도구함 → 가끔 → STUDIO → 이 시스템 → 설정 (D-103 영업 신설)',
+    order.join() === 'today,clients,sales,tools,occasional,studio,about,settings', order.join())
   const inGroup = (g: string) => MODULES.filter((m) => m.group === g).map((m) => m.key)
   check('메뉴: 오늘과 일정이 한 묶음', inGroup('today').join() === 'today,calendar')
-  check('메뉴: 잘 안 쓰는 넷이 가끔 쓰는 것으로 내려갔다',
-    inGroup('occasional').join() === 'consulting-studio,funding,journal-today,journal-week,journal-all', inGroup('occasional').join())
+  check('메뉴: 가끔 쓰는 것에는 작업실 · 자금만 (기록 셋은 일정 안으로, D-103)',
+    inGroup('occasional').join() === 'consulting-studio,funding', inGroup('occasional').join())
+  check('메뉴: 영업 묶음 = 영업자 정산 · 1차 미팅 체크리스트(준비 중)',
+    inGroup('sales').join() === 'agents,first-meeting' && MODULES.find((m) => m.key === 'first-meeting')?.status === 'soon', inGroup('sales').join())
+  check('메뉴: 고객 묶음에서 영업자 정산이 빠졌다', !inGroup('clients').includes('agents'))
+  check('메뉴: 처음 사용 가이드가 이 시스템 맨 위', inGroup('about')[0] === 'guide' && MODULES.find((m) => m.key === 'guide')?.path === '/getting-started')
+  check('메뉴: 향후 확장은 눌러도 이동하지 않고 펼쳐진다', MODULES.find((m) => m.key === 'roadmap')?.expand === 'future-items')
   check('메뉴: 가끔 쓰는 것은 접혀 있다', MODULE_GROUPS.find((g) => g.key === 'occasional')?.defaultCollapsed === true)
-  check('메뉴: 도구함은 고객 다음, 가끔 쓰는 것보다 위', order.indexOf('tools') === order.indexOf('clients') + 1 && order.indexOf('tools') < order.indexOf('occasional'))
+  check('메뉴: 도구함은 영업 다음, 가끔 쓰는 것보다 위', order.indexOf('tools') === order.indexOf('sales') + 1 && order.indexOf('sales') === order.indexOf('clients') + 1 && order.indexOf('tools') < order.indexOf('occasional'))
   check('메뉴: 도구함에 세금 계산기', inGroup('tools').includes('tool-tax'))
   // 도구를 목록에만 더하고 사이드바에 거는 것을 빠뜨리는 일이 없어야 한다 (D-86)
   check('메뉴: 쓸 수 있는 도구는 전부 사이드바 도구함에 걸린다',
@@ -114,6 +123,24 @@ check('modules: AX STUDIO 는 접을 수 있고 기본 접힘', MODULE_GROUPS.fi
     plannedTools().every((t) => !MODULES.some((m) => m.key === `tool-${t.key}`)))
   check('메뉴: 없어진 그룹을 가리키는 모듈이 없다', MODULES.every((m) => MODULE_GROUPS.some((g) => g.key === m.group)))
   check('메뉴: 모든 모듈 주소가 겹치지 않는다', new Set(MODULES.map((m) => m.path)).size === MODULES.length)
+}
+
+/* 지금 쓰는 사람 이름 (D-103) */
+{
+  const own = identityFromSession(null, null)
+  check('이름: 로그인 없으면 대표 이름', own.name === '김상호' && own.title === '대표' && own.initial === '김')
+  check('이름: 소유자인데 프로필 이름이 이메일 앞부분뿐이면 대표 이름', identityFromSession({ email: 'sanghohoho0813@gmail.com', user_metadata: { display_name: 'sanghohoho0813' } }, 'owner').name === '김상호')
+  const named = identityFromSession({ email: 'park@x.com', user_metadata: { display_name: '박지훈' } }, 'editor')
+  check('이름: 프로필에 이름을 넣으면 그 이름 + 역할', named.name === '박지훈' && named.title === '편집자' && named.initial === '박', JSON.stringify(named))
+  const plain = identityFromSession({ email: 'choi@x.com', user_metadata: {} }, 'viewer')
+  check('이름: 이름 없는 구성원은 이메일 앞부분 (대표 이름을 빌려 쓰지 않는다)', plain.name === 'choi' && plain.title === '보기 전용', JSON.stringify(plain))
+  check('이름: 소유자가 이름을 넣으면 그 이름 · 직함은 대표', identityFromSession({ email: 'a@b.c', user_metadata: { full_name: '김상호' } }, 'owner').title === '대표')
+}
+
+/* 향후 확장 안내창 내용 (D-103) */
+{
+  check('향후 확장: 항목마다 돌아가는 순서 3단계 이상과 예시가 있다', FUTURE_ITEMS.every((f) => f.scenario.length >= 3 && f.example.length > 20 && f.short.length > 0))
+  check('향후 확장: 짧은 이름이 겹치지 않는다', new Set(FUTURE_ITEMS.map((f) => f.short)).size === FUTURE_ITEMS.length)
 }
 
 /* 도구함 — 앞으로 붙을 것까지 목록 하나로 (D-86) */

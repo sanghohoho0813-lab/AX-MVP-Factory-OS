@@ -1,5 +1,4 @@
 import { Link, useLocation } from 'react-router-dom'
-import { TextScaleControl } from '../ui/TextScaleControl'
 import {
   Building,
   Check,
@@ -136,10 +135,6 @@ function UserMenu() {
             <Settings aria-hidden="true" className="size-4 text-slate-400" />
             설정
           </Link>
-          <div className="mt-1 border-t border-slate-100 px-3 pt-2.5 pb-1.5">
-            <p className="mb-1.5 text-[0.875rem] font-semibold text-slate-500">글자 크기</p>
-            <TextScaleControl compact />
-          </div>
         </div>
       )}
     </div>

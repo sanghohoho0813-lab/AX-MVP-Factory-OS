@@ -38,6 +38,8 @@ const OperationsHubPage = lazy(() => import('../pages/OperationsHubPage').then((
 const OperationsClientDetailPage = lazy(() => import('../pages/OperationsClientDetailPage').then((m) => ({ default: m.OperationsClientDetailPage })))
 const OpsCalendarPage = lazy(() => import('../pages/OpsCalendarPage').then((m) => ({ default: m.OpsCalendarPage })))
 const AgentSettlementPage = lazy(() => import('../pages/AgentSettlementPage').then((m) => ({ default: m.AgentSettlementPage })))
+// D-103: 영업자용 1차 미팅 체크리스트가 들어올 자리
+const FirstMeetingChecklistPage = lazy(() => import('../pages/sales/FirstMeetingChecklistPage').then((m) => ({ default: m.FirstMeetingChecklistPage })))
 const TaxCalculatorsPage = lazy(() => import('../pages/TaxCalculatorsPage').then((m) => ({ default: m.TaxCalculatorsPage })))
 const ToolsHubPage = lazy(() => import('../pages/ToolsHubPage').then((m) => ({ default: m.ToolsHubPage })))
 const ToolsReviewPage = lazy(() => import('../pages/ToolsReviewPage').then((m) => ({ default: m.ToolsReviewPage })))
@@ -388,6 +390,7 @@ export const appRouteChildren = [
       { path: 'ops/calendar', element: <OpsCalendarPage /> },
       // 영업자 정산 — 누구한테 지금 얼마를 줘야 하는가 (D-78)
       { path: 'ops/agents', element: <AgentSettlementPage /> },
+      { path: 'sales/first-meeting', element: <FirstMeetingChecklistPage /> },
       { path: 'ops/clients/:clientId', element: <OperationsClientDetailPage /> },
       // 컨설팅 작업실 — 특허 × 벤처 × MVP 단계 엔진
       { path: 'studio', element: <ConsultingStudioPage /> },

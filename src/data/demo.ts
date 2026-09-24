@@ -1,17 +1,19 @@
 import type { PriorityTask, TimelineItem, TimelineTrack } from '../types'
+import { brand } from '../brand/brand.config'
 
 /* ------------------------------------------------------------------ */
 /* 워크스페이스 / 사용자                                                */
 /* ------------------------------------------------------------------ */
 
-export const CURRENT_WORKSPACE = '김팀장의 AX랩'
+export const CURRENT_WORKSPACE = brand.brandNameKo
 
-export const WORKSPACES = ['김팀장의 AX랩', '대한정밀 컨설팅룸'] as const
+export const WORKSPACES = [brand.brandNameKo, '대한정밀 컨설팅룸'] as const
 
+/** 로컬(로그인 없음) 모드의 사용자 — 대표 (D-103: 예전 '김팀장 · AX랩 대표' 자리표시) */
 export const CURRENT_USER = {
-  name: '김팀장',
-  role: 'AX랩 대표',
-  initial: '김',
+  name: brand.ownerName,
+  role: brand.ownerTitle,
+  initial: brand.ownerName.slice(0, 1),
 } as const
 
 export const NOTIFICATION_COUNT = 8

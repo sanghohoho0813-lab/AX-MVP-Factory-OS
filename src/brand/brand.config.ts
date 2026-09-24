@@ -39,6 +39,12 @@ export interface BrandConfig {
   customerProjectsPath: string
   /** 문의 이메일 */
   supportEmail: string
+  /**
+   * 대표 이름·직함 (D-103) — 로그인한 사람의 이름을 아직 모를 때 쓰는 기본값.
+   * 로그인한 사람이 프로필에 이름을 넣으면 그 이름이 먼저다(`auth/currentUser.ts`).
+   */
+  ownerName: string
+  ownerTitle: string
   /** 기본 화면 테마 — 9종 Canonical Theme 중 하나 */
   defaultThemeId: UiThemeKey
 }
@@ -59,6 +65,8 @@ export const brand: BrandConfig = {
   customerPortalLabel: 'My MIRAE',
   customerProjectsPath: '/my-projects',
   supportEmail: 'sanghohoho0813@gmail.com',
+  ownerName: '김상호',
+  ownerTitle: '대표',
   // 로고의 짙은 청록 M 과 공개 사이트의 웜 액센트에 가장 가까운 팔레트
   defaultThemeId: 'deep-teal',
 }

@@ -9,9 +9,9 @@ import { Link } from 'react-router-dom'
 import { Building, Check, ChevronDown, LogOut, Plus, Settings } from 'lucide-react'
 import { useDismissable } from '../../lib/useDismissable'
 import { useToast } from '../ui/toastContext'
-import { TextScaleControl } from '../ui/TextScaleControl'
 import { useAuth } from '../../auth/AuthProvider'
 import { createWorkspace } from '../../auth/workspaceService'
+import { useCurrentUser } from './useCurrentUser'
 
 const ROLE_LABEL: Record<string, string> = { owner: '소유자', admin: '관리자', editor: '편집자', viewer: '뷰어' }
 
@@ -120,7 +120,9 @@ export function SupabaseUserMenu() {
   const { open, setOpen, containerRef } = useDismissable<HTMLDivElement>()
   const { session, signOut } = useAuth()
   const email = session?.user.email ?? ''
-  const initial = email ? email[0]?.toUpperCase() : 'U'
+  // D-103: 이메일 대신 이름(없으면 대표 이름) — 사이드바 아래와 같은 이름
+  const me = useCurrentUser()
+  const initial = me.initial
   return (
     <div ref={containerRef} className="relative">
       <button
@@ -134,14 +136,16 @@ export function SupabaseUserMenu() {
           {initial}
         </span>
         <span className="hidden max-w-[180px] text-left leading-tight xl:block">
-          <span className="block truncate text-[13px] font-semibold text-slate-800">{email}</span>
+          <span className="block truncate text-[13px] font-semibold text-slate-800">{me.name}</span>
+          <span className="block truncate text-[0.8125rem] text-slate-400">{me.title}</span>
         </span>
         <ChevronDown aria-hidden="true" className="hidden size-4 text-slate-400 xl:block" />
       </button>
       {open && (
         <div className="absolute top-full right-0 z-30 mt-1.5 w-56 rounded-(--radius-card) border border-slate-200 bg-white p-1.5 shadow-(--shadow-overlay)">
           <div className="border-b border-slate-100 px-3 py-2.5">
-            <p className="truncate text-sm font-semibold text-slate-800">{email}</p>
+            <p className="truncate text-sm font-semibold text-slate-800">{me.name} {me.title}</p>
+            <p className="truncate text-[0.8125rem] text-slate-400">{email}</p>
           </div>
           <Link to="/settings" onClick={() => setOpen(false)} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
             <Settings aria-hidden="true" className="size-4 text-slate-400" /> 설정
@@ -153,10 +157,6 @@ export function SupabaseUserMenu() {
           >
             <LogOut aria-hidden="true" className="size-4 text-slate-400" /> 로그아웃
           </button>
-          <div className="mt-1 border-t border-slate-100 px-3 pt-2.5 pb-1.5">
-            <p className="mb-1.5 text-[0.875rem] font-semibold text-slate-500">글자 크기</p>
-            <TextScaleControl compact />
-          </div>
         </div>
       )}
     </div>

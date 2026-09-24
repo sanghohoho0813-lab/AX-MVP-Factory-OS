@@ -9,7 +9,6 @@
  */
 
 import {
-  createContext,
   useCallback,
   useContext,
   useEffect,
@@ -32,18 +31,7 @@ import {
 } from './bootstrap'
 import { getCurrentSession, onAuthStateChange, signOut as authSignOut } from './authService'
 import { listMyWorkspaces, type WorkspaceMembership } from './workspaceService'
-
-interface AuthContextValue {
-  bootstrap: BootstrapState
-  session: Session | null
-  workspaces: WorkspaceMembership[]
-  currentWorkspaceId: string | null
-  selectWorkspace: (workspaceId: string) => void
-  refreshWorkspaces: () => Promise<void>
-  signOut: () => Promise<void>
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null)
+import { AuthContext, type AuthContextValue } from './authContext'
 
 const WORKSPACE_STORAGE_KEY = 'axmvp.active_workspace'
 

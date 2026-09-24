@@ -15,6 +15,7 @@ import { downloadLocalBackup, clearLocalDomainData } from '../../services/dataIm
 import { useAuth } from '../../auth/AuthProvider'
 import { WorkspaceMembersPanel } from '../../components/data/WorkspaceMembersPanel'
 import { ImportWizard } from '../../components/data/ImportWizard'
+import { useCurrentUser } from '../../components/layout/useCurrentUser'
 import { TabNav, SettingRow, AppearancePanel, TextScalePanel, FeatureVisibilityPanel, SystemPanel, type TabKey } from './parts'
 import { OnboardingSettingsPanel } from './OnboardingSettingsPanel'
 import { SupabaseHealthPanel } from './SupabaseHealthPanel'
@@ -76,6 +77,8 @@ export function SupabaseSettingsView() {
   const { session, workspaces, currentWorkspaceId } = useAuth()
   const current = workspaces.find((w) => w.workspaceId === currentWorkspaceId)
   const roleLabel: Record<string, string> = { owner: '소유자', admin: '관리자', editor: '편집자', viewer: '뷰어' }
+  // D-103: 사이드바 아래·머리줄과 같은 이름 (프로필 이름이 없으면 대표 이름)
+  const me = useCurrentUser()
   return (
     <div className="mx-auto flex w-full max-w-[1000px] flex-col gap-5">
       <PageHeader title="설정" description="내 계정·워크스페이스·데이터·시스템을 관리합니다." />
@@ -83,6 +86,7 @@ export function SupabaseSettingsView() {
       {tab === 'me' && (
         <>
           <Panel title="내 정보">
+            <SettingRow label="이름">{me.name} {me.title}</SettingRow>
             <SettingRow label="이메일">{session?.user.email ?? '—'}</SettingRow>
             <SettingRow label="현재 워크스페이스">{current?.workspace?.name ?? '—'}</SettingRow>
             <SettingRow label="내 역할">{current ? roleLabel[current.role] : '—'}</SettingRow>

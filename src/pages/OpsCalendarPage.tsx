@@ -29,6 +29,7 @@ import type { JournalEntry } from '../types/bridge'
 import { TodoActionSheet, TodoComposer, TodoRow, type TodoAction } from '../components/journal/TodoBoard'
 import { Button } from '../components/ui/Button'
 import { PageHeader } from '../components/ui/PageHeader'
+import { ScheduleTabs } from '../components/journal/ScheduleTabs'
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
 const KINDS: ScheduleKind[] = ['task', 'funding', 'payment', 'document', 'tool']
@@ -141,6 +142,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
           </Button>
         }
       />
+      <ScheduleTabs />
 
       {/* 월 이동 + 종류 필터 */}
       <div className="flex flex-wrap items-center justify-between gap-3">

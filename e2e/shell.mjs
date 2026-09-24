@@ -28,7 +28,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const navText = (await nav.innerText()) ?? ''
   const at = (t) => navText.indexOf(t)
   check('메뉴: 오늘과 일정이 한 묶음', at('오늘') >= 0 && at('일정') > at('오늘') && at('일정') < at('고객 운영'), navText.slice(0, 160))
-  check('메뉴: 도구함이 고객 다음', at('도구함') > at('고객 운영') && at('도구함') < at('가끔 쓰는 것'), navText.slice(0, 260))
+  check('메뉴: 영업이 고객 다음, 도구함이 영업 다음 (D-103)', at('영업자 정산') > at('고객 이벤트함') && at('도구함') > at('영업자 정산') && at('도구함') < at('가끔 쓰는 것'), navText.slice(0, 320))
+  check('메뉴: 영업 묶음에 1차 미팅 체크리스트(준비 중)', at('1차 미팅 체크리스트') > at('영업자 정산') && navText.includes('준비 중'), navText.slice(0, 360))
   check('메뉴: 잘 안 쓰는 것은 접힌 묶음 안', at('가끔 쓰는 것') > 0 && at('컨설팅 작업실') === -1, navText.slice(0, 320))
   check('메뉴: 세금 계산기가 사이드바에 있다', at('세금 계산기') > 0)
   check('메뉴: AX STUDIO 는 그 아래', at('AX STUDIO') > at('가끔 쓰는 것'))
@@ -37,7 +38,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await nav.getByRole('button', { name: /가끔 쓰는 것/ }).click()
   await page.waitForTimeout(400)
   const opened = (await nav.innerText()) ?? ''
-  check('메뉴: 펴면 넷이 다 나온다', ['컨설팅 작업실', '자금·지원사업', '오늘 기록', '주간 돌아보기'].every((t) => opened.includes(t)), opened.slice(0, 320))
+  check('메뉴: 펴면 작업실 · 자금이 나온다', ['컨설팅 작업실', '자금·지원사업'].every((t) => opened.includes(t)), opened.slice(0, 320))
+  check('메뉴: 기록 셋은 가끔 쓰는 것에 없다 (일정 안 탭으로, D-103)', !['오늘 기록', '주간 돌아보기', '전체 기록'].some((t) => opened.includes(t)), opened)
 
   // 시계 — 날짜 + 초, 1초마다 움직인다
   const clock = page.locator('header [aria-label^="지금 "]:visible').first()
@@ -50,7 +52,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 
   // 시계는 고객 플랫폼 단추 왼쪽
   const clockBox = await clock.boundingBox()
-  const portalBox = await page.getByRole('link', { name: /고객 플랫폼/ }).first().boundingBox()
+  const portalBox = await page.locator('header').getByRole('link', { name: /고객 플랫폼/ }).first().boundingBox()
   check('시계: 고객 플랫폼 왼쪽에 있다', clockBox && portalBox && clockBox.x < portalBox.x, JSON.stringify({ clockBox, portalBox }))
   check('시계: 글자가 크다(16px 이상)', (await clock.locator('span').last().evaluate((el) => parseFloat(getComputedStyle(el).fontSize))) >= 16)
 
@@ -67,6 +69,66 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     sBox && hBox && sBox.x + sBox.width / 2 < hBox.x + hBox.width / 2,
     JSON.stringify({ search: sBox, headerMid: hBox && Math.round(hBox.x + hBox.width / 2) }))
   check('검색: 폭이 352px 이하', sBox && sBox.width <= 352, String(sBox?.width))
+
+  /* ---- D-103: 사이드바 아래 이름 · 고객 플랫폼 아이콘 · 글자 크기는 설정에만 ---- */
+  const account = page.getByTestId('sidebar-account')
+  check('사이드바 아래: 김상호 대표', ((await account.innerText()) ?? '').replace(/\s+/g, ' ').includes('김상호 대표'), await account.innerText())
+  const portalIcon = page.getByTestId('sidebar-portal-link')
+  check('사이드바 아래: 고객 플랫폼은 작은 아이콘(새 창)', (await portalIcon.getAttribute('target')) === '_blank' && ((await portalIcon.innerText()) ?? '').trim() === '' && ((await portalIcon.boundingBox())?.width ?? 99) <= 40)
+  check('사이드바: 글자 크기 조절이 없다', (await page.locator('aside').getByText('글자 크기').count()) === 0)
+  await page.getByRole('button', { name: '사용자 메뉴' }).click()
+  await page.waitForTimeout(200)
+  check('사용자 메뉴: 글자 크기 조절이 없다 (설정으로 옮김)', (await page.locator('header').getByText('글자 크기').count()) === 0)
+  check('사용자 메뉴: 김상호 · 대표', ((await page.locator('header').innerText()) ?? '').includes('김상호'))
+  await page.keyboard.press('Escape')
+  await page.goto(BASE + '/settings', { waitUntil: 'networkidle' })
+  check('설정: 글자 크기는 여기', (await page.getByRole('main').getByText('글자 크기').count()) >= 1)
+
+  /* ---- D-103: 향후 확장 — 이동하지 않고 펼침 → 가운데 안내창 → 끄기 ---- */
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  const nav2 = page.getByRole('navigation', { name: '주 메뉴' })
+  await nav2.getByRole('button', { name: /이 시스템/ }).click()
+  await page.waitForTimeout(200)
+  const sys = (await nav2.innerText()) ?? ''
+  check('이 시스템: 처음 사용 가이드가 맨 위', sys.indexOf('처음 사용 가이드') > sys.indexOf('이 시스템') && sys.indexOf('처음 사용 가이드') < sys.indexOf('기획의도'), sys.slice(-300))
+  const before = page.url()
+  const roadmapBtn = nav2.getByRole('button', { name: /향후 확장/ })
+  await roadmapBtn.click()
+  await page.waitForTimeout(250)
+  check('향후 확장: 눌러도 화면이 옮겨 가지 않는다', page.url() === before, page.url())
+  check('향후 확장: 메뉴 안에서 펼쳐진다', (await roadmapBtn.getAttribute('aria-expanded')) === 'true' && (await nav2.locator('[data-future]').count()) >= 5)
+  await nav2.locator('[data-future="notify"]').click()
+  await page.waitForTimeout(300)
+  const dlg = page.getByTestId('future-dialog')
+  const box = await page.getByRole('dialog').boundingBox()
+  const vp = page.viewportSize()
+  check('향후 확장: 안내창이 뜬다 — 돌아가는 순서 · 예시', (await dlg.count()) === 1 && ((await dlg.innerText()) ?? '').includes('이렇게 돌아갈 수 있습니다') && ((await dlg.innerText()) ?? '').includes('예시'))
+  check('향후 확장: 안내창이 화면 가운데', box && Math.abs(box.x + box.width / 2 - vp.width / 2) < 12 /* 세로 스크롤 막대 폭만큼 */ && Math.abs(box.y + box.height / 2 - vp.height / 2) < 40, JSON.stringify(box))
+  await page.getByRole('dialog').getByRole('button', { name: /다음/ }).click()
+  await page.waitForTimeout(150)
+  check('향후 확장: 다음으로 넘겨 본다', ((await dlg.innerText()) ?? '').includes('하루 정리'))
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(150)
+  check('향후 확장: Esc 로 꺼진다', (await dlg.count()) === 0 && page.url() === before)
+  await nav2.locator('[data-future="saas"]').click()
+  await page.getByRole('dialog').getByRole('button', { name: '닫기', exact: true }).last().click()
+  await page.waitForTimeout(150)
+  check('향후 확장: 닫기 단추로도 꺼진다', (await dlg.count()) === 0)
+
+  /* ---- D-103: 영업 · 1차 미팅 체크리스트 자리 ---- */
+  await nav2.getByRole('link', { name: /1차 미팅 체크리스트/ }).click()
+  await page.waitForURL(/\/sales\/first-meeting/)
+  await page.getByRole('heading', { name: /1차 미팅 체크리스트/ }).first().waitFor().catch(() => {})
+  check('1차 미팅 체크리스트: 준비 중 자리 화면', ((await page.getByRole('main').innerText()) ?? '').includes('준비 중'))
+
+  /* ---- D-103: 기록은 일정 안의 탭 ---- */
+  for (const [path, label] of [['/ops/calendar', '달력'], ['/journal', '오늘 기록'], ['/journal/week', '주간 돌아보기'], ['/journal/all', '전체 기록']]) {
+    await page.goto(BASE + path, { waitUntil: 'networkidle' })
+    const tabs = page.getByTestId('schedule-tabs')
+    const cur = tabs.locator('[aria-current="page"]')
+    check(`일정 탭 ${path}: 네 칸 · '${label}' 이 켜짐`, (await tabs.getByRole('link').count()) === 4 && ((await cur.innerText()) ?? '').includes(label), (await cur.innerText().catch(() => '')) ?? '')
+    check(`일정 탭 ${path}: 사이드바는 '일정' 에 불`, ((await page.getByRole('navigation', { name: '주 메뉴' }).locator('a[aria-current="page"]').innerText()) ?? '').includes('일정'))
+  }
 
   // 도구함
   await page.goto(BASE + '/tools', { waitUntil: 'networkidle' })
@@ -101,6 +163,14 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('휴대폰 서랍: 같은 순서', drawer.indexOf('도구함') > drawer.indexOf('고객 운영') && drawer.indexOf('가끔 쓰는 것') > drawer.indexOf('도구함'), drawer.slice(0, 260))
   const logoH = await page.locator('img[alt]:visible').first().evaluate((el) => el.getBoundingClientRect().height)
   check('휴대폰 서랍: 로고도 48px', Math.round(logoH) === 48, String(logoH))
+  // D-103: 예전 '이 기기 · 계정' 칸(고객 플랫폼 열기 · 처음 사용 가이드 · 글자 크기) 없음 — 아래는 이름 한 줄 + 아이콘
+  const whole = (await page.locator('.fixed.inset-0.z-50').first().innerText()) ?? ''
+  check('휴대폰 서랍: 이 기기 · 계정 칸 · 글자 크기가 없다', !whole.includes('이 기기') && !whole.includes('글자 크기') && !whole.includes('고객 플랫폼 열기'), whole.slice(-200))
+  check('휴대폰 서랍: 아래에 김상호 대표', whole.replace(/\s+/g, ' ').includes('김상호 대표'))
+  await page.keyboard.press('Escape').catch(() => {})
+  await page.goto(BASE + '/journal', { waitUntil: 'networkidle' })
+  const tabBoxes = await page.getByTestId('schedule-tabs').getByRole('link').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right)] }))
+  check('휴대폰 일정 탭: 네 칸이 모두 화면 안 (옆으로 밀지 않아도)', tabBoxes.length === 4 && tabBoxes.every(([l, r]) => l >= 0 && r <= 390), JSON.stringify(tabBoxes))
   await ctx.close()
 }
 

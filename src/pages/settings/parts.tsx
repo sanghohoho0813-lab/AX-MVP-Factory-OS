@@ -29,18 +29,20 @@ export const SETTINGS_TABS: { key: TabKey; label: string; icon: typeof Info }[] 
 
 export function TabNav({ active, onChange }: { active: TabKey; onChange: (k: TabKey) => void }) {
   return (
-    <nav aria-label="설정 메뉴" className="flex min-w-0 gap-1 overflow-x-auto border-b border-slate-200">
+    // D-103: 휴대폰에서 넷째 칸('시스템')이 오른쪽에 잘려 옆으로 밀어야 보였다 — 좁으면 네 칸 한 줄(아이콘 위 · 글 아래)
+    <nav aria-label="설정 메뉴" className="grid min-w-0 grid-cols-4 border-b border-slate-200 sm:flex sm:gap-1">
       {SETTINGS_TABS.map((t) => (
         <button
           key={t.key}
           type="button"
+          aria-current={active === t.key ? 'page' : undefined}
           onClick={() => onChange(t.key)}
-          className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors ${
+          className={`-mb-px flex min-w-0 flex-col items-center gap-0.5 border-b-2 px-1 py-2 text-[0.8rem] font-medium break-keep transition-colors sm:shrink-0 sm:flex-row sm:gap-1.5 sm:px-3 sm:py-2.5 sm:text-[13px] ${
             active === t.key ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <t.icon aria-hidden="true" className="size-4" />
-          {t.label}
+          <t.icon aria-hidden="true" className="size-4 shrink-0" />
+          <span className="max-w-full truncate">{t.label}</span>
         </button>
       ))}
     </nav>
