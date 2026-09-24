@@ -34,7 +34,7 @@ export function currentCapabilities(mode: DataMode): Capability[] {
   const cloud = mode === 'supabase'
   return [
     { key: 'today', label: '오늘 화면 (지금 이것부터 · 숫자 · 빠른 기록)', level: 'live', note: '규칙으로 순서를 정한다. AI 판단이 아니다.' },
-    { key: 'clients', label: '고객 운영 (업체별 현황표 · 업무 6종 + 직접 추가)', level: 'live', note: '마감·서류·수금 경고가 자동으로 붙는다.' },
+    { key: 'clients', label: '고객 관리 (업체별 현황표 · 업무 6종 + 직접 추가)', level: 'live', note: '마감·서류·수금 경고가 자동으로 붙는다.' },
     { key: 'detail', label: '업체 상세 (업무 · 서류 · 수금 · 자금 · 기록 · 파일)', level: 'live', note: '상태를 바꾸면 활동 기록이 자동으로 남는다.' },
     { key: 'journal', label: '업무 일기 (통화 · 결정 · 후속조치 · 막힘)', level: 'live', note: '고객에게는 어떤 경로로도 보이지 않는다.' },
     { key: 'calendar', label: '일정 (마감 · 신청 · 수금 · 서류 만료)', level: 'live', note: '모든 업체의 날짜를 한 달력에서 본다.' },
@@ -45,13 +45,13 @@ export function currentCapabilities(mode: DataMode): Capability[] {
     { key: 'mobile', label: '휴대폰 화면 (하단 내비 · 한 손 조작)', level: 'live', note: '360px · 글자 1.3배에서도 잘리지 않는다.' },
     {
       key: 'bridge_in',
-      label: '고객 플랫폼 → 이벤트함 (요청 · 서류 · 주문이 자동으로 들어옴)',
+      label: '고객 플랫폼 → 상담신청함 (요청 · 서류 · 주문이 자동으로 들어옴)',
       level: cloud ? 'live' : 'ready',
       note: cloud ? '2026-09-04 실제 왕복 확인 완료.' : '로컬 데모에서는 샘플 이벤트로만 볼 수 있다.',
     },
     {
       key: 'bridge_out',
-      label: '이벤트함 → 고객 플랫폼 (내가 발행한 업데이트가 고객 화면에)',
+      label: '상담신청함 → 고객 플랫폼 (내가 발행한 업데이트가 고객 화면에)',
       level: cloud ? 'live' : 'ready',
       note: cloud ? '초안은 고객에게 보이지 않고, 발행한 것만 보인다.' : '로컬 데모에서는 미리보기로만 확인한다.',
     },
@@ -89,7 +89,7 @@ export const FUTURE_ITEMS: FutureItem[] = [
     scenario: [
       "업체 화면에서 '고객에게 발행' 을 누르면",
       "고객이 받겠다고 한 곳(이메일 · 카카오 알림톡)으로 '새 소식이 있습니다' 한 줄이 갑니다",
-      "고객이 눌러서 My MIRAE 에서 확인하면 이벤트함에 '읽음' 이 남습니다",
+      "고객이 눌러서 My MIRAE 에서 확인하면 상담신청함에 '읽음' 이 남습니다",
     ],
     example: "정책자금 서류 보완 요청을 발행하면 고객사 대표에게 '서류 2건 보완이 필요합니다 — 확인하기' 알림톡이 갑니다. 이틀이 지나도 안 읽으면 오늘 화면에 '다시 연락' 이 뜹니다.",
   },
@@ -145,7 +145,7 @@ export const FUTURE_ITEMS: FutureItem[] = [
     scenario: [
       "이름 · 로고 · 색과 업무 종류 · 메뉴를 설정 한 곳에서 바꿉니다",
       "회사마다 작업실을 따로 두어 데이터가 섞이지 않습니다",
-      "월 구독으로 열고, 그 회사가 쓰는 도구함만 켭니다",
+      "월 구독으로 열고, 그 회사가 쓰는 도구만 켭니다",
     ],
     example: "다른 법인컨설팅 회사가 '○○컨설팅 OS' 로 가입하면 세금 계산기 · 정책자금 진단만 켠 채 자기 로고와 색으로 바로 씁니다.",
   },

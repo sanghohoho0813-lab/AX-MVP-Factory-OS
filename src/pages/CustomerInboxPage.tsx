@@ -104,7 +104,7 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
   return (
     <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-5">
       <ScreenTitle
-        title="고객 이벤트함"
+        title="잠재고객 상담신청"
         sub={`${brand.customerPlatformLabel}에서 고객이 한 일이 여기로 들어옵니다.`}
         actions={
           <>

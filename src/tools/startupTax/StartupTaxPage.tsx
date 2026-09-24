@@ -140,7 +140,7 @@ function StartupTaxScreen() {
                     summary={summaryText}
                     data={{ form, baseDate: baseDate.toISOString().slice(0, 10) }}
                   />
-                  <span className="text-sm text-gray-500">판정 결과를 고객 운영 업체 기록에 붙입니다.</span>
+                  <span className="text-sm text-gray-500">판정 결과를 고객 관리 업체 기록에 붙입니다.</span>
                 </div>
               }
             />

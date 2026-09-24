@@ -88,7 +88,7 @@ async function persist(): Promise<void> {
   const byId = new Map<string, { rec: Rec; inLead: boolean; inCompany: boolean }>()
   for (const r of leads) {
     const id = String(r.id ?? '')
-    if (!salesOsClientOf(id)) continue // 고객 운영에 없는 업체는 남기지 않는다
+    if (!salesOsClientOf(id)) continue // 고객 관리에 없는 업체는 남기지 않는다
     byId.set(id, { rec: r, inLead: true, inCompany: false })
   }
   for (const r of companies) {

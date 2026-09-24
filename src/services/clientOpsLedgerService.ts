@@ -289,7 +289,7 @@ function rowMatchesQuery(row: ClientOpsLedgerRow, query: string): boolean {
 function buildBriefingScript(rows: ClientOpsLedgerRow[], summary: ClientOpsLedgerSummary): string {
   if (rows.length === 0) return ''
   const header = [
-    `[고객 운영 브리핑]`,
+    `[고객 관리 브리핑]`,
     `초점: ${summary.focusLabel}`,
     `관리 고객사 ${summary.clientCount}곳 / 병목·주의 ${summary.blockedCount}건 / 정책자금 ${summary.fundingCount}건 / 사업계획서 보강 ${summary.businessPlanCount}건`,
   ].join('\n')

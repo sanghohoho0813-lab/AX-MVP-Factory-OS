@@ -310,7 +310,7 @@ function ProjectContent({ workspaceId, userId }: { workspaceId: string | null; u
         <div className={`flex flex-col gap-2 ${narrow}`}>
           <div className="flex items-center justify-between gap-2">
             <Link to="/studio" className="t-sub inline-flex min-w-0 items-center gap-1 text-slate-500 hover:text-slate-800">
-              <ArrowLeft aria-hidden="true" className="size-4 shrink-0" /> <span className="truncate">컨설팅 작업실</span>
+              <ArrowLeft aria-hidden="true" className="size-4 shrink-0" /> <span className="truncate">특허+벤처</span>
             </Link>
             <div className="flex shrink-0 items-center gap-1">
               <Button variant="ghost" size="sm" onClick={() => setSearchParams(advanced ? {} : { adv: '1' }, { replace: true })}>

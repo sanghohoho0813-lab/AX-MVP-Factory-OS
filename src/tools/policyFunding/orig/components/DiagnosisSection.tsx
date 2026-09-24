@@ -62,7 +62,7 @@ function SaveCustomerBar({
             이 진단 결과를 고객으로 저장하면 진행상태·메모를 이어서 관리할 수 있어요.
           </p>
           <label className="flex w-full max-w-md flex-col gap-1 text-left text-sm font-medium text-slate-700">
-            저장할 고객 운영 업체
+            저장할 고객 관리 업체
             <select
               value={clientId}
               onChange={(e) => setClientId(e.target.value)}
@@ -77,7 +77,7 @@ function SaveCustomerBar({
           </label>
           {clients.length === 0 ? (
             <p className="text-xs text-slate-500">
-              고객 운영에 업체가 없습니다. <a href="/ops/clients" className="font-semibold text-blue-700 underline">고객 운영</a>에서 업체를 먼저 만드세요.
+              고객 관리에 업체가 없습니다. <a href="/ops/clients" className="font-semibold text-blue-700 underline">고객 관리</a>에서 업체를 먼저 만드세요.
             </p>
           ) : already ? (
             <p className="text-xs text-slate-500">이미 상담 중인 업체입니다 — 진단 결과만 새로 바뀌고 단계·메모는 이어집니다.</p>

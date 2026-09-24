@@ -40,7 +40,7 @@ export default function OsAttach({
         deadlines={deadlines}
         presetClientId={os?.id}
       />
-      {os ? <span className="text-sm text-slate-500">→ 고객 운영 <b className="text-slate-700">{os.companyName}</b> 기록에 붙습니다</span> : null}
+      {os ? <span className="text-sm text-slate-500">→ 고객 관리 <b className="text-slate-700">{os.companyName}</b> 기록에 붙습니다</span> : null}
     </div>
   )
 }

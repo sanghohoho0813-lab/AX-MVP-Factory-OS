@@ -54,7 +54,7 @@ await step('하단 내비게이션이 다섯 칸으로 뜬다', async () => {
 await step('하단 내비로 고객 화면으로 간다', async () => {
   await page.locator('nav[aria-label="주요 화면"]').getByText('고객', { exact: true }).click()
   await page.waitForURL('**/ops/clients')
-  await page.getByRole('heading', { name: '고객 운영' }).waitFor({ timeout: 5000 })
+  await page.getByRole('heading', { name: '고객 관리' }).waitFor({ timeout: 5000 })
   return true
 })
 
@@ -97,7 +97,7 @@ await step('업무 일기에 한 줄 남긴다', async () => {
 })
 
 await step('이벤트함에서 한 건을 처리한다', async () => {
-  await page.locator('nav[aria-label="주요 화면"]').getByText('이벤트', { exact: true }).click()
+  await page.locator('nav[aria-label="주요 화면"]').getByText('상담신청', { exact: true }).click()
   await page.waitForURL('**/ops/inbox')
   await page.getByRole('button', { name: '처리 완료' }).first().click()
   await page.waitForTimeout(700)

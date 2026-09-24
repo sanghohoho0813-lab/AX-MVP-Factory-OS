@@ -506,7 +506,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               action={
                 isLocal ? (
                   <Link to="/ops/inbox" className="t-sub font-medium text-brand-700 hover:underline">
-                    이벤트함에서 샘플 만들기
+                    상담신청함에서 샘플 만들기
                   </Link>
                 ) : undefined
               }

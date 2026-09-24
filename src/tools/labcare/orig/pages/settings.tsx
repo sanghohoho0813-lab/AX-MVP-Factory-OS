@@ -49,7 +49,7 @@ export default function SettingsPage() {
       <section className="mb-5 rounded-2xl border border-sky-200 bg-sky-50 p-5">
         <p className="text-base font-bold text-sky-900">ℹ️ 이 모듈의 기록은 미래에이아이랩 OS 의 모듈 기록으로 저장됩니다.</p>
         <p className="mt-1 text-sm leading-relaxed text-sky-900/80">
-          클라우드 모드에서는 작업실 안의 다른 기기에서도 같은 기록이 보이고, 로컬 모드에서는 이 브라우저에만 남습니다. 고객사(회사명·대표자·주소)는 <b>고객 운영</b> 업체를 그대로 씁니다.
+          클라우드 모드에서는 작업실 안의 다른 기기에서도 같은 기록이 보이고, 로컬 모드에서는 이 브라우저에만 남습니다. 고객사(회사명·대표자·주소)는 <b>고객 관리</b> 업체를 그대로 씁니다.
         </p>
         <ul className="mt-2 space-y-1 text-sm leading-relaxed text-sky-900/80">
           <li>· <b>주 1회 백업</b>을 권장합니다 (아래 “백업 내보내기”).</li>

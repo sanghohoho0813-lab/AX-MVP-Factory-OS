@@ -272,7 +272,7 @@ export function Block({ title, hint, children, action }: { title: string; hint?:
 export function TablesMissingNotice() {
   return (
     <div className="rounded-(--radius-panel) border border-warning-200 bg-warning-50 p-5">
-      <p className="t-card break-keep text-warning-700">컨설팅 작업실은 READY 상태입니다</p>
+      <p className="t-card break-keep text-warning-700">특허+벤처 작업은 READY 상태입니다</p>
       <p className="t-body mt-1 break-keep text-slate-700">
         클라우드에 아직 컨설팅 표가 없습니다. 아래 SQL 을 Supabase SQL Editor 에서 한 번 실행하면 바로 쓸 수 있습니다.
         기존 데이터는 건드리지 않습니다.

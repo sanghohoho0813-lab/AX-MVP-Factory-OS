@@ -333,7 +333,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   return (
     <div className="flex flex-col gap-6">
       <ScreenTitle
-        title="고객 운영"
+        title="고객 관리"
         sub={`${today} · 관리 중인 업체 ${activeCount}곳`}
         actions={
           <>
@@ -350,7 +350,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       />
 
       {moreOpen && (
-        <BottomSheet title="고객 운영 도구" onClose={() => setMoreOpen(false)}>
+        <BottomSheet title="고객 관리 도구" onClose={() => setMoreOpen(false)}>
           <div className="flex flex-col gap-2">
             <Button variant="secondary" className="w-full justify-start" onClick={() => { setMoreOpen(false); navigate('/ops/calendar') }}>
               <CalendarDays aria-hidden="true" className="size-4" />

@@ -84,7 +84,7 @@ export function ModuleBackup({ moduleKey, buckets, label, onRestored }: ModuleBa
         <p className="t-sub break-keep text-slate-600">
           이 모듈이 쌓은 기록만 파일로 내보내고 되돌립니다. 업체 자체는{' '}
           <Link to="/settings" className="font-medium text-brand-700 hover:underline">
-            고객 운영 백업
+            고객 관리 백업
           </Link>{' '}
           이 맡습니다 — 같은 업체를 두 벌로 만들지 않기 위해서입니다.
         </p>

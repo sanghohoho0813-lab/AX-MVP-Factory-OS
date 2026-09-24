@@ -112,7 +112,7 @@ const projects = [
   const ledger = buildClientOpsLedger(organizations, projects)
   check('전체: 고객 3곳', ledger.summary.clientCount === 3, String(ledger.summary.clientCount))
   check('전체: 행 3개', ledger.rows.length === 3, String(ledger.rows.length))
-  check('전체: 브리핑 생성', ledger.briefingScript.includes('[고객 운영 브리핑]'))
+  check('전체: 브리핑 생성', ledger.briefingScript.includes('[고객 관리 브리핑]'))
   check('정렬: 고객 회신 대기가 먼저', ledger.rows[0].clientName === '대한정밀', ledger.rows[0]?.clientName)
 }
 

@@ -18,6 +18,7 @@ import { FUTURE_ITEMS, type FutureItem } from '../../config/capabilityStatus'
 import { FutureItemDialog } from './FutureItemDialog'
 import { futureIcon } from './futureIcons'
 import { useCurrentUser } from './useCurrentUser'
+import { useNavCounts, type NavCounts } from './useNavCounts'
 
 interface SidebarProps {
   collapsed: boolean
@@ -67,6 +68,7 @@ function SidebarContent({
   const navigate = useNavigate()
   const location = useLocation()
   const groups = enabledModulesByGroup()
+  const counts = useNavCounts()
   const [userCollapsed, setUserCollapsed] = useState<Set<ModuleGroupKey> | null>(null)
 
   useEffect(() => {
@@ -195,6 +197,7 @@ function SidebarContent({
                                 style={!isActive && group.key === 'tools' ? rampStyle(idx, items.length) : undefined}
                               />
                               {!collapsed && <span className="truncate">{item.label}</span>}
+                              <NavBadge kind={item.badge} counts={counts} active={isActive} collapsed={collapsed} />
                               {!collapsed && item.status === 'soon' && (
                                 <span
                                   className={`t-meta ml-auto shrink-0 rounded-full px-1.5 py-0.5 font-semibold ${
@@ -371,5 +374,40 @@ function FutureExpandRow({ item, collapsed }: { item: ModuleDefinition; collapse
       )}
       <FutureItemDialog item={picked} onClose={() => setPicked(null)} onPick={setPicked} />
     </>
+  )
+}
+
+/**
+ * D-104: 메뉴 옆 숫자.
+ *  - 고객 관리 — 등록 고객사 수. 튀지 않게 옅은 글자(0 이어도 보인다 — '몇 곳인지' 가 뜻이므로).
+ *  - 상담신청 · 1차 미팅 — 빨간 바탕 흰 숫자. 처리할 것이 있을 때만(0 이면 없음).
+ * 접힌 사이드바에서는 빨간 것만 아이콘 위에 작은 점 숫자로.
+ */
+function NavBadge({ kind, counts, active, collapsed }: { kind: ModuleDefinition['badge']; counts: NavCounts; active: boolean; collapsed: boolean }) {
+  if (!kind) return null
+  const n = kind === 'clients' ? counts.clients : kind === 'requests' ? counts.requests : counts.firstMeetings
+  if (n === null) return null
+  const text = n > 99 ? '99+' : String(n)
+  if (kind === 'clients') {
+    if (collapsed) return null
+    return (
+      <span data-nav-badge={kind} aria-label={`${n}곳`} className={`t-meta ml-auto shrink-0 tabular-nums ${active ? 'text-white/80' : 'text-navy-300'}`}>
+        {text}
+      </span>
+    )
+  }
+  if (n <= 0) return null
+  const label = kind === 'requests' ? `새 상담신청 ${n}건` : `남은 1차 미팅 ${n}건`
+  if (collapsed) {
+    return (
+      <span data-nav-badge={kind} aria-label={label} className="absolute top-1 right-3 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger-500 px-1 text-[0.7rem] font-bold text-white tabular-nums">
+        {text}
+      </span>
+    )
+  }
+  return (
+    <span data-nav-badge={kind} aria-label={label} className="t-meta ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-danger-500 px-1.5 font-bold text-white tabular-nums">
+      {text}
+    </span>
   )
 }

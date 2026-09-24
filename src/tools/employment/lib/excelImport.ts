@@ -321,7 +321,7 @@ export function buildImportPreview(input: {
         if (!bc.ok) warns.push(`사업자번호 확인 필요 — ${bc.reason}`)
       }
       client = (digits && byBiz.get(digits)) || byName.get(normName(companyName))
-      if (!client && !excluded) excluded = `고객 운영에 없는 업체 (${companyName || bizNo}) — 업체를 먼저 등록하세요`
+      if (!client && !excluded) excluded = `고객 관리에 없는 업체 (${companyName || bizNo}) — 업체를 먼저 등록하세요`
     }
     if (!empName && !excluded) excluded = '직원명 없음 — 저장 제외'
     if (!startD.ok) warns.push('입사일 날짜 형식 확인 필요')

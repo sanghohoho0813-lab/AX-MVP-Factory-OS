@@ -63,7 +63,7 @@ export function ModuleGate({ tool, section, children }: ModuleGateProps) {
               <Lock aria-hidden="true" className="size-4 shrink-0 text-amber-600" />이 모듈은 <b>{accessLabel(access, today)}</b> 상태입니다.
               첫 화면은 볼 수 있고, 다른 화면을 쓰려면 아래에서 열어 주세요.
               <Link to="/tools" className="font-medium text-brand-700 hover:underline">
-                도구함에서 관리
+                컨설팅 작업실에서 관리
               </Link>
             </p>
           </Surface>

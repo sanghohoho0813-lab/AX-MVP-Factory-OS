@@ -67,7 +67,7 @@ check('facts: 주민번호·비밀번호·계좌 항목이 없다', !FACTS.some(
 {
   const seeded = seedFactsFromClient({}, client(), NOW)
   check('facts: 고객 기록에서 회사 기본값을 가져온다', seeded.companyName?.value === '한솔테크' && seeded.representative?.value === '김대표' && seeded.employees?.value === '7')
-  check('facts: 가져온 값은 미확인 · 출처 표시', seeded.companyName?.status === 'unverified' && seeded.companyName?.source === '고객 운영 기록')
+  check('facts: 가져온 값은 미확인 · 출처 표시', seeded.companyName?.status === 'unverified' && seeded.companyName?.source === '고객 관리 기록')
   check('facts: 업태·종목을 합쳐 업종으로', seeded.industry?.value === '제조업 · 간판')
   const twice = seedFactsFromClient({ companyName: { value: '이미 확정', status: 'confirmed', source: '등기', asOfDate: '', note: '', updatedAt: null } }, client(), NOW)
   check('facts: 이미 있는 값은 덮지 않는다', twice.companyName?.value === '이미 확정')
@@ -254,8 +254,8 @@ check('qa: judge 합계는 10축 다 있어야', judgeTotal({ A: 9 }) === null &
   check('model: 기본 제출서류 8종', Object.keys(raw.venture.documents).length === 8)
 }
 check('registry: 컨설팅 작업실 모듈이 /studio 로 켜져 있다', MODULES.some((m) => m.path === '/studio' && m.enabled))
-// 컨설팅 작업실은 '가끔 쓰는 것' 묶음으로 내려갔다 (D-86)
-check('registry: 컨설팅 작업실이 가끔 쓰는 것 묶음에', MODULES.find((m) => m.path === '/studio')?.group === 'occasional' && MODULE_GROUPS.some((g) => g.key === 'occasional'))
+// D-104: 예전 컨설팅 작업실(임시 이름 특허+벤처)은 컨설팅 작업실 묶음(구 도구함) 안으로
+check('registry: 특허+벤처가 컨설팅 작업실 묶음에', MODULES.find((m) => m.path === '/studio')?.group === 'tools' && MODULES.find((m) => m.path === '/studio')?.label === '특허+벤처' && MODULE_GROUPS.find((g) => g.key === 'tools')?.title === '컨설팅 작업실')
 check('registry: /studio/abc → 컨설팅 작업실', moduleForPath('/studio/abc')?.path === '/studio')
 
 console.log(`\n컨설팅 엔진: ${passed} passed, ${failed} failed`)

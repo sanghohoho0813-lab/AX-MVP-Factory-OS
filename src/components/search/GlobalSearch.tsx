@@ -16,7 +16,7 @@ import { peekProjectCache } from '../../domain/consulting/projectCache'
 import { searchTools } from '../../config/toolRegistry'
 
 interface Hit {
-  group: '고객사' | '프로젝트' | '컨설팅 작업실' | '지금 해야 할 일' | '도구함' | '결과·자료'
+  group: '고객사' | '프로젝트' | '특허+벤처' | '지금 해야 할 일' | '컨설팅 작업실' | '결과·자료'
   label: string
   sublabel?: string
   onSelect: () => void
@@ -89,7 +89,7 @@ export function GlobalSearch() {
     for (const c of peekProjectCache()) {
       if (c.status === 'archived') continue
       if (!q || `${c.clientName} ${c.title} ${c.currentStage}`.toLowerCase().includes(q)) {
-        out.push({ group: '컨설팅 작업실', label: `${c.clientName} · ${c.title}`, sublabel: `현재 ${c.currentStage}`, onSelect: () => { navigate(`/studio/${c.id}`); close() } })
+        out.push({ group: '특허+벤처', label: `${c.clientName} · ${c.title}`, sublabel: `현재 ${c.currentStage}`, onSelect: () => { navigate(`/studio/${c.id}`); close() } })
       }
     }
     // 지금 해야 할 일 (행동이 필요한 프로젝트)
@@ -104,7 +104,7 @@ export function GlobalSearch() {
     for (const t of searchTools(query)) {
       if (!t.path) continue
       const path = t.path
-      out.push({ group: '도구함', label: t.label, sublabel: t.navHint ?? t.desc.slice(0, 40), onSelect: () => { navigate(path); close() } })
+      out.push({ group: '컨설팅 작업실', label: t.label, sublabel: t.navHint ?? t.desc.slice(0, 40), onSelect: () => { navigate(path); close() } })
     }
     for (const s of RESULT_SHORTCUTS) {
       if (!q || s.keywords.includes(q) || s.label.toLowerCase().includes(q)) {

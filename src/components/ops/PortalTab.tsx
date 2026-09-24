@@ -398,7 +398,7 @@ export function PortalTab({ record, workspaceId }: { record: ClientOpsRecord; wo
       <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 shadow-(--shadow-card)">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-[1.05rem] font-bold text-slate-900">이 고객의 이벤트 <span className="text-slate-400">{events.length}</span></h3>
-          <Link to="/ops/inbox" className="text-[0.9rem] font-medium text-brand-700 hover:underline">이벤트함</Link>
+          <Link to="/ops/inbox" className="text-[0.9rem] font-medium text-brand-700 hover:underline">상담신청함</Link>
         </div>
         {events.length === 0 ? (
           <p className="mt-2 text-[0.92rem] text-slate-500">아직 이 고객과 연결된 이벤트가 없습니다.</p>

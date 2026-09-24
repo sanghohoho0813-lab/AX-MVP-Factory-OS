@@ -133,7 +133,7 @@ export function ModuleShell({ tool, section, children }: ModuleShellProps) {
         </div>
         <ModuleNavList tool={tool} groups={groups} section={current.key} />
         <Link to="/tools" className="t-meta inline-flex items-center gap-1 px-1 text-slate-400 hover:text-slate-600">
-          <ChevronLeft aria-hidden="true" className="size-3.5" /> 도구함 전체
+          <ChevronLeft aria-hidden="true" className="size-3.5" /> 작업실 전체
         </Link>
       </nav>
 
@@ -151,7 +151,7 @@ export function ModuleShell({ tool, section, children }: ModuleShellProps) {
             </div>
             <ModuleNavList tool={tool} groups={groups} section={current.key} />
             <Link to="/tools" className="t-meta inline-flex items-center gap-1 text-slate-400">
-              <ChevronLeft aria-hidden="true" className="size-3.5" /> 도구함 전체
+              <ChevronLeft aria-hidden="true" className="size-3.5" /> 작업실 전체
             </Link>
           </div>
         </div>

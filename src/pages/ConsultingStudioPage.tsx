@@ -116,7 +116,7 @@ function StudioContent({ workspaceId }: { workspaceId: string | null }) {
   return (
     <div className="flex flex-col gap-5">
       <ScreenTitle
-        title="컨설팅 작업실"
+        title="특허+벤처"
         sub="특허 → MVP → 벤처인증 → 실사. 다음에 무엇을 할지는 시스템이 정합니다."
         actions={
           !missing && (
@@ -242,7 +242,7 @@ function StudioContent({ workspaceId }: { workspaceId: string | null }) {
                   </option>
                 ))}
               </select>
-              {activeClients.length === 0 && <span className="t-meta mt-1 block text-slate-500">고객 운영에 업체를 먼저 등록해 주세요.</span>}
+              {activeClients.length === 0 && <span className="t-meta mt-1 block text-slate-500">고객 관리에 업체를 먼저 등록해 주세요.</span>}
             </label>
             <p className="t-meta break-keep text-slate-500">
               회사 기본정보는 고객 기록에서 자동으로 가져옵니다. 나머지는 진행하면서 필요한 것만 물어봅니다.

@@ -163,7 +163,7 @@ function CustomerEditor({
   const handleSave = () => persist({});
 
   const handleDelete = () => {
-    const ok = window.confirm(`'${customer.companyName}' 상담 기록을 지울까요? (고객 운영 업체는 그대로 남습니다)`);
+    const ok = window.confirm(`'${customer.companyName}' 상담 기록을 지울까요? (고객 관리 업체는 그대로 남습니다)`);
     if (!ok) return;
     deleteCustomer(customer.id);
     router.push("/dashboard");

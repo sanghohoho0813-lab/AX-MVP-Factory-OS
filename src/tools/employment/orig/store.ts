@@ -79,7 +79,7 @@ export function toOrigCompany(os: ClientOpsRecord, meta: Rec | undefined, create
   const out: Rec = { ...osCompanyDefaults(os), ...m }
   out.id = os.id
   out.osId = os.id
-  out.name = os.companyName // 이름은 늘 고객 운영 기록 그대로
+  out.name = os.companyName // 이름은 늘 고객 관리 기록 그대로
   out.companyDocs = withFiles(m.companyDocs)
   out.notes = Array.isArray(m.notes) ? m.notes : []
   out.programInfos = Array.isArray(m.programInfos) ? m.programInfos : []

@@ -332,7 +332,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         title="업체를 찾을 수 없습니다"
         description="주소가 잘못되었거나 이미 삭제된 업체입니다."
         backTo="/ops/clients"
-        backLabel="고객 운영 현황으로"
+        backLabel="고객 관리 현황으로"
       />
     )
   }
@@ -376,7 +376,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           className="inline-flex w-fit items-center gap-1.5 text-[0.95rem] font-medium text-slate-500 hover:text-slate-800"
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
-          고객 운영 현황
+          고객 관리 현황
         </button>
         {/*
           머리말은 세 줄로 끝낸다 — 회사명 / 연락처 / 다음 행동.

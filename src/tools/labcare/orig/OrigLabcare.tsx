@@ -90,7 +90,7 @@ function CheckPicker() {
       </div>
       {clients.length === 0 ? (
         <p className="t-sub text-slate-500">
-          연구소 고객사가 아직 없습니다. <Link to="/tools/labcare/clients" className="font-bold text-navy-700 underline">고객사 관리</Link> 에서 고객 운영 업체를 연구소 고객사로 추가하세요.
+          연구소 고객사가 아직 없습니다. <Link to="/tools/labcare/clients" className="font-bold text-navy-700 underline">고객사 관리</Link> 에서 고객 관리 업체를 연구소 고객사로 추가하세요.
         </p>
       ) : (
         <ul className="grid gap-2 sm:grid-cols-2">

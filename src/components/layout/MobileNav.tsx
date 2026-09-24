@@ -8,6 +8,7 @@
  * 1024px 이상에서는 왼쪽 사이드바가 그 역할을 하므로 나타나지 않는다.
  */
 
+import { useNavCounts } from './useNavCounts'
 import { NavLink, useLocation } from 'react-router-dom'
 import { CalendarDays, Inbox, LayoutGrid, ListChecks, Sun } from 'lucide-react'
 
@@ -22,7 +23,7 @@ interface NavItem {
 const ITEMS: NavItem[] = [
   { to: '/', label: '오늘', icon: Sun, match: ['/'] },
   { to: '/ops/clients', label: '고객', icon: ListChecks, match: ['/ops/clients'] },
-  { to: '/ops/inbox', label: '이벤트', icon: Inbox, match: ['/ops/inbox'] },
+  { to: '/ops/inbox', label: '상담신청', icon: Inbox, match: ['/ops/inbox'] },
   { to: '/ops/calendar', label: '일정', icon: CalendarDays, match: ['/ops/calendar', '/journal'] },
 ]
 
@@ -33,6 +34,7 @@ function isActive(pathname: string, item: NavItem): boolean {
 
 export function MobileNav({ onOpenMore }: { onOpenMore: () => void }) {
   const { pathname } = useLocation()
+  const counts = useNavCounts()
 
   return (
     <nav
@@ -52,7 +54,15 @@ export function MobileNav({ onOpenMore }: { onOpenMore: () => void }) {
                   active ? 'text-brand-700' : 'text-slate-500'
                 }`}
               >
-                <Icon aria-hidden="true" className={`size-5 ${active ? 'text-brand-600' : 'text-slate-400'}`} />
+                <span className="relative">
+                  <Icon aria-hidden="true" className={`size-5 ${active ? 'text-brand-600' : 'text-slate-400'}`} />
+                  {/* D-104: 처리 안 한 상담신청 수 — 빨간 바탕 흰 숫자(0 이면 없음) */}
+                  {item.to === '/ops/inbox' && (counts.requests ?? 0) > 0 && (
+                    <span data-nav-badge="requests" aria-label={`새 상담신청 ${counts.requests}건`} className="absolute -top-1.5 -right-2.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger-500 px-1 text-[0.7rem] font-bold text-white tabular-nums">
+                      {(counts.requests ?? 0) > 99 ? '99+' : counts.requests}
+                    </span>
+                  )}
+                </span>
                 <span className="t-meta font-medium">{item.label}</span>
               </NavLink>
             </li>

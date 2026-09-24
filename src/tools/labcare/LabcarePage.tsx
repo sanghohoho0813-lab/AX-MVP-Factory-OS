@@ -216,8 +216,8 @@ export function LabcarePage() {
       {section === 'dashboard' ? (
         <>
           <OrigLabcare section="dashboard" />
-          <section className="flex flex-col gap-3" aria-label="고객 운영 업체와 연결">
-            <h2 className="t-section text-slate-900">고객 운영 업체와 연결</h2>
+          <section className="flex flex-col gap-3" aria-label="고객 관리 업체와 연결">
+            <h2 className="t-section text-slate-900">고객 관리 업체와 연결</h2>
             <ModuleDashboard toolKey="labcare" />
           </section>
         </>

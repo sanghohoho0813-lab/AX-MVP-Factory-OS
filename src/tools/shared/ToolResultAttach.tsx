@@ -214,7 +214,7 @@ export function ToolResultAttach(props: ToolResultAttachProps) {
             {loading ? (
               <p className="t-sub text-slate-500">업체를 불러오는 중…</p>
             ) : filtered.length === 0 ? (
-              <p className="t-sub text-slate-500">{clients.length === 0 ? '아직 업체가 없습니다. 고객 운영에서 먼저 만들어 주세요.' : '맞는 업체가 없습니다.'}</p>
+              <p className="t-sub text-slate-500">{clients.length === 0 ? '아직 업체가 없습니다. 고객 관리에서 먼저 만들어 주세요.' : '맞는 업체가 없습니다.'}</p>
             ) : (
               <ul className="flex max-h-[50vh] flex-col divide-y divide-slate-100 overflow-y-auto rounded-(--radius-panel) border border-slate-200">
                 {filtered.map((c) => {

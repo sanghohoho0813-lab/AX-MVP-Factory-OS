@@ -176,7 +176,7 @@ export default function ClientsPage() {
         added += 1;
       }
       refresh();
-      alert((added ? `${added}개 고객사를 추가했습니다.` : "추가된 행이 없습니다. 양식을 확인해 주세요.") + (skipped.length ? `\n고객 운영에 없는 업체라 건너뜀: ${skipped.join(", ")}` : ""));
+      alert((added ? `${added}개 고객사를 추가했습니다.` : "추가된 행이 없습니다. 양식을 확인해 주세요.") + (skipped.length ? `\n고객 관리에 없는 업체라 건너뜀: ${skipped.join(", ")}` : ""));
     };
     reader.readAsText(file, "utf-8");
     e.target.value = "";
@@ -378,7 +378,7 @@ function AddClientModal({
         </div>
         <form onSubmit={onSubmit} className="px-6 py-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div><label className={labelCls}>회사명 * (고객 운영 업체에서 고르기)</label>
+            <div><label className={labelCls}>회사명 * (고객 관리 업체에서 고르기)</label>
               <select className={field} value={form.osId} required data-testid="lab-client-pick"
                 onChange={(e) => setForm((f) => fillFromOs(f, e.target.value))}>
                 <option value="">업체 고르기</option>
@@ -386,7 +386,7 @@ function AddClientModal({
                   <option key={c.id} value={c.id}>{c.companyName}</option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-slate-400">업체가 없으면 먼저 <a href="/ops/clients" className="font-bold text-navy-700 underline">고객 운영</a>에 등록하세요.</p>
+              <p className="mt-1 text-xs text-slate-400">업체가 없으면 먼저 <a href="/ops/clients" className="font-bold text-navy-700 underline">고객 관리</a>에 등록하세요.</p>
             </div>
             <div><label className={labelCls}>업종</label><input className={field} value={form.industry} onChange={(e) => setForm((f) => ({ ...f, industry: e.target.value }))} placeholder="예) 식품 제조업" /></div>
             <div><label className={labelCls}>연구소 유형</label>

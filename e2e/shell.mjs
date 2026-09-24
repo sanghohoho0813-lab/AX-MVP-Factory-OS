@@ -5,6 +5,7 @@
  *   node e2e/shell.mjs http://localhost:4390
  */
 import { chromium } from 'playwright'
+import { seedScript } from './seed.mjs'
 
 const BASE = process.argv[2] ?? 'http://localhost:4390'
 let pass = 0
@@ -27,19 +28,16 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const nav = page.getByRole('navigation', { name: '주 메뉴' })
   const navText = (await nav.innerText()) ?? ''
   const at = (t) => navText.indexOf(t)
-  check('메뉴: 오늘과 일정이 한 묶음', at('오늘') >= 0 && at('일정') > at('오늘') && at('일정') < at('고객 운영'), navText.slice(0, 160))
-  check('메뉴: 영업이 고객 다음, 도구함이 영업 다음 (D-103)', at('영업자 정산') > at('고객 이벤트함') && at('도구함') > at('영업자 정산') && at('도구함') < at('가끔 쓰는 것'), navText.slice(0, 320))
+  check('메뉴: 오늘과 일정이 한 묶음', at('오늘') >= 0 && at('일정') > at('오늘') && at('일정') < at('고객 관리'), navText.slice(0, 160))
+  check('메뉴: 이름 — 고객 관리 · 잠재고객 상담신청 (D-104)', at('고객 관리') > 0 && at('잠재고객 상담신청') > at('고객 관리') && at('고객 운영') === -1 && at('이벤트함') === -1, navText.slice(0, 200))
+  check('메뉴: 영업이 고객 다음, 컨설팅 작업실(구 도구함)이 영업 다음', at('영업자 정산') > at('잠재고객 상담신청') && at('컨설팅 작업실') > at('영업자 정산') && at('도구함') === -1, navText.slice(0, 320))
   check('메뉴: 영업 묶음에 1차 미팅 체크리스트(준비 중)', at('1차 미팅 체크리스트') > at('영업자 정산') && navText.includes('준비 중'), navText.slice(0, 360))
-  check('메뉴: 잘 안 쓰는 것은 접힌 묶음 안', at('가끔 쓰는 것') > 0 && at('컨설팅 작업실') === -1, navText.slice(0, 320))
+  check('메뉴: 가끔 쓰는 것 묶음이 없다 (D-104)', at('가끔 쓰는 것') === -1)
+  check('메뉴: 특허+벤처 · 자금·지원사업이 컨설팅 작업실 안 (작업실 전체보다 위)', at('특허+벤처') > at('정책자금 진단') && at('자금·지원사업') > at('특허+벤처') && at('작업실 전체') > at('자금·지원사업'), navText.slice(0, 700))
   check('메뉴: 세금 계산기가 사이드바에 있다', at('세금 계산기') > 0)
-  check('메뉴: AX STUDIO 는 그 아래', at('AX STUDIO') > at('가끔 쓰는 것'))
+  check('메뉴: AX STUDIO 는 그 아래', at('AX STUDIO') > at('작업실 전체'))
   check('메뉴: 설정이 맨 아래', at('설정') > at('이 시스템'))
-
-  await nav.getByRole('button', { name: /가끔 쓰는 것/ }).click()
-  await page.waitForTimeout(400)
-  const opened = (await nav.innerText()) ?? ''
-  check('메뉴: 펴면 작업실 · 자금이 나온다', ['컨설팅 작업실', '자금·지원사업'].every((t) => opened.includes(t)), opened.slice(0, 320))
-  check('메뉴: 기록 셋은 가끔 쓰는 것에 없다 (일정 안 탭으로, D-103)', !['오늘 기록', '주간 돌아보기', '전체 기록'].some((t) => opened.includes(t)), opened)
+  check('메뉴: 기록 셋은 사이드바에 따로 없다 (일정 안 탭, D-103)', !['오늘 기록', '주간 돌아보기', '전체 기록'].some((t) => navText.includes(t)))
 
   // 시계 — 날짜 + 초, 1초마다 움직인다
   const clock = page.locator('header [aria-label^="지금 "]:visible').first()
@@ -69,6 +67,38 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     sBox && hBox && sBox.x + sBox.width / 2 < hBox.x + hBox.width / 2,
     JSON.stringify({ search: sBox, headerMid: hBox && Math.round(hBox.x + hBox.width / 2) }))
   check('검색: 폭이 352px 이하', sBox && sBox.width <= 352, String(sBox?.width))
+
+  /* ---- D-104: 메뉴 숫자 — 고객사 수(차분) · 상담신청(빨강 · 0 이면 없음) · 늘고 줄면 따라감 ---- */
+  {
+    const badge = (k) => page.locator(`aside [data-nav-badge="${k}"]`)
+    check('숫자: 빈 저장소 — 고객 관리 0 · 상담신청 숫자 없음', ((await badge('clients').innerText()) ?? '').trim() === '0' && (await badge('requests').count()) === 0)
+    await page.evaluate(seedScript())
+    await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+    await page.waitForTimeout(400)
+    const stored = await page.evaluate(() => ({
+      clients: JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').filter((c) => !c.archivedAt).length,
+      open: JSON.parse(localStorage.getItem('axmvp.v1.customer_events') ?? '[]').filter((e) => ['new', 'linked', 'in_progress'].includes(e.status)).length,
+    }))
+    const c1 = ((await badge('clients').innerText()) ?? '').trim()
+    const r1 = ((await badge('requests').innerText()) ?? '').trim()
+    check('숫자: 고객 관리 옆 = 등록 고객사 수', c1 === String(stored.clients) && stored.clients > 0, `${c1} / ${stored.clients}`)
+    check('숫자: 상담신청 옆 = 처리 안 한 신청 수', r1 === String(stored.open) && stored.open > 0, `${r1} / ${stored.open}`)
+    const colors = await badge('requests').evaluate((el) => ({ bg: getComputedStyle(el).backgroundColor, fg: getComputedStyle(el).color }))
+    const [rr, gg, bb] = (colors.bg.match(/\d+/g) ?? []).map(Number)
+    check('숫자: 상담신청은 빨간 바탕 · 흰 숫자', rr > 150 && gg < 110 && bb < 110 && colors.fg === 'rgb(255, 255, 255)', JSON.stringify(colors))
+    const quiet = await badge('clients').evaluate((el) => getComputedStyle(el).backgroundColor)
+    check('숫자: 고객사 수는 튀지 않게(바탕 없음)', quiet === 'rgba(0, 0, 0, 0)', quiet)
+    // 업체 하나를 지우면(보관) 화면을 옮길 때 줄어든다 · 다시 늘리면 늘어난다
+    await page.evaluate(() => { const k = 'axmvp.v1.operations_clients'; const l = JSON.parse(localStorage.getItem(k)); l[0].archivedAt = '2026-09-24T00:00:00.000Z'; localStorage.setItem(k, JSON.stringify(l)) })
+    await page.getByRole('navigation', { name: '주 메뉴' }).getByRole('link', { name: /^일정/ }).click()
+    await page.waitForTimeout(500)
+    check('숫자: 줄면 같이 준다', ((await badge('clients').innerText()) ?? '').trim() === String(stored.clients - 1), (await badge('clients').innerText()) ?? '')
+    await page.evaluate(() => { const k = 'axmvp.v1.operations_clients'; const l = JSON.parse(localStorage.getItem(k)); l[0].archivedAt = null; localStorage.setItem(k, JSON.stringify(l)) })
+    await page.getByRole('navigation', { name: '주 메뉴' }).getByRole('link', { name: /^오늘/ }).first().click()
+    await page.waitForTimeout(500)
+    check('숫자: 늘면 같이 는다', ((await badge('clients').innerText()) ?? '').trim() === String(stored.clients), (await badge('clients').innerText()) ?? '')
+    check('숫자: 1차 미팅은 아직 프로그램이 없어 숫자 없음(0 이면 안 단다)', (await badge('first-meetings').count()) === 0)
+  }
 
   /* ---- D-103: 사이드바 아래 이름 · 고객 플랫폼 아이콘 · 글자 크기는 설정에만 ---- */
   const account = page.getByTestId('sidebar-account')
@@ -160,7 +190,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByRole('button', { name: '메뉴 열기' }).click()
   await page.waitForTimeout(500)
   const drawer = (await page.getByRole('navigation', { name: '주 메뉴' }).innerText()) ?? ''
-  check('휴대폰 서랍: 같은 순서', drawer.indexOf('도구함') > drawer.indexOf('고객 운영') && drawer.indexOf('가끔 쓰는 것') > drawer.indexOf('도구함'), drawer.slice(0, 260))
+  check('휴대폰 서랍: 같은 순서', drawer.indexOf('컨설팅 작업실') > drawer.indexOf('고객 관리') && drawer.indexOf('AX STUDIO') > drawer.indexOf('컨설팅 작업실'), drawer.slice(0, 260))
   const logoH = await page.locator('img[alt]:visible').first().evaluate((el) => el.getBoundingClientRect().height)
   check('휴대폰 서랍: 로고도 48px', Math.round(logoH) === 48, String(logoH))
   // D-103: 예전 '이 기기 · 계정' 칸(고객 플랫폼 열기 · 처음 사용 가이드 · 글자 크기) 없음 — 아래는 이름 한 줄 + 아이콘

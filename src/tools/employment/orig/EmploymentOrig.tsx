@@ -153,7 +153,7 @@ export function EmploymentOrig({
       const cur = ref.current
       if (!cur) return
       const os = cur.clients.find((c) => c.id === comp.id)
-      if (!os) throw new Error('고객 운영에 없는 업체입니다. 고객 운영에서 먼저 등록해 주세요.')
+      if (!os) throw new Error('고객 관리에 없는 업체입니다. 고객 관리에서 먼저 등록해 주세요.')
       const prev = cur.metaRows.get(os.id)?.data
       const merged = toOrigCompany(os, { ...(prev ?? {}), ...comp, removedAt: undefined })
       const companies = cur.companies.some((c) => c.id === os.id) ? cur.companies.map((c) => (c.id === os.id ? merged : c)) : [...cur.companies, merged]
@@ -249,7 +249,7 @@ export function EmploymentOrig({
         else missing.push(String(comp.name || '(이름 없음)'))
       }
       if (missing.length) {
-        throw new Error(`고객 운영에 없는 업체 ${missing.length}곳(${missing.slice(0, 3).join(', ')}${missing.length > 3 ? ' 외' : ''}) — 고객 운영에 먼저 등록한 뒤 다시 올려 주세요`)
+        throw new Error(`고객 관리에 없는 업체 ${missing.length}곳(${missing.slice(0, 3).join(', ')}${missing.length > 3 ? ' 외' : ''}) — 고객 관리에 먼저 등록한 뒤 다시 올려 주세요`)
       }
       for (const [comp, os] of pairs) {
         remap.current.set(String(comp.id), os.id)

@@ -1,7 +1,7 @@
 /* [D-93] 원본 영업 OS(corp-consult-sales-os main · src/App.jsx)를 그대로 옮긴 것.
    이 OS 에서 바꾼 것 — 나머지 글자·배치·색·계산은 원본 그대로:
    · 저장: load()/save() 가 localStorage 대신 모듈 기록(./store.ts)
-   · 업체: 신규 고객·고객사의 한 줄 = 고객 운영 업체(업체명은 고객 운영에서 고른다)
+   · 업체: 신규 고객·고객사의 한 줄 = 고객 관리 업체(업체명은 고객 관리에서 고른다)
    · 뺀 것: PIN 앱 잠금 · 샘플 데이터 넣기 · 다른 SaaS 바로가기 · 브라우저 전체 스캔 정리(scrub)
    · 원본의 왼쪽 메뉴는 이 OS 의 모듈 목차가 대신한다(화면 = /tools/sales-kit/<화면>) */
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -661,7 +661,7 @@ function TextBlock({ title, text, copy }) {
 }
 // 샘플 넣기 단일 버튼 — 기본 3개. 교체 방식. setData는 함수형으로 최신 상태에 적용.
 function SampleCTA({ data, setData, style, label, n }) {
-  return null; // [D-93] 샘플 고객은 넣지 않는다 — 업체는 고객 운영에서
+  return null; // [D-93] 샘플 고객은 넣지 않는다 — 업체는 고객 관리에서
   // eslint-disable-next-line no-unreachable
   const cnt = n || 3;
   return (
@@ -3180,7 +3180,7 @@ function CustomerForm({ open, initial, mode, defaultDest, data, onSave, onClose,
       </Card>
       {/* 숫자 추출기(보조) 전용 화면 제거 — 내부 컴포넌트는 유지하되 화면에서는 노출하지 않음 */}
       <div>{lab("② 기본정보")}<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <div style={{ gridColumn: "1 / -1" }}>{/* [D-94] 업체 고르기는 한 줄 전체 — 좁은 폭에서 이름표가 세 줄로 찌그러지던 것 */}<Label>업체명 * <span style={{ fontWeight: 600, color: C.textM }}>(고객 운영 업체에서 고르기)</span></Label>{mode === "edit" ? <input style={{ ...inp, background: C.bg }} value={f.name} readOnly /> : <select style={inp} data-testid="sales-client-pick" value={f.osId || ""} onChange={(e) => { const os = salesOsClientOf(e.target.value); if (!os) { setF((p) => ({ ...p, osId: "", name: "" })); return; } setF((p) => osToCust(os, p)); }}><option value="">업체 고르기</option>{salesOsClients().map((c) => <option key={c.id} value={c.id}>{c.companyName}</option>)}</select>}{mode !== "edit" && salesOsClients().length === 0 ? <div style={{ color: C.warn, fontSize: "calc(var(--s,1.3)*14px)", marginTop: 4 }}>고객 운영에 업체가 없습니다. 먼저 <a href="/ops/clients" style={{ color: C.blue, fontWeight: 800 }}>고객 운영</a>에 업체를 등록하세요.</div> : null}{dupName && <div style={{ color: C.warn, fontSize: "calc(var(--s,1.3)*14px)", marginTop: 4 }}>같은 이름의 고객이 이미 있습니다. 저장하면 기존 고객을 수정합니다.</div>}</div>
+        <div style={{ gridColumn: "1 / -1" }}>{/* [D-94] 업체 고르기는 한 줄 전체 — 좁은 폭에서 이름표가 세 줄로 찌그러지던 것 */}<Label>업체명 * <span style={{ fontWeight: 600, color: C.textM }}>(고객 관리 업체에서 고르기)</span></Label>{mode === "edit" ? <input style={{ ...inp, background: C.bg }} value={f.name} readOnly /> : <select style={inp} data-testid="sales-client-pick" value={f.osId || ""} onChange={(e) => { const os = salesOsClientOf(e.target.value); if (!os) { setF((p) => ({ ...p, osId: "", name: "" })); return; } setF((p) => osToCust(os, p)); }}><option value="">업체 고르기</option>{salesOsClients().map((c) => <option key={c.id} value={c.id}>{c.companyName}</option>)}</select>}{mode !== "edit" && salesOsClients().length === 0 ? <div style={{ color: C.warn, fontSize: "calc(var(--s,1.3)*14px)", marginTop: 4 }}>고객 관리에 업체가 없습니다. 먼저 <a href="/ops/clients" style={{ color: C.blue, fontWeight: 800 }}>고객 관리</a>에 업체를 등록하세요.</div> : null}{dupName && <div style={{ color: C.warn, fontSize: "calc(var(--s,1.3)*14px)", marginTop: 4 }}>같은 이름의 고객이 이미 있습니다. 저장하면 기존 고객을 수정합니다.</div>}</div>
         <div><Label>업종</Label><select style={inp} value={f.industry} onChange={(e) => upd("industry", e.target.value)}>{INDUSTRIES.map((x) => <option key={x}>{x}</option>)}</select></div>
         <div><Label>대표자명</Label><input style={inp} value={f.ceoName} onChange={(e) => upd("ceoName", e.target.value)} /></div>
         <div><Label>대표 나이</Label><input type="number" style={inp} value={f.ceoAge} onChange={(e) => upd("ceoAge", e.target.value)} /></div>
@@ -3969,7 +3969,7 @@ function Prospecting({ data, setData, setTab, goMeeting, openAdd, selectId, rece
     setData({ ...data, leads: exists ? leads.map((l) => l.id === lead.id ? lead : l) : [lead, ...leads] });
     setOpen(false); setEdit(null); setSelected(lead.id);
   };
-  const del = (id) => { if (window.confirm("이 업체의 영업 기록을 삭제할까요? 고객 운영 업체는 그대로 남습니다.")) { setData({ ...data, leads: leads.filter((l) => l.id !== id) }); setSelected(null); showToast("고객을 삭제했습니다."); } };
+  const del = (id) => { if (window.confirm("이 업체의 영업 기록을 삭제할까요? 고객 관리 업체는 그대로 남습니다.")) { setData({ ...data, leads: leads.filter((l) => l.id !== id) }); setSelected(null); showToast("고객을 삭제했습니다."); } };
   // 리드 → 고객사 관리 전환(같은 업체명이 있으면 중복 생성 없이 고객사 관리로 이동)
   // 전환된 리드는 convertedToDB 플래그로 '고객사 관리 전환 완료' 상태를 남긴다.
   const toCompany = (l) => {
@@ -4272,7 +4272,7 @@ function CompaniesDB({ data, setData, goMeeting, openAdd, selectId, recentId, on
   const [q, setQ] = useState("");
   const [flt, setFlt] = useState("전체");
   const [custTab, setCustTab] = useState("잠재·신규");
-  const delCompany = (id) => { if (window.confirm("이 업체의 영업 기록을 삭제할까요? 고객 운영 업체는 그대로 남습니다.")) { setData({ ...data, companies: (data.companies || []).filter((c) => c.id !== id) }); setDetail(null); showToast("고객을 삭제했습니다."); } };
+  const delCompany = (id) => { if (window.confirm("이 업체의 영업 기록을 삭제할까요? 고객 관리 업체는 그대로 남습니다.")) { setData({ ...data, companies: (data.companies || []).filter((c) => c.id !== id) }); setDetail(null); showToast("고객을 삭제했습니다."); } };
   const allCompanies = data.companies || [];
   const TAB_DEFS = [["잠재·신규", (c) => c.stage !== "contracted" && pipe6Of(c.stage) !== "hold"], ["기존 계약", (c) => c.stage === "contracted"], ["전체", () => true], ["보류·장기관리", (c) => pipe6Of(c.stage) === "hold"]];
   const tabFn = (TAB_DEFS.find((t) => t[0] === custTab) || TAB_DEFS[0])[1];
@@ -5173,12 +5173,12 @@ function Settings({ data, setData, reset, pinSet, applyLock, removePin, onLockNo
       </div>
       <button style={{ ...btnP, marginTop: 14 }} onClick={() => { setData({ ...data, affordSettings: { greenPerEok: Number(aff.greenPerEok) || 300, yellowPerEok: Number(aff.yellowPerEok) || 600, defMonths: Number(aff.defMonths) || 84, defRate: isFinite(Number(aff.defRate)) ? Number(aff.defRate) : 100 } }); showToast("월납 적정성 기준을 저장했습니다."); }}>저장</button>
     </Card>
-    <Card style={{ padding: 20 }}><h3 style={h3}>③ 영업 기록 백업 / 복원<Help text="영업 기록만 파일로 내려받아 보관하거나, 그 파일로 되돌립니다. OS 전체 백업(고객 운영 → 더보기 → 백업 내려받기)에도 영업 기록이 함께 담깁니다." /></h3><p style={{ color: C.textM, fontSize: "calc(var(--s,1.3)*15px)", lineHeight: 1.6, margin: "0 0 10px" }}>영업 기록(고객·오늘 할 일·설정값)만 JSON 파일로 내려받습니다. 파일은 이 컴퓨터로만 내려받아지고 어디에도 올라가지 않습니다.</p><div style={{ background: C.warnBg, border: `1px solid ${C.warn}40`, borderRadius: 11, padding: "12px 14px", marginBottom: 12, fontSize: "calc(var(--s,1.3)*14px)", color: C.textS, lineHeight: 1.7 }}><b style={{ color: C.text }}>안전하게 쓰는 법</b><div style={{ marginTop: 4 }}>• <b>주 1회 백업</b>을 권장합니다 — OS 전체 백업 하나면 영업 기록도 함께 담깁니다.</div><div>• <b>공용 PC</b>에서는 쓰고 나서 로그아웃하세요.</div><div>• 실제 <b>민감정보(주민번호·계좌 등) 입력은 최소화</b>하시길 권합니다.</div></div><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><button style={btnP} onClick={download}>⬇️ 데이터 백업 다운로드</button><label style={{ ...btnS, display: "inline-flex", alignItems: "center", cursor: "pointer" }}>📂 백업 파일 불러오기<input type="file" accept="application/json,.json" onChange={onFile} style={{ display: "none" }} /></label><button style={btnS} onClick={() => copyText(JSON.stringify(data, null, 2), () => showToast("백업을 클립보드에 복사했습니다."))}>백업 클립보드 복사</button></div><div style={{ marginTop: 12 }}><Label>또는 백업 JSON 붙여넣기로 복원</Label><textarea style={{ ...inp, height: 110, resize: "vertical" }} value={backup} onChange={(e) => setBackup(e.target.value)} placeholder="백업 JSON을 붙여넣으세요." /><button style={{ ...btnS, marginTop: 8 }} onClick={() => { try { applyRestore(JSON.parse(backup)); } catch (e) { alert("백업 파일 형식이 올바르지 않습니다."); } }}>붙여넣기 복원</button></div></Card>
-    <Card style={{ padding: 20 }}><h3 style={h3}>④ 저장 방식 안내</h3><div style={{ fontSize: "calc(var(--s,1.3)*16px)", color: C.textS, lineHeight: 1.8 }}><div>• [이 OS] 영업 기록은 <b>미래에이아이랩 OS 의 모듈 기록</b>에 저장됩니다. 클라우드 모드면 작업실 안 다른 기기에서도 보입니다.</div><div>• 업체(업체명·대표자)는 <b>고객 운영</b> 업체를 그대로 씁니다. 여기서 지워도 고객 운영 업체는 남습니다.</div><div>• <b>공용 PC에서는 로그아웃에 주의하고</b>, 중요한 고객자료는 정기적으로 백업해주세요. (고객 운영 → 더보기 → 백업 내려받기 — 영업 기록도 함께 담깁니다)</div></div>
+    <Card style={{ padding: 20 }}><h3 style={h3}>③ 영업 기록 백업 / 복원<Help text="영업 기록만 파일로 내려받아 보관하거나, 그 파일로 되돌립니다. OS 전체 백업(고객 관리 → 더보기 → 백업 내려받기)에도 영업 기록이 함께 담깁니다." /></h3><p style={{ color: C.textM, fontSize: "calc(var(--s,1.3)*15px)", lineHeight: 1.6, margin: "0 0 10px" }}>영업 기록(고객·오늘 할 일·설정값)만 JSON 파일로 내려받습니다. 파일은 이 컴퓨터로만 내려받아지고 어디에도 올라가지 않습니다.</p><div style={{ background: C.warnBg, border: `1px solid ${C.warn}40`, borderRadius: 11, padding: "12px 14px", marginBottom: 12, fontSize: "calc(var(--s,1.3)*14px)", color: C.textS, lineHeight: 1.7 }}><b style={{ color: C.text }}>안전하게 쓰는 법</b><div style={{ marginTop: 4 }}>• <b>주 1회 백업</b>을 권장합니다 — OS 전체 백업 하나면 영업 기록도 함께 담깁니다.</div><div>• <b>공용 PC</b>에서는 쓰고 나서 로그아웃하세요.</div><div>• 실제 <b>민감정보(주민번호·계좌 등) 입력은 최소화</b>하시길 권합니다.</div></div><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><button style={btnP} onClick={download}>⬇️ 데이터 백업 다운로드</button><label style={{ ...btnS, display: "inline-flex", alignItems: "center", cursor: "pointer" }}>📂 백업 파일 불러오기<input type="file" accept="application/json,.json" onChange={onFile} style={{ display: "none" }} /></label><button style={btnS} onClick={() => copyText(JSON.stringify(data, null, 2), () => showToast("백업을 클립보드에 복사했습니다."))}>백업 클립보드 복사</button></div><div style={{ marginTop: 12 }}><Label>또는 백업 JSON 붙여넣기로 복원</Label><textarea style={{ ...inp, height: 110, resize: "vertical" }} value={backup} onChange={(e) => setBackup(e.target.value)} placeholder="백업 JSON을 붙여넣으세요." /><button style={{ ...btnS, marginTop: 8 }} onClick={() => { try { applyRestore(JSON.parse(backup)); } catch (e) { alert("백업 파일 형식이 올바르지 않습니다."); } }}>붙여넣기 복원</button></div></Card>
+    <Card style={{ padding: 20 }}><h3 style={h3}>④ 저장 방식 안내</h3><div style={{ fontSize: "calc(var(--s,1.3)*16px)", color: C.textS, lineHeight: 1.8 }}><div>• [이 OS] 영업 기록은 <b>미래에이아이랩 OS 의 모듈 기록</b>에 저장됩니다. 클라우드 모드면 작업실 안 다른 기기에서도 보입니다.</div><div>• 업체(업체명·대표자)는 <b>고객 관리</b> 업체를 그대로 씁니다. 여기서 지워도 고객 관리 업체는 남습니다.</div><div>• <b>공용 PC에서는 로그아웃에 주의하고</b>, 중요한 고객자료는 정기적으로 백업해주세요. (고객 관리 → 더보기 → 백업 내려받기 — 영업 기록도 함께 담깁니다)</div></div>
     </Card>
     {/* [D-94] 원본의 ‘출시 전 점검(QA 체크리스트)’ · ‘🐞 문제 제보용 정보’ · ‘앱 버전(Release Candidate v0.9)’ 카드와
         위와 겹치던 백업 단추 한 벌은 뺐다 — 개발 중에 쓰던 것이라 대표 화면에는 뜻이 없다 */}
-    <Card style={{ padding: 20, background: "#2A1515", border: `1px solid ${C.err}66` }}><h3 style={{ ...h3, color: C.err }}>⚠️ 위험 구역</h3><p style={{ color: C.textM, fontSize: "calc(var(--s,1.3)*15px)", lineHeight: 1.6, margin: "0 0 12px" }}>아래 작업은 되돌리기 어렵습니다. 먼저 백업을 받아두시길 권합니다.</p><div style={{ background: C.redBg, border: `1px solid ${C.err}40`, borderRadius: 11, padding: 14 }}><div style={{ fontWeight: 800, color: C.err, fontSize: "calc(var(--s,1.3)*15px)", marginBottom: 6 }}>🗑️ 전체 데이터 초기화</div><div style={{ color: C.textS, fontSize: "calc(var(--s,1.3)*14px)", lineHeight: 1.6, marginBottom: 8 }}>이 영업 도구의 모든 기록·설정이 삭제되며 복구할 수 없습니다(고객 운영 업체는 남습니다). 실행하려면 아래 칸에 <b>초기화</b> 라고 입력하세요.</div><div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}><input style={{ ...inp, width: "auto", marginBottom: 0, maxWidth: 200 }} value={resetText} onChange={(e) => setResetText(e.target.value)} placeholder="초기화" aria-label="초기화 확인 입력" /><button style={{ ...btnP, background: resetText.trim() === "초기화" ? C.err : C.bdrL, color: "#fff", cursor: resetText.trim() === "초기화" ? "pointer" : "not-allowed" }} disabled={resetText.trim() !== "초기화"} onClick={() => { setResetText(""); reset(); }}>전체 초기화 실행</button></div></div></Card>
+    <Card style={{ padding: 20, background: "#2A1515", border: `1px solid ${C.err}66` }}><h3 style={{ ...h3, color: C.err }}>⚠️ 위험 구역</h3><p style={{ color: C.textM, fontSize: "calc(var(--s,1.3)*15px)", lineHeight: 1.6, margin: "0 0 12px" }}>아래 작업은 되돌리기 어렵습니다. 먼저 백업을 받아두시길 권합니다.</p><div style={{ background: C.redBg, border: `1px solid ${C.err}40`, borderRadius: 11, padding: 14 }}><div style={{ fontWeight: 800, color: C.err, fontSize: "calc(var(--s,1.3)*15px)", marginBottom: 6 }}>🗑️ 전체 데이터 초기화</div><div style={{ color: C.textS, fontSize: "calc(var(--s,1.3)*14px)", lineHeight: 1.6, marginBottom: 8 }}>이 영업 도구의 모든 기록·설정이 삭제되며 복구할 수 없습니다(고객 관리 업체는 남습니다). 실행하려면 아래 칸에 <b>초기화</b> 라고 입력하세요.</div><div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}><input style={{ ...inp, width: "auto", marginBottom: 0, maxWidth: 200 }} value={resetText} onChange={(e) => setResetText(e.target.value)} placeholder="초기화" aria-label="초기화 확인 입력" /><button style={{ ...btnP, background: resetText.trim() === "초기화" ? C.err : C.bdrL, color: "#fff", cursor: resetText.trim() === "초기화" ? "pointer" : "not-allowed" }} disabled={resetText.trim() !== "초기화"} onClick={() => { setResetText(""); reset(); }}>전체 초기화 실행</button></div></div></Card>
     <Card style={{ padding: 20, background: C.bg }}><h3 style={{ ...h3, color: C.warn }}>신뢰/리스크 원칙</h3><p style={{ color: C.textS, lineHeight: 1.8, fontSize: "calc(var(--s,1.3)*16px)", margin: 0 }}>세무·절세·가업승계·판례 관련 문구는 항상 “검토 가능성”, “자료 확인 후 판단”, “세무사 검토 권장” 표현을 사용합니다. 고객에게 절세액·감면 여부·지원금 적용 여부를 단정하지 않는 것을 기본 원칙으로 합니다.</p></Card>
   </div>;
 }
@@ -5318,7 +5318,7 @@ export default function App({ tab: tabProp = "briefing", onTab, focus }) {
     for (const tgt of targets) {
       const list = tgt === "company" ? (d.companies || []) : (d.leads || []);
       const exists = list.find((x) => (rec.osId && x.id === rec.osId) || x.name === rec.name);
-      const id = rec.osId || (exists ? exists.id : uid()); // [D-93] id = 고객 운영 업체 id
+      const id = rec.osId || (exists ? exists.id : uid()); // [D-93] id = 고객 관리 업체 id
       const record = { ...rec, id, updatedAt: todayISO(), manual: true, sample: false, ...(exists ? {} : { createdAt: rec.createdAt || todayISO() }), ...(tgt === "company" ? { fromLead: dest === "both" } : {}) };
       const next = exists ? list.map((x) => (x.id === exists.id ? { ...x, ...record } : x)) : [record, ...list];
       if (tgt === "company") { d.companies = next; compId = id; } else { d.leads = next; leadId = id; }
@@ -5350,7 +5350,7 @@ export default function App({ tab: tabProp = "briefing", onTab, focus }) {
   const tabs = navGroups.flatMap((g) => g[1]);
   function reset() {
     try { localStorage.removeItem(SK); } catch (e) {}
-    clearLock(); setLock({}); setLocked(false); salesResetAll(); setData({ ...emptyData(), profile: data.profile }); showToast("영업 기록을 초기화했습니다. 고객 운영 업체는 그대로입니다.");
+    clearLock(); setLock({}); setLocked(false); salesResetAll(); setData({ ...emptyData(), profile: data.profile }); showToast("영업 기록을 초기화했습니다. 고객 관리 업체는 그대로입니다.");
   }
   const pageTitle = (tabs.find((t) => t[0] === tab) || tabs[0])[2];
   const navBtn = (on) => ({ background: C.card, border: "1px solid " + C.bdr, borderRadius: 9, height: "calc(var(--s,1.3)*36px)", minWidth: "calc(var(--s,1.3)*36px)", padding: "0 10px", color: on ? C.text : C.textM, opacity: on ? 1 : .4, cursor: on ? "pointer" : "not-allowed", fontWeight: 800, fontSize: "calc(var(--s,1.3)*15px)", display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1, fontFamily: FF });
@@ -5516,7 +5516,7 @@ export default function App({ tab: tabProp = "briefing", onTab, focus }) {
       {tab === "settings" && <TabFrame data={data} setData={setData} screenKey="settings" cfg={GUIDE.settings}><Settings data={data} setData={setData} reset={reset} pinSet={pinSet} applyLock={applyLock} removePin={removePin} onLockNow={() => setLocked(true)} /></TabFrame>}
       </div>
         </div>
-        <footer style={{ borderTop: "1px solid " + C.bdr, padding: 20, textAlign: "center", color: C.textM, fontSize: "calc(var(--s,1.3)*15px)", marginTop: "auto" }}><div style={{ fontSize: "calc(var(--s,1.3)*13px)", color: C.textM, marginBottom: 4 }}>🔒 영업 기록은 미래에이아이랩 OS 의 모듈 기록에 저장됩니다. 업체는 고객 운영 업체를 그대로 씁니다.</div></footer>
+        <footer style={{ borderTop: "1px solid " + C.bdr, padding: 20, textAlign: "center", color: C.textM, fontSize: "calc(var(--s,1.3)*15px)", marginTop: "auto" }}><div style={{ fontSize: "calc(var(--s,1.3)*13px)", color: C.textM, marginBottom: 4 }}>🔒 영업 기록은 미래에이아이랩 OS 의 모듈 기록에 저장됩니다. 업체는 고객 관리 업체를 그대로 씁니다.</div></footer>
       </div>
     </div>
     <CustomerForm open={!!addState} initial={addState?.initial} mode={addState?.mode} defaultDest={addState?.dest} data={data} onSave={registerCustomer} onClose={() => setAddState(null)} presetOsId={focus && ![...(data?.leads || []), ...(data?.companies || [])].some((c) => c.id === focus) ? focus : null} />

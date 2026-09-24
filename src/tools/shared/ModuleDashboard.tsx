@@ -136,7 +136,7 @@ export function ModuleDashboard({ toolKey, children }: ModuleDashboardProps) {
   return (
     <div className="flex flex-col gap-5" data-testid="module-dashboard" data-module={toolKey}>
       <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
-        <MetricTile label="업체" value={`${sum.clients.length}곳`} hint="고객 운영에 있는 업체" />
+        <MetricTile label="업체" value={`${sum.clients.length}곳`} hint="고객 관리에 있는 업체" />
         <MetricTile
           label="지금 돌릴 수 있는 업체"
           value={`${sum.ready.length}곳`}
@@ -160,7 +160,7 @@ export function ModuleDashboard({ toolKey, children }: ModuleDashboardProps) {
       {sum.clients.length === 0 && (
         <Surface edge="brand" showEdge>
           <p className="t-sub break-keep text-slate-600">
-            아직 업체가 없습니다. <Link to="/ops/clients" className="font-bold text-brand-700 hover:underline">고객 운영</Link> 에서 업체를 만들면
+            아직 업체가 없습니다. <Link to="/ops/clients" className="font-bold text-brand-700 hover:underline">고객 관리</Link> 에서 업체를 만들면
             이 화면이 그 업체들로 채워집니다. 이 모듈은 업체 명단을 따로 갖지 않습니다.
           </p>
         </Surface>

@@ -33,7 +33,7 @@ await page.evaluate(seedScript())
 // 1) 작업실이 열리고 비어 있다
 await page.goto(BASE + '/studio', { waitUntil: 'networkidle' })
 await wait(700)
-check('1 작업실 화면 열림', (await page.getByText('컨설팅 작업실').count()) > 0)
+check('1 작업실 화면 열림 (D-104 이름: 특허+벤처)', (await page.getByRole('heading', { name: '특허+벤처' }).count()) > 0)
 check('1 씨앗 프로젝트 카드', (await page.getByText('작업지연 위험분석 특허').count()) > 0)
 
 // 2) 새 프로젝트 — 고객 고르기
@@ -59,7 +59,7 @@ await wait(600)
 check('4 회사명 자동 채움', (await page.getByText('한솔테크').count()) > 0)
 check('4 상태 = 미확인', (await page.getByText('미확인').count()) > 0)
 const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.consulting_projects') ?? '[]'))
-check('4 저장소에 사실표 출처 = 고객 운영 기록', stored[0]?.factsheet?.companyName?.source === '고객 운영 기록')
+check('4 저장소에 사실표 출처 = 고객 관리 기록', stored[0]?.factsheet?.companyName?.source === '고객 관리 기록')
 
 // 5) 사실표 입력 — 고객 기록에 없던 항목(대표자·설립일·본점·주요 제품)을 채운다 (블러 저장)
 const fillFact = async (key, label, value) => {
@@ -235,7 +235,7 @@ await page.keyboard.press('Control+K')
 await wait(400)
 await page.keyboard.type('한솔')
 await wait(400)
-check('19 검색에 컨설팅 작업실 그룹', (await page.getByText('컨설팅 작업실').count()) >= 2)
+check('19 검색에 특허+벤처 그룹', (await page.getByRole('dialog').getByText('특허+벤처').count()) >= 1)
 await page.keyboard.press('Escape')
 
 // 20) 모바일 390 — 새 화면들 가로 넘침 0 · JS 오류 0

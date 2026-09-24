@@ -4762,7 +4762,7 @@ function CompanyEditModal(props){
   var stAdv=useState(false);
   var stBizTypeCustom=useState(INDUSTRY_OPTIONS.indexOf(c.bizType||"")>=0?false:(c.bizType?true:false));
   var st={
-    osId:useState(c.osId||props.presetOsId||""), // [D-93] 고객 운영 업체 id · [D-94] 업체에서 열었으면 골라 둔다
+    osId:useState(c.osId||props.presetOsId||""), // [D-93] 고객 관리 업체 id · [D-94] 업체에서 열었으면 골라 둔다
     name:useState(c.name||""),
     bizNo:useState(c.bizNo||""),
     ceoName:useState(c.ceoName||""),
@@ -4813,7 +4813,7 @@ function CompanyEditModal(props){
   }
   useEffect(function(){ if(isNew&&props.presetOsId)pickOs(props.presetOsId); },[]); // [D-94] 골라 둔 업체의 기록으로 칸 채우기
   function save(){
-    if(isNew&&!st.osId[0]){toast("고객 운영 업체를 고르세요","warn");return;}
+    if(isNew&&!st.osId[0]){toast("고객 관리 업체를 고르세요","warn");return;}
     if(!st.name[0].trim()){toast("업체명을 입력하세요","warn");return;}
     if(!isValidEmail(st.email[0])){toast("이메일 형식을 확인하세요","warn");return;}
     if(!isValidEmail(st.managerEmail[0])){toast("담당자 이메일 형식을 확인하세요","warn");return;}
@@ -4835,12 +4835,12 @@ function CompanyEditModal(props){
       <div style={{display:"grid",gap:12}}>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
           <div><Label>업체명 *</Label>{isNew?(
-            <select data-testid="emp-client-pick" aria-label="고객 운영 업체" style={inp} value={st.osId[0]} onChange={function(e){pickOs(e.target.value);}}>
-              <option value="">고객 운영 업체 고르기…</option>
+            <select data-testid="emp-client-pick" aria-label="고객 관리 업체" style={inp} value={st.osId[0]} onChange={function(e){pickOs(e.target.value);}}>
+              <option value="">고객 관리 업체 고르기…</option>
               {(props.osClients||[]).map(function(oc){return <option key={oc.id} value={oc.id} disabled={!!oc.taken}>{oc.name}{oc.taken?" (등록됨)":""}</option>;})}
             </select>
-          ):(<input style={Object.assign({},inp,{background:"#F8FAFC",color:"#475569"})} value={st.name[0]} readOnly title="업체 이름은 고객 운영에서 고칩니다"/>)}
-          {isNew&&<div style={{fontSize:11,color:"#94A3B8",marginTop:4}}>업체는 고객 운영에만 있습니다. 여기서는 고용지원금으로 관리할 업체를 고릅니다.</div>}</div>
+          ):(<input style={Object.assign({},inp,{background:"#F8FAFC",color:"#475569"})} value={st.name[0]} readOnly title="업체 이름은 고객 관리에서 고칩니다"/>)}
+          {isNew&&<div style={{fontSize:11,color:"#94A3B8",marginTop:4}}>업체는 고객 관리에만 있습니다. 여기서는 고용지원금으로 관리할 업체를 고릅니다.</div>}</div>
           <div><Label>사업자등록번호</Label><input style={inp} value={st.bizNo[0]} onChange={function(e){st.bizNo[1](fmtBizNo(e.target.value));}} placeholder="000-00-00000" inputMode="numeric"/></div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
@@ -7166,7 +7166,7 @@ export default function SubsidyApp(props){
             <div data-testid="emp-empty" style={{background:"#F8FAFC",border:"2px dashed var(--color-brand-200)",borderRadius:"var(--radius-panel)",padding:"36px 28px",marginBottom:32,textAlign:"center"}}>
               <div style={{fontSize:44,marginBottom:12}}>🏢</div>
               <h3 style={{margin:"0 0 10px",fontSize:22,fontWeight:800,color:"#0F172A"}}>고용지원금으로 관리할 업체를 고르세요</h3>
-              <p style={{margin:"0 0 22px",fontSize:15,color:"#475569",lineHeight:1.8}}>업체는 고객 운영에만 있습니다. 여기서는 그 가운데 고용지원금을 진행할 업체를 고릅니다.<br/>고른 업체에 직원을 넣으면 회차·서류·수수료·보고서가 원본 그대로 이어집니다.</p>
+              <p style={{margin:"0 0 22px",fontSize:15,color:"#475569",lineHeight:1.8}}>업체는 고객 관리에만 있습니다. 여기서는 그 가운데 고용지원금을 진행할 업체를 고릅니다.<br/>고른 업체에 직원을 넣으면 회차·서류·수수료·보고서가 원본 그대로 이어집니다.</p>
               <button onClick={function(){if(!requirePlan())return;stAddComp[1](true);}} style={{background:"var(--color-brand-600)",color:"#fff",border:"none",borderRadius:12,padding:"13px 32px",fontSize:16,fontWeight:700,cursor:"pointer",fontFamily:FF,boxShadow:"0 2px 8px color-mix(in srgb, var(--color-brand-600) 20%, transparent)"}}>+ 업체 고르기</button>
             </div>
           )}

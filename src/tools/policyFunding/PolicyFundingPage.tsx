@@ -167,7 +167,7 @@ function DiagnosisScreen() {
           summary={buildSummary(input, result)}
           data={{ input, agencies: result.agencies, tracks: result.specialTracks, documents: result.documents }}
         />
-        <span className="text-sm text-slate-500">진단 결과를 고객 운영 업체 기록(달력·오늘 포함)에 붙입니다.</span>
+        <span className="text-sm text-slate-500">진단 결과를 고객 관리 업체 기록(달력·오늘 포함)에 붙입니다.</span>
       </div>
     ),
     [],

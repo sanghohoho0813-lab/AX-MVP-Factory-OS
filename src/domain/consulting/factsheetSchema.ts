@@ -175,7 +175,7 @@ export function seedFactsFromClient(sheet: Factsheet, client: ClientOpsRecord, a
     if (factFilled(out[f.key])) continue
     const value = (pick[f.fromClient] ?? '').trim()
     if (value === '') continue
-    out[f.key] = { value, status: 'unverified', source: '고객 운영 기록', asOfDate: at.slice(0, 10), note: '', updatedAt: at }
+    out[f.key] = { value, status: 'unverified', source: '고객 관리 기록', asOfDate: at.slice(0, 10), note: '', updatedAt: at }
   }
   return out
 }

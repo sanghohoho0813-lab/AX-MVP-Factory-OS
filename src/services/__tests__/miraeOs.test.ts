@@ -102,19 +102,23 @@ check('modules: AX STUDIO 는 접을 수 있고 기본 접힘', MODULE_GROUPS.fi
 /* 메뉴 재분류 — 자주 쓰는 것이 위, 가끔 쓰는 것이 아래 (D-86) */
 {
   const order = MODULE_GROUPS.map((g) => g.key)
-  check('메뉴: 순서는 오늘 → 고객 → 영업 → 도구함 → 가끔 → STUDIO → 이 시스템 → 설정 (D-103 영업 신설)',
-    order.join() === 'today,clients,sales,tools,occasional,studio,about,settings', order.join())
+  check('메뉴: 순서는 오늘 → 고객 → 영업 → 컨설팅 작업실 → STUDIO → 이 시스템 → 설정 (D-104 가끔 쓰는 것 없앰)',
+    order.join() === 'today,clients,sales,tools,studio,about,settings', order.join())
+  check('메뉴: 이름 — 고객 관리 · 잠재고객 상담신청 · 컨설팅 작업실(구 도구함) · 특허+벤처 (D-104)',
+    MODULES.find((m) => m.key === 'client-ops')?.label === '고객 관리' && MODULES.find((m) => m.key === 'inbox')?.label === '잠재고객 상담신청' &&
+    MODULE_GROUPS.find((g) => g.key === 'tools')?.title === '컨설팅 작업실' && MODULES.find((m) => m.key === 'consulting-studio')?.label === '특허+벤처')
+  check('메뉴: 숫자 — 고객 관리(고객사 수) · 상담신청 · 1차 미팅',
+    MODULES.find((m) => m.key === 'client-ops')?.badge === 'clients' && MODULES.find((m) => m.key === 'inbox')?.badge === 'requests' && MODULES.find((m) => m.key === 'first-meeting')?.badge === 'first-meetings')
   const inGroup = (g: string) => MODULES.filter((m) => m.group === g).map((m) => m.key)
   check('메뉴: 오늘과 일정이 한 묶음', inGroup('today').join() === 'today,calendar')
-  check('메뉴: 가끔 쓰는 것에는 작업실 · 자금만 (기록 셋은 일정 안으로, D-103)',
-    inGroup('occasional').join() === 'consulting-studio,funding', inGroup('occasional').join())
+  check('메뉴: 특허+벤처 · 자금·지원사업이 컨설팅 작업실 안, 도입 검토중 · 작업실 전체보다 위 (D-104)',
+    inGroup('tools').slice(-4).join() === 'consulting-studio,funding,tools-review,tools' && inGroup('occasional').length === 0, inGroup('tools').join())
   check('메뉴: 영업 묶음 = 영업자 정산 · 1차 미팅 체크리스트(준비 중)',
     inGroup('sales').join() === 'agents,first-meeting' && MODULES.find((m) => m.key === 'first-meeting')?.status === 'soon', inGroup('sales').join())
   check('메뉴: 고객 묶음에서 영업자 정산이 빠졌다', !inGroup('clients').includes('agents'))
   check('메뉴: 처음 사용 가이드가 이 시스템 맨 위', inGroup('about')[0] === 'guide' && MODULES.find((m) => m.key === 'guide')?.path === '/getting-started')
   check('메뉴: 향후 확장은 눌러도 이동하지 않고 펼쳐진다', MODULES.find((m) => m.key === 'roadmap')?.expand === 'future-items')
-  check('메뉴: 가끔 쓰는 것은 접혀 있다', MODULE_GROUPS.find((g) => g.key === 'occasional')?.defaultCollapsed === true)
-  check('메뉴: 도구함은 영업 다음, 가끔 쓰는 것보다 위', order.indexOf('tools') === order.indexOf('sales') + 1 && order.indexOf('sales') === order.indexOf('clients') + 1 && order.indexOf('tools') < order.indexOf('occasional'))
+  check('메뉴: 컨설팅 작업실(구 도구함)은 영업 다음', order.indexOf('tools') === order.indexOf('sales') + 1 && order.indexOf('sales') === order.indexOf('clients') + 1)
   check('메뉴: 도구함에 세금 계산기', inGroup('tools').includes('tool-tax'))
   // 도구를 목록에만 더하고 사이드바에 거는 것을 빠뜨리는 일이 없어야 한다 (D-86)
   check('메뉴: 쓸 수 있는 도구는 전부 사이드바 도구함에 걸린다',

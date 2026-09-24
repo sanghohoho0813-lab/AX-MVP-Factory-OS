@@ -141,7 +141,7 @@ function CretopScreen() {
           data={{ companyInfo: ui.companyInfo, corePreview: ui.corePreview, oneLiner: one, selected }}
           subject={{ name: ui.companyInfo?.companyName, bizNo: ui.companyInfo?.businessNo }}
         />
-        <span className="t-meta text-slate-500">분석 결과를 고객 운영 업체 기록에 붙입니다.</span>
+        <span className="t-meta text-slate-500">분석 결과를 고객 관리 업체 기록에 붙입니다.</span>
       </div>
     )
   }

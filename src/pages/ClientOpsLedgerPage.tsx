@@ -191,9 +191,9 @@ export function ClientOpsLedgerPage() {
     try {
       if (!navigator.clipboard || !ledger.briefingScript) throw new Error('No briefing')
       await navigator.clipboard.writeText(ledger.briefingScript)
-      showToast('고객 운영 브리핑을 복사했습니다.')
+      showToast('고객 관리 브리핑을 복사했습니다.')
     } catch {
-      showToast('복사할 고객 운영 브리핑이 없습니다.')
+      showToast('복사할 고객 관리 브리핑이 없습니다.')
     }
   }
 
@@ -284,7 +284,7 @@ export function ClientOpsLedgerPage() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        title="고객 운영 레저"
+        title="고객 관리 레저"
         description="고객사별 회신, 정책자금, 사업계획서, 중간점검, 결과자료 상태를 한 화면에서 점검합니다."
         actions={
           <>
@@ -309,7 +309,7 @@ export function ClientOpsLedgerPage() {
       />
 
       <SummaryStrip
-        ariaLabel="고객 운영 레저 요약"
+        ariaLabel="고객 관리 레저 요약"
         items={[
           {
             key: 'clients',
@@ -420,9 +420,9 @@ export function ClientOpsLedgerPage() {
           </ul>
         </>
       ) : (
-        <Panel title="고객 운영 레저">
+        <Panel title="고객 관리 레저">
           <p className="text-[0.9rem] break-keep text-slate-500">
-            조건에 맞는 고객 운영 항목이 없습니다. 검색어 또는 필터를 조정하세요.
+            조건에 맞는 고객 관리 항목이 없습니다. 검색어 또는 필터를 조정하세요.
           </p>
         </Panel>
       )}

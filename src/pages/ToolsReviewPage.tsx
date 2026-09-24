@@ -26,7 +26,7 @@ export function ToolsReviewPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="도입 검토중"
-        description="쓸 수는 있지만 아직 정식으로 들이지 않은 도구입니다. 써 보고 '이건 쓰겠다' 하면 사이드바 도구함으로 올립니다."
+        description="쓸 수는 있지만 아직 정식으로 들이지 않은 도구입니다. 써 보고 '이건 쓰겠다' 하면 사이드바 컨설팅 작업실으로 올립니다."
       />
       {tools.length === 0 ? (
         <Surface className="p-6 text-center">

@@ -137,7 +137,7 @@ export default function DashboardView() {
 
       {filtered.length === 0 ? (
         <p className="mt-10 rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center text-slate-500">
-          {merged.length === 0 ? "아직 상담 중인 업체가 없습니다. 진단 결과 아래 '고객으로 저장하기' 에서 고객 운영 업체를 고르면 여기에 올라옵니다." : "조건에 맞는 고객이 없습니다."}
+          {merged.length === 0 ? "아직 상담 중인 업체가 없습니다. 진단 결과 아래 '고객으로 저장하기' 에서 고객 관리 업체를 고르면 여기에 올라옵니다." : "조건에 맞는 고객이 없습니다."}
         </p>
       ) : (
         <div className="mt-6 space-y-8" data-testid="pf-customer-list">

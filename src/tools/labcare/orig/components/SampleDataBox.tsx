@@ -23,7 +23,7 @@ export default function SampleDataBox({ onChange }: { onChange?: () => void; com
         <div>
           <h2 className="text-lg font-bold text-slate-900">🧪 예전에 넣은 샘플 고객사 {count}개</h2>
           <p className="mt-0.5 text-sm text-slate-600">
-            고객 운영에 없는 가짜 업체입니다. 실제 등록 고객과 구분되며, 샘플만 따로 삭제할 수 있습니다.
+            고객 관리에 없는 가짜 업체입니다. 실제 등록 고객과 구분되며, 샘플만 따로 삭제할 수 있습니다.
           </p>
         </div>
         <button

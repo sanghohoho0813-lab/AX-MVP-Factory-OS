@@ -105,7 +105,7 @@ export function ToolsHubPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="도구함"
+        title="컨설팅 작업실"
         description="계산기·판정기·분석기처럼 혼자 도는 것들이 모이는 곳입니다. 대표가 따로 만들어 둔 OS 들의 핵심이 여기로 들어왔습니다. 전부 규칙 계산이고 외부 호출이 없습니다."
       />
 

@@ -17,7 +17,7 @@ const WILL_DO = [
 ]
 
 const CONNECTS = [
-  { to: '/ops/clients', icon: ListChecks, label: '고객 운영', note: '체크한 업체가 업체 목록에 들어옵니다' },
+  { to: '/ops/clients', icon: ListChecks, label: '고객 관리', note: '체크한 업체가 업체 목록에 들어옵니다' },
   { to: '/ops/agents', icon: Handshake, label: '영업자 정산', note: '누가 데려온 업체인지가 정산으로 이어집니다' },
   { to: '/ops/calendar', icon: CalendarDays, label: '일정', note: '2차 미팅 · 자료 보내기가 달력에 뜹니다' },
 ]

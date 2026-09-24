@@ -55,7 +55,7 @@ export function ClientOperationsWorkspacePage() {
   const projects = projectRepository.getByOrganizationId(organizationId)
   const record = organization ? getClientOperations(organization) : null
 
-  if (!organization || !record) return <NotFoundState title="고객 운영 파일을 찾을 수 없습니다" description="고객사가 없거나 주소가 변경되었습니다." backTo="/ops/clients" backLabel="고객 운영으로 돌아가기" />
+  if (!organization || !record) return <NotFoundState title="고객 관리 파일을 찾을 수 없습니다" description="고객사가 없거나 주소가 변경되었습니다." backTo="/ops/clients" backLabel="고객 관리으로 돌아가기" />
 
   const summary = buildClientOperationsSummary(record)
   const taskProgress = Math.round((summary.taskCompleted / summary.taskTotal) * 100)
@@ -88,10 +88,10 @@ export function ClientOperationsWorkspacePage() {
       <PageHeader
         title={`${organization.name} 운영 파일`}
         description="필수 업무, 수금, 서류, 정책자금 준비 상태를 고객사 단위로 관리합니다."
-        actions={<><Link to="/ops/clients" className="inline-flex h-10 items-center justify-center gap-2 rounded-(--radius-control) border border-slate-300 bg-white px-4 text-[0.95rem] font-medium text-slate-700 hover:bg-slate-50"><ArrowLeft aria-hidden="true" className="size-4" />고객 운영</Link><Link to={`/clients/${organization.id}/edit`} className="inline-flex h-10 items-center justify-center gap-2 rounded-(--radius-control) border border-slate-300 bg-white px-4 text-[0.95rem] font-medium text-slate-700 hover:bg-slate-50"><Pencil aria-hidden="true" className="size-4" />기본정보 수정</Link></>}
+        actions={<><Link to="/ops/clients" className="inline-flex h-10 items-center justify-center gap-2 rounded-(--radius-control) border border-slate-300 bg-white px-4 text-[0.95rem] font-medium text-slate-700 hover:bg-slate-50"><ArrowLeft aria-hidden="true" className="size-4" />고객 관리</Link><Link to={`/clients/${organization.id}/edit`} className="inline-flex h-10 items-center justify-center gap-2 rounded-(--radius-control) border border-slate-300 bg-white px-4 text-[0.95rem] font-medium text-slate-700 hover:bg-slate-50"><Pencil aria-hidden="true" className="size-4" />기본정보 수정</Link></>}
       />
 
-      <SummaryStrip ariaLabel="고객 운영 파일 요약" items={[
+      <SummaryStrip ariaLabel="고객 관리 파일 요약" items={[
         { key: 'tasks', label: '기본 업무 완료', value: summary.taskCompleted, unit: `/${summary.taskTotal}`, icon: ClipboardCheck, tone: taskProgress === 100 ? 'success' : 'info' },
         { key: 'documents', label: '서류 수령', value: summary.documentReceived, unit: `/${summary.documentTotal}`, icon: FolderCheck, tone: docProgress === 100 ? 'success' : 'warning' },
         { key: 'funding', label: '정책자금 증빙', value: summary.fundingDocumentReceived, unit: `/${summary.fundingDocumentTotal}`, icon: Landmark, tone: fundingProgress === 100 ? 'success' : 'accent' },
