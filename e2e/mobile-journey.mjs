@@ -120,7 +120,8 @@ await step('오늘로 돌아온다', async () => {
 await step('더보기 서랍이 열리고 닫힌다', async () => {
   await page.getByRole('button', { name: '더보기' }).click()
   await page.waitForTimeout(500)
-  const opened = await page.getByText('이 기기 · 계정').isVisible()
+  // D-103: 서랍 아래 '이 기기 · 계정' 칸은 없어지고 이름 한 줄(김상호 대표 + 고객 플랫폼 아이콘)이 섰다
+  const opened = await page.getByTestId('sidebar-account').last().isVisible()
   await page.getByRole('button', { name: '메뉴 닫기' }).click()
   await page.waitForTimeout(400)
   return opened
