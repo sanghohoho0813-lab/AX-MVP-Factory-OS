@@ -11,7 +11,7 @@ import { DEFAULT_INPUT, SAMPLE_INPUT, runDiagnosis } from '../policyFunding/diag
 import { subjectMismatch } from '../shared/toolSubject'
 import { isStaleChunkError, reloadOnceForNewVersion } from '../../lib/staleChunk'
 import { isQuotaError } from '../../storage/storageFull'
-import { brandSync, retint } from '../shared/brandHex'
+import { brandSync, retint, themeHtml } from '../shared/brandHex'
 import { loadStartupTaxForm, saveStartupTaxForm, startupTaxKey, STARTUP_TAX_STORAGE_KEY } from '../startupTax/lib/formStore'
 import { moduleForPath, moduleMatchLength, screenTitleForPath } from '../../config/moduleRegistry'
 import { changeColor, CRETOP_C, TREND_COMMENT_TONE } from '../cretop/lib/tones'
@@ -761,6 +761,14 @@ await (async () => {
     check('brandSync: 테마를 바꾸면 true', sync() === true)
     check('brandSync: 팔레트·표가 새 테마색', C.blue === '#7A2E4A' && table.진행중[0] === '#7A2E4A' && table.진행중[1] === '#FBF1F4', JSON.stringify([C, table]))
     check('brandSync: 한 번 고친 뒤 다시 부르면 그대로', sync() === false)
+
+    // D-99: 새 창·내려받는 보고서 HTML — 만드는 순간의 테마색 (지금 테마: 버건디 600 #7A2E4A · 50 #FBF1F4)
+    const html = '<h1 style="border-bottom:3px solid #2563EB">x</h1><div style="background:#eff6ff;color:#059669;box-shadow:0 0 0 3px rgba(37,99,235,0.2)">y</div>'
+    const themed = themeHtml(html)
+    check('themeHtml: 원본 파랑 #2563EB → 지금 테마 600', themed.includes('#7A2E4A') && !/#2563eb/i.test(themed), themed)
+    check('themeHtml: 옅은 파랑(소문자여도) → 테마 50', themed.includes('#FBF1F4') && !/#eff6ff/i.test(themed), themed)
+    check('themeHtml: rgba 파랑 → 테마색 rgb', themed.includes('rgba(122,46,74,0.2)'), themed)
+    check('themeHtml: 뜻 있는 색(초록 수수료)은 그대로', themed.includes('#059669'))
   } finally {
     g.document = had.document
     g.getComputedStyle = had.gcs

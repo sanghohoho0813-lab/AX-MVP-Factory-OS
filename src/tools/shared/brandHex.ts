@@ -72,3 +72,39 @@ export function useThemeRerender(): void {
     return () => mo.disconnect()
   }, [])
 }
+
+/**
+ * 새 창·내려받는 HTML 보고서의 원본 파랑을 **만드는 순간의** 테마색으로 (D-99).
+ * 새 창에는 OS 의 색 변수가 없어서 var() 를 쓸 수 없다 — 그래서 글자로 된 16진수·rgba 를 테마 16진수로 바꿔 넣는다.
+ * 뜻이 있는 색(초록 수수료·빨강 경고·보라 등)은 목록에 없으니 그대로 남는다.
+ */
+const ORIGINAL_BLUES: ReadonlyArray<readonly [string, BrandStep]> = [
+  ['#EFF6FF', '50'], ['#DBEAFE', '100'], ['#BFDBFE', '200'], ['#93C5FD', '200'],
+  ['#60A5FA', '500'], ['#3B82F6', '500'], ['#2563EB', '600'],
+  ['#1D4ED8', '700'], ['#1E40AF', '700'], ['#1E3A8A', '700'],
+]
+const ORIGINAL_BLUE_RGB: ReadonlyArray<readonly [string, BrandStep]> = [['37,99,235', '600'], ['59,130,246', '500']]
+
+function hexToRgb(hex: string): string {
+  const n = parseInt(hex.slice(1), 16)
+  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`
+}
+
+export function themeHtml(html: string): string {
+  const map = new Map<string, string>()
+  for (const [blue, step] of ORIGINAL_BLUES) {
+    const now = brandHex(step, blue)
+    if (now.toLowerCase() !== blue.toLowerCase()) map.set(blue, now)
+  }
+  let out = html
+  if (map.size) {
+    const lower = new Map([...map].map(([k, v]) => [k.toLowerCase(), v]))
+    out = out.replace(new RegExp([...lower.keys()].join('|'), 'gi'), (m) => lower.get(m.toLowerCase()) ?? m)
+  }
+  for (const [rgb, step] of ORIGINAL_BLUE_RGB) {
+    const now = brandHex(step, '')
+    if (!now) continue
+    out = out.replace(new RegExp(`rgba\\(\\s*${rgb.split(',').join('\\s*,\\s*')}\\s*,`, 'g'), `rgba(${hexToRgb(now)},`)
+  }
+  return out
+}

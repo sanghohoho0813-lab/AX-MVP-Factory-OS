@@ -211,6 +211,20 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('직원 추가: 목록에 뜬다', detailText.includes('김청년'), detailText.slice(0, 160))
   check('직원 추가: 청년도약 회차표가 붙어 예상 잔여액 720만 원', detailText.includes('720만'), detailText.slice(0, 300))
 
+  // D-99: 내려받는 고객 보고서(HTML)도 지금 테마색 — 새 창·파일에는 OS 색 변수가 없어 만드는 순간 16진수로 넣는다
+  {
+    const brand600 = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--color-brand-600').trim().toLowerCase())
+    await empApp.getByRole('button', { name: /고객 보고서/ }).first().click()
+    await page.waitForTimeout(400)
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: /HTML 저장/ }).click()])
+    const { readFile } = await import('node:fs/promises')
+    const html = (await readFile(await dl.path(), 'utf8')).toLowerCase()
+    check('고객 보고서 HTML: 지금 테마 강조색이 들어 있다', brand600.startsWith('#') && html.includes(brand600), brand600)
+    check('고객 보고서 HTML: 원본 파랑(#2563eb)이 남지 않았다', !html.includes('#2563eb'), String((html.match(/#2563eb/g) || []).length))
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(300)
+  }
+
   // 진행 보드 — 같은 사람이 준비중 칸에
   await page.goto(BASE + '/tools/employment/board', { waitUntil: 'networkidle' })
   await page.waitForTimeout(900)

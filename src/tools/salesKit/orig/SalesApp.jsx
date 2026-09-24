@@ -5384,10 +5384,11 @@ export default function App({ tab: tabProp = "briefing", onTab, focus }) {
       }
       /* [D-98] 휴대폰 폭 칸에서: ‘고르기 칸 | 단추들’ 두 칸 줄은 위아래로(고르기 칸이 화살표만 남게 찌그러졌다),
          ‘제목 | 단추’ 줄은 단추가 글자 한두 자씩 세 줄로 꺾이지 않게 아랫줄로 내린다 */
+      /* [D-99] 넓은 화면에서도 ‘제목 | 단추’ 줄의 단추가 ‘등/록’ 처럼 꺾였다 — 단추는 줄지 않고 한 줄, 대신 설명 글이 줄어든다 */
+      .appRoot [style*="justify-content: space-between"] > button{flex-shrink:0;white-space:nowrap}
       @container sales (max-width:560px){
         .appRoot [style*="grid-template-columns: 1fr auto"]{grid-template-columns:1fr !important}
         .appRoot [style*="justify-content: space-between"]:has(> button){flex-wrap:wrap}
-        .appRoot [style*="justify-content: space-between"] > button{flex-shrink:0}
       }
       /* [D-96] 목차가 위 한 줄(☰ 영업 도구 모음 · 화면 이름)로 접히는 폭(1280px 아래)에서는 그 줄이 화면 이름을 이미 보여 준다 — 같은 제목을 또 크게 세우지 않는다 */
       @media (max-width:1279px){ .pcHeader{display:none !important} }
