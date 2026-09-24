@@ -1,3 +1,5 @@
+import { getDataModeConfig } from '../../data/dataMode'
+import { customerPrivacyText } from '../../services/customerPrivacyText'
 import { Clock, FileText, ListChecks, ShieldCheck } from 'lucide-react'
 import type { RespondentProfile } from '../../types/surveyRuntime'
 import type { PublicSurveyView } from '../../services/surveyRuntimeService'
@@ -191,11 +193,14 @@ export function SurveyStartScreen({
           개인정보 수집 안내
         </h2>
         <p className="mt-2 text-[13px] break-keep whitespace-pre-wrap text-slate-600">
-          {view.privacyNotice}
+          {customerPrivacyText(view.privacyNotice)}
         </p>
-        <p className="mt-2 text-[0.875rem] break-keep text-slate-400">
-          본 문구는 내부 테스트용 예시이며, 실제 운영 전 법적 검토가 필요합니다.
-        </p>
+        {/* D-101: 우리끼리 하는 말 — 로컬 시험 모드에서만. 클라우드(실제 고객)에는 보이지 않는다 */}
+        {getDataModeConfig().mode !== 'supabase' && (
+          <p className="mt-2 text-[0.875rem] break-keep text-slate-400">
+            본 문구는 내부 테스트용 예시이며, 실제 운영 전 법적 검토가 필요합니다.
+          </p>
+        )}
         {view.consentRequired && (
           <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-(--radius-card) border border-slate-200 px-4 py-3">
             <input

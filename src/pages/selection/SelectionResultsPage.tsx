@@ -220,7 +220,7 @@ export function SelectionResultsPage() {
               primaryLabel="만들 업무 선택으로 이동"
               onPrimary={() => navigate('/selection')}
               sampleLabel="샘플 결과 보기"
-              onSample={() => demo.start()}
+              onSample={demo.available ? () => demo.start() : undefined}
             />
           )
         ) : (

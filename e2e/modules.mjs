@@ -277,6 +277,50 @@ for (const [w, h, mob] of [[1440, 900, false], [390, 844, true]]) {
   await ctx.close()
 }
 
+/* ---- 시연 데이터가 없으면 '샘플 체험' 단추를 세우지 않는다 (D-101) — 전에는 눌러도 '찾을 수 없습니다' 로 끝났다 ---- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  for (const path of ['/settings', '/getting-started']) {
+    await page.goto(BASE + path, { waitUntil: 'networkidle' })
+    const n = await page.getByRole('button', { name: /샘플로 전체 흐름|샘플 전체 흐름|샘플 프로젝트로 체험/ }).count()
+    check(`${path}: 시연 데이터가 없으면 '샘플 체험' 단추가 없다`, n === 0, String(n))
+  }
+  await ctx.close()
+}
+
+/* ---- 고객 설문(휴대폰) — 반복 표가 화면을 옆으로 밀지 않고, 예전 기본 안내문의 '법적 검토' 문장이 고객에게 안 보인다 (D-101) ---- */
+{
+  const now = new Date().toISOString()
+  const opts = ['예', '아니오'].map((l, i) => ({ id: `o${i}`, label: l, value: `v${i}`, score: i, riskSignal: 'none', orderIndex: i }))
+  const base = { helpText: '', example: '', category: 'workflow', scope: 'common', scoringDomain: 'none', expertRiskGrade: 'green', condition: null, sourceScope: 'common' }
+  const dist = {
+    id: 'dist-qa', projectId: 'proj-qa', organizationId: 'org-qa', blueprintId: 'bp-qa', respondentRole: 'worker', surveyTitle: '고객 설문 시험',
+    blueprintSnapshot: [{ id: 's1', title: '거래처', description: '', orderIndex: 0, placements: [
+      { ...base, id: 'p1', questionId: 'q1', questionCode: 'QA-1', questionText: '거래처가 있나요?', type: 'yes_no', options: opts, repeatTableColumns: [], required: true, orderIndex: 0 },
+      { ...base, id: 'p2', questionId: 'q2', questionCode: 'QA-2', questionText: '주요 거래처를 적어 주세요.', type: 'repeat_table', options: [], required: false, orderIndex: 1,
+        repeatTableColumns: [{ id: 'c1', label: '거래처명', fieldType: 'short_text', required: true, unit: '', orderIndex: 0 }, { id: 'c2', label: '월 주문 건수', fieldType: 'number', required: false, unit: '건', orderIndex: 1 }, { id: 'c3', label: '비고', fieldType: 'short_text', required: false, unit: '', orderIndex: 2 }] },
+    ] }],
+    recipientName: '홍길동', recipientPosition: '', recipientEmail: '', recipientPhone: '', accessToken: 'qa-survey-token-d101', status: 'issued',
+    introMessage: '시험', consentRequired: true, expiresAt: null, issuedAt: now, firstOpenedAt: null, lastOpenedAt: null, submittedAt: null, revokedAt: null, createdAt: now, updatedAt: now,
+    privacyNotice: '본 설문은 담당 컨설턴트가 귀사의 업무 진단을 위해 응답 내용을 내부적으로만 활용합니다. 수집 항목은 응답자 성명·직책·연락처 및 설문 응답이며, 실제 운영 전 개인정보 처리 문구는 법적 검토가 필요합니다.',
+  }
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', isMobile: true, hasTouch: true })
+  const page = await ctx.newPage()
+  await page.goto(BASE + '/settings', { waitUntil: 'networkidle' })
+  await page.evaluate((d) => localStorage.setItem('axmvp.v1.survey_distributions', JSON.stringify([d])), dist)
+  await page.goto(BASE + '/survey/' + dist.accessToken, { waitUntil: 'networkidle' })
+  const privacy = await page.locator('main').innerText()
+  check('고객 설문: 예전 기본 안내문의 \'법적 검토\' 문장이 고객에게 안 보인다', !privacy.includes('처리 문구는 법적 검토가 필요'), privacy.slice(0, 120))
+  await page.locator('input[type=checkbox]').first().check()
+  await page.getByRole('button', { name: '설문 시작' }).click()
+  await page.waitForTimeout(400)
+  const tableShown = (await page.locator('main table').count()) === 1
+  const sw = await page.evaluate(() => document.documentElement.scrollWidth)
+  check('고객 설문: 반복 표가 있는 화면이 휴대폰 폭(390)을 넘지 않는다', tableShown && sw <= 391, `${tableShown} ${sw}`)
+  await ctx.close()
+}
+
 /* ---- 테마를 바꾸면 영업·크레탑이 새로고침 없이 따라간다 (D-98) ----
  * 모듈을 한 번 연 뒤(옛 테마로 팔레트를 읽음) 설정에서 테마를 바꾸고, 새로고침 없이(뒤로 가기) 돌아와
  * 화면에 옛 테마 강조색이 남았는지 센다. D-96·97 에서는 새로고침해야 바뀌었다 */

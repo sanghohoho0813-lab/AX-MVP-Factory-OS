@@ -289,7 +289,9 @@ export function OnboardingModal({ open, initialChapterId, onClose }: OnboardingM
                 />
 
                 {/* 두 갈래 경로 (§5) */}
-                <section aria-label="시작 방법 선택" className="grid gap-3 sm:grid-cols-2">
+                <section aria-label="시작 방법 선택" className={`grid gap-3 ${demoTour.available ? 'sm:grid-cols-2' : ''}`}>
+                  {/* D-101: 시연 데이터가 없으면(실운영 전환 뒤 기본) 이 칸을 세우지 않는다 — 눌러도 '찾을 수 없습니다' 로 끝났다 */}
+                  {demoTour.available && (
                   <div className="flex flex-col rounded-(--radius-panel) border border-slate-200 p-5">
                     <h3 className="text-[1.15rem] font-bold break-keep text-slate-900">
                       10분 만에 전체 흐름 둘러보기
@@ -303,6 +305,7 @@ export function OnboardingModal({ open, initialChapterId, onClose }: OnboardingM
                       </Button>
                     </div>
                   </div>
+                  )}
                   <div className="flex flex-col rounded-(--radius-panel) border border-slate-200 p-5">
                     <h3 className="text-[1.15rem] font-bold break-keep text-slate-900">
                       내 고객 프로젝트 시작하기
@@ -336,9 +339,11 @@ export function OnboardingModal({ open, initialChapterId, onClose }: OnboardingM
             {lightVariant ? '오늘의 작업 보기' : '오늘 안내 시작하기'}
           </Button>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="ghost" size="md" className="text-[1rem]" onClick={startSample}>
-              샘플로 전체 흐름 체험하기
-            </Button>
+            {demoTour.available && (
+              <Button variant="ghost" size="md" className="text-[1rem]" onClick={startSample}>
+                샘플로 전체 흐름 체험하기
+              </Button>
+            )}
             <button
               type="button"
               onClick={snoozeToday}

@@ -12,6 +12,8 @@ import { subjectMismatch } from '../shared/toolSubject'
 import { isStaleChunkError, reloadOnceForNewVersion } from '../../lib/staleChunk'
 import { isQuotaError } from '../../storage/storageFull'
 import { brandSync, retint, themeHtml } from '../shared/brandHex'
+import { cleanLabelText, selectCaptionText, symbolButtonName } from '../../lib/a11yAutoLabel'
+import { customerPrivacyText } from '../../services/customerPrivacyText'
 import { loadStartupTaxForm, saveStartupTaxForm, startupTaxKey, STARTUP_TAX_STORAGE_KEY } from '../startupTax/lib/formStore'
 import { moduleForPath, moduleMatchLength, screenTitleForPath } from '../../config/moduleRegistry'
 import { changeColor, CRETOP_C, TREND_COMMENT_TONE } from '../cretop/lib/tones'
@@ -773,6 +775,23 @@ await (async () => {
     g.document = had.document
     g.getComputedStyle = had.gcs
   }
+}
+
+/* ---- D-101: 원본 모듈 읽는 이름 ---- */
+check('기호 단추 이름: 🔍 → 검색 · + → 추가 · ⋮ → 더 보기 · ✕ → 닫기', symbolButtonName('🔍') === '검색' && symbolButtonName(' + ') === '추가' && symbolButtonName('⋮') === '더 보기' && symbolButtonName('✕') === '닫기')
+check('기호 단추 이름: 글자가 있으면 손대지 않는다', symbolButtonName('+ 업체 추가') === null && symbolButtonName('🔍 검색') === null && symbolButtonName('Aa') === null)
+check('기호 단추 이름: 모르는 기호는 지어내지 않는다', symbolButtonName('🎁') === null)
+check('칸 이름: 뒤 콜론·별표를 떼고 짧게', cleanLabelText('업체명 *') === '업체명' && cleanLabelText(' 사업자등록번호: ') === '사업자등록번호')
+check('고르기 칸 이름: 첫 항목이 제목 — 콜론 앞 · 그림 글자 뺌', selectCaptionText('필터: 전체') === '필터' && selectCaptionText('🗂️ 전체 업체 기준') === '전체 업체 기준', `${selectCaptionText('필터: 전체')} ${selectCaptionText('🗂️ 전체 업체 기준')}`)
+check('칸 이름: 설명문처럼 긴 글은 이름으로 쓰지 않는다', cleanLabelText('가'.repeat(41)) === null && cleanLabelText('123') === null && cleanLabelText('') === null)
+
+/* ---- D-101: 고객 설문 개인정보 안내문에서 우리끼리 할 말을 뺀다 ---- */
+{
+  const old = '본 설문은 담당 컨설턴트가 귀사의 업무 진단을 위해 응답 내용을 내부적으로만 활용합니다. 수집 항목은 응답자 성명·직책·연락처 및 설문 응답이며, 실제 운영 전 개인정보 처리 문구는 법적 검토가 필요합니다.'
+  const shown = customerPrivacyText(old)
+  check('고객 안내문: 예전 기본 문구의 법적 검토 문장이 빠진다', !shown.includes('법적 검토'), shown)
+  check('고객 안내문: 남은 문장이 자연스럽게 끝난다', shown.endsWith('설문 응답입니다.'), shown)
+  check('고객 안내문: 대표가 직접 쓴 문구는 그대로', customerPrivacyText('응답은 진단에만 씁니다.') === '응답은 진단에만 씁니다.')
 }
 
 console.log(`\ntools: ${passed} passed, ${failed} failed`)

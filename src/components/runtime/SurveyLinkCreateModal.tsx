@@ -20,8 +20,9 @@ import { LocalTestModeBanner } from './LocalTestModeBanner'
 import { SurveyLinkCopyField } from './SurveyLinkCopyField'
 import { useToast } from '../ui/toastContext'
 
+// D-101: 고객이 읽는 문구다 — 예전 기본값 끝의 '실제 운영 전 … 법적 검토가 필요합니다' 는 우리끼리 할 말이라 뺐다(입력칸 아래 안내로 옮김)
 const DEFAULT_PRIVACY =
-  '본 설문은 담당 컨설턴트가 귀사의 업무 진단을 위해 응답 내용을 내부적으로만 활용합니다. 수집 항목은 응답자 성명·직책·연락처 및 설문 응답이며, 실제 운영 전 개인정보 처리 문구는 법적 검토가 필요합니다.'
+  '본 설문은 담당 컨설턴트가 귀사의 업무 진단을 위해 응답 내용을 내부적으로만 활용합니다. 수집 항목은 응답자 성명·직책·연락처 및 설문 응답입니다.'
 const DEFAULT_INTRO =
   '안녕하세요. 귀사의 업무 현황과 개선 가능성을 진단하기 위한 설문입니다. 편하게 아시는 범위에서 응답해 주세요.'
 
@@ -361,6 +362,7 @@ export function SurveyLinkCreateModal({
             <TextAreaField
               id="dist-privacy"
               label="개인정보 안내문"
+              help="고객에게 그대로 보이는 문구입니다. 실제 운영 전 개인정보 처리 문구는 법적 검토를 받아 주세요."
               rows={2}
               value={privacyNotice}
               onChange={(e) => setPrivacyNotice(e.target.value)}

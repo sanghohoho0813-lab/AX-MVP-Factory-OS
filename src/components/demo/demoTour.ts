@@ -18,6 +18,9 @@ export const DEMO_TOUR_STEPS: DemoTourStep[] = [
 
 export interface DemoTourContextValue {
   active: boolean
+  /** D-101: 시연용 고객사·프로젝트가 있는지. v11(실운영 전환)에서 예시 데이터를 지웠으므로 대부분 false —
+   *  false 면 '샘플 체험' 단추를 보이지 않는다(눌러도 '찾을 수 없습니다' 로 끝났다) */
+  available: boolean
   stepIndex: number
   steps: DemoTourStep[]
   /** 시연을 시작한다 (데이터 준비 후 첫 단계로 이동) */

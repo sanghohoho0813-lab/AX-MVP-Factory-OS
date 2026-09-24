@@ -530,6 +530,22 @@ textarea {
   word-break: keep-all;
   overflow-wrap: anywhere;
 }
+/* D-101: fieldset 은 브라우저 기본 min-width 가 '안 내용만큼(min-content)' 이다 — 고객 설문의 반복 표(최소 480px)가
+   옆으로 밀리는 칸 안에 있는데도 fieldset 이 따라 넓어져 휴대폰(390)에서 설문 화면 전체가 523px 로 옆으로 밀렸다 */
+fieldset {
+  min-width: 0;
+}
+/* D-101: 원본 모듈은 입력칸에 outline:none 을 인라인으로 박아 두어 키보드로 옮겨 가도 어디 있는지 안 보였다(고용지원금 검색·연봉 칸 등).
+   키보드 초점(:focus-visible)일 때만 테마색 테두리 — 마우스로 누를 때는 그대로 */
+:is(.pf-orig, .st-orig, .lab-orig, .hr-app, .hr-portal, [data-testid="sales-orig"], .ui-modal, .cretop-mini) :is(input, select, textarea, button, a, [role="button"]):focus-visible {
+  outline: 2px solid var(--color-brand-500) !important;
+  outline-offset: 2px;
+}
+/* D-101: 날짜·월·시각 칸은 키보드 초점이 칸 안의 연·월·일 조각으로 들어가 칸 자체에는 초점 표시가 안 걸린다 — 안에 초점이 있으면 칸 전체에 테두리 */
+input:is([type="date"], [type="month"], [type="time"], [type="datetime-local"]):focus-within {
+  outline: 2px solid var(--color-brand-500) !important;
+  outline-offset: 2px;
+}
 /* 크레탑 원본 분석 앱(D-93) — 하단 탭은 화면 안에 붙는다. 휴대폰에서는 OS 하단 메뉴 위로 */
 @media (max-width: 1023px) {
   /* D-94: OS 하단 메뉴(높이 약 57px) 바로 위에 붙인다 */

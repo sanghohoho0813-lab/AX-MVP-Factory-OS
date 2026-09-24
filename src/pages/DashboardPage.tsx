@@ -119,9 +119,11 @@ export function DashboardPage() {
             <Button variant="primary" onClick={() => setStartOpen(true)}>
               <Plus aria-hidden="true" className="size-5" /> 새 고객 프로젝트 시작
             </Button>
-            <Button variant="secondary" onClick={() => demo.start()}>
-              <Sparkles aria-hidden="true" className="size-5" /> 샘플 프로젝트로 체험
-            </Button>
+            {demo.available && (
+              <Button variant="secondary" onClick={() => demo.start()}>
+                <Sparkles aria-hidden="true" className="size-5" /> 샘플 프로젝트로 체험
+              </Button>
+            )}
           </div>
         </section>
       )}
@@ -218,18 +220,22 @@ export function DashboardPage() {
             <MetricStrip metrics={metrics} />
             <PortfolioHealth projects={portfolioItems} />
             <div className="flex flex-wrap items-center gap-3">
-              <Button variant="secondary" onClick={() => demo.start()}>
-                <Sparkles aria-hidden="true" className="size-4" /> 샘플 데이터 완성·전체 흐름 체험
-              </Button>
+              {demo.available && (
+                <Button variant="secondary" onClick={() => demo.start()}>
+                  <Sparkles aria-hidden="true" className="size-4" /> 샘플 데이터 완성·전체 흐름 체험
+                </Button>
+              )}
               {demoExists && (
                 <button type="button" onClick={() => setResetOpen(true)} className="text-[0.9rem] font-medium text-slate-400 underline-offset-2 hover:text-slate-600 hover:underline">
                   샘플 데이터 초기화
                 </button>
               )}
             </div>
-            <p className="text-[0.9rem] break-keep text-slate-400">
-              샘플 프로젝트는 모든 단계의 결과가 준비되어 있어 전체 기능을 둘러볼 수 있습니다. 실제 진단·선정 엔진을 호출해 채우며, 여러 번 눌러도 중복되지 않고 직접 등록한 데이터는 보존됩니다.
-            </p>
+            {demo.available && (
+              <p className="text-[0.9rem] break-keep text-slate-400">
+                샘플 프로젝트는 모든 단계의 결과가 준비되어 있어 전체 기능을 둘러볼 수 있습니다. 실제 진단·선정 엔진을 호출해 채우며, 여러 번 눌러도 중복되지 않고 직접 등록한 데이터는 보존됩니다.
+              </p>
+            )}
           </div>
         )}
       </section>
@@ -239,7 +245,9 @@ export function DashboardPage() {
         <div className="flex flex-col gap-2.5">
           <ChoiceButton title="기존 고객사로 프로젝트 만들기" desc="이미 등록된 고객사에 새 프로젝트를 추가합니다." onClick={() => { setStartOpen(false); navigate('/projects/new') }} />
           <ChoiceButton title="새 고객사부터 등록하기" desc="고객사를 먼저 등록한 뒤 프로젝트를 만듭니다." onClick={() => { setStartOpen(false); navigate('/clients/new') }} />
-          <ChoiceButton title="샘플 프로젝트로 체험하기" desc="대한정밀 샘플로 전체 흐름을 먼저 둘러봅니다." onClick={() => { setStartOpen(false); demo.start() }} />
+          {demo.available && (
+            <ChoiceButton title="샘플 프로젝트로 체험하기" desc="대한정밀 샘플로 전체 흐름을 먼저 둘러봅니다." onClick={() => { setStartOpen(false); demo.start() }} />
+          )}
         </div>
       </Modal>
 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Sparkles, X } from 'lucide-react'
 import {
   GuidedDemoError,
+  getGuidedDemoStatus,
   prepareGuidedDemo,
 } from '../../services/guidedDemo/guidedDemoService'
 import { useToast } from '../ui/toastContext'
@@ -12,6 +13,13 @@ export function DemoTourProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
   const { showToast } = useToast()
   const [active, setActive] = useState(false)
+  const [available] = useState(() => {
+    try {
+      return getGuidedDemoStatus().baseReady
+    } catch {
+      return false
+    }
+  })
   const [stepIndex, setStepIndex] = useState(0)
 
   const start = useCallback(() => {
@@ -49,8 +57,8 @@ export function DemoTourProvider({ children }: { children: ReactNode }) {
   }, [navigate, showToast])
 
   const value = useMemo(
-    () => ({ active, stepIndex, steps: DEMO_TOUR_STEPS, start, next, prev, goTo, exit }),
-    [active, stepIndex, start, next, prev, goTo, exit],
+    () => ({ active, available, stepIndex, steps: DEMO_TOUR_STEPS, start, next, prev, goTo, exit }),
+    [active, available, stepIndex, start, next, prev, goTo, exit],
   )
 
   return (

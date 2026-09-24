@@ -308,7 +308,7 @@ export function AssessmentsListPage() {
               primaryLabel="응답 현황 확인"
               onPrimary={() => navigate('/diagnosis/surveys')}
               sampleLabel="샘플 진단 결과 보기"
-              onSample={() => demo.start()}
+              onSample={demo.available ? () => demo.start() : undefined}
             />
           )
         ) : (

@@ -685,8 +685,8 @@ export function FloorPlanner({ company }: { company: string }) {
                         {isText ? "✏️ 직접 텍스트 입력" : t}
                       </span>
                       <div className="flex items-center gap-1">
-                        <button type="button" onClick={() => removeLast(t)} className="h-8 w-8 rounded-lg bg-slate-100 text-lg font-bold text-slate-600 hover:bg-slate-200">−</button>
-                        <button type="button" onClick={() => addItem(t)} className={`h-8 w-8 rounded-lg text-lg font-bold text-white ${isText ? "bg-violet-600 hover:bg-violet-700" : "bg-navy-700 hover:bg-navy-800"}`}>+</button>
+                        <button type="button" onClick={() => removeLast(t)} aria-label={`${isText ? "텍스트" : t} 하나 빼기`} className="h-8 w-8 rounded-lg bg-slate-100 text-lg font-bold text-slate-600 hover:bg-slate-200">−</button>
+                        <button type="button" onClick={() => addItem(t)} aria-label={`${isText ? "텍스트" : t} 하나 더하기`} className={`h-8 w-8 rounded-lg text-lg font-bold text-white ${isText ? "bg-violet-600 hover:bg-violet-700" : "bg-navy-700 hover:bg-navy-800"}`}>+</button>
                       </div>
                     </div>
                     <p className="mt-1 text-xs text-slate-400">{isText ? "원하는 위치에 글자 배치" : `${countOf(t)}개 배치됨`}</p>

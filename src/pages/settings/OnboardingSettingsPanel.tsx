@@ -46,9 +46,11 @@ export function OnboardingSettingsPanel() {
         >
           마지막으로 본 안내 이어보기
         </Button>
-        <Button variant="secondary" size="md" className="text-[1rem]" onClick={() => demoTour.start()}>
-          샘플로 전체 흐름 체험하기
-        </Button>
+        {demoTour.available && (
+          <Button variant="secondary" size="md" className="text-[1rem]" onClick={() => demoTour.start()}>
+            샘플로 전체 흐름 체험하기
+          </Button>
+        )}
         <Button
           variant="secondary"
           size="md"

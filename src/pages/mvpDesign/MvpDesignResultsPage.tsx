@@ -80,7 +80,7 @@ export function MvpDesignResultsPage() {
             primaryLabel="기능·화면 설계로 이동"
             onPrimary={() => navigate('/mvp-design')}
             sampleLabel="샘플 설계 보기"
-            onSample={() => demo.start()}
+            onSample={demo.available ? () => demo.start() : undefined}
           />
         </Panel>
       ) : (

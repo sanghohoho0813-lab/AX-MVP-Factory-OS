@@ -220,12 +220,14 @@ export function GettingStartedPage() {
       {/* A. 빠른 시작 */}
       <SectionCard id="quick" title="A. 빠른 시작" description="처음이라면 여기서 바로 시작하세요.">
         <TodayTaskCard today={today} onGo={(p) => navigate(p)} onCreateProject={() => navigate('/clients/new')} />
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button variant="secondary" size="md" className="text-[1rem]" onClick={() => demoTour.start()}>
-            <Sparkles aria-hidden="true" className="size-4" />
-            샘플로 전체 흐름 체험하기
-          </Button>
-        </div>
+        {demoTour.available && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="secondary" size="md" className="text-[1rem]" onClick={() => demoTour.start()}>
+              <Sparkles aria-hidden="true" className="size-4" />
+              샘플로 전체 흐름 체험하기
+            </Button>
+          </div>
+        )}
       </SectionCard>
 
       {/* B. 핵심 사용 순서 */}

@@ -16,7 +16,7 @@ export function TextQuestion({ question, answer, onAnswer, disabled }: RendererP
           value={value}
           maxLength={LONG_MAX}
           disabled={disabled}
-          placeholder={question.example ? `예: ${question.example}` : undefined}
+          placeholder={question.example ? (/^예[:)]/.test(question.example.trim()) ? question.example : `예: ${question.example}`) : undefined}
           onChange={(e) => onAnswer({ kind: 'text', value: e.target.value })}
           className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-500 disabled:bg-slate-50"
         />
@@ -33,7 +33,7 @@ export function TextQuestion({ question, answer, onAnswer, disabled }: RendererP
         value={value}
         maxLength={SHORT_MAX}
         disabled={disabled}
-        placeholder={question.example ? `예: ${question.example}` : undefined}
+        placeholder={question.example ? (/^예[:)]/.test(question.example.trim()) ? question.example : `예: ${question.example}`) : undefined}
         onChange={(e) => onAnswer({ kind: 'text', value: e.target.value })}
         className={inputClass}
       />
