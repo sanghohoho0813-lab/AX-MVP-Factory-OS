@@ -127,7 +127,7 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
                 onClick={() => toggleCheck(item.value)}
                 className={[
                   // D-99: 휴대폰에서 '등록면허/세' 처럼 꺾이고 네모가 눌렸다 — 좌우 여백을 줄이고 네모는 줄지 않게, 글은 왼쪽 정렬
-                  'flex items-center gap-2.5 rounded-2xl border px-3 py-4 text-left text-lg font-medium transition-colors sm:px-4',
+                  'flex items-center gap-2.5 rounded-2xl border px-3 py-4 text-left text-base font-medium transition-colors sm:px-4 sm:text-lg',
                   active
                     ? 'border-brand bg-brand/5 text-brand'
                     : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300',
