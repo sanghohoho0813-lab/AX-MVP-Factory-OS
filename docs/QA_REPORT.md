@@ -1545,7 +1545,14 @@ npm run qa:shots --wide                   135장, 반응형 문제 없음
 
 ### 41-3. 게이트
 
-GATE_TABLE
+| 게이트 | 결과 |
+| --- | --- |
+| tsc · oxlint · build | 오류 0 (경고 43 — 늘지 않음) |
+| 단위·계약 20묶음 | 전부 녹색 (mirae-os 421 → **433**: 메뉴 재배치 · 이름 규칙 5 · 향후 확장 내용) |
+| qa:shell | 24 → **52 passed** (이름 · 아이콘 · 글자 크기 자리 · 향후 확장 펼침/가운데/끄기 · 영업 · 일정 탭 · 휴대폰 서랍/탭) |
+| qa:mobile | 15 passed (서랍 확인을 '이 기기 · 계정' 글 → 이름 줄로 바꿈) |
+| qa:modules 836 · tools 160 · simple 88 · studio 46 · board 163 · todos 25 · tax 74 | 전부 녹색 |
+| qa:squeeze --all | 짜부라진 글자 0 |
 
 ### 41-4. 확인하지 못한 것
 
