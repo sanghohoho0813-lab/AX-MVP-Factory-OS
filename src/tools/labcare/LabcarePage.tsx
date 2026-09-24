@@ -211,7 +211,8 @@ export function LabcarePage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="t-meta font-bold tracking-wide text-slate-400" data-testid="lab-module-eyebrow">기업부설연구소 OS</p>
+      {/* D-96: 모듈 이름은 왼쪽 목차 머리에 이미 있다 — 화면에는 숨기고 읽기 도구용으로만 둔다(고용지원금과 같게) */}
+      <p className="sr-only" data-testid="lab-module-eyebrow">기업부설연구소 OS</p>
       {section === 'dashboard' ? (
         <>
           <OrigLabcare section="dashboard" />

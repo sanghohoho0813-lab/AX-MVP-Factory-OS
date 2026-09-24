@@ -20,6 +20,11 @@ export function formatClockDate(d: Date): string {
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${DAY[d.getDay()]})`
 }
 
+/** 휴대폰 머리띠용 짧은 날짜 — '9월 24일 (목)' */
+function formatClockDateShort(d: Date): string {
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 (${DAY[d.getDay()]})`
+}
+
 export function formatClockTime(d: Date): string {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
@@ -37,12 +42,10 @@ export function HeaderClock() {
 
   return (
     <>
-      {/* 휴대폰 — 시각만. 날짜까지 넣으면 화면 이름이 밀린다 */}
-      <span
-        aria-label={`지금 ${date} ${time}`}
-        className="shrink-0 text-[0.95rem] font-bold text-slate-700 tabular-nums lg:hidden"
-      >
-        {time}
+      {/* 휴대폰 — D-96: 오늘 날짜도 늘 보이게(대표 요청). 짧은 날짜를 시각 위에 작게 얹어 폭은 그대로 둔다 */}
+      <span aria-label={`지금 ${date} ${time}`} className="flex shrink-0 flex-col items-end leading-tight lg:hidden">
+        <span className="text-[0.72rem] font-semibold whitespace-nowrap text-slate-500">{formatClockDateShort(now)}</span>
+        <span className="text-[0.95rem] font-bold whitespace-nowrap text-slate-700 tabular-nums">{time}</span>
       </span>
       {/* 데스크톱 — 날짜는 작게 위, 시각은 크게 아래 */}
       <span aria-label={`지금 ${date} ${time}`} className="hidden shrink-0 flex-col items-end leading-tight lg:flex">

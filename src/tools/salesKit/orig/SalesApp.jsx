@@ -5,6 +5,7 @@
    · 뺀 것: PIN 앱 잠금 · 샘플 데이터 넣기 · 다른 SaaS 바로가기 · 브라우저 전체 스캔 정리(scrub)
    · 원본의 왼쪽 메뉴는 이 OS 의 모듈 목차가 대신한다(화면 = /tools/sales-kit/<화면>) */
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { brandHex } from "../../shared/brandHex"; // [D-96]
 import { salesLoad, salesSave, salesOsClients, salesOsClientOf, salesResetAll } from "./store";
 import { createPortal } from "react-dom";
 // PDF: 정적 import(동적 import 청크 fetch 실패 방지) — pdf.js 본체는 메인 번들에, 워커는 ?url 정적 에셋으로.
@@ -148,8 +149,9 @@ const C = {
   gold: "#B45309",
   goldL: "#D97706",
   goldD: "#92400E",
-  blue: "#2563EB",
-  sky: "#0284C7",
+  // [D-96] 강조색은 OS 테마를 따른다(원본 #2563EB · #0284C7 · #E8F1FE) — 모든 모듈이 같은 색으로 보이게
+  blue: brandHex("600", "#2563EB"),
+  sky: brandHex("500", "#0284C7"),
   text: "#0F172A",
   textS: "#334155",
   textM: "#64748B",
@@ -163,7 +165,7 @@ const C = {
   greenBg: "#E7F6EF",
   redBg: "#FDECEC",
   warnBg: "#FDF1E1",
-  blueBg: "#E8F1FE",
+  blueBg: brandHex("50", "#E8F1FE"),
   purpleBg: "#F2ECFE",
 };
 
@@ -5363,6 +5365,8 @@ export default function App({ tab: tabProp = "briefing", onTab, focus }) {
   return <div className={"appRoot" + (drawerOpen ? " drawer-open" : "")} data-scale={scaleName} data-testid="sales-orig" style={{ background: C.bg, color: C.text, fontFamily: FF, fontSize: "calc(var(--s) * 18px)", borderRadius: 16, overflow: "hidden" }}>
     <style>{`
       .appRoot *{box-sizing:border-box}
+      /* [D-96] 원본은 제목이 브라우저 기본(굵게)이었다 — 이 OS 의 기본 초기화(굵기 상속)로 얇아진 것을 되돌린다 */
+      .appRoot h1,.appRoot h2,.appRoot h3,.appRoot h4{font-weight:700}
       .appRoot{container:sales / inline-size}
       /* [D-94] 이 OS 에서는 영업 화면이 OS 목차 옆 칸에 선다 — 원본 휴대폰 규칙(칸 나눔 → 한 줄)을 화면 폭이 아니라 칸 폭으로도 건다 */
       @container sales (max-width:860px){
@@ -5370,6 +5374,8 @@ export default function App({ tab: tabProp = "briefing", onTab, focus }) {
         .heroBtns{flex-direction:column !important}
         .heroBtns > *{width:100% !important}
       }
+      /* [D-96] 목차가 위 한 줄(☰ 영업 도구 모음 · 화면 이름)로 접히는 폭(1280px 아래)에서는 그 줄이 화면 이름을 이미 보여 준다 — 같은 제목을 또 크게 세우지 않는다 */
+      @media (max-width:1279px){ .pcHeader{display:none !important} }
       .appRoot ::-webkit-scrollbar{width:11px;height:11px}
       .appRoot ::-webkit-scrollbar-thumb{background:${C.bdrL};border-radius:999px;border:2px solid ${C.bg}}
       .appRoot ::-webkit-scrollbar-thumb:hover{background:#94A3B8}
@@ -5469,7 +5475,7 @@ export default function App({ tab: tabProp = "briefing", onTab, focus }) {
         <header className="pcHeader" style={{ position: "sticky", top: 0, zIndex: 40, background: "rgba(255,255,255,.9)", backdropFilter: "blur(8px)", borderBottom: `1px solid ${C.bdr}`, padding: "14px 28px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
             {/* [D-94] ‘← 뒤로 / 앞으로 →’ 는 뺐다 — OS 목차와 브라우저 뒤로 가기가 같은 일을 해 두 갈래가 되었다 */}
-            <h1 style={{ margin: 0, fontSize: "calc(var(--s,1.3)*30px)" }}>{pageTitle}</h1>
+            <h1 style={{ margin: 0, fontSize: "calc(var(--s,1.3)*24px)", fontWeight: 700, letterSpacing: "-0.02em" }}>{pageTitle}</h1>{/* [D-96] OS 화면 제목과 같은 굵기·크기(원본 30px·얇음) */}
           </div>
         </header>
         <div className="appMain" style={{ padding: "22px 28px", maxWidth: 1720, width: "100%", margin: "0 auto" }}>

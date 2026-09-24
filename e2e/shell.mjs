@@ -90,7 +90,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 
   const clock = page.locator('header [aria-label^="지금 "]:visible').first()
   check('휴대폰 시계: 머리띠에 보인다', (await clock.count()) === 1)
-  check('휴대폰 시계: 시각만 (날짜는 뺀다)', /^\d{2}:\d{2}:\d{2}$/.test(((await clock.innerText()) ?? '').trim()), (await clock.innerText()) ?? '')
+  // D-96: 휴대폰에서도 오늘 날짜가 늘 보인다 (짧게 — '9월 24일 (목)' 위 · 시각 아래)
+  check('휴대폰 시계: 오늘 날짜와 시각이 보인다', /^\d{1,2}월 \d{1,2}일 \([일월화수목금토]\)\s+\d{2}:\d{2}:\d{2}$/.test(((await clock.innerText()) ?? '').trim()), (await clock.innerText()) ?? '')
   const title = (await page.locator('header').innerText()) ?? ''
   check('휴대폰: 화면 이름이 여전히 보인다', title.includes('오늘'), title)
 

@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom"; // [D-94] 하단 탭 = 주�
 import { buildCretopParsedForUi, CORE_LABELS, cretopTrendCommentRich, cretopCashflowGradeInfo, cretopRowTrend, cretopPreviewTone, CRETOP_PREVIEW_TONES } from "../engine/index.js";
 import { extractPdfText } from "./pdf.js";
 import { cretopYearPool, cretopFillYears } from "./years.js"; // [D-94]
+import { brandHex } from "../../shared/brandHex"; // [D-96]
 import { StockValue } from "./StockValue.jsx";
 import { InfoModal, RawTextModal, DetailModal, StakeModal } from "./DetailPopups.jsx";
 import { extractAll, detectBizForm, isCorpOnlyStrategy } from "./extract.js";
@@ -24,7 +25,8 @@ import { meetingQuestionFlow, meetingDocs, meetingShort, meetingEffect } from ".
 const FF = "'Pretendard Variable','Pretendard',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
 const T = {
   bg: "#F4F6FA", surface: "#FFFFFF", ink: "#0F172A", sub: "#475569", mute: "#94A3B8",
-  line: "#E2E8F0", lineSoft: "#EEF2F7", brand: "#1D4ED8", brandSoft: "#EFF4FF",
+  // [D-96] 강조색은 OS 테마를 따른다(원본 #1D4ED8·#EFF4FF). 등급·단계 색은 뜻이 있어 그대로 둔다
+  line: "#E2E8F0", lineSoft: "#EEF2F7", brand: brandHex("700", "#1D4ED8"), brandSoft: brandHex("50", "#EFF4FF"),
   teal: "#0D9488", up: "#0F766E", down: "#B91C1C", flat: "#64748B",
   warnBg: "#FEF2F2", warnInk: "#B91C1C", okBg: "#ECFDF5", okInk: "#047857",
 };

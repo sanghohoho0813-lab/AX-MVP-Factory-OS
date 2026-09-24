@@ -137,6 +137,27 @@
  */
 .st-orig {
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 20px rgba(0, 0, 0, 0.06);
+  /* D-96: 원본 파랑(#3182f6) 대신 OS 테마 강조색 — 테마를 바꾸면 판정기도 따라간다 */
+  --color-brand: var(--color-brand-600);
+  --color-brand-dark: var(--color-brand-700);
+}
+
+/*
+ * D-96: 모듈 강조색을 OS 테마 하나로 — 정책자금 원본은 Tailwind 파랑(blue-*)을 썼다.
+ * Tailwind 4 의 색 글자는 변수(--color-blue-600 …)를 읽으므로, 정책자금 화면 안에서만 그 변수를 OS 테마 색으로 바꾼다.
+ * 계산·문구는 그대로이고, 색만 OS 와 같아진다.
+ */
+.pf-orig {
+  --color-blue-50: var(--color-brand-50);
+  --color-blue-100: var(--color-brand-100);
+  --color-blue-200: var(--color-brand-200);
+  --color-blue-300: var(--color-brand-200);
+  --color-blue-400: var(--color-brand-500);
+  --color-blue-500: var(--color-brand-500);
+  --color-blue-600: var(--color-brand-600);
+  --color-blue-700: var(--color-brand-700);
+  --color-blue-800: var(--color-brand-700);
+  --color-blue-900: var(--color-brand-700);
 }
 /* 넓은 화면에서만 1.25배 — 휴대폰 폭에서 키우면 칸이 좁아져 글자가 잘린다 */
 @media screen and (min-width: 1024px) {

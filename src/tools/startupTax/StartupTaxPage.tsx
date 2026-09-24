@@ -113,9 +113,10 @@ function StartupTaxScreen() {
       <div className="st-zoom" data-testid="startup-orig">
         <div className="mx-auto max-w-xl px-1 pb-10 pt-2">
           <header className="mb-6 px-1">
-            <div className="text-base font-bold text-brand">세무·법인컨설팅 상담용</div>
-            <h1 className="mt-1 text-4xl font-extrabold tracking-tight text-gray-900">창업감면 1분 판정기</h1>
-            <p className="mt-2.5 text-lg leading-relaxed text-gray-500">
+            {/* D-96: 제목 크기를 OS 화면 제목에 맞춘다 (원본 text-4xl 은 넓은 화면 1.25배 확대와 겹쳐 45px 였다) */}
+            <div className="text-sm font-bold text-brand">세무·법인컨설팅 상담용</div>
+            <h1 className="mt-1 text-[1.6rem] font-bold tracking-tight text-gray-900 lg:text-[1.45rem]">창업감면 1분 판정기</h1>
+            <p className="mt-2 text-base leading-relaxed text-gray-500">
               대표자 정보를 입력하면 창업기업 관련 감면 가능성을 1차로 판정합니다.
               <br />
               세액 계산기가 아닌 <b className="text-gray-700">상담 보조 판정 도구</b>입니다.
