@@ -11,6 +11,7 @@ import { DEFAULT_INPUT, SAMPLE_INPUT, runDiagnosis } from '../policyFunding/diag
 import { subjectMismatch } from '../shared/toolSubject'
 import { isStaleChunkError, reloadOnceForNewVersion } from '../../lib/staleChunk'
 import { isQuotaError } from '../../storage/storageFull'
+import { brandSync, retint } from '../shared/brandHex'
 import { loadStartupTaxForm, saveStartupTaxForm, startupTaxKey, STARTUP_TAX_STORAGE_KEY } from '../startupTax/lib/formStore'
 import { moduleForPath, moduleMatchLength, screenTitleForPath } from '../../config/moduleRegistry'
 import { changeColor, CRETOP_C, TREND_COMMENT_TONE } from '../cretop/lib/tones'
@@ -731,6 +732,40 @@ await (async () => {
   const after = await listRows(null, 'd95test', 'rows')
   check('공간이 나면 다음 저장에 한꺼번에 다시 적힌다', after.length === 3 && JSON.parse(mem.get([...mem.keys()].find((k) => k.includes('d95test')) ?? '') ?? '[]').length === 3, String(after.length))
 })()
+
+/* ---- D-98: 테마를 바꾸면 영업·크레탑 팔레트가 새로고침 없이 따라간다 ---- */
+{
+  const palette = { blue: '#2563EB', blueBg: '#E8F1FE', ok: '#059669' }
+  const btn = { background: palette.blue, border: `1px solid ${palette.blue}40` }
+  const stages = [{ color: palette.blue, bg: palette.blueBg }, { color: palette.ok }]
+  retint([palette, btn, stages], new Map([['#2563eb', '#7A2E4A'], ['#E8F1FE', '#FBF1F4']]))
+  check('retint: 팔레트 값이 새 색으로', palette.blue === '#7A2E4A' && palette.blueBg === '#FBF1F4', JSON.stringify(palette))
+  check('retint: 미리 담아 둔 단추 색·투명도 붙은 색도', btn.background === '#7A2E4A' && btn.border === '1px solid #7A2E4A40', JSON.stringify(btn))
+  check('retint: 표 안의 표까지 · 뜻 있는 색(초록)은 그대로', stages[0].color === '#7A2E4A' && stages[0].bg === '#FBF1F4' && stages[1].color === '#059669', JSON.stringify(stages))
+  const swap = { a: '#111111', b: '#222222' }
+  retint([swap], new Map([['#111111', '#222222'], ['#222222', '#333333']]))
+  check('retint: 옛 색→새 색이 다른 옛 색과 겹쳐도 한 번만 바뀐다', swap.a === '#222222' && swap.b === '#333333', JSON.stringify(swap))
+
+  const g = globalThis as unknown as { document?: unknown; getComputedStyle?: unknown }
+  const had = { document: g.document, gcs: g.getComputedStyle }
+  const vars: Record<string, string> = { '--color-brand-600': '#0F766E', '--color-brand-50': '#F0FDFA' }
+  g.document = { documentElement: {} }
+  g.getComputedStyle = () => ({ getPropertyValue: (n: string) => vars[n] ?? '' })
+  try {
+    const C = { blue: '#0F766E', blueBg: '#F0FDFA' }
+    const table = { 진행중: [C.blue, C.blueBg] }
+    const sync = brandSync({ blue: ['600', '#2563EB'], blueBg: ['50', '#E8F1FE'] }, [C, table])
+    check('brandSync: 테마가 그대로면 아무것도 안 바꾼다', sync() === false && C.blue === '#0F766E')
+    vars['--color-brand-600'] = '#7A2E4A'
+    vars['--color-brand-50'] = '#FBF1F4'
+    check('brandSync: 테마를 바꾸면 true', sync() === true)
+    check('brandSync: 팔레트·표가 새 테마색', C.blue === '#7A2E4A' && table.진행중[0] === '#7A2E4A' && table.진행중[1] === '#FBF1F4', JSON.stringify([C, table]))
+    check('brandSync: 한 번 고친 뒤 다시 부르면 그대로', sync() === false)
+  } finally {
+    g.document = had.document
+    g.getComputedStyle = had.gcs
+  }
+}
 
 console.log(`\ntools: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

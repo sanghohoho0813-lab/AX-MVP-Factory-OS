@@ -5,7 +5,7 @@
    · 뺀 것: PIN 앱 잠금 · 샘플 데이터 넣기 · 다른 SaaS 바로가기 · 브라우저 전체 스캔 정리(scrub)
    · 원본의 왼쪽 메뉴는 이 OS 의 모듈 목차가 대신한다(화면 = /tools/sales-kit/<화면>) */
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { brandHex } from "../../shared/brandHex"; // [D-96]
+import { brandHex, brandSync, useThemeRerender } from "../../shared/brandHex"; // [D-96] · [D-98] 테마 바로 따라가기
 import { salesLoad, salesSave, salesOsClients, salesOsClientOf, salesResetAll } from "./store";
 import { createPortal } from "react-dom";
 // PDF: 정적 import(동적 import 청크 fetch 실패 방지) — pdf.js 본체는 메인 번들에, 워커는 ?url 정적 에셋으로.
@@ -5233,7 +5233,15 @@ function LockScreen({ onUnlock, onReset }) {
     </div>
   </div>;
 }
+// [D-98] 테마를 바꾸면 새로고침 없이 따라간다 — 팔레트(C)와 그 색을 미리 담아 둔 표(단추·단계·상태 색)를 새 색으로 고친다
+const syncBrand = brandSync(
+  { blue: ["600", "#2563EB"], sky: ["500", "#0284C7"], blueBg: ["50", "#E8F1FE"] },
+  [C, btnP, DEAL_STAGES, PROPOSAL_STATE_STYLE, TODO_STYLE, DB_SOURCE_STYLE, DOC_STATUS_STYLE],
+);
+
 export default function App({ tab: tabProp = "briefing", onTab, focus }) {
+  useThemeRerender();
+  syncBrand();
   const [data, setData] = useState(() => { try { scrubLocalStorageOnce(); } catch (e) {} const d = load(); return d ? migrateData(d) : d; });
   // [D-93] 화면(tab)은 이 OS 의 모듈 목차(주소)가 쥔다
   const tab = tabProp;
@@ -5374,6 +5382,13 @@ export default function App({ tab: tabProp = "briefing", onTab, focus }) {
         .heroBtns{flex-direction:column !important}
         .heroBtns > *{width:100% !important}
       }
+      /* [D-98] 휴대폰 폭 칸에서: ‘고르기 칸 | 단추들’ 두 칸 줄은 위아래로(고르기 칸이 화살표만 남게 찌그러졌다),
+         ‘제목 | 단추’ 줄은 단추가 글자 한두 자씩 세 줄로 꺾이지 않게 아랫줄로 내린다 */
+      @container sales (max-width:560px){
+        .appRoot [style*="grid-template-columns: 1fr auto"]{grid-template-columns:1fr !important}
+        .appRoot [style*="justify-content: space-between"]:has(> button){flex-wrap:wrap}
+        .appRoot [style*="justify-content: space-between"] > button{flex-shrink:0}
+      }
       /* [D-96] 목차가 위 한 줄(☰ 영업 도구 모음 · 화면 이름)로 접히는 폭(1280px 아래)에서는 그 줄이 화면 이름을 이미 보여 준다 — 같은 제목을 또 크게 세우지 않는다 */
       @media (max-width:1279px){ .pcHeader{display:none !important} }
       .appRoot ::-webkit-scrollbar{width:11px;height:11px}
@@ -5386,7 +5401,7 @@ export default function App({ tab: tabProp = "briefing", onTab, focus }) {
       .appRoot button:not(:disabled):hover{filter:brightness(.97)}
       .appRoot button:not(:disabled):active{transform:translateY(1px)}
       .appRoot button:disabled{opacity:.45;cursor:not-allowed !important}
-      .appRoot input:focus,.appRoot select:focus,.appRoot textarea:focus{border-color:${C.blue} !important;box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+      .appRoot input:focus,.appRoot select:focus,.appRoot textarea:focus{border-color:${C.blue} !important;box-shadow:0 0 0 3px ${C.blue}1F}
       .appRoot button:focus-visible,.appRoot a:focus-visible{outline:2px solid ${C.blue};outline-offset:2px}
       .ui-fade{animation:uiFadeUp .26s cubic-bezier(.22,.61,.36,1) both}
       @keyframes uiFadeUp{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}

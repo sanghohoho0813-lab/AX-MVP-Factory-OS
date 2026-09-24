@@ -236,6 +236,31 @@ function ReportPicker() {
   )
 }
 
+/** D-98: 업체에서 연 인쇄 리포트 — 그 업체로 저장한 상담이 없으면 '고객을 찾을 수 없습니다' 로 막히지 않고 진단하기로 잇는다 */
+function ClientReport({ id }: { id: string }) {
+  const { clientName } = useToolClient()
+  if (getStoredCustomers().some((c) => c.id === id)) return <ReportView id={id} initialCustomer={null} />
+  return (
+    <>
+      <section className="mx-auto w-full max-w-4xl px-2 pt-6" data-testid="pf-report-none">
+        <div className="rounded-2xl border border-slate-100 bg-white p-6 text-center shadow-sm">
+          <p className="break-keep font-semibold text-slate-800">
+            {clientName || '이 업체'}로 저장한 정책자금 상담이 아직 없습니다.
+          </p>
+          <p className="mt-1 break-keep text-sm text-slate-500">진단한 뒤 ‘이 업체 상담으로 저장’을 누르면 여기서 리포트를 뽑을 수 있습니다.</p>
+          <Link
+            to={`/tools/policy-funding/diagnosis?client=${encodeURIComponent(id)}`}
+            className="mt-4 inline-block rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+          >
+            이 업체로 진단하기
+          </Link>
+        </div>
+      </section>
+      <ReportPicker />
+    </>
+  )
+}
+
 /* ------------------------------------------------------------------ */
 /* 목차                                                                 */
 /* ------------------------------------------------------------------ */
@@ -254,7 +279,7 @@ export function PolicyFundingPage() {
   }
   if (section === 'report') {
     const id = cid ?? clientId
-    return <OrigPolicy key={id ?? ''}>{id ? <ReportView id={id} initialCustomer={null} /> : <ReportPicker />}</OrigPolicy>
+    return <OrigPolicy key={id ?? ''}>{cid ? <ReportView id={cid} initialCustomer={null} /> : id ? <ClientReport id={id} /> : <ReportPicker />}</OrigPolicy>
   }
 
   return (

@@ -3,7 +3,8 @@ import { useSearchParams } from "react-router-dom"; // [D-94] 하단 탭 = 주�
 import { buildCretopParsedForUi, CORE_LABELS, cretopTrendCommentRich, cretopCashflowGradeInfo, cretopRowTrend, cretopPreviewTone, CRETOP_PREVIEW_TONES } from "../engine/index.js";
 import { extractPdfText } from "./pdf.js";
 import { cretopYearPool, cretopFillYears } from "./years.js"; // [D-94]
-import { brandHex } from "../../shared/brandHex"; // [D-96]
+import { brandHex, brandSync, useThemeRerender } from "../../shared/brandHex"; // [D-96] · [D-98] 테마 바로 따라가기
+import { T as SHARED_T } from "./theme.js";
 import { StockValue } from "./StockValue.jsx";
 import { InfoModal, RawTextModal, DetailModal, StakeModal } from "./DetailPopups.jsx";
 import { extractAll, detectBizForm, isCorpOnlyStrategy } from "./extract.js";
@@ -1777,7 +1778,12 @@ let lastSession = null;
 export function lastCretopSource() {
   return lastSession && lastSession.text ? { text: lastSession.text, fileName: lastSession.fileName || "" } : null;
 }
+// [D-98] 테마를 바꾸면 새로고침 없이 따라간다 — 이 파일의 T 와 다른 화면(주식가치·상세 창)이 쓰는 theme.js 의 T 둘 다
+const syncBrand = brandSync({ brand: ["700", "#1D4ED8"], brandSoft: ["50", "#EFF4FF"] }, [T, SHARED_T]);
+
 export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, resultBar, pendingFile, onPendingDone }) {
+  useThemeRerender();
+  syncBrand();
   const [mode, setMode] = useState("pdf"); // pdf | text
   const [text, setText] = useState(() => (lastSession ? lastSession.text : ""));
   const [fileName, setFileName] = useState(() => (lastSession ? lastSession.fileName : ""));

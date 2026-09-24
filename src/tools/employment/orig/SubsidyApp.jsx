@@ -7052,7 +7052,7 @@ export default function SubsidyApp(props){
         <div style={SB.bottom} className="sb-bottom">
           {/* 1) 보조 · 관리자 버튼 */}
           <div>
-            {!isAdmin&&!stFbHidden[0]&&(<button className={"sb-feedback"+(stFbGlow[0]?" fb-glow":"")} style={{width:"100%",marginBottom:8,padding:"10px",borderRadius:9,border:"1px solid rgba(96,165,250,0.35)",background:"color-mix(in srgb, var(--color-brand-500) 12%, transparent)",color:"var(--color-brand-200)",cursor:"pointer",fontFamily:FF,textAlign:"center"}} onClick={function(){openFeedback();stMobileNav[1](false);}}>
+            {!isAdmin&&!stFbHidden[0]&&(<button className={"sb-feedback"+(stFbGlow[0]?" fb-glow":"")} style={{width:"100%",marginBottom:8,padding:"10px",borderRadius:9,border:"1px solid color-mix(in srgb, var(--color-brand-500) 35%, transparent)",background:"color-mix(in srgb, var(--color-brand-500) 12%, transparent)",color:"var(--color-brand-200)",cursor:"pointer",fontFamily:FF,textAlign:"center"}} onClick={function(){openFeedback();stMobileNav[1](false);}}>
               <div style={{fontSize:14,fontWeight:700}}>💬 피드백 남기기</div>
               <div style={{fontSize:11,color:"#93A8C9",fontWeight:400,marginTop:2,lineHeight:1.4}}>더 좋은 프로그램으로 만들기 위해 의견을 들려주세요.</div>
             </button>)}

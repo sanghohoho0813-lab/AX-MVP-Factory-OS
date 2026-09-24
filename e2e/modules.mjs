@@ -60,10 +60,34 @@ for (const [w, h, mob] of [[1440, 900, false], [390, 844, true]]) {
           cw: document.documentElement.clientWidth,
           err: !!document.querySelector('[data-testid="screen-error"]'),
           text: (document.querySelector('main')?.innerText ?? '').trim().length,
+          // D-98: 화면(또는 창) 밖으로 삐져나가 잘린 칸 — 문서는 안 넘쳐도 창 안에서 잘릴 수 있다.
+          //   일부러 옆으로 미는 표·탭 줄(표·그림을 품었거나 한 줄 flex)은 뺀다
+          clipped: (() => {
+            const vw = document.documentElement.clientWidth
+            const intended = (el) => {
+              for (let a = el.parentElement; a; a = a.parentElement) {
+                const cs = getComputedStyle(a)
+                if ((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && a.scrollWidth > a.clientWidth) {
+                  const strip = (x) => getComputedStyle(x).display.includes('flex') && getComputedStyle(x).flexDirection.startsWith('row') && getComputedStyle(x).flexWrap === 'nowrap'
+                  return !!a.querySelector('table,svg,canvas') || strip(a) || (a.children.length === 1 && strip(a.children[0])) || a.scrollHeight <= a.clientHeight + 2
+                }
+              }
+              return false
+            }
+            const out = []
+            for (const el of document.body.querySelectorAll('input,select,textarea,button,a,span,p,div,td,th,h1,h2,h3,h4,label')) {
+              const r = el.getBoundingClientRect()
+              if (!r.width || !r.height || el.closest('aside,[aria-hidden="true"],.sr-only')) continue
+              const own = ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(el.tagName) || [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())
+              if (own && (r.right > vw + 2 || r.left < -2) && !intended(el)) out.push(`${el.tagName.toLowerCase()} "${(el.innerText || el.placeholder || '').trim().slice(0, 16)}"`)
+            }
+            return out
+          })(),
         }))
         check(`${w} ${path}: 오류 없음`, bucket.length === 0 && !r.err, bucket.slice(0, 3).join(' | '))
         check(`${w} ${path}: 가로로 넘치지 않음`, r.sw <= r.cw + 1, `${r.sw}/${r.cw}`)
         check(`${w} ${path}: 본문이 있다`, r.text >= 20, String(r.text))
+        check(`${w} ${path}: 화면 밖으로 잘린 칸 없음`, r.clipped.length === 0, r.clipped.slice(0, 3).join(' | '))
       }
     }
   }
@@ -194,6 +218,64 @@ for (const [w, h, mob] of [[1440, 900, false], [390, 844, true]]) {
   await page.evaluate(() => {
     for (const k of Object.keys(localStorage)) if (k.startsWith('zz_fill_')) localStorage.removeItem(k)
   })
+  await ctx.close()
+}
+
+/* ---- 테마를 바꾸면 영업·크레탑이 새로고침 없이 따라간다 (D-98) ----
+ * 모듈을 한 번 연 뒤(옛 테마로 팔레트를 읽음) 설정에서 테마를 바꾸고, 새로고침 없이(뒤로 가기) 돌아와
+ * 화면에 옛 테마 강조색이 남았는지 센다. D-96·97 에서는 새로고침해야 바뀌었다 */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const brandRgb = () =>
+    page.evaluate(() => {
+      const probe = document.createElement('i')
+      document.body.appendChild(probe)
+      const out = ['50', '500', '600', '700'].map((st) => {
+        probe.style.color = `var(--color-brand-${st})`
+        return getComputedStyle(probe).color
+      })
+      probe.remove()
+      return out
+    })
+  const leftovers = (old) =>
+    page.evaluate((old) => {
+      const set = new Set(old)
+      let n = 0
+      const ex = []
+      for (const el of document.querySelectorAll('main *')) {
+        const cs = getComputedStyle(el)
+        if (!el.getBoundingClientRect().width) continue
+        for (const v of [cs.color, cs.backgroundColor, cs.borderTopColor]) {
+          if (set.has(v)) {
+            n += 1
+            if (ex.length < 3) ex.push(`${el.tagName.toLowerCase()} "${(el.innerText || '').trim().slice(0, 14)}" ${v}`)
+            break
+          }
+        }
+      }
+      return { n, ex }
+    }, old)
+  for (const path of ['/tools/sales-kit/briefing', '/tools/cretop/analyze']) {
+    await page.evaluate(() => localStorage.setItem('axmvp.ui.preferences', JSON.stringify({ theme: 'deep-teal' })))
+    await page.goto(BASE + path, { waitUntil: 'networkidle' })
+    await page.waitForTimeout(400)
+    const oldRgb = await brandRgb()
+    const before = await leftovers(oldRgb)
+    await page.click('header a[aria-label="설정"]')
+    await page.waitForURL(/\/settings/)
+    await page.getByRole('radio', { name: /버건디/ }).click()
+    await page.waitForTimeout(200)
+    await page.goBack()
+    await page.waitForURL(new RegExp(path.replace(/\//g, '\\/')))
+    await page.waitForTimeout(500)
+    const after = await leftovers(oldRgb)
+    const theme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'))
+    check(`${path}: 옛 테마에서는 테마색이 보였다(시험이 제 구실을 하는지)`, before.n > 0, String(before.n))
+    check(`${path}: 테마를 바꾸고 새로고침 없이 돌아오면 옛 테마색 0`, theme === 'burgundy' && after.n === 0, `${theme} ${after.n} ${after.ex.join(' | ')}`)
+  }
   await ctx.close()
 }
 
