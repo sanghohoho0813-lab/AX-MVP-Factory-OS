@@ -457,7 +457,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             />
             {/* 새 요청은 '급한 일' 이 아니라 '새로 온 것' 이다 — 빨강 대신 브랜드색 */}
             <MetricTile
-              label="새 고객 이벤트"
+              label="새 상담신청"
               value={`${openEvents.length}건`}
               tone={openEvents.length > 0 ? 'brand' : 'neutral'}
               onClick={() => navigate('/ops/inbox')}
@@ -498,7 +498,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         {/* 4단계 — 고객 이벤트 */}
         <section aria-labelledby="events" data-tour="home-events" className="flex min-w-0 flex-col gap-3">
-          <SectionTitle title="고객 이벤트" icon={Inbox} to="/ops/inbox" count={openEvents.length} accent="event" />
+          <SectionTitle title="상담신청" icon={Inbox} to="/ops/inbox" count={openEvents.length} accent="event" />
           {openEvents.length === 0 ? (
             <Blank
               title={`새 고객 요청이 없습니다. ${brand.customerPlatformLabel}에서 요청이 오면 여기에 뜹니다.`}

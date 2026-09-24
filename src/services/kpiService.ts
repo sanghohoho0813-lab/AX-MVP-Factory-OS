@@ -289,7 +289,7 @@ function adoptionMetrics(input: KpiInput): KpiMetric[] {
   const eventsHandled: KpiMetric = {
     key: 'events_handled_30',
     group: 'adoption',
-    label: '최근 30일 고객 이벤트 처리',
+    label: '최근 30일 상담신청 처리',
     value: recent.length === 0 ? null : `${handled.length} / ${recent.length}건`,
     basis: recent.length,
     status: statusFor(recent.length),

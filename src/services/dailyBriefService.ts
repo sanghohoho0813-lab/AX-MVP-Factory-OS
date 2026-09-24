@@ -76,7 +76,7 @@ function eventScore(e: CustomerEvent): { score: number; reason: string } {
   if (e.eventType === 'customer_request_created') return { score: e.priority === 'high' ? 80 : 64, reason: '고객이 요청을 보냈습니다' }
   if (e.eventType === 'diagnosis_completed') return { score: e.priority === 'high' ? 72 : 58, reason: '사업 진단을 마친 잠재 고객입니다' }
   if (e.eventType === 'customer_action_completed') return { score: 56, reason: '고객이 요청한 조치를 마쳤습니다' }
-  return { score: 30, reason: '참고용 고객 이벤트' }
+  return { score: 30, reason: '참고용 상담신청' }
 }
 
 /**
@@ -191,12 +191,12 @@ export function buildDaySummary(input: {
     if (j.entryType === 'follow_up' && j.completed && isToday(j.completedAt)) done.push(withName(j.clientId, `후속조치 완료 — ${j.content}`))
   }
   const resolvedEvents = events.filter((e) => e.status === 'resolved' && isToday(e.handledAt))
-  for (const e of resolvedEvents) done.push(`고객 이벤트 처리 — ${eventSummary(e).who}: ${EVENT_TYPE_LABEL[e.eventType]}`)
+  for (const e of resolvedEvents) done.push(`상담신청 처리 — ${eventSummary(e).who}: ${EVENT_TYPE_LABEL[e.eventType]}`)
 
   const openCritical = alerts.filter((a) => a.severity === 'critical')
   const remaining = openCritical.map((a) => `${a.clientName} · ${a.title}`)
   const openEvents = events.filter(isOpenEvent)
-  for (const e of openEvents) remaining.push(`고객 이벤트 — ${eventSummary(e).who}: ${EVENT_TYPE_LABEL[e.eventType]}`)
+  for (const e of openEvents) remaining.push(`상담신청 — ${eventSummary(e).who}: ${EVENT_TYPE_LABEL[e.eventType]}`)
 
   const carriedOver = journal
     .filter((j) => j.entryType === 'follow_up' && !j.completed && j.dueDate !== '' && j.dueDate <= today)
@@ -205,7 +205,7 @@ export function buildDaySummary(input: {
   const decisions = todayJournal.filter((j) => j.entryType === 'decision').map((j) => withName(j.clientId, j.content))
   const issues = todayJournal.filter((j) => j.entryType === 'blocker').map((j) => withName(j.clientId, j.content))
   for (const e of events) {
-    if (e.status === 'new' && isToday(e.occurredAt)) issues.push(`새 고객 이벤트 — ${eventSummary(e).who}: ${eventSummary(e).what}`)
+    if (e.status === 'new' && isToday(e.occurredAt)) issues.push(`새 상담신청 — ${eventSummary(e).who}: ${eventSummary(e).what}`)
   }
 
   return {

@@ -94,7 +94,7 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
 
   const filters: { key: Filter; label: string }[] = [
     { key: 'open', label: '열린 것' },
-    { key: 'new', label: '새 이벤트' },
+    { key: 'new', label: '새 신청' },
     { key: 'in_progress', label: '처리 중' },
     { key: 'resolved', label: '처리 완료' },
     { key: 'ignored', label: '보류' },
@@ -122,7 +122,7 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
 
       {notReady && (
         <div className="rounded-(--radius-panel) border border-warning-200 bg-warning-50 p-4">
-          <p className="text-[0.98rem] font-semibold text-warning-700">고객 이벤트 연결 준비 중 (READY)</p>
+          <p className="text-[0.98rem] font-semibold text-warning-700">상담신청 연결 준비 중 (READY)</p>
           <p className="mt-1 text-[0.92rem] break-keep text-slate-700">
             클라우드에 브릿지 테이블이 아직 없습니다. <code className="rounded bg-white px-1">supabase/migrations/20260903000006_customer_bridge.sql</code> 을 적용하면
             진단 완료·주문·서류 업로드·요청이 자동으로 이곳에 쌓입니다. 적용 순서는 <code className="rounded bg-white px-1">docs/SETUP.md</code> 에 있습니다.

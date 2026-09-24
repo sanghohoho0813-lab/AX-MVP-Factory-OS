@@ -44,7 +44,7 @@ export const EVENT_TYPE_LABEL: Record<CustomerEventType, string> = {
 }
 
 export const EVENT_STATUS_LABEL: Record<CustomerEventStatus, string> = {
-  new: '새 이벤트',
+  new: '새 신청',
   linked: '연결됨',
   in_progress: '처리 중',
   resolved: '처리 완료',

@@ -379,6 +379,38 @@ for (const [w, h, mob] of [[1440, 900, false], [390, 844, true]]) {
   await ctx.close()
 }
 
+/* ---- D-105: 고객 실사용 테스트 화면(/test) 휴대폰 — 동의 → 완료 체크 · 의견 → 제출, 옆으로 밀리지 않음 ---- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  const errs = []
+  page.on('pageerror', (e) => errs.push(e.message))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(() => {
+    const now = new Date().toISOString()
+    const sc = (i, t) => ({ id: 'sc' + i, sourceScenarioId: '', sourceCriterionIds: [], title: t, description: '현장에서 실제로 해 보는 순서입니다. 휴대폰에서 긴 설명이 어떻게 보이는지 보려고 문장을 조금 길게 씁니다.', type: 'task', priority: 'high', targetRoles: [], preconditions: '관리자 계정으로 로그인한 상태', steps: ['메뉴에서 작업일지를 연다', '오늘 날짜로 새 일지를 만든다', '사진 두 장을 올리고 저장한다'], expectedResult: '저장 후 목록 맨 위에 오늘 일지가 보인다', measurementMethod: '', requiredEvidence: '', passRule: '3분 안에 도움 없이 끝내면 통과', required: true, status: 'ready', orderIndex: i, createdAt: now, updatedAt: now, archivedAt: null })
+    localStorage.setItem('axmvp.v1.validation_workspaces', JSON.stringify([{ id: 'vw-qa', organizationId: 'org-qa', projectId: 'p-qa', title: '작업일지 앱 현장 검증 (휴대폰 시험)', scenarios: [sc(1, '작업일지 새로 쓰기'), sc(2, '지난 일지 찾아보기 (검색어 · 날짜로)')], createdAt: now, updatedAt: now }]))
+    localStorage.setItem('axmvp.v1.validation_test_sessions', JSON.stringify([{ id: 'ts-qa', workspaceId: 'vw-qa', projectId: 'p-qa', accessToken: 'tok-qa-mobile', participantName: '박현장', scenarioIds: ['sc1', 'sc2'], status: 'active', consented: false, consentedAt: null, results: [], submittedAt: null, expiresAt: null, createdAt: now, updatedAt: now }]))
+  })
+  await page.goto(BASE + '/test/tok-qa-mobile', { waitUntil: 'networkidle' })
+  const wide = () => page.evaluate(() => document.documentElement.scrollWidth)
+  check('고객 테스트(휴대폰): 과제 두 개가 보인다', (await page.getByText('작업일지 새로 쓰기').count()) === 1 && (await page.getByText('지난 일지 찾아보기', { exact: false }).count()) === 1)
+  check('고객 테스트(휴대폰): 옆으로 밀리지 않는다', (await wide()) <= 391, String(await wide()))
+  const submit = page.getByRole('button', { name: /제출/ }).last()
+  check('고객 테스트: 동의 전에는 제출할 수 없다', await submit.isDisabled())
+  await page.locator('input[type=checkbox]').nth(0).check()
+  await page.locator('input[type=checkbox]').nth(1).check()
+  await page.locator('textarea').first().fill('사진 올리는 단추가 작아서 한 번 잘못 눌렀어요')
+  check('고객 테스트: 제출 단추가 손가락 크기(44px 이상)', ((await submit.boundingBox())?.height ?? 0) >= 44)
+  await submit.click()
+  await page.waitForTimeout(600)
+  check('고객 테스트: 제출하면 감사 화면', ((await page.locator('body').innerText()) ?? '').includes('제출이 완료되었습니다'))
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.validation_test_sessions'))[0])
+  check('고객 테스트: 답이 저장된다(완료 · 의견)', saved.status === 'completed' && saved.consented === true && JSON.stringify(saved.results).includes('잘못 눌렀어요'), JSON.stringify(saved).slice(0, 200))
+  check('고객 테스트: 화면 오류 없음', errs.length === 0, errs.join(' | '))
+  await ctx.close()
+}
+
 /* ---- D-102: 도구함 아이콘 색 사다리 · 세금 계산기 짙은 색이 테마를 따라감 · 인쇄 · 첫 화면 파일 ---- */
 {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })

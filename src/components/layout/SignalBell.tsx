@@ -6,7 +6,7 @@ import { useStoreVersion } from '../../lib/useStoreVersion'
 import { WorkspaceScope } from '../workspace/WorkspaceScope'
 import { listClients } from '../../services/clientOpsService'
 import { buildAllAlerts } from '../../services/clientOpsAlerts'
-import { isOpenEvent, listEvents } from '../../services/customerBridgeService'
+import { EVENT_TYPE_LABEL, eventSummary, isOpenEvent, listEvents } from '../../services/customerBridgeService'
 import { todayLocalDate } from '../../lib/appClock'
 import type { OpsAlert } from '../../types/clientOps'
 import type { CustomerEvent } from '../../types/bridge'
@@ -62,15 +62,16 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
         <div className="absolute top-full right-0 z-30 mt-1.5 w-80 max-w-[calc(100vw-2rem)] rounded-(--radius-card) border border-slate-200 bg-white shadow-(--shadow-overlay)">
           <p className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-900">지금 챙길 것</p>
           {count === 0 ? (
-            <p className="px-4 py-4 text-[0.9rem] text-slate-500">급한 경고와 새 고객 이벤트가 없습니다.</p>
+            <p className="px-4 py-4 text-[0.9rem] text-slate-500">급한 경고와 새 상담신청이 없습니다.</p>
           ) : (
             <ul className="max-h-80 overflow-y-auto">
               {events.slice(0, 4).map((e) => (
                 <li key={e.id} className="border-b border-slate-50">
                   <Link to="/ops/inbox" onClick={() => setOpen(false)} className="block px-4 py-2.5 hover:bg-slate-50">
-                    <span className="block text-[0.85rem] font-semibold text-slate-700">고객 이벤트</span>
+                    <span className="block text-[0.85rem] font-semibold text-slate-700">상담신청</span>
                     <span className="block truncate text-[0.9rem] text-slate-700">
-                      {typeof e.payload.company_name === 'string' ? e.payload.company_name : '고객'} · {e.eventType.replace(/_/g, ' ')}
+                      {/* D-105: 예전에는 'customer request created' 처럼 영문 코드가 그대로 보였다 — 상담신청 화면과 같은 한글 이름으로 */}
+                      {eventSummary(e).who} · {EVENT_TYPE_LABEL[e.eventType] ?? '고객 활동'}
                     </span>
                   </Link>
                 </li>
