@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Plus, RotateCcw, Trash2 } from 'lucide-react'
+import { Check, ChevronDown, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { PageHeader } from '../components/ui/PageHeader'
 import { ToolResultAttach } from '../tools/shared/ToolResultAttach'
 import { Button } from '../components/ui/Button'
@@ -109,6 +109,7 @@ export function TaxCalculatorsPage() {
   const sub = calc.subs.find((s) => s.key === subKey) ?? calc.subs[0]
 
   const [values, setValues] = useState<Values>(() => loadValues(calc))
+  const [pickerOpen, setPickerOpen] = useState(false)
   useEffect(() => {
     setValues(loadValues(calc))
   }, [calc])
@@ -270,7 +271,50 @@ export function TaxCalculatorsPage() {
       <PageHeader title="세금 계산기" description="대표이사 급여·퇴직급여·주식·상속·가지급금 등 9종. 규칙 계산이며 참고용입니다 — 실제 신고는 세무사와 상담하세요." />
 
       {/* 계산기 고르기 — 휴대폰에서는 가로로 넘기는 조각, 넓으면 한 줄 감싸기 */}
-      <nav aria-label="계산기 목록" className="no-print -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:flex-wrap">
+      {/* D-109: 휴대폰에서는 9개를 옆으로 밀어 찾지 않는다 — 지금 계산기 한 줄을 누르면 목록이 펼쳐지고, 고르면 닫힌다 */}
+      <div className="no-print sm:hidden">
+        <button
+          type="button"
+          data-testid="tax-picker"
+          aria-expanded={pickerOpen}
+          aria-controls="tax-picker-list"
+          onClick={() => setPickerOpen((o) => !o)}
+          className="tap flex w-full items-center gap-3 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-left shadow-(--shadow-card)"
+        >
+          <span className="t-meta shrink-0 rounded-full bg-navy-900 px-2 py-0.5 font-bold text-white tabular-nums">{calc.no}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[1rem] font-semibold text-slate-900">{calc.title}</span>
+            <span className="t-meta block text-slate-500">계산기 {TAX_CALCULATORS.length}종 · 눌러서 바꾸기</span>
+          </span>
+          <ChevronDown aria-hidden="true" className={`size-5 shrink-0 text-slate-400 transition-transform ${pickerOpen ? 'rotate-180' : ''}`} />
+        </button>
+        {pickerOpen && (
+          <ul id="tax-picker-list" aria-label="계산기 목록" className="mt-2 overflow-hidden rounded-(--radius-card) border border-slate-200 bg-white shadow-(--shadow-card)">
+            {TAX_CALCULATORS.map((c, i) => {
+              const on = c.key === calc.key
+              return (
+                <li key={c.key} className={i ? 'border-t border-slate-100' : ''}>
+                  <button
+                    type="button"
+                    aria-current={on ? 'true' : undefined}
+                    onClick={() => {
+                      setPickerOpen(false)
+                      if (!on) pick(c.key)
+                    }}
+                    className={`tap flex w-full items-center gap-3 px-4 py-3 text-left ${on ? 'bg-brand-50' : 'hover:bg-slate-50'}`}
+                  >
+                    <span className={`t-meta w-6 shrink-0 font-bold tabular-nums ${on ? 'text-brand-700' : 'text-slate-400'}`}>{c.no}</span>
+                    <span className={`min-w-0 flex-1 text-[0.95rem] break-keep ${on ? 'font-semibold text-brand-700' : 'font-medium text-slate-800'}`}>{c.title}</span>
+                    {on && <Check aria-hidden="true" className="size-4 shrink-0 text-brand-600" />}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+
+      <nav aria-label="계산기 목록" className="no-print hidden flex-wrap gap-1.5 sm:flex">
         {TAX_CALCULATORS.map((c) => (
           <button
             key={c.key}

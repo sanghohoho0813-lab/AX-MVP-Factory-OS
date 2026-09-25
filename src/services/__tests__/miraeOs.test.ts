@@ -58,7 +58,7 @@ import { documentStatus } from '../clientOpsAlerts'
 import { DOCUMENTS } from '../../content/clientOpsCatalog'
 import { isCustomDocumentKey } from '../../types/clientOps'
 import { classifyDocument, findIssuedDate, KNOWN_EXTRA_DOCS } from '../docClassify'
-import { TAX_CALCULATORS, computeSalary, corpTaxLocal, defaultValues, giftDeduction, incomeTax9, inheritGiftTax, oldBracketTax, pct, salaryBracketTax, won, yearsRoundUp9 } from '../taxCalc'
+import { TAX_CALCULATORS, calculatorOf, unlistedShareValuation, computeSalary, corpTaxLocal, defaultValues, giftDeduction, incomeTax9, inheritGiftTax, oldBracketTax, pct, salaryBracketTax, won, yearsRoundUp9 } from '../taxCalc'
 import { formatYmd, profileAsText, yearsInBusiness } from '../clientOpsProfile'
 import { SERVICE_STATUS_ORDER, isServiceOpen, isServiceNotApplicable, normalizeServiceStatus } from '../../content/clientOpsCatalog'
 import { BUILTIN_SERVICES, SERVICES, registerCustomServices } from '../../content/clientOpsCatalog'
@@ -1092,6 +1092,28 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
   let dup = ''
   for (const c of TAX_CALCULATORS) for (const g of [...(c.shared ?? []), ...c.subs.flatMap((s) => s.groups)]) for (const f of g.fields) { if (ids.has(f.id)) dup = f.id; ids.add(f.id) }
   check('세금: 입력 칸 id 가 겹치지 않는다', dup === '', dup)
+  // D-109: 09 비상장주식 가치평가 — 크레탑 주식가치 탭과 같은 함수. 기본값을 손으로 푼 값과 맞춘다.
+  const base = {
+    shares: 138000, ratePct: 10, asset: 3e9, debt: 1e9, reBook: 6e8, reFair: 8e8, severance: 0, goodwill: 0, corpType: '일반법인',
+    income: [2.5e8, 5e8, 4.2e8] as [number, number, number], months: [8, 3, 10] as [number, number, number], caps: [0, -2e8, 0] as [number, number, number],
+  }
+  const uv = unlistedShareValuation(base)
+  check('비상장: 순자산가액 = 자산 − 부채 + 부동산 평가차액', uv.netAssetValue === 2.2e9)
+  check('비상장: 감자 조정 순손익 (−2천만 · −5백만 · 0)', uv.netIncome.join() === [2.3e8, 4.95e8, 4.2e8].join(), uv.netIncome.join())
+  check('비상장: 기업가치 = 순자산 40% + 순손익가치 60% = 33.6억', Math.abs(uv.totalValue - 3.36e9) < 1, String(uv.totalValue))
+  check('비상장: 부동산 비율 25% → 자동판정 일반법인', Math.abs(uv.reRatio - 0.25) < 1e-12 && uv.autoType === '일반법인')
+  const t3 = calculatorOf('t3')!
+  const t3line = t3.subs[0].compute(defaultValues(t3)).blocks[0].lines.find((l) => l.k.startsWith('1주당 평가액'))
+  check('비상장: 세금 계산기 09 화면 값 = 같은 함수 값', t3line?.v === won(uv.finalPerShare), `${t3line?.v} vs ${won(uv.finalPerShare)}`)
+  const loss = unlistedShareValuation({ ...base, income: [0, 0, -1e8] })
+  check('비상장: 손실이면 최저 한도(순자산 × 80%)가 걸린다', loss.finalPerShare === loss.minFloor && loss.minFloor > loss.weightedValue)
+  const special = unlistedShareValuation({ ...base, corpType: '특수법인' })
+  check('비상장: 특수법인은 순자산 100%', special.wNetAsset === 1 && special.weightedValue === special.perShareNetAsset)
+  const heavy = unlistedShareValuation({ ...base, reBook: 1.5e9, reFair: 2e9, corpType: '부동산과다보유법인' })
+  check('비상장: 부동산 비율 57% → 자동판정 부동산과다 · 가중 60:40', heavy.autoType === '부동산과다보유법인' && heavy.wNetAsset === 0.6, `${heavy.reRatio}`)
+  // 예전 크레탑 간이식((손익×3 + 자산×2) ÷ 5, 최저 한도 없음)과 달라지는 경우 — 손실 법인
+  const oldSimple = (loss.perShareIncomeValue * 3 + loss.perShareNetAsset * 2) / 5
+  check('비상장: 손실 법인은 예전 간이식보다 높게(최저 한도) 나온다', loss.finalPerShare > oldSimple)
 }
 
 /* ------------------------------------------------------------------ */

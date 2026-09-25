@@ -361,33 +361,73 @@ function calc2(v: Values): Output {
 /* 3. 비상장주식 가치평가                                                */
 /* ------------------------------------------------------------------ */
 
-function calc3(v: Values): Output {
-  const { num, str } = mk(v)
-  const shares = num('v_shares')
-  const rate = num('v_rate') / 100
-  const asset = num('v_asset')
-  const debt = num('v_debt')
-  const reBook = num('v_re_book')
-  const reFair = num('v_re_fair')
-  const severance = num('v_severance')
-  const goodwill = num('v_goodwill')
+export type CorpValuationType = '일반법인' | '부동산과다보유법인' | '특수법인'
+
+/** 비상장주식 보충적 평가 입력 — 금액은 원, 연도 배열은 [1년전(가중 1), 2년전·직전(가중 2), 결산연도(가중 3)] */
+export interface UnlistedShareInput {
+  shares: number
+  /** 순손익가치 환원율(%) — 기획재정부 고시 이자율 */
+  ratePct: number
+  asset: number
+  debt: number
+  reBook: number
+  reFair: number
+  severance: number
+  goodwill: number
+  corpType: CorpValuationType | string
+  income: [number, number, number]
+  months: [number, number, number]
+  caps: [number, number, number]
+}
+
+export interface UnlistedShareResult {
+  netAssetValue: number
+  perShareNetAsset: number
+  reRatio: number
+  autoType: CorpValuationType
+  /** 자본거래 조정 뒤 연도별 순손익액 */
+  netIncome: [number, number, number]
+  perShareIncome: number[]
+  weightedAvg: number
+  perShareIncomeValue: number
+  corpType: string
+  wNetAsset: number
+  wIncome: number
+  weightedValue: number
+  minFloor: number
+  finalPerShare: number
+  totalValue: number
+  priceRatio: number
+}
+
+/**
+ * 09 비상장주식 가치평가(상증세법 보충적 평가)의 계산식 전부.
+ * 세금 계산기(09)와 크레탑 분석기 '주식가치' 탭이 이 함수 하나를 같이 쓴다 (D-109) — 한쪽만 고치지 말 것.
+ */
+export function unlistedShareValuation(i: UnlistedShareInput): UnlistedShareResult {
+  const shares = i.shares
+  const rate = i.ratePct / 100
+  const asset = i.asset
+  const debt = i.debt
+  const reBook = i.reBook
+  const reFair = i.reFair
 
   const netAssetBook = asset - debt
   const reDiff = reFair - reBook
-  const netAssetValue = netAssetBook + reDiff - severance + goodwill
+  const netAssetValue = netAssetBook + reDiff - i.severance + i.goodwill
   const perShareNetAsset = shares > 0 ? netAssetValue / shares : 0
   const reRatio = asset + reFair - reBook > 0 ? reFair / (asset + reFair - reBook) : 0
 
-  const inc = [num('v_inc0'), num('v_inc1'), num('v_inc2')]
-  const mon = [num('v_month0'), num('v_month1'), num('v_month2')]
-  const cap = [num('v_cap0'), num('v_cap1'), num('v_cap2')]
+  const inc = i.income
+  const mon = i.months
+  const cap = i.caps
   const adj = [0, 0, 0]
   for (let k = 0; k < 3; k++) {
     let a = (cap[k] * rate * mon[k]) / 12
     for (let j = k + 1; j < 3; j++) a += cap[j] * rate
     adj[k] = a
   }
-  const netIncome = [inc[0] + adj[0], inc[1] + adj[1], inc[2] + adj[2]]
+  const netIncome: [number, number, number] = [inc[0] + adj[0], inc[1] + adj[1], inc[2] + adj[2]]
   const perShareIncome = netIncome.map((x) => (shares > 0 ? x / shares : 0))
   const weights = [1, 2, 3]
   const weightedAvg = (perShareIncome[0] * weights[0] + perShareIncome[1] * weights[1] + perShareIncome[2] * weights[2]) / 6
@@ -395,10 +435,9 @@ function calc3(v: Values): Output {
 
   const specialCorp = reRatio >= 0.8
   const realEstateHeavy = !specialCorp && reRatio >= 0.5 && reRatio < 0.8
-  const autoType = specialCorp ? '특수법인' : realEstateHeavy ? '부동산과다보유법인' : '일반법인'
-  const hint = `참고 자동판정 결과: ${autoType} (부동산비율 ${pct(reRatio)} 기준, 실제 반영값은 아래 직접 선택입니다)`
+  const autoType: CorpValuationType = specialCorp ? '특수법인' : realEstateHeavy ? '부동산과다보유법인' : '일반법인'
 
-  const corpType = str('v_type')
+  const corpType = i.corpType
   const wNetAsset = corpType === '특수법인' ? 1 : corpType === '부동산과다보유법인' ? 0.6 : 0.4
   const wIncome = 1 - wNetAsset
 
@@ -409,6 +448,30 @@ function calc3(v: Values): Output {
   const priceRatio = netAssetValue !== 0 ? totalValue / netAssetValue : 0
 
   return {
+    netAssetValue, perShareNetAsset, reRatio, autoType, netIncome, perShareIncome, weightedAvg, perShareIncomeValue,
+    corpType, wNetAsset, wIncome, weightedValue, minFloor, finalPerShare, totalValue, priceRatio,
+  }
+}
+
+function calc3(v: Values): Output {
+  const { num, str } = mk(v)
+  const r = unlistedShareValuation({
+    shares: num('v_shares'),
+    ratePct: num('v_rate'),
+    asset: num('v_asset'),
+    debt: num('v_debt'),
+    reBook: num('v_re_book'),
+    reFair: num('v_re_fair'),
+    severance: num('v_severance'),
+    goodwill: num('v_goodwill'),
+    corpType: str('v_type'),
+    income: [num('v_inc0'), num('v_inc1'), num('v_inc2')],
+    months: [num('v_month0'), num('v_month1'), num('v_month2')],
+    caps: [num('v_cap0'), num('v_cap1'), num('v_cap2')],
+  })
+  const hint = `참고 자동판정 결과: ${r.autoType} (부동산비율 ${pct(r.reRatio)} 기준, 실제 반영값은 아래 직접 선택입니다)`
+
+  return {
     hint,
     blocks: [
       {
@@ -416,16 +479,16 @@ function calc3(v: Values): Output {
         title: '평가 결과',
         tone: 'dark',
         lines: [
-          L('순자산가액', won(netAssetValue)),
-          L('1주당 순자산가치', won(perShareNetAsset)),
-          L('1주당 순손익가치', won(perShareIncomeValue)),
-          L('법인구분 (반영값)', corpType),
-          L('가중치 (순자산/순손익)', `${pct(wNetAsset, 0)} / ${pct(wIncome, 0)}`),
-          L('A. 가중평균액', won(weightedValue)),
-          L('B. 최저시가기준 (순자산×80%)', won(minFloor)),
-          L('1주당 평가액 (Max A,B)', won(finalPerShare), 'big'),
-          L('기업가치 평가액', won(totalValue), 'highlight'),
-          L('순자산대비 주가비율', pct(priceRatio)),
+          L('순자산가액', won(r.netAssetValue)),
+          L('1주당 순자산가치', won(r.perShareNetAsset)),
+          L('1주당 순손익가치', won(r.perShareIncomeValue)),
+          L('법인구분 (반영값)', r.corpType),
+          L('가중치 (순자산/순손익)', `${pct(r.wNetAsset, 0)} / ${pct(r.wIncome, 0)}`),
+          L('A. 가중평균액', won(r.weightedValue)),
+          L('B. 최저시가기준 (순자산×80%)', won(r.minFloor)),
+          L('1주당 평가액 (Max A,B)', won(r.finalPerShare), 'big'),
+          L('기업가치 평가액', won(r.totalValue), 'highlight'),
+          L('순자산대비 주가비율', pct(r.priceRatio)),
         ],
       },
     ],

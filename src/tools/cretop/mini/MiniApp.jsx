@@ -1722,7 +1722,7 @@ function MiniResultsInner({ ui, tab = "overview", grade, manualGrade, setGrade, 
     <Section title="5대 재무비율" desc="보고서 재무비율 표 기준 · 3개년(자료 없으면 공란)"><RatioAreas ui={ui} /></Section>
     <Section title="상세 재무제표" desc="표를 선택해 해당 항목만 보기"><StatementSection ui={ui} /></Section>
   </>);
-  if (tab === "value") return <Section title="📊 예상 주식가치" desc="상증세법 보충적 평가방법 구조 준용 · 참고용 간이 계산"><StockValue ui={ui} /></Section>;
+  if (tab === "value") return <Section title="📊 예상 주식가치" desc="상증세법 보충적 평가방법 · 세금 계산기 09와 같은 계산식 · 참고용"><StockValue ui={ui} /></Section>;
   if (tab === "reco") return (<>
     <Section title="추천 컨설팅 우선순위" desc="🔥최우선 · 🟢권장 · 🟡조건확인 · ⚪낮음 · 모드/관심 항목으로 정렬"><RecommendationBoard ui={ui} /></Section>
     <Collapsible title="추가 제안 포인트 (전체)" count={CONSULTING_STRATEGIES.length} desc="카테고리별 · 항목 클릭 시 상세"><ConsultingStrategies ui={ui} /></Collapsible>
