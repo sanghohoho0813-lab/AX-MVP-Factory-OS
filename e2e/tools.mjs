@@ -625,6 +625,22 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByTestId('stock-value-cond').getByRole('button', { name: '원문 값으로 되돌리기' }).click()
   await page.waitForTimeout(300)
   check('되돌리기: 다시 10,100원', (await page.getByTestId('stock-value-final').innerText()).includes('10,100'))
+
+  // D-112: 고친 평가 조건은 분석 이력(클라우드)에도 — 이 브라우저 기억을 지워도(다른 기기처럼) 다시 분석하면 돌아온다
+  await page.getByTestId('stock-value-cond').getByLabel('법인 구분').selectOption('부동산과다보유법인')
+  await page.waitForTimeout(1500)
+  await page.evaluate(() => localStorage.removeItem('mini_stock_value_v1'))
+  await page.goto(BASE + '/tools/cretop?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  await page.getByRole('button', { name: '텍스트 붙여넣기' }).click()
+  await page.getByLabel('크레탑 원문').fill(SEBANG)
+  await page.getByTestId('cretop-run').click()
+  await page.waitForTimeout(900)
+  await tab('value')
+  await page.waitForTimeout(400)
+  const back = await page.getByTestId('stock-value-final').innerText()
+  // 부동산과다 60:40 → 11,300 × 0.6 + 9,300 × 0.4 = 10,500원
+  check('다른 기기처럼 지워도: 이력에서 발행주식수 · 법인 구분(부동산과다 10,500원)이 돌아온다', back.includes('10,500') && back.includes('부동산과다'), back.replace(/\n/g, ' '))
   await ctx.close()
 
   const m = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'ko-KR' })

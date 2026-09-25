@@ -4,12 +4,8 @@ import { Bell } from 'lucide-react'
 import { useDismissable } from '../../lib/useDismissable'
 import { useStoreVersion } from '../../lib/useStoreVersion'
 import { WorkspaceScope } from '../workspace/WorkspaceScope'
-import { listClients } from '../../services/clientOpsService'
-import { buildAllAlerts } from '../../services/clientOpsAlerts'
-import { EVENT_TYPE_LABEL, eventSummary, isOpenEvent, listEvents } from '../../services/customerBridgeService'
 import { todayLocalDate } from '../../lib/appClock'
 import type { OpsAlert } from '../../types/clientOps'
-import type { CustomerEvent } from '../../types/bridge'
 
 /**
  * 헤더 알림 종 — 데모 상수가 아니라 실제 경고(마감·서류·수금)와 열린 고객 이벤트 수를 보여준다.
@@ -18,20 +14,28 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
   const { open, setOpen, containerRef } = useDismissable<HTMLDivElement>()
   const version = useStoreVersion()
   const [alerts, setAlerts] = useState<OpsAlert[]>([])
-  const [events, setEvents] = useState<CustomerEvent[]>([])
+  /** 종 목록에 보일 상담신청 한 줄 (누구 · 종류) — 읽을 때 한 번 만든다 */
+  const [events, setEvents] = useState<{ id: string; text: string }[]>([])
 
   useEffect(() => {
     let alive = true
     void (async () => {
+      // D-112: 서비스는 종이 처음 셀 때 불러온다 — 첫 파일에서 뺀다
       try {
+        const [{ listClients }, { buildAllAlerts }] = await Promise.all([
+          import('../../services/clientOpsService'),
+          import('../../services/clientOpsAlerts'),
+        ])
         const clients = await listClients(workspaceId)
         if (alive) setAlerts(buildAllAlerts(clients, todayLocalDate()))
       } catch {
         if (alive) setAlerts([])
       }
       try {
+        const { EVENT_TYPE_LABEL, eventSummary, isOpenEvent, listEvents } = await import('../../services/customerBridgeService')
         const ev = await listEvents(workspaceId)
-        if (alive) setEvents(ev.filter(isOpenEvent))
+        // D-105: 예전에는 'customer request created' 처럼 영문 코드가 그대로 보였다 — 상담신청 화면과 같은 한글 이름으로
+        if (alive) setEvents(ev.filter(isOpenEvent).map((e) => ({ id: e.id, text: `${eventSummary(e).who} · ${EVENT_TYPE_LABEL[e.eventType] ?? '고객 활동'}` })))
       } catch {
         if (alive) setEvents([])
       }
@@ -70,8 +74,7 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
                   <Link to="/ops/inbox" onClick={() => setOpen(false)} className="block px-4 py-2.5 hover:bg-slate-50">
                     <span className="block text-[0.85rem] font-semibold text-slate-700">상담신청</span>
                     <span className="block truncate text-[0.9rem] text-slate-700">
-                      {/* D-105: 예전에는 'customer request created' 처럼 영문 코드가 그대로 보였다 — 상담신청 화면과 같은 한글 이름으로 */}
-                      {eventSummary(e).who} · {EVENT_TYPE_LABEL[e.eventType] ?? '고객 활동'}
+                      {e.text}
                     </span>
                   </Link>
                 </li>

@@ -214,7 +214,8 @@ function TourOverlay({ tour, onEnd }: { tour: ScreenTour; onEnd: () => void }) {
         end()
       } else if (e.key === 'ArrowRight') {
         e.preventDefault()
-        isLast ? end() : next()
+        if (isLast) end()
+        else next()
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault()
         prev()

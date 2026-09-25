@@ -3,8 +3,6 @@ import { useLocation } from 'react-router-dom'
 import { AuthContext } from '../../auth/authContext'
 import { getDataModeConfig } from '../../data/dataMode'
 import { useStoreVersion } from '../../lib/useStoreVersion'
-import { listClients } from '../../services/clientOpsService'
-import { isOpenEvent, listEvents } from '../../services/customerBridgeService'
 import { countPendingFirstMeetings } from '../../services/firstMeetingService'
 
 export interface NavCounts {
@@ -42,6 +40,11 @@ function emit(): void {
 }
 
 async function load(workspaceId: string | null): Promise<NavCounts> {
+  // D-112: 고객·상담신청 서비스는 숫자를 셀 때 불러온다 — 모든 화면이 먼저 받는 첫 파일에서 뺀다
+  const [{ listClients }, { isOpenEvent, listEvents }] = await Promise.all([
+    import('../../services/clientOpsService'),
+    import('../../services/customerBridgeService'),
+  ])
   const [c, e, f] = await Promise.allSettled([listClients(workspaceId), listEvents(workspaceId), countPendingFirstMeetings(workspaceId)])
   return {
     clients: c.status === 'fulfilled' ? c.value.filter((r) => r.archivedAt === null).length : null,

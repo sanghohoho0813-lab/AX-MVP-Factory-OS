@@ -73,7 +73,7 @@ export async function readSheetGrid(file) {
   var text = new TextDecoder("utf-8").decode(buf);
   // 한글 엑셀이 CSV 로 저장하면 EUC-KR 인 경우가 많다
   if (text.indexOf("�") >= 0) {
-    try { text = new TextDecoder("euc-kr").decode(buf); } catch (e) { /* utf-8 그대로 */ }
+    try { text = new TextDecoder("euc-kr").decode(buf); } catch { /* utf-8 그대로 */ }
   }
   return parseCsv(text);
 }

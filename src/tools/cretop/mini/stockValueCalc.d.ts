@@ -10,3 +10,9 @@ export function svCurrent(ui: CretopMiniUi): {
   sharesEdited: boolean
 }
 export function svSummaryLines(ui: CretopMiniUi): string[]
+export interface SvEntry {
+  at: string
+  shares?: string
+  cond?: Record<string, string>
+}
+export function svRestore(ui: CretopMiniUi | { companyInfo?: { companyName?: string; businessNo?: string } }, entry: SvEntry | null | undefined): boolean

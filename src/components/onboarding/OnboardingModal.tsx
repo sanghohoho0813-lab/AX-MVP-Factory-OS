@@ -113,7 +113,8 @@ export function OnboardingModal({ open, initialChapterId, onClose }: OnboardingM
     const panel = panelRef.current
     const focusFirst = () => {
       const nodes = panel?.querySelectorAll<HTMLElement>(FOCUSABLE)
-      nodes && nodes.length > 0 ? nodes[0].focus() : panel?.focus()
+      if (nodes && nodes.length > 0) nodes[0].focus()
+      else panel?.focus()
     }
     const raf = requestAnimationFrame(focusFirst)
 

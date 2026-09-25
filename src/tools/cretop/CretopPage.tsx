@@ -8,7 +8,7 @@
  * 골든 회귀 3벌(`npm run test:cretop`)이 원본과 같은 숫자를 지킨다. OCR 은 하지 않는다.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, FolderOpen, Copy, Check } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
@@ -18,7 +18,7 @@ import { ExtractorScreen } from './screens/ExtractorScreen'
 import { CoreCheckScreen } from './screens/CoreCheckScreen'
 import { Button } from '../../components/ui/Button'
 import { CretopMiniApp, buildOneLiner, oneLinerText, type CretopMiniHistoryItem, type CretopMiniUi } from './mini/MiniApp.jsx'
-import { svCurrent, svSummaryLines } from './mini/stockValueCalc.js'
+import { SV_EVENT, svCurrent, svRestore, svSummaryLines, type SvEntry } from './mini/stockValueCalc.js'
 import { useModuleBucket } from '../shared/useModuleBucket'
 import { useToast } from '../../components/ui/toastContext'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
@@ -31,6 +31,8 @@ interface AnalysisRow extends Record<string, unknown> {
   bizNo: string
   ts: string
   ui: CretopMiniUi
+  /** D-112: 주식가치 탭에서 고친 평가 조건(발행주식수 · 법인 구분 …) — 다른 기기 · 다른 직원도 같은 값 */
+  sv?: SvEntry | null
 }
 
 /** 원본 크레탑 분석 앱(D-93) + 이 OS 의 업체 연결(서류함 보고서 · 업체 기록에 붙이기 · 이력) */
@@ -70,10 +72,52 @@ function CretopScreen() {
     // 같은 회사(사업자번호·이름)의 이전 이력은 새 것으로 바꾼다 — 원본 비회원 이력과 같은 규칙
     const prev = (bucket.rows ?? []).find((r) => (bizNo && r.data.bizNo === bizNo) || r.data.company === company)
     // 원본처럼 저장이 안 되면 알려 준다 ('분석 저장 실패') — 결과 화면은 그대로 남는다
-    bucket.save({ id: prev?.id, clientId: clientId ?? prev?.clientId ?? '', data: { company, bizNo, ts: new Date().toISOString(), ui } }).catch((e: unknown) => {
+    bucket.save({ id: prev?.id, clientId: clientId ?? prev?.clientId ?? '', data: { company, bizNo, ts: new Date().toISOString(), ui, sv: prev?.data.sv ?? null } }).catch((e: unknown) => {
       showToast(`분석 저장 실패: ${e instanceof Error ? e.message : '오류'} — 연결을 확인하세요. 결과는 화면에 그대로 있습니다.`)
     })
   }
+
+  // D-112: 이력(클라우드)에 있던 평가 조건을 이 브라우저로 — 이 브라우저 값이 더 새것이면 그대로 둔다
+  useEffect(() => {
+    let changed = false
+    for (const r of bucket.rows ?? []) {
+      if (r.data.sv && svRestore({ companyInfo: { companyName: r.data.company, businessNo: r.data.bizNo } }, r.data.sv)) changed = true
+    }
+    if (changed) window.dispatchEvent(new Event(SV_EVENT))
+  }, [bucket.rows])
+
+  // D-112: 평가 조건을 고치면 그 회사 이력에 같이 저장한다. 칸마다 저장하지 않게 잠깐(0.8초) 모았다가 한 번에.
+  const rowsRef = useRef(bucket.rows)
+  rowsRef.current = bucket.rows
+  const saveRef = useRef(bucket.save)
+  saveRef.current = bucket.save
+  useEffect(() => {
+    const pending = new Map<string, { company: string; bizNo: string; entry: SvEntry }>()
+    let timer: number | undefined
+    const flush = () => {
+      for (const p of pending.values()) {
+        const row = (rowsRef.current ?? []).find((r) => (p.bizNo && r.data.bizNo === p.bizNo) || r.data.company === p.company)
+        if (!row) continue
+        void saveRef.current({ id: row.id, clientId: row.clientId, data: { ...row.data, sv: p.entry } }).catch(() => {
+          /* 이력 저장에 실패해도 이 브라우저에는 남아 있다 */
+        })
+      }
+      pending.clear()
+    }
+    const onChange = (e: Event) => {
+      const d = (e as CustomEvent<{ company: string; bizNo: string; entry: SvEntry } | undefined>).detail
+      if (!d || !d.entry) return
+      pending.set(d.bizNo || d.company, d)
+      window.clearTimeout(timer)
+      timer = window.setTimeout(flush, 800)
+    }
+    window.addEventListener(SV_EVENT, onChange)
+    return () => {
+      window.removeEventListener(SV_EVENT, onChange)
+      window.clearTimeout(timer)
+      flush()
+    }
+  }, [])
 
   /** 업체 서류함에 올려 둔 크레탑 보고서로 바로 분석 (D-90) */
   const runFromDocbox = async () => {

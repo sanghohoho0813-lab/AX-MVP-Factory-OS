@@ -118,7 +118,8 @@ export function SupabasePublicSurvey() {
     }
   }, [client, accessToken])
 
-  const sections = view?.sections ?? []
+  // 설문을 읽기 전에도 같은 빈 배열을 쓴다 — 매번 새 [] 면 아래 계산이 그릴 때마다 다시 돈다
+  const sections = useMemo(() => view?.sections ?? [], [view])
   const answerMap = useMemo(() => new Map(Object.entries(answers)), [answers])
   const codeById = useMemo(() => {
     const map = new Map<string, string>()

@@ -71,18 +71,39 @@ export function svLoad(ui) {
   try { const all = JSON.parse(localStorage.getItem(KEY) || "{}"); const v = all[selKey(ui)]; return v && typeof v === "object" ? v : {}; } catch { return {}; }
 }
 
-/** 고친 값만 남긴다 — 원문 그대로면 지운다(회사를 열어 보기만 해서는 쌓이지 않게) */
+/**
+ * 고친 값만 남긴다 — 원문 그대로면 칸을 비운 표시({at})만 남긴다(열어 보기만 해서는 값이 쌓이지 않게).
+ * D-112: 바뀔 때마다 알림에 회사 · 값 · 시각을 실어 보낸다 — 크레탑 화면이 분석 이력(클라우드)에 같이 저장한다.
+ */
 export function svSave(ui, { shares, cond }) {
+  const co = (ui && ui.companyInfo) || {};
+  const at = new Date().toISOString();
+  const entry = { at };
+  if (shares !== undefined && shares !== null) entry.shares = shares;
+  if (cond) entry.cond = cond;
+  try {
+    const all = JSON.parse(localStorage.getItem(KEY) || "{}");
+    all[selKey(ui)] = entry;
+    localStorage.setItem(KEY, JSON.stringify(all));
+  } catch { /* 저장 못 해도 화면 계산은 된다 */ }
+  try { window.dispatchEvent(new CustomEvent(SV_EVENT, { detail: { company: co.companyName || "", bizNo: co.businessNo || "", entry } })); } catch { /* 무시 */ }
+}
+
+/**
+ * D-112: 분석 이력(클라우드)에 있던 값을 이 브라우저로 — 이 브라우저 값보다 새것일 때만 덮는다.
+ * 다른 기기 · 다른 직원이 고친 평가 조건이 여기서도 보이게. 바꿨으면 true.
+ */
+export function svRestore(ui, entry) {
+  if (!entry || typeof entry !== "object" || typeof entry.at !== "string") return false;
   try {
     const all = JSON.parse(localStorage.getItem(KEY) || "{}");
     const k = selKey(ui);
-    const next = {};
-    if (shares !== undefined && shares !== null) next.shares = shares;
-    if (cond) next.cond = cond;
-    if (Object.keys(next).length) all[k] = next; else delete all[k];
+    const cur = all[k];
+    if (cur && typeof cur.at === "string" && cur.at >= entry.at) return false;
+    all[k] = entry;
     localStorage.setItem(KEY, JSON.stringify(all));
-  } catch { /* 저장 못 해도 화면 계산은 된다 */ }
-  try { window.dispatchEvent(new Event(SV_EVENT)); } catch { /* 무시 */ }
+    return true;
+  } catch { return false; }
 }
 
 export function parseShares(v) {

@@ -260,7 +260,8 @@ export function urgentReason(a: CheckAnswers): string {
 /** 점검 응답으로부터 위험도 평가 결과를 계산 */
 export function evaluateRisk(answers: CheckAnswers): RiskResult {
   const factors: RiskFactor[] = FACTOR_DEFS.filter((d) => d.triggered(answers)).map(
-    ({ triggered, ...rest }) => rest,
+    // eslint-disable-next-line no-unused-vars -- 판정 함수는 결과에서 빼려고 꺼낸다
+    ({ triggered: _triggered, ...rest }) => rest,
   );
 
   const rawScore = factors.reduce((sum, f) => sum + f.points, 0);

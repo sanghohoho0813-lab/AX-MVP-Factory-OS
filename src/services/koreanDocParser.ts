@@ -167,7 +167,7 @@ function valueAfter(text: string, labelPattern: string): string | undefined {
   v = v.replace(/^\s*\([^)]{0,12}\)\s*[:：]\s*/, '')
   v = v.replace(/^\s*\(\s*(?:단체명|법인명|상호|성명|대표자)\s*\)\s*/, '')
   v = v.replace(/^(소재지|성명|법인명|상호|단체명)\s*[:：]\s*/, '')
-  v = v.replace(/^[)\]}·.\-]+/, '').trim()
+  v = v.replace(/^[)\]}·.-]+/, '').trim()
   return v === '' ? undefined : v
 }
 

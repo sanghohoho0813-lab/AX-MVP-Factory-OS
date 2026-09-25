@@ -7,7 +7,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { T, FF, card } from "./theme.js";
-import { autoShares as autoSharesOf, bsWon, commas, netIncomeYears, num, parseShares, pctText, svCompute, svDefaults, svLoad, svSave, won } from "./stockValueCalc.js";
+import { SV_EVENT, autoShares as autoSharesOf, bsWon, commas, netIncomeYears, num, parseShares, pctText, svCompute, svDefaults, svLoad, svSave, won } from "./stockValueCalc.js";
 
 const CORP_TYPES = ["일반법인", "부동산과다보유법인", "특수법인"];
 let condOpenMemo = false; // 이 탭을 여는 동안 평가 조건 칸 펼침 상태
@@ -33,6 +33,13 @@ export function StockValue({ ui }) {
   // 다른 보고서를 분석하면 그 회사 값으로
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { setSt(initial()); }, [ui]);
+  // D-112: 분석 이력(클라우드)에서 다른 기기 값이 늦게 도착하면 다시 읽는다 (내가 고친 알림은 detail 이 있어 건너뛴다)
+  useEffect(() => {
+    const f = (e) => { if (!e.detail) setSt(initial()); };
+    window.addEventListener(SV_EVENT, f);
+    return () => window.removeEventListener(SV_EVENT, f);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ui]);
   const sharesInput = st.shares;
   const userEdited = st.sharesEdited;
   const cond = st.cond;
