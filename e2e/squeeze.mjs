@@ -77,11 +77,21 @@ const DETECTOR = `(() => {
     try {
       const range = document.createRange()
       range.selectNodeContents(el)
-      const tops = new Set()
+      // D-110: 한 줄 안에서도 글자 상자와 감싼 요소 상자의 top 이 1~2px 어긋난다(줄 간격 반쪽).
+      // 그걸 다른 줄로 세면 2줄짜리가 4줄로 잡힌다 — 4px 안의 top 은 같은 줄로 묶는다.
+      // 진짜 줄바꿈은 한 줄 높이(12px 이상)만큼 떨어지므로 그대로 잡힌다.
+      const ys = []
       for (const r of range.getClientRects()) {
-        if (r.width > 0 && r.height > 0) tops.add(Math.round(r.top))
+        if (r.width > 0 && r.height > 0) ys.push(r.top)
       }
-      if (tops.size > 0) lines = tops.size
+      ys.sort((a, b) => a - b)
+      let rows = 0
+      let last = -Infinity
+      for (const y of ys) {
+        if (y - last > 4) rows += 1
+        last = y
+      }
+      if (rows > 0) lines = rows
     } catch { /* 무시 */ }
 
     if (lines < 4) continue

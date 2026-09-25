@@ -3,7 +3,6 @@ import {
   Building,
   Check,
   ChevronDown,
-  ChevronRight,
   ExternalLink,
   Menu,
   Settings,
@@ -19,7 +18,19 @@ import { CloudSaveStatus } from '../cloud/CloudSaveStatus'
 import { SignalBell } from './SignalBell'
 import { HeaderClock } from './HeaderClock'
 import { brand } from '../../brand/brand.config'
-import { groupAccentClass, screenGroupForPath, screenTitleForPath } from '../../config/moduleRegistry'
+import { screenGroupForPath, screenTitleForPath, type NavAccent } from '../../config/moduleRegistry'
+
+/* D-110: 머리줄 묶음 이름 앞 색 띠 — 서랍 메뉴 묶음 띠와 같은 색. 글자와 한 줄로 흐르게 ::before 로 그린다 (통째로 적어야 Tailwind 가 만든다) */
+const GROUP_BAR: Record<NavAccent, string> = {
+  overview: 'before:bg-nav-overview',
+  ops: 'before:bg-nav-ops',
+  revenue: 'before:bg-nav-revenue',
+  customer: 'before:bg-nav-customer',
+  ai: 'before:bg-nav-ai',
+  evidence: 'before:bg-nav-evidence',
+  alert: 'before:bg-nav-alert',
+  system: 'before:bg-nav-system',
+}
 
 // supabase 전용 헤더 조각은 lazy 로 불러와 local entry 번들에 Supabase SDK 가 섞이지 않게 한다.
 const SupabaseWorkspaceSelector = lazy(() =>
@@ -166,10 +177,16 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
       {/* D-110: 제목 위에 서랍 메뉴의 묶음 이름을 작게 (영업 › 영업자 정산) — 색 띠는 서랍의 묶음 띠와 같은 색 */}
       <span className="flex min-w-0 flex-1 flex-col lg:hidden">
         {screenGroup && (
-          <span data-testid="screen-group" className="flex min-w-0 items-center gap-1 text-[0.7rem] leading-tight font-semibold text-slate-500">
-            <span aria-hidden="true" className={`h-2.5 w-[3px] shrink-0 rounded-full ${groupAccentClass(screenGroup.accent)}`} />
-            <span className="truncate">{screenGroup.title}</span>
-            <ChevronRight aria-hidden="true" className="size-3 shrink-0 text-slate-400" />
+          <span
+            data-testid="screen-group"
+            className={`flex min-w-0 items-center gap-1 text-[0.7rem] leading-tight font-semibold text-slate-500 before:h-2.5 before:w-[3px] before:shrink-0 before:rounded-full before:content-[''] ${GROUP_BAR[screenGroup.accent]}`}
+          >
+            <span className="truncate">
+              {screenGroup.title}
+              <span aria-hidden="true" className="ml-1 text-slate-400">
+                ›
+              </span>
+            </span>
           </span>
         )}
         <span className="t-card truncate text-slate-900">{screenTitle}</span>

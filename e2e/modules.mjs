@@ -516,7 +516,7 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
     await page.goto(BASE + path, { waitUntil: 'networkidle' })
     await page.waitForTimeout(300)
     const g = page.locator('header').getByTestId('screen-group')
-    const txt = (await g.innerText().catch(() => '')).trim()
+    const txt = (await g.innerText().catch(() => '')).replace('›', '').trim()
     const head = (await page.locator('header').first().innerText()).replace(/\s+/g, ' ')
     check(`머리줄 묶음: ${path} → ${group} › ${title}`, txt === group && head.includes(title), `${txt} | ${head.slice(0, 80)}`)
     const box = await page.locator('header').first().evaluate((el) => el.getBoundingClientRect().height)
