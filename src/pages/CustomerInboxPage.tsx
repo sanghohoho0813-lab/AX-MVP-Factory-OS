@@ -9,7 +9,8 @@ import { EventCard } from '../components/ops/EventCard'
 import { LinkCustomerModal } from '../components/ops/LinkCustomerModal'
 import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { listClients } from '../services/clientOpsService'
-import { EVENT_TYPE_LABEL, isOpenEvent, listEvents, seedDemoEvents, updateEvent } from '../services/customerBridgeService'
+import { EVENT_TYPE_LABEL, isOpenEvent, listEvents, seedDemoEvents, updateEvent, waitingDays } from '../services/customerBridgeService'
+import { todayLocalDate } from '../lib/appClock'
 import { getDataModeConfig } from '../data/dataMode'
 import { brand } from '../brand/brand.config'
 import type { ClientOpsRecord } from '../types/clientOps'
@@ -61,6 +62,14 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
   const [params, setParams] = useSearchParams()
   const typeParam = params.get('type')
   const typeFilter: CustomerEventType | 'all' = isEventType(typeParam) ? typeParam : 'all'
+  // D-111: 오래 기다린 먼저 — 들어온 지 오래된 열린 신청부터. 이것도 주소에 남긴다.
+  const waitingFirst = params.get('sort') === 'waiting'
+  const setWaitingFirst = (on: boolean) => {
+    const next = new URLSearchParams(params)
+    if (on) next.set('sort', 'waiting')
+    else next.delete('sort')
+    setParams(next, { replace: true })
+  }
   const setTypeFilter = (t: CustomerEventType | 'all') => {
     const next = new URLSearchParams(params)
     if (t === 'all') next.delete('type')
@@ -99,10 +108,16 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
 
   const clientNames = useMemo(() => new Map(clients.map((c) => [c.id, c.companyName])), [clients])
 
-  const visible = useMemo(
-    () => events.filter((e) => matchesStatus(e, filter) && (typeFilter === 'all' || e.eventType === typeFilter)),
-    [events, filter, typeFilter],
-  )
+  const visible = useMemo(() => {
+    const list = events.filter((e) => matchesStatus(e, filter) && (typeFilter === 'all' || e.eventType === typeFilter))
+    if (!waitingFirst) return list
+    // 열린 것 중 오래된 것 → 열린 것 중 새것 → 닫힌 것(원래 순서). 같은 날이면 원래 순서(급한 것 먼저)
+    const today = todayLocalDate()
+    return list
+      .map((e, i) => ({ e, i, w: waitingDays(e, today) }))
+      .sort((a, b) => (b.w ?? -1) - (a.w ?? -1) || a.i - b.i)
+      .map((x) => x.e)
+  }, [events, filter, typeFilter, waitingFirst])
 
   // 상태 칩 숫자는 고른 종류 안에서, 종류 칩 숫자는 고른 상태 안에서 센다 — 누르면 그 숫자만큼 나온다.
   const counts = useMemo(() => {
@@ -221,6 +236,29 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
             >
               {t.label}{' '}
               <span className={typeFilter === t.key ? 'text-white/70' : t.count === 0 ? 'text-slate-300' : 'text-slate-400'}>{t.count}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* D-111: 정렬 — 기본은 급한 것 · 새것 먼저, 켜면 오래 기다린 것 먼저 */}
+      {!loading && visible.length > 1 && (
+        <div className="-mt-2 flex items-center justify-end gap-1" role="group" aria-label="정렬">
+          {[
+            { on: false, label: '새것 먼저' },
+            { on: true, label: '오래 기다린 먼저' },
+          ].map((o) => (
+            <button
+              key={o.label}
+              type="button"
+              aria-pressed={waitingFirst === o.on}
+              data-testid={o.on ? 'inbox-sort-waiting' : 'inbox-sort-new'}
+              onClick={() => setWaitingFirst(o.on)}
+              className={`tap t-meta rounded-full px-2.5 py-1 font-medium ${
+                waitingFirst === o.on ? 'bg-slate-200 text-slate-900' : 'text-slate-500 hover:bg-slate-100'
+              }`}
+            >
+              {o.label}
             </button>
           ))}
         </div>

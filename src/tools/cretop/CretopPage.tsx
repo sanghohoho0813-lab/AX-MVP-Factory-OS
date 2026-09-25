@@ -18,6 +18,7 @@ import { ExtractorScreen } from './screens/ExtractorScreen'
 import { CoreCheckScreen } from './screens/CoreCheckScreen'
 import { Button } from '../../components/ui/Button'
 import { CretopMiniApp, buildOneLiner, oneLinerText, type CretopMiniHistoryItem, type CretopMiniUi } from './mini/MiniApp.jsx'
+import { svCurrent, svSummaryLines } from './mini/stockValueCalc.js'
 import { useModuleBucket } from '../shared/useModuleBucket'
 import { useToast } from '../../components/ui/toastContext'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
@@ -111,9 +112,13 @@ function CretopScreen() {
 
   const resultBar = (ui: CretopMiniUi, selected: string[]) => {
     const one = buildOneLiner(ui)
+    // D-111: 주식가치 탭에서 본(고친) 값 그대로 — 계산이 안 되면(발행주식수 없음 등) 줄을 넣지 않는다
+    const sv = svCurrent(ui)
+    const svLines = svSummaryLines(ui)
     const summary = [
       oneLinerText(one),
       ...(selected.length ? ['', '■ 최종 선택 컨설팅 항목', ...selected.map((n, i) => `${i + 1}. ${n}`)] : []),
+      ...(svLines.length ? ['', ...svLines] : []),
       '',
       '※ 크레탑 원문 기준 참고용 분석이며, 실제 상담 전 원문 확인이 필요합니다.',
     ].join('\n')
@@ -138,7 +143,13 @@ function CretopScreen() {
           verdict={null}
           verdictLabel={one.risks[0] ?? ''}
           summary={summary}
-          data={{ companyInfo: ui.companyInfo, corePreview: ui.corePreview, oneLiner: one, selected }}
+          data={{
+            companyInfo: ui.companyInfo,
+            corePreview: ui.corePreview,
+            oneLiner: one,
+            selected,
+            stockValue: sv.r ? { perShare: Math.round(sv.r.finalPerShare), total: Math.round(sv.r.totalValue), shares: sv.shares, corpType: sv.r.corpType, edited: sv.edited } : null,
+          }}
           subject={{ name: ui.companyInfo?.companyName, bizNo: ui.companyInfo?.businessNo }}
         />
         <span className="t-meta text-slate-500">분석 결과를 고객 관리 업체 기록에 붙입니다.</span>

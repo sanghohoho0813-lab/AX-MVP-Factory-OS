@@ -6,6 +6,7 @@ import { cretopYearPool, cretopFillYears } from "./years.js"; // [D-94]
 import { brandHex, brandSync, useThemeRerender } from "../../shared/brandHex"; // [D-96] · [D-98] 테마 바로 따라가기
 import { T as SHARED_T } from "./theme.js";
 import { StockValue } from "./StockValue.jsx";
+import { SV_EVENT } from "./stockValueCalc.js";
 import { InfoModal, RawTextModal, DetailModal, StakeModal } from "./DetailPopups.jsx";
 import { extractAll, detectBizForm, isCorpOnlyStrategy } from "./extract.js";
 import { formatPopupSection, CEO_PERSONAL_LABELS, WORK_BASIC_LABELS, WORK_DETAIL_LABELS } from "./popupFormat.js";
@@ -1791,6 +1792,9 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const [ui, setUi] = useState(() => (lastSession ? lastSession.ui : null));
+  // [D-111] 주식가치 조건을 고치면 결과 위 요약 막대(1장 요약 · 업체 기록 붙이기)도 새 값으로
+  const [, setSvTick] = useState(0);
+  useEffect(() => { const f = () => setSvTick((n) => n + 1); window.addEventListener(SV_EVENT, f); return () => window.removeEventListener(SV_EVENT, f); }, []);
   const [err, setErr] = useState("");
   // [D-94] 하단 탭 화면은 주소에 둔다 — 원본의 앱 안 ‘← 뒤로 / 앞으로 →’ 단추 대신 브라우저 뒤로 가기가 탭을 오간다
   const [searchParams, setSearchParams] = useSearchParams();

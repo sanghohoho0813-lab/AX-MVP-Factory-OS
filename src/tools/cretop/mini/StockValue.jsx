@@ -3,56 +3,58 @@
 //    예전 간이식(손익3:자산2 · 최저 80% 없음 · 있는 해만 평균)을 대체했다. 여기서 식을 따로 고치지 말 것.
 //  * 원문에서 자산총계·부채총계·3개년 당기순이익·발행주식수·부동산(토지·건물) 장부가를 읽어 채우고,
 //    원문에 없는 값(부동산 시가·퇴직급여추계액·영업권·증자/감자·법인 구분·이자율)은 '평가 조건'에서 고친다.
-import React, { useEffect, useMemo, useState } from "react";
+//  * [D-111] 재료·저장은 stockValueCalc.js — 1장 요약·업체 기록 붙이기도 같은 값을 쓴다. 고친 값은 회사별로 기억한다.
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { T, FF, card } from "./theme.js";
-import { unlistedShareValuation } from "../../../services/taxCalc";
+import { autoShares as autoSharesOf, bsWon, commas, netIncomeYears, num, parseShares, pctText, svCompute, svDefaults, svLoad, svSave, won } from "./stockValueCalc.js";
 
-const won = (n) => (n == null || !isFinite(n)) ? "—" : Math.round(n).toLocaleString() + "원";
-const pctText = (x, d = 1) => (x == null || !isFinite(x)) ? "—" : (x * 100).toFixed(d) + "%";
-const tr = (ui, k) => (ui.trendRows || []).find((r) => r.key === k && r.trend && r.trend.series);
-const num = (v) => { const n = parseFloat(String(v ?? "").replace(/[^0-9.-]/g, "")); return isFinite(n) ? n : 0; };
-const commas = (v) => { const t = String(v ?? "").trim(); if (t === "" || t === "-") return t; return num(t).toLocaleString("en-US", { maximumFractionDigits: 4 }); };
 const CORP_TYPES = ["일반법인", "부동산과다보유법인", "특수법인"];
+let condOpenMemo = false; // 이 탭을 여는 동안 평가 조건 칸 펼침 상태
 const TAX_STORE = "axmvp.tax.t3"; // 세금 계산기 09 가 기억하는 입력 (TaxCalculatorsPage STORAGE_PREFIX + key)
-
-/** 재무상태표 계정 금액(원) — 이름이 맞는 줄의 마지막(최근) 값 */
-function bsWon(ui, names) {
-  const bs = ui.detailStatements && ui.detailStatements.balanceSheet;
-  if (!bs || !bs.items) return null;
-  const u = bs.unit || "천원"; const f = u === "원" ? 1 : u === "천원" ? 1000 : u === "백만원" ? 1e6 : u === "억원" ? 1e8 : 1000;
-  let sum = null;
-  for (const name of names) {
-    const it = bs.items.find((x) => String(x.rawLabel || x.account || "").replace(/[\s()*]/g, "") === name);
-    const vals = it ? (it.numberCandidates || []).filter((v) => typeof v === "number") : [];
-    if (vals.length) sum = (sum || 0) + vals[vals.length - 1] * f;
-  }
-  return sum;
-}
-
-const latestEok = (row) => (row && row.trend.latest && typeof row.trend.latest.val === "number") ? row.trend.latest.val : null;
 
 export function StockValue({ ui }) {
   const navigate = useNavigate();
-  const niRow = tr(ui, "netIncome");
-  const eqRow = tr(ui, "totalEquity");
+  const niRow = (ui.trendRows || []).find((r) => r.key === "netIncome" && r.trend && r.trend.series);
   const niSeries = niRow ? niRow.trend.series.filter((s) => typeof s.val === "number") : [];
-  const last3 = niSeries.slice(-3).slice().sort((a, b) => (a.year || 0) - (b.year || 0)); // 오래된→최근
-  const rev = last3.slice().reverse(); // 최근→과거
-  const equityEok = latestEok(eqRow) != null ? latestEok(eqRow)
+  const eqRow = (ui.trendRows || []).find((r) => r.key === "totalEquity" && r.trend && r.trend.series);
+  const equityEok = (eqRow && eqRow.trend.latest && typeof eqRow.trend.latest.val === "number") ? eqRow.trend.latest.val
     : (ui.corePreview && ui.corePreview.totalEquity && typeof ui.corePreview.totalEquity.eok === "number" ? ui.corePreview.totalEquity.eok : null);
-  const assetEok = latestEok(tr(ui, "totalAssets"));
-  const debtEok = latestEok(tr(ui, "totalLiabilities"));
+  const last3 = netIncomeYears(ui); // 오래된→최근
 
   const bf = ui.bizForm || {};
   const [override, setOverride] = useState(false);   // 개인사업자 계산 강제(검증용 고급 옵션)
-  // 발행주식수: 주주현황 합산 자동값 기본 → 사용자 수정 가능
-  const autoShares = (ui.shares && ui.shares > 0) ? ui.shares : null;
+  // 발행주식수: 주주현황 합산 자동값 기본 → 사용자 수정 가능 (고친 값은 회사별로 기억)
+  const autoShares = autoSharesOf(ui);
   const autoSource = ui.sharesSource || null;
-  const [sharesInput, setSharesInput] = useState(autoShares ? String(autoShares) : "");
-  const [userEdited, setUserEdited] = useState(false);
-  const onShares = (v) => { setSharesInput(v); setUserEdited(true); };
-  const shares = (() => { const n = parseInt(String(sharesInput).replace(/[^0-9]/g, ""), 10); return (n && n > 0) ? n : null; })();
+  const defaults = svDefaults(ui);
+  const initial = () => { const saved = svLoad(ui); return { shares: saved.shares != null ? saved.shares : (autoShares ? String(autoShares) : ""), sharesEdited: saved.shares != null, cond: saved.cond ? { ...defaults, ...saved.cond } : defaults }; };
+  const [st, setSt] = useState(initial);
+  // 다른 보고서를 분석하면 그 회사 값으로
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setSt(initial()); }, [ui]);
+  const sharesInput = st.shares;
+  const userEdited = st.sharesEdited;
+  const cond = st.cond;
+  const edited = Object.keys(defaults).some((k) => cond[k] !== defaults[k]);
+  // 바뀔 때마다 이 회사 값으로 저장 — 원문 그대로인 칸은 저장하지 않는다
+  const persist = (next) => {
+    const condEdited = Object.keys(defaults).some((k) => next.cond[k] !== defaults[k]);
+    svSave(ui, { shares: next.sharesEdited ? next.shares : undefined, cond: condEdited ? next.cond : undefined });
+  };
+  // 저장은 그린 뒤에 — 그리는 도중에 저장 알림(SV_EVENT)을 보내면 요약 막대가 같은 틈에 다시 그려져 React 가 경고한다
+  const dirty = useRef(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (dirty.current) { dirty.current = false; persist(st); } }, [st]);
+  const update = (fn) => { dirty.current = true; setSt(fn); };
+  const onShares = (v) => update((c) => ({ ...c, shares: v, sharesEdited: true }));
+  const setC = (k, v) => update((c) => ({ ...c, cond: { ...c.cond, [k]: v } }));
+  const resetCond = () => update((c) => ({ ...c, cond: defaults }));
+  // 업체 기록에 붙이면 업체 목록을 다시 읽으면서 이 화면이 새로 그려진다 — 펼친 채로 두던 조건 칸이 접히지 않게 기억
+  const [openCond, setOpenCondState] = useState(() => condOpenMemo);
+  const setOpenCond = (fn) => setOpenCondState((o) => { const v = typeof fn === "function" ? fn(o) : fn; condOpenMemo = v; return v; });
+
+  const shares = parseShares(sharesInput);
   // 자본금(원) — 추정 액면가 역산용. detailStatements BS의 '자본금' 계정에서 추출(읽기 전용, 계산식 무관).
   const capitalWon = bsWon(ui, ["자본금"]) ?? bsWon(ui, ["보통주자본금"]);
   const estParValue = (capitalWon && shares) ? Math.round(capitalWon / shares) : null;   // 추정 액면가
@@ -65,40 +67,9 @@ export function StockValue({ ui }) {
     return { cand, rel, ok: rel <= 0.005 };   // 0.5% 이내면 일반 액면가와 일치로 간주
   })();
 
-  /* ---- [D-109] 평가 조건 — 원문 값으로 채우고, 없는 값은 사람이 고친다 ---- */
   const reBookAuto = bsWon(ui, ["토지", "건물", "구축물", "투자부동산"]);
-  const defaults = useMemo(() => {
-    const yearsWon = [null, null, null];
-    // 오래된→최근을 [1년전(가중1), 직전(가중2), 결산연도(가중3)] 자리에 뒤에서부터 채운다
-    last3.forEach((s, i) => { yearsWon[3 - last3.length + i] = s.val * 1e8; });
-    const asset = assetEok != null ? assetEok * 1e8 : (equityEok != null ? equityEok * 1e8 + (debtEok != null ? debtEok * 1e8 : 0) : null);
-    const debt = debtEok != null ? debtEok * 1e8 : (asset != null && equityEok != null ? asset - equityEok * 1e8 : null);
-    const s = (n) => (n == null ? "" : commas(String(Math.round(n))));
-    return {
-      rate: "10", type: "일반법인",
-      asset: s(asset), debt: s(debt),
-      reBook: s(reBookAuto ?? 0), reFair: s(reBookAuto ?? 0), severance: "0", goodwill: "0",
-      inc0: s(yearsWon[0]), inc1: s(yearsWon[1]), inc2: s(yearsWon[2]),
-      month0: "0", month1: "0", month2: "0", cap0: "0", cap1: "0", cap2: "0",
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ui]);
-  const [cond, setCond] = useState(defaults);
-  useEffect(() => { setCond(defaults); }, [defaults]); // 다른 보고서를 분석하면 그 값으로
-  const [openCond, setOpenCond] = useState(false);
-  const setC = (k, v) => setCond((c) => ({ ...c, [k]: v }));
-  const edited = Object.keys(defaults).some((k) => cond[k] !== defaults[k]);
-
   const yearsFound = last3.length;
-  const ready = !!shares && cond.asset !== "" && yearsFound > 0;
-  const r = ready ? unlistedShareValuation({
-    shares, ratePct: num(cond.rate), asset: num(cond.asset), debt: num(cond.debt),
-    reBook: num(cond.reBook), reFair: num(cond.reFair), severance: num(cond.severance), goodwill: num(cond.goodwill),
-    corpType: cond.type,
-    income: [num(cond.inc0), num(cond.inc1), num(cond.inc2)],
-    months: [num(cond.month0), num(cond.month1), num(cond.month2)],
-    caps: [num(cond.cap0), num(cond.cap1), num(cond.cap2)],
-  }) : null;
+  const r = svCompute(ui, shares, cond);
   const finalValue = r ? r.finalPerShare : null;
   const floorApplied = r ? r.minFloor > r.weightedValue : false;
 
@@ -277,7 +248,7 @@ export function StockValue({ ui }) {
               </CondGroup>
             ))}
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button type="button" onClick={() => setCond(defaults)} disabled={!edited}
+              <button type="button" onClick={resetCond} disabled={!edited}
                 style={{ border: `1px solid ${T.line}`, background: "#fff", color: edited ? T.sub : T.mute, borderRadius: 9, padding: "8px 12px", fontSize: "calc(12px * var(--fs,1))", fontWeight: 700, fontFamily: FF, cursor: edited ? "pointer" : "default" }}>원문 값으로 되돌리기</button>
             </div>
           </div>

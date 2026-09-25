@@ -582,6 +582,67 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await ctx.close()
 }
 
+/* D-111: 크레탑 주식가치 — 고친 값은 회사별로 기억 · 업체 기록에 붙일 때 요약에 들어간다 · 계산기 목록 Esc/바깥 닫기 */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.goto(BASE + '/tools/cretop?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  await page.getByRole('button', { name: '텍스트 붙여넣기' }).click()
+  await page.getByLabel('크레탑 원문').fill(SEBANG)
+  await page.getByTestId('cretop-run').click()
+  await page.waitForTimeout(800)
+  const tab = async (k) => { await page.locator(`[data-testid="cretop-mini-tabs"] button[data-tab="${k}"]`).click(); await page.waitForTimeout(350) }
+  await tab('value')
+  await page.getByPlaceholder('예: 50,000').fill('200000')
+  await page.getByTestId('stock-value-cond-toggle').click()
+  await page.getByTestId('stock-value-cond').getByLabel('법인 구분').selectOption('특수법인')
+  await page.waitForTimeout(300)
+  await tab('reco')
+  await tab('value')
+  const kept = await page.getByTestId('stock-value-final').innerText()
+  check('주식가치 기억: 다른 탭에 갔다 와도 발행주식수 · 법인 구분(특수 → 11,300원)이 남는다', kept.includes('11,300') && (await page.getByPlaceholder('예: 50,000').inputValue()) === '200000', kept.replace(/\n/g, ' '))
+  const quick = page.getByTestId('tool-attach-quick').first()
+  await quick.click()
+  await page.waitForTimeout(400)
+  // 예시 원문(세방형)과 업체(한솔테크)가 달라 '다른 회사 결과' 확인이 먼저 뜬다 — 그래도 붙인다
+  const mismatch = page.getByRole('button', { name: '그래도 붙이기' })
+  check('업체 기록 붙이기: 다른 회사 원문이면 한 번 더 묻는다', (await mismatch.count()) === 1)
+  await mismatch.click()
+  await page.waitForTimeout(900)
+  const saved = await page.evaluate(() => {
+    const list = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+    const c = list.find((r) => r.id === 'cli_hansol')
+    const t = (c?.toolResults ?? []).filter((x) => x.toolKey === 'cretop').pop()
+    return t ? { summary: t.summary, sv: t.data?.stockValue ?? null } : null
+  })
+  check('업체 기록 붙이기: 요약에 예상 주식가치(1주당 11,300원 · 특수법인)가 들어간다', !!saved && saved.summary.includes('예상 주식가치') && saved.summary.includes('11,300원') && saved.summary.includes('특수법인'), (saved?.summary ?? '없음').slice(-240))
+  check('업체 기록 붙이기: 데이터에도 1주당 · 기업가치 · 주식수', saved?.sv?.perShare === 11300 && saved?.sv?.total === 2260000000 && saved?.sv?.shares === 200000, JSON.stringify(saved?.sv))
+  // 되돌리면 요약도 원문 값으로
+  check('붙인 뒤: 펼쳐 둔 평가 조건 칸이 접히지 않는다', (await page.getByTestId('stock-value-cond').count()) === 1)
+  await page.getByTestId('stock-value-cond').getByRole('button', { name: '원문 값으로 되돌리기' }).click()
+  await page.waitForTimeout(300)
+  check('되돌리기: 다시 10,100원', (await page.getByTestId('stock-value-final').innerText()).includes('10,100'))
+  await ctx.close()
+
+  const m = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'ko-KR' })
+  const mp = await m.newPage()
+  await mp.goto(BASE + '/tools/tax', { waitUntil: 'networkidle' })
+  await mp.getByTestId('tax-picker').click()
+  await mp.waitForTimeout(200)
+  await mp.keyboard.press('Escape')
+  await mp.waitForTimeout(200)
+  check('390 세금 계산기: Esc 로 목록 닫힘', (await mp.locator('#tax-picker-list').count()) === 0)
+  await mp.getByTestId('tax-picker').click()
+  await mp.waitForTimeout(200)
+  await mp.locator('h2').first().click()
+  await mp.waitForTimeout(200)
+  check('390 세금 계산기: 바깥을 누르면 목록 닫힘', (await mp.locator('#tax-picker-list').count()) === 0)
+  await m.close()
+}
+
 await browser.close()
 console.log(`\n도구함(도구·붙이기·업체 연동·서류 부족·기한·검색): ${pass} passed, ${fail} failed`)
 process.exit(fail > 0 ? 1 : 0)

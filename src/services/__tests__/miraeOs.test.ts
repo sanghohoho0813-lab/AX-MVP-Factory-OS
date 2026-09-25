@@ -43,6 +43,7 @@ import {
 import type { ClientOpsRecord, OpsAlert } from '../../types/clientOps'
 import { mergeServices, normalizeCustomService, toServiceMeta } from '../customServiceService'
 import { buildKpis, kpisByGroup, kpiStatusSummary } from '../kpiService'
+import { svCurrent, svSummaryLines } from '../../tools/cretop/mini/stockValueCalc.js'
 import { profileFields, profileFieldsByGroup, regionOf } from '../clientOpsProfile'
 import { CONTRACT_STAGE_ORDER, CONTRACT_STAGE_LABEL, contractStageOf, statusForStage } from '../../types/clientOps'
 import type { ClientOpsStatus, ContractStage } from '../../types/clientOps'
@@ -1111,6 +1112,15 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
   check('비상장: 특수법인은 순자산 100%', special.wNetAsset === 1 && special.weightedValue === special.perShareNetAsset)
   const heavy = unlistedShareValuation({ ...base, reBook: 1.5e9, reFair: 2e9, corpType: '부동산과다보유법인' })
   check('비상장: 부동산 비율 57% → 자동판정 부동산과다 · 가중 60:40', heavy.autoType === '부동산과다보유법인' && heavy.wNetAsset === 0.6, `${heavy.reRatio}`)
+  // D-111: 크레탑 원문 → 주식가치 요약 줄 (저장소 없이도 원문 값으로 계산)
+  const tr = (key: string, vals: number[]) => ({ key, trend: { series: vals.map((val, i) => ({ year: 2023 + i, val })), latest: { val: vals[vals.length - 1] } } })
+  const cui = { companyInfo: { companyName: '시험회사' }, shares: 200000, trendRows: [tr('netIncome', [1.5, 1.8, 2.02]), tr('totalAssets', [120, 115, 110]), tr('totalLiabilities', [98, 101, 87.4])] }
+  const svc = svCurrent(cui as never)
+  check('크레탑 주식가치: 원문 값으로 1주당 10,100원', !!svc.r && Math.round(svc.r.finalPerShare) === 10100, String(svc.r?.finalPerShare))
+  const lines = svSummaryLines(cui as never)
+  check('크레탑 주식가치: 1장 요약 줄 = 1주당 · 기업가치 · 원문 값', lines.length === 3 && lines[1].includes('10,100원') && lines[1].includes('2,020,000,000원') && lines[2].includes('크레탑 원문 값'), lines.join(' / '))
+  check('크레탑 주식가치: 발행주식수 없으면 요약 줄 없음', svSummaryLines({ ...cui, shares: null } as never).length === 0)
+  check('크레탑 주식가치: 개인사업자는 요약 줄 없음', svSummaryLines({ ...cui, bizForm: { isPersonal: true } } as never).length === 0)
   // 예전 크레탑 간이식((손익×3 + 자산×2) ÷ 5, 최저 한도 없음)과 달라지는 경우 — 손실 법인
   const oldSimple = (loss.perShareIncomeValue * 3 + loss.perShareNetAsset * 2) / 5
   check('비상장: 손실 법인은 예전 간이식보다 높게(최저 한도) 나온다', loss.finalPerShare > oldSimple)

@@ -458,6 +458,15 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   await page.getByTestId('inbox-type-filter').getByRole('button', { name: /전부/ }).click()
   await page.waitForTimeout(200)
   check(`종류별(${tag}): 전부로 돌아오면 3장`, (await page.locator('main article').count()) === 3 && !page.url().includes('type='))
+  // D-111: 오래 기다린 먼저 — 6일 → 3일 → 오늘 순, 주소에 남는다
+  await page.getByTestId('inbox-sort-waiting').click()
+  await page.waitForTimeout(200)
+  const order = await page.locator('main article').evaluateAll((els) => els.map((e) => (e.innerText.match(/오래된가입|상담요청사|방금가입사/) || [''])[0]))
+  check(`정렬(${tag}): 오래 기다린 먼저 = 6일 · 3일 · 오늘`, order.join(',') === '오래된가입,상담요청사,방금가입사', order.join(','))
+  check(`정렬(${tag}): 주소에 남는다`, page.url().includes('sort=waiting'))
+  await page.getByTestId('inbox-sort-new').click()
+  await page.waitForTimeout(200)
+  check(`정렬(${tag}): 새것 먼저로 돌아온다`, !page.url().includes('sort='))
   if (!mobile) {
     await page.goto(BASE + '/ops/inbox?type=nonsense', { waitUntil: 'networkidle' })
     await page.waitForTimeout(300)

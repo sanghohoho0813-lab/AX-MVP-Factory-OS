@@ -5,7 +5,7 @@
  * 적은 값은 계산기마다 이 브라우저에 남는다 — 상담 중에 화면을 옮겨도 다시 적지 않는다.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Check, ChevronDown, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { PageHeader } from '../components/ui/PageHeader'
@@ -110,6 +110,23 @@ export function TaxCalculatorsPage() {
 
   const [values, setValues] = useState<Values>(() => loadValues(calc))
   const [pickerOpen, setPickerOpen] = useState(false)
+  const pickerRef = useRef<HTMLDivElement>(null)
+  // D-111: 펼친 목록은 Esc · 바깥을 누르면 닫는다 (고르지 않고 다시 보고 싶을 때)
+  useEffect(() => {
+    if (!pickerOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPickerOpen(false)
+    }
+    const onDown = (e: PointerEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setPickerOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('pointerdown', onDown)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('pointerdown', onDown)
+    }
+  }, [pickerOpen])
   useEffect(() => {
     setValues(loadValues(calc))
   }, [calc])
@@ -272,7 +289,7 @@ export function TaxCalculatorsPage() {
 
       {/* 계산기 고르기 — 휴대폰에서는 가로로 넘기는 조각, 넓으면 한 줄 감싸기 */}
       {/* D-109: 휴대폰에서는 9개를 옆으로 밀어 찾지 않는다 — 지금 계산기 한 줄을 누르면 목록이 펼쳐지고, 고르면 닫힌다 */}
-      <div className="no-print sm:hidden">
+      <div ref={pickerRef} className="no-print sm:hidden">
         <button
           type="button"
           data-testid="tax-picker"
