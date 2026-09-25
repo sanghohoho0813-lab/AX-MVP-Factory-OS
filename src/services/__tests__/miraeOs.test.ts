@@ -29,7 +29,8 @@ import {
   buildTopActions,
   daySummaryText,
 } from '../dailyBriefService'
-import { buildProjection, eventSummary, isOpenEvent, sortEvents } from '../customerBridgeService'
+import { EVENT_TYPE_LABEL, buildProjection, eventSummary, isOpenEvent, sortEvents } from '../customerBridgeService'
+import signupSql from '../../../supabase/migrations/20260925000014_signup_event.sql?raw'
 import { normalizeClientOps, withContract, withCustomField, withFee, withNewFee, withNewFunding, withService, withoutCustomField } from '../clientOpsService'
 import {
   contractAgeShort,
@@ -269,6 +270,21 @@ check('events: 정렬 = 상태 → 우선순위 → 최신', sortEvents(E).map((
 check('events: 열린 것 판정', isOpenEvent(E[1]) && !isOpenEvent(E[0]))
 check('events: 주문 요약', eventSummary(ev({ eventType: 'service_order_created', payload: { company_name: '한빛', product_slug: 'venture', order_number: 'SO-1' } })).what.includes('SO-1'))
 check('events: 요약 who 는 회사명 우선', eventSummary(ev({ payload: { company_name: '한빛', buyer_name: '김' } })).who === '한빛')
+// D-106: 홈페이지 회원가입 → 잠재고객 상담신청
+{
+  const su = eventSummary(ev({ eventType: 'customer_signed_up', payload: { name: '이고객', email: 'lee@x.com', company_name: '새봄식품' } }))
+  check('가입: 이름표는 회원가입', EVENT_TYPE_LABEL.customer_signed_up === '회원가입')
+  check('가입: 회사가 있으면 회사 · 사람 · 이메일', su.who === '새봄식품' && su.what.includes('회원가입') && su.what.includes('이고객') && su.what.includes('lee@x.com'), JSON.stringify(su))
+  const solo = eventSummary(ev({ eventType: 'customer_signed_up', payload: { email: 'k@x.com' } }))
+  check('가입: 이름 · 회사 없어도 이메일로', solo.who === '고객' && solo.what.includes('k@x.com'), JSON.stringify(solo))
+  check('가입: 처리 전이면 상담신청 숫자에 든다', isOpenEvent(ev({ eventType: 'customer_signed_up', status: 'new' })))
+  // 가입을 절대 막지 않는 장치가 SQL 에서 빠지면 여기서 먼저 걸린다 (2026-09-03 가입 장애 재발 방지)
+  check('가입 SQL: 오류를 삼켜 가입을 막지 않는다', /exception\s+when\s+others\s+then/i.test(signupSql) && signupSql.includes('raise warning'))
+  check('가입 SQL: 기존 가입 트리거 뒤에 돈다 (zzz_)', signupSql.includes('create trigger zzz_bridge_on_auth_user_created') && signupSql.includes('after insert on auth.users'))
+  check('가입 SQL: 내부 OS 직원 가입은 뺀다', signupSql.includes("'internal_os'"))
+  check('가입 SQL: 표 · 열 삭제 없음', !/drop\s+table|drop\s+column|truncate/i.test(signupSql))
+  check('가입 SQL: 기존 종류 여덟 가지를 모두 다시 허용', ['diagnosis_completed', 'consultation_requested', 'service_order_created', 'document_uploaded', 'customer_request_created', 'customer_action_completed', 'customer_reply', 'profile_updated', 'customer_signed_up'].every((t) => signupSql.includes(`'${t}'`)))
+}
 check('events: 값 없으면 고객', eventSummary(ev({ payload: {} })).who === '고객')
 // 상품 코드는 화면에 그대로 나오면 안 된다 — 아는 코드면 한글 이름으로 바꾼다
 check(

@@ -45,6 +45,8 @@ export type CustomerEventType =
   | 'customer_action_completed'
   | 'customer_reply'
   | 'profile_updated'
+  /** D-106: 홈페이지(고객 플랫폼)에서 새로 회원가입 — 아직 고객사와 연결 안 된 잠재 고객 */
+  | 'customer_signed_up'
 
 export type CustomerEventStatus = 'new' | 'linked' | 'in_progress' | 'resolved' | 'ignored'
 export type CustomerEventPriority = 'high' | 'medium' | 'low'

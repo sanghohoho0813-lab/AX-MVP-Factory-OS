@@ -45,7 +45,8 @@ export async function signUpWithPassword(
     const { data, error } = await getSupabaseClient().auth.signUp({
       email,
       password,
-      options: { data: displayName ? { display_name: displayName } : undefined },
+      // D-106: 내부 OS 직원 가입 표시 — 고객 플랫폼 회원가입 알림(잠재고객 상담신청)에서 빠지게 한다
+      options: { data: displayName ? { display_name: displayName, signup_app: 'internal_os' } : { signup_app: 'internal_os' } },
     })
     if (error) return fail(error)
     return ok(data.session)

@@ -75,6 +75,7 @@ function eventScore(e: CustomerEvent): { score: number; reason: string } {
   if (e.eventType === 'consultation_requested') return { score: 82, reason: '고객이 상담을 신청했습니다' }
   if (e.eventType === 'customer_request_created') return { score: e.priority === 'high' ? 80 : 64, reason: '고객이 요청을 보냈습니다' }
   if (e.eventType === 'diagnosis_completed') return { score: e.priority === 'high' ? 72 : 58, reason: '사업 진단을 마친 잠재 고객입니다' }
+  if (e.eventType === 'customer_signed_up') return { score: 60, reason: '홈페이지에 새로 가입한 잠재 고객입니다 — 먼저 연락해 볼 만합니다' }
   if (e.eventType === 'customer_action_completed') return { score: 56, reason: '고객이 요청한 조치를 마쳤습니다' }
   return { score: 30, reason: '참고용 상담신청' }
 }

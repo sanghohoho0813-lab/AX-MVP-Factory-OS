@@ -41,6 +41,7 @@ export const EVENT_TYPE_LABEL: Record<CustomerEventType, string> = {
   customer_action_completed: '요청 조치 완료',
   customer_reply: '고객 답변',
   profile_updated: '고객 정보 변경',
+  customer_signed_up: '회원가입',
 }
 
 export const EVENT_STATUS_LABEL: Record<CustomerEventStatus, string> = {
@@ -115,6 +116,13 @@ export function eventSummary(e: CustomerEvent): { who: string; what: string } {
       return { who, what: '답변을 남겼습니다' }
     case 'profile_updated':
       return { who, what: '계정 정보를 바꿨습니다' }
+    case 'customer_signed_up': {
+      // D-106: 이름 · 회사 · 이메일 중 있는 것만 — 가입 양식에 회사를 안 적는 사람도 많다
+      const email = str('email')
+      const person = str('name')
+      const extra = [person && person !== who ? person : '', email].filter(Boolean).join(' · ')
+      return { who, what: `고객 플랫폼에 회원가입했습니다${extra ? ` · ${extra}` : ''}` }
+    }
   }
 }
 
@@ -464,6 +472,14 @@ export function seedDemoEvents(): CustomerEvent[] {
       sourceId: 'demo-request-1',
       priority: 'medium',
       payload: { demo: true, company_name: '한빛정밀(샘플)', request_type: 'status', title: '벤처인증 진행 상황이 궁금합니다' },
+      occurredAt: now,
+    },
+    {
+      eventType: 'customer_signed_up',
+      sourceType: 'demo_signup',
+      sourceId: 'demo-signup-1',
+      priority: 'medium',
+      payload: { demo: true, name: '정새봄', email: 'demo3@example.com', phone: '010-0000-0003', company_name: '새봄식품(샘플)', signup_source: 'miraeailab.com' },
       occurredAt: now,
     },
   ]

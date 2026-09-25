@@ -62,6 +62,18 @@ Supabase Dashboard → SQL Editor 에서 **두 파일을 순서대로** 붙여 �
 
 4번은 이 프로젝트에서 **신규 계정 생성이 전부 실패하던 장애**를 고친다. `auth.users` 에 가입 트리거가 두 개(내부 OS `on_auth_user_created`, 공개 사이트 `zz_mirae_on_auth_user_created`) 걸려 있는데, 먼저 도는 내부 트리거가 `profiles.display_name` 에 넣도록 쓰여 있고 이 프로젝트의 `profiles` 에는 그 컬럼이 없어서 INSERT 전체가 롤백된다. Dashboard 의 Add user 도, miraeailab.com 회원가입도 같이 막힌다. 브릿지(…0006/0007/0008)와는 무관하며 그 이전부터 있던 문제다.
 
+### 3.3b 홈페이지 회원가입 알림 (D-106)
+
+`supabase/migrations/20260925000014_signup_event.sql` — miraeailab.com 에서 누가 회원가입하면 내부 OS **잠재고객 상담신청** 에 '회원가입' 한 줄이 뜬다(이름 · 이메일 · 연락처 · 회사).
+
+- 가입 트리거를 하나 더 건다: `zzz_bridge_on_auth_user_created` — 기존 두 가입 트리거 **뒤에** 돈다.
+- **알림이 실패해도 회원가입은 절대 막지 않는다**(오류를 삼키고 경고만 남김). 4번 장애를 되풀이하지 않기 위한 장치이며, 단위 시험이 SQL 안의 이 장치를 지키고 있다.
+- 내부 OS 가입 화면으로 만든 직원 계정은 뜨지 않는다.
+- `customer_events.event_type` 허용 값에 `customer_signed_up` 하나를 더한다(넓히기만, 기존 행 영향 없음).
+- 적용 후 확인: `select tgname from pg_trigger where tgrelid='auth.users'::regclass and not tgisinternal order by 1;` → 세 줄(on_auth_user_created · zz_mirae_on_auth_user_created · zzz_bridge_on_auth_user_created).
+- 시험: `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/signup_event.sql` (한 트랜잭션 · 끝에 되돌림).
+- 되돌리기: `drop trigger zzz_bridge_on_auth_user_created on auth.users;`
+
 > **…0006 을 이미 적용했다면** 나머지만 실행하면 된다. 전부 멱등이라 다시 실행해도 안전하다.
 > 계정을 만들어야 하므로 **4번을 먼저** 적용하는 것이 편하다.
 

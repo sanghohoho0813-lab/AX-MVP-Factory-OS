@@ -3,6 +3,11 @@
 브랜치: `main` (Production 직행 — DECISIONS D-16). Production: https://ax-mvp-factory-os.vercel.app (supabase 모드)
 고객 플랫폼: https://miraeailab.com (`main` 직행)
 
+## 홈페이지 회원가입 → 잠재고객 상담신청 (D-106) (2026-09-25)
+- miraeailab.com 에서 회원가입하면 잠재고객 상담신청에 '회원가입' 이 뜬다(이름 · 이메일 · 연락처 · 회사, 빨간 숫자 +1).
+- 알림이 실패해도 가입은 절대 안 막힌다. 직원 가입은 안 뜬다.
+- **사람이 할 일: Supabase SQL Editor 에서 `supabase/migrations/20260925000014_signup_event.sql` 실행** (SETUP.md 3.3b). 실행 전까지는 운영에서 안 뜬다.
+
 ## 메뉴 숫자 한 번만 세기 · 상담신청 말 맞추기 (D-105) (2026-09-24)
 - 메뉴 숫자는 한 번만 센다(사이드바 · 서랍 · 하단 탭 공유). 클라우드는 화면만 옮길 때 15초에 한 번까지.
 - 화면 안의 '고객 이벤트' → '상담신청'. 종 목록의 영문 코드(customer request created) → 한글.

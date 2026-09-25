@@ -29,7 +29,7 @@
     "test:employment": "vite build --config vite.employment.config.mjs && node .employment-out/employment.mjs",
     "test:labcare": "vite build --config vite.labcare.config.mjs && node .labcare-out/labcare.mjs",
     "test:xlsx": "vite build --config vite.xlsx.config.mjs && node .xlsx-out/xlsx.mjs",
-    "test:sql": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f supabase/tests/bridge_contract.sql && psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f supabase/tests/bridge_hardening.sql",
+    "test:sql": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f supabase/tests/bridge_contract.sql && psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f supabase/tests/bridge_hardening.sql && psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f supabase/tests/signup_event.sql",
     "e2e:internal": "node e2e/internal.mjs",
     "e2e:roundtrip": "node e2e/roundtrip.mjs",
     "test:all": "npm run test:contract && npm run test:client-ops && npm run test:client-operations && npm run test:progress && npm run test:persistence && npm run test:onboarding && npm run test:client-ops-alerts && npm run test:doc-parser && npm run test:client-ops-stage2 && npm run test:datamode && npm run test:autherrors && npm run test:mirae-os && npm run test:consulting && npm run test:operator && npm run test:startup-tax && npm run test:cretop && npm run test:tools && npm run test:employment && npm run test:labcare && npm run test:xlsx",

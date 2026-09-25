@@ -53,6 +53,9 @@ const FIELD_LABEL: Record<string, string> = {
   document_type: '서류 종류',
   file_name: '파일',
   source: '유입 경로',
+  // D-106 회원가입
+  signup_source: '가입한 곳',
+  signed_up_at: '가입 시각',
 }
 
 /**

@@ -379,6 +379,42 @@ for (const [w, h, mob] of [[1440, 900, false], [390, 844, true]]) {
   await ctx.close()
 }
 
+/* ---- D-106: 홈페이지 회원가입 → 잠재고객 상담신청 에 뜬다 (빨간 숫자 +1 · 회사 이름 미리 채움) ---- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.goto(BASE + '/ops/inbox', { waitUntil: 'networkidle' })
+  const reqBadge = async () => Number(((await page.locator('aside [data-nav-badge="requests"]').innerText().catch(() => '0')) ?? '0').trim() || 0)
+  const before = await reqBadge()
+  // 운영에서는 DB 트리거가 넣는 한 줄 — 같은 모양으로 넣는다
+  await page.evaluate(() => {
+    const k = 'axmvp.v1.customer_events'
+    const list = JSON.parse(localStorage.getItem(k) ?? '[]')
+    const now = new Date().toISOString()
+    list.unshift({ id: 'ev-signup-qa', workspaceId: null, portalClientLinkId: null, operationsClientId: null, profileId: 'p-signup', eventType: 'customer_signed_up', sourceType: 'auth_signup', sourceId: 'u-signup-qa', dedupeKey: 'auth_signup:u-signup-qa:customer_signed_up', payloadVersion: 1, payload: { name: '이고객', email: 'lee@customer.test', phone: '010-1234-5678', company_name: '새봄식품', signup_source: 'miraeailab.com' }, priority: 'medium', status: 'new', occurredAt: now, receivedAt: now, handledAt: null, handledBy: null, handlingNote: null, createdAt: now, updatedAt: now })
+    localStorage.setItem(k, JSON.stringify(list))
+  })
+  await page.goto(BASE + '/ops/inbox', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  const main = (await page.locator('main').innerText()) ?? ''
+  check('회원가입: 상담신청에 뜬다 (종류 · 설명)', main.includes('회원가입') && main.includes('고객 플랫폼에 회원가입했습니다') && main.includes('새봄식품'), main.slice(0, 300))
+  check('회원가입: 빨간 숫자가 하나 는다', (await reqBadge()) === before + 1, `${before} → ${await reqBadge()}`)
+  const card = page.locator('article', { hasText: '고객 플랫폼에 회원가입했습니다' }).first()
+  await card.getByRole('button', { name: /새 고객사로 만들기/ }).click()
+  await page.waitForTimeout(300)
+  const dlg = page.getByRole('dialog')
+  const values = await dlg.locator('input').evaluateAll((els) => els.map((e) => e.value))
+  check('회원가입: 새 고객사로 만들 때 회사 · 이름 · 연락처가 채워져 있다', values.includes('새봄식품') && values.some((v) => v.includes('010-1234-5678')), JSON.stringify(values))
+  await page.keyboard.press('Escape')
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.getByRole('button', { name: /챙길 것/ }).click()
+  await page.waitForTimeout(300)
+  check('회원가입: 머리줄 종에도 한글로 뜬다', ((await page.locator('header').innerText()) ?? '').includes('새봄식품 · 회원가입'))
+  await ctx.close()
+}
+
 /* ---- D-105: 고객 실사용 테스트 화면(/test) 휴대폰 — 동의 → 완료 체크 · 의견 → 제출, 옆으로 밀리지 않음 ---- */
 {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'ko-KR' })
