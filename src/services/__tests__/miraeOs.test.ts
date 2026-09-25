@@ -9,7 +9,7 @@
 
 import { brand, documentTitle } from '../../brand/brand.config'
 import { UI_THEMES, isThemeKey } from '../../lib/uiTheme'
-import { MODULES, MODULE_GROUPS, enabledModulesByGroup, moduleForPath } from '../../config/moduleRegistry'
+import { MODULES, MODULE_GROUPS, enabledModulesByGroup, moduleForPath, screenGroupForPath } from '../../config/moduleRegistry'
 import { identityFromSession } from '../../auth/currentUser'
 import { FUTURE_ITEMS } from '../../config/capabilityStatus'
 import { REVIEW_HUB_PATH, TOOLS, liveTools, plannedTools, reviewTools } from '../../config/toolRegistry'
@@ -1115,6 +1115,15 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
   const oldSimple = (loss.perShareIncomeValue * 3 + loss.perShareNetAsset * 2) / 5
   check('비상장: 손실 법인은 예전 간이식보다 높게(최저 한도) 나온다', loss.finalPerShare > oldSimple)
 }
+
+// D-110: 휴대폰 머리줄 위 작은 묶음 이름
+check('묶음 표시: 영업자 정산 → 영업', screenGroupForPath('/ops/agents')?.title === '영업')
+check('묶음 표시: 세금 계산기 → 컨설팅 작업실', screenGroupForPath('/tools/tax')?.title === '컨설팅 작업실')
+check('묶음 표시: 모듈 안쪽 화면도 → 컨설팅 작업실', screenGroupForPath('/tools/employment/roster')?.title === '컨설팅 작업실')
+check('묶음 표시: 상담신청 · 고객 관리 → 고객', screenGroupForPath('/ops/inbox')?.title === '고객' && screenGroupForPath('/ops/clients/abc')?.title === '고객')
+check('묶음 표시: 일정 → 오늘', screenGroupForPath('/ops/calendar')?.title === '오늘')
+check('묶음 표시: 오늘 화면은 오늘 › 오늘 이 되므로 없음', screenGroupForPath('/') === null)
+check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/zzz-none') === null)
 
 /* ------------------------------------------------------------------ */
 /* 영업자 정산 — 누구한테 지금 얼마 (D-78)                               */

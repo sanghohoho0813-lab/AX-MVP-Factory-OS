@@ -3,6 +3,7 @@ import {
   Building,
   Check,
   ChevronDown,
+  ChevronRight,
   ExternalLink,
   Menu,
   Settings,
@@ -18,7 +19,7 @@ import { CloudSaveStatus } from '../cloud/CloudSaveStatus'
 import { SignalBell } from './SignalBell'
 import { HeaderClock } from './HeaderClock'
 import { brand } from '../../brand/brand.config'
-import { screenTitleForPath } from '../../config/moduleRegistry'
+import { groupAccentClass, screenGroupForPath, screenTitleForPath } from '../../config/moduleRegistry'
 
 // supabase 전용 헤더 조각은 lazy 로 불러와 local entry 번들에 Supabase SDK 가 섞이지 않게 한다.
 const SupabaseWorkspaceSelector = lazy(() =>
@@ -145,6 +146,7 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
   const isSupabase = getDataModeConfig().mode === 'supabase'
   const { pathname } = useLocation()
   const screenTitle = screenTitleForPath(pathname) ?? brand.brandNameKo
+  const screenGroup = screenGroupForPath(pathname)
   return (
     <header className="no-print sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-[16px] sm:gap-3 lg:px-[24px]">
       <button
@@ -161,7 +163,17 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
         설정은 서랍과 '더보기' 로 옮겼다 — 작은 아이콘 대여섯 개가 위에서 경쟁하면
         정작 화면 제목이 안 보인다.
       */}
-      <span className="t-card min-w-0 flex-1 truncate text-slate-900 lg:hidden">{screenTitle}</span>
+      {/* D-110: 제목 위에 서랍 메뉴의 묶음 이름을 작게 (영업 › 영업자 정산) — 색 띠는 서랍의 묶음 띠와 같은 색 */}
+      <span className="flex min-w-0 flex-1 flex-col lg:hidden">
+        {screenGroup && (
+          <span data-testid="screen-group" className="flex min-w-0 items-center gap-1 text-[0.7rem] leading-tight font-semibold text-slate-500">
+            <span aria-hidden="true" className={`h-2.5 w-[3px] shrink-0 rounded-full ${groupAccentClass(screenGroup.accent)}`} />
+            <span className="truncate">{screenGroup.title}</span>
+            <ChevronRight aria-hidden="true" className="size-3 shrink-0 text-slate-400" />
+          </span>
+        )}
+        <span className="t-card truncate text-slate-900">{screenTitle}</span>
+      </span>
       {/* 휴대폰에서도 지금 몇 시인지는 보인다 (D-87) */}
       <span className="lg:hidden">
         <HeaderClock />

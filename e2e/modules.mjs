@@ -504,6 +504,29 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   await ctx.close()
 }
 
+/* ---- D-110: 휴대폰 머리줄 — 제목 위에 서랍 메뉴 묶음 이름 (영업 › 영업자 정산) ---- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const headH0 = await page.locator('header').first().evaluate((el) => el.getBoundingClientRect().height)
+  check('머리줄 묶음: 오늘 화면은 묶음 표시 없음', (await page.getByTestId('screen-group').count()) === 0)
+  for (const [path, group, title] of [['/ops/agents', '영업', '영업자 정산'], ['/tools/tax', '컨설팅 작업실', '세금 계산기'], ['/ops/inbox', '고객', '잠재고객 상담신청'], ['/tools/employment/roster', '컨설팅 작업실', '고용지원금 매니저']]) {
+    await page.goto(BASE + path, { waitUntil: 'networkidle' })
+    await page.waitForTimeout(300)
+    const g = page.locator('header').getByTestId('screen-group')
+    const txt = (await g.innerText().catch(() => '')).trim()
+    const head = (await page.locator('header').first().innerText()).replace(/\s+/g, ' ')
+    check(`머리줄 묶음: ${path} → ${group} › ${title}`, txt === group && head.includes(title), `${txt} | ${head.slice(0, 80)}`)
+    const box = await page.locator('header').first().evaluate((el) => el.getBoundingClientRect().height)
+    check(`머리줄 묶음: ${path} 머리줄 높이가 늘지 않는다`, Math.abs(box - headH0) <= 1, `${headH0} → ${box}`)
+  }
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  check('머리줄 묶음: 옆으로 밀리지 않음', overflow <= 1, String(overflow))
+  await ctx.close()
+}
+
 /* ---- D-105: 고객 실사용 테스트 화면(/test) 휴대폰 — 동의 → 완료 체크 · 의견 → 제출, 옆으로 밀리지 않음 ---- */
 {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'ko-KR' })

@@ -213,6 +213,19 @@ export function screenTitleForPath(pathname: string): string | null {
   return moduleForPath(pathname)?.label ?? null
 }
 
+/**
+ * 머리줄 위 작은 글씨 — 이 화면이 서랍 메뉴의 어느 묶음에 있는지 (D-110, 예: 영업 › 영업자 정산).
+ * 묶음 이름이 화면 이름과 같으면(오늘 › 오늘) 띄우지 않는다.
+ */
+export function screenGroupForPath(pathname: string): ModuleGroup | null {
+  const review = reviewTools().find((t) => t.path && underPath(pathname, t.path))
+  const groupKey = review ? 'tools' : moduleForPath(pathname)?.group
+  const group = MODULE_GROUPS.find((g) => g.key === groupKey) ?? null
+  if (!group) return null
+  if (group.title === screenTitleForPath(pathname)) return null
+  return group
+}
+
 /*
  * 아래 두 표는 반드시 클래스 이름을 통째로 적어야 한다.
  *
