@@ -1605,7 +1605,13 @@ npm run qa:shots --wide                   135장, 반응형 문제 없음
 
 ### 게이트
 
-GATE_TABLE
+| 게이트 | 결과 |
+| --- | --- |
+| tsc · oxlint · build | 오류 0 (경고 43 — 늘지 않음) |
+| 단위·계약 20묶음 | 전부 녹색 (mirae-os 434) |
+| qa:modules | 836 → **843 passed** (고객 테스트 화면 휴대폰 7) |
+| qa:shell 61 · tools 160 · simple 88 · studio 46 · board 163 · todos 25 · mobile 15 · tax 74 | 전부 녹색 (숫자 공유로 바꾼 뒤에도 숫자 늘고 줆 시험 통과) |
+| qa:squeeze --all | 짜부라진 글자 0 |
 
 ### 확인하지 못한 것
 
