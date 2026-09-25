@@ -10,7 +10,7 @@
 
 import { getDataModeConfig } from '../data/dataMode'
 import { getSupabaseClient } from '../lib/supabase/client'
-import { nowIso } from '../lib/appClock'
+import { nowIso, todayLocalDate } from '../lib/appClock'
 import { generateId, notifyStoreChanged, readJson, STORAGE_KEYS, writeJson } from '../storage/localStore'
 import { isCustomerStage, suggestServiceForProduct, type CustomerStage } from '../config/serviceCatalog'
 import type {
@@ -143,6 +143,31 @@ export function sortEvents(events: CustomerEvent[]): CustomerEvent[] {
 
 export function isOpenEvent(e: CustomerEvent): boolean {
   return e.status === 'new' || e.status === 'linked' || e.status === 'in_progress'
+}
+
+/** 이 날수 이상 열려 있으면 "N일째 대기"를 띄운다. 넘으면 빨간색. */
+export const WAITING_WARN_DAYS = 2
+export const WAITING_DANGER_DAYS = 5
+
+/**
+ * 열린 상담신청이 들어온 날부터 오늘까지 며칠째인지 (사람 기준 날짜, 같은 날이면 0).
+ * 닫힌 건·날짜를 못 읽는 건은 null — 기다리는 중이 아니다.
+ */
+export function waitingDays(e: CustomerEvent, today: string): number | null {
+  if (!isOpenEvent(e)) return null
+  const at = new Date(e.occurredAt)
+  if (Number.isNaN(at.getTime())) return null
+  const from = todayLocalDate(at)
+  const a = Date.UTC(+from.slice(0, 4), +from.slice(5, 7) - 1, +from.slice(8, 10))
+  const b = Date.UTC(+today.slice(0, 4), +today.slice(5, 7) - 1, +today.slice(8, 10))
+  if (Number.isNaN(b)) return null
+  return Math.max(0, Math.round((b - a) / 86_400_000))
+}
+
+/** 배지로 보여 줄 만큼 오래 기다렸는지 — 'warn' | 'danger' | null */
+export function waitingLevel(days: number | null): 'warn' | 'danger' | null {
+  if (days === null || days < WAITING_WARN_DAYS) return null
+  return days >= WAITING_DANGER_DAYS ? 'danger' : 'warn'
 }
 
 /* ------------------------------------------------------------------ */

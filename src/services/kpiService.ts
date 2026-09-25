@@ -297,7 +297,21 @@ function adoptionMetrics(input: KpiInput): KpiMetric[] {
     caution: '고객이 플랫폼을 쓰지 않으면 0건이다. 이 값이 늘어야 고객 셀프서비스가 자리 잡은 것이다.',
   }
 
-  return [activeDays, journalWeek, eventsHandled]
+  // 홈페이지 회원가입 — 잠재 고객이 몇 명 들어왔고, 그중 몇 명을 고객사로 이었는지 (D-107)
+  const signups = recent.filter((e) => e.eventType === 'customer_signed_up')
+  const signupsLinked = signups.filter((e) => e.operationsClientId !== null || e.status === 'linked' || e.status === 'in_progress' || e.status === 'resolved')
+  const signups30: KpiMetric = {
+    key: 'signups_30',
+    group: 'adoption',
+    label: '최근 30일 홈페이지 회원가입',
+    value: signups.length === 0 ? null : `${signups.length}명 · 고객사 연결 ${signupsLinked.length}명`,
+    basis: signups.length,
+    status: statusFor(signups.length),
+    method: '고객 플랫폼에 새로 가입한 계정 수와, 그중 상담신청함에서 고객사에 연결했거나 처리 중·처리 완료로 넘긴 수.',
+    caution: '내부 직원 가입은 세지 않는다. 가입 알림은 2026-09-25 SQL 적용 뒤부터 쌓인다 — 그 전 가입자는 없다.',
+  }
+
+  return [activeDays, journalWeek, eventsHandled, signups30]
 }
 
 /* ------------------------------------------------------------------ */

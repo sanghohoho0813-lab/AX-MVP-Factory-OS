@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Inbox, RefreshCw, Sparkles } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { ScreenTitle } from '../components/ui/primitives'
@@ -8,13 +9,34 @@ import { EventCard } from '../components/ops/EventCard'
 import { LinkCustomerModal } from '../components/ops/LinkCustomerModal'
 import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { listClients } from '../services/clientOpsService'
-import { isOpenEvent, listEvents, seedDemoEvents, updateEvent } from '../services/customerBridgeService'
+import { EVENT_TYPE_LABEL, isOpenEvent, listEvents, seedDemoEvents, updateEvent } from '../services/customerBridgeService'
 import { getDataModeConfig } from '../data/dataMode'
 import { brand } from '../brand/brand.config'
 import type { ClientOpsRecord } from '../types/clientOps'
-import type { CustomerEvent, CustomerEventStatus } from '../types/bridge'
+import type { CustomerEvent, CustomerEventStatus, CustomerEventType } from '../types/bridge'
 
 type Filter = 'open' | 'all' | CustomerEventStatus
+
+/** 종류 칩 순서 — 먼저 챙길 것부터. 여기 없는 종류는 뒤에 붙는다. */
+const TYPE_ORDER: CustomerEventType[] = [
+  'service_order_created',
+  'consultation_requested',
+  'customer_request_created',
+  'document_uploaded',
+  'customer_signed_up',
+  'diagnosis_completed',
+  'customer_action_completed',
+]
+
+function isEventType(v: string | null): v is CustomerEventType {
+  return v !== null && Object.prototype.hasOwnProperty.call(EVENT_TYPE_LABEL, v)
+}
+
+function matchesStatus(e: CustomerEvent, filter: Filter): boolean {
+  if (filter === 'open') return isOpenEvent(e)
+  if (filter === 'all') return true
+  return e.status === filter
+}
 
 /** 브릿지 테이블이 아직 없을 때(마이그레이션 미적용) 나는 오류인지 */
 function isNotReadyError(cause: unknown): boolean {
@@ -35,6 +57,16 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
   const [loading, setLoading] = useState(true)
   const [notReady, setNotReady] = useState(false)
   const [filter, setFilter] = useState<Filter>('open')
+  // 종류는 주소에 남긴다 — 오늘 화면·성과 지표에서 "회원가입만" 으로 바로 들어올 수 있게.
+  const [params, setParams] = useSearchParams()
+  const typeParam = params.get('type')
+  const typeFilter: CustomerEventType | 'all' = isEventType(typeParam) ? typeParam : 'all'
+  const setTypeFilter = (t: CustomerEventType | 'all') => {
+    const next = new URLSearchParams(params)
+    if (t === 'all') next.delete('type')
+    else next.set('type', t)
+    setParams(next, { replace: true })
+  }
   const [linking, setLinking] = useState<{ event: CustomerEvent; tab: 'existing' | 'new' } | null>(null)
 
   const load = useCallback(async () => {
@@ -67,20 +99,37 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
 
   const clientNames = useMemo(() => new Map(clients.map((c) => [c.id, c.companyName])), [clients])
 
-  const visible = useMemo(() => {
-    if (filter === 'open') return events.filter(isOpenEvent)
-    if (filter === 'all') return events
-    return events.filter((e) => e.status === filter)
-  }, [events, filter])
+  const visible = useMemo(
+    () => events.filter((e) => matchesStatus(e, filter) && (typeFilter === 'all' || e.eventType === typeFilter)),
+    [events, filter, typeFilter],
+  )
 
+  // 상태 칩 숫자는 고른 종류 안에서, 종류 칩 숫자는 고른 상태 안에서 센다 — 누르면 그 숫자만큼 나온다.
   const counts = useMemo(() => {
-    const c: Record<Filter, number> = { open: 0, all: events.length, new: 0, linked: 0, in_progress: 0, resolved: 0, ignored: 0 }
+    const c: Record<Filter, number> = { open: 0, all: 0, new: 0, linked: 0, in_progress: 0, resolved: 0, ignored: 0 }
     for (const e of events) {
+      if (typeFilter !== 'all' && e.eventType !== typeFilter) continue
+      c.all += 1
       c[e.status] += 1
       if (isOpenEvent(e)) c.open += 1
     }
     return c
-  }, [events])
+  }, [events, typeFilter])
+
+  const typeChips = useMemo(() => {
+    const present = new Set(events.map((e) => e.eventType))
+    if (typeFilter !== 'all') present.add(typeFilter)
+    const inStatus = events.filter((e) => matchesStatus(e, filter))
+    const types = [...present].sort((a, b) => {
+      const ia = TYPE_ORDER.indexOf(a)
+      const ib = TYPE_ORDER.indexOf(b)
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)
+    })
+    return {
+      total: inStatus.length,
+      items: types.map((t) => ({ key: t, label: EVENT_TYPE_LABEL[t], count: inStatus.filter((e) => e.eventType === t).length })),
+    }
+  }, [events, filter, typeFilter])
 
   const setStatus = async (event: CustomerEvent, status: CustomerEventStatus) => {
     try {
@@ -149,16 +198,53 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
         ))}
       </div>
 
+      {/* 종류가 두 가지 이상일 때만 — 한 가지뿐이면 고를 것이 없다 */}
+      {typeChips.items.length >= 2 && (
+        <div
+          role="group"
+          aria-label="종류별 보기"
+          data-testid="inbox-type-filter"
+          className="-mx-4 -mt-2 flex items-center gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          <span className="t-meta shrink-0 pr-0.5 text-slate-400">종류</span>
+          {[{ key: 'all' as const, label: '전부', count: typeChips.total }, ...typeChips.items].map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              aria-pressed={typeFilter === t.key}
+              onClick={() => setTypeFilter(t.key)}
+              className={`tap t-meta shrink-0 rounded-full border px-3 py-1.5 font-medium whitespace-nowrap ${
+                typeFilter === t.key
+                  ? 'border-navy-800 bg-navy-800 text-white'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {t.label}{' '}
+              <span className={typeFilter === t.key ? 'text-white/70' : t.count === 0 ? 'text-slate-300' : 'text-slate-400'}>{t.count}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {loading ? (
         <p className="py-8 text-center text-[0.95rem] text-slate-500">불러오는 중…</p>
       ) : visible.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-(--radius-panel) border border-dashed border-slate-300 bg-white px-4 py-10 text-center">
           <Inbox aria-hidden="true" className="size-8 text-slate-300" />
-          <p className="text-[1rem] font-semibold text-slate-700">{filter === 'open' ? '새 고객 요청이 없습니다.' : '해당하는 이벤트가 없습니다.'}</p>
+          <p className="text-[1rem] font-semibold text-slate-700">{typeFilter !== 'all'
+              ? `${EVENT_TYPE_LABEL[typeFilter]} 중에 해당하는 것이 없습니다.`
+              : filter === 'open'
+                ? '새 고객 요청이 없습니다.'
+                : '해당하는 상담신청이 없습니다.'}</p>
           <p className="max-w-md text-[0.9rem] break-keep text-slate-500">
             고객이 {brand.customerPlatformLabel}에서 진단을 마치거나, 서비스를 주문하거나, 서류를 올리거나, 요청을 보내면 여기에 나타납니다.
           </p>
-          {isLocal && filter === 'open' && (
+          {typeFilter !== 'all' && (
+            <button type="button" onClick={() => setTypeFilter('all')} className="t-sub mt-1 font-medium text-brand-700 hover:underline">
+              모든 종류 보기
+            </button>
+          )}
+          {isLocal && filter === 'open' && typeFilter === 'all' && (
             <button
               type="button"
               onClick={() => {

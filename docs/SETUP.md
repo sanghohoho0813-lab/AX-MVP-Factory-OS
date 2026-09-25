@@ -64,6 +64,8 @@ Supabase Dashboard → SQL Editor 에서 **두 파일을 순서대로** 붙여 �
 
 ### 3.3b 홈페이지 회원가입 알림 (D-106)
 
+> ✅ 운영 적용 완료 (2026-09-25, 대표 실행).
+
 `supabase/migrations/20260925000014_signup_event.sql` — miraeailab.com 에서 누가 회원가입하면 내부 OS **잠재고객 상담신청** 에 '회원가입' 한 줄이 뜬다(이름 · 이메일 · 연락처 · 회사).
 
 - 가입 트리거를 하나 더 건다: `zzz_bridge_on_auth_user_created` — 기존 두 가입 트리거 **뒤에** 돈다.

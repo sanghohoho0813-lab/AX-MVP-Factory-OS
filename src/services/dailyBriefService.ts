@@ -10,7 +10,7 @@ import type { ClientOpsRecord, OpsAlert } from '../types/clientOps'
 import type { CustomerEvent, JournalEntry } from '../types/bridge'
 import { daysLeftFrom } from './clientOpsAlerts'
 import { netAmountOf } from './feeMath'
-import { eventSummary, isOpenEvent, EVENT_TYPE_LABEL } from './customerBridgeService'
+import { eventSummary, isOpenEvent, waitingDays, waitingLevel, EVENT_TYPE_LABEL } from './customerBridgeService'
 
 export type BriefActionKind = 'alert' | 'event' | 'follow_up' | 'funding' | 'payment'
 
@@ -114,7 +114,12 @@ export function buildTopActions(
 
   for (const e of input.events) {
     if (!isOpenEvent(e)) continue
-    const { score, reason } = eventScore(e)
+    const base = eventScore(e)
+    const waited = waitingDays(e, input.today)
+    const level = waitingLevel(waited)
+    // 오래 기다린 요청은 위로 올린다 — 같은 종류라도 먼저 들어온 쪽이 먼저다.
+    const score = level ? Math.min(99, base.score + (level === 'danger' ? 12 : 6)) : base.score
+    const reason = level ? `${base.reason} · ${waited}일째 대기 중` : base.reason
     const s = eventSummary(e)
     const clientName = (e.operationsClientId && input.clientNames.get(e.operationsClientId)) || s.who
     out.push({

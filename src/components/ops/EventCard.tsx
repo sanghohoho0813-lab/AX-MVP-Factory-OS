@@ -7,7 +7,10 @@ import {
   EVENT_TYPE_LABEL,
   eventSummary,
   isOpenEvent,
+  waitingDays,
+  waitingLevel,
 } from '../../services/customerBridgeService'
+import { todayLocalDate } from '../../lib/appClock'
 import { activityTimeText } from '../../services/clientOpsActivity'
 import { Badge, type Tone } from '../ui/primitives'
 import { suggestServiceForProduct } from '../../config/serviceCatalog'
@@ -84,6 +87,8 @@ export function EventCard({
     event.eventType === 'service_order_created' && typeof event.payload.product_slug === 'string'
       ? suggestServiceForProduct(event.payload.product_slug)
       : null
+  const waited = waitingDays(event, todayLocalDate())
+  const waitLevel = waitingLevel(waited)
   const fields = Object.entries(event.payload).filter(([k, v]) => k !== 'demo' && k !== 'intake' && typeof v === 'string' && v !== '')
 
   return (
@@ -98,11 +103,16 @@ export function EventCard({
           className={`absolute inset-y-0 left-0 w-[3px] ${event.priority === 'high' ? 'bg-danger-500' : 'bg-brand-500'}`}
         />
       )}
-      {/* 머리줄 — 배지는 최대 두 개. 급한 것과 처리 상태만 남긴다 */}
+      {/* 머리줄 — 급한 것 · 오래 기다린 날 · 처리 상태만 남긴다 */}
       <div className="t-meta flex flex-wrap items-center gap-1.5">
         {event.priority === 'high' && isOpenEvent(event) && <Badge tone="danger">지금</Badge>}
         <span className="font-medium text-slate-500">{EVENT_TYPE_LABEL[event.eventType]}</span>
         {event.status !== 'new' && <Badge tone={STATUS_TONE[event.status]}>{EVENT_STATUS_LABEL[event.status]}</Badge>}
+        {waitLevel && (
+          <span data-testid="event-waiting">
+            <Badge tone={waitLevel === 'danger' ? 'danger' : 'warning'}>{waited}일째 대기</Badge>
+          </span>
+        )}
         {isDemo && <Badge tone="neutral">샘플</Badge>}
         <span className="ml-auto text-slate-400">
           <time dateTime={event.occurredAt}>{activityTimeText(event.occurredAt)}</time>

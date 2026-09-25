@@ -415,6 +415,57 @@ for (const [w, h, mob] of [[1440, 900, false], [390, 844, true]]) {
   await ctx.close()
 }
 
+/* ---- D-107: 상담신청 종류별 보기 · N일째 대기 (1440 · 390) ---- */
+for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+  const mobile = vp.width < 500
+  const ctx = await browser.newContext({ viewport: vp, isMobile: mobile, hasTouch: mobile, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  const tag = mobile ? '390' : '1440'
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(() => {
+    const k = 'axmvp.v1.customer_events'
+    const row = (id, eventType, daysAgo, payload) => {
+      const at = new Date(Date.now() - daysAgo * 86_400_000).toISOString()
+      return { id, workspaceId: null, portalClientLinkId: null, operationsClientId: null, profileId: null, eventType, sourceType: 'qa', sourceId: id, dedupeKey: `qa:${id}`, payloadVersion: 1, payload, priority: 'medium', status: 'new', occurredAt: at, receivedAt: at, handledAt: null, handledBy: null, handlingNote: null, createdAt: at, updatedAt: at }
+    }
+    localStorage.setItem(k, JSON.stringify([
+      row('d107-su-old', 'customer_signed_up', 6, { name: '오래기다림', email: 'old@customer.test', company_name: '오래된가입' }),
+      row('d107-su-new', 'customer_signed_up', 0, { name: '방금가입', email: 'new@customer.test', company_name: '방금가입사' }),
+      row('d107-consult', 'consultation_requested', 3, { name: '상담고객', company_name: '상담요청사' }),
+    ]))
+  })
+  await page.goto(BASE + '/ops/inbox', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  const group = page.getByTestId('inbox-type-filter')
+  check(`종류별(${tag}): 종류 칩 줄이 보인다`, await group.isVisible())
+  const chipText = (await group.innerText()).replace(/\s+/g, ' ')
+  check(`종류별(${tag}): 전부 3 · 상담 신청 1 · 회원가입 2`, /전부 3/.test(chipText) && /상담 신청 1/.test(chipText) && /회원가입 2/.test(chipText), chipText)
+  const oldCard = page.locator('article', { hasText: '오래된가입' })
+  check(`종류별(${tag}): 6일 기다린 가입에 빨간 "6일째 대기"`, (await oldCard.getByTestId('event-waiting').innerText()).includes('6일째 대기'))
+  check(`종류별(${tag}): 3일 기다린 상담에 "3일째 대기"`, (await page.locator('article', { hasText: '상담요청사' }).getByTestId('event-waiting').innerText()).includes('3일째 대기'))
+  check(`종류별(${tag}): 오늘 들어온 것은 대기 배지 없음`, (await page.locator('article', { hasText: '방금가입사' }).getByTestId('event-waiting').count()) === 0)
+  await group.getByRole('button', { name: /회원가입/ }).click()
+  await page.waitForTimeout(200)
+  check(`종류별(${tag}): 회원가입만 누르면 2장`, (await page.locator('main article').count()) === 2 && (await page.locator('main article', { hasText: '상담요청사' }).count()) === 0)
+  check(`종류별(${tag}): 주소에 남는다`, page.url().includes('type=customer_signed_up'), page.url())
+  check(`종류별(${tag}): 누른 칩이 눌림으로 표시`, (await group.getByRole('button', { name: /회원가입/ }).getAttribute('aria-pressed')) === 'true')
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(300)
+  check(`종류별(${tag}): 새로고침해도 회원가입만`, (await page.locator('main article').count()) === 2)
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  check(`종류별(${tag}): 옆으로 밀리지 않음`, overflow <= 1, String(overflow))
+  await page.getByTestId('inbox-type-filter').getByRole('button', { name: /전부/ }).click()
+  await page.waitForTimeout(200)
+  check(`종류별(${tag}): 전부로 돌아오면 3장`, (await page.locator('main article').count()) === 3 && !page.url().includes('type='))
+  if (!mobile) {
+    await page.goto(BASE + '/ops/inbox?type=nonsense', { waitUntil: 'networkidle' })
+    await page.waitForTimeout(300)
+    check('종류별: 모르는 종류 주소는 전부로', (await page.locator('main article').count()) === 3)
+  }
+  await ctx.close()
+}
+
 /* ---- D-105: 고객 실사용 테스트 화면(/test) 휴대폰 — 동의 → 완료 체크 · 의견 → 제출, 옆으로 밀리지 않음 ---- */
 {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'ko-KR' })

@@ -29,7 +29,7 @@ import {
   buildTopActions,
   daySummaryText,
 } from '../dailyBriefService'
-import { EVENT_TYPE_LABEL, buildProjection, eventSummary, isOpenEvent, sortEvents } from '../customerBridgeService'
+import { EVENT_TYPE_LABEL, buildProjection, eventSummary, isOpenEvent, sortEvents, waitingDays, waitingLevel } from '../customerBridgeService'
 import signupSql from '../../../supabase/migrations/20260925000014_signup_event.sql?raw'
 import { normalizeClientOps, withContract, withCustomField, withFee, withNewFee, withNewFunding, withService, withoutCustomField } from '../clientOpsService'
 import {
@@ -286,6 +286,24 @@ check('events: 요약 who 는 회사명 우선', eventSummary(ev({ payload: { co
   check('가입 SQL: 기존 종류 여덟 가지를 모두 다시 허용', ['diagnosis_completed', 'consultation_requested', 'service_order_created', 'document_uploaded', 'customer_request_created', 'customer_action_completed', 'customer_reply', 'profile_updated', 'customer_signed_up'].every((t) => signupSql.includes(`'${t}'`)))
 }
 check('events: 값 없으면 고객', eventSummary(ev({ payload: {} })).who === '고객')
+// D-107: 오래 기다린 상담신청 — "N일째 대기" (정오 UTC 로 잡아 시간대가 달라도 같은 날)
+{
+  const at = (d: string) => `${d}T12:00:00.000Z`
+  check('대기: 같은 날은 0일', waitingDays(ev({ occurredAt: at('2026-09-25') }), '2026-09-25') === 0)
+  check('대기: 사흘 전 들어온 새 신청은 3일', waitingDays(ev({ occurredAt: at('2026-09-22') }), '2026-09-25') === 3)
+  check('대기: 처리 완료·보류는 기다리는 중이 아니다', waitingDays(ev({ status: 'resolved', occurredAt: at('2026-09-01') }), '2026-09-25') === null && waitingDays(ev({ status: 'ignored', occurredAt: at('2026-09-01') }), '2026-09-25') === null)
+  check('대기: 연결만 하고 처리 안 한 것도 센다', waitingDays(ev({ status: 'linked', occurredAt: at('2026-09-20') }), '2026-09-25') === 5)
+  check('대기: 날짜를 못 읽으면 null', waitingDays(ev({ occurredAt: 'nope' }), '2026-09-25') === null)
+  check('대기: 미래 날짜는 0 (음수 없음)', waitingDays(ev({ occurredAt: at('2026-09-30') }), '2026-09-25') === 0)
+  check('대기: 1일은 배지 없음 · 2일 주의 · 5일 빨강', waitingLevel(1) === null && waitingLevel(2) === 'warn' && waitingLevel(4) === 'warn' && waitingLevel(5) === 'danger' && waitingLevel(null) === null)
+  // 같은 회원가입이라도 오래 기다린 쪽이 오늘 화면에서 먼저 나온다
+  const fresh = ev({ id: 'su-fresh', eventType: 'customer_signed_up', occurredAt: at('2026-09-25') })
+  const stale = ev({ id: 'su-stale', eventType: 'customer_signed_up', occurredAt: at('2026-09-19') })
+  const acts = buildTopActions({ alerts: [], events: [fresh, stale], followUps: [], clientNames: new Map(), today: '2026-09-25' }, 5)
+  check('대기: 오래 기다린 가입이 위로', acts[0]?.id === 'event:su-stale' && acts[1]?.id === 'event:su-fresh', acts.map((a) => a.id).join())
+  check('대기: 이유에 며칠째인지 적힌다', acts[0]?.reason.includes('6일째 대기') === true && !acts[1]?.reason.includes('대기 중'), acts[0]?.reason)
+  check('대기: 점수는 99를 넘지 않는다', acts.every((a) => a.score <= 99))
+}
 // 상품 코드는 화면에 그대로 나오면 안 된다 — 아는 코드면 한글 이름으로 바꾼다
 check(
   'events: 주문 요약이 상품 코드를 한글 이름으로 바꾼다',
@@ -466,7 +484,7 @@ check('funding: 14일 내 미접수만', fd.length === 1 && fd[0].programName ==
   const kpis = buildKpis({ records: [k1, k2], journal: kj, events: [], today: TODAY })
   const by = (key: string) => kpis.find((m) => m.key === key)!
 
-  check('kpi: 10개 지표가 4그룹으로 나뉜다', kpis.length === 10 && kpisByGroup(kpis).every((g) => g.items.length >= 2))
+  check('kpi: 11개 지표가 4그룹으로 나뉜다', kpis.length === 11 && kpisByGroup(kpis).every((g) => g.items.length >= 2))
   check('kpi: 잴 수 없는 것은 값 없이 방법만', by('first_action_minutes').value === null && by('first_action_minutes').status === 'unknown' && by('first_action_minutes').method.length > 20)
   check('kpi: 예정일 지난 미수금 — 보관 업체는 제외', by('overdue_receivables_now').value === '1건 · 2,000,000원')
   check('kpi: 근거가 적으면 기준선 만드는 중', by('overdue_receivables_now').status === 'baseline_forming')
@@ -476,6 +494,20 @@ check('funding: 14일 내 미접수만', fd.length === 1 && fd[0].programName ==
   check('kpi: 관리 중 업체는 보관 제외 1곳', by('active_clients').value === '1곳')
   check('kpi: 30일 기록일 = 일기 1일 + 활동 1일 (오래된 일기 제외)', by('active_days_30').value === '2일 / 30일')
   check('kpi: 이벤트 없으면 처리율은 값 없음', by('events_handled_30').value === null)
+  check('kpi: 가입 없으면 가입 지표도 값 없음', by('signups_30').value === null && by('signups_30').group === 'adoption')
+  {
+    const recentAt = `${shiftDate(TODAY, -3)}T12:00:00.000Z`
+    const sEvents = [
+      ev({ id: 's1', eventType: 'customer_signed_up', status: 'new', occurredAt: recentAt }),
+      ev({ id: 's2', eventType: 'customer_signed_up', status: 'linked', operationsClientId: 'k1', occurredAt: recentAt }),
+      ev({ id: 's3', eventType: 'customer_signed_up', status: 'ignored', occurredAt: recentAt }),
+      ev({ id: 's-old', eventType: 'customer_signed_up', status: 'resolved', occurredAt: `${shiftDate(TODAY, -40)}T12:00:00.000Z` }),
+      ev({ id: 'r1', eventType: 'consultation_requested', status: 'resolved', occurredAt: recentAt }),
+    ]
+    const sk = buildKpis({ records: [k1], journal: [], events: sEvents, today: TODAY }).find((m) => m.key === 'signups_30')!
+    check('kpi: 30일 가입 3명 중 고객사 연결 1명 (40일 전 · 상담 신청 제외)', sk.value === '3명 · 고객사 연결 1명', String(sk.value))
+    check('kpi: 가입 지표 근거 수 = 가입 수', sk.basis === 3)
+  }
   const summary = kpiStatusSummary(kpis)
   check('kpi: 상태 요약 합이 지표 수', summary.measured + summary.baseline_forming + summary.unknown === kpis.length)
   check('kpi: 목표치 필드가 없다 (숫자 발명 금지)', kpis.every((m) => !('target' in m)))
