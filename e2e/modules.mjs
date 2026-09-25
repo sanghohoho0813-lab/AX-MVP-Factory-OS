@@ -466,6 +466,44 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   await ctx.close()
 }
 
+/* ---- D-108: 휴대폰 하단 목차 — 순서 · 서랍과 같은 아이콘 색 · 고객사 수 · 상담신청 빨간 숫자 ---- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.goto(BASE + '/ops/calendar', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  const bar = page.locator('nav[aria-label="주요 화면"]')
+  const labels = (await bar.locator('li').allInnerTexts()).map((t) => t.replace(/\d+/g, '').replace(/\s+/g, ''))
+  check('하단 목차: 오늘 · 일정 · 고객 · 상담신청 · 더보기 순서', labels.join(',') === '오늘,일정,고객,상담신청,더보기', labels.join(','))
+  const colors = await page.evaluate(() => {
+    const probe = (v) => { const d = document.createElement('span'); d.style.color = `var(${v})`; document.body.appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c }
+    const icons = [...document.querySelectorAll('nav[aria-label="주요 화면"] li svg')].map((el) => getComputedStyle(el).color)
+    return { icons, want: ['--color-nav-overview', '--color-nav-evidence', '--color-nav-ops', '--color-nav-alert'].map(probe) }
+  })
+  check('하단 목차: 아이콘 색이 서랍 메뉴와 같다 (오늘 · 일정 · 고객 · 상담신청)', colors.want.every((c, i) => colors.icons[i] === c), JSON.stringify(colors))
+  check('하단 목차: 더보기도 회색이 아니다', colors.icons[4] !== 'rgb(148, 163, 184)' && new Set(colors.icons).size === 5, JSON.stringify(colors.icons))
+  const clientBadge = bar.locator('[data-nav-badge="clients"]')
+  // 서랍(햄버거) 메뉴의 고객 관리 숫자와 같아야 한다
+  await page.locator('header').getByRole('button', { name: /메뉴/ }).first().click()
+  await page.waitForTimeout(400)
+  const drawerClients = (await page.locator('[role="dialog"] [data-nav-badge="clients"], aside [data-nav-badge="clients"]').last().innerText().catch(() => '')).trim()
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+  check('하단 목차: 고객 옆 고객사 수 = 서랍 메뉴 숫자', /^\d+$/.test(drawerClients) && (await clientBadge.innerText()).trim() === drawerClients, `${await clientBadge.innerText()} vs ${drawerClients}`)
+  const fs = await clientBadge.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
+  check('하단 목차: 고객사 수 글자는 이름보다 작다', fs < 11, String(fs))
+  const req = bar.locator('[data-nav-badge="requests"]')
+  const n = Number((await req.innerText()).trim())
+  check('하단 목차: 상담신청 빨간 숫자', n > 0 && (await req.evaluate((el) => getComputedStyle(el).backgroundColor)) !== 'rgba(0, 0, 0, 0)')
+  check('하단 목차: 상담신청이 있으면 이름도 빨강', (await bar.getByText('상담신청', { exact: true }).evaluate((el) => getComputedStyle(el).color)) !== (await bar.getByText('오늘', { exact: true }).evaluate((el) => getComputedStyle(el).color)))
+  check('하단 목차: 지금 화면(일정) 표시', (await bar.locator('a[aria-current="page"]').innerText()).includes('일정'))
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  check('하단 목차: 옆으로 밀리지 않음', overflow <= 1, String(overflow))
+  await ctx.close()
+}
+
 /* ---- D-105: 고객 실사용 테스트 화면(/test) 휴대폰 — 동의 → 완료 체크 · 의견 → 제출, 옆으로 밀리지 않음 ---- */
 {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'ko-KR' })
