@@ -531,6 +531,24 @@ export interface SalesInfo {
   memo?: string
   /** 미팅 기록 — 최신이 앞 */
   meetings?: SalesMeetingNote[]
+  /** 제안 (D-114 3단계) — 고른 상품 · 합계 · 상태 · 월납 */
+  proposal?: SalesProposal
+  /** 계약 준비 체크 10 · 필수 서류 14 중 챙긴 것 (이름) */
+  contractPrep?: string[]
+}
+
+/** 제안 한 건 (D-114 3단계) — 원본 영업 도구의 제안 상태 · 월납 제안을 그대로 */
+export interface SalesProposal {
+  /** 고른 상품 이름 */
+  packages: string[]
+  /** 합계 수임료(만원, 상품표 가격 기준) */
+  feeManwon: number
+  /** 제안 상태 — 제안 전 · 제안서 작성 · 제안 완료 · 견적 전달 · 검토 중 · 조건 조율 · 계약 예정 · 계약 완료 · 보류 */
+  status: string
+  /** 마지막으로 저장한 날 (YYYY-MM-DD) */
+  at: string
+  /** 월납 보험료 제안 — 만원 · 개월 · 환급률(%) · 직전년도 당기순이익(만원) */
+  monthly?: { premium: number; months: number; rate: number; netIncome: number | null } | null
 }
 
 /** 미팅 한 번의 기록 — 적은 메모와 규칙 분석 결과 (D-114 2단계) */

@@ -234,6 +234,8 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   check('미팅 준비: 체크를 켜고 저장하면 점수가 오른다', score2 > score1, `${score1} → ${score2}`)
   // 미팅 기록 — 1차
   await page.getByTestId('meeting-rounds').getByRole('button', { name: '1차 미팅' }).click()
+  // 차수를 바꾸면 기록 칸이 새로 그려진다 — 새 칸이 뜬 뒤에 적는다(옛 칸에 적으면 사라진다)
+  await page.getByRole('heading', { name: '1차 미팅 기록' }).waitFor()
   const rec = page.getByTestId('meeting-recorder')
   await rec.getByLabel('미팅에서 나온 말 · 메모').fill('가지급금 정리는 관심 있는데 비용이 부담되고 세무사랑 상의해볼게요')
   await rec.getByRole('button', { name: '메모 나눠 보기' }).click()
@@ -266,6 +268,99 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   check('미팅 준비 390: 옆으로 넘치지 않는다', overflow <= 1, String(overflow))
   check('미팅 준비 390: 차수 네 칸이 한 줄', (await page.getByTestId('meeting-rounds').getByRole('button').count()) === 4)
+  await ctx.close()
+}
+
+/* ---- D-114 3단계: 상품·제안 (1440) ---- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+  await ctx.grantPermissions(['clipboard-read', 'clipboard-write'])
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e).slice(0, 160)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(() => {
+    const k = 'axmvp.v1.operations_clients'
+    const list = JSON.parse(localStorage.getItem(k) ?? '[]')
+    const now = new Date().toISOString()
+    list.push({ id: 'cli_prop', workspaceId: null, companyName: '제안정밀', contactName: '김대표', industry: '금속 제조', employeeCount: '26', establishedAt: '2008-03-02', status: 'waiting', createdAt: now, updatedAt: now,
+      sales: { stage: 'closing', source: '소개', referrer: '', interests: ['가업승계', '미처분이익잉여금'], concern: '', expectedFee: null, history: [{ at: now, from: null, to: 'closing' }], movedAt: now, ceoAge: 58, revenueM: 3500 } })
+    localStorage.setItem(k, JSON.stringify(list))
+  })
+  await page.goto(BASE + '/sales/proposal?client=cli_prop', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  check('상품·제안: 탭 세 개', ((await page.getByTestId('sales-tabs').innerText()) ?? '').includes('상품·제안'))
+  const rec = page.getByTestId('recommended')
+  check('상품·제안: 추천 3이 골라진 채 시작 — 가업승계 사전점검 먼저', (await rec.getByRole('button', { pressed: true }).count()) === 3 && ((await rec.innerText()) ?? '').indexOf('가업승계 사전점검') >= 0)
+  check('상품·제안: 합계 = 원본 가격 합 (500 + 200 + 200 = 900만원)', ((await page.getByTestId('proposal-sum').innerText()) ?? '').includes('900만원'), await page.getByTestId('proposal-sum').innerText())
+  const doc1 = (await page.getByTestId('proposal-doc').innerText()) ?? ''
+  check('상품·제안: 공유용 제안서 — 추천 1 이 첫 상품', doc1.includes('[제안정밀 법인컨설팅 제안 초안]') && doc1.includes('대표님 공유용') && !doc1.includes('[내부]') && doc1.includes('1. 가업승계 사전점검 패키지'))
+  await page.getByRole('button', { name: '상품 더 고르기 (40종)' }).click()
+  await page.getByRole('button', { name: /^정관정비 패키지 · 150만/ }).click()
+  check('상품·제안: 더 고르면 합계가 는다 (1,050만원)', ((await page.getByTestId('proposal-sum').innerText()) ?? '').includes('1,050만원'))
+  for (const [name, word] of [['제안서 (내부용)', '[내부]'], ['업무범위서', '[업무 범위]'], ['견적 카톡', '예상 진행 기간'], ['상황별 카톡', '[1차 연락용]'], ['자료 요청', '확인하면 좋겠습니다']]) {
+    await page.getByTestId('proposal-docs').getByRole('button', { name }).click()
+    check(`상품·제안: ${name}`, ((await page.getByTestId('proposal-doc').innerText()) ?? '').includes(word))
+  }
+  // 월납
+  await page.getByLabel('월납 (만원)').fill('300')
+  await page.getByLabel('직전년도 순이익 (만원)').fill('31000')
+  const mr = (await page.getByTestId('monthly-result').innerText()) ?? ''
+  check('월납: 84개월 2억 5,200만원 · 초록', mr.includes('2억 5,200만원') && mr.includes('초록'), mr.slice(0, 200))
+  await page.getByTestId('proposal-docs').getByRole('button', { name: '제안서 (대표님 공유용)' }).click()
+  check('월납: 제안서에 월납 플랜이 들어간다', ((await page.getByTestId('proposal-doc').innerText()) ?? '').includes('월납 플랜 검토안'))
+  await page.getByLabel('제안 상태').selectOption('견적 전달')
+  await page.getByRole('button', { name: '제안 저장' }).click()
+  await page.waitForTimeout(600)
+  let saved = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients')).find((c) => c.id === 'cli_prop'))
+  check('제안 저장: 상품 4 · 1,050만원 · 견적 전달 · 월납 · 예상 수임료', saved.sales.proposal?.packages.length === 4 && saved.sales.proposal.feeManwon === 1050 && saved.sales.proposal.status === '견적 전달' && saved.sales.proposal.monthly?.premium === 300 && saved.sales.expectedFee === 10_500_000, JSON.stringify(saved.sales.proposal))
+  // 계약 준비 — 체크해도 고른 상품은 그대로
+  const prep = page.getByTestId('contract-prep')
+  await prep.getByLabel('제안 범위 확인').check()
+  await page.waitForTimeout(400)
+  check('계약 준비: 체크 저장 · 고른 상품 유지', ((await page.getByTestId('proposal-sum').innerText()) ?? '').includes('1,050만원'))
+  const before = Number(((await page.locator('aside [data-nav-badge="clients"]').innerText()) ?? '0').trim())
+  await prep.getByRole('button', { name: '계약 완료로' }).click()
+  await page.waitForTimeout(800)
+  saved = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients')).find((c) => c.id === 'cli_prop'))
+  check('계약 완료: 계약함 · 영업 단계 · 수금 항목 4개(상품표 가격)', saved.status === 'active' && saved.sales.stage === 'contracted' && saved.fees.length === 4 && saved.fees.some((f) => f.label === '정관정비 패키지' && f.amount === 1_500_000), JSON.stringify(saved.fees.map((f) => [f.label, f.amount])))
+  check('계약 완료: 제안 준비 체크 유지', saved.sales.contractPrep?.includes('제안 범위 확인'))
+  await page.getByRole('navigation', { name: '주 메뉴' }).getByRole('link', { name: /^일정/ }).click()
+  await page.waitForTimeout(600)
+  check('계약 완료: 메뉴 숫자(계약 고객) +1', Number(((await page.locator('aside [data-nav-badge="clients"]').innerText()) ?? '0').trim()) === before + 1)
+  // 상품표 — 가격 고치기 · 되돌리기
+  await page.goto(BASE + '/sales/proposal?view=catalog', { waitUntil: 'networkidle' })
+  const cat = page.getByTestId('catalog')
+  check('상품표: 40종 · 8분류', (await cat.locator('li').count()) === 40 && (await page.getByRole('group', { name: '상품 분류' }).getByRole('button').count()) === 9)
+  await cat.getByRole('button', { name: '정관정비 패키지 가격 고치기' }).click()
+  await cat.getByLabel('정관정비 패키지 가격(만원)').fill('180')
+  await cat.getByRole('button', { name: '저장' }).click()
+  await page.waitForTimeout(400)
+  check('상품표: 가격 고침 → 표에 반영 · 저장', ((await cat.innerText()) ?? '').includes('180만원 ·고침') && (await page.evaluate(() => JSON.stringify(localStorage.getItem('axmvp.module.sales-os.catalog') ?? ''))).includes('180'))
+  await page.goto(BASE + '/sales/proposal?client=cli_prop', { waitUntil: 'networkidle' })
+  await page.getByRole('button', { name: '상품 더 고르기 (40종)' }).click()
+  check('상품표: 고친 가격이 제안에도', await page.getByRole('button', { name: /^정관정비 패키지 · 180만/ }).count() === 1)
+  await page.goto(BASE + '/sales/proposal?view=catalog', { waitUntil: 'networkidle' })
+  await page.getByTestId('catalog').getByRole('button', { name: '원본 가격으로 되돌리기' }).click()
+  await page.waitForTimeout(300)
+  check('상품표: 원본 가격으로 되돌리기', ((await page.getByTestId('catalog').innerText()) ?? '').includes('150만원') && !((await page.getByTestId('catalog').innerText()) ?? '').includes('·고침'))
+  check('JS 오류 없음 (상품·제안)', errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
+/* ---- 상품·제안 390 ---- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  for (const path of ['/sales/proposal', '/sales/proposal?view=catalog']) {
+    await page.goto(BASE + path, { waitUntil: 'networkidle' })
+    await page.waitForTimeout(400)
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+    check(`상품·제안 390: 옆으로 넘치지 않는다 (${path})`, overflow <= 1, String(overflow))
+  }
   await ctx.close()
 }
 

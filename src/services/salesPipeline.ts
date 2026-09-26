@@ -14,6 +14,7 @@ import {
   type ClientOpsRecord,
   type SalesInfo,
   type SalesMeetingNote,
+  type SalesProposal,
   type SalesStage,
   type SalesStageEvent,
 } from '../types/clientOps'
@@ -56,6 +57,20 @@ const strList = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is
 
 /** 미팅 기록은 이만큼만 남긴다 */
 const MEETING_LIMIT = 30
+
+function normalizeProposal(p: Record<string, unknown>): SalesProposal {
+  const n = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : d)
+  const m = p.monthly && typeof p.monthly === 'object' ? (p.monthly as Record<string, unknown>) : null
+  return {
+    packages: [...new Set(strList(p.packages))],
+    feeManwon: n(p.feeManwon, 0),
+    status: str(p.status) || '제안 전',
+    at: str(p.at),
+    monthly: m && n(m.premium, 0) > 0
+      ? { premium: n(m.premium, 0), months: n(m.months, 84) || 84, rate: n(m.rate, 100), netIncome: typeof m.netIncome === 'number' && m.netIncome > 0 ? m.netIncome : null }
+      : null,
+  }
+}
 
 function normalizeMeetings(list: unknown[]): SalesMeetingNote[] {
   const out: SalesMeetingNote[] = []
@@ -110,6 +125,8 @@ export function normalizeSales(v: unknown): SalesInfo | null {
   }
   if (typeof s.memo === 'string') out.memo = s.memo
   if (Array.isArray(s.meetings)) out.meetings = normalizeMeetings(s.meetings)
+  if (s.proposal && typeof s.proposal === 'object') out.proposal = normalizeProposal(s.proposal as Record<string, unknown>)
+  if (Array.isArray(s.contractPrep)) out.contractPrep = [...new Set(strList(s.contractPrep))]
   return out
 }
 

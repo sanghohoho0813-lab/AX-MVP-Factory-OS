@@ -78,6 +78,20 @@ import {
 } from '../salesEngine'
 import { engineIndustry, profileFromMemo, roundForStage, stageAfterMeeting, toEngineItem, withMeetingNote, withSalesProfile } from '../salesMeeting'
 import salesAppSource from '../../tools/salesKit/orig/SalesApp.jsx?raw'
+import {
+  CONTRACT_CHECKLIST,
+  DEFAULT_PACKAGES,
+  PKG_CATEGORIES,
+  PROPOSAL_STATES,
+  REQUIRED_DOCS,
+  affordability,
+  buildProposal,
+  buildScopeDoc,
+  insuranceSim,
+  manToText,
+  matchPackages,
+} from '../salesProposal'
+import { catalogWithPrices, cleanPrices, feeSum, toProposalItem, withContractFromProposal, withContractPrep, withProposal } from '../salesOffer'
 import { digitsOf, formatNumberOf, numberSegments } from '../../lib/format'
 import { agentLedger, agentLedgerTotals, agentShares, feeMathOf, feeTotals, marginPct, marginText, netAmountOf } from '../feeMath'
 import { CLIENT_FILTER_ORDER, filterClients, isClientFilterKey, matchesClientFilter } from '../clientOpsFilter'
@@ -1401,7 +1415,56 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   const mv = importLegacySalesAccounts([normalizeClientOps({ id: 'lg', workspaceId: null, companyName: '옛', status: 'waiting', createdAt: at, updatedAt: at })], [{ clientId: 'lg', data: { stage: 'lead', ceoAge: 61, revenue: '2000', flags: { hiring: true }, memo: '옛 메모' } }], at)
   check('미팅: 옛 기록 옮기기 — 나이 · 매출 · 체크 · 메모도', mv[0].sales?.ceoAge === 61 && mv[0].sales.revenueM === 2000 && mv[0].sales.flags?.hiring === true && mv[0].sales.memo === '옛 메모')
 
-  check('미팅: 탭 — 영업 보드 · 미팅 준비, 1차 미팅 체크리스트 자리와 다른 주소', SALES_TABS.map((t) => t.to).join() === '/sales/board,/sales/meeting' && moduleForPath('/sales/meeting')?.key === 'sales' && moduleForPath('/sales/first-meeting')?.key === 'first-meeting')
+  check('미팅: 탭 — 영업 보드 · 미팅 준비, 1차 미팅 체크리스트 자리와 다른 주소', SALES_TABS.map((t) => t.to).slice(0, 2).join() === '/sales/board,/sales/meeting' && moduleForPath('/sales/meeting')?.key === 'sales' && moduleForPath('/sales/first-meeting')?.key === 'first-meeting')
+}
+
+/* ------------------------------------------------------------------ */
+/* D-114 3단계 — 상품 · 제안 · 월납 · 계약 준비                           */
+/* ------------------------------------------------------------------ */
+{
+  const at = '2026-09-26T01:00:00.000Z'
+  check('제안: 상품 40 · 8분류 · 제안 상태 9 · 계약 체크 10 · 필수 서류 14', DEFAULT_PACKAGES.length === 40 && PKG_CATEGORIES.length === 8 && PROPOSAL_STATES.length === 9 && CONTRACT_CHECKLIST.length === 10 && REQUIRED_DOCS.length === 14)
+  check('제안: 상품 이름 · 가격이 원본 그대로', DEFAULT_PACKAGES.every((p) => salesAppSource.includes(`["${p.name}", "${p.cat}", ${p.fee},`)), DEFAULT_PACKAGES.find((p) => !salesAppSource.includes(`["${p.name}", "${p.cat}", ${p.fee},`))?.name)
+  check('제안: 가격 합계(원본 40종) 8,320만원', feeSum(DEFAULT_PACKAGES) === 8320)
+  const ds = { name: '대성정밀', industry: '제조업', revenue: 3500, empCount: 26, estYears: 18, ceoAge: 58, interests: ['가업승계', '미처분이익잉여금'], stage: 'meeting2_scheduled', concern: '승계' }
+  const mp = matchPackages(ds, DEFAULT_PACKAGES)
+  check('제안: 추천 상품 3 — 승계 고객은 가업승계 사전점검 먼저', mp.length === 3 && mp[0].pkg.name === '가업승계 사전점검 패키지', mp.map((x) => x.pkg.name).join())
+  const pc = buildProposal(ds, mp.map((x) => x.pkg), 'client')
+  const pi = buildProposal(ds, mp.map((x) => x.pkg), 'internal')
+  check('제안: 공유용 제안서 — 회사 · 상품 · 요청자료, 내부 영업 포인트 없음', pc.includes('[대성정밀 법인컨설팅 제안 초안]') && pc.includes('가업승계 사전점검 패키지') && pc.includes('■ 요청자료') && !pc.includes('[내부]'))
+  check('제안: 내부용 제안서 — 영업 · 클로징 포인트', pi.includes('[내부]'))
+  const sd = buildScopeDoc(ds, mp[0].pkg)
+  check('제안: 업무범위서 — 범위 · 별도 협의 · 기간', sd.includes('[업무 범위]') && sd.includes('[별도 협의 범위]') && sd.includes('4~8주'))
+  // 월납
+  const sim = insuranceSim(300, 84, 100)
+  check('월납: 300만 × 84개월 = 2억 5,200만', sim.total === 25200 && sim.base === 25200 && manToText(sim.total) === '2억 5,200만원')
+  check('월납: 환급률 90% → 목적자금 90%', insuranceSim(100, 84, 90).base === 7560)
+  check('월납: 순이익 3.1억 · 월 300만 = 초록(한도 930만)', affordability(300, 31000).level === 'green' && affordability(300, 31000).greenLimit === 930)
+  check('월납: 순이익 1억 · 월 500만 = 노랑, 월 700만 = 빨강', affordability(500, 10000).level === 'yellow' && affordability(700, 10000).level === 'red')
+  check('월납: 순이익 모르면 판정 안 함', affordability(300, null).level === 'none' && !affordability(300, null).hasBase)
+  check('월납: 원본 색 값이 빠졌다', !('color' in affordability(300, 31000)))
+
+  // 가격 고치기
+  const first = DEFAULT_PACKAGES[0]
+  check('상품표: 고친 가격만 덮는다', catalogWithPrices({ [first.id]: 999 })[0].fee === 999 && catalogWithPrices({})[0].fee === first.fee && catalogWithPrices(null)[1].fee === DEFAULT_PACKAGES[1].fee)
+  check('상품표: 원본과 같은 값 · 이상한 값은 저장에서 빠진다', JSON.stringify(cleanPrices({ [first.id]: first.fee, [DEFAULT_PACKAGES[1].id]: 50, zz: 1, [DEFAULT_PACKAGES[2].id]: -1 })) === JSON.stringify({ [DEFAULT_PACKAGES[1].id]: 50 }))
+
+  // 고객 기록 쪽
+  const rec = normalizeClientOps({ id: 'pr', workspaceId: null, companyName: '제안상사', industry: '제조', status: 'waiting', createdAt: at, updatedAt: at, sales: { stage: 'closing', source: '소개', referrer: '', interests: ['가업승계'], concern: '', expectedFee: null, history: [], movedAt: at } })
+  const pkgs = mp.map((x) => x.pkg)
+  const p1 = withProposal(rec, { packages: pkgs.map((p) => p.name), feeManwon: feeSum(pkgs), status: '견적 전달', monthly: { premium: 300, months: 84, rate: 100, netIncome: 31000 } }, at)
+  check('제안 저장: 상품 · 합계 · 상태 · 월납 · 예상 수임료(원) · 활동', p1.sales?.proposal?.packages.length === 3 && p1.sales.proposal.feeManwon === 900 && p1.sales.proposal.status === '견적 전달' && p1.sales.proposal.monthly?.premium === 300 && p1.sales.expectedFee === 9_000_000 && p1.activity[0].text.startsWith('제안 저장 — 견적 전달 · 3개 · 900만원 · 월납 300만원'), JSON.stringify(p1.sales?.proposal))
+  check('제안 저장: 같은 값이면 그대로', withProposal(p1, { packages: p1.sales!.proposal!.packages, feeManwon: 900, status: '견적 전달', monthly: { premium: 300, months: 84, rate: 100, netIncome: 31000 } }, '2026-09-27T00:00:00.000Z') === p1)
+  check('제안 저장: 저장 → 다시 읽기', normalizeClientOps(JSON.parse(JSON.stringify(p1))).sales?.proposal?.monthly?.netIncome === 31000)
+  const pit = toProposalItem(p1)
+  check('제안 문서 한 줄: 월납 값 · 순이익이 들어간다', pit.proposalMonthlyPremium === 300 && pit.proposalMonths === 84 && pit.netIncome === 31000 && pit.industry === '제조업')
+  const c1 = withContractPrep(p1, '제안 범위 확인', true)
+  check('계약 준비: 켜고 끄기 · 같은 값이면 그대로', c1.sales?.contractPrep?.includes('제안 범위 확인') === true && withContractPrep(c1, '제안 범위 확인', true) === c1 && withContractPrep(c1, '제안 범위 확인', false).sales?.contractPrep?.length === 0)
+  const k1 = withContractFromProposal(c1, pkgs, '2026-09-28T03:00:00.000Z')
+  check('계약 완료: 계약함 · 계약일 · 영업 단계 · 제안 상태', k1.status === 'active' && k1.contract.signedAt === '2026-09-28' && k1.sales?.stage === 'contracted' && k1.sales.proposal?.status === '계약 완료')
+  check('계약 완료: 상품마다 수금 항목(계약금 · 상품표 가격 원)', k1.fees.length === rec.fees.length + 3 && k1.fees.some((f) => f.label === '가업승계 사전점검 패키지' && f.amount === 5_000_000 && f.kind === 'deposit'))
+  check('계약 완료: 두 번 눌러도 수금 항목은 한 번', withContractFromProposal(k1, pkgs).fees.length === k1.fees.length)
+  check('탭: 영업 보드 · 미팅 준비 · 상품·제안', SALES_TABS.map((t) => t.label).join() === '영업 보드,미팅 준비,상품·제안' && moduleForPath('/sales/proposal')?.key === 'sales')
 }
 
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)
