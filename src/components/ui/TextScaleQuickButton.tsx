@@ -5,7 +5,8 @@
 import { useTextScale } from './textScale'
 import { TEXT_SCALES, TEXT_SCALE_META } from '../../lib/uiTextScale'
 
-export function TextScaleQuickButton() {
+/** showLabel: 서랍처럼 자리가 있는 곳 — 지금 크기를 늘 글로 */
+export function TextScaleQuickButton({ showLabel = false }: { showLabel?: boolean }) {
   const { scale, setScale } = useTextScale()
   const next = TEXT_SCALES[(TEXT_SCALES.indexOf(scale) + 1) % TEXT_SCALES.length]
   const label = TEXT_SCALE_META[scale].label
@@ -23,7 +24,8 @@ export function TextScaleQuickButton() {
         <span className="text-[0.8rem]">가</span>
         <span className="text-[1.1rem]">가</span>
       </span>
-      <span className="hidden text-[0.9rem] font-medium sm:inline">글자 {label}</span>
+      {/* 글은 넓은 화면에서만(머리줄이 넘치지 않게) — 좁으면 '가가' 와 풍선 도움말 */}
+      <span className={showLabel ? 'text-[0.9rem] font-medium whitespace-nowrap' : 'hdr-opt hidden text-[0.9rem] font-medium whitespace-nowrap min-[1700px]:inline'}>글자 {label}</span>
     </button>
   )
 }

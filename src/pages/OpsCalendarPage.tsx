@@ -284,15 +284,17 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                       {list.slice(0, 3).map((e) => (
                         <span
                           key={e.id}
-                          className={`t-meta flex items-center gap-1 truncate rounded border px-1 py-0.5 ${
+                          title={`${e.clientName} · ${e.title}`}
+                          className={`flex min-w-0 flex-col rounded border px-1 py-0.5 leading-tight ${
                             e.done ? 'border-slate-100 text-slate-300 line-through' : SCHEDULE_KIND_CLASS[e.kind].chip
                           }`}
                         >
-                          <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${SCHEDULE_KIND_CLASS[e.kind].dot}`} />
-                          {/* D-120: 업체 이름만 보여서 무슨 일인지 몰랐다 — 이름 뒤에 일(성공보수 · 1차 미팅 …)을 붙인다 */}
-                          <span className="truncate" title={`${e.clientName} · ${e.title}`}>
-                            {e.clientName.replace(/\(주\)|㈜|주식회사/g, '').trim()} · {e.title}
+                          {/* D-120: 업체 이름만 보여서 무슨 일인지 몰랐다 — 윗줄 무슨 일(성공보수 · 1차 미팅 …), 아랫줄 업체 */}
+                          <span className="t-meta flex min-w-0 items-center gap-1 font-semibold">
+                            <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${SCHEDULE_KIND_CLASS[e.kind].dot}`} />
+                            <span className="truncate">{e.title}</span>
                           </span>
+                          <span className="t-meta truncate pl-2.5 opacity-80">{e.clientName.replace(/\(주\)|㈜|주식회사/g, '').trim()}</span>
                         </span>
                       ))}
                       {list.length > 3 && (

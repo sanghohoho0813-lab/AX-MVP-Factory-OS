@@ -23,7 +23,7 @@ import { LinkCustomerModal } from '../components/ops/LinkCustomerModal'
 import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { listClients } from '../services/clientOpsService'
 import { salesRecontacts, salesRisks } from '../services/salesSignals'
-import { salesInFlow } from '../services/salesPipeline'
+import { isProspect, salesInFlow } from '../services/salesPipeline'
 import { buildAllAlerts } from '../services/clientOpsAlerts'
 import { buildAllSchedule, upcomingWithin } from '../services/clientOpsSchedule'
 import {
@@ -218,6 +218,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const schedule = useMemo(() => buildAllSchedule(clients, today), [clients, today])
   // '이번 주 마감' 은 마감만 — 다음 약속(D-120)은 아래 '약속' 줄에 따로
   const weekDue = useMemo(() => upcomingWithin(schedule, 7).filter((e) => !e.done && e.kind !== 'next'), [schedule])
+  /** 계약 전 업체 — 약속 줄에서 '미팅 준비' 로, 나머지는 '업체 열기' 로 */
+  const prospectIds = useMemo(() => new Set(clients.filter(isProspect).map((c) => c.id)), [clients])
   /** 다음 약속 — 지난 것 · 오늘 · 내일 (D-120). 날짜 순 */
   const appointments = useMemo(
     () => schedule.filter((e) => e.kind === 'next' && e.daysLeft !== null && e.daysLeft <= 1).sort((a, b) => a.date.localeCompare(b.date)),
@@ -420,16 +422,22 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                 const late = (e.daysLeft ?? 0) < 0
                 return (
                   <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
-                    <span className={`t-sub w-16 shrink-0 font-semibold ${late ? 'text-danger-700' : 'text-brand-700'}`}>
+                    <span className={`t-sub w-20 shrink-0 font-semibold whitespace-nowrap ${late ? 'text-danger-700' : 'text-brand-700'}`}>
                       {e.daysLeft === 0 ? '오늘' : e.daysLeft === 1 ? '내일' : `${Math.abs(e.daysLeft ?? 0)}일 지남`}
                     </span>
                     <Link to={`/ops/clients/${e.clientId}`} className="t-body font-bold text-slate-900 hover:text-brand-700 hover:underline">
                       {e.clientName}
                     </Link>
                     <span className="t-body min-w-0 flex-[1_1_10rem] break-keep text-slate-700">{e.title}</span>
-                    <Link to={`/sales/meeting?client=${e.clientId}`} className="t-sub ml-auto shrink-0 font-semibold text-brand-700 hover:underline">
-                      준비하기 →
-                    </Link>
+                    {prospectIds.has(e.clientId) ? (
+                      <Link to={`/sales/meeting?client=${e.clientId}`} className="t-sub ml-auto shrink-0 font-semibold text-brand-700 hover:underline">
+                        미팅 준비 →
+                      </Link>
+                    ) : (
+                      <Link to={`/ops/clients/${e.clientId}`} className="t-sub ml-auto shrink-0 font-semibold text-brand-700 hover:underline">
+                        업체 열기 →
+                      </Link>
+                    )}
                   </li>
                 )
               })}

@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { TextScaleQuickButton } from '../ui/TextScaleQuickButton'
 import { useStoreVersion } from '../../lib/useStoreVersion'
 import { isAdvancedVisible } from '../../lib/featureVisibility'
 import { useEffect, useState } from 'react'
@@ -204,16 +205,17 @@ function SidebarContent({
                               <NavBadge kind={item.badge} counts={counts} active={isActive} collapsed={collapsed} />
                               {!collapsed && item.status === 'soon' && (
                                 <span
-                                  className={`t-meta ml-auto shrink-0 rounded-full px-1.5 py-0.5 font-semibold ${
+                                  className={`ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[0.75rem] font-semibold ${
                                     isActive ? 'bg-white/20 text-white' : 'bg-navy-800 text-navy-200'
                                   }`}
                                 >
+                                  {/* D-120: 배지는 작게 — 메뉴 이름(1차 미팅 체크리스트)이 잘리지 않게 */}
                                   준비 중
                                 </span>
                               )}
                               {!collapsed && item.status === 'next' && (
                                 <span
-                                  className={`t-meta ml-auto shrink-0 rounded-full border px-1.5 py-0.5 font-semibold tracking-wide ${
+                                  className={`ml-auto shrink-0 rounded-full border px-1.5 py-0.5 text-[0.75rem] font-semibold tracking-wide ${
                                     isActive ? 'border-white/40 text-white' : 'border-navy-600 text-navy-300'
                                   }`}
                                 >
@@ -240,6 +242,13 @@ function SidebarContent({
         가이드는 '이 시스템' 묶음으로, 글자 크기는 설정으로 갔다.
       */}
       <div className="shrink-0 border-t border-navy-800 px-3 py-3">
+        {/* D-120: 휴대폰 서랍에서는 글자 크기를 바로 — 머리줄에 자리가 없다 */}
+        {onCloseMobile && (
+          <div className="mb-2 flex items-center justify-between gap-2 px-1">
+            <span className="text-[0.9rem] text-navy-200">글자 크기</span>
+            <TextScaleQuickButton showLabel />
+          </div>
+        )}
         <SidebarAccount collapsed={collapsed} />
         {!collapsed && (
           <p className="t-meta truncate px-3 pt-2 pb-1 text-navy-300" title={`${brand.productSubtitle} · ${APP_VERSION}`}>

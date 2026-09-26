@@ -46,6 +46,7 @@
     "qa:squeeze": "node e2e/squeeze.mjs",
     "qa:sales": "node e2e/sales.mjs",
     "qa:journey": "node e2e/journey.mjs",
+    "qa:easy": "node e2e/easy.mjs",
     "qa:themes": "node e2e/themes.mjs"
   },
   "dependencies": {

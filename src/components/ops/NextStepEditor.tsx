@@ -128,8 +128,10 @@ export function NextStepEditor({
       {date && <p className="t-sub text-slate-600">→ {friendlyDate(date)} · {relativeDay(date, today)}</p>}
       {firstMeeting && (
         <label className="t-sub flex items-center gap-2 text-slate-700">
-          <input type="checkbox" checked={move} onChange={(e) => setMove(e.target.checked)} className="size-5 accent-brand-600" />
-          영업 단계를 <strong className="font-semibold">1차 미팅 예정</strong>으로 옮기기
+          <input type="checkbox" checked={move} onChange={(e) => setMove(e.target.checked)} className="size-5 shrink-0 accent-brand-600" />
+          <span className="min-w-0 break-keep">
+            영업 단계를 <strong className="font-semibold">1차 미팅 예정</strong>으로 옮기기
+          </span>
         </label>
       )}
       <div className="flex flex-wrap items-center gap-2">

@@ -193,7 +193,7 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
         <span className="t-card truncate text-slate-900">{screenTitle}</span>
       </span>
       {/* 휴대폰에서도 지금 몇 시인지는 보인다 (D-87) */}
-      <span className="lg:hidden">
+      <span className="hdr-mclock lg:hidden">
         <HeaderClock />
       </span>
 
@@ -216,7 +216,8 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
         1360px 부터 보인다. 1280 에서는 머리띠 내용이 1008px 인데 자리가 977px 뿐이라 화면이 옆으로
         밀렸다(실측). 그 아래에서는 감추고 Ctrl+K 로 연다 — 억지로 줄이면 안내 문구가 잘린다.
       */}
-      <div className="hidden w-[15rem] shrink-0 min-[1360px]:block 2xl:w-[19rem]">
+      {/* D-120: 글자 '크게 · 매우 크게' 에서는 넓은 검색 칸 대신 '찾기' 단추(hdr-wide-search · index.css) */}
+      <div className="hdr-wide-search hidden w-[15rem] shrink-0 min-[1360px]:block 2xl:w-[19rem]">
         <GlobalSearch />
       </div>
 
@@ -224,7 +225,7 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
 
       <div className="flex shrink-0 items-center gap-1.5 lg:gap-2.5">
         {/* 오늘이 며칠이고 지금 몇 시인지 — 고객 플랫폼 단추 왼쪽에 크게 (D-87) */}
-        <span className="hidden lg:inline-flex">
+        <span className="hdr-clock hidden lg:inline-flex">
           <HeaderClock />
         </span>
         {/* 고객이 보는 표면으로 건너가는 문 — 새 탭. 로그인 세션은 공유하지 않는다(가짜 SSO 금지). */}
@@ -232,29 +233,35 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
           href={brand.customerPlatformUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="hidden h-10 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 px-3 text-[0.9rem] font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50 md:inline-flex"
+          aria-label={brand.customerPlatformLabel}
+          title={brand.customerPlatformLabel}
+          className="hdr-tight hidden h-10 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 px-2.5 text-[0.9rem] font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50 md:inline-flex min-[1700px]:px-3"
         >
           <ExternalLink aria-hidden="true" className="size-4 text-slate-400" />
-          {brand.customerPlatformLabel}
+          {/* D-120: 1700px 아래에서는 아이콘만 — 머리줄이 옆으로 넘치지 않게 */}
+          <span className="hidden min-[1700px]:inline">{brand.customerPlatformLabel}</span>
         </a>
         {/* 가이드·저장상태·설정·계정은 모바일에서 서랍/더보기 로 옮겼다 */}
-        <span className="hidden 2xl:inline-flex">
+        <span className="hdr-opt hidden 2xl:inline-flex">
           <GuideButton />
         </span>
-        <span className="hidden min-[1700px]:inline-flex">
+        {/* D-120: 저장 상태 글은 아주 넓은 화면에서만(글자 크기 단추 자리를 냈다) — 서랍 · 설정에도 있다 */}
+        <span className="hdr-opt hidden min-[2100px]:inline-flex">
           <CloudSaveStatus state={isSupabase ? 'saved' : 'local'} compact={false} />
         </span>
-        {/* D-120: 글자 크기를 머리줄에서 바로 — 설정 깊숙이 있었다 */}
-        <TextScaleQuickButton />
+        {/* D-120: 글자 크기를 머리줄에서 바로 — 설정 깊숙이 있었다. 휴대폰은 서랍 메뉴에 */}
+        <span className="hidden lg:inline-flex">
+          <TextScaleQuickButton />
+        </span>
         {/* D-120: 1360px 아래에서도 찾기 — 예전에는 Ctrl+K 로만 열렸다 */}
-        <span className="inline-flex min-[1360px]:hidden">
+        <span className="hdr-compact-search inline-flex min-[1360px]:hidden">
           <GlobalSearch compact />
         </span>
         <SignalBell />
         <Link
           to="/settings"
           aria-label="설정"
-          className="hidden size-10 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-100 hover:text-slate-700 lg:flex"
+          className="hdr-tight hidden size-10 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-100 hover:text-slate-700 lg:flex"
         >
           <Settings aria-hidden="true" className="size-5" />
         </Link>

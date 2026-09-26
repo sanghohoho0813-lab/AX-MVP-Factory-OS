@@ -629,3 +629,36 @@ input:is([type="date"], [type="month"], [type="time"], [type="datetime-local"]):
   color: var(--color-slate-500);
 }
 
+/* D-120: 글자 '크게 · 매우 크게' 에서 머리줄이 옆으로 넘치지 않게 — 덜 중요한 것부터 뺀다 */
+html[data-text-scale="large"] .hdr-wide-search,
+html[data-text-scale="extra_large"] .hdr-wide-search,
+html[data-text-scale="large"] .hdr-opt,
+html[data-text-scale="extra_large"] .hdr-opt {
+  display: none !important;
+}
+html[data-text-scale="large"] .hdr-compact-search,
+html[data-text-scale="extra_large"] .hdr-compact-search {
+  display: inline-flex !important;
+}
+@media (max-width: 1599px) {
+  html[data-text-scale="large"] .hdr-clock,
+  html[data-text-scale="extra_large"] .hdr-clock {
+    display: none !important;
+  }
+}
+/* 휴대폰 '매우 크게' — 머리줄 시계를 빼서 화면 제목 자리를 지킨다(시계는 오늘 화면 맨 위에도 있다) */
+html[data-text-scale="extra_large"] .hdr-mclock {
+  display: none !important;
+}
+@media (max-width: 419px) {
+  html[data-text-scale="large"] .hdr-mclock {
+    display: none !important;
+  }
+}
+/* 1280px 아래 '매우 크게' — 고객 플랫폼 · 설정 아이콘을 뺀다(둘 다 옆 메뉴에 있다) */
+@media (max-width: 1279px) {
+  html[data-text-scale="extra_large"] .hdr-tight {
+    display: none !important;
+  }
+}
+
