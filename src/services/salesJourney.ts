@@ -256,10 +256,11 @@ export function buildJourney(record: ClientOpsRecord, opts: JourneyOptions): Jou
       {
         label: '크레탑 분석',
         done: !!cretop,
-        to: `/sales/new?client=${id}`,
+        // D-121: 1차 미팅 준비 = 크레탑 분석기 — 미팅 준비 1차 탭에서 바로 넣는다
+        to: `/sales/meeting?client=${id}&round=1`,
         note: cretop ? `${localDateOf(cretop.createdAt)} 붙임` : '보고서를 넣으면 기본 정보 · 추천 전략이 채워집니다',
       },
-      { label: '질문 · 전략 준비', done: cur >= 1 || meetings.length > 0, to: `/sales/meeting?client=${id}&round=1`, note: '1차 대본 · 크레탑 질문 흐름' },
+      { label: '질문 · 전략 준비', done: cur >= 1 || meetings.length > 0, to: `/sales/meeting?client=${id}&round=1`, note: '크레탑 질문 흐름 · 영업 대본' },
       {
         label: '1차 미팅 날짜',
         done: cur >= 1 || salesStageOf(record) === 'm1sched',

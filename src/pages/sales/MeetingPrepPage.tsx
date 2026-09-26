@@ -1,5 +1,12 @@
 /**
- * 영업 관리 › 미팅 준비 (D-114 2단계).
+ * 영업 관리 › 미팅 준비 (D-114 2단계 · D-121 다시 짬).
+ *
+ * D-121 대표 지시 — "스크롤이 너무 길고 쓸데없는 게 많다. 정말 필요한 것만."
+ *  - 맨 위 한 장: 업체 · 단계 · 점수 · 다음 약속. 영업 흐름은 한 줄로 접어 둔다.
+ *  - 1차 미팅 준비 = 크레탑 분석기 그대로(단독 판매 부품 CretopWorkbench). 분석하면 이 업체에 바로 반영.
+ *    엔진 대본(오프닝 · 질문 · 자료 · 전략 TOP3)은 그 아래 '영업 대본' 으로 접는다.
+ *  - 2차 · 3차는 운영 OS 흐름: 크레탑 전략에서 이어서 물을 것 → 핵심 대본 → 제안 · 계약. 나머지는 '더 보기'.
+ *  - 카톡 문구는 한 묶음으로 접는다. 글은 지우지 않았다.
  *
  * 기업컨설팅 OS 의 '미팅 준비' · '고객 카드 분석' · '녹취/메모 분석' 을 고객 관리 한 장부 위로 옮겼다.
  *  - 고객을 고르면: 리드 점수 · 등급 · 전략 TOP3 · 미팅 테마, 그리고 첫 연락 · 1차 · 2차 · 3차 대본(원본 문구 그대로).
@@ -10,16 +17,22 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ChevronRight, NotebookPen, Presentation } from 'lucide-react'
+import { Check, ChevronRight, FileText, NotebookPen, Presentation, ScanSearch } from 'lucide-react'
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useToast } from '../../components/ui/toastContext'
-import { Badge, Disclosure, ScreenTitle, Surface, type Tone } from '../../components/ui/primitives'
+import { Badge, Disclosure, ScreenTitle, type Tone } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { SalesTabs } from '../../components/sales/SalesTabs'
 import { rampAt } from '../../components/sales/salesColor'
 import { CopyButton, NumberedList, PillList, ScriptBlock, StageBadge } from '../../components/sales/salesParts'
 import { SalesJourneyCard } from '../../components/sales/SalesJourneyCard'
-import { CretopMeetingPanel } from '../../components/sales/CretopMeetingPanel'
+import { CretopFollowUp } from '../../components/sales/CretopFollowUp'
+import { NextStepEditor } from '../../components/ops/NextStepEditor'
+import { CretopWorkbench } from '../../tools/cretop/CretopWorkbench'
+import { ToolClientScope } from '../../tools/shared/toolClientContext'
+import type { CretopMiniUi } from '../../tools/cretop/mini/MiniApp.jsx'
+import { registerFromCretop } from '../../services/salesIntake'
+import { companyKey } from '../../services/salesCretop'
 import { withSalesPath } from '../../services/salesJourney'
 import { listClients, saveClient } from '../../services/clientOpsService'
 import { salesStageOf, withSalesStage } from '../../services/salesPipeline'
@@ -378,7 +391,6 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
   const item = useMemo(() => (record ? toEngineItem(record) : null), [record])
   const score = item ? scoreLead(item) : 0
   const tier = scoreTier(score)
-  const strategies = useMemo(() => (item ? recommendedStrategiesFor(item) : []), [item])
   const theme = item ? MEETING_THEMES[detectTheme(item)] : null
 
   /** 저장 — 됐으면 true. 실패하면 알리고 저장된 내용으로 조용히 다시 읽는다 */
@@ -400,9 +412,22 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
     }
   }
 
+  /** 크레탑 분석 → 이 업체 기록에 (빈 칸 채우기 · 추천 전략 · 도구 결과). 분석 이력은 작업대가 이미 남겼다 */
+  const applyCretop = async (rec: ClientOpsRecord, ui: CretopMiniUi, selected: string[], msg: string): Promise<boolean> => {
+    try {
+      const r = await registerFromCretop({ workspaceId, ui, existing: rec, selected, saveHistory: false })
+      setRecords((list) => list.map((x) => (x.id === r.record.id ? r.record : x)))
+      showToast(`${msg}${r.filled.length > 0 ? ` — 채운 칸: ${r.filled.join(' · ')}` : ''}`)
+      return true
+    } catch (cause) {
+      showToast(cause instanceof Error ? `업체에 반영하지 못했습니다 — ${cause.message}` : '업체에 반영하지 못했습니다.')
+      return false
+    }
+  }
+
   return (
-    <div className="flex flex-col gap-5">
-      <ScreenTitle title="영업 관리" sub={`${today} · 미팅 준비 — 고객을 고르면 영업 흐름 · 크레탑 전략 · 1·2·3차 대본이 한 화면에`} />
+    <div className="flex flex-col gap-4">
+      <ScreenTitle title="영업 관리" sub={`${today} · 미팅 준비 — 1차는 크레탑 분석기, 2차부터 이어서 물을 것 · 대본`} />
       <SalesTabs />
 
       {error && (
@@ -444,16 +469,8 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
 
           {record && item && (
             <>
-              {/* D-119: 영업 흐름 — 1차 준비부터 계약 뒤까지, 걸음마다 할 일 · 작업실 도구 */}
-              <SalesJourneyCard
-                record={record}
-                today={today}
-                onPathChange={(path) => void persist(withSalesPath(record, path), path ? '계약 경로를 정했습니다.' : '계약 경로를 비웠습니다.')}
-                onSave={(n, m) => persist(n, m)}
-              />
-
-              {/* 요약 — 누구 · 어디까지 · 점수 · 무엇부터 */}
-              <Surface className="flex flex-col gap-3">
+              {/* D-121: 요약 한 장 — 누구 · 어디까지 · 점수 · 다음 약속 */}
+              <section aria-label="고객 요약" data-testid="meeting-summary" className="flex flex-col gap-2.5 rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                   <Link to={`/ops/clients/${record.id}`} className="t-card inline-flex items-center gap-1 font-bold text-slate-900 hover:text-brand-700 hover:underline">
                     {record.companyName}
@@ -465,29 +482,18 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                   </Badge>
                   {theme && <span className="t-sub text-slate-500">미팅 테마 · {theme.label}</span>}
                 </div>
-                {item.interests && item.interests.length > 0 && <PillList items={item.interests} />}
-                <div>
-                  <h2 className="t-sub font-bold text-slate-800">먼저 볼 전략 TOP3</h2>
-                  <ol className="mt-1.5 grid gap-2 lg:grid-cols-3">
-                    {strategies.map((st, i) => (
-                      <li key={st.id} className="relative flex flex-col gap-1 overflow-hidden rounded-(--radius-control) border border-slate-200 bg-slate-50 p-3 pl-4">
-                        <span aria-hidden="true" className="ramp-bar absolute inset-y-0 left-0 w-[3px]" style={rampAt(i, 3)} />
-                        <span className="t-sub font-bold text-slate-900">
-                          <span className="ramp-text tabular-nums" style={rampAt(i, 3)}>{i + 1}.</span> {st.name}
-                        </span>
-                        <span className="t-meta break-keep text-slate-600">{st.fit}</span>
-                        <span className="t-meta text-slate-500">
-                          수임료 {st.fee}
-                          {st.needTaxPro ? ' · 세무사 검토 필요' : ''}
-                        </span>
-                      </li>
-                    ))}
-                  </ol>
+                <div className="border-t border-slate-100 pt-2.5">
+                  <NextStepEditor record={record} today={today} onSave={(n, m) => persist(n, m)} />
                 </div>
-                <p className="t-meta break-keep text-slate-400">
-                  점수 · 전략은 매출 · 직원 · 대표 나이 · 업력 · 관심사 · 유입 경로 · 단계로 매기는 규칙 계산입니다(원본 기준 20~88점).
-                </p>
-              </Surface>
+              </section>
+
+              {/* 영업 흐름 — 한 줄로 접어 둔다(펼치면 걸음 · 할 일 · 작업실 도구) */}
+              <SalesJourneyCard
+                record={record}
+                today={today}
+                foldable
+                onPathChange={(path) => void persist(withSalesPath(record, path), path ? '계약 경로를 정했습니다.' : '계약 경로를 비웠습니다.')}
+              />
 
               <ProfileEditor record={record} onSave={(n, m) => void persist(n, m)} />
 
@@ -506,10 +512,47 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                 ))}
               </div>
 
-              {/* D-119: 크레탑 분석기의 전략 · 질문 흐름을 이 차수에 맞게 */}
-              <CretopMeetingPanel record={record} round={round} />
+              {round === 0 && <FirstContactPlan item={item} />}
 
-              <RoundPlan item={item} round={round} />
+              {round === 1 && (
+                <>
+                  {/* D-121: 1차 미팅 준비 = 크레탑 분석기 그대로(단독 판매 부품) — 분석하면 이 업체에 바로 반영 */}
+                  <section aria-label="크레탑 분석기" data-testid="meeting-cretop" className="flex flex-col gap-2">
+                    <h2 className="t-section flex items-center gap-2 text-slate-900">
+                      <ScanSearch aria-hidden="true" className="size-5 text-brand-600" />
+                      크레탑 분석기
+                      <span className="t-sub font-medium text-slate-500">· 1차 미팅 준비</span>
+                    </h2>
+                    <ToolClientScope workspaceId={workspaceId} client={record}>
+                      <CretopWorkbench
+                        embedded
+                        onAnalyzed={(ui) => {
+                          // 다른 회사 보고서를 넣었으면 저절로 붙이지 않는다 — 맞으면 결과 막대의 '이 업체에 반영' 으로
+                          if (!sameCompany(record, ui)) {
+                            showToast(`${ui.companyInfo?.companyName || '이 보고서'} — ${record.companyName} 과(와) 다른 회사 같아 반영하지 않았습니다. 맞으면 '이 업체에 반영' 을 누르세요.`)
+                            return
+                          }
+                          void applyCretop(record, ui, [], '크레탑 분석을 이 업체에 반영했습니다')
+                        }}
+                        attachSlot={(ui, selected) => (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            data-testid="meeting-cretop-apply"
+                            onClick={() => void applyCretop(record, ui, selected, selected.length > 0 ? `고른 항목 ${selected.length}개를 이 업체에 반영했습니다` : '이 업체에 다시 반영했습니다')}
+                          >
+                            <Check aria-hidden="true" className="size-4" />
+                            {selected.length > 0 ? `고른 항목 ${selected.length}개 반영` : '이 업체에 반영'}
+                          </Button>
+                        )}
+                      />
+                    </ToolClientScope>
+                  </section>
+                  <FirstMeetingScript item={item} />
+                </>
+              )}
+
+              {(round === 2 || round === 3) && <LaterRoundPlan record={record} item={item} round={round} onGoFirst={() => setRound(1)} />}
 
               {round !== 0 && <MeetingRecorder
                   key={`${record.id}-${round}`}
@@ -540,7 +583,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                 </Disclosure>
               )}
 
-              <ScriptBlock title="다음 연락 카톡 (고객 유형별)" text={followUpKakao(item)} copy />
+              <KakaoGroup item={item} />
             </>
           )}
         </>
@@ -549,70 +592,189 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
   )
 }
 
-/** 차수별 대본 — 원본 buildMeetingPlan · buildLeadPlan 문구 그대로 */
-function RoundPlan({ item, round }: { item: ReturnType<typeof toEngineItem>; round: Round }) {
-  if (round === 0) {
-    const p = buildLeadPlan(item)
-    return (
-      <div data-testid="meeting-plan" className="flex flex-col gap-3">
-        <ScriptBlock title="첫 마디" text={p.hook} copy />
-        <ScriptBlock title="전화 대본" text={p.phone} copy />
-        <ScriptBlock title="통화 뒤 카톡" text={p.kakao} copy />
-        <ScriptBlock title="자주 나오는 거절과 답">
+type EngineItem = ReturnType<typeof toEngineItem>
+
+/** 보고서가 이 업체 것인가 — 사업자번호가 둘 다 있으면 그것으로, 아니면 이름으로. 모르면 같다고 본다 */
+function sameCompany(record: ClientOpsRecord, ui: CretopMiniUi): boolean {
+  const d = (v: string) => v.replace(/[^0-9]/g, '')
+  const a = d(record.businessNumber)
+  const b = d(ui.companyInfo?.businessNo ?? '')
+  if (a.length === 10 && b.length === 10) return a === b
+  const x = companyKey(record.companyName)
+  const y = companyKey(ui.companyInfo?.companyName ?? '')
+  if (x === '' || y === '') return true
+  return x.includes(y) || y.includes(x)
+}
+
+/** 앞의 몇 줄만 — 나머지는 '더 보기' (글은 지우지 않는다) */
+function MoreList({ items, first = 5 }: { items: string[]; first?: number }) {
+  const [all, setAll] = useState(false)
+  const shown = all ? items : items.slice(0, first)
+  return (
+    <div className="flex flex-col gap-2">
+      <NumberedList items={shown} />
+      {items.length > first && (
+        <button type="button" onClick={() => setAll((v) => !v)} className="t-sub self-start font-semibold text-brand-700 hover:underline">
+          {all ? '접기' : `더 보기 (${items.length - first}개)`}
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** 첫 연락 — 첫 마디 · 전화 대본만 펼쳐 두고 나머지는 접기 (원본 buildLeadPlan 문구 그대로) */
+function FirstContactPlan({ item }: { item: EngineItem }) {
+  const p = buildLeadPlan(item)
+  return (
+    <div data-testid="meeting-plan" className="flex flex-col gap-3">
+      <ScriptBlock title="첫 마디" text={p.hook} copy />
+      <ScriptBlock title="전화 대본" text={p.phone} copy />
+      <Disclosure title="거절과 답 · 1차 미팅으로 넘기는 말" hint={`거절 ${p.objections.length}가지`}>
+        <div className="flex flex-col gap-3">
           <ObjectionList items={p.objections} />
-        </ScriptBlock>
-        <ScriptBlock title="1차 미팅으로 넘기는 말" text={p.meetingBridge} />
-      </div>
-    )
-  }
-  if (round === 1) {
-    const p = buildMeetingPlan(item, 'm1')
-    return (
+          <ScriptBlock title="1차 미팅으로 넘기는 말" text={p.meetingBridge} copy />
+        </div>
+      </Disclosure>
+    </div>
+  )
+}
+
+/** 1차 영업 대본 — 크레탑 분석기 아래 접어 둔다. 규칙으로 고른 전략 TOP3 도 여기 */
+function FirstMeetingScript({ item }: { item: EngineItem }) {
+  const p = buildMeetingPlan(item, 'm1')
+  const strategies = recommendedStrategiesFor(item)
+  return (
+    <Disclosure title="영업 대본 — 오프닝 · 질문 · 요청 자료" hint={`질문 ${p.questions.length}개 · 전략 TOP3`}>
       <div data-testid="meeting-plan" className="flex flex-col gap-3">
         <ScriptBlock title="목표" text={p.goal} />
         <ScriptBlock title="오프닝" text={p.opening} copy />
         <ScriptBlock title={`질문 ${p.questions.length}개`}>
-          <NumberedList items={p.questions} />
+          <MoreList items={p.questions} />
         </ScriptBlock>
-        <ScriptBlock title="피할 것" text={p.avoid} />
         <ScriptBlock title="요청할 자료">
           <PillList items={p.docs} />
         </ScriptBlock>
+        <ScriptBlock title="먼저 볼 전략 TOP3">
+          <ol className="grid gap-2 lg:grid-cols-3">
+            {strategies.map((st, i) => (
+              <li key={st.id} className="relative flex flex-col gap-1 overflow-hidden rounded-(--radius-control) border border-slate-200 bg-slate-50 p-3 pl-4">
+                <span aria-hidden="true" className="ramp-bar absolute inset-y-0 left-0 w-[3px]" style={rampAt(i, 3)} />
+                <span className="t-sub font-bold text-slate-900">
+                  <span className="ramp-text tabular-nums" style={rampAt(i, 3)}>{i + 1}.</span> {st.name}
+                </span>
+                <span className="t-meta break-keep text-slate-600">{st.fit}</span>
+                <span className="t-meta text-slate-500">
+                  수임료 {st.fee}
+                  {st.needTaxPro ? ' · 세무사 검토 필요' : ''}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </ScriptBlock>
+        <ScriptBlock title="피할 것" text={p.avoid} />
         <ScriptBlock title="다음 단계" text={p.next} />
-        <ScriptBlock title="미팅 뒤 카톡" text={p.kakao} copy />
       </div>
-    )
-  }
+    </Disclosure>
+  )
+}
+
+/**
+ * 2차 · 3차 — 운영 OS 흐름(D-121): 크레탑 전략에서 이어서 물을 것 → 이번 차수 핵심 대본 → 제안 · 계약으로.
+ * 원본 대본의 나머지(진행 순서 · 거절과 답 · 수임료 · 전략)는 '더 보기' 로 접는다.
+ */
+function LaterRoundPlan({ record, item, round, onGoFirst }: { record: ClientOpsRecord; item: EngineItem; round: 2 | 3; onGoFirst: () => void }) {
+  const proposal = record.sales?.proposal ?? null
+  const prep = record.sales?.contractPrep?.length ?? 0
+  const followUp = (
+    <section aria-label="이어서 물을 것" className="flex flex-col gap-2">
+      <h2 className="t-section text-slate-900">
+        이어서 물을 것 <span className="t-sub font-medium text-slate-500">· 크레탑 전략 {round === 2 ? 'D 제안 연결' : 'E 다음 액션'}</span>
+      </h2>
+      <CretopFollowUp record={record} round={round} onGoFirst={onGoFirst} />
+    </section>
+  )
+  const nextLink = (
+    <Link
+      to={`/sales/proposal?client=${record.id}`}
+      data-testid="meeting-proposal-link"
+      className="flex items-center gap-2.5 rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-3 hover:bg-slate-50"
+    >
+      <FileText aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="t-sub font-bold text-slate-900">{round === 2 ? '제안서 · 견적' : '계약 준비'}</span>
+        <span className="t-meta break-keep text-slate-500">
+          {round === 2
+            ? proposal
+              ? `${proposal.packages.length}개 상품 · ${proposal.status}`
+              : '아직 제안서가 없습니다 — 2차 미팅 전에 만들어 두세요'
+            : `계약 준비 체크 ${prep}개 끝냄${proposal ? ` · 제안 ${proposal.status}` : ''}`}
+        </span>
+      </span>
+      <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
+    </Link>
+  )
   if (round === 2) {
     const p = buildMeetingPlan(item, 'm2')
     return (
-      <div data-testid="meeting-plan" className="flex flex-col gap-3">
-        <ScriptBlock title="목표" text={p.goal} />
-        <ScriptBlock title="핵심 이슈 TOP3">
-          <NumberedList items={p.topIssues.map((t) => t.replace(/^\d+\.\s*/, ''))} />
-        </ScriptBlock>
-        <ScriptBlock title="진행 순서" text={p.approach} />
-        <ScriptBlock title="거절과 답">
-          <ObjectionList items={p.objections} />
-        </ScriptBlock>
-        <ScriptBlock title="마무리 말" text={p.close} copy />
-        <ScriptBlock title="받을 자료">
-          <PillList items={p.docs} />
-        </ScriptBlock>
-        <ScriptBlock title="수임료 범위 (내부)" text={p.fee} />
-      </div>
+      <>
+        {followUp}
+        <div data-testid="meeting-plan" className="flex flex-col gap-3">
+          <ScriptBlock title="핵심 이슈 TOP3">
+            <NumberedList items={p.topIssues.map((t) => t.replace(/^\d+\.\s*/, ''))} />
+          </ScriptBlock>
+          <ScriptBlock title="마무리 말" text={p.close} copy />
+          {nextLink}
+          <Disclosure title="더 보기 — 목표 · 진행 순서 · 거절과 답 · 받을 자료 · 수임료">
+            <div className="flex flex-col gap-3">
+              <ScriptBlock title="목표" text={p.goal} />
+              <ScriptBlock title="진행 순서" text={p.approach} />
+              <ScriptBlock title="거절과 답">
+                <ObjectionList items={p.objections} />
+              </ScriptBlock>
+              <ScriptBlock title="받을 자료">
+                <PillList items={p.docs} />
+              </ScriptBlock>
+              <ScriptBlock title="수임료 범위 (내부)" text={p.fee} />
+            </div>
+          </Disclosure>
+        </div>
+      </>
     )
   }
   const p = buildMeetingPlan(item, 'm3')
   return (
-    <div data-testid="meeting-plan" className="flex flex-col gap-3">
-      <ScriptBlock title="목표" text={p.goal} />
-      <ScriptBlock title="전략" text={p.strategy} />
-      <ScriptBlock title="1차 계약 제안" text={p.proposal} copy />
-      <ScriptBlock title="가격 이야기" text={p.priceTalk} copy />
-      <ScriptBlock title="'생각해 볼게요' 에 대한 답" text={p.holdTalk} copy />
-      <ScriptBlock title="계약 안내 카톡" text={p.contractKakao} copy />
-    </div>
+    <>
+      {followUp}
+      <div data-testid="meeting-plan" className="flex flex-col gap-3">
+        <ScriptBlock title="1차 계약 제안" text={p.proposal} copy />
+        <ScriptBlock title="가격 이야기" text={p.priceTalk} copy />
+        <ScriptBlock title="'생각해 볼게요' 에 대한 답" text={p.holdTalk} copy />
+        {nextLink}
+        <Disclosure title="더 보기 — 목표 · 전략">
+          <div className="flex flex-col gap-3">
+            <ScriptBlock title="목표" text={p.goal} />
+            <ScriptBlock title="전략" text={p.strategy} />
+          </div>
+        </Disclosure>
+      </div>
+    </>
+  )
+}
+
+/** 카톡 문구 — 차수마다 흩어져 있던 것을 한 묶음으로 접어 둔다 */
+function KakaoGroup({ item }: { item: EngineItem }) {
+  const lead = buildLeadPlan(item)
+  const m1 = buildMeetingPlan(item, 'm1')
+  const m3 = buildMeetingPlan(item, 'm3')
+  return (
+    <Disclosure title="카톡 문구" hint="통화 뒤 · 1차 미팅 뒤 · 다음 연락 · 계약 안내">
+      <div data-testid="meeting-kakao" className="flex flex-col gap-3">
+        <ScriptBlock title="통화 뒤 카톡" text={lead.kakao} copy />
+        <ScriptBlock title="1차 미팅 뒤 카톡" text={m1.kakao} copy />
+        <ScriptBlock title="다음 연락 카톡 (고객 유형별)" text={followUpKakao(item)} copy />
+        <ScriptBlock title="계약 안내 카톡" text={m3.contractKakao} copy />
+      </div>
+    </Disclosure>
   )
 }
 

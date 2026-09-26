@@ -218,6 +218,9 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   check('미팅 준비: 사이드바는 그대로 영업 관리 (탭은 목차에 없다)', ((await page.locator('aside a[aria-current="page"]').innerText()) ?? '').includes('영업 관리') && !((await page.locator('aside nav').innerText()) ?? '').includes('미팅 준비'))
   const score1 = Number(((await page.getByTestId('lead-score').innerText()) ?? '').replace(/\D/g, ''))
   check('미팅 준비: 리드 점수 20~88', score1 >= 20 && score1 <= 88, String(score1))
+  // D-121: 1차 탭 = 크레탑 분석기 · 엔진 대본(오프닝 · 질문 · 전략 TOP3)은 '영업 대본' 으로 접혀 있다
+  check('미팅 준비: 1차는 크레탑 분석기 · 영업 대본은 접힘', (await page.getByTestId('meeting-cretop').count()) === 1 && (await page.getByTestId('meeting-plan').count()) === 0)
+  await page.getByRole('button', { name: /영업 대본 — 오프닝/ }).click()
   const main1 = (await page.locator('main').innerText()) ?? ''
   check('미팅 준비: 전략 TOP3 — 가업승계 먼저', main1.includes('먼저 볼 전략 TOP3') && main1.indexOf('가업승계') > 0)
   check('미팅 준비: 1차 미팅 예정 → 1차 대본이 먼저 (질문 · 오프닝 · 요청 자료)', ((await page.getByTestId('meeting-rounds').getByRole('button', { name: '1차 미팅' }).getAttribute('aria-pressed')) === 'true') && main1.includes('오프닝') && /질문 \d+개/.test(main1) && main1.includes('미팅정밀'))

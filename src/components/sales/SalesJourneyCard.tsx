@@ -22,6 +22,7 @@ export function SalesJourneyCard({
   onPathChange,
   compact = false,
   onSave,
+  foldable = false,
 }: {
   record: ClientOpsRecord
   today: string
@@ -31,6 +32,8 @@ export function SalesJourneyCard({
   compact?: boolean
   /** 주면 카드 위에 '다음 약속' 고치기가 붙는다(D-120) — 미팅 준비에서 */
   onSave?: (next: ClientOpsRecord, msg: string) => void | boolean | Promise<void | boolean>
+  /** 한 줄로 접어 두고 눌러서 펼친다(D-121) — 미팅 준비에서. 접힌 줄에 지금 걸음 · 다음 할 일 */
+  foldable?: boolean
 }) {
   const access = useModuleAccessMap(record.workspaceId)
   const journey = useMemo(() => buildJourney(record, { today, access }), [record, today, access])
@@ -45,6 +48,34 @@ export function SalesJourneyCard({
   const open = journey.steps.find((s) => s.key === openKey) ?? journey.steps[0]
   const openIndex = journey.steps.indexOf(open)
   const path = journey.path
+  const [unfolded, setUnfolded] = useState(false)
+
+  if (foldable && !unfolded) {
+    const now = journey.steps.find((s) => s.key === journey.current) ?? journey.steps[0]
+    const todo = now.tasks.find((t) => !t.done && !t.soon)
+    const nowIndex = journey.steps.indexOf(now)
+    return (
+      <section data-testid="sales-journey" data-folded="1" aria-label="영업 흐름" className="rounded-(--radius-panel) border border-slate-200 bg-white">
+        <button
+          type="button"
+          data-testid="journey-unfold"
+          aria-expanded={false}
+          onClick={() => setUnfolded(true)}
+          className="tap flex w-full items-center gap-2 px-4 py-3 text-left sm:px-5"
+        >
+          <Route aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="t-sub font-bold break-keep text-slate-900">
+              영업 흐름 · <span className="ramp-text" style={rampAt(nowIndex, 6)}>{nowIndex + 1}/6 {now.label}</span>
+              {path && <span className="font-medium text-slate-500"> · {SALES_PATH_INFO[path].label}</span>}
+            </span>
+            {todo && <span className="t-meta break-keep text-slate-500">다음 할 일 · {todo.label}</span>}
+          </span>
+          <span className="t-meta shrink-0 font-semibold text-brand-700">펼치기</span>
+        </button>
+      </section>
+    )
+  }
 
   return (
     <section data-testid="sales-journey" aria-label="영업 흐름" className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5">
@@ -53,6 +84,11 @@ export function SalesJourneyCard({
           <Route aria-hidden="true" className="size-5 text-brand-600" />
           영업 흐름
           <span className="t-sub font-medium text-slate-500">· 지금 {journey.steps.find((s) => s.key === journey.current)?.label}</span>
+          {foldable && (
+            <button type="button" data-testid="journey-fold" onClick={() => setUnfolded(false)} className="t-meta font-semibold text-brand-700 hover:underline">
+              접기
+            </button>
+          )}
         </h2>
         <div role="group" aria-label="계약 경로" data-testid="sales-path" className="flex flex-wrap items-center gap-1.5">
           <span className="t-meta text-slate-500">계약 경로</span>

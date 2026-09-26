@@ -83,9 +83,12 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const hist = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.module.cretop.analyses') ?? '[]'))
   check('등록: 크레탑 분석 이력에도 이 업체로', hist.some((h) => h.clientId === id && h.data.company === '한빛정밀(주)'), JSON.stringify(hist.map((h) => h.clientId)))
 
-  // 미팅 준비 — 영업 흐름
+  // 미팅 준비 — 영업 흐름 (D-121: 한 줄로 접혀 있다 → 펼치기)
   const journey = page.getByTestId('sales-journey')
   await journey.waitFor()
+  const fold = (await journey.innerText()) ?? ''
+  check('영업 흐름: 한 줄로 접혀 있다 — 지금 걸음 · 다음 할 일', (await journey.getAttribute('data-folded')) === '1' && fold.includes('1/6 1차 미팅 준비') && fold.includes('다음 할 일'), fold.slice(0, 120))
+  await page.getByTestId('journey-unfold').click()
   check('영업 흐름: 지금 1차 미팅 준비', ((await journey.locator('[data-journey-step="prep"]').getAttribute('data-state')) ?? '') === 'now')
   const prep = page.getByTestId('journey-open')
   check('영업 흐름: 크레탑 분석 · 1차 미팅 날짜 자동 체크', (await prep.locator('[data-journey-task="크레탑 분석"]').getAttribute('data-done')) === '1' && (await prep.locator('[data-journey-task="1차 미팅 날짜"]').getAttribute('data-done')) === '1')
@@ -103,19 +106,24 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(400)
   check('계약 경로: 현금 → 3차 · 클로징은 건너뛸 수 있음', (await journey.locator('[data-journey-step="closing"]').getAttribute('data-state')) === 'optional' && ((await journey.innerText()) ?? '').includes('2차 미팅에서 계약'))
   await page.reload({ waitUntil: 'networkidle' })
-  await page.getByTestId('sales-journey').waitFor()
+  await page.getByTestId('journey-unfold').click()
   check('계약 경로: 새로고침해도 남는다', (await page.getByTestId('sales-path').getByRole('button', { name: '현금 계약' }).getAttribute('aria-pressed')) === 'true')
 
-  // 미팅 준비 — 크레탑 전략
-  const cm = page.getByTestId('cretop-meeting')
-  check('크레탑 전략: 먼저 볼 것 · 추천 5', ((await cm.getByTestId('cretop-diagnosis').innerText()) ?? '').includes('현금성 자산') && (await cm.locator('[data-cretop-pick]').count()) === 5)
-  const now1 = await cm.getByTestId('cretop-flow-now').first().innerText()
-  check('크레탑 전략: 1차에서 물을 것 = A · B · C', now1.includes('1차에서 물을 것') && now1.includes('A 오프닝') && now1.includes('C 문제 인식') && !now1.includes('D 제안 연결'), now1.slice(0, 200))
-  check('크레탑 전략: 추천 멘트 · 더 보기(글은 지우지 않음)', ((await cm.innerText()) ?? '').includes('추천 멘트') && (await cm.getByText('더 보기').count()) >= 1)
+  // 미팅 준비 1차 = 크레탑 분석기 그대로 (D-121) — 등록 때 넣은 분석으로 바로 열린다
+  const mc = page.getByTestId('meeting-cretop')
+  await mc.getByTestId('cretop-result-bar').waitFor()
+  check('1차: 크레탑 분석기가 들어 있다 — 이 업체 분석으로 시작', ((await mc.innerText()) ?? '').includes('한빛정밀') && (await mc.getByTestId('cretop-mini-tabs').count()) === 1)
+  check('1차: 결과 막대 — 1장 요약 · 이 업체에 반영', (await mc.getByTestId('meeting-cretop-apply').count()) === 1)
+  check('1차: 옛 전략 목록 · 흩어진 카톡은 없다(한 묶음으로 접힘)', (await page.getByTestId('cretop-meeting').count()) === 0 && (await page.getByTestId('meeting-kakao').count()) === 0 && (await page.getByRole('button', { name: /카톡 문구/ }).count()) === 1)
   await page.getByTestId('meeting-rounds').getByRole('button', { name: '2차 미팅' }).click()
   await page.waitForTimeout(300)
-  const now2 = await page.getByTestId('cretop-meeting').getByTestId('cretop-flow-now').first().innerText()
-  check('크레탑 전략: 2차로 바꾸면 D 제안 연결', now2.includes('2차에서 물을 것') && now2.includes('D 제안 연결') && !now2.includes('A 오프닝'), now2.slice(0, 200))
+  const fu = page.getByTestId('cretop-followup')
+  const fu2 = (await fu.innerText()) ?? ''
+  check('2차: 이어서 물을 것 = 크레탑 전략의 D 제안 연결', (await fu.locator('[data-cretop-pick]').count()) >= 1 && fu2.includes('D 제안 연결') && !fu2.includes('A 오프닝'), fu2.slice(0, 200))
+  check('2차: 제안서 · 견적으로 잇기', ((await page.getByTestId('meeting-proposal-link').getAttribute('href')) ?? '') === `/sales/proposal?client=${id}`)
+  await page.getByTestId('meeting-rounds').getByRole('button', { name: '3차 클로징' }).click()
+  await page.waitForTimeout(300)
+  check('3차: 이어서 물을 것 = E 다음 액션', ((await page.getByTestId('cretop-followup').innerText()) ?? '').includes('E 다음 액션'))
 
   // 모듈 잠금 — 감추지 않고 잠김
   await page.evaluate(() => {
@@ -123,6 +131,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     localStorage.setItem('axmvp.module.system.access', JSON.stringify([{ id: 'acc1', clientId: '', data: { moduleKey: 'policy-funding', state: 'locked', trialEndsAt: '' }, createdAt: now, updatedAt: now }]))
   })
   await page.reload({ waitUntil: 'networkidle' })
+  await page.getByTestId('journey-unfold').click()
   await page.getByTestId('sales-journey').locator('[data-journey-step="m1"]').click()
   await page.waitForTimeout(300)
   const lockedRow = await page.getByTestId('journey-open').locator('[data-journey-tool="policy-funding"]').innerText()
@@ -191,6 +200,24 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForURL(/\/sales\/meeting\?client=/)
   check('크레탑 분석기 → 영업: 같은 업체(한빛정밀)에 붙이고 미팅 준비로', new URL(page.url()).searchParams.get('client') === id && (await clients(page)).length === n3)
 
+  // (마지막에 — 다른 회사 번호가 붙으므로 앞의 '같은 업체' 시험과 섞이지 않게) 1차 탭에서 바로 분석 — 다른 회사 보고서면 저절로 붙이지 않고, '이 업체에 반영' 을 누르면 붙인다
+  await page.goto(BASE + '/sales/meeting?client=cli_mirae&round=1', { waitUntil: 'networkidle' })
+  const mc2 = page.getByTestId('meeting-cretop')
+  check('1차: 크레탑이 없는 업체는 보고서 넣기부터', (await mc2.getByRole('button', { name: '텍스트 붙여넣기' }).count()) === 1)
+  await mc2.getByRole('button', { name: '텍스트 붙여넣기' }).click()
+  await mc2.getByLabel('크레탑 원문').fill(CRETOP)
+  await mc2.getByTestId('cretop-run').click()
+  await mc2.getByTestId('cretop-result-bar').waitFor()
+  await page.waitForTimeout(600)
+  const m0 = (await clients(page)).find((c) => c.id === 'cli_mirae')
+  check('1차: 다른 회사 보고서는 저절로 붙이지 않는다', !m0.toolResults.some((t) => t.toolKey === 'cretop'), JSON.stringify(m0.toolResults.map((t) => t.toolKey)))
+  await mc2.getByTestId('meeting-cretop-apply').click()
+  await page.waitForTimeout(600)
+  const m1 = (await clients(page)).find((c) => c.id === 'cli_mirae')
+  check("1차: '이 업체에 반영' 을 누르면 붙는다", m1.toolResults.some((t) => t.toolKey === 'cretop' && t.data.ranked.length === 26))
+  const h2 = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.module.cretop.analyses') ?? '[]'))
+  check('1차: 분석 이력은 한 번만(작업대가 남김)', h2.filter((h) => h.data.company === '한빛정밀(주)').length === 1, String(h2.length))
+
   check('JS 오류 없음 (1440)', errors.length === 0, errors.join(' | '))
   await ctx.close()
 }
@@ -213,7 +240,11 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByTestId('intake-save').click()
   await page.waitForURL(/\/sales\/meeting\?client=/)
   await page.getByTestId('sales-journey').waitFor()
-  check('390: 미팅 준비(영업 흐름 · 크레탑 전략) 넘침 0', (await overflowX(page)) <= 0, String(await overflowX(page)))
+  await page.getByTestId('meeting-cretop').getByTestId('cretop-result-bar').waitFor()
+  check('390: 미팅 준비 1차(크레탑 분석기) 넘침 0', (await overflowX(page)) <= 0, String(await overflowX(page)))
+  await page.getByTestId('meeting-rounds').getByRole('button', { name: '2차 미팅' }).click()
+  await page.getByTestId('cretop-followup').waitFor()
+  check('390: 미팅 준비 2차(이어서 물을 것) 넘침 0', (await overflowX(page)) <= 0, String(await overflowX(page)))
   check('JS 오류 없음 (390)', errors.length === 0, errors.join(' | '))
   await ctx.close()
 }
