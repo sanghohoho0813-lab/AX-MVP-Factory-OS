@@ -48,6 +48,7 @@ import {
   withoutFee,
   withoutFunding,
   withoutNote,
+  normalizeClientOps,
 } from '../services/clientOpsService'
 import {
   buildClientAlerts,
@@ -118,6 +119,7 @@ import { ClientSalesCard } from '../components/sales/ClientSalesCard'
 import { SalesJourneyCard } from '../components/sales/SalesJourneyCard'
 import { withSalesPath } from '../services/salesJourney'
 import { ContractCard } from '../components/ops/ContractCard'
+import { InlineConfirm } from '../components/ui/InlineConfirm'
 import { WorkHistoryCard } from '../components/ops/WorkHistoryCard'
 import { ToolResultsCard } from '../components/ops/ToolResultsCard'
 import { ClientToolsCard } from '../components/ops/ClientToolsCard'
@@ -215,23 +217,30 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
    * 늦게 온 예전 응답은 화면에 되돌려 쓰지 않는다.
    */
   const latestRef = useRef<ClientOpsRecord | null>(null)
-  const savingRef = useRef(false)
+  /** 지금 돌고 있는 저장 — 그동안 또 고친 사람도 이 저장이 끝난 결과(됐는지)를 기다린다(D-122) */
+  const loopRef = useRef<Promise<boolean> | null>(null)
+  /** 업체를 빨리 옮겨 다닐 때 늦게 온 예전 업체 응답을 버린다(D-122) */
+  const loadSeq = useRef(0)
 
   const load = useCallback(
     async (quiet = false) => {
+      const seq = ++loadSeq.current
       try {
-        await loadCustomServicesIntoCatalog(workspaceId)
         // 저장 실패 뒤 다시 읽을 때는 화면을 '불러오는 중' 으로 바꾸지 않는다 — 열어 둔 칸 · 적던 글이 사라지지 않게
         if (!quiet) setLoading(true)
         const all = await listClients(workspaceId)
-        const found = all.find((r) => r.id === clientId) ?? null
+        // D-122: 업체를 읽은 뒤 직접 만든 업무 항목을 올리고, 같은 자리에서 새 칸을 채운다(목록 · 기록이 어긋나는 틈을 없앤다)
+        await loadCustomServicesIntoCatalog(workspaceId)
+        if (seq !== loadSeq.current) return
+        const hit = all.find((r) => r.id === clientId)
+        const found = hit ? normalizeClientOps(hit) : null
         latestRef.current = found
         setRecord(found)
         setNotFound(found === null)
       } catch (cause) {
         showToast(cause instanceof Error ? cause.message : '불러오지 못했습니다.')
       } finally {
-        if (!quiet) setLoading(false)
+        if (!quiet && seq === loadSeq.current) setLoading(false)
       }
     },
     [workspaceId, clientId, showToast],
@@ -251,32 +260,37 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   }, [workspaceId, clientId, tab])
 
   const commit = useCallback(
-    async (next: ClientOpsRecord): Promise<boolean> => {
+    (next: ClientOpsRecord): Promise<boolean> => {
       latestRef.current = next
       setRecord(next)
-      // 이미 저장 중이면 그 저장이 끝난 뒤 가장 새 기록으로 이어서 저장한다(아래 반복). 실패하면 그쪽에서 알린다
-      if (savingRef.current) return true
-      savingRef.current = true
-      try {
-        for (;;) {
-          const target: ClientOpsRecord | null = latestRef.current
-          if (!target) break
-          const saved: ClientOpsRecord = await saveClient(target)
-          if (latestRef.current === target) {
-            latestRef.current = saved
-            setRecord(saved)
-            setSavedAt(Date.now())
-            break
+      // 이미 저장 중이면 그 저장이 끝난 뒤 가장 새 기록으로 이어서 저장한다(아래 반복).
+      // D-122: 기다린 사람에게도 '됐다' 를 미리 말하지 않는다 — 같은 결과를 기다려 받는다(실패하면 적던 칸이 남는다)
+      if (loopRef.current) return loopRef.current
+      const run = (async (): Promise<boolean> => {
+        await Promise.resolve() // loopRef 에 먼저 걸고 시작한다
+        try {
+          for (;;) {
+            const target: ClientOpsRecord | null = latestRef.current
+            if (!target) break
+            const saved: ClientOpsRecord = await saveClient(target)
+            if (latestRef.current === target) {
+              latestRef.current = saved
+              setRecord(saved)
+              setSavedAt(Date.now())
+              break
+            }
           }
+          return true
+        } catch (cause) {
+          showToast(cause instanceof Error ? `${cause.message} — 저장된 내용으로 다시 불러왔습니다.` : '저장하지 못했습니다. 저장된 내용으로 다시 불러왔습니다.')
+          void load(true)
+          return false
+        } finally {
+          loopRef.current = null
         }
-        return true
-      } catch (cause) {
-        showToast(cause instanceof Error ? `${cause.message} — 저장된 내용으로 다시 불러왔습니다.` : '저장하지 못했습니다. 저장된 내용으로 다시 불러왔습니다.')
-        void load(true)
-        return false
-      } finally {
-        savingRef.current = false
-      }
+      })()
+      loopRef.current = run
+      return run
     },
     [showToast, load],
   )
@@ -664,7 +678,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       <ContractCard
         record={record}
         today={today}
-        onSave={(next) => void commit(withContract(record, next))}
+        onSave={(next) => commit(withContract(record, next))}
       />
 
       <WorkHistoryCard record={record} onOpen={(key) => setTab('work', key)} />
@@ -1225,16 +1239,17 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                         >
                           이름 고치기
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            void commit(withoutCustomDocument(record, custom.id))
-                            showToast('서류 칸을 없앴습니다. 올린 파일은 파일 탭에 남아 있습니다.')
+                        {/* D-122: 칸을 없애기 전에 한 번 묻는다(업체 정보의 직접 만든 칸과 같게) */}
+                        <InlineConfirm
+                          label="칸 없애기"
+                          question={`'${custom.label}' 칸을 없앨까요?`}
+                          confirmLabel="없애기"
+                          onConfirm={() => {
+                            void commit(withoutCustomDocument(record, custom.id)).then((ok) => {
+                              if (ok) showToast('서류 칸을 없앴습니다. 올린 파일은 파일 탭에 남아 있습니다.')
+                            })
                           }}
-                          className="t-sub font-medium text-slate-500 hover:text-danger-700 hover:underline"
-                        >
-                          칸 없애기
-                        </button>
+                        />
                       </div>
                     ))}
                 </div>
@@ -1300,7 +1315,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         <FundingSection
           record={record}
           today={today}
-          onAdd={(input) => void commit(withNewFunding(record, input))}
+          onAdd={(input) => commit(withNewFunding(record, input))}
           onChange={(id, patch) => void commit(withFunding(record, id, patch))}
           onRemove={(id) => void commit(withoutFunding(record, id))}
         />
@@ -1318,9 +1333,9 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           <NotesSection
             record={record}
             onAdd={(text) => commit(withNewNote(record, text))}
-            onEdit={(id, text) => void commit(withNoteText(record, id, text))}
-            onPin={(id, pinned) => void commit(withNotePinned(record, id, pinned))}
-            onDelete={(id) => void commit(withoutNote(record, id))}
+            onEdit={(id, text) => commit(withNoteText(record, id, text))}
+            onPin={(id, pinned) => commit(withNotePinned(record, id, pinned))}
+            onDelete={(id) => commit(withoutNote(record, id))}
           />
         </>
       )}
@@ -1641,7 +1656,7 @@ function FeesSection({
   today,
 }: {
   record: ClientOpsRecord
-  onChange: (next: ClientOpsRecord) => void
+  onChange: (next: ClientOpsRecord) => void | boolean | Promise<boolean>
   today: string
 }) {
   const [kind, setKind] = useState<FeeKind>('deposit')
@@ -1661,8 +1676,11 @@ function FeesSection({
   /** 누구한테 얼마 나가는지 — 수수료 칸 아래 한 줄 */
   const shares = agentShares(record.fees)
 
-  const add = () => {
-    onChange(
+  const [adding, setAdding] = useState(false)
+  const add = async () => {
+    if (adding) return
+    setAdding(true)
+    const ok = await onChange(
       withNewFee(record, {
         kind,
         serviceKey: serviceKey === '' ? null : serviceKey,
@@ -1672,6 +1690,9 @@ function FeesSection({
         dueDate,
       }),
     )
+    setAdding(false)
+    // D-122: 저장이 된 뒤에만 비운다 — 실패하면 적은 금액 · 날짜가 그대로 남는다
+    if (ok === false) return
     setAmount(0)
     setAgentFee(0)
     setAgentName('')
@@ -1738,7 +1759,7 @@ function FeesSection({
                         }
                         className="size-5 accent-brand-600"
                       />
-                      <span className="sr-only">입금 완료</span>
+                      <span className="t-meta font-semibold text-slate-600">입금</span>
                     </label>
                     <span className="order-2 min-w-0 flex-1">
                     <span className="flex flex-wrap items-center gap-1.5">
@@ -1770,14 +1791,8 @@ function FeesSection({
                       )}
                     </span>
                     </span>
-                    <button
-                      type="button"
-                      aria-label={`${fee.label} 삭제`}
-                      onClick={() => onChange(withoutFee(record, fee.id))}
-                      className="order-6 ml-auto shrink-0 rounded-(--radius-control) p-2 text-slate-400 hover:bg-slate-100 hover:text-danger-600"
-                    >
-                      <Trash2 aria-hidden="true" className="size-4" />
-                    </button>
+                    {/* D-122: 한 번에 지우지 않는다 — 입금까지 적힌 항목도 한 번 스치면 사라졌다 */}
+                    <InlineConfirm className="order-6 ml-auto" question={`${fee.label} 지울까요?`} onConfirm={() => void onChange(withoutFee(record, fee.id))} testId="fee-delete" />
                   </div>
 
                   {/* 입력 줄 — 휴대폰에서는 제목 아래로 내려오고 왼쪽 여백을 체크칸에 맞춘다 */}
@@ -1956,7 +1971,7 @@ function FeesSection({
               className="mt-1 block rounded-(--radius-control) border border-slate-300 px-2 py-2 text-[0.95rem]"
             />
           </label>
-          <Button variant="secondary" onClick={add}>
+          <Button variant="secondary" onClick={() => void add()} disabled={adding}>
             <Plus aria-hidden="true" className="size-4" />
             추가
           </Button>

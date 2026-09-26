@@ -1,6 +1,17 @@
 /** 한국 원화·날짜·전화번호·사업자등록번호·D-day 공용 유틸리티 */
 
 /** 1200000000 → "1,200,000,000원" */
+/**
+ * 원 단위 금액 칸 글 → 숫자 (D-122). 소수점 뒤는 버린다 — 예전에는 숫자만 남겨서
+ * '3,300,000.00' 을 붙여 넣으면 330,000,000(100배)이 됐다. 숫자가 없으면 null.
+ */
+export function wonOf(text: string): number | null {
+  const whole = text.split('.')[0].replace(/[^0-9]/g, '')
+  if (whole === '') return null
+  const n = Number(whole)
+  return Number.isFinite(n) ? n : null
+}
+
 export function formatKrw(amount: number | null): string {
   if (amount === null || !Number.isFinite(amount)) return '-'
   return `${amount.toLocaleString('ko-KR')}원`

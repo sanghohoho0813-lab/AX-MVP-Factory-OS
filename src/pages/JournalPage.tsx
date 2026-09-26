@@ -173,9 +173,9 @@ function JournalContent({ workspaceId, userId }: { workspaceId: string | null; u
           clientNames={clientNames}
           today={today}
           showDate={range !== 'today'}
-          onToggleComplete={(e) => void mutate(() => updateJournalEntry(e, { completed: !e.completed }))}
-          onTogglePin={(e) => void mutate(() => updateJournalEntry(e, { pinned: !e.pinned }))}
-          onEdit={(e, content) => { if (content) void mutate(() => updateJournalEntry(e, { content }), '수정했습니다.') }}
+          onToggleComplete={(e) => mutate(() => updateJournalEntry(e, { completed: !e.completed }))}
+          onTogglePin={(e) => mutate(() => updateJournalEntry(e, { pinned: !e.pinned }))}
+          onEdit={(e, content) => mutate(() => updateJournalEntry(e, { content }), '수정했습니다.')}
           onDelete={(e) => setPendingDelete(e)}
           emptyTitle={range === 'today' ? '오늘 기록된 업무가 없습니다.' : '이 기간에 기록이 없습니다.'}
         />

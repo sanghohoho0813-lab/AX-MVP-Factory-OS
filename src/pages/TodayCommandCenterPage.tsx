@@ -13,6 +13,7 @@ import {
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { Blank, Disclosure, MetricTile } from '../components/ui/primitives'
 import { Modal } from '../components/ui/Modal'
+import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { Button } from '../components/ui/Button'
 import { useToast } from '../components/ui/toastContext'
 import { QuickCapture } from '../components/journal/QuickCapture'
@@ -31,7 +32,7 @@ import {
   createJournalEntry,
   deleteJournalEntry,
   listJournal,
-  shiftDate,
+  postponedDue,
   updateJournalEntry,
 } from '../services/journalService'
 import { isOpenEvent, listEvents, updateEvent } from '../services/customerBridgeService'
@@ -184,6 +185,9 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const [linking, setLinking] = useState<{ event: CustomerEvent; tab: 'existing' | 'new' } | null>(null)
   /** 눌러서 연 할 일 — 무엇을 할지 시트에서 고른다 */
   const [todoPick, setTodoPick] = useState<JournalEntry | null>(null)
+  /** D-122: 지우기 전에 한 번 묻는다 — 일기 화면 · 업체 기록과 같게 */
+  const [pendingDelete, setPendingDelete] = useState<JournalEntry | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -283,7 +287,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     }
     if (action === 'tomorrow') {
       void journalMutate(
-        () => updateJournalEntry(entry, { dueDate: shiftDate(today, 1), completed: false }),
+        () => updateJournalEntry(entry, { dueDate: postponedDue(entry.dueDate, today), completed: false }),
         '내일로 미뤘습니다.',
       )
       return
@@ -309,13 +313,19 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const journalMutate = async (fn: () => Promise<unknown>, done?: string): Promise<boolean> => {
     try {
       await fn()
-      setJournal(await listJournal(workspaceId))
-      if (done) showToast(done)
-      return true
     } catch (cause) {
       showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
       return false
     }
+    // D-122: 저장은 됐는데 다시 읽기만 실패했으면 '됐다' — 적은 글을 남겨 두면 다시 눌러 두 번 들어간다
+    try {
+      setJournal(await listJournal(workspaceId))
+    } catch {
+      showToast('저장했습니다. 목록을 다시 읽지 못했습니다 — 잠시 뒤 새로고침해 주세요.')
+      return true
+    }
+    if (done) showToast(done)
+    return true
   }
 
   const setEventStatus = async (event: CustomerEvent, status: CustomerEventStatus) => {
@@ -534,10 +544,10 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             clientNames={clientNames}
             today={today}
             showDate={false}
-            onToggleComplete={(e) => void journalMutate(() => updateJournalEntry(e, { completed: !e.completed }))}
-            onTogglePin={(e) => void journalMutate(() => updateJournalEntry(e, { pinned: !e.pinned }))}
-            onEdit={(e, content) => { if (content) void journalMutate(() => updateJournalEntry(e, { content })) }}
-            onDelete={(e) => void journalMutate(() => deleteJournalEntry(e), '지웠습니다.')}
+            onToggleComplete={(e) => journalMutate(() => updateJournalEntry(e, { completed: !e.completed }))}
+            onTogglePin={(e) => journalMutate(() => updateJournalEntry(e, { pinned: !e.pinned }))}
+            onEdit={(e, content) => journalMutate(() => updateJournalEntry(e, { content }))}
+            onDelete={(e) => setPendingDelete(e)}
             emptyTitle="오늘 기록된 업무가 없습니다."
             emptyHint="통화·결정·후속조치를 바로 남겨두면 나중에 고객별 이력이 이어집니다."
           />
@@ -669,9 +679,11 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           clientName={todoPick.clientId ? clientNameOf(todoPick.clientId) : undefined}
           clients={active}
           onPick={(action) => applyTodoAction(todoPick, action)}
-          onSave={(patch) => {
-            setTodoPick(null)
-            void journalMutate(() => updateJournalEntry(todoPick, patch), '고쳤습니다.')
+          onSave={async (patch) => {
+            // D-122: 저장이 된 뒤에만 닫는다 — 실패하면 고치던 칸이 그대로
+            const ok = await journalMutate(() => updateJournalEntry(todoPick, patch), '고쳤습니다.')
+            if (ok) setTodoPick(null)
+            return ok
           }}
           onOpenClient={
             todoPick.clientId ? () => navigate(`/ops/clients/${todoPick.clientId}`) : undefined
@@ -679,6 +691,25 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           onClose={() => setTodoPick(null)}
         />
       )}
+
+      <ConfirmModal
+        open={pendingDelete !== null}
+        title="기록 삭제"
+        message={pendingDelete ? `"${pendingDelete.content.slice(0, 40)}${pendingDelete.content.length > 40 ? '…' : ''}" 기록을 지웁니다. 되돌릴 수 없습니다.` : ''}
+        confirmLabel="삭제"
+        danger
+        busy={deleting}
+        onConfirm={() => {
+          const e = pendingDelete
+          if (!e) return
+          setDeleting(true)
+          void journalMutate(() => deleteJournalEntry(e), '지웠습니다.').then(() => {
+            setDeleting(false)
+            setPendingDelete(null)
+          })
+        }}
+        onCancel={() => setPendingDelete(null)}
+      />
 
       {linking && (
         <LinkCustomerModal

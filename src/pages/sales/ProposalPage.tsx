@@ -437,9 +437,10 @@ function ProposalContent({ workspaceId }: { workspaceId: string | null }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (quiet = false) => {
     try {
-      setLoading(true)
+      // D-122: 저장 실패 뒤 다시 읽을 때는 화면을 비우지 않는다 — 적던 제안서 초안이 사라지지 않게
+      if (!quiet) setLoading(true)
       const [list, rows] = await Promise.all([listClients(workspaceId), listRows(workspaceId, CATALOG_MODULE, CATALOG_BUCKET).catch(() => [])])
       setRecords(list)
       const row = rows.find((r) => r.data.key === 'prices')
@@ -449,7 +450,7 @@ function ProposalContent({ workspaceId }: { workspaceId: string | null }) {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '업체 목록을 불러오지 못했습니다.')
     } finally {
-      setLoading(false)
+      if (!quiet) setLoading(false)
     }
   }, [workspaceId])
   useEffect(() => {
@@ -469,19 +470,21 @@ function ProposalContent({ workspaceId }: { workspaceId: string | null }) {
   const setView = (v: 'client' | 'catalog') => setParams((p) => { const n = new URLSearchParams(p); if (v === 'catalog') n.set('view', 'catalog'); else n.delete('view'); return n }, { replace: true })
   const pick = (id: string) => setParams((p) => { const n = new URLSearchParams(p); n.set('client', id); return n }, { replace: true })
 
-  const persist = async (next: ClientOpsRecord, msg: string) => {
+  const persist = async (next: ClientOpsRecord, msg: string): Promise<boolean> => {
     if (next === record) {
       showToast(msg)
-      return
+      return true
     }
     setRecords((list) => list.map((r) => (r.id === next.id ? next : r)))
     try {
       const saved = await saveClient(next)
       setRecords((list) => list.map((r) => (r.id === saved.id ? saved : r)))
       showToast(msg)
+      return true
     } catch (cause) {
-      showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
-      void load()
+      showToast(cause instanceof Error ? `${cause.message} — 다시 눌러 주세요.` : '저장하지 못했습니다. 다시 눌러 주세요.')
+      void load(true)
+      return false
     }
   }
 

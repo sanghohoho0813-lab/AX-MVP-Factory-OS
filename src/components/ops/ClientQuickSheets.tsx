@@ -9,7 +9,7 @@
  */
 
 import { useState } from 'react'
-import { Check, Plus, Trash2 } from 'lucide-react'
+import { Check, Plus } from 'lucide-react'
 import type { ClientOpsRecord, FeeKind, ServiceKey, ServiceStatus } from '../../types/clientOps'
 import {
   FEE_KIND_LABEL,
@@ -19,6 +19,7 @@ import {
   SERVICE_STATUS_ORDER,
 } from '../../content/clientOpsCatalog'
 import { withFee, withNewFee, withoutFee, withService } from '../../services/clientOpsService'
+import { InlineConfirm } from '../ui/InlineConfirm'
 import { daysLeftFrom, dueText } from '../../services/clientOpsAlerts'
 import { netAmountOf } from '../../services/feeMath'
 import { formatKrw } from '../../lib/format'
@@ -159,19 +160,13 @@ export function ClientMoneySheet({
                       onChange={(e) => onSave(withFee(record, fee.id, { receivedAt: e.target.checked ? today : null }))}
                       className="size-5 accent-brand-600"
                     />
-                    <span className="sr-only">입금 완료</span>
+                    <span className="t-meta font-semibold text-slate-600">입금</span>
                   </label>
                   <span className="t-body min-w-0 flex-1 truncate font-semibold text-slate-900">{fee.label}</span>
                   {overdue && <span className="t-meta shrink-0 font-bold text-danger-700">{dueText(left)}</span>}
                   {fee.receivedAt && <span className="t-meta shrink-0 text-success-700">{fee.receivedAt} 입금</span>}
-                  <button
-                    type="button"
-                    aria-label={`${fee.label} 삭제`}
-                    onClick={() => onSave(withoutFee(record, fee.id))}
-                    className="shrink-0 rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-danger-600"
-                  >
-                    <Trash2 aria-hidden="true" className="size-4" />
-                  </button>
+                  {/* D-122: 한 번에 지우지 않는다 — 그 줄에서 한 번 더 묻는다 */}
+                  <InlineConfirm question={`${fee.label} 지울까요?`} onConfirm={() => onSave(withoutFee(record, fee.id))} />
                 </div>
                 <div className="mt-2 flex items-center gap-2 pl-[1.9rem]">
                   <input

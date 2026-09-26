@@ -21,7 +21,8 @@ import {
   suggestCustomerStage,
   suggestServiceForProduct,
 } from '../../config/serviceCatalog'
-import { applyJournalFilter, dueFollowUps, shiftDate, weekStart } from '../journalService'
+import { applyJournalFilter, dueFollowUps, postponedDue, shiftDate, weekStart } from '../journalService'
+import { wonOf } from '../../lib/format'
 import {
   buildDaySummary,
   buildFundingDeadlines,
@@ -31,7 +32,7 @@ import {
 } from '../dailyBriefService'
 import { EVENT_TYPE_LABEL, buildProjection, eventSummary, isOpenEvent, sortEvents, waitingDays, waitingLevel } from '../customerBridgeService'
 import signupSql from '../../../supabase/migrations/20260925000014_signup_event.sql?raw'
-import { normalizeClientOps, withContract, withCustomField, withFee, withNewFee, withNewFunding, withService, withoutCustomField } from '../clientOpsService'
+import { normalizeClientOps, withContract, withCustomField, withFee, withNewFee, withNewFunding, withService, withoutCustomField, withoutFee } from '../clientOpsService'
 import {
   contractAgeShort,
   contractAgeText,
@@ -1691,6 +1692,24 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   }
   check('크레탑 단독 경계: 본체 파일이 있다', Object.keys(files).length >= 10, String(Object.keys(files).length))
   check('크레탑 단독 경계: 본체(mini · engine · lib)는 OS(업체 · 영업 · 화면 · 저장소)를 import 하지 않는다 — 예외 taxCalc · brandHex', bad.length === 0, bad.join(' | '))
+}
+
+/* ------------------------------------------------------------------ */
+/* D-122 안정화 — 돈 칸 · 미루기 · 지운 수금 기록                              */
+/* ------------------------------------------------------------------ */
+{
+  check('돈 칸: 자리점 · 소수점 붙여넣기는 100배가 되지 않는다', wonOf('3,300,000.00') === 3_300_000 && wonOf('1,500,000원') === 1_500_000 && wonOf('1.5') === 1)
+  check('돈 칸: 숫자가 없으면 null', wonOf('') === null && wonOf('원') === null && wonOf('.50') === null)
+  check('내일로 미루기: 기한이 지났거나 오늘이면 오늘+1', postponedDue('2026-09-20', '2026-09-26') === '2026-09-27' && postponedDue('2026-09-26', '2026-09-26') === '2026-09-27' && postponedDue('', '2026-09-26') === '2026-09-27')
+  check('내일로 미루기: 기한이 뒤면 그 다음 날(당겨지지 않는다)', postponedDue('2026-10-05', '2026-09-26') === '2026-10-06')
+  const base = normalizeClientOps({ id: 'c_fee', companyName: '지움상사' })
+  const withTwo = withNewFee(withNewFee(base, { kind: 'deposit', amount: 3_300_000 }), { kind: 'success', amount: 5_000_000 })
+  const target = withTwo.fees[0]
+  const paid = withFee(withTwo, target.id, { receivedAt: '2026-09-20' })
+  const gone = withoutFee(paid, target.id)
+  check('수금 항목 삭제: 그 하나만 지운다', gone.fees.length === 1 && gone.fees[0].id !== target.id)
+  check('수금 항목 삭제: 무엇을 얼마 · 입금일까지 활동 기록에 남긴다', gone.activity[0]?.text.includes('수금 항목 삭제') && gone.activity[0].text.includes('3,300,000원') && gone.activity[0].text.includes('입금 2026-09-20'), gone.activity[0]?.text)
+  check('수금 항목 삭제: 없는 id 면 그대로', withoutFee(paid, 'nope').fees.length === 2)
 }
 
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)

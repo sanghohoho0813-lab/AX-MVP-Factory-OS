@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, ClipboardCopy, Phone, X } from 'lucide-react'
 import { Button } from '../ui/Button'
+import { wonOf } from '../../lib/format'
 
 /** 저장 상태 표시 — 자동 저장이 실제로 됐는지 눈으로 확인시켜 준다 */
 export function SavedBadge({ savedAt }: { savedAt: number | null }) {
@@ -202,8 +203,7 @@ const AMOUNT_STEPS = [
 
 /** 숫자만 남긴다 (콤마·원 표시·공백 제거) */
 export function parseAmount(text: string): number {
-  const n = Number(text.replace(/[^0-9]/g, ''))
-  return Number.isFinite(n) ? n : 0
+  return wonOf(text) ?? 0
 }
 
 /**

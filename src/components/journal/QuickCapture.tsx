@@ -33,8 +33,11 @@ export function QuickCapture({
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
   const textRef = useRef<HTMLTextAreaElement>(null)
+  // D-122: 저장 중에 Ctrl+Enter 를 또 눌러도 한 번만 — 단추는 막혀도 단축키는 막히지 않았다
+  const busyRef = useRef(false)
 
   const submit = async () => {
+    if (busyRef.current) return
     const text = content.trim()
     if (!text) {
       setError('내용을 적어 주세요.')
@@ -45,6 +48,7 @@ export function QuickCapture({
       setError('후속조치는 언제까지 할지 날짜를 정해 주세요.')
       return
     }
+    busyRef.current = true
     setBusy(true)
     setError('')
     try {
@@ -62,6 +66,7 @@ export function QuickCapture({
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
     } finally {
+      busyRef.current = false
       setBusy(false)
     }
   }

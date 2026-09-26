@@ -40,14 +40,17 @@ export function ClientJournalTab({ record, workspaceId, userId }: { record: Clie
   const mine = useMemo(() => applyJournalFilter(entries, { range: 'all', clientId: record.id }, today), [entries, record.id, today])
   const clientNames = useMemo(() => new Map([[record.id, record.companyName]]), [record.id, record.companyName])
 
-  const mutate = async (fn: () => Promise<unknown>, done?: string) => {
+  /** 됐으면 true — 실패하면 false 를 돌려줘서 적던 글을 지우지 않게 한다(D-122) */
+  const mutate = async (fn: () => Promise<unknown>, done?: string): Promise<boolean> => {
     try {
       await fn()
-      await load()
-      if (done) showToast(done)
     } catch (cause) {
-      showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
+      showToast(cause instanceof Error ? `${cause.message} — 적은 글은 그대로 있습니다.` : '저장하지 못했습니다. 적은 글은 그대로 있습니다.')
+      return false
     }
+    await load()
+    if (done) showToast(done)
+    return true
   }
 
   return (
@@ -65,9 +68,9 @@ export function ClientJournalTab({ record, workspaceId, userId }: { record: Clie
           clientNames={clientNames}
           today={today}
           showClient={false}
-          onToggleComplete={(e) => void mutate(() => updateJournalEntry(e, { completed: !e.completed }))}
-          onTogglePin={(e) => void mutate(() => updateJournalEntry(e, { pinned: !e.pinned }))}
-          onEdit={(e, content) => { if (content) void mutate(() => updateJournalEntry(e, { content }), '수정했습니다.') }}
+          onToggleComplete={(e) => mutate(() => updateJournalEntry(e, { completed: !e.completed }))}
+          onTogglePin={(e) => mutate(() => updateJournalEntry(e, { pinned: !e.pinned }))}
+          onEdit={(e, content) => mutate(() => updateJournalEntry(e, { content }), '수정했습니다.')}
           onDelete={(e) => setPendingDelete(e)}
           emptyTitle="이 업체에 대한 기록이 없습니다."
           emptyHint="통화·결정·후속조치를 남기면 이 업체의 이력이 시간순으로 이어집니다."

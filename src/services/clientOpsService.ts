@@ -516,7 +516,25 @@ export async function createClient(
   return fromRow(data as Record<string, unknown>)
 }
 
-export async function saveClient(record: ClientOpsRecord): Promise<ClientOpsRecord> {
+/**
+ * 같은 업체 저장은 부른 순서대로 한 줄로 보낸다(D-122).
+ * 보드 · 미팅 준비 · 제안 · 정산처럼 화면마다 저장하는 곳이 많은데, 클라우드에서 응답이 늦게 오면
+ * 나중에 부른 저장보다 먼저 부른 저장이 늦게 도착해 예전 값이 남을 수 있었다. 앞 저장이 실패해도 다음 저장은 간다.
+ */
+const saveChains = new Map<string, Promise<unknown>>()
+
+export function saveClient(record: ClientOpsRecord): Promise<ClientOpsRecord> {
+  const prev = saveChains.get(record.id) ?? Promise.resolve()
+  const run = prev.catch(() => undefined).then(() => saveClientNow(record))
+  const tail = run.catch(() => undefined)
+  saveChains.set(record.id, tail)
+  void tail.then(() => {
+    if (saveChains.get(record.id) === tail) saveChains.delete(record.id)
+  })
+  return run
+}
+
+async function saveClientNow(record: ClientOpsRecord): Promise<ClientOpsRecord> {
   const next = normalizeClientOps({ ...record, updatedAt: nowIso() })
   if (isLocal()) {
     writeLocal(readLocal().map((item) => (item.id === next.id ? next : item)))
@@ -805,7 +823,13 @@ export function withFee(record: ClientOpsRecord, feeId: string, patch: Partial<F
 }
 
 export function withoutFee(record: ClientOpsRecord, feeId: string): ClientOpsRecord {
-  return { ...record, fees: record.fees.filter((f) => f.id !== feeId) }
+  const gone = record.fees.find((f) => f.id === feeId)
+  const next = { ...record, fees: record.fees.filter((f) => f.id !== feeId) }
+  if (!gone) return next
+  // D-122: 지운 것도 기록에 남긴다 — 무엇을 얼마짜리를 지웠는지(잘못 눌렀을 때 다시 넣을 수 있게)
+  const amount = gone.amount !== null ? ` ${gone.amount.toLocaleString('ko-KR')}원` : ''
+  const paid = gone.receivedAt ? ` (입금 ${gone.receivedAt})` : ''
+  return withActivity(next, 'fee_added', `수금 항목 삭제 · ${gone.label}${amount}${paid}`, gone.serviceKey)
 }
 
 /* ------------------------------------------------------------------ */

@@ -226,7 +226,7 @@ export function TodoActionSheet({
   clients?: { id: string; companyName: string }[]
   onPick: (action: TodoAction) => void
   /** 적어 둔 내용·기한·업체를 고칠 때 */
-  onSave?: (patch: { content: string; dueDate: string; clientId: string | null }) => void
+  onSave?: (patch: { content: string; dueDate: string; clientId: string | null }) => unknown
   /** 관련 업체가 있을 때만 */
   onOpenClient?: () => void
   onClose: () => void
@@ -249,10 +249,17 @@ export function TodoActionSheet({
       ? [{ id: entry.clientId, companyName: clientName }, ...clients]
       : clients
 
-  const save = () => {
-    if (onSave && content.trim() !== '') onSave({ content: content.trim(), dueDate, clientId: clientId === '' ? null : clientId })
-    setEditing(false)
+  const [saving, setSaving] = useState(false)
+  /** D-122: 저장이 된 뒤에만 닫는다 — false 가 오면(실패) 고치던 칸 그대로 */
+  const save = async () => {
+    if (!onSave || content.trim() === '' || saving) return
+    setSaving(true)
+    const ok = await onSave({ content: content.trim(), dueDate, clientId: clientId === '' ? null : clientId })
+    setSaving(false)
+    if (ok !== false) setEditing(false)
   }
+  /** 삭제는 한 번 더 묻는다(D-122) */
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const rows: { action: TodoAction; label: string; hint: string; tone?: 'danger' }[] = [
     { action: 'open', label: '진행 중', hint: '아직 안 끝났습니다 (목록에 남습니다)' },
@@ -269,8 +276,8 @@ export function TodoActionSheet({
         footer={
           <div className="flex justify-end gap-2">
             <Button onClick={() => { setContent(entry.content); setDueDate(entry.dueDate); setClientId(entry.clientId ?? ''); setEditing(false) }}>취소</Button>
-            <Button variant="primary" disabled={content.trim() === ''} onClick={save}>
-              저장
+            <Button variant="primary" disabled={content.trim() === '' || saving} onClick={() => void save()}>
+              {saving ? '저장 중…' : '저장'}
             </Button>
           </div>
         }
@@ -285,7 +292,7 @@ export function TodoActionSheet({
               rows={3}
               onChange={(e) => setContent(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) save()
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void save()
               }}
               className="t-body mt-1 w-full resize-y rounded-(--radius-control) border border-slate-300 px-3 py-2.5 focus:border-brand-500 focus:outline-none"
             />
@@ -349,7 +356,7 @@ export function TodoActionSheet({
             <button
               key={r.action}
               type="button"
-              onClick={() => onPick(r.action)}
+              onClick={() => (r.action === 'delete' ? setConfirmDelete(true) : onPick(r.action))}
               className={`flex items-center gap-3 rounded-(--radius-control) border px-3 py-3 text-left ${
                 active
                   ? 'border-brand-400 bg-brand-50'
@@ -369,6 +376,17 @@ export function TodoActionSheet({
           )
         })}
       </div>
+      {confirmDelete && (
+        <div role="alertdialog" aria-label="할 일 삭제 확인" data-testid="todo-delete-confirm" className="mt-2 flex flex-col gap-2 rounded-(--radius-control) border border-danger-200 bg-danger-50 px-3 py-3">
+          <p className="t-body font-semibold break-keep text-danger-800">이 할 일을 지울까요? 되돌릴 수 없습니다.</p>
+          <div className="flex gap-2">
+            <Button variant="danger" onClick={() => onPick('delete')}>
+              지우기
+            </Button>
+            <Button onClick={() => setConfirmDelete(false)}>취소</Button>
+          </div>
+        </div>
+      )}
 
       {clientName && onOpenClient && (
         <Button variant="secondary" className="mt-3 w-full" onClick={onOpenClient}>

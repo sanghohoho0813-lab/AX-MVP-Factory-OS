@@ -148,6 +148,15 @@ function writeLocal(entries: JournalEntry[]): void {
 /* ------------------------------------------------------------------ */
 
 /** YYYY-MM-DD 문자열에서 n 일 전 날짜 */
+/**
+ * '내일로 미루기' 의 새 기한 (D-122) — 오늘 기준 내일, 단 기한이 이미 더 뒤면 그 다음 날.
+ * 예전에는 늘 오늘+1 이라, 달력에서 10/5 할 일을 미루면 9/27 로 당겨졌다.
+ */
+export function postponedDue(dueDate: string, today: string): string {
+  const base = /^\d{4}-\d{2}-\d{2}$/.test(dueDate) && dueDate > today ? dueDate : today
+  return shiftDate(base, 1)
+}
+
 export function shiftDate(date: string, days: number): string {
   const [y, m, d] = date.split('-').map(Number)
   const dt = new Date(y, m - 1, d + days)
@@ -224,15 +233,25 @@ export const TODO_PRESETS: { label: string; text: string }[] = [
 export async function listJournal(workspaceId: string | null): Promise<JournalEntry[]> {
   if (isLocal()) return readLocal()
   if (!workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
-  const { data, error } = await getSupabaseClient()
-    .from('ops_journal_entries')
-    .select('*')
-    .eq('workspace_id', workspaceId)
-    .order('entry_date', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(1000)
-  if (error) throw error
-  return (data ?? []).map((r) => fromRow(r as Record<string, unknown>))
+  // D-122: 예전에는 새 것 1000건에서 끊겨, 몇 달 쓰면 오래된 업체 기록 · 오래 밀린 할 일이 조용히 사라졌다.
+  // 1000건씩 끝까지 읽는다(안전 상한 20,000건).
+  const PAGE = 1000
+  const out: JournalEntry[] = []
+  for (let from = 0; from < 20_000; from += PAGE) {
+    const { data, error } = await getSupabaseClient()
+      .from('ops_journal_entries')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .order('entry_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(from, from + PAGE - 1)
+    if (error) throw error
+    const rows = data ?? []
+    out.push(...rows.map((r) => fromRow(r as Record<string, unknown>)))
+    if (rows.length < PAGE) break
+  }
+  return out
 }
 
 export async function createJournalEntry(
@@ -268,10 +287,25 @@ export async function createJournalEntry(
   return fromRow(data as Record<string, unknown>)
 }
 
+/** 고친 칸 → 표 칸 이름 (D-122: 고친 칸만 보낸다) */
+const PATCH_COLUMNS: Partial<Record<keyof JournalEntry, keyof ReturnType<typeof toRow>>> = {
+  entryDate: 'entry_date',
+  entryType: 'entry_type',
+  content: 'content',
+  clientId: 'client_id',
+  projectId: 'project_id',
+  serviceKey: 'service_key',
+  dueDate: 'due_date',
+  pinned: 'pinned',
+  completed: 'completed',
+}
+
 export async function updateJournalEntry(entry: JournalEntry, patch: Partial<JournalEntry>): Promise<JournalEntry> {
-  const next = normalize({ ...entry, ...patch, updatedAt: nowIso() })
+  // D-122: 로컬은 저장된 가장 새 값 위에 얹는다 — 화면이 들고 있던 예전 사본으로 덮지 않게
+  const base = isLocal() ? (readLocal().find((e) => e.id === entry.id) ?? entry) : entry
+  const next = normalize({ ...base, ...patch, updatedAt: nowIso() })
   if (patch.completed !== undefined) {
-    next.completedAt = patch.completed ? (entry.completedAt ?? nowIso()) : null
+    next.completedAt = patch.completed ? (base.completedAt ?? nowIso()) : null
   }
   if (isLocal()) {
     writeLocal(readLocal().map((e) => (e.id === next.id ? next : e)))
@@ -279,20 +313,18 @@ export async function updateJournalEntry(entry: JournalEntry, patch: Partial<Jou
   }
   if (!entry.workspaceId || !entry.ownerId) throw new Error('로그인과 워크스페이스가 필요합니다.')
   const row = toRow(next, entry.workspaceId, entry.ownerId)
+  // D-122: 고친 칸만 보낸다. 예전에는 모든 칸을 화면의 사본으로 보내서, 고정한 뒤 목록이 다시 읽히기 전에
+  // '완료' 를 누르면 고정이 풀렸다.
+  const update: Record<string, unknown> = {}
+  for (const key of Object.keys(patch) as (keyof JournalEntry)[]) {
+    const col = PATCH_COLUMNS[key]
+    if (col) update[col] = row[col]
+  }
+  if (patch.completed !== undefined) update.completed_at = row.completed_at
+  if (Object.keys(update).length === 0) return entry
   const { data, error } = await getSupabaseClient()
     .from('ops_journal_entries')
-    .update({
-      entry_date: row.entry_date,
-      entry_type: row.entry_type,
-      content: row.content,
-      client_id: row.client_id,
-      project_id: row.project_id,
-      service_key: row.service_key,
-      due_date: row.due_date,
-      pinned: row.pinned,
-      completed: row.completed,
-      completed_at: row.completed_at,
-    })
+    .update(update)
     .eq('id', entry.id)
     .select()
     .single()

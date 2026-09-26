@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Landmark, Plus, Trash2 } from 'lucide-react'
+import { Landmark, Plus } from 'lucide-react'
+import { InlineConfirm } from '../ui/InlineConfirm'
 import type { ClientOpsRecord, FundingStatus } from '../../types/clientOps'
 import { FUNDING_STATUS_LABEL } from '../../content/clientOpsCatalog'
 import { daysLeftFrom, dueText } from '../../services/clientOpsAlerts'
-import { formatKrw } from '../../lib/format'
+import { formatKrw, wonOf } from '../../lib/format'
 import { Button } from '../ui/Button'
 import { Panel } from '../ui/Panel'
 
@@ -42,7 +43,7 @@ export function FundingSection({
   record: ClientOpsRecord
   today: string
   onChange: (id: string, patch: Record<string, unknown>) => void
-  onAdd: (input: Record<string, unknown>) => void
+  onAdd: (input: Record<string, unknown>) => void | boolean | Promise<boolean>
   onRemove: (id: string) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -58,16 +59,21 @@ export function FundingSection({
     .filter((a) => a.status === 'selected')
     .reduce((s, a) => s + (a.approvedAmount ?? 0), 0)
 
-  const submit = () => {
-    if (form.programName.trim() === '') return
-    const n = Number(form.requestedAmount.replace(/[^0-9]/g, ''))
-    onAdd({
+  const [adding, setAdding] = useState(false)
+  const submit = async () => {
+    if (form.programName.trim() === '' || adding) return
+    const n = wonOf(form.requestedAmount) ?? 0
+    setAdding(true)
+    const ok = await onAdd({
       programName: form.programName.trim(),
       institution: form.institution.trim(),
       applyDueDate: form.applyDueDate,
       requestedAmount: Number.isFinite(n) && n > 0 ? n : null,
       status: 'watching',
     })
+    setAdding(false)
+    // D-122: 저장이 된 뒤에만 비우고 닫는다
+    if (ok === false) return
     setForm({ programName: '', institution: '', applyDueDate: '', requestedAmount: '' })
     setOpen(false)
   }
@@ -145,14 +151,8 @@ export function FundingSection({
                           </option>
                         ))}
                       </select>
-                      <button
-                        type="button"
-                        aria-label={`${a.programName} 삭제`}
-                        onClick={() => onRemove(a.id)}
-                        className="rounded-(--radius-control) p-2 text-slate-400 hover:bg-slate-100 hover:text-danger-600"
-                      >
-                        <Trash2 aria-hidden="true" className="size-4" />
-                      </button>
+                      {/* D-122: 한 번에 지우지 않는다 */}
+                      <InlineConfirm question={`${a.programName} 지울까요?`} onConfirm={() => onRemove(a.id)} />
                     </div>
                   </div>
 
@@ -172,7 +172,7 @@ export function FundingSection({
                         inputMode="numeric"
                         value={a.requestedAmount ?? ''}
                         onChange={(e) => {
-                          const n = Number(e.target.value.replace(/[^0-9]/g, ''))
+                          const n = wonOf(e.target.value) ?? 0
                           onChange(a.id, { requestedAmount: Number.isFinite(n) && n > 0 ? n : null })
                         }}
                         className={`mt-1 w-full ${inputCls}`}
@@ -184,7 +184,7 @@ export function FundingSection({
                         inputMode="numeric"
                         value={a.approvedAmount ?? ''}
                         onChange={(e) => {
-                          const n = Number(e.target.value.replace(/[^0-9]/g, ''))
+                          const n = wonOf(e.target.value) ?? 0
                           onChange(a.id, { approvedAmount: Number.isFinite(n) && n > 0 ? n : null })
                         }}
                         className={`mt-1 w-full ${inputCls}`}
@@ -245,7 +245,7 @@ export function FundingSection({
                 />
               </label>
               <div className="flex gap-2">
-                <Button variant="primary" onClick={submit} disabled={form.programName.trim() === ''}>
+                <Button variant="primary" onClick={() => void submit()} disabled={form.programName.trim() === '' || adding}>
                   추가
                 </Button>
                 <Button variant="secondary" onClick={() => setOpen(false)}>

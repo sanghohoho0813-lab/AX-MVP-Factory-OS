@@ -36,7 +36,7 @@ import {
 } from '../content/clientOpsCatalog'
 import { netAmountOf } from './feeMath'
 import { allDocumentMetas, emptyDocumentState } from './clientOpsDocuments'
-import { todayLocalDate } from '../lib/appClock'
+import { localDateOf, todayLocalDate } from '../lib/appClock'
 
 /* ------------------------------------------------------------------ */
 /* 날짜 유틸 (로컬 날짜 문자열 기준, 시간대 흔들림 없음)                 */
@@ -267,7 +267,7 @@ export function buildClientAlerts(record: ClientOpsRecord, today: string): OpsAl
 
     // 3) 고객 회신 장기 대기
     if (state.status === 'waiting_client' && state.waitingSince) {
-      const waited = daysBetween(state.waitingSince.slice(0, 10), today)
+      const waited = daysBetween(localDateOf(state.waitingSince), today)
       if (waited !== null && waited >= WAITING_TOO_LONG_DAYS) {
         push(out, {
           id: `${record.id}:${meta.key}:waiting`,
@@ -430,7 +430,7 @@ export function buildClientAlerts(record: ClientOpsRecord, today: string): OpsAl
     .sort()
     .pop()
   if (lastTouch) {
-    const quiet = daysBetween(lastTouch.slice(0, 10), today)
+    const quiet = daysBetween(localDateOf(lastTouch), today)
     if (quiet !== null && quiet >= QUIET_DAYS) {
       push(out, {
         id: `${record.id}:quiet`,

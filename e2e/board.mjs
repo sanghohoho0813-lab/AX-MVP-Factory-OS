@@ -383,6 +383,9 @@ check('업무 15개에서도 가로 스크롤 없음', of2.d <= of2.w + 1, `${of
   const beforeDelete = (await page.locator('main').innerText()) ?? ''
   check('서류함: 고친 이름이 화면에 보인다', beforeDelete.includes('국세 완납증명서(최신)'))
   await page.getByRole('button', { name: '칸 없애기' }).last().click()
+  // D-122: 한 번 더 묻는다 — 묻기만 하고 아직 지우지 않았다
+  check('서류함: 칸 없애기는 한 번 더 묻는다', ((await page.locator('main').innerText()) ?? '').includes('칸을 없앨까요?') && ((await page.locator('main').innerText()) ?? '').includes('국세 완납증명서(최신)'))
+  await page.getByRole('button', { name: '없애기', exact: true }).click()
   await page.waitForTimeout(800)
   const afterDelete = (await page.locator('main').innerText()) ?? ''
   check('서류함: 없애면 목록에서 빠진다', !afterDelete.includes('국세 완납증명서(최신)'), afterDelete.slice(0, 300))

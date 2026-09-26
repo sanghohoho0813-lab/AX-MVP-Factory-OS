@@ -42,6 +42,7 @@
     "qa:studio": "node e2e/studio.mjs",
     "qa:simple": "node e2e/simple.mjs",
     "qa:shots": "node e2e/shots.mjs",
+    "qa:steady": "node e2e/steady.mjs",
     "qa:modules": "node e2e/modules.mjs",
     "qa:squeeze": "node e2e/squeeze.mjs",
     "qa:sales": "node e2e/sales.mjs",

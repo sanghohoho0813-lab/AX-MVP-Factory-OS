@@ -51,6 +51,7 @@ import {
   pendingLocalClients,
   replaceAllClients,
   saveClient,
+  normalizeClientOps,
 } from '../services/clientOpsService'
 import { downloadBackup, MODULE_DATA_PREFIX, mergeBackup, parseBackup, parseBackupToolInputs, writeToolInputs, type MergeMode } from '../services/clientOpsBackup'
 import {
@@ -140,9 +141,11 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const load = useCallback(async () => {
     try {
       setLoading(true)
-      // 직접 만든 업무 항목을 먼저 목록에 올린 뒤 업체를 읽는다
+      // D-122: 업체를 먼저 읽고, 직접 만든 업무 항목을 목록에 올린 '바로 그 자리에서' 새 칸까지 채워 넣는다.
+      // 예전 순서(목록 먼저 → 업체 읽기)는 그 사이에 화면이 다시 그려지면 새 칸이 없는 예전 기록을 읽다 멈출 수 있었다.
+      const all = await listClients(workspaceId)
       await loadCustomServicesIntoCatalog(workspaceId)
-      setRecords(await listClients(workspaceId))
+      setRecords(all.map((r) => normalizeClientOps(r)))
       setError('')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '고객 목록을 불러오지 못했습니다.')

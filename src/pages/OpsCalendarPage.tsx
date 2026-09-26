@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CalendarDays, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
@@ -8,7 +8,7 @@ import {
   createJournalEntry,
   deleteJournalEntry,
   listJournal,
-  shiftDate,
+  postponedDue,
   todosOn,
   updateJournalEntry,
 } from '../services/journalService'
@@ -95,16 +95,28 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
     [records],
   )
 
+  /** 저장 중에 또 누르면(할 일로 · 미루기) 두 번 들어가지 않게 — 한 번에 하나(D-122) */
+  const busyRef = useRef(false)
   const mutate = async (fn: () => Promise<unknown>, done?: string): Promise<boolean> => {
+    if (busyRef.current) return false
+    busyRef.current = true
     try {
       await fn()
-      setJournal(await listJournal(workspaceId))
-      if (done) showToast(done)
-      return true
     } catch (cause) {
       showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
       return false
+    } finally {
+      busyRef.current = false
     }
+    // 저장은 됐는데 다시 읽기만 실패했으면 '됐다'
+    try {
+      setJournal(await listJournal(workspaceId))
+    } catch {
+      showToast('저장했습니다. 목록을 다시 읽지 못했습니다 — 잠시 뒤 새로고침해 주세요.')
+      return true
+    }
+    if (done) showToast(done)
+    return true
   }
 
   const clientNameOf = (id: string) => records.find((r) => r.id === id)?.companyName
@@ -118,7 +130,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
     }
     if (action === 'tomorrow') {
       void mutate(
-        () => updateJournalEntry(entry, { dueDate: shiftDate(today, 1), completed: false }),
+        () => updateJournalEntry(entry, { dueDate: postponedDue(entry.dueDate, today), completed: false }),
         '내일로 미뤘습니다.',
       )
       return
@@ -239,6 +251,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                   <button
                     key={d}
                     type="button"
+                    data-date={d}
                     onClick={() => setPicked(d)}
                     className={`flex min-h-[5.5rem] flex-col gap-1 border-r border-b border-slate-100 p-1.5 text-left last:border-r-0 ${
                       inMonth ? 'bg-white' : 'bg-slate-50/60'
@@ -402,9 +415,11 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
           clientName={todoPick.clientId ? clientNameOf(todoPick.clientId) : undefined}
           clients={activeClients}
           onPick={(action) => applyTodoAction(todoPick, action)}
-          onSave={(patch) => {
-            setTodoPick(null)
-            void mutate(() => updateJournalEntry(todoPick, patch), '고쳤습니다.')
+          onSave={async (patch) => {
+            // D-122: 저장이 된 뒤에만 닫는다 — 실패하면 고치던 칸이 그대로
+            const ok = await mutate(() => updateJournalEntry(todoPick, patch), '고쳤습니다.')
+            if (ok) setTodoPick(null)
+            return ok
           }}
           onOpenClient={
             todoPick.clientId ? () => navigate(`/ops/clients/${todoPick.clientId}`) : undefined

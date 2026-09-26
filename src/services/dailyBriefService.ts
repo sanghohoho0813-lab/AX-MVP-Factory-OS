@@ -10,6 +10,7 @@ import type { ClientOpsRecord, OpsAlert } from '../types/clientOps'
 import type { CustomerEvent, JournalEntry } from '../types/bridge'
 import { daysLeftFrom } from './clientOpsAlerts'
 import { netAmountOf } from './feeMath'
+import { localDateOf } from '../lib/appClock'
 import { eventSummary, isOpenEvent, waitingDays, waitingLevel, EVENT_TYPE_LABEL } from './customerBridgeService'
 
 export type BriefActionKind = 'alert' | 'event' | 'follow_up' | 'funding' | 'payment'
@@ -181,7 +182,8 @@ export function buildDaySummary(input: {
   clientNames: Map<string, string>
 }): DaySummary {
   const { today, journal, clients, alerts, events, clientNames } = input
-  const isToday = (iso: string | null) => typeof iso === 'string' && iso.slice(0, 10) === today
+  // D-122: 한국 날짜로 — UTC 로 자르면 오전 9시 전에 한 일이 '어제' 로 빠졌다
+  const isToday = (iso: string | null) => typeof iso === 'string' && localDateOf(iso) === today
   const name = (id: string | null) => (id ? (clientNames.get(id) ?? '') : '')
   const withName = (id: string | null, text: string) => (name(id) ? `${name(id)} · ${text}` : text)
 

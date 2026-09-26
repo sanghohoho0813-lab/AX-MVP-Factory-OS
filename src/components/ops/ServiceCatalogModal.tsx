@@ -16,7 +16,7 @@ import { ACCENT_CLASS, BUILTIN_SERVICES, type ServiceAccent } from '../../conten
 import {
   archiveCustomService,
   createCustomService,
-  loadCustomServicesIntoCatalog,
+  listCustomServices,
   restoreCustomService,
   type CustomService,
 } from '../../services/customServiceService'
@@ -50,7 +50,8 @@ export function ServiceCatalogModal({
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const reload = async () => setList(await loadCustomServicesIntoCatalog(workspaceId))
+  // D-122: 여기서는 목록만 읽는다 — 업무 칸 목록(카탈로그)은 화면이 업체를 다시 읽을 때 함께 올린다(어긋나는 틈이 없게)
+  const reload = async () => setList(await listCustomServices(workspaceId))
 
   useEffect(() => {
     void reload()

@@ -5,6 +5,9 @@ import type { JournalEntry } from '../../types/bridge'
 import { JOURNAL_TYPE_CLASS, JOURNAL_TYPE_LABEL } from '../../services/journalService'
 import { daysLeftFrom, dueText } from '../../services/clientOpsAlerts'
 
+const ROW_BTN =
+  'tap inline-flex h-10 items-center gap-1 rounded-(--radius-control) px-2.5 text-[0.9rem] font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-50'
+
 /**
  * 업무 일기 목록 — 시간순 타임라인.
  * 후속조치는 완료 체크, 모든 항목은 수정·삭제·고정이 된다.
@@ -26,9 +29,11 @@ export function JournalList({
   entries: JournalEntry[]
   clientNames: Map<string, string>
   today: string
-  onToggleComplete: (e: JournalEntry) => void
-  onTogglePin: (e: JournalEntry) => void
-  onEdit: (e: JournalEntry, content: string) => void
+  /** 저장이 끝날 때까지 그 줄의 단추를 잠근다 — 두 번 눌러 예전 값으로 덮지 않게(D-122) */
+  onToggleComplete: (e: JournalEntry) => unknown
+  onTogglePin: (e: JournalEntry) => unknown
+  /** false 를 돌려주면(저장 실패) 고치던 칸을 닫지 않는다 */
+  onEdit: (e: JournalEntry, content: string) => unknown
   onDelete: (e: JournalEntry) => void
   showClient?: boolean
   showDate?: boolean
@@ -37,6 +42,23 @@ export function JournalList({
 }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
+  const [busyId, setBusyId] = useState<string | null>(null)
+  /** 한 줄씩 차례로 — 저장 중인 줄은 다른 단추가 먹지 않는다 */
+  const run = async (e: JournalEntry, fn: () => unknown): Promise<unknown> => {
+    if (busyId === e.id) return false
+    setBusyId(e.id)
+    try {
+      return await fn()
+    } finally {
+      setBusyId(null)
+    }
+  }
+  const saveEdit = async (e: JournalEntry) => {
+    const text = draft.trim()
+    if (text === '') return
+    const ok = await run(e, () => onEdit(e, text))
+    if (ok !== false) setEditingId(null)
+  }
 
   if (entries.length === 0) {
     return (
@@ -105,15 +127,16 @@ export function JournalList({
                 <div className="mt-2 flex gap-2">
                   <button
                     type="button"
-                    onClick={() => { onEdit(e, draft.trim()); setEditingId(null) }}
-                    className="inline-flex h-9 items-center gap-1 rounded-(--radius-control) bg-brand-600 px-3 text-[0.9rem] font-semibold text-white hover:bg-brand-700"
+                    onClick={() => void saveEdit(e)}
+                    disabled={draft.trim() === '' || busyId === e.id}
+                    className="tap inline-flex h-10 items-center gap-1 rounded-(--radius-control) bg-brand-600 px-3.5 text-[0.95rem] font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
                   >
-                    <Check aria-hidden="true" className="size-4" /> 저장
+                    <Check aria-hidden="true" className="size-4" /> {busyId === e.id ? '저장 중…' : '저장'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setEditingId(null)}
-                    className="inline-flex h-9 items-center gap-1 rounded-(--radius-control) border border-slate-200 px-3 text-[0.9rem] text-slate-600 hover:bg-slate-50"
+                    className="tap inline-flex h-10 items-center gap-1 rounded-(--radius-control) border border-slate-200 px-3.5 text-[0.95rem] text-slate-600 hover:bg-slate-50"
                   >
                     <X aria-hidden="true" className="size-4" /> 취소
                   </button>
@@ -130,9 +153,10 @@ export function JournalList({
                 {isFollow && (
                   <button
                     type="button"
-                    onClick={() => onToggleComplete(e)}
+                    onClick={() => void run(e, () => onToggleComplete(e))}
+                    disabled={busyId === e.id}
                     aria-pressed={e.completed}
-                    className={`inline-flex h-8 items-center gap-1 rounded-(--radius-control) border px-2.5 text-[0.85rem] font-medium ${
+                    className={`tap inline-flex h-10 items-center gap-1 rounded-(--radius-control) border px-3 text-[0.9rem] font-medium disabled:opacity-50 ${
                       e.completed ? 'border-success-200 bg-success-50 text-success-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                     }`}
                   >
@@ -140,14 +164,16 @@ export function JournalList({
                     {e.completed ? '완료됨' : '완료'}
                   </button>
                 )}
-                <button type="button" onClick={() => { setDraft(e.content); setEditingId(e.id) }} aria-label="수정" className="inline-flex size-10 items-center justify-center rounded-(--radius-control) text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-                  <Pencil aria-hidden="true" className="size-4" />
+                {/* D-122: 아이콘만 두지 않는다 — 50~60대는 연필 · 핀 모양을 읽지 않는다 */}
+                <button type="button" onClick={() => { setDraft(e.content); setEditingId(e.id) }} disabled={busyId === e.id} className={ROW_BTN}>
+                  <Pencil aria-hidden="true" className="size-4" /> 수정
                 </button>
-                <button type="button" onClick={() => onTogglePin(e)} aria-label={e.pinned ? '고정 해제' : '고정'} className="inline-flex size-10 items-center justify-center rounded-(--radius-control) text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                <button type="button" onClick={() => void run(e, () => onTogglePin(e))} disabled={busyId === e.id} className={ROW_BTN}>
                   {e.pinned ? <PinOff aria-hidden="true" className="size-4" /> : <Pin aria-hidden="true" className="size-4" />}
+                  {e.pinned ? '고정 풀기' : '고정'}
                 </button>
-                <button type="button" onClick={() => onDelete(e)} aria-label="삭제" className="inline-flex size-10 items-center justify-center rounded-(--radius-control) text-slate-400 hover:bg-danger-50 hover:text-danger-600">
-                  <Trash2 aria-hidden="true" className="size-4" />
+                <button type="button" onClick={() => onDelete(e)} disabled={busyId === e.id} className={`${ROW_BTN} hover:!bg-danger-50 hover:!text-danger-700`}>
+                  <Trash2 aria-hidden="true" className="size-4" /> 삭제
                 </button>
               </div>
             )}

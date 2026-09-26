@@ -20,14 +20,13 @@ import {
   type InsurancePolicy,
 } from '../../types/clientOps'
 import { monthlyPremiumTotal, summarizeContract } from '../../services/contractSummary'
-import { formatKrw } from '../../lib/format'
+import { formatKrw, wonOf } from '../../lib/format'
 import { BottomSheet } from '../ui/primitives'
 import { Button } from '../ui/Button'
 
 /** 숫자 입력 — 빈 칸이면 null(모름), 숫자면 원 단위 */
 function amountOf(text: string): number | null {
-  const d = text.replace(/[^0-9]/g, '')
-  return d === '' ? null : Number(d)
+  return wonOf(text)
 }
 
 /**
@@ -62,7 +61,7 @@ export function ContractCard({
 }: {
   record: ClientOpsRecord
   today: string
-  onSave: (next: ContractInfo) => void
+  onSave: (next: ContractInfo) => void | boolean | Promise<boolean | void>
 }) {
   const [editing, setEditing] = useState(false)
   const [open, setOpen] = useState(false)
@@ -159,7 +158,12 @@ export function ContractCard({
         </>
       )}
 
-      {editing && <ContractSheet contract={c} onClose={() => setEditing(false)} onSave={(next) => { onSave(next); setEditing(false) }} />}
+      {editing && <ContractSheet contract={c} onClose={() => setEditing(false)} onSave={async (next) => {
+            // D-122: 저장이 된 뒤에만 닫는다 — 실패하면 고친 날짜 · 금액이 그대로 남는다
+            const ok = await onSave(next)
+            if (ok !== false) setEditing(false)
+            return ok
+          }} />}
     </section>
   )
 }
@@ -174,7 +178,7 @@ function ContractSheet({
   onClose,
 }: {
   contract: ContractInfo
-  onSave: (next: ContractInfo) => void
+  onSave: (next: ContractInfo) => void | boolean | Promise<boolean | void>
   onClose: () => void
 }) {
   const [signedAt, setSignedAt] = useState(contract.signedAt)
@@ -190,14 +194,19 @@ function ContractSheet({
   const patch = (id: string, p: Partial<InsurancePolicy>) =>
     setPolicies((cur) => cur.map((x) => (x.id === id ? { ...x, ...p } : x)))
 
-  const save = () =>
-    onSave({
+  const [busy, setBusy] = useState(false)
+  const save = async () => {
+    if (busy) return
+    setBusy(true)
+    await onSave({
       signedAt: signedAt.trim(),
       kind,
       cashAmount: wantsCash ? amountOf(cash) : null,
       policies: wantsInsurance ? policies.filter((p) => p.insurer.trim() !== '' || p.productName.trim() !== '' || p.monthlyPremium !== null) : [],
       note: note.trim(),
     })
+    setBusy(false)
+  }
 
   return (
     <BottomSheet
@@ -206,8 +215,8 @@ function ContractSheet({
       footer={
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>취소</Button>
-          <Button variant="primary" onClick={save}>
-            저장
+          <Button variant="primary" onClick={() => void save()} disabled={busy}>
+            {busy ? '저장 중…' : '저장'}
           </Button>
         </div>
       }
@@ -254,7 +263,7 @@ function ContractSheet({
                 aria-label="현금 계약 금액"
                 value={withCommas(cash)}
                 placeholder="예: 5,000,000"
-                onChange={(e) => setCash(e.target.value.replace(/[^0-9]/g, ''))}
+                onChange={(e) => setCash(String(wonOf(e.target.value) ?? ''))}
                 className="t-body h-12 min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 px-3 text-right tabular-nums"
               />
               <span className="t-body shrink-0 text-slate-600">원</span>

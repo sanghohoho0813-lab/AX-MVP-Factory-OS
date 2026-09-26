@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import type { CustomerEvent, PortalClientLink } from '../../types/bridge'
@@ -132,19 +132,27 @@ export function LinkCustomerModal({
     }
   }
 
+  const createdRef = useRef<ClientOpsRecord | null>(null)
+  const savedRef = useRef<ClientOpsRecord | null>(null)
   const submitNew = async () => {
     if (!form.companyName.trim()) { setError('회사명을 입력해 주세요.'); return }
     setBusy(true); setError('')
     try {
       // D-114: 상담신청에서 만든 업체는 계약 전 — 잠재고객(영업 단계 '잠재 고객', 유입 '홈페이지 상담신청')으로 시작한다
-      const created = await createClient(workspaceId, {
-        companyName: form.companyName,
-        contactName: form.contactName,
-        contactPhone: form.contactPhone,
-        industry: form.industry,
-        status: 'waiting',
-      })
-      const saved = await saveClient(
+      // D-122: 만든 뒤 다음 걸음(저장 · 연결)이 실패해 다시 누르면 같은 업체를 또 만들지 않는다
+      const created =
+        createdRef.current ??
+        (await createClient(workspaceId, {
+          companyName: form.companyName,
+          contactName: form.contactName,
+          contactPhone: form.contactPhone,
+          industry: form.industry,
+          status: 'waiting',
+        }))
+      createdRef.current = created
+      const saved =
+        savedRef.current ??
+        (await saveClient(
         withNewProspect(
           withActivity(
             { ...created, contactEmail: form.contactEmail.trim() },
@@ -153,10 +161,12 @@ export function LinkCustomerModal({
           ),
           '홈페이지 상담신청',
         ),
-      )
+      ))
+      savedRef.current = saved
       await finish(saved)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '만들지 못했습니다.')
+      const msg = cause instanceof Error ? cause.message : '만들지 못했습니다.'
+      setError(createdRef.current ? `${msg} — 업체는 이미 만들었습니다. 다시 누르면 새로 만들지 않고 이어서 연결합니다.` : msg)
     } finally {
       setBusy(false)
     }

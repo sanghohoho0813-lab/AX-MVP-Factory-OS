@@ -19,6 +19,7 @@ import { daysLeftFrom } from './clientOpsAlerts'
 import { netAmountOf } from './feeMath'
 import { salesInFlow } from './salesPipeline'
 import { formatKrw } from '../lib/format'
+import { localDateOf } from '../lib/appClock'
 
 export type KpiGroup = 'cost' | 'revenue' | 'sales' | 'scale' | 'adoption'
 
@@ -74,9 +75,9 @@ function shiftDate(day: string, offset: number): string {
   return t.toISOString().slice(0, 10)
 }
 
-/** ISO 시각 → YYYY-MM-DD (로컬이 아니라 저장된 UTC 기준. 날짜 단위 집계라 충분하다) */
+/** ISO 시각 → YYYY-MM-DD 한국(로컬) 날짜 — D-122: UTC 로 자르면 오전 9시 전 일이 전날로 셌다 */
 function dayOf(iso: string): string {
-  return iso.slice(0, 10)
+  return localDateOf(iso)
 }
 
 export interface KpiInput {

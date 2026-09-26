@@ -8,6 +8,7 @@
 
 import type { ClientOpsRecord, FeeItem, SalesProposal } from '../types/clientOps'
 import { emptySales } from '../types/clientOps'
+import { localDateOf } from '../lib/appClock'
 import { withActivity } from './clientOpsActivity'
 import { salesStageOf, withSalesStage } from './salesPipeline'
 import { toEngineItem } from './salesMeeting'
@@ -58,7 +59,7 @@ export function withProposal(
 ): ClientOpsRecord {
   const base = record.sales ?? emptySales(salesStageOf(record), at)
   const prev = base.proposal
-  const proposal: SalesProposal = { ...next, packages: [...new Set(next.packages)], at: at.slice(0, 10) }
+  const proposal: SalesProposal = { ...next, packages: [...new Set(next.packages)], at: localDateOf(at) }
   const same = prev && JSON.stringify({ ...prev, at: '' }) === JSON.stringify({ ...proposal, at: '' })
   if (same) return record
   const expectedFee = proposal.feeManwon > 0 ? proposal.feeManwon * 10_000 : base.expectedFee
@@ -105,7 +106,7 @@ export function withContractFromProposal(record: ClientOpsRecord, pkgs: SalesPac
       note: '영업 관리 제안에서 계약',
     })
   }
-  if (next.sales?.proposal) next = { ...next, sales: { ...next.sales, proposal: { ...next.sales.proposal, status: '계약 완료', at: at.slice(0, 10) } } }
+  if (next.sales?.proposal) next = { ...next, sales: { ...next.sales, proposal: { ...next.sales.proposal, status: '계약 완료', at: localDateOf(at) } } }
   if (added.length === 0) return next
   next = { ...next, fees: [...next.fees, ...added] }
   const total = added.reduce((s, f) => s + (f.amount ?? 0), 0)

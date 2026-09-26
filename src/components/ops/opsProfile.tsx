@@ -472,6 +472,8 @@ export function CompanyProfileCard({
 /* 메모                                                                 */
 /* ------------------------------------------------------------------ */
 
+const NOTE_BTN = 'tap inline-flex h-10 items-center gap-1 rounded-(--radius-control) px-2.5 text-[0.9rem] font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-800'
+
 export function NotesSection({
   record,
   onAdd,
@@ -481,21 +483,36 @@ export function NotesSection({
 }: {
   record: ClientOpsRecord
   onAdd: (text: string) => void | boolean | Promise<void | boolean>
-  onEdit: (id: string, text: string) => void
-  onPin: (id: string, pinned: boolean) => void
-  onDelete: (id: string) => void
+  onEdit: (id: string, text: string) => unknown
+  onPin: (id: string, pinned: boolean) => unknown
+  onDelete: (id: string) => unknown
 }) {
   const [draft, setDraft] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [savingEdit, setSavingEdit] = useState(false)
+  /** D-122: 지우기 전에 그 메모 자리에서 한 번 묻는다 */
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const notes = sortedNotes(record)
 
   const add = async () => {
     const t = draft.trim()
-    if (t === '') return
-    // D-120: 저장이 된 뒤에 비운다
+    if (t === '' || adding) return
+    setAdding(true)
+    // D-120: 저장이 된 뒤에 비운다 · D-122: 저장 중에 또 눌러도 한 번만
     const ok = await onAdd(t)
+    setAdding(false)
     if (ok !== false) setDraft('')
+  }
+  /** D-122: 빈 글로 저장하지 않고, 저장이 된 뒤에만 닫는다 */
+  const saveEdit = async (id: string) => {
+    const t = editText.trim()
+    if (t === '' || savingEdit) return
+    setSavingEdit(true)
+    const ok = await onEdit(id, t)
+    setSavingEdit(false)
+    if (ok !== false) setEditingId(null)
   }
 
   return (
@@ -512,7 +529,7 @@ export function NotesSection({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) add()
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void add()
           }}
           rows={2}
           placeholder="예: 9/3 대표님 통화 — 중소기업확인서 이번 주 안에 발급해서 보내주기로 함"
@@ -520,7 +537,7 @@ export function NotesSection({
         />
         <div className="mt-2 flex items-center justify-between gap-2">
           <span className="text-[0.875rem] text-slate-500">Ctrl(⌘) + Enter 로도 추가됩니다</span>
-          <Button variant="primary" size="sm" disabled={draft.trim() === ''} onClick={add}>
+          <Button variant="primary" size="sm" disabled={draft.trim() === '' || adding} onClick={() => void add()}>
             <Plus aria-hidden="true" className="size-3.5" />
             메모 추가
           </Button>
@@ -552,15 +569,8 @@ export function NotesSection({
                     <Button variant="secondary" size="sm" onClick={() => setEditingId(null)}>
                       취소
                     </Button>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => {
-                        onEdit(n.id, editText.trim())
-                        setEditingId(null)
-                      }}
-                    >
-                      저장
+                    <Button variant="primary" size="sm" disabled={editText.trim() === '' || savingEdit} onClick={() => void saveEdit(n.id)}>
+                      {savingEdit ? '저장 중…' : '저장'}
                     </Button>
                   </div>
                 </div>
@@ -569,45 +579,41 @@ export function NotesSection({
                   <p className="min-w-0 flex-1 text-[1rem] leading-relaxed break-keep whitespace-pre-wrap text-slate-800">
                     {n.text}
                   </p>
-                  <div className="flex shrink-0 items-center gap-0.5">
-                    <button
-                      type="button"
-                      aria-label={n.pinned ? '고정 해제' : '위로 고정'}
-                      title={n.pinned ? '고정 해제' : '위로 고정'}
-                      onClick={() => onPin(n.id, !n.pinned)}
-                      className={`rounded-(--radius-control) p-1.5 hover:bg-slate-100 ${
-                        n.pinned ? 'text-brand-700' : 'text-slate-400'
-                      }`}
-                    >
-                      {n.pinned ? (
-                        <PinOff aria-hidden="true" className="size-4" />
-                      ) : (
-                        <Pin aria-hidden="true" className="size-4" />
-                      )}
+                </div>
+              )}
+              {/* D-122: 아이콘만 두지 않는다 — 글자 · 누르기 쉬운 크기 · 삭제는 한 번 더 묻기 */}
+              {editingId !== n.id && (
+                deletingId === n.id ? (
+                  <div role="alertdialog" aria-label="메모 삭제 확인" className="mt-2 flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-danger-200 bg-danger-50 px-3 py-2">
+                    <span className="t-sub font-semibold text-danger-800">이 메모를 지울까요?</span>
+                    <Button variant="danger" size="sm" onClick={() => { setDeletingId(null); void onDelete(n.id) }}>
+                      지우기
+                    </Button>
+                    <Button size="sm" onClick={() => setDeletingId(null)}>
+                      취소
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                    <button type="button" onClick={() => void onPin(n.id, !n.pinned)} className={`${NOTE_BTN} ${n.pinned ? 'text-brand-700' : ''}`}>
+                      {n.pinned ? <PinOff aria-hidden="true" className="size-4" /> : <Pin aria-hidden="true" className="size-4" />}
+                      {n.pinned ? '고정 풀기' : '위로 고정'}
                     </button>
                     <button
                       type="button"
-                      aria-label="메모 수정"
-                      title="수정"
                       onClick={() => {
                         setEditingId(n.id)
                         setEditText(n.text)
                       }}
-                      className="rounded-(--radius-control) p-1.5 text-slate-400 hover:bg-slate-100 hover:text-brand-600"
+                      className={NOTE_BTN}
                     >
-                      <Pencil aria-hidden="true" className="size-4" />
+                      <Pencil aria-hidden="true" className="size-4" /> 수정
                     </button>
-                    <button
-                      type="button"
-                      aria-label="메모 삭제"
-                      title="삭제"
-                      onClick={() => onDelete(n.id)}
-                      className="rounded-(--radius-control) p-1.5 text-slate-400 hover:bg-slate-100 hover:text-danger-600"
-                    >
-                      <Trash2 aria-hidden="true" className="size-4" />
+                    <button type="button" onClick={() => setDeletingId(n.id)} className={`${NOTE_BTN} hover:!bg-danger-50 hover:!text-danger-700`}>
+                      <Trash2 aria-hidden="true" className="size-4" /> 삭제
                     </button>
                   </div>
-                </div>
+                )
               )}
               <p className="mt-1.5 text-[0.875rem] text-slate-400">
                 {localDateOf(n.updatedAt)}

@@ -119,6 +119,7 @@ export function BulkDocUploadSheet({
     setBusy(true)
     let rec = record
     let okCount = 0
+    const doneIds: string[] = []
     for (const it of targets) {
       patch(it.id, { status: 'uploading', error: '' })
       try {
@@ -138,17 +139,26 @@ export function BulkDocUploadSheet({
         }
         if (it.issuedAt) rec = withDocument(rec, key, { received: true, issuedAt: it.issuedAt })
         patch(it.id, { status: 'done' })
+        doneIds.push(it.id)
         okCount += 1
       } catch (cause) {
         patch(it.id, { status: 'error', error: cause instanceof Error ? cause.message : '올리지 못했습니다.' })
       }
+    }
+    // D-122: 하나도 못 올렸으면 저장하지 않는다('0건을 올렸습니다' 라고 하지 않게)
+    if (okCount === 0) {
+      showToast('올린 서류가 없습니다. 빨간 줄의 까닭을 확인하고 다시 올려 주세요.')
+      setBusy(false)
+      return
     }
     try {
       const saved = await saveClient(rec)
       onSaved(saved)
       showToast(uploadable ? `서류 ${okCount}건을 올렸습니다.` : `서류 ${okCount}건을 기록했습니다. 파일 자체는 클라우드 연결 후 보관됩니다.`)
     } catch (cause) {
-      showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
+      // D-122: 파일은 올라갔는데 업체 기록 저장이 실패했다 — 초록 체크로 두면 다시 올릴 수 없으니 '다시 올리기' 로 되돌린다
+      for (const id of doneIds) patch(id, { status: 'ready', error: '업체 기록에 저장하지 못했습니다 — 다시 올려 주세요' })
+      showToast(cause instanceof Error ? `${cause.message} — 서류를 다시 올려 주세요.` : '저장하지 못했습니다. 서류를 다시 올려 주세요.')
     } finally {
       setBusy(false)
     }
@@ -276,7 +286,7 @@ export function BulkDocUploadSheet({
                   {it.status === 'reading' && it.progress && (
                     <p className="t-sub text-slate-500">{it.progress.label}</p>
                   )}
-                  {it.status === 'error' && <p className="t-sub text-danger-700">{it.error}</p>}
+                  {(it.status === 'error' || (it.status === 'ready' && it.error !== '')) && <p className="t-sub text-danger-700">{it.error}</p>}
 
                   {it.status === 'ready' && it.result && (
                     <>
