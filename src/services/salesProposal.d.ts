@@ -60,6 +60,8 @@ export function topRecommendations(item: ProposalItem): { name: string; reason: 
 export function buildKakaoSet(item: ProposalItem): [string, string][]
 export function buildDocRequestText(item: ProposalItem): string
 
+/** 방문용 1페이지 사전 점검 리포트 (공유용/내부용) */
+export function buildVisitReport(item: ProposalItem, mode: 'internal' | 'client', profile?: Partial<ReportProfile>): string
 export const REPORT_PROFILE_DEFAULT: ReportProfile
 export const VISIT_BASE_DOCS: string[]
 export function extraCheckItems(item: ProposalItem): string[]

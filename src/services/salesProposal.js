@@ -277,7 +277,46 @@ const CONSULT_DESC = (() => { const m = {}; CONSULT_CATALOG.forEach((g) => g.ite
 function consultDesc(name) { return CONSULT_DESC[name] || "관련 요건과 자료를 확인해 검토합니다."; }
 function bundleReason(names) { const a = (names || []).filter(Boolean); if (a.length < 2) return ""; return `${a.slice(0, 3).join(" · ")}${a.length > 3 ? " 등" : ""}은 기업 신뢰도와 자금·세무 흐름에서 서로 연결될 수 있어, 우선순위와 순서를 함께 정리해보는 것이 좋습니다.`; }
 
+function buildVisitReport(item, mode, profile) {
+  const p = profile || REPORT_PROFILE_DEFAULT;
+  const name = getCompanyName(item) || item.name;
+  const recos = topRecommendations(item);
+  const div = "━━━━━━━━━━━━━━━━";
+  const dateK = todayISO().replace(/-/g, ".");
+  const L = [];
+  L.push(div, "[법인컨설팅 사전 점검 리포트]", `고객사: ${name}`, `작성일: ${dateK}`, `담당: ${p.consultant} ${p.title} · ${p.org}`, `구분: ${mode === "internal" ? "내부 검토용" : "대표님 공유용"}`, div, "");
+  L.push("■ 회사 현황 요약", `${safe(item.industry, "-")} · 매출 ${wonFromMillion(item.revenue)} · 직원 ${safe(item.empCount, "-")}명 · 업력 ${safe(item.estYears, "-")}년 · 상담 단계 ${stageOf(item.stage).label}`);
+  if (item.concern) L.push(`주요 고민: ${item.concern}`);
+  if (item.financialSummary) {
+    const fs = item.financialSummary;
+    if (mode === "internal") {
+      L.push("", "■ [내부] 재무자료 1차 분석(추출 후보 · 확정 아님)");
+      if ((fs.numbers || []).length) L.push("· 주요 숫자: " + fs.numbers.map((n) => `${n.label} ${n.display}`).join(" · "));
+      if ((fs.highlights || []).length) L.push("· 눈에 띄는 항목: " + fs.highlights.join(" · "));
+      (fs.reviewCandidates || []).slice(0, 4).forEach((r) => L.push("· 검토 후보: " + r));
+    } else {
+      L.push("", "■ 재무자료 참고", "제공된 자료 기준으로 일부 재무 항목은 추가 확인해보면 좋겠습니다. 실제 적용 여부는 재무제표 원본과 세부 계정 확인 후 판단이 필요합니다.");
+    }
+  }
+  L.push("", "■ 지금 점검이 필요한 이유", visitReasonText(item, mode), "");
+  L.push("■ 우선 검토 후보 TOP 3");
+  recos.forEach((r, i) => { L.push(`${i + 1}. ${r.name}`, `   · 점검 포인트: ${mode === "internal" ? r.reason : "대표님 상황에서 한 번 확인해보면 좋은 부분입니다."}`, `   · 필요 자료: ${r.docs.join(", ")}`, `   · 유의: ${r.risk}`); });
+  if (mode === "internal") {
+    L.push("", "■ [내부] 영업 포인트 · 리스크 · 다음 액션", `· 핵심 영업 포인트: ${recos[0].name} 중심${recos.length > 1 ? ` → ${recos.slice(1).map((r) => r.name).join(" / ")} 확장` : ""}`, `· 예상 리스크: ${recos[0].risk}`, `· 조심할 표현: 효과·수급·인증을 단정하지 말 것 → "검토 가능성 · 자료 확인 후 판단 · 세무사 검토 권장"으로`, `· 다음 액션: ${item.nextAction || "자료 요청"} → 자료 확인 후 2차 미팅 제안`);
+  }
+  L.push("", "■ 추가로 확인하면 좋은 항목", extraCheckItems(item).join(", "), "");
+  L.push("■ 요청 자료 체크리스트");
+  visitRequestDocs(item).forEach((d) => L.push(`☐ ${d}`));
+  L.push("", "■ 다음 미팅 제안", "자료 확인 후 실제 적용 가능성이 있는 부분만 추려서 다시 정리드리겠습니다. 부담 없이 현재 상황과 우선순위만 함께 확인하는 자리로 봐주시면 됩니다.", "");
+  L.push(div, `담당: ${p.consultant} ${p.title} · ${p.org}`);
+  if (p.phone) L.push(`연락처: ${p.phone}`);
+  if (p.email) L.push(`이메일: ${p.email}`);
+  L.push("", `※ ${p.footer}`, div);
+  return L.join("\n");
+}
+
 export {
+  buildVisitReport,
   PKG_CATEGORIES, buildDefaultPackages, DEFAULT_PACKAGES, matchPackages, buildProposal,
   SCOPE_TEMPLATES, PKG_DURATION, SCOPE_EXCLUDED, scopeItems, pkgDuration, buildScopeDoc, buildQuoteText, scopeKakaoSet,
   PROPOSAL_STATES, CONTRACT_CHECKLIST, recoReason, topRecommendations, buildKakaoSet, buildDocRequestText,

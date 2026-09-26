@@ -34,6 +34,7 @@ import {
   buildProposal,
   buildQuoteText,
   buildScopeDoc,
+  buildVisitReport,
   getAffordSettings,
   insuranceSim,
   manToText,
@@ -50,8 +51,9 @@ const CATALOG_BUCKET = 'catalog'
 
 const inputClass = 'mt-1 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.95rem] text-slate-800 focus:border-brand-500 focus:outline-none'
 
-type DocKey = 'client' | 'internal' | 'scope' | 'quote' | 'kakao' | 'docs'
+type DocKey = 'visit' | 'client' | 'internal' | 'scope' | 'quote' | 'kakao' | 'docs'
 const DOCS: { key: DocKey; label: string }[] = [
+  { key: 'visit', label: '방문 리포트' },
   { key: 'client', label: '제안서 (대표님 공유용)' },
   { key: 'internal', label: '제안서 (내부용)' },
   { key: 'scope', label: '업무범위서' },
@@ -177,8 +179,10 @@ function ProposalWork({ record, catalog, onSave }: { record: ClientOpsRecord; ca
   const docItem = { ...item, ...(premium > 0 ? { proposalMonthlyPremium: premium, proposalMonths: months, proposalRefundRate: rate } : {}), ...(net ? { netIncome: net } : {}) }
 
   const docText = (() => {
-    if (picked.length === 0 && doc !== 'kakao' && doc !== 'docs') return ''
+    if (picked.length === 0 && doc !== 'kakao' && doc !== 'docs' && doc !== 'visit') return ''
     switch (doc) {
+      case 'visit':
+        return buildVisitReport(docItem, 'client', profile)
       case 'client':
         return buildProposal(docItem, picked, 'client', profile)
       case 'internal':
@@ -283,7 +287,7 @@ function ProposalWork({ record, catalog, onSave }: { record: ClientOpsRecord; ca
       {/* 문서 */}
       <Surface className="flex flex-col gap-3">
         <h2 className="t-section text-slate-900">문서 · 문구</h2>
-        <div role="group" aria-label="문서 종류" data-testid="proposal-docs" className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-6">
+        <div role="group" aria-label="문서 종류" data-testid="proposal-docs" className="grid grid-cols-2 gap-1 sm:grid-cols-4 xl:grid-cols-7">
           {DOCS.map((x) => (
             <button key={x.key} type="button" aria-pressed={doc === x.key} onClick={() => setDoc(x.key)} className={`tap rounded-(--radius-control) border px-2 py-2 text-[0.85rem] font-semibold break-keep ${doc === x.key ? 'border-brand-500 bg-brand-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
               {x.label}

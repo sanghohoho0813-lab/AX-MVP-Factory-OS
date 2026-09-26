@@ -1,4 +1,4 @@
-import { KanbanSquare, PackageSearch, Presentation, type LucideIcon } from 'lucide-react'
+import { KanbanSquare, Library, PackageSearch, Presentation, type LucideIcon } from 'lucide-react'
 
 /**
  * 영업 관리 안의 탭 목록 (D-114) — 사이드바 '영업 관리' 한 줄이 이 주소들을 모두 맡는다.
@@ -16,6 +16,8 @@ export const SALES_TABS: SalesTab[] = [
   { to: '/sales/meeting', label: '미팅 준비', icon: Presentation },
   // D-114 3단계 — 상품표 40 · 제안서 · 업무범위서 · 월납 제안 · 계약 준비
   { to: '/sales/proposal', label: '상품·제안', icon: PackageSearch },
+  // D-114 4단계 — 영업 전략 17 · 크레탑 무기 34 · 절세 전략 25 · 주제별 연락할 고객
+  { to: '/sales/strategy', label: '전략', icon: Library },
 ]
 
 export const SALES_TAB_PATHS = SALES_TABS.map((t) => t.to)

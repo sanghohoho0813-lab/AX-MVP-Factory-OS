@@ -364,6 +364,62 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   await ctx.close()
 }
 
+/* ---- D-114 4단계: 전략 라이브러리 · 영업 신호 · 성과 지표 · 방문 리포트 ---- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e).slice(0, 160)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(() => {
+    const k = 'axmvp.v1.operations_clients'
+    const list = JSON.parse(localStorage.getItem(k) ?? '[]')
+    const now = Date.now()
+    const iso = (d) => new Date(now - d * 86400000).toISOString()
+    const s = (stage, more = {}) => ({ stage, source: '', referrer: '', interests: [], concern: '', expectedFee: null, history: [{ at: iso(80), from: null, to: stage }], movedAt: iso(80), ...more })
+    list.push(
+      { id: 'sig_overdue', workspaceId: null, companyName: '날짜지남상사', status: 'waiting', nextAction: '자료 받기', nextActionDueDate: new Date(now - 5 * 86400000).toISOString().slice(0, 10), createdAt: iso(80), updatedAt: iso(80), sales: s('m1done', { interests: ['연구소'] }) },
+      { id: 'sig_quiet', workspaceId: null, companyName: '조용한정밀', industry: '금속 제조', status: 'waiting', createdAt: iso(80), updatedAt: iso(80), sales: s('hold') },
+    )
+    localStorage.setItem(k, JSON.stringify(list))
+  })
+  await page.goto(BASE + '/sales/board', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  const sig = page.getByTestId('sales-signals')
+  check('보드: 지금 챙길 영업 · 다시 연락할 곳 두 칸', ((await sig.innerText()) ?? '').includes('지금 챙길 영업') && (await sig.innerText()).includes('다시 연락할 곳'))
+  await sig.getByRole('button', { name: /지금 챙길 영업/ }).click()
+  check('보드: 날짜 지난 곳이 이유와 함께', /날짜지남상사[\s\S]*다음 할 일 날짜 5일 지남/.test((await sig.innerText()) ?? ''))
+  await sig.getByRole('button', { name: /다시 연락할 곳/ }).click()
+  check('보드: 보류가 길어진 곳 · 연락 문구 복사', ((await sig.innerText()) ?? '').includes('조용한정밀') && (await sig.getByRole('button', { name: '연락 문구' }).count()) >= 1)
+
+  await page.goto(BASE + '/sales/strategy', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  check('전략: 영업 관리 안의 네 번째 탭', ((await page.getByTestId('sales-tabs').innerText()) ?? '').includes('전략') && ((await page.locator('aside a[aria-current="page"]').innerText()) ?? '').includes('영업 관리'))
+  check('전략: 전체 76 (영업 전략 17 · 크레탑 무기 34 · 절세 전략 25)', ((await page.getByTestId('library-count').innerText()) ?? '').trim() === '76개')
+  await page.getByTestId('library-source').getByRole('button', { name: /크레탑 무기/ }).click()
+  check('전략: 크레탑 무기만 34', ((await page.getByTestId('library-count').innerText()) ?? '').trim() === '34개')
+  await page.getByTestId('library-source').getByRole('button', { name: /^전체/ }).click()
+  await page.getByLabel('전략 찾기').fill('가지급금')
+  const n = Number(((await page.getByTestId('library-count').innerText()) ?? '').replace(/\D/g, ''))
+  check('전략: 찾기로 좁힌다', n > 0 && n < 76, String(n))
+  await page.getByTestId('library-list').locator('li').first().getByRole('button').first().click()
+  check('전략: 펼치면 복사 단추', (await page.getByTestId('library-list').getByRole('button', { name: '복사' }).count()) >= 1)
+  const topics = (await page.getByTestId('topic-list').innerText()) ?? ''
+  check('전략: 주제별 연락할 고객 — 연구소 관심 · 제조 업종', /연구소\/인증[\s\S]*날짜지남상사/.test(topics) && topics.includes('조용한정밀'), topics.slice(0, 300))
+
+  await page.goto(BASE + '/kpi', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  const kpiText = (await page.locator('main').innerText()) ?? ''
+  check('성과 지표: 영업 묶음 — 진행 중인 영업 · 전환 · 걸린 날', kpiText.includes('진행 중인 영업') && kpiText.includes('잠재고객 → 계약 전환') && kpiText.includes('계약까지 걸린 날'))
+
+  await page.goto(BASE + '/sales/proposal?client=sig_overdue', { waitUntil: 'networkidle' })
+  await page.getByTestId('proposal-docs').getByRole('button', { name: '방문 리포트' }).click()
+  check('방문 리포트: 사전 점검 리포트 · 담당자 = 로그인한 사람', /\[법인컨설팅 사전 점검 리포트\][\s\S]*담당: 김상호 대표/.test((await page.getByTestId('proposal-doc').innerText()) ?? ''))
+  check('JS 오류 없음 (4단계)', errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\nsales: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

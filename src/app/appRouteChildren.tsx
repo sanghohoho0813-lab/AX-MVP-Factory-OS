@@ -39,6 +39,7 @@ const OperationsClientDetailPage = lazy(() => import('../pages/OperationsClientD
 const OpsCalendarPage = lazy(() => import('../pages/OpsCalendarPage').then((m) => ({ default: m.OpsCalendarPage })))
 const AgentSettlementPage = lazy(() => import('../pages/AgentSettlementPage').then((m) => ({ default: m.AgentSettlementPage })))
 // D-103: 영업자용 1차 미팅 체크리스트가 들어올 자리
+const StrategyLibraryPage = lazy(() => import('../pages/sales/StrategyLibraryPage').then((m) => ({ default: m.StrategyLibraryPage })))
 const ProposalPage = lazy(() => import('../pages/sales/ProposalPage').then((m) => ({ default: m.ProposalPage })))
 const MeetingPrepPage = lazy(() => import('../pages/sales/MeetingPrepPage').then((m) => ({ default: m.MeetingPrepPage })))
 const SalesBoardPage = lazy(() => import('../pages/sales/SalesBoardPage').then((m) => ({ default: m.SalesBoardPage })))
@@ -399,6 +400,7 @@ export const appRouteChildren = [
       { path: 'sales/board', element: <SalesBoardPage /> },
       { path: 'sales/meeting', element: <MeetingPrepPage /> },
       { path: 'sales/proposal', element: <ProposalPage /> },
+      { path: 'sales/strategy', element: <StrategyLibraryPage /> },
       { path: 'ops/clients/:clientId', element: <OperationsClientDetailPage /> },
       // 컨설팅 작업실 — 특허 × 벤처 × MVP 단계 엔진
       { path: 'studio', element: <ConsultingStudioPage /> },

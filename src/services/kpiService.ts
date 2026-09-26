@@ -19,7 +19,7 @@ import { daysLeftFrom } from './clientOpsAlerts'
 import { netAmountOf } from './feeMath'
 import { formatKrw } from '../lib/format'
 
-export type KpiGroup = 'cost' | 'revenue' | 'scale' | 'adoption'
+export type KpiGroup = 'cost' | 'revenue' | 'sales' | 'scale' | 'adoption'
 
 /**
  * measured          근거가 충분해 값을 믿을 수 있다
@@ -47,6 +47,7 @@ export interface KpiMetric {
 export const KPI_GROUP_LABEL: Record<KpiGroup, string> = {
   cost: '비용 · 시간',
   revenue: '매출 · 돈',
+  sales: '영업',
   scale: '규모',
   adoption: '실제 사용',
 }
@@ -315,15 +316,71 @@ function adoptionMetrics(input: KpiInput): KpiMetric[] {
 }
 
 /* ------------------------------------------------------------------ */
+/* 영업 (D-114) — 영업 칸(단계 이력)에서만 센다                           */
+/* ------------------------------------------------------------------ */
+
+const FLOW = new Set(['lead', 'm1sched', 'm1done', 'm2', 'closing'])
+
+function salesMetrics(input: KpiInput): KpiMetric[] {
+  const live = input.records.filter((r) => r.archivedAt === null && r.sales)
+  const inFlow = live.filter((r) => FLOW.has(r.sales!.stage))
+  const fee = inFlow.reduce((s, r) => s + (r.sales!.expectedFee ?? 0), 0)
+  // 잠재 고객에서 시작한 업체(영업 칸이 생길 때 잠재 고객이었던 곳) 중 계약 완료에 닿은 비율
+  const started = input.records.filter((r) => r.sales && r.sales.history[0]?.to === 'lead' && r.sales.history[0]?.from === null)
+  const won = started.filter((r) => r.sales!.history.some((h) => h.to === 'contracted'))
+  const closedOut = started.filter((r) => r.sales!.history.some((h) => h.to === 'contracted' || h.to === 'lost'))
+  const days = won
+    .map((r) => {
+      const a = Date.parse(r.sales!.history[0].at)
+      const b = Date.parse(r.sales!.history.find((h) => h.to === 'contracted')!.at)
+      return Number.isFinite(a) && Number.isFinite(b) ? Math.max(0, Math.round((b - a) / 86_400_000)) : null
+    })
+    .filter((d): d is number => d !== null)
+    .sort((x, y) => x - y)
+  const median = days.length ? days[Math.floor(days.length / 2)] : null
+
+  return [
+    {
+      key: 'sales_pipeline',
+      group: 'sales',
+      label: '진행 중인 영업',
+      value: `${inFlow.length}곳 · 예상 수임료 ${formatKrw(fee)}`,
+      basis: inFlow.length,
+      status: inFlow.length === 0 ? 'unknown' : 'measured',
+      method: '영업 단계가 잠재 고객 ~ 3차 클로징인 업체 수와 그 예상 수임료 합. 영업 관리 보드와 같은 기준.',
+    },
+    {
+      key: 'sales_win_rate',
+      group: 'sales',
+      label: '잠재고객 → 계약 전환',
+      value: closedOut.length === 0 ? null : `${Math.round((won.length / closedOut.length) * 100)}% (${won.length}/${closedOut.length})`,
+      basis: closedOut.length,
+      status: statusFor(closedOut.length),
+      method: '잠재 고객으로 시작한 업체 중 결론이 난 곳(계약 완료 또는 이탈)에서 계약 완료 비율. 아직 진행 중인 곳은 빼고 센다.',
+      caution: '영업 관리(D-114) 이전 업체는 단계 이력이 없어 들어가지 않는다.',
+    },
+    {
+      key: 'sales_days_to_win',
+      group: 'sales',
+      label: '잠재고객 → 계약까지 걸린 날 (가운데 값)',
+      value: median === null ? null : `${median}일`,
+      basis: days.length,
+      status: statusFor(days.length),
+      method: '잠재 고객으로 등록한 날부터 계약 완료로 옮긴 날까지. 여러 곳의 가운데 값.',
+    },
+  ]
+}
+
+/* ------------------------------------------------------------------ */
 /* 전체                                                                 */
 /* ------------------------------------------------------------------ */
 
 export function buildKpis(input: KpiInput): KpiMetric[] {
-  return [...costMetrics(input), ...revenueMetrics(input), ...scaleMetrics(input), ...adoptionMetrics(input)]
+  return [...costMetrics(input), ...revenueMetrics(input), ...salesMetrics(input), ...scaleMetrics(input), ...adoptionMetrics(input)]
 }
 
 export function kpisByGroup(metrics: KpiMetric[]): { group: KpiGroup; items: KpiMetric[] }[] {
-  const order: KpiGroup[] = ['cost', 'revenue', 'scale', 'adoption']
+  const order: KpiGroup[] = ['cost', 'revenue', 'sales', 'scale', 'adoption']
   return order.map((group) => ({ group, items: metrics.filter((m) => m.group === group) }))
 }
 

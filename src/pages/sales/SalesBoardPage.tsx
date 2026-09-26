@@ -14,7 +14,9 @@ import { Link, useNavigate } from 'react-router-dom'
 import { ChevronRight, CirclePlus, KanbanSquare, Presentation, Search } from 'lucide-react'
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useToast } from '../../components/ui/toastContext'
-import { MetricTile, ScreenTitle } from '../../components/ui/primitives'
+import { Badge, Disclosure, MetricTile, ScreenTitle } from '../../components/ui/primitives'
+import { CopyButton } from '../../components/sales/salesParts'
+import { salesRecontacts, salesRisks } from '../../services/salesSignals'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { SalesTabs } from '../../components/sales/SalesTabs'
@@ -274,6 +276,9 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
     return { inFlow: inFlow.length, fee, wonThisMonth, stale, parked: all.hold.length + all.lost.length }
   }, [all, today])
 
+  const risks = useMemo(() => salesRisks(records, today), [records, today])
+  const recontacts = useMemo(() => salesRecontacts(records), [records])
+
   const move = useCallback(
     async (record: ClientOpsRecord, stage: SalesStage) => {
       const next = withSalesStage(record, stage)
@@ -378,6 +383,41 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
           hint={`보류·이탈 ${stats.parked}곳은 따로`}
         />
       </section>
+
+      {/* D-114 4단계: 원본 '영업 위험 신호' · '재접촉 명분' — 있을 때만, 접어서 */}
+      {(risks.length > 0 || recontacts.length > 0) && (
+        <div className="grid gap-2.5 xl:grid-cols-2" data-testid="sales-signals">
+          {risks.length > 0 && (
+            <Disclosure title="지금 챙길 영업" hint={`${risks.length}곳 · ${risks[0].record.companyName} — ${risks[0].reason}`} badge={<Badge tone="warning">{risks.length}</Badge>}>
+              <ul className="flex flex-col divide-y divide-slate-100">
+                {risks.map((r) => (
+                  <li key={r.record.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+                    <button type="button" onClick={() => open(r.record)} className="t-sub font-bold text-slate-900 hover:text-brand-700 hover:underline">{r.record.companyName}</button>
+                    <span className="t-sub text-warning-700">{r.reason}</span>
+                    <Link to={`/sales/meeting?client=${r.record.id}`} className="t-meta ml-auto font-semibold text-brand-700 hover:underline">{r.action} →</Link>
+                  </li>
+                ))}
+              </ul>
+            </Disclosure>
+          )}
+          {recontacts.length > 0 && (
+            <Disclosure title="다시 연락할 곳" hint={`${recontacts.length}곳 · 오래 조용하거나 보류가 길어진 곳`} badge={<Badge>{recontacts.length}</Badge>}>
+              <ul className="flex flex-col divide-y divide-slate-100">
+                {recontacts.map((r) => (
+                  <li key={r.record.id} className="flex flex-col gap-1 py-2">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <button type="button" onClick={() => open(r.record)} className="t-sub font-bold text-slate-900 hover:text-brand-700 hover:underline">{r.record.companyName}</button>
+                      <span className="t-meta text-slate-400">{r.days >= 999 ? '기록 없음' : `${r.days}일 조용함`}</span>
+                      <span className="ml-auto"><CopyButton text={r.ment} label="연락 문구" /></span>
+                    </span>
+                    {r.reasons.map((x) => <span key={x} className="t-meta break-keep text-slate-500">· {x}</span>)}
+                  </li>
+                ))}
+              </ul>
+            </Disclosure>
+          )}
+        </div>
+      )}
 
       {liveCount > 0 && (
         <div className="relative w-full min-w-0 sm:max-w-md">

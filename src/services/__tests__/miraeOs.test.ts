@@ -91,6 +91,9 @@ import {
   manToText,
   matchPackages,
 } from '../salesProposal'
+import { CRETOP_WEAPONS, PROPOSAL_TOPICS, TAX_STRATEGIES } from '../salesLibrary'
+import { customersForTopic, lastSalesTouch, salesRecontacts, salesRisks } from '../salesSignals'
+import { buildVisitReport } from '../salesProposal'
 import { catalogWithPrices, cleanPrices, feeSum, toProposalItem, withContractFromProposal, withContractPrep, withProposal } from '../salesOffer'
 import { digitsOf, formatNumberOf, numberSegments } from '../../lib/format'
 import { agentLedger, agentLedgerTotals, agentShares, feeMathOf, feeTotals, marginPct, marginText, netAmountOf } from '../feeMath'
@@ -529,7 +532,7 @@ check('funding: 14일 내 미접수만', fd.length === 1 && fd[0].programName ==
   const kpis = buildKpis({ records: [k1, k2], journal: kj, events: [], today: TODAY })
   const by = (key: string) => kpis.find((m) => m.key === key)!
 
-  check('kpi: 11개 지표가 4그룹으로 나뉜다', kpis.length === 11 && kpisByGroup(kpis).every((g) => g.items.length >= 2))
+  check('kpi: 14개 지표가 5그룹으로 나뉜다 (D-114 영업 3개)', kpis.length === 14 && kpisByGroup(kpis).length === 5 && kpisByGroup(kpis).every((g) => g.items.length >= 2))
   check('kpi: 잴 수 없는 것은 값 없이 방법만', by('first_action_minutes').value === null && by('first_action_minutes').status === 'unknown' && by('first_action_minutes').method.length > 20)
   check('kpi: 예정일 지난 미수금 — 보관 업체는 제외', by('overdue_receivables_now').value === '1건 · 2,000,000원')
   check('kpi: 근거가 적으면 기준선 만드는 중', by('overdue_receivables_now').status === 'baseline_forming')
@@ -1464,7 +1467,63 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('계약 완료: 계약함 · 계약일 · 영업 단계 · 제안 상태', k1.status === 'active' && k1.contract.signedAt === '2026-09-28' && k1.sales?.stage === 'contracted' && k1.sales.proposal?.status === '계약 완료')
   check('계약 완료: 상품마다 수금 항목(계약금 · 상품표 가격 원)', k1.fees.length === rec.fees.length + 3 && k1.fees.some((f) => f.label === '가업승계 사전점검 패키지' && f.amount === 5_000_000 && f.kind === 'deposit'))
   check('계약 완료: 두 번 눌러도 수금 항목은 한 번', withContractFromProposal(k1, pkgs).fees.length === k1.fees.length)
-  check('탭: 영업 보드 · 미팅 준비 · 상품·제안', SALES_TABS.map((t) => t.label).join() === '영업 보드,미팅 준비,상품·제안' && moduleForPath('/sales/proposal')?.key === 'sales')
+  check('탭: 영업 보드 · 미팅 준비 · 상품·제안', SALES_TABS.map((t) => t.label).slice(0, 3).join() === '영업 보드,미팅 준비,상품·제안' && moduleForPath('/sales/proposal')?.key === 'sales')
+}
+
+/* ------------------------------------------------------------------ */
+/* D-114 4단계 — 전략 라이브러리 · 영업 신호 · 성과 지표 영업 묶음            */
+/* ------------------------------------------------------------------ */
+{
+  const now = new Date('2026-09-26T03:00:00.000Z')
+  const today = '2026-09-26'
+  const ago = (d: number) => new Date(now.getTime() - d * 86_400_000).toISOString()
+  check('라이브러리: 크레탑 무기 34(5분류) · 절세 전략 25 · 제안 주제 7', CRETOP_WEAPONS.reduce((n, g) => n + g.items.length, 0) === 34 && CRETOP_WEAPONS.length === 5 && TAX_STRATEGIES.length === 25 && PROPOSAL_TOPICS.length === 7)
+  check('라이브러리: 문구가 원본 그대로', CRETOP_WEAPONS.every((g) => g.items.every((w) => salesAppSource.includes(w.q))) && TAX_STRATEGIES.every((t) => salesAppSource.includes(`["${t.name}", "${t.cat}"`)))
+
+  const mk = (id: string, extra: Record<string, unknown>) =>
+    normalizeClientOps({ id, workspaceId: null, companyName: id, status: 'waiting', createdAt: ago(100), updatedAt: ago(100), ...extra })
+  const sales = (stage: string, more: Record<string, unknown> = {}) => ({ stage, source: '', referrer: '', interests: [], concern: '', expectedFee: null, history: [{ at: ago(10), from: null, to: stage }], movedAt: ago(10), ...more })
+  const overdue = mk('지난일', { nextActionDueDate: '2026-09-20', sales: sales('m1done') })
+  const proposed = mk('제안후', { sales: sales('m2', { proposal: { packages: ['a'], feeManwon: 100, status: '제안 완료', at: '2026-09-10' } }), activity: [{ id: 'x', kind: 'sales', text: 't', serviceKey: null, at: ago(9) }] })
+  const quoted = mk('견적후', { sales: sales('m2', { proposal: { packages: ['a'], feeManwon: 100, status: '견적 전달', at: '2026-09-10' } }), activity: [{ id: 'y', kind: 'sales', text: 't', serviceKey: null, at: ago(1) }] })
+  const bigFee = mk('큰수임료', { sales: sales('lead', { expectedFee: 5_000_000 }), activity: [{ id: 'z', kind: 'sales', text: 't', serviceKey: null, at: ago(1) }], nextAction: '연락' })
+  const won = mk('계약함', { status: 'active', nextActionDueDate: '2026-09-01', sales: sales('contracted') })
+  const calm = mk('조용함', { sales: sales('lead'), nextAction: '연락', activity: [{ id: 'w', kind: 'sales', text: 't', serviceKey: null, at: ago(1) }] })
+  const risks = salesRisks([overdue, proposed, quoted, bigFee, won, calm], today, now)
+  const reasonOf = (id: string) => risks.find((r) => r.record.id === id)?.reason ?? ''
+  check('신호: 다음 할 일 날짜 지남 (6일)', reasonOf('지난일') === '다음 할 일 날짜 6일 지남', reasonOf('지난일'))
+  check('신호: 제안 완료 7일 후속 없음', reasonOf('제안후') === '제안 완료 후 7일 이상 후속 없음', reasonOf('제안후'))
+  check('신호: 견적 전달 7일 변화 없음', reasonOf('견적후') === '견적 전달 후 7일 이상 변화 없음')
+  check('신호: 예상 수임료 300만+ 인데 미팅 기록 없음', reasonOf('큰수임료') === '예상 수임료 높은데 미팅 기록 없음')
+  check('신호: 계약 완료 · 이상 없는 곳은 안 뜬다', reasonOf('계약함') === '' && reasonOf('조용함') === '')
+  check('신호: 마지막 활동 = 활동 · 미팅 · 단계 · 수정 중 가장 최근', lastSalesTouch(quoted) === ago(1) && lastSalesTouch(mk('빈', {})) === ago(100))
+
+  const old = mk('오래됨', { employeeCount: '12명', sales: sales('m1done', { interests: ['연구소'], movedAt: ago(80), history: [{ at: ago(80), from: null, to: 'm1done' }] }) })
+  const held = mk('보류됨', { sales: sales('hold', { movedAt: ago(40), history: [{ at: ago(40), from: null, to: 'hold' }] }), activity: [{ id: 'h', kind: 'sales', text: 't', serviceKey: null, at: ago(40) }] })
+  const fresh = mk('최근', { employeeCount: '30', sales: sales('lead'), activity: [{ id: 'f', kind: 'sales', text: 't', serviceKey: null, at: ago(2) }] })
+  const rc = salesRecontacts([old, held, fresh], now)
+  check('다시 연락: 60일 조용 · 보류 30일 지남만, 오래된 순', rc.map((r) => r.record.id).join() === '오래됨,보류됨', rc.map((r) => r.record.id).join())
+  check('다시 연락: 직원만 있다고 올리지 않는다(원본과 다른 점)', !rc.some((r) => r.record.id === '최근'))
+  check('다시 연락: 이유 2개까지 · 연락 문구', rc[0].reasons.length === 2 && rc[0].reasons[1].includes('고용지원금') && rc[0].ment.startsWith('오래됨 대표님, 최근 60일'))
+
+  const topicRd = PROPOSAL_TOPICS.find((t) => t.key === 'rd')!
+  const rdHit = customersForTopic([mk('연구', { sales: sales('lead', { interests: ['연구소'] }) }), mk('제조사', { industry: '금속 제조', sales: sales('lead') }), mk('무관', { sales: sales('lead') }), { ...mk('보관', { sales: sales('lead', { interests: ['연구소'] }) }), archivedAt: ago(1) }], topicRd)
+  check('주제별 고객: 관심사 · 업종 낱말로, 보관 · 이탈 빼고', rdHit.map((r) => r.id).join() === '연구,제조사', rdHit.map((r) => r.id).join())
+
+  const vr = buildVisitReport({ name: '대성정밀', industry: '제조업', revenue: 3500, empCount: 26, estYears: 18, ceoAge: 58, interests: ['가업승계'], stage: 'meeting1_scheduled' }, 'client', { consultant: '김상호', title: '대표', org: '미래' })
+  check('방문 리포트: 사전 점검 · TOP3 · 담당자 줄', vr.includes('[법인컨설팅 사전 점검 리포트]') && vr.includes('우선 검토 후보 TOP 3') && vr.includes('담당: 김상호 대표 · 미래'))
+
+  // 성과 지표 — 영업 묶음
+  const k1 = mk('k1', { sales: { ...sales('contracted'), history: [{ at: ago(30), from: null, to: 'lead' }, { at: ago(10), from: 'lead', to: 'contracted' }] } })
+  const k2 = mk('k2', { sales: { ...sales('lost'), history: [{ at: ago(30), from: null, to: 'lead' }, { at: ago(5), from: 'lead', to: 'lost' }] } })
+  const k3 = mk('k3', { sales: sales('m2', { expectedFee: 2_000_000, history: [{ at: ago(3), from: null, to: 'lead' }] }) })
+  const kp = buildKpis({ records: [k1, k2, k3], journal: [], events: [], today })
+  const kv = (key: string) => kp.find((m) => m.key === key)
+  check('성과 지표: 영업 묶음 — 진행 중 1곳 · 예상 수임료', kv('sales_pipeline')?.value?.startsWith('1곳') === true && kv('sales_pipeline')?.group === 'sales', kv('sales_pipeline')?.value ?? '')
+  check('성과 지표: 전환 50% (1/2, 진행 중은 빼고)', kv('sales_win_rate')?.value === '50% (1/2)' && kv('sales_win_rate')?.status === 'baseline_forming', kv('sales_win_rate')?.value ?? '')
+  check('성과 지표: 계약까지 20일', kv('sales_days_to_win')?.value === '20일')
+  check('성과 지표: 묶음 순서 — 매출 다음 영업', kpisByGroup(kp).map((g) => g.group).join() === 'cost,revenue,sales,scale,adoption')
+  check('탭: 영업 보드 · 미팅 준비 · 상품·제안 · 전략', SALES_TABS.map((t) => t.label).join() === '영업 보드,미팅 준비,상품·제안,전략' && moduleForPath('/sales/strategy')?.key === 'sales')
 }
 
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)
