@@ -2,6 +2,7 @@
  * 공유 라우트 정의 — local·supabase 두 라우터가 재사용한다.
  * (App.tsx 에서 추출; 도메인 페이지는 route-level lazy loading 유지)
  */
+import { RouteErrorScreen } from '../components/layout/RouteErrorScreen'
 import { Suspense, lazy, type ReactElement } from 'react'
 import { Navigate } from 'react-router-dom'
 import { MODULE_PAGES } from '../data/modules'
@@ -534,8 +535,10 @@ export const appRouteChildren = [
       { path: '*', element: <Navigate to="/" replace /> },
 ]
 
+// D-120: 고객이 여는 공개 화면에도 오류 화면(기본 라우터 오류 화면 대신)
 export const publicSurveyRoute = {
   path: '/survey/:accessToken',
+  errorElement: <RouteErrorScreen />,
   element: (
     <Suspense fallback={<RouteFallback />}>
       <PublicSurveyPage />
@@ -545,6 +548,7 @@ export const publicSurveyRoute = {
 
 export const publicTestRoute = {
   path: '/test/:accessToken',
+  errorElement: <RouteErrorScreen />,
   element: (
     <Suspense fallback={<RouteFallback />}>
       <LocalTestPage />

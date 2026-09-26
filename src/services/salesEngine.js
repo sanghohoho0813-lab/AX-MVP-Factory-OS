@@ -7,8 +7,10 @@
  * 원본 앱(영업 도구 모음)은 아직 자기 복사본을 쓴다 — 영업 도구 모음을 내릴 때(4단계) 한 벌로 합친다.
  */
 
+// [D-120] 로컬(한국) 날짜 — 원본은 UTC 날짜라 오전 9시 전에는 어제로 찍혔다
 function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 function money(n) {
   const v = Number(n) || 0;

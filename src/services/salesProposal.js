@@ -9,8 +9,10 @@
  */
 import { STRATEGY_LIBRARY, recommendedStrategiesFor } from "./salesEngine.js";
 
+// [D-120] 로컬(한국) 날짜 — 원본은 UTC 날짜라 오전 9시 전에는 어제로 찍혔다
 function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 function money(n) {
   const v = Number(n) || 0;

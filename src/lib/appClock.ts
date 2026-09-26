@@ -27,6 +27,17 @@ export function todayLocalDate(at: Date = nowDate()): string {
 }
 
 /**
+ * 저장된 시각(ISO, UTC) → 로컬 날짜 YYYY-MM-DD (D-120).
+ * `iso.slice(0, 10)` 은 UTC 날짜라 한국 오전 9시 전 기록이 '어제' 로 보였다. 이미 날짜(YYYY-MM-DD)면 그대로.
+ */
+export function localDateOf(iso: string | null | undefined): string {
+  if (!iso) return ''
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? iso.slice(0, 10) : todayLocalDate(d)
+}
+
+/**
  * 테스트 전용 — 고정 시각을 주입한다. null 로 해제.
  * (프로덕션 코드 경로에서는 호출하지 않는다.)
  */

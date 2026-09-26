@@ -42,6 +42,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
   /** 달력에는 마감만이 아니라 내가 적은 할 일도 함께 뜬다 */
   const [journal, setJournal] = useState<JournalEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [ym, setYm] = useState<[number, number]>(() => {
     const [y, m] = today.split('-')
     return [Number(y), Number(m)]
@@ -57,6 +58,10 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
       const [c, j] = await Promise.all([listClients(workspaceId), listJournal(workspaceId)])
       setRecords(c)
       setJournal(j)
+      setLoadError('')
+    } catch (cause) {
+      // D-120: 못 읽으면 빈 달력 대신 알린다
+      setLoadError(cause instanceof Error ? cause.message : '일정을 불러오지 못했습니다.')
     } finally {
       setLoading(false)
     }
@@ -90,13 +95,15 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
     [records],
   )
 
-  const mutate = async (fn: () => Promise<unknown>, done?: string) => {
+  const mutate = async (fn: () => Promise<unknown>, done?: string): Promise<boolean> => {
     try {
       await fn()
       setJournal(await listJournal(workspaceId))
       if (done) showToast(done)
+      return true
     } catch (cause) {
       showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
+      return false
     }
   }
 
@@ -193,6 +200,14 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
         </div>
       </div>
 
+      {loadError && (
+        <p role="alert" className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-danger-200 bg-danger-50 px-4 py-3 text-[0.95rem] text-danger-700">
+          일정을 불러오지 못했습니다 — {loadError}
+          <button type="button" onClick={() => void load()} className="tap font-semibold underline">
+            다시 불러오기
+          </button>
+        </p>
+      )}
       {loading ? (
         <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-10 text-[0.95rem] text-slate-500">
           불러오는 중…
@@ -306,7 +321,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                     date={picked}
                     clients={activeClients}
                     onAdd={(draft) =>
-                      void mutate(
+                      mutate(
                         () =>
                           createJournalEntry(workspaceId, userId, {
                             entryDate: today,

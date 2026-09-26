@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { localDateOf } from '../../lib/appClock'
 import { useParams } from 'react-router-dom'
 import { Phone, Plus } from 'lucide-react'
 import type {
@@ -538,7 +539,7 @@ function ActivityItem({
   return (
     <div className="rounded-(--radius-card) border border-slate-100 bg-slate-50/40 p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[0.875rem] text-slate-400">{activity.occurredAt.slice(0, 10)}</span>
+        <span className="text-[0.875rem] text-slate-400">{localDateOf(activity.occurredAt)}</span>
         <OutreachChannelBadge channel={activity.channel} />
         {activity.contactRole && <span className="text-[0.875rem] text-slate-500">{activity.contactRole}</span>}
         {internal && (

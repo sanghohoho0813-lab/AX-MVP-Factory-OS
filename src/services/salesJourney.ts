@@ -14,6 +14,7 @@
  * 순수 함수만 둔다. 규칙 계산이다 — 외부 호출 없음.
  */
 
+import { localDateOf } from '../lib/appClock'
 import type { ClientOpsRecord, SalesPath, SalesStage } from '../types/clientOps'
 import { withActivity } from './clientOpsActivity'
 import { canUse, type ModuleAccess } from './moduleAccess'
@@ -256,7 +257,7 @@ export function buildJourney(record: ClientOpsRecord, opts: JourneyOptions): Jou
         label: '크레탑 분석',
         done: !!cretop,
         to: `/sales/new?client=${id}`,
-        note: cretop ? `${cretop.createdAt.slice(0, 10)} 붙임` : '보고서를 넣으면 기본 정보 · 추천 전략이 채워집니다',
+        note: cretop ? `${localDateOf(cretop.createdAt)} 붙임` : '보고서를 넣으면 기본 정보 · 추천 전략이 채워집니다',
       },
       { label: '질문 · 전략 준비', done: cur >= 1 || meetings.length > 0, to: `/sales/meeting?client=${id}&round=1`, note: '1차 대본 · 크레탑 질문 흐름' },
       {
@@ -268,7 +269,7 @@ export function buildJourney(record: ClientOpsRecord, opts: JourneyOptions): Jou
       { label: '1차 미팅 체크리스트 (AX)', done: false, to: '/sales/first-meeting', note: '준비 중 — 들어갈 자리', soon: true },
     ],
     m1: [
-      { label: '1차 미팅 기록', done: had(1), to: `/sales/meeting?client=${id}&round=1`, note: lastM1 ? lastM1.at.slice(0, 10) : '' },
+      { label: '1차 미팅 기록', done: had(1), to: `/sales/meeting?client=${id}&round=1`, note: lastM1 ? localDateOf(lastM1.at) : '' },
       { label: '요청 자료 받기', done: cur >= 2, to: `/ops/clients/${id}?tab=docs`, note: lastM1?.nextDocs.length ? lastM1.nextDocs.slice(0, 3).join(' · ') : `받은 서류 ${docsIn}` },
       { label: '다음 미팅 약속', done: cur >= 2, to: `/ops/clients/${id}`, note: cur === 1 && record.nextActionDueDate ? record.nextActionDueDate : '' },
     ],

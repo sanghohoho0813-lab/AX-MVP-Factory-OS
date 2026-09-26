@@ -42,7 +42,8 @@ export function TodoComposer({
 }: {
   date: string
   clients: { id: string; companyName: string }[]
-  onAdd: (draft: TodoDraft) => void
+  /** false 를 돌려주면(저장 실패) 적은 글을 비우지 않는다 — D-120 */
+  onAdd: (draft: TodoDraft) => void | boolean | Promise<void | boolean>
   autoFocus?: boolean
   compact?: boolean
 }) {
@@ -50,11 +51,14 @@ export function TodoComposer({
   const [clientId, setClientId] = useState('')
   const [open, setOpen] = useState(autoFocus)
 
-  const submit = () => {
+  const [busy, setBusy] = useState(false)
+  const submit = async () => {
     const content = text.trim()
-    if (content === '') return
-    onAdd({ content, dueDate: date, clientId: clientId === '' ? null : clientId })
-    setText('')
+    if (content === '' || busy) return
+    setBusy(true)
+    const ok = await onAdd({ content, dueDate: date, clientId: clientId === '' ? null : clientId })
+    setBusy(false)
+    if (ok !== false) setText('')
   }
 
   if (!open) {

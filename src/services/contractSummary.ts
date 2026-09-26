@@ -8,7 +8,7 @@
 import type { ClientOpsRecord, ContractInfo, ServiceKey } from '../types/clientOps'
 import { CONTRACT_KIND_LABEL } from '../types/clientOps'
 import { SERVICES } from '../content/clientOpsCatalog'
-import { todayLocalDate } from '../lib/appClock'
+import { todayLocalDate, localDateOf } from '../lib/appClock'
 import { formatKrw } from '../lib/format'
 
 function ymd(s: string): [number, number, number] | null {
@@ -127,7 +127,7 @@ export function doneWorks(record: ClientOpsRecord): DoneWork[] {
     .map((s) => ({
       key: s.key,
       label: s.label,
-      at: (record.services[s.key]?.completedAt ?? '').slice(0, 10),
+      at: localDateOf(record.services[s.key]?.completedAt ?? ''),
     }))
     .sort((a, b) => (b.at || '').localeCompare(a.at || ''))
 }

@@ -14,6 +14,7 @@
  */
 
 import { listRows, saveRow } from './moduleData'
+import { todayLocalDate } from '../lib/appClock'
 
 export type ModuleAccessState = 'locked' | 'trial' | 'open'
 
@@ -73,7 +74,8 @@ export function accessLabel(access: Pick<ModuleAccess, 'state' | 'trialEndsAt'>,
 export function trialEndDate(today: string, days = TRIAL_DAYS): string {
   const d = new Date(`${today}T00:00:00`)
   d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
+  // D-120: 로컬 자정을 toISOString 으로 바꾸면 한국에서는 하루 앞 날짜가 됐다(체험이 하루 짧았다)
+  return todayLocalDate(d)
 }
 
 /* ------------------------------------------------------------------ */

@@ -9,7 +9,7 @@
 import { getDataModeConfig } from '../data/dataMode'
 import { getSupabaseClient } from '../lib/supabase/client'
 import { generateId, notifyStoreChanged, readJson, STORAGE_KEYS, writeJson } from '../storage/localStore'
-import { nowIso } from '../lib/appClock'
+import { nowIso, todayLocalDate } from '../lib/appClock'
 import { formatFileSize } from '../lib/format'
 import {
   DOCUMENTS,
@@ -231,7 +231,7 @@ function upgradeFees(raw: Partial<ClientOpsRecord> & LegacyShape): FeeItem[] {
 
   // 예전 계약금·성공보수 두 칸 → 수금 항목으로 승격
   const out: FeeItem[] = []
-  const today = nowIso().slice(0, 10)
+  const today = todayLocalDate()
   if (raw.contractDepositAmount != null || raw.contractDepositReceived) {
     out.push({
       id: 'legacy-deposit',
@@ -888,9 +888,9 @@ export function withFunding(
       const next = { ...a, ...patch, updatedAt: nowIso() }
       // 상태 전환 시 날짜 자동 기록
       if (patch.status && patch.status !== a.status) {
-        if (patch.status === 'submitted' && next.submittedAt === null) next.submittedAt = nowIso().slice(0, 10)
+        if (patch.status === 'submitted' && next.submittedAt === null) next.submittedAt = todayLocalDate()
         if ((patch.status === 'selected' || patch.status === 'rejected') && next.resultAt === null) {
-          next.resultAt = nowIso().slice(0, 10)
+          next.resultAt = todayLocalDate()
         }
       }
       return next
@@ -1048,11 +1048,15 @@ function uploadErrorMessage(raw: string, file: File): string {
   return `파일을 올리지 못했습니다. ${raw}`
 }
 
-export async function uploadDocumentFile(
-  record: ClientOpsRecord,
+/**
+ * 파일만 보관함에 올리고, 업체 기록에 넣을 서류 칸 값을 돌려준다(저장은 하지 않는다) — D-120.
+ * 올리는 동안 다른 칸을 고쳐도 덮어쓰지 않게, 부르는 쪽이 '그때의 최신 기록' 에 이 값을 얹어 저장한다.
+ */
+export async function storeDocumentFile(
+  record: Pick<ClientOpsRecord, 'workspaceId' | 'id'>,
   key: DocumentKey,
   file: File,
-): Promise<ClientOpsRecord> {
+): Promise<Pick<DocumentState, 'received' | 'fileName' | 'fileSize' | 'storagePath'>> {
   if (!canUploadFiles()) {
     throw new Error('파일 보관은 Supabase 클라우드 저장을 연결한 뒤 사용할 수 있습니다.')
   }
@@ -1065,14 +1069,16 @@ export async function uploadDocumentFile(
     .storage.from('client-documents')
     .upload(path, file, { contentType: file.type || 'application/octet-stream' })
   if (error) throw new Error(uploadErrorMessage(error.message, file))
-  return saveClient(
-    withDocument(record, key, {
-      received: true,
-      fileName: file.name,
-      fileSize: file.size,
-      storagePath: path,
-    }),
-  )
+  return { received: true, fileName: file.name, fileSize: file.size, storagePath: path }
+}
+
+export async function uploadDocumentFile(
+  record: ClientOpsRecord,
+  key: DocumentKey,
+  file: File,
+): Promise<ClientOpsRecord> {
+  const patch = await storeDocumentFile(record, key, file)
+  return saveClient(withDocument(record, key, patch))
 }
 
 /**

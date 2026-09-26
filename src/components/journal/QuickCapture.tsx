@@ -20,7 +20,8 @@ export function QuickCapture({
 }: {
   clients: ClientOpsRecord[]
   defaultClientId?: string | null
-  onCreate: (input: CreateJournalInput) => Promise<void>
+  /** false 를 돌려주면(저장 실패) 적은 글을 그대로 둔다 — D-120 */
+  onCreate: (input: CreateJournalInput) => Promise<void | boolean>
   compact?: boolean
   autoFocus?: boolean
 }) {
@@ -47,12 +48,13 @@ export function QuickCapture({
     setBusy(true)
     setError('')
     try {
-      await onCreate({
+      const ok = await onCreate({
         content: text,
         entryType: type,
         clientId: clientId || null,
         dueDate: type === 'follow_up' ? dueDate : '',
       })
+      if (ok === false) return
       setContent('')
       setDueDate('')
       if (type !== 'note') setType('note')

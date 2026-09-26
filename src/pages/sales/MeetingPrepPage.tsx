@@ -46,7 +46,7 @@ import {
   type ScoreTierKey,
   type TranscriptAnalysis,
 } from '../../services/salesEngine'
-import { todayLocalDate } from '../../lib/appClock'
+import { todayLocalDate, localDateOf } from '../../lib/appClock'
 import { SALES_STAGE_LABEL, SALES_STAGE_ORDER, type ClientOpsRecord, type SalesStage } from '../../types/clientOps'
 
 type Round = 0 | 1 | 2 | 3
@@ -85,9 +85,11 @@ function ProfileEditor({ record, onSave }: { record: ClientOpsRecord; onSave: (n
     [s],
   )
   const [d, setD] = useState(init)
-  const [seen, setSeen] = useState(init)
-  if (seen !== init) {
-    setSeen(init)
+  // D-120: 값으로 비교 — 다른 저장(단계 · 계약 경로 …)에 적던 칸이 지워지지 않게
+  const initKey = JSON.stringify(init)
+  const [seen, setSeen] = useState(initKey)
+  if (seen !== initKey) {
+    setSeen(initKey)
     setD(init)
   }
   const dirty = JSON.stringify(d) !== JSON.stringify(init)
@@ -185,11 +187,50 @@ function ProfileEditor({ record, onSave }: { record: ClientOpsRecord; onSave: (n
 /* 미팅 기록                                                             */
 /* ------------------------------------------------------------------ */
 
-function MeetingRecorder({ record, round, today, onSave }: { record: ClientOpsRecord; round: 1 | 2 | 3; today: string; onSave: (next: ClientOpsRecord, msg: string) => void }) {
+/**
+ * 적던 미팅 메모 — 차수 · 고객을 바꾸거나 새로고침해도 이 탭에 남는다(D-120). 저장되면 지운다.
+ * sessionStorage 라 이 브라우저 탭 안에서만 산다(다른 사람 · 다른 기기로 가지 않는다).
+ */
+const draftKey = (id: string, round: number) => `axmvp.meetingDraft.${id}.${round}`
+function readDraft(id: string, round: number): string {
+  try {
+    return sessionStorage.getItem(draftKey(id, round)) ?? ''
+  } catch {
+    return ''
+  }
+}
+function writeDraft(id: string, round: number, text: string) {
+  try {
+    if (text.trim() === '') sessionStorage.removeItem(draftKey(id, round))
+    else sessionStorage.setItem(draftKey(id, round), text)
+  } catch {
+    /* 저장 공간이 없어도 화면은 돈다 */
+  }
+}
+
+/** 미팅에서 받기로 한 자료 → 보낼 카톡 한 덩어리 */
+function docRequestText(record: ClientOpsRecord, docs: string[]): string {
+  const who = record.representativeName || record.contactName || record.companyName
+  return [
+    `${who} 대표님, 오늘 시간 내 주셔서 감사합니다.`,
+    '말씀 나눈 내용을 정확히 검토하려고, 편하실 때 아래 자료를 부탁드립니다.',
+    '',
+    ...docs.map((d, i) => `${i + 1}. ${d}`),
+    '',
+    '사진이나 파일 어느 쪽이든 괜찮습니다. 받는 대로 정리해서 다음 미팅 때 말씀드리겠습니다.',
+  ].join('\n')
+}
+
+function MeetingRecorder({ record, round, today, onSave }: { record: ClientOpsRecord; round: 1 | 2 | 3; today: string; onSave: (next: ClientOpsRecord, msg: string) => Promise<boolean> }) {
   const stage = salesStageOf(record)
   const target = stageAfterMeeting(round)
   const canMove = SALES_STAGE_ORDER.indexOf(target) > SALES_STAGE_ORDER.indexOf(stage) && stage !== 'contracted' && stage !== 'hold' && stage !== 'lost'
-  const [text, setText] = useState('')
+  const [text, setTextState] = useState(() => readDraft(record.id, round))
+  const setText = (v: string) => {
+    setTextState(v)
+    writeDraft(record.id, round, v)
+  }
+  const [saving, setSaving] = useState(false)
   const [result, setResult] = useState<TranscriptAnalysis | null>(null)
   const [move, setMove] = useState(true)
   const [next, setNext] = useState('')
@@ -201,13 +242,19 @@ function MeetingRecorder({ record, round, today, onSave }: { record: ClientOpsRe
     const docs = a.nextDocs.slice(0, 3).join(' · ')
     setNext(round === 3 ? '계약 조건 회신 확인' : `${round + 1}차 미팅 준비${docs ? ` — 자료 받기: ${docs}` : ''}`)
   }
-  const save = () => {
-    if (!result) return
+  const save = async () => {
+    if (!result || saving) return
     let rec = withMeetingNote(record, { round, text, analysis: result, nextAction: next, nextActionDueDate: due })
     if (canMove && move) rec = withSalesStage(rec, target)
-    onSave(rec, `${round}차 미팅을 기록했습니다${canMove && move ? ` · ${SALES_STAGE_LABEL[target]}로 옮김` : ''}.`)
-    setText('')
-    setResult(null)
+    setSaving(true)
+    const ok = await onSave(rec, `${round}차 미팅을 기록했습니다${canMove && move ? ` · ${SALES_STAGE_LABEL[target]}로 옮김` : ''}.`)
+    setSaving(false)
+    // D-120: 저장이 된 뒤에만 비운다 — 실패하면 적은 메모가 그대로 남는다
+    if (ok) {
+      writeDraft(record.id, round, '')
+      setTextState('')
+      setResult(null)
+    }
   }
 
   return (
@@ -254,6 +301,7 @@ function MeetingRecorder({ record, round, today, onSave }: { record: ClientOpsRe
           </dl>
           <ScriptBlock title="다음 미팅 방향" text={result.strategy} />
           <ScriptBlock title="감사 카톡" text={result.kakao} copy />
+          {result.nextDocs.length > 0 && <ScriptBlock title="자료 요청 카톡" text={docRequestText(record, result.nextDocs)} copy />}
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem]">
             <label className="block text-[0.85rem] text-slate-500">
               다음 할 일
@@ -271,8 +319,8 @@ function MeetingRecorder({ record, round, today, onSave }: { record: ClientOpsRe
             </label>
           )}
           <div className="flex justify-end">
-            <Button variant="primary" onClick={save}>
-              기록 저장
+            <Button variant="primary" onClick={() => void save()} disabled={saving}>
+              {saving ? '저장 중…' : '기록 저장'}
             </Button>
           </div>
         </div>
@@ -294,15 +342,16 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (quiet = false) => {
     try {
-      setLoading(true)
+      // D-120: 저장 실패 뒤 다시 읽을 때는 화면을 비우지 않는다(적던 칸이 사라지지 않게)
+      if (!quiet) setLoading(true)
       setRecords(await listClients(workspaceId))
       setError('')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '업체 목록을 불러오지 못했습니다.')
     } finally {
-      setLoading(false)
+      if (!quiet) setLoading(false)
     }
   }, [workspaceId])
   useEffect(() => {
@@ -332,19 +381,22 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
   const strategies = useMemo(() => (item ? recommendedStrategiesFor(item) : []), [item])
   const theme = item ? MEETING_THEMES[detectTheme(item)] : null
 
-  const persist = async (next: ClientOpsRecord, msg: string) => {
+  /** 저장 — 됐으면 true. 실패하면 알리고 저장된 내용으로 조용히 다시 읽는다 */
+  const persist = async (next: ClientOpsRecord, msg: string): Promise<boolean> => {
     if (next === record) {
       showToast(msg)
-      return
+      return true
     }
     setRecords((list) => list.map((r) => (r.id === next.id ? next : r)))
     try {
       const saved = await saveClient(next)
       setRecords((list) => list.map((r) => (r.id === saved.id ? saved : r)))
       showToast(msg)
+      return true
     } catch (cause) {
-      showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
-      void load()
+      showToast(cause instanceof Error ? `${cause.message} — 다시 눌러 주세요.` : '저장하지 못했습니다. 다시 눌러 주세요.')
+      void load(true)
+      return false
     }
   }
 
@@ -458,10 +510,11 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                   record={record}
                   round={round}
                   today={today}
-                  onSave={(n, m) => {
-                    void persist(n, m)
-                    // 기록했으면 다음 차수 대본으로 넘어간다
-                    if (round < 3) setRound((round + 1) as Round)
+                  onSave={async (n, m) => {
+                    const ok = await persist(n, m)
+                    // 기록이 저장됐으면 다음 차수 대본으로 넘어간다(실패하면 적은 메모를 그대로 둔다)
+                    if (ok && round < 3) setRound((round + 1) as Round)
+                    return ok
                   }}
                 />}
 
@@ -471,7 +524,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                     {record.sales?.meetings?.map((m) => (
                       <li key={m.id} className="rounded-(--radius-control) border border-slate-200 bg-white p-3">
                         <p className="t-meta text-slate-500">
-                          {m.at.slice(0, 10)} · {m.round}차 · {m.reaction}
+                          {localDateOf(m.at)} · {m.round}차 · {m.reaction}
                         </p>
                         <p className="t-sub mt-1 break-keep whitespace-pre-line text-slate-700">{m.text}</p>
                         {m.issues.length > 0 && <div className="mt-1.5"><PillList items={m.issues} /></div>}

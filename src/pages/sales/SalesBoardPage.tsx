@@ -37,7 +37,7 @@ import {
 } from '../../services/salesPipeline'
 import { SALES_INTERESTS, SALES_SOURCES, SALES_STALE_DAYS } from '../../content/salesCatalog'
 import { formatKrwCompact, krwTile } from '../../lib/format'
-import { todayLocalDate } from '../../lib/appClock'
+import { todayLocalDate, localDateOf } from '../../lib/appClock'
 import {
   SALES_FLOW_STAGES,
   SALES_STAGE_HINT,
@@ -272,7 +272,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
   const stats = useMemo(() => {
     const month = today.slice(0, 7)
     const { list: inFlow, fee } = salesInFlow(records)
-    const wonThisMonth = all.contracted.filter((r) => (r.sales?.movedAt ?? '').slice(0, 7) === month).length
+    const wonThisMonth = all.contracted.filter((r) => localDateOf(r.sales?.movedAt).slice(0, 7) === month).length
     const stale = inFlow.filter((r) => {
       const d = daysInStage(r)
       return d !== null && d >= SALES_STALE_DAYS
@@ -307,8 +307,9 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
   const create = async (f: ProspectForm) => {
     if (!f.companyName.trim()) return
     setBusy(true)
+    let created: ClientOpsRecord | null = null
     try {
-      const created = await createClient(workspaceId, {
+      created = await createClient(workspaceId, {
         companyName: f.companyName,
         contactName: f.contactName,
         contactPhone: f.contactPhone,
@@ -327,7 +328,16 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
       setPicked('lead')
       showToast(`${saved.companyName} — 잠재고객으로 등록했습니다.`)
     } catch (cause) {
-      showToast(cause instanceof Error ? cause.message : '등록하지 못했습니다.')
+      const msg = cause instanceof Error ? cause.message : '등록하지 못했습니다.'
+      if (created) {
+        // D-120: 업체는 만들어졌는데 영업 칸 저장만 실패 — 다시 누르면 같은 업체가 두 번 생기므로 창을 닫고 목록에 넣는다
+        const made = created
+        setRecords((list) => (list.some((r) => r.id === made.id) ? list : [made, ...list]))
+        setFormOpen(false)
+        showToast(`${made.companyName} 은(는) 만들어졌지만 영업 칸을 저장하지 못했습니다 — 카드에서 다시 고쳐 주세요. (${msg})`)
+      } else {
+        showToast(msg)
+      }
     } finally {
       setBusy(false)
     }

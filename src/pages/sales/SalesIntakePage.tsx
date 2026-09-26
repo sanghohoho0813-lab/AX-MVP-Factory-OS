@@ -9,6 +9,8 @@
  * 분석은 크레탑 분석기와 같은 규칙(analysisCore.js). 결과는 크레탑 분석 이력에도 이 업체로 남는다.
  * ?client=<id> 로 들어오면 그 업체에 붙인다(영업 흐름 · 미팅 준비의 '크레탑 보고서 넣기').
  */
+import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard'
+import { ConfirmModal } from '../../components/ui/ConfirmModal'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Building2, FileUp, ScanSearch, Sparkles } from 'lucide-react'
@@ -96,6 +98,8 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
   const [meetingDate, setMeetingDate] = useState('')
   const [asNew, setAsNew] = useState(false)
   const [saving, setSaving] = useState(false)
+  // D-120: 분석해 놓고 등록 전에 다른 곳으로 가면 묻는다(읽은 보고서 · 적은 칸이 사라지므로)
+  const { blocker, allowNavigation } = useUnsavedChangesGuard(ui !== null && !saving)
 
   const load = useCallback(async () => {
     try {
@@ -163,9 +167,12 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
       const what = res.created ? '잠재고객으로 등록했습니다' : `${res.record.companyName}에 붙였습니다`
       showToast(`${what} — 기본 정보 ${res.filled.length}칸${res.uploaded ? ' · 서류함에 보고서' : ''}.`)
       for (const w of res.warnings) showToast(w)
+      allowNavigation()
       navigate(`/sales/meeting?client=${res.record.id}&round=1`)
     } catch (e) {
-      showToast(e instanceof Error ? e.message : '등록하지 못했습니다.')
+      showToast(`${e instanceof Error ? e.message : '등록하지 못했습니다.'} — 다시 누르면 같은 업체에 이어서 붙입니다.`)
+      // D-120: 업체는 만들어지고 뒤 단계만 실패했을 수 있다 — 목록을 다시 읽어 두면 다시 눌렀을 때 새로 만들지 않고 붙인다
+      void load()
     } finally {
       setSaving(false)
     }
@@ -388,6 +395,16 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
           </>
         )
       )}
+      <ConfirmModal
+        open={blocker.state === 'blocked'}
+        title="아직 등록하지 않았습니다"
+        message="분석한 보고서와 적은 칸이 사라집니다. 이 화면을 나갈까요?"
+        confirmLabel="나가기"
+        cancelLabel="계속 등록"
+        danger
+        onConfirm={() => blocker.proceed?.()}
+        onCancel={() => blocker.reset?.()}
+      />
     </div>
   )
 }

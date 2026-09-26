@@ -17,7 +17,7 @@ import { useToast } from '../ui/toastContext'
 import { canExtractText, extractTextFromFile } from '../../services/docTextExtract'
 import { CONFIDENCE_LABEL, classifyDocument, type ClassifyResult } from '../../services/docClassify'
 import { allDocumentMetas } from '../../services/clientOpsDocuments'
-import { canUploadFiles, saveClient, uploadDocumentFile, withCustomDocument, withDocument } from '../../services/clientOpsService'
+import { canUploadFiles, saveClient, storeDocumentFile, withCustomDocument, withDocument } from '../../services/clientOpsService'
 import { formatFileSize } from '../../lib/format'
 
 /** '새 칸 만들기' 를 뜻하는 고르는 칸 값 */
@@ -130,7 +130,8 @@ export function BulkDocUploadSheet({
           key = it.target
         }
         if (uploadable) {
-          rec = await uploadDocumentFile(rec, key, it.file)
+          // D-120: 파일만 올리고, 기록 저장은 끝에 한 번(파일마다 저장하던 것을 줄였다)
+          rec = withDocument(rec, key, await storeDocumentFile(rec, key, it.file))
         } else {
           // 이 브라우저 모드에는 파일 보관이 없다 — 받았다는 사실과 이름·발급일만 남긴다
           rec = withDocument(rec, key, { received: true, fileName: it.file.name, fileSize: it.file.size })

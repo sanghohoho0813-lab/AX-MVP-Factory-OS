@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { localDateOf } from '../../lib/appClock'
 import { Link } from 'react-router-dom'
 import { CheckCircle2, ExternalLink, Eye, Link2, MessageSquareReply, Plus, Send, Sparkles, Upload } from 'lucide-react'
 import type { ClientOpsRecord, DocumentKey } from '../../types/clientOps'
@@ -102,13 +103,20 @@ export function PortalTab({ record, workspaceId }: { record: ClientOpsRecord; wo
     void load()
   }, [load])
 
-  const run = async (fn: () => Promise<unknown>, done?: string) => {
+  /** 됐으면 true. 도는 동안에는 같은 단추를 다시 못 누른다(D-120 — 두 번 눌러 두 번 요청되던 것) */
+  const [running, setRunning] = useState(false)
+  const run = async (fn: () => Promise<unknown>, done?: string): Promise<boolean> => {
+    setRunning(true)
     try {
       await fn()
       await load()
       if (done) showToast(done)
+      return true
     } catch (cause) {
       showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
+      return false
+    } finally {
+      setRunning(false)
     }
   }
 
@@ -170,7 +178,7 @@ export function PortalTab({ record, workspaceId }: { record: ClientOpsRecord; wo
             ) : link ? (
               <div className="mt-1 text-[0.92rem] text-slate-600">
                 <p>
-                  <span className="font-semibold text-success-700">연결됨</span> · {link.profileEmail || '(계정)'} · 연결일 {link.linkedAt.slice(0, 10)}
+                  <span className="font-semibold text-success-700">연결됨</span> · {link.profileEmail || '(계정)'} · 연결일 {localDateOf(link.linkedAt)}
                   {isLocal && <span className="ml-2 rounded-full bg-highlight-100 px-2 py-0.5 t-meta font-semibold text-highlight-700">DEMO</span>}
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -445,15 +453,19 @@ export function PortalTab({ record, workspaceId }: { record: ClientOpsRecord; wo
             <Button variant="secondary" onClick={() => setDocForm((f) => ({ ...f, open: false }))}>취소</Button>
             <Button
               variant="primary"
+              disabled={running}
               onClick={() =>
                 link &&
                 void run(
                   () => requestDocument(workspaceId, { linkId: link.id, operationsClientId: record.id, documentType: docForm.key, title: docForm.title, customerNote: docForm.note }),
                   '고객 화면에 서류 요청을 올렸습니다.',
-                ).then(() => setDocForm((f) => ({ ...f, open: false })))
+                ).then((ok) => {
+                  // 실패하면 창을 닫지 않는다 — 적은 내용 그대로 다시 누를 수 있게
+                  if (ok) setDocForm((f) => ({ ...f, open: false }))
+                })
               }
             >
-              요청
+              {running ? '요청 중…' : '요청'}
             </Button>
           </>
         }

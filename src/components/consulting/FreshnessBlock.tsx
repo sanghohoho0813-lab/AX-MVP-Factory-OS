@@ -8,7 +8,7 @@ import { Badge } from '../ui/primitives'
 import { Button } from '../ui/Button'
 import { useEditor } from './editorContext'
 import { FRESHNESS_DAYS } from '../../domain/consulting/gateEngine'
-import { nowIso } from '../../lib/appClock'
+import { todayLocalDate } from '../../lib/appClock'
 import type { PolicyFreshness } from '../../types/consulting'
 import { TextField } from './studioParts'
 
@@ -24,7 +24,7 @@ export function FreshnessBlock({ scope, title, ok, highlighted = false }: { scop
   const records = p.freshness.filter((f) => f.scope === scope).sort((a, b) => b.checkedAt.localeCompare(a.checkedAt))
 
   const add = async () => {
-    const rec: PolicyFreshness = { scope, checkedAt: nowIso().slice(0, 10), source: source.trim() || SOURCE_HINT[scope].split(' — ')[0], differences: diff.trim() }
+    const rec: PolicyFreshness = { scope, checkedAt: todayLocalDate(), source: source.trim() || SOURCE_HINT[scope].split(' — ')[0], differences: diff.trim() }
     update((cur) => ({ ...cur, freshness: [rec, ...cur.freshness] }))
     await decide({ stageKey: scope === 'patent_filing' ? 'S7' : 'S14', kind: 'policy', summary: `최신 공식 기준 확인 · ${rec.source}`, reason: rec.differences || '이 Master 와 차이 없음' })
     setSource('')

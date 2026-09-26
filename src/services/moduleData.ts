@@ -217,7 +217,11 @@ export async function deleteRow(
   writeLocal(key, readLocal(key).filter((r) => r.id !== id))
 }
 
-/** 이 모듈의 한 갈래를 통째로 바꾼다 (가져오기·되돌리기용) */
+/**
+ * 이 모듈의 한 갈래를 통째로 바꾼다 (가져오기·되돌리기용).
+ * D-120: 새 줄을 먼저 넣고(같은 id 는 고쳐 쓰고) 그다음 새 목록에 없는 줄만 지운다 —
+ * 예전에는 먼저 다 지우고 넣어서, 넣기가 실패하면 갈래가 통째로 비었다.
+ */
 export async function replaceRows(
   workspaceId: string | null,
   moduleKey: string,
@@ -227,31 +231,29 @@ export async function replaceRows(
   if (isCloud() && workspaceId) {
     try {
       const client = getSupabaseClient()
-      const { error: delError } = await client
-        .from('module_data')
-        .delete()
-        .eq('workspace_id', workspaceId)
-        .eq('module_key', moduleKey)
-        .eq('bucket', bucket)
-      if (delError && !missingTable(delError.message)) throw delError
-      if (!delError) {
-        if (rows.length > 0) {
-          const { error } = await client.from('module_data').insert(
-            rows.map((r) => ({
-              id: r.id,
-              workspace_id: workspaceId,
-              module_key: moduleKey,
-              bucket,
-              client_id: r.clientId || null,
-              payload: r.data,
-              updated_at: r.updatedAt,
-            })),
-          )
-          if (error && !missingTable(error.message)) throw error
-          if (!error) return
-        } else {
-          return
-        }
+      let usable = true
+      if (rows.length > 0) {
+        const { error } = await client.from('module_data').upsert(
+          rows.map((r) => ({
+            id: r.id,
+            workspace_id: workspaceId,
+            module_key: moduleKey,
+            bucket,
+            client_id: r.clientId || null,
+            payload: r.data,
+            updated_at: r.updatedAt,
+          })),
+          { onConflict: 'id' },
+        )
+        if (error && !missingTable(error.message)) throw error
+        if (error) usable = false
+      }
+      if (usable) {
+        let del = client.from('module_data').delete().eq('workspace_id', workspaceId).eq('module_key', moduleKey).eq('bucket', bucket)
+        if (rows.length > 0) del = del.not('id', 'in', `(${rows.map((r) => `"${r.id.replace(/"/g, '')}"`).join(',')})`)
+        const { error: delError } = await del
+        if (delError && !missingTable(delError.message)) throw delError
+        if (!delError) return
       }
     } catch (cause) {
       if (!(cause instanceof Error && missingTable(cause.message))) throw cause

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSerialSave } from '../lib/useSerialSave'
 import { useNavigate } from 'react-router-dom'
 import {
   Archive,
@@ -276,18 +277,21 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
    * 목록 시트에서 고친 값을 저장한다.
    * 먼저 화면을 바꾸고(기다림 없음) 저장에 실패하면 서버 값으로 되돌린다.
    */
+  // D-120: 금액처럼 글자마다 저장하는 칸 — 늦게 온 예전 응답이 새 값을 덮지 않게 차례로 저장한다
+  const serialSave = useSerialSave<ClientOpsRecord>(
+    saveClient,
+    (saved) => setRecords((prev) => prev.map((r) => (r.id === saved.id ? saved : r))),
+    (cause) => {
+      showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
+      void load()
+    },
+  )
   const quickSave = useCallback(
     async (next: ClientOpsRecord) => {
       setRecords((prev) => prev.map((r) => (r.id === next.id ? next : r)))
-      try {
-        const saved = await saveClient(next)
-        setRecords((prev) => prev.map((r) => (r.id === saved.id ? saved : r)))
-      } catch (cause) {
-        showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
-        void load()
-      }
+      await serialSave(next)
     },
-    [showToast, load],
+    [serialSave],
   )
 
   const onRestoreFile = async (file: File | undefined) => {
@@ -309,7 +313,9 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     setRestoring(true)
     setError('')
     try {
-      const result = mergeBackup(records, incoming, mode)
+      // D-120: 화면을 연 뒤 다른 곳에서 만든 업체가 지워지지 않게 — 합치기 직전에 가장 새 목록을 다시 읽는다
+      const fresh = await listClients(workspaceId)
+      const result = mergeBackup(fresh, incoming, mode)
       await replaceAllClients(workspaceId, result.records)
       // 도구함 입력값도 되돌린다 (D-89) — 창업감면 폼·크레탑 붙여넣기 같은 것
       const toolCount = writeToolInputs(restorePrompt?.toolInputs)
@@ -337,7 +343,8 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     setMigrating(true)
     setError('')
     try {
-      const result = mergeBackup(records, leftover, 'merge')
+      const fresh = await listClients(workspaceId)
+      const result = mergeBackup(fresh, leftover, 'merge')
       await replaceAllClients(workspaceId, result.records)
       await load()
       setLeftover([])

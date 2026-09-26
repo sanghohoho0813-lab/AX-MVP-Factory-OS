@@ -27,7 +27,7 @@ import {
   downloadDocumentFile,
   listClients,
   saveClient,
-  uploadDocumentFile,
+  storeDocumentFile,
   withContract,
   withCustomDocument,
   withCustomField,
@@ -208,20 +208,33 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const today = todayLocalDate()
   const contractAge = contractAgeShort(record?.contract.signedAt ?? '', today)
 
-  const load = useCallback(async () => {
-    try {
-      await loadCustomServicesIntoCatalog(workspaceId)
-      setLoading(true)
-      const all = await listClients(workspaceId)
-      const found = all.find((r) => r.id === clientId) ?? null
-      setRecord(found)
-      setNotFound(found === null)
-    } catch (cause) {
-      showToast(cause instanceof Error ? cause.message : '불러오지 못했습니다.')
-    } finally {
-      setLoading(false)
-    }
-  }, [workspaceId, clientId, showToast])
+  /**
+   * D-120 저장 순서 — 칸마다 바로 저장하는데, 응답이 늦게 오면 예전 값이 새 값을 덮던 문제를 막는다.
+   * latestRef 는 화면에 보이는 가장 새 기록. 저장 중에 또 고치면 끝난 뒤 가장 새 기록으로 한 번 더 저장하고,
+   * 늦게 온 예전 응답은 화면에 되돌려 쓰지 않는다.
+   */
+  const latestRef = useRef<ClientOpsRecord | null>(null)
+  const savingRef = useRef(false)
+
+  const load = useCallback(
+    async (quiet = false) => {
+      try {
+        await loadCustomServicesIntoCatalog(workspaceId)
+        // 저장 실패 뒤 다시 읽을 때는 화면을 '불러오는 중' 으로 바꾸지 않는다 — 열어 둔 칸 · 적던 글이 사라지지 않게
+        if (!quiet) setLoading(true)
+        const all = await listClients(workspaceId)
+        const found = all.find((r) => r.id === clientId) ?? null
+        latestRef.current = found
+        setRecord(found)
+        setNotFound(found === null)
+      } catch (cause) {
+        showToast(cause instanceof Error ? cause.message : '불러오지 못했습니다.')
+      } finally {
+        if (!quiet) setLoading(false)
+      }
+    },
+    [workspaceId, clientId, showToast],
+  )
 
   useEffect(() => {
     void load()
@@ -237,19 +250,38 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   }, [workspaceId, clientId, tab])
 
   const commit = useCallback(
-    async (next: ClientOpsRecord) => {
+    async (next: ClientOpsRecord): Promise<boolean> => {
+      latestRef.current = next
       setRecord(next)
+      // 이미 저장 중이면 그 저장이 끝난 뒤 가장 새 기록으로 이어서 저장한다(아래 반복). 실패하면 그쪽에서 알린다
+      if (savingRef.current) return true
+      savingRef.current = true
       try {
-        const saved = await saveClient(next)
-        setRecord(saved)
-        setSavedAt(Date.now())
+        for (;;) {
+          const target: ClientOpsRecord | null = latestRef.current
+          if (!target) break
+          const saved: ClientOpsRecord = await saveClient(target)
+          if (latestRef.current === target) {
+            latestRef.current = saved
+            setRecord(saved)
+            setSavedAt(Date.now())
+            break
+          }
+        }
+        return true
       } catch (cause) {
-        showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
-        void load()
+        showToast(cause instanceof Error ? `${cause.message} — 저장된 내용으로 다시 불러왔습니다.` : '저장하지 못했습니다. 저장된 내용으로 다시 불러왔습니다.')
+        void load(true)
+        return false
+      } finally {
+        savingRef.current = false
       }
     },
     [showToast, load],
   )
+
+  /** 지금 화면의 가장 새 기록 — 기다린 뒤(파일 올리기 등) 이것에 얹어 저장한다 */
+  const current = useCallback((): ClientOpsRecord | null => latestRef.current ?? record, [record])
 
   /** 계약 단계 변경 — 인라인 select 와 더보기 시트가 함께 쓴다 */
   const changeStage = (stage: ContractStage) => {
@@ -345,9 +377,10 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const onPickFile = async (key: DocumentKey, file: File | undefined) => {
     if (!file) return
     try {
-      const saved = await uploadDocumentFile(record, key, file)
-      setRecord(saved)
-      setSavedAt(Date.now())
+      // D-120: 파일을 올리는 동안 고친 것이 있어도 덮지 않게 — 올린 뒤의 가장 새 기록에 얹는다
+      const patch = await storeDocumentFile(record, key, file)
+      const base = current() ?? record
+      await commit(withDocument(base, key, patch))
       showToast('파일을 보관했습니다.')
     } catch (cause) {
       showToast(cause instanceof Error ? cause.message : '파일을 보관하지 못했습니다.')
@@ -575,17 +608,21 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         clients={[]}
         compact
         onAdd={(draft) =>
-          void createJournalEntry(workspaceId, userId, {
+          createJournalEntry(workspaceId, userId, {
             entryDate: today,
             entryType: 'follow_up',
             content: draft.content,
             clientId: record.id,
             dueDate: draft.dueDate,
           })
-            .then(() => showToast('오늘 할 일에 넣었습니다.'))
-            .catch((cause: unknown) =>
-              showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.'),
-            )
+            .then(() => {
+              showToast('오늘 할 일에 넣었습니다.')
+              return true
+            })
+            .catch((cause: unknown) => {
+              showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
+              return false
+            })
         }
       />
 
@@ -951,6 +988,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             record={record}
             onClose={() => setBulkOpen(false)}
             onSaved={(saved) => {
+              latestRef.current = saved
               setRecord(saved)
               setSavedAt(Date.now())
             }}
@@ -1273,7 +1311,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           <ClientJournalTab record={record} workspaceId={workspaceId} userId={userId} />
           <NotesSection
             record={record}
-            onAdd={(text) => void commit(withNewNote(record, text))}
+            onAdd={(text) => commit(withNewNote(record, text))}
             onEdit={(id, text) => void commit(withNoteText(record, id, text))}
             onPin={(id, pinned) => void commit(withNotePinned(record, id, pinned))}
             onDelete={(id) => void commit(withoutNote(record, id))}
@@ -1333,9 +1371,11 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 className="w-full justify-start"
                 onClick={() => {
                   const next = withArchived(record, record.archivedAt === null)
-                  void commit(next)
                   setMoreOpen(false)
-                  showToast(next.archivedAt ? '보관 처리했습니다. 목록·경고에서 빠집니다.' : '보관을 해제했습니다.')
+                  // D-120: 저장이 된 뒤에 알린다(실패하면 commit 이 따로 알린다)
+                  void commit(next).then((ok) => {
+                    if (ok) showToast(next.archivedAt ? '보관 처리했습니다. 목록·경고에서 빠집니다.' : '보관을 해제했습니다.')
+                  })
                 }}
               >
                 <Archive aria-hidden="true" className="size-4" />
@@ -1450,7 +1490,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         <ServiceCatalogModal
           workspaceId={workspaceId}
           onClose={() => setCatalogOpen(false)}
-          onChanged={() => void load()}
+          onChanged={() => void load(true)}
         />
       )}
 

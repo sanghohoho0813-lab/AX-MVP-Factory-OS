@@ -10,6 +10,7 @@
  *  - 추천 멘트 · 복사 단추를 바로 옆에. 추천 이유 · 핵심 확인사항 · 문제 제기 · 이대로 두면 · 요청 자료 · 기대 효과는
  *    '더 보기' 안에 — 글은 하나도 지우지 않았다.
  */
+import { localDateOf } from '../../lib/appClock'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronDown, FileSearch, ScanSearch } from 'lucide-react'
@@ -138,7 +139,7 @@ export function CretopMeetingPanel({ record, round }: { record: ClientOpsRecord;
           <FileSearch aria-hidden="true" className="size-5 text-brand-600" />
           크레탑에서 가져온 전략
           <span className="t-meta font-medium text-slate-500">
-            {m.at.slice(0, 10)} 분석 · {m.selected.length ? `분석기에서 고른 ${m.selected.length}개` : '추천 순'}
+            {localDateOf(m.at)} 분석 · {m.selected.length ? `분석기에서 고른 ${m.selected.length}개` : '추천 순'}
           </span>
         </h2>
         <Link to={`/tools/cretop/analyze?client=${record.id}`} className="t-meta font-semibold text-brand-700 hover:underline">

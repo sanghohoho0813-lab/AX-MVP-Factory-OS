@@ -48,7 +48,8 @@ interface SurveyLinkCreateModalProps {
 function toDateInputValue(daysFromNow: number): string {
   const d = new Date()
   d.setDate(d.getDate() + daysFromNow)
-  return d.toISOString().slice(0, 10)
+  // D-120: 로컬 날짜로(UTC 로 바꾸면 오전 9시 전에는 하루 앞)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 export function SurveyLinkCreateModal({

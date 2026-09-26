@@ -41,10 +41,12 @@ export function ClientSalesCard({ record, onSave }: { record: ClientOpsRecord; o
   const prospect = isProspect(record)
   const [draft, setDraft] = useState<Draft>(() => draftOf(record))
   const base = useMemo(() => draftOf(record), [record])
-  // 저장되어 기록이 바뀌면 칸도 새 값으로 (렌더 중에 맞춘다 — 효과로 한 번 더 그리지 않게)
-  const [seen, setSeen] = useState(base)
-  if (seen !== base) {
-    setSeen(base)
+  // 저장되어 영업 칸 값이 바뀌면 칸도 새 값으로 (렌더 중에 맞춘다 — 효과로 한 번 더 그리지 않게).
+  // D-120: 기록 객체가 아니라 '값' 으로 비교한다 — 회사 정보 등 다른 칸을 저장해도 적던 영업 칸이 지워지지 않게
+  const baseKey = JSON.stringify(base)
+  const [seen, setSeen] = useState(baseKey)
+  if (seen !== baseKey) {
+    setSeen(baseKey)
     setDraft(base)
   }
   const dirty = JSON.stringify(draft) !== JSON.stringify(base)

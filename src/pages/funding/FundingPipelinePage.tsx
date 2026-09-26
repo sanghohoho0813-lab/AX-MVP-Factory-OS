@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { localDateOf } from '../../lib/appClock'
 import { useParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Plus, Target } from 'lucide-react'
 import type {
@@ -352,7 +353,7 @@ function ApplicationCard({
           value={app.requestedAmount ? `${app.requestedAmount} ${app.currency}` : '금액 미입력'}
         />
         {app.approvedAmount && <Field label="승인 금액" value={`${app.approvedAmount} ${app.currency}`} />}
-        <Field label="제출일" value={app.submittedAt ? app.submittedAt.slice(0, 10) : ''} />
+        <Field label="제출일" value={app.submittedAt ? localDateOf(app.submittedAt) : ''} />
         <Field label="담당자" value={app.ownerId} />
         <Field label="다음 조치" value={app.nextAction} />
       </dl>

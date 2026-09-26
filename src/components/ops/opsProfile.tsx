@@ -1,4 +1,5 @@
 import { Fragment, useState } from 'react'
+import { localDateOf } from '../../lib/appClock'
 import { Check, ChevronDown, ChevronUp, ClipboardCopy, Copy, FileUp, Pencil, Pin, PinOff, Plus, Trash2 } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import {
@@ -479,7 +480,7 @@ export function NotesSection({
   onDelete,
 }: {
   record: ClientOpsRecord
-  onAdd: (text: string) => void
+  onAdd: (text: string) => void | boolean | Promise<void | boolean>
   onEdit: (id: string, text: string) => void
   onPin: (id: string, pinned: boolean) => void
   onDelete: (id: string) => void
@@ -489,11 +490,12 @@ export function NotesSection({
   const [editText, setEditText] = useState('')
   const notes = sortedNotes(record)
 
-  const add = () => {
+  const add = async () => {
     const t = draft.trim()
     if (t === '') return
-    onAdd(t)
-    setDraft('')
+    // D-120: 저장이 된 뒤에 비운다
+    const ok = await onAdd(t)
+    if (ok !== false) setDraft('')
   }
 
   return (
@@ -608,7 +610,7 @@ export function NotesSection({
                 </div>
               )}
               <p className="mt-1.5 text-[0.8rem] text-slate-400">
-                {n.updatedAt.slice(0, 10)}
+                {localDateOf(n.updatedAt)}
                 {n.createdAt !== n.updatedAt ? ' 수정됨' : ''}
               </p>
             </li>

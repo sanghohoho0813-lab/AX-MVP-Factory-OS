@@ -285,7 +285,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
 
   /** 오늘 할 일 한 줄 넣기 — 업무 일기의 '할 일' 로 저장된다 */
   const addTodo = (draft: { content: string; dueDate: string; clientId: string | null }) =>
-    void journalMutate(
+    journalMutate(
       () =>
         createJournalEntry(workspaceId, userId, {
           entryDate: today,
@@ -297,13 +297,16 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
       '할 일을 넣었습니다.',
     )
 
-  const journalMutate = async (fn: () => Promise<unknown>, done?: string) => {
+  /** 됐으면 true — 할 일 칸은 실패하면 적은 글을 그대로 둔다(D-120) */
+  const journalMutate = async (fn: () => Promise<unknown>, done?: string): Promise<boolean> => {
     try {
       await fn()
       setJournal(await listJournal(workspaceId))
       if (done) showToast(done)
+      return true
     } catch (cause) {
       showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
+      return false
     }
   }
 
