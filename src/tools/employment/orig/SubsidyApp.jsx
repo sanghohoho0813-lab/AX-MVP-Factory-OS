@@ -6095,7 +6095,13 @@ var SCREEN_GUIDES = {
 function ScreenGuide(props){
   var key=props.viewKey; var g=SCREEN_GUIDES[key];
   var stHidden=useState(function(){return guideHidden(key);});
-  var stOpen=useState(true);
+  // [D-113] 휴대폰은 접힌 한 줄로 시작 — 펼친 안내가 첫 화면을 다 차지해 정작 할 일이 안 보였다.
+  // 펼치거나 접으면 화면마다 기억한다(넓은 화면은 예전처럼 펼친 채로 시작).
+  var stOpen0=useState(function(){
+    try{var v=localStorage.getItem("emp_guide_open_"+key);if(v==="1")return true;if(v==="0")return false;}catch(e){}
+    try{return window.innerWidth>=640;}catch(e){return true;}
+  });
+  var stOpen=[stOpen0[0],function(v){try{localStorage.setItem("emp_guide_open_"+key,v?"1":"0");}catch(e){}stOpen0[1](v);}];
   if(!g||stHidden[0])return null;
   function hideForDay(){guideHideForDay(key);stHidden[1](true);}
   function runCta(act){

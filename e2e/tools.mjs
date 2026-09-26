@@ -659,6 +659,62 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await m.close()
 }
 
+/* D-113: 휴대폰 크레탑 — 입력 칸 접기 · 기본정보 2칸 · 핵심지표 3칸 · 인증 2칸 · 제목 한 줄 / 고용지원금 안내 접힘 / 영업 숫자 3칸 */
+{
+  const RICH = ['기업명 세방형(주)', '사업자번호 771-81-00284', '법인번호 131111-0435121', '대표자 이승욱', '종업원수 8명', '설립일 2016-01-15', '결산월 12월', '기업유형 일반법인', '기업규모 소기업', '주소 서울 강남구 논현로142길 23 (논현동)', '표준산업분류(10차) (J59113) 광고영화및비디오물제작업', '주요제품 영상물제작, 광고대행서비스', SEBANG].join('\n')
+  const cols = (loc) => loc.evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length)
+  for (const vp of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+    const mob = vp.width < 500
+    const tag = mob ? '390' : '1440'
+    const ctx = await browser.newContext({ viewport: vp, isMobile: mob, hasTouch: mob, locale: 'ko-KR' })
+    const page = await ctx.newPage()
+    await page.goto(BASE + '/tools/cretop', { waitUntil: 'networkidle' })
+    await page.getByRole('button', { name: '텍스트 붙여넣기' }).click()
+    await page.getByLabel('크레탑 원문').fill(RICH)
+    await page.getByTestId('cretop-run').click()
+    await page.waitForTimeout(900)
+    check(`${tag} 크레탑: 분석 뒤 입력 칸은 한 줄로 접힌다`, (await page.getByTestId('cretop-input-collapsed').count()) === 1 && (await page.getByLabel('크레탑 원문').count()) === 0)
+    await page.getByTestId('cretop-input-collapsed').click()
+    await page.waitForTimeout(200)
+    check(`${tag} 크레탑: 누르면 다시 펼쳐 새로 분석할 수 있다`, (await page.getByTestId('cretop-run').count()) === 1)
+    await page.getByRole('button', { name: /접기/ }).first().click()
+    const core = await cols(page.getByTestId('cretop-core-grid'))
+    const info = await cols(page.getByTestId('cretop-basic-info'))
+    if (mob) {
+      check('390 크레탑: 핵심지표 3칸', core === 3, String(core))
+      check('390 크레탑: 기본정보 2칸 · 주소는 한 줄 다 씀', info === 2 && (await page.locator('[data-testid="cretop-basic-info"] [data-wide="1"]').first().evaluate((el) => getComputedStyle(el).gridColumnStart)) === '1', String(info))
+      check('390 크레탑: 인증 칩 2칸', (await cols(page.getByTestId('cretop-cert-chips'))) === 2)
+      const h2 = await page.locator('#mini-results h2').first().evaluate((el) => ({ h: el.getBoundingClientRect().height, lh: parseFloat(getComputedStyle(el).fontSize) }))
+      check('390 크레탑: 구역 제목이 두 줄로 쪼개지지 않는다', h2.h < h2.lh * 1.8, JSON.stringify(h2))
+      const clipped = await page.locator('[data-core-card]').evaluateAll((els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.getAttribute('data-core-card')))
+      check('390 크레탑: 지표 칸 글자가 칸 밖으로 넘치지 않는다', clipped.length === 0, clipped.join(','))
+      check('390 크레탑: 가로 넘침 없음', (await page.evaluate(() => document.documentElement.scrollWidth)) <= 390)
+    } else {
+      check('1440 크레탑: 핵심지표는 넓게(4칸 이상)', core >= 4, String(core))
+    }
+    await page.locator('[data-testid="cretop-mini-tabs"] button[data-tab="summary"]').click()
+    await page.waitForTimeout(400)
+    const sumCore = await cols(page.getByTestId('cretop-core-grid'))
+    check(`${tag} 크레탑 요약: 핵심지표 ${mob ? '3칸' : '여러 칸'}`, mob ? sumCore === 3 : sumCore >= 4, String(sumCore))
+
+    await page.goto(BASE + '/tools/employment/companies', { waitUntil: 'networkidle' })
+    await page.waitForTimeout(400)
+    const guideOpen = (await page.getByRole('button', { name: /안내 접기/ }).count()) > 0
+    check(`${tag} 고용지원금: 안내는 ${mob ? '접힌 한 줄로 시작' : '펼친 채로 시작'}`, mob ? !guideOpen && (await page.getByRole('button', { name: /안내 펼치기/ }).count()) > 0 : guideOpen)
+    if (mob) {
+      await page.getByRole('button', { name: /안내 펼치기/ }).first().click()
+      await page.reload({ waitUntil: 'networkidle' })
+      await page.waitForTimeout(400)
+      check('390 고용지원금: 펼친 것을 기억한다(새로고침 뒤에도)', (await page.getByRole('button', { name: /안내 접기/ }).count()) > 0)
+    }
+    await page.goto(BASE + '/tools/sales-kit/pipeline', { waitUntil: 'networkidle' })
+    await page.waitForTimeout(400)
+    const sk = await cols(page.getByTestId('sales-kpi-grid'))
+    check(`${tag} 영업 진행현황: 숫자 칸 ${mob ? '3' : '6'}칸`, sk === (mob ? 3 : 6), String(sk))
+    await ctx.close()
+  }
+}
+
 await browser.close()
 console.log(`\n도구함(도구·붙이기·업체 연동·서류 부족·기한·검색): ${pass} passed, ${fail} failed`)
 process.exit(fail > 0 ? 1 : 0)

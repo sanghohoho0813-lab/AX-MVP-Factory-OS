@@ -573,3 +573,17 @@ input:is([type="date"], [type="month"], [type="time"], [type="datetime-local"]):
     font-size: 15px !important;
   }
 }
+
+/* D-113: 영업 도구 숫자 칸 — 휴대폰 3칸 · 태블릿 4칸 · 넓은 화면 6칸 (한 칸에 하나씩 길게 내려가지 않게) */
+.sk-kpi-grid {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(6px, 2vw, 10px);
+}
+@media (min-width: 640px) {
+  .sk-kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (min-width: 1024px) {
+  .sk-kpi-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}

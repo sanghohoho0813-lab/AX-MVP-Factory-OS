@@ -4321,11 +4321,13 @@ function SalesMetrics({ data }) {
   const m = salesMetrics(data);
   const cards = [["전체 고객", m.total + "명", C.text], ["이번 주 다음 연락", m.thisWeek + "명", C.blue], ["다음 연락 지연", m.overdue + "명", C.err], ["제안 완료", m.proposed + "명", C.sky], ["견적 전달", m.quoteSent + "명", C.purple], ["조건 조율", m.negotiating + "명", C.warn], ["계약 예정", m.preContract + "명", C.gold], ["계약 완료", m.done + "명", C.ok], ["보류", m.onhold + "명", C.textM], ["예상 수임료 합계(컨설팅)", feeMoney(m.feeSum), C.gold], ["계약 완료 수임료", feeMoney(m.contractedFeeSum), C.ok]];
   const monthlyCards = [["월납 제안 고객", m.monthlyPropCount + "명", C.blue], ["월납 제안액 합계(월)", feeMoney(m.monthlyPremiumSum), C.blue], ["84개월 목적자금 합계", manToText(m.projectedSum), C.gold], ["적정성 초록/노랑/빨강", `${m.affordN.green} / ${m.affordN.yellow} / ${m.affordN.red}`, C.ok]];
-  const cardEl = (c) => <Card key={c[0]} style={{ flex: "1 1 140px", minWidth: 0, padding: "clamp(12px,3vw,18px)" }}><div style={{ fontSize: "calc(var(--s,1.3)*14px)", color: C.textM, fontWeight: 700 }}>{c[0]}</div><div style={{ fontSize: "calc(var(--s,1.3)*22px)", fontWeight: 900, color: c[2], marginTop: 4, lineHeight: 1.2 }}>{c[1]}</div></Card>;
+  // [D-113] 휴대폰에서 두 칸씩 열한 줄로 내려가던 숫자 칸을 세 칸 격자로 — 글자는 화면 폭에 맞춰 조금 줄인다
+  const cardEl = (c) => <Card key={c[0]} style={{ minWidth: 0, padding: "clamp(10px,2.6vw,18px)" }}><div style={{ fontSize: "min(calc(var(--s,1.3)*14px), 3.3vw)", color: C.textM, fontWeight: 700, wordBreak: "keep-all", lineHeight: 1.3 }}>{c[0]}</div><div style={{ fontSize: "min(calc(var(--s,1.3)*22px), 5.4vw)", fontWeight: 900, color: c[2], marginTop: 4, lineHeight: 1.2, overflowWrap: "anywhere" }}>{c[1]}</div></Card>;
+  // 칸 수는 CSS(.sk-kpi-grid)가 화면 폭으로 정한다 — 부모 폭이 내용에 맞춰 정해져 'auto-fill' 이 늘 한 칸이 됐다(실측)
   return <div style={{ marginBottom: 16 }}>
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>{cards.map(cardEl)}</div>
+    <div data-testid="sales-kpi-grid" className="sk-kpi-grid">{cards.map(cardEl)}</div>
     <div style={{ marginTop: 12, fontSize: "calc(var(--s,1.3)*14px)", fontWeight: 800, color: C.blue }}>📅 월납 보험료 제안 지표 <span style={{ color: C.textM, fontWeight: 600 }}>(컨설팅 수임료와 구분된 지표입니다)</span></div>
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 8 }}>{monthlyCards.map(cardEl)}</div>
+    <div className="sk-kpi-grid" style={{ marginTop: 8 }}>{monthlyCards.map(cardEl)}</div>
   </div>;
 }
 // 고객 상세 모달(리포트/제안서·다음 연락 관리 공용)

@@ -396,12 +396,17 @@ export function oneLinerText(o) {
   ].join("\n");
 }
 
+// [D-113] 휴대폰(640px 미만) — 핵심지표 3칸 · 기본정보 2칸 · 작은 글씨로 한 화면에 더 많이
+const NarrowCtx = createContext(false);
+const useNarrow = () => useContext(NarrowCtx);
+
 function Section({ id, title, desc, children }) {
   return (
     <section id={id} style={{ marginTop: 22, scrollMarginTop: 12 }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 10 }}>
-        <h2 style={{ margin: 0, fontSize: "calc(17px * var(--fs,1))", fontWeight: 800, color: T.ink }}>{title}</h2>
-        {desc && <span style={{ fontSize: "calc(12px * var(--fs,1))", color: T.mute }}>{desc}</span>}
+      {/* [D-113] 제목은 한 줄로 두고 설명은 옆 → 좁으면 아래로 (예전: 좁은 칸에서 '기업 / 개요' 처럼 제목이 쪼개졌다) */}
+      <div style={{ display: "flex", alignItems: "baseline", gap: "2px 10px", marginBottom: 10, flexWrap: "wrap" }}>
+        <h2 style={{ margin: 0, fontSize: "calc(17px * var(--fs,1))", fontWeight: 800, color: T.ink, whiteSpace: "nowrap" }}>{title}</h2>
+        {desc && <span style={{ fontSize: "calc(12px * var(--fs,1))", color: T.mute, minWidth: 0 }}>{desc}</span>}
       </div>
       {children}
     </section>
@@ -435,18 +440,46 @@ export function gradeToOption(parsed) {
   else if (/^C/.test(s)) base = "CCC 이하"; else return "미확인";
   return lower ? base.toLowerCase() : base;
 }
+/* [D-113] 핵심지표 카드 크기 — 기본 · 요약(dense) · 휴대폰 3칸(narrow).
+   narrow 는 이름표 위 · 값 · 태그 아래로 쌓는다(한 칸이 100px 남짓이라 이름표와 태그가 한 줄에 안 들어간다).
+   값이 칸보다 길면 글자를 조금 줄여서라도 끝까지 보이게(… 로 자르지 않음). */
+function coreCardSize(dense, narrow) {
+  if (narrow) return { pad: "8px 8px", label: 9.5, tag: 8, val: 13, weakVal: 10, sub: 8.5, gap: 3, stack: true };
+  const f = dense ? 0.74 : 1;
+  // 넓은 화면도 '원문 확인 필요' 는 작게 줄바꿈 — 예전에는 '원문 확…' 으로 잘렸다
+  return { pad: dense ? "7px 9px" : "12px 14px", label: 12 * f, tag: 9.5 * f, val: 21 * f, weakVal: 13 * f, sub: 11 * f, gap: dense ? 2 : 5, stack: false };
+}
+function CardTag({ text, color, z }) {
+  return <span style={{ fontSize: `calc(${z.tag}px * var(--fs,1))`, fontWeight: 800, color, background: "#fff", border: `1px solid ${color}55`, borderRadius: 5, padding: "0 5px", whiteSpace: "nowrap", alignSelf: "flex-start" }}>{text}</span>;
+}
+function CardHead({ label, tag, z }) {
+  if (z.stack) return <div style={{ fontSize: `calc(${z.label}px * var(--fs,1))`, color: T.sub, fontWeight: 700, lineHeight: 1.25, wordBreak: "keep-all" }}>{label}</div>;
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 5 }}>
+      <span style={{ fontSize: `calc(${z.label}px * var(--fs,1))`, color: T.sub, fontWeight: 700 }}>{label}</span>
+      {tag}
+    </div>
+  );
+}
+function CardValue({ val, color, weak, z }) {
+  // 긴 값(약 2,022만원 · 1,298.25% 등)은 조금 작게 — 칸 밖으로 잘리지 않게
+  const long = String(val).length > 7;
+  const size = weak ? z.weakVal : long ? z.val * 0.82 : z.val;
+  const wrap = z.stack || weak;
+  return <div style={{ fontSize: `calc(${size}px * var(--fs,1))`, fontWeight: 800, color, marginTop: z.gap, lineHeight: 1.2, ...(wrap ? { overflowWrap: "anywhere", letterSpacing: "-0.02em" } : { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }) }}>{val}</div>;
+}
+
 // 핵심지표 신용등급 카드 — 선택/원문 등급 + 색상·상태
 function GradeCard({ grade, dense }) {
+  const z = coreCardSize(dense, useNarrow());
   const t = gradeTone(grade);
   const show = grade && grade !== "미확인";
-  const f = dense ? 0.74 : 1;
+  const tag = <CardTag text={t.status} color={t.color} z={z} />;
   return (
-    <div style={{ ...card, padding: dense ? "7px 9px" : "12px 14px", background: t.bg, borderColor: t.bd }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 5 }}>
-        <span style={{ fontSize: `calc(${12 * f}px * var(--fs,1))`, color: T.sub, fontWeight: 700 }}>신용등급</span>
-        <span style={{ fontSize: `calc(${9.5 * f}px * var(--fs,1))`, fontWeight: 800, color: t.color, background: "#fff", border: `1px solid ${t.color}55`, borderRadius: 5, padding: "0 5px", whiteSpace: "nowrap" }}>{t.status}</span>
-      </div>
-      <div style={{ fontSize: `calc(${21 * f}px * var(--fs,1))`, fontWeight: 800, color: show ? t.color : T.mute, marginTop: dense ? 2 : 5, whiteSpace: "nowrap" }}>{show ? grade : "미확인"}</div>
+    <div style={{ ...card, padding: z.pad, background: t.bg, borderColor: t.bd, minWidth: 0 }}>
+      <CardHead label="신용등급" tag={tag} z={z} />
+      <CardValue val={show ? grade : "미확인"} color={show ? t.color : T.mute} weak={!show} z={z} />
+      {z.stack ? <div style={{ marginTop: 4 }}>{tag}</div> : null}
     </div>
   );
 }
@@ -503,20 +536,19 @@ function coreToneOf(key, obj) {
   return { ...pal, tag: dir };
 }
 function CoreCard({ keyName, obj, sub, dense }) {
+  const z = coreCardSize(dense, useNarrow());
   const label = coreLabel(keyName);
   const { val, weak, note } = coreLatestText(keyName, obj);
   const tone = weak ? null : coreToneOf(keyName, obj);
   const fg = tone ? tone.fg : (weak ? T.mute : T.ink);
-  const f = dense ? 0.74 : 1;
+  const tag = tone && tone.tag ? <CardTag text={tone.tag} color={tone.fg} z={z} /> : null;
   return (
-    <div style={{ ...card, padding: dense ? "7px 9px" : "12px 14px", background: tone ? tone.bg : T.surface, borderColor: tone ? tone.bd : T.line }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 5 }}>
-        <span style={{ fontSize: `calc(${12 * f}px * var(--fs,1))`, color: T.sub, fontWeight: 700 }}>{label}</span>
-        {tone && tone.tag ? <span style={{ fontSize: `calc(${9.5 * f}px * var(--fs,1))`, fontWeight: 800, color: tone.fg, background: "#fff", border: `1px solid ${tone.fg}55`, borderRadius: 5, padding: "0 5px", whiteSpace: "nowrap" }}>{tone.tag}</span> : null}
-      </div>
-      <div style={{ fontSize: `calc(${21 * f}px * var(--fs,1))`, fontWeight: 800, color: fg, marginTop: dense ? 2 : 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{val}</div>
-      {sub ? <div style={{ fontSize: `calc(${11 * f}px * var(--fs,1))`, fontWeight: 600, color: T.mute, marginTop: 2, lineHeight: 1.3 }}>{sub}</div> : null}
-      {note ? <div style={{ fontSize: `calc(${11 * f}px * var(--fs,1))`, color: T.mute, marginTop: 2, lineHeight: 1.3 }}>{note}</div> : null}
+    <div data-core-card={keyName} style={{ ...card, padding: z.pad, background: tone ? tone.bg : T.surface, borderColor: tone ? tone.bd : T.line, minWidth: 0 }}>
+      <CardHead label={label} tag={tag} z={z} />
+      <CardValue val={weak && z.stack ? "원문 확인" : val} color={fg} weak={weak} z={z} />
+      {z.stack && tag ? <div style={{ marginTop: 4 }}>{tag}</div> : null}
+      {sub ? <div style={{ fontSize: `calc(${z.sub}px * var(--fs,1))`, fontWeight: 600, color: T.mute, marginTop: 2, lineHeight: 1.3 }}>{sub}</div> : null}
+      {note ? <div style={{ fontSize: `calc(${z.sub}px * var(--fs,1))`, color: T.mute, marginTop: 2, lineHeight: 1.3 }}>{note}</div> : null}
     </div>
   );
 }
@@ -552,16 +584,17 @@ function TaxCard({ cp, dense }) {
   const ni = cp.netIncome;
   const niEok = ni && typeof ni.eok === "number" ? ni.eok : null;
   const neg = typeof niEok === "number" && niEok < 0;
-  const val = niEok == null ? "원문 확인 필요" : neg ? "약 0원(적자)" : fmtTaxWon(estCorpTaxWon(niEok));
-  const f = dense ? 0.74 : 1;
+  const z = coreCardSize(dense, useNarrow());
+  // 휴대폰 3칸에서는 '약' 을 빼고(태그 '추정' 이 같은 뜻) 금액만 — '약 / 2,022만원' 으로 쪼개지던 것
+  const full = niEok == null ? (z.stack ? "원문 확인" : "원문 확인 필요") : neg ? "약 0원(적자)" : fmtTaxWon(estCorpTaxWon(niEok));
+  const val = z.stack && !neg && niEok != null ? full.replace(/^약\s*/, "") : full;
+  const tag = <CardTag text="추정" color={T.flat} z={z} />;
   return (
-    <div style={{ ...card, padding: dense ? "7px 9px" : "12px 14px", borderStyle: "dashed" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 5 }}>
-        <span style={{ fontSize: `calc(${12 * f}px * var(--fs,1))`, color: T.sub, fontWeight: 700 }}>예상 법인세</span>
-        <span style={{ fontSize: `calc(${9.5 * f}px * var(--fs,1))`, fontWeight: 800, color: T.flat, background: "#fff", border: `1px solid ${T.flat}55`, borderRadius: 5, padding: "0 5px" }}>추정</span>
-      </div>
-      <div style={{ fontSize: `calc(${21 * f}px * var(--fs,1))`, fontWeight: 800, color: niEok == null ? T.mute : T.ink, marginTop: dense ? 2 : 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{val}</div>
-      <div style={{ fontSize: `calc(${11 * f}px * var(--fs,1))`, color: T.mute, marginTop: 2, lineHeight: 1.3 }}>당기순이익 기준 단순 추정(법인세+지방소득세)</div>
+    <div data-core-card="tax" style={{ ...card, padding: z.pad, borderStyle: "dashed", minWidth: 0 }}>
+      <CardHead label="예상 법인세" tag={tag} z={z} />
+      <CardValue val={val} color={niEok == null ? T.mute : T.ink} weak={niEok == null} z={z} />
+      {z.stack ? <div style={{ marginTop: 4 }}>{tag}</div> : null}
+      <div style={{ fontSize: `calc(${z.sub}px * var(--fs,1))`, color: T.mute, marginTop: 2, lineHeight: 1.3 }}>{z.stack ? "당기순이익 기준 단순 추정" : "당기순이익 기준 단순 추정(법인세+지방소득세)"}</div>
     </div>
   );
 }
@@ -575,6 +608,7 @@ function bizAgeYears(established) {
   return (y >= 0 && y < 200) ? y : null;
 }
 function CoreGrid({ ui, grade, lastY, compact }) {
+  const narrow = useNarrow();
   const cp = ui.corePreview || {};
   const co = ui.companyInfo || {};
   const personal = !!(ui.bizForm && ui.bizForm.isPersonal);
@@ -587,7 +621,10 @@ function CoreGrid({ ui, grade, lastY, compact }) {
       {!compact ? <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         <span style={{ fontSize: "calc(12.5px * var(--fs,1))", fontWeight: 800, color: T.brand, background: T.brandSoft, border: `1px solid ${T.brand}22`, borderRadius: 999, padding: "5px 12px" }}>📅 크레탑 상 최신 자료: {lastY ? `${lastY}년 결산 기준` : "최근 결산 기준"}</span>
         <div style={{ flexBasis: "100%", height: 0 }} />
-        <span style={{ fontSize: "calc(11.5px * var(--fs,1))", fontWeight: 700, color: "#3B5BA9", background: T.brandSoft, border: `1px solid ${T.brand}1A`, borderRadius: 8, padding: "5px 11px", lineHeight: 1.5 }}>각 지표는 <b>최신 연도 기준</b>이며, 직전연도 대비 <b style={{ color: T.up }}>증가</b>·<b style={{ color: T.down }}>감소</b>·<b style={{ color: T.flat }}>변동없음</b>을 표시합니다. 부채비율·유동비율·이자보상배수·현금흐름등급은 <b>양호/주의/위험</b> 판정도 함께 표시합니다.</span>
+        {/* [D-113] 휴대폰은 한 줄 요약 — 긴 설명 상자가 지표보다 먼저 화면을 차지했다 */}
+        {narrow
+          ? <span style={{ fontSize: "calc(10px * var(--fs,1))", fontWeight: 700, color: T.sub, lineHeight: 1.5 }}>최신 연도 값 · 태그 = 전년 대비 <b style={{ color: T.up }}>증가</b>/<b style={{ color: T.down }}>감소</b> · 비율은 <b>양호/주의/위험</b></span>
+          : <span style={{ fontSize: "calc(11.5px * var(--fs,1))", fontWeight: 700, color: "#3B5BA9", background: T.brandSoft, border: `1px solid ${T.brand}1A`, borderRadius: 8, padding: "5px 11px", lineHeight: 1.5 }}>각 지표는 <b>최신 연도 기준</b>이며, 직전연도 대비 <b style={{ color: T.up }}>증가</b>·<b style={{ color: T.down }}>감소</b>·<b style={{ color: T.flat }}>변동없음</b>을 표시합니다. 부채비율·유동비율·이자보상배수·현금흐름등급은 <b>양호/주의/위험</b> 판정도 함께 표시합니다.</span>}
       </div> : null}
       {/* 회사 한눈에 — 기업유형 · 업력 · 업종(요약 브리핑에서는 숨김) */}
       {!compact ? <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -595,7 +632,8 @@ function CoreGrid({ ui, grade, lastY, compact }) {
         {age != null ? <span style={infoChip}>📅 업력 {age}년{co.established ? ` (${String(co.established).slice(0, 4)}년 설립)` : ""}</span> : null}
         {industry ? <span style={{ ...infoChip, whiteSpace: "normal", color: T.sub }}>🏭 {industry}</span> : null}
       </div> : null}
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill,minmax(min(100%,${compact ? 124 : 160}px),1fr))`, gap: compact ? 6 : 10 }}>
+      {/* [D-113] 휴대폰은 3칸 — 예전에는 한 칸에 하나씩 세로로 길게 내려갔다 */}
+      <div data-testid="cretop-core-grid" style={{ display: "grid", gridTemplateColumns: narrow ? "repeat(3,minmax(0,1fr))" : `repeat(auto-fill,minmax(min(100%,${compact ? 124 : 160}px),1fr))`, gap: narrow ? 6 : compact ? 6 : 10 }}>
         {CORE_SUMMARY_KEYS.map((key) => key === "creditGrade" ? <GradeCard key={key} grade={grade} dense={compact} /> : <CoreCard key={key} keyName={key} obj={cp[key]} sub={marginSub(key, cp)} dense={compact} />)}
         <TaxCard cp={cp} dense={compact} />
       </div>
@@ -969,15 +1007,19 @@ function CompanyHeader({ ui, grade, manualGrade, setGrade, isAdmin, compact }) {
   const bf = ui.bizForm || {};
   const dbg = ui._extractDebug || null;
   const [popup, setPopup] = useState(null);   // 'company' | 'ceo' | 'workplace' | 'debug'
-  const popBtn = { border: `1px solid ${T.brand}55`, background: "#fff", color: T.brand, borderRadius: 8, padding: "4px 10px", fontSize: "calc(11px * var(--fs,1))", fontWeight: 800, fontFamily: FF, cursor: "pointer", whiteSpace: "nowrap" };
+  const narrowHdr = useNarrow();
+  const popBtn = { border: `1px solid ${T.brand}55`, background: "#fff", color: T.brand, borderRadius: 8, padding: narrowHdr ? "5px 4px" : "4px 10px", fontSize: narrowHdr ? "calc(9.5px * var(--fs,1))" : "calc(11px * var(--fs,1))", fontWeight: 800, fontFamily: FF, cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 };
   const cg = co.creditGrade;
   const hasCg = cg && cg !== "이미지 원문 확인 필요";
   const cfG = co.cashflowGrade;
   const cfInfo = cfG ? cretopCashflowGradeInfo(cfG.latest) : null;
 
   // 기본 정보 라벨/값 (있는 항목만)
+  const narrow = useNarrow();
   const rows = [];
   const add = (k, v) => { if (v) rows.push([k, v]); };
+  // [D-113] 긴 값(주소·업종·제품)은 한 줄을 다 쓰고, 짧은 값은 두 칸씩 — 휴대폰에서 한 줄에 하나씩 길게 내려가던 것
+  const WIDE = new Set(["주소", "표준산업분류 10차", "표준산업분류 11차", "표준산업분류", "주요제품"]);
   add("사업자번호", co.businessNo);
   add("법인번호", co.corpRegNo);
   add("대표자", co.ceoName);
@@ -1027,7 +1069,8 @@ function CompanyHeader({ ui, grade, manualGrade, setGrade, isAdmin, compact }) {
       </div>
 
       {/* 상세정보 팝업 버튼 — 기업/대표자/사업장 (요약 브리핑에서는 숨김) */}
-      {!compact ? <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+      {/* [D-113] 휴대폰은 세 칸 격자 — 세 줄로 흩어지던 단추를 두 줄로 */}
+      {!compact ? <div style={narrow ? { display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 5, marginTop: 10 } : { display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
         <button onClick={() => setPopup("company")} style={popBtn}>📄 상세정보</button>
         <button onClick={() => setPopup("ceo")} style={popBtn}>👤 대표자 상세</button>
         <button onClick={() => setPopup("workplace")} style={popBtn}>🏢 사업장 현황</button>
@@ -1038,9 +1081,9 @@ function CompanyHeader({ ui, grade, manualGrade, setGrade, isAdmin, compact }) {
 
       {/* 기본 정보 — 라벨 위·값 아래(스택)로 큰 글자에서도 안 눌리게 */}
       {rows.length ? (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(100%,150px),1fr))", gap: "10px 16px", marginTop: 13 }}>
+        <div data-testid="cretop-basic-info" style={{ display: "grid", gridTemplateColumns: narrow ? "repeat(2,minmax(0,1fr))" : "repeat(auto-fill,minmax(min(100%,150px),1fr))", gap: narrow ? "8px 12px" : "10px 16px", marginTop: 13 }}>
           {rows.map(([k, v], i) => (
-            <div key={i} style={{ minWidth: 0 }}>
+            <div key={i} data-wide={WIDE.has(k) ? "1" : undefined} style={{ minWidth: 0, gridColumn: WIDE.has(k) ? (narrow ? "1 / -1" : "span 2") : undefined }}>
               <div style={{ color: T.mute, fontSize: "calc(11px * var(--fs,1))", fontWeight: 700, marginBottom: 2 }}>{k}</div>
               <div style={{ color: T.ink, fontWeight: 700, fontSize: "calc(13px * var(--fs,1))", lineHeight: 1.45, wordBreak: "break-word" }}>{v}</div>
             </div>
@@ -1052,11 +1095,13 @@ function CompanyHeader({ ui, grade, manualGrade, setGrade, isAdmin, compact }) {
       {hasCert ? (
         <div style={{ marginTop: 14 }}>
           <div style={subHdr}>기업인증 <span style={{ color: T.mute, fontWeight: 600 }}>(인증 표 기준)</span></div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+          {/* [D-113] 휴대폰은 두 칸 격자 — 한 줄에 하나씩 다섯 줄로 내려가던 것 */}
+          <div data-testid="cretop-cert-chips" style={narrow ? { display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 5 } : { display: "flex", flexWrap: "wrap", gap: 5 }}>
             {CERT_ROWS.map(([nm, k], i) => {
               const st = certInfo[k]; const ok = st === "인증"; const no = st === "미인증";
               const col = ok ? T.okInk : no ? T.mute : T.warnInk; const bg = ok ? T.okBg : no ? T.lineSoft : T.warnBg;
-              return <span key={i} style={{ fontSize: "calc(11px * var(--fs,1))", fontWeight: 700, color: col, background: bg, border: `1px solid ${col}33`, borderRadius: 6, padding: "2px 8px" }}>{nm} {st || "확인 필요"}</span>;
+              const word = st ? (narrow && st.includes("원문") ? "확인 필요" : st) : "확인 필요";
+              return <span key={i} style={{ fontSize: "calc(11px * var(--fs,1))", fontWeight: 700, color: col, background: bg, border: `1px solid ${col}33`, borderRadius: 6, padding: "2px 8px", minWidth: 0, overflowWrap: "anywhere" }}>{nm} {word}</span>;
             })}
           </div>
         </div>
@@ -1818,7 +1863,10 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
   const [fontScale, setFontScale] = useState(() => {
     try { const v = parseFloat(localStorage.getItem("mini_fontScale")); return [1.3, 1.55].includes(v) ? v : 1.3; } catch (e) { return 1.3; }
   });
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => { try { return window.innerWidth < 640; } catch (e) { return false; } });
+  // [D-113] 입력 칸 펼침 — 결과가 없으면 늘 펼침, 새로 분석하면 접는다
+  const [inputOpen, setInputOpen] = useState(false);
+  useEffect(() => { setInputOpen(false); }, [ui]);
   useEffect(() => {
     const f = () => { try { setIsMobile(window.innerWidth < 640); } catch (e) {} };
     f(); window.addEventListener("resize", f); return () => window.removeEventListener("resize", f);
@@ -1943,9 +1991,22 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
 
       {/* 콘텐츠(main)만 --fs로 글자 확대 → 박스는 그대로, 헤더/하단탭/사이드바는 정상 크기 */}
       <div style={{ maxWidth: tab === "reco" ? 980 : 720, margin: "0 auto", padding: "16px 14px 16px", width: "100%", boxSizing: "border-box", overflowX: "hidden", "--fs": fontScale }}>
-        {/* 개요 탭에서만 입력/업로드 영역 노출 */}
-        {tab === "overview" ? (
-          <div style={{ ...card, padding: 22, marginBottom: 8, "--fs": fontScale * 1.3 }}>
+        {/* 개요 탭에서만 입력/업로드 영역 노출.
+            [D-113] 분석이 끝나면 한 줄로 접는다 — 휴대폰에서 결과를 보려면 입력 칸을 한참 내려야 했다. 누르면 다시 펼친다. */}
+        {tab === "overview" && ui && !inputOpen ? (
+          <button type="button" data-testid="cretop-input-collapsed" onClick={() => setInputOpen(true)}
+            style={{ ...card, width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", marginBottom: 8, cursor: "pointer", fontFamily: FF, textAlign: "left", boxSizing: "border-box" }}>
+            <span aria-hidden="true" style={{ fontSize: "calc(15px * var(--fs,1))" }}>📄</span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: "block", fontSize: "calc(11.5px * var(--fs,1))", fontWeight: 800, color: T.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fileName || "붙여넣은 원문"} 분석 결과</span>
+              <span style={{ display: "block", fontSize: "calc(9.5px * var(--fs,1))", color: T.mute, marginTop: 1 }}>다른 보고서로 새로 분석하려면 누르세요</span>
+            </span>
+            <span style={{ fontSize: "calc(10.5px * var(--fs,1))", fontWeight: 800, color: T.brand, border: `1px solid ${T.brand}55`, borderRadius: 8, padding: "5px 9px", whiteSpace: "nowrap", background: "#fff" }}>새 분석 ▾</span>
+          </button>
+        ) : null}
+        {tab === "overview" && (!ui || inputOpen) ? (
+          <div style={{ ...card, padding: isMobile ? 16 : 22, marginBottom: 8, "--fs": isMobile ? fontScale : fontScale * 1.3 }}>
+            {ui ? <button type="button" onClick={() => setInputOpen(false)} style={{ float: "right", border: "none", background: "transparent", color: T.mute, fontFamily: FF, fontSize: "calc(11px * var(--fs,1))", fontWeight: 700, cursor: "pointer", padding: "2px 4px" }}>접기 ▴</button> : null}
             <div style={{ fontSize: "calc(14.5px * var(--fs,1))", fontWeight: 800, marginBottom: 6 }}>{ui ? "새 분석 / 다시 분석" : "크레탑 보고서로 재무진단 시작"}</div>
             <div style={{ fontSize: "calc(12px * var(--fs,1))", color: T.sub, marginBottom: 16, lineHeight: 1.5 }}>크레탑(KRD) 기업종합보고서 PDF를 올리거나 텍스트를 붙여넣고 진단을 실행하세요. 데이터는 브라우저에서만 처리됩니다.</div>
             <div style={{ display: "flex", width: "100%", maxWidth: 380, background: T.lineSoft, borderRadius: 10, padding: 4, marginBottom: 16 }}>{/* [D-94] 좁은 칸에서도 두 단추가 한 줄에 반씩 */}
@@ -1976,7 +2037,9 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
         {ui && resultBar ? <div style={{ margin: "8px 0" }}>{resultBar(ui, getSelected(ui))}</div> : null}
 
         <div id="mini-results">
-          <MiniResults ui={ui} tab={tab} grade={grade} manualGrade={manualGrade} setGrade={setManualGrade} lastY={lastY} isAdmin={isAdmin} onTab={goTab} />
+          <NarrowCtx.Provider value={isMobile}>
+            <MiniResults ui={ui} tab={tab} grade={grade} manualGrade={manualGrade} setGrade={setManualGrade} lastY={lastY} isAdmin={isAdmin} onTab={goTab} />
+          </NarrowCtx.Provider>
         </div>
       </div>
 
