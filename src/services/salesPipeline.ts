@@ -13,6 +13,7 @@ import {
   isSalesStage,
   type ClientOpsRecord,
   type SalesInfo,
+  type SalesMeetingNote,
   type SalesStage,
   type SalesStageEvent,
 } from '../types/clientOps'
@@ -51,6 +52,22 @@ export function salesStageFrom(v: unknown): SalesStage | null {
 }
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '')
+const strList = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [])
+
+/** 미팅 기록은 이만큼만 남긴다 */
+const MEETING_LIMIT = 30
+
+function normalizeMeetings(list: unknown[]): SalesMeetingNote[] {
+  const out: SalesMeetingNote[] = []
+  for (const raw of list) {
+    if (!raw || typeof raw !== 'object') continue
+    const m = raw as Record<string, unknown>
+    if (typeof m.id !== 'string' || typeof m.at !== 'string') continue
+    const round = m.round === 2 || m.round === 3 ? m.round : 1
+    out.push({ id: m.id, at: m.at, round, text: str(m.text), reaction: str(m.reaction), issues: strList(m.issues), hesitant: strList(m.hesitant), nextDocs: strList(m.nextDocs) })
+  }
+  return out.slice(0, MEETING_LIMIT)
+}
 
 function normalizeHistory(v: unknown): SalesStageEvent[] {
   if (!Array.isArray(v)) return []
@@ -84,6 +101,15 @@ export function normalizeSales(v: unknown): SalesInfo | null {
     movedAt: str(s.movedAt) || history[history.length - 1]?.at || '',
   }
   if (s.imported && typeof s.imported === 'object' && !Array.isArray(s.imported)) out.imported = s.imported as Record<string, unknown>
+  // 2단계 칸 — 있을 때만 싣는다(없던 기록 모양은 그대로)
+  const posNum = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null)
+  if (s.ceoAge !== undefined) out.ceoAge = posNum(s.ceoAge)
+  if (s.revenueM !== undefined) out.revenueM = posNum(s.revenueM)
+  if (s.flags && typeof s.flags === 'object' && !Array.isArray(s.flags)) {
+    out.flags = Object.fromEntries(Object.entries(s.flags as Record<string, unknown>).filter(([, v]) => v === true).map(([k]) => [k, true]))
+  }
+  if (typeof s.memo === 'string') out.memo = s.memo
+  if (Array.isArray(s.meetings)) out.meetings = normalizeMeetings(s.meetings)
   return out
 }
 
@@ -210,6 +236,11 @@ export interface LegacyAccountRow {
  * 원본 줄은 지우지 않는다. 원래 기록 전체는 sales.imported 에 둔다 — 미팅 대본 · 점수 단계에서 쓴다.
  * 바뀐 업체만 돌려준다.
  */
+function toNum(v: unknown): number | null {
+  const n = typeof v === 'number' ? v : parseFloat(str(v).replace(/[^0-9.]/g, ''))
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
 export function importLegacySalesAccounts(
   records: ClientOpsRecord[],
   rows: LegacyAccountRow[],
@@ -233,6 +264,11 @@ export function importLegacySalesAccounts(
       history: [{ at, from: null, to: stage }],
       movedAt: at,
       imported: { ...d },
+      // 2단계(미팅 준비)가 쓰는 칸 — 원본에 있던 값 그대로
+      ceoAge: toNum(d.ceoAge),
+      revenueM: toNum(d.revenue),
+      flags: d.flags && typeof d.flags === 'object' ? (d.flags as Record<string, boolean>) : {},
+      memo: str(d.memo),
     }
     const normalized = normalizeSales(sales) ?? sales
     out.push(withActivity({ ...rec, sales: normalized }, 'sales', `영업 도구 모음 기록 옮김 · ${SALES_STAGE_LABEL[stage]}`, null, at))

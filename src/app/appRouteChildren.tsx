@@ -39,6 +39,7 @@ const OperationsClientDetailPage = lazy(() => import('../pages/OperationsClientD
 const OpsCalendarPage = lazy(() => import('../pages/OpsCalendarPage').then((m) => ({ default: m.OpsCalendarPage })))
 const AgentSettlementPage = lazy(() => import('../pages/AgentSettlementPage').then((m) => ({ default: m.AgentSettlementPage })))
 // D-103: 영업자용 1차 미팅 체크리스트가 들어올 자리
+const MeetingPrepPage = lazy(() => import('../pages/sales/MeetingPrepPage').then((m) => ({ default: m.MeetingPrepPage })))
 const SalesBoardPage = lazy(() => import('../pages/sales/SalesBoardPage').then((m) => ({ default: m.SalesBoardPage })))
 const FirstMeetingChecklistPage = lazy(() => import('../pages/sales/FirstMeetingChecklistPage').then((m) => ({ default: m.FirstMeetingChecklistPage })))
 const TaxCalculatorsPage = lazy(() => import('../pages/TaxCalculatorsPage').then((m) => ({ default: m.TaxCalculatorsPage })))
@@ -395,6 +396,7 @@ export const appRouteChildren = [
       // 영업 관리 (D-114) — 기업컨설팅 OS 를 고객 관리 한 장부 위로. 사이드바 한 줄, 안에서는 탭
       { path: 'sales', element: <Navigate to="/sales/board" replace /> },
       { path: 'sales/board', element: <SalesBoardPage /> },
+      { path: 'sales/meeting', element: <MeetingPrepPage /> },
       { path: 'ops/clients/:clientId', element: <OperationsClientDetailPage /> },
       // 컨설팅 작업실 — 특허 × 벤처 × MVP 단계 엔진
       { path: 'studio', element: <ConsultingStudioPage /> },

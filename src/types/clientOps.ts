@@ -521,6 +521,30 @@ export interface SalesInfo {
   movedAt: string
   /** 기업컨설팅 OS(영업 도구 모음)에서 옮겨 온 원래 기록 — 미팅 대본 · 점수 등 다음 단계에서 쓴다 */
   imported?: Record<string, unknown>
+  /** 대표 나이 — 리드 점수 · 승계 질문에 쓴다 (D-114 2단계) */
+  ceoAge?: number | null
+  /** 매출(백만원) — 원본 단위 그대로 */
+  revenueM?: number | null
+  /** 고객 체크 17가지(가지급금 있음 · 자녀 근무 …) — 켜진 것만 */
+  flags?: Record<string, boolean>
+  /** 상담 메모 (자유 글) */
+  memo?: string
+  /** 미팅 기록 — 최신이 앞 */
+  meetings?: SalesMeetingNote[]
+}
+
+/** 미팅 한 번의 기록 — 적은 메모와 규칙 분석 결과 (D-114 2단계) */
+export interface SalesMeetingNote {
+  id: string
+  at: string
+  /** 몇 차 미팅 */
+  round: 1 | 2 | 3
+  text: string
+  /** 반응 추정 · 언급된 주제 · 망설임 · 다음 자료 */
+  reaction: string
+  issues: string[]
+  hesitant: string[]
+  nextDocs: string[]
 }
 
 export function emptySales(stage: SalesStage = 'lead', at: string = new Date().toISOString()): SalesInfo {

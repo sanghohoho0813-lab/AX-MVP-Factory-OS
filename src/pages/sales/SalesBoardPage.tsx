@@ -10,8 +10,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ChevronRight, CirclePlus, KanbanSquare, Search } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { ChevronRight, CirclePlus, KanbanSquare, Presentation, Search } from 'lucide-react'
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useToast } from '../../components/ui/toastContext'
 import { MetricTile, ScreenTitle } from '../../components/ui/primitives'
@@ -93,7 +93,21 @@ function SalesCard({ record, today, onOpen, onMove }: { record: ClientOpsRecord;
           <span className={overdue ? 'font-semibold text-danger-700' : ''}>다음 {record.nextActionDueDate.slice(5).replace('-', '.')}</span>
         )}
       </p>
-      <StageSelect record={record} onMove={onMove} />
+      <div className="flex items-center gap-1.5">
+        <div className="min-w-0 flex-1">
+          <StageSelect record={record} onMove={onMove} />
+        </div>
+        {!QUIET_STAGES.includes(stage) && (
+          <Link
+            to={`/sales/meeting?client=${record.id}`}
+            aria-label={`${record.companyName} 미팅 준비`}
+            title="미팅 준비"
+            className="tap flex size-8 shrink-0 items-center justify-center rounded-(--radius-control) border border-slate-200 text-slate-500 hover:border-brand-300 hover:text-brand-700"
+          >
+            <Presentation aria-hidden="true" className="size-4" />
+          </Link>
+        )}
+      </div>
     </li>
   )
 }

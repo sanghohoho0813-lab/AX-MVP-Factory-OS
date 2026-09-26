@@ -192,6 +192,83 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   await ctx.close()
 }
 
+/* ---- D-114 2단계: 미팅 준비 (1440) ---- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e).slice(0, 160)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(() => {
+    const k = 'axmvp.v1.operations_clients'
+    const list = JSON.parse(localStorage.getItem(k) ?? '[]')
+    const now = new Date().toISOString()
+    list.push({ id: 'cli_meet', workspaceId: null, companyName: '미팅정밀', contactName: '김대표', industry: '금속 제조', employeeCount: '26', establishedAt: '2008-03-02', status: 'waiting', createdAt: now, updatedAt: now,
+      sales: { stage: 'm1sched', source: '소개', referrer: '', interests: ['가업승계'], concern: '장남 승계', expectedFee: null, history: [{ at: now, from: null, to: 'm1sched' }], movedAt: now, ceoAge: 58, revenueM: 3500 } })
+    localStorage.setItem(k, JSON.stringify(list))
+  })
+  await page.goto(BASE + '/sales/board', { waitUntil: 'networkidle' })
+  const tabs = page.getByTestId('sales-tabs')
+  check('미팅 준비: 영업 관리 안의 탭 — 영업 보드 · 미팅 준비', ((await tabs.innerText()) ?? '').includes('영업 보드') && (await tabs.innerText()).includes('미팅 준비'))
+  await page.getByTestId('sales-board').getByRole('link', { name: '미팅정밀 미팅 준비' }).click()
+  await page.waitForTimeout(600)
+  check('미팅 준비: 보드 카드에서 그 고객으로 열린다', page.url().includes('/sales/meeting?client=cli_meet') && (await page.getByLabel('미팅 준비할 고객').inputValue()) === 'cli_meet', page.url())
+  check('미팅 준비: 사이드바는 그대로 영업 관리 (탭은 목차에 없다)', ((await page.locator('aside a[aria-current="page"]').innerText()) ?? '').includes('영업 관리') && !((await page.locator('aside nav').innerText()) ?? '').includes('미팅 준비'))
+  const score1 = Number(((await page.getByTestId('lead-score').innerText()) ?? '').replace(/\D/g, ''))
+  check('미팅 준비: 리드 점수 20~88', score1 >= 20 && score1 <= 88, String(score1))
+  const main1 = (await page.locator('main').innerText()) ?? ''
+  check('미팅 준비: 전략 TOP3 — 가업승계 먼저', main1.includes('먼저 볼 전략 TOP3') && main1.indexOf('가업승계') > 0)
+  check('미팅 준비: 1차 미팅 예정 → 1차 대본이 먼저 (질문 · 오프닝 · 요청 자료)', ((await page.getByTestId('meeting-rounds').getByRole('button', { name: '1차 미팅' }).getAttribute('aria-pressed')) === 'true') && main1.includes('오프닝') && /질문 \d+개/.test(main1) && main1.includes('미팅정밀'))
+  for (const [name, word] of [['첫 연락', '전화 대본'], ['2차 미팅', '핵심 이슈 TOP3'], ['3차 클로징', '가격 이야기']]) {
+    await page.getByTestId('meeting-rounds').getByRole('button', { name }).click()
+    await page.waitForTimeout(150)
+    check(`미팅 준비: ${name} 대본`, ((await page.getByTestId('meeting-plan').innerText()) ?? '').includes(word))
+  }
+  // 고객 정보 고치면 점수가 바뀐다
+  await page.getByRole('button', { name: /고객 정보 — 점수 · 대본 재료/ }).click()
+  await page.getByRole('button', { name: '가지급금 있음' }).click()
+  await page.getByRole('button', { name: '고객 정보 저장' }).click()
+  await page.waitForTimeout(500)
+  const score2 = Number(((await page.getByTestId('lead-score').innerText()) ?? '').replace(/\D/g, ''))
+  check('미팅 준비: 체크를 켜고 저장하면 점수가 오른다', score2 > score1, `${score1} → ${score2}`)
+  // 미팅 기록 — 1차
+  await page.getByTestId('meeting-rounds').getByRole('button', { name: '1차 미팅' }).click()
+  const rec = page.getByTestId('meeting-recorder')
+  await rec.getByLabel('미팅에서 나온 말 · 메모').fill('가지급금 정리는 관심 있는데 비용이 부담되고 세무사랑 상의해볼게요')
+  await rec.getByRole('button', { name: '메모 나눠 보기' }).click()
+  const an = (await page.getByTestId('meeting-analysis').innerText()) ?? ''
+  check('미팅 기록: 반응 · 망설임 · 주제를 나눈다', an.includes('신중·부담 반응 추정') && an.includes('비용/수임료 부담') && an.includes('가지급금'), an.slice(0, 200))
+  await rec.getByRole('button', { name: '기록 저장' }).click()
+  await page.waitForTimeout(700)
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients')).find((c) => c.id === 'cli_meet'))
+  check('미팅 기록: 저장 — 미팅 목록 · 1차 미팅 완료로 · 다음 할 일 · 체크 유지', saved.sales.meetings?.length === 1 && saved.sales.stage === 'm1done' && saved.nextAction.startsWith('2차 미팅 준비') && saved.sales.flags?.gajigeup === true, JSON.stringify({ st: saved.sales.stage, n: saved.nextAction }))
+  check('미팅 기록: 저장 뒤 2차 대본으로 넘어간다', ((await page.getByTestId('meeting-rounds').getByRole('button', { name: '2차 미팅' }).getAttribute('aria-pressed')) === 'true'))
+  // 업체 상세 → 미팅 준비 링크
+  await page.goto(BASE + '/ops/clients/cli_meet', { waitUntil: 'networkidle' })
+  await page.getByTestId('client-sales-card').getByRole('link', { name: '미팅 준비' }).click()
+  await page.waitForTimeout(500)
+  check('업체 상세 영업 칸 → 미팅 준비 (그 고객)', page.url().includes('client=cli_meet'))
+  const act = saved.activity.map((a) => a.text).join(' | ')
+  check('활동 기록: 고객 정보 수정 · 미팅 기록 · 단계 옮김', act.includes('영업 고객 정보 수정') && act.includes('1차 미팅 기록') && act.includes('1차 미팅 예정 → 1차 미팅 완료'), act.slice(0, 300))
+  check('JS 오류 없음 (미팅 준비)', errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
+/* ---- 미팅 준비 390 ---- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.goto(BASE + '/sales/meeting', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  check('미팅 준비 390: 옆으로 넘치지 않는다', overflow <= 1, String(overflow))
+  check('미팅 준비 390: 차수 네 칸이 한 줄', (await page.getByTestId('meeting-rounds').getByRole('button').count()) === 4)
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\nsales: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

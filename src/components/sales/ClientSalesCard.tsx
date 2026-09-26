@@ -7,7 +7,7 @@
  */
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { KanbanSquare } from 'lucide-react'
+import { KanbanSquare, Presentation } from 'lucide-react'
 import { Disclosure } from '../ui/primitives'
 import { Button } from '../ui/Button'
 import { daysInStage, isProspect, salesStageOf, withSalesInfo, withSalesStage } from '../../services/salesPipeline'
@@ -95,10 +95,16 @@ export function ClientSalesCard({ record, onSave }: { record: ClientOpsRecord; o
               {days !== null ? (days === 0 ? '오늘 옮김' : `이 단계 ${days}일째`) : '단계를 옮긴 기록 없음'}
               {prospect && stage !== 'contracted' ? ' · 계약 완료로 옮기면 계약 고객이 됩니다' : ''}
             </p>
-            <Link to="/sales/board" className="t-sub ml-auto inline-flex items-center gap-1 pb-2 font-medium text-brand-700 hover:underline">
-              <KanbanSquare aria-hidden="true" className="size-4" />
-              영업 보드
-            </Link>
+            <span className="ml-auto flex items-center gap-3 pb-2">
+              <Link to={`/sales/meeting?client=${record.id}`} className="t-sub inline-flex items-center gap-1 font-medium text-brand-700 hover:underline">
+                <Presentation aria-hidden="true" className="size-4" />
+                미팅 준비
+              </Link>
+              <Link to="/sales/board" className="t-sub inline-flex items-center gap-1 font-medium text-brand-700 hover:underline">
+                <KanbanSquare aria-hidden="true" className="size-4" />
+                영업 보드
+              </Link>
+            </span>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

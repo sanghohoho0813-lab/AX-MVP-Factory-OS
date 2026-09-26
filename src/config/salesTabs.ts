@@ -1,4 +1,4 @@
-import { KanbanSquare, type LucideIcon } from 'lucide-react'
+import { KanbanSquare, Presentation, type LucideIcon } from 'lucide-react'
 
 /**
  * 영업 관리 안의 탭 목록 (D-114) — 사이드바 '영업 관리' 한 줄이 이 주소들을 모두 맡는다.
@@ -10,6 +10,10 @@ export interface SalesTab {
   icon: LucideIcon
 }
 
-export const SALES_TABS: SalesTab[] = [{ to: '/sales/board', label: '영업 보드', icon: KanbanSquare }]
+export const SALES_TABS: SalesTab[] = [
+  { to: '/sales/board', label: '영업 보드', icon: KanbanSquare },
+  // D-114 2단계 — 'AX 1차 미팅 체크리스트'(/sales/first-meeting, 대표가 따로 만드는 중)와는 다른 것: 원본 영업 도구의 1·2·3차 대본
+  { to: '/sales/meeting', label: '미팅 준비', icon: Presentation },
+]
 
 export const SALES_TAB_PATHS = SALES_TABS.map((t) => t.to)

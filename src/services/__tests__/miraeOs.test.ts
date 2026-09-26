@@ -64,6 +64,20 @@ import {
 } from '../salesPipeline'
 import { SALES_FLOW_STAGES, SALES_STAGE_ORDER } from '../../types/clientOps'
 import { SALES_TABS, SALES_TAB_PATHS } from '../../config/salesTabs'
+import {
+  CUST_FLAGS,
+  MEETING_THEMES,
+  STRATEGY_LIBRARY,
+  analyzeTranscript,
+  buildLeadPlan,
+  buildMeetingPlan,
+  followUpKakao,
+  recommendedStrategiesFor,
+  scoreLead,
+  scoreTier,
+} from '../salesEngine'
+import { engineIndustry, profileFromMemo, roundForStage, stageAfterMeeting, toEngineItem, withMeetingNote, withSalesProfile } from '../salesMeeting'
+import salesAppSource from '../../tools/salesKit/orig/SalesApp.jsx?raw'
 import { digitsOf, formatNumberOf, numberSegments } from '../../lib/format'
 import { agentLedger, agentLedgerTotals, agentShares, feeMathOf, feeTotals, marginPct, marginText, netAmountOf } from '../feeMath'
 import { CLIENT_FILTER_ORDER, filterClients, isClientFilterKey, matchesClientFilter } from '../clientOpsFilter'
@@ -1326,6 +1340,68 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('영업: 영업 관리가 탭 주소를 모두 맡는다', SALES_TAB_PATHS.every((p) => moduleForPath(p)?.key === 'sales') && SALES_TABS[0].to === '/sales/board')
   check('영업: 1차 미팅 체크리스트 자리는 따로 남는다', moduleForPath('/sales/first-meeting')?.key === 'first-meeting' && MODULES.find((m) => m.key === 'first-meeting')?.status === 'soon')
   check('영업: 머리줄 — 영업 › 영업 관리', screenGroupForPath('/sales/board')?.title === '영업')
+}
+
+/* ------------------------------------------------------------------ */
+/* D-114 2단계 — 미팅 준비 (원본 영업 규칙 엔진 · 고객 기록 다리)            */
+/* ------------------------------------------------------------------ */
+{
+  const at = '2026-09-26T01:00:00.000Z'
+  // 원본과 같은가 — 문구가 원본 파일에 그대로 있다
+  check('미팅: 전략 17 · 테마 8 · 고객 체크 17', STRATEGY_LIBRARY.length === 17 && Object.keys(MEETING_THEMES).length === 8 && CUST_FLAGS.length === 17)
+  check('미팅: 전략 이름 · 맞는 고객 문구가 원본 그대로', STRATEGY_LIBRARY.every((st) => salesAppSource.includes(`name: "${st.name}"`) && salesAppSource.includes(st.pitch)))
+  check('미팅: 테마 질문이 원본 그대로', Object.values(MEETING_THEMES).every((t) => t.m1q.every((q) => salesAppSource.includes(q))))
+
+  // 원본 샘플 고객(대성정밀)로 점수 · 추천 · 대본
+  const ds = { name: '대성정밀', industry: '제조업', revenue: 3500, empCount: 26, estYears: 18, ceoAge: 58, interests: ['가업승계', '미처분이익잉여금', '주식이동', '정관정비'], concern: '장남 승계', stage: 'meeting2_scheduled', source: '소개', nextDate: '2026-09-30' }
+  const sc = scoreLead(ds)
+  check('미팅: 원본 샘플 점수 20~88 사이 · 등급', sc >= 20 && sc <= 88 && scoreTier(sc).label.length > 0, String(sc))
+  check('미팅: 점수 상한 88 · 하한 20', scoreLead({ ...ds, revenue: 99999, empCount: 999, interests: Object.keys({ 가업승계: 1, 미처분이익잉여금: 1, 가지급금: 1, 연구소: 1 }), stage: 'closing_scheduled' }) === 88 && scoreLead({}) >= 20)
+  check('미팅: 등급 경계 85 · 70 · 55 · 40', scoreTier(85).key === 'high' && scoreTier(84).key === 'chase' && scoreTier(70).key === 'chase' && scoreTier(55).key === 'nurture' && scoreTier(40).key === 'long' && scoreTier(39).key === 'low')
+  const top = recommendedStrategiesFor(ds)
+  check('미팅: 전략 TOP3 — 승계 고객은 가업승계가 먼저', top.length === 3 && top[0].name.includes('가업승계'), top.map((t) => t.name).join())
+  check('미팅: 관심사가 없어도 전략 3개', recommendedStrategiesFor({}).length === 3)
+  const m1 = buildMeetingPlan(ds, 'm1')
+  check('미팅: 1차 — 질문 12개 이하 · 오프닝에 회사 이름 · 자료', m1.questions.length > 0 && m1.questions.length <= 12 && m1.opening.includes('대성정밀') && m1.docs.length > 0)
+  const m2 = buildMeetingPlan(ds, 'm2')
+  check('미팅: 2차 — 이슈 3 · 거절 대응 · 수임료', m2.topIssues.length === 3 && m2.objections.length >= 3 && m2.fee.includes('만'))
+  const m3 = buildMeetingPlan(ds, 'm3')
+  check('미팅: 3차 — 제안 · 가격 · 보류 · 계약 카톡', [m3.proposal, m3.priceTalk, m3.holdTalk, m3.contractKakao].every((t) => t.length > 20))
+  const lp = buildLeadPlan(ds)
+  check('미팅: 첫 연락 — 전화 대본 · 거절 3 · 등급 키', lp.phone.includes('대성정밀') && lp.objections.length === 3 && lp.tier === scoreTier(lp.score).key)
+  check('미팅: 후속 카톡은 테마별', followUpKakao(ds).includes('승계') && followUpKakao({ interests: ['연구소'] }).includes('연구개발'))
+  const ta = analyzeTranscript('가지급금 정리는 관심 있는데 비용이 부담되고 세무사랑 상의해볼게요')
+  check('미팅: 메모 나누기 — 주제 · 망설임 · 반응', ta.issues.includes('가지급금') && ta.hesitant.includes('비용/수임료 부담') && ta.hesitant.includes('가족/세무사 상의 필요') && ta.reaction === '신중·부담 반응 추정', JSON.stringify(ta.hesitant))
+
+  // 고객 기록 → 엔진
+  check('미팅: 업종 글 → 원본 업종', engineIndustry('금속 제조') === '제조업' && engineIndustry('소프트웨어 개발') === 'IT/소프트웨어' && engineIndustry('') === '' && engineIndustry('농업') === '농업')
+  const rec = normalizeClientOps({ id: 'mt', workspaceId: null, companyName: '미팅테크', industry: '정밀기계 제조', employeeCount: '26명', establishedAt: '2008-03-02', status: 'waiting', nextActionDueDate: '2026-10-01', createdAt: at, updatedAt: at, sales: { stage: 'm1sched', source: '소개', referrer: '', interests: ['절세'], concern: '승계 고민', expectedFee: null, history: [], movedAt: at, ceoAge: 58, revenueM: 3500, flags: { gajigeup: true, childWorks: true }, memo: '메모' } })
+  const it = toEngineItem(rec, new Date('2026-09-26T00:00:00Z'))
+  check('미팅: 고객 기록 → 엔진 한 줄 (업종 · 직원 · 업력 · 나이 · 매출 · 단계 · 다음 날짜)', it.industry === '제조업' && it.empCount === 26 && it.estYears === 18 && it.ceoAge === 58 && it.revenue === 3500 && it.stage === 'meeting1_scheduled' && it.nextDate === '2026-10-01', JSON.stringify(it))
+  check('미팅: 체크 → 관심사 (가지급금 · 자녀 근무 → 가업승계 · 정관정비)', ['절세', '가지급금', '가업승계', '미처분이익잉여금', '정관정비'].every((x) => it.interests?.includes(x)), JSON.stringify(it.interests))
+  check('미팅: 영업 칸 새 값이 저장 → 다시 읽기에서 살아남는다', normalizeClientOps(JSON.parse(JSON.stringify(rec))).sales?.flags?.gajigeup === true && rec.sales?.revenueM === 3500 && rec.sales.memo === '메모')
+  check('미팅: 차수 — 단계별 기본값 · 기록 뒤 단계', roundForStage('lead') === 1 && roundForStage('m1done') === 2 && roundForStage('closing') === 3 && stageAfterMeeting(1) === 'm1done' && stageAfterMeeting(3) === 'closing')
+
+  // 고객 정보 고치기 · 메모 채우기
+  const p1 = withSalesProfile(rec, { ceoAge: 60, flags: { gajigeup: true, childWorks: true } }, at)
+  check('미팅: 고객 정보 — 바뀐 것만 기록 (체크는 같아서 빠짐)', p1.sales?.ceoAge === 60 && p1.activity[0].text === '영업 고객 정보 수정 — 대표 나이')
+  check('미팅: 고객 정보 — 안 바뀌면 그대로', withSalesProfile(rec, { ceoAge: 58, memo: '메모' }) === rec)
+  const bare = normalizeClientOps({ id: 'b', workspaceId: null, companyName: '빈', status: 'waiting', createdAt: at, updatedAt: at, sales: { stage: 'lead', source: '', referrer: '', interests: [], concern: '', expectedFee: null, history: [], movedAt: at } })
+  const fm = profileFromMemo(bare, '제조업 매출 35억 직원 26명 대표 58세 자녀 근무 가지급금')
+  check('미팅: 메모로 빈 칸 채우기 — 나이 · 매출 · 체크', fm.patch.ceoAge === 58 && fm.patch.revenueM === 3500 && fm.patch.flags?.childWorks === true && fm.patch.flags?.gajigeup === true && fm.filled.length === 3, JSON.stringify(fm))
+  check('미팅: 메모로 채우기 — 이미 적은 값은 덮지 않는다', profileFromMemo(rec, '대표 40세 매출 10억').filled.length === 0)
+
+  // 미팅 기록
+  const mn = withMeetingNote(rec, { round: 1, text: ' 가지급금 관심 있어요 ', analysis: ta, nextAction: '2차 미팅 준비', nextActionDueDate: '2026-09-30' }, at)
+  check('미팅: 기록 — 미팅 목록 · 다음 할 일 · 활동 기록', mn.sales?.meetings?.[0].round === 1 && mn.sales.meetings[0].text === '가지급금 관심 있어요' && mn.nextAction === '2차 미팅 준비' && mn.nextActionDueDate === '2026-09-30' && mn.activity[0].text.startsWith('1차 미팅 기록 — 신중·부담 반응 추정'))
+  check('미팅: 기록 — 다음 할 일을 비우면 그대로', withMeetingNote(rec, { round: 2, text: 'x', analysis: ta, nextAction: '' }).nextAction === rec.nextAction)
+  check('미팅: 기록 — 단계는 따로 옮긴다(기록만으로는 안 바뀜)', mn.sales?.stage === 'm1sched')
+
+  // 옮기기가 2단계 칸도 가져온다
+  const mv = importLegacySalesAccounts([normalizeClientOps({ id: 'lg', workspaceId: null, companyName: '옛', status: 'waiting', createdAt: at, updatedAt: at })], [{ clientId: 'lg', data: { stage: 'lead', ceoAge: 61, revenue: '2000', flags: { hiring: true }, memo: '옛 메모' } }], at)
+  check('미팅: 옛 기록 옮기기 — 나이 · 매출 · 체크 · 메모도', mv[0].sales?.ceoAge === 61 && mv[0].sales.revenueM === 2000 && mv[0].sales.flags?.hiring === true && mv[0].sales.memo === '옛 메모')
+
+  check('미팅: 탭 — 영업 보드 · 미팅 준비, 1차 미팅 체크리스트 자리와 다른 주소', SALES_TABS.map((t) => t.to).join() === '/sales/board,/sales/meeting' && moduleForPath('/sales/meeting')?.key === 'sales' && moduleForPath('/sales/first-meeting')?.key === 'first-meeting')
 }
 
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)
