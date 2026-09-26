@@ -60,12 +60,20 @@ export function normalizeEstablished(v: string): string {
   return `${m[1]}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`
 }
 
+/** PDF 에서 읽은 이름의 띄어쓰기 정리 — '테스트산업 ( 주 )' → '테스트산업(주)' */
+export function tidyCompanyName(v: string): string {
+  return v
+    .replace(/\s*\(\s*(주|유|합|사)\s*\)\s*/g, '($1)')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
 export function cretopCompany(ui: CretopMiniUi): CretopCompany {
   const co = (ui.companyInfo ?? {}) as Record<string, unknown>
   const grade = s(co.creditGrade)
   const emp = parseInt(s(co.employees).replace(/[^0-9]/g, ''), 10)
   return {
-    name: s(co.companyName),
+    name: tidyCompanyName(s(co.companyName)),
     bizNo: s(co.businessNo),
     corpRegNo: s(co.corpRegNo),
     ceo: s(co.ceoName),

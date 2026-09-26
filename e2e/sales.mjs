@@ -156,7 +156,8 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
 
   // 테마 — 보드의 강조색(고른 칸 · 버튼)은 테마 brand 색을 따른다
   await page.goto(BASE + '/sales/board', { waitUntil: 'networkidle' })
-  const btnColor = async () => page.getByRole('button', { name: /새 잠재고객/ }).evaluate((el) => getComputedStyle(el).backgroundColor)
+  // D-119: 보드의 주 단추는 '크레탑으로 등록'(새 잠재고객은 흰 단추로)
+  const btnColor = async () => page.getByTestId('board-cretop-intake').evaluate((el) => getComputedStyle(el).backgroundColor)
   const c1 = await btnColor()
   const cur = await page.evaluate(() => document.documentElement.getAttribute('data-theme'))
   await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), cur === 'forest-sage' ? 'burgundy' : 'forest-sage')

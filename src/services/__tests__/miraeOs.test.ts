@@ -81,7 +81,7 @@ import { engineIndustry, profileFromMemo, roundForStage, stageAfterMeeting, toEn
 import salesAppSource from '../../tools/salesKit/orig/SalesApp.jsx?raw'
 import cretopCompanyText from '../../../e2e/fixtures/cretop-company.txt?raw'
 import { analyzeCretopText } from '../../tools/cretop/mini/analysisCore.js'
-import { applyCretopToClient, companyKey, cretopForMeeting, cretopResultInput, cretopTier, digestCretop, findClientForCretop, meetingPicks, normalizeEstablished, FLOW_ROUND } from '../salesCretop'
+import { applyCretopToClient, tidyCompanyName, companyKey, cretopForMeeting, cretopResultInput, cretopTier, digestCretop, findClientForCretop, meetingPicks, normalizeEstablished, FLOW_ROUND } from '../salesCretop'
 import { SALES_PATH_INFO, buildJourney, journeyTools, withSalesPath } from '../salesJourney'
 import { withToolResult } from '../clientOpsService'
 import {
@@ -1544,7 +1544,7 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   // 크레탑 규칙 계산을 화면 밖에서 — 원본 buildResult 와 같은 칸
   const ui = analyzeCretopText(cretopCompanyText, null)
   const co = ui.companyInfo ?? {}
-  check('크레탑(화면 밖): 회사 · 사업자번호 · 대표 · 대표 나이', co.companyName === '한빛정밀(주)' && co.businessNo === '123-45-67890' && (co as Record<string, unknown>).ceoName === '김한빛' && ui.ceoAge === 64, JSON.stringify(co).slice(0, 200))
+  check('크레탑(화면 밖): 회사 · 사업자번호 · 대표 · 대표 나이', co.companyName === '한빛정밀(주)' && co.businessNo === '214-87-35291' && (co as Record<string, unknown>).ceoName === '김한빛' && ui.ceoAge === 64, JSON.stringify(co).slice(0, 200))
   check('크레탑(화면 밖): 주식가치 · 개인사업자 판별 칸도 만든다', 'bizForm' in ui && 'shares' in ui && 'stakeholders' in ui)
 
   const d = digestCretop(ui)
@@ -1554,13 +1554,14 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('다리: 체크 — 가지급금 · 대출', d.flags.gajigeup === true && d.flags.hasLoan === true, JSON.stringify(d.flags))
   check('다리: 고민 한 줄은 진단 요약의 가장 급한 줄', d.concern.includes('현금성 자산'), d.concern)
   check('다리: 순위 26개 · 등급 문턱 80/60/40', d.refs.length === 26 && cretopTier(80) === 'top' && cretopTier(60) === 'rec' && cretopTier(40) === 'cond' && cretopTier(39) === 'low')
+  check('다리: PDF 이름 띄어쓰기 정리', tidyCompanyName('테스트산업 ( 주 )') === '테스트산업(주)' && tidyCompanyName('( 주 ) 한빛') === '(주)한빛' && tidyCompanyName('한빛정밀(주)') === '한빛정밀(주)')
   check('다리: 설립일 모양 맞추기', normalizeEstablished('2008.4.5') === '2008-04-05' && normalizeEstablished('2011년') === '2011-01-01' && normalizeEstablished('모름') === '')
   check('다리: 질문 흐름 차수 — A·B·C 1차 · D 2차 · E 3차', FLOW_ROUND.A === 1 && FLOW_ROUND.C === 1 && FLOW_ROUND.D === 2 && FLOW_ROUND.E === 3)
 
   // 같은 업체 찾기
   const mkc = (id: string, extra: Record<string, unknown> = {}) => normalizeClientOps({ id, workspaceId: null, companyName: id, status: 'waiting', createdAt: at, updatedAt: at, ...extra })
   const other = mkc('다른회사')
-  const byBiz = mkc('한빛', { businessNumber: '1234567890' })
+  const byBiz = mkc('한빛', { businessNumber: '2148735291' })
   const byName = mkc('한빛정밀 주식회사')
   check('같은 업체: 사업자번호(숫자만) 먼저', findClientForCretop([other, byBiz, byName], d.company)?.id === '한빛')
   check('같은 업체: 이름 — (주) · 주식회사 · 띄어쓰기 무시', findClientForCretop([other, byName], d.company)?.id === '한빛정밀 주식회사' && companyKey('㈜ 한빛 정밀') === '한빛정밀')
@@ -1569,7 +1570,7 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   // 고객 기록에 채우기 — 빈 칸만
   const fresh = mkc('한빛정밀(주)', { representativeName: '직접적은대표' })
   const { record: filled, filled: labels } = applyCretopToClient(fresh, d, { at, source: '소개' })
-  check('채우기: 빈 칸만 — 사람이 적은 대표는 그대로', filled.representativeName === '직접적은대표' && filled.businessNumber === '123-45-67890' && filled.employeeCount === '23명' && filled.establishedAt === '2008-04-15' && !labels.includes('대표자'), labels.join())
+  check('채우기: 빈 칸만 — 사람이 적은 대표는 그대로', filled.representativeName === '직접적은대표' && filled.businessNumber === '214-87-35291' && filled.employeeCount === '23명' && filled.establishedAt === '2008-04-15' && !labels.includes('대표자'), labels.join())
   check('채우기: 영업 칸 — 잠재 고객 · 유입 경로 · 관심사 · 대표 나이 · 매출', filled.sales?.stage === 'lead' && filled.sales.source === '소개' && filled.sales.interests.includes('정책자금') && filled.sales.ceoAge === 64 && filled.sales.revenueM === 6704)
   check('채우기: 활동 기록 두 줄(등록 · 채움)', filled.activity.length === 2 && filled.activity.some((a) => a.text.startsWith('잠재고객 등록 · 크레탑')) && filled.activity.some((a) => a.text.startsWith('크레탑으로 기본 정보 채움')))
   const withOwn = mkc('기존', { sales: { stage: 'm1done', source: '전화', referrer: '', interests: ['절세'], concern: '내 고민', expectedFee: null, history: [], movedAt: at, ceoAge: 50 } })

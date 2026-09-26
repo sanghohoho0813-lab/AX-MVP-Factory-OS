@@ -966,8 +966,10 @@ function RecCard({ rk, selected, onToggle }) {
 }
 // 티어 그룹(헤더 + 카드들)
 // [D-119] 조건 확인 · 가능성 낮음 등급은 접어 둔다(펼치면 그대로) — 먼저 볼 것만 앞에
-function TierGroup({ emoji, label, col, items, selectedSet, onToggle, folded }) {
+function TierGroup({ emoji, label, col, items, selectedSet, onToggle, folded, limit }) {
   const [open, setOpen] = useState(!folded);
+  const [all, setAll] = useState(false);   // [D-119] 많은 등급(검토 권장 16개 등)은 앞 몇 개만, 나머지는 '더 보기'
+  const shown = (all || !limit) ? items : items.slice(0, limit);
   if (!open) return (
     <button type="button" data-testid="cretop-tier-folded" onClick={() => setOpen(true)} style={{ display: "flex", alignItems: "center", gap: 7, width: "100%", border: `1px dashed ${T.line}`, background: "#fff", borderRadius: 10, padding: "9px 12px", fontFamily: FF, cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>
       <span style={{ fontSize: "calc(14px * var(--fs,1))" }}>{emoji}</span>
@@ -983,7 +985,8 @@ function TierGroup({ emoji, label, col, items, selectedSet, onToggle, folded }) 
         <span style={{ fontSize: "calc(14px * var(--fs,1))", fontWeight: 900, color: col }}>{label}</span>
         <span style={{ fontSize: "calc(11.5px * var(--fs,1))", color: T.mute, fontWeight: 700 }}>({items.length})</span>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(100%,360px),1fr))", gap: 10 }}>{items.map((rk) => <RecCard key={rk.s.name} rk={rk} selected={selectedSet && selectedSet.has(rk.s.name)} onToggle={onToggle} />)}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(100%,360px),1fr))", gap: 10 }}>{shown.map((rk) => <RecCard key={rk.s.name} rk={rk} selected={selectedSet && selectedSet.has(rk.s.name)} onToggle={onToggle} />)}</div>
+      {shown.length < items.length ? <button type="button" data-testid="cretop-tier-more" onClick={() => setAll(true)} style={{ marginTop: 8, width: "100%", border: `1px dashed ${T.line}`, background: "#fff", color: T.brand, borderRadius: 10, padding: "8px 12px", fontFamily: FF, fontSize: "calc(12px * var(--fs,1))", fontWeight: 800, cursor: "pointer" }}>{label} {items.length - shown.length}개 더 보기 ▾</button> : null}
     </div>
   );
 }
@@ -1121,7 +1124,7 @@ function RecommendationBoard({ ui }) {
       <RecoSettings mode={mode} setMode={setModeP} interests={interests} toggle={toggle} />
       {modeNotice ? <div style={{ fontSize: "calc(12px * var(--fs,1))", color: "#92400E", background: "#FFFBEB", border: `1px solid #FDE68A`, borderRadius: 9, padding: "10px 12px", lineHeight: 1.55, fontWeight: 700 }}>ℹ️ {modeNotice}</div> : null}
       {pinned.length ? <TierGroup emoji="⭐" label="관심 항목" col={T.brand} items={pinned} selectedSet={selectedSet} onToggle={onToggle} /> : null}
-      {groups.map((g) => g.items.length ? <TierGroup key={g.t.key} emoji={g.t.emoji} label={g.t.label} col={g.t.col} items={g.items} selectedSet={selectedSet} onToggle={onToggle} folded={g.t.key === "cond" || g.t.key === "low"} /> : null)}
+      {groups.map((g) => g.items.length ? <TierGroup key={g.t.key} emoji={g.t.emoji} label={g.t.label} col={g.t.col} items={g.items} selectedSet={selectedSet} onToggle={onToggle} folded={g.t.key === "cond" || g.t.key === "low"} limit={g.t.key === "rec" ? 6 : undefined} /> : null)}
       {corpOnly.length ? <CorpOnlyFold items={corpOnly} /> : null}
     </div>
   );

@@ -220,7 +220,14 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
             ))}
           </div>
           {mode === 'pdf' ? (
-            <label className="flex cursor-pointer flex-col items-center gap-2 rounded-(--radius-control) border-2 border-dashed border-brand-200 bg-brand-50/40 px-4 py-8 text-center hover:bg-brand-50">
+            <label
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault()
+                void onPick(e.dataTransfer.files?.[0])
+              }}
+              className="flex cursor-pointer flex-col items-center gap-2 rounded-(--radius-control) border-2 border-dashed border-brand-200 bg-brand-50/40 px-4 py-8 text-center hover:bg-brand-50"
+            >
               <FileUp aria-hidden="true" className="size-7 text-brand-500" />
               <span className="t-body font-semibold text-brand-700">{busy ? status || '읽는 중…' : '크레탑 PDF 고르기'}</span>
               <span className="t-meta text-slate-500">{file ? file.name : '누르거나 파일을 끌어다 놓으세요 · PDF · TXT'}</span>
