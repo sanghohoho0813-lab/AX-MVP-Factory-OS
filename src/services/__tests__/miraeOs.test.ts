@@ -84,6 +84,10 @@ import { analyzeCretopText } from '../../tools/cretop/mini/analysisCore.js'
 import { applyCretopToClient, tidyCompanyName, companyKey, cretopForMeeting, cretopResultInput, cretopTier, digestCretop, findClientForCretop, meetingPicks, normalizeEstablished, FLOW_ROUND } from '../salesCretop'
 import { SALES_PATH_INFO, buildJourney, journeyTools, withSalesPath } from '../salesJourney'
 import { withToolResult } from '../clientOpsService'
+import { NEXT_QUICK_DAYS, addDaysLocal, friendlyDate, nextSuggestions, relativeDay, suggestsFirstMeeting, withNextAction } from '../clientOpsNextAction'
+import { buildClientSchedule } from '../clientOpsSchedule'
+import { localDateOf } from '../../lib/appClock'
+import { trialEndDate } from '../moduleAccess'
 import {
   CONTRACT_CHECKLIST,
   DEFAULT_PACKAGES,
@@ -1624,6 +1628,45 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('영업 흐름: 계약 뒤 추가 제안 — 이미 제안한 정책자금은 빼고 크레탑 추천에서', jw.steps[5].tasks.length > 0 && jw.steps[5].tasks.every((t) => t.label.startsWith('추가 제안 · ') && !t.label.includes('정책자금')), jw.steps[5].tasks.map((t) => t.label).join())
   const held = { ...m1, sales: { ...m1.sales, stage: 'hold' as const, history: [{ at, from: null, to: 'lead' as const }, { at, from: 'lead' as const, to: 'm2' as const }, { at, from: 'm2' as const, to: 'hold' as const }] } }
   check('영업 흐름: 보류는 거기까지 갔던 걸음(2차)에서', buildJourney(held, { today }).current === 'm2')
+}
+
+/* ------------------------------------------------------------------ */
+/* D-120 다음 약속 · 로컬 날짜                                            */
+/* ------------------------------------------------------------------ */
+{
+  const at = '2026-09-26T09:00:00.000Z'
+  const mk = (extra: Record<string, unknown> = {}) => normalizeClientOps({ id: 'n1', workspaceId: null, companyName: '약속상사', status: 'waiting', createdAt: at, updatedAt: at, ...extra })
+  const lead = mk({ sales: { stage: 'lead', source: '', referrer: '', interests: [], concern: '', expectedFee: null, history: [], movedAt: at } })
+
+  // 날짜 말
+  check('다음 약속: 날짜 더하기(달 넘김)', addDaysLocal('2026-09-29', 3) === '2026-10-02' && addDaysLocal('2026-12-31', 1) === '2027-01-01')
+  check('다음 약속: 9월 29일(화)', friendlyDate('2026-09-29') === '9월 29일(화)' && friendlyDate('모름') === '모름')
+  check('다음 약속: 오늘 · 내일 · 모레 · n일 뒤 · n일 지남', relativeDay('2026-09-26', '2026-09-26') === '오늘' && relativeDay('2026-09-27', '2026-09-26') === '내일' && relativeDay('2026-09-28', '2026-09-26') === '모레' && relativeDay('2026-10-03', '2026-09-26') === '7일 뒤' && relativeDay('2026-09-24', '2026-09-26') === '2일 지남')
+  check('다음 약속: 빨리 고르기 5개(오늘 ~ 2주 뒤)', NEXT_QUICK_DAYS.map((q) => q.days).join() === '0,1,3,7,14')
+  check('다음 약속: 단계별 자주 쓰는 말', nextSuggestions(lead)[0] === '1차 미팅' && nextSuggestions(mk({ status: 'active' }))[0] === '진행 상황 보고')
+
+  // 바꾸기
+  const a = withNextAction(lead, ' 1차 미팅 ', '2026-09-29', { at })
+  check('다음 약속: 적기 — 글 · 날짜 · 활동 기록', a.nextAction === '1차 미팅' && a.nextActionDueDate === '2026-09-29' && a.activity[0].text === '다음 할 일 · 1차 미팅 · 2026-09-29')
+  check('다음 약속: 같으면 그대로(기록도 안 늘어남)', withNextAction(a, '1차 미팅', '2026-09-29', { at }) === a)
+  check('다음 약속: 이상한 날짜는 비운다', withNextAction(lead, '전화', '9/29', { at }).nextActionDueDate === '')
+  check('다음 약속: 비우기', withNextAction(a, '', '', { at }).nextAction === '' && withNextAction(a, '', '', { at }).activity[0].text === '다음 할 일 비움')
+  check('다음 약속: 잠재 + 1차 미팅 + 날짜면 1차 미팅 예정으로 옮길지 묻는다', suggestsFirstMeeting(lead, '1차 미팅', '2026-09-29') && !suggestsFirstMeeting(lead, '1차 미팅', '') && !suggestsFirstMeeting(lead, '전화', '2026-09-29'))
+  const moved = withNextAction(lead, '1차 미팅', '2026-09-29', { moveToM1: true, at })
+  check('다음 약속: 옮기기를 고르면 1차 미팅 예정', moved.sales?.stage === 'm1sched' && withNextAction(lead, '1차 미팅', '2026-09-29', { moveToM1: false, at }).sales?.stage === 'lead')
+
+  // 일정 · 오늘
+  const ev = buildClientSchedule(a, '2026-09-26').filter((e) => e.kind === 'next')
+  check('일정: 다음 약속이 달력에 — 제목 · 남은 날', ev.length === 1 && ev[0].title === '1차 미팅' && ev[0].daysLeft === 3 && ev[0].done === false)
+  check('일정: 지나도 끝난 것으로 치지 않는다(바꿀 때까지)', buildClientSchedule(a, '2026-10-05').find((e) => e.kind === 'next')?.done === false)
+  check('일정: 날짜가 없으면 달력에 없다', buildClientSchedule(withNextAction(lead, '전화', '', { at }), '2026-09-26').every((e) => e.kind !== 'next'))
+  check('일정: 보관한 업체는 없다', buildClientSchedule({ ...a, archivedAt: at }, '2026-09-26').length === 0)
+
+  // 로컬 날짜
+  const kstEarly = new Date(2026, 8, 26, 7, 30) // 로컬 9월 26일 오전 7:30
+  check('로컬 날짜: 저장 시각 → 로컬 날짜(UTC 가 전날이어도)', localDateOf(kstEarly.toISOString()) === '2026-09-26')
+  check('로컬 날짜: 날짜는 그대로 · 빈 값은 빈 글자', localDateOf('2026-09-26') === '2026-09-26' && localDateOf('') === '' && localDateOf(null) === '')
+  check('체험 끝나는 날: 오늘 + 14일(하루 당겨지지 않음)', trialEndDate('2026-09-26') === '2026-10-10' && trialEndDate('2026-12-25', 14) === '2027-01-08')
 }
 
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)

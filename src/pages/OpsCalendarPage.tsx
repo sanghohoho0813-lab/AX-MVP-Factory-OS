@@ -32,7 +32,7 @@ import { PageHeader } from '../components/ui/PageHeader'
 import { ScheduleTabs } from '../components/journal/ScheduleTabs'
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
-const KINDS: ScheduleKind[] = ['task', 'funding', 'payment', 'document', 'tool']
+const KINDS: ScheduleKind[] = ['next', 'task', 'funding', 'payment', 'document', 'tool']
 
 function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; userId: string | null }) {
   const navigate = useNavigate()

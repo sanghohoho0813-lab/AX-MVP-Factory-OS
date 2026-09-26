@@ -243,6 +243,10 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
         <span className="hidden min-[1700px]:inline-flex">
           <CloudSaveStatus state={isSupabase ? 'saved' : 'local'} compact={false} />
         </span>
+        {/* D-120: 1360px 아래에서도 찾기 — 예전에는 Ctrl+K 로만 열렸다 */}
+        <span className="inline-flex min-[1360px]:hidden">
+          <GlobalSearch compact />
+        </span>
         <SignalBell />
         <Link
           to="/settings"

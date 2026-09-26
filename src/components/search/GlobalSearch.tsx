@@ -1,10 +1,11 @@
 /**
  * 전역 빠른 이동 검색. 상단 검색을 누르거나 Ctrl/Cmd+K, `/` 로 연다.
- * 고객사·프로젝트·지금 해야 할 일·도구함·결과 자료를 그룹으로 찾아 실제 화면으로 이동한다.
+ * 고객 관리 업체(D-120 — 대표자 · 사업자번호 · 전화 뒷자리로도)·고객사·프로젝트·지금 해야 할 일·도구함·결과 자료를
+ * 그룹으로 찾아 실제 화면으로 이동한다.
  * 외부 라이브러리 없이 구현한다.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Search, CornerDownLeft } from 'lucide-react'
@@ -14,9 +15,14 @@ import { computeProjectJourney } from '../../services/journeyService'
 import { useActiveProject } from '../../context/activeProject'
 import { peekProjectCache } from '../../domain/consulting/projectCache'
 import { searchTools } from '../../config/toolRegistry'
+import { AuthContext } from '../../auth/authContext'
+import { listClients } from '../../services/clientOpsService'
+import { matchesClientSearch } from '../../services/clientOpsSearch'
+import { isProspect } from '../../services/salesPipeline'
+import type { ClientOpsRecord } from '../../types/clientOps'
 
 interface Hit {
-  group: '고객사' | '프로젝트' | '특허+벤처' | '지금 해야 할 일' | '컨설팅 작업실' | '결과·자료'
+  group: '고객 관리' | '고객사' | '프로젝트' | '특허+벤처' | '지금 해야 할 일' | '컨설팅 작업실' | '결과·자료'
   label: string
   sublabel?: string
   onSelect: () => void
@@ -29,13 +35,35 @@ const RESULT_SHORTCUTS: { label: string; keywords: string; path: string }[] = [
   { label: '전체 진행 현황', keywords: '전체 진행 현황 리포트 대시보드', path: '/reports' },
 ]
 
-export function GlobalSearch() {
+/**
+ * compact: 좁은 화면(1360px 아래)용 '찾기' 단추(D-120) — 예전에는 그 폭에서 검색 칸이 사라지고 Ctrl+K 로만 열렸다.
+ * 단축키는 넓은 칸 하나만 듣는다(두 곳이 함께 열리지 않게).
+ */
+export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
   const navigate = useNavigate()
   const { setActiveProject } = useActiveProject()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  // D-120: 고객 관리 업체 — 열 때마다 새로 읽는다(못 읽으면 이 묶음만 빠진다)
+  const auth = useContext(AuthContext)
+  const workspaceId = auth?.currentWorkspaceId ?? null
+  const [opsClients, setOpsClients] = useState<ClientOpsRecord[]>([])
+  useEffect(() => {
+    if (!open) return
+    let alive = true
+    listClients(workspaceId)
+      .then((list) => {
+        if (alive) setOpsClients(list.filter((r) => r.archivedAt === null))
+      })
+      .catch(() => {
+        /* 검색은 다른 묶음으로 계속 */
+      })
+    return () => {
+      alive = false
+    }
+  }, [open, workspaceId])
 
   const close = useCallback(() => { setOpen(false); setQuery(''); setActive(0) }, [])
 
@@ -47,6 +75,7 @@ export function GlobalSearch() {
     openRef.current = open
   }, [open])
   useEffect(() => {
+    if (compact) return
     const onKey = (e: KeyboardEvent) => {
       const cmdK = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k'
       const slash = e.key === '/' && !/input|textarea|select/i.test((e.target as HTMLElement)?.tagName ?? '')
@@ -61,7 +90,19 @@ export function GlobalSearch() {
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [close])
+  }, [close, compact])
+  // compact 는 열려 있을 때만 Esc 를 듣는다
+  useEffect(() => {
+    if (!compact || !open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopImmediatePropagation()
+        close()
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [compact, open, close])
 
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 20)
@@ -73,6 +114,19 @@ export function GlobalSearch() {
     const orgs = organizationRepository.getAll()
     const projects = projectRepository.getAll().filter((p) => p.status !== 'archived')
     const out: Hit[] = []
+
+    // 고객 관리 업체 — 회사명 · 대표자 · 담당자 · 사업자번호 · 전화 뒷자리 · 직접 만든 칸
+    if (q) {
+      for (const r of opsClients.filter((c) => matchesClientSearch(c, query)).slice(0, 8)) {
+        const who = r.representativeName || r.contactName
+        out.push({
+          group: '고객 관리',
+          label: r.companyName,
+          sublabel: [isProspect(r) ? '잠재고객' : '계약 고객', who, r.contactPhone || r.businessNumber].filter(Boolean).join(' · '),
+          onSelect: () => { navigate(`/ops/clients/${r.id}`); close() },
+        })
+      }
+    }
 
     for (const o of orgs) {
       if (!q || `${o.name} ${o.industry} ${o.primaryContact.name}`.toLowerCase().includes(q)) {
@@ -113,7 +167,7 @@ export function GlobalSearch() {
     }
     return out.slice(0, 24)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, query])
+  }, [open, query, opsClients])
 
   useEffect(() => { setActive(0) }, [query])
 
@@ -133,6 +187,18 @@ export function GlobalSearch() {
 
   return (
     <>
+      {compact ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="찾기 — 업체 · 대표 · 전화번호 · 도구"
+          data-testid="search-compact"
+          className="flex size-10 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-600 hover:bg-slate-100 hover:text-slate-800 sm:w-auto sm:gap-1.5 sm:px-3"
+        >
+          <Search aria-hidden="true" className="size-5" />
+          <span className="hidden text-[0.95rem] font-medium sm:inline">찾기</span>
+        </button>
+      ) : (
       <button
         type="button"
         onClick={() => setOpen(true)}
@@ -140,9 +206,10 @@ export function GlobalSearch() {
       >
         <Search aria-hidden="true" className="size-4 shrink-0" />
         {/* min-w-0 이 없으면 좁은 화면에서 글자가 칸 밖으로 삐져나와 옆 버튼을 덮는다 */}
-        <span className="min-w-0 truncate">고객사·프로젝트·도구 검색</span>
+        <span className="min-w-0 truncate">업체·대표·전화·도구 찾기</span>
         <kbd className="ml-auto hidden shrink-0 rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[0.75rem] font-medium text-slate-400 2xl:inline">Ctrl K</kbd>
       </button>
+      )}
 
       {/* D-94: body 로 띄운다 — 머리줄 안에 있으면 머리줄 층(z) 에 갇혀 모듈 창(영업 고객 등록 등) 뒤에 깔렸다 */}
       {open && createPortal(
@@ -156,7 +223,7 @@ export function GlobalSearch() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={onKeyDown}
-                placeholder="고객사·프로젝트·할 일·도구 검색"
+                placeholder="업체 이름 · 대표 · 전화번호 뒷자리 · 도구"
                 className="h-14 w-full bg-transparent text-[1.05rem] text-slate-900 outline-none placeholder:text-slate-400"
               />
             </div>

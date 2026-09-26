@@ -436,6 +436,11 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
               ))}
             </select>
           </label>
+          {!record && clientId !== '' && (
+            <p role="status" data-testid="client-missing" className="t-body rounded-(--radius-control) border border-warning-200 bg-warning-50 px-4 py-3 break-keep text-slate-800">
+              이 업체를 찾을 수 없습니다 — 보관했거나 지운 업체일 수 있습니다. 위 칸에서 다른 업체를 골라 주세요.
+            </p>
+          )}
 
           {record && item && (
             <>
@@ -444,6 +449,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                 record={record}
                 today={today}
                 onPathChange={(path) => void persist(withSalesPath(record, path), path ? '계약 경로를 정했습니다.' : '계약 경로를 비웠습니다.')}
+                onSave={(n, m) => persist(n, m)}
               />
 
               {/* 요약 — 누구 · 어디까지 · 점수 · 무엇부터 */}

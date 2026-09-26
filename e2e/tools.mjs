@@ -277,7 +277,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(700)
   await page.keyboard.press('Control+k')
   await page.waitForTimeout(500)
-  check('Ctrl+K: OS 검색만 뜬다', (await page.getByPlaceholder('고객사·프로젝트·할 일·도구 검색').count()) === 1 && (await page.getByPlaceholder('업체명, 직원명, 지원금명으로 검색…').count()) === 0)
+  check('Ctrl+K: OS 검색만 뜬다', (await page.getByPlaceholder('업체 이름 · 대표 · 전화번호 뒷자리 · 도구').count()) === 1 && (await page.getByPlaceholder('업체명, 직원명, 지원금명으로 검색…').count()) === 0)
   await page.keyboard.press('Escape')
 
   /* ---- D-92: 연구소 — 원본 화면 그대로 · 고객사는 고객 운영 업체에서 고른다 ---- */

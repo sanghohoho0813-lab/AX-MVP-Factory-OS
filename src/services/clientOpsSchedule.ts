@@ -1,7 +1,7 @@
 /**
  * 일정 수집 — 전 업체의 모든 기한을 한 목록으로 모은다 (순수 함수).
  *
- * 모으는 것: 업무 마감 · 정책자금 신청 마감 · 수금 예정일 · 서류 유효기간 만료일.
+ * 모으는 것: 업무 마감 · 정책자금 신청 마감 · 수금 예정일 · 서류 유효기간 만료일 · 다음 약속(D-120).
  * 달력·오늘 화면이 이 결과만 사용한다.
  */
 
@@ -15,7 +15,7 @@ import {
 import { documentStatus, daysLeftFrom } from './clientOpsAlerts'
 import { todayLocalDate } from '../lib/appClock'
 
-export type ScheduleKind = 'task' | 'funding' | 'payment' | 'document' | 'tool'
+export type ScheduleKind = 'next' | 'task' | 'funding' | 'payment' | 'document' | 'tool'
 
 export interface ScheduleEvent {
   id: string
@@ -34,6 +34,7 @@ export interface ScheduleEvent {
 }
 
 export const SCHEDULE_KIND_LABEL: Record<ScheduleKind, string> = {
+  next: '다음 약속',
   task: '업무 마감',
   funding: '정책자금 신청',
   payment: '수금 예정',
@@ -49,6 +50,7 @@ export const SCHEDULE_KIND_LABEL: Record<ScheduleKind, string> = {
  * 색 모자이크가 되어 정작 '오늘 뭐가 있나' 가 보이지 않는다.
  */
 export const SCHEDULE_KIND_CLASS: Record<ScheduleKind, { dot: string; chip: string }> = {
+  next: { dot: 'bg-brand-600', chip: 'border-brand-200 bg-brand-50 text-brand-800' },
   task: { dot: 'bg-cat-plan-500', chip: 'border-slate-200 bg-white text-slate-600' },
   funding: { dot: 'bg-cat-fund-500', chip: 'border-slate-200 bg-white text-slate-600' },
   payment: { dot: 'bg-cat-money-500', chip: 'border-slate-200 bg-white text-slate-600' },
@@ -61,6 +63,22 @@ export function buildClientSchedule(record: ClientOpsRecord, today: string): Sch
   if (record.archivedAt !== null) return []
   const out: ScheduleEvent[] = []
   const name = record.companyName || '(이름 없음)'
+
+  // 다음 약속 (D-120) — 1차 미팅 · 자료 받기 · 견적 회신 … 지나도 '끝남' 이 아니다(바꿀 때까지 남는다)
+  if (record.nextActionDueDate) {
+    out.push({
+      id: `${record.id}:next`,
+      date: record.nextActionDueDate,
+      kind: 'next',
+      clientId: record.id,
+      clientName: name,
+      title: record.nextAction || '다음 할 일',
+      detail: '다음 약속',
+      serviceKey: null,
+      done: false,
+      daysLeft: daysLeftFrom(today, record.nextActionDueDate),
+    })
+  }
 
   // 업무 마감
   for (const meta of SERVICES) {

@@ -216,7 +216,13 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const clientNames = useMemo(() => new Map(clients.map((c) => [c.id, c.companyName])), [clients])
   const alerts = useMemo(() => buildAllAlerts(clients, today), [clients, today])
   const schedule = useMemo(() => buildAllSchedule(clients, today), [clients, today])
-  const weekDue = useMemo(() => upcomingWithin(schedule, 7).filter((e) => !e.done), [schedule])
+  // '이번 주 마감' 은 마감만 — 다음 약속(D-120)은 아래 '약속' 줄에 따로
+  const weekDue = useMemo(() => upcomingWithin(schedule, 7).filter((e) => !e.done && e.kind !== 'next'), [schedule])
+  /** 다음 약속 — 지난 것 · 오늘 · 내일 (D-120). 날짜 순 */
+  const appointments = useMemo(
+    () => schedule.filter((e) => e.kind === 'next' && e.daysLeft !== null && e.daysLeft <= 1).sort((a, b) => a.date.localeCompare(b.date)),
+    [schedule],
+  )
   const waiting = useMemo(
     // 업체 수준의 '고객 대기' 는 계약 단계로 바뀌면서 사라졌다 — 경고만 센다
     () => alerts.filter((a) => a.kind === 'waiting_too_long').length,
@@ -403,6 +409,32 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               />
             ))}
           </ul>
+        )}
+
+        {/* D-120: 다음 약속 — 업체마다 적어 둔 '다음에 무엇을, 언제' 가운데 지난 것 · 오늘 · 내일 */}
+        {appointments.length > 0 && (
+          <div data-testid="today-appointments" className="flex flex-col gap-2">
+            <p className="t-sub font-semibold text-slate-700">업체 약속 {appointments.length}건</p>
+            <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-control) border border-slate-200 bg-white">
+              {appointments.map((e) => {
+                const late = (e.daysLeft ?? 0) < 0
+                return (
+                  <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                    <span className={`t-sub w-16 shrink-0 font-semibold ${late ? 'text-danger-700' : 'text-brand-700'}`}>
+                      {e.daysLeft === 0 ? '오늘' : e.daysLeft === 1 ? '내일' : `${Math.abs(e.daysLeft ?? 0)}일 지남`}
+                    </span>
+                    <Link to={`/ops/clients/${e.clientId}`} className="t-body font-bold text-slate-900 hover:text-brand-700 hover:underline">
+                      {e.clientName}
+                    </Link>
+                    <span className="t-body min-w-0 flex-[1_1_10rem] break-keep text-slate-700">{e.title}</span>
+                    <Link to={`/sales/meeting?client=${e.clientId}`} className="t-sub ml-auto shrink-0 font-semibold text-brand-700 hover:underline">
+                      준비하기 →
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
         )}
 
         {/* 끝낸 것은 접어 둔다 — 남은 일이 목록의 전부여야 한다 */}

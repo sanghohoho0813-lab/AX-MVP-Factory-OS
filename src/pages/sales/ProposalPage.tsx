@@ -541,6 +541,11 @@ function ProposalContent({ workspaceId }: { workspaceId: string | null }) {
               ))}
             </select>
           </label>
+          {!record && clientId !== '' && (
+            <p role="status" data-testid="client-missing" className="t-body rounded-(--radius-control) border border-warning-200 bg-warning-50 px-4 py-3 break-keep text-slate-800">
+              이 업체를 찾을 수 없습니다 — 보관했거나 지운 업체일 수 있습니다. 위 칸에서 다른 업체를 골라 주세요.
+            </p>
+          )}
           {record && (
             <>
               <p className="flex flex-wrap items-center gap-2">

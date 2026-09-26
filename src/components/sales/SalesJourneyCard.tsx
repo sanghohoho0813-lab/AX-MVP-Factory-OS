@@ -6,6 +6,7 @@
  * 잠긴 모듈(D-91)은 감추지 않고 '잠김' 으로 — 나중에 모듈별 결제를 붙이는 자리.
  * 색은 테마 띠(ramp) · 성공색만 쓴다(D-118 규칙).
  */
+import { NextStepEditor } from '../ops/NextStepEditor'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Check, Circle, Lock, Route, Wrench } from 'lucide-react'
@@ -20,6 +21,7 @@ export function SalesJourneyCard({
   today,
   onPathChange,
   compact = false,
+  onSave,
 }: {
   record: ClientOpsRecord
   today: string
@@ -27,6 +29,8 @@ export function SalesJourneyCard({
   onPathChange?: (path: SalesPath | null) => void
   /** 고객 상세처럼 다른 카드 사이에 둘 때 — 걸음 설명(hint)을 줄인다 */
   compact?: boolean
+  /** 주면 카드 위에 '다음 약속' 고치기가 붙는다(D-120) — 미팅 준비에서 */
+  onSave?: (next: ClientOpsRecord, msg: string) => void | boolean | Promise<void | boolean>
 }) {
   const access = useModuleAccessMap(record.workspaceId)
   const journey = useMemo(() => buildJourney(record, { today, access }), [record, today, access])
@@ -70,6 +74,11 @@ export function SalesJourneyCard({
         </div>
       </div>
       {path && <p className="t-meta -mt-1 break-keep text-slate-500">{SALES_PATH_INFO[path].label} — {SALES_PATH_INFO[path].hint}</p>}
+      {onSave && (
+        <div className="rounded-(--radius-control) border border-slate-200 px-3 py-2.5">
+          <NextStepEditor record={record} today={today} onSave={onSave} />
+        </div>
+      )}
 
       {/* 여섯 걸음 */}
       <ol className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-6">

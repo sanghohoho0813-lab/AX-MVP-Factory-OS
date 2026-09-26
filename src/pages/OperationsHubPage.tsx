@@ -666,6 +666,25 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
             줄바꿈시키면 몇 개가 되든 가로로는 넘치지 않는다.
             휴대폰과 데스크톱이 같은 부품을 쓴다 — 한쪽만 어긋날 일이 없다.
           */}
+          {/* D-120: 고른 보기 · 검색에 맞는 업체가 없으면 빈 화면 대신 알려 주고 바로 풀 수 있게 */}
+          {ordered.length === 0 && (
+            <div data-testid="clients-empty-filter" className="flex flex-col items-center gap-3 rounded-(--radius-panel) border border-dashed border-slate-300 bg-white px-5 py-10 text-center">
+              <p className="text-[1.1rem] font-bold text-slate-800">조건에 맞는 업체가 없습니다</p>
+              <p className="t-body break-keep text-slate-600">
+                {query.trim() ? `'${query.trim()}' 로 찾은 업체가 없습니다. ` : ''}보기 · 검색 조건을 풀면 전체 {records.length}곳이 보입니다.
+              </p>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setQuery('')
+                  setFilterKey('all')
+                  setSegment('all')
+                }}
+              >
+                조건 모두 풀기
+              </Button>
+            </div>
+          )}
           <ul className="ax-stagger flex flex-col gap-2.5 xl:grid xl:grid-cols-2">
             {ordered.map((record, i) => {
               const p = clientOpsProgress(record, today)

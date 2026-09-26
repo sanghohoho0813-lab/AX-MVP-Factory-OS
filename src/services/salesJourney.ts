@@ -263,15 +263,16 @@ export function buildJourney(record: ClientOpsRecord, opts: JourneyOptions): Jou
       {
         label: '1차 미팅 날짜',
         done: cur >= 1 || salesStageOf(record) === 'm1sched',
-        to: `/ops/clients/${id}`,
-        note: record.nextActionDueDate && cur === 0 ? `${record.nextActionDueDate} · ${record.nextAction || '다음 할 일'}` : '',
+        // D-120: 날짜는 카드 위 '다음 약속' 에서 바로 정한다(예전 링크는 날짜를 고칠 수 없는 업체 화면으로 갔다)
+        to: null,
+        note: record.nextActionDueDate && cur === 0 ? `${record.nextActionDueDate} · ${record.nextAction || '다음 할 일'}` : "'다음 약속' 에서 날짜를 정합니다",
       },
       { label: '1차 미팅 체크리스트 (AX)', done: false, to: '/sales/first-meeting', note: '준비 중 — 들어갈 자리', soon: true },
     ],
     m1: [
       { label: '1차 미팅 기록', done: had(1), to: `/sales/meeting?client=${id}&round=1`, note: lastM1 ? localDateOf(lastM1.at) : '' },
       { label: '요청 자료 받기', done: cur >= 2, to: `/ops/clients/${id}?tab=docs`, note: lastM1?.nextDocs.length ? lastM1.nextDocs.slice(0, 3).join(' · ') : `받은 서류 ${docsIn}` },
-      { label: '다음 미팅 약속', done: cur >= 2, to: `/ops/clients/${id}`, note: cur === 1 && record.nextActionDueDate ? record.nextActionDueDate : '' },
+      { label: '다음 미팅 약속', done: cur >= 2, to: null, note: cur === 1 && record.nextActionDueDate ? record.nextActionDueDate : "'다음 약속' 에서 정합니다" },
     ],
     m2: [
       { label: '제안서', done: !!s?.proposal, to: `/sales/proposal?client=${id}`, note: s?.proposal ? `${s.proposal.packages.length}개 · ${s.proposal.status}` : '' },

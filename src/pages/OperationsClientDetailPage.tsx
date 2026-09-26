@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { NextStepEditor } from '../components/ops/NextStepEditor'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -351,7 +352,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   /** 가장 임박한 마감 (헤더 표시) */
   const nearest = useMemo(() => {
     if (!record) return null
-    const upcoming = buildClientSchedule(record, today).filter((e) => !e.done)
+    // 다음 약속은 바로 아래 '지금 할 일' 에 있으므로 여기서는 마감만
+    const upcoming = buildClientSchedule(record, today).filter((e) => !e.done && e.kind !== 'next')
     return upcoming.sort((a, b) => a.date.localeCompare(b.date))[0] ?? null
   }, [record, today])
 
@@ -567,15 +569,19 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       <Surface showEdge edge={nextActionTone} className="!p-0">
         <div className="px-4 py-4 sm:px-5">
           <p className="t-meta font-semibold tracking-wide text-slate-500 uppercase">지금 할 일</p>
-          <p className="t-card mt-1 break-keep text-slate-900">
-            {record.nextAction || '다음 행동이 정해지지 않았습니다.'}
-          </p>
-          {record.nextActionDueDate && (
-            <p className={`t-sub mt-0.5 ${nextActionTone === 'danger' ? 'font-semibold text-danger-700' : 'text-slate-500'}`}>
-              {record.nextActionDueDate}까지
-              {nextActionDaysLeft !== null && ` · ${dueText(nextActionDaysLeft)}`}
-            </p>
-          )}
+          {/* D-120: 여기서 바로 고친다(예전에는 고칠 곳이 없었다). 적은 날짜는 일정 · 오늘 화면에 뜬다 */}
+          <div className="mt-1.5">
+            <NextStepEditor
+              record={record}
+              today={today}
+              label="다음 할 일"
+              onSave={async (n, msg) => {
+                const ok = await commit(n)
+                if (ok) showToast(msg)
+                return ok
+              }}
+            />
+          </div>
         </div>
         {startedServices.length > 0 && (
           <div className="border-t border-slate-100 px-4 py-3 sm:px-5">

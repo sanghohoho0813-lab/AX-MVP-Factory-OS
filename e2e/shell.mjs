@@ -59,7 +59,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('로고: 48px 로 커졌다', Math.round(logoH) === 48, String(logoH))
 
   // 검색 — 왼쪽, 좁게
-  const search = page.getByRole('button', { name: /검색/ }).first()
+  const search = page.getByRole('button', { name: /찾기/ }).first()
   const sBox = await search.boundingBox()
   const hBox = await page.locator('header').boundingBox()
   // 머리띠는 사이드바 오른쪽에서 시작하므로 가운데는 hBox.x + hBox.width / 2 다 (x 를 빼먹으면 늘 실패한다)
