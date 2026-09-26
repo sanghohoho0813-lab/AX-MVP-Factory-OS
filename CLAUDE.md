@@ -26,6 +26,7 @@ npm run qa:board  -- http://localhost:4390
 npm run qa:todos  -- http://localhost:4390
 npm run e2e:mobile -- http://localhost:4390
 npm run qa:sales  -- http://localhost:4390         # 영업 관리(보드 · 잠재고객 · 계약 고객 숫자)
+npm run qa:journey -- http://localhost:4390        # 영업 흐름(크레탑 → 잠재고객 → 미팅 준비 · 작업실 도구)
 npm run qa:squeeze -- http://localhost:4390 --all  # 짜부라진 글자 0
 npm run qa:modules -- http://localhost:4390       # 모듈 전 화면 오류·넘침 0 · 오류 울타리 · 인쇄 · 저장 공간 가득 참
 ```
