@@ -37,7 +37,7 @@ import { registerFromCretop } from '../../services/salesIntake'
 import { companyKey } from '../../services/salesCretop'
 import { withSalesPath } from '../../services/salesJourney'
 import { listClients, saveClient } from '../../services/clientOpsService'
-import { salesStageOf, withSalesStage } from '../../services/salesPipeline'
+import { salesStageOf, stageReached, withSalesStage } from '../../services/salesPipeline'
 import { SALES_INTERESTS } from '../../content/salesCatalog'
 import {
   interestsFromIssues,
@@ -437,6 +437,9 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
   // 차수 — 고르지 않았으면 단계로 정한다(잠재 고객은 첫 연락부터)
   const rp = params.get('round')
   const round: Round = rp === '0' || rp === '1' || rp === '2' || rp === '3' ? (Number(rp) as Round) : stage === 'lead' ? 0 : roundForStage(stage)
+  // D-124: 지금 기록할 수 있는 차수 — 그보다 뒤는 미리 보기
+  const liveRound: Round = roundForStage(stage)
+  const ahead = round > liveRound
 
   // D-124: 업체를 바꾸면 기록을 남긴다 — 뒤로가기로 앞 업체에 돌아온다(예전엔 한 번에 영업 관리 밖으로 나갔다)
   const pick = (id: string) => setParams((p) => { const n = new URLSearchParams(p); n.set('client', id); n.delete('round'); return n })
@@ -555,13 +558,21 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                     key={r.key}
                     type="button"
                     aria-pressed={round === r.key}
+                    data-ahead={r.key > liveRound ? '1' : undefined}
                     onClick={() => setRound(r.key)}
-                    className={`tap rounded-[8px] px-2 py-2 text-[0.85rem] font-semibold break-keep sm:px-4 sm:text-[0.9rem] ${round === r.key ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                    className={`tap rounded-[8px] px-2 py-2 text-[0.85rem] font-semibold break-keep sm:px-4 sm:text-[0.9rem] ${round === r.key ? 'bg-brand-600 text-white' : r.key > liveRound ? 'text-slate-400 hover:bg-slate-50' : 'text-slate-600 hover:bg-slate-50'}`}
                   >
                     {r.label}
                   </button>
                 ))}
               </div>
+
+              {/* D-124: 아직 오지 않은 차수는 미리 보기만 — 기록 · 회사 사정 칸은 그 미팅을 마친 뒤에 */}
+              {ahead && (
+                <p data-testid="round-ahead" className="t-sub break-keep rounded-(--radius-control) border border-dashed border-slate-300 bg-slate-50 px-3.5 py-2.5 text-slate-600">
+                  아직 {liveRound}차 미팅 단계입니다. {round}차 미팅은 미리 보기만 — 기록은 그 미팅을 마친 뒤에 남깁니다.
+                </p>
+              )}
 
               {round === 0 && <FirstContactPlan item={item} />}
 
@@ -605,7 +616,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
 
               {(round === 2 || round === 3) && <LaterRoundPlan record={record} item={item} round={round} onGoFirst={() => setRound(1)} />}
 
-              {round !== 0 && <MeetingRecorder
+              {round !== 0 && !ahead && <MeetingRecorder
                   key={`${record.id}-${round}`}
                   record={record}
                   round={round}
@@ -619,7 +630,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                 />}
 
               {/* D-123: 미팅에서 알게 된 것은 미팅 기록 바로 아래 — 크레탑을 보기도 전(맨 위)에는 알 수 없는 것들이었다 */}
-              {round !== 0 && <ProfileEditor record={record} onSave={(n, m) => void persist(n, m)} />}
+              {round !== 0 && !ahead && <ProfileEditor record={record} onSave={(n, m) => void persist(n, m)} />}
 
               {(record.sales?.meetings?.length ?? 0) > 0 && (
                 <Disclosure title="지난 미팅 기록" hint={`${record.sales?.meetings?.length}건`}>
@@ -637,7 +648,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                 </Disclosure>
               )}
 
-              <KakaoGroup item={item} />
+              <KakaoGroup item={item} record={record} />
             </>
           )}
         </>
@@ -816,17 +827,24 @@ function LaterRoundPlan({ record, item, round, onGoFirst }: { record: ClientOpsR
 }
 
 /** 카톡 문구 — 차수마다 흩어져 있던 것을 한 묶음으로 접어 둔다 */
-function KakaoGroup({ item }: { item: EngineItem }) {
+/** D-124: 지금 단계에 보낼 카톡만 — 1차 미팅 전에 계약 안내 카톡이 보이지 않게 */
+function KakaoGroup({ item, record }: { item: EngineItem; record: ClientOpsRecord }) {
   const lead = buildLeadPlan(item)
   const m1 = buildMeetingPlan(item, 'm1')
   const m3 = buildMeetingPlan(item, 'm3')
+  const met = stageReached(record, 'm1done')
+  const blocks: { title: string; text: string }[] = [
+    ...(!met ? [{ title: '통화 뒤 카톡', text: lead.kakao }] : []),
+    ...(stageReached(record, 'm1sched') ? [{ title: '1차 미팅 뒤 카톡', text: m1.kakao }] : []),
+    { title: '다음 연락 카톡 (고객 유형별)', text: followUpKakao(item) },
+    ...(stageReached(record, 'm2') ? [{ title: '계약 안내 카톡', text: m3.contractKakao }] : []),
+  ]
   return (
-    <Disclosure title="카톡 문구" hint="통화 뒤 · 1차 미팅 뒤 · 다음 연락 · 계약 안내">
+    <Disclosure title="카톡 문구" hint={blocks.map((b) => b.title.replace(/ 카톡.*$/, '')).join(' · ')}>
       <div data-testid="meeting-kakao" className="flex flex-col gap-3">
-        <ScriptBlock title="통화 뒤 카톡" text={lead.kakao} copy />
-        <ScriptBlock title="1차 미팅 뒤 카톡" text={m1.kakao} copy />
-        <ScriptBlock title="다음 연락 카톡 (고객 유형별)" text={followUpKakao(item)} copy />
-        <ScriptBlock title="계약 안내 카톡" text={m3.contractKakao} copy />
+        {blocks.map((b) => (
+          <ScriptBlock key={b.title} title={b.title} text={b.text} copy />
+        ))}
       </div>
     </Disclosure>
   )

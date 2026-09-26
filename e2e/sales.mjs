@@ -242,7 +242,11 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   await page.getByTestId('meeting-rounds').getByRole('button', { name: '첫 연락' }).click()
   await page.waitForTimeout(150)
   check('미팅 준비: 첫 연락 탭에는 회사 사정 칸이 없다(미팅 뒤에 적는 것)', (await page.getByRole('button', { name: /미팅에서 알게 된 회사 사정/ }).count()) === 0)
+  // D-124: 아직 오지 않은 차수(1차 미팅 예정인데 3차)는 미리 보기만 — 기록 · 회사 사정 칸이 없다
   await page.getByTestId('meeting-rounds').getByRole('button', { name: '3차 클로징' }).click()
+  await page.waitForTimeout(150)
+  check('미팅 준비: 아직 오지 않은 3차는 미리 보기 — 기록 칸 없음', (await page.getByTestId('round-ahead').count()) === 1 && (await page.getByTestId('meeting-recorder').count()) === 0 && (await page.getByTestId('meeting-rounds').getByRole('button', { name: '3차 클로징' }).getAttribute('data-ahead')) === '1')
+  await page.getByTestId('meeting-rounds').getByRole('button', { name: '1차 미팅' }).click()
   await page.waitForTimeout(150)
   const recBox = await page.getByTestId('meeting-recorder').boundingBox()
   const profBox = await page.getByRole('button', { name: /미팅에서 알게 된 회사 사정/ }).boundingBox()

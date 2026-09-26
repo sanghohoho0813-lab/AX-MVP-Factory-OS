@@ -24,6 +24,7 @@ import { brand } from '../../brand/brand.config'
 import { listClients, saveClient } from '../../services/clientOpsService'
 import { listRows, saveRow } from '../../services/moduleData'
 import { salesStageOf, stageReached } from '../../services/salesPipeline'
+import { SALES_PATH_INFO } from '../../services/salesJourney'
 import { catalogWithPrices, cleanPrices, feeSum, toProposalItem, withContractPrep, withProposal } from '../../services/salesOffer'
 import { contractCloseDraft, withContractClose, type ContractCloseDraft } from '../../services/salesContract'
 import { ContractCloseSheet } from '../../components/sales/ContractCloseSheet'
@@ -230,9 +231,17 @@ function ProposalWork({
   const prepDone = CONTRACT_CHECKLIST.filter((c) => prep.has(c)).length
   const docsDone = REQUIRED_DOCS.filter((c) => prep.has(`서류:${c}`)).length
   const stage = salesStageOf(record)
+  // D-124: 계약 준비는 3차 클로징부터(현금 · 단계별처럼 클로징을 건너뛰는 경로는 2차 미팅부터) — 그 전에는 한 줄 안내만
+  const path = record.sales?.path ?? null
+  const showPrep = stage === 'contracted' || stageReached(record, 'closing') || (path !== null && SALES_PATH_INFO[path].skipClosing && stageReached(record, 'm2'))
 
   return (
     <div className="flex flex-col gap-4">
+      {!stageReached(record, 'm1done') && (
+        <p data-testid="proposal-early" className="t-sub break-keep rounded-(--radius-control) border border-dashed border-slate-300 bg-slate-50 px-3.5 py-2.5 text-slate-600">
+          아직 1차 미팅 전입니다. 제안은 보통 1차 미팅에서 관심사를 확인한 뒤에 만듭니다 — 미리 골라 두어도 됩니다.
+        </p>
+      )}
       {/* 고른 상품 */}
       <Surface className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -406,6 +415,12 @@ function ProposalWork({
         </Disclosure>
       )}
 
+      {!showPrep && (
+        <p data-testid="contract-prep-later" className="t-meta break-keep text-slate-500">
+          계약 준비(계약 전 확인 · 받을 서류 · 계약 완료로)는 3차 클로징부터 보입니다{path && SALES_PATH_INFO[path].skipClosing ? '' : ' — 현금 · 단계별 계약이면 2차 미팅부터'}.
+        </p>
+      )}
+      {showPrep && (
       <Disclosure title="계약 준비" hint={`체크 ${prepDone}/${CONTRACT_CHECKLIST.length} · 서류 ${docsDone}/${REQUIRED_DOCS.length}`} defaultOpen={stage === 'closing'}>
         <div className="flex flex-col gap-4" data-testid="contract-prep">
           <fieldset>
@@ -452,6 +467,7 @@ function ProposalWork({
           </div>
         </div>
       </Disclosure>
+      )}
       {closing && (
         <ContractCloseSheet
           record={record}

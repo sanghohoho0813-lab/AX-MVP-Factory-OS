@@ -75,7 +75,7 @@ export function ContractCard({
   const gap = contractGap(record)
 
   return (
-    <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5">
+    <section data-testid="contract-card" className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
         <h2 className="t-section text-slate-900">계약</h2>
         <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>

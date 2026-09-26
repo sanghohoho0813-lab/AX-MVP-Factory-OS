@@ -66,11 +66,11 @@ export function MobileNav({ onOpenMore }: { onOpenMore: () => void }) {
           const requests = item.to === '/ops/inbox' ? (counts.requests ?? 0) : 0
           const clients = item.to === '/ops/clients' ? counts.clients : null
           return (
-            <li key={item.to} className="flex-1">
+            <li key={item.to} className="min-w-0 flex-1">
               <Link
                 to={item.to}
                 aria-current={active ? 'page' : undefined}
-                className="flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 py-1.5"
+                className="flex min-h-14 flex-col items-center justify-center gap-0.5 px-0 py-1.5"
               >
                 <span
                   className={`relative flex h-7 w-12 items-center justify-center rounded-full transition-colors ${active ? ACTIVE_BG[item.accent] : ''}`}
@@ -87,7 +87,7 @@ export function MobileNav({ onOpenMore }: { onOpenMore: () => void }) {
                     </span>
                   )}
                 </span>
-                <span className="flex items-baseline gap-0.5">
+                <span className="flex items-baseline gap-0.5 whitespace-nowrap">
                   <span
                     className={`t-meta ${
                       active ? 'font-semibold text-slate-900' : requests > 0 ? 'font-semibold text-danger-600' : 'font-medium text-slate-500'
@@ -106,11 +106,11 @@ export function MobileNav({ onOpenMore }: { onOpenMore: () => void }) {
             </li>
           )
         })}
-        <li className="flex-1">
+        <li className="min-w-0 flex-1">
           <button
             type="button"
             onClick={onOpenMore}
-            className="flex min-h-14 w-full flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-slate-500"
+            className="flex min-h-14 w-full flex-col items-center justify-center gap-0.5 px-0 py-1.5 whitespace-nowrap text-slate-500"
           >
             {/* 더보기 = 서랍 — 서랍 속 컨설팅 작업실 첫 아이콘과 같은 색(테마를 따라간다) */}
             <span className="flex h-7 w-12 items-center justify-center">

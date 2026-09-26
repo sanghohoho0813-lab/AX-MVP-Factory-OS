@@ -20,6 +20,7 @@ import {
   restoreCustomService,
   type CustomService,
 } from '../../services/customServiceService'
+import { useBackToClose } from '../../lib/backToClose'
 
 const ACCENTS: { key: ServiceAccent; label: string }[] = [
   { key: 'neutral', label: '기본' },
@@ -43,6 +44,7 @@ export function ServiceCatalogModal({
   /** 목록이 바뀌면 화면을 다시 그리도록 알린다 */
   onChanged: () => void
 }) {
+  useBackToClose(true, onClose)
   const [list, setList] = useState<CustomService[]>([])
   const [label, setLabel] = useState('')
   const [description, setDescription] = useState('')

@@ -44,6 +44,7 @@
     "qa:shots": "node e2e/shots.mjs",
     "qa:steady": "node e2e/steady.mjs",
     "qa:flow": "node e2e/flow.mjs",
+    "qa:real": "node e2e/real.mjs",
     "qa:modules": "node e2e/modules.mjs",
     "qa:squeeze": "node e2e/squeeze.mjs",
     "qa:sales": "node e2e/sales.mjs",

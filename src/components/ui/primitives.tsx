@@ -20,6 +20,7 @@ import { useEffect, useId, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ChevronRight, X } from 'lucide-react'
 import { screenTitleForPath } from '../../config/moduleRegistry'
+import { useBackToClose } from '../../lib/backToClose'
 
 /* ------------------------------------------------------------------ */
 /* 색 계약                                                              */
@@ -151,7 +152,8 @@ export function ScreenTitle({
           </h1>
           {sub && <p className={`t-sub break-keep text-slate-500 ${sameAsHeader ? 'lg:mt-1' : 'mt-1'}`}>{sub}</p>}
         </div>
-        {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+        {/* D-124: 휴대폰 큰 글자에서 버튼이 화면 밖으로 밀리지 않게 — 좁으면 버튼끼리도 줄을 바꾼다 */}
+        {actions && <div className="flex max-w-full min-w-0 flex-wrap items-center gap-2">{actions}</div>}
       </div>
     </div>
   )
@@ -398,6 +400,8 @@ export function BottomSheet({
   children: ReactNode
   footer?: ReactNode
 }) {
+  // D-124: 휴대폰 뒤로가기는 시트만 닫는다
+  useBackToClose(true, onClose)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()

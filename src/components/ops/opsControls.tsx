@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Check, ClipboardCopy, Phone, X } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { wonOf } from '../../lib/format'
+import { useBackToClose } from '../../lib/backToClose'
 
 /** 저장 상태 표시 — 자동 저장이 실제로 됐는지 눈으로 확인시켜 준다 */
 export function SavedBadge({ savedAt }: { savedAt: number | null }) {
@@ -104,6 +105,7 @@ export function MessageModal({
   text: string
   onClose: () => void
 }) {
+  useBackToClose(true, onClose)
   const [copied, setCopied] = useState(false)
   const ref = useRef<HTMLTextAreaElement>(null)
 

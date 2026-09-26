@@ -8,6 +8,7 @@ import {
 } from '../../services/koreanDocParser'
 import { EXTRACT_METHOD_LABEL, extractTextFromFile, type ExtractMethod } from '../../services/docTextExtract'
 import { Button } from '../ui/Button'
+import { useBackToClose } from '../../lib/backToClose'
 
 type FieldKey = keyof Omit<ParsedCompanyInfo, 'source'>
 
@@ -41,6 +42,7 @@ export function DocImportModal({
   onApply: (result: DocImportResult) => void
   onClose: () => void
 }) {
+  useBackToClose(true, onClose)
   const [tab, setTab] = useState<'file' | 'paste'>('file')
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<{ ratio: number; label: string } | null>(null)

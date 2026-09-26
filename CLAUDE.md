@@ -30,6 +30,7 @@ npm run qa:journey -- http://localhost:4390        # 영업 흐름(크레탑 →
 npm run qa:easy -- http://localhost:4390           # 쉽고 튼튼하게(글자 크기 · 대비 · 머리줄 넘침 · 다음 약속 · 찾기 · 미팅 메모)
 npm run qa:steady -- http://localhost:4390         # 튼튼하게(저장 실패해도 적은 것 남음 · 삭제는 한 번 더 묻기)
 npm run qa:flow -- http://localhost:4390           # 흐름 잇기(계약 완료 한 번에 · 상태 하나 · 미팅 → 서류함 · 오늘 돈 줄)
+npm run qa:real -- http://localhost:4390           # 실제 데이터처럼(긴 이름 · 많은 항목 · 360~430 · 큰 글자에서 잘림 · 넘침 0)
 npm run qa:squeeze -- http://localhost:4390 --all  # 짜부라진 글자 0
 npm run qa:modules -- http://localhost:4390       # 모듈 전 화면 오류·넘침 0 · 오류 울타리 · 인쇄 · 저장 공간 가득 참
 ```

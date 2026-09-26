@@ -12,6 +12,7 @@
  *   6. 고객 관리 새 업체 — 기본 잠재고객 · 같은 업체가 있으면 알림
  *   9. (D-124) 영업 관리에서 업체를 열고 뒤로 → 고객 관리가 아니라 영업 관리로
  *  10. (D-124) 세금 계산기 목록을 펼친 채 화면을 밀어도 목록이 닫히며 튀지 않는다(누르면 닫힘)
+ *  11. (D-124) 창이 열려 있을 때 뒤로가기는 창만 닫는다 · 뒤로 오면 보던 자리 · 찾던 말 그대로
  */
 
 import { chromium } from 'playwright'
@@ -204,6 +205,63 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
     await page.waitForTimeout(300)
     check(`세금 계산기: 목록 밖을 누르면 닫힘 ${tag}`, (await list.count()) === 0)
   }
+
+  /* 11 (D-124) 뒤로가기 — 창만 닫기 · 보던 자리 · 찾던 말 (앱 안에서 옮겨 다닌 기록이어야 한다 — goto 는 문서를 새로 연다) */
+  const inApp = async (href) => {
+    await page.evaluate((h) => { const a = document.querySelector(`a[href="${h}"]`); a?.click() }, href)
+    await page.waitForURL((u) => u.pathname === href.split('?')[0])
+    await page.waitForTimeout(400)
+  }
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await inApp('/ops/clients')
+  await page.getByRole('button', { name: /등록/ }).first().click()
+  await page.getByLabel('업체명').waitFor()
+  await page.goBack()
+  await page.waitForTimeout(400)
+  check(`뒤로가기: 새 업체 창만 닫고 고객 관리에 머문다 ${tag}`, (await page.getByLabel('업체명').count()) === 0 && new URL(page.url()).pathname === '/ops/clients', page.url())
+  if (mob) {
+    await page.getByRole('button', { name: '메뉴 열기' }).click()
+    await page.getByRole('button', { name: '메뉴 닫기' }).waitFor()
+    await page.goBack()
+    await page.waitForTimeout(400)
+    check(`뒤로가기: 서랍 메뉴만 닫는다 ${tag}`, (await page.getByRole('button', { name: '메뉴 닫기' }).count()) === 0 && new URL(page.url()).pathname === '/ops/clients', page.url())
+    await page.locator('main').getByText('한솔테크(주)').filter({ visible: true }).first().click()
+    await page.waitForURL(/\/ops\/clients\/cli_hansol/)
+    await page.waitForTimeout(400)
+    await page.getByRole('button', { name: '더보기' }).first().click()
+    await page.waitForTimeout(300)
+    const sheets = () => page.locator('[role="dialog"][aria-modal="true"]').count()
+    const opened = await sheets()
+    await page.goBack()
+    await page.waitForTimeout(400)
+    check(`뒤로가기: 더보기 시트만 닫고 업체 화면에 머문다 ${tag}`, opened >= 1 && (await sheets()) === 0 && new URL(page.url()).pathname === '/ops/clients/cli_hansol', `${opened} → ${await sheets()} ${page.url()}`)
+  }
+  // 보던 자리
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  const want = Math.min(900, await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight - 10))
+  await page.evaluate((y) => window.scrollTo(0, y), want)
+  await page.waitForTimeout(300)
+  const atY = await page.evaluate(() => window.scrollY)
+  await page.evaluate(() => { const a = document.querySelector('a[href="/ops/calendar"]'); a?.click() })
+  await page.waitForURL(/\/ops\/calendar/)
+  await page.waitForTimeout(300)
+  check(`새 화면은 맨 위에서 ${tag}`, (await page.evaluate(() => window.scrollY)) === 0)
+  await page.goBack()
+  await page.waitForTimeout(1200)
+  const backY = await page.evaluate(() => window.scrollY)
+  check(`뒤로 오면 보던 자리 ${tag}`, atY > 100 && Math.abs(backY - atY) <= 40, `${atY} → ${backY}`)
+  // 찾던 말
+  await inApp('/ops/clients')
+  const search = page.getByRole('searchbox').or(page.getByPlaceholder(/찾기|검색/)).filter({ visible: true }).first()
+  await search.fill('한솔')
+  await page.waitForTimeout(600)
+  check(`찾기: 찾던 말이 주소에 ${tag}`, new URL(page.url()).searchParams.get('q') === '한솔', page.url())
+  await page.locator('main').getByText('한솔테크(주)').filter({ visible: true }).first().click()
+  await page.waitForURL(/\/ops\/clients\/cli_hansol/)
+  await page.goBack()
+  await page.waitForTimeout(500)
+  check(`찾기: 업체를 열었다 뒤로 와도 찾던 말 그대로 ${tag}`, (await search.inputValue()) === '한솔', await search.inputValue())
 
   check(`JS 오류 없음 ${tag}`, errors.length === 0, errors.join(' | '))
   await ctx.close()

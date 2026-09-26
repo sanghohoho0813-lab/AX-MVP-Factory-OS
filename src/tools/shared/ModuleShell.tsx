@@ -16,6 +16,7 @@ import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, Menu, X } from 'lucide-react'
 import { sectionAccent, type ToolDefinition } from '../../config/toolRegistry'
 import type { NavAccent } from '../../config/moduleRegistry'
+import { useBackToClose } from '../../lib/backToClose'
 
 /**
  * 목차 아이콘 색 (D-92) — OS 왼쪽 메뉴와 같은 8색.
@@ -66,6 +67,7 @@ export interface ModuleShellProps {
 export function ModuleShell({ tool, section, children }: ModuleShellProps) {
   const sections = tool.sections ?? []
   const [drawer, setDrawer] = useState(false)
+  useBackToClose(drawer, () => setDrawer(false))
   const location = useLocation()
 
   // 화면을 옮기면 서랍은 닫는다

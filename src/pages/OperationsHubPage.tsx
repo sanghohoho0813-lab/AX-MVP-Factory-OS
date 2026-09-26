@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSerialSave } from '../lib/useSerialSave'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useQueryInUrl } from '../lib/useQueryInUrl'
 import {
   Archive,
   Building2,
@@ -72,6 +73,7 @@ import { Button } from '../components/ui/Button'
 import { useToast } from '../components/ui/toastContext'
 import { Modal } from '../components/ui/Modal'
 import { AlertRow, SEVERITY_META } from '../components/ops/opsParts'
+import { useBackToClose } from '../lib/backToClose'
 
 type ClientSegment = 'contract' | 'prospect' | 'all'
 const SEGMENTS: { key: ClientSegment; label: string }[] = [
@@ -109,6 +111,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [formOpen, setFormOpen] = useState(false)
+  useBackToClose(formOpen, () => setFormOpen(false))
   const [tab, setTab] = useState<AlertSeverity | 'all'>('all')
   // 현황표를 먼저 보고 싶다는 요청이 있어 이 목록은 기본으로 접어 둔다.
   const [alertsOpen, setAlertsOpen] = useState(false)
@@ -130,7 +133,10 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const [form, setForm] = useState({ companyName: '', contactName: '', contactPhone: '', businessNumber: '' })
   /** D-122: 새로 넣는 업체는 기본 잠재고객 — 예전에는 계약 고객으로 들어가 계약 숫자가 부풀고 영업 보드 '계약 완료' 칸에 떴다 */
   const [asProspect, setAsProspect] = useState(true)
-  const [query, setQuery] = useState('')
+  // D-124: 찾던 말은 주소(?q=)에 — 업체를 열었다가 뒤로 와도 그대로
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [query, setQuery] = useState(() => searchParams.get('q') ?? '')
+  useQueryInUrl(query, searchParams, setSearchParams)
   const [showArchived, setShowArchived] = useState(false)
   const [restoring, setRestoring] = useState(false)
   const [leftover, setLeftover] = useState<ClientOpsRecord[]>([])

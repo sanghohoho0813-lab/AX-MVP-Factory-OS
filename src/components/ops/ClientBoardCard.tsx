@@ -292,7 +292,7 @@ export function ClientBoardCard({
               </span>
             ))}
             {mutedMeta.map((m, i) => (
-              <span key={`m-${m}-${i}`} className="whitespace-nowrap text-slate-500">
+              <span key={`m-${m}-${i}`} className="max-w-full break-keep text-slate-500 [overflow-wrap:anywhere]">
                 {(i > 0 || strongMeta.length > 0) && <span aria-hidden="true" className="mr-2 text-slate-300">·</span>}
                 {m}
               </span>

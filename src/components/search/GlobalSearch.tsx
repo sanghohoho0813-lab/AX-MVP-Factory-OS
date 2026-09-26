@@ -20,6 +20,7 @@ import { listClients } from '../../services/clientOpsService'
 import { matchesClientSearch } from '../../services/clientOpsSearch'
 import { isProspect } from '../../services/salesPipeline'
 import type { ClientOpsRecord } from '../../types/clientOps'
+import { useBackToClose } from '../../lib/backToClose'
 
 interface Hit {
   group: '고객 관리' | '고객사' | '프로젝트' | '특허+벤처' | '지금 해야 할 일' | '컨설팅 작업실' | '결과·자료'
@@ -66,6 +67,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
   }, [open, workspaceId])
 
   const close = useCallback(() => { setOpen(false); setQuery(''); setActive(0) }, [])
+  useBackToClose(open, close)
 
   // 전역 단축키
   // D-94: 붙잡는 단계(capture)에서 먼저 듣는다 — 검색 창이 열려 있을 때 Esc 는 검색 창만 닫고,

@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
@@ -10,6 +10,8 @@ import { RouteProjectSync } from '../../context/RouteProjectSync'
 import { ContentErrorBoundary } from './ContentErrorBoundary'
 import { StorageFullNotice } from './StorageFullNotice'
 import { ScrollTopButton } from './ScrollTopButton'
+import { BackToCloseGuard } from '../../lib/backToClose'
+import { useScrollMemory } from '../../lib/scrollMemory'
 
 function ShellFallback() {
   return (
@@ -24,15 +26,13 @@ export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
 
-  // 라우트 변경 시 모바일 메뉴를 닫고 스크롤을 상단으로
-  useEffect(() => {
-    setMobileOpen(false)
-    window.scrollTo(0, 0)
-  }, [location.pathname])
+  // 화면이 바뀌면 모바일 메뉴를 닫고 맨 위로 — 뒤로 · 앞으로 온 것이면 보던 자리로 (D-124)
+  useScrollMemory(() => setMobileOpen(false))
 
   return (
     <ActiveProjectProvider>
       <RouteProjectSync />
+      <BackToCloseGuard />
       <DemoTourProvider>
       <OnboardingProvider>
       <div className="flex min-h-screen">

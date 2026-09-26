@@ -148,6 +148,20 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByTestId('sales-journey').waitFor()
   check('고객 상세: 영업 흐름 카드', ((await page.getByTestId('sales-journey').innerText()) ?? '').includes('1차 미팅 준비'))
 
+  // D-124: 단계에 맞춰 보이는 것 — 1차 미팅 예정인 잠재고객
+  check('단계별: 계약 전 · 계약 정보 없음 → 업체 화면에 빈 계약 카드 없음', (await page.getByTestId('contract-card').count()) === 0)
+  check('단계별: 영업 카드 관심사는 1차 미팅 뒤에', (await page.getByTestId('interests-later').count()) === 1 || (await page.getByTestId('client-sales-card').getByRole('button', { name: '정책자금' }).count()) === 0)
+  await page.goto(`${BASE}/sales/proposal?client=${id}`, { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  check('단계별: 1차 미팅 전 제안 화면 — 안내 한 줄 · 계약 준비는 아직', (await page.getByTestId('proposal-early').count()) === 1 && (await page.getByTestId('contract-prep').count()) === 0 && (await page.getByTestId('contract-prep-later').count()) === 1)
+  await page.goto(`${BASE}/sales/meeting?client=${id}&round=1`, { waitUntil: 'networkidle' })
+  await page.getByRole('button', { name: /카톡 문구/ }).click()
+  const kakao = (await page.getByTestId('meeting-kakao').innerText()) ?? ''
+  check('단계별: 1차 미팅 전 카톡 — 통화 뒤 · 1차 미팅 뒤는 있고 계약 안내는 없다', kakao.includes('통화 뒤 카톡') && kakao.includes('1차 미팅 뒤 카톡') && !kakao.includes('계약 안내 카톡'), kakao.slice(0, 120))
+  await page.getByTestId('meeting-rounds').getByRole('button', { name: '3차 클로징' }).click()
+  await page.waitForTimeout(200)
+  check('단계별: 아직 오지 않은 3차는 미리 보기 — 기록 칸 없음', (await page.getByTestId('round-ahead').count()) === 1 && (await page.getByTestId('meeting-recorder').count()) === 0)
+
   // 같은 업체 — 새로 만들지 않고 붙인다
   await page.goto(BASE + '/sales/new', { waitUntil: 'networkidle' })
   await page.getByRole('button', { name: '글 붙여넣기' }).click()

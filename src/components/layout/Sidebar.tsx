@@ -23,6 +23,7 @@ import { FutureItemDialog } from './FutureItemDialog'
 import { futureIcon } from './futureIcons'
 import { useCurrentUser } from './useCurrentUser'
 import { useNavCounts, type NavCounts } from './useNavCounts'
+import { useBackToClose } from '../../lib/backToClose'
 
 interface SidebarProps {
   collapsed: boolean
@@ -273,6 +274,8 @@ function SidebarContent({
 }
 
 export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobile }: SidebarProps) {
+  // D-124: 서랍 메뉴가 열렸을 때 휴대폰 뒤로가기는 서랍만 닫는다
+  useBackToClose(mobileOpen, onCloseMobile)
   return (
     <>
       <aside className={`no-print sticky top-0 hidden h-screen shrink-0 transition-[width] duration-200 lg:block ${collapsed ? 'w-[80px]' : 'w-64 xl:w-72'}`}>

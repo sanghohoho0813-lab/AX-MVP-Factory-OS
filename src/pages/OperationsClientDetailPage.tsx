@@ -119,7 +119,7 @@ import { ActivityLog } from '../components/ops/ActivityLog'
 import { ClientSalesCard } from '../components/sales/ClientSalesCard'
 import { SalesJourneyCard } from '../components/sales/SalesJourneyCard'
 import { withSalesPath } from '../services/salesJourney'
-import { salesStageOf, withSalesStage } from '../services/salesPipeline'
+import { isProspect, salesStageOf, withSalesStage } from '../services/salesPipeline'
 import { addDaysLocal } from '../services/clientOpsNextAction'
 import { ContractCard } from '../components/ops/ContractCard'
 import { InlineConfirm } from '../components/ui/InlineConfirm'
@@ -155,6 +155,11 @@ import { brand } from '../brand/brand.config'
 
 const inputCls =
   'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.98rem] focus:border-brand-500 focus:outline-none'
+
+/** 계약 정보가 하나라도 적혀 있나 — 계약일 · 방식 · 현금 금액 · 보험 */
+function hasContractInfo(r: ClientOpsRecord): boolean {
+  return r.contract.signedAt !== '' || r.contract.kind !== '' || (r.contract.cashAmount ?? 0) > 0 || r.contract.policies.length > 0
+}
 
 type DetailTab = 'overview' | 'work' | 'consulting' | 'docs' | 'fees' | 'funding' | 'portal' | 'journal' | 'files'
 const DETAIL_TABS: { key: DetailTab; label: string }[] = [
@@ -478,7 +483,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="t-page break-keep text-slate-900">{record.companyName || '(이름 없음)'}</h1>
+              <h1 className="t-page min-w-0 break-keep text-slate-900 [overflow-wrap:anywhere]">{record.companyName || '(이름 없음)'}</h1>
               <ClientStatusChip status={record.status} />
             </div>
             <p className="t-sub mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-slate-500">
@@ -768,7 +773,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
       <ClientSalesCard record={record} onSave={(next) => void commit(next)} onContract={openClose} />
 
-      <ContractCard
+      {/* D-124: 계약 전(잠재고객)이고 적힌 계약 정보도 없으면 빈 계약 카드를 띄우지 않는다 — 계약은 영업 카드의 '계약 완료' 에서 */}
+      {(!isProspect(record) || hasContractInfo(record)) && <ContractCard
         record={record}
         today={today}
         onSave={(next) => commit(withContract(record, next))}
@@ -777,7 +783,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             if (ok) showToast('차이만큼 수금 항목(계약 잔금 · 7일 뒤)을 넣었습니다. 수금 탭에서 고칠 수 있습니다.')
           })
         }
-      />
+      />}
 
       <WorkHistoryCard record={record} onOpen={(key) => setTab('work', key)} />
 

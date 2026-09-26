@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { fromState } from '../../lib/navFrom'
+import { useQueryInUrl } from '../../lib/useQueryInUrl'
 import { ChevronRight, CirclePlus, KanbanSquare, Presentation, ScanSearch, Search } from 'lucide-react'
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useToast } from '../../components/ui/toastContext'
@@ -201,9 +202,11 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
   const [records, setRecords] = useState<ClientOpsRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [query, setQuery] = useState('')
   // D-119: 크레탑 등록 화면의 '크레탑 없이 직접 입력' → ?new=1 로 들어오면 바로 연다
   const [searchParams, setSearchParams] = useSearchParams()
+  // D-124: 찾던 말은 주소(?q=)에 — 업체를 열었다가 뒤로 와도 그대로
+  const [query, setQuery] = useState(() => searchParams.get('q') ?? '')
+  useQueryInUrl(query, searchParams, setSearchParams)
   const [formOpen, setFormOpen] = useState(() => searchParams.get('new') === '1')
   // D-124: ?new=1 은 한 번만 — 주소에 남으면 뒤로가기로 돌아올 때마다 빈 등록 창이 다시 떴다
   useEffect(() => {
