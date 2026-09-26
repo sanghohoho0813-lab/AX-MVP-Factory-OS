@@ -1499,16 +1499,18 @@ export function lastCretopSource() {
 // [D-98] 테마를 바꾸면 새로고침 없이 따라간다 — 이 파일의 T 와 다른 화면(주식가치·상세 창)이 쓰는 theme.js 의 T 둘 다
 const syncBrand = brandSync({ brand: ["700", "#1D4ED8"], brandSoft: ["50", "#EFF4FF"] }, [T, SHARED_T]);
 
-export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, resultBar, pendingFile, onPendingDone }) {
+// [D-121] embedded: 다른 화면(영업 관리 › 미팅 준비) 안에 들어갈 때 — 마지막 세션(다른 업체)을 이어 붙이지 않고 initialUi(이 업체 분석)로 시작한다.
+export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, resultBar, pendingFile, onPendingDone, initialUi = null, embedded = false }) {
+  const resume = embedded ? null : lastSession;
   useThemeRerender();
   syncBrand();
   const [mode, setMode] = useState("pdf"); // pdf | text
-  const [text, setText] = useState(() => (lastSession ? lastSession.text : ""));
-  const [fileName, setFileName] = useState(() => (lastSession ? lastSession.fileName : ""));
-  const [pdfPages, setPdfPages] = useState(() => (lastSession ? lastSession.pdfPages : null));   // PDF 페이지별 텍스트(섹션 추출 정확도용)
+  const [text, setText] = useState(() => (resume ? resume.text : ""));
+  const [fileName, setFileName] = useState(() => (resume ? resume.fileName : ""));
+  const [pdfPages, setPdfPages] = useState(() => (resume ? resume.pdfPages : null));   // PDF 페이지별 텍스트(섹션 추출 정확도용)
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
-  const [ui, setUi] = useState(() => (lastSession ? lastSession.ui : null));
+  const [ui, setUi] = useState(() => (embedded ? initialUi : resume ? resume.ui : null));
   // [D-111] 주식가치 조건을 고치면 결과 위 요약 막대(1장 요약 · 업체 기록 붙이기)도 새 값으로
   const [, setSvTick] = useState(0);
   useEffect(() => { const f = () => setSvTick((n) => n + 1); window.addEventListener(SV_EVENT, f); return () => window.removeEventListener(SV_EVENT, f); }, []);
@@ -1526,7 +1528,7 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
   }, [setSearchParams]);
   // 화면을 옮겼다 돌아왔을 때(주소에 view 가 없을 때) 보던 탭으로 이어 보기 — 원본 동작
   useEffect(() => {
-    if (!viewParam && lastSession && lastSession.ui && lastSession.tab && lastSession.tab !== "overview") setTab(lastSession.tab, true);
+    if (!viewParam && resume && resume.ui && resume.tab && resume.tab !== "overview") setTab(resume.tab, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [manualGrade, setManualGrade] = useState(null); // 신용등급 직접 선택
@@ -1543,7 +1545,7 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
     const f = () => { try { setIsMobile(window.innerWidth < 640); } catch (e) {} };
     f(); window.addEventListener("resize", f); return () => window.removeEventListener("resize", f);
   }, []);
-  useEffect(() => { lastSession = { text, fileName, pdfPages, ui, tab }; }, [text, fileName, pdfPages, ui, tab]);
+  useEffect(() => { if (!embedded) lastSession = { text, fileName, pdfPages, ui, tab }; }, [embedded, text, fileName, pdfPages, ui, tab]);
   const pickScale = (v) => { setFontScale(v); try { localStorage.setItem("mini_fontScale", String(v)); } catch (e) {} };
   const [rawViewOpen, setRawViewOpen] = useState(false);   // 원문 텍스트 보기(추출 디버그)
   useEffect(() => { setManualGrade(null); }, [ui]); // 새 분석/이력 열람 시 직접선택 초기화

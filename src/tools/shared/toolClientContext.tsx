@@ -130,3 +130,23 @@ function FrameInner({ workspaceId, children }: { workspaceId: string | null; chi
     </ToolClientCtx.Provider>
   )
 }
+
+/**
+ * D-121: 도구 라우트 밖(영업 관리 › 미팅 준비 등)에서 도구 부품을 '이 업체 일로' 쓸 때.
+ * 주소(?client=)가 아니라 넘겨준 업체 기록으로 틀을 세운다. 띠는 얹지 않는다(바깥 화면이 이미 업체를 보여 준다).
+ */
+export function ToolClientScope({ workspaceId, client, children }: { workspaceId: string | null; client: ClientOpsRecord | null; children: ReactNode }) {
+  const cache = useRef<Promise<ClientOpsRecord[]> | null>(null)
+  useEffect(() => {
+    cache.current = null
+  }, [workspaceId])
+  const loadClients = useCallback(() => {
+    if (!cache.current) cache.current = listClients(workspaceId).catch(() => [] as ClientOpsRecord[])
+    return cache.current
+  }, [workspaceId])
+  const value = useMemo<ToolClientValue>(
+    () => ({ clientId: client?.id ?? null, clientName: client?.companyName ?? '', clientRecord: client, workspaceId, loadClients }),
+    [client, workspaceId, loadClients],
+  )
+  return <ToolClientCtx.Provider value={value}>{children}</ToolClientCtx.Provider>
+}

@@ -8,8 +8,8 @@
  * 골든 회귀 3벌(`npm run test:cretop`)이 원본과 같은 숫자를 지킨다. OCR 은 하지 않는다.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, FolderOpen, Copy, Check, KanbanSquare } from 'lucide-react'
+import { useState } from 'react'
+import { KanbanSquare } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
@@ -18,146 +18,22 @@ import { useModuleSection } from '../shared/ModuleRoute'
 import { ExtractorScreen } from './screens/ExtractorScreen'
 import { CoreCheckScreen } from './screens/CoreCheckScreen'
 import { Button } from '../../components/ui/Button'
-import { CretopMiniApp, type CretopMiniHistoryItem, type CretopMiniUi } from './mini/MiniApp.jsx'
-import { cretopCompany, cretopResultInput, findClientForCretop } from '../../services/salesCretop'
+import type { CretopMiniUi } from './mini/MiniApp.jsx'
+import { CretopWorkbench } from './CretopWorkbench'
+import { cretopCompany, findClientForCretop } from '../../services/salesCretop'
 import { registerFromCretop } from '../../services/salesIntake'
-import { SV_EVENT, svCurrent, svRestore, svSummaryLines, type SvEntry } from './mini/stockValueCalc.js'
-import { useModuleBucket } from '../shared/useModuleBucket'
 import { useToast } from '../../components/ui/toastContext'
-import { ToolResultAttach } from '../shared/ToolResultAttach'
 import { useToolClient } from '../shared/toolClientContext'
-import { fetchClientDocFile, hasDocFile } from '../shared/clientDocFile'
 
-/** 분석 이력 한 줄 — 원본은 Supabase analyses 에, 이 OS 는 모듈 기록(cretop/analyses)에 */
-interface AnalysisRow extends Record<string, unknown> {
-  company: string
-  bizNo: string
-  ts: string
-  ui: CretopMiniUi
-  /** D-112: 주식가치 탭에서 고친 평가 조건(발행주식수 · 법인 구분 …) — 다른 기기 · 다른 직원도 같은 값 */
-  sv?: SvEntry | null
-}
-
-/** 원본 크레탑 분석 앱(D-93) + 이 OS 의 업체 연결(서류함 보고서 · 업체 기록에 붙이기 · 이력) */
+/**
+ * 분석 화면 = 크레탑 분석기 작업대(CretopWorkbench) + 영업으로 넘기는 단추.
+ * D-121: 분석기 본체 · 업체 연결은 작업대로 옮겼다(미팅 준비 1차도 같은 작업대를 쓴다). 영업 연결은 여기(바깥)에만 둔다.
+ */
 function CretopScreen() {
-  const { clientRecord, clientName, clientId, loadClients, workspaceId } = useToolClient()
+  const { clientRecord, clientName, loadClients, workspaceId } = useToolClient()
   const navigate = useNavigate()
-  const [salesBusy, setSalesBusy] = useState(false)
-  const [names, setNames] = useState<Record<string, string>>({})
-  useEffect(() => {
-    let alive = true
-    void loadClients().then((list) => {
-      if (alive) setNames(Object.fromEntries(list.map((c) => [c.id, c.companyName])))
-    })
-    return () => {
-      alive = false
-    }
-  }, [loadClients])
-  const clientNameOf = (id: string) => names[id] ?? ''
-  const bucket = useModuleBucket<AnalysisRow>('cretop', 'analyses')
   const { showToast } = useToast()
-  const [pendingFile, setPendingFile] = useState<File | null>(null)
-  const [docBusy, setDocBusy] = useState(false)
-  const [docError, setDocError] = useState('')
-  const [copied, setCopied] = useState(false)
-
-  const history: CretopMiniHistoryItem[] = useMemo(
-    () =>
-      [...(bucket.rows ?? [])]
-        .sort((a, b) => String(b.data.ts).localeCompare(String(a.data.ts)))
-        .map((r) => ({ id: r.id, company: r.data.company, ts: r.data.ts, ui: r.data.ui, clientName: r.clientId ? clientNameOf(r.clientId) : '' })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [bucket.rows, names],
-  )
-
-  const onSaved = (ui: CretopMiniUi) => {
-    const co = ui.companyInfo ?? {}
-    const company = co.companyName || '기업명 미상'
-    const bizNo = co.businessNo || ''
-    // 같은 회사(사업자번호·이름)의 이전 이력은 새 것으로 바꾼다 — 원본 비회원 이력과 같은 규칙
-    const prev = (bucket.rows ?? []).find((r) => (bizNo && r.data.bizNo === bizNo) || r.data.company === company)
-    // 원본처럼 저장이 안 되면 알려 준다 ('분석 저장 실패') — 결과 화면은 그대로 남는다
-    bucket.save({ id: prev?.id, clientId: clientId ?? prev?.clientId ?? '', data: { company, bizNo, ts: new Date().toISOString(), ui, sv: prev?.data.sv ?? null } }).catch((e: unknown) => {
-      showToast(`분석 저장 실패: ${e instanceof Error ? e.message : '오류'} — 연결을 확인하세요. 결과는 화면에 그대로 있습니다.`)
-    })
-  }
-
-  // D-112: 이력(클라우드)에 있던 평가 조건을 이 브라우저로 — 이 브라우저 값이 더 새것이면 그대로 둔다
-  useEffect(() => {
-    let changed = false
-    for (const r of bucket.rows ?? []) {
-      if (r.data.sv && svRestore({ companyInfo: { companyName: r.data.company, businessNo: r.data.bizNo } }, r.data.sv)) changed = true
-    }
-    if (changed) window.dispatchEvent(new Event(SV_EVENT))
-  }, [bucket.rows])
-
-  // D-112: 평가 조건을 고치면 그 회사 이력에 같이 저장한다. 칸마다 저장하지 않게 잠깐(0.8초) 모았다가 한 번에.
-  const rowsRef = useRef(bucket.rows)
-  rowsRef.current = bucket.rows
-  const saveRef = useRef(bucket.save)
-  saveRef.current = bucket.save
-  useEffect(() => {
-    const pending = new Map<string, { company: string; bizNo: string; entry: SvEntry }>()
-    let timer: number | undefined
-    const flush = () => {
-      for (const p of pending.values()) {
-        const row = (rowsRef.current ?? []).find((r) => (p.bizNo && r.data.bizNo === p.bizNo) || r.data.company === p.company)
-        if (!row) continue
-        void saveRef.current({ id: row.id, clientId: row.clientId, data: { ...row.data, sv: p.entry } }).catch(() => {
-          /* 이력 저장에 실패해도 이 브라우저에는 남아 있다 */
-        })
-      }
-      pending.clear()
-    }
-    const onChange = (e: Event) => {
-      const d = (e as CustomEvent<{ company: string; bizNo: string; entry: SvEntry } | undefined>).detail
-      if (!d || !d.entry) return
-      pending.set(d.bizNo || d.company, d)
-      window.clearTimeout(timer)
-      timer = window.setTimeout(flush, 800)
-    }
-    window.addEventListener(SV_EVENT, onChange)
-    return () => {
-      window.removeEventListener(SV_EVENT, onChange)
-      window.clearTimeout(timer)
-      flush()
-    }
-  }, [])
-
-  /** 업체 서류함에 올려 둔 크레탑 보고서로 바로 분석 (D-90) */
-  const runFromDocbox = async () => {
-    setDocError('')
-    setDocBusy(true)
-    try {
-      const got = await fetchClientDocFile(clientRecord, 'cretopReport')
-      if (!got) {
-        setDocError('서류함에 올려 둔 파일이 없습니다. 파일을 먼저 올려 주세요.')
-        return
-      }
-      setPendingFile(got.file)
-    } catch (cause) {
-      setDocError(cause instanceof Error ? cause.message : '서류함 파일을 읽지 못했습니다.')
-    } finally {
-      setDocBusy(false)
-    }
-  }
-
-  const extraInput = clientRecord ? (
-    <div className="flex flex-col gap-1.5">
-      {hasDocFile(clientRecord, 'cretopReport') ? (
-        <Button variant="secondary" onClick={() => void runFromDocbox()} disabled={docBusy} className="w-full sm:w-auto" data-testid="cretop-from-docbox">
-          <FolderOpen aria-hidden="true" className="size-4" />
-          {docBusy ? '서류함에서 읽는 중…' : `${clientName} 서류함의 보고서로 분석`}
-        </Button>
-      ) : (
-        <span className="t-sub flex items-center gap-1.5 break-keep text-danger-700" data-testid="cretop-docbox-missing">
-          <AlertTriangle aria-hidden="true" className="size-4 shrink-0" />
-          서류함에 크레탑 기업종합보고서가 없습니다 — 올려 두면 여기서 바로 분석합니다
-        </span>
-      )}
-      {docError && <span className="t-sub text-danger-700">{docError}</span>}
-    </div>
-  ) : null
+  const [salesBusy, setSalesBusy] = useState(false)
 
   /**
    * D-119: 분석 → 영업으로 한 번에. 이 업체로 열었으면 그 업체에, 아니면 같은 업체(사업자번호 · 이름)를 찾아 붙이고,
@@ -178,61 +54,18 @@ function CretopScreen() {
     }
   }
 
-  const resultBar = (ui: CretopMiniUi, selected: string[]) => {
-    // D-111: 주식가치 탭에서 본(고친) 값 그대로 — 계산이 안 되면(발행주식수 없음 등) 줄을 넣지 않는다
-    const sv = svCurrent(ui)
-    const svLines = svSummaryLines(ui)
-    // D-119: 붙이는 모양은 영업 쪽과 한 함수(순위 · 진단 요약까지 실어 미팅 준비가 다시 꺼낸다)
-    const input = cretopResultInput(ui, selected, {
-      stockValue: sv.r ? { perShare: Math.round(sv.r.finalPerShare), total: Math.round(sv.r.totalValue), shares: sv.shares, corpType: sv.r.corpType, edited: sv.edited } : null,
-      extraLines: svLines,
-    })
-    const summary = input.summary
-    const copy = async () => {
-      try {
-        await navigator.clipboard.writeText(summary)
-        setCopied(true)
-        window.setTimeout(() => setCopied(false), 1800)
-      } catch {
-        /* 요약 탭에서 손으로 */
-      }
-    }
-    return (
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3" data-testid="cretop-result-bar">
-        <Button size="sm" onClick={() => void copy()}>
-          {copied ? <Check aria-hidden="true" className="size-4" /> : <Copy aria-hidden="true" className="size-4" />}
-          {copied ? '복사됨' : '1장 요약 복사'}
-        </Button>
-        <ToolResultAttach
-          toolKey="cretop"
-          title={input.title}
-          verdict={null}
-          verdictLabel={input.verdictLabel}
-          summary={summary}
-          data={input.data}
-          subject={{ name: ui.companyInfo?.companyName, bizNo: ui.companyInfo?.businessNo }}
-        />
-        <Button size="sm" variant="secondary" onClick={() => void toSales(ui, selected)} disabled={salesBusy} data-testid="cretop-to-sales">
-          <KanbanSquare aria-hidden="true" className="size-4" />
-          {salesBusy ? '넘기는 중…' : clientRecord ? `${clientName} 미팅 준비로` : '잠재고객 등록 · 미팅 준비'}
-        </Button>
-        <span className="t-meta break-keep text-slate-500">붙이기 = 업체 기록에 결과만 · 미팅 준비 = 빈 기본 정보 · 영업 칸까지 채우고 1차 미팅 준비로</span>
-      </div>
-    )
-  }
-
   return (
-    <div className="flex flex-col gap-4">
-      <CretopMiniApp
-        history={history}
-        onSaved={onSaved}
-        onDelete={(h) => void bucket.remove(h.id)}
-        extraInput={extraInput}
-        resultBar={resultBar}
-        pendingFile={pendingFile}
-        onPendingDone={() => setPendingFile(null)}
-      />
-    </div>
+    <CretopWorkbench
+      actions={(ui, selected) => (
+        <>
+          <Button size="sm" variant="secondary" onClick={() => void toSales(ui, selected)} disabled={salesBusy} data-testid="cretop-to-sales">
+            <KanbanSquare aria-hidden="true" className="size-4" />
+            {salesBusy ? '넘기는 중…' : clientRecord ? `${clientName} 미팅 준비로` : '잠재고객 등록 · 미팅 준비'}
+          </Button>
+          <span className="t-meta break-keep text-slate-500">붙이기 = 업체 기록에 결과만 · 미팅 준비 = 빈 기본 정보 · 영업 칸까지 채우고 1차 미팅 준비로</span>
+        </>
+      )}
+    />
   )
 }
 

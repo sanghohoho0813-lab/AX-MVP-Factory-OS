@@ -18,17 +18,17 @@ import { withActivity } from './clientOpsActivity'
 import {
   CONSULTING_STRATEGIES,
   buildDiagnosisSummary,
-  buildOneLiner,
   detailHasPositive,
-  oneLinerText,
-  rankStrategies,
-  type CretopRanked,
   type CretopStrategy,
   type CretopTone,
 } from '../tools/cretop/mini/analysisCore.js'
-import { isCorpOnlyStrategy } from '../tools/cretop/mini/extract.js'
 import { meetingDocs, meetingQuestionFlow, type MeetingFlowStep } from '../tools/cretop/mini/meetingFlow.js'
 import type { CretopMiniUi } from '../tools/cretop/mini/MiniApp.jsx'
+import { rankedRefs, type CretopPickRef, type CretopResultData } from '../tools/cretop/lib/cretopResult'
+
+// D-121: 결과 모양(순위 · 1장 요약 · 붙이는 모양)은 크레탑 폴더로 옮겼다(단독 판매 경계) — 예전 import 는 그대로 된다
+export { CRETOP_RESULT_TITLE, cretopResultInput, cretopSummaryText, rankedRefs } from '../tools/cretop/lib/cretopResult'
+export type { CretopPickRef, CretopResultData } from '../tools/cretop/lib/cretopResult'
 
 /* ------------------------------------------------------------------ */
 /* 회사 정보                                                            */
@@ -105,14 +105,6 @@ export function cretopTier(score: number): CretopTier {
   return score >= 80 ? 'top' : score >= 60 ? 'rec' : score >= 40 ? 'cond' : 'low'
 }
 
-/** 고객 기록에 남기는 짧은 순위 한 줄 — 이름으로 전략 원문(질문 흐름 · 멘트 …)을 다시 찾는다 */
-export interface CretopPickRef {
-  name: string
-  score: number
-  reasons: string[]
-  held: boolean
-}
-
 export interface CretopPick extends CretopPickRef {
   cat: string
   tier: CretopTier
@@ -132,14 +124,6 @@ export function toPick(ref: CretopPickRef): CretopPick | null {
   const st = strategyByName(ref.name)
   if (!st) return null
   return { ...ref, cat: st.cat, tier: cretopTier(ref.score), strategy: st, flow: meetingQuestionFlow(st), docs: meetingDocs(st) }
-}
-
-/** 개인사업자면 법인 전용 전략은 뺀다(크레탑 분석기 제안 탭과 같다) */
-export function rankedRefs(ui: CretopMiniUi): CretopPickRef[] {
-  const personal = !!(ui.bizForm as { isPersonal?: boolean } | undefined)?.isPersonal
-  return rankStrategies(ui)
-    .filter((r: CretopRanked) => !(personal && isCorpOnlyStrategy(r.s.name)))
-    .map((r) => ({ name: r.s.name, score: r.score, reasons: r.reasons.slice(0, 3), held: r.held }))
 }
 
 /**
@@ -313,60 +297,6 @@ export function applyCretopToClient(record: ClientOpsRecord, d: CretopDigest, op
   if (!record.sales) out = withActivity(out, 'sales', `잠재고객 등록 · 크레탑${sales.source ? ` · ${sales.source}` : ''}`, null, at)
   if (filled.length > 0) out = withActivity(out, 'sales', `크레탑으로 기본 정보 채움 · ${filled.join(' · ')}`, null, at)
   return { record: out, filled }
-}
-
-/* ------------------------------------------------------------------ */
-/* 도구 결과(크레탑 분석) — 크레탑 분석기 '업체 기록에 붙이기' 와 같은 모양    */
-/* ------------------------------------------------------------------ */
-
-export const CRETOP_RESULT_TITLE = '크레탑 분석'
-
-/** 1장 요약 글 — 크레탑 분석기 결과 막대의 '1장 요약 복사' 와 같은 글 */
-export function cretopSummaryText(ui: CretopMiniUi, selected: string[] = [], extraLines: string[] = []): string {
-  return [
-    oneLinerText(buildOneLiner(ui)),
-    ...(selected.length ? ['', '■ 최종 선택 컨설팅 항목', ...selected.map((n, i) => `${i + 1}. ${n}`)] : []),
-    ...(extraLines.length ? ['', ...extraLines] : []),
-    '',
-    '※ 크레탑 원문 기준 참고용 분석이며, 실제 상담 전 원문 확인이 필요합니다.',
-  ].join('\n')
-}
-
-export interface CretopResultData {
-  companyInfo: unknown
-  corePreview: unknown
-  oneLiner: ReturnType<typeof buildOneLiner>
-  selected: string[]
-  stockValue: unknown
-  /** D-119: 26개 전략 순위(이름 · 점수 · 이유 · 보유) — 미팅 준비가 질문 흐름을 다시 꺼낸다 */
-  ranked?: CretopPickRef[]
-  /** D-119: 진단 요약(위험 · 주의 · 기회 · 참고) */
-  diagnosis?: { text: string; tone: CretopTone }[]
-}
-
-export function cretopResultInput(
-  ui: CretopMiniUi,
-  selected: string[] = [],
-  extra: { stockValue?: unknown; extraLines?: string[] } = {},
-): Omit<ToolResult, 'id' | 'createdAt' | 'publishedUpdateId' | 'deadlines'> {
-  const one = buildOneLiner(ui)
-  const data: CretopResultData = {
-    companyInfo: ui.companyInfo,
-    corePreview: ui.corePreview,
-    oneLiner: one,
-    selected,
-    stockValue: extra.stockValue ?? null,
-    ranked: rankedRefs(ui),
-    diagnosis: buildDiagnosisSummary(ui),
-  }
-  return {
-    toolKey: 'cretop',
-    title: CRETOP_RESULT_TITLE,
-    verdict: null,
-    verdictLabel: one.risks[0] ?? '',
-    summary: cretopSummaryText(ui, selected, extra.extraLines ?? []),
-    data,
-  }
 }
 
 /* ------------------------------------------------------------------ */

@@ -1669,6 +1669,30 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('체험 끝나는 날: 오늘 + 14일(하루 당겨지지 않음)', trialEndDate('2026-09-26') === '2026-10-10' && trialEndDate('2026-12-25', 14) === '2027-01-08')
 }
 
+/* ------------------------------------------------------------------ */
+/* D-121 크레탑 분석기 단독 판매 경계 — 본체(mini · engine · lib)는 OS 를 모른다 */
+/* ------------------------------------------------------------------ */
+{
+  const files = import.meta.glob('../../tools/cretop/{mini,engine,lib}/**/*.{js,jsx,ts}', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
+  const bad: string[] = []
+  for (const [path, src] of Object.entries(files)) {
+    if (path.endsWith('.d.ts')) continue
+    for (const m of src.matchAll(/(?:import|export)[^'"]*from\s*['"]([^'"]+)['"]/g)) {
+      const spec = m[1]
+      if (!spec.startsWith('.')) continue
+      // 본체 안(./ ../mini ../engine ../lib)만 허용. 예외 둘: 주식가치 계산의 세금 계산(services/taxCalc) ·
+      // 테마 색 읽기(tools/shared/brandHex — OS 밖에서는 기본 색으로 돈다)
+      const allowed = /services\/taxCalc$|shared\/brandHex$/.test(spec)
+      const outside = /^(\.\.\/){2,}/.test(spec) && !allowed
+      const toOs = /\/(services|pages|components|config|types|repositories|auth|data)\//.test(spec) && !allowed
+      const toSibling = /^\.\.\/(shared|CretopPage|CretopWorkbench|screens)/.test(spec)
+      if (outside || toOs || toSibling) bad.push(`${path.replace('../../tools/cretop/', '')} → ${spec}`)
+    }
+  }
+  check('크레탑 단독 경계: 본체 파일이 있다', Object.keys(files).length >= 10, String(Object.keys(files).length))
+  check('크레탑 단독 경계: 본체(mini · engine · lib)는 OS(업체 · 영업 · 화면 · 저장소)를 import 하지 않는다 — 예외 taxCalc · brandHex', bad.length === 0, bad.join(' | '))
+}
+
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
 void (0 as unknown as ClientOpsRecord)

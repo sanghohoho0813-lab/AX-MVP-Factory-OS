@@ -20,6 +20,9 @@ export interface CretopMiniAppProps {
   resultBar?: (ui: CretopMiniUi, selected: string[]) => ReactNode
   pendingFile?: File | null
   onPendingDone?: () => void
+  /** [D-121] 다른 화면 안에 들어갈 때 — 마지막 세션 대신 이 분석으로 시작 */
+  initialUi?: CretopMiniUi | null
+  embedded?: boolean
 }
 export function CretopMiniApp(props: CretopMiniAppProps): ReactNode
 export interface CretopOneLiner { company: string; risks: string[]; questions: string[]; strategies: string[] }

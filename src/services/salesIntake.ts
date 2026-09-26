@@ -30,6 +30,8 @@ export interface CretopIntakeInput {
   /** 크레탑 분석기에서 '최종 선택' 한 항목 */
   selected?: string[]
   at?: string
+  /** false 면 크레탑 분석 이력은 건드리지 않는다 — 크레탑 작업대가 이미 저장한 경우(D-121) */
+  saveHistory?: boolean
 }
 
 export interface CretopIntakeResult {
@@ -83,10 +85,12 @@ export async function registerFromCretop(input: CretopIntakeInput): Promise<Cret
   }
   let saved = await saveClient(record)
 
-  try {
-    await saveCretopHistory(input.workspaceId, saved.id, input.ui, at)
-  } catch (e) {
-    warnings.push(`크레탑 분석 이력 저장 실패 — ${e instanceof Error ? e.message : '오류'}`)
+  if (input.saveHistory !== false) {
+    try {
+      await saveCretopHistory(input.workspaceId, saved.id, input.ui, at)
+    } catch (e) {
+      warnings.push(`크레탑 분석 이력 저장 실패 — ${e instanceof Error ? e.message : '오류'}`)
+    }
   }
 
   let uploaded = false
