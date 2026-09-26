@@ -10,8 +10,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { ChevronRight, CirclePlus, KanbanSquare, Presentation, Search } from 'lucide-react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { ChevronRight, CirclePlus, KanbanSquare, Presentation, ScanSearch, Search } from 'lucide-react'
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useToast } from '../../components/ui/toastContext'
 import { Badge, Disclosure, MetricTile, ScreenTitle } from '../../components/ui/primitives'
@@ -21,6 +21,7 @@ import { salesRecontacts, salesRisks } from '../../services/salesSignals'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { SalesTabs } from '../../components/sales/SalesTabs'
+import { LINK_BUTTON } from '../../components/sales/salesStyle'
 import { createClient, listClients, saveClient } from '../../services/clientOpsService'
 import { matchesClientSearch } from '../../services/clientOpsSearch'
 import { listRows } from '../../services/moduleData'
@@ -217,7 +218,9 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
-  const [formOpen, setFormOpen] = useState(false)
+  // D-119: 크레탑 등록 화면의 '크레탑 없이 직접 입력' → ?new=1 로 들어오면 바로 연다
+  const [searchParams] = useSearchParams()
+  const [formOpen, setFormOpen] = useState(() => searchParams.get('new') === '1')
   const [busy, setBusy] = useState(false)
   // 좁은 화면에서는 한 번에 한 칸만 — 고른 칸을 기억한다
   const [picked, setPicked] = useState<SalesStage>(() => {
@@ -365,11 +368,19 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
         title="영업 관리"
         sub={`${today} · 진행 중 ${stats.inFlow}곳 · 계약 완료 ${all.contracted.length}곳`}
         actions={
-          <Button variant="primary" onClick={() => setFormOpen(true)}>
-            <CirclePlus aria-hidden="true" className="size-4" />
-            <span className="hidden sm:inline">새 잠재고객</span>
-            <span className="sm:hidden">등록</span>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* D-119: 크레탑 보고서 한 번으로 등록 · 기본 정보 · 1차 미팅 전략까지 */}
+            <Link to="/sales/new" data-testid="board-cretop-intake" className={LINK_BUTTON.primary}>
+              <ScanSearch aria-hidden="true" className="size-4" />
+              <span className="hidden sm:inline">크레탑으로 등록</span>
+              <span className="sm:hidden">크레탑</span>
+            </Link>
+            <Button variant="secondary" onClick={() => setFormOpen(true)}>
+              <CirclePlus aria-hidden="true" className="size-4" />
+              <span className="hidden sm:inline">새 잠재고객</span>
+              <span className="sm:hidden">직접</span>
+            </Button>
+          </div>
         }
       />
       <SalesTabs />

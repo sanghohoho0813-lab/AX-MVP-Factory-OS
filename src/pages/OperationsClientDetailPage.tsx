@@ -114,6 +114,8 @@ import { withActivity } from '../services/clientOpsActivity'
 import { allDocumentMetas, emptyDocumentState } from '../services/clientOpsDocuments'
 import { ActivityLog } from '../components/ops/ActivityLog'
 import { ClientSalesCard } from '../components/sales/ClientSalesCard'
+import { SalesJourneyCard } from '../components/sales/SalesJourneyCard'
+import { withSalesPath } from '../services/salesJourney'
 import { ContractCard } from '../components/ops/ContractCard'
 import { WorkHistoryCard } from '../components/ops/WorkHistoryCard'
 import { ToolResultsCard } from '../components/ops/ToolResultsCard'
@@ -611,6 +613,9 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         가장 자주 나오는 질문이다. 접어 두면 매번 카톡을 뒤지게 된다.
       */}
       {/* D-114: 영업 — 잠재고객이면 펼쳐서, 계약 고객이면 접어서 */}
+      {/* D-119: 영업 흐름 — 1차 준비 → 1·2·3차 → 계약 → 계약 뒤 추가 제안, 걸음마다 할 일 · 작업실 도구 */}
+      <SalesJourneyCard record={record} today={today} compact onPathChange={(path) => void commit(withSalesPath(record, path))} />
+
       <ClientSalesCard record={record} onSave={(next) => void commit(next)} />
 
       <ContractCard

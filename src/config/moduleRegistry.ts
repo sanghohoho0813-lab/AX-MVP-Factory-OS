@@ -25,7 +25,7 @@ import {
   Sun,
   Workflow,
 } from 'lucide-react'
-import { SALES_TAB_PATHS } from './salesTabs'
+import { SALES_EXTRA_PATHS, SALES_TAB_PATHS } from './salesTabs'
 import { REVIEW_HUB_PATH, type ToolDefinition, liveTools, movedTools, reviewTools } from './toolRegistry'
 
 /**
@@ -146,7 +146,7 @@ export const MODULES: ModuleDefinition[] = [
   { key: 'inbox', label: '잠재고객 상담신청', path: '/ops/inbox', icon: Inbox, group: 'clients', accent: 'alert', enabled: true, badge: 'requests', hint: '고객 이벤트함' },
 
   // D-114: 기업컨설팅 OS(영업 도구 모음)를 옮긴 곳 — 목차는 이 한 줄, 보드 · 미팅 준비 · 상품·견적 · 전략은 안의 탭
-  { key: 'sales', label: '영업 관리', path: '/sales/board', icon: KanbanSquare, group: 'sales', accent: 'revenue', enabled: true, alsoPaths: [...SALES_TAB_PATHS, ...movedToPaths('/sales/board')], hint: '영업 보드 · 잠재고객 → 미팅 → 계약' },
+  { key: 'sales', label: '영업 관리', path: '/sales/board', icon: KanbanSquare, group: 'sales', accent: 'revenue', enabled: true, alsoPaths: [...SALES_TAB_PATHS, ...SALES_EXTRA_PATHS, ...movedToPaths('/sales/board')], hint: '영업 보드 · 잠재고객 → 미팅 → 계약' },
   { key: 'agents', label: '영업자 정산', path: '/ops/agents', icon: Handshake, group: 'sales', accent: 'revenue', enabled: true, hint: '누구한테 지금 얼마를 줘야 하는가' },
   // 만들고 있는 프로그램이 들어올 자리 — 들어오면 status 를 지우고 화면만 바꾼다 (docs/DECISIONS D-103)
   { key: 'first-meeting', label: '1차 미팅 체크리스트', path: '/sales/first-meeting', icon: ClipboardCheck, group: 'sales', accent: 'revenue', enabled: true, status: 'soon', badge: 'first-meetings', hint: '영업자용 AX 1차 미팅 체크리스트 — 만드는 중' },

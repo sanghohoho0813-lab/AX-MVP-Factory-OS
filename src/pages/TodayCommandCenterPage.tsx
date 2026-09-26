@@ -547,6 +547,11 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             진행 중 <strong className="font-semibold text-slate-800 tabular-nums">{salesFlow.count}곳</strong>
             {salesFlow.fee > 0 && <> · 예상 수임료 <strong className="font-semibold text-slate-800 tabular-nums">{krwTile(salesFlow.fee)}</strong></>}
             {salesRecontactList.length > 0 && <> · 다시 연락할 곳 {salesRecontactList.length}</>}
+            {' · '}
+            {/* D-119: 크레탑 보고서 한 번으로 잠재고객 등록 */}
+            <Link to="/sales/new" data-testid="today-cretop-intake" className="font-semibold whitespace-nowrap text-brand-700 hover:underline">
+              + 크레탑으로 등록
+            </Link>
           </p>
           {salesRiskList.length === 0 && salesRecontactList.length === 0 ? (
             <Blank title="지금 챙길 영업이 없습니다. 잠재고객은 영업 관리에서 등록합니다." icon={<KanbanSquare className="size-7" />} />

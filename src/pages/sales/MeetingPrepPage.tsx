@@ -18,6 +18,9 @@ import { Button } from '../../components/ui/Button'
 import { SalesTabs } from '../../components/sales/SalesTabs'
 import { rampAt } from '../../components/sales/salesColor'
 import { CopyButton, NumberedList, PillList, ScriptBlock, StageBadge } from '../../components/sales/salesParts'
+import { SalesJourneyCard } from '../../components/sales/SalesJourneyCard'
+import { CretopMeetingPanel } from '../../components/sales/CretopMeetingPanel'
+import { withSalesPath } from '../../services/salesJourney'
 import { listClients, saveClient } from '../../services/clientOpsService'
 import { salesStageOf, withSalesStage } from '../../services/salesPipeline'
 import {
@@ -347,7 +350,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <ScreenTitle title="영업 관리" sub={`${today} · 미팅 준비 — 고객을 고르면 첫 연락 · 1·2·3차 대본이 준비됩니다`} />
+      <ScreenTitle title="영업 관리" sub={`${today} · 미팅 준비 — 고객을 고르면 영업 흐름 · 크레탑 전략 · 1·2·3차 대본이 한 화면에`} />
       <SalesTabs />
 
       {error && (
@@ -384,6 +387,13 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
 
           {record && item && (
             <>
+              {/* D-119: 영업 흐름 — 1차 준비부터 계약 뒤까지, 걸음마다 할 일 · 작업실 도구 */}
+              <SalesJourneyCard
+                record={record}
+                today={today}
+                onPathChange={(path) => void persist(withSalesPath(record, path), path ? '계약 경로를 정했습니다.' : '계약 경로를 비웠습니다.')}
+              />
+
               {/* 요약 — 누구 · 어디까지 · 점수 · 무엇부터 */}
               <Surface className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
@@ -437,6 +447,9 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                   </button>
                 ))}
               </div>
+
+              {/* D-119: 크레탑 분석기의 전략 · 질문 흐름을 이 차수에 맞게 */}
+              <CretopMeetingPanel record={record} round={round} />
 
               <RoundPlan item={item} round={round} />
 

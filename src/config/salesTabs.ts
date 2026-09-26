@@ -21,3 +21,6 @@ export const SALES_TABS: SalesTab[] = [
 ]
 
 export const SALES_TAB_PATHS = SALES_TABS.map((t) => t.to)
+
+/** 탭은 아니지만 영업 관리가 맡는 주소 (D-119) — 크레탑으로 새 잠재고객 */
+export const SALES_EXTRA_PATHS = ['/sales/new']

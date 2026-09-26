@@ -9,7 +9,8 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, FolderOpen, Copy, Check } from 'lucide-react'
+import { AlertTriangle, FolderOpen, Copy, Check, KanbanSquare } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
 import { ModuleDashboard } from '../shared/ModuleDashboard'
@@ -17,7 +18,9 @@ import { useModuleSection } from '../shared/ModuleRoute'
 import { ExtractorScreen } from './screens/ExtractorScreen'
 import { CoreCheckScreen } from './screens/CoreCheckScreen'
 import { Button } from '../../components/ui/Button'
-import { CretopMiniApp, buildOneLiner, oneLinerText, type CretopMiniHistoryItem, type CretopMiniUi } from './mini/MiniApp.jsx'
+import { CretopMiniApp, type CretopMiniHistoryItem, type CretopMiniUi } from './mini/MiniApp.jsx'
+import { cretopCompany, cretopResultInput, findClientForCretop } from '../../services/salesCretop'
+import { registerFromCretop } from '../../services/salesIntake'
 import { SV_EVENT, svCurrent, svRestore, svSummaryLines, type SvEntry } from './mini/stockValueCalc.js'
 import { useModuleBucket } from '../shared/useModuleBucket'
 import { useToast } from '../../components/ui/toastContext'
@@ -37,7 +40,9 @@ interface AnalysisRow extends Record<string, unknown> {
 
 /** 원본 크레탑 분석 앱(D-93) + 이 OS 의 업체 연결(서류함 보고서 · 업체 기록에 붙이기 · 이력) */
 function CretopScreen() {
-  const { clientRecord, clientName, clientId, loadClients } = useToolClient()
+  const { clientRecord, clientName, clientId, loadClients, workspaceId } = useToolClient()
+  const navigate = useNavigate()
+  const [salesBusy, setSalesBusy] = useState(false)
   const [names, setNames] = useState<Record<string, string>>({})
   useEffect(() => {
     let alive = true
@@ -154,18 +159,35 @@ function CretopScreen() {
     </div>
   ) : null
 
+  /**
+   * D-119: 분석 → 영업으로 한 번에. 이 업체로 열었으면 그 업체에, 아니면 같은 업체(사업자번호 · 이름)를 찾아 붙이고,
+   * 없으면 잠재고객으로 새로 만든다 — 빈 기본 정보 · 영업 칸 · 도구 결과를 채우고 미팅 준비(1차)로 간다.
+   */
+  const toSales = async (ui: CretopMiniUi, selected: string[]) => {
+    setSalesBusy(true)
+    try {
+      const existing = clientRecord ?? findClientForCretop(await loadClients(), cretopCompany(ui))
+      const res = await registerFromCretop({ workspaceId, ui, existing, selected })
+      showToast(`${res.created ? '잠재고객으로 등록했습니다' : `${res.record.companyName}에 붙였습니다`} — 기본 정보 ${res.filled.length}칸.`)
+      for (const w of res.warnings) showToast(w)
+      navigate(`/sales/meeting?client=${res.record.id}&round=1`)
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : '영업으로 넘기지 못했습니다.')
+    } finally {
+      setSalesBusy(false)
+    }
+  }
+
   const resultBar = (ui: CretopMiniUi, selected: string[]) => {
-    const one = buildOneLiner(ui)
     // D-111: 주식가치 탭에서 본(고친) 값 그대로 — 계산이 안 되면(발행주식수 없음 등) 줄을 넣지 않는다
     const sv = svCurrent(ui)
     const svLines = svSummaryLines(ui)
-    const summary = [
-      oneLinerText(one),
-      ...(selected.length ? ['', '■ 최종 선택 컨설팅 항목', ...selected.map((n, i) => `${i + 1}. ${n}`)] : []),
-      ...(svLines.length ? ['', ...svLines] : []),
-      '',
-      '※ 크레탑 원문 기준 참고용 분석이며, 실제 상담 전 원문 확인이 필요합니다.',
-    ].join('\n')
+    // D-119: 붙이는 모양은 영업 쪽과 한 함수(순위 · 진단 요약까지 실어 미팅 준비가 다시 꺼낸다)
+    const input = cretopResultInput(ui, selected, {
+      stockValue: sv.r ? { perShare: Math.round(sv.r.finalPerShare), total: Math.round(sv.r.totalValue), shares: sv.shares, corpType: sv.r.corpType, edited: sv.edited } : null,
+      extraLines: svLines,
+    })
+    const summary = input.summary
     const copy = async () => {
       try {
         await navigator.clipboard.writeText(summary)
@@ -183,20 +205,18 @@ function CretopScreen() {
         </Button>
         <ToolResultAttach
           toolKey="cretop"
-          title="크레탑 분석"
+          title={input.title}
           verdict={null}
-          verdictLabel={one.risks[0] ?? ''}
+          verdictLabel={input.verdictLabel}
           summary={summary}
-          data={{
-            companyInfo: ui.companyInfo,
-            corePreview: ui.corePreview,
-            oneLiner: one,
-            selected,
-            stockValue: sv.r ? { perShare: Math.round(sv.r.finalPerShare), total: Math.round(sv.r.totalValue), shares: sv.shares, corpType: sv.r.corpType, edited: sv.edited } : null,
-          }}
+          data={input.data}
           subject={{ name: ui.companyInfo?.companyName, bizNo: ui.companyInfo?.businessNo }}
         />
-        <span className="t-meta text-slate-500">분석 결과를 고객 관리 업체 기록에 붙입니다.</span>
+        <Button size="sm" variant="secondary" onClick={() => void toSales(ui, selected)} disabled={salesBusy} data-testid="cretop-to-sales">
+          <KanbanSquare aria-hidden="true" className="size-4" />
+          {salesBusy ? '넘기는 중…' : clientRecord ? `${clientName} 미팅 준비로` : '잠재고객 등록 · 미팅 준비'}
+        </Button>
+        <span className="t-meta break-keep text-slate-500">붙이기 = 업체 기록에 결과만 · 미팅 준비 = 빈 기본 정보 · 영업 칸까지 채우고 1차 미팅 준비로</span>
       </div>
     )
   }

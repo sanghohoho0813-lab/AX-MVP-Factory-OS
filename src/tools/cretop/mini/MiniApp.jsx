@@ -875,6 +875,8 @@ function loadRecoInterests() { try { return JSON.parse(localStorage.getItem(RECO
 
 // 미팅 질문 흐름(5단계: 오프닝→현황→문제인식→제안연결→다음액션) — 대표가 니즈를 느끼도록 설계
 const STEP_COL = { A: "#0D9488", B: "#1D4ED8", C: "#B45309", D: "#7C3AED", E: "#15803D" };
+// [D-119] 질문 5단계를 미팅 차수에 나눈다 — 1차 A·B·C · 2차 D(제안 연결) · 3차 E(다음 액션). 영업 관리 › 미팅 준비와 같은 규칙
+const FLOW_ROUND = { A: 1, B: 1, C: 1, D: 2, E: 3 };
 function MeetingFlow({ s, title = "대표에게 던질 질문 흐름" }) {
   const flow = meetingQuestionFlow(s);
   if (!flow.length) return null;
@@ -886,7 +888,7 @@ function MeetingFlow({ s, title = "대표에게 던질 질문 흐름" }) {
           <div key={i} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
             <span style={{ flex: "0 0 auto", fontSize: "calc(9px * var(--fs,1))", fontWeight: 800, color: STEP_COL[x.step] || T.brand, background: "#fff", border: `1px solid ${STEP_COL[x.step] || T.brand}55`, borderRadius: 4, padding: "1px 0", marginTop: 1, width: 16, textAlign: "center" }}>{x.step}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: "calc(9.5px * var(--fs,1))", fontWeight: 700, color: T.mute, marginBottom: 1 }}>{x.label}</div>
+              <div style={{ fontSize: "calc(9.5px * var(--fs,1))", fontWeight: 700, color: T.mute, marginBottom: 1 }}>{x.label} · {FLOW_ROUND[x.step] || 1}차</div>
               <div style={{ fontSize: "calc(12.5px * var(--fs,1))", lineHeight: 1.55, color: T.ink, wordBreak: "keep-all" }}>{x.q}</div>
             </div>
           </div>
@@ -896,30 +898,41 @@ function MeetingFlow({ s, title = "대표에게 던질 질문 흐름" }) {
   );
 }
 // 상세 보기 본문 — 추천이유·핵심확인·미팅질문흐름(5단계)·문제제기·멘트·요청자료·기대효과
+// [D-119] 대표 지시 "하나하나 누르면 이것저것 많이 써 있어 정신없다 — 지우지 말고 합리적으로".
+//   앞에는 미팅에서 바로 쓰는 것만(추천 이유 · 추천 멘트 · 차수별 질문 흐름), 나머지(핵심 확인사항 · 문제 제기 ·
+//   이대로 두면 · 요청 자료 · 기대 효과)는 '더 보기' 안에. 글은 하나도 지우지 않았다.
 function StrategyDetail({ s, reasons }) {
   const why = (reasons && reasons.length) ? reasons : [s.why];
+  const [more, setMore] = useState(false);
   return (
     <div style={{ display: "grid", gap: 9 }}>
-      <DetailList title="1. 추천 이유" items={why} />
-      <DetailList title="2. 핵심 확인사항" items={s.interest} />
-      <MeetingFlow s={s} title="3. 대표에게 던질 질문 흐름" />
-      {s.problem ? (
-        <div style={{ fontSize: "calc(12.5px * var(--fs,1))", color: "#991B1B", background: "#FEF2F2", border: `1px solid #FCA5A5`, borderRadius: 8, padding: "8px 10px", lineHeight: 1.5 }}>
-          <span style={{ fontSize: "calc(10.5px * var(--fs,1))", fontWeight: 800, color: SEM.bad }}>문제 제기 ⚠️</span>
-          <div style={{ marginTop: 2, fontWeight: 600 }}>{s.problem}</div>
-        </div>
-      ) : null}
-      {s.implication ? (
-        <div style={{ fontSize: "calc(12.5px * var(--fs,1))", color: "#92400E", background: "#FFFBEB", border: `1px solid #FDE68A`, borderRadius: 8, padding: "8px 10px", lineHeight: 1.5 }}>
-          <span style={{ fontSize: "calc(10.5px * var(--fs,1))", fontWeight: 800, color: SEM.warn }}>이대로 두면</span>
-          <div style={{ marginTop: 2 }}>{s.implication}</div>
-        </div>
-      ) : null}
+      <DetailList title="추천 이유" items={why} />
       <div style={{ fontSize: "calc(12.5px * var(--fs,1))", color: T.ink, background: T.brandSoft, border: `1px solid ${T.brand}22`, borderRadius: 8, padding: "8px 10px", lineHeight: 1.5 }}>
-        <span style={{ fontSize: "calc(10.5px * var(--fs,1))", fontWeight: 800, color: T.brand }}>4. 실무 활용 포인트 · 추천 멘트 💡</span><div style={{ marginTop: 2 }}>“{s.ment}”</div>
+        <span style={{ fontSize: "calc(10.5px * var(--fs,1))", fontWeight: 800, color: T.brand }}>추천 멘트 💡</span><div style={{ marginTop: 2 }}>“{s.ment}”</div>
       </div>
-      <DetailList title="5. 요청 자료" items={meetingDocs(s)} />
-      <DetailList title="6. 기대 효과" items={s.effects} />
+      <MeetingFlow s={s} title="대표에게 던질 질문 흐름 · 차수별" />
+      <button type="button" data-testid="cretop-detail-more" aria-expanded={more} onClick={() => setMore((o) => !o)} style={{ justifySelf: "start", border: `1px solid ${T.line}`, background: "#fff", color: T.sub, borderRadius: 8, padding: "5px 11px", fontSize: "calc(11.5px * var(--fs,1))", fontWeight: 700, fontFamily: FF, cursor: "pointer", textAlign: "left", wordBreak: "keep-all" }}>
+        {more ? "접기 ▲" : "더 보기 — 핵심 확인사항 · 문제 제기 · 이대로 두면 · 요청 자료 · 기대 효과 ▼"}
+      </button>
+      {more ? (
+        <div style={{ display: "grid", gap: 9 }}>
+          <DetailList title="핵심 확인사항" items={s.interest} />
+          {s.problem ? (
+            <div style={{ fontSize: "calc(12.5px * var(--fs,1))", color: "#991B1B", background: "#FEF2F2", border: `1px solid #FCA5A5`, borderRadius: 8, padding: "8px 10px", lineHeight: 1.5 }}>
+              <span style={{ fontSize: "calc(10.5px * var(--fs,1))", fontWeight: 800, color: SEM.bad }}>문제 제기 ⚠️</span>
+              <div style={{ marginTop: 2, fontWeight: 600 }}>{s.problem}</div>
+            </div>
+          ) : null}
+          {s.implication ? (
+            <div style={{ fontSize: "calc(12.5px * var(--fs,1))", color: "#92400E", background: "#FFFBEB", border: `1px solid #FDE68A`, borderRadius: 8, padding: "8px 10px", lineHeight: 1.5 }}>
+              <span style={{ fontSize: "calc(10.5px * var(--fs,1))", fontWeight: 800, color: SEM.warn }}>이대로 두면</span>
+              <div style={{ marginTop: 2 }}>{s.implication}</div>
+            </div>
+          ) : null}
+          <DetailList title="요청 자료" items={meetingDocs(s)} />
+          <DetailList title="기대 효과" items={s.effects} />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -952,7 +965,17 @@ function RecCard({ rk, selected, onToggle }) {
   );
 }
 // 티어 그룹(헤더 + 카드들)
-function TierGroup({ emoji, label, col, items, selectedSet, onToggle }) {
+// [D-119] 조건 확인 · 가능성 낮음 등급은 접어 둔다(펼치면 그대로) — 먼저 볼 것만 앞에
+function TierGroup({ emoji, label, col, items, selectedSet, onToggle, folded }) {
+  const [open, setOpen] = useState(!folded);
+  if (!open) return (
+    <button type="button" data-testid="cretop-tier-folded" onClick={() => setOpen(true)} style={{ display: "flex", alignItems: "center", gap: 7, width: "100%", border: `1px dashed ${T.line}`, background: "#fff", borderRadius: 10, padding: "9px 12px", fontFamily: FF, cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>
+      <span style={{ fontSize: "calc(14px * var(--fs,1))" }}>{emoji}</span>
+      <span style={{ fontSize: "calc(13px * var(--fs,1))", fontWeight: 800, color: col }}>{label}</span>
+      <span style={{ fontSize: "calc(11.5px * var(--fs,1))", color: T.mute, fontWeight: 700 }}>({items.length})</span>
+      <span style={{ marginLeft: "auto", fontSize: "calc(11px * var(--fs,1))", color: T.brand, fontWeight: 800, whiteSpace: "nowrap" }}>펼치기 ▾</span>
+    </button>
+  );
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 7, margin: "2px 0 8px" }}>
@@ -965,9 +988,20 @@ function TierGroup({ emoji, label, col, items, selectedSet, onToggle }) {
   );
 }
 // 추천 설정(모드 + 관심 항목)
+// [D-119] 추천 기준은 한 번 정하면 잘 바꾸지 않는다 — 접어 두고, 이미 고른 것이 있으면 한 줄로 보여 준다
 function RecoSettings({ mode, setMode, interests, toggle }) {
+  const [open, setOpen] = useState(false);
+  const modeLabel = (REC_MODES.find((m) => m.key === mode) || REC_MODES[0]).label;
+  if (!open) return (
+    <button type="button" data-testid="cretop-reco-settings" aria-expanded="false" onClick={() => setOpen(true)} style={{ ...card, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", fontFamily: FF, cursor: "pointer", textAlign: "left", width: "100%", boxSizing: "border-box" }}>
+      <span style={{ fontSize: "calc(12.5px * var(--fs,1))", fontWeight: 800, color: T.ink }}>🎚️ 추천 기준</span>
+      <span style={{ fontSize: "calc(11.5px * var(--fs,1))", color: T.sub, minWidth: 0, flex: 1, wordBreak: "keep-all" }}>{modeLabel}{interests.length ? ` · 관심 ${interests.join("·")}` : ""}</span>
+      <span style={{ fontSize: "calc(11px * var(--fs,1))", color: T.brand, fontWeight: 800, whiteSpace: "nowrap" }}>바꾸기 ▾</span>
+    </button>
+  );
   return (
     <div style={{ ...card, padding: "12px 14px", display: "grid", gap: 11 }}>
+      <button type="button" aria-expanded="true" onClick={() => setOpen(false)} style={{ justifySelf: "end", border: "none", background: "transparent", color: T.mute, fontFamily: FF, fontSize: "calc(11px * var(--fs,1))", fontWeight: 700, cursor: "pointer", padding: 0 }}>접기 ▴</button>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <span style={{ fontSize: "calc(12.5px * var(--fs,1))", fontWeight: 800, color: T.ink }}>🎚️ 추천 모드</span>
         <select value={mode} onChange={(e) => setMode(e.target.value)} style={{ border: `1px solid ${T.line}`, borderRadius: 8, padding: "6px 10px", fontSize: "calc(12.5px * var(--fs,1))", fontFamily: FF, color: T.ink, background: "#fff", cursor: "pointer", fontWeight: 700 }}>
@@ -1087,7 +1121,7 @@ function RecommendationBoard({ ui }) {
       <RecoSettings mode={mode} setMode={setModeP} interests={interests} toggle={toggle} />
       {modeNotice ? <div style={{ fontSize: "calc(12px * var(--fs,1))", color: "#92400E", background: "#FFFBEB", border: `1px solid #FDE68A`, borderRadius: 9, padding: "10px 12px", lineHeight: 1.55, fontWeight: 700 }}>ℹ️ {modeNotice}</div> : null}
       {pinned.length ? <TierGroup emoji="⭐" label="관심 항목" col={T.brand} items={pinned} selectedSet={selectedSet} onToggle={onToggle} /> : null}
-      {groups.map((g) => g.items.length ? <TierGroup key={g.t.key} emoji={g.t.emoji} label={g.t.label} col={g.t.col} items={g.items} selectedSet={selectedSet} onToggle={onToggle} /> : null)}
+      {groups.map((g) => g.items.length ? <TierGroup key={g.t.key} emoji={g.t.emoji} label={g.t.label} col={g.t.col} items={g.items} selectedSet={selectedSet} onToggle={onToggle} folded={g.t.key === "cond" || g.t.key === "low"} /> : null)}
       {corpOnly.length ? <CorpOnlyFold items={corpOnly} /> : null}
     </div>
   );
