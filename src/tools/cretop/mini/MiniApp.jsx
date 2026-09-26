@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, createContext, useContext } from "react";
+import React, { useState, useEffect, useCallback, createContext, useContext, useRef } from "react";
 import { useSearchParams } from "react-router-dom"; // [D-94] 하단 탭 = 주소(?view=) → 브라우저 뒤로 가기로 탭을 오간다
 import { CORE_LABELS, cretopTrendCommentRich, cretopCashflowGradeInfo, cretopRowTrend, cretopPreviewTone, CRETOP_PREVIEW_TONES } from "../engine/index.js";
 import { extractPdfText } from "./pdf.js";
@@ -1549,11 +1549,26 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
   const pickScale = (v) => { setFontScale(v); try { localStorage.setItem("mini_fontScale", String(v)); } catch (e) {} };
   const [rawViewOpen, setRawViewOpen] = useState(false);   // 원문 텍스트 보기(추출 디버그)
   useEffect(() => { setManualGrade(null); }, [ui]); // 새 분석/이력 열람 시 직접선택 초기화
-  const scrollTop = () => { try { window.scrollTo({ top: 0, behavior: "auto" }); } catch (e) {} };
+  // [D-123] 탭을 바꾸면 페이지 맨 위가 아니라 분석기 첫머리로 — 미팅 준비처럼 다른 화면 안에 들어 있으면
+  // 맨 위로 튀어 한참 다시 내려와야 했다. 이미 분석기 첫머리가 보이면(그보다 위에 있으면) 움직이지 않는다.
+  const rootRef = useRef(null);
+  const scrollTop = () => {
+    try {
+      const el = rootRef.current;
+      if (!el) { window.scrollTo({ top: 0, behavior: "auto" }); return; }
+      const top = Math.max(0, el.getBoundingClientRect().top + window.scrollY - 72); // 72 = 붙어 있는 머리줄
+      if (window.scrollY > top + 1) window.scrollTo({ top, behavior: "auto" });
+    } catch (e) {}
+  };
+  const firstTabRun = useRef(true);
 
   // [D-94] 원본의 앱 안 뒤로/앞으로(스냅샷 스택)는 뺐다 — OS 안에서는 브라우저 뒤로 가기와 두 갈래가 되어 헷갈렸다
   const goTab = (t) => { if (t !== tab) setTab(t); scrollTop(); };  // 탭 전환 = 화면 전환 + 주소 기록
-  useEffect(() => { scrollTop(); }, [tab]); // 브라우저 뒤로 가기로 탭이 바뀌어도 맨 위부터
+  useEffect(() => {
+    // 처음 그릴 때는 움직이지 않는다(다른 화면 안에 들어 있을 때 화면이 끌려가지 않게)
+    if (firstTabRun.current) { firstTabRun.current = false; return; }
+    scrollTop();
+  }, [tab]); // 브라우저 뒤로 가기로 탭이 바뀌어도 분석기 첫머리부터
   // 저장된 분석 다시 열기 — 재분석 없음
   const openHistory = (h) => {
     setSidebar(false); setErr("");
@@ -1618,7 +1633,7 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
   }
 
   return (
-    <div className="cretop-mini" data-testid="cretop-mini" style={{ fontFamily: FF, background: T.bg, color: T.ink, overflowX: "clip", "--fs": 1, borderRadius: "var(--radius-panel)", border: `1px solid ${T.line}` }}>{/* [D-94] hidden → clip: hidden 이면 이 상자가 스크롤 상자가 되어 하단 탭이 화면에 붙지 않고 맨 끝 내용을 가렸다 */}
+    <div ref={rootRef} className="cretop-mini" data-testid="cretop-mini" style={{ fontFamily: FF, background: T.bg, color: T.ink, overflowX: "clip", "--fs": 1, borderRadius: "var(--radius-panel)", border: `1px solid ${T.line}` }}>{/* [D-94] hidden → clip: hidden 이면 이 상자가 스크롤 상자가 되어 하단 탭이 화면에 붙지 않고 맨 끝 내용을 가렸다 */}
       {/* 상단: 햄버거 + 서비스명 + 글자 크기 (정상 크기 — 콘텐츠만 확대) */}
       <header style={{ background: T.surface, borderBottom: `1px solid ${T.line}`, borderRadius: "var(--radius-panel) var(--radius-panel) 0 0" }}>
         <div style={{ maxWidth: 1040, margin: "0 auto", padding: "10px 12px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>

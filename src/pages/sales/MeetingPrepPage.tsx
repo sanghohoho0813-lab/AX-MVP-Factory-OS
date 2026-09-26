@@ -20,12 +20,13 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { Check, ChevronRight, FileText, NotebookPen, Presentation, ScanSearch } from 'lucide-react'
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useToast } from '../../components/ui/toastContext'
-import { Badge, Disclosure, ScreenTitle, type Tone } from '../../components/ui/primitives'
+import { Disclosure, ScreenTitle } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { SalesTabs } from '../../components/sales/SalesTabs'
 import { rampAt } from '../../components/sales/salesColor'
 import { CopyButton, NumberedList, PillList, ScriptBlock, StageBadge } from '../../components/sales/salesParts'
 import { SalesJourneyCard } from '../../components/sales/SalesJourneyCard'
+import { LeadLevel } from '../../components/sales/LeadLevel'
 import { CretopFollowUp } from '../../components/sales/CretopFollowUp'
 import { NextStepEditor } from '../../components/ops/NextStepEditor'
 import { CretopWorkbench } from '../../tools/cretop/CretopWorkbench'
@@ -58,7 +59,6 @@ import {
   recommendedStrategiesFor,
   scoreLead,
   scoreTier,
-  type ScoreTierKey,
   type TranscriptAnalysis,
 } from '../../services/salesEngine'
 import { todayLocalDate, localDateOf } from '../../lib/appClock'
@@ -72,8 +72,6 @@ const ROUNDS: { key: Round; label: string }[] = [
   { key: 3, label: '3차 클로징' },
 ]
 
-/** 등급 색 — 테마색 하나 · 경고 · 회색만 (원본의 초록 · 금색 · 주황 · 파랑 대신) */
-const TIER_TONE: Record<ScoreTierKey, Tone> = { high: 'success', chase: 'brand', nurture: 'warning', long: 'neutral', low: 'neutral' }
 
 const inputClass = 'mt-1 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.95rem] text-slate-800 focus:border-brand-500 focus:outline-none'
 
@@ -120,7 +118,7 @@ function ProfileEditor({ record, onSave }: { record: ClientOpsRecord; onSave: (n
         flags: d.flags,
         memo: d.memo,
       }),
-      '고객 정보를 저장했습니다. 점수 · 대본이 새 값으로 바뀌었습니다.',
+      '회사 사정을 저장했습니다. 중요도 · 대본이 새 값으로 바뀌었습니다.',
     )
   }
   const fillFromMemo = () => {
@@ -139,7 +137,7 @@ function ProfileEditor({ record, onSave }: { record: ClientOpsRecord; onSave: (n
   }
 
   return (
-    <Disclosure title="고객 정보 — 점수 · 대본 재료" hint={`대표 ${d.ceoAge || '?'}세 · 매출 ${d.revenueEok ? `${d.revenueEok}억` : '?'} · 체크 ${onCount}개`}>
+    <Disclosure title="미팅에서 알게 된 회사 사정" hint={`대표 나이 · 매출 · 가지급금 같은 사정 — 적으면 중요도 · 대본이 맞춰집니다 · 지금 대표 ${d.ceoAge || '?'}세 · 매출 ${d.revenueEok ? `${d.revenueEok}억` : '?'} · 체크 ${onCount}개`}>
       <div className="flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <label className="block text-[0.85rem] text-slate-500">
@@ -189,8 +187,8 @@ function ProfileEditor({ record, onSave }: { record: ClientOpsRecord; onSave: (n
           <Button variant="secondary" size="sm" onClick={fillFromMemo} disabled={d.memo.trim() === ''}>
             메모로 빈 칸 채우기
           </Button>
-          <Button variant="primary" size="sm" onClick={save} disabled={!dirty}>
-            고객 정보 저장
+          <Button variant="primary" size="sm" onClick={save} disabled={!dirty} data-testid="profile-save">
+            저장
           </Button>
         </div>
       </div>
@@ -501,9 +499,8 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                     <ChevronRight aria-hidden="true" className="size-4 text-slate-400" />
                   </Link>
                   <StageBadge stage={stage} />
-                  <Badge tone={TIER_TONE[tier.key]}>
-                    <span data-testid="lead-score" className="tabular-nums">{score}점</span> · {tier.label}
-                  </Badge>
+                  {/* D-123: 점수(64점) 대신 중요도 5단계 색 — 빨강 · 주황 · 노랑 · 초록 · 파랑 */}
+                  <LeadLevel tier={tier.key} score={score} withHint />
                   {theme && <span className="t-sub text-slate-500">미팅 테마 · {theme.label}</span>}
                 </div>
                 <div className="border-t border-slate-100 pt-2.5">
@@ -518,8 +515,6 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                 foldable
                 onPathChange={(path) => void persist(withSalesPath(record, path), path ? '계약 경로를 정했습니다.' : '계약 경로를 비웠습니다.')}
               />
-
-              <ProfileEditor record={record} onSave={(n, m) => void persist(n, m)} />
 
               {/* 차수 고르기 */}
               <div role="group" aria-label="미팅 차수" data-testid="meeting-rounds" className="grid grid-cols-4 gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:inline-flex sm:self-start">
@@ -590,6 +585,9 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                     return ok
                   }}
                 />}
+
+              {/* D-123: 미팅에서 알게 된 것은 미팅 기록 바로 아래 — 크레탑을 보기도 전(맨 위)에는 알 수 없는 것들이었다 */}
+              {round !== 0 && <ProfileEditor record={record} onSave={(n, m) => void persist(n, m)} />}
 
               {(record.sales?.meetings?.length ?? 0) > 0 && (
                 <Disclosure title="지난 미팅 기록" hint={`${record.sales?.meetings?.length}건`}>
