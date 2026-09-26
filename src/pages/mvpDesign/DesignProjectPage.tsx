@@ -223,7 +223,7 @@ export function DesignProjectPage() {
                       ['AI 기능', design.aiFeatures.length],
                     ].map(([label, value]) => (
                       <div key={label as string}>
-                        <dt className="text-[0.82rem] text-slate-400">{label}</dt>
+                        <dt className="text-[0.875rem] text-slate-400">{label}</dt>
                         <dd className="text-[1.1rem] font-bold text-slate-800">{value}</dd>
                       </div>
                     ))}

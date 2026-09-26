@@ -207,14 +207,14 @@ function ScenariosBody({ workspace: w }: { workspace: ValidationWorkspace }) {
               <p className="text-sm font-semibold break-keep text-slate-800">{s.title}</p>
               <ScenarioTypeBadge type={s.type} />
               {s.required ? (
-                <span className="rounded-md border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[0.82rem] font-semibold text-brand-700">필수</span>
+                <span className="rounded-md border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[0.875rem] font-semibold text-brand-700">필수</span>
               ) : (
-                <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.82rem] text-slate-500">선택</span>
+                <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.875rem] text-slate-500">선택</span>
               )}
-              <span className={`rounded-md border px-1.5 py-0.5 text-[0.82rem] font-medium ${TONE_BADGE_CLASS[PRIORITY_META[s.priority].tone]}`}>
+              <span className={`rounded-md border px-1.5 py-0.5 text-[0.875rem] font-medium ${TONE_BADGE_CLASS[PRIORITY_META[s.priority].tone]}`}>
                 {PRIORITY_META[s.priority].label}
               </span>
-              <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.82rem] text-slate-500">
+              <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.875rem] text-slate-500">
                 {STATUS_LABEL[s.status]}
               </span>
             </div>

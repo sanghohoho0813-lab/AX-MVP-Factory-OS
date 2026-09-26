@@ -16,7 +16,7 @@ const HYPOTHESIS_PRIORITY_LABEL: Record<string, string> = {
   low: '낮음',
 }
 
-const inputClass = 'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[14px] focus:border-brand-400 focus:outline-none'
+const inputClass = 'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.875rem] focus:border-brand-400 focus:outline-none'
 const labelClass = 'mb-1 block text-[0.9rem] font-semibold text-slate-500'
 
 function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
@@ -163,7 +163,7 @@ function HypothesesPanel({ w }: { w: ValidationWorkspace }) {
               <div className="flex items-start gap-2">
                 <Lightbulb aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-400" />
                 <p className="min-w-0 text-sm font-semibold break-keep text-slate-800">{h.statement}</p>
-                <span className="ml-auto shrink-0 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.82rem] text-slate-500">
+                <span className="ml-auto shrink-0 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.875rem] text-slate-500">
                   {HYPOTHESIS_PRIORITY_LABEL[h.priority] ?? h.priority}
                 </span>
               </div>

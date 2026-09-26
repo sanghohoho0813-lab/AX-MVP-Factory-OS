@@ -36,35 +36,35 @@ export function SurveyCompletionPage({
       <dl className="mt-6 w-full rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-4 text-left shadow-(--shadow-card)">
         {organizationName && (
           <div className="flex justify-between border-b border-slate-100 py-2">
-            <dt className="text-[13px] text-slate-400">고객사</dt>
-            <dd className="text-[13px] font-medium text-slate-700">{organizationName}</dd>
+            <dt className="text-[0.875rem] text-slate-400">고객사</dt>
+            <dd className="text-[0.875rem] font-medium text-slate-700">{organizationName}</dd>
           </div>
         )}
         <div className="flex justify-between border-b border-slate-100 py-2">
-          <dt className="text-[13px] text-slate-400">설문</dt>
-          <dd className="max-w-52 truncate text-[13px] font-medium text-slate-700">
+          <dt className="text-[0.875rem] text-slate-400">설문</dt>
+          <dd className="max-w-52 truncate text-[0.875rem] font-medium text-slate-700">
             {surveyTitle}
           </dd>
         </div>
         {recipientName && (
           <div className="flex justify-between border-b border-slate-100 py-2">
-            <dt className="text-[13px] text-slate-400">응답자</dt>
-            <dd className="text-[13px] font-medium text-slate-700">{recipientName}</dd>
+            <dt className="text-[0.875rem] text-slate-400">응답자</dt>
+            <dd className="text-[0.875rem] font-medium text-slate-700">{recipientName}</dd>
           </div>
         )}
         <div className="flex justify-between border-b border-slate-100 py-2">
-          <dt className="text-[13px] text-slate-400">제출 일시</dt>
-          <dd className="text-[13px] font-medium text-slate-700">
+          <dt className="text-[0.875rem] text-slate-400">제출 일시</dt>
+          <dd className="text-[0.875rem] font-medium text-slate-700">
             {formatDateTime(submittedAt)}
           </dd>
         </div>
         <div className="flex justify-between border-b border-slate-100 py-2">
-          <dt className="text-[13px] text-slate-400">응답 문항</dt>
-          <dd className="text-[13px] font-medium text-slate-700">{answeredCount}개</dd>
+          <dt className="text-[0.875rem] text-slate-400">응답 문항</dt>
+          <dd className="text-[0.875rem] font-medium text-slate-700">{answeredCount}개</dd>
         </div>
         <div className="flex justify-between py-2">
-          <dt className="text-[13px] text-slate-400">필수 문항</dt>
-          <dd className="text-[13px] font-medium text-slate-700">
+          <dt className="text-[0.875rem] text-slate-400">필수 문항</dt>
+          <dd className="text-[0.875rem] font-medium text-slate-700">
             {requiredComplete ? '완료' : '일부 미완료'}
           </dd>
         </div>

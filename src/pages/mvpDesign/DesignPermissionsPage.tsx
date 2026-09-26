@@ -40,7 +40,7 @@ export function DesignPermissionsPage() {
                       <ShieldCheck aria-hidden="true" className="size-4 text-slate-400" />
                       <p className="text-sm font-semibold text-slate-800">{role.name}</p>
                       {role.isPrimaryUser && (
-                        <span className="inline-flex items-center gap-1 rounded-md border border-success-200 bg-success-50 px-1.5 py-0.5 text-[0.82rem] font-medium text-success-700">
+                        <span className="inline-flex items-center gap-1 rounded-md border border-success-200 bg-success-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-success-700">
                           <Star aria-hidden="true" className="size-3" />주 사용자
                         </span>
                       )}

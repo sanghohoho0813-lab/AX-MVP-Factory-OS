@@ -519,7 +519,7 @@ export function NotesSection({
           className="t-body w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2.5 focus:border-brand-500 focus:outline-none"
         />
         <div className="mt-2 flex items-center justify-between gap-2">
-          <span className="text-[0.82rem] text-slate-500">Ctrl(⌘) + Enter 로도 추가됩니다</span>
+          <span className="text-[0.875rem] text-slate-500">Ctrl(⌘) + Enter 로도 추가됩니다</span>
           <Button variant="primary" size="sm" disabled={draft.trim() === ''} onClick={add}>
             <Plus aria-hidden="true" className="size-3.5" />
             메모 추가
@@ -609,7 +609,7 @@ export function NotesSection({
                   </div>
                 </div>
               )}
-              <p className="mt-1.5 text-[0.8rem] text-slate-400">
+              <p className="mt-1.5 text-[0.875rem] text-slate-400">
                 {localDateOf(n.updatedAt)}
                 {n.createdAt !== n.updatedAt ? ' 수정됨' : ''}
               </p>

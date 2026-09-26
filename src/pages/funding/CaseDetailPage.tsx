@@ -450,7 +450,7 @@ function CaseDetailContent({ context }: { context: CaseContext }) {
                   <CaseVisibilityBadge visibility={caseStudy.visibility} />
                   <ConsentBadge status={caseStudy.consentStatus} />
                   {caseStudy.manuallyEdited && (
-                    <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.82rem] text-slate-500">직접 수정됨</span>
+                    <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.875rem] text-slate-500">직접 수정됨</span>
                   )}
                 </div>
               </div>
@@ -763,7 +763,7 @@ function DetailList({ title, items }: { title: string; items: string[] }) {
 function SysItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-[0.82rem] text-slate-400">{label}</dt>
+      <dt className="text-[0.875rem] text-slate-400">{label}</dt>
       <dd className="mt-0.5 text-[0.9rem] break-keep text-slate-600">{value}</dd>
     </div>
   )

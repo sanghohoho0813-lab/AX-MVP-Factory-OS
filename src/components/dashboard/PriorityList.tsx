@@ -40,7 +40,7 @@ export function PriorityList({ tasks }: PriorityListProps) {
             <div className="flex items-center gap-2.5">
               <span
                 aria-label={`${task.rank}순위`}
-                className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[0.8125rem] font-bold ${
+                className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[0.875rem] font-bold ${
                   RANK_CLASS[task.rank] ?? 'bg-slate-500 text-white'
                 }`}
               >
@@ -51,7 +51,7 @@ export function PriorityList({ tasks }: PriorityListProps) {
                 {task.client} — {task.title}
               </p>
             </div>
-            <p className="text-[13px] break-keep text-slate-500">
+            <p className="text-[0.875rem] break-keep text-slate-500">
               {task.nextAction}
             </p>
             <div className="mt-auto flex items-center justify-between gap-3 pt-0.5">
@@ -62,7 +62,7 @@ export function PriorityList({ tasks }: PriorityListProps) {
               <button
                 type="button"
                 onClick={() => handleAction(task)}
-                className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-semibold text-brand-600 hover:bg-brand-50 hover:text-brand-700"
+                className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[0.875rem] font-semibold text-brand-600 hover:bg-brand-50 hover:text-brand-700"
               >
                 {task.action.label}
                 <ArrowRight aria-hidden="true" className="size-3.5" />

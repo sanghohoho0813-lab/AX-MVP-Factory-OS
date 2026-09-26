@@ -209,7 +209,7 @@ function OverviewBody({
           value={
             <span className="inline-flex flex-col items-end">
               <span>{PLAIN_GATE_LABEL[currentGate]}</span>
-              <span className="text-[0.75rem] font-normal text-slate-400">Gate {GATE_META[currentGate].index}</span>
+              <span className="text-[0.8125rem] font-normal text-slate-400">Gate {GATE_META[currentGate].index}</span>
             </span>
           }
         />
@@ -254,7 +254,7 @@ function OverviewBody({
                 <li key={s.id} className="rounded-(--radius-control) border border-slate-200 px-4 py-3">
                   <div className="flex items-start justify-between gap-2">
                     <p className="min-w-0 text-[1.05rem] font-semibold break-keep text-slate-800">{s.title}</p>
-                    <span className={`shrink-0 rounded-md border px-2 py-0.5 text-[0.82rem] font-medium ${s.required ? 'border-brand-200 bg-brand-50 text-brand-700' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
+                    <span className={`shrink-0 rounded-md border px-2 py-0.5 text-[0.875rem] font-medium ${s.required ? 'border-brand-200 bg-brand-50 text-brand-700' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
                       {s.required ? '필수' : '선택'}
                     </span>
                   </div>
@@ -332,7 +332,7 @@ function OverviewBody({
           </button>
           {showExpert && (
             <div className="flex flex-col gap-5 border-t border-slate-100 px-5 py-5">
-              <div className="flex flex-wrap items-center gap-2 text-[0.82rem] text-slate-400">
+              <div className="flex flex-wrap items-center gap-2 text-[0.875rem] text-slate-400">
                 <span>검증 v{w.version}</span>
                 <span>단계 통과 {summary.gatesPassed}/8</span>
                 <span>규칙 {w.ruleVersion}</span>
@@ -350,9 +350,9 @@ function OverviewBody({
                       <li key={gate} className="flex items-center justify-between gap-3 rounded-(--radius-card) border border-slate-200 px-3.5 py-2.5">
                         <span className="flex min-w-0 flex-col">
                           <span className="text-[0.95rem] font-medium break-keep text-slate-700">{PLAIN_GATE_LABEL[gate]}</span>
-                          <span className="text-[0.78rem] text-slate-400">Gate {GATE_META[gate].index}</span>
+                          <span className="text-[0.8125rem] text-slate-400">Gate {GATE_META[gate].index}</span>
                         </span>
-                        {gr ? <GateStatusBadge status={gr.status} /> : <span className="text-[0.82rem] text-slate-400">미생성</span>}
+                        {gr ? <GateStatusBadge status={gr.status} /> : <span className="text-[0.875rem] text-slate-400">미생성</span>}
                       </li>
                     )
                   })}
@@ -371,7 +371,7 @@ function OverviewBody({
                       ['필수 미측정', `${summary.requiredNotRun}건`],
                     ].map(([label, value]) => (
                       <div key={label}>
-                        <dt className="text-[0.82rem] text-slate-400">{label}</dt>
+                        <dt className="text-[0.875rem] text-slate-400">{label}</dt>
                         <dd className="text-[1.1rem] font-bold text-slate-800">{value}</dd>
                       </div>
                     ))}

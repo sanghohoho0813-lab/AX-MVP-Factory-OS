@@ -71,7 +71,7 @@ export function DueDateField({
             key={q.label}
             type="button"
             onClick={() => onChange(shiftDays(today, q.days))}
-            className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[0.82rem] font-medium text-slate-600 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+            className="tap rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[0.875rem] font-medium text-slate-600 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
           >
             {q.label}
           </button>
@@ -80,7 +80,7 @@ export function DueDateField({
           <button
             type="button"
             onClick={() => onChange('')}
-            className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[0.82rem] font-medium text-slate-400 hover:text-danger-600"
+            className="tap rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[0.875rem] font-medium text-slate-400 hover:text-danger-600"
           >
             지우기
           </button>

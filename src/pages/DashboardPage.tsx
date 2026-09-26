@@ -153,7 +153,7 @@ export function DashboardPage() {
                       <p className="flex items-center gap-1.5 text-[0.95rem] text-slate-500">
                         <span className="truncate">{j.orgName}</span>
                         {j.progress.isSample && (
-                          <span className="shrink-0 rounded-full border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[0.78rem] font-semibold text-brand-700">샘플</span>
+                          <span className="shrink-0 rounded-full border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[0.8125rem] font-semibold text-brand-700">샘플</span>
                         )}
                       </p>
                       <p className="mt-0.5 text-[1.15rem] leading-tight font-bold break-keep text-slate-900">{j.project.name}</p>

@@ -43,7 +43,7 @@ import {
 } from '../../components/validation/badges'
 import { ReadOnlyNotice, TrackSectionFrame } from './validationShared'
 
-const inputClass = 'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[14px] focus:border-brand-400 focus:outline-none'
+const inputClass = 'w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.875rem] focus:border-brand-400 focus:outline-none'
 const labelClass = 'mb-1 block text-[0.9rem] font-semibold text-slate-500'
 
 const CONSENT_STATUSES = Object.keys(CONSENT_META) as ParticipantConsentStatus[]
@@ -221,11 +221,11 @@ function BuildPanel({ w, readOnly }: { w: ValidationWorkspace; readOnly: boolean
                 <p className="text-sm font-semibold text-slate-800">{b.name}</p>
                 {b.version && <span className="text-[0.9rem] text-slate-400">v{b.version}</span>}
                 <BuildStatusBadge status={b.status} />
-                <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.82rem] text-slate-500">
+                <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.875rem] text-slate-500">
                   {BUILD_TYPE_META[b.type].label}
                 </span>
                 {b.isCurrent && (
-                  <span className="inline-flex items-center gap-1 rounded-md border border-success-200 bg-success-50 px-1.5 py-0.5 text-[0.82rem] font-medium text-success-700">
+                  <span className="inline-flex items-center gap-1 rounded-md border border-success-200 bg-success-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-success-700">
                     <CheckCircle2 aria-hidden="true" className="size-3.5" />
                     활성 버전
                   </span>

@@ -217,7 +217,7 @@ export function WebsiteProjectPage() {
                       <p className="text-[1.05rem] font-semibold break-keep text-slate-800">{p.name}</p>
                       <div className="flex items-center gap-2">
                         <PageStatusBadge status={p.status} />
-                        <span className={`text-[0.82rem] font-medium ${needsContent ? 'text-warning-700' : 'text-success-700'}`}>
+                        <span className={`text-[0.875rem] font-medium ${needsContent ? 'text-warning-700' : 'text-success-700'}`}>
                           {needsContent ? '자료 준비 필요' : '준비됨'}
                         </span>
                       </div>
@@ -275,7 +275,7 @@ export function WebsiteProjectPage() {
                       ['콘텐츠 준비율', `${Math.round((contentReady / contentTotal) * 100)}%`],
                     ].map(([label, value]) => (
                       <div key={label as string}>
-                        <dt className="text-[0.82rem] text-slate-400">{label}</dt>
+                        <dt className="text-[0.875rem] text-slate-400">{label}</dt>
                         <dd className="text-[1.1rem] font-bold text-slate-800">{value}</dd>
                       </div>
                     ))}

@@ -59,13 +59,13 @@ function TrackGrid({ row }: { row: ClientOpsLedgerRow }) {
       {row.tracks.map((track) => (
         <div key={track.key} className="min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <dt className="text-[0.76rem] font-semibold whitespace-nowrap text-slate-500">{track.label}</dt>
-            <span className="text-[0.76rem] font-semibold text-slate-500">{track.value}%</span>
+            <dt className="text-[0.8125rem] font-semibold whitespace-nowrap text-slate-500">{track.label}</dt>
+            <span className="text-[0.8125rem] font-semibold text-slate-500">{track.value}%</span>
           </div>
           <div className="mt-1">
             <ProgressBar value={track.value} tone={track.tone} label={`${row.clientName} ${track.label}`} />
           </div>
-          <dd className="mt-1 truncate text-[0.75rem] text-slate-400">{track.detail}</dd>
+          <dd className="mt-1 truncate text-[0.8125rem] text-slate-400">{track.detail}</dd>
         </div>
       ))}
     </dl>
@@ -80,14 +80,14 @@ function QuickCheckPanel({
   onToggle: (row: ClientOpsLedgerRow, key: ClientOpsCheckKey, checked: boolean) => void
 }) {
   if (!row.projectId) {
-    return <p className="text-[0.82rem] text-slate-400">프로젝트를 먼저 등록하면 운영 체크를 저장할 수 있습니다.</p>
+    return <p className="text-[0.875rem] text-slate-400">프로젝트를 먼저 등록하면 운영 체크를 저장할 수 있습니다.</p>
   }
   return (
     <div className="flex flex-wrap gap-2">
       {QUICK_CHECKS.map((item) => (
         <label
           key={item.key}
-          className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-2.5 text-[0.8rem] font-medium text-slate-600 hover:bg-slate-50"
+          className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-2.5 text-[0.875rem] font-medium text-slate-600 hover:bg-slate-50"
         >
           <input
             type="checkbox"
@@ -130,7 +130,7 @@ function MobileLedgerCard({
       </div>
 
       <div className="mt-4">
-        <div className="flex items-center justify-between gap-3 text-[0.8rem] font-medium text-slate-500">
+        <div className="flex items-center justify-between gap-3 text-[0.875rem] font-medium text-slate-500">
           <span>{row.stageLabel}</span>
           <span>{row.progressPercent}%</span>
         </div>
@@ -140,7 +140,7 @@ function MobileLedgerCard({
       </div>
 
       <div className="mt-4 rounded-(--radius-card) border border-slate-200 bg-slate-50 px-3 py-3">
-        <p className="text-[0.8rem] font-semibold text-slate-500">다음 운영 행동</p>
+        <p className="text-[0.875rem] font-semibold text-slate-500">다음 운영 행동</p>
         <p className="mt-1 text-[0.88rem] leading-relaxed break-keep text-slate-700">{row.recommendedMove}</p>
       </div>
 
@@ -228,9 +228,9 @@ export function ClientOpsLedgerPage() {
           <p className="max-w-72 truncate text-[0.9rem] font-medium text-slate-700">{row.projectName}</p>
           <div className="mt-1 flex items-center gap-2">
             <ProgressBar value={row.progressPercent} tone={row.tone} label={`${row.clientName} 진행률`} />
-            <span className="shrink-0 text-[0.78rem] font-semibold text-slate-500">{row.progressPercent}%</span>
+            <span className="shrink-0 text-[0.8125rem] font-semibold text-slate-500">{row.progressPercent}%</span>
           </div>
-          <p className="mt-1 text-[0.78rem] text-slate-400">{row.stageLabel}</p>
+          <p className="mt-1 text-[0.8125rem] text-slate-400">{row.stageLabel}</p>
         </div>
       ),
     },
@@ -240,7 +240,7 @@ export function ClientOpsLedgerPage() {
       cell: (row) => (
         <div className="min-w-0">
           <p className="max-w-52 truncate text-[0.9rem] font-semibold text-slate-700">{row.bottleneck}</p>
-          <p className="mt-0.5 text-[0.8rem] text-slate-400">{row.dueLabel}</p>
+          <p className="mt-0.5 text-[0.875rem] text-slate-400">{row.dueLabel}</p>
         </div>
       ),
     },
@@ -255,7 +255,7 @@ export function ClientOpsLedgerPage() {
       cell: (row) => (
         <div className="min-w-0">
           <p className="max-w-72 truncate text-[0.9rem] font-medium text-brand-700">{row.nextAction}</p>
-          <p className="mt-0.5 text-[0.8rem] text-slate-400">예상 {row.estimatedMinutes}분</p>
+          <p className="mt-0.5 text-[0.875rem] text-slate-400">예상 {row.estimatedMinutes}분</p>
         </div>
       ),
     },
@@ -272,7 +272,7 @@ export function ClientOpsLedgerPage() {
         <Link
           to={`/ops/clients/${row.organizationId}`}
           onClick={(event) => event.stopPropagation()}
-          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-2.5 text-[0.8rem] font-medium whitespace-nowrap text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-2.5 text-[0.875rem] font-medium whitespace-nowrap text-slate-700 hover:bg-slate-50 hover:text-slate-900"
         >
           운영 파일
           <ArrowRight aria-hidden="true" className="size-3.5" />
@@ -356,7 +356,7 @@ export function ClientOpsLedgerPage() {
               <CalendarClock aria-hidden="true" className="size-4.5" />
             </span>
             <div>
-              <p className="text-[0.8rem] font-medium text-slate-500">마감 임박</p>
+              <p className="text-[0.875rem] font-medium text-slate-500">마감 임박</p>
               <p className="mt-0.5 text-xl font-bold text-slate-900">{ledger.summary.dueSoonCount}건</p>
             </div>
           </div>
@@ -365,7 +365,7 @@ export function ClientOpsLedgerPage() {
               <ClipboardList aria-hidden="true" className="size-4.5" />
             </span>
             <div>
-              <p className="text-[0.8rem] font-medium text-slate-500">현재 필터 작업량</p>
+              <p className="text-[0.875rem] font-medium text-slate-500">현재 필터 작업량</p>
               <p className="mt-0.5 text-xl font-bold text-slate-900">{ledger.summary.estimatedMinutes}분</p>
             </div>
           </div>
@@ -374,7 +374,7 @@ export function ClientOpsLedgerPage() {
               <ListChecks aria-hidden="true" className="size-4.5" />
             </span>
             <div>
-              <p className="text-[0.8rem] font-medium text-slate-500">운영 판단</p>
+              <p className="text-[0.875rem] font-medium text-slate-500">운영 판단</p>
               <p className="mt-0.5 text-[0.95rem] font-semibold break-keep text-slate-800">
                 {ledger.summary.focusLabel}으로 큐를 정렬했습니다.
               </p>

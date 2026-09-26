@@ -73,7 +73,7 @@ export function DataCompletenessPanel({ result }: { result: AssessmentResult }) 
       {rows.map(([label, value, help]) => (
         <div key={label}>
           <div className="mb-1 flex items-center justify-between">
-            <span className="text-[13px] font-medium text-slate-600">{label}</span>
+            <span className="text-[0.875rem] font-medium text-slate-600">{label}</span>
             <span className="text-sm font-semibold text-slate-800">{value}%</span>
           </div>
           <ProgressBar value={value} tone="info" label={label} />
@@ -126,7 +126,7 @@ export function AnalysisProgressSteps({ steps }: { steps: AnalysisStep[] }) {
           <li key={step.label} className="flex items-start gap-2.5">
             <Icon aria-hidden="true" className={`mt-0.5 size-4 shrink-0 ${STEP_COLOR[step.state]}`} />
             <div>
-              <p className="text-[13px] font-medium text-slate-700">
+              <p className="text-[0.875rem] font-medium text-slate-700">
                 <span className="mr-1 text-slate-400">{i + 1}.</span>
                 {step.label}
               </p>
@@ -201,7 +201,7 @@ export function WebsiteReadinessSummary({
             normalized >= 66 ? 'success' : normalized >= 40 ? 'info' : 'warning'
           return (
             <div key={d.domain} className="flex items-center gap-3">
-              <span className="w-40 shrink-0 text-[13px] text-slate-600">
+              <span className="w-40 shrink-0 text-[0.875rem] text-slate-600">
                 {WEBSITE_DOMAIN_META[d.domain].label}
               </span>
               <div className="min-w-0 flex-1">
@@ -221,7 +221,7 @@ export function WebsiteReadinessSummary({
           {website.missingContent.length > 0 && (
             <div className="rounded-(--radius-control) border border-warning-200 bg-warning-50/40 px-3 py-2">
               <p className="text-[0.875rem] font-semibold text-warning-700">부족한 콘텐츠</p>
-              <p className="mt-0.5 text-[13px] break-keep text-slate-600">
+              <p className="mt-0.5 text-[0.875rem] break-keep text-slate-600">
                 {website.missingContent.join(', ')}
               </p>
             </div>
@@ -229,7 +229,7 @@ export function WebsiteReadinessSummary({
           {website.missingAssets.length > 0 && (
             <div className="rounded-(--radius-control) border border-warning-200 bg-warning-50/40 px-3 py-2">
               <p className="text-[0.875rem] font-semibold text-warning-700">부족한 이미지·영상 자산</p>
-              <p className="mt-0.5 text-[13px] break-keep text-slate-600">
+              <p className="mt-0.5 text-[0.875rem] break-keep text-slate-600">
                 {website.missingAssets.join(', ')}
               </p>
             </div>

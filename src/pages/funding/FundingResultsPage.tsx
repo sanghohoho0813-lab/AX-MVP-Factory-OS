@@ -136,7 +136,7 @@ export function FundingResultsPage() {
   const open = (r: Row) => navigate(`/funding/projects/${r.strategy.projectId}/review`)
 
   const columns: DataTableColumn<Row>[] = [
-    { key: 'client', header: '고객사', cell: (r) => <span className="text-[13px] font-medium text-slate-700">{r.orgName}</span> },
+    { key: 'client', header: '고객사', cell: (r) => <span className="text-[0.875rem] font-medium text-slate-700">{r.orgName}</span> },
     {
       key: 'project', header: '프로젝트 · 우선 기관', className: 'min-w-[180px]',
       cell: (r) => (
@@ -153,17 +153,17 @@ export function FundingResultsPage() {
           <div className="flex flex-wrap gap-1">
             {r.strategy.preferredSupportTypes.map((t) => <SupportTypeBadge key={t} type={t} />)}
           </div>
-        ) : <span className="text-[13px] text-slate-400">-</span>
+        ) : <span className="text-[0.875rem] text-slate-400">-</span>
       ),
     },
     {
       key: 'stage', header: '진행 단계',
-      cell: (r) => (r.bestStage ? <ApplicationStageBadge stage={r.bestStage} /> : <span className="text-[13px] text-slate-400">신청 전</span>),
+      cell: (r) => (r.bestStage ? <ApplicationStageBadge stage={r.bestStage} /> : <span className="text-[0.875rem] text-slate-400">신청 전</span>),
     },
     {
       key: 'amounts', header: '요청·승인액', className: 'hidden lg:table-cell',
       cell: (r) => (
-        <div className="text-[13px] text-slate-600">
+        <div className="text-[0.875rem] text-slate-600">
           <p>요청 {r.requested || '-'}</p>
           <p>승인 {r.approved || '-'}</p>
         </div>
@@ -172,7 +172,7 @@ export function FundingResultsPage() {
     {
       key: 'progress', header: '부족조건 · 준비율', className: 'hidden lg:table-cell',
       cell: (r) => (
-        <div className="text-[13px] text-slate-600">
+        <div className="text-[0.875rem] text-slate-600">
           <p>미해결 {r.summary.openGapCount}건</p>
           <p>준비 {r.summary.docReadyRate}%</p>
         </div>
@@ -180,14 +180,14 @@ export function FundingResultsPage() {
     },
     {
       key: 'contact', header: '최근 접촉', className: 'hidden xl:table-cell',
-      cell: (r) => <span className="text-[13px] text-slate-500">{r.lastContact ? formatDate(r.lastContact) : '-'}</span>,
+      cell: (r) => <span className="text-[0.875rem] text-slate-500">{r.lastContact ? formatDate(r.lastContact) : '-'}</span>,
     },
     {
       key: 'outcome', header: '결과 · 상태',
       cell: (r) => (
         <div className="flex flex-wrap items-center gap-1.5">
-          {r.latestOutcome ? <OutcomeTypeBadge type={r.latestOutcome.type} /> : <span className="text-[13px] text-slate-400">결과 없음</span>}
-          {r.summary.caseCandidate && <span className="rounded-md border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-brand-700">사례 후보</span>}
+          {r.latestOutcome ? <OutcomeTypeBadge type={r.latestOutcome.type} /> : <span className="text-[0.875rem] text-slate-400">결과 없음</span>}
+          {r.summary.caseCandidate && <span className="rounded-md border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-brand-700">사례 후보</span>}
           <StrategyStatusBadge status={r.strategy.status} />
         </div>
       ),
@@ -199,7 +199,7 @@ export function FundingResultsPage() {
       <button
         type="button"
         onClick={() => navigate('/funding')}
-        className="inline-flex w-fit items-center gap-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-800"
+        className="inline-flex w-fit items-center gap-1.5 text-[0.875rem] font-medium text-slate-500 hover:text-slate-800"
       >
         <ArrowLeft aria-hidden="true" className="size-3.5" />
         기관·자금 연계
@@ -254,9 +254,9 @@ export function FundingResultsPage() {
                   <StrategyStatusBadge status={r.strategy.status} />
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  {r.bestStage ? <ApplicationStageBadge stage={r.bestStage} /> : <span className="text-[13px] text-slate-400">신청 전</span>}
+                  {r.bestStage ? <ApplicationStageBadge stage={r.bestStage} /> : <span className="text-[0.875rem] text-slate-400">신청 전</span>}
                   {r.latestOutcome && <OutcomeTypeBadge type={r.latestOutcome.type} />}
-                  {r.summary.caseCandidate && <span className="rounded-md border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-brand-700">사례 후보</span>}
+                  {r.summary.caseCandidate && <span className="rounded-md border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-brand-700">사례 후보</span>}
                 </div>
                 {r.strategy.preferredSupportTypes.length > 0 && (
                   <div className="flex flex-wrap gap-1">

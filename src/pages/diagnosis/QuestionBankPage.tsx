@@ -223,7 +223,7 @@ export function QuestionBankPage() {
       header: '질문',
       className: 'min-w-[240px] max-w-md',
       cell: (q) => (
-        <p className="line-clamp-2 text-[13px] break-keep text-slate-700" title={q.text}>
+        <p className="line-clamp-2 text-[0.875rem] break-keep text-slate-700" title={q.text}>
           {q.text}
         </p>
       ),
@@ -260,7 +260,7 @@ export function QuestionBankPage() {
       header: '사용',
       className: 'text-center',
       cell: (q) => (
-        <span className="text-[13px] text-slate-600">{usageById.get(q.id) ?? 0}</span>
+        <span className="text-[0.875rem] text-slate-600">{usageById.get(q.id) ?? 0}</span>
       ),
     },
     {
@@ -283,7 +283,7 @@ export function QuestionBankPage() {
       header: '최근 수정',
       className: 'hidden lg:table-cell',
       cell: (q) => (
-        <span className="text-[13px] whitespace-nowrap text-slate-500">
+        <span className="text-[0.875rem] whitespace-nowrap text-slate-500">
           {formatDate(q.updatedAt)}
         </span>
       ),
@@ -453,7 +453,7 @@ export function QuestionBankPage() {
                     <span className="font-mono text-[0.875rem] font-semibold text-slate-400">
                       {q.code}
                     </span>
-                    <p className="mt-0.5 text-[13px] break-keep text-slate-800">
+                    <p className="mt-0.5 text-[0.875rem] break-keep text-slate-800">
                       {q.text}
                     </p>
                   </button>

@@ -52,7 +52,7 @@ export function ConditionEditor({
 
   return (
     <div className="mt-2 rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2.5">
-      <label className="flex cursor-pointer items-center gap-2 text-[13px] font-medium text-slate-700">
+      <label className="flex cursor-pointer items-center gap-2 text-[0.875rem] font-medium text-slate-700">
         <input
           type="checkbox"
           checked={enabled}
@@ -79,7 +79,7 @@ export function ConditionEditor({
             onChange={(e) =>
               onChange({ ...condition, sourceQuestionId: e.target.value })
             }
-            className="h-9 w-full rounded-lg border border-slate-300 px-2 text-[13px]"
+            className="h-9 w-full rounded-lg border border-slate-300 px-2 text-[0.875rem]"
           >
             {sourceQuestions.map((q) => (
               <option key={q.id} value={q.id}>
@@ -96,7 +96,7 @@ export function ConditionEditor({
                 operator: e.target.value as ConditionOperator,
               })
             }
-            className="h-9 w-full rounded-lg border border-slate-300 px-2 text-[13px]"
+            className="h-9 w-full rounded-lg border border-slate-300 px-2 text-[0.875rem]"
           >
             {OPERATORS.map((op) => (
               <option key={op} value={op}>
@@ -112,7 +112,7 @@ export function ConditionEditor({
                 onChange={(e) =>
                   onChange({ ...condition, comparisonValue: e.target.value })
                 }
-                className="h-9 w-full rounded-lg border border-slate-300 px-2 text-[13px]"
+                className="h-9 w-full rounded-lg border border-slate-300 px-2 text-[0.875rem]"
               >
                 <option value="">값 선택</option>
                 {source.options.map((o) => (
@@ -130,7 +130,7 @@ export function ConditionEditor({
                   onChange({ ...condition, comparisonValue: e.target.value })
                 }
                 placeholder="비교값 입력"
-                className="h-9 w-full rounded-lg border border-slate-300 px-2 text-[13px]"
+                className="h-9 w-full rounded-lg border border-slate-300 px-2 text-[0.875rem]"
               />
             ))}
         </div>

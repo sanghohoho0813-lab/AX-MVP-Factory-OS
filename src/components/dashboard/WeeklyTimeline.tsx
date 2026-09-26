@@ -28,7 +28,7 @@ export function WeeklyTimeline({ tracks, items }: WeeklyTimelineProps) {
         <h2 className="text-base font-semibold text-slate-900">
           이번 주 운영 타임라인
         </h2>
-        <p className="text-[13px] text-slate-400">{WEEK_RANGE_LABEL}</p>
+        <p className="text-[0.875rem] text-slate-400">{WEEK_RANGE_LABEL}</p>
       </div>
 
       {/* 데스크톱/태블릿: CSS Grid 타임라인 */}
@@ -66,7 +66,7 @@ export function WeeklyTimeline({ tracks, items }: WeeklyTimelineProps) {
                     aria-hidden="true"
                     className={`size-1.5 shrink-0 rounded-full ${TONE_DOT_CLASS[track.tone]}`}
                   />
-                  <span className="truncate text-[13px] font-medium text-slate-600">
+                  <span className="truncate text-[0.875rem] font-medium text-slate-600">
                     {track.label}
                   </span>
                 </div>
@@ -82,7 +82,7 @@ export function WeeklyTimeline({ tracks, items }: WeeklyTimelineProps) {
                       <p className="truncate text-[0.875rem] font-medium text-slate-700">
                         {item.title}
                       </p>
-                      <p className="truncate text-[0.8125rem] text-slate-400">
+                      <p className="truncate text-[0.875rem] text-slate-400">
                         {item.owner}
                       </p>
                     </div>

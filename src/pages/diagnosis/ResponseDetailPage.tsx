@@ -99,7 +99,7 @@ export function ResponseDetailPage() {
           badges={<SurveyDistributionStatusBadge status={distribution.status} />}
         />
         <Panel title="응답 없음">
-          <p className="text-[13px] text-slate-500">
+          <p className="text-[0.875rem] text-slate-500">
             아직 제출되거나 작성된 응답이 없습니다. 응답자가 설문을 시작하면 이곳에서
             원본 답변을 확인할 수 있습니다.
           </p>
@@ -197,7 +197,7 @@ export function ResponseDetailPage() {
                     <QuestionCategoryBadge category={p.category} />
                     <QuestionScopeBadge scope={p.sourceScope} />
                     {p.required && (
-                      <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.8125rem] text-slate-500">
+                      <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.875rem] text-slate-500">
                         필수
                       </span>
                     )}
@@ -212,7 +212,7 @@ export function ResponseDetailPage() {
                     <SurveyAnswerDisplay placement={p} value={answerMap.get(p.questionId)} />
                   </div>
                   {answeredAtOf.get(p.questionId) && (
-                    <p className="mt-1.5 text-[0.8125rem] text-slate-400">
+                    <p className="mt-1.5 text-[0.875rem] text-slate-400">
                       응답 {formatDateTime(answeredAtOf.get(p.questionId) ?? null)}
                     </p>
                   )}
@@ -227,11 +227,11 @@ export function ResponseDetailPage() {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Panel title={`미응답 문항 (${unanswered.length})`}>
           {unanswered.length === 0 ? (
-            <p className="text-[13px] text-slate-500">모든 가시 문항에 응답했습니다.</p>
+            <p className="text-[0.875rem] text-slate-500">모든 가시 문항에 응답했습니다.</p>
           ) : (
             <ul className="flex flex-col gap-2">
               {unanswered.map((p) => (
-                <li key={p.id} className="flex items-center gap-2 text-[13px]">
+                <li key={p.id} className="flex items-center gap-2 text-[0.875rem]">
                   <span className="font-mono text-[0.875rem] text-slate-400">{p.questionCode}</span>
                   <span className="min-w-0 flex-1 truncate text-slate-600">{p.questionText}</span>
                   {p.required ? (
@@ -247,12 +247,12 @@ export function ResponseDetailPage() {
 
         <Panel title="파일 응답">
           {fileAnswers.length === 0 ? (
-            <p className="text-[13px] text-slate-500">파일 응답이 없습니다.</p>
+            <p className="text-[0.875rem] text-slate-500">파일 응답이 없습니다.</p>
           ) : (
             <ul className="flex flex-col gap-2">
               {fileAnswers.map((p) => (
                 <li key={p.id}>
-                  <p className="mb-1 text-[13px] text-slate-600">{p.questionText}</p>
+                  <p className="mb-1 text-[0.875rem] text-slate-600">{p.questionText}</p>
                   <SurveyAnswerDisplay placement={p} value={answerMap.get(p.questionId)} />
                 </li>
               ))}
@@ -271,7 +271,7 @@ export function ResponseDetailPage() {
           ) : undefined
         }
       >
-        <p className="text-[13px] text-slate-500">
+        <p className="text-[0.875rem] text-slate-500">
           조건에 따라 최종 제출에서 제외된 문항이 {excludedCount}개 있습니다.
         </p>
         {showExcluded && excludedCount > 0 && (
@@ -280,7 +280,7 @@ export function ResponseDetailPage() {
               .flatMap((s) => s.placements)
               .filter((p) => !visibleIds.has(p.questionId))
               .map((p) => (
-                <li key={p.id} className="flex items-center gap-2 text-[13px]">
+                <li key={p.id} className="flex items-center gap-2 text-[0.875rem]">
                   <span className="font-mono text-[0.875rem] text-slate-400">{p.questionCode}</span>
                   <span className="min-w-0 flex-1 truncate text-slate-500">{p.questionText}</span>
                 </li>
@@ -290,7 +290,7 @@ export function ResponseDetailPage() {
       </Panel>
 
       <Panel title="내부 검토 메모">
-        <p className="flex items-start gap-2 text-[13px] break-keep text-slate-500">
+        <p className="flex items-start gap-2 text-[0.875rem] break-keep text-slate-500">
           <FileText aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-400" />
           검토 메모 저장과 AI 응답 요약은 다음 단계에서 제공됩니다. 현재 화면은 구조화된
           원본 답변을 정확하게 확인하는 데 집중합니다.

@@ -157,7 +157,7 @@ function ReviewContent({ strategy, projectId }: { strategy: FundingStrategy; pro
           <a
             key={s.id}
             href={`#${s.id}`}
-            className="rounded-(--radius-control) border border-slate-200 px-2.5 py-1 text-[13px] font-medium text-slate-600 hover:border-brand-300 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-brand-500"
+            className="rounded-(--radius-control) border border-slate-200 px-2.5 py-1 text-[0.875rem] font-medium text-slate-600 hover:border-brand-300 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-brand-500"
           >
             {s.label}
           </a>
@@ -172,11 +172,11 @@ function ReviewContent({ strategy, projectId }: { strategy: FundingStrategy; pro
           <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <dt className="text-[0.875rem] text-slate-400">연계 목적</dt>
-              <dd className="text-[13px] break-keep text-slate-700">{strategy.objective || '미입력'}</dd>
+              <dd className="text-[0.875rem] break-keep text-slate-700">{strategy.objective || '미입력'}</dd>
             </div>
             <div>
               <dt className="text-[0.875rem] text-slate-400">자금 용도</dt>
-              <dd className="text-[13px] break-keep text-slate-700">{strategy.targetUse || '미입력'}</dd>
+              <dd className="text-[0.875rem] break-keep text-slate-700">{strategy.targetUse || '미입력'}</dd>
             </div>
           </dl>
         </Panel>
@@ -185,13 +185,13 @@ function ReviewContent({ strategy, projectId }: { strategy: FundingStrategy; pro
       {/* 후보 기관·프로그램 */}
       <section id="sec-candidates" tabIndex={-1} aria-label="후보 기관·프로그램">
         <Panel title="후보 기관·프로그램">
-          <p className="mb-3 text-[13px] text-slate-500">우선 검토 {primaryMatches.length}개 · 보조 검토 {secondaryMatches.length}개 · 전체 {summary.matchCount}개</p>
+          <p className="mb-3 text-[0.875rem] text-slate-500">우선 검토 {primaryMatches.length}개 · 보조 검토 {secondaryMatches.length}개 · 전체 {summary.matchCount}개</p>
           {primaryMatches.length === 0 ? (
-            <p className="text-[13px] text-warning-700">우선 검토 후보가 없습니다. 기관 후보 화면에서 우선순위를 지정하세요.</p>
+            <p className="text-[0.875rem] text-warning-700">우선 검토 후보가 없습니다. 기관 후보 화면에서 우선순위를 지정하세요.</p>
           ) : (
             <ul className="flex flex-col gap-2">
               {primaryMatches.map((m) => (
-                <li key={m.id} className="rounded-(--radius-card) border border-slate-100 bg-slate-50/60 px-3 py-2 text-[13px] break-keep text-slate-700">
+                <li key={m.id} className="rounded-(--radius-card) border border-slate-100 bg-slate-50/60 px-3 py-2 text-[0.875rem] break-keep text-slate-700">
                   <span className="mr-1.5 rounded-md border border-success-200 bg-success-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-success-700">우선</span>
                   {m.reasonSummary || '사유 미입력'}
                 </li>
@@ -204,18 +204,18 @@ function ReviewContent({ strategy, projectId }: { strategy: FundingStrategy; pro
       {/* 근거·부족조건 */}
       <section id="sec-evidence" tabIndex={-1} aria-label="근거·부족조건">
         <Panel title="근거·부족조건">
-          <p className="mb-3 text-[13px] text-slate-500">
+          <p className="mb-3 text-[0.875rem] text-slate-500">
             근거 {summary.evidenceCount}건 (검증 {summary.verifiedEvidenceCount}건) · 부족조건 {summary.gapCount}건 (미해결 {summary.openGapCount}건 · 중대 {summary.criticalGapCount}건)
           </p>
           {criticalGaps.length === 0 ? (
-            <p className="text-[13px] text-success-700">미해결 중대 부족조건이 없습니다.</p>
+            <p className="text-[0.875rem] text-success-700">미해결 중대 부족조건이 없습니다.</p>
           ) : (
             <ul className="flex flex-col gap-2">
               {criticalGaps.map((g) => (
                 <li key={g.id} className="flex items-start gap-2 rounded-(--radius-card) border border-danger-200 bg-danger-50/60 px-3 py-2">
                   <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-danger-600" />
                   <div>
-                    <p className="text-[13px] font-medium break-keep text-danger-800">{g.title}</p>
+                    <p className="text-[0.875rem] font-medium break-keep text-danger-800">{g.title}</p>
                     <p className="text-[0.875rem] break-keep text-danger-700">{g.requiredAction || g.description}</p>
                   </div>
                 </li>
@@ -230,13 +230,13 @@ function ReviewContent({ strategy, projectId }: { strategy: FundingStrategy; pro
         <Panel title="공식 확인사항">
           <div aria-live="polite">
             {officialConfirmations.length === 0 ? (
-              <p className="text-[13px] text-slate-500">등록된 공식 확인사항이 없습니다. 실제 조건은 공식 공고와 기관 문의로 확인하세요.</p>
+              <p className="text-[0.875rem] text-slate-500">등록된 공식 확인사항이 없습니다. 실제 조건은 공식 공고와 기관 문의로 확인하세요.</p>
             ) : (
               <>
-                <p className="mb-2 text-[13px] font-medium text-warning-700">공식 공고·기관 확인이 필요한 항목 {officialConfirmations.length}건</p>
+                <p className="mb-2 text-[0.875rem] font-medium text-warning-700">공식 공고·기관 확인이 필요한 항목 {officialConfirmations.length}건</p>
                 <ul className="flex flex-col gap-1.5">
                   {officialConfirmations.map((item, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-[13px] break-keep text-slate-700">
+                    <li key={idx} className="flex items-start gap-2 text-[0.875rem] break-keep text-slate-700">
                       <Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-warning-500" />
                       {item}
                     </li>
@@ -268,10 +268,10 @@ function ReviewContent({ strategy, projectId }: { strategy: FundingStrategy; pro
             <StaleBanner show={stale} />
           </div>
           {strategy.sourceSnapshot.length === 0 ? (
-            <p className="px-5 py-4 text-[13px] text-slate-500">기록된 출처 스냅샷이 없습니다.</p>
+            <p className="px-5 py-4 text-[0.875rem] text-slate-500">기록된 출처 스냅샷이 없습니다.</p>
           ) : (
             <div className="overflow-x-auto px-5 py-4">
-              <table className="w-full text-left text-[13px]">
+              <table className="w-full text-left text-[0.875rem]">
                 <thead>
                   <tr className="border-b border-slate-100 text-[0.875rem] text-slate-400">
                     <th scope="col" className="py-2 pr-3 font-medium">출처</th>
@@ -311,11 +311,11 @@ function ReviewContent({ strategy, projectId }: { strategy: FundingStrategy; pro
             <div>
               <p className="mb-1.5 text-[0.875rem] font-semibold text-slate-500">위험</p>
               {strategy.risks.length === 0 ? (
-                <p className="text-[13px] text-slate-400">등록된 위험 없음</p>
+                <p className="text-[0.875rem] text-slate-400">등록된 위험 없음</p>
               ) : (
                 <ul className="flex flex-col gap-1">
                   {strategy.risks.map((r, idx) => (
-                    <li key={idx} className="text-[13px] break-keep text-slate-600">· {r}</li>
+                    <li key={idx} className="text-[0.875rem] break-keep text-slate-600">· {r}</li>
                   ))}
                 </ul>
               )}
@@ -323,11 +323,11 @@ function ReviewContent({ strategy, projectId }: { strategy: FundingStrategy; pro
             <div>
               <p className="mb-1.5 text-[0.875rem] font-semibold text-slate-500">미해결 질문</p>
               {strategy.openQuestions.length === 0 ? (
-                <p className="text-[13px] text-slate-400">등록된 질문 없음</p>
+                <p className="text-[0.875rem] text-slate-400">등록된 질문 없음</p>
               ) : (
                 <ul className="flex flex-col gap-1">
                   {strategy.openQuestions.map((q, idx) => (
-                    <li key={idx} className="text-[13px] break-keep text-slate-600">· {q}</li>
+                    <li key={idx} className="text-[0.875rem] break-keep text-slate-600">· {q}</li>
                   ))}
                 </ul>
               )}
@@ -344,15 +344,15 @@ function ReviewContent({ strategy, projectId }: { strategy: FundingStrategy; pro
         >
           <div className="flex flex-col gap-4">
             <label className="flex flex-col gap-1.5">
-              <span className="text-[13px] font-medium text-slate-600">전략 요약</span>
+              <span className="text-[0.875rem] font-medium text-slate-600">전략 요약</span>
               <textarea className={inputClass} rows={3} value={strategySummary} disabled={readOnly} onChange={(e) => setStrategySummary(e.target.value)} />
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[13px] font-medium text-slate-600">내부 의견 (분석가 노트)</span>
+              <span className="text-[0.875rem] font-medium text-slate-600">내부 의견 (분석가 노트)</span>
               <textarea className={inputClass} rows={3} value={analystNotes} disabled={readOnly} onChange={(e) => setAnalystNotes(e.target.value)} />
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[13px] font-medium text-slate-600">공식 확인사항 메모</span>
+              <span className="text-[0.875rem] font-medium text-slate-600">공식 확인사항 메모</span>
               <textarea className={inputClass} rows={3} value={officialConfirmationNotes} disabled={readOnly} onChange={(e) => setOfficialConfirmationNotes(e.target.value)} />
             </label>
           </div>
@@ -364,13 +364,13 @@ function ReviewContent({ strategy, projectId }: { strategy: FundingStrategy; pro
         <Panel title="품질검사">
           <div aria-live="polite" className="mb-4">
             {finalizeCheck.ok ? (
-              <div className="flex items-center gap-2 rounded-(--radius-card) border border-success-200 bg-success-50/60 px-3 py-2 text-[13px] font-medium text-success-700">
+              <div className="flex items-center gap-2 rounded-(--radius-card) border border-success-200 bg-success-50/60 px-3 py-2 text-[0.875rem] font-medium text-success-700">
                 <CheckCircle2 aria-hidden="true" className="size-4" />
                 확정 가능한 상태입니다.
               </div>
             ) : (
               <div className="rounded-(--radius-card) border border-danger-200 bg-danger-50/60 px-3 py-2">
-                <p className="flex items-center gap-2 text-[13px] font-medium text-danger-700">
+                <p className="flex items-center gap-2 text-[0.875rem] font-medium text-danger-700">
                   <XCircle aria-hidden="true" className="size-4" />
                   확정 전 해결할 항목 {finalizeCheck.reasons.length}건
                 </p>
@@ -383,7 +383,7 @@ function ReviewContent({ strategy, projectId }: { strategy: FundingStrategy; pro
             )}
           </div>
           {strategy.qualityChecks.length === 0 ? (
-            <p className="text-[13px] text-slate-500">품질검사 항목이 없습니다.</p>
+            <p className="text-[0.875rem] text-slate-500">품질검사 항목이 없습니다.</p>
           ) : (
             <div className="flex flex-col gap-4">
               {(['error', 'warning', 'info'] as FundingQualitySeverity[]).map((sev) => {
@@ -399,13 +399,13 @@ function ReviewContent({ strategy, projectId }: { strategy: FundingStrategy; pro
       {/* 상태 액션 */}
       <Panel title="상태·확정">
         {strategy.status === 'finalized' && (
-          <div className="mb-4 flex items-center gap-2 rounded-(--radius-card) border border-success-200 bg-success-50/60 px-3 py-2 text-[13px] text-success-700">
+          <div className="mb-4 flex items-center gap-2 rounded-(--radius-card) border border-success-200 bg-success-50/60 px-3 py-2 text-[0.875rem] text-success-700">
             <ShieldCheck aria-hidden="true" className="size-4" />
             확정일 {formatDate(strategy.finalizedAt)} · 스냅샷 생성됨 (읽기 전용)
           </div>
         )}
         {!finalizeCheck.ok && !readOnly && (
-          <p className="mb-3 text-[13px] text-warning-700">확정하려면 위 품질검사의 오류를 먼저 해결하세요.</p>
+          <p className="mb-3 text-[0.875rem] text-warning-700">확정하려면 위 품질검사의 오류를 먼저 해결하세요.</p>
         )}
         <div className="flex flex-wrap items-center gap-2">
           {!readOnly && (
@@ -446,9 +446,9 @@ function ProgressRow({ label, value, to }: { label: string; value: string; to: s
     <li className="flex items-center justify-between gap-3 rounded-(--radius-card) border border-slate-100 bg-slate-50/60 px-3 py-2">
       <div className="min-w-0">
         <p className="text-[0.875rem] text-slate-400">{label}</p>
-        <p className="text-[13px] break-keep text-slate-700">{value}</p>
+        <p className="text-[0.875rem] break-keep text-slate-700">{value}</p>
       </div>
-      <NavLink to={to} className="shrink-0 text-[13px] font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800">
+      <NavLink to={to} className="shrink-0 text-[0.875rem] font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800">
         이동
       </NavLink>
     </li>
@@ -477,7 +477,7 @@ function QualityGroup({ severity, items }: { severity: FundingQualitySeverity; i
               <span className={`rounded-md border px-1.5 py-0.5 text-[0.875rem] font-medium ${c.passed ? 'border-success-200 bg-success-50 text-success-700' : SEVERITY_CHIP[severity]}`}>
                 {c.passed ? '통과' : SEVERITY_LABEL[severity]}
               </span>
-              <span className="text-[13px] font-medium break-keep text-slate-700">{c.title}</span>
+              <span className="text-[0.875rem] font-medium break-keep text-slate-700">{c.title}</span>
             </div>
             <p className="mt-0.5 text-[0.875rem] break-keep text-slate-500">{c.description}</p>
           </li>

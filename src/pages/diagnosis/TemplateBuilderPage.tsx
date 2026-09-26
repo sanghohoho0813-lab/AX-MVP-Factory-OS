@@ -113,7 +113,7 @@ export function TemplateBuilderPage() {
           <p className="text-sm font-semibold break-keep text-warning-800">
             게시된 템플릿은 기존 프로젝트의 일관성을 위해 직접 수정하지 않습니다.
           </p>
-          <p className="mt-1 text-[13px] break-keep text-warning-700">
+          <p className="mt-1 text-[0.875rem] break-keep text-warning-700">
             새 버전을 생성해 수정하세요. 새 버전은 초안 상태로 만들어집니다.
           </p>
           <div className="mt-4 flex justify-center gap-2">
@@ -282,7 +282,7 @@ export function TemplateBuilderPage() {
       {/* 기본정보 */}
       <div className="grid grid-cols-1 gap-4 rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-4 shadow-(--shadow-card) sm:grid-cols-2 lg:grid-cols-4">
         <div className="sm:col-span-2">
-          <label htmlFor="tpl-name" className="mb-1 block text-[13px] font-medium text-slate-700">
+          <label htmlFor="tpl-name" className="mb-1 block text-[0.875rem] font-medium text-slate-700">
             템플릿명
           </label>
           <input
@@ -297,7 +297,7 @@ export function TemplateBuilderPage() {
           />
         </div>
         <div>
-          <label htmlFor="tpl-role" className="mb-1 block text-[13px] font-medium text-slate-700">
+          <label htmlFor="tpl-role" className="mb-1 block text-[0.875rem] font-medium text-slate-700">
             응답자
           </label>
           <select
@@ -317,7 +317,7 @@ export function TemplateBuilderPage() {
           </select>
         </div>
         <div>
-          <label htmlFor="tpl-purpose" className="mb-1 block text-[13px] font-medium text-slate-700">
+          <label htmlFor="tpl-purpose" className="mb-1 block text-[0.875rem] font-medium text-slate-700">
             목적
           </label>
           <select
@@ -337,7 +337,7 @@ export function TemplateBuilderPage() {
           </select>
         </div>
         <div className="sm:col-span-2 lg:col-span-4">
-          <label htmlFor="tpl-desc" className="mb-1 block text-[13px] font-medium text-slate-700">
+          <label htmlFor="tpl-desc" className="mb-1 block text-[0.875rem] font-medium text-slate-700">
             설명
           </label>
           <input
@@ -366,7 +366,7 @@ export function TemplateBuilderPage() {
             key={tab}
             type="button"
             onClick={() => setMobileTab(tab)}
-            className={`-mb-px border-b-2 px-3 py-2 text-[13px] font-medium ${
+            className={`-mb-px border-b-2 px-3 py-2 text-[0.875rem] font-medium ${
               mobileTab === tab
                 ? 'border-brand-600 text-brand-700'
                 : 'border-transparent text-slate-500'
@@ -389,7 +389,7 @@ export function TemplateBuilderPage() {
           {sections.length === 0 ? (
             <div className="rounded-(--radius-panel) border border-dashed border-slate-300 px-6 py-12 text-center">
               <p className="text-sm font-medium text-slate-600">아직 섹션이 없습니다</p>
-              <p className="mt-1 text-[13px] text-slate-400">
+              <p className="mt-1 text-[0.875rem] text-slate-400">
                 질문 라이브러리에서 질문을 추가하면 첫 섹션이 만들어집니다.
               </p>
             </div>

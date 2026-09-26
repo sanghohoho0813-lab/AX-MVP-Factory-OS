@@ -103,7 +103,7 @@ export function WorkspaceMembersPanel() {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-[13px] text-slate-500">
+      <div className="flex items-center gap-2 text-[0.875rem] text-slate-500">
         <Loader2 aria-hidden="true" className="size-4 animate-spin" /> 구성원 불러오는 중…
       </div>
     )
@@ -112,7 +112,7 @@ export function WorkspaceMembersPanel() {
   return (
     <div className="flex flex-col gap-5">
       {error && (
-        <p className="rounded-(--radius-control) border border-danger-200 bg-danger-50/70 px-3 py-2 text-[13px] text-danger-700">{error}</p>
+        <p className="rounded-(--radius-control) border border-danger-200 bg-danger-50/70 px-3 py-2 text-[0.875rem] text-danger-700">{error}</p>
       )}
 
       <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-card) border border-slate-200">
@@ -129,7 +129,7 @@ export function WorkspaceMembersPanel() {
                     aria-label="역할"
                     value={m.role}
                     onChange={(e) => handleRoleChange(m, e.target.value as WorkspaceRole)}
-                    className="h-8 rounded-(--radius-control) border border-slate-300 bg-white px-2 text-[13px] text-slate-700"
+                    className="h-8 rounded-(--radius-control) border border-slate-300 bg-white px-2 text-[0.875rem] text-slate-700"
                   >
                     {ROLES.map((r) => (
                       <option key={r} value={r}>{ROLE_LABEL[r]}</option>
@@ -192,14 +192,14 @@ export function WorkspaceMembersPanel() {
             <div className="mt-3 rounded-(--radius-control) border border-brand-200 bg-white px-3 py-2.5">
               <p className="text-[0.875rem] text-slate-500">아래 초대 코드는 지금만 표시됩니다(서버에는 해시만 저장). 7일 후 만료, 1회 사용.</p>
               <div className="mt-1.5 flex items-center gap-2">
-                <code className="min-w-0 flex-1 truncate rounded bg-slate-100 px-2 py-1 text-[13px] text-slate-800">{issuedToken}</code>
+                <code className="min-w-0 flex-1 truncate rounded bg-slate-100 px-2 py-1 text-[0.875rem] text-slate-800">{issuedToken}</code>
                 <button
                   type="button"
                   onClick={() => {
                     void navigator.clipboard?.writeText(issuedToken)
                     showToast('초대 코드를 복사했습니다.')
                   }}
-                  className="flex h-8 cursor-pointer items-center gap-1 rounded-(--radius-control) border border-slate-300 px-2 text-[13px] text-slate-600 hover:bg-slate-50"
+                  className="flex h-8 cursor-pointer items-center gap-1 rounded-(--radius-control) border border-slate-300 px-2 text-[0.875rem] text-slate-600 hover:bg-slate-50"
                 >
                   <Copy aria-hidden="true" className="size-3.5" /> 복사
                 </button>
@@ -208,7 +208,7 @@ export function WorkspaceMembersPanel() {
           )}
         </form>
       ) : (
-        <p className="text-[13px] text-slate-500">구성원 관리는 소유자·관리자만 할 수 있습니다.</p>
+        <p className="text-[0.875rem] text-slate-500">구성원 관리는 소유자·관리자만 할 수 있습니다.</p>
       )}
 
       <ConfirmModal

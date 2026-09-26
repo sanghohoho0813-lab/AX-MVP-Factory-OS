@@ -51,7 +51,7 @@ export function ValidationProjectPage() {
         aria-label="테스트 진행 방식 안내"
         className="rounded-(--radius-panel) border border-brand-100 bg-brand-50/60 p-5"
       >
-        <p className="text-[0.82rem] font-semibold tracking-wide text-brand-700 uppercase">진행 방식</p>
+        <p className="text-[0.875rem] font-semibold tracking-wide text-brand-700 uppercase">진행 방식</p>
         <p className="mt-1.5 text-[1.05rem] font-semibold break-keep text-slate-900">
           트랙별로 실제 사용 테스트를 진행하고 단계별 검토로 다음 진행을 판정합니다.
         </p>
@@ -96,7 +96,7 @@ function TrackCard({
           <TrackBadge track={track.trackType} />
           {workspace && <WorkspaceStatusBadge status={workspace.status} />}
         </div>
-        {workspace && <span className="text-[0.82rem] text-slate-400">검증 v{workspace.version}</span>}
+        {workspace && <span className="text-[0.875rem] text-slate-400">검증 v{workspace.version}</span>}
       </div>
 
       {!track.eligibility.available ? (

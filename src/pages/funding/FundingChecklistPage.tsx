@@ -118,7 +118,7 @@ function AddDocModal({
     >
       <div className="flex flex-col gap-4">
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-slate-700">분류</span>
+          <span className="text-[0.875rem] font-semibold text-slate-700">분류</span>
           <select
             className={INPUT_CLASS}
             value={draft.category}
@@ -132,7 +132,7 @@ function AddDocModal({
           </select>
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-slate-700">자료명</span>
+          <span className="text-[0.875rem] font-semibold text-slate-700">자료명</span>
           <input
             className={INPUT_CLASS}
             value={draft.title}
@@ -141,7 +141,7 @@ function AddDocModal({
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-slate-700">필요한 이유</span>
+          <span className="text-[0.875rem] font-semibold text-slate-700">필요한 이유</span>
           <textarea
             className={INPUT_CLASS}
             rows={2}
@@ -157,7 +157,7 @@ function AddDocModal({
             checked={draft.required}
             onChange={(e) => setDraft((d) => ({ ...d, required: e.target.checked }))}
           />
-          <span className="text-[13px] break-keep text-slate-700">필수 자료</span>
+          <span className="text-[0.875rem] break-keep text-slate-700">필수 자료</span>
         </label>
         <label className="flex items-start gap-2">
           <input
@@ -166,7 +166,7 @@ function AddDocModal({
             checked={draft.officialFormRequired}
             onChange={(e) => setDraft((d) => ({ ...d, officialFormRequired: e.target.checked }))}
           />
-          <span className="text-[13px] break-keep text-slate-700">기관 공식 양식 필요</span>
+          <span className="text-[0.875rem] break-keep text-slate-700">기관 공식 양식 필요</span>
         </label>
         <label className="flex items-start gap-2">
           <input
@@ -175,7 +175,7 @@ function AddDocModal({
             checked={draft.sensitive}
             onChange={(e) => setDraft((d) => ({ ...d, sensitive: e.target.checked }))}
           />
-          <span className="text-[13px] break-keep text-slate-700">민감정보 포함 (재무·개인정보 등)</span>
+          <span className="text-[0.875rem] break-keep text-slate-700">민감정보 포함 (재무·개인정보 등)</span>
         </label>
       </div>
     </Modal>
@@ -226,9 +226,9 @@ function EditOwnerModal({
       }
     >
       <div className="flex flex-col gap-4">
-        <p className="text-[13px] font-semibold text-slate-700">{doc.title}</p>
+        <p className="text-[0.875rem] font-semibold text-slate-700">{doc.title}</p>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-slate-700">담당자</span>
+          <span className="text-[0.875rem] font-semibold text-slate-700">담당자</span>
           <input
             className={INPUT_CLASS}
             value={draft.ownerId}
@@ -237,7 +237,7 @@ function EditOwnerModal({
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-slate-700">기한</span>
+          <span className="text-[0.875rem] font-semibold text-slate-700">기한</span>
           <input
             type="date"
             className={INPUT_CLASS}
@@ -292,11 +292,11 @@ function LinkPackageModal({
       }
     >
       <div className="flex flex-col gap-3">
-        <p className="text-[13px] break-keep text-slate-600">
+        <p className="text-[0.875rem] break-keep text-slate-600">
           Stage 10 제출자료 중 확정된 패키지를 <span className="font-semibold">{doc.title}</span>에 연결합니다.
         </p>
         {packages.length === 0 ? (
-          <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-3 py-2.5 text-[13px] text-slate-500">
+          <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-3 py-2.5 text-[0.875rem] text-slate-500">
             확정된 제출자료 패키지가 없습니다. 먼저 제출자료 화면에서 패키지를 확정하세요.
           </p>
         ) : (
@@ -315,7 +315,7 @@ function LinkPackageModal({
                   onChange={() => setSelected(p.id)}
                 />
                 <span className="min-w-0">
-                  <span className="block text-[13px] font-medium break-keep text-slate-800">{p.name}</span>
+                  <span className="block text-[0.875rem] font-medium break-keep text-slate-800">{p.name}</span>
                   <span className="block text-[0.875rem] text-slate-400">v{p.version}</span>
                 </span>
               </label>
@@ -356,7 +356,7 @@ function DocRow({
     <tr className="align-top">
       <th scope="row" className="px-3 py-3 text-left font-normal">
         <div className="flex flex-col gap-1">
-          <span className="text-[13px] font-semibold break-keep text-slate-900">{doc.title}</span>
+          <span className="text-[0.875rem] font-semibold break-keep text-slate-900">{doc.title}</span>
           {doc.description && (
             <span className="text-[0.875rem] break-keep text-slate-500">{doc.description}</span>
           )}
@@ -367,7 +367,7 @@ function DocRow({
           </div>
         </div>
       </th>
-      <td className="px-3 py-3 text-[13px] break-keep text-slate-600">{target}</td>
+      <td className="px-3 py-3 text-[0.875rem] break-keep text-slate-600">{target}</td>
       <td className="px-3 py-3">
         {readOnly ? (
           <DocumentStatusBadge status={doc.status} />
@@ -375,7 +375,7 @@ function DocRow({
           <label className="flex flex-col gap-1">
             <span className="sr-only">{doc.title} 상태</span>
             <select
-              className="rounded-(--radius-control) border border-slate-200 px-2 py-1 text-[13px]"
+              className="rounded-(--radius-control) border border-slate-200 px-2 py-1 text-[0.875rem]"
               value={doc.status}
               onChange={(e) => onStatus(doc.id, e.target.value as DocumentRequirementStatus)}
             >
@@ -388,7 +388,7 @@ function DocRow({
           </label>
         )}
       </td>
-      <td className="px-3 py-3 text-[13px] break-keep text-slate-600">
+      <td className="px-3 py-3 text-[0.875rem] break-keep text-slate-600">
         <div className="flex flex-col gap-0.5">
           <span>{doc.ownerId || '담당 미지정'}</span>
           <span className="text-[0.875rem] text-slate-400">{doc.dueDate ? `기한 ${doc.dueDate}` : '기한 미정'}</span>
@@ -403,7 +403,7 @@ function DocRow({
           )}
         </div>
       </td>
-      <td className="px-3 py-3 text-[13px]">
+      <td className="px-3 py-3 text-[0.875rem]">
         {doc.sourceDeliverablePackageId ? (
           <Link
             to={`/deliverables/projects/${projectId}/packages/${doc.sourceDeliverablePackageId}`}
@@ -525,10 +525,10 @@ function ChecklistView({
         <span aria-hidden="true" className="mt-0.5 text-warning-600">
           ⚠
         </span>
-        <p className="text-[13px] font-medium break-keep text-warning-800">{INSTITUTION_SUBMISSION_NOTE}</p>
+        <p className="text-[0.875rem] font-medium break-keep text-warning-800">{INSTITUTION_SUBMISSION_NOTE}</p>
       </div>
 
-      <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[13px] text-slate-600">
+      <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.875rem] text-slate-600">
         {finalizedPackages.length > 0 ? (
           <span>
             연결 가능한 Stage 10 확정 제출자료 패키지 {finalizedPackages.length}개:{' '}
@@ -561,7 +561,7 @@ function ChecklistView({
           <div className="flex flex-col gap-6 px-5 py-5">
             {grouped.map(({ category, docs }) => (
               <section key={category} className="flex flex-col gap-2">
-                <h3 className="text-[13px] font-semibold text-slate-700">
+                <h3 className="text-[0.875rem] font-semibold text-slate-700">
                   {DOCUMENT_CATEGORY_LABEL[category]}
                   <span className="ml-1.5 text-[0.875rem] font-normal text-slate-400">{docs.length}건</span>
                 </h3>

@@ -18,7 +18,7 @@ function ComparisonCard({ item }: { item: ResponseComparisonItem }) {
         <ComparisonStatusBadge status={item.status} />
         <ComparisonImportanceBadge importance={item.importance} />
         {item.requiresInterview && (
-          <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-warning-700">
+          <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
             <MessageCircleQuestion aria-hidden="true" className="size-3" />
             인터뷰 필요
           </span>
@@ -37,7 +37,7 @@ function ComparisonCard({ item }: { item: ResponseComparisonItem }) {
               <span className="ml-1 font-normal text-slate-400">{v.respondentName}</span>
             </dt>
             <dd
-              className={`mt-0.5 text-[13px] break-keep text-slate-800 ${
+              className={`mt-0.5 text-[0.875rem] break-keep text-slate-800 ${
                 expanded ? '' : 'line-clamp-2'
               }`}
             >
@@ -50,7 +50,7 @@ function ComparisonCard({ item }: { item: ResponseComparisonItem }) {
         ))}
       </dl>
 
-      <p className="mt-2 text-[13px] break-keep text-slate-600">{item.interpretation}</p>
+      <p className="mt-2 text-[0.875rem] break-keep text-slate-600">{item.interpretation}</p>
       {item.respondentValues.some((v) => v.displayValue.length > 60) && (
         <button
           type="button"

@@ -59,9 +59,10 @@ export function ArtifactsTab({ focus }: { focus?: string }) {
     <div className="flex flex-col gap-4">
       <Surface>
         <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
+          {/* D-120: 좁은 화면 · 큰 글자에서 단추 옆에 끼어 짜부라지지 않게 — 16rem 아래로는 단추가 아래로 내려간다 */}
+          <div className="min-w-0 flex-[1_1_16rem]">
             <h2 className="t-section text-slate-900">산출물 · 버전 이력</h2>
-            <p className="t-sub mt-1 break-keep text-slate-500">LLM 결과를 들여온 것(llm_paste/llm_file)과 직접 적은 것(manual)이 종류별로 버전으로 쌓입니다. 확정한 것만 사업계획서·실사에 씁니다.</p>
+            <p className="t-sub mt-1 break-keep text-slate-500">LLM 결과를 붙여 넣거나 파일로 들여온 것과 직접 적은 것이 종류별로 버전으로 쌓입니다. 확정한 것만 사업계획서·실사에 씁니다.</p>
           </div>
           <Button variant="primary" onClick={() => setAdding('NOTE')}>
             <Plus aria-hidden="true" className="size-4" /> 직접 적기

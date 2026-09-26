@@ -59,11 +59,11 @@ export function PriorityMatrixPage() {
       ) : (
         <>
           <div className="flex items-center gap-1 self-start rounded-(--radius-control) border border-slate-200 p-0.5">
-            <button type="button" onClick={() => setView('matrix')} className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-medium ${view === 'matrix' ? 'bg-slate-100 text-slate-800' : 'text-slate-500'}`}>
+            <button type="button" onClick={() => setView('matrix')} className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[0.875rem] font-medium ${view === 'matrix' ? 'bg-slate-100 text-slate-800' : 'text-slate-500'}`}>
               <Grid2x2 aria-hidden="true" className="size-4" />
               매트릭스
             </button>
-            <button type="button" onClick={() => setView('list')} className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-medium ${view === 'list' ? 'bg-slate-100 text-slate-800' : 'text-slate-500'}`}>
+            <button type="button" onClick={() => setView('list')} className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[0.875rem] font-medium ${view === 'list' ? 'bg-slate-100 text-slate-800' : 'text-slate-500'}`}>
               <List aria-hidden="true" className="size-4" />
               목록
             </button>
@@ -88,7 +88,7 @@ export function PriorityMatrixPage() {
                     <li key={q} className="flex items-start gap-2">
                       <span className={`mt-1 size-2.5 shrink-0 rounded-full ${TONE_DOT_CLASS[QUADRANT_META[q].tone]}`} />
                       <div>
-                        <p className="text-[13px] font-medium text-slate-700">{QUADRANT_META[q].label}</p>
+                        <p className="text-[0.875rem] font-medium text-slate-700">{QUADRANT_META[q].label}</p>
                         <p className="text-[0.875rem] break-keep text-slate-400">{QUADRANT_META[q].description}</p>
                         <p className="mt-0.5 text-[0.875rem] text-slate-400">후보 {active.filter((c) => c.quadrant === q).length}건</p>
                       </div>

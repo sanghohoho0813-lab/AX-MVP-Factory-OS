@@ -98,7 +98,7 @@ export function DeliverablesMainPage() {
         return (
           <div className="flex flex-wrap gap-1">
             {labels.map((label) => (
-              <span key={label} className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.82rem] font-medium text-slate-600">{label}</span>
+              <span key={label} className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-slate-600">{label}</span>
             ))}
           </div>
         )

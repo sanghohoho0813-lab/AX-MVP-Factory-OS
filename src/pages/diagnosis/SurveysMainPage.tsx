@@ -184,7 +184,7 @@ export function SurveysMainPage() {
       key: 'org',
       header: '고객사',
       cell: (r) => (
-        <span className="text-[13px] font-medium text-slate-700">{r.orgName}</span>
+        <span className="text-[0.875rem] font-medium text-slate-700">{r.orgName}</span>
       ),
     },
     {
@@ -192,7 +192,7 @@ export function SurveysMainPage() {
       header: '프로젝트',
       className: 'hidden xl:table-cell',
       cell: (r) => (
-        <span className="block max-w-40 truncate text-[13px] text-slate-600">
+        <span className="block max-w-40 truncate text-[0.875rem] text-slate-600">
           {r.projectName}
         </span>
       ),
@@ -201,7 +201,7 @@ export function SurveysMainPage() {
       key: 'survey',
       header: '설문',
       cell: (r) => (
-        <span className="block max-w-48 truncate text-[13px] text-slate-700">
+        <span className="block max-w-48 truncate text-[0.875rem] text-slate-700">
           {r.distribution.surveyTitle}
         </span>
       ),
@@ -210,7 +210,7 @@ export function SurveysMainPage() {
       key: 'recipient',
       header: '응답자',
       cell: (r) => (
-        <span className="text-[13px] text-slate-600">
+        <span className="text-[0.875rem] text-slate-600">
           {r.distribution.recipientName}
         </span>
       ),
@@ -411,7 +411,7 @@ export function SurveysMainPage() {
                   <button
                     type="button"
                     onClick={() => window.open(buildSurveyUrl(r.distribution.accessToken), '_blank')}
-                    className="inline-flex cursor-pointer items-center gap-1 text-[13px] font-medium text-brand-600"
+                    className="inline-flex cursor-pointer items-center gap-1 text-[0.875rem] font-medium text-brand-600"
                   >
                     <ExternalLink aria-hidden="true" className="size-3.5" />
                     응답자 화면
@@ -419,7 +419,7 @@ export function SurveysMainPage() {
                   <button
                     type="button"
                     onClick={() => navigate(`/diagnosis/surveys/${r.distribution.id}`)}
-                    className="ml-auto inline-flex cursor-pointer items-center gap-1 text-[13px] font-semibold text-brand-600"
+                    className="ml-auto inline-flex cursor-pointer items-center gap-1 text-[0.875rem] font-semibold text-brand-600"
                   >
                     상세
                     <ArrowRight aria-hidden="true" className="size-3.5" />

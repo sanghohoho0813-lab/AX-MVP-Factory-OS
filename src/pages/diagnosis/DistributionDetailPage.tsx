@@ -268,7 +268,7 @@ export function DistributionDetailPage() {
                 </dl>
               </>
             ) : (
-              <p className="text-[13px] text-slate-500">아직 응답이 시작되지 않았습니다.</p>
+              <p className="text-[0.875rem] text-slate-500">아직 응답이 시작되지 않았습니다.</p>
             )}
           </Panel>
 
@@ -308,7 +308,7 @@ export function DistributionDetailPage() {
                     className="mt-1.5 size-1.5 shrink-0 rounded-full bg-brand-500"
                   />
                   <div>
-                    <p className="text-[13px] font-medium text-slate-700">{event.label}</p>
+                    <p className="text-[0.875rem] font-medium text-slate-700">{event.label}</p>
                     <p className="text-[0.875rem] text-slate-400">{formatDateTime(event.at)}</p>
                   </div>
                 </li>

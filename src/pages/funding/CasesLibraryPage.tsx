@@ -98,7 +98,7 @@ export function CasesLibraryPage() {
                     {c.industry && <p className="mt-0.5 text-[0.9rem] text-slate-400">{c.industry}</p>}
                   </div>
                   {c.visibility === 'internal' && (
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-danger-200 bg-danger-50 px-2 py-0.5 text-[0.82rem] font-medium text-danger-700">
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-danger-200 bg-danger-50 px-2 py-0.5 text-[0.875rem] font-medium text-danger-700">
                       <Lock aria-hidden="true" className="size-3.5" />
                       외부 공개 금지
                     </span>

@@ -108,7 +108,7 @@ export function FundingMainPage() {
   const go = (r: Row) => navigate(`/funding/projects/${r.project.id}`)
 
   const columns: DataTableColumn<Row>[] = [
-    { key: 'client', header: '고객사', cell: (r) => <span className="text-[13px] font-medium text-slate-700">{r.orgName}</span> },
+    { key: 'client', header: '고객사', cell: (r) => <span className="text-[0.875rem] font-medium text-slate-700">{r.orgName}</span> },
     {
       key: 'project', header: '프로젝트', className: 'min-w-[150px]',
       cell: (r) => (
@@ -121,7 +121,7 @@ export function FundingMainPage() {
     {
       key: 'use', header: '필요한 자금 용도', className: 'hidden xl:table-cell min-w-[160px]',
       cell: (r) => (
-        <span className="line-clamp-2 text-[13px] text-slate-600">
+        <span className="line-clamp-2 text-[0.875rem] text-slate-600">
           {r.latest?.targetUse || r.project.objective || '미입력'}
         </span>
       ),
@@ -130,11 +130,11 @@ export function FundingMainPage() {
       key: 'evidence', header: '준비된 근거', className: 'hidden lg:table-cell',
       cell: (r) => {
         const labels = evidenceFlags(r.eligibility)
-        if (labels.length === 0) return <span className="text-[13px] text-slate-400">없음</span>
+        if (labels.length === 0) return <span className="text-[0.875rem] text-slate-400">없음</span>
         return (
           <div className="flex flex-wrap gap-1">
             {labels.map((label) => (
-              <span key={label} className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-slate-600">{label}</span>
+              <span key={label} className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-slate-600">{label}</span>
             ))}
           </div>
         )
@@ -144,18 +144,18 @@ export function FundingMainPage() {
       key: 'candidate', header: '추천 후보', className: 'hidden lg:table-cell',
       cell: (r) => (
         r.summary
-          ? <span className="text-[13px] font-medium text-slate-700">우선 검토 {r.summary.primaryCount}곳</span>
-          : <span className="text-[13px] text-slate-400">미생성</span>
+          ? <span className="text-[0.875rem] font-medium text-slate-700">우선 검토 {r.summary.primaryCount}곳</span>
+          : <span className="text-[0.875rem] text-slate-400">미생성</span>
       ),
     },
     {
       key: 'status', header: '현재 상태',
-      cell: (r) => (r.latest ? <StrategyStatusBadge status={r.latest.status} /> : <span className="text-[13px] text-slate-400">없음</span>),
+      cell: (r) => (r.latest ? <StrategyStatusBadge status={r.latest.status} /> : <span className="text-[0.875rem] text-slate-400">없음</span>),
     },
     {
       key: 'action', header: '', className: 'text-right',
       cell: (r) => (
-        <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand-600">
+        <span className="inline-flex items-center gap-1 text-[0.875rem] font-semibold text-brand-600">
           {r.latest ? '연계 보기' : '연계 시작'}
           <ArrowRight aria-hidden="true" className="size-3.5" />
         </span>
@@ -186,7 +186,7 @@ export function FundingMainPage() {
         className="flex items-start gap-2 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3"
       >
         <ShieldAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning-600" />
-        <p className="text-[13px] break-keep text-warning-800">{NO_APPROVAL_PREDICTION_NOTE}</p>
+        <p className="text-[0.875rem] break-keep text-warning-800">{NO_APPROVAL_PREDICTION_NOTE}</p>
       </div>
 
       <HelpNote
@@ -245,7 +245,7 @@ export function FundingMainPage() {
                         <ProjectTypeBadge type={r.project.projectType} compact />
                       </div>
                     </div>
-                    <span className="shrink-0 text-[13px] font-semibold text-brand-600">{r.latest ? '연계 보기' : '연계 시작'}</span>
+                    <span className="shrink-0 text-[0.875rem] font-semibold text-brand-600">{r.latest ? '연계 보기' : '연계 시작'}</span>
                   </button>
                 </li>
               ))}
@@ -257,7 +257,7 @@ export function FundingMainPage() {
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <Panel title="진행 중 신청" flush>
           {inProgress.length === 0 ? (
-            <div className="px-5 py-8 text-center text-[13px] text-slate-400">제출·심사 중인 신청이 없습니다.</div>
+            <div className="px-5 py-8 text-center text-[0.875rem] text-slate-400">제출·심사 중인 신청이 없습니다.</div>
           ) : (
             <ul className="divide-y divide-slate-100">
               {inProgress.map((r) => (
@@ -277,7 +277,7 @@ export function FundingMainPage() {
 
         <Panel title="보완 요청" flush>
           {supplement.length === 0 ? (
-            <div className="px-5 py-8 text-center text-[13px] text-slate-400">보완 요청받은 신청이 없습니다.</div>
+            <div className="px-5 py-8 text-center text-[0.875rem] text-slate-400">보완 요청받은 신청이 없습니다.</div>
           ) : (
             <ul className="divide-y divide-slate-100">
               {supplement.map((r) => (
@@ -299,7 +299,7 @@ export function FundingMainPage() {
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <Panel title="최근 결과" flush>
           {results.length === 0 ? (
-            <div className="px-5 py-8 text-center text-[13px] text-slate-400">기록된 결과가 없습니다.</div>
+            <div className="px-5 py-8 text-center text-[0.875rem] text-slate-400">기록된 결과가 없습니다.</div>
           ) : (
             <ul className="divide-y divide-slate-100">
               {results.map((r) => {
@@ -324,7 +324,7 @@ export function FundingMainPage() {
           <div className="flex flex-col gap-3 px-5 py-5">
             <div className="flex items-start gap-2">
               <RefreshCw aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning-500" />
-              <p className="text-[13px] break-keep text-slate-600">
+              <p className="text-[0.875rem] break-keep text-slate-600">
                 재확인이 필요한(오래됨·확인 필요·재확인 권장) 지원 프로그램이{' '}
                 <span className="font-semibold text-warning-700">{stalePrograms}건</span> 있습니다. 실제 조건은 공식 공고에서 확인하세요.
               </p>

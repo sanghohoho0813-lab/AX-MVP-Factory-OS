@@ -41,7 +41,7 @@ export function SurveyReviewPage({
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[13px]">
+      <div className="flex flex-wrap gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-[0.875rem]">
         <span className={requiredComplete ? 'text-success-700' : 'text-warning-700'}>
           필수 문항 {requiredComplete ? '완료' : '미완료'}
         </span>
@@ -66,7 +66,7 @@ export function SurveyReviewPage({
             className="rounded-(--radius-panel) border border-slate-200 bg-white shadow-(--shadow-card)"
           >
             <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-5 py-3">
-              <h2 className="text-[15px] font-semibold text-slate-800">{section.title}</h2>
+              <h2 className="text-[0.9375rem] font-semibold text-slate-800">{section.title}</h2>
               <Button variant="ghost" size="sm" onClick={() => onEditSection(section.id)}>
                 <PencilLine aria-hidden="true" className="size-3.5" />
                 수정하기
@@ -78,7 +78,7 @@ export function SurveyReviewPage({
                 return (
                   <li key={p.id} className="px-5 py-3.5">
                     <div className="flex items-start gap-2">
-                      <p className="min-w-0 flex-1 text-[13px] font-medium break-keep text-slate-700">
+                      <p className="min-w-0 flex-1 text-[0.875rem] font-medium break-keep text-slate-700">
                         {p.questionText}
                         {p.required && <span className="ml-0.5 text-danger-500">*</span>}
                       </p>
@@ -101,7 +101,7 @@ export function SurveyReviewPage({
       })}
 
       <div className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-5 text-center shadow-(--shadow-card)">
-        <p className="text-[13px] break-keep text-slate-500">
+        <p className="text-[0.875rem] break-keep text-slate-500">
           제출 후에는 이 링크에서 답변을 수정할 수 없습니다.
         </p>
         <Button

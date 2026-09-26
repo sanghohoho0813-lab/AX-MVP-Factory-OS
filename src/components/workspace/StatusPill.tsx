@@ -63,7 +63,7 @@ export function StatusPill({
   size?: 'sm' | 'md'
 }) {
   const meta = META[status]
-  const pad = size === 'sm' ? 'px-2 py-0.5 text-[0.8rem]' : 'px-2.5 py-1 text-[0.9rem]'
+  const pad = size === 'sm' ? 'px-2 py-0.5 text-[0.875rem]' : 'px-2.5 py-1 text-[0.9rem]'
   return (
     <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border font-semibold ${pad} ${meta.className}`}>
       <span aria-hidden="true" className="size-1.5 rounded-full bg-current opacity-70" />

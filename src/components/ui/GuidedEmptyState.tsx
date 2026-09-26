@@ -56,7 +56,7 @@ export function GuidedEmptyState({
       {prereqs && prereqs.length > 0 && (
         <ul className="mt-4 flex w-full max-w-sm flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-left">
           {prereqs.map((step) => (
-            <li key={step.label} className="flex items-center gap-2 text-[13px]">
+            <li key={step.label} className="flex items-center gap-2 text-[0.875rem]">
               {step.done ? (
                 <CheckCircle2 aria-hidden="true" className="size-4 shrink-0 text-success-500" />
               ) : (

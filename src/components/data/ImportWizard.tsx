@@ -79,22 +79,22 @@ export function ImportWizard() {
       <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 p-4">
         <div className="flex items-center justify-between">
           <p className="text-sm font-semibold text-slate-800">로컬 데이터 검사</p>
-          <span className="text-[13px] text-slate-500">
+          <span className="text-[0.875rem] text-slate-500">
             스키마 v{snapshot.schemaVersion} · 총 {snapshot.totalItems}건
           </span>
         </div>
         {!snapshot.schemaMatches && (
-          <p className="mt-2 rounded border border-warning-200 bg-warning-50 px-3 py-2 text-[13px] break-keep text-warning-700">
+          <p className="mt-2 rounded border border-warning-200 bg-warning-50 px-3 py-2 text-[0.875rem] break-keep text-warning-700">
             로컬 스키마(v{snapshot.schemaVersion})가 앱 기대 버전(v{snapshot.expectedSchemaVersion})과 다릅니다.
             가져오기 전에 최신 앱으로 한 번 접속해 마이그레이션을 완료하세요.
           </p>
         )}
         {summary.length === 0 ? (
-          <p className="mt-3 text-[13px] text-slate-500">가져올 로컬 데이터가 없습니다.</p>
+          <p className="mt-3 text-[0.875rem] text-slate-500">가져올 로컬 데이터가 없습니다.</p>
         ) : (
           <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
             {summary.map((s) => (
-              <li key={s.domain} className="flex items-center justify-between text-[13px] text-slate-600">
+              <li key={s.domain} className="flex items-center justify-between text-[0.875rem] text-slate-600">
                 <span className="truncate">{DOMAIN_LABEL[s.domain] ?? s.domain}</span>
                 <span className="font-semibold text-slate-800">{s.count}</span>
               </li>
@@ -105,7 +105,7 @@ export function ImportWizard() {
 
       {/* 2. 진행률 */}
       {running && progress && (
-        <div className="flex items-center gap-2 rounded-(--radius-card) border border-brand-200 bg-brand-50/60 px-4 py-3 text-[13px] text-brand-700">
+        <div className="flex items-center gap-2 rounded-(--radius-card) border border-brand-200 bg-brand-50/60 px-4 py-3 text-[0.875rem] text-brand-700">
           <Loader2 aria-hidden="true" className="size-4 animate-spin" />
           {DOMAIN_LABEL[progress.domain as ImportDomain] ?? progress.domain} 가져오는 중… {progress.done}/{progress.total}
         </div>
@@ -113,7 +113,7 @@ export function ImportWizard() {
 
       {/* 3. 오류 */}
       {error && (
-        <p className="rounded-(--radius-card) border border-danger-200 bg-danger-50/70 px-4 py-3 text-[13px] break-keep text-danger-700">
+        <p className="rounded-(--radius-card) border border-danger-200 bg-danger-50/70 px-4 py-3 text-[0.875rem] break-keep text-danger-700">
           {error}
         </p>
       )}
@@ -121,7 +121,7 @@ export function ImportWizard() {
       {/* 4. 결과 */}
       {result && (
         <div
-          className={`rounded-(--radius-card) border px-4 py-3 text-[13px] ${
+          className={`rounded-(--radius-card) border px-4 py-3 text-[0.875rem] ${
             result.status === 'completed'
               ? 'border-success-200 bg-success-50/70 text-success-700'
               : result.status === 'partial'

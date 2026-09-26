@@ -236,7 +236,7 @@ export function ModuleFormPage() {
       </FormSection>
 
       <Panel title={`연결 질문 (${form.questionIds.length})`}>
-        <p className="mb-3 text-[13px] text-slate-500">
+        <p className="mb-3 text-[0.875rem] text-slate-500">
           {form.kind === 'industry'
             ? '업종 특화 질문을 우선 추천합니다. 공통 질문도 필요하면 추가할 수 있습니다.'
             : '목적 특화 질문을 우선 추천합니다. 공통 질문도 필요하면 추가할 수 있습니다.'}

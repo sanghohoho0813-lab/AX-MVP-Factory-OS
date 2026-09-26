@@ -41,7 +41,7 @@ export function RepeatTableQuestion({ question, answer, onAnswer, disabled }: Re
               <tr>
                 <td
                   colSpan={columns.length + 1}
-                  className="px-3 py-4 text-center text-[13px] text-slate-400"
+                  className="px-3 py-4 text-center text-[0.875rem] text-slate-400"
                 >
                   행 추가를 눌러 입력을 시작하세요.
                 </td>
@@ -95,7 +95,7 @@ export function RepeatTableQuestion({ question, answer, onAnswer, disabled }: Re
         type="button"
         disabled={disabled}
         onClick={addRow}
-        className="mt-2 inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-[13px] font-medium text-brand-600 hover:bg-brand-50"
+        className="mt-2 inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-[0.875rem] font-medium text-brand-600 hover:bg-brand-50"
       >
         <Plus aria-hidden="true" className="size-3.5" />행 추가
       </button>

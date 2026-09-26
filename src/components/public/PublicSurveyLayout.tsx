@@ -25,12 +25,12 @@ export function PublicSurveyLayout({
         <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-5 py-3.5">
           <span
             aria-hidden="true"
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-navy-900 text-[13px] font-bold text-white"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-navy-900 text-[0.875rem] font-bold text-white"
           >
             AX
           </span>
           <div className="min-w-0">
-            <p className="truncate text-[0.8125rem] text-slate-400">
+            <p className="truncate text-[0.875rem] text-slate-400">
               기업 AX 현장진단{organizationName ? ` · ${organizationName}` : ''}
             </p>
             <p className="truncate text-sm font-semibold text-slate-800">

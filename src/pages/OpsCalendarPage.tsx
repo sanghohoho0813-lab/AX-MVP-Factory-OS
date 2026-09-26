@@ -289,7 +289,10 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                           }`}
                         >
                           <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${SCHEDULE_KIND_CLASS[e.kind].dot}`} />
-                          <span className="truncate">{e.clientName}</span>
+                          {/* D-120: 업체 이름만 보여서 무슨 일인지 몰랐다 — 이름 뒤에 일(성공보수 · 1차 미팅 …)을 붙인다 */}
+                          <span className="truncate" title={`${e.clientName} · ${e.title}`}>
+                            {e.clientName.replace(/\(주\)|㈜|주식회사/g, '').trim()} · {e.title}
+                          </span>
                         </span>
                       ))}
                       {list.length > 3 && (
@@ -446,11 +449,11 @@ export function EventRow({
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="text-[1.02rem] font-bold break-keep text-slate-900">{event.clientName}</span>
-            <span className={`rounded-full border px-2 py-0.5 text-[0.8rem] font-medium ${cls.chip}`}>
+            <span className={`rounded-full border px-2 py-0.5 text-[0.875rem] font-medium ${cls.chip}`}>
               {SCHEDULE_KIND_LABEL[event.kind]}
             </span>
             {event.done && (
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.8rem] text-slate-500">
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.875rem] text-slate-500">
                 처리됨
               </span>
             )}

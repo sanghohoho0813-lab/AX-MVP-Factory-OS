@@ -140,13 +140,13 @@ export function JournalList({
                     {e.completed ? '완료됨' : '완료'}
                   </button>
                 )}
-                <button type="button" onClick={() => { setDraft(e.content); setEditingId(e.id) }} aria-label="수정" className="inline-flex size-8 items-center justify-center rounded-(--radius-control) text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                <button type="button" onClick={() => { setDraft(e.content); setEditingId(e.id) }} aria-label="수정" className="inline-flex size-10 items-center justify-center rounded-(--radius-control) text-slate-400 hover:bg-slate-100 hover:text-slate-700">
                   <Pencil aria-hidden="true" className="size-4" />
                 </button>
-                <button type="button" onClick={() => onTogglePin(e)} aria-label={e.pinned ? '고정 해제' : '고정'} className="inline-flex size-8 items-center justify-center rounded-(--radius-control) text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                <button type="button" onClick={() => onTogglePin(e)} aria-label={e.pinned ? '고정 해제' : '고정'} className="inline-flex size-10 items-center justify-center rounded-(--radius-control) text-slate-400 hover:bg-slate-100 hover:text-slate-700">
                   {e.pinned ? <PinOff aria-hidden="true" className="size-4" /> : <Pin aria-hidden="true" className="size-4" />}
                 </button>
-                <button type="button" onClick={() => onDelete(e)} aria-label="삭제" className="inline-flex size-8 items-center justify-center rounded-(--radius-control) text-slate-400 hover:bg-danger-50 hover:text-danger-600">
+                <button type="button" onClick={() => onDelete(e)} aria-label="삭제" className="inline-flex size-10 items-center justify-center rounded-(--radius-control) text-slate-400 hover:bg-danger-50 hover:text-danger-600">
                   <Trash2 aria-hidden="true" className="size-4" />
                 </button>
               </div>

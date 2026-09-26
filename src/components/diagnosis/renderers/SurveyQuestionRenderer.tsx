@@ -58,7 +58,7 @@ export function SurveyQuestionRenderer({
 
   return (
     <fieldset className="border-0 p-0">
-      <legend className="mb-2 flex gap-2 text-[15px] font-medium break-keep text-slate-800">
+      <legend className="mb-2 flex gap-2 text-[0.9375rem] font-medium break-keep text-slate-800">
         <span className="text-slate-400">{index}.</span>
         <span>
           {question.text}
@@ -71,7 +71,7 @@ export function SurveyQuestionRenderer({
         </span>
       </legend>
       {question.helpText && (
-        <p className="mb-2 text-[13px] break-keep text-slate-500">
+        <p className="mb-2 text-[0.875rem] break-keep text-slate-500">
           {question.helpText}
         </p>
       )}

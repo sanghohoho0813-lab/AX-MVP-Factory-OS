@@ -158,7 +158,7 @@ export function SelectionProjectPage() {
           {/* 추천 핵심 후보 */}
           <Panel title="추천 핵심 후보 (상위 3)">
             {rec.top.length === 0 ? (
-              <p className="text-[13px] text-slate-500">추천할 후보가 없습니다.</p>
+              <p className="text-[0.875rem] text-slate-500">추천할 후보가 없습니다.</p>
             ) : (
               <ul className="flex flex-col gap-2.5">
                 {rec.top.map((c) => {
@@ -173,7 +173,7 @@ export function SelectionProjectPage() {
                         <div className="flex items-center gap-2">
                           <p className="truncate text-sm font-semibold text-slate-800">{c.name}</p>
                           {isPrimary && (
-                            <span className="rounded-md border border-success-200 bg-success-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-success-700">
+                            <span className="rounded-md border border-success-200 bg-success-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-success-700">
                               추천 핵심
                             </span>
                           )}
@@ -188,7 +188,7 @@ export function SelectionProjectPage() {
                       <button
                         type="button"
                         onClick={() => navigate(`/selection/projects/${projectId}/candidates/${c.id}`)}
-                        className="inline-flex cursor-pointer items-center gap-1 text-[13px] font-semibold text-brand-600"
+                        className="inline-flex cursor-pointer items-center gap-1 text-[0.875rem] font-semibold text-brand-600"
                       >
                         상세
                         <ArrowRight aria-hidden="true" className="size-3.5" />
@@ -217,9 +217,9 @@ export function SelectionProjectPage() {
           <Panel title="진행 순서">
             <ol className="flex flex-col gap-2">
               {STEPS.map((label, i) => (
-                <li key={label} className="flex items-center gap-2 text-[13px]">
+                <li key={label} className="flex items-center gap-2 text-[0.875rem]">
                   <span
-                    className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[0.8125rem] font-semibold ${
+                    className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[0.875rem] font-semibold ${
                       stepStates[i] === 'done' ? 'bg-success-100 text-success-700' : 'bg-slate-100 text-slate-400'
                     }`}
                   >
@@ -252,7 +252,7 @@ export function SelectionProjectPage() {
             <Panel title="선행 준비사항">
               <ul className="flex flex-col gap-1.5">
                 {prerequisites.map((p) => (
-                  <li key={p} className="text-[13px] break-keep text-slate-600">• {p}</li>
+                  <li key={p} className="text-[0.875rem] break-keep text-slate-600">• {p}</li>
                 ))}
               </ul>
             </Panel>
@@ -302,7 +302,7 @@ function SummaryBlock({ title, items, empty }: { title: string; items: string[];
       ) : (
         <ul className="flex flex-col gap-0.5">
           {items.slice(0, 3).map((item) => (
-            <li key={item} className="text-[13px] break-keep text-slate-600">• {item}</li>
+            <li key={item} className="text-[0.875rem] break-keep text-slate-600">• {item}</li>
           ))}
         </ul>
       )}

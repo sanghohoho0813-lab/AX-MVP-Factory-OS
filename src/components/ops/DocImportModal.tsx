@@ -216,11 +216,11 @@ export function DocImportModal({
             <div className="mt-4">
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-[1.08rem] font-bold text-slate-900">읽은 내용</h3>
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.82rem] text-slate-600">
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.875rem] text-slate-600">
                   {DOC_SOURCE_LABEL[parsed.source]}
                 </span>
                 {method && method !== 'paste' && (
-                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.82rem] text-slate-500">
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.875rem] text-slate-500">
                     {EXTRACT_METHOD_LABEL[method]}
                   </span>
                 )}

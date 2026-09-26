@@ -382,13 +382,11 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
             {/* D-119: 크레탑 보고서 한 번으로 등록 · 기본 정보 · 1차 미팅 전략까지 */}
             <Link to="/sales/new" data-testid="board-cretop-intake" className={LINK_BUTTON.primary}>
               <ScanSearch aria-hidden="true" className="size-4" />
-              <span className="hidden sm:inline">크레탑으로 등록</span>
-              <span className="sm:hidden">크레탑</span>
+              크레탑으로 등록
             </Link>
             <Button variant="secondary" onClick={() => setFormOpen(true)}>
               <CirclePlus aria-hidden="true" className="size-4" />
-              <span className="hidden sm:inline">새 잠재고객</span>
-              <span className="sm:hidden">직접</span>
+              새 잠재고객
             </Button>
           </div>
         }

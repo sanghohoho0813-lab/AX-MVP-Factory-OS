@@ -25,7 +25,7 @@ export function DetailHeader({
     <div className="flex flex-col gap-3">
       <Link
         to={backTo}
-        className="inline-flex w-fit items-center gap-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-800"
+        className="inline-flex w-fit items-center gap-1.5 text-[0.875rem] font-medium text-slate-500 hover:text-slate-800"
       >
         <ArrowLeft aria-hidden="true" className="size-3.5" />
         {backLabel}
@@ -39,7 +39,7 @@ export function DetailHeader({
             {badges}
           </div>
           {meta && (
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-slate-500">
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.875rem] text-slate-500">
               {meta}
             </div>
           )}

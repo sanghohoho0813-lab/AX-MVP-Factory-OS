@@ -294,7 +294,7 @@ function MetricCard({
       <div className="flex flex-wrap items-center gap-2">
         <p className="text-sm font-semibold text-slate-800">{metric.name}</p>
         <MetricDirectionBadge direction={metric.direction} />
-        {metric.required && <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.82rem] font-medium text-slate-500">필수</span>}
+        {metric.required && <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-slate-500">필수</span>}
         {metric.unit && <span className="text-[0.9rem] text-slate-400">단위: {metric.unit}</span>}
       </div>
       <div className="mt-2 grid grid-cols-2 gap-2 text-[0.95rem] sm:grid-cols-3">

@@ -565,7 +565,7 @@ export function FloorPlanner({ company }: { company: string }) {
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-base font-bold text-navy-700">1</span>
         <span>
           <span className="block text-base font-bold">도면 편집</span>
-          <span className="block text-xs text-navy-100">공간·요소를 편집하면, 바로 아래에서 JPEG/PDF로 저장할 수 있습니다</span>
+          <span className="block text-[0.8125rem] text-navy-100">공간·요소를 편집하면, 바로 아래에서 JPEG/PDF로 저장할 수 있습니다</span>
         </span>
       </div>
 
@@ -575,7 +575,7 @@ export function FloorPlanner({ company }: { company: string }) {
           <button type="button" onClick={undo} disabled={!canUndo} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40">↶ 되돌리기</button>
           <button type="button" onClick={redo} disabled={!canRedo} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40">↷ 다시 실행</button>
           <button type="button" onClick={deleteSelection} disabled={!sel} className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-sm font-bold text-status-danger hover:bg-red-50 disabled:opacity-40">🗑 선택 삭제</button>
-          <span className="hidden text-xs text-slate-400 @2xl:inline">Ctrl+Z 되돌리기 · Ctrl+Shift+Z 다시실행 · Delete 삭제</span>
+          <span className="hidden text-[0.8125rem] text-slate-400 @2xl:inline">Ctrl+Z 되돌리기 · Ctrl+Shift+Z 다시실행 · Delete 삭제</span>
           <button type="button" onClick={startBlank} className="ml-auto rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-100">빈 도면으로 시작</button>
           <button type="button" onClick={loadSamples} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-100">기본 샘플 불러오기</button>
         </div>
@@ -591,7 +591,7 @@ export function FloorPlanner({ company }: { company: string }) {
           {tool !== "select" ? (
             <label className="flex items-center gap-1.5 text-sm font-semibold text-slate-600">굵기
               <input type="range" min={2} max={10} step={1} value={penWidth} onChange={(e) => setPenWidth(Number(e.target.value))} />
-              <span className="w-5 text-xs text-slate-500">{penWidth}</span>
+              <span className="w-5 text-[0.8125rem] text-slate-500">{penWidth}</span>
             </label>
           ) : null}
           {tool === "pen" ? (
@@ -602,7 +602,7 @@ export function FloorPlanner({ company }: { company: string }) {
               ))}
             </span>
           ) : null}
-          {tool !== "select" ? <span className="text-xs text-slate-400">원본 도면 위를 드래그해 그리세요 · Ctrl+Z 되돌리기</span> : null}
+          {tool !== "select" ? <span className="text-[0.8125rem] text-slate-400">원본 도면 위를 드래그해 그리세요 · Ctrl+Z 되돌리기</span> : null}
           <button type="button" onClick={clearStrokes} disabled={!(doc.strokes?.length)} className="ml-auto rounded-lg border border-red-200 bg-white px-3 py-1.5 text-sm font-bold text-status-danger hover:bg-red-50 disabled:opacity-40">그린 선 전체 삭제</button>
         </div>
       ) : null}
@@ -689,7 +689,7 @@ export function FloorPlanner({ company }: { company: string }) {
                         <button type="button" onClick={() => addItem(t)} aria-label={`${isText ? "텍스트" : t} 하나 더하기`} className={`h-8 w-8 rounded-lg text-lg font-bold text-white ${isText ? "bg-violet-600 hover:bg-violet-700" : "bg-navy-700 hover:bg-navy-800"}`}>+</button>
                       </div>
                     </div>
-                    <p className="mt-1 text-xs text-slate-400">{isText ? "원하는 위치에 글자 배치" : `${countOf(t)}개 배치됨`}</p>
+                    <p className="mt-1 text-[0.8125rem] text-slate-400">{isText ? "원하는 위치에 글자 배치" : `${countOf(t)}개 배치됨`}</p>
                   </div>
                 );
               })}

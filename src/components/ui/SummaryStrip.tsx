@@ -33,7 +33,7 @@ export function SummaryStrip({ ariaLabel, items }: SummaryStripProps) {
               <item.icon className="size-4.5" />
             </span>
             <div className="min-w-0">
-              <dt className="flex items-center gap-1.5 text-[13px] font-medium text-slate-500">
+              <dt className="flex items-center gap-1.5 text-[0.875rem] font-medium text-slate-500">
                 <span
                   aria-hidden="true"
                   className={`size-1.5 rounded-full ${TONE_DOT_CLASS[item.tone]}`}
@@ -43,7 +43,7 @@ export function SummaryStrip({ ariaLabel, items }: SummaryStripProps) {
               <dd className="mt-0.5 text-xl font-bold text-slate-900">
                 {item.value}
                 {item.unit && (
-                  <span className="ml-0.5 text-[13px] font-medium text-slate-500">
+                  <span className="ml-0.5 text-[0.875rem] font-medium text-slate-500">
                     {item.unit}
                   </span>
                 )}

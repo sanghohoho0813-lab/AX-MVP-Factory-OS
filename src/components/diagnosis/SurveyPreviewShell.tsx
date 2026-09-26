@@ -72,7 +72,7 @@ export function SurveyPreviewShell({
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-3.5">
         <div className="flex flex-wrap items-center gap-2">
           <RespondentRoleBadge role={respondentRole} />
-          <span className="text-[13px] text-slate-500">
+          <span className="text-[0.875rem] text-slate-500">
             예상 약 {estimatedMinutes}분 · {RESPONDENT_ROLE_META[respondentRole].label}용 미리보기
           </span>
         </div>
@@ -149,7 +149,7 @@ export function SurveyPreviewShell({
             <h3 className="text-base font-semibold text-slate-900">{title}</h3>
             <p className="mt-0.5 text-sm font-medium text-slate-700">{section.title}</p>
             {section.description && (
-              <p className="mt-1 text-[13px] break-keep text-slate-500">
+              <p className="mt-1 text-[0.875rem] break-keep text-slate-500">
                 {section.description}
               </p>
             )}
@@ -170,7 +170,7 @@ export function SurveyPreviewShell({
               )
             })}
             {placements.length === 0 && (
-              <p className="text-[13px] text-slate-400">
+              <p className="text-[0.875rem] text-slate-400">
                 이 섹션의 질문은 이전 답변 조건에 따라 표시됩니다.
               </p>
             )}

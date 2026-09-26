@@ -946,7 +946,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                         return (
                           <span
                             key={k}
-                            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[0.82rem] font-medium ${
+                            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[0.875rem] font-medium ${
                               v.usable
                                 ? 'border-success-200 bg-success-50 text-success-700'
                                 : 'border-slate-200 bg-slate-50 text-slate-500'
@@ -1075,13 +1075,13 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                       </span>
                     </label>
                     {view.expired && (
-                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-danger-200 bg-danger-100 px-2 py-0.5 text-[0.8rem] font-bold text-danger-700">
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-danger-200 bg-danger-100 px-2 py-0.5 text-[0.875rem] font-bold text-danger-700">
                         <FileWarning aria-hidden="true" className="size-3.5" />
                         만료됨
                       </span>
                     )}
                     {!view.expired && view.expiringSoon && (
-                      <span className="shrink-0 rounded-full border border-warning-200 bg-warning-100 px-2 py-0.5 text-[0.8rem] font-bold text-warning-800">
+                      <span className="shrink-0 rounded-full border border-warning-200 bg-warning-100 px-2 py-0.5 text-[0.875rem] font-bold text-warning-800">
                         {dueText(view.daysLeft)}
                       </span>
                     )}
@@ -1098,7 +1098,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                             onChange={(e) => void commit(withDocument(record, meta.key, { issuedAt: e.target.value }))}
                             className={`mt-1 ${inputCls}`}
                           />
-                          <span className="mt-1 block text-[0.8rem] text-slate-500">
+                          <span className="mt-1 block text-[0.875rem] text-slate-500">
                             {view.expiresOn
                               ? `${view.expiresOn}까지 유효 (${meta.validMonths}개월)`
                               : `유효 ${meta.validMonths}개월 — 발급일을 넣어주세요`}
@@ -1175,14 +1175,14 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                   )}
 
                   {needed.length > 0 && (
-                    <p className="text-[0.82rem] break-keep text-slate-400">
+                    <p className="text-[0.875rem] break-keep text-slate-400">
                       필요한 업무: {needed.map((s) => s.shortLabel).join(', ')}
                     </p>
                   )}
 
                   {/* 이 서류를 쓰는 도구 (D-90) — 올려 두면 그 도구가 바로 돈다 */}
                   {toolsNeeding(meta.key).length > 0 && (
-                    <p className="text-[0.82rem] break-keep text-brand-700" data-testid={`doc-tools-${meta.key}`}>
+                    <p className="text-[0.875rem] break-keep text-brand-700" data-testid={`doc-tools-${meta.key}`}>
                       <Wrench aria-hidden="true" className="mr-1 inline size-3.5 align-[-2px]" />
                       이 서류를 쓰는 도구: {toolsNeeding(meta.key).map((t) => t.label).join(' · ')}
                     </p>

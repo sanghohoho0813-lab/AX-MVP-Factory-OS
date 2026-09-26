@@ -96,7 +96,7 @@ export function CandidateCard({ candidate, onOpen, onStatusChange }: CandidateCa
         <button
           type="button"
           onClick={() => onOpen(candidate)}
-          className="inline-flex cursor-pointer items-center gap-1 text-[13px] font-semibold text-brand-600 hover:text-brand-700"
+          className="inline-flex cursor-pointer items-center gap-1 text-[0.875rem] font-semibold text-brand-600 hover:text-brand-700"
         >
           상세
           <ArrowRight aria-hidden="true" className="size-3.5" />
@@ -132,7 +132,7 @@ export function CandidateBoard({
           return (
             <section key={col.key} className="flex w-72 shrink-0 flex-col gap-2.5">
               <header className="flex items-center justify-between rounded-(--radius-control) bg-slate-100 px-3 py-1.5">
-                <span className="text-[13px] font-semibold text-slate-600">
+                <span className="text-[0.875rem] font-semibold text-slate-600">
                   {CANDIDATE_STATUS_META[col.key].label}
                 </span>
                 <span className="text-[0.875rem] text-slate-400">{items.length}</span>
@@ -179,7 +179,7 @@ export function CandidateTable({
     { key: 'quadrant', header: '사분면', cell: (c) => <PriorityQuadrantBadge quadrant={c.quadrant} /> },
     { key: 'confidence', header: '신뢰도', className: 'hidden lg:table-cell', cell: (c) => <CandidateConfidenceBadge confidence={c.confidence} /> },
     { key: 'approach', header: '자동화', className: 'hidden xl:table-cell', cell: (c) => <AutomationApproachBadge approach={c.automationApproach} /> },
-    { key: 'saving', header: '월 절감', className: 'hidden lg:table-cell', cell: (c) => <span className="text-[13px] text-slate-600">{monthlySavingLabel(c)}</span> },
+    { key: 'saving', header: '월 절감', className: 'hidden lg:table-cell', cell: (c) => <span className="text-[0.875rem] text-slate-600">{monthlySavingLabel(c)}</span> },
     { key: 'status', header: '상태', cell: (c) => <CandidateStatusBadge status={c.status} /> },
   ]
   return (

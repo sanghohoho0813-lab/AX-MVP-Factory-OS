@@ -224,12 +224,12 @@ export function ProjectDetailPage() {
         title={project.name}
         badges={
           <>
-            <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[13px] font-semibold tracking-wide text-slate-500">
+            <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.875rem] font-semibold tracking-wide text-slate-500">
               {project.projectCode}
             </span>
             <ProjectTypeBadge type={project.projectType} compact />
             {progress.isSample && (
-              <span className="rounded-full border border-brand-200 bg-brand-50 px-2.5 py-0.5 text-[13px] font-semibold text-brand-700">
+              <span className="rounded-full border border-brand-200 bg-brand-50 px-2.5 py-0.5 text-[0.875rem] font-semibold text-brand-700">
                 샘플
               </span>
             )}
@@ -302,7 +302,7 @@ export function ProjectDetailPage() {
           data-tour="control-next"
           className="rounded-(--radius-panel) border border-brand-200 bg-brand-50/50 p-5"
         >
-          <p className="text-[13px] font-semibold tracking-wide text-brand-700 uppercase">
+          <p className="text-[0.875rem] font-semibold tracking-wide text-brand-700 uppercase">
             지금 해야 할 일
           </p>
           <p className="mt-1.5 text-lg font-bold break-keep text-slate-900">
@@ -329,7 +329,7 @@ export function ProjectDetailPage() {
             const inner = (
               <>
                 <span
-                  className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full border text-[13px] font-semibold ${STEP_CIRCLE_CLASS[step.state]}`}
+                  className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full border text-[0.875rem] font-semibold ${STEP_CIRCLE_CLASS[step.state]}`}
                 >
                   {step.state === 'completed' ? (
                     <Check aria-hidden="true" className="size-4" />
@@ -347,7 +347,7 @@ export function ProjectDetailPage() {
                       {step.label}
                     </span>
                     <span
-                      className={`text-[13px] font-semibold ${STEP_STATE_TEXT_CLASS[step.state]}`}
+                      className={`text-[0.875rem] font-semibold ${STEP_STATE_TEXT_CLASS[step.state]}`}
                     >
                       {STEP_STATE_LABEL[step.state]}
                     </span>
@@ -400,7 +400,7 @@ export function ProjectDetailPage() {
                   <span className="text-[0.95rem] font-semibold break-keep text-slate-800">
                     {item.label}
                   </span>
-                  <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-[13px] font-semibold text-brand-600">
+                  <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-[0.875rem] font-semibold text-brand-600">
                     열기
                     <ArrowRight aria-hidden="true" className="size-3.5" />
                   </span>
@@ -504,7 +504,7 @@ export function ProjectDetailPage() {
                       <button
                         type="button"
                         onClick={() => navigate(`/diagnosis/projects/${project.id}/setup`)}
-                        className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-semibold text-brand-600 hover:bg-brand-50"
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[0.875rem] font-semibold text-brand-600 hover:bg-brand-50"
                       >
                         <FilePen aria-hidden="true" className="size-3.5" />
                         계속 설계
@@ -514,7 +514,7 @@ export function ProjectDetailPage() {
                       <button
                         type="button"
                         onClick={() => navigate(`/diagnosis/projects/${project.id}/setup`)}
-                        className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-semibold text-brand-600 hover:bg-brand-50"
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[0.875rem] font-semibold text-brand-600 hover:bg-brand-50"
                       >
                         <ClipboardList aria-hidden="true" className="size-3.5" />
                         설계 시작
@@ -524,7 +524,7 @@ export function ProjectDetailPage() {
                       <button
                         type="button"
                         onClick={() => setLinkModalOpen(true)}
-                        className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-semibold text-brand-600 hover:bg-brand-50"
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[0.875rem] font-semibold text-brand-600 hover:bg-brand-50"
                       >
                         <Plus aria-hidden="true" className="size-3.5" />
                         테스트 링크 생성
@@ -534,7 +534,7 @@ export function ProjectDetailPage() {
                       <button
                         type="button"
                         onClick={() => navigate(`/diagnosis/surveys/${submitted.id}/response`)}
-                        className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-semibold text-brand-600 hover:bg-brand-50"
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[0.875rem] font-semibold text-brand-600 hover:bg-brand-50"
                       >
                         응답 상세 보기
                       </button>
@@ -544,7 +544,7 @@ export function ProjectDetailPage() {
                         <button
                           type="button"
                           onClick={() => navigate(`/diagnosis/surveys/${activeLink.id}`)}
-                          className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-semibold text-brand-600 hover:bg-brand-50"
+                          className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[0.875rem] font-semibold text-brand-600 hover:bg-brand-50"
                         >
                           응답 현황 보기
                         </button>
@@ -641,7 +641,7 @@ export function ProjectDetailPage() {
           className="flex w-full cursor-pointer items-center justify-between gap-3 px-5 py-4 text-left"
         >
           <div className="min-w-0">
-            <h2 className="text-[15px] font-semibold text-slate-900">고급 운영 기능</h2>
+            <h2 className="text-[0.9375rem] font-semibold text-slate-900">고급 운영 기능</h2>
             <p className="mt-0.5 text-[0.875rem] break-keep text-slate-500">
               프로젝트 후반에 사용하는 고급 운영 기능입니다.
             </p>

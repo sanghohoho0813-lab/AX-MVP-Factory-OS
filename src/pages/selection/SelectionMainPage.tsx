@@ -100,7 +100,7 @@ export function SelectionMainPage() {
     navigate(r.lifecycle === 'finalized' ? `/selection/projects/${r.project.id}/decision` : `/selection/projects/${r.project.id}`)
 
   const columns: DataTableColumn<Row>[] = [
-    { key: 'client', header: '고객사', cell: (r) => <span className="text-[13px] font-medium text-slate-700">{r.orgName}</span> },
+    { key: 'client', header: '고객사', cell: (r) => <span className="text-[0.875rem] font-medium text-slate-700">{r.orgName}</span> },
     {
       key: 'project', header: '프로젝트', className: 'min-w-[150px]',
       cell: (r) => (
@@ -111,12 +111,12 @@ export function SelectionMainPage() {
       ),
     },
     { key: 'type', header: '유형', cell: (r) => <ProjectTypeBadge type={r.project.projectType} compact /> },
-    { key: 'diagnosis', header: '진단 판정', className: 'hidden lg:table-cell', cell: (r) => <span className="text-[13px] text-slate-600">{r.diagnosisLabel}</span> },
-    { key: 'candidates', header: '후보', cell: (r) => <span className="text-[13px] text-slate-600">{r.candidateCount}건</span> },
+    { key: 'diagnosis', header: '진단 판정', className: 'hidden lg:table-cell', cell: (r) => <span className="text-[0.875rem] text-slate-600">{r.diagnosisLabel}</span> },
+    { key: 'candidates', header: '후보', cell: (r) => <span className="text-[0.875rem] text-slate-600">{r.candidateCount}건</span> },
     {
       key: 'action', header: '', className: 'text-right',
       cell: (r) => (
-        <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand-600">
+        <span className="inline-flex items-center gap-1 text-[0.875rem] font-semibold text-brand-600">
           {LIFECYCLE_ACTION[r.lifecycle]}
           <ArrowRight aria-hidden="true" className="size-3.5" />
         </span>
@@ -167,7 +167,7 @@ export function SelectionMainPage() {
                       <p className="truncate text-sm font-semibold text-slate-800">{r.orgName} · {r.project.name}</p>
                       <p className="text-[0.875rem] text-slate-400">후보 {r.candidateCount}건</p>
                     </div>
-                    <span className="shrink-0 text-[13px] font-semibold text-brand-600">{LIFECYCLE_ACTION[r.lifecycle]}</span>
+                    <span className="shrink-0 text-[0.875rem] font-semibold text-brand-600">{LIFECYCLE_ACTION[r.lifecycle]}</span>
                   </button>
                 </li>
               ))}
@@ -179,7 +179,7 @@ export function SelectionMainPage() {
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <Panel title="진행 중인 과제선별" flush>
           {inProgress.length === 0 ? (
-            <div className="px-5 py-8 text-center text-[13px] text-slate-400">진행 중인 과제선별이 없습니다.</div>
+            <div className="px-5 py-8 text-center text-[0.875rem] text-slate-400">진행 중인 과제선별이 없습니다.</div>
           ) : (
             <ul className="divide-y divide-slate-100">
               {inProgress.map((r) => (
@@ -199,7 +199,7 @@ export function SelectionMainPage() {
 
         <Panel title="최근 확정 결과" flush>
           {finalized.length === 0 ? (
-            <div className="px-5 py-8 text-center text-[13px] text-slate-400">확정된 선정 결과가 없습니다.</div>
+            <div className="px-5 py-8 text-center text-[0.875rem] text-slate-400">확정된 선정 결과가 없습니다.</div>
           ) : (
             <ul className="divide-y divide-slate-100">
               {finalized.map((r) => (
@@ -220,13 +220,13 @@ export function SelectionMainPage() {
 
       {websiteProjects.length > 0 && (
         <Panel title="홈페이지 단독 프로젝트">
-          <p className="mb-2 text-[13px] break-keep text-slate-500">
+          <p className="mb-2 text-[0.875rem] break-keep text-slate-500">
             홈페이지 제작 프로젝트에는 AX 과제선별을 적용하지 않습니다. 제작 방향은 웹사이트 스튜디오에서 설계합니다.
           </p>
           <ul className="flex flex-wrap gap-2">
             {websiteProjects.map((p) => (
               <li key={p.id}>
-                <button type="button" onClick={() => navigate('/website-studio')} className="rounded-(--radius-control) border border-slate-200 px-3 py-1.5 text-[13px] text-slate-600 hover:bg-slate-50">
+                <button type="button" onClick={() => navigate('/website-studio')} className="rounded-(--radius-control) border border-slate-200 px-3 py-1.5 text-[0.875rem] text-slate-600 hover:bg-slate-50">
                   {p.name}
                 </button>
               </li>

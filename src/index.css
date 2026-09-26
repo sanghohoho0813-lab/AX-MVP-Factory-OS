@@ -321,13 +321,13 @@ html[data-motion="reduced"] *::after {
   line-height: 1.6;
 }
 
-.t-sub {             /* 보조 설명 */
-  font-size: 0.9rem;
+.t-sub {             /* 보조 설명 — D-120: 0.9 → 0.9375rem(15px). 50~60대도 안경 없이 */
+  font-size: 0.9375rem;
   line-height: 1.55;
 }
 
-.t-meta {            /* 배지·메타데이터 전용. 본문에 쓰지 않는다 */
-  font-size: 0.82rem;
+.t-meta {            /* 배지·메타데이터 전용. 본문에 쓰지 않는다 — D-120: 0.82 → 0.875rem(14px) */
+  font-size: 0.875rem;
   line-height: 1.4;
 }
 
@@ -610,3 +610,22 @@ input:is([type="date"], [type="month"], [type="time"], [type="datetime-local"]):
   border-color: var(--color-brand-200);
   border-color: oklch(from var(--color-brand-500) 0.86 0.06 calc(h + var(--ramp-shift, 0)));
 }
+
+/* ------------------------------------------------------------------ */
+/* D-120 읽기 쉽게 — 50~60대도 쓰도록                                    */
+/*                                                                      */
+/* 흐린 회색 글자(slate-400 ≈ 대비 2.6:1 · slate-300 ≈ 1.5:1)가 날짜 · 금액 · */
+/* 안내 같은 뜻 있는 글에 747곳 쓰였다. 화면마다 고치지 않고 여기서 한 단계씩 */
+/* 진하게 한다(slate-400 → 500 ≈ 4.8:1). 아이콘 · 테두리 색은 그대로다.      */
+/* 어두운 바탕 위에 이 글자색을 쓰는 곳은 없다(확인함).                        */
+/* ------------------------------------------------------------------ */
+.text-slate-400 {
+  color: var(--color-slate-500);
+}
+.text-slate-300 {
+  color: var(--color-slate-400);
+}
+.placeholder\:text-slate-400::placeholder {
+  color: var(--color-slate-500);
+}
+

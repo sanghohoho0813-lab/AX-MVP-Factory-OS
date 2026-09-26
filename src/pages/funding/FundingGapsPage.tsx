@@ -129,7 +129,7 @@ function EvidenceSection({ strategy, readOnly }: { strategy: FundingStrategy; re
           <EmptyState icon={FileText} title="등록된 근거가 없습니다" description="확정된 결과에서 자동 수집되거나 직접 추가할 수 있습니다." />
         ) : (
           <div className="min-w-0 overflow-x-auto">
-            <table className="w-full min-w-[680px] border-collapse text-[13px]">
+            <table className="w-full min-w-[680px] border-collapse text-[0.875rem]">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-[0.875rem] text-slate-400">
                   <th scope="col" className="px-5 py-2.5 font-medium">근거명</th>
@@ -152,13 +152,13 @@ function EvidenceSection({ strategy, readOnly }: { strategy: FundingStrategy; re
                     </td>
                     <td className="px-3 py-2.5 text-slate-500">{SOURCE_TYPE_LABEL[e.sourceType]}</td>
                     <td className="px-3 py-2.5">
-                      <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[0.8125rem] font-medium ${e.verified ? 'border-success-200 bg-success-50 text-success-700' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
+                      <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[0.875rem] font-medium ${e.verified ? 'border-success-200 bg-success-50 text-success-700' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
                         {e.verified ? '검증' : '미검증'}
                       </span>
                     </td>
                     <td className="px-3 py-2.5">
                       {e.sensitive && (
-                        <span className="inline-flex items-center gap-1 rounded-md border border-danger-200 bg-danger-50 px-2 py-0.5 text-[0.8125rem] font-medium text-danger-700">
+                        <span className="inline-flex items-center gap-1 rounded-md border border-danger-200 bg-danger-50 px-2 py-0.5 text-[0.875rem] font-medium text-danger-700">
                           <Lock aria-hidden="true" className="size-3" />
                           민감정보
                         </span>
@@ -195,7 +195,7 @@ function EvidenceSection({ strategy, readOnly }: { strategy: FundingStrategy; re
       >
         <div className="flex flex-col gap-4">
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-slate-600">근거명</span>
+            <span className="text-[0.875rem] font-medium text-slate-600">근거명</span>
             <input
               value={form.label}
               onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
@@ -204,7 +204,7 @@ function EvidenceSection({ strategy, readOnly }: { strategy: FundingStrategy; re
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1.5">
-              <span className="text-[13px] font-medium text-slate-600">값</span>
+              <span className="text-[0.875rem] font-medium text-slate-600">값</span>
               <input
                 value={form.value}
                 onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))}
@@ -212,7 +212,7 @@ function EvidenceSection({ strategy, readOnly }: { strategy: FundingStrategy; re
               />
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[13px] font-medium text-slate-600">단위</span>
+              <span className="text-[0.875rem] font-medium text-slate-600">단위</span>
               <input
                 value={form.unit}
                 onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
@@ -221,7 +221,7 @@ function EvidenceSection({ strategy, readOnly }: { strategy: FundingStrategy; re
             </label>
           </div>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-slate-600">설명</span>
+            <span className="text-[0.875rem] font-medium text-slate-600">설명</span>
             <textarea
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
@@ -229,7 +229,7 @@ function EvidenceSection({ strategy, readOnly }: { strategy: FundingStrategy; re
               className="w-full rounded-(--radius-control) border border-slate-200 px-3 py-2 text-sm"
             />
           </label>
-          <label className="flex items-center gap-2 text-[13px] text-slate-600">
+          <label className="flex items-center gap-2 text-[0.875rem] text-slate-600">
             <input
               type="checkbox"
               checked={form.sensitive}
@@ -359,14 +359,14 @@ function GapSection({ strategy, readOnly }: { strategy: FundingStrategy; readOnl
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.8125rem] font-medium text-slate-500">
+                      <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.875rem] font-medium text-slate-500">
                         {CATEGORY_LABEL[gap.category]}
                       </span>
                       <GapSeverityBadge severity={gap.severity} />
                       <GapStatusBadge status={gap.status} />
                     </div>
                     <p className="mt-1.5 text-sm font-semibold break-keep text-slate-900">{gap.title}</p>
-                    {gap.description && <p className="mt-0.5 text-[13px] break-keep text-slate-600">{gap.description}</p>}
+                    {gap.description && <p className="mt-0.5 text-[0.875rem] break-keep text-slate-600">{gap.description}</p>}
                   </div>
                   {!readOnly && (
                     <div className="flex gap-1.5">
@@ -375,7 +375,7 @@ function GapSection({ strategy, readOnly }: { strategy: FundingStrategy; readOnl
                     </div>
                   )}
                 </div>
-                <dl className="mt-3 grid grid-cols-1 gap-x-4 gap-y-2 text-[13px] sm:grid-cols-2">
+                <dl className="mt-3 grid grid-cols-1 gap-x-4 gap-y-2 text-[0.875rem] sm:grid-cols-2">
                   {gap.requiredAction && (
                     <div className="flex flex-col gap-0.5">
                       <dt className="text-[0.875rem] font-semibold text-slate-400">필요한 행동</dt>
@@ -418,7 +418,7 @@ function GapSection({ strategy, readOnly }: { strategy: FundingStrategy; readOnl
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1.5">
-              <span className="text-[13px] font-medium text-slate-600">구분</span>
+              <span className="text-[0.875rem] font-medium text-slate-600">구분</span>
               <select
                 value={form.category}
                 onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as CriterionCategory }))}
@@ -430,7 +430,7 @@ function GapSection({ strategy, readOnly }: { strategy: FundingStrategy; readOnl
               </select>
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[13px] font-medium text-slate-600">심각도</span>
+              <span className="text-[0.875rem] font-medium text-slate-600">심각도</span>
               <select
                 value={form.severity}
                 onChange={(e) => setForm((f) => ({ ...f, severity: e.target.value as GapSeverity }))}
@@ -443,7 +443,7 @@ function GapSection({ strategy, readOnly }: { strategy: FundingStrategy; readOnl
             </label>
           </div>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-slate-600">부족 내용</span>
+            <span className="text-[0.875rem] font-medium text-slate-600">부족 내용</span>
             <input
               value={form.title}
               onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
@@ -451,7 +451,7 @@ function GapSection({ strategy, readOnly }: { strategy: FundingStrategy; readOnl
             />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-slate-600">설명</span>
+            <span className="text-[0.875rem] font-medium text-slate-600">설명</span>
             <textarea
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
@@ -461,7 +461,7 @@ function GapSection({ strategy, readOnly }: { strategy: FundingStrategy; readOnl
             />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-slate-600">필요한 행동</span>
+            <span className="text-[0.875rem] font-medium text-slate-600">필요한 행동</span>
             <input
               value={form.requiredAction}
               onChange={(e) => setForm((f) => ({ ...f, requiredAction: e.target.value }))}
@@ -469,7 +469,7 @@ function GapSection({ strategy, readOnly }: { strategy: FundingStrategy; readOnl
             />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-slate-600">필요한 증빙</span>
+            <span className="text-[0.875rem] font-medium text-slate-600">필요한 증빙</span>
             <input
               value={form.evidenceNeeded}
               onChange={(e) => setForm((f) => ({ ...f, evidenceNeeded: e.target.value }))}
@@ -492,7 +492,7 @@ function GapSection({ strategy, readOnly }: { strategy: FundingStrategy; readOnl
       >
         <div className="flex flex-col gap-4">
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-slate-600">상태</span>
+            <span className="text-[0.875rem] font-medium text-slate-600">상태</span>
             <select
               value={editForm.status}
               onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value as GapStatus }))}
@@ -504,7 +504,7 @@ function GapSection({ strategy, readOnly }: { strategy: FundingStrategy; readOnl
             </select>
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-slate-600">담당자</span>
+            <span className="text-[0.875rem] font-medium text-slate-600">담당자</span>
             <input
               value={editForm.ownerId}
               onChange={(e) => setEditForm((f) => ({ ...f, ownerId: e.target.value }))}
@@ -512,7 +512,7 @@ function GapSection({ strategy, readOnly }: { strategy: FundingStrategy; readOnl
             />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-slate-600">기한</span>
+            <span className="text-[0.875rem] font-medium text-slate-600">기한</span>
             <input
               type="date"
               value={editForm.dueDate}
@@ -552,7 +552,7 @@ function GapsBody({ strategy }: { strategy: FundingStrategy }) {
           role="tab"
           aria-selected={tab === 'evidence'}
           onClick={() => setTab('evidence')}
-          className={`-mb-px border-b-2 px-4 py-2.5 text-[13px] font-medium transition-colors ${tab === 'evidence' ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
+          className={`-mb-px border-b-2 px-4 py-2.5 text-[0.875rem] font-medium transition-colors ${tab === 'evidence' ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
         >
           근거 ({strategy.evidence.length})
         </button>
@@ -561,7 +561,7 @@ function GapsBody({ strategy }: { strategy: FundingStrategy }) {
           role="tab"
           aria-selected={tab === 'gaps'}
           onClick={() => setTab('gaps')}
-          className={`-mb-px border-b-2 px-4 py-2.5 text-[13px] font-medium transition-colors ${tab === 'gaps' ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
+          className={`-mb-px border-b-2 px-4 py-2.5 text-[0.875rem] font-medium transition-colors ${tab === 'gaps' ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
         >
           부족조건 ({strategy.gaps.length})
         </button>

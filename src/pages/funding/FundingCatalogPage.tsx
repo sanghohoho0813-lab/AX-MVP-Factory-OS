@@ -40,7 +40,7 @@ const inputClass = 'w-full rounded-(--radius-control) border border-slate-200 px
 function Field({ label, htmlFor, children, hint }: { label: string; htmlFor: string; children: ReactNode; hint?: string }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={htmlFor} className="text-[13px] font-medium text-slate-700">{label}</label>
+      <label htmlFor={htmlFor} className="text-[0.875rem] font-medium text-slate-700">{label}</label>
       {children}
       {hint && <p className="text-[0.875rem] text-slate-400">{hint}</p>}
     </div>
@@ -160,7 +160,7 @@ export function FundingCatalogPage() {
       <button
         type="button"
         onClick={() => navigate('/funding')}
-        className="inline-flex w-fit items-center gap-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-800"
+        className="inline-flex w-fit items-center gap-1.5 text-[0.875rem] font-medium text-slate-500 hover:text-slate-800"
       >
         <ArrowLeft aria-hidden="true" className="size-3.5" />
         기관·자금 연계
@@ -187,7 +187,7 @@ export function FundingCatalogPage() {
         className="flex items-start gap-2 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3"
       >
         <Landmark aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning-600" />
-        <p className="text-[13px] break-keep text-warning-800">
+        <p className="text-[0.875rem] break-keep text-warning-800">
           이 목록은 검토 참고용이며 실제 공고가 아닙니다. 실제 조건·금리·한도·접수기간은 각 기관의 공식 공고에서 반드시 확인해야 합니다.
         </p>
       </div>
@@ -279,12 +279,12 @@ export function FundingCatalogPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm font-medium text-slate-800">{prog.name}</span>
                         {prog.isTemplate && (
-                          <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-slate-500">실제 공고 아님(템플릿)</span>
+                          <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-slate-500">실제 공고 아님(템플릿)</span>
                         )}
                       </div>
                     </td>
                     <td className="px-4 py-3.5 align-middle"><SupportTypeBadge type={prog.supportType} /></td>
-                    <td className="hidden px-4 py-3.5 align-middle text-[13px] text-slate-600 lg:table-cell">{instNameById.get(prog.institutionId) ?? '알 수 없음'}</td>
+                    <td className="hidden px-4 py-3.5 align-middle text-[0.875rem] text-slate-600 lg:table-cell">{instNameById.get(prog.institutionId) ?? '알 수 없음'}</td>
                     <td className="px-4 py-3.5 align-middle"><FreshnessBadge status={computeProgramFreshness(prog)} /></td>
                     <td className="hidden px-4 py-3.5 align-middle xl:table-cell"><SourceStatusBadge status={prog.sourceStatus} /></td>
                   </tr>
@@ -465,7 +465,7 @@ function ProgramCreateModal({
       }
     >
       {institutions.length === 0 ? (
-        <p className="text-[13px] text-warning-700">먼저 기관을 등록해야 프로그램을 연결할 수 있습니다.</p>
+        <p className="text-[0.875rem] text-warning-700">먼저 기관을 등록해야 프로그램을 연결할 수 있습니다.</p>
       ) : (
         <div className="flex flex-col gap-4">
           <Field label="연결 기관" htmlFor="prog-inst">

@@ -513,7 +513,7 @@ function LocalPublicSurvey() {
             <p
               role="alert"
               aria-live="assertive"
-              className="mb-4 rounded-(--radius-card) border border-danger-200 bg-danger-50 px-4 py-2.5 text-[13px] font-medium text-danger-700"
+              className="mb-4 rounded-(--radius-card) border border-danger-200 bg-danger-50 px-4 py-2.5 text-[0.875rem] font-medium text-danger-700"
             >
               남은 필수 문항이 {errorIds.size}개 있습니다. 표시된 문항에 응답해 주세요.
             </p>

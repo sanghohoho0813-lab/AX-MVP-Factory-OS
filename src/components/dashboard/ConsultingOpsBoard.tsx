@@ -49,11 +49,11 @@ function OpsItemRow({ item }: { item: ConsultingOpsItem }) {
         </div>
         <div className="min-w-0">
           <p className="truncate text-[0.92rem] font-medium text-slate-700">{item.nextAction}</p>
-          <p className="mt-0.5 truncate text-[0.82rem] text-slate-400">{item.reason}</p>
+          <p className="mt-0.5 truncate text-[0.875rem] text-slate-400">{item.reason}</p>
         </div>
         <div className="flex items-center gap-2 md:justify-end">
           <StatusBadge tone={item.tone}>{item.dueLabel}</StatusBadge>
-          <span className="text-[0.82rem] font-medium text-slate-400">{item.progressLabel}</span>
+          <span className="text-[0.875rem] font-medium text-slate-400">{item.progressLabel}</span>
         </div>
       </Link>
     </li>
@@ -127,7 +127,7 @@ export function ConsultingOpsBoard({ brief }: ConsultingOpsBoardProps) {
     <section aria-labelledby="consulting-ops" className="rounded-(--radius-panel) border border-slate-200 bg-white shadow-(--shadow-card)">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
         <div>
-          <h2 id="consulting-ops" className="text-[15px] font-semibold text-slate-900">컨설팅 관제실</h2>
+          <h2 id="consulting-ops" className="text-[0.9375rem] font-semibold text-slate-900">컨설팅 관제실</h2>
           <p className="mt-1 text-[0.875rem] text-slate-500">
             고객 답변, 마감, 정책자금 준비, 월 처리량을 한 번에 점검합니다.
           </p>
@@ -135,23 +135,23 @@ export function ConsultingOpsBoard({ brief }: ConsultingOpsBoardProps) {
         <div className="flex flex-wrap items-center gap-2">
           <Link
             to="/ops/clients"
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-[0.82rem] font-semibold text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900"
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-[0.875rem] font-semibold text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900"
           >
             고객 관리 레저
             <ArrowRight aria-hidden="true" className="size-3.5" />
           </Link>
           <Link
             to="/today"
-            className="inline-flex items-center gap-1.5 rounded-md border border-brand-600 bg-brand-600 px-2.5 py-1 text-[0.82rem] font-semibold text-white transition-colors hover:bg-brand-700"
+            className="inline-flex items-center gap-1.5 rounded-md border border-brand-600 bg-brand-600 px-2.5 py-1 text-[0.875rem] font-semibold text-white transition-colors hover:bg-brand-700"
           >
             오늘 할 일 열기
             <ArrowRight aria-hidden="true" className="size-3.5" />
           </Link>
-          <div className="inline-flex items-center gap-1.5 rounded-md border border-brand-200 bg-brand-50 px-2.5 py-1 text-[0.82rem] font-semibold text-brand-700">
+          <div className="inline-flex items-center gap-1.5 rounded-md border border-brand-200 bg-brand-50 px-2.5 py-1 text-[0.875rem] font-semibold text-brand-700">
             <TrendingUp aria-hidden="true" className="size-3.5" />
             오늘 초점: {brief.focusLabel}
           </div>
-          <div className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-[0.82rem] font-medium text-slate-500">
+          <div className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-[0.875rem] font-medium text-slate-500">
             <CalendarClock aria-hidden="true" className="size-3.5" />
             프로젝트 데이터 기준
           </div>
@@ -164,7 +164,7 @@ export function ConsultingOpsBoard({ brief }: ConsultingOpsBoardProps) {
           return (
             <div key={key} className="px-5 py-4">
               <div className="flex items-center justify-between gap-3">
-                <span className="text-[0.82rem] font-medium text-slate-400">{label}</span>
+                <span className="text-[0.875rem] font-medium text-slate-400">{label}</span>
                 <Icon aria-hidden="true" className="size-4 text-slate-300" />
               </div>
               <div className="mt-2 flex items-end gap-2">
@@ -205,7 +205,7 @@ export function ConsultingOpsBoard({ brief }: ConsultingOpsBoardProps) {
                   <div className="min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <p className="truncate text-[0.9rem] font-medium text-slate-700">{stage.label}</p>
-                      <span className="text-[0.82rem] font-semibold text-slate-400">{stage.count}건</span>
+                      <span className="text-[0.875rem] font-semibold text-slate-400">{stage.count}건</span>
                     </div>
                     <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
                       <span className={`block h-full rounded-full ${TONE_BAR_CLASS[stage.tone]}`} style={{ width: `${stage.percent}%` }} />

@@ -369,7 +369,7 @@ export function QuestionFormPage() {
             </div>
           )}
           {!showOptions && !showColumns && (
-            <p className="text-[13px] text-slate-400 sm:col-span-2">
+            <p className="text-[0.875rem] text-slate-400 sm:col-span-2">
               이 유형은 선택지·컬럼 설정이 필요하지 않습니다.
             </p>
           )}
@@ -406,8 +406,8 @@ export function QuestionFormPage() {
         >
           <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-5 py-4">
             <span className="min-w-0">
-              <span className="text-[15px] font-semibold text-slate-900">고급 분석 설정</span>
-              <span className="mt-0.5 block text-[13px] break-keep text-slate-500">
+              <span className="text-[0.9375rem] font-semibold text-slate-900">고급 분석 설정</span>
+              <span className="mt-0.5 block text-[0.875rem] break-keep text-slate-500">
                 자동 점수와 분석 규칙을 수정할 때만 사용합니다.
               </span>
             </span>

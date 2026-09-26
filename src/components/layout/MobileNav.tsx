@@ -79,7 +79,7 @@ export function MobileNav({ onOpenMore }: { onOpenMore: () => void }) {
                     <span
                       data-nav-badge="requests"
                       aria-label={`새 상담신청 ${requests}건`}
-                      className="absolute -top-1 right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-danger-500 px-1 text-[0.7rem] leading-none font-bold text-white tabular-nums shadow-sm ring-2 ring-white"
+                      className="absolute -top-1 right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-danger-500 px-1 text-[0.8125rem] leading-none font-bold text-white tabular-nums shadow-sm ring-2 ring-white"
                     >
                       {requests > 99 ? '99+' : requests}
                     </span>
@@ -95,7 +95,7 @@ export function MobileNav({ onOpenMore }: { onOpenMore: () => void }) {
                   </span>
                   {/* D-108 · D-114: 계약 고객 수 — 아주 작게, 튀지 않는 색 (0 도 보인다) */}
                   {clients !== null && (
-                    <span data-nav-badge="clients" aria-label={`계약 고객 ${clients}곳`} className="text-[0.62rem] leading-none font-medium text-slate-400 tabular-nums">
+                    <span data-nav-badge="clients" aria-label={`계약 고객 ${clients}곳`} className="text-[0.8125rem] leading-none font-medium text-slate-400 tabular-nums">
                       {clients > 999 ? '999+' : clients}
                     </span>
                   )}

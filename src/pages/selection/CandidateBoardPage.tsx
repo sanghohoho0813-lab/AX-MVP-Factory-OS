@@ -202,7 +202,7 @@ export function CandidateBoardPage() {
               <li key={c.id} className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-5">
                 <div className="flex items-start justify-between gap-2">
                   <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-[0.85rem] font-bold text-brand-700">추천 {i + 1}</span>
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.8rem] font-medium text-slate-500">추천도 {Math.round(c.priorityScore)}</span>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.875rem] font-medium text-slate-500">추천도 {Math.round(c.priorityScore)}</span>
                 </div>
                 <p className="text-[1.15rem] font-bold break-keep text-slate-900">{c.name}</p>
                 <dl className="flex flex-col gap-2 text-[0.92rem]">
@@ -248,7 +248,7 @@ export function CandidateBoardPage() {
           <button
             type="button"
             onClick={() => setView('board')}
-            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-medium ${view === 'board' ? 'bg-slate-100 text-slate-800' : 'text-slate-500'}`}
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[0.875rem] font-medium ${view === 'board' ? 'bg-slate-100 text-slate-800' : 'text-slate-500'}`}
           >
             <LayoutGrid aria-hidden="true" className="size-4" />
             보드
@@ -256,7 +256,7 @@ export function CandidateBoardPage() {
           <button
             type="button"
             onClick={() => setView('table')}
-            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-medium ${view === 'table' ? 'bg-slate-100 text-slate-800' : 'text-slate-500'}`}
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[0.875rem] font-medium ${view === 'table' ? 'bg-slate-100 text-slate-800' : 'text-slate-500'}`}
           >
             <Table2 aria-hidden="true" className="size-4" />
             표
@@ -327,7 +327,7 @@ export function CandidateBoardPage() {
         </div>
       ) : filtered.length === 0 ? (
         <Panel title="후보">
-          <p className="text-[13px] text-slate-500">조건에 맞는 후보가 없습니다.</p>
+          <p className="text-[0.875rem] text-slate-500">조건에 맞는 후보가 없습니다.</p>
         </Panel>
       ) : view === 'board' ? (
         <>

@@ -108,7 +108,7 @@ export function ModulesPage() {
       header: '관련 키',
       className: 'hidden xl:table-cell',
       cell: (m) => (
-        <span className="text-[13px] text-slate-600">
+        <span className="text-[0.875rem] text-slate-600">
           {m.keys
             .map((k) => (m.kind === 'industry' ? industryKeyLabel(k) : objectiveKeyLabel(k)))
             .join(', ')}
@@ -131,13 +131,13 @@ export function ModulesPage() {
       key: 'count',
       header: '질문 수',
       className: 'text-center',
-      cell: (m) => <span className="text-[13px] text-slate-600">{m.questionIds.length}</span>,
+      cell: (m) => <span className="text-[0.875rem] text-slate-600">{m.questionIds.length}</span>,
     },
     {
       key: 'version',
       header: '버전',
       className: 'hidden 2xl:table-cell text-center',
-      cell: (m) => <span className="text-[13px] text-slate-500">v{m.version}</span>,
+      cell: (m) => <span className="text-[0.875rem] text-slate-500">v{m.version}</span>,
     },
     { key: 'status', header: '상태', cell: (m) => <ModuleStatusBadge status={m.status} /> },
     {
@@ -145,7 +145,7 @@ export function ModulesPage() {
       header: '최근 수정',
       className: 'hidden lg:table-cell',
       cell: (m) => (
-        <span className="text-[13px] whitespace-nowrap text-slate-500">
+        <span className="text-[0.875rem] whitespace-nowrap text-slate-500">
           {formatDate(m.updatedAt)}
         </span>
       ),

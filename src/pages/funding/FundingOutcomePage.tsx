@@ -35,7 +35,7 @@ import {
 import { FundingStrategyFrame } from './fundingShared'
 
 const inputClass = 'w-full rounded-(--radius-control) border border-slate-200 px-3 py-2 text-sm'
-const labelClass = 'text-[13px] font-medium text-slate-600'
+const labelClass = 'text-[0.875rem] font-medium text-slate-600'
 
 function displayValue(value: string): string {
   return value.trim() === '' ? '미입력' : value
@@ -314,7 +314,7 @@ function OutcomeContent({ strategy }: { strategy: FundingStrategy }) {
                         {appById.get(outcome.applicationId)?.applicationName ?? '연결된 신청 없음'}
                       </span>
                     </div>
-                    <p className="text-[13px] break-keep text-slate-600">{displayValue(outcome.summary)}</p>
+                    <p className="text-[0.875rem] break-keep text-slate-600">{displayValue(outcome.summary)}</p>
                   </div>
                   {!readOnly && (
                     <div className="flex shrink-0 items-center gap-1">
@@ -368,7 +368,7 @@ function OutcomeContent({ strategy }: { strategy: FundingStrategy }) {
         flush
       >
         <div className="px-5 pt-4">
-          <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-3 py-2 text-[13px] break-keep text-slate-500">
+          <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-3 py-2 text-[0.875rem] break-keep text-slate-500">
             근거 없는 전후 수치를 만들지 않으며 실제값·검증 여부를 표시합니다. 값이 없으면 &lsquo;미입력&rsquo;으로 둡니다.
           </p>
         </div>
@@ -566,7 +566,7 @@ function OutcomeContent({ strategy }: { strategy: FundingStrategy }) {
               <Labeled label="측정 방법">
                 <input className={inputClass} value={metricForm.measurementMethod} onChange={(e) => setMetricForm((f) => ({ ...f, measurementMethod: e.target.value }))} />
               </Labeled>
-              <label className="flex items-center gap-2 text-[13px] text-slate-600">
+              <label className="flex items-center gap-2 text-[0.875rem] text-slate-600">
                 <input type="checkbox" checked={metricForm.sensitive} onChange={(e) => setMetricForm((f) => ({ ...f, sensitive: e.target.checked }))} />
                 민감정보 (고객용 자료에서 가림)
               </label>
@@ -628,14 +628,14 @@ function InternalPerformanceSection({ strategy, readOnly }: { strategy: FundingS
   return (
     <details className="group rounded-(--radius-panel) border border-slate-200 bg-white shadow-(--shadow-card)">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-5 py-4">
-        <span className="flex items-center gap-2 text-[15px] font-semibold text-slate-900">
+        <span className="flex items-center gap-2 text-[0.9375rem] font-semibold text-slate-900">
           <ShieldAlert aria-hidden="true" className="size-4 text-warning-500" />
           내부 성과 (민감정보 · 기본 접힘)
         </span>
         <ChevronDown aria-hidden="true" className="size-4 text-slate-400 transition-transform group-open:rotate-180" />
       </summary>
       <div className="border-t border-slate-100 px-5 py-5">
-        <p className="mb-4 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-3 py-2 text-[13px] break-keep text-warning-700">
+        <p className="mb-4 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-3 py-2 text-[0.875rem] break-keep text-warning-700">
           금액(외부 투입비·수임료 등)은 민감정보이며 고객용 자료에서 자동으로 가려집니다. 메인 화면에서는 강조하지 않습니다.
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -674,7 +674,7 @@ function AmountField({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col">
       <dt className="text-[0.875rem] text-slate-400">{label}</dt>
-      <dd className={`text-[13px] ${empty ? 'text-slate-400' : 'font-medium text-slate-700'}`}>{empty ? '미입력' : value}</dd>
+      <dd className={`text-[0.875rem] ${empty ? 'text-slate-400' : 'font-medium text-slate-700'}`}>{empty ? '미입력' : value}</dd>
     </div>
   )
 }
@@ -685,7 +685,7 @@ function ListBlock({ title, items }: { title: string; items: string[] }) {
       <p className="text-[0.875rem] font-semibold text-slate-500">{title}</p>
       <ul className="mt-1 flex flex-col gap-0.5">
         {items.map((item, idx) => (
-          <li key={idx} className="text-[13px] break-keep text-slate-600">· {item}</li>
+          <li key={idx} className="text-[0.875rem] break-keep text-slate-600">· {item}</li>
         ))}
       </ul>
     </div>
@@ -696,7 +696,7 @@ function TextBlock({ title, value }: { title: string; value: string }) {
   return (
     <div className="rounded-(--radius-card) border border-slate-100 bg-slate-50/60 px-3 py-2">
       <p className="text-[0.875rem] font-semibold text-slate-500">{title}</p>
-      <p className="mt-0.5 text-[13px] break-keep text-slate-600">{value}</p>
+      <p className="mt-0.5 text-[0.875rem] break-keep text-slate-600">{value}</p>
     </div>
   )
 }

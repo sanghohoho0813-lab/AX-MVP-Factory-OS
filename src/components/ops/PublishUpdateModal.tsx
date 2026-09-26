@@ -104,10 +104,10 @@ export function PublishUpdateModal({
 
       {preview ? (
         <div className="mt-4 rounded-(--radius-panel) border border-slate-200 bg-slate-50 p-4">
-          <p className="text-[0.8rem] font-semibold tracking-wide text-slate-400 uppercase">고객에게 이렇게 보입니다</p>
+          <p className="text-[0.875rem] font-semibold tracking-wide text-slate-400 uppercase">고객에게 이렇게 보입니다</p>
           <p className="mt-2 text-[0.85rem] text-slate-500">{projectName} · {stage ? CUSTOMER_STAGE_LABEL[stage] : CUSTOMER_STAGE_LABEL[link.customerStage]}</p>
           <div className="mt-2 rounded-(--radius-card) border border-slate-200 bg-white p-4">
-            <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[0.8rem] font-semibold text-brand-700">{UPDATE_CATEGORY_LABEL[category]}</span>
+            <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[0.875rem] font-semibold text-brand-700">{UPDATE_CATEGORY_LABEL[category]}</span>
             <h3 className="mt-2 text-[1.05rem] font-bold text-slate-900">{title || '(제목)'}</h3>
             <p className="mt-1 text-[0.95rem] break-keep whitespace-pre-wrap text-slate-700">{body || '(내용 없음)'}</p>
             {actionRequired && (

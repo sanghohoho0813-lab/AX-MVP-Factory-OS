@@ -68,7 +68,7 @@ export function SelectionNav({ projectId }: { projectId: string }) {
           to={tab.to}
           end={tab.end}
           className={({ isActive }) =>
-            `-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors ${
+            `-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[0.875rem] font-medium transition-colors ${
               isActive ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`
           }
@@ -107,7 +107,7 @@ export function SelectionGateNotice({
           <Filter aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-slate-400" />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-slate-800">홈페이지 단독 프로젝트입니다</p>
-            <p className="mt-1 text-[13px] break-keep text-slate-600">
+            <p className="mt-1 text-[0.875rem] break-keep text-slate-600">
               홈페이지 제작 프로젝트에는 AX 자동화 과제선별을 적용하지 않습니다. 홈페이지 제작 방향은
               웹사이트 스튜디오에서 설계합니다.
               {readiness ? ` 현재 제작 준비도는 ${readiness.overallScore}점입니다.` : ''}
@@ -128,7 +128,7 @@ export function SelectionGateNotice({
         <ClipboardCheck aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-slate-400" />
         <div className="min-w-0">
           <p className="text-sm font-semibold text-slate-800">먼저 진단 결과가 필요합니다</p>
-          <p className="mt-1 text-[13px] break-keep text-slate-600">
+          <p className="mt-1 text-[0.875rem] break-keep text-slate-600">
             과제선별은 확정된 진단 결과를 기준으로 실행됩니다. 진단 분석을 실행·확정한 뒤 다시 시도하세요.
           </p>
           <div className="mt-3">
@@ -151,7 +151,7 @@ export function ReselectionBanner({ show, onRun }: { show: boolean; onRun: () =>
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3">
       <RefreshCw aria-hidden="true" className="size-4 shrink-0 text-warning-600" />
-      <p className="min-w-0 flex-1 text-[13px] break-keep text-warning-800">
+      <p className="min-w-0 flex-1 text-[0.875rem] break-keep text-warning-800">
         새로운 진단 결과 또는 후보 변경이 있어 재선별이 필요합니다.
       </p>
       <Button variant="secondary" size="sm" onClick={onRun}>

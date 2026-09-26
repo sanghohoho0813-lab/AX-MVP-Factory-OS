@@ -40,7 +40,7 @@ function Field({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-[13px] font-medium text-slate-700">
+      <label htmlFor={id} className="mb-1 block text-[0.875rem] font-medium text-slate-700">
         {label}
         {required && <span className="ml-0.5 text-danger-500">*</span>}
       </label>
@@ -96,7 +96,7 @@ export function SurveyStartScreen({
           <div className="flex items-center gap-2">
             <ListChecks aria-hidden="true" className="size-4 text-slate-400" />
             <div>
-              <dt className="text-[0.8125rem] text-slate-400">전체 섹션</dt>
+              <dt className="text-[0.875rem] text-slate-400">전체 섹션</dt>
               <dd className="text-sm font-semibold text-slate-700">
                 {view.totalSections}개
               </dd>
@@ -105,14 +105,14 @@ export function SurveyStartScreen({
           <div className="flex items-center gap-2">
             <Clock aria-hidden="true" className="size-4 text-slate-400" />
             <div>
-              <dt className="text-[0.8125rem] text-slate-400">예상 시간</dt>
+              <dt className="text-[0.875rem] text-slate-400">예상 시간</dt>
               <dd className="text-sm font-semibold text-slate-700">약 {estimatedMinutes}분</dd>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <FileText aria-hidden="true" className="size-4 text-slate-400" />
             <div>
-              <dt className="text-[0.8125rem] text-slate-400">응답 역할</dt>
+              <dt className="text-[0.875rem] text-slate-400">응답 역할</dt>
               <dd className="text-sm font-semibold text-slate-700">
                 {RESPONDENT_ROLE_META[view.respondentRole].label}
               </dd>
@@ -121,7 +121,7 @@ export function SurveyStartScreen({
           <div className="flex items-center gap-2">
             <Clock aria-hidden="true" className="size-4 text-slate-400" />
             <div>
-              <dt className="text-[0.8125rem] text-slate-400">응답 만료</dt>
+              <dt className="text-[0.875rem] text-slate-400">응답 만료</dt>
               <dd className="text-sm font-semibold text-slate-700">
                 {view.expiresAt ? formatDate(view.expiresAt) : '없음'}
               </dd>
@@ -138,7 +138,7 @@ export function SurveyStartScreen({
       {hasDraft && (
         <section className="rounded-(--radius-panel) border border-brand-200 bg-brand-50 px-5 py-4">
           <p className="text-sm font-medium text-brand-800">작성 중인 응답이 있습니다</p>
-          <p className="mt-0.5 text-[13px] text-brand-700">
+          <p className="mt-0.5 text-[0.875rem] text-brand-700">
             현재 진행률 {draftProgress}%
             {draftLastSaved ? ` · 마지막 저장 ${formatDate(draftLastSaved)}` : ''}
           </p>
@@ -147,7 +147,7 @@ export function SurveyStartScreen({
 
       {/* 응답자 정보 */}
       <section className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-5 shadow-(--shadow-card)">
-        <h2 className="text-[15px] font-semibold text-slate-900">응답자 정보</h2>
+        <h2 className="text-[0.9375rem] font-semibold text-slate-900">응답자 정보</h2>
         <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field
             id="resp-name"
@@ -188,11 +188,11 @@ export function SurveyStartScreen({
 
       {/* 개인정보 동의 */}
       <section className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-5 shadow-(--shadow-card)">
-        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-slate-900">
+        <h2 className="flex items-center gap-2 text-[0.9375rem] font-semibold text-slate-900">
           <ShieldCheck aria-hidden="true" className="size-4 text-slate-400" />
           개인정보 수집 안내
         </h2>
-        <p className="mt-2 text-[13px] break-keep whitespace-pre-wrap text-slate-600">
+        <p className="mt-2 text-[0.875rem] break-keep whitespace-pre-wrap text-slate-600">
           {customerPrivacyText(view.privacyNotice)}
         </p>
         {/* D-101: 우리끼리 하는 말 — 로컬 시험 모드에서만. 클라우드(실제 고객)에는 보이지 않는다 */}
@@ -209,7 +209,7 @@ export function SurveyStartScreen({
               onChange={(e) => onConsentChange(e.target.checked)}
               className="mt-0.5 size-4 accent-brand-600"
             />
-            <span className="text-[13px] break-keep text-slate-700">
+            <span className="text-[0.875rem] break-keep text-slate-700">
               개인정보 수집·이용에 동의합니다. (필수)
             </span>
           </label>

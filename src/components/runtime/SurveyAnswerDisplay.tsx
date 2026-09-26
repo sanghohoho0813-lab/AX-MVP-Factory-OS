@@ -29,12 +29,12 @@ export function FileMetadataDisplay({ file }: { file: SurveyFileMetadata }) {
     <div className="flex items-center gap-2.5 rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2">
       <FileText aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
       <div className="min-w-0">
-        <p className="truncate text-[13px] font-medium text-slate-700">{file.name}</p>
+        <p className="truncate text-[0.875rem] font-medium text-slate-700">{file.name}</p>
         <p className="text-[0.875rem] text-slate-400">
           {sizeLabel} · {file.type || '형식 미상'}
         </p>
       </div>
-      <span className="ml-auto shrink-0 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-warning-700">
+      <span className="ml-auto shrink-0 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
         실제 파일 미보관
       </span>
     </div>
@@ -49,7 +49,7 @@ interface SurveyAnswerDisplayProps {
 /** 질문 유형별 응답 값을 사람이 읽기 쉬운 형태로 표시 */
 export function SurveyAnswerDisplay({ placement, value }: SurveyAnswerDisplayProps) {
   if (value === undefined || value === null || value === '') {
-    return <span className="text-[13px] text-slate-400">미응답</span>
+    return <span className="text-[0.875rem] text-slate-400">미응답</span>
   }
 
   switch (placement.type) {
@@ -64,7 +64,7 @@ export function SurveyAnswerDisplay({ placement, value }: SurveyAnswerDisplayPro
     case 'multiple_choice':
       if (Array.isArray(value)) {
         if (value.length === 0)
-          return <span className="text-[13px] text-slate-400">미응답</span>
+          return <span className="text-[0.875rem] text-slate-400">미응답</span>
         return (
           <div className="flex flex-wrap gap-1.5">
             {(value as string[]).map((v) => (
@@ -114,7 +114,7 @@ export function SurveyAnswerDisplay({ placement, value }: SurveyAnswerDisplayPro
           (a, b) => a.orderIndex - b.orderIndex,
         )
         if (rows.length === 0)
-          return <span className="text-[13px] text-slate-400">미응답</span>
+          return <span className="text-[0.875rem] text-slate-400">미응답</span>
         return (
           <div className="overflow-x-auto rounded-(--radius-control) border border-slate-200">
             <table className="w-full min-w-[360px] text-sm">
@@ -150,7 +150,7 @@ export function SurveyAnswerDisplay({ placement, value }: SurveyAnswerDisplayPro
       return null
     case 'file':
       if (isFileMeta(value)) return <FileMetadataDisplay file={value} />
-      return <span className="text-[13px] text-slate-400">미응답</span>
+      return <span className="text-[0.875rem] text-slate-400">미응답</span>
     case 'long_text':
       return (
         <p className="text-sm break-keep whitespace-pre-wrap text-slate-800">

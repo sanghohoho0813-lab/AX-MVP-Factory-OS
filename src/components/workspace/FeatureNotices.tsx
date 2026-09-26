@@ -43,7 +43,7 @@ function NoticeFrame({
           <Icon aria-hidden="true" className="size-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[0.82rem] font-semibold tracking-wide text-slate-500">{badge}</p>
+          <p className="text-[0.875rem] font-semibold tracking-wide text-slate-500">{badge}</p>
           <h2 className="mt-0.5 text-[1.15rem] font-bold break-keep text-slate-900">{title}</h2>
           <p className="mt-1.5 text-[0.95rem] leading-relaxed break-keep text-slate-600">{description}</p>
           {bullets && bullets.length > 0 && (

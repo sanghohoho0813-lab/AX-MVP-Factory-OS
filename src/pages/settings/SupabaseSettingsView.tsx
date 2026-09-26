@@ -49,7 +49,7 @@ function DataPanelSupabase() {
       </Panel>
 
       <Panel title="로컬 원본 정리">
-        <p className="text-[13px] break-keep text-slate-500">
+        <p className="text-[0.875rem] break-keep text-slate-500">
           클라우드로 가져오기를 마친 뒤, 이 브라우저에 남은 로컬 원본을 정리할 수 있습니다. 정리 전 자동으로 JSON 백업을 내려받습니다.
         </p>
         <Button variant="secondary" className="mt-4" onClick={() => setConfirmClear(true)}>

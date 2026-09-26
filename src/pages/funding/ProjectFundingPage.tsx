@@ -190,13 +190,13 @@ function StrategyOverview({ strategy, projectId, objectiveFallback }: { strategy
         <Panel title="현재 근거·부족조건">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="rounded-(--radius-card) border border-slate-200 px-4 py-3">
-              <p className="text-[0.82rem] font-semibold text-slate-500">현재 근거</p>
+              <p className="text-[0.875rem] font-semibold text-slate-500">현재 근거</p>
               <p className="mt-1 text-[0.9rem] break-keep text-slate-700">
                 {summary.evidenceCount > 0 ? `근거 ${summary.evidenceCount}건 중 ${summary.verifiedEvidenceCount}건 확인됨 (기초 근거 있음)` : '연결할 근거가 아직 없습니다. 근거 확인이 필요합니다.'}
               </p>
             </div>
             <div className="rounded-(--radius-card) border border-slate-200 px-4 py-3">
-              <p className="text-[0.82rem] font-semibold text-slate-500">부족조건</p>
+              <p className="text-[0.875rem] font-semibold text-slate-500">부족조건</p>
               <p className="mt-1 text-[0.9rem] break-keep text-slate-700">
                 {openGaps.length > 0 ? `미해결 ${openGaps.length}건 — 자료 보강 필요` : '미해결 부족조건이 없습니다.'}
               </p>
@@ -259,7 +259,7 @@ function StrategyOverview({ strategy, projectId, objectiveFallback }: { strategy
           </button>
           {showExpert && (
             <div className="flex flex-col gap-5 border-t border-slate-100 px-5 py-5">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.82rem] text-slate-400">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.875rem] text-slate-400">
                 <span>전략 v{strategy.version}</span>
                 <span>규칙 {strategy.ruleVersion || '-'}</span>
                 {readOnly && (
@@ -281,7 +281,7 @@ function StrategyOverview({ strategy, projectId, objectiveFallback }: { strategy
                     ['결과 기록', `${summary.outcomeCount}`],
                   ].map(([label, value]) => (
                     <div key={label}>
-                      <dt className="text-[0.82rem] text-slate-400">{label}</dt>
+                      <dt className="text-[0.875rem] text-slate-400">{label}</dt>
                       <dd className="text-[1.15rem] font-bold text-slate-800">{value}</dd>
                     </div>
                   ))}
@@ -294,7 +294,7 @@ function StrategyOverview({ strategy, projectId, objectiveFallback }: { strategy
                     {strategy.matches.slice(0, 8).map((m) => (
                       <li key={m.id} className="flex items-center justify-between gap-2 text-[0.9rem]">
                         <span className="min-w-0 truncate text-slate-600">{institutionName(m.institutionId)}</span>
-                        <span className="shrink-0 text-[0.82rem] font-medium text-slate-500">{MATCH_CONFIDENCE_META[m.confidence].label}</span>
+                        <span className="shrink-0 text-[0.875rem] font-medium text-slate-500">{MATCH_CONFIDENCE_META[m.confidence].label}</span>
                       </li>
                     ))}
                   </ul>
@@ -332,7 +332,7 @@ function InstitutionCard({ match }: { match: FundingMatch }) {
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
         <Building2 aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
         <p className="text-[1.05rem] font-semibold break-keep text-slate-900">{name}</p>
-        <span className="text-[0.82rem] break-keep text-slate-400">{programName(match.programId)}</span>
+        <span className="text-[0.875rem] break-keep text-slate-400">{programName(match.programId)}</span>
       </div>
       <dl className="mt-2.5 flex flex-col gap-2">
         <CardRow label="왜 검토" value={match.reasonSummary || '검토 사유 확인 필요'} />
@@ -366,7 +366,7 @@ function ApplicationCard({ strategy, app }: { strategy: FundingStrategy; app: Fu
 function CardRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
-      <dt className="shrink-0 text-[0.82rem] font-semibold text-slate-500 sm:w-24">{label}</dt>
+      <dt className="shrink-0 text-[0.875rem] font-semibold text-slate-500 sm:w-24">{label}</dt>
       <dd className="min-w-0 text-[0.9rem] break-keep text-slate-700">{value}</dd>
     </div>
   )
@@ -440,7 +440,7 @@ function StartFunding({ projectId, eligibility, objective }: { projectId: string
                   <CircleDashed aria-hidden="true" className="size-4 shrink-0 text-slate-300" />
                 )}
                 <span className="min-w-0 flex-1 truncate text-[0.9rem] font-medium text-slate-700">{row.label}</span>
-                <span className={`shrink-0 text-[0.82rem] font-medium ${row.ready ? 'text-success-600' : 'text-slate-400'}`}>
+                <span className={`shrink-0 text-[0.875rem] font-medium ${row.ready ? 'text-success-600' : 'text-slate-400'}`}>
                   {row.ready ? '사용 가능' : '선행 필요'}
                 </span>
               </li>

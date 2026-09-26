@@ -31,7 +31,7 @@ export function FieldWrapper({
 }: FieldWrapperProps) {
   return (
     <div className={fullWidth ? 'sm:col-span-2' : ''}>
-      <label htmlFor={id} className="mb-1.5 block text-[13px] font-medium text-slate-700">
+      <label htmlFor={id} className="mb-1.5 block text-[0.875rem] font-medium text-slate-700">
         {label}
         {required && (
           <span aria-hidden="true" className="ml-0.5 text-danger-500">
@@ -233,7 +233,7 @@ export function RadioGroupField({
 }: RadioGroupFieldProps) {
   return (
     <fieldset className={fullWidth ? 'sm:col-span-2' : ''}>
-      <legend className="mb-1.5 block text-[13px] font-medium text-slate-700">
+      <legend className="mb-1.5 block text-[0.875rem] font-medium text-slate-700">
         {label}
         {required && (
           <span aria-hidden="true" className="ml-0.5 text-danger-500">
@@ -296,7 +296,7 @@ export function CheckboxGroupField({
 }: CheckboxGroupFieldProps) {
   return (
     <fieldset className={fullWidth ? 'sm:col-span-2' : ''}>
-      <legend className="mb-1.5 block text-[13px] font-medium text-slate-700">
+      <legend className="mb-1.5 block text-[0.875rem] font-medium text-slate-700">
         {label}
       </legend>
       <div className="flex flex-wrap gap-2">
@@ -305,7 +305,7 @@ export function CheckboxGroupField({
           return (
             <label
               key={option}
-              className={`flex min-h-9 cursor-pointer items-center gap-2 rounded-(--radius-control) border px-3 py-1.5 text-[13px] font-medium transition-colors ${
+              className={`flex min-h-9 cursor-pointer items-center gap-2 rounded-(--radius-control) border px-3 py-1.5 text-[0.875rem] font-medium transition-colors ${
                 checked
                   ? 'border-brand-600 bg-brand-50 text-brand-700'
                   : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'

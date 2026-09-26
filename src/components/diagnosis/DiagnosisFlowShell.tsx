@@ -47,7 +47,7 @@ export function DiagnosisStepNav({ current, projectId }: { current: DiagnosisSte
                   state === 'current' ? 'bg-brand-50 text-brand-800' : state === 'done' ? 'text-slate-600 hover:bg-slate-50' : 'text-slate-400 hover:bg-slate-50'
                 }`}
               >
-                <span className={`flex size-6 shrink-0 items-center justify-center rounded-full border text-[0.78rem] font-bold ${
+                <span className={`flex size-6 shrink-0 items-center justify-center rounded-full border text-[0.8125rem] font-bold ${
                   state === 'done' ? 'border-success-500 bg-success-500 text-white' : state === 'current' ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 text-slate-400'
                 }`}>
                   {state === 'done' ? <Check aria-hidden="true" className="size-3.5" /> : i + 1}

@@ -23,7 +23,7 @@ export function BrandLogo({
       <span className={`inline-flex items-center gap-2 ${className}`}>
         <span
           aria-hidden="true"
-          className={`grid size-8 shrink-0 place-items-center rounded-lg text-[0.8rem] font-black ${
+          className={`grid size-8 shrink-0 place-items-center rounded-lg text-[0.875rem] font-black ${
             tone === 'dark' ? 'bg-white/10 text-white' : 'bg-navy-900 text-white'
           }`}
         >
@@ -58,7 +58,7 @@ export function ProductWordmark({ tone = 'light', className = '' }: { tone?: 'li
       <span className={`block text-[0.95rem] font-bold ${tone === 'dark' ? 'text-white' : 'text-slate-900'}`}>
         {brand.productName}
       </span>
-      <span className={`block text-[0.72rem] font-medium tracking-wide ${tone === 'dark' ? 'text-navy-300' : 'text-slate-500'}`}>
+      <span className={`block text-[0.8125rem] font-medium tracking-wide ${tone === 'dark' ? 'text-navy-300' : 'text-slate-500'}`}>
         {brand.productSubtitle}
       </span>
     </span>

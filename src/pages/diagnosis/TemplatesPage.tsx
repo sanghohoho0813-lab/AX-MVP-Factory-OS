@@ -51,7 +51,7 @@ function QualityDot({ template }: { template: SurveyTemplate }) {
     error: { icon: XCircle, className: 'text-danger-500', label: '오류' },
   }[verdict]
   return (
-    <span className="inline-flex items-center gap-1 text-[13px] text-slate-600" title={`품질 ${meta.label}`}>
+    <span className="inline-flex items-center gap-1 text-[0.875rem] text-slate-600" title={`품질 ${meta.label}`}>
       <meta.icon aria-hidden="true" className={`size-4 ${meta.className}`} />
       {meta.label}
     </span>
@@ -209,19 +209,19 @@ export function TemplatesPage() {
       key: 'sections',
       header: '섹션',
       className: 'hidden xl:table-cell text-center',
-      cell: (t) => <span className="text-[13px] text-slate-600">{t.sections.length}</span>,
+      cell: (t) => <span className="text-[0.875rem] text-slate-600">{t.sections.length}</span>,
     },
     {
       key: 'questions',
       header: '문항',
       className: 'text-center',
-      cell: (t) => <span className="text-[13px] text-slate-600">{questionCount(t)}</span>,
+      cell: (t) => <span className="text-[0.875rem] text-slate-600">{questionCount(t)}</span>,
     },
     {
       key: 'minutes',
       header: '예상시간',
       className: 'hidden lg:table-cell',
-      cell: (t) => <span className="text-[13px] text-slate-600">약 {t.estimatedMinutes}분</span>,
+      cell: (t) => <span className="text-[0.875rem] text-slate-600">약 {t.estimatedMinutes}분</span>,
     },
     {
       key: 'quality',
@@ -244,7 +244,7 @@ export function TemplatesPage() {
       header: '최근 수정',
       className: 'hidden 2xl:table-cell',
       cell: (t) => (
-        <span className="text-[13px] whitespace-nowrap text-slate-500">
+        <span className="text-[0.875rem] whitespace-nowrap text-slate-500">
           {formatDate(t.updatedAt)}
         </span>
       ),

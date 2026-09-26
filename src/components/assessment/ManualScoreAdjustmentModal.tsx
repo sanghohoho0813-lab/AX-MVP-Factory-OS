@@ -62,7 +62,7 @@ export function ManualScoreAdjustmentModal({
       }
     >
       <div className="flex flex-col gap-4">
-        <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] break-keep text-slate-600">
+        <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2 text-[0.875rem] break-keep text-slate-600">
           자동 계산 점수는 <strong>{domainScore.rawScore}점</strong>입니다. 담당자 판단으로
           보정하면 자동 계산값과 보정 사유가 함께 보존됩니다.
         </p>
@@ -106,7 +106,7 @@ export function ManualScoreAdjustmentModal({
           />
         </div>
         {error && (
-          <p role="alert" className="text-[13px] text-danger-600">
+          <p role="alert" className="text-[0.875rem] text-danger-600">
             {error}
           </p>
         )}

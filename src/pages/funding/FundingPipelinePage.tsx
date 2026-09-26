@@ -38,7 +38,7 @@ function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col">
       <dt className="text-[0.875rem] text-slate-400">{label}</dt>
-      <dd className="text-[13px] break-keep text-slate-700">{value || '—'}</dd>
+      <dd className="text-[0.875rem] break-keep text-slate-700">{value || '—'}</dd>
     </div>
   )
 }
@@ -60,7 +60,7 @@ function StageOverview({ counts }: { counts: Record<ApplicationStage, number> })
                 count > 0 ? 'border-brand-200 bg-brand-50/50' : 'border-slate-200 bg-slate-50/40'
               }`}
             >
-              <span className="text-[13px] font-medium break-keep text-slate-700">
+              <span className="text-[0.875rem] font-medium break-keep text-slate-700">
                 {APPLICATION_STAGE_META[stage].label}
               </span>
               <span
@@ -136,7 +136,7 @@ function AddAppModal({
     >
       <div className="flex flex-col gap-4">
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-slate-700">대상 후보</span>
+          <span className="text-[0.875rem] font-semibold text-slate-700">대상 후보</span>
           <select
             className={INPUT_CLASS}
             value={draft.matchId}
@@ -160,7 +160,7 @@ function AddAppModal({
           )}
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-slate-700">신청명</span>
+          <span className="text-[0.875rem] font-semibold text-slate-700">신청명</span>
           <input
             className={INPUT_CLASS}
             value={draft.applicationName}
@@ -169,7 +169,7 @@ function AddAppModal({
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-slate-700">접수번호·참조(선택)</span>
+          <span className="text-[0.875rem] font-semibold text-slate-700">접수번호·참조(선택)</span>
           <input
             className={INPUT_CLASS}
             value={draft.applicationReference}
@@ -179,7 +179,7 @@ function AddAppModal({
         </label>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-semibold text-slate-700">신청 금액(선택)</span>
+            <span className="text-[0.875rem] font-semibold text-slate-700">신청 금액(선택)</span>
             <input
               className={INPUT_CLASS}
               value={draft.requestedAmount}
@@ -189,7 +189,7 @@ function AddAppModal({
             <span className="text-[0.875rem] text-slate-400">금액을 임의로 생성하지 않습니다. 실제 값만 입력하세요.</span>
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-semibold text-slate-700">통화</span>
+            <span className="text-[0.875rem] font-semibold text-slate-700">통화</span>
             <input
               className={INPUT_CLASS}
               value={draft.currency}
@@ -253,10 +253,10 @@ function EditAppModal({
       }
     >
       <div className="flex flex-col gap-4">
-        <p className="text-[13px] font-semibold text-slate-700">{app.applicationName}</p>
+        <p className="text-[0.875rem] font-semibold text-slate-700">{app.applicationName}</p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-semibold text-slate-700">신청 금액</span>
+            <span className="text-[0.875rem] font-semibold text-slate-700">신청 금액</span>
             <input
               className={INPUT_CLASS}
               value={draft.requestedAmount}
@@ -265,7 +265,7 @@ function EditAppModal({
             />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-semibold text-slate-700">승인 금액</span>
+            <span className="text-[0.875rem] font-semibold text-slate-700">승인 금액</span>
             <input
               className={INPUT_CLASS}
               value={draft.approvedAmount}
@@ -278,7 +278,7 @@ function EditAppModal({
           금액은 사용자가 입력한 값만 저장하며, 예상 금액을 자동으로 만들지 않습니다.
         </span>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-slate-700">다음 조치</span>
+          <span className="text-[0.875rem] font-semibold text-slate-700">다음 조치</span>
           <input
             className={INPUT_CLASS}
             value={draft.nextAction}
@@ -287,7 +287,7 @@ function EditAppModal({
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-slate-700">보완 요청 사항 (한 줄에 하나)</span>
+          <span className="text-[0.875rem] font-semibold text-slate-700">보완 요청 사항 (한 줄에 하나)</span>
           <textarea
             className={INPUT_CLASS}
             rows={3}
@@ -331,13 +331,13 @@ function ApplicationCard({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-[15px] font-semibold break-keep text-slate-900">
+            <h3 className="text-[0.9375rem] font-semibold break-keep text-slate-900">
               {match ? institutionName(match.institutionId) : '후보 미지정'}
             </h3>
             <ApplicationStageBadge stage={app.applicationStage} />
           </div>
-          {program && <p className="mt-0.5 text-[13px] text-slate-500">{program}</p>}
-          <p className="mt-0.5 text-[13px] font-medium break-keep text-slate-700">{app.applicationName}</p>
+          {program && <p className="mt-0.5 text-[0.875rem] text-slate-500">{program}</p>}
+          <p className="mt-0.5 text-[0.875rem] font-medium break-keep text-slate-700">{app.applicationName}</p>
         </div>
         {!readOnly && (
           <Button variant="secondary" size="sm" onClick={() => onEdit(app)}>
@@ -360,10 +360,10 @@ function ApplicationCard({
 
       {supplementActive && app.supplementRequests.length > 0 && (
         <div className="mt-3 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 p-3">
-          <p className="text-[13px] font-semibold text-warning-800">보완 요청 사항</p>
+          <p className="text-[0.875rem] font-semibold text-warning-800">보완 요청 사항</p>
           <ul className="mt-1 flex flex-col gap-1">
             {app.supplementRequests.map((r, i) => (
-              <li key={i} className="flex items-start gap-2 text-[13px] break-keep text-warning-800">
+              <li key={i} className="flex items-start gap-2 text-[0.875rem] break-keep text-warning-800">
                 <span aria-hidden="true" className="mt-1.5 size-1.5 shrink-0 rounded-full bg-warning-400" />
                 <span className="min-w-0 whitespace-pre-wrap">{r}</span>
               </li>
@@ -373,7 +373,7 @@ function ApplicationCard({
       )}
 
       {isResult && (
-        <p className="mt-3 rounded-(--radius-card) border border-brand-100 bg-brand-50/60 px-3 py-2 text-[13px] break-keep text-brand-700">
+        <p className="mt-3 rounded-(--radius-card) border border-brand-100 bg-brand-50/60 px-3 py-2 text-[0.875rem] break-keep text-brand-700">
           결과가 확정된 단계입니다. 결과·성과 화면에서 상세 결과와 성과를 기록하세요.
         </p>
       )}
@@ -401,7 +401,7 @@ function ApplicationCard({
           <label className="ml-auto flex items-center gap-1.5">
             <span className="text-[0.875rem] text-slate-500">단계 이동</span>
             <select
-              className="rounded-(--radius-control) border border-slate-200 px-2 py-1 text-[13px]"
+              className="rounded-(--radius-control) border border-slate-200 px-2 py-1 text-[0.875rem]"
               value={app.applicationStage}
               onChange={(e) => onStage(app.id, e.target.value as ApplicationStage)}
             >

@@ -48,7 +48,7 @@ function CheckRow({ check }: { check: SurveyQualityCheck }) {
     <li className="flex items-start gap-2.5 py-2">
       <Icon aria-hidden="true" className={`mt-0.5 size-4 shrink-0 ${color}`} />
       <div className="min-w-0">
-        <p className="text-[13px] font-medium break-keep text-slate-700">
+        <p className="text-[0.875rem] font-medium break-keep text-slate-700">
           {check.title}
         </p>
         {check.description && (
@@ -114,7 +114,7 @@ export function SurveyQualityPanel({ checks }: SurveyQualityPanelProps) {
         </div>
       )}
       {errors.length === 0 && warnings.length === 0 && (
-        <p className="text-[13px] text-success-700">
+        <p className="text-[0.875rem] text-success-700">
           모든 필수 품질 조건을 통과했습니다. ({passed.length}개 항목 확인)
         </p>
       )}

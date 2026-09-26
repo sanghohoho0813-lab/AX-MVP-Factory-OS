@@ -47,7 +47,7 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <dt className="text-[0.875rem] text-slate-400">{label}</dt>
-      <dd className="mt-0.5 text-[13px] break-keep whitespace-pre-wrap text-slate-700">{value || '-'}</dd>
+      <dd className="mt-0.5 text-[0.875rem] break-keep whitespace-pre-wrap text-slate-700">{value || '-'}</dd>
     </div>
   )
 }
@@ -151,7 +151,7 @@ export function CandidateDetailPage() {
       />
 
       {candidate.quadrantExceptionReason && (
-        <p className="rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-2.5 text-[13px] break-keep text-warning-800">
+        <p className="rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-2.5 text-[0.875rem] break-keep text-warning-800">
           분류 예외: {candidate.quadrantExceptionReason}
         </p>
       )}
@@ -203,7 +203,7 @@ export function CandidateDetailPage() {
           <Panel title="추천 자동화 방식">
             <div className="flex flex-col gap-2">
               <AutomationApproachBadge approach={candidate.automationApproach} />
-              <p className="text-[13px] break-keep text-slate-600">{candidate.automationApproachReason}</p>
+              <p className="text-[0.875rem] break-keep text-slate-600">{candidate.automationApproachReason}</p>
               <ComplexityBadge complexity={candidate.complexity} />
             </div>
           </Panel>
@@ -211,7 +211,7 @@ export function CandidateDetailPage() {
           <Panel title="AI 필요성">
             <div className="flex flex-col gap-2">
               <AiNecessityBadge necessity={candidate.aiNecessity} />
-              <p className="text-[13px] break-keep text-slate-600">{candidate.aiReason}</p>
+              <p className="text-[0.875rem] break-keep text-slate-600">{candidate.aiReason}</p>
               {candidate.humanReviewRequired && (
                 <p className="text-[0.875rem] text-warning-700">결과에 대한 담당자 최종 검토가 필요합니다.</p>
               )}
@@ -227,7 +227,7 @@ export function CandidateDetailPage() {
               {candidate.templateMix.map((t) => (
                 <li key={t.template} className="flex items-center justify-between gap-2 rounded-(--radius-control) border border-slate-200 px-3 py-2">
                   <div className="min-w-0">
-                    <p className="text-[13px] font-medium text-slate-700">{MVP_TEMPLATE_META[t.template].label}</p>
+                    <p className="text-[0.875rem] font-medium text-slate-700">{MVP_TEMPLATE_META[t.template].label}</p>
                     <p className="text-[0.875rem] text-slate-400">{t.reason}</p>
                   </div>
                   <span className="shrink-0 text-sm font-bold text-slate-800">{t.percentage}%</span>
@@ -240,7 +240,7 @@ export function CandidateDetailPage() {
           </Panel>
 
           <Panel title="원본 근거">
-            <div className="flex flex-col gap-1.5 text-[13px] text-slate-600">
+            <div className="flex flex-col gap-1.5 text-[0.875rem] text-slate-600">
               <p>업무군: <TaskFamilyBadge family={candidate.taskFamily} /></p>
               <p>출처 질문: {candidate.sourceQuestionCodes.join(', ') || '-'}</p>
               <p>진단 근거 {candidate.sourceEvidenceIds.length}건 · 출처 유형 {candidate.sourceTypes.length}종</p>

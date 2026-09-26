@@ -137,7 +137,7 @@ export function AssessmentsListPage() {
       key: 'client',
       header: '고객사',
       cell: (r) => (
-        <span className="text-[13px] font-medium text-slate-700">
+        <span className="text-[0.875rem] font-medium text-slate-700">
           {r.organization?.name ?? '알 수 없음'}
         </span>
       ),
@@ -167,7 +167,7 @@ export function AssessmentsListPage() {
       className: 'min-w-[140px]',
       cell: (r) =>
         r.assessment.analysisKind === 'website' ? (
-          <span className="text-[13px] text-slate-500">홈페이지 준비도</span>
+          <span className="text-[0.875rem] text-slate-500">홈페이지 준비도</span>
         ) : (
           <AssessmentRecommendationBadge recommendation={r.assessment.recommendation} withIcon={false} />
         ),
@@ -185,7 +185,7 @@ export function AssessmentsListPage() {
         <div className="flex items-center gap-1.5">
           <AssessmentStatusBadge status={r.assessment.status} />
           {r.needsReanalysis && (
-            <span className="inline-flex items-center gap-0.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-warning-700">
+            <span className="inline-flex items-center gap-0.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
               <RefreshCw aria-hidden="true" className="size-3" />
               재분석
             </span>
@@ -203,13 +203,13 @@ export function AssessmentsListPage() {
       key: 'updated',
       header: '최근 분석',
       className: 'hidden lg:table-cell',
-      cell: (r) => <span className="text-[13px] text-slate-500">{formatDate(r.assessment.updatedAt)}</span>,
+      cell: (r) => <span className="text-[0.875rem] text-slate-500">{formatDate(r.assessment.updatedAt)}</span>,
     },
     {
       key: 'owner',
       header: '담당자',
       className: 'hidden xl:table-cell',
-      cell: (r) => <span className="text-[13px] text-slate-600">{memberName(r.project.ownerId)}</span>,
+      cell: (r) => <span className="text-[0.875rem] text-slate-600">{memberName(r.project.ownerId)}</span>,
     },
   ]
 
@@ -348,7 +348,7 @@ export function AssessmentsListPage() {
                         />
                       )}
                       {r.needsReanalysis && (
-                        <span className="inline-flex items-center gap-0.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-warning-700">
+                        <span className="inline-flex items-center gap-0.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
                           <RefreshCw aria-hidden="true" className="size-3" />
                           재분석
                         </span>

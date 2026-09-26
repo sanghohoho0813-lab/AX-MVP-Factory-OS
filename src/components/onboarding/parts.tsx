@@ -33,7 +33,7 @@ export function ChapterStatusBadge({ status }: { status: ChapterDisplayStatus })
   const { icon: Icon, cls } = STATUS_STYLE[status]
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[0.82rem] font-medium ${cls}`}
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[0.875rem] font-medium ${cls}`}
     >
       <Icon aria-hidden="true" className="size-3.5" />
       {CHAPTER_STATUS_LABEL[status]}
@@ -222,7 +222,7 @@ export function ChapterDetail({
           </h3>
           <ChapterStatusBadge status={status} />
           {chapter.advanced && (
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.82rem] text-slate-500">
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.875rem] text-slate-500">
               고급 운영
             </span>
           )}

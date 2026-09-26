@@ -39,7 +39,7 @@ export function PortfolioHealth({ projects }: PortfolioHealthProps) {
           {counts.map(({ health, count }) => (
             <li
               key={health}
-              className="flex items-center gap-1.5 text-[13px] text-slate-500"
+              className="flex items-center gap-1.5 text-[0.875rem] text-slate-500"
             >
               <span
                 aria-hidden="true"
@@ -75,14 +75,14 @@ export function PortfolioHealth({ projects }: PortfolioHealthProps) {
                     <p className="truncate text-sm font-semibold text-slate-800">
                       {project.client}
                     </p>
-                    <p className="truncate text-xs text-slate-400">
+                    <p className="truncate text-[0.8125rem] text-slate-400">
                       {project.industry}
                     </p>
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                   {project.isSample && (
-                    <span className="rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[0.78rem] font-medium text-brand-700">
+                    <span className="rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[0.8125rem] font-medium text-brand-700">
                       샘플
                     </span>
                   )}

@@ -23,7 +23,7 @@ function WorkflowColumn({ workflow, tone }: { workflow: MvpWorkflow; tone: 'curr
             const meta = HANDLED_META[step.handledBy]
             return (
               <li key={step.id} className="flex items-start gap-3 rounded-(--radius-card) border border-slate-200 px-3.5 py-2.5">
-                <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[0.82rem] font-semibold text-slate-500">
+                <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[0.875rem] font-semibold text-slate-500">
                   {i + 1}
                 </span>
                 <div className="min-w-0 flex-1">

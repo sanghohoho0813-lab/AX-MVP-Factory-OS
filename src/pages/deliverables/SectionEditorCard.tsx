@@ -124,7 +124,7 @@ export function SectionEditorCard({
       actions={
         <div className="flex items-center gap-1.5">
           {section.manuallyEdited && (
-            <span className="rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.82rem] font-medium text-warning-700">
+            <span className="rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.875rem] font-medium text-warning-700">
               수동 수정됨
             </span>
           )}

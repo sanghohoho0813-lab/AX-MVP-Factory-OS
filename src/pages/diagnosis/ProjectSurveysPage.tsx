@@ -193,7 +193,7 @@ export function ProjectSurveysPage() {
                 { ok: responseSummary.submitted > 0, label: '제출된 응답에 필수 답변 포함' },
               ].map((c) => (
                 <li key={c.label} className="flex items-center gap-2">
-                  <span className={`flex size-5 items-center justify-center rounded-full text-[0.7rem] font-bold ${c.ok ? 'bg-success-500 text-white' : 'bg-slate-200 text-slate-500'}`}>{c.ok ? '✓' : '·'}</span>
+                  <span className={`flex size-5 items-center justify-center rounded-full text-[0.8125rem] font-bold ${c.ok ? 'bg-success-500 text-white' : 'bg-slate-200 text-slate-500'}`}>{c.ok ? '✓' : '·'}</span>
                   <span className={c.ok ? 'text-slate-700' : 'text-slate-500'}>{c.label}</span>
                 </li>
               ))}
@@ -246,7 +246,7 @@ export function ProjectSurveysPage() {
                         type="button"
                         onClick={() => window.open(buildSurveyUrl(d.accessToken), '_blank')}
                         disabled={d.status === 'revoked' || d.status === 'expired'}
-                        className="inline-flex cursor-pointer items-center gap-1 text-[13px] font-medium text-brand-600 disabled:cursor-not-allowed disabled:text-slate-300"
+                        className="inline-flex cursor-pointer items-center gap-1 text-[0.875rem] font-medium text-brand-600 disabled:cursor-not-allowed disabled:text-slate-300"
                       >
                         <ExternalLink aria-hidden="true" className="size-3.5" />
                         응답자 화면 열기
@@ -255,7 +255,7 @@ export function ProjectSurveysPage() {
                         type="button"
                         onClick={() => copyLink(d.accessToken)}
                         disabled={d.status === 'revoked' || d.status === 'expired'}
-                        className="inline-flex cursor-pointer items-center gap-1 text-[13px] font-medium text-slate-500 disabled:cursor-not-allowed disabled:text-slate-300"
+                        className="inline-flex cursor-pointer items-center gap-1 text-[0.875rem] font-medium text-slate-500 disabled:cursor-not-allowed disabled:text-slate-300"
                       >
                         <Copy aria-hidden="true" className="size-3.5" />
                         복사
@@ -263,7 +263,7 @@ export function ProjectSurveysPage() {
                       <button
                         type="button"
                         onClick={() => navigate(`/diagnosis/surveys/${d.id}`)}
-                        className="ml-auto inline-flex cursor-pointer items-center gap-1 text-[13px] font-semibold text-brand-600"
+                        className="ml-auto inline-flex cursor-pointer items-center gap-1 text-[0.875rem] font-semibold text-brand-600"
                       >
                         <Eye aria-hidden="true" className="size-3.5" />
                         상세

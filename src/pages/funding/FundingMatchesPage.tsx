@@ -41,7 +41,7 @@ function ApprovalNote() {
   return (
     <div className="flex items-start gap-2.5 rounded-(--radius-card) border border-slate-200 bg-slate-50/70 px-4 py-3">
       <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-400" />
-      <p className="text-[13px] break-keep text-slate-600">{NO_APPROVAL_PREDICTION_NOTE}</p>
+      <p className="text-[0.875rem] break-keep text-slate-600">{NO_APPROVAL_PREDICTION_NOTE}</p>
     </div>
   )
 }
@@ -58,7 +58,7 @@ function ChipList({ label, items, tone = 'slate' }: { label: string; items: stri
           : 'border-slate-200 bg-slate-50 text-slate-600'
   return (
     <div className="flex flex-col gap-1">
-      <p className="text-[0.8125rem] font-semibold tracking-wide text-slate-400 uppercase">{label}</p>
+      <p className="text-[0.875rem] font-semibold tracking-wide text-slate-400 uppercase">{label}</p>
       <ul className="flex flex-wrap gap-1.5">
         {items.map((item, i) => (
           <li key={i} className={`rounded-md border px-2 py-0.5 text-[0.875rem] break-keep ${toneClass}`}>
@@ -80,7 +80,7 @@ function CriterionTable({
   onStatus: (criterionId: string, status: CriterionStatus) => void
 }) {
   if (match.criterionChecks.length === 0) {
-    return <p className="text-[13px] break-keep text-slate-400">등록된 요건 점검 항목이 없습니다.</p>
+    return <p className="text-[0.875rem] break-keep text-slate-400">등록된 요건 점검 항목이 없습니다.</p>
   }
   // 좁은 화면에서 가로 스크롤이 생기지 않도록 표 대신 세로 카드 목록으로 표시한다.
   return (
@@ -88,15 +88,15 @@ function CriterionTable({
       {match.criterionChecks.map((c) => (
         <li key={c.id} className="min-w-0 rounded-(--radius-card) border border-slate-200 px-3 py-2.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="min-w-0 text-[13px] font-medium break-keep text-slate-700">{c.label}</p>
+            <p className="min-w-0 text-[0.875rem] font-medium break-keep text-slate-700">{c.label}</p>
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.8125rem] text-slate-500">{CRITERION_CATEGORY_LABEL[c.category]}</span>
+              <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.875rem] text-slate-500">{CRITERION_CATEGORY_LABEL[c.category]}</span>
               <CriterionStatusBadge status={c.status} />
             </div>
           </div>
           {c.description && <p className="mt-1 text-[0.875rem] break-keep text-slate-400">{c.description}</p>}
           {c.status === 'unknown' && (
-            <p className="mt-1 text-[0.8125rem] break-keep text-slate-400">데이터 없음 — 미충족과 다릅니다(확인 필요).</p>
+            <p className="mt-1 text-[0.875rem] break-keep text-slate-400">데이터 없음 — 미충족과 다릅니다(확인 필요).</p>
           )}
           {c.missingEvidence && (
             <p className="mt-1 text-[0.875rem] break-keep text-slate-500">부족한 증빙: {c.missingEvidence}</p>
@@ -168,7 +168,7 @@ function MatchCard({
             <MatchPriorityBadge priority={match.priority} />
             <MatchConfidenceBadge confidence={match.confidence} />
           </div>
-          <p className="mt-0.5 text-[13px] text-slate-500">{programName(match.programId)}</p>
+          <p className="mt-0.5 text-[0.875rem] text-slate-500">{programName(match.programId)}</p>
         </div>
         {!readOnly && (
           <div className="flex flex-wrap items-center gap-2">
@@ -198,9 +198,9 @@ function MatchCard({
 
       {!excluded && (
         <div className="mt-3 flex min-w-0 flex-col gap-3">
-          {match.reasonSummary && <p className="text-[13px] break-keep text-slate-700">{match.reasonSummary}</p>}
+          {match.reasonSummary && <p className="text-[0.875rem] break-keep text-slate-700">{match.reasonSummary}</p>}
           {match.expectedUse && (
-            <p className="text-[13px] break-keep text-slate-600">
+            <p className="text-[0.875rem] break-keep text-slate-600">
               <span className="font-semibold text-slate-500">예상 활용: </span>
               {match.expectedUse}
             </p>
@@ -215,11 +215,11 @@ function MatchCard({
 
           {match.officialConfirmationRequired.length > 0 && (
             <div aria-live="polite" className="rounded-(--radius-card) border border-warning-300 bg-warning-50 px-3.5 py-3">
-              <p className="flex items-center gap-1.5 text-[13px] font-semibold text-warning-800">
+              <p className="flex items-center gap-1.5 text-[0.875rem] font-semibold text-warning-800">
                 <AlertTriangle aria-hidden="true" className="size-4" />
                 공식 확인 필요
               </p>
-              <ul className="mt-1.5 list-disc space-y-1 pl-5 text-[13px] break-keep text-warning-700">
+              <ul className="mt-1.5 list-disc space-y-1 pl-5 text-[0.875rem] break-keep text-warning-700">
                 {match.officialConfirmationRequired.map((item, i) => (
                   <li key={i}>{item}</li>
                 ))}
@@ -228,7 +228,7 @@ function MatchCard({
           )}
 
           {match.analystOpinion && (
-            <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-[13px] break-keep text-slate-600">
+            <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-[0.875rem] break-keep text-slate-600">
               <span className="font-semibold text-slate-500">검토 의견: </span>
               {match.analystOpinion}
             </p>
@@ -337,7 +337,7 @@ function MatchesBody({ strategy }: { strategy: FundingStrategy }) {
         }
       >
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-medium text-slate-600">제외 사유</span>
+          <span className="text-[0.875rem] font-medium text-slate-600">제외 사유</span>
           <textarea
             value={exclusionReason}
             onChange={(e) => setExclusionReason(e.target.value)}
@@ -362,7 +362,7 @@ function MatchesBody({ strategy }: { strategy: FundingStrategy }) {
       >
         <div className="flex flex-col gap-4">
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-slate-600">공식 확인 필요 사항 (한 줄에 하나)</span>
+            <span className="text-[0.875rem] font-medium text-slate-600">공식 확인 필요 사항 (한 줄에 하나)</span>
             <textarea
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value)}
@@ -372,7 +372,7 @@ function MatchesBody({ strategy }: { strategy: FundingStrategy }) {
             />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-slate-600">검토 의견</span>
+            <span className="text-[0.875rem] font-medium text-slate-600">검토 의견</span>
             <textarea
               value={opinionText}
               onChange={(e) => setOpinionText(e.target.value)}

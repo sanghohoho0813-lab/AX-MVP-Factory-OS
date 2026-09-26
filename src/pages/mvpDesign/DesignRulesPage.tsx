@@ -29,7 +29,7 @@ export function DesignRulesPage() {
                       <p className="text-sm font-semibold text-slate-800">{rule.name}</p>
                       <BusinessRuleTypeBadge type={rule.type} />
                       {rule.needsConfirmation && (
-                        <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.82rem] font-medium text-warning-700">
+                        <span className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
                           <AlertTriangle aria-hidden="true" className="size-3" />담당자 확인 필요
                         </span>
                       )}
@@ -55,7 +55,7 @@ export function DesignRulesPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         <Bot aria-hidden="true" className="size-4 text-accent-500" />
                         <p className="text-sm font-semibold text-slate-800">{ai.name}</p>
-                        <span className="rounded-md border border-accent-200 bg-accent-50 px-1.5 py-0.5 text-[0.82rem] text-accent-700">{AI_PURPOSE_META[ai.purpose].label}</span>
+                        <span className="rounded-md border border-accent-200 bg-accent-50 px-1.5 py-0.5 text-[0.875rem] text-accent-700">{AI_PURPOSE_META[ai.purpose].label}</span>
                         {ai.humanConfirms && (
                           <span className="inline-flex items-center gap-1 text-[0.875rem] text-warning-600"><ShieldCheck aria-hidden="true" className="size-3.5" />사람이 확정</span>
                         )}

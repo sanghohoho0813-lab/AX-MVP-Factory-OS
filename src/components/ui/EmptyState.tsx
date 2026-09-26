@@ -19,7 +19,7 @@ export function EmptyState({ icon: Icon, title, description, action }: EmptyStat
       </span>
       <p className="mt-3 text-sm font-semibold break-keep text-slate-800">{title}</p>
       {description && (
-        <p className="mt-1 max-w-sm text-[13px] break-keep text-slate-500">
+        <p className="mt-1 max-w-sm text-[0.875rem] break-keep text-slate-500">
           {description}
         </p>
       )}

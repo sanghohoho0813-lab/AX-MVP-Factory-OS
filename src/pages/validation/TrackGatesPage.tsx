@@ -93,7 +93,7 @@ function GateCard({
         className="flex w-full flex-wrap items-center gap-2 px-5 py-4 text-left"
       >
         {gateLocked && <Lock aria-hidden="true" className="size-4 text-slate-400" />}
-        <span className="text-[15px] font-semibold text-slate-900">{meta.label}</span>
+        <span className="text-[0.9375rem] font-semibold text-slate-900">{meta.label}</span>
         <GateStatusBadge status={review.status} />
         <span className="inline-flex items-center gap-1 text-[0.9rem] text-slate-400">
           자동 초안 <GateStatusBadge status={review.autoDraftStatus} />
@@ -119,7 +119,7 @@ function GateCard({
                 <li key={c.id} className="rounded-(--radius-card) border border-slate-200 px-3 py-2.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-[0.95rem] font-medium text-slate-800">{c.title}</p>
-                    {c.required && <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.82rem] text-slate-500">필수</span>}
+                    {c.required && <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[0.875rem] text-slate-500">필수</span>}
                     <span className="ml-auto"><GateCriterionStatusBadge status={c.status} /></span>
                   </div>
                   {c.description && <p className="mt-1 text-[0.9rem] break-keep text-slate-500">{c.description}</p>}

@@ -169,7 +169,7 @@ function RoundsBody({
                   <label key={s.id} className="flex items-center gap-2 text-[0.95rem] text-slate-700">
                     <input type="checkbox" checked={scenarioIds.includes(s.id)} onChange={() => setScenarioIds((prev) => toggle(prev, s.id))} className="size-4 rounded border-slate-300" />
                     <span className="break-keep">{s.title}</span>
-                    {s.required && <span className="rounded border border-brand-200 bg-brand-50 px-1 text-[0.82rem] font-semibold text-brand-700">필수</span>}
+                    {s.required && <span className="rounded border border-brand-200 bg-brand-50 px-1 text-[0.875rem] font-semibold text-brand-700">필수</span>}
                   </label>
                 ))}
               </div>

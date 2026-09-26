@@ -374,7 +374,7 @@ export function ProjectDeliverablesPage() {
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="text-[1.05rem] font-semibold break-keep text-slate-900">{pkg.name}</p>
-                          <p className="mt-0.5 text-[0.82rem] text-slate-400">확정 당시 내용 v{pkg.version}</p>
+                          <p className="mt-0.5 text-[0.875rem] text-slate-400">확정 당시 내용 v{pkg.version}</p>
                         </div>
                         <span className="shrink-0"><PackageStatusBadge status={pkg.status} /></span>
                       </div>
@@ -384,7 +384,7 @@ export function ProjectDeliverablesPage() {
                       </div>
                       <p className="text-[0.9rem] break-keep text-slate-600">{s.headline}</p>
                       {stale && (
-                        <span className="w-fit rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.82rem] font-medium text-warning-700">
+                        <span className="w-fit rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.875rem] font-medium text-warning-700">
                           출처 원본 변경됨 · 새 버전 검토 필요
                         </span>
                       )}

@@ -38,10 +38,10 @@ function BulletList({ label, items }: { label: string; items: string[] }) {
   if (items.length === 0) return null
   return (
     <div>
-      <p className="mb-1 text-[13px] font-semibold text-slate-700">{label}</p>
+      <p className="mb-1 text-[0.875rem] font-semibold text-slate-700">{label}</p>
       <ul className="flex flex-col gap-1">
         {items.map((item, i) => (
-          <li key={i} className="flex items-start gap-2 text-[13px] break-keep text-slate-700">
+          <li key={i} className="flex items-start gap-2 text-[0.875rem] break-keep text-slate-700">
             <span aria-hidden="true" className="mt-1.5 size-1.5 shrink-0 rounded-full bg-slate-300" />
             <span className="min-w-0 whitespace-pre-wrap">{item}</span>
           </li>
@@ -55,7 +55,7 @@ function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col">
       <dt className="text-[0.875rem] text-slate-400">{label}</dt>
-      <dd className="text-[13px] break-keep text-slate-700">{value || '—'}</dd>
+      <dd className="text-[0.875rem] break-keep text-slate-700">{value || '—'}</dd>
     </div>
   )
 }
@@ -127,7 +127,7 @@ function AddPlanModal({
     >
       <div className="flex flex-col gap-4">
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-slate-700">대상 기관</span>
+          <span className="text-[0.875rem] font-semibold text-slate-700">대상 기관</span>
           <select
             className={INPUT_CLASS}
             value={draft.institutionId}
@@ -148,7 +148,7 @@ function AddPlanModal({
           )}
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-slate-700">접촉 목적</span>
+          <span className="text-[0.875rem] font-semibold text-slate-700">접촉 목적</span>
           <input
             className={INPUT_CLASS}
             value={draft.purpose}
@@ -157,7 +157,7 @@ function AddPlanModal({
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-slate-700">대상 담당(역할)</span>
+          <span className="text-[0.875rem] font-semibold text-slate-700">대상 담당(역할)</span>
           <input
             className={INPUT_CLASS}
             value={draft.targetRole}
@@ -166,7 +166,7 @@ function AddPlanModal({
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-slate-700">접촉 채널</span>
+          <span className="text-[0.875rem] font-semibold text-slate-700">접촉 채널</span>
           <select
             className={INPUT_CLASS}
             value={draft.channel}
@@ -180,7 +180,7 @@ function AddPlanModal({
           </select>
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-slate-700">예정일</span>
+          <span className="text-[0.875rem] font-semibold text-slate-700">예정일</span>
           <input
             type="date"
             className={INPUT_CLASS}
@@ -243,7 +243,7 @@ function EditPlanModal({
     >
       <div className="flex flex-col gap-4">
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-slate-700">진행 상태</span>
+          <span className="text-[0.875rem] font-semibold text-slate-700">진행 상태</span>
           <select
             className={INPUT_CLASS}
             value={draft.status}
@@ -257,7 +257,7 @@ function EditPlanModal({
           </select>
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-slate-700">담당자</span>
+          <span className="text-[0.875rem] font-semibold text-slate-700">담당자</span>
           <input
             className={INPUT_CLASS}
             value={draft.ownerId}
@@ -266,7 +266,7 @@ function EditPlanModal({
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-slate-700">예정일</span>
+          <span className="text-[0.875rem] font-semibold text-slate-700">예정일</span>
           <input
             type="date"
             className={INPUT_CLASS}
@@ -347,7 +347,7 @@ function RecordActivityModal({
       <div className="flex flex-col gap-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-semibold text-slate-700">접촉 채널</span>
+            <span className="text-[0.875rem] font-semibold text-slate-700">접촉 채널</span>
             <select
               className={INPUT_CLASS}
               value={draft.channel}
@@ -361,7 +361,7 @@ function RecordActivityModal({
             </select>
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-semibold text-slate-700">상대 역할</span>
+            <span className="text-[0.875rem] font-semibold text-slate-700">상대 역할</span>
             <input
               className={INPUT_CLASS}
               value={draft.contactRole}
@@ -371,7 +371,7 @@ function RecordActivityModal({
           </label>
         </div>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-slate-700">상대 메모(선택)</span>
+          <span className="text-[0.875rem] font-semibold text-slate-700">상대 메모(선택)</span>
           <input
             className={INPUT_CLASS}
             value={draft.contactNameNote}
@@ -381,7 +381,7 @@ function RecordActivityModal({
           <span className="text-[0.875rem] text-warning-600">개인 연락처·실명 등 민감정보를 과도하게 저장하지 마세요.</span>
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-slate-700">접촉 요약</span>
+          <span className="text-[0.875rem] font-semibold text-slate-700">접촉 요약</span>
           <textarea
             className={INPUT_CLASS}
             rows={2}
@@ -391,7 +391,7 @@ function RecordActivityModal({
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-slate-700">기관 답변</span>
+          <span className="text-[0.875rem] font-semibold text-slate-700">기관 답변</span>
           <textarea
             className={INPUT_CLASS}
             rows={2}
@@ -401,7 +401,7 @@ function RecordActivityModal({
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-semibold text-slate-700">요청 자료 (한 줄에 하나)</span>
+          <span className="text-[0.875rem] font-semibold text-slate-700">요청 자료 (한 줄에 하나)</span>
           <textarea
             className={INPUT_CLASS}
             rows={2}
@@ -412,7 +412,7 @@ function RecordActivityModal({
         </label>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-semibold text-slate-700">다음 조치</span>
+            <span className="text-[0.875rem] font-semibold text-slate-700">다음 조치</span>
             <input
               className={INPUT_CLASS}
               value={draft.nextAction}
@@ -421,7 +421,7 @@ function RecordActivityModal({
             />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-semibold text-slate-700">다음 조치 기한</span>
+            <span className="text-[0.875rem] font-semibold text-slate-700">다음 조치 기한</span>
             <input
               type="date"
               className={INPUT_CLASS}
@@ -437,7 +437,7 @@ function RecordActivityModal({
             checked={draft.internalOnly}
             onChange={(e) => setDraft((d) => ({ ...d, internalOnly: e.target.checked }))}
           />
-          <span className="text-[13px] break-keep text-slate-700">
+          <span className="text-[0.875rem] break-keep text-slate-700">
             내부 메모 (고객·외부 공유 대상 아님)
           </span>
         </label>
@@ -472,14 +472,14 @@ function PlanCard({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-[15px] font-semibold break-keep text-slate-900">
+            <h3 className="text-[0.9375rem] font-semibold break-keep text-slate-900">
               {institutionName(plan.institutionId)}
             </h3>
             <OutreachChannelBadge channel={plan.channel} />
             <OutreachPlanStatusBadge status={plan.status} />
           </div>
           {programName(plan.programId) && (
-            <p className="mt-0.5 text-[13px] text-slate-500">{programName(plan.programId)}</p>
+            <p className="mt-0.5 text-[0.875rem] text-slate-500">{programName(plan.programId)}</p>
           )}
         </div>
         {!readOnly && (
@@ -509,7 +509,7 @@ function PlanCard({
 
       {activities.length > 0 && (
         <div className="mt-4 border-t border-slate-100 pt-3">
-          <p className="mb-2 text-[13px] font-semibold text-slate-700">접촉 기록</p>
+          <p className="mb-2 text-[0.875rem] font-semibold text-slate-700">접촉 기록</p>
           <div className="flex flex-col gap-3">
             {shareable.map((a) => (
               <ActivityItem key={a.id} activity={a} internal={false} />
@@ -548,16 +548,16 @@ function ActivityItem({
           </span>
         )}
       </div>
-      <p className="mt-1.5 text-[13px] break-keep whitespace-pre-wrap text-slate-700">{activity.summary}</p>
+      <p className="mt-1.5 text-[0.875rem] break-keep whitespace-pre-wrap text-slate-700">{activity.summary}</p>
       {activity.institutionFeedback && (
-        <p className="mt-1 text-[13px] break-keep whitespace-pre-wrap text-slate-600">
+        <p className="mt-1 text-[0.875rem] break-keep whitespace-pre-wrap text-slate-600">
           <span className="font-semibold text-slate-500">기관 답변: </span>
           {activity.institutionFeedback}
         </p>
       )}
       <BulletList label="요청 자료" items={activity.requestedMaterials} />
       {activity.nextAction && (
-        <p className="mt-1 text-[13px] break-keep text-slate-600">
+        <p className="mt-1 text-[0.875rem] break-keep text-slate-600">
           <span className="font-semibold text-slate-500">다음 조치: </span>
           {activity.nextAction}
           {activity.nextActionDueDate ? ` (기한 ${activity.nextActionDueDate})` : ''}

@@ -39,7 +39,7 @@ export function SurveyPage({
   return (
     <div className="flex flex-col gap-6">
       {page.sectionDescription && page.pageInSection === 1 && (
-        <p className="text-[13px] break-keep text-slate-500">
+        <p className="text-[0.875rem] break-keep text-slate-500">
           {page.sectionDescription}
         </p>
       )}

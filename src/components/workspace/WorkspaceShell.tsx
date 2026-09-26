@@ -126,7 +126,7 @@ export function WorkspaceStepNav({
                   state === 'current' ? 'bg-brand-50 text-brand-800' : state === 'done' ? 'text-slate-600 hover:bg-slate-50' : 'text-slate-400 hover:bg-slate-50'
                 }`}
               >
-                <span className={`flex size-6 shrink-0 items-center justify-center rounded-full border text-[0.78rem] font-bold ${
+                <span className={`flex size-6 shrink-0 items-center justify-center rounded-full border text-[0.8125rem] font-bold ${
                   state === 'done' ? 'border-success-500 bg-success-500 text-white' : state === 'current' ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 text-slate-400'
                 }`}>
                   {state === 'done' ? <Check aria-hidden="true" className="size-3.5" /> : i + 1}
@@ -229,7 +229,7 @@ export function WorkspaceCompletionChecklist({ title = '완료 조건', items }:
       <ul className="flex flex-col gap-2">
         {items.map((c) => (
           <li key={c.label} className="flex items-start gap-2 text-[0.92rem]">
-            <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold ${c.ok ? 'bg-success-500 text-white' : 'bg-slate-200 text-slate-500'}`} aria-hidden="true">
+            <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[0.8125rem] font-bold ${c.ok ? 'bg-success-500 text-white' : 'bg-slate-200 text-slate-500'}`} aria-hidden="true">
               {c.ok ? '✓' : '·'}
             </span>
             <span className="min-w-0 flex-1">

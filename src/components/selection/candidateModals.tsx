@@ -56,7 +56,7 @@ export function CandidateScoreAdjustModal({
       }
     >
       <div className="flex flex-col gap-4">
-        <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] break-keep text-slate-600">
+        <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2 text-[0.875rem] break-keep text-slate-600">
           자동 계산 점수는 <strong>{domainScore.autoScore}점</strong>입니다. 보정 시 자동 계산값과 사유가 함께 보존됩니다.
         </p>
         <div>
@@ -88,7 +88,7 @@ export function CandidateScoreAdjustModal({
             className="w-full resize-none rounded-(--radius-control) border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
           />
         </div>
-        {error && <p role="alert" className="text-[13px] text-danger-600">{error}</p>}
+        {error && <p role="alert" className="text-[0.875rem] text-danger-600">{error}</p>}
       </div>
     </Modal>
   )
@@ -154,14 +154,14 @@ export function CandidateMergeModal({
       }
     >
       <div className="flex flex-col gap-4">
-        <p className="text-[13px] break-keep text-slate-500">
+        <p className="text-[0.875rem] break-keep text-slate-500">
           동일한 업무를 가리키는 후보를 2개 이상 선택하고, 유지할 대상을 지정하세요. 서로 다른 업무는 병합하지 마세요.
         </p>
         <div className="flex flex-col gap-1.5">
           {candidates.map((c) => {
             const isChecked = checked.includes(c.id)
             return (
-              <div key={c.id} className="flex items-center gap-2 rounded-(--radius-control) border border-slate-200 px-3 py-2 text-[13px]">
+              <div key={c.id} className="flex items-center gap-2 rounded-(--radius-control) border border-slate-200 px-3 py-2 text-[0.875rem]">
                 <input type="checkbox" checked={isChecked} onChange={() => toggle(c)} aria-label={`${c.name} 병합 선택`} />
                 <span className="min-w-0 flex-1 truncate text-slate-700">{c.name}</span>
                 {isChecked && (

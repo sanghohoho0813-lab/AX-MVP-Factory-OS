@@ -313,9 +313,9 @@ function ProjectContent({ workspaceId, userId }: { workspaceId: string | null; u
               <ArrowLeft aria-hidden="true" className="size-4 shrink-0" /> <span className="truncate">특허+벤처</span>
             </Link>
             <div className="flex shrink-0 items-center gap-1">
-              <Button variant="ghost" size="sm" onClick={() => setSearchParams(advanced ? {} : { adv: '1' }, { replace: true })}>
+              <Button variant="ghost" size="sm" aria-label={advanced ? '간단히 보기' : '고급 보기'} onClick={() => setSearchParams(advanced ? {} : { adv: '1' }, { replace: true })}>
                 <SlidersHorizontal aria-hidden="true" className="size-4" />
-                <span className="hidden sm:inline">{advanced ? '간단히' : '고급'}</span>
+                <span>{advanced ? '간단히' : '고급'}</span>
               </Button>
               <Button variant="ghost" size="sm" aria-label="프로젝트 설정" onClick={() => setMoreOpen(true)}>
                 <MoreHorizontal aria-hidden="true" className="size-4" />

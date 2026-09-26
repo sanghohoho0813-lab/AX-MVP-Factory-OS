@@ -116,7 +116,7 @@ function ReviewBody({ design }: { design: WebsiteDesign }) {
           onChange={(e) => setSummary(e.target.value)}
           disabled={!editable}
           rows={4}
-          className="w-full max-w-[1000px] rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[14px] focus:border-brand-400 focus:outline-none disabled:bg-slate-50"
+          className="w-full max-w-[1000px] rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.875rem] focus:border-brand-400 focus:outline-none disabled:bg-slate-50"
           placeholder="담당자 최종 설계 의견을 작성하세요. 확정하려면 필수입니다."
         />
         {editable && <div className="mt-3"><Button variant="secondary" size="sm" onClick={saveSummary}>저장</Button></div>}

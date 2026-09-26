@@ -127,7 +127,7 @@ function CatalogView({ catalog, prices, onSavePrice }: { catalog: SalesPackage[]
           )
         })}
       </ul>
-      <p className="t-meta break-keep text-slate-400">가격 · 설명은 기업컨설팅 OS 원본 그대로입니다(대표 결정 D-114). 가격을 누르면 고칠 수 있고, 고친 값만 따로 저장됩니다.</p>
+      <p className="t-meta break-keep text-slate-400">가격 · 설명은 기업컨설팅 OS 원본 그대로입니다. 가격을 누르면 고칠 수 있고, 고친 값만 따로 저장됩니다.</p>
     </div>
   )
 }

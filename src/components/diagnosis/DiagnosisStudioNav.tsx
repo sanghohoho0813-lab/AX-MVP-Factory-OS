@@ -30,7 +30,7 @@ export function DiagnosisStudioNav() {
           to={tab.to}
           end={tab.end}
           className={({ isActive }) =>
-            `-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors ${
+            `-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[0.875rem] font-medium transition-colors ${
               isActive
                 ? 'border-brand-600 text-brand-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'

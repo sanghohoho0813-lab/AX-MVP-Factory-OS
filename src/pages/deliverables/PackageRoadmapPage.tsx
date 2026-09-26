@@ -48,7 +48,7 @@ const INPUT_CLASS = 'w-full rounded-(--radius-control) border border-slate-200 p
 function PhaseStatusChip({ status }: { status: RoadmapPhaseStatus }) {
   const m = PHASE_STATUS_META[status]
   return (
-    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[0.82rem] font-medium ${m.tone}`}>
+    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[0.875rem] font-medium ${m.tone}`}>
       {m.label}
     </span>
   )
@@ -91,10 +91,10 @@ function PhaseCard({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[0.82rem] font-semibold text-slate-500">
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[0.875rem] font-semibold text-slate-500">
               {phase.orderIndex + 1}
             </span>
-            <h3 className="text-[15px] font-semibold break-keep text-slate-900">{phase.name}</h3>
+            <h3 className="text-[0.9375rem] font-semibold break-keep text-slate-900">{phase.name}</h3>
             <PhaseStatusChip status={phase.status} />
           </div>
           {phase.objective && (
@@ -199,7 +199,7 @@ function RoadmapView({ pkg, readOnly }: { pkg: DeliverablePackage; readOnly: boo
             <section key={track} className="flex flex-col gap-3">
               <div className="flex items-center gap-2">
                 <DeliverableTrackBadge track={track} />
-                <h2 className="text-[15px] font-semibold text-slate-900">
+                <h2 className="text-[0.9375rem] font-semibold text-slate-900">
                   {DELIVERABLE_TRACK_META[track].label} 실행 단계
                 </h2>
               </div>

@@ -88,7 +88,7 @@ function FeatureCard({ design, feature }: { design: MvpDesign; feature: MvpFeatu
 function IoBox({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-(--radius-control) bg-slate-50 px-3 py-2">
-      <p className="text-[0.82rem] font-semibold text-slate-400">{label}</p>
+      <p className="text-[0.875rem] font-semibold text-slate-400">{label}</p>
       <p className="mt-0.5 text-[0.875rem] break-keep text-slate-600">{value || '-'}</p>
     </div>
   )

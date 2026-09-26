@@ -238,7 +238,7 @@ export function PortalTab({ record, workspaceId }: { record: ClientOpsRecord; wo
           )}
         </div>
         {link && (
-          <p className="mt-3 text-[0.82rem] text-slate-400">
+          <p className="mt-3 text-[0.875rem] text-slate-400">
             고객은 로그인 후{' '}
             <a href={`${brand.customerPlatformUrl}${brand.customerProjectsPath}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-brand-700 hover:underline">
               {brand.customerPlatformUrl.replace('https://', '')}{brand.customerProjectsPath} <ExternalLink aria-hidden="true" className="size-3" />
@@ -427,7 +427,7 @@ export function PortalTab({ record, workspaceId }: { record: ClientOpsRecord; wo
           </ul>
         )}
         {events.length > 0 && (
-          <p className="mt-2 text-[0.82rem] text-slate-400">
+          <p className="mt-2 text-[0.875rem] text-slate-400">
             최근: {events.slice(0, 3).map((e) => `${EVENT_TYPE_LABEL[e.eventType]} — ${eventSummary(e).what}`).join(' · ')}
           </p>
         )}
@@ -501,7 +501,7 @@ export function PortalTab({ record, workspaceId }: { record: ClientOpsRecord; wo
       <Modal open={preview !== null} title="고객 화면 미리보기 (고객이 보는 것과 동일)" size="lg" onClose={() => setPreview(null)}>
         {preview?.project && (
           <div className="rounded-(--radius-panel) border border-slate-200 bg-slate-50 p-4">
-            <p className="text-[0.8rem] font-semibold tracking-wide text-slate-400 uppercase">{brand.customerPortalLabel} · 내 프로젝트</p>
+            <p className="text-[0.875rem] font-semibold tracking-wide text-slate-400 uppercase">{brand.customerPortalLabel} · 내 프로젝트</p>
             <h3 className="mt-1 text-[1.2rem] font-bold text-slate-900">{preview.project.name}</h3>
             <p className="text-[0.9rem] text-slate-500">
               {CUSTOMER_STAGE_LABEL[preview.project.stage]}{preview.project.consultant_name ? ` · 담당 ${preview.project.consultant_name}` : ''}
@@ -547,7 +547,7 @@ export function PortalTab({ record, workspaceId }: { record: ClientOpsRecord; wo
                 </ul>
               </div>
             </div>
-            <p className="mt-3 text-[0.8rem] text-slate-400">내부 메모·수임료·업무 세부 단계·활동 기록은 포함되지 않습니다.</p>
+            <p className="mt-3 text-[0.875rem] text-slate-400">내부 메모·수임료·업무 세부 단계·활동 기록은 포함되지 않습니다.</p>
           </div>
         )}
       </Modal>

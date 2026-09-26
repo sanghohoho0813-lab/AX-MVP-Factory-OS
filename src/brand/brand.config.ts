@@ -54,7 +54,7 @@ export const brand: BrandConfig = {
   brandNameKo: '미래AI랩',
   productName: 'MIRAE AI LAB OS',
   productNameKo: '미래AI랩 OS',
-  productSubtitle: 'Consulting Operations & AX Studio',
+  productSubtitle: '컨설팅 운영 · AX 스튜디오',
   logoLight: '/brand/mirae-ai-lab-logo-transparent.png',
   logoDark: '/brand/mirae-ai-lab-logo-light.png',
   logoSize: { width: 828, height: 250 },

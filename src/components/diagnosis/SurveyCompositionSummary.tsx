@@ -8,7 +8,7 @@ interface SurveyCompositionSummaryProps {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-2 py-1.5">
-      <span className="text-[13px] text-slate-500">{label}</span>
+      <span className="text-[0.875rem] text-slate-500">{label}</span>
       <span className="text-sm font-semibold text-slate-800">{value}</span>
     </div>
   )

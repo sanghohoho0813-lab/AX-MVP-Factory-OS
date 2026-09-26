@@ -22,7 +22,7 @@ interface FilterBarProps {
 }
 
 const filterSelectClass =
-  "h-9 cursor-pointer rounded-(--radius-control) border border-slate-200 bg-white bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m4%206%204%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-position-[right_8px_center] bg-no-repeat appearance-none pr-8 pl-3 text-[13px] text-slate-700 hover:border-slate-300"
+  "h-9 cursor-pointer rounded-(--radius-control) border border-slate-200 bg-white bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m4%206%204%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-position-[right_8px_center] bg-no-repeat appearance-none pr-8 pl-3 text-[0.875rem] text-slate-700 hover:border-slate-300"
 
 /** 검색 + 셀렉트 필터 + 초기화 + 결과 수를 담는 공통 필터 바 */
 export function FilterBar({
@@ -73,7 +73,7 @@ export function FilterBar({
           <button
             type="button"
             onClick={onReset}
-            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-(--radius-control) px-2.5 text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-(--radius-control) px-2.5 text-[0.875rem] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700"
           >
             <RotateCcw aria-hidden="true" className="size-3.5" />
             필터 초기화

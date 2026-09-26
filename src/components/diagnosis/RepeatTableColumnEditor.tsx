@@ -59,11 +59,11 @@ export function RepeatTableColumnEditor({
   return (
     <div className="sm:col-span-2">
       <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-[13px] font-medium text-slate-700">표 반복 컬럼</span>
+        <span className="text-[0.875rem] font-medium text-slate-700">표 반복 컬럼</span>
         <button
           type="button"
           onClick={add}
-          className="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-[13px] font-medium text-brand-600 hover:bg-brand-50"
+          className="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-[0.875rem] font-medium text-brand-600 hover:bg-brand-50"
         >
           <Plus aria-hidden="true" className="size-3.5" />
           컬럼 추가
@@ -71,7 +71,7 @@ export function RepeatTableColumnEditor({
       </div>
 
       {sorted.length === 0 ? (
-        <p className="rounded-(--radius-control) border border-dashed border-slate-300 px-3 py-4 text-center text-[13px] text-slate-400">
+        <p className="rounded-(--radius-control) border border-dashed border-slate-300 px-3 py-4 text-center text-[0.875rem] text-slate-400">
           컬럼을 추가해 주세요. (최소 2개)
         </p>
       ) : (

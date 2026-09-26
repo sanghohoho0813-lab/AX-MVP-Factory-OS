@@ -39,7 +39,7 @@ export function ActivityTimeline({ activities }: ActivityTimelineProps) {
               <meta.icon className="size-3.5" />
             </span>
             <div className="min-w-0 pt-0.5">
-              <p className="text-[13px] font-medium break-keep text-slate-800">
+              <p className="text-[0.875rem] font-medium break-keep text-slate-800">
                 {activity.title}
               </p>
               {activity.description && (
@@ -47,7 +47,7 @@ export function ActivityTimeline({ activities }: ActivityTimelineProps) {
                   {activity.description}
                 </p>
               )}
-              <p className="mt-1 text-[0.8125rem] text-slate-400">
+              <p className="mt-1 text-[0.875rem] text-slate-400">
                 {activity.actorName} · {formatDateTime(activity.createdAt)}
               </p>
             </div>

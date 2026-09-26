@@ -260,7 +260,7 @@ export function OnboardingModal({ open, initialChapterId, onClose }: OnboardingM
                         <span className="text-slate-400">{c.order}.</span>
                         {c.title}
                         {c.advanced && (
-                          <span className="rounded bg-slate-100 px-1 text-[0.75rem] text-slate-500">
+                          <span className="rounded bg-slate-100 px-1 text-[0.8125rem] text-slate-500">
                             고급
                           </span>
                         )}

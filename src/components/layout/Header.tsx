@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
+import { TextScaleQuickButton } from '../ui/TextScaleQuickButton'
 import {
   Building,
   Check,
@@ -106,15 +107,15 @@ function UserMenu() {
       >
         <span
           aria-hidden="true"
-          className="flex size-8 items-center justify-center rounded-full bg-navy-900 text-[13px] font-semibold text-white"
+          className="flex size-8 items-center justify-center rounded-full bg-navy-900 text-[0.875rem] font-semibold text-white"
         >
           {CURRENT_USER.initial}
         </span>
         <span className="hidden max-w-[160px] text-left leading-tight xl:block">
-          <span className="block truncate text-[13px] font-semibold text-slate-800">
+          <span className="block truncate text-[0.875rem] font-semibold text-slate-800">
             {CURRENT_USER.name}
           </span>
-          <span className="block truncate text-[0.8125rem] text-slate-400">
+          <span className="block truncate text-[0.875rem] text-slate-400">
             {CURRENT_USER.role}
           </span>
         </span>
@@ -179,7 +180,7 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
         {screenGroup && (
           <span
             data-testid="screen-group"
-            className={`flex min-w-0 items-center gap-1 text-[0.7rem] leading-tight font-semibold text-slate-500 before:h-2.5 before:w-[3px] before:shrink-0 before:rounded-full before:content-[''] ${GROUP_BAR[screenGroup.accent]}`}
+            className={`flex min-w-0 items-center gap-1 text-[0.8125rem] leading-tight font-semibold text-slate-500 before:h-2.5 before:w-[3px] before:shrink-0 before:rounded-full before:content-[''] ${GROUP_BAR[screenGroup.accent]}`}
           >
             <span className="truncate">
               {screenGroup.title}
@@ -243,6 +244,8 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
         <span className="hidden min-[1700px]:inline-flex">
           <CloudSaveStatus state={isSupabase ? 'saved' : 'local'} compact={false} />
         </span>
+        {/* D-120: 글자 크기를 머리줄에서 바로 — 설정 깊숙이 있었다 */}
+        <TextScaleQuickButton />
         {/* D-120: 1360px 아래에서도 찾기 — 예전에는 Ctrl+K 로만 열렸다 */}
         <span className="inline-flex min-[1360px]:hidden">
           <GlobalSearch compact />

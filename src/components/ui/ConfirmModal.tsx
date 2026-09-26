@@ -54,7 +54,7 @@ export function ConfirmModal({
     >
       <p className="break-keep">{message}</p>
       {warning && (
-        <p className="mt-3 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2.5 text-[13px] break-keep text-warning-700">
+        <p className="mt-3 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2.5 text-[0.875rem] break-keep text-warning-700">
           {warning}
         </p>
       )}

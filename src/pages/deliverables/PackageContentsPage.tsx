@@ -89,7 +89,7 @@ function ContentsBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: 
           >
             <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-3">
               <DeliverableTrackBadge track={track} />
-              <span className="text-[0.82rem] text-slate-400">{rows.length}개</span>
+              <span className="text-[0.875rem] text-slate-400">{rows.length}개</span>
             </div>
             <ul className="divide-y divide-slate-100">
               {rows.map((section) => {
@@ -110,12 +110,12 @@ function ContentsBody({ pkg, packageId }: { pkg: DeliverablePackage; packageId: 
                         <SectionStatusBadge status={section.status} />
                         {!excluded && <VisibilityBadge visibility={section.visibility} />}
                         {section.manuallyEdited && (
-                          <span className="rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.82rem] font-medium text-warning-700">
+                          <span className="rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.875rem] font-medium text-warning-700">
                             수동 수정됨
                           </span>
                         )}
                       </div>
-                      <p className="mt-1 font-mono text-[0.82rem] text-slate-400">{section.type}</p>
+                      <p className="mt-1 font-mono text-[0.875rem] text-slate-400">{section.type}</p>
                     </div>
 
                     {!readOnly && (

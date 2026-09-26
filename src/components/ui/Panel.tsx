@@ -14,7 +14,7 @@ export function Panel({ title, actions, children, flush = false, className = '' 
   return (
     <section className={`rounded-(--radius-panel) border border-slate-200 bg-white shadow-(--shadow-card) ${className}`}>
       {(title || actions) && <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-4">
-        {title && <h2 className="text-[15px] font-semibold text-slate-900">{title}</h2>}
+        {title && <h2 className="text-[0.9375rem] font-semibold text-slate-900">{title}</h2>}
         {actions}
       </div>}
       <div className={flush ? '' : 'px-5 py-5'}>{children}</div>

@@ -90,6 +90,8 @@ export interface ModuleDefinition {
    * 'first-meetings' 아직 끝내지 않은 1차 미팅(빨강). 빨강은 0 이면 달지 않는다.
    */
   badge?: 'clients' | 'requests' | 'first-meetings'
+  /** 설정 '고급 운영 기능 보기' 를 켰을 때만 목차에 보인다 (D-120) */
+  advanced?: boolean
 }
 
 /*
@@ -106,7 +108,7 @@ export const MODULE_GROUPS: ModuleGroup[] = [
   // 고객 기록과 상관없이 혼자 도는 것들 — 앞으로 여기로 계속 들어온다 (toolRegistry.ts)
   { key: 'tools', title: '컨설팅 작업실', accent: 'system' },
   // D-104: '가끔 쓰는 것' 은 없앴다 — 특허+벤처 · 자금·지원사업이 컨설팅 작업실로 가면서 빈 묶음이 됐다
-  { key: 'studio', title: 'AX STUDIO', accent: 'ai', collapsible: true, defaultCollapsed: true },
+  { key: 'studio', title: 'AX 스튜디오', accent: 'ai', collapsible: true, defaultCollapsed: true },
   { key: 'about', title: '이 시스템', accent: 'system', collapsible: true, defaultCollapsed: true },
   { key: 'settings', title: '설정', accent: 'system' },
 ]
@@ -156,10 +158,10 @@ export const MODULES: ModuleDefinition[] = [
   { key: 'selection', label: '만들 업무', path: '/selection', icon: Filter, group: 'studio', accent: 'ai', enabled: true, hint: '과제 선별' },
   { key: 'mvp-design', label: 'AX 설계', path: '/mvp-design', icon: PencilRuler, group: 'studio', accent: 'ai', enabled: true, hint: 'MVP 설계' },
   { key: 'website-studio', label: '홈페이지 설계', path: '/website-studio', icon: Palette, group: 'studio', accent: 'ai', enabled: true },
-  { key: 'validation', label: '검증', path: '/validation', icon: FlaskConical, group: 'studio', accent: 'ai', enabled: true, hint: '현장 검증' },
+  { key: 'validation', label: '검증', path: '/validation', icon: FlaskConical, group: 'studio', accent: 'ai', enabled: true, hint: '현장 검증', advanced: true },
   { key: 'deliverables', label: '결과자료', path: '/deliverables', icon: FileCheck2, group: 'studio', accent: 'ai', enabled: true },
-  { key: 'institutions', label: '기관 전략', path: '/funding/catalog', icon: Landmark, group: 'studio', accent: 'ai', enabled: true, hint: '기관·프로그램 목록' },
-  { key: 'cases', label: '사례', path: '/cases', icon: Library, group: 'studio', accent: 'ai', enabled: true },
+  { key: 'institutions', label: '기관 전략', path: '/funding/catalog', icon: Landmark, group: 'studio', accent: 'ai', enabled: true, hint: '기관·프로그램 목록', advanced: true },
+  { key: 'cases', label: '사례', path: '/cases', icon: Library, group: 'studio', accent: 'ai', enabled: true, advanced: true },
   { key: 'clients', label: '고객사·프로젝트', path: '/clients', icon: Building2, group: 'studio', accent: 'ai', enabled: true, hint: 'AX 프로젝트 단위 관리' },
 
   // 이 시스템이 왜 있는지 · 성과를 어떻게 재는지 · 다음에 무엇을 만들지 — 규격이 요구하는 '찾을 수 있는 이야기'
@@ -181,10 +183,15 @@ export const MODULES: ModuleDefinition[] = [
 ]
 
 /** 켜져 있는 모듈만, 그룹 순서대로 묶어 돌려준다 */
-export function enabledModulesByGroup(): { group: ModuleGroup; items: ModuleDefinition[] }[] {
+/**
+ * 목차 묶음. opts.advanced 가 false 면 '고급 운영 기능' 메뉴(검증 · 기관 전략 · 사례)를 뺀다(D-120) —
+ * 설정의 '고급 운영 기능 보기' 가 말한 대로. 주소로는 계속 열린다. opts 를 안 주면 전부(시험 · 옛 호출).
+ */
+export function enabledModulesByGroup(opts: { advanced?: boolean } = {}): { group: ModuleGroup; items: ModuleDefinition[] }[] {
+  const showAdvanced = opts.advanced ?? true
   return MODULE_GROUPS.map((group) => ({
     group,
-    items: MODULES.filter((m) => m.enabled && m.group === group.key),
+    items: MODULES.filter((m) => m.enabled && m.group === group.key && (showAdvanced || !m.advanced)),
   })).filter((g) => g.items.length > 0)
 }
 

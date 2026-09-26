@@ -51,7 +51,7 @@ export function TemplatePreviewPage() {
         }
       />
 
-      <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] break-keep text-slate-600">
+      <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50 px-4 py-3 text-[0.875rem] break-keep text-slate-600">
         내부 검수용 미리보기입니다. 입력값은 저장되지 않으며, 고객용 설문 발급은 다음
         개발 단계에서 제공됩니다.
       </p>

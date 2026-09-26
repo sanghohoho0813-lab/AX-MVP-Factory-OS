@@ -34,7 +34,7 @@ function dateInputToIso(value: string): string | null {
 function InfoRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1 border-b border-slate-100 py-3 last:border-0 sm:flex-row sm:gap-4">
-      <dt className="w-40 shrink-0 text-[13px] font-medium text-slate-500">{label}</dt>
+      <dt className="w-40 shrink-0 text-[0.875rem] font-medium text-slate-500">{label}</dt>
       <dd className="min-w-0 flex-1 text-sm break-keep text-slate-700">{children}</dd>
     </div>
   )
@@ -45,7 +45,7 @@ function StringList({ items, empty }: { items: string[]; empty: string }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {items.map((item, i) => (
-        <span key={`${item}-${i}`} className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[13px] text-slate-600">{item}</span>
+        <span key={`${item}-${i}`} className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.875rem] text-slate-600">{item}</span>
       ))}
     </div>
   )
@@ -108,7 +108,7 @@ export function InstitutionDetailPage() {
           className="flex items-start gap-2 rounded-(--radius-card) border border-warning-200 bg-warning-50/60 px-4 py-3"
         >
           <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning-600" />
-          <p className="text-[13px] break-keep text-warning-800">확인일·유효기간을 확인해 최신성을 갱신하세요. 실제 조건은 공식 공고에서 확인해야 합니다.</p>
+          <p className="text-[0.875rem] break-keep text-warning-800">확인일·유효기간을 확인해 최신성을 갱신하세요. 실제 조건은 공식 공고에서 확인해야 합니다.</p>
         </div>
       )}
 
@@ -142,7 +142,7 @@ export function InstitutionDetailPage() {
 
       <Panel title={`이 기관의 프로그램 (${programs.length})`} flush>
         {programs.length === 0 ? (
-          <div className="px-5 py-8 text-center text-[13px] text-slate-400">등록된 프로그램이 없습니다.</div>
+          <div className="px-5 py-8 text-center text-[0.875rem] text-slate-400">등록된 프로그램이 없습니다.</div>
         ) : (
           <ul className="divide-y divide-slate-100">
             {programs.map((prog) => (
@@ -232,11 +232,11 @@ function EditInstitutionModal({
     >
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="inst-edit-url" className="text-[13px] font-medium text-slate-700">공식 URL</label>
+          <label htmlFor="inst-edit-url" className="text-[0.875rem] font-medium text-slate-700">공식 URL</label>
           <input id="inst-edit-url" className={inputClass} value={officialUrl} onChange={(e) => setOfficialUrl(e.target.value)} placeholder="https://" />
         </div>
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="inst-edit-source" className="text-[13px] font-medium text-slate-700">출처 상태</label>
+          <label htmlFor="inst-edit-source" className="text-[0.875rem] font-medium text-slate-700">출처 상태</label>
           <select id="inst-edit-source" className={inputClass} value={sourceStatus} onChange={(e) => setSourceStatus(e.target.value as SourceStatus)}>
             {SOURCE_STATUSES.map((s) => (
               <option key={s} value={s}>{SOURCE_STATUS_META[s].label}</option>
@@ -244,15 +244,15 @@ function EditInstitutionModal({
           </select>
         </div>
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="inst-edit-verified" className="text-[13px] font-medium text-slate-700">확인일</label>
+          <label htmlFor="inst-edit-verified" className="text-[0.875rem] font-medium text-slate-700">확인일</label>
           <input id="inst-edit-verified" type="date" className={inputClass} value={lastVerifiedAt} onChange={(e) => setLastVerifiedAt(e.target.value)} />
         </div>
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="inst-edit-valid" className="text-[13px] font-medium text-slate-700">유효기간</label>
+          <label htmlFor="inst-edit-valid" className="text-[0.875rem] font-medium text-slate-700">유효기간</label>
           <input id="inst-edit-valid" type="date" className={inputClass} value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
         </div>
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="inst-edit-caution" className="text-[13px] font-medium text-slate-700">유의사항</label>
+          <label htmlFor="inst-edit-caution" className="text-[0.875rem] font-medium text-slate-700">유의사항</label>
           <textarea id="inst-edit-caution" rows={3} className={inputClass} value={cautionNotes} onChange={(e) => setCautionNotes(e.target.value)} />
         </div>
       </div>

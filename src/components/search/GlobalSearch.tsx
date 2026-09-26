@@ -207,7 +207,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
         <Search aria-hidden="true" className="size-4 shrink-0" />
         {/* min-w-0 이 없으면 좁은 화면에서 글자가 칸 밖으로 삐져나와 옆 버튼을 덮는다 */}
         <span className="min-w-0 truncate">업체·대표·전화·도구 찾기</span>
-        <kbd className="ml-auto hidden shrink-0 rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[0.75rem] font-medium text-slate-400 2xl:inline">Ctrl K</kbd>
+        <kbd className="ml-auto hidden shrink-0 rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[0.8125rem] font-medium text-slate-400 2xl:inline">Ctrl K</kbd>
       </button>
       )}
 
@@ -233,7 +233,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
               ) : (
                 grouped.map((g) => (
                   <div key={g.group} className="mb-1">
-                    <p className="px-3 py-1.5 text-[0.8rem] font-semibold text-slate-400">{g.group}</p>
+                    <p className="px-3 py-1.5 text-[0.875rem] font-semibold text-slate-400">{g.group}</p>
                     <ul>
                       {g.items.map(({ hit, index }) => (
                         <li key={index}>

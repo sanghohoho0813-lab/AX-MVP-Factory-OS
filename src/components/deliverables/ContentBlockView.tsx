@@ -15,7 +15,7 @@ const TONE_CALLOUT: Record<DeliverableBlockTone, string> = {
 export function ContentBlockView({ block, showInternal }: { block: DeliverableContentBlock; showInternal: boolean }) {
   if (block.internalOnly && !showInternal) return null
   const internalTag = block.internalOnly && showInternal ? (
-    <span className="ml-2 rounded border border-danger-200 bg-danger-50 px-1.5 py-0.5 text-[0.78rem] font-semibold text-danger-600">내부 전용</span>
+    <span className="ml-2 rounded border border-danger-200 bg-danger-50 px-1.5 py-0.5 text-[0.8125rem] font-semibold text-danger-600">내부 전용</span>
   ) : null
 
   switch (block.type) {
@@ -24,26 +24,26 @@ export function ContentBlockView({ block, showInternal }: { block: DeliverableCo
     case 'paragraph':
       return (
         <div>
-          {block.title && <p className="text-[13px] font-semibold text-slate-700">{block.title}{internalTag}</p>}
-          <p className="text-[13px] leading-relaxed break-keep whitespace-pre-wrap text-slate-700">{block.text}</p>
+          {block.title && <p className="text-[0.875rem] font-semibold text-slate-700">{block.title}{internalTag}</p>}
+          <p className="text-[0.875rem] leading-relaxed break-keep whitespace-pre-wrap text-slate-700">{block.text}</p>
         </div>
       )
     case 'callout':
     case 'warning':
       return (
         <div className={`rounded-(--radius-card) border px-4 py-3 ${TONE_CALLOUT[block.type === 'warning' ? 'warning' : block.tone]}`}>
-          {block.title && <p className="text-[13px] font-semibold break-keep">{block.title}{internalTag}</p>}
-          <p className="text-[13px] leading-relaxed break-keep whitespace-pre-wrap">{block.text}</p>
+          {block.title && <p className="text-[0.875rem] font-semibold break-keep">{block.title}{internalTag}</p>}
+          <p className="text-[0.875rem] leading-relaxed break-keep whitespace-pre-wrap">{block.text}</p>
         </div>
       )
     case 'bullet_list':
     case 'checklist':
       return (
         <div>
-          {block.title && <p className="mb-1 text-[13px] font-semibold text-slate-700">{block.title}{internalTag}</p>}
+          {block.title && <p className="mb-1 text-[0.875rem] font-semibold text-slate-700">{block.title}{internalTag}</p>}
           <ul className="flex flex-col gap-1">
             {block.items.map((item, i) => (
-              <li key={i} className="flex items-start gap-2 text-[13px] break-keep text-slate-700">
+              <li key={i} className="flex items-start gap-2 text-[0.875rem] break-keep text-slate-700">
                 <span aria-hidden="true" className="mt-1.5 size-1.5 shrink-0 rounded-full bg-slate-300" />
                 <span className="min-w-0 whitespace-pre-wrap">{item}</span>
               </li>
@@ -55,11 +55,11 @@ export function ContentBlockView({ block, showInternal }: { block: DeliverableCo
     case 'timeline':
       return (
         <div>
-          {block.title && <p className="mb-1 text-[13px] font-semibold text-slate-700">{block.title}{internalTag}</p>}
+          {block.title && <p className="mb-1 text-[0.875rem] font-semibold text-slate-700">{block.title}{internalTag}</p>}
           <ol className="flex flex-col gap-1">
             {block.items.map((item, i) => (
-              <li key={i} className="flex items-start gap-2 text-[13px] break-keep text-slate-700">
-                <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[0.8125rem] font-semibold text-slate-500">{i + 1}</span>
+              <li key={i} className="flex items-start gap-2 text-[0.875rem] break-keep text-slate-700">
+                <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[0.875rem] font-semibold text-slate-500">{i + 1}</span>
                 <span className="min-w-0 whitespace-pre-wrap">{item}</span>
               </li>
             ))}
@@ -69,12 +69,12 @@ export function ContentBlockView({ block, showInternal }: { block: DeliverableCo
     case 'key_value':
       return (
         <div>
-          {block.title && <p className="mb-1.5 text-[13px] font-semibold text-slate-700">{block.title}{internalTag}</p>}
+          {block.title && <p className="mb-1.5 text-[0.875rem] font-semibold text-slate-700">{block.title}{internalTag}</p>}
           <dl className="grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
             {block.keyValues.map((kv, i) => (
               <div key={i} className="flex flex-col">
                 <dt className="text-[0.875rem] text-slate-400">{kv.key}</dt>
-                <dd className="text-[13px] break-keep whitespace-pre-wrap text-slate-700">{kv.value || '-'}</dd>
+                <dd className="text-[0.875rem] break-keep whitespace-pre-wrap text-slate-700">{kv.value || '-'}</dd>
               </div>
             ))}
           </dl>
@@ -83,16 +83,16 @@ export function ContentBlockView({ block, showInternal }: { block: DeliverableCo
     case 'metric':
       return (
         <div className="flex items-baseline justify-between gap-3 rounded-(--radius-card) border border-slate-200 px-3.5 py-2">
-          <span className="text-[13px] text-slate-500">{block.title}</span>
+          <span className="text-[0.875rem] text-slate-500">{block.title}</span>
           <span className="text-sm font-semibold break-keep text-slate-800">{block.text}</span>
         </div>
       )
     case 'table':
       return (
         <div>
-          {block.title && <p className="mb-1.5 text-[13px] font-semibold text-slate-700">{block.title}{internalTag}</p>}
+          {block.title && <p className="mb-1.5 text-[0.875rem] font-semibold text-slate-700">{block.title}{internalTag}</p>}
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-[13px]">
+            <table className="w-full border-collapse text-[0.875rem]">
               {block.tableHeaders.length > 0 && (
                 <thead>
                   <tr className="border-b border-slate-200">
@@ -119,7 +119,7 @@ export function ContentBlockView({ block, showInternal }: { block: DeliverableCo
     case 'prompt':
       return (
         <div>
-          {block.title && <p className="mb-1 text-[13px] font-semibold text-slate-700">{block.title}{internalTag}</p>}
+          {block.title && <p className="mb-1 text-[0.875rem] font-semibold text-slate-700">{block.title}{internalTag}</p>}
           <pre className="overflow-x-auto rounded-(--radius-card) border border-slate-200 bg-slate-50 p-3 text-[0.875rem] leading-relaxed break-words whitespace-pre-wrap text-slate-700">{block.text}</pre>
         </div>
       )

@@ -65,17 +65,17 @@ function PromptCard({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand-100 text-[0.82rem] font-semibold text-brand-700">
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand-100 text-[0.875rem] font-semibold text-brand-700">
               {prompt.sequenceNumber}
             </span>
-            <h3 className="text-[15px] font-semibold break-keep text-slate-900">{prompt.title}</h3>
+            <h3 className="text-[0.9375rem] font-semibold break-keep text-slate-900">{prompt.title}</h3>
             {prompt.manuallyEdited && (
-              <span className="inline-flex items-center rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.82rem] font-medium text-warning-700">
+              <span className="inline-flex items-center rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.875rem] font-medium text-warning-700">
                 수동 수정됨
               </span>
             )}
             {done && (
-              <span className="inline-flex items-center gap-1 rounded-md border border-success-200 bg-success-50 px-2 py-0.5 text-[0.82rem] font-medium text-success-700">
+              <span className="inline-flex items-center gap-1 rounded-md border border-success-200 bg-success-50 px-2 py-0.5 text-[0.875rem] font-medium text-success-700">
                 <Check aria-hidden="true" className="size-3" />
                 완료 표시
               </span>
@@ -262,7 +262,7 @@ function PromptsView({ pkg, readOnly }: { pkg: DeliverablePackage; readOnly: boo
             <section key={track} className="flex flex-col gap-3">
               <div className="flex items-center gap-2">
                 <DeliverableTrackBadge track={track} />
-                <h2 className="text-[15px] font-semibold text-slate-900">
+                <h2 className="text-[0.9375rem] font-semibold text-slate-900">
                   {DELIVERABLE_TRACK_META[track].label} 개발 프롬프트
                 </h2>
               </div>

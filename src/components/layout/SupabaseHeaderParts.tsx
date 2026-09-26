@@ -79,7 +79,7 @@ export function SupabaseWorkspaceSelector() {
                 >
                   <span className="min-w-0 truncate">
                     {ws.workspace?.name ?? ws.workspaceId}
-                    <span className="ml-1.5 text-[0.8125rem] text-slate-400">{ROLE_LABEL[ws.role]}</span>
+                    <span className="ml-1.5 text-[0.875rem] text-slate-400">{ROLE_LABEL[ws.role]}</span>
                   </span>
                   {ws.workspaceId === currentWorkspaceId && <Check aria-hidden="true" className="size-4 shrink-0 text-brand-600" />}
                 </button>
@@ -94,9 +94,9 @@ export function SupabaseWorkspaceSelector() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="새 워크스페이스 이름"
-                  className="h-8 min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 px-2 text-[13px]"
+                  className="h-8 min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 px-2 text-[0.875rem]"
                 />
-                <button type="submit" disabled={busy} className="h-8 shrink-0 cursor-pointer rounded-(--radius-control) bg-brand-600 px-2.5 text-[13px] font-medium text-white disabled:opacity-50">
+                <button type="submit" disabled={busy} className="h-8 shrink-0 cursor-pointer rounded-(--radius-control) bg-brand-600 px-2.5 text-[0.875rem] font-medium text-white disabled:opacity-50">
                   만들기
                 </button>
               </form>
@@ -132,12 +132,12 @@ export function SupabaseUserMenu() {
         onClick={() => setOpen((v) => !v)}
         className="flex h-10 cursor-pointer items-center gap-2.5 rounded-(--radius-control) px-1.5 hover:bg-slate-100 sm:px-2"
       >
-        <span aria-hidden="true" className="flex size-8 items-center justify-center rounded-full bg-navy-900 text-[13px] font-semibold text-white">
+        <span aria-hidden="true" className="flex size-8 items-center justify-center rounded-full bg-navy-900 text-[0.875rem] font-semibold text-white">
           {initial}
         </span>
         <span className="hidden max-w-[180px] text-left leading-tight xl:block">
-          <span className="block truncate text-[13px] font-semibold text-slate-800">{me.name}</span>
-          <span className="block truncate text-[0.8125rem] text-slate-400">{me.title}</span>
+          <span className="block truncate text-[0.875rem] font-semibold text-slate-800">{me.name}</span>
+          <span className="block truncate text-[0.875rem] text-slate-400">{me.title}</span>
         </span>
         <ChevronDown aria-hidden="true" className="hidden size-4 text-slate-400 xl:block" />
       </button>
@@ -145,7 +145,7 @@ export function SupabaseUserMenu() {
         <div className="absolute top-full right-0 z-30 mt-1.5 w-56 rounded-(--radius-card) border border-slate-200 bg-white p-1.5 shadow-(--shadow-overlay)">
           <div className="border-b border-slate-100 px-3 py-2.5">
             <p className="truncate text-sm font-semibold text-slate-800">{me.name} {me.title}</p>
-            <p className="truncate text-[0.8125rem] text-slate-400">{email}</p>
+            <p className="truncate text-[0.875rem] text-slate-400">{email}</p>
           </div>
           <Link to="/settings" onClick={() => setOpen(false)} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
             <Settings aria-hidden="true" className="size-4 text-slate-400" /> 설정

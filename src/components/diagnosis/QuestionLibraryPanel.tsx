@@ -106,7 +106,7 @@ export function QuestionLibraryPanel({ addedIds, onAdd }: QuestionLibraryPanelPr
 
       <ul className="flex-1 divide-y divide-slate-100 overflow-y-auto">
         {filtered.length === 0 ? (
-          <li className="px-4 py-8 text-center text-[13px] text-slate-400">
+          <li className="px-4 py-8 text-center text-[0.875rem] text-slate-400">
             조건에 맞는 질문이 없습니다.
           </li>
         ) : (
@@ -118,13 +118,13 @@ export function QuestionLibraryPanel({ addedIds, onAdd }: QuestionLibraryPanelPr
                   <span className="font-mono text-[0.875rem] font-semibold text-slate-400">
                     {q.code}
                   </span>
-                  <p className="line-clamp-2 text-[13px] break-keep text-slate-700">
+                  <p className="line-clamp-2 text-[0.875rem] break-keep text-slate-700">
                     {q.text}
                   </p>
                   <div className="mt-1 flex flex-wrap items-center gap-1">
                     <QuestionScopeBadge scope={q.scope} />
                     <QuestionCategoryBadge category={q.category} />
-                    <span className="text-[0.8125rem] text-slate-400">
+                    <span className="text-[0.875rem] text-slate-400">
                       약 {QUESTION_TYPE_META[q.type].estimateMinutes}분
                     </span>
                   </div>

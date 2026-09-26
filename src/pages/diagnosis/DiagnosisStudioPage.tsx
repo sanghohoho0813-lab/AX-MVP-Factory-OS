@@ -195,7 +195,7 @@ export function DiagnosisStudioPage() {
       key: 'client',
       header: '고객사',
       cell: (p) => (
-        <span className="text-[13px] font-medium text-slate-700">
+        <span className="text-[0.875rem] font-medium text-slate-700">
           {data.orgById.get(p.organizationId)?.name ?? '알 수 없음'}
         </span>
       ),
@@ -237,7 +237,7 @@ export function DiagnosisStudioPage() {
       key: 'owner',
       header: '담당자',
       className: 'hidden xl:table-cell',
-      cell: (p) => <span className="text-[13px] text-slate-600">{memberName(p.ownerId)}</span>,
+      cell: (p) => <span className="text-[0.875rem] text-slate-600">{memberName(p.ownerId)}</span>,
     },
     {
       key: 'action',
@@ -249,7 +249,7 @@ export function DiagnosisStudioPage() {
           <button
             type="button"
             onClick={() => navigate(lifecycleTarget(p, lc))}
-            className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-semibold text-brand-600 hover:bg-brand-50"
+            className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[0.875rem] font-semibold text-brand-600 hover:bg-brand-50"
           >
             {LIFECYCLE_META[lc].action}
             <ArrowRight aria-hidden="true" className="size-3.5" />
@@ -341,7 +341,7 @@ export function DiagnosisStudioPage() {
                       <button
                         type="button"
                         onClick={() => navigate(lifecycleTarget(p, lc))}
-                        className="inline-flex cursor-pointer items-center gap-1 text-[13px] font-semibold text-brand-600"
+                        className="inline-flex cursor-pointer items-center gap-1 text-[0.875rem] font-semibold text-brand-600"
                       >
                         {LIFECYCLE_META[lc].action}
                         <ArrowRight aria-hidden="true" className="size-3.5" />
@@ -359,11 +359,11 @@ export function DiagnosisStudioPage() {
       <details className="group rounded-(--radius-panel) border border-slate-200 bg-white shadow-(--shadow-card)">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-5 py-4">
           <span className="min-w-0">
-            <span className="flex items-center gap-2 text-[15px] font-semibold text-slate-900">
+            <span className="flex items-center gap-2 text-[0.9375rem] font-semibold text-slate-900">
               <Settings aria-hidden="true" className="size-4 text-slate-400" />
               진단 설정
             </span>
-            <span className="mt-0.5 block text-[13px] break-keep text-slate-500">
+            <span className="mt-0.5 block text-[0.875rem] break-keep text-slate-500">
               질문·업종 모듈·설문 양식 등은 자동 점수·분석 규칙을 수정할 때만 사용합니다.
             </span>
           </span>
@@ -413,7 +413,7 @@ export function DiagnosisStudioPage() {
 
           {data.recentTemplates.length > 0 && (
             <div className="border-t border-slate-100 pt-4">
-              <p className="mb-2 text-[13px] font-semibold text-slate-500">최근 수정 설문 양식</p>
+              <p className="mb-2 text-[0.875rem] font-semibold text-slate-500">최근 수정 설문 양식</p>
               <ul className="flex flex-col gap-1.5">
                 {data.recentTemplates.map((t) => (
                   <li key={t.id}>
@@ -421,7 +421,7 @@ export function DiagnosisStudioPage() {
                       to={`/diagnosis/templates/${t.id}/preview`}
                       className="flex items-center gap-3 rounded-(--radius-control) px-2 py-1.5 hover:bg-slate-50"
                     >
-                      <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-slate-700">{t.name}</span>
+                      <span className="min-w-0 flex-1 truncate text-[0.875rem] font-medium text-slate-700">{t.name}</span>
                       <RespondentRoleBadge role={t.respondentRole} />
                       <TemplateStatusBadge status={t.status} />
                       <span className="text-[0.875rem] text-slate-400">{formatDate(t.updatedAt)}</span>

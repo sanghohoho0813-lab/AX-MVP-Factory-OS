@@ -52,11 +52,11 @@ function BulletPanel({
   return (
     <Panel title={title}>
       {items.length === 0 ? (
-        <p className="text-[13px] text-slate-400">{empty}</p>
+        <p className="text-[0.875rem] text-slate-400">{empty}</p>
       ) : (
         <ul className="flex flex-col gap-1.5">
           {items.map((item) => (
-            <li key={item} className="flex items-start gap-2 text-[13px] break-keep text-slate-700">
+            <li key={item} className="flex items-start gap-2 text-[0.875rem] break-keep text-slate-700">
               <Icon aria-hidden="true" className={`mt-0.5 size-3.5 shrink-0 ${tone}`} />
               {item}
             </li>
@@ -177,7 +177,7 @@ export function AssessmentResultPage() {
       </div>
 
       {!isViewingLatest && (
-        <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50 px-4 py-2.5 text-[13px] break-keep text-slate-500">
+        <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50 px-4 py-2.5 text-[0.875rem] break-keep text-slate-500">
           이전 버전(v{viewed.version}) 결과를 조회 중입니다. 편집은 최신 버전에서만 가능합니다.
         </p>
       )}
@@ -202,7 +202,7 @@ export function AssessmentResultPage() {
         <Panel title="응답자 비교 요약">
           <ul className="flex flex-col gap-1.5">
             {viewed.conflictSummary.map((c) => (
-              <li key={c} className="text-[13px] break-keep text-slate-700">• {c}</li>
+              <li key={c} className="text-[0.875rem] break-keep text-slate-700">• {c}</li>
             ))}
           </ul>
         </Panel>
@@ -212,7 +212,7 @@ export function AssessmentResultPage() {
       <Panel title="추천 다음 행동">
         <ul className="flex flex-col gap-1.5">
           {viewed.suggestedNextActions.map((a) => (
-            <li key={a} className="flex items-start gap-2 text-[13px] break-keep text-slate-700">
+            <li key={a} className="flex items-start gap-2 text-[0.875rem] break-keep text-slate-700">
               <CheckCircle2 aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-brand-500" />
               {a}
             </li>
@@ -225,7 +225,7 @@ export function AssessmentResultPage() {
         <div className="flex flex-col gap-3">
           <div>
             <p className="mb-1 text-[0.875rem] font-medium text-slate-400">자동 요약 (규칙 기반)</p>
-            <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] break-keep text-slate-600">
+            <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2 text-[0.875rem] break-keep text-slate-600">
               {viewed.autoSummary}
             </p>
           </div>

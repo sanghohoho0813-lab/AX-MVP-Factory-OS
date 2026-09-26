@@ -42,7 +42,7 @@ export function ProjectContextBar() {
             <Building2 aria-hidden="true" className="size-4 shrink-0" />
             <span className="truncate">{organization?.name ?? '고객사'}</span>
             {progress.isSample && (
-              <span className="shrink-0 rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[0.78rem] font-semibold text-brand-700">샘플</span>
+              <span className="shrink-0 rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[0.8125rem] font-semibold text-brand-700">샘플</span>
             )}
           </p>
           <h1 className="mt-0.5 text-[1.35rem] leading-tight font-bold break-keep text-slate-900">{project.name}</h1>
@@ -71,7 +71,7 @@ export function ProjectContextBar() {
             <div role="menu" className="absolute top-full right-0 z-30 mt-1.5 w-72 rounded-(--radius-card) border border-slate-200 bg-white p-1.5 shadow-(--shadow-overlay)">
               {recentProjects.length > 0 && (
                 <>
-                  <p className="px-3 py-1.5 text-[0.8rem] font-semibold text-slate-400">최근 프로젝트</p>
+                  <p className="px-3 py-1.5 text-[0.875rem] font-semibold text-slate-400">최근 프로젝트</p>
                   {recentProjects.map((p) => (
                     <button
                       key={p.id}
@@ -81,7 +81,7 @@ export function ProjectContextBar() {
                       className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-[0.95rem] hover:bg-slate-50 ${p.id === project.id ? 'font-semibold text-brand-700' : 'text-slate-700'}`}
                     >
                       <span className="truncate">{p.name}</span>
-                      {p.id === project.id && <span className="text-[0.8rem] text-brand-600">현재</span>}
+                      {p.id === project.id && <span className="text-[0.875rem] text-brand-600">현재</span>}
                     </button>
                   ))}
                   <div className="my-1 border-t border-slate-100" />

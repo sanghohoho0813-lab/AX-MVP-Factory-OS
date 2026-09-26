@@ -71,7 +71,7 @@ export function ModuleQuestionPicker({
           </p>
         </div>
         {connected.length === 0 ? (
-          <p className="px-4 py-8 text-center text-[13px] text-slate-400">
+          <p className="px-4 py-8 text-center text-[0.875rem] text-slate-400">
             오른쪽에서 질문을 추가하세요.
           </p>
         ) : (
@@ -102,7 +102,7 @@ export function ModuleQuestionPicker({
                   <span className="font-mono text-[0.875rem] font-semibold text-slate-400">
                     {q.code}
                   </span>
-                  <p className="text-[13px] break-keep text-slate-700">{q.text}</p>
+                  <p className="text-[0.875rem] break-keep text-slate-700">{q.text}</p>
                   <div className="mt-1 flex flex-wrap gap-1">
                     <QuestionScopeBadge scope={q.scope} />
                     <QuestionTypeBadge type={q.type} />
@@ -143,7 +143,7 @@ export function ModuleQuestionPicker({
             aria-label="범위 필터"
             value={scopeFilter}
             onChange={(e) => setScopeFilter(e.target.value)}
-            className="h-9 rounded-(--radius-control) border border-slate-200 px-2.5 text-[13px] text-slate-700"
+            className="h-9 rounded-(--radius-control) border border-slate-200 px-2.5 text-[0.875rem] text-slate-700"
           >
             <option value="">모든 범위</option>
             {QUESTION_SCOPES.map((s) => (
@@ -155,7 +155,7 @@ export function ModuleQuestionPicker({
         </div>
         <ul className="max-h-96 divide-y divide-slate-100 overflow-y-auto">
           {candidates.length === 0 ? (
-            <li className="px-4 py-8 text-center text-[13px] text-slate-400">
+            <li className="px-4 py-8 text-center text-[0.875rem] text-slate-400">
               추가할 질문이 없습니다.
             </li>
           ) : (
@@ -165,7 +165,7 @@ export function ModuleQuestionPicker({
                   <span className="font-mono text-[0.875rem] font-semibold text-slate-400">
                     {q.code}
                   </span>
-                  <p className="text-[13px] break-keep text-slate-700">{q.text}</p>
+                  <p className="text-[0.875rem] break-keep text-slate-700">{q.text}</p>
                   <div className="mt-1 flex flex-wrap gap-1">
                     <QuestionScopeBadge scope={q.scope} />
                     <QuestionCategoryBadge category={q.category} />

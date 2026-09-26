@@ -43,7 +43,7 @@ function PackageIdentity({ pkg }: { pkg: DeliverablePackage }) {
       <PackageTypeBadge type={pkg.type} />
       <AudienceBadge audience={pkg.audience} />
       <PackageStatusBadge status={pkg.status} />
-      <span className="text-[0.82rem] text-slate-400">v{pkg.version} (확정 당시 내용)</span>
+      <span className="text-[0.875rem] text-slate-400">v{pkg.version} (확정 당시 내용)</span>
     </div>
   )
 }

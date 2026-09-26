@@ -213,7 +213,7 @@ export function TemplateSectionEditor({
             </div>
 
             {placements.length === 0 ? (
-              <p className="px-4 py-6 text-center text-[13px] text-slate-400">
+              <p className="px-4 py-6 text-center text-[0.875rem] text-slate-400">
                 왼쪽 질문 라이브러리에서 질문을 추가하세요.
               </p>
             ) : (
@@ -249,7 +249,7 @@ export function TemplateSectionEditor({
                             {question?.code ?? '삭제된 질문'}
                           </span>
                           <p
-                            className={`text-[13px] break-keep ${missing ? 'text-danger-600' : 'text-slate-700'}`}
+                            className={`text-[0.875rem] break-keep ${missing ? 'text-danger-600' : 'text-slate-700'}`}
                           >
                             {question?.text ?? '참조할 수 없는 질문입니다. 제거해 주세요.'}
                           </p>
@@ -327,7 +327,7 @@ export function TemplateSectionEditor({
       <button
         type="button"
         onClick={addSection}
-        className="flex items-center justify-center gap-1.5 rounded-(--radius-panel) border border-dashed border-slate-300 py-3 text-[13px] font-medium text-slate-500 hover:border-brand-400 hover:text-brand-600"
+        className="flex items-center justify-center gap-1.5 rounded-(--radius-panel) border border-dashed border-slate-300 py-3 text-[0.875rem] font-medium text-slate-500 hover:border-brand-400 hover:text-brand-600"
       >
         <Plus aria-hidden="true" className="size-4" />
         섹션 추가

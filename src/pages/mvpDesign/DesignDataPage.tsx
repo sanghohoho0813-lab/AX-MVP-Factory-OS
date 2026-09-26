@@ -44,7 +44,7 @@ export function DesignDataPage() {
                           <tr key={f.id}>
                             <td className="py-2 pr-3">
                               <span className="font-medium text-slate-700">{f.label}</span>
-                              {f.sensitive && <span className="ml-1.5 rounded border border-warning-200 bg-warning-50 px-1 text-[0.78rem] text-warning-700">민감</span>}
+                              {f.sensitive && <span className="ml-1.5 rounded border border-warning-200 bg-warning-50 px-1 text-[0.8125rem] text-warning-700">민감</span>}
                               <span className="ml-1 text-[0.875rem] text-slate-400">{f.name}</span>
                             </td>
                             <td className="py-2 pr-3 text-slate-600">{FIELD_TYPE_META[f.type].label}</td>

@@ -74,11 +74,11 @@ function StrategyBody({ design }: { design: WebsiteDesign }) {
         <div className="flex max-w-[1000px] flex-col gap-3">
           <div>
             <label htmlFor="s-purpose" className="mb-1 block text-[0.85rem] font-semibold text-slate-500">홈페이지 목적</label>
-            <textarea id="s-purpose" value={purpose} onChange={(e) => setPurpose(e.target.value)} rows={2} className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[14px] focus:border-brand-400 focus:outline-none" />
+            <textarea id="s-purpose" value={purpose} onChange={(e) => setPurpose(e.target.value)} rows={2} className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.875rem] focus:border-brand-400 focus:outline-none" />
           </div>
           <div>
             <label htmlFor="s-msg" className="mb-1 block text-[0.85rem] font-semibold text-slate-500">핵심 메시지</label>
-            <input id="s-msg" value={keyMessage} onChange={(e) => setKeyMessage(e.target.value)} className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[14px] focus:border-brand-400 focus:outline-none" />
+            <input id="s-msg" value={keyMessage} onChange={(e) => setKeyMessage(e.target.value)} className="w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.875rem] focus:border-brand-400 focus:outline-none" />
           </div>
           <div><Button variant="secondary" size="sm" onClick={saveText}>저장</Button></div>
         </div>

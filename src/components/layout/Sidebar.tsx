@@ -1,4 +1,6 @@
 import type { CSSProperties } from 'react'
+import { useStoreVersion } from '../../lib/useStoreVersion'
+import { isAdvancedVisible } from '../../lib/featureVisibility'
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ChevronDown, ChevronsLeft, ChevronsRight, ExternalLink, X } from 'lucide-react'
@@ -67,7 +69,9 @@ function SidebarContent({
 }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const groups = enabledModulesByGroup()
+  // D-120: 설정 '고급 운영 기능 보기' 를 따른다(끄면 검증 · 기관 전략 · 사례를 목차에서 뺀다). 바꾸면 바로 다시 그린다
+  useStoreVersion()
+  const groups = enabledModulesByGroup({ advanced: isAdvancedVisible() })
   const counts = useNavCounts()
   const [userCollapsed, setUserCollapsed] = useState<Set<ModuleGroupKey> | null>(null)
 
@@ -117,7 +121,7 @@ function SidebarContent({
           ) : (
             <span className="flex min-w-0 flex-col items-start gap-0.5">
               <BrandLogo tone="dark" imgClassName="h-12 max-w-[200px]" />
-              <span className="truncate text-[0.72rem] font-semibold tracking-wide text-navy-300">
+              <span className="truncate text-[0.8125rem] font-semibold tracking-wide text-navy-300">
                 {brand.productName}
               </span>
             </span>
@@ -147,14 +151,14 @@ function SidebarContent({
                       aria-expanded={!isCollapsed}
                       aria-controls={listId}
                       onClick={() => toggleGroup(group.key, isCollapsed)}
-                      className="flex w-full cursor-pointer items-center gap-1.5 rounded-md px-3 pb-1.5 text-[0.8rem] font-semibold tracking-wide text-navy-300 hover:text-white"
+                      className="flex w-full cursor-pointer items-center gap-1.5 rounded-md px-3 pb-1.5 text-[0.875rem] font-semibold tracking-wide text-navy-300 hover:text-white"
                     >
                       <span aria-hidden="true" className={`h-3 w-1 shrink-0 rounded-full ${groupAccentClass(group.accent)}`} />
                       <span className="flex-1 text-left">{group.title}</span>
                       <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
                     </button>
                   ) : (
-                    <p id={`nav-${group.key}`} className="flex items-center gap-1.5 px-3 pb-1.5 text-[0.8rem] font-semibold tracking-wide text-navy-300">
+                    <p id={`nav-${group.key}`} className="flex items-center gap-1.5 px-3 pb-1.5 text-[0.875rem] font-semibold tracking-wide text-navy-300">
                       <span aria-hidden="true" className={`h-3 w-1 shrink-0 rounded-full ${groupAccentClass(group.accent)}`} />
                       {group.title}
                     </p>
@@ -213,7 +217,7 @@ function SidebarContent({
                                     isActive ? 'border-white/40 text-white' : 'border-navy-600 text-navy-300'
                                   }`}
                                 >
-                                  NEXT
+                                  다음
                                 </span>
                               )}
                         </Link>
@@ -346,7 +350,7 @@ function FutureExpandRow({ item, collapsed }: { item: ModuleDefinition; collapse
         {!collapsed && <span className="truncate">{item.label}</span>}
         {!collapsed && (
           <span className="ml-auto flex shrink-0 items-center gap-1.5">
-            <span className="t-meta rounded-full border border-navy-600 px-1.5 py-0.5 font-semibold tracking-wide text-navy-300">NEXT</span>
+            <span className="t-meta rounded-full border border-navy-600 px-1.5 py-0.5 font-semibold tracking-wide text-navy-300">다음</span>
             <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${open ? '' : '-rotate-90'}`} />
           </span>
         )}
@@ -400,7 +404,7 @@ function NavBadge({ kind, counts, active, collapsed }: { kind: ModuleDefinition[
   const label = kind === 'requests' ? `새 상담신청 ${n}건` : `남은 1차 미팅 ${n}건`
   if (collapsed) {
     return (
-      <span data-nav-badge={kind} aria-label={label} className="absolute top-1 right-3 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger-500 px-1 text-[0.7rem] font-bold text-white tabular-nums">
+      <span data-nav-badge={kind} aria-label={label} className="absolute top-1 right-3 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger-500 px-1 text-[0.8125rem] font-bold text-white tabular-nums">
         {text}
       </span>
     )

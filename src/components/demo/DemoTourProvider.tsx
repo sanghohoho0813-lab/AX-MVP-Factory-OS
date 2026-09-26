@@ -90,11 +90,11 @@ function DemoBanner({
       className="fixed inset-x-0 bottom-0 z-30 border-t border-navy-800 bg-navy-900 px-4 py-2.5 text-white shadow-(--shadow-overlay) sm:inset-x-auto sm:right-4 sm:bottom-4 sm:rounded-(--radius-panel) sm:border"
     >
       <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-x-3 gap-y-2 sm:mx-0">
-        <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold">
+        <span className="inline-flex items-center gap-1.5 text-[0.875rem] font-semibold">
           <Sparkles aria-hidden="true" className="size-4 text-brand-200" />
           샘플 체험 중
         </span>
-        <span aria-live="polite" className="min-w-0 flex-1 text-[13px] text-navy-200">
+        <span aria-live="polite" className="min-w-0 flex-1 text-[0.875rem] text-navy-200">
           <span className="font-medium text-white">
             {stepIndex + 1}/{total}
           </span>{' '}
@@ -105,7 +105,7 @@ function DemoBanner({
             type="button"
             onClick={onPrev}
             disabled={isFirst}
-            className="inline-flex min-h-9 items-center gap-1 rounded-(--radius-control) border border-navy-700 px-2.5 text-[13px] font-medium text-navy-200 hover:bg-navy-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex min-h-9 items-center gap-1 rounded-(--radius-control) border border-navy-700 px-2.5 text-[0.875rem] font-medium text-navy-200 hover:bg-navy-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ChevronLeft aria-hidden="true" className="size-4" />
             이전
@@ -114,7 +114,7 @@ function DemoBanner({
             type="button"
             onClick={onNext}
             disabled={isLast}
-            className="inline-flex min-h-9 items-center gap-1 rounded-(--radius-control) bg-brand-600 px-3 text-[13px] font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex min-h-9 items-center gap-1 rounded-(--radius-control) bg-brand-600 px-3 text-[0.875rem] font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
             다음
             <ChevronRight aria-hidden="true" className="size-4" />
@@ -123,7 +123,7 @@ function DemoBanner({
             type="button"
             onClick={onExit}
             aria-label="샘플 체험 종료"
-            className="inline-flex min-h-9 items-center gap-1 rounded-(--radius-control) px-2 text-[13px] font-medium text-navy-300 hover:bg-navy-800 hover:text-white"
+            className="inline-flex min-h-9 items-center gap-1 rounded-(--radius-control) px-2 text-[0.875rem] font-medium text-navy-300 hover:bg-navy-800 hover:text-white"
           >
             <X aria-hidden="true" className="size-4" />
             <span className="hidden sm:inline">종료</span>

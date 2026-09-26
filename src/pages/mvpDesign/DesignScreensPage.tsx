@@ -48,17 +48,17 @@ export function DesignScreensPage() {
                       </div>
                     </div>
                     <div>
-                      <p className="mb-1 text-[0.82rem] font-semibold text-slate-400">구성 요소</p>
+                      <p className="mb-1 text-[0.875rem] font-semibold text-slate-400">구성 요소</p>
                       <ul className="flex flex-wrap gap-1.5">
                         {screen.components.map((c) => (
-                          <li key={c.id} className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.82rem] text-slate-600" title={c.description}>
+                          <li key={c.id} className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.875rem] text-slate-600" title={c.description}>
                             {c.label}
                           </li>
                         ))}
                       </ul>
                     </div>
                     <div>
-                      <p className="mb-1 text-[0.82rem] font-semibold text-slate-400">담는 기능</p>
+                      <p className="mb-1 text-[0.875rem] font-semibold text-slate-400">담는 기능</p>
                       <p className="text-[0.875rem] break-keep text-slate-600">
                         {screen.featureIds.map((id) => featureName(design, id)).join(', ')}
                       </p>

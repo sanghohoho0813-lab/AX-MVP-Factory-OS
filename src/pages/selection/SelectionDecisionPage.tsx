@@ -106,7 +106,7 @@ export function SelectionDecisionPage() {
         {header}
         <SelectionNav projectId={projectId} />
         <Panel title="핵심 과제 선정">
-          <p className="text-[13px] text-slate-500">먼저 후보 과제를 추출해야 선정을 시작할 수 있습니다.</p>
+          <p className="text-[0.875rem] text-slate-500">먼저 후보 과제를 추출해야 선정을 시작할 수 있습니다.</p>
           <Button variant="primary" size="sm" className="mt-3" onClick={() => navigate(`/selection/projects/${projectId}`)}>
             개요로 이동
           </Button>
@@ -124,7 +124,7 @@ export function SelectionDecisionPage() {
         {header}
         <SelectionNav projectId={projectId} />
         <Panel title="핵심 과제 선정">
-          <p className="text-[13px] break-keep text-slate-600">
+          <p className="text-[0.875rem] break-keep text-slate-600">
             첫 번째 MVP에서 해결할 핵심 업무와 후속 과제를 확정합니다. 규칙 엔진 추천을 반영한 초안을 생성하세요.
           </p>
           <Button variant="primary" className="mt-3" onClick={startDraft}>
@@ -225,7 +225,7 @@ export function SelectionDecisionPage() {
             {primary ? (
               <SelectedCandidateCard candidate={primary} onOpen={() => navigate(`/selection/projects/${projectId}/candidates/${primary.id}`)} highlight />
             ) : (
-              <p className="text-[13px] text-warning-700">핵심 과제를 1개 선택하세요.</p>
+              <p className="text-[0.875rem] text-warning-700">핵심 과제를 1개 선택하세요.</p>
             )}
             {editable && (
               <div className="mt-3">
@@ -243,9 +243,9 @@ export function SelectionDecisionPage() {
                           onChange={() => doSetPrimary(c.id)}
                           aria-label={`${c.name} 핵심 과제 지정`}
                         />
-                        <span className={`min-w-0 flex-1 truncate text-[13px] ${eligible ? 'text-slate-700' : 'text-slate-400'}`}>{c.name}</span>
+                        <span className={`min-w-0 flex-1 truncate text-[0.875rem] ${eligible ? 'text-slate-700' : 'text-slate-400'}`}>{c.name}</span>
                         <span className="shrink-0 text-sm font-bold text-slate-700">{c.priorityScore}</span>
-                        {!eligible && <span className="shrink-0 text-[0.8125rem] text-slate-400">지정 불가</span>}
+                        {!eligible && <span className="shrink-0 text-[0.875rem] text-slate-400">지정 불가</span>}
                       </li>
                     )
                   })}
@@ -276,7 +276,7 @@ export function SelectionDecisionPage() {
                     return (
                       <li key={c.id} className="flex items-center gap-2 rounded-(--radius-control) border border-slate-200 px-3 py-2">
                         <input type="checkbox" checked={isSec} disabled={disabled} onChange={() => doToggleSecondary(c.id)} aria-label={`${c.name} 보조 과제 지정`} />
-                        <span className={`min-w-0 flex-1 truncate text-[13px] ${disabled ? 'text-slate-400' : 'text-slate-700'}`}>{c.name}</span>
+                        <span className={`min-w-0 flex-1 truncate text-[0.875rem] ${disabled ? 'text-slate-400' : 'text-slate-700'}`}>{c.name}</span>
                         <span className="shrink-0 text-sm font-bold text-slate-700">{c.priorityScore}</span>
                       </li>
                     )
@@ -293,7 +293,7 @@ export function SelectionDecisionPage() {
                   .filter((c) => c.id !== decision.primaryCandidateId && !decision.secondaryCandidateIds.includes(c.id))
                   .map((c) => (
                     <li key={c.id} className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 px-3 py-2">
-                      <span className="min-w-0 flex-1 truncate text-[13px] text-slate-700">{c.name}</span>
+                      <span className="min-w-0 flex-1 truncate text-[0.875rem] text-slate-700">{c.name}</span>
                       <button type="button" onClick={() => setCandidateDecisionBucket(decision.id, c.id, 'deferred')} className="cursor-pointer text-[0.875rem] font-medium text-warning-700 hover:underline">보류</button>
                       <button type="button" onClick={() => setCandidateDecisionBucket(decision.id, c.id, 'rejected')} className="cursor-pointer text-[0.875rem] font-medium text-danger-600 hover:underline">제외</button>
                     </li>
@@ -310,7 +310,7 @@ export function SelectionDecisionPage() {
           {/* 선정 요약 */}
           <Panel title="선정 요약">
             <div className="flex flex-col gap-2">
-              <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] break-keep text-slate-600">
+              <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2 text-[0.875rem] break-keep text-slate-600">
                 {decision.autoSummary}
               </p>
               <label htmlFor="decision-summary" className="text-[0.875rem] font-medium text-slate-400">담당자 최종 의견</label>
@@ -362,29 +362,29 @@ export function SelectionDecisionPage() {
           {/* 위험·선행 */}
           <Panel title="주요 위험">
             {decision.decisionRisks.length === 0 ? (
-              <p className="text-[13px] text-slate-500">등록된 주요 위험이 없습니다.</p>
+              <p className="text-[0.875rem] text-slate-500">등록된 주요 위험이 없습니다.</p>
             ) : (
-              <ul className="flex flex-col gap-1">{decision.decisionRisks.slice(0, 6).map((r) => <li key={r} className="text-[13px] break-keep text-slate-600">• {r}</li>)}</ul>
+              <ul className="flex flex-col gap-1">{decision.decisionRisks.slice(0, 6).map((r) => <li key={r} className="text-[0.875rem] break-keep text-slate-600">• {r}</li>)}</ul>
             )}
           </Panel>
           <Panel title="선행 준비사항">
             {decision.prerequisiteActions.length === 0 ? (
-              <p className="text-[13px] text-slate-500">필수 선행조건이 없습니다.</p>
+              <p className="text-[0.875rem] text-slate-500">필수 선행조건이 없습니다.</p>
             ) : (
-              <ul className="flex flex-col gap-1">{decision.prerequisiteActions.map((r) => <li key={r} className="text-[13px] break-keep text-slate-600">• {r}</li>)}</ul>
+              <ul className="flex flex-col gap-1">{decision.prerequisiteActions.map((r) => <li key={r} className="text-[0.875rem] break-keep text-slate-600">• {r}</li>)}</ul>
             )}
           </Panel>
 
           {/* Stage 7 전달 범위 */}
           {primary && (
             <Panel title="Stage 7 전달 범위">
-              <div className="flex flex-col gap-2 text-[13px] text-slate-600">
+              <div className="flex flex-col gap-2 text-[0.875rem] text-slate-600">
                 <p>권장 MVP 수준: <span className="font-medium text-slate-800">{mvpLevelLabel(decision.recommendedMvpLevel, 'ax')}</span></p>
                 <div>
                   <p className="mb-1 text-[0.875rem] font-medium text-slate-400">템플릿 조합</p>
                   <ul className="flex flex-col gap-0.5">
                     {(decision.recommendedTemplateMix.length > 0 ? decision.recommendedTemplateMix : primary.templateMix).map((t) => (
-                      <li key={t.template} className="text-[13px]">{MVP_TEMPLATE_META[t.template].label} {t.percentage}%</li>
+                      <li key={t.template} className="text-[0.875rem]">{MVP_TEMPLATE_META[t.template].label} {t.percentage}%</li>
                     ))}
                   </ul>
                 </div>
@@ -415,7 +415,7 @@ export function SelectionDecisionPage() {
 
           {finalized && context.handoff && (
             <Panel title="확정 완료">
-              <p className="text-[13px] break-keep text-slate-600">
+              <p className="text-[0.875rem] break-keep text-slate-600">
                 핵심 과제 '{primary?.name}'이(가) 확정되어 기능·화면 설계로 전달할 인계 스냅샷이 생성되었습니다.
               </p>
               <p className="mt-1 text-[0.875rem] text-slate-400">생성 {formatDateTime(context.handoff.generatedAt)}</p>
@@ -458,7 +458,7 @@ export function SelectionDecisionPage() {
 function SysItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[0.8rem] text-slate-400">{label}</dt>
+      <dt className="text-[0.875rem] text-slate-400">{label}</dt>
       <dd className="truncate text-[0.9rem] font-medium text-slate-700">{value}</dd>
     </div>
   )

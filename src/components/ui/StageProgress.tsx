@@ -26,7 +26,7 @@ export function StageProgress({ flow, currentStage }: StageProgressProps) {
                   className={`h-px flex-1 ${index === 0 ? 'bg-transparent' : done || current ? 'bg-brand-500' : 'bg-slate-200'}`}
                 />
                 <span
-                  className={`flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${
+                  className={`flex size-7 shrink-0 items-center justify-center rounded-full border text-[0.8125rem] font-semibold ${
                     done
                       ? 'border-brand-600 bg-brand-600 text-white'
                       : current
@@ -46,7 +46,7 @@ export function StageProgress({ flow, currentStage }: StageProgressProps) {
                 />
               </div>
               <span
-                className={`w-full truncate text-center text-[11px] font-medium sm:text-xs ${
+                className={`w-full truncate text-center text-[0.8125rem] font-medium sm:text-[0.8125rem] ${
                   current ? 'text-brand-700' : done ? 'text-slate-600' : 'text-slate-400'
                 }`}
                 title={PROJECT_STAGE_META[stage].label}

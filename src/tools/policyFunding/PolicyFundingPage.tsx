@@ -226,7 +226,7 @@ function ReportPicker() {
                   <b className="block truncate text-slate-900">{c.companyName}</b>
                   <span className="text-sm text-slate-500">{c.recommendedAgency}{c.diagnosisResult ? '' : ' · 진단 기록 없음'}</span>
                 </span>
-                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${STAGE_BADGE[c.stage]}`}>{c.stage}</span>
+                <span className={`shrink-0 rounded-full px-2.5 py-1 text-[0.8125rem] font-semibold ${STAGE_BADGE[c.stage]}`}>{c.stage}</span>
               </Link>
             </li>
           ))}

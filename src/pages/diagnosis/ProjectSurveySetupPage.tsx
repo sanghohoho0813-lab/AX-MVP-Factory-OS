@@ -368,11 +368,11 @@ export function ProjectSurveySetupPage() {
                   </div>
                   <div className="mt-auto pt-1">
                     {ready ? (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-success-200 bg-success-50 px-2.5 py-0.5 text-[0.82rem] font-semibold text-success-700"><Check aria-hidden="true" className="size-3.5" />준비 완료</span>
+                      <span className="inline-flex items-center gap-1 rounded-full border border-success-200 bg-success-50 px-2.5 py-0.5 text-[0.875rem] font-semibold text-success-700"><Check aria-hidden="true" className="size-3.5" />준비 완료</span>
                     ) : active ? (
-                      <span className="inline-flex items-center rounded-full border border-brand-200 bg-white px-2.5 py-0.5 text-[0.82rem] font-semibold text-brand-700">선택됨 · 아래에서 구성</span>
+                      <span className="inline-flex items-center rounded-full border border-brand-200 bg-white px-2.5 py-0.5 text-[0.875rem] font-semibold text-brand-700">선택됨 · 아래에서 구성</span>
                     ) : (
-                      <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[0.82rem] font-medium text-slate-500">눌러서 선택</span>
+                      <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[0.875rem] font-medium text-slate-500">눌러서 선택</span>
                     )}
                   </div>
                 </button>
@@ -425,7 +425,7 @@ export function ProjectSurveySetupPage() {
                                 <p className="text-[0.98rem] break-keep text-slate-700">{q?.text}</p>
                                 {expertOpen && (
                                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                                    <span className="font-mono text-[0.78rem] text-slate-400">{q?.code}</span>
+                                    <span className="font-mono text-[0.8125rem] text-slate-400">{q?.code}</span>
                                     {q && <QuestionScopeBadge scope={p.sourceScope} />}
                                     {q && <QuestionTypeBadge type={q.type} />}
                                     <label className="flex cursor-pointer items-center gap-1 text-[0.85rem] text-slate-500">
@@ -445,7 +445,7 @@ export function ProjectSurveySetupPage() {
                                 type="button"
                                 onClick={() => toggleExclude(p.questionId)}
                                 aria-label={excluded ? `${q?.code} 제외 취소` : `${q?.code} 제외`}
-                                className={`inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md border px-2 py-1 text-[0.82rem] font-medium ${
+                                className={`inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md border px-2 py-1 text-[0.875rem] font-medium ${
                                   excluded ? 'border-brand-300 text-brand-600 hover:bg-brand-50' : 'border-slate-300 text-slate-500 hover:bg-slate-50'
                                 }`}
                               >
@@ -495,10 +495,10 @@ export function ProjectSurveySetupPage() {
                           <input type="radio" name="template" checked={active} onChange={() => setTemplateId(t.id)} className="size-4 accent-brand-600" />
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-[0.95rem] font-medium text-slate-800">{t.name}</p>
-                            <p className="text-[0.82rem] text-slate-400">문항 {t.sections.reduce((n, s) => n + s.placements.length, 0)}개 · 약 {t.estimatedMinutes}분</p>
+                            <p className="text-[0.875rem] text-slate-400">문항 {t.sections.reduce((n, s) => n + s.placements.length, 0)}개 · 약 {t.estimatedMinutes}분</p>
                           </div>
                           <RespondentRoleBadge role={t.respondentRole} />
-                          {recommended && <span className="rounded-md border border-success-200 bg-success-50 px-2 py-0.5 text-[0.8rem] font-medium text-success-700">추천</span>}
+                          {recommended && <span className="rounded-md border border-success-200 bg-success-50 px-2 py-0.5 text-[0.875rem] font-medium text-success-700">추천</span>}
                         </label>
                       )
                     })}
@@ -509,7 +509,7 @@ export function ProjectSurveySetupPage() {
                           <input type="radio" name="template" checked={active} onChange={() => setTemplateId(t.id)} className="size-4 accent-brand-600" />
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-[0.95rem] font-medium text-slate-800">{t.name}</p>
-                            <p className="text-[0.82rem] text-warning-600">초안 템플릿입니다. 게시본을 우선 사용하는 것을 권장합니다.</p>
+                            <p className="text-[0.875rem] text-warning-600">초안 템플릿입니다. 게시본을 우선 사용하는 것을 권장합니다.</p>
                           </div>
                           <TemplateStatusBadge status={t.status} />
                         </label>
@@ -531,14 +531,14 @@ export function ProjectSurveySetupPage() {
                             <input type="checkbox" checked={active} onChange={() => toggleModule(module.id)} className="mt-0.5 size-4 accent-brand-600" />
                             <div className="min-w-0 flex-1">
                               <p className="text-[0.95rem] font-medium text-slate-800">{module.name}</p>
-                              <p className="text-[0.82rem] text-slate-500">질문 {module.questionIds.length}개 · {reason}</p>
+                              <p className="text-[0.875rem] text-slate-500">질문 {module.questionIds.length}개 · {reason}</p>
                             </div>
                           </label>
                         )
                       })
                     )}
                     {!industryKey && project.projectType !== 'website' && (
-                      <p className="text-[0.82rem] text-slate-400">고객사 업종이 표준 업종으로 인식되지 않아 업종 모듈이 자동 추천되지 않았습니다.</p>
+                      <p className="text-[0.875rem] text-slate-400">고객사 업종이 표준 업종으로 인식되지 않아 업종 모듈이 자동 추천되지 않았습니다.</p>
                     )}
                   </div>
                 </div>
@@ -554,10 +554,10 @@ export function ProjectSurveySetupPage() {
                       {customCandidates.map((q) => (
                         <li key={q.id} className="flex items-center gap-2 px-3 py-2">
                           <div className="min-w-0 flex-1">
-                            <span className="font-mono text-[0.78rem] text-slate-400">{q.code}</span>
+                            <span className="font-mono text-[0.8125rem] text-slate-400">{q.code}</span>
                             <p className="truncate text-[0.9rem] text-slate-700">{q.text}</p>
                           </div>
-                          <button type="button" onClick={() => addCustom(q.id)} className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-[0.82rem] font-medium text-slate-600 hover:bg-slate-50">
+                          <button type="button" onClick={() => addCustom(q.id)} className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-[0.875rem] font-medium text-slate-600 hover:bg-slate-50">
                             <Plus aria-hidden="true" className="size-3" />추가
                           </button>
                         </li>
@@ -567,7 +567,7 @@ export function ProjectSurveySetupPage() {
                   {additionalQuestions.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {additionalQuestions.map((q) => (
-                        <span key={q.id} className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.82rem] text-warning-700">
+                        <span key={q.id} className="inline-flex items-center gap-1 rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 text-[0.875rem] text-warning-700">
                           {q.code}
                           <button type="button" aria-label={`${q.code} 맞춤 질문 제거`} onClick={() => removeCustom(q.id)} className="cursor-pointer hover:text-warning-900">
                             <X aria-hidden="true" className="size-3" />

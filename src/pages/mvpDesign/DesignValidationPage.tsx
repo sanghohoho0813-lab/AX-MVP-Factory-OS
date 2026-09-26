@@ -86,7 +86,7 @@ export function DesignValidationPage() {
                       <div className="flex items-center gap-2">
                         <FlaskConical aria-hidden="true" className="size-3.5 text-slate-400" />
                         <p className="text-[0.92rem] font-medium text-slate-700">{t.title}</p>
-                        <span className={`rounded-md border px-1.5 py-0.5 text-[0.82rem] font-medium ${TONE_BADGE_CLASS[TEST_KIND_META[t.kind].tone]}`}>
+                        <span className={`rounded-md border px-1.5 py-0.5 text-[0.875rem] font-medium ${TONE_BADGE_CLASS[TEST_KIND_META[t.kind].tone]}`}>
                           {TEST_KIND_META[t.kind].label}
                         </span>
                       </div>

@@ -32,7 +32,7 @@ export function SalesTabs() {
               {({ isActive }) => (
                 <>
                   <t.icon aria-hidden="true" className={`size-4 shrink-0 ${isActive ? '' : 'ramp-text'}`} style={isActive ? undefined : rampAt(i, SALES_TABS.length)} />
-                  <span className="text-[0.8rem] leading-tight sm:text-[0.9rem] sm:whitespace-nowrap">{t.label}</span>
+                  <span className="text-[0.875rem] leading-tight sm:text-[0.9rem] sm:whitespace-nowrap">{t.label}</span>
                 </>
               )}
             </NavLink>

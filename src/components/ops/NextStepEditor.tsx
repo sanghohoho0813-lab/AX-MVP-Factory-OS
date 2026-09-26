@@ -63,7 +63,7 @@ export function NextStepEditor({
       <div data-testid="next-step" className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <CalendarClock aria-hidden="true" className={`size-5 shrink-0 ${overdue ? 'text-danger-600' : 'text-brand-600'}`} />
         <span className="t-sub font-semibold text-slate-600">{label}</span>
-        <span className="t-body min-w-0 flex-1 break-keep text-slate-900">
+        <span className="t-body min-w-0 flex-[1_1_14rem] break-keep text-slate-900">
           {record.nextAction || record.nextActionDueDate ? (
             <>
               <strong className="font-semibold">{record.nextAction || '할 일'}</strong>

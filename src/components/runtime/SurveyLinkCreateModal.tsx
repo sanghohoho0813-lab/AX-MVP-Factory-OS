@@ -237,7 +237,7 @@ export function SurveyLinkCreateModal({
             url={url}
             onOpen={() => window.open(url, '_blank')}
           />
-          <p className="text-[13px] text-slate-500">
+          <p className="text-[0.875rem] text-slate-500">
             이 링크는 같은 브라우저 프로필에서만 열립니다. 응답 현황은 링크 상세에서
             확인할 수 있습니다.
           </p>
@@ -314,7 +314,7 @@ export function SurveyLinkCreateModal({
         </div>
 
         <div className="border-t border-slate-100 pt-4">
-          <p className="mb-3 text-[13px] font-semibold text-slate-700">응답자 정보</p>
+          <p className="mb-3 text-[0.875rem] font-semibold text-slate-700">응답자 정보</p>
           <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
             <TextField
               id="dist-name"
@@ -351,7 +351,7 @@ export function SurveyLinkCreateModal({
         </div>
 
         <div className="border-t border-slate-100 pt-4">
-          <p className="mb-3 text-[13px] font-semibold text-slate-700">안내 설정</p>
+          <p className="mb-3 text-[0.875rem] font-semibold text-slate-700">안내 설정</p>
           <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
             <TextAreaField
               id="dist-intro"
@@ -379,7 +379,7 @@ export function SurveyLinkCreateModal({
               ]}
             />
             <div>
-              <span className="mb-1.5 block text-[13px] font-medium text-slate-700">
+              <span className="mb-1.5 block text-[0.875rem] font-medium text-slate-700">
                 응답 만료일
               </span>
               <div className="flex flex-wrap gap-1.5">
@@ -390,7 +390,7 @@ export function SurveyLinkCreateModal({
                       key={preset.label}
                       type="button"
                       onClick={() => setExpiryDays(preset.days)}
-                      className={`h-8 cursor-pointer rounded-(--radius-control) border px-2.5 text-[13px] font-medium ${
+                      className={`h-8 cursor-pointer rounded-(--radius-control) border px-2.5 text-[0.875rem] font-medium ${
                         active
                           ? 'border-brand-600 bg-brand-50 text-brand-700'
                           : 'border-slate-300 text-slate-600 hover:border-slate-400'

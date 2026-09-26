@@ -57,7 +57,7 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
       >
         <Bell aria-hidden="true" className="size-5" />
         {count > 0 && (
-          <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger-500 px-1 text-[0.78rem] font-semibold text-white">
+          <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger-500 px-1 text-[0.8125rem] font-semibold text-white">
             {count > 99 ? '99+' : count}
           </span>
         )}

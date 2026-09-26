@@ -113,7 +113,7 @@ export function SelectionResultsPage() {
   const go = (r: Row) => navigate(`/selection/projects/${r.project.id}/decision`)
 
   const columns: DataTableColumn<Row>[] = [
-    { key: 'client', header: '고객사', cell: (r) => <span className="text-[13px] font-medium text-slate-700">{r.organization?.name ?? '-'}</span> },
+    { key: 'client', header: '고객사', cell: (r) => <span className="text-[0.875rem] font-medium text-slate-700">{r.organization?.name ?? '-'}</span> },
     {
       key: 'project', header: '프로젝트', className: 'min-w-[140px]',
       cell: (r) => (
@@ -125,19 +125,19 @@ export function SelectionResultsPage() {
     },
     {
       key: 'primary', header: '핵심 과제', className: 'min-w-[150px]',
-      cell: (r) => <span className="text-[13px] text-slate-700">{r.primary?.name ?? <span className="text-slate-400">미선정</span>}</span>,
+      cell: (r) => <span className="text-[0.875rem] text-slate-700">{r.primary?.name ?? <span className="text-slate-400">미선정</span>}</span>,
     },
     { key: 'score', header: '점수', cell: (r) => <span className="text-sm font-bold text-slate-800">{r.primary?.priorityScore ?? '-'}</span> },
     { key: 'quadrant', header: '사분면', className: 'hidden lg:table-cell', cell: (r) => (r.primary ? <PriorityQuadrantBadge quadrant={r.primary.quadrant} /> : <span className="text-slate-300">-</span>) },
     { key: 'approach', header: '자동화', className: 'hidden xl:table-cell', cell: (r) => (r.primary ? <AutomationApproachBadge approach={r.primary.automationApproach} /> : <span className="text-slate-300">-</span>) },
-    { key: 'mvp', header: 'MVP 수준', className: 'hidden xl:table-cell', cell: (r) => <span className="text-[13px] text-slate-600">{mvpLevelLabel(r.decision.recommendedMvpLevel, 'ax')}</span> },
+    { key: 'mvp', header: 'MVP 수준', className: 'hidden xl:table-cell', cell: (r) => <span className="text-[0.875rem] text-slate-600">{mvpLevelLabel(r.decision.recommendedMvpLevel, 'ax')}</span> },
     {
       key: 'status', header: '상태',
       cell: (r) => (
         <div className="flex items-center gap-1.5">
           <SelectionStatusBadge status={r.decision.status} />
           {r.reselection && (
-            <span className="inline-flex items-center gap-0.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-warning-700">
+            <span className="inline-flex items-center gap-0.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
               <RefreshCw aria-hidden="true" className="size-3" />
               재선별
             </span>
@@ -146,8 +146,8 @@ export function SelectionResultsPage() {
       ),
     },
     { key: 'version', header: '버전', className: 'hidden xl:table-cell', cell: (r) => <span className="text-[0.875rem] text-slate-400">v{r.decision.version}</span> },
-    { key: 'updated', header: '확정일', className: 'hidden lg:table-cell', cell: (r) => <span className="text-[13px] text-slate-500">{formatDate(r.decision.finalizedAt ?? r.decision.updatedAt)}</span> },
-    { key: 'owner', header: '담당자', className: 'hidden xl:table-cell', cell: (r) => <span className="text-[13px] text-slate-600">{memberName(r.project.ownerId)}</span> },
+    { key: 'updated', header: '확정일', className: 'hidden lg:table-cell', cell: (r) => <span className="text-[0.875rem] text-slate-500">{formatDate(r.decision.finalizedAt ?? r.decision.updatedAt)}</span> },
+    { key: 'owner', header: '담당자', className: 'hidden xl:table-cell', cell: (r) => <span className="text-[0.875rem] text-slate-600">{memberName(r.project.ownerId)}</span> },
   ]
 
   const hasActive = query !== '' || status !== '' || sort !== 'recent'
@@ -236,13 +236,13 @@ export function SelectionResultsPage() {
                       <p className="min-w-0 truncate text-sm font-semibold text-slate-800">{r.organization?.name} · {r.project.name}</p>
                       {r.primary && <span className="shrink-0 text-sm font-bold text-slate-800">{r.primary.priorityScore}점</span>}
                     </div>
-                    <p className="truncate text-[13px] text-slate-600">{r.primary?.name ?? '핵심 미선정'}</p>
+                    <p className="truncate text-[0.875rem] text-slate-600">{r.primary?.name ?? '핵심 미선정'}</p>
                     <div className="flex flex-wrap items-center gap-1.5">
                       <ProjectTypeBadge type={r.project.projectType} compact />
                       <SelectionStatusBadge status={r.decision.status} />
                       {r.primary && <CandidateConfidenceBadge confidence={r.primary.confidence} />}
                       {r.reselection && (
-                        <span className="inline-flex items-center gap-0.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-warning-700">
+                        <span className="inline-flex items-center gap-0.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-warning-700">
                           <RefreshCw aria-hidden="true" className="size-3" />
                           재선별
                         </span>

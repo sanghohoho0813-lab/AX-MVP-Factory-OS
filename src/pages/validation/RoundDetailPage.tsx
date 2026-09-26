@@ -247,7 +247,7 @@ function RoundDetailBody({
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-sm font-semibold break-keep text-slate-800">{s.title}</p>
-                        {s.required && <span className="rounded border border-brand-200 bg-brand-50 px-1 text-[0.82rem] font-semibold text-brand-700">필수</span>}
+                        {s.required && <span className="rounded border border-brand-200 bg-brand-50 px-1 text-[0.875rem] font-semibold text-brand-700">필수</span>}
                         {run ? <RunResultBadge result={run.result} /> : <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.9rem] text-slate-500">미기록</span>}
                       </div>
                       <p className="mt-1 text-[0.9rem] break-keep text-slate-500">통과 기준: {s.passRule.trim() ? s.passRule : '미입력'}</p>

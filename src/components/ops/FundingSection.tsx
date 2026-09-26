@@ -113,12 +113,12 @@ export function FundingSection({
                         <span className="text-[1.05rem] font-bold break-keep text-slate-900">
                           {a.programName || '(공고명 없음)'}
                         </span>
-                        <span className={`rounded-full border px-2 py-0.5 text-[0.8rem] font-semibold ${STATUS_CLASS[a.status]}`}>
+                        <span className={`rounded-full border px-2 py-0.5 text-[0.875rem] font-semibold ${STATUS_CLASS[a.status]}`}>
                           {FUNDING_STATUS_LABEL[a.status]}
                         </span>
                         {openStage && left !== null && (
                           <span
-                            className={`rounded-full border px-2 py-0.5 text-[0.8rem] font-bold ${
+                            className={`rounded-full border px-2 py-0.5 text-[0.875rem] font-bold ${
                               left < 0
                                 ? 'border-danger-200 bg-danger-100 text-danger-700'
                                 : left <= 7

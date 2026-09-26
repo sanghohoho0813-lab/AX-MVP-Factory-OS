@@ -71,7 +71,7 @@ function SitemapBody({ design }: { design: WebsiteDesign }) {
 
         <div className="mt-4 flex max-w-[560px] items-end gap-2">
           <label className="min-w-0 flex-1 text-[0.85rem] font-semibold text-slate-500">새 페이지 이름
-            <input value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} className="mt-0.5 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[14px] focus:border-brand-400 focus:outline-none" placeholder="예: 자료실" />
+            <input value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} className="mt-0.5 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.875rem] focus:border-brand-400 focus:outline-none" placeholder="예: 자료실" />
           </label>
           <Button variant="secondary" onClick={add}><Plus aria-hidden="true" className="size-4" />페이지 추가</Button>
         </div>

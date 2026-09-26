@@ -31,11 +31,11 @@ function InterviewItem({
       <div className="flex flex-wrap items-center gap-2">
         <InterviewPriorityBadge priority={q.priority} />
         <InterviewStatusBadge status={q.status} />
-        <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.8125rem] font-medium text-slate-500">
+        <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.875rem] font-medium text-slate-500">
           {RESPONDENT_ROLE_META[q.targetRespondentRole].label} 대상
         </span>
         {q.manual && (
-          <span className="rounded-md border border-accent-200 bg-accent-50 px-1.5 py-0.5 text-[0.8125rem] font-medium text-accent-700">
+          <span className="rounded-md border border-accent-200 bg-accent-50 px-1.5 py-0.5 text-[0.875rem] font-medium text-accent-700">
             수동
           </span>
         )}
@@ -50,7 +50,7 @@ function InterviewItem({
 
       {q.status === 'answered' && !answering && (
         <div className="mt-2 rounded-(--radius-control) border border-success-200 bg-success-50/50 px-3 py-2">
-          <p className="text-[13px] break-keep whitespace-pre-wrap text-slate-700">{q.answer}</p>
+          <p className="text-[0.875rem] break-keep whitespace-pre-wrap text-slate-700">{q.answer}</p>
           {q.answeredAt && (
             <p className="mt-1 text-[0.875rem] text-slate-400">기록 {formatDateTime(q.answeredAt)}</p>
           )}
@@ -108,7 +108,7 @@ function InterviewItem({
           <button
             type="button"
             onClick={() => onExclude(q)}
-            className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-medium text-slate-400 hover:text-slate-600"
+            className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[0.875rem] font-medium text-slate-400 hover:text-slate-600"
           >
             <X aria-hidden="true" className="size-3.5" />
             제외

@@ -81,12 +81,12 @@ export function WizardLayout({
                       state === 'current' ? 'bg-brand-50 font-semibold text-brand-800' : state === 'done' ? 'text-slate-700 hover:bg-slate-50' : 'text-slate-400'
                     }`}
                   >
-                    <span className={`flex size-6 shrink-0 items-center justify-center rounded-full border text-[0.8rem] font-bold ${
+                    <span className={`flex size-6 shrink-0 items-center justify-center rounded-full border text-[0.875rem] font-bold ${
                       state === 'done' ? 'border-success-500 bg-success-500 text-white' : state === 'current' ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 text-slate-400'
                     }`}>
                       {state === 'done' ? <Check aria-hidden="true" className="size-3.5" /> : i + 1}
                     </span>
-                    <span className="truncate">{s.title}{s.optional && <span className="ml-1 text-[0.8rem] text-slate-400">(선택)</span>}</span>
+                    <span className="truncate">{s.title}{s.optional && <span className="ml-1 text-[0.875rem] text-slate-400">(선택)</span>}</span>
                   </button>
                 </li>
               )

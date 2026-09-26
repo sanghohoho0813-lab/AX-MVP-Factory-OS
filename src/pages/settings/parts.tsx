@@ -37,7 +37,7 @@ export function TabNav({ active, onChange }: { active: TabKey; onChange: (k: Tab
           type="button"
           aria-current={active === t.key ? 'page' : undefined}
           onClick={() => onChange(t.key)}
-          className={`-mb-px flex min-w-0 flex-col items-center gap-0.5 border-b-2 px-1 py-2 text-[0.8rem] font-medium break-keep transition-colors sm:shrink-0 sm:flex-row sm:gap-1.5 sm:px-3 sm:py-2.5 sm:text-[13px] ${
+          className={`-mb-px flex min-w-0 flex-col items-center gap-0.5 border-b-2 px-1 py-2 text-[0.875rem] font-medium break-keep transition-colors sm:shrink-0 sm:flex-row sm:gap-1.5 sm:px-3 sm:py-2.5 sm:text-[0.875rem] ${
             active === t.key ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -52,8 +52,8 @@ export function TabNav({ active, onChange }: { active: TabKey; onChange: (k: Tab
 export function SettingRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-50 py-2.5 last:border-0">
-      <span className="text-[13px] text-slate-500">{label}</span>
-      <span className="text-[13px] font-medium text-slate-800">{children}</span>
+      <span className="text-[0.875rem] text-slate-500">{label}</span>
+      <span className="text-[0.875rem] font-medium text-slate-800">{children}</span>
     </div>
   )
 }
@@ -96,7 +96,7 @@ export function FeatureVisibilityPanel() {
         <span className="min-w-0">
           <span className="block text-[0.95rem] font-semibold text-slate-800">고급 운영 기능 보기</span>
           <span className="block text-[0.88rem] break-keep text-slate-500">
-            {advanced ? '실제 사용 테스트·기관 연계·사례 메뉴가 표시됩니다.' : '지금은 핵심 흐름만 표시합니다.'}
+            {advanced ? '목차 AX 스튜디오에 검증 · 기관 전략 · 사례가 보입니다.' : '지금은 핵심 흐름만 — 검증 · 기관 전략 · 사례는 목차에서 뺐습니다(주소로는 열립니다).'}
           </span>
         </span>
         <input
@@ -133,19 +133,19 @@ export function LocalDataSummaryPanel() {
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CloudSaveStatus state="local" />
-          <span className="text-[13px] text-slate-500">스키마 v{snapshot.schemaVersion} · 총 {snapshot.totalItems}건</span>
+          <span className="text-[0.875rem] text-slate-500">스키마 v{snapshot.schemaVersion} · 총 {snapshot.totalItems}건</span>
         </div>
         {summary.length > 0 ? (
           <ul className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
             {summary.map((s) => (
-              <li key={s.domain} className="flex items-center justify-between text-[13px] text-slate-600">
+              <li key={s.domain} className="flex items-center justify-between text-[0.875rem] text-slate-600">
                 <span className="truncate">{s.domain}</span>
                 <span className="font-semibold text-slate-800">{s.count}</span>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="text-[13px] text-slate-500">저장된 로컬 데이터가 없습니다.</p>
+          <p className="text-[0.875rem] text-slate-500">저장된 로컬 데이터가 없습니다.</p>
         )}
         <div>
           <Button variant="secondary" onClick={() => { downloadLocalBackup(); showToast('로컬 백업(JSON)을 내려받았습니다.') }}>

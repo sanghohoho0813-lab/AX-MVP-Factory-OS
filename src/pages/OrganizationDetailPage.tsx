@@ -41,7 +41,7 @@ import { useToast } from '../components/ui/toastContext'
 function InfoItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs text-slate-400">{label}</dt>
+      <dt className="text-[0.8125rem] text-slate-400">{label}</dt>
       <dd className="mt-0.5 text-sm break-keep text-slate-700">{value || '-'}</dd>
     </div>
   )
@@ -119,7 +119,7 @@ export function OrganizationDetailPage() {
           className="block px-5 py-4 transition-colors hover:bg-slate-50"
         >
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold tracking-wide text-slate-400">
+            <span className="text-[0.8125rem] font-semibold tracking-wide text-slate-400">
               {project.projectCode}
             </span>
             <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">
@@ -127,7 +127,7 @@ export function OrganizationDetailPage() {
             </p>
             <ProjectTypeBadge type={project.projectType} compact />
             {progress.isSample && (
-              <span className="rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[0.78rem] font-medium text-brand-700">
+              <span className="rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[0.8125rem] font-medium text-brand-700">
                 샘플
               </span>
             )}
@@ -226,7 +226,7 @@ export function OrganizationDetailPage() {
       />
 
       {organization.archivedAt && (
-        <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] break-keep text-slate-600">
+        <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50 px-4 py-3 text-[0.875rem] break-keep text-slate-600">
           {formatDate(organization.archivedAt)}에 보관 처리된 고객사입니다. 기본
           목록에는 표시되지 않지만 데이터는 유지됩니다.
         </p>
