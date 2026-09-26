@@ -113,6 +113,7 @@ import { agentShares, feeMathOf, feeTotals, marginPct, marginText, netAmountOf }
 import { withActivity } from '../services/clientOpsActivity'
 import { allDocumentMetas, emptyDocumentState } from '../services/clientOpsDocuments'
 import { ActivityLog } from '../components/ops/ActivityLog'
+import { ClientSalesCard } from '../components/sales/ClientSalesCard'
 import { ContractCard } from '../components/ops/ContractCard'
 import { WorkHistoryCard } from '../components/ops/WorkHistoryCard'
 import { ToolResultsCard } from '../components/ops/ToolResultsCard'
@@ -609,6 +610,9 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         "이 회사 언제 계약했지, 얼마짜리였지, 우리가 뭘 해 줬더라" 는 상담 중에
         가장 자주 나오는 질문이다. 접어 두면 매번 카톡을 뒤지게 된다.
       */}
+      {/* D-114: 영업 — 잠재고객이면 펼쳐서, 계약 고객이면 접어서 */}
+      <ClientSalesCard record={record} onSave={(next) => void commit(next)} />
+
       <ContractCard
         record={record}
         today={today}

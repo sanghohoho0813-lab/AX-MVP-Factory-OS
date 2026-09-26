@@ -16,7 +16,8 @@
 
 import { useState } from 'react'
 import { ArrowRight, ChevronRight, FileUp } from 'lucide-react'
-import { CONTRACT_KIND_LABEL, CONTRACT_STAGE_LABEL, contractStageOf } from '../../types/clientOps'
+import { CONTRACT_KIND_LABEL, CONTRACT_STAGE_LABEL, SALES_STAGE_LABEL, contractStageOf } from '../../types/clientOps'
+import { salesStageOf } from '../../services/salesPipeline'
 import { formatNumberOf } from '../../lib/format'
 import type { ClientOpsRecord, ServiceKey, ServiceStatus } from '../../types/clientOps'
 import { SERVICES, SERVICE_STATUS_LABEL, isServiceOpen } from '../../content/clientOpsCatalog'
@@ -219,7 +220,8 @@ export function ClientBoardCard({
   const bizNo = formatNumberOf('business', record.businessNumber)
   /* 계약한 지 얼마나 됐는지 — 계약 전이면 단계를, 계약했으면 개월수를 보여 준다 */
   const age = contractAgeShort(record.contract.signedAt, today)
-  const contractMeta = stage === 'signed' ? (age === '' ? '' : `계약 ${age}`) : CONTRACT_STAGE_LABEL[stage]
+  // D-114: 계약 전이면 '계약 전' 대신 영업 단계(잠재 · 1차 미팅 예정 …)를 쓴다 — 어디까지 왔는지가 더 쓸모 있다
+  const contractMeta = stage === 'signed' ? (age === '' ? '' : `계약 ${age}`) : stage === 'pre' ? `잠재 · ${SALES_STAGE_LABEL[salesStageOf(record)]}` : CONTRACT_STAGE_LABEL[stage]
   const strongMeta = [repName, contractMeta].filter((v) => v.trim() !== '')
   /* 계약 종류(현금·보험·혼합)는 배경 정보다 — 흐린 쪽에 둔다 (D-79) */
   const kindMeta = record.contract.kind !== '' ? CONTRACT_KIND_LABEL[record.contract.kind] : ''

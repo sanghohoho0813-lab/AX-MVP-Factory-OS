@@ -6,7 +6,7 @@ import { useStoreVersion } from '../../lib/useStoreVersion'
 import { countPendingFirstMeetings } from '../../services/firstMeetingService'
 
 export interface NavCounts {
-  /** 등록된 고객사(보관 안 한 것) — 아직 못 읽었으면 null */
+  /** 계약 고객(보관 안 했고 계약 단계가 '계약 전' 이 아닌 것, D-114) — 잠재고객은 고객 관리 안에서 본다. 못 읽었으면 null */
   clients: number | null
   /** 처리 안 한 상담신청(새로 · 연결됨 · 진행 중) */
   requests: number | null
@@ -41,13 +41,14 @@ function emit(): void {
 
 async function load(workspaceId: string | null): Promise<NavCounts> {
   // D-112: 고객·상담신청 서비스는 숫자를 셀 때 불러온다 — 모든 화면이 먼저 받는 첫 파일에서 뺀다
-  const [{ listClients }, { isOpenEvent, listEvents }] = await Promise.all([
+  const [{ listClients }, { isOpenEvent, listEvents }, { countContractClients }] = await Promise.all([
     import('../../services/clientOpsService'),
     import('../../services/customerBridgeService'),
+    import('../../services/salesPipeline'),
   ])
   const [c, e, f] = await Promise.allSettled([listClients(workspaceId), listEvents(workspaceId), countPendingFirstMeetings(workspaceId)])
   return {
-    clients: c.status === 'fulfilled' ? c.value.filter((r) => r.archivedAt === null).length : null,
+    clients: c.status === 'fulfilled' ? countContractClients(c.value) : null,
     requests: e.status === 'fulfilled' ? e.value.filter(isOpenEvent).length : null,
     firstMeetings: f.status === 'fulfilled' ? f.value : null,
   }

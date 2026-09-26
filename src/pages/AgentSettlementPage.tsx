@@ -71,7 +71,7 @@ function SettlementContent({ workspaceId }: { workspaceId: string | null }) {
         sub={`${today} · 영업자 ${totals.agents}명`}
         actions={
           <Button variant="secondary" onClick={() => navigate('/ops/clients')}>
-            고객 관리으로
+            고객 관리로
           </Button>
         }
       />

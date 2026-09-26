@@ -48,6 +48,22 @@ import { profileFields, profileFieldsByGroup, regionOf } from '../clientOpsProfi
 import { CONTRACT_STAGE_ORDER, CONTRACT_STAGE_LABEL, contractStageOf, statusForStage } from '../../types/clientOps'
 import type { ClientOpsStatus, ContractStage } from '../../types/clientOps'
 import { clientOpsProgress } from '../clientOpsAlerts'
+import {
+  countContractClients,
+  daysInStage,
+  groupBySalesStage,
+  importLegacySalesAccounts,
+  isContractClient,
+  isProspect,
+  normalizeSales,
+  salesStageFrom,
+  salesStageOf,
+  withNewProspect,
+  withSalesInfo,
+  withSalesStage,
+} from '../salesPipeline'
+import { SALES_FLOW_STAGES, SALES_STAGE_ORDER } from '../../types/clientOps'
+import { SALES_TABS, SALES_TAB_PATHS } from '../../config/salesTabs'
 import { digitsOf, formatNumberOf, numberSegments } from '../../lib/format'
 import { agentLedger, agentLedgerTotals, agentShares, feeMathOf, feeTotals, marginPct, marginText, netAmountOf } from '../feeMath'
 import { CLIENT_FILTER_ORDER, filterClients, isClientFilterKey, matchesClientFilter } from '../clientOpsFilter'
@@ -115,8 +131,8 @@ check('modules: AX STUDIO 는 접을 수 있고 기본 접힘', MODULE_GROUPS.fi
   check('메뉴: 오늘과 일정이 한 묶음', inGroup('today').join() === 'today,calendar')
   check('메뉴: 특허+벤처 · 자금·지원사업이 컨설팅 작업실 안, 도입 검토중 · 작업실 전체보다 위 (D-104)',
     inGroup('tools').slice(-4).join() === 'consulting-studio,funding,tools-review,tools' && inGroup('occasional').length === 0, inGroup('tools').join())
-  check('메뉴: 영업 묶음 = 영업자 정산 · 1차 미팅 체크리스트(준비 중)',
-    inGroup('sales').join() === 'agents,first-meeting' && MODULES.find((m) => m.key === 'first-meeting')?.status === 'soon', inGroup('sales').join())
+  check('메뉴: 영업 묶음 = 영업 관리(D-114) · 영업자 정산 · 1차 미팅 체크리스트(준비 중)',
+    inGroup('sales').join() === 'sales,agents,first-meeting' && MODULES.find((m) => m.key === 'first-meeting')?.status === 'soon', inGroup('sales').join())
   check('메뉴: 고객 묶음에서 영업자 정산이 빠졌다', !inGroup('clients').includes('agents'))
   check('메뉴: 처음 사용 가이드가 이 시스템 맨 위', inGroup('about')[0] === 'guide' && MODULES.find((m) => m.key === 'guide')?.path === '/getting-started')
   check('메뉴: 향후 확장은 눌러도 이동하지 않고 펼쳐진다', MODULES.find((m) => m.key === 'roadmap')?.expand === 'future-items')
@@ -1224,6 +1240,92 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('정렬: 계약 오래된 순', byContract[0] === 'b' && byContract[1] === 'a', JSON.stringify(byContract))
   check('정렬: 계약일이 없으면 맨 뒤', byContract[2] === 'c')
   check('정렬: 급한 순도 모두 돌려준다', sortClients(list, 'urgency', T).length === 3)
+}
+
+
+/* ------------------------------------------------------------------ */
+/* D-114 영업 통합 1단계 — 영업 칸 · 단계 · 계약 고객 수 · 옛 기록 옮기기     */
+/* ------------------------------------------------------------------ */
+{
+  const at = '2026-09-26T01:00:00.000Z'
+  const mk = (id: string, status: ClientOpsStatus, extra: Record<string, unknown> = {}) =>
+    normalizeClientOps({ id, workspaceId: null, companyName: `업체${id}`, status, createdAt: at, updatedAt: at, ...extra })
+
+  // 원본 15단계 → 8단계 (PIPE6 대응표)
+  const legacyMap: [string, string][] = [
+    ['lead', 'lead'], ['contacted', 'lead'], ['meeting_proposed', 'lead'],
+    ['meeting1_scheduled', 'm1sched'], ['meeting1_done', 'm1done'], ['docs_requested', 'm1done'], ['docs_received', 'm1done'],
+    ['proposal_sent', 'm2'], ['meeting2_scheduled', 'm2'], ['meeting2_done', 'm2'],
+    ['closing_scheduled', 'closing'], ['decision_pending', 'closing'], ['contracted', 'contracted'], ['hold', 'hold'], ['lost', 'lost'],
+  ]
+  check('영업: 원본 15단계가 모두 8단계로 간다', legacyMap.every(([a, b]) => salesStageFrom(a) === b), JSON.stringify(legacyMap.map(([a]) => salesStageFrom(a))))
+  check('영업: 새 단계 키는 그대로 · 모르는 값은 null', salesStageFrom('m2') === 'm2' && salesStageFrom('아무거나') === null && salesStageFrom(3) === null)
+  check('영업: 8단계 · 흐름 6칸', SALES_STAGE_ORDER.length === 8 && SALES_FLOW_STAGES.length === 6 && !SALES_FLOW_STAGES.includes('hold'))
+
+  // 정규화 — 없으면 null, 이상한 값은 걸러낸다
+  check('영업: 영업 칸 없는 옛 업체는 null', mk('x', 'active').sales === null && normalizeSales(undefined) === null && normalizeSales({ stage: '??' }) === null)
+  const ns = normalizeSales({ stage: 'docs_requested', source: ' 소개 ', interests: ['절세', '절세', '', 3], expectedFee: -5, history: [{ at, from: null, to: 'contacted' }, { bad: 1 }] })
+  check('영업: 정규화 — 옛 단계 키 · 공백 · 중복 관심사 · 음수 수임료 · 깨진 이력',
+    ns !== null && ns.stage === 'm1done' && ns.source === '소개' && JSON.stringify(ns.interests) === '["절세"]' && ns.expectedFee === null && ns.history.length === 1 && ns.history[0].to === 'lead',
+    JSON.stringify(ns))
+  const round = mk('r', 'waiting', { sales: { stage: 'm2', source: '전화', referrer: '', interests: [], concern: '', expectedFee: 3_000_000, history: [], movedAt: at } })
+  check('영업: 고객 기록 정규화가 영업 칸을 지킨다(저장 → 다시 읽기)', round.sales?.stage === 'm2' && round.sales.expectedFee === 3_000_000 && normalizeClientOps(JSON.parse(JSON.stringify(round))).sales?.stage === 'm2')
+
+  // 계약 고객 · 잠재고객
+  const list = [mk('a', 'active'), mk('b', 'waiting'), mk('c', 'completed'), mk('d', 'paused'), { ...mk('e', 'active'), archivedAt: at }, { ...mk('f', 'waiting'), archivedAt: at }]
+  check('영업: 계약 고객 = 보관 안 함 · 계약 전 아님 (a · c · d)', countContractClients(list) === 3 && isContractClient(list[0]) && !isContractClient(list[1]) && !isContractClient(list[4]))
+  check('영업: 잠재고객 = 보관 안 함 · 계약 전 (b)', list.filter(isProspect).map((r) => r.id).join() === 'b')
+  check('영업: 영업 칸 없는 업체의 칸 — 계약 전이면 잠재, 계약했으면 계약 완료', salesStageOf(list[1]) === 'lead' && salesStageOf(list[0]) === 'contracted' && salesStageOf(list[2]) === 'contracted')
+  const groups = groupBySalesStage(list)
+  check('영업: 보드 묶음 — 보관한 업체는 빠진다', groups.lead.map((r) => r.id).join() === 'b' && groups.contracted.length === 3 && SALES_STAGE_ORDER.every((s) => Array.isArray(groups[s])))
+
+  // 단계 옮기기
+  const p0 = withNewProspect(mk('p', 'waiting'), '홈페이지 상담신청', at)
+  check('영업: 잠재고객 등록 — 잠재 고객 칸 · 유입 · 이력 1 · 활동 기록', p0.sales?.stage === 'lead' && p0.sales.source === '홈페이지 상담신청' && p0.sales.history.length === 1 && p0.activity[0]?.kind === 'sales' && p0.activity[0].text.includes('잠재고객 등록'))
+  check('영업: 이미 영업 칸이 있으면 잠재고객 등록은 그대로', withNewProspect(p0, '전화') === p0)
+  const at2 = '2026-09-27T02:00:00.000Z'
+  const p1 = withSalesStage(p0, 'm1sched', at2)
+  check('영업: 단계 옮김 — 이력 · movedAt · 활동 기록 문구', p1.sales?.stage === 'm1sched' && p1.sales.history.length === 2 && p1.sales.history[1].from === 'lead' && p1.sales.movedAt === at2 && p1.activity[0].text === '영업 단계 잠재 고객 → 1차 미팅 예정')
+  check('영업: 같은 단계로는 아무것도 안 바뀐다', withSalesStage(p1, 'm1sched') === p1)
+  check('영업: 중간 단계는 계약 단계를 건드리지 않는다', p1.status === 'waiting')
+  const p2 = withSalesStage(p1, 'contracted', '2026-09-28T03:00:00.000Z')
+  check('영업: 계약 완료 → 계약함(진행 중) · 계약일 비어 있으면 그날', p2.status === 'active' && p2.contract.signedAt === '2026-09-28' && isContractClient(p2))
+  const signed = { ...p1, contract: { ...p1.contract, signedAt: '2026-09-01' } }
+  check('영업: 계약일이 이미 있으면 그대로', withSalesStage(signed, 'contracted').contract.signedAt === '2026-09-01')
+  const back = withSalesStage(p2, 'hold')
+  check('영업: 계약 뒤 영업 단계를 되돌려도 계약은 취소하지 않는다', back.status === 'active' && back.sales?.stage === 'hold')
+  const old = withSalesStage(mk('o', 'active'), 'hold', at2)
+  check('영업: 영업 칸 없던 계약 고객 — 계약 완료 칸에서 출발', old.sales?.history[0].from === 'contracted' && old.activity[0].text === '영업 단계 계약 완료 → 보류·장기관리')
+  check('영업: 머문 날 수', daysInStage(p1, new Date('2026-10-01T02:00:00.000Z')) === 4 && daysInStage(mk('z', 'active')) === null)
+
+  // 영업 정보 고치기
+  const i1 = withSalesInfo(p1, { referrer: '김소개', expectedFee: 5_000_000, interests: ['가업승계'] }, at2)
+  check('영업: 정보 수정 — 바뀐 칸 이름만 활동 기록에', i1.sales?.referrer === '김소개' && i1.sales.expectedFee === 5_000_000 && i1.activity[0].text === '영업 정보 수정 — 소개자 · 관심사 · 예상 수임료')
+  check('영업: 안 바뀌면 그대로', withSalesInfo(i1, { referrer: '김소개' }) === i1)
+
+  // 영업 도구 모음 기록 옮기기
+  const recs = [mk('k1', 'waiting'), mk('k2', 'active'), round, mk('k4', 'waiting')]
+  const rows = [
+    { clientId: 'k1', data: { stage: 'docs_received', dbSource: '소개', referrer: '박소개', interests: ['가지급금'], concern: '가지급금 1.5억', expectedFee: 600, memo: '메모' } },
+    { clientId: 'k2', data: { stage: 'contracted', source: '전화', expectedFee: '1,200' } },
+    { clientId: 'r', data: { stage: 'lead' } },
+    { clientId: 'zz', data: { stage: 'lead' } },
+  ]
+  const moved = importLegacySalesAccounts(recs, rows, at)
+  const k1 = moved.find((r) => r.id === 'k1')
+  check('영업: 옮기기 — 영업 칸 없는 업체만 (k1 · k2), 이미 있는 r · 없는 업체 zz 는 건너뜀', moved.map((r) => r.id).join() === 'k1,k2', moved.map((r) => r.id).join())
+  check('영업: 옮기기 — 단계 · 유입 · 소개자 · 관심사 · 고민 · 만원→원', k1?.sales?.stage === 'm1done' && k1.sales.source === '소개' && k1.sales.referrer === '박소개' && k1.sales.interests[0] === '가지급금' && k1.sales.concern === '가지급금 1.5억' && k1.sales.expectedFee === 6_000_000)
+  check('영업: 옮기기 — 원래 기록 전체를 imported 에 · 활동 기록', k1?.sales?.imported?.memo === '메모' && k1.activity[0].text.includes('영업 도구 모음 기록 옮김'))
+  check('영업: 옮기기 — 글자로 적힌 수임료 · source 도 읽는다', moved[1].sales?.expectedFee === 12_000_000 && moved[1].sales.source === '전화')
+  check('영업: 옮기기 — 두 번 불러도 같은 결과(이미 옮긴 업체는 건너뜀)', importLegacySalesAccounts(recs.map((r) => moved.find((m) => m.id === r.id) ?? r), rows, at).length === 0)
+  check('영업: 옮기기 — 계약 단계는 건드리지 않는다', k1?.status === 'waiting')
+
+  // 메뉴 — 사이드바는 한 줄, 안에서 탭
+  const salesItems = MODULES.filter((m) => m.group === 'sales' && m.enabled).map((m) => m.key)
+  check('영업: 영업 묶음 = 영업 관리 · 영업자 정산 · 1차 미팅 체크리스트 자리', salesItems.join() === 'sales,agents,first-meeting', salesItems.join())
+  check('영업: 영업 관리가 탭 주소를 모두 맡는다', SALES_TAB_PATHS.every((p) => moduleForPath(p)?.key === 'sales') && SALES_TABS[0].to === '/sales/board')
+  check('영업: 1차 미팅 체크리스트 자리는 따로 남는다', moduleForPath('/sales/first-meeting')?.key === 'first-meeting' && MODULES.find((m) => m.key === 'first-meeting')?.status === 'soon')
+  check('영업: 머리줄 — 영업 › 영업 관리', screenGroupForPath('/sales/board')?.title === '영업')
 }
 
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)

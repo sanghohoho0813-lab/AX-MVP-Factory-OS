@@ -396,6 +396,7 @@ export type ActivityKind =
   | 'contract' // 계약 정보 변경 (계약일·방식·금액·보험)
   | 'archive' // 보관·보관 해제
   | 'tool' // 도구함 결과를 붙임 (창업감면 판정 · 크레탑 분석 · 정책자금 진단 …)
+  | 'sales' // 영업 단계 변경 · 영업 정보 수정 (D-114)
 
 /**
  * 도구함 결과 한 건 (D-88).
@@ -450,6 +451,80 @@ export interface ActivityEntry {
   serviceKey: ServiceKey | null
   /** 발생 시각 */
   at: string
+}
+
+/* ------------------------------------------------------------------ */
+/* 영업 (D-114) — 계약 전 고객도 고객 관리 한 장부에                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 영업 단계 — 기업컨설팅 OS(영업 도구 모음)의 '핵심 6단계 + 보류' 를 그대로 옮기고 '이탈' 을 따로 뺐다.
+ *   lead 잠재 고객 → m1sched 1차 미팅 예정 → m1done 1차 미팅 완료 → m2 2차 미팅(제안·견적) → closing 3차 클로징 → contracted 계약 완료
+ *   hold 보류·장기관리 · lost 이탈
+ * 계약 단계(pre/signed/closed)와는 따로 둔다 — 영업은 '어디까지 왔나', 계약 단계는 '계약을 했나'.
+ * contracted 로 옮기면 계약 단계도 '계약 완료' 가 된다(salesPipeline.withSalesStage).
+ */
+export type SalesStage = 'lead' | 'm1sched' | 'm1done' | 'm2' | 'closing' | 'contracted' | 'hold' | 'lost'
+
+export const SALES_STAGE_ORDER: SalesStage[] = ['lead', 'm1sched', 'm1done', 'm2', 'closing', 'contracted', 'hold', 'lost']
+
+/** 보드의 흐름 칸(보류·이탈 제외) */
+export const SALES_FLOW_STAGES: SalesStage[] = ['lead', 'm1sched', 'm1done', 'm2', 'closing', 'contracted']
+
+export const SALES_STAGE_LABEL: Record<SalesStage, string> = {
+  lead: '잠재 고객',
+  m1sched: '1차 미팅 예정',
+  m1done: '1차 미팅 완료',
+  m2: '2차 미팅',
+  closing: '3차 클로징',
+  contracted: '계약 완료',
+  hold: '보류·장기관리',
+  lost: '이탈',
+}
+
+export const SALES_STAGE_HINT: Record<SalesStage, string> = {
+  lead: '발굴 · 첫 연락',
+  m1sched: '일정 조율 · 확정',
+  m1done: '자료 요청 · 수령 · 제안 준비',
+  m2: '제안서 · 견적 전달, 2차 진행',
+  closing: '조건 조율 · 의사결정 · 청약 준비',
+  contracted: '계약 완료 · 관리 시작',
+  hold: '지금은 아님 — 다시 연락할 때까지',
+  lost: '진행하지 않기로 함',
+}
+
+export function isSalesStage(v: unknown): v is SalesStage {
+  return typeof v === 'string' && (SALES_STAGE_ORDER as string[]).includes(v)
+}
+
+export interface SalesStageEvent {
+  at: string
+  from: SalesStage | null
+  to: SalesStage
+}
+
+export interface SalesInfo {
+  stage: SalesStage
+  /** 유입 경로 (소개 · 홈페이지 상담신청 · 전화 …) */
+  source: string
+  /** 소개한 사람 */
+  referrer: string
+  /** 관심사 (절세 · 가업승계 · 가지급금 …) */
+  interests: string[]
+  /** 대표의 고민 한 줄 */
+  concern: string
+  /** 예상 수임료(원) — 모르면 null */
+  expectedFee: number | null
+  /** 단계 이력 (최신이 끝) */
+  history: SalesStageEvent[]
+  /** 마지막으로 단계를 옮긴 시각 */
+  movedAt: string
+  /** 기업컨설팅 OS(영업 도구 모음)에서 옮겨 온 원래 기록 — 미팅 대본 · 점수 등 다음 단계에서 쓴다 */
+  imported?: Record<string, unknown>
+}
+
+export function emptySales(stage: SalesStage = 'lead', at: string = new Date().toISOString()): SalesInfo {
+  return { stage, source: '', referrer: '', interests: [], concern: '', expectedFee: null, history: [{ at, from: null, to: stage }], movedAt: at }
 }
 
 export interface ClientOpsRecord {
@@ -519,6 +594,8 @@ export interface ClientOpsRecord {
   fundingApplications: FundingApplication[]
   /** 도구함에서 붙인 결과들 — 최신이 앞 (D-88) */
   toolResults: ToolResult[]
+  /** 영업 정보 (D-114). 영업 보드에 올린 적 없는 업체는 null */
+  sales: SalesInfo | null
   /** 자동 활동 기록 — 최신순. 오래된 것은 잘라낸다. */
   activity: ActivityEntry[]
   /** 보관 처리 시각 (보관하면 목록·경고에서 빠진다) */
@@ -533,6 +610,10 @@ export interface CreateClientOpsInput {
   contactPhone?: string
   businessNumber?: string
   industry?: string
+  /** 기본 'active'(계약함). 잠재고객은 'waiting'(계약 전) — D-114 */
+  status?: ClientOpsStatus
+  /** 영업 칸 — 잠재고객으로 만들 때 (D-114) */
+  sales?: SalesInfo | null
 }
 
 /* ------------------------------------------------------------------ */

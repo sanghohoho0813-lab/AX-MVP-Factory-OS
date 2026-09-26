@@ -44,6 +44,7 @@
     "qa:shots": "node e2e/shots.mjs",
     "qa:modules": "node e2e/modules.mjs",
     "qa:squeeze": "node e2e/squeeze.mjs",
+    "qa:sales": "node e2e/sales.mjs",
     "qa:themes": "node e2e/themes.mjs"
   },
   "dependencies": {

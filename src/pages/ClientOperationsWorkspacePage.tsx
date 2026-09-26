@@ -55,7 +55,7 @@ export function ClientOperationsWorkspacePage() {
   const projects = projectRepository.getByOrganizationId(organizationId)
   const record = organization ? getClientOperations(organization) : null
 
-  if (!organization || !record) return <NotFoundState title="고객 관리 파일을 찾을 수 없습니다" description="고객사가 없거나 주소가 변경되었습니다." backTo="/ops/clients" backLabel="고객 관리으로 돌아가기" />
+  if (!organization || !record) return <NotFoundState title="고객 관리 파일을 찾을 수 없습니다" description="고객사가 없거나 주소가 변경되었습니다." backTo="/ops/clients" backLabel="고객 관리로 돌아가기" />
 
   const summary = buildClientOperationsSummary(record)
   const taskProgress = Math.round((summary.taskCompleted / summary.taskTotal) * 100)

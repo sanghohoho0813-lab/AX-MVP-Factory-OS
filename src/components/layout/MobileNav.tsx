@@ -93,9 +93,9 @@ export function MobileNav({ onOpenMore }: { onOpenMore: () => void }) {
                   >
                     {item.label}
                   </span>
-                  {/* D-108: 등록된 고객사 수 — 아주 작게, 튀지 않는 색 (0 도 보인다) */}
+                  {/* D-108 · D-114: 계약 고객 수 — 아주 작게, 튀지 않는 색 (0 도 보인다) */}
                   {clients !== null && (
-                    <span data-nav-badge="clients" aria-label={`고객사 ${clients}곳`} className="text-[0.62rem] leading-none font-medium text-slate-400 tabular-nums">
+                    <span data-nav-badge="clients" aria-label={`계약 고객 ${clients}곳`} className="text-[0.62rem] leading-none font-medium text-slate-400 tabular-nums">
                       {clients > 999 ? '999+' : clients}
                     </span>
                   )}

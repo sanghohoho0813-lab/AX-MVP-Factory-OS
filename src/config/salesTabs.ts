@@ -1,0 +1,15 @@
+import { KanbanSquare, type LucideIcon } from 'lucide-react'
+
+/**
+ * 영업 관리 안의 탭 목록 (D-114) — 사이드바 '영업 관리' 한 줄이 이 주소들을 모두 맡는다.
+ * 탭이 늘면 여기만 는다(메뉴 목록 moduleRegistry 와 탭 모양 SalesTabs 가 같이 읽는다).
+ */
+export interface SalesTab {
+  to: string
+  label: string
+  icon: LucideIcon
+}
+
+export const SALES_TABS: SalesTab[] = [{ to: '/sales/board', label: '영업 보드', icon: KanbanSquare }]
+
+export const SALES_TAB_PATHS = SALES_TABS.map((t) => t.to)

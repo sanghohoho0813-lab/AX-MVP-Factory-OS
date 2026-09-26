@@ -379,7 +379,7 @@ function FutureExpandRow({ item, collapsed }: { item: ModuleDefinition; collapse
 
 /**
  * D-104: 메뉴 옆 숫자.
- *  - 고객 관리 — 등록 고객사 수. 튀지 않게 옅은 글자(0 이어도 보인다 — '몇 곳인지' 가 뜻이므로).
+ *  - 고객 관리 — 계약 고객 수(D-114, 잠재고객은 빼고 고객 관리 안에서 본다). 튀지 않게 옅은 글자(0 이어도 보인다 — '몇 곳인지' 가 뜻이므로).
  *  - 상담신청 · 1차 미팅 — 빨간 바탕 흰 숫자. 처리할 것이 있을 때만(0 이면 없음).
  * 접힌 사이드바에서는 빨간 것만 아이콘 위에 작은 점 숫자로.
  */
@@ -391,7 +391,7 @@ function NavBadge({ kind, counts, active, collapsed }: { kind: ModuleDefinition[
   if (kind === 'clients') {
     if (collapsed) return null
     return (
-      <span data-nav-badge={kind} aria-label={`${n}곳`} className={`t-meta ml-auto shrink-0 tabular-nums ${active ? 'text-white/80' : 'text-navy-300'}`}>
+      <span data-nav-badge={kind} aria-label={`계약 고객 ${n}곳`} className={`t-meta ml-auto shrink-0 tabular-nums ${active ? 'text-white/80' : 'text-navy-300'}`}>
         {text}
       </span>
     )

@@ -50,6 +50,7 @@ import type {
 } from '../types/clientOps'
 import { CONTRACT_KIND_LABEL, emptyContract, isCustomDocumentKey, isCustomServiceKey, isProfileGroupKey } from '../types/clientOps'
 import { documentMetaOf, makeCustomDocumentKey } from './clientOpsDocuments'
+import { normalizeSales } from './salesPipeline'
 
 /* ------------------------------------------------------------------ */
 /* 기본값 · 정규화 (예전 형식 자동 승격 포함)                            */
@@ -347,6 +348,7 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
         }))
       : [],
     toolResults: normalizeToolResults(value.toolResults),
+    sales: normalizeSales(value.sales),
     activity: Array.isArray(value.activity)
       ? value.activity
           .filter((a) => a && typeof a.text === 'string' && typeof a.at === 'string')
@@ -487,6 +489,8 @@ export async function createClient(
     contactPhone: input.contactPhone?.trim() ?? '',
     businessNumber: input.businessNumber?.trim() ?? '',
     industry: input.industry?.trim() ?? '',
+    status: input.status ?? 'active',
+    sales: input.sales ?? null,
     createdAt: now,
     updatedAt: now,
   })

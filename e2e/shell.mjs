@@ -76,12 +76,14 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     await page.goto(BASE + '/', { waitUntil: 'networkidle' })
     await page.waitForTimeout(400)
     const stored = await page.evaluate(() => ({
-      clients: JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').filter((c) => !c.archivedAt).length,
+      // D-114: 계약 고객만 — 계약 전(status 'waiting')인 잠재고객은 빼고 센다
+      clients: JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').filter((c) => !c.archivedAt && c.status !== 'waiting').length,
+      prospects: JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').filter((c) => !c.archivedAt && c.status === 'waiting').length,
       open: JSON.parse(localStorage.getItem('axmvp.v1.customer_events') ?? '[]').filter((e) => ['new', 'linked', 'in_progress'].includes(e.status)).length,
     }))
     const c1 = ((await badge('clients').innerText()) ?? '').trim()
     const r1 = ((await badge('requests').innerText()) ?? '').trim()
-    check('숫자: 고객 관리 옆 = 등록 고객사 수', c1 === String(stored.clients) && stored.clients > 0, `${c1} / ${stored.clients}`)
+    check('숫자: 고객 관리 옆 = 계약 고객 수 (잠재고객 빼고)', c1 === String(stored.clients) && stored.clients > 0 && stored.prospects > 0, `${c1} / 계약 ${stored.clients} · 잠재 ${stored.prospects}`)
     check('숫자: 상담신청 옆 = 처리 안 한 신청 수', r1 === String(stored.open) && stored.open > 0, `${r1} / ${stored.open}`)
     const colors = await badge('requests').evaluate((el) => ({ bg: getComputedStyle(el).backgroundColor, fg: getComputedStyle(el).color }))
     const [rr, gg, bb] = (colors.bg.match(/\d+/g) ?? []).map(Number)
@@ -89,11 +91,11 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     const quiet = await badge('clients').evaluate((el) => getComputedStyle(el).backgroundColor)
     check('숫자: 고객사 수는 튀지 않게(바탕 없음)', quiet === 'rgba(0, 0, 0, 0)', quiet)
     // 업체 하나를 지우면(보관) 화면을 옮길 때 줄어든다 · 다시 늘리면 늘어난다
-    await page.evaluate(() => { const k = 'axmvp.v1.operations_clients'; const l = JSON.parse(localStorage.getItem(k)); l[0].archivedAt = '2026-09-24T00:00:00.000Z'; localStorage.setItem(k, JSON.stringify(l)) })
+    await page.evaluate(() => { const k = 'axmvp.v1.operations_clients'; const l = JSON.parse(localStorage.getItem(k)); l.find((c) => c.status !== 'waiting').archivedAt = '2026-09-24T00:00:00.000Z'; localStorage.setItem(k, JSON.stringify(l)) })
     await page.getByRole('navigation', { name: '주 메뉴' }).getByRole('link', { name: /^일정/ }).click()
     await page.waitForTimeout(500)
     check('숫자: 줄면 같이 준다', ((await badge('clients').innerText()) ?? '').trim() === String(stored.clients - 1), (await badge('clients').innerText()) ?? '')
-    await page.evaluate(() => { const k = 'axmvp.v1.operations_clients'; const l = JSON.parse(localStorage.getItem(k)); l[0].archivedAt = null; localStorage.setItem(k, JSON.stringify(l)) })
+    await page.evaluate(() => { const k = 'axmvp.v1.operations_clients'; const l = JSON.parse(localStorage.getItem(k)); l.forEach((c) => { c.archivedAt = null }); localStorage.setItem(k, JSON.stringify(l)) })
     await page.getByRole('navigation', { name: '주 메뉴' }).getByRole('link', { name: /^오늘/ }).first().click()
     await page.waitForTimeout(500)
     check('숫자: 늘면 같이 는다', ((await badge('clients').innerText()) ?? '').trim() === String(stored.clients), (await badge('clients').innerText()) ?? '')

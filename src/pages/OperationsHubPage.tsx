@@ -18,6 +18,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { ServiceCatalogModal } from '../components/ops/ServiceCatalogModal'
 const SORT_KEY = 'axmvp.clients.sort'
 const FILTER_KEY = 'axmvp.clients.filter'
+const SEGMENT_KEY = 'axmvp.clients.segment'
 
 import { ClientBoardCard } from '../components/ops/ClientBoardCard'
 import { matchesClientSearch, searchHit } from '../services/clientOpsSearch'
@@ -61,11 +62,19 @@ import { DUE_SOON_DAYS } from '../content/clientOpsCatalog'
 import { todayLocalDate } from '../lib/appClock'
 import { krwTile } from '../lib/format'
 import { contractStageOf } from '../types/clientOps'
+import { isContractClient, isProspect } from '../services/salesPipeline'
 import type { ClientOpsRecord, OpsAlert, AlertSeverity, ServiceKey } from '../types/clientOps'
 import { Button } from '../components/ui/Button'
 import { useToast } from '../components/ui/toastContext'
 import { Modal } from '../components/ui/Modal'
 import { AlertRow, SEVERITY_META } from '../components/ops/opsParts'
+
+type ClientSegment = 'contract' | 'prospect' | 'all'
+const SEGMENTS: { key: ClientSegment; label: string }[] = [
+  { key: 'contract', label: '계약 고객' },
+  { key: 'prospect', label: '잠재고객' },
+  { key: 'all', label: '전체' },
+]
 
 const SEVERITY_TABS: { key: AlertSeverity | 'all'; label: string }[] = [
   { key: 'all', label: '전체' },
@@ -181,15 +190,39 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     }
   }, [filterKey])
 
+  /*
+   * D-114: 계약 고객 · 잠재고객 · 전체. 메뉴 옆 숫자는 계약 고객만 세고, 잠재고객은 여기 들어와서 본다.
+   * 보관함을 볼 때는 구분 없이 보관한 업체 전부.
+   */
+  const [segment, setSegment] = useState<ClientSegment>(() => {
+    try {
+      const v = localStorage.getItem(SEGMENT_KEY)
+      return v === 'contract' || v === 'prospect' ? v : 'all'
+    } catch {
+      return 'all'
+    }
+  })
+  useEffect(() => {
+    try {
+      localStorage.setItem(SEGMENT_KEY, segment)
+    } catch {
+      /* 저장 못 해도 화면은 돈다 */
+    }
+  }, [segment])
+  const contractCount = records.filter(isContractClient).length
+  const prospectCount = records.filter(isProspect).length
+
   const visible = useMemo(() => {
     return records.filter((r) => {
       if (!showArchived && r.archivedAt !== null) return false
       if (showArchived && r.archivedAt === null) return false
+      if (!showArchived && segment === 'contract' && !isContractClient(r)) return false
+      if (!showArchived && segment === 'prospect' && !isProspect(r)) return false
       if (!matchesClientFilter(r, filterKey, today)) return false
       // 회사명뿐 아니라 담당자·번호·직접 만든 칸·영업자 이름까지 (D-76)
       return matchesClientSearch(r, query)
     })
-  }, [records, query, showArchived, filterKey, today])
+  }, [records, query, showArchived, filterKey, today, segment])
   const archivedCount = records.filter((r) => r.archivedAt !== null).length
 
   /*
@@ -334,7 +367,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     <div className="flex flex-col gap-6">
       <ScreenTitle
         title="고객 관리"
-        sub={`${today} · 관리 중인 업체 ${activeCount}곳`}
+        sub={`${today} · 계약 고객 ${contractCount}곳 · 잠재고객 ${prospectCount}곳`}
         actions={
           <>
             <Button variant="primary" onClick={() => setFormOpen(true)}>
@@ -457,6 +490,28 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
           <li><strong>전부 바꾸기</strong> — 지금 목록을 지우고 백업 내용으로 채웁니다. 되돌릴 수 없습니다.</li>
         </ul>
       </Modal>
+
+      {/* D-114: 계약 고객 · 잠재고객 · 전체 */}
+      {records.length > 0 && !showArchived && (
+        <div role="group" aria-label="고객 구분" data-testid="client-segment" className="grid grid-cols-3 gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:inline-flex sm:w-auto sm:self-start">
+          {SEGMENTS.map((sg) => {
+            const n = sg.key === 'contract' ? contractCount : sg.key === 'prospect' ? prospectCount : contractCount + prospectCount
+            const on = segment === sg.key
+            return (
+              <button
+                key={sg.key}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setSegment(sg.key)}
+                className={`tap flex items-center justify-center gap-1.5 rounded-[8px] px-2 py-2 font-semibold break-keep sm:px-4 ${on ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+              >
+                <span className="text-[0.9rem]">{sg.label}</span>
+                <span className={`t-meta tabular-nums ${on ? 'text-white/85' : 'text-slate-400'}`}>{n}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* 검색 · 보관 */}
       {records.length > 0 && (

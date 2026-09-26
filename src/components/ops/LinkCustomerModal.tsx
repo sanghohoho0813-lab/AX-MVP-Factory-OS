@@ -5,6 +5,7 @@ import type { CustomerEvent, PortalClientLink } from '../../types/bridge'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { createClient, saveClient } from '../../services/clientOpsService'
+import { withNewProspect } from '../../services/salesPipeline'
 import { withActivity } from '../../services/clientOpsActivity'
 import { createLink, findProfileByEmail, listLinksForClient, updateEvent } from '../../services/customerBridgeService'
 import { normalizeQuery } from '../../lib/format'
@@ -135,17 +136,22 @@ export function LinkCustomerModal({
     if (!form.companyName.trim()) { setError('회사명을 입력해 주세요.'); return }
     setBusy(true); setError('')
     try {
+      // D-114: 상담신청에서 만든 업체는 계약 전 — 잠재고객(영업 단계 '잠재 고객', 유입 '홈페이지 상담신청')으로 시작한다
       const created = await createClient(workspaceId, {
         companyName: form.companyName,
         contactName: form.contactName,
         contactPhone: form.contactPhone,
         industry: form.industry,
+        status: 'waiting',
       })
       const saved = await saveClient(
-        withActivity(
-          { ...created, contactEmail: form.contactEmail.trim() },
-          'profile',
-          `고객 플랫폼 이벤트(${event.eventType})에서 고객사 생성`,
+        withNewProspect(
+          withActivity(
+            { ...created, contactEmail: form.contactEmail.trim() },
+            'profile',
+            `고객 플랫폼 이벤트(${event.eventType})에서 고객사 생성`,
+          ),
+          '홈페이지 상담신청',
         ),
       )
       await finish(saved)
@@ -259,7 +265,7 @@ export function LinkCustomerModal({
         </div>
       ) : (
         <div className="mt-4">
-          <p className="text-[0.88rem] text-slate-500">고객이 제출한 값으로 채웠습니다. 저장 전 확인하세요.</p>
+          <p className="text-[0.88rem] break-keep text-slate-500">고객이 제출한 값으로 채웠습니다. 저장 전 확인하세요. 계약 전이라 <strong className="font-semibold text-slate-700">잠재고객</strong>으로 등록되고, 영업 관리 보드의 '잠재 고객' 칸에 올라갑니다.</p>
           <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
             {(
               [
