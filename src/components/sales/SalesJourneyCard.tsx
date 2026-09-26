@@ -72,7 +72,7 @@ export function SalesJourneyCard({
       {path && <p className="t-meta -mt-1 break-keep text-slate-500">{SALES_PATH_INFO[path].label} — {SALES_PATH_INFO[path].hint}</p>}
 
       {/* 여섯 걸음 */}
-      <ol className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
+      <ol className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-6">
         {journey.steps.map((s, i) => {
           const sel = s.key === open.key
           const doneCount = s.tasks.filter((t) => t.done && !t.soon).length
