@@ -558,8 +558,9 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               ).map((x) => (
                 <li key={x.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-2.5">
                   <Link to={`/ops/clients/${x.id}`} className="t-sub font-bold text-slate-900 hover:text-brand-700 hover:underline">{x.name}</Link>
-                  <span className={`t-sub min-w-0 flex-1 break-keep ${x.tone}`}>{x.why}</span>
-                  <Link to={`/sales/meeting?client=${x.id}`} className="t-meta shrink-0 font-semibold text-brand-700 hover:underline">{x.go} →</Link>
+                  {/* 12rem 아래로는 줄이지 않고 다음 줄로 — 좁은 화면 · 큰 글자에서 한 줄에 두세 자씩 짜부라지지 않게 */}
+                  <span className={`t-sub min-w-0 flex-[1_1_12rem] break-keep ${x.tone}`}>{x.why}</span>
+                  <Link to={`/sales/meeting?client=${x.id}`} className="t-meta ml-auto shrink-0 font-semibold text-brand-700 hover:underline">{x.go} →</Link>
                 </li>
               ))}
             </ul>
