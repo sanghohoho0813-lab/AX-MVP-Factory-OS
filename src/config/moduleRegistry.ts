@@ -26,7 +26,7 @@ import {
   Workflow,
 } from 'lucide-react'
 import { SALES_TAB_PATHS } from './salesTabs'
-import { REVIEW_HUB_PATH, type ToolDefinition, liveTools, reviewTools } from './toolRegistry'
+import { REVIEW_HUB_PATH, type ToolDefinition, liveTools, movedTools, reviewTools } from './toolRegistry'
 
 /**
  * 모듈 레지스트리 — 이 제품이 어떤 화면 묶음으로 구성되는지의 목록.
@@ -131,6 +131,11 @@ function toolModules(): ModuleDefinition[] {
     }))
 }
 
+/** D-118: 이 메뉴로 옮겨 온 옛 도구 주소 — 그 주소에 있어도 이 메뉴에 불이 켜진다 */
+function movedToPaths(target: string): string[] {
+  return movedTools().flatMap((t) => (t.path && t.movedTo?.path === target ? [t.path] : []))
+}
+
 export const MODULES: ModuleDefinition[] = [
   { key: 'today', label: '오늘', path: '/', icon: Sun, group: 'today', accent: 'overview', enabled: true, exact: true },
   // D-103: 오늘 기록 · 주간 돌아보기 · 전체 기록은 일정 안의 탭이다 — 그 주소에서도 '일정' 에 불이 켜진다
@@ -141,7 +146,7 @@ export const MODULES: ModuleDefinition[] = [
   { key: 'inbox', label: '잠재고객 상담신청', path: '/ops/inbox', icon: Inbox, group: 'clients', accent: 'alert', enabled: true, badge: 'requests', hint: '고객 이벤트함' },
 
   // D-114: 기업컨설팅 OS(영업 도구 모음)를 옮긴 곳 — 목차는 이 한 줄, 보드 · 미팅 준비 · 상품·견적 · 전략은 안의 탭
-  { key: 'sales', label: '영업 관리', path: '/sales/board', icon: KanbanSquare, group: 'sales', accent: 'revenue', enabled: true, alsoPaths: SALES_TAB_PATHS, hint: '영업 보드 · 잠재고객 → 미팅 → 계약' },
+  { key: 'sales', label: '영업 관리', path: '/sales/board', icon: KanbanSquare, group: 'sales', accent: 'revenue', enabled: true, alsoPaths: [...SALES_TAB_PATHS, ...movedToPaths('/sales/board')], hint: '영업 보드 · 잠재고객 → 미팅 → 계약' },
   { key: 'agents', label: '영업자 정산', path: '/ops/agents', icon: Handshake, group: 'sales', accent: 'revenue', enabled: true, hint: '누구한테 지금 얼마를 줘야 하는가' },
   // 만들고 있는 프로그램이 들어올 자리 — 들어오면 status 를 지우고 화면만 바꾼다 (docs/DECISIONS D-103)
   { key: 'first-meeting', label: '1차 미팅 체크리스트', path: '/sales/first-meeting', icon: ClipboardCheck, group: 'sales', accent: 'revenue', enabled: true, status: 'soon', badge: 'first-meetings', hint: '영업자용 AX 1차 미팅 체크리스트 — 만드는 중' },
@@ -212,7 +217,7 @@ export function moduleForPath(pathname: string): ModuleDefinition | null {
  * 예전에는 이 주소를 맡는 메뉴가 없어 휴대폰 머리줄에 회사 이름만 떴다.
  */
 export function screenTitleForPath(pathname: string): string | null {
-  const review = reviewTools().find((t) => t.path && underPath(pathname, t.path))
+  const review = [...reviewTools(), ...movedTools()].find((t) => t.path && underPath(pathname, t.path))
   if (review) return review.label
   return moduleForPath(pathname)?.label ?? null
 }

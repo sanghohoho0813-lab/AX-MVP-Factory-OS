@@ -7,6 +7,8 @@
  *   - `status: 'review'`  — 도입 검토중. 쓸 수는 있지만 사이드바에는 '도입 검토중' 한 줄로만 묶인다.
  *                            대표가 "이건 쓰겠다" 하면 'live' 로 바꾸는 것으로 끝.
  *   - `status: 'planned'` — 자리만 잡아 둔 것. 도구함 화면에 '아직 없다' 고 적어 두고, 누를 수 없다.
+ *   - `status: 'moved'`   — OS 안 다른 곳으로 옮겨 간 것(D-118). 목차 · 검색에서 빠지고, 주소는 예전 기록 보기용으로 남는다.
+ *                            `movedTo` 가 옮겨 간 곳 — 그 화면의 메뉴 줄이 이 주소도 맡는다.
  *
  * 없는 기능을 있는 것처럼 보이게 하지 않는다 — 자리만 잡아 둔 것은 그렇게 적는다.
  * 규칙 계산이다. 어느 도구도 외부 API·LLM 을 부르지 않는다.
@@ -45,7 +47,7 @@ import {
   Wrench,
 } from 'lucide-react'
 
-export type ToolStatus = 'live' | 'review' | 'planned'
+export type ToolStatus = 'live' | 'review' | 'planned' | 'moved'
 
 export interface ToolDefinition {
   key: string
@@ -58,6 +60,8 @@ export interface ToolDefinition {
   path: string | null
   icon: LucideIcon
   status: ToolStatus
+  /** status 'moved' 일 때 옮겨 간 곳 */
+  movedTo?: { path: string; label: string }
   /** 어디서 가져왔는가 — 원본 저장소·브랜치. 도구함 카드 아래에 작게 적는다 */
   origin?: string
   /**
@@ -256,7 +260,9 @@ export const TOOLS: ToolDefinition[] = [
     navHint: '미팅 대본 · 전략 추천 · 상품 가격표',
     path: '/tools/sales-kit',
     icon: Briefcase,
-    status: 'review',
+    // D-118: 영업 관리(D-114~117)로 다 옮겼다 — 목차에서 내리고 예전 기록 보기용으로만 남긴다
+    status: 'moved',
+    movedTo: { path: '/sales/board', label: '영업 › 영업 관리' },
     origin: 'corp-consult-sales-os · main (법인컨설팅 세일즈 OS)',
     keywords: '영업 미팅 대본 상담 전략 가격표 제안 컨설팅 상품',
     recommendedDocs: ['cretopReport'],
@@ -297,6 +303,11 @@ export function reviewTools(): ToolDefinition[] {
   return TOOLS.filter((t) => t.status === 'review')
 }
 
+/** 다른 곳으로 옮겨 간 것 (D-118) */
+export function movedTools(): ToolDefinition[] {
+  return TOOLS.filter((t) => t.status === 'moved')
+}
+
 export function plannedTools(): ToolDefinition[] {
   return TOOLS.filter((t) => t.status === 'planned')
 }
@@ -310,7 +321,7 @@ export function toolOf(key: string): ToolDefinition | undefined {
  * 쓸 수 있는 것과 검토중인 것만 — 자리만 잡아 둔 것은 눌러도 갈 곳이 없으므로 나오지 않는다.
  */
 export function searchTools(query: string): ToolDefinition[] {
-  const usable = TOOLS.filter((t) => t.path !== null && t.status !== 'planned')
+  const usable = TOOLS.filter((t) => t.path !== null && t.status !== 'planned' && t.status !== 'moved')
   const q = query.trim().toLowerCase()
   if (!q) return usable
   return usable.filter((t) =>
@@ -320,7 +331,7 @@ export function searchTools(query: string): ToolDefinition[] {
 
 /** 이 서류를 쓰는 도구들 (서류함에서 "왜 필요한지" 에 함께 적는다, D-90) */
 export function toolsNeeding(doc: DocumentKey): ToolDefinition[] {
-  return TOOLS.filter((t) => t.status !== 'planned' && (t.requiredDocs ?? []).includes(doc))
+  return TOOLS.filter((t) => t.status !== 'planned' && t.status !== 'moved' && (t.requiredDocs ?? []).includes(doc))
 }
 
 /** 도구가 쓰는 서류 전부 (필요 + 있으면 좋음) */

@@ -7,6 +7,7 @@
  */
 import { NavLink } from 'react-router-dom'
 import { SALES_TABS } from '../../config/salesTabs'
+import { rampAt } from './salesColor'
 
 export function SalesTabs() {
   if (SALES_TABS.length < 2) return null
@@ -16,7 +17,7 @@ export function SalesTabs() {
         className="grid gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:inline-flex sm:w-auto"
         style={{ gridTemplateColumns: `repeat(${SALES_TABS.length}, minmax(0, 1fr))` }}
       >
-        {SALES_TABS.map((t) => (
+        {SALES_TABS.map((t, i) => (
           <li key={t.to} className="min-w-0">
             <NavLink
               to={t.to}
@@ -27,8 +28,13 @@ export function SalesTabs() {
                 }`
               }
             >
-              <t.icon aria-hidden="true" className="size-4 shrink-0" />
-              <span className="text-[0.8rem] leading-tight sm:text-[0.9rem] sm:whitespace-nowrap">{t.label}</span>
+              {/* D-118: 안 고른 탭 아이콘은 탭마다 조금씩 다른 구분색(테마를 따라감) — 고른 탭은 흰색 */}
+              {({ isActive }) => (
+                <>
+                  <t.icon aria-hidden="true" className={`size-4 shrink-0 ${isActive ? '' : 'ramp-text'}`} style={isActive ? undefined : rampAt(i, SALES_TABS.length)} />
+                  <span className="text-[0.8rem] leading-tight sm:text-[0.9rem] sm:whitespace-nowrap">{t.label}</span>
+                </>
+              )}
             </NavLink>
           </li>
         ))}

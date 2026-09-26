@@ -420,6 +420,68 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   await ctx.close()
 }
 
+/* ---- D-118: 구분색(테마를 따라감) · 오늘의 영업 · 영업 도구 모음 목차에서 내림 ---- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e).slice(0, 160)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(() => {
+    const k = 'axmvp.v1.operations_clients'
+    const list = JSON.parse(localStorage.getItem(k) ?? '[]')
+    const now = Date.now()
+    const iso = (d) => new Date(now - d * 86400000).toISOString()
+    const s = (stage) => ({ stage, source: '', referrer: '', interests: [], concern: '', expectedFee: 4000000, history: [{ at: iso(3), from: null, to: stage }], movedAt: iso(3) })
+    list.push(
+      { id: 'c_lead', workspaceId: null, companyName: '색시험리드', status: 'waiting', nextAction: '전화', nextActionDueDate: new Date(now - 2 * 86400000).toISOString().slice(0, 10), createdAt: iso(3), updatedAt: iso(3), sales: s('lead') },
+      { id: 'c_m2', workspaceId: null, companyName: '색시험이차', status: 'waiting', createdAt: iso(3), updatedAt: iso(3), sales: s('m2') },
+    )
+    localStorage.setItem(k, JSON.stringify(list))
+  })
+  await page.goto(BASE + '/sales/board', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  const bars = async () => page.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-testid="sales-board"] [data-sales-col]')].map((c) => [c.getAttribute('data-sales-col'), getComputedStyle(c.querySelector('[data-stage-bar]')).backgroundColor])))
+  const b1 = await bars()
+  const vals = Object.values(b1)
+  check('색: 칸 머리 띠 6개가 모두 칠해져 있다', vals.length === 6 && vals.every((v) => v && v !== 'rgba(0, 0, 0, 0)'), JSON.stringify(b1))
+  check('색: 단계마다 조금씩 다르다(잠재 ≠ 2차 ≠ 클로징)', new Set([b1.lead, b1.m2, b1.closing]).size === 3, JSON.stringify(b1))
+  const t1 = await page.getByTestId('sales-tabs').locator('a:not([aria-current]) svg').first().evaluate((el) => getComputedStyle(el).color)
+  check('색: 안 고른 탭 아이콘은 회색이 아니다', t1 !== 'rgb(71, 85, 105)', t1)
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'burgundy'))
+  await page.waitForTimeout(250)
+  const b2 = await bars()
+  check('색: 테마를 바꾸면 띠 색도 바뀐다', b2.lead !== b1.lead && b2.m2 !== b1.m2, `${b1.lead} → ${b2.lead}`)
+  check('색: 계약 완료 띠는 테마와 상관없이 성공색', b2.contracted === b1.contracted)
+  await page.evaluate(() => document.documentElement.removeAttribute('data-theme'))
+  await page.goto(BASE + '/sales/meeting?client=c_m2', { waitUntil: 'networkidle' })
+  check('색: 미팅 준비의 단계 배지(점 + 옅은 바탕)', (await page.locator('[data-stage-badge="m2"]').count()) === 1)
+
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  const ts = (await page.getByTestId('today-sales').innerText()) ?? ''
+  // 3곳 = 색시험 2곳 + 영업 칸 없는 계약 전 시드(미래바이오랩) — 보드와 같은 기준
+  check('오늘: 영업 묶음 — 진행 중 · 예상 수임료 · 챙길 곳(날짜 지남)', /진행 중\s*3곳/.test(ts) && ts.includes('800만') && /색시험리드[\s\S]*다음 할 일 날짜 2일 지남/.test(ts), ts.slice(0, 300))
+  await page.getByTestId('today-sales').getByRole('link', { name: '모두 보기' }).click()
+  await page.waitForURL(/\/sales\/board/)
+  check('오늘: 모두 보기 → 영업 보드', page.url().includes('/sales/board'))
+  await page.getByTestId('sales-board').waitFor()
+  const boardSub = (await page.locator('main').innerText()).match(/진행 중 (\d+)곳/)?.[1]
+  check('오늘 · 보드: 진행 중 숫자가 같다', boardSub !== undefined && new RegExp(`진행 중\\s*${boardSub}곳`).test(ts), `board ${boardSub} / today ${ts.match(/진행 중\s*\d+곳/)?.[0]}`)
+
+  const nav = (await page.getByRole('navigation', { name: '주 메뉴' }).innerText()) ?? ''
+  check('목차: 도입 검토중 줄이 없다', !nav.includes('도입 검토중'))
+  await page.goto(BASE + '/tools/sales-kit/briefing', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  check('옛 주소: 영업 도구 모음은 그대로 열리고 옮겨 갔다는 안내', ((await page.getByTestId('sales-kit-moving').innerText()) ?? '').includes('영업 › 영업 관리로 옮겼습니다'))
+  check('옛 주소: 사이드바는 영업 관리에 불', ((await page.locator('aside a[aria-current="page"]').innerText()) ?? '').includes('영업 관리'))
+  await page.goto(BASE + '/tools', { waitUntil: 'networkidle' })
+  check('작업실 전체: 옮겨 간 것 한 줄', ((await page.getByTestId('tools-moved').innerText()) ?? '').includes('영업 도구 모음'))
+  check('JS 오류 없음 (D-118)', errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\nsales: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

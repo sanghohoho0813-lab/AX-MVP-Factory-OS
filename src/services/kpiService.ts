@@ -17,6 +17,7 @@ import type { CustomerEvent, JournalEntry } from '../types/bridge'
 import { SERVICES, isServiceStarted } from '../content/clientOpsCatalog'
 import { daysLeftFrom } from './clientOpsAlerts'
 import { netAmountOf } from './feeMath'
+import { salesInFlow } from './salesPipeline'
 import { formatKrw } from '../lib/format'
 
 export type KpiGroup = 'cost' | 'revenue' | 'sales' | 'scale' | 'adoption'
@@ -319,12 +320,8 @@ function adoptionMetrics(input: KpiInput): KpiMetric[] {
 /* 영업 (D-114) — 영업 칸(단계 이력)에서만 센다                           */
 /* ------------------------------------------------------------------ */
 
-const FLOW = new Set(['lead', 'm1sched', 'm1done', 'm2', 'closing'])
-
 function salesMetrics(input: KpiInput): KpiMetric[] {
-  const live = input.records.filter((r) => r.archivedAt === null && r.sales)
-  const inFlow = live.filter((r) => FLOW.has(r.sales!.stage))
-  const fee = inFlow.reduce((s, r) => s + (r.sales!.expectedFee ?? 0), 0)
+  const { list: inFlow, fee } = salesInFlow(input.records)
   // 잠재 고객에서 시작한 업체(영업 칸이 생길 때 잠재 고객이었던 곳) 중 계약 완료에 닿은 비율
   const started = input.records.filter((r) => r.sales && r.sales.history[0]?.to === 'lead' && r.sales.history[0]?.from === null)
   const won = started.filter((r) => r.sales!.history.some((h) => h.to === 'contracted'))

@@ -18,6 +18,7 @@ import { salesStageOf } from '../../services/salesPipeline'
 import { STRATEGY_LIBRARY } from '../../services/salesEngine'
 import { CRETOP_WEAPONS, PROPOSAL_TOPICS, TAX_STRATEGIES } from '../../services/salesLibrary'
 import { customersForTopic } from '../../services/salesSignals'
+import { rampAt, rampStyle } from '../../components/sales/salesColor'
 import { todayLocalDate } from '../../lib/appClock'
 import { SALES_STAGE_LABEL, type ClientOpsRecord } from '../../types/clientOps'
 
@@ -36,6 +37,8 @@ interface Entry {
 }
 
 const SOURCE_LABEL: Record<Exclude<Source, 'all'>, string> = { strategy: '영업 전략', cretop: '크레탑 무기', tax: '절세 전략' }
+/** D-118: 종류마다 조금씩 다른 구분색(테마를 따라감) */
+const SOURCE_SHIFT: Record<Exclude<Source, 'all'>, number> = { strategy: 0, cretop: 44, tax: 88 }
 
 function buildEntries(): Entry[] {
   const out: Entry[] = []
@@ -102,10 +105,11 @@ function EntryRow({ e }: { e: Entry }) {
     <li className="overflow-hidden rounded-(--radius-control) border border-slate-200 bg-white">
       <button type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)} className="tap flex w-full items-start gap-2 px-3.5 py-3 text-left">
         <ChevronRight aria-hidden="true" className={`mt-1 size-4 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-90' : ''}`} />
+        <span aria-hidden="true" className="ramp-dot mt-2 size-2 shrink-0 rounded-full" style={rampStyle(SOURCE_SHIFT[e.source])} />
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-baseline gap-x-2">
             <span className="t-body font-bold text-slate-900">{e.name}</span>
-            <span className="t-meta text-slate-400">{SOURCE_LABEL[e.source]} · {e.cat}</span>
+            <span className="t-meta"><span className="ramp-text font-semibold" style={rampStyle(SOURCE_SHIFT[e.source])}>{SOURCE_LABEL[e.source]}</span><span className="text-slate-400"> · {e.cat}</span></span>
           </span>
           {!open && <span className="t-sub mt-0.5 line-clamp-1 block break-keep text-slate-500">{e.line}</span>}
         </span>
@@ -153,11 +157,12 @@ function LibraryContent({ workspaceId }: { workspaceId: string | null }) {
       <Surface className="flex flex-col gap-3">
         <h2 className="t-section text-slate-900">주제별 — 지금 연락할 고객</h2>
         <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4" data-testid="topic-list">
-          {topics.map(({ t, list: cs }) => (
-            <li key={t.key} className="flex flex-col gap-1 rounded-(--radius-control) border border-slate-200 bg-slate-50 p-3">
+          {topics.map(({ t, list: cs }, ti) => (
+            <li key={t.key} className="relative flex flex-col gap-1 overflow-hidden rounded-(--radius-control) border border-slate-200 bg-slate-50 p-3 pl-4">
+              <span aria-hidden="true" className="ramp-bar absolute inset-y-0 left-0 w-[3px]" style={rampAt(ti, topics.length)} />
               <span className="flex items-baseline justify-between gap-2">
                 <span className="t-sub font-bold text-slate-900">{t.name}</span>
-                <span className={`t-meta rounded-full px-2 font-semibold tabular-nums ${cs.length > 0 ? 'bg-brand-50 text-brand-700' : 'bg-white text-slate-400'}`}>{cs.length}곳</span>
+                <span className={`t-meta rounded-full px-2 font-semibold tabular-nums ${cs.length > 0 ? 'ramp-soft ramp-text' : 'bg-white text-slate-400'}`} style={cs.length > 0 ? rampAt(ti, topics.length) : undefined}>{cs.length}곳</span>
               </span>
               <span className="t-meta break-keep text-slate-500">{t.action}</span>
               {cs.length > 0 && (
@@ -181,6 +186,7 @@ function LibraryContent({ workspaceId }: { workspaceId: string | null }) {
         <div role="group" aria-label="전략 종류" data-testid="library-source" className="grid grid-cols-2 gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:inline-flex sm:self-start">
           {(['all', 'strategy', 'cretop', 'tax'] as Source[]).map((k) => (
             <button key={k} type="button" aria-pressed={source === k} onClick={() => setSource(k)} className={`tap rounded-[8px] px-3 py-2 text-[0.88rem] font-semibold break-keep ${source === k ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
+              {k !== 'all' && source !== k && <span aria-hidden="true" className="ramp-dot mr-1.5 inline-block size-2 rounded-full" style={rampStyle(SOURCE_SHIFT[k])} />}
               {k === 'all' ? '전체' : SOURCE_LABEL[k]} <span className="tabular-nums opacity-75">{counts[k]}</span>
             </button>
           ))}

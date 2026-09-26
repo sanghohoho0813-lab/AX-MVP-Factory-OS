@@ -54,7 +54,7 @@ export function SalesKitPage() {
     <div className="flex flex-col gap-5">
       {/* D-114: 운영 OS 영업 관리로 옮기는 중 — 새 영업 일은 그쪽에서 */}
       <p data-testid="sales-kit-moving" className="no-print t-sub flex flex-wrap items-center gap-x-2 gap-y-1 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-4 py-2.5 break-keep text-slate-700">
-        <span>영업 단계 · 잠재고객은 이제 <strong className="font-semibold">영업 › 영업 관리</strong>에서 고객 관리와 한 장부로 봅니다. 여기 기록은 그쪽으로 한 번 복사됩니다(원본은 그대로).</span>
+        <span><strong className="font-semibold">영업 › 영업 관리</strong>로 옮겼습니다 — 보드 · 미팅 준비 · 상품·제안 · 전략. 이 화면은 예전 기록을 보는 용도로 남겨 둡니다(여기 기록은 영업 관리로 한 번 복사됐습니다).</span>
         <Link to="/sales/board" className="font-semibold text-brand-700 hover:underline">영업 관리 열기 →</Link>
       </p>
       <SalesApp tab={tab} onTab={onTab} focus={clientId ?? null} />

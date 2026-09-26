@@ -102,6 +102,7 @@ export function ToolsHubPage() {
   const live = TOOLS.filter((t) => t.status === 'live')
   const review = TOOLS.filter((t) => t.status === 'review')
   const planned = TOOLS.filter((t) => t.status === 'planned')
+  const moved = TOOLS.filter((t) => t.status === 'moved')
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -119,6 +120,20 @@ export function ToolsHubPage() {
           ))}
         </div>
       </section>
+
+      {/* D-118: 다른 곳으로 옮겨 간 것 — 카드가 아니라 한 줄 안내. 예전 화면은 기록 보기용으로 열린다 */}
+      {moved.length > 0 && (
+        <section aria-label="옮겨 간 것" data-testid="tools-moved" className="flex flex-col gap-1.5 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3">
+          {moved.map((t) => (
+            <p key={t.key} className="t-sub flex flex-wrap items-baseline gap-x-2 gap-y-1 break-keep text-slate-600">
+              <span className="font-semibold text-slate-800">{t.label}</span>
+              <span>→ {t.movedTo?.label}로 옮겼습니다.</span>
+              {t.movedTo && <Link to={t.movedTo.path} className="font-semibold text-brand-700 hover:underline">열기</Link>}
+              {t.path && <Link to={t.path} className="t-meta text-slate-500 hover:underline">예전 화면(기록 보기)</Link>}
+            </p>
+          ))}
+        </section>
+      )}
 
       {review.length > 0 && (
         <section aria-labelledby="tools-review" className="flex flex-col gap-3">

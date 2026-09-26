@@ -43,9 +43,9 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   for (const k of ['tax', 'startup-tax', 'cretop', 'employment', 'labcare', 'policy-funding']) {
     check(`도구함: ${k} 카드가 누를 수 있다`, (await page.locator(`a[data-tool="${k}"]`).count()) === 1)
   }
-  check('도구함: 영업 도구 모음은 검토중 배지', (await page.locator('a[data-tool="sales-kit"]').innerText()).includes('검토중'))
+  check('도구함: 영업 도구 모음은 카드 대신 옮겨 간 곳 안내(D-118)', (await page.locator('a[data-tool="sales-kit"]').count()) === 0 && ((await page.getByTestId('tools-moved').innerText()) ?? '').includes('영업 › 영업 관리'))
   check('도구함: 기업인증 OS 는 누를 수 없다', (await page.locator('div[data-tool="cert-os"]').count()) === 1)
-  check('사이드바: 도구함에 다섯 도구 + 도입 검토중', (await page.getByRole('navigation', { name: '주 메뉴' }).innerText()).includes('도입 검토중'))
+  check('사이드바: 도입 검토중 줄이 없다 · 영업 관리가 있다 (D-118)', !(await page.getByRole('navigation', { name: '주 메뉴' }).innerText()).includes('도입 검토중') && (await page.getByRole('navigation', { name: '주 메뉴' }).innerText()).includes('영업 관리'))
 
   // 창업감면 판정기
   await page.goto(BASE + '/tools/startup-tax', { waitUntil: 'networkidle' })
@@ -511,7 +511,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   // 도입 검토중
   await page.goto(BASE + '/tools/review', { waitUntil: 'networkidle' })
   await page.waitForTimeout(300)
-  check('도입 검토중: 영업 도구 모음과 이유', (await page.locator('body').innerText()).includes('왜 검토중인가'))
+  check('도입 검토중: 검토중인 도구가 없다고 적힌다 (D-118)', (await page.locator('body').innerText()).includes('검토중인 도구가 없습니다'))
 
   check('1440: 화면 오류 0', errors.length === 0, errors.join(' | ').slice(0, 300))
   await ctx.close()

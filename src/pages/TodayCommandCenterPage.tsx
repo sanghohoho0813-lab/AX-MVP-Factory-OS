@@ -6,6 +6,7 @@ import {
   Clock,
   Copy,
   Inbox,
+  KanbanSquare,
   Moon,
   NotebookPen,
 } from 'lucide-react'
@@ -21,6 +22,8 @@ import { EventCard } from '../components/ops/EventCard'
 import { LinkCustomerModal } from '../components/ops/LinkCustomerModal'
 import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { listClients } from '../services/clientOpsService'
+import { salesRecontacts, salesRisks } from '../services/salesSignals'
+import { salesInFlow } from '../services/salesPipeline'
 import { buildAllAlerts } from '../services/clientOpsAlerts'
 import { buildAllSchedule, upcomingWithin } from '../services/clientOpsSchedule'
 import {
@@ -115,7 +118,7 @@ function ActionRow({ action, rank }: { action: BriefAction; rank: number }) {
  *
  * 클래스 이름은 통째로 적는다(이어 붙이면 Tailwind 가 만들지 않는다).
  */
-type SectionAccent = 'todo' | 'urgent' | 'journal' | 'event' | 'client' | 'money' | 'fund'
+type SectionAccent = 'todo' | 'urgent' | 'journal' | 'event' | 'client' | 'money' | 'fund' | 'sales'
 
 const SECTION_CHIP: Record<SectionAccent, string> = {
   todo: 'bg-brand-50 text-brand-600',
@@ -125,6 +128,7 @@ const SECTION_CHIP: Record<SectionAccent, string> = {
   client: 'bg-teal-50 text-nav-ops',
   money: 'bg-amber-50 text-nav-revenue',
   fund: 'bg-emerald-50 text-nav-evidence',
+  sales: 'bg-amber-50 text-nav-revenue',
 }
 
 function SectionTitle({
@@ -219,6 +223,13 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     [alerts],
   )
   const money = useMemo(() => buildMoneySignals(clients, today), [clients, today])
+  // D-118: 영업 신호 — 영업 관리 보드와 같은 규칙
+  const salesRiskList = useMemo(() => salesRisks(clients, today), [clients, today])
+  const salesRecontactList = useMemo(() => salesRecontacts(clients), [clients])
+  const salesFlow = useMemo(() => {
+    const flow = salesInFlow(clients)
+    return { count: flow.list.length, fee: flow.fee }
+  }, [clients])
   const openEvents = useMemo(() => events.filter(isOpenEvent), [events])
   const followUps = useMemo(() => journal.filter((j) => j.entryType === 'follow_up' && !j.completed), [journal])
   /**
@@ -523,6 +534,32 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                     onCreateClient={() => setLinking({ event: e, tab: 'new' })}
                     onStatus={(status) => void setEventStatus(e, status)}
                   />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {/* D-118: 영업 — 영업 관리 보드의 '지금 챙길 영업' 을 오늘에서도. 없으면 다시 연락할 곳 */}
+        <section aria-labelledby="today-sales" data-testid="today-sales" className="flex min-w-0 flex-col gap-3">
+          <SectionTitle title="영업" icon={KanbanSquare} to="/sales/board" count={salesRiskList.length} accent="sales" />
+          <p className="t-sub text-slate-500">
+            진행 중 <strong className="font-semibold text-slate-800 tabular-nums">{salesFlow.count}곳</strong>
+            {salesFlow.fee > 0 && <> · 예상 수임료 <strong className="font-semibold text-slate-800 tabular-nums">{krwTile(salesFlow.fee)}</strong></>}
+            {salesRecontactList.length > 0 && <> · 다시 연락할 곳 {salesRecontactList.length}</>}
+          </p>
+          {salesRiskList.length === 0 && salesRecontactList.length === 0 ? (
+            <Blank title="지금 챙길 영업이 없습니다. 잠재고객은 영업 관리에서 등록합니다." icon={<KanbanSquare className="size-7" />} />
+          ) : (
+            <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-panel) border border-slate-200 bg-white">
+              {(salesRiskList.length > 0
+                ? salesRiskList.slice(0, 3).map((r) => ({ id: r.record.id, name: r.record.companyName, why: r.reason, tone: 'text-warning-700', go: r.action }))
+                : salesRecontactList.slice(0, 3).map((r) => ({ id: r.record.id, name: r.record.companyName, why: r.reasons[0], tone: 'text-slate-500', go: '연락하기' }))
+              ).map((x) => (
+                <li key={x.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-2.5">
+                  <Link to={`/ops/clients/${x.id}`} className="t-sub font-bold text-slate-900 hover:text-brand-700 hover:underline">{x.name}</Link>
+                  <span className={`t-sub min-w-0 flex-1 break-keep ${x.tone}`}>{x.why}</span>
+                  <Link to={`/sales/meeting?client=${x.id}`} className="t-meta shrink-0 font-semibold text-brand-700 hover:underline">{x.go} →</Link>
                 </li>
               ))}
             </ul>

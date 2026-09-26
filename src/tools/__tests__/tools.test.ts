@@ -268,13 +268,13 @@ function check(name: string, cond: boolean, detail?: string): void {
 /* ---- 5. 도구 목록 ---- */
 {
   check('도구목록: 쓸 수 있는 도구 6개 (세금·창업감면·크레탑·고용지원금·연구소·정책자금)', liveTools().length === 6, liveTools().map((t) => t.key).join())
-  check('도구목록: 검토중 1개 · 자리만 1개', reviewTools().length === 1 && plannedTools().length === 1)
+  check('도구목록: 검토중 0개 · 옮겨 감 1개(영업 도구 모음 → 영업 관리, D-118) · 자리만 1개', reviewTools().length === 0 && TOOLS.filter((t) => t.status === 'moved').length === 1 && plannedTools().length === 1)
   check('도구목록: 키가 겹치지 않는다', new Set(TOOLS.map((t) => t.key)).size === TOOLS.length)
   check('도구목록: 옮겨 온 것은 원본을 적는다', TOOLS.filter((t) => t.status !== 'planned').every((t) => !!t.origin))
   check('도구목록: toolOf 로 찾는다', toolOf('cretop')?.path === '/tools/cretop' && toolOf('nope') === undefined)
 
   // 검색 (D-89) — 대표는 도구 이름이 아니라 하고 싶은 일로 찾는다
-  check('도구검색: 빈 말이면 쓸 수 있는 것 + 검토중 (자리만 잡은 것은 빼고)', searchTools('').length === 7 && searchTools('').every((t) => t.path !== null))
+  check('도구검색: 빈 말이면 쓸 수 있는 것 + 검토중 (자리만 잡은 것 · 옮겨 간 것은 빼고)', searchTools('').length === 6 && searchTools('').every((t) => t.path !== null))
   check('도구검색: 이름으로', searchTools('크레탑').map((t) => t.key).join() === 'cretop')
   check('도구검색: 이름에 없는 말로도 — 부채비율 → 크레탑', searchTools('부채비율').map((t) => t.key).join() === 'cretop')
   check('도구검색: 지원금 → 고용지원금', searchTools('장려금').map((t) => t.key).join() === 'employment')
@@ -678,9 +678,9 @@ function check(name: string, cond: boolean, detail?: string): void {
   saveStartupTaxForm('cli_a', { ...EMPTY_FORM, businessType: '법인사업자' as typeof EMPTY_FORM.businessType })
   check('창업감면 저장: 한 업체의 답이 다른 업체로 새지 않는다', loadStartupTaxForm('cli_a')?.businessType === '법인사업자' && loadStartupTaxForm('cli_b') === null && loadStartupTaxForm(null) === null)
 
-  // 도입 검토중 도구(영업 도구 모음)에 있어도 메뉴 줄에 불이 켜지고, 머리줄에 도구 이름이 뜬다
+  // D-118: 영업 도구 모음은 영업 관리로 옮겨 갔다 — 예전 주소에 있어도 영업 관리 줄에 불이 켜지고, 머리줄에 도구 이름이 뜬다
   const review = moduleForPath('/tools/sales-kit/briefing')
-  check('메뉴: 영업 도구 주소는 도입 검토중 줄이 맡는다', review?.key === 'tools-review', review?.key)
+  check('메뉴: 영업 도구 주소는 영업 관리 줄이 맡는다', review?.key === 'sales', review?.key)
   check('메뉴: 머리줄 이름은 영업 도구 모음', screenTitleForPath('/tools/sales-kit/briefing') === '영업 도구 모음', String(screenTitleForPath('/tools/sales-kit/briefing')))
   check('메뉴: 도구함 전체는 /tools 에서만 켜진다', moduleMatchLength({ path: '/tools', exact: true }, '/tools/cretop') === 0 && moduleForPath('/tools')?.key === 'tools')
   check('메뉴: 크레탑은 크레탑 줄', moduleForPath('/tools/cretop/core-check')?.path === '/tools/cretop')

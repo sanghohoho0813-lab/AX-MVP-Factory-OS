@@ -16,6 +16,7 @@ import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useToast } from '../../components/ui/toastContext'
 import { Badge, Disclosure, MetricTile, ScreenTitle } from '../../components/ui/primitives'
 import { CopyButton } from '../../components/sales/salesParts'
+import { stageColor } from '../../components/sales/salesColor'
 import { salesRecontacts, salesRisks } from '../../services/salesSignals'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
@@ -27,6 +28,7 @@ import {
   daysInStage,
   groupBySalesStage,
   importLegacySalesAccounts,
+  salesInFlow,
   salesStageOf,
   withNewProspect,
   withSalesInfo,
@@ -266,15 +268,14 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
 
   const stats = useMemo(() => {
     const month = today.slice(0, 7)
-    const inFlow = SALES_FLOW_STAGES.filter((s) => s !== 'contracted').flatMap((s) => all[s])
-    const fee = inFlow.reduce((sum, r) => sum + (r.sales?.expectedFee ?? 0), 0)
+    const { list: inFlow, fee } = salesInFlow(records)
     const wonThisMonth = all.contracted.filter((r) => (r.sales?.movedAt ?? '').slice(0, 7) === month).length
     const stale = inFlow.filter((r) => {
       const d = daysInStage(r)
       return d !== null && d >= SALES_STALE_DAYS
     }).length
     return { inFlow: inFlow.length, fee, wonThisMonth, stale, parked: all.hold.length + all.lost.length }
-  }, [all, today])
+  }, [all, records, today])
 
   const risks = useMemo(() => salesRisks(records, today), [records, today])
   const recontacts = useMemo(() => salesRecontacts(records), [records])
@@ -332,13 +333,19 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
   const open = (r: ClientOpsRecord) => navigate(`/ops/clients/${r.id}`)
   const liveCount = records.filter((r) => r.archivedAt === null).length
 
-  const column = (stage: SalesStage, list: ClientOpsRecord[]) => (
-    <section key={stage} aria-label={SALES_STAGE_LABEL[stage]} data-sales-col={stage} className="flex min-w-0 flex-col gap-2 rounded-(--radius-panel) border border-slate-200 bg-slate-50 p-2">
-      <div className="flex items-baseline justify-between gap-2 px-1 pt-1">
-        <h2 className="t-sub min-w-0 truncate font-bold text-slate-800">{SALES_STAGE_LABEL[stage]}</h2>
-        <span className={`t-meta shrink-0 rounded-full px-2 font-semibold tabular-nums ${stage === 'contracted' && list.length > 0 ? 'bg-success-50 text-success-700' : 'bg-white text-slate-500'}`}>{list.length}</span>
+  const column = (stage: SalesStage, list: ClientOpsRecord[]) => {
+    const c = stageColor(stage)
+    return (
+    <section key={stage} aria-label={SALES_STAGE_LABEL[stage]} data-sales-col={stage} className="relative flex min-w-0 flex-col gap-2 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-slate-50 p-2 pt-3">
+      {/* D-118: 칸 머리 위 3px 띠 + 옅은 머리 바탕 — 단계 구분색(테마를 따라간다). 칸 전체는 칠하지 않는다 */}
+      <span aria-hidden="true" data-stage-bar className={`absolute inset-x-0 top-0 h-[3px] ${c.bar}`} style={c.style} />
+      <div data-stage-head className={`-mx-2 -mt-3 flex flex-col gap-0.5 px-3 pt-3.5 pb-2 ${c.soft}`} style={c.style}>
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 className={`t-sub min-w-0 truncate font-bold ${c.text}`} style={c.style}>{SALES_STAGE_LABEL[stage]}</h2>
+          <span className={`t-meta shrink-0 rounded-full bg-white px-2 font-semibold tabular-nums ${list.length > 0 ? c.text : 'text-slate-400'}`} style={list.length > 0 ? c.style : undefined}>{list.length}</span>
+        </div>
+        <p className="t-meta break-keep text-slate-500">{SALES_STAGE_HINT[stage]}</p>
       </div>
-      <p className="t-meta -mt-1 px-1 break-keep text-slate-400">{SALES_STAGE_HINT[stage]}</p>
       {list.length === 0 ? (
         <p className="t-meta rounded-(--radius-control) border border-dashed border-slate-200 px-2 py-4 text-center text-slate-400">없음</p>
       ) : (
@@ -349,7 +356,8 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
         </ul>
       )}
     </section>
-  )
+    )
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -472,7 +480,11 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
                       on ? 'border-brand-500 bg-brand-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    <span className="t-meta w-full truncate font-semibold">{SALES_STAGE_LABEL[s]}</span>
+                    <span className="t-meta flex w-full min-w-0 items-start gap-1.5 font-semibold">
+                      <span aria-hidden="true" className={`mt-[0.4em] size-2 shrink-0 rounded-full ${on ? 'bg-white' : stageColor(s).dot}`} style={on ? undefined : stageColor(s).style} />
+                      {/* 좁으면 두 줄로 — '1차 미팅 예정' · '1차 미팅 완료' 가 둘 다 '1차 미팅 …' 으로 잘리면 구별이 안 된다 */}
+                      <span className="min-w-0 break-keep leading-tight">{SALES_STAGE_LABEL[s]}</span>
+                    </span>
                     <span className={`t-body font-bold tabular-nums ${on ? 'text-white' : 'text-slate-900'}`}>{groups[s].length}</span>
                   </button>
                 )

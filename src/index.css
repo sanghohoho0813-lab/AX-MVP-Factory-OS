@@ -587,3 +587,26 @@ input:is([type="date"], [type="month"], [type="time"], [type="datetime-local"]):
 @media (min-width: 1024px) {
   .sk-kpi-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
+/* D-118: 영업 관리 구분색 — 사이드바 도구함 아이콘(nav-ramp)처럼 테마 강조색에서 출발해 색상(hue)만 조금씩 옮긴다.
+   테마를 바꾸면 같이 바뀌고, 밝기 · 채도를 고정해 한 화면에 여러 색이 있어도 톤이 튀지 않는다.
+   --ramp-shift 는 부르는 쪽(salesColor.ts)이 정한다. 상대 색 문법이 없는 브라우저는 테마색 그대로 */
+.ramp-bar {
+  background-color: var(--color-brand-500);
+  background-color: oklch(from var(--color-brand-500) 0.66 0.13 calc(h + var(--ramp-shift, 0)));
+}
+.ramp-dot {
+  background-color: var(--color-brand-500);
+  background-color: oklch(from var(--color-brand-500) 0.66 0.13 calc(h + var(--ramp-shift, 0)));
+}
+.ramp-soft {
+  background-color: var(--color-brand-50);
+  background-color: oklch(from var(--color-brand-500) 0.965 0.025 calc(h + var(--ramp-shift, 0)));
+}
+.ramp-text {
+  color: var(--color-brand-700);
+  color: oklch(from var(--color-brand-500) 0.47 0.12 calc(h + var(--ramp-shift, 0)));
+}
+.ramp-border {
+  border-color: var(--color-brand-200);
+  border-color: oklch(from var(--color-brand-500) 0.86 0.06 calc(h + var(--ramp-shift, 0)));
+}

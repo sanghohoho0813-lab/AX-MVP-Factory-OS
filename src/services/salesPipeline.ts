@@ -6,6 +6,7 @@
  */
 
 import {
+  SALES_FLOW_STAGES,
   SALES_STAGE_LABEL,
   SALES_STAGE_ORDER,
   contractStageOf,
@@ -170,6 +171,16 @@ export function groupBySalesStage(records: ClientOpsRecord[]): Record<SalesStage
   const movedAt = (r: ClientOpsRecord) => r.sales?.movedAt || r.updatedAt
   for (const s of SALES_STAGE_ORDER) out[s].sort((a, b) => movedAt(b).localeCompare(movedAt(a)))
   return out
+}
+
+/**
+ * 진행 중인 영업 — 잠재 고객 ~ 3차 클로징. 보드 · 오늘 화면 · KPI 가 모두 이 기준으로 센다(D-118).
+ * 영업 칸이 없는 계약 전 업체도 '잠재 고객' 으로 들어간다(보드와 같다).
+ */
+export function salesInFlow(records: ClientOpsRecord[]): { list: ClientOpsRecord[]; fee: number } {
+  const g = groupBySalesStage(records)
+  const list = SALES_FLOW_STAGES.filter((s) => s !== 'contracted').flatMap((s) => g[s])
+  return { list, fee: list.reduce((sum, r) => sum + (r.sales?.expectedFee ?? 0), 0) }
 }
 
 /** 이 단계에 머문 날 수 (옮긴 적이 없으면 null) */

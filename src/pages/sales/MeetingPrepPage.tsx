@@ -16,7 +16,8 @@ import { useToast } from '../../components/ui/toastContext'
 import { Badge, Disclosure, ScreenTitle, Surface, type Tone } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { SalesTabs } from '../../components/sales/SalesTabs'
-import { CopyButton, NumberedList, PillList, ScriptBlock } from '../../components/sales/salesParts'
+import { rampAt } from '../../components/sales/salesColor'
+import { CopyButton, NumberedList, PillList, ScriptBlock, StageBadge } from '../../components/sales/salesParts'
 import { listClients, saveClient } from '../../services/clientOpsService'
 import { salesStageOf, withSalesStage } from '../../services/salesPipeline'
 import {
@@ -390,7 +391,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                     {record.companyName}
                     <ChevronRight aria-hidden="true" className="size-4 text-slate-400" />
                   </Link>
-                  <Badge>{SALES_STAGE_LABEL[stage]}</Badge>
+                  <StageBadge stage={stage} />
                   <Badge tone={TIER_TONE[tier.key]}>
                     <span data-testid="lead-score" className="tabular-nums">{score}점</span> · {tier.label}
                   </Badge>
@@ -401,9 +402,10 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                   <h2 className="t-sub font-bold text-slate-800">먼저 볼 전략 TOP3</h2>
                   <ol className="mt-1.5 grid gap-2 lg:grid-cols-3">
                     {strategies.map((st, i) => (
-                      <li key={st.id} className="flex flex-col gap-1 rounded-(--radius-control) border border-slate-200 bg-slate-50 p-3">
+                      <li key={st.id} className="relative flex flex-col gap-1 overflow-hidden rounded-(--radius-control) border border-slate-200 bg-slate-50 p-3 pl-4">
+                        <span aria-hidden="true" className="ramp-bar absolute inset-y-0 left-0 w-[3px]" style={rampAt(i, 3)} />
                         <span className="t-sub font-bold text-slate-900">
-                          <span className="text-brand-700 tabular-nums">{i + 1}.</span> {st.name}
+                          <span className="ramp-text tabular-nums" style={rampAt(i, 3)}>{i + 1}.</span> {st.name}
                         </span>
                         <span className="t-meta break-keep text-slate-600">{st.fit}</span>
                         <span className="t-meta text-slate-500">

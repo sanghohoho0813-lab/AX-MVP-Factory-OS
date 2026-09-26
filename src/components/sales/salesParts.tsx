@@ -4,6 +4,8 @@
  */
 import { useState, type ReactNode } from 'react'
 import { Check, Copy } from 'lucide-react'
+import { SALES_STAGE_LABEL, type SalesStage } from '../../types/clientOps'
+import { stageColor } from './salesColor'
 
 export function CopyButton({ text, label = '복사' }: { text: string; label?: string }) {
   const [done, setDone] = useState(false)
@@ -72,5 +74,16 @@ export function PillList({ items }: { items: string[] }) {
         </li>
       ))}
     </ul>
+  )
+}
+
+/** 영업 단계 배지 — 점 + 이름, 옅은 단계색 바탕 (D-118) */
+export function StageBadge({ stage }: { stage: SalesStage }) {
+  const c = stageColor(stage)
+  return (
+    <span data-stage-badge={stage} className={`t-meta inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 font-semibold ${c.soft} ${c.text} ${c.border}`} style={c.style}>
+      <span aria-hidden="true" className={`size-1.5 rounded-full ${c.dot}`} style={c.style} />
+      {SALES_STAGE_LABEL[stage]}
+    </span>
   )
 }

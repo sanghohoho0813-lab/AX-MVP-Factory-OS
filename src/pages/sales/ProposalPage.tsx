@@ -16,7 +16,8 @@ import { useToast } from '../../components/ui/toastContext'
 import { Badge, Disclosure, MetricTile, ScreenTitle, Surface, type Tone } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { SalesTabs } from '../../components/sales/SalesTabs'
-import { CopyButton, PillList } from '../../components/sales/salesParts'
+import { CopyButton, PillList, StageBadge } from '../../components/sales/salesParts'
+import { rampAt } from '../../components/sales/salesColor'
 import { useCurrentUser } from '../../components/layout/useCurrentUser'
 import { brand } from '../../brand/brand.config'
 import { listClients, saveClient } from '../../services/clientOpsService'
@@ -78,7 +79,7 @@ function CatalogView({ catalog, prices, onSavePrice }: { catalog: SalesPackage[]
   return (
     <div className="flex flex-col gap-3" data-testid="catalog">
       <div className="flex flex-wrap gap-1.5" role="group" aria-label="상품 분류">
-        {['전체', ...PKG_CATEGORIES].map((c) => (
+        {['전체', ...PKG_CATEGORIES].map((c, ci) => (
           <button
             key={c}
             type="button"
@@ -86,6 +87,7 @@ function CatalogView({ catalog, prices, onSavePrice }: { catalog: SalesPackage[]
             onClick={() => setCat(c)}
             className={`t-meta rounded-full border px-2.5 py-1 font-semibold ${cat === c ? 'border-brand-500 bg-brand-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
           >
+            {c !== '전체' && cat !== c && <span aria-hidden="true" className="ramp-dot mr-1 inline-block size-1.5 rounded-full align-middle" style={rampAt(ci - 1, PKG_CATEGORIES.length)} />}
             {c} <span className="tabular-nums opacity-75">{c === '전체' ? catalog.length : catalog.filter((p) => p.cat === c).length}</span>
           </button>
         ))}
@@ -113,7 +115,7 @@ function CatalogView({ catalog, prices, onSavePrice }: { catalog: SalesPackage[]
                   </button>
                 )}
               </div>
-              <p className="t-meta text-slate-500">{p.cat} · 기간 {pkgDuration(p)}</p>
+              <p className="t-meta text-slate-500"><span className="ramp-text font-semibold" style={rampAt(PKG_CATEGORIES.indexOf(p.cat), PKG_CATEGORIES.length)}>{p.cat}</span> · 기간 {pkgDuration(p)}</p>
               <p className="t-sub break-keep text-slate-700">{p.desc}</p>
               <p className="t-meta break-keep text-slate-500">맞는 고객 — {p.fit}</p>
               {changed && editing !== p.id && (
@@ -235,7 +237,10 @@ function ProposalWork({ record, catalog, onSave }: { record: ClientOpsRecord; ca
                   onClick={() => toggle(pkg.name)}
                   className={`flex h-full w-full flex-col gap-1 rounded-(--radius-control) border p-3 text-left ${on ? 'border-brand-400 bg-brand-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
                 >
-                  <span className="t-meta font-semibold text-brand-700">추천 {i + 1}</span>
+                  <span className="t-meta inline-flex items-center gap-1.5 font-semibold ramp-text" style={rampAt(PKG_CATEGORIES.indexOf(pkg.cat), PKG_CATEGORIES.length)}>
+                    <span aria-hidden="true" className="ramp-dot size-1.5 rounded-full" style={rampAt(PKG_CATEGORIES.indexOf(pkg.cat), PKG_CATEGORIES.length)} />
+                    추천 {i + 1} · {pkg.cat}
+                  </span>
                   <span className="t-sub font-bold text-slate-900">{pkg.name}</span>
                   <span className="t-meta tabular-nums text-slate-600">{pkg.fee.toLocaleString('ko-KR')}만원 · {pkgDuration(pkg)}</span>
                   <span className="t-meta break-keep text-slate-500">{reason}</span>
@@ -543,7 +548,7 @@ function ProposalContent({ workspaceId }: { workspaceId: string | null }) {
                   {record.companyName}
                   <ChevronRight aria-hidden="true" className="size-4 text-slate-400" />
                 </Link>
-                <Badge>{SALES_STAGE_LABEL[salesStageOf(record)]}</Badge>
+                <StageBadge stage={salesStageOf(record)} />
                 {record.sales?.proposal && <Badge tone="brand">{record.sales.proposal.status}</Badge>}
                 {(record.sales?.interests?.length ?? 0) > 0 && <PillList items={record.sales?.interests ?? []} />}
               </p>

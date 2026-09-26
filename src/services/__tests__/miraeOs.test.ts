@@ -9,10 +9,10 @@
 
 import { brand, documentTitle } from '../../brand/brand.config'
 import { UI_THEMES, isThemeKey } from '../../lib/uiTheme'
-import { MODULES, MODULE_GROUPS, enabledModulesByGroup, moduleForPath, screenGroupForPath } from '../../config/moduleRegistry'
+import { MODULES, MODULE_GROUPS, enabledModulesByGroup, moduleForPath, screenGroupForPath, screenTitleForPath } from '../../config/moduleRegistry'
 import { identityFromSession } from '../../auth/currentUser'
 import { FUTURE_ITEMS } from '../../config/capabilityStatus'
-import { REVIEW_HUB_PATH, TOOLS, liveTools, plannedTools, reviewTools } from '../../config/toolRegistry'
+import { REVIEW_HUB_PATH, TOOLS, liveTools, plannedTools, reviewTools, searchTools } from '../../config/toolRegistry'
 import { formatClockDate, formatClockTime } from '../../components/layout/HeaderClock'
 import {
   CUSTOMER_STAGE_ORDER,
@@ -57,6 +57,7 @@ import {
   isProspect,
   normalizeSales,
   salesStageFrom,
+  salesInFlow,
   salesStageOf,
   withNewProspect,
   withSalesInfo,
@@ -160,8 +161,8 @@ check('modules: AX STUDIO 는 접을 수 있고 기본 접힘', MODULE_GROUPS.fi
     MODULES.find((m) => m.key === 'client-ops')?.badge === 'clients' && MODULES.find((m) => m.key === 'inbox')?.badge === 'requests' && MODULES.find((m) => m.key === 'first-meeting')?.badge === 'first-meetings')
   const inGroup = (g: string) => MODULES.filter((m) => m.group === g).map((m) => m.key)
   check('메뉴: 오늘과 일정이 한 묶음', inGroup('today').join() === 'today,calendar')
-  check('메뉴: 특허+벤처 · 자금·지원사업이 컨설팅 작업실 안, 도입 검토중 · 작업실 전체보다 위 (D-104)',
-    inGroup('tools').slice(-4).join() === 'consulting-studio,funding,tools-review,tools' && inGroup('occasional').length === 0, inGroup('tools').join())
+  check('메뉴: 특허+벤처 · 자금·지원사업이 컨설팅 작업실 안, 작업실 전체보다 위 (D-104) · 검토중 도구가 없으면 도입 검토중 줄도 없다 (D-118)',
+    inGroup('tools').slice(-3).join() === 'consulting-studio,funding,tools' && !inGroup('tools').includes('tools-review') && inGroup('occasional').length === 0, inGroup('tools').join())
   check('메뉴: 영업 묶음 = 영업 관리(D-114) · 영업자 정산 · 1차 미팅 체크리스트(준비 중)',
     inGroup('sales').join() === 'sales,agents,first-meeting' && MODULES.find((m) => m.key === 'first-meeting')?.status === 'soon', inGroup('sales').join())
   check('메뉴: 고객 묶음에서 영업자 정산이 빠졌다', !inGroup('clients').includes('agents'))
@@ -203,9 +204,10 @@ check('modules: AX STUDIO 는 접을 수 있고 기본 접힘', MODULE_GROUPS.fi
   check('도구함: 자리만 잡아 둔 것은 그렇게 적는다', plannedTools().every((t) => t.desc.includes('아직 없습니다')))
   check('도구함: 자리만 잡아 둔 것은 기업인증 OS 하나 (크레탑은 들어왔다)', plannedTools().map((t) => t.label).join() === '기업인증 OS')
   check('도구함: 옮겨 온 다섯 도구가 전부 쓸 수 있다', ['startup-tax', 'cretop', 'employment', 'labcare', 'policy-funding'].every((k) => liveTools().some((t) => t.key === k)))
-  check('도구함: 영업 도구 모음은 도입 검토중', reviewTools().map((t) => t.key).join() === 'sales-kit')
-  check('메뉴: 도입 검토중 한 줄이 도구함에 걸린다', MODULES.some((m) => m.key === 'tools-review' && m.group === 'tools' && m.path === REVIEW_HUB_PATH))
-  check('메뉴: 검토중 도구는 사이드바에 이름이 따로 안 걸린다', !MODULES.some((m) => m.path === '/tools/sales-kit'))
+  check('도구함: 영업 도구 모음은 영업 관리로 옮겨 감(D-118) — 검토중 도구 없음', reviewTools().length === 0 && TOOLS.find((t) => t.key === 'sales-kit')?.status === 'moved' && TOOLS.find((t) => t.key === 'sales-kit')?.movedTo?.path === '/sales/board')
+  check('메뉴: 검토중 도구가 없으면 도입 검토중 줄도 없다', !MODULES.some((m) => m.key === 'tools-review' || m.path === REVIEW_HUB_PATH))
+  check('메뉴: 옮겨 간 도구는 사이드바에 이름이 없고, 그 주소는 영업 관리가 맡는다', !MODULES.some((m) => m.path === '/tools/sales-kit') && moduleForPath('/tools/sales-kit/briefing')?.key === 'sales')
+  check('메뉴: 옮겨 간 도구 — 머리줄 영업 › 영업 도구 모음 · 검색 · 서류 목록에서 빠짐', screenTitleForPath('/tools/sales-kit/meeting') === '영업 도구 모음' && screenGroupForPath('/tools/sales-kit/meeting')?.title === '영업' && !searchTools('영업').some((t) => t.key === 'sales-kit'))
   check('도구함: 모든 도구 주소가 /tools/ 아래', TOOLS.every((t) => t.path === null || t.path.startsWith('/tools/')))
   check('도구함: 키가 겹치지 않는다', new Set(TOOLS.map((t) => t.key)).size === TOOLS.length)
 }
@@ -1309,6 +1311,8 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('영업: 영업 칸 없는 업체의 칸 — 계약 전이면 잠재, 계약했으면 계약 완료', salesStageOf(list[1]) === 'lead' && salesStageOf(list[0]) === 'contracted' && salesStageOf(list[2]) === 'contracted')
   const groups = groupBySalesStage(list)
   check('영업: 보드 묶음 — 보관한 업체는 빠진다', groups.lead.map((r) => r.id).join() === 'b' && groups.contracted.length === 3 && SALES_STAGE_ORDER.every((s) => Array.isArray(groups[s])))
+  const flow = salesInFlow([...list, round])
+  check('영업: 진행 중 — 영업 칸 없는 계약 전 업체도 잠재로 센다(보드 · 오늘 · KPI 같은 기준)', flow.list.map((r) => r.id).sort().join() === 'b,r' && flow.fee === 3_000_000, flow.list.map((r) => r.id).join())
 
   // 단계 옮기기
   const p0 = withNewProspect(mk('p', 'waiting'), '홈페이지 상담신청', at)
