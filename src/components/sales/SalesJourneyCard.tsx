@@ -50,7 +50,9 @@ export function SalesJourneyCard({
   const access = useModuleAccessMap(record.workspaceId)
   const location = useLocation()
   /** D-124: 영업 화면에서 업체 화면으로 가는 줄이면 돌아올 곳을 싣는다 */
-  const linkState = (to: string) => (location.pathname.startsWith('/sales') && to.startsWith('/ops/clients/') ? fromState(location) : undefined)
+  // 영업 화면에서 업체로 가면 '영업에서 왔음' 을 들고 간다 · 업체 화면 안(탭)에서는 이미 들고 온 것을 그대로 넘긴다
+  const linkState = (to: string) =>
+    !to.startsWith('/ops/clients/') ? undefined : location.pathname.startsWith('/sales') ? fromState(location) : location.pathname.startsWith('/ops/clients/') ? (location.state as unknown) : undefined
   const journey = useMemo(() => buildJourney(record, { today, access }), [record, today, access])
   const [picked, setPicked] = useState<JourneyStepKey | null>(null)
   // 다른 업체로 바뀌면 지금 걸음으로 돌아간다
@@ -241,13 +243,13 @@ export function SalesJourneyCard({
           <p className="t-meta -mt-0.5 break-keep text-slate-500">누르면 이 업체 정보가 채워진 채로 열리고, 나온 결과는 이 업체 기록에 붙습니다. 안 써도 영업은 그대로 진행됩니다.</p>
           {open.tools.length === 0 ? (
             <p className="t-sub rounded-(--radius-control) border border-dashed border-slate-200 px-3 py-3 break-keep text-slate-500">
-              {open.key === 'contract' ? '계약 걸음은 수금 · 서류 탭에서 이어 갑니다.' : '관심사를 고르거나 크레탑 분석을 붙이면 맞는 도구가 여기 뜹니다.'}
+              {open.key === 'contract' ? '계약 걸음은 수금 · 서류 탭에서 이어 갑니다.' : stageReached(record, 'm1done') ? '관심사를 고르거나 크레탑 분석을 붙이면 맞는 도구가 여기 뜹니다.' : '크레탑 분석을 붙이거나 1차 미팅에서 관심사를 확인하면 맞는 도구가 여기 뜹니다.'}
             </p>
           ) : (
             <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-control) border border-slate-200">
               {open.tools.map((t, i) => (
                 <li key={t.key} data-journey-tool={t.key}>
-                  <Link to={t.to} className="flex items-start gap-2.5 px-3 py-2.5 hover:bg-slate-50">
+                  <Link to={t.to} state={linkState(t.to)} className="flex items-start gap-2.5 px-3 py-2.5 hover:bg-slate-50">
                     <span aria-hidden="true" className="ramp-dot mt-1.5 size-2 shrink-0 rounded-full" style={rampAt(i, Math.max(2, open.tools.length))} />
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="t-sub inline-flex flex-wrap items-center gap-1.5 font-semibold text-slate-900">

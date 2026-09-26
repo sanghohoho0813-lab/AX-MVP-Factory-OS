@@ -236,6 +236,21 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
     await page.waitForTimeout(400)
     check(`뒤로가기: 더보기 시트만 닫고 업체 화면에 머문다 ${tag}`, opened >= 1 && (await sheets()) === 0 && new URL(page.url()).pathname === '/ops/clients/cli_hansol', `${opened} → ${await sheets()} ${page.url()}`)
   }
+  // '저장 안 한 내용' 막기가 있는 화면(크레탑 등록)에서도 뒤로가기는 열린 창만 닫는다
+  await page.goto(BASE + '/sales/board', { waitUntil: 'networkidle' })
+  await page.getByTestId('board-cretop-intake').click()
+  await page.waitForURL(/\/sales\/new/)
+  await page.waitForTimeout(400)
+  const opener = mob ? page.getByRole('button', { name: '메뉴 열기' }) : page.getByRole('button', { name: /빠른 이동|찾기/ }).first()
+  if (await opener.count()) {
+    await opener.click()
+    await page.waitForTimeout(300)
+    const dialogs = () => page.locator('[role="dialog"][aria-modal="true"], [aria-label="메뉴 닫기"]').count()
+    const before = await dialogs()
+    await page.goBack()
+    await page.waitForTimeout(400)
+    check(`뒤로가기: 크레탑 등록 화면에서도 열린 창만 닫는다 ${tag}`, before >= 1 && (await dialogs()) === 0 && new URL(page.url()).pathname === '/sales/new', `${before} → ${await dialogs()} ${page.url()}`)
+  }
   // 보던 자리
   await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)

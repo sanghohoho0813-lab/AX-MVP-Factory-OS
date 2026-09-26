@@ -33,7 +33,20 @@ export function useBackToClose(open: boolean, onClose: () => void): void {
   }, [open])
 }
 
-/** 앱 틀(AppShell)에 하나만 둔다 — 라우터가 막기를 하나만 받는다 */
+/** 열린 창이 있나 — 다른 막기(useUnsavedChangesGuard)가 먼저 물어본다 */
+export function hasOpenLayer(): boolean {
+  return layers.length > 0
+}
+
+/** 맨 위 창을 닫는다 */
+export function closeTopLayer(): void {
+  layers[layers.length - 1]?.close()
+}
+
+/**
+ * 앱 틀(AppShell)에 하나만 둔다 — 라우터는 마지막에 등록한 막기 하나만 따른다.
+ * 그래서 화면에 '저장 안 한 내용' 막기가 있으면 그쪽(useUnsavedChangesGuard)이 창 닫기까지 맡는다.
+ */
 export function BackToCloseGuard(): null {
   const blocker = useBlocker(({ historyAction }) => historyAction === 'POP' && layers.length > 0)
   useEffect(() => {

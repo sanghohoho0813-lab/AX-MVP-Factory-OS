@@ -448,7 +448,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
                   <li key={r.record.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
                     <button type="button" onClick={() => open(r.record)} className="t-sub font-bold text-slate-900 hover:text-brand-700 hover:underline">{r.record.companyName}</button>
                     <span className="t-sub text-warning-700">{r.reason}</span>
-                    <Link to={salesActionPath(r.action, r.record.id)} className="t-meta ml-auto font-semibold text-brand-700 hover:underline">{r.action} →</Link>
+                    <Link to={salesActionPath(r.action, r.record.id)} state={salesActionPath(r.action, r.record.id).startsWith('/ops/clients/') ? fromState(location) : undefined} className="t-meta ml-auto font-semibold text-brand-700 hover:underline">{r.action} →</Link>
                   </li>
                 ))}
               </ul>

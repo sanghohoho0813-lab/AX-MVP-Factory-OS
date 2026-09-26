@@ -15,6 +15,7 @@ import {
 import { getChapter } from '../../content/onboardingGuideContent'
 import { Button } from '../ui/Button'
 import { ChapterStatusBadge, ChapterDetail, TodayTaskCard } from './parts'
+import { useBackToClose } from '../../lib/backToClose'
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
@@ -37,6 +38,7 @@ function resolveRoute(template: string, projectId: string | null): string {
 }
 
 export function OnboardingModal({ open, initialChapterId, onClose }: OnboardingModalProps) {
+  useBackToClose(open, onClose)
   const navigate = useNavigate()
   const version = useStoreVersion()
   const { project } = useActiveProject()

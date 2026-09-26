@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useBackToClose } from "../../../lib/backToClose"; // [D-124]
 // [D-93] 고용지원금 매니저 Pro 원본(git-test-kind-cori src/components/app/SubsidyApp.jsx)을 그대로 옮긴 것.
 //   바꾼 곳만 [D-93] 으로 적었다: 저장(→ EmploymentOrig.tsx · 모듈 기록), 업체 추가(→ 고객 운영 업체 고르기),
 //   로그인·결제·관리자·피드백·샘플·PIN(→ 없음), 브라우저 뒤로가기(→ OS 주소), 엑셀 읽기(→ OS 엑셀 읽개).
@@ -277,6 +278,7 @@ function Modal(props){
     return function(){document.body.classList.remove("no-scroll");};
   },[props.open]);
   var closeRef=useRef(props.onClose); closeRef.current=props.onClose;
+  useBackToClose(!!props.open, function(){ if(closeRef.current)closeRef.current(); }); // [D-124] 휴대폰 뒤로가기는 창만 닫는다
   useEffect(function(){
     if(!props.open||typeof window==="undefined")return;
     var entry={};
@@ -6173,6 +6175,7 @@ function ScreenGuide(props){
 // ── Cmd+K 글로벌 검색 팔레트 ─────────────────────────────
 function CmdKSearch(props){
   var open=props.open; var onClose=props.onClose;
+  useBackToClose(!!open, function(){ if(onClose)onClose(); }); // [D-124]
   var companies=props.companies||[]; var employees=props.employees||[];
   var programs=props.programs||{}; var goCompany=props.goCompany;
   var setView=props.setView;

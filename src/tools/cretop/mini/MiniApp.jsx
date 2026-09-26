@@ -8,6 +8,7 @@ import { T as SHARED_T } from "./theme.js";
 import { StockValue } from "./StockValue.jsx";
 import { SV_EVENT } from "./stockValueCalc.js";
 import { InfoModal, RawTextModal, DetailModal, StakeModal } from "./DetailPopups.jsx";
+import { useBackToClose } from "../../../lib/backToClose"; // [D-124]
 import { isCorpOnlyStrategy } from "./extract.js";
 import { formatPopupSection, CEO_PERSONAL_LABELS, WORK_BASIC_LABELS, WORK_DETAIL_LABELS } from "./popupFormat.js";
 import { getSelected, toggleSelected } from "./selection.js";
@@ -1453,6 +1454,7 @@ const FONT_SCALES = [["기본", 1.3], ["크게", 1.55]];
 // 분석 이력은 Supabase(analyses)에 저장 — data.js(listAnalyses/createAnalysis/getAnalysisResult) 사용.
 // 사이드 패널 — 계정(Supabase Auth) + 분석 이력(서버) + 새 분석/로그아웃.
 function Sidebar({ history, onClose, onOpen, onNew, onDelete }) {
+  useBackToClose(true, onClose); // [D-124] 휴대폰 뒤로가기는 이력 패널만 닫는다
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.38)", zIndex: 60 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: "min(86vw,340px)", background: "#fff", boxShadow: "2px 0 18px rgba(15,23,42,.2)", display: "flex", flexDirection: "column", overflowY: "auto", "--fs": 1.15 }}>

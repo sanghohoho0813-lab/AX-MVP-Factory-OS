@@ -5,6 +5,7 @@ import { getScreenHelp, getScreenTour } from '../../content/onboardingGuideConte
 import type { ScreenTour, TourStep } from '../../types/onboarding'
 import { Button } from '../ui/Button'
 import { useOnboarding } from './onboardingContext'
+import { useBackToClose } from '../../lib/backToClose'
 
 /**
  * 화면별 "이 화면 사용법"(§12) + "이 화면 따라 해보기"(§13) 런처.
@@ -51,6 +52,7 @@ export function ScreenGuide({ screenKey }: { screenKey: string }) {
 /* ------------------------------------------------------------------ */
 
 function HelpPanel({ screenKey, onClose }: { screenKey: string; onClose: () => void }) {
+  useBackToClose(true, onClose)
   const help = getScreenHelp(screenKey)!
   const { openGuide } = useOnboarding()
   const panelRef = useRef<HTMLDivElement>(null)
@@ -162,6 +164,7 @@ function reducedMotion(): boolean {
 }
 
 function TourOverlay({ tour, onEnd }: { tour: ScreenTour; onEnd: () => void }) {
+  useBackToClose(true, onEnd)
   const [index, setIndex] = useState(0)
   const [rect, setRect] = useState<Rect | null>(null)
   const tooltipRef = useRef<HTMLDivElement>(null)

@@ -78,12 +78,12 @@ export function useScrollMemory(onRouteChange?: () => void): void {
 
     if (navType !== 'POP') {
       if (!samePath) window.scrollTo(0, 0)
-      // 탭 · 검색어만 바꾼 것(REPLACE)은 새 칸 이름으로 지금 자리를 옮겨 적는다
-      else if (navType === 'REPLACE') remember(location.key, window.scrollY)
+      // 같은 화면에서 탭 · 검색어 · 업체만 바꾼 것은 새 칸 이름으로 지금 자리를 적어 둔다(안 움직여도 돌아올 자리가 있게)
+      else remember(location.key, window.scrollY)
       return
     }
     const y = readAll()[location.key]
-    if (!y) {
+    if (y === undefined) {
       if (!samePath) window.scrollTo(0, 0)
       return
     }

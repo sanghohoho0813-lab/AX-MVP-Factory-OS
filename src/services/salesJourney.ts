@@ -20,7 +20,7 @@ import { withActivity } from './clientOpsActivity'
 import { canUse, type ModuleAccess } from './moduleAccess'
 import { cretopForMeeting, interestOf, latestCretopResult, meetingPicks } from './salesCretop'
 import { deriveInterests } from './salesEngine'
-import { isContractClient, salesStageOf } from './salesPipeline'
+import { isContractClient, salesStageOf, stageReached } from './salesPipeline'
 import { CONTRACT_CHECKLIST } from './salesProposal'
 
 /* ------------------------------------------------------------------ */
@@ -119,7 +119,9 @@ export function journeyTools(record: ClientOpsRecord, opts: JourneyOptions): Jou
   const cretop = cretopForMeeting(record)
   const reasonOf = new Map<string, string>()
   const own = deriveInterests({ interests: s?.interests ?? [], flags: s?.flags ?? {} })
-  for (const it of own) if (!reasonOf.has(it)) reasonOf.set(it, `관심사 · ${it}`)
+  // D-124: 1차 미팅 전에는 관심사가 아니라 '미리 적은 주제' — 관심사는 1차 미팅에서 확인한다
+  const ownLabel = stageReached(record, 'm1done') ? '관심사' : '미리 적은 주제'
+  for (const it of own) if (!reasonOf.has(it)) reasonOf.set(it, `${ownLabel} · ${it}`)
   if (cretop) {
     for (const p of cretop.picks) {
       if (p.held || p.score < 60) continue
