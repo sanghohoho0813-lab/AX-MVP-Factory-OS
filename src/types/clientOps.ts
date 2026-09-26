@@ -535,6 +535,17 @@ export interface SalesInfo {
   proposal?: SalesProposal
   /** 계약 준비 체크 10 · 필수 서류 14 중 챙긴 것 (이름) */
   contractPrep?: string[]
+  /**
+   * 계약 경로 (D-119) — 무엇으로 계약할 것 같은가. 영업 흐름에서 몇 차에 계약하는지가 달라진다.
+   * cash 현금(1차 뒤 전화 · 2차) · insurance 법인보험(3·4차) · total 종합 컨설팅 · step 단계별(현금 먼저 → 종합)
+   */
+  path?: SalesPath
+}
+
+export type SalesPath = 'cash' | 'insurance' | 'total' | 'step'
+export const SALES_PATH_ORDER: SalesPath[] = ['cash', 'insurance', 'total', 'step']
+export function isSalesPath(v: unknown): v is SalesPath {
+  return typeof v === 'string' && (SALES_PATH_ORDER as string[]).includes(v)
 }
 
 /** 제안 한 건 (D-114 3단계) — 원본 영업 도구의 제안 상태 · 월납 제안을 그대로 */

@@ -11,6 +11,7 @@ import {
   SALES_STAGE_ORDER,
   contractStageOf,
   emptySales,
+  isSalesPath,
   isSalesStage,
   type ClientOpsRecord,
   type SalesInfo,
@@ -128,6 +129,7 @@ export function normalizeSales(v: unknown): SalesInfo | null {
   if (Array.isArray(s.meetings)) out.meetings = normalizeMeetings(s.meetings)
   if (s.proposal && typeof s.proposal === 'object') out.proposal = normalizeProposal(s.proposal as Record<string, unknown>)
   if (Array.isArray(s.contractPrep)) out.contractPrep = [...new Set(strList(s.contractPrep))]
+  if (isSalesPath(s.path)) out.path = s.path
   return out
 }
 

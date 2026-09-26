@@ -79,6 +79,11 @@ import {
 } from '../salesEngine'
 import { engineIndustry, profileFromMemo, roundForStage, stageAfterMeeting, toEngineItem, withMeetingNote, withSalesProfile } from '../salesMeeting'
 import salesAppSource from '../../tools/salesKit/orig/SalesApp.jsx?raw'
+import cretopCompanyText from '../../../e2e/fixtures/cretop-company.txt?raw'
+import { analyzeCretopText } from '../../tools/cretop/mini/analysisCore.js'
+import { applyCretopToClient, companyKey, cretopForMeeting, cretopResultInput, cretopTier, digestCretop, findClientForCretop, meetingPicks, normalizeEstablished, FLOW_ROUND } from '../salesCretop'
+import { SALES_PATH_INFO, buildJourney, journeyTools, withSalesPath } from '../salesJourney'
+import { withToolResult } from '../clientOpsService'
 import {
   CONTRACT_CHECKLIST,
   DEFAULT_PACKAGES,
@@ -1528,6 +1533,96 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('성과 지표: 계약까지 20일', kv('sales_days_to_win')?.value === '20일')
   check('성과 지표: 묶음 순서 — 매출 다음 영업', kpisByGroup(kp).map((g) => g.group).join() === 'cost,revenue,sales,scale,adoption')
   check('탭: 영업 보드 · 미팅 준비 · 상품·제안 · 전략', SALES_TABS.map((t) => t.label).join() === '영업 보드,미팅 준비,상품·제안,전략' && moduleForPath('/sales/strategy')?.key === 'sales')
+}
+
+/* ------------------------------------------------------------------ */
+/* D-119 영업 흐름 한몸 — 크레탑 → 잠재고객 · 미팅 준비 · 영업 흐름 · 작업실 도구 */
+/* ------------------------------------------------------------------ */
+{
+  const at = '2026-09-26T09:00:00.000Z'
+  const today = '2026-09-26'
+  // 크레탑 규칙 계산을 화면 밖에서 — 원본 buildResult 와 같은 칸
+  const ui = analyzeCretopText(cretopCompanyText, null)
+  const co = ui.companyInfo ?? {}
+  check('크레탑(화면 밖): 회사 · 사업자번호 · 대표 · 대표 나이', co.companyName === '한빛정밀(주)' && co.businessNo === '123-45-67890' && (co as Record<string, unknown>).ceoName === '김한빛' && ui.ceoAge === 64, JSON.stringify(co).slice(0, 200))
+  check('크레탑(화면 밖): 주식가치 · 개인사업자 판별 칸도 만든다', 'bizForm' in ui && 'shares' in ui && 'stakeholders' in ui)
+
+  const d = digestCretop(ui)
+  check('다리: 회사 정보 — 설립일 YYYY-MM-DD · 직원 23 · 업종', d.company.established === '2008-04-15' && d.company.employees === 23 && d.company.industry.includes('제조업'))
+  check('다리: 매출 67억 → 6704 백만원 · 대표 64세', d.revenueM === 6704 && d.ceoAge === 64, `${d.revenueM}`)
+  check('다리: 관심사 — 크레탑 추천(검토 권장 이상)에서 · 최대 5', d.interests.length > 0 && d.interests.length <= 5 && d.interests.includes('정책자금') && d.interests.includes('가업승계'), d.interests.join())
+  check('다리: 체크 — 가지급금 · 대출', d.flags.gajigeup === true && d.flags.hasLoan === true, JSON.stringify(d.flags))
+  check('다리: 고민 한 줄은 진단 요약의 가장 급한 줄', d.concern.includes('현금성 자산'), d.concern)
+  check('다리: 순위 26개 · 등급 문턱 80/60/40', d.refs.length === 26 && cretopTier(80) === 'top' && cretopTier(60) === 'rec' && cretopTier(40) === 'cond' && cretopTier(39) === 'low')
+  check('다리: 설립일 모양 맞추기', normalizeEstablished('2008.4.5') === '2008-04-05' && normalizeEstablished('2011년') === '2011-01-01' && normalizeEstablished('모름') === '')
+  check('다리: 질문 흐름 차수 — A·B·C 1차 · D 2차 · E 3차', FLOW_ROUND.A === 1 && FLOW_ROUND.C === 1 && FLOW_ROUND.D === 2 && FLOW_ROUND.E === 3)
+
+  // 같은 업체 찾기
+  const mkc = (id: string, extra: Record<string, unknown> = {}) => normalizeClientOps({ id, workspaceId: null, companyName: id, status: 'waiting', createdAt: at, updatedAt: at, ...extra })
+  const other = mkc('다른회사')
+  const byBiz = mkc('한빛', { businessNumber: '1234567890' })
+  const byName = mkc('한빛정밀 주식회사')
+  check('같은 업체: 사업자번호(숫자만) 먼저', findClientForCretop([other, byBiz, byName], d.company)?.id === '한빛')
+  check('같은 업체: 이름 — (주) · 주식회사 · 띄어쓰기 무시', findClientForCretop([other, byName], d.company)?.id === '한빛정밀 주식회사' && companyKey('㈜ 한빛 정밀') === '한빛정밀')
+  check('같은 업체: 없으면 null', findClientForCretop([other], d.company) === null)
+
+  // 고객 기록에 채우기 — 빈 칸만
+  const fresh = mkc('한빛정밀(주)', { representativeName: '직접적은대표' })
+  const { record: filled, filled: labels } = applyCretopToClient(fresh, d, { at, source: '소개' })
+  check('채우기: 빈 칸만 — 사람이 적은 대표는 그대로', filled.representativeName === '직접적은대표' && filled.businessNumber === '123-45-67890' && filled.employeeCount === '23명' && filled.establishedAt === '2008-04-15' && !labels.includes('대표자'), labels.join())
+  check('채우기: 영업 칸 — 잠재 고객 · 유입 경로 · 관심사 · 대표 나이 · 매출', filled.sales?.stage === 'lead' && filled.sales.source === '소개' && filled.sales.interests.includes('정책자금') && filled.sales.ceoAge === 64 && filled.sales.revenueM === 6704)
+  check('채우기: 활동 기록 두 줄(등록 · 채움)', filled.activity.length === 2 && filled.activity.some((a) => a.text.startsWith('잠재고객 등록 · 크레탑')) && filled.activity.some((a) => a.text.startsWith('크레탑으로 기본 정보 채움')))
+  const withOwn = mkc('기존', { sales: { stage: 'm1done', source: '전화', referrer: '', interests: ['절세'], concern: '내 고민', expectedFee: null, history: [], movedAt: at, ceoAge: 50 } })
+  const again = applyCretopToClient(withOwn, d, { at }).record
+  check('채우기: 이미 있는 영업 칸 — 단계 · 고민 · 대표 나이는 그대로, 관심사는 합친다', again.sales?.stage === 'm1done' && again.sales.concern === '내 고민' && again.sales.ceoAge === 50 && again.sales.interests[0] === '절세' && again.sales.interests.includes('정책자금'))
+  check('채우기: 저장 → 다시 읽기', normalizeClientOps(JSON.parse(JSON.stringify(filled))).sales?.revenueM === 6704)
+
+  // 도구 결과 — 크레탑 분석기 '붙이기' 와 같은 모양 + 순위 · 진단
+  const input = cretopResultInput(ui, ['가업승계'])
+  check('도구 결과: 제목 · 1장 요약 · 선택 항목', input.toolKey === 'cretop' && input.title === '크레탑 분석' && input.summary.includes('[한빛정밀(주)] 미팅 전 1장 요약') && input.summary.includes('■ 최종 선택 컨설팅 항목'))
+  const attached = withToolResult(filled, input)
+  const m = cretopForMeeting(attached)
+  check('미팅 준비: 붙인 결과에서 순위 · 진단을 다시 꺼낸다', m !== null && m.picks.length === 26 && m.diagnosis.length > 0 && m.selected.join() === '가업승계')
+  check('미팅 준비: 선택한 항목이 있으면 그것부터', meetingPicks(m!).map((p) => p.name).join() === '가업승계')
+  check('미팅 준비: 전략마다 질문 흐름 A~E · 요청 자료', m!.picks[0].flow.length === 5 && m!.picks[0].flow[0].step === 'A' && m!.picks[0].docs.length > 0)
+  const noSel = cretopForMeeting(withToolResult(filled, cretopResultInput(ui)))!
+  const top = meetingPicks(noSel)
+  check('미팅 준비: 선택이 없으면 검토 권장 이상 · 보유 아님 · 5개', top.length === 5 && top.every((p) => p.score >= 60 && !p.held) && top[0].name === '정책자금', top.map((p) => p.name).join())
+  const legacy = withToolResult(fresh, { toolKey: 'cretop', title: '크레탑 분석', verdict: null, verdictLabel: '', summary: '', data: { oneLiner: { company: 'x', risks: ['위험 한 줄'], questions: [], strategies: ['정책자금', '없는전략'] }, selected: [] } })
+  const lm = cretopForMeeting(legacy)
+  check('미팅 준비: 예전 결과(순위 없음)는 추천 이름으로 · 모르는 이름은 뺀다', lm !== null && lm.picks.map((p) => p.name).join() === '정책자금' && lm.diagnosis[0].text === '위험 한 줄')
+
+  // 작업실 도구 — 관심사 · 크레탑 근거로, 이 업체로 열림, 잠금 표시
+  const tools = journeyTools(attached, { today })
+  const key = tools.map((t) => t.key)
+  check('작업실 도구: 정책자금 · 가업승계 → 정책자금 진단 · 주식가치 · 세금 계산기', key.includes('policy-funding') && key.includes('cretop-value') && key.includes('tax'), key.join())
+  check('작업실 도구: 이 업체로 열린다(?client=)', tools.every((t) => t.to.includes(attached.id)))
+  check('작업실 도구: 크레탑 근거를 이유로', tools.find((t) => t.key === 'policy-funding')?.reason.startsWith('크레탑 · 정책자금') === true)
+  check('작업실 도구: 업력 18년이면 창업감면은 빼고', !key.includes('startup-tax'))
+  const young = journeyTools({ ...attached, establishedAt: '2023-03-01' }, { today })
+  check('작업실 도구: 업력 7년 이하면 창업감면 판정기', young.some((t) => t.key === 'startup-tax'))
+  const locked = journeyTools(attached, { today, access: new Map([['policy-funding', { moduleKey: 'policy-funding', state: 'locked', trialEndsAt: '', updatedAt: '' }]]) })
+  check('작업실 도구: 잠긴 모듈은 감추지 않고 잠김', locked.find((t) => t.key === 'policy-funding')?.locked === true && locked.find((t) => t.key === 'tax')?.locked === false)
+
+  // 영업 흐름 여섯 걸음
+  const j0 = buildJourney(attached, { today })
+  check('영업 흐름: 여섯 걸음 · 잠재 고객은 1차 준비', j0.steps.map((s) => s.key).join() === 'prep,m1,m2,closing,contract,after' && j0.current === 'prep' && j0.steps[0].state === 'now')
+  check('영업 흐름: 크레탑을 붙였으면 1차 준비 첫 할 일 체크', j0.steps[0].tasks[0].label === '크레탑 분석' && j0.steps[0].tasks[0].done)
+  check('영업 흐름: 1차 미팅 체크리스트(AX) 자리 — 준비 중', j0.steps[0].tasks.some((t) => t.soon === true && t.to === '/sales/first-meeting'))
+  const m1 = { ...attached, sales: { ...attached.sales!, stage: 'm1done' as const, meetings: [{ id: 'n', at, round: 1 as const, text: '', reaction: '', issues: [], hesitant: [], nextDocs: ['재무제표', '주주명부'] }] } }
+  const j1 = buildJourney(m1, { today })
+  check('영업 흐름: 1차 완료 → 1차 미팅 걸음, 기록 체크 · 요청 자료 이름', j1.current === 'm1' && j1.steps[0].state === 'done' && j1.steps[1].tasks[0].done && j1.steps[1].tasks[1].note === '재무제표 · 주주명부')
+  const cash = buildJourney(withSalesPath(m1, 'cash', at), { today })
+  check('영업 흐름: 현금 계약이면 3차 · 클로징은 건너뛸 수 있음', cash.path === 'cash' && cash.steps[3].state === 'optional' && SALES_PATH_INFO.cash.hint.includes('2차'))
+  check('영업 흐름: 법인보험은 3·4차 안내 · 건너뛰지 않음', buildJourney(withSalesPath(m1, 'insurance', at), { today }).steps[3].state === 'next' && SALES_PATH_INFO.insurance.hint.includes('4차'))
+  check('계약 경로: 저장 → 다시 읽기 · 활동 기록', normalizeClientOps(JSON.parse(JSON.stringify(withSalesPath(m1, 'step', at)))).sales?.path === 'step' && withSalesPath(m1, 'step', at).activity[0].text === '계약 경로 · 단계별')
+  check('계약 경로: 이상한 값은 버린다', normalizeClientOps(JSON.parse(JSON.stringify({ ...m1, sales: { ...m1.sales, path: 'weird' } }))).sales?.path === undefined)
+  const won = { ...attached, status: 'active' as const, sales: { ...attached.sales!, stage: 'contracted' as const, proposal: { packages: ['정책자금 컨설팅'], feeManwon: 300, status: '계약 완료', at: today } }, fees: [{ id: 'f', serviceKey: 'policyFund' as never, kind: 'deposit' as const, label: '착수금', amount: 1000000, agentFee: 0, agentName: '', agentPaidAt: '', dueDate: '', receivedAt: '', note: '' }] }
+  const jw = buildJourney(won, { today })
+  check('영업 흐름: 계약 · 수금 항목까지 → 계약 후 관리', jw.current === 'after' && jw.steps[4].state === 'done')
+  check('영업 흐름: 계약 뒤 추가 제안 — 이미 제안한 정책자금은 빼고 크레탑 추천에서', jw.steps[5].tasks.length > 0 && jw.steps[5].tasks.every((t) => t.label.startsWith('추가 제안 · ') && !t.label.includes('정책자금')), jw.steps[5].tasks.map((t) => t.label).join())
+  const held = { ...m1, sales: { ...m1.sales, stage: 'hold' as const, history: [{ at, from: null, to: 'lead' as const }, { at, from: 'lead' as const, to: 'm2' as const }, { at, from: 'm2' as const, to: 'hold' as const }] } }
+  check('영업 흐름: 보류는 거기까지 갔던 걸음(2차)에서', buildJourney(held, { today }).current === 'm2')
 }
 
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)
