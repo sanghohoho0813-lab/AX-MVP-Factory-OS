@@ -22,7 +22,7 @@ export function TextScaleControl({ showPreview = false, compact = false }: { sho
               aria-checked={on}
               aria-label={`글자 크기 ${TEXT_SCALE_META[s].label}`}
               onClick={() => setScale(s)}
-              className={`flex-1 rounded-(--radius-control) border px-2 py-1.5 text-[0.875rem] font-medium transition-colors ${
+              className={`tap flex-1 rounded-(--radius-control) border px-2 py-1.5 text-[0.875rem] font-medium transition-colors ${
                 on ? 'border-brand-400 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
               }`}
             >

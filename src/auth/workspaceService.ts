@@ -47,7 +47,7 @@ export async function listMyWorkspaces(): Promise<WorkspaceMembership[]> {
   const { data, error } = await getSupabaseClient()
     .from('workspace_members')
     .select('workspace_id, user_id, role, workspaces:workspace_id (id, name, slug, owner_id, created_at)')
-  if (error) throw new Error('워크스페이스 목록을 불러오지 못했습니다.')
+  if (error) throw new Error('작업공간 목록을 불러오지 못했습니다.')
   return (data ?? []).map((row) => {
     const r = row as unknown as {
       workspace_id: string
@@ -70,7 +70,7 @@ export async function createWorkspace(name: string, slug?: string): Promise<Work
     workspace_name: name,
     workspace_slug: slug ?? null,
   })
-  if (error) throw new Error(error.message || '워크스페이스를 생성하지 못했습니다.')
+  if (error) throw new Error(error.message || '작업공간을 생성하지 못했습니다.')
   return mapWorkspace(data as WorkspaceRow)
 }
 

@@ -127,7 +127,7 @@ export function PublishUpdateModal({
                 role="radio"
                 aria-checked={category === c}
                 onClick={() => { setCategory(c); if (c === 'document_request' || c === 'question') setActionRequired(true) }}
-                className={`rounded-full border px-3 py-1 text-[0.88rem] font-semibold ${category === c ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                className={`tap rounded-full border px-3 py-1 text-[0.88rem] font-semibold ${category === c ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
               >
                 {UPDATE_CATEGORY_LABEL[c]}
               </button>

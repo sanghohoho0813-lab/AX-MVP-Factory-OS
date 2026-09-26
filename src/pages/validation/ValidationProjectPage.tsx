@@ -115,7 +115,7 @@ function TrackCard({
       ) : !workspace ? (
         <div className="flex flex-col gap-3">
           <p className="text-[0.95rem] break-keep text-slate-600">
-            확정된 출처 설계로 검증 워크스페이스를 생성해 실제 사용 테스트를 시작할 수 있습니다.
+            확정된 출처 설계로 검증 작업공간을 생성해 실제 사용 테스트를 시작할 수 있습니다.
           </p>
           <div>
             <Button variant="primary" onClick={onStart}>

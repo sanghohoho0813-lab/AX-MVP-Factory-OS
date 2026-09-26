@@ -89,7 +89,7 @@ export class LocalValidationWorkspaceRepository implements ValidationWorkspaceRe
   update(id: string, input: Partial<ValidationWorkspaceInput>): ValidationWorkspace {
     const list = this.read()
     const index = list.findIndex((w) => w.id === id)
-    if (index < 0) throw new EntityNotFoundError('검증 워크스페이스')
+    if (index < 0) throw new EntityNotFoundError('검증 작업공간')
     const updated: ValidationWorkspace = {
       ...list[index],
       ...input,
@@ -115,7 +115,7 @@ export class LocalValidationWorkspaceRepository implements ValidationWorkspaceRe
 
   finalize(id: string, finalizerName: string): ValidationWorkspace {
     const target = this.getById(id)
-    if (!target) throw new EntityNotFoundError('검증 워크스페이스')
+    if (!target) throw new EntityNotFoundError('검증 작업공간')
     const ts = nowIso()
     const next = this.read().map((w) => {
       // 같은 프로젝트·트랙의 기존 확정본을 supersede

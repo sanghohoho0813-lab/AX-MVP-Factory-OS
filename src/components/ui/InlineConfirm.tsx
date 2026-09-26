@@ -5,7 +5,7 @@
  * "지울까요? [지우기] [취소]" 로 바뀐다 — 휴대폰에서 잘못 스친 손가락 한 번으로는 지워지지 않는다.
  * 아이콘만 두지 않고 '삭제' 글자를 함께 둔다(50~60대는 휴지통 모양을 읽지 않는다).
  */
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Trash2 } from 'lucide-react'
 
 export function InlineConfirm({
@@ -15,7 +15,10 @@ export function InlineConfirm({
   onConfirm,
   className = '',
   testId,
+  icon,
 }: {
+  /** 단추 앞 그림 — 없으면 휴지통. null 이면 그림 없이 */
+  icon?: ReactNode | null
   label?: string
   question?: string
   confirmLabel?: string
@@ -32,7 +35,7 @@ export function InlineConfirm({
         onClick={() => setAsking(true)}
         className={`tap inline-flex h-10 shrink-0 items-center gap-1 rounded-(--radius-control) px-2.5 text-[0.9rem] font-medium text-slate-500 hover:bg-danger-50 hover:text-danger-700 ${className}`}
       >
-        <Trash2 aria-hidden="true" className="size-4" />
+        {icon === undefined ? <Trash2 aria-hidden="true" className="size-4" /> : icon}
         {label}
       </button>
     )

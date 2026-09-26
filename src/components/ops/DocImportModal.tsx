@@ -116,7 +116,7 @@ export function DocImportModal({
             type="button"
             aria-label="닫기"
             onClick={onClose}
-            className="flex size-8 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-400 hover:bg-slate-100"
+            className="tap flex size-10 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-100"
           >
             <X aria-hidden="true" className="size-4" />
           </button>
@@ -134,7 +134,7 @@ export function DocImportModal({
                 type="button"
                 aria-pressed={tab === t.key}
                 onClick={() => setTab(t.key)}
-                className={`rounded-(--radius-control) border px-3 py-1.5 text-[0.92rem] font-medium ${
+                className={`tap rounded-(--radius-control) border px-3 py-1.5 text-[0.92rem] font-medium ${
                   tab === t.key
                     ? 'border-brand-300 bg-brand-50 text-brand-700'
                     : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'

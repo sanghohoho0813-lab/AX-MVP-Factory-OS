@@ -120,6 +120,7 @@ import { SalesJourneyCard } from '../components/sales/SalesJourneyCard'
 import { withSalesPath } from '../services/salesJourney'
 import { ContractCard } from '../components/ops/ContractCard'
 import { InlineConfirm } from '../components/ui/InlineConfirm'
+import { ScrollHintRow } from '../components/ui/ScrollHintRow'
 import { WorkHistoryCard } from '../components/ops/WorkHistoryCard'
 import { ToolResultsCard } from '../components/ops/ToolResultsCard'
 import { ClientToolsCard } from '../components/ops/ClientToolsCard'
@@ -536,10 +537,13 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
       {/* 탭 — 개요는 요약, 나머지는 각 영역 */}
       {/* 탭은 화면 위에 붙여 둔다 — 아래로 내려가도 지금 어느 영역인지 잃지 않는다 */}
-      <div
+      {/* D-122: 오른쪽에 탭이 더 있으면 '›' — 휴대폰에서 수금 · 자금 · 고객 플랫폼 탭이 있는 줄 몰랐다 */}
+      <ScrollHintRow
         role="tablist"
-        aria-label="업체 상세"
-        className="sticky top-16 z-20 -mx-4 flex gap-1 overflow-x-auto border-b border-slate-200 bg-slate-50/95 px-4 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        ariaLabel="업체 상세"
+        activeKey={tab}
+        className="sticky top-16 z-20 -mx-4 bg-slate-50/95 backdrop-blur sm:-mx-6 lg:-mx-10"
+        innerClassName="flex gap-1 border-b border-slate-200 px-4 sm:px-6 lg:px-10"
       >
         {DETAIL_TABS.map((t) => {
           const badge =
@@ -568,7 +572,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             </button>
           )
         })}
-      </div>
+      </ScrollHintRow>
 
       {tab === 'overview' && (
         <>
@@ -588,7 +592,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             <NextStepEditor
               record={record}
               today={today}
-              label="다음 할 일"
+              label="다음 약속"
               onSave={async (n, msg) => {
                 const ok = await commit(n)
                 if (ok) showToast(msg)
@@ -646,50 +650,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         }
       />
 
-      {/*
-        2단계 — 회사 기본 정보.
-        접어 두지 않는다. 업체를 여는 이유의 절반은 "사업자번호가 뭐였지 / 설립이
-        몇 년도지 / 인증서 받았던가" 를 확인하려는 것이고, 그때마다 접힌 칸을 펴야
-        했다. 상담 중에 한 번 더 누르게 만드는 것이 곧 카톡을 뒤지게 만드는 것이다.
-      */}
-      <Surface>
-        <CompanyProfileCard
-          record={record}
-          today={today}
-          onImport={() => setImportOpen(true)}
-          onEdit={(key, value) => void commit({ ...record, [key]: value })}
-          onCustomField={(field) => void commit(withCustomField(record, field))}
-          onRemoveCustomField={(id) => void commit(withoutCustomField(record, id))}
-          bare
-        />
-      </Surface>
-
-      {/*
-        2단계 — 계약과 해 드린 일.
-        "이 회사 언제 계약했지, 얼마짜리였지, 우리가 뭘 해 줬더라" 는 상담 중에
-        가장 자주 나오는 질문이다. 접어 두면 매번 카톡을 뒤지게 된다.
-      */}
-      {/* D-114: 영업 — 잠재고객이면 펼쳐서, 계약 고객이면 접어서 */}
-      {/* D-119: 영업 흐름 — 1차 준비 → 1·2·3차 → 계약 → 계약 뒤 추가 제안, 걸음마다 할 일 · 작업실 도구 */}
-      <SalesJourneyCard record={record} today={today} compact onPathChange={(path) => void commit(withSalesPath(record, path))} />
-
-      <ClientSalesCard record={record} onSave={(next) => void commit(next)} />
-
-      <ContractCard
-        record={record}
-        today={today}
-        onSave={(next) => commit(withContract(record, next))}
-      />
-
-      <WorkHistoryCard record={record} onOpen={(key) => setTab('work', key)} />
-
-      {/* 도구함에서 붙인 결과 — 창업감면 판정·크레탑 분석·정책자금 진단 … (D-88) */}
-      <ToolResultsCard record={record} onChange={(next) => void commit(next)} />
-
-      {/* 이 업체로 도구 열기 — 결과가 다시 여기로 돌아온다 (D-89). 없는 서류는 여기서 빨갛게 (D-90) */}
-      <ClientToolsCard record={record} today={today} onOpenDocs={() => setTab('docs')} />
-
-      {/* 3단계 — 막힘 / 돈 / 고객 연결 */}
+      {/* D-122: 막힘 · 돈 · 지금 챙길 것을 회사 정보 위로 — 예전엔 휴대폰에서 4,000px 아래에 있었다 */}
       <section aria-label="현재 상태" className="ax-stagger grid grid-cols-2 gap-2.5 lg:grid-cols-3">
         <MetricTile
           label="없는 서류"
@@ -737,6 +698,49 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           )}
         </Section>
       )}
+
+      {/*
+        2단계 — 회사 기본 정보.
+        접어 두지 않는다. 업체를 여는 이유의 절반은 "사업자번호가 뭐였지 / 설립이
+        몇 년도지 / 인증서 받았던가" 를 확인하려는 것이고, 그때마다 접힌 칸을 펴야
+        했다. 상담 중에 한 번 더 누르게 만드는 것이 곧 카톡을 뒤지게 만드는 것이다.
+      */}
+      <Surface>
+        <CompanyProfileCard
+          record={record}
+          today={today}
+          onImport={() => setImportOpen(true)}
+          onEdit={(key, value) => void commit({ ...record, [key]: value })}
+          onCustomField={(field) => void commit(withCustomField(record, field))}
+          onRemoveCustomField={(id) => void commit(withoutCustomField(record, id))}
+          bare
+        />
+      </Surface>
+
+      {/*
+        2단계 — 계약과 해 드린 일.
+        "이 회사 언제 계약했지, 얼마짜리였지, 우리가 뭘 해 줬더라" 는 상담 중에
+        가장 자주 나오는 질문이다. 접어 두면 매번 카톡을 뒤지게 된다.
+      */}
+      {/* D-114: 영업 — 잠재고객이면 펼쳐서, 계약 고객이면 접어서 */}
+      {/* D-119: 영업 흐름 — 1차 준비 → 1·2·3차 → 계약 → 계약 뒤 추가 제안, 걸음마다 할 일 · 작업실 도구 */}
+      <SalesJourneyCard record={record} today={today} compact foldable onPathChange={(path) => void commit(withSalesPath(record, path))} />
+
+      <ClientSalesCard record={record} onSave={(next) => void commit(next)} />
+
+      <ContractCard
+        record={record}
+        today={today}
+        onSave={(next) => commit(withContract(record, next))}
+      />
+
+      <WorkHistoryCard record={record} onOpen={(key) => setTab('work', key)} />
+
+      {/* 도구함에서 붙인 결과 — 창업감면 판정·크레탑 분석·정책자금 진단 … (D-88) */}
+      <ToolResultsCard record={record} onChange={(next) => void commit(next)} />
+
+      {/* 이 업체로 도구 열기 — 결과가 다시 여기로 돌아온다 (D-89). 없는 서류는 여기서 빨갛게 (D-90) */}
+      <ClientToolsCard record={record} today={today} onOpenDocs={() => setTab('docs')} />
 
       {/* 3단계 — 나머지는 접어 둔다 */}
       <Disclosure
@@ -1060,12 +1064,12 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                             경고 목록에 올리지 않는 대신, 업체를 열었을 때 여기서
                             한눈에 보이면 된다 — 서류는 '해야 할 일' 이 아니라 '상태' 다.
                           */}
+                          {/* D-122: 점만으로는 뜻을 모른다 — '안 받음' 글자로 */}
                           {!state.received && (
-                            <span
-                              aria-label="아직 안 받음"
-                              title="아직 안 받음"
-                              className="size-2 shrink-0 rounded-full bg-danger-500"
-                            />
+                            <span className="t-meta inline-flex shrink-0 items-center gap-1 rounded-full border border-danger-200 bg-danger-50 px-1.5 py-0.5 font-semibold text-danger-700">
+                              <span aria-hidden="true" className="size-1.5 rounded-full bg-danger-500" />
+                              안 받음
+                            </span>
                           )}
                           <span className="text-[1.05rem] font-bold break-keep text-slate-900">{meta.label}</span>
                           {urgent && (
@@ -1749,7 +1753,7 @@ function FeesSection({
                 // 데스크톱에서는 줄바꿈을 허용해야 한다 — 영업자 수수료 줄(sm:w-full)이 같은 줄에 끼면
                 // 이름 칸이 0px 로 짜부라져 '08-25 입금' 조각이 날짜 칸 위로 올라탄다(§20-3).
                 <li key={fee.id} className="flex flex-col gap-2.5 px-4 py-3.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:px-5">
-                  <div className="flex min-w-0 items-start gap-2.5 sm:contents">
+                  <div className="flex min-w-0 flex-wrap items-start gap-2.5 sm:contents">
                     <label className="order-1 flex shrink-0 items-center gap-2 pt-0.5 sm:pt-0">
                       <input
                         type="checkbox"
@@ -1761,7 +1765,8 @@ function FeesSection({
                       />
                       <span className="t-meta font-semibold text-slate-600">입금</span>
                     </label>
-                    <span className="order-2 min-w-0 flex-1">
+                    {/* D-122: 좁으면 '삭제' 단추가 아래 줄로 — 이름 칸이 짜부라지지 않게 */}
+                    <span className="order-2 min-w-0 flex-[1_1_10rem]">
                     <span className="flex flex-wrap items-center gap-1.5">
                       <span className="text-[1rem] font-semibold break-keep text-slate-900">{fee.label}</span>
                       {fee.serviceKey && (
@@ -1822,7 +1827,7 @@ function FeesSection({
                       aria-label={`${fee.label} 금액에 100만원 더하기`}
                       title="누를 때마다 100만원씩 더합니다"
                       onClick={() => onChange(withFee(record, fee.id, { amount: (fee.amount ?? 0) + 1_000_000 }))}
-                      className="order-5 shrink-0 rounded-(--radius-control) border border-slate-200 px-2 py-2 text-[0.85rem] font-semibold whitespace-nowrap text-slate-600 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 sm:py-1.5"
+                      className="tap order-5 shrink-0 rounded-(--radius-control) border border-slate-200 px-2 py-2 text-[0.85rem] font-semibold whitespace-nowrap text-slate-600 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 sm:py-1.5"
                     >
                       +100만
                     </button>

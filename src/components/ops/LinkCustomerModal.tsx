@@ -121,7 +121,7 @@ export function LinkCustomerModal({
 
   const submitExisting = async () => {
     const client = clients.find((c) => c.id === selectedId)
-    if (!client) { setError('연결할 고객사를 골라 주세요.'); return }
+    if (!client) { setError('연결할 업체를 골라 주세요.'); return }
     setBusy(true); setError('')
     try {
       await finish(client)
@@ -157,7 +157,7 @@ export function LinkCustomerModal({
           withActivity(
             { ...created, contactEmail: form.contactEmail.trim() },
             'profile',
-            `고객 플랫폼 이벤트(${event.eventType})에서 고객사 생성`,
+            `고객 플랫폼 이벤트(${event.eventType})에서 업체 생성`,
           ),
           '홈페이지 상담신청',
         ),
@@ -190,7 +190,7 @@ export function LinkCustomerModal({
           </label>
           {profileChecked && accountEmail.trim() && !profile && (
             <p className="mt-1 text-[0.85rem] text-slate-500">
-              이 이메일로 가입한 계정을 찾지 못했습니다. 고객사에는 연결되고, 계정은 나중에 업체 상세 &gt; 고객 플랫폼 탭에서 연결할 수 있습니다.
+              이 이메일로 가입한 계정을 찾지 못했습니다. 업체에는 연결되고, 계정은 나중에 업체 상세 &gt; 고객 플랫폼 탭에서 연결할 수 있습니다.
             </p>
           )}
         </>
@@ -198,7 +198,7 @@ export function LinkCustomerModal({
       {profile && (
         <label className="mt-2 flex cursor-pointer items-center gap-2 text-[0.9rem] text-slate-700">
           <input type="checkbox" checked={linkAccount} onChange={(e) => setLinkAccount(e.target.checked)} className="size-4 accent-brand-600" />
-          이 계정을 고객사와 연결해 고객 화면(My MIRAE)을 열어 준다
+          이 계정을 업체와 연결해 고객 화면(My MIRAE)을 열어 준다
         </label>
       )}
     </div>
@@ -207,14 +207,14 @@ export function LinkCustomerModal({
   return (
     <Modal
       open
-      title="고객사와 연결"
+      title="업체와 연결"
       size="lg"
       onClose={onClose}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>취소</Button>
           <Button variant="primary" onClick={() => void (tab === 'existing' ? submitExisting() : submitNew())} disabled={busy}>
-            {busy ? '연결 중…' : tab === 'existing' ? '이 고객사에 연결' : '만들고 연결'}
+            {busy ? '연결 중…' : tab === 'existing' ? '이 업체에 연결' : '만들고 연결'}
           </Button>
         </>
       }
@@ -227,9 +227,9 @@ export function LinkCustomerModal({
             role="tab"
             aria-selected={tab === t}
             onClick={() => { setTab(t); setError('') }}
-            className={`flex-1 rounded-[8px] px-3 py-1.5 text-[0.92rem] font-semibold ${tab === t ? 'bg-white text-slate-900 shadow-(--shadow-card)' : 'text-slate-500'}`}
+            className={`tap flex-1 rounded-[8px] px-3 py-1.5 text-[0.92rem] font-semibold ${tab === t ? 'bg-white text-slate-900 shadow-(--shadow-card)' : 'text-slate-500'}`}
           >
-            {t === 'existing' ? '기존 고객사' : '새 고객사 만들기'}
+            {t === 'existing' ? '기존 업체' : '새 업체 만들기'}
           </button>
         ))}
       </div>
@@ -238,7 +238,7 @@ export function LinkCustomerModal({
         <div className="mt-4">
           {suggested.length > 0 && !query && (
             <p className="mb-2 text-[0.88rem] text-slate-500">
-              회사명·연락처가 같은 고객사가 위에 있습니다. 맞는지 확인하고 고르세요 — 자동으로 합치지 않습니다.
+              회사명·연락처가 같은 업체가 위에 있습니다. 맞는지 확인하고 고르세요 — 자동으로 합치지 않습니다.
             </p>
           )}
           <div className="relative">
@@ -247,12 +247,12 @@ export function LinkCustomerModal({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="업체명·대표자·사업자번호로 찾기"
-              aria-label="고객사 검색"
+              aria-label="업체 검색"
               className="w-full rounded-(--radius-control) border border-slate-300 py-2 pr-3 pl-9 text-[0.95rem] focus:border-brand-500 focus:outline-none"
             />
           </div>
-          <ul role="radiogroup" aria-label="고객사" className="mt-2 max-h-64 overflow-y-auto rounded-(--radius-control) border border-slate-200">
-            {candidates.length === 0 && <li className="px-3 py-4 text-center text-[0.9rem] text-slate-500">일치하는 고객사가 없습니다.</li>}
+          <ul role="radiogroup" aria-label="업체" className="mt-2 max-h-64 overflow-y-auto rounded-(--radius-control) border border-slate-200">
+            {candidates.length === 0 && <li className="px-3 py-4 text-center text-[0.9rem] text-slate-500">일치하는 업체가 없습니다.</li>}
             {candidates.map(({ c, s }) => (
               <li key={c.id} className="border-b border-slate-100 last:border-0">
                 <button

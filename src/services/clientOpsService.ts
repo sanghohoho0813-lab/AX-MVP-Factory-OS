@@ -466,7 +466,7 @@ function isLocal(): boolean {
 
 export async function listClients(workspaceId: string | null): Promise<ClientOpsRecord[]> {
   if (isLocal()) return readLocal().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-  if (!workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  if (!workspaceId) throw new Error('선택된 작업공간이 없습니다.')
   const { data, error } = await getSupabaseClient()
     .from('operations_clients')
     .select('*')
@@ -498,7 +498,7 @@ export async function createClient(
     writeLocal([record, ...readLocal()])
     return record
   }
-  if (!workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  if (!workspaceId) throw new Error('선택된 작업공간이 없습니다.')
   const { data, error } = await getSupabaseClient()
     .from('operations_clients')
     .insert({
@@ -540,7 +540,7 @@ async function saveClientNow(record: ClientOpsRecord): Promise<ClientOpsRecord> 
     writeLocal(readLocal().map((item) => (item.id === next.id ? next : item)))
     return next
   }
-  if (!next.workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  if (!next.workspaceId) throw new Error('선택된 작업공간이 없습니다.')
   const { data, error } = await getSupabaseClient()
     .from('operations_clients')
     .update({
@@ -572,7 +572,7 @@ export async function replaceAllClients(
     writeLocal(normalized)
     return normalized
   }
-  if (!workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  if (!workspaceId) throw new Error('선택된 작업공간이 없습니다.')
   const client = getSupabaseClient()
   const rows = normalized.map((r) => ({
     id: r.id,
@@ -600,7 +600,7 @@ export async function deleteClient(record: ClientOpsRecord): Promise<void> {
     writeLocal(readLocal().filter((item) => item.id !== record.id))
     return
   }
-  if (!record.workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  if (!record.workspaceId) throw new Error('선택된 작업공간이 없습니다.')
   const { error } = await getSupabaseClient()
     .from('operations_clients')
     .delete()
@@ -1084,7 +1084,7 @@ export async function storeDocumentFile(
   if (!canUploadFiles()) {
     throw new Error('파일 보관은 Supabase 클라우드 저장을 연결한 뒤 사용할 수 있습니다.')
   }
-  if (!record.workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  if (!record.workspaceId) throw new Error('선택된 작업공간이 없습니다.')
   // 저장 경로에는 영문·숫자만 남긴다(한글 파일명도 안전하게 올라간다).
   // 원래 이름은 fileName 에 그대로 보관해 화면에는 한글로 보인다.
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
@@ -1118,7 +1118,7 @@ export async function uploadModuleFile(
   if (!canUploadFiles()) {
     throw new Error('파일 보관은 Supabase 클라우드 저장을 연결한 뒤 사용할 수 있습니다.')
   }
-  if (!workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  if (!workspaceId) throw new Error('선택된 작업공간이 없습니다.')
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
   const path = `${workspaceId}/${clientId}/${folder}/${generateId()}-${safeName}`
   const { error } = await getSupabaseClient()

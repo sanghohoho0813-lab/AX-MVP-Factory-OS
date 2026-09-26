@@ -246,7 +246,7 @@ check('업무 15개에서도 가로 스크롤 없음', of2.d <= of2.w + 1, `${of
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.waitForTimeout(800)
   const todayText = (await page.locator('main').innerText()) ?? ''
-  check('오늘: 받아야 할 내 돈 칸이 내 몫(750만)', todayText.includes('받아야 할 내 돈') && todayText.includes('750만원'), todayText.slice(0, 400))
+  check('오늘: 못 받은 내 돈 칸이 내 몫(750만)', todayText.includes('못 받은 내 돈') && todayText.includes('750만원'), todayText.slice(0, 400))
 }
 
 /* ---------------- 보기 필터 · 검색 근거 · 영업자 정산 · 입금일 고치기 (D-78~81) ---------------- */

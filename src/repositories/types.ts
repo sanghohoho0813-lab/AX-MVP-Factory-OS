@@ -148,7 +148,7 @@ export class EntityNotFoundError extends Error {
       | 'MVP 설계 인계'
       | '홈페이지 설계'
       | '홈페이지 설계 인계'
-      | '검증 워크스페이스'
+      | '검증 작업공간'
       | '검증 인계'
       | '로컬 테스트 세션'
       | '제출자료 패키지'

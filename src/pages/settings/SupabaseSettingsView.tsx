@@ -42,7 +42,7 @@ function DataPanelSupabase() {
   return (
     <>
       <Panel title="로컬 데이터 가져오기">
-        <HelpNote summary="이 브라우저의 로컬 데이터를 현재 워크스페이스(클라우드)로 옮깁니다. 멱등하며 원본은 지워지지 않습니다." />
+        <HelpNote summary="이 브라우저의 로컬 데이터를 현재 작업공간(클라우드)로 옮깁니다. 멱등하며 원본은 지워지지 않습니다." />
         <div className="mt-4">
           <ImportWizard />
         </div>
@@ -81,14 +81,14 @@ export function SupabaseSettingsView() {
   const me = useCurrentUser()
   return (
     <div className="mx-auto flex w-full max-w-[1000px] flex-col gap-5">
-      <PageHeader title="설정" description="내 계정·워크스페이스·데이터·시스템을 관리합니다." />
+      <PageHeader title="설정" description="내 계정·작업공간·데이터·시스템을 관리합니다." />
       <TabNav active={tab} onChange={setTab} />
       {tab === 'me' && (
         <>
           <Panel title="내 정보">
             <SettingRow label="이름">{me.name} {me.title}</SettingRow>
             <SettingRow label="이메일">{session?.user.email ?? '—'}</SettingRow>
-            <SettingRow label="현재 워크스페이스">{current?.workspace?.name ?? '—'}</SettingRow>
+            <SettingRow label="현재 작업공간">{current?.workspace?.name ?? '—'}</SettingRow>
             <SettingRow label="내 역할">{current ? roleLabel[current.role] : '—'}</SettingRow>
           </Panel>
           <AppearancePanel />
@@ -98,7 +98,7 @@ export function SupabaseSettingsView() {
         </>
       )}
       {tab === 'workspace' && (
-        <Panel title={`워크스페이스 · ${current?.workspace?.name ?? ''}`}>
+        <Panel title={`작업공간 · ${current?.workspace?.name ?? ''}`}>
           <WorkspaceMembersPanel />
         </Panel>
       )}

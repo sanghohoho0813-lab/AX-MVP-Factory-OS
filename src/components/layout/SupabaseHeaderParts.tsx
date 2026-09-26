@@ -43,10 +43,10 @@ export function SupabaseWorkspaceSelector() {
       const ws = await createWorkspace(name.trim())
       await refreshWorkspaces()
       selectWorkspace(ws.id)
-      showToast('워크스페이스를 만들었습니다.')
+      showToast('작업공간을 만들었습니다.')
       window.location.assign('/')
     } catch (err) {
-      showToast(err instanceof Error ? err.message : '워크스페이스를 만들지 못했습니다.')
+      showToast(err instanceof Error ? err.message : '작업공간을 만들지 못했습니다.')
     } finally {
       setBusy(false)
     }
@@ -62,12 +62,12 @@ export function SupabaseWorkspaceSelector() {
         className="flex h-10 w-full min-w-0 cursor-pointer items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:border-slate-300 hover:text-slate-900"
       >
         <Building aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
-        <span className="truncate">{current?.workspace?.name ?? '워크스페이스'}</span>
+        <span className="truncate">{current?.workspace?.name ?? '작업공간'}</span>
         <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
       </button>
       {open && (
         <div className="absolute top-full left-0 z-30 mt-1.5 w-72 rounded-(--radius-card) border border-slate-200 bg-white p-1.5 shadow-(--shadow-overlay)">
-          <ul role="listbox" aria-label="워크스페이스 선택" className="max-h-64 overflow-y-auto">
+          <ul role="listbox" aria-label="작업공간 선택" className="max-h-64 overflow-y-auto">
             {workspaces.map((ws) => (
               <li key={ws.workspaceId}>
                 <button
@@ -93,7 +93,7 @@ export function SupabaseWorkspaceSelector() {
                   autoFocus
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="새 워크스페이스 이름"
+                  placeholder="새 작업공간 이름"
                   className="h-8 min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 px-2 text-[0.875rem]"
                 />
                 <button type="submit" disabled={busy} className="h-8 shrink-0 cursor-pointer rounded-(--radius-control) bg-brand-600 px-2.5 text-[0.875rem] font-medium text-white disabled:opacity-50">
@@ -106,7 +106,7 @@ export function SupabaseWorkspaceSelector() {
                 onClick={() => setCreating(true)}
                 className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-brand-700 hover:bg-brand-50"
               >
-                <Plus aria-hidden="true" className="size-4" /> 새 워크스페이스 만들기
+                <Plus aria-hidden="true" className="size-4" /> 새 작업공간 만들기
               </button>
             )}
           </div>

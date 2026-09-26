@@ -49,7 +49,7 @@ export function SignupPage() {
   return (
     <AuthLayout
       title="회원가입"
-      subtitle="새 계정을 만들어 클라우드 워크스페이스를 시작하세요."
+      subtitle="새 계정을 만들어 클라우드 작업공간을 시작하세요."
       footer={
         <>
           이미 계정이 있으신가요?{' '}

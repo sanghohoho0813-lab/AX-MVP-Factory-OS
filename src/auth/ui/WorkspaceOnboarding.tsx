@@ -24,7 +24,7 @@ export function WorkspaceOnboarding() {
     setError(null)
     setNotice(null)
     if (!name.trim()) {
-      setError('워크스페이스 이름을 입력하세요.')
+      setError('작업공간 이름을 입력하세요.')
       return
     }
     setBusy(true)
@@ -32,9 +32,9 @@ export function WorkspaceOnboarding() {
       const ws = await createWorkspace(name.trim())
       await refreshWorkspaces()
       selectWorkspace(ws.id)
-      setNotice('워크스페이스를 만들었습니다.')
+      setNotice('작업공간을 만들었습니다.')
     } catch (err) {
-      setError(err instanceof Error ? err.message : '워크스페이스를 만들지 못했습니다.')
+      setError(err instanceof Error ? err.message : '작업공간을 만들지 못했습니다.')
     } finally {
       setBusy(false)
     }
@@ -54,7 +54,7 @@ export function WorkspaceOnboarding() {
       const membership = await acceptInvite(inviteToken.trim())
       await refreshWorkspaces()
       selectWorkspace(membership.workspaceId)
-      setNotice('워크스페이스에 합류했습니다.')
+      setNotice('작업공간에 합류했습니다.')
     } catch (err) {
       setError(err instanceof Error ? err.message : '초대를 수락하지 못했습니다.')
     } finally {
@@ -66,13 +66,13 @@ export function WorkspaceOnboarding() {
     <div className="flex min-h-dvh items-center justify-center bg-slate-50 px-4 py-10">
       <div className="w-full max-w-[460px]">
         <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-xl font-bold text-slate-900">워크스페이스 시작</h1>
+          <h1 className="text-xl font-bold text-slate-900">작업공간 시작</h1>
           <Button variant="ghost" size="sm" onClick={() => void signOut()}>
             <LogOut aria-hidden="true" className="size-4" /> 로그아웃
           </Button>
         </div>
         <p className="mb-5 text-sm break-keep text-slate-500">
-          새 워크스페이스를 만들거나, 받은 초대 코드로 기존 워크스페이스에 참여하세요.
+          새 작업공간을 만들거나, 받은 초대 코드로 기존 작업공간에 참여하세요.
         </p>
 
         <AuthError message={error} />
@@ -81,9 +81,9 @@ export function WorkspaceOnboarding() {
 
         <form onSubmit={handleCreate} className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
-            <Building2 aria-hidden="true" className="size-4 text-brand-600" /> 새 워크스페이스 만들기
+            <Building2 aria-hidden="true" className="size-4 text-brand-600" /> 새 작업공간 만들기
           </div>
-          <AuthField id="ws-name" label="워크스페이스 이름" value={name} onChange={setName} placeholder="예: 우리 컨설팅" disabled={busy} />
+          <AuthField id="ws-name" label="작업공간 이름" value={name} onChange={setName} placeholder="예: 우리 컨설팅" disabled={busy} />
           <Button type="submit" variant="primary" disabled={busy} className="mt-4 h-11 w-full">
             <Plus aria-hidden="true" className="size-4" /> {busy ? '처리 중…' : '만들기'}
           </Button>

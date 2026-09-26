@@ -41,9 +41,9 @@ function LocalSettings() {
         </>
       )}
       {tab === 'workspace' && (
-        <Panel title="워크스페이스">
+        <Panel title="작업공간">
           <p className="text-[0.875rem] break-keep text-slate-500">
-            로컬 데모 모드에서는 워크스페이스·구성원이 없습니다. 클라우드 저장(supabase) 모드에서 워크스페이스를 만들고 구성원을 초대할 수 있습니다.
+            이 브라우저에만 저장하는 연습용 모드에는 작업공간·구성원이 없습니다. 클라우드 저장으로 바꾸면 작업공간을 만들고 구성원을 초대할 수 있습니다.
           </p>
         </Panel>
       )}

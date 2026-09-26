@@ -144,7 +144,7 @@ export function ClientSalesCard({ record, onSave }: { record: ClientOpsRecord; o
                     type="button"
                     aria-pressed={on}
                     onClick={() => set('interests', on ? draft.interests.filter((v) => v !== x) : [...draft.interests, x])}
-                    className={`t-meta rounded-full border px-2.5 py-1 font-medium ${on ? 'border-brand-400 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                    className={`tap t-meta rounded-full border px-2.5 py-1 font-medium ${on ? 'border-brand-400 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
                   >
                     {x}
                   </button>

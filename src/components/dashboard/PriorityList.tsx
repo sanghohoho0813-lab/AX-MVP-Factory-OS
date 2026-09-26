@@ -62,7 +62,7 @@ export function PriorityList({ tasks }: PriorityListProps) {
               <button
                 type="button"
                 onClick={() => handleAction(task)}
-                className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[0.875rem] font-semibold text-brand-600 hover:bg-brand-50 hover:text-brand-700"
+                className="tap inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-[0.875rem] font-semibold text-brand-600 hover:bg-brand-50 hover:text-brand-700"
               >
                 {task.action.label}
                 <ArrowRight aria-hidden="true" className="size-3.5" />

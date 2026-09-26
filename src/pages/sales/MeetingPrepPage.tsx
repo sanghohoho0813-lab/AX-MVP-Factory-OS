@@ -164,7 +164,7 @@ function ProfileEditor({ record, onSave }: { record: ClientOpsRecord; onSave: (n
                     type="button"
                     aria-pressed={on}
                     onClick={() => setD({ ...d, flags: { ...d.flags, [key]: !on } })}
-                    className={`t-meta rounded-full border px-2.5 py-1 font-medium ${on ? 'border-brand-400 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                    className={`tap t-meta rounded-full border px-2.5 py-1 font-medium ${on ? 'border-brand-400 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
                   >
                     {label}
                   </button>

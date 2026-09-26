@@ -45,7 +45,7 @@ export function JoinPage() {
       await refreshWorkspaces()
       selectWorkspace(membership.workspaceId)
       setDone(true)
-      setNotice('워크스페이스에 합류했습니다. 잠시 후 이동합니다.')
+      setNotice('작업공간에 합류했습니다. 잠시 후 이동합니다.')
       setTimeout(() => navigate('/', { replace: true }), 1200)
     } catch (err) {
       setError(err instanceof Error ? err.message : '초대를 수락하지 못했습니다.')
@@ -57,7 +57,7 @@ export function JoinPage() {
   if (!session) {
     return (
       <AuthLayout
-        title="워크스페이스 초대"
+        title="작업공간 초대"
         subtitle="초대를 수락하려면 먼저 로그인하거나 회원가입해야 합니다."
         footer={
           <>
@@ -75,7 +75,7 @@ export function JoinPage() {
   }
 
   return (
-    <AuthLayout title="워크스페이스 초대" subtitle="아래 버튼을 눌러 워크스페이스에 합류하세요.">
+    <AuthLayout title="작업공간 초대" subtitle="아래 버튼을 눌러 작업공간에 합류하세요.">
       <div className="flex flex-col gap-4">
         <AuthError message={error} />
         <AuthNotice message={notice} />

@@ -429,7 +429,7 @@ const local = {
 
 export async function listEvents(workspaceId: string | null): Promise<CustomerEvent[]> {
   if (isLocal()) return sortEvents(local.events())
-  if (!workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  if (!workspaceId) throw new Error('선택된 작업공간이 없습니다.')
   const { data, error } = await getSupabaseClient()
     .from('customer_events')
     .select('*')
@@ -524,7 +524,7 @@ const LINK_SELECT = '*, profiles:profile_id(email)'
 
 export async function listLinks(workspaceId: string | null): Promise<PortalClientLink[]> {
   if (isLocal()) return local.links()
-  if (!workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  if (!workspaceId) throw new Error('선택된 작업공간이 없습니다.')
   const { data, error } = await getSupabaseClient()
     .from('portal_client_links')
     .select(LINK_SELECT)
@@ -574,7 +574,7 @@ export async function createLink(
     local.write(STORAGE_KEYS.portalLinks, [link, ...existing])
     return link
   }
-  if (!workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  if (!workspaceId) throw new Error('선택된 작업공간이 없습니다.')
   const { data, error } = await getSupabaseClient()
     .from('portal_client_links')
     .insert({
@@ -621,7 +621,7 @@ export async function updateLink(
 
 export async function listUpdates(workspaceId: string | null, linkId: string): Promise<PortalUpdate[]> {
   if (isLocal()) return local.updates().filter((u) => u.portalClientLinkId === linkId).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-  if (!workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  if (!workspaceId) throw new Error('선택된 작업공간이 없습니다.')
   const { data, error } = await getSupabaseClient()
     .from('portal_updates')
     .select('*')
@@ -671,7 +671,7 @@ export async function publishUpdate(workspaceId: string | null, input: PublishUp
     }
     return update
   }
-  if (!workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  if (!workspaceId) throw new Error('선택된 작업공간이 없습니다.')
   const client = getSupabaseClient()
   const { data, error } = await client
     .from('portal_updates')
@@ -717,7 +717,7 @@ export async function archiveUpdate(update: PortalUpdate): Promise<PortalUpdate>
 
 export async function listRequests(workspaceId: string | null, linkId: string): Promise<PortalRequest[]> {
   if (isLocal()) return local.requests().filter((r) => r.portalClientLinkId === linkId).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-  if (!workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  if (!workspaceId) throw new Error('선택된 작업공간이 없습니다.')
   const { data, error } = await getSupabaseClient()
     .from('portal_requests')
     .select('*')
@@ -784,7 +784,7 @@ export function seedDemoRequest(linkId: string, workspaceId: string | null): Por
 
 export async function listDocuments(workspaceId: string | null, linkId: string): Promise<PortalDocument[]> {
   if (isLocal()) return local.documents().filter((d) => d.portalClientLinkId === linkId).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-  if (!workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  if (!workspaceId) throw new Error('선택된 작업공간이 없습니다.')
   const { data, error } = await getSupabaseClient()
     .from('portal_documents')
     .select('*')
@@ -819,7 +819,7 @@ export async function requestDocument(
     local.write(STORAGE_KEYS.portalDocuments, [doc, ...local.documents()])
     return doc
   }
-  if (!workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  if (!workspaceId) throw new Error('선택된 작업공간이 없습니다.')
   const { data, error } = await getSupabaseClient()
     .from('portal_documents')
     .insert({
@@ -888,7 +888,7 @@ export async function shareDocument(
     local.write(STORAGE_KEYS.portalDocuments, [doc, ...local.documents()])
     return doc
   }
-  if (!workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  if (!workspaceId) throw new Error('선택된 작업공간이 없습니다.')
   const { data, error } = await getSupabaseClient()
     .from('portal_documents')
     .insert({

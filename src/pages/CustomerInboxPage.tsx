@@ -62,7 +62,7 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
   const [params, setParams] = useSearchParams()
   const typeParam = params.get('type')
   const typeFilter: CustomerEventType | 'all' = isEventType(typeParam) ? typeParam : 'all'
-  // D-111: 오래 기다린 먼저 — 들어온 지 오래된 열린 신청부터. 이것도 주소에 남긴다.
+  // D-111: 오래 기다린 것 먼저 — 들어온 지 오래된 열린 신청부터. 이것도 주소에 남긴다.
   const waitingFirst = params.get('sort') === 'waiting'
   const setWaitingFirst = (on: boolean) => {
     const next = new URLSearchParams(params)
@@ -186,11 +186,15 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
 
       {notReady && (
         <div className="rounded-(--radius-panel) border border-warning-200 bg-warning-50 p-4">
-          <p className="text-[0.98rem] font-semibold text-warning-700">상담신청 연결 준비 중 (READY)</p>
+          {/* D-122: 개발자 말(READY · 브릿지 · 마이그레이션 · 파일 경로)을 앞에 두지 않는다 */}
+          <p className="text-[0.98rem] font-semibold text-warning-700">홈페이지 상담신청 연결을 아직 켜지 않았습니다</p>
           <p className="mt-1 text-[0.92rem] break-keep text-slate-700">
-            클라우드에 브릿지 테이블이 아직 없습니다. <code className="rounded bg-white px-1">supabase/migrations/20260903000006_customer_bridge.sql</code> 을 적용하면
-            진단 완료·주문·서류 업로드·요청이 자동으로 이곳에 쌓입니다. 적용 순서는 <code className="rounded bg-white px-1">docs/SETUP.md</code> 에 있습니다.
+            연결이 켜지면 홈페이지에서 들어온 상담신청 · 주문 · 서류 업로드가 여기 저절로 쌓입니다. 관리자에게 '상담신청 연결을 켜 달라' 고 알려 주세요.
           </p>
+          <details className="mt-2 text-[0.85rem] text-slate-500">
+            <summary className="cursor-pointer">관리자용 안내</summary>
+            <p className="mt-1 break-keep">클라우드에 브릿지 테이블이 없습니다. supabase/migrations/20260903000006_customer_bridge.sql 을 적용하세요(순서는 docs/SETUP.md).</p>
+          </details>
         </div>
       )}
 
@@ -208,7 +212,7 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
                 : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
             }`}
           >
-            {f.label} <span className={counts[f.key] === 0 ? 'text-slate-300' : 'text-slate-400'}>{counts[f.key]}</span>
+            {f.label} <span className={counts[f.key] === 0 ? 'text-slate-400' : 'text-slate-500'}>{counts[f.key]}</span>
           </button>
         ))}
       </div>
@@ -235,7 +239,7 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
               }`}
             >
               {t.label}{' '}
-              <span className={typeFilter === t.key ? 'text-white/70' : t.count === 0 ? 'text-slate-300' : 'text-slate-400'}>{t.count}</span>
+              <span className={typeFilter === t.key ? 'text-white/70' : t.count === 0 ? 'text-slate-400' : 'text-slate-500'}>{t.count}</span>
             </button>
           ))}
         </div>
@@ -246,7 +250,7 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
         <div className="-mt-2 flex items-center justify-end gap-1" role="group" aria-label="정렬">
           {[
             { on: false, label: '새것 먼저' },
-            { on: true, label: '오래 기다린 먼저' },
+            { on: true, label: '오래 기다린 것 먼저' },
           ].map((o) => (
             <button
               key={o.label}
@@ -322,7 +326,7 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
           onDone={(updated, link) => {
             setLinking(null)
             setEvents((list) => list.map((e) => (e.id === updated.id ? updated : e)))
-            showToast(link ? '고객사와 고객 계정을 연결했습니다.' : '고객사에 연결했습니다.')
+            showToast(link ? '업체와 고객 계정을 연결했습니다.' : '업체에 연결했습니다.')
             void load()
           }}
         />

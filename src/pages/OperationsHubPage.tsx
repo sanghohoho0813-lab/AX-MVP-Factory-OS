@@ -385,8 +385,10 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
               <span className="hidden sm:inline">새 업체 등록</span>
               <span className="sm:hidden">등록</span>
             </Button>
-            <Button variant="ghost" onClick={() => setMoreOpen(true)} aria-label="더보기">
+            {/* D-122: 점 세 개만 두지 않는다 — 백업 · 일정 · 정산이 여기 숨어 있었다 */}
+            <Button variant="ghost" onClick={() => setMoreOpen(true)}>
               <MoreHorizontal aria-hidden="true" className="size-5" />
+              더보기
             </Button>
           </>
         }
@@ -721,7 +723,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
           조각에 이미 '7일 지남' 이라고 글자로 쓰여 있으므로 빨강이 무슨 뜻인지 물어볼 일이 없다.
           범례가 필요하다는 것은 화면이 스스로 설명하지 못한다는 뜻이다.
         */}
-        <p className="t-sub text-slate-500">업무 조각을 누르면 상태가 바로 바뀝니다.</p>
+        <p className="t-sub text-slate-500">업무 조각을 누르면 상태를 고르는 창이 열립니다.</p>
       </section>
 
       {/* A. 지금 챙길 것 */}
@@ -761,7 +763,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                     setTab(t.key)
                     setShowAllAlerts(false)
                   }}
-                  className={`rounded-(--radius-control) border px-3 py-1.5 text-[0.9rem] font-medium ${
+                  className={`tap rounded-(--radius-control) border px-3 py-1.5 text-[0.9rem] font-medium ${
                     tab === t.key
                       ? 'border-brand-300 bg-brand-50 text-brand-700'
                       : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
@@ -865,7 +867,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
               <h2 className="text-[1.3rem] font-bold text-slate-900">새 업체 등록</h2>
               <button
                 type="button"
-                className="text-[0.95rem] text-slate-500 hover:text-slate-800"
+                className="tap text-[0.95rem] text-slate-500 hover:text-slate-800"
                 onClick={() => setFormOpen(false)}
               >
                 닫기

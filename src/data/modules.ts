@@ -122,9 +122,9 @@ export const MODULE_PAGES: ModulePageConfig[] = [
     path: '/settings',
     title: '설정',
     description:
-      '워크스페이스, 구성원, 알림 등 운영 환경을 관리합니다.',
+      '작업공간, 구성원, 알림 등 운영 환경을 관리합니다.',
     upcomingFeatures: [
-      '워크스페이스·구성원 관리',
+      '작업공간·구성원 관리',
       '알림·이메일 설정',
       '진단 템플릿 기본값 관리',
     ],

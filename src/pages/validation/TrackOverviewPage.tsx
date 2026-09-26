@@ -454,7 +454,7 @@ export function TrackOverviewPage() {
         currentKey="overview"
       >
         <div className="rounded-(--radius-card) border border-slate-200 bg-slate-50/60 px-4 py-3 text-[0.95rem] break-keep text-slate-500">
-          아직 이 트랙의 검증 워크스페이스가 없습니다. 트랙 선택 화면에서 ‘검증 시작’을 눌러 생성하세요.
+          아직 이 트랙의 검증 작업공간이 없습니다. 트랙 선택 화면에서 ‘검증 시작’을 눌러 생성하세요.
         </div>
       </WorkspaceShell>
     )

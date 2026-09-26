@@ -402,7 +402,7 @@ for (const [w, h, mob] of [[1440, 900, false], [390, 844, true]]) {
   check('회원가입: 상담신청에 뜬다 (종류 · 설명)', main.includes('회원가입') && main.includes('고객 플랫폼에 회원가입했습니다') && main.includes('새봄식품'), main.slice(0, 300))
   check('회원가입: 빨간 숫자가 하나 는다', (await reqBadge()) === before + 1, `${before} → ${await reqBadge()}`)
   const card = page.locator('article', { hasText: '고객 플랫폼에 회원가입했습니다' }).first()
-  await card.getByRole('button', { name: /새 고객사로 만들기/ }).click()
+  await card.getByRole('button', { name: /새 업체로 만들기/ }).click()
   await page.waitForTimeout(300)
   const dlg = page.getByRole('dialog')
   const values = await dlg.locator('input').evaluateAll((els) => els.map((e) => e.value))

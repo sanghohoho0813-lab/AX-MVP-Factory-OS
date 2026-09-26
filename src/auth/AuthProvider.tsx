@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setBootstrap(readyState('supabase'))
       } catch {
         if (mounted.current) {
-          setBootstrap(connectionErrorState('supabase', '워크스페이스 정보를 불러오지 못했습니다.'))
+          setBootstrap(connectionErrorState('supabase', '작업공간 정보를 불러오지 못했습니다.'))
         }
       }
     },

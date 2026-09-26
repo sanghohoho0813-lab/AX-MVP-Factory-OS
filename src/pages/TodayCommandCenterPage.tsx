@@ -504,7 +504,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               onClick={() => navigate('/ops/clients')}
             />
             <MetricTile
-              label="받아야 할 내 돈"
+              label="못 받은 내 돈"
               value={krwTile(money.scheduled.total + money.overdue.total)}
               tone={money.overdue.count > 0 ? 'danger' : 'neutral'}
               hint={
@@ -607,7 +607,15 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             </Link>
           </p>
           {salesRiskList.length === 0 && salesRecontactList.length === 0 ? (
-            <Blank title="지금 챙길 영업이 없습니다. 잠재고객은 영업 관리에서 등록합니다." icon={<KanbanSquare className="size-7" />} />
+            <Blank
+              title="지금 챙길 영업이 없습니다."
+              icon={<KanbanSquare className="size-7" />}
+              action={
+                <Link to="/sales/board" className="tap inline-flex items-center gap-1 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-3 py-2 font-semibold text-brand-700 hover:bg-brand-100">
+                  영업 보드에서 잠재고객 등록 →
+                </Link>
+              }
+            />
           ) : (
             <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-panel) border border-slate-200 bg-white">
               {(salesRiskList.length > 0
@@ -721,7 +729,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           onDone={(updated) => {
             setLinking(null)
             setEvents((list) => list.map((e) => (e.id === updated.id ? updated : e)))
-            showToast('고객사에 연결했습니다.')
+            showToast('업체에 연결했습니다.')
             void load()
           }}
         />

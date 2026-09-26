@@ -106,7 +106,7 @@ export function TodoComposer({
             key={p.label}
             type="button"
             onClick={() => setText((v) => (v.trim() === '' ? p.text : v))}
-            className="t-meta shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 font-medium whitespace-nowrap text-slate-600 hover:border-brand-300 hover:text-brand-700"
+            className="tap t-meta shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 font-medium whitespace-nowrap text-slate-600 hover:border-brand-300 hover:text-brand-700"
           >
             {p.label}
           </button>
@@ -187,7 +187,7 @@ export function TodoRow({
         )}
       </button>
 
-      <button type="button" onClick={onPick} className="min-w-0 flex-1 text-left">
+      <button type="button" onClick={onPick} className="tap min-w-0 flex-1 text-left">
         <span className={`t-body block break-keep ${entry.completed ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
           {entry.content}
         </span>

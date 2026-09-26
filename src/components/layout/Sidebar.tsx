@@ -129,7 +129,7 @@ function SidebarContent({
           )}
         </button>
         {onCloseMobile && (
-          <button type="button" aria-label="메뉴 닫기" onClick={onCloseMobile} className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-navy-300 hover:bg-navy-800 hover:text-white">
+          <button type="button" aria-label="메뉴 닫기" onClick={onCloseMobile} className="tap flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-lg text-navy-300 hover:bg-navy-800 hover:text-white">
             <X aria-hidden="true" className="size-5" />
           </button>
         )}

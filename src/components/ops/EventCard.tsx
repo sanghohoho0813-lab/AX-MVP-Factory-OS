@@ -129,11 +129,11 @@ export function EventCard({
             className="inline-flex items-center gap-1 font-medium text-brand-700 hover:underline"
           >
             <Building2 aria-hidden="true" className="size-3.5" />
-            {clientName ?? '연결된 고객사'} 열기
+            {clientName ?? '연결된 업체'} 열기
           </Link>
         ) : (
           <span className="inline-flex items-center gap-1 text-slate-500">
-            <Link2 aria-hidden="true" className="size-3.5" /> 아직 고객사와 연결되지 않음
+            <Link2 aria-hidden="true" className="size-3.5" /> 아직 업체와 연결되지 않음
           </span>
         )}
         {suggestion && <span className="text-slate-500">· 추천: {suggestion.shortLabel}</span>}
@@ -154,7 +154,7 @@ export function EventCard({
             <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1 rounded-(--radius-control) bg-slate-50 p-3 text-[0.9rem] sm:grid-cols-2">
               {fields.map(([k, v]) => (
                 <div key={k} className="flex gap-2">
-                  <dt className="w-24 shrink-0 text-slate-500">{FIELD_LABEL[k] ?? k}</dt>
+                  <dt className="w-24 shrink-0 text-slate-500">{FIELD_LABEL[k] ?? '기타 항목'}</dt>
                   <dd className="min-w-0 break-all text-slate-800">{String(v)}</dd>
                 </div>
               ))}
@@ -173,10 +173,10 @@ export function EventCard({
             {!event.operationsClientId && (
               <>
                 <button type="button" onClick={onLink} className="tap t-sub inline-flex h-11 items-center gap-1 rounded-(--radius-control) bg-brand-600 px-3 font-semibold text-white hover:bg-brand-700 sm:h-10">
-                  <Link2 aria-hidden="true" className="size-4" /> 고객사와 연결
+                  <Link2 aria-hidden="true" className="size-4" /> 업체와 연결
                 </button>
                 <button type="button" onClick={onCreateClient} className="tap t-sub inline-flex h-11 items-center gap-1 rounded-(--radius-control) border border-slate-200 px-3 font-medium text-slate-700 hover:bg-slate-50 sm:h-10">
-                  <Plus aria-hidden="true" className="size-4" /> 새 고객사로 만들기
+                  <Plus aria-hidden="true" className="size-4" /> 새 업체로 만들기
                 </button>
               </>
             )}

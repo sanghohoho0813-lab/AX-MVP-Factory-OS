@@ -311,7 +311,7 @@ export function CompanyProfileCard({
                                     onClick={() => void copy(`${f.key}__s${i}`, seg)}
                                     aria-label={`${f.label} ${seg} 만 복사`}
                                     title={`${seg} 만 복사 — 칸이 나뉜 신청서용`}
-                                    className={`rounded px-1 py-1 text-[0.98rem] font-semibold tabular-nums ${
+                                    className={`tap rounded px-1 py-1 text-[0.98rem] font-semibold tabular-nums ${
                                       copiedKey === `${f.key}__s${i}`
                                         ? 'bg-success-50 text-success-700'
                                         : 'text-slate-800 hover:bg-brand-50 hover:text-brand-700'
@@ -327,7 +327,7 @@ export function CompanyProfileCard({
                                 onClick={() => void copy(f.key, f.value)}
                                 aria-label={`${f.label} 전체 복사`}
                                 title={`전체 복사 — ${f.value}`}
-                                className="ml-0.5 shrink-0 rounded p-1 hover:bg-slate-100"
+                                className="tap ml-0.5 shrink-0 rounded p-1 hover:bg-slate-100"
                               >
                                 {copiedKey === f.key ? (
                                   <Check aria-hidden="true" className="size-3.5 text-success-600" />
@@ -363,7 +363,7 @@ export function CompanyProfileCard({
                               onClick={() => void copy(`${f.key}__digits`, digitsOf(f.value))}
                               title={`숫자만 복사 — ${digitsOf(f.value)}`}
                               aria-label={`${f.label} 숫자만 복사`}
-                              className="t-meta shrink-0 rounded-(--radius-control) border border-slate-200 px-1.5 py-0.5 font-medium text-slate-500 hover:border-brand-300 hover:text-brand-700"
+                              className="tap t-meta shrink-0 rounded-(--radius-control) border border-slate-200 px-1.5 py-0.5 font-medium text-slate-500 hover:border-brand-300 hover:text-brand-700"
                             >
                               {copiedKey === `${f.key}__digits` ? '복사됨' : '숫자만'}
                             </button>
@@ -378,7 +378,7 @@ export function CompanyProfileCard({
                           aria-label={`${f.label} 고치기`}
                           title="고치기"
                           onClick={() => startEdit(f)}
-                          className="shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-brand-600"
+                          className="tap shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-brand-600"
                         >
                           <Pencil aria-hidden="true" className="size-3.5" />
                         </button>

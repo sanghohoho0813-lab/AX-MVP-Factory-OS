@@ -232,7 +232,7 @@ export const TODO_PRESETS: { label: string; text: string }[] = [
 
 export async function listJournal(workspaceId: string | null): Promise<JournalEntry[]> {
   if (isLocal()) return readLocal()
-  if (!workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  if (!workspaceId) throw new Error('선택된 작업공간이 없습니다.')
   // D-122: 예전에는 새 것 1000건에서 끊겨, 몇 달 쓰면 오래된 업체 기록 · 오래 밀린 할 일이 조용히 사라졌다.
   // 1000건씩 끝까지 읽는다(안전 상한 20,000건).
   const PAGE = 1000
@@ -277,7 +277,7 @@ export async function createJournalEntry(
     writeLocal([entry, ...readLocal()])
     return entry
   }
-  if (!workspaceId || !ownerId) throw new Error('로그인과 워크스페이스가 필요합니다.')
+  if (!workspaceId || !ownerId) throw new Error('로그인과 작업공간이 필요합니다.')
   const { data, error } = await getSupabaseClient()
     .from('ops_journal_entries')
     .insert(toRow(entry, workspaceId, ownerId))
@@ -311,7 +311,7 @@ export async function updateJournalEntry(entry: JournalEntry, patch: Partial<Jou
     writeLocal(readLocal().map((e) => (e.id === next.id ? next : e)))
     return next
   }
-  if (!entry.workspaceId || !entry.ownerId) throw new Error('로그인과 워크스페이스가 필요합니다.')
+  if (!entry.workspaceId || !entry.ownerId) throw new Error('로그인과 작업공간이 필요합니다.')
   const row = toRow(next, entry.workspaceId, entry.ownerId)
   // D-122: 고친 칸만 보낸다. 예전에는 모든 칸을 화면의 사본으로 보내서, 고정한 뒤 목록이 다시 읽히기 전에
   // '완료' 를 누르면 고정이 풀렸다.

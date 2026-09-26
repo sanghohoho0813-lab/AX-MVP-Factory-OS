@@ -65,7 +65,7 @@ function WorkspaceSelector() {
       {open && (
         <ul
           role="listbox"
-          aria-label="워크스페이스 선택"
+          aria-label="작업공간 선택"
           className="absolute top-full left-0 z-30 mt-1.5 w-60 rounded-(--radius-card) border border-slate-200 bg-white p-1.5 shadow-(--shadow-overlay)"
         >
           {WORKSPACES.map((ws) => (

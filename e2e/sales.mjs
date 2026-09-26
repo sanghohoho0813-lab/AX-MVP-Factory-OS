@@ -145,7 +145,7 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   await page.goto(BASE + '/ops/inbox', { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)
   const ev = page.locator('article', { hasText: '새길바이오' }).first()
-  await ev.getByRole('button', { name: /새 고객사로 만들기/ }).click()
+  await ev.getByRole('button', { name: /새 업체로 만들기/ }).click()
   await page.waitForTimeout(300)
   const linkDlg = page.getByRole('dialog')
   check('상담신청: 잠재고객으로 등록된다는 안내', ((await linkDlg.innerText()) ?? '').includes('잠재고객'))

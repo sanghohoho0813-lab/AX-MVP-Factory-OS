@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ArrowRight, Handshake } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { useToast } from '../components/ui/toastContext'
@@ -105,6 +105,9 @@ function SettlementContent({ workspaceId }: { workspaceId: string | null }) {
             업체 상세의 수금 탭에서 항목마다 <strong className="font-semibold">영업자 수수료</strong>와{' '}
             <strong className="font-semibold">이름</strong>을 적으면 여기에 사람별로 모입니다.
           </p>
+          <Link to="/ops/clients" className="mt-5 inline-flex font-semibold text-brand-700 hover:underline">
+            고객 관리로 →
+          </Link>
         </div>
       ) : (
         <ul className="flex flex-col gap-4">
@@ -133,8 +136,9 @@ function SettlementContent({ workspaceId }: { workspaceId: string | null }) {
                   {row.items.map((item) => {
                     const state = item.agentPaidAt ? 'paid' : item.receivedAt ? 'payable' : 'waiting'
                     return (
-                      <li key={item.feeId} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-5 py-3">
-                        <label className="flex shrink-0 items-center gap-2">
+                      <li key={item.feeId} className="flex items-start gap-3 px-5 py-3">
+                        {/* D-122: 체크 칸에 '지급' 글자 · 줄은 두 층(업체 · 금액 / 무엇 · 상태) — 다섯 가지가 한 줄에 엉켜 줄바꿈이 제멋대로였다 */}
+                        <label className="tap flex shrink-0 flex-col items-center gap-0.5 pt-0.5">
                           <input
                             type="checkbox"
                             aria-label={`${item.clientName} ${item.label} 영업자 지급 완료`}
@@ -143,30 +147,37 @@ function SettlementContent({ workspaceId }: { workspaceId: string | null }) {
                             onChange={(e) => void togglePaid(item, e.target.checked)}
                             className="size-5 accent-brand-600 disabled:opacity-40"
                           />
+                          <span className={`t-meta font-semibold ${state === 'waiting' ? 'text-slate-400' : 'text-slate-600'}`}>지급</span>
                         </label>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/ops/clients/${item.clientId}?tab=fees`)}
-                          className="inline-flex min-w-0 items-center gap-1 text-left font-semibold text-slate-900 hover:text-brand-700 hover:underline"
-                        >
-                          <span className="truncate">{item.clientName}</span>
-                          <ArrowRight aria-hidden="true" className="size-3.5 shrink-0 text-slate-400" />
-                        </button>
-                        <span className="t-sub text-slate-600">{item.label}</span>
-                        <strong className="ml-auto text-[1rem] font-semibold text-slate-900 tabular-nums">{formatKrw(item.agentFee)}</strong>
-                        {state === 'paid' ? (
-                          <span className="rounded-full border border-success-200 bg-success-50 px-2 py-0.5 t-meta font-semibold text-success-700">
-                            지급 {item.agentPaidAt}
-                          </span>
-                        ) : state === 'payable' ? (
-                          <span className="rounded-full border border-warning-200 bg-warning-50 px-2 py-0.5 t-meta font-bold text-warning-700">
-                            줄 돈 · 고객 입금 {item.receivedAt}
-                          </span>
-                        ) : (
-                          <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 t-meta text-slate-500">
-                            고객 입금 전{item.amount !== null ? ` · 청구 ${formatKrw(item.amount)}` : ''}
-                          </span>
-                        )}
+                        <div className="flex min-w-0 flex-1 flex-col gap-1">
+                          <div className="flex items-baseline gap-2">
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/ops/clients/${item.clientId}?tab=fees`)}
+                              className="tap inline-flex min-w-0 items-center gap-1 text-left font-semibold text-slate-900 hover:text-brand-700 hover:underline"
+                            >
+                              <span className="truncate">{item.clientName}</span>
+                              <ArrowRight aria-hidden="true" className="size-3.5 shrink-0 text-slate-400" />
+                            </button>
+                            <strong className="ml-auto shrink-0 text-[1rem] font-semibold text-slate-900 tabular-nums">{formatKrw(item.agentFee)}</strong>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span className="t-sub text-slate-600">{item.label}</span>
+                            {state === 'paid' ? (
+                              <span className="rounded-full border border-success-200 bg-success-50 px-2 py-0.5 t-meta font-semibold text-success-700">
+                                지급 {item.agentPaidAt}
+                              </span>
+                            ) : state === 'payable' ? (
+                              <span className="rounded-full border border-warning-200 bg-warning-50 px-2 py-0.5 t-meta font-bold text-warning-700">
+                                줄 돈 · 고객 입금 {item.receivedAt}
+                              </span>
+                            ) : (
+                              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 t-meta text-slate-500">
+                                고객 입금 전{item.amount !== null ? ` · 청구 ${formatKrw(item.amount)}` : ''}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </li>
                     )
                   })}

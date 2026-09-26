@@ -62,57 +62,46 @@ export function ClientToolsCard({
           </Surface>
         )}
 
-        <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+        {/* D-122: 도구마다 한두 줄로 — 예전 카드는 없는 서류를 줄마다 늘어놔 휴대폰에서 1,200px 가까이 됐다 */}
+        <ul className="grid divide-y divide-slate-100 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white sm:grid-cols-2 sm:divide-y-0 sm:gap-px sm:bg-slate-100 xl:grid-cols-3">
           {readiness.map((r) => {
             const t = r.tool
             const Icon = t.icon
             const blocked = !r.ready
             return (
-              <Link
-                key={t.key}
-                to={`${t.path}?client=${record.id}`}
-                data-tool={t.key}
-                data-ready={r.ready ? 'yes' : 'no'}
-                className={`tap flex flex-col gap-1.5 rounded-(--radius-panel) border p-3.5 ${
-                  blocked
-                    ? 'border-danger-200 bg-danger-50/40 hover:border-danger-300'
-                    : 'border-slate-200 bg-white hover:border-brand-300 hover:bg-brand-50/40'
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <Icon aria-hidden="true" className={`size-4 shrink-0 ${blocked ? 'text-danger-500' : 'text-slate-400'}`} />
-                  <span className="t-body min-w-0 flex-1 truncate font-bold text-slate-900">{t.label}</span>
-                  <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-slate-300" />
-                </span>
-                {blocked ? (
-                  <span className="flex flex-col gap-0.5">
-                    {r.missing.map((need) => (
-                      <span key={need.key} className="t-sub flex flex-wrap items-baseline gap-1 font-medium break-keep text-danger-700">
-                        <AlertTriangle aria-hidden="true" className="size-3.5 shrink-0 translate-y-0.5" />
-                        {need.label}
-                        <span className="t-meta font-normal text-danger-600">— {missingReason(need)}</span>
+              <li key={t.key} className="bg-white">
+                <Link
+                  to={`${t.path}?client=${record.id}`}
+                  data-tool={t.key}
+                  data-ready={r.ready ? 'yes' : 'no'}
+                  className={`tap flex h-full items-start gap-2.5 px-3.5 py-3 ${blocked ? 'hover:bg-danger-50/50' : 'hover:bg-brand-50/40'}`}
+                >
+                  <Icon aria-hidden="true" className={`mt-0.5 size-4 shrink-0 ${blocked ? 'text-danger-500' : 'text-slate-400'}`} />
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="t-body font-bold break-keep text-slate-900">{t.label}</span>
+                    {blocked ? (
+                      <span className="t-sub font-medium break-keep text-danger-700">
+                        서류 {r.missing.length}건 필요 · {r.missing.map((need) => (need.received ? `${need.label}(${missingReason(need).replace(/ \(.*\)$/, '')})` : need.label)).join(' · ')}
                       </span>
-                    ))}
+                    ) : (
+                      <span className="t-sub flex items-center gap-1 text-success-700">
+                        <Check aria-hidden="true" className="size-3.5 shrink-0" />
+                        {r.needsNothing ? '바로 쓸 수 있습니다' : '필요한 서류가 다 있습니다'}
+                      </span>
+                    )}
+                    {r.missingOptional.length > 0 && (
+                      <span className="t-meta break-keep text-slate-500">있으면 더 정확 — {missingDocsText(r.missingOptional)}</span>
+                    )}
                   </span>
-                ) : (
-                  <span className="t-sub flex items-center gap-1 text-success-700">
-                    <Check aria-hidden="true" className="size-3.5 shrink-0" />
-                    {r.needsNothing ? '바로 쓸 수 있습니다' : '필요한 서류가 다 있습니다'}
-                  </span>
-                )}
-                {r.missingOptional.length > 0 && (
-                  <span className="t-meta break-keep text-slate-500">
-                    있으면 더 정확합니다 — {missingDocsText(r.missingOptional)}
-                  </span>
-                )}
-              </Link>
+                  <ArrowRight aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-300" />
+                </Link>
+              </li>
             )
           })}
-        </div>
+        </ul>
 
-        <p className="t-meta break-keep text-slate-400">
-          도구에서 나온 판정은 단추 한 번으로 이 업체 기록에 붙습니다. 기한이 있는 결과는 달력에도 올라갑니다.
-          서류가 없어도 도구는 열립니다 — 그때는 직접 붙여넣어 쓰면 됩니다.
+        <p className="t-meta break-keep text-slate-500">
+          도구에서 나온 판정은 단추 한 번으로 이 업체 기록에 붙습니다. 서류가 없어도 도구는 열립니다.
         </p>
       </div>
     </Section>

@@ -65,7 +65,7 @@ function wrap(err: unknown): never {
 }
 
 function needWs(workspaceId: string | null): string {
-  if (!workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  if (!workspaceId) throw new Error('선택된 작업공간이 없습니다.')
   return workspaceId
 }
 

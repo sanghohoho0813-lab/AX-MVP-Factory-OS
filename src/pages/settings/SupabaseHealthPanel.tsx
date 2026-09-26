@@ -44,8 +44,8 @@ export function SupabaseHealthPanel() {
 
     add('login', '로그인', session ? 'ok' : 'fail', session ? (session.user.email ?? '로그인됨') : '로그인이 필요합니다')
 
-    add('workspace', '워크스페이스', currentWorkspaceId ? 'ok' : 'fail',
-      currentWorkspaceId ? (workspaces.find((w) => w.workspaceId === currentWorkspaceId)?.workspace?.name ?? '선택됨') : '워크스페이스를 만들어 주세요')
+    add('workspace', '작업공간', currentWorkspaceId ? 'ok' : 'fail',
+      currentWorkspaceId ? (workspaces.find((w) => w.workspaceId === currentWorkspaceId)?.workspace?.name ?? '선택됨') : '작업공간을 만들어 주세요')
 
     // 실제 표 읽기
     try {

@@ -183,7 +183,7 @@ function DecisionBody({ w }: { w: ValidationWorkspace }) {
         summary="테스트 결과를 근거로 다음 단계를 결정하고, 준비가 되면 검증을 확정합니다. 근거 없는 성공 판정은 허용되지 않습니다."
         what="최종 결정을 기록하고, 품질검사를 통과하면 검증을 확정합니다."
         when="Gate 6 결과 판정을 마친 뒤 사용합니다."
-        next="확정하면 워크스페이스가 읽기 전용으로 고정되고 인계 스냅샷이 생성됩니다."
+        next="확정하면 작업공간이 읽기 전용으로 고정되고 인계 스냅샷이 생성됩니다."
       />
 
       <Panel title="현재 상태 요약">
@@ -247,7 +247,7 @@ function DecisionBody({ w }: { w: ValidationWorkspace }) {
         open={confirmOpen}
         title="검증 확정"
         message="이 검증을 확정할까요?"
-        warning="확정하면 워크스페이스가 읽기 전용으로 고정되고 인계 스냅샷이 생성됩니다. 이후 수정하려면 새 버전을 만들어야 합니다."
+        warning="확정하면 작업공간이 읽기 전용으로 고정되고 인계 스냅샷이 생성됩니다. 이후 수정하려면 새 버전을 만들어야 합니다."
         confirmLabel="확정"
         busy={busy}
         onConfirm={finalize}

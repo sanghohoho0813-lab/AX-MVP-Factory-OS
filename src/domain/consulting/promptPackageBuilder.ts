@@ -402,7 +402,7 @@ export function buildPromptPackage(input: BuildInput): BuiltPackage {
     '',
     outputBlock(input.type, stage, body.title, body.sections),
     '',
-    '첨부한 "Context" 문서에 사실표 전체·워크스페이스 내용·최근 산출물이 있다. 본문과 다르면 Context 의 최신 값을 따르되, 서로 다른 값을 발견하면 "확인 필요" 에 적는다.',
+    '첨부한 "Context" 문서에 사실표 전체·작업공간 내용·최근 산출물이 있다. 본문과 다르면 Context 의 최신 값을 따르되, 서로 다른 값을 발견하면 "확인 필요" 에 적는다.',
   ].join('\n')
 
   const contextRaw = buildContext(p, input)

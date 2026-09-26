@@ -22,7 +22,7 @@ export type TabKey = 'me' | 'workspace' | 'data' | 'system'
 
 export const SETTINGS_TABS: { key: TabKey; label: string; icon: typeof Info }[] = [
   { key: 'me', label: '내 설정', icon: SlidersHorizontal },
-  { key: 'workspace', label: '워크스페이스', icon: Users },
+  { key: 'workspace', label: '작업공간', icon: Users },
   { key: 'data', label: '데이터', icon: Database },
   { key: 'system', label: '시스템', icon: Info },
 ]
@@ -116,9 +116,9 @@ export function SystemPanel({ mode, connection }: { mode: string; connection: Re
   return (
     <Panel title="시스템 정보">
       <SettingRow label="앱">{brand.productName} · {brand.productSubtitle}</SettingRow>
-      <SettingRow label="데이터 모드">{mode === 'supabase' ? '클라우드(supabase)' : '로컬 데모(local)'}</SettingRow>
+      <SettingRow label="저장 방식">{mode === 'supabase' ? '클라우드 저장' : '이 브라우저에만 저장(연습용)'}</SettingRow>
       <SettingRow label="연결 상태">{connection}</SettingRow>
-      <SettingRow label="로컬 스키마">v{SCHEMA_VERSION}</SettingRow>
+      <SettingRow label="저장 형식 버전">v{SCHEMA_VERSION}</SettingRow>
       <SettingRow label="DB 마이그레이션">stage12a</SettingRow>
     </Panel>
   )
@@ -152,7 +152,7 @@ export function LocalDataSummaryPanel() {
             로컬 데이터 내보내기(JSON)
           </Button>
           <p className="mt-2 text-[0.875rem] break-keep text-slate-400">
-            클라우드 저장(supabase 모드)으로 옮기려면 로그인 후 설정 &gt; 데이터에서 가져오기를 실행하세요. 로컬 데이터는 자동으로 지워지지 않습니다.
+            클라우드 저장으로 옮기려면 로그인 후 설정 &gt; 데이터에서 가져오기를 실행하세요. 로컬 데이터는 자동으로 지워지지 않습니다.
           </p>
         </div>
       </div>

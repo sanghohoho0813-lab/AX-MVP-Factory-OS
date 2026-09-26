@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { localDateOf } from '../../lib/appClock'
 import { Link } from 'react-router-dom'
-import { CheckCircle2, ExternalLink, Eye, Link2, MessageSquareReply, Plus, Send, Sparkles, Upload } from 'lucide-react'
+import { CheckCircle2, ExternalLink, Eye, Link2, MessageSquareReply, Plus, Send, Share2, Sparkles, Upload } from 'lucide-react'
+import { InlineConfirm } from '../ui/InlineConfirm'
 import type { ClientOpsRecord, DocumentKey } from '../../types/clientOps'
 import type { CustomerEvent, PortalClientLink, PortalDocument, PortalProjection, PortalRequest, PortalUpdate } from '../../types/bridge'
 import { Button } from '../ui/Button'
@@ -156,10 +157,13 @@ export function PortalTab({ record, workspaceId }: { record: ClientOpsRecord; wo
   if (notReady) {
     return (
       <div className="rounded-(--radius-panel) border border-warning-200 bg-warning-50 p-4">
-        <p className="text-[0.98rem] font-semibold text-warning-700">고객 플랫폼 연결 준비 중 (READY)</p>
-        <p className="mt-1 text-[0.92rem] break-keep text-slate-700">
-          클라우드에 브릿지 테이블이 아직 없습니다. <code className="rounded bg-white px-1">docs/SETUP.md</code> 의 순서대로 마이그레이션을 적용하면 이 탭이 켜집니다.
-        </p>
+        {/* D-122: 개발자 말(READY · 브릿지 테이블 · 마이그레이션 · 파일 경로)을 앞에 두지 않는다 */}
+        <p className="text-[0.98rem] font-semibold text-warning-700">고객 플랫폼 연결을 아직 켜지 않았습니다</p>
+        <p className="mt-1 text-[0.92rem] break-keep text-slate-700">연결이 켜지면 이 탭에서 고객에게 소식 · 서류 요청을 보낼 수 있습니다. 관리자에게 '고객 플랫폼 연결을 켜 달라' 고 알려 주세요.</p>
+        <details className="mt-2 text-[0.85rem] text-slate-500">
+          <summary className="cursor-pointer">관리자용 안내</summary>
+          <p className="mt-1 break-keep">클라우드에 브릿지 테이블이 없습니다. docs/SETUP.md 의 순서대로 마이그레이션을 적용하면 켜집니다.</p>
+        </details>
       </div>
     )
   }
@@ -179,7 +183,7 @@ export function PortalTab({ record, workspaceId }: { record: ClientOpsRecord; wo
               <div className="mt-1 text-[0.92rem] text-slate-600">
                 <p>
                   <span className="font-semibold text-success-700">연결됨</span> · {link.profileEmail || '(계정)'} · 연결일 {localDateOf(link.linkedAt)}
-                  {isLocal && <span className="ml-2 rounded-full bg-highlight-100 px-2 py-0.5 t-meta font-semibold text-highlight-700">DEMO</span>}
+                  {isLocal && <span className="ml-2 rounded-full bg-highlight-100 px-2 py-0.5 t-meta font-semibold text-highlight-700">연습용</span>}
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <label className="text-[0.88rem] text-slate-500">
@@ -285,8 +289,8 @@ export function PortalTab({ record, workspaceId }: { record: ClientOpsRecord; wo
                       </>
                     )}
                     {isLocal && d.status === 'requested' && (
-                      <Button variant="secondary" size="sm" onClick={() => void run(async () => seedDemoUpload(d), '고객 업로드를 흉내 냈습니다 (DEMO).')}>
-                        <Upload aria-hidden="true" className="size-4" /> 고객 업로드 흉내 (DEMO)
+                      <Button variant="secondary" size="sm" onClick={() => void run(async () => seedDemoUpload(d), '고객 업로드를 흉내 냈습니다 (연습용).')}>
+                        <Upload aria-hidden="true" className="size-4" /> 고객 업로드 흉내 (연습용)
                       </Button>
                     )}
                   </li>
@@ -301,19 +305,21 @@ export function PortalTab({ record, workspaceId }: { record: ClientOpsRecord; wo
                   {(Object.entries(record.documents) as [DocumentKey, ClientOpsRecord['documents'][DocumentKey]][])
                     .filter(([, v]) => v.storagePath && !documents.some((d) => d.storagePath === v.storagePath))
                     .map(([key, v]) => (
-                      <button
+                      // D-122: 누르면 바로 고객 화면에 올라가던 것을 한 번 묻는다
+                      <InlineConfirm
                         key={key}
-                        type="button"
-                        onClick={() =>
+                        icon={<Share2 aria-hidden="true" className="size-4" />}
+                        label={`${DOCUMENTS.find((x) => x.key === key)?.label ?? key} 공유`}
+                        question="고객 화면에 보입니다. 공유할까요?"
+                        confirmLabel="공유"
+                        className="!text-slate-700 hover:!bg-brand-50 hover:!text-brand-700"
+                        onConfirm={() =>
                           void run(
                             () => shareDocument(workspaceId, { linkId: link.id, operationsClientId: record.id, documentType: key, title: DOCUMENTS.find((x) => x.key === key)?.label ?? key, storagePath: v.storagePath, fileName: v.fileName }),
                             '고객에게 공유했습니다.',
                           )
                         }
-                        className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[0.85rem] text-slate-700 hover:border-brand-300 hover:text-brand-700"
-                      >
-                        {DOCUMENTS.find((x) => x.key === key)?.label ?? key} 공유
-                      </button>
+                      />
                     ))}
                 </div>
               </div>
@@ -325,8 +331,8 @@ export function PortalTab({ record, workspaceId }: { record: ClientOpsRecord; wo
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-[1.05rem] font-bold text-slate-900">고객이 보낸 요청 <span className="text-slate-400">{openRequests.length} 열림</span></h3>
               {isLocal && (
-                <Button variant="secondary" size="sm" onClick={() => void run(async () => seedDemoRequest(link.id, workspaceId), '샘플 요청을 만들었습니다 (DEMO).')}>
-                  <Sparkles aria-hidden="true" className="size-4" /> 샘플 요청 (DEMO)
+                <Button variant="secondary" size="sm" onClick={() => void run(async () => seedDemoRequest(link.id, workspaceId), '샘플 요청을 만들었습니다 (연습용).')}>
+                  <Sparkles aria-hidden="true" className="size-4" /> 샘플 요청 (연습용)
                 </Button>
               )}
             </div>
@@ -388,9 +394,14 @@ export function PortalTab({ record, workspaceId }: { record: ClientOpsRecord; wo
                           {u.customerCompletedAt ? '고객 조치 완료' : `고객 조치 대기${u.dueDate ? ` · ${u.dueDate}까지` : ''}`}
                         </span>
                       )}
-                      <button type="button" onClick={() => void run(() => archiveUpdate(u), '고객 화면에서 내렸습니다.')} className="ml-auto text-slate-400 hover:text-danger-600">
-                        내리기
-                      </button>
+                      <InlineConfirm
+                        className="ml-auto"
+                        icon={null}
+                        label="내리기"
+                        question="고객 화면에서 내릴까요?"
+                        confirmLabel="내리기"
+                        onConfirm={() => void run(() => archiveUpdate(u), '고객 화면에서 내렸습니다.')}
+                      />
                     </div>
                     <p className="mt-1 text-[0.98rem] font-semibold text-slate-900">{u.title}</p>
                     {u.body && <p className="text-[0.92rem] break-keep whitespace-pre-wrap text-slate-600">{u.body}</p>}

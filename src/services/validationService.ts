@@ -199,7 +199,7 @@ export function ensureWorkspace(projectId: string, trackType: ValidationTrackTyp
     organizationId: project.organizationId,
     projectId,
     activityType: 'project_updated',
-    title: `실제 사용 테스트(${TRACK_META[trackType].label}) 워크스페이스가 생성되었습니다.`,
+    title: `실제 사용 테스트(${TRACK_META[trackType].label}) 작업공간이 생성되었습니다.`,
     description: `필수 시나리오 ${created.scenarios.filter((s) => s.required).length}개 · 규칙 v${VALIDATION_RULE_VERSION}`,
     actorName: CURRENT_USER.name,
   })
@@ -225,7 +225,7 @@ export function getWorkspace(id: string): ValidationWorkspace | null {
 
 function load(workspaceId: string): ValidationWorkspace {
   const w = validationWorkspaceRepository.getById(workspaceId)
-  if (!w) throw new ValidationEditError('검증 워크스페이스를 찾을 수 없습니다.')
+  if (!w) throw new ValidationEditError('검증 작업공간을 찾을 수 없습니다.')
   return w
 }
 

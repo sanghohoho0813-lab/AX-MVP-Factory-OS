@@ -85,7 +85,7 @@ function CatalogView({ catalog, prices, onSavePrice }: { catalog: SalesPackage[]
             type="button"
             aria-pressed={cat === c}
             onClick={() => setCat(c)}
-            className={`t-meta rounded-full border px-2.5 py-1 font-semibold ${cat === c ? 'border-brand-500 bg-brand-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+            className={`tap t-meta rounded-full border px-2.5 py-1 font-semibold ${cat === c ? 'border-brand-500 bg-brand-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
           >
             {c !== '전체' && cat !== c && <span aria-hidden="true" className="ramp-dot mr-1 inline-block size-1.5 rounded-full align-middle" style={rampAt(ci - 1, PKG_CATEGORIES.length)} />}
             {c} <span className="tabular-nums opacity-75">{c === '전체' ? catalog.length : catalog.filter((p) => p.cat === c).length}</span>
@@ -255,7 +255,7 @@ function ProposalWork({ record, catalog, onSave }: { record: ClientOpsRecord; ca
             <ul className="mt-1 flex flex-wrap gap-1.5">
               {picked.filter((p) => !recommended.some((r) => r.pkg.id === p.id)).map((p) => (
                 <li key={p.id}>
-                  <button type="button" onClick={() => toggle(p.name)} className="t-meta rounded-full border border-brand-400 bg-brand-50 px-2.5 py-1 font-medium text-brand-700" aria-label={`${p.name} 빼기`}>
+                  <button type="button" onClick={() => toggle(p.name)} className="tap t-meta rounded-full border border-brand-400 bg-brand-50 px-2.5 py-1 font-medium text-brand-700" aria-label={`${p.name} 빼기`}>
                     {p.name} · {p.fee}만원 ✕
                   </button>
                 </li>
@@ -276,7 +276,7 @@ function ProposalWork({ record, catalog, onSave }: { record: ClientOpsRecord; ca
                     {catalog.filter((p) => p.cat === c).map((p) => {
                       const on = d.names.includes(p.name)
                       return (
-                        <button key={p.id} type="button" aria-pressed={on} onClick={() => toggle(p.name)} className={`t-meta rounded-full border px-2.5 py-1 font-medium ${on ? 'border-brand-400 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
+                        <button key={p.id} type="button" aria-pressed={on} onClick={() => toggle(p.name)} className={`tap t-meta rounded-full border px-2.5 py-1 font-medium ${on ? 'border-brand-400 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
                           {p.name} · {p.fee}만
                         </button>
                       )

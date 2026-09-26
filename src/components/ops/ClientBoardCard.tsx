@@ -115,7 +115,7 @@ function ServiceChip({ chip, onClick }: { chip: ChipState; onClick: () => void }
     >
       <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full no-underline ${DOT[chip.status]}`} />
       <span className="whitespace-nowrap">{chip.label}</span>
-      {note !== '' && <span className={`whitespace-nowrap ${na ? '' : 'opacity-70'}`}>{note}</span>}
+      {note !== '' && <span className={`whitespace-nowrap ${na ? '' : 'font-medium'}`}>{note}</span>}
     </button>
   )
 }
@@ -245,7 +245,7 @@ export function ClientBoardCard({
               {rank}
             </span>
           )}
-          <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+          <button type="button" onClick={onOpen} className="tap flex min-w-0 flex-1 items-center gap-2 text-left">
             <span className="t-card truncate font-bold text-slate-900 hover:text-brand-700 hover:underline">
               {record.companyName || '(이름 없음)'}
             </span>

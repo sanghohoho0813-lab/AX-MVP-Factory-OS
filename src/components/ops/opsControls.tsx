@@ -145,7 +145,7 @@ export function MessageModal({
             type="button"
             aria-label="닫기"
             onClick={onClose}
-            className="flex size-8 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-400 hover:bg-slate-100"
+            className="tap flex size-10 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-100"
           >
             <X aria-hidden="true" className="size-4" />
           </button>
@@ -242,7 +242,7 @@ export function AmountField({
             key={s.value}
             type="button"
             onClick={() => onChange(value + s.value)}
-            className="rounded-(--radius-control) border border-slate-200 bg-white px-2.5 py-2 text-[0.9rem] font-semibold text-slate-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+            className="tap rounded-(--radius-control) border border-slate-200 bg-white px-2.5 py-2 text-[0.9rem] font-semibold text-slate-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
           >
             {s.label}
           </button>
@@ -251,7 +251,7 @@ export function AmountField({
           type="button"
           onClick={() => onChange(0)}
           disabled={value === 0}
-          className="rounded-(--radius-control) px-2 py-2 text-[0.9rem] text-slate-400 hover:text-slate-700 disabled:opacity-40"
+          className="tap rounded-(--radius-control) px-2 py-2 text-[0.9rem] text-slate-500 hover:text-slate-700 disabled:opacity-40"
         >
           <X aria-hidden="true" className="mr-0.5 inline size-3.5" />
           지우기

@@ -73,7 +73,7 @@ export function FilterBar({
           <button
             type="button"
             onClick={onReset}
-            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-(--radius-control) px-2.5 text-[0.875rem] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+            className="tap inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-(--radius-control) px-2.5 text-[0.875rem] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700"
           >
             <RotateCcw aria-hidden="true" className="size-3.5" />
             필터 초기화

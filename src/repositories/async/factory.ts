@@ -17,7 +17,7 @@ import { createSupabaseBundle } from '../supabase/bundle'
 export class SupabaseModeNotWiredError extends Error {
   constructor() {
     super(
-      'Supabase 저장소를 만들 수 없습니다. 로그인·워크스페이스 선택 후 다시 시도하세요.',
+      'Supabase 저장소를 만들 수 없습니다. 로그인·작업공간 선택 후 다시 시도하세요.',
     )
     this.name = 'SupabaseModeNotWiredError'
   }

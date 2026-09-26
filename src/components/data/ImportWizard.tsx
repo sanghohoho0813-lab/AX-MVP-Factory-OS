@@ -156,11 +156,11 @@ export function ImportWizard() {
           {running ? (
             <><Loader2 aria-hidden="true" className="size-4 animate-spin" /> 가져오는 중…</>
           ) : (
-            <><CloudUpload aria-hidden="true" className="size-4" /> 이 워크스페이스로 가져오기</>
+            <><CloudUpload aria-hidden="true" className="size-4" /> 이 작업공간으로 가져오기</>
           )}
         </Button>
         {!canImport && snapshot.totalItems > 0 && (
-          <p className="mt-2 text-[0.875rem] text-slate-500">워크스페이스를 선택한 뒤 가져올 수 있습니다.</p>
+          <p className="mt-2 text-[0.875rem] text-slate-500">작업공간을 선택한 뒤 가져올 수 있습니다.</p>
         )}
         <p className="mt-2 text-[0.875rem] break-keep text-slate-400">
           가져오기는 멱등입니다. 같은 데이터를 다시 실행해도 중복되지 않으며, 원본 로컬 데이터는 지워지지 않습니다.

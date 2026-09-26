@@ -200,7 +200,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                 type="button"
                 aria-pressed={on}
                 onClick={() => toggleKind(k)}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.85rem] font-medium ${
+                className={`tap inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.85rem] font-medium ${
                   on ? SCHEDULE_KIND_CLASS[k].chip : 'border-slate-200 bg-white text-slate-400'
                 }`}
               >
@@ -262,7 +262,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                         isToday
                           ? 'bg-brand-600 text-white'
                           : !inMonth
-                            ? 'text-slate-300'
+                            ? 'text-slate-400'
                             : dow === 0
                               ? 'text-weekday-sun'
                               : dow === 6
@@ -299,7 +299,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                           key={e.id}
                           title={`${e.clientName} · ${e.title}`}
                           className={`flex min-w-0 flex-col rounded border px-1 py-0.5 leading-tight ${
-                            e.done ? 'border-slate-100 text-slate-300 line-through' : SCHEDULE_KIND_CLASS[e.kind].chip
+                            e.done ? 'border-slate-100 text-slate-500 line-through' : SCHEDULE_KIND_CLASS[e.kind].chip
                           }`}
                         >
                           {/* D-120: 업체 이름만 보여서 무슨 일인지 몰랐다 — 윗줄 무슨 일(성공보수 · 1차 미팅 …), 아랫줄 업체 */}
@@ -443,18 +443,7 @@ export function EventRow({
 }) {
   const cls = SCHEDULE_KIND_CLASS[event.kind]
   return (
-    <li className="relative">
-      {onTodo && (
-        <button
-          type="button"
-          aria-label={`${event.clientName} ${event.title} — 할 일로 넣기`}
-          title="할 일로 넣기"
-          onClick={onTodo}
-          className="tap absolute top-2 right-2 z-10 rounded-(--radius-control) border border-slate-200 bg-white p-1.5 text-slate-500 hover:border-brand-300 hover:text-brand-700"
-        >
-          <Plus aria-hidden="true" className="size-4" />
-        </button>
-      )}
+    <li className="flex flex-col">
       <button
         type="button"
         onClick={onOpen}
@@ -475,7 +464,7 @@ export function EventRow({
               </span>
             )}
           </span>
-          <span className={`mt-0.5 block text-[1rem] break-keep ${event.done ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+          <span className={`mt-0.5 block text-[1rem] break-keep ${event.done ? 'text-slate-500 line-through' : 'text-slate-800'}`}>
             {event.title}
           </span>
           {event.detail && <span className="block text-[0.9rem] break-keep text-slate-500">{event.detail}</span>}
@@ -494,6 +483,18 @@ export function EventRow({
           </span>
         )}
       </button>
+      {/* D-122: 카드 모서리에 떠 있던 '+' 는 남은 날 배지를 가렸고 뜻도 몰랐다 — 카드 아래 글자 단추로 */}
+      {onTodo && (
+        <button
+          type="button"
+          aria-label={`${event.clientName} ${event.title} — 할 일로 넣기`}
+          onClick={onTodo}
+          className="tap t-sub -mt-px inline-flex items-center gap-1 self-end rounded-b-(--radius-control) border border-t-0 border-slate-200 bg-slate-50 px-3 py-1.5 font-semibold text-brand-700 hover:bg-brand-50"
+        >
+          <Plus aria-hidden="true" className="size-4" />
+          할 일로 넣기
+        </button>
+      )}
     </li>
   )
 }

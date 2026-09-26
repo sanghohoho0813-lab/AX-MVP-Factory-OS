@@ -121,7 +121,7 @@ function fromRow(row: Record<string, unknown>): OperationsClient {
 
 export async function listOperationsClients(workspaceId: string | null): Promise<OperationsClient[]> {
   if (getDataModeConfig().mode === 'local') return readLocal().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-  if (!workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  if (!workspaceId) throw new Error('선택된 작업공간이 없습니다.')
   const { data, error } = await getSupabaseClient().from('operations_clients').select('*').eq('workspace_id', workspaceId).order('updated_at', { ascending: false })
   if (error) throw error
   return (data ?? []).map((row) => fromRow(row as Record<string, unknown>))
@@ -134,7 +134,7 @@ export async function createOperationsClient(workspaceId: string | null, input: 
     writeJson(STORAGE_KEYS.operationsClients, [record, ...readLocal()])
     return record
   }
-  if (!workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  if (!workspaceId) throw new Error('선택된 작업공간이 없습니다.')
   const { data, error } = await getSupabaseClient().from('operations_clients').insert({ id: record.id, workspace_id: workspaceId, company_name: record.companyName, status: record.status, next_action: record.nextAction, next_action_due_date: record.nextActionDueDate || null, payload: payloadOf(record) }).select().single()
   if (error) throw error
   return fromRow(data as Record<string, unknown>)
@@ -146,7 +146,7 @@ export async function saveOperationsClient(record: OperationsClient): Promise<Op
     writeJson(STORAGE_KEYS.operationsClients, readLocal().map((item) => item.id === next.id ? next : item))
     return next
   }
-  if (!next.workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  if (!next.workspaceId) throw new Error('선택된 작업공간이 없습니다.')
   const { data, error } = await getSupabaseClient().from('operations_clients').update({ company_name: next.companyName, status: next.status, next_action: next.nextAction, next_action_due_date: next.nextActionDueDate || null, payload: payloadOf(next) }).eq('id', next.id).eq('workspace_id', next.workspaceId).select().single()
   if (error) throw error
   return fromRow(data as Record<string, unknown>)
@@ -154,7 +154,7 @@ export async function saveOperationsClient(record: OperationsClient): Promise<Op
 
 export async function uploadOperationsDocument(record: OperationsClient, key: OperationsDocumentKey, file: File): Promise<OperationsClient> {
   if (getDataModeConfig().mode !== 'supabase') throw new Error('파일 보관은 Supabase 클라우드 저장을 연결한 뒤 사용할 수 있습니다.')
-  if (!record.workspaceId) throw new Error('선택된 워크스페이스가 없습니다.')
+  if (!record.workspaceId) throw new Error('선택된 작업공간이 없습니다.')
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
   const path = `${record.workspaceId}/${record.id}/${key}/${generateId()}-${safeName}`
   const { error } = await getSupabaseClient().storage.from('client-documents').upload(path, file, { contentType: file.type || undefined })

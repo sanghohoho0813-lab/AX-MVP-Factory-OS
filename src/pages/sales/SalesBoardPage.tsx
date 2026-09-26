@@ -81,7 +81,7 @@ function SalesCard({ record, today, onOpen, onMove }: { record: ClientOpsRecord;
   return (
     <li data-testid="sales-card" className="relative flex flex-col gap-1.5 overflow-hidden rounded-(--radius-control) border border-slate-200 bg-white p-3">
       {stale && <span aria-hidden="true" className="absolute inset-y-0 left-0 w-[3px] bg-warning-500" />}
-      <button type="button" onClick={onOpen} className="flex min-w-0 items-center gap-1 text-left">
+      <button type="button" onClick={onOpen} className="tap flex min-w-0 items-center gap-1 text-left">
         <span className="t-body min-w-0 truncate font-bold text-slate-900 hover:text-brand-700 hover:underline">{record.companyName || '(이름 없음)'}</span>
         <ChevronRight aria-hidden="true" className="size-3.5 shrink-0 text-slate-400" />
       </button>
@@ -98,21 +98,18 @@ function SalesCard({ record, today, onOpen, onMove }: { record: ClientOpsRecord;
           <span className={overdue ? 'font-semibold text-danger-700' : ''}>다음 {record.nextActionDueDate.slice(5).replace('-', '.')}</span>
         )}
       </p>
-      <div className="flex items-center gap-1.5">
-        <div className="min-w-0 flex-1">
-          <StageSelect record={record} onMove={onMove} />
-        </div>
-        {!QUIET_STAGES.includes(stage) && (
-          <Link
-            to={`/sales/meeting?client=${record.id}`}
-            aria-label={`${record.companyName} 미팅 준비`}
-            title="미팅 준비"
-            className="tap flex size-8 shrink-0 items-center justify-center rounded-(--radius-control) border border-slate-200 text-slate-500 hover:border-brand-300 hover:text-brand-700"
-          >
-            <Presentation aria-hidden="true" className="size-4" />
-          </Link>
-        )}
-      </div>
+      <StageSelect record={record} onMove={onMove} />
+      {/* D-122: 아이콘만 두지 않는다 — '미팅 준비' 글자로 */}
+      {!QUIET_STAGES.includes(stage) && (
+        <Link
+          to={`/sales/meeting?client=${record.id}`}
+          aria-label={`${record.companyName} 미팅 준비`}
+          className="tap t-meta inline-flex items-center gap-1 self-start rounded-(--radius-control) px-1 font-semibold text-brand-700 hover:underline"
+        >
+          <Presentation aria-hidden="true" className="size-3.5" />
+          미팅 준비
+        </Link>
+      )}
     </li>
   )
 }
@@ -198,7 +195,7 @@ function NewProspectModal({ open, busy, onClose, onSubmit }: { open: boolean; bu
                 type="button"
                 aria-pressed={on}
                 onClick={() => set('interests', on ? f.interests.filter((v) => v !== x) : [...f.interests, x])}
-                className={`t-meta rounded-full border px-2.5 py-1 font-medium ${on ? 'border-brand-400 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                className={`tap t-meta rounded-full border px-2.5 py-1 font-medium ${on ? 'border-brand-400 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
               >
                 {x}
               </button>
@@ -291,10 +288,23 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
       try {
         const saved = await saveClient(next)
         setRecords((list) => list.map((r) => (r.id === saved.id ? saved : r)))
+        // D-122: 작은 고르는 칸이라 휴대폰에서 잘못 스치기 쉽다 — 옮긴 뒤 8초 동안 '되돌리기'
+        const undo = async () => {
+          setRecords((list) => list.map((r) => (r.id === record.id ? record : r)))
+          try {
+            const back = await saveClient(record)
+            setRecords((list) => list.map((r) => (r.id === back.id ? back : r)))
+            showToast(`${record.companyName} — ${SALES_STAGE_LABEL[salesStageOf(record)]}(으)로 되돌렸습니다.`)
+          } catch (e) {
+            showToast(e instanceof Error ? e.message : '되돌리지 못했습니다.')
+            void load()
+          }
+        }
         showToast(
           stage === 'contracted' && record.status === 'waiting'
             ? `${record.companyName} — 계약 완료. 고객 관리에서 계약 고객으로 넘어갔습니다.`
             : `${record.companyName} — ${SALES_STAGE_LABEL[stage]}`,
+          { label: '되돌리기', onClick: () => void undo() },
         )
       } catch (cause) {
         showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')

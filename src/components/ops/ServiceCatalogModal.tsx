@@ -96,7 +96,7 @@ export function ServiceCatalogModal({
           <h2 className="text-[1.3rem] font-bold text-slate-900">업무 항목 관리</h2>
           <button
             type="button"
-            className="text-[0.95rem] text-slate-500 hover:text-slate-800"
+            className="tap text-[0.95rem] text-slate-500 hover:text-slate-800"
             onClick={onClose}
           >
             닫기
@@ -143,7 +143,7 @@ export function ServiceCatalogModal({
                   <button
                     type="button"
                     onClick={() => void toggleArchive(c)}
-                    className="flex shrink-0 items-center gap-1 rounded-(--radius-control) border border-slate-200 px-2.5 py-1.5 text-[0.88rem] font-medium text-slate-600 hover:bg-slate-50"
+                    className="tap flex shrink-0 items-center gap-1 rounded-(--radius-control) border border-slate-200 px-2.5 py-1.5 text-[0.88rem] font-medium text-slate-600 hover:bg-slate-50"
                   >
                     <Archive aria-hidden="true" className="size-3.5" />
                     내리기
@@ -167,7 +167,7 @@ export function ServiceCatalogModal({
                   <button
                     type="button"
                     onClick={() => void toggleArchive(c)}
-                    className="flex shrink-0 items-center gap-1 rounded-(--radius-control) border border-slate-200 bg-white px-2.5 py-1.5 text-[0.88rem] font-medium text-slate-600 hover:bg-slate-100"
+                    className="tap flex shrink-0 items-center gap-1 rounded-(--radius-control) border border-slate-200 bg-white px-2.5 py-1.5 text-[0.88rem] font-medium text-slate-600 hover:bg-slate-100"
                   >
                     <RotateCcw aria-hidden="true" className="size-3.5" />
                     되살리기
@@ -209,7 +209,7 @@ export function ServiceCatalogModal({
                     type="button"
                     aria-pressed={accent === a.key}
                     onClick={() => setAccent(a.key)}
-                    className={`rounded-full border px-2.5 py-1 text-[0.88rem] font-medium ${ACCENT_CLASS[a.key].chip} ${
+                    className={`tap rounded-full border px-2.5 py-1 text-[0.88rem] font-medium ${ACCENT_CLASS[a.key].chip} ${
                       accent === a.key ? 'ring-2 ring-brand-400' : ''
                     }`}
                   >

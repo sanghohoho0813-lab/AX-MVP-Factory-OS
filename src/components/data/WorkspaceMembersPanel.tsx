@@ -139,7 +139,7 @@ export function WorkspaceMembersPanel() {
                     type="button"
                     aria-label="구성원 제거"
                     onClick={() => setConfirmRemove(m)}
-                    className="flex size-8 cursor-pointer items-center justify-center rounded-(--radius-control) text-slate-400 hover:bg-danger-50 hover:text-danger-600"
+                    className="tap flex size-8 cursor-pointer items-center justify-center rounded-(--radius-control) text-slate-400 hover:bg-danger-50 hover:text-danger-600"
                   >
                     <Trash2 aria-hidden="true" className="size-4" />
                   </button>
@@ -199,7 +199,7 @@ export function WorkspaceMembersPanel() {
                     void navigator.clipboard?.writeText(issuedToken)
                     showToast('초대 코드를 복사했습니다.')
                   }}
-                  className="flex h-8 cursor-pointer items-center gap-1 rounded-(--radius-control) border border-slate-300 px-2 text-[0.875rem] text-slate-600 hover:bg-slate-50"
+                  className="tap flex h-8 cursor-pointer items-center gap-1 rounded-(--radius-control) border border-slate-300 px-2 text-[0.875rem] text-slate-600 hover:bg-slate-50"
                 >
                   <Copy aria-hidden="true" className="size-3.5" /> 복사
                 </button>
@@ -214,7 +214,7 @@ export function WorkspaceMembersPanel() {
       <ConfirmModal
         open={confirmRemove !== null}
         title="구성원 제거"
-        message={`${confirmRemove?.displayName ?? confirmRemove?.email ?? ''} 님을 이 워크스페이스에서 제거할까요?`}
+        message={`${confirmRemove?.displayName ?? confirmRemove?.email ?? ''} 님을 이 작업공간에서 제거할까요?`}
         confirmLabel="제거"
         danger
         busy={busy}

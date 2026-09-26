@@ -131,11 +131,14 @@ function EntryRow({ e }: { e: Entry }) {
   )
 }
 
+const LIB_FIRST = 12
+
 function LibraryContent({ workspaceId }: { workspaceId: string | null }) {
   const today = todayLocalDate()
   const entries = useMemo(buildEntries, [])
   const [source, setSource] = useState<Source>('all')
   const [q, setQ] = useState('')
+  const [showAll, setShowAll] = useState(false)
   const [records, setRecords] = useState<ClientOpsRecord[]>([])
   useEffect(() => {
     let alive = true
@@ -156,8 +159,9 @@ function LibraryContent({ workspaceId }: { workspaceId: string | null }) {
 
       <Surface className="flex flex-col gap-3">
         <h2 className="t-section text-slate-900">주제별 — 지금 연락할 고객</h2>
+        {/* D-122: 연락할 곳이 있는 주제만 칸으로 — 없는 주제는 한 줄에 모은다(휴대폰에서 8칸이 화면 두 장이었다) */}
         <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4" data-testid="topic-list">
-          {topics.map(({ t, list: cs }, ti) => (
+          {topics.map(({ t, list: cs }, ti) => cs.length === 0 ? null : (
             <li key={t.key} className="relative flex flex-col gap-1 overflow-hidden rounded-(--radius-control) border border-slate-200 bg-slate-50 p-3 pl-4">
               <span aria-hidden="true" className="ramp-bar absolute inset-y-0 left-0 w-[3px]" style={rampAt(ti, topics.length)} />
               <span className="flex items-baseline justify-between gap-2">
@@ -179,7 +183,12 @@ function LibraryContent({ workspaceId }: { workspaceId: string | null }) {
             </li>
           ))}
         </ul>
-        <p className="t-meta break-keep text-slate-400">관심사 · 고민 · 메모 · 업종 낱말로 고르는 규칙 계산입니다(원본 기준). 이름을 누르면 미팅 준비로 갑니다.</p>
+        {topics.some(({ list: cs }) => cs.length === 0) && (
+          <p className="t-sub break-keep text-slate-500" data-testid="topic-empty">
+            지금 연락할 곳이 없는 주제 · {topics.filter(({ list: cs }) => cs.length === 0).map(({ t }) => t.name).join(' · ')}
+          </p>
+        )}
+        <p className="t-meta break-keep text-slate-500">관심사 · 고민 · 메모 · 업종 낱말로 고르는 규칙 계산입니다(원본 기준). 이름을 누르면 미팅 준비로 갑니다.</p>
       </Surface>
 
       <div className="flex flex-col gap-3">
@@ -197,8 +206,14 @@ function LibraryContent({ workspaceId }: { workspaceId: string | null }) {
         </div>
         <p className="t-sub text-slate-500" data-testid="library-count">{list.length}개</p>
         <ul className="grid gap-2 lg:grid-cols-2" data-testid="library-list">
-          {list.map((e) => <EntryRow key={e.id} e={e} />)}
+          {(showAll ? list : list.slice(0, LIB_FIRST)).map((e) => <EntryRow key={e.id} e={e} />)}
         </ul>
+        {/* D-122: 76개를 한 번에 늘어놓지 않는다 — 찾기 · 종류로 좁히거나 더 보기 */}
+        {list.length > LIB_FIRST && (
+          <button type="button" data-testid="library-more" onClick={() => setShowAll((v) => !v)} className="tap t-sub self-start rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50">
+            {showAll ? '접기' : `${list.length - LIB_FIRST}개 더 보기`}
+          </button>
+        )}
       </div>
     </div>
   )

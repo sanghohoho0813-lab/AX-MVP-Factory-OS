@@ -24,7 +24,7 @@ export function ScreenGuide({ screenKey }: { screenKey: string }) {
         <button
           type="button"
           onClick={() => setHelpOpen(true)}
-          className="inline-flex h-9 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 text-[0.92rem] font-medium text-slate-600 hover:border-slate-300 hover:text-slate-900"
+          className="tap inline-flex h-9 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 text-[0.92rem] font-medium text-slate-600 hover:border-slate-300 hover:text-slate-900"
         >
           <BookOpen aria-hidden="true" className="size-4 text-slate-400" />
           이 화면 사용법
@@ -34,7 +34,7 @@ export function ScreenGuide({ screenKey }: { screenKey: string }) {
         <button
           type="button"
           onClick={() => setTourOn(true)}
-          className="inline-flex h-9 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 text-[0.92rem] font-medium text-slate-600 hover:border-slate-300 hover:text-slate-900"
+          className="tap inline-flex h-9 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 text-[0.92rem] font-medium text-slate-600 hover:border-slate-300 hover:text-slate-900"
         >
           <Footprints aria-hidden="true" className="size-4 text-slate-400" />
           이 화면 따라 해보기
@@ -90,7 +90,7 @@ function HelpPanel({ screenKey, onClose }: { screenKey: string; onClose: () => v
             type="button"
             aria-label="닫기"
             onClick={onClose}
-            className="flex size-8 items-center justify-center rounded-(--radius-control) text-slate-400 hover:bg-slate-100"
+            className="tap flex size-8 items-center justify-center rounded-(--radius-control) text-slate-400 hover:bg-slate-100"
           >
             <X aria-hidden="true" className="size-4" />
           </button>
@@ -280,7 +280,7 @@ function TourOverlay({ tour, onEnd }: { tour: ScreenTour; onEnd: () => void }) {
           <button
             type="button"
             onClick={end}
-            className="rounded-(--radius-control) px-2.5 py-1.5 text-[0.92rem] font-medium text-slate-500 hover:bg-slate-100"
+            className="tap rounded-(--radius-control) px-2.5 py-1.5 text-[0.92rem] font-medium text-slate-500 hover:bg-slate-100"
           >
             그만 보기
           </button>
@@ -289,7 +289,7 @@ function TourOverlay({ tour, onEnd }: { tour: ScreenTour; onEnd: () => void }) {
               type="button"
               onClick={prev}
               disabled={isFirst}
-              className="inline-flex h-9 items-center gap-1 rounded-(--radius-control) border border-slate-200 px-2.5 text-[0.92rem] font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+              className="tap inline-flex h-9 items-center gap-1 rounded-(--radius-control) border border-slate-200 px-2.5 text-[0.92rem] font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
             >
               <ChevronLeft aria-hidden="true" className="size-4" />
               이전
@@ -297,7 +297,7 @@ function TourOverlay({ tour, onEnd }: { tour: ScreenTour; onEnd: () => void }) {
             <button
               type="button"
               onClick={() => (isLast ? end() : next())}
-              className="inline-flex h-9 items-center gap-1 rounded-(--radius-control) bg-brand-600 px-3 text-[0.92rem] font-semibold text-white hover:bg-brand-700"
+              className="tap inline-flex h-9 items-center gap-1 rounded-(--radius-control) bg-brand-600 px-3 text-[0.92rem] font-semibold text-white hover:bg-brand-700"
             >
               {isLast ? '마치기' : '다음'}
               {!isLast && <ChevronRight aria-hidden="true" className="size-4" />}
