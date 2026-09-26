@@ -44,3 +44,8 @@
 ## core 개선을 양쪽에 반영하는 법
 - core 파일(§PORTABILITY 2)만 바꾼 커밋은 두 저장소에 cherry-pick 한다. 교체 지점 파일을 건드린 커밋은 cherry-pick 하지 않는다.
 - 두 저장소가 갈라지는 것을 막으려면 core 를 npm 패키지로 빼는 것이 다음 단계 — 두 번째 SaaS 가 확정될 때 결정한다(DECISIONS D-15).
+
+## 크레탑 분석기 단독 판매 (D-121)
+
+- 떼어 갈 것: `src/tools/cretop/{mini,engine,lib}` + `src/services/taxCalc`(주식가치) + `src/tools/shared/brandHex`(색). 이 밖의 OS 코드를 부르지 않는다 — `miraeOs.test.ts` 'D-121 크레탑 본체 경계' 가 import 를 읽어 지킨다.
+- 붙이는 자리: `CretopMiniApp` 의 `history` · `onSaved` · `onDelete`(분석 이력 저장소) · `extraInput`(보고서 가져오기) · `resultBar`(결과 막대 단추) · `initialUi` · `embedded`. 이 OS 에서는 `CretopWorkbench` 가 이것을 모듈 기록 · 서류함 · 업체 기록에 잇는다 — 단독 제품은 이 파일 대신 자기 저장소를 잇는 얇은 연결부를 쓴다.
