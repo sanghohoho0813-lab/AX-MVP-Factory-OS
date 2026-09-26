@@ -35,7 +35,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('메뉴: 가끔 쓰는 것 묶음이 없다 (D-104)', at('가끔 쓰는 것') === -1)
   check('메뉴: 특허+벤처 · 자금·지원사업이 컨설팅 작업실 안 (작업실 전체보다 위)', at('특허+벤처') > at('정책자금 진단') && at('자금·지원사업') > at('특허+벤처') && at('작업실 전체') > at('자금·지원사업'), navText.slice(0, 700))
   check('메뉴: 세금 계산기가 사이드바에 있다', at('세금 계산기') > 0)
-  check('메뉴: AX STUDIO 는 그 아래', at('AX STUDIO') > at('작업실 전체'))
+  // D-120: 'AX STUDIO' → 'AX 스튜디오'(쉬운 말)
+  check('메뉴: AX 스튜디오 는 그 아래', at('AX 스튜디오') > at('작업실 전체'))
   check('메뉴: 설정이 맨 아래', at('설정') > at('이 시스템'))
   check('메뉴: 기록 셋은 사이드바에 따로 없다 (일정 안 탭, D-103)', !['오늘 기록', '주간 돌아보기', '전체 기록'].some((t) => navText.includes(t)))
 
@@ -192,12 +193,13 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByRole('button', { name: '메뉴 열기' }).click()
   await page.waitForTimeout(500)
   const drawer = (await page.getByRole('navigation', { name: '주 메뉴' }).innerText()) ?? ''
-  check('휴대폰 서랍: 같은 순서', drawer.indexOf('컨설팅 작업실') > drawer.indexOf('고객 관리') && drawer.indexOf('AX STUDIO') > drawer.indexOf('컨설팅 작업실'), drawer.slice(0, 260))
+  check('휴대폰 서랍: 같은 순서', drawer.indexOf('컨설팅 작업실') > drawer.indexOf('고객 관리') && drawer.indexOf('AX 스튜디오') > drawer.indexOf('컨설팅 작업실'), drawer.slice(0, 260))
   const logoH = await page.locator('img[alt]:visible').first().evaluate((el) => el.getBoundingClientRect().height)
   check('휴대폰 서랍: 로고도 48px', Math.round(logoH) === 48, String(logoH))
-  // D-103: 예전 '이 기기 · 계정' 칸(고객 플랫폼 열기 · 처음 사용 가이드 · 글자 크기) 없음 — 아래는 이름 한 줄 + 아이콘
+  // D-103: 예전 '이 기기 · 계정' 칸(고객 플랫폼 열기 · 처음 사용 가이드) 없음 — 아래는 이름 한 줄 + 아이콘
+  // D-120: 글자 크기만 서랍으로 되돌렸다 — 휴대폰 머리줄에 자리가 없고, 50~60대가 설정까지 찾아가지 않는다
   const whole = (await page.locator('.fixed.inset-0.z-50').first().innerText()) ?? ''
-  check('휴대폰 서랍: 이 기기 · 계정 칸 · 글자 크기가 없다', !whole.includes('이 기기') && !whole.includes('글자 크기') && !whole.includes('고객 플랫폼 열기'), whole.slice(-200))
+  check('휴대폰 서랍: 이 기기 · 계정 칸 없음 · 글자 크기는 있다(D-120)', !whole.includes('이 기기') && whole.includes('글자 크기') && !whole.includes('고객 플랫폼 열기'), whole.slice(-200))
   check('휴대폰 서랍: 아래에 김상호 대표', whole.replace(/\s+/g, ' ').includes('김상호 대표'))
   await page.keyboard.press('Escape').catch(() => {})
   await page.goto(BASE + '/journal', { waitUntil: 'networkidle' })

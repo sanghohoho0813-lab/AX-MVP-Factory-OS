@@ -501,8 +501,10 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   await page.keyboard.press('Escape')
   await page.waitForTimeout(300)
   check('하단 목차: 고객 옆 고객사 수 = 서랍 메뉴 숫자', /^\d+$/.test(drawerClients) && (await clientBadge.innerText()).trim() === drawerClients, `${await clientBadge.innerText()} vs ${drawerClients}`)
+  // D-120: 11px 아래로 두지 않는다(50~60대) — 대신 이름보다 작게
   const fs = await clientBadge.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
-  check('하단 목차: 고객사 수 글자는 이름보다 작다', fs < 11, String(fs))
+  const nameFs = await clientBadge.evaluate((el) => parseFloat(getComputedStyle(el.previousElementSibling).fontSize))
+  check('하단 목차: 고객사 수 글자는 이름보다 작다(11px 이상)', fs < nameFs && fs >= 11, `${fs} / 이름 ${nameFs}`)
   const req = bar.locator('[data-nav-badge="requests"]')
   const n = Number((await req.innerText()).trim())
   check('하단 목차: 상담신청 빨간 숫자', n > 0 && (await req.evaluate((el) => getComputedStyle(el).backgroundColor)) !== 'rgba(0, 0, 0, 0)')

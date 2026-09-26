@@ -503,7 +503,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(500)
   await page.keyboard.press('Control+k')
   await page.waitForTimeout(300)
-  await page.getByPlaceholder(/검색/).fill('부채비율')
+  await page.getByPlaceholder('업체 이름 · 대표 · 전화번호 뒷자리 · 도구').fill('부채비율')
   await page.waitForTimeout(400)
   check('검색: 부채비율 → 크레탑 분석기', (await page.locator('body').innerText()).includes('크레탑 분석기'))
   await page.keyboard.press('Escape')
