@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Inbox, RefreshCw, Sparkles } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { ScreenTitle } from '../components/ui/primitives'
@@ -52,6 +52,7 @@ function isNotReadyError(cause: unknown): boolean {
  */
 function InboxContent({ workspaceId }: { workspaceId: string | null }) {
   const { showToast } = useToast()
+  const navigate = useNavigate()
   const isLocal = getDataModeConfig().mode === 'local'
   const [events, setEvents] = useState<CustomerEvent[]>([])
   const [clients, setClients] = useState<ClientOpsRecord[]>([])
@@ -326,7 +327,9 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
           onDone={(updated, link) => {
             setLinking(null)
             setEvents((list) => list.map((e) => (e.id === updated.id ? updated : e)))
-            showToast(link ? '업체와 고객 계정을 연결했습니다.' : '업체에 연결했습니다.')
+            // D-122: 다음 걸음 — 미팅 준비(1차 = 크레탑 분석기)로 바로
+            const cid = updated.operationsClientId
+            showToast(link ? '업체와 고객 계정을 연결했습니다.' : '업체에 연결했습니다.', cid ? { label: '미팅 준비 →', onClick: () => navigate(`/sales/meeting?client=${cid}&round=1`) } : undefined)
             void load()
           }}
         />

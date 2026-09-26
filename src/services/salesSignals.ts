@@ -38,6 +38,16 @@ export interface SalesRisk {
   action: string
 }
 
+/**
+ * 할 일에 맞는 화면 (D-122) — 예전에는 무엇이든 미팅 준비로 갔다.
+ * 견적 · 제안 → 상품·제안, 다음 할 일 정하기 → 업체 상세(다음 약속), 연락 · 미팅 → 미팅 준비.
+ */
+export function salesActionPath(action: string, clientId: string): string {
+  if (/견적|업무범위|제안서|검토 상황/.test(action)) return `/sales/proposal?client=${clientId}`
+  if (/다음 할 일 정하기/.test(action)) return `/ops/clients/${clientId}`
+  return `/sales/meeting?client=${clientId}`
+}
+
 /** 영업 위험 신호 — 계약 완료 · 이탈 · 보관은 빼고, 최대 10곳 */
 export function salesRisks(records: ClientOpsRecord[], today: string, now: Date = new Date()): SalesRisk[] {
   const out: SalesRisk[] = []

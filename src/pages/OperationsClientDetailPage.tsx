@@ -118,8 +118,12 @@ import { ActivityLog } from '../components/ops/ActivityLog'
 import { ClientSalesCard } from '../components/sales/ClientSalesCard'
 import { SalesJourneyCard } from '../components/sales/SalesJourneyCard'
 import { withSalesPath } from '../services/salesJourney'
+import { salesStageOf, withSalesStage } from '../services/salesPipeline'
+import { addDaysLocal } from '../services/clientOpsNextAction'
 import { ContractCard } from '../components/ops/ContractCard'
 import { InlineConfirm } from '../components/ui/InlineConfirm'
+import { ContractCloseSheet } from '../components/sales/ContractCloseSheet'
+import { contractCloseDraft, withContractClose, type ContractCloseDraft } from '../services/salesContract'
 import { ScrollHintRow } from '../components/ui/ScrollHintRow'
 import { WorkHistoryCard } from '../components/ops/WorkHistoryCard'
 import { ToolResultsCard } from '../components/ops/ToolResultsCard'
@@ -299,18 +303,37 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   /** 지금 화면의 가장 새 기록 — 기다린 뒤(파일 올리기 등) 이것에 얹어 저장한다 */
   const current = useCallback((): ClientOpsRecord | null => latestRef.current ?? record, [record])
 
-  /** 계약 단계 변경 — 인라인 select 와 더보기 시트가 함께 쓴다 */
-  const changeStage = (stage: ContractStage) => {
+  /** D-122: 계약 완료 확인 시트 — 영업 카드 · 계약 단계에서 '계약 완료' 를 고르면 */
+  const [closing, setClosing] = useState<ContractCloseDraft | null>(null)
+  const [allRecords, setAllRecords] = useState<ClientOpsRecord[]>([])
+  const openClose = () => {
+    if (!record) return
+    setClosing(contractCloseDraft(record, { today, records: allRecords.length > 0 ? allRecords : [record] }))
+    void listClients(workspaceId).then(setAllRecords).catch(() => undefined)
+  }
+
+  /**
+   * 계약 단계 변경 — 인라인 select 와 더보기 시트가 함께 쓴다.
+   * D-122: 영업 단계도 함께 맞춘다. 예전에는 여기서 계약 완료로 바꿔도 영업 보드에는 3차 클로징으로 남아
+   * 같은 업체가 계약 고객이면서 '진행 중' 으로 세였다. 계약 전으로 되돌리면 영업은 클로징으로.
+   */
+  const changeStage = (stage: ContractStage, direct = false) => {
     if (!record) return
     const before = contractStageOf(record.status)
     if (before === stage) return
-    void commit(
-      withActivity(
-        { ...record, status: statusForStage(stage) },
-        'profile',
-        `계약 단계 · ${CONTRACT_STAGE_LABEL[before]} → ${CONTRACT_STAGE_LABEL[stage]}`,
-      ),
+    if (stage === 'signed' && before === 'pre' && !direct) {
+      openClose()
+      return
+    }
+    let next = withActivity(
+      { ...record, status: statusForStage(stage) },
+      'profile',
+      `계약 단계 · ${CONTRACT_STAGE_LABEL[before]} → ${CONTRACT_STAGE_LABEL[stage]}`,
     )
+    const sales = salesStageOf(next)
+    if (stage !== 'pre' && sales !== 'contracted' && record.sales) next = withSalesStage(next, 'contracted')
+    if (stage === 'pre' && record.sales?.stage === 'contracted') next = withSalesStage(next, 'closing')
+    void commit(next)
   }
 
   const alerts = useMemo(() => (record ? buildClientAlerts(record, today) : []), [record, today])
@@ -726,12 +749,17 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       {/* D-119: 영업 흐름 — 1차 준비 → 1·2·3차 → 계약 → 계약 뒤 추가 제안, 걸음마다 할 일 · 작업실 도구 */}
       <SalesJourneyCard record={record} today={today} compact foldable onPathChange={(path) => void commit(withSalesPath(record, path))} />
 
-      <ClientSalesCard record={record} onSave={(next) => void commit(next)} />
+      <ClientSalesCard record={record} onSave={(next) => void commit(next)} onContract={openClose} />
 
       <ContractCard
         record={record}
         today={today}
         onSave={(next) => commit(withContract(record, next))}
+        onAddFee={(amount) =>
+          void commit(withNewFee(record, { kind: 'interim', label: '계약 잔금', amount, dueDate: addDaysLocal(today, 7) })).then((ok) => {
+            if (ok) showToast('차이만큼 수금 항목(계약 잔금 · 7일 뒤)을 넣었습니다. 수금 탭에서 고칠 수 있습니다.')
+          })
+        }
       />
 
       <WorkHistoryCard record={record} onOpen={(key) => setTab('work', key)} />
@@ -1329,7 +1357,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
       {tab === 'fees' && <FeesSection record={record} onChange={commit} today={today} />}
 
-      {tab === 'portal' && <PortalTab record={record} workspaceId={workspaceId} />}
+      {tab === 'portal' && <PortalTab record={record} workspaceId={workspaceId} onRecordChange={commit} />}
 
       {tab === 'journal' && (
         <>
@@ -1614,6 +1642,23 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             void commit(withActivity(next, 'profile', `서류에서 기업 정보 ${filled}개 항목 반영`))
             setImportOpen(false)
             showToast('서류에서 읽은 정보를 반영했습니다.')
+          }}
+        />
+      )}
+
+      {closing && (
+        <ContractCloseSheet
+          record={record}
+          draft={closing}
+          onClose={() => setClosing(null)}
+          onSubmit={async (d) => {
+            const ok = await commit(withContractClose(record, d))
+            if (ok) showToast(`${record.companyName} — 계약 완료. 수금 항목 · 계약 정보를 넣었습니다.`)
+            return ok
+          }}
+          onStageOnly={async () => {
+            changeStage('signed', true)
+            return true
           }}
         />
       )}

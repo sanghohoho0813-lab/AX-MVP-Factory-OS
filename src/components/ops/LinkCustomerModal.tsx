@@ -6,6 +6,8 @@ import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { createClient, saveClient } from '../../services/clientOpsService'
 import { withNewProspect } from '../../services/salesPipeline'
+import { withInboxPayload } from '../../services/inboxToSales'
+import { todayLocalDate } from '../../lib/appClock'
 import { withActivity } from '../../services/clientOpsActivity'
 import { createLink, findProfileByEmail, listLinksForClient, updateEvent } from '../../services/customerBridgeService'
 import { normalizeQuery } from '../../lib/format'
@@ -153,7 +155,8 @@ export function LinkCustomerModal({
       const saved =
         savedRef.current ??
         (await saveClient(
-        withNewProspect(
+        // D-122: 고객이 적어 보낸 문의 · 진행 방식 · 희망 연락 시간도 영업 칸으로
+        withInboxPayload(withNewProspect(
           withActivity(
             { ...created, contactEmail: form.contactEmail.trim() },
             'profile',
@@ -161,7 +164,9 @@ export function LinkCustomerModal({
           ),
           '홈페이지 상담신청',
         ),
-      ))
+        event.payload,
+        todayLocalDate(),
+      )))
       savedRef.current = saved
       await finish(saved)
     } catch (cause) {

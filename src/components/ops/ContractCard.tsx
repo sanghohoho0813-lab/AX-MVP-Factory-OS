@@ -20,6 +20,7 @@ import {
   type InsurancePolicy,
 } from '../../types/clientOps'
 import { monthlyPremiumTotal, summarizeContract } from '../../services/contractSummary'
+import { contractGap } from '../../services/salesContract'
 import { formatKrw, wonOf } from '../../lib/format'
 import { BottomSheet } from '../ui/primitives'
 import { Button } from '../ui/Button'
@@ -58,16 +59,20 @@ export function ContractCard({
   record,
   today,
   onSave,
+  onAddFee,
 }: {
   record: ClientOpsRecord
   today: string
   onSave: (next: ContractInfo) => void | boolean | Promise<boolean | void>
+  /** D-122: 계약 금액이 수금 항목보다 크면 '차이만큼 수금 항목 추가' */
+  onAddFee?: (amount: number) => void
 }) {
   const [editing, setEditing] = useState(false)
   const [open, setOpen] = useState(false)
   const c = record.contract
   const s = summarizeContract(c, today)
   const premium = monthlyPremiumTotal(c)
+  const gap = contractGap(record)
 
   return (
     <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5">
@@ -106,6 +111,19 @@ export function ContractCard({
           {/* 얼마에 */}
           {s.moneyText !== '' && <p className="t-body mt-2 font-semibold text-slate-800">{s.moneyText}</p>}
           {c.note.trim() !== '' && <p className="t-sub mt-1 break-keep text-slate-600">{c.note}</p>}
+          {gap && (
+            <div data-testid="contract-gap" className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2">
+              <span className="t-sub break-keep text-slate-800">
+                계약 현금 {formatKrw(gap.cash)} · 수금 항목 {formatKrw(gap.fees)} ·{' '}
+                <strong className="font-semibold text-warning-800">{gap.gap > 0 ? `${formatKrw(gap.gap)} 덜 적힘` : `${formatKrw(-gap.gap)} 더 적힘`}</strong>
+              </span>
+              {gap.gap > 0 && onAddFee && (
+                <Button variant="secondary" size="sm" onClick={() => onAddFee(gap.gap)}>
+                  차이만큼 수금 항목 추가
+                </Button>
+              )}
+            </div>
+          )}
 
           {/* 자세한 것은 눌러야 나온다 */}
           {c.policies.length > 0 && (

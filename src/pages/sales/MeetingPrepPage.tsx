@@ -37,10 +37,12 @@ import { withSalesPath } from '../../services/salesJourney'
 import { listClients, saveClient } from '../../services/clientOpsService'
 import { salesStageOf, withSalesStage } from '../../services/salesPipeline'
 import {
+  missingDocSlots,
   profileFromMemo,
   roundForStage,
   stageAfterMeeting,
   toEngineItem,
+  withDocSlots,
   withMeetingNote,
   withSalesProfile,
 } from '../../services/salesMeeting'
@@ -249,18 +251,22 @@ function MeetingRecorder({ record, round, today, onSave }: { record: ClientOpsRe
   const [next, setNext] = useState('')
   const [due, setDue] = useState(addDays(today, 3))
 
+  /** D-122: 받기로 한 자료 가운데 서류함에 칸을 만들 것(기본 전부) */
+  const [slots, setSlots] = useState<string[]>([])
   const analyze = () => {
     const a = analyzeTranscript(text)
     setResult(a)
+    setSlots(missingDocSlots(record, a.nextDocs))
     const docs = a.nextDocs.slice(0, 3).join(' · ')
     setNext(round === 3 ? '계약 조건 회신 확인' : `${round + 1}차 미팅 준비${docs ? ` — 자료 받기: ${docs}` : ''}`)
   }
   const save = async () => {
     if (!result || saving) return
     let rec = withMeetingNote(record, { round, text, analysis: result, nextAction: next, nextActionDueDate: due })
+    if (slots.length > 0) rec = withDocSlots(rec, slots)
     if (canMove && move) rec = withSalesStage(rec, target)
     setSaving(true)
-    const ok = await onSave(rec, `${round}차 미팅을 기록했습니다${canMove && move ? ` · ${SALES_STAGE_LABEL[target]}로 옮김` : ''}.`)
+    const ok = await onSave(rec, `${round}차 미팅을 기록했습니다${canMove && move ? ` · ${SALES_STAGE_LABEL[target]}로 옮김` : ''}${slots.length > 0 ? ` · 서류함에 칸 ${slots.length}개` : ''}.`)
     setSaving(false)
     // D-120: 저장이 된 뒤에만 비운다 — 실패하면 적은 메모가 그대로 남는다
     if (ok) {
@@ -315,6 +321,24 @@ function MeetingRecorder({ record, round, today, onSave }: { record: ClientOpsRe
           <ScriptBlock title="다음 미팅 방향" text={result.strategy} />
           <ScriptBlock title="감사 카톡" text={result.kakao} copy />
           {result.nextDocs.length > 0 && <ScriptBlock title="자료 요청 카톡" text={docRequestText(record, result.nextDocs)} copy />}
+          {missingDocSlots(record, result.nextDocs).length > 0 && (
+            <fieldset data-testid="meeting-doc-slots" className="rounded-(--radius-control) border border-slate-200 bg-white p-3">
+              <legend className="t-sub px-1 font-semibold text-slate-700">서류함에 칸 만들기 — 받았는지 챙기게</legend>
+              <div className="flex flex-col gap-1.5">
+                {missingDocSlots(record, result.nextDocs).map((d) => (
+                  <label key={d} className="t-sub flex items-center gap-2 text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={slots.includes(d)}
+                      onChange={(e) => setSlots((cur) => (e.target.checked ? [...cur, d] : cur.filter((x) => x !== d)))}
+                      className="size-4 accent-brand-600"
+                    />
+                    {d}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem]">
             <label className="block text-[0.85rem] text-slate-500">
               다음 할 일

@@ -36,7 +36,16 @@ function draftOf(r: ClientOpsRecord): Draft {
   }
 }
 
-export function ClientSalesCard({ record, onSave }: { record: ClientOpsRecord; onSave: (next: ClientOpsRecord) => void }) {
+export function ClientSalesCard({
+  record,
+  onSave,
+  onContract,
+}: {
+  record: ClientOpsRecord
+  onSave: (next: ClientOpsRecord) => void
+  /** D-122: '계약 완료' 를 고르면 — 주면 확인 시트(수금 · 계약 정보 한 번에)를 연다 */
+  onContract?: () => void
+}) {
   const stage = salesStageOf(record)
   const prospect = isProspect(record)
   const [draft, setDraft] = useState<Draft>(() => draftOf(record))
@@ -83,7 +92,11 @@ export function ClientSalesCard({ record, onSave }: { record: ClientOpsRecord; o
               <select
                 value={stage}
                 aria-label="영업 단계"
-                onChange={(e) => onSave(withSalesStage(record, e.target.value as SalesStage))}
+                onChange={(e) => {
+                  const next = e.target.value as SalesStage
+                  if (next === 'contracted' && stage !== 'contracted' && onContract) onContract()
+                  else onSave(withSalesStage(record, next))
+                }}
                 className={`${inputClass} font-semibold`}
               >
                 {SALES_STAGE_ORDER.map((st) => (

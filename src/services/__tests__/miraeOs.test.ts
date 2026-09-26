@@ -78,7 +78,9 @@ import {
   scoreLead,
   scoreTier,
 } from '../salesEngine'
-import { engineIndustry, profileFromMemo, roundForStage, stageAfterMeeting, toEngineItem, withMeetingNote, withSalesProfile } from '../salesMeeting'
+import { engineIndustry, interestsFromIssues, missingDocSlots, profileFromMemo, roundForStage, stageAfterMeeting, toEngineItem, withDocSlots, withMeetingNote, withSalesProfile } from '../salesMeeting'
+import { PATH_TO_KIND, agentRateOf, contractCloseDraft, contractGap, withContractClose } from '../salesContract'
+import { withInboxPayload } from '../inboxToSales'
 import salesAppSource from '../../tools/salesKit/orig/SalesApp.jsx?raw'
 import cretopCompanyText from '../../../e2e/fixtures/cretop-company.txt?raw'
 import { analyzeCretopText } from '../../tools/cretop/mini/analysisCore.js'
@@ -103,7 +105,7 @@ import {
   matchPackages,
 } from '../salesProposal'
 import { CRETOP_WEAPONS, PROPOSAL_TOPICS, TAX_STRATEGIES } from '../salesLibrary'
-import { customersForTopic, lastSalesTouch, salesRecontacts, salesRisks } from '../salesSignals'
+import { customersForTopic, lastSalesTouch, salesActionPath, salesRecontacts, salesRisks } from '../salesSignals'
 import { buildVisitReport } from '../salesProposal'
 import { catalogWithPrices, cleanPrices, feeSum, toProposalItem, withContractFromProposal, withContractPrep, withProposal } from '../salesOffer'
 import { digitsOf, formatNumberOf, numberSegments } from '../../lib/format'
@@ -1710,6 +1712,45 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('수금 항목 삭제: 그 하나만 지운다', gone.fees.length === 1 && gone.fees[0].id !== target.id)
   check('수금 항목 삭제: 무엇을 얼마 · 입금일까지 활동 기록에 남긴다', gone.activity[0]?.text.includes('수금 항목 삭제') && gone.activity[0].text.includes('3,300,000원') && gone.activity[0].text.includes('입금 2026-09-20'), gone.activity[0]?.text)
   check('수금 항목 삭제: 없는 id 면 그대로', withoutFee(paid, 'nope').fees.length === 2)
+}
+
+/* ------------------------------------------------------------------ */
+/* D-122 흐름 잇기 — 계약 완료 한 번에 · 차이 · 미팅 → 관심사 · 서류 칸 · 상담신청 · 링크 */
+/* ------------------------------------------------------------------ */
+{
+  const at = '2026-09-26T03:00:00.000Z'
+  const lead = withSalesInfo(withNewProspect(normalizeClientOps({ id: 'c_close', companyName: '한번에상사', status: 'waiting' }), '소개', at), { referrer: '최영업', expectedFee: 5_000_000 }, at)
+  const past = normalizeClientOps({ id: 'c_past', companyName: '예전', fees: [{ id: 'f1', serviceKey: null, kind: 'deposit', label: 'x', amount: 10_000_000, agentFee: 1_000_000, agentName: '최영업', agentPaidAt: null, dueDate: '', receivedAt: null, note: '' }] })
+  check('계약 완료 초안: 영업자 = 소개한 사람 · 예전에 쓴 율(10%)', agentRateOf([past], '최영업') === 10 && contractCloseDraft(lead, { today: '2026-09-26', records: [past, lead] }).agentRatePct === 10)
+  const d0 = contractCloseDraft(lead, { today: '2026-09-26' })
+  check('계약 완료 초안: 계약일 오늘 · 받을 날 7일 뒤 · 예상 수임료 한 줄', d0.signedAt === '2026-09-26' && d0.dueDate === '2026-10-03' && d0.lines.length === 1 && d0.lines[0].amount === 5_000_000)
+  const withProducts = contractCloseDraft(lead, { today: '2026-09-26', products: [{ name: '벤처인증 패키지', fee: 300 }, { name: '정책자금 컨설팅', fee: 500 }] })
+  check('계약 완료 초안: 상품마다 한 줄(만원 → 원) · 업무 짐작(벤처 · 정책자금)', withProducts.lines.length === 2 && withProducts.lines[1].amount === 5_000_000 && withProducts.services.includes('venture') && withProducts.services.includes('policyFund'), JSON.stringify(withProducts.services))
+  const closed = withContractClose(lead, { ...withProducts, agentName: '최영업', agentRatePct: 10, kind: 'mixed', monthlyPremium: 3_000_000 }, at)
+  check('계약 완료: 계약 고객 · 영업 단계 계약 완료', closed.status === 'active' && closed.sales?.stage === 'contracted')
+  check('계약 완료: 수금 항목 2개 — 받을 날 · 영업자 · 수수료 10%', closed.fees.length === 2 && closed.fees.every((f) => f.dueDate === '2026-10-03' && f.agentName === '최영업') && closed.fees[0].agentFee === 300_000)
+  check('계약 완료: 계약 정보 — 현금 + 보험 · 현금 800만 · 월납 보험 한 줄', closed.contract.kind === 'mixed' && closed.contract.cashAmount === 8_000_000 && closed.contract.policies.length === 1 && closed.contract.policies[0].monthlyPremium === 3_000_000)
+  check('계약 완료: 고른 업무는 진행 중으로', closed.services.venture.status === 'in_progress' && closed.services.policyFund.status === 'in_progress')
+  const twice = withContractClose(closed, { ...withProducts, agentName: '', agentRatePct: null, kind: 'mixed', monthlyPremium: 3_000_000 }, at)
+  check('계약 완료: 두 번 눌러도 수금 · 보험이 두 번 생기지 않는다', twice.fees.length === 2 && twice.contract.policies.length === 1)
+  check('계약 · 수금 차이: 같으면 없음 · 다르면 차이', contractGap(closed) === null && contractGap({ ...closed, contract: { ...closed.contract, cashAmount: 10_000_000 } })?.gap === 2_000_000)
+  check('계약 경로 → 방식: 현금 · 법인보험 · 종합', PATH_TO_KIND.cash === 'cash' && PATH_TO_KIND.insurance === 'insurance' && PATH_TO_KIND.total === 'mixed')
+
+  check('미팅 주제 → 관심사: 목록에 있는 것만', JSON.stringify(interestsFromIssues(['가지급금', '연구소/세액공제', '특허/상표'])) === JSON.stringify(['가지급금', '연구소']))
+  const ta2 = analyzeTranscript('가지급금 정리가 필요하고 연구소도 궁금합니다')
+  const met = withMeetingNote(lead, { round: 1, text: '가지급금 정리가 필요하고 연구소도 궁금합니다', analysis: ta2 }, at)
+  check('미팅 기록: 나온 주제가 관심사에 더해진다(빼지 않음)', (met.sales?.interests ?? []).includes('가지급금') && (met.sales?.interests ?? []).includes('연구소'))
+  const slots = missingDocSlots(lead, ['재무제표(최근 3개년)', '주주명부', '정관', '계정별원장'])
+  check('서류 칸: 표준 칸(최근 3개년 재무제표)은 다시 만들지 않는다', !slots.some((x) => x.includes('재무제표')) && slots.includes('주주명부'), JSON.stringify(slots))
+  const slotted = withDocSlots(lead, ['주주명부', '정관'])
+  check('서류 칸: 만들고, 두 번째에는 없는 것만', slotted.customDocuments.length === 2 && missingDocSlots(slotted, ['주주명부', '정관']).length === 0)
+
+  const fromInbox = withInboxPayload(lead, { message: '가지급금 때문에 상담 받고 싶습니다', program: '정책자금', preferred_contact_time: '평일 오후' }, '2026-09-26')
+  check('상담신청 → 영업: 문의 내용 = 대표 고민 · 관심사 · 희망 연락 = 다음 약속', fromInbox.sales?.concern === '가지급금 때문에 상담 받고 싶습니다' && (fromInbox.sales?.interests ?? []).includes('정책자금') && (fromInbox.sales?.interests ?? []).includes('가지급금') && fromInbox.nextAction.startsWith('첫 연락') && fromInbox.nextActionDueDate === '2026-09-26')
+  check('영업 신호 링크: 견적 → 상품·제안 · 다음 할 일 → 업체 · 그 밖 → 미팅 준비', salesActionPath('견적 · 업무범위서 보내기', 'x') === '/sales/proposal?client=x' && salesActionPath('다음 할 일 정하기', 'x') === '/ops/clients/x' && salesActionPath('연락하기', 'x') === '/sales/meeting?client=x')
+  const withReport = { ...lead, documents: { ...lead.documents, cretopReport: { ...lead.documents.cretopReport, received: true } } }
+  const contractStep = buildJourney(withReport, { today: '2026-09-26' }).steps.find((st) => st.key === 'contract')
+  check('영업 흐름: 크레탑 보고서만으로는 계약 서류가 끝나지 않는다', contractStep?.tasks.find((t) => t.label === '계약 서류')?.done === false)
 }
 
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)

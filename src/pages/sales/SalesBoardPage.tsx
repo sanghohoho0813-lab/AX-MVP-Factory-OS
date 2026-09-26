@@ -17,12 +17,14 @@ import { useToast } from '../../components/ui/toastContext'
 import { Badge, Disclosure, MetricTile, ScreenTitle } from '../../components/ui/primitives'
 import { CopyButton } from '../../components/sales/salesParts'
 import { stageColor } from '../../components/sales/salesColor'
-import { salesRecontacts, salesRisks } from '../../services/salesSignals'
+import { salesActionPath, salesRecontacts, salesRisks } from '../../services/salesSignals'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { SalesTabs } from '../../components/sales/SalesTabs'
 import { LINK_BUTTON } from '../../components/sales/salesStyle'
 import { createClient, listClients, saveClient } from '../../services/clientOpsService'
+import { contractCloseDraft, withContractClose, type ContractCloseDraft } from '../../services/salesContract'
+import { ContractCloseSheet } from '../../components/sales/ContractCloseSheet'
 import { matchesClientSearch } from '../../services/clientOpsSearch'
 import { listRows } from '../../services/moduleData'
 import {
@@ -280,8 +282,29 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
   const risks = useMemo(() => salesRisks(records, today), [records, today])
   const recontacts = useMemo(() => salesRecontacts(records), [records])
 
+  /** D-122: '계약 완료' 로 옮기면 확인 시트 — 수금 항목 · 받을 날 · 영업자 · 계약 방식까지 한 번에 */
+  const [closing, setClosing] = useState<{ record: ClientOpsRecord; draft: ContractCloseDraft } | null>(null)
+  const saveClose = async (record: ClientOpsRecord, d: ContractCloseDraft): Promise<boolean> => {
+    const next = withContractClose(record, d)
+    setRecords((list) => list.map((r) => (r.id === next.id ? next : r)))
+    try {
+      const saved = await saveClient(next)
+      setRecords((list) => list.map((r) => (r.id === saved.id ? saved : r)))
+      showToast(`${record.companyName} — 계약 완료. 수금 항목 · 계약 정보를 넣었습니다. 업체 상세의 수금 탭에서 이어 갑니다.`)
+      return true
+    } catch (cause) {
+      showToast(cause instanceof Error ? `${cause.message} — 다시 눌러 주세요.` : '저장하지 못했습니다. 다시 눌러 주세요.')
+      void load()
+      return false
+    }
+  }
+
   const move = useCallback(
-    async (record: ClientOpsRecord, stage: SalesStage) => {
+    async (record: ClientOpsRecord, stage: SalesStage, direct = false) => {
+      if (stage === 'contracted' && !direct && salesStageOf(record) !== 'contracted') {
+        setClosing({ record, draft: contractCloseDraft(record, { today, records }) })
+        return
+      }
       const next = withSalesStage(record, stage)
       if (next === record) return
       setRecords((list) => list.map((r) => (r.id === next.id ? next : r)))
@@ -311,7 +334,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
         void load()
       }
     },
-    [showToast, load],
+    [showToast, load, today, records],
   )
 
   const create = async (f: ProspectForm) => {
@@ -431,7 +454,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
                   <li key={r.record.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
                     <button type="button" onClick={() => open(r.record)} className="t-sub font-bold text-slate-900 hover:text-brand-700 hover:underline">{r.record.companyName}</button>
                     <span className="t-sub text-warning-700">{r.reason}</span>
-                    <Link to={`/sales/meeting?client=${r.record.id}`} className="t-meta ml-auto font-semibold text-brand-700 hover:underline">{r.action} →</Link>
+                    <Link to={salesActionPath(r.action, r.record.id)} className="t-meta ml-auto font-semibold text-brand-700 hover:underline">{r.action} →</Link>
                   </li>
                 ))}
               </ul>
@@ -534,6 +557,18 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
       )}
 
       <NewProspectModal open={formOpen} busy={busy} onClose={() => setFormOpen(false)} onSubmit={(f) => void create(f)} />
+      {closing && (
+        <ContractCloseSheet
+          record={closing.record}
+          draft={closing.draft}
+          onClose={() => setClosing(null)}
+          onSubmit={(d) => saveClose(closing.record, d)}
+          onStageOnly={async () => {
+            await move(closing.record, 'contracted', true)
+            return true
+          }}
+        />
+      )}
     </div>
   )
 }

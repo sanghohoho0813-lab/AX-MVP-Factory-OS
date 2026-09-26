@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { CheckCircle2, ExternalLink, Eye, Link2, MessageSquareReply, Plus, Send, Share2, Sparkles, Upload } from 'lucide-react'
 import { InlineConfirm } from '../ui/InlineConfirm'
 import type { ClientOpsRecord, DocumentKey } from '../../types/clientOps'
+import { withDocument } from '../../services/clientOpsService'
 import type { CustomerEvent, PortalClientLink, PortalDocument, PortalProjection, PortalRequest, PortalUpdate } from '../../types/bridge'
 import { Button } from '../ui/Button'
 import { Modal } from '../ui/Modal'
@@ -52,7 +53,16 @@ function isNotReadyError(cause: unknown): boolean {
  * 연결 계정 · 고객 이벤트 · 고객 요청(답변) · 공유 서류(요청/확인/공유) · 공개한 업데이트 · 고객 화면 미리보기.
  * 고객 인증을 우회하지 않는다 — 미리보기는 고객 투영과 같은 함수를 워크스페이스 권한으로 부른 결과다.
  */
-export function PortalTab({ record, workspaceId }: { record: ClientOpsRecord; workspaceId: string | null }) {
+export function PortalTab({
+  record,
+  workspaceId,
+  onRecordChange,
+}: {
+  record: ClientOpsRecord
+  workspaceId: string | null
+  /** D-122: 고객이 올린 서류를 확인하면 내부 서류함에도 '받음' 으로 — 업체 기록 저장 */
+  onRecordChange?: (next: ClientOpsRecord) => Promise<boolean>
+}) {
   const { showToast } = useToast()
   const isLocal = getDataModeConfig().mode === 'local'
   const [links, setLinks] = useState<PortalClientLink[]>([])
@@ -280,7 +290,25 @@ export function PortalTab({ record, workspaceId }: { record: ClientOpsRecord; wo
                     </span>
                     {d.status === 'uploaded' && (
                       <>
-                        <Button variant="primary" size="sm" onClick={() => void run(() => reviewDocument(d, 'verified'), '확인 완료로 표시했습니다.')}>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() =>
+                            void run(async () => {
+                              await reviewDocument(d, 'verified')
+                              // D-122: 내부 서류함도 '받음' — 예전에는 고객 화면만 바뀌어 '없는 서류' 경고 · 서류 요청 문구가 계속 이 서류를 달라고 했다
+                              if (onRecordChange && d.documentType in record.documents) {
+                                await onRecordChange(
+                                  withDocument(record, d.documentType as DocumentKey, {
+                                    received: true,
+                                    ...(d.storagePath ? { storagePath: d.storagePath } : {}),
+                                    ...(d.fileName ? { fileName: d.fileName } : {}),
+                                  }),
+                                )
+                              }
+                            }, d.documentType in record.documents && onRecordChange ? '확인 완료 · 서류함에도 받음으로 넣었습니다.' : '확인 완료로 표시했습니다.')
+                          }
+                        >
                           <CheckCircle2 aria-hidden="true" className="size-4" /> 확인 완료
                         </Button>
                         <Button variant="secondary" size="sm" onClick={() => void run(() => reviewDocument(d, 'rejected'), '고객에게 다시 요청했습니다.')}>

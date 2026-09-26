@@ -23,7 +23,8 @@ import { EventCard } from '../components/ops/EventCard'
 import { LinkCustomerModal } from '../components/ops/LinkCustomerModal'
 import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { listClients } from '../services/clientOpsService'
-import { salesRecontacts, salesRisks } from '../services/salesSignals'
+import { salesActionPath, salesRecontacts, salesRisks } from '../services/salesSignals'
+import { agentLedger, agentLedgerTotals } from '../services/feeMath'
 import { isProspect, salesInFlow } from '../services/salesPipeline'
 import { buildAllAlerts } from '../services/clientOpsAlerts'
 import { buildAllSchedule, upcomingWithin } from '../services/clientOpsSchedule'
@@ -235,6 +236,15 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     [alerts],
   )
   const money = useMemo(() => buildMoneySignals(clients, today), [clients, today])
+  const agentPayable = useMemo(() => agentLedgerTotals(agentLedger(clients)).payable, [clients])
+  /** 계약 고객의 받을 날 없는 미수 항목 — 달력 · 연체 경고에 안 뜬다 */
+  const noDueFees = useMemo(
+    () =>
+      clients
+        .filter((c) => c.archivedAt === null)
+        .flatMap((c) => c.fees.filter((f) => f.receivedAt === null && f.dueDate === '' && (f.amount ?? 0) > 0).map((f) => ({ clientId: c.id, label: f.label }))),
+    [clients],
+  )
   // D-118: 영업 신호 — 영업 관리 보드와 같은 규칙
   const salesRiskList = useMemo(() => salesRisks(clients, today), [clients, today])
   const salesRecontactList = useMemo(() => salesRecontacts(clients), [clients])
@@ -517,7 +527,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                   .filter((v) => v !== '')
                   .join(' · ') || undefined
               }
-              onClick={() => navigate('/ops/clients')}
+              // D-122: 연체가 있으면 가장 오래 밀린 업체의 수금 탭으로 바로
+              onClick={() => navigate(money.overdue.items[0] ? `/ops/clients/${money.overdue.items[0].clientId}?tab=fees` : '/ops/clients')}
             />
             {/* 새 요청은 '급한 일' 이 아니라 '새로 온 것' 이다 — 빨강 대신 브랜드색 */}
             <MetricTile
@@ -527,6 +538,22 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               onClick={() => navigate('/ops/inbox')}
             />
           </div>
+
+          {/* D-122: 오늘 화면에 안 보이던 돈 두 가지 — 영업자에게 줄 돈 · 받을 날을 안 정한 수금 */}
+          {(agentPayable > 0 || noDueFees.length > 0) && (
+            <p data-testid="today-money-notes" className="t-sub flex flex-wrap gap-x-4 gap-y-1 break-keep text-slate-600">
+              {agentPayable > 0 && (
+                <Link to="/ops/agents" className="font-semibold text-warning-700 hover:underline">
+                  영업자에게 줄 돈 {krwTile(agentPayable)} (고객 입금됨) →
+                </Link>
+              )}
+              {noDueFees.length > 0 && (
+                <Link to={`/ops/clients/${noDueFees[0].clientId}?tab=fees`} className="font-semibold text-slate-700 hover:underline">
+                  받을 날을 안 정한 수금 {noDueFees.length}건 →
+                </Link>
+              )}
+            </p>
+          )}
 
           <p className="t-meta break-keep text-slate-500">급한 순서대로 셋만 — 규칙으로 고른 것이며 AI 판단이 아닙니다.</p>
         </section>
@@ -626,7 +653,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                   <Link to={`/ops/clients/${x.id}`} className="t-sub font-bold text-slate-900 hover:text-brand-700 hover:underline">{x.name}</Link>
                   {/* 12rem 아래로는 줄이지 않고 다음 줄로 — 좁은 화면 · 큰 글자에서 한 줄에 두세 자씩 짜부라지지 않게 */}
                   <span className={`t-sub min-w-0 flex-[1_1_12rem] break-keep ${x.tone}`}>{x.why}</span>
-                  <Link to={`/sales/meeting?client=${x.id}`} className="t-meta ml-auto shrink-0 font-semibold text-brand-700 hover:underline">{x.go} →</Link>
+                  <Link to={salesActionPath(x.go, x.id)} className="t-meta ml-auto shrink-0 font-semibold text-brand-700 hover:underline">{x.go} →</Link>
                 </li>
               ))}
             </ul>
@@ -729,7 +756,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           onDone={(updated) => {
             setLinking(null)
             setEvents((list) => list.map((e) => (e.id === updated.id ? updated : e)))
-            showToast('업체에 연결했습니다.')
+            const cid = updated.operationsClientId
+            showToast('업체에 연결했습니다.', cid ? { label: '미팅 준비 →', onClick: () => navigate(`/sales/meeting?client=${cid}&round=1`) } : undefined)
             void load()
           }}
         />

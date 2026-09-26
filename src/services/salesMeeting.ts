@@ -9,6 +9,8 @@ import type { ClientOpsRecord, SalesMeetingNote, SalesStage } from '../types/cli
 import { emptySales } from '../types/clientOps'
 import { withActivity } from './clientOpsActivity'
 import { salesStageOf } from './salesPipeline'
+import { allDocumentMetas } from './clientOpsDocuments'
+import { withCustomDocument } from './clientOpsService'
 import {
   analyzeTranscript,
   deriveInterests,
@@ -176,12 +178,62 @@ export function withMeetingNote(record: ClientOpsRecord, opts: MeetingRecordOpti
     hesitant: opts.analysis.hesitant,
     nextDocs: opts.analysis.nextDocs,
   }
-  let next: ClientOpsRecord = { ...record, sales: { ...base, meetings: [note, ...(base.meetings ?? [])].slice(0, 30) } }
+  // D-122: 미팅에서 나온 주제를 영업 관심사에 더한다(빼지는 않는다) — 작업실 도구 · 상품 추천 · 주제별 연락이
+  // 관심사를 읽는데, 예전에는 미팅 뒤에도 그대로라 미팅에서 나온 말이 아무 데도 이어지지 않았다.
+  const learned = interestsFromIssues(note.issues).filter((i) => !base.interests.includes(i))
+  let next: ClientOpsRecord = { ...record, sales: { ...base, interests: [...base.interests, ...learned], meetings: [note, ...(base.meetings ?? [])].slice(0, 30) } }
   if (opts.nextAction !== undefined && opts.nextAction.trim() !== '') {
     next = { ...next, nextAction: opts.nextAction.trim(), nextActionDueDate: opts.nextActionDueDate ?? next.nextActionDueDate }
   }
   const topics = note.issues.slice(0, 3).join(' · ')
-  return withActivity(next, 'sales', `${opts.round}차 미팅 기록 — ${note.reaction}${topics ? ` · ${topics}` : ''}`, null, at)
+  return withActivity(next, 'sales', `${opts.round}차 미팅 기록 — ${note.reaction}${topics ? ` · ${topics}` : ''}${learned.length ? ` · 관심사 더함: ${learned.join(' · ')}` : ''}`, null, at)
+}
+
+/** 미팅 주제(원본 규칙 이름) → 영업 관심사 (D-122) */
+const ISSUE_TO_INTEREST: Record<string, string[]> = {
+  가지급금: ['가지급금'],
+  미처분이익잉여금: ['미처분이익잉여금'],
+  가업승계: ['가업승계'],
+  정관정비: ['정관정비'],
+  임원퇴직금: ['임원퇴직금'],
+  '연구소/세액공제': ['연구소'],
+  '벤처/인증': ['벤처인증'],
+  정책자금: ['정책자금'],
+  고용지원금: ['고용지원금'],
+  법인보험: ['법인보험'],
+}
+
+export function interestsFromIssues(issues: string[]): string[] {
+  const out: string[] = []
+  for (const i of issues) for (const x of ISSUE_TO_INTEREST[i] ?? []) if (!out.includes(x)) out.push(x)
+  return out
 }
 
 export { analyzeTranscript }
+
+/* ------------------------------------------------------------------ */
+/* D-122 미팅에서 받기로 한 자료 → 서류함 칸                               */
+/* ------------------------------------------------------------------ */
+
+const coreOf = (label: string) => label.replace(/\(.*?\)/g, '').replace(/[\s·]/g, '')
+
+/**
+ * 미팅에서 받기로 한 자료 가운데 서류함에 아직 칸이 없는 것 — 표준 칸 이름 · 직접 만든 칸 이름과 비교한다
+ * ('재무제표(최근 3개년)' 은 표준 '최근 3개년 재무제표' 로 본다). 예전에는 자료 요청 카톡으로만 남아
+ * 받았는지 챙길 곳이 없었다.
+ */
+export function missingDocSlots(record: ClientOpsRecord, docs: string[]): string[] {
+  const have = [...allDocumentMetas(record).map((m) => m.label)].map(coreOf)
+  return [...new Set(docs.map((d) => d.trim()).filter(Boolean))].filter((d) => {
+    const c = coreOf(d)
+    if (c === '') return false
+    return !have.some((h) => h.includes(c) || c.includes(h) || (c.includes('재무제표') && h.includes('재무제표')))
+  })
+}
+
+/** 고른 자료마다 서류함에 칸을 만든다(있으면 건너뛴다) */
+export function withDocSlots(record: ClientOpsRecord, docs: string[]): ClientOpsRecord {
+  let next = record
+  for (const d of missingDocSlots(record, docs)) next = withCustomDocument(next, { label: d })
+  return next
+}

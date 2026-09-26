@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSerialSave } from '../lib/useSerialSave'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   Archive,
   Building2,
@@ -42,6 +42,8 @@ import { ClientMoneySheet, ServiceStatusSheet } from '../components/ops/ClientQu
 import { BulkDocUploadSheet } from '../components/ops/BulkDocUploadSheet'
 import { BottomSheet, MetricTile, ScreenTitle, type Tone } from '../components/ui/primitives'
 import { loadCustomServicesIntoCatalog } from '../services/customServiceService'
+import { withNewProspect } from '../services/salesPipeline'
+import { findClientForCretop } from '../services/salesCretop'
 import { getDataModeConfig } from '../data/dataMode'
 import { CloudUpload, Handshake } from 'lucide-react'
 import {
@@ -126,6 +128,8 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const bulkRecord = bulkDocsFor ? (records.find((r) => r.id === bulkDocsFor) ?? null) : null
   const [showAllAlerts, setShowAllAlerts] = useState(false)
   const [form, setForm] = useState({ companyName: '', contactName: '', contactPhone: '', businessNumber: '' })
+  /** D-122: 새로 넣는 업체는 기본 잠재고객 — 예전에는 계약 고객으로 들어가 계약 숫자가 부풀고 영업 보드 '계약 완료' 칸에 떴다 */
+  const [asProspect, setAsProspect] = useState(true)
   const [query, setQuery] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const [restoring, setRestoring] = useState(false)
@@ -359,12 +363,16 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     }
   }
 
+  /** D-122: 같은 업체(사업자번호 · 이름)가 이미 있으면 알려 준다 — 크레탑 등록과 같은 규칙 */
+  const dupe = form.companyName.trim() === '' && form.businessNumber.trim() === '' ? null : findClientForCretop(records, { name: form.companyName, bizNo: form.businessNumber })
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!form.companyName.trim()) return
     try {
       setSaving(true)
-      const record = await createClient(workspaceId, form)
+      const created = await createClient(workspaceId, { ...form, ...(asProspect ? { status: 'waiting' as const } : {}) })
+      const record = asProspect ? await saveClient(withNewProspect(created, '')) : created
       navigate(`/ops/clients/${record.id}`)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '고객을 등록하지 못했습니다.')
@@ -915,6 +923,35 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                   className="mt-1.5 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2.5 text-[1rem]"
                 />
               </label>
+              <fieldset>
+                <legend className="text-[0.95rem] font-medium text-slate-700">어떤 업체인가요</legend>
+                <div className="mt-1.5 grid grid-cols-2 gap-2">
+                  {[
+                    { on: true, label: '잠재고객', hint: '아직 계약 전 — 영업 보드로' },
+                    { on: false, label: '계약 고객', hint: '이미 계약함' },
+                  ].map((o) => (
+                    <button
+                      key={o.label}
+                      type="button"
+                      aria-pressed={asProspect === o.on}
+                      onClick={() => setAsProspect(o.on)}
+                      className={`tap flex flex-col items-start rounded-(--radius-control) border px-3 py-2 text-left ${asProspect === o.on ? 'border-brand-600 bg-brand-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+                    >
+                      <span className="text-[0.98rem] font-bold text-slate-900">{o.label}</span>
+                      <span className="t-meta text-slate-500">{o.hint}</span>
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+              {dupe && (
+                <p role="status" data-testid="new-client-dupe" className="t-sub rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 break-keep text-slate-800">
+                  같은 업체가 이미 있습니다 —{' '}
+                  <Link to={`/ops/clients/${dupe.id}`} className="font-semibold text-brand-700 underline">
+                    {dupe.companyName} 열기
+                  </Link>
+                  . 다른 업체면 그대로 등록하세요.
+                </p>
+              )}
             </div>
             <div className="mt-6 flex justify-end gap-2">
               <Button type="button" variant="secondary" onClick={() => setFormOpen(false)}>

@@ -23,7 +23,9 @@ import { brand } from '../../brand/brand.config'
 import { listClients, saveClient } from '../../services/clientOpsService'
 import { listRows, saveRow } from '../../services/moduleData'
 import { salesStageOf } from '../../services/salesPipeline'
-import { catalogWithPrices, cleanPrices, feeSum, toProposalItem, withContractFromProposal, withContractPrep, withProposal } from '../../services/salesOffer'
+import { catalogWithPrices, cleanPrices, feeSum, toProposalItem, withContractPrep, withProposal } from '../../services/salesOffer'
+import { contractCloseDraft, withContractClose, type ContractCloseDraft } from '../../services/salesContract'
+import { ContractCloseSheet } from '../../components/sales/ContractCloseSheet'
 import {
   CONTRACT_CHECKLIST,
   PKG_CATEGORIES,
@@ -136,7 +138,19 @@ function CatalogView({ catalog, prices, onSavePrice }: { catalog: SalesPackage[]
 /* 고객 제안                                                            */
 /* ------------------------------------------------------------------ */
 
-function ProposalWork({ record, catalog, onSave }: { record: ClientOpsRecord; catalog: SalesPackage[]; onSave: (next: ClientOpsRecord, msg: string) => void }) {
+function ProposalWork({
+  record,
+  records,
+  catalog,
+  onSave,
+}: {
+  record: ClientOpsRecord
+  records: ClientOpsRecord[]
+  catalog: SalesPackage[]
+  onSave: (next: ClientOpsRecord, msg: string) => void | boolean | Promise<boolean>
+}) {
+  /** D-122: 계약 완료 확인 시트(받을 날 · 영업자 · 계약 방식 · 보험 · 업무까지 한 번에) */
+  const [closing, setClosing] = useState<ContractCloseDraft | null>(null)
   const me = useCurrentUser()
   const profile = { consultant: me.name, title: me.title, org: brand.companyName }
   const item = useMemo(() => toProposalItem(record), [record])
@@ -404,20 +418,32 @@ function ProposalWork({ record, catalog, onSave }: { record: ClientOpsRecord; ca
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
             <p className="t-sub break-keep text-slate-600">
               {stage === 'contracted'
-                ? '이미 계약 완료입니다.'
-                : `계약 완료로 넘기면 계약 고객이 되고, 고른 상품 ${picked.length}개가 수금 항목(계약금 · 상품표 가격)으로 들어갑니다.`}
+                ? `이미 계약 고객입니다. 새로 고른 상품 ${picked.length}개를 추가 계약으로 — 수금 항목에 더합니다(같은 이름은 빼고).`
+                : `계약 완료로 넘기면 계약 고객이 되고, 고른 상품 ${picked.length}개가 수금 항목으로 들어갑니다. 받을 날 · 영업자 · 계약 방식은 다음 창에서 확인합니다.`}
             </p>
             <Button
               variant="primary"
-              disabled={stage === 'contracted' || picked.length === 0}
-              onClick={() => onSave(withContractFromProposal(record, picked), `${record.companyName} — 계약 완료. 수금 항목 ${picked.length}개를 만들었습니다.`)}
+              data-testid="proposal-contract"
+              disabled={picked.length === 0}
+              onClick={() => setClosing(contractCloseDraft(record, { today: todayLocalDate(), products: picked.map((p) => ({ name: p.name, fee: p.fee })), records }))}
             >
               <FileSignature aria-hidden="true" className="size-4" />
-              계약 완료로
+              {stage === 'contracted' ? '추가 계약 → 수금 항목' : '계약 완료로'}
             </Button>
           </div>
         </div>
       </Disclosure>
+      {closing && (
+        <ContractCloseSheet
+          record={record}
+          draft={closing}
+          onClose={() => setClosing(null)}
+          onSubmit={async (d) => {
+            const ok = await onSave(withContractClose(record, d), `${record.companyName} — ${stage === 'contracted' ? '추가 계약' : '계약 완료'}. 수금 항목 · 계약 정보를 넣었습니다.`)
+            return ok !== false
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -560,7 +586,7 @@ function ProposalContent({ workspaceId }: { workspaceId: string | null }) {
                 {record.sales?.proposal && <Badge tone="brand">{record.sales.proposal.status}</Badge>}
                 {(record.sales?.interests?.length ?? 0) > 0 && <PillList items={record.sales?.interests ?? []} />}
               </p>
-              <ProposalWork key={record.id} record={record} catalog={catalog} onSave={(n, m) => void persist(n, m)} />
+              <ProposalWork key={record.id} record={record} records={records} catalog={catalog} onSave={(n, m) => persist(n, m)} />
             </>
           )}
         </>

@@ -237,7 +237,8 @@ export function buildJourney(record: ClientOpsRecord, opts: JourneyOptions): Jou
   const lastM1 = meetings.find((m) => m.round === 1)
   const prep = new Set(s?.contractPrep ?? [])
   const prepDone = CONTRACT_CHECKLIST.filter((x) => prep.has(x)).length
-  const docsIn = Object.values(record.documents).filter((d) => d.received).length
+  // D-122: 크레탑 보고서는 영업 자료이지 계약 서류가 아니다 — 크레탑 등록만 해도 '계약 서류' 가 끝남으로 뜨던 것
+  const docsIn = Object.entries(record.documents).filter(([k, d]) => d.received && k !== 'cretopReport').length
 
   // 계약 뒤 추가 제안 — 크레탑 추천 가운데 제안에 아직 없는 것
   const proposed = (s?.proposal?.packages ?? []).join(' ')
