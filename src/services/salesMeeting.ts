@@ -163,6 +163,8 @@ export interface MeetingRecordOptions {
   /** 다음 할 일 · 날짜 — 비우면 그대로 둔다 */
   nextAction?: string
   nextActionDueDate?: string
+  /** D-124: 1차 미팅에서 확인한 관심사 — 주면 이것으로 바꾼다(주지 않으면 나온 주제를 더하기만) */
+  interests?: string[]
 }
 
 /** 미팅 기록을 남긴다 — 영업 칸 미팅 목록 · 활동 기록 · (고르면) 다음 할 일 */
@@ -180,13 +182,14 @@ export function withMeetingNote(record: ClientOpsRecord, opts: MeetingRecordOpti
   }
   // D-122: 미팅에서 나온 주제를 영업 관심사에 더한다(빼지는 않는다) — 작업실 도구 · 상품 추천 · 주제별 연락이
   // 관심사를 읽는데, 예전에는 미팅 뒤에도 그대로라 미팅에서 나온 말이 아무 데도 이어지지 않았다.
-  const learned = interestsFromIssues(note.issues).filter((i) => !base.interests.includes(i))
-  let next: ClientOpsRecord = { ...record, sales: { ...base, interests: [...base.interests, ...learned], meetings: [note, ...(base.meetings ?? [])].slice(0, 30) } }
+  const confirmed = opts.interests ? [...new Set(opts.interests.map((i) => i.trim()).filter(Boolean))] : null
+  const learned = confirmed ? confirmed.filter((i) => !base.interests.includes(i)) : interestsFromIssues(note.issues).filter((i) => !base.interests.includes(i))
+  let next: ClientOpsRecord = { ...record, sales: { ...base, interests: confirmed ?? [...base.interests, ...learned], meetings: [note, ...(base.meetings ?? [])].slice(0, 30) } }
   if (opts.nextAction !== undefined && opts.nextAction.trim() !== '') {
     next = { ...next, nextAction: opts.nextAction.trim(), nextActionDueDate: opts.nextActionDueDate ?? next.nextActionDueDate }
   }
   const topics = note.issues.slice(0, 3).join(' · ')
-  return withActivity(next, 'sales', `${opts.round}차 미팅 기록 — ${note.reaction}${topics ? ` · ${topics}` : ''}${learned.length ? ` · 관심사 더함: ${learned.join(' · ')}` : ''}`, null, at)
+  return withActivity(next, 'sales', `${opts.round}차 미팅 기록 — ${note.reaction}${topics ? ` · ${topics}` : ''}${confirmed ? ` · 관심사 확인: ${confirmed.join(' · ') || '없음'}` : learned.length ? ` · 관심사 더함: ${learned.join(' · ')}` : ''}`, null, at)
 }
 
 /** 미팅 주제(원본 규칙 이름) → 영업 관심사 (D-122) */

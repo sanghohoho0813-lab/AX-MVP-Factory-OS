@@ -10,6 +10,8 @@
  *   4. 오늘 화면 — 영업자에게 줄 돈 · 받을 날 안 정한 수금 줄(누르면 그 화면으로)
  *   5. 미팅 기록 — 받기로 한 자료를 서류함 칸으로 · 나온 주제는 관심사로
  *   6. 고객 관리 새 업체 — 기본 잠재고객 · 같은 업체가 있으면 알림
+ *   9. (D-124) 영업 관리에서 업체를 열고 뒤로 → 고객 관리가 아니라 영업 관리로
+ *  10. (D-124) 세금 계산기 목록을 펼친 채 화면을 밀어도 목록이 닫히며 튀지 않는다(누르면 닫힘)
  */
 
 import { chromium } from 'playwright'
@@ -144,6 +146,63 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
     await box.fill('김대표 서류')
     await page.getByRole('button', { name: '통화', exact: true }).first().click()
     check(`할 일 프리셋: 적은 글 앞에 붙는다 ${tag}`, (await box.inputValue()).startsWith('대표님 통화 — ') && (await box.inputValue()).includes('김대표 서류'), await box.inputValue())
+  }
+
+  /* 9 (D-124) 영업 관리 → 업체 → 뒤로 */
+  const path = () => new URL(page.url()).pathname + new URL(page.url()).search
+  await page.goto(BASE + '/sales', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  await page.getByTestId('sales-card').filter({ visible: true }).first().getByRole('button').first().click()
+  await page.waitForURL(/\/ops\/clients\//)
+  await page.waitForTimeout(300)
+  const backBtn = page.getByTestId('client-back')
+  check(`뒤로: 영업 관리에서 연 업체는 '영업 관리로' 단추 ${tag}`, ((await backBtn.innerText()) ?? '').includes('영업 관리로'), await backBtn.innerText())
+  const current = await page.locator('[aria-current="page"]').filter({ visible: true }).allInnerTexts()
+  check(`뒤로: 메뉴는 영업 관리에 머문다(고객 관리로 바뀌지 않음) ${tag}`, (mob || current.some((t) => t.includes('영업'))) && !current.some((t) => t.includes('고객')), current.join())
+  await page.locator('[role="tab"]').filter({ visible: true }).nth(1).click()
+  await page.waitForURL(/tab=/)
+  await backBtn.click()
+  await page.waitForURL((u) => u.pathname.startsWith('/sales'))
+  check(`뒤로: 탭을 바꾼 뒤에도 단추는 영업 관리로 ${tag}`, new URL(page.url()).pathname.startsWith('/sales'), page.url())
+  await page.getByTestId('sales-card').filter({ visible: true }).first().getByRole('button').first().click()
+  await page.waitForURL(/\/ops\/clients\//)
+  await page.goBack()
+  await page.waitForTimeout(400)
+  check(`뒤로: 브라우저 · 휴대폰 뒤로가기도 영업 관리로 ${tag}`, new URL(page.url()).pathname.startsWith('/sales'), page.url())
+  await page.goto(BASE + '/sales/meeting?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  await page.locator('main a[href="/ops/clients/cli_hansol"]').filter({ visible: true }).first().click()
+  await page.waitForURL(/\/ops\/clients\/cli_hansol/)
+  await page.goBack()
+  await page.waitForTimeout(400)
+  check(`뒤로: 미팅 준비에서 연 업체 → 뒤로 → 그 미팅 준비로 ${tag}`, path().startsWith('/sales/meeting?client=cli_hansol'), path())
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  check(`뒤로: 고객 관리에서 연 업체는 그대로 '고객 관리 현황' ${tag}`, ((await page.getByTestId('client-back').innerText()) ?? '').includes('고객 관리'))
+
+  /* 10 (D-124) 세금 계산기 목록 — 밀면 안 닫힘 · 누르면 닫힘 (휴대폰) */
+  if (mob) {
+    await page.goto(BASE + '/tools/tax', { waitUntil: 'networkidle' })
+    await page.waitForTimeout(400)
+    const picker = page.getByTestId('tax-picker')
+    await picker.click()
+    await page.waitForTimeout(200)
+    const list = page.locator('#tax-picker-list')
+    const box = await list.boundingBox()
+    // 목록 바로 아래(목록 밖)에서 손가락으로 위로 민다
+    const y = Math.min(840, Math.round((box?.y ?? 0) + (box?.height ?? 0) + 30))
+    const cdp = await ctx.newCDPSession(page)
+    const y0 = await page.evaluate(() => window.scrollY)
+    await cdp.send('Input.synthesizeScrollGesture', { x: 200, y: y > 60 ? y : 600, yDistance: -250, gestureSourceType: 'touch', speed: 600 })
+    await page.waitForTimeout(400)
+    const y1 = await page.evaluate(() => window.scrollY)
+    check(`세금 계산기: 목록을 펼친 채 밀어도 목록은 그대로 ${tag}`, (await list.count()) === 1, `scroll ${y0} → ${y1}`)
+    check(`세금 계산기: 민 만큼만 움직인다(튀지 않음) ${tag}`, y1 >= y0 && y1 - y0 <= 400, `scroll ${y0} → ${y1}`)
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.waitForTimeout(200)
+    const hb = await page.locator('h1').first().boundingBox()
+    await page.touchscreen.tap(200, Math.round((hb?.y ?? 80) + (hb?.height ?? 20) / 2))
+    await page.waitForTimeout(300)
+    check(`세금 계산기: 목록 밖을 누르면 닫힘 ${tag}`, (await list.count()) === 0)
   }
 
   check(`JS 오류 없음 ${tag}`, errors.length === 0, errors.join(' | '))

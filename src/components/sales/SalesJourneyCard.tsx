@@ -8,9 +8,11 @@
  */
 import { NextStepEditor } from '../ops/NextStepEditor'
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
+import { fromState } from '../../lib/navFrom'
 import { ArrowRight, Check, Circle, Lock, Route, Wrench } from 'lucide-react'
 import { Badge } from '../ui/primitives'
+import { stageReached } from '../../services/salesPipeline'
 import { buildJourney, SALES_PATH_INFO, type JourneyStepKey } from '../../services/salesJourney'
 import { useModuleAccessMap } from './useModuleAccessMap'
 import { SALES_PATH_ORDER, type ClientOpsRecord, type SalesPath } from '../../types/clientOps'
@@ -46,6 +48,9 @@ export function SalesJourneyCard({
   foldable?: boolean
 }) {
   const access = useModuleAccessMap(record.workspaceId)
+  const location = useLocation()
+  /** D-124: 영업 화면에서 업체 화면으로 가는 줄이면 돌아올 곳을 싣는다 */
+  const linkState = (to: string) => (location.pathname.startsWith('/sales') && to.startsWith('/ops/clients/') ? fromState(location) : undefined)
   const journey = useMemo(() => buildJourney(record, { today, access }), [record, today, access])
   const [picked, setPicked] = useState<JourneyStepKey | null>(null)
   // 다른 업체로 바뀌면 지금 걸음으로 돌아간다
@@ -59,6 +64,8 @@ export function SalesJourneyCard({
   const openIndex = journey.steps.indexOf(open)
   const path = journey.path
   const [unfolded, setUnfolded] = useState(false)
+  // D-124: 계약 경로는 2차 · 3차 미팅에서 정한다 — 1차 미팅 준비 때는 보이지 않는다(이미 정했으면 보인다)
+  const showPath = path !== null || stageReached(record, 'm2')
 
   if (foldable && !unfolded) {
     const now = journey.steps.find((s) => s.key === journey.current) ?? journey.steps[0]
@@ -101,7 +108,9 @@ export function SalesJourneyCard({
           )}
         </h2>
       </div>
-      {/* D-123: 계약 경로 — 처음 보는 사람도 알게: 무엇을 고르는지 · 고르면 무엇이 바뀌는지 · 다시 누르면 풀린다 */}
+      {/* D-123: 계약 경로 — 처음 보는 사람도 알게: 무엇을 고르는지 · 고르면 무엇이 바뀌는지 · 다시 누르면 풀린다
+          D-124: 2차 미팅 걸음부터만 — 무엇으로 계약할지는 2 · 3차 미팅에서 정해지는 것이라 1차 준비 때는 보이지 않는다(이미 정했으면 보인다) */}
+      {showPath && (
       <div role="group" aria-label="계약 경로" data-testid="sales-path" className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2.5">
         <p className="t-sub break-keep text-slate-700">
           <strong className="font-bold text-slate-900">계약 경로</strong> — 이 업체와 무엇으로 계약할 것 같나요?
@@ -131,6 +140,7 @@ export function SalesJourneyCard({
           })}
         </div>
       </div>
+      )}
       {onSave && (
         <div className="rounded-(--radius-control) border border-slate-200 px-3 py-2.5">
           <NextStepEditor record={record} today={today} onSave={onSave} />
@@ -211,7 +221,7 @@ export function SalesJourneyCard({
               return (
                 <li key={t.label} data-journey-task={t.label} data-done={t.done ? '1' : '0'}>
                   {t.to ? (
-                    <Link to={t.to} className="flex items-start gap-2.5 px-3 py-2.5 hover:bg-slate-50">
+                    <Link to={t.to} state={linkState(t.to)} className="flex items-start gap-2.5 px-3 py-2.5 hover:bg-slate-50">
                       {body}
                     </Link>
                   ) : (

@@ -9,7 +9,8 @@
  */
 
 import { useNavCounts } from './useNavCounts'
-import { NavLink, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
+import { useNavPath } from '../../lib/navFrom'
 import { CalendarDays, Inbox, LayoutGrid, ListChecks, Sun } from 'lucide-react'
 import { navAccentClass, type NavAccent } from '../../config/moduleRegistry'
 
@@ -49,7 +50,8 @@ function isActive(pathname: string, item: NavItem): boolean {
 }
 
 export function MobileNav({ onOpenMore }: { onOpenMore: () => void }) {
-  const { pathname } = useLocation()
+  // D-124: 영업에서 온 업체 화면이면 '고객' 칸에 불을 켜지 않는다
+  const pathname = useNavPath()
   const counts = useNavCounts()
 
   return (
@@ -65,7 +67,7 @@ export function MobileNav({ onOpenMore }: { onOpenMore: () => void }) {
           const clients = item.to === '/ops/clients' ? counts.clients : null
           return (
             <li key={item.to} className="flex-1">
-              <NavLink
+              <Link
                 to={item.to}
                 aria-current={active ? 'page' : undefined}
                 className="flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 py-1.5"
@@ -100,7 +102,7 @@ export function MobileNav({ onOpenMore }: { onOpenMore: () => void }) {
                     </span>
                   )}
                 </span>
-              </NavLink>
+              </Link>
             </li>
           )
         })}

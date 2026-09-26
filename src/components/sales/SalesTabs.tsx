@@ -5,11 +5,16 @@
  * 그래서 기업컨설팅 OS 의 여러 화면(보드 · 미팅 준비 · 상품·견적 · 전략)은 사이드바 한 줄('영업 관리') 아래 탭으로 둔다.
  * 일정 안의 탭(ScheduleTabs, D-103)과 같은 모양이다.
  */
-import { NavLink } from 'react-router-dom'
+import { NavLink, useSearchParams } from 'react-router-dom'
 import { SALES_TABS } from '../../config/salesTabs'
 import { rampAt } from './salesColor'
 
+/** 업체를 골라 보는 탭 — 옮겨 가도 보던 업체를 그대로 (D-124) */
+const CLIENT_TABS = new Set(['/sales/meeting', '/sales/proposal'])
+
 export function SalesTabs() {
+  const [params] = useSearchParams()
+  const client = params.get('client')
   if (SALES_TABS.length < 2) return null
   return (
     <nav aria-label="영업 관리 보기" data-testid="sales-tabs" className="no-print">
@@ -20,7 +25,7 @@ export function SalesTabs() {
         {SALES_TABS.map((t, i) => (
           <li key={t.to} className="min-w-0">
             <NavLink
-              to={t.to}
+              to={client && CLIENT_TABS.has(t.to) ? `${t.to}?client=${encodeURIComponent(client)}` : t.to}
               end
               className={({ isActive }) =>
                 `tap flex h-full flex-col items-center justify-center gap-0.5 rounded-[8px] px-1 py-1.5 text-center font-semibold break-keep sm:flex-row sm:gap-1.5 sm:px-3 sm:py-2 ${

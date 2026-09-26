@@ -12,7 +12,8 @@
 import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard'
 import { ConfirmModal } from '../../components/ui/ConfirmModal'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
+import { fromState } from '../../lib/navFrom'
 import { Building2, FileUp, ScanSearch, Sparkles } from 'lucide-react'
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useToast } from '../../components/ui/toastContext'
@@ -77,6 +78,7 @@ function Row({ label, value, kept }: { label: string; value: string; kept?: stri
 }
 
 function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
+  const location = useLocation()
   const navigate = useNavigate()
   const { showToast } = useToast()
   const [params] = useSearchParams()
@@ -168,7 +170,8 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
       showToast(`${what} — 기본 정보 ${res.filled.length}칸${res.uploaded ? ' · 서류함에 보고서' : ''}.`)
       for (const w of res.warnings) showToast(w)
       allowNavigation()
-      navigate(`/sales/meeting?client=${res.record.id}&round=1`)
+      // D-124: 등록 화면을 미팅 준비로 바꿔 끼운다 — 뒤로가기에 빈 등록 화면이 다시 뜨지 않게
+      navigate(`/sales/meeting?client=${res.record.id}&round=1`, { replace: true })
     } catch (e) {
       showToast(`${e instanceof Error ? e.message : '등록하지 못했습니다.'} — 다시 누르면 같은 업체에 이어서 붙입니다.`)
       // D-120: 업체는 만들어지고 뒤 단계만 실패했을 수 있다 — 목록을 다시 읽어 두면 다시 눌렀을 때 새로 만들지 않고 붙인다
@@ -365,7 +368,7 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
                   </ol>
                 </div>
                 <div>
-                  <p className="t-meta mb-1.5 font-semibold text-slate-500">영업 관심사로 들어갈 것</p>
+                  <p className="t-meta mb-1.5 font-semibold text-slate-500">1차 미팅 때 물어볼 주제</p>
                   <PillList items={digest.interests} />
                 </div>
                 {digest.concern && (
@@ -382,7 +385,7 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
               </button>
               <div className="flex flex-wrap items-center gap-2">
                 {existing && (
-                  <Link to={`/ops/clients/${existing.id}`} className={LINK_BUTTON.secondary}>
+                  <Link to={`/ops/clients/${existing.id}`} state={fromState(location)} className={LINK_BUTTON.secondary}>
                     업체 보기
                   </Link>
                 )}

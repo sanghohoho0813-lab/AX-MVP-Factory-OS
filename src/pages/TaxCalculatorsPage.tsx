@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useOutsideTap } from '../lib/useDismissable'
 import { Check, ChevronDown, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { PageHeader } from '../components/ui/PageHeader'
 import { ToolResultAttach } from '../tools/shared/ToolResultAttach'
@@ -112,20 +113,15 @@ export function TaxCalculatorsPage() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const pickerRef = useRef<HTMLDivElement>(null)
   // D-111: 펼친 목록은 Esc · 바깥을 누르면 닫는다 (고르지 않고 다시 보고 싶을 때)
+  // D-124: 바깥을 '눌렀을 때만' — 화면을 밀어 스크롤할 때 닫히면 목록 높이만큼 화면이 튀었다
+  useOutsideTap(pickerRef, () => setPickerOpen(false), pickerOpen)
   useEffect(() => {
     if (!pickerOpen) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setPickerOpen(false)
     }
-    const onDown = (e: PointerEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setPickerOpen(false)
-    }
     document.addEventListener('keydown', onKey)
-    document.addEventListener('pointerdown', onDown)
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.removeEventListener('pointerdown', onDown)
-    }
+    return () => document.removeEventListener('keydown', onKey)
   }, [pickerOpen])
   useEffect(() => {
     setValues(loadValues(calc))

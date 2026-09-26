@@ -10,7 +10,7 @@ import { Link } from 'react-router-dom'
 import { KanbanSquare, Presentation } from 'lucide-react'
 import { Disclosure } from '../ui/primitives'
 import { Button } from '../ui/Button'
-import { daysInStage, isProspect, salesStageOf, withSalesInfo, withSalesStage } from '../../services/salesPipeline'
+import { daysInStage, isProspect, salesStageOf, stageReached, withSalesInfo, withSalesStage } from '../../services/salesPipeline'
 import { SALES_INTERESTS, SALES_SOURCES } from '../../content/salesCatalog'
 import { formatKrwCompact } from '../../lib/format'
 import { SALES_STAGE_LABEL, SALES_STAGE_ORDER, type ClientOpsRecord, type SalesStage } from '../../types/clientOps'
@@ -146,6 +146,12 @@ export function ClientSalesCard({
             </label>
           </div>
 
+          {/* D-124: 관심사는 1차 미팅을 마친 뒤에 — 그 전에는 모르는 것을 짐작해 적지 않게 */}
+          {!stageReached(record, 'm1done') ? (
+            <p data-testid="interests-later" className="t-meta break-keep rounded-(--radius-control) bg-slate-50 px-3 py-2 text-slate-500">
+              관심사는 1차 미팅을 마친 뒤 미팅 기록에서 확인합니다.
+            </p>
+          ) : (
           <fieldset>
             <legend className="text-[0.85rem] text-slate-500">관심사</legend>
             <div className="mt-1 flex flex-wrap gap-1.5">
@@ -165,6 +171,7 @@ export function ClientSalesCard({
               })}
             </div>
           </fieldset>
+          )}
 
           <div className="flex justify-end gap-2">
             {dirty && (

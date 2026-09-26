@@ -9,7 +9,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { fromState } from '../../lib/navFrom'
 import { ChevronRight, FileSignature, PackageSearch, Search } from 'lucide-react'
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useToast } from '../../components/ui/toastContext'
@@ -22,7 +23,7 @@ import { useCurrentUser } from '../../components/layout/useCurrentUser'
 import { brand } from '../../brand/brand.config'
 import { listClients, saveClient } from '../../services/clientOpsService'
 import { listRows, saveRow } from '../../services/moduleData'
-import { salesStageOf } from '../../services/salesPipeline'
+import { salesStageOf, stageReached } from '../../services/salesPipeline'
 import { catalogWithPrices, cleanPrices, feeSum, toProposalItem, withContractPrep, withProposal } from '../../services/salesOffer'
 import { contractCloseDraft, withContractClose, type ContractCloseDraft } from '../../services/salesContract'
 import { ContractCloseSheet } from '../../components/sales/ContractCloseSheet'
@@ -471,6 +472,7 @@ function ProposalWork({
 /* ------------------------------------------------------------------ */
 
 function ProposalContent({ workspaceId }: { workspaceId: string | null }) {
+  const location = useLocation()
   const { showToast } = useToast()
   const today = todayLocalDate()
   const [params, setParams] = useSearchParams()
@@ -512,7 +514,8 @@ function ProposalContent({ workspaceId }: { workspaceId: string | null }) {
   const record = live.find((r) => r.id === clientId) ?? null
 
   const setView = (v: 'client' | 'catalog') => setParams((p) => { const n = new URLSearchParams(p); if (v === 'catalog') n.set('view', 'catalog'); else n.delete('view'); return n }, { replace: true })
-  const pick = (id: string) => setParams((p) => { const n = new URLSearchParams(p); n.set('client', id); return n }, { replace: true })
+  // D-124: 업체를 바꾸면 기록을 남긴다(뒤로가기로 앞 업체)
+  const pick = (id: string) => setParams((p) => { const n = new URLSearchParams(p); n.set('client', id); return n })
 
   const persist = async (next: ClientOpsRecord, msg: string): Promise<boolean> => {
     if (next === record) {
@@ -596,13 +599,13 @@ function ProposalContent({ workspaceId }: { workspaceId: string | null }) {
           {record && (
             <>
               <p className="flex flex-wrap items-center gap-2">
-                <Link to={`/ops/clients/${record.id}`} className="t-card inline-flex items-center gap-1 font-bold text-slate-900 hover:text-brand-700 hover:underline">
+                <Link to={`/ops/clients/${record.id}`} state={fromState(location)} className="t-card inline-flex items-center gap-1 font-bold text-slate-900 hover:text-brand-700 hover:underline">
                   {record.companyName}
                   <ChevronRight aria-hidden="true" className="size-4 text-slate-400" />
                 </Link>
                 <StageBadge stage={salesStageOf(record)} />
                 {record.sales?.proposal && <Badge tone="brand">{record.sales.proposal.status}</Badge>}
-                {(record.sales?.interests?.length ?? 0) > 0 && <PillList items={record.sales?.interests ?? []} />}
+                {(record.sales?.interests?.length ?? 0) > 0 && stageReached(record, 'm1done') && <PillList items={record.sales?.interests ?? []} />}
               </p>
               <ProposalWork key={record.id} record={record} records={records} catalog={catalog} onSave={(n, m) => persist(n, m)} />
             </>

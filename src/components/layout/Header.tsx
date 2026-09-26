@@ -1,4 +1,5 @@
-import { Link, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
+import { useNavPath } from '../../lib/navFrom'
 import { TextScaleQuickButton } from '../ui/TextScaleQuickButton'
 import {
   Building,
@@ -156,7 +157,8 @@ function UserMenu() {
 
 export function Header({ onOpenMobileMenu }: HeaderProps) {
   const isSupabase = getDataModeConfig().mode === 'supabase'
-  const { pathname } = useLocation()
+  // D-124: 영업에서 온 업체 화면은 머리줄도 '영업 관리' 그대로
+  const pathname = useNavPath()
   const screenTitle = screenTitleForPath(pathname) ?? brand.brandNameKo
   const screenGroup = screenGroupForPath(pathname)
   return (

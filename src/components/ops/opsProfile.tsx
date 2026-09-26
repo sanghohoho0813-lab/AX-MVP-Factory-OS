@@ -151,8 +151,9 @@ export function CompanyProfileCard({
           </span>
         </h2>
         {/* 글자를 크게 쓰는 설정에서는 단추 두 개가 한 줄을 넘는다 — 줄여도 되고 접혀도 되게 둔다 */}
-        <div className="flex min-w-0 flex-wrap gap-2">
-          <Button variant="secondary" size="sm" onClick={onImport}>
+        {/* D-124: 휴대폰에서는 두 줄 격자(불러오기 한 줄 · 복사 둘) — 크기가 제각각인 단추 셋이 들쭉날쭉 쌓였다 */}
+        <div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
+          <Button variant="secondary" size="sm" onClick={onImport} className="col-span-2">
             <FileUp aria-hidden="true" className="size-3.5" />
             서류에서 불러오기
           </Button>
@@ -183,17 +184,18 @@ export function CompanyProfileCard({
             {g.fields.map((f) => (
               <div
                 key={f.key}
-                className={`flex flex-wrap items-baseline justify-between gap-x-2 border-b border-slate-200/70 py-2 ${
+                className={`flex flex-col gap-0.5 border-b border-slate-200/70 py-2 sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between sm:gap-x-2 ${
                   f.wide ? 'sm:col-span-2 xl:col-span-3' : ''
                 }`}
               >
+                {/* D-124: 휴대폰에서는 이름 위 · 값 아래(값이 제 폭을 다 쓴다) — 옆에 두면 긴 주소 · 번호가 오른쪽으로 잘렸다 */}
                 <dt className="t-sub shrink-0 text-slate-500">{f.label}</dt>
                 {/*
                   조각으로 나뉜 번호는 한 줄에 다 들어가야 한다 — 조각이 세로로 쌓이면
                   번호가 아니라 숫자 기둥이 된다(D-23). 남는 폭이 모자라면 값 전체가
                   라벨 아래 줄로 내려가 제 폭을 갖는다.
                 */}
-                <dd className={`flex-1 text-right ${segmentsOf(f).length > 0 ? 'min-w-[9.5rem]' : 'min-w-0'}`}>
+                <dd className={`min-w-0 text-left sm:flex-1 sm:text-right ${segmentsOf(f).length > 0 ? 'sm:min-w-[9.5rem]' : ''}`}>
                   {editingKey === f.key ? (
                     <div className="flex flex-col gap-1.5">
                       {/* 직접 만든 칸은 이름도 고칠 수 있다 — 잘못 적은 이름 때문에 지웠다 다시 만들지 않게 */}
@@ -287,9 +289,9 @@ export function CompanyProfileCard({
                       {canEdit(f) ? '+ 입력' : '미입력'}
                     </button>
                   ) : (
-                    <span className="inline-flex max-w-full items-center gap-1.5">
+                    <span className="inline-flex max-w-full flex-wrap items-center gap-1.5">
                       {f.copyable ? (
-                        <span className="inline-flex min-w-0 flex-wrap items-center justify-end gap-1">
+                        <span className="inline-flex min-w-0 flex-wrap items-center justify-start gap-1 sm:justify-end">
                           {/*
                             번호는 조각마다 따로 복사된다.
                             신청서 입력칸이 [ ]-[ ]-[ ] 로 나뉘어 있으면 전체를 붙이고 손으로
@@ -311,7 +313,7 @@ export function CompanyProfileCard({
                                     onClick={() => void copy(`${f.key}__s${i}`, seg)}
                                     aria-label={`${f.label} ${seg} 만 복사`}
                                     title={`${seg} 만 복사 — 칸이 나뉜 신청서용`}
-                                    className={`tap rounded px-1 py-1 text-[0.98rem] font-semibold tabular-nums ${
+                                    className={`tap !min-w-0 rounded px-1 py-1 text-[0.98rem] font-semibold tabular-nums ${
                                       copiedKey === `${f.key}__s${i}`
                                         ? 'bg-success-50 text-success-700'
                                         : 'text-slate-800 hover:bg-brand-50 hover:text-brand-700'
@@ -341,9 +343,9 @@ export function CompanyProfileCard({
                               type="button"
                               onClick={() => void copy(f.key, f.value)}
                               title="눌러서 복사 — 보이는 그대로"
-                              className="group inline-flex min-w-0 items-center gap-1 text-right"
+                              className="group inline-flex min-w-0 items-center gap-1 text-left sm:text-right"
                             >
-                              <span className={`truncate text-[0.98rem] font-semibold text-slate-800 group-hover:text-brand-700 group-hover:underline ${f.numberKind ? 'tabular-nums' : ''}`}>
+                              <span className={`min-w-0 text-[0.98rem] font-semibold [overflow-wrap:anywhere] text-slate-800 group-hover:text-brand-700 group-hover:underline ${f.numberKind ? 'tabular-nums' : ''}`}>
                                 {f.value}
                               </span>
                               {copiedKey === f.key ? (
@@ -370,7 +372,7 @@ export function CompanyProfileCard({
                           )}
                         </span>
                       ) : (
-                        <span className="min-w-0 text-[0.98rem] font-semibold break-keep text-slate-800">{f.value}</span>
+                        <span className="min-w-0 text-[0.98rem] font-semibold break-keep [overflow-wrap:anywhere] text-slate-800">{f.value}</span>
                       )}
                       {canEdit(f) && (
                         <button

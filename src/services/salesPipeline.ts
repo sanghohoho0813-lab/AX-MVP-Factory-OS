@@ -150,6 +150,21 @@ export function salesStageOf(record: Pick<ClientOpsRecord, 'sales' | 'status'>):
 }
 
 /**
+ * 이 업체가 그 단계까지 와 본 적이 있나 (D-124) — 단계마다 보일 것만 보이게 하려고.
+ * 지금 단계 · 지나온 단계 이력 · 적어 둔 미팅 기록 중 가장 멀리 간 것으로 본다.
+ * 그래서 보류 · 이탈로 옮긴 업체도 예전에 2차 미팅까지 갔으면 2차 미팅 때 정한 것은 그대로 보인다.
+ */
+export function stageReached(record: Pick<ClientOpsRecord, 'sales' | 'status'>, stage: SalesStage): boolean {
+  const want = SALES_FLOW_STAGES.indexOf(stage)
+  if (want < 0) return salesStageOf(record) === stage
+  const seen: SalesStage[] = [salesStageOf(record), ...(record.sales?.history ?? []).map((h) => h.to)]
+  let far = Math.max(...seen.map((s) => SALES_FLOW_STAGES.indexOf(s)))
+  const rounds = (record.sales?.meetings ?? []).map((m) => m.round)
+  if (rounds.length > 0) far = Math.max(far, SALES_FLOW_STAGES.indexOf(Math.max(...rounds) >= 2 ? 'm2' : 'm1done'))
+  return far >= want
+}
+
+/**
  * 계약 고객 — 고객 관리 옆 숫자(D-114)가 세는 것.
  * 보관하지 않았고, 계약 단계가 '계약 전' 이 아닌 업체(계약함 · 계약 완료).
  */

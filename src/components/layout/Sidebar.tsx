@@ -3,7 +3,8 @@ import { TextScaleQuickButton } from '../ui/TextScaleQuickButton'
 import { useStoreVersion } from '../../lib/useStoreVersion'
 import { isAdvancedVisible } from '../../lib/featureVisibility'
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useNavPath } from '../../lib/navFrom'
 import { ChevronDown, ChevronsLeft, ChevronsRight, ExternalLink, X } from 'lucide-react'
 import { APP_VERSION } from '../../data/navigation'
 import { brand } from '../../brand/brand.config'
@@ -69,7 +70,8 @@ function SidebarContent({
   onCloseMobile?: () => void
 }) {
   const navigate = useNavigate()
-  const location = useLocation()
+  // D-124: 영업에서 온 업체 화면이면 영업 관리에 불을 켠 채로
+  const navPath = useNavPath()
   // D-120: 설정 '고급 운영 기능 보기' 를 따른다(끄면 검증 · 기관 전략 · 사례를 목차에서 뺀다). 바꾸면 바로 다시 그린다
   useStoreVersion()
   const groups = enabledModulesByGroup({ advanced: isAdvancedVisible() })
@@ -138,7 +140,7 @@ function SidebarContent({
       <nav aria-label="주 메뉴" className="flex-1 overflow-y-auto px-3 py-4">
         <ul className="flex flex-col gap-4">
           {groups.map(({ group, items }) => {
-            const containsActive = items.some((m) => moduleMatchLength(m, location.pathname) > 0)
+            const containsActive = items.some((m) => moduleMatchLength(m, navPath) > 0)
             const isCollapsed = group.collapsible
               ? isGroupCollapsed(group.key, group.defaultCollapsed ?? false, containsActive)
               : false
@@ -179,7 +181,7 @@ function SidebarContent({
                         ) : (
                         (() => {
                           // D-103: 불 켜짐과 '지금 화면'(aria-current)을 같은 규칙으로 — 함께 맡는 주소(일정 ↔ 기록)에서도 읽는 기계가 알게
-                          const isActive = moduleMatchLength(item, location.pathname) > 0
+                          const isActive = moduleMatchLength(item, navPath) > 0
                           return (
                         <Link
                           to={item.path}

@@ -16,7 +16,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { fromState } from '../../lib/navFrom'
 import { Check, ChevronRight, FileText, NotebookPen, Presentation, ScanSearch } from 'lucide-react'
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useToast } from '../../components/ui/toastContext'
@@ -37,7 +38,9 @@ import { companyKey } from '../../services/salesCretop'
 import { withSalesPath } from '../../services/salesJourney'
 import { listClients, saveClient } from '../../services/clientOpsService'
 import { salesStageOf, withSalesStage } from '../../services/salesPipeline'
+import { SALES_INTERESTS } from '../../content/salesCatalog'
 import {
+  interestsFromIssues,
   missingDocSlots,
   profileFromMemo,
   roundForStage,
@@ -251,16 +254,19 @@ function MeetingRecorder({ record, round, today, onSave }: { record: ClientOpsRe
 
   /** D-122: 받기로 한 자료 가운데 서류함에 칸을 만들 것(기본 전부) */
   const [slots, setSlots] = useState<string[]>([])
+  /** D-124: 1차 미팅에서 확인한 관심사 — 관심사는 1차 미팅을 마친 뒤에 정한다(미리 적어 둔 것 + 메모에 나온 주제) */
+  const [interests, setInterests] = useState<string[]>([])
   const analyze = () => {
     const a = analyzeTranscript(text)
     setResult(a)
     setSlots(missingDocSlots(record, a.nextDocs))
+    if (round === 1) setInterests([...new Set([...(record.sales?.interests ?? []), ...interestsFromIssues(a.issues)])])
     const docs = a.nextDocs.slice(0, 3).join(' · ')
     setNext(round === 3 ? '계약 조건 회신 확인' : `${round + 1}차 미팅 준비${docs ? ` — 자료 받기: ${docs}` : ''}`)
   }
   const save = async () => {
     if (!result || saving) return
-    let rec = withMeetingNote(record, { round, text, analysis: result, nextAction: next, nextActionDueDate: due })
+    let rec = withMeetingNote(record, { round, text, analysis: result, nextAction: next, nextActionDueDate: due, ...(round === 1 ? { interests } : {}) })
     if (slots.length > 0) rec = withDocSlots(rec, slots)
     if (canMove && move) rec = withSalesStage(rec, target)
     setSaving(true)
@@ -319,10 +325,34 @@ function MeetingRecorder({ record, round, today, onSave }: { record: ClientOpsRe
           <ScriptBlock title="다음 미팅 방향" text={result.strategy} />
           <ScriptBlock title="감사 카톡" text={result.kakao} copy />
           {result.nextDocs.length > 0 && <ScriptBlock title="자료 요청 카톡" text={docRequestText(record, result.nextDocs)} copy />}
+          {round === 1 && (
+            <fieldset data-testid="meeting-interests" className="rounded-(--radius-control) border border-brand-200 bg-white p-3">
+              {/* float: 글이 두 줄이 되어도 테두리 위에 겹치지 않게 */}
+              <legend className="t-sub float-left w-full font-semibold break-keep text-slate-800">이 회사 관심사 — 1차 미팅에서 확인한 것</legend>
+              <p className="t-meta clear-both pt-1 break-keep text-slate-500">메모에 나온 주제와 미리 적어 둔 주제를 켜 두었습니다. 맞는 것만 남기세요. 저장하면 영업 보드 · 제안 · 작업실 도구 추천에 쓰입니다.</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {[...new Set([...SALES_INTERESTS, ...(record.sales?.interests ?? []), ...interestsFromIssues(result.issues)])].map((x) => {
+                  const on = interests.includes(x)
+                  return (
+                    <button
+                      key={x}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => setInterests((cur) => (on ? cur.filter((v) => v !== x) : [...cur, x]))}
+                      className={`tap t-meta rounded-full border px-2.5 py-1 font-medium ${on ? 'border-brand-400 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                    >
+                      {on && <Check aria-hidden="true" className="mr-0.5 inline size-3.5" />}
+                      {x}
+                    </button>
+                  )
+                })}
+              </div>
+            </fieldset>
+          )}
           {missingDocSlots(record, result.nextDocs).length > 0 && (
             <fieldset data-testid="meeting-doc-slots" className="rounded-(--radius-control) border border-slate-200 bg-white p-3">
-              <legend className="t-sub px-1 font-semibold text-slate-700">서류함에 칸 만들기 — 받았는지 챙기게</legend>
-              <div className="flex flex-col gap-1.5">
+              <legend className="t-sub float-left w-full font-semibold break-keep text-slate-700">서류함에 칸 만들기 — 받았는지 챙기게</legend>
+              <div className="clear-both flex flex-col gap-1.5 pt-1.5">
                 {missingDocSlots(record, result.nextDocs).map((d) => (
                   <label key={d} className="t-sub flex items-center gap-2 text-slate-700">
                     <input
@@ -370,6 +400,7 @@ function MeetingRecorder({ record, round, today, onSave }: { record: ClientOpsRe
 /* ------------------------------------------------------------------ */
 
 function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
+  const location = useLocation()
   const { showToast } = useToast()
   const today = todayLocalDate()
   const [params, setParams] = useSearchParams()
@@ -407,7 +438,8 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
   const rp = params.get('round')
   const round: Round = rp === '0' || rp === '1' || rp === '2' || rp === '3' ? (Number(rp) as Round) : stage === 'lead' ? 0 : roundForStage(stage)
 
-  const pick = (id: string) => setParams((p) => { const n = new URLSearchParams(p); n.set('client', id); n.delete('round'); return n }, { replace: true })
+  // D-124: 업체를 바꾸면 기록을 남긴다 — 뒤로가기로 앞 업체에 돌아온다(예전엔 한 번에 영업 관리 밖으로 나갔다)
+  const pick = (id: string) => setParams((p) => { const n = new URLSearchParams(p); n.set('client', id); n.delete('round'); return n })
   const setRound = (r: Round) => setParams((p) => { const n = new URLSearchParams(p); if (record) n.set('client', record.id); n.set('round', String(r)); return n }, { replace: true })
 
   const item = useMemo(() => (record ? toEngineItem(record) : null), [record])
@@ -494,7 +526,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
               {/* D-121: 요약 한 장 — 누구 · 어디까지 · 점수 · 다음 약속 */}
               <section aria-label="고객 요약" data-testid="meeting-summary" className="flex flex-col gap-2.5 rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                  <Link to={`/ops/clients/${record.id}`} className="t-card inline-flex items-center gap-1 font-bold text-slate-900 hover:text-brand-700 hover:underline">
+                  <Link to={`/ops/clients/${record.id}`} state={fromState(location)} className="t-card inline-flex items-center gap-1 font-bold text-slate-900 hover:text-brand-700 hover:underline">
                     {record.companyName}
                     <ChevronRight aria-hidden="true" className="size-4 text-slate-400" />
                   </Link>

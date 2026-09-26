@@ -10,7 +10,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
+import { fromState } from '../../lib/navFrom'
 import { ChevronRight, CirclePlus, KanbanSquare, Presentation, ScanSearch, Search } from 'lucide-react'
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useToast } from '../../components/ui/toastContext'
@@ -33,11 +34,12 @@ import {
   importLegacySalesAccounts,
   salesInFlow,
   salesStageOf,
+  stageReached,
   withNewProspect,
   withSalesInfo,
   withSalesStage,
 } from '../../services/salesPipeline'
-import { SALES_INTERESTS, SALES_SOURCES, SALES_STALE_DAYS } from '../../content/salesCatalog'
+import { SALES_SOURCES, SALES_STALE_DAYS } from '../../content/salesCatalog'
 import { formatKrwCompact, krwTile } from '../../lib/format'
 import { todayLocalDate, localDateOf } from '../../lib/appClock'
 import {
@@ -90,7 +92,7 @@ function SalesCard({ record, today, onOpen, onMove }: { record: ClientOpsRecord;
       {(who || s?.source) && (
         <p className="t-meta truncate text-slate-500">{[who, s?.source, s?.referrer ? `소개 ${s.referrer}` : ''].filter(Boolean).join(' · ')}</p>
       )}
-      {s && s.interests.length > 0 && (
+      {s && s.interests.length > 0 && stageReached(record, 'm1done') && (
         <p className="t-meta truncate text-slate-600">{s.interests.slice(0, 3).join(' · ')}{s.interests.length > 3 ? ` 외 ${s.interests.length - 3}` : ''}</p>
       )}
       <p className="t-meta flex flex-wrap items-baseline gap-x-2 text-slate-500">
@@ -186,30 +188,13 @@ function NewProspectModal({ open, busy, onClose, onSubmit }: { open: boolean; bu
           <input value={f.concern} onChange={(e) => set('concern', e.target.value)} placeholder="예) 가지급금이 쌓여 정리 방법을 찾는 중" className={inputClass} />
         </label>
       </div>
-      <fieldset className="mt-3">
-        <legend className="text-[0.85rem] text-slate-500">관심사</legend>
-        <div className="mt-1 flex flex-wrap gap-1.5">
-          {SALES_INTERESTS.map((x) => {
-            const on = f.interests.includes(x)
-            return (
-              <button
-                key={x}
-                type="button"
-                aria-pressed={on}
-                onClick={() => set('interests', on ? f.interests.filter((v) => v !== x) : [...f.interests, x])}
-                className={`tap t-meta rounded-full border px-2.5 py-1 font-medium ${on ? 'border-brand-400 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
-              >
-                {x}
-              </button>
-            )
-          })}
-        </div>
-      </fieldset>
+      <p className="t-meta mt-3 break-keep text-slate-500">관심사는 1차 미팅을 마친 뒤 미팅 기록에서 확인합니다.</p>
     </Modal>
   )
 }
 
 function BoardContent({ workspaceId }: { workspaceId: string | null }) {
+  const location = useLocation()
   const navigate = useNavigate()
   const { showToast } = useToast()
   const today = todayLocalDate()
@@ -218,8 +203,14 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
   // D-119: 크레탑 등록 화면의 '크레탑 없이 직접 입력' → ?new=1 로 들어오면 바로 연다
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [formOpen, setFormOpen] = useState(() => searchParams.get('new') === '1')
+  // D-124: ?new=1 은 한 번만 — 주소에 남으면 뒤로가기로 돌아올 때마다 빈 등록 창이 다시 떴다
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setSearchParams((p) => { const n = new URLSearchParams(p); n.delete('new'); return n }, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
   const [busy, setBusy] = useState(false)
   // 좁은 화면에서는 한 번에 한 칸만 — 고른 칸을 기억한다
   const [picked, setPicked] = useState<SalesStage>(() => {
@@ -376,7 +367,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
     }
   }
 
-  const open = (r: ClientOpsRecord) => navigate(`/ops/clients/${r.id}`)
+  const open = (r: ClientOpsRecord) => navigate(`/ops/clients/${r.id}`, { state: fromState(location) })
   const liveCount = records.filter((r) => r.archivedAt === null).length
 
   const column = (stage: SalesStage, list: ClientOpsRecord[]) => {

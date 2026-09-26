@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { NextStepEditor } from '../components/ops/NextStepEditor'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { navFromOf } from '../lib/navFrom'
 import {
   ArrowLeft,
   Check,
@@ -178,8 +179,21 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const tabParam = searchParams.get('tab')
   const tab: DetailTab = isDetailTab(tabParam) ? tabParam : 'overview'
   /** 개요에서 항목을 누르면 그 항목이 열린 채로 업무 탭이 뜨도록 svc 를 함께 싣는다 */
+  const location = useLocation()
+  /** D-124: 영업에서 왔으면 돌아갈 곳 — 탭을 바꿔도 잃지 않게 state 를 함께 싣는다 */
+  const navFrom = navFromOf(location.state)
   const setTab = (next: DetailTab, svc?: ServiceKey) =>
-    setSearchParams(next === 'overview' ? {} : svc ? { tab: next, svc } : { tab: next }, { replace: true })
+    setSearchParams(next === 'overview' ? {} : svc ? { tab: next, svc } : { tab: next }, { replace: true, state: location.state })
+  const goBack = () => {
+    if (!navFrom) {
+      navigate('/ops/clients')
+      return
+    }
+    // 앱 안에서 왔으면 한 칸 뒤로(보던 자리 그대로), 주소로 바로 열었으면 그 화면으로
+    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0
+    if (idx > 0) navigate(-1)
+    else navigate(navFrom.path)
+  }
   const focusedService = searchParams.get('svc')
   const [portalLinked, setPortalLinked] = useState<boolean | null>(null)
   const [infoOpen, setInfoOpen] = useState(false)
@@ -450,11 +464,12 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       <div className="flex flex-col gap-3">
         <button
           type="button"
-          onClick={() => navigate('/ops/clients')}
-          className="inline-flex w-fit items-center gap-1.5 text-[0.95rem] font-medium text-slate-500 hover:text-slate-800"
+          data-testid="client-back"
+          onClick={goBack}
+          className="tap inline-flex w-fit items-center gap-1.5 text-[0.95rem] font-medium text-slate-500 hover:text-slate-800"
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
-          고객 관리 현황
+          {navFrom ? `${navFrom.label}로` : '고객 관리 현황'}
         </button>
         {/*
           머리말은 세 줄로 끝낸다 — 회사명 / 연락처 / 다음 행동.

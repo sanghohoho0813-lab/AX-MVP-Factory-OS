@@ -88,14 +88,14 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   await dlg.getByLabel('대표자·담당자').fill('한시험')
   await dlg.getByLabel('유입 경로').selectOption('소개')
   await dlg.getByLabel('예상 수임료 (만원)').fill('300')
-  await dlg.getByRole('button', { name: '절세' }).click()
+  check('새 잠재고객: 관심사는 1차 미팅 뒤에 — 등록 창에는 고르는 칸이 없다', (await dlg.getByRole('button', { name: '절세' }).count()) === 0 && ((await dlg.innerText()) ?? '').includes('1차 미팅을 마친 뒤'))
   await dlg.getByRole('button', { name: '잠재고객 등록' }).click()
   await page.waitForTimeout(700)
   const leadCol = board.locator('[data-sales-col="lead"]')
   check('새 잠재고객: 잠재 고객 칸에 뜬다', ((await leadCol.innerText()) ?? '').includes('보드시험테크'), await leadCol.innerText())
   check('새 잠재고객: 메뉴 숫자(계약 고객)는 그대로', (await clientsBadge(page)) === before, `${before} → ${await clientsBadge(page)}`)
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients')).find((c) => c.companyName === '보드시험테크'))
-  check('새 잠재고객: 계약 전 · 영업 칸 · 수임료 원 단위', stored?.status === 'waiting' && stored?.sales?.stage === 'lead' && stored.sales.expectedFee === 3_000_000 && stored.sales.interests.includes('절세'), JSON.stringify(stored?.sales))
+  check('새 잠재고객: 계약 전 · 영업 칸 · 수임료 원 단위', stored?.status === 'waiting' && stored?.sales?.stage === 'lead' && stored.sales.expectedFee === 3_000_000 && stored.sales.interests.length === 0, JSON.stringify(stored?.sales))
 
   // 고객 관리 — 잠재고객 보기
   await page.getByRole('navigation', { name: '주 메뉴' }).getByRole('link', { name: /^고객 관리/ }).click()

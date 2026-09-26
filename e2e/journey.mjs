@@ -62,7 +62,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const comp = await page.getByTestId('intake-company').innerText()
   check('확인: 회사 · 사업자번호 · 대표(나이) · 직원 · 설립일', comp.includes('한빛정밀(주)') && comp.includes('214-87-35291') && comp.includes('김한빛 · 64세') && comp.includes('23명') && comp.includes('2008-04-15'), comp.slice(0, 300))
   const ins = await page.getByTestId('intake-insight').innerText()
-  check('확인: 먼저 볼 것 · 추천 컨설팅 · 관심사', ins.includes('현금성 자산') && ins.includes('정책자금') && ins.includes('가업승계') && ins.includes('영업 관심사로 들어갈 것'), ins.slice(0, 300))
+  check('확인: 먼저 볼 것 · 추천 컨설팅 · 관심사', ins.includes('현금성 자산') && ins.includes('정책자금') && ins.includes('가업승계') && ins.includes('1차 미팅 때 물어볼 주제'), ins.slice(0, 300))
   check('확인: 같은 업체가 없으면 붙이기 안내가 없다', (await page.getByTestId('intake-match').count()) === 0)
 
   // ③ 등록
@@ -101,13 +101,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('작업실 도구: 이 업체로 열린다', href === `/tools/policy-funding/diagnosis?client=${id}`, href)
   check('작업실 도구: 크레탑 근거를 이유로', ((await page.getByTestId('journey-open').locator('[data-journey-tool="policy-funding"]').innerText()) ?? '').includes('크레탑 · 정책자금'))
 
-  // 계약 경로
-  await page.getByTestId('sales-path').getByRole('button', { name: '현금 계약' }).click()
-  await page.waitForTimeout(400)
-  check('계약 경로: 현금 → 3차 · 클로징은 건너뛸 수 있음', (await journey.locator('[data-journey-step="closing"]').getAttribute('data-state')) === 'optional' && ((await journey.innerText()) ?? '').includes('2차 미팅에서 계약'))
-  await page.reload({ waitUntil: 'networkidle' })
-  await page.getByTestId('journey-unfold').click()
-  check('계약 경로: 새로고침해도 남는다', (await page.getByTestId('sales-path').getByRole('button', { name: '현금 계약' }).getAttribute('aria-pressed')) === 'true')
+  // D-124: 계약 경로는 2차 · 3차 미팅에서 정한다 — 1차 미팅 준비 때는 안 보인다
+  check('계약 경로: 1차 미팅 준비 때는 안 보인다', (await page.getByTestId('sales-path').count()) === 0 && !((await journey.innerText()) ?? '').includes('계약 경로'))
 
   // 미팅 준비 1차 = 크레탑 분석기 그대로 (D-121) — 등록 때 넣은 분석으로 바로 열린다
   const mc = page.getByTestId('meeting-cretop')
@@ -209,6 +204,41 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByTestId('cretop-to-sales').click()
   await page.waitForURL(/\/sales\/meeting\?client=/)
   check('크레탑 분석기 → 영업: 같은 업체(한빛정밀)에 붙이고 미팅 준비로', new URL(page.url()).searchParams.get('client') === id && (await clients(page)).length === n3)
+
+  // D-124: 관심사는 1차 미팅 기록에서 확인 → 그 뒤에 보인다 · 계약 경로는 2차 미팅부터
+  await page.goto(`${BASE}/sales/meeting?client=${id}&round=1`, { waitUntil: 'networkidle' })
+  const rec1 = page.getByTestId('meeting-recorder')
+  await rec1.getByLabel('미팅에서 나온 말 · 메모').fill('가지급금 정리에 관심 있고 정책자금도 알아보고 싶다고 하심. 재무제표 보내 주기로 함')
+  await rec1.getByRole('button', { name: '메모 나눠 보기' }).click()
+  const mi = page.getByTestId('meeting-interests')
+  const onChips = await mi.locator('button[aria-pressed="true"]').allInnerTexts()
+  check('1차 기록: 관심사 확인 줄 — 미리 적은 주제(정책자금) · 메모에 나온 주제(가지급금)가 켜져 있다', onChips.some((t) => t.includes('정책자금')) && onChips.some((t) => t.includes('가지급금')), onChips.join())
+  await mi.getByRole('button', { name: /가업승계/ }).click()
+  const want = (await mi.locator('button[aria-pressed="true"]').allInnerTexts()).map((t) => t.trim())
+  await rec1.getByRole('button', { name: '기록 저장' }).click()
+  await page.waitForTimeout(700)
+  const r1 = (await clients(page)).find((c) => c.id === id)
+  check('1차 기록: 확인한 관심사만 남는다 · 1차 미팅 완료로', r1.sales.stage === 'm1done' && r1.sales.interests.length === want.length && want.every((w) => r1.sales.interests.includes(w)), JSON.stringify({ st: r1.sales.stage, i: r1.sales.interests, want }))
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.getByTestId('journey-unfold').click()
+  check('1차 미팅 완료: 계약 경로는 아직 안 보인다', (await page.getByTestId('sales-path').count()) === 0)
+  await page.goto(`${BASE}/sales/meeting?client=${id}&round=2`, { waitUntil: 'networkidle' })
+  const rec2 = page.getByTestId('meeting-recorder')
+  await rec2.getByLabel('미팅에서 나온 말 · 메모').fill('제안서 보고 긍정적. 비용은 한 번에 내는 쪽이 좋다고 함')
+  await rec2.getByRole('button', { name: '메모 나눠 보기' }).click()
+  check('2차 기록: 관심사 확인 줄은 1차에만', (await page.getByTestId('meeting-interests').count()) === 0)
+  await rec2.getByRole('button', { name: '기록 저장' }).click()
+  await page.waitForTimeout(700)
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.getByTestId('journey-unfold').click()
+  const journey2 = page.getByTestId('sales-journey')
+  check('2차 미팅: 계약 경로가 보인다', (await page.getByTestId('sales-path').count()) === 1)
+  await page.getByTestId('sales-path').getByRole('button', { name: '현금 계약' }).click()
+  await page.waitForTimeout(400)
+  check('계약 경로: 현금 → 3차 · 클로징은 건너뛸 수 있음', (await journey2.locator('[data-journey-step="closing"]').getAttribute('data-state')) === 'optional' && ((await journey2.innerText()) ?? '').includes('2차 미팅에서 계약'))
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.getByTestId('journey-unfold').click()
+  check('계약 경로: 새로고침해도 남는다', (await page.getByTestId('sales-path').getByRole('button', { name: '현금 계약' }).getAttribute('aria-pressed')) === 'true')
 
   // (마지막에 — 다른 회사 번호가 붙으므로 앞의 '같은 업체' 시험과 섞이지 않게) 1차 탭에서 바로 분석 — 다른 회사 보고서면 저절로 붙이지 않고, '이 업체에 반영' 을 누르면 붙인다
   await page.goto(BASE + '/sales/meeting?client=cli_mirae&round=1', { waitUntil: 'networkidle' })

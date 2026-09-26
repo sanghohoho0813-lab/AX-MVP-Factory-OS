@@ -60,6 +60,7 @@ import {
   salesStageFrom,
   salesInFlow,
   salesStageOf,
+  stageReached,
   withNewProspect,
   withSalesInfo,
   withSalesStage,
@@ -1740,6 +1741,16 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   const ta2 = analyzeTranscript('가지급금 정리가 필요하고 연구소도 궁금합니다')
   const met = withMeetingNote(lead, { round: 1, text: '가지급금 정리가 필요하고 연구소도 궁금합니다', analysis: ta2 }, at)
   check('미팅 기록: 나온 주제가 관심사에 더해진다(빼지 않음)', (met.sales?.interests ?? []).includes('가지급금') && (met.sales?.interests ?? []).includes('연구소'))
+  // D-124: 1차 미팅에서 확인한 관심사로 바꾼다 · 단계마다 보일 것
+  const confirmedMet = withMeetingNote({ ...lead, sales: { ...lead.sales!, interests: ['절세', '정책자금'] } }, { round: 1, text: '가지급금 정리가 필요합니다', analysis: analyzeTranscript('가지급금 정리가 필요합니다'), interests: ['가지급금', '정책자금', ' '] }, at)
+  check('1차 미팅 관심사 확인: 고른 것만 남는다(빈 칸 · 끈 것은 빠짐)', JSON.stringify(confirmedMet.sales?.interests) === JSON.stringify(['가지급금', '정책자금']), JSON.stringify(confirmedMet.sales?.interests))
+  check('1차 미팅 관심사 확인: 활동 기록에 남는다', confirmedMet.activity[0]?.text.includes('관심사 확인: 가지급금 · 정책자금') === true, confirmedMet.activity[0]?.text)
+  const sched = withSalesStage(lead, 'm1sched', at)
+  check('단계 도달: 1차 미팅 예정은 1차 미팅 완료 전', !stageReached(sched, 'm1done') && stageReached(sched, 'm1sched') && stageReached(sched, 'lead'))
+  check('단계 도달: 1차 미팅 기록이 있으면 1차 미팅 완료로 본다', stageReached(met, 'm1done') && !stageReached(met, 'm2'))
+  const heldAfterM2 = withSalesStage(withSalesStage(sched, 'm2', at), 'hold', at)
+  check('단계 도달: 2차까지 갔다가 보류해도 2차에서 정한 것은 보인다', stageReached(heldAfterM2, 'm2') && !stageReached(heldAfterM2, 'closing'))
+  check('단계 도달: 영업 칸이 없는 계약 고객은 계약 완료', stageReached({ sales: null, status: 'active' }, 'closing'))
   const slots = missingDocSlots(lead, ['재무제표(최근 3개년)', '주주명부', '정관', '계정별원장'])
   check('서류 칸: 표준 칸(최근 3개년 재무제표)은 다시 만들지 않는다', !slots.some((x) => x.includes('재무제표')) && slots.includes('주주명부'), JSON.stringify(slots))
   const slotted = withDocSlots(lead, ['주주명부', '정관'])
