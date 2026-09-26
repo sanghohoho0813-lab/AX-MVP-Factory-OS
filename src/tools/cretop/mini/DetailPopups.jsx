@@ -1,7 +1,7 @@
 // 크레탑 미니앱 — 상세정보/대표자/사업장/관계회사/거래처 팝업. 크레탑 원문 추출값 표시.
 import React, { useEffect, useState } from "react";
 import { T, FF } from "./theme.js";
-import { useBackToClose } from "../../../lib/backToClose";
+import { useBackClose } from "./useBackClose.js"; // [D-124]
 
 const FZ = (n) => Math.round(n * 1.35 * 10) / 10;   // 팝업 글씨 약 +35%(가독성)
 const overlay = { position: "fixed", inset: 0, background: "rgba(15,23,42,.5)", zIndex: 80, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "0 14px", overflowY: "auto" };
@@ -9,7 +9,7 @@ const panel = { width: "100%", maxWidth: 680, margin: "6vh 0 40px", background: 
 
 // [D-94] Esc 로 닫기 — 원본 팝업은 바깥 누르기·✕ 로만 닫혔다
 function useEscClose(onClose) {
-  useBackToClose(true, onClose || (() => {})); // [D-124] 휴대폰 뒤로가기는 팝업만 닫는다
+  useBackClose(true, onClose); // [D-124] 휴대폰 뒤로가기는 팝업만 닫는다
   useEffect(() => {
     const f = (e) => { if (e.key === "Escape" && onClose) onClose(); };
     window.addEventListener("keydown", f);

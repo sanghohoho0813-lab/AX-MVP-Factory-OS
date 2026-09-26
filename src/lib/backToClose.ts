@@ -33,6 +33,24 @@ export function useBackToClose(open: boolean, onClose: () => void): void {
   }, [open])
 }
 
+/**
+ * 단독 판매 부품(크레탑 분석기)은 OS 를 import 하지 않는다(경계 시험) — 그래서 전역 손잡이로 창을 올린다.
+ * OS 밖에서 돌면 손잡이가 없어 아무 일도 하지 않는다.
+ */
+export interface BackLayerHandle {
+  push: (close: () => void) => () => void
+}
+;(globalThis as { __axBackLayers?: BackLayerHandle }).__axBackLayers = {
+  push(close) {
+    const layer: OpenLayer = { close }
+    layers.push(layer)
+    return () => {
+      const i = layers.indexOf(layer)
+      if (i >= 0) layers.splice(i, 1)
+    }
+  },
+}
+
 /** 열린 창이 있나 — 다른 막기(useUnsavedChangesGuard)가 먼저 물어본다 */
 export function hasOpenLayer(): boolean {
   return layers.length > 0
