@@ -233,7 +233,8 @@ export function ClientBoardCard({
 
       <div className="flex flex-col gap-2 p-3.5 pl-[1.15rem] sm:p-4 sm:pl-[1.15rem]">
         {/* 이름 줄 */}
-        <div className="flex items-start justify-between gap-2">
+        {/* D-122: 좁으면 배지 · 진행률이 아랫줄로 — 휴대폰 큰 글자에서 이름이 몇 글자로 잘렸다 */}
+        <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
           {/*
             번호는 옅게, 그리고 이름 단추 **밖**에 둔다.
             단추 안에 넣으면 글자 크기가 다른 상자가 한 줄에 셋(번호·이름·화살표)이 되어
@@ -245,7 +246,7 @@ export function ClientBoardCard({
               {rank}
             </span>
           )}
-          <button type="button" onClick={onOpen} className="tap flex min-w-0 flex-1 items-center gap-2 text-left">
+          <button type="button" onClick={onOpen} className="tap flex min-w-0 flex-[1_1_11rem] items-center gap-2 text-left">
             <span className="t-card truncate font-bold text-slate-900 hover:text-brand-700 hover:underline">
               {record.companyName || '(이름 없음)'}
             </span>

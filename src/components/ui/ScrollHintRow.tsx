@@ -16,7 +16,10 @@ export function ScrollHintRow({
   ariaLabel,
   /** 이 값이 바뀌면 고른 것(aria-selected · aria-pressed)을 화면 안으로 */
   activeKey,
+  fade = 'from-slate-50 via-slate-50/90',
 }: {
+  /** 흐린 가장자리 색 — 흰 카드 안이면 'from-white via-white/90' */
+  fade?: string
   children: ReactNode
   className?: string
   innerClassName?: string
@@ -57,7 +60,7 @@ export function ScrollHintRow({
         {children}
       </div>
       {more && (
-        <span aria-hidden="true" data-testid="scroll-more" className="pointer-events-none absolute inset-y-0 right-0 flex w-10 items-center justify-end bg-gradient-to-l from-slate-50 via-slate-50/90 to-transparent pr-1">
+        <span aria-hidden="true" data-testid="scroll-more" className={`pointer-events-none absolute inset-y-0 right-0 flex w-10 items-center justify-end bg-gradient-to-l ${fade} to-transparent pr-1`}>
           <ChevronRight className="size-5 text-slate-500" />
         </span>
       )}

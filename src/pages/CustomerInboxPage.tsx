@@ -5,6 +5,7 @@ import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { ScreenTitle } from '../components/ui/primitives'
 import { Button } from '../components/ui/Button'
 import { useToast } from '../components/ui/toastContext'
+import { ScrollHintRow } from '../components/ui/ScrollHintRow'
 import { EventCard } from '../components/ops/EventCard'
 import { LinkCustomerModal } from '../components/ops/LinkCustomerModal'
 import { ScreenGuide } from '../components/onboarding/ScreenGuide'
@@ -200,7 +201,8 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
       )}
 
       {/* 한 줄로 유지하고 넘치면 옆으로 민다 — 두 줄이 되면 목록이 화면 밖으로 밀린다 */}
-      <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {/* D-122: 오른쪽에 더 있으면 '›' */}
+      <ScrollHintRow className="-mx-4 sm:mx-0" innerClassName="flex gap-1.5 px-4 sm:flex-wrap sm:px-0">
         {filters.map((f) => (
           <button
             key={f.key}
@@ -216,7 +218,7 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
             {f.label} <span className={counts[f.key] === 0 ? 'text-slate-400' : 'text-slate-500'}>{counts[f.key]}</span>
           </button>
         ))}
-      </div>
+      </ScrollHintRow>
 
       {/* 종류가 두 가지 이상일 때만 — 한 가지뿐이면 고를 것이 없다 */}
       {typeChips.items.length >= 2 && (

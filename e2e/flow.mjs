@@ -125,6 +125,27 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   const made = (await clients(page)).find((c) => c.companyName === `새잠재상사${w}`)
   check(`새 업체: 잠재고객(계약 전 · 영업 잠재 고객)으로 들어간다 ${tag}`, made?.status === 'waiting' && made?.sales?.stage === 'lead', JSON.stringify({ s: made?.status, st: made?.sales?.stage }))
 
+  /* 7 (4묶음) 서류 탭 — 지금 필요 없는 안 받은 서류는 설명 줄 없이 · 받음을 켜면 펼쳐진다 */
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=docs', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  const main = (await page.locator('main').innerText()) ?? ''
+  check(`서류 탭: 지금 필요 없는 안 받은 서류는 설명 줄을 접는다 ${tag}`, main.includes('대표자 휴대폰번호') && !main.includes('본인인증·서류 발급 때 계속 필요합니다'))
+  check(`서류 탭: 지금 필요한 서류는 설명까지 ${tag}`, main.includes('대부분의 기관이 3개월 이내 발급본을'))
+  await page.getByLabel('대표자 휴대폰번호 받음').check()
+  await page.waitForTimeout(500)
+  check(`서류 탭: 받음을 켜면 그 줄이 펼쳐진다(메모 칸) ${tag}`, ((await page.locator('main').innerText()) ?? '').includes('본인인증·서류 발급 때 계속 필요합니다'))
+
+  /* 8 (4묶음) 할 일 프리셋 — 이미 적은 글이 있으면 앞에 붙는다 */
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  await page.getByRole('button', { name: '할 일 적기' }).first().click()
+  const box = page.getByLabel('할 일 내용', { exact: true }).first()
+  {
+    await box.fill('김대표 서류')
+    await page.getByRole('button', { name: '통화', exact: true }).first().click()
+    check(`할 일 프리셋: 적은 글 앞에 붙는다 ${tag}`, (await box.inputValue()).startsWith('대표님 통화 — ') && (await box.inputValue()).includes('김대표 서류'), await box.inputValue())
+  }
+
   check(`JS 오류 없음 ${tag}`, errors.length === 0, errors.join(' | '))
   await ctx.close()
 }

@@ -63,7 +63,10 @@ export function withProposal(
   const same = prev && JSON.stringify({ ...prev, at: '' }) === JSON.stringify({ ...proposal, at: '' })
   if (same) return record
   const expectedFee = proposal.feeManwon > 0 ? proposal.feeManwon * 10_000 : base.expectedFee
-  const out = { ...record, sales: { ...base, proposal, expectedFee } }
+  // D-122: 계약한 제안을 새 상품 제안(추가 계약)이 덮으면 지난 제안으로 옮긴다 — 예전에는 처음 계약 내용이 사라졌다
+  const archive = prev && prev.status === '계약 완료' && prev.packages.join('|') !== proposal.packages.join('|')
+  const pastProposals = archive ? [prev, ...(base.pastProposals ?? [])].slice(0, 10) : base.pastProposals
+  const out = { ...record, sales: { ...base, proposal, expectedFee, ...(pastProposals ? { pastProposals } : {}) } }
   const bits = [proposal.status, proposal.packages.length ? `${proposal.packages.length}개 · ${proposal.feeManwon.toLocaleString('ko-KR')}만원` : '', proposal.monthly ? `월납 ${proposal.monthly.premium.toLocaleString('ko-KR')}만원` : '']
   return withActivity(out, 'sales', `제안 저장 — ${bits.filter(Boolean).join(' · ')}`, null, at)
 }

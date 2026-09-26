@@ -207,6 +207,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   /* 직접 만든 서류 칸 (D-82) — 적는 중인 새 칸과, 이름을 고치는 중인 칸 */
   const [newDocLabel, setNewDocLabel] = useState('')
   const [newDocMonths, setNewDocMonths] = useState('')
+  /** D-122: 서류 탭에서 펼쳐 둔 줄 — 받았고 문제없는 서류는 한 줄로 접는다 */
+  const [openDocs, setOpenDocs] = useState<Set<string>>(() => new Set())
   const [renamingDoc, setRenamingDoc] = useState<string | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
   /* 서류 한꺼번에 올리기 시트 (D-84) */
@@ -1049,7 +1051,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
         {!uploadable && (
           <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-4 py-3 text-[0.92rem] break-keep text-slate-600">
-            지금은 이 브라우저에만 저장되는 모드입니다. 받았는지 여부·발급일·보관 위치는 지금도 기록되고, 실제 파일 첨부는 Supabase 클라우드를 연결하면 켜집니다.
+            지금은 이 브라우저에만 저장되는 모드입니다. 받았는지 여부·발급일·보관 위치는 지금도 기록되고, 실제 파일 첨부는 클라우드 저장을 연결하면 켜집니다.
           </p>
         )}
 
@@ -1063,6 +1065,10 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               const urgent = urgentDocs.has(meta.key)
               /* 직접 만든 칸이면 이름을 고치고 없앨 수 있다 (D-82) */
               const custom = record.customDocuments.find((d) => d.key === meta.key)
+              // D-122: 받았고(파일이 필요하면 파일까지) 만료 · 곧 만료 · 지금 필요가 아니면 한 줄로 — 서류 탭이 휴대폰에서 3,700px 이었다
+              const compact = state.received && !view.expired && !view.expiringSoon && !urgent && (!meta.needsFile || state.fileName !== '') && !openDocs.has(meta.key)
+              // 아직 안 받았지만 지금 필요하지 않은 서류 — 설명 줄은 빼고 이름 · 쓰는 도구만
+              const later = !state.received && !urgent && !view.expired && !openDocs.has(meta.key)
               return (
                 <div
                   key={meta.key}
@@ -1082,7 +1088,10 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                         type="checkbox"
                         aria-label={`${meta.label} 받음`}
                         checked={state.received}
-                        onChange={(e) => void commit(withDocument(record, meta.key, { received: e.target.checked }))}
+                        onChange={(e) => {
+                          if (e.target.checked) setOpenDocs((cur) => new Set(cur).add(meta.key))
+                          void commit(withDocument(record, meta.key, { received: e.target.checked }))
+                        }}
                         className="mt-1 size-5 shrink-0 accent-brand-600"
                       />
                       <span className="min-w-0">
@@ -1117,7 +1126,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                             </span>
                           )}
                         </span>
-                        <span className="mt-0.5 block text-[0.88rem] break-keep text-slate-500">{meta.hint}</span>
+                        {!compact && !later && <span className="mt-0.5 block text-[0.88rem] break-keep text-slate-500">{meta.hint}</span>}
                       </span>
                     </label>
                     {view.expired && (
@@ -1133,6 +1142,39 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                     )}
                   </div>
 
+                  {compact ? (
+                    <div data-doc-compact={meta.key} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-[1.9rem]">
+                      <span className="t-sub font-medium text-success-700">받음</span>
+                      {view.expiresOn && <span className="t-sub text-slate-600">{view.expiresOn}까지 유효</span>}
+                      {state.fileName && (
+                        <span className="t-sub inline-flex min-w-0 items-center gap-1 text-slate-600">
+                          <Paperclip aria-hidden="true" className="size-3.5 shrink-0" />
+                          <span className="max-w-[12rem] truncate">{state.fileName}</span>
+                        </span>
+                      )}
+                      {state.storagePath !== '' && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          aria-label={`${meta.label} 내려받기`}
+                          disabled={!uploadable}
+                          title={uploadable ? undefined : '클라우드(Supabase)를 연결하면 내려받을 수 있습니다.'}
+                          onClick={() => void onDownload(state)}
+                        >
+                          <Download aria-hidden="true" className="size-3.5" />
+                          내려받기
+                        </Button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setOpenDocs((cur) => new Set(cur).add(meta.key))}
+                        className="tap t-sub font-semibold text-brand-700 hover:underline"
+                      >
+                        자세히 · 고치기
+                      </button>
+                    </div>
+                  ) : (
+                    <>
                   {state.received && (
                     <div className="grid gap-2 sm:grid-cols-2">
                       {meta.validMonths !== null && (
@@ -1220,8 +1262,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                     </div>
                   )}
 
-                  {needed.length > 0 && (
-                    <p className="text-[0.875rem] break-keep text-slate-400">
+                  {needed.length > 0 && !later && (
+                    <p className="text-[0.875rem] break-keep text-slate-500">
                       필요한 업무: {needed.map((s) => s.shortLabel).join(', ')}
                     </p>
                   )}
@@ -1232,6 +1274,9 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                       <Wrench aria-hidden="true" className="mr-1 inline size-3.5 align-[-2px]" />
                       이 서류를 쓰는 도구: {toolsNeeding(meta.key).map((t) => t.label).join(' · ')}
                     </p>
+                  )}
+
+                    </>
                   )}
 
                   {custom &&

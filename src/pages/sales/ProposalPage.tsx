@@ -387,6 +387,24 @@ function ProposalWork({
       </Surface>
 
       {/* 계약 준비 */}
+      {/* D-122: 지난 제안 — 추가 계약 때 처음 계약 내용이 덮이지 않게 남긴다 */}
+      {(record.sales?.pastProposals?.length ?? 0) > 0 && (
+        <Disclosure title="지난 제안" hint={`${record.sales?.pastProposals?.length}건 · 계약한 것`}>
+          <ul data-testid="past-proposals" className="flex flex-col gap-2">
+            {record.sales?.pastProposals?.map((p, i) => (
+              <li key={`${p.at}-${i}`} className="rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-2.5">
+                <p className="t-meta text-slate-500">
+                  {p.at} · {p.status}
+                  {p.feeManwon > 0 ? ` · ${p.feeManwon.toLocaleString('ko-KR')}만원` : ''}
+                  {p.monthly ? ` · 월납 ${p.monthly.premium.toLocaleString('ko-KR')}만원` : ''}
+                </p>
+                <p className="t-sub mt-0.5 break-keep text-slate-800">{p.packages.join(' · ') || '(상품 없음)'}</p>
+              </li>
+            ))}
+          </ul>
+        </Disclosure>
+      )}
+
       <Disclosure title="계약 준비" hint={`체크 ${prepDone}/${CONTRACT_CHECKLIST.length} · 서류 ${docsDone}/${REQUIRED_DOCS.length}`} defaultOpen={stage === 'closing'}>
         <div className="flex flex-col gap-4" data-testid="contract-prep">
           <fieldset>

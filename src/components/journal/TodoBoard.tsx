@@ -16,6 +16,7 @@ import { useState } from 'react'
 import { ArrowRight, Check, ChevronDown, Pencil, Plus, X } from 'lucide-react'
 import type { JournalEntry } from '../../types/bridge'
 import { TODO_PRESETS } from '../../services/journalService'
+import { ScrollHintRow } from '../ui/ScrollHintRow'
 import { dueText } from '../../services/clientOpsAlerts'
 import { daysLeftFrom } from '../../services/clientOpsAlerts'
 import { Button } from '../ui/Button'
@@ -100,18 +101,19 @@ export function TodoComposer({
       </div>
 
       {/* 자주 쓰는 문구 — 앞부분만 채우고 뒷말은 직접 쓴다 */}
-      <div className="-mx-1 mt-2 flex gap-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {/* D-122: 오른쪽에 더 있으면 '›' · 이미 적은 글이 있으면 앞에 붙인다(예전엔 아무 일도 안 일어났다) */}
+      <ScrollHintRow className="-mx-1 mt-2" innerClassName="flex gap-1 px-1" fade="from-white via-white/90">
         {TODO_PRESETS.map((p) => (
           <button
             key={p.label}
             type="button"
-            onClick={() => setText((v) => (v.trim() === '' ? p.text : v))}
+            onClick={() => setText((v) => (v.trim() === '' ? p.text : v.startsWith(p.text) ? v : `${p.text}${v.trim()}`))}
             className="tap t-meta shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 font-medium whitespace-nowrap text-slate-600 hover:border-brand-300 hover:text-brand-700"
           >
             {p.label}
           </button>
         ))}
-      </div>
+      </ScrollHintRow>
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
         {!compact && clients.length > 0 && (

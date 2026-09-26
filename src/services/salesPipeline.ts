@@ -128,6 +128,9 @@ export function normalizeSales(v: unknown): SalesInfo | null {
   if (typeof s.memo === 'string') out.memo = s.memo
   if (Array.isArray(s.meetings)) out.meetings = normalizeMeetings(s.meetings)
   if (s.proposal && typeof s.proposal === 'object') out.proposal = normalizeProposal(s.proposal as Record<string, unknown>)
+  if (Array.isArray(s.pastProposals)) {
+    out.pastProposals = s.pastProposals.filter((x): x is Record<string, unknown> => !!x && typeof x === 'object').map((x) => normalizeProposal(x)).slice(0, 10)
+  }
   if (Array.isArray(s.contractPrep)) out.contractPrep = [...new Set(strList(s.contractPrep))]
   if (isSalesPath(s.path)) out.path = s.path
   return out

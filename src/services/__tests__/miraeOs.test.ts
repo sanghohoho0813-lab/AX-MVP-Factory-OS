@@ -1750,6 +1750,10 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('영업 신호 링크: 견적 → 상품·제안 · 다음 할 일 → 업체 · 그 밖 → 미팅 준비', salesActionPath('견적 · 업무범위서 보내기', 'x') === '/sales/proposal?client=x' && salesActionPath('다음 할 일 정하기', 'x') === '/ops/clients/x' && salesActionPath('연락하기', 'x') === '/sales/meeting?client=x')
   const withReport = { ...lead, documents: { ...lead.documents, cretopReport: { ...lead.documents.cretopReport, received: true } } }
   const contractStep = buildJourney(withReport, { today: '2026-09-26' }).steps.find((st) => st.key === 'contract')
+  const firstDeal = withProposal(lead, { packages: ['정관정비 패키지'], feeManwon: 150, status: '계약 완료', monthly: null }, at)
+  const upsell = withProposal(firstDeal, { packages: ['벤처인증 패키지'], feeManwon: 300, status: '제안 완료', monthly: null }, '2026-10-01T00:00:00.000Z')
+  check('추가 제안: 계약한 제안은 지난 제안으로 남는다', upsell.sales?.proposal?.packages[0] === '벤처인증 패키지' && upsell.sales?.pastProposals?.[0]?.packages[0] === '정관정비 패키지')
+  check('추가 제안: 계약 전 제안을 고칠 때는 쌓지 않는다', (withProposal(upsell, { packages: ['벤처인증 패키지', 'ISO'], feeManwon: 400, status: '견적 전달', monthly: null }, at).sales?.pastProposals?.length ?? 0) === 1)
   check('영업 흐름: 크레탑 보고서만으로는 계약 서류가 끝나지 않는다', contractStep?.tasks.find((t) => t.label === '계약 서류')?.done === false)
 }
 

@@ -222,7 +222,7 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   if (mob) {
     await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
     await page.waitForTimeout(500)
-    check(`업체 상세 휴대폰: 오른쪽에 탭이 더 있다는 '›' ${tag}`, (await page.getByTestId('scroll-more').count()) === 1)
+    check(`업체 상세 휴대폰: 오른쪽에 탭이 더 있다는 '›' ${tag}`, (await page.locator('[role="tablist"][aria-label="업체 상세"]').locator('xpath=..').getByTestId('scroll-more').count()) === 1)
   }
 
   await page.goto(BASE + '/sales/strategy', { waitUntil: 'networkidle' })

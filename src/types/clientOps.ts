@@ -533,6 +533,8 @@ export interface SalesInfo {
   meetings?: SalesMeetingNote[]
   /** 제안 (D-114 3단계) — 고른 상품 · 합계 · 상태 · 월납 */
   proposal?: SalesProposal
+  /** 지난 제안 (D-122) — 계약한 제안을 새 제안(추가 계약)이 덮을 때 여기로 옮긴다. 최신이 앞, 10건까지 */
+  pastProposals?: SalesProposal[]
   /** 계약 준비 체크 10 · 필수 서류 14 중 챙긴 것 (이름) */
   contractPrep?: string[]
   /**
