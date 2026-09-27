@@ -141,7 +141,7 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   await editLi.getByRole('button', { name: '저장' }).click()
   await page.waitForTimeout(600)
   const noteLi2 = page.locator('li', { hasText: '시험 메모 하나 (고침)' })
-  await noteLi2.getByRole('button', { name: '네, 지웁니다' }).click()
+  await noteLi2.getByRole('button', { name: '지우기' }).click()
   check(`메모: 삭제는 한 번 더 묻는다 ${tag}`, ((await noteLi2.innerText()) ?? '').includes('이 메모를 지울까요?'))
   await noteLi2.getByRole('button', { name: '네, 지웁니다' }).click()
   await page.waitForTimeout(600)

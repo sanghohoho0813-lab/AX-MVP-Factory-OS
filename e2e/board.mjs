@@ -592,7 +592,7 @@ check('실제로 지워졌다', left === false)
   await page.waitForTimeout(300)
   await page.getByLabel('새 칸 이름').fill('공장 등록번호')
   await page.getByLabel('새 칸 내용').fill('충남-2019-0042')
-  await page.getByRole('button', { name: '넣기' }).first().click()
+  await page.getByRole('button', { name: '넣기', exact: true }).first().click()
   await page.waitForTimeout(800)
   const made = (await page.locator('main').innerText()) ?? ''
   check('칸 추가: 화면에 바로 보인다', made.includes('공장 등록번호') && made.includes('충남-2019-0042'), made.slice(0, 200))
