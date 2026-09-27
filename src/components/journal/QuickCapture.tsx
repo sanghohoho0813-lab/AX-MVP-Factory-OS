@@ -5,11 +5,12 @@ import type { JournalEntryType } from '../../types/bridge'
 import { JOURNAL_TYPES, JOURNAL_TYPE_LABEL, type CreateJournalInput } from '../../services/journalService'
 import { DueDateField } from '../ops/opsControls'
 import { todayLocalDate } from '../../lib/appClock'
+import { useSessionDraft } from '../../lib/useSessionDraft'
 
 /**
  * 빠른 기록 — "무슨 일이 있었나요?" 한 줄이면 저장된다.
- * 유형(메모·통화·결정·후속조치·막힘·성과·아이디어)과 고객 연결은 선택.
- * 후속조치는 기한을 받아 홈의 "오늘 반드시"에 올라간다. Ctrl/Cmd+Enter 로 저장.
+ * 유형(메모·통화·결정·할 일·막힘·성과·아이디어)과 고객 연결은 선택.
+ * 할 일는 기한을 받아 홈의 "오늘 반드시"에 올라간다. Ctrl/Cmd+Enter 로 저장.
  */
 export function QuickCapture({
   clients,
@@ -26,7 +27,8 @@ export function QuickCapture({
   autoFocus?: boolean
 }) {
   const [type, setType] = useState<JournalEntryType>('note')
-  const [content, setContent] = useState('')
+  // D-126: 적던 글은 탭 · 화면을 오가도 남는다(이 브라우저 탭 안에서만) — 업체 메모 칸과 같은 약속
+  const [content, setContent, clearContent] = useSessionDraft(`axmvp.draft.capture.${defaultClientId ?? 'all'}`, '')
   const [clientId, setClientId] = useState<string>(defaultClientId ?? '')
   const [dueDate, setDueDate] = useState('')
   const [busy, setBusy] = useState(false)
@@ -45,7 +47,7 @@ export function QuickCapture({
       return
     }
     if (type === 'follow_up' && !dueDate) {
-      setError('후속조치는 언제까지 할지 날짜를 정해 주세요.')
+      setError('할 일는 언제까지 할지 날짜를 정해 주세요.')
       return
     }
     busyRef.current = true
@@ -59,7 +61,7 @@ export function QuickCapture({
         dueDate: type === 'follow_up' ? dueDate : '',
       })
       if (ok === false) return
-      setContent('')
+      clearContent()
       setDueDate('')
       if (type !== 'note') setType('note')
       textRef.current?.focus()
@@ -78,7 +80,7 @@ export function QuickCapture({
     }
   }
 
-  /* 무엇이든 적기 시작하기 전에는 종류·고객사 선택을 보여주지 않는다.
+  /* 무엇이든 적기 시작하기 전에는 종류·업체 선택을 보여주지 않는다.
      처음 보이는 것이 빈 칸 하나뿐이어야 손이 먼저 나간다. */
   const expanded = open || content.trim().length > 0
 
@@ -135,10 +137,10 @@ export function QuickCapture({
             <select
               value={clientId}
               onChange={(e) => setClientId(e.target.value)}
-              aria-label="연결할 고객사"
+              aria-label="연결할 업체"
               className="t-sub h-11 min-w-0 max-w-full rounded-(--radius-control) border border-slate-300 px-2.5 text-slate-700 focus:border-brand-500 focus:outline-none sm:h-10"
             >
-              <option value="">고객사 연결 안 함</option>
+              <option value="">업체 연결 안 함</option>
               {clients.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.companyName}

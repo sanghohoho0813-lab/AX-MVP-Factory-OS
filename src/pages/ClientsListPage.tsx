@@ -134,7 +134,7 @@ export function ClientsListPage() {
         },
         {
           key: 'edit',
-          label: '수정',
+          label: '고치기',
           icon: Pencil,
           onSelect: () => navigate(`/clients/${row.organization.id}/edit`),
         },
@@ -179,17 +179,17 @@ export function ClientsListPage() {
             <div className="flex min-w-0 items-center gap-1.5">
               <p className="max-w-52 truncate text-[0.95rem] font-medium text-slate-700">{row.primaryProject.name}</p>
               {row.primaryProgress?.isSample && (
-                <span className="shrink-0 rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[0.8125rem] font-medium text-brand-700">
+                <span className="shrink-0 rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[0.875rem] font-medium text-brand-700">
                   샘플
                 </span>
               )}
             </div>
             {row.primaryProgress && (
-              <p className="mt-0.5 text-[0.85rem] text-slate-500">
+              <p className="mt-0.5 text-[0.875rem] text-slate-500">
                 {row.primaryProgress.stepText} · {row.primaryProgress.currentStepLabel}
               </p>
             )}
-            {row.projects.length > 1 && <p className="mt-0.5 text-[0.85rem] text-slate-400">외 {row.projects.length - 1}건</p>}
+            {row.projects.length > 1 && <p className="mt-0.5 text-[0.875rem] text-slate-400">외 {row.projects.length - 1}건</p>}
           </div>
         ) : (
           <span className="text-[0.95rem] text-slate-400">프로젝트 없음</span>
@@ -396,7 +396,7 @@ export function ClientsListPage() {
                     <p className="truncate text-sm font-semibold text-slate-800">
                       {row.organization.name}
                     </p>
-                    <p className="mt-0.5 text-[0.8125rem] text-slate-400">
+                    <p className="mt-0.5 text-[0.875rem] text-slate-400">
                       {row.organization.industry} ·{' '}
                       {row.organization.primaryContact.name}
                     </p>
@@ -413,7 +413,7 @@ export function ClientsListPage() {
                     </StatusBadge>
                   )}
                   {row.primaryProgress?.isSample && (
-                    <span className="rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[0.8125rem] font-medium text-brand-700">
+                    <span className="rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[0.875rem] font-medium text-brand-700">
                       샘플
                     </span>
                   )}
@@ -424,7 +424,7 @@ export function ClientsListPage() {
                       <p className="truncate text-sm font-medium text-slate-700">
                         {row.primaryProject.name}
                         {row.projects.length > 1 && (
-                          <span className="ml-1 text-[0.85rem] font-normal text-slate-400">
+                          <span className="ml-1 text-[0.875rem] font-normal text-slate-400">
                             외 {row.projects.length - 1}건
                           </span>
                         )}

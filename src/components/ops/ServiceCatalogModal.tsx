@@ -116,7 +116,7 @@ export function ServiceCatalogModal({
             {BUILTIN_SERVICES.map((s) => (
               <li
                 key={s.key}
-                className={`rounded-full border px-2.5 py-1 text-[0.85rem] font-medium ${ACCENT_CLASS[s.accent].chip}`}
+                className={`rounded-full border px-2.5 py-1 text-[0.875rem] font-medium ${ACCENT_CLASS[s.accent].chip}`}
               >
                 {s.label}
               </li>

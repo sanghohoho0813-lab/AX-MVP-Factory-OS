@@ -1263,6 +1263,7 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('보기: 완납은 못 받은 돈에 안 나온다', !matchesClientFilter(paidAll, 'unpaid', T))
   check('보기: 키 검사', isClientFilterKey('overdue') && !isClientFilterKey('x') && CLIENT_FILTER_ORDER[0] === 'all')
   // D-125: 다음 약속 지남 — 오늘보다 앞 날짜만(오늘 · 빈 날짜는 아님)
+  check('보기: 고객 회신 대기 — waiting_client 업무가 있는 업체만', matchesClientFilter({ ...cash, services: { ...cash.services, ax: { ...cash.services.ax, status: 'waiting_client' } } }, 'waiting', T) && !matchesClientFilter(cash, 'waiting', T))
   check('보기: 다음 약속 지남', matchesClientFilter({ ...lead, nextActionDueDate: '2026-09-13' }, 'late', T) && !matchesClientFilter({ ...lead, nextActionDueDate: T }, 'late', T) && !matchesClientFilter({ ...lead, nextActionDueDate: '' }, 'late', T) && CLIENT_FILTER_ORDER[1] === 'late')
 }
 

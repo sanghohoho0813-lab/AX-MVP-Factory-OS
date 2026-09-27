@@ -320,11 +320,11 @@ function OutcomeContent({ strategy }: { strategy: FundingStrategy }) {
                     <div className="flex shrink-0 items-center gap-1">
                       <Button variant="ghost" size="sm" onClick={() => openEditOutcome(outcome)}>
                         <Pencil aria-hidden="true" className="size-3.5" />
-                        수정
+                        고치기
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => setOutcomeToDelete(outcome)}>
                         <Trash2 aria-hidden="true" className="size-3.5" />
-                        삭제
+                        지우기
                       </Button>
                     </div>
                   )}
@@ -409,7 +409,7 @@ function OutcomeContent({ strategy }: { strategy: FundingStrategy }) {
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => setMetricToDelete(metric)}>
                         <Trash2 aria-hidden="true" className="size-3.5" />
-                        삭제
+                        지우기
                       </Button>
                     </div>
                   )}
@@ -584,7 +584,7 @@ function OutcomeContent({ strategy }: { strategy: FundingStrategy }) {
         title="결과 삭제"
         message="이 결과 기록을 삭제하시겠습니까? 연결된 성과 KPI도 함께 삭제됩니다."
         warning="삭제하면 되돌릴 수 없습니다."
-        confirmLabel="삭제"
+        confirmLabel="지우기"
         danger
         onConfirm={confirmRemoveOutcome}
         onCancel={() => setOutcomeToDelete(null)}
@@ -593,7 +593,7 @@ function OutcomeContent({ strategy }: { strategy: FundingStrategy }) {
         open={metricToDelete !== null}
         title="KPI 삭제"
         message="이 성과 KPI를 삭제하시겠습니까?"
-        confirmLabel="삭제"
+        confirmLabel="지우기"
         danger
         onConfirm={confirmRemoveMetric}
         onCancel={() => setMetricToDelete(null)}

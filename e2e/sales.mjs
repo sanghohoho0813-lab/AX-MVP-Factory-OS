@@ -231,9 +231,9 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   check('미팅 준비: 1차는 크레탑 분석기 · 영업 대본은 접힘', (await page.getByTestId('meeting-cretop').count()) === 1 && (await page.getByTestId('meeting-plan').count()) === 0)
   await page.getByRole('button', { name: /영업 대본 — 오프닝/ }).click()
   const main1 = (await page.locator('main').innerText()) ?? ''
-  check('미팅 준비: 전략 TOP3 — 가업승계 먼저', main1.includes('먼저 볼 전략 TOP3') && main1.indexOf('가업승계') > 0)
+  check('미팅 준비: 전략 TOP3 — 가업승계 먼저', main1.includes('먼저 볼 전략 3가지') && main1.indexOf('가업승계') > 0)
   check('미팅 준비: 1차 미팅 예정 → 1차 대본이 먼저 (질문 · 오프닝 · 요청 자료)', ((await page.getByTestId('meeting-rounds').getByRole('button', { name: '1차 미팅' }).getAttribute('aria-pressed')) === 'true') && main1.includes('오프닝') && /질문 \d+개/.test(main1) && main1.includes('미팅정밀'))
-  for (const [name, word] of [['첫 연락', '전화 대본'], ['2차 미팅', '핵심 이슈 TOP3'], ['3차 클로징', '가격 이야기']]) {
+  for (const [name, word] of [['첫 연락', '전화 대본'], ['2차 미팅', '핵심 이슈 3가지'], ['3차 클로징', '가격 이야기']]) {
     await page.getByTestId('meeting-rounds').getByRole('button', { name }).click()
     await page.waitForTimeout(150)
     check(`미팅 준비: ${name} 대본`, ((await page.getByTestId('meeting-plan').innerText()) ?? '').includes(word))
@@ -424,7 +424,10 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   await page.waitForTimeout(500)
   const sig = page.getByTestId('sales-signals')
   check('보드: 지금 챙길 영업 · 다시 연락할 곳 두 칸', ((await sig.innerText()) ?? '').includes('지금 챙길 영업') && (await sig.innerText()).includes('다시 연락할 곳'))
-  await sig.getByRole('button', { name: /지금 챙길 영업/ }).click()
+  // D-126: '지금 챙길 영업' 은 처음부터 펼쳐져 있다 — 접혀 있을 때만 연다
+  const riskBtn = sig.getByRole('button', { name: /지금 챙길 영업/ })
+  if ((await riskBtn.getAttribute('aria-expanded')) !== 'true') await riskBtn.click()
+  check('보드: 지금 챙길 영업은 처음부터 펼쳐져 있다', (await riskBtn.getAttribute('aria-expanded')) === 'true')
   check('보드: 날짜 지난 곳이 이유와 함께', /날짜지남상사[\s\S]*다음 약속 5일 지남/.test((await sig.innerText()) ?? ''))
   await sig.getByRole('button', { name: /다시 연락할 곳/ }).click()
   check('보드: 보류가 길어진 곳 · 연락 문구 복사', ((await sig.innerText()) ?? '').includes('조용한정밀') && (await sig.getByRole('button', { name: '연락 문구' }).count()) >= 1)

@@ -100,7 +100,7 @@ export const SECTION_STATUS_META: Record<DeliverableSectionStatus, Meta> = {
   needs_review: { label: '검토 필요', tone: 'warning', order: 1 },
   approved: { label: '검토 완료', tone: 'success', order: 2 },
   excluded: { label: '제외', tone: 'neutral', order: 3 },
-  blocked: { label: '차단', tone: 'danger', order: 4 },
+  blocked: { label: '막힘', tone: 'danger', order: 4 },
 }
 
 /* 프롬프트 유형 */

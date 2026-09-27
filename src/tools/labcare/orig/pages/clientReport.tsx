@@ -216,7 +216,7 @@ function ReportBody() {
             onClick={() => window.print()}
             className="rounded-lg bg-navy-700 px-5 py-2.5 text-base font-bold text-white hover:bg-navy-800"
           >
-            PDF 출력
+            인쇄 · PDF 저장
           </button>
           {!customerView ? (
             <Link

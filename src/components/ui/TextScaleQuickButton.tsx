@@ -21,7 +21,7 @@ export function TextScaleQuickButton({ showLabel = false }: { showLabel?: boolea
       className="flex h-10 shrink-0 items-center gap-1 rounded-(--radius-control) border border-slate-200 bg-white px-2.5 text-slate-700 hover:border-brand-300 hover:text-brand-700"
     >
       <span aria-hidden="true" className="font-bold leading-none">
-        <span className="text-[0.8rem]">가</span>
+        <span className="text-[0.875rem]">가</span>
         <span className="text-[1.1rem]">가</span>
       </span>
       {/* 글은 넓은 화면에서만(머리줄이 넘치지 않게) — 좁으면 '가가' 와 풍선 도움말 */}

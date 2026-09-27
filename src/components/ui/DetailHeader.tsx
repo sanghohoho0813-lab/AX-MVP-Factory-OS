@@ -25,7 +25,7 @@ export function DetailHeader({
     <div className="flex flex-col gap-3">
       <Link
         to={backTo}
-        className="inline-flex w-fit items-center gap-1.5 text-[0.875rem] font-medium text-slate-500 hover:text-slate-800"
+        className="tap inline-flex w-fit items-center gap-1.5 t-sub font-medium text-slate-500 hover:text-slate-800"
       >
         <ArrowLeft aria-hidden="true" className="size-3.5" />
         {backLabel}
@@ -33,7 +33,7 @@ export function DetailHeader({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-xl font-bold break-keep text-slate-900 lg:text-2xl">
+            <h1 className="t-page break-keep text-slate-900">
               {title}
             </h1>
             {badges}

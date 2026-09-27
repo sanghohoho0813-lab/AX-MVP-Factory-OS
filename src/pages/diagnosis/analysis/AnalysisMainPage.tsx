@@ -213,7 +213,7 @@ export function AnalysisMainPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <AssessmentStatusBadge status={latest.status} />
                 <RuleVersionInfo result={latest} />
-                <span className="text-[0.85rem] text-slate-400">제출 응답 {latest.sourceResponseIds.length}건 기준</span>
+                <span className="text-[0.875rem] text-slate-400">제출 응답 {latest.sourceResponseIds.length}건 기준</span>
               </div>
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                 <Panel title="분석 진행 순서"><AnalysisProgressSteps steps={steps} /></Panel>

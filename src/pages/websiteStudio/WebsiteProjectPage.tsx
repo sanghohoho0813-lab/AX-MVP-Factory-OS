@@ -238,7 +238,7 @@ export function WebsiteProjectPage() {
             <p className="text-[0.98rem] leading-relaxed break-keep text-slate-700">{designWords}</p>
             <div className="mt-2.5 flex flex-wrap gap-1.5">
               {designDirection.personalities.map((p) => (
-                <span key={p} className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[0.85rem] font-medium text-slate-600">
+                <span key={p} className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[0.875rem] font-medium text-slate-600">
                   {BRAND_PERSONALITY_META[p].label}
                 </span>
               ))}
@@ -255,7 +255,7 @@ export function WebsiteProjectPage() {
           </button>
           {showExpert && (
             <div className="flex flex-col gap-5 border-t border-slate-100 px-5 py-5">
-              <div className="flex flex-wrap items-center gap-2 text-[0.85rem] text-slate-400">
+              <div className="flex flex-wrap items-center gap-2 text-[0.875rem] text-slate-400">
                 <WebsiteStatusBadge status={design.status} />
                 <span>설계 v{design.version}</span>
                 <span>유형 코드: {strategy.websiteType}</span>
@@ -316,7 +316,7 @@ export function WebsiteProjectPage() {
 function DefItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-[0.85rem] font-semibold text-slate-500">{label}</dt>
+      <dt className="text-[0.875rem] font-semibold text-slate-500">{label}</dt>
       <dd className="mt-0.5 text-[0.98rem] break-keep text-slate-700">{value || '-'}</dd>
     </div>
   )

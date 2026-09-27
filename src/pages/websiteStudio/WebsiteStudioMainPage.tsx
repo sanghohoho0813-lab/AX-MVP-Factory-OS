@@ -93,7 +93,7 @@ export function WebsiteStudioMainPage() {
       cell: (r) => (
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-slate-800">{r.project.name}</p>
-          <p className="text-[0.85rem] text-slate-400">{r.project.projectCode}</p>
+          <p className="text-[0.875rem] text-slate-400">{r.project.projectCode}</p>
         </div>
       ),
     },
@@ -162,7 +162,7 @@ export function WebsiteStudioMainPage() {
                   <button type="button" onClick={() => go(r)} className="flex w-full items-center justify-between gap-2 px-5 py-3.5 text-left hover:bg-slate-50">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-slate-800">{r.orgName} · {r.project.name}</p>
-                      <p className="text-[0.85rem] text-slate-400">준비도 {r.readiness !== null ? `${r.readiness}점` : '미확정'}</p>
+                      <p className="text-[0.875rem] text-slate-400">준비도 {r.readiness !== null ? `${r.readiness}점` : '미확정'}</p>
                     </div>
                     <span className="shrink-0 text-[0.9rem] font-semibold text-brand-600">{LIFECYCLE_ACTION[r.lifecycle]}</span>
                   </button>
@@ -184,7 +184,7 @@ export function WebsiteStudioMainPage() {
                   <button type="button" onClick={() => go(r)} className="flex w-full items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50">
                     <div className="min-w-0 text-left">
                       <p className="truncate text-sm font-medium text-slate-800">{r.orgName} · {r.project.name}</p>
-                      <p className="text-[0.85rem] text-slate-400">부족 콘텐츠 {r.missingContent} · 자산 {r.missingAssets}</p>
+                      <p className="text-[0.875rem] text-slate-400">부족 콘텐츠 {r.missingContent} · 자산 {r.missingAssets}</p>
                     </div>
                     {r.status && <WebsiteStatusBadge status={r.status} />}
                   </button>
@@ -204,7 +204,7 @@ export function WebsiteStudioMainPage() {
                   <button type="button" onClick={() => go(r)} className="flex w-full items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50">
                     <div className="min-w-0 text-left">
                       <p className="truncate text-sm font-medium text-slate-800">{r.orgName} · {r.project.name}</p>
-                      <p className="text-[0.85rem] text-slate-400">{memberName(r.project.ownerId)}</p>
+                      <p className="text-[0.875rem] text-slate-400">{memberName(r.project.ownerId)}</p>
                     </div>
                     {r.websiteType && <WebsiteTypeBadge type={r.websiteType} />}
                   </button>

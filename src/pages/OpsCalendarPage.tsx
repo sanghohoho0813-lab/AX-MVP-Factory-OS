@@ -204,7 +204,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                 type="button"
                 aria-pressed={on}
                 onClick={() => toggleKind(k)}
-                className={`tap inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.85rem] font-medium ${
+                className={`tap inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.875rem] font-medium ${
                   on ? SCHEDULE_KIND_CLASS[k].chip : 'border-slate-200 bg-white text-slate-400'
                 }`}
               >
@@ -262,7 +262,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                     } ${isPicked ? 'ring-2 ring-brand-400 ring-inset' : ''} hover:bg-brand-50/40`}
                   >
                     <span
-                      className={`inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[0.85rem] font-semibold ${
+                      className={`inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[0.875rem] font-semibold ${
                         isToday
                           ? 'bg-brand-600 text-white'
                           : !inMonth
@@ -475,7 +475,7 @@ export function EventRow({
         </span>
         {!event.done && event.daysLeft !== null && (
           <span
-            className={`shrink-0 rounded-full border px-2 py-0.5 text-[0.85rem] font-semibold whitespace-nowrap ${
+            className={`shrink-0 rounded-full border px-2 py-0.5 text-[0.875rem] font-semibold whitespace-nowrap ${
               event.daysLeft < 0
                 ? 'border-danger-200 bg-danger-50 text-danger-700'
                 : event.daysLeft <= 7

@@ -287,7 +287,7 @@ export function ProjectDeliverablesPage() {
                     <CircleDashed aria-hidden="true" className="size-4 shrink-0 text-slate-300" />
                   )}
                   <span className="min-w-0 flex-1 break-keep text-[0.9rem] font-medium text-slate-700">{row.label}</span>
-                  <span className={`shrink-0 text-[0.85rem] font-medium whitespace-nowrap ${row.ready ? 'text-success-600' : 'text-slate-400'}`}>
+                  <span className={`shrink-0 text-[0.875rem] font-medium whitespace-nowrap ${row.ready ? 'text-success-600' : 'text-slate-400'}`}>
                     {row.ready ? '준비됨' : row.pendingState}
                   </span>
                   {row.ready && (
@@ -412,7 +412,7 @@ export function ProjectDeliverablesPage() {
             <ChevronDown aria-hidden="true" className={`size-5 transition-transform ${showExpert ? 'rotate-180' : ''}`} />
           </button>
           {showExpert && (
-            <div className="flex flex-col gap-4 border-t border-slate-100 px-5 py-5 text-[0.85rem] text-slate-500">
+            <div className="flex flex-col gap-4 border-t border-slate-100 px-5 py-5 text-[0.875rem] text-slate-500">
               <p className="break-keep">
                 내부에서 &lsquo;자료 묶음(Package)&rsquo;은 확정 스냅샷(Snapshot)과 규칙 버전(Rule Version)을 기준으로 관리됩니다. 아래는 시스템 식별용 정보입니다.
               </p>

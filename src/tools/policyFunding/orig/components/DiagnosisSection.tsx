@@ -47,19 +47,19 @@ function SaveCustomerBar({
       {saved ? (
         <div className="flex flex-col items-center gap-3">
           <p className="font-semibold text-blue-900">
-            ✅ 고객으로 저장했어요. 대시보드에서 관리할 수 있습니다.
+            이 업체 상담으로 저장했습니다. 업체 목록에서 이어서 볼 수 있습니다.
           </p>
           <Link
             href={`/customers/${clientId}`}
             className="rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
           >
-            고객 관리 대시보드로 이동
+            업체 목록 보기
           </Link>
         </div>
       ) : (
         <div className="flex flex-col items-center gap-2">
           <p className="text-sm text-slate-600">
-            이 진단 결과를 고객으로 저장하면 진행상태·메모를 이어서 관리할 수 있어요.
+            이 진단 결과를 이 업체 상담으로 저장하면 진행 상태 · 메모를 이어서 관리합니다.
           </p>
           <label className="flex w-full max-w-md flex-col gap-1 text-left text-sm font-medium text-slate-700">
             저장할 고객 관리 업체
@@ -89,7 +89,7 @@ function SaveCustomerBar({
             data-testid="pf-save-consult"
             className="rounded-xl bg-blue-600 px-6 py-3 text-base font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            고객으로 저장하기
+            이 업체 상담으로 저장
           </button>
         </div>
       )}

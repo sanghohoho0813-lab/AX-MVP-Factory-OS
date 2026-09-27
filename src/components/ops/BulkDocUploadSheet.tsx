@@ -293,7 +293,7 @@ export function BulkDocUploadSheet({
                       <p className="t-sub break-keep text-slate-600">{it.result.reason}</p>
                       {/* 칸 고르기 — 판별이 틀렸으면 여기서 바꾼다. 확실해도 바꿀 수 있다 */}
                       <div className="flex flex-wrap items-end gap-2">
-                        <label className="w-full text-[0.85rem] font-medium text-slate-600 sm:w-auto sm:flex-1 sm:max-w-xs">
+                        <label className="w-full text-[0.875rem] font-medium text-slate-600 sm:w-auto sm:flex-1 sm:max-w-xs">
                           어느 칸에
                           <select
                             aria-label={`${it.file.name} 칸 고르기`}
@@ -313,7 +313,7 @@ export function BulkDocUploadSheet({
                           </select>
                         </label>
                         {it.target === NEW_CELL && (
-                          <label className="w-full text-[0.85rem] font-medium text-slate-600 sm:w-48">
+                          <label className="w-full text-[0.875rem] font-medium text-slate-600 sm:w-48">
                             새 칸 이름
                             <input
                               aria-label={`${it.file.name} 새 칸 이름`}
@@ -324,7 +324,7 @@ export function BulkDocUploadSheet({
                             />
                           </label>
                         )}
-                        <label className="text-[0.85rem] font-medium text-slate-600">
+                        <label className="text-[0.875rem] font-medium text-slate-600">
                           발급일
                           <input
                             type="date"

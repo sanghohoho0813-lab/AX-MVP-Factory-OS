@@ -61,7 +61,7 @@ export function JourneyFlow({
                   )}
                 </span>
                 {step.state === 'current' && (
-                  <span className="inline-flex items-center gap-1 text-[0.8125rem] font-semibold text-brand-600">
+                  <span className="inline-flex items-center gap-1 text-[0.875rem] font-semibold text-brand-600">
                     <Circle aria-hidden="true" className="size-1.5 fill-current" />
                     지금 단계
                   </span>

@@ -443,7 +443,7 @@ export function ProjectFormPage() {
               </div>
               {j && (
                 <div className="rounded-(--radius-card) border border-brand-100 bg-brand-50/60 px-4 py-3">
-                  <p className="text-[0.85rem] font-semibold text-brand-700">첫 번째 해야 할 일</p>
+                  <p className="text-[0.875rem] font-semibold text-brand-700">첫 번째 해야 할 일</p>
                   <p className="mt-0.5 text-[0.95rem] break-keep text-slate-700">{j.actionText}</p>
                 </div>
               )}

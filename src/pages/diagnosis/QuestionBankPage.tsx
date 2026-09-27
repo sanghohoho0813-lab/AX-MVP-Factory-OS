@@ -181,7 +181,7 @@ export function QuestionBankPage() {
       items={[
         {
           key: 'edit',
-          label: '수정',
+          label: '고치기',
           icon: Pencil,
           onSelect: () => navigate(`/diagnosis/questions/${question.id}/edit`),
         },

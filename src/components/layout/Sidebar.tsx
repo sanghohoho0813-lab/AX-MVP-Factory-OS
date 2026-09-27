@@ -125,7 +125,7 @@ function SidebarContent({
           ) : (
             <span className="flex min-w-0 flex-col items-start gap-0.5">
               <BrandLogo tone="dark" imgClassName="h-12 max-w-[200px]" />
-              <span className="truncate text-[0.8125rem] font-semibold tracking-wide text-navy-300">
+              <span className="truncate text-[0.875rem] font-semibold tracking-wide text-navy-300">
                 {brand.productName}
               </span>
             </span>
@@ -208,7 +208,7 @@ function SidebarContent({
                               <NavBadge kind={item.badge} counts={counts} active={isActive} collapsed={collapsed} />
                               {!collapsed && item.status === 'soon' && (
                                 <span
-                                  className={`ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[0.75rem] font-semibold ${
+                                  className={`ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[0.875rem] font-semibold ${
                                     isActive ? 'bg-white/20 text-white' : 'bg-navy-800 text-navy-200'
                                   }`}
                                 >
@@ -218,7 +218,7 @@ function SidebarContent({
                               )}
                               {!collapsed && item.status === 'next' && (
                                 <span
-                                  className={`ml-auto shrink-0 rounded-full border px-1.5 py-0.5 text-[0.75rem] font-semibold tracking-wide ${
+                                  className={`ml-auto shrink-0 rounded-full border px-1.5 py-0.5 text-[0.875rem] font-semibold tracking-wide ${
                                     isActive ? 'border-white/40 text-white' : 'border-navy-600 text-navy-300'
                                   }`}
                                 >
@@ -418,7 +418,7 @@ function NavBadge({ kind, counts, active, collapsed }: { kind: ModuleDefinition[
   const label = kind === 'requests' ? `새 상담신청 ${n}건` : `남은 1차 미팅 ${n}건`
   if (collapsed) {
     return (
-      <span data-nav-badge={kind} aria-label={label} className="absolute top-1 right-3 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger-500 px-1 text-[0.8125rem] font-bold text-white tabular-nums">
+      <span data-nav-badge={kind} aria-label={label} className="absolute top-1 right-3 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger-500 px-1 text-[0.875rem] font-bold text-white tabular-nums">
         {text}
       </span>
     )

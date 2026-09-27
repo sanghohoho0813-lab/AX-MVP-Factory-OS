@@ -132,7 +132,7 @@ export function CandidateDetailPage() {
           <>
             <Button variant="secondary" onClick={() => setEditOpen(true)}>
               <Pencil aria-hidden="true" className="size-4" />
-              편집
+              고치기
             </Button>
             <Button variant="primary" onClick={() => { setCandidateStatus(candidate.id, 'shortlisted'); showToast('우선 후보로 지정했습니다.') }}>
               <Star aria-hidden="true" className="size-4" />

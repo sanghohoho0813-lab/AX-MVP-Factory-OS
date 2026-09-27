@@ -451,7 +451,7 @@ function FeedbackCard({
           </Button>
           <Button variant="ghost" size="sm" onClick={() => setConfirmOpen(true)}>
             <Trash2 aria-hidden="true" className="size-4" />
-            삭제
+            지우기
           </Button>
         </div>
       )}
@@ -459,7 +459,7 @@ function FeedbackCard({
         open={confirmOpen}
         title="피드백 삭제"
         message={`'${item.title}' 피드백을 삭제할까요?`}
-        confirmLabel="삭제"
+        confirmLabel="지우기"
         danger
         busy={busy}
         onConfirm={remove}

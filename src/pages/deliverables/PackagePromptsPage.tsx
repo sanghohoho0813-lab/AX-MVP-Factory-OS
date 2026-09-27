@@ -90,7 +90,7 @@ function PromptCard({
         <div className="flex shrink-0 items-center gap-2">
           {!readOnly && (
             <Button variant="secondary" size="sm" onClick={() => onEdit(prompt)}>
-              편집
+              고치기
             </Button>
           )}
           {!readOnly && prompt.manuallyEdited && (

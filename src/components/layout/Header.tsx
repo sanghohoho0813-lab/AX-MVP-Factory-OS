@@ -182,7 +182,7 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
         {screenGroup && (
           <span
             data-testid="screen-group"
-            className={`flex min-w-0 items-center gap-1 text-[0.8125rem] leading-tight font-semibold text-slate-500 before:h-2.5 before:w-[3px] before:shrink-0 before:rounded-full before:content-[''] ${GROUP_BAR[screenGroup.accent]}`}
+            className={`flex min-w-0 items-center gap-1 text-[0.875rem] leading-tight font-semibold text-slate-500 before:h-2.5 before:w-[3px] before:shrink-0 before:rounded-full before:content-[''] ${GROUP_BAR[screenGroup.accent]}`}
           >
             <span className="truncate">
               {screenGroup.title}

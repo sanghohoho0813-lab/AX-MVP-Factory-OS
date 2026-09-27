@@ -163,7 +163,7 @@ export function ProjectSurveysPage() {
                 <div key={view.respondentRole} className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-5">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-[1.1rem] font-bold text-slate-900">{roleLabel}</p>
-                    <span className={`rounded-full border px-2.5 py-0.5 text-[0.85rem] font-semibold ${stateCls}`}>{stateLabel}</span>
+                    <span className={`rounded-full border px-2.5 py-0.5 text-[0.875rem] font-semibold ${stateCls}`}>{stateLabel}</span>
                   </div>
                   <p className="text-[0.9rem] text-slate-500">문항 {view.questionCount}개 · 약 {view.estimatedMinutes}분 · 발급 {links.length} · 제출 {submitted}</p>
                   {hasLink && <ProgressBar value={submitted > 0 ? 100 : 10} tone={submitted > 0 ? 'success' : 'info'} label={`${roleLabel} 진행률`} />}
@@ -193,7 +193,7 @@ export function ProjectSurveysPage() {
                 { ok: responseSummary.submitted > 0, label: '제출된 응답에 필수 답변 포함' },
               ].map((c) => (
                 <li key={c.label} className="flex items-center gap-2">
-                  <span className={`flex size-5 items-center justify-center rounded-full text-[0.8125rem] font-bold ${c.ok ? 'bg-success-500 text-white' : 'bg-slate-200 text-slate-500'}`}>{c.ok ? '✓' : '·'}</span>
+                  <span className={`flex size-5 items-center justify-center rounded-full text-[0.875rem] font-bold ${c.ok ? 'bg-success-500 text-white' : 'bg-slate-200 text-slate-500'}`}>{c.ok ? '✓' : '·'}</span>
                   <span className={c.ok ? 'text-slate-700' : 'text-slate-500'}>{c.label}</span>
                 </li>
               ))}
@@ -290,7 +290,7 @@ export function ProjectSurveysPage() {
                 </div>
               ))}
               <div>
-                <dt className="text-[0.85rem] text-slate-400">평균 진행률</dt>
+                <dt className="text-[0.875rem] text-slate-400">평균 진행률</dt>
                 <dd className="mt-1 flex items-center gap-2">
                   <ProgressBar value={responseSummary.averageProgress} tone="info" label="평균 진행률" />
                   <span className="shrink-0 text-[0.95rem] font-semibold text-slate-700">

@@ -425,10 +425,10 @@ export function ProjectSurveySetupPage() {
                                 <p className="text-[0.98rem] break-keep text-slate-700">{q?.text}</p>
                                 {expertOpen && (
                                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                                    <span className="font-mono text-[0.8125rem] text-slate-400">{q?.code}</span>
+                                    <span className="font-mono text-[0.875rem] text-slate-400">{q?.code}</span>
                                     {q && <QuestionScopeBadge scope={p.sourceScope} />}
                                     {q && <QuestionTypeBadge type={q.type} />}
-                                    <label className="flex cursor-pointer items-center gap-1 text-[0.85rem] text-slate-500">
+                                    <label className="flex cursor-pointer items-center gap-1 text-[0.875rem] text-slate-500">
                                       <input
                                         type="checkbox"
                                         checked={p.required}
@@ -554,7 +554,7 @@ export function ProjectSurveySetupPage() {
                       {customCandidates.map((q) => (
                         <li key={q.id} className="flex items-center gap-2 px-3 py-2">
                           <div className="min-w-0 flex-1">
-                            <span className="font-mono text-[0.8125rem] text-slate-400">{q.code}</span>
+                            <span className="font-mono text-[0.875rem] text-slate-400">{q.code}</span>
                             <p className="truncate text-[0.9rem] text-slate-700">{q.text}</p>
                           </div>
                           <button type="button" onClick={() => addCustom(q.id)} className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-[0.875rem] font-medium text-slate-600 hover:bg-slate-50">
@@ -604,7 +604,7 @@ export function ProjectSurveySetupPage() {
           </div>
 
           <p className="mt-3 rounded-(--radius-control) border border-slate-200 bg-white px-3.5 py-2.5 text-[0.9rem] break-keep text-slate-500">
-            로컬 모드는 이 브라우저에만 저장됩니다. 준비한 설문과 응답은 같은 브라우저에서만 열 수 있으며, 외부 공유는 Supabase 연결 후 제공됩니다.
+            로컬 모드는 이 브라우저에만 저장됩니다. 준비한 설문과 응답은 같은 브라우저에서만 열 수 있으며, 외부 공유는 클라우드 연결 후 제공됩니다.
           </p>
 
           <div className="mt-4 flex flex-wrap gap-2.5">

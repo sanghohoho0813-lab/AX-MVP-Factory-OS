@@ -274,7 +274,7 @@ function TourOverlay({ tour, onEnd }: { tour: ScreenTour; onEnd: () => void }) {
         style={tipStyle}
         className="absolute w-[min(360px,calc(100vw-24px))] rounded-(--radius-panel) border border-slate-200 bg-white p-4 shadow-(--shadow-overlay) outline-none"
       >
-        <p aria-live="polite" className="text-[0.85rem] font-medium text-slate-400">
+        <p aria-live="polite" className="text-[0.875rem] font-medium text-slate-400">
           {index + 1} / {tour.steps.length}
         </p>
         <h3 className="mt-0.5 text-[1.15rem] font-bold break-keep text-slate-900">{step.title}</h3>

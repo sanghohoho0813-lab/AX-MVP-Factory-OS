@@ -120,7 +120,7 @@ check('오늘 화면에도 되돌아온다', await page.getByText('일정에서 
 await page.getByText('일정에서 적은 할 일').first().click()
 await page.waitForTimeout(400)
 check('할 일 시트가 열린다', await page.getByRole('dialog').isVisible())
-for (const name of ['진행 중', '완료', '내일로 미루기', '삭제']) {
+for (const name of ['진행 중', '완료', '내일로 미루기', '지우기']) {
   check(`시트에 '${name}' 이 있다`, (await page.getByRole('dialog').getByText(name, { exact: true }).count()) > 0)
 }
 

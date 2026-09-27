@@ -59,13 +59,13 @@ function TrackGrid({ row }: { row: ClientOpsLedgerRow }) {
       {row.tracks.map((track) => (
         <div key={track.key} className="min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <dt className="text-[0.8125rem] font-semibold whitespace-nowrap text-slate-500">{track.label}</dt>
-            <span className="text-[0.8125rem] font-semibold text-slate-500">{track.value}%</span>
+            <dt className="text-[0.875rem] font-semibold whitespace-nowrap text-slate-500">{track.label}</dt>
+            <span className="text-[0.875rem] font-semibold text-slate-500">{track.value}%</span>
           </div>
           <div className="mt-1">
             <ProgressBar value={track.value} tone={track.tone} label={`${row.clientName} ${track.label}`} />
           </div>
-          <dd className="mt-1 truncate text-[0.8125rem] text-slate-400">{track.detail}</dd>
+          <dd className="mt-1 truncate text-[0.875rem] text-slate-400">{track.detail}</dd>
         </div>
       ))}
     </dl>
@@ -216,7 +216,7 @@ export function ClientOpsLedgerPage() {
             <p className="max-w-56 truncate text-[0.98rem] font-bold text-slate-900">{row.clientName}</p>
             <StatusBadge tone={row.tone}>{row.statusLabel}</StatusBadge>
           </div>
-          <p className="mt-0.5 truncate text-[0.85rem] text-slate-500">{row.primaryContact}</p>
+          <p className="mt-0.5 truncate text-[0.875rem] text-slate-500">{row.primaryContact}</p>
         </div>
       ),
     },
@@ -228,9 +228,9 @@ export function ClientOpsLedgerPage() {
           <p className="max-w-72 truncate text-[0.9rem] font-medium text-slate-700">{row.projectName}</p>
           <div className="mt-1 flex items-center gap-2">
             <ProgressBar value={row.progressPercent} tone={row.tone} label={`${row.clientName} 진행률`} />
-            <span className="shrink-0 text-[0.8125rem] font-semibold text-slate-500">{row.progressPercent}%</span>
+            <span className="shrink-0 text-[0.875rem] font-semibold text-slate-500">{row.progressPercent}%</span>
           </div>
-          <p className="mt-1 text-[0.8125rem] text-slate-400">{row.stageLabel}</p>
+          <p className="mt-1 text-[0.875rem] text-slate-400">{row.stageLabel}</p>
         </div>
       ),
     },

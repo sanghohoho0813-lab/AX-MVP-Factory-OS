@@ -297,6 +297,9 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   const lateNames = allList.filter((c) => c.archivedAt == null && c.nextActionDueDate && c.nextActionDueDate < todayStr).map((c) => c.companyName)
   const seg = page.getByTestId('client-segment')
   if (await seg.count()) await seg.getByRole('button', { name: /전체/ }).click()
+  // D-126: 휴대폰에서는 보기 · 정렬이 '거르기' 뒤에 접혀 있다
+  const tg = page.getByTestId('client-filters-toggle')
+  if ((await tg.isVisible()) && (await tg.getAttribute('aria-expanded')) !== 'true') await tg.click()
   await page.getByLabel('업체 보기 조건').selectOption('late')
   await page.waitForTimeout(400)
   const listText = (await page.locator('main').innerText()) ?? ''

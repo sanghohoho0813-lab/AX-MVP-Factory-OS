@@ -46,14 +46,14 @@ function PageCard({ design, page, onToast }: { design: WebsiteDesign; page: Webs
         {sections.map((s, i) => (
           <li key={s.id} className="rounded-(--radius-card) border border-slate-200 px-3.5 py-2.5">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[0.85rem] font-semibold text-slate-500">{i + 1}</span>
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[0.875rem] font-semibold text-slate-500">{i + 1}</span>
               <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">{s.title || SECTION_TYPE_META[s.sectionType].label}</p>
               <SectionStatusBadge status={s.contentStatus} />
               <select
                 aria-label={`${SECTION_TYPE_META[s.sectionType].label} 범위`}
                 value={s.scope}
                 onChange={(e) => run(() => updateSection(design.id, page.id, s.id, { scope: e.target.value as WebsiteSection['scope'] }), '범위를 변경했습니다.')}
-                className="rounded-(--radius-control) border border-slate-300 px-2 py-1 text-[0.85rem] text-slate-700 focus:border-brand-400 focus:outline-none"
+                className="rounded-(--radius-control) border border-slate-300 px-2 py-1 text-[0.875rem] text-slate-700 focus:border-brand-400 focus:outline-none"
               >
                 {PAGE_STATUSES.map((sc) => <option key={sc} value={sc}>{PAGE_STATUS_META[sc].label}</option>)}
               </select>
@@ -61,11 +61,11 @@ function PageCard({ design, page, onToast }: { design: WebsiteDesign; page: Webs
                 <IconBtn label="위로" onClick={() => run(() => moveSection(design.id, page.id, s.id, 'up'), '이동했습니다.')} disabled={i === 0}><ChevronUp className="size-4" /></IconBtn>
                 <IconBtn label="아래로" onClick={() => run(() => moveSection(design.id, page.id, s.id, 'down'), '이동했습니다.')} disabled={i === sections.length - 1}><ChevronDown className="size-4" /></IconBtn>
                 <IconBtn label="복제" onClick={() => run(() => duplicateSection(design.id, page.id, s.id), '복제했습니다.')}><Copy className="size-4" /></IconBtn>
-                <IconBtn label="삭제" onClick={() => run(() => deleteSection(design.id, page.id, s.id), '삭제했습니다.')} danger><Trash2 className="size-4" /></IconBtn>
+                <IconBtn label="지우기" onClick={() => run(() => deleteSection(design.id, page.id, s.id), '삭제했습니다.')} danger><Trash2 className="size-4" /></IconBtn>
               </div>
             </div>
             {(s.keyMessage || s.requiredAssets.length > 0) && (
-              <p className="mt-1.5 pl-8 text-[0.85rem] break-keep text-slate-500">
+              <p className="mt-1.5 pl-8 text-[0.875rem] break-keep text-slate-500">
                 {s.keyMessage && <span>{s.keyMessage}</span>}
                 {s.requiredAssets.length > 0 && <span className="text-slate-400"> · 필요 이미지: {s.requiredAssets.join(', ')}</span>}
                 {s.ctaActionId && <span className="text-brand-500"> · CTA 포함</span>}

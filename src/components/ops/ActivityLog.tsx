@@ -102,7 +102,7 @@ export function ActivityLog({
                   </div>
                   <div className={`min-w-0 flex-1 ${last ? 'pb-0' : 'pb-3'}`}>
                     <p className="text-[0.95rem] break-keep text-slate-800">{a.text}</p>
-                    <p className="text-[0.85rem] text-slate-400">
+                    <p className="text-[0.875rem] text-slate-400">
                       <time dateTime={a.at}>{activityTimeText(a.at)}</time>
                     </p>
                   </div>

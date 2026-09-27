@@ -145,7 +145,7 @@ export function EventCard({
             type="button"
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
-            className="inline-flex items-center gap-1 text-[0.85rem] font-medium text-slate-500 hover:text-slate-800"
+            className="inline-flex items-center gap-1 text-[0.875rem] font-medium text-slate-500 hover:text-slate-800"
           >
             {open ? <ChevronUp aria-hidden="true" className="size-4" /> : <ChevronDown aria-hidden="true" className="size-4" />}
             고객이 제출한 내용 {fields.length}개

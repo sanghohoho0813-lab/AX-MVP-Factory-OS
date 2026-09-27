@@ -201,7 +201,7 @@ export function CandidateBoardPage() {
             {[...activeCandidates].sort((a, b) => b.priorityScore - a.priorityScore).slice(0, 3).map((c, i) => (
               <li key={c.id} className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-5">
                 <div className="flex items-start justify-between gap-2">
-                  <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-[0.85rem] font-bold text-brand-700">추천 {i + 1}</span>
+                  <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-[0.875rem] font-bold text-brand-700">추천 {i + 1}</span>
                   <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.875rem] font-medium text-slate-500">추천도 {Math.round(c.priorityScore)}</span>
                 </div>
                 <p className="text-[1.15rem] font-bold break-keep text-slate-900">{c.name}</p>

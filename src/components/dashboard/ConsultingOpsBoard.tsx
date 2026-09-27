@@ -94,7 +94,7 @@ function RecommendationCard({ item }: { item: ConsultingOpsRecommendation }) {
         <p className="text-[0.95rem] font-semibold break-keep text-slate-900">{item.title}</p>
         <StatusBadge tone={item.tone}>권장</StatusBadge>
       </div>
-      <p className="mt-1.5 text-[0.86rem] leading-relaxed break-keep text-slate-500">{item.detail}</p>
+      <p className="mt-1.5 text-[0.875rem] leading-relaxed break-keep text-slate-500">{item.detail}</p>
     </li>
   )
 }

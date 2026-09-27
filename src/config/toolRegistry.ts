@@ -158,7 +158,7 @@ export const TOOLS: ToolDefinition[] = [
     recommendedDocs: ['corporateRegistry'],
     sections: [
       { key: 'judge', label: '1분 판정', icon: Target, hint: '여덟 가지로 감면 가능성 판정' },
-      { key: 'report', label: '판정 결과서', icon: FileText, accent: 'customer', hint: '상담용 결과서 인쇄·저장' },
+      { key: 'report', label: '결과서', icon: FileText, accent: 'customer', hint: '상담용 결과서 인쇄·저장' },
     ],
   },
   {
@@ -192,8 +192,8 @@ export const TOOLS: ToolDefinition[] = [
     requiredDocs: ['payrollRoster'],
     recommendedDocs: ['businessRegistration'],
     sections: [
-      { key: 'dashboard', label: '대시보드', icon: LayoutDashboard, hint: '이번 달 신청 가능·지연·서류·수령 한눈에' },
-      { key: 'companies', label: '업체 관리', icon: Building2, hint: '업체별 직원·회차·서류·수수료·업무 일지' },
+      { key: 'dashboard', label: '한눈에 보기', icon: LayoutDashboard, hint: '이번 달 신청 가능·지연·서류·수령 한눈에' },
+      { key: 'companies', label: '업체 목록', icon: Building2, hint: '업체별 직원·회차·서류·수수료·업무 일지' },
       { key: 'board', label: '진행 보드', icon: ClipboardList, hint: '준비중 → 최종 지급까지 7단계' },
       { key: 'diagnosis', label: '채용 진단', icon: Target, group: '판정', hint: '채용 조건으로 가능한 지원금 가려내기' },
       { key: 'roster', label: '4대보험 명부 진단', icon: FileSpreadsheet, group: '판정', hint: '명부 파일로 직원별 후보 1차 검토' },
@@ -217,9 +217,9 @@ export const TOOLS: ToolDefinition[] = [
     requiredDocs: ['businessRegistration'],
     recommendedDocs: ['corporateRegistry'],
     sections: [
-      { key: 'dashboard', label: '대시보드', icon: LayoutDashboard, hint: '오늘 할 일·설립 진행·연구노트·변경 D-day' },
+      { key: 'dashboard', label: '한눈에 보기', icon: LayoutDashboard, hint: '오늘 할 일·설립 진행·연구노트·변경 D-day' },
       { key: 'tasks', label: '오늘 할 일', icon: ListChecks, hint: '서류·노트·변경신고·리포트를 한 줄로' },
-      { key: 'clients', label: '연구소 고객사', icon: Building2, hint: '연구소 관점의 업체 현황' },
+      { key: 'clients', label: '업체 목록', icon: Building2, hint: '연구소 관점의 업체 현황' },
       { key: 'assessment', label: '설립 가능성 체크', icon: ClipboardCheck, group: '설립', hint: '인원·자격·물적요건 판정' },
       { key: 'setup-docs', label: '설립서류 관리', icon: FileText, group: '설립', hint: '서류 26종 체크 + 요청문·프롬프트' },
       { key: 'org-diagram', label: '조직도·도면', icon: Gauge, group: '설립', hint: '조직도 SVG · 도면 편집기 · 촬영 가이드' },
@@ -229,7 +229,7 @@ export const TOOLS: ToolDefinition[] = [
       { key: 'check', label: '월간 점검', icon: ListChecks, group: '사후관리', hint: '8문항 점검 → 위험도' },
       { key: 'inspection', label: '현장조사 대비', icon: ClipboardCheck, group: '사후관리', hint: '사람·공간·활동 12항목' },
       { key: 'tax', label: '세액공제', icon: Wallet, group: '성과', hint: '연구·인력개발비 세액공제 예상' },
-      { key: 'reports', label: '고객 리포트', icon: FileText, group: '성과', hint: '월간·상세·절세·방문용 4종' },
+      { key: 'reports', label: '결과서', icon: FileText, group: '성과', hint: '월간·상세·절세·방문용 4종' },
       { key: 'resources', label: '안내문·자료실', icon: Megaphone, group: '성과', hint: '템플릿 11종' },
       { key: 'settings', label: '설정·백업', icon: Wrench, group: '설정', hint: '백업 내보내기·불러오기' },
     ],
@@ -237,7 +237,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     key: 'policy-funding',
     label: '정책자금 진단',
-    desc: '8문항 빠른 진단으로 추천 기관 TOP3·세부 트랙·리스크·필요 서류·90일 로드맵·상담 대본을 뽑습니다. 64건 사례 지식 기반.',
+    desc: '8문항 빠른 진단으로 추천 기관 3곳·세부 트랙·리스크·필요 서류·90일 로드맵·상담 대본을 뽑습니다. 64건 사례 지식 기반.',
     navHint: '기관 추천 · 서류 · 로드맵 · 상담 대본',
     path: '/tools/policy-funding',
     icon: Landmark,
@@ -247,10 +247,10 @@ export const TOOLS: ToolDefinition[] = [
     requiredDocs: ['businessRegistration', 'financialStatements'],
     recommendedDocs: ['smeCertificate', 'corporateRegistry', 'healthInsurance'],
     sections: [
-      { key: 'dashboard', label: '대시보드', icon: LayoutDashboard, hint: '상담 단계별 현황·오늘 할 일' },
+      { key: 'dashboard', label: '한눈에 보기', icon: LayoutDashboard, hint: '상담 단계별 현황·오늘 할 일' },
       { key: 'diagnosis', label: '진단하기', icon: Target, accent: 'ai', hint: '8문항 빠른 진단 + 심층 진단' },
-      { key: 'customers', label: '상담 고객 관리', icon: Building2, accent: 'ops', hint: '단계·다음 액션·체크리스트' },
-      { key: 'report', label: '인쇄 리포트', icon: FileText, accent: 'customer', hint: '대표님 한 페이지 요약 + 11섹션' },
+      { key: 'customers', label: '업체 목록', icon: Building2, accent: 'ops', hint: '단계·다음 액션·체크리스트' },
+      { key: 'report', label: '결과서', icon: FileText, accent: 'customer', hint: '대표님 한 페이지 요약 + 11섹션' },
     ],
   },
   {

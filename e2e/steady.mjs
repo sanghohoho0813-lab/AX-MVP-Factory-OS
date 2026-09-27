@@ -113,13 +113,20 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   await page.waitForTimeout(600)
   check(`업체 기록: 되면 저장 · 비워진다 ${tag}`, (await cap.inputValue()) === '' && (await journal(page)).some((j) => j.content.includes('저장 실패해도')))
 
-  const memo = page.getByPlaceholder(/대표님 통화/)
-  await memo.fill('시험 메모 하나')
-  await page.getByRole('button', { name: '메모 추가' }).click()
-  await page.waitForTimeout(500)
+  // D-126: 업무 일기 탭에는 기록 칸 하나만 — 예전 메모는 보이고 고칠 수 있다(메모를 시드로 넣어 확인)
+  await page.evaluate((k) => {
+    const list = JSON.parse(localStorage.getItem(k) ?? '[]')
+    const r = list.find((c) => c.id === 'cli_hansol')
+    const now = new Date().toISOString()
+    r.notes_list = [...(r.notes_list ?? []), { id: 'n_test_one', text: '시험 메모 하나', pinned: false, createdAt: now, updatedAt: now }]
+    localStorage.setItem(k, JSON.stringify(list))
+  }, CLIENTS)
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  check(`업무 일기 탭: 새 메모 칸은 없고 기록 칸 하나 ${tag}`, (await page.getByRole('button', { name: '메모 추가' }).count()) === 0 && (await page.getByLabel('기록 내용').count()) === 1)
   const noteLi = page.locator('li', { hasText: '시험 메모 하나' })
-  check(`메모: 수정 · 삭제 단추에 글자 ${tag}`, (await noteLi.getByRole('button', { name: '수정' }).count()) === 1 && (await noteLi.getByRole('button', { name: '삭제' }).count()) === 1)
-  await noteLi.getByRole('button', { name: '수정' }).click()
+  check(`메모: 고치기 · 지우기 단추에 글자 ${tag}`, (await noteLi.getByRole('button', { name: '고치기' }).count()) === 1 && (await noteLi.getByRole('button', { name: '지우기' }).count()) === 1)
+  await noteLi.getByRole('button', { name: '고치기' }).click()
   // 고치는 동안에는 글이 칸 안에 있다 — 칸이 있는 줄로 찾는다
   const editLi = page.locator('li').filter({ has: page.locator('textarea') }).filter({ has: page.getByRole('button', { name: '취소' }) }).last()
   const editBox = editLi.locator('textarea')
@@ -134,9 +141,9 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   await editLi.getByRole('button', { name: '저장' }).click()
   await page.waitForTimeout(600)
   const noteLi2 = page.locator('li', { hasText: '시험 메모 하나 (고침)' })
-  await noteLi2.getByRole('button', { name: '삭제' }).click()
+  await noteLi2.getByRole('button', { name: '네, 지웁니다' }).click()
   check(`메모: 삭제는 한 번 더 묻는다 ${tag}`, ((await noteLi2.innerText()) ?? '').includes('이 메모를 지울까요?'))
-  await noteLi2.getByRole('button', { name: '지우기' }).click()
+  await noteLi2.getByRole('button', { name: '네, 지웁니다' }).click()
   await page.waitForTimeout(600)
   check(`메모: 지우면 사라진다 ${tag}`, (await page.locator('li', { hasText: '시험 메모 하나 (고침)' }).count()) === 0)
 
@@ -148,8 +155,8 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   await page.getByRole('button', { name: '기록', exact: true }).first().click()
   await page.waitForTimeout(600)
   const row = page.locator('li', { hasText: '오늘 시험 기록' }).first()
-  check(`오늘 기록: 수정 · 고정 · 삭제에 글자 ${tag}`, (await row.getByRole('button', { name: '수정' }).count()) === 1 && (await row.getByRole('button', { name: '고정' }).count()) === 1 && (await row.getByRole('button', { name: '삭제' }).count()) === 1)
-  await row.getByRole('button', { name: '삭제' }).click()
+  check(`오늘 기록: 고치기 · 고정 · 지우기에 글자 ${tag}`, (await row.getByRole('button', { name: '고치기' }).count()) === 1 && (await row.getByRole('button', { name: '고정' }).count()) === 1 && (await row.getByRole('button', { name: '지우기' }).count()) === 1)
+  await row.getByRole('button', { name: '지우기' }).click()
   const dlg = page.getByRole('dialog')
   check(`오늘 기록: 삭제는 확인 창 ${tag}`, (await dlg.count()) === 1 && ((await dlg.innerText()) ?? '').includes('오늘 시험 기록'))
   await dlg.getByRole('button', { name: '취소' }).click()
@@ -177,7 +184,7 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   await page.waitForTimeout(300)
   await page.getByLabel('선택한 날짜').getByText('열흘 뒤 할 일').first().click()
   const sheet = page.getByRole('dialog')
-  await sheet.getByText('삭제', { exact: true }).click()
+  await sheet.getByText('지우기', { exact: true }).click()
   check(`할 일 시트: 삭제는 한 번 더 묻는다 ${tag}`, (await page.getByTestId('todo-delete-confirm').count()) === 1 && (await journal(page)).some((j) => j.id === 'j_future'))
   await sheet.getByText('내일로 미루기', { exact: true }).click()
   await page.waitForTimeout(600)
@@ -187,11 +194,11 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   /* 8 서류 칸 · 지원사업 */
   await page.goto(BASE + '/ops/clients/cli_daum?tab=funding', { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)
-  const fundDel = page.getByRole('button', { name: '삭제', exact: true }).first()
+  const fundDel = page.getByRole('button', { name: '지우기', exact: true }).first()
   if ((await fundDel.count()) > 0) {
     const n0 = (await clients(page)).find((c) => c.id === 'cli_daum').fundingApplications.length
     await fundDel.click()
-    check(`지원사업 삭제: 한 번 더 묻는다 ${tag}`, (await page.getByRole('button', { name: '지우기' }).count()) >= 1 && (await clients(page)).find((c) => c.id === 'cli_daum').fundingApplications.length === n0)
+    check(`지원사업 지우기: 한 번 더 묻는다 ${tag}`, (await page.getByRole('button', { name: '네, 지웁니다' }).count()) >= 1 && (await clients(page)).find((c) => c.id === 'cli_daum').fundingApplications.length === n0)
   } else {
     check(`지원사업: 시드에 신청 건이 있다 ${tag}`, false)
   }
@@ -252,13 +259,14 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
 
   // 업체 메모 — 탭을 바꿨다 와도 남는다
   await page.goto(BASE + '/ops/clients/cli_hansol?tab=journal', { waitUntil: 'networkidle' })
-  const noteBox = page.getByPlaceholder(/대표님 통화 — 중소기업확인서/)
+  const noteBox = page.getByLabel('기록 내용')
   await noteBox.fill('탭 바꿔도 남는 메모')
   await page.locator('[role="tab"]').filter({ visible: true }).first().click()
   await page.waitForTimeout(300)
   await page.locator('[role="tab"]', { hasText: '업무 일기' }).filter({ visible: true }).first().click()
   await page.waitForTimeout(300)
-  check(`업체 메모: 탭을 바꿨다 와도 적던 글이 남는다 ${tag}`, (await page.getByPlaceholder(/대표님 통화 — 중소기업확인서/).inputValue()) === '탭 바꿔도 남는 메모')
+  check(`업체 기록: 탭을 바꿨다 와도 적던 글이 남는다 ${tag}`, (await page.getByLabel('기록 내용').inputValue()) === '탭 바꿔도 남는 메모')
+  await page.getByLabel('기록 내용').fill('')
 
   // 회사 사정 — 다른 업체로 넘어가지 않고, 다녀오면 그대로
   await page.goto(BASE + '/sales/meeting?client=cli_hansol&round=1', { waitUntil: 'networkidle' })

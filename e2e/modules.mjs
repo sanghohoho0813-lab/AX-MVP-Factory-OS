@@ -173,7 +173,7 @@ for (const [w, h, mob] of [[1440, 900, false], [390, 844, true]]) {
   // 인쇄 — 정책자금 리포트: '문서 영역' 표시가 없는 원본 화면도 빈 종이가 아니라 리포트가 찍힌다 (D-95)
   await page.goto(BASE + '/tools/policy-funding/diagnosis?sample=1&client=cli_hansol', { waitUntil: 'networkidle' })
   await page.waitForTimeout(600)
-  await page.getByRole('button', { name: '고객으로 저장하기' }).first().click()
+  await page.getByRole('button', { name: '이 업체 상담으로 저장' }).first().click()
   await page.waitForTimeout(600)
   await page.goto(BASE + '/tools/policy-funding/report?cid=cli_hansol', { waitUntil: 'networkidle' })
   await page.waitForTimeout(600)

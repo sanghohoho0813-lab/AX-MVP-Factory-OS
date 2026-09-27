@@ -255,7 +255,7 @@ export function DocImportModal({
                               <span className="block text-[0.88rem] text-slate-500">{PARSED_FIELD_LABEL[k]}</span>
                               <span className="block text-[1rem] font-semibold break-keep text-slate-900">{value}</span>
                               {willOverwrite && (
-                                <span className="mt-0.5 block text-[0.85rem] text-warning-800">
+                                <span className="mt-0.5 block text-[0.875rem] text-warning-800">
                                   기존 값 「{current}」을(를) 덮어씁니다
                                 </span>
                               )}

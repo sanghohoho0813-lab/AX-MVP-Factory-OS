@@ -73,14 +73,14 @@ export function ClientJournalTab({ record, workspaceId, userId }: { record: Clie
           onEdit={(e, content) => mutate(() => updateJournalEntry(e, { content }), '수정했습니다.')}
           onDelete={(e) => setPendingDelete(e)}
           emptyTitle="이 업체에 대한 기록이 없습니다."
-          emptyHint="통화·결정·후속조치를 남기면 이 업체의 이력이 시간순으로 이어집니다."
+          emptyHint="통화·결정·할 일를 남기면 이 업체의 이력이 시간순으로 이어집니다."
         />
       )}
       <ConfirmModal
         open={pendingDelete !== null}
         title="기록 삭제"
         message="이 기록을 지웁니다. 되돌릴 수 없습니다."
-        confirmLabel="삭제"
+        confirmLabel="지우기"
         danger
         onConfirm={() => { const t = pendingDelete; setPendingDelete(null); if (t) void mutate(() => deleteJournalEntry(t), '지웠습니다.') }}
         onCancel={() => setPendingDelete(null)}

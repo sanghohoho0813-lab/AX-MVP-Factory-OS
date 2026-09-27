@@ -15,6 +15,7 @@ import {
   RefreshCw,
   Search,
   Upload,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { ServiceCatalogModal } from '../components/ops/ServiceCatalogModal'
@@ -193,7 +194,10 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
    * 보기 조건도 기억한다(D-79). '못 받은 돈 있음' 으로 두고 수금 전화를 도는 날은
    * 하루 종일 그 보기로 일한다 — 새로고침마다 되돌아가면 결국 안 쓴다.
    */
+  // D-126: 오늘 화면 숫자 칸에서 ?filter= 로 들어오면 그 보기로 연다(기억해 둔 보기보다 우선)
+  const urlFilter = searchParams.get('filter')
   const [filterKey, setFilterKey] = useState<ClientFilterKey>(() => {
+    if (isClientFilterKey(urlFilter)) return urlFilter
     try {
       const v = localStorage.getItem(FILTER_KEY)
       return isClientFilterKey(v) ? v : 'all'
@@ -201,6 +205,8 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       return 'all'
     }
   })
+  /** 휴대폰에서 보기 · 정렬은 '거르기' 를 눌러야 펼쳐진다 — 첫 업체 카드가 조건 줄 넉 줄 아래에 있었다 */
+  const [filtersOpen, setFiltersOpen] = useState(() => isClientFilterKey(urlFilter))
   useEffect(() => {
     try {
       localStorage.setItem(FILTER_KEY, filterKey)
@@ -214,6 +220,8 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
    * 보관함을 볼 때는 구분 없이 보관한 업체 전부.
    */
   const [segment, setSegment] = useState<ClientSegment>(() => {
+    // ?filter= 로 들어오면 구분 없이 전체에서 거른다(잠재고객 보기로 기억돼 있으면 계약 고객 결과가 안 보인다)
+    if (isClientFilterKey(urlFilter)) return 'all'
     try {
       const v = localStorage.getItem(SEGMENT_KEY)
       return v === 'contract' || v === 'prospect' ? v : 'all'
@@ -582,6 +590,20 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
             정렬은 고르는 칸 하나로 둔다. 단추 네 개를 늘어놓으면 검색줄이 두 줄이 되고,
             좁은 화면에서 제일 많이 쓰는 검색칸이 밀린다.
           */}
+          {/* D-126: 휴대폰에서는 '거르기' 단추 하나 — 누르면 보기 · 정렬이 펼쳐진다 */}
+          <button
+            type="button"
+            aria-expanded={filtersOpen}
+            data-testid="client-filters-toggle"
+            onClick={() => setFiltersOpen((v) => !v)}
+            className={`tap inline-flex items-center gap-1.5 rounded-(--radius-control) border px-3 py-2 text-[0.92rem] font-medium sm:hidden ${
+              filterKey !== 'all' || sortKey !== 'urgency' ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600'
+            }`}
+          >
+            <SlidersHorizontal aria-hidden="true" className="size-4" />
+            거르기{filterKey !== 'all' ? ` · ${CLIENT_FILTER_LABEL[filterKey]}` : ''}
+          </button>
+          <div className={`${filtersOpen ? 'flex' : 'hidden'} w-full flex-wrap items-center gap-2 sm:flex sm:w-auto`}>
           {/* 보기 — 무엇을 보일지. 정렬은 그 다음에 순서를 정한다 (D-79) */}
           <label className="flex shrink-0 items-center gap-1.5">
             <span className="t-sub text-slate-500">보기</span>
@@ -616,6 +638,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
             </select>
           </label>
           <span className="t-sub shrink-0 text-slate-500">{CLIENT_SORT_HINT[sortKey]}</span>
+          </div>
           {(query !== '' || filterKey !== 'all') && (
             <span className="text-[0.9rem] text-slate-500">{visible.length}곳 찾음</span>
           )}
@@ -766,7 +789,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
               className={`size-5 text-slate-400 transition-transform ${alertsOpen ? 'rotate-90' : ''}`}
             />
             지금 챙길 것
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.85rem] font-semibold text-slate-600">
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.875rem] font-semibold text-slate-600">
               {alerts.length}
             </span>
           </button>
@@ -981,7 +1004,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
 
       {/* 판단 기준은 '지금 챙길 것' 을 펼쳤을 때만 — 매일 보는 화면에 각주가 늘 떠 있을 이유가 없다 */}
       {alertsOpen && (
-        <p className="pb-2 text-[0.85rem] text-slate-500">
+        <p className="pb-2 text-[0.875rem] text-slate-500">
           {SEVERITY_META.critical.label}·{SEVERITY_META.warning.label} 판단 기준: 마감 {DUE_SOON_DAYS}일 이내, 서류 유효기간 30일 이내,
           고객 회신 7일 이상 대기.
         </p>

@@ -26,12 +26,15 @@ export function NextStepEditor({
   today,
   onSave,
   label = '다음 약속',
+  hideLabel = false,
 }: {
   record: ClientOpsRecord
   today: string
   /** 저장 — 됐으면 true 를 돌려주면 펼친 칸을 닫는다 */
   onSave: (next: ClientOpsRecord, msg: string) => void | boolean | Promise<void | boolean>
-  label?: string
+  label?: string,
+  /** D-126: 바깥 카드가 이미 '다음 약속' 이라고 말할 때 — 같은 말을 두 번 쓰지 않는다 */
+  hideLabel?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [text, setText] = useState(record.nextAction)
@@ -62,7 +65,7 @@ export function NextStepEditor({
     return (
       <div data-testid="next-step" className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <CalendarClock aria-hidden="true" className={`size-5 shrink-0 ${overdue ? 'text-danger-600' : 'text-brand-600'}`} />
-        <span className="t-sub font-semibold text-slate-600">{label}</span>
+        {!hideLabel && <span className="t-sub font-semibold text-slate-600">{label}</span>}
         <span className="t-body min-w-0 flex-[1_1_14rem] break-keep text-slate-900">
           {record.nextAction || record.nextActionDueDate ? (
             <>
@@ -80,7 +83,7 @@ export function NextStepEditor({
         </span>
         <Button size="sm" variant="secondary" onClick={start} data-testid="next-step-edit">
           <Pencil aria-hidden="true" className="size-4" />
-          {record.nextAction || record.nextActionDueDate ? '바꾸기' : '정하기'}
+          {record.nextAction || record.nextActionDueDate ? '고치기' : '정하기'}
         </Button>
       </div>
     )

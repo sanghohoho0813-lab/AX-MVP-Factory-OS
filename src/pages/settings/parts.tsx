@@ -118,8 +118,7 @@ export function SystemPanel({ mode, connection }: { mode: string; connection: Re
       <SettingRow label="앱">{brand.productName} · {brand.productSubtitle}</SettingRow>
       <SettingRow label="저장 방식">{mode === 'supabase' ? '클라우드 저장' : '이 브라우저에만 저장(연습용)'}</SettingRow>
       <SettingRow label="연결 상태">{connection}</SettingRow>
-      <SettingRow label="저장 형식 버전">v{SCHEMA_VERSION}</SettingRow>
-      <SettingRow label="DB 마이그레이션">stage12a</SettingRow>
+      <SettingRow label="저장 형식">v{SCHEMA_VERSION} · stage12a</SettingRow>
     </Panel>
   )
 }
@@ -133,7 +132,7 @@ export function LocalDataSummaryPanel() {
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CloudSaveStatus state="local" />
-          <span className="text-[0.875rem] text-slate-500">스키마 v{snapshot.schemaVersion} · 총 {snapshot.totalItems}건</span>
+          <span className="text-[0.875rem] text-slate-500">저장 형식 v{snapshot.schemaVersion} · 총 {snapshot.totalItems}건</span>
         </div>
         {summary.length > 0 ? (
           <ul className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">

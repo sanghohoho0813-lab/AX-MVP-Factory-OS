@@ -87,7 +87,7 @@ export function ClientSalesCard({
       <Disclosure title="영업" hint={hint} defaultOpen={prospect}>
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
-            <label className="block min-w-44 flex-1 text-[0.85rem] text-slate-500 sm:max-w-xs">
+            <label className="block min-w-44 flex-1 text-[0.875rem] text-slate-500 sm:max-w-xs">
               영업 단계
               <select
                 value={stage}
@@ -123,7 +123,7 @@ export function ClientSalesCard({
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <label className="block text-[0.85rem] text-slate-500">
+            <label className="block text-[0.875rem] text-slate-500">
               유입 경로
               <select value={draft.source} onChange={(e) => set('source', e.target.value)} className={inputClass}>
                 <option value="">선택</option>
@@ -132,15 +132,17 @@ export function ClientSalesCard({
                 ))}
               </select>
             </label>
-            <label className="block text-[0.85rem] text-slate-500">
-              소개한 사람
-              <input value={draft.referrer} onChange={(e) => set('referrer', e.target.value)} className={inputClass} />
-            </label>
-            <label className="block text-[0.85rem] text-slate-500">
+            {(draft.source === '소개' || draft.referrer !== '') && (
+              <label className="block text-[0.875rem] text-slate-500">
+                소개한 사람
+                <input value={draft.referrer} onChange={(e) => set('referrer', e.target.value)} className={inputClass} />
+              </label>
+            )}
+            <label className="block text-[0.875rem] text-slate-500">
               예상 수임료 (만원)
               <input value={draft.feeManwon} inputMode="numeric" onChange={(e) => set('feeManwon', e.target.value.replace(/[^0-9]/g, ''))} className={inputClass} />
             </label>
-            <label className="block text-[0.85rem] text-slate-500 sm:col-span-3">
+            <label className="block text-[0.875rem] text-slate-500 sm:col-span-3">
               대표 고민 한 줄
               <input value={draft.concern} onChange={(e) => set('concern', e.target.value)} className={inputClass} />
             </label>
@@ -153,7 +155,7 @@ export function ClientSalesCard({
             </p>
           ) : (
           <fieldset>
-            <legend className="text-[0.85rem] text-slate-500">관심사</legend>
+            <legend className="text-[0.875rem] text-slate-500">관심사</legend>
             <div className="mt-1 flex flex-wrap gap-1.5">
               {[...new Set([...SALES_INTERESTS, ...draft.interests])].map((x) => {
                 const on = draft.interests.includes(x)

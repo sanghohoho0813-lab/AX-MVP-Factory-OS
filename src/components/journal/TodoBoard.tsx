@@ -20,6 +20,8 @@ import { ScrollHintRow } from '../ui/ScrollHintRow'
 import { dueText } from '../../services/clientOpsAlerts'
 import { daysLeftFrom } from '../../services/clientOpsAlerts'
 import { Button } from '../ui/Button'
+import { DueDateField } from '../ops/opsControls'
+import { todayLocalDate } from '../../lib/appClock'
 import { BottomSheet } from '../ui/primitives'
 
 export interface TodoDraft {
@@ -241,6 +243,7 @@ export function TodoActionSheet({
   const [editing, setEditing] = useState(false)
   const [content, setContent] = useState(entry.content)
   const [dueDate, setDueDate] = useState(entry.dueDate)
+  const today = todayLocalDate()
   const [clientId, setClientId] = useState(entry.clientId ?? '')
   /*
    * 지금 붙어 있는 업체가 목록(보관·종료 제외)에 없어도 고르는 칸에서 사라지면 안 된다 —
@@ -267,7 +270,7 @@ export function TodoActionSheet({
     { action: 'open', label: '진행 중', hint: '아직 안 끝났습니다 (목록에 남습니다)' },
     { action: 'done', label: '완료', hint: '끝났습니다 (아래로 접힙니다)' },
     { action: 'tomorrow', label: '내일로 미루기', hint: '기한을 내일로 옮깁니다' },
-    { action: 'delete', label: '삭제', hint: '기록에서 지웁니다 — 되돌릴 수 없습니다', tone: 'danger' },
+    { action: 'delete', label: '지우기', hint: '기록에서 지웁니다 — 되돌릴 수 없습니다', tone: 'danger' },
   ]
 
   if (editing) {
@@ -300,14 +303,8 @@ export function TodoActionSheet({
             />
           </label>
           <label className="block">
-            <span className="t-sub font-medium text-slate-700">언제까지</span>
-            <input
-              type="date"
-              aria-label="할 일 기한 고치기"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="t-body mt-1 h-12 w-full rounded-(--radius-control) border border-slate-300 px-3"
-            />
+            {/* D-126: 다른 곳과 같은 오늘 · 내일 · 3일 뒤 단추 */}
+            <DueDateField label="언제까지" ariaLabel="할 일 기한 고치기" value={dueDate} today={today} onChange={setDueDate} />
             {dueDate !== '' && (
               <button
                 type="button"
@@ -383,7 +380,7 @@ export function TodoActionSheet({
           <p className="t-body font-semibold break-keep text-danger-800">이 할 일을 지울까요? 되돌릴 수 없습니다.</p>
           <div className="flex gap-2">
             <Button variant="danger" onClick={() => onPick('delete')}>
-              지우기
+              네, 지웁니다
             </Button>
             <Button onClick={() => setConfirmDelete(false)}>취소</Button>
           </div>

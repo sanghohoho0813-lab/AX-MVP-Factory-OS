@@ -117,7 +117,7 @@ export function SalesJourneyCard({
         <p className="t-sub break-keep text-slate-700">
           <strong className="font-bold text-slate-900">계약 경로</strong> — 이 업체와 무엇으로 계약할 것 같나요?
           <span className="t-meta block text-slate-500">
-            {onPathChange ? '하나를 누르면 아래 걸음이 그 경로에 맞춰집니다. 한 번 더 누르면 풀립니다. 모르면 비워 두세요.' : '미팅 준비에서 고를 수 있습니다.'}
+            {onPathChange ? '하나를 누르면 아래 단계가 그 경로에 맞춰집니다. 한 번 더 누르면 풀립니다. 모르면 비워 두세요.' : '미팅 준비에서 고를 수 있습니다.'}
           </span>
         </p>
         <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
@@ -175,7 +175,7 @@ export function SalesJourneyCard({
                       <Check aria-hidden="true" className="size-3.5" />
                     </span>
                   ) : (
-                    <span className={`inline-flex size-5 items-center justify-center rounded-full text-[0.75rem] font-bold text-white tabular-nums ${c.num} ${s.state === 'next' || s.state === 'optional' ? 'opacity-50' : ''}`}>
+                    <span className={`inline-flex size-5 items-center justify-center rounded-full text-[0.875rem] font-bold text-white tabular-nums ${c.num} ${s.state === 'next' || s.state === 'optional' ? 'opacity-50' : ''}`}>
                       {i + 1}
                     </span>
                   )}

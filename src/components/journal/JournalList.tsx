@@ -10,7 +10,7 @@ const ROW_BTN =
 
 /**
  * 업무 일기 목록 — 시간순 타임라인.
- * 후속조치는 완료 체크, 모든 항목은 수정·삭제·고정이 된다.
+ * 할 일는 완료 체크, 모든 항목은 수정·삭제·고정이 된다.
  * 고객 이름을 누르면 그 업체 상세로 간다.
  */
 export function JournalList({
@@ -24,7 +24,7 @@ export function JournalList({
   showClient = true,
   showDate = true,
   emptyTitle = '오늘 기록된 업무가 없습니다.',
-  emptyHint = '통화·결정·후속조치를 바로 남겨두면 나중에 고객별 이력이 이어집니다.',
+  emptyHint = '통화·결정·할 일를 바로 남겨두면 나중에 고객별 이력이 이어집니다.',
 }: {
   entries: JournalEntry[]
   clientNames: Map<string, string>
@@ -95,7 +95,7 @@ export function JournalList({
               e.pinned ? 'border-highlight-500' : overdue ? 'border-danger-200' : 'border-slate-200'
             } ${e.completed ? 'opacity-70' : ''}`}
           >
-            <div className="flex flex-wrap items-center gap-2 text-[0.85rem]">
+            <div className="flex flex-wrap items-center gap-2 text-[0.875rem]">
               <span className={`rounded-full px-2 py-0.5 font-semibold ${JOURNAL_TYPE_CLASS[e.entryType]}`}>
                 {JOURNAL_TYPE_LABEL[e.entryType]}
               </span>
@@ -166,14 +166,14 @@ export function JournalList({
                 )}
                 {/* D-122: 아이콘만 두지 않는다 — 50~60대는 연필 · 핀 모양을 읽지 않는다 */}
                 <button type="button" onClick={() => { setDraft(e.content); setEditingId(e.id) }} disabled={busyId === e.id} className={ROW_BTN}>
-                  <Pencil aria-hidden="true" className="size-4" /> 수정
+                  <Pencil aria-hidden="true" className="size-4" /> 고치기
                 </button>
                 <button type="button" onClick={() => void run(e, () => onTogglePin(e))} disabled={busyId === e.id} className={ROW_BTN}>
                   {e.pinned ? <PinOff aria-hidden="true" className="size-4" /> : <Pin aria-hidden="true" className="size-4" />}
                   {e.pinned ? '고정 풀기' : '고정'}
                 </button>
                 <button type="button" onClick={() => onDelete(e)} disabled={busyId === e.id} className={`${ROW_BTN} hover:!bg-danger-50 hover:!text-danger-700`}>
-                  <Trash2 aria-hidden="true" className="size-4" /> 삭제
+                  <Trash2 aria-hidden="true" className="size-4" /> 지우기
                 </button>
               </div>
             )}

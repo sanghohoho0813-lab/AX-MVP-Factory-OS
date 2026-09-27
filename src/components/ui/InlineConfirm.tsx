@@ -3,15 +3,15 @@
  *
  * 한 번 누르면 지워지던 곳(수금 항목 · 지원사업 · 서류 칸 …)에 쓴다. 창을 띄우지 않고 그 줄에서
  * "지울까요? [지우기] [취소]" 로 바뀐다 — 휴대폰에서 잘못 스친 손가락 한 번으로는 지워지지 않는다.
- * 아이콘만 두지 않고 '삭제' 글자를 함께 둔다(50~60대는 휴지통 모양을 읽지 않는다).
+ * 아이콘만 두지 않고 '지우기' 글자를 함께 둔다(D-126: 지우기 → 네, 지웁니다 로 통일)(50~60대는 휴지통 모양을 읽지 않는다).
  */
 import { useState, type ReactNode } from 'react'
 import { Trash2 } from 'lucide-react'
 
 export function InlineConfirm({
-  label = '삭제',
+  label = '지우기',
   question = '지울까요?',
-  confirmLabel = '지우기',
+  confirmLabel = '네, 지웁니다',
   onConfirm,
   className = '',
   testId,

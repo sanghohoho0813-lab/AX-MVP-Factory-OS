@@ -67,8 +67,8 @@ function ReviewBody({ design }: { design: WebsiteDesign }) {
       <div className="flex flex-wrap items-center gap-2">
         <WebsiteStatusBadge status={design.status} />
         <WebsiteTypeBadge type={design.strategy.websiteType} />
-        <span className="text-[0.85rem] text-slate-400">설계 v{design.version}</span>
-        {finalized && design.finalizedBy && <span className="text-[0.85rem] text-slate-400">확정: {design.finalizedBy}</span>}
+        <span className="text-[0.875rem] text-slate-400">설계 v{design.version}</span>
+        {finalized && design.finalizedBy && <span className="text-[0.875rem] text-slate-400">확정: {design.finalizedBy}</span>}
       </div>
 
       <Panel title="설계 요약">
@@ -179,7 +179,7 @@ function ReviewBody({ design }: { design: WebsiteDesign }) {
 function Item({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-[0.85rem] font-semibold text-slate-500">{label}</dt>
+      <dt className="text-[0.875rem] font-semibold text-slate-500">{label}</dt>
       <dd className="mt-0.5 text-[0.9rem] break-keep text-slate-700">{value}</dd>
     </div>
   )

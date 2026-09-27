@@ -75,7 +75,7 @@ export function ModulesPage() {
       items={[
         {
           key: 'edit',
-          label: '수정',
+          label: '고치기',
           icon: Pencil,
           onSelect: () => navigate(`/diagnosis/modules/${module.id}/edit`),
         },

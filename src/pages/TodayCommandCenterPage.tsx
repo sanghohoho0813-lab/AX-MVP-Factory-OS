@@ -478,17 +478,17 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                     <span className={`t-sub w-20 shrink-0 font-semibold whitespace-nowrap ${late ? 'text-danger-700' : 'text-brand-700'}`}>
                       {e.daysLeft === 0 ? '오늘' : e.daysLeft === 1 ? '내일' : `${Math.abs(e.daysLeft ?? 0)}일 지남`}
                     </span>
-                    <Link to={`/ops/clients/${e.clientId}`} className="t-body font-bold text-slate-900 hover:text-brand-700 hover:underline">
+                    <Link to={`/ops/clients/${e.clientId}`} className="tap t-body inline-flex items-center font-bold text-slate-900 hover:text-brand-700 hover:underline">
                       {e.clientName}
                     </Link>
                     <span className="t-body min-w-0 flex-[1_1_10rem] break-keep text-slate-700">{e.title}</span>
                     <span className="ml-auto flex shrink-0 items-center gap-2">
                       {prospectIds.has(e.clientId) ? (
-                        <Link to={`/sales/meeting?client=${e.clientId}`} className="t-sub font-semibold text-brand-700 hover:underline">
+                        <Link to={`/sales/meeting?client=${e.clientId}`} className="tap t-sub inline-flex items-center font-semibold text-brand-700 hover:underline">
                           미팅 준비 →
                         </Link>
                       ) : (
-                        <Link to={`/ops/clients/${e.clientId}`} className="t-sub font-semibold text-brand-700 hover:underline">
+                        <Link to={`/ops/clients/${e.clientId}`} className="tap t-sub inline-flex items-center font-semibold text-brand-700 hover:underline">
                           업체 열기 →
                         </Link>
                       )}
@@ -548,7 +548,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               label="고객 회신 대기"
               value={`${waiting}건`}
               tone={waiting > 0 ? 'warning' : 'neutral'}
-              onClick={() => navigate('/ops/clients')}
+              // D-126: 그 조건으로 거른 목록이 바로 열린다(예전엔 전체 목록)
+              onClick={() => navigate(waiting > 0 ? '/ops/clients?filter=waiting' : '/ops/clients')}
             />
             <MetricTile
               label="못 받은 내 돈"
@@ -567,7 +568,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                   .join(' · ') || undefined
               }
               // D-122: 연체가 있으면 가장 오래 밀린 업체의 수금 탭으로 바로
-              onClick={() => navigate(money.overdue.items[0] ? `/ops/clients/${money.overdue.items[0].clientId}?tab=fees` : '/ops/clients')}
+              onClick={() => navigate(money.overdue.items[0] ? `/ops/clients/${money.overdue.items[0].clientId}?tab=fees` : money.scheduled.count > 0 ? '/ops/clients?filter=unpaid' : '/ops/clients')}
             />
             {/* 새 요청은 '급한 일' 이 아니라 '새로 온 것' 이다 — 빨강 대신 브랜드색 */}
             <MetricTile
@@ -722,7 +723,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           </>
         }
       >
-        <p className="text-[0.85rem] text-slate-400">오늘 남긴 기록 · 처리한 일을 모아 정리했습니다.</p>
+        <p className="text-[0.875rem] text-slate-400">오늘 남긴 기록 · 처리한 일을 모아 정리했습니다.</p>
         {(
           [
             ['오늘 처리', daySummary.done, 'text-success-700'],
@@ -770,7 +771,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         open={pendingDelete !== null}
         title="기록 삭제"
         message={pendingDelete ? `"${pendingDelete.content.slice(0, 40)}${pendingDelete.content.length > 40 ? '…' : ''}" 기록을 지웁니다. 되돌릴 수 없습니다.` : ''}
-        confirmLabel="삭제"
+        confirmLabel="지우기"
         danger
         busy={deleting}
         onConfirm={() => {

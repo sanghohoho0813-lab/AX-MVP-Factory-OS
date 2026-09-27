@@ -89,7 +89,7 @@ export function ProjectStepRail({
               <p className="mt-0.5 text-[0.875rem] text-slate-400" aria-current={st === 'current' ? 'step' : undefined}>
                 {meta.badge}
               </p>
-              {st === 'locked' && <p className="mt-0.5 text-[0.8125rem] break-keep text-slate-400 md:hidden">{step.lockedHint}</p>}
+              {st === 'locked' && <p className="mt-0.5 text-[0.875rem] break-keep text-slate-400 md:hidden">{step.lockedHint}</p>}
             </div>
           </div>
         )

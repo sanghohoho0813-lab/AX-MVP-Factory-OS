@@ -108,7 +108,7 @@ function MetricModal({
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>취소</Button>
-          <Button variant="primary" onClick={submit}>{metric ? '수정' : '추가'}</Button>
+          <Button variant="primary" onClick={submit}>{metric ? '저장' : '추가'}</Button>
         </>
       }
     >
@@ -332,10 +332,10 @@ function MetricCard({
             <Ruler aria-hidden="true" className="size-4" />
             측정값 기록
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => onEdit(metric)}>수정</Button>
+          <Button variant="ghost" size="sm" onClick={() => onEdit(metric)}>고치기</Button>
           <Button variant="ghost" size="sm" onClick={() => setConfirmOpen(true)}>
             <Trash2 aria-hidden="true" className="size-4" />
-            삭제
+            지우기
           </Button>
         </div>
       )}
@@ -343,7 +343,7 @@ function MetricCard({
         open={confirmOpen}
         title="KPI 삭제"
         message={`'${metric.name}' KPI와 측정 이력을 삭제할까요?`}
-        confirmLabel="삭제"
+        confirmLabel="지우기"
         danger
         busy={busy}
         onConfirm={remove}

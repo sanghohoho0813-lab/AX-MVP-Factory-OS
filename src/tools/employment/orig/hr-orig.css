@@ -24,18 +24,19 @@
 /* ── 반응형 폰트 스케일 (모바일 기준값) · --fsm = 전체 글자 크기 배율(설정) ── */
 .hr-app, .hr-portal {
   --fsm: 1;
-  --fs-meta: calc(12px * var(--fsm));
-  --fs-sub: calc(13px * var(--fsm));
-  --fs-name: calc(14px * var(--fsm));
-  --fs-row: calc(14px * var(--fsm));
-  --fs-badge: calc(12px * var(--fsm));
-  --fs-btn: calc(13px * var(--fsm));
-  --fs-tab: calc(15px * var(--fsm));
-  --fs-label: calc(13px * var(--fsm));
-  --fs-dday: calc(12px * var(--fsm));
-  --fs-body: calc(14px * var(--fsm));
-  --fs-list: calc(14px * var(--fsm));
-  --fs-mini: calc(10px * var(--fsm));
+  /* D-126: 휴대폰에서 글자가 더 작아지지 않는다 — 넓은 칸(≥641px)과 같은 크기, 바닥 14px */
+  --fs-meta: calc(14px * var(--fsm));
+  --fs-sub: calc(15px * var(--fsm));
+  --fs-name: calc(17px * var(--fsm));
+  --fs-row: calc(16px * var(--fsm));
+  --fs-badge: calc(14px * var(--fsm));
+  --fs-btn: calc(16px * var(--fsm));
+  --fs-tab: calc(17px * var(--fsm));
+  --fs-label: calc(15px * var(--fsm));
+  --fs-dday: calc(14px * var(--fsm));
+  --fs-body: calc(16px * var(--fsm));
+  --fs-list: calc(17px * var(--fsm));
+  --fs-mini: calc(14px * var(--fsm));
 }
 html[data-fontscale="large"] .hr-app, html[data-fontscale="large"] .hr-portal { --fsm: 1.1; }
 html[data-fontscale="xlarge"] .hr-app, html[data-fontscale="xlarge"] .hr-portal { --fsm: 1.22; }

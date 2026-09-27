@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { fromState } from '../../lib/navFrom'
+import { NEXT_QUICK_DAYS } from '../../services/clientOpsNextAction'
 import { useDraftState } from '../../lib/useSessionDraft'
 import { Check, ChevronRight, FileText, NotebookPen, Phone, Presentation, ScanSearch, Send } from 'lucide-react'
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
@@ -147,11 +148,11 @@ function ProfileEditor({ record, onSave }: { record: ClientOpsRecord; onSave: (n
     <Disclosure title="미팅에서 알게 된 회사 사정" hint={`대표 나이 · 매출 · 가지급금 같은 사정 — 적으면 중요도 · 대본이 맞춰집니다 · 지금 대표 ${d.ceoAge || '?'}세 · 매출 ${d.revenueEok ? `${d.revenueEok}억` : '?'} · 체크 ${onCount}개`}>
       <div className="flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <label className="block text-[0.85rem] text-slate-500">
+          <label className="block text-[0.875rem] text-slate-500">
             대표 나이
             <input value={d.ceoAge} inputMode="numeric" onChange={(e) => setD({ ...d, ceoAge: e.target.value.replace(/[^0-9]/g, '') })} className={inputClass} />
           </label>
-          <label className="block text-[0.85rem] text-slate-500">
+          <label className="block text-[0.875rem] text-slate-500">
             매출 (억원)
             <input value={d.revenueEok} inputMode="decimal" onChange={(e) => setD({ ...d, revenueEok: e.target.value.replace(/[^0-9.]/g, '') })} className={inputClass} />
           </label>
@@ -180,7 +181,7 @@ function ProfileEditor({ record, onSave }: { record: ClientOpsRecord; onSave: (n
             </div>
           </fieldset>
         ))}
-        <label className="block text-[0.85rem] text-slate-500">
+        <label className="block text-[0.875rem] text-slate-500">
           상담 메모
           <textarea
             value={d.memo}
@@ -362,6 +363,13 @@ function MeetingRecorder({ record, round, today, onSave, onNextRound }: { record
           <Button variant="ghost" size="sm" onClick={() => setWrap(null)}>
             기록 하나 더
           </Button>
+          {/* D-126: 2차 뒤에는 제안서 · 견적, 3차 뒤에는 계약 준비로 바로 — 예전엔 3차 기록 뒤 갈 곳이 없었다 */}
+          {round >= 2 && (
+            <Link to={`/sales/proposal?client=${record.id}`} data-testid="wrapup-proposal" className={LINK_BUTTON.primary}>
+              {round === 2 ? '제안서 · 견적 만들기' : '계약 준비 · 계약 완료로'}
+              <ChevronRight aria-hidden="true" className="size-4" />
+            </Link>
+          )}
           {round < 3 && (
             <Button variant="secondary" size="sm" onClick={onNextRound} data-testid="wrapup-next">
               {round + 1}차 미팅 준비 보기
@@ -378,7 +386,7 @@ function MeetingRecorder({ record, round, today, onSave, onNextRound }: { record
         <NotebookPen aria-hidden="true" className="size-5 text-brand-600" />
         {round}차 미팅 기록
       </h2>
-      <label className="block text-[0.85rem] text-slate-500">
+      <label className="block text-[0.875rem] text-slate-500">
         미팅에서 나온 말 · 메모
         <textarea
           value={text}
@@ -414,9 +422,11 @@ function MeetingRecorder({ record, round, today, onSave, onNextRound }: { record
               <dd className="mt-1"><PillList items={result.nextDocs} /></dd>
             </div>
           </dl>
-          <ScriptBlock title="다음 미팅 방향" text={result.strategy} />
-          <ScriptBlock title="감사 카톡" text={result.kakao} copy />
-          {result.nextDocs.length > 0 && <ScriptBlock title="자료 요청 카톡" text={docRequestText(record, result.nextDocs)} copy />}
+          {/* D-126: 카톡 문구는 저장 뒤 마무리 카드에서 한 번만 — 여기서는 방향만, 접어서 */}
+          <Disclosure title="다음 미팅 방향" hint="누르면 펼쳐집니다">
+            <p className="t-sub break-keep whitespace-pre-line text-slate-700">{result.strategy}</p>
+          </Disclosure>
+          <p className="t-meta break-keep text-slate-500">저장하면 감사 카톡{result.nextDocs.length > 0 ? ' · 자료 요청 카톡' : ''} 문구가 한 번에 나옵니다.</p>
           {round === 1 && (
             <fieldset data-testid="meeting-interests" className="rounded-(--radius-control) border border-brand-200 bg-white p-3">
               {/* float: 글이 두 줄이 되어도 테두리 위에 겹치지 않게 */}
@@ -460,14 +470,26 @@ function MeetingRecorder({ record, round, today, onSave, onNextRound }: { record
             </fieldset>
           )}
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem]">
-            <label className="block text-[0.85rem] text-slate-500">
-              다음 할 일
+            <label className="block text-[0.875rem] text-slate-500">
+              다음 약속
               <input value={next} onChange={(e) => setNext(e.target.value)} className={inputClass} />
             </label>
-            <label className="block text-[0.85rem] text-slate-500">
+            <label className="block text-[0.875rem] text-slate-500">
               날짜
               <input type="date" value={due} onChange={(e) => setDue(e.target.value)} className={inputClass} />
             </label>
+          </div>
+          {/* D-126: 다른 곳(다음 약속)과 같은 빠른 날짜 단추 */}
+          <div className="-mt-1 flex flex-wrap gap-1.5" aria-label="날짜 빨리 고르기">
+            {NEXT_QUICK_DAYS.map((q) => {
+              const v = addDays(today, q.days)
+              const on = due === v
+              return (
+                <button key={q.label} type="button" aria-pressed={on} onClick={() => setDue(v)} className={`tap rounded-full border px-3 py-1.5 t-meta font-medium ${on ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white text-slate-700 hover:border-brand-400'}`}>
+                  {q.label}
+                </button>
+              )
+            })}
           </div>
           {canMove && (
             <label className="t-sub flex items-center gap-2 text-slate-700">
@@ -596,7 +618,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
         </div>
       ) : (
         <>
-          <label className="flex max-w-xl flex-col gap-1 text-[0.85rem] text-slate-500">
+          <label className="flex max-w-xl flex-col gap-1 text-[0.875rem] text-slate-500">
             고객
             <select value={record?.id ?? ''} onChange={(e) => pick(e.target.value)} aria-label="미팅 준비할 고객" className={`${inputClass} !mt-0 font-semibold`}>
               {grouped.map((g) => (
@@ -653,7 +675,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                     aria-pressed={round === r.key}
                     data-ahead={r.key > liveRound ? '1' : undefined}
                     onClick={() => setRound(r.key)}
-                    className={`tap rounded-[8px] px-2 py-2 text-[0.85rem] font-semibold break-keep sm:px-4 sm:text-[0.9rem] ${round === r.key ? 'bg-brand-600 text-white' : r.key > liveRound ? 'text-slate-400 hover:bg-slate-50' : 'text-slate-600 hover:bg-slate-50'}`}
+                    className={`tap rounded-[8px] px-2 py-2 text-[0.875rem] font-semibold break-keep sm:px-4 sm:text-[0.9rem] ${round === r.key ? 'bg-brand-600 text-white' : r.key > liveRound ? 'text-slate-400 hover:bg-slate-50' : 'text-slate-600 hover:bg-slate-50'}`}
                   >
                     {r.label}
                   </button>
@@ -669,6 +691,22 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
 
               {round === 0 && <FirstContactPlan item={item} />}
 
+              {/* D-126: 미팅 날이 됐으면(오늘 · 지남) 기록 칸이 분석기 한참 아래에 있다 — 한 번에 내려가는 단추 */}
+              {round === 1 && !ahead && record.nextActionDueDate !== '' && record.nextActionDueDate <= today && (
+                <button
+                  type="button"
+                  data-testid="meeting-jump-record"
+                  onClick={() => document.querySelector('[data-testid="meeting-recorder"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                  className="tap flex w-full items-center justify-between gap-3 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-4 py-3 text-left hover:bg-brand-100/60"
+                >
+                  <span className="t-body font-semibold text-slate-900">
+                    {record.nextActionDueDate === today ? '오늘 1차 미팅' : '1차 미팅 날짜가 지났습니다'} — 미팅이 끝났으면 기록부터
+                  </span>
+                  <span className="t-sub inline-flex shrink-0 items-center gap-1 font-semibold text-brand-700">
+                    기록 적기 <ChevronRight aria-hidden="true" className="size-4" />
+                  </span>
+                </button>
+              )}
               {round === 1 && (
                 <>
                   {/* D-121: 1차 미팅 준비 = 크레탑 분석기 그대로(단독 판매 부품) — 분석하면 이 업체에 바로 반영 */}
@@ -809,7 +847,7 @@ function FirstMeetingScript({ item }: { item: EngineItem }) {
         <ScriptBlock title="요청할 자료">
           <PillList items={p.docs} />
         </ScriptBlock>
-        <ScriptBlock title="먼저 볼 전략 TOP3">
+        <ScriptBlock title="먼저 볼 전략 3가지">
           <ol className="grid gap-2 lg:grid-cols-3">
             {strategies.map((st, i) => (
               <li key={st.id} className="relative flex flex-col gap-1 overflow-hidden rounded-(--radius-control) border border-slate-200 bg-slate-50 p-3 pl-4">
@@ -874,7 +912,7 @@ function LaterRoundPlan({ record, item, round, onGoFirst }: { record: ClientOpsR
       <>
         {followUp}
         <div data-testid="meeting-plan" className="flex flex-col gap-3">
-          <ScriptBlock title="핵심 이슈 TOP3">
+          <ScriptBlock title="핵심 이슈 3가지">
             <NumberedList items={p.topIssues.map((t) => t.replace(/^\d+\.\s*/, ''))} />
           </ScriptBlock>
           <ScriptBlock title="마무리 말" text={p.close} copy />

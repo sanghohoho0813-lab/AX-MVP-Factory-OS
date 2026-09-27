@@ -341,7 +341,7 @@ function ApplicationCard({
         </div>
         {!readOnly && (
           <Button variant="secondary" size="sm" onClick={() => onEdit(app)}>
-            편집
+            고치기
           </Button>
         )}
       </div>

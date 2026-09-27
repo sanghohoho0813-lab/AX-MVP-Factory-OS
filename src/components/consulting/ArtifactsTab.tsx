@@ -140,7 +140,7 @@ export function ArtifactsTab({ focus }: { focus?: string }) {
         open={pendingDelete !== null}
         title="산출물 삭제"
         message="이 버전을 지웁니다. 되돌릴 수 없습니다. 이력을 남기려면 지우는 대신 '대체됨' 으로 두세요."
-        confirmLabel="삭제"
+        confirmLabel="지우기"
         danger
         onConfirm={() => { const t = pendingDelete; setPendingDelete(null); if (t) void remove(t) }}
         onCancel={() => setPendingDelete(null)}

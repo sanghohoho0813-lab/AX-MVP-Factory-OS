@@ -71,7 +71,7 @@ export function CoreCheckScreen() {
               샘플 넣기
             </Button>
             <Button variant="ghost" size="sm" onClick={() => { setText(''); setChecked(new Set()) }}>
-              <RotateCcw aria-hidden="true" className="size-4" /> 비우기
+              <RotateCcw aria-hidden="true" className="size-4" /> 처음부터
             </Button>
           </div>
         </div>

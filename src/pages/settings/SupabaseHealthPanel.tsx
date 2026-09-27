@@ -75,7 +75,7 @@ export function SupabaseHealthPanel() {
 
   return (
     <Panel title="클라우드 연결 점검">
-      <HelpNote summary="Supabase 연결이 제대로 됐는지 하나씩 확인합니다. 안 되는 항목이 있으면 무엇을 고쳐야 하는지 함께 알려드립니다." />
+      <HelpNote summary="클라우드 연결이 제대로 됐는지 하나씩 확인합니다. 안 되는 항목이 있으면 무엇을 고쳐야 하는지 함께 알려드립니다." />
       <div className="mt-4">
         <Button variant="primary" onClick={() => void run()} disabled={running}>
           <RefreshCw aria-hidden="true" className={`size-4 ${running ? 'animate-spin' : ''}`} />

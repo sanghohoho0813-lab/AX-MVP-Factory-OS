@@ -49,12 +49,15 @@ export function DueDateField({
   today,
   onChange,
   hint,
+  ariaLabel,
 }: {
   label: string
   value: string
   today: string
   onChange: (v: string) => void
   hint?: string
+  /** 화면 글자와 다른 이름으로 찾을 때(시험 · 보조기기) */
+  ariaLabel?: string
 }) {
   return (
     <div>
@@ -63,6 +66,7 @@ export function DueDateField({
         <input
           type="date"
           value={value}
+          aria-label={ariaLabel}
           onChange={(e) => onChange(e.target.value)}
           className="mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[0.98rem] focus:border-brand-500 focus:outline-none"
         />
@@ -88,7 +92,7 @@ export function DueDateField({
           </button>
         )}
       </div>
-      {hint && <p className="mt-1 text-[0.85rem] font-semibold">{hint}</p>}
+      {hint && <p className="mt-1 text-[0.875rem] font-semibold">{hint}</p>}
     </div>
   )
 }
@@ -169,7 +173,7 @@ export function MessageModal({
             </Button>
             <Button variant="primary" onClick={() => void copy()}>
               <ClipboardCopy aria-hidden="true" className="size-4" />
-              {copied ? '복사했습니다' : '복사하기'}
+              {copied ? '복사했습니다' : '복사'}
             </Button>
           </div>
         </div>

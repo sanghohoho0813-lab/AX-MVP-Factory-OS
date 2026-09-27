@@ -157,7 +157,7 @@ export function FundingSection({
                   </div>
 
                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                    <label className="text-[0.85rem] font-medium text-slate-600">
+                    <label className="text-[0.875rem] font-medium text-slate-600">
                       신청 마감
                       <input
                         type="date"
@@ -166,7 +166,7 @@ export function FundingSection({
                         className={`mt-1 w-full ${inputCls}`}
                       />
                     </label>
-                    <label className="text-[0.85rem] font-medium text-slate-600">
+                    <label className="text-[0.875rem] font-medium text-slate-600">
                       신청 금액(원)
                       <input
                         inputMode="numeric"
@@ -178,7 +178,7 @@ export function FundingSection({
                         className={`mt-1 w-full ${inputCls}`}
                       />
                     </label>
-                    <label className="text-[0.85rem] font-medium text-slate-600">
+                    <label className="text-[0.875rem] font-medium text-slate-600">
                       확정 금액(원)
                       <input
                         inputMode="numeric"
@@ -190,7 +190,7 @@ export function FundingSection({
                         className={`mt-1 w-full ${inputCls}`}
                       />
                     </label>
-                    <label className="text-[0.85rem] font-medium text-slate-600">
+                    <label className="text-[0.875rem] font-medium text-slate-600">
                       메모
                       <input
                         value={a.note}
@@ -201,7 +201,7 @@ export function FundingSection({
                   </div>
 
                   {(a.submittedAt || a.resultAt) && (
-                    <p className="text-[0.85rem] text-slate-500">
+                    <p className="text-[0.875rem] text-slate-500">
                       {a.submittedAt && <>접수 {a.submittedAt}</>}
                       {a.submittedAt && a.resultAt && ' · '}
                       {a.resultAt && <>결과 {a.resultAt}</>}
@@ -216,7 +216,7 @@ export function FundingSection({
         <div className="border-t border-slate-100 px-5 py-4">
           {open ? (
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
-              <label className="text-[0.85rem] font-medium text-slate-600 lg:col-span-2">
+              <label className="text-[0.875rem] font-medium text-slate-600 lg:col-span-2">
                 사업·공고명
                 <input
                   autoFocus
@@ -226,7 +226,7 @@ export function FundingSection({
                   className={`mt-1 w-full ${inputCls}`}
                 />
               </label>
-              <label className="text-[0.85rem] font-medium text-slate-600">
+              <label className="text-[0.875rem] font-medium text-slate-600">
                 기관
                 <input
                   value={form.institution}
@@ -235,7 +235,7 @@ export function FundingSection({
                   className={`mt-1 w-full ${inputCls}`}
                 />
               </label>
-              <label className="text-[0.85rem] font-medium text-slate-600">
+              <label className="text-[0.875rem] font-medium text-slate-600">
                 신청 마감
                 <input
                   type="date"

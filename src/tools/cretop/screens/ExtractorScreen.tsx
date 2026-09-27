@@ -99,7 +99,7 @@ export function ExtractorScreen() {
               샘플 넣기
             </Button>
             <Button variant="ghost" size="sm" onClick={() => { setText(''); setOff(new Set()) }}>
-              <RotateCcw aria-hidden="true" className="size-4" /> 비우기
+              <RotateCcw aria-hidden="true" className="size-4" /> 처음부터
             </Button>
           </div>
         </div>
@@ -124,7 +124,7 @@ export function ExtractorScreen() {
                   표 복사
                 </Button>
                 <Button variant="ghost" size="sm" onClick={download} data-testid="cretop-extract-csv">
-                  <Download aria-hidden="true" className="size-4" /> CSV
+                  <Download aria-hidden="true" className="size-4" /> 엑셀용 파일
                 </Button>
               </span>
             }

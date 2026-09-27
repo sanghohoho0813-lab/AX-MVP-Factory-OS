@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { NextStepEditor } from '../components/ops/NextStepEditor'
-import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { LINK_BUTTON } from '../components/sales/salesStyle'
 import { navFromOf } from '../lib/navFrom'
 import {
   ArrowLeft,
@@ -21,6 +22,7 @@ import {
   Trash2,
   Upload,
   Wrench,
+  Presentation,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { getDataModeConfig } from '../data/dataMode'
@@ -409,6 +411,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   }, [record, today])
 
   /** 가장 임박한 마감 (헤더 표시) */
+  const [todoOpen, setTodoOpen] = useState(false)
+  const prospect = record ? isProspect(record) : false
   const nearest = useMemo(() => {
     if (!record) return null
     // 다음 약속은 바로 아래 '지금 할 일' 에 있으므로 여기서는 마감만
@@ -521,7 +525,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           {/* 데스크톱에서만 인라인으로 — 모바일은 아래 '더보기' 시트로 */}
           <div className="hidden items-end gap-2 lg:flex">
             <ScreenGuide screenKey="client_detail" />
-            <label className="t-sub font-medium text-slate-600">
+            {/* D-126: 잠재고객은 영업 단계 하나만(계약 단계는 '계약 전' 으로 정해져 있다) */}
+            {!prospect && <label className="t-sub font-medium text-slate-600">
               계약 단계
               <select
                 value={contractStageOf(record.status)}
@@ -535,13 +540,20 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 ))}
               </select>
             </label>
+            }
           </div>
         </div>
 
-        {/* 주요 행동 — 한 화면에 강조 버튼은 하나만 둔다 */}
+        {/* 주요 행동 — 한 화면에 강조 버튼은 하나만 둔다. D-126: 잠재고객은 서류보다 미팅이 먼저 */}
         <div className="flex flex-wrap items-center gap-2">
+          {prospect && (
+            <Link to={`/sales/meeting?client=${record.id}`} data-testid="client-primary-meeting" className={LINK_BUTTON.primary}>
+              <Presentation aria-hidden="true" className="size-4" />
+              미팅 준비
+            </Link>
+          )}
           <Button
-            variant="primary"
+            variant={prospect ? 'secondary' : 'primary'}
             onClick={() =>
               setMessage({
                 title: '서류 요청 문구',
@@ -631,12 +643,14 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       {/* 1단계 — 지금 할 일 */}
       <Surface showEdge edge={nextActionTone} className="!p-0">
         <div className="px-4 py-4 sm:px-5">
-          <p className="t-meta font-semibold tracking-wide text-slate-500 uppercase">지금 할 일</p>
+          {/* D-126: '지금 할 일 → 다음 약속 → 할 일 적기' 세 겹이던 것을 '다음 약속' 하나로 */}
+          <p className="t-meta font-semibold tracking-wide text-slate-500 uppercase">다음 약속</p>
           {/* D-120: 여기서 바로 고친다(예전에는 고칠 곳이 없었다). 적은 날짜는 일정 · 오늘 화면에 뜬다 */}
           <div className="mt-1.5">
             <NextStepEditor
               record={record}
               today={today}
+              hideLabel
               label="다음 약속"
               onSave={async (n, msg) => {
                 const ok = await commit(n)
@@ -672,6 +686,18 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         상담하다 "그럼 다음 주에 서류 주세요" 가 나오면 그 자리에서 적어야 한다.
         일기 화면으로 옮겨 가면 십중팔구 안 적는다. 이 업체가 자동으로 붙는다.
       */}
+      {/* D-126: 늘 열려 있던 두 번째 입력 칸을 접는다 — 필요할 때만 '내 할 일에도 넣기' */}
+      {!todoOpen ? (
+        <button
+          type="button"
+          data-testid="client-todo-open"
+          onClick={() => setTodoOpen(true)}
+          className="tap t-sub inline-flex w-fit items-center gap-1.5 self-start rounded-(--radius-control) border border-dashed border-slate-300 bg-white px-3.5 py-2 font-medium text-slate-600 hover:border-brand-400 hover:text-brand-700"
+        >
+          <Plus aria-hidden="true" className="size-4" />
+          오늘 내 할 일에도 넣기
+        </button>
+      ) : (
       <TodoComposer
         date={today}
         clients={[]}
@@ -694,6 +720,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             })
         }
       />
+      )}
 
       {/* D-122: 막힘 · 돈 · 지금 챙길 것을 회사 정보 위로 — 예전엔 휴대폰에서 4,000px 아래에 있었다 */}
       <section aria-label="현재 상태" className="ax-stagger grid grid-cols-2 gap-2.5 lg:grid-cols-3">
@@ -956,7 +983,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                           {missing.map((m) => (
                             <li
                               key={m.key}
-                              className="rounded-full border border-danger-200 bg-white px-2 py-0.5 text-[0.85rem] font-medium text-danger-700"
+                              className="rounded-full border border-danger-200 bg-white px-2 py-0.5 text-[0.875rem] font-medium text-danger-700"
                             >
                               {m.label}
                               {m.expired ? ' (만료)' : ''}
@@ -1009,7 +1036,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                     </label>
 
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-[0.85rem] text-slate-500">필요 서류</span>
+                      <span className="text-[0.875rem] text-slate-500">필요 서류</span>
                       {meta.requiredDocuments.map((k) => {
                         const v = documentStatus(k, record.documents[k], today)
                         return (
@@ -1179,7 +1206,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                           size="sm"
                           aria-label={`${meta.label} 내려받기`}
                           disabled={!uploadable}
-                          title={uploadable ? undefined : '클라우드(Supabase)를 연결하면 내려받을 수 있습니다.'}
+                          title={uploadable ? undefined : '클라우드를 연결하면 내려받을 수 있습니다.'}
                           onClick={() => void onDownload(state)}
                         >
                           <Download aria-hidden="true" className="size-3.5" />
@@ -1264,7 +1291,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                           size="sm"
                           aria-label={`${meta.label} 내려받기`}
                           disabled={!uploadable}
-                          title={uploadable ? undefined : '클라우드(Supabase)를 연결하면 내려받을 수 있습니다.'}
+                          title={uploadable ? undefined : '클라우드를 연결하면 내려받을 수 있습니다.'}
                           onClick={() => void onDownload(state)}
                         >
                           <Download aria-hidden="true" className="size-3.5" />
@@ -1433,6 +1460,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           <ClientJournalTab record={record} workspaceId={workspaceId} userId={userId} />
           <NotesSection
             record={record}
+            allowAdd={false}
             onAdd={(text) => commit(withNewNote(record, text))}
             onEdit={(id, text) => commit(withNoteText(record, id, text))}
             onPin={(id, pinned) => commit(withNotePinned(record, id, pinned))}
@@ -1446,7 +1474,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       {moreOpen && (
         <BottomSheet title="이 업체에서 할 수 있는 것" onClose={() => setMoreOpen(false)}>
           <div className="flex flex-col gap-4">
-            <label className="t-sub font-medium text-slate-600">
+            {!prospect && <label className="t-sub font-medium text-slate-600">
               계약 단계
               <select
                 value={contractStageOf(record.status)}
@@ -1460,6 +1488,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 ))}
               </select>
             </label>
+            }
 
             <div className="flex flex-col gap-2">
               <Button
@@ -1556,7 +1585,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               </p>
               <div className="mt-5 flex flex-wrap justify-end gap-2">
                 <Button variant="secondary" onClick={() => setDeleteStep(0)}>
-                  그만두기
+                  취소
                 </Button>
                 <Button variant="danger" onClick={() => setDeleteStep(2)}>
                   네, 다음으로
@@ -1669,7 +1698,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               className={`mt-1 ${inputCls}`}
             />
           </label>
-          <p className="mt-3 flex items-start gap-1.5 text-[0.85rem] break-keep text-slate-400">
+          <p className="mt-3 flex items-start gap-1.5 text-[0.875rem] break-keep text-slate-400">
             <ShieldAlert aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
             공동인증서 비밀번호와 주민등록번호는 이 시스템에 저장하지 않습니다. 인증서는 "받았는지"와 "어디에 보관 중인지"만 기록하세요.
           </p>
@@ -1868,17 +1897,19 @@ function FeesSection({
                 // 이름 칸이 0px 로 짜부라져 '08-25 입금' 조각이 날짜 칸 위로 올라탄다(§20-3).
                 <li key={fee.id} className="flex flex-col gap-2.5 px-4 py-3.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:px-5">
                   <div className="flex min-w-0 flex-wrap items-start gap-2.5 sm:contents">
-                    <label className="order-1 flex shrink-0 items-center gap-2 pt-0.5 sm:pt-0">
-                      <input
-                        type="checkbox"
-                        checked={fee.receivedAt !== null}
-                        onChange={(e) =>
-                          onChange(withFee(record, fee.id, { receivedAt: e.target.checked ? today : null }))
-                        }
-                        className="size-5 accent-brand-600"
-                      />
-                      <span className="t-meta font-semibold text-slate-600">입금</span>
-                    </label>
+                    {/* D-126: 가장 자주 누르는 '입금' 이 작은 체크 칸이었다 — 손가락 크기 단추로 */}
+                    <button
+                      type="button"
+                      aria-pressed={fee.receivedAt !== null}
+                      aria-label={`${fee.label} 입금`}
+                      onClick={() => onChange(withFee(record, fee.id, { receivedAt: fee.receivedAt !== null ? null : today }))}
+                      className={`tap order-1 inline-flex h-10 shrink-0 items-center gap-1.5 rounded-(--radius-control) border px-3 t-sub font-semibold ${
+                        fee.receivedAt !== null ? 'border-success-300 bg-success-50 text-success-800' : 'border-slate-300 bg-white text-slate-700 hover:border-brand-400 hover:text-brand-700'
+                      }`}
+                    >
+                      {fee.receivedAt !== null ? <Check aria-hidden="true" className="size-4" /> : null}
+                      {fee.receivedAt !== null ? '입금됨' : '입금 확인'}
+                    </button>
                     {/* D-122: 좁으면 '삭제' 단추가 아래 줄로 — 이름 칸이 짜부라지지 않게 */}
                     <span className="order-2 min-w-0 flex-[1_1_10rem]">
                     <span className="flex flex-wrap items-center gap-1.5">
@@ -1941,7 +1972,7 @@ function FeesSection({
                       aria-label={`${fee.label} 금액에 100만원 더하기`}
                       title="누를 때마다 100만원씩 더합니다"
                       onClick={() => onChange(withFee(record, fee.id, { amount: (fee.amount ?? 0) + 1_000_000 }))}
-                      className="tap order-5 shrink-0 rounded-(--radius-control) border border-slate-200 px-2 py-2 text-[0.85rem] font-semibold whitespace-nowrap text-slate-600 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 sm:py-1.5"
+                      className="tap order-5 shrink-0 rounded-(--radius-control) border border-slate-200 px-2 py-2 text-[0.875rem] font-semibold whitespace-nowrap text-slate-600 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 sm:py-1.5"
                     >
                       +100만
                     </button>
@@ -2081,15 +2112,9 @@ function FeesSection({
               이익률 {marginText(draftMargin)}
             </span>
           )}
-          <label className="text-[0.88rem] font-medium text-slate-600">
-            받기로 한 날
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="mt-1 block rounded-(--radius-control) border border-slate-300 px-2 py-2 text-[0.95rem]"
-            />
-          </label>
+          <div className="min-w-0">
+            <DueDateField label="받기로 한 날" value={dueDate} today={today} onChange={setDueDate} />
+          </div>
           <Button variant="secondary" onClick={() => void add()} disabled={adding}>
             <Plus aria-hidden="true" className="size-4" />
             추가

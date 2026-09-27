@@ -193,7 +193,7 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
           <p className="mt-1 text-[0.92rem] break-keep text-slate-700">
             연결이 켜지면 홈페이지에서 들어온 상담신청 · 주문 · 서류 업로드가 여기 저절로 쌓입니다. 관리자에게 '상담신청 연결을 켜 달라' 고 알려 주세요.
           </p>
-          <details className="mt-2 text-[0.85rem] text-slate-500">
+          <details className="mt-2 text-[0.875rem] text-slate-500">
             <summary className="cursor-pointer">관리자용 안내</summary>
             <p className="mt-1 break-keep">클라우드에 브릿지 테이블이 없습니다. supabase/migrations/20260903000006_customer_bridge.sql 을 적용하세요(순서는 docs/SETUP.md).</p>
           </details>

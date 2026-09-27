@@ -162,34 +162,37 @@ function NewProspectModal({ open, busy, onClose, onSubmit }: { open: boolean; bu
     >
       <p className="t-sub break-keep text-slate-500">계약 전 업체로 등록됩니다. 고객 관리 '잠재고객' 에도 같이 보이고, 계약하면 계약 고객으로 넘어갑니다.</p>
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="block text-[0.85rem] text-slate-500">
+        <label className="block text-[0.875rem] text-slate-500">
           회사명 *
           <input value={f.companyName} onChange={(e) => set('companyName', e.target.value)} className={inputClass} />
         </label>
-        <label className="block text-[0.85rem] text-slate-500">
+        <label className="block text-[0.875rem] text-slate-500">
           대표자·담당자
           <input value={f.contactName} onChange={(e) => set('contactName', e.target.value)} className={inputClass} />
         </label>
-        <label className="block text-[0.85rem] text-slate-500">
+        <label className="block text-[0.875rem] text-slate-500">
           휴대폰번호
           <input value={f.contactPhone} inputMode="tel" onChange={(e) => set('contactPhone', e.target.value)} placeholder="010-" className={inputClass} />
         </label>
-        <label className="block text-[0.85rem] text-slate-500">
+        <label className="block text-[0.875rem] text-slate-500">
           유입 경로
           <select value={f.source} onChange={(e) => set('source', e.target.value)} className={inputClass}>
             <option value="">선택</option>
             {SALES_SOURCES.map((x) => <option key={x} value={x}>{x}</option>)}
           </select>
         </label>
-        <label className="block text-[0.85rem] text-slate-500">
-          소개한 사람
-          <input value={f.referrer} onChange={(e) => set('referrer', e.target.value)} className={inputClass} />
-        </label>
-        <label className="block text-[0.85rem] text-slate-500">
+        {/* D-126: 소개로 왔을 때만 묻는다 */}
+        {(f.source === '소개' || f.referrer !== '') && (
+          <label className="block text-[0.875rem] text-slate-500">
+            소개한 사람
+            <input value={f.referrer} onChange={(e) => set('referrer', e.target.value)} className={inputClass} />
+          </label>
+        )}
+        <label className="block text-[0.875rem] text-slate-500">
           예상 수임료 (만원)
           <input value={f.feeManwon} inputMode="numeric" onChange={(e) => set('feeManwon', e.target.value.replace(/[^0-9]/g, ''))} placeholder="예) 300" className={inputClass} />
         </label>
-        <label className="block text-[0.85rem] text-slate-500 sm:col-span-2">
+        <label className="block text-[0.875rem] text-slate-500 sm:col-span-2">
           대표 고민 한 줄
           <input value={f.concern} onChange={(e) => set('concern', e.target.value)} placeholder="예) 가지급금이 쌓여 정리 방법을 찾는 중" className={inputClass} />
         </label>
@@ -447,13 +450,16 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
       {(risks.length > 0 || recontacts.length > 0) && (
         <div className="grid gap-2.5 xl:grid-cols-2" data-testid="sales-signals">
           {risks.length > 0 && (
-            <Disclosure title="지금 챙길 영업" hint={`${risks.length}곳 · ${risks[0].record.companyName} — ${risks[0].reason}`} badge={<Badge tone="warning">{risks.length}</Badge>}>
+            <Disclosure title="지금 챙길 영업" hint={`${risks.length}곳 · ${risks[0].record.companyName} — ${risks[0].reason}`} badge={<Badge tone="warning">{risks.length}</Badge>} defaultOpen>
               <ul className="flex flex-col divide-y divide-slate-100">
                 {risks.map((r) => (
-                  <li key={r.record.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
-                    <button type="button" onClick={() => open(r.record)} className="t-sub font-bold text-slate-900 hover:text-brand-700 hover:underline">{r.record.companyName}</button>
+                  <li key={r.record.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5">
+                    <button type="button" onClick={() => open(r.record)} className="tap t-sub inline-flex items-center font-bold text-slate-900 hover:text-brand-700 hover:underline">{r.record.companyName}</button>
                     <span className="t-sub text-warning-700">{r.reason}</span>
-                    <Link to={salesActionPath(r.action, r.record.id)} state={salesActionPath(r.action, r.record.id).startsWith('/ops/clients/') ? fromState(location) : undefined} className="t-meta ml-auto font-semibold text-brand-700 hover:underline">{r.action} →</Link>
+                    <span className="ml-auto flex items-center gap-1.5">
+                      <Link to={salesActionPath(r.action, r.record.id)} state={salesActionPath(r.action, r.record.id).startsWith('/ops/clients/') ? fromState(location) : undefined} className="tap t-sub inline-flex items-center font-semibold text-brand-700 hover:underline">{r.action} →</Link>
+                      <CallButton phone={r.record.contactPhone.trim() || r.record.companyPhone.trim()} name={r.record.companyName} />
+                    </span>
                   </li>
                 ))}
               </ul>

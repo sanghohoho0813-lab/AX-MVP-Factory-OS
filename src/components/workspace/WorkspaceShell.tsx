@@ -126,7 +126,7 @@ export function WorkspaceStepNav({
                   state === 'current' ? 'bg-brand-50 text-brand-800' : state === 'done' ? 'text-slate-600 hover:bg-slate-50' : 'text-slate-400 hover:bg-slate-50'
                 }`}
               >
-                <span className={`flex size-6 shrink-0 items-center justify-center rounded-full border text-[0.8125rem] font-bold ${
+                <span className={`flex size-6 shrink-0 items-center justify-center rounded-full border text-[0.875rem] font-bold ${
                   state === 'done' ? 'border-success-500 bg-success-500 text-white' : state === 'current' ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 text-slate-400'
                 }`}>
                   {state === 'done' ? <Check aria-hidden="true" className="size-3.5" /> : i + 1}
@@ -224,19 +224,19 @@ export function WorkspaceCompletionChecklist({ title = '완료 조건', items }:
     <div>
       <p className="mb-2 flex items-center justify-between gap-2 text-[0.95rem] font-semibold text-slate-700">
         {title}
-        <span className="text-[0.85rem] font-medium text-slate-400">{done}/{items.length}</span>
+        <span className="text-[0.875rem] font-medium text-slate-400">{done}/{items.length}</span>
       </p>
       <ul className="flex flex-col gap-2">
         {items.map((c) => (
           <li key={c.label} className="flex items-start gap-2 text-[0.92rem]">
-            <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[0.8125rem] font-bold ${c.ok ? 'bg-success-500 text-white' : 'bg-slate-200 text-slate-500'}`} aria-hidden="true">
+            <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[0.875rem] font-bold ${c.ok ? 'bg-success-500 text-white' : 'bg-slate-200 text-slate-500'}`} aria-hidden="true">
               {c.ok ? '✓' : '·'}
             </span>
             <span className="min-w-0 flex-1">
               <span className={`break-keep ${c.ok ? 'text-slate-700' : 'text-slate-500'}`}>{c.label}</span>
               <span className="sr-only">{c.ok ? ' (완료됨)' : ' (미완료)'}</span>
               {!c.ok && c.actionPath && (
-                <NavLink to={c.actionPath} className="mt-0.5 flex w-fit items-center gap-1 text-[0.85rem] font-semibold text-brand-600 hover:text-brand-700">
+                <NavLink to={c.actionPath} className="mt-0.5 flex w-fit items-center gap-1 text-[0.875rem] font-semibold text-brand-600 hover:text-brand-700">
                   {c.actionLabel ?? '이 항목 처리하기'}
                   <ArrowRight aria-hidden="true" className="size-3.5" />
                 </NavLink>
@@ -272,7 +272,7 @@ export function WorkspaceWarningPanel({ warnings }: { warnings: WorkspaceWarning
             <span className="min-w-0 flex-1">
               {w.message}
               {w.actionPath && (
-                <NavLink to={w.actionPath} className="mt-0.5 flex w-fit items-center gap-1 text-[0.85rem] font-semibold underline-offset-2 hover:underline">
+                <NavLink to={w.actionPath} className="mt-0.5 flex w-fit items-center gap-1 text-[0.875rem] font-semibold underline-offset-2 hover:underline">
                   {w.actionLabel ?? '해당 화면으로 이동'}
                   <ArrowRight aria-hidden="true" className="size-3.5" />
                 </NavLink>

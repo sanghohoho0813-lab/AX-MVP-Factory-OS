@@ -9,7 +9,8 @@
  * 적은 값은 이 브라우저에 남는다 — 상담 중 화면을 옮겨도 다시 적지 않는다.
  */
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useToolClient } from '../shared/toolClientContext'
+import { useEffect, useMemo, useState, type ReactNode, useRef } from 'react'
 import { Check, Copy, RotateCcw } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
@@ -269,11 +270,22 @@ function taxClientOf(f: TaxForm): Client {
 }
 
 function TaxTab() {
-  const [form, setForm] = useState<TaxForm>(() => {
-    const s = readStore<TaxForm>(STORE.tax, EMPTY_TAX)
+  // D-126: 업체마다 따로 기억한다 — 다른 업체로 열면 그 업체 답(없으면 빈 칸)
+  const { clientId } = useToolClient()
+  const taxKey = clientId ? `${STORE.tax}.${clientId}` : STORE.tax
+  const readTax = (k: string) => {
+    const s = readStore<TaxForm>(k, EMPTY_TAX)
     return { ...s, benefitKeys: Array.isArray(s.benefitKeys) ? s.benefitKeys : [] }
-  })
-  usePersist(STORE.tax, form)
+  }
+  const [form, setForm] = useState<TaxForm>(() => readTax(taxKey))
+  const loadedFor = useRef(taxKey)
+  useEffect(() => {
+    if (loadedFor.current === taxKey) return
+    loadedFor.current = taxKey
+    setForm(readTax(taxKey))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taxKey])
+  usePersist(taxKey, form)
   const copyState = useCopy()
   const set = <K extends keyof TaxForm>(k: K, v: TaxForm[K]) => setForm((f) => ({ ...f, [k]: v }))
   const toggleBenefit = (key: string) => setForm((f) => ({ ...f, benefitKeys: f.benefitKeys.includes(key) ? f.benefitKeys.filter((k) => k !== key) : [...f.benefitKeys, key] }))

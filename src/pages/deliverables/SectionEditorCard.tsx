@@ -149,7 +149,7 @@ export function SectionEditorCard({
         <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
           <Button variant="secondary" size="sm" onClick={openEdit}>
             <Pencil aria-hidden="true" className="size-4" />
-            편집
+            고치기
           </Button>
           {section.status !== 'approved' && (
             <Button variant="secondary" size="sm" onClick={markReviewed} disabled={reviewBusy}>

@@ -8,7 +8,7 @@
  * 이 OS 에서 더한 것: 고객 = 고객 운영 업체(orig/storage) · 업체 정보로 채우기(D-90) · 업체 기록에 붙이기(D-89).
  */
 
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ReactNode, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
@@ -30,10 +30,12 @@ import ReportView from './orig/components/ReportView'
 import { STAGE_BADGE } from './orig/stages'
 
 const STORAGE_KEY = 'axmvp.tools.policyFunding'
+/** D-126: 업체마다 따로 기억한다 — 예전에는 브라우저에 하나라 다른 업체로 열어도 앞 업체 답이 그대로 보였다 */
+const keyFor = (clientId: string | null | undefined) => (clientId ? `${STORAGE_KEY}.${clientId}` : STORAGE_KEY)
 
-function loadInput(): DiagnosisInput {
+function loadInput(clientId: string | null | undefined): DiagnosisInput {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(keyFor(clientId))
     if (!raw) return DEFAULT_INPUT
     return { ...DEFAULT_INPUT, ...(JSON.parse(raw) as Partial<DiagnosisInput>) }
   } catch {
@@ -110,7 +112,13 @@ function DiagnosisScreen() {
   const [params] = useSearchParams()
   const { clientId } = useToolClient()
   const autoSample = params.get('sample') === '1'
-  const [seed, setSeed] = useState<{ input: DiagnosisInput; key: number }>(() => ({ input: loadInput(), key: 0 }))
+  const [seed, setSeed] = useState<{ input: DiagnosisInput; key: number }>(() => ({ input: loadInput(clientId), key: 0 }))
+  const loadedFor = useRef<string | null | undefined>(clientId)
+  useEffect(() => {
+    if (loadedFor.current === clientId) return
+    loadedFor.current = clientId
+    setSeed((s) => ({ input: loadInput(clientId), key: s.key + 1 }))
+  }, [clientId])
 
   // 업체에서 열었으면 아는 것을 채운다 (D-90).
   // 이 도구는 기본값이 빈 값이 아니라서(개인사업자·1~3년 …), **아직 손대지 않은 칸만** 바꾼다.
@@ -150,11 +158,11 @@ function DiagnosisScreen() {
 
   const remember = useCallback((input: DiagnosisInput) => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(input))
+      localStorage.setItem(keyFor(clientId), JSON.stringify(input))
     } catch {
       /* 저장 못 해도 진단은 된다 */
     }
-  }, [])
+  }, [clientId])
 
   const extras = useCallback(
     (input: DiagnosisInput, result: DiagnosisResult) => (
@@ -176,12 +184,12 @@ function DiagnosisScreen() {
   return (
     <OrigPolicy>
       <PrefillNote note={prefillNote} />
-      <section className="w-full px-2 pt-6 pb-8 @min-[640px]:pt-10">
-        <div className="mx-auto max-w-4xl text-center">
-          <span className="inline-block rounded-full bg-blue-50 px-4 py-1.5 text-sm font-medium text-blue-700">규칙 진단</span>
-          <h1 className="mt-4 text-3xl font-bold tracking-tight @min-[640px]:text-4xl">정책자금 진단</h1>
-          <p className="mx-auto mt-4 max-w-2xl text-slate-600">
-            DB가 들어온 순간, 이 업체를 어떤 기관으로 안내하고 어떤 말로 상담해야 할지 바로 확인하세요.
+      {/* D-126: 다른 화면과 같은 제목 크기 · 왼쪽 정렬(가운데 큰 배너는 이 OS 에서 이 화면만 달랐다) */}
+      <section className="w-full px-2 pt-4 pb-4">
+        <div className="mx-auto max-w-4xl">
+          <h1 className="t-page break-keep text-slate-900">정책자금 진단</h1>
+          <p className="t-sub mt-1 max-w-2xl break-keep text-slate-500">
+            이 업체를 어떤 기관으로 안내하고 어떤 말로 상담할지 바로 확인합니다.
           </p>
         </div>
       </section>
@@ -208,7 +216,7 @@ function ReportPicker() {
   const list = getStoredCustomers()
   return (
     <section className="mx-auto w-full max-w-4xl px-2 pt-6 pb-16" data-testid="pf-report-picker">
-      <h1 className="text-2xl font-bold tracking-tight">인쇄 리포트</h1>
+      <h1 className="t-page break-keep text-slate-900">결과서</h1>
       <p className="mt-2 text-slate-600">고객을 고르면 대표님용 한 페이지 요약 + 상세 리포트가 열립니다.</p>
       {list.length === 0 ? (
         <p className="mt-8 rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center text-slate-500">
@@ -226,7 +234,7 @@ function ReportPicker() {
                   <b className="block truncate text-slate-900">{c.companyName}</b>
                   <span className="text-sm text-slate-500">{c.recommendedAgency}{c.diagnosisResult ? '' : ' · 진단 기록 없음'}</span>
                 </span>
-                <span className={`shrink-0 rounded-full px-2.5 py-1 text-[0.8125rem] font-semibold ${STAGE_BADGE[c.stage]}`}>{c.stage}</span>
+                <span className={`shrink-0 rounded-full px-2.5 py-1 text-[0.875rem] font-semibold ${STAGE_BADGE[c.stage]}`}>{c.stage}</span>
               </Link>
             </li>
           ))}

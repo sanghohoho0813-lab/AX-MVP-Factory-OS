@@ -260,7 +260,11 @@ check('업무 15개에서도 가로 스크롤 없음', of2.d <= of2.w + 1, `${of
   const hubText = (await page.locator('main').innerText()) ?? ''
   check('카드: 계약 종류가 보인다', hubText.includes('현금 + 보험'), hubText.slice(0, 400))
 
-  // 보기 — 무엇을 보일지
+  // 보기 — 무엇을 보일지 (D-126: 휴대폰에서는 '거르기' 를 눌러야 보인다)
+  {
+    const tg = page.getByTestId('client-filters-toggle')
+    if ((await tg.count()) && (await tg.isVisible()) && (await tg.getAttribute('aria-expanded')) !== 'true') await tg.click()
+  }
   const view = page.getByLabel('업체 보기 조건')
   check('보기: 고르는 칸이 있다', (await view.count()) === 1)
   await view.selectOption('insurance')
@@ -644,6 +648,10 @@ check('실제로 지워졌다', left === false)
 {
   await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
   await page.waitForTimeout(800)
+  {
+    const tg = page.getByTestId('client-filters-toggle')
+    if ((await tg.count()) && (await tg.isVisible()) && (await tg.getAttribute('aria-expanded')) !== 'true') await tg.click()
+  }
   const picker = page.locator('select[aria-label="업체 정렬 기준"]')
   check('정렬: 고르는 칸이 있다', (await picker.count()) > 0)
   const opts = await picker.locator('option').allInnerTexts()

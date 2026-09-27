@@ -53,9 +53,12 @@ import {
 
 const STORAGE_PREFIX = 'axmvp.tools.employment.'
 
-function loadStored<T>(tab: string, fallback: T): T {
+/** D-126: 업체마다 따로 기억한다(업체 없이 열면 공용 칸) */
+const keyFor = (tab: string, clientId: string | null | undefined) => STORAGE_PREFIX + tab + (clientId ? `.${clientId}` : '')
+
+function loadStored<T>(tab: string, fallback: T, clientId?: string | null): T {
   try {
-    const raw = localStorage.getItem(STORAGE_PREFIX + tab)
+    const raw = localStorage.getItem(keyFor(tab, clientId))
     if (!raw) return fallback
     return { ...fallback, ...(JSON.parse(raw) as Partial<T>) }
   } catch {
@@ -64,14 +67,24 @@ function loadStored<T>(tab: string, fallback: T): T {
 }
 
 function useStored<T extends object>(tab: string, fallback: T) {
-  const [value, setValue] = useState<T>(() => loadStored(tab, fallback))
+  const { clientId } = useToolClient()
+  const [value, setValue] = useState<T>(() => loadStored(tab, fallback, clientId))
+  const loadedFor = useRef<string | null | undefined>(clientId)
   useEffect(() => {
+    if (loadedFor.current === clientId) return
+    loadedFor.current = clientId
+    setValue(loadStored(tab, fallback, clientId))
+    // fallback 은 고정 상수 — 업체가 바뀔 때만 다시 읽는다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId, tab])
+  useEffect(() => {
+    if (loadedFor.current !== clientId) return
     try {
-      localStorage.setItem(STORAGE_PREFIX + tab, JSON.stringify(value))
+      localStorage.setItem(keyFor(tab, clientId), JSON.stringify(value))
     } catch {
       /* 저장 못 해도 계산은 된다 */
     }
-  }, [tab, value])
+  }, [tab, value, clientId])
   return [value, setValue] as const
 }
 
@@ -587,14 +600,14 @@ function RosterTab() {
           )
         )}
         <Field label="③ 또는 명부 글자 붙여넣기" hint="PDF 에서 복사한 글자, 홈택스·고용24 화면 복사본 모두 됩니다">
-          <textarea aria-label="명부 글자" value={text} onChange={(e) => setText(e.target.value)} rows={7} className={`${inputCls} font-mono text-[0.85rem]`} placeholder={'성명 주민등록번호 국민연금 건강보험 산재보험 고용보험\n홍길동 980310-1****** 2026-01-05 2026-01-05 2026-01-05 2026-01-05'} />
+          <textarea aria-label="명부 글자" value={text} onChange={(e) => setText(e.target.value)} rows={7} className={`${inputCls} font-mono text-[0.875rem]`} placeholder={'성명 주민등록번호 국민연금 건강보험 산재보험 고용보험\n홍길동 980310-1****** 2026-01-05 2026-01-05 2026-01-05 2026-01-05'} />
         </Field>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <Button variant="primary" disabled={busy || !text.trim()} onClick={runText} className="w-full sm:w-auto">
             <Upload aria-hidden="true" className="size-4" /> {busy ? '읽는 중…' : '붙여 넣은 글자로 진단'}
           </Button>
           <Button variant="ghost" size="sm" onClick={clearAll}>
-            <RotateCcw aria-hidden="true" className="size-4" /> 비우기
+            <RotateCcw aria-hidden="true" className="size-4" /> 처음부터
           </Button>
         </div>
         {notice && <p className="t-sub break-keep text-slate-600">{notice}</p>}

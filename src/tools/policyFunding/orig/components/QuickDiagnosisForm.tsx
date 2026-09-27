@@ -202,7 +202,7 @@ export default function QuickDiagnosisForm({ value, onChange, onSubmit }: Props)
         type="submit"
         className="mt-8 w-full rounded-xl bg-blue-600 px-8 py-4 text-base font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
       >
-        ⚡ 30초 진단 결과 보기
+        진단 결과 보기
       </button>
     </form>
   );

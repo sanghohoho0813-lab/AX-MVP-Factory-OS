@@ -281,7 +281,7 @@ export function ClientStatusChip({ status }: { status: ClientOpsStatus }) {
     closed: 'bg-slate-100 text-slate-500 border-slate-200',
   }
   return (
-    <span className={`rounded-full border px-2 py-0.5 text-[0.85rem] font-semibold ${cls[stage]}`}>
+    <span className={`rounded-full border px-2 py-0.5 text-[0.875rem] font-semibold ${cls[stage]}`}>
       {CONTRACT_STAGE_LABEL[stage]}
     </span>
   )
@@ -335,7 +335,7 @@ export function StatTile({
       <strong className="mt-1.5 block text-[1.7rem] leading-tight font-bold text-slate-900">
         {value}
       </strong>
-      {hint && <span className="mt-0.5 block text-[0.85rem] break-keep text-slate-500">{hint}</span>}
+      {hint && <span className="mt-0.5 block text-[0.875rem] break-keep text-slate-500">{hint}</span>}
     </Tag>
   )
 }

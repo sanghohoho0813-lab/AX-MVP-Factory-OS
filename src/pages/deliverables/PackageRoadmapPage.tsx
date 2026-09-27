@@ -22,9 +22,9 @@ import { PackageSectionFrame, ReadOnlyNotice, DeliverableNotFound } from './deli
 const PHASE_STATUS_META: Record<RoadmapPhaseStatus, { label: string; tone: string }> = {
   planned: { label: '계획', tone: 'border-slate-200 bg-slate-50 text-slate-600' },
   ready: { label: '착수 준비', tone: 'border-brand-200 bg-brand-50 text-brand-700' },
-  in_progress: { label: '진행 중', tone: 'border-warning-200 bg-warning-50 text-warning-700' },
+  in_progress: { label: '진행 중', tone: 'border-brand-200 bg-brand-50 text-brand-700' },
   completed: { label: '완료', tone: 'border-success-200 bg-success-50 text-success-700' },
-  blocked: { label: '차단', tone: 'border-danger-200 bg-danger-50 text-danger-700' },
+  blocked: { label: '막힘', tone: 'border-danger-200 bg-danger-50 text-danger-700' },
   deferred: { label: '보류', tone: 'border-slate-200 bg-slate-50 text-slate-500' },
 }
 const PHASE_STATUS_ORDER: RoadmapPhaseStatus[] = [
@@ -105,7 +105,7 @@ function PhaseCard({
         </div>
         {!readOnly && (
           <Button variant="secondary" size="sm" onClick={() => onEdit(phase)}>
-            편집
+            고치기
           </Button>
         )}
       </div>

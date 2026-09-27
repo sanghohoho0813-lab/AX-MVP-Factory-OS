@@ -121,6 +121,10 @@ export function ModuleShell({ tool, section, children }: ModuleShellProps) {
           {tool.label}
         </button>
         <span className="t-sub min-w-0 truncate text-slate-500">{current.label}</span>
+        {/* D-126: 휴대폰에서도 작업실로 돌아가는 길이 보인다(예전엔 목차 서랍 안 연한 글자뿐) */}
+        <Link to="/tools" className="tap t-sub ml-auto inline-flex shrink-0 items-center gap-1 text-slate-600 hover:text-brand-700">
+          <ChevronLeft aria-hidden="true" className="size-4" /> 작업실
+        </Link>
       </div>
 
       {/* 넓은 화면 — 모듈 목차 한 칸 */}

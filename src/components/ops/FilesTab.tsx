@@ -74,7 +74,7 @@ export function FilesTab({ record, workspaceId }: { record: ClientOpsRecord; wor
                 <FileText aria-hidden="true" className="size-5 shrink-0 text-slate-400" />
                 <span className="min-w-0 flex-1">
                   <span className="block text-[0.95rem] font-semibold text-slate-800">{documentMetaOf(record, key).label}</span>
-                  <span className="block truncate text-[0.85rem] text-slate-500">
+                  <span className="block truncate text-[0.875rem] text-slate-500">
                     {v.fileName}
                     {v.fileSize > 0 ? ` · ${formatFileSize(v.fileSize)}` : ''}
                     {v.issuedAt ? ` · 발급 ${v.issuedAt}` : ''}
@@ -107,7 +107,7 @@ export function FilesTab({ record, workspaceId }: { record: ClientOpsRecord; wor
                 <FileText aria-hidden="true" className={`size-5 shrink-0 ${d.source === 'customer' ? 'text-brand-500' : 'text-slate-400'}`} />
                 <span className="min-w-0 flex-1">
                   <span className="block text-[0.95rem] font-semibold text-slate-800">{d.title}</span>
-                  <span className="block truncate text-[0.85rem] text-slate-500">
+                  <span className="block truncate text-[0.875rem] text-slate-500">
                     {d.source === 'customer' ? '고객 업로드' : '고객에게 공유'} · {DOCUMENT_STATUS_LABEL[d.status]} · {d.fileName}
                     {d.fileSize ? ` · ${formatFileSize(d.fileSize)}` : ''}
                     {d.uploadedAt ? ` · ${activityTimeText(d.uploadedAt)}` : ''}

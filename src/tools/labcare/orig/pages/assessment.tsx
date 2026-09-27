@@ -6,6 +6,7 @@ import PageGuide from "../components/PageGuide";
 import { downloadSvgAsJpeg, printSvg } from "../../lib/download";
 import { addTempCompany } from "../lib/storage";
 import { assessFeasibility, requiredForLab } from "../../lib/feasibility";
+import { usePrefillFromClient } from "../../../shared/usePrefill";
 import type { FeasibilityResult } from "../../types";
 import type {
   ActivityNature,
@@ -176,6 +177,15 @@ export default function AssessmentPage() {
   const [becameMediumWithinYear, setBecameMediumWithinYear] = useState(false);
   const [employeeCount, setEmployeeCount] = useState(10);
   const [isOverseasLab, setIsOverseasLab] = useState(false);
+  // D-126: 업체에서 열었으면 회사명 · 업종 · 업력 · 직원 수를 업체 기록에서 채운다(예전엔 직원 10명 · 업력 3년이라는 지어낸 값으로 시작했다)
+  const { note: prefillNote } = usePrefillFromClient((facts) => {
+    const filled: string[] = [];
+    if (facts.companyName) { setCompanyName(facts.companyName); filled.push("회사명"); }
+    if (facts.industryText) { setIndustry(facts.industryText); setCustomIndustry(true); filled.push("업종"); }
+    if (facts.years !== null) { setYears(Math.max(0, Math.round(facts.years))); filled.push("업력"); }
+    if (facts.employeeCount !== null) { setEmployeeCount(facts.employeeCount); filled.push("직원 수"); }
+    return filled;
+  });
 
   /* 신고대상 */
   const [isForProfit, setIsForProfit] = useState(true);
@@ -354,6 +364,7 @@ export default function AssessmentPage() {
       title="연구소 설립 가능성 체크"
       subtitle="기업 정보와 연구인력 조건을 바탕으로 연구소/전담부서 설립 가능성을 빠르게 검토합니다"
     >
+      {prefillNote && <p className="mb-3 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-800" data-testid="lab-prefill-note">{prefillNote}</p>}
       <PageGuide
         id="assessment"
         purpose="기업부설연구소·연구개발전담부서 설립 가능성을 1차 검토합니다."

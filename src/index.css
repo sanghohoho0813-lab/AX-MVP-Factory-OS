@@ -136,6 +136,8 @@
  * 이 OS 의 다른 화면은 그대로 두고, 판정기 화면만 1.25배로 그린다.
  */
 .st-orig {
+  --text-xs: 0.875rem;
+  --text-xs--line-height: 1.35rem;
   /* D-96: 원본 파랑(#3182f6) 대신 OS 테마 강조색 — 테마를 바꾸면 판정기도 따라간다 */
   --color-brand: var(--color-brand-600);
   --color-brand-dark: var(--color-brand-700);
@@ -147,6 +149,9 @@
  * 계산·문구는 그대로이고, 색만 OS 와 같아진다.
  */
 .pf-orig {
+  /* D-126: 작은 글자 바닥 14px — 연구소(.lab-orig)와 같게 */
+  --text-xs: 0.875rem;
+  --text-xs--line-height: 1.35rem;
   --color-blue-50: var(--color-brand-50);
   --color-blue-100: var(--color-brand-100);
   --color-blue-200: var(--color-brand-200);

@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useToolClient } from '../tools/shared/toolClientContext'
 import { useSearchParams } from 'react-router-dom'
 import { useOutsideTap } from '../lib/useDismissable'
 import { Check, ChevronDown, Plus, RotateCcw, Trash2 } from 'lucide-react'
@@ -52,10 +53,13 @@ function displayDefaults(calc: Calculator): Values {
   return out
 }
 
-function loadValues(calc: Calculator): Values {
+/** D-126: 업체마다 따로 기억한다 — 다른 업체로 열면 앞 업체 숫자가 남지 않는다 */
+const storeKey = (calc: Calculator, clientId: string | null | undefined) => STORAGE_PREFIX + calc.key + (clientId ? `.${clientId}` : '')
+
+function loadValues(calc: Calculator, clientId?: string | null): Values {
   const base = displayDefaults(calc)
   try {
-    const raw = localStorage.getItem(STORAGE_PREFIX + calc.key)
+    const raw = localStorage.getItem(storeKey(calc, clientId))
     if (!raw) return base
     const saved = JSON.parse(raw) as Values
     // 저장된 것 위에 기본값을 덧대지 않는다 — 없는 칸만 기본값
@@ -109,7 +113,8 @@ export function TaxCalculatorsPage() {
   const subKey = params.get('s') ?? calc.subs[0].key
   const sub = calc.subs.find((s) => s.key === subKey) ?? calc.subs[0]
 
-  const [values, setValues] = useState<Values>(() => loadValues(calc))
+  const { clientId } = useToolClient()
+  const [values, setValues] = useState<Values>(() => loadValues(calc, clientId))
   const [pickerOpen, setPickerOpen] = useState(false)
   const pickerRef = useRef<HTMLDivElement>(null)
   // D-111: 펼친 목록은 Esc · 바깥을 누르면 닫는다 (고르지 않고 다시 보고 싶을 때)
@@ -123,16 +128,22 @@ export function TaxCalculatorsPage() {
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [pickerOpen])
+  // 계산기 · 업체가 바뀌면 그 칸의 값을 읽는다 — 읽기 전에는 저장하지 않는다(앞 업체 숫자가 뒤 업체 칸에 들어가지 않게)
+  const loadedFor = useRef(`${calc.key}|${clientId ?? ''}`)
   useEffect(() => {
-    setValues(loadValues(calc))
-  }, [calc])
+    const k = `${calc.key}|${clientId ?? ''}`
+    if (loadedFor.current === k) return
+    loadedFor.current = k
+    setValues(loadValues(calc, clientId))
+  }, [calc, clientId])
   useEffect(() => {
+    if (loadedFor.current !== `${calc.key}|${clientId ?? ''}`) return
     try {
-      localStorage.setItem(STORAGE_PREFIX + calc.key, JSON.stringify(values))
+      localStorage.setItem(storeKey(calc, clientId), JSON.stringify(values))
     } catch {
       /* 저장 못 해도 계산은 된다 */
     }
-  }, [calc.key, values])
+  }, [values, calc, clientId])
 
   const out = useMemo(() => {
     try {
@@ -441,7 +452,7 @@ export function TaxCalculatorsPage() {
             <h3 className="mb-3 border-b border-slate-100 pb-2 text-[0.98rem] font-bold text-slate-900">{t.title}</h3>
             {/* D-102: 인쇄하면 오른쪽 칸이 잘렸다 — 종이에서는 가로 넘김 대신 글자를 줄여 한 폭에 */}
             <div className="overflow-x-auto print:overflow-visible">
-              <table data-table={t.id} className="w-full min-w-[640px] text-[0.85rem] print:min-w-0 print:text-[7pt]">
+              <table data-table={t.id} className="w-full min-w-[640px] text-[0.875rem] print:min-w-0 print:text-[7pt]">
                 <thead>
                   <tr>
                     {t.head.map((h, i) => (

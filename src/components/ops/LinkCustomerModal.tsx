@@ -184,7 +184,7 @@ export function LinkCustomerModal({
         <p className="mt-1 text-[0.9rem] text-slate-600">이 이벤트를 만든 계정이 확인되었습니다{guessEmail ? ` · ${guessEmail}` : ''}.</p>
       ) : (
         <>
-          <label className="mt-1 block text-[0.85rem] text-slate-500">
+          <label className="mt-1 block text-[0.875rem] text-slate-500">
             계정 이메일
             <input
               value={accountEmail}
@@ -194,7 +194,7 @@ export function LinkCustomerModal({
             />
           </label>
           {profileChecked && accountEmail.trim() && !profile && (
-            <p className="mt-1 text-[0.85rem] text-slate-500">
+            <p className="mt-1 text-[0.875rem] text-slate-500">
               이 이메일로 가입한 계정을 찾지 못했습니다. 업체에는 연결되고, 계정은 나중에 업체 상세 &gt; 고객 플랫폼 탭에서 연결할 수 있습니다.
             </p>
           )}
@@ -269,7 +269,7 @@ export function LinkCustomerModal({
                 >
                   <span className="min-w-0">
                     <span className="block truncate text-[0.95rem] font-semibold text-slate-800">{c.companyName}</span>
-                    <span className="block truncate text-[0.85rem] text-slate-500">{[c.contactName, c.contactPhone, c.industry].filter(Boolean).join(' · ') || '정보 없음'}</span>
+                    <span className="block truncate text-[0.875rem] text-slate-500">{[c.contactName, c.contactPhone, c.industry].filter(Boolean).join(' · ') || '정보 없음'}</span>
                   </span>
                   {s > 0 && <span className="shrink-0 rounded-full bg-highlight-100 px-2 py-0.5 t-meta font-semibold text-highlight-700">후보</span>}
                 </button>
@@ -291,7 +291,7 @@ export function LinkCustomerModal({
                 ['industry', '업종'],
               ] as const
             ).map(([key, label]) => (
-              <label key={key} className="block text-[0.85rem] text-slate-500">
+              <label key={key} className="block text-[0.875rem] text-slate-500">
                 {label}
                 <input
                   value={form[key]}

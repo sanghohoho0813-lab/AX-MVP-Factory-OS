@@ -206,7 +206,7 @@ export default function ResultCard({
       <SectionLabel step="②" title="추천 기관 & 세부 자금 트랙" />
 
       {/* 추천 기관 TOP 3 (GOOD / BAD) */}
-      <Card title="추천 기관 TOP 3" emoji="🏦">
+      <Card title="추천 기관 3곳" emoji="🏦">
         <div className="space-y-4" data-testid="pf-agencies">
           {result.agencies.map((a, idx) => (
             <div key={a.name} data-agency-rank={a.rank} className="rounded-xl border border-slate-100 bg-slate-50 p-4">

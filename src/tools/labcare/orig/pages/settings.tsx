@@ -73,7 +73,7 @@ export default function SettingsPage() {
         {/* 백업 / 복원 */}
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
           <h2 className="text-lg font-bold text-slate-900">백업 · 복원</h2>
-          <p className="mt-1 text-sm text-slate-500">전체 데이터를 JSON 파일로 내보내고, 같은 형식의 파일로 복원합니다.</p>
+          <p className="mt-1 text-sm text-slate-500">전체 데이터를 백업 파일로 내보내고, 같은 형식의 파일로 복원합니다.</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button type="button" onClick={() => { exportData(); flash("ok", "백업 파일을 내보냈습니다."); }}
               className="rounded-xl bg-navy-700 px-5 py-2.5 text-base font-bold text-white hover:bg-navy-800">백업 내보내기 (JSON)</button>

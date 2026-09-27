@@ -320,13 +320,13 @@ function ProposalWork({
         <h2 className="t-section text-slate-900">문서 · 문구</h2>
         <div role="group" aria-label="문서 종류" data-testid="proposal-docs" className="grid grid-cols-2 gap-1 sm:grid-cols-4 xl:grid-cols-7">
           {DOCS.map((x) => (
-            <button key={x.key} type="button" aria-pressed={doc === x.key} onClick={() => setDoc(x.key)} className={`tap rounded-(--radius-control) border px-2 py-2 text-[0.85rem] font-semibold break-keep ${doc === x.key ? 'border-brand-500 bg-brand-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
+            <button key={x.key} type="button" aria-pressed={doc === x.key} onClick={() => setDoc(x.key)} className={`tap rounded-(--radius-control) border px-2 py-2 text-[0.875rem] font-semibold break-keep ${doc === x.key ? 'border-brand-500 bg-brand-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
               {x.label}
             </button>
           ))}
         </div>
         {(doc === 'scope' || doc === 'quote') && picked.length > 1 && (
-          <label className="block max-w-md text-[0.85rem] text-slate-500">
+          <label className="block max-w-md text-[0.875rem] text-slate-500">
             상품
             <select value={Math.min(scopePkg, picked.length - 1)} onChange={(e) => setScopePkg(Number(e.target.value))} className={inputClass}>
               {picked.map((p, i) => <option key={p.id} value={i}>{p.name}</option>)}
@@ -350,19 +350,19 @@ function ProposalWork({
       <Surface className="flex flex-col gap-3" >
         <h2 className="t-section text-slate-900">월납 보험료 제안</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <label className="block text-[0.85rem] text-slate-500">
+          <label className="block text-[0.875rem] text-slate-500">
             월납 (만원)
             <input value={d.premium} inputMode="numeric" onChange={(e) => setD({ ...d, premium: e.target.value.replace(/[^0-9]/g, '') })} className={inputClass} />
           </label>
-          <label className="block text-[0.85rem] text-slate-500">
+          <label className="block text-[0.875rem] text-slate-500">
             납입 기간 (개월)
             <input value={d.months} inputMode="numeric" onChange={(e) => setD({ ...d, months: e.target.value.replace(/[^0-9]/g, '') })} className={inputClass} />
           </label>
-          <label className="block text-[0.85rem] text-slate-500">
+          <label className="block text-[0.875rem] text-slate-500">
             환급률 (%)
             <input value={d.rate} inputMode="numeric" onChange={(e) => setD({ ...d, rate: e.target.value.replace(/[^0-9]/g, '') })} className={inputClass} />
           </label>
-          <label className="block text-[0.85rem] text-slate-500">
+          <label className="block text-[0.875rem] text-slate-500">
             직전년도 순이익 (만원)
             <input value={d.net} inputMode="numeric" onChange={(e) => setD({ ...d, net: e.target.value.replace(/[^0-9]/g, '') })} className={inputClass} />
           </label>
@@ -384,7 +384,7 @@ function ProposalWork({
 
       {/* 제안 상태 · 저장 */}
       <Surface className="flex flex-wrap items-end gap-3">
-        <label className="block min-w-44 flex-1 text-[0.85rem] text-slate-500 sm:max-w-xs">
+        <label className="block min-w-44 flex-1 text-[0.875rem] text-slate-500 sm:max-w-xs">
           제안 상태
           <select value={d.status} onChange={(e) => setD({ ...d, status: e.target.value })} aria-label="제안 상태" className={inputClass}>
             {PROPOSAL_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -599,7 +599,7 @@ function ProposalContent({ workspaceId }: { workspaceId: string | null }) {
         </div>
       ) : (
         <>
-          <label className="flex max-w-xl flex-col gap-1 text-[0.85rem] text-slate-500">
+          <label className="flex max-w-xl flex-col gap-1 text-[0.875rem] text-slate-500">
             고객
             <select value={record?.id ?? ''} onChange={(e) => pick(e.target.value)} aria-label="제안할 고객" className={`${inputClass} !mt-0 font-semibold`}>
               {grouped.map((g) => (

@@ -207,7 +207,7 @@ export function DesignProjectPage() {
           </button>
           {showExpert && (
             <div className="flex flex-col gap-5 border-t border-slate-100 px-5 py-5">
-              <div className="flex flex-wrap items-center gap-2 text-[0.85rem] text-slate-400">
+              <div className="flex flex-wrap items-center gap-2 text-[0.875rem] text-slate-400">
                 <span>설계 v{design.version}</span>
                 <span>Must {must.length} · Should {should.length} · Later {later.length}</span>
               </div>
@@ -264,7 +264,7 @@ export function DesignProjectPage() {
 function DefItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-[0.85rem] font-semibold text-slate-500">{label}</dt>
+      <dt className="text-[0.875rem] font-semibold text-slate-500">{label}</dt>
       <dd className="mt-0.5 text-[0.98rem] break-keep text-slate-700">{value || '-'}</dd>
     </div>
   )

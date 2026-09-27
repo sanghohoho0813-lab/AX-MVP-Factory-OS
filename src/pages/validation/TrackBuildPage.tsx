@@ -259,10 +259,10 @@ function BuildPanel({ w, readOnly }: { w: ValidationWorkspace; readOnly: boolean
                     </Button>
                   )}
                   <Button variant="ghost" size="sm" onClick={() => setEditing(b)}>
-                    편집
+                    고치기
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => setRemoveTarget(b)}>
-                    삭제
+                    지우기
                   </Button>
                 </div>
               )}
@@ -294,7 +294,7 @@ function BuildPanel({ w, readOnly }: { w: ValidationWorkspace; readOnly: boolean
         open={removeTarget !== null}
         title="테스트 버전 삭제"
         message={`'${removeTarget?.name ?? ''}' 테스트 버전을 삭제하시겠습니까?`}
-        confirmLabel="삭제"
+        confirmLabel="지우기"
         danger
         onConfirm={doRemove}
         onCancel={() => setRemoveTarget(null)}
@@ -487,7 +487,7 @@ function ParticipantPanel({ w, readOnly }: { w: ValidationWorkspace; readOnly: b
                     </select>
                   </label>
                   <Button variant="ghost" size="sm" onClick={() => setRemoveTarget(p)}>
-                    삭제
+                    지우기
                   </Button>
                 </div>
               )}
@@ -501,7 +501,7 @@ function ParticipantPanel({ w, readOnly }: { w: ValidationWorkspace; readOnly: b
         open={removeTarget !== null}
         title="참여자 삭제"
         message={`'${removeTarget?.name ?? ''}' 참여자를 삭제하시겠습니까?`}
-        confirmLabel="삭제"
+        confirmLabel="지우기"
         danger
         onConfirm={doRemove}
         onCancel={() => setRemoveTarget(null)}

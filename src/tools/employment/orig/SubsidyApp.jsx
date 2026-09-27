@@ -389,7 +389,7 @@ function ChkItem(props){
         </label>
         <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
           {!isDisabled&&props.onCopyReq&&<button onClick={props.onCopyReq} style={{background:"var(--color-brand-50)",border:"1px solid var(--color-brand-200)",borderRadius:7,color:"var(--color-brand-700)",cursor:"pointer",fontSize:13,padding:"3px 7px"}} title="이 서류 요청 문구 복사">📋</button>}
-          {!isDisabled&&props.onDelete&&<button onClick={props.onDelete} style={{background:"none",border:"none",color:"#CBD5E1",cursor:"pointer",fontSize:17}} title="삭제">🗑️</button>}
+          {!isDisabled&&props.onDelete&&<button onClick={props.onDelete} style={{background:"none",border:"1px solid #E2E8F0",borderRadius:8,color:"#64748B",cursor:"pointer",fontSize:14,padding:"8px 10px"}} title="지우기">🗑️ 지우기</button>}
         </div>
       </div>
       {!isDisabled&&(
@@ -536,7 +536,7 @@ function HiringDiagnosis(props){ var programs=props.programs; var st1=useState("
       {[["채용 전(사전신청 가능)",st9],["최근 감원 이력 없음",st10],["월보수 124만원 이상",st11]].map(function(arr,i){var st=arr[1];return(<label key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 16px",borderRadius:10,background:st[0]?"#ECFDF5":"#FEF2F2",border:st[0]?"1px solid #A7F3D0":"1px solid #FECACA",cursor:"pointer",fontSize:17}}><input type="checkbox" checked={st[0]} onChange={function(){st[1](!st[0]);}} style={{width:18,height:18,accentColor:"#059669"}}/><span style={{color:st[0]?"#059669":"#DC2626"}}>{arr[0]}</span></label>);})}
       {st2[0].indexOf("청년")>=0&&st6[0]==="수도권"&&(<label style={{display:"flex",alignItems:"center",gap:10,padding:"12px 16px",borderRadius:10,background:st12[0]?"#ECFDF5":"#FEF2F2",border:st12[0]?"1px solid #A7F3D0":"1px solid #FECACA",cursor:"pointer",fontSize:17}}><input type="checkbox" checked={st12[0]} onChange={function(){st12[1](!st12[0]);}} style={{width:18,height:18,accentColor:"#059669"}}/><span style={{color:st12[0]?"#059669":"#DC2626"}}>취업애로요건 해당(청년·수도권)</span></label>)}
     </div>
-    <button style={Object.assign({},btnP,{width:"100%",padding:16,fontSize:20})} onClick={runDiagnose}>🎯 지원금 가능성 진단</button>
+    <button style={Object.assign({},btnP,{width:"100%",padding:16,fontSize:20})} onClick={runDiagnose}>진단 결과 보기</button>
   </Card>
   {result&&(<div>{recommend.length>0&&(<Card style={{padding:20,marginBottom:16,border:"2px solid #6EE7B7"}}><h4 style={{margin:"0 0 12px",fontSize:20,fontWeight:700,color:"#059669"}}>✅ 가능성 높음 ({recommend.length})</h4>{recommend.map(function(r){return <DiagRow key={r.program.id} r={r}/>;})}</Card>)}{maybe.length>0&&(<Card style={{padding:20,marginBottom:16,border:"1px solid #E2E8F0"}}><h4 style={{margin:"0 0 12px",fontSize:20,fontWeight:700,color:"#475569"}}>⚠️ 조건 확인 필요 ({maybe.length})</h4>{maybe.map(function(r){return <DiagRow key={r.program.id} r={r}/>;})}</Card>)}{recommend.length===0&&maybe.length===0&&(<Card style={{padding:36,textAlign:"center"}}><div style={{fontSize:40,marginBottom:10}}>🔍</div><p style={{color:"#94A3B8",fontSize:18,margin:0}}>입력 조건에 뚜렷하게 맞는 지원금이 없어요.</p></Card>)}<Notice>진단 결과는 가능성 안내이며 확정이 아닙니다. 실제 신청 전 최신 공고를 확인하세요.</Notice></div>)}</div>);
 }
@@ -3212,7 +3212,7 @@ function PayrollDiagnosis(props){
               <div style={{borderTop:"1px solid #F1F5F9",paddingTop:14,display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
                 <button onClick={function(){stStep[1](3);}} style={Object.assign({},btnS,{padding:"11px 16px",fontSize:17})}>← 명부 정리로 돌아가기</button>
                 <button onClick={doCopy} style={Object.assign({},btnP,{background:stCopied[0]?"#059669":"#0F766E",padding:"12px 20px",fontSize:18.5})}>{stCopied[0]?"✓ 복사됨 (주민번호 미포함)":"📋 상담용 요약 복사"}</button>
-                <button onClick={function(){toast("고객 보고서 반영·업체 임시저장·PDF 내보내기는 다음 단계로 준비 중입니다.","success");}} style={Object.assign({},btnS,{padding:"11px 18px",fontSize:17,color:"#94A3B8"})}>🗂️ 보고서 반영·저장·PDF (다음 단계)</button>
+                {/* [D-126] 아무 일도 하지 않던 '보고서 반영·저장·PDF (다음 단계)' 단추는 뺐다 */}
                 <span style={{fontSize:14.5,color:"#94A3B8",marginLeft:"auto"}}>분석은 브라우저에서만 처리 · 저장되지 않음</span>
               </div>
             </div>
@@ -4315,7 +4315,7 @@ function CompDet(props){
                       <td style={{padding:"11px 12px",color:"var(--color-brand-600)"}}>{rem>0?fMan(rem):"—"}</td>
                       <td style={{padding:"11px 12px"}}>{dd!==null?<DdayBadge dday={dd}/>:<span style={{color:"#CBD5E1",fontSize:"var(--fs-meta)"}}>—</span>}</td>
                       <td style={{padding:"11px 8px",whiteSpace:"nowrap"}}>
-                        <button onClick={function(){st2[1](emp);}} style={{background:"none",border:"none",color:"#64748B",cursor:"pointer",fontSize:17,padding:"2px 6px"}} title="편집">✏️</button>
+                        <button onClick={function(){st2[1](emp);}} className="prog-tap" style={{background:"none",border:"1px solid #E2E8F0",borderRadius:8,color:"#475569",cursor:"pointer",fontSize:14,padding:"8px 10px",marginRight:4}} title="고치기">✏️ 고치기</button>
                         <button onClick={function(){if(window.confirm("'"+emp.name+"' 직원을 삭제하시겠습니까?\n삭제된 직원은 기본 목록에서 숨겨지며, 회차와 서류 관리 내역도 함께 보이지 않습니다."))props.onDeleteEmployee(emp.id);}} style={{background:"none",border:"none",color:"#DC2626",cursor:"pointer",fontSize:17,padding:"2px 6px"}} title="삭제">🗑️</button>
                       </td>
                     </tr>
@@ -4699,9 +4699,9 @@ function CompDet(props){
                           {!isEditing&&(
                             <div style={{display:"flex",gap:4,flexShrink:0}}>
                               <button onClick={function(){startEdit(n);}}
-                                style={{background:"none",border:"none",color:"#94A3B8",cursor:"pointer",fontSize:14,padding:"1px 5px",borderRadius:4,lineHeight:1}} title="편집">✏️</button>
+                                style={{background:"none",border:"1px solid #E2E8F0",color:"#475569",cursor:"pointer",fontSize:14,padding:"8px 10px",borderRadius:8,lineHeight:1}} title="고치기">✏️ 고치기</button>
                               <button onClick={function(){if(window.confirm("삭제하겠습니까?"))delNote(n.id);}}
-                                style={{background:"none",border:"none",color:"#CBD5E1",cursor:"pointer",fontSize:14,padding:"1px 5px",borderRadius:4,lineHeight:1}} title="삭제">🗑️</button>
+                                style={{background:"none",border:"1px solid #E2E8F0",color:"#64748B",cursor:"pointer",fontSize:14,padding:"8px 10px",borderRadius:8,lineHeight:1}} title="지우기">🗑️ 지우기</button>
                             </div>
                           )}
                         </div>
@@ -7114,7 +7114,7 @@ export default function SubsidyApp(props){
             ):(
               <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
                 {/* [D-94] 목차 화면의 ‘← 이전’ 은 뺐다 — OS 목차·브라우저 뒤로 가기와 겹쳤다. 업체 상세에서는 ‘← 업체 목록’ 으로 남긴다 */}
-                <span className="app-title" style={{fontSize:27,fontWeight:800,color:"#0F172A",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",letterSpacing:"-0.5px"}}>
+                <span className="app-title" style={{fontSize:"1.6rem",fontWeight:800,color:"#0F172A",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",letterSpacing:"-0.5px"}}>
                   {(SIDEBAR_NAV.find(function(n){return n.key===activeKey;})||{label:"대시보드"}).icon}&nbsp;
                   {(SIDEBAR_NAV.find(function(n){return n.key===activeKey;})||{label:"대시보드"}).label}
                 </span>
@@ -7125,12 +7125,12 @@ export default function SubsidyApp(props){
             <button onClick={function(){stCmdK[1](true);}} title="업체·직원 검색"
               style={{display:"flex",alignItems:"center",gap:7,padding:"9px 16px",borderRadius:10,border:"1.5px solid #E2E8F0",background:"#F8FAFC",color:"#64748B",fontSize:15,cursor:"pointer",fontFamily:FF,whiteSpace:"nowrap"}}>
               <span>🔍</span>
-              <span className="hide-mobile">검색</span>
+              <span>검색</span>
               
             </button>
             <NotifBell employees={employees} companies={companies} programs={programs} goCompany={goCompany} settings={profile.settings||{}} tier={tier}/>
             {(stView[0]==="dashboard"||stView[0]==="company")&&!selectedCompany&&(
-              <button style={btnP} className="hover-lift add-co-btn" data-tour="add-company" data-testid="emp-add-company" onClick={function(){if(!requirePlan())return;stAddComp[1](true);}}>+<span className="hide-mobile"> 업체 추가</span></button>
+              <button style={btnP} className="hover-lift add-co-btn" data-tour="add-company" data-testid="emp-add-company" onClick={function(){if(!requirePlan())return;stAddComp[1](true);}}>+<span> 업체 추가</span></button>
             )}
           </div>
         </div>

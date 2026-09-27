@@ -375,7 +375,7 @@ function CardRow({ label, value }: { label: string; value: string }) {
 function DefItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-[0.85rem] font-semibold text-slate-500">{label}</dt>
+      <dt className="text-[0.875rem] font-semibold text-slate-500">{label}</dt>
       <dd className="mt-0.5 text-[0.9rem] break-keep text-slate-700">{value || '-'}</dd>
     </div>
   )

@@ -79,7 +79,7 @@ await step('빠른 기록: 메모 저장', async () => {
 })
 await step('빠른 기록: 후속조치(오늘 기한) → Top 3 에 등장', async () => {
   const cap = p.locator('section[data-tour="home-capture"]')
-  await cap.getByRole('radio', { name: '후속조치' }).click()
+  await cap.getByRole('radio', { name: '할 일' }).click()
   await cap.locator('textarea[aria-label="기록 내용"]').fill('E2E 후속조치 오늘')
   await cap.locator('input[type="date"]').fill(ymd)
   await cap.locator('button:has-text("기록")').click()

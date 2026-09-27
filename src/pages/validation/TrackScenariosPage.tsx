@@ -239,7 +239,7 @@ function ScenariosBody({ workspace: w }: { workspace: ValidationWorkspace }) {
               </Button>
               <Button variant="ghost" size="sm" onClick={() => openEdit(s)}>
                 <Pencil aria-hidden="true" className="size-4" />
-                편집
+                고치기
               </Button>
               <Button variant="ghost" size="sm" onClick={() => handleDuplicate(s.id)}>
                 <Copy aria-hidden="true" className="size-4" />

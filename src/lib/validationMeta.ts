@@ -83,7 +83,7 @@ export const TRACK_META: Record<ValidationTrackType, { label: string; icon: Luci
 export const WORKSPACE_STATUS_META: Record<ValidationWorkspaceStatus, IconMeta> = {
   draft: { label: '준비 중', tone: 'neutral', icon: FlaskConical, order: 0 },
   ready: { label: '테스트 준비', tone: 'info', icon: ClipboardCheck, order: 1 },
-  testing: { label: '테스트 중', tone: 'warning', icon: Users, order: 2 },
+  testing: { label: '테스트 중', tone: 'info', icon: Users, order: 2 },
   evaluating: { label: '결과 검토', tone: 'accent', icon: Gauge, order: 3 },
   finalized: { label: '검증 확정', tone: 'success', icon: CheckCircle2, order: 4 },
   superseded: { label: '이전 버전', tone: 'neutral', icon: MinusCircle, order: 5 },
@@ -109,7 +109,7 @@ export const GATE_NUMBERS: ValidationGateNumber[] = ['gate_0', 'gate_1', 'gate_2
 export const GATE_STATUS_META: Record<ValidationGateStatus, IconMeta> = {
   locked: { label: '잠김', tone: 'neutral', icon: Lock, order: 0 },
   ready: { label: '준비됨', tone: 'info', icon: ClipboardCheck, order: 1 },
-  in_progress: { label: '진행 중', tone: 'warning', icon: FlaskConical, order: 2 },
+  in_progress: { label: '진행 중', tone: 'info', icon: FlaskConical, order: 2 },
   passed: { label: '통과', tone: 'success', icon: CheckCircle2, order: 3 },
   conditional_pass: { label: '조건부 통과', tone: 'warning', icon: AlertTriangle, order: 4 },
   failed: { label: '실패', tone: 'danger', icon: XCircle, order: 5 },
@@ -155,7 +155,7 @@ export const BUILD_TYPES = Object.keys(BUILD_TYPE_META) as BuildArtifactType[]
 export const BUILD_STATUS_META: Record<BuildArtifactStatus, SimpleMeta> = {
   draft: { label: '초안', tone: 'neutral', order: 0 },
   ready_for_test: { label: '테스트 준비', tone: 'info', order: 1 },
-  testing: { label: '테스트 중', tone: 'warning', order: 2 },
+  testing: { label: '테스트 중', tone: 'info', order: 2 },
   replaced: { label: '교체됨', tone: 'neutral', order: 3 },
   archived: { label: '보관', tone: 'neutral', order: 4 },
 }
@@ -175,7 +175,7 @@ export const PARTICIPANT_ROLES = Object.keys(PARTICIPANT_ROLE_META) as Validatio
 
 export const CONSENT_META: Record<ParticipantConsentStatus, SimpleMeta> = {
   not_required: { label: '불필요', tone: 'neutral', order: 0 },
-  pending: { label: '대기', tone: 'warning', order: 1 },
+  pending: { label: '대기', tone: 'neutral', order: 1 },
   agreed: { label: '동의', tone: 'success', order: 2 },
   declined: { label: '거절', tone: 'danger', order: 3 },
 }
@@ -209,7 +209,7 @@ export const SCENARIO_TYPES = Object.keys(SCENARIO_TYPE_META) as ValidationScena
 export const ROUND_STATUS_META: Record<ValidationRoundStatus, SimpleMeta> = {
   planned: { label: '계획', tone: 'neutral', order: 0 },
   ready: { label: '준비', tone: 'info', order: 1 },
-  in_progress: { label: '진행 중', tone: 'warning', order: 2 },
+  in_progress: { label: '진행 중', tone: 'info', order: 2 },
   completed: { label: '완료', tone: 'success', order: 3 },
   cancelled: { label: '취소', tone: 'neutral', order: 4 },
 }

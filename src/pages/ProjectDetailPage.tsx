@@ -573,7 +573,7 @@ export function ProjectDetailPage() {
           </ul>
           <p className="mt-3 flex items-center gap-2 text-[0.875rem] break-keep text-slate-500">
             <LocalTestModeBadge />
-            테스트 링크와 응답은 이 브라우저에만 저장됩니다. 외부 공유는 Supabase 연결 후 제공됩니다.
+            테스트 링크와 응답은 이 브라우저에만 저장됩니다. 외부 공유는 클라우드 연결 후 제공됩니다.
           </p>
         </Panel>
       )}

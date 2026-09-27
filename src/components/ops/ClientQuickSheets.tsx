@@ -193,7 +193,7 @@ export function ClientMoneySheet({
                     type="button"
                     aria-label={`${fee.label} 금액에 100만원 더하기`}
                     onClick={() => onSave(withFee(record, fee.id, { amount: (fee.amount ?? 0) + 1_000_000 }))}
-                    className="shrink-0 rounded-(--radius-control) border border-slate-200 px-2 py-2 text-[0.85rem] font-semibold whitespace-nowrap text-slate-600 hover:border-brand-300"
+                    className="shrink-0 rounded-(--radius-control) border border-slate-200 px-2 py-2 text-[0.875rem] font-semibold whitespace-nowrap text-slate-600 hover:border-brand-300"
                   >
                     +100만
                   </button>

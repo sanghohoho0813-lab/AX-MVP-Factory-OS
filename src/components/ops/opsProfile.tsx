@@ -497,8 +497,11 @@ export function NotesSection({
   onEdit,
   onPin,
   onDelete,
+  allowAdd = true,
 }: {
   record: ClientOpsRecord
+  /** D-126: 같은 탭에 기록 칸이 이미 있으면 새 메모 칸은 두지 않는다(예전 메모는 그대로 보이고 고칠 수 있다) */
+  allowAdd?: boolean
   onAdd: (text: string) => void | boolean | Promise<void | boolean>
   onEdit: (id: string, text: string) => unknown
   onPin: (id: string, pinned: boolean) => unknown
@@ -513,6 +516,7 @@ export function NotesSection({
   /** D-122: 지우기 전에 그 메모 자리에서 한 번 묻는다 */
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const notes = sortedNotes(record)
+  if (!allowAdd && notes.length === 0) return null
 
   const add = async () => {
     const t = draft.trim()
@@ -539,10 +543,10 @@ export function NotesSection({
         <h2 id="notes" className="text-[1.3rem] font-bold text-slate-900">
           메모
         </h2>
-        <p className="text-[0.9rem] text-slate-500">통화 내용·요청사항을 적어두세요. 수정·삭제할 수 있습니다.</p>
+        <p className="text-[0.9rem] text-slate-500">{allowAdd ? '통화 내용 · 요청사항을 적어 두세요. 고치거나 지울 수 있습니다.' : '예전에 적은 메모입니다. 새로 적을 것은 위 기록 칸에 적으세요.'}</p>
       </div>
 
-      <div className="rounded-(--radius-panel) border border-slate-200 bg-slate-50 p-3">
+      {allowAdd && <div className="rounded-(--radius-panel) border border-slate-200 bg-slate-50 p-3">
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -561,11 +565,14 @@ export function NotesSection({
           </Button>
         </div>
       </div>
+      }
 
       {notes.length === 0 ? (
-        <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-6 text-[0.95rem] text-slate-500">
-          아직 메모가 없습니다.
-        </p>
+        allowAdd ? (
+          <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-6 text-[0.95rem] text-slate-500">
+            아직 메모가 없습니다.
+          </p>
+        ) : null
       ) : (
         <ul className="flex flex-col gap-2">
           {notes.map((n) => (
@@ -605,7 +612,7 @@ export function NotesSection({
                   <div role="alertdialog" aria-label="메모 삭제 확인" className="mt-2 flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-danger-200 bg-danger-50 px-3 py-2">
                     <span className="t-sub font-semibold text-danger-800">이 메모를 지울까요?</span>
                     <Button variant="danger" size="sm" onClick={() => { setDeletingId(null); void onDelete(n.id) }}>
-                      지우기
+                      네, 지웁니다
                     </Button>
                     <Button size="sm" onClick={() => setDeletingId(null)}>
                       취소
@@ -625,10 +632,10 @@ export function NotesSection({
                       }}
                       className={NOTE_BTN}
                     >
-                      <Pencil aria-hidden="true" className="size-4" /> 수정
+                      <Pencil aria-hidden="true" className="size-4" /> 고치기
                     </button>
                     <button type="button" onClick={() => setDeletingId(n.id)} className={`${NOTE_BTN} hover:!bg-danger-50 hover:!text-danger-700`}>
-                      <Trash2 aria-hidden="true" className="size-4" /> 삭제
+                      <Trash2 aria-hidden="true" className="size-4" /> 지우기
                     </button>
                   </div>
                 )

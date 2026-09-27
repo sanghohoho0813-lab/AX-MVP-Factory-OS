@@ -22,7 +22,7 @@ const VARIANT_CLASS: Record<ButtonVariant, string> = {
 
 /* 손가락으로 누르는 화면에서는 44px 아래로 내려가지 않는다 */
 const SIZE_CLASS: Record<ButtonSize, string> = {
-  sm: 'h-10 px-3 t-sub gap-1.5',
+  sm: 'tap h-10 px-3 t-sub gap-1.5',
   md: 'h-11 px-4 t-body gap-2 sm:h-10',
 }
 

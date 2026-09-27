@@ -48,7 +48,7 @@ function ContentBody({ design }: { design: WebsiteDesign }) {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] text-left text-[0.9rem]">
             <thead>
-              <tr className="border-b border-slate-100 text-[0.85rem] text-slate-400">
+              <tr className="border-b border-slate-100 text-[0.875rem] text-slate-400">
                 <th scope="col" className="px-5 py-2.5 font-medium">콘텐츠</th>
                 <th scope="col" className="px-3 py-2.5 font-medium">유형</th>
                 <th scope="col" className="px-3 py-2.5 font-medium">필수</th>
@@ -63,12 +63,12 @@ function ContentBody({ design }: { design: WebsiteDesign }) {
                   <td className="px-3 py-2.5 text-slate-500">{CONTENT_ITEM_TYPE_META[c.type].label}</td>
                   <td className="px-3 py-2.5 text-slate-500">{c.required ? '필수' : '선택'}</td>
                   <td className="px-3 py-2.5">
-                    <select aria-label={`${c.title} 상태`} value={c.status} onChange={(e) => run(() => updateContentItem(design.id, c.id, { status: e.target.value as ContentItemStatus }))} className="rounded-(--radius-control) border border-slate-300 px-2 py-1 text-[0.85rem] text-slate-700 focus:border-brand-400 focus:outline-none">
+                    <select aria-label={`${c.title} 상태`} value={c.status} onChange={(e) => run(() => updateContentItem(design.id, c.id, { status: e.target.value as ContentItemStatus }))} className="rounded-(--radius-control) border border-slate-300 px-2 py-1 text-[0.875rem] text-slate-700 focus:border-brand-400 focus:outline-none">
                       {CONTENT_STATUSES.map((s) => <option key={s} value={s}>{CONTENT_ITEM_STATUS_META[s].label}</option>)}
                     </select>
                   </td>
                   <td className="px-5 py-2.5">
-                    <input aria-label={`${c.title} 담당자`} value={c.owner} onChange={(e) => updateContentItem(design.id, c.id, { owner: e.target.value })} placeholder="담당자" className="w-28 rounded-(--radius-control) border border-slate-300 px-2 py-1 text-[0.85rem] focus:border-brand-400 focus:outline-none" />
+                    <input aria-label={`${c.title} 담당자`} value={c.owner} onChange={(e) => updateContentItem(design.id, c.id, { owner: e.target.value })} placeholder="담당자" className="w-28 rounded-(--radius-control) border border-slate-300 px-2 py-1 text-[0.875rem] focus:border-brand-400 focus:outline-none" />
                   </td>
                 </tr>
               ))}
@@ -81,7 +81,7 @@ function ContentBody({ design }: { design: WebsiteDesign }) {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[520px] text-left text-[0.9rem]">
             <thead>
-              <tr className="border-b border-slate-100 text-[0.85rem] text-slate-400">
+              <tr className="border-b border-slate-100 text-[0.875rem] text-slate-400">
                 <th scope="col" className="px-5 py-2.5 font-medium">자산</th>
                 <th scope="col" className="px-3 py-2.5 font-medium">수량</th>
                 <th scope="col" className="px-3 py-2.5 font-medium">필수</th>
@@ -91,11 +91,11 @@ function ContentBody({ design }: { design: WebsiteDesign }) {
             <tbody className="divide-y divide-slate-50">
               {design.assetRequirements.map((a) => (
                 <tr key={a.id}>
-                  <td className="px-5 py-2.5 font-medium text-slate-700">{a.title} <span className="text-[0.85rem] font-normal text-slate-400">{ASSET_TYPE_META[a.type].label}</span></td>
+                  <td className="px-5 py-2.5 font-medium text-slate-700">{a.title} <span className="text-[0.875rem] font-normal text-slate-400">{ASSET_TYPE_META[a.type].label}</span></td>
                   <td className="px-3 py-2.5 text-slate-500">{a.quantity}개</td>
                   <td className="px-3 py-2.5 text-slate-500">{a.required ? '필수' : '선택'}</td>
                   <td className="px-5 py-2.5 flex items-center gap-2">
-                    <select aria-label={`${a.title} 상태`} value={a.status} onChange={(e) => run(() => updateAssetRequirement(design.id, a.id, { status: e.target.value as AssetStatus }))} className="rounded-(--radius-control) border border-slate-300 px-2 py-1 text-[0.85rem] text-slate-700 focus:border-brand-400 focus:outline-none">
+                    <select aria-label={`${a.title} 상태`} value={a.status} onChange={(e) => run(() => updateAssetRequirement(design.id, a.id, { status: e.target.value as AssetStatus }))} className="rounded-(--radius-control) border border-slate-300 px-2 py-1 text-[0.875rem] text-slate-700 focus:border-brand-400 focus:outline-none">
                       {ASSET_STATUSES.map((s) => <option key={s} value={s}>{ASSET_STATUS_META[s].label}</option>)}
                     </select>
                     <AssetStatusBadge status={a.status} />
@@ -105,7 +105,7 @@ function ContentBody({ design }: { design: WebsiteDesign }) {
             </tbody>
           </table>
         </div>
-        <p className="px-5 py-3 text-[0.85rem] text-slate-400">실제 파일 업로드는 하지 않으며 요구사항과 준비상태만 기록합니다.</p>
+        <p className="px-5 py-3 text-[0.875rem] text-slate-400">실제 파일 업로드는 하지 않으며 요구사항과 준비상태만 기록합니다.</p>
       </Panel>
     </>
   )

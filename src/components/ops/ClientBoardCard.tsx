@@ -111,7 +111,7 @@ function ServiceChip({ chip, onClick }: { chip: ChipState; onClick: () => void }
       type="button"
       onClick={onClick}
       title={`${chip.label} · ${SERVICE_STATUS_LABEL[chip.status]} — 눌러서 상태 바꾸기`}
-      className={`tap inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.85rem] font-medium hover:border-brand-300 ${look}`}
+      className={`tap inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.875rem] font-medium hover:border-brand-300 ${look}`}
     >
       <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full no-underline ${DOT[chip.status]}`} />
       <span className="whitespace-nowrap">{chip.label}</span>
@@ -316,7 +316,7 @@ export function ClientBoardCard({
 
         {/* 다음 할 일 */}
         <p className="t-sub break-keep text-slate-700">
-          {record.nextAction || <span className="text-slate-400">다음 할 일이 정해지지 않았습니다</span>}
+          {record.nextAction || <span className="text-slate-400">다음 약속이 없습니다</span>}
           {record.nextActionDueDate && (
             <span className={dLeft !== null && dLeft < 0 ? 'font-semibold text-danger-700' : 'text-slate-500'}>
               {' · '}
@@ -347,7 +347,7 @@ export function ClientBoardCard({
               <button
                 type="button"
                 onClick={() => setAllChips((v) => !v)}
-                className="tap inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[0.85rem] font-medium text-slate-600 hover:border-brand-300 hover:text-brand-700"
+                className="tap inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[0.875rem] font-medium text-slate-600 hover:border-brand-300 hover:text-brand-700"
               >
                 {allChips ? '접기' : hiddenLabel}
               </button>

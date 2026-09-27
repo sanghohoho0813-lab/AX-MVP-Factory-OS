@@ -75,7 +75,7 @@ export function OnboardingSettingsPanel() {
           가이드 진행 초기화
         </Button>
       </div>
-      <p className="mt-2 text-[0.85rem] break-keep text-slate-400">
+      <p className="mt-2 text-[0.875rem] break-keep text-slate-400">
         “가이드 진행 초기화”는 안내를 읽은 표시만 지웁니다. 고객사·프로젝트·진단·설계 등 실제 데이터와 샘플 데이터는 삭제되지 않습니다.
       </p>
     </Panel>

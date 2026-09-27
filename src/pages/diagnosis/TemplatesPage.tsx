@@ -145,7 +145,7 @@ export function TemplatesPage() {
       items={[
         {
           key: 'edit',
-          label: '편집',
+          label: '고치기',
           icon: Pencil,
           onSelect: () => handleEdit(template),
         },

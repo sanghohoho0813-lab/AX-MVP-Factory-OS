@@ -15,13 +15,14 @@ import { CONTRACT_KIND_LABEL, contractStageOf } from '../types/clientOps'
 import { clientOpsProgress } from './clientOpsAlerts'
 import { todayLocalDate } from '../lib/appClock'
 
-export type ClientFilterKey = 'all' | 'cash' | 'insurance' | 'mixed' | 'unsigned' | 'unpaid' | 'overdue' | 'late'
+export type ClientFilterKey = 'all' | 'cash' | 'insurance' | 'mixed' | 'unsigned' | 'unpaid' | 'overdue' | 'late' | 'waiting'
 
-export const CLIENT_FILTER_ORDER: ClientFilterKey[] = ['all', 'late', 'unpaid', 'overdue', 'cash', 'insurance', 'mixed', 'unsigned']
+export const CLIENT_FILTER_ORDER: ClientFilterKey[] = ['all', 'late', 'waiting', 'unpaid', 'overdue', 'cash', 'insurance', 'mixed', 'unsigned']
 
 export const CLIENT_FILTER_LABEL: Record<ClientFilterKey, string> = {
   all: '전체',
   late: '다음 약속 지남',
+  waiting: '고객 회신 대기',
   unpaid: '못 받은 돈 있음',
   overdue: '연체 있음',
   cash: `${CONTRACT_KIND_LABEL.cash} 계약`,
@@ -53,6 +54,9 @@ export function matchesClientFilter(r: ClientOpsRecord, key: ClientFilterKey, to
     case 'late':
       // D-125: 다음 약속 날짜가 오늘보다 앞인데 아직 그대로인 업체 — "약속 지난 데부터 전화하자"
       return r.nextActionDueDate !== '' && r.nextActionDueDate < today
+    case 'waiting':
+      // D-126: 고객 회신을 기다리는 업무가 하나라도 있는 업체 — 오늘 화면 '고객 회신 대기' 칸이 여기로 온다
+      return Object.values(r.services).some((s) => s.status === 'waiting_client')
   }
 }
 

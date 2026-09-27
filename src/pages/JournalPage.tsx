@@ -145,10 +145,10 @@ function JournalContent({ workspaceId, userId }: { workspaceId: string | null; u
           <select
             value={clientFilter}
             onChange={(e) => setClientFilter(e.target.value)}
-            aria-label="고객사로 보기"
+            aria-label="업체로 보기"
             className="t-sub h-11 rounded-(--radius-control) border border-slate-300 px-2.5 text-slate-700 sm:h-10"
           >
-            <option value="">모든 고객사</option>
+            <option value="">모든 업체</option>
             {clients.map((c) => (
               <option key={c.id} value={c.id}>{c.companyName}</option>
             ))}
@@ -168,7 +168,7 @@ function JournalContent({ workspaceId, userId }: { workspaceId: string | null; u
           </select>
           <label className="t-sub tap inline-flex cursor-pointer items-center gap-1.5 text-slate-600">
             <input type="checkbox" checked={openOnly} onChange={(e) => setOpenOnly(e.target.checked)} className="size-5 accent-brand-600" />
-            안 끝난 후속조치만
+            안 끝난 할 일만
           </label>
         </div>
       )}
@@ -193,7 +193,7 @@ function JournalContent({ workspaceId, userId }: { workspaceId: string | null; u
         open={pendingDelete !== null}
         title="기록 삭제"
         message="이 기록을 지웁니다. 되돌릴 수 없습니다."
-        confirmLabel="삭제"
+        confirmLabel="지우기"
         danger
         onConfirm={() => {
           const target = pendingDelete

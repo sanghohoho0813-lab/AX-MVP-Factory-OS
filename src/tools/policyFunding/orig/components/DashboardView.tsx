@@ -79,7 +79,7 @@ export default function DashboardView() {
     <section className="mx-auto w-full max-w-6xl px-6 pt-12 pb-20 @min-[640px]:pt-16">
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-bold tracking-tight @min-[640px]:text-3xl">
-          고객 관리 대시보드
+          상담 업체 한눈에 보기
         </h1>
         <p className="text-slate-600">
           관리 중인 고객의 진행 상태와 다음 액션을 한눈에 확인하세요.

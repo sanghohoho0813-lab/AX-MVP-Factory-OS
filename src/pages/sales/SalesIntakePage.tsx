@@ -14,6 +14,7 @@ import { ConfirmModal } from '../../components/ui/ConfirmModal'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { fromState } from '../../lib/navFrom'
+import { DueDateField } from '../../components/ops/opsControls'
 import { Building2, FileUp, ScanSearch, Sparkles } from 'lucide-react'
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useToast } from '../../components/ui/toastContext'
@@ -250,7 +251,7 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
                 onChange={(e) => setText(e.target.value)}
                 aria-label="크레탑 보고서 글"
                 placeholder="크레탑 기업종합보고서 글을 붙여넣으세요."
-                className={`${inputClass} !mt-0 min-h-48 font-mono text-[0.85rem]`}
+                className={`${inputClass} !mt-0 min-h-48 font-mono text-[0.875rem]`}
               />
               <Button variant="primary" className="self-start" onClick={() => analyze(text, null)} disabled={busy}>
                 <ScanSearch aria-hidden="true" className="size-4" />
@@ -308,7 +309,7 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
                   <Row label="매출" value={digest.revenueM ? `${(digest.revenueM / 100).toLocaleString('ko-KR', { maximumFractionDigits: 1 })}억` : ''} />
                 </dl>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <label className="block text-[0.85rem] text-slate-500">
+                  <label className="block text-[0.875rem] text-slate-500">
                     유입 경로
                     <select value={source} onChange={(e) => setSource(e.target.value)} className={inputClass}>
                       <option value="">선택</option>
@@ -319,15 +320,15 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
                       ))}
                     </select>
                   </label>
-                  <label className="block text-[0.85rem] text-slate-500">
-                    1차 미팅 날짜
-                    <input type="date" value={meetingDate} min={today} onChange={(e) => setMeetingDate(e.target.value)} className={inputClass} />
-                  </label>
-                  <label className="block text-[0.85rem] text-slate-500">
+                  {/* D-126: 달력 칸만 있던 것에 오늘 · 내일 · 3일 뒤 단추 */}
+                  <div className="min-w-0">
+                    <DueDateField label="1차 미팅 날짜" value={meetingDate} today={today} onChange={setMeetingDate} />
+                  </div>
+                  <label className="block text-[0.875rem] text-slate-500">
                     담당자
                     <input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder={c.ceo || ''} className={inputClass} />
                   </label>
-                  <label className="block text-[0.85rem] text-slate-500">
+                  <label className="block text-[0.875rem] text-slate-500">
                     휴대폰번호
                     <input value={contactPhone} inputMode="tel" onChange={(e) => setContactPhone(e.target.value)} placeholder="010-" className={inputClass} />
                   </label>

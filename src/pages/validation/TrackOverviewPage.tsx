@@ -209,7 +209,7 @@ function OverviewBody({
           value={
             <span className="inline-flex flex-col items-end">
               <span>{PLAIN_GATE_LABEL[currentGate]}</span>
-              <span className="text-[0.8125rem] font-normal text-slate-400">Gate {GATE_META[currentGate].index}</span>
+              <span className="text-[0.875rem] font-normal text-slate-400">Gate {GATE_META[currentGate].index}</span>
             </span>
           }
         />
@@ -350,7 +350,7 @@ function OverviewBody({
                       <li key={gate} className="flex items-center justify-between gap-3 rounded-(--radius-card) border border-slate-200 px-3.5 py-2.5">
                         <span className="flex min-w-0 flex-col">
                           <span className="text-[0.95rem] font-medium break-keep text-slate-700">{PLAIN_GATE_LABEL[gate]}</span>
-                          <span className="text-[0.8125rem] text-slate-400">Gate {GATE_META[gate].index}</span>
+                          <span className="text-[0.875rem] text-slate-400">Gate {GATE_META[gate].index}</span>
                         </span>
                         {gr ? <GateStatusBadge status={gr.status} /> : <span className="text-[0.875rem] text-slate-400">미생성</span>}
                       </li>
@@ -410,7 +410,7 @@ function OverviewBody({
 function DefItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-[0.85rem] font-semibold text-slate-500">{label}</dt>
+      <dt className="text-[0.875rem] font-semibold text-slate-500">{label}</dt>
       <dd className="mt-0.5 text-[0.98rem] break-keep text-slate-700">{value || '-'}</dd>
     </div>
   )
@@ -419,7 +419,7 @@ function DefItem({ label, value }: { label: string; value: string }) {
 function ScenarioField({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
-      <dt className="shrink-0 text-[0.85rem] font-medium text-slate-400 sm:w-28">{label}</dt>
+      <dt className="shrink-0 text-[0.875rem] font-medium text-slate-400 sm:w-28">{label}</dt>
       <dd className="min-w-0 flex-1 text-[0.92rem] break-keep text-slate-700">{value || '-'}</dd>
     </div>
   )

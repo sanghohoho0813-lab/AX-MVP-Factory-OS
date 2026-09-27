@@ -370,8 +370,8 @@ function GapSection({ strategy, readOnly }: { strategy: FundingStrategy; readOnl
                   </div>
                   {!readOnly && (
                     <div className="flex gap-1.5">
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(gap)}>수정</Button>
-                      <Button variant="ghost" size="sm" onClick={() => setRemoveTarget(gap)}>삭제</Button>
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(gap)}>고치기</Button>
+                      <Button variant="ghost" size="sm" onClick={() => setRemoveTarget(gap)}>지우기</Button>
                     </div>
                   )}
                 </div>
@@ -527,7 +527,7 @@ function GapSection({ strategy, readOnly }: { strategy: FundingStrategy; readOnl
         open={removeTarget !== null}
         title="부족조건 삭제"
         message={`'${removeTarget?.title ?? ''}' 부족조건을 삭제하시겠습니까?`}
-        confirmLabel="삭제"
+        confirmLabel="지우기"
         danger
         onConfirm={confirmRemove}
         onCancel={() => setRemoveTarget(null)}

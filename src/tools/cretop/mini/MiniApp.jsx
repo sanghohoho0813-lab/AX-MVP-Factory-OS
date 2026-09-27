@@ -1646,7 +1646,7 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
             <div style={{ display: "inline-flex", background: T.lineSoft, borderRadius: 9, padding: 2 }}>
               {FONT_SCALES.map(([label, v]) => (
                 <button key={v} onClick={() => pickScale(v)} title={`${label} (${Math.round(v * 100)}%)`} style={{ border: "none", cursor: "pointer", borderRadius: 7, padding: isMobile ? "4px 8px" : "6px 12px", fontSize: isMobile ? 11 : 12.5, fontWeight: 800, fontFamily: FF, whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 4, background: fontScale === v ? T.surface : "transparent", color: fontScale === v ? T.brand : T.sub, boxShadow: fontScale === v ? "0 1px 2px rgba(15,23,42,.08)" : "none" }}>
-                  <span style={{ fontSize: isMobile ? 10 : 12.5, fontWeight: 900, letterSpacing: -0.5 }}>Aa</span>{label}
+                  <span style={{ fontSize: 13, fontWeight: 900, letterSpacing: -0.5 }}>Aa</span>{label}
                 </button>
               ))}
             </div>
@@ -1656,7 +1656,7 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
 
       {/* 안내 (원본 상단 안내에서 '정식 출시 전·기기별 저장' 부분은 이 OS 에 맞지 않아 뺐다) */}
       <div style={{ background: "#FFF7ED", borderBottom: `1px solid #F59E0B40` }}>
-        <div style={{ maxWidth: 1040, margin: "0 auto", padding: "11px 14px", color: "#92400E", fontSize: 12.5, lineHeight: 1.6 }}>
+        <div style={{ maxWidth: 1040, margin: "0 auto", padding: "11px 14px", color: "#92400E", fontSize: 14, lineHeight: 1.6 }}>
           분석 결과는 참고용이며, 실제 상담 전 원문 확인이 필요합니다. 규칙 계산이며 외부 호출은 없습니다.
         </div>
       </div>
@@ -1673,10 +1673,10 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
             style={{ ...card, width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", marginBottom: 8, cursor: "pointer", fontFamily: FF, textAlign: "left", boxSizing: "border-box" }}>
             <span aria-hidden="true" style={{ fontSize: "calc(15px * var(--fs,1))" }}>📄</span>
             <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: "block", fontSize: "calc(11.5px * var(--fs,1))", fontWeight: 800, color: T.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fileName || "붙여넣은 원문"} 분석 결과</span>
-              <span style={{ display: "block", fontSize: "calc(9.5px * var(--fs,1))", color: T.mute, marginTop: 1 }}>다른 보고서로 새로 분석하려면 누르세요</span>
+              <span style={{ display: "block", fontSize: "calc(14px * var(--fs,1))", fontWeight: 800, color: T.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fileName || "붙여넣은 원문"} 분석 결과</span>
+              <span style={{ display: "block", fontSize: "calc(13px * var(--fs,1))", color: T.mute, marginTop: 1 }}>다른 보고서로 새로 분석하려면 누르세요</span>
             </span>
-            <span style={{ fontSize: "calc(10.5px * var(--fs,1))", fontWeight: 800, color: T.brand, border: `1px solid ${T.brand}55`, borderRadius: 8, padding: "5px 9px", whiteSpace: "nowrap", background: "#fff" }}>새 분석 ▾</span>
+            <span style={{ fontSize: "calc(13px * var(--fs,1))", fontWeight: 800, color: T.brand, border: `1px solid ${T.brand}55`, borderRadius: 8, padding: "5px 9px", whiteSpace: "nowrap", background: "#fff" }}>새 분석 ▾</span>
           </button>
         ) : null}
         {tab === "overview" && (!ui || inputOpen) ? (

@@ -15,7 +15,7 @@ const TONE_CALLOUT: Record<DeliverableBlockTone, string> = {
 export function ContentBlockView({ block, showInternal }: { block: DeliverableContentBlock; showInternal: boolean }) {
   if (block.internalOnly && !showInternal) return null
   const internalTag = block.internalOnly && showInternal ? (
-    <span className="ml-2 rounded border border-danger-200 bg-danger-50 px-1.5 py-0.5 text-[0.8125rem] font-semibold text-danger-600">내부 전용</span>
+    <span className="ml-2 rounded border border-danger-200 bg-danger-50 px-1.5 py-0.5 text-[0.875rem] font-semibold text-danger-600">내부 전용</span>
   ) : null
 
   switch (block.type) {

@@ -57,7 +57,7 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
       >
         <Bell aria-hidden="true" className="size-5" />
         {count > 0 && (
-          <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger-500 px-1 text-[0.8125rem] font-semibold text-white">
+          <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger-500 px-1 text-[0.875rem] font-semibold text-white">
             {count > 99 ? '99+' : count}
           </span>
         )}
@@ -72,7 +72,7 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
               {events.slice(0, 4).map((e) => (
                 <li key={e.id} className="border-b border-slate-50">
                   <Link to="/ops/inbox" onClick={() => setOpen(false)} className="block px-4 py-2.5 hover:bg-slate-50">
-                    <span className="block text-[0.85rem] font-semibold text-slate-700">상담신청</span>
+                    <span className="block text-[0.875rem] font-semibold text-slate-700">상담신청</span>
                     <span className="block truncate text-[0.9rem] text-slate-700">
                       {e.text}
                     </span>
@@ -82,7 +82,7 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
               {critical.slice(0, 6).map((a) => (
                 <li key={a.id} className="border-b border-slate-50">
                   <Link to={`/ops/clients/${a.clientId}`} onClick={() => setOpen(false)} className="block px-4 py-2.5 hover:bg-slate-50">
-                    <span className="block text-[0.85rem] font-semibold text-danger-700">{a.clientName}</span>
+                    <span className="block text-[0.875rem] font-semibold text-danger-700">{a.clientName}</span>
                     <span className="block truncate text-[0.9rem] text-slate-700">{a.title}</span>
                   </Link>
                 </li>

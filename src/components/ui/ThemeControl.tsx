@@ -34,7 +34,7 @@ export function ThemeControl() {
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[0.95rem] font-semibold text-slate-800">{t.label}</span>
-              <span className="block truncate text-[0.85rem] text-slate-500">{t.hint}</span>
+              <span className="block truncate text-[0.875rem] text-slate-500">{t.hint}</span>
             </span>
             {on && <Check aria-hidden="true" className="size-4 shrink-0 text-brand-700" />}
           </button>

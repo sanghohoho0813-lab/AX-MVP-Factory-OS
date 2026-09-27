@@ -170,7 +170,7 @@ export function PortalTab({
         {/* D-122: 개발자 말(READY · 브릿지 테이블 · 마이그레이션 · 파일 경로)을 앞에 두지 않는다 */}
         <p className="text-[0.98rem] font-semibold text-warning-700">고객 플랫폼 연결을 아직 켜지 않았습니다</p>
         <p className="mt-1 text-[0.92rem] break-keep text-slate-700">연결이 켜지면 이 탭에서 고객에게 소식 · 서류 요청을 보낼 수 있습니다. 관리자에게 '고객 플랫폼 연결을 켜 달라' 고 알려 주세요.</p>
-        <details className="mt-2 text-[0.85rem] text-slate-500">
+        <details className="mt-2 text-[0.875rem] text-slate-500">
           <summary className="cursor-pointer">관리자용 안내</summary>
           <p className="mt-1 break-keep">클라우드에 브릿지 테이블이 없습니다. docs/SETUP.md 의 순서대로 마이그레이션을 적용하면 켜집니다.</p>
         </details>
@@ -236,7 +236,7 @@ export function PortalTab({
             </div>
           ) : (
             <div className="flex w-full flex-wrap items-end gap-2 sm:w-auto">
-              <label className="min-w-0 flex-1 text-[0.85rem] text-slate-500 sm:w-64">
+              <label className="min-w-0 flex-1 text-[0.875rem] text-slate-500 sm:w-64">
                 고객 계정 이메일
                 <input
                   value={linkEmail}
@@ -257,7 +257,7 @@ export function PortalTab({
             <a href={`${brand.customerPlatformUrl}${brand.customerProjectsPath}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-brand-700 hover:underline">
               {brand.customerPlatformUrl.replace('https://', '')}{brand.customerProjectsPath} <ExternalLink aria-hidden="true" className="size-3" />
             </a>
-            에서 봅니다. 여기 "고객 화면 보기"는 고객과 같은 투영을 내 권한으로 읽은 것이며 고객 로그인을 대신하지 않습니다.
+            에서 봅니다. 여기 "고객 화면 보기"는 고객이 보는 것과 같은 내용을 내 계정으로 읽은 것입니다. 고객 로그인을 대신하지는 않습니다.
           </p>
         )}
       </section>
@@ -280,7 +280,7 @@ export function PortalTab({
                   <li key={d.id} className="flex flex-wrap items-center gap-2 py-2.5">
                     <span className="min-w-0 flex-1">
                       <span className="block text-[0.95rem] font-semibold text-slate-800">{d.title}</span>
-                      <span className="block text-[0.85rem] text-slate-500">
+                      <span className="block text-[0.875rem] text-slate-500">
                         {DOCUMENT_STATUS_LABEL[d.status]}
                         {d.visibility === 'shared_with_customer' && ' · 고객에게 공유됨'}
                         {d.fileName && ` · ${d.fileName}`}
@@ -370,7 +370,7 @@ export function PortalTab({
               <ul className="mt-3 flex flex-col gap-3">
                 {requests.map((r) => (
                   <li key={r.id} className="rounded-(--radius-card) border border-slate-200 p-3">
-                    <div className="flex flex-wrap items-center gap-2 text-[0.85rem]">
+                    <div className="flex flex-wrap items-center gap-2 text-[0.875rem]">
                       <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600">{REQUEST_TYPE_LABEL[r.requestType]}</span>
                       <span className="text-slate-500">{REQUEST_STATUS_LABEL[r.status]}</span>
                       <span className="text-slate-400">{activityTimeText(r.createdAt)}</span>
@@ -414,7 +414,7 @@ export function PortalTab({
               <ol className="mt-3 flex flex-col gap-2">
                 {published.map((u) => (
                   <li key={u.id} className="rounded-(--radius-card) border border-slate-200 p-3">
-                    <div className="flex flex-wrap items-center gap-2 text-[0.85rem]">
+                    <div className="flex flex-wrap items-center gap-2 text-[0.875rem]">
                       <span className="rounded-full bg-brand-50 px-2 py-0.5 font-semibold text-brand-700">{UPDATE_CATEGORY_LABEL[u.category]}</span>
                       <span className="text-slate-400">{u.publishedAt ? activityTimeText(u.publishedAt) : ''}</span>
                       {u.customerActionRequired && (
@@ -444,7 +444,7 @@ export function PortalTab({
       {/* 고객 이벤트 */}
       <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 shadow-(--shadow-card)">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-[1.05rem] font-bold text-slate-900">이 고객의 이벤트 <span className="text-slate-400">{events.length}</span></h3>
+          <h3 className="text-[1.05rem] font-bold text-slate-900">이 고객의 상담신청 · 요청 <span className="text-slate-400">{events.length}</span></h3>
           <Link to="/ops/inbox" className="text-[0.9rem] font-medium text-brand-700 hover:underline">상담신청함</Link>
         </div>
         {events.length === 0 ? (

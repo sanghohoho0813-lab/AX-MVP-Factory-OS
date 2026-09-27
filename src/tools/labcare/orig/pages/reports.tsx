@@ -169,9 +169,7 @@ export default function ReportsPage() {
               <p className="flex-1 rounded-lg bg-navy-50 px-3 py-2.5 text-sm font-semibold text-navy-700">
                 💡 "출력"을 누르면 리포트가 열리며 인쇄(PDF 저장) 창이 자동으로 뜹니다
               </p>
-              <button type="button" className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-400" disabled>
-                고객 공유 링크 (준비중)
-              </button>
+
             </div>
             <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm leading-relaxed text-slate-500">
               ※ 기대 혜택은 "세액공제 검토 가능성", "요건 충족 시 활용 가능"으로 안내합니다. 확정
