@@ -13,7 +13,6 @@ import { Check, FileSearch, Pencil } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import {
   FACT_DEFS,
-  displayFact,
   factDef,
   hardFactsToConfirm,
   normalizeFactInput,
@@ -291,7 +290,8 @@ export function FactNumbersCard({ record, now, onCommit }: { record: ClientOpsRe
           </p>
           {toConfirm.length > 0 && (
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span>적어 둔 값 — {toConfirm.map((f) => `${f.label} ${displayFact(factDef(f.key), f.value)}`).join(' · ')}</span>
+              {/* 값은 위 회사 정보 칸에 서식대로 보인다 — 여기는 이름만(날것 값 · 긴 이름이 넘치지 않게) */}
+              <span className="min-w-0 break-keep [overflow-wrap:anywhere]">적어 둔 값 — {toConfirm.map((f) => f.label).join(' · ')}</span>
               <Button variant="secondary" size="sm" onClick={() => void confirmAll()} data-testid="fact-confirm-entered">
                 <Check aria-hidden="true" className="size-4" /> 모두 맞음
               </Button>
