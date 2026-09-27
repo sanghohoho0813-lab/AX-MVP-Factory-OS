@@ -116,17 +116,15 @@ export function ModuleShell({ tool, section, children }: ModuleShellProps) {
           type="button"
           onClick={() => setDrawer(true)}
           data-testid="module-menu-open"
-          aria-label={`${tool.label} 목차 열기`}
-          className="tap inline-flex items-center gap-2 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.95rem] font-bold text-slate-800"
+          aria-label={`${current.label} — ${tool.label} 목차 열기`}
+          className="tap inline-flex min-w-0 items-center gap-2 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.95rem] font-bold text-slate-800"
         >
-          <Menu aria-hidden="true" className="size-4" />
-          {tool.label}
+          {/* D-127: 머리줄이 이미 '분야 › 도구 이름' 을 보여 준다 — 여기는 지금 화면 이름(누르면 목차) */}
+          <Menu aria-hidden="true" className="size-4 shrink-0" />
+          <span className="min-w-0 truncate">{current.label}</span>
         </button>
-        <span className="t-sub min-w-0 truncate text-slate-500">{current.label}</span>
-        {/* D-126: 휴대폰에서도 작업실로 돌아가는 길이 보인다(예전엔 목차 서랍 안 연한 글자뿐) */}
-        <Link to="/tools" className="tap t-sub ml-auto inline-flex shrink-0 items-center gap-1 text-slate-600 hover:text-brand-700">
-          <ChevronLeft aria-hidden="true" className="size-4" /> 작업실
-        </Link>
+        {/* D-126 · D-127: 휴대폰에서도 돌아가는 길 — 이 도구가 든 모듈로 */}
+        <BackToModule tool={tool} className="ml-auto shrink-0" short />
       </div>
 
       {/* 넓은 화면 — 모듈 목차 한 칸 */}
@@ -219,14 +217,14 @@ function ModuleNavList({
 }
 
 /** D-127: 목차 아래 — 이 도구가 든 모듈로 돌아가는 길(업체로 열었으면 그 업체를 들고) */
-function BackToModule({ tool, className = '' }: { tool: ToolDefinition; className?: string }) {
+function BackToModule({ tool, className = '', short = false }: { tool: ToolDefinition; className?: string; short?: boolean }) {
   const [params] = useSearchParams()
   const f = catalogFeature(tool.key)
   const m = f ? catalogModule(f.module) : undefined
   const to = withClient(m?.route ?? '/tools', params.get('client'))
   return (
     <Link to={to} data-testid="module-back" className={`tap t-sub inline-flex items-center gap-1 font-medium text-slate-600 hover:text-brand-700 ${className}`}>
-      <ChevronLeft aria-hidden="true" className="size-4" /> {m ? `${m.name} 모듈` : '모듈 전체'}
+      <ChevronLeft aria-hidden="true" className="size-4" /> {m ? (short ? m.name : `${m.name} 모듈`) : '모듈 전체'}
     </Link>
   )
 }

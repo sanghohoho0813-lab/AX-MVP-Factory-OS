@@ -161,10 +161,11 @@ function FeatureRow({
         data-tool={isTool ? f.key : undefined}
         data-feature={f.key}
         data-ready={ready ? (ready.ready ? 'yes' : 'no') : undefined}
-        className={`tap flex items-start gap-2.5 px-3.5 py-3 ${blocked ? 'hover:bg-danger-50/50' : 'hover:bg-brand-50/40'}`}
+        className={`tap flex flex-wrap items-start gap-x-2.5 gap-y-2 px-3.5 py-3 ${blocked ? 'hover:bg-danger-50/50' : 'hover:bg-brand-50/40'}`}
       >
         {Icon && <Icon aria-hidden="true" className={`mt-1 size-4 shrink-0 ${blocked ? 'text-danger-500' : 'text-slate-400'}`} />}
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        {/* 좁은 화면 · 큰 글자에서는 동사 단추가 아래 줄로 내려간다(설명이 한 글자씩 쪼개지지 않게) */}
+        <span className="flex min-w-0 grow basis-[11rem] flex-col gap-0.5">
           <span className="t-body font-bold break-keep text-slate-900">{entry.topic}</span>
           {ready && blocked ? (
             <span className="t-sub font-medium break-keep text-danger-700">
@@ -178,7 +179,7 @@ function FeatureRow({
           ) : null}
           {ready && ready.missingOptional.length > 0 && <span className="t-meta break-keep text-slate-500">있으면 더 정확 — {missingDocsText(ready.missingOptional)}</span>}
         </span>
-        <span className="t-sub mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-2.5 py-1 font-semibold text-brand-800">
+        <span className="t-sub ml-auto inline-flex shrink-0 items-center gap-1 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-2.5 py-1 font-semibold text-brand-800">
           {entry.verb}
           <ArrowRight aria-hidden="true" className="size-3.5" />
         </span>
