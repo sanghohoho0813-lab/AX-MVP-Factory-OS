@@ -9,6 +9,7 @@ import {
 import { EXTRACT_METHOD_LABEL, extractTextFromFile, type ExtractMethod } from '../../services/docTextExtract'
 import { Button } from '../ui/Button'
 import { useBackToClose } from '../../lib/backToClose'
+import { particle } from '../../lib/josa'
 
 type FieldKey = keyof Omit<ParsedCompanyInfo, 'source'>
 
@@ -256,7 +257,7 @@ export function DocImportModal({
                               <span className="block text-[1rem] font-semibold break-keep text-slate-900">{value}</span>
                               {willOverwrite && (
                                 <span className="mt-0.5 block text-[0.875rem] text-warning-800">
-                                  기존 값 「{current}」을(를) 덮어씁니다
+                                  기존 값 「{current}」{particle(current, '을/를')} 덮어씁니다
                                 </span>
                               )}
                             </span>

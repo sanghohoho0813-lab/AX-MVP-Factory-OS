@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import type { ModulePageConfig } from '../types'
 import { PageHeader } from '../components/ui/PageHeader'
 import { StatusBadge } from '../components/ui/StatusBadge'
+import { josa } from '../lib/josa'
 
 interface EmptyModulePageProps {
   config: ModulePageConfig
@@ -28,7 +29,7 @@ export function EmptyModulePage({ config }: EmptyModulePageProps) {
             <StatusBadge tone="info">아직 제공되지 않는 기능</StatusBadge>
           </div>
           <h2 className="mt-4 text-lg font-semibold break-keep text-slate-900">
-            {config.title}은(는) 아직 제공되지 않는 기능입니다
+            {josa(config.title, '은/는')} 아직 제공되지 않는 기능입니다
           </h2>
           <p className="mt-2 text-sm break-keep text-slate-500">
             데이터가 없거나 이전 단계가 부족해서가 아니라, 이 기능 자체가 아직

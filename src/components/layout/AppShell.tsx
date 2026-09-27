@@ -12,6 +12,8 @@ import { StorageFullNotice } from './StorageFullNotice'
 import { ScrollTopButton } from './ScrollTopButton'
 import { BackToCloseGuard } from '../../lib/backToClose'
 import { useScrollMemory } from '../../lib/scrollMemory'
+import { EntitlementsProvider } from '../../lib/entitlementsContext'
+import { ModuleBoundary } from '../modules/ModuleBoundary'
 
 function ShellFallback() {
   return (
@@ -30,6 +32,7 @@ export function AppShell() {
   useScrollMemory(() => setMobileOpen(false))
 
   return (
+    <EntitlementsProvider>
     <ActiveProjectProvider>
       <RouteProjectSync />
       <BackToCloseGuard />
@@ -54,7 +57,10 @@ export function AppShell() {
               {/* D-95: 한 화면이 넘어져도 사이드바·머리줄은 남는다. 다른 화면으로 옮기면 풀린다 */}
               <ContentErrorBoundary resetKey={location.pathname}>
                 <Suspense fallback={<ShellFallback />}>
-                  <Outlet />
+                  {/* D-127: 잠긴 모듈의 화면은 여기 한 곳에서 모듈 소개로 바꾼다 — 화면마다 요금제를 묻지 않는다 */}
+                  <ModuleBoundary pathname={location.pathname}>
+                    <Outlet />
+                  </ModuleBoundary>
                 </Suspense>
               </ContentErrorBoundary>
             </div>
@@ -66,6 +72,7 @@ export function AppShell() {
       </OnboardingProvider>
       </DemoTourProvider>
     </ActiveProjectProvider>
+    </EntitlementsProvider>
   )
 }
 

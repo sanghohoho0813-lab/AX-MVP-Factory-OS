@@ -5,6 +5,7 @@ import type {
 } from '../../types/selection'
 import { QUADRANT_META, TASK_FAMILY_META } from '../../lib/selectionMeta'
 import { candidateRiskLevel } from './candidateScoring'
+import { josa } from '../../lib/josa'
 
 /** primary(핵심 과제) 자동 추천 대상에서 제외되는 후보인지 */
 export function isPrimaryEligible(c: AutomationCandidate): boolean {
@@ -101,7 +102,7 @@ export function buildSelectionSummary(
     : ''
   const secondaryText =
     secondary.length > 0
-      ? ` 후속으로 ${secondary.map((s) => s.name).join(', ')}을(를) 2차 고도화 후보로 분리합니다.`
+      ? ` 후속으로 ${josa(secondary.map((s) => s.name).join(', '), '을/를')} 2차 고도화 후보로 분리합니다.`
       : ''
   return `${org}의 1차 핵심 과제는 '${primary.name}'(${familyLabel})로 추천합니다. ${effectText}${quadrant} 영역에 위치해 ${primary.automationApproach === 'workflow_automation' ? '워크플로 자동화' : primary.automationApproach === 'rule_based' ? '규칙 기반' : 'AI 보조 포함'} 방식으로 MVP-lite 수준에서 검증할 수 있습니다.${secondaryText} (규칙 기반 계산)`
 }

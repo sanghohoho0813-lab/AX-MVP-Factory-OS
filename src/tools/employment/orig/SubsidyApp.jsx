@@ -8,6 +8,7 @@ import { useBackToClose } from "../../../lib/backToClose"; // [D-124]
 import { supabase, validateUploadFile, trackActivity, accessPeriodLabel, hrPortalRoot, readSheetGrid, downloadCsv } from "./stubs";
 import * as PD from "./payrollDiagnosis";
 import { themeHtml } from "../../shared/brandHex"; // [D-99] 새 창·내려받는 보고서도 테마색
+import { particle } from "../../../lib/josa"; // [D-127] 을(를) · 이(가) 같은 어색한 조사 대신
 
 // ── 상수 ──────────────────────────────────────────────────
 var MIN_WAGE_2026 = 10320;
@@ -29,6 +30,9 @@ function guideHideForDay(key){try{localStorage.setItem(GUIDE_HIDE_PREFIX+key,Str
 function guideReset(key){try{localStorage.removeItem(GUIDE_HIDE_PREFIX+key);}catch(e){}}
 // ── 전체 글자 크기(설정) 적용 ──
 function applyFontScale(v){try{document.documentElement.setAttribute("data-fontscale",v==="large"||v==="xlarge"?v:"normal");}catch(e){}}
+// [D-127] OS 글자 크기(data-text-scale) → 이 모듈의 글자 크기
+var OS_TO_HR={"default":"normal","large":"large","extra_large":"xlarge"};
+function osTextScale(){try{return document.documentElement.getAttribute("data-text-scale");}catch(e){return null;}}
 function fD(ds){ if(!ds) return ""; var d=new Date(ds); return d.getFullYear()+"."+(d.getMonth()+1)+"."+d.getDate(); }
 function fDFull(ds){ if(!ds) return ""; var d=new Date(ds); return d.getFullYear()+"년 "+(d.getMonth()+1)+"월 "+d.getDate()+"일"; }
 function fMan(n){ var v=Math.abs(n||0); return v>=10000?Math.round(n/10000).toLocaleString()+"만 원":((n||0).toLocaleString())+"원"; }
@@ -430,7 +434,7 @@ function DocSection(props){
     var label=name.trim();
     if(hasDoc(label)){ toast("이미 추가된 서류입니다.","info"); return false; }
     props.onChange(docs.concat([{id:uid(),label:label,done:false,status:"none",files:[],isCustom:true}]));
-    toast(label+"이(가) 추가되었습니다.","success");
+    toast(label+particle(label,"이/가")+" 추가되었습니다.","success");
     return true;
   }
   function delDoc(idx){ props.onChange(docs.filter(function(_,i){return i!==idx;})); }
@@ -1014,7 +1018,7 @@ function AgencyReport(props){
       '<div class="kc" style="'+(rd.missingDocsCount>0?'background:#FFFBEB;border-color:#FDE68A':'')+'"><div class="l">미제출 서류</div><div class="v" style="color:'+(rd.missingDocsCount>0?'#D97706':'#059669')+'">'+rd.missingDocsCount+'건</div></div>',
       '<div class="kc"><div class="l">예상 컨설팅 수수료'+(rd.rate>0?' ('+rd.rate+'%)':'')+'</div><div class="v" style="color:#334155">'+(rd.rate>0?fM2(rd.estFee):'-')+'</div></div>'
     ].join("");
-    var narrative='현재 <strong>'+cl+'</strong>은(는) 총 <strong>'+rd.emps.length+'명</strong>의 근로자에 대해 고용지원금 검토 및 관리를 진행 중입니다. 현재까지 수령 완료된 금액은 <strong style="color:#059669">'+fM2(rd.totalRcv)+'</strong>이며, 향후 예상 수령액은 <strong style="color:#2563EB">'+fM2(rd.totalExp-rd.totalRcv)+'</strong>입니다. 향후 90일 이내 신청 또는 확인이 필요한 건은 총 <strong>'+rd.upcoming.length+'건</strong>'+(secO?', 그중 신청기한이 지나 즉시 점검이 필요한 건은 <strong style="color:#DC2626">'+rd.overdue.length+'건</strong>':'')+'입니다.';
+    var narrative='현재 <strong>'+cl+'</strong>'+particle(cl,'은/는')+' 총 <strong>'+rd.emps.length+'명</strong>의 근로자에 대해 고용지원금 검토 및 관리를 진행 중입니다. 현재까지 수령 완료된 금액은 <strong style="color:#059669">'+fM2(rd.totalRcv)+'</strong>이며, 향후 예상 수령액은 <strong style="color:#2563EB">'+fM2(rd.totalExp-rd.totalRcv)+'</strong>입니다. 향후 90일 이내 신청 또는 확인이 필요한 건은 총 <strong>'+rd.upcoming.length+'건</strong>'+(secO?', 그중 신청기한이 지나 즉시 점검이 필요한 건은 <strong style="color:#DC2626">'+rd.overdue.length+'건</strong>':'')+'입니다.';
     var CSS=[
       '*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}',
       'body{font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic","Segoe UI",sans-serif;color:#0F172A;background:#fff;line-height:1.6;-webkit-print-color-adjust:exact;print-color-adjust:exact;}',
@@ -4187,7 +4191,7 @@ function CompDet(props){
     if(st2[0]){
       var prev=st2[0];
       props.onPatchEmployee(empData.id,empData);
-      if(prev.status!==empData.status&&props.onLog)props.onLog(company.id,empData.name+" 상태가 '"+stLabel(prev.status)+"' → '"+stLabel(empData.status)+"'(으)로 변경됨","상태변경");
+      if(prev.status!==empData.status&&props.onLog)props.onLog(company.id,empData.name+" 상태가 '"+stLabel(prev.status)+"' → '"+stLabel(empData.status)+"'"+particle(stLabel(empData.status),"으로/로")+" 변경됨","상태변경");
       toast("직원 정보가 저장되었습니다.","success");
     } else {
       props.onSaveEmployee(empData);
@@ -4241,7 +4245,7 @@ function CompDet(props){
     var allChecked=allIds.length>0&&allIds.every(function(id){return selSet.has(id);});
     function toggleSelect(id){var cur=stSelected[0].slice();var i=cur.indexOf(id);if(i>=0)cur.splice(i,1);else cur.push(id);stSelected[1](cur);}
     function toggleAll(){if(allChecked)stSelected[1]([]);else stSelected[1](allIds);}
-    function bulkStatus(s){var n=stSelected[0].length;stSelected[0].forEach(function(id){props.onPatchEmployee(id,{status:s});});if(n>0&&props.onLog)props.onLog(company.id,n+"명 상태를 '"+stLabel(s)+"'(으)로 일괄 변경","상태변경");stSelected[1]([]);toast(n+"명 상태가 변경되었습니다.","success");}
+    function bulkStatus(s){var n=stSelected[0].length;stSelected[0].forEach(function(id){props.onPatchEmployee(id,{status:s});});if(n>0&&props.onLog)props.onLog(company.id,n+"명 상태를 '"+stLabel(s)+"'"+particle(stLabel(s),"으로/로")+" 일괄 변경","상태변경");stSelected[1]([]);toast(n+"명 상태가 변경되었습니다.","success");}
     function bulkCopy(){var rows=filteredEmps.filter(function(e){return selSet.has(e.id);});var text=rows.map(function(e){var p=programs[e.programId];var s=STS.find(function(s){return s.key===e.status;})||STS[0];return[e.name,(s?s.label:""),(p?p.name:""),e.startDate||""].join("\t");}).join("\n");navigator.clipboard.writeText(text);}
     function getNextDday(emp){if(!emp.startDate)return null;var ddays=(emp.rounds||[]).filter(function(r){return!r.isPaid;}).map(function(r){return getDday(addMo(emp.startDate,r.month));}).filter(function(d){return d!==null&&d>=0;});return ddays.length?Math.min.apply(null,ddays):null;}
     function getRcv(emp){return(emp.rounds||[]).reduce(function(s,r){return s+(r.isPaid?r.received||0:0);},0);}
@@ -5992,8 +5996,8 @@ function SettingsScreen(props){
         <p style={{margin:0,fontSize:FS_BODY,color:"#64748B"}}>글자 크기와 화면 안내를 내게 맞게 바꿀 수 있어요.</p>
       </div>
 
-      {/* 전체 글자 크기 */}
-      <div style={card}>
+      {/* 전체 글자 크기 — [D-127] OS 안에서는 OS 설정을 따르므로 한 줄 안내만 */}
+      {osTextScale() ? <div style={{...card,fontSize:15,color:"#475569",lineHeight:1.6}}>글자 크기는 OS 전체 설정을 따릅니다 — 머리줄의 <b>가가</b> 단추나 설정에서 바꿉니다.</div> : <div style={card}>
         <div style={{fontSize:18,fontWeight:800,color:"#0F172A",letterSpacing:"-0.3px"}}>전체 글자 크기</div>
         <div style={{fontSize:14,color:"#64748B",margin:"6px 0 16px",lineHeight:1.5}}>화면 전체의 글자 크기를 조절합니다. 눈이 편한 크기를 선택하세요.</div>
         <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
@@ -6003,11 +6007,11 @@ function SettingsScreen(props){
                 background:on?"var(--color-brand-50)":"#fff",border:on?"2px solid var(--color-brand-600)":"1px solid #E2E8F0"}}>
               <span style={{fontSize:o.v==="normal"?20:o.v==="large"?25:30,fontWeight:800,color:on?"var(--color-brand-700)":"#475569",lineHeight:1}}>{o.sample}</span>
               <span style={{fontSize:14.5,fontWeight:700,color:on?"var(--color-brand-700)":"#475569"}}>{o.label}</span>
-              {on&&<span style={{fontSize:12,fontWeight:700,color:"var(--color-brand-600)"}}>✓ 사용 중</span>}
+              {on&&<span style={{fontSize:14,fontWeight:700,color:"var(--color-brand-600)"}}>✓ 사용 중</span>}
             </button>
           );})}
         </div>
-      </div>
+      </div>}
 
       {/* 화면 안내 다시 보기 */}
       <div style={card}>
@@ -6034,7 +6038,7 @@ function SettingsScreen(props){
       <div style={card}>
         <div style={{fontSize:18,fontWeight:800,color:"#0F172A",letterSpacing:"-0.3px"}}>데이터 백업</div>
         <div style={{fontSize:14,color:"#64748B",margin:"6px 0 14px",lineHeight:1.6}}>현재 화면에 보이는 업체·직원·지원금·메모 데이터를 JSON 파일로 내려받아 보관할 수 있습니다.</div>
-        <button className="prog-tap" style={btnP} onClick={exportBackup}>⬇️ 전체 데이터 백업 내보내기 (JSON)</button>
+        <button className="prog-tap" style={{...btnP,whiteSpace:"normal",maxWidth:"100%",wordBreak:"keep-all"}} onClick={exportBackup}>⬇️ 전체 데이터 백업 내보내기 (JSON)</button>{/* [D-127] 좁은 휴대폰에서 옆으로 넘쳤다 */}
         <div style={{marginTop:14,padding:"13px 16px",background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:12,fontSize:13.5,color:"#92400E",lineHeight:1.7}}>
           <div style={{fontWeight:800,marginBottom:4}}>안전한 사용 안내</div>
           · <strong>주 1회 백업</strong>을 권장합니다.<br/>
@@ -6054,7 +6058,7 @@ function SettingsScreen(props){
       </div>
 
       {/* 데이터 보관 방식 안내 (정확한 표기) */}
-      <div style={{fontSize:12.5,color:"#94A3B8",textAlign:"center",lineHeight:1.6,marginBottom:8}}>
+      <div style={{fontSize:14,color:"#64748B",textAlign:"center",lineHeight:1.6,marginBottom:8}}>
         업무 데이터(업체·직원 등)는 이 OS 의 모듈 기록에 보관됩니다. 화면 설정(글자 크기·안내)만 이 브라우저에 저장됩니다.
       </div>
     </div>
@@ -6335,7 +6339,7 @@ function KanbanBoard(props){
     var sl=(STS.find(function(s){return s.key===newStatus;})||{}).label||newStatus;
     if(e&&props.onLog)props.onLog(e.companyId,e.name+" 상태 → '"+sl+"'","상태변경");
     stMenu[1](null);
-    toast("'"+sl+"'(으)로 상태가 변경되었습니다.","success");
+    toast("'"+sl+"'"+particle(sl,"으로/로")+" 상태가 변경되었습니다.","success");
   }
 
   // 파이프라인 요약
@@ -6802,7 +6806,16 @@ export default function SubsidyApp(props){
   var stCompany=[props.companyId||null,function(id){if(props.onNav)props.onNav({company:id});}];
   // [D-93] 원본의 history pushState/popstate 는 뺐다 — 뒤로가기는 OS 주소(라우터)가 맡는다
   // 저장된 전체 글자 크기 설정 적용 (새로고침 후에도 유지)
-  useEffect(function(){ try{applyFontScale(localStorage.getItem("hrSubsidyPro_fontScale"));}catch(e){} },[]);
+  // [D-127] OS 안에서는 OS 글자 크기(설정 · 머리줄 '가가')를 따른다 — 모듈마다 따로 글자 크기를 두지 않는다
+  useEffect(function(){
+    var os=osTextScale();
+    if(!os){ try{applyFontScale(localStorage.getItem("hrSubsidyPro_fontScale"));}catch(e){} return undefined; }
+    var sync=function(){ applyFontScale(OS_TO_HR[osTextScale()]||"normal"); };
+    sync();
+    var mo=new MutationObserver(sync);
+    mo.observe(document.documentElement,{attributes:true,attributeFilter:["data-text-scale"]});
+    return function(){ mo.disconnect(); };
+  },[]);
   var stFocusEmp=useState(null); // 진행보드 등에서 '처리하기'로 넘어온 직원 id
   var stAddComp=useState(false);
   // [D-94] 업체 상세에서 열었는데 아직 고용지원금 업체가 아니면 — 그 업체를 골라 둔 채 '업체 추가' 창을 연다
@@ -7249,7 +7262,7 @@ export default function SubsidyApp(props){
               <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",padding:"14px 16px",marginBottom:16,background:"#F0FDFA",border:"1px solid #99F6E4",borderRadius:14}}>
                 <div style={{flex:"1 1 280px",minWidth:0}}>
                   <div style={{fontSize:15,fontWeight:800,color:"#0F766E"}}>이미 채용된 직원이 있다면? 4대보험 명부로 한 번에 진단</div>
-                  <div style={{fontSize:12.5,color:"#475569",marginTop:3,lineHeight:1.5}}>가입자 명부를 올리면 지원금 후보와 세액공제 가능성을 자동으로 분류합니다. (1차 검토 · 저장되지 않음)</div>
+                  <div style={{fontSize:14.5,color:"#475569",marginTop:3,lineHeight:1.5}}>{/* [D-127] 12.5 → 14.5 */}가입자 명부를 올리면 지원금 후보와 세액공제 가능성을 자동으로 분류합니다. (1차 검토 · 저장되지 않음)</div>
                 </div>
                 <PayrollDiagnosis compact/>
               </div>

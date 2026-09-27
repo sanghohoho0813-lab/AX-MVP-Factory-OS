@@ -19,6 +19,7 @@ import { composeProblemSentence } from '../../../domain/consulting/suggestions'
 import type { ConsultingProject } from '../../../types/consulting'
 import { Button } from '../../ui/Button'
 import { HelpNote } from './HelpNote'
+import { josa } from '../../../lib/josa'
 
 export function TaskCard({
   task,
@@ -268,7 +269,7 @@ export function TaskCard({
                 </p>
               ))}
               {(inputs[0].suggestionBasedOn ?? []).length > 0 && (
-                <p className="t-sub mt-2 text-slate-600">앞에서 정한 {inputs[0].suggestionBasedOn?.join(' · ')} 을(를) 보고 만들었습니다.</p>
+                <p className="t-sub mt-2 text-slate-600">앞에서 정한 {josa(inputs[0].suggestionBasedOn?.join(' · ') ?? '', '을/를')} 보고 만들었습니다.</p>
               )}
               <button type="button" onClick={() => setEditOpen(true)} className="tap t-sub mt-2 font-medium text-slate-600 hover:text-slate-900">
                 고쳐 쓸게요

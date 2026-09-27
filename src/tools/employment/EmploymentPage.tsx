@@ -235,7 +235,7 @@ export function EmploymentPage() {
       <div className="flex flex-col gap-4">
         {/* D-94: 위 OS 모듈 머리줄이 이미 이름을 보여 준다 — 화면에는 숨기고 읽기 도구용 제목으로만 둔다 */}
         <h1 className="sr-only" data-testid="emp-module-eyebrow">
-          고용지원금 매니저 Pro
+          고용지원금 관리
         </h1>
         <EmploymentOrig view={TO_VIEW[section] ?? section} companyId={cid} onNav={onNav} focusClient={clientId} />
         {section === 'dashboard' && (
@@ -252,7 +252,7 @@ export function EmploymentPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="고용지원금 매니저"
+        title="고용지원금 관리"
         description={`${meta?.label ?? ''} — ${meta?.hint ?? ''}. 상담용 1차 검토이며 운영기관 심사와 세무 대리인 검토를 대신하지 않습니다.`}
       />
       {section === 'schedule' && <ScheduleTab />}

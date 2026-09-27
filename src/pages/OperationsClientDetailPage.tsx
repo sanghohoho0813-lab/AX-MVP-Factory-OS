@@ -152,6 +152,7 @@ import { ClientConsultingTab } from '../components/consulting/ClientConsultingTa
 import { listLinksForClient } from '../services/customerBridgeService'
 import { buildClientSchedule } from '../services/clientOpsSchedule'
 import { brand } from '../brand/brand.config'
+import { josa } from '../lib/josa'
 
 
 
@@ -1619,7 +1620,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                     setDeleting(true)
                     void deleteClient(record)
                       .then(() => {
-                        showToast(`${record.companyName}을(를) 삭제했습니다.`)
+                        showToast(`${josa(record.companyName, '을/를')} 삭제했습니다.`)
                         navigate('/ops/clients')
                       })
                       .catch((cause: unknown) => {

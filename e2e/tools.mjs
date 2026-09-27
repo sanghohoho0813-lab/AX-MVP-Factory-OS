@@ -44,7 +44,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     check(`도구함: ${k} 카드가 누를 수 있다`, (await page.locator(`a[data-tool="${k}"]`).count()) === 1)
   }
   check('도구함: 영업 도구 모음은 카드 대신 옮겨 간 곳 안내(D-118)', (await page.locator('a[data-tool="sales-kit"]').count()) === 0 && ((await page.getByTestId('tools-moved').innerText()) ?? '').includes('영업 › 영업 관리'))
-  check('도구함: 기업인증 OS 는 누를 수 없다', (await page.locator('div[data-tool="cert-os"]').count()) === 1)
+  check('도구함: 기업인증 검토는 누를 수 없다', (await page.locator('div[data-tool="cert-os"]').count()) === 1)
   check('사이드바: 도입 검토중 줄이 없다 · 영업 관리가 있다 (D-118)', !(await page.getByRole('navigation', { name: '주 메뉴' }).innerText()).includes('도입 검토중') && (await page.getByRole('navigation', { name: '주 메뉴' }).innerText()).includes('영업 관리'))
 
   // 창업감면 판정기
@@ -266,7 +266,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('원본 안 이동: 주소가 진행 보드로', page.url().includes('/tools/employment/board'), page.url())
 
   // 채용 진단 · 급여 계산기 · 시뮬레이터 · 지원금 관리 · 설정 — 원본 화면
-  for (const [sec, word] of [['diagnosis', '채용 예정 진단'], ['wage', '급여'], ['simulator', '시뮬레이터'], ['programs', '청년일자리도약장려금'], ['settings', '전체 글자 크기']]) {
+  for (const [sec, word] of [['diagnosis', '채용 예정 진단'], ['wage', '급여'], ['simulator', '시뮬레이터'], ['programs', '청년일자리도약장려금'], ['settings', 'OS 전체 설정을 따릅니다']]) {
     await page.goto(BASE + '/tools/employment/' + sec, { waitUntil: 'networkidle' })
     await page.waitForTimeout(600)
     check(`원본 화면: ${sec}`, (await page.getByTestId('emp-orig').innerText()).includes(word), (await page.getByTestId('emp-orig').innerText()).slice(0, 120))
@@ -388,38 +388,69 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(400)
   check('영업 절세전략: 원본 전략 카드', (await page.getByTestId('sales-orig').innerText()).includes('가업승계'))
 
-  /* ---- D-91 6단계: 모듈 잠금 (잠김 · 체험 · 열림) ---- */
+  /* ---- D-91 · D-127: 요금제와 모듈 (BASIC · GROWTH · PRO · ALL · 체험 · 열기 · 잠그기) ---- */
   await page.goto(BASE + '/tools', { waitUntil: 'networkidle' })
   await page.waitForTimeout(700)
   const accessList = page.getByTestId('module-access-list')
-  check('모듈 잠금: 목차가 여러 칸인 모듈만 판다', (await accessList.locator('[data-module]').count()) >= 5, String(await accessList.locator('[data-module]').count()))
-  await accessList.locator('[data-module="labcare"] button[data-act="lock"]').click()
+  const row = (k) => accessList.locator(`[data-module="${k}"]`)
+  check('요금제: 전문 모듈 여섯 줄', (await accessList.locator('[data-module]').count()) === 6, String(await accessList.locator('[data-module]').count()))
+  check('요금제: 처음에는 ALL — 전부 요금제에 포함', (await page.getByTestId('plan-picker').locator('[aria-checked="true"]').getAttribute('data-plan')) === 'ALL' && (await row('growth').innerText()).includes('요금제에 포함'))
+  check('요금제: 사는 단추 · 가격이 없다', !/구매|결제하기|원\/월|만원/.test((await page.getByTestId('plan-panel').innerText()) ?? ''))
+  await page.getByTestId('plan-picker').locator('[data-plan="BASIC"]').click()
+  await page.getByTestId('plan-save').click()
   await page.waitForTimeout(700)
-  check('모듈 잠금: 잠그면 잠김으로 바뀐다', (await accessList.locator('[data-module="labcare"]').innerText()).includes('잠김'), (await accessList.locator('[data-module="labcare"]').innerText()).slice(0, 80))
+  check('BASIC: 전문 모듈은 요금제에 없음', (await row('growth').innerText()).includes('요금제에 없음'), (await row('growth').innerText()).slice(0, 80))
+  check('BASIC: 메뉴의 기업성장 줄에 잠김', (await page.locator('aside nav [data-nav-category="growth"]').innerText()).includes('잠김'))
 
   await page.goto(BASE + '/tools/labcare', { waitUntil: 'networkidle' })
   await page.waitForTimeout(800)
   check('모듈 잠금: 잠겨도 첫 화면은 보인다', (await page.getByTestId('module-dashboard').count()) === 1)
-  check('모듈 잠금: 잠겼다고 띠로 알려 준다', (await page.getByTestId('module-locked-banner').count()) === 1)
+  check('모듈 잠금: 잠겼다고 띠로 알려 준다 · 모듈 살펴보기', (await page.getByTestId('module-locked-banner').count()) === 1 && (await page.getByTestId('module-locked-banner').innerText()).includes('모듈 살펴보기'))
 
   await page.goto(BASE + '/tools/labcare/notes', { waitUntil: 'networkidle' })
   await page.waitForTimeout(800)
-  check('모듈 잠금: 다른 화면은 승인 화면이 대신 선다', (await page.getByTestId('module-locked').count()) === 1)
-  check('모듈 잠금: 결제가 없다고 적는다', (await page.getByTestId('module-locked').innerText()).includes('결제는 아직'), (await page.getByTestId('module-locked').innerText()).slice(0, 120))
+  const lockedText = (await page.getByTestId('module-locked').innerText().catch(() => '')) ?? ''
+  check('모듈 잠금: 다른 화면은 모듈 소개 한 장이 대신 선다', (await page.getByTestId('module-locked').count()) === 1 && lockedText.includes('기업성장 모듈'), lockedText.slice(0, 120))
+  check('모듈 잠금: 결제가 없다고 적는다 · 사는 단추가 없다', lockedText.includes('결제는 아직') && !/구매|결제하기/.test(lockedText), lockedText.slice(0, 160))
+  check('모듈 잠금: 어색한 조사가 없다', !/을\(를\)|은\(는\)|이\(가\)/.test(lockedText), lockedText.slice(0, 160))
   await page.getByTestId('module-trial').click()
   await page.waitForTimeout(900)
   check('모듈 잠금: 체험을 시작하면 화면이 열린다', (await page.getByTestId('lab-orig').count()) === 1)
 
+  // 잠긴 모듈의 화면 전체(AX 스튜디오 기업 진단)는 모듈 소개가 대신 선다
+  await page.goto(BASE + '/diagnosis', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  check('BASIC: 기업 진단 → AX 스튜디오 모듈 소개', (await page.getByTestId('module-locked').getAttribute('data-module-key').catch(() => '')) === 'ax-studio')
+  await page.getByTestId('module-explore').click()
+  await page.waitForTimeout(600)
+  check('모듈 살펴보기: 잠겨 있어도 열린다', page.url().includes('/modules/ax-studio') && (await page.getByTestId('module-status').getAttribute('data-usable')) === 'no')
+
   await page.goto(BASE + '/tools', { waitUntil: 'networkidle' })
   await page.waitForTimeout(700)
-  check('모듈 잠금: 체험 남은 날을 적는다', /체험 \d+일 남음/.test(await page.getByTestId('module-access-list').locator('[data-module="labcare"]').innerText()), (await page.getByTestId('module-access-list').locator('[data-module="labcare"]').innerText()).slice(0, 80))
-  await page.getByTestId('module-access-list').locator('[data-module="labcare"] button[data-act="open"]').click()
+  check('모듈 잠금: 체험 남은 날을 적는다', /체험 \d+일 남음/.test(await row('growth').innerText()), (await row('growth').innerText()).slice(0, 80))
+  await row('growth').locator('button[data-act="open"]').click()
   await page.waitForTimeout(700)
-  {
-    // D-94: 열린 모듈에는 ‘체험’(열림 → 체험으로 내려감)·‘열기’(아무 일 없음) 단추가 없다
-    const row = page.getByTestId('module-access-list').locator('[data-module="labcare"]')
-    check('모듈 잠금: 열린 모듈에는 체험·열기 단추가 없고 모듈로 가기가 있다', (await row.locator('button[data-act="trial"], button[data-act="open"]').count()) === 0 && (await row.locator('[data-act="go"]').count()) === 1)
-  }
+  check('모듈 잠금: 계속 열어 두면 체험·열기 단추가 없고 살펴보기가 있다', (await row('growth').locator('button[data-act="trial"], button[data-act="open"]').count()) === 0 && (await row('growth').locator('[data-act="go"]').count()) === 1 && (await row('growth').innerText()).includes('열어 둠'))
+
+  // GROWTH — 두 개만 고른다
+  await page.getByTestId('plan-picker').locator('[data-plan="GROWTH"]').click()
+  await page.locator('[data-pick="tax-finance"]').check()
+  await page.locator('[data-pick="ax-studio"]').check()
+  check('GROWTH: 둘을 고르면 나머지는 못 고른다', await page.locator('[data-pick="web-studio"]').isDisabled())
+  await page.getByTestId('plan-save').click()
+  await page.waitForTimeout(700)
+  check('GROWTH: 고른 모듈', (await row('ax-studio').innerText()).includes('고른 모듈') && (await row('web-studio').innerText()).includes('요금제에 없음'))
+
+  // 되돌리기 — 뒤 시험을 위해 ALL · 요금제 따름
+  await page.getByTestId('plan-picker').locator('[data-plan="ALL"]').click()
+  await page.getByTestId('plan-save').click()
+  await page.waitForTimeout(700)
+  await row('growth').locator('button[data-act="lock"]').click()
+  await page.waitForTimeout(700)
+  check('잠그기: ALL 이어도 대표가 잠그면 잠김', (await row('growth').innerText()).includes('잠김'))
+  await row('growth').locator('button[data-act="inherit"]').click()
+  await page.waitForTimeout(700)
+  check('잠금 풀기: 다시 요금제에 포함', (await row('growth').innerText()).includes('요금제에 포함'))
 
   /* ---- D-89: 업체에서 도구 열기 → 결과·기한이 그 업체로 ---- */
   // 업체 상세에 '이 업체로 도구 열기' 줄이 있고, 거기서 연 도구에는 업체 띠가 뜬다
@@ -465,6 +496,12 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('업체 상세: 막힌 도구는 빨갛게 표시된다', (await toolsBox.locator('a[data-tool][data-ready="no"]').count()) >= 3)
   check('업체 상세: 세금 계산기는 서류 없이도 준비됨', (await toolsBox.locator('a[data-tool="tax"][data-ready="yes"]').count()) === 1)
   check('업체 상세: 고용지원금 카드에 무엇이 없는지 적혀 있다', (await toolsBox.locator('a[data-tool="employment"]').innerText()).includes('4대보험 가입자 명부'))
+  // D-127: 업체에서 출발 — 모듈(분야)마다 묶고 쉬운 동사로
+  const growthBox = toolsBox.locator('[data-client-module="growth"]')
+  const growthText = (await growthBox.innerText()) ?? ''
+  check('업체 상세: 기업성장 묶음 — 고용지원금 확인하기 · 정책자금 진단하기', growthText.includes('고용지원금') && growthText.includes('확인하기') && growthText.includes('정책자금') && growthText.includes('진단하기'), growthText.slice(0, 160))
+  check('업체 상세: 절세 계산하기', ((await toolsBox.locator('[data-client-module="tax-finance"]').innerText()) ?? '').includes('계산하기'))
+  check('업체 상세: 모듈 입구가 업체를 들고 간다', ((await toolsBox.locator('a[data-feature="consulting-studio"]').getAttribute('href')) ?? '') === '/ops/clients/cli_hansol?tab=consulting')
 
   // 서류함 탭 — 이 서류를 쓰는 도구
   await page.goto(BASE + '/ops/clients/cli_hansol?tab=docs', { waitUntil: 'networkidle' })

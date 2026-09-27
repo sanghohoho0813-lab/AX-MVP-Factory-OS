@@ -19,6 +19,7 @@ import { CONFIDENCE_LABEL, classifyDocument, type ClassifyResult } from '../../s
 import { allDocumentMetas } from '../../services/clientOpsDocuments'
 import { canUploadFiles, saveClient, storeDocumentFile, withCustomDocument, withDocument } from '../../services/clientOpsService'
 import { formatFileSize } from '../../lib/format'
+import { particle } from '../../lib/josa'
 
 /** '새 칸 만들기' 를 뜻하는 고르는 칸 값 */
 const NEW_CELL = '__new__'
@@ -345,7 +346,7 @@ export function BulkDocUploadSheet({
                       </div>
                       {replacing && (
                         <p className="t-sub text-warning-700">
-                          그 칸에 이미 <strong className="font-semibold">{replacing}</strong> 이(가) 있습니다 — 올리면 바뀝니다.
+                          그 칸에 이미 <strong className="font-semibold">{replacing}</strong>{particle(replacing, '이/가')} 있습니다 — 올리면 바뀝니다.
                         </p>
                       )}
                     </>

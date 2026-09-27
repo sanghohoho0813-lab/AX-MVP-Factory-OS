@@ -17,6 +17,7 @@ import { documentsSummary, factsFromDocuments, type DocFactRead } from '../../..
 import type { ConsultingProject } from '../../../types/consulting'
 import { BottomSheet } from '../../ui/primitives'
 import { Button } from '../../ui/Button'
+import { particle } from '../../../lib/josa'
 
 /** 한 번에 받아 읽는 서류 수 — 사업자등록증 + 법인등기부등본 */
 const MAX_FILES = 2
@@ -138,7 +139,7 @@ export function CompanyDocSheet({
                       <span className="min-w-0 flex-1">
                         <span className="t-sub block text-slate-500">{factDef(f.key).label}</span>
                         <span className="t-body block font-semibold break-keep text-slate-900">{f.value}</span>
-                        {overwrites && <span className="t-sub mt-0.5 block break-keep text-warning-800">지금 적힌 「{now}」을(를) 바꿉니다</span>}
+                        {overwrites && <span className="t-sub mt-0.5 block break-keep text-warning-800">지금 적힌 「{now}」{particle(now, '을/를')} 바꿉니다</span>}
                         {f.status === 'unverified' && <span className="t-meta mt-0.5 block break-keep text-slate-500">서류의 종목에서 옮긴 값입니다 — 맞는지 봐 주세요</span>}
                       </span>
                     </label>

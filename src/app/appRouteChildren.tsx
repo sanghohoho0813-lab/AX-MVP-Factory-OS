@@ -48,6 +48,7 @@ const SalesBoardPage = lazy(() => import('../pages/sales/SalesBoardPage').then((
 const FirstMeetingChecklistPage = lazy(() => import('../pages/sales/FirstMeetingChecklistPage').then((m) => ({ default: m.FirstMeetingChecklistPage })))
 const TaxCalculatorsPage = lazy(() => import('../pages/TaxCalculatorsPage').then((m) => ({ default: m.TaxCalculatorsPage })))
 const ToolsHubPage = lazy(() => import('../pages/ToolsHubPage').then((m) => ({ default: m.ToolsHubPage })))
+const ModuleOverviewPage = lazy(() => import('../pages/ModuleOverviewPage').then((m) => ({ default: m.ModuleOverviewPage })))
 const ToolsReviewPage = lazy(() => import('../pages/ToolsReviewPage').then((m) => ({ default: m.ToolsReviewPage })))
 // 도구함 — 대표가 따로 만들어 둔 OS 들에서 핵심만 옮긴 것 (D-88). 규칙은 원본 그대로, 화면만 이 OS 것.
 const StartupTaxPage = lazy(() => import('../tools/startupTax/StartupTaxPage').then((m) => ({ default: m.StartupTaxPage })))
@@ -409,6 +410,9 @@ export const appRouteChildren = [
       { path: 'studio', element: <ConsultingStudioPage /> },
       { path: 'studio/:projectId', element: <ConsultingProjectPage /> },
       { path: 'tools', element: <ToolsHubPage /> },
+      // D-127: 모듈 살펴보기 — 잠겨 있어도 늘 열린다. 업체에서 왔으면(?client=) 그 업체 띠가 뜬다
+      { path: 'modules', element: <Navigate to="/tools" replace /> },
+      { path: 'modules/:moduleKey', element: toolRoute(<ModuleOverviewPage />) },
       // 세금 계산기 9종 — 배포본 HTML 의 계산식을 그대로 옮긴 것 (D-85)
       // 도구 화면은 모두 같은 틀로 감싼다 — 업체에서 열었으면(`?client=`) 띠가 뜨고 결과가 그 업체로 간다 (D-89)
       { path: 'tools/tax', element: toolRoute(<TaxCalculatorsPage />) },

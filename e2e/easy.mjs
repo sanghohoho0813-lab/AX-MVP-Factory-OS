@@ -76,7 +76,15 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByTestId('text-scale-quick').first().click()
   check('글자 크기: 매우 크게 → 다시 기본', (await page.evaluate(() => document.documentElement.getAttribute('data-text-scale'))) === 'default')
 
-  // 목차 — 고급 기능은 기본으로 빠져 있다
+  // 목차 — 고급 기능은 기본으로 빠져 있다 (D-127: 분야 줄을 펼쳐서 본다 — 기관 전략은 정부지원사업, 검증 · 사례는 AX 스튜디오)
+  const openCats = async () => {
+    for (const name of [/정부지원사업/, /AX 스튜디오/]) {
+      const b = page.locator('aside nav').getByRole('button', { name })
+      if ((await b.getAttribute('aria-expanded')) !== 'true') await b.click()
+    }
+    await page.waitForTimeout(200)
+  }
+  await openCats()
   const nav = (await page.locator('aside nav').innerText()) ?? ''
   check('목차: 기본은 검증 · 기관 전략 · 사례 없음 · AX 스튜디오(한글)', !nav.includes('기관 전략') && !nav.includes('사례') && !/\n검증\n/.test(nav) && nav.includes('AX 스튜디오'), nav.slice(0, 400))
   await page.evaluate(() => {
@@ -85,8 +93,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     localStorage.setItem(k, JSON.stringify({ ...p, featureVisibility: 'advanced' }))
   })
   await page.reload({ waitUntil: 'networkidle' })
-  await page.locator('aside nav').getByRole('button', { name: /AX 스튜디오/ }).click().catch(() => {})
-  await page.waitForTimeout(200)
+  await openCats()
   const nav2 = (await page.locator('aside nav').innerText()) ?? ''
   check('목차: 고급 기능을 켜면 기관 전략 · 사례가 보인다', nav2.includes('기관 전략') && nav2.includes('사례'), nav2.slice(0, 400))
   await page.evaluate(() => {

@@ -24,6 +24,7 @@ import type {
   NegativeActivity,
   ResearcherCandidate,
 } from "../../types";
+import { particle } from '../../../../lib/josa'
 
 /* ───────────────── 스타일 매핑 ───────────────── */
 
@@ -305,7 +306,7 @@ export default function AssessmentPage() {
       projectName: projectName || undefined,
       researcherCount: pick,
     });
-    setSentMsg(`‘${companyName.trim()}’이(가) 설립서류 관리에 임시 저장되었습니다.`);
+    setSentMsg(`‘${companyName.trim()}’${particle(companyName.trim(), '이/가')} 설립서류 관리에 임시 저장되었습니다.`);
     return true;
   }
 

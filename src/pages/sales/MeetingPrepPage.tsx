@@ -70,6 +70,7 @@ import {
 } from '../../services/salesEngine'
 import { todayLocalDate, localDateOf } from '../../lib/appClock'
 import { SALES_STAGE_LABEL, SALES_STAGE_ORDER, type ClientOpsRecord, type SalesStage } from '../../types/clientOps'
+import { josa } from '../../lib/josa'
 
 type Round = 0 | 1 | 2 | 3
 const ROUNDS: { key: Round; label: string }[] = [
@@ -722,7 +723,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                         onAnalyzed={(ui) => {
                           // 다른 회사 보고서를 넣었으면 저절로 붙이지 않는다 — 맞으면 결과 막대의 '이 업체에 반영' 으로
                           if (!sameCompany(record, ui)) {
-                            showToast(`${ui.companyInfo?.companyName || '이 보고서'} — ${record.companyName} 과(와) 다른 회사 같아 반영하지 않았습니다. 맞으면 '이 업체에 반영' 을 누르세요.`)
+                            showToast(`${ui.companyInfo?.companyName || '이 보고서'} — ${josa(record.companyName, '과/와')} 다른 회사 같아 반영하지 않았습니다. 맞으면 '이 업체에 반영' 을 누르세요.`)
                             return
                           }
                           void applyCretop(record, ui, [], '크레탑 분석을 이 업체에 반영했습니다')

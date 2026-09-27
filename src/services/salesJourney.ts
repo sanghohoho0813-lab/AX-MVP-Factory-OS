@@ -76,8 +76,8 @@ const TOOL: Record<string, ToolDef> = {
   'cretop-value': { key: 'cretop-value', label: '주식가치 (크레탑)', path: (id) => `/tools/cretop/analyze?client=${id}&view=value`, accessKey: 'cretop', resultKey: null },
   tax: { key: 'tax', label: '세금 계산기', path: (id) => `/tools/tax?client=${id}`, accessKey: null, resultKey: 'tax' },
   'startup-tax': { key: 'startup-tax', label: '창업감면 판정기', path: (id) => `/tools/startup-tax/judge?client=${id}`, accessKey: 'startup-tax', resultKey: 'startup-tax' },
-  employment: { key: 'employment', label: '고용지원금 매니저', path: (id) => `/tools/employment/diagnosis?client=${id}`, accessKey: 'employment', resultKey: 'employment' },
-  labcare: { key: 'labcare', label: '기업부설연구소 OS', path: (id) => `/tools/labcare/assessment?client=${id}`, accessKey: 'labcare', resultKey: 'labcare' },
+  employment: { key: 'employment', label: '고용지원금 관리', path: (id) => `/tools/employment/diagnosis?client=${id}`, accessKey: 'employment', resultKey: 'employment' },
+  labcare: { key: 'labcare', label: '기업부설연구소 관리', path: (id) => `/tools/labcare/assessment?client=${id}`, accessKey: 'labcare', resultKey: 'labcare' },
   'policy-funding': { key: 'policy-funding', label: '정책자금 진단', path: (id) => `/tools/policy-funding/diagnosis?client=${id}`, accessKey: 'policy-funding', resultKey: 'policy-funding' },
   studio: { key: 'studio', label: '특허+벤처', path: (id) => `/ops/clients/${id}?tab=consulting`, accessKey: null, resultKey: null },
 }
@@ -107,8 +107,17 @@ function yearsSince(date: string, today: string): number | null {
 export interface JourneyOptions {
   /** YYYY-MM-DD */
   today: string
-  /** 모듈 잠금 상태(listAccess). 없으면 모두 열림으로 본다 */
+  /** 모듈 잠금 상태(listAccess). 없으면 모두 열림으로 본다 — 예전 호출용 */
   access?: Map<string, ModuleAccess>
+  /** D-127: 이 기능을 지금 못 쓰나(권한 계산 결과). 주면 access 보다 먼저 본다 */
+  isLocked?: (featureKey: string) => boolean
+}
+
+function lockedFor(accessKey: string | null, opts: JourneyOptions): boolean {
+  if (!accessKey) return false
+  if (opts.isLocked) return opts.isLocked(accessKey)
+  const a = opts.access?.get(accessKey)
+  return a ? !canUse(a, opts.today) : false
 }
 
 /**
@@ -143,9 +152,8 @@ export function journeyTools(record: ClientOpsRecord, opts: JourneyOptions): Jou
     const def = TOOL[key]
     if (!def) return
     seen.add(key)
-    const access = def.accessKey ? opts.access?.get(def.accessKey) : undefined
     const done = def.resultKey ? record.toolResults.some((r) => r.toolKey === def.resultKey) : key === 'cretop-value' ? !!(latestCretopResult(record)?.data as { stockValue?: unknown } | undefined)?.stockValue : false
-    out.push({ key, label: def.label, to: def.path(record.id), reason, done, locked: access ? !canUse(access, opts.today) : false })
+    out.push({ key, label: def.label, to: def.path(record.id), reason, done, locked: lockedFor(def.accessKey, opts) })
   }
   for (const [interest, reason] of reasonOf) {
     for (const key of INTEREST_TOOLS[interest] ?? []) {
@@ -256,10 +264,7 @@ export function buildJourney(record: ClientOpsRecord, opts: JourneyOptions): Jou
     to: `/tools/cretop/analyze?client=${id}`,
     reason: '재무 · 신용 · 추천 전략을 미팅 전에',
     done: !!cretop,
-    locked: (() => {
-      const a = opts.access?.get('cretop')
-      return a ? !canUse(a, opts.today) : false
-    })(),
+    locked: lockedFor('cretop', opts),
   }
   const others = tools.filter((t) => t.key !== 'cretop')
   const lastM1 = meetings.find((m) => m.round === 1)

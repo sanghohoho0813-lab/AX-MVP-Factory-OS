@@ -80,7 +80,7 @@ export default function ReportsPage() {
               key={t}
               type="button"
               onClick={() => setReportType(t)}
-              className={`whitespace-nowrap rounded-xl border px-3 py-3 text-base font-bold ${
+              className={`min-w-0 break-keep rounded-xl border px-3 py-3 text-base font-bold ${
                 reportType === t
                   ? "border-navy-600 bg-navy-50 text-navy-700"
                   : "border-slate-200 text-slate-500 hover:bg-slate-50"

@@ -50,6 +50,7 @@ import { applyTask } from '../domain/consulting/applyTask'
 import { resolveCurrentTask } from '../domain/consulting/currentTask'
 import { nowIso, todayLocalDate } from '../lib/appClock'
 import type { ConsultingArtifact, ConsultingDecision, ConsultingEvidence, ConsultingProject, ConsultingPromptPackage, ProjectStatus } from '../types/consulting'
+import { particle } from '../lib/josa'
 
 /* 간단 모드 3개 + 고급 12개 */
 type SimpleTab = 'progress' | 'results' | 'timeline'
@@ -287,7 +288,7 @@ function ProjectContent({ workspaceId, userId }: { workspaceId: string | null; u
 
   if (missing) return <TablesMissingNotice />
   if (loading && !project) return <p className="t-sub py-10 text-center text-slate-500">불러오는 중…</p>
-  if (notFound || !project || !value) return <NotFoundState title="프로젝트를 찾지 못했습니다" description="지워졌거나 다른 작업공간의 프로젝트입니다." backTo="/studio" backLabel="컨설팅 작업실" />
+  if (notFound || !project || !value) return <NotFoundState title="프로젝트를 찾지 못했습니다" description="지워졌거나 다른 작업공간의 프로젝트입니다." backTo="/studio" backLabel="특허+벤처" />
 
   const task = resolveCurrentTask(project, { artifacts, prompts, evidence, today })
   const tabs = advanced ? ADV_TABS : SIMPLE_TABS
@@ -433,7 +434,7 @@ function ProjectContent({ workspaceId, userId }: { workspaceId: string | null; u
             </>
           }
         >
-          <p>프로젝트 이름 <strong className="text-slate-900">{project.title}</strong> 을(를) 그대로 적으면 지워집니다.</p>
+          <p>프로젝트 이름 <strong className="text-slate-900">{project.title}</strong>{particle(project.title, '을/를')} 그대로 적으면 지워집니다.</p>
           <input aria-label="프로젝트 이름 확인" value={deleteTyped} onChange={(e) => setDeleteTyped(e.target.value)} className="t-body mt-3 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2" />
         </Modal>
       </div>

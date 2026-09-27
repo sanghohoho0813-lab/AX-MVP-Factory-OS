@@ -158,7 +158,7 @@ export function notImplemented(repo: string, method: string): (...args: unknown[
   return () =>
     Promise.reject(
       new SupabaseRepositoryError(
-        `${repo}.${method} 은(는) 아직 Supabase 어댑터에서 구현되지 않았습니다(다음 단계에서 도메인 화면 연결 시 구현).`,
+        `${repo}.${method}는 아직 Supabase 어댑터에서 구현되지 않았습니다(다음 단계에서 도메인 화면 연결 시 구현).`,
       ),
     )
 }

@@ -201,7 +201,7 @@ export function LabcarePage() {
     return (
       <div className="flex flex-col gap-6">
         <PageHeader
-          title="기업부설연구소 OS"
+          title="기업부설연구소 관리"
           description={`${meta?.label ?? '세액공제'} — ${meta?.hint ?? '연구개발비 세액공제 예상'}. 상담용 1차 검토이며 세무 대리인 검토를 대신하지 않습니다.`}
         />
         <TaxTab />
@@ -213,7 +213,7 @@ export function LabcarePage() {
   return (
     <div className="flex flex-col gap-4">
       {/* D-96: 모듈 이름은 왼쪽 목차 머리에 이미 있다 — 화면에는 숨기고 읽기 도구용으로만 둔다(고용지원금과 같게) */}
-      <p className="sr-only" data-testid="lab-module-eyebrow">기업부설연구소 OS</p>
+      <p className="sr-only" data-testid="lab-module-eyebrow">기업부설연구소 관리</p>
       {section === 'dashboard' ? (
         <>
           <OrigLabcare section="dashboard" />

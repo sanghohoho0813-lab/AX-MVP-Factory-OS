@@ -253,10 +253,10 @@ check('qa: judge 합계는 10축 다 있어야', judgeTotal({ A: 9 }) === null &
   check('model: 진행도', projectProgress(raw).done === 1 && projectProgress(raw).total === 17)
   check('model: 기본 제출서류 8종', Object.keys(raw.venture.documents).length === 8)
 }
-check('registry: 컨설팅 작업실 모듈이 /studio 로 켜져 있다', MODULES.some((m) => m.path === '/studio' && m.enabled))
-// D-104: 예전 컨설팅 작업실(임시 이름 특허+벤처)은 컨설팅 작업실 묶음(구 도구함) 안으로
-check('registry: 특허+벤처가 컨설팅 작업실 묶음에', MODULES.find((m) => m.path === '/studio')?.group === 'tools' && MODULES.find((m) => m.path === '/studio')?.label === '특허+벤처' && MODULE_GROUPS.find((g) => g.key === 'tools')?.title === '컨설팅 작업실')
-check('registry: /studio/abc → 컨설팅 작업실', moduleForPath('/studio/abc')?.path === '/studio')
+check('registry: 특허+벤처 화면이 /studio 로 켜져 있다', MODULES.some((m) => m.path === '/studio' && m.enabled))
+// D-127: 특허+벤처는 전문 모듈 › 기술사업화 분야 줄 아래
+check('registry: 특허+벤처가 전문 모듈 › 기술사업화 아래', MODULES.find((m) => m.path === '/studio')?.group === 'modules' && MODULES.find((m) => m.path === '/studio')?.label === '특허+벤처' && MODULES.find((m) => m.path === '/studio')?.parent === 'cat-tech-biz' && MODULE_GROUPS.find((g) => g.key === 'modules')?.title === '전문 모듈')
+check('registry: /studio/abc → 특허+벤처', moduleForPath('/studio/abc')?.path === '/studio')
 
 console.log(`\n컨설팅 엔진: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

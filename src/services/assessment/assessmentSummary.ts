@@ -9,6 +9,7 @@ import { ASSESSMENT_DOMAIN_META, RECOMMENDATION_META } from '../../lib/assessmen
 import { RESPONDENT_ROLE_META } from '../../lib/surveyMeta'
 import type { AnalysisDataset } from './analysisData'
 import type { ConfidenceResult } from './confidenceEngine'
+import { josa } from '../../lib/josa'
 
 export interface AssessmentNarrative {
   keyStrengths: string[]
@@ -77,7 +78,7 @@ export function buildNarrative(
     .slice(0, 4)
     .map(
       (d) =>
-        `${ASSESSMENT_DOMAIN_META[d.domain].label}이(가) 우수합니다 (정규화 ${d.normalizedScore}점).`,
+        `${josa(ASSESSMENT_DOMAIN_META[d.domain].label, '이/가')} 우수합니다 (정규화 ${d.normalizedScore}점).`,
     )
 
   const keyWeaknesses = [...measured]
@@ -86,7 +87,7 @@ export function buildNarrative(
     .slice(0, 4)
     .map(
       (d) =>
-        `${ASSESSMENT_DOMAIN_META[d.domain].label}이(가) 부족합니다 (정규화 ${d.normalizedScore}점).`,
+        `${josa(ASSESSMENT_DOMAIN_META[d.domain].label, '이/가')} 부족합니다 (정규화 ${d.normalizedScore}점).`,
     )
 
   const keyRisks = issues
@@ -138,7 +139,7 @@ export function buildNarrative(
     )
   } else if (worst && worst.normalizedScore < 50) {
     parts.push(
-      `다만 ${ASSESSMENT_DOMAIN_META[worst.domain].label}이(가) 부족해 보완이 필요합니다`,
+      `다만 ${josa(ASSESSMENT_DOMAIN_META[worst.domain].label, '이/가')} 부족해 보완이 필요합니다`,
     )
   }
 

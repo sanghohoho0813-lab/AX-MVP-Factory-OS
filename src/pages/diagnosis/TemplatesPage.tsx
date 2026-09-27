@@ -38,6 +38,7 @@ import {
 } from '../../components/diagnosis/badges'
 import { useToast } from '../../components/ui/toastContext'
 import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react'
+import { josa } from '../../lib/josa'
 
 function questionCount(template: SurveyTemplate): number {
   return template.sections.reduce((n, s) => n + s.placements.length, 0)
@@ -122,7 +123,7 @@ export function TemplatesPage() {
 
   const handleClone = (template: SurveyTemplate) => {
     const cloned = surveyTemplateRepository.cloneAsDraft(template.id)
-    showToast(`${cloned.name} (으)로 복제했습니다.`)
+    showToast(`${josa(cloned.name, '으로/로')} 복제했습니다.`)
     navigate(`/diagnosis/templates/${cloned.id}/edit`)
   }
 

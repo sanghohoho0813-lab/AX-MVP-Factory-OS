@@ -175,19 +175,22 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
             type="button"
             aria-label="이전 달"
             onClick={() => setYm(shiftMonth(ym[0], ym[1], -1))}
-            className="tap rounded-(--radius-control) border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50"
+            className="tap t-sub inline-flex items-center gap-0.5 rounded-(--radius-control) border border-slate-200 bg-white py-2 pr-2.5 pl-1.5 font-medium text-slate-700 hover:bg-slate-50"
           >
+            {/* D-127: 화살표만 두지 않는다 — 무엇을 하는지 글로 */}
             <ChevronLeft aria-hidden="true" className="size-4" />
+            지난달
           </button>
-          <span className="min-w-[7.5rem] text-center text-[1.2rem] font-bold text-slate-900">
+          <span className="min-w-[6.5rem] text-center text-[1.2rem] font-bold text-slate-900">
             {ym[0]}년 {ym[1]}월
           </span>
           <button
             type="button"
             aria-label="다음 달"
             onClick={() => setYm(shiftMonth(ym[0], ym[1], 1))}
-            className="tap rounded-(--radius-control) border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50"
+            className="tap t-sub inline-flex items-center gap-0.5 rounded-(--radius-control) border border-slate-200 bg-white py-2 pr-1.5 pl-2.5 font-medium text-slate-700 hover:bg-slate-50"
           >
+            다음 달
             <ChevronRight aria-hidden="true" className="size-4" />
           </button>
           <span className="w-full text-[0.9rem] whitespace-nowrap text-slate-500 sm:ml-1 sm:w-auto">

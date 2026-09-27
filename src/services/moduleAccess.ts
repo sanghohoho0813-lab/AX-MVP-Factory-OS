@@ -16,7 +16,8 @@
 import { listRows, saveRow } from './moduleData'
 import { todayLocalDate } from '../lib/appClock'
 
-export type ModuleAccessState = 'locked' | 'trial' | 'open'
+/** inherit(D-127): 따로 정하지 않음 — 요금제를 따른다 (기록을 지우지 않고 이 값으로 되돌린다) */
+export type ModuleAccessState = 'locked' | 'trial' | 'open' | 'inherit'
 
 export interface ModuleAccess {
   moduleKey: string
@@ -46,7 +47,7 @@ export function trialExpired(access: Pick<ModuleAccess, 'state' | 'trialEndsAt'>
 
 /** 지금 쓸 수 있는가 (체험이 끝났으면 못 쓴다) */
 export function canUse(access: Pick<ModuleAccess, 'state' | 'trialEndsAt'>, today: string): boolean {
-  if (access.state === 'open') return true
+  if (access.state === 'open' || access.state === 'inherit') return true
   if (access.state === 'trial') return !trialExpired(access, today)
   return false
 }
@@ -62,6 +63,7 @@ export function trialDaysLeft(access: Pick<ModuleAccess, 'state' | 'trialEndsAt'
 /** 화면에 적을 한 줄 */
 export function accessLabel(access: Pick<ModuleAccess, 'state' | 'trialEndsAt'>, today: string): string {
   if (access.state === 'open') return '열림'
+  if (access.state === 'inherit') return '요금제 따름'
   if (access.state === 'trial') {
     const left = trialDaysLeft(access, today)
     if (left === null) return '체험'
@@ -90,7 +92,7 @@ export async function listAccess(workspaceId: string | null): Promise<Map<string
     if (!key) continue
     map.set(key, {
       moduleKey: key,
-      state: (r.data.state === 'locked' || r.data.state === 'trial' ? r.data.state : 'open') as ModuleAccessState,
+      state: (r.data.state === 'locked' || r.data.state === 'trial' || r.data.state === 'inherit' ? r.data.state : 'open') as ModuleAccessState,
       trialEndsAt: typeof r.data.trialEndsAt === 'string' ? r.data.trialEndsAt : '',
       updatedAt: r.updatedAt,
     })

@@ -39,6 +39,7 @@ import {
   } from './selectionShared'
 import { useSelectionData } from './useSelectionData'
 import { ScreenGuide } from '../../components/onboarding/ScreenGuide'
+import { particle } from '../../lib/josa'
 
 const KPI_OPTIONS = ['월 처리시간', '월 처리 가능 건수', '오류·누락 건수', '사용 횟수·사용자 수', '고객 응답시간']
 
@@ -416,7 +417,7 @@ export function SelectionDecisionPage() {
           {finalized && context.handoff && (
             <Panel title="확정 완료">
               <p className="text-[0.875rem] break-keep text-slate-600">
-                핵심 과제 '{primary?.name}'이(가) 확정되어 기능·화면 설계로 전달할 인계 스냅샷이 생성되었습니다.
+                핵심 과제 '{primary?.name}'{particle(primary?.name ?? '', '이/가')} 확정되어 기능·화면 설계로 전달할 인계 스냅샷이 생성되었습니다.
               </p>
               <p className="mt-1 text-[0.875rem] text-slate-400">생성 {formatDateTime(context.handoff.generatedAt)}</p>
             </Panel>

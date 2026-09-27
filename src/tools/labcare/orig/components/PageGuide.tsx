@@ -64,7 +64,7 @@ export default function PageGuide({
 
       <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <button type="button" onClick={toggle} className="inline-flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-navy-700">
+          <button type="button" onClick={toggle} className="tap inline-flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-navy-700">
             <span className="text-base">💡</span>
             {open ? "안내 접기" : "처음 쓰는 분 안내"}
             <span className="text-slate-400">{open ? "▲" : "▼"}</span>

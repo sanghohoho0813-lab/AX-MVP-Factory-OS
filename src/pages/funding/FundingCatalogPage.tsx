@@ -34,6 +34,7 @@ import {
   SourceStatusBadge,
   SupportTypeBadge,
 } from '../../components/funding/badges'
+import { particle } from '../../lib/josa'
 
 const inputClass = 'w-full rounded-(--radius-control) border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-brand-500'
 
@@ -300,7 +301,7 @@ export function FundingCatalogPage() {
         onClose={() => setInstOpen(false)}
         onCreated={(inst) => {
           setInstOpen(false)
-          showToast(`기관 "${inst.name}"을(를) 등록했습니다.`)
+          showToast(`기관 "${inst.name}"${particle(inst.name, '을/를')} 등록했습니다.`)
         }}
         onError={(message) => showToast(message)}
       />
@@ -310,7 +311,7 @@ export function FundingCatalogPage() {
         onClose={() => setProgOpen(false)}
         onCreated={(prog) => {
           setProgOpen(false)
-          showToast(`프로그램 "${prog.name}"을(를) 등록했습니다.`)
+          showToast(`프로그램 "${prog.name}"${particle(prog.name, '을/를')} 등록했습니다.`)
         }}
         onError={(message) => showToast(message)}
       />

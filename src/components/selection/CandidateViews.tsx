@@ -12,6 +12,7 @@ import {
   PriorityQuadrantBadge,
   TaskFamilyBadge,
 } from './badges'
+import { josa } from '../../lib/josa'
 
 const STATUS_ACTIONS: CandidateStatus[] = [
   'reviewing',
@@ -48,7 +49,7 @@ export function CandidateCard({ candidate, onOpen, onStatusChange }: CandidateCa
           ariaLabel={`${candidate.name} 작업`}
           items={STATUS_ACTIONS.filter((s) => s !== candidate.status).map((s) => ({
             key: s,
-            label: `${CANDIDATE_STATUS_META[s].label}(으)로`,
+            label: josa(CANDIDATE_STATUS_META[s].label, '으로/로'),
             danger: s === 'rejected' || s === 'archived',
             onSelect: () => onStatusChange(candidate, s),
           }))}

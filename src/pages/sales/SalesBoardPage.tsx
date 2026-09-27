@@ -52,6 +52,7 @@ import {
   type ClientOpsRecord,
   type SalesStage,
 } from '../../types/clientOps'
+import { josa } from '../../lib/josa'
 
 const PICK_KEY = 'axmvp.sales.board.stage'
 
@@ -319,7 +320,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
           try {
             const back = await saveClient(record)
             setRecords((list) => list.map((r) => (r.id === back.id ? back : r)))
-            showToast(`${record.companyName} — ${SALES_STAGE_LABEL[salesStageOf(record)]}(으)로 되돌렸습니다.`)
+            showToast(`${record.companyName} — ${josa(SALES_STAGE_LABEL[salesStageOf(record)], '으로/로')} 되돌렸습니다.`)
           } catch (e) {
             showToast(e instanceof Error ? e.message : '되돌리지 못했습니다.')
             void load()
@@ -369,7 +370,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
         const made = created
         setRecords((list) => (list.some((r) => r.id === made.id) ? list : [made, ...list]))
         setFormOpen(false)
-        showToast(`${made.companyName} 은(는) 만들어졌지만 영업 칸을 저장하지 못했습니다 — 카드에서 다시 고쳐 주세요. (${msg})`)
+        showToast(`${josa(made.companyName, '은/는')} 만들어졌지만 영업 칸을 저장하지 못했습니다 — 카드에서 다시 고쳐 주세요. (${msg})`)
       } else {
         showToast(msg)
       }

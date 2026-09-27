@@ -28,6 +28,7 @@ import type {
 } from '../../types/mvpDesign'
 import type { FeatureBlueprint } from './featureBlueprints'
 import { TEMPLATE_BLUEPRINTS } from './featureBlueprints'
+import { josa } from '../../lib/josa'
 
 export interface GeneratedDesign {
   workflows: MvpWorkflow[]
@@ -474,9 +475,9 @@ function buildAcceptance(features: MvpFeature[]): AcceptanceCriterion[] {
       list.push({
         id: `ac-${list.length}`,
         featureId: f.id,
-        given: `${f.input}이(가) 준비된 상태에서`,
-        when: `${f.name}을(를) 실행하면`,
-        then: `${f.output}이(가) 생성된다`,
+        given: `${josa(f.input, '이/가')} 준비된 상태에서`,
+        when: `${josa(f.name, '을/를')} 실행하면`,
+        then: `${josa(f.output, '이/가')} 생성된다`,
         measurable: true,
         order: list.length,
       })
@@ -485,7 +486,7 @@ function buildAcceptance(features: MvpFeature[]): AcceptanceCriterion[] {
           id: `ac-${list.length}`,
           featureId: f.id,
           given: '필수 항목이 비어 있거나 형식이 잘못된 상태에서',
-          when: `${f.name}을(를) 실행하면`,
+          when: `${josa(f.name, '을/를')} 실행하면`,
           then: '저장·처리가 막히고 오류 항목이 표시된다',
           measurable: true,
           order: list.length,

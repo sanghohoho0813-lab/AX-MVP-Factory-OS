@@ -8,6 +8,7 @@
 import type { ConsistencyWarning, ConsultingProject, CoreThreadKey } from '../../types/consulting'
 import { CORE_THREAD_KEYS, CORE_THREAD_LABEL } from './projectModel'
 import { factText } from './factsheetSchema'
+import { josa } from '../../lib/josa'
 
 /** 한글·영문 2자 이상 토막 (조사가 붙어도 앞 2~3자는 겹치므로 거칠지만 설명 가능한 기준) */
 export function contentWords(text: string): Set<string> {
@@ -41,7 +42,7 @@ export function coreThreadWarnings(p: ConsultingProject): ConsistencyWarning[] {
   // 1) 빈 칸
   const empty = CORE_THREAD_KEYS.filter((k) => t[k].trim() === '')
   for (const k of empty) {
-    out.push({ code: `thread_empty_${k}`, severity: 'info', message: `${CORE_THREAD_LABEL[k]} 이(가) 비어 있습니다.`, tab: 'thread', focus: k })
+    out.push({ code: `thread_empty_${k}`, severity: 'info', message: `${josa(CORE_THREAD_LABEL[k], '이/가')} 비어 있습니다.`, tab: 'thread', focus: k })
   }
 
   // 2) 핵심 기술 낱말 겹침 — 특허 ↔ AX Core ↔ 벤처 문장이 같은 기술을 말하는가
@@ -58,7 +59,7 @@ export function coreThreadWarnings(p: ConsultingProject): ConsistencyWarning[] {
         out.push({
           code: `thread_drift_${k}`,
           severity: 'p1',
-          message: `${CORE_THREAD_LABEL[k]} 이(가) 핵심 해결기술과 같은 낱말을 하나도 쓰지 않습니다 — 서로 다른 기술로 읽힐 수 있습니다 (Master §35-1).`,
+          message: `${josa(CORE_THREAD_LABEL[k], '이/가')} 핵심 해결기술과 같은 낱말을 하나도 쓰지 않습니다 — 서로 다른 기술로 읽힐 수 있습니다 (Master §35-1).`,
           tab: 'thread',
           focus: k,
         })

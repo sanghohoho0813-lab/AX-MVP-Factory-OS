@@ -24,6 +24,7 @@ import { futureIcon } from './futureIcons'
 import { useCurrentUser } from './useCurrentUser'
 import { useNavCounts, type NavCounts } from './useNavCounts'
 import { useBackToClose } from '../../lib/backToClose'
+import { useEntitlements } from '../../lib/entitlementsStore'
 
 interface SidebarProps {
   collapsed: boolean
@@ -108,6 +109,20 @@ function SidebarContent({
     writeCollapsedGroups(next)
   }
 
+  /** D-127: 분야 줄 — 지금 화면이 그 안이면 펼치고, 아니면 사람이 연 것만 펼친다(처음에는 접힘) */
+  const isCategoryOpen = (key: string, containsActive: boolean) => {
+    if (containsActive) return true
+    return userCollapsed?.has(`open:cat:${key}` as ModuleGroupKey) ?? false
+  }
+  const toggleCategory = (key: string, currentlyOpen: boolean) => {
+    const next = new Set(userCollapsed ?? [])
+    const k = `open:cat:${key}` as ModuleGroupKey
+    if (currentlyOpen) next.delete(k)
+    else next.add(k)
+    setUserCollapsed(next)
+    writeCollapsedGroups(next)
+  }
+
   return (
     <div className="flex h-full flex-col bg-navy-900 text-navy-200">
       {/* 로고를 1.5배로 키우면서 머리 칸도 함께 키운다 — 안 키우면 제품명 줄이 눌린다 (D-87) */}
@@ -175,59 +190,32 @@ function SidebarContent({
                     aria-label={collapsed || group.collapsible ? group.title : undefined}
                     className="flex flex-col gap-1"
                   >
-                    {items.map((item, idx) => (
+                    {items.filter((item) => !item.parent).map((item, idx, top) => (
                       <li key={item.key}>
                         {item.expand === 'future-items' ? (
                           <FutureExpandRow item={item} collapsed={collapsed} />
+                        ) : item.kind === 'category' ? (
+                          <CategoryRow
+                            item={item}
+                            items={items.filter((c) => c.parent === item.key)}
+                            navPath={navPath}
+                            collapsed={collapsed}
+                            onNavigate={onNavigate}
+                            rampIndex={idx}
+                            rampCount={top.length}
+                            isOpen={isCategoryOpen}
+                            onToggle={toggleCategory}
+                          />
                         ) : (
-                        (() => {
-                          // D-103: 불 켜짐과 '지금 화면'(aria-current)을 같은 규칙으로 — 함께 맡는 주소(일정 ↔ 기록)에서도 읽는 기계가 알게
-                          const isActive = moduleMatchLength(item, navPath) > 0
-                          return (
-                        <Link
-                          to={item.path}
-                          onClick={onNavigate}
-                          title={collapsed ? item.label : item.hint}
-                          aria-current={isActive ? 'page' : undefined}
-                          className={`relative flex min-h-11 items-center gap-3 rounded-(--radius-control) px-3 py-2.5 text-[0.95rem] font-medium transition-colors ${collapsed ? 'justify-center px-0' : ''} ${
-                            isActive ? 'active bg-brand-600 text-white' : 'text-navy-200 hover:bg-navy-800 hover:text-white'
-                          }`}
-                        >
-                              {isActive && !collapsed && (
-                                <span
-                                  aria-hidden="true"
-                                  className="absolute top-1/2 left-0 h-6 w-1 -translate-y-1/2 rounded-r-full bg-white/90"
-                                />
-                              )}
-                              <item.icon
-                                aria-hidden="true"
-                                className={`size-5 shrink-0 ${isActive ? 'text-white' : group.key === 'tools' ? 'nav-ramp' : navAccentClass(item.accent)}`}
-                                style={!isActive && group.key === 'tools' ? rampStyle(idx, items.length) : undefined}
-                              />
-                              {!collapsed && <span className="truncate">{item.label}</span>}
-                              <NavBadge kind={item.badge} counts={counts} active={isActive} collapsed={collapsed} />
-                              {!collapsed && item.status === 'soon' && (
-                                <span
-                                  className={`ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[0.875rem] font-semibold ${
-                                    isActive ? 'bg-white/20 text-white' : 'bg-navy-800 text-navy-200'
-                                  }`}
-                                >
-                                  {/* D-120: 배지는 작게 — 메뉴 이름(1차 미팅 체크리스트)이 잘리지 않게 */}
-                                  준비 중
-                                </span>
-                              )}
-                              {!collapsed && item.status === 'next' && (
-                                <span
-                                  className={`ml-auto shrink-0 rounded-full border px-1.5 py-0.5 text-[0.875rem] font-semibold tracking-wide ${
-                                    isActive ? 'border-white/40 text-white' : 'border-navy-600 text-navy-300'
-                                  }`}
-                                >
-                                  다음
-                                </span>
-                              )}
-                        </Link>
-                          )
-                        })()
+                          <NavLinkRow
+                            item={item}
+                            isActive={moduleMatchLength(item, navPath) > 0}
+                            collapsed={collapsed}
+                            onNavigate={onNavigate}
+                            counts={counts}
+                            iconClass={group.key === 'modules' ? 'nav-ramp' : navAccentClass(item.accent)}
+                            iconStyle={group.key === 'modules' ? rampStyle(idx, top.length) : undefined}
+                          />
                         )}
                       </li>
                     ))}
@@ -288,6 +276,146 @@ export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobil
             <SidebarContent collapsed={false} onNavigate={onCloseMobile} onCloseMobile={onCloseMobile} />
           </div>
         </div>
+      )}
+    </>
+  )
+}
+
+function NavLinkRow({
+  item,
+  isActive,
+  collapsed,
+  onNavigate,
+  counts,
+  iconClass,
+  iconStyle,
+  nested = false,
+}: {
+  item: ModuleDefinition
+  isActive: boolean
+  collapsed: boolean
+  onNavigate?: () => void
+  counts: NavCounts
+  iconClass: string
+  iconStyle?: CSSProperties
+  nested?: boolean
+}) {
+  return (
+    <Link
+      to={item.path}
+      onClick={onNavigate}
+      title={collapsed ? item.label : item.hint}
+      // D-103: 불 켜짐과 '지금 화면'(aria-current)을 같은 규칙으로 — 함께 맡는 주소(일정 ↔ 기록)에서도 읽는 기계가 알게
+      aria-current={isActive ? 'page' : undefined}
+      className={`relative flex min-h-11 items-center gap-3 rounded-(--radius-control) px-3 py-2.5 font-medium transition-colors ${nested ? 'text-[0.92rem]' : 'text-[0.95rem]'} ${collapsed ? 'justify-center px-0' : ''} ${
+        isActive ? 'active bg-brand-600 text-white' : 'text-navy-200 hover:bg-navy-800 hover:text-white'
+      }`}
+    >
+      {isActive && !collapsed && <span aria-hidden="true" className="absolute top-1/2 left-0 h-6 w-1 -translate-y-1/2 rounded-r-full bg-white/90" />}
+      <item.icon aria-hidden="true" className={`${nested ? 'size-4' : 'size-5'} shrink-0 ${isActive ? 'text-white' : iconClass}`} style={!isActive ? iconStyle : undefined} />
+      {!collapsed && <span className="truncate">{item.label}</span>}
+      <NavBadge kind={item.badge} counts={counts} active={isActive} collapsed={collapsed} />
+      {!collapsed && item.status === 'soon' && (
+        <span className={`ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[0.875rem] font-semibold ${isActive ? 'bg-white/20 text-white' : 'bg-navy-800 text-navy-200'}`}>
+          {/* D-120: 배지는 작게 — 메뉴 이름(1차 미팅 체크리스트)이 잘리지 않게 */}
+          준비 중
+        </span>
+      )}
+      {!collapsed && item.status === 'next' && (
+        <span className={`ml-auto shrink-0 rounded-full border px-1.5 py-0.5 text-[0.875rem] font-semibold tracking-wide ${isActive ? 'border-white/40 text-white' : 'border-navy-600 text-navy-300'}`}>
+          다음
+        </span>
+      )}
+    </Link>
+  )
+}
+
+/**
+ * D-127: 전문 모듈 분야 한 줄 — 누르면 그 아래 기능이 펼쳐진다(화면은 옮기지 않는다).
+ * 잠긴 모듈도 감추지 않고 '잠김' 을 글자로 적는다. 사이드바를 접었을 때는 모듈 살펴보기로 가는 아이콘.
+ */
+function CategoryRow({
+  item,
+  items,
+  navPath,
+  collapsed,
+  onNavigate,
+  rampIndex,
+  rampCount,
+  isOpen,
+  onToggle,
+}: {
+  item: ModuleDefinition
+  items: ModuleDefinition[]
+  navPath: string
+  collapsed: boolean
+  onNavigate?: () => void
+  rampIndex: number
+  rampCount: number
+  isOpen: (key: string, containsActive: boolean) => boolean
+  onToggle: (key: string, currentlyOpen: boolean) => void
+}) {
+  const { ent } = useEntitlements()
+  const counts = useNavCounts()
+  const locked = item.moduleKey ? !ent.module(item.moduleKey).usable : false
+  const selfActive = moduleMatchLength(item, navPath) > 0
+  const childActive = items.some((c) => moduleMatchLength(c, navPath) > 0)
+  const open = isOpen(item.key, childActive || selfActive)
+  const listId = `nav-cat-${item.key}`
+  if (collapsed) {
+    return (
+      <Link
+        to={item.path}
+        onClick={onNavigate}
+        title={item.label}
+        aria-current={selfActive || childActive ? 'page' : undefined}
+        className={`relative flex min-h-11 items-center justify-center rounded-(--radius-control) py-2.5 transition-colors ${selfActive || childActive ? 'active bg-brand-600 text-white' : 'text-navy-200 hover:bg-navy-800 hover:text-white'}`}
+      >
+        <item.icon aria-hidden="true" className={`size-5 shrink-0 ${selfActive || childActive ? 'text-white' : 'nav-ramp'}`} style={rampStyle(rampIndex, rampCount)} />
+        <span className="sr-only">{item.label}</span>
+      </Link>
+    )
+  }
+  return (
+    <>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={listId}
+        data-nav-category={item.moduleKey}
+        onClick={() => onToggle(item.key, open)}
+        title={item.hint}
+        className={`relative flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-(--radius-control) px-3 py-2.5 text-left text-[0.95rem] font-medium transition-colors ${
+          selfActive ? 'bg-navy-800 text-white' : childActive ? 'text-white' : 'text-navy-200 hover:bg-navy-800 hover:text-white'
+        }`}
+      >
+        <item.icon aria-hidden="true" className="nav-ramp size-5 shrink-0" style={rampStyle(rampIndex, rampCount)} />
+        <span className="min-w-0 flex-1 truncate">{item.label}</span>
+        {locked && (
+          <span data-nav-locked className="shrink-0 rounded-full border border-navy-600 px-1.5 py-0.5 text-[0.875rem] font-semibold text-navy-300">
+            잠김
+          </span>
+        )}
+        <ChevronDown aria-hidden="true" className={`size-4 shrink-0 transition-transform ${open ? '' : '-rotate-90'}`} />
+      </button>
+      {open && (
+        <ul id={listId} aria-label={`${item.label} 기능`} className="mt-1 ml-5 flex flex-col gap-0.5 border-l border-navy-700 pl-2">
+          {items.map((c) => (
+            <li key={c.key}>
+              <NavLinkRow item={c} isActive={moduleMatchLength(c, navPath) > 0} collapsed={false} onNavigate={onNavigate} counts={counts} iconClass="text-navy-300" nested />
+            </li>
+          ))}
+          <li>
+            <Link
+              to={item.path}
+              onClick={onNavigate}
+              aria-current={selfActive ? 'page' : undefined}
+              className={`flex min-h-11 items-center gap-2 rounded-(--radius-control) px-3 py-2 text-[0.92rem] font-medium ${selfActive ? 'bg-brand-600 text-white' : 'text-navy-300 hover:bg-navy-800 hover:text-white'}`}
+            >
+              {item.label} 살펴보기
+            </Link>
+          </li>
+        </ul>
       )}
     </>
   )

@@ -107,6 +107,8 @@ for (const [w, h, mob] of [[1440, 900, false], [390, 844, true]]) {
   page.on('load', () => {
     loads += 1
   })
+  // D-127: 도구는 분야 줄(절세·재무) 아래에 접혀 있다 — 펼치고 누른다
+  await page.getByRole('navigation', { name: '주 메뉴' }).getByRole('button', { name: /절세·재무/ }).click()
   await page.getByRole('navigation', { name: '주 메뉴' }).getByRole('link', { name: '크레탑 분석기' }).click()
   await page.waitForTimeout(3000)
   const panel = page.getByTestId('screen-error')
@@ -523,7 +525,7 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   await page.evaluate(seedScript())
   const headH0 = await page.locator('header').first().evaluate((el) => el.getBoundingClientRect().height)
   check('머리줄 묶음: 오늘 화면은 묶음 표시 없음', (await page.getByTestId('screen-group').count()) === 0)
-  for (const [path, group, title] of [['/ops/agents', '영업', '영업자 정산'], ['/tools/tax', '컨설팅 작업실', '세금 계산기'], ['/ops/inbox', '고객', '잠재고객 상담신청'], ['/tools/employment/roster', '컨설팅 작업실', '고용지원금 매니저']]) {
+  for (const [path, group, title] of [['/ops/agents', '영업', '영업자 정산'], ['/tools/tax', '절세·재무', '세금 계산기'], ['/ops/inbox', '고객', '잠재고객 상담신청'], ['/tools/employment/roster', '기업성장', '고용지원금 관리']]) {
     await page.goto(BASE + path, { waitUntil: 'networkidle' })
     await page.waitForTimeout(300)
     const g = page.locator('header').getByTestId('screen-group')

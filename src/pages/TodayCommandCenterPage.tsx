@@ -161,7 +161,7 @@ function SectionTitle({
         {typeof count === 'number' && <span className="text-[0.95rem] font-semibold text-slate-500">{count}</span>}
       </h2>
       {to && (
-        <Link to={to} className="text-[0.9rem] font-medium text-brand-700 hover:underline">
+        <Link to={to} className="tap inline-flex items-center text-[0.9rem] font-medium text-brand-700 hover:underline">
           모두 보기
         </Link>
       )}
@@ -398,7 +398,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                 : todoCount > 0
                   ? `오늘 할 일 ${todoCount}건`
                   : '오늘 할 일을 적어 보세요'}
-              <Link to="/journal" className="t-sub font-medium text-brand-700 hover:underline">
+              <Link to="/journal" className="tap t-sub inline-flex items-center font-medium text-brand-700 hover:underline">
                 모두 보기
               </Link>
             </h1>
@@ -583,12 +583,12 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           {(agentPayable > 0 || noDueFees.length > 0) && (
             <p data-testid="today-money-notes" className="t-sub flex flex-wrap gap-x-4 gap-y-1 break-keep text-slate-600">
               {agentPayable > 0 && (
-                <Link to="/ops/agents" className="font-semibold text-warning-700 hover:underline">
+                <Link to="/ops/agents" className="tap inline-flex items-center font-semibold text-warning-700 hover:underline">
                   영업자에게 줄 돈 {krwTile(agentPayable)} (고객 입금됨) →
                 </Link>
               )}
               {noDueFees.length > 0 && (
-                <Link to={`/ops/clients/${noDueFees[0].clientId}?tab=fees`} className="font-semibold text-slate-700 hover:underline">
+                <Link to={`/ops/clients/${noDueFees[0].clientId}?tab=fees`} className="tap inline-flex items-center font-semibold text-slate-700 hover:underline">
                   받을 날을 안 정한 수금 {noDueFees.length}건 →
                 </Link>
               )}
@@ -619,7 +619,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             emptyHint="통화 · 결정 · 할 일을 바로 남겨 두면 나중에 고객별 이력이 이어집니다."
           />
           {todayJournal.length > 4 && (
-            <Link to="/journal" className="t-sub font-medium text-brand-700 hover:underline">
+            <Link to="/journal" className="tap t-sub inline-flex items-center font-medium text-brand-700 hover:underline">
               오늘 기록 {todayJournal.length}건 모두 보기
             </Link>
           )}

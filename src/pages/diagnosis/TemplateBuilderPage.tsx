@@ -34,6 +34,7 @@ import { TemplateSectionEditor } from '../../components/diagnosis/TemplateSectio
 import { SurveyQualityPanel } from '../../components/diagnosis/SurveyQualityPanel'
 import { SurveyCompositionSummaryView } from '../../components/diagnosis/SurveyCompositionSummary'
 import { useToast } from '../../components/ui/toastContext'
+import { josa } from '../../lib/josa'
 
 type BuilderTab = 'library' | 'sections' | 'summary'
 
@@ -234,7 +235,7 @@ export function TemplateBuilderPage() {
     try {
       publishTemplate(id)
       allowNavigation()
-      showToast(`${name || '템플릿'}을(를) 게시했습니다.`)
+      showToast(`${josa(name || '템플릿', '을/를')} 게시했습니다.`)
       navigate('/diagnosis/templates')
     } catch {
       setSaving(false)

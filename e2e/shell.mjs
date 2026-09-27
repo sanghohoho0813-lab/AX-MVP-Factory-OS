@@ -30,13 +30,19 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const at = (t) => navText.indexOf(t)
   check('메뉴: 오늘과 일정이 한 묶음', at('오늘') >= 0 && at('일정') > at('오늘') && at('일정') < at('고객 관리'), navText.slice(0, 160))
   check('메뉴: 이름 — 고객 관리 · 잠재고객 상담신청 (D-104)', at('고객 관리') > 0 && at('잠재고객 상담신청') > at('고객 관리') && at('고객 운영') === -1 && at('이벤트함') === -1, navText.slice(0, 200))
-  check('메뉴: 영업이 고객 다음, 컨설팅 작업실(구 도구함)이 영업 다음', at('영업자 정산') > at('잠재고객 상담신청') && at('컨설팅 작업실') > at('영업자 정산') && at('도구함') === -1, navText.slice(0, 320))
+  check('메뉴: 영업이 고객 다음, 전문 모듈(구 컨설팅 작업실)이 영업 다음 (D-127)', at('영업자 정산') > at('잠재고객 상담신청') && at('전문 모듈') > at('영업자 정산') && at('도구함') === -1 && at('컨설팅 작업실') === -1, navText.slice(0, 320))
   check('메뉴: 영업 묶음에 1차 미팅 체크리스트(준비 중)', at('1차 미팅 체크리스트') > at('영업자 정산') && navText.includes('준비 중'), navText.slice(0, 360))
   check('메뉴: 가끔 쓰는 것 묶음이 없다 (D-104)', at('가끔 쓰는 것') === -1)
-  check('메뉴: 특허+벤처 · 자금·지원사업이 컨설팅 작업실 안 (작업실 전체보다 위)', at('특허+벤처') > at('정책자금 진단') && at('자금·지원사업') > at('특허+벤처') && at('작업실 전체') > at('자금·지원사업'), navText.slice(0, 700))
-  check('메뉴: 세금 계산기가 사이드바에 있다', at('세금 계산기') > 0)
+  // D-127: 전문 모듈은 분야 여섯 줄 + 모듈 전체 — 도구는 분야 줄 아래에 접혀 있다(모듈이 늘어도 줄이 늘지 않는다)
+  const cats = ['기업성장', '정부지원사업', '절세·재무', '기술사업화', 'AX 스튜디오', '웹 스튜디오', '모듈 전체']
+  check('메뉴: 분야 여섯 줄 순서 · 모듈 전체가 끝', cats.every((c, i) => at(c) > at('전문 모듈') && (i === 0 || at(c) > at(cats[i - 1]))), navText.slice(0, 700))
+  check('메뉴: 처음에는 도구 줄이 접혀 있다', at('세금 계산기') === -1 && at('정책자금 진단') === -1, navText.slice(0, 700))
+  await nav.getByRole('button', { name: /절세·재무/ }).click()
+  await page.waitForTimeout(200)
+  const navOpen = (await nav.innerText()) ?? ''
+  check('메뉴: 절세·재무를 누르면 세금 계산기 · 창업감면 · 크레탑이 펼쳐진다', ['세금 계산기', '창업감면 판정기', '크레탑 분석기'].every((t) => navOpen.includes(t)) && navOpen.includes('절세·재무 살펴보기'), navOpen.slice(0, 700))
+  await nav.getByRole('button', { name: /절세·재무/ }).click()
   // D-120: 'AX STUDIO' → 'AX 스튜디오'(쉬운 말)
-  check('메뉴: AX 스튜디오 는 그 아래', at('AX 스튜디오') > at('작업실 전체'))
   check('메뉴: 설정이 맨 아래', at('설정') > at('이 시스템'))
   check('메뉴: 기록 셋은 사이드바에 따로 없다 (일정 안 탭, D-103)', !['오늘 기록', '주간 돌아보기', '전체 기록'].some((t) => navText.includes(t)))
 
@@ -167,9 +173,10 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.goto(BASE + '/tools', { waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
   const tools = (await page.locator('main').innerText()) ?? ''
-  check('도구함: 세금 계산기가 먼저', tools.indexOf('세금 계산기') > 0 && tools.indexOf('세금 계산기') < tools.indexOf('기업인증 OS'), tools.slice(0, 260))
-  check('도구함: 앞으로 붙을 것을 적어 둔다 (크레탑은 들어와서 빠짐)', tools.includes('기업인증 OS') && tools.includes('아직 없음') && tools.includes('크레탑 분석기'))
-  check('도구함: 아직 없는 것은 누를 수 없다', (await page.getByRole('link', { name: /기업인증 OS/ }).count()) === 0)
+  check('모듈 전체: 모듈 카드 여섯', (await page.getByTestId('module-cards').locator('[data-module-card]').count()) === 6)
+  check('모듈 전체: 세금 계산기는 절세·재무 카드 안', ((await page.locator('[data-module-card="tax-finance"]').innerText()) ?? '').includes('세금 계산기'))
+  check('모듈 전체: 앞으로 붙을 것을 적어 둔다 (크레탑은 들어와서 빠짐)', tools.includes('기업인증 검토') && tools.includes('준비 중') && tools.includes('크레탑 분석기'))
+  check('도구함: 아직 없는 것은 누를 수 없다', (await page.getByRole('link', { name: /기업인증 검토/ }).count()) === 0)
   await page.getByRole('link', { name: /세금 계산기/ }).first().click()
   await page.waitForTimeout(700)
   check('도구함: 세금 계산기로 간다', page.url().includes('/tools/tax'), page.url())
@@ -193,7 +200,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByRole('button', { name: '메뉴 열기' }).click()
   await page.waitForTimeout(500)
   const drawer = (await page.getByRole('navigation', { name: '주 메뉴' }).innerText()) ?? ''
-  check('휴대폰 서랍: 같은 순서', drawer.indexOf('컨설팅 작업실') > drawer.indexOf('고객 관리') && drawer.indexOf('AX 스튜디오') > drawer.indexOf('컨설팅 작업실'), drawer.slice(0, 260))
+  check('휴대폰 서랍: 같은 순서', drawer.indexOf('전문 모듈') > drawer.indexOf('고객 관리') && drawer.indexOf('AX 스튜디오') > drawer.indexOf('전문 모듈'), drawer.slice(0, 260))
   const logoH = await page.locator('img[alt]:visible').first().evaluate((el) => el.getBoundingClientRect().height)
   check('휴대폰 서랍: 로고도 48px', Math.round(logoH) === 48, String(logoH))
   // D-103: 예전 '이 기기 · 계정' 칸(고객 플랫폼 열기 · 처음 사용 가이드) 없음 — 아래는 이름 한 줄 + 아이콘

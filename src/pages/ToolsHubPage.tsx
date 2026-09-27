@@ -1,60 +1,28 @@
-import { ArrowRight, BarChart3, FileCheck2, FlaskConical, FolderKanban, Lightbulb, Users } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { PageHeader } from '../components/ui/PageHeader'
 import { ModuleAccessPanel } from '../components/tools/ModuleAccessPanel'
-import { getDataModeConfig } from '../data/dataMode'
-import { useAuth } from '../auth/AuthProvider'
-import { Badge, ListSurface, Section } from '../components/ui/primitives'
+import { Badge } from '../components/ui/primitives'
 import { REVIEW_HUB_PATH, TOOLS, type ToolDefinition } from '../config/toolRegistry'
+import { featuresOfModule, visibleModules, type CatalogModule } from '../config/productCatalog'
+import { featureIcon, featureLabel, featurePath } from '../config/featurePaths'
+import { useEntitlements } from '../lib/entitlementsStore'
 
 /**
- * 도구함 — 고객 기록과 상관없이 혼자 도는 것들이 모이는 곳 (D-86 · D-88).
+ * 전문 모듈 전체 (D-86 · D-88 · D-127) — 예전 '컨설팅 작업실(도구함)'.
  *
- * 대표가 따로 만들어 둔 작은 OS 들이 여기로 들어온다. 그때 화면을 고치지 않도록
- * 목록은 `toolRegistry.ts` 한 곳에서 읽는다.
- *   - 쓸 수 있는 것 → 카드, 누르면 들어간다
+ * 모듈 카드 여섯 장(분야마다 하나) · 그 안의 기능 · 요금제와 모듈 관리.
+ * 목록은 제품 카탈로그(productCatalog.ts)와 도구 목록(toolRegistry.ts)에서 읽는다 — 새 도구가 들어와도 이 화면은 고치지 않는다.
+ *   - 아직 없는 기능 → '준비 중', 누를 수 없다
  *   - 도입 검토중 → 따로 묶어 '검토중' 배지. 쓸 수는 있다
- *   - 아직 없는 것 → **없다고 적고 누를 수 없게** 둔다
- *
- * 아래의 설계·진단·검증 목록은 AX STUDIO 로 가는 길이다 — 자주 쓰지 않으므로 도구 아래에 둔다.
  */
-const groups = [
-  {
-    title: '고객·진단',
-    icon: Users,
-    links: [
-      ['고객사·프로젝트', '/clients'],
-      ['기업 진단', '/diagnosis'],
-      ['설문 관리', '/diagnosis/surveys'],
-      ['분석 결과', '/diagnosis/assessments'],
-    ],
-  },
-  {
-    title: 'AX 설계',
-    icon: Lightbulb,
-    links: [
-      ['만들 업무 선택', '/selection'],
-      ['AX 기능 설계', '/mvp-design'],
-      ['홈페이지 설계', '/website-studio'],
-      ['제출자료', '/deliverables/results'],
-    ],
-  },
-  {
-    title: '검증·성과',
-    icon: FlaskConical,
-    links: [
-      ['현장 검증', '/validation'],
-      ['검증 결과', '/validation/results'],
-      ['전체 현황', '/reports'],
-      ['사례 라이브러리', '/cases'],
-    ],
-  },
-] as const
-
-const SHORTCUTS = [
-  { label: '자금·지원사업', to: '/funding', icon: FolderKanban },
-  { label: '결과자료', to: '/deliverables/results', icon: FileCheck2 },
-  { label: '전체 진행 현황', to: '/reports', icon: BarChart3 },
+/** AX 스튜디오 안쪽에서 자주 찾는 화면 — 메뉴에는 없고 여기서 바로 간다 */
+const STUDIO_LINKS = [
+  ['설문 관리', '/diagnosis/surveys'],
+  ['분석 결과', '/diagnosis/assessments'],
+  ['검증 결과', '/validation/results'],
+  ['제출자료', '/deliverables/results'],
+  ['전체 진행 현황', '/reports'],
 ] as const
 
 export function ToolCard({ t }: { t: ToolDefinition }) {
@@ -87,38 +55,76 @@ export function ToolCard({ t }: { t: ToolDefinition }) {
   )
 }
 
-function ModuleAccessSection() {
-  // 로컬 모드에는 작업실이 없다 — 다른 화면과 같은 방식으로 가른다
-  const mode = getDataModeConfig().mode
-  return mode === 'supabase' ? <CloudAccess /> : <ModuleAccessPanel workspaceId={null} />
-}
-
-function CloudAccess() {
-  const { currentWorkspaceId } = useAuth()
-  return <ModuleAccessPanel workspaceId={currentWorkspaceId} />
+/** 전문 모듈 한 장 — 이름 · 상태 · 소개 · 들어 있는 기능(누르면 그 기능으로) */
+function ModuleCard({ m }: { m: CatalogModule }) {
+  const { ent } = useEntitlements()
+  const e = ent.module(m.key)
+  const features = featuresOfModule(m.key)
+  return (
+    <li className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-4" data-module-card={m.key}>
+      <div className="flex flex-wrap items-center gap-2">
+        <m.icon aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
+        <h3 className="t-card font-bold text-slate-900">{m.name}</h3>
+        <Badge tone={e.usable ? (e.source === 'trial' ? 'warning' : 'success') : 'neutral'}>{e.usable ? (e.source === 'trial' ? e.label : '쓰는 중') : '잠김'}</Badge>
+      </div>
+      <p className="t-sub break-keep text-slate-600">{m.description}</p>
+      <ul className="flex flex-col divide-y divide-slate-100 border-y border-slate-100">
+        {features.map((f) => {
+          const path = featurePath(f)
+          const Icon = featureIcon(f)
+          return (
+            <li key={f.key}>
+              {path ? (
+                <Link to={path} data-tool={f.source === 'tool' ? f.key : undefined} data-feature={f.key} className="tap t-body flex items-center gap-2.5 py-2.5 font-medium text-slate-800 hover:text-brand-700">
+                  {Icon && <Icon aria-hidden="true" className="size-4 shrink-0 text-slate-400" />}
+                  <span className="min-w-0 flex-1 break-keep">{featureLabel(f)}</span>
+                  <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-slate-300" />
+                </Link>
+              ) : (
+                <div data-tool={f.source === 'tool' ? f.key : undefined} className="t-body flex items-center gap-2.5 py-2.5 text-slate-500">
+                  {Icon && <Icon aria-hidden="true" className="size-4 shrink-0 text-slate-300" />}
+                  <span className="min-w-0 flex-1 break-keep">{featureLabel(f)}</span>
+                  <Badge>준비 중</Badge>
+                </div>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+      <Link to={m.route} className="tap t-body inline-flex w-fit items-center gap-1 font-semibold text-brand-700 hover:underline" data-act="explore">
+        {m.name} 살펴보기 <ArrowRight aria-hidden="true" className="size-4" />
+      </Link>
+    </li>
+  )
 }
 
 export function ToolsHubPage() {
-  const live = TOOLS.filter((t) => t.status === 'live')
   const review = TOOLS.filter((t) => t.status === 'review')
-  const planned = TOOLS.filter((t) => t.status === 'planned')
   const moved = TOOLS.filter((t) => t.status === 'moved')
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="컨설팅 작업실"
-        description="계산기·판정기·분석기처럼 혼자 도는 것들이 모이는 곳입니다. 대표가 따로 만들어 둔 OS 들의 핵심이 여기로 들어왔습니다. 전부 규칙 계산이고 외부 호출이 없습니다."
+        title="전문 모듈"
+        description="기본 OS 위에 더하는 전문 업무입니다. 분야마다 모듈 하나 — 업체 화면에서 바로 열리고, 업체 정보를 다시 적지 않습니다. 전부 규칙 계산이고 외부 호출이 없습니다."
       />
 
-      <section aria-labelledby="tools-list" className="flex flex-col gap-3">
-        <h2 id="tools-list" className="t-section text-slate-900">
-          도구 <span className="t-meta font-medium text-slate-500">{live.length}개</span>
+      <section aria-labelledby="modules-list" className="flex flex-col gap-3">
+        <h2 id="modules-list" className="t-section text-slate-900">
+          모듈 <span className="t-meta font-medium text-slate-500">{visibleModules().length}개</span>
         </h2>
-        <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-          {live.map((t) => (
-            <ToolCard key={t.key} t={t} />
+        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="module-cards">
+          {visibleModules().map((m) => (
+            <ModuleCard key={m.key} m={m} />
           ))}
-        </div>
+        </ul>
+        <p className="t-sub flex flex-wrap items-center gap-x-3 gap-y-1 break-keep text-slate-600">
+          <span className="font-semibold text-slate-700">AX 스튜디오 안쪽 화면</span>
+          {STUDIO_LINKS.map(([label, to]) => (
+            <Link key={to} to={to} className="tap inline-flex items-center font-medium text-brand-700 hover:underline">
+              {label}
+            </Link>
+          ))}
+        </p>
       </section>
 
       {/* D-118: 다른 곳으로 옮겨 간 것 — 카드가 아니라 한 줄 안내. 예전 화면은 기록 보기용으로 열린다 */}
@@ -128,8 +134,8 @@ export function ToolsHubPage() {
             <p key={t.key} className="t-sub flex flex-wrap items-baseline gap-x-2 gap-y-1 break-keep text-slate-600">
               <span className="font-semibold text-slate-800">{t.label}</span>
               <span>→ {t.movedTo?.label}로 옮겼습니다.</span>
-              {t.movedTo && <Link to={t.movedTo.path} className="font-semibold text-brand-700 hover:underline">열기</Link>}
-              {t.path && <Link to={t.path} className="t-meta text-slate-500 hover:underline">예전 화면(기록 보기)</Link>}
+              {t.movedTo && <Link to={t.movedTo.path} className="tap inline-flex items-center font-semibold text-brand-700 hover:underline">열기</Link>}
+              {t.path && <Link to={t.path} className="tap inline-flex items-center text-slate-600 hover:underline">예전 화면(기록 보기)</Link>}
             </p>
           ))}
         </section>
@@ -153,57 +159,7 @@ export function ToolsHubPage() {
         </section>
       )}
 
-      {planned.length > 0 && (
-        <section aria-labelledby="tools-planned" className="flex flex-col gap-3">
-          <h2 id="tools-planned" className="t-section text-slate-900">
-            자리만 잡아 둔 것
-          </h2>
-          <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-            {planned.map((t) => (
-              <ToolCard key={t.key} t={t} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      <ModuleAccessSection />
-
-      <section aria-labelledby="studio-links" className="flex flex-col gap-3">
-        <h2 id="studio-links" className="t-section text-slate-900">
-          설계·진단·검증 (AX STUDIO)
-        </h2>
-        <div className="grid gap-5 xl:grid-cols-3">
-          {groups.map((group) => (
-            <Section key={group.title} title={group.title} action={<group.icon aria-hidden="true" className="size-5 text-slate-400" />}>
-              <ListSurface>
-                {group.links.map(([label, path]) => (
-                  <Link
-                    key={path}
-                    to={path}
-                    className="tap t-body flex items-center justify-between gap-2 px-4 py-3.5 font-medium text-slate-700 hover:bg-slate-50 hover:text-brand-700 sm:px-5"
-                  >
-                    <span className="min-w-0 break-keep">{label}</span>
-                    <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-slate-300" />
-                  </Link>
-                ))}
-              </ListSurface>
-            </Section>
-          ))}
-        </div>
-      </section>
-
-      <div className="grid gap-2.5 sm:grid-cols-3">
-        {SHORTCUTS.map((s) => (
-          <Link
-            key={s.to}
-            to={s.to}
-            className="ax-lift tap flex items-center gap-3 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3.5"
-          >
-            <s.icon aria-hidden="true" className="size-5 shrink-0 text-slate-400" />
-            <span className="t-body font-medium text-slate-800">{s.label}</span>
-          </Link>
-        ))}
-      </div>
+      <ModuleAccessPanel />
     </div>
   )
 }

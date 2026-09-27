@@ -53,6 +53,7 @@ import {
   DEMO_TOKEN_PREFIX,
   type DemoRespondent,
 } from './demoDataset'
+import { particle } from '../../lib/josa'
 
 export class GuidedDemoError extends Error {
   constructor(message: string) {
@@ -247,7 +248,7 @@ function ensureFinalizedSelection(): void {
   if (!primaryCandidate) throw new GuidedDemoError('시연용 자동화 후보를 만들지 못했습니다.')
   if (decision.decisionSummary.trim() === '') {
     updateDecision(decision.id, {
-      decisionSummary: `반복성과 효과가 큰 '${primaryCandidate.name}'을(를) 1차 핵심 과제로 선정합니다.`,
+      decisionSummary: `반복성과 효과가 큰 '${primaryCandidate.name}'${particle(primaryCandidate.name, '을/를')} 1차 핵심 과제로 선정합니다.`,
     })
   }
   finalizeSelection(decision.id)

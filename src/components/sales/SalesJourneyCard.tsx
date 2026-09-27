@@ -14,7 +14,7 @@ import { ArrowRight, Check, Circle, Lock, Route, Wrench } from 'lucide-react'
 import { Badge } from '../ui/primitives'
 import { stageReached } from '../../services/salesPipeline'
 import { buildJourney, SALES_PATH_INFO, type JourneyStepKey } from '../../services/salesJourney'
-import { useModuleAccessMap } from './useModuleAccessMap'
+import { useEntitlements } from '../../lib/entitlementsStore'
 import { SALES_PATH_ORDER, type ClientOpsRecord, type SalesPath } from '../../types/clientOps'
 import { rampAt } from './salesColor'
 
@@ -47,13 +47,14 @@ export function SalesJourneyCard({
   /** 한 줄로 접어 두고 눌러서 펼친다(D-121) — 미팅 준비에서. 접힌 줄에 지금 걸음 · 다음 할 일 */
   foldable?: boolean
 }) {
-  const access = useModuleAccessMap(record.workspaceId)
+  // D-127: 잠김은 권한 계산에서 — 요금제 · 체험 · 대표가 잠근 것까지 한 번에
+  const { ent } = useEntitlements()
   const location = useLocation()
   /** D-124: 영업 화면에서 업체 화면으로 가는 줄이면 돌아올 곳을 싣는다 */
   // 영업 화면에서 업체로 가면 '영업에서 왔음' 을 들고 간다 · 업체 화면 안(탭)에서는 이미 들고 온 것을 그대로 넘긴다
   const linkState = (to: string) =>
     !to.startsWith('/ops/clients/') ? undefined : location.pathname.startsWith('/sales') ? fromState(location) : location.pathname.startsWith('/ops/clients/') ? (location.state as unknown) : undefined
-  const journey = useMemo(() => buildJourney(record, { today, access }), [record, today, access])
+  const journey = useMemo(() => buildJourney(record, { today, isLocked: (k) => !ent.feature(k).usable }), [record, today, ent])
   const [picked, setPicked] = useState<JourneyStepKey | null>(null)
   // 다른 업체로 바뀌면 지금 걸음으로 돌아간다
   const [seenId, setSeenId] = useState(record.id)

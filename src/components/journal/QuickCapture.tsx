@@ -10,7 +10,7 @@ import { useSessionDraft } from '../../lib/useSessionDraft'
 /**
  * 빠른 기록 — "무슨 일이 있었나요?" 한 줄이면 저장된다.
  * 유형(메모·통화·결정·할 일·막힘·성과·아이디어)과 고객 연결은 선택.
- * 할 일는 기한을 받아 홈의 "오늘 반드시"에 올라간다. Ctrl/Cmd+Enter 로 저장.
+ * 할 일은 기한을 받아 홈의 "오늘 반드시"에 올라간다. Ctrl/Cmd+Enter 로 저장.
  */
 export function QuickCapture({
   clients,
@@ -47,7 +47,7 @@ export function QuickCapture({
       return
     }
     if (type === 'follow_up' && !dueDate) {
-      setError('할 일는 언제까지 할지 날짜를 정해 주세요.')
+      setError('할 일은 언제까지 할지 날짜를 정해 주세요.')
       return
     }
     busyRef.current = true

@@ -15,6 +15,14 @@ import { getSelected, toggleSelected } from "./selection.js";
 import { ratioKeys, num, ratioVal, lastStep, coreTrend, buildDiagnosisSummary, CONSULTING_CATEGORIES, CONSULTING_STRATEGIES, rankStrategies, buildMeetingQuestions, analyzeCretopText } from "./analysisCore.js";
 import { meetingQuestionFlow, meetingDocs, meetingShort, meetingEffect } from "./meetingFlow.js";
 
+// [D-127] 을/를 — 받침으로 고른다(이 폴더는 OS 코드를 부르지 않으므로 여기서 짧게)
+function objParticle(word) {
+  const w = String(word || "").replace(/\([^()]*\)$/, "").trim();
+  const c = w.charCodeAt(w.length - 1);
+  if (c >= 0xac00 && c <= 0xd7a3) return (c - 0xac00) % 28 ? "을" : "를";
+  return "를";
+}
+
 /* ──────────────────────────────────────────────────────────────
    [D-93] 크레탑 원본 분석 앱(cretop-mini-app 브랜치 src/mini/MiniApp.jsx)을 그대로 옮긴 것.
    이 OS 에서 바꾼 것: 로그인·회원가입·무료체험 횟수·설문·관리자 화면은 뺐다(OS 로그인이 대신한다).
@@ -1233,7 +1241,7 @@ function OneLinerSummary({ ui, onTab, grade, manualGrade }) {
   const mq = buildMeetingQuestions(ui);
   const issues = diag.filter((l) => l.tone !== "info").slice(0, 5).map((l, i) => ({ tone: l.tone, text: l.text, q: mq[i] || "" }));
   const direction = hasSelection
-    ? `이번 미팅에서는 ${focus.slice(0, 4).join(", ")}${focus.length > 4 ? " 등" : ""}을(를) 중심으로 확인하면 좋습니다.`
+    ? `이번 미팅에서는 ${focus.slice(0, 4).join(", ")}${focus.length > 4 ? " 등을" : objParticle(focus[Math.min(focus.length, 4) - 1])} 중심으로 확인하면 좋습니다.`
     : "제안 탭에서 항목을 선택하면 미팅 방향과 질문지가 여기에 자동으로 정리됩니다.";
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfUrl, setPdfUrl] = useState("");     // 생성된 PDF blob URL(수동 열기/저장 링크용)
@@ -1412,7 +1420,7 @@ function BottomNav({ tab, onTab }) {
     <nav className="cretop-mini-tabs" data-testid="cretop-mini-tabs" style={{ position: "sticky", bottom: 0, background: "#fff", borderTop: `1px solid ${T.line}`, boxShadow: "0 -2px 12px rgba(15,23,42,.08)", zIndex: 30, borderRadius: "0 0 var(--radius-panel) var(--radius-panel)" }}>
       <div style={{ maxWidth: 760, margin: "0 auto", display: "flex" }}>
         {TABS.map(([k, label, icon]) => (
-          <button key={k} data-tab={k} aria-current={tab === k ? "page" : undefined} onClick={() => onTab(k)} style={{ flex: "1 1 20%", minWidth: 0, border: "none", background: tab === k ? T.brandSoft : "transparent", cursor: "pointer", padding: "9px 1px 11px", fontFamily: FF, color: tab === k ? T.brand : T.sub, fontWeight: tab === k ? 800 : 600, fontSize: "calc(11.5px * var(--fs,1))", borderTop: `2px solid ${tab === k ? T.brand : "transparent"}`, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, whiteSpace: "nowrap" }}>
+          <button key={k} data-tab={k} aria-current={tab === k ? "page" : undefined} onClick={() => onTab(k)} style={{ flex: "1 1 20%", minWidth: 0, border: "none", background: tab === k ? T.brandSoft : "transparent", cursor: "pointer", padding: "9px 1px 11px", fontFamily: FF, color: tab === k ? T.brand : T.sub, fontWeight: tab === k ? 800 : 600, fontSize: "calc(14px * var(--fs,1))", borderTop: `2px solid ${tab === k ? T.brand : "transparent"}`, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, whiteSpace: "nowrap" }}>
             <span style={{ fontSize: "calc(18px * var(--fs,1))", lineHeight: 1 }}>{icon}</span><span>{label}</span>
           </button>
         ))}
@@ -1549,6 +1557,18 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
   }, []);
   useEffect(() => { if (!embedded) lastSession = { text, fileName, pdfPages, ui, tab }; }, [embedded, text, fileName, pdfPages, ui, tab]);
   const pickScale = (v) => { setFontScale(v); try { localStorage.setItem("mini_fontScale", String(v)); } catch (e) {} };
+  // [D-127] OS 안에서는 OS 글자 크기(설정 · 머리줄 '가가')를 따른다 — 모듈마다 따로 글자 크기 단추를 두지 않는다.
+  //   혼자 도는 크레탑(OS 밖)에는 data-text-scale 이 없으므로 예전 단추가 그대로 남는다.
+  const readOsScale = () => { try { return document.documentElement.getAttribute("data-text-scale"); } catch (e) { return null; } };
+  const [osScale, setOsScale] = useState(readOsScale);
+  useEffect(() => {
+    try {
+      const mo = new MutationObserver(() => setOsScale(readOsScale()));
+      mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-text-scale"] });
+      return () => mo.disconnect();
+    } catch (e) { return undefined; }
+  }, []);
+  const effScale = osScale ? ({ default: 1.3, large: 1.42, extra_large: 1.55 }[osScale] ?? 1.3) : fontScale;
   const [rawViewOpen, setRawViewOpen] = useState(false);   // 원문 텍스트 보기(추출 디버그)
   useEffect(() => { setManualGrade(null); }, [ui]); // 새 분석/이력 열람 시 직접선택 초기화
   // [D-123] 탭을 바꾸면 페이지 맨 위가 아니라 분석기 첫머리로 — 미팅 준비처럼 다른 화면 안에 들어 있으면
@@ -1640,8 +1660,8 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
       <header style={{ background: T.surface, borderBottom: `1px solid ${T.line}`, borderRadius: "var(--radius-panel) var(--radius-panel) 0 0" }}>
         <div style={{ maxWidth: 1040, margin: "0 auto", padding: "10px 12px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           {/* [D-94] OS 모듈 머리줄이 이미 '크레탑 분석기' 를 보여 준다 — 원본의 로고·'법인 재무진단' 제목은 겹쳐서 뺐다. ☰ 는 무엇을 여는지 글로 적는다 */}
-          <button onClick={() => setSidebar(true)} title="분석 이력" data-testid="cretop-mini-menu" style={{ border: `1px solid ${T.line}`, background: "#fff", cursor: "pointer", borderRadius: 9, height: 36, padding: "0 12px", fontSize: "calc(13px * var(--fs,1))", fontWeight: 800, fontFamily: FF, color: T.ink, flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}><span aria-hidden="true" style={{ fontSize: "calc(16px * var(--fs,1))" }}>☰</span>분석 이력{history.length ? ` ${history.length}` : ""}</button>
-          <div style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <button onClick={() => setSidebar(true)} title="분석 이력" data-testid="cretop-mini-menu" style={{ border: `1px solid ${T.line}`, background: "#fff", cursor: "pointer", borderRadius: 9, height: 44, padding: "0 12px", fontSize: "calc(14px * var(--fs,1))", fontWeight: 800, fontFamily: FF, color: T.ink, flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}><span aria-hidden="true" style={{ fontSize: "calc(16px * var(--fs,1))" }}>☰</span>분석 이력{history.length ? ` ${history.length}` : ""}</button>
+          {osScale ? null : <div style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6 }}>
             {!isMobile ? <span style={{ fontSize: "calc(11px * var(--fs,1))", color: T.mute, fontWeight: 700 }}>글자크기</span> : null}
             <div style={{ display: "inline-flex", background: T.lineSoft, borderRadius: 9, padding: 2 }}>
               {FONT_SCALES.map(([label, v]) => (
@@ -1650,7 +1670,7 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
                 </button>
               ))}
             </div>
-          </div>
+          </div>}
         </div>
       </header>
 
@@ -1665,7 +1685,7 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
       {rawViewOpen ? <RawTextModal text={text} pages={pdfPages} onClose={() => setRawViewOpen(false)} /> : null}
 
       {/* 콘텐츠(main)만 --fs로 글자 확대 → 박스는 그대로, 헤더/하단탭/사이드바는 정상 크기 */}
-      <div style={{ maxWidth: tab === "reco" ? 980 : 720, margin: "0 auto", padding: "16px 14px 16px", width: "100%", boxSizing: "border-box", overflowX: "hidden", "--fs": fontScale }}>
+      <div style={{ maxWidth: tab === "reco" ? 980 : 720, margin: "0 auto", padding: "16px 14px 16px", width: "100%", boxSizing: "border-box", overflowX: "hidden", "--fs": effScale }}>
         {/* 개요 탭에서만 입력/업로드 영역 노출.
             [D-113] 분석이 끝나면 한 줄로 접는다 — 휴대폰에서 결과를 보려면 입력 칸을 한참 내려야 했다. 누르면 다시 펼친다. */}
         {tab === "overview" && ui && !inputOpen ? (
@@ -1680,7 +1700,7 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
           </button>
         ) : null}
         {tab === "overview" && (!ui || inputOpen) ? (
-          <div style={{ ...card, padding: isMobile ? 16 : 22, marginBottom: 8, "--fs": isMobile ? fontScale : fontScale * 1.3 }}>
+          <div style={{ ...card, padding: isMobile ? 16 : 22, marginBottom: 8, "--fs": isMobile ? effScale : effScale * 1.3 }}>
             {ui ? <button type="button" onClick={() => setInputOpen(false)} style={{ float: "right", border: "none", background: "transparent", color: T.mute, fontFamily: FF, fontSize: "calc(11px * var(--fs,1))", fontWeight: 700, cursor: "pointer", padding: "2px 4px" }}>접기 ▴</button> : null}
             <div style={{ fontSize: "calc(14.5px * var(--fs,1))", fontWeight: 800, marginBottom: 6 }}>{ui ? "새 분석 / 다시 분석" : "크레탑 보고서로 재무진단 시작"}</div>
             <div style={{ fontSize: "calc(12px * var(--fs,1))", color: T.sub, marginBottom: 16, lineHeight: 1.5 }}>크레탑(KRD) 기업종합보고서 PDF를 올리거나 텍스트를 붙여넣고 진단을 실행하세요. 데이터는 브라우저에서만 처리됩니다.</div>

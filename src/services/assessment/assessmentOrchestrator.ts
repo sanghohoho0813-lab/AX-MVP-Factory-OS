@@ -18,6 +18,7 @@ import { generateInterviewQuestions } from './interviewQuestionEngine'
 import { buildNarrative } from './assessmentSummary'
 import { analyzeWebsiteReadiness } from './websiteReadiness'
 import { ASSESSMENT_RULE_VERSION } from './scoringConfig'
+import { josa } from '../../lib/josa'
 
 export interface AnalysisComputation {
   resultInput: AssessmentResultInput
@@ -33,10 +34,10 @@ export function computeSnapshotHash(responseIds: string[]): string {
 function websiteNarrative(website: WebsiteReadinessResult) {
   const strengths = website.domains
     .filter((d) => d.maxScore > 0 && d.score / d.maxScore >= 0.75)
-    .map((d) => `${WEBSITE_DOMAIN_META[d.domain].label}이(가) 잘 준비되어 있습니다.`)
+    .map((d) => `${josa(WEBSITE_DOMAIN_META[d.domain].label, '이/가')} 잘 준비되어 있습니다.`)
   const weaknesses = website.domains
     .filter((d) => d.maxScore > 0 && d.score / d.maxScore < 0.5)
-    .map((d) => `${WEBSITE_DOMAIN_META[d.domain].label}이(가) 부족합니다.`)
+    .map((d) => `${josa(WEBSITE_DOMAIN_META[d.domain].label, '이/가')} 부족합니다.`)
   return { strengths, weaknesses }
 }
 

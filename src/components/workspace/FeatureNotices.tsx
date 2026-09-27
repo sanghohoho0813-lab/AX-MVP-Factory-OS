@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowRight, Cloud, Layers, Lock, PackageOpen } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Button } from '../ui/Button'
+import { josa } from '../../lib/josa'
 
 function NoticeFrame({
   icon: Icon,
@@ -144,7 +145,7 @@ export function AdvancedFeatureNotice({
     <NoticeFrame
       icon={Layers}
       badge="고급 운영 기능"
-      title={`${featureName}은(는) 프로젝트 후반에 사용하는 고급 운영 기능입니다.`}
+      title={`${josa(featureName, '은/는')} 프로젝트 후반에 사용하는 고급 운영 기능입니다.`}
       description={whenToUse}
       bullets={[
         '기본 흐름(진단 → 업무 선택 → 설계 → 결과자료)을 먼저 진행하는 것을 권장합니다.',

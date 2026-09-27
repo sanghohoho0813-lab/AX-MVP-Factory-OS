@@ -42,6 +42,7 @@ import {
 } from '../../components/diagnosis/badges'
 import { useToast } from '../../components/ui/toastContext'
 import { Building2, CircleDot, Sparkles } from 'lucide-react'
+import { josa } from '../../lib/josa'
 
 interface FilterState {
   query: string
@@ -157,7 +158,7 @@ export function QuestionBankPage() {
   const handleClone = (question: Question) => {
     try {
       const cloned = questionRepository.clone(question.id)
-      showToast(`${cloned.code} (으)로 복제했습니다.`)
+      showToast(`${josa(cloned.code, '으로/로')} 복제했습니다.`)
       navigate(`/diagnosis/questions/${cloned.id}/edit`)
     } catch (error) {
       showToast(error instanceof Error ? error.message : '복제에 실패했습니다.')

@@ -17,6 +17,8 @@ import { ChevronLeft, Menu, X } from 'lucide-react'
 import { sectionAccent, type ToolDefinition } from '../../config/toolRegistry'
 import type { NavAccent } from '../../config/moduleRegistry'
 import { useBackToClose } from '../../lib/backToClose'
+import { catalogFeature, catalogModule } from '../../config/productCatalog'
+import { withClient } from '../../components/modules/moduleText'
 
 /**
  * 목차 아이콘 색 (D-92) — OS 왼쪽 메뉴와 같은 8색.
@@ -138,9 +140,7 @@ export function ModuleShell({ tool, section, children }: ModuleShellProps) {
           <span className="t-card min-w-0 truncate font-bold text-slate-900">{tool.label}</span>
         </div>
         <ModuleNavList tool={tool} groups={groups} section={current.key} />
-        <Link to="/tools" className="t-meta inline-flex items-center gap-1 px-1 text-slate-400 hover:text-slate-600">
-          <ChevronLeft aria-hidden="true" className="size-3.5" /> 작업실 전체
-        </Link>
+        <BackToModule tool={tool} className="px-1" />
       </nav>
 
       {/* 서랍 */}
@@ -156,9 +156,7 @@ export function ModuleShell({ tool, section, children }: ModuleShellProps) {
               </button>
             </div>
             <ModuleNavList tool={tool} groups={groups} section={current.key} />
-            <Link to="/tools" className="t-meta inline-flex items-center gap-1 text-slate-400">
-              <ChevronLeft aria-hidden="true" className="size-3.5" /> 작업실 전체
-            </Link>
+            <BackToModule tool={tool} />
           </div>
         </div>
       )}
@@ -217,5 +215,18 @@ function ModuleNavList({
         </div>
       ))}
     </div>
+  )
+}
+
+/** D-127: 목차 아래 — 이 도구가 든 모듈로 돌아가는 길(업체로 열었으면 그 업체를 들고) */
+function BackToModule({ tool, className = '' }: { tool: ToolDefinition; className?: string }) {
+  const [params] = useSearchParams()
+  const f = catalogFeature(tool.key)
+  const m = f ? catalogModule(f.module) : undefined
+  const to = withClient(m?.route ?? '/tools', params.get('client'))
+  return (
+    <Link to={to} data-testid="module-back" className={`tap t-sub inline-flex items-center gap-1 font-medium text-slate-600 hover:text-brand-700 ${className}`}>
+      <ChevronLeft aria-hidden="true" className="size-4" /> {m ? `${m.name} 모듈` : '모듈 전체'}
+    </Link>
   )
 }

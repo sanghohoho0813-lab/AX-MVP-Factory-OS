@@ -23,7 +23,7 @@ import type { ClientOpsRecord } from '../../types/clientOps'
 import { useBackToClose } from '../../lib/backToClose'
 
 interface Hit {
-  group: '고객 관리' | '고객사' | '프로젝트' | '특허+벤처' | '지금 해야 할 일' | '컨설팅 작업실' | '결과·자료'
+  group: '고객 관리' | '고객사' | '프로젝트' | '특허+벤처' | '지금 해야 할 일' | '전문 모듈' | '결과·자료'
   label: string
   sublabel?: string
   onSelect: () => void
@@ -160,7 +160,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
     for (const t of searchTools(query)) {
       if (!t.path) continue
       const path = t.path
-      out.push({ group: '컨설팅 작업실', label: t.label, sublabel: t.navHint ?? t.desc.slice(0, 40), onSelect: () => { navigate(path); close() } })
+      out.push({ group: '전문 모듈', label: t.label, sublabel: t.navHint ?? t.desc.slice(0, 40), onSelect: () => { navigate(path); close() } })
     }
     for (const s of RESULT_SHORTCUTS) {
       if (!q || s.keywords.includes(q) || s.label.toLowerCase().includes(q)) {

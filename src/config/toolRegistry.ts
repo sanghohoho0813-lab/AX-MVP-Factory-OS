@@ -181,7 +181,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     key: 'employment',
-    label: '고용지원금 매니저',
+    label: '고용지원금 관리',
     desc: '2026년 고용지원금 15종 — 채용 상황을 고르면 받을 수 있는 지원금을 가려내고, 입사일로 회차별 신청일과 급여·4대보험 부담을 계산합니다.',
     navHint: '지원금 15종 판정 · 회차 일정 · 급여 계산',
     path: '/tools/employment',
@@ -206,7 +206,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     key: 'labcare',
-    label: '기업부설연구소 OS',
+    label: '기업부설연구소 관리',
     desc: '설립 가능성 판정(인원·자격·물적요건) · 설립서류 체크리스트 · 월간 사후관리 위험도 · 세액공제 예상 · 안내문 11종.',
     navHint: '연구소 설립 판정 · 사후관리 · 세액공제',
     path: '/tools/labcare',
@@ -285,8 +285,8 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     key: 'cert-os',
-    label: '기업인증 OS',
-    desc: '대표가 따로 만들어 둔 것입니다. 여기로 옮기면 이 자리에 붙습니다 — 아직 없습니다.',
+    label: '기업인증 검토',
+    desc: '벤처 · 이노비즈 · 메인비즈 같은 기업인증의 준비 상태를 검토합니다 — 아직 없습니다. 들어오면 이 자리에 붙습니다.',
     path: null,
     icon: BadgeCheck,
     status: 'planned',

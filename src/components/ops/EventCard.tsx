@@ -126,7 +126,7 @@ export function EventCard({
         {event.operationsClientId ? (
           <Link
             to={`/ops/clients/${event.operationsClientId}`}
-            className="inline-flex items-center gap-1 font-medium text-brand-700 hover:underline"
+            className="tap inline-flex items-center gap-1 font-medium text-brand-700 hover:underline"
           >
             <Building2 aria-hidden="true" className="size-3.5" />
             {clientName ?? '연결된 업체'} 열기
@@ -145,7 +145,7 @@ export function EventCard({
             type="button"
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
-            className="inline-flex items-center gap-1 text-[0.875rem] font-medium text-slate-500 hover:text-slate-800"
+            className="tap inline-flex items-center gap-1 text-[0.9rem] font-medium text-slate-600 hover:text-slate-800"
           >
             {open ? <ChevronUp aria-hidden="true" className="size-4" /> : <ChevronDown aria-hidden="true" className="size-4" />}
             고객이 제출한 내용 {fields.length}개

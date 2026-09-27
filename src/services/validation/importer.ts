@@ -7,6 +7,7 @@ import type {
   ValidationScenario,
   ValidationScenarioType,
 } from '../../types/validation'
+import { josa } from '../../lib/josa'
 
 const ISO = '1970-01-01T00:00:00.000Z'
 
@@ -88,7 +89,7 @@ export function importFromMvpDesign(h: MvpDesignHandoffSnapshot): ImportResult {
       type: 'happy_path',
       required: true,
       priority: 'critical',
-      passRule: `${f.output}이(가) 정상적으로 생성되고 담당자가 확인 가능`,
+      passRule: `${josa(f.output, '이/가')} 정상적으로 생성되고 담당자가 확인 가능`,
     })
     if (f.type === 'input_form' || f.type === 'data_validation') {
       seeds.push({ title: `${f.name} 입력 검증`, description: '필수·형식 오류 입력 시 처리', type: 'error', required: true, priority: 'high', passRule: '오류 입력이 차단되고 안내가 표시됨' })
@@ -119,7 +120,7 @@ export function importFromMvpDesign(h: MvpDesignHandoffSnapshot): ImportResult {
   const hypotheses: ValidationHypothesis[] = [
     {
       id: 'hy-0',
-      statement: `${h.coreTaskName}을(를) MVP로 만들면 대상 사용자의 문제가 실제로 줄어든다.`,
+      statement: `${josa(h.coreTaskName, '을/를')} MVP로 만들면 대상 사용자의 문제가 실제로 줄어든다.`,
       source: 'mvp_design',
       evidenceRequired: '핵심 기능 정상 수행·사용자 피드백',
       successCondition: '필수 시나리오 통과 + 핵심 KPI 개선 방향 확인',

@@ -11,6 +11,7 @@
  */
 
 import type { ClientOpsRecord } from '../../types/clientOps'
+import { josa } from '../../lib/josa'
 
 /** 업체가 적어 둔 업종 말 → 창업감면·정책자금이 쓰는 업종 값 */
 const INDUSTRY_WORDS: { value: string; words: string[] }[] = [
@@ -100,5 +101,5 @@ export function clientFacts(record: ClientOpsRecord, today: Date): ClientFacts {
 
 /** 채운 칸 이름들 → "대표 생년월일 · 설립일을 업체 기록에서 채웠습니다" */
 export function prefilledText(names: string[]): string {
-  return names.length === 0 ? '' : `${names.join(' · ')}을(를) 업체 기록에서 채웠습니다`
+  return names.length === 0 ? '' : `${josa(names.join(' · '), '을/를')} 업체 기록에서 채웠습니다`
 }

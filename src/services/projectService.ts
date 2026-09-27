@@ -3,6 +3,7 @@ import { PROJECT_STATUS_META } from '../lib/domainMeta'
 import { PROJECT_STAGE_META } from '../lib/statusMeta'
 import { activityRepository, projectRepository } from '../repositories'
 import { CURRENT_USER } from '../data/demo'
+import { josa } from '../lib/josa'
 
 export function createProject(input: ProjectInput): Project {
   const project = projectRepository.create(input)
@@ -28,7 +29,7 @@ export function updateProject(id: string, input: ProjectInput): Project {
         organizationId: project.organizationId,
         projectId: project.id,
         activityType: 'status_changed',
-        title: `프로젝트 상태가 ${PROJECT_STATUS_META[project.status].label}(으)로 변경되었습니다.`,
+        title: `프로젝트 상태가 ${josa(PROJECT_STATUS_META[project.status].label, '으로/로')} 변경되었습니다.`,
         description: `${PROJECT_STATUS_META[before.status].label} → ${PROJECT_STATUS_META[project.status].label}`,
         actorName: CURRENT_USER.name,
       })
@@ -38,7 +39,7 @@ export function updateProject(id: string, input: ProjectInput): Project {
         organizationId: project.organizationId,
         projectId: project.id,
         activityType: 'stage_changed',
-        title: `프로젝트 단계가 ${PROJECT_STAGE_META[project.currentStage].label}(으)로 변경되었습니다.`,
+        title: `프로젝트 단계가 ${josa(PROJECT_STAGE_META[project.currentStage].label, '으로/로')} 변경되었습니다.`,
         description: `${PROJECT_STAGE_META[before.currentStage].label} → ${PROJECT_STAGE_META[project.currentStage].label}`,
         actorName: CURRENT_USER.name,
       })

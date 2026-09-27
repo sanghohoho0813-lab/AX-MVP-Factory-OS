@@ -160,32 +160,32 @@ check('modules: /journal · /journal/week · /journal/all 은 일정이 맡는�
 check('modules: 모든 모듈의 group 이 정의된 그룹', MODULES.every((m) => MODULE_GROUPS.some((g) => g.key === m.group)))
 const grouped = enabledModulesByGroup()
 check('modules: 첫 그룹은 오늘', grouped[0]?.group.key === 'today')
-check('modules: AX STUDIO 는 접을 수 있고 기본 접힘', MODULE_GROUPS.find((g) => g.key === 'studio')?.collapsible === true && MODULE_GROUPS.find((g) => g.key === 'studio')?.defaultCollapsed === true)
+check('modules: AX STUDIO 는 전문 모듈의 분야 한 줄(D-127) — 안의 화면은 그 줄 아래', MODULES.find((m) => m.key === 'cat-ax-studio')?.kind === 'category' && MODULES.filter((m) => m.parent === 'cat-ax-studio').length >= 5)
 
 /* 메뉴 재분류 — 자주 쓰는 것이 위, 가끔 쓰는 것이 아래 (D-86) */
 {
   const order = MODULE_GROUPS.map((g) => g.key)
-  check('메뉴: 순서는 오늘 → 고객 → 영업 → 컨설팅 작업실 → STUDIO → 이 시스템 → 설정 (D-104 가끔 쓰는 것 없앰)',
-    order.join() === 'today,clients,sales,tools,studio,about,settings', order.join())
-  check('메뉴: 이름 — 고객 관리 · 잠재고객 상담신청 · 컨설팅 작업실(구 도구함) · 특허+벤처 (D-104)',
+  check('메뉴: 순서는 오늘 → 고객 → 영업 → 전문 모듈 → 이 시스템 → 설정 (D-127 컨설팅 작업실 + AX 스튜디오 → 전문 모듈)',
+    order.join() === 'today,clients,sales,modules,about,settings', order.join())
+  check('메뉴: 이름 — 고객 관리 · 잠재고객 상담신청 · 전문 모듈 · 특허+벤처 (D-104 · D-127)',
     MODULES.find((m) => m.key === 'client-ops')?.label === '고객 관리' && MODULES.find((m) => m.key === 'inbox')?.label === '잠재고객 상담신청' &&
-    MODULE_GROUPS.find((g) => g.key === 'tools')?.title === '컨설팅 작업실' && MODULES.find((m) => m.key === 'consulting-studio')?.label === '특허+벤처')
+    MODULE_GROUPS.find((g) => g.key === 'modules')?.title === '전문 모듈' && MODULES.find((m) => m.key === 'consulting-studio')?.label === '특허+벤처')
   check('메뉴: 숫자 — 고객 관리(고객사 수) · 상담신청 · 1차 미팅',
     MODULES.find((m) => m.key === 'client-ops')?.badge === 'clients' && MODULES.find((m) => m.key === 'inbox')?.badge === 'requests' && MODULES.find((m) => m.key === 'first-meeting')?.badge === 'first-meetings')
   const inGroup = (g: string) => MODULES.filter((m) => m.group === g).map((m) => m.key)
   check('메뉴: 오늘과 일정이 한 묶음', inGroup('today').join() === 'today,calendar')
-  check('메뉴: 특허+벤처 · 자금·지원사업이 컨설팅 작업실 안, 작업실 전체보다 위 (D-104) · 검토중 도구가 없으면 도입 검토중 줄도 없다 (D-118)',
-    inGroup('tools').slice(-3).join() === 'consulting-studio,funding,tools' && !inGroup('tools').includes('tools-review') && inGroup('occasional').length === 0, inGroup('tools').join())
+  check('메뉴: 특허+벤처 → 기술사업화 · 자금·지원사업 → 정부지원사업 줄 아래, 모듈 전체가 맨 끝 (D-127) · 검토중 도구가 없으면 도입 검토중 줄도 없다 (D-118)',
+    MODULES.find((m) => m.key === 'consulting-studio')?.parent === 'cat-tech-biz' && MODULES.find((m) => m.key === 'funding')?.parent === 'cat-gov-support' && inGroup('modules').slice(-1).join() === 'tools' && !inGroup('modules').includes('tools-review'), inGroup('modules').join())
   check('메뉴: 영업 묶음 = 영업 관리(D-114) · 영업자 정산 · 1차 미팅 체크리스트(준비 중)',
     inGroup('sales').join() === 'sales,agents,first-meeting' && MODULES.find((m) => m.key === 'first-meeting')?.status === 'soon', inGroup('sales').join())
   check('메뉴: 고객 묶음에서 영업자 정산이 빠졌다', !inGroup('clients').includes('agents'))
   check('메뉴: 처음 사용 가이드가 이 시스템 맨 위', inGroup('about')[0] === 'guide' && MODULES.find((m) => m.key === 'guide')?.path === '/getting-started')
   check('메뉴: 향후 확장은 눌러도 이동하지 않고 펼쳐진다', MODULES.find((m) => m.key === 'roadmap')?.expand === 'future-items')
-  check('메뉴: 컨설팅 작업실(구 도구함)은 영업 다음', order.indexOf('tools') === order.indexOf('sales') + 1 && order.indexOf('sales') === order.indexOf('clients') + 1)
-  check('메뉴: 도구함에 세금 계산기', inGroup('tools').includes('tool-tax'))
+  check('메뉴: 전문 모듈은 영업 다음', order.indexOf('modules') === order.indexOf('sales') + 1 && order.indexOf('sales') === order.indexOf('clients') + 1)
+  check('메뉴: 세금 계산기는 절세·재무 줄 아래', MODULES.find((m) => m.key === 'tool-tax')?.parent === 'cat-tax-finance')
   // 도구를 목록에만 더하고 사이드바에 거는 것을 빠뜨리는 일이 없어야 한다 (D-86)
   check('메뉴: 쓸 수 있는 도구는 전부 사이드바 도구함에 걸린다',
-    liveTools().every((t) => MODULES.some((m) => m.group === 'tools' && m.path === t.path)))
+    liveTools().every((t) => MODULES.some((m) => m.group === 'modules' && m.path === t.path)))
   check('메뉴: 아직 없는 도구는 사이드바에 걸리지 않는다',
     plannedTools().every((t) => !MODULES.some((m) => m.key === `tool-${t.key}`)))
   check('메뉴: 없어진 그룹을 가리키는 모듈이 없다', MODULES.every((m) => MODULE_GROUPS.some((g) => g.key === m.group)))
@@ -215,7 +215,7 @@ check('modules: AX STUDIO 는 접을 수 있고 기본 접힘', MODULE_GROUPS.fi
   check('도구함: 세금 계산기는 지금 쓸 수 있다', liveTools().some((t) => t.path === '/tools/tax'))
   check('도구함: 자리만 잡아 둔 것은 주소가 없다', plannedTools().every((t) => t.path === null))
   check('도구함: 자리만 잡아 둔 것은 그렇게 적는다', plannedTools().every((t) => t.desc.includes('아직 없습니다')))
-  check('도구함: 자리만 잡아 둔 것은 기업인증 OS 하나 (크레탑은 들어왔다)', plannedTools().map((t) => t.label).join() === '기업인증 OS')
+  check('도구함: 자리만 잡아 둔 것은 기업인증 검토 하나 (크레탑은 들어왔다)', plannedTools().map((t) => t.label).join() === '기업인증 검토')
   check('도구함: 옮겨 온 다섯 도구가 전부 쓸 수 있다', ['startup-tax', 'cretop', 'employment', 'labcare', 'policy-funding'].every((k) => liveTools().some((t) => t.key === k)))
   check('도구함: 영업 도구 모음은 영업 관리로 옮겨 감(D-118) — 검토중 도구 없음', reviewTools().length === 0 && TOOLS.find((t) => t.key === 'sales-kit')?.status === 'moved' && TOOLS.find((t) => t.key === 'sales-kit')?.movedTo?.path === '/sales/board')
   check('메뉴: 검토중 도구가 없으면 도입 검토중 줄도 없다', !MODULES.some((m) => m.key === 'tools-review' || m.path === REVIEW_HUB_PATH))
@@ -232,7 +232,7 @@ check('modules: AX STUDIO 는 접을 수 있고 기본 접힘', MODULE_GROUPS.fi
   check('시계: 시각은 초까지 두 자리', formatClockTime(d) === '09:05:07', formatClockTime(d))
   check('시계: 자정', formatClockTime(new Date(2026, 0, 1, 0, 0, 0)) === '00:00:00')
 }
-check('modules: 일기 그룹이 AX STUDIO 보다 앞', grouped.findIndex((g) => g.group.key === 'journal') < grouped.findIndex((g) => g.group.key === 'studio'))
+check('modules: 전문 모듈 묶음이 이 시스템 · 설정보다 앞 (D-127)', grouped.findIndex((g) => g.group.key === 'modules') < grouped.findIndex((g) => g.group.key === 'about'))
 check('moduleForPath: 정확 일치 홈', moduleForPath('/')?.key === 'today')
 check('moduleForPath: 하위 경로 → 가장 긴 접두', moduleForPath('/funding/catalog/programs/x')?.key === 'institutions')
 check('moduleForPath: 업체 상세 → 고객 운영', moduleForPath('/ops/clients/abc')?.key === 'client-ops')
@@ -1196,8 +1196,8 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
 
 // D-110: 휴대폰 머리줄 위 작은 묶음 이름
 check('묶음 표시: 영업자 정산 → 영업', screenGroupForPath('/ops/agents')?.title === '영업')
-check('묶음 표시: 세금 계산기 → 컨설팅 작업실', screenGroupForPath('/tools/tax')?.title === '컨설팅 작업실')
-check('묶음 표시: 모듈 안쪽 화면도 → 컨설팅 작업실', screenGroupForPath('/tools/employment/roster')?.title === '컨설팅 작업실')
+check('묶음 표시: 세금 계산기 → 절세·재무 (D-127 분야 이름)', screenGroupForPath('/tools/tax')?.title === '절세·재무')
+check('묶음 표시: 모듈 안쪽 화면도 → 기업성장', screenGroupForPath('/tools/employment/roster')?.title === '기업성장')
 check('묶음 표시: 상담신청 · 고객 관리 → 고객', screenGroupForPath('/ops/inbox')?.title === '고객' && screenGroupForPath('/ops/clients/abc')?.title === '고객')
 check('묶음 표시: 일정 → 오늘', screenGroupForPath('/ops/calendar')?.title === '오늘')
 check('묶음 표시: 오늘 화면은 오늘 › 오늘 이 되므로 없음', screenGroupForPath('/') === null)

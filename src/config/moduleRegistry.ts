@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { SALES_EXTRA_PATHS, SALES_TAB_PATHS } from './salesTabs'
 import { REVIEW_HUB_PATH, type ToolDefinition, liveTools, movedTools, reviewTools } from './toolRegistry'
+import { FEATURE_CATALOG, visibleModules } from './productCatalog'
 
 /**
  * 모듈 레지스트리 — 이 제품이 어떤 화면 묶음으로 구성되는지의 목록.
@@ -43,9 +44,7 @@ export type ModuleGroupKey =
   | 'today'
   | 'clients'
   | 'sales'
-  | 'tools'
-  | 'occasional'
-  | 'studio'
+  | 'modules'
   | 'about'
   | 'settings'
 
@@ -92,6 +91,13 @@ export interface ModuleDefinition {
   badge?: 'clients' | 'requests' | 'first-meetings'
   /** 설정 '고급 운영 기능 보기' 를 켰을 때만 목차에 보인다 (D-120) */
   advanced?: boolean
+  /**
+   * D-127: 전문 모듈 묶음 — 'category' 는 분야 한 줄(눌러서 펼침), parent 는 그 아래 줄이 어느 분야 줄에 드는지.
+   * moduleKey 는 제품 카탈로그(productCatalog.ts)의 모듈 key — 잠김 표시를 여기서 읽는다.
+   */
+  kind?: 'category'
+  parent?: string
+  moduleKey?: string
 }
 
 /*
@@ -105,32 +111,69 @@ export const MODULE_GROUPS: ModuleGroup[] = [
   { key: 'clients', title: '고객', accent: 'ops' },
   // D-103: 영업자 일(정산 · 1차 미팅 체크리스트)을 고객 운영과 나눈다
   { key: 'sales', title: '영업', accent: 'revenue' },
-  // 고객 기록과 상관없이 혼자 도는 것들 — 앞으로 여기로 계속 들어온다 (toolRegistry.ts)
-  { key: 'tools', title: '컨설팅 작업실', accent: 'system' },
-  // D-104: '가끔 쓰는 것' 은 없앴다 — 특허+벤처 · 자금·지원사업이 컨설팅 작업실로 가면서 빈 묶음이 됐다
-  { key: 'studio', title: 'AX 스튜디오', accent: 'ai', collapsible: true, defaultCollapsed: true },
+  // D-127: 전문 모듈 — 분야 여섯 줄(기업성장 · 정부지원사업 · 절세·재무 · 기술사업화 · AX STUDIO · WEB STUDIO).
+  // 도구는 분야 줄 아래에 접혀 있다. 도구가 늘어도 이 묶음의 줄 수는 늘지 않는다(예전 컨설팅 작업실 + AX 스튜디오)
+  { key: 'modules', title: '전문 모듈', accent: 'system' },
   { key: 'about', title: '이 시스템', accent: 'system', collapsible: true, defaultCollapsed: true },
   { key: 'settings', title: '설정', accent: 'system' },
 ]
 
 /**
- * 도구함 줄은 **도구 목록에서 만든다**(`toolRegistry.ts`, D-86).
- * 새 도구는 거기 한 줄만 더하면 사이드바와 도구함 화면에 같이 붙는다 — 두 군데를 고치다가
- * 한쪽을 빠뜨리는 일을 없앤다. 아직 없는 것(`planned`)은 메뉴에 걸지 않는다.
+ * 전문 모듈 줄 (D-127) — 제품 카탈로그의 분야마다 한 줄, 그 아래에 그 분야의 기능.
+ *
+ * 도구 줄은 **도구 목록에서 만든다**(`toolRegistry.ts`, D-86) — 새 도구는 거기 한 줄 + 카탈로그
+ * (`productCatalog.ts` FEATURE_CATALOG)에 어느 모듈인지 한 줄이면 메뉴 · 모듈 살펴보기 · 업체 화면에 같이 붙는다.
+ * 아직 없는 것(`planned`)은 메뉴에 걸지 않는다.
  */
-function toolModules(): ModuleDefinition[] {
-  return liveTools()
-    .filter((t): t is ToolDefinition & { path: string } => t.path !== null)
-    .map((t) => ({
-      key: `tool-${t.key}`,
-      label: t.label,
-      path: t.path,
-      icon: t.icon,
-      group: 'tools' as const,
-      accent: 'system' as const,
-      enabled: true,
-      hint: t.navHint,
-    }))
+function toolModule(t: ToolDefinition & { path: string }, parent: string): ModuleDefinition {
+  return {
+    key: `tool-${t.key}`,
+    label: t.label,
+    path: t.path,
+    icon: t.icon,
+    group: 'modules',
+    accent: 'system',
+    enabled: true,
+    hint: t.navHint,
+    parent,
+  }
+}
+
+/** 메뉴 줄로 쓰는 기능(도구가 아닌 화면) — 분야는 카탈로그가 정한다 */
+const FEATURE_NAV: Omit<ModuleDefinition, 'group' | 'parent'>[] = [
+  { key: 'diagnosis', label: '기업 진단', path: '/diagnosis', icon: ClipboardList, accent: 'ai', enabled: true, hint: '진단 스튜디오' },
+  { key: 'selection', label: '만들 업무', path: '/selection', icon: Filter, accent: 'ai', enabled: true, hint: '과제 선별' },
+  { key: 'mvp-design', label: 'AX 설계', path: '/mvp-design', icon: PencilRuler, accent: 'ai', enabled: true, hint: 'MVP 설계' },
+  { key: 'validation', label: '검증', path: '/validation', icon: FlaskConical, accent: 'ai', enabled: true, hint: '현장 검증', advanced: true },
+  { key: 'deliverables', label: '결과자료', path: '/deliverables', icon: FileCheck2, accent: 'ai', enabled: true },
+  { key: 'cases', label: '사례', path: '/cases', icon: Library, accent: 'ai', enabled: true, advanced: true },
+  { key: 'clients', label: '고객사·프로젝트', path: '/clients', icon: Building2, accent: 'ai', enabled: true, hint: 'AX 프로젝트 단위 관리' },
+  { key: 'website-studio', label: '홈페이지 설계', path: '/website-studio', icon: Palette, accent: 'ai', enabled: true },
+  // D-104: 예전 '컨설팅 작업실'(임시 이름 특허+벤처)
+  { key: 'consulting-studio', label: '특허+벤처', path: '/studio', icon: Workflow, accent: 'ai', enabled: true, hint: '특허 · 벤처인증 · MVP 단계 관리 (예전 이름: 컨설팅 작업실)' },
+  { key: 'funding', label: '자금·지원사업', path: '/funding', icon: Landmark, accent: 'revenue', enabled: true },
+  { key: 'institutions', label: '기관 전략', path: '/funding/catalog', icon: Landmark, accent: 'ai', enabled: true, hint: '기관·프로그램 목록', advanced: true },
+]
+
+function moduleRows(): ModuleDefinition[] {
+  const tools = liveTools().filter((t): t is ToolDefinition & { path: string } => t.path !== null)
+  const rows: ModuleDefinition[] = []
+  for (const m of visibleModules()) {
+    const parent = `cat-${m.key}`
+    const children: ModuleDefinition[] = []
+    for (const f of FEATURE_CATALOG.filter((x) => x.module === m.key)) {
+      if (f.source === 'tool') {
+        const t = tools.find((x) => x.key === f.key)
+        if (t) children.push(toolModule(t, parent))
+      } else {
+        const n = FEATURE_NAV.find((x) => x.key === f.key)
+        if (n) children.push({ ...n, group: 'modules', parent })
+      }
+    }
+    if (children.length === 0) continue
+    rows.push({ key: parent, label: m.name, path: m.route, icon: m.icon, group: 'modules', accent: 'system', enabled: true, kind: 'category', moduleKey: m.key, hint: m.covers.join(' · ') }, ...children)
+  }
+  return rows
 }
 
 /** D-118: 이 메뉴로 옮겨 온 옛 도구 주소 — 그 주소에 있어도 이 메뉴에 불이 켜진다 */
@@ -154,31 +197,18 @@ export const MODULES: ModuleDefinition[] = [
   { key: 'first-meeting', label: '1차 미팅 체크리스트', path: '/sales/first-meeting', icon: ClipboardCheck, group: 'sales', accent: 'revenue', enabled: true, status: 'soon', badge: 'first-meetings', hint: '영업자용 AX 1차 미팅 체크리스트 — 만드는 중' },
 
 
-  { key: 'diagnosis', label: '기업 진단', path: '/diagnosis', icon: ClipboardList, group: 'studio', accent: 'ai', enabled: true, hint: '진단 스튜디오' },
-  { key: 'selection', label: '만들 업무', path: '/selection', icon: Filter, group: 'studio', accent: 'ai', enabled: true, hint: '과제 선별' },
-  { key: 'mvp-design', label: 'AX 설계', path: '/mvp-design', icon: PencilRuler, group: 'studio', accent: 'ai', enabled: true, hint: 'MVP 설계' },
-  { key: 'website-studio', label: '홈페이지 설계', path: '/website-studio', icon: Palette, group: 'studio', accent: 'ai', enabled: true },
-  { key: 'validation', label: '검증', path: '/validation', icon: FlaskConical, group: 'studio', accent: 'ai', enabled: true, hint: '현장 검증', advanced: true },
-  { key: 'deliverables', label: '결과자료', path: '/deliverables', icon: FileCheck2, group: 'studio', accent: 'ai', enabled: true },
-  { key: 'institutions', label: '기관 전략', path: '/funding/catalog', icon: Landmark, group: 'studio', accent: 'ai', enabled: true, hint: '기관·프로그램 목록', advanced: true },
-  { key: 'cases', label: '사례', path: '/cases', icon: Library, group: 'studio', accent: 'ai', enabled: true, advanced: true },
-  { key: 'clients', label: '고객사·프로젝트', path: '/clients', icon: Building2, group: 'studio', accent: 'ai', enabled: true, hint: 'AX 프로젝트 단위 관리' },
-
   // 이 시스템이 왜 있는지 · 성과를 어떻게 재는지 · 다음에 무엇을 만들지 — 규격이 요구하는 '찾을 수 있는 이야기'
   { key: 'guide', label: '처음 사용 가이드', path: '/getting-started', icon: LifeBuoy, group: 'about', accent: 'system', enabled: true, hint: '처음 쓰는 순서 · 화면별 안내' },
   { key: 'why', label: '기획의도', path: '/why', icon: BookOpenText, group: 'about', accent: 'system', enabled: true, hint: '이 시스템을 왜 만들었는가' },
   { key: 'kpi', label: '성과 지표', path: '/kpi', icon: Gauge, group: 'about', accent: 'system', enabled: true, hint: '돈·시간·규모·사용 지표' },
   { key: 'roadmap', label: '향후 확장', path: '/roadmap', icon: Compass, group: 'about', accent: 'system', enabled: true, status: 'next', expand: 'future-items', hint: '아직 없는 기능과 계획 — 눌러서 펼치기' },
 
-  ...toolModules(),
-  // D-104: 예전 '컨설팅 작업실'(임시 이름 특허+벤처) · 자금·지원사업도 이 묶음(구 도구함)으로
-  { key: 'consulting-studio', label: '특허+벤처', path: '/studio', icon: Workflow, group: 'tools', accent: 'ai', enabled: true, hint: '특허 · 벤처인증 · MVP 단계 관리 (예전 이름: 컨설팅 작업실)' },
-  { key: 'funding', label: '자금·지원사업', path: '/funding', icon: Landmark, group: 'tools', accent: 'revenue', enabled: true },
+  ...moduleRows(),
   // 도입 검토중 — 검토중인 도구가 하나라도 있을 때만 한 줄 (D-88)
   ...(reviewTools().length > 0
-    ? [{ key: 'tools-review', label: '도입 검토중', path: REVIEW_HUB_PATH, icon: FlaskRound, group: 'tools' as const, accent: 'system' as const, enabled: true, hint: '쓸 수는 있지만 아직 정식으로 들이지 않은 것', alsoPaths: reviewTools().flatMap((t) => (t.path ? [t.path] : [])) }]
+    ? [{ key: 'tools-review', label: '도입 검토중', path: REVIEW_HUB_PATH, icon: FlaskRound, group: 'modules' as const, accent: 'system' as const, enabled: true, hint: '쓸 수는 있지만 아직 정식으로 들이지 않은 것', alsoPaths: reviewTools().flatMap((t) => (t.path ? [t.path] : [])) }]
     : []),
-  { key: 'tools', label: '작업실 전체', path: '/tools', icon: LayoutGrid, group: 'tools', accent: 'system', enabled: true, hint: '앞으로 붙을 것까지 한눈에', exact: true },
+  { key: 'tools', label: '모듈 전체', path: '/tools', icon: LayoutGrid, group: 'modules', accent: 'system', enabled: true, hint: '전문 모듈 여섯과 그 안의 기능 · 요금제', alsoPaths: ['/modules'], exact: true },
   { key: 'settings', label: '설정', path: '/settings', icon: Settings, group: 'settings', accent: 'system', enabled: true },
 ]
 
@@ -235,7 +265,11 @@ export function screenTitleForPath(pathname: string): string | null {
  */
 export function screenGroupForPath(pathname: string): ModuleGroup | null {
   const review = reviewTools().find((t) => t.path && underPath(pathname, t.path))
-  const groupKey = review ? 'tools' : moduleForPath(pathname)?.group
+  const m = review ? null : moduleForPath(pathname)
+  // D-127: 전문 모듈 안의 화면은 분야 이름으로(절세·재무 › 세금 계산기) — '전문 모듈' 보다 어디인지 잘 보인다
+  const parent = m?.parent ? MODULES.find((x) => x.key === m.parent) : undefined
+  if (parent) return { key: 'modules', title: parent.label, accent: parent.accent }
+  const groupKey = review ? 'modules' : m?.group
   const group = MODULE_GROUPS.find((g) => g.key === groupKey) ?? null
   if (!group) return null
   if (group.title === screenTitleForPath(pathname)) return null

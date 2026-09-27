@@ -235,14 +235,14 @@ export default function SetupDocumentsPage() {
             type="button"
             onClick={addTarget}
             disabled={!pickId}
-            className="whitespace-nowrap rounded-lg bg-navy-700 px-5 py-2.5 text-base font-bold text-white hover:bg-navy-800 disabled:opacity-40"
+            className="max-w-full break-keep rounded-lg bg-navy-700 px-5 py-2.5 text-base font-bold text-white hover:bg-navy-800 disabled:opacity-40" /* [D-127] nowrap 이면 휴대폰 큰 글자에서 옆으로 넘쳤다 */
           >
             설립서류 관리 대상 추가
           </button>
           <button
             type="button"
             onClick={() => setTempOpen(true)}
-            className="whitespace-nowrap rounded-lg border border-navy-300 bg-navy-50 px-5 py-2.5 text-base font-bold text-navy-700 hover:bg-navy-100"
+            className="max-w-full break-keep rounded-lg border border-navy-300 bg-navy-50 px-5 py-2.5 text-base font-bold text-navy-700 hover:bg-navy-100"
           >
             + 임시 체크 시작 (등록 전)
           </button>
