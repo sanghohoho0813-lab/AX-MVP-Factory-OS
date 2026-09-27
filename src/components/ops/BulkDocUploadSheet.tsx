@@ -20,6 +20,11 @@ import { allDocumentMetas } from '../../services/clientOpsDocuments'
 import { canUploadFiles, saveClient, storeDocumentFile, withCustomDocument, withDocument } from '../../services/clientOpsService'
 import { formatFileSize } from '../../lib/format'
 import { particle } from '../../lib/josa'
+import { parseKoreanBusinessDocument } from '../../services/koreanDocParser'
+import { withFactCandidates } from '../../services/customerFacts'
+import { generateId } from '../../storage/localStore'
+import { nowIso } from '../../lib/appClock'
+import type { FactSource } from '../../types/clientOps'
 
 /** '새 칸 만들기' 를 뜻하는 고르는 칸 값 */
 const NEW_CELL = '__new__'
@@ -35,6 +40,35 @@ interface Item {
   newLabel: string
   issuedAt: string
   error: string
+  /** D-128: 읽은 글자 — 사업자등록증 · 등기부등본이면 회사 정보를 찾아 '확인 필요' 로 남긴다(저장하지 않는다) */
+  text: string
+}
+
+/** 서류 칸 → 사실의 출처 (D-128). 여기 없는 서류는 회사 정보를 찾지 않는다 */
+const FACT_DOC: Record<string, FactSource> = { businessRegistration: 'businessRegistration', corporateRegistry: 'corporateRegistry' }
+
+/**
+ * D-128: 사업자등록증 · 등기부등본이면 글자에서 회사 정보를 찾아 '확인 필요' 로만 남긴다.
+ * 저절로 확정하지 않는다 — 업체 화면에서 [모두 확인] 을 눌러야 모듈이 쓴다.
+ */
+function withFoundFacts(rec: ClientOpsRecord, key: DocumentKey, text: string): ClientOpsRecord {
+  const source = FACT_DOC[key]
+  if (!source || !text.trim()) return rec
+  const p = parseKoreanBusinessDocument(text)
+  const ref = `doc:${key}:${nowIso()}`
+  const found = [
+    ['companyName', p.companyName],
+    ['businessNumber', p.businessNumber],
+    ['corporateNumber', p.corporateNumber],
+    ['representativeName', p.representativeName],
+    ['establishedAt', p.establishedAt],
+    ['businessAddress', p.address],
+    ['businessCategory', p.businessCategory],
+    ['businessItem', p.businessItem],
+  ]
+    .filter((x): x is [string, string] => typeof x[1] === 'string' && x[1].trim() !== '')
+    .map(([k, value]) => ({ key: k, value, source, asOf: '', ref }))
+  return found.length > 0 ? withFactCandidates(rec, found, nowIso(), generateId) : rec
 }
 
 export function BulkDocUploadSheet({
@@ -77,6 +111,7 @@ export function BulkDocUploadSheet({
       newLabel: '',
       issuedAt: '',
       error: '',
+      text: '',
     }))
     setItems((list) => [...list, ...fresh])
     setBusy(true)
@@ -94,6 +129,7 @@ export function BulkDocUploadSheet({
       }
       const result = classifyDocument({ text, fileName: it.file.name }, metas)
       patch(it.id, {
+        text,
         status: 'ready',
         progress: null,
         result,
@@ -139,6 +175,7 @@ export function BulkDocUploadSheet({
           rec = withDocument(rec, key, { received: true, fileName: it.file.name, fileSize: it.file.size })
         }
         if (it.issuedAt) rec = withDocument(rec, key, { received: true, issuedAt: it.issuedAt })
+        rec = withFoundFacts(rec, key, it.text)
         patch(it.id, { status: 'done' })
         doneIds.push(it.id)
         okCount += 1
@@ -155,7 +192,9 @@ export function BulkDocUploadSheet({
     try {
       const saved = await saveClient(rec)
       onSaved(saved)
-      showToast(uploadable ? `서류 ${okCount}건을 올렸습니다.` : `서류 ${okCount}건을 기록했습니다. 파일 자체는 클라우드 연결 후 보관됩니다.`)
+      const found = saved.factInbox.length - record.factInbox.length
+      const tail = found > 0 ? ` 자료에서 회사 정보 ${found}건을 찾았습니다 — 개요에서 확인해 주세요.` : ''
+      showToast((uploadable ? `서류 ${okCount}건을 올렸습니다.` : `서류 ${okCount}건을 기록했습니다. 파일 자체는 클라우드 연결 후 보관됩니다.`) + tail)
     } catch (cause) {
       // D-122: 파일은 올라갔는데 업체 기록 저장이 실패했다 — 초록 체크로 두면 다시 올릴 수 없으니 '다시 올리기' 로 되돌린다
       for (const id of doneIds) patch(id, { status: 'ready', error: '업체 기록에 저장하지 못했습니다 — 다시 올려 주세요' })

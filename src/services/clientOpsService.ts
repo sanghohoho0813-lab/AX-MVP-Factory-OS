@@ -37,6 +37,9 @@ import type {
   ContractInfo,
   CustomDocument,
   CustomProfileField,
+  FactCandidate,
+  FactMeta,
+  FactSource,
   FundingApplication,
   FundingStatus,
   ClientOpsStatus,
@@ -178,6 +181,51 @@ function normalizeContract(raw: unknown): ContractInfo {
  * 이 기능이 없던 시절의 기록에는 아예 없으므로 빈 배열이 된다(기존 데이터 영향 0).
  * 묶음 이름이 이상하면 '회사' 로 보낸다 — 칸을 잃어버리느니 자리를 옮긴다.
  */
+const FACT_SOURCES: FactSource[] = ['manual', 'businessRegistration', 'corporateRegistry', 'cretop', 'financialStatements', 'payrollRoster', 'meeting']
+const isFactSource = (v: unknown): v is FactSource => typeof v === 'string' && (FACT_SOURCES as string[]).includes(v)
+const str = (v: unknown) => (typeof v === 'string' ? v : '')
+
+/** D-128: 사실 출처 · 상태 — 이 기능이 없던 기록에는 없으므로 빈 것이 된다(기존 데이터 영향 0) */
+function normalizeFactMeta(raw: unknown): Record<string, FactMeta> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  const out: Record<string, FactMeta> = {}
+  for (const [k, v] of Object.entries(raw as Record<string, Record<string, unknown>>)) {
+    if (!v || typeof v !== 'object') continue
+    const status = v.status === 'confirmed' || v.status === 'estimated' ? v.status : 'entered'
+    out[k] = {
+      source: isFactSource(v.source) ? v.source : 'manual',
+      status,
+      asOf: str(v.asOf),
+      confirmedAt: str(v.confirmedAt),
+      updatedAt: str(v.updatedAt),
+      ...(Array.isArray(v.dismissed) ? { dismissed: v.dismissed.filter((x): x is string => typeof x === 'string') } : {}),
+    }
+  }
+  return out
+}
+
+function normalizeFactValues(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  const out: Record<string, string> = {}
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) if (typeof v === 'string' && v.trim() !== '') out[k] = v
+  return out
+}
+
+function normalizeFactInbox(raw: unknown): FactCandidate[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .filter((c) => c && typeof c === 'object' && typeof c.key === 'string' && typeof c.value === 'string' && c.value.trim() !== '')
+    .map((c) => ({
+      id: str(c.id) || generateId(),
+      key: c.key as string,
+      value: c.value as string,
+      source: isFactSource(c.source) ? c.source : 'manual',
+      asOf: str(c.asOf),
+      ref: str(c.ref),
+      foundAt: str(c.foundAt),
+    }))
+}
+
 function normalizeCustomFields(raw: unknown): CustomProfileField[] {
   if (!Array.isArray(raw)) return []
   return raw
@@ -320,6 +368,9 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
     documents,
     contract: normalizeContract(value.contract),
     customFields: normalizeCustomFields(value.customFields),
+    factMeta: normalizeFactMeta(value.factMeta),
+    factValues: normalizeFactValues(value.factValues),
+    factInbox: normalizeFactInbox(value.factInbox),
     customDocuments,
     fees: upgradeFees(value),
     notes_list: Array.isArray(value.notes_list)

@@ -60,6 +60,26 @@ function employeesBand(n: number | null): DiagnosisInput['employees'] | null {
   return '10명 이상'
 }
 
+/** 원 → 매출 규모 칸 (D-128) */
+function revenueBand(won: number): DiagnosisInput['revenue'] {
+  const eok = won / 1e8
+  if (eok < 1) return '1억 미만'
+  if (eok < 5) return '1~5억'
+  if (eok < 10) return '5~10억'
+  if (eok < 30) return '10~30억'
+  return '30억 이상'
+}
+
+function lastYearRevenueBand(won: number): NonNullable<DiagnosisInput['lastYearRevenue']> {
+  const eok = won / 1e8
+  if (eok < 1) return '1억 미만'
+  if (eok < 3) return '1~3억'
+  if (eok < 5) return '3~5억'
+  if (eok < 10) return '5~10억'
+  if (eok < 30) return '10~30억'
+  return '30억 이상'
+}
+
 function ceoAgeBand(age: number | null): NonNullable<DiagnosisInput['ceoAge']> | null {
   if (age === null) return null
   if (age <= 39) return '만 39세 이하'
@@ -146,6 +166,24 @@ function DiagnosisScreen() {
     if (next.employees === DEFAULT_INPUT.employees && emp) {
       next.employees = emp
       filled.push('직원 수')
+    }
+    // D-128: 매출 · 순이익은 사실 창고에서 — 확인됨 · 적어 둔 값만(예상값은 넣지 않는다)
+    const rev = facts.revenue && !facts.revenue.estimated ? facts.revenue.won : null
+    if (rev !== null) {
+      const band = revenueBand(rev)
+      if (next.revenue === DEFAULT_INPUT.revenue && band !== next.revenue) {
+        next.revenue = band
+        filled.push('매출 규모')
+      }
+      if ((next.lastYearRevenue ?? '미확인') === '미확인') {
+        next.lastYearRevenue = lastYearRevenueBand(rev)
+        filled.push(`작년 매출${facts.revenue?.asOf ? `(${facts.revenue.asOf})` : ''}`)
+      }
+    }
+    const ni = facts.netIncome && !facts.netIncome.estimated ? facts.netIncome.won : null
+    if (ni !== null && (next.netProfit ?? '미확인') === '미확인') {
+      next.netProfit = ni > 0 ? '흑자' : ni < 0 ? '적자' : '손익분기'
+      filled.push('순이익')
     }
     const age = ceoAgeBand(facts.representativeAge)
     if ((next.ceoAge ?? '미확인') === '미확인' && age) {

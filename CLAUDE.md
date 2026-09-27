@@ -18,7 +18,7 @@ MIRAE AI LAB OS × Customer Platform.
 
 ```bash
 npx tsc --noEmit -p tsconfig.app.json && npx oxlint src && npm run build
-npm run test:all                                   # 단위·계약 14묶음
+npm run test:all                                   # 단위·계약 전부(카탈로그 · 사실 창고 포함)
 npx vite preview --port 4390 &                     # 아래 E2E 용
 npm run qa:simple -- http://localhost:4390         # 간단 모드
 npm run qa:studio -- http://localhost:4390         # 컨설팅 작업실(고급)
@@ -33,6 +33,7 @@ npm run qa:flow -- http://localhost:4390           # 흐름 잇기(계약 완료
 npm run qa:real -- http://localhost:4390           # 실제 데이터처럼(긴 이름 · 많은 항목 · 360~430 · 큰 글자에서 잘림 · 넘침 0)
 npm run qa:squeeze -- http://localhost:4390 --all  # 짜부라진 글자 0
 npm run qa:modules -- http://localhost:4390       # 모듈 전 화면 오류·넘침 0 · 오류 울타리 · 인쇄 · 저장 공간 가득 참
+npm run qa:facts -- http://localhost:4390         # 고객 사실 창고(자료에서 찾은 정보 확인 → 모듈이 다시 씀)
 ```
 
 화면을 손댔으면 **실제로 찍어서 눈으로 본다**(`npm run qa:shots -- <url> <dir> --wide`).

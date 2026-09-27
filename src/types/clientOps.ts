@@ -582,6 +582,54 @@ export function emptySales(stage: SalesStage = 'lead', at: string = new Date().t
   return { stage, source: '', referrer: '', interests: [], concern: '', expectedFee: null, history: [{ at, from: null, to: stage }], movedAt: at }
 }
 
+/* ------------------------------------------------------------------ */
+/* 사실 창고 (D-128) — 고객 정보는 하나, 모듈은 그것을 다시 쓴다          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 사실 하나의 상태.
+ *  - confirmed  자료로 확인했거나 대표가 '맞음' 을 눌렀다
+ *  - entered    대표가 적었다(자료로 확인하지는 않았다) — 쓰지만 제출 전에는 확인
+ *  - estimated  예상값(상담 메모 등) — 참고로만
+ * 자료에서 읽기만 하고 아직 확인하지 않은 값은 여기 오지 않는다 — `factInbox`(확인 필요)에 있다.
+ */
+export type FactStatus = 'confirmed' | 'entered' | 'estimated'
+
+/** 어디서 왔나 */
+export type FactSource =
+  | 'manual' // 직접 적음
+  | 'businessRegistration' // 사업자등록증
+  | 'corporateRegistry' // 법인등기부등본
+  | 'cretop' // 크레탑 기업종합보고서
+  | 'financialStatements' // 재무제표
+  | 'payrollRoster' // 4대보험 가입자 명부
+  | 'meeting' // 상담 · 미팅 메모
+
+export interface FactMeta {
+  source: FactSource
+  status: FactStatus
+  /** 기준 시점 — 재무는 연도('2025'), 서류는 발급일. 없으면 '' */
+  asOf: string
+  /** 확인한 때 (확인 전이면 '') */
+  confirmedAt: string
+  updatedAt: string
+  /** 다시 묻지 않을 자료 후보(틀렸다고 뺀 것) — 'cretop:<결과 id>' 같은 이름 */
+  dismissed?: string[]
+}
+
+/** 자료에서 읽었지만 아직 확인하지 않은 값 — 확인하기 전에는 어떤 모듈도 쓰지 않는다 */
+export interface FactCandidate {
+  id: string
+  /** 사실 이름 (services/clientFacts.ts 의 FACT_DEFS) */
+  key: string
+  value: string
+  source: FactSource
+  asOf: string
+  /** 어느 자료에서 — 같은 자료를 다시 묻지 않게 */
+  ref: string
+  foundAt: string
+}
+
 export interface ClientOpsRecord {
   id: string
   workspaceId: string | null
@@ -653,6 +701,12 @@ export interface ClientOpsRecord {
   sales: SalesInfo | null
   /** 자동 활동 기록 — 최신순. 오래된 것은 잘라낸다. */
   activity: ActivityEntry[]
+  /** D-128: 사실마다 출처 · 상태 (payload 에 함께 저장된다 — DB 변경 없음) */
+  factMeta: Record<string, FactMeta>
+  /** D-128: 업체 칸이 따로 없는 사실의 값(매출 · 영업이익 · 인증 …) — 이 업체의 유일한 자리 */
+  factValues: Record<string, string>
+  /** D-128: 자료에서 읽었지만 아직 확인하지 않은 값 */
+  factInbox: FactCandidate[]
   /** 보관 처리 시각 (보관하면 목록·경고에서 빠진다) */
   archivedAt: string | null
   createdAt: string

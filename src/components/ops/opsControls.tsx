@@ -188,7 +188,7 @@ export function PhoneLink({ phone }: { phone: string }) {
   return (
     <a
       href={`tel:${phone.replace(/[^0-9+]/g, '')}`}
-      className="inline-flex items-center gap-1 font-medium text-brand-700 hover:underline"
+      className="tap inline-flex items-center gap-1 font-medium text-brand-700 hover:underline"
     >
       <Phone aria-hidden="true" className="size-3.5" />
       {phone}

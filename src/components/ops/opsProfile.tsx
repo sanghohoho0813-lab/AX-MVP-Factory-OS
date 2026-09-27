@@ -42,6 +42,7 @@ export function CompanyProfileCard({
   onEdit,
   onCustomField,
   onRemoveCustomField,
+  factNote,
   /** 접이식 구역 안에 들어갈 때 — 카드 안 카드가 되지 않도록 테두리·제목을 뺀다 */
   bare = false,
 }: {
@@ -54,6 +55,8 @@ export function CompanyProfileCard({
   onCustomField?: (field: { id?: string; group: ProfileGroup; label: string; value: string }) => void
   /** 직접 만든 칸을 지웠을 때 */
   onRemoveCustomField?: (id: string) => void
+  /** D-128: 칸의 출처 · 확인 상태 한 줄 (자료로 확인한 값 · 예상값만 — 평범하게 적은 값은 조용히) */
+  factNote?: (key: string) => { text: string; confirmed: boolean } | null
   bare?: boolean
 }) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
@@ -390,6 +393,15 @@ export function CompanyProfileCard({
                       )}
                     </span>
                   )}
+                  {editingKey !== f.key && !f.empty && f.edit && (() => {
+                    const note = factNote?.(f.edit)
+                    return note ? (
+                      <span data-fact-note={f.edit} className={`t-meta mt-0.5 flex items-center gap-1 sm:justify-end ${note.confirmed ? 'text-success-700' : 'text-slate-500'}`}>
+                        {note.confirmed && <Check aria-hidden="true" className="size-3.5 shrink-0" />}
+                        {note.text}
+                      </span>
+                    ) : null
+                  })()}
                 </dd>
               </div>
             ))}

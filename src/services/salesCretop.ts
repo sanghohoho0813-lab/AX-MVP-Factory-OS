@@ -12,6 +12,7 @@
  * 규칙 계산이다 — 외부 호출 없음.
  */
 
+import { factDef, withFactValue } from './customerFacts'
 import type { ClientOpsRecord, SalesInfo, ToolResult } from '../types/clientOps'
 import { emptySales } from '../types/clientOps'
 import { withActivity } from './clientOpsActivity'
@@ -264,11 +265,13 @@ export function applyCretopToClient(record: ClientOpsRecord, d: CretopDigest, op
   const c = d.company
   const filled: string[] = []
   const next: ClientOpsRecord = { ...record }
+  const filledKeys: string[] = []
   const fill = <K extends keyof ClientOpsRecord>(key: K, value: ClientOpsRecord[K], label: string) => {
     if (typeof value === 'string' && value.trim() === '') return
     if (typeof next[key] === 'string' && (next[key] as string).trim() !== '') return
     next[key] = value
     filled.push(label)
+    filledKeys.push(key as string)
   }
   fill('businessNumber', c.bizNo, '사업자번호')
   fill('corporateNumber', c.corpRegNo, '법인번호')
@@ -294,6 +297,10 @@ export function applyCretopToClient(record: ClientOpsRecord, d: CretopDigest, op
   next.sales = sales
 
   let out = next
+  // D-128: 크레탑에서 채운 칸은 출처(크레탑 보고서)를 남긴다 — 등록 화면에서 본 값이라 '적어 둠', 신청 전에는 한 번 더 확인
+  for (const key of filledKeys) {
+    if (factDef(key)?.field) out = withFactValue(out, key, String(out[key as keyof ClientOpsRecord] ?? ''), { source: 'cretop', status: 'entered', now: at })
+  }
   if (!record.sales) out = withActivity(out, 'sales', `잠재고객 등록 · 크레탑${sales.source ? ` · ${sales.source}` : ''}`, null, at)
   if (filled.length > 0) out = withActivity(out, 'sales', `크레탑으로 기본 정보 채움 · ${filled.join(' · ')}`, null, at)
   return { record: out, filled }

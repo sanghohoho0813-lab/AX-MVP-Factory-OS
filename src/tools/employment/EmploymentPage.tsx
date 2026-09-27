@@ -24,6 +24,7 @@ import { usePrefillFromClient } from '../shared/usePrefill'
 import { useToolClient } from '../shared/toolClientContext'
 import { fetchClientDocFile, hasDocFile } from '../shared/clientDocFile'
 import { PrefillNote } from '../shared/PrefillNote'
+import { FactSendButton } from '../shared/FactSendButton'
 import { DEFAULT_PROGRAMS, PROGRAM_LIST } from './lib/programs'
 import { fD, fDFull } from './lib/dates'
 import { fMan, fProgramAmt } from './lib/format'
@@ -676,6 +677,8 @@ function RosterTab() {
                     employees: analysis.rows.map((r) => ({ name: r.emp.name, age: r.diag.age, candidates: r.diag.candidates.map((c) => `${c.key}:${c.level}`) })),
                   }}
                 />
+                {/* D-128: 명부에서 센 재직 인원을 업체 정보로 — 정책자금 · 연구소 등이 다시 묻지 않게 */}
+                <FactSendButton factKey="employeeCount" value={String(analysis.counts.activeCount)} display={`${analysis.counts.activeCount}명`} source="payrollRoster" asOf={meta?.issueDate ?? ''} />
               </div>
             </Surface>
 

@@ -28,6 +28,8 @@ const FIELD_ORDER: FieldKey[] = [
 
 export interface DocImportResult {
   picked: Partial<Record<FieldKey, string>>
+  /** D-128: 어느 서류에서 읽었나 — 사실의 출처로 남긴다 */
+  source: ParsedCompanyInfo['source']
 }
 
 /**
@@ -96,7 +98,7 @@ export function DocImportModal({
     if (!parsed) return
     const picked: Partial<Record<FieldKey, string>> = {}
     for (const k of found) if (checked[k]) picked[k] = String(parsed[k])
-    onApply({ picked })
+    onApply({ picked, source: parsed?.source ?? 'unknown' })
   }
 
   return (
@@ -218,7 +220,7 @@ export function DocImportModal({
           {parsed && (
             <div className="mt-4">
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-[1.08rem] font-bold text-slate-900">읽은 내용</h3>
+                <h3 className="text-[1.08rem] font-bold break-keep text-slate-900">자료에서 다음 정보를 찾았습니다</h3>
                 <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[0.875rem] text-slate-600">
                   {DOC_SOURCE_LABEL[parsed.source]}
                 </span>
@@ -236,7 +238,7 @@ export function DocImportModal({
               ) : (
                 <>
                   <p className="mt-1 text-[0.88rem] text-slate-500">
-                    적용할 항목만 체크하세요. 체크한 값만 덮어씁니다.
+                    맞으면 그대로 두고, 틀린 것만 체크를 빼세요. 확인한 값은 '확인됨' 으로 남고 모든 전문 모듈이 씁니다.
                   </p>
                   <ul className="mt-2 flex flex-col gap-1.5">
                     {found.map((k) => {
@@ -274,7 +276,7 @@ export function DocImportModal({
 
         <div className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-100 px-5 py-3.5">
           <span className="text-[0.88rem] text-slate-500">
-            {parsed ? `${pickedCount}개 항목 적용 예정` : '읽은 내용은 확인 후 적용됩니다'}
+            {parsed ? `${pickedCount}개 확인 예정` : '읽은 내용은 확인한 뒤에만 넣습니다'}
           </span>
           <div className="flex gap-2">
             <Button variant="secondary" onClick={onClose}>
@@ -282,7 +284,7 @@ export function DocImportModal({
             </Button>
             <Button variant="primary" disabled={pickedCount === 0} onClick={apply}>
               <Check aria-hidden="true" className="size-4" />
-              {pickedCount}개 적용하기
+              {pickedCount === found.length ? '모두 확인' : `${pickedCount}개 확인`}
             </Button>
           </div>
         </div>

@@ -98,7 +98,7 @@ function ButtonGroup<T extends string>({
             key={opt}
             type="button"
             onClick={() => onSelect(opt)}
-            className={`rounded-lg border px-3.5 py-2 text-sm font-medium transition-colors ${
+            className={`tap rounded-lg border px-3.5 py-2 text-sm font-medium transition-colors ${
               active
                 ? "border-blue-600 bg-blue-600 text-white"
                 : "border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700"
@@ -405,7 +405,7 @@ export default function DiagnosisForm({ value, onChange, onSubmit }: Props) {
                   key={s}
                   type="button"
                   onClick={() => toggleStrength(s)}
-                  className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                  className={`tap rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
                     active
                       ? "border-blue-600 bg-blue-50 text-blue-700"
                       : "border-slate-200 bg-white text-slate-600 hover:border-blue-300"
@@ -427,7 +427,7 @@ export default function DiagnosisForm({ value, onChange, onSubmit }: Props) {
                   key={b}
                   type="button"
                   onClick={() => toggleBonus(b)}
-                  className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                  className={`tap rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
                     active
                       ? "border-blue-600 bg-blue-50 text-blue-700"
                       : "border-slate-200 bg-white text-slate-600 hover:border-blue-300"

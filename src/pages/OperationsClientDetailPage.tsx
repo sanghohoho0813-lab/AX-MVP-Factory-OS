@@ -76,7 +76,7 @@ import {
   servicesNeeding,
   isServiceOpen,
 } from '../content/clientOpsCatalog'
-import { todayLocalDate } from '../lib/appClock'
+import { nowIso, todayLocalDate } from '../lib/appClock'
 import { formatFileSize, formatKrw, krwTile } from '../lib/format'
 import {
   CONTRACT_KIND_LABEL,
@@ -109,6 +109,8 @@ import {
   SavedBadge,
 } from '../components/ops/opsControls'
 import { CompanyProfileCard, NotesSection } from '../components/ops/opsProfile'
+import { FactInboxCard, FactNumbersCard } from '../components/ops/ClientFactsCards'
+import { factNoteFor, withFactValue, withProfileFieldEdit } from '../services/customerFacts'
 import { TodoComposer } from '../components/journal/TodoBoard'
 import { createJournalEntry } from '../services/journalService'
 import { FundingSection } from '../components/ops/FundingSection'
@@ -496,7 +498,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               {record.contactName && <span>{record.contactName}</span>}
               {/* 계약한 지 얼마나 됐는지 — 계약 카드까지 내려가지 않아도 머리말에서 보인다 */}
               {contractAge !== '' && (
-                <button type="button" onClick={() => setTab('overview')} className="font-medium text-brand-700">
+                <button type="button" onClick={() => setTab('overview')} className="tap inline-flex items-center font-medium text-brand-700">
                   {record.contract.kind !== '' ? `${CONTRACT_KIND_LABEL[record.contract.kind]} · ` : '계약 · '}
                   {contractAge}
                 </button>
@@ -505,7 +507,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 <button
                   type="button"
                   onClick={() => setTab('portal')}
-                  className={portalLinked ? 'text-success-700' : 'text-slate-400'}
+                  className={`tap inline-flex items-center ${portalLinked ? 'text-success-700' : 'text-slate-500'}`}
                 >
                   {brand.customerPlatformLabel} {portalLinked ? '연결됨' : '미연결'}
                 </button>
@@ -778,16 +780,23 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         몇 년도지 / 인증서 받았던가" 를 확인하려는 것이고, 그때마다 접힌 칸을 펴야
         했다. 상담 중에 한 번 더 누르게 만드는 것이 곧 카톡을 뒤지게 만드는 것이다.
       */}
+      {/* D-128: 자료에서 읽은 값은 확인을 받아야 사실이 된다 — 있을 때만 뜬다 */}
+      <FactInboxCard record={record} now={nowIso()} onCommit={async (next, msg) => { if (await commit(next)) showToast(msg) }} />
       <Surface>
         <CompanyProfileCard
           record={record}
           today={today}
           onImport={() => setImportOpen(true)}
-          onEdit={(key, value) => void commit({ ...record, [key]: value })}
+          factNote={(key) => factNoteFor(record, key)}
+          onEdit={(key, value) => void commit(withProfileFieldEdit(record, key, value, nowIso()))}
           onCustomField={(field) => void commit(withCustomField(record, field))}
           onRemoveCustomField={(id) => void commit(withoutCustomField(record, id))}
           bare
         />
+        {/* D-128: 업체 칸이 없던 사실(매출 · 영업이익 · 인증 …) — 출처와 확인 상태가 한 줄로 */}
+        <div className="mt-4 border-t border-slate-200 pt-4">
+          <FactNumbersCard record={record} now={nowIso()} onCommit={async (next, msg) => { if (await commit(next)) showToast(msg) }} />
+        </div>
       </Surface>
 
       {/*
@@ -1724,18 +1733,24 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             businessItemsExtra: record.businessItemsExtra,
           }}
           onClose={() => setImportOpen(false)}
-          onApply={({ picked }) => {
-            const next = { ...record }
-            if (picked.companyName) next.companyName = picked.companyName
-            if (picked.businessNumber) next.businessNumber = picked.businessNumber
-            if (picked.corporateNumber) next.corporateNumber = picked.corporateNumber
+          onApply={({ picked, source }) => {
+            // D-128: 서류에서 읽고 대표가 확인한 값 — 출처(사업자등록증 · 등기부등본)와 '확인됨' 을 함께 남긴다
+            const from = source === 'corporate_registry' ? 'corporateRegistry' : 'businessRegistration'
+            const now = nowIso()
+            let next = { ...record }
+            const put = (key: string, value: string | undefined) => {
+              if (value) next = withFactValue(next, key, value, { source: from, status: 'confirmed', now })
+            }
+            put('companyName', picked.companyName)
+            put('businessNumber', picked.businessNumber)
+            put('corporateNumber', picked.corporateNumber)
             // 서류에서 읽은 대표자 이름은 대표자 칸으로 — 담당자 칸을 덮어쓰지 않는다
-            if (picked.representativeName) next.representativeName = picked.representativeName
-            if (picked.representativeBirth) next.representativeBirth = picked.representativeBirth
-            if (picked.establishedAt) next.establishedAt = picked.establishedAt
-            if (picked.address) next.businessAddress = picked.address
-            if (picked.businessCategory) next.businessCategory = picked.businessCategory
-            if (picked.businessItem) next.businessItem = picked.businessItem
+            put('representativeName', picked.representativeName)
+            put('representativeBirth', picked.representativeBirth)
+            put('establishedAt', picked.establishedAt)
+            put('businessAddress', picked.address)
+            put('businessCategory', picked.businessCategory)
+            put('businessItem', picked.businessItem)
             if (picked.businessItemsExtra) next.businessItemsExtra = picked.businessItemsExtra
             const filled = Object.values(picked).filter((v) => typeof v === 'string' && v.trim() !== '').length
             void commit(withActivity(next, 'profile', `서류에서 기업 정보 ${filled}개 항목 반영`))

@@ -4,6 +4,9 @@
  * 업체 상세에서 도구를 열면(`?client=`) 이미 아는 것은 다시 묻지 않는다.
  * 대표 생년월일·설립일·업종·직원 수는 업체 기록에 있다 — 그대로 옮겨 채운다.
  *
+ * D-128: 값은 고객 사실 창고(services/customerFacts.ts)에서 읽는다 — 확인됨 · 적어 둠 · 예상값만.
+ * 자료에서 읽고 아직 확인하지 않은 후보는 도구에 넣지 않는다.
+ *
  * 규칙
  *  - **빈 칸만 채운다.** 대표가 이미 고쳐 둔 값은 건드리지 않는다.
  *  - 모르면 비워 둔다. 짐작해서 넣지 않는다 — 판정이 달라지기 때문이다.
@@ -12,6 +15,7 @@
 
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { josa } from '../../lib/josa'
+import { readFact, usableFactValue, wonOf } from '../../services/customerFacts'
 
 /** 업체가 적어 둔 업종 말 → 창업감면·정책자금이 쓰는 업종 값 */
 const INDUSTRY_WORDS: { value: string; words: string[] }[] = [
@@ -67,6 +71,14 @@ export function ageOf(birth: string, today: Date): number | null {
   return age < 0 ? null : age
 }
 
+/** 원 단위 사실 하나 — 값 · 기준 연도 · 상태 */
+export interface WonFact {
+  won: number
+  asOf: string
+  /** 예상값이면 true — 확정된 숫자처럼 쓰지 않는다 */
+  estimated: boolean
+}
+
 /** 도구가 공통으로 쓰는 '업체에서 아는 것' */
 export interface ClientFacts {
   companyName: string
@@ -83,19 +95,47 @@ export interface ClientFacts {
   employeeCount: number | null
   years: number | null
   representativeAge: number | null
+  /* D-128 — 사실 창고에서 더 읽는 것(모르면 비워 둔다) */
+  representativeName: string
+  businessNumber: string
+  corporateNumber: string
+  address: string
+  revenue: WonFact | null
+  operatingProfit: WonFact | null
+  netIncome: WonFact | null
+  totalAssets: WonFact | null
+  totalLiabilities: WonFact | null
+}
+
+function wonFact(record: ClientOpsRecord, key: string): WonFact | null {
+  const f = readFact(record, key)
+  if (!f || f.status === 'missing') return null
+  const won = wonOf(f.value)
+  return won === null ? null : { won, asOf: f.asOf, estimated: f.status === 'estimated' }
 }
 
 export function clientFacts(record: ClientOpsRecord, today: Date): ClientFacts {
+  const established = usableFactValue(record, 'establishedAt')
+  const birth = usableFactValue(record, 'representativeBirth')
   return {
-    companyName: record.companyName ?? '',
+    companyName: usableFactValue(record, 'companyName'),
     businessType: businessTypeOf(record),
-    representativeBirth: record.representativeBirth ?? '',
-    establishedAt: record.establishedAt ?? '',
+    representativeBirth: birth,
+    establishedAt: established,
     industry: industryValueOf(record.industry || record.businessItem || record.businessCategory),
     industryText: record.industry ?? '',
-    employeeCount: employeeCountOf(record.employeeCount),
-    years: yearsInBusiness(record.establishedAt, today),
-    representativeAge: ageOf(record.representativeBirth, today),
+    employeeCount: employeeCountOf(usableFactValue(record, 'employeeCount')),
+    years: yearsInBusiness(established, today),
+    representativeAge: ageOf(birth, today),
+    representativeName: usableFactValue(record, 'representativeName'),
+    businessNumber: usableFactValue(record, 'businessNumber'),
+    corporateNumber: usableFactValue(record, 'corporateNumber'),
+    address: usableFactValue(record, 'businessAddress'),
+    revenue: wonFact(record, 'revenue'),
+    operatingProfit: wonFact(record, 'operatingProfit'),
+    netIncome: wonFact(record, 'netIncome'),
+    totalAssets: wonFact(record, 'totalAssets'),
+    totalLiabilities: wonFact(record, 'totalLiabilities'),
   }
 }
 

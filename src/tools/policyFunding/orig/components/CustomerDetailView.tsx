@@ -422,7 +422,7 @@ function CustomerEditor({
                 key={r}
                 type="button"
                 onClick={() => chooseReaction(r)}
-                className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                className={`tap rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
                   active
                     ? "border-blue-600 bg-blue-600 text-white"
                     : "border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700"
