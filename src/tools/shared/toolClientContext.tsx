@@ -117,7 +117,7 @@ function FrameInner({ workspaceId, children }: { workspaceId: string | null; chi
             </span>
             <Link
               to={`/ops/clients/${clientId}`}
-              className="t-sub ml-auto inline-flex shrink-0 items-center gap-1 font-medium text-brand-700 hover:underline"
+              className="tap t-sub ml-auto inline-flex shrink-0 items-center gap-1 font-medium text-brand-700 hover:underline"
             >
               <ArrowLeft aria-hidden="true" className="size-4" /> 업체로<span className="max-sm:sr-only"> 돌아가기</span>
             </Link>
