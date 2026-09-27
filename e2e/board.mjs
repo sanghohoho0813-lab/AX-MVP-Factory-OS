@@ -283,6 +283,7 @@ check('업무 15개에서도 가로 스크롤 없음', of2.d <= of2.w + 1, `${of
   await page.reload({ waitUntil: 'networkidle' })
   await page.waitForTimeout(800)
   check('보기: 새로고침해도 기억한다', (await view.inputValue()) === 'unpaid')
+  check('보기: 조건이 걸려 있으면 새로고침 뒤에도 펼쳐져 보인다(D-126)', await view.isVisible())
   await view.selectOption('all')
   await page.waitForTimeout(400)
 

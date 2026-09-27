@@ -116,7 +116,7 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   // D-126: 업무 일기 탭에는 기록 칸 하나만 — 예전 메모는 보이고 고칠 수 있다(메모를 시드로 넣어 확인)
   await page.evaluate((k) => {
     const list = JSON.parse(localStorage.getItem(k) ?? '[]')
-    const r = list.find((c) => c.id === 'cli_hansol')
+    const r = list.find((c) => c.id === 'cli_daum')
     const now = new Date().toISOString()
     r.notes_list = [...(r.notes_list ?? []), { id: 'n_test_one', text: '시험 메모 하나', pinned: false, createdAt: now, updatedAt: now }]
     localStorage.setItem(k, JSON.stringify(list))

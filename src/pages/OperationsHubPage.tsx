@@ -206,7 +206,17 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     }
   })
   /** 휴대폰에서 보기 · 정렬은 '거르기' 를 눌러야 펼쳐진다 — 첫 업체 카드가 조건 줄 넉 줄 아래에 있었다 */
-  const [filtersOpen, setFiltersOpen] = useState(() => isClientFilterKey(urlFilter))
+  const [filtersOpen, setFiltersOpen] = useState(() => {
+    if (isClientFilterKey(urlFilter)) return true
+    // 기억해 둔 보기 · 정렬이 기본이 아니면 펼쳐 둔다 — 왜 목록이 짧은지 보여야 한다
+    try {
+      const f = localStorage.getItem(FILTER_KEY)
+      const so = localStorage.getItem(SORT_KEY)
+      return (isClientFilterKey(f) && f !== 'all') || (so !== null && so !== 'urgency')
+    } catch {
+      return false
+    }
+  })
   useEffect(() => {
     try {
       localStorage.setItem(FILTER_KEY, filterKey)
