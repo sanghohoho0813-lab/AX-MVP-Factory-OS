@@ -16,6 +16,8 @@
  *   8. 서류 칸 · 지원사업 삭제도 묻는다
  *   9. (2묶음) 영업 단계를 옮기면 '되돌리기' · 달력 '할 일로 넣기' 글자 · 업체 상세 탭 줄 '›' ·
  *      전략 목록 12 + 더 보기 · 정산 체크 칸 '지급' 글자
+ *  10. (D-125) 업무 일기 화면 저장 실패 → 적은 글 남음 · 업체 메모 · 회사 사정 · 제안 고르던 것은 다른 화면에 다녀와도 남음 ·
+ *      회사 사정 칸이 다른 업체로 넘어가지 않음 · 계약 완료 시트 수수료 3.3% 를 칠 수 있음
  */
 
 import { chromium } from 'playwright'
@@ -234,6 +236,69 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   await page.goto(BASE + '/ops/agents', { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)
   check(`정산: 체크 칸에 '지급' 글자 ${tag}`, (await page.locator('main label', { hasText: '지급' }).count()) >= 1)
+
+  /* 10 (D-125) */
+  await page.goto(BASE + '/journal', { waitUntil: 'networkidle' })
+  const jbox = page.getByLabel('기록 내용')
+  await jbox.fill('일기 화면 저장 실패 시험')
+  await failOn(page, JOURNAL)
+  await jbox.press('Control+Enter')
+  await page.waitForTimeout(500)
+  await failOn(page, null)
+  check(`업무 일기: 저장이 실패하면 적은 글이 남는다 ${tag}`, (await jbox.inputValue()).includes('일기 화면 저장 실패 시험'), await jbox.inputValue())
+  await jbox.press('Control+Enter')
+  await page.waitForTimeout(500)
+  check(`업무 일기: 되면 저장 · 비워진다 ${tag}`, (await jbox.inputValue()) === '' && (await journal(page)).some((j) => j.content.includes('일기 화면 저장 실패 시험')))
+
+  // 업체 메모 — 탭을 바꿨다 와도 남는다
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=journal', { waitUntil: 'networkidle' })
+  const noteBox = page.getByPlaceholder(/대표님 통화 — 중소기업확인서/)
+  await noteBox.fill('탭 바꿔도 남는 메모')
+  await page.locator('[role="tab"]').filter({ visible: true }).first().click()
+  await page.waitForTimeout(300)
+  await page.locator('[role="tab"]', { hasText: '업무 일기' }).filter({ visible: true }).first().click()
+  await page.waitForTimeout(300)
+  check(`업체 메모: 탭을 바꿨다 와도 적던 글이 남는다 ${tag}`, (await page.getByPlaceholder(/대표님 통화 — 중소기업확인서/).inputValue()) === '탭 바꿔도 남는 메모')
+
+  // 회사 사정 — 다른 업체로 넘어가지 않고, 다녀오면 그대로
+  await page.goto(BASE + '/sales/meeting?client=cli_hansol&round=1', { waitUntil: 'networkidle' })
+  await page.getByRole('button', { name: /미팅에서 알게 된 회사 사정/ }).click()
+  await page.getByLabel('상담 메모').fill('한솔 회사 사정 적던 것')
+  await page.getByLabel('미팅 준비할 고객').selectOption('cli_daum')
+  await page.waitForTimeout(400)
+  const prof = page.getByRole('button', { name: /미팅에서 알게 된 회사 사정/ })
+  if ((await page.getByLabel('상담 메모').count()) === 0) await prof.click()
+  check(`회사 사정: 다른 업체로 바꾸면 적던 글이 따라가지 않는다 ${tag}`, !(await page.getByLabel('상담 메모').inputValue()).includes('한솔'), await page.getByLabel('상담 메모').inputValue())
+  await page.getByLabel('미팅 준비할 고객').selectOption('cli_hansol')
+  await page.waitForTimeout(400)
+  if ((await page.getByLabel('상담 메모').count()) === 0) await page.getByRole('button', { name: /미팅에서 알게 된 회사 사정/ }).click()
+  check(`회사 사정: 원래 업체로 오면 적던 글이 남아 있다 ${tag}`, (await page.getByLabel('상담 메모').inputValue()) === '한솔 회사 사정 적던 것', await page.getByLabel('상담 메모').inputValue())
+
+  // 제안 — 고르던 상품은 미팅 준비 탭에 다녀와도 그대로
+  await page.goto(BASE + '/sales/proposal?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  const count0 = await page.getByTestId('proposal-count').innerText()
+  await page.getByTestId('recommended').locator('button[aria-pressed]').first().click()
+  const count1 = await page.getByTestId('proposal-count').innerText()
+  await page.getByTestId('sales-tabs').getByRole('link', { name: /미팅 준비/ }).click()
+  await page.waitForURL(/\/sales\/meeting/)
+  await page.getByTestId('sales-tabs').getByRole('link', { name: /상품/ }).click()
+  await page.waitForURL(/\/sales\/proposal/)
+  await page.waitForTimeout(400)
+  check(`제안: 고르던 상품은 다른 탭에 다녀와도 그대로 ${tag}`, count0 !== count1 && (await page.getByTestId('proposal-count').innerText()) === count1, `${count0} → ${count1} → ${await page.getByTestId('proposal-count').innerText()}`)
+
+  // 계약 완료 시트 — 수수료 소수점
+  await page.goto(BASE + '/ops/clients/cli_mirae', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  const sc = page.getByTestId('client-sales-card')
+  if (!(await sc.getByLabel('영업 단계').isVisible())) await sc.getByRole('button', { name: /영업/ }).first().click()
+  await sc.getByLabel('영업 단계').selectOption('contracted')
+  await page.getByTestId('contract-close').waitFor()
+  const rate = page.getByLabel('영업자 수수료율')
+  await rate.fill('')
+  await rate.pressSequentially('3.3')
+  check(`계약 완료 시트: 수수료 3.3% 를 칠 수 있다 ${tag}`, (await rate.inputValue()) === '3.3', await rate.inputValue())
+  await page.keyboard.press('Escape')
 
   check(`JS 오류 없음 ${tag}`, errors.length === 0, errors.join(' | '))
   await ctx.close()

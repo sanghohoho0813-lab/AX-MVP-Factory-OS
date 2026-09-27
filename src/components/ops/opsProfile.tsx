@@ -13,6 +13,7 @@ import {
 import { sortedNotes } from '../../services/clientOpsService'
 import { digitsOf, numberSegments } from '../../lib/format'
 import { Button } from '../ui/Button'
+import { useSessionDraft } from '../../lib/useSessionDraft'
 
 /** 번호 칸만 조각으로 나눈다 — 주소·회사명 같은 글자는 나누지 않는다 */
 function segmentsOf(f: ProfileField): string[] {
@@ -489,7 +490,8 @@ export function NotesSection({
   onPin: (id: string, pinned: boolean) => unknown
   onDelete: (id: string) => unknown
 }) {
-  const [draft, setDraft] = useState('')
+  // D-125: 적던 메모는 탭을 바꿔도 남는다(이 브라우저 탭 안에서만)
+  const [draft, setDraft, clearDraft] = useSessionDraft(`axmvp.draft.note.${record.id}`, '')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
   const [adding, setAdding] = useState(false)
@@ -505,7 +507,7 @@ export function NotesSection({
     // D-120: 저장이 된 뒤에 비운다 · D-122: 저장 중에 또 눌러도 한 번만
     const ok = await onAdd(t)
     setAdding(false)
-    if (ok !== false) setDraft('')
+    if (ok !== false) clearDraft()
   }
   /** D-122: 빈 글로 저장하지 않고, 저장이 된 뒤에만 닫는다 */
   const saveEdit = async (id: string) => {

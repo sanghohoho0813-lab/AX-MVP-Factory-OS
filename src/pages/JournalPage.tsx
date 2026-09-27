@@ -85,14 +85,22 @@ function JournalContent({ workspaceId, userId }: { workspaceId: string | null; u
     return byType
   }, [entries, range, today])
 
-  const mutate = async (fn: () => Promise<unknown>, done?: string) => {
+  // D-125: 성공 · 실패를 돌려준다 — 예전에는 실패해도 아무것도 돌려주지 않아 적던 글이 성공처럼 지워졌다
+  const mutate = async (fn: () => Promise<unknown>, done?: string): Promise<boolean> => {
     try {
       await fn()
-      await load()
-      if (done) showToast(done)
     } catch (cause) {
-      showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
+      showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다. 적은 글은 그대로 두었습니다.')
+      return false
     }
+    // 저장은 됐다 — 다시 읽기가 실패해도 성공으로 본다(다시 누르면 두 번 저장된다)
+    try {
+      await load()
+    } catch {
+      /* 목록은 다음에 다시 읽는다 */
+    }
+    if (done) showToast(done)
+    return true
   }
 
   return (

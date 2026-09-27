@@ -283,7 +283,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
     setRecords((list) => list.map((r) => (r.id === next.id ? next : r)))
     try {
       const saved = await saveClient(next)
-      setRecords((list) => list.map((r) => (r.id === saved.id ? saved : r)))
+      setRecords((list) => list.map((r) => (r === next ? saved : r))) // D-125: 그 사이 더 새로 고친 것이 있으면 늦게 온 응답으로 덮지 않는다
       showToast(`${record.companyName} — 계약 완료. 수금 항목 · 계약 정보를 넣었습니다. 업체 상세의 수금 탭에서 이어 갑니다.`)
       return true
     } catch (cause) {
@@ -304,7 +304,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
       setRecords((list) => list.map((r) => (r.id === next.id ? next : r)))
       try {
         const saved = await saveClient(next)
-        setRecords((list) => list.map((r) => (r.id === saved.id ? saved : r)))
+        setRecords((list) => list.map((r) => (r === next ? saved : r))) // D-125: 그 사이 더 새로 고친 것이 있으면 늦게 온 응답으로 덮지 않는다
         // D-122: 작은 고르는 칸이라 휴대폰에서 잘못 스치기 쉽다 — 옮긴 뒤 8초 동안 '되돌리기'
         const undo = async () => {
           setRecords((list) => list.map((r) => (r.id === record.id ? record : r)))

@@ -113,7 +113,8 @@ export function ClientMoneySheet({
 }: {
   record: ClientOpsRecord
   today: string
-  onSave: (next: ClientOpsRecord) => void
+  /** D-125: 저장이 됐는지 돌려주면 된 뒤에만 새 항목 칸을 비운다 */
+  onSave: (next: ClientOpsRecord) => void | Promise<boolean>
   onOpenClient: () => void
   onClose: () => void
 }) {
@@ -124,8 +125,9 @@ export function ClientMoneySheet({
   // 내 몫 기준 (D-74) — 영업자에게 나갈 돈은 여기서 빼고 센다
   const unpaid = record.fees.filter((f) => f.receivedAt === null).reduce((n, f) => n + netAmountOf(f), 0)
 
-  const add = () => {
-    onSave(withNewFee(record, { kind, label: FEE_KIND_LABEL[kind], amount: amount > 0 ? amount : null, dueDate: due }))
+  const add = async () => {
+    const ok = await onSave(withNewFee(record, { kind, label: FEE_KIND_LABEL[kind], amount: amount > 0 ? amount : null, dueDate: due }))
+    if (ok === false) return
     setAmount(0)
     setDue('')
   }
@@ -234,7 +236,7 @@ export function ClientMoneySheet({
             className="min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 px-2 py-2 text-[0.92rem]"
           />
         </div>
-        <Button variant="primary" size="sm" className="mt-2 w-full" onClick={add}>
+        <Button variant="primary" size="sm" className="mt-2 w-full" onClick={() => void add()}>
           <Plus aria-hidden="true" className="size-3.5" />
           넣기
         </Button>

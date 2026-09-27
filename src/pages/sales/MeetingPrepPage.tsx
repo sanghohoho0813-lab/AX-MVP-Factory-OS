@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { fromState } from '../../lib/navFrom'
+import { useDraftState } from '../../lib/useSessionDraft'
 import { Check, ChevronRight, FileText, NotebookPen, Presentation, ScanSearch } from 'lucide-react'
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useToast } from '../../components/ui/toastContext'
@@ -100,13 +101,14 @@ function ProfileEditor({ record, onSave }: { record: ClientOpsRecord; onSave: (n
     }),
     [s],
   )
-  const [d, setD] = useState(init)
+  // D-125: 적던 것은 이 탭에 남긴다 — 다른 화면에 다녀와도(저장 전이면) 그대로
+  const [d, setD, resetD] = useDraftState(`axmvp.draft.profile.${record.id}`, init)
   // D-120: 값으로 비교 — 다른 저장(단계 · 계약 경로 …)에 적던 칸이 지워지지 않게
   const initKey = JSON.stringify(init)
   const [seen, setSeen] = useState(initKey)
   if (seen !== initKey) {
     setSeen(initKey)
-    setD(init)
+    resetD()
   }
   const dirty = JSON.stringify(d) !== JSON.stringify(init)
   const onCount = Object.values(d.flags).filter(Boolean).length
@@ -459,7 +461,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
     setRecords((list) => list.map((r) => (r.id === next.id ? next : r)))
     try {
       const saved = await saveClient(next)
-      setRecords((list) => list.map((r) => (r.id === saved.id ? saved : r)))
+      setRecords((list) => list.map((r) => (r === next ? saved : r))) // D-125: 그 사이 더 새로 고친 것이 있으면 늦게 온 응답으로 덮지 않는다
       showToast(msg)
       return true
     } catch (cause) {
@@ -630,7 +632,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                 />}
 
               {/* D-123: 미팅에서 알게 된 것은 미팅 기록 바로 아래 — 크레탑을 보기도 전(맨 위)에는 알 수 없는 것들이었다 */}
-              {round !== 0 && !ahead && <ProfileEditor record={record} onSave={(n, m) => void persist(n, m)} />}
+              {round !== 0 && !ahead && <ProfileEditor key={record.id} record={record} onSave={(n, m) => void persist(n, m)} />}
 
               {(record.sales?.meetings?.length ?? 0) > 0 && (
                 <Disclosure title="지난 미팅 기록" hint={`${record.sales?.meetings?.length}건`}>

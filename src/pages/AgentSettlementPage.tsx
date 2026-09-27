@@ -56,7 +56,7 @@ function SettlementContent({ workspaceId }: { workspaceId: string | null }) {
     setRecords((list) => list.map((r) => (r.id === next.id ? next : r)))
     try {
       const saved = await saveClient(next)
-      setRecords((list) => list.map((r) => (r.id === saved.id ? saved : r)))
+      setRecords((list) => list.map((r) => (r === next ? saved : r))) // D-125: 그 사이 더 새로 고친 것이 있으면 늦게 온 응답으로 덮지 않는다
       showToast(paid ? '지급 완료로 표시했습니다.' : '지급 완료를 취소했습니다.')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '저장하지 못했습니다.')

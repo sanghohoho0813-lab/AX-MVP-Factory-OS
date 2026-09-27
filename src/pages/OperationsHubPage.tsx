@@ -111,6 +111,11 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [formOpen, setFormOpen] = useState(false)
+  /** D-125: 이번 등록에서 이미 만든 업체(영업 칸 저장만 실패한 경우 다시 쓰려고) */
+  const createdRef = useRef<ClientOpsRecord | null>(null)
+  useEffect(() => {
+    if (!formOpen) createdRef.current = null
+  }, [formOpen])
   useBackToClose(formOpen, () => setFormOpen(false))
   const [tab, setTab] = useState<AlertSeverity | 'all'>('all')
   // 현황표를 먼저 보고 싶다는 요청이 있어 이 목록은 기본으로 접어 둔다.
@@ -300,9 +305,9 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     },
   )
   const quickSave = useCallback(
-    async (next: ClientOpsRecord) => {
+    async (next: ClientOpsRecord): Promise<boolean> => {
       setRecords((prev) => prev.map((r) => (r.id === next.id ? next : r)))
-      await serialSave(next)
+      return serialSave(next)
     },
     [serialSave],
   )
@@ -377,8 +382,11 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     if (!form.companyName.trim()) return
     try {
       setSaving(true)
-      const created = await createClient(workspaceId, { ...form, ...(asProspect ? { status: 'waiting' as const } : {}) })
+      // D-125: 업체는 만들어졌는데 영업 칸 저장이 실패하면, 다시 눌러도 새로 만들지 않고 그 업체로 다시 한다(중복 업체 방지)
+      const created = createdRef.current ?? (await createClient(workspaceId, { ...form, ...(asProspect ? { status: 'waiting' as const } : {}) }))
+      createdRef.current = created
       const record = asProspect ? await saveClient(withNewProspect(created, '')) : created
+      createdRef.current = null
       navigate(`/ops/clients/${record.id}`)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '고객을 등록하지 못했습니다.')
@@ -856,7 +864,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
         <ClientMoneySheet
           record={quickRecord}
           today={today}
-          onSave={(next) => void quickSave(next)}
+          onSave={quickSave}
           onOpenClient={() => navigate(`/ops/clients/${quickRecord.id}?tab=fees`)}
           onClose={() => setQuick(null)}
         />

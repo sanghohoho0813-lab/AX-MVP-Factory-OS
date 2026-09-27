@@ -1387,15 +1387,18 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             variant="secondary"
             disabled={newDocLabel.trim() === ''}
             onClick={() => {
+              // D-125: 저장이 된 뒤에만 칸을 비우고 알린다(실패하면 적은 이름이 남는다)
               void commit(
                 withCustomDocument(record, {
                   label: newDocLabel,
                   validMonths: newDocMonths === '' ? null : Number(newDocMonths),
                 }),
-              )
-              setNewDocLabel('')
-              setNewDocMonths('')
-              showToast('서류 칸을 만들었습니다.')
+              ).then((ok) => {
+                if (!ok) return
+                setNewDocLabel('')
+                setNewDocMonths('')
+                showToast('서류 칸을 만들었습니다.')
+              })
             }}
           >
             <Plus aria-hidden="true" className="size-4" />

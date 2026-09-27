@@ -37,6 +37,7 @@ export function ContractCloseSheet({
   onClose: () => void
 }) {
   const [d, setD] = useState<ContractCloseDraft>(initial)
+  const [rateText, setRateText] = useState(() => (initial.agentRatePct === null ? '' : String(initial.agentRatePct)))
   const [busy, setBusy] = useState(false)
   const total = d.lines.reduce((s, l) => s + (l.amount ?? 0), 0)
   const wantsIns = d.kind === 'insurance' || d.kind === 'mixed'
@@ -148,11 +149,14 @@ export function ContractCloseSheet({
           <label className="t-sub font-medium text-slate-700">
             수수료 %
             <input
-              value={d.agentRatePct === null ? '' : String(d.agentRatePct)}
+              value={rateText}
               inputMode="decimal"
               aria-label="영업자 수수료율"
               onChange={(e) => {
-                const n = parseFloat(e.target.value.replace(/[^0-9.]/g, ''))
+                // D-125: 글자는 적은 그대로 둔다 — 숫자로 바꿔 되돌리면 '3.' 의 점이 사라져 3.3% 를 칠 수 없었다
+                const t = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1')
+                setRateText(t)
+                const n = parseFloat(t)
                 setD({ ...d, agentRatePct: Number.isFinite(n) ? Math.min(100, n) : null })
               }}
               className={`${inputCls} text-right`}

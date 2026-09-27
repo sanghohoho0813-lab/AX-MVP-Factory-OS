@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { fromState } from '../../lib/navFrom'
+import { useDraftState } from '../../lib/useSessionDraft'
 import { ChevronRight, FileSignature, PackageSearch, Search } from 'lucide-react'
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useToast } from '../../components/ui/toastContext'
@@ -171,13 +172,14 @@ function ProposalWork({
       net: saved?.monthly?.netIncome ? String(saved.monthly.netIncome) : '',
     }
   }, [saved, recommended])
-  const [d, setD] = useState(initial)
+  // D-125: 고르던 상품 · 월납 · 순이익은 이 탭에 남긴다 — 미팅 준비 탭에 다녀와도(저장 전이면) 그대로
+  const [d, setD, resetD] = useDraftState(`axmvp.draft.proposal.${record.id}`, initial)
   // 저장된 제안이 바뀌었을 때만 칸을 새로 채운다 — 계약 준비 체크처럼 다른 것을 저장해도 고르던 상품은 그대로
   const savedKey = JSON.stringify(saved ?? null)
   const [seenKey, setSeenKey] = useState(savedKey)
   if (seenKey !== savedKey) {
     setSeenKey(savedKey)
-    setD(initial)
+    resetD()
   }
   const [doc, setDoc] = useState<DocKey>('client')
   const [scopePkg, setScopePkg] = useState(0)
@@ -541,7 +543,7 @@ function ProposalContent({ workspaceId }: { workspaceId: string | null }) {
     setRecords((list) => list.map((r) => (r.id === next.id ? next : r)))
     try {
       const saved = await saveClient(next)
-      setRecords((list) => list.map((r) => (r.id === saved.id ? saved : r)))
+      setRecords((list) => list.map((r) => (r === next ? saved : r))) // D-125: 그 사이 더 새로 고친 것이 있으면 늦게 온 응답으로 덮지 않는다
       showToast(msg)
       return true
     } catch (cause) {

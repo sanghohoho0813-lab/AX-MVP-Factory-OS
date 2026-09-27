@@ -98,7 +98,11 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
   /** 저장 중에 또 누르면(할 일로 · 미루기) 두 번 들어가지 않게 — 한 번에 하나(D-122) */
   const busyRef = useRef(false)
   const mutate = async (fn: () => Promise<unknown>, done?: string): Promise<boolean> => {
-    if (busyRef.current) return false
+    if (busyRef.current) {
+      // D-125: 조용히 무시하지 않는다 — 적은 글은 칸에 그대로 있다
+      showToast('앞의 저장이 끝나는 중입니다. 잠시 뒤 다시 눌러 주세요.')
+      return false
+    }
     busyRef.current = true
     try {
       await fn()
