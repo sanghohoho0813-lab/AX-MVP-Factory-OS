@@ -394,7 +394,7 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
                 </Button>
               </div>
             </div>
-            <p className="t-meta break-keep text-slate-400">크레탑 원문 기준 규칙 계산입니다(외부 호출 없음). 숫자는 실제 상담 전 원문으로 한 번 더 확인하세요.</p>
+            <p className="t-meta break-keep text-slate-400">크레탑 원문에서 읽은 숫자입니다. 상담 전에 원문으로 한 번 더 확인하세요.</p>
           </>
         )
       )}

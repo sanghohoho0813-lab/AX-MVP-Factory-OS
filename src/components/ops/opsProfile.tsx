@@ -68,6 +68,8 @@ export function CompanyProfileCard({
   /** 지우기를 한 번 더 확인받는 칸 */
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null)
   const fields = profileFields(record, today)
+  /** D-125: 휴대폰에서는 첫 묶음(회사)만 — 나머지는 누르면. 업체 개요가 휴대폰에서 4,800px 넘게 길었다 */
+  const [showAllGroups, setShowAllGroups] = useState(false)
   const allGroups = profileFieldsByGroup(record, today)
   const filled = fields.filter((f) => !f.empty).length
   const emptyCount = fields.length - filled
@@ -178,8 +180,8 @@ export function CompanyProfileCard({
         번호는 <strong className="font-semibold">조각마다 따로</strong> 복사됩니다 — 칸이 나뉜 신청서에 하나씩 붙이세요.
       </p>
 
-      {groups.map((g) => (
-        <div key={g.group} className="mt-4 first:mt-3">
+      {groups.map((g, gi) => (
+        <div key={g.group} className={`mt-4 first:mt-3 ${gi > 0 && !showAllGroups ? 'hidden sm:block' : ''}`}>
           <p className="t-meta font-semibold tracking-wide text-slate-500 uppercase">{g.label}</p>
           <dl className="mt-1 grid gap-x-6 gap-y-0 sm:grid-cols-2 xl:grid-cols-3">
             {g.fields.map((f) => (
@@ -456,6 +458,18 @@ export function CompanyProfileCard({
           )}
         </div>
       ))}
+
+      {groups.length > 1 && !showAllGroups && (
+        <button
+          type="button"
+          data-testid="profile-more"
+          onClick={() => setShowAllGroups(true)}
+          className="tap t-sub mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-200 py-2 font-semibold text-slate-700 hover:bg-slate-50 sm:hidden"
+        >
+          <ChevronDown aria-hidden="true" className="size-4" />
+          나머지 {groups.slice(1).reduce((n, g) => n + g.fields.length, 0)}칸 보기 — {groups.slice(1).map((g) => g.label).join(' · ')}
+        </button>
+      )}
 
       {emptyCount > 0 && filled > 0 && (
         <button

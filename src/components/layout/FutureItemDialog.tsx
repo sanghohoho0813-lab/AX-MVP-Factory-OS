@@ -44,7 +44,7 @@ export function FutureItemDialog({ item, onClose, onPick }: { item: FutureItem |
             <Icon className="size-5" />
           </span>
           <div className="min-w-0">
-            <span className="t-meta inline-block rounded-full border border-slate-300 px-2 py-0.5 font-semibold tracking-wide text-slate-500">NEXT · 아직 없는 기능</span>
+            <span className="t-meta inline-block rounded-full border border-slate-300 px-2 py-0.5 font-semibold tracking-wide text-slate-500">곧 추가 · 아직 없는 기능</span>
             <p className="t-body mt-1.5 break-keep text-slate-800">{item.what}</p>
           </div>
         </div>

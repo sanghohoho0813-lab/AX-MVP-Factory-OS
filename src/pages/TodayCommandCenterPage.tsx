@@ -24,7 +24,9 @@ import { LinkCustomerModal } from '../components/ops/LinkCustomerModal'
 import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { listClients } from '../services/clientOpsService'
 import { salesActionPath, salesRecontacts, salesRisks } from '../services/salesSignals'
-import { agentLedger, agentLedgerTotals } from '../services/feeMath'
+import { agentLedger, agentLedgerTotals, netAmountOf } from '../services/feeMath'
+import { CallButton } from '../components/ops/opsControls'
+import { addDaysLocal } from '../services/clientOpsNextAction'
 import { isProspect, salesInFlow } from '../services/salesPipeline'
 import { buildAllAlerts } from '../services/clientOpsAlerts'
 import { buildAllSchedule, upcomingWithin } from '../services/clientOpsSchedule'
@@ -237,6 +239,18 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   )
   const money = useMemo(() => buildMoneySignals(clients, today), [clients, today])
   const agentPayable = useMemo(() => agentLedgerTotals(agentLedger(clients)).payable, [clients])
+  const phoneOf = (id: string) => {
+    const c = clients.find((x) => x.id === id)
+    return c ? c.contactPhone.trim() || c.companyPhone.trim() : ''
+  }
+  /** D-125: 이번 주(오늘 ~ 6일 뒤) 받을 날인 안 받은 돈 — 내 몫 기준 */
+  const weekIn = useMemo(() => {
+    const end = addDaysLocal(today, 6)
+    const items = clients
+      .filter((c) => c.archivedAt === null)
+      .flatMap((c) => c.fees.filter((f) => f.receivedAt === null && f.dueDate !== '' && f.dueDate >= today && f.dueDate <= end))
+    return { count: items.length, total: items.reduce((n, f) => n + netAmountOf(f), 0) }
+  }, [clients, today])
   /** 계약 고객의 받을 날 없는 미수 항목 — 달력 · 연체 경고에 안 뜬다 */
   const noDueFees = useMemo(
     () =>
@@ -253,7 +267,6 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     return { count: flow.list.length, fee: flow.fee }
   }, [clients])
   const openEvents = useMemo(() => events.filter(isOpenEvent), [events])
-  const followUps = useMemo(() => journal.filter((j) => j.entryType === 'follow_up' && !j.completed), [journal])
   /**
    * 오늘 화면에 걸리는 할 일 — 기한이 오늘 이하인 것 전부.
    * 끝낸 것도 포함한다(아래에서 접어 두려면 목록에 있어야 한다).
@@ -262,9 +275,29 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     () => journal.filter((j) => j.entryType === 'follow_up' && j.dueDate !== '' && j.dueDate <= today),
     [journal, today],
   )
+  // D-125: '지금 이것부터' 는 바로 위 할 일 목록과 겹치지 않게(할 일은 빼고) — 대신 영업에서 멈춘 곳을 함께 세운다.
+  // 다음 약속이 지난 곳은 위 '업체 약속' 에 이미 있으므로 뺀다.
+  const salesTop = useMemo<BriefAction[]>(
+    () =>
+      salesRiskList
+        .filter((r) => !r.reason.startsWith('다음 약속'))
+        .map((r) => ({
+          id: `sales:${r.record.id}`,
+          kind: 'sales' as const,
+          title: `${r.record.companyName} — ${r.action}`,
+          detail: r.reason,
+          reason: '영업 — 여기서 멈춰 있습니다',
+          severity: 'warning' as const,
+          href: salesActionPath(r.action, r.record.id),
+          clientId: r.record.id,
+          clientName: r.record.companyName,
+          score: 80,
+        })),
+    [salesRiskList],
+  )
   const top = useMemo(
-    () => buildTopActions({ alerts, events, followUps, clientNames, today }, 3),
-    [alerts, events, followUps, clientNames, today],
+    () => buildTopActions({ alerts, events, followUps: [], clientNames, today, extra: salesTop }, 3),
+    [alerts, events, clientNames, today, salesTop],
   )
   const todayJournal = useMemo(() => applyJournalFilter(journal, { range: 'today' }, today), [journal, today])
   const daySummary = useMemo(
@@ -449,15 +482,19 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                       {e.clientName}
                     </Link>
                     <span className="t-body min-w-0 flex-[1_1_10rem] break-keep text-slate-700">{e.title}</span>
-                    {prospectIds.has(e.clientId) ? (
-                      <Link to={`/sales/meeting?client=${e.clientId}`} className="t-sub ml-auto shrink-0 font-semibold text-brand-700 hover:underline">
-                        미팅 준비 →
-                      </Link>
-                    ) : (
-                      <Link to={`/ops/clients/${e.clientId}`} className="t-sub ml-auto shrink-0 font-semibold text-brand-700 hover:underline">
-                        업체 열기 →
-                      </Link>
-                    )}
+                    <span className="ml-auto flex shrink-0 items-center gap-2">
+                      {prospectIds.has(e.clientId) ? (
+                        <Link to={`/sales/meeting?client=${e.clientId}`} className="t-sub font-semibold text-brand-700 hover:underline">
+                          미팅 준비 →
+                        </Link>
+                      ) : (
+                        <Link to={`/ops/clients/${e.clientId}`} className="t-sub font-semibold text-brand-700 hover:underline">
+                          업체 열기 →
+                        </Link>
+                      )}
+                      {/* D-125: 약속 줄에서 바로 전화 */}
+                      <CallButton phone={phoneOf(e.clientId)} name={e.clientName} />
+                    </span>
                   </li>
                 )
               })}
@@ -490,7 +527,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           {loading ? (
             <p className="t-sub text-slate-500">불러오는 중…</p>
           ) : top.length === 0 ? (
-            <Blank title="마감 지남·막힘·오늘 후속조치가 없습니다." icon={<ClipboardCheck className="size-7" />} />
+            <Blank title="마감 지남 · 막힘 · 오늘 할 일이 없습니다." icon={<ClipboardCheck className="size-7" />} />
           ) : (
             <ol className="ax-stagger flex flex-col gap-2">
               {top.map((a, i) => (
@@ -519,6 +556,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               tone={money.overdue.count > 0 ? 'danger' : 'neutral'}
               hint={
                 [
+                  // D-125: 이번 주 들어올 돈을 먼저 — 대표가 가장 먼저 묻는 숫자
+                  weekIn.count > 0 ? `이번 주 받을 것 ${krwTile(weekIn.total)} · ${weekIn.count}건` : '',
                   money.overdue.count > 0 ? `연체 ${money.overdue.count}건` : '',
                   money.scheduled.gross + money.overdue.gross !== money.scheduled.total + money.overdue.total
                     ? `청구 기준 ${krwTile(money.scheduled.gross + money.overdue.gross)}`
@@ -555,7 +594,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             </p>
           )}
 
-          <p className="t-meta break-keep text-slate-500">급한 순서대로 셋만 — 규칙으로 고른 것이며 AI 판단이 아닙니다.</p>
+          <p className="t-meta break-keep text-slate-500">급한 순서대로 셋만 골랐습니다.</p>
         </section>
 
         {/* 3단계 — 빠른 기록 */}
@@ -576,7 +615,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             onEdit={(e, content) => journalMutate(() => updateJournalEntry(e, { content }))}
             onDelete={(e) => setPendingDelete(e)}
             emptyTitle="오늘 기록된 업무가 없습니다."
-            emptyHint="통화·결정·후속조치를 바로 남겨두면 나중에 고객별 이력이 이어집니다."
+            emptyHint="통화 · 결정 · 할 일을 바로 남겨 두면 나중에 고객별 이력이 이어집니다."
           />
           {todayJournal.length > 4 && (
             <Link to="/journal" className="t-sub font-medium text-brand-700 hover:underline">
@@ -683,7 +722,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           </>
         }
       >
-        <p className="text-[0.85rem] text-slate-400">활동 기록·업무 일기·이벤트 처리 내역을 규칙으로 정리한 것입니다 (AI 요약 아님).</p>
+        <p className="text-[0.85rem] text-slate-400">오늘 남긴 기록 · 처리한 일을 모아 정리했습니다.</p>
         {(
           [
             ['오늘 처리', daySummary.done, 'text-success-700'],

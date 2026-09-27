@@ -19,9 +19,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { fromState } from '../../lib/navFrom'
 import { useDraftState } from '../../lib/useSessionDraft'
-import { Check, ChevronRight, FileText, NotebookPen, Presentation, ScanSearch } from 'lucide-react'
+import { Check, ChevronRight, FileText, NotebookPen, Phone, Presentation, ScanSearch, Send } from 'lucide-react'
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useToast } from '../../components/ui/toastContext'
+import { LINK_BUTTON } from '../../components/sales/salesStyle'
+import { CallButton } from '../../components/ops/opsControls'
 import { Disclosure, ScreenTitle } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { SalesTabs } from '../../components/sales/SalesTabs'
@@ -227,10 +229,10 @@ function writeDraft(id: string, round: number, text: string) {
 }
 
 /** 미팅에서 받기로 한 자료 → 보낼 카톡 한 덩어리 */
-function docRequestText(record: ClientOpsRecord, docs: string[]): string {
+function docRequestText(record: ClientOpsRecord, docs: string[], withGreeting = true): string {
   const who = record.representativeName || record.contactName || record.companyName
   return [
-    `${who} 대표님, 오늘 시간 내 주셔서 감사합니다.`,
+    ...(withGreeting ? [`${who} 대표님, 오늘 시간 내 주셔서 감사합니다.`] : []),
     '말씀 나눈 내용을 정확히 검토하려고, 편하실 때 아래 자료를 부탁드립니다.',
     '',
     ...docs.map((d, i) => `${i + 1}. ${d}`),
@@ -239,7 +241,45 @@ function docRequestText(record: ClientOpsRecord, docs: string[]): string {
   ].join('\n')
 }
 
-function MeetingRecorder({ record, round, today, onSave }: { record: ClientOpsRecord; round: 1 | 2 | 3; today: string; onSave: (next: ClientOpsRecord, msg: string) => Promise<boolean> }) {
+/** D-125: 미팅 기록을 저장한 뒤 한 번에 할 것 — 카톡 한 덩어리 · 전화 · 다음 약속 */
+interface WrapUp {
+  kakao: string
+  phone: string
+  nextAction: string
+  due: string
+  moved: string | null
+  docs: number
+}
+
+/** 휴대폰이면 공유 창(카카오톡 고르기), 아니면 복사 */
+function ShareTextButton({ text }: { text: string }) {
+  const { showToast } = useToast()
+  const share = async () => {
+    const nav = navigator as Navigator & { share?: (d: { text: string }) => Promise<void> }
+    if (typeof nav.share === 'function') {
+      try {
+        await nav.share({ text })
+        return
+      } catch {
+        /* 닫았으면 복사로 */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text)
+      showToast('카톡 문구를 복사했습니다. 카카오톡에 붙여 넣으세요.')
+    } catch {
+      showToast('복사하지 못했습니다. 글을 길게 눌러 복사해 주세요.')
+    }
+  }
+  return (
+    <Button variant="primary" size="sm" onClick={() => void share()} data-testid="wrapup-share">
+      <Send aria-hidden="true" className="size-4" />
+      카톡 보내기
+    </Button>
+  )
+}
+
+function MeetingRecorder({ record, round, today, onSave, onNextRound }: { record: ClientOpsRecord; round: 1 | 2 | 3; today: string; onSave: (next: ClientOpsRecord, msg: string) => Promise<boolean>; onNextRound: () => void }) {
   const stage = salesStageOf(record)
   const target = stageAfterMeeting(round)
   const canMove = SALES_STAGE_ORDER.indexOf(target) > SALES_STAGE_ORDER.indexOf(stage) && stage !== 'contracted' && stage !== 'hold' && stage !== 'lost'
@@ -254,6 +294,8 @@ function MeetingRecorder({ record, round, today, onSave }: { record: ClientOpsRe
   const [next, setNext] = useState('')
   const [due, setDue] = useState(addDays(today, 3))
 
+  /** D-125: 저장한 뒤 마무리 카드 — 예전에는 저장하면 카톡 문구가 사라져 먼저 저장한 대표는 복사할 수 없었다 */
+  const [wrap, setWrap] = useState<WrapUp | null>(null)
   /** D-122: 받기로 한 자료 가운데 서류함에 칸을 만들 것(기본 전부) */
   const [slots, setSlots] = useState<string[]>([])
   /** D-124: 1차 미팅에서 확인한 관심사 — 관심사는 1차 미팅을 마친 뒤에 정한다(미리 적어 둔 것 + 메모에 나온 주제) */
@@ -277,9 +319,57 @@ function MeetingRecorder({ record, round, today, onSave }: { record: ClientOpsRe
     // D-120: 저장이 된 뒤에만 비운다 — 실패하면 적은 메모가 그대로 남는다
     if (ok) {
       writeDraft(record.id, round, '')
+      setWrap({
+        // 감사 인사는 한 번만 — 자료 요청 쪽의 인사 줄은 뺀다
+        kakao: [result.kakao, result.nextDocs.length > 0 ? docRequestText(record, result.nextDocs, false) : ''].filter(Boolean).join('\n\n'),
+        phone: record.contactPhone.trim() || record.companyPhone.trim(),
+        nextAction: next.trim(),
+        due,
+        moved: canMove && move ? SALES_STAGE_LABEL[target] : null,
+        docs: slots.length,
+      })
       setTextState('')
       setResult(null)
     }
+  }
+
+  if (wrap) {
+    return (
+      <section aria-label="미팅 마무리" data-testid="meeting-wrapup" className="flex flex-col gap-3 rounded-(--radius-panel) border border-success-200 bg-success-50/40 p-4 sm:p-5">
+        <h2 className="t-section flex items-center gap-2 text-slate-900">
+          <Check aria-hidden="true" className="size-5 text-success-600" />
+          {round}차 미팅을 기록했습니다
+        </h2>
+        <p className="t-sub break-keep text-slate-600">
+          {[wrap.moved ? `영업 단계 → ${wrap.moved}` : '', wrap.docs > 0 ? `서류함에 칸 ${wrap.docs}개` : '', wrap.nextAction ? `다음 약속 ${wrap.due} · ${wrap.nextAction}` : ''].filter(Boolean).join(' · ')}
+        </p>
+        <div className="rounded-(--radius-control) border border-slate-200 bg-white p-3">
+          <p className="t-sub font-semibold text-slate-700">보낼 카톡 — 감사 인사{wrap.kakao.includes('자료') ? ' · 받을 자료' : ''}를 한 번에</p>
+          <pre data-testid="wrapup-kakao" className="t-sub mt-1.5 font-[inherit] break-keep whitespace-pre-wrap text-slate-700">{wrap.kakao}</pre>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <ShareTextButton text={wrap.kakao} />
+            <CopyButton text={wrap.kakao} />
+            {wrap.phone && (
+              <a href={`tel:${wrap.phone.replace(/[^0-9+]/g, '')}`} className={LINK_BUTTON.secondary}>
+                <Phone aria-hidden="true" className="size-4" />
+                전화 {wrap.phone}
+              </a>
+            )}
+          </div>
+        </div>
+        <p className="t-meta break-keep text-slate-500">다음 약속 날짜는 위 '다음 약속' 의 바꾸기에서 고칠 수 있습니다.</p>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setWrap(null)}>
+            기록 하나 더
+          </Button>
+          {round < 3 && (
+            <Button variant="secondary" size="sm" onClick={onNextRound} data-testid="wrapup-next">
+              {round + 1}차 미팅 준비 보기
+            </Button>
+          )}
+        </div>
+      </section>
+    )
   }
 
   return (
@@ -300,7 +390,7 @@ function MeetingRecorder({ record, round, today, onSave }: { record: ClientOpsRe
       </label>
       <div className="flex justify-end">
         <Button variant="secondary" size="sm" onClick={analyze} disabled={text.trim() === ''}>
-          메모 나눠 보기
+          메모 정리하기
         </Button>
       </div>
       {result && (
@@ -392,7 +482,7 @@ function MeetingRecorder({ record, round, today, onSave }: { record: ClientOpsRe
           </div>
         </div>
       )}
-      <p className="t-meta break-keep text-slate-400">메모 속 낱말로 나누는 규칙 계산입니다. 실제 뜻은 다시 확인하세요.</p>
+      <p className="t-meta break-keep text-slate-400">메모 속 낱말로 나눈 것입니다. 실제 뜻은 다시 확인하세요.</p>
     </section>
   )
 }
@@ -536,6 +626,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                     <ChevronRight aria-hidden="true" className="size-4 text-slate-400" />
                   </Link>
                   <StageBadge stage={stage} />
+                  <span className="ml-auto"><CallButton phone={record.contactPhone.trim() || record.companyPhone.trim()} name={record.companyName} /></span>
                   {/* D-123: 점수(64점) 대신 중요도 5단계 색 — 빨강 · 주황 · 노랑 · 초록 · 파랑 */}
                   <LeadLevel tier={tier.key} score={score} withHint />
                   {theme && <span className="t-sub text-slate-500">미팅 테마 · {theme.label}</span>}
@@ -623,12 +714,9 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                   record={record}
                   round={round}
                   today={today}
-                  onSave={async (n, m) => {
-                    const ok = await persist(n, m)
-                    // 기록이 저장됐으면 다음 차수 대본으로 넘어간다(실패하면 적은 메모를 그대로 둔다)
-                    if (ok && round < 3) setRound((round + 1) as Round)
-                    return ok
-                  }}
+                  onSave={persist}
+                  // D-125: 저장하면 마무리 카드(카톡 · 전화 · 다음 약속) — 다음 차수로는 누를 때 간다
+                  onNextRound={() => setRound((round + 1) as Round)}
                 />}
 
               {/* D-123: 미팅에서 알게 된 것은 미팅 기록 바로 아래 — 크레탑을 보기도 전(맨 위)에는 알 수 없는 것들이었다 */}

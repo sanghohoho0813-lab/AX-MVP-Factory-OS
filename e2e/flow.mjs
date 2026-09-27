@@ -13,6 +13,7 @@
  *   9. (D-124) 영업 관리에서 업체를 열고 뒤로 → 고객 관리가 아니라 영업 관리로
  *  10. (D-124) 세금 계산기 목록을 펼친 채 화면을 밀어도 목록이 닫히며 튀지 않는다(누르면 닫힘)
  *  11. (D-124) 창이 열려 있을 때 뒤로가기는 창만 닫는다 · 뒤로 오면 보던 자리 · 찾던 말 그대로
+ *  12. (D-125) 전화 단추(오늘 약속 줄 · 영업 보드 카드) · 고객 관리 '다음 약속 지남' 보기 · 휴대폰 하단 '영업'
  */
 
 import { chromium } from 'playwright'
@@ -105,7 +106,7 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   await page.waitForTimeout(500)
   const rec = page.getByTestId('meeting-recorder')
   await rec.getByLabel('미팅에서 나온 말 · 메모').fill('가지급금 정리가 필요하다고 하셨고 주주명부와 정관을 보내 주기로 함')
-  await rec.getByRole('button', { name: '메모 나눠 보기' }).click()
+  await rec.getByRole('button', { name: '메모 정리하기' }).click()
   const slots = page.getByTestId('meeting-doc-slots')
   check(`미팅 기록: 서류함에 칸 만들기(주주명부 · 정관) ${tag}`, (await slots.count()) === 1 && ((await slots.innerText()) ?? '').includes('주주명부') && ((await slots.innerText()) ?? '').includes('정관'))
   await rec.getByRole('button', { name: '기록 저장' }).click()
@@ -277,6 +278,36 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   await page.goBack()
   await page.waitForTimeout(500)
   check(`찾기: 업체를 열었다 뒤로 와도 찾던 말 그대로 ${tag}`, (await search.inputValue()) === '한솔', await search.inputValue())
+
+  /* 12 (D-125) */
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  const appt = page.getByTestId('today-appointments')
+  if (await appt.count()) {
+    const calls = appt.getByTestId('call-button')
+    check(`전화: 오늘 약속 줄에 전화 단추(tel:) ${tag}`, (await calls.count()) >= 1 && ((await calls.first().getAttribute('href')) ?? '').startsWith('tel:'))
+  }
+  await page.goto(BASE + '/sales/board', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  check(`전화: 영업 보드 카드에 전화 단추 ${tag}`, (await page.getByTestId('sales-card').getByTestId('call-button').count()) >= 1)
+  await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  const allList = await clients(page)
+  const todayStr = await page.evaluate(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })
+  const lateNames = allList.filter((c) => c.archivedAt == null && c.nextActionDueDate && c.nextActionDueDate < todayStr).map((c) => c.companyName)
+  const seg = page.getByTestId('client-segment')
+  if (await seg.count()) await seg.getByRole('button', { name: /전체/ }).click()
+  await page.getByLabel('업체 보기 조건').selectOption('late')
+  await page.waitForTimeout(400)
+  const listText = (await page.locator('main').innerText()) ?? ''
+  check(`고객 관리: '다음 약속 지남' 보기 — 약속 지난 업체가 보인다 ${tag}`, lateNames.length > 0 && lateNames.every((n) => listText.includes(n)), lateNames.join(','))
+  await page.getByLabel('업체 보기 조건').selectOption('all')
+  if (mob) {
+    await page.locator('nav[aria-label="주요 화면"]').getByText('영업', { exact: true }).click()
+    await page.waitForURL(/\/sales\/board/)
+    await page.waitForTimeout(500)
+    check(`휴대폰 하단: '영업' 을 누르면 영업 보드 · 불이 켜진다 ${tag}`, (await page.locator('nav[aria-label="주요 화면"] [aria-current="page"]').innerText()).includes('영업'))
+  }
 
   check(`JS 오류 없음 ${tag}`, errors.length === 0, errors.join(' | '))
   await ctx.close()

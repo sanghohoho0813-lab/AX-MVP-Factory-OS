@@ -192,6 +192,26 @@ export function PhoneLink({ phone }: { phone: string }) {
   )
 }
 
+/**
+ * 전화 단추 (D-125) — 업체가 나오는 줄마다 누르면 바로 전화. 번호가 없으면 아무것도 그리지 않는다.
+ * 44px 둥근 단추(휴대폰 손가락 크기).
+ */
+export function CallButton({ phone, name }: { phone: string; name: string }) {
+  const digits = phone.replace(/[^0-9+]/g, '')
+  if (digits.length < 7) return null
+  return (
+    <a
+      href={`tel:${digits}`}
+      aria-label={`${name} 전화 ${phone}`}
+      title={`전화 ${phone}`}
+      data-testid="call-button"
+      className="inline-flex size-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-brand-700 hover:bg-brand-50"
+    >
+      <Phone aria-hidden="true" className="size-[18px]" />
+    </a>
+  )
+}
+
 /* ------------------------------------------------------------------ */
 /* 금액 입력                                                            */
 /* ------------------------------------------------------------------ */

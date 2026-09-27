@@ -573,6 +573,10 @@ check('실제로 지워졌다', left === false)
   await page.goto(BASE + '/ops/clients/cli_wooil', { waitUntil: 'networkidle' })
   await page.waitForTimeout(800)
 
+  // D-125: 휴대폰에서는 첫 묶음(회사)만 보이고 나머지는 '나머지 N칸 보기' 로 편다
+  check('회사 기본 정보(휴대폰): 처음엔 회사 묶음만 · 나머지 보기 단추', (await page.getByTestId('profile-more').count()) === 1 && (await page.getByRole('button', { name: '사람에 칸 추가' }).count()) === 0)
+  await page.getByTestId('profile-more').click()
+  await page.waitForTimeout(300)
   // 네 묶음 모두에 칸을 만들 수 있다 — 아직 아무것도 안 적은 묶음(연락처)도
   for (const g of ['회사', '사람', '연락처', '인증서']) {
     check(`칸 추가: ${g} 묶음에 만들 수 있다`, (await page.getByRole('button', { name: `${g}에 칸 추가` }).count()) > 0)

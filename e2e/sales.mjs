@@ -263,14 +263,20 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   await page.getByRole('heading', { name: '1차 미팅 기록' }).waitFor()
   const rec = page.getByTestId('meeting-recorder')
   await rec.getByLabel('미팅에서 나온 말 · 메모').fill('가지급금 정리는 관심 있는데 비용이 부담되고 세무사랑 상의해볼게요')
-  await rec.getByRole('button', { name: '메모 나눠 보기' }).click()
+  await rec.getByRole('button', { name: '메모 정리하기' }).click()
   const an = (await page.getByTestId('meeting-analysis').innerText()) ?? ''
   check('미팅 기록: 반응 · 망설임 · 주제를 나눈다', an.includes('신중·부담 반응 추정') && an.includes('비용/수임료 부담') && an.includes('가지급금'), an.slice(0, 200))
   await rec.getByRole('button', { name: '기록 저장' }).click()
   await page.waitForTimeout(700)
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients')).find((c) => c.id === 'cli_meet'))
   check('미팅 기록: 저장 — 미팅 목록 · 1차 미팅 완료로 · 다음 할 일 · 체크 유지', saved.sales.meetings?.length === 1 && saved.sales.stage === 'm1done' && saved.nextAction.startsWith('2차 미팅 준비') && saved.sales.flags?.gajigeup === true, JSON.stringify({ st: saved.sales.stage, n: saved.nextAction }))
-  check('미팅 기록: 저장 뒤 2차 대본으로 넘어간다', ((await page.getByTestId('meeting-rounds').getByRole('button', { name: '2차 미팅' }).getAttribute('aria-pressed')) === 'true'))
+  // D-125: 저장하면 마무리 카드 — 감사 카톡(+ 받을 자료)을 한 덩어리로 · 보내기 · 전화 · 다음 차수는 누를 때
+  const wrap = page.getByTestId('meeting-wrapup')
+  const wrapText = (await wrap.innerText().catch(() => '')) ?? ''
+  check('미팅 기록: 저장 뒤 마무리 카드 — 카톡 문구 · 보내기 · 다음 약속', (await wrap.count()) === 1 && ((await page.getByTestId('wrapup-kakao').innerText()) ?? '').length > 20 && (await page.getByTestId('wrapup-share').count()) === 1 && wrapText.includes('다음 약속'), wrapText.slice(0, 200))
+  await page.getByTestId('wrapup-next').click()
+  await page.waitForTimeout(400)
+  check('미팅 기록: 마무리 카드에서 누르면 2차 대본으로', ((await page.getByTestId('meeting-rounds').getByRole('button', { name: '2차 미팅' }).getAttribute('aria-pressed')) === 'true'))
   // 업체 상세 → 미팅 준비 링크
   await page.goto(BASE + '/ops/clients/cli_meet', { waitUntil: 'networkidle' })
   await page.getByTestId('client-sales-card').getByRole('link', { name: '미팅 준비' }).click()
@@ -419,7 +425,7 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   const sig = page.getByTestId('sales-signals')
   check('보드: 지금 챙길 영업 · 다시 연락할 곳 두 칸', ((await sig.innerText()) ?? '').includes('지금 챙길 영업') && (await sig.innerText()).includes('다시 연락할 곳'))
   await sig.getByRole('button', { name: /지금 챙길 영업/ }).click()
-  check('보드: 날짜 지난 곳이 이유와 함께', /날짜지남상사[\s\S]*다음 할 일 날짜 5일 지남/.test((await sig.innerText()) ?? ''))
+  check('보드: 날짜 지난 곳이 이유와 함께', /날짜지남상사[\s\S]*다음 약속 5일 지남/.test((await sig.innerText()) ?? ''))
   await sig.getByRole('button', { name: /다시 연락할 곳/ }).click()
   check('보드: 보류가 길어진 곳 · 연락 문구 복사', ((await sig.innerText()) ?? '').includes('조용한정밀') && (await sig.getByRole('button', { name: '연락 문구' }).count()) >= 1)
 
@@ -492,7 +498,7 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   await page.waitForTimeout(500)
   const ts = (await page.getByTestId('today-sales').innerText()) ?? ''
   // 3곳 = 색시험 2곳 + 영업 칸 없는 계약 전 시드(미래바이오랩) — 보드와 같은 기준
-  check('오늘: 영업 묶음 — 진행 중 · 예상 수임료 · 챙길 곳(날짜 지남)', /진행 중\s*3곳/.test(ts) && ts.includes('800만') && /색시험리드[\s\S]*다음 할 일 날짜 2일 지남/.test(ts), ts.slice(0, 300))
+  check('오늘: 영업 묶음 — 진행 중 · 예상 수임료 · 챙길 곳(날짜 지남)', /진행 중\s*3곳/.test(ts) && ts.includes('800만') && /색시험리드[\s\S]*다음 약속 2일 지남/.test(ts), ts.slice(0, 300))
   await page.getByTestId('today-sales').getByRole('link', { name: '모두 보기' }).click()
   await page.waitForURL(/\/sales\/board/)
   check('오늘: 모두 보기 → 영업 보드', page.url().includes('/sales/board'))

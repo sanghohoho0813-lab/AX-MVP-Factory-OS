@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { fromState } from '../../lib/navFrom'
 import { useQueryInUrl } from '../../lib/useQueryInUrl'
+import { CallButton } from '../../components/ops/opsControls'
 import { ChevronRight, CirclePlus, KanbanSquare, Presentation, ScanSearch, Search } from 'lucide-react'
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useToast } from '../../components/ui/toastContext'
@@ -86,10 +87,14 @@ function SalesCard({ record, today, onOpen, onMove }: { record: ClientOpsRecord;
   return (
     <li data-testid="sales-card" className="relative flex flex-col gap-1.5 overflow-hidden rounded-(--radius-control) border border-slate-200 bg-white p-3">
       {stale && <span aria-hidden="true" className="absolute inset-y-0 left-0 w-[3px] bg-warning-500" />}
-      <button type="button" onClick={onOpen} className="tap flex min-w-0 items-center gap-1 text-left">
-        <span className="t-body min-w-0 truncate font-bold text-slate-900 hover:text-brand-700 hover:underline">{record.companyName || '(이름 없음)'}</span>
-        <ChevronRight aria-hidden="true" className="size-3.5 shrink-0 text-slate-400" />
-      </button>
+      <div className="flex min-w-0 items-center gap-1">
+        <button type="button" onClick={onOpen} className="tap flex min-w-0 flex-1 items-center gap-1 text-left">
+          <span className="t-body min-w-0 truncate font-bold text-slate-900 hover:text-brand-700 hover:underline">{record.companyName || '(이름 없음)'}</span>
+          <ChevronRight aria-hidden="true" className="size-3.5 shrink-0 text-slate-400" />
+        </button>
+        {/* D-125: 카드에서 바로 전화 */}
+        <CallButton phone={record.contactPhone.trim() || record.companyPhone.trim()} name={record.companyName} />
+      </div>
       {(who || s?.source) && (
         <p className="t-meta truncate text-slate-500">{[who, s?.source, s?.referrer ? `소개 ${s.referrer}` : ''].filter(Boolean).join(' · ')}</p>
       )}

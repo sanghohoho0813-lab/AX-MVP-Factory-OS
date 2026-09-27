@@ -485,14 +485,14 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   await page.waitForTimeout(500)
   const bar = page.locator('nav[aria-label="주요 화면"]')
   const labels = (await bar.locator('li').allInnerTexts()).map((t) => t.replace(/\d+/g, '').replace(/\s+/g, ''))
-  check('하단 목차: 오늘 · 일정 · 고객 · 상담신청 · 더보기 순서', labels.join(',') === '오늘,일정,고객,상담신청,더보기', labels.join(','))
+  check('하단 목차: 오늘 · 일정 · 고객 · 상담 · 영업 · 더보기 순서', labels.join(',') === '오늘,일정,고객,상담,영업,더보기', labels.join(','))
   const colors = await page.evaluate(() => {
     const probe = (v) => { const d = document.createElement('span'); d.style.color = `var(${v})`; document.body.appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c }
     const icons = [...document.querySelectorAll('nav[aria-label="주요 화면"] li svg')].map((el) => getComputedStyle(el).color)
-    return { icons, want: ['--color-nav-overview', '--color-nav-evidence', '--color-nav-ops', '--color-nav-alert'].map(probe) }
+    return { icons, want: ['--color-nav-overview', '--color-nav-evidence', '--color-nav-ops', '--color-nav-alert', '--color-nav-revenue'].map(probe) }
   })
-  check('하단 목차: 아이콘 색이 서랍 메뉴와 같다 (오늘 · 일정 · 고객 · 상담신청)', colors.want.every((c, i) => colors.icons[i] === c), JSON.stringify(colors))
-  check('하단 목차: 더보기도 회색이 아니다', colors.icons[4] !== 'rgb(148, 163, 184)' && new Set(colors.icons).size === 5, JSON.stringify(colors.icons))
+  check('하단 목차: 아이콘 색이 서랍 메뉴와 같다 (오늘 · 일정 · 고객 · 상담신청 · 영업)', colors.want.every((c, i) => colors.icons[i] === c), JSON.stringify(colors))
+  check('하단 목차: 더보기도 회색이 아니다', colors.icons[5] !== 'rgb(148, 163, 184)' && new Set(colors.icons).size === 6, JSON.stringify(colors.icons))
   const clientBadge = bar.locator('[data-nav-badge="clients"]')
   // 서랍(햄버거) 메뉴의 고객 관리 숫자와 같아야 한다
   await page.locator('header').getByRole('button', { name: /메뉴/ }).first().click()
@@ -508,7 +508,7 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   const req = bar.locator('[data-nav-badge="requests"]')
   const n = Number((await req.innerText()).trim())
   check('하단 목차: 상담신청 빨간 숫자', n > 0 && (await req.evaluate((el) => getComputedStyle(el).backgroundColor)) !== 'rgba(0, 0, 0, 0)')
-  check('하단 목차: 상담신청이 있으면 이름도 빨강', (await bar.getByText('상담신청', { exact: true }).evaluate((el) => getComputedStyle(el).color)) !== (await bar.getByText('오늘', { exact: true }).evaluate((el) => getComputedStyle(el).color)))
+  check('하단 목차: 상담신청이 있으면 이름도 빨강', (await bar.getByText('상담', { exact: true }).evaluate((el) => getComputedStyle(el).color)) !== (await bar.getByText('오늘', { exact: true }).evaluate((el) => getComputedStyle(el).color)))
   check('하단 목차: 지금 화면(일정) 표시', (await bar.locator('a[aria-current="page"]').innerText()).includes('일정'))
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   check('하단 목차: 옆으로 밀리지 않음', overflow <= 1, String(overflow))

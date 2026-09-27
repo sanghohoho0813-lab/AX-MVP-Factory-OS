@@ -44,7 +44,7 @@ export interface SalesRisk {
  */
 export function salesActionPath(action: string, clientId: string): string {
   if (/견적|업무범위|제안서|검토 상황/.test(action)) return `/sales/proposal?client=${clientId}`
-  if (/다음 할 일 정하기/.test(action)) return `/ops/clients/${clientId}`
+  if (/다음 (할 일|약속) 정하기/.test(action)) return `/ops/clients/${clientId}`
   return `/sales/meeting?client=${clientId}`
 }
 
@@ -61,7 +61,7 @@ export function salesRisks(records: ClientOpsRecord[], today: string, now: Date 
     let action = ''
     if (r.nextActionDueDate && r.nextActionDueDate < today) {
       const d = daysSince(r.nextActionDueDate, new Date(`${today}T00:00:00`)) ?? 0
-      reason = `다음 할 일 날짜 ${d}일 지남`
+      reason = `다음 약속 ${d}일 지남`
       action = '연락하기'
     } else if (p?.status === '제안 완료' && (touch === null || touch >= 7)) {
       reason = '제안 완료 후 7일 이상 후속 없음'
@@ -71,7 +71,7 @@ export function salesRisks(records: ClientOpsRecord[], today: string, now: Date 
       action = '검토 상황 확인'
     } else if (scoreLead(toEngineItem(r, now)) >= 70 && r.nextAction.trim() === '') {
       reason = '계약 가능성 높은데 다음 할 일 없음'
-      action = '다음 할 일 정하기'
+      action = '다음 약속 정하기'
     } else if ((r.sales?.expectedFee ?? 0) >= 3_000_000 && (r.sales?.meetings?.length ?? 0) === 0) {
       reason = '예상 수임료 높은데 미팅 기록 없음'
       action = '1차 미팅 제안'
@@ -97,18 +97,29 @@ export function salesRecontacts(records: ClientOpsRecord[], now: Date = new Date
     if (r.archivedAt !== null) continue
     const stage = salesStageOf(r)
     const ds = daysSince(lastSalesTouch(r), now) ?? 999
+    // D-125: 안쪽 이유(대표가 보는 것)와 고객에게 보내는 문구를 나눈다 — 예전에는 '관리 접점 회복이 필요합니다' 같은
+    // 안쪽 말이 그대로 고객 카톡에 들어갔다
     const timing: string[] = []
-    if (ds >= 60) timing.push('최근 60일 이상 연락 이력이 없어 관리 접점 회복이 필요합니다.')
-    if (stage === 'hold' && (daysSince(r.sales?.movedAt, now) ?? 0) >= 30) timing.push('보류 후 30일이 지나 재접촉 타이밍으로 볼 수 있습니다.')
+    if (ds >= 60) timing.push(ds >= 999 ? '연락 기록 없음' : `${ds}일째 연락 없음`)
+    const heldDays = daysSince(r.sales?.movedAt, now) ?? 0
+    if (stage === 'hold' && heldDays >= 30) timing.push(`보류한 지 ${heldDays}일 — 다시 연락할 때`)
     if (timing.length === 0) continue
     const extra: string[] = []
     const emp = parseInt(String(r.employeeCount ?? '').replace(/[^0-9]/g, ''), 10)
-    if (Number.isFinite(emp) && emp > 0) extra.push('직원 수 변동 여부에 따라 고용지원금 검토 가능성을 다시 점검해볼 수 있습니다.')
     const it = r.sales?.interests ?? []
-    if (it.includes('연구소')) extra.push('연구소·인증 요건 재점검 가능성이 있습니다.')
-    if (it.includes('정책자금')) extra.push('정책자금·보증 관련 재점검 가능성이 있습니다.')
+    if (Number.isFinite(emp) && emp > 0) extra.push('직원 수가 바뀌었으면 고용지원금 다시 보기')
+    if (it.includes('연구소')) extra.push('연구소 · 인증 요건 다시 보기')
+    if (it.includes('정책자금')) extra.push('정책자금 · 보증 다시 보기')
     const reasons = [...timing, ...extra].slice(0, 2)
-    out.push({ record: r, reasons, days: ds, ment: `${r.companyName} 대표님, ${reasons[0]} 부담 없이 현황만 가볍게 점검해보시죠. 자료 확인 후 우선순위만 정리드리겠습니다.` })
+    const hook = it.includes('정책자금')
+      ? '새로 나온 정책자금 · 보증 일정이 있어 한번 살펴봐 드리면 좋을 것 같아 연락드렸습니다.'
+      : it.includes('연구소')
+        ? '연구소 · 인증 쪽 요건이 달라진 부분이 있어 확인해 드리려고 연락드렸습니다.'
+        : Number.isFinite(emp) && emp > 0
+          ? '요즘 직원 채용은 어떠신지, 고용지원금 받을 수 있는 부분이 있는지 확인해 드리려고 연락드렸습니다.'
+          : '요즘 회사 사정은 어떠신지, 도와드릴 부분이 있는지 여쭤보려고 연락드렸습니다.'
+    const who = r.representativeName.trim() ? `${r.representativeName.trim()} 대표님` : `${r.companyName} 대표님`
+    out.push({ record: r, reasons, days: ds, ment: `${who}, 오랜만에 안부 드립니다. ${hook} 편하실 때 10분 정도 통화 가능하실까요?` })
   }
   return out.sort((a, b) => b.days - a.days).slice(0, 12)
 }

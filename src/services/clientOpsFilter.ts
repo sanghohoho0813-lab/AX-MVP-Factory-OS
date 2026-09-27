@@ -15,12 +15,13 @@ import { CONTRACT_KIND_LABEL, contractStageOf } from '../types/clientOps'
 import { clientOpsProgress } from './clientOpsAlerts'
 import { todayLocalDate } from '../lib/appClock'
 
-export type ClientFilterKey = 'all' | 'cash' | 'insurance' | 'mixed' | 'unsigned' | 'unpaid' | 'overdue'
+export type ClientFilterKey = 'all' | 'cash' | 'insurance' | 'mixed' | 'unsigned' | 'unpaid' | 'overdue' | 'late'
 
-export const CLIENT_FILTER_ORDER: ClientFilterKey[] = ['all', 'unpaid', 'overdue', 'cash', 'insurance', 'mixed', 'unsigned']
+export const CLIENT_FILTER_ORDER: ClientFilterKey[] = ['all', 'late', 'unpaid', 'overdue', 'cash', 'insurance', 'mixed', 'unsigned']
 
 export const CLIENT_FILTER_LABEL: Record<ClientFilterKey, string> = {
   all: '전체',
+  late: '다음 약속 지남',
   unpaid: '못 받은 돈 있음',
   overdue: '연체 있음',
   cash: `${CONTRACT_KIND_LABEL.cash} 계약`,
@@ -49,6 +50,9 @@ export function matchesClientFilter(r: ClientOpsRecord, key: ClientFilterKey, to
       return clientOpsProgress(r, today).unpaidNet > 0
     case 'overdue':
       return clientOpsProgress(r, today).overduePayments > 0
+    case 'late':
+      // D-125: 다음 약속 날짜가 오늘보다 앞인데 아직 그대로인 업체 — "약속 지난 데부터 전화하자"
+      return r.nextActionDueDate !== '' && r.nextActionDueDate < today
   }
 }
 

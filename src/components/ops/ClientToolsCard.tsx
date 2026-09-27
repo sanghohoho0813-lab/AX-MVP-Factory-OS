@@ -10,12 +10,15 @@
  * 도구를 막지는 않는다 — 손으로 붙여넣어 쓰는 길이 늘 있기 때문이다.
  */
 
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertTriangle, ArrowRight, Check, FileUp } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { liveTools } from '../../config/toolRegistry'
 import { missingDocsForTools, missingDocsText, missingReason, readinessOf } from '../../services/toolReadiness'
 import { Badge, Section, Surface } from '../ui/primitives'
+
+const MOBILE_FIRST = 3
 
 export function ClientToolsCard({
   record,
@@ -28,6 +31,8 @@ export function ClientToolsCard({
   onOpenDocs: () => void
 }) {
   const tools = liveTools().filter((t) => t.path !== null)
+  /** D-125: 휴대폰에서는 앞의 셋만 — 나머지는 누르면(업체 개요가 휴대폰에서 너무 길었다) */
+  const [showAll, setShowAll] = useState(false)
   if (tools.length === 0) return null
 
   const readiness = readinessOf(record, tools, today)
@@ -64,12 +69,12 @@ export function ClientToolsCard({
 
         {/* D-122: 도구마다 한두 줄로 — 예전 카드는 없는 서류를 줄마다 늘어놔 휴대폰에서 1,200px 가까이 됐다 */}
         <ul className="grid divide-y divide-slate-100 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white sm:grid-cols-2 sm:divide-y-0 sm:gap-px sm:bg-slate-100 xl:grid-cols-3">
-          {readiness.map((r) => {
+          {readiness.map((r, i) => {
             const t = r.tool
             const Icon = t.icon
             const blocked = !r.ready
             return (
-              <li key={t.key} className="bg-white">
+              <li key={t.key} className={`bg-white ${i >= MOBILE_FIRST && !showAll ? 'hidden sm:block' : ''}`}>
                 <Link
                   to={`${t.path}?client=${record.id}`}
                   data-tool={t.key}
@@ -99,6 +104,16 @@ export function ClientToolsCard({
             )
           })}
         </ul>
+        {readiness.length > MOBILE_FIRST && !showAll && (
+          <button
+            type="button"
+            data-testid="client-tools-more"
+            onClick={() => setShowAll(true)}
+            className="tap t-sub inline-flex w-full items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white py-2 font-semibold text-slate-700 hover:bg-slate-50 sm:hidden"
+          >
+            도구 {readiness.length - MOBILE_FIRST}개 더 보기
+          </button>
+        )}
 
         <p className="t-meta break-keep text-slate-500">
           도구에서 나온 판정은 단추 한 번으로 이 업체 기록에 붙습니다. 서류가 없어도 도구는 열립니다.

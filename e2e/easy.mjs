@@ -197,7 +197,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByTestId('meeting-rounds').getByRole('button', { name: '1차 미팅' }).click()
   await page.waitForTimeout(200)
   check('미팅 메모: 차수를 바꿨다 와도 적은 글이 남는다', (await page.getByTestId('meeting-recorder').locator('textarea').inputValue()).includes('가지급금'))
-  await page.getByRole('button', { name: '메모 나눠 보기' }).click()
+  await page.getByRole('button', { name: '메모 정리하기' }).click()
   check('미팅 메모: 받을 자료가 있으면 자료 요청 카톡', ((await page.getByTestId('meeting-analysis').innerText()) ?? '').includes('자료 요청 카톡'))
   await page.getByRole('button', { name: '기록 저장' }).click()
   await page.waitForTimeout(500)

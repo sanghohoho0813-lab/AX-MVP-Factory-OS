@@ -188,7 +188,7 @@ function LibraryContent({ workspaceId }: { workspaceId: string | null }) {
             지금 연락할 곳이 없는 주제 · {topics.filter(({ list: cs }) => cs.length === 0).map(({ t }) => t.name).join(' · ')}
           </p>
         )}
-        <p className="t-meta break-keep text-slate-500">관심사 · 고민 · 메모 · 업종 낱말로 고르는 규칙 계산입니다(원본 기준). 이름을 누르면 미팅 준비로 갑니다.</p>
+        <p className="t-meta break-keep text-slate-500">관심사 · 고민 · 메모 · 업종 낱말로 골랐습니다. 이름을 누르면 미팅 준비로 갑니다.</p>
       </Surface>
 
       <div className="flex flex-col gap-3">

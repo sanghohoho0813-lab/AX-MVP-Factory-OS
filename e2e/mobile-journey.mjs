@@ -46,9 +46,9 @@ await step('오늘 화면이 오늘 할 일부터 보여준다', async () => {
   return true
 })
 
-await step('하단 내비게이션이 다섯 칸으로 뜬다', async () => {
+await step('하단 내비게이션이 여섯 칸으로 뜬다(D-125 영업 추가)', async () => {
   const n = await page.locator('nav[aria-label="주요 화면"] a, nav[aria-label="주요 화면"] button').count()
-  return n === 5 ? `${n}칸` : false
+  return n === 6 ? `${n}칸` : false
 })
 
 await step('하단 내비로 고객 화면으로 간다', async () => {
@@ -97,7 +97,7 @@ await step('업무 일기에 한 줄 남긴다', async () => {
 })
 
 await step('이벤트함에서 한 건을 처리한다', async () => {
-  await page.locator('nav[aria-label="주요 화면"]').getByText('상담신청', { exact: true }).click()
+  await page.locator('nav[aria-label="주요 화면"]').getByText('상담', { exact: true }).click()
   await page.waitForURL('**/ops/inbox')
   await page.getByRole('button', { name: '처리 완료' }).first().click()
   await page.waitForTimeout(700)

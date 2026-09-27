@@ -17,6 +17,7 @@
 import { localDateOf } from '../lib/appClock'
 import type { ClientOpsRecord, SalesPath, SalesStage } from '../types/clientOps'
 import { withActivity } from './clientOpsActivity'
+import { allDocumentMetas } from './clientOpsDocuments'
 import { canUse, type ModuleAccess } from './moduleAccess'
 import { cretopForMeeting, interestOf, latestCretopResult, meetingPicks } from './salesCretop'
 import { deriveInterests } from './salesEngine'
@@ -214,6 +215,31 @@ function currentIndex(record: ClientOpsRecord): number {
 
 const PROPOSAL_SENT = new Set(['견적 전달', '검토 중', '조건 조율', '계약 예정', '계약 완료'])
 
+/** 가장 최근 1차 미팅 기록의 '받을 자료' */
+function lastM1Docs(meetings: { round: number; at: string; nextDocs: string[] }[]): string[] {
+  const m1 = meetings.filter((m) => m.round === 1).sort((a, b) => b.at.localeCompare(a.at))[0]
+  return m1?.nextDocs ?? []
+}
+
+const docCore = (label: string) => label.replace(/\(.*?\)/g, '').replace(/[\s·]/g, '')
+
+/**
+ * 미팅에서 받기로 한 자료를 받았나 (D-125) — 이름으로 서류 칸을 찾아 '받음' 인지 본다(서류함에 칸 만들기와 같은 짝짓기).
+ * 칸을 못 찾은 자료는 아직 안 받은 것으로 센다.
+ */
+export function requestedDocsStatus(record: ClientOpsRecord, names: string[]): { name: string; received: boolean }[] {
+  const metas = allDocumentMetas(record)
+  return [...new Set(names.map((n) => n.trim()).filter(Boolean))].map((name) => {
+    const c = docCore(name)
+    const meta = metas.find((m) => {
+      const h = docCore(m.label)
+      return h !== '' && c !== '' && (h.includes(c) || c.includes(h) || (c.includes('재무제표') && h.includes('재무제표')))
+    })
+    const state = meta ? (record.documents as Record<string, { received?: boolean } | undefined>)[meta.key] : undefined
+    return { name, received: state?.received === true }
+  })
+}
+
 export function buildJourney(record: ClientOpsRecord, opts: JourneyOptions): Journey {
   const id = record.id
   const s = record.sales
@@ -241,6 +267,8 @@ export function buildJourney(record: ClientOpsRecord, opts: JourneyOptions): Jou
   const prepDone = CONTRACT_CHECKLIST.filter((x) => prep.has(x)).length
   // D-122: 크레탑 보고서는 영업 자료이지 계약 서류가 아니다 — 크레탑 등록만 해도 '계약 서류' 가 끝남으로 뜨던 것
   const docsIn = Object.entries(record.documents).filter(([k, d]) => d.received && k !== 'cretopReport').length
+  const requested = requestedDocsStatus(record, lastM1Docs(meetings))
+  const requestedIn = requested.filter((d) => d.received).length
 
   // 계약 뒤 추가 제안 — 크레탑 추천 가운데 제안에 아직 없는 것
   const proposed = (s?.proposal?.packages ?? []).join(' ')
@@ -275,8 +303,15 @@ export function buildJourney(record: ClientOpsRecord, opts: JourneyOptions): Jou
     ],
     m1: [
       { label: '1차 미팅 기록', done: had(1), to: `/sales/meeting?client=${id}&round=1`, note: lastM1 ? localDateOf(lastM1.at) : '' },
-      { label: '요청 자료 받기', done: cur >= 2, to: `/ops/clients/${id}?tab=docs`, note: lastM1?.nextDocs.length ? lastM1.nextDocs.slice(0, 3).join(' · ') : `받은 서류 ${docsIn}` },
-      { label: '다음 미팅 약속', done: cur >= 2, to: null, note: cur === 1 && record.nextActionDueDate ? record.nextActionDueDate : "'다음 약속' 에서 정합니다" },
+      // D-125: 받기로 한 자료를 다 받으면 끝(예전엔 2차 미팅 단계가 되어야만 체크됐다) · 몇 개 받았는지
+      {
+        label: '요청 자료 받기',
+        done: requested.length > 0 ? requestedIn === requested.length : cur >= 2,
+        to: `/ops/clients/${id}?tab=docs`,
+        note: requested.length > 0 ? `${requested.length}개 중 ${requestedIn}개 받음 · ${requested.filter((d) => !d.received).slice(0, 3).map((d) => d.name).join(' · ') || '다 받음'}` : `받은 서류 ${docsIn}`,
+      },
+      // D-125: 1차 미팅 뒤 오늘 이후 날짜로 다음 약속이 있으면 끝
+      { label: '다음 미팅 약속', done: cur >= 2 || (had(1) && record.nextActionDueDate !== '' && record.nextActionDueDate >= opts.today), to: null, note: cur === 1 && record.nextActionDueDate ? `${record.nextActionDueDate}${record.nextAction ? ` · ${record.nextAction}` : ''}` : "'다음 약속' 에서 정합니다" },
     ],
     m2: [
       { label: '제안서', done: !!s?.proposal, to: `/sales/proposal?client=${id}`, note: s?.proposal ? `${s.proposal.packages.length}개 · ${s.proposal.status}` : '' },

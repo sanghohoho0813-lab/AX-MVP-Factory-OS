@@ -11,7 +11,7 @@
 import { useNavCounts } from './useNavCounts'
 import { Link } from 'react-router-dom'
 import { useNavPath } from '../../lib/navFrom'
-import { CalendarDays, Inbox, LayoutGrid, ListChecks, Sun } from 'lucide-react'
+import { CalendarDays, Inbox, KanbanSquare, LayoutGrid, ListChecks, Sun } from 'lucide-react'
 import { navAccentClass, type NavAccent } from '../../config/moduleRegistry'
 
 interface NavItem {
@@ -24,12 +24,14 @@ interface NavItem {
   match?: string[]
 }
 
-/** 서랍 메뉴 순서와 같다: 오늘 → 일정 → 고객 → 상담신청 (D-108) */
+/** 서랍 메뉴 순서와 같다: 오늘 → 일정 → 고객 → 상담신청 → 영업 (D-108 · D-125: 영업이 하루 일의 절반이라 아래에도) */
 const ITEMS: NavItem[] = [
   { to: '/', label: '오늘', icon: Sun, accent: 'overview', match: ['/'] },
   { to: '/ops/calendar', label: '일정', icon: CalendarDays, accent: 'evidence', match: ['/ops/calendar', '/journal'] },
   { to: '/ops/clients', label: '고객', icon: ListChecks, accent: 'ops', match: ['/ops/clients'] },
-  { to: '/ops/inbox', label: '상담신청', icon: Inbox, accent: 'alert', match: ['/ops/inbox'] },
+  // D-125: 여섯 칸이 되어 아래에서는 '상담' 으로 줄인다(서랍에는 '잠재고객 상담신청' 그대로) — 큰 글자에서 옆 칸과 붙었다
+  { to: '/ops/inbox', label: '상담', icon: Inbox, accent: 'alert', match: ['/ops/inbox'] },
+  { to: '/sales/board', label: '영업', icon: KanbanSquare, accent: 'revenue', match: ['/sales'] },
 ]
 
 /* 고른 칸의 옅은 바탕 — Tailwind 는 적힌 글자만 만들므로 통째로 적는다 */

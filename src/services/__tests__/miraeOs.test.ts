@@ -86,7 +86,7 @@ import salesAppSource from '../../tools/salesKit/orig/SalesApp.jsx?raw'
 import cretopCompanyText from '../../../e2e/fixtures/cretop-company.txt?raw'
 import { analyzeCretopText } from '../../tools/cretop/mini/analysisCore.js'
 import { applyCretopToClient, tidyCompanyName, companyKey, cretopForMeeting, cretopResultInput, cretopTier, digestCretop, findClientForCretop, meetingPicks, normalizeEstablished, FLOW_ROUND } from '../salesCretop'
-import { SALES_PATH_INFO, buildJourney, journeyTools, withSalesPath } from '../salesJourney'
+import { SALES_PATH_INFO, buildJourney, journeyTools, requestedDocsStatus, withSalesPath } from '../salesJourney'
 import { withToolResult } from '../clientOpsService'
 import { NEXT_QUICK_DAYS, addDaysLocal, friendlyDate, nextSuggestions, relativeDay, suggestsFirstMeeting, withNextAction } from '../clientOpsNextAction'
 import { buildClientSchedule } from '../clientOpsSchedule'
@@ -447,6 +447,12 @@ check('top: 모든 항목에 이유', top.every((a) => a.reason.length > 0))
 check('top: 처리 완료 이벤트·미래 후속조치 제외', !top.some((a) => a.id === 'event:done' || a.id === 'follow:fu-later'))
 check('top: 후속조치 이유에 며칠 지났는지', top.find((a) => a.id === 'follow:fu')?.reason.includes('2일') === true)
 check('top: limit', buildTopActions({ alerts: [], events: [], followUps: [], clientNames: names, today: TODAY }).length === 0)
+// D-125: 영업에서 멈춘 곳도 같은 줄에 선다(점수 순)
+{
+  const salesExtra = { id: 'sales:x', kind: 'sales' as const, title: 'x', detail: '', reason: '영업', severity: 'warning' as const, href: '/sales', clientId: 'x', clientName: 'x', score: 80 }
+  const mixed = buildTopActions({ alerts: [alert({ id: 'w', kind: 'task_due_soon', severity: 'warning' })], events: [], followUps: [], clientNames: names, today: TODAY, extra: [salesExtra] }, 3)
+  check('top: 영업 신호가 임박 마감보다 먼저', mixed.map((a) => a.id).join() === 'sales:x,alert:w', mixed.map((a) => a.id).join())
+}
 
 // 하루 정리
 let rec = normalizeClientOps({ id: 'c1', companyName: '한빛', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
@@ -1256,6 +1262,8 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('보기: 연체 있음 — 예정일 지난 미수금', names('overdue') === '미수')
   check('보기: 완납은 못 받은 돈에 안 나온다', !matchesClientFilter(paidAll, 'unpaid', T))
   check('보기: 키 검사', isClientFilterKey('overdue') && !isClientFilterKey('x') && CLIENT_FILTER_ORDER[0] === 'all')
+  // D-125: 다음 약속 지남 — 오늘보다 앞 날짜만(오늘 · 빈 날짜는 아님)
+  check('보기: 다음 약속 지남', matchesClientFilter({ ...lead, nextActionDueDate: '2026-09-13' }, 'late', T) && !matchesClientFilter({ ...lead, nextActionDueDate: T }, 'late', T) && !matchesClientFilter({ ...lead, nextActionDueDate: '' }, 'late', T) && CLIENT_FILTER_ORDER[1] === 'late')
 }
 
 /* ------------------------------------------------------------------ */
@@ -1508,7 +1516,7 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   const calm = mk('조용함', { sales: sales('lead'), nextAction: '연락', activity: [{ id: 'w', kind: 'sales', text: 't', serviceKey: null, at: ago(1) }] })
   const risks = salesRisks([overdue, proposed, quoted, bigFee, won, calm], today, now)
   const reasonOf = (id: string) => risks.find((r) => r.record.id === id)?.reason ?? ''
-  check('신호: 다음 할 일 날짜 지남 (6일)', reasonOf('지난일') === '다음 할 일 날짜 6일 지남', reasonOf('지난일'))
+  check('신호: 다음 약속 지남 (6일)', reasonOf('지난일') === '다음 약속 6일 지남', reasonOf('지난일'))
   check('신호: 제안 완료 7일 후속 없음', reasonOf('제안후') === '제안 완료 후 7일 이상 후속 없음', reasonOf('제안후'))
   check('신호: 견적 전달 7일 변화 없음', reasonOf('견적후') === '견적 전달 후 7일 이상 변화 없음')
   check('신호: 예상 수임료 300만+ 인데 미팅 기록 없음', reasonOf('큰수임료') === '예상 수임료 높은데 미팅 기록 없음')
@@ -1521,7 +1529,9 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   const rc = salesRecontacts([old, held, fresh], now)
   check('다시 연락: 60일 조용 · 보류 30일 지남만, 오래된 순', rc.map((r) => r.record.id).join() === '오래됨,보류됨', rc.map((r) => r.record.id).join())
   check('다시 연락: 직원만 있다고 올리지 않는다(원본과 다른 점)', !rc.some((r) => r.record.id === '최근'))
-  check('다시 연락: 이유 2개까지 · 연락 문구', rc[0].reasons.length === 2 && rc[0].reasons[1].includes('고용지원금') && rc[0].ment.startsWith('오래됨 대표님, 최근 60일'))
+  check('다시 연락: 이유 2개까지 · 짧은 안쪽 이유', rc[0].reasons.length === 2 && /^\d+일째 연락 없음$/.test(rc[0].reasons[0]) && rc[0].reasons[1].includes('고용지원금'), JSON.stringify(rc[0].reasons))
+  // D-125: 고객에게 가는 문구에 안쪽 말(관리 접점 · 재접촉 타이밍)이 들어가지 않는다 · 관심사로 첫말
+  check('다시 연락: 고객 문구는 안부 · 관심사(연구소) · 안쪽 말 없음', rc[0].ment.includes('오랜만에 안부') && rc[0].ment.includes('연구소') && !/접점|타이밍|이력/.test(rc[0].ment), rc[0].ment)
 
   const topicRd = PROPOSAL_TOPICS.find((t) => t.key === 'rd')!
   const rdHit = customersForTopic([mk('연구', { sales: sales('lead', { interests: ['연구소'] }) }), mk('제조사', { industry: '금속 제조', sales: sales('lead') }), mk('무관', { sales: sales('lead') }), { ...mk('보관', { sales: sales('lead', { interests: ['연구소'] }) }), archivedAt: ago(1) }], topicRd)
@@ -1620,7 +1630,7 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('영업 흐름: 1차 미팅 체크리스트(AX) 자리 — 준비 중', j0.steps[0].tasks.some((t) => t.soon === true && t.to === '/sales/first-meeting'))
   const m1 = { ...attached, sales: { ...attached.sales!, stage: 'm1done' as const, meetings: [{ id: 'n', at, round: 1 as const, text: '', reaction: '', issues: [], hesitant: [], nextDocs: ['재무제표', '주주명부'] }] } }
   const j1 = buildJourney(m1, { today })
-  check('영업 흐름: 1차 완료 → 1차 미팅 걸음, 기록 체크 · 요청 자료 이름', j1.current === 'm1' && j1.steps[0].state === 'done' && j1.steps[1].tasks[0].done && j1.steps[1].tasks[1].note === '재무제표 · 주주명부')
+  check('영업 흐름: 1차 완료 → 1차 미팅 걸음, 기록 체크 · 요청 자료 이름', j1.current === 'm1' && j1.steps[0].state === 'done' && j1.steps[1].tasks[0].done && j1.steps[1].tasks[1].note === '2개 중 0개 받음 · 재무제표 · 주주명부', j1.steps[1].tasks[1].note)
   const cash = buildJourney(withSalesPath(m1, 'cash', at), { today })
   check('영업 흐름: 현금 계약이면 3차 · 클로징은 건너뛸 수 있음', cash.path === 'cash' && cash.steps[3].state === 'optional' && SALES_PATH_INFO.cash.hint.includes('2차'))
   check('영업 흐름: 법인보험은 3·4차 안내 · 건너뛰지 않음', buildJourney(withSalesPath(m1, 'insurance', at), { today }).steps[3].state === 'next' && SALES_PATH_INFO.insurance.hint.includes('4차'))
@@ -1755,6 +1765,16 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('서류 칸: 표준 칸(최근 3개년 재무제표)은 다시 만들지 않는다', !slots.some((x) => x.includes('재무제표')) && slots.includes('주주명부'), JSON.stringify(slots))
   const slotted = withDocSlots(lead, ['주주명부', '정관'])
   check('서류 칸: 만들고, 두 번째에는 없는 것만', slotted.customDocuments.length === 2 && missingDocSlots(slotted, ['주주명부', '정관']).length === 0)
+  // D-125: 요청 자료 받기 · 다음 미팅 약속 체크
+  const withReq = { ...slotted, nextAction: '2차 미팅', nextActionDueDate: '2026-12-31', sales: { ...slotted.sales!, stage: 'm1done' as const, meetings: [{ id: 'm1', at, round: 1 as const, text: 'x', reaction: '', issues: [], hesitant: [], nextDocs: ['주주명부', '정관'] }] } }
+  check('요청 자료: 이름으로 서류 칸을 찾아 받았는지 본다(처음엔 둘 다 안 받음)', requestedDocsStatus(withReq, ['주주명부', '정관']).every((d) => !d.received))
+  const keyOf = (label: string) => withReq.customDocuments.find((d) => d.label === label)!.key
+  const oneIn = withDocument(withReq, keyOf('주주명부'), { received: true })
+  const m1Of = (r: typeof withReq) => buildJourney(r, { today: '2026-09-27' }).steps.find((x) => x.key === 'm1')!.tasks
+  check('요청 자료: 하나 받으면 1/2 · 아직 끝 아님', m1Of(oneIn)[1].done === false && m1Of(oneIn)[1].note.startsWith('2개 중 1개 받음'), m1Of(oneIn)[1].note)
+  const allIn = withDocument(oneIn, keyOf('정관'), { received: true })
+  check('요청 자료: 다 받으면 끝(2차 미팅 전이어도)', m1Of(allIn)[1].done === true)
+  check('다음 미팅 약속: 1차 미팅 뒤 오늘 이후 날짜가 있으면 끝', m1Of(withReq)[2].done === true && m1Of({ ...withReq, nextActionDueDate: '2026-09-01' })[2].done === false)
 
   const fromInbox = withInboxPayload(lead, { message: '가지급금 때문에 상담 받고 싶습니다', program: '정책자금', preferred_contact_time: '평일 오후' }, '2026-09-26')
   check('상담신청 → 영업: 문의 내용 = 대표 고민 · 관심사 · 희망 연락 = 다음 약속', fromInbox.sales?.concern === '가지급금 때문에 상담 받고 싶습니다' && (fromInbox.sales?.interests ?? []).includes('정책자금') && (fromInbox.sales?.interests ?? []).includes('가지급금') && fromInbox.nextAction.startsWith('첫 연락') && fromInbox.nextActionDueDate === '2026-09-26')

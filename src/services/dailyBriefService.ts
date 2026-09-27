@@ -13,7 +13,7 @@ import { netAmountOf } from './feeMath'
 import { localDateOf } from '../lib/appClock'
 import { eventSummary, isOpenEvent, waitingDays, waitingLevel, EVENT_TYPE_LABEL } from './customerBridgeService'
 
-export type BriefActionKind = 'alert' | 'event' | 'follow_up' | 'funding' | 'payment'
+export type BriefActionKind = 'alert' | 'event' | 'follow_up' | 'funding' | 'payment' | 'sales'
 
 export interface BriefAction {
   id: string
@@ -92,10 +92,12 @@ export function buildTopActions(
     followUps: JournalEntry[]
     clientNames: Map<string, string>
     today: string
+    /** D-125: 다른 곳(영업 신호)에서 고른 것을 같은 줄에 세운다 */
+    extra?: BriefAction[]
   },
   limit = 3,
 ): BriefAction[] {
-  const out: BriefAction[] = []
+  const out: BriefAction[] = [...(input.extra ?? [])]
 
   for (const a of input.alerts) {
     const { score, reason } = alertScore(a)
@@ -147,7 +149,7 @@ export function buildTopActions(
       kind: 'follow_up',
       title: f.content.length > 60 ? `${f.content.slice(0, 60)}…` : f.content,
       detail: f.clientId ? (input.clientNames.get(f.clientId) ?? '') : '',
-      reason: overdue ? `후속조치 기한이 ${-left}일 지났습니다` : '오늘까지 하기로 한 후속조치입니다',
+      reason: overdue ? `할 일 기한이 ${-left}일 지났습니다` : '오늘까지 하기로 한 할 일입니다',
       severity: overdue ? 'critical' : 'warning',
       href: f.clientId ? `/ops/clients/${f.clientId}` : '/journal',
       clientId: f.clientId,
@@ -196,7 +198,7 @@ export function buildDaySummary(input: {
     }
   }
   for (const j of journal) {
-    if (j.entryType === 'follow_up' && j.completed && isToday(j.completedAt)) done.push(withName(j.clientId, `후속조치 완료 — ${j.content}`))
+    if (j.entryType === 'follow_up' && j.completed && isToday(j.completedAt)) done.push(withName(j.clientId, `할 일 끝냄 — ${j.content}`))
   }
   const resolvedEvents = events.filter((e) => e.status === 'resolved' && isToday(e.handledAt))
   for (const e of resolvedEvents) done.push(`상담신청 처리 — ${eventSummary(e).who}: ${EVENT_TYPE_LABEL[e.eventType]}`)
