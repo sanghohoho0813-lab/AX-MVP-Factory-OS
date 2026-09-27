@@ -32,7 +32,7 @@ export function LeadLevel({ tier, score, withHint = false }: { tier: ScoreTierKe
       data-level={lv.n}
       data-score={score}
       title={`영업 중요도 ${lv.n}단계(5단계 중) — ${lv.hint}`}
-      className={`t-sub inline-flex items-center gap-2 rounded-full border px-2.5 py-1 font-bold ${lv.pill}`}
+      className={`t-sub inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-full border px-2.5 py-1 font-bold ${lv.pill}`}
     >
       {/* 다섯 칸 — 지금 단계만 진하게 */}
       <span aria-hidden="true" className="inline-flex items-center gap-0.5">
@@ -40,8 +40,8 @@ export function LeadLevel({ tier, score, withHint = false }: { tier: ScoreTierKe
           <span key={k} className={`rounded-full ${LEAD_LEVELS[k].dot} ${k === tier ? 'size-2.5 ring-2 ring-white' : 'size-1.5 opacity-35'}`} />
         ))}
       </span>
-      {lv.label}
-      {withHint && <span className="font-medium opacity-80">· {lv.hint}</span>}
+      <span className="whitespace-nowrap">{lv.label}</span>
+      {withHint && <span className="font-medium break-keep opacity-80">· {lv.hint}</span>}
     </span>
   )
 }

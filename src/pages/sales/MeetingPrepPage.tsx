@@ -4,12 +4,12 @@
  * D-121 대표 지시 — "스크롤이 너무 길고 쓸데없는 게 많다. 정말 필요한 것만."
  *  - 맨 위 한 장: 업체 · 단계 · 점수 · 다음 약속. 영업 흐름은 한 줄로 접어 둔다.
  *  - 1차 미팅 준비 = 크레탑 분석기 그대로(단독 판매 부품 CretopWorkbench). 분석하면 이 업체에 바로 반영.
- *    엔진 대본(오프닝 · 질문 · 자료 · 전략 TOP3)은 그 아래 '영업 대본' 으로 접는다.
+ *    엔진 대본(오프닝 · 질문 · 자료 · 전략 3가지)은 그 아래 '영업 대본' 으로 접는다.
  *  - 2차 · 3차는 운영 OS 흐름: 크레탑 전략에서 이어서 물을 것 → 핵심 대본 → 제안 · 계약. 나머지는 '더 보기'.
  *  - 카톡 문구는 한 묶음으로 접는다. 글은 지우지 않았다.
  *
  * 기업컨설팅 OS 의 '미팅 준비' · '고객 카드 분석' · '녹취/메모 분석' 을 고객 관리 한 장부 위로 옮겼다.
- *  - 고객을 고르면: 리드 점수 · 등급 · 전략 TOP3 · 미팅 테마, 그리고 첫 연락 · 1차 · 2차 · 3차 대본(원본 문구 그대로).
+ *  - 고객을 고르면: 리드 점수 · 등급 · 전략 3가지 · 미팅 테마, 그리고 첫 연락 · 1차 · 2차 · 3차 대본(원본 문구 그대로).
  *  - 고객 정보(대표 나이 · 매출 · 체크 17 · 메모)를 고치면 점수 · 대본이 바로 바뀐다. 메모 글로 빈 칸을 채울 수 있다.
  *  - 미팅 뒤 적은 메모를 규칙으로 나눠(반응 · 주제 · 망설임 · 다음 자료) 기록하고, 단계 · 다음 할 일을 한 번에 옮긴다.
  * 모두 규칙 계산이다(LLM 호출 없음). 'AX 1차 미팅 체크리스트'(/sales/first-meeting) 자리와는 따로다.
@@ -832,12 +832,12 @@ function FirstContactPlan({ item }: { item: EngineItem }) {
   )
 }
 
-/** 1차 영업 대본 — 크레탑 분석기 아래 접어 둔다. 규칙으로 고른 전략 TOP3 도 여기 */
+/** 1차 영업 대본 — 크레탑 분석기 아래 접어 둔다. 규칙으로 고른 전략 3가지 도 여기 */
 function FirstMeetingScript({ item }: { item: EngineItem }) {
   const p = buildMeetingPlan(item, 'm1')
   const strategies = recommendedStrategiesFor(item)
   return (
-    <Disclosure title="영업 대본 — 오프닝 · 질문 · 요청 자료" hint={`질문 ${p.questions.length}개 · 전략 TOP3`}>
+    <Disclosure title="영업 대본 — 오프닝 · 질문 · 요청 자료" hint={`질문 ${p.questions.length}개 · 전략 3가지`}>
       <div data-testid="meeting-plan" className="flex flex-col gap-3">
         <ScriptBlock title="목표" text={p.goal} />
         <ScriptBlock title="오프닝" text={p.opening} copy />
