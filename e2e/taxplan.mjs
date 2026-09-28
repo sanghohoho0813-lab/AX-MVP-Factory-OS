@@ -118,6 +118,30 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.locator('[data-glance="cash"]').click()
   await page.waitForTimeout(500)
   check('한눈에 줄을 누르면 그 결과로', await page.evaluate(() => { const r = document.querySelector('[data-testid="result-cash"]').getBoundingClientRect(); return r.top < window.innerHeight && r.bottom > 0 }))
+  // D-133 여러 해에 나눠 가져오기
+  const split = page.getByTestId('split-box')
+  check('나눠 가져오기: 처음에는 접혀 있다(계산이 무거워 펼칠 때만)', (await split.evaluate((e) => e.open)) === false)
+  await split.locator('summary').first().click()
+  await page.getByTestId('split-best').waitFor({ timeout: 5000 })
+  const splitText = (await split.innerText()) ?? ''
+  check('나눠 가져오기: 1 · 2 · 3 · 5년 네 줄 · 가장 적음 표시', (await split.locator('[data-split]').count()) === 4 && (await split.locator('text=가장 적음').count()) === 1, splitText.slice(0, 300))
+  check('나눠 가져오기: 1년 줄 = 추천 순부담(2,397만원) · 나누면 덜 내는 돈', splitText.includes('2,397만원') && /\d+년에 나누면/.test(splitText) && splitText.includes('덜 냅니다'), splitText.slice(0, 300))
+  check('나눠 가져오기: 해마다 계산기와 같은 숫자 · ★ 해마다 더한 것', (await split.locator('[data-proof="ok"]').count()) === 1 && splitText.includes('★ 해마다 같은 급여'))
+  check('한눈에: 나누면 덜 내는 돈도 한 줄에', ((await page.getByTestId('plan-glance').innerText()) ?? '').includes('년에 나누면'))
+  // D-133 대표님께 드릴 한 장
+  check('인쇄 단추 · 화면에서는 한 장이 안 보인다', (await page.getByTestId('plan-print').count()) === 1 && !(await page.getByTestId('plan-print-sheet').isVisible()))
+  await page.emulateMedia({ media: 'print' })
+  const sheet = await page.evaluate(() => {
+    const el = document.querySelector('[data-testid="plan-print-sheet"]')
+    const vis = (e) => !!e && getComputedStyle(e).display !== 'none' && getComputedStyle(e).visibility !== 'hidden' && e.getBoundingClientRect().height > 0
+    return { sheet: vis(el), text: el?.textContent ?? '', planWant: vis(document.querySelector('[aria-labelledby="plan-want"]')), nav: vis(document.querySelector('nav')) }
+  })
+  check('인쇄: 한 장만 찍힌다(입력 · 메뉴는 빠짐)', sheet.sheet && !sheet.planWant && !sheet.nav, JSON.stringify({ ...sheet, text: sheet.text.length }))
+  check('인쇄: 업체 이름 · 한눈에 · 나눠 가져오기 · 계산기 대조 · 세무사 확인', sheet.text.includes('절세 설계 요약') && sheet.text.includes('한눈에') && sheet.text.includes('여러 해에 나눠') && /맞춰 본 곳 \d+곳 중 \d+곳/.test(sheet.text) && sheet.text.includes('세무사'), sheet.text.slice(0, 200))
+  const pdf = await page.pdf({ format: 'A4' })
+  const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length
+  check('인쇄: A4 3장 이하(빈 종이 없음)', pages >= 1 && pages <= 3, String(pages))
+  await page.emulateMedia({ media: 'screen' })
   check('현금 1억 · 배당: 다른 주주 몫 · 차등배당 주의', ((await divCard.innerText()) ?? '').includes('다른 주주도') && ((await divCard.innerText()) ?? '').includes('차등배당'))
   await divCard.getByText('계산 근거 보기').click()
   check('근거: 법 조항 · 어느 계산기', ((await divCard.innerText()) ?? '').includes('03 2026 소득세') && ((await divCard.innerText()) ?? '').includes('§14'))

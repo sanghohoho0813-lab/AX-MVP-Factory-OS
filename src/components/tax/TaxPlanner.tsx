@@ -7,7 +7,7 @@
  */
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { BadgeCheck, ChevronDown, ClipboardCopy, ExternalLink, Plus, Save, Search, Trash2 } from 'lucide-react'
+import { BadgeCheck, ChevronDown, ClipboardCopy, ExternalLink, Plus, Printer, Save, Search, Trash2 } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { useToast } from '../ui/toastContext'
 import { copyText } from '../consulting/studioParts'
@@ -36,9 +36,12 @@ import {
   retirePlan,
   salaryPlan,
   shareValueOf,
+  splitPlan,
   viewProfile,
   wonOf,
   type CalcOpen,
+  type CashRouteKey,
+  type SplitPlan,
   type CashRoute,
   type Proof,
   calcNo,
@@ -147,6 +150,9 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
   const wantRetire = st.goals.includes('retire')
   const cashTarget = wonOf(st.cashTarget)
   const cash = useMemo(() => (wantCash && cashTarget > 0 ? cashPlan(p, st.register, sv, cashTarget, today) : null), [wantCash, cashTarget, p, st.register, sv, today])
+  /* D-133: 여러 해에 나눠 가져오기 — 계산이 무거워(해마다 9종 식을 다시 푼다) 펼쳤을 때만 */
+  const [splitOpen, setSplitOpen] = useState(false)
+  const split = useMemo(() => (splitOpen && cash ? splitPlan(p, st.register, sv, cashTarget, today) : null), [splitOpen, cash, p, st.register, sv, cashTarget, today])
   const salary = useMemo(
     () => (wantSalary ? salaryPlan(p, { mode: st.salary.mode, ratePct: Number(st.salary.rate) || 0, netMonthly: wonOf(st.salary.net) }) : null),
     [wantSalary, st.salary, p],
@@ -193,9 +199,14 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
     for (const h of holdings) now.push(`${h.row.name}(${RELATION_LABEL[h.row.relation]}) ${h.row.shares.toLocaleString('ko-KR')}주 · ${(h.ratio * 100).toFixed(1)}%${sv.perShare > 0 ? ` · ${krw(h.value)}` : ''}`)
     if (now.length) parts.push({ title: '현황', lines: now })
     if (cash) {
-      const lines = cash.routes.map((r) => `${r === cash.best ? '[추천] ' : ''}${r.verify.length > 0 ? '★' : ''}${r.label}: ${r.ok ? `세금 ${krw(r.personalTax)} · 법인세 절감 ${krw(r.corpSaving)} · 순부담 ${krw(r.netBurden)}` : `안 됨 — ${r.reason}`}`)
+      const lines = cash.routes.map((r) => {
+        const tag = r === cash.best ? '[추천] ' : r.unsafe ? '[추천하지 않음] ' : r.key === 'retire' && r.ok ? '[퇴임할 때만] ' : ''
+        const burden = r.netBurden < 0 ? `이득 ${krw(-r.netBurden)}` : `순부담 ${krw(r.netBurden)}`
+        return `${tag}${r.verify.length > 0 ? '★' : ''}${r.label}: ${r.ok ? `세금 ${krw(r.personalTax)} · 법인세 절감 ${krw(r.corpSaving)} · ${burden}` : `안 됨 — ${r.reason}`}`
+      })
       parts.push({ title: `대표가 세후 ${krw(cash.target)} 가져오기`, lines })
     }
+    if (split?.best) parts.push({ title: '여러 해에 나눠 가져오면', lines: [...split.rows.map(splitLine), `★ ${split.outside}`] })
     if (salary?.ok && salary.r) parts.push({ title: '급여 맞추기', lines: [`${salary.message}: 월 ${won(salary.monthly)} · 실효부담률 ${(salary.r.effRate * 100).toFixed(1)}% · 세후 월 ${won(salary.r.afterTax / 12)}`] })
     if (gift?.ok && on('gift'))
       parts.push({
@@ -320,7 +331,16 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
 
   /* ---- D-132: 한눈 요약 — 목표마다 한 줄. 누르면 그 카드로 ---- */
   const glance: { goal: GoalKey; text: string; ok: boolean }[] = GOAL_ORDER.filter(on).map((g) => {
-    if (g === 'cash') return { goal: g, ok: !!cash?.best, text: cash?.best ? `추천 ${cash.best.label} — 순부담 ${krw(cash.best.netBurden)}` : cashTarget > 0 ? '되는 방법이 없습니다 — 아래 까닭을 보세요' : '가져올 금액을 적으세요' }
+    if (g === 'cash')
+      return {
+        goal: g,
+        ok: !!cash?.best,
+        text: cash?.best
+          ? `추천 ${cash.best.label} — 순부담 ${krw(cash.best.netBurden)}${split?.best && split.best.years > 1 && split.saving > 0 ? ` · ★${split.best.years}년에 나누면 ${krw(split.saving)} 덜` : ''}`
+          : cashTarget > 0
+            ? '되는 방법이 없습니다 — 아래 까닭을 보세요'
+            : '가져올 금액을 적으세요',
+      }
     if (g === 'salary') return { goal: g, ok: !!salary?.ok, text: salary?.ok ? `월 급여 ${won(salary.monthly)}${salary.r ? ` · 실효 ${(salary.r.effRate * 100).toFixed(1)}%` : ''}` : (salary?.message ?? '') }
     if (g === 'gift')
       return {
@@ -334,6 +354,13 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
     if (g === 'loan') return { goal: g, ok: !!loan?.ok, text: loan?.ok ? `해마다 ${krw(loan.yearLoss)} 손해 · 10년 ${krw(loan.tenYear)}` : '가지급금 잔액을 적으세요' }
     return { goal: g, ok: !!retire?.ok, text: retire?.ok ? `한도 ${krw(retire.limit)} · 세후 ${krw(retire.net)}` : (retire?.message ?? '') }
   })
+  /** 인쇄 한 장에 적을 '계산기와 맞춰 본 곳' 수 */
+  const proofCount = () => {
+    const pfs = [cash?.best?.proof, salary?.proof, gift?.ok ? gift.proof : null, inherit?.ok ? inherit.proof : null, loan?.ok ? loan.proof : null, retire?.ok ? retire.proof : null, ...(split?.best?.proofs ?? [])].filter(
+      (x): x is Proof => !!x,
+    )
+    return { all: pfs.length, ok: pfs.filter((x) => checkProof(x).ok).length }
+  }
   const goTo = (g: GoalKey) => document.querySelector(`[data-testid="result-${g}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
 
   /* ---- D-132: 현황 채움 — 결과에 크게 쓰이는 칸 ---- */
@@ -358,7 +385,7 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
     <NeedCtx.Provider value={needSet}>
     <div className="flex flex-col gap-5" data-testid="tax-plan">
       {/* ① 원하는 것 */}
-      <section className="flex flex-col gap-3 rounded-(--radius-panel) border border-brand-200 bg-brand-50 p-4" aria-labelledby="plan-want">
+      <section className="no-print flex flex-col gap-3 rounded-(--radius-panel) border border-brand-200 bg-brand-50 p-4" aria-labelledby="plan-want">
         <h2 id="plan-want" className="t-card font-bold text-slate-900">
           원하는 결과를 적으세요{clientName ? ` — ${clientName}` : ''}
         </h2>
@@ -427,11 +454,11 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
 
       {/* ③ 결과 */}
       {st.goals.length === 0 ? (
-        <p className="t-body rounded-(--radius-panel) border border-dashed border-slate-300 bg-white px-4 py-5 break-keep text-slate-600">
+        <p className="no-print t-body rounded-(--radius-panel) border border-dashed border-slate-300 bg-white px-4 py-5 break-keep text-slate-600">
           위에서 원하는 결과를 적거나 &lsquo;한 번에 볼 것&rsquo;을 누르면 여기에 방법 · 세금 · 근거가 나옵니다.
         </p>
       ) : (
-        <section className="flex flex-col gap-4" aria-labelledby="plan-result">
+        <section className="no-print flex flex-col gap-4" aria-labelledby="plan-result">
           <div className="flex flex-col gap-2 rounded-(--radius-panel) border-2 border-navy-900 bg-white p-4" data-testid="plan-glance">
             <p className="t-card font-bold text-slate-900">한눈에</p>
             <ul className="flex flex-col gap-1">
@@ -465,6 +492,7 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
                   </div>
                   <NeedBox items={needsFor('cash')} onJump={jump} />
                   {cash ? <CashRoutes plan={cash} onOpen={onOpenCalc} /> : <p className="t-sub text-slate-500">금액을 적으면 급여 · 배당 · 자사주(양도 · 소각) · 퇴직금을 모두 계산해 비교합니다.</p>}
+                  {cash?.best && <SplitBox open={splitOpen} onToggle={setSplitOpen} split={split} />}
                 </ResultCard>
               )
             if (g === 'salary')
@@ -679,7 +707,7 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
       )}
 
       {/* ② 현황 */}
-      <section className="flex flex-col gap-3" aria-labelledby="plan-now">
+      <section className="no-print flex flex-col gap-3" aria-labelledby="plan-now">
         <div className="flex flex-col gap-1.5">
           <h2 id="plan-now" className="t-card font-bold text-slate-900">
             이 회사 현황 <span className="t-sub font-normal text-slate-500">— 고치면 위 결과가 바로 바뀝니다</span>
@@ -827,8 +855,14 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
           <Button variant="secondary" onClick={() => void copy()}>
             <ClipboardCopy aria-hidden="true" className="size-4" /> 요약 복사
           </Button>
+          {st.goals.length > 0 && (
+            <Button variant="secondary" onClick={() => window.print()} data-testid="plan-print" title="대표님께 드릴 한 장으로 인쇄하거나 PDF로 저장합니다">
+              <Printer aria-hidden="true" className="size-4" /> 인쇄 · PDF
+            </Button>
+          )}
         </div>
       </div>
+      {st.goals.length > 0 && <PrintSheet clientName={clientName} today={today} glance={glance} parts={summaryParts()} proofs={proofCount()} />}
     </div>
     </NeedCtx.Provider>
   )
@@ -1318,7 +1352,7 @@ function ProofBadge({ proof, outside }: { proof?: Proof | null; outside?: string
       {res && !res.ok && (
         <span className="t-meta rounded-full border border-danger-300 bg-danger-50 px-2 py-0.5 font-bold text-danger-800">⚠ 계산기 {calcNo(proof!.calc)}과 다름 — 세무사 확인</span>
       )}
-      {outside && <span className="t-meta rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 font-semibold break-keep text-amber-900">★ {outside}</span>}
+      {outside && <span className="t-meta rounded-(--radius-control) border border-amber-300 bg-amber-50 px-2 py-0.5 font-semibold break-keep text-amber-900">★ {outside}</span>}
     </span>
   )
 }
@@ -1394,5 +1428,164 @@ function RouteCard({ r, best, onOpen }: { r: CashRoute; best: boolean; onOpen: (
         </div>
       </details>
     </li>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* D-133: 여러 해에 나눠 가져오기 · 대표님께 드릴 한 장                     */
+/* ------------------------------------------------------------------ */
+
+const ROUTE_SHORT: Record<CashRouteKey, string> = {
+  salary: '급여',
+  dividend: '배당',
+  shareSale: '주식 팔기',
+  shareBurn: '자사주 소각',
+  spouseBurn: '배우자 증여 후 소각',
+  retire: '퇴직금',
+  mix: '급여+배당',
+}
+
+/** 해마다 고른 방법 — 같은 것이 이어지면 '주식 팔기 ×3' */
+function stepsText(row: SplitPlan['rows'][number]): string {
+  const out: string[] = []
+  let i = 0
+  while (i < row.steps.length) {
+    let j = i
+    while (j + 1 < row.steps.length && row.steps[j + 1].key === row.steps[i].key) j += 1
+    const n = j - i + 1
+    out.push(`${ROUTE_SHORT[row.steps[i].key]}${n > 1 ? ` ×${n}` : ''}`)
+    i = j + 1
+  }
+  return out.join(' → ')
+}
+
+function splitLine(row: SplitPlan['rows'][number]): string {
+  const head = row.years === 1 ? '1년에 다' : `${row.years}년에 나눠(해마다 ${krw(row.perYear)})`
+  return row.ok ? `${head}: ${stepsText(row)} · 순부담 합 ${krw(row.total)}` : `${head}: 안 됨 — ${row.reason}`
+}
+
+function SplitBox({ open, onToggle, split }: { open: boolean; onToggle: (v: boolean) => void; split: SplitPlan | null }) {
+  const one = split?.oneShot
+  const proofs = split?.best?.proofs ?? []
+  const bad = proofs.filter((x) => !checkProof(x).ok).length
+  const calcs = [...new Set(proofs.map((x) => calcNo(x.calc)))].join(' · ')
+  return (
+    <details open={open} onToggle={(e) => onToggle(e.currentTarget.open)} className="group rounded-(--radius-control) border border-slate-200 bg-slate-50" data-testid="split-box">
+      <summary className="tap flex cursor-pointer list-none items-center gap-2 px-3 py-2.5">
+        <span className="t-body min-w-0 flex-1 font-bold break-keep text-slate-900">여러 해에 나눠 가져오면? (1 · 2 · 3 · 5년 비교)</span>
+        <ChevronDown aria-hidden="true" className="size-5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+      </summary>
+      {open && split && (
+        <div className="flex flex-col gap-2 border-t border-slate-200 px-3 pt-2.5 pb-3">
+          {split.best && (
+            <p className="t-body break-keep text-slate-800" data-testid="split-best">
+              {split.best.years === 1 ? (
+                <>
+                  <b className="font-bold text-brand-800">1년에 다 가져오는 것</b>이 가장 적게 냅니다.
+                </>
+              ) : one?.ok ? (
+                <>
+                  <b className="font-bold text-brand-800">{split.best.years}년에 나누면</b> 1년에 다 가져올 때보다 <b className="font-bold">{krw(split.saving)}</b> 덜 냅니다.
+                </>
+              ) : (
+                <>
+                  1년에는 안 되고, <b className="font-bold text-brand-800">{split.best.years}년에 나누면</b> 됩니다.
+                </>
+              )}
+            </p>
+          )}
+          <ol className="flex flex-col gap-1.5">
+            {split.rows.map((r) => {
+              const isBest = r === split.best
+              return (
+                <li
+                  key={r.years}
+                  data-split={r.years}
+                  data-ok={r.ok}
+                  className={`flex flex-wrap items-baseline gap-x-3 gap-y-0.5 rounded-(--radius-control) border px-3 py-2 ${isBest ? 'border-brand-500 bg-white' : 'border-slate-200 bg-white'}`}
+                >
+                  <span className="t-body min-w-0 flex-[1_1_12rem] break-keep">
+                    <b className="font-bold text-slate-900">{r.years === 1 ? '1년에 다' : `${r.years}년에 나눠`}</b>
+                    {isBest && <span className="t-meta ml-1.5 rounded-full bg-brand-600 px-2 py-0.5 font-bold whitespace-nowrap text-white">가장 적음</span>}
+                    <span className="t-sub block text-slate-600">{r.ok ? `해마다 ${krw(r.perYear)} · ${stepsText(r)}` : `안 됨 — ${r.reason}`}</span>
+                  </span>
+                  {r.ok && (
+                    <span className="ml-auto shrink-0 text-right whitespace-nowrap tabular-nums">
+                      <span className="t-sub text-slate-500">순부담 합 </span>
+                      <b className="font-bold text-navy-900">{krw(r.total)}</b>
+                      {one?.ok && r.years > 1 && <span className="t-sub block text-success-700">{r.total < one.total ? `${krw(one.total - r.total)} 덜` : `${krw(r.total - one.total)} 더`}</span>}
+                    </span>
+                  )}
+                </li>
+              )
+            })}
+          </ol>
+          <span className="flex flex-wrap items-center gap-1.5" data-proof={proofs.length === 0 ? 'none' : bad === 0 ? 'ok' : 'bad'}>
+            {proofs.length > 0 && bad === 0 && (
+              <span className="t-meta inline-flex items-center gap-1 rounded-full border border-success-200 bg-success-50 px-2 py-0.5 font-semibold text-success-700">
+                ✓ 해마다 계산기 {calcs}과 같은 숫자({proofs.length}번 맞춰 봄)
+              </span>
+            )}
+            {bad > 0 && <span className="t-meta rounded-full border border-danger-300 bg-danger-50 px-2 py-0.5 font-bold text-danger-800">⚠ 계산기와 다른 해 {bad}개 — 세무사 확인</span>}
+            <span className="t-meta rounded-(--radius-control) border border-amber-300 bg-amber-50 px-2 py-0.5 font-semibold break-keep text-amber-900">★ {split.outside}</span>
+          </span>
+          {split.notes.length > 0 && (
+            <ul className="t-sub list-disc pl-5 break-keep text-slate-600">
+              {split.notes.map((n) => (
+                <li key={n}>{n}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </details>
+  )
+}
+
+/** 인쇄할 때만 보이는 한 장 — 한눈에 · 목표별 결과 · ★ · 세무사 확인 */
+function PrintSheet({
+  clientName,
+  today,
+  glance,
+  parts,
+  proofs,
+}: {
+  clientName: string
+  today: string
+  glance: { goal: GoalKey; text: string }[]
+  parts: { title: string; lines: string[] }[]
+  proofs: { all: number; ok: number }
+}) {
+  return (
+    <div className="print-document hidden bg-white text-slate-900 print:block" data-testid="plan-print-sheet" aria-hidden="true">
+      <h1 className="text-[1.5rem] font-bold">{clientName ? `${clientName} ` : ''}절세 설계 요약</h1>
+      <p className="mt-1 text-slate-600">{today} · 세금 계산기 9종의 식으로 계산 · 참고용</p>
+      <section className="avoid-break mt-4 rounded border-2 border-slate-900 p-3">
+        <h2 className="font-bold">한눈에</h2>
+        <ul className="mt-1 flex flex-col gap-0.5">
+          {glance.map((x) => (
+            <li key={x.goal}>
+              <span className="text-slate-600">{GOAL_LABEL[x.goal]}</span> — <b>{x.text}</b>
+            </li>
+          ))}
+        </ul>
+      </section>
+      {parts.map((pt) => (
+        <section key={pt.title} className="avoid-break mt-3">
+          <h2 className="border-b border-slate-400 pb-0.5 font-bold">{pt.title}</h2>
+          <ul className="mt-1 flex flex-col gap-0.5">
+            {pt.lines.map((l) => (
+              <li key={l}>{l}</li>
+            ))}
+          </ul>
+        </section>
+      ))}
+      <section className="avoid-break mt-4 border-t border-slate-400 pt-2 text-slate-700">
+        <p>
+          계산기와 다시 맞춰 본 곳 {proofs.all}곳 중 {proofs.ok}곳 같은 숫자. ★ 표시는 확실하지 않아 세무사 검증이 필요한 부분입니다.
+        </p>
+        <p>참고용 계산입니다 — 실행 전에 담당 세무사가 요건 · 사실관계를 확인해야 합니다.</p>
+      </section>
+    </div>
   )
 }

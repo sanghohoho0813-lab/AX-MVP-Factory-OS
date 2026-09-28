@@ -618,6 +618,10 @@ export interface CashRoute {
   proof?: Proof | null
   /** D-132: 계산기 9종 밖의 식 · 가정이 들어간 곳(★) */
   outside?: string
+  /** D-133: 대표 주식이 줄어드는 방법(팔기 · 소각)의 주 수 — 나눠 가져올 때 다음 해 주식 수 */
+  soldShares?: number
+  /** D-133: 배당가능이익에서 나가는 돈(배당 · 자기주식 취득) — 나눠 가져올 때 다음 해 한도 */
+  fromEarnings?: number
 }
 
 export interface CashPlan {
@@ -735,6 +739,7 @@ function dividendRoute(c: Ctx, target: number): CashRoute {
     open: { calc: 't9', sub: 'inc_a', values: got.values, label: '03 소득세(1안)에서 열기' },
     verify: [],
     proof: { calc: 't9', sub: 'inc_a', values: got.values, blockId: 'inc_a_out3', k: '종합소득세 총부담세액', expect: got.after },
+    fromEarnings: companyOut,
   }
 }
 
@@ -778,11 +783,16 @@ function shareSaleRoute(c: Ctx, target: number): CashRoute {
     ],
     conditions: [
       ...(ceo.acquirePrice > 0 ? [] : [c.p.par > 0 ? `취득가를 몰라 액면가(${fmt(c.p.par)})로 보았습니다.` : '취득가 · 액면가를 몰라 0원으로 보았습니다 — 세금이 실제보다 많게 나옵니다.']),
+      ...(c.p.retainedEarnings > 0 && q * V > c.p.retainedEarnings
+        ? [`회사가 사기에는 배당 가능한 이익(${fmt(c.p.retainedEarnings)})이 모자랍니다(${fmt(q * V)} 필요) — 모자란 만큼은 다른 사람에게 팔아야 합니다.`]
+        : []),
       '회사가 사들이면 배당가능이익 한도 · 주주총회 결의가 필요하고, 소각하면 의제배당으로 과세될 수 있습니다 — 세무사 확인.',
     ],
     basis: SHARE_SALE_BASIS,
     open: { calc: 't9', sub: 'inc_a', values: r.values, label: '03 소득세(1안)에서 열기' },
     proof: { calc: 't9', sub: 'inc_a', values: r.values, blockId: 'inc_a_out1', k: '⑫ 양도소득세 총부담액', expect: r.gainTax },
+    soldShares: q,
+    fromEarnings: q * V,
     verify: ['회사가 사들인 주식을 보유 · 다시 팔 목적이어야 양도소득입니다 — 소각할 목적이면 의제배당(아래 "자사주 소각")으로 과세됩니다. 계약서 · 이사회 · 주주총회 결의 내용으로 판단'],
   }
 }
@@ -891,6 +901,8 @@ function shareBurnRoute(c: Ctx, target: number): CashRoute {
     basis: SHARE_BURN_BASIS,
     open: { calc: 't9', sub: 'inc_a', values: r.values, label: '03 소득세(1안)에서 열기' },
     proof: { calc: 't9', sub: 'inc_a', values: r.values, blockId: 'inc_a_out3', k: '종합소득세 총부담세액', expect: r.incomeTax },
+    soldShares: q,
+    fromEarnings: out,
     verify: ['의제배당에도 배당가산(Gross-up) · 배당세액공제를 적용해 계산했습니다 — 소각 재원(이익잉여금 · 자본잉여금)에 따라 달라질 수 있습니다'],
   }
 }
@@ -974,6 +986,7 @@ function mixRoute(c: Ctx, target: number): CashRoute | null {
     verify: [],
     proof: null,
     outside: '01 급여 · 03 소득세 계산기 결과를 더한 것',
+    fromEarnings: companyDiv,
   }
 }
 
@@ -993,6 +1006,96 @@ export function cashPlan(p: ProfileView, reg: ShareholderRow[], sv: ShareValue, 
   const ranked = [...routes].sort((a, b) => rank(a) - rank(b) || a.netBurden - b.netBurden)
   const best = ranked.find((r) => r.ok && !r.unsafe && r.key !== 'retire') ?? null
   return { target, routes: ranked, best, notes }
+}
+
+/* ------------------------------------------------------------------ */
+/* 목표 2-1 — 여러 해에 나눠 가져오기 (D-133)                               */
+/*  해마다는 위 cashPlan 그대로(계산기 9종 식). 더하는 것만 계산기 밖이다.     */
+/* ------------------------------------------------------------------ */
+
+export const SPLIT_YEARS = [1, 2, 3, 5] as const
+
+export interface SplitRow {
+  years: number
+  /** 해마다 가져올 세후 금액 */
+  perYear: number
+  ok: boolean
+  reason: string
+  /** 해마다 고른 방법(추천과 같은 규칙: 되는 것 중 순부담이 가장 적은 것 · 다툼 있는 방법 · 퇴직금 제외) */
+  steps: CashRoute[]
+  /** 해마다 순부담의 합 */
+  total: number
+  /** 해마다 대표 세금의 합 */
+  totalTax: number
+  /** 해마다 결과를 계산기로 다시 맞춰 볼 값 */
+  proofs: Proof[]
+}
+
+export interface SplitPlan {
+  target: number
+  rows: SplitRow[]
+  /** 합이 가장 적은 것 */
+  best: SplitRow | null
+  /** 1년에 다 가져올 때 */
+  oneShot: SplitRow | null
+  /** 1년에 다 가져올 때보다 덜 내는 돈(1년에 안 되면 0) */
+  saving: number
+  outside: string
+  notes: string[]
+}
+
+export const SPLIT_OUTSIDE = '해마다 같은 급여 · 같은 세법(2026년)으로 보고, 해마다 계산기 결과를 더한 것 — 새로 생기는 이익 · 주식가치 변화는 넣지 않았습니다'
+
+export function splitPlan(p: ProfileView, reg: ShareholderRow[], sv: ShareValue, target: number, today: string): SplitPlan {
+  const empty: SplitPlan = { target, rows: [], best: null, oneShot: null, saving: 0, outside: SPLIT_OUTSIDE, notes: [] }
+  if (!(target > 0)) return empty
+  const rows: SplitRow[] = []
+  for (const years of SPLIT_YEARS) {
+    const perYear = Math.round(target / years)
+    let p2: ProfileView = { ...p }
+    let reg2 = reg.map((r) => ({ ...r }))
+    let sv2: ShareValue = { ...sv }
+    const steps: CashRoute[] = []
+    let reason = ''
+    for (let y = 1; y <= years; y++) {
+      const best = cashPlan(p2, reg2, sv2, perYear, today).best
+      if (!best) {
+        reason = y === 1 ? '되는 방법이 없습니다.' : `${y}년째에는 되는 방법이 없습니다(앞선 해에 이익 · 주식을 써서).`
+        break
+      }
+      steps.push(best)
+      // 다음 해: 판 · 소각한 주식은 빼고, 배당가능이익에서 나간 돈도 뺀다
+      if (best.soldShares) {
+        const sold = best.soldShares
+        reg2 = reg2.map((r) => (r.relation === 'ceo' ? { ...r, shares: Math.max(0, r.shares - sold) } : r))
+        if (best.key === 'shareBurn') sv2 = { ...sv2, totalShares: Math.max(0, sv2.totalShares - sold) }
+      }
+      if (best.fromEarnings && p2.retainedEarnings > 0) {
+        // 0 은 '모름' 이라 한도 없이 계산되므로, 다 쓴 경우는 1원으로 남겨 '더는 안 됨' 이 되게 한다
+        p2 = { ...p2, retainedEarnings: Math.max(1, p2.retainedEarnings - best.fromEarnings) }
+      }
+    }
+    const ok = steps.length === years
+    rows.push({
+      years,
+      perYear,
+      ok,
+      reason,
+      steps,
+      total: ok ? steps.reduce((a, r) => a + r.netBurden, 0) : 0,
+      totalTax: ok ? steps.reduce((a, r) => a + r.personalTax, 0) : 0,
+      proofs: steps.map((r) => r.proof).filter((x): x is Proof => !!x),
+    })
+  }
+  const okRows = rows.filter((r) => r.ok)
+  const best = okRows.length ? okRows.reduce((a, b) => (b.total < a.total - 1 ? b : a)) : null
+  const oneShot = rows.find((r) => r.years === 1) ?? null
+  const saving = best && oneShot?.ok ? Math.max(0, oneShot.total - best.total) : 0
+  const notes: string[] = []
+  if (p.retainedEarnings === 0) notes.push('배당 가능한 이익을 적으면 해마다 쓸 수 있는 한도를 가립니다.')
+  if (best && best.years > 1) notes.push('나눠 받으면 돈도 그만큼 늦게 들어옵니다 — 지금 꼭 필요한 금액부터 정하세요.')
+  if (best && best.years > 1 && best.steps.some((r) => r.key === 'salary' || r.key === 'mix')) notes.push('급여로 나눠 받으면 해마다 임원 보수 한도(정관 · 주주총회) 안이어야 합니다.')
+  return { target, rows, best, oneShot, saving, outside: SPLIT_OUTSIDE, notes }
 }
 
 /* ------------------------------------------------------------------ */

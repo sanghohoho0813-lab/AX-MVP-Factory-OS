@@ -23,6 +23,8 @@ import {
   retirePlan,
   salaryPlan,
   shareValueOf,
+  splitPlan,
+  SPLIT_YEARS,
   successionLimit,
   successionSpecialTax,
   viewProfile,
@@ -288,6 +290,15 @@ check('금액: "1억 5천" = 1억 5천만 · "5천" 은 5천원인지 5천만원
       if (nums.some((n) => !Number.isFinite(n))) broken.push(`${i}: NaN/Infinity`)
       for (const r of cp.routes) if (r.ok && !r.unsafe && r.key !== 'mix' && r.net < target - 1) broken.push(`${i}: ${r.key} 손에 ${r.net} < ${target}`)
       if (cp.best?.unsafe) broken.push(`${i}: 다툼 있는 방법이 추천됨`)
+      if (i < 10) {
+        const spR = splitPlan(pv, regR, svR, target, TODAY)
+        for (const r of spR.rows) {
+          if (!Number.isFinite(r.total)) broken.push(`${i}: 나눠 ${r.years}년 NaN`)
+          if (r.ok && r.steps.some((x) => x.unsafe || x.key === 'retire')) broken.push(`${i}: 나눠 ${r.years}년에 다툼 · 퇴직금`)
+          for (const pf of r.proofs) if (!checkProof(pf).ok) broken.push(`${i}: 나눠 ${r.years}년 대조 ${pf.k}`)
+        }
+        if (spR.rows[0]?.ok !== !!cp.best) broken.push(`${i}: 나눠 1년 ≠ 추천`)
+      }
       const pfs = [...cp.routes.map((r) => r.proof), sp.proof, gp.proof, ip.proof, ip.familyBiz?.proof, lp.proof, rp.proof].filter((x): x is Proof => !!x)
       for (const pf of pfs) if (!checkProof(pf).ok) broken.push(`${i}: ${pf.calc} ${pf.k} ${pf.expect} ≠ ${checkProof(pf).got}`)
       cases += 1
@@ -296,7 +307,35 @@ check('금액: "1억 5천" = 1억 5천만 · "5천" 은 5천원인지 5천만원
     }
   }
   broken = broken.slice(0, 8)
-  check(`무작위 현황 ${cases}벌: 멈춤 · NaN 0 · 목표 채움 · 계산기 대조 전부 일치 · 다툼 방법 추천 0`, cases === 40 && broken.length === 0, broken)
+  check(`무작위 현황 ${cases}벌: 멈춤 · NaN 0 · 목표 채움 · 계산기 대조 전부 일치 · 다툼 방법 추천 0 · 나눠 가져오기 10벌`, cases === 40 && broken.length === 0, broken)
+}
+
+
+/* ---------------- D-133 나눠 가져오기 ---------------- */
+{
+  const t0 = Date.now()
+  const sp = splitPlan(p, reg, sv, 1e8, TODAY)
+  const ms = Date.now() - t0
+  check(`나눠: 1 · 2 · 3 · 5년 네 줄 (${ms}ms)`, sp.rows.map((r) => r.years).join(',') === SPLIT_YEARS.join(','), sp.rows.map((r) => r.years))
+  const one = sp.rows[0]
+  check('나눠: 1년 줄 = 현금 가져오기 추천과 같은 방법 · 같은 순부담', one.ok && one.steps[0].key === cash.best?.key && Math.abs(one.total - (cash.best?.netBurden ?? -1)) < 1, [one.total, cash.best?.netBurden])
+  check('나눠: 해마다 목표만큼 손에(합이 목표 이상)', sp.rows.filter((r) => r.ok).every((r) => r.steps.length === r.years && r.steps.reduce((a, x) => a + x.net, 0) >= 1e8 - r.years * 2), sp.rows.map((r) => [r.years, Math.round(r.steps.reduce((a, x) => a + x.net, 0))]))
+  check('나눠: 가장 싼 줄 ≤ 1년에 다 · 아끼는 돈 = 차이', !!sp.best && sp.best.total <= one.total + 1 && Math.abs(sp.saving - (one.total - sp.best.total)) < 1, [sp.best?.years, sp.best?.total, one.total, sp.saving])
+  check('나눠: 해마다 결과도 계산기로 다시 맞춰 보면 같다', sp.rows.flatMap((r) => r.proofs).length >= 5 && sp.rows.flatMap((r) => r.proofs).every((pf) => checkProof(pf).ok))
+  check('나눠: 계산기 밖(더하기 · 해마다 같다고 봄) 표시', sp.outside.includes('해마다') && sp.outside.includes('더한'))
+  const soldAll = sp.rows.map((r) => r.steps.reduce((a, x) => a + (x.soldShares ?? 0), 0))
+  check('나눠: 해마다 판 주식의 합 ≤ 대표 주식', soldAll.every((n) => n <= 60000), soldAll)
+  // 배당가능이익 1억 · 주식가치 모름(주식 방법 안 됨) → 급여 · 배당만. 배당으로 쓴 이익의 합은 1억을 넘지 않는다
+  const tight = viewProfile({ ...raw, retainedEarnings: '1억', vAsset: '', vDebt: '', vInc0: '', vInc1: '', vInc2: '' })
+  const spT = splitPlan(tight, reg, shareValueOf(tight, reg), 1.5e8, TODAY)
+  const used = spT.rows.map((r) => r.steps.filter((x) => x.key === 'dividend' || x.key === 'shareBurn' || x.key === 'mix').reduce((a, x) => a + (x.fromEarnings ?? 0), 0))
+  check('나눠: 배당가능이익은 해마다 줄어든다(배당으로 쓴 합 ≤ 1억)', spT.rows.some((r) => r.ok && r.years > 1) && used.every((u) => u <= 1e8 + 1), spT.rows.map((r, k) => [r.years, r.ok, Math.round(used[k]), r.steps.map((x) => x.key).join(',')]))
+  const sale = cashPlan(viewProfile({ ...raw, retainedEarnings: '1억' }), reg, sv, 3e8, TODAY).routes.find((r) => r.key === 'shareSale')
+  check('주식 팔기: 회사가 사기에 이익이 모자라면 그렇다고 적는다', sale?.conditions.some((x) => x.includes('다른 사람에게 팔아야')) === true, sale?.conditions)
+  check('나눠: 금액이 없으면 줄 없음', splitPlan(p, reg, sv, 0, TODAY).rows.length === 0)
+  const sp5 = splitPlan(p, reg, sv, 5e8, TODAY)
+  check('나눠: 5억도 오류 없이 · 합 NaN 0', sp5.rows.every((r) => Number.isFinite(r.total) && Number.isFinite(r.totalTax)), sp5.rows.map((r) => r.total))
+  if (process.env.SHOW) for (const x of [sp, spT, sp5]) console.log(x.target, x.rows.map((r) => `${r.years}년 ${r.ok ? Math.round(r.total) : r.reason} [${r.steps.map((s) => s.key).join(',')}]`).join(' | '), 'best', x.best?.years, 'save', Math.round(x.saving))
 }
 
 if (process.env.SHOW) {
