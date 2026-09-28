@@ -6,9 +6,9 @@
  * 이미 같은 값이면 단추 대신 '업체 정보와 같음' 만 적는다.
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Check, Send } from 'lucide-react'
-import type { FactSource } from '../../types/clientOps'
+import type { ClientOpsRecord, FactSource } from '../../types/clientOps'
 import { listClients, saveClient } from '../../services/clientOpsService'
 import { factDef, readFact, sameFactValue, withFactValue } from '../../services/customerFacts'
 import { nowIso } from '../../lib/appClock'
@@ -16,18 +16,51 @@ import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/toastContext'
 import { useToolClient } from './toolClientContext'
 
-export function FactSendButton({ factKey, value, display, source, asOf = '' }: { factKey: string; value: string; display: string; source: FactSource; asOf?: string }) {
-  const { clientId, clientRecord, clientName, workspaceId } = useToolClient()
+export function FactSendButton({
+  factKey,
+  value,
+  display,
+  source,
+  asOf = '',
+  targetClientId,
+}: {
+  factKey: string
+  value: string
+  display: string
+  source: FactSource
+  asOf?: string
+  /** D-135: 주소(?client=)가 아닌 다른 업체로 보낼 때 — 연구소 고객사처럼 모듈 안에서 업체를 고른 경우 */
+  targetClientId?: string
+}) {
+  const ctx = useToolClient()
+  const { workspaceId } = ctx
   const { showToast } = useToast()
   const [sent, setSent] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [other, setOther] = useState<ClientOpsRecord | null>(null)
+  const clientId = targetClientId ?? ctx.clientId
+  const useOther = !!targetClientId && targetClientId !== ctx.clientId
+  useEffect(() => {
+    if (!useOther) return
+    let alive = true
+    void ctx.loadClients().then((list) => {
+      if (alive) setOther(list.find((c) => c.id === targetClientId) ?? null)
+    })
+    return () => {
+      alive = false
+    }
+    // 업체가 바뀔 때만 다시 읽는다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useOther, targetClientId])
+  const clientRecord = useOther ? other : ctx.clientRecord
+  const clientName = clientRecord?.companyName ?? ctx.clientName
   if (!clientId || !clientRecord || !value) return null
   const def = factDef(factKey)
   const cur = readFact(clientRecord, factKey)
   const same = sent || (cur && cur.status === 'confirmed' && sameFactValue(def, cur.value, value))
   if (same) {
     return (
-      <span className="t-sub inline-flex items-center gap-1 text-success-700" data-testid={`fact-sent-${factKey}`}>
+      <span className="t-sub inline-flex max-w-full items-center gap-1 break-keep text-success-700" data-testid={`fact-sent-${factKey}`}>
         <Check aria-hidden="true" className="size-4" /> {def?.label} {display} — 업체 정보와 같음
       </span>
     )
@@ -46,8 +79,9 @@ export function FactSendButton({ factKey, value, display, source, asOf = '' }: {
     }
   }
   return (
-    <Button variant="secondary" disabled={busy} onClick={() => void send()} data-testid={`fact-send-${factKey}`}>
-      <Send aria-hidden="true" className="size-4" /> {def?.label} {display}{cur && cur.status !== 'missing' ? ` (지금 ${cur.display})` : ''} — 업체 정보로
+    <Button variant="secondary" disabled={busy} onClick={() => void send()} data-testid={`fact-send-${factKey}`} className="!h-auto min-h-11 max-w-full !shrink !whitespace-normal text-left break-keep">
+      <Send aria-hidden="true" className="size-4" /> {def?.label} {display}
+      {cur && cur.status !== 'missing' && sameFactValue(def, cur.value, value) ? ' — 맞다고 확인' : `${cur && cur.status !== 'missing' ? ` (지금 ${cur.display})` : ''} — 업체 정보로`}
     </Button>
   )
 }

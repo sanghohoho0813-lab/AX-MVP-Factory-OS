@@ -8,6 +8,7 @@
 import type { ToolDeadline } from '../../../../types/clientOps'
 import { ToolResultAttach } from '../../../shared/ToolResultAttach'
 import { osClientOf } from '../store'
+import { FactSendButton } from '../../../shared/FactSendButton'
 
 export default function OsAttach({
   clientId,
@@ -17,6 +18,7 @@ export default function OsAttach({
   summary,
   data,
   deadlines,
+  fact,
 }: {
   clientId?: string
   title: string
@@ -25,6 +27,8 @@ export default function OsAttach({
   summary: string
   data: unknown
   deadlines?: ToolDeadline[]
+  /** D-135: 이 화면에서 확인된 사실을 업체 정보로(예: 연구소 인정 정보 → 보유 연구소) */
+  fact?: { key: string; value: string; display: string }
 }) {
   const os = clientId ? osClientOf(clientId) : undefined
   if (clientId && !os) return null
@@ -41,6 +45,7 @@ export default function OsAttach({
         presetClientId={os?.id}
       />
       {os ? <span className="text-sm text-slate-500">→ 고객 관리 <b className="text-slate-700">{os.companyName}</b> 기록에 붙습니다</span> : null}
+      {os && fact ? <FactSendButton factKey={fact.key} value={fact.value} display={fact.display} source="certificate" targetClientId={os.id} /> : null}
     </div>
   )
 }

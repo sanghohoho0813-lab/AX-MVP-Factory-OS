@@ -45,6 +45,8 @@ import { buildCretopMeetingPoints, cretopGradeIsLow } from '../cretop/lib/meetin
 import { buildCretopParsedForUi, extractCretopCore } from '../cretop/engine/index.js'
 import { normalizeClientOps, safeOpenPath, withDocument, withToolResult, withToolResultPublished, withoutToolResult, TOOL_RESULT_LIMIT, TOOL_DEADLINE_LIMIT } from '../../services/clientOpsService'
 import { latestToolResult, toolResultGroups, withToolResultDeadline } from '../../services/toolResultGroups'
+import { findOrgForClient, orgGapsFromClient, orgInputFromClient } from '../../services/axClientLink'
+import type { Organization } from '../../types/domain'
 import { buildClientSchedule, SCHEDULE_KIND_LABEL } from '../../services/clientOpsSchedule'
 import { roundDeadlines } from '../employment/lib/toolDeadlines'
 import { changeDeadlines, surveyDeadlineDate } from '../labcare/lib/toolDeadlines'
@@ -821,6 +823,32 @@ check('칸 이름: 설명문처럼 긴 글은 이름으로 쓰지 않는다', cl
   const withCalc = withToolResult(hung, { toolKey: 'policy-funding', title: '정책자금 진단', verdict: null, verdictLabel: '회차', summary: '', data: null, deadlines: [{ date: '2026-11-01', title: '신청', note: '' }] })
   check('할 일 걸기: 도구가 기한을 새로 심어도 사람이 건 할 일은 남는다', withCalc.toolResults[1].deadlines.length === 1 && withCalc.toolResults[1].deadlines[0].todo === true && withCalc.toolResults[0].deadlines.length === 1)
   check('할 일 걸기: 저장 → 다시 읽어도 할 일 표시가 남는다', normalizeClientOps(JSON.parse(JSON.stringify(hung)) as Record<string, unknown>).toolResults[0].deadlines[0].todo === true)
+}
+
+
+/* ---------------- D-135 업체 ↔ AX 스튜디오 고객사 ---------------- */
+{
+  const rec = normalizeClientOps({
+    id: 'cli_ax', companyName: '한솔테크(주)', workspaceId: null, businessNumber: '123-45-67890', corporateNumber: '110111-1234567',
+    industry: '제조업', businessAddress: '경기도 성남시 분당구 판교로 1', establishedAt: '2015-03-02', employeeCount: '12명',
+    contactName: '김대표', contactPhone: '010-1111-2222', contactEmail: 'ceo@example.com',
+  })
+  const input = orgInputFromClient(rec)
+  check('AX 고객사: 업체 정보로 칸을 채운다', input.name === '한솔테크(주)' && input.businessRegistrationNumber === '123-45-67890' && input.industry === '제조업' && input.foundedAt === '2015-03-02' && input.employeeCount === 12 && input.address.startsWith('경기도') && input.primaryContact.phone === '010-1111-2222', JSON.stringify(input))
+  check('AX 고객사: 법인 · 지역 · 끈', input.businessType === 'corporation' && input.region === '경기' && input.clientOpsId === 'cli_ax', `${input.businessType} ${input.region}`)
+  const org = (o: Partial<Organization>): Organization => ({ ...input, clientOpsId: undefined, id: 'o', createdAt: '', updatedAt: '', archivedAt: null, ...o })
+  const linked = org({ id: 'o1', clientOpsId: 'cli_ax', businessRegistrationNumber: '' })
+  const sameBn = org({ id: 'o2', businessRegistrationNumber: '1234567890' })
+  const nameOnly = org({ id: 'o3', businessRegistrationNumber: '', name: '한솔테크(주)' })
+  const otherLinked = org({ id: 'o4', clientOpsId: 'cli_other', businessRegistrationNumber: '123-45-67890' })
+  check('찾기: 끈이 있으면 그 고객사', findOrgForClient(rec, [sameBn, linked])?.id === 'o1')
+  check('찾기: 끈이 없으면 사업자번호가 같은(하이픈 무관) 고객사', findOrgForClient(rec, [nameOnly, sameBn])?.id === 'o2')
+  check('찾기: 이름만 같으면 잇지 않는다 · 다른 업체와 이어진 고객사도 아님', findOrgForClient(rec, [nameOnly, otherLinked]) === null)
+  check('찾기: 사업자번호가 없거나 짧으면 끈으로만', findOrgForClient({ id: 'x', businessNumber: '' }, [sameBn]) === null)
+  check('찾기: 보관한 고객사는 아님', findOrgForClient(rec, [{ ...linked, archivedAt: '2026-01-01' }]) === null)
+  const gaps = orgGapsFromClient(org({ id: 'o5', industry: '', address: '서울 어딘가', foundedAt: null, employeeCount: null, businessRegistrationNumber: '123-45-67890' }), rec)
+  check('채우기: 빈 칸만(고객사에서 적은 주소는 그대로) · 끈 잇기', gaps.industry === '제조업' && gaps.address === undefined && gaps.foundedAt === '2015-03-02' && gaps.employeeCount === 12 && gaps.clientOpsId === 'cli_ax', JSON.stringify(gaps))
+  check('채우기: 다 차 있고 이어져 있으면 바꿀 것 없음', Object.keys(orgGapsFromClient(linked, rec)).length === 1 && Object.keys(orgGapsFromClient({ ...linked, businessRegistrationNumber: '123-45-67890' }, rec)).length === 0)
 }
 
 console.log(`\ntools: ${passed} passed, ${failed} failed`)

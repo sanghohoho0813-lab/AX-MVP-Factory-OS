@@ -5,6 +5,7 @@
  *        · 업체 기록에 붙이면 '다음 할 일도 걸까요?' → 3일 뒤로 걸면 달력 · 업체 다음 할 일 · 활동 기록
  *        · 보러 가기 → 업체 상세의 도구 결과로 · 결과는 모듈마다 한 묶음(지난 결과 접힘) · 만든 화면 다시 열기
  *        · 모듈 입구 줄에 '지난번 결과 · 다시 계산하기'
+ *  D-135  업체 → AX 고객사 열기(없으면 업체 정보로 만듦 · 두 번 열어도 하나) · 업체 상세 AX 프로젝트 카드 · 창업감면 생년월일 → 업체 정보
  *  390 · 360(1.30배)  업체 상세 결과 · 모듈 입구 · 할 일 상자 — 가로 넘침 0
  *
  *   node e2e/connect.mjs http://localhost:4390
@@ -105,6 +106,57 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(700)
   check('달력: 건 할 일이 뜬다', ((await page.locator('main').innerText()) ?? '').includes('절세 방안 설명 미팅'))
   check('JS 오류 없음', errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
+
+/* ---------------- D-135 업체 ↔ AX 스튜디오 · 사실 되돌림 (1440) ---------------- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await setup(page)
+  const orgs = () => page.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith('.organizations')); return k ? JSON.parse(localStorage.getItem(k) ?? '[]') : [] })
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  const axRow = page.getByTestId('client-tools').locator('a[data-feature="clients"]')
+  check('업체 상세: 모듈 입구에 AX 프로젝트 줄', (await axRow.count()) === 1 && ((await axRow.innerText()) ?? '').includes('AX 프로젝트'))
+  check('업체 상세: 이어진 AX 고객사가 없으면 AX 프로젝트 카드는 없다', (await page.getByTestId('ax-projects').count()) === 0)
+  await page.goto(BASE + '/ax/open?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  const o1 = (await orgs()).filter((o) => o.clientOpsId === 'cli_hansol')
+  check('AX 열기: 업체 정보로 AX 고객사를 만든다(사업자번호 · 업종 · 끈)', o1.length === 1 && o1[0].name === '한솔테크(주)' && o1[0].businessRegistrationNumber === '123-45-67890', JSON.stringify(o1.map((o) => [o.name, o.businessRegistrationNumber])))
+  check('AX 열기: 그 고객사 화면으로 · 업체 기록으로 돌아가는 줄', page.url().endsWith(`/clients/${o1[0]?.id}`) && (await page.getByTestId('org-client-link').count()) === 1, page.url())
+  await page.goto(BASE + '/ax/open?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  check('AX 열기: 두 번 열어도 고객사는 하나', (await orgs()).filter((o) => o.clientOpsId === 'cli_hansol' || o.name === '한솔테크(주)').length === 1 && page.url().endsWith(`/clients/${o1[0]?.id}`))
+  // 프로젝트 하나(AX 스튜디오에서 만든 것처럼)
+  await page.evaluate((orgId) => {
+    const k = Object.keys(localStorage).find((x) => x.endsWith('.organizations')).replace(/organizations$/, 'projects')
+    const list = JSON.parse(localStorage.getItem(k) ?? '[]')
+    const now = new Date().toISOString()
+    list.push({ id: 'prj_ax1', projectCode: 'AX-2026-901', organizationId: orgId, name: '생산계획 AX MVP', projectType: 'ax', objective: '작업지시 자동화', currentStage: 'diagnosis', currentMvpLevel: 0, targetMvpLevel: 2, status: 'active', healthStatus: 'healthy', progress: 0, ownerId: 'u1', fundingRequired: false, targetInstitutions: [], targetFundingAmount: null, startDate: null, dueDate: null, nextAction: '대표 진단 설문', nextActionDueDate: null, riskSummary: '', createdAt: now, updatedAt: now, archivedAt: null })
+    localStorage.setItem(k, JSON.stringify(list))
+  }, o1[0]?.id)
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const axCard = page.getByTestId('ax-projects')
+  const axText = (await axCard.innerText().catch(() => '')) ?? ''
+  check('업체 상세: AX 프로젝트 카드(이름 · 단계 · 다음)', axText.includes('생산계획 AX MVP') && axText.includes('다음:'), axText.slice(0, 200))
+  check('업체 상세: 프로젝트 · 고객사로 가는 길', (await axCard.locator('a[data-ax-project="prj_ax1"]').getAttribute('href')) === '/projects/prj_ax1' && (await page.getByTestId('ax-org-open').getAttribute('href')) === `/clients/${o1[0]?.id}`)
+
+  // 창업감면: 판정에 적은 대표 생년월일 → 업체 정보로
+  await page.goto(BASE + '/tools/startup-tax?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  await page.getByRole('button', { name: '1분 판정하기' }).click()
+  await page.waitForTimeout(800)
+  const birthBtn = page.getByTestId('fact-send-representativeBirth').or(page.getByTestId('fact-sent-representativeBirth'))
+  check('창업감면: 판정에 쓴 대표 생년월일을 업체 정보로(또는 같음)', (await birthBtn.count()) >= 1)
+  check('창업감면: 원본 예시 날짜(1980-01-01)는 보내지 않는다', !(((await page.locator('main').innerText()) ?? '').includes('1980.01.01 — 업체 정보로')))
+  check('JS 오류 없음(AX · 사실)', errors.length === 0, errors.join(' | '))
   await ctx.close()
 }
 

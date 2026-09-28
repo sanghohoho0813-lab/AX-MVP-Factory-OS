@@ -16,6 +16,7 @@ import { StartupTaxReportScreen } from './screens/ReportScreen'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
 import { usePrefillFromClient } from '../shared/usePrefill'
 import { PrefillNote } from '../shared/PrefillNote'
+import { FactSendButton } from '../shared/FactSendButton'
 import { useToolClient } from '../shared/toolClientContext'
 import { loadStartupTaxForm, saveStartupTaxForm } from './lib/formStore'
 import type { FormData as StartupTaxForm, JudgementResult } from './types'
@@ -150,6 +151,15 @@ function StartupTaxScreen() {
           <footer className="t-meta mt-10 px-1 text-center text-slate-400">창업감면 1분 판정기 · 상담용 사전진단 도구</footer>
         </div>
       </div>
+
+      {/* D-135: 판정에 쓴 대표 생년월일 · 창업일을 업체 정보로(같으면 '같음' 만 · 원본 예시 날짜는 보내지 않는다).
+          확대해 그리는 원본 화면 밖에 둔다 — 안에 두면 휴대폰 큰 글자에서 단추가 화면 밖으로 밀렸다 */}
+      {submitted && result && (
+        <div className="no-print flex flex-wrap items-center gap-2" data-testid="startup-facts">
+          {/^\d{4}-\d{2}-\d{2}$/.test(form.birthDate) && form.birthDate !== ORIG_BIRTH && <FactSendButton factKey="representativeBirth" value={form.birthDate} display={form.birthDate.replace(/-/g, '.')} source="manual" />}
+          {/^\d{4}-\d{2}-\d{2}$/.test(form.startupDate) && form.startupDate !== ORIG_STARTUP && <FactSendButton factKey="establishedAt" value={form.startupDate} display={form.startupDate.replace(/-/g, '.')} source="manual" />}
+        </div>
+      )}
 
       {/* 인쇄 전용 A4 결과서 — 원본 PrintSheet (인쇄하면 이것만 나온다) */}
       {submitted && result && (

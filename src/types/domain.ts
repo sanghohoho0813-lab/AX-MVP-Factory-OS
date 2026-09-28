@@ -40,6 +40,8 @@ export interface Organization {
   status: OrganizationStatus
   healthStatus: HealthStatus
   notes: string
+  /** D-135: 연결된 고객 운영 업체(ClientOpsRecord.id) — 업체에서 AX 스튜디오를 열면 이 고객사로 온다. 없으면 따로 만든 고객사 */
+  clientOpsId?: string
   createdAt: string
   updatedAt: string
   archivedAt: string | null

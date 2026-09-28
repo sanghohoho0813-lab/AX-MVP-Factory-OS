@@ -132,6 +132,7 @@ import { contractCloseDraft, withContractClose, type ContractCloseDraft } from '
 import { ScrollHintRow } from '../components/ui/ScrollHintRow'
 import { WorkHistoryCard } from '../components/ops/WorkHistoryCard'
 import { ToolResultsCard } from '../components/ops/ToolResultsCard'
+import { AxProjectsCard } from '../components/ops/AxProjectsCard'
 import { ClientToolsCard } from '../components/ops/ClientToolsCard'
 import { toolsNeeding } from '../config/toolRegistry'
 import { PortalTab } from '../components/ops/PortalTab'
@@ -812,6 +813,9 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
       {/* 이 업체로 도구 열기 — 결과가 다시 여기로 돌아온다 (D-89). 없는 서류는 여기서 빨갛게 (D-90) */}
       <ClientToolsCard record={record} today={today} onOpenDocs={() => setTab('docs')} />
+
+      {/* D-135: 이 업체와 이어진 AX 스튜디오 프로젝트 */}
+      <AxProjectsCard record={record} />
 
       {/* 3단계 — 나머지는 접어 둔다 */}
       <Disclosure

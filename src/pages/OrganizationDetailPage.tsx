@@ -225,6 +225,15 @@ export function OrganizationDetailPage() {
         }
       />
 
+      {organization.clientOpsId && (
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-(--radius-card) border border-brand-200 bg-brand-50 px-4 py-2.5 text-[0.95rem] break-keep text-slate-700" data-testid="org-client-link">
+          고객 관리 업체와 이어진 고객사입니다 — 연락 · 수금 · 서류는 업체 기록에서.
+          <Link to={`/ops/clients/${encodeURIComponent(organization.clientOpsId)}`} className="tap ml-auto inline-flex items-center font-semibold text-brand-700 hover:underline">
+            업체 기록 열기
+          </Link>
+        </p>
+      )}
+
       {organization.archivedAt && (
         <p className="rounded-(--radius-card) border border-slate-200 bg-slate-50 px-4 py-3 text-[0.875rem] break-keep text-slate-600">
           {formatDate(organization.archivedAt)}에 보관 처리된 고객사입니다. 기본

@@ -260,7 +260,7 @@ export const FEATURE_CATALOG: CatalogFeature[] = [
   { key: 'validation', source: 'nav', module: 'ax-studio', lockedPreview: 'intro', summary: '현장에서 써 보고 결과를 모읍니다.' },
   { key: 'deliverables', source: 'nav', module: 'ax-studio', lockedPreview: 'intro', summary: '제출용 결과자료를 만듭니다.' },
   { key: 'cases', source: 'nav', module: 'ax-studio', lockedPreview: 'intro', summary: '지난 사례를 찾아봅니다.' },
-  { key: 'clients', source: 'nav', module: 'ax-studio', lockedPreview: 'intro', summary: 'AX 프로젝트를 고객사 단위로 관리합니다.' },
+  { key: 'clients', source: 'nav', module: 'ax-studio', lockedPreview: 'intro', clientEntry: { topic: 'AX 프로젝트', verb: '열기', path: '/ax/open' }, summary: 'AX 프로젝트를 고객사 단위로 관리합니다.' },
   // WEB STUDIO
   { key: 'website-studio', source: 'nav', module: 'web-studio', lockedPreview: 'intro', summary: '업체 홈페이지의 구성 · 문구 · 디자인을 설계합니다.' },
 ]

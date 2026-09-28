@@ -251,6 +251,7 @@ function ReportBody() {
                 ...nextActions.map((a) => `· ${a}`),
               ].join("\n")}
               data={{ kind: "report", clientId: client.id, month }}
+              fact={labFactOf(client)}
             />
           </div>
         )}
@@ -499,6 +500,13 @@ function ReportBody() {
       </div>
     </Layout>
   );
+}
+
+/** D-135: 연구소 인정 정보 → 업체의 '연구소' 사실(인정일이 있을 때만) */
+function labFactOf(c: { labType: string; labName: string; certifiedDate: string; labRegistrationNumber?: string }): { key: string; value: string; display: string } | undefined {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(c.certifiedDate)) return undefined;
+  const value = [c.labType, c.labName, `인정 ${c.certifiedDate}`, c.labRegistrationNumber ? `인정번호 ${c.labRegistrationNumber}` : ""].filter(Boolean).join(" · ");
+  return { key: "researchLab", value, display: `${c.labType}(${c.certifiedDate} 인정)` };
 }
 
 export default function ReportPage() {

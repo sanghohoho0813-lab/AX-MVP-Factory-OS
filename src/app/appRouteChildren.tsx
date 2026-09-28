@@ -3,6 +3,7 @@
  * (App.tsx 에서 추출; 도메인 페이지는 route-level lazy loading 유지)
  */
 import { RouteErrorScreen } from '../components/layout/RouteErrorScreen'
+import { AxOpenPage } from '../pages/AxOpenPage'
 import { Suspense, lazy, type ReactElement } from 'react'
 import { Navigate } from 'react-router-dom'
 import { MODULE_PAGES } from '../data/modules'
@@ -381,6 +382,8 @@ export const appRouteChildren = [
       { index: true, element: <TodayCommandCenterPage /> },
       { path: 'clients', element: <ClientsListPage /> },
       { path: 'clients/new', element: <OrganizationFormPage /> },
+      // D-135: 업체에서 AX 스튜디오 열기 — 그 업체의 AX 고객사로(없으면 업체 정보로 만든다)
+      { path: 'ax/open', element: toolRoute(<AxOpenPage />) },
       { path: 'clients/:organizationId', element: <OrganizationDetailPage /> },
       { path: 'clients/:organizationId/edit', element: <OrganizationFormPage /> },
       { path: 'projects/new', element: <ProjectFormPage /> },
