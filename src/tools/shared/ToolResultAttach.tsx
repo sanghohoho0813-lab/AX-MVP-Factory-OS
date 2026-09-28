@@ -43,7 +43,7 @@ export interface ToolResultAttachProps {
 }
 
 export function ToolResultAttach(props: ToolResultAttachProps) {
-  const { clientId, clientName, workspaceId, loadClients } = useToolClient()
+  const { clientId, clientName, workspaceId, loadClients, replaceClient } = useToolClient()
   const presetId = props.presetClientId ?? clientId ?? ''
   const { showToast } = useToast()
   const [open, setOpen] = useState(false)
@@ -111,6 +111,7 @@ export function ToolResultAttach(props: ToolResultAttachProps) {
       })
       const saved = await saveClient(next)
       next = saved
+      replaceClient(saved)
       let publishedNote = ''
       if (alsoPublish) {
         const links = await listLinksForClient(workspaceId, target.id)
@@ -119,7 +120,10 @@ export function ToolResultAttach(props: ToolResultAttachProps) {
           // 고객에게 나가는 것은 이 함수 하나가 정한다 (D-89) — 제목과 요약 글뿐
           const update = await publishUpdate(workspaceId, buildToolPublishInput(link.id, { title: props.title, summary: props.summary }))
           const resultId = next.toolResults[0]?.id
-          if (resultId) next = await saveClient(withToolResultPublished(next, resultId, update.id))
+          if (resultId) {
+            next = await saveClient(withToolResultPublished(next, resultId, update.id))
+            replaceClient(next)
+          }
           publishedNote = ' · 고객 플랫폼에도 발행했습니다'
         } else {
           publishedNote = ' · 연결된 고객 계정이 없어 발행은 건너뛰었습니다'

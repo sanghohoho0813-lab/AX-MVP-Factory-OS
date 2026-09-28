@@ -719,10 +719,30 @@ export interface ClientOpsRecord {
   factValues: Record<string, string>
   /** D-128: 자료에서 읽었지만 아직 확인하지 않은 값 */
   factInbox: FactCandidate[]
+  /**
+   * D-130: 주주명부(표) — 절세 설계 · 세금 계산기가 읽는다. 비어 있으면 위 `shareholders` 글에서 읽어 제안만 한다.
+   * payload 에 함께 저장된다(DB 변경 없음).
+   */
+  shareholderRegister: ShareholderRow[]
+  /** D-130: 절세 설계 현황(대표 급여 · 가지급금 · 잉여금 · 평가 재료 …) — 값은 글자 그대로. 뜻은 services/taxPlan.ts 가 정한다 */
+  taxProfile: Record<string, string>
   /** 보관 처리 시각 (보관하면 목록·경고에서 빠진다) */
   archivedAt: string | null
   createdAt: string
   updatedAt: string
+}
+
+/** D-130: 주주와 대표의 관계 — 증여공제 · 상속 · 특수관계 판단에 쓴다 */
+export type ShareholderRelation = 'ceo' | 'spouse' | 'child' | 'minor_child' | 'parent' | 'executive' | 'relative' | 'corp' | 'other'
+
+export interface ShareholderRow {
+  id: string
+  name: string
+  relation: ShareholderRelation
+  /** 보유 주식 수 */
+  shares: number
+  /** 1주당 취득가(원). 모르면 0 — 계산에서는 액면가로 본다고 밝힌다 */
+  acquirePrice: number
 }
 
 export interface CreateClientOpsInput {

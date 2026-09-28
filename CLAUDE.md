@@ -36,6 +36,7 @@ npm run qa:modules -- http://localhost:4390       # 모듈 전 화면 오류·�
 npm run qa:facts -- http://localhost:4390         # 고객 사실 창고(자료에서 찾은 정보 확인 → 모듈이 다시 씀)
 npm run qa:detail -- http://localhost:4390        # 업체 상세(탭 순서 · 서류 → 회사정보 · 현황 카드 누르기 · 삭제 체크 · 360~430)
 npm run qa:files                                  # 서류 파일(클라우드 흉내 — 미리보기 · 새 창 · 내려받기 · 교체 · 비공개 저장소)
+npm run qa:taxplan -- http://localhost:4390       # 절세 설계(원하는 결과 → 계산기 식으로 거꾸로 · 계산기 열기 · 업체 기록 저장)
 ```
 
 화면을 손댔으면 **실제로 찍어서 눈으로 본다**(`npm run qa:shots -- <url> <dir> --wide`).

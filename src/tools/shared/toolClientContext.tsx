@@ -27,6 +27,11 @@ export interface ToolClientValue {
   workspaceId: string | null
   /** 업체 목록을 한 번만 읽어 돌려준다 (붙이기 시트와 공유) */
   loadClients: () => Promise<ClientOpsRecord[]>
+  /**
+   * D-130: 저장한 업체 기록을 읽어 둔 목록에도 넣는다 — 안 넣으면 같은 화면의 다른 단추(결과 붙이기)가
+   * 예전 기록 위에 저장해 방금 저장한 것(주주명부 · 절세 현황)을 지운다.
+   */
+  replaceClient: (record: ClientOpsRecord) => void
 }
 
 /**
@@ -39,6 +44,7 @@ const EMPTY: ToolClientValue = {
   clientRecord: null,
   workspaceId: null,
   loadClients: () => listClients(null).catch(() => [] as ClientOpsRecord[]),
+  replaceClient: () => {},
 }
 
 const ToolClientCtx = createContext<ToolClientValue>(EMPTY)
@@ -94,10 +100,19 @@ function FrameInner({ workspaceId, children }: { workspaceId: string | null; chi
     }
   }, [clientId, loadClients])
 
+  const replaceClient = useCallback(
+    (record: ClientOpsRecord) => {
+      const prev = cache.current ?? Promise.resolve([] as ClientOpsRecord[])
+      cache.current = prev.then((list) => (list.some((c) => c.id === record.id) ? list.map((c) => (c.id === record.id ? record : c)) : [...list, record]))
+      if (record.id === clientId) setClient(record)
+    },
+    [clientId],
+  )
+
   const clientName = client?.companyName ?? ''
   const value = useMemo<ToolClientValue>(
-    () => ({ clientId, clientName, clientRecord: client, workspaceId, loadClients }),
-    [clientId, clientName, client, workspaceId, loadClients],
+    () => ({ clientId, clientName, clientRecord: client, workspaceId, loadClients, replaceClient }),
+    [clientId, clientName, client, workspaceId, loadClients, replaceClient],
   )
 
   // 업체를 물고 온 때만 띠를 얹는다 — 그냥 연 도구 화면은 예전과 한 픽셀도 다르지 않다.
@@ -144,9 +159,13 @@ export function ToolClientScope({ workspaceId, client, children }: { workspaceId
     if (!cache.current) cache.current = listClients(workspaceId).catch(() => [] as ClientOpsRecord[])
     return cache.current
   }, [workspaceId])
+  const replaceClient = useCallback((record: ClientOpsRecord) => {
+    const prev = cache.current ?? Promise.resolve([] as ClientOpsRecord[])
+    cache.current = prev.then((list) => (list.some((c) => c.id === record.id) ? list.map((c) => (c.id === record.id ? record : c)) : [...list, record]))
+  }, [])
   const value = useMemo<ToolClientValue>(
-    () => ({ clientId: client?.id ?? null, clientName: client?.companyName ?? '', clientRecord: client, workspaceId, loadClients }),
-    [client, workspaceId, loadClients],
+    () => ({ clientId: client?.id ?? null, clientName: client?.companyName ?? '', clientRecord: client, workspaceId, loadClients, replaceClient }),
+    [client, workspaceId, loadClients, replaceClient],
   )
   return <ToolClientCtx.Provider value={value}>{children}</ToolClientCtx.Provider>
 }

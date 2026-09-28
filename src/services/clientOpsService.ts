@@ -39,6 +39,8 @@ import type {
   CustomDocument,
   CustomProfileField,
   FactCandidate,
+  ShareholderRelation,
+  ShareholderRow,
   FactMeta,
   FactSource,
   FundingApplication,
@@ -212,6 +214,28 @@ function normalizeFactValues(raw: unknown): Record<string, string> {
   return out
 }
 
+const SHAREHOLDER_RELATIONS: ShareholderRelation[] = ['ceo', 'spouse', 'child', 'minor_child', 'parent', 'executive', 'relative', 'corp', 'other']
+
+/** D-130: 주주명부 — 이름이나 주식 수가 없는 줄은 버리지 않는다(적는 중일 수 있다). 숫자는 0 이상으로 */
+function normalizeShareholderRegister(raw: unknown): ShareholderRow[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .filter((r) => r && typeof r === 'object')
+    .map((r) => {
+      const num = (x: unknown) => {
+        const n = typeof x === 'number' ? x : Number(String(x ?? '').replace(/,/g, ''))
+        return Number.isFinite(n) && n > 0 ? n : 0
+      }
+      return {
+        id: str(r.id) || generateId(),
+        name: str(r.name),
+        relation: SHAREHOLDER_RELATIONS.includes(r.relation) ? r.relation : 'other',
+        shares: Math.floor(num(r.shares)),
+        acquirePrice: num(r.acquirePrice),
+      }
+    })
+}
+
 function normalizeFactInbox(raw: unknown): FactCandidate[] {
   if (!Array.isArray(raw)) return []
   return raw
@@ -377,6 +401,8 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
     factMeta: normalizeFactMeta(value.factMeta),
     factValues: normalizeFactValues(value.factValues),
     factInbox: normalizeFactInbox(value.factInbox),
+    shareholderRegister: normalizeShareholderRegister(value.shareholderRegister),
+    taxProfile: normalizeFactValues(value.taxProfile),
     customDocuments,
     fees: upgradeFees(value),
     notes_list: Array.isArray(value.notes_list)

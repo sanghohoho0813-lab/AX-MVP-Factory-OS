@@ -13,6 +13,8 @@ import { Check, ChevronDown, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { PageHeader } from '../components/ui/PageHeader'
 import { ToolResultAttach } from '../tools/shared/ToolResultAttach'
 import { Button } from '../components/ui/Button'
+import { TaxPlanner } from '../components/tax/TaxPlanner'
+import type { CalcOpen } from '../services/taxPlan'
 import {
   TAX_CALCULATORS,
   calculatorOf,
@@ -152,6 +154,41 @@ export function TaxCalculatorsPage() {
       return { blocks: [] as Block[], tables: [] as TableOut[] }
     }
   }, [sub, values])
+
+  /*
+   * D-130: 업체로 열면(?client=) 먼저 '원하는 결과로 찾기'. 계산기를 고르면(?c=) 예전 그대로.
+   * 업체 없이 열면 예전처럼 계산기부터(원본 대조 qa:tax 가 이 화면을 연다) — 위 두 칸으로 오갈 수 있다.
+   */
+  const mode: 'plan' | 'calc' = params.get('m') === 'plan' || (params.get('client') && !params.get('c') && params.get('m') !== 'calc') ? 'plan' : 'calc'
+  const setMode = (m: 'plan' | 'calc') => {
+    const next = new URLSearchParams()
+    const client = params.get('client')
+    if (client) next.set('client', client)
+    next.set('m', m)
+    if (m === 'calc') next.set('c', calc.key)
+    setParams(next)
+  }
+  /** 절세 설계에서 찾은 숫자 그대로 그 계산기를 연다 — 그 계산기에 적어 둔 값은 이 숫자로 바뀐다 */
+  const openCalc = (o: CalcOpen) => {
+    const target = calculatorOf(o.calc)
+    if (!target) return
+    const merged: Values = { ...loadValues(target, clientId), ...o.values }
+    try {
+      localStorage.setItem(storeKey(target, clientId), JSON.stringify(merged))
+    } catch {
+      /* 저장 못 하면 아래에서 바로 넣는다 */
+    }
+    loadedFor.current = `${target.key}|${clientId ?? ''}`
+    setValues(merged)
+    const next = new URLSearchParams()
+    const client = params.get('client')
+    if (client) next.set('client', client)
+    next.set('m', 'calc')
+    next.set('c', o.calc)
+    if (target.subs.length > 1) next.set('s', o.sub)
+    setParams(next)
+    window.scrollTo({ top: 0 })
+  }
 
   const pick = (c: string, s?: string) => {
     const next = new URLSearchParams()
@@ -293,6 +330,33 @@ export function TaxCalculatorsPage() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader title="세금 계산기" description="대표이사 급여·퇴직급여·주식·상속·가지급금 등 9종. 규칙 계산이며 참고용입니다 — 실제 신고는 세무사와 상담하세요." />
+
+      {/* D-130: 두 가지 쓰는 법 — 원하는 결과부터(절세 설계) · 계산기 하나씩 */}
+      <div role="tablist" aria-label="세금 계산기 쓰는 법" className="no-print grid grid-cols-2 gap-1 rounded-(--radius-card) border border-slate-200 bg-slate-50 p-1">
+        {(
+          [
+            ['plan', '원하는 결과로 찾기'],
+            ['calc', `계산기 ${TAX_CALCULATORS.length}종`],
+          ] as const
+        ).map(([m, label]) => (
+          <button
+            key={m}
+            type="button"
+            role="tab"
+            aria-selected={mode === m}
+            data-mode={m}
+            onClick={() => mode !== m && setMode(m)}
+            className={`tap rounded-(--radius-control) px-3 py-2 text-[0.98rem] font-semibold break-keep ${mode === m ? 'bg-white text-brand-800 shadow-(--shadow-card)' : 'text-slate-600 hover:text-slate-900'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {mode === 'plan' ? (
+        <TaxPlanner onOpenCalc={openCalc} />
+      ) : (
+      <>
 
       {/* 계산기 고르기 — 휴대폰에서는 가로로 넘기는 조각, 넓으면 한 줄 감싸기 */}
       {/* D-109: 휴대폰에서는 9개를 옆으로 밀어 찾지 않는다 — 지금 계산기 한 줄을 누르면 목록이 펼쳐지고, 고르면 닫힌다 */}
@@ -481,6 +545,8 @@ export function TaxCalculatorsPage() {
 
         {calc.note && <p className="t-sub rounded-(--radius-control) border-l-4 border-amber-400 bg-amber-50 px-3 py-2 break-keep text-slate-600">{calc.note}</p>}
       </section>
+      </>
+      )}
     </div>
   )
 }
