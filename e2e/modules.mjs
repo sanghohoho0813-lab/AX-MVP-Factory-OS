@@ -622,7 +622,7 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
       probe.remove()
       const dark = [...document.querySelectorAll('[data-block]')].find((e) => getComputedStyle(e).color !== 'rgb(15, 23, 42)' && getComputedStyle(e).backgroundColor !== 'rgb(255, 255, 255)')
       const th = document.querySelector('table[data-table] th')
-      const tab = document.querySelector('button[role="tab"][aria-selected="true"]')
+      const tab = document.querySelector('[role="tablist"][aria-label$="소탭"] button[role="tab"][aria-selected="true"]')
       return { navy, dark: dark && getComputedStyle(dark).backgroundColor, th: th && getComputedStyle(th).backgroundColor, tab: tab && getComputedStyle(tab).backgroundColor }
     })
     check(`${theme}: 세금 계산기 짙은 결과 칸 = 사이드바와 같은 테마 짙은 색`, col.dark === col.navy, JSON.stringify(col))
