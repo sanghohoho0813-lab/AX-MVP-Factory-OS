@@ -157,6 +157,7 @@ import { ClientConsultingTab } from '../components/consulting/ClientConsultingTa
 import { listLinksForClient } from '../services/customerBridgeService'
 import { buildClientSchedule } from '../services/clientOpsSchedule'
 import { brand } from '../brand/brand.config'
+import { SERVICE_STATUS_LOOK } from '../components/ops/serviceStatusLook'
 import { josa } from '../lib/josa'
 
 
@@ -680,10 +681,11 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                   <button
                     type="button"
                     onClick={() => setTab('work', m.key)}
-                    className="tap t-meta inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1.5 font-medium text-slate-700 hover:border-brand-300 hover:text-brand-700"
+                    // D-129: 현황 카드와 같은 상태 조각(글자 + 바탕색)
+                    data-chip-status={record.services[m.key].status}
+                    className={`tap t-meta inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 font-medium hover:border-brand-500 ${SERVICE_STATUS_LOOK[record.services[m.key].status]}`}
                   >
-                    <Dot tone={statusTone(record.services[m.key].status)} />
-                    {m.shortLabel} · {SERVICE_STATUS_LABEL[record.services[m.key].status]}
+                    <span className="font-semibold">{m.shortLabel}</span> {SERVICE_STATUS_LABEL[record.services[m.key].status]}
                   </button>
                 </li>
               ))}
@@ -1152,7 +1154,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                     />
                   )}
                   <div className="flex flex-wrap items-start justify-between gap-2">
-                    <label className="flex min-w-0 items-start gap-2.5">
+                    <label className="flex min-h-11 min-w-0 items-start gap-2.5 py-1">
                       <input
                         type="checkbox"
                         aria-label={`${meta.label} 받음`}
@@ -1227,7 +1229,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                           label={meta.label}
                           storagePath={state.storagePath}
                           fileName={state.fileName}
-                          onReplace={meta.needsFile && uploadable ? () => fileInputs.current[meta.key]?.click() : undefined}
+                          onReplace={meta.needsFile ? () => fileInputs.current[meta.key]?.click() : undefined}
                         />
                       )}
                       <button
@@ -1289,7 +1291,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                         label={meta.label}
                         storagePath={state.storagePath}
                         fileName={state.fileName}
-                        onReplace={uploadable ? () => fileInputs.current[meta.key]?.click() : undefined}
+                        onReplace={() => fileInputs.current[meta.key]?.click()}
                       />
                       {!uploadable && !state.fileName && (
                         <span className="t-meta break-keep text-slate-500">파일 첨부는 클라우드를 연결하면 켜집니다.</span>

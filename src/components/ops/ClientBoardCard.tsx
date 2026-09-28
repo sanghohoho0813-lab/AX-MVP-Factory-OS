@@ -26,6 +26,7 @@ import { GENDER_LABEL, yearsInBusiness, regionOf } from '../../services/clientOp
 import { ageOf } from '../../tools/shared/clientPrefill'
 import { contractAgeShort } from '../../services/contractSummary'
 import { formatKrw } from '../../lib/format'
+import { SERVICE_OVERDUE_LOOK, SERVICE_STATUS_LOOK } from './serviceStatusLook'
 import { Badge, type Tone } from '../ui/primitives'
 
 /* ------------------------------------------------------------------ */
@@ -63,20 +64,6 @@ export function chipStateFor(
   }
 }
 
-/**
- * D-129: 상태는 점이 아니라 바탕색 있는 조각 + 글자로 — 멀리서도 보이게, 색만으로 판단하지 않게.
- *   진행 중 → 호박색 · 완료 → 브랜드색 · 고객 대기 → 보라 · 보류 · 시작 전 → 회색 · 기한 지남 → 빨강
- * 색은 이 여섯 가지뿐이다(알록달록해지지 않게).
- */
-const STATUS_LOOK: Record<ServiceStatus, string> = {
-  in_progress: 'border-amber-300 bg-amber-100 text-amber-900',
-  done: 'border-brand-200 bg-brand-100 text-brand-700',
-  waiting_client: 'border-violet-200 bg-violet-100 text-violet-800',
-  on_hold: 'border-slate-300 bg-slate-100 text-slate-700',
-  not_started: 'border-slate-200 bg-slate-50 text-slate-600',
-  not_applicable: 'border-slate-200 bg-white text-slate-400 line-through decoration-slate-300',
-}
-
 const SHORT: Record<ServiceStatus, string> = {
   done: '완료',
   in_progress: '진행 중',
@@ -89,7 +76,7 @@ const SHORT: Record<ServiceStatus, string> = {
 function ServiceChip({ chip, onClick }: { chip: ChipState; onClick: () => void }) {
   const na = chip.status === 'not_applicable'
   const danger = !na && chip.overdue
-  const look = danger ? 'border-danger-200 bg-danger-50 text-danger-700' : STATUS_LOOK[chip.status]
+  const look = danger ? SERVICE_OVERDUE_LOOK : SERVICE_STATUS_LOOK[chip.status]
   // 상태 글자는 늘 적는다 — 마감이 가까우면 D-날짜를 덧붙인다
   const due = chip.overdue || chip.dueSoon ? dueText(chip.daysLeft) : ''
 
@@ -294,7 +281,8 @@ export function ClientBoardCard({
               </span>
             )}
             {strongMeta.map((m, i) => (
-              <span key={`s-${m}-${i}`} className="font-semibold whitespace-nowrap text-slate-800">
+              /* D-129: 대표자 줄이 길어졌다(이름 · 성별 · 나이) — 좁으면 줄을 바꾼다(한 칸에 가두면 잘린다) */
+              <span key={`s-${m}-${i}`} className="max-w-full font-semibold break-keep text-slate-800 [overflow-wrap:anywhere]">
                 {i > 0 && <span aria-hidden="true" className="mr-2 font-normal text-slate-300">·</span>}
                 {m}
               </span>

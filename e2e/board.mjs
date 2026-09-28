@@ -86,7 +86,7 @@ await page.waitForTimeout(400)
 check('펴면 해당 없음 조각이 다시 보인다', (await page.getByRole('button', { name: /^특허/ }).count()) > 0)
 await page.getByRole('button', { name: /^특허/ }).first().click()
 await page.waitForTimeout(400)
-await page.getByRole('button', { name: /진행 중/ }).first().click()
+await page.getByRole('dialog').getByRole('button', { name: /진행 중/ }).first().click()
 await page.waitForTimeout(600)
 const back = await page.evaluate(() => {
   const list = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
@@ -261,7 +261,7 @@ check('업무 15개에서도 가로 스크롤 없음', of2.d <= of2.w + 1, `${of
     return ['한솔테크', '다움에너지', '미래바이오랩', '선한식품', '우일산업'].filter((n) => t.includes(n))
   }
   const hubText = (await page.locator('main').innerText()) ?? ''
-  check('카드: 계약 종류가 보인다', hubText.includes('현금 + 보험'), hubText.slice(0, 400))
+  check('카드: 계약 종류가 보인다(이름 옆 배지)', hubText.includes('혼합 계약'), hubText.slice(0, 400))
 
   // 보기 — 무엇을 보일지 (D-126: 휴대폰에서는 '거르기' 를 눌러야 보인다)
   {

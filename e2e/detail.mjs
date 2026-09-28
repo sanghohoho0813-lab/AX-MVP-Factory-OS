@@ -63,7 +63,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('서류 목록: 사업자등록번호 · 법인등록번호 · 사업장 주소 칸이 없다', !/(^|\n)\s*(사업자등록번호|법인등록번호|사업장 주소)\s*(\n|$)/.test(docsText) && (await page.locator('[data-file-input="businessNumber"], [data-file-input="corporateNumber"], [data-file-input="businessAddress"]').count()) === 0)
   check('예전 파일(법인인감증명서.pdf)이 그대로 있다', docsText.includes('법인인감증명서.pdf'))
   const seal = page.locator('[data-file-actions="법인인감증명서"]').first()
-  check('파일 단추: 미리보기 · 새 창 · 내려받기(교체는 클라우드 시험에서)', (await seal.getByRole('button', { name: '법인인감증명서 미리보기' }).count()) === 1 && (await seal.getByRole('button', { name: '법인인감증명서 새 창에서 열기' }).count()) === 1 && (await seal.getByRole('button', { name: '법인인감증명서 내려받기' }).count()) === 1, String(await page.locator('[data-file-actions]').evaluateAll((els) => els.map((e) => e.getAttribute('data-file-actions') + ':' + e.textContent))))
+  check('파일 단추: 미리보기 · 새 창 · 내려받기 · 파일 교체(로컬 모드는 잠김 — 교체는 클라우드 시험에서)', (await seal.getByRole('button', { name: '법인인감증명서 미리보기' }).count()) === 1 && (await seal.getByRole('button', { name: '법인인감증명서 새 창에서 열기' }).count()) === 1 && (await seal.getByRole('button', { name: '법인인감증명서 내려받기' }).count()) === 1 && (await seal.getByRole('button', { name: '법인인감증명서 파일 교체' }).isDisabled()), String(await page.locator('[data-file-actions]').evaluateAll((els) => els.map((e) => e.getAttribute('data-file-actions') + ':' + e.textContent))))
   const rec0 = await record(page)
   check('예전 기록: 사업자등록번호 · 법인등록번호 값은 그대로', rec0.businessNumber === '123-45-67890' && rec0.corporateNumber === '134511-0022334')
 
