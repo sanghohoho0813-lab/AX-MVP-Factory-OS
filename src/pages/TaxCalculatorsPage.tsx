@@ -15,6 +15,9 @@ import { ToolResultAttach } from '../tools/shared/ToolResultAttach'
 import { Button } from '../components/ui/Button'
 import { TaxPlanner } from '../components/tax/TaxPlanner'
 import type { CalcOpen } from '../services/taxPlan'
+import { calcPrefill } from '../services/taxCalcPrefill'
+import type { ClientOpsRecord } from '../types/clientOps'
+import { PrefillNote } from '../tools/shared/PrefillNote'
 import {
   TAX_CALCULATORS,
   calculatorOf,
@@ -57,6 +60,26 @@ function displayDefaults(calc: Calculator): Values {
 
 /** D-126: 업체마다 따로 기억한다 — 다른 업체로 열면 앞 업체 숫자가 남지 않는다 */
 const storeKey = (calc: Calculator, clientId: string | null | undefined) => STORAGE_PREFIX + calc.key + (clientId ? `.${clientId}` : '')
+
+/** 업체 숫자도 기본값처럼 금액 칸은 쉼표로 보여 준다 */
+function prefillShown(calc: Calculator, values: Record<string, string>): Values {
+  const fields = [...(calc.shared ?? []), ...calc.subs.flatMap((s) => s.groups)].flatMap((g) => g.fields)
+  const amount = new Set(fields.filter((f) => !isRowsField(f) && f.type === 'amount').map((f) => f.id))
+  return Object.fromEntries(Object.entries(values).map(([k, v]) => [k, amount.has(k) ? withCommas(v) : v]))
+}
+
+/** 처음 여는 계산기면(저장한 값 없음) 업체 숫자로 채운 칸 이름도 함께 — 그 외에는 빈 배열 */
+function loadValuesWithPrefill(calc: Calculator, clientId: string | null | undefined, record: ClientOpsRecord | null): { values: Values; prefilled: string[] } {
+  try {
+    if (clientId && record && !localStorage.getItem(storeKey(calc, clientId))) {
+      const pf = calcPrefill(calc.key, record)
+      return { values: { ...displayDefaults(calc), ...prefillShown(calc, pf.values) }, prefilled: pf.names }
+    }
+  } catch {
+    /* 저장소를 못 읽으면 아래 기본 */
+  }
+  return { values: loadValues(calc, clientId), prefilled: [] }
+}
 
 function loadValues(calc: Calculator, clientId?: string | null): Values {
   const base = displayDefaults(calc)
@@ -115,8 +138,12 @@ export function TaxCalculatorsPage() {
   const subKey = params.get('s') ?? calc.subs[0].key
   const sub = calc.subs.find((s) => s.key === subKey) ?? calc.subs[0]
 
-  const { clientId } = useToolClient()
-  const [values, setValues] = useState<Values>(() => loadValues(calc, clientId))
+  const { clientId, clientRecord } = useToolClient()
+  /** D-134: 업체 기록이 아직 안 왔으면 기다린다 — 그 사이 예시값을 저장하면 업체 숫자로 채울 기회를 잃는다 */
+  const recordReady = !clientId || !!clientRecord
+  const [first] = useState(() => loadValuesWithPrefill(calc, clientId, clientRecord))
+  const [prefilled, setPrefilled] = useState<string[]>(first.prefilled)
+  const [values, setValues] = useState<Values>(first.values)
   const [pickerOpen, setPickerOpen] = useState(false)
   const pickerRef = useRef<HTMLDivElement>(null)
   // D-111: 펼친 목록은 Esc · 바깥을 누르면 닫는다 (고르지 않고 다시 보고 싶을 때)
@@ -131,21 +158,23 @@ export function TaxCalculatorsPage() {
     return () => document.removeEventListener('keydown', onKey)
   }, [pickerOpen])
   // 계산기 · 업체가 바뀌면 그 칸의 값을 읽는다 — 읽기 전에는 저장하지 않는다(앞 업체 숫자가 뒤 업체 칸에 들어가지 않게)
-  const loadedFor = useRef(`${calc.key}|${clientId ?? ''}`)
+  const loadKey = `${calc.key}|${clientId ?? ''}|${recordReady ? 'ok' : 'wait'}`
+  const loadedFor = useRef(loadKey)
   useEffect(() => {
-    const k = `${calc.key}|${clientId ?? ''}`
-    if (loadedFor.current === k) return
-    loadedFor.current = k
-    setValues(loadValues(calc, clientId))
-  }, [calc, clientId])
+    if (loadedFor.current === loadKey) return
+    loadedFor.current = loadKey
+    const r = loadValuesWithPrefill(calc, clientId, clientRecord)
+    setValues(r.values)
+    setPrefilled(r.prefilled)
+  }, [calc, clientId, clientRecord, loadKey])
   useEffect(() => {
-    if (loadedFor.current !== `${calc.key}|${clientId ?? ''}`) return
+    if (!recordReady || loadedFor.current !== loadKey) return
     try {
       localStorage.setItem(storeKey(calc, clientId), JSON.stringify(values))
     } catch {
       /* 저장 못 해도 계산은 된다 */
     }
-  }, [values, calc, clientId])
+  }, [values, calc, clientId, recordReady, loadKey])
 
   const out = useMemo(() => {
     try {
@@ -172,14 +201,15 @@ export function TaxCalculatorsPage() {
   const openCalc = (o: CalcOpen) => {
     const target = calculatorOf(o.calc)
     if (!target) return
-    const merged: Values = { ...loadValues(target, clientId), ...o.values }
+    const merged: Values = { ...loadValuesWithPrefill(target, clientId, clientRecord).values, ...o.values }
     try {
       localStorage.setItem(storeKey(target, clientId), JSON.stringify(merged))
     } catch {
       /* 저장 못 하면 아래에서 바로 넣는다 */
     }
-    loadedFor.current = `${target.key}|${clientId ?? ''}`
+    loadedFor.current = `${target.key}|${clientId ?? ''}|${recordReady ? 'ok' : 'wait'}`
     setValues(merged)
+    setPrefilled([])
     const next = new URLSearchParams()
     const client = params.get('client')
     if (client) next.set('client', client)
@@ -210,7 +240,17 @@ export function TaxCalculatorsPage() {
     setValues((cur) => ({ ...cur, [f.id]: [...((cur[f.id] as RowValues[]) ?? []), { ...(f.newRow ?? {}) }] }))
   const removeRow = (id: string, i: number) =>
     setValues((cur) => ({ ...cur, [id]: ((cur[id] as RowValues[]) ?? []).filter((_, j) => j !== i) }))
-  const reset = () => setValues(displayDefaults(calc))
+  const reset = () => {
+    setValues(displayDefaults(calc))
+    setPrefilled([])
+  }
+  /** D-134: 이 업체 숫자(절세 설계 현황 · 주주명부)로 다시 채우기 — 이율 · 공제 같은 계산기 기본값은 그대로 */
+  const clientFill = clientId && clientRecord ? calcPrefill(calc.key, clientRecord) : null
+  const fillFromClient = () => {
+    if (!clientFill || clientFill.names.length === 0) return
+    setValues((cur) => ({ ...cur, ...prefillShown(calc, clientFill.values) }))
+    setPrefilled(clientFill.names)
+  }
 
   const renderField = (f: AnyField) => {
     if (isRowsField(f)) return renderRows(f)
@@ -427,11 +467,19 @@ export function TaxCalculatorsPage() {
             <h2 className="t-section mt-0.5 text-slate-900">{calc.title}</h2>
             <p className="t-sub mt-1 break-keep text-slate-500">{calc.desc}</p>
           </div>
-          <Button variant="ghost" size="sm" className="no-print" onClick={reset} title="이 계산기의 입력을 기본값으로 되돌립니다">
-            <RotateCcw aria-hidden="true" className="size-4" />
-            기본값으로
-          </Button>
+          <div className="no-print flex flex-wrap gap-1.5">
+            {clientFill && clientFill.names.length > 0 && (
+              <Button variant="secondary" size="sm" onClick={fillFromClient} data-testid="calc-fill-client" title="이 업체의 절세 설계 현황 · 주주명부 숫자로 칸을 채웁니다">
+                업체 숫자로 채우기
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" onClick={reset} title="이 계산기의 입력을 기본값으로 되돌립니다">
+              <RotateCcw aria-hidden="true" className="size-4" />
+              기본값으로
+            </Button>
+          </div>
         </div>
+        {prefilled.length > 0 && <PrefillNote note={`이 업체 기록(절세 설계 현황 · 주주명부)에서 채웠습니다: ${prefilled.join(' · ')}`} />}
 
         {calc.subs.length > 1 && (
           <div role="tablist" aria-label={`${calc.title} 소탭`} className="flex flex-wrap gap-1.5">

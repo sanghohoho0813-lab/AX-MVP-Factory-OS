@@ -14,8 +14,10 @@
 
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, ArrowRight, Check, FileUp, Lock } from 'lucide-react'
-import type { ClientOpsRecord } from '../../types/clientOps'
+import { AlertTriangle, ArrowRight, Check, FileUp, History, Lock } from 'lucide-react'
+import type { ClientOpsRecord, ToolResult } from '../../types/clientOps'
+import { latestToolResult } from '../../services/toolResultGroups'
+import { activityTimeText } from '../../services/clientOpsActivity'
 import { liveTools } from '../../config/toolRegistry'
 import { FEATURE_CATALOG, visibleModules, type CatalogFeature } from '../../config/productCatalog'
 import { clientEntryHref, featureIcon } from '../../config/featurePaths'
@@ -107,7 +109,7 @@ export function ClientToolsCard({
                 </header>
                 <ul className="divide-y divide-slate-100">
                   {features.map((f) => (
-                    <FeatureRow key={f.key} f={f} recordId={record.id} ready={readyOf.get(f.key)} usable={ent.feature(f.key).usable} moduleRoute={m.route} />
+                    <FeatureRow key={f.key} f={f} recordId={record.id} ready={readyOf.get(f.key)} usable={ent.feature(f.key).usable} moduleRoute={m.route} last={latestToolResult(record, f.key)} />
                   ))}
                 </ul>
               </section>
@@ -139,8 +141,11 @@ function FeatureRow({
   ready,
   usable,
   moduleRoute,
+  last,
 }: {
   f: CatalogFeature
+  /** D-134: 이 업체에서 이 기능으로 낸 가장 최근 결과 */
+  last: ToolResult | null
   recordId: string
   ready: ReturnType<typeof readinessOf>[number] | undefined
   usable: boolean
@@ -178,9 +183,17 @@ function FeatureRow({
             </span>
           ) : null}
           {ready && ready.missingOptional.length > 0 && <span className="t-meta break-keep text-slate-500">있으면 더 정확 — {missingDocsText(ready.missingOptional)}</span>}
+          {last && (
+            <span className="t-sub flex items-start gap-1 break-keep text-slate-700" data-testid="feature-last">
+              <History aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-slate-500" />
+              <span>
+                지난번 <b className="font-semibold">{last.verdictLabel || last.title}</b> · {activityTimeText(last.createdAt)}
+              </span>
+            </span>
+          )}
         </span>
         <span className="t-sub ml-auto inline-flex shrink-0 items-center gap-1 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-2.5 py-1 font-semibold text-brand-800">
-          {entry.verb}
+          {last ? `다시 ${entry.verb}` : entry.verb}
           <ArrowRight aria-hidden="true" className="size-3.5" />
         </span>
       </Link>

@@ -181,8 +181,9 @@ export default function AssessmentPage() {
   // D-126: 업체에서 열었으면 회사명 · 업종 · 업력 · 직원 수를 업체 기록에서 채운다(예전엔 직원 10명 · 업력 3년이라는 지어낸 값으로 시작했다)
   const { note: prefillNote } = usePrefillFromClient((facts) => {
     const filled: string[] = [];
-    if (facts.companyName) { setCompanyName(facts.companyName); filled.push("회사명"); }
-    if (facts.industryText) { setIndustry(facts.industryText); setCustomIndustry(true); filled.push("업종"); }
+    // D-134: 이미 적은 회사명 · 업종은 덮지 않는다(업체 기록이 늦게 오면 적던 글이 사라졌다)
+    if (facts.companyName && !companyName.trim()) { setCompanyName(facts.companyName); filled.push("회사명"); }
+    if (facts.industryText && !industry.trim()) { setIndustry(facts.industryText); setCustomIndustry(true); filled.push("업종"); }
     if (facts.years !== null) { setYears(Math.max(0, Math.round(facts.years))); filled.push("업력"); }
     if (facts.employeeCount !== null) { setEmployeeCount(facts.employeeCount); filled.push("직원 수"); }
     return filled;

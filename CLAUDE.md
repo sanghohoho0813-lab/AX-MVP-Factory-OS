@@ -38,6 +38,7 @@ npm run qa:detail -- http://localhost:4390        # 업체 상세(탭 순서 · 
 npm run qa:files                                  # 서류 파일(클라우드 흉내 — 미리보기 · 새 창 · 내려받기 · 교체 · 비공개 저장소)
 npm run qa:taxplan -- http://localhost:4390       # 절세 설계(원하는 결과 → 계산기 식으로 거꾸로 · 계산기 열기 · 업체 기록 저장)
 npm run qa:calendar -- http://localhost:4390      # 큰 달력(날짜 칸 → 일요일부터 · 창 위 · Esc · 직접 적기 · 휴대폰)
+npm run qa:connect -- http://localhost:4390       # 모듈 ↔ 업체 잇기(계산기 업체 숫자 채움 · 붙이며 할 일 걸기 · 결과 묶음 · 다시 열기)
 ```
 
 화면을 손댔으면 **실제로 찍어서 눈으로 본다**(`npm run qa:shots -- <url> <dir> --wide`).

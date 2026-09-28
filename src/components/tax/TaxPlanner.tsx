@@ -248,6 +248,7 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
           verdictLabel: cash?.best ? `추천 ${cash.best.label}` : st.goals.map((g) => GOAL_LABEL[g]).join(' · '),
           summary: planSummary(parts),
           data: { plan: true, goals: st.goals },
+          openPath: `/tools/tax?client=${encodeURIComponent(clientId)}`,
         })
       }
       const saved = await saveClient(next)

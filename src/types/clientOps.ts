@@ -419,6 +419,8 @@ export interface ToolDeadline {
   title: string
   /** 한 줄 더 — 없으면 빈 글자 */
   note: string
+  /** D-134: 사람이 결과를 보고 건 할 일 — 도구를 다시 돌려 기한을 새로 심어도 지우지 않는다 */
+  todo?: true
 }
 
 export interface ToolResult {
@@ -440,6 +442,8 @@ export interface ToolResult {
   createdAt: string
   /** 고객 플랫폼에 발행했으면 그 update id */
   publishedUpdateId: string | null
+  /** D-134: 이 결과를 만든 화면(주소) — 업체 상세에서 '만든 화면 다시 열기'. 모르면 없음 */
+  openPath?: string
 }
 
 export interface ActivityEntry {

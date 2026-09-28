@@ -17,6 +17,7 @@ import {
   giftPlan,
   holdersFromText,
   inheritancePlan,
+  lineWon,
   loanPlan,
   parseGoalText,
   profileSuggestions,
@@ -33,6 +34,7 @@ import {
 } from '../taxPlan'
 import type { ClientOpsRecord, ShareholderRow } from '../../types/clientOps'
 import { parseTypedDate } from '../../lib/typedDate'
+import { calcPrefill } from '../taxCalcPrefill'
 
 let pass = 0
 let fail = 0
@@ -336,6 +338,40 @@ check('금액: "1억 5천" = 1억 5천만 · "5천" 은 5천원인지 5천만원
   const sp5 = splitPlan(p, reg, sv, 5e8, TODAY)
   check('나눠: 5억도 오류 없이 · 합 NaN 0', sp5.rows.every((r) => Number.isFinite(r.total) && Number.isFinite(r.totalTax)), sp5.rows.map((r) => r.total))
   if (process.env.SHOW) for (const x of [sp, spT, sp5]) console.log(x.target, x.rows.map((r) => `${r.years}년 ${r.ok ? Math.round(r.total) : r.reason} [${r.steps.map((s) => s.key).join(',')}]`).join(' | '), 'best', x.best?.years, 'save', Math.round(x.saving))
+}
+
+
+/* ---------------- D-134 계산기 미리 채움 ---------------- */
+{
+  const rec = { companyName: '한솔테크(주)', taxProfile: raw as Record<string, string>, shareholderRegister: reg }
+  const t2 = calcPrefill('t2', rec)
+  check('미리 채움: 01 급여 = 대표 월 급여', t2.values.s_monthly === '8000000' && t2.names.includes('대표 월 급여'), t2)
+  const t3 = calcPrefill('t3', rec)
+  check('미리 채움: 09 주식가치 = 회사 이름 · 발행주식 · 자산 · 부채 · 순손익', t3.values.v_name === '한솔테크(주)' && t3.values.v_shares === String(sv.totalShares) && t3.values.v_asset === '5000000000' && t3.values.v_debt === '2000000000' && t3.values.v_inc0 === '400000000', t3.values)
+  const t9p = calcPrefill('t9', rec)
+  check('미리 채움: 03 소득세 = 연봉 · 대표 주식 · 취득가 · 1주 가치(09 식)', t9p.values.inc_a_salary === '96000000' && t9p.values.inc_a_heldShares === '60000' && t9p.values.inc_a_acquirePrice === '5000' && t9p.values.inc_a_transferPrice === String(sv.perShare), t9p.values)
+  const allKeys = ['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9'].flatMap((k) => Object.keys(calcPrefill(k, rec).values))
+  check('미리 채움: 이율 · 공제 · 배수 같은 계산기 기본값은 건드리지 않는다', !allKeys.some((k) => /rate|_ins|_borrow|_years|_mult|personalDed|basicDed|_corp$|_inc$/.test(k) && k !== 'v_rate'), allKeys)
+  check('미리 채움: 환원율은 대표가 적었을 때만(적었으니 그 값)', calcPrefill('t3', rec).values.v_rate === '10' && calcPrefill('t3', { ...rec, taxProfile: { ...rec.taxProfile, vRate: '' } }).values.v_rate === undefined)
+  check('미리 채움: 모르는 값은 채우지 않는다(0 · 빈 칸)', calcPrefill('t1', { ...rec, taxProfile: { ...rec.taxProfile, loanBalance: '' } }).names.length === 0)
+  check('미리 채움: 업체 없음 · 7 · 8번은 비움', calcPrefill('t2', null).names.length === 0 && calcPrefill('t7', rec).names.length === 0 && calcPrefill('t8', rec).names.length === 0)
+  // 같은 업체를 계산기로 열면 절세 설계와 같은 숫자 — 채운 값으로 계산기 식을 그대로 돌려 본다
+  const runWith = (c: string, sub: string, v: Record<string, string>) => {
+    const calc = calculatorOf(c)!
+    return (calc.subs.find((x) => x.key === sub) ?? calc.subs[0]).compute({ ...defaultValues(calc), ...v })
+  }
+  const t3out = runWith('t3', 'v', calcPrefill('t3', rec).values)
+  const t3per = lineWon(t3out, 'v_out', '1주당 평가액 (Max A,B)')
+  check('미리 채움: 09 계산기 1주 가치 = 절세 설계 1주 가치(예시 부동산 · 유상증자 값이 안 남음)', Math.abs(t3per - sv.perShare) <= 1, [t3per, sv.perShare])
+  const recEstate = { ...rec, taxProfile: { ...rec.taxProfile, estateRealEstate: '15억', estateFinancial: '3억', children: '2' } }
+  const pE = viewProfile(recEstate.taxProfile)
+  const t4out = runWith('t4', 'i1', calcPrefill('t4', recEstate).values)
+  const inhNow = inheritancePlan(pE, reg, shareValueOf(pE, reg), null)
+  check('미리 채움: 08 상속세 계산기 = 절세 설계 "지금 상속되면"', inhNow.ok && Math.abs(lineWon(t4out, 'h_out', '납부할 상속세') - inhNow.taxNow) <= 1, [lineWon(t4out, 'h_out', '납부할 상속세'), inhNow.taxNow])
+  check('미리 채움: 모르는 칸을 0 으로 둔 것을 알린다', calcPrefill('t3', rec).names.includes('모르는 칸은 0(절세 설계와 같게)'))
+  const calcIds = new Set<string>()
+  for (const c of ['t1', 't2', 't3', 't4', 't5', 't6', 't9']) for (const k of Object.keys(defaultValues(calculatorOf(c)!))) calcIds.add(k)
+  check('미리 채움: 채우는 칸은 모두 계산기에 있는 칸', allKeys.every((k) => calcIds.has(k)), allKeys.filter((k) => !calcIds.has(k)))
 }
 
 if (process.env.SHOW) {

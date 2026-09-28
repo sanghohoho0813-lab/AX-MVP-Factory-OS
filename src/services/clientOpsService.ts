@@ -1046,6 +1046,7 @@ function normalizeToolDeadlines(value: unknown): ToolDeadline[] {
       date: d.date,
       title: typeof d.title === 'string' && d.title ? d.title : '기한',
       note: typeof d.note === 'string' ? d.note : '',
+      ...(d.todo === true ? { todo: true as const } : {}),
     })
   }
   return out.slice(0, TOOL_DEADLINE_LIMIT)
@@ -1070,9 +1071,15 @@ function normalizeToolResults(value: unknown): ToolResult[] {
       deadlines: normalizeToolDeadlines(r.deadlines),
       createdAt: typeof r.createdAt === 'string' ? r.createdAt : nowIso(),
       publishedUpdateId: typeof r.publishedUpdateId === 'string' ? r.publishedUpdateId : null,
+      ...(safeOpenPath(r.openPath) ? { openPath: safeOpenPath(r.openPath) } : {}),
     })
   }
   return out
+}
+
+/** 결과를 만든 화면 주소 — 앱 안 주소(/tools/…)만 받는다(바깥 주소 · 스크립트 막기) */
+export function safeOpenPath(v: unknown): string {
+  return typeof v === 'string' && /^\/tools\/[\w\-/]*(\?[\w\-=&%.]*)?$/.test(v) ? v : ''
 }
 
 export const TOOL_RESULT_LIMIT = 50
@@ -1082,8 +1089,8 @@ export const TOOL_DEADLINE_LIMIT = 24
 /** 도구 결과 한 건을 붙인다 — 최신이 앞, 상한을 넘으면 오래된 것부터 잘린다. */
 export function withToolResult(
   record: ClientOpsRecord,
-  input: Omit<ToolResult, 'id' | 'createdAt' | 'publishedUpdateId' | 'deadlines'> &
-    Partial<Pick<ToolResult, 'id' | 'createdAt' | 'publishedUpdateId' | 'deadlines'>>,
+  input: Omit<ToolResult, 'id' | 'createdAt' | 'publishedUpdateId' | 'deadlines' | 'openPath'> &
+    Partial<Pick<ToolResult, 'id' | 'createdAt' | 'publishedUpdateId' | 'deadlines' | 'openPath'>>,
 ): ClientOpsRecord {
   const item: ToolResult = {
     id: input.id ?? generateId(),
@@ -1096,6 +1103,7 @@ export function withToolResult(
     deadlines: normalizeToolDeadlines(input.deadlines),
     createdAt: input.createdAt ?? nowIso(),
     publishedUpdateId: input.publishedUpdateId ?? null,
+    ...(safeOpenPath(input.openPath) ? { openPath: safeOpenPath(input.openPath) } : {}),
   }
   const text = item.verdictLabel ? `${item.title} · ${item.verdictLabel}` : item.title
   // 같은 도구의 같은 결과를 다시 붙이면, 먼저 붙였던 기한은 달력에서 내린다 (D-89).
@@ -1104,7 +1112,8 @@ export function withToolResult(
   const prior =
     item.deadlines.length > 0
       ? record.toolResults.map((r) =>
-          r.toolKey === item.toolKey && r.title === item.title && r.deadlines.length > 0 ? { ...r, deadlines: [] } : r,
+          // 사람이 건 할 일(todo)은 남긴다 — 도구가 계산한 기한만 새 것으로 바뀐다 (D-134)
+          r.toolKey === item.toolKey && r.title === item.title && r.deadlines.some((d) => !d.todo) ? { ...r, deadlines: r.deadlines.filter((d) => d.todo) } : r,
         )
       : record.toolResults
   return withActivity({ ...record, toolResults: [item, ...prior].slice(0, TOOL_RESULT_LIMIT) }, 'tool', text)

@@ -43,7 +43,8 @@ import {
 } from '../salesKit/lib/salesData.js'
 import { buildCretopMeetingPoints, cretopGradeIsLow } from '../cretop/lib/meetingPoints'
 import { buildCretopParsedForUi, extractCretopCore } from '../cretop/engine/index.js'
-import { normalizeClientOps, withDocument, withToolResult, withToolResultPublished, withoutToolResult, TOOL_RESULT_LIMIT, TOOL_DEADLINE_LIMIT } from '../../services/clientOpsService'
+import { normalizeClientOps, safeOpenPath, withDocument, withToolResult, withToolResultPublished, withoutToolResult, TOOL_RESULT_LIMIT, TOOL_DEADLINE_LIMIT } from '../../services/clientOpsService'
+import { latestToolResult, toolResultGroups, withToolResultDeadline } from '../../services/toolResultGroups'
 import { buildClientSchedule, SCHEDULE_KIND_LABEL } from '../../services/clientOpsSchedule'
 import { roundDeadlines } from '../employment/lib/toolDeadlines'
 import { changeDeadlines, surveyDeadlineDate } from '../labcare/lib/toolDeadlines'
@@ -792,6 +793,34 @@ check('칸 이름: 설명문처럼 긴 글은 이름으로 쓰지 않는다', cl
   check('고객 안내문: 예전 기본 문구의 법적 검토 문장이 빠진다', !shown.includes('법적 검토'), shown)
   check('고객 안내문: 남은 문장이 자연스럽게 끝난다', shown.endsWith('설문 응답입니다.'), shown)
   check('고객 안내문: 대표가 직접 쓴 문구는 그대로', customerPrivacyText('응답은 진단에만 씁니다.') === '응답은 진단에만 씁니다.')
+}
+
+
+/* ---------------- D-134 결과 ↔ 업체 상세 ---------------- */
+{
+  let r = normalizeClientOps({ id: 'z1', companyName: '묶음', workspaceId: null })
+  r = withToolResult(r, { toolKey: 'policy-funding', title: '정책자금 진단', verdict: null, verdictLabel: '가능성 보통', summary: 'a', data: null, openPath: '/tools/policy-funding?client=z1' })
+  r = withToolResult(r, { toolKey: 'tax', title: '세금', verdict: null, verdictLabel: '퇴직', summary: 'b', data: null })
+  r = withToolResult(r, { toolKey: 'policy-funding', title: '정책자금 진단', verdict: null, verdictLabel: '가능성 높음', summary: 'c', data: null, openPath: '/tools/policy-funding/diagnosis?client=z1&x=1' })
+  const g = toolResultGroups(r.toolResults)
+  check('묶음: 모듈마다 한 묶음 · 최근 쓴 모듈이 앞', g.length === 2 && g[0].toolKey === 'policy-funding' && g[1].toolKey === 'tax')
+  check('묶음: 가장 최근 것이 앞 · 지난 것 1개', g[0].latest.verdictLabel === '가능성 높음' && g[0].older.length === 1 && g[0].older[0].verdictLabel === '가능성 보통')
+  check('지난 결과: 모듈 줄에 가장 최근 것', latestToolResult(r, 'policy-funding')?.verdictLabel === '가능성 높음' && latestToolResult(r, 'labcare') === null)
+  check('만든 화면: 앱 안 주소만 남는다', r.toolResults[0].openPath === '/tools/policy-funding/diagnosis?client=z1&x=1')
+  check('만든 화면: 바깥 주소 · 스크립트는 버린다', safeOpenPath('https://evil.example/x') === '' && safeOpenPath('javascript:alert(1)') === '' && safeOpenPath('/tools/x?a=<b>') === '' && safeOpenPath('//evil.example') === '')
+  const round = normalizeClientOps(JSON.parse(JSON.stringify(r)) as Record<string, unknown>)
+  check('만든 화면: 저장 → 다시 읽어도 남는다 · 없던 결과는 없음', round.toolResults[0].openPath === r.toolResults[0].openPath && round.toolResults[1].openPath === undefined)
+  const id = r.toolResults[0].id
+  const hung = withToolResultDeadline(r, id, { date: '2026-10-05', title: '정책자금 신청 서류 준비', note: '정책자금 진단 결과에서' })
+  check('할 일 걸기: 그 결과의 기한으로 → 달력 · 오늘', hung.toolResults[0].deadlines.length === 1 && hung.toolResults[0].deadlines[0].title === '정책자금 신청 서류 준비')
+  check('할 일 걸기: 활동 기록에 남는다', hung.activity[0]?.text.includes('정책자금 신청 서류 준비') === true)
+  check('할 일 걸기: 같은 날 · 같은 글은 두 번 안 걸린다', withToolResultDeadline(hung, id, { date: '2026-10-05', title: '정책자금 신청 서류 준비', note: '' }).toolResults[0].deadlines.length === 1)
+  check('할 일 걸기: 날짜 · 글이 이상하면 그대로', withToolResultDeadline(r, id, { date: '10/5', title: 'x', note: '' }) === r && withToolResultDeadline(r, id, { date: '2026-10-05', title: '  ', note: '' }) === r && withToolResultDeadline(r, 'none', { date: '2026-10-05', title: 'x', note: '' }) === r)
+  const again = withToolResult(hung, { toolKey: 'policy-funding', title: '정책자금 진단', verdict: null, verdictLabel: '다시', summary: '', data: null })
+  check('할 일 걸기: 다시 진단해도(기한 없는 결과) 걸어 둔 할 일은 남는다', again.toolResults[1].deadlines.length === 1)
+  const withCalc = withToolResult(hung, { toolKey: 'policy-funding', title: '정책자금 진단', verdict: null, verdictLabel: '회차', summary: '', data: null, deadlines: [{ date: '2026-11-01', title: '신청', note: '' }] })
+  check('할 일 걸기: 도구가 기한을 새로 심어도 사람이 건 할 일은 남는다', withCalc.toolResults[1].deadlines.length === 1 && withCalc.toolResults[1].deadlines[0].todo === true && withCalc.toolResults[0].deadlines.length === 1)
+  check('할 일 걸기: 저장 → 다시 읽어도 할 일 표시가 남는다', normalizeClientOps(JSON.parse(JSON.stringify(hung)) as Record<string, unknown>).toolResults[0].deadlines[0].todo === true)
 }
 
 console.log(`\ntools: ${passed} passed, ${failed} failed`)
