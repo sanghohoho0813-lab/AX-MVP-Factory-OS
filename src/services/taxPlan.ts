@@ -45,6 +45,9 @@ export const PROFILE_FIELDS = {
   children: '자녀 수',
   priorGift: '10년 안에 자녀에게 증여한 금액',
   retireMult: '정관 퇴직금 지급배수',
+  ceoAge: '대표 나이(만)',
+  bizYears: '대표가 회사를 경영한 햇수',
+  bizAssetRatio: '가업자산 비율(%) — 사업과 무관한 자산을 뺀 몫',
 } as const
 
 export type ProfileKey = keyof typeof PROFILE_FIELDS
@@ -96,6 +99,12 @@ export interface ProfileView {
   children: number
   priorGift: number
   retireMult: number
+  /** 모르면 null — 짐작하지 않는다 */
+  ceoAge: number | null
+  bizYears: number | null
+  /** 0~1. 안 적으면 1(100%)로 보고 ★ 표시 */
+  bizAssetRatio: number
+  bizAssetRatioGiven: boolean
 }
 
 export function viewProfile(p: TaxProfile): ProfileView {
@@ -127,7 +136,21 @@ export function viewProfile(p: TaxProfile): ProfileView {
     children: Math.max(0, Math.floor(numOf(p.children, 0))),
     priorGift: wonOf(p.priorGift),
     retireMult: Math.min(2, Math.max(0, numOf(p.retireMult, 2))),
+    ceoAge: p.ceoAge && p.ceoAge.trim() !== '' ? Math.floor(numOf(p.ceoAge)) : null,
+    bizYears: p.bizYears && p.bizYears.trim() !== '' ? numOf(p.bizYears) : null,
+    bizAssetRatio: p.bizAssetRatio && p.bizAssetRatio.trim() !== '' ? Math.min(100, Math.max(0, numOf(p.bizAssetRatio))) / 100 : 1,
+    bizAssetRatioGiven: !!(p.bizAssetRatio && p.bizAssetRatio.trim() !== ''),
   }
+}
+
+/** 만 나이 · 햇수 — YYYY-MM-DD 두 개 사이 */
+export function fullYearsBetween(from: string, to: string): number | null {
+  const a = /^(\d{4})-(\d{2})-(\d{2})$/.exec(from)
+  const b = /^(\d{4})-(\d{2})-(\d{2})$/.exec(to)
+  if (!a || !b) return null
+  let y = Number(b[1]) - Number(a[1])
+  if (Number(b[2]) * 100 + Number(b[3]) < Number(a[2]) * 100 + Number(a[3])) y -= 1
+  return y >= 0 ? y : null
 }
 
 /* ------------------------------------------------------------------ */
@@ -159,7 +182,7 @@ export function cretopStockOf(record: ClientOpsRecord | null): CretopStock | nul
   return null
 }
 
-export function profileSuggestions(record: ClientOpsRecord | null, profile: TaxProfile): ProfileSuggestion[] {
+export function profileSuggestions(record: ClientOpsRecord | null, profile: TaxProfile, today = ''): ProfileSuggestion[] {
   if (!record) return []
   const out: ProfileSuggestion[] = []
   const empty = (k: ProfileKey) => !profile[k] || profile[k]!.trim() === ''
@@ -173,6 +196,12 @@ export function profileSuggestions(record: ClientOpsRecord | null, profile: TaxP
   const cr = cretopStockOf(record)
   if (cr && cr.shares > 0) put('totalShares', String(cr.shares), '크레탑 보고서 · 발행주식수')
   if (record.establishedAt) put('ceoStartDate', record.establishedAt, '설립일 — 대표가 설립 때부터 임원이면 그대로')
+  if (today) {
+    const age = record.representativeBirth ? fullYearsBetween(record.representativeBirth, today) : null
+    if (age !== null) put('ceoAge', String(age), '회사 정보 · 대표 생년월일')
+    const years = record.establishedAt ? fullYearsBetween(record.establishedAt, today) : null
+    if (years !== null) put('bizYears', String(years), '설립일부터 — 대표가 그때부터 경영했으면 그대로')
+  }
   return out
 }
 
@@ -484,7 +513,7 @@ export function salaryPlan(p: ProfileView, goal: SalaryGoal): SalaryResult {
 /* 목표 2 — 대표가 세후 N원 가져오기: 급여 · 배당 · 주식 양도 · 퇴직금 · 섞기  */
 /* ------------------------------------------------------------------ */
 
-export type CashRouteKey = 'salary' | 'dividend' | 'shareSale' | 'retire' | 'mix'
+export type CashRouteKey = 'salary' | 'dividend' | 'shareSale' | 'shareBurn' | 'spouseBurn' | 'retire' | 'mix'
 
 export interface CashRoute {
   key: CashRouteKey
@@ -506,6 +535,12 @@ export interface CashRoute {
   conditions: string[]
   basis: string[]
   open: CalcOpen | null
+  /** ★ 확실하지 않아 세무사 검증이 필요한 것 — 화면에 별표로 */
+  verify: string[]
+  /** 다툼이 있는 방법 — 추천에서 빼고 맨 뒤 '검증 필요' 로 */
+  unsafe?: boolean
+  /** 돈을 받는 사람이 대표가 아닐 때(배우자) */
+  receiver?: string
 }
 
 export interface CashPlan {
@@ -528,7 +563,7 @@ function eokOf(n: number): string {
 }
 
 function failRoute(key: CashRouteKey, label: string, reason: string, basis: string[] = []): CashRoute {
-  return { key, label, ok: false, reason, companyOut: 0, personalTax: 0, corpSaving: 0, netBurden: 0, net: 0, lines: [], conditions: [], basis, open: null }
+  return { key, label, ok: false, reason, companyOut: 0, personalTax: 0, corpSaving: 0, netBurden: 0, net: 0, lines: [], conditions: [], basis, open: null, verify: [] }
 }
 
 interface Ctx {
@@ -565,6 +600,7 @@ function salaryRoute(c: Ctx, target: number): CashRoute & { newMonthly: number }
     ],
     basis: SALARY_BASIS,
     open: { calc: 't2', sub: 'main', values: { s_monthly: s(m1) }, label: '01 급여 최적화에서 열기' },
+    verify: [],
     newMonthly: m1,
   }
 }
@@ -619,6 +655,7 @@ function dividendRoute(c: Ctx, target: number): CashRoute {
     conditions,
     basis: DIVIDEND_BASIS,
     open: { calc: 't9', sub: 'inc_a', values: got.values, label: '03 소득세(1안)에서 열기' },
+    verify: [],
   }
 }
 
@@ -665,6 +702,7 @@ function shareSaleRoute(c: Ctx, target: number): CashRoute {
     ],
     basis: SHARE_SALE_BASIS,
     open: { calc: 't9', sub: 'inc_a', values: r.values, label: '03 소득세(1안)에서 열기' },
+    verify: ['회사가 사들인 주식을 보유 · 다시 팔 목적이어야 양도소득입니다 — 소각할 목적이면 의제배당(아래 "자사주 소각")으로 과세됩니다. 계약서 · 이사회 · 주주총회 결의 내용으로 판단'],
   }
 }
 
@@ -721,6 +759,95 @@ function retireRoute(c: Ctx, target: number): CashRoute {
     ],
     basis: RETIRE_BASIS,
     open: { calc: 't9', sub: 'inc_a', values: r.values, label: '03 소득세(1안)에서 열기' },
+    verify: [],
+  }
+}
+
+const SHARE_BURN_BASIS = [
+  '03 2026 소득세 계산기(종합소득세)의 식 그대로 — 회사가 주식을 사서 소각하면 받은 돈 − 취득가가 배당(의제배당, 소득세법 §17②)이 되어 지금 급여와 합쳐 종합과세',
+  '자기주식 취득은 배당가능이익 한도 안에서 · 주주총회 결의(상법 §341)',
+  '1주당 가격은 09 비상장주식 가치평가(상증세법 §63)',
+]
+
+/** 자사주 소각(이익소각 · 감자) — 대표에게는 배당(의제배당). 양도(보유 목적)와 나란히 비교한다 */
+function shareBurnRoute(c: Ctx, target: number): CashRoute {
+  const label = '자사주 소각(의제배당)'
+  const ceo = ceoOf(c.reg)
+  const V = c.sv.perShare
+  if (!ceo || ceo.shares <= 0) return failRoute('shareBurn', label, '주주명부에 대표 주식 수를 적어 주세요.', SHARE_BURN_BASIS)
+  if (!(V > 0)) return failRoute('shareBurn', label, '1주당 가치를 알아야 합니다(자산 · 순이익 또는 직접 적기).', SHARE_BURN_BASIS)
+  const H = ceo.shares
+  const acquire = ceo.acquirePrice > 0 ? ceo.acquirePrice : c.p.par
+  const r0 = computeSalary(c.p.monthlySalary)
+  const base = t9({ today: c.today, salary: r0.annual, insDed: r0.insTotal, interest: c.p.otherFinIncome }).incomeTax
+  const at = (q: number) => t9({ today: c.today, salary: r0.annual, insDed: r0.insTotal, interest: c.p.otherFinIncome, dividend: Math.max(0, q * (V - acquire)) })
+  const f = (q: number) => q * V - (at(q).incomeTax - base)
+  const all = f(H)
+  if (all < target) return failRoute('shareBurn', label, `대표 주식을 다 소각해도 세후 ${fmt(all)}입니다.`, SHARE_BURN_BASIS)
+  const q = Math.min(H, Math.ceil(solveUp(f, target, 0, H, H) ?? H))
+  const r = at(q)
+  const tax = r.incomeTax - base
+  const out = q * V
+  const ok = !(c.p.retainedEarnings > 0 && out > c.p.retainedEarnings)
+  return {
+    key: 'shareBurn',
+    label,
+    ok,
+    reason: ok ? '' : `자기주식은 배당 가능한 이익(${fmt(c.p.retainedEarnings)}) 안에서만 살 수 있습니다(${fmt(out)} 필요).`,
+    companyOut: out,
+    personalTax: tax,
+    corpSaving: 0,
+    netBurden: tax,
+    net: out - tax,
+    lines: [`대표 주식 ${q.toLocaleString('ko-KR')}주 × 1주 ${fmt(V)} → 소각`, `의제배당 ${fmt(Math.max(0, q * (V - acquire)))} (받은 돈 − 취득가)`],
+    conditions: [
+      ...(ceo.acquirePrice > 0 ? [] : [c.p.par > 0 ? `취득가를 몰라 액면가(${fmt(c.p.par)})로 보았습니다.` : '취득가 · 액면가를 몰라 0원으로 보았습니다.']),
+      ...(c.p.retainedEarnings === 0 ? ['배당 가능한 이익을 적으면 살 수 있는 한도를 가립니다.'] : []),
+      '소각하면 다른 주주 지분율이 올라갑니다(주식 수가 줄어서).',
+    ],
+    basis: SHARE_BURN_BASIS,
+    open: { calc: 't9', sub: 'inc_a', values: r.values, label: '03 소득세(1안)에서 열기' },
+    verify: ['의제배당에도 배당가산(Gross-up) · 배당세액공제를 적용해 계산했습니다 — 소각 재원(이익잉여금 · 자본잉여금)에 따라 달라질 수 있습니다'],
+  }
+}
+
+/**
+ * 배우자에게 주식을 증여한 뒤 회사가 사서 소각 — 컨설팅에서 흔히 쓰였지만 다툼이 있다.
+ * 계산은 04 증여세 식 그대로, 의제배당은 증여가액 = 소각가라 0 으로 본다. 추천하지 않고 '★ 검증 필요' 로만.
+ */
+function spouseBurnRoute(c: Ctx, target: number): CashRoute {
+  const label = '배우자 증여 후 소각'
+  const ceo = ceoOf(c.reg)
+  const V = c.sv.perShare
+  const basis = [
+    '04 증여세 계산기의 식 그대로 — 배우자 증여재산공제 6억(상증세법 §53, 10년 합산)',
+    '배우자가 증여받은 값(시가)이 취득가가 되어, 같은 값에 소각하면 의제배당이 거의 없다는 계산',
+  ]
+  const verify = [
+    '증여받은 주식을 곧 양도 · 소각하면 증여자(대표)의 취득가로 계산하는 이월과세(소득세법 §97의2, 2025년부터 주식 포함 · 1년)와 같은 취지로 과세될 수 있습니다',
+    '소각 대금이 결국 대표에게 돌아가면 실질과세(국세기본법 §14)로 부인된 사례가 있습니다',
+    '돈은 대표가 아니라 배우자에게 갑니다',
+  ]
+  if (!ceo || ceo.shares <= 0 || !(V > 0)) return { ...failRoute('spouseBurn', label, '대표 주식 수 · 1주당 가치를 알아야 합니다.', basis), unsafe: true, verify }
+  const q = Math.min(ceo.shares, Math.ceil(target / V))
+  const g = giftTax(V, q, 0, '배우자')
+  return {
+    key: 'spouseBurn',
+    label,
+    ok: q * V >= target,
+    reason: q * V >= target ? '' : '대표 주식이 모자랍니다.',
+    companyOut: q * V,
+    personalTax: g.tax,
+    corpSaving: 0,
+    netBurden: g.tax,
+    net: q * V - g.tax,
+    lines: [`대표 → 배우자 ${q.toLocaleString('ko-KR')}주 증여(${fmt(q * V)}) → 회사가 사서 소각`, `증여세 ${fmt(g.tax)} · 의제배당 0원으로 계산`],
+    conditions: ['추천하지 않습니다 — 세무사와 먼저 확인할 방법입니다.'],
+    basis,
+    open: { calc: 't5', sub: 'j2', values: g.values, label: '04 증여세 비교에서 열기' },
+    verify,
+    unsafe: true,
+    receiver: '배우자',
   }
 }
 
@@ -758,6 +885,7 @@ function mixRoute(c: Ctx, target: number): CashRoute | null {
     conditions: ['급여 · 배당 각각의 조건을 모두 지켜야 합니다.'],
     basis: [...SALARY_BASIS.slice(0, 1), ...DIVIDEND_BASIS.slice(0, 2), '섞는 비율은 10% 간격으로 모두 계산해 순부담이 가장 적은 것을 골랐다'],
     open: null,
+    verify: [],
   }
 }
 
@@ -765,16 +893,17 @@ export function cashPlan(p: ProfileView, reg: ShareholderRow[], sv: ShareValue, 
   const notes: string[] = []
   if (!(target > 0)) return { target, routes: [], best: null, notes: ['가져올 금액(세후)을 적어 주세요.'] }
   const c: Ctx = { p, reg, sv, today }
-  const routes: CashRoute[] = [salaryRoute(c, target), dividendRoute(c, target), shareSaleRoute(c, target), retireRoute(c, target)]
+  const routes: CashRoute[] = [salaryRoute(c, target), dividendRoute(c, target), shareSaleRoute(c, target), shareBurnRoute(c, target), retireRoute(c, target)]
   const mix = mixRoute(c, target)
-  const bestSingle = routes.filter((r) => r.ok).sort((a, b) => a.netBurden - b.netBurden)[0]
+  const bestSingle = routes.filter((r) => r.ok && r.key !== 'retire').sort((a, b) => a.netBurden - b.netBurden)[0]
   if (mix && (!bestSingle || mix.netBurden < bestSingle.netBurden - 1)) routes.push(mix)
   else notes.push('급여와 배당을 섞어도 한 가지 방법보다 싸지 않았습니다.')
+  routes.push(spouseBurnRoute(c, target))
   if (p.monthlySalary === 0) notes.push('대표 월 급여(지금)를 적으면 모든 방법이 더 정확해집니다.')
-  // 줄 세우기: 되는 것(순부담 적은 순) → 퇴직금(퇴임할 때만 — 지금 쓰는 길이 아닐 수 있어 뒤로) → 안 되는 것
-  const rank = (r: CashRoute) => (!r.ok ? 2 : r.key === 'retire' ? 1 : 0)
+  // 줄 세우기: 되는 것(순부담 적은 순) → 퇴직금(퇴임할 때만) → ★ 다툼 있는 방법 → 안 되는 것
+  const rank = (r: CashRoute) => (r.unsafe ? 3 : !r.ok ? 2 : r.key === 'retire' ? 1 : 0)
   const ranked = [...routes].sort((a, b) => rank(a) - rank(b) || a.netBurden - b.netBurden)
-  const best = ranked.find((r) => r.ok && r.key !== 'retire') ?? ranked.find((r) => r.ok) ?? null
+  const best = ranked.find((r) => r.ok && !r.unsafe && r.key !== 'retire') ?? null
   return { target, routes: ranked, best, notes }
 }
 
@@ -789,6 +918,39 @@ export interface GiftGoal {
   mode: GiftMode
   /** pct: 발행주식 대비 %, shares: 주 수, value: 원, budget: 증여세 상한(원) */
   amount: number
+}
+
+/** 가업승계 증여세 과세특례(조세특례제한법 §30의6) — 2023년 1월 1일 이후 증여분 기준 */
+export const SUCCESSION = { deduction: 1e9, bracket: 1.2e10, lowRate: 0.1, highRate: 0.2 }
+
+/** 특례 한도 — 부모가 가업을 경영한 기간 10년 300억 · 20년 400억 · 30년 600억 */
+export function successionLimit(years: number | null): number {
+  if (years === null) return 0
+  return years >= 30 ? 6e10 : years >= 20 ? 4e10 : years >= 10 ? 3e10 : 0
+}
+
+/** 특례 세액 — (특례 가액 − 10억) 중 120억까지 10% · 넘는 부분 20% */
+export function successionSpecialTax(specialValue: number): number {
+  const base = Math.max(0, specialValue - SUCCESSION.deduction)
+  return base <= SUCCESSION.bracket ? base * SUCCESSION.lowRate : SUCCESSION.bracket * SUCCESSION.lowRate + (base - SUCCESSION.bracket) * SUCCESSION.highRate
+}
+
+export type CheckState = 'ok' | 'no' | 'unknown'
+
+export interface SuccessionResult {
+  state: CheckState
+  checks: { label: string; state: CheckState; note: string }[]
+  limit: number
+  specialValue: number
+  excessValue: number
+  specialTax: number
+  excessTax: number
+  total: number
+  general: number
+  saving: number
+  lines: string[]
+  verify: string[]
+  basis: string[]
 }
 
 export interface GiftResult {
@@ -807,6 +969,8 @@ export interface GiftResult {
   conditions: string[]
   basis: string[]
   open: CalcOpen | null
+  /** 가업승계 증여세 과세특례와 비교 — 자녀에게 줄 때만 */
+  succession: SuccessionResult | null
 }
 
 /** 주주명부 관계 → 04 계산기 '증여자와의 관계'(증여자 = 대표) */
@@ -836,7 +1000,7 @@ export function giftPlan(p: ProfileView, reg: ShareholderRow[], sv: ShareValue, 
   const who = reg.find((r) => r.id === goal.recipientId) ?? null
   const empty: GiftResult = {
     ok: false, message: '', recipient: who?.name ?? '', rel: '', qty: 0, value: 0, tax: 0, deduction: 0, taxFreeQty: 0,
-    ceoAfterPct: 0, recipientAfterPct: 0, lines: [], conditions: [], basis: GIFT_BASIS, open: null,
+    ceoAfterPct: 0, recipientAfterPct: 0, lines: [], conditions: [], basis: GIFT_BASIS, open: null, succession: null,
   }
   if (!ceo || ceo.shares <= 0) return { ...empty, message: '주주명부에 대표 주식 수를 적어 주세요.' }
   if (!who) return { ...empty, message: '받는 사람을 주주명부에서 골라 주세요(아직 주식이 없으면 0주로 한 줄 넣으세요).' }
@@ -870,7 +1034,6 @@ export function giftPlan(p: ProfileView, reg: ShareholderRow[], sv: ShareValue, 
   const conditions = [
     ...(qty > ceo.shares ? [`대표 주식(${ceo.shares.toLocaleString('ko-KR')}주)보다 많아 대표 주식 전부로 계산했습니다.`] : []),
     ...(prior > 0 ? [`10년 안에 준 ${fmt(prior)}을 합산했습니다.`] : []),
-    '가업승계 증여세 과세특례(조세특례제한법 §30의6 — 요건을 갖추면 10억 공제 뒤 낮은 세율)는 계산기에 없습니다 — 해당하면 세금이 크게 줄 수 있어 세무사 확인.',
     '증여 뒤 10년 안에 대표가 사망하면 이 증여는 상속재산에 다시 더해집니다(상증세법 §13).',
   ]
   return {
@@ -892,6 +1055,68 @@ export function giftPlan(p: ProfileView, reg: ShareholderRow[], sv: ShareValue, 
     conditions,
     basis: GIFT_BASIS,
     open: { calc: 't5', sub: 'j2', values: g.values, label: '04 증여세 비교에서 열기' },
+    succession: who.relation === 'child' || who.relation === 'minor_child' ? successionPlan(p, who.relation, capped * V, g.tax, prior, rel) : null,
+  }
+}
+
+const SUCCESSION_BASIS = [
+  '조세특례제한법 §30의6 가업승계 증여세 과세특례(2023년 1월 1일 이후 증여분): 가업주식 가액에서 10억 공제 → 120억까지 10% · 넘는 부분 20%',
+  '특례 한도: 부모가 가업을 경영한 기간 10년 이상 300억 · 20년 이상 400억 · 30년 이상 600억',
+  '특례로 증여한 주식은 증여 뒤 기간과 관계없이 상속세 과세가액에 더해진다(가업상속공제 요건을 갖추면 그때 공제받을 수 있다)',
+  '일반 증여세는 04 증여세 비교 계산기의 식 그대로',
+]
+
+function successionPlan(p: ProfileView, relation: ShareholderRelation, value: number, generalTax: number, prior: number, rel: string): SuccessionResult {
+  const checks: SuccessionResult['checks'] = [
+    {
+      label: '증여자(대표) 60세 이상',
+      state: p.ceoAge === null ? 'unknown' : p.ceoAge >= 60 ? 'ok' : 'no',
+      note: p.ceoAge === null ? '대표 나이를 적어 주세요' : `만 ${p.ceoAge}세`,
+    },
+    {
+      label: '받는 사람 18세 이상 자녀',
+      state: relation === 'child' ? 'ok' : 'unknown',
+      note: relation === 'child' ? '성년 자녀' : '미성년 자녀 — 18세 이상이면 됩니다',
+    },
+    {
+      label: '대표가 10년 이상 계속 경영',
+      state: p.bizYears === null ? 'unknown' : p.bizYears >= 10 ? 'ok' : 'no',
+      note: p.bizYears === null ? '경영한 햇수를 적어 주세요' : `${p.bizYears}년`,
+    },
+    { label: '중소기업 · 중견기업(가업상속공제 대상 업종)', state: 'unknown', note: '업종 · 규모 확인 필요' },
+  ]
+  const state: CheckState = checks.some((c) => c.state === 'no') ? 'no' : checks.some((c) => c.state === 'unknown') ? 'unknown' : 'ok'
+  const limit = successionLimit(p.bizYears !== null && p.bizYears >= 10 ? p.bizYears : 10)
+  const specialValue = Math.min(value * p.bizAssetRatio, limit)
+  const excessValue = Math.max(0, value - specialValue)
+  const specialTax = successionSpecialTax(specialValue)
+  const excessTax = excessValue > 0 ? giftTax(excessValue, 1, prior, rel).tax : 0
+  const total = specialTax + excessTax
+  const verify = [
+    '금액 · 세율 · 한도는 2023년 개정 조세특례제한법 기준입니다 — 2026년 현재 그대로인지 확인',
+    ...(p.bizAssetRatioGiven ? [] : ['가업자산 비율을 100%로 보았습니다 — 사업과 무관한 자산(임대 부동산 · 과다 현금 등) 몫은 특례가 안 되어 세금이 늘어납니다']),
+    ...(excessValue > 0 ? ['특례를 넘는 부분을 일반 증여세로 따로 계산했습니다 — 실제 합산 방법은 세무사 확인'] : []),
+    '특례에는 신고세액공제(3%)를 적용하지 않았습니다',
+    '사후관리 5년(받은 사람이 가업에 종사 · 3년 안 대표이사 취임 · 지분 유지)을 어기면 일반 증여세와 이자를 추징합니다',
+  ]
+  return {
+    state,
+    checks,
+    limit,
+    specialValue,
+    excessValue,
+    specialTax,
+    excessTax,
+    total,
+    general: generalTax,
+    saving: generalTax - total,
+    lines: [
+      `특례 가액 ${eokOf(specialValue)}${excessValue > 0 ? ` · 특례 밖 ${eokOf(excessValue)}` : ''} (한도 ${eokOf(limit)})`,
+      excessValue > 0 ? `특례 증여세 ${fmt(specialTax)} + 특례 밖 일반 증여세 ${fmt(excessTax)} = ${fmt(total)}` : `특례 증여세 ${fmt(specialTax)} ((특례 가액 − 10억) × 10%)`,
+      `일반 증여세 ${fmt(generalTax)} → ${generalTax - total > 0 ? `${eokOf(generalTax - total)} 적음` : '차이 없음'}`,
+    ],
+    verify,
+    basis: SUCCESSION_BASIS,
   }
 }
 
@@ -907,6 +1132,8 @@ export interface InheritResult {
   taxNow: number
   /** 계획한 증여가 있을 때 — 10년 안 상속(합산) · 10년 뒤 상속 */
   withGift: { giftValue: number; giftTax: number; within10: number; after10: number } | null
+  /** 가업상속공제(상증세법 §18의2)를 받으면 ★ — 대표가 10년 이상 경영했을 때만 */
+  familyBiz: { deduction: number; tax: number; verify: string[] } | null
   lines: string[]
   conditions: string[]
   basis: string[]
@@ -936,7 +1163,7 @@ export function inheritancePlan(p: ProfileView, reg: ShareholderRow[], sv: Share
   const shareValue = ceo && sv.perShare > 0 ? ceo.shares * sv.perShare : 0
   const estate = p.estateRealEstate + p.estateFinancial + p.estateOther + shareValue
   if (estate <= 0) {
-    return { ok: false, message: '대표 재산(부동산 · 금융 · 기타)이나 주식가치를 알아야 합니다.', estate: 0, shareValue: 0, taxNow: 0, withGift: null, lines: [], conditions: [], basis: INHERIT_BASIS, open: null }
+    return { ok: false, message: '대표 재산(부동산 · 금융 · 기타)이나 주식가치를 알아야 합니다.', estate: 0, shareValue: 0, taxNow: 0, withGift: null, familyBiz: null, lines: [], conditions: [], basis: INHERIT_BASIS, open: null }
   }
   const now = inheritTax(p, p.estateOther + shareValue, p.priorGift, 0)
   let withGift: InheritResult['withGift'] = null
@@ -946,6 +1173,19 @@ export function inheritancePlan(p: ProfileView, reg: ShareholderRow[], sv: Share
     const after10 = inheritTax(p, left, 0, 0).tax
     withGift = { giftValue: gift.value, giftTax: gift.tax, within10, after10 }
   }
+  let familyBiz: InheritResult['familyBiz'] = null
+  if (shareValue > 0 && p.bizYears !== null && p.bizYears >= 10) {
+    const deduction = Math.min(shareValue * p.bizAssetRatio, successionLimit(p.bizYears))
+    familyBiz = {
+      deduction,
+      tax: inheritTax(p, p.estateOther + shareValue - deduction, p.priorGift, 0).tax,
+      verify: [
+        '가업상속공제 요건(대표가 10년 이상 경영 · 지분 40% 이상을 10년 이상 보유 · 대표이사 재직 기간, 상속인이 가업에 종사 · 대표이사 취임)을 모두 갖춰야 합니다',
+        '사후관리 5년(가업 · 고용 · 지분 유지)을 어기면 추징합니다',
+        '한도(10년 300억 · 20년 400억 · 30년 600억)와 가업자산 비율은 2023년 개정 기준 — 2026년 현재 확인',
+      ],
+    }
+  }
   return {
     ok: true,
     message: '',
@@ -953,6 +1193,7 @@ export function inheritancePlan(p: ProfileView, reg: ShareholderRow[], sv: Share
     shareValue,
     taxNow: now.tax,
     withGift,
+    familyBiz,
     lines: [
       `대표 재산 ${eokOf(estate)} (주식 ${eokOf(shareValue)} 포함) · 채무 ${eokOf(p.estateDebt)}`,
       `배우자 ${p.spouseAlive ? '있음' : '없음'} · 자녀 ${p.children}명`,
@@ -1131,11 +1372,19 @@ export function parseGoalText(text: string): ParsedGoal {
     add('inherit')
     out.heard.push('상속세 미리 보기')
   }
+  if (has(/자사주|자기주식|이익소각|소각/)) {
+    add('cash')
+    out.heard.push('자사주 — 양도(보유 목적)와 소각(의제배당) 비교')
+  }
+  if (has(/특례/) && !out.goals.includes('gift')) {
+    add('gift')
+    out.heard.push('가업승계 증여세 과세특례')
+  }
   if (has(/퇴직|퇴임|은퇴/)) {
     add('retire')
     out.heard.push('퇴직금 한도 · 세금')
   }
-  if (!out.loan && amount && (has(/현금|가져오|가져가|인출|빼|필요|쓰고|마련|받고\s*싶/) || out.goals.length === 0) && !(out.salary?.mode === 'net') && !out.gift?.amount) {
+  if (!out.loan && amount && (has(/현금|가져오|가져가|인출|빼|필요|쓰고|마련|받고\s*싶|자사주|자기주식|소각/) || out.goals.length === 0) && !(out.salary?.mode === 'net') && !(out.gift && (out.gift.mode === 'value' || out.gift.mode === 'budget'))) {
     add('cash')
     out.cash = amount
     out.heard.push(`대표가 세후 ${fmt(amount)} 가져오기 — 급여 · 배당 · 주식 · 퇴직금 비교`)

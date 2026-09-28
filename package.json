@@ -53,6 +53,7 @@
     "qa:detail": "node e2e/detail.mjs",
     "qa:files": "node e2e/files-cloud.mjs",
     "qa:taxplan": "node e2e/taxplan.mjs",
+    "qa:calendar": "node e2e/calendar.mjs",
     "qa:squeeze": "node e2e/squeeze.mjs",
     "qa:sales": "node e2e/sales.mjs",
     "qa:journey": "node e2e/journey.mjs",

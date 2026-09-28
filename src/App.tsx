@@ -6,6 +6,7 @@ import { TextScaleProvider } from './components/ui/TextScaleProvider'
 import { AppearanceProvider } from './components/ui/AppearanceProvider'
 import { getDataModeConfig } from './data/dataMode'
 import { appRouteChildren, publicSurveyRoute, publicTestRoute } from './app/appRouteChildren'
+import { DatePickerHost } from './components/ui/DatePickerHost'
 import { RouteErrorScreen } from './components/layout/RouteErrorScreen'
 
 // supabase 모드 앱(및 Supabase SDK)은 지연 로딩해 local 모드 entry 번들에 포함되지 않게 한다.
@@ -38,6 +39,8 @@ function App() {
     <TextScaleProvider>
       <AppearanceProvider>
         <ToastProvider>
+          {/* D-131: OS 의 모든 날짜 칸 → 큰 달력(일요일부터) */}
+          <DatePickerHost />
           {cfg.mode === 'supabase' ? (
             <Suspense fallback={<BootSplash />}>
               <SupabaseApp />

@@ -37,6 +37,7 @@ npm run qa:facts -- http://localhost:4390         # 고객 사실 창고(자료�
 npm run qa:detail -- http://localhost:4390        # 업체 상세(탭 순서 · 서류 → 회사정보 · 현황 카드 누르기 · 삭제 체크 · 360~430)
 npm run qa:files                                  # 서류 파일(클라우드 흉내 — 미리보기 · 새 창 · 내려받기 · 교체 · 비공개 저장소)
 npm run qa:taxplan -- http://localhost:4390       # 절세 설계(원하는 결과 → 계산기 식으로 거꾸로 · 계산기 열기 · 업체 기록 저장)
+npm run qa:calendar -- http://localhost:4390      # 큰 달력(날짜 칸 → 일요일부터 · 창 위 · Esc · 직접 적기 · 휴대폰)
 ```
 
 화면을 손댔으면 **실제로 찍어서 눈으로 본다**(`npm run qa:shots -- <url> <dir> --wide`).
