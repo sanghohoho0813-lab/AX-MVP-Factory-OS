@@ -14,7 +14,8 @@
  * 모듈을 새로 사도 이미 있는 사실을 바로 쓴다.
  */
 
-import type { ClientOpsRecord, FactCandidate, FactMeta, FactSource, FactStatus } from '../types/clientOps'
+import type { ClientOpsRecord, FactCandidate, FactMeta, FactSource, FactStatus, ProfileGroupKey } from '../types/clientOps'
+import { withCustomField } from './clientOpsService'
 import { parseKoreanDate } from './koreanDocParser'
 
 /* ------------------------------------------------------------------ */
@@ -89,6 +90,7 @@ export const FACT_SOURCE_LABEL: Record<FactSource, string> = {
   financialStatements: '재무제표',
   payrollRoster: '4대보험 명부',
   meeting: '상담 메모',
+  certificate: '인증서 · 확인서',
 }
 
 export const FACT_STATUS_LABEL: Record<FactStatus, string> = {
@@ -233,6 +235,18 @@ export interface PendingFact {
   current: string
   /** 받아 둔 후보(factInbox) 인가, 붙어 있는 크레탑 결과에서 읽은 것인가 */
   from: 'inbox' | 'cretop'
+  /** D-129: 회사 기본 정보의 직접 만든 칸으로 가면 그 묶음(인증서 …) */
+  customGroup?: ProfileGroupKey
+}
+
+/** D-129: 'cf:<칸 이름>' — 직접 만든 칸으로 가는 후보 */
+export const CUSTOM_FACT_PREFIX = 'cf:'
+export function isCustomFactKey(key: string): boolean {
+  return key.startsWith(CUSTOM_FACT_PREFIX)
+}
+function customFieldOf(record: ClientOpsRecord, label: string) {
+  const norm = (v: string) => v.replace(/\s/g, '')
+  return record.customFields.find((f) => norm(f.label) === norm(label))
 }
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null)
@@ -288,9 +302,21 @@ export function cretopFacts(record: ClientOpsRecord): { key: string; value: stri
 export function pendingFacts(record: ClientOpsRecord): PendingFact[] {
   const out: PendingFact[] = []
   const seen = new Set<string>()
-  const consider = (c: { id: string; key: string; value: string; source: FactSource; asOf: string; ref: string }, from: PendingFact['from']) => {
+  const consider = (c: { id: string; key: string; value: string; source: FactSource; asOf: string; ref: string; label?: string; group?: ProfileGroupKey }, from: PendingFact['from']) => {
+    if (!c.value.trim()) return
+    if (isCustomFactKey(c.key)) {
+      // 직접 만든 칸으로 가는 후보 — 같은 이름의 칸에 같은 값이면 묻지 않는다(같은 인증서를 또 올려도 칸이 늘지 않는다)
+      const label = c.label ?? c.key.slice(CUSTOM_FACT_PREFIX.length)
+      const cur = customFieldOf(record, label)?.value ?? ''
+      if (cur && sameFactValue(undefined, cur, c.value)) return
+      if (record.factMeta?.[c.key]?.dismissed?.includes(c.ref)) return
+      if (seen.has(c.key)) return
+      seen.add(c.key)
+      out.push({ id: c.id, key: c.key, label, value: c.value, display: c.value, source: c.source, sourceLabel: FACT_SOURCE_LABEL[c.source] + (c.asOf ? ` ${c.asOf}` : ''), asOf: c.asOf, ref: c.ref, current: cur, from, customGroup: c.group ?? 'credential' })
+      return
+    }
     const def = factDef(c.key)
-    if (!def || !c.value.trim()) return
+    if (!def) return
     const cur = rawValue(record, def)
     if (cur && sameFactValue(def, cur, c.value)) return
     if (record.factMeta?.[c.key]?.dismissed?.includes(c.ref)) return
@@ -313,7 +339,7 @@ export function pendingFacts(record: ClientOpsRecord): PendingFact[] {
   }
   for (const c of record.factInbox ?? []) consider(c, 'inbox')
   for (const c of cretopFacts(record)) consider({ id: `${c.ref}:${c.key}`, source: 'cretop', ...c }, 'cretop')
-  return FACT_DEFS.flatMap((d) => out.filter((p) => p.key === d.key))
+  return [...FACT_DEFS.flatMap((d) => out.filter((p) => p.key === d.key)), ...out.filter((p) => isCustomFactKey(p.key))]
 }
 
 /* ------------------------------------------------------------------ */
@@ -369,7 +395,7 @@ export function withFactConfirmed(record: ClientOpsRecord, key: string, now: str
 /** 자료에서 찾은 값 받아 두기 — 확정하지 않는다(확인 필요로만) */
 export function withFactCandidates(record: ClientOpsRecord, found: Omit<FactCandidate, 'id' | 'foundAt'>[], now: string, makeId: () => string): ClientOpsRecord {
   const keep = (record.factInbox ?? []).filter((c) => !found.some((f) => f.key === c.key))
-  const fresh = found.filter((f) => factDef(f.key) && f.value.trim() !== '').map((f) => ({ ...f, id: makeId(), foundAt: now }))
+  const fresh = found.filter((f) => (factDef(f.key) || isCustomFactKey(f.key)) && f.value.trim() !== '').map((f) => ({ ...f, id: makeId(), foundAt: now }))
   return { ...record, factInbox: [...fresh, ...keep] }
 }
 
@@ -402,6 +428,15 @@ export function withFactDecisions(record: ClientOpsRecord, decisions: FactDecisi
     if (d.action === 'reject') {
       // 값이 없던 사실이면 빈 메타만 남는다 — 읽을 때 값이 없으므로 '없음' 이다
       next = dismiss(next)
+      continue
+    }
+    if (isCustomFactKey(p.key)) {
+      // 회사 기본 정보의 칸 — 같은 이름이 있으면 고치고, 없으면 만든다
+      const value = d.action === 'fix' ? (d.value ?? '').trim() : p.value
+      if (!value) continue
+      const cur = customFieldOf(next, p.label)
+      next = withCustomField(next, { id: cur?.id, group: cur?.group ?? p.customGroup ?? 'credential', label: cur?.label ?? p.label, value })
+      next = { ...next, factMeta: { ...(next.factMeta ?? {}), [p.key]: { source: d.action === 'fix' ? 'manual' : p.source, status: 'confirmed', asOf: p.asOf, confirmedAt: now, updatedAt: now, dismissed: [...new Set([...(next.factMeta?.[p.key]?.dismissed ?? []), p.ref])] } } }
       continue
     }
     if (d.action === 'fix') {

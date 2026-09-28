@@ -604,6 +604,7 @@ export type FactSource =
   | 'financialStatements' // 재무제표
   | 'payrollRoster' // 4대보험 가입자 명부
   | 'meeting' // 상담 · 미팅 메모
+  | 'certificate' // 인증서 · 확인서 · 인정서 (D-129)
 
 export interface FactMeta {
   source: FactSource
@@ -628,6 +629,12 @@ export interface FactCandidate {
   /** 어느 자료에서 — 같은 자료를 다시 묻지 않게 */
   ref: string
   foundAt: string
+  /**
+   * D-129: 공통 사실이 아니라 회사 기본 정보의 칸(직접 만든 칸)으로 가는 후보 — key 는 'cf:<칸 이름>'.
+   * 예: 인증서 묶음의 '연구개발전담부서' 칸. 같은 이름의 칸이 있으면 그 칸을 고치고, 없으면 만든다(중복 칸 없음).
+   */
+  label?: string
+  group?: ProfileGroupKey
 }
 
 export interface ClientOpsRecord {
@@ -655,6 +662,11 @@ export interface ClientOpsRecord {
   representativeName: string
   /** 대표자 생년월일 (YYYY-MM-DD) — 나이 자동 계산 */
   representativeBirth: string
+  /**
+   * D-129: 대표자 성별 — 대표가 **직접 고른 값만**('' 이면 모름 · 표시하지 않는다).
+   * 이름으로 짐작하지 않고, 주민등록번호로 계산하지 않는다(주민등록번호는 저장하지 않는다).
+   */
+  representativeGender: '' | 'male' | 'female'
   /**
    * 상시근로자 수. 정책자금·벤처인증·중소기업확인서에서 거의 매번 묻는다.
    * 숫자만 넣지 않고 글자로 두는 이유: "5명(대표 포함)" 처럼 단서가 붙는다.

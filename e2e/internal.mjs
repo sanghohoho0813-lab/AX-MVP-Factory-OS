@@ -219,8 +219,8 @@ await step('업무 일기 탭: 고객 연결 기록', async () => {
   await shot('06-client-journal-1440')
   return (await p.getByText('E2E 고객 상세에서 남긴 결정').count()) >= 1
 })
-await step('파일 탭 렌더', async () => {
-  await p.getByRole('tab', { name: '파일' }).click()
+await step('서류 탭 안 · 고객과 주고받은 파일', async () => {
+  await p.getByRole('tab', { name: '서류' }).click()
   await p.waitForTimeout(200)
   return (await p.getByText('고객과 주고받은 파일').count()) >= 1
 })

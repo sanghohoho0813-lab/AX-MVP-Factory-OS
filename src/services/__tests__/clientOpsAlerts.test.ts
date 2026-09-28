@@ -291,7 +291,15 @@ check('문구: 미정', dueText(null) === '기한 미정')
 /* ---------------- 카탈로그 일관성 ---------------- */
 {
   check('카탈로그: 업무 6종', SERVICES.length === 6, String(SERVICES.length))
-  check('카탈로그: 서류 13종 (도구용 3종 포함, D-90)', DOCUMENTS.length === 13, String(DOCUMENTS.length))
+  // D-129: 사업자등록번호 · 법인번호 · 사업장 주소는 서류가 아니라 회사 기본 정보 — 13 → 10
+  check('카탈로그: 서류 10종 (도구용 3종 포함 · 회사 정보 3종 뺌, D-129)', DOCUMENTS.length === 10, String(DOCUMENTS.length))
+  check('카탈로그: 서류 목록에 번호 · 주소가 없다', !DOCUMENTS.some((d) => ['businessNumber', 'corporateNumber', 'businessAddress'].includes(d.key)))
+  check('카탈로그: 법인설립 · 정책자금은 주소 · 법인번호를 회사 정보로 요구', SERVICES.find((s) => s.key === 'incorporation')?.requiredFacts?.includes('businessAddress') === true && SERVICES.find((s) => s.key === 'policyFund')?.requiredFacts?.includes('corporateNumber') === true)
+  {
+    // 예전에 '받음' 으로 적어 둔 기록은 지우지 않는다
+    const kept = normalizeClientOps({ id: 'legacy', companyName: 'x', documents: { businessNumber: { received: true, issuedAt: '', fileName: '', fileSize: 0, storagePath: '', note: '123-45-67890', updatedAt: null } } } as never)
+    check('예전 기록: 서류 칸에서 빠져도 적어 둔 값은 남는다', kept.documents.businessNumber?.received === true && kept.documents.businessNumber?.note === '123-45-67890')
+  }
   const docKeys = new Set(DOCUMENTS.map((d) => d.key))
   const badRefs = SERVICES.flatMap((s) => s.requiredDocuments.filter((d) => !docKeys.has(d)))
   check('카탈로그: 필요서류가 모두 실제 서류를 가리킴', badRefs.length === 0, badRefs.join(','))

@@ -13,6 +13,7 @@ import { nowIso, todayLocalDate } from '../lib/appClock'
 import { formatFileSize } from '../lib/format'
 import {
   DOCUMENTS,
+  COMPANY_INFO_DOCUMENT_KEYS,
   FEE_KIND_LABEL,
   SERVICES,
   serviceMeta,
@@ -181,7 +182,7 @@ function normalizeContract(raw: unknown): ContractInfo {
  * 이 기능이 없던 시절의 기록에는 아예 없으므로 빈 배열이 된다(기존 데이터 영향 0).
  * 묶음 이름이 이상하면 '회사' 로 보낸다 — 칸을 잃어버리느니 자리를 옮긴다.
  */
-const FACT_SOURCES: FactSource[] = ['manual', 'businessRegistration', 'corporateRegistry', 'cretop', 'financialStatements', 'payrollRoster', 'meeting']
+const FACT_SOURCES: FactSource[] = ['manual', 'businessRegistration', 'corporateRegistry', 'cretop', 'financialStatements', 'payrollRoster', 'meeting', 'certificate']
 const isFactSource = (v: unknown): v is FactSource => typeof v === 'string' && (FACT_SOURCES as string[]).includes(v)
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
 
@@ -223,6 +224,8 @@ function normalizeFactInbox(raw: unknown): FactCandidate[] {
       asOf: str(c.asOf),
       ref: str(c.ref),
       foundAt: str(c.foundAt),
+      ...(typeof c.label === 'string' && c.label.trim() !== '' ? { label: c.label.trim() } : {}),
+      ...(isProfileGroupKey(c.group) ? { group: c.group } : {}),
     }))
 }
 
@@ -326,6 +329,8 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
      */
     const keys = new Set<DocumentKey>([
       ...DOCUMENTS.map((d) => d.key),
+      // D-129: 서류 목록에서 뺀 예전 칸(사업자등록번호 · 법인번호 · 주소)도 적어 둔 기록이 있으면 그대로 둔다
+      ...Object.keys(stored).filter((k) => COMPANY_INFO_DOCUMENT_KEYS.includes(k)),
       ...customDocuments.map((d) => d.key),
       ...Object.keys(stored).filter(isCustomDocumentKey),
     ])
@@ -351,6 +356,7 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
     industry: value.industry ?? '',
     representativeName: value.representativeName ?? '',
     representativeBirth: value.representativeBirth ?? '',
+    representativeGender: value.representativeGender === 'male' || value.representativeGender === 'female' ? value.representativeGender : '',
     employeeCount: value.employeeCount ?? '',
     shareholders: value.shareholders ?? '',
     establishedAt: value.establishedAt ?? '',
@@ -1198,18 +1204,36 @@ export async function documentFileUrl(storagePath: string, downloadName?: string
 /**
  * 첨부 파일 내려받기.
  *
- * 저장소가 붙여 준 attachment 헤더 덕분에 링크를 누르면 바로 저장된다.
+ * 파일을 서명 주소로 받아 **원래 이름 그대로** 저장한다(D-129).
+ * 저장소에 download= 로 이름을 맡기면 라이브러리가 한글 이름을 두 번 인코딩해 '%EC%9A…' 같은 이름이 될 수 있었다.
+ * 같은 출처의 blob 주소에 a.download 를 달면 브라우저가 이름을 그대로 쓴다.
+ * 받아 오지 못하면(네트워크 · 큰 파일) 예전처럼 저장소 주소로 내려받는다.
  * 새 탭으로 열지 않는다 — 열어 두면 PDF 미리보기가 떠서 '받았다' 는 느낌이 나지 않는다.
  */
 export async function downloadDocumentFile(state: Pick<DocumentState, 'storagePath' | 'fileName'>): Promise<void> {
   if (!canUploadFiles()) {
     throw new Error('파일 내려받기는 Supabase 클라우드 저장을 연결한 뒤 사용할 수 있습니다.')
   }
-  const url = await documentFileUrl(state.storagePath, state.fileName || undefined)
+  const url = await documentFileUrl(state.storagePath)
   if (!url) throw new Error('파일 주소를 만들지 못했습니다.')
+  const name = state.fileName || state.storagePath.split('/').pop() || '서류'
+  try {
+    const res = await fetch(url)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const href = URL.createObjectURL(await res.blob())
+    clickDownload(href, name)
+    setTimeout(() => URL.revokeObjectURL(href), 60_000)
+  } catch {
+    const direct = await documentFileUrl(state.storagePath, name)
+    if (!direct) throw new Error('파일 주소를 만들지 못했습니다.')
+    clickDownload(direct, name)
+  }
+}
+
+function clickDownload(href: string, name: string): void {
   const a = document.createElement('a')
-  a.href = url
-  a.download = state.fileName || ''
+  a.href = href
+  a.download = name
   a.rel = 'noopener'
   document.body.appendChild(a)
   a.click()

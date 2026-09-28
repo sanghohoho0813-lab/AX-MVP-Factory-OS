@@ -221,13 +221,16 @@ check('업무 15개에서도 가로 스크롤 없음', of2.d <= of2.w + 1, `${of
   const head = (await page.locator('main').innerText()) ?? ''
   const headAll = (await page.locator('main').evaluate((el) => el.textContent)) ?? ''
   check('상세 머리말: 계약 종류와 개월수가 보인다', /현금 \+ 보험 · 1년( \d+개월)?째/.test(head), head.slice(0, 300))
-  check('상세 개요: 못 받은 내 돈 400만', head.includes('못 받은 내 돈') && head.includes('400만원'), head.slice(0, 600))
-  check('상세 개요: 청구 기준 550만 힌트', headAll.includes('청구 기준 550만원'), headAll.slice(0, 300))
+  // D-129: 개요는 가볍게 — 돈 숫자 칸은 수금 탭에만 둔다
+  check('상세 개요: 돈 숫자 칸을 되풀이하지 않는다', !head.includes('못 받은 내 돈'), head.slice(0, 600))
+  void headAll
 
   await page.goto(BASE + '/ops/clients/cli_hansol?tab=fees', { waitUntil: 'networkidle' })
   await page.waitForTimeout(800)
   const feesTab = (await page.locator('main').innerText()) ?? ''
   const feesAll = (await page.locator('main').evaluate((el) => el.textContent)) ?? ''
+  check('수금 탭: 못 받은 내 돈 400만', feesTab.includes('못 받은 내 돈') && feesTab.includes('400만원'), feesTab.slice(0, 600))
+  check('수금 탭: 청구 기준 550만 힌트', feesAll.includes('청구 기준 550만원'), feesAll.slice(0, 300))
   check('수금 탭: 영업자 이름이 항목에 보인다', feesTab.includes('최영업 몫 빼고'), feesTab.slice(0, 400))
   check('수금 탭: 영업자 수수료 칸 아래 누구에게 얼마', feesAll.includes('최영업 2,000,000원'), feesAll.slice(0, 300))
   const nameInput = page.getByLabel('성공보수 영업자 이름')
@@ -486,15 +489,16 @@ await page.getByRole('button', { name: '네, 다음으로' }).click()
 await page.waitForTimeout(400)
 check('2차 확인이 뜬다', await page.getByText('마지막 확인').first().isVisible())
 
-const disabled = await page.getByRole('button', { name: /영구 삭제/ }).isDisabled()
-check('이름을 적기 전에는 못 누른다', disabled)
-await page.getByLabel('확인을 위해 업체 이름 입력').fill('틀린이름')
+// D-129: 이름을 적지 않는다 — 확인 칸 하나에 체크
+const disabled = await page.getByRole('button', { name: '이 업체 영구 삭제' }).isDisabled()
+check('체크 전에는 못 누른다', disabled)
+check('이름 입력 칸이 없다', (await page.getByLabel('확인을 위해 업체 이름 입력').count()) === 0)
+const box = page.getByTestId('delete-confirm-check')
+check('확인 문장에 업체 이름이 들어 있다', await page.getByText('한솔테크(주) 업체를 영구 삭제하는 것을 확인했습니다.').isVisible())
+await box.check()
 await page.waitForTimeout(200)
-check('틀린 이름이면 여전히 못 누른다', await page.getByRole('button', { name: /영구 삭제/ }).isDisabled())
-await page.getByLabel('확인을 위해 업체 이름 입력').fill('한솔테크(주)')
-await page.waitForTimeout(200)
-check('이름이 맞으면 눌린다', !(await page.getByRole('button', { name: /영구 삭제/ }).isDisabled()))
-await page.getByRole('button', { name: /영구 삭제/ }).click()
+check('체크하면 눌린다', !(await page.getByRole('button', { name: '이 업체 영구 삭제' }).isDisabled()))
+await page.getByRole('button', { name: '이 업체 영구 삭제' }).click()
 await page.waitForTimeout(900)
 check('목록으로 돌아온다', page.url().endsWith('/ops/clients'))
 const left = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').some((r) => r.id === 'cli_hansol'))

@@ -22,7 +22,8 @@ import { formatNumberOf } from '../../lib/format'
 import type { ClientOpsRecord, ServiceKey, ServiceStatus } from '../../types/clientOps'
 import { SERVICES, SERVICE_STATUS_LABEL, isServiceOpen } from '../../content/clientOpsCatalog'
 import { clientOpsProgress, daysLeftFrom, dueText } from '../../services/clientOpsAlerts'
-import { yearsInBusiness, regionOf } from '../../services/clientOpsProfile'
+import { GENDER_LABEL, yearsInBusiness, regionOf } from '../../services/clientOpsProfile'
+import { ageOf } from '../../tools/shared/clientPrefill'
 import { contractAgeShort } from '../../services/contractSummary'
 import { formatKrw } from '../../lib/format'
 import { Badge, type Tone } from '../ui/primitives'
@@ -62,20 +63,24 @@ export function chipStateFor(
   }
 }
 
-/** 상태별 점 색 — 색은 시간과 상태만 말한다 */
-const DOT: Record<ServiceStatus, string> = {
-  done: 'bg-success-500',
-  in_progress: 'bg-brand-500',
-  waiting_client: 'bg-warning-500',
-  on_hold: 'bg-slate-400',
-  not_started: 'bg-slate-300',
-  not_applicable: 'bg-slate-300',
+/**
+ * D-129: 상태는 점이 아니라 바탕색 있는 조각 + 글자로 — 멀리서도 보이게, 색만으로 판단하지 않게.
+ *   진행 중 → 호박색 · 완료 → 브랜드색 · 고객 대기 → 보라 · 보류 · 시작 전 → 회색 · 기한 지남 → 빨강
+ * 색은 이 여섯 가지뿐이다(알록달록해지지 않게).
+ */
+const STATUS_LOOK: Record<ServiceStatus, string> = {
+  in_progress: 'border-amber-300 bg-amber-100 text-amber-900',
+  done: 'border-brand-200 bg-brand-100 text-brand-700',
+  waiting_client: 'border-violet-200 bg-violet-100 text-violet-800',
+  on_hold: 'border-slate-300 bg-slate-100 text-slate-700',
+  not_started: 'border-slate-200 bg-slate-50 text-slate-600',
+  not_applicable: 'border-slate-200 bg-white text-slate-400 line-through decoration-slate-300',
 }
 
 const SHORT: Record<ServiceStatus, string> = {
   done: '완료',
-  in_progress: '진행',
-  waiting_client: '대기',
+  in_progress: '진행 중',
+  waiting_client: '고객 대기',
   on_hold: '보류',
   not_started: '시작 전',
   not_applicable: '해당 없음',
@@ -84,38 +89,21 @@ const SHORT: Record<ServiceStatus, string> = {
 function ServiceChip({ chip, onClick }: { chip: ChipState; onClick: () => void }) {
   const na = chip.status === 'not_applicable'
   const danger = !na && chip.overdue
-  const warn = !na && !danger && chip.dueSoon
-
-  // 해당 없음은 가로선으로 지운 것처럼 — 있지만 세지 않는 항목이라는 뜻
-  const look = na
-    ? 'border-slate-200 bg-white text-slate-400 line-through decoration-slate-300'
-    : danger
-      ? 'border-danger-200 bg-danger-50 text-danger-700'
-      : warn
-        ? 'border-warning-200 bg-warning-50 text-warning-800'
-        : chip.status === 'done'
-          ? 'border-success-200 bg-success-50/60 text-success-800'
-          : 'border-slate-200 bg-white text-slate-700'
-
-  // '시작 전' 은 굳이 쓰지 않는다 — 아무 표시 없는 회색 조각이 곧 시작 전이다.
-  // 조각이 15개까지 늘어날 것이라 글자 하나가 줄 수를 바꾼다.
-  const note =
-    chip.overdue || chip.dueSoon
-      ? dueText(chip.daysLeft)
-      : chip.status === 'not_started'
-        ? ''
-        : SHORT[chip.status]
+  const look = danger ? 'border-danger-200 bg-danger-50 text-danger-700' : STATUS_LOOK[chip.status]
+  // 상태 글자는 늘 적는다 — 마감이 가까우면 D-날짜를 덧붙인다
+  const due = chip.overdue || chip.dueSoon ? dueText(chip.daysLeft) : ''
 
   return (
     <button
       type="button"
       onClick={onClick}
       title={`${chip.label} · ${SERVICE_STATUS_LABEL[chip.status]} — 눌러서 상태 바꾸기`}
-      className={`tap inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.875rem] font-medium hover:border-brand-300 ${look}`}
+      data-chip-status={chip.status}
+      className={`tap inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.875rem] font-medium hover:border-brand-500 ${look}`}
     >
-      <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full no-underline ${DOT[chip.status]}`} />
-      <span className="whitespace-nowrap">{chip.label}</span>
-      {note !== '' && <span className={`whitespace-nowrap ${na ? '' : 'font-medium'}`}>{note}</span>}
+      <span className="whitespace-nowrap font-semibold">{chip.label}</span>
+      <span className="whitespace-nowrap">{danger ? `기한 지남 ${due}`.trim() : SHORT[chip.status]}</span>
+      {!danger && due !== '' && <span className="whitespace-nowrap font-bold">{due}</span>}
     </button>
   )
 }
@@ -207,6 +195,9 @@ export function ClientBoardCard({
   const y = yearsInBusiness(record.establishedAt, today)
   const region = regionOf(record.businessAddress)
   const repName = record.representativeName.trim() || record.contactName.trim()
+  // D-129: '김대표 · 남 · 만 52세' — 성별은 고른 값만(이름으로 짐작하지 않는다), 나이는 생년월일에서
+  const repAge = ageOf(record.representativeBirth, new Date(`${today}T00:00:00`))
+  const repLine = repName ? [repName, GENDER_LABEL[record.representativeGender] ?? '', repAge !== null ? `만 ${repAge}세` : ''].filter((v) => v !== '').join(' · ') : ''
 
   /*
    * 회사 정보는 한 덩어리 회색 줄이 아니라 두 무게로 나눈다.
@@ -222,13 +213,25 @@ export function ClientBoardCard({
   const age = contractAgeShort(record.contract.signedAt, today)
   // D-114: 계약 전이면 '계약 전' 대신 영업 단계(잠재 · 1차 미팅 예정 …)를 쓴다 — 어디까지 왔는지가 더 쓸모 있다
   const contractMeta = stage === 'signed' ? (age === '' ? '' : `계약 ${age}`) : stage === 'pre' ? `잠재 · ${SALES_STAGE_LABEL[salesStageOf(record)]}` : CONTRACT_STAGE_LABEL[stage]
-  const strongMeta = [repName, contractMeta].filter((v) => v.trim() !== '')
-  /* 계약 종류(현금·보험·혼합)는 배경 정보다 — 흐린 쪽에 둔다 (D-79) */
-  const kindMeta = record.contract.kind !== '' ? CONTRACT_KIND_LABEL[record.contract.kind] : ''
-  const mutedMeta = [kindMeta, region, record.businessCategory || record.industry].filter((v) => v && v.trim() !== '')
+  const strongMeta = [repLine, contractMeta].filter((v) => v.trim() !== '')
+  /* D-129: 계약 종류는 이름 옆 작은 배지로 — 현금 계약 · 보험 계약 · 혼합 계약 */
+  const kindBadge = record.contract.kind === '' ? '' : record.contract.kind === 'mixed' ? '혼합 계약' : `${CONTRACT_KIND_LABEL[record.contract.kind]} 계약`
+  const mutedMeta = [region, record.businessCategory || record.industry].filter((v) => v && v.trim() !== '')
 
   return (
-    <li className={`relative overflow-hidden rounded-(--radius-panel) border ${CARD_FILL[tone]}`}>
+    <li
+      data-testid="client-card"
+      data-client-id={record.id}
+      /* D-129: 카드의 빈 곳 어디를 눌러도 업체로 — 안의 단추(업무 조각 · 돈 · 서류 올리기)는 각자 일을 한다.
+         키보드는 이름 단추 · '업체 열기' 로 연다(카드 자체는 초점을 받지 않는다 — 단추 안에 단추를 두지 않으려고) */
+      onClick={(e) => {
+        const t = e.target as HTMLElement
+        if (t.closest('button, a, input, select, textarea, label, [role="button"], [data-no-open]')) return
+        if ((window.getSelection?.()?.toString() ?? '') !== '') return
+        onOpen()
+      }}
+      className={`relative cursor-pointer overflow-hidden rounded-(--radius-panel) border transition-colors hover:border-brand-300 ${CARD_FILL[tone]}`}
+    >
       <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${CARD_EDGE[tone]}`} />
 
       <div className="flex flex-col gap-2 p-3.5 pl-[1.15rem] sm:p-4 sm:pl-[1.15rem]">
@@ -252,6 +255,11 @@ export function ClientBoardCard({
             </span>
             <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
           </button>
+          {kindBadge && (
+            <span data-contract-badge className="t-meta shrink-0 self-center rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 font-semibold whitespace-nowrap text-brand-700">
+              {kindBadge}
+            </span>
+          )}
           <div className="flex shrink-0 items-center gap-2">
             {criticalCount > 0 ? (
               <Badge tone={tone}>지금 {criticalCount}</Badge>
@@ -309,7 +317,7 @@ export function ClientBoardCard({
         {bizNo !== '' && (
           <p className="t-sub flex items-baseline gap-1.5 text-slate-500">
             {/* 아이콘 대신 낱말로 — 체크 표시를 붙이면 '확인된 번호' 라는 다른 뜻이 된다 */}
-            <span className="shrink-0 text-slate-400">사업자</span>
+            <span className="shrink-0 text-slate-500">사업자등록번호</span>
             <span className="tabular-nums">{bizNo}</span>
           </p>
         )}

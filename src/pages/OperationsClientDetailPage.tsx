@@ -8,10 +8,11 @@ import {
   Check,
   ChevronDown,
   Archive,
+  Landmark,
+  Workflow,
   ChevronRight,
   MoreHorizontal,
   ClipboardCopy,
-  Download,
   FileUp,
   FileWarning,
   Lock,
@@ -28,7 +29,6 @@ import { useAuth } from '../auth/AuthProvider'
 import { getDataModeConfig } from '../data/dataMode'
 import {
   canUploadFiles,
-  downloadDocumentFile,
   listClients,
   saveClient,
   storeDocumentFile,
@@ -110,7 +110,7 @@ import {
 } from '../components/ops/opsControls'
 import { CompanyProfileCard, NotesSection } from '../components/ops/opsProfile'
 import { FactInboxCard, FactNumbersCard } from '../components/ops/ClientFactsCards'
-import { factNoteFor, withFactValue, withProfileFieldEdit } from '../services/customerFacts'
+import { factNoteFor, readFact, withFactValue, withProfileFieldEdit } from '../services/customerFacts'
 import { TodoComposer } from '../components/journal/TodoBoard'
 import { createJournalEntry } from '../services/journalService'
 import { FundingSection } from '../components/ops/FundingSection'
@@ -149,7 +149,10 @@ import { loadCustomServicesIntoCatalog } from '../services/customServiceService'
 import { ServiceCatalogModal } from '../components/ops/ServiceCatalogModal'
 import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { ClientJournalTab } from '../components/ops/ClientJournalTab'
-import { FilesTab } from '../components/ops/FilesTab'
+import { ClientSharedFiles } from '../components/ops/FilesTab'
+import { DocFileActions } from '../components/ops/DocFileActions'
+import { withDocFacts } from '../services/docFacts'
+import { generateId } from '../storage/localStore'
 import { ClientConsultingTab } from '../components/consulting/ClientConsultingTab'
 import { listLinksForClient } from '../services/customerBridgeService'
 import { buildClientSchedule } from '../services/clientOpsSchedule'
@@ -166,17 +169,21 @@ function hasContractInfo(r: ClientOpsRecord): boolean {
   return r.contract.signedAt !== '' || r.contract.kind !== '' || (r.contract.cashAmount ?? 0) > 0 || r.contract.policies.length > 0
 }
 
-type DetailTab = 'overview' | 'work' | 'consulting' | 'docs' | 'fees' | 'funding' | 'portal' | 'journal' | 'files'
-const DETAIL_TABS: { key: DetailTab; label: string }[] = [
+type DetailTab = 'overview' | 'work' | 'consulting' | 'docs' | 'fees' | 'funding' | 'portal' | 'journal'
+/**
+ * D-129: 매일 쓰는 순서 — 개요 → 서류 → 업무 → 업무 일기 → 고객 플랫폼 → 수금.
+ * 컨설팅(특허+벤처) · 자금·지원은 기본 줄에서 뺐다(hidden) — 기능 · 데이터 · 주소(?tab=)는 그대로이고, 더보기에서 연다.
+ * 예전 '파일' 탭은 서류 탭 안으로 들어갔다(?tab=files 는 서류로 연다).
+ */
+const DETAIL_TABS: { key: DetailTab; label: string; hidden?: boolean }[] = [
   { key: 'overview', label: '개요' },
-  { key: 'work', label: '업무' },
-  { key: 'consulting', label: '컨설팅' },
   { key: 'docs', label: '서류' },
-  { key: 'fees', label: '수금' },
-  { key: 'funding', label: '자금·지원' },
-  { key: 'portal', label: '고객 플랫폼' },
+  { key: 'work', label: '업무' },
   { key: 'journal', label: '업무 일기' },
-  { key: 'files', label: '파일' },
+  { key: 'portal', label: '고객 플랫폼' },
+  { key: 'fees', label: '수금' },
+  { key: 'consulting', label: '컨설팅', hidden: true },
+  { key: 'funding', label: '자금·지원', hidden: true },
 ]
 function isDetailTab(v: string | null): v is DetailTab {
   return DETAIL_TABS.some((t) => t.key === v)
@@ -187,7 +194,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
-  const tab: DetailTab = isDetailTab(tabParam) ? tabParam : 'overview'
+  // D-129: 예전 '파일' 탭 주소는 서류로 — 고객과 주고받은 파일도 서류 탭 아래에 있다
+  const tab: DetailTab = tabParam === 'files' ? 'docs' : isDetailTab(tabParam) ? tabParam : 'overview'
   /** 개요에서 항목을 누르면 그 항목이 열린 채로 업무 탭이 뜨도록 svc 를 함께 싣는다 */
   const location = useLocation()
   /** D-124: 영업에서 왔으면 돌아갈 곳 — 탭을 바꿔도 잃지 않게 state 를 함께 싣는다 */
@@ -227,7 +235,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
    * "예" 를 습관적으로 누르는 것을 막는다.
    */
   const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0)
-  const [deleteTyped, setDeleteTyped] = useState('')
+  /** D-129: 두 번째 확인은 이름 타이핑이 아니라 체크 — 휴대폰 키보드 · 붙여넣기에서 자꾸 막혔다 */
+  const [deleteChecked, setDeleteChecked] = useState(false)
   /* 직접 만든 서류 칸 (D-82) — 적는 중인 새 칸과, 이름을 고치는 중인 칸 */
   const [newDocLabel, setNewDocLabel] = useState('')
   const [newDocMonths, setNewDocMonths] = useState('')
@@ -448,19 +457,18 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       // D-120: 파일을 올리는 동안 고친 것이 있어도 덮지 않게 — 올린 뒤의 가장 새 기록에 얹는다
       const patch = await storeDocumentFile(record, key, file)
       const base = current() ?? record
-      await commit(withDocument(base, key, patch))
+      const ok = await commit(withDocument(base, key, patch))
       showToast('파일을 보관했습니다.')
+      // D-129: 올린 서류에서 회사 정보(번호 · 인증 …)를 찾아 '확인 필요' 로 — 저절로 확정하지 않는다
+      const reader = ok ? await import('../services/docTextExtract') : null
+      if (reader && reader.canExtractText(file)) {
+        const res = await reader.extractTextFromFile(file).catch(() => null)
+        const latest = current() ?? record
+        const { record: withFound, found } = withDocFacts(latest, key, res?.text ?? '', nowIso(), generateId)
+        if (found > 0 && (await commit(withFound))) showToast(`서류에서 회사 정보 ${found}건을 찾았습니다 — 개요에서 확인해 주세요.`)
+      }
     } catch (cause) {
       showToast(cause instanceof Error ? cause.message : '파일을 보관하지 못했습니다.')
-    }
-  }
-
-  /** 올려 둔 파일 다시 받기 (D-83) */
-  const onDownload = async (state: { storagePath: string; fileName: string }) => {
-    try {
-      await downloadDocumentFile(state)
-    } catch (cause) {
-      showToast(cause instanceof Error ? cause.message : '파일을 내려받지 못했습니다.')
     }
   }
 
@@ -605,7 +613,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         className="sticky top-16 z-20 -mx-4 bg-slate-50/95 backdrop-blur sm:-mx-6 lg:-mx-10"
         innerClassName="flex gap-1 border-b border-slate-200 px-4 sm:px-6 lg:px-10"
       >
-        {DETAIL_TABS.map((t) => {
+        {DETAIL_TABS.filter((t) => !t.hidden || t.key === tab).map((t) => {
           const badge =
             t.key === 'overview' ? alerts.filter((a) => a.severity === 'critical').length
               : t.key === 'docs' ? urgentDocs.size
@@ -725,35 +733,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       />
       )}
 
-      {/* D-122: 막힘 · 돈 · 지금 챙길 것을 회사 정보 위로 — 예전엔 휴대폰에서 4,000px 아래에 있었다 */}
-      <section aria-label="현재 상태" className="ax-stagger grid grid-cols-2 gap-2.5 lg:grid-cols-3">
-        <MetricTile
-          label="없는 서류"
-          value={`${urgentDocs.size}건`}
-          tone={urgentDocs.size > 0 ? 'danger' : 'neutral'}
-          onClick={() => setTab('docs')}
-        />
-        <MetricTile
-          label="못 받은 내 돈"
-          value={krwTile(progress.unpaidNet)}
-          tone={progress.overduePayments > 0 ? 'danger' : 'neutral'}
-          hint={
-            [
-              progress.overduePayments > 0 ? `예정일 지난 건 ${progress.overduePayments}건` : '',
-              progress.unpaidAmount !== progress.unpaidNet ? `청구 기준 ${krwTile(progress.unpaidAmount)}` : '',
-            ]
-              .filter((v) => v !== '')
-              .join(' · ') || undefined
-          }
-          onClick={() => setTab('fees')}
-        />
-        <MetricTile
-          label={brand.customerPortalLabel}
-          value={portalLinked === null ? '준비 중' : portalLinked ? '연결됨' : '미연결'}
-          onClick={() => setTab('portal')}
-        />
-      </section>
-
+      {/* D-129: '없는 서류 · 못 받은 내 돈 · 고객 플랫폼' 칸은 뺐다 — 탭 숫자(서류 · 수금)와 머리줄에 이미 있고,
+          급한 것은 '지금 챙길 것' 이 말한다. 개요는 다음 약속 · 지금 챙길 것 · 회사 정보 · 계약 · 활동 기록만. */}
       {/* 2단계 — 이 업체에서 지금 챙길 것 (상위 3건만) */}
       {alerts.length > 0 && (
         <Section title="지금 챙길 것" count={alerts.length}>
@@ -1069,6 +1050,21 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                           </span>
                         )
                       })}
+                      {/* D-129: 서류가 아니라 회사 기본 정보로 있어야 하는 것 — 값이 있으면 됨 */}
+                      {(meta.requiredFacts ?? []).map((k) => {
+                        const f = readFact(record, k)
+                        const ok = !!f && f.status !== 'missing'
+                        return (
+                          <span
+                            key={`fact-${k}`}
+                            data-required-fact={k}
+                            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[0.875rem] font-medium ${ok ? 'border-success-200 bg-success-50 text-success-700' : 'border-slate-200 bg-slate-50 text-slate-500'}`}
+                          >
+                            {ok ? <Check aria-hidden="true" className="size-3" /> : <span aria-hidden="true" className="text-[0.9em]">○</span>}
+                            회사 정보 · {f?.label ?? k}
+                          </span>
+                        )
+                      })}
                     </div>
                   </div>
                 )}
@@ -1140,6 +1136,21 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                           : 'border-slate-200 bg-white'
                   }`}
                 >
+                  {meta.needsFile && (
+                    <input
+                      ref={(el) => {
+                        fileInputs.current[meta.key] = el
+                      }}
+                      type="file"
+                      aria-hidden="true"
+                      tabIndex={-1}
+                      /* 형식을 제한하지 않는다 — 한글(HWP)·워드·엑셀·압축파일도 그대로 올린다.
+                         휴대폰에서는 카메라로 찍은 사진도 여기서 바로 선택된다. */
+                      className="hidden"
+                      data-file-input={meta.key}
+                      onChange={(e) => void onPickFile(meta.key, e.target.files?.[0])}
+                    />
+                  )}
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <label className="flex min-w-0 items-start gap-2.5">
                       <input
@@ -1210,18 +1221,14 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                           <span className="max-w-[12rem] truncate">{state.fileName}</span>
                         </span>
                       )}
-                      {state.storagePath !== '' && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          aria-label={`${meta.label} 내려받기`}
-                          disabled={!uploadable}
-                          title={uploadable ? undefined : '클라우드를 연결하면 내려받을 수 있습니다.'}
-                          onClick={() => void onDownload(state)}
-                        >
-                          <Download aria-hidden="true" className="size-3.5" />
-                          내려받기
-                        </Button>
+                      {/* D-129: 파일이 있으면 여기서 바로 — 미리보기 · 새 창 · 내려받기 · 교체(예전 '파일' 탭이 하던 일) */}
+                      {(state.storagePath !== '' || meta.needsFile) && (
+                        <DocFileActions
+                          label={meta.label}
+                          storagePath={state.storagePath}
+                          fileName={state.fileName}
+                          onReplace={meta.needsFile && uploadable ? () => fileInputs.current[meta.key]?.click() : undefined}
+                        />
                       )}
                       <button
                         type="button"
@@ -1270,52 +1277,22 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                   )}
 
                   {meta.needsFile && state.received && (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <input
-                        ref={(el) => {
-                          fileInputs.current[meta.key] = el
-                        }}
-                        type="file"
-                        /* 형식을 제한하지 않는다 — 한글(HWP)·워드·엑셀·압축파일도 그대로 올린다.
-                           휴대폰에서는 카메라로 찍은 사진도 여기서 바로 선택된다. */
-                        className="hidden"
-                        onChange={(e) => void onPickFile(meta.key, e.target.files?.[0])}
-                      />
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        aria-label={`${meta.label} ${state.fileName ? '파일 교체' : '파일 첨부'}`}
-                        disabled={!uploadable}
-                        onClick={() => fileInputs.current[meta.key]?.click()}
-                      >
-                        <Upload aria-hidden="true" className="size-3.5" />
-                        {state.fileName ? '파일 교체' : '파일 첨부'}
-                      </Button>
-                      {/*
-                        올린 파일은 다시 받을 수 있어야 한다 (D-83).
-                        저장소가 attachment 헤더를 붙여 주므로 새 탭이 아니라 바로 내려받는다.
-                      */}
-                      {state.storagePath !== '' && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          aria-label={`${meta.label} 내려받기`}
-                          disabled={!uploadable}
-                          title={uploadable ? undefined : '클라우드를 연결하면 내려받을 수 있습니다.'}
-                          onClick={() => void onDownload(state)}
-                        >
-                          <Download aria-hidden="true" className="size-3.5" />
-                          내려받기
-                        </Button>
-                      )}
+                    <div className="flex flex-col gap-1.5">
                       {state.fileName && (
                         <span className="t-sub inline-flex min-w-0 items-center gap-1 text-slate-600">
                           <Paperclip aria-hidden="true" className="size-3.5 shrink-0" />
                           <span className="truncate">{state.fileName}</span>
-                          {state.fileSize > 0 && (
-                            <span className="shrink-0 text-slate-400">{formatFileSize(state.fileSize)}</span>
-                          )}
+                          {state.fileSize > 0 && <span className="shrink-0 text-slate-400">{formatFileSize(state.fileSize)}</span>}
                         </span>
+                      )}
+                      <DocFileActions
+                        label={meta.label}
+                        storagePath={state.storagePath}
+                        fileName={state.fileName}
+                        onReplace={uploadable ? () => fileInputs.current[meta.key]?.click() : undefined}
+                      />
+                      {!uploadable && !state.fileName && (
+                        <span className="t-meta break-keep text-slate-500">파일 첨부는 클라우드를 연결하면 켜집니다.</span>
                       )}
                     </div>
                   )}
@@ -1381,7 +1358,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                           confirmLabel="없애기"
                           onConfirm={() => {
                             void commit(withoutCustomDocument(record, custom.id)).then((ok) => {
-                              if (ok) showToast('서류 칸을 없앴습니다. 올린 파일은 파일 탭에 남아 있습니다.')
+                              if (ok) showToast('서류 칸을 없앴습니다. 올린 파일은 아래 ‘칸이 없어진 서류의 파일’ 에 남아 있습니다.')
                             })
                           }}
                         />
@@ -1445,6 +1422,9 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             기본 10종에 없는 서류를 만들어 둡니다. 유효기간을 넣으면 발급일 기준으로 만료를 알려드립니다.
           </p>
         </div>
+
+        {/* D-129: 예전 '파일' 탭 — 고객과 주고받은 파일 · 칸이 없어진 서류의 파일도 서류 탭 아래에서 */}
+        <ClientSharedFiles record={record} workspaceId={workspaceId} />
       </section>
 
       )}
@@ -1479,7 +1459,6 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         </>
       )}
 
-      {tab === 'files' && <FilesTab record={record} workspaceId={workspaceId} />}
 
       {moreOpen && (
         <BottomSheet title="이 업체에서 할 수 있는 것" onClose={() => setMoreOpen(false)}>
@@ -1515,6 +1494,31 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               >
                 <ClipboardCopy aria-hidden="true" className="size-4" />
                 진행 상황 보고 문구
+              </Button>
+              {/* D-129: 기본 탭 줄에서 뺀 두 영역 — 기능과 기록은 그대로, 여기서 연다 */}
+              <Button
+                variant="secondary"
+                className="w-full justify-start"
+                data-testid="more-consulting"
+                onClick={() => {
+                  setMoreOpen(false)
+                  setTab('consulting')
+                }}
+              >
+                <Workflow aria-hidden="true" className="size-4" />
+                컨설팅(특허 · 벤처) 보기
+              </Button>
+              <Button
+                variant="secondary"
+                className="w-full justify-start"
+                data-testid="more-funding"
+                onClick={() => {
+                  setMoreOpen(false)
+                  setTab('funding')
+                }}
+              >
+                <Landmark aria-hidden="true" className="size-4" />
+                자금 · 지원사업 보기{record.fundingApplications.length > 0 ? ` (${record.fundingApplications.length}건)` : ''}
               </Button>
               <Button
                 variant="secondary"
@@ -1565,7 +1569,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       {/*
         업체 삭제 — 두 번 묻는다.
         1) 무엇이 함께 사라지는지 숫자로 보여 준다.
-        2) 업체 이름을 그대로 적게 한다. "예" 를 습관적으로 누르는 것을 막는 장치다.
+        2) '영구 삭제를 확인했습니다' 체크를 해야 단추가 눌린다 — D-129: 예전엔 이름을 다시 적게 했는데 휴대폰 키보드에서 불편했다.
         되돌릴 수 없으므로 지우기 전에 백업을 권한다.
       */}
       {deleteStep > 0 && (
@@ -1574,7 +1578,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           title={deleteStep === 1 ? '이 업체를 삭제할까요?' : '정말 지웁니다 — 마지막 확인'}
           onClose={() => {
             setDeleteStep(0)
-            setDeleteTyped('')
+            setDeleteChecked(false)
           }}
         >
           {deleteStep === 1 ? (
@@ -1597,6 +1601,22 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 <Button variant="secondary" onClick={() => setDeleteStep(0)}>
                   취소
                 </Button>
+                {/* 지우기보다 보관이 먼저다 — 목록 · 경고에서만 빠지고 기록은 남는다 */}
+                {record.archivedAt === null && (
+                  <Button
+                    variant="primary"
+                    data-testid="delete-archive-instead"
+                    onClick={() => {
+                      setDeleteStep(0)
+                      void commit(withArchived(record, true)).then((ok) => {
+                        if (ok) showToast('보관 처리했습니다. 목록 · 경고에서 빠지고 기록은 남습니다.')
+                      })
+                    }}
+                  >
+                    <Archive aria-hidden="true" className="size-4" />
+                    대신 보관하기
+                  </Button>
+                )}
                 <Button variant="danger" onClick={() => setDeleteStep(2)}>
                   네, 다음으로
                 </Button>
@@ -1605,26 +1625,27 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           ) : (
             <>
               <p className="t-body break-keep text-slate-800">
-                지우려면 업체 이름을 그대로 적어 주세요.
+                마지막으로 확인합니다. 지우면 <strong className="font-semibold text-danger-700">되돌릴 수 없습니다.</strong>
               </p>
-              <p className="t-sub mt-1 text-slate-500">
-                적어야 할 이름: <strong className="font-semibold text-slate-800">{record.companyName || '(이름 없음)'}</strong>
-              </p>
-              <input
-                autoFocus
-                value={deleteTyped}
-                onChange={(e) => setDeleteTyped(e.target.value)}
-                placeholder="업체 이름"
-                aria-label="확인을 위해 업체 이름 입력"
-                className={`mt-3 ${inputCls}`}
-              />
+              <label className="tap mt-3 flex cursor-pointer items-start gap-3 rounded-(--radius-control) border border-danger-200 bg-danger-50/50 px-3.5 py-3">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-5 shrink-0 accent-danger-600"
+                  checked={deleteChecked}
+                  onChange={(e) => setDeleteChecked(e.target.checked)}
+                  data-testid="delete-confirm-check"
+                />
+                <span className="t-body break-keep text-slate-800">
+                  <strong className="font-semibold">{record.companyName || '(이름 없음)'}</strong> 업체를 영구 삭제하는 것을 확인했습니다.
+                </span>
+              </label>
               <div className="mt-5 flex flex-wrap justify-end gap-2">
-                <Button variant="secondary" onClick={() => setDeleteStep(1)}>
+                <Button variant="secondary" onClick={() => { setDeleteStep(1); setDeleteChecked(false) }}>
                   뒤로
                 </Button>
                 <Button
                   variant="danger"
-                  disabled={deleting || deleteTyped.trim() !== (record.companyName || '(이름 없음)').trim()}
+                  disabled={deleting || !deleteChecked}
                   onClick={() => {
                     setDeleting(true)
                     void deleteClient(record)
@@ -1639,7 +1660,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                   }}
                 >
                   <Trash2 aria-hidden="true" className="size-4" />
-                  {deleting ? '지우는 중…' : '영구 삭제'}
+                  {deleting ? '지우는 중…' : '이 업체 영구 삭제'}
                 </Button>
               </div>
             </>

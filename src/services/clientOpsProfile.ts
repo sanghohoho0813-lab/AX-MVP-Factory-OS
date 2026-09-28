@@ -118,6 +118,7 @@ export type ProfileEditKey =
   | 'businessAddress'
   | 'representativeName'
   | 'representativeBirth'
+  | 'representativeGender'
   | 'contactName'
   | 'contactTitle'
   | 'employeeCount'
@@ -126,6 +127,9 @@ export type ProfileEditKey =
   | 'companyPhone'
   | 'contactEmail'
   | 'homepage'
+
+/** D-129: 대표자 성별 — 고른 값만 */
+export const GENDER_LABEL: Record<string, string> = { male: '남', female: '여', '': '' }
 
 export interface ProfileField {
   key: string
@@ -151,6 +155,8 @@ export interface ProfileField {
   edit?: ProfileEditKey
   /** 입력칸에 넣을 예시 */
   placeholder?: string
+  /** D-129: 적는 칸이 아니라 고르는 칸(대표자 성별 …) — 값 · 화면 글자 */
+  options?: { value: string; label: string }[]
   /**
    * 대표가 직접 만든 칸이면 그 칸의 id.
    * 표준 칸과 달리 **칸 자체를 지울 수 있다** — 표준 칸은 값만 비운다.
@@ -189,7 +195,7 @@ export function profileFields(
     label: string,
     value: string,
     group: ProfileGroup,
-    opts: { copyable?: boolean; wide?: boolean; edit?: ProfileEditKey; placeholder?: string; numberKind?: NumberKind } = {},
+    opts: { copyable?: boolean; wide?: boolean; edit?: ProfileEditKey; placeholder?: string; numberKind?: NumberKind; options?: { value: string; label: string }[] } = {},
   ): ProfileField => {
     const raw = value.trim()
     // 기록에 하이픈이 없어도(3138112508) 화면에는 서류에 적히는 모양(313-81-12508)으로 보여 준다
@@ -205,6 +211,7 @@ export function profileFields(
       edit: opts.edit,
       placeholder: opts.placeholder,
       numberKind: opts.numberKind,
+      options: opts.options,
     }
   }
 
@@ -258,13 +265,21 @@ export function profileFields(
     f(
       'representativeName',
       '대표자',
-      repName ? `${repName}${record.representativeBirth ? ` · ${record.representativeBirth}${age !== null ? ` (만 ${age}세)` : ''}` : ''}` : '',
+      repName ? `${repName}${record.representativeGender ? ` · ${GENDER_LABEL[record.representativeGender]}` : ''}${record.representativeBirth ? ` · ${record.representativeBirth}${age !== null ? ` (만 ${age}세)` : ''}` : ''}` : '',
       'people',
       { edit: 'representativeName' },
     ),
     f('representativeBirth', '대표자 생년월일', record.representativeBirth, 'people', {
       edit: 'representativeBirth',
       placeholder: '1980-12-31',
+    }),
+    // D-129: 고른 값만 — 이름으로 짐작하지 않는다
+    f('representativeGender', '대표자 성별', GENDER_LABEL[record.representativeGender] ?? '', 'people', {
+      edit: 'representativeGender',
+      options: [
+        { value: 'male', label: '남' },
+        { value: 'female', label: '여' },
+      ],
     }),
     f(
       'contactName',

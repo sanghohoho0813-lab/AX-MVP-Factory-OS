@@ -24,6 +24,11 @@ export interface ServiceMeta {
   description: string
   /** 이 업무를 시작·진행하려면 반드시 있어야 하는 서류 */
   requiredDocuments: DocumentKey[]
+  /**
+   * D-129: 서류가 아니라 회사 기본 정보로 있어야 하는 것(사업장 주소 · 법인등록번호 …).
+   * 예전에는 '서류' 칸으로 받았다 — 이제 회사 기본 정보(사실 창고) 값이 있으면 된다.
+   */
+  requiredFacts?: string[]
   /** 여러 번 반복 신청하는 업무인지 (정책자금) */
   recurring: boolean
   /** 진행 순서 (앞 업무가 대체로 먼저) */
@@ -57,7 +62,8 @@ export const BUILTIN_SERVICES: ServiceMeta[] = [
     label: '법인설립',
     shortLabel: '법인설립',
     description: '개인사업자이거나 법인이 없는 경우에만 진행합니다. 이미 법인이면 "해당 없음"으로 두세요.',
-    requiredDocuments: ['representativeId', 'representativePhone', 'businessAddress'],
+    requiredDocuments: ['representativeId', 'representativePhone'],
+    requiredFacts: ['businessAddress'],
     recurring: false,
     order: 1,
     accent: 'neutral',
@@ -121,8 +127,8 @@ export const BUILTIN_SERVICES: ServiceMeta[] = [
       'smeCertificate',
       'healthInsurance',
       'jointCertificate',
-      'corporateNumber',
     ],
+    requiredFacts: ['corporateNumber'],
     recurring: true,
     order: 6,
     accent: 'fund',
@@ -242,7 +248,7 @@ export interface DocumentMeta {
   hint: string
 }
 
-export const DOCUMENTS: DocumentMeta[] = [
+const ALL_DOCUMENT_METAS: DocumentMeta[] = [
   {
     key: 'businessRegistration',
     label: '사업자등록증',
@@ -354,10 +360,21 @@ export const DOCUMENTS: DocumentMeta[] = [
   },
 ]
 
+/**
+ * D-129: 서류가 아니라 회사 기본 정보인 것 — 사업자등록번호 · 법인번호 · 사업장 주소.
+ * 서류 목록 · 서류 수에서 뺀다. 예전에 '받음' 으로 적어 둔 기록은 지우지 않고 그대로 둔다(읽기만 가능).
+ * 값은 회사 기본 정보(businessNumber · corporateNumber · businessAddress)가 유일한 자리다.
+ */
+export const COMPANY_INFO_DOCUMENT_KEYS: DocumentKey[] = ['businessNumber', 'corporateNumber', 'businessAddress']
+
+/** 서류함에 보이는 기본 서류 */
+export const DOCUMENTS: DocumentMeta[] = ALL_DOCUMENT_METAS.filter((d) => !COMPANY_INFO_DOCUMENT_KEYS.includes(d.key))
+
 export const DOCUMENT_KEYS: DocumentKey[] = DOCUMENTS.map((d) => d.key)
 
 export function documentMeta(key: DocumentKey): DocumentMeta {
-  return DOCUMENTS.find((d) => d.key === key) ?? DOCUMENTS[0]
+  // 예전 칸(회사 정보)도 이름은 찾는다 — 옛 기록을 읽을 때
+  return ALL_DOCUMENT_METAS.find((d) => d.key === key) ?? DOCUMENTS[0]
 }
 
 /** 이 서류를 필요로 하는 업무 목록 (서류함에서 "왜 필요한지" 표시) */

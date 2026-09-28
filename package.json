@@ -49,6 +49,8 @@
     "qa:real": "node e2e/real.mjs",
     "qa:modules": "node e2e/modules.mjs",
     "qa:facts": "node e2e/facts.mjs",
+    "qa:detail": "node e2e/detail.mjs",
+    "qa:files": "node e2e/files-cloud.mjs",
     "qa:squeeze": "node e2e/squeeze.mjs",
     "qa:sales": "node e2e/sales.mjs",
     "qa:journey": "node e2e/journey.mjs",

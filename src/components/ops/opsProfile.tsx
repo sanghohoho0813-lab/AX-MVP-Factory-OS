@@ -218,6 +218,25 @@ export function CompanyProfileCard({
                           className="w-full rounded-(--radius-control) border border-slate-300 px-2 py-1 text-right text-[0.9rem] text-slate-700 focus:border-brand-400 focus:outline-none"
                         />
                       )}
+                      {f.options ? (
+                        /* D-129: 고르는 칸 — 누르면 바로 저장(휴대폰에서 적지 않는다) */
+                        <span role="group" aria-label={`${f.label} 고르기`} className="flex flex-wrap justify-end gap-1.5">
+                          {f.options.map((o) => (
+                            <button
+                              key={o.value}
+                              type="button"
+                              aria-pressed={draft === o.value}
+                              onClick={() => {
+                                if (onEdit && f.edit) onEdit(f.edit, o.value)
+                                setEditingKey(null)
+                              }}
+                              className={`tap t-body rounded-(--radius-control) border px-4 font-semibold ${draft === o.value ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-300 bg-white text-slate-700'}`}
+                            >
+                              {o.label}
+                            </button>
+                          ))}
+                        </span>
+                      ) : (
                       <input
                         autoFocus
                         aria-label={`${f.label} 값`}
@@ -230,6 +249,7 @@ export function CompanyProfileCard({
                         }}
                         className="w-full rounded-(--radius-control) border border-brand-400 px-2 py-1 text-right text-[0.98rem] font-semibold text-slate-900 focus:outline-none"
                       />
+                      )}
                       <div className="flex flex-wrap justify-end gap-x-3 gap-y-1">
                         {/*
                           지우기는 두 가지다.
@@ -289,6 +309,7 @@ export function CompanyProfileCard({
                     <button
                       type="button"
                       disabled={!canEdit(f)}
+                      aria-label={canEdit(f) ? `${f.label} 입력` : undefined}
                       onClick={() => startEdit(f)}
                       className="text-[0.95rem] text-slate-500 hover:text-brand-700 hover:underline disabled:hover:text-slate-500 disabled:hover:no-underline"
                     >
