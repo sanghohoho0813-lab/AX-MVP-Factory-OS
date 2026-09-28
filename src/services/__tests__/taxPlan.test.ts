@@ -7,8 +7,12 @@
  */
 
 import { normalizeClientOps } from '../clientOpsService'
-import { computeSalary, inheritGiftTax, unlistedShareValuation } from '../taxCalc'
+import { calculatorOf, computeSalary, defaultValues, inheritGiftTax, unlistedShareValuation } from '../taxCalc'
 import {
+  ASSUMPTIONS,
+  calcDefault,
+  checkProof,
+  type Proof,
   cashPlan,
   giftPlan,
   holdersFromText,
@@ -202,6 +206,98 @@ check('업체 기록에서 채우기: 자산 · 순이익(결산 연도) · 설�
 check('날짜 적기: 20150302 · 2015-03-02 · 2015.3.2 · 2015/3/2 · 2015년 3월 2일', ['20150302', '2015-03-02', '2015.3.2', '2015/3/2', '2015년 3월 2일'].every((t) => parseTypedDate(t) === '2015-03-02'))
 check('날짜 적기: 없는 날짜(2월 30일 · 13월) · 글은 null', parseTypedDate('20260230') === null && parseTypedDate('2026.13.1') === null && parseTypedDate('내일') === null)
 check('날짜 적기: 윤년 2월 29일', parseTypedDate('2024.2.29') === '2024-02-29' && parseTypedDate('2025.2.29') === null)
+
+/* ---- D-132: 원본 식 지킴이 ---- */
+const dv = (c: string, f: string) => defaultValues(calculatorOf(c)!)[f]
+check('가정 = 계산기 기본값: 03 인적공제 · 07 인정이자 · 4대보험 · 차입이자 · 기간 · 02 지급배수 · 09 환원율',
+  ASSUMPTIONS.personalDed === dv('t9', 'inc_a_personalDed') && ASSUMPTIONS.loanRate === dv('t1', 'g_rate') && ASSUMPTIONS.loanIns === dv('t1', 'g_ins') &&
+  ASSUMPTIONS.loanBorrow === dv('t1', 'g_borrow') && ASSUMPTIONS.loanYears === dv('t1', 'g_years') && ASSUMPTIONS.retireMultPre === dv('t6', 'r_mult_pre') &&
+  ASSUMPTIONS.retireMultPost === dv('t6', 'r_mult_post') && ASSUMPTIONS.valuationRate === dv('t3', 'v_rate'), ASSUMPTIONS)
+check('법인세 절감률 = 01 계산기 식(과표 2억 이하 · 초과)', Math.abs(ASSUMPTIONS.corpRateLow - computeSalary(5e6).corpSaveLow / 6e7) < 1e-12 && Math.abs(ASSUMPTIONS.corpRateHigh - computeSalary(5e6).corpSaveHigh / 6e7) < 1e-12)
+let threw = false
+try {
+  calcDefault('t1', '없는칸')
+} catch {
+  threw = true
+}
+check('계산기에 없는 칸을 가정으로 쓰려 하면 멈춘다(짐작하지 않음)', threw)
+
+const proofsOf = (): (Proof | null | undefined)[] => [
+  ...cash.routes.map((r) => r.proof),
+  salaryPlan(p, { mode: 'rate', ratePct: 20 }).proof,
+  g10.proof,
+  inh.proof,
+  fb.familyBiz?.proof,
+  loan.proof,
+  ret.proof,
+]
+const proofs = proofsOf().filter((x): x is Proof => !!x)
+const bad = proofs.filter((pf) => !checkProof(pf).ok)
+check(`대조: 결과 ${proofs.length}개가 모두 같은 값으로 계산기를 열었을 때와 같다`, proofs.length >= 10 && bad.length === 0, bad.map((b) => [b.calc, b.k, b.expect, checkProof(b).got]))
+check('대조: 계산기 밖 식에는 표시(특례 · 섞기 · 배우자 소각 · 퇴직금 법인세 절감)', !!big.succession?.outside && cash.routes.filter((r) => r.outside).length >= 2)
+check('대조: 틀린 숫자는 잡아낸다', !checkProof({ ...proofs[0], expect: proofs[0].expect + 1000 }).ok)
+
+check('금액: "1억 5천" = 1억 5천만 · "5천" 은 5천원인지 5천만원인지 몰라 읽지 않음 · 음수 급여는 0', wonOf('1억 5천') === 1.5e8 && wonOf('1억5천') === 1.5e8 && wonOf('5천') === 0 && viewProfile({ monthlySalary: '-300만' }).monthlySalary === 0)
+
+// 무작위 현황 — 어떤 값이 들어와도 멈추거나 NaN 이 나오지 않고, 목표를 채우고, 계산기와 같다
+{
+  let seed = 20260928
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648)
+  const pick = <T,>(xs: T[]) => xs[Math.floor(rnd() * xs.length)]
+  let cases = 0
+  let broken: string[] = []
+  for (let i = 0; i < 40; i++) {
+    const total = pick([1000, 10000, 100000, 1000000])
+    const ceoPct = pick([0.3, 0.51, 0.8, 1])
+    const regR: ShareholderRow[] = [
+      { id: 'a', name: '대표', relation: 'ceo', shares: Math.round(total * ceoPct), acquirePrice: pick([0, 500, 5000, 10000]) },
+      { id: 'b', name: '자녀', relation: pick(['child', 'minor_child'] as const), shares: Math.round(total * (1 - ceoPct)), acquirePrice: 0 },
+    ]
+    const prof: TaxProfile = {
+      monthlySalary: String(pick([0, 2e6, 8e6, 3e7])),
+      ceoStartDate: pick(['', '2005-01-10', '2019-12-31', '2024-06-01']),
+      retainedEarnings: String(pick([0, 5e7, 3e9])),
+      corpBand: pick(['2억 이하', '2억 초과']),
+      par: String(pick([0, 500, 5000])),
+      vAsset: String(pick([0, 3e8, 5e9, 8e10])),
+      vDebt: String(pick([0, 1e8, 2e9])),
+      vInc0: pick(['', '-2억', '1억']),
+      vInc1: pick(['', '0', '3억']),
+      vInc2: pick(['', '-5000만', '6억', '30억']),
+      loanBalance: String(pick([0, 5e7, 1e9])),
+      estateRealEstate: String(pick([0, 1e9])),
+      children: pick(['', '0', '2']),
+      ceoAge: pick(['', '45', '65']),
+      bizYears: pick(['', '5', '12', '35']),
+    }
+    const pv = viewProfile(prof)
+    const svR = shareValueOf(pv, regR)
+    const target = pick([1e7, 1e8, 5e8, 2e9])
+    try {
+      const cp = cashPlan(pv, regR, svR, target, TODAY)
+      const sp = salaryPlan(pv, { mode: pick(['rate', 'net', 'min'] as const), ratePct: pick([12, 20, 35]), netMonthly: pick([3e6, 8e6, 3e7]) })
+      const gp = giftPlan(pv, regR, svR, { recipientId: 'b', mode: pick(['pct', 'free', 'budget', 'value'] as const), amount: pick([10, 1e8, 5e8]) })
+      const ip = inheritancePlan(pv, regR, svR, gp)
+      const lp = loanPlan(pv)
+      const rp = retirePlan(pv, TODAY)
+      const nums = [
+        ...cp.routes.flatMap((r) => [r.companyOut, r.personalTax, r.corpSaving, r.netBurden, r.net]),
+        gp.tax, gp.value, ip.taxNow, lp.yearLoss, rp.limit, rp.tax, sp.monthly,
+        ...(gp.succession ? [gp.succession.total, gp.succession.general] : []),
+      ]
+      if (nums.some((n) => !Number.isFinite(n))) broken.push(`${i}: NaN/Infinity`)
+      for (const r of cp.routes) if (r.ok && !r.unsafe && r.key !== 'mix' && r.net < target - 1) broken.push(`${i}: ${r.key} 손에 ${r.net} < ${target}`)
+      if (cp.best?.unsafe) broken.push(`${i}: 다툼 있는 방법이 추천됨`)
+      const pfs = [...cp.routes.map((r) => r.proof), sp.proof, gp.proof, ip.proof, ip.familyBiz?.proof, lp.proof, rp.proof].filter((x): x is Proof => !!x)
+      for (const pf of pfs) if (!checkProof(pf).ok) broken.push(`${i}: ${pf.calc} ${pf.k} ${pf.expect} ≠ ${checkProof(pf).got}`)
+      cases += 1
+    } catch (e) {
+      broken.push(`${i}: 멈춤 ${String(e)}`)
+    }
+  }
+  broken = broken.slice(0, 8)
+  check(`무작위 현황 ${cases}벌: 멈춤 · NaN 0 · 목표 채움 · 계산기 대조 전부 일치 · 다툼 방법 추천 0`, cases === 40 && broken.length === 0, broken)
+}
 
 if (process.env.SHOW) {
   console.log('주식', sv.perShare, sv.total)

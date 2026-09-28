@@ -40,6 +40,9 @@ import {
   wonOf,
   type CalcOpen,
   type CashRoute,
+  type Proof,
+  calcNo,
+  checkProof,
   type CheckState,
   type SuccessionResult,
   type GiftMode,
@@ -315,6 +318,36 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
     })
   }
 
+  /* ---- D-132: 한눈 요약 — 목표마다 한 줄. 누르면 그 카드로 ---- */
+  const glance: { goal: GoalKey; text: string; ok: boolean }[] = GOAL_ORDER.filter(on).map((g) => {
+    if (g === 'cash') return { goal: g, ok: !!cash?.best, text: cash?.best ? `추천 ${cash.best.label} — 순부담 ${krw(cash.best.netBurden)}` : cashTarget > 0 ? '되는 방법이 없습니다 — 아래 까닭을 보세요' : '가져올 금액을 적으세요' }
+    if (g === 'salary') return { goal: g, ok: !!salary?.ok, text: salary?.ok ? `월 급여 ${won(salary.monthly)}${salary.r ? ` · 실효 ${(salary.r.effRate * 100).toFixed(1)}%` : ''}` : (salary?.message ?? '') }
+    if (g === 'gift')
+      return {
+        goal: g,
+        ok: !!gift?.ok,
+        text: gift?.ok
+          ? `증여세 ${krw(gift.tax)}${gift.succession && gift.succession.state !== 'no' ? ` · ★특례면 ${krw(gift.succession.total)}` : ''}`
+          : (gift?.message ?? ''),
+      }
+    if (g === 'inherit') return { goal: g, ok: !!inherit?.ok, text: inherit?.ok ? `지금 상속되면 ${krw(inherit.taxNow)}${inherit.familyBiz ? ` · ★가업상속공제면 ${krw(inherit.familyBiz.tax)}` : ''}` : (inherit?.message ?? '') }
+    if (g === 'loan') return { goal: g, ok: !!loan?.ok, text: loan?.ok ? `해마다 ${krw(loan.yearLoss)} 손해 · 10년 ${krw(loan.tenYear)}` : '가지급금 잔액을 적으세요' }
+    return { goal: g, ok: !!retire?.ok, text: retire?.ok ? `한도 ${krw(retire.limit)} · 세후 ${krw(retire.net)}` : (retire?.message ?? '') }
+  })
+  const goTo = (g: GoalKey) => document.querySelector(`[data-testid="result-${g}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+
+  /* ---- D-132: 현황 채움 — 결과에 크게 쓰이는 칸 ---- */
+  const core: [string, boolean][] = [
+    ['대표 월 급여', p.monthlySalary > 0],
+    ['주주명부(대표 주식)', !!ceo && ceo.shares > 0],
+    ['주식가치', sv.perShare > 0],
+    ['대표 취임일', !!p.ceoStartDate],
+    ['배당 가능한 이익', p.retainedEarnings > 0],
+    ['대표 나이', p.ceoAge !== null],
+    ['경영한 햇수', p.bizYears !== null],
+  ]
+  const filled = core.filter(([, ok]) => ok).length
+
   const suggestions = profileSuggestions(clientRecord, st.profile, today)
   const cretop = cretopStockOf(clientRecord)
   const textHolders = st.register.length === 0 && clientRecord?.shareholders ? holdersFromText(clientRecord.shareholders, clientRecord.representativeName) : []
@@ -399,6 +432,23 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
         </p>
       ) : (
         <section className="flex flex-col gap-4" aria-labelledby="plan-result">
+          <div className="flex flex-col gap-2 rounded-(--radius-panel) border-2 border-navy-900 bg-white p-4" data-testid="plan-glance">
+            <p className="t-card font-bold text-slate-900">한눈에</p>
+            <ul className="flex flex-col gap-1">
+              {glance.map((x) => (
+                <li key={x.goal}>
+                  <button type="button" onClick={() => goTo(x.goal)} className="tap flex w-full flex-col gap-0.5 rounded-(--radius-control) px-1 py-1 text-left hover:bg-slate-50 sm:flex-row sm:items-baseline sm:gap-2" data-glance={x.goal}>
+                    <span className="t-sub shrink-0 font-semibold text-slate-500">{GOAL_LABEL[x.goal]}</span>
+                    <span className={`t-body min-w-0 flex-1 font-bold break-keep tabular-nums ${x.ok ? 'text-navy-900' : 'text-slate-500'}`}>{x.text}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <p className="t-sub break-keep text-slate-600">
+              모든 숫자는 세금 계산기 9종의 식으로 계산했습니다 — 결과마다 <b className="font-semibold text-success-700">✓ 계산기 같은 숫자</b>로 다시 맞춰 봅니다.
+              {needSet.size > 0 && <span className="font-semibold text-danger-700"> 빨간 칸 {needSet.size}개를 채우면 더 정확해집니다.</span>}
+            </p>
+          </div>
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <h2 id="plan-result" className="t-card font-bold text-slate-900">결과</h2>
             <p className="t-sub text-slate-600">
@@ -470,6 +520,7 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
                           : []
                       }
                       basis={salary.basis}
+                      proof={salary.proof}
                       open={salary.open}
                       onOpen={onOpenCalc}
                     />
@@ -531,6 +582,7 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
                       lines={gift.ok ? [...gift.lines, `대표 지분 → ${gift.ceoAfterPct.toFixed(1)}% · ${gift.recipient} → ${gift.recipientAfterPct.toFixed(1)}%`] : []}
                       conditions={gift.ok ? gift.conditions : []}
                       basis={gift.basis}
+                      proof={gift.proof}
                       open={gift.open}
                       onOpen={onOpenCalc}
                     />
@@ -562,6 +614,7 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
                       }
                       conditions={inherit.ok ? inherit.conditions : []}
                       basis={inherit.basis}
+                      proof={inherit.proof}
                       open={inherit.open}
                       onOpen={onOpenCalc}
                     />
@@ -572,6 +625,7 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
                       <p className="text-[1.1rem] font-bold text-navy-900 tabular-nums">
                         상속세 {krw(inherit.familyBiz.tax)} <span className="t-body font-semibold text-brand-800">(공제 {krw(inherit.familyBiz.deduction)} · 지금보다 {krw(inherit.taxNow - inherit.familyBiz.tax)} 적음)</span>
                       </p>
+                      <ProofBadge proof={inherit.familyBiz.proof} outside={inherit.familyBiz.outside} />
                       <VerifyBox items={inherit.familyBiz.verify} />
                     </div>
                   )}
@@ -588,6 +642,7 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
                       headline={loan.ok ? `해마다 ${krw(loan.yearLoss)} 손해` : ''}
                       lines={loan.ok ? [...loan.lines, `5년 ${krw(loan.fiveYear)} · 10년 ${krw(loan.tenYear)}`] : []}
                       basis={loan.basis}
+                      proof={loan.proof}
                       open={loan.open}
                       onOpen={onOpenCalc}
                       extra={
@@ -612,6 +667,7 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
                     lines={retire.ok ? [...retire.lines, `퇴직소득세(지방세 포함) ${won(retire.tax)}`] : []}
                     conditions={retire.ok ? ['실제로 퇴임할 때만 받을 수 있습니다 — 정관에 임원 퇴직금 규정이 있어야 합니다.'] : []}
                     basis={retire.basis}
+                    proof={retire.proof}
                     open={retire.open}
                     onOpen={onOpenCalc}
                   />
@@ -624,7 +680,24 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
 
       {/* ② 현황 */}
       <section className="flex flex-col gap-3" aria-labelledby="plan-now">
-        <h2 id="plan-now" className="t-card font-bold text-slate-900">이 회사 현황 <span className="t-sub font-normal text-slate-500">— 고치면 위 결과가 바로 바뀝니다</span></h2>
+        <div className="flex flex-col gap-1.5">
+          <h2 id="plan-now" className="t-card font-bold text-slate-900">
+            이 회사 현황 <span className="t-sub font-normal text-slate-500">— 고치면 위 결과가 바로 바뀝니다</span>
+          </h2>
+          <div className="flex items-center gap-3" data-testid="plan-filled">
+            <span className="t-sub shrink-0 font-semibold text-slate-700 tabular-nums">
+              채운 칸 {filled}/{core.length}
+            </span>
+            <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-200" aria-hidden="true">
+              <span className="block h-full rounded-full bg-brand-600" style={{ width: `${(filled / core.length) * 100}%` }} />
+            </span>
+          </div>
+          {filled < core.length && (
+            <p className="t-sub break-keep text-slate-600">
+              아직: {core.filter(([, ok]) => !ok).map(([k]) => k).join(' · ')}
+            </p>
+          )}
+        </div>
         <NowSummary
           perShare={sv.perShare}
           total={sv.total}
@@ -977,6 +1050,7 @@ function SuccessionBlock({ r }: { r: SuccessionResult }) {
           </ul>
         </>
       )}
+      <ProofBadge outside={r.outside} />
       <VerifyBox items={r.verify} />
       <Basis basis={r.basis} />
     </div>
@@ -1151,6 +1225,8 @@ function Outcome(props: {
   open: CalcOpen | null
   onOpen: (o: CalcOpen) => void
   extra?: ReactNode
+  proof?: Proof | null
+  outside?: string
 }) {
   if (!props.ok) return <p className="t-body rounded-(--radius-control) bg-slate-50 px-3 py-2.5 break-keep text-slate-700">{props.message}</p>
   return (
@@ -1171,6 +1247,7 @@ function Outcome(props: {
           ))}
         </ul>
       )}
+      <ProofBadge proof={props.proof} outside={props.outside} />
       <div className="flex flex-wrap items-center gap-2">
         {props.extra}
         <OpenButton open={props.open} onOpen={props.onOpen} />
@@ -1201,14 +1278,17 @@ function CashRoutes({ plan, onOpen }: { plan: NonNullable<ReturnType<typeof cash
         ))}
       </ol>
       {risky.length > 0 && (
-        <div className="flex flex-col gap-2" data-testid="route-risky">
-          <p className="t-body font-bold text-amber-900">★ 검증 필요 — 추천하지 않는 방법(다툼이 있음)</p>
-          <ol className="flex flex-col gap-3">
+        <details className="group flex flex-col gap-2" data-testid="route-risky">
+          <summary className="tap t-body flex cursor-pointer list-none items-center gap-2 font-bold text-amber-900">
+            <span className="min-w-0 flex-1 break-keep">★ 검증 필요 — 추천하지 않는 방법 {risky.length}개(다툼이 있음) 보기</span>
+            <ChevronDown aria-hidden="true" className="size-5 shrink-0 transition-transform group-open:rotate-180" />
+          </summary>
+          <ol className="mt-2 flex flex-col gap-3">
             {risky.map((r) => (
               <RouteCard key={r.key} r={r} best={false} onOpen={onOpen} />
             ))}
           </ol>
-        </div>
+        </details>
       )}
       {plan.notes.length > 0 && (
         <ul className="t-sub list-disc pl-5 break-keep text-slate-600">
@@ -1217,22 +1297,37 @@ function CashRoutes({ plan, onOpen }: { plan: NonNullable<ReturnType<typeof cash
           ))}
         </ul>
       )}
-      <p className="t-sub break-keep text-slate-500">순부담 = 대표가 내는 세금(4대보험 포함) − 회사가 덜 내는 법인세. 적을수록 좋습니다.</p>
+      <p className="t-sub break-keep text-slate-500">순부담 = 대표가 내는 세금(4대보험 포함) − 회사가 덜 내는 법인세. 적을수록 좋습니다(법인세가 더 줄면 “이득”). 퇴직금은 퇴임할 때만 받을 수 있어 추천에서 뺍니다.</p>
     </div>
   )
 }
 
-function RouteCard({ r, best, onOpen }: { r: CashRoute; best: boolean; onOpen: (o: CalcOpen) => void }) {
+/**
+ * D-132: 계산기 대조 표시 — 이 숫자가 세금 계산기 9종의 식에서 나왔는지 그 자리에서 다시 맞춰 본다.
+ *  ✓ 계산기 NN과 같은 숫자 · ★ 계산기 밖 식(특례 등) · ⚠ 다름(나오면 안 된다 — 세무사 확인)
+ */
+function ProofBadge({ proof, outside }: { proof?: Proof | null; outside?: string }) {
+  const res = proof ? checkProof(proof) : null
   return (
-    <li className={`flex flex-col gap-2 rounded-(--radius-control) border p-3 ${best ? 'border-brand-500 bg-white' : r.ok ? 'border-slate-200 bg-white' : 'border-slate-200 bg-slate-50'}`} data-route={r.key} data-ok={r.ok}>
-      <div className="flex flex-wrap items-center gap-2">
-        {best && <span className="t-meta rounded-full bg-brand-600 px-2 py-0.5 font-bold text-white">추천</span>}
-        <span className="t-card font-bold break-keep text-slate-900">{r.label}</span>
-        {r.verify.length > 0 && <span className="t-meta rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 font-bold text-amber-900">★ 검증 필요</span>}
-      </div>
+    <span className="flex flex-wrap items-center gap-1.5" data-proof={res ? (res.ok ? 'ok' : 'bad') : 'none'}>
+      {res && res.ok && (
+        <span className="t-meta inline-flex items-center gap-1 rounded-full border border-success-200 bg-success-50 px-2 py-0.5 font-semibold text-success-700">
+          ✓ 계산기 {calcNo(proof!.calc)}과 같은 숫자
+        </span>
+      )}
+      {res && !res.ok && (
+        <span className="t-meta rounded-full border border-danger-300 bg-danger-50 px-2 py-0.5 font-bold text-danger-800">⚠ 계산기 {calcNo(proof!.calc)}과 다름 — 세무사 확인</span>
+      )}
+      {outside && <span className="t-meta rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 font-semibold break-keep text-amber-900">★ {outside}</span>}
+    </span>
+  )
+}
+
+function RouteBody({ r, onOpen }: { r: CashRoute; onOpen: (o: CalcOpen) => void }) {
+  return (
+    <>
       {r.ok ? (
         <>
-          <p className="text-[1.15rem] font-bold text-navy-900 tabular-nums">순부담 {krw(r.netBurden)}</p>
           <dl className="t-sub grid grid-cols-1 gap-x-4 gap-y-0.5 text-slate-700 sm:grid-cols-2">
             {(
               [
@@ -1266,11 +1361,38 @@ function RouteCard({ r, best, onOpen }: { r: CashRoute; best: boolean; onOpen: (
           ))}
         </ul>
       )}
+      {r.ok && <ProofBadge proof={r.proof} outside={r.outside} />}
       <VerifyBox items={r.verify} />
       <div className="flex flex-wrap items-center gap-2">
         <OpenButton open={r.open} onOpen={onOpen} />
       </div>
       {r.basis.length > 0 && <Basis basis={r.basis} />}
+    </>
+  )
+}
+
+/** 추천은 펼쳐 두고, 나머지는 한 줄 — 누르면 펼친다(D-132: 여섯 장을 다 펴면 휴대폰에서 끝이 없었다) */
+function RouteCard({ r, best, onOpen }: { r: CashRoute; best: boolean; onOpen: (o: CalcOpen) => void }) {
+  const [open, setOpen] = useState(best)
+  return (
+    <li className={`rounded-(--radius-control) border ${best ? 'border-brand-500 bg-white' : r.ok ? 'border-slate-200 bg-white' : 'border-slate-200 bg-slate-50'}`} data-route={r.key} data-ok={r.ok}>
+      <details open={open} onToggle={(e) => setOpen(e.currentTarget.open)} className="group">
+        <summary className="tap flex cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2.5">
+          <span className="flex min-w-0 flex-[1_1_14rem] flex-wrap items-center gap-x-2 gap-y-1">
+            {best && <span className="t-meta rounded-full bg-brand-600 px-2 py-0.5 font-bold whitespace-nowrap text-white">추천</span>}
+            <span className="t-card font-bold break-keep text-slate-900">{r.label}</span>
+            {r.verify.length > 0 && <span className="t-meta rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 font-bold whitespace-nowrap text-amber-900">★ 검증 필요</span>}
+            {r.key === 'retire' && r.ok && <span className="t-meta rounded-full border border-slate-300 bg-slate-50 px-2 py-0.5 font-semibold whitespace-nowrap text-slate-700">퇴임할 때만</span>}
+          </span>
+          <span className={`ml-auto shrink-0 text-right font-bold whitespace-nowrap tabular-nums ${r.ok ? 'text-[1.05rem] text-navy-900' : 't-sub text-slate-500'}`}>
+            {!r.ok ? '안 됨' : r.netBurden < 0 ? `이득 ${krw(-r.netBurden)}` : `순부담 ${krw(r.netBurden)}`}
+          </span>
+          <ChevronDown aria-hidden="true" className="size-5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="flex flex-col gap-2 border-t border-slate-100 px-3 pt-2.5 pb-3">
+          <RouteBody r={r} onOpen={onOpen} />
+        </div>
+      </details>
     </li>
   )
 }

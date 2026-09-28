@@ -96,6 +96,11 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const burnCard = cash.locator('[data-route="shareBurn"]')
   check('자사주 소각(의제배당): 양도와 나란히 · 순부담 4,338만원 · ★ 검증 필요', ((await burnCard.innerText()) ?? '').includes('4,338만원') && ((await burnCard.innerText()) ?? '').includes('★ 검증 필요'), (await burnCard.innerText()).slice(0, 200))
   const risky = page.getByTestId('route-risky')
+  check('더 쉽게: 추천만 펼쳐 두고 나머지는 한 줄(순부담만)', (await cash.locator('[data-route] details[open]').count()) === 1 && (await cash.locator('[data-route="shareSale"] details[open]').count()) === 1, String(await cash.locator('[data-route] details[open]').count()))
+  check('더 쉽게: ★ 추천하지 않는 방법은 접힌 묶음', (await risky.evaluate((e) => e.open)) === false && ((await risky.innerText()) ?? '').includes('추천하지 않는 방법 1개'))
+  check('퇴직금 줄: 퇴임할 때만 · 법인세가 더 줄면 이득', ((await cash.locator('[data-route="retire"] summary').first().innerText()) ?? '').includes('퇴임할 때만') && /이득|순부담/.test((await cash.locator('[data-route="retire"] summary').first().innerText()) ?? ''))
+  await risky.locator('summary').first().click()
+  await cash.locator('[data-route="spouseBurn"] summary').first().click()
   check('배우자 증여 후 소각: 추천하지 않는 ★ 묶음에 · 돈은 배우자에게', (await risky.locator('[data-route="spouseBurn"]').count()) === 1 && ((await risky.innerText()) ?? '').includes('배우자 손에') && ((await risky.innerText()) ?? '').includes('실질과세'))
   check('★ 표시 안내가 결과 머리에', ((await page.locator('[aria-labelledby="plan-result"]').innerText()) ?? '').includes('★ = 확실하지 않아'))
   const best = (await page.getByTestId('route-best').innerText()) ?? ''
@@ -103,6 +108,16 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const order = await cash.locator('[data-route]').evaluateAll((els) => els.map((e) => e.getAttribute('data-route')))
   check('현금 1억: 추천이 맨 위 · 퇴직금(퇴임 때만)은 뒤 · ★다툼 있는 방법은 맨 끝', order[0] === 'shareSale' && order.indexOf('retire') > order.indexOf('dividend') && order[order.length - 1] === 'spouseBurn', order.join(','))
   const divCard = cash.locator('[data-route="dividend"]')
+  await divCard.locator('summary').first().click()
+  const glance = (await page.getByTestId('plan-glance').innerText()) ?? ''
+  check('한눈에: 목표마다 한 줄 · 9종 식으로 계산', glance.includes('주식 팔기') && glance.includes('2,397만원') && glance.includes('계산기 9종'), glance)
+  const proofs = await page.locator('[data-proof]').evaluateAll((els) => els.map((e) => e.getAttribute('data-proof')))
+  check('계산기 대조: 결과마다 ✓ 계산기 같은 숫자 · 다른 숫자 0', proofs.includes('ok') && !proofs.includes('bad') && ((await cash.locator('[data-route="shareSale"]').innerText()) ?? '').includes('계산기 03과 같은 숫자'), proofs.join(','))
+  const filled = (await page.getByTestId('plan-filled').innerText()) ?? ''
+  check('현황: 채운 칸 표시', /채운 칸 \d+\/\d+/.test(filled), filled)
+  await page.locator('[data-glance="cash"]').click()
+  await page.waitForTimeout(500)
+  check('한눈에 줄을 누르면 그 결과로', await page.evaluate(() => { const r = document.querySelector('[data-testid="result-cash"]').getBoundingClientRect(); return r.top < window.innerHeight && r.bottom > 0 }))
   check('현금 1억 · 배당: 다른 주주 몫 · 차등배당 주의', ((await divCard.innerText()) ?? '').includes('다른 주주도') && ((await divCard.innerText()) ?? '').includes('차등배당'))
   await divCard.getByText('계산 근거 보기').click()
   check('근거: 법 조항 · 어느 계산기', ((await divCard.innerText()) ?? '').includes('03 2026 소득세') && ((await divCard.innerText()) ?? '').includes('§14'))

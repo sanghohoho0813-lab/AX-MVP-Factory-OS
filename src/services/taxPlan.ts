@@ -56,13 +56,48 @@ export type TaxProfile = Partial<Record<ProfileKey, string>>
 export const CORP_BAND_OPTIONS = ['2억 이하', '2억 초과'] as const
 export const CORP_TYPE_OPTIONS = ['일반법인', '부동산과다보유법인', '특수법인'] as const
 
-/** 법인세 절감 가정 — 01 계산기와 같은 숫자(과표 2억 이하 11% · 초과 22%, 지방소득세 포함) */
-const CORP_RATE = { low: 0.11, high: 0.22 }
+/**
+ * D-132: 가정값은 계산기 9종의 정의에서 읽는다 — 절세 설계가 따로 숫자를 적어 두지 않는다.
+ * 계산기(원본)의 기본값이 바뀌면 절세 설계도 같이 바뀐다. 한 벌만 둔다.
+ */
+export function calcDefault(calcKey: string, fieldId: string): string {
+  const calc = calculatorOf(calcKey)
+  const v = calc ? defaultValues(calc)[fieldId] : undefined
+  if (typeof v !== 'string') throw new Error(`계산기 ${calcKey} 에 ${fieldId} 칸이 없습니다`)
+  return v
+}
+
+/** 법인세 절감률 — 01 대표이사 급여 계산기의 식에서 그대로 꺼낸다(과표 2억 이하 · 초과) */
+const CORP_RATE = (() => {
+  const r = computeSalary(1000000)
+  return { low: r.corpSaveLow / r.annual, high: r.corpSaveHigh / r.annual }
+})()
+
+/** 절세 설계가 쓰는 가정 — 전부 계산기 정의의 기본값(단위 시험이 같은지 지킨다) */
+export const ASSUMPTIONS = {
+  /** 03 소득세: 인적공제 */
+  personalDed: calcDefault('t9', 'inc_a_personalDed'),
+  /** 07 가지급금: 인정이자율 · 4대보험 추가부담률 · 차입이자율 · 분석기간 */
+  loanRate: calcDefault('t1', 'g_rate'),
+  loanIns: calcDefault('t1', 'g_ins'),
+  loanBorrow: calcDefault('t1', 'g_borrow'),
+  loanYears: calcDefault('t1', 'g_years'),
+  /** 02 퇴직급여: 지급배수(2019년까지 · 2020년부터) */
+  retireMultPre: calcDefault('t6', 'r_mult_pre'),
+  retireMultPost: calcDefault('t6', 'r_mult_post'),
+  /** 09 비상장주식: 순손익가치 환원율 */
+  valuationRate: calcDefault('t3', 'v_rate'),
+  corpRateLow: CORP_RATE.low,
+  corpRateHigh: CORP_RATE.high,
+}
 
 /** '1억 2천만' · '120,000,000' · '1.2억' · '300백만' → 원. 못 읽으면 0 */
 export function wonOf(text: string | undefined): number {
   if (!text) return 0
-  const t = text.replace(/(\d+(?:\.\d+)?)\s*백만/g, (_, n: string) => `${Number(n) * 100}만`)
+  const t = text
+    .replace(/(\d+(?:\.\d+)?)\s*백만/g, (_, n: string) => `${Number(n) * 100}만`)
+    // '1억 5천' 은 말로는 1억 5천만 — 억 뒤의 '천' 만 천만으로 읽는다(그냥 '5천' 은 5천원인지 5천만원인지 몰라 읽지 않는다 — 칸 아래 '읽지 못했습니다')
+    .replace(/억\s*(\d+)\s*천(?!만)/g, (_, n: string) => `억${n}천만`)
   const v = parseWonInput(t)
   return v !== null && Number.isFinite(v) ? v : 0
 }
@@ -111,31 +146,31 @@ export function viewProfile(p: TaxProfile): ProfileView {
   const incOf = (k: 'vInc0' | 'vInc1' | 'vInc2') => (p[k] && p[k]!.trim() !== '' ? wonOf(p[k]) : null)
   const band = p.corpBand === '2억 초과' ? '2억 초과' : '2억 이하'
   return {
-    monthlySalary: wonOf(p.monthlySalary),
+    monthlySalary: Math.max(0, wonOf(p.monthlySalary)),
     ceoStartDate: /^\d{4}-\d{2}-\d{2}$/.test(p.ceoStartDate ?? '') ? p.ceoStartDate! : '',
-    loanBalance: wonOf(p.loanBalance),
-    retainedEarnings: wonOf(p.retainedEarnings),
+    loanBalance: Math.max(0, wonOf(p.loanBalance)),
+    retainedEarnings: Math.max(0, wonOf(p.retainedEarnings)),
     corpBand: band,
     corpRate: band === '2억 초과' ? CORP_RATE.high : CORP_RATE.low,
     totalShares: Math.floor(numOf(p.totalShares)),
-    par: wonOf(p.par),
-    perShareManual: wonOf(p.perShareManual),
-    vRate: numOf(p.vRate, 10) || 10,
-    vAsset: wonOf(p.vAsset),
-    vDebt: wonOf(p.vDebt),
-    vReBook: wonOf(p.vReBook),
-    vReFair: wonOf(p.vReFair),
+    par: Math.max(0, wonOf(p.par)),
+    perShareManual: Math.max(0, wonOf(p.perShareManual)),
+    vRate: numOf(p.vRate, Number(ASSUMPTIONS.valuationRate)) || Number(ASSUMPTIONS.valuationRate),
+    vAsset: Math.max(0, wonOf(p.vAsset)),
+    vDebt: Math.max(0, wonOf(p.vDebt)),
+    vReBook: Math.max(0, wonOf(p.vReBook)),
+    vReFair: Math.max(0, wonOf(p.vReFair)),
     vType: (CORP_TYPE_OPTIONS as readonly string[]).includes(p.vType ?? '') ? p.vType! : '일반법인',
     vInc: [incOf('vInc0'), incOf('vInc1'), incOf('vInc2')],
-    otherFinIncome: wonOf(p.otherFinIncome),
-    estateRealEstate: wonOf(p.estateRealEstate),
-    estateFinancial: wonOf(p.estateFinancial),
-    estateOther: wonOf(p.estateOther),
-    estateDebt: wonOf(p.estateDebt),
+    otherFinIncome: Math.max(0, wonOf(p.otherFinIncome)),
+    estateRealEstate: Math.max(0, wonOf(p.estateRealEstate)),
+    estateFinancial: Math.max(0, wonOf(p.estateFinancial)),
+    estateOther: Math.max(0, wonOf(p.estateOther)),
+    estateDebt: Math.max(0, wonOf(p.estateDebt)),
     spouseAlive: p.spouseAlive !== '없음',
     children: Math.max(0, Math.floor(numOf(p.children, 0))),
-    priorGift: wonOf(p.priorGift),
-    retireMult: Math.min(2, Math.max(0, numOf(p.retireMult, 2))),
+    priorGift: Math.max(0, wonOf(p.priorGift)),
+    retireMult: Math.min(Number(ASSUMPTIONS.retireMultPost), Math.max(0, numOf(p.retireMult, Number(ASSUMPTIONS.retireMultPost)))),
     ceoAge: p.ceoAge && p.ceoAge.trim() !== '' ? Math.floor(numOf(p.ceoAge)) : null,
     bizYears: p.bizYears && p.bizYears.trim() !== '' ? numOf(p.bizYears) : null,
     bizAssetRatio: p.bizAssetRatio && p.bizAssetRatio.trim() !== '' ? Math.min(100, Math.max(0, numOf(p.bizAssetRatio))) / 100 : 1,
@@ -349,6 +384,41 @@ export function lineWon(out: Output, blockId: string, k: string, nth = 0): numbe
   return Number.isFinite(n) ? n : NaN
 }
 
+/** 결과 줄의 글자 그대로 */
+export function lineText(out: Output, blockId: string, k: string): string {
+  return out.blocks.find((b) => b.id === blockId)?.lines.find((l) => l.k === k)?.v ?? ''
+}
+
+/**
+ * D-132: 대조(proof) — 절세 설계가 보여 주는 숫자를 '같은 값으로 계산기에서 열었을 때' 나오는 줄과 맞춰 본다.
+ * 화면에 '✓ 계산기 NN과 같은 숫자' 로 보이고, 단위 시험이 무작위 현황 수십 벌에서 전부 맞는지 본다.
+ */
+export interface Proof {
+  calc: string
+  sub: string
+  values: Record<string, string>
+  blockId: string
+  k: string
+  nth?: number
+  /** 절세 설계가 쓴 숫자 */
+  expect: number
+}
+
+export function checkProof(pf: Proof): { ok: boolean; got: number } {
+  try {
+    const got = lineWon(run(pf.calc, pf.sub, pf.values), pf.blockId, pf.k, pf.nth ?? 0)
+    // 계산기는 원 단위로 반올림해 보여 준다 — 1원 안쪽은 같다
+    return { ok: Number.isFinite(got) && Number.isFinite(pf.expect) && Math.abs(got - pf.expect) <= 1, got }
+  } catch {
+    return { ok: false, got: NaN }
+  }
+}
+
+/** 계산기 번호 — 't9' → '03' */
+export function calcNo(calcKey: string): string {
+  return calculatorOf(calcKey)?.no ?? calcKey
+}
+
 const s = (n: number) => String(Math.round(n))
 
 /** f 가 늘어나는 함수일 때 f(x) ≥ target 인 가장 작은 x (계산기 05 solveLimit 과 같은 이분법) */
@@ -408,7 +478,7 @@ function t9Values(i: T9In): Record<string, string> {
     [`${p}_salary`]: s(i.salary ?? 0),
     [`${p}_pension`]: '0',
     [`${p}_other`]: '0',
-    [`${p}_personalDed`]: '1500000',
+    [`${p}_personalDed`]: ASSUMPTIONS.personalDed,
     [`${p}_otherDed`]: s(i.insDed ?? 0),
     [`${p}_specialCredit`]: '0',
     [`${p}_otherCredit`]: '0',
@@ -422,6 +492,7 @@ function t9(i: T9In) {
     gainTax: lineWon(out, 'inc_a_out1', '⑫ 양도소득세 총부담액'),
     retireTax: lineWon(out, 'inc_a_out2', '⑩ 퇴직소득세 총부담액'),
     incomeTax: lineWon(out, 'inc_a_out3', '종합소득세 총부담세액'),
+    autoMajor: lineText(out, 'inc_a_out1', '자동판정 참고값'),
     values,
   }
 }
@@ -451,6 +522,7 @@ export interface SalaryResult {
   best: { low: { m: number; r: Sal }; high: { m: number; r: Sal } }
   basis: string[]
   open: CalcOpen | null
+  proof?: Proof | null
 }
 
 function salaryGrid() {
@@ -483,6 +555,7 @@ export function salaryPlan(p: ProfileView, goal: SalaryGoal): SalaryResult {
     monthly,
     r: computeSalary(monthly),
     open: { calc: 't2', sub: 'main', values: { s_monthly: s(monthly) }, label: '01 급여 최적화에서 열기' },
+    proof: { calc: 't2', sub: 'main', values: { s_monthly: s(monthly) }, blockId: 's_corp', k: '세후 실수령액', expect: computeSalary(monthly).afterTax },
   })
   if (goal.mode === 'min') {
     const b = p.corpRate === CORP_RATE.high ? best.high : best.low
@@ -541,6 +614,10 @@ export interface CashRoute {
   unsafe?: boolean
   /** 돈을 받는 사람이 대표가 아닐 때(배우자) */
   receiver?: string
+  /** D-132: 계산기 대조 — 같은 값으로 계산기를 열면 나오는 줄 */
+  proof?: Proof | null
+  /** D-132: 계산기 9종 밖의 식 · 가정이 들어간 곳(★) */
+  outside?: string
 }
 
 export interface CashPlan {
@@ -601,6 +678,7 @@ function salaryRoute(c: Ctx, target: number): CashRoute & { newMonthly: number }
     basis: SALARY_BASIS,
     open: { calc: 't2', sub: 'main', values: { s_monthly: s(m1) }, label: '01 급여 최적화에서 열기' },
     verify: [],
+    proof: { calc: 't2', sub: 'main', values: { s_monthly: s(m1) }, blockId: 's_personal', k: '개인 부담 총액', expect: r1.personalTotal },
     newMonthly: m1,
   }
 }
@@ -619,7 +697,7 @@ function dividendToCeo(c: Ctx, salaryAnnual: number, insDed: number, target: num
   if (draw === null) return null
   const d = Math.ceil(draw / 1000) * 1000
   const after = t9({ today: c.today, salary: salaryAnnual, insDed, interest: c.p.otherFinIncome, dividend: d })
-  return { dividend: d, tax: after.incomeTax - base, values: after.values }
+  return { dividend: d, tax: after.incomeTax - base, after: after.incomeTax, values: after.values }
 }
 
 function dividendRoute(c: Ctx, target: number): CashRoute {
@@ -656,6 +734,7 @@ function dividendRoute(c: Ctx, target: number): CashRoute {
     basis: DIVIDEND_BASIS,
     open: { calc: 't9', sub: 'inc_a', values: got.values, label: '03 소득세(1안)에서 열기' },
     verify: [],
+    proof: { calc: 't9', sub: 'inc_a', values: got.values, blockId: 'inc_a_out3', k: '종합소득세 총부담세액', expect: got.after },
   }
 }
 
@@ -674,7 +753,8 @@ function shareSaleRoute(c: Ctx, target: number): CashRoute {
   const H = ceo.shares
   const total = c.sv.totalShares
   const acquire = ceo.acquirePrice > 0 ? ceo.acquirePrice : c.p.par
-  const isMajor = (total > 0 && H / total >= 0.04) || H * V >= 1e9
+  // 대주주 판정은 03 계산기의 '자동판정 참고값' 을 그대로 쓴다(지분율 · 보유 시가총액 기준 — 식을 따로 두지 않는다)
+  const isMajor = t9({ today: c.today, qty: 0, price: V, acquire, totalShares: total, held: H }).autoMajor === '대주주'
   const run1 = (q: number) => t9({ today: c.today, qty: q, price: V, acquire, totalShares: total, held: H, isMajor })
   const f = (q: number) => q * V - run1(q).gainTax
   const all = f(H)
@@ -702,6 +782,7 @@ function shareSaleRoute(c: Ctx, target: number): CashRoute {
     ],
     basis: SHARE_SALE_BASIS,
     open: { calc: 't9', sub: 'inc_a', values: r.values, label: '03 소득세(1안)에서 열기' },
+    proof: { calc: 't9', sub: 'inc_a', values: r.values, blockId: 'inc_a_out1', k: '⑫ 양도소득세 총부담액', expect: r.gainTax },
     verify: ['회사가 사들인 주식을 보유 · 다시 팔 목적이어야 양도소득입니다 — 소각할 목적이면 의제배당(아래 "자사주 소각")으로 과세됩니다. 계약서 · 이사회 · 주주총회 결의 내용으로 판단'],
   }
 }
@@ -718,7 +799,7 @@ function retireLimit(c: Ctx, start: string): number {
   const out = run('t6', 'p2', {
     r_start: start,
     r_end: c.today,
-    r_mult_pre: '3',
+    r_mult_pre: ASSUMPTIONS.retireMultPre,
     r_mult_post: String(c.p.retireMult),
     r_avg1: s(annual),
     r_avg2: s(annual),
@@ -760,6 +841,8 @@ function retireRoute(c: Ctx, target: number): CashRoute {
     basis: RETIRE_BASIS,
     open: { calc: 't9', sub: 'inc_a', values: r.values, label: '03 소득세(1안)에서 열기' },
     verify: [],
+    proof: { calc: 't9', sub: 'inc_a', values: r.values, blockId: 'inc_a_out2', k: '⑩ 퇴직소득세 총부담액', expect: r.retireTax },
+    outside: '법인세 절감은 01 계산기의 법인세율(11% · 22%)을 퇴직금에 곱한 값',
   }
 }
 
@@ -807,6 +890,7 @@ function shareBurnRoute(c: Ctx, target: number): CashRoute {
     ],
     basis: SHARE_BURN_BASIS,
     open: { calc: 't9', sub: 'inc_a', values: r.values, label: '03 소득세(1안)에서 열기' },
+    proof: { calc: 't9', sub: 'inc_a', values: r.values, blockId: 'inc_a_out3', k: '종합소득세 총부담세액', expect: r.incomeTax },
     verify: ['의제배당에도 배당가산(Gross-up) · 배당세액공제를 적용해 계산했습니다 — 소각 재원(이익잉여금 · 자본잉여금)에 따라 달라질 수 있습니다'],
   }
 }
@@ -845,6 +929,8 @@ function spouseBurnRoute(c: Ctx, target: number): CashRoute {
     conditions: ['추천하지 않습니다 — 세무사와 먼저 확인할 방법입니다.'],
     basis,
     open: { calc: 't5', sub: 'j2', values: g.values, label: '04 증여세 비교에서 열기' },
+    proof: { calc: 't5', sub: 'j2', values: g.values, blockId: 'k_out', k: '납부할 증여세', expect: g.tax },
+    outside: '의제배당 0원은 계산기 밖 가정(증여가액 = 소각가)',
     verify,
     unsafe: true,
     receiver: '배우자',
@@ -886,6 +972,8 @@ function mixRoute(c: Ctx, target: number): CashRoute | null {
     basis: [...SALARY_BASIS.slice(0, 1), ...DIVIDEND_BASIS.slice(0, 2), '섞는 비율은 10% 간격으로 모두 계산해 순부담이 가장 적은 것을 골랐다'],
     open: null,
     verify: [],
+    proof: null,
+    outside: '01 급여 · 03 소득세 계산기 결과를 더한 것',
   }
 }
 
@@ -951,6 +1039,8 @@ export interface SuccessionResult {
   lines: string[]
   verify: string[]
   basis: string[]
+  /** 계산기 9종 밖의 식 */
+  outside: string
 }
 
 export interface GiftResult {
@@ -969,6 +1059,7 @@ export interface GiftResult {
   conditions: string[]
   basis: string[]
   open: CalcOpen | null
+  proof?: Proof | null
   /** 가업승계 증여세 과세특례와 비교 — 자녀에게 줄 때만 */
   succession: SuccessionResult | null
 }
@@ -1055,6 +1146,7 @@ export function giftPlan(p: ProfileView, reg: ShareholderRow[], sv: ShareValue, 
     conditions,
     basis: GIFT_BASIS,
     open: { calc: 't5', sub: 'j2', values: g.values, label: '04 증여세 비교에서 열기' },
+    proof: { calc: 't5', sub: 'j2', values: g.values, blockId: 'k_out', k: '납부할 증여세', expect: g.tax },
     succession: who.relation === 'child' || who.relation === 'minor_child' ? successionPlan(p, who.relation, capped * V, g.tax, prior, rel) : null,
   }
 }
@@ -1117,6 +1209,7 @@ function successionPlan(p: ProfileView, relation: ShareholderRelation, value: nu
     ],
     verify,
     basis: SUCCESSION_BASIS,
+    outside: '조세특례제한법 §30의6 식 — 계산기 9종에 없는 식(일반 증여세는 04 식)',
   }
 }
 
@@ -1133,11 +1226,12 @@ export interface InheritResult {
   /** 계획한 증여가 있을 때 — 10년 안 상속(합산) · 10년 뒤 상속 */
   withGift: { giftValue: number; giftTax: number; within10: number; after10: number } | null
   /** 가업상속공제(상증세법 §18의2)를 받으면 ★ — 대표가 10년 이상 경영했을 때만 */
-  familyBiz: { deduction: number; tax: number; verify: string[] } | null
+  familyBiz: { deduction: number; tax: number; verify: string[]; proof: Proof; outside: string } | null
   lines: string[]
   conditions: string[]
   basis: string[]
   open: CalcOpen | null
+  proof?: Proof | null
 }
 
 const INHERIT_BASIS = [
@@ -1176,9 +1270,12 @@ export function inheritancePlan(p: ProfileView, reg: ShareholderRow[], sv: Share
   let familyBiz: InheritResult['familyBiz'] = null
   if (shareValue > 0 && p.bizYears !== null && p.bizYears >= 10) {
     const deduction = Math.min(shareValue * p.bizAssetRatio, successionLimit(p.bizYears))
+    const fbt = inheritTax(p, p.estateOther + shareValue - deduction, p.priorGift, 0)
     familyBiz = {
       deduction,
-      tax: inheritTax(p, p.estateOther + shareValue - deduction, p.priorGift, 0).tax,
+      tax: fbt.tax,
+      proof: { calc: 't4', sub: 'i1', values: fbt.values, blockId: 'h_out', k: '납부할 상속세', expect: fbt.tax },
+      outside: '공제액(상증세법 §18의2)은 계산기 9종 밖 — 공제한 뒤 상속세는 08 식',
       verify: [
         '가업상속공제 요건(대표가 10년 이상 경영 · 지분 40% 이상을 10년 이상 보유 · 대표이사 재직 기간, 상속인이 가업에 종사 · 대표이사 취임)을 모두 갖춰야 합니다',
         '사후관리 5년(가업 · 고용 · 지분 유지)을 어기면 추징합니다',
@@ -1201,6 +1298,7 @@ export function inheritancePlan(p: ProfileView, reg: ShareholderRow[], sv: Share
     conditions: ['주식가치는 오늘 값입니다 — 회사가 크면 상속 때 값도 커집니다.', '장례비는 최소 500만원, 공과금은 0원으로 보았습니다.'],
     basis: INHERIT_BASIS,
     open: { calc: 't4', sub: 'i1', values: now.values, label: '08 상속세에서 열기' },
+    proof: { calc: 't4', sub: 'i1', values: now.values, blockId: 'h_out', k: '납부할 상속세', expect: now.tax },
   }
 }
 
@@ -1218,10 +1316,11 @@ export interface LoanResult {
   lines: string[]
   basis: string[]
   open: CalcOpen | null
+  proof?: Proof | null
 }
 
 const LOAN_BASIS = [
-  '07 가지급금 손실계산기의 식 그대로 — 인정이자(법인세법 시행령 §89, 당좌대출이자율 4.6% 가정)의 법인세 · 대표 소득세(상여처분) · 4대보험, 차입금이 있으면 지급이자 손금불산입(법인세법 §28)',
+  '07 가지급금 손실계산기의 식 그대로 — 인정이자(법인세법 시행령 §89, 07 계산기 기본 인정이자율)의 법인세 · 대표 소득세(상여처분) · 4대보험, 차입금이 있으면 지급이자 손금불산입(법인세법 §28)',
   '대표 한계세율은 지금 급여로 01 계산기에서 구했다',
   '갚으려면 대표가 세후로 잔액만큼 필요하다 — "현금 가져오기" 목표로 가장 싼 길을 본다',
 ]
@@ -1234,8 +1333,8 @@ export function loanPlan(p: ProfileView): LoanResult {
   const b = computeSalary(m0 + 100000)
   const marginal = Math.min(0.495, Math.max(0.066, (b.finalTax + b.localTax - (a.finalTax + a.localTax)) / 1200000))
   const values = {
-    g_principal: s(bal), g_rate: '4.6', g_years: '5', g_corp: String(Math.round(p.corpRate * 100)),
-    g_inc: (marginal * 100).toFixed(1), g_ins: '9', g_debt: '없음', g_borrow: '4.6',
+    g_principal: s(bal), g_rate: ASSUMPTIONS.loanRate, g_years: ASSUMPTIONS.loanYears, g_corp: String(Math.round(p.corpRate * 100)),
+    g_inc: (marginal * 100).toFixed(1), g_ins: ASSUMPTIONS.loanIns, g_debt: '없음', g_borrow: ASSUMPTIONS.loanBorrow,
   }
   const out = run('t1', 'main', values)
   return {
@@ -1245,9 +1344,10 @@ export function loanPlan(p: ProfileView): LoanResult {
     fiveYear: lineWon(out, 'g_out', '분석기간(5년) 누적손실'),
     tenYear: lineWon(out, 'g_out', '10년 방치 시 누적손실'),
     marginalPct: marginal * 100,
-    lines: [`가지급금 ${fmt(bal)} · 인정이자 4.6% · 대표 한계세율 ${(marginal * 100).toFixed(1)}% · 회사 차입금 없음으로 가정`],
+    lines: [`가지급금 ${fmt(bal)} · 인정이자 ${ASSUMPTIONS.loanRate}%(07 계산기 기본값) · 대표 한계세율 ${(marginal * 100).toFixed(1)}% · 회사 차입금 없음으로 가정`],
     basis: LOAN_BASIS,
     open: { calc: 't1', sub: 'main', values, label: '07 가지급금에서 열기' },
+    proof: { calc: 't1', sub: 'main', values, blockId: 'g_out', k: '연간 손실액 (1년차 기준)', expect: lineWon(out, 'g_out', '연간 손실액 (1년차 기준)') },
   }
 }
 
@@ -1266,12 +1366,13 @@ export interface RetireResult {
   open: CalcOpen | null
 }
 
-export function retirePlan(p: ProfileView, today: string): RetireResult {
+export function retirePlan(p: ProfileView, today: string): RetireResult & { proof?: Proof | null } {
   if (!p.ceoStartDate) return { ok: false, message: '대표 취임일(퇴직금 기산일)을 적어 주세요.', limit: 0, tax: 0, net: 0, lines: [], basis: RETIRE_BASIS, open: null }
   if (!(p.monthlySalary > 0)) return { ok: false, message: '대표 월 급여(지금)를 적어 주세요 — 한도가 급여로 정해집니다.', limit: 0, tax: 0, net: 0, lines: [], basis: RETIRE_BASIS, open: null }
   const c: Ctx = { p, reg: [], sv: { perShare: 0, total: 0, totalShares: 0, source: 'none', result: null, notes: [] }, today }
   const limit = retireLimit(c, p.ceoStartDate)
   const r = t9({ today, retireAmt: limit, startDate: p.ceoStartDate })
+  const limitValues = { r_start: p.ceoStartDate, r_end: today, r_mult_pre: ASSUMPTIONS.retireMultPre, r_mult_post: String(p.retireMult), r_avg1: s(p.monthlySalary * 12), r_avg2: s(p.monthlySalary * 12), r_avg3: s(p.monthlySalary * 12) }
   return {
     ok: true,
     message: '',
@@ -1280,12 +1381,8 @@ export function retirePlan(p: ProfileView, today: string): RetireResult {
     net: limit - r.retireTax,
     lines: [`취임 ${p.ceoStartDate} ~ 오늘 · 정관 배수 ${p.retireMult}배 · 최근 급여 = 지금 급여로 가정`],
     basis: RETIRE_BASIS,
-    open: {
-      calc: 't6',
-      sub: 'p2',
-      values: { r_start: p.ceoStartDate, r_end: today, r_mult_pre: '3', r_mult_post: String(p.retireMult), r_avg1: s(p.monthlySalary * 12), r_avg2: s(p.monthlySalary * 12), r_avg3: s(p.monthlySalary * 12) },
-      label: '02 퇴직급여(한도)에서 열기',
-    },
+    open: { calc: 't6', sub: 'p2', values: limitValues, label: '02 퇴직급여(한도)에서 열기' },
+    proof: { calc: 't6', sub: 'p2', values: limitValues, blockId: 'r_out', k: '정관 규정 있을 시 퇴직소득한도', expect: limit },
   }
 }
 
