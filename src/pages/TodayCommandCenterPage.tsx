@@ -43,6 +43,7 @@ import {
   buildDaySummary,
   buildMoneySignals,
   buildTopActions,
+  hardDeadlineActions,
   daySummaryText,
   type BriefAction,
 } from '../services/dailyBriefService'
@@ -299,6 +300,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     () => buildTopActions({ alerts, events, followUps: [], clientNames, today, extra: salesTop }, 3),
     [alerts, events, clientNames, today, salesTop],
   )
+  /** D-138: 지나면 신청할 수 없는 기한(청년도약 참여신청 등) 7일 안 — 오늘 할 일 칸에 따로 둔다(순위 다툼에 묻히지 않게) */
+  const hardDue = useMemo(() => hardDeadlineActions(schedule), [schedule])
   const todayJournal = useMemo(() => applyJournalFilter(journal, { range: 'today' }, today), [journal, today])
   const daySummary = useMemo(
     () => buildDaySummary({ today, journal, clients, alerts, events, clientNames }),
@@ -464,6 +467,25 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               />
             ))}
           </ul>
+        )}
+
+        {/* D-138: 놓치면 끝나는 기한 — 지나면 신청할 수 없는 것만(7일 안) */}
+        {hardDue.length > 0 && (
+          <div data-testid="today-hard-deadlines" className="flex flex-col gap-2">
+            <p className="t-sub font-semibold text-danger-700">놓치면 끝나는 기한 {hardDue.length}건</p>
+            <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-control) border border-danger-200 bg-white">
+              {hardDue.map((a) => (
+                <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                  <span className="t-sub w-20 shrink-0 font-semibold whitespace-nowrap text-danger-700">{a.reason.startsWith('오늘') ? '오늘까지' : a.reason.split(' — ')[0]}</span>
+                  <Link to={a.href} className="tap t-body inline-flex items-center font-bold text-slate-900 hover:text-brand-700 hover:underline">
+                    {a.clientName}
+                  </Link>
+                  <span className="t-body min-w-0 flex-[1_1_10rem] break-keep text-slate-700">{a.title}</span>
+                  <span className="t-sub ml-auto shrink-0 break-keep text-slate-500">지나면 신청 불가</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         {/* D-120: 다음 약속 — 업체마다 적어 둔 '다음에 무엇을, 언제' 가운데 지난 것 · 오늘 · 내일 */}

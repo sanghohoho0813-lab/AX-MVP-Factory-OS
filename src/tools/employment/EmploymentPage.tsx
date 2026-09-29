@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, Check, Copy, FolderOpen, RotateCcw, Upload } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
@@ -30,6 +30,10 @@ import { fD, fDFull } from './lib/dates'
 import { fMan, fProgramAmt } from './lib/format'
 import { roundSchedule, type RoundKind } from './lib/schedule'
 import { roundDeadlines } from './lib/toolDeadlines'
+import { notYetRegistered, youthEmployeeRecord, youthEnrollDeadlines, youthEnrollItems, type YouthEnrollItem } from './lib/rosterEnroll'
+import { listRows, saveRow } from '../../services/moduleData'
+import { employeeRowData, toOrigEmployee } from './orig/store'
+import type { ClientOpsRecord } from '../../types/clientOps'
 import {
   analyzeRoster,
   buildCopyText,
@@ -452,6 +456,107 @@ function numOrNull(v: string): number | null {
   return v.trim() === '' ? null : Number(v)
 }
 
+/**
+ * D-138: 명부에서 나온 청년도약 후보 — 사람마다 참여신청 기한(입사 후 3개월)을 보이고, 고른 업체의 고용지원금 직원으로 바로 등록한다.
+ * 등록은 진행 상태 '준비' · 청년도약 · 회차표 그대로. 같은 이름 + 입사일이 이미 있으면 다시 만들지 않는다.
+ */
+function YouthEnrollPanel({ items }: { items: YouthEnrollItem[] }) {
+  const { clientRecord, workspaceId, loadClients } = useToolClient()
+  const [clients, setClients] = useState<ClientOpsRecord[]>([])
+  const [pick, setPick] = useState(clientRecord?.id ?? '')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<{ text: string; cid: string } | null>(null)
+  useEffect(() => {
+    if (clientRecord) return
+    let alive = true
+    void loadClients()
+      .then((list) => {
+        if (alive) setClients(list.filter((c) => !c.archivedAt))
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [clientRecord, loadClients])
+  useEffect(() => {
+    if (clientRecord) setPick(clientRecord.id)
+  }, [clientRecord])
+
+  const register = async () => {
+    if (!pick) return
+    setBusy(true)
+    setMsg(null)
+    try {
+      const rows = await listRows(workspaceId, 'employment', 'employees')
+      const existing = rows.map((r) => toOrigEmployee(r))
+      const todo = notYetRegistered(items, existing, pick)
+      const program = DEFAULT_PROGRAMS.youth_jump as unknown as Parameters<typeof youthEmployeeRecord>[2]
+      for (const it of todo) {
+        const id = `emp-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`
+        await saveRow(workspaceId, 'employment', 'employees', { id, clientId: pick, data: employeeRowData(youthEmployeeRecord(it, pick, program, id)) })
+      }
+      const skipped = items.length - todo.length
+      setMsg({ text: `${todo.length}명을 청년도약 직원(준비)으로 등록했습니다${skipped > 0 ? ` · 이미 있는 ${skipped}명은 건너뜀` : ''}`, cid: pick })
+    } catch (cause) {
+      setMsg({ text: cause instanceof Error ? cause.message : '등록하지 못했습니다.', cid: '' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div data-testid="youth-enroll">
+      <Surface edge="warning" showEdge className="flex flex-col gap-2.5 p-4 sm:p-5">
+        <div className="flex flex-col gap-0.5">
+          <span className="t-card font-bold break-keep text-slate-900">청년도약 참여신청 기한 {items.length}명</span>
+          <span className="t-sub break-keep text-slate-600">채용 전 신청이 원칙이고, 입사 후 3개월 안까지만 예외로 받습니다. 기한이 지나면 새로 신청할 수 없습니다.</span>
+        </div>
+        <ul className="flex flex-col gap-1">
+          {items.map((it) => (
+            <li key={`${it.name}-${it.hireDate}`} className="t-sub flex flex-wrap items-baseline gap-x-2 break-keep text-slate-700">
+              <b className="text-slate-900">{it.name}</b>
+              <span className="tabular-nums">입사 {it.hireDate}</span>
+              <Badge tone={it.daysLeft <= 14 ? 'danger' : 'warning'}>
+                D-{it.daysLeft} · {it.deadline.slice(5).replace('-', '/')}까지
+              </Badge>
+            </li>
+          ))}
+        </ul>
+        <p className="t-meta break-keep text-slate-500">업체 기록에 붙이면 사람마다 이 기한이 달력에 올라가고, 7일 안이면 오늘 화면 '놓치면 끝나는 기한' 에 뜹니다.</p>
+        <div className="flex flex-wrap items-center gap-2">
+          {!clientRecord && (
+            <select aria-label="등록할 업체" value={pick} onChange={(e) => setPick(e.target.value)} className="t-sub h-11 max-w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3 text-slate-800">
+              <option value="">업체 고르기</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.companyName}
+                </option>
+              ))}
+            </select>
+          )}
+          <Button variant="secondary" disabled={!pick || busy} onClick={() => void register()} data-testid="youth-enroll-register">
+            {busy ? '등록 중…' : `${clientRecord ? `${clientRecord.companyName} ` : ''}직원으로 등록 (${items.length}명)`}
+          </Button>
+        </div>
+        {msg && (
+          <p className="t-sub break-keep text-slate-700" data-testid="youth-enroll-done">
+            {msg.text}
+            {msg.cid && (
+              <>
+                {' '}
+                ·{' '}
+                <Link className="font-medium text-brand-700 underline" to={`/tools/employment/companies?cid=${encodeURIComponent(msg.cid)}`}>
+                  직원 목록 보기
+                </Link>
+              </>
+            )}
+          </p>
+        )}
+      </Surface>
+    </div>
+  )
+}
+
 function RosterTab() {
   const [form, setForm] = useStored<RosterForm>('roster', EMPTY_ROSTER)
   const set = <K extends keyof RosterForm>(k: K, v: RosterForm[K]) => setForm((f) => ({ ...f, [k]: v }))
@@ -477,6 +582,8 @@ function RosterTab() {
   const unitNormal = form.unitsTouched && form.unitNormal !== '' ? form.unitNormal : String(units.normal)
 
   const analysis: RosterAnalysis | null = useMemo(() => (employees && employees.length > 0 ? analyzeRoster(employees, { baseDate }) : null), [employees, baseDate])
+  // D-138: 지금 참여신청할 수 있는 청년도약 후보 — 기한이 달력 · 오늘에 붙고, 직원으로 바로 등록할 수 있다
+  const youthItems = useMemo(() => (analysis ? youthEnrollItems(analysis.rows, baseDate) : []), [analysis, baseDate])
   const estimate = useMemo(
     () => estimateTaxCredit({ region, sizeType: form.sizeType, prevTotal: numOrNull(form.prevTotal), prevYouth: numOrNull(form.prevYouth), curTotal: numOrNull(form.curTotal), curYouth: numOrNull(form.curYouth), unitYouth, unitNormal }),
     [region, form.sizeType, form.prevTotal, form.prevYouth, form.curTotal, form.curYouth, unitYouth, unitNormal],
@@ -684,11 +791,14 @@ function RosterTab() {
                     issueDate: meta?.issueDate ?? null,
                     employees: analysis.rows.map((r) => ({ name: r.emp.name, age: r.diag.age, candidates: r.diag.candidates.map((c) => `${c.key}:${c.level}`) })),
                   }}
+                  deadlines={youthEnrollDeadlines(youthItems)}
                 />
                 {/* D-128: 명부에서 센 재직 인원을 업체 정보로 — 정책자금 · 연구소 등이 다시 묻지 않게 */}
                 <FactSendButton factKey="employeeCount" value={String(analysis.counts.activeCount)} display={`${analysis.counts.activeCount}명`} source="payrollRoster" asOf={meta?.issueDate ?? ''} />
               </div>
             </Surface>
+
+            {youthItems.length > 0 && <YouthEnrollPanel items={youthItems} />}
 
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
               <MetricTile label="총 인원" value={`${analysis.counts.totalEmp}명`} hint={`재직 추정 ${analysis.counts.activeCount}`} />

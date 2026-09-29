@@ -105,3 +105,26 @@ export function hireWindowBlocks(w: HireWindow): boolean {
 export function todayYmdLocal(now: Date = new Date()): string {
   return ymdString({ y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate() })
 }
+
+/** 진행 상태가 아직 '준비'(참여신청 전)인가 — 비었으면 준비로 본다 */
+export function notEnrolledYet(status: string | null | undefined): boolean {
+  return !status || status === 'preparing'
+}
+
+/**
+ * D-138: 등록해 둔 직원의 참여신청 기한 — 아직 '준비' 인 직원만 본다(참여 중이면 회차 일정의 일).
+ * 입사일과 상관없는 지원금 · 입사일 모름이면 null.
+ */
+export function enrollWindowOf(programId: string, hireDate: string | null | undefined, status: string | null | undefined, today: Date | string): HireWindow | null {
+  if (!notEnrolledYet(status)) return null
+  const w = hireWindowOf(programId, hireDate, today)
+  return w.state === 'na' || w.state === 'unknown' ? null : w
+}
+
+/** 화면 한 줄 — '참여신청 D-12(11/03까지)' · '참여신청 기한 지남' · '채용 전 약정 필요' */
+export function enrollBadgeText(w: HireWindow): string {
+  if (w.state === 'closed') return '참여신청 기한 지남'
+  if (w.state === 'preOnly') return '채용 전 약정 필요'
+  if (w.state === 'open' && w.daysLeft != null) return `참여신청 D-${w.daysLeft} (${w.deadline.slice(5).replace('-', '/')}까지)`
+  return ''
+}

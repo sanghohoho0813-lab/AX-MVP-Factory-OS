@@ -8,6 +8,7 @@
 
 import type { ClientOpsRecord, OpsAlert } from '../types/clientOps'
 import type { CustomerEvent, JournalEntry } from '../types/bridge'
+import type { ScheduleEvent } from './clientOpsSchedule'
 import { daysLeftFrom } from './clientOpsAlerts'
 import { netAmountOf } from './feeMath'
 import { localDateOf } from '../lib/appClock'
@@ -327,4 +328,32 @@ export function buildFundingDeadlines(clients: ClientOpsRecord[], today: string,
     }
   }
   return out.sort((a, b) => a.daysLeft - b.daysLeft)
+}
+
+/**
+ * D-138: 지나면 신청할 수 없는 도구 기한(hard) 중 `days` 일 안에 닥친 것 — 오늘 화면 '놓치면 끝나는 기한' 칸.
+ * (다른 목록과 같이 세울 때를 위해 점수도 매겨 둔다.)
+ * 예: 명부 진단에서 붙인 청년도약 참여신청(입사 후 3개월). 지난 것은 이미 끝난 일이라 세우지 않는다.
+ * 점수: D-0·1 은 101(지난 지원사업 마감 100 보다 위) · D-2·3 은 97 · D-7 까지 78(임박 지원사업 76 보다 위).
+ */
+export function hardDeadlineActions(schedule: readonly ScheduleEvent[], days = 7): BriefAction[] {
+  return schedule
+    .filter((e) => e.kind === 'tool' && e.hard === true && !e.done && e.daysLeft !== null && e.daysLeft >= 0 && e.daysLeft <= days)
+    .sort((a, b) => (a.daysLeft ?? 0) - (b.daysLeft ?? 0))
+    .map((e) => {
+      const left = e.daysLeft ?? 0
+      return {
+        id: `hard:${e.id}`,
+        kind: 'alert' as const,
+        title: e.title,
+        detail: `${e.clientName} · ${e.date}까지`,
+        reason: left === 0 ? '오늘이 마지막 날 — 지나면 신청할 수 없습니다' : `D-${left} — 지나면 신청할 수 없습니다`,
+        severity: left <= 3 ? ('critical' as const) : ('warning' as const),
+        href: `/ops/clients/${e.clientId}`,
+        clientId: e.clientId,
+        clientName: e.clientName,
+        // 오늘 · 내일이 마지막이면 이미 지난 마감(100)보다 위 — 지난 것은 되돌릴 수 없지만 이것은 아직 살릴 수 있다
+        score: left <= 1 ? 101 : left <= 3 ? 97 : 78,
+      }
+    })
 }

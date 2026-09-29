@@ -29,6 +29,7 @@ import {
   buildMoneySignals,
   buildTopActions,
   daySummaryText,
+  hardDeadlineActions,
 } from '../dailyBriefService'
 import { EVENT_TYPE_LABEL, buildProjection, eventSummary, isOpenEvent, sortEvents, waitingDays, waitingLevel } from '../customerBridgeService'
 import signupSql from '../../../supabase/migrations/20260925000014_signup_event.sql?raw'
@@ -1839,6 +1840,38 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('추가 제안: 계약한 제안은 지난 제안으로 남는다', upsell.sales?.proposal?.packages[0] === '벤처인증 패키지' && upsell.sales?.pastProposals?.[0]?.packages[0] === '정관정비 패키지')
   check('추가 제안: 계약 전 제안을 고칠 때는 쌓지 않는다', (withProposal(upsell, { packages: ['벤처인증 패키지', 'ISO'], feeManwon: 400, status: '견적 전달', monthly: null }, at).sales?.pastProposals?.length ?? 0) === 1)
   check('영업 흐름: 크레탑 보고서만으로는 계약 서류가 끝나지 않는다', contractStep?.tasks.find((t) => t.label === '계약 서류')?.done === false)
+}
+
+// ── D-138: 지나면 신청할 수 없는 도구 기한(hard) → 오늘 '지금 이것부터' ──
+{
+  const base = normalizeClientOps({ id: 'h1', companyName: '청년상사', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  const attach = (r: ClientOpsRecord, dls: { date: string; title: string; note: string; hard?: true; todo?: true }[]) =>
+    withToolResult(r, { toolKey: 'employment', title: '4대보험 명부 진단', verdict: 'candidates', verdictLabel: '', summary: '', data: null, deadlines: dls })
+  const r1 = normalizeClientOps(
+    JSON.parse(JSON.stringify(attach(base, [
+      { date: '2026-10-01', title: '청년도약 참여신청 — 급한청년', note: '', hard: true },
+      { date: '2026-11-03', title: '청년도약 참여신청 — 최근청년', note: '', hard: true },
+      { date: '2026-09-30', title: '1회차 신청', note: '' },
+      { date: '2026-09-20', title: '청년도약 참여신청 — 지난사람', note: '', hard: true },
+    ]))),
+  )
+  const kept = r1.toolResults[0].deadlines
+  check('hard 기한: 저장 · 다시 읽어도 hard 가 남는다(모르는 값은 안 붙음)', kept.filter((d) => d.hard === true).length === 3 && kept.find((d) => d.title === '1회차 신청')?.hard === undefined)
+  const sch = buildClientSchedule(r1, '2026-09-29')
+  const acts = hardDeadlineActions(sch)
+  check('hard 기한: 7일 안 · 안 지난 것만 오늘 맨 위 후보(D-2 하나)', acts.length === 1 && acts[0].title === '청년도약 참여신청 — 급한청년' && acts[0].reason.startsWith('D-2') && acts[0].severity === 'critical' && acts[0].href === '/ops/clients/h1', JSON.stringify(acts.map((a) => a.title)))
+  check('hard 기한: 보통 도구 기한(1회차 신청)은 올리지 않음 · 지난 것도 올리지 않음', !acts.some((a) => a.title === '1회차 신청' || a.title.includes('지난사람')))
+  const top = buildTopActions({ alerts: [], events: [], followUps: [], clientNames: new Map(), today: '2026-09-29', extra: acts }, 3)
+  check('hard 기한: 지금 이것부터 첫 줄', top[0]?.id.startsWith('hard:') === true)
+  const overdueFunding: OpsAlert = { id: 'fo', kind: 'funding_overdue', severity: 'critical', clientId: 'x', clientName: 'x', title: '지난 마감', detail: '', dueDate: '2026-09-10' } as OpsAlert
+  const mixed = buildTopActions({ alerts: [overdueFunding], events: [], followUps: [], clientNames: new Map(), today: '2026-09-29', extra: acts }, 3)
+  check('hard 기한: D-2 는 이미 지난 지원사업 마감 바로 다음(97 < 100) · 마지막 날이면 그보다 위(101)', mixed[0]?.id === 'alert:fo' && mixed[1]?.id.startsWith('hard:') === true && acts[0].score === 97)
+  const lastDay = hardDeadlineActions(buildClientSchedule(r1, '2026-10-01'))
+  check('hard 기한: 마지막 날에는 오늘이 마지막 날', lastDay[0]?.reason.startsWith('오늘이 마지막 날') === true && lastDay[0].score === 101)
+  // 명부를 다시 붙이면 옛 기한은 내려간다(도구 기한 — todo 아님)
+  const r2 = attach(r1, [{ date: '2026-11-03', title: '청년도약 참여신청 — 최근청년', note: '', hard: true }])
+  const all = r2.toolResults.flatMap((t) => t.deadlines).filter((d) => d.title.startsWith('청년도약 참여신청'))
+  check('hard 기한: 같은 명부 결과를 다시 붙이면 옛 기한은 달력에서 내린다(겹치지 않음)', all.length === 1, String(all.length))
 }
 
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)

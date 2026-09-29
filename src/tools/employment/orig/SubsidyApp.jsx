@@ -17,7 +17,7 @@ import { simulate } from "../lib/simulator";
 import { roundsMismatch, roundsSum, ROUNDS_CHECK_NOTE } from "../lib/programs";
 import { stripRrn, bizNoLooksLikeRrn, birthFromCell, isRrnHeader, RRN_REMOVED } from "../lib/privacy";
 import { parseBulkPaste as parseExcelData } from "../lib/excelImport";
-import { hireWindowOf, hireWindowBlocks } from "../lib/hireWindow"; // [D-137] 입사일로 본 신청 기한
+import { hireWindowOf, hireWindowBlocks, enrollWindowOf, enrollBadgeText } from "../lib/hireWindow"; // [D-137] 입사일로 본 신청 기한 · [D-138] 등록 직원 참여신청 기한
 
 // ── 상수 ──────────────────────────────────────────────────
 var MIN_WAGE_2026 = 10320;
@@ -835,7 +835,7 @@ function AgencyReport(props){
     var planWeek=[],planMonth=[],planNext=[];
     emps.forEach(function(e){
       var p=programs[e.programId]; var pname=p?p.name:"(지원금 미지정)";
-      var stx=STS.find(function(s){return s.key===e.status;}); var statusLabel=stx?stx.label:"";
+      var stx=STS.find(function(s){return s.key===e.status;}); var statusLabel=stx?stx.label:""; var ew=enrollWindowOf(e.programId,e.startDate,e.status,new Date()); if(ew&&hireWindowBlocks(ew))riskItems.push({empName:e.name,prog:pname,status:statusLabel,problem:enrollBadgeText(ew)+" (입사 "+e.startDate+")",impact:e.totalExpected||0,action:"참여신청을 이미 했는지 확인 — 안 했으면 새로 신청 불가"}); /* [D-138] */
       var rcv=(e.rounds||[]).reduce(function(ss,r){return ss+(r.isPaid?r.received||0:0);},0);
       if(!byProg[e.programId])byProg[e.programId]={name:pname,count:0,expected:0,received:0,delay:0,missingDocs:0};
       var bp=byProg[e.programId]; bp.count++; bp.expected+=e.totalExpected||0; bp.received+=rcv;
@@ -1250,6 +1250,18 @@ function DdayAlerts(props){
   var stAll=useState(false); // 전체 보기 토글 (기본 상위 7건만)
   var tasks=useMemo(function(){
     var list=[];
+    // 0) [D-138] 아직 '준비' 인 직원의 참여신청 기한 — 지났으면 새로 신청 불가, 가까우면 먼저
+    props.employees.forEach(function(emp){
+      var w=enrollWindowOf(emp.programId,emp.startDate,emp.status,new Date()); if(!w)return;
+      var company=props.companies.find(function(c){return c.id===emp.companyId;});
+      var program=props.programs[emp.programId]; var pn=program?program.name:"";
+      if(w.state==="open"){
+        if(w.daysLeft==null||w.daysLeft>Math.max(ddayLimit,14))return;
+        list.push({id:"enr-"+emp.id,kind:"참여신청 기한",kindColor:"#DC2626",title:emp.name,sub:(company?company.name+" · ":"")+pn+" · "+w.deadline+"까지 (입사 후 3개월)",dday:w.daysLeft,companyId:emp.companyId,pri:1,sort:w.daysLeft}); /* 아직 안 지났으니 '임박' 과 같은 줄(기한 초과로 세지 않음) */
+      } else {
+        list.push({id:"enr-"+emp.id,kind:"기한 지남",kindColor:"#DC2626",title:emp.name,sub:(company?company.name+" · ":"")+pn+" — "+enrollBadgeText(w)+" · 이미 신청했으면 진행 상태를 바꾸세요",dday:null,companyId:emp.companyId,pri:0,sort:-1000});
+      }
+    });
     // 1) 신청기한 초과/임박 + 지급 예정 확인 (회차 기한 기준)
     props.employees.forEach(function(emp){
       if(emp.status==="resigned")return;
@@ -3692,6 +3704,9 @@ function StatusDropdown(props){
   );
 }
 
+/* [D-138] 아직 '준비' 인 직원의 참여신청 기한 — 입사 후 3개월(청년도약) 등. 참여 중이면 안 보인다 */
+function EnrollBadge(props){ var e=props.emp; var w=enrollWindowOf(e.programId,e.startDate,e.status,new Date()); if(!w)return null; var t=enrollBadgeText(w); if(!t)return null; var bad=hireWindowBlocks(w); var near=!bad&&w.daysLeft!=null&&w.daysLeft<=14; return <span data-testid="enroll-badge" title={w.text} style={{fontSize:"var(--fs-badge)",fontWeight:700,padding:"2px 8px",borderRadius:999,background:(bad||near)?"#FEE2E2":"#FEF3C7",color:(bad||near)?"#B91C1C":"#92400E",whiteSpace:"nowrap"}}>{bad?"⚠ ":""}{t}</span>; }
+
 function EmpCard(props){
   var emp=props.emp,programs=props.programs,company=props.company;
   var uploadFn=props.uploadFn,getUrlFn=props.getUrlFn;
@@ -3720,6 +3735,7 @@ function EmpCard(props){
             <StatusDropdown value={emp.status} onChange={function(k){props.onPatch(emp.id,{status:k});}}/>
             {p&&<span style={{...neutralBadge()}}>{p.name}</span>}
             <YearBadge year={empProgYear(emp,programs)}/>
+            <EnrollBadge emp={emp}/>
           </div>
           <div style={{fontSize:"var(--fs-meta)",color:"#64748B",display:"flex",gap:8,flexWrap:"wrap"}}>
             {emp.startDate&&<span>입사 {fD(emp.startDate)}</span>}
@@ -4294,7 +4310,7 @@ function CompDet(props){
                       <td style={{padding:"10px 12px",textAlign:"center"}}>
                         <input type="checkbox" checked={isSel} onChange={function(){toggleSelect(emp.id);}} style={{cursor:"pointer",width:15,height:15}}/>
                       </td>
-                      <td style={{padding:"11px 12px",fontWeight:700,color:"#1E293B",fontSize:"var(--fs-name)"}}>{emp.name}</td>
+                      <td style={{padding:"11px 12px",fontWeight:700,color:"#1E293B",fontSize:"var(--fs-name)"}}>{emp.name}<div style={{marginTop:3,fontWeight:400}}><EnrollBadge emp={emp}/></div></td>
                       <td style={{padding:"11px 12px"}}>
                         <select value={emp.status} onChange={function(e){props.onPatchEmployee(emp.id,{status:e.target.value});}}
                           style={{padding:"5px 8px",borderRadius:6,border:"1px solid #E2E8F0",fontSize:"var(--fs-badge)",background:s.bg,color:s.color,cursor:"pointer",fontFamily:FF,fontWeight:600}}>

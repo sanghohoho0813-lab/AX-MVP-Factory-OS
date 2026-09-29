@@ -31,6 +31,8 @@ export interface ScheduleEvent {
   done: boolean
   /** 오늘 기준 남은 일수 */
   daysLeft: number | null
+  /** D-138: 지나면 신청할 수 없는 기한(도구 기한 중) */
+  hard?: boolean
 }
 
 export const SCHEDULE_KIND_LABEL: Record<ScheduleKind, string> = {
@@ -166,6 +168,7 @@ export function buildClientSchedule(record: ClientOpsRecord, today: string): Sch
         serviceKey: null,
         done: d.date < today,
         daysLeft: daysLeftFrom(today, d.date),
+        ...(d.hard ? { hard: true } : {}),
       })
     }
   }

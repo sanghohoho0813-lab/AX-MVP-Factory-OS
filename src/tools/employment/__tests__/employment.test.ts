@@ -29,7 +29,8 @@ import {
 import { companyMetaOf, employeeRowData, matchOsClient, memosFromRow, osCompanyDefaults, osPickList, programsFromD91, regionOfAddress, toOrigCompany, toOrigEmployee } from '../orig/store'
 import type { ClientOpsRecord } from '../../../types/clientOps'
 import { simulate, simulationText } from '../lib/simulator'
-import { HIRE_WINDOWS, fullMonthsSince, hireWindowBlocks, hireWindowOf } from '../lib/hireWindow'
+import { HIRE_WINDOWS, enrollBadgeText, enrollWindowOf, fullMonthsSince, hireWindowBlocks, hireWindowOf, notEnrolledYet } from '../lib/hireWindow'
+import { notYetRegistered, youthEmployeeRecord, youthEnrollDeadlines, youthEnrollItems } from '../lib/rosterEnroll'
 import { agencyAutoComment, agencyDocRequestText, agencyReportData, agencySummaryText, commissionSummary, companyRanking, companyRiskRanking, ddayAlerts, emptyCompanyMeta, monthlyReceived, pendingPayments, programPipeline } from '../lib/companyMeta'
 import { buildImportPreview, parseBulkPaste, parseMoneyCell, xlAutoMap, xlBizNoCheck, xlDetectHeader, xlNormDate } from '../lib/excelImport'
 import { birthFromCell, looksLikeRrn, safeBizNo } from '../lib/privacy'
@@ -556,7 +557,14 @@ check('ROSTER_FIELDS 9', ROSTER_FIELDS.length === 9 && ROSTER_FIELDS[0].key === 
 
   const comps = [{ id: 'c1', name: '한솔테크', meta }]
   const tasks = ddayAlerts([base({ id: 'late', stage: 'preparing' })], comps, T)
-  check('오늘 할 일: 지난 회차는 신청 지연', tasks[0]?.kind === '신청 지연', tasks[0]?.kind)
+  // D-138: 2026-01-05 입사 · 아직 준비 → 참여신청 기한(4/5) 지남이 맨 앞, 회차 신청 지연도 같이
+  check('오늘 할 일: 준비 중인데 입사 3개월 지났으면 맨 앞에 기한 지남(기한 초과로 셈)', tasks[0]?.kind === '기한 지남' && tasks[0]?.pri === 0 && tasks[0]?.sub.includes('참여신청 기한 지남'), tasks[0]?.kind)
+  check('오늘 할 일: 지난 회차는 신청 지연', tasks.some((t) => t.kind === '신청 지연'))
+  const t2 = ddayAlerts([base({ id: 'new', stage: 'preparing', hireDate: '2026-06-30' }), base({ id: 'on', stage: 'submitted', hireDate: '2020-01-01' })], comps, T)
+  check('오늘 할 일: 입사 3개월 기한 7일 남음 → 참여신청 기한 D-7', t2.some((t) => t.id === 'enr-new' && t.kind === '참여신청 기한' && t.dday === 7 && t.pri === 1 && t.sub.includes('2026-09-30')) && t2.find((t) => t.id === 'enr-new' && t.pri === 0) === undefined, JSON.stringify(t2.map((t) => [t.id, t.kind, t.dday])))
+  check('오늘 할 일: 이미 신청한 직원(접수)은 입사일이 오래돼도 기한 알림 없음', !t2.some((t) => t.id === 'enr-on'))
+  const t3 = ddayAlerts([base({ id: 'far', stage: 'preparing', hireDate: '2026-09-01' })], comps, T)
+  check('오늘 할 일: 기한이 한참 남으면(D-68) 아직 안 띄움', !t3.some((t) => t.id === 'enr-far'))
   check('오늘 할 일: 급여일 미입력 알림', tasks.some((t) => t.kind === '정보 누락'))
   check('오늘 할 일: 서류 미완료 알림', tasks.some((t) => t.kind === '서류'))
   check('월별 수령: 지급일 달에 들어간다', monthlyReceived([paid], 2026)[6].received === 3000000)
@@ -921,6 +929,47 @@ check('ROSTER_FIELDS 9', ROSTER_FIELDS.length === 9 && ROSTER_FIELDS[0].key === 
   console.log(`  무작위 명부 ${total}명: 청년도약 후보 ${youthCand} · 기한 지나 뺌 ${youthExp}`)
   check('무작위 명부 500명: 기한 지난 사람은 어떤 지원금 후보에도 없다', bad.length === 0, bad.slice(0, 8).join(' | '))
   check('무작위 명부: 청년도약 후보와 뺀 사람이 둘 다 나온다(시험이 헛돌지 않음)', youthCand > 0 && youthExp > 0, `${youthCand}/${youthExp}`)
+}
+
+// ── D-138: 명부 → 참여신청 기한 · 직원 등록 · 등록 직원 기한 ──
+{
+  const T = '2026-09-29'
+  const mk = (name: string, birthDate: string, gender: 'M' | 'F', hireDate: string | null, statusRaw = '취득'): RosterEmployee => ({ name, birthDate, gender, rrnMasked: null, hireDate, loseDate: null, statusRaw, insuranceRaw: '국민·건강·산재·고용', workplace: '', bizNo: '', ins: { np: true, hi: true, wc: true, ei: true }, insKnown: { np: true, hi: true, wc: true, ei: true } })
+  const roster = [
+    mk('가청년', '1998-03-10', 'M', '2026-08-03'),
+    mk('나청년', '2000-05-10', 'F', '2026.7.1'),
+    mk('다오래', '1999-01-01', 'M', '2023-03-02'),
+    mk('라모름', '1999-01-01', 'M', null),
+    mk('마고령', '1965-05-01', 'M', '2026-08-01'),
+    mk('바퇴사', '1999-01-01', 'F', '2026-08-15', '상실'),
+    mk('사예정', '2001-02-02', 'M', '2026-10-15'),
+  ]
+  const a = analyzeRoster(roster, { baseDate: T })
+  const items = youthEnrollItems(a.rows, T)
+  check('명부 → 참여신청: 기한 안 · 재직 · 입사일 아는 청년만(오래된 · 모름 · 고령 · 상실 뺌)', items.map((i) => i.name).join() === '나청년,가청년,사예정', items.map((i) => `${i.name}:${i.daysLeft}`).join())
+  check('  기한이 가까운 사람부터 · 날짜 모양 맞춤(2026.7.1 → 2026-07-01)', items[0].name === '나청년' && items[0].hireDate === '2026-07-01' && items[0].deadline === '2026-10-01' && items[0].daysLeft === 2)
+  check('  입사 예정은 입사 후 3개월까지', items[2].deadline === '2027-01-15' && items[2].gender === 'male')
+  const dl = youthEnrollDeadlines(items)
+  check('  업체에 붙일 기한: 사람마다 하나 · 도구 기한(todo 아님 — 다시 붙이면 바뀜) · 이름과 입사일', dl.length === 3 && dl.every((d) => !('todo' in d) && /^\d{4}-\d{2}-\d{2}$/.test(d.date)) && dl[0].title === '청년도약 참여신청 — 나청년' && dl[0].note.includes('2026-07-01'))
+  const existing = [{ id: 'e1', companyId: 'c1', name: '나 청년', startDate: '2026-07-01' }, { id: 'e2', companyId: 'c2', name: '가청년', startDate: '2026-08-03' }]
+  const todo = notYetRegistered(items, existing, 'c1')
+  check('  이미 같은 업체에 같은 이름 + 입사일이면 다시 만들지 않음(다른 업체는 상관없음)', todo.map((i) => i.name).join() === '가청년,사예정')
+  const rec = youthEmployeeRecord(items[1], 'c1', DEFAULT_PROGRAMS.youth_jump as never, 'emp-1')
+  check('  등록 모양: 청년도약 · 준비 · 회차 3개 · 720만 · 서류', rec.programId === 'youth_jump' && rec.status === 'preparing' && (rec.rounds as unknown[]).length === 3 && rec.totalExpected === 7200000 && (rec.employeeDocs as unknown[]).length > 0 && rec.startDate === '2026-08-03')
+  const row = employeeRowData(rec)
+  const back = toOrigEmployee({ id: 'emp-1', clientId: 'c1', data: row })
+  check('  모듈 기록으로 저장 → 원본 화면이 같은 직원으로 읽음', back.name === '가청년' && back.status === 'preparing' && back.startDate === '2026-08-03' && back.companyId === 'c1' && row.hireDate === '2026-08-03' && row.stage === 'preparing')
+  check('  주민번호 모양은 기록에 없음', !JSON.stringify(row).match(/\d{6}-\d{7}/))
+
+  // 등록 직원 배지
+  check('등록 직원: 준비 · 빈 상태만 기한을 본다', notEnrolledYet('preparing') && notEnrolledYet('') && notEnrolledYet(undefined) && !notEnrolledYet('submitted') && !notEnrolledYet('approved'))
+  const w1 = enrollWindowOf('youth_jump', '2026-08-03', 'preparing', T)
+  check('  청년도약 입사 2개월 → 참여신청 D-35 (11/03까지)', !!w1 && enrollBadgeText(w1) === '참여신청 D-35 (11/03까지)', w1 ? enrollBadgeText(w1) : 'null')
+  const w2 = enrollWindowOf('youth_jump', '2024-01-02', 'preparing', T)
+  check('  입사 2년 · 준비 → 참여신청 기한 지남', !!w2 && enrollBadgeText(w2) === '참여신청 기한 지남')
+  check('  이미 신청(접수)했으면 · 입사일과 상관없는 지원금이면 · 입사일 모르면 → 표시 없음', enrollWindowOf('youth_jump', '2024-01-02', 'submitted', T) === null && enrollWindowOf('parental_leave', '2010-01-01', 'preparing', T) === null && enrollWindowOf('youth_jump', '', 'preparing', T) === null)
+  const w3 = enrollWindowOf('saeil_women', '2026-09-01', 'preparing', T)
+  check('  새일 인턴을 이미 채용한 뒤 준비로 등록 → 채용 전 약정 필요', !!w3 && enrollBadgeText(w3) === '채용 전 약정 필요')
 }
 
 console.log(`\nemployment: ${passed} passed, ${failed} failed`)

@@ -15,6 +15,7 @@
 
 import { addMo, getDdayFrom, parseYMD } from './dates'
 import { EMP_STAGE_LABEL, EMP_STAGES, empReceived, type EmpRecord } from './empRecords'
+import { enrollBadgeText, enrollWindowOf } from './hireWindow'
 import { COMPANY_DEFAULT_DOCS } from './programs'
 
 /* ------------------------------------------------------------------ */
@@ -358,6 +359,19 @@ export function ddayAlerts(
   ddayLimit = 7,
 ): AlertTask[] {
   const list: AlertTask[] = []
+  // D-138: 아직 '준비' 인 직원의 참여신청 기한 — 지났으면 새로 신청 불가, 가까우면(14일 · 알림 일수 중 큰 쪽) 먼저
+  for (const emp of employees) {
+    const w = enrollWindowOf(emp.programId, emp.hireDate, emp.stage, today)
+    if (!w) continue
+    const company = companies.find((c) => c.id === emp.clientId)
+    const head = company ? `${company.name} · ` : ''
+    if (w.state === 'open') {
+      if (w.daysLeft == null || w.daysLeft > Math.max(ddayLimit, 14)) continue
+      list.push({ id: `enr-${emp.id}`, kind: '참여신청 기한', kindColor: '#DC2626', title: emp.name, sub: `${head}${w.deadline}까지 (입사 후 3개월)`, dday: w.daysLeft, clientId: emp.clientId, pri: 1, sort: w.daysLeft })
+    } else {
+      list.push({ id: `enr-${emp.id}`, kind: '기한 지남', kindColor: '#DC2626', title: emp.name, sub: `${head}${enrollBadgeText(w)} · 이미 신청했으면 진행 상태를 바꾸세요`, dday: null, clientId: emp.clientId, pri: 0, sort: -1000 })
+    }
+  }
   for (const emp of employees) {
     if (emp.stage === 'resigned' || !emp.hireDate || !emp.programId) continue
     const company = companies.find((c) => c.id === emp.clientId)
