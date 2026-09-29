@@ -52,12 +52,16 @@ export interface CretopCompany {
 
 const s = (v: unknown): string => (typeof v === 'string' ? v.trim() : typeof v === 'number' ? String(v) : '')
 
-/** '2008-04-15' · '2008.4.15' · '2008년 4월' · '2008' → YYYY-MM-DD (모르는 칸은 01) */
+/**
+ * '2008-04-15' · '2008.4.15' · '2008년 04월 15일' → YYYY-MM-DD.
+ * D-136: 연 · 월 · 일이 다 있을 때만 — '2008' · '2008년 4월' 처럼 모자라면 빈 글자(예전에는 -01-01 을 지어냈다). 없는 날짜(13월 · 32일)도 빈 글자.
+ */
 export function normalizeEstablished(v: string): string {
-  const m = /((?:19|20)\d{2})(?:[-./년\s]+(\d{1,2}))?(?:[-./월\s]+(\d{1,2}))?/.exec(v)
+  const m = /((?:19|20)\d{2})\s*(?:[-./]|년)\s*(\d{1,2})\s*(?:[-./]|월)\s*(\d{1,2})(?!\d)/.exec(v)
   if (!m) return ''
-  const mm = Math.min(12, Math.max(1, Number(m[2] ?? 1)))
-  const dd = Math.min(31, Math.max(1, Number(m[3] ?? 1)))
+  const mm = Number(m[2])
+  const dd = Number(m[3])
+  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return ''
   return `${m[1]}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`
 }
 
@@ -179,9 +183,12 @@ export interface CretopDigest {
   isPersonal: boolean
 }
 
+/** D-136: 확인이 필요한 칸(최신 연도 빈칸 · 단위 모름 · 표끼리 다름 …)은 영업 칸 · 체크로 넘기지 않는다 */
 function eokOf(ui: CretopMiniUi, key: string): number | null {
-  const cp = (ui.corePreview ?? {}) as Record<string, { eok?: unknown } | undefined>
-  const v = cp[key]?.eok
+  const cp = (ui.corePreview ?? {}) as Record<string, { eok?: unknown; needsCheck?: unknown } | undefined>
+  const cell = cp[key]
+  if (!cell || cell.needsCheck === true) return null
+  const v = cell.eok
   return typeof v === 'number' && Number.isFinite(v) ? v : null
 }
 
@@ -235,13 +242,28 @@ export function companyKey(name: string): string {
     .toLowerCase()
 }
 
-/** 사업자번호가 같거나(10자리) 이름이 같은 업체 — 보관하지 않은 것을 먼저 */
+/**
+ * 같은 업체 찾기 — 보관하지 않은 것을 먼저.
+ * D-136: ① 사업자번호(10자리)가 같은 업체가 목록 어디에 있든 이름보다 먼저.
+ *        ② 이름만 같은 업체는 사업자번호가 서로 다르지 않을 때만(한쪽이라도 번호가 없을 때) — 번호가 다르면 다른 회사라 붙이지 않는다(null → 새로 만들지 사람이 고른다).
+ */
 export function findClientForCretop(records: ClientOpsRecord[], company: Pick<CretopCompany, 'name' | 'bizNo'>): ClientOpsRecord | null {
   const biz = digits(company.bizNo)
   const key = companyKey(company.name)
-  const hit = (r: ClientOpsRecord) => (biz.length === 10 && digits(r.businessNumber) === biz) || (key !== '' && companyKey(r.companyName) === key)
   const live = records.filter((r) => r.archivedAt === null)
-  return live.find(hit) ?? records.find(hit) ?? null
+  const archived = records.filter((r) => r.archivedAt !== null)
+  if (biz.length === 10) {
+    const byBiz = (r: ClientOpsRecord) => digits(r.businessNumber) === biz
+    const found = live.find(byBiz) ?? archived.find(byBiz)
+    if (found) return found
+  }
+  if (key === '') return null
+  const byName = (r: ClientOpsRecord) => {
+    if (companyKey(r.companyName) !== key) return false
+    const theirs = digits(r.businessNumber)
+    return !(biz.length === 10 && theirs.length === 10 && theirs !== biz)
+  }
+  return live.find(byName) ?? archived.find(byName) ?? null
 }
 
 /* ------------------------------------------------------------------ */

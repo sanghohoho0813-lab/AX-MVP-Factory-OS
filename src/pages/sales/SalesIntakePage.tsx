@@ -25,7 +25,8 @@ import { PillList, StageBadge } from '../../components/sales/salesParts'
 import { rampAt } from '../../components/sales/salesColor'
 import { LINK_BUTTON } from '../../components/sales/salesStyle'
 import { listClients } from '../../services/clientOpsService'
-import { CRETOP_TIER_LABEL, digestCretop, findClientForCretop, toPick, type CretopTier } from '../../services/salesCretop'
+import { CRETOP_TIER_LABEL, companyKey, digestCretop, findClientForCretop, toPick, type CretopTier } from '../../services/salesCretop'
+import { subjectMismatch } from '../../tools/shared/toolSubject'
 import { registerFromCretop } from '../../services/salesIntake'
 import { salesStageOf } from '../../services/salesPipeline'
 import { analyzeCretopText } from '../../tools/cretop/mini/analysisCore.js'
@@ -117,8 +118,16 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
 
   const target = clientParam ? (records.find((r) => r.id === clientParam) ?? null) : null
   const digest = useMemo(() => (ui ? digestCretop(ui) : null), [ui])
-  const match = useMemo(() => (digest ? (target ?? findClientForCretop(records, digest.company)) : null), [digest, records, target])
+  // D-136: ?client= 로 연 업체와 보고서 회사(사업자번호 · 이름)가 다르면 그 업체에 쓰지 않는다 — 보고서 회사로 찾거나 새로 만든다
+  const targetMismatch = !!(target && digest && subjectMismatch({ name: digest.company.name, bizNo: digest.company.bizNo }, target))
+  const match = useMemo(() => (digest ? ((target && !targetMismatch ? target : null) ?? findClientForCretop(records, digest.company)) : null), [digest, records, target, targetMismatch])
   const existing = match && !asNew ? match : null
+  // D-136: 이름은 같은데 사업자번호가 달라 붙이지 않은 업체 — 새로 등록하기 전에 알려 준다
+  const sameNameOther = useMemo(() => {
+    if (!digest || match) return null
+    const key = companyKey(digest.company.name)
+    return key ? (records.find((r) => r.archivedAt === null && companyKey(r.companyName) === key) ?? null) : null
+  }, [digest, match, records])
 
   const analyze = (raw: string, pages: Array<{ pageNo: number; text: string }> | null) => {
     const t = raw.trim()
@@ -206,7 +215,15 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
         </Link>
       </div>
 
-      {target && (
+      {target && targetMismatch && c && (
+        <p role="alert" data-testid="intake-target-mismatch" className="t-sub flex items-start gap-2 break-keep rounded-(--radius-control) border border-danger-200 bg-danger-50 px-4 py-2.5 text-danger-700">
+          <Building2 aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          <span className="min-w-0">
+            이 보고서는 <strong className="font-semibold">{c.name || '회사 이름 없음'}{c.bizNo ? ` (${c.bizNo})` : ''}</strong> 것입니다 — <strong className="font-semibold">{target.companyName}</strong> 에는 채우지 않습니다. 아래에서 보고서 회사로 등록합니다.
+          </span>
+        </p>
+      )}
+      {target && !targetMismatch && (
         <p data-testid="intake-target" className="t-sub flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-4 py-2.5 text-brand-800">
           <Building2 aria-hidden="true" className="size-4" />
           <strong className="font-semibold">{target.companyName}</strong> 에 붙입니다 — 빈 칸만 채우고, 적어 둔 값은 그대로 둡니다.
@@ -270,7 +287,12 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
         digest && (
           <>
             {/* 같은 업체 */}
-            {match && !target && (
+            {sameNameOther && (
+              <p data-testid="intake-same-name" className="t-sub break-keep rounded-(--radius-control) border border-warning-200 bg-warning-50 px-4 py-2.5 text-slate-800">
+                이름이 같은 업체 <strong className="font-semibold">{sameNameOther.companyName}</strong> 가 있지만 사업자번호가 달라 붙이지 않습니다 — 새 잠재고객으로 등록합니다.
+              </p>
+            )}
+            {match && (!target || targetMismatch) && (
               <section data-testid="intake-match" className="flex flex-col gap-2 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-4 py-3">
                 <p className="t-sub flex flex-wrap items-center gap-2 text-slate-800">
                   이미 고객 관리에 있는 업체입니다 — <strong className="font-semibold">{match.companyName}</strong>

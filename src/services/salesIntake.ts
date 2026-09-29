@@ -50,7 +50,11 @@ async function saveCretopHistory(workspaceId: string | null, clientId: string, u
   const company = co.companyName || '기업명 미상'
   const bizNo = co.businessNo || ''
   const rows = await listRows(workspaceId, 'cretop', 'analyses')
-  const prev = rows.find((r) => (bizNo && r.data.bizNo === bizNo) || r.data.company === company)
+  // D-136: 사업자번호가 둘 다 있으면 번호로만 — 이름이 같아도 번호가 다르면 다른 회사(그 회사 이력 · 평가 조건을 덮거나 가져오지 않는다)
+  const num = (v: unknown) => String(v ?? '').replace(/\D/g, '')
+  const prev =
+    rows.find((r) => bizNo !== '' && num(r.data.bizNo) !== '' && num(r.data.bizNo) === num(bizNo)) ??
+    rows.find((r) => r.data.company === company && (num(bizNo) === '' || num(r.data.bizNo) === ''))
   await saveRow(workspaceId, 'cretop', 'analyses', {
     id: prev?.id,
     clientId,

@@ -7,7 +7,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { T, FF, card } from "./theme.js";
-import { SV_EVENT, autoShares as autoSharesOf, bsWon, commas, netIncomeYears, num, parseShares, pctText, svCompute, svDefaults, svLoad, svSave, won } from "./stockValueCalc.js";
+import { SV_EVENT, autoShares as autoSharesOf, bsWon, commas, netIncomeSlots, netIncomeYears, num, parseShares, pctText, svCompute, svDefaults, svLoad, svMerge, svSave, won } from "./stockValueCalc.js";
 
 const CORP_TYPES = ["일반법인", "부동산과다보유법인", "특수법인"];
 let condOpenMemo = false; // 이 탭을 여는 동안 평가 조건 칸 펼침 상태
@@ -28,7 +28,8 @@ export function StockValue({ ui }) {
   const autoShares = autoSharesOf(ui);
   const autoSource = ui.sharesSource || null;
   const defaults = svDefaults(ui);
-  const initial = () => { const saved = svLoad(ui); return { shares: saved.shares != null ? saved.shares : (autoShares ? String(autoShares) : ""), sharesEdited: saved.shares != null, cond: saved.cond ? { ...defaults, ...saved.cond } : defaults }; };
+  // [D-136] 고친 칸만 덮고, 원문 칸(자산 · 부채 · 순이익 …)은 같은 결산연도 보고서에서 고친 것만 — 새 보고서는 자기 숫자(svMerge)
+  const initial = () => { const m = svMerge(ui, svLoad(ui), defaults); return { shares: m.sharesText, sharesEdited: m.sharesEdited, cond: m.cond }; };
   const [st, setSt] = useState(initial);
   // 다른 보고서를 분석하면 그 회사 값으로
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -44,10 +45,9 @@ export function StockValue({ ui }) {
   const userEdited = st.sharesEdited;
   const cond = st.cond;
   const edited = Object.keys(defaults).some((k) => cond[k] !== defaults[k]);
-  // 바뀔 때마다 이 회사 값으로 저장 — 원문 그대로인 칸은 저장하지 않는다
+  // 바뀔 때마다 이 회사 값으로 저장 — 원문 그대로인 칸은 저장하지 않는다(svSave 가 원문과 다른 칸만 골라 결산연도와 함께 남긴다)
   const persist = (next) => {
-    const condEdited = Object.keys(defaults).some((k) => next.cond[k] !== defaults[k]);
-    svSave(ui, { shares: next.sharesEdited ? next.shares : undefined, cond: condEdited ? next.cond : undefined });
+    svSave(ui, { shares: next.sharesEdited ? next.shares : undefined, cond: next.cond });
   };
   // 저장은 그린 뒤에 — 그리는 도중에 저장 알림(SV_EVENT)을 보내면 요약 막대가 같은 틈에 다시 그려져 React 가 경고한다
   const dirty = useRef(false);
@@ -111,8 +111,7 @@ export function StockValue({ ui }) {
   if (!down.length) down.push("뚜렷한 하락 요인은 확인되지 않았습니다.");
 
   // 연도 자리: [1년전(가중1), 직전(가중2), 결산연도(가중3)]
-  const slotYear = [null, null, null];
-  last3.forEach((x, i) => { slotYear[3 - last3.length + i] = x.year || null; });
+  const slotYear = netIncomeSlots(ui).map((x) => x.year || null);   // [D-136] 연도로 자리를 정한다(결산연도 칸이 비어도 자리가 밀리지 않게)
   const yl = (i, fb) => slotYear[i] ? `${slotYear[i]}년` : fb;
   const tableRows = r ? [
     ["순자산가액 (자산 − 부채 ± 조정)", won(r.netAssetValue)],
@@ -170,7 +169,7 @@ export function StockValue({ ui }) {
           ? <div style={{ fontSize: "calc(10.5px * var(--fs,1))", color: T.brand, fontWeight: 700 }}>✎ 사용자 직접 입력값 사용 중{autoShares ? ` (자동값 ${autoShares.toLocaleString()}주)` : ""}</div>
           : autoShares
             ? <div style={{ fontSize: "calc(10.5px * var(--fs,1))", color: T.mute }}>출처: {autoSource || "크레탑 자동 추출"}</div>
-            : <div style={{ fontSize: "calc(10.5px * var(--fs,1))", color: "#92400E" }}>원문에서 발행주식수를 찾지 못했습니다. 직접 입력해주세요.</div>}
+            : <div style={{ fontSize: "calc(10.5px * var(--fs,1))", color: "#92400E" }}>{ui.sharesCheck ? `${ui.sharesCheck} — 직접 입력해주세요.` : "원문에서 발행주식수를 찾지 못했습니다. 직접 입력해주세요."}</div>}
       </div>
 
       {/* 액면가 — 추정(자본금÷발행주식수) + sanity check + 안내 */}

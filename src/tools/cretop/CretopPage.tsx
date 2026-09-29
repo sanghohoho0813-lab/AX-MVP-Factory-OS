@@ -24,6 +24,8 @@ import { cretopCompany, findClientForCretop } from '../../services/salesCretop'
 import { registerFromCretop } from '../../services/salesIntake'
 import { useToast } from '../../components/ui/toastContext'
 import { useToolClient } from '../shared/toolClientContext'
+import { subjectMismatch } from '../shared/toolSubject'
+import { ConfirmModal } from '../../components/ui/ConfirmModal'
 
 /**
  * 분석 화면 = 크레탑 분석기 작업대(CretopWorkbench) + 영업으로 넘기는 단추.
@@ -34,15 +36,24 @@ function CretopScreen() {
   const navigate = useNavigate()
   const { showToast } = useToast()
   const [salesBusy, setSalesBusy] = useState(false)
+  /** D-136: 이 업체로 열었는데 보고서의 회사(사업자번호 · 이름)가 다르면 — 그 업체에 쓰지 않고 먼저 묻는다 */
+  const [mismatch, setMismatch] = useState<{ ui: CretopMiniUi; selected: string[]; reportName: string } | null>(null)
 
   /**
    * D-119: 분석 → 영업으로 한 번에. 이 업체로 열었으면 그 업체에, 아니면 같은 업체(사업자번호 · 이름)를 찾아 붙이고,
    * 없으면 잠재고객으로 새로 만든다 — 빈 기본 정보 · 영업 칸 · 도구 결과를 채우고 미팅 준비(1차)로 간다.
    */
-  const toSales = async (ui: CretopMiniUi, selected: string[]) => {
+  const toSales = async (ui: CretopMiniUi, selected: string[], ignoreOpened = false) => {
+    const company = cretopCompany(ui)
+    // D-136: 연 업체와 보고서 회사가 다르면 그 업체의 사업자번호 · 대표 · 주소를 보고서 값으로 채우지 않는다
+    if (clientRecord && !ignoreOpened && subjectMismatch({ name: company.name, bizNo: company.bizNo }, clientRecord)) {
+      setMismatch({ ui, selected, reportName: `${company.name || '회사 이름 없음'}${company.bizNo ? ` (${company.bizNo})` : ''}` })
+      return
+    }
     setSalesBusy(true)
     try {
-      const existing = clientRecord ?? findClientForCretop(await loadClients(), cretopCompany(ui))
+      const opened = ignoreOpened ? null : clientRecord
+      const existing = opened ?? findClientForCretop(await loadClients(), company)
       const res = await registerFromCretop({ workspaceId, ui, existing, selected })
       showToast(`${res.created ? '잠재고객으로 등록했습니다' : `${res.record.companyName}에 붙였습니다`} — 기본 정보 ${res.filled.length}칸.`)
       for (const w of res.warnings) showToast(w)
@@ -55,17 +66,32 @@ function CretopScreen() {
   }
 
   return (
-    <CretopWorkbench
-      actions={(ui, selected) => (
-        <>
-          <Button size="sm" variant="secondary" onClick={() => void toSales(ui, selected)} disabled={salesBusy} data-testid="cretop-to-sales">
-            <KanbanSquare aria-hidden="true" className="size-4" />
-            {salesBusy ? '넘기는 중…' : clientRecord ? `${clientName} 미팅 준비로` : '잠재고객 등록 · 미팅 준비'}
-          </Button>
-          <span className="t-meta break-keep text-slate-500">붙이기 = 업체 기록에 결과만 · 미팅 준비 = 빈 기본 정보 · 영업 칸까지 채우고 1차 미팅 준비로</span>
-        </>
-      )}
-    />
+    <>
+      <ConfirmModal
+        open={mismatch !== null}
+        title="다른 회사 보고서입니다"
+        message={mismatch ? `이 보고서는 ${mismatch.reportName} 것입니다. 지금 연 업체(${clientName})에는 채우지 않습니다. 보고서 회사로(같은 업체가 있으면 거기에, 없으면 새 잠재고객으로) 등록할까요?` : ''}
+        confirmLabel="보고서 회사로 등록"
+        cancelLabel="취소"
+        onConfirm={() => {
+          const m = mismatch
+          setMismatch(null)
+          if (m) void toSales(m.ui, m.selected, true)
+        }}
+        onCancel={() => setMismatch(null)}
+      />
+      <CretopWorkbench
+        actions={(ui, selected) => (
+          <>
+            <Button size="sm" variant="secondary" onClick={() => void toSales(ui, selected)} disabled={salesBusy} data-testid="cretop-to-sales">
+              <KanbanSquare aria-hidden="true" className="size-4" />
+              {salesBusy ? '넘기는 중…' : clientRecord ? `${clientName} 미팅 준비로` : '잠재고객 등록 · 미팅 준비'}
+            </Button>
+            <span className="t-meta break-keep text-slate-500">붙이기 = 업체 기록에 결과만 · 미팅 준비 = 빈 기본 정보 · 영업 칸까지 채우고 1차 미팅 준비로</span>
+          </>
+        )}
+      />
+    </>
   )
 }
 

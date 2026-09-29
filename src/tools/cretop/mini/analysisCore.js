@@ -227,14 +227,20 @@ export function detailHasPositive(ui, re) {
   }
   return false;
 }
-// 원문에서 대표자 생년 추정 → 연령(best-effort). 못 찾으면 null.
+// 원문에서 대표자 생년 → 연령. 못 찾거나 애매하면 null.
+// [D-136] '생년월일 · 출생 · ○○○○년생 · 나이 ○○세' 처럼 대놓고 적힌 것만 쓴다 — 예전에는 '대표자' 줄 근처 아무 연도(설립 · 취임)를 생년으로 읽었다.
+//   찾은 생년(나이)이 서로 다르면 어느 쪽인지 몰라 null.
 export function extractCeoAge(raw) {
-  const t = String(raw || "");
-  let m = t.match(/대표[자이][^\n]{0,40}((?:19|20)\d{2})[.\-년/\s]/) || t.match(/생년(?:월일)?[^\d]{0,6}((?:19|20)\d{2})/);
-  if (!m) return null;
-  const by = parseInt(m[1], 10);
-  if (by < 1930 || by > NOW_YEAR - 18) return null;
-  return NOW_YEAR - by;
+  const t = String(raw || "").replace(/[ \t　]+/g, " ");
+  const ages = new Set();
+  const byYear = (y) => { const by = parseInt(y, 10); if (by >= 1930 && by <= NOW_YEAR - 18) ages.add(NOW_YEAR - by); };
+  const grab = (re, fn) => { const rx = new RegExp(re.source, "g"); let m; while ((m = rx.exec(t))) fn(m); };
+  grab(/(?:생\s*년\s*월\s*일|생\s*년|출\s*생(?:\s*일|\s*연도|\s*년도)?)\s*[:：]?\s*((?:19|20)\d{2})(?!\d)/, (m) => byYear(m[1]));
+  grab(/((?:19|20)\d{2})\s*(?:년|[.\-/]\s*\d{1,2}\s*[.\-/]\s*\d{1,2}\s*)?\s*생(?![가-힣])/, (m) => byYear(m[1]));
+  grab(/(?:나이|연령)\s*[:：]?\s*만?\s*(\d{2})\s*세/, (m) => { const a = parseInt(m[1], 10); if (a >= 18 && a <= 100) ages.add(a); });
+  if (!ages.size) return null;
+  const arr = [...ages].sort((a, b) => a - b);
+  return arr[arr.length - 1] - arr[0] <= 1 ? arr[arr.length - 1] : null;   // 생일 전후 1살 차이는 같은 사람으로
 }
 // 원문에서 주주 복수 여부 추정(best-effort) — 주주현황/주주명에 2명 이상 또는 1인 지분<100%
 export function extractMultiOwner(raw) {
@@ -396,7 +402,7 @@ export function analyzeCretopText(raw, pages) {
   result.stakeholders = ex.stakeholders;
   result.ceoDetail = ex.ceoDetail;
   result.workplace = ex.workplace;
-  result.shares = ex.shares; result.parValue = ex.parValue; result.sharesSource = ex.sharesSource;
+  result.shares = ex.shares; result.parValue = ex.parValue; result.sharesSource = ex.sharesSource; result.sharesCheck = ex.sharesCheck || null;
   result._extractDebug = ex._extractDebug;
   result.bizForm = detectBizForm(result);   // 개인사업자 감지
   return result;

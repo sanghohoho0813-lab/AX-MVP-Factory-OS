@@ -125,10 +125,13 @@ function parseShareholderRows(block) {
   const tight = (s) => String(s).replace(/\s+/g, "").replace(/\(주\)/g, "(주)").trim();
   const META = /^(?:주주명|성명|구분|순위|보통주|우선주|지분율|소유\s*주식|발행\s*주식|현황\s*기준|기준\s*일|작성|조회\s*일|단위|자본금|비고|경영\s*실권자|회사와)/;
   // 콤마 없는 병합 숫자에서 보통주(소유주식수) 복원 — 'X 0 X …' 대칭 또는 첫 값
-  const recoverShares = (s) => {
+  // [D-136] 앞 1/3 폴백은 짐작이다 — guessed 표시를 달아 합계 행으로 맞춰 보지 못하면 발행주식수를 자동으로 쓰지 않는다
+  const guessedRecs = new Set();
+  const recoverShares = (s, rec) => {
     const d = s.replace(/[^0-9]/g, "");
     if (s.includes(",") || d.length <= 4) return parseInt(d, 10);
     for (let len = 1; len * 2 + 1 <= d.length; len++) { const b = d.slice(0, len); if (d[len] === "0" && d.slice(len + 1, len + 1 + len) === b) return parseInt(b, 10); }
+    if (rec) guessedRecs.add(rec);
     return parseInt(d.slice(0, Math.max(1, Math.round(d.length / 3))), 10);   // 폴백: 앞 1/3
   };
   const isFrag = (l) => !!l && !/\d/.test(l) && /^[가-힣()]+$/.test(l.replace(/\s/g, "")) && l.replace(/\s/g, "").length <= 12 && !META.test(l);
@@ -149,7 +152,8 @@ function parseShareholderRows(block) {
       if (SH_KIND.test(combo) || /특수\s*관계인/.test(combo)) kind = combo;
     }
     const numTok = (ln.replace(SH_KIND, " ").replace(name, " ").match(/\d[\d,]*/g) || [])[0];
-    const shares = numTok ? recoverShares(numTok) : null;
+    const recKey = name + "|" + i;
+    const shares = numTok ? recoverShares(numTok, recKey) : null;
     const tm = ln.match(/([가-힣]+)(?:\s+([가-힣]+))?\s*$/);   // 끝 관계(공백분리 또는 병합)
     let relMgr = null, relCo = null;
     if (tm) {
@@ -157,7 +161,7 @@ function parseShareholderRows(block) {
       else { const rm = tm[1].match(SH_RELMGR); if (rm && tm[1].length > rm[1].length) { relMgr = rm[1]; relCo = tm[1].slice(rm[1].length); } }   // 병합형
     }
     if (!shares) continue;
-    recs.push({ name, kind, shares, relMgr, relCo });
+    recs.push({ name, kind, shares, relMgr, relCo, guessed: guessedRecs.has(recKey) });
   }
   const sumShares = recs.reduce((a, r) => a + (r.shares || 0), 0);
   const base = (total != null && total > 0) ? total : (sumShares > 0 ? sumShares : null);   // 지분율 분모(합계 우선, 없으면 개별합)
@@ -166,7 +170,7 @@ function parseShareholderRows(block) {
     const pct = (r.shares != null && base) ? Math.round((r.shares / base) * 100 * 10) / 10 : null;
     const pctStr = pct != null ? String(pct) : null;
     const key = r.name + "|" + (r.shares || ""); if (seen.has(key)) return; seen.add(key);
-    _raw.push({ name: r.name, shares: r.shares, pct: pctStr });
+    _raw.push({ name: r.name, shares: r.shares, pct: pctStr, guessed: !!r.guessed });
     cols.push({ name: r.name, kind: r.kind || null, shares: r.shares, pct: pctStr, relMgr: r.relMgr || null, relCo: r.relCo || null });
     rows.push(r.name + (r.shares ? ` ${r.shares.toLocaleString()}주` : "") + (pctStr ? ` / ${pctStr}%` : ""));
   });
@@ -222,8 +226,12 @@ export function extractShareCount(raw, pages) {
   const raws = sh._raw || [];
   const sum = raws.reduce((a, r) => a + (r.shares || 0), 0);
   const holders = raws.filter((r) => r.shares).length;
-  const count = (sh.total && sh.total >= sum * 0.9) ? sh.total : (sum > 0 ? sum : null);   // 합계 행 우선(개별합과 큰 차이 없을 때)
-  return (count && holders >= 1) ? { count, holders, source: "크레탑 주요주주현황 자동 추출" } : { count: null };
+  if (!holders) return { count: null };
+  // 합계 행 우선(개별합과 큰 차이 없을 때)
+  if (sh.total && sh.total >= sum * 0.9) return { count: sh.total, holders, source: "크레탑 주요주주현황 자동 추출" };
+  // [D-136] 합계 행이 없거나 개별합과 안 맞으면 — 목록이 주요 주주만일 수 있고, 붙은 숫자를 짐작해 나눈 줄도 있을 수 있다.
+  //   개별합을 발행주식수로 쓰지 않고 '확인 필요' 후보로만 남긴다(주식가치 1주당 값이 틀리게 커지는 것을 막는다)
+  return { count: null, candidate: sum > 0 ? sum : null, holders, needsCheck: true, reason: sh.total ? "합계 행이 개별 주주 합과 맞지 않음" : (raws.some((r) => r.guessed) ? "합계 행 없음 · 붙은 숫자를 나눠 읽은 줄 있음" : "합계 행 없음 — 주요 주주만 적힌 표일 수 있음") };
 }
 // 6p: 연혁/사업목적
 export function extractCompanyExtras(raw, pages) {
@@ -295,6 +303,8 @@ export function extractAll(raw, pages) {
   const sc = extractShareCount(raw, pages);   // 주주현황 보통주 합산(우선)
   const sharesDefault = (sc && sc.count) ? sc.count : sh.shares;
   const sharesSource = (sc && sc.count) ? `${sc.source} (${sc.holders}명 합산)` : (sh.shares ? "원문 발행주식수" : null);
+  // [D-136] 자동값이 없고 주주 합만 있으면 확인 필요 안내(자동으로 채우지 않음)
+  const sharesCheck = (!sharesDefault && sc && sc.needsCheck && sc.candidate) ? `주주현황 ${sc.holders}명 합 ${sc.candidate.toLocaleString()}주 — ${sc.reason}. 발행주식수 확인 필요` : null;
   const preview = (v) => v ? String(v).replace(/\s+/g, " ").slice(0, 300) : null;
   const stakePrev = (st) => st ? (st.noData ? "조회된 자료가 없습니다." : (st.rows || []).join(" / ")) : null;
   const stakeOk = (st) => !!(st && (st.noData || (st.rows && st.rows.length)));
@@ -308,5 +318,5 @@ export function extractAll(raw, pages) {
       { key: "work", label: "page 9 사업장 현황", ok: !!(workplace.basic || workplace.detail), preview: preview(workplace.detail || workplace.basic) },
     ],
   };
-  return { stakeholders, companyExtras, ceoDetail, workplace, shares: sharesDefault, sharesSource, parValue: sh.parValue, _extractDebug: debug };
+  return { stakeholders, companyExtras, ceoDetail, workplace, shares: sharesDefault, sharesSource, sharesCheck, parValue: sh.parValue, _extractDebug: debug };
 }

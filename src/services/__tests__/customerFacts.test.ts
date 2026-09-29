@@ -121,7 +121,7 @@ const withCretop = (r: ClientOpsRecord): ClientOpsRecord => ({
   const r = withCretop(base)
   const cf = cretopFacts(r)
   const val = (k: string) => cf.find((c) => c.key === k)?.value
-  check('크레탑: 백만원 → 원, eok 우선', val('revenue') === '1234000000' && val('operatingProfit') === '-50000000' && val('totalAssets') === '2000000000', `${val('revenue')} ${val('totalAssets')}`)
+  check('크레탑: 백만원 → 원(원문 값 × 원문 단위)', val('revenue') === '1234000000' && val('operatingProfit') === '-50000000' && val('totalAssets') === '2000000000', `${val('revenue')} ${val('totalAssets')}`)
   check('크레탑: 없는 칸은 안 만든다', val('totalLiabilities') === undefined)
   check('크레탑: 설립일 2019.03.02 → 2019-03-02', val('establishedAt') === '2019-03-02')
   check('크레탑: 기준 연도', cf.find((c) => c.key === 'revenue')?.asOf === '2025')
@@ -236,6 +236,31 @@ const withCretop = (r: ClientOpsRecord): ClientOpsRecord => ({
   const g = normalizeClientOps({ id: 'g', companyName: 'x', representativeGender: 'female' } as Partial<ClientOpsRecord>)
   const g2 = normalizeClientOps({ id: 'g2', companyName: 'x', representativeGender: '여자' } as unknown as Partial<ClientOpsRecord>)
   check('대표자 성별: 고른 값만 · 모르는 글은 비운다', g.representativeGender === 'female' && g2.representativeGender === '' && base.representativeGender === '')
+}
+
+/* ---- D-136 크레탑 → 사실: 정확한 원 · 확인 필요는 후보로 만들지 않는다 ---- */
+{
+  const withCp = (corePreview: Record<string, unknown>, companyInfo: Record<string, unknown> = {}): ClientOpsRecord => {
+    const r = withCretop(base)
+    return { ...r, toolResults: [{ ...r.toolResults[0], data: { companyInfo, corePreview } }] }
+  }
+  const val = (r: ClientOpsRecord, k: string) => cretopFacts(r).find((c) => c.key === k)?.value
+  const exact = withCp({ revenue: { value: 6703634, unit: '천원', eok: 67.04, year: 2024 }, netIncome: { value: 92443, unit: '천원', eok: 0.92, year: 2024 } })
+  check('D-136 크레탑: 천원 → 원 정확히(억 반올림 X) — 6,703,634천원 = 6,703,634,000원', val(exact, 'revenue') === '6703634000' && val(exact, 'netIncome') === '92443000', `${val(exact, 'revenue')} ${val(exact, 'netIncome')}`)
+  const won = withCp({ revenue: { value: 6703634000, unit: '원', eok: 67.04, year: 2024 } })
+  check('D-136 크레탑: 원 단위 그대로', val(won, 'revenue') === '6703634000')
+  const flagged = withCp({
+    revenue: { value: null, unit: '백만원', eok: null, year: 2024, latestMissing: true, needsCheck: true },
+    operatingProfit: { value: 6703634, unit: '백만원', eok: 67036.34, year: 2024, needsCheck: true, unitAssumed: true },
+    netIncome: { value: 92, unit: '백만원', eok: 0.92, year: null },
+    totalAssets: { value: 5716, unit: '백만원', eok: 57.16, year: 2024 },
+  })
+  check('D-136 크레탑: 최신 연도 빈칸 · 확인 필요(단위 추정 · 범위 밖) · 연도 모름은 후보로 만들지 않는다', val(flagged, 'revenue') === undefined && val(flagged, 'operatingProfit') === undefined && val(flagged, 'netIncome') === undefined && val(flagged, 'totalAssets') === '5716000000')
+  check('D-136 크레탑: 확인 필요 칸은 확인 목록에도 안 뜬다', !pendingFacts(flagged).some((p) => ['revenue', 'operatingProfit', 'netIncome'].includes(p.key)))
+  const legacyEok = withCp({ revenue: { eok: 12.34, year: 2025 } })
+  check('D-136 크레탑: 예전 결과(단위 없이 억만) → 억 × 1억', val(legacyEok, 'revenue') === '1234000000')
+  const yearOnly = withCp({}, { companyName: '연도만(주)', established: '2011', employees: '1234' })
+  check('D-136 크레탑: 연도만 있는 설립일은 사실 후보로 만들지 않는다 · 직원 1234', val(yearOnly, 'establishedAt') === undefined && val(yearOnly, 'employeeCount') === '1234')
 }
 
 /* ---- 저장 모양 · 예전 기록 ---- */

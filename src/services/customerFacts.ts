@@ -251,20 +251,32 @@ function customFieldOf(record: ClientOpsRecord, label: string) {
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 
-/** 크레탑 금액 한 칸 → 원 */
+/** 크레탑 원문 단위 → 원 배수 */
+const CRETOP_UNIT_WON: Record<string, number> = { 원: 1, 천원: 1e3, 천: 1e3, 만원: 1e4, 만: 1e4, 백만원: 1e6, 백만: 1e6, 억원: 1e8, 억: 1e8 }
+
+/**
+ * 크레탑 금액 한 칸 → 원.
+ * D-136: ① 원문 값 × 원문 단위로 정확히(예전에는 억 단위로 반올림한 값 × 1억 — 6,703,634천원이 67.04억 = 6,704,000,000원이 됐다).
+ *        ② 엔진이 '확인 필요'로 표시한 칸(최신 연도 빈칸 · 단위 모름 · 값/연도 짝 모름 · 표끼리 다름 · 현실 범위 밖)은 사실 후보로 만들지 않는다.
+ *        ③ 연도를 모르는 값도 만들지 않는다 — 어느 해 숫자인지 모르는 것을 '최신' 으로 올리지 않는다.
+ */
 function cretopWon(cell: unknown): { won: number; year: string } | null {
   if (!cell || typeof cell !== 'object') return null
-  const c = cell as { value?: unknown; unit?: unknown; eok?: unknown; year?: unknown; absent?: unknown }
-  if (c.absent) return null
-  const eok = num(c.eok)
-  let won: number | null = eok !== null ? eok * 1e8 : null
+  const c = cell as { value?: unknown; unit?: unknown; eok?: unknown; year?: unknown; absent?: unknown; needsCheck?: unknown; latestMissing?: unknown }
+  if (c.absent || c.needsCheck === true || c.latestMissing === true) return null
+  const year = c.year === null || c.year === undefined ? '' : String(c.year)
+  if (!/^(19|20)\d{2}$/.test(year)) return null
+  const v = num(c.value)
+  const unit = typeof c.unit === 'string' ? c.unit.trim() : ''
+  const mult = CRETOP_UNIT_WON[unit]
+  let won: number | null = v !== null && mult !== undefined ? v * mult : null
   if (won === null) {
-    const v = num(c.value)
-    if (v === null) return null
-    const unit = typeof c.unit === 'string' ? c.unit : ''
-    won = unit.includes('백만') ? v * 1e6 : unit.includes('천') ? v * 1e3 : unit.includes('억') ? v * 1e8 : v
+    // 예전 결과(단위 없이 억만 남은 것) — 억 값 그대로
+    const eok = num(c.eok)
+    if (eok === null) return null
+    won = eok * 1e8
   }
-  return { won: Math.round(won), year: c.year === null || c.year === undefined ? '' : String(c.year) }
+  return { won: Math.round(won), year }
 }
 
 /** 붙어 있는 가장 최근 크레탑 결과에서 읽을 수 있는 사실들 */

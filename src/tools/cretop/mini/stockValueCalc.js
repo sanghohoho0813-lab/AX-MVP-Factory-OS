@@ -14,29 +14,63 @@ export const commas = (v) => { const t = String(v ?? "").trim(); if (t === "" ||
 export const won = (n) => (n == null || !isFinite(n)) ? "—" : Math.round(n).toLocaleString() + "원";
 export const pctText = (x, d = 1) => (x == null || !isFinite(x)) ? "—" : (x * 100).toFixed(d) + "%";
 
-const tr = (ui, k) => (ui.trendRows || []).find((r) => r.key === k && r.trend && r.trend.series);
+// [D-136] 엔진이 '확인 필요'로 표시한 칸(최신 연도 빈칸 · 단위 모름 · 표끼리 다름)은 평가 조건에 자동으로 채우지 않는다(직접 적는다)
+const cpBad = (ui, k) => !!(ui.corePreview && ui.corePreview[k] && ui.corePreview[k].needsCheck);
+const tr = (ui, k) => (cpBad(ui, k) ? undefined : (ui.trendRows || []).find((r) => r.key === k && r.trend && r.trend.series));
 const latestEok = (row) => (row && row.trend.latest && typeof row.trend.latest.val === "number") ? row.trend.latest.val : null;
+const UNIT_WON = { "원": 1, "천원": 1000, "만원": 1e4, "백만원": 1e6, "억원": 1e8 };
 
-/** 재무상태표 계정 금액(원) — 이름이 맞는 줄의 마지막(최근) 값을 더한다 */
+/**
+ * 재무상태표 계정 금액(원) — 이름이 맞는 줄의 최신 연도 칸 값을 더한다.
+ * [D-136] 표의 단위(단위:백만원 등)를 그대로 쓴다 · 최신 연도 칸이 비었으면 예전 연도 값으로 채우지 않는다 · 단위를 모르면 null.
+ */
 export function bsWon(ui, names) {
   const bs = ui.detailStatements && ui.detailStatements.balanceSheet;
   if (!bs || !bs.items) return null;
-  const u = bs.unit || "천원"; const f = u === "원" ? 1 : u === "천원" ? 1000 : u === "백만원" ? 1e6 : u === "억원" ? 1e8 : 1000;
+  const f = UNIT_WON[bs.unit || "천원"];
+  if (f == null) return null;
   let sum = null;
   for (const name of names) {
     const it = bs.items.find((x) => String(x.rawLabel || x.account || "").replace(/[\s()*]/g, "") === name);
-    const vals = it ? (it.numberCandidates || []).filter((v) => typeof v === "number") : [];
-    if (vals.length) sum = (sum || 0) + vals[vals.length - 1] * f;
+    const nc = it ? (it.numberCandidates || []) : [];
+    const last = nc.length ? nc[nc.length - 1] : null;
+    if (typeof last === "number") sum = (sum || 0) + last * f;
   }
   return sum;
 }
 
-/** 원문에서 읽은 3개년 당기순이익(오래된→최근) */
+/** 원문에서 읽은 3개년 당기순이익(오래된→최근, 숫자 있는 해만) */
 export function netIncomeYears(ui) {
-  const niRow = tr(ui, "netIncome");
-  const niSeries = niRow ? niRow.trend.series.filter((s) => typeof s.val === "number") : [];
-  return niSeries.slice(-3).slice().sort((a, b) => (a.year || 0) - (b.year || 0));
+  return netIncomeSlots(ui).filter((s) => typeof s.val === "number");
 }
+
+/**
+ * [D-136] 가중치 자리 [1년전(×1), 직전(×2), 결산연도(×3)] 에 맞춘 당기순이익(억) — 연도로 자리를 정한다.
+ * 결산연도 칸이 비었으면 그 자리는 null(예전에는 숫자 있는 해를 뒤에서부터 채워 2023년 값이 결산연도 자리에 앉았다).
+ */
+export function netIncomeSlots(ui) {
+  const row = tr(ui, "netIncome");
+  const ser = row ? row.trend.series : [];
+  const dated = ser.filter((s) => typeof s.year === "number");
+  if (dated.length) {
+    const ly = Math.max(...dated.map((s) => s.year));
+    return [ly - 2, ly - 1, ly].map((y) => { const hit = dated.find((s) => s.year === y); return { year: y, val: hit && typeof hit.val === "number" ? hit.val : null }; });
+  }
+  const nums = ser.filter((s) => typeof s.val === "number").slice(-3);
+  const out = [{ year: null, val: null }, { year: null, val: null }, { year: null, val: null }];
+  nums.forEach((s, i) => { out[3 - nums.length + i] = { year: s.year || null, val: s.val }; });
+  return out;
+}
+
+/** [D-136] 이 보고서의 결산연도 — 고쳐 둔 평가 조건이 어느 보고서 기준인지 적어 둔다 */
+export function svBasis(ui) {
+  const fy = ((ui && ui.financialYears) || []).filter((y) => typeof y === "number");
+  if (fy.length) return String(Math.max(...fy));
+  const ys = netIncomeSlots(ui || {}).map((s) => s.year).filter((y) => typeof y === "number");
+  return ys.length ? String(Math.max(...ys)) : "";
+}
+/** 원문(결산연도)에서 오는 평가 조건 — 다른 보고서(결산연도)에서 고친 값은 가져오지 않는다 */
+const REPORT_FIELDS = new Set(["asset", "debt", "reBook", "reFair", "inc0", "inc1", "inc2", "month0", "month1", "month2", "cap0", "cap1", "cap2"]);
 
 export function autoShares(ui) {
   return (ui.shares && ui.shares > 0) ? ui.shares : null;
@@ -44,16 +78,15 @@ export function autoShares(ui) {
 
 /** 원문 값으로 채운 평가 조건 (문자열 — 입력 칸 그대로) */
 export function svDefaults(ui) {
-  const last3 = netIncomeYears(ui);
+  const slots = netIncomeSlots(ui);
   const eqRow = tr(ui, "totalEquity");
   const equityEok = latestEok(eqRow) != null ? latestEok(eqRow)
-    : (ui.corePreview && ui.corePreview.totalEquity && typeof ui.corePreview.totalEquity.eok === "number" ? ui.corePreview.totalEquity.eok : null);
+    : (!cpBad(ui, "totalEquity") && ui.corePreview && ui.corePreview.totalEquity && typeof ui.corePreview.totalEquity.eok === "number" ? ui.corePreview.totalEquity.eok : null);
   const assetEok = latestEok(tr(ui, "totalAssets"));
   const debtEok = latestEok(tr(ui, "totalLiabilities"));
   const reBookAuto = bsWon(ui, ["토지", "건물", "구축물", "투자부동산"]);
-  const yearsWon = [null, null, null];
-  // 오래된→최근을 [1년전(가중1), 직전(가중2), 결산연도(가중3)] 자리에 뒤에서부터 채운다
-  last3.forEach((s, i) => { yearsWon[3 - last3.length + i] = s.val * 1e8; });
+  // [1년전(가중1), 직전(가중2), 결산연도(가중3)] — 연도로 자리를 정한다(D-136)
+  const yearsWon = slots.map((s) => (typeof s.val === "number" ? s.val * 1e8 : null));
   const asset = assetEok != null ? assetEok * 1e8 : (equityEok != null ? equityEok * 1e8 + (debtEok != null ? debtEok * 1e8 : 0) : null);
   const debt = debtEok != null ? debtEok * 1e8 : (asset != null && equityEok != null ? asset - equityEok * 1e8 : null);
   const s = (n) => (n == null ? "" : commas(String(Math.round(n))));
@@ -66,21 +99,48 @@ export function svDefaults(ui) {
   };
 }
 
-/** 이 회사에 대해 사람이 고쳐 둔 값 — { shares?: string, cond?: object } */
+/** 이 회사에 대해 사람이 고쳐 둔 값 — { shares?: string, cond?: object, basis?: 결산연도, v?: 2 } */
 export function svLoad(ui) {
   try { const all = JSON.parse(localStorage.getItem(KEY) || "{}"); const v = all[selKey(ui)]; return v && typeof v === "object" ? v : {}; } catch { return {}; }
 }
 
 /**
- * 고친 값만 남긴다 — 원문 그대로면 칸을 비운 표시({at})만 남긴다(열어 보기만 해서는 값이 쌓이지 않게).
+ * [D-136] 저장해 둔 값 + 이 보고서의 원문 값 → 화면 조건.
+ *  - 사람이 고친 칸만 덮는다(예전에는 한 칸만 고쳐도 조건 전체를 저장해 자산 · 부채 · 순이익이 그때 값으로 굳었다).
+ *  - 원문에서 오는 칸(자산 · 부채 · 부동산 · 3개년 순이익 · 증자/감자)은 같은 결산연도 보고서에서 고친 것만 — 새 보고서는 자기 숫자를 쓴다.
+ *    예전 모양(결산연도 표시 없음)의 저장값은 원문 칸을 버리고 이자율 · 법인 구분 · 퇴직급여 · 영업권만 살린다.
+ *  - 발행주식수도 같은 결산연도에서 고친 것만(새 보고서에 자동값이 없으면 고친 값을 그대로).
+ */
+export function svMerge(ui, saved, defaults) {
+  const basis = svBasis(ui);
+  const sameReport = !!saved && saved.v === 2 && saved.basis === basis && basis !== "";
+  const cond = { ...defaults };
+  for (const [k, v] of Object.entries((saved && saved.cond) || {})) {
+    if (!(k in defaults) || typeof v !== "string") continue;
+    if (REPORT_FIELDS.has(k) && !sameReport) continue;
+    cond[k] = v;
+  }
+  const keepShares = !!saved && saved.shares != null && (sameReport || !autoShares(ui));
+  const sharesText = keepShares ? String(saved.shares) : (autoShares(ui) ? String(autoShares(ui)) : "");
+  return { cond, sharesText, sharesEdited: keepShares, edited: Object.keys(defaults).some((k) => cond[k] !== defaults[k]) };
+}
+
+/**
+ * 고친 칸만 남긴다(원문 값과 다른 칸) — 원문 그대로면 칸을 비운 표시({at})만 남긴다(열어 보기만 해서는 값이 쌓이지 않게).
  * D-112: 바뀔 때마다 알림에 회사 · 값 · 시각을 실어 보낸다 — 크레탑 화면이 분석 이력(클라우드)에 같이 저장한다.
+ * D-136: 어느 보고서(결산연도) 기준으로 고쳤는지(basis)를 함께 남긴다.
  */
 export function svSave(ui, { shares, cond }) {
   const co = (ui && ui.companyInfo) || {};
   const at = new Date().toISOString();
-  const entry = { at };
+  const entry = { at, v: 2, basis: svBasis(ui) };
   if (shares !== undefined && shares !== null) entry.shares = shares;
-  if (cond) entry.cond = cond;
+  if (cond) {
+    const defaults = svDefaults(ui);
+    const edits = {};
+    for (const k of Object.keys(cond)) { if (cond[k] !== defaults[k]) edits[k] = cond[k]; }
+    if (Object.keys(edits).length) entry.cond = edits;
+  }
   try {
     const all = JSON.parse(localStorage.getItem(KEY) || "{}");
     all[selKey(ui)] = entry;
@@ -114,7 +174,8 @@ export function parseShares(v) {
 /** 조건 → 09 계산 결과 (계산할 재료가 없으면 null) */
 export function svCompute(ui, shares, cond) {
   const yearsFound = netIncomeYears(ui).length;
-  if (!shares || cond.asset === "" || yearsFound === 0) return null;
+  // [D-136] 결산연도 순이익 칸이 비었으면(원문 최신 연도 빈칸) 0 으로 계산하지 않는다 — 직접 적으면 계산
+  if (!shares || cond.asset === "" || cond.inc2 === "" || yearsFound === 0) return null;
   return unlistedShareValuation({
     shares, ratePct: num(cond.rate), asset: num(cond.asset), debt: num(cond.debt),
     reBook: num(cond.reBook), reFair: num(cond.reFair), severance: num(cond.severance), goodwill: num(cond.goodwill),
@@ -127,14 +188,13 @@ export function svCompute(ui, shares, cond) {
 
 /** 지금 이 회사의 주식가치 — 고친 값이 있으면 그것, 없으면 원문 값 */
 export function svCurrent(ui) {
-  const saved = svLoad(ui);
   const defaults = svDefaults(ui);
-  const cond = saved.cond ? { ...defaults, ...saved.cond } : defaults;
-  const sharesText = saved.shares != null ? saved.shares : (autoShares(ui) ? String(autoShares(ui)) : "");
-  const shares = parseShares(sharesText);
+  const m = svMerge(ui, svLoad(ui), defaults);
+  const cond = m.cond;
+  const shares = parseShares(m.sharesText);
   const bf = ui.bizForm || {};
   const r = bf.isPersonal ? null : svCompute(ui, shares, cond);
-  return { r, shares, cond, edited: !!saved.cond, sharesEdited: saved.shares != null };
+  return { r, shares, cond, edited: m.edited, sharesEdited: m.sharesEdited };
 }
 
 /** 1장 요약 · 업체 기록에 붙일 줄 (계산이 안 되면 빈 배열) */

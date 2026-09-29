@@ -81,7 +81,8 @@ export function CretopWorkbench({ embedded = false, onAnalyzed, actions, attachS
     const hit =
       rows.find((r) => r.clientId === clientRecord.id) ??
       (biz.length === 10 ? rows.find((r) => digits(r.data.bizNo) === biz) : undefined) ??
-      rows.find((r) => r.data.company === clientRecord.companyName)
+      // D-136: 이름만 같고 사업자번호가 다른 회사의 분석은 가져오지 않는다
+      rows.find((r) => r.data.company === clientRecord.companyName && (biz.length !== 10 || digits(String(r.data.bizNo ?? '')).length !== 10))
     return hit?.data.ui ?? null
   }, [embedded, clientRecord, bucket.rows])
 
@@ -90,7 +91,12 @@ export function CretopWorkbench({ embedded = false, onAnalyzed, actions, attachS
     const company = co.companyName || '기업명 미상'
     const bizNo = co.businessNo || ''
     // 같은 회사(사업자번호·이름)의 이전 이력은 새 것으로 바꾼다 — 원본 비회원 이력과 같은 규칙
-    const prev = (bucket.rows ?? []).find((r) => (bizNo && r.data.bizNo === bizNo) || r.data.company === company)
+    // D-136: 사업자번호가 둘 다 있으면 번호로만 — 이름만 같은 다른 회사의 이력(업체 연결 · 평가 조건)을 덮거나 가져오지 않는다
+    const mine = digits(bizNo)
+    const rows = bucket.rows ?? []
+    const prev =
+      rows.find((r) => mine !== '' && digits(String(r.data.bizNo ?? '')) === mine) ??
+      rows.find((r) => r.data.company === company && (mine === '' || digits(String(r.data.bizNo ?? '')) === ''))
     // 원본처럼 저장이 안 되면 알려 준다 ('분석 저장 실패') — 결과 화면은 그대로 남는다
     bucket.save({ id: prev?.id, clientId: clientId ?? prev?.clientId ?? '', data: { company, bizNo, ts: new Date().toISOString(), ui, sv: prev?.data.sv ?? null } }).catch((e: unknown) => {
       showToast(`분석 저장 실패: ${e instanceof Error ? e.message : '오류'} — 연결을 확인하세요. 결과는 화면에 그대로 있습니다.`)

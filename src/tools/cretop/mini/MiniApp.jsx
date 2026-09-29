@@ -146,8 +146,13 @@ function coreLatestText(key, obj) {
   if (key === "cashflowGrade") { const v = obj && obj.latest; return { val: v || "원문 확인 필요", weak: !v }; }
   if (obj && obj.absent) return { val: "미보유", note: "원문에 차입금 계정 없음(0원)" };
   const isR = !!(obj && obj.isRatio) || ratioKeys.has(key);
+  // [D-136] 자본총계 0 이하 — 부채비율은 계산 불가(자본잠식)
+  if (isR && obj && obj.capitalErosion && obj.display) return { val: "계산 불가", note: `자본잠식${obj.year ? ` · ${obj.year}년 자본총계 0 이하` : ""}` };
   if (isR) { const v = obj && obj.value; return typeof v === "number" ? { val: `${num(v)}${obj.unit || "%"}` } : { val: "원문 확인 필요", weak: true }; }
-  if (obj && typeof obj.eok === "number") return { val: fmtTrendVal(obj.eok, "억원") };
+  // [D-136] 엔진이 확인 필요로 표시한 금액(최신 연도 빈칸 · 단위 모름 · 표끼리 다름) — 이유를 함께
+  const why = obj && obj.needsCheck && Array.isArray(obj.checkReasons) && obj.checkReasons.length ? `확인 필요 · ${obj.checkReasons[0]}` : null;
+  if (obj && obj.latestMissing) return { val: "원문 확인 필요", weak: true, note: why };
+  if (obj && typeof obj.eok === "number") return { val: fmtTrendVal(obj.eok, "억원"), weak: !!why, note: why || (obj.unitAssumed ? `단위 표시 없음 — ${obj.unit}로 추정` : null) };
   const v = obj && obj.value; if (typeof v === "number") return { val: `${num(v)}${obj.unit || ""}` };
   return { val: "원문 확인 필요", weak: true };
 }
@@ -171,6 +176,8 @@ function cashflowVerdict(grade) { const m = String(grade || "").match(/CR\s*([1-
 const verdictPal = (v) => v === "위험" ? TONE_BAD : v === "주의" ? TONE_WARN : TONE_GOOD;   // 양호/우수/매우우수=초록
 function coreToneOf(key, obj) {
   if (key === "cashflowGrade") { const cv = cashflowVerdict(obj && obj.latest); return cv ? { ...verdictPal(cv), tag: cv } : null; }
+  // [D-136] 자본총계 0 이하 — 부채비율 숫자(음수)를 '양호' 로 보이지 않게
+  if (key === "debtRatio" && obj && obj.capitalErosion) return { ...TONE_BAD, tag: "자본잠식" };
   // 방향(증가/감소/변동없음 또는 흑자전환 등 전환어)
   const st = lastStep(coreTrend(key, obj));
   let dir = null;

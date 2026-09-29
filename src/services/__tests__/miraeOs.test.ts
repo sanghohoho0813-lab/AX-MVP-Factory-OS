@@ -44,7 +44,7 @@ import {
 import type { ClientOpsRecord, OpsAlert } from '../../types/clientOps'
 import { mergeServices, normalizeCustomService, toServiceMeta } from '../customServiceService'
 import { buildKpis, kpisByGroup, kpiStatusSummary } from '../kpiService'
-import { svCurrent, svSummaryLines } from '../../tools/cretop/mini/stockValueCalc.js'
+import { bsWon, netIncomeSlots, svCurrent, svDefaults, svLoad, svMerge, svSave, svSummaryLines } from '../../tools/cretop/mini/stockValueCalc.js'
 import { profileFields, profileFieldsByGroup, regionOf } from '../clientOpsProfile'
 import { CONTRACT_STAGE_ORDER, CONTRACT_STAGE_LABEL, contractStageOf, statusForStage } from '../../types/clientOps'
 import type { ClientOpsStatus, ContractStage } from '../../types/clientOps'
@@ -1194,6 +1194,37 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
   check('크레탑 주식가치: 1장 요약 줄 = 1주당 · 기업가치 · 원문 값', lines.length === 3 && lines[1].includes('10,100원') && lines[1].includes('2,020,000,000원') && lines[2].includes('크레탑 원문 값'), lines.join(' / '))
   check('크레탑 주식가치: 발행주식수 없으면 요약 줄 없음', svSummaryLines({ ...cui, shares: null } as never).length === 0)
   check('크레탑 주식가치: 개인사업자는 요약 줄 없음', svSummaryLines({ ...cui, bizForm: { isPersonal: true } } as never).length === 0)
+  // D-136: 고친 칸만 저장 · 원문 칸(자산 · 부채 · 순이익)은 같은 결산연도 보고서에서 고친 것만 — 새 보고서는 자기 숫자
+  {
+    const mem: Record<string, string> = {}
+    const g = globalThis as unknown as { localStorage?: unknown }
+    const hadLs = g.localStorage !== undefined
+    if (!hadLs) g.localStorage = { getItem: (k: string) => mem[k] ?? null, setItem: (k: string, v: string) => { mem[k] = v }, removeItem: (k: string) => { delete mem[k] } }
+    const trY = (key: string, y0: number, vals: Array<number | null>) => ({ key, trend: { series: vals.map((val, i) => ({ year: y0 + i, val })), latest: { val: vals[vals.length - 1] } } })
+    const co = { companyName: '주식가치시험', businessNo: '111-11-11111' }
+    const u24 = { companyInfo: co, shares: 200000, financialYears: [2022, 2023, 2024], trendRows: [trY('netIncome', 2022, [1.5, 1.8, 2.02]), trY('totalAssets', 2022, [120, 115, 110]), trY('totalLiabilities', 2022, [98, 101, 87.4])] } as never
+    const u25 = { companyInfo: co, shares: 200000, financialYears: [2023, 2024, 2025], trendRows: [trY('netIncome', 2023, [1.8, 2.02, 3]), trY('totalAssets', 2023, [115, 110, 130]), trY('totalLiabilities', 2023, [101, 87.4, 90])] } as never
+    const d24 = svDefaults(u24)
+    svSave(u24, { cond: { ...d24, rate: '8' } })
+    const saved = svLoad(u24)
+    check('주식가치 저장: 고친 칸(이자율)만 · 결산연도와 함께', JSON.stringify(saved.cond) === JSON.stringify({ rate: '8' }) && saved.basis === '2024' && saved.v === 2, JSON.stringify(saved))
+    const c24 = svCurrent(u24)
+    check('주식가치 저장: 한 칸 고쳐도 자산 · 순이익은 원문 값 그대로', c24.cond.rate === '8' && c24.cond.asset === d24.asset && c24.cond.inc2 === d24.inc2 && c24.edited)
+    svSave(u24, { cond: { ...d24, rate: '8', asset: '12,000,000,000' } })
+    check('주식가치 저장: 같은 보고서에서 고친 자산은 다시 열어도 그대로', svCurrent(u24).cond.asset === '12,000,000,000')
+    const c25 = svCurrent(u25)
+    const d25 = svDefaults(u25)
+    check('주식가치 저장: 새 보고서(2025)는 자기 자산 · 순이익(2024 에서 고친 자산을 쓰지 않음) · 이자율은 그대로', c25.cond.asset === d25.asset && c25.cond.asset !== '12,000,000,000' && c25.cond.inc2 === d25.inc2 && d25.inc2 === '300,000,000' && c25.cond.rate === '8', JSON.stringify(c25.cond))
+    const legacy = svMerge(u25, { at: 'x', cond: { ...d24, rate: '9', asset: '99' } }, d25)
+    check('주식가치 저장: 예전 모양(전체 조건 저장)은 원문 칸을 버리고 이자율만 살린다', legacy.cond.asset === d25.asset && legacy.cond.inc0 === d25.inc0 && legacy.cond.rate === '9')
+    const holed = { companyInfo: { companyName: '빈칸' }, shares: 200000, financialYears: [2022, 2023, 2024], trendRows: [trY('netIncome', 2022, [1.5, 1.8, null]), trY('totalAssets', 2022, [120, 115, 110]), trY('totalLiabilities', 2022, [98, 101, 87.4])] } as never
+    const slots = netIncomeSlots(holed)
+    check('주식가치: 결산연도 순이익이 빈칸이면 그 자리는 비운다(2023 값이 결산연도 자리에 앉지 않음)', slots.map((x) => x.year).join() === '2022,2023,2024' && slots[2].val === null && svDefaults(holed).inc2 === '' && svDefaults(holed).inc1 === '180,000,000')
+    check('주식가치: 결산연도 순이익이 없으면 계산하지 않는다', svCurrent(holed).r === null)
+    const bsUi = (unit: string, land: Array<number | null>) => ({ detailStatements: { balanceSheet: { unit, items: [{ rawLabel: '토지', numberCandidates: land }] } } }) as never
+    check('주식가치: 재무상태표 단위(백만원)를 쓴다 · 최신 칸이 비면 예전 값으로 채우지 않는다', bsWon(bsUi('백만원', [100, 100, 120]), ['토지']) === 1.2e8 && bsWon(bsUi('천원', [100, 100, 120]), ['토지']) === 120000 && bsWon(bsUi('백만원', [100, 100, null]), ['토지']) === null)
+    if (!hadLs) delete g.localStorage
+  }
   // 예전 크레탑 간이식((손익×3 + 자산×2) ÷ 5, 최저 한도 없음)과 달라지는 경우 — 손실 법인
   const oldSimple = (loss.perShareIncomeValue * 3 + loss.perShareNetAsset * 2) / 5
   check('비상장: 손실 법인은 예전 간이식보다 높게(최저 한도) 나온다', loss.finalPerShare > oldSimple)
@@ -1579,7 +1610,9 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('다리: 고민 한 줄은 진단 요약의 가장 급한 줄', d.concern.includes('현금성 자산'), d.concern)
   check('다리: 순위 26개 · 등급 문턱 80/60/40', d.refs.length === 26 && cretopTier(80) === 'top' && cretopTier(60) === 'rec' && cretopTier(40) === 'cond' && cretopTier(39) === 'low')
   check('다리: PDF 이름 띄어쓰기 정리', tidyCompanyName('테스트산업 ( 주 )') === '테스트산업(주)' && tidyCompanyName('( 주 ) 한빛') === '(주)한빛' && tidyCompanyName('한빛정밀(주)') === '한빛정밀(주)')
-  check('다리: 설립일 모양 맞추기', normalizeEstablished('2008.4.5') === '2008-04-05' && normalizeEstablished('2011년') === '2011-01-01' && normalizeEstablished('모름') === '')
+  check('다리: 설립일 모양 맞추기', normalizeEstablished('2008.4.5') === '2008-04-05' && normalizeEstablished('2008년 04월 15일') === '2008-04-15' && normalizeEstablished('모름') === '')
+  // D-136: 연도(연 · 월)만 있으면 날짜를 지어내지 않는다(예전 2011-01-01) · 없는 날짜도 비운다
+  check('다리: 설립일 — 연도만 · 연월만 · 없는 날짜는 빈 글자', normalizeEstablished('2011년') === '' && normalizeEstablished('2011') === '' && normalizeEstablished('2008년 4월') === '' && normalizeEstablished('2008-13-01') === '')
   check('다리: 질문 흐름 차수 — A·B·C 1차 · D 2차 · E 3차', FLOW_ROUND.A === 1 && FLOW_ROUND.C === 1 && FLOW_ROUND.D === 2 && FLOW_ROUND.E === 3)
 
   // 같은 업체 찾기
@@ -1590,6 +1623,20 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('같은 업체: 사업자번호(숫자만) 먼저', findClientForCretop([other, byBiz, byName], d.company)?.id === '한빛')
   check('같은 업체: 이름 — (주) · 주식회사 · 띄어쓰기 무시', findClientForCretop([other, byName], d.company)?.id === '한빛정밀 주식회사' && companyKey('㈜ 한빛 정밀') === '한빛정밀')
   check('같은 업체: 없으면 null', findClientForCretop([other], d.company) === null)
+  // D-136: 번호가 같은 업체는 목록 순서와 상관없이 이름보다 먼저 · 이름이 같아도 번호가 다르면 다른 회사
+  check('같은 업체: 번호 일치가 목록 뒤에 있어도 이름 일치보다 먼저', findClientForCretop([byName, other, byBiz], d.company)?.id === '한빛')
+  const archivedBiz = mkc('보관된한빛', { businessNumber: '214-87-35291', archivedAt: at })
+  check('같은 업체: 보관된 번호 일치 > 살아 있는 이름 일치', findClientForCretop([byName, archivedBiz], d.company)?.id === '보관된한빛')
+  const sameNameOtherBiz = mkc('한빛정밀(주)', { businessNumber: '999-99-99999' })
+  check('같은 업체: 이름이 같아도 사업자번호가 다르면 붙이지 않는다(null)', findClientForCretop([sameNameOtherBiz], d.company) === null)
+  check('같은 업체: 번호 다른 같은 이름은 건너뛰고 번호 없는 같은 이름에', findClientForCretop([sameNameOtherBiz, byName], d.company)?.id === '한빛정밀 주식회사')
+  check('같은 업체: 보고서에 번호가 없으면 이름으로', findClientForCretop([sameNameOtherBiz], { name: '한빛정밀(주)', bizNo: '' })?.id === '한빛정밀(주)')
+  // D-136: 확인 필요 금액(최신 연도 빈칸 · 단위 모름 …)은 영업 칸(매출) · 체크로 넘기지 않는다
+  const holed = analyzeCretopText(cretopCompanyText.replace('매출액 6472 6775 6704', '매출액 6472 6775 -').replace('매출액 6,472,000 6,775,000 6,703,634', '매출액 6,472,000 6,775,000 -'), null)
+  const hd = digestCretop(holed)
+  check('다리: 최신 연도 매출이 빈칸이면 매출을 넣지 않는다(2023 값을 최신으로 쓰지 않음)', hd.revenueM === null && (holed.corePreview as Record<string, { needsCheck?: boolean }>).revenue.needsCheck === true, `${hd.revenueM}`)
+  const holedRec = applyCretopToClient(mkc('빈칸회사'), hd, { at }).record
+  check('채우기: 확인 필요 매출은 영업 칸에 없다', holedRec.sales?.revenueM === undefined)
 
   // 고객 기록에 채우기 — 빈 칸만
   const fresh = mkc('한빛정밀(주)', { representativeName: '직접적은대표' })

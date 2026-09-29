@@ -7,6 +7,41 @@ function cretopEokText(eok) { if (eok == null) return ""; const r = Math.round(e
 const CRETOP_ACCT = [[/^매출액$|^매출$|^영업수익$|^수입금액$/, "매출액"], [/^매출원가$/, "매출원가"], [/^판매비와?관리비$|^판관비$/, "판매비와관리비"], [/^영업이익$/, "영업이익"], [/^당기순이익$|^순이익$/, "당기순이익"], [/^법인세비용$|^법인세$/, "법인세비용"], [/^이자비용$/, "이자비용"], [/^자산총계$|^자산$|^총자산$/, "자산총계"], [/^부채총계$|^부채$|^총부채$/, "부채총계"], [/^자본총계$|^자본$|^자기자본$/, "자본총계"], [/^유동자산$/, "유동자산"], [/^비유동자산$/, "비유동자산"], [/^유동부채$/, "유동부채"], [/^비유동부채$/, "비유동부채"], [/^단기차입금$/, "단기차입금"], [/^장기차입금$/, "장기차입금"], [/^가지급금$/, "가지급금"], [/^가수금$/, "가수금"], [/^미처분이익잉여금$/, "미처분이익잉여금"], [/^이익잉여금$/, "이익잉여금"], [/^유형자산$/, "유형자산"], [/^임차?보증금$/, "보증금"]];
 const CRETOP_RATIO = [[/^부채비율$/, "부채비율", "%"], [/^유동비율$/, "유동비율", "%"], [/^차입금의존도$/, "차입금의존도", "%"], [/^영업이익률$/, "영업이익률", "%"], [/^(당기)?순이익률$/, "당기순이익률", "%"], [/^매출액?(증가|성장)율$/, "매출액증가율", "%"], [/^자기자본비율$/, "자기자본비율", "%"], [/총자산.{0,2}이익률|ROA/i, "ROA", "%"], [/자기자본.{0,2}이익률|ROE/i, "ROE", "%"], [/^이자보상배수$|^이자보상배율$/, "이자보상배수", "배"]];
 function cretopNum(tok) { if (tok == null) return null; let s = String(tok).trim(); if (s === "-" || s === "") return null; let neg = false; if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1, -1); } if (/^[△▲▽-]/.test(s)) { neg = true; s = s.replace(/^[△▲▽-]/, ""); } if (!/^[0-9][0-9,]*(\.[0-9]+)?$/.test(s)) return null; const n = parseFloat(s.replace(/,/g, "")); return isFinite(n) ? (neg ? -n : n) : null; }
+// [D-136] 부호 있는 숫자 한 칸 — 붙은 음수("-1,234") · 괄호("(1,234)") · 세모("△1,234")는 모두 음수. 단독 "-"는 숫자가 아니다(빈칸).
+function cretopSignedNum(tok) {
+  let s = String(tok == null ? "" : tok).trim().replace(/[−–]/g, "-");
+  if (!s) return null;
+  let neg = false;
+  if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1, -1).trim(); }
+  if (/^[△▽-]/.test(s)) { if (neg) return null; neg = true; s = s.slice(1); }
+  if (!/^\d[\d,]*(?:\.\d+)?$/.test(s)) return null;
+  const n = parseFloat(s.replace(/,/g, ""));
+  return isFinite(n) ? (neg ? -n : n) : null;
+}
+const cretopIsDashTok = (t) => t === "-" || t === "－" || t === "–" || t === "−";
+// [D-136] 값 칸(숫자 · 빈칸 '-' · 글자값) → 값 배열. 단독 '-'는 빈칸(null).
+// 예외 하나: 연도 수(yearN)를 알고 숫자 개수가 연도 수와 똑같은데 '-'가 더 있으면, 숫자 바로 앞 '-'는 글자 단위 PDF에서 떨어진 음수 부호("- 129,326")로 본다.
+function cretopCellsToValues(cells, yearN) {
+  const valCount = cells.filter((c) => c.type !== "dash").length;
+  const dashCount = cells.length - valCount;
+  const out = [];
+  if (yearN >= 2 && valCount === yearN && dashCount > 0) {
+    let neg = false;
+    for (let i = 0; i < cells.length; i++) { const c = cells[i];
+      if (c.type === "dash") { neg = !!(cells[i + 1] && cells[i + 1].type === "num"); continue; }
+      out.push(c.type === "num" && neg ? -Math.abs(c.val) : c.val); neg = false; }
+    return out;
+  }
+  for (const c of cells) out.push(c.type === "dash" ? null : c.val);
+  return out;
+}
+// [D-136] 원문 순서 연도 ↔ 값을 짝지은 뒤 연도 오름차순으로 — 최신→과거 순 표도 값이 제 연도에 붙는다. 개수가 다르면 null(짝 모름).
+function cretopPairAsc(years, vals) {
+  if (!years || !vals || !years.length || years.length !== vals.length) return null;
+  const idx = years.map((_, i) => i).sort((a, b) => years[a] - years[b]);
+  return { years: idx.map((i) => years[i]), vals: idx.map((i) => vals[i]) };
+}
+const cretopIsAscending = (ys) => (ys || []).every((y, i, a) => i === 0 || a[i - 1] < y);
 function cretopRowNums(line) { const toks = line.split(" ").filter(Boolean); const isN = (t) => t === "-" || /^[(]?[△▲▽-]?[0-9][0-9,]*(\.[0-9]+)?[)]?$/.test(t); let i = toks.length; const numToks = []; while (i > 0 && isN(toks[i - 1])) { numToks.unshift(toks[i - 1]); i--; } const label = toks.slice(0, i).join("").replace(/\([^)]*\)/g, "").replace(/\*/g, "").trim(); return { label, numToks }; }
 // 비율 행(라벨로 시작) 판별 — 숫자가 여러 개여도(업종평균 등) 마지막 숫자를 조회기업 값으로 사용.
 const CRETOP_HEADER_WORD = /^(구분|연도|기준|기준일|기준일자|기말|기초|항목|항목명|과목|과목명|계정|계정명|계정과목|분기|년|기|기업|당기|전기|전전기)$/;
@@ -168,7 +203,8 @@ const FINAL_UNIT_EOK = { "백만원": 0.01, "백만": 0.01, "천원": 1e-5, "천
 const CORE_LABEL_KR = { revenue: "매출액", operatingProfit: "영업이익", netIncome: "당기순이익", totalAssets: "자산총계", totalLiabilities: "부채총계", totalEquity: "자본총계", retainedEarnings: "미처분이익잉여금", debtRatio: "부채비율", currentRatio: "유동비율", interestCoverageRatio: "이자보상배수" };
 const CORE_ORDER = ["revenue", "operatingProfit", "netIncome", "totalAssets", "totalLiabilities", "totalEquity", "retainedEarnings", "debtRatio", "currentRatio", "interestCoverageRatio"];
 function cretopYearHeader(l) { const toks = String(l).split(" ").filter(Boolean); const yrs = []; let other = 0; for (const t of toks) { const m = t.match(/^((?:19|20)\d{2})(?:[-.\/]\d{1,2}(?:[-.\/]\d{1,2})?|년)?$/); if (m) yrs.push(+m[1]); else if (/^(구분|연도|기준|기준일|기준일자|기말|기초|항목|항목명|과목|과목명|계정|계정명|계정과목|분기|년|기|기업|당기|전기|전전기)$/.test(t)) { } else other++; } return (yrs.length >= 1 && other === 0 && new Set(yrs).size === yrs.length) ? yrs : null; }
-function parseAcctRow(line) { const toks = String(line).split(" ").filter(Boolean); const isNumDash = (t) => t === "-" || /^[(]?-?[0-9][0-9,]*(?:\.[0-9]+)?[)]?$/.test(t); let i = 0; while (i < toks.length && !isNumDash(toks[i])) i++; if (i === 0 || i >= toks.length) return null; const label = normalizeAccountLabel(toks.slice(0, i).join("")); const values = toks.slice(i).map((t) => (t === "-" ? null : parseNumLoose(String(t).replace(/[()]/g, "")))); return { label, values }; }
+// [D-136] 괄호 · 세모 음수도 음수로(예전에는 "(1,234)" 를 양수로 읽었다). 단독 '-'는 빈칸.
+function parseAcctRow(line) { const toks = String(line).split(" ").filter(Boolean); const isNumDash = (t) => cretopIsDashTok(t) || cretopSignedNum(t) != null; let i = 0; while (i < toks.length && !isNumDash(toks[i])) i++; if (i === 0 || i >= toks.length) return null; const label = normalizeAccountLabel(toks.slice(0, i).join("")); const values = []; for (const t of toks.slice(i)) { if (cretopIsDashTok(t)) { values.push(null); continue; } const v = cretopSignedNum(t); if (v == null) break; values.push(v); } return { label, values }; }
 // ── 크레탑 숫자 추출기(Stage 1) — 재무표 섹션에서 계정-숫자 후보를 '검수용 표'로 추출(자동 적용 X) ──
 // buildCretopFinalCoreMetrics와 동일한 섹션 판별 규칙(추출 대상 한정: 업계순위/동종업계/거래처 등 제외)
 function cretopSecOf(l) {
@@ -242,7 +278,8 @@ function extractCretopNumbers(rawText) {
       if (badRange) { status = "오류 의심"; confidence = "낮음"; }
       else if (noUnit) { status = "단위 확인 필요"; confidence = "보통"; }
       else if (noYear) { status = "연도 확인 필요"; confidence = "보통"; }
-      else { status = "적용 후보"; confidence = valsAll.length === (years ? years.length : 0) ? "높음" : "보통"; }
+      else if (valsAll.length !== years.length) { status = "검수 필요"; confidence = "보통"; }   // [D-136] 값 개수≠연도 — 어느 칸이 빈칸인지 모른다
+      else { status = "적용 후보"; confidence = "높음"; }
       rows.push({ id: `x${idc++}`, accountKey: mkey, account: EXTRACT_LABEL_KR[mkey], rawLabel: parsed.label, year: latestYear, values: valsAll, latestIndex, rawValue: selected, unit: unit || "", section: b.name || "표", rowText: l, confidence, status, isRatio: false, sel: status === "적용 후보" });
     }
   }
@@ -320,16 +357,28 @@ function compactKoreanAndNumberSpacing(line) {
   s = s.replace(/([가-힣])\s+([:：])/g, "$1$2").replace(/([:：])\s+([가-힣])/g, "$1$2");
   // 숫자/구분자(콤마·소수점·날짜) 연속 토큰을 한 덩어리로 모아 재조립
   // '-'는 뒤에 숫자가 올 때만 묶고(음수/날짜/연속비율), 빈칸 '-'(뒤가 숫자 아님)는 보존 → "11,000 - -" 유지
-  s = s.replace(/-?\d(?:\s*[\d.,\/]|\s*-(?=\s*\d))*/g, (run) => cretopReassembleNumberRun(run));
+  // [D-136] 단, 콤마·소수점·날짜 구분자가 없는 '떨어진 숫자 칸'(예 "당기순이익 5 8 9" · "0 0 0")은 연도 칸마다 따로인 값일 수 있어 붙이지 않는다.
+  //   붙이는 것은 한 글자씩 떨어진 숫자가 5개 이상 이어질 때뿐(글자 단위 PDF의 붙은 다년치 — 뒤에서 연도 수만큼 다시 나눈다),
+  //   그리고 한글 라벨도 글자 단위로 떨어진 줄(또는 한글이 없는 줄)일 때뿐이다.
+  const koTok = String(line || "").trim().split(/\s+/).filter((x) => /[가-힣]/.test(x));
+  const koSpaced = koTok.length === 0 || (koTok.filter((x) => x.length === 1).length >= 2 && koTok.filter((x) => x.length === 1).length * 2 >= koTok.length);
+  s = s.replace(/-?\d(?:\s*[\d.,\/]|\s*-(?=\s*\d))*/g, (run) => {
+    if (!/[.,\/]/.test(run) && !/\d\s*-/.test(run)) {
+      const parts = run.trim().split(/\s+/);
+      if (parts.length > 1 && (!koSpaced || parts.length < 5 || parts.some((p) => p.replace(/^-/, "").length > 1))) return run.trim();
+    }
+    return cretopReassembleNumberRun(run);
+  });
   s = s.replace(/단위\s*[:：]\s*/g, "단위:");
   return s.replace(/\s{2,}/g, " ").trim();
 }
 function normalizeCretopLine(line) { return compactKoreanAndNumberSpacing(line); }
 function normalizeCretopPdfText(rawText) { return String(rawText || "").split(/\r?\n/).map(normalizeCretopLine).join("\n"); }
 function extractNumbersFromCretopLine(line) { const s = normalizeCretopLine(line); return (s.match(/-?\d{1,3}(?:,\d{3})*(?:\.\d+)?|-?\d+(?:\.\d+)?/g) || []).filter((t) => !cretopIsBareYear(t)).map(parseNumLoose).filter((x) => x != null); }
-function cretopNumTokens(text) { return String(text).match(/-?\d[\d,]*(?:\.\d+)?/g) || []; }
+// [D-136] 괄호 · 세모 음수도 한 토큰으로("(1,234)" → -1234, "△1,234" → -1234)
+function cretopNumTokens(text) { return String(text).match(/\(\s*[△▽-]?\d[\d,]*(?:\.\d+)?\s*\)|[△▽-]?\d[\d,]*(?:\.\d+)?/g) || []; }
 function cretopIsBareYear(tok) { return /^(19|20)\d{2}$/.test(String(tok)); }
-function cretopValuesIn(text) { return cretopNumTokens(text).filter((t) => !cretopIsBareYear(t)).map(parseNumLoose).filter((x) => x != null); }
+function cretopValuesIn(text) { return cretopNumTokens(text).filter((t) => !cretopIsBareYear(String(t).replace(/[()\s]/g, ""))).map((t) => cretopSignedNum(String(t).replace(/\s+/g, ""))).filter((x) => x != null); }
 function cretopLineYears(line) {
   const toks = String(line).split(/\s+/).filter(Boolean); if (!toks.length) return null;
   // char-spaced 추출 시 '구분 계정명'이 '구분계정명'처럼 합쳐지므로 라벨어 연속(concat)도 라벨토큰으로 허용
@@ -415,35 +464,54 @@ function cretopRowRank(r) {
 }
 // 한 라인에 지표명이 2개 이상 있는 경우(예: "부채비율 63.34 61.99 61.6 매출채권회전율 6.31 5.52 5.76")
 // 지표명 기준으로 분할해 각 지표의 값 배열을 따로 뽑는다. 음수(- / △)도 인식.
-function cretopSplitLineMetrics(line, am, rm) {
+// [D-136] 단독 '-'는 빈칸(null) — 예전에는 다음 숫자의 음수 부호로 읽어 "매출액 - 6775 6704" 가 [-6775, 6704] 가 됐다.
+//   음수는 붙은 "-1,234" · "(1,234)" · "△1,234" 와 떨어진 "△ 1,234". yearN(연도 수)을 알면 글자 단위 PDF의 떨어진 부호만 예외로 본다(cretopCellsToValues).
+function cretopSplitLineMetrics(line, am, rm, yearN) {
   const A = am || CRETOP_EXTRACT_ACCT, R = rm || CRETOP_EXTRACT_RATIO;
   const toks = String(line).split(/\s+/).filter(Boolean);
   const matchAcct = (s) => { const norm = normalizeAccountLabel(String(s).replace(/[\s△▲▼▽()*+\-]+$/, "")); if (A[norm]) return { key: A[norm], label: norm, isRatio: false }; if (R[norm]) return { key: R[norm][0], label: norm, isRatio: true, unit: R[norm][1] }; return null; };
-  const asNum = (t) => { const m = String(t).match(/^([△▽(]?)(-?)([\d,]+(?:\.\d+)?)\)?$/); if (!m) return null; const v = parseNumLoose(m[3]); if (v == null) return null; return (m[1] || m[2] === "-") ? -Math.abs(v) : v; };
   const segs = []; let cur = null; let neg = false;
   for (let i = 0; i < toks.length; i++) {
     const t = toks[i];
-    if (t === "-" || t === "△" || t === "▽") { neg = true; continue; }            // 음수 부호(공백 분리)
+    if (cretopIsDashTok(t)) { if (cur) cur.cells.push({ type: "dash" }); neg = false; continue; }   // 빈칸
+    if (t === "△" || t === "▽") { neg = true; continue; }                          // 음수 부호(공백 분리)
     if (t === "▲" || t === "▼") { neg = false; continue; }                          // 증감 화살표(부호 아님)
-    const v = asNum(t);
-    if (v != null) { if (cur) cur.values.push(neg && v > 0 ? -v : v); neg = false; continue; }
+    const v = cretopSignedNum(t);
+    if (v != null) { if (cur) cur.cells.push({ type: "num", val: neg ? -Math.abs(v) : v }); neg = false; continue; }
     neg = false;
     let acct = matchAcct(t), consumed = 1;
-    if (!acct) { let merged = t; for (let j = i + 1; j < toks.length && j <= i + 3 && asNum(toks[j]) == null && toks[j] !== "-"; j++) { merged += toks[j]; const a2 = matchAcct(merged); if (a2) { acct = a2; consumed = j - i + 1; break; } } }
-    if (acct) { cur = { key: acct.key, label: acct.label, isRatio: !!acct.isRatio, unit: acct.unit, values: [] }; segs.push(cur); i += consumed - 1; }
+    if (!acct) { let merged = t; for (let j = i + 1; j < toks.length && j <= i + 3 && cretopSignedNum(toks[j]) == null && !cretopIsDashTok(toks[j]); j++) { merged += toks[j]; const a2 = matchAcct(merged); if (a2) { acct = a2; consumed = j - i + 1; break; } } }
+    if (acct) { cur = { key: acct.key, label: acct.label, isRatio: !!acct.isRatio, unit: acct.unit, cells: [] }; segs.push(cur); i += consumed - 1; }
   }
-  return segs.filter((s) => s.values.length);
+  return segs.map((s) => ({ key: s.key, label: s.label, isRatio: s.isRatio, unit: s.unit, values: cretopCellsToValues(s.cells, yearN || 0) })).filter((s) => s.values.some((v) => v != null));
+}
+// [D-136] 섹션(재무표 제목 기준) 범위마다 연도(원문 순서 그대로 — 최신→과거 표도 값과 짝이 맞게)와 단위.
+// 단위는 같은 섹션 안 가장 가까운 앞 '단위', 없으면 가장 가까운 뒤 '단위'(제목 다음 줄에 단위가 오는 PDF). 둘 다 없으면 null → 부르는 쪽이 관례로 '추정'.
+function cretopSectionAxes(lines) {
+  const n = lines.length; const years = new Array(n).fill(null); const units = new Array(n).fill(null);
+  const flush = (s, e) => {
+    const ys = []; for (let k = s; k < e; k++) { const yl = cretopLineYears(lines[k].ntext); if (yl) yl.forEach((y) => { if (!ys.includes(y)) ys.push(y); }); }
+    for (let k = s; k < e; k++) {
+      years[k] = ys;
+      let u = null; for (let j = k; j >= s; j--) { if (lines[j].unit) { u = lines[j].unit; break; } }
+      if (!u) { for (let j = k + 1; j < e; j++) { if (lines[j].unit) { u = lines[j].unit; break; } } }
+      units[k] = u;
+    }
+  };
+  let start = 0;
+  for (let k = 0; k < n; k++) { if (k > 0 && cretopSecOf(lines[k].ntext)) { flush(start, k); start = k; } }
+  flush(start, n);
+  return { years, units };
 }
 // 한 줄만 보지 않고 계정명 발견 시 주변 라인의 숫자/연도를 모아 후보 행 생성(형태 A~E 대응)
 function extractCretopCandidatesFromLines(rawText, opts) {
   const am = opts && opts.acct; const rm = opts && opts.ratio; const labels = (opts && opts.labels) || EXTRACT_LABEL_KR;
   const dbg = analyzeCretopRaw(rawText, am, rm); const lines = dbg.lines; const rows = []; let idc = 0;
-  // 섹션 단위 연도축 산출(연도 헤더가 표 위/아래 어디 있거나 줄이 깨져 있어도 같은 섹션이면 공유)
-  const lineSecYears = new Array(lines.length).fill(null);
-  { let start = 0; const flush = (s, e) => { const ys = []; for (let k = s; k < e; k++) { const yl = cretopLineYears(lines[k].ntext); if (yl) yl.forEach((y) => { if (!ys.includes(y)) ys.push(y); }); } const sorted = ys.slice().sort((a, b) => a - b); for (let k = s; k < e; k++) lineSecYears[k] = sorted; };
-    for (let k = 0; k < lines.length; k++) { if (k > 0 && cretopSecOf(lines[k].ntext)) { flush(start, k); start = k; } } flush(start, lines.length); }
-  const addRow = (L, acct, valueNumsIn, years, unitIn, ctx) => {
+  // 섹션 단위 연도축 산출(연도 헤더가 표 위/아래 어디 있거나 줄이 깨져 있어도 같은 섹션이면 공유) — 원문 순서 유지(짝지은 뒤 정렬)
+  const axes = cretopSectionAxes(lines); const lineSecYears = axes.years;
+  const addRow = (L, acct, valueNumsIn, yearsIn, unitIn, ctx, unitAssumed) => {
     let valueNums = (valueNumsIn || []).slice(); if (!valueNums.length) return;
+    let years = (yearsIn || []).slice();
     let unit = acct.isRatio ? acct.unit : unitIn;
     // 붙어버린 다년치 정수(금액) 재분할 — 음수 부호는 첫 값에 적용
     let splitNote = "";
@@ -452,14 +520,22 @@ function extractCretopCandidatesFromLines(rawText, opts) {
       if (ds.replace(/^-/, "").length > years.length) { const split = splitCretopCompactNumbersByYears(ds, years, acct.label); if (split && split.length === years.length) { valueNums = split; splitNote = ` · 글자 단위 PDF로 ${years.length}개년 숫자가 붙어 ${years.length}분할 후 자연스러운 조합 선택`; } }
     }
     // 최대 연도 수(지표명 뒤 N개)만 — 5개년처럼 과다 표시 방지
-    if (years.length && valueNums.length > years.length) valueNums = valueNums.slice(0, years.length);
+    const overCount = years.length && valueNums.length > years.length;
+    if (overCount) valueNums = valueNums.slice(0, years.length);
+    // [D-136] 원문 순서 연도 ↔ 값 짝 → 연도 오름차순(최신→과거 표 대응). 개수가 다르면 연도만 오름차순(값 짝은 모름 → 검수 필요)
+    const paired = cretopPairAsc(years, valueNums);
+    const descUnpaired = !paired && years.length > 1 && !cretopIsAscending(years);
+    if (paired) { years = paired.years; valueNums = paired.vals; } else if (years.length) years = years.slice().sort((a, b) => a - b);
     let selected = null, latestIndex = -1, latestYear = null, reason = "", status = "", confidence = "보통";
     const tooMany = valueNums.length > (years.length ? years.length : 4) + 1;
-    if (years.length && valueNums.length === years.length) { latestYear = Math.max(...years); latestIndex = years.indexOf(latestYear); selected = valueNums[latestIndex]; reason = `연도 ${years.join("/")} 중 최신 ${latestYear} → index ${latestIndex}`; status = "적용 후보"; confidence = "높음"; }
+    if (paired && !overCount) { latestYear = years[years.length - 1]; latestIndex = years.length - 1; selected = valueNums[latestIndex]; reason = `연도 ${years.join("/")} 중 최신 ${latestYear} → index ${latestIndex}`; status = "적용 후보"; confidence = "높음";
+      if (selected == null) { reason = `최신 ${latestYear}년 칸이 비어 있음(-) — 예전 연도 값을 최신으로 쓰지 않음`; status = "검수 필요"; confidence = "보통"; } }
+    else if (paired) { latestYear = years[years.length - 1]; latestIndex = years.length - 1; selected = valueNums[latestIndex]; reason = `숫자 후보가 연도(${years.length})보다 많음 — 앞 ${years.length}개만 사용, 확인 필요`; status = "검수 필요"; confidence = "낮음"; }
     else if (tooMany) { selected = valueNums[valueNums.length - 1]; latestIndex = valueNums.length - 1; latestYear = years.length ? Math.max(...years) : null; reason = `숫자 후보 ${valueNums.length}개 과다 — 자동 선택 보류(오른쪽 값 임시)`; status = "검수 필요"; confidence = "낮음"; }
-    else if (years.length) { latestYear = Math.max(...years); selected = valueNums[valueNums.length - 1]; latestIndex = valueNums.length - 1; reason = `값 개수(${valueNums.length})≠연도(${years.length}) — 오른쪽 값 사용`; status = "검수 필요"; confidence = "보통"; }
+    else if (years.length) { latestYear = Math.max(...years); selected = valueNums[valueNums.length - 1]; latestIndex = valueNums.length - 1; reason = `값 개수(${valueNums.length})≠연도(${years.length}) — 오른쪽 값 사용${descUnpaired ? " · 최신→과거 순 표라 짝 불명" : ""}`; status = "검수 필요"; confidence = "보통"; }
     else { selected = valueNums[valueNums.length - 1]; latestIndex = valueNums.length - 1; reason = "연도 미감지 — 오른쪽 끝(최신) 값 사용"; status = "연도 확인 필요"; confidence = "보통"; }
     if (splitNote) reason += splitNote;
+    if (!acct.isRatio && unitAssumed) reason += ` · 단위 표시 없음 — ${unit}로 추정`;
     const uf = unit && FINAL_UNIT_EOK[unit] != null ? FINAL_UNIT_EOK[unit] : null;
     if (!acct.isRatio) {
       if (uf == null && status === "적용 후보") { status = "단위 확인 필요"; confidence = "보통"; }
@@ -469,18 +545,18 @@ function extractCretopCandidatesFromLines(rawText, opts) {
     if (acct.isRatio) { if (hardBlock) { status = "제외"; confidence = "낮음"; reason = "동종업계/업계순위 비교값으로 보여 자사 지표에서 제외"; } }
     else if (L.blocked) { status = "제외"; confidence = "낮음"; reason = `차단 섹션(${L.section}) — 다른 회사 숫자 가능성`; }
     const isAggregate = /\(\s*\*\s*\)/.test(L.ntext || "");   // 집계행((*) 표기) 우선용
-    rows.push({ id: `c${idc++}`, accountKey: acct.key, account: labels[acct.key] || acct.label, rawLabel: acct.label, isRatio: !!acct.isRatio, lineIndex: L.li, rawLineIndex: L.i, contextLines: ctx, rowText: L.text, normLine: L.ntext, numberCandidates: valueNums, yearCandidates: years, rawValue: selected, latestIndex, year: latestYear, selectedReason: reason, unit, section: L.section, confidence, status, isAggregate, sel: status === "적용 후보" });
+    rows.push({ id: `c${idc++}`, accountKey: acct.key, account: labels[acct.key] || acct.label, rawLabel: acct.label, isRatio: !!acct.isRatio, lineIndex: L.li, rawLineIndex: L.i, contextLines: ctx, rowText: L.text, normLine: L.ntext, numberCandidates: valueNums, yearCandidates: years, rawValue: selected, latestIndex, year: latestYear, selectedReason: reason, unit, unitAssumed: !acct.isRatio && !!unitAssumed, section: L.section, confidence, status, isAggregate, sel: status === "적용 후보" });
   };
   for (let li = 0; li < lines.length; li++) {
     const L = lines[li]; if (!L.acctKey) continue;
-    let unit = "";
-    for (let k = li; k >= 0; k--) { if (lines[k].unit) { unit = lines[k].unit; break; } if (lines[k].section !== L.section) break; }
-    if (!unit) { if (/요약|MY/.test(L.section)) unit = "백만원"; else if (/재무상태표|손익계산서/.test(L.section)) unit = "천원"; }
+    // [D-136] 단위: 같은 섹션의 가장 가까운 앞/뒤 '단위' → 없으면 섹션 관례로 추정(unitAssumed)
+    let unit = axes.units[li] || ""; let unitAssumed = false;
+    if (!unit) { if (/요약|MY/.test(L.section)) unit = "백만원"; else if (/재무상태표|손익계산서/.test(L.section)) unit = "천원"; unitAssumed = !!unit; }
     const years = (lineSecYears[li] || []).slice();
     const ctx = [{ i: L.i, li: L.li, text: L.text, ntext: L.ntext }];
     // 한 라인에 여러 지표가 함께 있으면 지표별로 분할해 각각 행 생성
-    const segs = cretopSplitLineMetrics(L.ntext, am, rm);
-    if (segs.length) { for (const seg of segs) addRow(L, seg, seg.values, years, unit, ctx); }
+    const segs = cretopSplitLineMetrics(L.ntext, am, rm, years.length);
+    if (segs.length) { for (const seg of segs) addRow(L, seg, seg.values, years, unit, ctx, unitAssumed); }
     else {
       // 계정명만 있고 값은 다음 줄 — 주변 라인에서 값 수집(형태 A~E)
       const acct = cretopLineAcct(L.ntext, am, rm); if (!acct) continue;
@@ -493,7 +569,7 @@ function extractCretopCandidatesFromLines(rawText, opts) {
         if (vs.length) { valueNums.push(...vs); started = true; }
         else if (started) break;
       }
-      if (valueNums.length) addRow(L, acct, valueNums, years, unit, ctx);
+      if (valueNums.length) addRow(L, acct, valueNums, years, unit, ctx, unitAssumed);
     }
   }
   // 같은 지표가 여러 후보면 순위(정확 계정명·요약 재무표·상태) 점수로 최우선 1건만 자동선택/미리보기 대표로
@@ -574,41 +650,34 @@ function cretopSortBsItems(items) { return (items || []).map((it, i) => ({ it, i
 function parseCretopDetailRow(ntext, yearN) {
   if (!ntext || CRETOP_DETAIL_NONFIN.test(ntext)) return null;
   const toks = String(ntext).split(/\s+/).filter(Boolean);
-  const isNum = (t) => /^-?[\d,]+(?:\.\d+)?$/.test(t);   // 붙은 음수(-123)는 숫자로 인식
-  const isDash = (t) => t === "-" || t === "－";
+  const isNum = (t) => cretopSignedNum(t) != null;   // [D-136] 붙은 음수(-123) · 괄호 (123) · 세모 △123 모두 숫자(음수)로 인식
+  const isDash = cretopIsDashTok;
   let fv = -1;
   for (let i = 0; i < toks.length; i++) { const t = toks[i]; if (isNum(t) || isDash(t)) { fv = i; break; } if ((t === "△" || t === "▽") && i + 1 < toks.length && isNum(toks[i + 1])) { fv = i; break; } }
   if (fv <= 0) return null;
   const name = normalizeDetailLabel(toks.slice(0, fv).join(""));
   if (!/[가-힣]/.test(name) || /^[(]?(구분|계정명)[)]?$/.test(name)) return null;
-  // 토큰 → 셀 분류: num(부호포함 숫자) / dash(단독 '-', 다음이 숫자인지 표시)
+  // 토큰 → 셀 분류: num(부호포함 숫자) / dash(단독 '-')
   const cells = []; let pendingNeg = false;
   for (let i = fv; i < toks.length; i++) { const t = toks[i];
     if (t === "△" || t === "▽") { pendingNeg = true; continue; }
     if (t === "▲" || t === "▼") { pendingNeg = false; continue; }
-    if (isDash(t)) { cells.push({ type: "dash", beforeNum: (i + 1 < toks.length) && isNum(toks[i + 1]) }); continue; }
-    if (isNum(t)) { let v = parseFloat(t.replace(/,/g, "")); if (pendingNeg) v = -Math.abs(v); cells.push({ type: "num", val: v }); pendingNeg = false; continue; }
+    if (isDash(t)) { cells.push({ type: "dash" }); pendingNeg = false; continue; }
+    const n = cretopSignedNum(t);
+    if (n != null) { cells.push({ type: "num", val: pendingNeg ? -Math.abs(n) : n }); pendingNeg = false; continue; }
     break;
   }
-  const numCount = cells.filter((c) => c.type === "num").length;
-  const dashCount = cells.length - numCount;
-  let vals;
-  if (yearN >= 2 && numCount === yearN && (numCount + dashCount) > yearN) {
-    // 숫자 개수가 연도 수와 같고 '-'가 초과 → 숫자 앞 '-'는 음수부호(병합), 단독 '-'는 무시
-    vals = [];
-    for (let i = 0; i < cells.length; i++) { const c = cells[i]; if (c.type === "dash") { if (c.beforeNum && cells[i + 1] && cells[i + 1].type === "num") cells[i + 1].val = -Math.abs(cells[i + 1].val); continue; } vals.push(c.val); }
-  } else {
-    vals = cells.map((c) => c.type === "num" ? c.val : null);   // '-'는 빈칸(null)
-  }
+  // 숫자 개수가 연도 수와 같고 '-'가 초과 → 숫자 앞 '-'는 음수부호(글자 단위 PDF), 그 밖의 단독 '-'는 빈칸(null)
+  const vals = cretopCellsToValues(cells, yearN);
   if (vals.filter((v) => v != null).length < 1) return null;
   return { name, values: vals };
 }
 // 상세 재무제표 — 섹션 안에서 계정명+숫자 행을 가능한 한 모두(사전 미등록 포함) 원문 순서대로 수집
 function extractCretopDetail(rawText) {
   const dbg = analyzeCretopRaw(rawText); const lines = dbg.lines;
-  const lineSecYears = new Array(lines.length).fill(null);
-  { let start = 0; const flush = (s, e) => { const ys = []; for (let k = s; k < e; k++) { const yl = cretopLineYears(lines[k].ntext); if (yl) yl.forEach((y) => { if (!ys.includes(y)) ys.push(y); }); } const sorted = ys.slice().sort((a, b) => a - b); for (let k = s; k < e; k++) lineSecYears[k] = sorted; };
-    for (let k = 0; k < lines.length; k++) { if (k > 0 && cretopSecOf(lines[k].ntext)) { flush(start, k); start = k; } } flush(start, lines.length); }
+  // [D-136] 연도는 원문 순서(짝지은 뒤 오름차순 정렬), 단위는 같은 섹션의 '단위'(제목 줄 · 다음 줄 포함) — 없을 때만 관례(요약/MY 백만원 · 상세 천원)로 추정
+  const axes = cretopSectionAxes(lines); const lineSecYears = axes.years;
+  const unitOf = (li, L) => { const u = axes.units[li]; if (u) return { unit: u, assumed: false }; return { unit: /요약|MY/.test(L.section || "") ? "백만원" : "천원", assumed: true }; };
   const groupOf = (sec) => { if (/이익잉여금처분/.test(sec)) return "re"; if (/제조원가/.test(sec)) return "mc"; if (/손익계산서/.test(sec)) return "is"; if (/재무상태표|MY/.test(sec)) return "bs"; return null; };
   const bySec = { bs: {}, is: {}, re: {}, mc: {} }; const secYears = { bs: {}, is: {}, re: {}, mc: {} }; const secDateHdr = { bs: {}, is: {}, re: {}, mc: {} }; const noData = {};
   lines.forEach((L, li) => {
@@ -617,22 +686,27 @@ function extractCretopDetail(rawText) {
     // 상세 명세서 신호: 'YYYY-MM-DD' 날짜 헤더가 있는 섹션은 상세표(요약/MY가 아님)로 표시
     if (cretopLineYears(L.ntext) && /(?:19|20)\d{2}\s*[-.\/]\s*\d{1,2}\s*[-.\/]\s*\d{1,2}/.test(L.ntext)) secDateHdr[gk][L.section || "?"] = true;
     if (cretopSecOf(L.ntext) || cretopLineYears(L.ntext)) return;
-    const years = (lineSecYears[li] || []).slice(); const yearN = years.length || 3;
-    const sn0 = L.section || "?";
+    const yearsText = (lineSecYears[li] || []).slice(); const yearN = yearsText.length || 3;
+    const years = yearsText.slice().sort((a, b) => a - b);
+    const sn0 = L.section || "?"; const uo = unitOf(li, L);
     // 구조 헤더(감사의견/자산/부채/자본/당좌자산 등 — 숫자 없는 행)도 원문 순서대로 포함('감사의견'부터 시작)
     const lab0 = normalizeDetailLabel(L.ntext);
     // 감사의견은 의견 텍스트(적정/한정/부적정/의견거절)가 붙어도 헤더성 첫 행으로 보존 — lineIndex가 가장 앞이면 그대로 첫 행
     const isAudit = /^감사의견/.test(lab0);
-    if (isAudit || /^(자산|부채|자본|당좌자산)$/.test(lab0)) { const auditOpinion = isAudit ? ((L.ntext.match(/적정|한정|부적정|의견거절|비적정/) || [])[0] || null) : null; (bySec[gk][sn0] = bySec[gk][sn0] || []).push({ id: `d_${gk}_${li}`, accountKey: "d_" + (isAudit ? "감사의견" : lab0), account: isAudit ? "감사의견" : lab0, rawLabel: isAudit ? "감사의견" : lab0, isRatio: false, lineIndex: L.li, contextLines: [], rowText: L.text, normLine: L.ntext, numberCandidates: Array.from({ length: yearN }, () => null), yearCandidates: years.length ? years : [], rawValue: auditOpinion, year: years[years.length - 1] || null, unit: L.unit || "천원", section: sn0, status: "연도 확인 필요", confidence: "보통", isHeader: true, sel: false }); secYears[gk][sn0] = years; return; }
+    if (isAudit || /^(자산|부채|자본|당좌자산)$/.test(lab0)) { const auditOpinion = isAudit ? ((L.ntext.match(/적정|한정|부적정|의견거절|비적정/) || [])[0] || null) : null; (bySec[gk][sn0] = bySec[gk][sn0] || []).push({ id: `d_${gk}_${li}`, accountKey: "d_" + (isAudit ? "감사의견" : lab0), account: isAudit ? "감사의견" : lab0, rawLabel: isAudit ? "감사의견" : lab0, isRatio: false, lineIndex: L.li, contextLines: [], rowText: L.text, normLine: L.ntext, numberCandidates: Array.from({ length: yearN }, () => null), yearCandidates: years.length ? years : [], rawValue: auditOpinion, year: years[years.length - 1] || null, unit: uo.unit, unitAssumed: uo.assumed, section: sn0, status: "연도 확인 필요", confidence: "보통", isHeader: true, sel: false }); secYears[gk][sn0] = years; return; }
     const seg = parseCretopDetailRow(L.ntext, yearN); if (!seg) return;
-    let vals = seg.values.slice();
+    let vals = seg.values.slice(); let splitDone = false;
     // 글자단위로 붙어버린 다년치 순수정수(예 "410256102")를 연도 수만큼 재분할
     // 단, '-'(빈칸) 칸이 있는 행(예 "88470 - -")은 단일연도 실제값이므로 분할 금지 → 토큰이 정확히 1개(placeholder 없음)일 때만 적용
-    if (vals.length === 1 && yearN >= 2) { const only = vals[0]; if (only != null && Number.isInteger(only) && only >= 0 && String(only).length > yearN && !/[,.]/.test(seg.name)) { const sp = splitCretopCompactNumbersByYears(String(only), years.length ? years : Array.from({ length: yearN }, (_, i) => i), seg.name); if (sp && sp.length === yearN) vals = sp; } }
+    if (vals.length === 1 && yearN >= 2) { const only = vals[0]; if (only != null && Number.isInteger(only) && only >= 0 && String(only).length > yearN && !/[,.]/.test(seg.name)) { const sp = splitCretopCompactNumbersByYears(String(only), yearsText.length ? yearsText : Array.from({ length: yearN }, (_, i) => i), seg.name); if (sp && sp.length === yearN) { vals = sp; splitDone = true; } } }
+    // [D-136] 값 개수≠연도 수 → 어느 칸이 비었는지 모른다(countMismatch — 최신값을 사실로 쓰지 않음)
+    const countMismatch = yearsText.length > 0 && vals.length !== yearN;
     vals = vals.slice(0, yearN); while (vals.length < yearN) vals.push(null);  // 3개년 컬럼 유지(빈칸은 null)
-    const unit = L.unit || (/요약|MY/.test(L.section) ? "백만원" : "천원"); const sn = L.section || "?";
+    // [D-136] 원문 순서 연도 ↔ 값 짝 → 연도 오름차순(최신→과거 순 표도 제 연도에)
+    const pr = cretopPairAsc(yearsText, vals); if (pr) vals = pr.vals;
+    const unit = uo.unit; const sn = L.section || "?";
     const nz = vals.slice().reverse().find((v) => v != null);
-    (bySec[gk][sn] = bySec[gk][sn] || []).push({ id: `d_${gk}_${li}`, accountKey: "d_" + seg.name, account: seg.name, rawLabel: seg.name, isRatio: false, lineIndex: L.li, contextLines: [], rowText: L.text, normLine: L.ntext, numberCandidates: vals, yearCandidates: years.length ? years : [], rawValue: nz != null ? nz : null, year: years[years.length - 1] || null, unit, section: sn, status: "연도 확인 필요", confidence: "보통", sel: false });
+    (bySec[gk][sn] = bySec[gk][sn] || []).push({ id: `d_${gk}_${li}`, accountKey: "d_" + seg.name, account: seg.name, rawLabel: seg.name, isRatio: false, lineIndex: L.li, contextLines: [], rowText: L.text, normLine: L.ntext, numberCandidates: vals, yearCandidates: years.length ? years : [], rawValue: nz != null ? nz : null, year: years[years.length - 1] || null, unit, unitAssumed: uo.assumed, countMismatch, compactSplit: splitDone, section: sn, status: "연도 확인 필요", confidence: "보통", sel: false });
     secYears[gk][sn] = years;
   });
   const DETAIL_ONLY_ACCT = /당좌자산|기타현금및예금|단기대여금|기타단기대여금|선급법인세|선급부가세|매출채권|선급금|선급비용/;
@@ -669,38 +743,39 @@ function normalizeRatioMetricName(name) {
 }
 const CRETOP_RATIO_TEXTVAL = /^(적자전환|흑자전환|적자지속|흑자지속|조회된자료가없습니다|자료없음|해당없음)$/;
 // 한 줄에서 '지표명 + 최대 N개 값(숫자/텍스트형)' 추출
+// [D-136] 단독 '-'는 빈칸(null). 숫자 개수가 N과 같고 '-'가 더 있을 때만 숫자 앞 '-'를 부호로(cretopCellsToValues)
 function parseRatioRow(line, N) {
   const toks = String(line).split(/\s+/).filter(Boolean);
-  const isNum = (t) => /^-?[\d,]+(?:\.\d+)?$/.test(t);
-  const nameToks = []; const vals = []; let started = false, neg = false;
+  const isNum = (t) => cretopSignedNum(t) != null;
+  const nameToks = []; const cells = []; let started = false, neg = false;
   for (let i = 0; i < toks.length; i++) {
     const t = toks[i];
     if (!started) {
       if (t === "△" || t === "▽") { neg = true; started = true; continue; }
-      if (t === "-" && i + 1 < toks.length && isNum(toks[i + 1])) { neg = true; started = true; continue; }
-      if (isNum(t) || CRETOP_RATIO_TEXTVAL.test(t) || t === "*") { started = true; i--; continue; }
+      if (cretopIsDashTok(t) || isNum(t) || CRETOP_RATIO_TEXTVAL.test(t) || t === "*") { started = true; i--; continue; }
       nameToks.push(t); continue;
     }
     if (t === "▲" || t === "▼") { continue; }
-    if (t === "△" || t === "▽" || (t === "-" && i + 1 < toks.length && isNum(toks[i + 1]))) { neg = true; continue; }
-    if (isNum(t)) { let v = parseFloat(t.replace(/,/g, "")); if (neg) v = -Math.abs(v); vals.push(v); neg = false; }
-    else if (CRETOP_RATIO_TEXTVAL.test(t)) { vals.push(t); neg = false; }
-    else if (/^(?:적자전환|흑자전환|적자지속|흑자지속){2,}$/.test(t)) { (t.match(/적자전환|흑자전환|적자지속|흑자지속/g) || []).forEach((x) => vals.push(x)); neg = false; }   // char-spaced로 합쳐진 텍스트형(적자전환흑자전환) 분리
-    else if (t === "*") { vals.push("*"); }
+    if (t === "△" || t === "▽") { neg = true; continue; }
+    if (cretopIsDashTok(t)) { cells.push({ type: "dash" }); neg = false; continue; }
+    if (isNum(t)) { const v = cretopSignedNum(t); cells.push({ type: "num", val: neg ? -Math.abs(v) : v }); neg = false; }
+    else if (CRETOP_RATIO_TEXTVAL.test(t)) { cells.push({ type: "text", val: t }); neg = false; }
+    else if (/^(?:적자전환|흑자전환|적자지속|흑자지속){2,}$/.test(t)) { (t.match(/적자전환|흑자전환|적자지속|흑자지속/g) || []).forEach((x) => cells.push({ type: "text", val: x })); neg = false; }   // char-spaced로 합쳐진 텍스트형(적자전환흑자전환) 분리
+    else if (t === "*") { cells.push({ type: "text", val: "*" }); }
     else break;
-    if (vals.length >= N) break;
   }
   const name = nameToks.join("");
-  if (!name || !vals.length) return null;
+  const vals = cretopCellsToValues(cells, N);
+  if (!name || !vals.some((v) => v != null)) return null;
   return { name, values: vals.slice(0, N) };
 }
 // 재무비율 '전체 표'(재무비율 단위:% + 연도/날짜 헤더)에서 각 지표의 3개년 값을 직접 추출(요약 카드 혼입 방지)
 function extractCretopFullRatioTable(rawText) {
   const lines = normalizeCretopPdfText(rawText).split(/\r?\n/).map((l) => l.trim());
-  let start = -1, years = null;
+  let start = -1, years = null, yearsText = null;
   for (let i = 0; i < lines.length; i++) {
     if (/재무\s*비율/.test(lines[i]) && !/동종|업계|순위/.test(lines[i])) {
-      for (let j = i; j <= Math.min(i + 5, lines.length - 1); j++) { const yl = cretopLineYears(lines[j]); if (yl && yl.length >= 2) { start = j + 1; years = yl.slice().sort((a, b) => a - b); break; } }
+      for (let j = i; j <= Math.min(i + 5, lines.length - 1); j++) { const yl = cretopLineYears(lines[j]); if (yl && yl.length >= 2) { start = j + 1; yearsText = yl.slice(); years = yl.slice().sort((a, b) => a - b); break; } }
       if (start >= 0) break;
     }
   }
@@ -715,7 +790,10 @@ function extractCretopFullRatioTable(rawText) {
     if (catRe.test(ln)) continue;
     const seg = parseRatioRow(ln, N); if (!seg) continue;
     const key = normalizeRatioMetricName(seg.name);
-    if (key && !metrics[key]) metrics[key] = { key, name: normalizeAccountLabel(seg.name), values: seg.values, years };
+    // [D-136] 원문 순서 연도 ↔ 값 짝 → 오름차순. 최신→과거 표에서 값 개수가 모자라면 짝을 몰라 싣지 않는다
+    let values = seg.values; const pr = cretopPairAsc(yearsText, values);
+    if (pr) values = pr.vals; else if (!cretopIsAscending(yearsText)) continue;
+    if (key && !metrics[key]) metrics[key] = { key, name: normalizeAccountLabel(seg.name), values, years };
   }
   return Object.keys(metrics).length ? { years, metrics } : null;
 }
@@ -726,10 +804,10 @@ function cretopFullRatioRows(rawText) {
   Object.keys(ft.metrics).forEach((key) => {
     const m = ft.metrics[key]; const years = ft.years; const N = years.length;
     const nums = m.values.filter((v) => typeof v === "number");
-    const latestNum = nums.length ? m.values.slice().reverse().find((v) => typeof v === "number") : null;
     const latestRaw = m.values[m.values.length - 1];
+    const latestMissing = latestRaw == null;   // [D-136] 최신 연도 칸이 비었으면 예전 연도 값을 최신으로 올리지 않는다
     const unit = (CORE_RATIO[m.name] && CORE_RATIO[m.name][1]) || "%";
-    out.push({ id: `ft${idc++}`, accountKey: key, account: CORE_LABELS[key] || m.name, rawLabel: m.name, isRatio: true, lineIndex: -1, contextLines: [], rowText: `${m.name} ${m.values.join(" ")}`, normLine: `${m.name} ${m.values.join(" ")}`, numberCandidates: nums, yearCandidates: years.slice(), textValues: m.values, rawValue: typeof latestRaw === "number" ? latestRaw : (latestNum != null ? latestNum : latestRaw), latestIndex: m.values.length - 1, year: years[years.length - 1], selectedReason: "재무비율 전체표에서 직접 추출(요약 카드보다 우선)", unit, section: "재무비율(전체표)", confidence: "높음", status: "적용 후보", sel: false, fromFullTable: true });
+    out.push({ id: `ft${idc++}`, accountKey: key, account: CORE_LABELS[key] || m.name, rawLabel: m.name, isRatio: true, lineIndex: -1, contextLines: [], rowText: `${m.name} ${m.values.join(" ")}`, normLine: `${m.name} ${m.values.join(" ")}`, numberCandidates: nums, yearCandidates: years.slice(), textValues: m.values, rawValue: latestMissing ? null : latestRaw, latestIndex: m.values.length - 1, year: years[years.length - 1], selectedReason: latestMissing ? `최신 ${years[years.length - 1]}년 칸이 비어 있음 — 확인 필요` : "재무비율 전체표에서 직접 추출(요약 카드보다 우선)", unit, section: "재무비율(전체표)", confidence: latestMissing ? "보통" : "높음", status: latestMissing ? "검수 필요" : "적용 후보", sel: false, fromFullTable: true });
   });
   return out;
 }
@@ -848,8 +926,18 @@ function extractCretopCompanyInfo(rawText, dbg) {
   const std11 = cleanInd((t.match(stdRe("11")) || [])[1]);
   const std = std10 || std11 || cleanInd((t.match(new RegExp("표준\\s*산업\\s*분류\\s*[(（]?\\s*1?[01]?\\s*차?\\s*[)）]?\\s*[:：]?\\s*" + indValCap)) || [])[1]);
   const ind = std || (t.match(/(?:^|\n)\s*업종\s*[:：]\s*([가-힣A-Za-z·/()\s]{2,24}?(?:제조업|서비스업|도매업|소매업|건설업|업))/) || [])[1];
-  const est = (t.match(/(?:설립(?:일|년월|일자)?|법인설립)\s*[:：]?\s*((?:19|20)\d{2}(?:[-.\/]\d{1,2}(?:[-.\/]\d{1,2})?)?)/) || [])[1];
-  const emp = (t.match(/(?:종업원|직원|상시\s*근로자)\s*수?\s*[:：]?\s*(\d{1,5})\s*명?/) || [])[1];
+  // [D-136] 설립일: '2008-04-15' · '2008.4.15' · '2008년 04월 15일' → 날짜가 다 있으면 YYYY-MM-DD, 연(월)만 있으면 원문 그대로(날짜를 지어내지 않는다)
+  const est = (() => {
+    const m = t.match(/(?:설립(?:일|년월일|년월|일자)?|법인설립)\s*[:：]?\s*((?:19|20)\d{2})(?:\s*(?:[-.\/]|년)\s*(\d{1,2}))?(?:\s*(?:[-.\/]|월)\s*(\d{1,2}))?/);
+    if (!m) return "";
+    const c8 = t.match(/(?:설립(?:일|년월일|년월|일자)?|법인설립)\s*[:：]?\s*((?:19|20)\d{2})(\d{2})(\d{2})(?!\d)/);
+    if (c8 && +c8[2] >= 1 && +c8[2] <= 12 && +c8[3] >= 1 && +c8[3] <= 31) return `${c8[1]}-${c8[2]}-${c8[3]}`;
+    const mo = m[2] != null ? +m[2] : null, da = m[3] != null ? +m[3] : null;
+    if (mo != null && da != null && mo >= 1 && mo <= 12 && da >= 1 && da <= 31) return `${m[1]}-${String(mo).padStart(2, "0")}-${String(da).padStart(2, "0")}`;
+    return mo != null && mo >= 1 && mo <= 12 ? `${m[1]}-${String(mo).padStart(2, "0")}` : m[1];
+  })();
+  // [D-136] 직원 수: '1,234명' → 1234 (예전에는 콤마 앞 '1' 만 읽었다)
+  const emp = (() => { const m = t.match(/(?:종업원|직원|상시\s*근로자)\s*수?\s*[:：]?\s*(\d{1,3}(?:,\d{3})+|\d{1,6})(?![\d,])\s*명?/); return m ? m[1].replace(/,/g, "") : ""; })();
   const product = (t.match(/주요\s*제품(?:\s*[(（]?상품[)）]?)?\s*[:：]?\s*([가-힣A-Za-z0-9·,()\s]{2,40}?)(?:\n|업종|대표|설립|$)/) || [])[1];
   const corpType = (t.match(/기업\s*유형\s*[:：]?\s*(주식회사|유한회사|유한책임회사|합자회사|합명회사|일반법인|개인사업자|[가-힣]{2,4}법인)/) || [])[1];
   const scale = (t.match(/기업\s*규모\s*[:：]?\s*(대기업|중견기업|중소기업|소상공인|소기업|중기업|벤처기업)/) || [])[1];
@@ -951,18 +1039,42 @@ function buildCretopParsedForUi(rawText) {
   // 상세 재무상태표에서 최신값(집계행 (*) 우선)
   // 집계행((*) 표기, normalizeDetailLabel가 *를 지워 "단기차입금()"으로 남음) 우선, 없으면 최대 magnitude(하위행 11,000보다 집계 우선)
   const bsRow = (names) => { const g = det.bs; if (!g) return null; for (const nm of names) { const cands = g.items.filter((it) => (it.rawLabel || "").replace(/\([^)]*\)/g, "") === nm || it.rawLabel === nm); if (!cands.length) continue; const agg = cands.find((c) => /\(\s*\*?\s*\)/.test(c.rawLabel || "")); if (agg) return agg; if (cands.length === 1) return cands[0]; return cands.slice().sort((a, b) => { const av = Math.max(...(a.numberCandidates || []).map((v) => Math.abs(v || 0))), bv = Math.max(...(b.numberCandidates || []).map((v) => Math.abs(v || 0))); return bv - av; })[0]; } return null; };
-  const fromRow = (r, isRatio) => { if (!r) return null; const vals = (r.numberCandidates || []).slice(); const years = (r.yearCandidates && r.yearCandidates.length) ? r.yearCandidates : (det.bs ? det.bs.years : []); const latest = vals.slice().reverse().find((v) => v != null); const uf = CRETOP_UF[r.unit]; return { value: latest, unit: r.unit, eok: (!isRatio && latest != null && uf != null) ? Math.round(latest * uf * 100) / 100 : null, year: (years && years.length) ? years[years.length - 1] : (r.year || null), series: vals, years: years || [], isRatio: !!isRatio, rawLabel: r.rawLabel }; };
+  // [D-136] 행 → 미리보기 한 칸. 값은 '제 연도' 값만 — 최신 연도 칸이 비었으면 예전 연도 값을 최신으로 쓰지 않는다(value=null · latestMissing).
+  //   확인이 필요한 것(연도 없음 · 값/연도 개수 다름 · 단위 모름 · 현실 범위 밖 · 후보 상태 나쁨)은 needsCheck + checkReasons — 사실 창고 · 영업 칸으로 넘기지 않는다.
+  const fromRow = (r, isRatio) => {
+    if (!r) return null;
+    const checks = [];
+    let vals = (r.numberCandidates || []).slice();
+    const ownYears = !!(r.yearCandidates && r.yearCandidates.length);
+    let years = ownYears ? r.yearCandidates.slice() : (det.bs ? (det.bs.years || []).slice() : []);
+    if (!ownYears) checks.push(years.length ? "표에 연도가 없어 재무상태표 연도를 빌려 씀 — 연도 확인 필요" : "연도 확인 필요");
+    const pr = cretopPairAsc(years, vals);
+    if (pr) { years = pr.years; vals = pr.vals; }
+    else if (years.length) { checks.push(`값 ${vals.length}개 · 연도 ${years.length}개 — 어느 연도 값인지 확인 필요`); years = years.slice().sort((a, b) => a - b); }
+    if (r.countMismatch) checks.push("값 개수가 연도 수와 달라 빈칸 위치 확인 필요");
+    const cand = !String(r.accountKey || "").startsWith("d_") && typeof r.status === "string";
+    if (cand && r.status !== "적용 후보") checks.push(`후보 상태: ${r.status}`);
+    let latest, year, latestMissing = false;
+    if (pr) { latest = vals[vals.length - 1]; year = years[years.length - 1]; if (latest == null) { latestMissing = true; checks.push(`${year}년(최신) 값이 비어 있음 — 예전 연도 값을 쓰지 않음`); } }
+    else { latest = vals.slice().reverse().find((v) => v != null); year = years.length ? years[years.length - 1] : (r.year || null); }
+    if (latest === undefined) latest = null;
+    const uf = CRETOP_UF[r.unit];
+    if (!isRatio && uf == null) checks.push("단위 확인 필요");
+    const eokRaw = (!isRatio && latest != null && uf != null) ? latest * uf : null;
+    if (eokRaw != null) { const v = validateAmountEok(eokRaw, r.rawLabel || ""); if (v.level === "suspect" || v.level === "error" || v.level === "exclude") checks.push(`${v.reason}${r.unitAssumed ? ` · 단위 표시 없음(${r.unit} 추정)` : ""}`); }
+    return { value: latest, unit: r.unit, eok: eokRaw != null ? Math.round(eokRaw * 100) / 100 : null, year, series: vals, years: years || [], isRatio: !!isRatio, rawLabel: r.rawLabel, unitAssumed: !isRatio && !!r.unitAssumed, latestMissing, needsCheck: checks.length > 0, checkReasons: checks };
+  };
   // 재무비율 행을 원문에서 직접 스캔 — 한 줄에 여러 지표가 붙어도 분해, 업종평균/재무진단 섹션은 제외(조회기업 값만)
   const ratioScan = (() => {
     const ls = normalizeCretopPdfText(rawText).split(/\r?\n/).map((l) => l.trim());
     // '재무비율' 헤더 + 카테고리 헤더(성장성/수익성/안정성/활동성/생산성/재무구조/부채상환능력)를 모두 비율표 시작점으로(상세표는 카테고리별로만 나뉘어 있을 수 있음)
     const starts = []; for (let i = 0; i < ls.length; i++) { if ((/재무\s*비율/.test(ls[i]) || /^(?:성장성|수익성|안정성|활동성|생산성|재무구조|부채상환능력)/.test(ls[i])) && !/동종|업계|순위/.test(ls[i])) starts.push(i); }
-    const map = {}; let hdrYears = []; let yearSource = "none";
+    const map = {}; let hdrYears = []; let hdrText = []; let yearSource = "none";
     if (starts.length) {
       // 재무진단(업종평균·전년대비) 섹션 진입 시 중단 — 업종평균 값이 비율로 섞이지 않게
       const breakRe = /재무\s*진단|업종\s*평균|전년\s*대비|^재무상태표|^손익계산서|제조원가|이익잉여금처분|현금\s*흐름\s*분석|주요\s*주주|^거래처/;
       const skipRe = /동종\s*업계|업계\s*순위|COPYRIGHT|페이지|감사\s*의견|기업\s*개요|조회/;
-      const isNum = (t) => /^-?[\d,]+(?:\.\d+)?$/.test(t); const isDash = (t) => t === "-" || t === "－"; const isTxt = (t) => /^(?:적자전환|흑자전환|적자지속|흑자지속)+$/.test(t);
+      const isNum = (t) => cretopSignedNum(t) != null; const isDash = cretopIsDashTok; const isTxt = (t) => /^(?:적자전환|흑자전환|적자지속|흑자지속)+$/.test(t);
       // char-spaced로 '성장성매출액증가율'처럼 구분+지표명이 한 토큰으로 붙어도, 문자열 접미사에서 알려진 지표명을 찾음
       const matchName = (buf) => { const joined = normalizeAccountLabel(buf.join("")); if (!joined) return null;
         if (CORE_RATIO[joined]) return CORE_RATIO[joined][0];   // 전체 일치 우선
@@ -972,17 +1084,21 @@ function buildCretopParsedForUi(rawText) {
       // 모든 '재무비율' 섹션 순회(요약 2단표 + 상세 단일컬럼표 둘 다) — 값 개수 많은 것 우선 병합(유동비율/EBITDA·차입금 등 상세표에만 있는 지표 포함)
       for (const s of starts) {
         for (let i = s + 1; i < ls.length; i++) { const ln = ls[i]; if (!ln) continue; if (breakRe.test(ln)) break; if (skipRe.test(ln)) continue;
-          if (!hdrYears.length) { const yl = cretopLineYears(ln); if (yl && yl.length >= 1) { hdrYears = yl.slice().sort((a, b) => a - b); yearSource = "ratioTable"; continue; }
+          if (!hdrYears.length) { const yl = cretopLineYears(ln); if (yl && yl.length >= 1) { hdrText = yl.slice(); hdrYears = yl.slice().sort((a, b) => a - b); yearSource = "ratioTable"; continue; }
             // 2단 헤더(예: '성장성 2022 2023 2024 수익성 2022 2023 2024') — 카테고리어가 섞여 일반 연도행 판별엔 실패하지만 연도는 추출
-            if (/성장성|수익성|안정성|활동성|생산성|재무구조|부채상환/.test(ln)) { const ys = (ln.match(/(?:19|20)\d{2}/g) || []).map(Number); if (ys.length >= 2) { hdrYears = Array.from(new Set(ys)).sort((a, b) => a - b); yearSource = "ratioTable2col"; continue; } } }
+            if (/성장성|수익성|안정성|활동성|생산성|재무구조|부채상환/.test(ln)) { const ys = (ln.match(/(?:19|20)\d{2}/g) || []).map(Number); if (ys.length >= 2) { hdrText = Array.from(new Set(ys)); hdrYears = hdrText.slice().sort((a, b) => a - b); yearSource = "ratioTable2col"; continue; } } }
           // 카테고리 헤더 행(성장성/수익성/안정성/활동성 + 연도만, 지표명 없음)은 지표로 파싱하지 않고 건너뜀
           { const stripped = ln.replace(/성장성|수익성|안정성|활동성|생산성|재무구조|부채상환능력/g, "").replace(/(?:19|20)\d{2}/g, "").replace(/[\s\-.,]/g, ""); if (!stripped && /(?:19|20)\d{2}/.test(ln)) continue; }
           const toks = ln.split(/\s+/).filter(Boolean); let nameBuf = []; let j = 0;
           while (j < toks.length) { const t = toks[j];
             if (isNum(t) || isDash(t) || t === "△" || t === "▽" || isTxt(t)) {
-              const key = matchName(nameBuf); const vals = []; let neg = false;
-              while (j < toks.length && (isNum(toks[j]) || isDash(toks[j]) || toks[j] === "△" || toks[j] === "▽" || isTxt(toks[j]))) { const tt = toks[j]; if (tt === "△" || tt === "▽") { neg = true; j++; continue; } if (isDash(tt)) { if (j + 1 < toks.length && isNum(toks[j + 1])) { neg = true; j++; continue; } vals.push(null); j++; continue; } if (isTxt(tt)) { (tt.match(/적자전환|흑자전환|적자지속|흑자지속/g) || []).forEach((x) => vals.push(x)); j++; continue; } let v = parseFloat(tt.replace(/,/g, "")); if (neg) v = -Math.abs(v); vals.push(v); neg = false; j++; }
-              if (key) { const nums = vals.filter((v) => typeof v === "number" || /전환|지속/.test(String(v))); if (nums.length && (!map[key] || numCnt(nums) > numCnt(map[key]))) map[key] = nums; }
+              const key = matchName(nameBuf); const cells = []; let neg = false;
+              // [D-136] 단독 '-'는 빈칸(null)으로 남긴다(예전에는 다음 숫자의 음수 부호 · 또는 빈칸을 지워 값이 한 칸씩 밀렸다)
+              while (j < toks.length && (isNum(toks[j]) || isDash(toks[j]) || toks[j] === "△" || toks[j] === "▽" || isTxt(toks[j]))) { const tt = toks[j]; if (tt === "△" || tt === "▽") { neg = true; j++; continue; } if (isDash(tt)) { cells.push({ type: "dash" }); neg = false; j++; continue; } if (isTxt(tt)) { (tt.match(/적자전환|흑자전환|적자지속|흑자지속/g) || []).forEach((x) => cells.push({ type: "text", val: x })); j++; continue; } const v = cretopSignedNum(tt); cells.push({ type: "num", val: neg ? -Math.abs(v) : v }); neg = false; j++; }
+              if (key) { let vals = cretopCellsToValues(cells, hdrText.length);
+                // 원문 순서 연도 ↔ 값 짝 → 오름차순. 최신→과거 표인데 개수가 다르면 짝을 몰라 싣지 않는다
+                if (hdrText.length) { const pr = cretopPairAsc(hdrText, vals); if (pr) vals = pr.vals; else if (!cretopIsAscending(hdrText)) vals = null; }
+                if (vals && numCnt(vals) && (!map[key] || numCnt(vals) > numCnt(map[key]))) map[key] = vals; }
               nameBuf = [];
             } else { nameBuf.push(t); j++; }
           }
@@ -1022,23 +1138,39 @@ function buildCretopParsedForUi(rawText) {
   const ratioUnitOf = (key) => { const nm = Object.keys(CORE_RATIO).find((n) => CORE_RATIO[n][0] === key); return (nm && CORE_RATIO[nm][1]) || "%"; };
   const ratioLatest = (key) => {
     const series = ratioRowSeries[key];
-    if (series && series.length) { const use = ratioYears.length && series.length > ratioYears.length ? series.slice(-ratioYears.length) : series; const yrs = alignRatioYears(use); const lastNum = [...use].reverse().find((v) => typeof v === "number"); return { value: lastNum != null ? lastNum : use[use.length - 1], year: yrs.length ? yrs[yrs.length - 1] : null, series: use, years: yrs, isRatio: true, unit: ratioUnitOf(key), confidence: yrs.length ? ratioYearConfidence : "yearUnknown" }; }
-    if (ft && ft.metrics[key]) { const m = ft.metrics[key]; const v = [...m.values].reverse().find((x) => typeof x === "number"); if (v != null) { const yrs = (m.years && m.years.length === m.values.length) ? m.years : alignRatioYears(m.values); return { value: v, year: yrs.length ? yrs[yrs.length - 1] : null, series: m.values, years: yrs, isRatio: true, unit: ratioUnitOf(key), confidence: ratioYearConfidence }; } }
+    // [D-136] 최신 칸이 비었으면(null) 예전 연도 값을 최신으로 올리지 않는다
+    if (series && series.length) { const use = ratioYears.length && series.length > ratioYears.length ? series.slice(-ratioYears.length) : series; const yrs = alignRatioYears(use); const lastV = use[use.length - 1]; return { value: lastV == null ? null : lastV, latestMissing: lastV == null, year: yrs.length ? yrs[yrs.length - 1] : null, series: use, years: yrs, isRatio: true, unit: ratioUnitOf(key), confidence: yrs.length ? ratioYearConfidence : "yearUnknown" }; }
+    if (ft && ft.metrics[key]) { const m = ft.metrics[key]; const v = m.values[m.values.length - 1]; if (typeof v === "number") { const yrs = (m.years && m.years.length === m.values.length) ? m.years : alignRatioYears(m.values); return { value: v, year: yrs.length ? yrs[yrs.length - 1] : null, series: m.values, years: yrs, isRatio: true, unit: ratioUnitOf(key), confidence: ratioYearConfidence }; } }
     return null;   // 후보행(업종평균·조회일시 2025 혼입 가능) 미사용 — 비율은 재무비율 표/전체표에서만
   };
   // 요약 손익계산서 행을 원문에서 직접 스캔 — 후보 절단(값 개수>연도 시 slice)·연도 미검출로 2023이 누락되는 문제 우회
+  // [D-136] 단위: 제목 줄 → 같은 섹션의 가장 가까운 앞 '단위' → 가장 가까운 뒤 '단위' → 없으면 관례(요약/MY 백만원 · 그 밖 천원)로 추정(unitAssumed).
+  //   예전에는 단위가 안 보이면 무조건 백만원으로 봐서 천원 표가 1000배로 읽힐 수 있었다. 연도는 섹션 전체에서(원문 순서) 모아 값과 짝지은 뒤 오름차순.
   const summaryISseries = (() => {
     const ls = normalizeCretopPdfText(rawText).split(/\r?\n/).map((l) => l.trim());
-    const map = {}; let inSec = false, curUnit = "백만원", curYears = [];
-    for (let i = 0; i < ls.length; i++) {
-      const ln = ls[i]; if (!ln) continue;
-      if (/손익\s*계산서/.test(ln)) { inSec = true; const um = ln.match(/단위\s*[:：]?\s*(백만원|천원|억원|원)/); curUnit = um ? um[1] : "백만원"; curYears = []; continue; }
-      if (/재무상태표|재무\s*비율|현금\s*흐름|제조원가|이익잉여금처분|기업\s*개요|COPYRIGHT|페이지/.test(ln)) { inSec = false; continue; }
-      if (!inSec) continue;
-      const yl = cretopLineYears(ln); if (yl && yl.length >= 2) { curYears = yl.slice().sort((a, b) => a - b); continue; }
-      const um2 = ln.match(/단위\s*[:：]?\s*(백만원|천원|억원|원)/); if (um2) { curUnit = um2[1]; continue; }
-      const segs = cretopSplitLineMetrics(ln, CORE_ACCT, CORE_RATIO);
-      for (const seg of segs) { if (seg.isRatio || !seg.values.length) continue; if (!map[seg.key] || seg.values.length > map[seg.key].values.length) map[seg.key] = { values: seg.values.slice(), unit: curUnit, years: curYears.slice() }; }
+    const UNIT_RE = /단위\s*[:：(]?\s*(백만원|천원|만원|억원|원)/;
+    const STOP_RE = /재무상태표|재무\s*비율|현금\s*흐름|제조원가|이익잉여금처분|기업\s*개요|COPYRIGHT|페이지/;
+    const secs = []; let cur = null;
+    for (let i = 0; i < ls.length; i++) { const ln = ls[i]; if (!ln) continue;
+      if (/손익\s*계산서/.test(ln)) { if (cur) cur.end = i; cur = { start: i, end: ls.length, title: ln }; secs.push(cur); continue; }
+      if (cur && STOP_RE.test(ln)) { cur.end = i; cur = null; } }
+    const map = {};
+    for (const sec of secs) {
+      const unitAt = []; const yrs = [];
+      for (let i = sec.start; i < sec.end; i++) { const ln = ls[i]; if (!ln) continue; const um = ln.match(UNIT_RE); if (um) unitAt.push({ i, unit: um[1] }); if (i > sec.start) { const yl = cretopLineYears(ln); if (yl && yl.length >= 2) yl.forEach((y) => { if (!yrs.includes(y)) yrs.push(y); }); } }
+      const conv = /요약|MY/i.test(sec.title) ? "백만원" : "천원";
+      for (let i = sec.start + 1; i < sec.end; i++) {
+        const ln = ls[i]; if (!ln) continue;
+        const yl = cretopLineYears(ln); if ((yl && yl.length >= 2) || UNIT_RE.test(ln)) continue;
+        let before = null; for (const u of unitAt) { if (u.i <= i) before = u; }
+        const after = unitAt.find((u) => u.i > i);
+        const unit = before ? before.unit : (after ? after.unit : conv); const unitAssumed = !before && !after;
+        const segs = cretopSplitLineMetrics(ln, CORE_ACCT, CORE_RATIO, yrs.length);
+        for (const seg of segs) { if (seg.isRatio || !seg.values.length) continue;
+          const pr = cretopPairAsc(yrs, seg.values);
+          const entry = pr ? { values: pr.vals, unit, years: pr.years, unitAssumed } : { values: seg.values.slice(), unit, years: [], unitAssumed, yearMismatch: yrs.length > 0 };
+          if (!map[seg.key] || entry.values.length > map[seg.key].values.length) map[seg.key] = entry; }
+      }
     }
     return map;
   })();
@@ -1049,16 +1181,27 @@ function buildCretopParsedForUi(rawText) {
   const numCntR = (r) => r ? (r.numberCandidates || []).filter((v) => typeof v === "number").length : 0;
   const amtPrimary = (key) => {
     const cands = [];
-    if (SUMMARY_IS_KEYS.has(key)) { const sm = summaryISseries[key]; if (sm && sm.values.length) cands.push({ numberCandidates: sm.values, yearCandidates: (sm.years.length === sm.values.length) ? sm.years : [], unit: sm.unit, rawLabel: CORE_LABELS[key] || key }); const ir = isRowFor(IS_NAMES[key] || []); if (ir) cands.push(ir); }
+    if (SUMMARY_IS_KEYS.has(key)) { const sm = summaryISseries[key]; if (sm && sm.values.length) cands.push({ numberCandidates: sm.values, yearCandidates: sm.years, unit: sm.unit, unitAssumed: sm.unitAssumed, countMismatch: !!sm.yearMismatch, rawLabel: CORE_LABELS[key] || key }); const ir = isRowFor(IS_NAMES[key] || []); if (ir) cands.push(ir); }
     const gp = groups.primary[key]; if (gp) cands.push(gp);
     if (!cands.length) return null;
-    // 숫자 값 개수(=연도 수) 최다 소스 우선 — 콤마 없는 요약이 '136 123 92'를 한 숫자로 뭉칠 때 콤마 있는 상세 손익으로 3개년 복원
-    cands.sort((a, b) => numCntR(b) - numCntR(a));
-    return fromRow(cands[0], false);
+    // 숫자 값 개수(=연도 수) 최다 소스 우선 — 콤마 없는 요약이 '136 123 92'를 한 숫자로 뭉칠 때 콤마 있는 상세 손익으로 3개년 복원. 같으면 단위가 적힌 쪽
+    cands.sort((a, b) => (numCntR(b) - numCntR(a)) || ((a.unitAssumed ? 1 : 0) - (b.unitAssumed ? 1 : 0)));
+    const res = fromRow(cands[0], false);
+    // [D-136] 같은 연도를 말하는 다른 표(요약 ↔ 상세 ↔ 후보)와 금액이 어긋나면(단위 1000배 · 연도 밀림) 확인 필요 — 반올림(백만원) 차이는 허용
+    if (res && typeof res.value === "number" && res.year != null) {
+      const mine = toMillionWon(res.value, res.unit);
+      for (const c of cands.slice(1)) {
+        const o = fromRow(c, false);
+        if (!o || o.year !== res.year || typeof o.value !== "number" || mine == null) continue;
+        const other = toMillionWon(o.value, o.unit); if (other == null) continue;
+        if (Math.abs(mine - other) > Math.max(1.5, 0.01 * Math.max(Math.abs(mine), Math.abs(other)))) { res.needsCheck = true; res.checkReasons.push(`다른 표 값(${Number(o.value).toLocaleString()}${o.unit || ""})과 달라 단위·연도 확인 필요`); break; }
+      }
+    }
+    return res;
   };
   // 비율 계산도 '미리보기 금액과 동일한 출처'에서 — 금액 카드가 맞으면(부채총계 21.79억 등) 비율도 맞음.
   // amtPrimary 결과 {series, unit, years}를 백만원으로 정규화(상세 BS 섹션 로컬 행이 단위 오라벨일 때 61,601% 튀던 문제 차단)
-  const amtSeriesD = (key) => { const a = amtPrimary(key); const out = { map: {}, prov: {} }; if (!a || !a.series || !a.series.length) return out; const yrs = a.years || []; a.series.forEach((v, i) => { const y = yrs[i]; if (y != null && typeof v === "number") { const mm = toMillionWon(v, a.unit); if (mm != null) { out.map[y] = mm; out.prov[y] = { label: CORE_LABELS[key] || key, value: v, unit: a.unit }; } } }); return out; };
+  const amtSeriesD = (key) => { const a = amtPrimary(key); const out = { map: {}, prov: {} }; if (!a || !a.series || !a.series.length) return out; const yrs = a.years || []; if (yrs.length !== a.series.length) return out; /* [D-136] 연도 짝을 모르면 비율 계산에 쓰지 않는다 */ a.series.forEach((v, i) => { const y = yrs[i]; if (y != null && typeof v === "number") { const mm = toMillionWon(v, a.unit); if (mm != null) { out.map[y] = mm; out.prov[y] = { label: CORE_LABELS[key] || key, value: v, unit: a.unit }; } } }); return out; };
   // ── 미리보기/추이 비율은 '재무비율 표(보고서값)'가 아니라 '최신 재무제표 연도' 기준으로 직접 계산 ──
   // (재무비율 표는 단일/과거 연도일 수 있어 5개 영역에만 사용. 미리보기·추이는 재무제표 BS/IS에서 연도별로 산출)
   const bsYears = (det.bs && det.bs.years && det.bs.years.length) ? det.bs.years.slice() : [];
@@ -1104,15 +1247,17 @@ function buildCretopParsedForUi(rawText) {
   const computeRatio = (key) => {
     const def = COMPUTED_RATIO_DEFS[key]; if (!def) return null;
     const P = def.pair(); const numMap = P.num.map, denMap = P.den.map;   // 분자·분모 같은 출처/같은 단위(백만원 정규화) → 단위 혼합 없음
-    const ys = computedRatioYears.filter((y) => typeof numMap[y] === "number" && typeof denMap[y] === "number" && denMap[y] !== 0);
+    // [D-136] 부채비율은 자본총계가 정확히 0 인 해도 버리지 않는다 — 값은 계산 불가(null)지만 자본잠식 신호로 남긴다(예전에는 0 을 건너뛰어 전 연도 값이 최신처럼 보였다)
+    const keepZero = key === "debtRatio";
+    const ys = computedRatioYears.filter((y) => typeof numMap[y] === "number" && typeof denMap[y] === "number" && (denMap[y] !== 0 || keepZero));
     if (!ys.length) return null;
-    const values = ys.map((y) => Math.round((numMap[y] / denMap[y]) * def.factor * 100) / 100);
+    const values = ys.map((y) => (denMap[y] === 0 ? null : Math.round((numMap[y] / denMap[y]) * def.factor * 100) / 100));
     const lastY = ys[ys.length - 1];
-    const capitalErosion = key === "debtRatio" && typeof denMap[lastY] === "number" && denMap[lastY] < 0;   // 자본총계 음수 → 자본잠식 위험
-    const res = { value: values[values.length - 1], year: lastY, series: values, years: ys, isRatio: true, unit: def.unit, source: "computedFromFinancialStatements", formula: def.formula, confidence: "computed", capitalErosion, _numProv: P.num.prov[lastY] || null, _denProv: P.den.prov[lastY] || null };
+    const capitalErosion = key === "debtRatio" && typeof denMap[lastY] === "number" && denMap[lastY] <= 0;   // 자본총계 0 이하 → 자본잠식
+    const res = { value: values[values.length - 1], year: lastY, series: values, years: ys, isRatio: true, unit: def.unit, source: "computedFromFinancialStatements", formula: def.formula, confidence: "computed", capitalErosion, display: capitalErosion ? "계산 불가(자본잠식)" : null, _numProv: P.num.prov[lastY] || null, _denProv: P.den.prov[lastY] || null };
     // 방어: 부채비율/당기순이익률이 비정상적으로 큼(>1000) → 단위 혼합 의심. 혼합 출처면 폐기(원문 확인 필요), 일관 출처면 경고만 남기고 표시
     const lim = SANITY_MAX[key];
-    if (lim != null && !capitalErosion && Math.abs(res.value) > lim) { unitMixWarnings.push(`${key}=${res.value}${def.unit} > ${lim}(${P.mixed ? "혼합출처·폐기" : "일관출처·표시"})`); if (P.mixed) return null; }
+    if (lim != null && !capitalErosion && typeof res.value === "number" && Math.abs(res.value) > lim) { unitMixWarnings.push(`${key}=${res.value}${def.unit} > ${lim}(${P.mixed ? "혼합출처·폐기" : "일관출처·표시"})`); if (P.mixed) return null; }
     return res;
   };
   const reportRatioYears = ratioYears.slice();   // 재무비율 표(보고서값) 연도 — 5개 영역 전용
@@ -1122,7 +1267,7 @@ function buildCretopParsedForUi(rawText) {
   // 미리보기 비율: ① 재무제표 직접 계산(최신연도) → ② 보조: 재무비율 표(단, 표 최신연도 == 재무제표 최신연도일 때만) → ③ 원문 확인 필요
   const previewRatio = (key) => {
     const comp = computeRatio(key);
-    if (comp && typeof comp.value === "number") { corePreviewRatioSource[key] = "computedFromFinancialStatements"; return comp; }
+    if (comp && (typeof comp.value === "number" || comp.capitalErosion)) { corePreviewRatioSource[key] = "computedFromFinancialStatements"; return comp; }
     const def = COMPUTED_RATIO_DEFS[key] || {};
     if (!def.computedOnly && reportLatestYear != null && latestFinYear != null && reportLatestYear === latestFinYear) { const rl = ratioLatest(key); if (rl && typeof rl.value === "number") { corePreviewRatioSource[key] = "reportRatioTable"; return Object.assign({}, rl, { source: "reportRatioTable", formula: def.formula || null }); } }
     corePreviewRatioSource[key] = "unavailable"; return null;   // null → 카드에 '원문 확인 필요'
@@ -1254,9 +1399,10 @@ function buildCretopFinalCoreMetrics(rawText) {
       const valid = eok != null ? validateAmountEok(eok, parsed.label) : { level: "normal" };
       const bad = valid.level === "suspect" || valid.level === "error" || valid.level === "exclude";
       const noYear = !(years && years.length);
-      const caveat = [eok == null ? "단위 확인 필요" : null, noYear ? "연도 확인 필요(오른쪽 끝 값 사용)" : null].filter(Boolean).join(" · ");
+      const countOff = !noYear && valsAll.length !== years.length;
+      const caveat = [eok == null ? "단위 확인 필요" : null, noYear ? "연도 확인 필요(오른쪽 끝 값 사용)" : null, countOff ? "값 개수≠연도 — 확인 필요" : null].filter(Boolean).join(" · ");
       const display = bad ? `원문 확인 필요 (${cretopEokText(eok)} · 현실 범위 초과)` : (eok == null ? `${selected.toLocaleString()}${caveat ? " · " + caveat : ""}` : `${cretopEokText(eok)}${caveat ? " (" + caveat + ")" : ""}`);
-      const rec = { key: mkey, label: parsed.label, year: latestYear, latestIndex, values: valsAll, rawValue: selected, unit: unit || "", eok, display, source: b.name || "표", rowText: l, _prio: b.prio, bad, noYear };
+      const rec = { key: mkey, label: parsed.label, year: latestYear, latestIndex, values: valsAll, rawValue: selected, unit: unit || "", eok, display, source: b.name || "표", rowText: l, _prio: b.prio, bad, noYear, needsCheck: bad || noYear || countOff || eok == null };
       if (!metrics[mkey] || b.prio >= metrics[mkey]._prio) metrics[mkey] = rec;
     }
   }
@@ -1274,9 +1420,15 @@ function buildFinPreview(text) {
   if (m) { let s = m[1]; for (const lb of LABELS) { const idx = s.indexOf(lb); if (idx > 0) { s = s.slice(0, idx); } } s = s.replace(/[,\/|].*$/, "").replace(/\s+/g, " ").trim(); if (s && !LABELS.some((lb) => s === lb || s.startsWith(lb))) nm = s; }
   // 2) 라벨 매칭이 비거나 라벨어면, 표지/기업개요 앞부분의 (주)/㈜/주식회사 상호 토큰을 사용
   if (!nm) { const comp = (t.slice(0, 1500).match(/(?:\(주\)|㈜)\s?[가-힣A-Za-z0-9]{2,20}|[가-힣A-Za-z0-9]{2,20}\s?(?:\(주\)|㈜)|주식회사\s?[가-힣A-Za-z0-9]{2,20}|[가-힣A-Za-z0-9]{2,20}\s?주식회사/g) || [])[0]; if (comp) nm = comp.replace(/\s+/g, ""); }
-  const biz = (t.match(/(?:사업자\s*(?:등록)?번호|사업자번호)\s*[:：]?\s*([0-9]{3}-?[0-9]{2}-?[0-9]{5})/) || [])[1];
-  const ceo = (t.match(/대표(?:자|이사)?\s*명?\s*[:：]?\s*([가-힣]{2,4})(?=\s|종업원|사업자|$)/) || [])[1];
-  return { head, companyName: nm ? nm.trim().replace(/\s+/g, " ") : "", businessNo: biz || "", ceoName: (ceo && !LABELS.includes(ceo)) ? ceo : "" };
+  // [D-136] 사업자번호: '214 - 87 - 35291' 처럼 띄어 쓴 것도 → 214-87-35291
+  const bizM = t.match(/(?:사업자\s*(?:등록)?\s*번호)\s*[:：]?\s*([0-9]{3})\s*[-－–]?\s*([0-9]{2})\s*[-－–]?\s*([0-9]{5})(?![0-9])/);
+  const biz = bizM ? `${bizM[1]}-${bizM[2]}-${bizM[3]}` : "";
+  // [D-136] 대표자: '대표이사 : 김한빛, 이두리' → 김한빛(예전에는 '이사' 를 이름으로 읽었다). 라벨 말(이사 · 생년월일 …)은 이름이 아니다
+  const NOT_NAME = /^(이사|대표|대표자|자명|성명|명|생년|생년월|생년월일|주소|전화|연락처|학력|경력|취임|취임일|나이|연령|인적사항|사항)$/;
+  let ceo = "";
+  { const rx = /대표\s*(?:자|이사)?\s*(?:명|성명)?\s*[:：]?\s*([가-힣]{2,4})(?=[\s,，·/()（）]|외|종업원|사업자|$)/g; let x;
+    while ((x = rx.exec(t))) { if (!NOT_NAME.test(x[1]) && !LABELS.includes(x[1])) { ceo = x[1]; break; } rx.lastIndex = x.index + 2; } }
+  return { head, companyName: nm ? nm.trim().replace(/\s+/g, " ") : "", businessNo: biz || "", ceoName: ceo };
 }
 // 가상 크레탑 표 샘플(붙여넣기 칸용) — 전부 가상 데이터(실제 업체 아님)
 const CRETOP_SAMPLE_TABLES = {

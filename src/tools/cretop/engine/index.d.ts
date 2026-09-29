@@ -21,6 +21,15 @@ export interface CretopAmount {
   /** 부채비율 — 자본잠식 위험 */
   capitalErosion?: boolean
   formula?: string | null
+  /** D-136: 부채비율 계산 불가(자본잠식) 같은 글 표시 */
+  display?: string | null
+  /** D-136: 최신 연도 칸이 비어 value 가 null */
+  latestMissing?: boolean
+  /** D-136: 단위 표시가 없어 관례로 추정한 단위 */
+  unitAssumed?: boolean
+  /** D-136: 확인 필요 — 사실 창고 · 영업 칸으로 넘기지 않는다 */
+  needsCheck?: boolean
+  checkReasons?: string[]
 }
 
 export interface CretopTrendPoint {
