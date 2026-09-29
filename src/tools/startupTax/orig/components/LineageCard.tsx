@@ -1,13 +1,14 @@
 import type { Lineage } from '../../types'
-import { formatAge } from '../../lib/lineage'
+import { formatAge, formatTaxRemaining } from '../../lib/lineage'
 import { formatKoreanDate } from '../../lib/date'
 
 // 창업일 승계 분석 — 법인전환·양수·승계 시 실질 창업일과 업력/잔여 감면기간
 export default function LineageCard({ lineage }: { lineage: Lineage }) {
   // 신규 창업이고 업력도 7년 이내면 특별히 알릴 내용이 없어 숨긴다
-  if (!lineage.inherited && lineage.within7Years !== false) return null
+  // D-136: 신규 창업이라도 세액감면 과세연도가 끝났으면 보인다
+  if (!lineage.inherited && lineage.within7Years !== false && lineage.hasTaxRemaining !== false) return null
 
-  const warn = lineage.needsOriginalDate || lineage.within7Years === false
+  const warn = lineage.needsOriginalDate || lineage.within7Years === false || lineage.hasTaxRemaining === false
 
   return (
     <div
@@ -17,7 +18,7 @@ export default function LineageCard({ lineage }: { lineage: Lineage }) {
     >
       <div className="flex items-center gap-2.5">
         <span className="text-2xl">🔗</span>
-        <h3 className="text-xl font-bold text-gray-900">창업일 승계 분석</h3>
+        <h3 className="text-xl font-bold text-gray-900">{lineage.inherited ? '창업일 승계 분석' : '업력 · 감면 기간'}</h3>
       </div>
 
       <p className="mt-2 text-base leading-relaxed text-gray-700">{lineage.effectiveStartLabel}</p>
@@ -32,12 +33,8 @@ export default function LineageCard({ lineage }: { lineage: Lineage }) {
             tone={lineage.within7Years ? 'good' : 'bad'}
           />
           <Row
-            label="세액감면 5년 잔여"
-            value={
-              lineage.hasTaxRemaining
-                ? `약 ${formatAge(lineage.taxRemainingYears)} 남음`
-                : '기간 경과 가능성'
-            }
+            label="세액감면 5개 과세연도"
+            value={formatTaxRemaining(lineage)}
             tone={lineage.hasTaxRemaining ? 'good' : 'bad'}
           />
         </div>

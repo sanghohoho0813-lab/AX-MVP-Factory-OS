@@ -56,7 +56,7 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
           minYear={1930}
           maxYear={currentYear - 10}
         />
-        <HintText>만 15~34세는 청년 창업 요건에 해당할 수 있습니다. (병역기간 미반영)</HintText>
+        <HintText>창업 당시 만 15~34세면 청년 창업에 해당할 수 있습니다. (병역 기간 최대 6년 빼기) 처음 보이는 1980년 1월 1일은 예시라 판정에 쓰지 않습니다.</HintText>
       </Section>
 
       {/* 3. 창업일 */}
@@ -70,6 +70,7 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
           maxYear={currentYear}
           yearStep={5}
         />
+        <HintText>처음 보이는 2020년 1월 1일은 예시라 판정에 쓰지 않습니다. 실제 창업일로 바꿔 주세요.</HintText>
       </Section>
 
       {/* 4. 지역 */}

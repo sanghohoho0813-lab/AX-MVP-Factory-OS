@@ -61,6 +61,16 @@ export default function PrintSheet({ form, result, baseDate }: Props) {
             {result.keyReasons.map((r) => `✓ ${r}`).join('   ')}
           </p>
         )}
+        {result.alerts.length > 0 && (
+          <div className="mt-1.5 border-t border-gray-200 pt-1.5 text-[10px] text-gray-800">
+            <b className="text-amber-700">★ 세무사 확인 필요</b>
+            <ul className="mt-0.5 list-disc pl-4 leading-relaxed">
+              {result.alerts.map((a) => (
+                <li key={a}>{a}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       {/* 입력 요약 */}
@@ -69,13 +79,13 @@ export default function PrintSheet({ form, result, baseDate }: Props) {
           <Row
             cells={[
               ['사업자 유형', labelOf(LABEL.businessType, form.businessType)],
-              ['대표자 나이', result.age !== null ? `만 ${result.age}세` : '-'],
+              ['창업 당시 나이', result.age !== null ? `만 ${result.age}세` : '-'],
             ]}
           />
           <Row
             cells={[
               ['창업일', form.startupDate ? formatKoreanDate(form.startupDate) : '-'],
-              ['청년 여부', result.isYouth === null ? '-' : result.isYouth ? '해당 가능' : '미해당'],
+              ['청년 여부', result.isYouth === null ? (result.age === null ? '-' : '확인 필요') : result.isYouth ? '해당 가능' : '미해당'],
             ]}
           />
           <Row

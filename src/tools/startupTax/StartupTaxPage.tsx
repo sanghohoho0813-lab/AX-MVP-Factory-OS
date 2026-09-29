@@ -1,8 +1,10 @@
 /**
- * 창업감면 1분 판정기 (D-88) — startup-tax-checker 의 판정 규칙을 한 글자도 바꾸지 않고 옮긴 것.
+ * 창업감면 1분 판정기 (D-88) — startup-tax-checker 의 판정 규칙을 옮겨 온 것.
  *
- * 규칙은 `lib/` 안에 있고(원본 그대로), 이 파일은 묻고 보여 주기만 한다.
- * 원본의 조합 셀프테스트(9,216 조합 · 52만 검증)가 `npm run test:startup-tax` 로 그대로 돈다.
+ * 규칙은 `lib/` 안에 있고, 이 파일은 묻고 보여 주기만 한다.
+ * D-136: 원본 규칙의 틀린 곳을 고쳤다(청년 나이는 창업 당시 · 과밀+비청년 0% · 5개 과세연도 · 업종 목록 ·
+ * 동종 재개업 · 지역↔과밀 맞춰 보기 · 예시 날짜 · 2026 개정). 단정 못 하는 것은 '★ 세무사 확인 필요' 로 보인다.
+ * 원본의 조합 셀프테스트(조합 · 경계 사례)가 `npm run test:startup-tax` 로 돈다.
  *
  * 적은 값은 이 브라우저에 남는다 — 상담 중 화면을 옮겨도 다시 적지 않는다.
  */
@@ -20,16 +22,19 @@ import { FactSendButton } from '../shared/FactSendButton'
 import { useToolClient } from '../shared/toolClientContext'
 import { loadStartupTaxForm, saveStartupTaxForm } from './lib/formStore'
 import type { FormData as StartupTaxForm, JudgementResult } from './types'
-import { EMPTY_ADVANCED, EMPTY_FORM } from './lib/formDefaults'
+import { EMPTY_ADVANCED, EMPTY_FORM, PLACEHOLDER_BIRTH, PLACEHOLDER_STARTUP, withoutPlaceholders } from './lib/formDefaults'
 import { judge, VERDICT_EMOJI, VERDICT_LABEL } from './lib/judgement'
 import { buildSummaryText } from './lib/summary'
 import InputForm from './orig/components/InputForm'
 import ResultCards from './orig/components/ResultCards'
 import PrintSheet from './orig/components/PrintSheet'
 
-/** 원본 기본값 (요청 사양: 생년월일 1980-01-01, 창업일 2020-01-01) — 업체 정보로 채울 때 이 값은 '안 적은 것' 으로 본다 */
-const ORIG_BIRTH = '1980-01-01'
-const ORIG_STARTUP = '2020-01-01'
+/**
+ * 원본 기본값 (요청 사양: 생년월일 1980-01-01, 창업일 2020-01-01) — 업체 정보로 채울 때 이 값은 '안 적은 것' 으로 본다.
+ * D-136: 판정할 때도 '안 적은 것' 이다 — 예시 날짜 그대로 누르면 '생년월일·창업일을 입력해야 판정합니다' 가 나온다.
+ */
+const ORIG_BIRTH = PLACEHOLDER_BIRTH
+const ORIG_STARTUP = PLACEHOLDER_STARTUP
 
 function freshForm(): StartupTaxForm {
   return { ...EMPTY_FORM, birthDate: ORIG_BIRTH, startupDate: ORIG_STARTUP, checkItems: { ...EMPTY_FORM.checkItems }, advanced: { ...EMPTY_ADVANCED } }
@@ -64,7 +69,9 @@ function StartupTaxScreen() {
     saveStartupTaxForm(clientId, form)
   }, [form, clientId])
 
-  const result: JudgementResult | null = useMemo(() => (submitted ? judge(form, baseDate) : null), [submitted, form, baseDate])
+  // D-136: 예시 날짜는 빈 칸으로 바꿔 판정한다 (화면에는 그대로 둔다)
+  const judgedForm = useMemo(() => withoutPlaceholders(form), [form])
+  const result: JudgementResult | null = useMemo(() => (submitted ? judge(judgedForm, baseDate) : null), [submitted, judgedForm, baseDate])
   const summaryText = useMemo(() => (result ? buildSummaryText(result) : ''), [result])
 
   // 업체에서 열었으면 아는 것은 다시 묻지 않는다 (D-90) — 빈 칸(원본 기본값 포함)만 채운다
@@ -164,7 +171,7 @@ function StartupTaxScreen() {
       {/* 인쇄 전용 A4 결과서 — 원본 PrintSheet (인쇄하면 이것만 나온다) */}
       {submitted && result && (
         <div className="print-document">
-          <PrintSheet form={form} result={result} baseDate={baseDate} />
+          <PrintSheet form={judgedForm} result={result} baseDate={baseDate} />
         </div>
       )}
     </div>

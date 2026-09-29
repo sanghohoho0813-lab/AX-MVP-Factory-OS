@@ -133,17 +133,19 @@ export interface Lineage {
   inherited: boolean // 창업일이 기존 사업에서 승계되는 유형인지
   effectiveStartDate: string // 실질 창업일 (승계 시 기존 개인사업 최초 개시일)
   effectiveStartLabel: string // 근거 설명
-  businessAgeYears: number | null // 실질 창업일 기준 업력(년, 소수)
+  businessAgeYears: number | null // 실질 창업일 기준 업력(년, 소수 · 달력 기준)
   within7Years: boolean | null // 창업지원법 창업기업 업력 7년 이내 여부
-  taxRemainingYears: number | null // 조특법 감면 5년 중 잔여 연수
+  taxLastYear: number | null // 조특법 감면 마지막 과세연도 (보수적: 창업연도 + 4, D-136)
+  taxRemainingYears: number | null // 조특법 감면 과세연도 중 올해 포함 남은 수 (정수)
   hasTaxRemaining: boolean | null // 감면 잔여기간 존재 여부
   needsOriginalDate: boolean // 승계형인데 기존 개시일 미입력 → 확인 필요
 }
 
 // 청년 기준 (조특법 / 창업지원법 분리)
 export interface YouthStatus {
-  age: number | null
-  taxLaw: boolean | null // 조특법: 만 15~34세 (병역 최대 6년 차감)
+  age: number | null // 창업 당시 만 나이 (조특법 청년 판단 기준, D-136)
+  ageNow: number | null // 오늘 기준 만 나이 (창업지원법 청년 우대 참고)
+  taxLaw: boolean | null // 조특법: 창업 당시 만 15~34세 (병역 최대 6년 차감)
   taxLawNote: string
   startupLaw: boolean | null // 창업지원법: 만 39세 이하
   startupLawNote: string
@@ -167,6 +169,10 @@ export interface FrameworkResult {
 export interface JudgementResult {
   overall: Verdict
   oneLineConclusion: string // 한줄 결론 (사장님용)
+  // D-136: 날짜가 없거나(예시 날짜 포함) 예비창업이면 판정 대신 이 안내가 한줄 결론이 된다
+  notice: string | null
+  // D-136: 판정기가 단정하지 못한 것 — 화면에 "★ 세무사 확인 필요" 로 보인다
+  alerts: string[]
   reasons: string[] // 판정 사유 (간단 불릿)
   keyReasons: string[] // 이번 판정의 핵심 이유 (3줄, 창업형태/업종/권역)
   keyChecks: string[] // 주요 확인사항 (초기 화면 노출)
@@ -178,7 +184,7 @@ export interface JudgementResult {
   missedPoints: string[] // 많은 대표님들이 놓치는 부분
   expertReview: ExpertReview // 전문가 검토 추천도 (A/B/C/D)
 
-  // 청년 분석 (기존 호환) + 이중 기준
+  // 청년 분석 (기존 호환) + 이중 기준 — age 는 창업 당시 만 나이
   isYouth: boolean | null
   age: number | null
   youth: YouthStatus

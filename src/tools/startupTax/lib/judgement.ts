@@ -2,14 +2,23 @@ import type {
   FormData,
   ItemResult,
   JudgementResult,
+  Lineage,
   RegistrationReference,
   Verdict,
 } from '../types'
-import { calcAge, isYouthAge } from './date'
+import { calcAge, formatDate, parseLocalDate, toLocalDay } from './date'
 import { diagnoseExclusion } from './exclusion'
 import { buildYouthStatus } from './youth'
 import { buildFrameworks } from './frameworks'
 import { buildLineage } from './lineage'
+import {
+  checkRegion,
+  industryAlertOf,
+  industryClassOf,
+  REVISED_RULE_ALERT,
+  REVISED_RULE_FROM,
+  worstOf,
+} from './rules'
 import {
   buildConsultChecklist,
   buildConsultQuestions,
@@ -48,6 +57,11 @@ export const VERDICT_ONELINE: Record<Verdict, string> = {
   bad: '현재 정보 기준으로는 창업감면 적용이 어려워 보입니다.',
 }
 
+// D-136: 판정 대신 보여 주는 안내 (한줄 결론 자리)
+export const NOTICE_MISSING_DATES = '생년월일·창업일을 입력해야 판정합니다.'
+export const NOTICE_DATE_ORDER = '생년월일이 창업일보다 늦습니다. 날짜를 확인해야 판정합니다.'
+export const NOTICE_PRE_STARTUP = '예비창업 — 창업 후 판정합니다. 지금 결과는 참고용입니다.'
+
 // 긍정적일수록 높은 순위 (종합판정은 가장 보수적인 = 최저 순위 채택)
 const VERDICT_RANK: Record<Verdict, number> = {
   bad: 0,
@@ -81,9 +95,10 @@ function judgeStartupRecognition(form: FormData): { verdict: Verdict; note: stri
         note: '기존 사업을 양수한 경우 창업으로 인정되지 않을 가능성이 있습니다.',
       }
     case 'reopen_same':
+      // 조특법은 창업이 아니다(§6⑩ — 세액감면은 불가로 본다). 창업지원법은 폐업 3년 뒤면 창업일 수 있어 '주의' 로 둔다.
       return {
         verdict: 'caution',
-        note: '폐업 후 같은 업종으로 재창업한 경우 창업 인정이 제한될 수 있습니다.',
+        note: '폐업 후 같은 업종으로 다시 시작한 경우 조특법상 창업이 아닙니다. 창업지원법은 폐업 후 3년(부도·파산 2년)이 지나면 창업으로 볼 수 있습니다.',
       }
     case 'succession':
       return {
@@ -109,23 +124,54 @@ function isRecognitionWeak(v: Verdict): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// C. 법인세 / 소득세 감면
+// 판정에 함께 쓰는 사실 (D-136)
 // ---------------------------------------------------------------------------
-function judgeIncomeTax(form: FormData, recognition: Verdict, isYouth: boolean | null): ItemResult {
+interface Facts {
+  youthTax: boolean | null // 조특법 청년 (창업 당시 나이 기준, 35~40세는 병역 확인 전 null)
+  lineage: Lineage
+  baseYear: number
+  datesMissing: boolean // 생년월일·창업일 없음 / 잘못됨 / 예시 날짜 / 순서 뒤바뀜
+  future: boolean // 창업일이 아직 오지 않음 (예비창업)
+  after2026: boolean // 2026-01-01 이후 창업 (개정 규정 확인 필요)
+  regionInconsistent: boolean // 지역 ↔ 과밀억제권역 답이 맞지 않음
+}
+
+// 모든 항목에 똑같이 씌우는 상한 — 입력이 불완전하면 '가능성 높음' 이 나오지 않게
+function applyInputCaps(verdict: Verdict, reasons: string[], facts: Facts): Verdict {
+  let v = verdict
+  if (facts.regionInconsistent) {
+    v = worstOf(v, 'caution')
+    reasons.push('사업장 지역과 과밀억제권역 답이 서로 맞지 않아 주소 확인이 필요합니다.')
+  }
+  if (facts.datesMissing) {
+    v = worstOf(v, 'conditional')
+    reasons.push('생년월일·창업일을 입력해야 판정합니다.')
+  } else if (facts.future) {
+    v = worstOf(v, 'conditional')
+    reasons.push('예비창업 — 창업 후 판정합니다.')
+  }
+  return v
+}
+
+// ---------------------------------------------------------------------------
+// C. 법인세 / 소득세 감면 (조특법 §6)
+// ---------------------------------------------------------------------------
+function judgeIncomeTax(form: FormData, recognition: Verdict, facts: Facts): ItemResult {
   const reasons: string[] = []
   const checkPoints: string[] = [
-    '창업 지역·업종·과밀억제권역 여부에 따라 감면율(50%~100%)이 달라집니다.',
+    '창업 지역·업종·과밀억제권역 여부에 따라 감면율(0%~100%)이 달라집니다.',
     '최초로 소득이 발생한 과세연도 기준으로 감면 기간이 산정됩니다.',
     '업종 코드(한국표준산업분류)가 감면 대상 업종에 해당하는지 확인이 필요합니다.',
   ]
   let verdict: Verdict
   let consultScript: string
 
-  const isExcludedIndustry =
-    form.industry === 'real_estate' || form.industry === 'finance_insurance'
-  const inOverconcentration = form.overconcentration === 'yes'
+  const industry = industryClassOf(form.industry)
+  // form.overconcentration 은 지역과 맞춰 본 값 (서울 = 과밀)
+  const over = form.overconcentration
+  const isYouth = facts.youthTax
 
-  if (isExcludedIndustry) {
+  if (industry === 'excluded') {
     verdict = 'bad'
     reasons.push(
       form.industry === 'real_estate'
@@ -135,50 +181,126 @@ function judgeIncomeTax(form: FormData, recognition: Verdict, isYouth: boolean |
     reasons.push('대상 업종 여부를 업종 코드로 다시 확인할 필요가 있습니다.')
     consultScript =
       '대표님 업종은 창업감면 대상 업종에서 제외될 수 있어, 정확한 업종 코드 확인이 먼저 필요합니다.'
+  } else if (form.startupForm === 'reopen_same') {
+    // D-136: 폐업 후 같은 업종 재개업은 조특법상 창업이 아니다 (§6⑩)
+    verdict = 'bad'
+    reasons.push('폐업 후 같은 업종을 다시 시작한 것은 조특법상 창업으로 보지 않습니다. (조특법 §6⑩)')
+    reasons.push('폐업 전과 업종이 달라졌다면 결과가 달라질 수 있어 확인이 필요합니다.')
+    consultScript =
+      '폐업 전과 같은 업종을 다시 시작하신 경우 조특법 창업감면은 받기 어렵습니다. 업종이 달라졌는지부터 확인하겠습니다.'
   } else if (isRecognitionWeak(recognition)) {
     verdict = 'caution'
     reasons.push('창업 인정 여부가 불확실하여 감면 적용에 주의가 필요합니다.')
     reasons.push('창업 형태(전환·양수·승계 등)에 따라 적용이 제한될 수 있습니다.')
     consultScript =
       '이 케이스는 신규창업이라기보다 법인전환·사업승계로 볼 여지가 있어 창업감면 적용이 제한될 수 있습니다.'
+    // 잔여 감면기간을 이어받더라도 과밀억제권역 + 청년 아님이면 원칙 0%
+    if (over !== 'no' && isYouth !== true) {
+      verdict = 'conditional'
+      reasons.push('과밀억제권역에서 청년이 아니면 원칙적으로 감면이 없어(0%) 생계형·벤처 해당 여부 확인이 필요합니다.')
+    }
   } else if (recognition === 'conditional') {
     verdict = 'conditional'
     reasons.push('창업 형태가 확인되어야 감면 적용 여부를 판단할 수 있습니다.')
     reasons.push('신규 창업으로 확인되면 감면 가능성이 높아집니다.')
     consultScript = '창업 형태(신규/전환/양수)를 먼저 확인하면 감면 가능 여부가 분명해집니다.'
-  } else if (isYouth === true && !inOverconcentration) {
+  } else if (over === 'no') {
+    // 과밀억제권역 밖: 청년 100% · 청년 아님 50% — 둘 다 감면 대상
     verdict = 'good'
-    reasons.push('청년 창업 + 수도권 과밀억제권역 외 지역으로 유리한 조건입니다.')
-    reasons.push('청년창업중소기업 세액감면(높은 감면율) 적용 가능성을 검토할 수 있습니다.')
-    consultScript =
-      '대표님은 청년 + 비과밀억제권역 창업으로, 창업감면에서 가장 유리한 구간에 해당할 가능성이 있습니다.'
-  } else if (isYouth === true && inOverconcentration) {
+    if (isYouth === true) {
+      reasons.push('청년 창업 + 수도권 과밀억제권역 외 지역으로 유리한 조건입니다.')
+      reasons.push('청년창업중소기업 세액감면(높은 감면율) 적용 가능성을 검토할 수 있습니다.')
+      consultScript =
+        '대표님은 청년 + 비과밀억제권역 창업으로, 창업감면에서 가장 유리한 구간에 해당할 가능성이 있습니다.'
+    } else {
+      reasons.push('비과밀억제권역 창업으로 일반 창업중소기업 세액감면(감면율 50%) 검토가 가능합니다.')
+      if (isYouth === null) reasons.push('병역 기간을 빼면 청년(감면율 우대)일 수 있어 확인이 필요합니다.')
+      consultScript =
+        '대표님 케이스는 창업감면 가능성이 있어 보이지만, 업종 코드와 최초 소득 발생연도 확인이 먼저 필요합니다.'
+    }
+  } else if (isYouth === true) {
+    // 과밀억제권역(또는 모름) + 청년: 과밀이면 50%
     verdict = 'caution'
-    reasons.push('청년 창업이지만 수도권 과밀억제권역으로 일부 제한이 있을 수 있습니다.')
-    reasons.push('과밀억제권역에서는 감면율이 낮아지거나 적용이 제한될 수 있습니다.')
-    consultScript =
-      '청년 창업이지만 과밀억제권역이라 감면율이 달라질 수 있어, 권역 여부 확인이 우선입니다.'
+    if (over === 'yes') {
+      reasons.push('청년 창업이지만 수도권 과밀억제권역으로 감면율이 50%로 낮아집니다.')
+      reasons.push('과밀억제권역에서는 감면율이 낮아지거나 적용이 제한될 수 있습니다.')
+      consultScript =
+        '청년 창업이지만 과밀억제권역이라 감면율이 달라질 수 있어, 권역 여부 확인이 우선입니다.'
+    } else {
+      reasons.push('청년 창업이지만 과밀억제권역 여부에 따라 감면율이 50%~100%로 달라집니다.')
+      reasons.push('사업장 주소로 과밀억제권역인지 먼저 확인해야 합니다.')
+      consultScript = '청년 창업이라 감면 가능성은 있으나, 과밀억제권역 여부에 따라 감면율이 크게 다릅니다.'
+    }
   } else {
-    verdict = 'good'
-    reasons.push('창업 인정 가능성이 있어 창업중소기업 세액감면 검토가 가능합니다.')
+    // D-136: 과밀억제권역(또는 모름) + 청년 아님 → 원칙 감면 0% (§6①).
+    // 예외는 생계형(연 매출 8천만원 이하, §6⑥) · 벤처기업(§6②) — 판정기는 모르므로 '조건부'.
+    verdict = 'conditional'
     reasons.push(
-      inOverconcentration
-        ? '다만 과밀억제권역 여부에 따라 감면율이 달라질 수 있습니다.'
-        : '비과밀억제권역으로 비교적 유리한 조건입니다.',
+      over === 'yes'
+        ? '과밀억제권역에서 청년이 아니면 창업감면이 없는 것(0%)이 원칙입니다.'
+        : '과밀억제권역이라면 청년이 아닌 경우 창업감면이 없을 수 있습니다(0%).',
     )
+    reasons.push('생계형(연 매출 8천만원 이하)·벤처기업이면 감면받을 수 있어 확인이 필요합니다.')
     consultScript =
-      '대표님 케이스는 창업감면 가능성이 있어 보이지만, 과밀억제권역 여부와 업종 코드 확인이 먼저 필요합니다.'
+      '과밀억제권역에서 청년이 아니시면 원칙적으로 감면이 없습니다. 연 매출 8천만원 이하이거나 벤처기업이면 달라지니 그것부터 확인하겠습니다.'
   }
+
+  // 업종 — 대상 업종 목록(§6③)에 확실히 있지 않으면 '가능성 높음' 금지
+  if (industry === 'partial') {
+    verdict = worstOf(verdict, 'caution')
+    reasons.push(
+      form.industry === 'wholesale_retail'
+        ? '도소매업은 통신판매업만 감면 대상이라 세부 업종 확인이 필요합니다.'
+        : '전문서비스업은 변호사·세무사·회계사 등 전문직이 감면 대상에서 빠져 세부 업종 확인이 필요합니다.',
+    )
+  } else if (industry === 'unknown') {
+    verdict = worstOf(verdict, 'caution')
+    reasons.push('업종 확인 필요 — 감면 대상 업종인지 업종 코드로 확인해야 합니다.')
+  }
+
+  // 감면 기간 — 신규 창업도 5개 과세연도가 지나면 끝 (승계형은 조특법 기준 블록에서 본다)
+  const L = facts.lineage
+  if (!L.inherited && L.taxLastYear !== null) {
+    if (facts.baseYear > L.taxLastYear) {
+      verdict = 'bad'
+      reasons.push(
+        `창업한 해부터 5개 과세연도(~${L.taxLastYear}년)가 지나 감면 기간이 끝났을 가능성이 높습니다.`,
+      )
+    } else if (facts.baseYear === L.taxLastYear) {
+      verdict = worstOf(verdict, 'caution')
+      reasons.push(`올해(${L.taxLastYear}년)가 감면 마지막 과세연도일 수 있습니다.`)
+    }
+  }
+
+  if (facts.after2026) {
+    verdict = worstOf(verdict, 'caution')
+    reasons.push('2026년 이후 창업은 개정 규정(지역 구분 · 감면율) 확인이 필요합니다.')
+  }
+  verdict = applyInputCaps(verdict, reasons, facts)
 
   reasons.push('정확한 감면율은 창업지역, 업종, 과밀억제권역, 최초 소득 발생연도에 따라 달라집니다.')
 
   return { key: 'incomeTax', title: '법인세 / 소득세 감면', verdict, reasons, checkPoints, consultScript }
 }
 
+// 지방세(취득세·재산세) 공용 — 지특법 §58의3 도 조특법 §6③ 업종 목록을 따른다
+function applyLocalIndustry(verdict: Verdict, reasons: string[], form: FormData): Verdict {
+  const industry = industryClassOf(form.industry)
+  if (industry === 'excluded') {
+    reasons.push('감면 대상 업종이 아니면 지방세 창업감면도 받기 어렵습니다.')
+    return 'bad'
+  }
+  if (industry !== 'eligible') {
+    reasons.push('지방세 창업감면도 대상 업종이어야 하므로 업종 확인이 필요합니다.')
+    return worstOf(verdict, 'caution')
+  }
+  return verdict
+}
+
 // ---------------------------------------------------------------------------
 // D. 취득세 감면
 // ---------------------------------------------------------------------------
-function judgeAcquisitionTax(form: FormData, recognition: Verdict): ItemResult {
+function judgeAcquisitionTax(form: FormData, recognition: Verdict, facts: Facts): ItemResult {
   const reasons: string[] = []
   const checkPoints: string[] = [
     '취득한 부동산이 사업용(직접 사용)인지 확인이 필요합니다.',
@@ -201,11 +323,12 @@ function judgeAcquisitionTax(form: FormData, recognition: Verdict): ItemResult {
     reasons.push('신규 창업 + 사업용 직접 사용이면 감면 가능성이 생깁니다.')
     consultScript = '취득세는 창업 인정 여부와 사업용 부동산 취득 계획 확인 후 판단이 가능합니다.'
   } else if (inOverconcentration) {
-    verdict = 'caution'
-    reasons.push('수도권 과밀억제권역으로 취득세 감면이 제한되거나 불리할 수 있습니다.')
+    // D-136: 지특법 §58의3 창업중소기업 감면은 원칙적으로 과밀억제권역 밖 창업만
+    verdict = 'bad'
+    reasons.push('지방세 창업감면(지특법 §58의3)은 원칙적으로 과밀억제권역 밖 창업만 대상입니다.')
     reasons.push('과밀억제권역 내 취득은 중과 또는 감면 배제 대상이 될 수 있습니다.')
     consultScript =
-      '과밀억제권역이라 취득세는 오히려 불리할 수 있어, 권역·중과 여부 확인이 필요합니다.'
+      '과밀억제권역이라 취득세는 감면이 어렵고 오히려 불리할 수 있어, 권역·중과 여부 확인이 필요합니다.'
   } else if (form.overconcentration === 'no') {
     verdict = 'good'
     reasons.push('비과밀억제권역으로 창업 사업용 부동산 취득세 감면 가능성이 있습니다.')
@@ -219,13 +342,16 @@ function judgeAcquisitionTax(form: FormData, recognition: Verdict): ItemResult {
     consultScript = '과밀억제권역 여부가 확인되어야 취득세 감면 판단이 가능합니다.'
   }
 
+  verdict = applyLocalIndustry(verdict, reasons, form)
+  verdict = applyInputCaps(verdict, reasons, facts)
+
   return { key: 'acquisitionTax', title: '취득세 감면', verdict, reasons, checkPoints, consultScript }
 }
 
 // ---------------------------------------------------------------------------
 // E. 재산세 감면
 // ---------------------------------------------------------------------------
-function judgePropertyTax(recognition: Verdict): ItemResult {
+function judgePropertyTax(form: FormData, recognition: Verdict, facts: Facts): ItemResult {
   const reasons: string[] = []
   const checkPoints: string[] = [
     '해당 부동산을 사업에 직접 사용하는지(자가 사용) 확인이 필요합니다.',
@@ -246,6 +372,17 @@ function judgePropertyTax(recognition: Verdict): ItemResult {
     reasons.push('창업 형태가 확인되어야 재산세 감면 판단이 가능합니다.')
     reasons.push('사업용 직접 사용 여부도 함께 확인되어야 합니다.')
     consultScript = '재산세 감면은 창업 인정 여부와 부동산 사용 형태 확인 후 판단이 가능합니다.'
+  } else if (form.overconcentration === 'yes') {
+    // D-136: 과밀억제권역이면 재산세도 창업감면 대상 밖이 원칙 (지특법 §58의3)
+    verdict = 'bad'
+    reasons.push('지방세 창업감면(지특법 §58의3)은 원칙적으로 과밀억제권역 밖 창업만 대상입니다.')
+    reasons.push('과밀억제권역 창업은 재산세 감면도 받기 어렵습니다.')
+    consultScript = '과밀억제권역 창업이라 재산세 창업감면은 어렵습니다. 예외가 있는지만 확인하겠습니다.'
+  } else if (form.overconcentration !== 'no') {
+    verdict = 'conditional'
+    reasons.push('과밀억제권역 여부가 확인되어야 재산세 감면 판단이 가능합니다.')
+    reasons.push('사업용 직접 사용 여부도 함께 확인되어야 합니다.')
+    consultScript = '과밀억제권역 여부와 부동산 사용 형태가 확인되어야 재산세 감면 판단이 가능합니다.'
   } else {
     verdict = 'good'
     reasons.push('창업 인정 가능성이 있고 사업용 직접 사용 부동산이면 감면 가능성이 있습니다.')
@@ -253,6 +390,9 @@ function judgePropertyTax(recognition: Verdict): ItemResult {
     consultScript =
       '사업장으로 직접 사용하는 부동산이라면 재산세 감면 가능성이 있습니다. 임대·투자용이면 달라집니다.'
   }
+
+  verdict = applyLocalIndustry(verdict, reasons, form)
+  verdict = applyInputCaps(verdict, reasons, facts)
 
   return { key: 'propertyTax', title: '재산세 감면', verdict, reasons, checkPoints, consultScript }
 }
@@ -279,12 +419,94 @@ function buildRegistrationReference(form: FormData): RegistrationReference {
 }
 
 // ---------------------------------------------------------------------------
+// ★ 세무사 확인 필요 — 판정기가 단정하지 못한 이유 (D-136)
+// ---------------------------------------------------------------------------
+function buildAlerts(form: FormData, facts: Facts, age: number | null, regionAlert: string | null): string[] {
+  const out: string[] = []
+  const industry = industryClassOf(form.industry)
+
+  if (regionAlert) out.push(regionAlert)
+
+  const industryAlert = industryAlertOf(form.industry)
+  if (industryAlert) out.push(industryAlert)
+
+  if (form.startupForm === 'reopen_same') {
+    out.push('폐업 후 같은 업종 재개업은 조특법상 창업이 아닙니다(§6⑩). 폐업 전과 업종이 정말 같은지 ★확인')
+  }
+
+  // 과밀(또는 모름) + 청년 아님 → 원칙 0%
+  if (industry !== 'excluded' && form.overconcentration !== 'no' && facts.youthTax !== true) {
+    out.push('과밀억제권역에서 청년이 아니면 감면 0%가 원칙입니다. 생계형(연 매출 8천만원 이하)·벤처기업이면 감면 가능 — ★확인')
+  }
+
+  if (facts.youthTax === null && age !== null) {
+    out.push(`창업 당시 만 ${age}세 — 병역 기간(최대 6년)을 빼면 청년일 수 있습니다. 병역 기간 ★확인`)
+  }
+  if (form.businessType === 'corporation' && (facts.youthTax === true || (facts.youthTax === null && age !== null))) {
+    out.push('법인은 청년 대표가 최대주주(최대출자자)여야 청년 감면을 받습니다 — 지분 ★확인')
+  }
+
+  // 감면 기간 (과세연도)
+  const L = facts.lineage
+  if (L.taxLastYear !== null && L.hasTaxRemaining === false) {
+    out.push(
+      `감면 기간(~${L.taxLastYear}년 과세연도)이 끝난 것으로 봤습니다. 처음 소득이 난 해가 늦었거나 지난 해분 신고·경정청구가 남았다면 받을 수 있습니다 — ★확인`,
+    )
+  } else if (L.taxLastYear !== null && L.taxRemainingYears === 1) {
+    out.push(`올해(${L.taxLastYear}년)가 감면 마지막 과세연도일 수 있습니다. 처음 소득이 난 해에 따라 달라집니다 — ★확인`)
+  }
+  // 끝났거나 마지막 해일 때만 — 법인 사업연도가 1~12월이 아니면 경계가 달라진다
+  if (L.taxLastYear !== null && L.taxRemainingYears !== null && L.taxRemainingYears <= 1 && form.businessType === 'corporation') {
+    out.push('과세연도는 1~12월로 계산했습니다. 법인 사업연도가 다르면 감면 기간이 달라집니다 — ★확인')
+  }
+
+  if (facts.after2026) out.push(REVISED_RULE_ALERT)
+
+  if (form.overconcentration === 'yes' && industry !== 'excluded') {
+    out.push('과밀억제권역 창업은 취득세·재산세 창업감면(지특법 §58의3) 대상이 아닌 것이 원칙입니다 — 예외 ★확인')
+  }
+
+  return [...new Set(out)]
+}
+
+// ---------------------------------------------------------------------------
 // 종합 판정
 // ---------------------------------------------------------------------------
-export function judge(form: FormData, baseDate: Date = new Date()): JudgementResult {
-  const age = calcAge(form.birthDate, baseDate)
-  const isYouth = isYouthAge(age)
+export function judge(inputForm: FormData, baseDate: Date = new Date()): JudgementResult {
+  // D-136: 지역과 과밀억제권역 답을 맞춰 본다 (서울 = 전 지역 과밀). 판정은 맞춘 값으로 한다.
+  const region = checkRegion(inputForm)
+  const form: FormData =
+    region.effective === inputForm.overconcentration
+      ? inputForm
+      : { ...inputForm, overconcentration: region.effective }
+
+  const today = toLocalDay(baseDate)
+  const lineage = buildLineage(form, baseDate)
+  const birth = parseLocalDate(form.birthDate)
+  const start = parseLocalDate(form.startupDate)
+  const future = start !== null && start.getTime() > today.getTime()
+
+  // D-136: 조특법 청년은 "창업 당시" 나이 — 승계형은 실질 창업일(기존 사업 최초 개시일) 기준
+  const youthStart = parseLocalDate(lineage.effectiveStartDate) ?? start
+  const rawAge = birth && youthStart ? calcAge(form.birthDate, youthStart) : null
+  const dateOrderWrong = rawAge !== null && rawAge < 0
+  const age = dateOrderWrong ? null : rawAge
+  const rawAgeNow = birth ? calcAge(form.birthDate, today) : null
+  const ageNow = rawAgeNow !== null && rawAgeNow >= 0 ? rawAgeNow : null
+
+  const youth = buildYouthStatus(age, ageNow)
+  const isYouth = youth.taxLaw
   const recognition = judgeStartupRecognition(form)
+
+  const facts: Facts = {
+    youthTax: isYouth,
+    lineage,
+    baseYear: today.getFullYear(),
+    datesMissing: !birth || !start || dateOrderWrong,
+    future,
+    after2026: start !== null && formatDate(start) >= REVISED_RULE_FROM,
+    regionInconsistent: region.inconsistent,
+  }
 
   const checked = form.checkItems
   const anyChecked =
@@ -292,9 +514,9 @@ export function judge(form: FormData, baseDate: Date = new Date()): JudgementRes
 
   // 핵심 항목 (종합판정 대상): 법인세 / 취득세 / 재산세
   const allCore: ItemResult[] = [
-    judgeIncomeTax(form, recognition.verdict, isYouth),
-    judgeAcquisitionTax(form, recognition.verdict),
-    judgePropertyTax(recognition.verdict),
+    judgeIncomeTax(form, recognition.verdict, facts),
+    judgeAcquisitionTax(form, recognition.verdict, facts),
+    judgePropertyTax(form, recognition.verdict, facts),
   ]
   const coreItems = allCore.filter((item) => !anyChecked || checked[item.key])
 
@@ -302,7 +524,19 @@ export function judge(form: FormData, baseDate: Date = new Date()): JudgementRes
   const showRegistration = !anyChecked || checked.registrationTax
   const registration = showRegistration ? buildRegistrationReference(form) : null
 
+  const alerts = buildAlerts(form, facts, age, region.alert)
+  const frameworks = buildFrameworks(
+    form,
+    allCore,
+    recognition.verdict,
+    youth,
+    registration ? registration.note : buildRegistrationReference(form).note,
+    lineage,
+    facts.after2026 ? [REVISED_RULE_ALERT] : [],
+  )
+
   // 종합판정: 핵심 항목(등록면허세 제외) 중 가장 보수적인 상태
+  // D-136: 조특법 기준(세액감면) 판정보다 좋게 나오지 않는다 — 머리 판정이 법 기준 블록과 어긋나지 않게
   let overall: Verdict = 'good'
   if (coreItems.length === 0) {
     overall = 'conditional'
@@ -311,23 +545,25 @@ export function judge(form: FormData, baseDate: Date = new Date()): JudgementRes
       if (VERDICT_RANK[item.verdict] < VERDICT_RANK[overall]) overall = item.verdict
     }
   }
+  const taxLaw = frameworks.find((f) => f.key === 'taxLaw')
+  if (taxLaw) overall = worstOf(overall, taxLaw.verdict)
+
+  const notice = facts.datesMissing
+    ? dateOrderWrong
+      ? NOTICE_DATE_ORDER
+      : NOTICE_MISSING_DATES
+    : future
+      ? NOTICE_PRE_STARTUP
+      : null
 
   const keyChecks = buildKeyChecks(form)
-  const youth = buildYouthStatus(age)
-  const lineage = buildLineage(form, baseDate)
-  const frameworks = buildFrameworks(
-    form,
-    allCore,
-    recognition.verdict,
-    youth,
-    registration ? registration.note : buildRegistrationReference(form).note,
-    lineage,
-  )
 
   return {
     overall,
-    oneLineConclusion: VERDICT_ONELINE[overall],
-    reasons: buildReasons(form, isYouth),
+    oneLineConclusion: notice ?? VERDICT_ONELINE[overall],
+    notice,
+    alerts,
+    reasons: buildReasons(form, isYouth, age),
     keyReasons: buildKeyReasons(form),
     keyChecks,
     savingsPoints: buildSavingsPoints(coreItems, overall, recognition.verdict),

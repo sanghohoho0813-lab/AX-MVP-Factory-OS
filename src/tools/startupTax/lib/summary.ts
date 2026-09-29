@@ -18,7 +18,9 @@ export function buildSummaryText(result: JudgementResult): string {
   L.push('종합판정')
   L.push(`${VERDICT_EMOJI[result.overall]} ${VERDICT_LABEL[result.overall]}`)
   L.push('')
-  L.push(CUSTOMER_LINE[result.overall])
+  // D-136: 날짜가 없거나 예비창업이면 판정 문장 대신 그 안내를 보낸다
+  L.push(result.notice ?? CUSTOMER_LINE[result.overall])
+  if (result.alerts.length > 0) L.push(`★ 세무사 확인 필요 ${result.alerts.length}건 (상담 때 함께 확인)`)
 
   // 확인 필요 항목 (최대 2개)
   if (result.keyChecks.length > 0) {

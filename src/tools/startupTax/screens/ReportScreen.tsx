@@ -16,6 +16,7 @@ import { judge, VERDICT_EMOJI, VERDICT_LABEL } from '../lib/judgement'
 import { buildSummaryText } from '../lib/summary'
 import type { Verdict } from '../types'
 import { loadStartupTaxForm } from '../lib/formStore'
+import { withoutPlaceholders } from '../lib/formDefaults'
 import { useToolClient } from '../../shared/toolClientContext'
 import { ToolResultAttach } from '../../shared/ToolResultAttach'
 import PrintSheet from '../orig/components/PrintSheet'
@@ -31,7 +32,11 @@ export function StartupTaxReportScreen() {
   const [copied, setCopied] = useState(false)
   // 업체에서 열었으면 그 업체의 판정만 (D-94) — 다른 업체 판정이 섞여 나오지 않게
   const { clientId, clientName } = useToolClient()
-  const form = useMemo(() => loadStartupTaxForm(clientId), [clientId])
+  // D-136: 화면의 예시 날짜(1980-01-01 · 2020-01-01)는 안 적은 것으로 보고 판정한다
+  const form = useMemo(() => {
+    const saved = loadStartupTaxForm(clientId)
+    return saved ? withoutPlaceholders(saved) : null
+  }, [clientId])
   const result = useMemo(() => (form ? judge(form) : null), [form])
 
   if (!form || !result) {
@@ -78,10 +83,11 @@ export function StartupTaxReportScreen() {
           label="종합 판정"
           value={`${VERDICT_EMOJI[result.overall]} ${VERDICT_LABEL[result.overall]}`}
           tone={VERDICT_TONE[result.overall]}
+          hint={result.notice ?? undefined}
         />
         <MetricTile label="예상 절세 규모" value={result.savingsLevel.label} hint={result.savingsLevel.level} />
         <MetricTile label="전문가 검토" value={result.expertReview.grade} hint={result.expertReview.label} />
-        <MetricTile label="청년 여부" value={result.isYouth === null ? '확인 필요' : result.isYouth ? '해당' : '해당 없음'} hint={result.age ? `만 ${result.age}세` : ''} />
+        <MetricTile label="청년 여부" value={result.isYouth === null ? '확인 필요' : result.isYouth ? '해당' : '해당 없음'} hint={result.age !== null ? `창업 당시 만 ${result.age}세` : ''} />
       </div>
 
       <Section
@@ -104,6 +110,18 @@ export function StartupTaxReportScreen() {
           </pre>
         </Surface>
       </Section>
+
+      {result.alerts.length > 0 && (
+        <Section title="★ 세무사 확인 필요" count={result.alerts.length}>
+          <Surface edge="warning" showEdge>
+            <ul className="t-sub flex list-disc flex-col gap-1 break-keep pl-5 text-slate-700" data-testid="startup-report-alerts">
+              {result.alerts.map((a) => (
+                <li key={a}>{a}</li>
+              ))}
+            </ul>
+          </Surface>
+        </Section>
+      )}
 
       <Section title="판정 사유" count={result.keyReasons.length}>
         <Surface>

@@ -17,7 +17,7 @@ export default function YouthCard({ youth }: { youth: YouthStatus }) {
         <span className="text-2xl">🎂</span>
         <h3 className="text-xl font-bold text-gray-900">청년 기준 (우대 · 법별 분리)</h3>
         {youth.age !== null && (
-          <span className="ml-auto text-base font-bold text-gray-400">만 {youth.age}세</span>
+          <span className="ml-auto text-base font-bold text-gray-400">창업 당시 만 {youth.age}세</span>
         )}
       </div>
 
@@ -33,7 +33,7 @@ export default function YouthCard({ youth }: { youth: YouthStatus }) {
             <span className={`rounded-full px-3 py-1 text-sm font-bold ${tax.cls}`}>{tax.text}</span>
           </div>
           <p className="mt-1.5 text-sm leading-relaxed text-gray-500">
-            만 15~34세 (병역 최대 6년 차감) · 감면율 우대 · {youth.taxLawNote}
+            창업 당시 만 15~34세 (병역 최대 6년 차감) · 감면율 우대 · {youth.taxLawNote}
           </p>
         </div>
 

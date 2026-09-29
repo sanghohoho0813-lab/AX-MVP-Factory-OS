@@ -7,6 +7,7 @@ import type {
   Verdict,
 } from '../types'
 import { LABEL } from './options'
+import { industryClassOf } from './rules'
 
 // 결과 기반으로 상담 활용 콘텐츠를 생성한다.
 // - reasons: 판정 사유 (간단 불릿, 종합카드/카톡 공용)
@@ -15,7 +16,13 @@ import { LABEL } from './options'
 // - consultChecklist: 전문가 상담 시 확인할 항목 (계약 유도)
 
 function isExcludedIndustry(form: FormData): boolean {
-  return form.industry === 'real_estate' || form.industry === 'finance_insurance'
+  return industryClassOf(form.industry) === 'excluded'
+}
+
+// D-136: 대상 업종 목록(§6③)에 확실히 있지 않은 업종 — 도소매·전문서비스·기타·모르는 값
+function isUncertainIndustry(form: FormData): boolean {
+  const c = industryClassOf(form.industry)
+  return c === 'partial' || c === 'unknown'
 }
 
 // 창업 형태 짧은 라벨 (핵심 이유용)
@@ -70,8 +77,9 @@ export function buildSavingsLevel(
   }
 
   // 핵심 감면(법인세·소득세)이 유리 + 청년/비과밀 등 유리조건 → 가장 큰 절세 구간
+  // D-136: 종합이 '가능성 높음' 이 아니면 A(수천만 원 이상)는 절대 보이지 않는다
   const strongCondition = isYouth === true || form.overconcentration === 'no'
-  if (incomeGood && strongCondition && goodCount >= 2) {
+  if (overall === 'good' && incomeGood && strongCondition && goodCount >= 2) {
     return { level: 'A', label: SAVINGS_LEVEL_LABEL.A }
   }
   if (incomeGood) {
@@ -85,7 +93,7 @@ export function buildSavingsLevel(
 }
 
 // 판정 사유 (긍정/부정 요소를 짧게)
-export function buildReasons(form: FormData, isYouth: boolean | null): string[] {
+export function buildReasons(form: FormData, isYouth: boolean | null, age: number | null = null): string[] {
   const out: string[] = []
 
   // 창업 형태
@@ -113,6 +121,7 @@ export function buildReasons(form: FormData, isYouth: boolean | null): string[] 
   // 청년
   if (isYouth === true) out.push('청년 창업')
   else if (isYouth === false) out.push('청년 요건 미해당')
+  else if (age !== null) out.push('청년 여부 확인 필요 (병역 기간)')
 
   // 과밀억제권역
   if (form.overconcentration === 'no') out.push('비과밀억제권역')
@@ -120,7 +129,9 @@ export function buildReasons(form: FormData, isYouth: boolean | null): string[] 
 
   // 업종
   if (isExcludedIndustry(form)) out.push('부동산·금융업 (감면 제외 가능성)')
-  else if (form.industry && form.industry !== 'etc') out.push('감면 대상 업종 가능성')
+  else if (industryClassOf(form.industry) === 'eligible') out.push('감면 대상 업종 가능성')
+  else if (industryClassOf(form.industry) === 'partial') out.push('세부 업종 확인 필요 (일부 제외)')
+  else out.push('업종 확인 필요')
 
   return out
 }
@@ -132,7 +143,7 @@ export function buildKeyChecks(form: FormData): string[] {
   if (form.overconcentration === 'unknown' || form.overconcentration === '') {
     out.push('과밀억제권역 여부 확인')
   }
-  if (isExcludedIndustry(form) || form.industry === 'etc' || form.industry === '') {
+  if (isExcludedIndustry(form) || isUncertainIndustry(form)) {
     out.push('정확한 업종코드 확인')
   }
   if (
@@ -178,7 +189,7 @@ export function buildConsultQuestions(form: FormData, isYouth: boolean | null): 
   if (form.overconcentration === 'unknown' || form.overconcentration === '') {
     out.push('사업장을 어디에 두실 예정인가요? (수도권 과밀억제권역 여부)')
   }
-  if (isExcludedIndustry(form) || form.industry === 'etc' || form.industry === '') {
+  if (isExcludedIndustry(form) || isUncertainIndustry(form)) {
     out.push('주업종의 정확한 업종코드(한국표준산업분류)는 무엇인가요?')
   }
   // 취득세 관련 (사업용 부동산)
@@ -344,9 +355,9 @@ export function buildExpertReview(
     factors.push('과밀억제권역 불명확')
 
   // 업종
-  if (form.industry === 'real_estate' || form.industry === 'finance_insurance')
-    factors.push('감면 제외 우려 업종')
-  if (form.industry === 'etc' || form.industry === '') factors.push('업종 불명확')
+  if (isExcludedIndustry(form)) factors.push('감면 제외 우려 업종')
+  if (industryClassOf(form.industry) === 'partial') factors.push('업종 세부 확인 (일부 제외)')
+  if (industryClassOf(form.industry) === 'unknown') factors.push('업종 불명확')
 
   // 항목별 검토 필요 (취득세/재산세)
   const acq = coreItems.find((i) => i.key === 'acquisitionTax')
@@ -354,7 +365,7 @@ export function buildExpertReview(
   const prop = coreItems.find((i) => i.key === 'propertyTax')
   if (prop && prop.verdict !== 'good') factors.push('재산세 검토 필요')
 
-  // 청년 경계구간 (만 33~35세) 또는 생년월일 미입력
+  // 청년 경계구간 (창업 당시 만 33~35세) 또는 생년월일·창업일 미입력
   if (age !== null && age >= 33 && age <= 35) factors.push('청년 여부 경계구간')
   if (isYouth === null) factors.push('대표자 정보 부족')
 

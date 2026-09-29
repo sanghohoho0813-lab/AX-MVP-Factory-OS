@@ -7,7 +7,7 @@ import type {
   Verdict,
   YouthStatus,
 } from '../types'
-import { formatAge } from './lineage'
+import { formatAge, formatTaxRemaining } from './lineage'
 
 // ---------------------------------------------------------------------------
 // 유틸
@@ -47,15 +47,16 @@ const INDUSTRY_TAXLAW_NOTE: Record<string, string> = {
   manufacturing: '제조업은 조특법 제6조 감면 대상 업종에 해당할 가능성이 높습니다.',
   ict: '정보통신업은 세부 업종(SW개발·정보서비스 등)에 따라 대상 여부가 달라져 업종코드 확인이 필요합니다.',
   professional:
-    '전문서비스업은 세부 업종에 따라 대상/제외가 나뉘므로 업종코드(엔지니어링·연구개발 등) 확인이 필요합니다.',
+    '전문서비스업은 세부 업종에 따라 대상/제외가 나뉩니다. 변호사·변리사·법무사·회계사·세무사·수의사·행정사·건축설계 등은 제외되므로 업종코드 확인이 필요합니다.',
   wholesale_retail:
-    '도소매업은 조특법상 단순 도소매가 아니라 통신판매업 등 세부 업종 해당 여부 확인이 필요합니다.',
+    '도소매업은 통신판매업만 감면 대상입니다. 일반 도매·소매는 대상이 아니어서 세부 업종 확인이 필요합니다.',
   restaurant: '음식점업은 대상 업종에 해당할 수 있으나 세부 요건 확인이 필요합니다.',
   real_estate: '부동산업은 조특법 제6조 감면 대상에서 제외될 가능성이 높습니다.',
   finance_insurance:
     '금융·보험업은 세부 업종 확인이 필요하며 감면 대상에서 제외될 가능성이 있습니다.',
   etc: '업종코드에 따라 대상 여부가 달라지므로 주업종 코드 확인이 필요합니다.',
 }
+const INDUSTRY_UNKNOWN_NOTE = '업종 확인 필요 — 주업종 코드가 조특법 제6조 대상 업종인지 확인이 필요합니다.'
 
 // ===========================================================================
 // 1) 조특법 기준 (법인세/소득세 세액감면)
@@ -65,6 +66,7 @@ function buildTaxLaw(
   income: ItemResult | undefined,
   youth: YouthStatus,
   lineage: Lineage,
+  extraRisks: string[],
 ): FrameworkResult {
   const a = form.advanced
   let v: Verdict = income?.verdict ?? 'conditional'
@@ -85,7 +87,9 @@ function buildTaxLaw(
       risks.push('기존 사업 양수는 창업 제외 대상이 될 수 있습니다.')
       break
     case 'reopen_same':
-      risks.push('폐업 후 동종 재개업은 창업 제외 대상이 될 수 있습니다.')
+      // D-136: 조특법 §6⑩ — 폐업 후 같은 업종 재개업은 창업이 아니다 (창업지원법의 3년 규칙과 다르다)
+      v = 'bad'
+      risks.push('폐업 후 같은 업종 재개업은 조특법상 창업으로 보지 않습니다(§6⑩). 창업지원법의 폐업 3년 규칙과 다릅니다.')
       break
     case 'succession':
       risks.push('특수관계인 사업 승계는 창업으로 인정되지 않을 가능성이 높습니다.')
@@ -101,12 +105,12 @@ function buildTaxLaw(
       )
       checkPoints.push('기존 개인사업 최초 개시일(사업자등록일)을 확인해 주세요.')
     } else if (lineage.hasTaxRemaining === true) {
-      // 잔여기간 있음 → 승계 검토 대상 (완전 불가로 보지 않음)
+      // 잔여기간 있음 → 승계 검토 대상 (완전 불가로 보지 않음). D-136: 과세연도로 센다
       v = worst(v, 'caution')
       risks.push(
-        `기존 창업일 기준 업력 ${formatAge(lineage.businessAgeYears)} — 감면 잔여기간 약 ${formatAge(
-          lineage.taxRemainingYears,
-        )}이 남아 승계 적용을 검토할 수 있습니다.`,
+        `기존 창업일 기준 업력 ${formatAge(lineage.businessAgeYears)} — 감면 기간 ${formatTaxRemaining(
+          lineage,
+        )}. 승계 적용을 검토할 수 있습니다.`,
       )
       checkPoints.push(
         '기존 개인사업 창업 당시 감면 요건(업종·지역·창업 인정)을 충족했는지 확인이 필요합니다.',
@@ -116,10 +120,20 @@ function buildTaxLaw(
       risks.push(
         `기존 창업일 기준 업력 ${formatAge(
           lineage.businessAgeYears,
-        )}으로 창업중소기업 세액감면 기간(5년)이 이미 경과했을 가능성이 높습니다.`,
+        )} — 창업중소기업 세액감면 기간(5개 과세연도, ${formatTaxRemaining(lineage)})이 이미 지났을 가능성이 높습니다.`,
       )
     }
+  } else if (lineage.hasTaxRemaining === false) {
+    // D-136: 신규 창업도 5개 과세연도가 지나면 감면 끝 (보수적: 창업한 해 + 4년)
+    v = 'bad'
+    risks.push(
+      `창업일 기준 감면 기간(5개 과세연도, ${formatTaxRemaining(lineage)})이 지났을 가능성이 높습니다.`,
+    )
+  } else if (lineage.taxRemainingYears === 1) {
+    v = worst(v, 'caution')
+    risks.push(`감면 기간 — ${formatTaxRemaining(lineage)}일 수 있습니다.`)
   }
+  risks.push(...extraRisks)
 
   // 새 입력 기반 추가 리스크 (사업 동일성 / 자산 인수)
   // 승계형(법인전환·양수·승계)은 동일성·자산인수가 구조상 당연하므로 중복 감점하지 않고
@@ -148,8 +162,9 @@ function buildTaxLaw(
   v = downgrade(v, Math.min(nf, 2))
 
   // 업종 안내
-  const industryNote = form.industry ? INDUSTRY_TAXLAW_NOTE[form.industry] : ''
-  if (industryNote) checkPoints.unshift(industryNote)
+  // D-136: 이 판정기가 모르는 업종 값도 '확인 필요' 로 안내한다
+  const industryNote = form.industry ? (INDUSTRY_TAXLAW_NOTE[form.industry] ?? INDUSTRY_UNKNOWN_NOTE) : INDUSTRY_UNKNOWN_NOTE
+  checkPoints.unshift(industryNote)
 
   // 항목 포인트
   const points: SavingsPoint[] = [
@@ -354,13 +369,14 @@ export function buildFrameworks(
   youth: YouthStatus,
   registrationNote: string | null,
   lineage: Lineage,
+  extraTaxRisks: string[] = [],
 ): FrameworkResult[] {
   const income = allCore.find((i) => i.key === 'incomeTax')
   const acquisition = allCore.find((i) => i.key === 'acquisitionTax')
   const property = allCore.find((i) => i.key === 'propertyTax')
 
   return [
-    buildTaxLaw(form, income, youth, lineage),
+    buildTaxLaw(form, income, youth, lineage, extraTaxRisks),
     buildStartupLaw(form, recognition, youth, lineage),
     buildLocalTax(acquisition, property, registrationNote),
   ]
