@@ -17,15 +17,20 @@ import type { ClientOpsRecord } from '../../types/clientOps'
 import { josa } from '../../lib/josa'
 import { readFact, usableFactValue, wonOf } from '../../services/customerFacts'
 
-/** 업체가 적어 둔 업종 말 → 창업감면·정책자금이 쓰는 업종 값 */
+/**
+ * 업체가 적어 둔 업종 말 → 창업감면·정책자금이 쓰는 업종 값.
+ * D-136: **감면 · 지원에서 빠지는 업종(부동산 · 금융)을 먼저 본다** — 예전에는 '부동산개발업' 이 '개발' 로
+ * 정보통신이 되고 '부동산 컨설팅' 이 전문서비스가 되어, 안 되는 업종이 된다고 나왔다.
+ * '임대' 는 부동산 임대일 때만 부동산(장비 · 차량 임대는 다른 업종 — 모르면 비워 둔다).
+ */
 const INDUSTRY_WORDS: { value: string; words: string[] }[] = [
+  { value: 'real_estate', words: ['부동산', '건물임대', '주택임대', '상가임대', '토지임대', '분양'] },
+  { value: 'finance_insurance', words: ['금융', '보험', '대부', '투자자문', '신탁'] },
   { value: 'manufacturing', words: ['제조', '생산', '가공', '공장'] },
   { value: 'ict', words: ['정보통신', 'IT', '소프트웨어', 'SW', '플랫폼', '앱', '시스템', '개발'] },
   { value: 'professional', words: ['전문', '컨설팅', '엔지니어링', '설계', '연구'] },
   { value: 'wholesale_retail', words: ['도소매', '도매', '소매', '유통', '판매', '무역'] },
   { value: 'restaurant', words: ['음식', '식당', '외식', '카페'] },
-  { value: 'real_estate', words: ['부동산', '임대'] },
-  { value: 'finance_insurance', words: ['금융', '보험', '대부'] },
 ]
 
 /** 업체의 업종 글에서 도구가 아는 값 찾기 (못 찾으면 빈 글자) */
@@ -51,13 +56,28 @@ export function employeeCountOf(text: string): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-/** 설립일 → 업력(년). 설립일이 없으면 null */
+/**
+ * 설립일 → 업력(꽉 찬 개월 수). 설립일이 없거나 오늘보다 뒤면 null.
+ * D-136: 달력으로 센다(생일 세듯) — 3년 11개월은 47개월이지 '3년 = 36개월' 이 아니다.
+ * 연구소의 '창업 3년 이내' 처럼 개월로 가르는 규칙은 이 값을 써야 한다.
+ */
+export function monthsInBusiness(establishedAt: string, today: Date): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(establishedAt ?? '')
+  if (!m) return null
+  const y = Number(m[1])
+  const mo = Number(m[2])
+  const d = Number(m[3])
+  const check = new Date(y, mo - 1, d)
+  if (check.getFullYear() !== y || check.getMonth() !== mo - 1 || check.getDate() !== d) return null
+  let months = (today.getFullYear() - y) * 12 + (today.getMonth() - (mo - 1))
+  if (today.getDate() < d) months -= 1
+  return months < 0 ? null : months
+}
+
+/** 설립일 → 업력(꽉 찬 년). 설립일이 없으면 null — 달력으로 센다(D-136) */
 export function yearsInBusiness(establishedAt: string, today: Date): number | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(establishedAt ?? '')) return null
-  const start = new Date(`${establishedAt}T00:00:00`)
-  if (Number.isNaN(start.getTime())) return null
-  const years = (today.getTime() - start.getTime()) / (365.25 * 86400000)
-  return years < 0 ? null : Math.floor(years)
+  const months = monthsInBusiness(establishedAt, today)
+  return months === null ? null : Math.floor(months / 12)
 }
 
 /** 생년월일 → 만 나이 (없으면 null) */
@@ -94,6 +114,8 @@ export interface ClientFacts {
   industryText: string
   employeeCount: number | null
   years: number | null
+  /** D-136: 꽉 찬 개월 — '3년 이내' 같은 규칙은 years 가 아니라 이것으로 */
+  months: number | null
   representativeAge: number | null
   /* D-128 — 사실 창고에서 더 읽는 것(모르면 비워 둔다) */
   representativeName: string
@@ -126,6 +148,7 @@ export function clientFacts(record: ClientOpsRecord, today: Date): ClientFacts {
     industryText: record.industry ?? '',
     employeeCount: employeeCountOf(usableFactValue(record, 'employeeCount')),
     years: yearsInBusiness(established, today),
+    months: monthsInBusiness(established, today),
     representativeAge: ageOf(birth, today),
     representativeName: usableFactValue(record, 'representativeName'),
     businessNumber: usableFactValue(record, 'businessNumber'),
