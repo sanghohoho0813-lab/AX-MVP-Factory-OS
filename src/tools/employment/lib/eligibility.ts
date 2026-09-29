@@ -5,6 +5,7 @@
  */
 
 import { BOSU_FLOOR_2026, ELIG, EXCL, MIN_WAGE_2026 } from './constants'
+import { hireWindowBlocks, hireWindowOf } from './hireWindow'
 import { YOUTH_MAX_AGE, youthAgeAt, youthByYears, youthLimitLabel } from './dates'
 import type { EmpType, Gender, Program } from './programs'
 
@@ -112,7 +113,9 @@ export function diagnoseHiring(a: HiringAnswers, programs: readonly Program[]): 
     }
     if (m.preApply && a.preApply === false) {
       if (p.id === 'youth_jump') {
-        reasons.push('사전신청 원칙(입사 3개월 내 예외)')
+        // D-137: 예외는 '입사 후 3개월 안' 뿐 — 그 뒤면 새로 신청할 수 없으니 이유가 아니라 확인할 것
+        cautions.push('★ 채용 전에 신청 안 했으면 입사 후 3개월 안에 참여신청 — 지났으면 신청 불가')
+        capped = true
       } else {
         blockers.push('사전신청 필수')
       }
@@ -258,6 +261,10 @@ export interface YouthGateInput {
   excl: Record<string, boolean | undefined>
   /** 입사일 (나이 기준일). 없으면 오늘 */
   hireDate?: string
+  /** D-137: 기준일(오늘) — 입사 3개월 신청 기한을 본다. 없으면 오늘 */
+  today?: Date | string
+  /** D-137: 이미 참여신청을 해 둔 직원(진행 상태가 준비 다음) — 기한과 상관없이 회차대로 */
+  enrolled?: boolean
 }
 
 export interface YouthGateResult {
@@ -271,6 +278,9 @@ export interface YouthGateResult {
   nearBorder: boolean
   ok: boolean
   hasBirth: boolean
+  /** D-137: 입사일로 본 신청 기한 — 지났으면(참여 중이 아니면) ok 가 아니다 */
+  hireWindowBlocked: boolean
+  hireWindowText: string
 }
 
 /** 생년월일을 모를 때 원본 폼이 넣어 두던 자리값 — 이 값이면 '생년월일 미입력' 으로 본다 */
@@ -289,7 +299,9 @@ export function youthGate(input: YouthGateInput): YouthGateResult {
   const failedX = EXCL.filter((x) => input.excl[x.id] === false)
   const allXok = EXCL.every((x) => input.excl[x.id] === true)
   const has = !!input.birthDate && input.birthDate !== BIRTH_PLACEHOLDER
-  const ok = has && aOk && anyE && allXok
+  const hw = hireWindowOf('youth_jump', input.hireDate || null, input.today ?? new Date())
+  const hwBlocked = hireWindowBlocks(hw) && !input.enrolled
+  const ok = has && aOk && anyE && allXok && !hwBlocked
   return {
     age: ya.age,
     ageMonths: ya.totalMonths ?? 0,
@@ -301,5 +313,7 @@ export function youthGate(input: YouthGateInput): YouthGateResult {
     nearBorder: ya.byService,
     ok: ok,
     hasBirth: has,
+    hireWindowBlocked: hwBlocked,
+    hireWindowText: hw.text,
   }
 }

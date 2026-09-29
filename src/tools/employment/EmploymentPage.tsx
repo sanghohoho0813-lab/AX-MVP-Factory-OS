@@ -707,6 +707,12 @@ function RosterTab() {
                     </div>
                     <span className="t-sub text-slate-700">
                       후보 <b className="text-slate-900">{s.candidateCount}명</b> · 확인 {s.check} · 추가자료 {s.more}
+                      {s.expired > 0 && (
+                        <span data-testid="roster-expired" className="text-slate-500">
+                          {' '}
+                          · 입사일로 신청 기한 지나 뺀 {s.expired}명
+                        </span>
+                      )}
                     </span>
                     <span className="t-meta break-keep text-slate-500">{s.note}</span>
                     <span className="t-meta text-slate-400">
@@ -755,7 +761,7 @@ function RosterTab() {
                         </td>
                         <td className="px-3 py-2">
                           <div className="flex flex-wrap gap-1">
-                            {r.diag.candidates.length === 0 ? (
+                            {r.diag.candidates.length === 0 && r.diag.expired.length === 0 ? (
                               <span className="t-meta text-slate-400">-</span>
                             ) : (
                               r.diag.candidates.map((c) => (
@@ -763,6 +769,11 @@ function RosterTab() {
                                   {SUBSIDY_SHORT[c.key] ?? c.key} · {LEVELS[c.level].label}
                                 </Badge>
                               ))
+                            )}
+                            {r.diag.expired.length > 0 && (
+                              <span className="t-meta break-keep text-slate-400" title={r.diag.expired.map((c) => c.note).join('\n')}>
+                                기한 지나 뺌: {r.diag.expired.map((c) => SUBSIDY_SHORT[c.key] ?? c.key).join(' · ')}
+                              </span>
                             )}
                           </div>
                         </td>
@@ -773,16 +784,21 @@ function RosterTab() {
               </Surface>
             </Section>
 
-            <Disclosure title="직원별 확인 문구" hint="후보마다 왜 확인이 필요한지">
+            <Disclosure title="직원별 확인 문구" hint="후보마다 왜 확인이 필요한지 · 왜 뺐는지">
               <ul className="flex flex-col gap-2">
                 {analysis.rows
-                  .filter((r) => r.diag.candidates.length > 0)
+                  .filter((r) => r.diag.candidates.length > 0 || r.diag.expired.length > 0)
                   .map((r, i) => (
                     <li key={`${r.emp.name}-${i}`} className="flex flex-col gap-0.5">
                       <span className="t-body font-medium text-slate-800">{r.emp.name}</span>
                       {r.diag.candidates.map((c) => (
                         <span key={c.key} className="t-sub break-keep text-slate-600">
                           · {SUBSIDY_SHORT[c.key] ?? c.key}: {c.note}
+                        </span>
+                      ))}
+                      {r.diag.expired.map((c) => (
+                        <span key={`x-${c.key}`} className="t-sub break-keep text-slate-500">
+                          · {SUBSIDY_SHORT[c.key] ?? c.key} 뺌: {c.note}
                         </span>
                       ))}
                     </li>

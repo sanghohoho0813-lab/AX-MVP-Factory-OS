@@ -29,6 +29,7 @@ import {
 import { companyMetaOf, employeeRowData, matchOsClient, memosFromRow, osCompanyDefaults, osPickList, programsFromD91, regionOfAddress, toOrigCompany, toOrigEmployee } from '../orig/store'
 import type { ClientOpsRecord } from '../../../types/clientOps'
 import { simulate, simulationText } from '../lib/simulator'
+import { HIRE_WINDOWS, fullMonthsSince, hireWindowBlocks, hireWindowOf } from '../lib/hireWindow'
 import { agencyAutoComment, agencyDocRequestText, agencyReportData, agencySummaryText, commissionSummary, companyRanking, companyRiskRanking, ddayAlerts, emptyCompanyMeta, monthlyReceived, pendingPayments, programPipeline } from '../lib/companyMeta'
 import { buildImportPreview, parseBulkPaste, parseMoneyCell, xlAutoMap, xlBizNoCheck, xlDetectHeader, xlNormDate } from '../lib/excelImport'
 import { birthFromCell, looksLikeRrn, safeBizNo } from '../lib/privacy'
@@ -300,7 +301,7 @@ function rowOf(rows: ReturnType<typeof diagnoseHiring>, id: string) {
   const rows3 = diagnoseHiring({ ...BASE_ANSWERS, noLayoff: false }, PROGRAM_LIST)
   check('감원 이력 → 전 제도 blocker', rows3.every((r) => r.blockers.indexOf('최근 감원 이력—신청 제한') >= 0))
   const rows4 = diagnoseHiring({ ...BASE_ANSWERS, preApply: false }, PROGRAM_LIST)
-  check('youth_jump 사전신청 안 함 → reason(예외)', rowOf(rows4, 'youth_jump')?.reasons.indexOf('사전신청 원칙(입사 3개월 내 예외)') >= 0 && rowOf(rows4, 'youth_jump')?.blockers.length === 0)
+  check('youth_jump 사전신청 안 함 → ★ 입사 3개월 안 확인 · 가능성 높음 아님(D-137)', (rowOf(rows4, 'youth_jump')?.cautions.join() ?? '').includes('입사 후 3개월 안에 참여신청') && rowOf(rows4, 'youth_jump')?.blockers.length === 0 && rowOf(rows4, 'youth_jump')?.status === 'maybe')
   check('work_exp 사전신청 안 함 → blocker', rowOf(rows4, 'work_exp')?.blockers.indexOf('사전신청 필수') >= 0)
 }
 
@@ -308,13 +309,13 @@ function rowOf(rows: ReturnType<typeof diagnoseHiring>, id: string) {
 const ALL_ELIG_NONE: Record<string, boolean> = {}
 const ALL_EXCL_OK: Record<string, boolean> = { x1: true, x2: true, x3: true, x4: true, x5: true }
 {
-  const g = youthGate({ birthDate: '1991-01-15', gender: 'male', milMonths: 18, elig: { e3: true }, excl: ALL_EXCL_OK, hireDate: '2026-06-01' })
+  const g = youthGate({ birthDate: '1991-01-15', gender: 'male', milMonths: 18, elig: { e3: true }, excl: ALL_EXCL_OK, hireDate: '2026-06-01', today: '2026-06-01' })
   check('youthGate 경계선 (35세4개월 · 군 18개월)', g.age === 35 && g.ageOk && g.nearBorder && g.ok && g.maxLabel === '만34세(+복무 18개월 · 최대 39세)', JSON.stringify(g))
-  const g2 = youthGate({ birthDate: '1991-01-15', gender: 'male', milMonths: 0, elig: { e3: true }, excl: ALL_EXCL_OK, hireDate: '2026-06-01' })
+  const g2 = youthGate({ birthDate: '1991-01-15', gender: 'male', milMonths: 0, elig: { e3: true }, excl: ALL_EXCL_OK, hireDate: '2026-06-01', today: '2026-06-01' })
   check('youthGate 군복무 없으면 미충족', !g2.ageOk && !g2.ok && !g2.nearBorder && g2.maxLabel === '만34세')
-  const g3 = youthGate({ birthDate: '1998-03-10', gender: 'female', milMonths: 0, elig: ALL_ELIG_NONE, excl: ALL_EXCL_OK, hireDate: '2026-06-01' })
+  const g3 = youthGate({ birthDate: '1998-03-10', gender: 'female', milMonths: 0, elig: ALL_ELIG_NONE, excl: ALL_EXCL_OK, hireDate: '2026-06-01', today: '2026-06-01' })
   check('youthGate 취업애로 0개 → ok false', g3.ageOk && !g3.anyElig && !g3.ok)
-  const g4 = youthGate({ birthDate: '1998-03-10', gender: 'female', milMonths: 0, elig: { e1: true }, excl: { ...ALL_EXCL_OK, x2: false }, hireDate: '2026-06-01' })
+  const g4 = youthGate({ birthDate: '1998-03-10', gender: 'female', milMonths: 0, elig: { e1: true }, excl: { ...ALL_EXCL_OK, x2: false }, hireDate: '2026-06-01', today: '2026-06-01' })
   check('youthGate 제외요건 해당 → failedExcl', !g4.allExclOk && g4.failedExcl.join() === '사업주 가족이 아닐 것' && !g4.ok)
 }
 
@@ -336,7 +337,7 @@ const ALL_EXCL_OK: Record<string, boolean> = { x1: true, x2: true, x3: true, x4:
 // ── 명부 진단 ───────────────────────────────────────────
 const BASE = new Date('2026-06-01T00:00:00')
 const ROSTER: RosterEmployee[] = [
-  { name: '홍길동', birthDate: '1998-03-10', gender: 'M', rrnMasked: '980310-1******', hireDate: '2026-01-05', loseDate: null, statusRaw: '취득', insuranceRaw: '국민·건강·산재·고용', workplace: '', bizNo: '', ins: { np: true, hi: true, wc: true, ei: true }, insKnown: { np: true, hi: true, wc: true, ei: true } },
+  { name: '홍길동', birthDate: '1998-03-10', gender: 'M', rrnMasked: '980310-1******', hireDate: '2026-04-01', loseDate: null, statusRaw: '취득', insuranceRaw: '국민·건강·산재·고용', workplace: '', bizNo: '', ins: { np: true, hi: true, wc: true, ei: true }, insKnown: { np: true, hi: true, wc: true, ei: true } },
   { name: '박노인', birthDate: '1965-05-01', gender: 'M', rrnMasked: '650501-1******', hireDate: '2015-01-01', loseDate: null, statusRaw: '취득', insuranceRaw: '국민·건강·산재·고용', workplace: '', bizNo: '', ins: { np: true, hi: true, wc: true, ei: true }, insKnown: { np: true, hi: true, wc: true, ei: true } },
   { name: '김영희', birthDate: '1986-02-01', gender: 'F', rrnMasked: '860201-2******', hireDate: '2020-03-01', loseDate: null, statusRaw: '취득', insuranceRaw: '국민·건강', workplace: '', bizNo: '', ins: { np: true, hi: true, wc: false, ei: false }, insKnown: { np: true, hi: true, wc: true, ei: true } },
 ]
@@ -345,14 +346,14 @@ const ROSTER: RosterEmployee[] = [
   check('classify 청년 28세 · 신규입사', d0.age === 28 && d0.isYouth && d0.recentHire && d0.active && d0.eiOn && !d0.insPartial && !d0.relSuspect)
   check('  후보 youth_jump(check) · emp_promo(more)', d0.candidates.map((c) => `${c.key}:${c.level}`).join() === 'youth_jump:check,emp_promo:more')
   const d1 = classifyEmployee(ROSTER[1], { baseDate: BASE })
-  check('classify 61세 → senior_continue·senior_intern', d1.age === 61 && d1.isSenior && d1.candidates.map((c) => c.key).join() === 'senior_continue,senior_intern' && d1.candidates.every((c) => c.level === 'check'))
+  // D-137: 2015년 입사 61세 — 계속고용은 입사일과 상관없어 후보, 시니어 인턴십은 채용 전 약정이 필요해 뺀다
+  check('classify 61세(2015 입사) → senior_continue 후보 · senior_intern 은 뺌', d1.age === 61 && d1.isSenior && d1.candidates.map((c) => c.key).join() === 'senior_continue' && d1.candidates.every((c) => c.level === 'check') && d1.expired.map((c) => c.key).join() === 'senior_intern', JSON.stringify({ c: d1.candidates, e: d1.expired }))
   const d2 = classifyEmployee(ROSTER[2], { baseDate: BASE })
   check('classify 여성 40세 · 고용/산재 미가입', d2.age === 40 && d2.isFemale && d2.eiNeedsCheck && d2.wcNeedsCheck && d2.insPartial && d2.onlyNpHi && d2.relSuspect && d2.insMissingCount === 2)
-  // D-136: 김영희는 입사(2020-03-01) 때 만 34세 → 청년. 다만 입사 13개월이 넘어 청년도약은 '추가자료 필요' 로만
-  const sw = d2.candidates.find((c) => c.key === 'saeil_women')
-  const yj2 = d2.candidates.find((c) => c.key === 'youth_jump')
-  check('  후보 saeil_women(check) + 확인 문구', !!sw && sw.level === 'check' && sw.note.indexOf('고용보험 피보험자격 확인 필요') >= 0 && sw.note.indexOf('특수관계자·대표자·임원 여부 확인 필요') >= 0)
-  check('  입사 때 청년이던 오래된 직원 → youth_jump 는 more · 기간 문구', d2.isYouth && d2.hireAge === 34 && !!yj2 && yj2.level === 'more' && yj2.note.includes('입사 13개월 넘음'), JSON.stringify(yj2))
+  // D-137: 김영희는 입사(2020-03-01) 때 만 34세 → 청년. 그러나 6년 전 입사 — 청년도약(입사 3개월) · 고용촉진(12개월) 기한이 지났고
+  //        새일여성인턴은 채용 전 약정이 필요하다 → 후보 0, 모두 '뺀 것'
+  check('  6년 전 입사 여성 → 후보 없음(새일 · 청년도약 뺌 · 고용촉진 없음)', d2.isYouth && d2.hireAge === 34 && d2.candidates.length === 0 && ['youth_jump', 'saeil_women'].every((k) => d2.expired.some((c) => c.key === k)) && !d2.candidates.some((c) => c.key === 'emp_promo'), JSON.stringify({ c: d2.candidates, e: d2.expired }))
+  check('  뺀 까닭이 보인다(입사 N개월 · 기한 지남 / 채용 전 약정)', d2.expired.find((c) => c.key === 'youth_jump')?.note.includes('기한') === true && d2.expired.find((c) => c.key === 'saeil_women')?.note.includes('이미 채용한 직원') === true)
   const d3 = classifyEmployee({ ...ROSTER[0], rel: 'ceo' }, { baseDate: BASE })
   check('classify 대표자 표시 → level more', d3.relMarked && d3.candidates[0].level === 'more')
   const d4 = classifyEmployee({ ...ROSTER[0], statusRaw: '상실' }, { baseDate: BASE })
@@ -361,13 +362,14 @@ const ROSTER: RosterEmployee[] = [
   const a = analyzeRoster(ROSTER, { baseDate: BASE })
   check('analyzeRoster counts (청년은 입사일 기준)', a.counts.totalEmp === 3 && a.counts.activeCount === 3 && a.counts.youthCount === 2 && a.counts.seniorCount === 1 && a.counts.generalCount === 1 && a.counts.newHireCount === 1, JSON.stringify(a.counts))
   check('analyzeRoster 확인 필요 인원', a.eiCheckCount === 1 && a.wcCheckCount === 1 && a.partialInsCount === 1 && a.relCheckCount === 1)
-  check('analyzeRoster 후보 지원금 4건', a.candidateSubsidyCount === 4 && a.checkItemCount === 6, `${a.candidateSubsidyCount}/${a.checkItemCount}`)
+  check('analyzeRoster 후보 지원금 2건(청년도약 · 계속고용) · 오래된 직원은 뺀 수로', a.candidateSubsidyCount === 2 && a.checkItemCount === 3, `${a.candidateSubsidyCount}/${a.checkItemCount}`)
+  check('analyzeRoster 뺀 수: 새일 1 · 시니어 인턴 1 · 청년도약 1 · 고용촉진 0(나이 조건 없는 지원금은 세지 않음)', a.subsidySummary.find((s) => s.key === 'saeil_women')?.expired === 1 && a.subsidySummary.find((s) => s.key === 'senior_intern')?.expired === 1 && a.subsidySummary.find((s) => s.key === 'youth_jump')?.expired === 1 && a.subsidySummary.find((s) => s.key === 'emp_promo')?.expired === 0, JSON.stringify(a.subsidySummary.map((s) => [s.key, s.expired])))
   const yj = a.subsidySummary.find((s) => s.key === 'youth_jump')
   const pa = a.subsidySummary.find((s) => s.key === 'parental')
   check('summary youth_jump check 1 · level check', !!yj && yj.check === 1 && yj.candidateCount === 1 && yj.level === 'check' && yj.confidence === 'more')
   check('summary parental 는 항상 more', !!pa && pa.level === 'more' && pa.candidateCount === 0)
   // D-136: 규칙표 총액 하나만 쓴다 (청년도약 720 · 계속고용 720 · 시니어 인턴 550 · 새일 400)
-  check('estimateSubsidyTotal', estimateSubsidyTotal(a.subsidySummary) === (720 + 720 + 550 + 400) * 10000, String(estimateSubsidyTotal(a.subsidySummary)))
+  check('estimateSubsidyTotal — 새로 신청할 수 있는 후보만(청년도약 720 · 계속고용 720)', estimateSubsidyTotal(a.subsidySummary) === (720 + 720) * 10000, String(estimateSubsidyTotal(a.subsidySummary)))
   const txt = buildCopyText({ company: '미래상사', totalEmp: 3, youthCount: 1, seniorCount: 1, eiCheckCount: 1, wcCheckCount: 1, partialInsCount: 1, relCheckCount: 1, candidateSubsidyCount: 4 })
   check('buildCopyText 첫줄·주의문구', txt.startsWith('미래상사 4대보험 명부 1차 검토 결과') && txt.indexOf('· 통합고용세액공제 예상: 전년도 인원·소재지 입력 후 검토 가능') >= 0 && txt.indexOf('홍길동') < 0)
 }
@@ -664,7 +666,7 @@ check('ROSTER_FIELDS 9', ROSTER_FIELDS.length === 9 && ROSTER_FIELDS[0].key === 
   check('RRN: 생년월일 칸 읽기', birthFromCell('9501151', (x) => xlNormDate(x).value).value === '1995-01-15' && birthFromCell('19950115', (x) => xlNormDate(x).value).fromRrn === false && birthFromCell('19950115', (x) => xlNormDate(x).value).value === '1995-01-15')
 
   // ── 2. 청년 나이: 만 34세 11개월 통과 · 35세 0개월 탈락 · 병역 가산 · 두 화면 같은 답 ──
-  const gate = (birthDate: string, milMonths = 0, gender: 'male' | 'female' = 'male') => youthGate({ birthDate, gender, milMonths, elig: { e1: true }, excl: ALL_EXCL_OK, hireDate: '2026-06-01' })
+  const gate = (birthDate: string, milMonths = 0, gender: 'male' | 'female' = 'male') => youthGate({ birthDate, gender, milMonths, elig: { e1: true }, excl: ALL_EXCL_OK, hireDate: '2026-06-01', today: '2026-06-01' })
   check('청년: 34세 10개월 통과', gate('1991-07-02').ageOk && gate('1991-07-02').ok)
   check('청년: 34세 11개월(35번째 생일 전날) 통과', gate('1991-06-02').ageOk, JSON.stringify(gate('1991-06-02')))
   check('청년: 35세 0개월(35번째 생일 당일) 탈락', !gate('1991-06-01').ageOk)
@@ -750,7 +752,7 @@ check('ROSTER_FIELDS 9', ROSTER_FIELDS.length === 9 && ROSTER_FIELDS[0].key === 
   {
     const young = classifyEmployee({ ...ROSTER[0], birthDate: '1991-03-01', hireDate: '2026-01-05' }, { baseDate: BASE })
     check('세액공제·명부: 입사 때 34세면 청년 (지금 35세여도)', young.age === 35 && young.hireAge === 34 && young.isYouth, JSON.stringify({ a: young.age, h: young.hireAge, y: young.isYouth }))
-    const older = classifyEmployee({ ...ROSTER[0], birthDate: '1990-12-01', hireDate: '2026-01-05' }, { baseDate: BASE })
+    const older = classifyEmployee({ ...ROSTER[0], birthDate: '1990-12-01', hireDate: '2026-04-01' }, { baseDate: BASE })
     check('명부: 입사 때 35세 남성 → 청년 아님 · 복무 확인 ★', !older.isYouth && older.candidates.some((c) => c.key === 'youth_jump' && c.level === 'more' && c.note.includes('★')))
   }
 
@@ -801,6 +803,124 @@ check('ROSTER_FIELDS 9', ROSTER_FIELDS.length === 9 && ROSTER_FIELDS[0].key === 
     const yj = simulate(DEFAULT_PROGRAMS.youth_jump, 1, '2026-01-01')
     check('시뮬레이터: 청년도약은 회차 합 = 총액', !yj.mismatch && yj.perPerson === 7200000 && yj.total === 7200000 && !simulationText('청년', 1, yj).includes('★'))
   }
+}
+
+// ── D-137: 15개 지원금 × 맞는 경우 / 안 맞는 경우 (채용 진단 표) ──
+{
+  const TYPES = ['정규직', '계약직', '인턴'] as const
+  const fails: string[] = []
+  const table: string[] = []
+  for (const p of PROGRAM_LIST) {
+    const m = p.match
+    const fit: HiringAnswers = {
+      ...BASE_ANSWERS,
+      cats: [m.cats[0]],
+      specials: m.special ? [m.special[0]] : [],
+      age: m.ageMin === 60 ? 62 : m.ageMin === 55 ? 60 : m.ageMax === 34 ? 29 : 40,
+      gender: m.gender === 'female' ? 'female' : 'male',
+      empType: m.empTypes[0],
+      companySize: m.companyMin != null ? m.companyMin + 5 : m.companyMax != null ? Math.min(10, m.companyMax - 1) : 10,
+    }
+    const row = diagnoseHiring(fit, [p])[0]
+    // 맞는 경우: 막는 것 0 · 제외 아님
+    if (row.blockers.length || row.status === 'exclude') fails.push(`${p.id} 맞는 경우인데 ${row.status} ${row.blockers.join('/')}`)
+    const cases: [string, Partial<HiringAnswers>, boolean][] = []
+    if (m.ageMin != null) cases.push(['나이 모자람', { age: m.ageMin - 1 }, true])
+    if (m.ageMax != null) cases.push(['나이 넘음', { age: m.milExtend ? 40 : m.ageMax + 1 }, true])
+    if (m.gender === 'female') cases.push(['남성', { gender: 'male' }, true])
+    const wrongType = TYPES.find((t) => m.empTypes.indexOf(t) < 0)
+    if (wrongType) cases.push([`채용형태 ${wrongType}`, { empType: wrongType }, true])
+    if (m.companyMax != null) cases.push([`${m.companyMax}인`, { companySize: m.companyMax }, true])
+    if (m.companyMin != null) cases.push([`${m.companyMin - 1}인`, { companySize: m.companyMin - 1 }, true])
+    if (m.preApply) cases.push(['사전신청 안 함', { preApply: false }, p.id !== 'youth_jump'])
+    if (m.bosuFloor) cases.push(['보수 124만 아래', { aboveFloor: false }, true])
+    cases.push(['최근 감원', { noLayoff: false }, true])
+    let n = 0
+    for (const [label, patch, mustBlock] of cases) {
+      const r = diagnoseHiring({ ...fit, ...patch }, [p])[0]
+      n++
+      // 안 맞는 경우: 절대 '가능성 높음' 이 아니다. 막는 조건이면 막는 이유가 적힌다
+      if (r.status === 'recommend') fails.push(`${p.id} ${label} → recommend`)
+      if (mustBlock && !r.blockers.length) fails.push(`${p.id} ${label} → 막는 이유 없음`)
+    }
+    table.push(`${p.id}:${row.status}/${n}`)
+  }
+  console.log(`  15개 표: ${table.join(' ')}`)
+  check('15개 지원금이 다 있다', PROGRAM_LIST.length === 15, String(PROGRAM_LIST.length))
+  check('15개 × 맞는 경우는 막힘 없음 · 안 맞는 경우는 가능성 높음 아님 + 막는 이유', fails.length === 0, fails.join(' | '))
+  // 청년 나이 경계(병역 가산): 34세 통과 · 35세 남 복무 없음 막힘 · 청년 아닌 유형은 청년 지원금 가능성 높음 아님
+  const y35 = diagnoseHiring({ ...BASE_ANSWERS, age: 35, milMonths: 0 }, PROGRAM_LIST).find((r) => r.program.id === 'youth_jump')
+  check('청년도약 35세 복무 없음 → 막힘', !!y35 && y35.blockers.includes('나이 요건 미충족') && y35.status !== 'recommend')
+  const notYouth = diagnoseHiring({ ...BASE_ANSWERS, cats: ['고령자'], age: 62 }, PROGRAM_LIST).find((r) => r.program.id === 'youth_jump')
+  check('고령자 62세 → 청년도약 가능성 높음 아님', !!notYouth && notYouth.status !== 'recommend')
+}
+
+// ── D-137: 입사일로 본 신청 기한 (대표: '몇 년 전에 입사했는데 대상자로 뜨면 안 된다') ──
+{
+  const T = '2026-06-15'
+  const yj = (hd: string, today = T) => hireWindowOf('youth_jump', hd, today)
+  check('기한: 청년도약 3개월 = 입사 3개월 되는 날까지', yj('2026-03-15').state === 'open' && yj('2026-03-15').deadline === '2026-06-15' && yj('2026-03-15').daysLeft === 0)
+  check('  하루 지나면 닫힘', yj('2026-03-14').state === 'closed' && hireWindowBlocks(yj('2026-03-14')) && yj('2026-03-14').text.includes('지남'))
+  check('  입사 1주 · 입사 예정은 열림', yj('2026-06-08').state === 'open' && yj('2026-07-01').state === 'open')
+  check('  2년 전 · 6년 전 입사는 닫힘', yj('2024-06-15').state === 'closed' && yj('2020-03-01').state === 'closed' && yj('2020-03-01').monthsSinceHire === 75)
+  check('  말일 입사: 11/30 → 2/28(평년) 까지', yj('2025-11-30', '2026-02-28').state === 'open' && yj('2025-11-30', '2026-03-01').state === 'closed' && yj('2025-11-30').deadline === '2026-02-28')
+  check('  말일 입사: 2023-11-30 → 2024-02-29(윤년)', hireWindowOf('youth_jump', '2023-11-30', '2024-02-29').state === 'open' && hireWindowOf('youth_jump', '2023-11-30', '2024-03-01').state === 'closed')
+  check('  입사일 모름 · 없는 날짜 → 판단 안 함(unknown)', yj('').state === 'unknown' && yj('2026-02-31').state === 'unknown' && !hireWindowBlocks(yj('')))
+  check('  여러 모양 날짜(2026.3.15 · 20260315)', yj('2026.3.15').state === 'open' && yj('20260315').state === 'open')
+  check('  고용촉진 12개월', hireWindowOf('emp_promo', '2025-06-15', T).state === 'open' && hireWindowOf('emp_promo', '2025-06-14', T).state === 'closed' && hireWindowOf('emp_promo', '2025-06-14', T).text.includes('★확인'))
+  check('  사전 약정 지원금(새일 · 시니어 인턴 · 일경험): 이미 채용 → 막힘 · 채용 예정 → 열림', ['saeil_women', 'senior_intern', 'work_exp'].every((k) => hireWindowOf(k, '2026-06-01', T).state === 'preOnly' && hireWindowOf(k, '2026-06-15', T).state === 'preOnly' && hireWindowOf(k, '2026-07-01', T).state === 'open'))
+  check('  입사일과 상관없는 지원금(계속고용 · 육아 · 고용유지 등) → na', ['senior_continue', 'parental_leave', 'emp_retention', 'worklife45', 'disabled_emp'].every((k) => hireWindowOf(k, '2010-01-01', T).state === 'na' && !hireWindowBlocks(hireWindowOf(k, '2010-01-01', T))))
+  check('  대표 확인한 기준은 청년도약 3개월 하나(나머지 ★)', Object.entries(HIRE_WINDOWS).filter(([, r]) => r.confirmed).map(([k]) => k).join() === 'youth_jump')
+  check('  꽉 찬 개월: 1/31→2/28 = 1 · 3/15→6/14 = 2 · 앞날 = 0', fullMonthsSince('2026-01-31', '2026-02-28') === 1 && fullMonthsSince('2026-03-15', '2026-06-14') === 2 && fullMonthsSince('2026-07-01', '2026-06-15') === 0)
+  check('  Date 로 넘겨도 같은 날(현지 기준)', hireWindowOf('youth_jump', '2026-03-15', new Date(2026, 5, 15, 23, 59)).state === 'open' && hireWindowOf('youth_jump', '2026-03-15', new Date(2026, 5, 16, 0, 1)).state === 'closed')
+
+  // 청년 자격요건(직원 한 명 화면) — 기한 지나면 '대상자 예상' 이 나오지 않는다. 이미 참여 중이면 회차대로
+  const g = (hireDate: string, enrolled = false) => youthGate({ birthDate: '1998-03-10', gender: 'female', milMonths: 0, elig: { e1: true }, excl: ALL_EXCL_OK, hireDate, today: T, enrolled })
+  check('자격요건: 입사 1개월 → 대상자 예상', g('2026-05-15').ok && !g('2026-05-15').hireWindowBlocked)
+  check('자격요건: 입사 2년 → 대상자 아님(기한 지남 문구)', !g('2024-06-01').ok && g('2024-06-01').hireWindowBlocked && g('2024-06-01').hireWindowText.includes('기한'))
+  check('자격요건: 입사 2년이어도 이미 참여 중이면 막지 않음', g('2024-06-01', true).ok && !g('2024-06-01', true).hireWindowBlocked)
+}
+
+// ── D-137: 무작위 명부 500명 × 기준일 여럿 — 기한 지난 사람이 후보로 나오지 않는다 ──
+{
+  let seed = 137
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const rdate = (y0: number, y1: number) => { const y = y0 + Math.floor(rnd() * (y1 - y0 + 1)); const mo = 1 + Math.floor(rnd() * 12); const d = 1 + Math.floor(rnd() * 31); return `${y}-${pad(mo)}-${pad(Math.min(d, new Date(y, mo, 0).getDate()))}` }
+  const bases = ['2026-01-31', '2026-03-01', '2026-06-15', '2026-09-29', '2026-12-31']
+  const bad: string[] = []
+  let youthCand = 0, youthExp = 0, total = 0
+  for (const b of bases) {
+    const emps: RosterEmployee[] = []
+    for (let i = 0; i < 100; i++) {
+      const gender = rnd() < 0.5 ? 'M' : 'F'
+      const hireDate = rnd() < 0.08 ? null : rnd() < 0.4 ? rdate(2026, 2026) : rdate(2010, 2025)
+      emps.push({ name: `직원${i}`, birthDate: rdate(1955, 2006), gender, rrnMasked: null, hireDate, loseDate: null, statusRaw: '취득', insuranceRaw: '국민·건강·산재·고용', workplace: '', bizNo: '', ins: { np: true, hi: true, wc: true, ei: true }, insKnown: { np: true, hi: true, wc: true, ei: true } })
+    }
+    for (const e of emps) {
+      total++
+      const d = classifyEmployee(e, { baseDate: b })
+      for (const c of d.candidates) {
+        const w = hireWindowOf(c.key, e.hireDate, b)
+        if (hireWindowBlocks(w)) bad.push(`${b} ${e.hireDate} ${c.key}`)
+        if (c.key === 'youth_jump' && e.hireDate && (fullMonthsSince(e.hireDate, b) ?? 0) >= 4) bad.push(`${b} 청년 ${e.hireDate} 입사 ${fullMonthsSince(e.hireDate, b)}개월`)
+        if (c.key === 'emp_promo' && e.hireDate && (fullMonthsSince(e.hireDate, b) ?? 0) >= 13) bad.push(`${b} 고용촉진 ${e.hireDate}`)
+        if (c.key === 'emp_promo' && !e.hireDate) bad.push(`${b} 고용촉진 입사일 모름`)
+        if ((c.key === 'saeil_women' || c.key === 'senior_intern') && e.hireDate && e.hireDate <= b) bad.push(`${b} ${c.key} 이미 채용 ${e.hireDate}`)
+        if (!e.hireDate && c.level !== 'more' && HIRE_WINDOWS[c.key]?.enrollMonths != null) bad.push(`${b} 입사일 모름인데 ${c.key}:${c.level}`)
+        if (c.key === 'youth_jump') youthCand++
+      }
+      if (d.expired.some((c) => c.key === 'youth_jump')) youthExp++
+      if (d.expired.some((c) => d.candidates.some((k) => k.key === c.key))) bad.push(`${b} 후보와 뺀 목록에 같은 지원금`)
+    }
+    const a = analyzeRoster(emps, { baseDate: b })
+    const cand = a.subsidySummary.find((s) => s.key === 'youth_jump')
+    const recount = emps.map((e) => classifyEmployee(e, { baseDate: b })).filter((d) => d.active && d.candidates.some((c) => c.key === 'youth_jump' && c.level !== 'more')).length
+    if (cand && cand.candidateCount !== recount) bad.push(`${b} 요약 청년도약 ${cand.candidateCount} ≠ ${recount}`)
+  }
+  console.log(`  무작위 명부 ${total}명: 청년도약 후보 ${youthCand} · 기한 지나 뺌 ${youthExp}`)
+  check('무작위 명부 500명: 기한 지난 사람은 어떤 지원금 후보에도 없다', bad.length === 0, bad.slice(0, 8).join(' | '))
+  check('무작위 명부: 청년도약 후보와 뺀 사람이 둘 다 나온다(시험이 헛돌지 않음)', youthCand > 0 && youthExp > 0, `${youthCand}/${youthExp}`)
 }
 
 console.log(`\nemployment: ${passed} passed, ${failed} failed`)

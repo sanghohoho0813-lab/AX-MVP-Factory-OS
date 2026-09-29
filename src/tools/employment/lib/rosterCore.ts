@@ -19,6 +19,7 @@
 
 import { calcAgeDetailed, daysInMonth, parseYMD, youthAgeAt } from './dates'
 import { DEFAULT_PROGRAMS } from './programs'
+import { hireWindowBlocks, hireWindowOf } from './hireWindow'
 
 // ── 결과 단계(레벨) 정의 ──────────────────────────────────
 export type LevelKey = 'likely' | 'check' | 'more' | 'unknown'
@@ -757,6 +758,8 @@ export interface EmployeeDiag {
   relSuspect: boolean
   relCheck: boolean
   candidates: Candidate[]
+  /** D-137: 나이 · 성별로는 맞지만 입사일로 보아 새로 신청할 수 없어 뺀 것(기한 지남 · 채용 전 약정 필요) — 후보 수 · 예상액에 넣지 않는다 */
+  expired: Candidate[]
 }
 
 // ── 직원별 지원금 후보 1차 분류 ───────────────────────────
@@ -804,26 +807,43 @@ export function classifyEmployee(emp: RosterEmployee, opts?: { baseDate?: Date |
       : ''
 
   const cands: Candidate[] = []
+  const expired: Candidate[] = []
+  /**
+   * D-137: 입사일로 본 신청 기간 — 지났거나(청년도약 입사 3개월 · 고용촉진 12개월) 채용 전 약정이 필요한 지원금(새일 · 시니어 인턴)이면
+   * 후보가 아니라 '뺀 것' 으로. 입사일을 모르면 '추가자료 필요' 로만(후보 수 · 예상액에 넣지 않음).
+   */
+  function push(c: Candidate): void {
+    const w = hireWindowOf(c.key, emp.hireDate, base)
+    if (hireWindowBlocks(w)) {
+      expired.push({ key: c.key, level: 'more', note: w.text })
+      return
+    }
+    if (w.state === 'unknown') {
+      cands.push({ key: c.key, level: 'more', note: c.note + ' · ' + w.text })
+      return
+    }
+    cands.push(w.state === 'open' ? { ...c, note: c.note + ' · ' + w.text } : c)
+  }
   function lvl(base2: LevelKey): LevelKey {
     return relMarked ? 'more' : base2
   }
   const ageBasis = hireKnown ? '입사일 기준 ' : ''
-  // 입사일이 오래됐으면(약 13개월 넘음) 신규 채용 지원금 기간이 지났을 수 있다 → '추가자료 필요' 로만 (후보 수·예상액에 넣지 않음)
-  const oldHire = hireKnown && !recentHire
   if (youth)
-    cands.push({
+    push({
       key: 'youth_jump',
-      level: oldHire ? 'more' : lvl(eiNeedsCheck ? 'more' : 'check'),
-      note: '청년 연령(' + ageBasis + '만 ' + hireAge + '세) 1차 해당 · 취업애로청년 요건·신청기간 확인 필요' + (oldHire ? ' · 입사 13개월 넘음 — 신청 기간이 지났을 수 있음' : '') + eiNote + relNote,
+      level: lvl(eiNeedsCheck ? 'more' : 'check'),
+      note: '청년 연령(' + ageBasis + '만 ' + hireAge + '세) 1차 해당 · 취업애로청년 요건 확인 필요' + eiNote + relNote,
     })
   else if (emp.gender === 'M' && hireAge != null && hireAge >= 35 && hireAge <= 39)
-    cands.push({ key: 'youth_jump', level: 'more', note: '★ ' + ageBasis + '만 ' + hireAge + '세 — 병역 복무기간(최대 6년)을 빼면 청년일 수 있음 · 복무기간 확인 필요' + eiNote + relNote })
-  if (recentHire) cands.push({ key: 'emp_promo', level: 'more', note: '신규 입사 추정 · 취업취약계층·워크넷 구직등록 등 추가자료 필요' + eiNote + relNote })
+    push({ key: 'youth_jump', level: 'more', note: '★ ' + ageBasis + '만 ' + hireAge + '세 — 병역 복무기간(최대 6년)을 빼면 청년일 수 있음 · 복무기간 확인 필요' + eiNote + relNote })
+  // 고용촉진장려금은 명부만으로는 대상(취업지원프로그램 이수 등)을 알 수 없다 — 입사 12개월 안인 사람만 '추가자료 필요' 로
+  // (나이 · 성별 조건이 없는 지원금이라 기한이 지난 직원은 '뺀 것' 으로도 세지 않는다 — 오래 다닌 직원 전부가 뜨면 소음)
+  if (hireKnown && !hireWindowBlocks(hireWindowOf('emp_promo', emp.hireDate, base))) push({ key: 'emp_promo', level: 'more', note: '신규 입사 · 취업취약계층·취업지원프로그램 이수 등 추가자료 필요' + eiNote + relNote })
   if (senior) {
-    cands.push({ key: 'senior_continue', level: lvl('check'), note: '고령 연령(만 ' + age + '세) 1차 해당 · 정년·계속고용제도·취업규칙 확인 필요' + eiNote + relNote })
-    cands.push({ key: 'senior_intern', level: lvl(eiNeedsCheck ? 'more' : 'check'), note: '고령 연령 1차 해당 · 참여기관·사업요건 확인 필요' + eiNote + relNote })
+    push({ key: 'senior_continue', level: lvl('check'), note: '고령 연령(만 ' + age + '세) 1차 해당 · 정년·계속고용제도·취업규칙 확인 필요' + eiNote + relNote })
+    push({ key: 'senior_intern', level: lvl(eiNeedsCheck ? 'more' : 'check'), note: '고령 연령 1차 해당 · 참여기관·사업요건 확인 필요' + eiNote + relNote })
   }
-  if (female && age != null && age >= 20 && age <= 59) cands.push({ key: 'saeil_women', level: lvl('check'), note: '여성 1차 해당 · 경력단절 여부·새일센터 연계 확인 필요' + eiNote + relNote })
+  if (female && age != null && age >= 20 && age <= 59) push({ key: 'saeil_women', level: lvl('check'), note: '여성 1차 해당 · 경력단절 여부·새일센터 연계 확인 필요' + eiNote + relNote })
 
   return {
     age: age,
@@ -846,6 +866,7 @@ export function classifyEmployee(emp: RosterEmployee, opts?: { baseDate?: Date |
     relSuspect: relSuspect,
     relCheck: relMarked || relSuspect,
     candidates: cands,
+    expired: expired,
   }
 }
 
@@ -857,6 +878,8 @@ export interface SubsidySummaryRow {
   check: number
   more: number
   candidateCount: number
+  /** D-137: 나이 · 성별은 맞지만 입사일로 보아 새로 신청할 수 없어 뺀 사람 수 */
+  expired: number
   note: string
   level: LevelKey
   confidence: ConfidenceKey
@@ -897,7 +920,9 @@ export function analyzeRoster(employees: RosterEmployee[], opts?: { baseDate?: D
     let likely = 0
     let check = 0
     let more = 0
+    let expired = 0
     activeRows.forEach((r) => {
+      if (r.diag.expired.some((x) => x.key === d.key)) expired++
       const c = r.diag.candidates.find((x) => x.key === d.key)
       if (!c) return
       if (c.level === 'likely') likely++
@@ -906,7 +931,7 @@ export function analyzeRoster(employees: RosterEmployee[], opts?: { baseDate?: D
     })
     const note = d.basis
     const level: LevelKey = d.key === 'parental' ? 'more' : likely > 0 ? 'likely' : check > 0 ? 'check' : more > 0 ? 'more' : 'unknown'
-    return { key: d.key, name: d.name, site: d.site, likely: likely, check: check, more: more, candidateCount: likely + check, note: note, level: level, confidence: d.confidence, confReason: d.confReason, docs: d.docs || [] }
+    return { key: d.key, name: d.name, site: d.site, likely: likely, check: check, more: more, candidateCount: likely + check, expired: expired, note: note, level: level, confidence: d.confidence, confReason: d.confReason, docs: d.docs || [] }
   })
 
   // 후보 건수 / 확인 필요 항목 수 (재직 추정 기준)
