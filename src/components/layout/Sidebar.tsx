@@ -427,7 +427,8 @@ function CategoryRow({
  * 전체 폭은 84° — 한 칸에 84/(n-1)° 씩(8칸이면 12°). 더 넓히면 맨 아래가 딴 색처럼 튄다.
  */
 function rampStyle(index: number, count: number): CSSProperties {
-  const step = count > 1 ? 84 / (count - 1) : 0
+  // D-136: 한 칸 14° 까지만 — 잘 안 쓰는 분야를 접어 줄이 넷이 되어도 색이 크게 튀지 않게(예전 일곱 줄일 때와 같은 폭)
+  const step = count > 1 ? Math.min(14, 84 / (count - 1)) : 0
   return { ['--ramp-shift' as string]: String(Math.round(index * step)) }
 }
 
