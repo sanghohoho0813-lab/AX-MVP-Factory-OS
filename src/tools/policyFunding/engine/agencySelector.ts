@@ -6,6 +6,7 @@
 import type { AgencyRule, KnowledgeBase, Profile } from "./knowledgeEngine";
 import type { AgencyRecommendation, DeprioritizedAgency } from "../types";
 import exclusionJson from "../knowledge/agency-exclusion-rules.json";
+import { smallBizNote, smallBizStatus } from "./eligibility";
 
 const clamp = (n: number, min = 0, max = 100) =>
   Math.max(min, Math.min(max, Math.round(n)));
@@ -81,10 +82,12 @@ function unfavorableHits(rule: AgencyRule, profile: Profile): string[] {
   const hits: string[] = [];
   for (const c of rule.unfavorableConditions) {
     const t = c;
-    if (t.includes("저신용") && profile.lowCredit) hits.push(c);
+    // D-136: 체납·미납을 읽는다 (예전에는 이 조건을 아무도 보지 않았다)
+    if ((t.includes("체납") || t.includes("미납")) && profile.taxBlocked) hits.push(c);
+    else if (t.includes("저신용") && profile.lowCredit) hits.push(c);
     else if (
       (t.includes("상시근로자") || t.includes("규모가 커")) &&
-      profile.input.employees === "10명 이상"
+      smallBizStatus(profile) === "no"
     )
       hits.push(c);
     else if (t.includes("기술 강점") && !profile.hasTech) hits.push(c);
@@ -167,6 +170,10 @@ function adjustApplies(agencyKey: string, e: AdjustEntry, p: Profile): boolean {
 interface Scored {
   rule: AgencyRule;
   score: number;
+  /** 100 으로 자르기 전 점수 — 같은 점수일 때 순서 가르기용 */
+  raw: number;
+  /** 걸린 불리 조건·감점 수 */
+  penaltyCount: number;
   reasons: string[];
   cautions: string[];
   exceptionalReview?: boolean;
@@ -214,7 +221,15 @@ function scoreAgency(rule: AgencyRule, profile: Profile): Scored {
 
   const unf = unfavorableHits(rule, profile);
   s -= unf.length * 9;
+  let penaltyCount = unf.length;
   for (const u of unf.slice(0, 1)) cautions.push(u);
+
+  // D-136: 소진공은 소상공인만. 기준을 넘는지 확실치 않으면(업종을 모름) 감점하고 ★확인
+  if (rule.key === "semas" && smallBizStatus(profile) === "unsure") {
+    s -= 12;
+    penaltyCount += 1;
+    cautions.unshift(smallBizNote(profile));
+  }
 
   // ── 9차 보정 1: 연매출 체급 티어 (신보) ──
   const tierRule = EXCLUSION.revenueTierRules.find(
@@ -227,6 +242,7 @@ function scoreAgency(rule: AgencyRule, profile: Profile): Scored {
       const isException = signals.length >= tierRule.exception.minSignals;
       const penalty = isException ? Math.round(tier.penalty / 2) : tier.penalty;
       s -= penalty;
+      penaltyCount += 1;
       if (isException) {
         exceptionalReview = true;
         exceptionalNote = `${tierRule.exception.label} — 강점(${signals.slice(0, 3).join("·")})이 많아 예외적으로 검토 가능하나 신중 접근이 필요합니다.`;
@@ -252,6 +268,7 @@ function scoreAgency(rule: AgencyRule, profile: Profile): Scored {
     for (const c of adjust.cautions) {
       if (adjustApplies(rule.key, c, profile)) {
         s -= c.penalty ?? 0;
+        penaltyCount += 1;
         cautions.push(c.reason);
         if (!deprioritizedReason) deprioritizedReason = c.reason;
       }
@@ -265,6 +282,8 @@ function scoreAgency(rule: AgencyRule, profile: Profile): Scored {
   return {
     rule,
     score: clamp(s),
+    raw: Math.round(s),
+    penaltyCount,
     reasons: reasons.slice(0, 3),
     cautions: cautions.slice(0, 2),
     exceptionalReview,
@@ -286,12 +305,32 @@ export function selectAgencies(
   kb: KnowledgeBase,
 ): AgencySelection {
   const candidates = kb.agencies.filter((a) => CORE_KEYS.includes(a.key));
-  const scored = candidates
-    .map((rule) => scoreAgency(rule, profile))
-    .sort((a, b) => b.score - a.score);
+  const all = candidates.map((rule) => scoreAgency(rule, profile));
+
+  // D-136: 소상공인 기준을 확실히 넘으면 소진공은 "대상 아님" — 순위에 넣지 않는다
+  const sbStatus = smallBizStatus(profile);
+  const notEligible = all.filter((x) => x.rule.key === "semas" && sbStatus === "no");
+  const scored = all
+    .filter((x) => !notEligible.includes(x))
+    // 같은 점수(100 에서 잘린 경우 포함)면 JSON 순서가 아니라:
+    //   ① 불리 조건·감점이 적은 기관 → ② 자르기 전 점수가 높은 기관 → ③ CORE_KEYS 순서
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        a.penaltyCount - b.penaltyCount ||
+        b.raw - a.raw ||
+        CORE_KEYS.indexOf(a.rule.key) - CORE_KEYS.indexOf(b.rule.key),
+    );
+
+  // 소상공인인지 확실치 않으면 소진공을 1순위로 두지 않는다
+  if (sbStatus === "unsure" && scored[0]?.rule.key === "semas" && scored.length > 1) {
+    const [first, second] = scored;
+    scored[0] = second;
+    scored[1] = first;
+  }
 
   const top3 = scored.slice(0, 3);
-  const rest = scored.slice(3);
+  const rest = [...scored.slice(3), ...notEligible];
 
   const recommendations: AgencyRecommendation[] = top3.map((x, idx) => ({
     rank: idx + 1,
@@ -309,9 +348,9 @@ export function selectAgencies(
   const deprioritized: DeprioritizedAgency[] = rest
     .map((x) => ({
       name: x.rule.name,
-      reason:
-        x.deprioritizedReason ??
-        genericDeprioritizedReason(x.rule, profile),
+      reason: notEligible.includes(x)
+        ? smallBizNote(profile)
+        : (x.deprioritizedReason ?? genericDeprioritizedReason(x.rule, profile)),
     }))
     .filter((d): d is DeprioritizedAgency => Boolean(d.reason));
 

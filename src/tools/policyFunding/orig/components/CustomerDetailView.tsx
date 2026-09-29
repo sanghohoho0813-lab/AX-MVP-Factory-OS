@@ -30,6 +30,7 @@ import {
   reactionResponse,
 } from "../../consultation";
 import { customerTodayTasks } from "../../coach";
+import { isDiagnosed } from "../../report";
 import CopyMessage from "./CopyMessage";
 
 // useSyncExternalStore 로 서버/클라이언트 렌더를 구분해 하이드레이션 안전하게 처리
@@ -263,10 +264,14 @@ function CustomerEditor({
           </div>
           <div className="text-right">
             <p className="text-xs font-semibold text-slate-500">가능성 점수</p>
-            <p className="text-3xl font-bold text-blue-600">
-              {customer.score}
-              <span className="text-base text-slate-400"> / 100</span>
-            </p>
+            {isDiagnosed(customer) ? (
+              <p className="text-3xl font-bold text-blue-600">
+                {customer.score}
+                <span className="text-base text-slate-400"> / 100</span>
+              </p>
+            ) : (
+              <p className="text-xl font-bold text-slate-500">진단 전</p>
+            )}
           </div>
         </div>
 

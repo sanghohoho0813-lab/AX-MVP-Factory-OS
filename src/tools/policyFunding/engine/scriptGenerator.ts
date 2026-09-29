@@ -2,7 +2,7 @@
 // 상황별 대화 스크립트를 찾아 CoachContent·메시지·코치 인사이트를 생성.
 
 import type { KnowledgeBase, Profile } from "./knowledgeEngine";
-import type { CoachContent, CoachInsight, RiskAssessment } from "../types";
+import type { CoachContent, CoachInsight, HeadlineAssessment, RiskAssessment } from "../types";
 
 function group(kb: KnowledgeBase, key: string): string[] {
   return kb.scriptGroups.find((g) => g.key === key)?.scripts ?? [];
@@ -74,14 +74,21 @@ export function generateMessages(
   profile: Profile,
   topAgency: string,
   kb: KnowledgeBase,
+  headline?: HeadlineAssessment,
 ): { documentMessage: string; followUpMessage: string } {
   const company = profile.companyName;
   const purpose = profile.input.purpose;
+  // D-136: 가능성이 낮으면 고객에게 "가능성이 있어 보인다"고 보내지 않는다
+  const low = headline?.level === "낮음";
+  const fix = headline?.firstFix ?? "먼저 정리할 부분";
 
   const documentMessage =
     `${company} 대표님 안녕하세요 😊\n` +
-    `오늘 말씀 나눈 대로 ${topAgency} 기준으로 검토를 진행하겠습니다.\n` +
-    `아래 서류만 준비해 주시면 한도부터 꼼꼼히 확인해 정리해드릴게요.\n\n` +
+    (low
+      ? `오늘 말씀 나눈 대로 기관 접수 전에 먼저 정리할 부분이 있어 함께 확인하겠습니다(${fix}).\n` +
+        `아래 서류를 보내 주시면 무엇부터 정리할지 확인해 안내드릴게요.\n\n`
+      : `오늘 말씀 나눈 대로 ${topAgency} 기준으로 검토를 진행하겠습니다.\n` +
+        `아래 서류만 준비해 주시면 한도부터 꼼꼼히 확인해 정리해드릴게요.\n\n`) +
     kb.requiredDocuments.map((d, idx) => `${idx + 1}. ${d}`).join("\n") +
     `\n\n` +
     (group(kb, "documentRequest").slice(-1)[0] ??
@@ -91,7 +98,9 @@ export function generateMessages(
   const followUpMessage =
     `${company} 대표님, 안녕하세요 😊\n` +
     `${reContact[0] ?? "지난 상담 이후 검토를 이어가고 있어 짧게 연락드립니다."}\n` +
-    `말씀 주신 ${purpose} 관련해 ${topAgency} 기준으로 준비하면 충분히 가능성이 있어 보입니다.\n` +
+    (low
+      ? `말씀 주신 ${purpose} 관련해, 기관 접수 전에 먼저 정리할 부분(${fix})이 있어 함께 보면 좋겠습니다.\n`
+      : `말씀 주신 ${purpose} 관련해 ${topAgency} 기준으로 준비하면 충분히 가능성이 있어 보입니다.\n`) +
     `${reContact[1] ?? "편하신 시간에 10분만 통화 가능하실까요?"}`;
 
   return { documentMessage, followUpMessage };
@@ -115,6 +124,7 @@ export function buildCoachInsight(
   profile: Profile,
   risk: RiskAssessment,
   kb: KnowledgeBase,
+  headline?: HeadlineAssessment,
 ): CoachInsight {
   // 가장 먼저 확인할 것 — precheck 5대 체크리스트 + 결격
   const firstChecks: string[] = [];
@@ -128,10 +138,11 @@ export function buildCoachInsight(
   // 리스크 — riskAnalyzer 결과
   const risks = risk.factors.slice(0, 4);
 
-  // 상담 전략
-  const strategies: string[] = [
-    "1순위 기관부터 서류를 완비해 한도를 최대한 끌어올리세요.",
-  ];
+  // 상담 전략 — D-136: 막는 사실이 있으면 그것부터
+  const strategies: string[] =
+    headline && headline.level === "낮음" && headline.firstFix
+      ? [`기관 접수보다 먼저: ${headline.firstFix} — 그 전에는 서류를 모아도 쓰기 어렵습니다.`]
+      : ["1순위 기관부터 서류를 완비해 한도를 최대한 끌어올리세요."];
   const focus = planFocus(profile, kb);
   if (focus)
     strategies.push(`사업계획서에서 ${focus} 중심으로 숫자를 제시하세요.`);
@@ -139,7 +150,7 @@ export function buildCoachInsight(
     strategies.push(
       "기술력·특허·연구소를 기술평가 자료로 정리하면 등급과 한도가 함께 올라갑니다.",
     );
-  if (profile.input.credit === "낮음")
+  if (profile.lowCredit)
     strategies.push(
       "저신용이면 소진공·지역재단 소액부터 접근해 실적을 쌓은 뒤 확대하세요.",
     );

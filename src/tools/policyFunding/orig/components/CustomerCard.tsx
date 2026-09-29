@@ -7,6 +7,7 @@ import {
   closingVerdict,
   computeClosingScore,
 } from "../../consultation";
+import { isDiagnosed } from "../../report";
 
 function CustomerCardBase({
   customer: c,
@@ -58,7 +59,7 @@ function CustomerCardBase({
           {c.recommendedAgency}
         </span>
         <span className="rounded-full bg-slate-100 px-2.5 py-0.5 font-medium text-slate-600">
-          가능성 {c.score}점
+          {isDiagnosed(c) ? `가능성 ${c.score}점` : "진단 전"}
         </span>
         <span className={`rounded-full px-2.5 py-0.5 font-medium ${closingCls}`}>
           계약 {closing}점 · {verdict.label}

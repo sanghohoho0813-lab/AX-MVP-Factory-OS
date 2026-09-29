@@ -5,6 +5,7 @@
 import type { KnowledgeBase, Profile } from "./knowledgeEngine";
 import type {
   AgencyRecommendation,
+  HeadlineAssessment,
   RiskAssessment,
   SimilarCase,
 } from "../types";
@@ -26,6 +27,7 @@ export function generateReasoning(
   cases: SimilarCase[],
   risk: RiskAssessment,
   kb: KnowledgeBase,
+  headline?: HeadlineAssessment,
 ): string {
   const i = profile.input;
   const top = agencies[0]?.name ?? "신용보증기금";
@@ -62,11 +64,18 @@ export function generateReasoning(
   const checkpointHint = kb.checkpoints.find((c) =>
     ["taxArrears", "financialStatement", "existingDebt"].includes(c.key),
   );
+  // D-136: '신용' 칸 하나가 아니라 신용점수 구간·연체·파산/회생까지 본 lowCredit 으로
   const third =
     ` 다만 ${cautionShort}. ` +
-    (i.credit === "낮음"
+    (profile.lowCredit
       ? "신용이 낮은 편이라 저신용 대응 상품부터 단계적으로 접근하는 것이 안전합니다."
       : `${checkpointHint ? "세금 체납·재무제표·기대출" : "재무제표와 부채비율"} 확인을 먼저 권합니다.`);
 
-  return first + casePart + third;
+  // 접수를 막거나 가능성을 낮게 만든 이유가 있으면 그것부터 말한다
+  const lead =
+    headline && headline.level === "낮음" && headline.reasons[0]
+      ? `지금은 진행이 어렵습니다 — ${headline.reasons[0]}. 이 문제를 먼저 정리한 뒤를 기준으로 보면, `
+      : "";
+
+  return lead + first + casePart + third;
 }

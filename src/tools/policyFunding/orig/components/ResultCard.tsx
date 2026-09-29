@@ -1,8 +1,8 @@
 
 
 import { useState } from "react";
-import type { DiagnosisInput, DiagnosisResult } from "../../types";
-import { likelihoodOf } from "../../types";
+import type { DiagnosisInput, DiagnosisResult, LikelihoodLevel } from "../../types";
+import { likelihoodOf, lowerLikelihood } from "../../types";
 import {
   aiReasoning,
   buildCoachChat,
@@ -43,8 +43,9 @@ function FlowChain({ steps }: { steps: string[] }) {
 }
 
 // 3단계 가능성 배지 (퍼센트 대신)
-function LikelihoodBadge({ score }: { score: number }) {
-  const level = likelihoodOf(score);
+// D-136: 기관 칸의 배지는 첫 줄 판정보다 높게 말하지 않는다 (체납이면 기관 칸도 '낮음')
+function LikelihoodBadge({ score, cap }: { score: number; cap?: LikelihoodLevel }) {
+  const level = cap ? lowerLikelihood(likelihoodOf(score), cap) : likelihoodOf(score);
   const cls =
     level === "높음"
       ? "bg-green-50 text-green-700 ring-green-200"
@@ -149,6 +150,12 @@ export default function ResultCard({
   const tasks = todayTasks(input, result);
   const reasoning = aiReasoning(input, result);
   const chat = buildCoachChat(result);
+  const headlineLevel = result.likelihoodLevel ?? likelihoodOf(result.overallScore);
+  // D-136: 가능성을 낮춘 이유와 ★ 확인 필요를 첫 카드에 보인다
+  const verdictReasons = (result.headline?.reasons ?? []).slice(0, 3);
+  const checks = (result.headline?.checks ?? []).filter(
+    (c) => !verdictReasons.some((t) => t.includes(c.replace(/^★\s*/, ""))),
+  );
 
   return (
     <div className="space-y-6">
@@ -166,13 +173,24 @@ export default function ResultCard({
           <span className="rounded-full bg-white/15 px-3 py-1.5">
             <Stars score={result.overallScore} />
           </span>
-          <span className="text-lg font-bold">
-            진행 가능성 {result.likelihoodLevel ?? likelihoodOf(result.overallScore)}
+          <span className="text-lg font-bold" data-testid="pf-likelihood">
+            진행 가능성 {headlineLevel}
           </span>
           <span className="rounded-full bg-white/15 px-3 py-1 text-sm font-medium">
             1순위 · {result.topAgency}
           </span>
         </div>
+
+        {(verdictReasons.length > 0 || checks.length > 0) && (
+          <ul className="mt-4 space-y-1 text-sm text-blue-50" data-testid="pf-verdict-reasons">
+            {verdictReasons.map((t) => (
+              <li key={t} className="break-keep">· {t}</li>
+            ))}
+            {checks.map((c) => (
+              <li key={c} className="break-keep font-semibold text-amber-200">{c}</li>
+            ))}
+          </ul>
+        )}
 
         <div className="mt-6 rounded-2xl bg-white/10 p-5">
           <p className="text-sm font-semibold text-blue-50">✅ 오늘 해야 할 일</p>
@@ -226,7 +244,7 @@ export default function ResultCard({
                     </span>
                   )}
                 </div>
-                <LikelihoodBadge score={a.score} />
+                <LikelihoodBadge score={a.score} cap={headlineLevel} />
               </div>
               {a.exceptionalReview && a.exceptionalNote && (
                 <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">

@@ -237,8 +237,10 @@ export type RiskLevel = "매우 낮음" | "낮음" | "보통" | "높음" | "매�
 export interface RiskAssessment {
   level: RiskLevel;
   score: number; // 0(안전)~100(위험)
-  factors: string[];
+  factors: string[]; // 실제로 걸린 위험만 (심한 것 먼저)
   explanation: string;
+  // D-136: "확인하세요" 같은 안내는 위험이 아니다 — 따로 둔다
+  reminders?: string[];
 }
 
 export interface ConfidenceAssessment {
@@ -309,8 +311,37 @@ export interface DocumentCheck {
 export type LikelihoodLevel = "높음" | "보통" | "낮음";
 
 // 내부 점수(0~100) → 화면용 3단계 가능성
+// D-136: 첫 줄 점수(overallScore)는 5~96 이다. 96 이 위 끝이라 별점(점수÷20)은 최대 4개 —
+// 5개는 일부러 나오지 않는다(정책자금은 "확실"이 없다).
 export function likelihoodOf(score: number): LikelihoodLevel {
   return score >= 70 ? "높음" : score >= 50 ? "보통" : "낮음";
+}
+
+const LEVEL_RANK: Record<LikelihoodLevel, number> = { 낮음: 0, 보통: 1, 높음: 2 };
+/** 둘 중 더 낮은 가능성 */
+export function lowerLikelihood(a: LikelihoodLevel, b: LikelihoodLevel): LikelihoodLevel {
+  return LEVEL_RANK[a] <= LEVEL_RANK[b] ? a : b;
+}
+export function likelihoodRank(l: LikelihoodLevel): number {
+  return LEVEL_RANK[l];
+}
+
+// D-136: 첫 줄 판정(진행 가능성) — 기관 순위(어느 기관이 맞나)와 따로 계산한다.
+// 기관 적합도에서 출발해 나쁜 사실마다 깎고, 막는 사실은 위 끝을 누른다.
+// 나쁜 사실이 하나 더 켜지면 점수는 절대 오르지 않는다.
+export interface HeadlineAssessment {
+  score: number;
+  level: LikelihoodLevel;
+  /** 나쁜 사실을 빼고 본 기관 적합도(상위 3곳 평균) — 출발점 */
+  fitScore: number;
+  /** 접수를 막는 사실 (없으면 null) */
+  blocked: "체납" | "제외 업종" | null;
+  /** 점수를 깎거나 막은 이유 — 심한 것 먼저 */
+  reasons: string[];
+  /** ★ 확인 필요 */
+  checks: string[];
+  /** 가장 먼저 정리할 것 */
+  firstFix: string | null;
 }
 
 export interface SpecialTrackCandidate {
@@ -449,6 +480,8 @@ export interface DiagnosisResult {
   // 11차: 3단계 가능성 + 세부 자금 트랙
   likelihoodLevel?: LikelihoodLevel;
   specialTracks?: SpecialTrackCandidate[];
+  // D-136: 첫 줄 판정의 이유 (옛 저장 결과에는 없다)
+  headline?: HeadlineAssessment;
   // 12차: 사업계획 전략 AI (전부 옵셔널)
   planStrategy?: PlanStrategy; // 작업1: 기관별 전략 흐름
   planLogic?: PlanLogicStep[]; // 작업2: 논리 흐름 7단계

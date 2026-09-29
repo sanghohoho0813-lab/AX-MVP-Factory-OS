@@ -36,9 +36,6 @@ function parseRevenueEok(s: string | null): number | null {
   }
   return null;
 }
-function inputRevenueEok(idx: number): number {
-  return [0.5, 3, 7.5, 20, 40][idx] ?? 3;
-}
 
 function parseCredit(s: string | null): number | null {
   if (!s) return null;
@@ -48,10 +45,12 @@ function parseCredit(s: string | null): number | null {
   if (/300|초저신용|바닥/.test(s)) return 0;
   return null;
 }
-function inputCredit(c: string): number | null {
-  if (c === "우수") return 3;
+function inputCredit(p: Profile): number | null {
+  if (p.veryLowCredit) return 0;
+  if (p.lowCredit) return 1;
+  if (p.highCredit) return 3;
+  const c = p.input.credit;
   if (c === "보통") return 2;
-  if (c === "낮음") return 1;
   return null;
 }
 
@@ -125,15 +124,10 @@ function scoreCase(
 
   // 업력 (8)
   s += prox(parseYears(c.businessAge), inputYears(profile.yearsIdx), 8, 8);
-  // 매출 (8)
-  s += prox(
-    parseRevenueEok(c.revenue),
-    inputRevenueEok(profile.revenueIdx),
-    15,
-    8,
-  );
-  // 신용 (6)
-  s += prox(parseCredit(c.creditStatus), inputCredit(profile.input.credit), 3, 6);
+  // 매출 (8) — D-136: 전년도 매출 칸이 있으면 그것 (profile.revenueEok)
+  s += prox(parseRevenueEok(c.revenue), profile.revenueEok, 15, 8);
+  // 신용 (6) — 신용점수 구간·파산/회생도 반영
+  s += prox(parseCredit(c.creditStatus), inputCredit(profile), 3, 6);
   // 법인여부 (4)
   const caseCorp = /법인/.test(c.industry + c.title + caseText);
   if (caseCorp === profile.isCorp) s += 4;

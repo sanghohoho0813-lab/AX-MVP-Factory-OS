@@ -75,10 +75,14 @@ function ReportDocument({ customer }: { customer: Customer }) {
               <p className="text-xs font-semibold text-blue-700">
                 종합 가능성 점수
               </p>
-              <p className="text-4xl font-bold text-blue-700">
-                {r.score}
-                <span className="text-base text-blue-400"> / 100</span>
-              </p>
+              {r.score === null ? (
+                <p className="text-2xl font-bold text-slate-500">진단 전</p>
+              ) : (
+                <p className="text-4xl font-bold text-blue-700">
+                  {r.score}
+                  <span className="text-base text-blue-400"> / 100</span>
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -90,10 +94,12 @@ function ReportDocument({ customer }: { customer: Customer }) {
             <div>
               <p className="text-xs font-semibold text-slate-500">추천기관</p>
               <p className="mt-1 text-sm font-bold text-slate-900">{r.topAgency}</p>
-              <p className="text-amber-400" aria-label={`${r.stars}점`}>
-                {"★".repeat(r.stars)}
-                <span className="text-slate-300">{"★".repeat(5 - r.stars)}</span>
-              </p>
+              {r.stars !== null && (
+                <p className="text-amber-400" aria-label={`${r.stars}점`}>
+                  {"★".repeat(r.stars)}
+                  <span className="text-slate-300">{"★".repeat(5 - r.stars)}</span>
+                </p>
+              )}
             </div>
             <div>
               <p className="text-xs font-semibold text-slate-500">가능성</p>
@@ -108,7 +114,7 @@ function ReportDocument({ customer }: { customer: Customer }) {
               >
                 {r.likelihood}
               </p>
-              <p className="text-xs text-slate-400">내부 점수 {r.score}점</p>
+              {r.score !== null && <p className="text-xs text-slate-400">내부 점수 {r.score}점</p>}
             </div>
             <div>
               <p className="text-xs font-semibold text-slate-500">예상 진행기간</p>
@@ -127,6 +133,18 @@ function ReportDocument({ customer }: { customer: Customer }) {
               <p className="mt-1 text-sm font-bold text-slate-900">{r.keyPrep}</p>
             </div>
           </div>
+          {(r.verdictReasons.length > 0 || r.checks.length > 0) && (
+            <ul className="mt-4 space-y-1 text-sm text-slate-700" data-testid="pf-report-reasons">
+              {r.verdictReasons.map((t) => (
+                <li key={t} className="break-keep">· {t}</li>
+              ))}
+              {r.checks
+                .filter((c) => !r.verdictReasons.some((t) => t.includes(c.replace(/^★\s*/, ""))))
+                .map((c) => (
+                  <li key={c} className="break-keep text-amber-800">{c}</li>
+                ))}
+            </ul>
+          )}
         </div>
 
         <div className="space-y-8 px-8 py-8">

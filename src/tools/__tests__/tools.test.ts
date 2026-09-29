@@ -19,11 +19,38 @@ import { moduleForPath, moduleMatchLength, screenTitleForPath } from '../../conf
 import { changeColor, CRETOP_C, TREND_COMMENT_TONE } from '../cretop/lib/tones'
 import { mapHref as labHref } from '../labcare/orig/nav'
 import { mapHref as pfHref } from '../policyFunding/orig/nav'
-import { buildCustomerFromDiagnosis, customerFromRow, getStoredCustomerById, resetPolicyStoreForTest } from '../policyFunding/orig/storage'
-import { oneLineConclusion, todayTasks } from '../policyFunding/coach'
+import { buildCustomerFromDiagnosis, customerFromRow, getStoredCustomerById, resetPolicyStoreForTest, todayStr } from '../policyFunding/orig/storage'
+import { aiReasoning, oneLineConclusion, todayTasks } from '../policyFunding/coach'
+import { assessHeadlineFor, buildProfile, inferIndustryCategory } from '../policyFunding/engine/knowledgeEngine'
+import { blockerApplies, hardBlockers, screenIndustry, smallBizStatus } from '../policyFunding/engine/eligibility'
 import { REPORT_DISCLAIMER } from '../policyFunding/report'
 import type { DiagnosisInput } from '../policyFunding/types'
-import { CUSTOMER_STAGES, PLAN_CHECKLIST_ITEMS, likelihoodOf } from '../policyFunding/types'
+import {
+  ACTUAL_BUSINESS_OPTIONS,
+  BONUS_ITEM_OPTIONS,
+  BUSINESS_TYPES,
+  CEO_AGE_OPTIONS,
+  CREDIT_BAND_OPTIONS,
+  CREDIT_OPTIONS,
+  CUSTOMER_STAGES,
+  DEBT_RELIEF_OPTIONS,
+  EMPLOYEE_OPTIONS,
+  EXISTING_DEBT_LEVEL_OPTIONS,
+  FACILITY_USE_OPTIONS,
+  FUNDING_SIZE_OPTIONS,
+  HIRING_PLAN_OPTIONS,
+  LAST_YEAR_REVENUE_OPTIONS,
+  NET_PROFIT_OPTIONS,
+  PLAN_CHECKLIST_ITEMS,
+  PURPOSE_OPTIONS,
+  REVENUE_OPTIONS,
+  SECOND_FINANCE_OPTIONS,
+  STRENGTH_OPTIONS,
+  YEARS_OPTIONS,
+  YES_NO_UNKNOWN_OPTIONS,
+  likelihoodOf,
+  lowerLikelihood,
+} from '../policyFunding/types'
 import {
   CRETOP_WEAPONS,
   CUST_FLAGS,
@@ -110,7 +137,8 @@ function check(name: string, cond: boolean, detail?: string): void {
 
   const arrears = runDiagnosis(mk({ taxArrears: '있음', insuranceArrears: '있음' }))
   check('정책자금: 체납이 있으면 로드맵 0일차가 완납 정리', !!arrears.roadmap && /체납/.test(arrears.roadmap.steps[0].task), arrears.roadmap?.steps[0].task)
-  check('정책자금: 체납이 있으면 리스크 점수가 기본보다 높다', (arrears.risk?.score ?? 0) >= (d.risk?.score ?? 0))
+  // D-136: 예전엔 >= 라서 체납을 무시해도(같은 점수) 통과했다 — 이제 반드시 더 높아야 한다
+  check('정책자금: 체납이 있으면 리스크 점수가 기본보다 높다', (arrears.risk?.score ?? 0) > (d.risk?.score ?? 0), `${arrears.risk?.score} vs ${d.risk?.score}`)
 
   const youth = runDiagnosis(mk({ industry: 'IT 플랫폼', years: '1년 미만', ceoAge: '만 39세 이하', purpose: '창업자금', strengths: ['청년대표'] }))
   check('정책자금: 청년 창업은 청년창업 트랙이 잡힌다', (youth.specialTracks ?? []).some((t) => /청년/.test(t.name)), (youth.specialTracks ?? []).map((t) => t.name).join())
@@ -124,6 +152,270 @@ function check(name: string, cond: boolean, detail?: string): void {
   check('정책자금: 같은 입력이면 같은 결과(결정적)', JSON.stringify(runDiagnosis(SAMPLE_INPUT)) === JSON.stringify(r))
   check('정책자금: 고객 단계 12개', CUSTOMER_STAGES.length === 12, String(CUSTOMER_STAGES.length))
   check('정책자금: 사업계획 체크리스트 10개', PLAN_CHECKLIST_ITEMS.length === 10)
+}
+
+/* ---- 1-1. D-136 정책자금 — 첫 줄 판정이 틀리면 큰일 ---- */
+{
+  const mk = (base: DiagnosisInput, patch: Partial<DiagnosisInput>): DiagnosisInput => ({ ...base, ...patch })
+  const rank = (l: string | undefined) => (l === '높음' ? 2 : l === '보통' ? 1 : 0)
+  const r0 = runDiagnosis(SAMPLE_INPUT)
+
+  // 나쁜 사실: 칸 → 값별 심한 정도 (0 = 나쁘지 않음)
+  const SEV: Record<string, Record<string, number>> = {
+    taxArrears: { 있음: 1 },
+    insuranceArrears: { 있음: 1 },
+    debtRelief: { 신용회복: 1, 회생: 2, 파산: 3 },
+    creditBand: { '600점대': 1, '600점 미만': 2 },
+    credit: { 낮음: 1 },
+    recentDelinquency: { 있음: 1 },
+    secondFinance: { '일부 있음': 1, 많음: 2 },
+    existingDebtLevel: { '매출 대비 높음': 1, '매출 초과': 2 },
+    netProfit: { 적자: 1 },
+    debtRatioStatus: { 높음: 1 },
+    interestCoverage: { 낮음: 1 },
+  }
+  const sevOf = (k: string, v: unknown) => SEV[k][String(v)] ?? 0
+  // 지금 값보다 같거나 더 나쁜 값으로만 켠다
+  const flipsOf = (x: DiagnosisInput): { label: string; next: DiagnosisInput }[] => {
+    const out: { label: string; next: DiagnosisInput }[] = []
+    for (const k of Object.keys(SEV)) {
+      const cur = sevOf(k, (x as unknown as Record<string, unknown>)[k])
+      for (const v of Object.keys(SEV[k])) {
+        if (SEV[k][v] > 0 && SEV[k][v] >= cur && v !== (x as unknown as Record<string, unknown>)[k]) out.push({ label: `${k}=${v}`, next: { ...x, [k]: v } })
+      }
+    }
+    return out
+  }
+
+  // 1) 나쁜 사실을 켜면 첫 줄 점수·가능성이 절대 오르지 않는다 (전체 진단으로, 기본값·샘플에서)
+  for (const [name, base] of [['기본값', DEFAULT_INPUT], ['샘플', SAMPLE_INPUT]] as const) {
+    const b = runDiagnosis(base)
+    const bad = flipsOf(base).filter((f) => {
+      const a = runDiagnosis(f.next)
+      return a.overallScore > b.overallScore || rank(a.likelihoodLevel) > rank(b.likelihoodLevel)
+    })
+    check(`정책자금 D-136: ${name}에서 나쁜 사실 하나를 켜도 첫 줄이 오르지 않는다`, bad.length === 0, bad.map((f) => f.label).join())
+  }
+
+  // 2) 최악 → 낮음
+  const WORST: DiagnosisInput = mk(SAMPLE_INPUT, { credit: '낮음', creditBand: '600점 미만', recentDelinquency: '있음', debtRelief: '파산', taxArrears: '있음', insuranceArrears: '있음', existingDebtLevel: '매출 초과', secondFinance: '많음', netProfit: '적자', debtRatioStatus: '높음', interestCoverage: '낮음' })
+  const worst = runDiagnosis(WORST)
+  check('정책자금 D-136: 최악 프로필은 낮음', worst.likelihoodLevel === '낮음', `${worst.likelihoodLevel} ${worst.overallScore}`)
+  check('정책자금 D-136: 최악 프로필 리스크는 매우 높음', worst.risk?.level === '매우 높음', worst.risk?.level)
+  const worstNoArrears = runDiagnosis(mk(WORST, { taxArrears: '없음', insuranceArrears: '없음' }))
+  check('정책자금 D-136: 체납이 없어도 파산·600점 미만·연체면 낮음', worstNoArrears.likelihoodLevel === '낮음', `${worstNoArrears.likelihoodLevel} ${worstNoArrears.overallScore}`)
+  check('정책자금 D-136: 예전처럼 나쁜 사실이 샘플보다 점수를 올리지 않는다', worst.overallScore < runDiagnosis(SAMPLE_INPUT).overallScore)
+
+  // 3) 체납 → 낮음 · 결론 · 오늘 할 일 · 다음 할 일
+  for (const [label, patch] of [['국세/지방세', { taxArrears: '있음' }], ['4대보험', { insuranceArrears: '있음' }]] as const) {
+    const r = runDiagnosis(mk(SAMPLE_INPUT, patch as Partial<DiagnosisInput>))
+    const concl = oneLineConclusion(r)
+    const tasks = todayTasks(SAMPLE_INPUT, r)
+    check(`정책자금 D-136: ${label} 체납 → 가능성 낮음`, r.likelihoodLevel === '낮음' && r.overallScore < 50, `${r.likelihoodLevel} ${r.overallScore}`)
+    check(`정책자금 D-136: ${label} 체납 → 이유에 "체납 해소 전에는 대부분 기관 접수 불가"`, (r.headline?.reasons[0] ?? '').includes('체납 해소 전에는 대부분 기관 접수 불가'), r.headline?.reasons[0])
+    check(`정책자금 D-136: ${label} 체납 → 결론은 체납부터 (기관 검토 권유 아님)`, /체납/.test(concl) && !concl.includes('가장 유리') && !concl.includes(r.topAgency), concl)
+    check(`정책자금 D-136: ${label} 체납 → 오늘 할 일에 체납 해소·완납증명`, tasks.some((t) => /체납/.test(t)) && tasks.some((t) => /완납증명/.test(t)) && !tasks.some((t) => t.includes(`${r.topAgency} 중심으로`)), tasks.join(' | '))
+    check(`정책자금 D-136: ${label} 체납 → 다음 할 일이 1순위 기관 상담 예약이 아니다`, !r.nextAction.includes(r.topAgency) && !/예약/.test(r.nextAction) && /체납/.test(r.nextAction), r.nextAction)
+    check(`정책자금 D-136: ${label} 체납 → 리스크 매우 높음 · 첫 위험이 체납`, r.risk?.level === '매우 높음' && /체납/.test(r.risk?.factors[0] ?? ''), `${r.risk?.level} ${r.risk?.factors[0]}`)
+    check(`정책자금 D-136: ${label} 체납 → 트랙도 높음이 아니다`, (r.specialTracks ?? []).every((t) => t.level !== '높음'))
+    check(`정책자금 D-136: ${label} 체납 → 고객 메시지가 "가능성 있어 보인다"고 하지 않는다`, !r.followUpMessage.includes('충분히 가능성'))
+  }
+  check('정책자금 D-136: JSON 의 막는 사실(hardBlockers)은 전부 입력 칸에 이어져 있다', hardBlockers().length >= 2 && hardBlockers().every((b) => blockerApplies(b, {}) !== null), hardBlockers().map((b) => b.condition).join())
+
+  // 4) 파산 · 600점 미만 (신용 칸은 '보통') → 리스크 높음 이상, 저신용 말투
+  for (const [label, patch] of [['파산', { debtRelief: '파산' }], ['회생', { debtRelief: '회생' }], ['600점 미만', { creditBand: '600점 미만' }]] as const) {
+    for (const base of [DEFAULT_INPUT, SAMPLE_INPUT]) {
+      const r = runDiagnosis(mk(base, { ...(patch as Partial<DiagnosisInput>), credit: '보통' }))
+      check(`정책자금 D-136: ${label}(신용 보통) → 리스크 높음 이상`, r.risk?.level === '높음' || r.risk?.level === '매우 높음', `${r.risk?.level} ${r.risk?.score}`)
+      check(`정책자금 D-136: ${label}(신용 보통) → 가능성 낮음`, r.likelihoodLevel === '낮음', `${r.likelihoodLevel} ${r.overallScore}`)
+      check(`정책자금 D-136: ${label}(신용 보통) → 설명이 저신용 기준`, /저신용/.test(r.reasoning ?? '') && /신용|파산|회생/.test(r.nextAction), r.nextAction)
+    }
+  }
+
+  // 5) 심층 답(부채비율·이자보상배수·기대출 매출 초과·적자)이 점수·리스크를 바꾼다
+  for (const [label, patch] of [['부채비율 높음', { debtRatioStatus: '높음' }], ['이자보상배수 낮음', { interestCoverage: '낮음' }], ['기대출 매출 초과', { existingDebtLevel: '매출 초과' }], ['적자', { netProfit: '적자' }]] as const) {
+    const b = runDiagnosis(SAMPLE_INPUT)
+    const r = runDiagnosis(mk(SAMPLE_INPUT, patch as Partial<DiagnosisInput>))
+    check(`정책자금 D-136: 심층 '${label}' → 첫 줄 점수가 내려간다`, r.overallScore < b.overallScore, `${b.overallScore} → ${r.overallScore}`)
+    check(`정책자금 D-136: 심층 '${label}' → 리스크 점수가 오른다`, (r.risk?.score ?? 0) > (b.risk?.score ?? 0), `${b.risk?.score} → ${r.risk?.score}`)
+  }
+
+  // 6) 무작위 5,000건 (고정 씨앗) — 낮음에 닿고, 나쁜 사실 하나를 켜서 오르는 일이 없다
+  let seed = 136
+  const rnd = () => {
+    seed = (seed + 0x6d2b79f5) | 0
+    let t = seed
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+  const pick = <T>(xs: readonly T[]): T => xs[Math.floor(rnd() * xs.length)]
+  const INDUSTRIES = ['', '자동차부품 제조', '치킨집', '카페', 'IT 플랫폼', '온라인 소매', '인테리어 시공', '헤어샵', '물류 운송', '생활용품 도소매', '식품 가공', '학원', '전자상거래', '부품 도소매']
+  const randomInput = (): DiagnosisInput => ({
+    ...DEFAULT_INPUT,
+    companyName: pick(['', '가나(주)']),
+    industry: pick(INDUSTRIES),
+    businessType: pick(BUSINESS_TYPES),
+    years: pick(YEARS_OPTIONS),
+    revenue: pick(REVENUE_OPTIONS),
+    employees: pick(EMPLOYEE_OPTIONS),
+    credit: pick(CREDIT_OPTIONS),
+    purpose: pick(PURPOSE_OPTIONS),
+    strengths: STRENGTH_OPTIONS.filter(() => rnd() < 0.2),
+    actualBusiness: pick(ACTUAL_BUSINESS_OPTIONS),
+    ceoAge: pick(CEO_AGE_OPTIONS),
+    lastYearRevenue: pick(LAST_YEAR_REVENUE_OPTIONS),
+    revenueTrend3y: pick(['증가', '유지', '감소', '미확인'] as const),
+    netProfit: pick(NET_PROFIT_OPTIONS),
+    creditBand: pick(CREDIT_BAND_OPTIONS),
+    recentDelinquency: pick(YES_NO_UNKNOWN_OPTIONS),
+    debtRelief: pick(DEBT_RELIEF_OPTIONS),
+    taxArrears: pick(YES_NO_UNKNOWN_OPTIONS),
+    insuranceArrears: pick(YES_NO_UNKNOWN_OPTIONS),
+    existingDebtLevel: pick(EXISTING_DEBT_LEVEL_OPTIONS),
+    secondFinance: pick(SECOND_FINANCE_OPTIONS),
+    fundingSize: pick(FUNDING_SIZE_OPTIONS),
+    facilityUse: pick(FACILITY_USE_OPTIONS),
+    hiringPlan: pick(HIRING_PLAN_OPTIONS),
+    majorClients: pick(YES_NO_UNKNOWN_OPTIONS),
+    bonusItems: BONUS_ITEM_OPTIONS.filter(() => rnd() < 0.1),
+    debtRatioStatus: pick(['양호', '보통', '높음', '미확인'] as const),
+    interestCoverage: pick(['양호', '보통', '낮음', '미확인'] as const),
+  })
+  const seen = { 낮음: 0, 보통: 0, 높음: 0 }
+  const violations: string[] = []
+  let outOfRange = 0
+  for (let n = 0; n < 5000; n += 1) {
+    const x = randomInput()
+    const h = assessHeadlineFor(x)
+    seen[h.level] += 1
+    if (h.score < 5 || h.score > 96 || h.level !== likelihoodOf(h.score)) outOfRange += 1
+    for (const f of flipsOf(x)) {
+      const a = assessHeadlineFor(f.next)
+      if (a.score > h.score || rank(a.level) > rank(h.level)) violations.push(`#${n} ${f.label} ${h.score}→${a.score}`)
+    }
+  }
+  check('정책자금 D-136: 무작위 5,000건에서 낮음·보통·높음이 모두 나온다', seen.낮음 > 0 && seen.보통 > 0 && seen.높음 > 0, JSON.stringify(seen))
+  check('정책자금 D-136: 무작위 5,000건 — 나쁜 사실 하나를 켜서 첫 줄이 오른 적 0번', violations.length === 0, violations.slice(0, 5).join(' / '))
+  check('정책자금 D-136: 첫 줄 점수는 5~96, 가능성은 점수로 정해진다', outOfRange === 0, String(outOfRange))
+  let mismatch = 0
+  for (let n = 0; n < 150; n += 1) {
+    const x = randomInput()
+    const r = runDiagnosis(x)
+    if (r.overallScore !== assessHeadlineFor(x).score || r.likelihoodLevel !== likelihoodOf(r.overallScore)) mismatch += 1
+    // 파산·회생·600점 미만이면 리스크는 높음 이상
+    if ((x.debtRelief === '파산' || x.debtRelief === '회생' || x.creditBand === '600점 미만') && !(r.risk?.level === '높음' || r.risk?.level === '매우 높음')) mismatch += 1
+  }
+  check('정책자금 D-136: 전체 진단의 첫 줄 = 가벼운 판정 (무작위 150건)', mismatch === 0, String(mismatch))
+
+  // 7) 제외 업종은 절대 높음이 아니다
+  for (const ind of ['유흥주점', '단란주점', '카지노 바', '사행성 게임장', '대부업', '대부중개업', '부동산 임대업', '부동산 매매업', '보험대리점']) {
+    const levels = [DEFAULT_INPUT, SAMPLE_INPUT, WORST].map((b) => runDiagnosis(mk(b, { industry: ind, actualBusiness: '기타' })))
+    check(`정책자금 D-136: 제외 업종 '${ind}' → 낮음 · 제외 업종 확인`, levels.every((r) => r.likelihoodLevel === '낮음' && r.headline?.blocked === '제외 업종' && /제외 업종/.test(r.headline?.reasons[0] ?? '')), levels.map((r) => r.likelihoodLevel).join())
+    check(`정책자금 D-136: 제외 업종 '${ind}' → 결론이 업종 확인`, /업종/.test(oneLineConclusion(levels[1])), oneLineConclusion(levels[1]))
+  }
+  for (const ind of ['부동산 중개', '부동산개발', '장비 임대업']) {
+    const r = runDiagnosis(mk(SAMPLE_INPUT, { industry: ind, actualBusiness: '기타' }))
+    check(`정책자금 D-136: 일부 제외 '${ind}' → 높음 아님 · ★확인`, r.likelihoodLevel !== '높음' && (r.headline?.checks ?? []).some((c) => c.includes('★')), `${r.likelihoodLevel} ${r.headline?.checks.join()}`)
+  }
+  check('정책자금 D-136: 자동차 경정비는 제외 업종이 아니다', screenIndustry('자동차 경정비').kind === null)
+  check('정책자금 D-136: 애견 분양은 제외 업종이 아니다', screenIndustry('애견 분양샵').kind === null)
+
+  // 8) 소상공인(소진공) — 5인 미만, 제조·건설·운수·광업 10인 미만
+  const cafe59 = runDiagnosis(mk(DEFAULT_INPUT, { industry: '카페', actualBusiness: '음식점·카페', employees: '5~9명', purpose: '시설자금' }))
+  check('정책자금 D-136: 카페 직원 5~9명 → 소진공은 추천 3곳에 없다', !cafe59.agencies.some((a) => a.name === '소상공인시장진흥공단'), cafe59.agencies.map((a) => a.name).join())
+  check('정책자금 D-136: 카페 직원 5~9명 → 소진공 "대상 아님" 사유', (cafe59.deprioritized ?? []).some((d) => d.name === '소상공인시장진흥공단' && /대상 아님/.test(d.reason)), JSON.stringify(cafe59.deprioritized))
+  check('정책자금 D-136: 소상공인 아니면 혁신성장촉진자금(소상공인 전용) 없음', !(cafe59.specialTracks ?? []).some((t) => t.name === '혁신성장촉진자금'), (cafe59.specialTracks ?? []).map((t) => t.name).join())
+  const mfg59 = runDiagnosis(mk(DEFAULT_INPUT, { industry: '식품 가공', actualBusiness: '제조', employees: '5~9명' }))
+  check('정책자금 D-136: 제조 5~9명은 소상공인(10인 미만) — 소진공이 빠지지 않는다', !(mfg59.deprioritized ?? []).some((d) => /대상 아님/.test(d.reason)), JSON.stringify(mfg59.deprioritized))
+  for (const ind of ['카페', '식품 가공', '인테리어 시공', '']) {
+    const big = runDiagnosis(mk(DEFAULT_INPUT, { industry: ind, actualBusiness: '기타', employees: '10명 이상' }))
+    check(`정책자금 D-136: 직원 10명 이상('${ind || '업종 없음'}') → 소진공 1순위 아님`, big.topAgency !== '소상공인시장진흥공단' && !big.agencies.some((a) => a.name === '소상공인시장진흥공단'), big.agencies.map((a) => a.name).join())
+  }
+  const unsure = runDiagnosis(mk(DEFAULT_INPUT, { industry: '', actualBusiness: '기타', employees: '5~9명' }))
+  const unsureSemas = unsure.agencies.find((a) => a.name === '소상공인시장진흥공단')
+  check('정책자금 D-136: 업종을 몰라 기준(5인/10인)이 갈리면 소진공은 1순위가 아니고 ★확인', unsure.topAgency !== '소상공인시장진흥공단' && (!unsureSemas || unsureSemas.cautions.some((c) => c.includes('★'))), `${unsure.topAgency} ${unsureSemas?.cautions.join()}`)
+  check('정책자금 D-136: 1~4명 카페는 소상공인', smallBizStatus(buildProfile(mk(DEFAULT_INPUT, { industry: '카페', employees: '1~4명' }))) === 'yes')
+
+  // 9) 업종 분류 — 글자 일부만 맞아 틀리던 것들
+  const CLS: [string, string][] = [
+    ['전자상거래', '도소매'],
+    ['부품 도소매', '도소매'],
+    ['기계 판매 도매', '도소매'],
+    ['부동산개발', '건설/기타'],
+    ['배달대행', '서비스'],
+    ['hair salon', '서비스'],
+    ['헤어샵', '서비스'],
+    ['자동차부품 제조', '제조'],
+    ['전자부품 제조', '제조'],
+    ['IT 플랫폼', 'IT/지식서비스'],
+    ['AI 솔루션', 'IT/지식서비스'],
+    ['치킨집', '음식/외식'],
+    ['생활용품 도소매', '도소매'],
+    ['스마트팜', '건설/기타'],
+  ]
+  for (const [text, want] of CLS) check(`정책자금 D-136: 업종 '${text}' → ${want}`, inferIndustryCategory(text) === want, inferIndustryCategory(text))
+  check('정책자금 D-136: "hair" 는 IT 가 아니다', inferIndustryCategory('hair') !== 'IT/지식서비스')
+  check('정책자금 D-136: 실제 하는 일(제조)을 고르면 업종 글자(도소매)보다 앞선다', runDiagnosis(mk(DEFAULT_INPUT, { industry: '부품 도소매', actualBusiness: '제조' })).industryCategory === '제조')
+  const reasonCat = aiReasoning(mk(DEFAULT_INPUT, { industry: '온라인', actualBusiness: '제조', creditBand: '600점대' }), runDiagnosis(mk(DEFAULT_INPUT, { industry: '온라인', actualBusiness: '제조', creditBand: '600점대' })))
+  check('정책자금 D-136: 판단 근거는 엔진 업종(실제 하는 일)과 신용점수 구간을 쓴다', reasonCat.signals.includes('제조업') && reasonCat.signals.some((s) => s.includes('600점대')), reasonCat.signals.join())
+
+  // 10) 트랙 요건
+  const youthOld = runDiagnosis(mk(DEFAULT_INPUT, { industry: 'IT 플랫폼', years: '7년 이상', ceoAge: '만 39세 이하', strengths: ['청년대표'] }))
+  check('정책자금 D-136: 업력 7년 이상이면 청년창업·창업기반지원자금 없음', !(youthOld.specialTracks ?? []).some((t) => /청년창업|창업기반/.test(t.name)), (youthOld.specialTracks ?? []).map((t) => t.name).join())
+  const young = runDiagnosis(mk(DEFAULT_INPUT, { industry: 'IT 플랫폼', years: '1~3년', taxArrears: '없음', insuranceArrears: '없음' }))
+  check('정책자금 D-136: 업력 7년 미만이면 창업기반지원자금 후보', (young.specialTracks ?? []).some((t) => t.name === '창업기반지원자금'), (young.specialTracks ?? []).map((t) => t.name).join())
+  const restart = runDiagnosis(mk(DEFAULT_INPUT, { debtRelief: '파산' }))
+  const restartTrack = (restart.specialTracks ?? []).find((t) => t.name === '재창업')
+  check('정책자금 D-136: 파산 진행 중이면 재창업 트랙은 높음이 아니고 ★확인', !!restartTrack && restartTrack.level !== '높음', JSON.stringify(restartTrack))
+  const hire = runDiagnosis(mk(DEFAULT_INPUT, { hiringPlan: '있음', taxArrears: '없음', insuranceArrears: '없음' }))
+  const hireTrack = (hire.specialTracks ?? []).find((t) => t.name === '고용창출')
+  check('정책자금 D-136: "전 업종" 트랙이 조건 하나로 높음이 되지 않는다', !!hireTrack && hireTrack.level === '보통', JSON.stringify(hireTrack?.level))
+  check('정책자금 D-136: 샘플은 트랙이 그대로 높음 (혁신성장·스마트공장)', (r0.specialTracks ?? []).filter((t) => t.level === '높음').length >= 3)
+
+  // 11) 리포트 — 체납 없음이면 "세금 체납"이라 쓰지 않는다 · 진단 전은 "진단 전"
+  const baseCustomer = { id: 'c9', companyName: '가', industry: '-', businessType: '개인사업자', recommendedAgency: '-', score: 0, stage: '신규 DB', nextAction: '', lastContactedAt: '', updatedAt: '', upsellOpportunities: [], memo: '' } as unknown as Customer
+  const withResult = (inp: DiagnosisInput) => {
+    const res = runDiagnosis(inp)
+    return buildReportModel({ ...baseCustomer, recommendedAgency: res.topAgency, score: res.overallScore, likelihoodLevel: res.likelihoodLevel, diagnosisInput: inp, diagnosisResult: res })
+  }
+  const sampleReport = withResult(SAMPLE_INPUT)
+  check('정책자금 D-136: 체납 없음인 샘플 리포트에 "세금 체납"이 핵심 리스크로 찍히지 않는다', sampleReport.riskKeyword !== '세금 체납', sampleReport.riskKeyword)
+  check('정책자금 D-136: 샘플 결과의 위험 목록에 확인 안내가 섞이지 않는다', !(r0.risk?.factors ?? []).some((f) => /여부를 먼저 확인/.test(f)) && (r0.risk?.reminders ?? []).length > 0)
+  check('정책자금 D-136: 체납 있음 리포트는 "세금 체납"', withResult(mk(SAMPLE_INPUT, { taxArrears: '있음' })).riskKeyword === '세금 체납')
+  const undiag = buildReportModel(baseCustomer)
+  check('정책자금 D-136: 진단 전 고객 → 가능성 "진단 전" · 점수·별 없음', undiag.likelihood === '진단 전' && undiag.score === null && undiag.stars === null && !undiag.diagnosed && undiag.riskKeyword === '진단 전', JSON.stringify({ l: undiag.likelihood, s: undiag.score, st: undiag.stars }))
+  check('정책자금 D-136: 모듈 기록에서 점수 없이 읽은 고객도 진단 전', buildReportModel(customerFromRow('cli_z', { stage: '신규 DB' })).likelihood === '진단 전')
+  check('정책자금 D-136: 체납 결과 리포트는 이유를 싣는다', withResult(mk(SAMPLE_INPUT, { taxArrears: '있음' })).verdictReasons.some((t) => /체납/.test(t)))
+
+  // 12) 빈 값이 와도 멈추지 않는다
+  const messy = { ...DEFAULT_INPUT, strengths: null, industry: undefined, memo: null, companyName: null, bonusItems: undefined } as unknown as DiagnosisInput
+  let threw = ''
+  try {
+    const r = runDiagnosis(messy)
+    oneLineConclusion(r)
+    todayTasks(messy, r)
+    aiReasoning(messy, r)
+    if (r.agencies.length !== 3) threw = 'agencies'
+  } catch (e) {
+    threw = String(e)
+  }
+  check('정책자금 D-136: strengths·industry·memo·companyName 이 비어도(null) 진단된다', threw === '', threw)
+
+  // 13) 매출 칸 두 개 — 전년도 매출을 적었으면 그것 하나만
+  const pick3 = (x: ReturnType<typeof runDiagnosis>) => JSON.stringify({ u: x.upsells, c: x.cases, a: x.agencies })
+  const lyA = runDiagnosis(mk(DEFAULT_INPUT, { businessType: '법인사업자', revenue: '1억 미만', lastYearRevenue: '10~30억' }))
+  const lyB = runDiagnosis(mk(DEFAULT_INPUT, { businessType: '법인사업자', revenue: '10~30억', lastYearRevenue: '10~30억' }))
+  check('정책자금 D-136: 전년도 매출이 있으면 옛 매출 칸은 업셀·사례·기관에 안 쓰인다', pick3(lyA) === pick3(lyB))
+  check('정책자금 D-136: 전년도 매출 10~30억 법인 → 법인 절세 업셀', lyA.upsells.some((u) => /절세|법인/.test(u.title)), lyA.upsells.map((u) => u.title).join())
+
+  // 14) 오늘 날짜는 이 기기 날짜 · 같은 점수 순서는 결정적
+  check('정책자금 D-136: 오늘 날짜는 로컬 날짜', todayStr(new Date(2026, 8, 29, 0, 30)) === '2026-09-29' && todayStr(new Date(2026, 0, 5, 23, 59)) === '2026-01-05')
+  const tie = runDiagnosis(SAMPLE_INPUT).agencies
+  check('정책자금 D-136: 100점 동점도 순서가 매번 같다', JSON.stringify(tie.map((a) => a.name)) === JSON.stringify(runDiagnosis({ ...SAMPLE_INPUT }).agencies.map((a) => a.name)))
+
+  // 15) 기관 칸 가능성 배지도 첫 줄보다 높게 말하지 않는다
+  check('정책자금 D-136: 둘 중 낮은 가능성', lowerLikelihood('높음', '낮음') === '낮음' && lowerLikelihood('보통', '높음') === '보통')
 }
 
 /* ---- 2. 영업 도구 표 ---- */

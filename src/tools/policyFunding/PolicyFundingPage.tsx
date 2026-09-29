@@ -91,6 +91,9 @@ function buildSummary(input: DiagnosisInput, r: DiagnosisResult): string {
   const lines = [
     `[정책자금 진단] ${input.companyName || '(회사명 미입력)'} · ${input.industry || r.industryCategory || ''}`.trim(),
     `진행 가능성 ${r.likelihoodLevel ?? ''} · 추천 기관 ${r.agencies.map((a, i) => `${i + 1}순위 ${a.name}`).join(' / ')}`,
+    // D-136: 가능성을 낮춘 이유 · ★ 확인 필요를 붙인다
+    ...(r.headline?.reasons.length ? [`판단 이유: ${r.headline.reasons.slice(0, 2).join(' / ')}`] : []),
+    ...(r.headline?.checks.length ? [`확인 필요: ${r.headline.checks.join(' / ')}`] : []),
     `핵심 전략: ${r.summary.coreStrategy}`,
     `가장 큰 리스크: ${r.summary.biggestRisk}`,
     `다음 할 일: ${r.nextAction}`,

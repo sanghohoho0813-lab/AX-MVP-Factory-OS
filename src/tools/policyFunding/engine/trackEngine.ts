@@ -5,6 +5,7 @@
 import type { Profile } from "./knowledgeEngine";
 import type { LikelihoodLevel, SpecialTrackCandidate } from "../types";
 import tracksJson from "../knowledge/special-funding-tracks.json";
+import { smallBizStatus } from "./eligibility";
 
 interface TrackDef {
   key: string;
@@ -12,6 +13,8 @@ interface TrackDef {
   agencies: string[];
   recommendConditions: string[];
   signals: { all?: string[]; any?: string[]; boost?: string[] };
+  // D-136: 트랙 요건 — 안 맞으면 후보에서 빼거나 '높음'으로 두지 않는다
+  requires?: { smallBiz?: boolean; maxYears?: number; notInBankruptcy?: boolean };
   checkQuestions: string[];
   requiredDocuments: string[];
   favorableIndustries: string[];
@@ -58,7 +61,9 @@ function evalSignal(key: string, p: Profile): { hit: boolean; reason?: string } 
     case "youth":
       return { hit: p.isYouth, reason: "만 39세 이하 청년 대표" };
     case "earlyStage":
-      return { hit: p.yearsIdx <= 1, reason: "창업 초기(3년 이내)" };
+      return { hit: p.yearsIdx >= 0 && p.yearsIdx <= 1, reason: "창업 초기(3년 이내)" };
+    case "under7y":
+      return { hit: p.yearsIdx >= 0 && p.yearsIdx <= 2, reason: "업력 7년 미만" };
     case "womenCert":
       return {
         hit: (p.input.bonusItems ?? []).includes("여성기업"),
@@ -75,8 +80,9 @@ function evalSignal(key: string, p: Profile): { hit: boolean; reason?: string } 
     case "hiring":
       return { hit: p.hasEmploymentGrowth, reason: "채용 계획·고용 증가" };
     case "smallBiz":
+      // D-136: 업종별 상시근로자 기준(5인·10인 미만)으로 — 확실할 때만
       return {
-        hit: p.revenueEok < 10 && p.employeesIdx <= 2,
+        hit: p.revenueEok < 10 && smallBizStatus(p) === "yes",
         reason: "소상공인 규모",
       };
     case "growth":
@@ -89,9 +95,30 @@ function evalSignal(key: string, p: Profile): { hit: boolean; reason?: string } 
 export function detectSpecialTracks(profile: Profile): SpecialTrackCandidate[] {
   const out: SpecialTrackCandidate[] = [];
 
+  const sb = smallBizStatus(profile);
+  const inBankruptcy =
+    profile.input.debtRelief === "파산" || profile.input.debtRelief === "회생";
+
   for (const t of TRACKS) {
     const reasons: string[] = [];
+    const extraCautions: string[] = [];
+    let capLevel: LikelihoodLevel | null = null;
     let ok = true;
+
+    // D-136: 트랙 요건 먼저
+    const req = t.requires ?? {};
+    if (req.maxYears === 7 && !(profile.yearsIdx >= 0 && profile.yearsIdx <= 2)) continue; // 업력 7년 미만만
+    if (req.smallBiz) {
+      if (sb === "no") continue; // 소상공인 전용 — 대상 아님
+      if (sb === "unsure") {
+        capLevel = "보통";
+        extraCautions.push("★ 소상공인 해당 여부(업종별 상시근로자 기준) 확인");
+      }
+    }
+    if (req.notInBankruptcy && inBankruptcy) {
+      capLevel = "보통";
+      extraCautions.push(`★ ${profile.input.debtRelief} 진행 중이면 면책·인가 뒤에 신청 — 진행 상태 확인`);
+    }
 
     for (const k of t.signals.all ?? []) {
       const r = evalSignal(k, profile);
@@ -121,24 +148,25 @@ export function detectSpecialTracks(profile: Profile): SpecialTrackCandidate[] {
         if (r.reason && !reasons.includes(r.reason)) reasons.push(r.reason);
       }
     }
-    // 업종 적합 추가 근거
+    // 업종 적합 추가 근거 — D-136: "전 업종"은 누구에게나 맞는 말이라 가점이 아니다
     if (
       t.favorableIndustries.some(
-        (f) => f === "전 업종" || f.includes(profile.industryCategory),
+        (f) => !f.startsWith("전 업종") && f.includes(profile.industryCategory),
       )
     ) {
       boostHits += 1;
     }
 
-    const level: LikelihoodLevel =
+    let level: LikelihoodLevel =
       reasons.length >= 2 || boostHits >= 1 ? "높음" : "보통";
+    if (capLevel && level === "높음") level = capLevel;
 
     out.push({
       key: t.key,
       name: t.name,
       level,
       reasons: reasons.slice(0, 4),
-      cautions: t.cautions.slice(0, 2),
+      cautions: [...extraCautions, ...t.cautions].slice(0, 2),
       requiredDocuments: t.requiredDocuments.slice(0, 3),
       consultingScript: t.consultingScript,
     });

@@ -45,9 +45,11 @@ export interface ReportModel {
   businessType: string;
   diagnosisDate: string;
   topAgency: string;
-  score: number;
+  /** D-136: 진단 전이면 null (0점·별 1개로 찍지 않는다) */
+  score: number | null;
+  diagnosed: boolean;
   // 대표님 한 페이지 요약
-  stars: number;
+  stars: number | null;
   estimatedPeriod: string;
   riskKeyword: string;
   keyPrep: string;
@@ -62,8 +64,11 @@ export interface ReportModel {
   disclaimer: string;
   incall: ReportIncall | null;
   planDraft: PlanDraft | null;
-  // 11차: 3단계 가능성 + 세부 자금 트랙
-  likelihood: LikelihoodLevel;
+  // 11차: 3단계 가능성 + 세부 자금 트랙 (D-136: 진단 전이면 "진단 전")
+  likelihood: LikelihoodLevel | "진단 전";
+  /** D-136: 가능성을 낮춘 이유 · ★ 확인 필요 (진단 결과가 있을 때만) */
+  verdictReasons: string[];
+  checks: string[];
   specialTracks: SpecialTrackCandidate[];
   // 12차: 사업계획 전략 AI (진단 고객만 — 없으면 null)
   planStrategy: PlanStrategy | null;
@@ -113,12 +118,30 @@ function estimatePeriod(agency: string): string {
   return "3~5주";
 }
 
-function riskKeywordOf(risk: string): string {
+// D-136: 실제로 걸린 위험 글에서만 뽑는다. "~ 여부를 먼저 확인" 같은 안내는 위험이 아니다
+// (예전에는 체납 '없음'인데도 안내 문구 때문에 "세금 체납"이 찍혔다).
+export function riskKeywordOf(risk: string): string {
+  if (/여부를\s*(먼저\s*)?확인/.test(risk)) return "사전 점검 필요";
+  if (risk.includes("제외 업종")) return "제외 업종";
+  if (risk.includes("체납")) return "세금 체납";
+  if (risk.includes("파산") || risk.includes("회생")) return "파산·회생";
+  if (risk.includes("연체")) return "최근 연체";
   if (risk.includes("신용")) return "대표 신용";
+  if (risk.includes("2금융") || risk.includes("카드론")) return "2금융·카드론";
+  if (risk.includes("기존 대출")) return "기존 대출";
   if (risk.includes("부채")) return "부채비율";
-  if (risk.includes("체납") || risk.includes("세금")) return "세금 체납";
+  if (risk.includes("적자") || risk.includes("이자")) return "손익·이자";
   if (risk.includes("업력") || risk.includes("실적")) return "짧은 업력·실적";
   return "사전 점검 필요";
+}
+
+/** 진단을 한 번이라도 돌린 고객인가 (점수 0 · 결과 없음 = 진단 전) */
+export function isDiagnosed(customer: Customer): boolean {
+  return (
+    !!customer.diagnosisResult ||
+    !!customer.likelihoodLevel ||
+    (typeof customer.score === "number" && customer.score > 0)
+  );
 }
 
 const DEFAULT_DOCUMENTS = [
@@ -222,16 +245,29 @@ export function buildReportModel(customer: Customer): ReportModel {
   const keyPrepDoc =
     documents.find((d) => d.includes("재무")) ?? documents[0] ?? "사업자등록증";
 
+  const diagnosed = isDiagnosed(customer);
+  // 핵심 리스크: 진단 결과가 있으면 실제로 걸린 위험(factors)에서만, 없으면 "큰 위험 없음"
+  const riskKeyword = !diagnosed
+    ? "진단 전"
+    : result?.risk
+      ? result.risk.factors[0]
+        ? riskKeywordOf(result.risk.factors[0])
+        : "큰 위험 없음"
+      : result
+        ? riskKeywordOf(biggestRisk)
+        : "사전 점검 필요";
+
   return {
     companyName: customer.companyName,
     industry: customer.industry,
     businessType: customer.businessType,
     diagnosisDate: customer.lastContactedAt || customer.updatedAt,
     topAgency: customer.recommendedAgency,
-    score: customer.score,
-    stars: progressStars(customer.score),
+    score: diagnosed ? customer.score : null,
+    diagnosed,
+    stars: diagnosed ? progressStars(customer.score) : null,
     estimatedPeriod: estimatePeriod(customer.recommendedAgency),
-    riskKeyword: riskKeywordOf(biggestRisk),
+    riskKeyword,
     keyPrep: keyPrepDoc,
     coreStrategy,
     biggestRisk,
@@ -244,10 +280,13 @@ export function buildReportModel(customer: Customer): ReportModel {
     disclaimer: REPORT_DISCLAIMER,
     incall: buildIncall(customer),
     planDraft: customer.diagnosisResult?.planDraft ?? null,
-    likelihood:
-      customer.likelihoodLevel ??
-      customer.diagnosisResult?.likelihoodLevel ??
-      likelihoodOf(customer.score),
+    likelihood: !diagnosed
+      ? "진단 전"
+      : (customer.likelihoodLevel ??
+        customer.diagnosisResult?.likelihoodLevel ??
+        likelihoodOf(customer.score)),
+    verdictReasons: result?.headline?.reasons.slice(0, 3) ?? [],
+    checks: result?.headline?.checks ?? [],
     specialTracks:
       customer.specialFundingTracks ??
       customer.diagnosisResult?.specialTracks ??

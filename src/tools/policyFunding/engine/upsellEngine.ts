@@ -11,12 +11,13 @@ function matchesTrigger(rule: UpsellRule, p: Profile): boolean {
   if (t.includes("직원 있음")) return p.input.employees !== "0명";
   if (t.includes("제조") || t.includes("기술") || t.includes("특허"))
     return p.hasManufacturing || p.hasTech;
-  if (t.includes("매출 10억 이상 법인")) return p.isCorp && p.revenueIdx >= 3;
+  // D-136: 매출은 revenueEok 하나로 본다 (빠른 진단의 전년도 매출 칸 포함)
+  if (t.includes("매출 10억 이상 법인")) return p.isCorp && p.revenueEok >= 10;
   if (t.includes("창업 초기") || t.includes("청년"))
     return p.isYouth || p.input.years === "1년 미만" || p.input.purpose === "창업자금";
   if (t.includes("수출")) return p.hasExport;
   if (t.includes("R&D")) return p.hasTech || p.industryCategory === "IT/지식서비스";
-  if (t.includes("개인사업자 매출 증가")) return !p.isCorp && p.revenueIdx >= 2;
+  if (t.includes("개인사업자 매출 증가")) return !p.isCorp && p.revenueEok >= 5;
   // 승인 후 재접촉/재무제표 오류 등 진단 시점에 판단 불가한 트리거는 제외
   return false;
 }

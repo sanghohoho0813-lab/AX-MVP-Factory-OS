@@ -62,7 +62,9 @@ import { buildStoryVersions } from "./storyEngine";
 import { getGrowthLogic } from "./growthLogicEngine";
 import { getReviewFocus } from "./reviewFocusEngine";
 import { getDocumentPriority } from "./documentPriorityEngine";
-import { likelihoodOf } from "../types";
+import { assessHeadline, cleanProfile } from "./eligibility";
+import { likelihoodOf, lowerLikelihood } from "../types";
+import type { HeadlineAssessment } from "../types";
 
 // ── knowledge 스키마 타입 ──
 export interface AgencyRule {
@@ -246,22 +248,82 @@ const STRENGTH_KEYWORD: Record<string, string> = {
 };
 
 // industryCategory 추론 (6-value 통제 어휘 — knowledge/funding-cases.json 과 동일 기준)
-export function inferIndustryCategory(text: string): IndustryCategory {
-  const s = (text || "").toLowerCase();
+// D-136: 글자 일부만 맞아도 걸리던 문제를 고쳤다 — 더 구체적인 말(전자상거래·배달대행·부동산)을
+// 먼저 보고, 영문 약어(it·ai·oem)는 낱말 경계로만 찾는다("hair" 가 IT 가 되지 않게).
+export function inferIndustryCategory(text: string | null | undefined): IndustryCategory {
+  const s = String(text ?? "").toLowerCase();
   const has = (...ks: string[]) => ks.some((k) => s.includes(k.toLowerCase()));
-  if (has("제조", "공장", "가공", "생산", "부품", "금속", "기계", "섬유", "화학", "전자", "oem"))
+  const word = (...ks: string[]) =>
+    ks.some((k) => new RegExp(`(^|[^a-z0-9])${k}([^a-z0-9]|$)`).test(s));
+
+  // 1) 구체적인 말 먼저
+  if (has("부동산")) return "건설/기타"; // 부동산개발·임대 — IT(개발)로 가지 않게 (제외 업종 판정은 eligibility)
+  // 2) 분명한 제조
+  if (has("제조", "공장", "가공", "생산", "금형", "주조", "도금") || word("oem", "odm"))
     return "제조";
+  if (has("배달대행", "배달 대행", "퀵서비스", "대리운전", "택배", "화물", "운송", "물류"))
+    return "서비스";
+  if (has("전자상거래", "통신판매", "온라인쇼핑", "온라인 쇼핑", "스마트스토어", "오픈마켓"))
+    return "도소매";
+  // 3) 음식
   if (has("음식", "외식", "식당", "카페", "요식", "한식", "분식", "주점", "베이커리", "치킨", "배달", "프랜차이즈"))
     return "음식/외식";
-  if (has("소프트", "아이티", "it", "앱", "플랫폼", "개발", "소프트웨어", "지식", "콘텐츠", "바이오", "테크", "스타트업", "게임", "ai", "데이터"))
-    return "IT/지식서비스";
-  if (has("도소매", "도매", "소매", "쇼핑몰", "판매", "유통", "커머스", "상사", "마트", "무역", "온라인", "화장품", "중고차", "식자재"))
+  // 4) 파는 일 (부품 도소매 · 기계 판매 도매 → 도소매)
+  if (has("도소매", "도매", "소매", "판매", "유통", "쇼핑몰", "무역", "상사") || /(^|[^스])마트/.test(s)) // "스마트"는 마트가 아니다
     return "도소매";
+  // 5) 제조 쪽 낱말 (파는 말이 없을 때만)
+  if (has("부품", "금속", "기계", "섬유", "화학", "전자"))
+    return "제조";
+  // 6) IT·지식
+  if (
+    has("소프트", "아이티", "앱", "플랫폼", "개발", "소프트웨어", "지식", "콘텐츠", "바이오", "테크", "스타트업", "게임", "데이터") ||
+    word("it", "ai", "app", "sw", "saas")
+  )
+    return "IT/지식서비스";
+  if (has("커머스", "온라인", "화장품", "중고차", "식자재")) return "도소매";
   if (has("건설", "인테리어", "시공", "토목", "전기공사", "설비공사", "건축", "농업"))
     return "건설/기타";
-  if (has("미용", "서비스", "운송", "물류", "교육", "학원", "병원", "의료", "숙박", "용역", "컨설", "청소", "세탁", "정비", "광고", "왁싱", "네일", "피부", "애견"))
+  if (
+    has("미용", "헤어", "서비스", "교육", "학원", "병원", "의료", "숙박", "용역", "컨설", "청소", "세탁", "정비", "광고", "왁싱", "네일", "피부", "애견") ||
+    word("hair", "salon", "nail", "beauty")
+  )
     return "서비스";
   return "건설/기타";
+}
+
+// 실제 하는 일(actualBusiness)을 고르면 그 분류를 그대로 쓴다 ('기타'면 업종 글자로 추론)
+const ACTUAL_BUSINESS_CATEGORY: Record<string, IndustryCategory> = {
+  제조: "제조",
+  도소매: "도소매",
+  "음식점·카페": "음식/외식",
+  서비스: "서비스",
+  "건설·인테리어": "건설/기타",
+  "IT·플랫폼": "IT/지식서비스",
+};
+
+export function resolveIndustryCategory(input: Pick<DiagnosisInput, "industry" | "actualBusiness">): IndustryCategory {
+  const fromActual = input.actualBusiness ? ACTUAL_BUSINESS_CATEGORY[input.actualBusiness] : undefined;
+  return fromActual ?? inferIndustryCategory(input.industry);
+}
+
+// D-136: 옛 저장값·빈 값이 와도 멈추지 않게 입력을 고른다
+export function normalizeInput(raw: DiagnosisInput): DiagnosisInput {
+  const r = (raw ?? {}) as Partial<DiagnosisInput>;
+  const str = (v: unknown) => (typeof v === "string" ? v : "");
+  return {
+    ...(r as DiagnosisInput),
+    companyName: str(r.companyName),
+    industry: str(r.industry),
+    memo: str(r.memo),
+    businessType: r.businessType ?? "개인사업자",
+    years: r.years ?? "1~3년",
+    revenue: r.revenue ?? "1~5억",
+    employees: r.employees ?? "1~4명",
+    credit: r.credit ?? "알 수 없음",
+    purpose: r.purpose ?? "운전자금",
+    strengths: Array.isArray(r.strengths) ? r.strengths.filter((s) => typeof s === "string") : [],
+    bonusItems: Array.isArray(r.bonusItems) ? r.bonusItems.filter((s) => typeof s === "string") : [],
+  };
 }
 
 // ── 전처리: 입력 → Profile ──
@@ -321,6 +383,15 @@ const LEGACY_REVENUE_EOK: Record<string, number> = {
   "30억 이상": 40,
 };
 
+// 억 → REVENUE_OPTIONS 칸 번호 (두 매출 칸이 서로 다른 말을 하지 않게 revenueEok 에서 만든다)
+function revenueIdxOf(eok: number): number {
+  if (eok < 1) return REVENUE_OPTIONS.indexOf("1억 미만");
+  if (eok < 5) return REVENUE_OPTIONS.indexOf("1~5억");
+  if (eok < 10) return REVENUE_OPTIONS.indexOf("5~10억");
+  if (eok < 30) return REVENUE_OPTIONS.indexOf("10~30억");
+  return REVENUE_OPTIONS.indexOf("30억 이상");
+}
+
 // 가점 항목 → 매칭 키워드 (사례·기관 매칭에 합류)
 const BONUS_KEYWORD: Record<string, string> = {
   "특허 보유": "특허",
@@ -333,12 +404,10 @@ const BONUS_KEYWORD: Record<string, string> = {
   "만39세 이하 청년기업": "청년",
 };
 
-export function buildProfile(input: DiagnosisInput): Profile {
-  // 실제 하는 일 분류(actualBusiness)가 있으면 업종 추론에 우선 반영
-  const industryText = [input.actualBusiness, input.industry]
-    .filter(Boolean)
-    .join(" ");
-  const industryCategory = inferIndustryCategory(industryText);
+export function buildProfile(rawInput: DiagnosisInput): Profile {
+  const input = normalizeInput(rawInput);
+  // 실제 하는 일 분류(actualBusiness)를 고르면 그 분류가 우선 (D-136)
+  const industryCategory = resolveIndustryCategory(input);
   const has = (s: Strength) => input.strengths.includes(s);
   const bonusItems = (input.bonusItems ?? []).filter((b) => b !== "없음");
   const strengthKeywords = Array.from(
@@ -376,10 +445,13 @@ export function buildProfile(input: DiagnosisInput): Profile {
   if (has("제조업")) tags.push("제조");
 
   // ── 인콜 확장 파생 신호 ──
+  // D-136: 매출 칸이 둘이다(빠른 진단은 lastYearRevenue). 적어 둔 전년도 매출이 있으면 그것 하나만 쓴다.
   const revenueEok =
-    input.lastYearRevenue && input.lastYearRevenue !== "미확인"
+    (input.lastYearRevenue && input.lastYearRevenue !== "미확인"
       ? LAST_YEAR_REVENUE_EOK[input.lastYearRevenue]
-      : LEGACY_REVENUE_EOK[input.revenue] ?? 3;
+      : undefined) ??
+    LEGACY_REVENUE_EOK[input.revenue] ??
+    3;
 
   const band = input.creditBand ?? "미확인";
   const veryLowCredit =
@@ -458,7 +530,7 @@ export function buildProfile(input: DiagnosisInput): Profile {
     hasExport: has("수출") || bonusItems.includes("수출 실적"),
     strengthKeywords,
     yearsIdx: YEARS_OPTIONS.indexOf(input.years),
-    revenueIdx: REVENUE_OPTIONS.indexOf(input.revenue),
+    revenueIdx: revenueIdxOf(revenueEok),
     employeesIdx: EMPLOYEE_OPTIONS.indexOf(input.employees),
     creditIdx,
     tags: Array.from(new Set(tags)),
@@ -480,8 +552,25 @@ export function buildProfile(input: DiagnosisInput): Profile {
   };
 }
 
+// ── D-136 첫 줄 판정 ──
+// 나쁜 사실을 뺀 프로필로 기관 적합도(상위 3곳 평균)를 구해 출발점으로 삼고,
+// eligibility.assessHeadline 이 나쁜 사실마다 깎고 막는 사실로 위 끝을 누른다.
+function headlineOf(profile: Profile): HeadlineAssessment {
+  const { recommendations } = selectAgencies(cleanProfile(profile), KB);
+  const fit =
+    recommendations.reduce((sum, a) => sum + a.score, 0) /
+    (recommendations.length || 1);
+  return assessHeadline(profile, fit);
+}
+
+/** 첫 줄 판정만 (가벼움 — 시험·미리보기용). runDiagnosis 의 overallScore 와 같은 값 */
+export function assessHeadlineFor(input: DiagnosisInput): HeadlineAssessment {
+  return headlineOf(buildProfile(input));
+}
+
 // ── 오케스트레이션 ──
-export function runKnowledgeDiagnosis(input: DiagnosisInput): DiagnosisResult {
+export function runKnowledgeDiagnosis(rawInput: DiagnosisInput): DiagnosisResult {
+  const input = normalizeInput(rawInput);
   // 1) 전처리 + industryCategory
   const profile = buildProfile(input);
 
@@ -492,6 +581,10 @@ export function runKnowledgeDiagnosis(input: DiagnosisInput): DiagnosisResult {
   );
   const topAgency = agencies[0]?.name ?? "신용보증기금";
   const second = agencies[1]?.name;
+
+  // 2-1) 첫 줄 판정 (기관 순위와 따로)
+  const headline = headlineOf(profile);
+  const low = headline.level === "낮음";
 
   // 3) 사례 매칭 (funding-cases.json, 유사도 TOP5)
   const cases = matchCases(profile, KB, topAgency);
@@ -509,7 +602,7 @@ export function runKnowledgeDiagnosis(input: DiagnosisInput): DiagnosisResult {
     agencies.map((a) => a.name),
   );
   const reasoning =
-    generateReasoning(profile, agencies, cases, risk, KB) +
+    generateReasoning(profile, agencies, cases, risk, KB, headline) +
     (comparisonForReasoning.length > 0
       ? ` ${comparisonForReasoning[0]}`
       : "") +
@@ -517,11 +610,12 @@ export function runKnowledgeDiagnosis(input: DiagnosisInput): DiagnosisResult {
 
   // 6) scripts + coachInsight (funding-scripts / contract-notices / 인콜 조건부 질문)
   const coach = generateScripts(profile, topAgency, KB);
-  const coachInsight = buildCoachInsight(profile, risk, KB);
+  const coachInsight = buildCoachInsight(profile, risk, KB, headline);
   const { documentMessage, followUpMessage } = generateMessages(
     profile,
     topAgency,
     KB,
+    headline,
   );
 
   // 7) upsell (upsell-rules + funding-upsells, TOP5)
@@ -540,7 +634,13 @@ export function runKnowledgeDiagnosis(input: DiagnosisInput): DiagnosisResult {
   const documentChecks = checkDocuments(profile);
 
   // 8-2.5) 세부 자금 트랙 후보 (11차 — special-funding-tracks.json)
-  const specialTracks = detectSpecialTracks(profile);
+  // D-136: 첫 줄이 '높음'이 아니면 트랙도 그보다 높게 말하지 않는다
+  const specialTracks = detectSpecialTracks(profile).map((t) => {
+    const level = lowerLikelihood(t.level, headline.level);
+    if (level === t.level) return t;
+    const note = headline.firstFix ? `먼저: ${headline.firstFix}` : "첫 줄 판정 먼저 확인";
+    return { ...t, level, cautions: [note, ...t.cautions].slice(0, 2) };
+  });
 
   // 8-2.6) 사업계획 전략 AI (12차)
   const planStrategy = getPlanStrategy(topAgency); // 작업1
@@ -567,35 +667,54 @@ export function runKnowledgeDiagnosis(input: DiagnosisInput): DiagnosisResult {
     missingDocs.length > 0
       ? ` 현재 자료 기준으로는 ${missingDocs.join("과 ")}이(가) 가장 중요합니다.`
       : "";
+  const coachLead =
+    low && headline.firstFix
+      ? `지금은 사업계획서보다 이것이 먼저입니다: ${headline.firstFix} (${headline.reasons[0] ?? "진행 어려움"}). `
+      : "";
   const coachMessage =
-    planScore.total < 70
+    coachLead +
+    (planScore.total < 70
       ? `이 업체는 사업계획서의 완성도가 승인 여부를 크게 좌우할 가능성이 있습니다. 특히 ${
           weak2.length > 0 ? weak2.join("·") : "매출 증가 논리"
         } 부분을 강하게 보완하면 승인 가능성이 눈에 띄게 올라갑니다.${docLine} ${framework.emphasis}`
       : `사업계획 기본기는 갖춰져 있습니다(완성도 ${planScore.total}점). 이제 ${reviewFocus.focus
           .slice(0, 2)
           .map((f) => f.label.split(" ")[0])
-          .join("·")} 중심으로 숫자를 다듬고, 증빙을 눈으로 보여줄 준비를 하면 됩니다.${docLine}`;
+          .join("·")} 중심으로 숫자를 다듬고, 증빙을 눈으로 보여줄 준비를 하면 됩니다.${docLine}`);
 
-  // 9) 진행 추천도 (기관 점수 집계)
-  const avg =
-    agencies.reduce((sum, a) => sum + a.score, 0) / (agencies.length || 1);
-  const overallScore = clamp(avg, 42, 96);
+  // 9) 진행 가능성 — D-136: 기관 적합도 평균이 아니라 첫 줄 판정(headline) 점수.
+  //    (예전: 상위 3곳 평균이라 저신용 가점이 첫 줄을 올리고, 체납은 안 봤다)
+  const overallScore = headline.score;
 
   // 10) confidence (신뢰도)
   const confidence = calculateConfidence(profile, agencies, cases);
 
-  // 11) summary + nextAction
-  const coreStrategy = profile.hasTech
-    ? `기술 강점을 앞세워 ${topAgency} 중심으로 준비${second ? `, ${second} 병행` : ""}`
-    : input.credit === "낮음"
-      ? `저신용 대응 상품(${topAgency}) 소액부터 단계적으로 접근`
-      : `${topAgency} 중심으로 서류부터 완비해 한도 극대화${second ? ` (백업: ${second})` : ""}`;
+  // 11) summary + nextAction — 막는 사실 → 낮음 → 저신용 → 기술 → 기본 순서
+  const coreStrategy =
+    headline.blocked === "체납"
+      ? "체납 해소 후 다시 진단 — 그 전에는 기관 접수 보류"
+      : headline.blocked === "제외 업종"
+        ? "정책자금 대상 업종인지 먼저 확인(★) — 확인 전에는 접수 보류"
+        : low
+          ? `먼저 ${headline.firstFix ?? "걸리는 문제 정리"} → 다시 진단 — 그 전에는 접수 보류`
+          : profile.lowCredit
+            ? `저신용 대응 상품(${topAgency}) 소액부터 단계적으로 접근`
+            : profile.hasTech
+              ? `기술 강점을 앞세워 ${topAgency} 중심으로 준비${second ? `, ${second} 병행` : ""}`
+              : `${topAgency} 중심으로 서류부터 완비해 한도 극대화${second ? ` (백업: ${second})` : ""}`;
 
   const nextAction =
-    input.credit === "낮음"
-      ? `${topAgency} 기준 서류 요청 오늘 발송 → 저신용 대응 상품 병행 검토`
-      : `${topAgency} 기준 서류 요청 오늘 발송 → 1순위 기관 상담 일정 예약`;
+    headline.blocked === "체납"
+      ? "체납 완납 → 완납증명(납세증명서) 받기 → 다시 진단 (기관 상담은 그 뒤)"
+      : headline.blocked === "제외 업종"
+        ? "사업자등록 업종 코드 확인 → 정책자금 대상인지 확인(★) → 다시 진단"
+        : low
+          ? `${headline.firstFix ?? "걸리는 문제 정리"} → 다시 진단 (기관 상담은 그 뒤)`
+          : profile.lowCredit
+            ? `${topAgency} 기준 서류 요청 오늘 발송 → 저신용 대응 상품 병행 검토`
+            : headline.level === "보통" && headline.firstFix
+              ? `${headline.firstFix} → ${topAgency} 기준 서류 요청`
+              : `${topAgency} 기준 서류 요청 오늘 발송 → 1순위 기관 상담 일정 예약`;
 
   return {
     companyName: profile.companyName,
@@ -606,7 +725,9 @@ export function runKnowledgeDiagnosis(input: DiagnosisInput): DiagnosisResult {
       score: overallScore,
       topAgency,
       coreStrategy,
-      biggestRisk: risk.factors[0] ?? risk.explanation,
+      // D-136: 걸린 위험이 없으면 "없다"고 쓴다 (안내 문구를 위험처럼 보이지 않게)
+      biggestRisk:
+        risk.factors[0] ?? "현재 입력으로는 큰 위험 요소가 보이지 않습니다.",
     },
     coachInsight,
     agencies,
@@ -633,6 +754,7 @@ export function runKnowledgeDiagnosis(input: DiagnosisInput): DiagnosisResult {
     coachMessage,
     likelihoodLevel: likelihoodOf(overallScore),
     specialTracks,
+    headline,
     // 사업계획 전략 AI (12차)
     planStrategy,
     planLogic,

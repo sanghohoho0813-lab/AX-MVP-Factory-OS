@@ -24,8 +24,10 @@ let workspace: string | null = null
 let osClients: ClientOpsRecord[] = []
 const rowIdOf = new Map<string, string>()
 
-export function todayStr(): string {
-  return new Date().toISOString().slice(0, 10)
+/** 오늘 날짜(YYYY-MM-DD) — D-136: 이 기기의 날짜로 (UTC 로 자르면 한국 아침 9시 전에는 어제가 된다) */
+export function todayStr(now: Date = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`
 }
 
 function isStage(v: unknown): v is CustomerStage {
