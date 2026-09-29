@@ -78,7 +78,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 
   // 목차 — 고급 기능은 기본으로 빠져 있다 (D-127: 분야 줄을 펼쳐서 본다 — 기관 전략은 정부지원사업, 검증 · 사례는 AX 스튜디오)
   const openCats = async () => {
-    for (const name of [/정부지원사업/, /AX 스튜디오/]) {
+    // D-136: AX 스튜디오는 '잘 안 쓰는 기능' 묶음 안 — 묶음부터 편다
+    for (const name of [/정부지원사업/, /잘 안 쓰는 기능/, /AX 스튜디오/]) {
       const b = page.locator('aside nav').getByRole('button', { name })
       if ((await b.getAttribute('aria-expanded')) !== 'true') await b.click()
     }

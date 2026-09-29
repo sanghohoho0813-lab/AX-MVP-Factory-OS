@@ -34,8 +34,17 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('메뉴: 영업 묶음에 1차 미팅 체크리스트(준비 중)', at('1차 미팅 체크리스트') > at('영업자 정산') && navText.includes('준비 중'), navText.slice(0, 360))
   check('메뉴: 가끔 쓰는 것 묶음이 없다 (D-104)', at('가끔 쓰는 것') === -1)
   // D-127: 전문 모듈은 분야 여섯 줄 + 모듈 전체 — 도구는 분야 줄 아래에 접혀 있다(모듈이 늘어도 줄이 늘지 않는다)
-  const cats = ['기업성장', '정부지원사업', '절세·재무', '기술사업화', 'AX 스튜디오', '웹 스튜디오', '모듈 전체']
-  check('메뉴: 분야 여섯 줄 순서 · 모듈 전체가 끝', cats.every((c, i) => at(c) > at('전문 모듈') && (i === 0 || at(c) > at(cats[i - 1]))), navText.slice(0, 700))
+  // D-136: 자주 쓰는 분야 셋 + 모듈 전체, 그 아래 접힌 '잘 안 쓰는 기능'(기술사업화 · AX 스튜디오 · 웹 스튜디오)
+  const cats = ['기업성장', '정부지원사업', '절세·재무', '모듈 전체', '잘 안 쓰는 기능']
+  check('메뉴: 분야 셋 · 모듈 전체 · 잘 안 쓰는 기능 순서', cats.every((c, i) => at(c) > at('전문 모듈') && (i === 0 || at(c) > at(cats[i - 1]))), navText.slice(0, 700))
+  check('메뉴: 잘 안 쓰는 기능은 처음에 접혀 있다(기술사업화 · AX 스튜디오 · 웹 스튜디오 안 보임)', at('기술사업화') === -1 && at('AX 스튜디오') === -1 && at('웹 스튜디오') === -1, navText.slice(0, 700))
+  await nav.getByRole('button', { name: /잘 안 쓰는 기능/ }).click()
+  await page.waitForTimeout(200)
+  const navRare = (await nav.innerText()) ?? ''
+  const atR = (t) => navRare.indexOf(t)
+  check('메뉴: 잘 안 쓰는 기능을 펴면 기술사업화 · AX 스튜디오 · 웹 스튜디오', ['기술사업화', 'AX 스튜디오', '웹 스튜디오'].every((t, i, a) => atR(t) > atR('잘 안 쓰는 기능') && (i === 0 || atR(t) > atR(a[i - 1]))), navRare.slice(0, 900))
+  await nav.getByRole('button', { name: /잘 안 쓰는 기능/ }).click()
+  await page.waitForTimeout(200)
   check('메뉴: 처음에는 도구 줄이 접혀 있다', at('세금 계산기') === -1 && at('정책자금 진단') === -1, navText.slice(0, 700))
   await nav.getByRole('button', { name: /절세·재무/ }).click()
   await page.waitForTimeout(200)
@@ -200,7 +209,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByRole('button', { name: '메뉴 열기' }).click()
   await page.waitForTimeout(500)
   const drawer = (await page.getByRole('navigation', { name: '주 메뉴' }).innerText()) ?? ''
-  check('휴대폰 서랍: 같은 순서', drawer.indexOf('전문 모듈') > drawer.indexOf('고객 관리') && drawer.indexOf('AX 스튜디오') > drawer.indexOf('전문 모듈'), drawer.slice(0, 260))
+  check('휴대폰 서랍: 같은 순서', drawer.indexOf('전문 모듈') > drawer.indexOf('고객 관리') && drawer.indexOf('잘 안 쓰는 기능') > drawer.indexOf('전문 모듈'), drawer.slice(0, 260))
   const logoH = await page.locator('img[alt]:visible').first().evaluate((el) => el.getBoundingClientRect().height)
   check('휴대폰 서랍: 로고도 48px', Math.round(logoH) === 48, String(logoH))
   // D-103: 예전 '이 기기 · 계정' 칸(고객 플랫폼 열기 · 처음 사용 가이드) 없음 — 아래는 이름 한 줄 + 아이콘

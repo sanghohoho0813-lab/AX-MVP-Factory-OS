@@ -45,6 +45,7 @@ export type ModuleGroupKey =
   | 'clients'
   | 'sales'
   | 'modules'
+  | 'rare'
   | 'about'
   | 'settings'
 
@@ -114,6 +115,8 @@ export const MODULE_GROUPS: ModuleGroup[] = [
   // D-127: 전문 모듈 — 분야 여섯 줄(기업성장 · 정부지원사업 · 절세·재무 · 기술사업화 · AX STUDIO · WEB STUDIO).
   // 도구는 분야 줄 아래에 접혀 있다. 도구가 늘어도 이 묶음의 줄 수는 늘지 않는다(예전 컨설팅 작업실 + AX 스튜디오)
   { key: 'modules', title: '전문 모듈', accent: 'system' },
+  // D-136: 대표 "특허·벤처 · AX 스튜디오는 거의 안 쓴다" — 지우지 않고 접힌 한 묶음으로(주소 · 데이터 · 기능 그대로)
+  { key: 'rare', title: '잘 안 쓰는 기능', accent: 'system', collapsible: true, defaultCollapsed: true },
   { key: 'about', title: '이 시스템', accent: 'system', collapsible: true, defaultCollapsed: true },
   { key: 'settings', title: '설정', accent: 'system' },
 ]
@@ -160,18 +163,20 @@ function moduleRows(): ModuleDefinition[] {
   const rows: ModuleDefinition[] = []
   for (const m of visibleModules()) {
     const parent = `cat-${m.key}`
+    // D-136: 잘 안 쓰는 모듈(기술사업화 · AX 스튜디오 · 웹 스튜디오)은 접힌 '잘 안 쓰는 기능' 묶음으로
+    const group: ModuleGroupKey = m.rarelyUsed ? 'rare' : 'modules'
     const children: ModuleDefinition[] = []
     for (const f of FEATURE_CATALOG.filter((x) => x.module === m.key)) {
       if (f.source === 'tool') {
         const t = tools.find((x) => x.key === f.key)
-        if (t) children.push(toolModule(t, parent))
+        if (t) children.push({ ...toolModule(t, parent), group })
       } else {
         const n = FEATURE_NAV.find((x) => x.key === f.key)
-        if (n) children.push({ ...n, group: 'modules', parent })
+        if (n) children.push({ ...n, group, parent })
       }
     }
     if (children.length === 0) continue
-    rows.push({ key: parent, label: m.name, path: m.route, icon: m.icon, group: 'modules', accent: 'system', enabled: true, kind: 'category', moduleKey: m.key, hint: m.covers.join(' · ') }, ...children)
+    rows.push({ key: parent, label: m.name, path: m.route, icon: m.icon, group, accent: 'system', enabled: true, kind: 'category', moduleKey: m.key, hint: m.covers.join(' · ') }, ...children)
   }
   return rows
 }

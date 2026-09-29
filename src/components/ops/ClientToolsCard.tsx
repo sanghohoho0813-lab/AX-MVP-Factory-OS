@@ -25,8 +25,6 @@ import { useEntitlements } from '../../lib/entitlementsStore'
 import { missingDocsForTools, missingDocsText, missingReason, readinessOf } from '../../services/toolReadiness'
 import { Badge, Section, Surface } from '../ui/primitives'
 
-/** 휴대폰에서 처음 펼쳐 둘 모듈 수 — 나머지는 누르면 */
-const MOBILE_FIRST = 2
 
 export function ClientToolsCard({
   record,
@@ -40,7 +38,7 @@ export function ClientToolsCard({
 }) {
   const { ent } = useEntitlements()
   const tools = liveTools().filter((t) => t.path !== null)
-  /** D-125: 휴대폰에서는 앞의 몇 개만 — 나머지는 누르면(업체 개요가 휴대폰에서 너무 길었다) */
+  /** D-136: 잘 안 쓰는 모듈(기술사업화 · AX · 웹 스튜디오)은 접어 둔다 — 누르면 펼친다. 자주 쓰는 모듈은 휴대폰에서도 다 보인다 */
   const [showAll, setShowAll] = useState(false)
 
   const readiness = readinessOf(record, tools, today)
@@ -53,6 +51,7 @@ export function ClientToolsCard({
     .map((m) => ({ m, features: FEATURE_CATALOG.filter((f) => f.module === m.key && f.clientEntry) }))
     .filter((g) => g.features.length > 0)
   const count = groups.reduce((n, g) => n + g.features.length, 0)
+  const rareCount = groups.filter((g) => g.m.rarelyUsed).length
   if (count === 0) return null
 
   return (
@@ -84,14 +83,15 @@ export function ClientToolsCard({
         )}
 
         <div className="grid gap-2.5 lg:grid-cols-2">
-          {groups.map(({ m, features }, gi) => {
+          {groups.map(({ m, features }) => {
             const me = ent.module(m.key)
             return (
               <section
                 key={m.key}
                 aria-label={`${m.name} 모듈`}
                 data-client-module={m.key}
-                className={`overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white ${gi >= MOBILE_FIRST && !showAll ? 'hidden sm:block' : ''}`}
+                data-rare={m.rarelyUsed ? 'yes' : undefined}
+                className={`overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white ${m.rarelyUsed && !showAll ? 'hidden' : ''}`}
               >
                 <header className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50/70 px-3.5 py-2">
                   <m.icon aria-hidden="true" className="size-4 shrink-0 text-slate-500" />
@@ -116,14 +116,15 @@ export function ClientToolsCard({
             )
           })}
         </div>
-        {groups.length > MOBILE_FIRST && !showAll && (
+        {rareCount > 0 && (
           <button
             type="button"
             data-testid="client-tools-more"
-            onClick={() => setShowAll(true)}
-            className="tap t-sub inline-flex w-full items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white py-2 font-semibold text-slate-700 hover:bg-slate-50 sm:hidden"
+            aria-expanded={showAll}
+            onClick={() => setShowAll((v) => !v)}
+            className="tap t-sub inline-flex w-full items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white py-2 font-semibold text-slate-700 hover:bg-slate-50"
           >
-            모듈 {groups.length - MOBILE_FIRST}개 더 보기
+            {showAll ? '잘 안 쓰는 기능 접기' : `잘 안 쓰는 기능 ${rareCount}개 보기 (특허·벤처 · AX · 웹 스튜디오)`}
           </button>
         )}
 

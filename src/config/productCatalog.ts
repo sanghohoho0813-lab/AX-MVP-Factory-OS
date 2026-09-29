@@ -75,6 +75,8 @@ export interface CatalogModule {
   dependencies: string[]
   /** 메뉴 · 모듈 목록에 보이는가 */
   visible: boolean
+  /** D-136: 거의 쓰지 않는 모듈 — 목차의 접힌 '잘 안 쓰는 기능' 묶음 · 업체 상세 모듈 입구 맨 뒤 */
+  rarelyUsed?: boolean
   order: number
 }
 
@@ -169,6 +171,7 @@ export const MODULE_CATALOG: CatalogModule[] = [
     entitlementKey: 'module.tech-biz',
     dependencies: [],
     visible: true,
+    rarelyUsed: true,
     order: 4,
   },
   {
@@ -187,6 +190,7 @@ export const MODULE_CATALOG: CatalogModule[] = [
     entitlementKey: 'module.ax-studio',
     dependencies: [],
     visible: true,
+    rarelyUsed: true,
     order: 5,
   },
   {
@@ -205,6 +209,7 @@ export const MODULE_CATALOG: CatalogModule[] = [
     entitlementKey: 'module.web-studio',
     dependencies: [],
     visible: true,
+    rarelyUsed: true,
     order: 6,
   },
 ]

@@ -165,8 +165,13 @@ check('modules: AX STUDIO 는 전문 모듈의 분야 한 줄(D-127) — 안의 
 /* 메뉴 재분류 — 자주 쓰는 것이 위, 가끔 쓰는 것이 아래 (D-86) */
 {
   const order = MODULE_GROUPS.map((g) => g.key)
-  check('메뉴: 순서는 오늘 → 고객 → 영업 → 전문 모듈 → 이 시스템 → 설정 (D-127 컨설팅 작업실 + AX 스튜디오 → 전문 모듈)',
-    order.join() === 'today,clients,sales,modules,about,settings', order.join())
+  check('메뉴: 순서는 오늘 → 고객 → 영업 → 전문 모듈 → 잘 안 쓰는 기능 → 이 시스템 → 설정 (D-136)',
+    order.join() === 'today,clients,sales,modules,rare,about,settings', order.join())
+  check('메뉴: 잘 안 쓰는 기능 = 기술사업화(특허·벤처) · AX 스튜디오 · 웹 스튜디오 — 처음엔 접힘 (D-136)',
+    MODULES.filter((m) => m.group === 'rare' && m.kind === 'category').map((m) => m.key).join() === 'cat-tech-biz,cat-ax-studio,cat-web-studio' &&
+      MODULE_GROUPS.find((g) => g.key === 'rare')?.defaultCollapsed === true &&
+      MODULES.filter((m) => m.group === 'modules' && m.kind === 'category').map((m) => m.key).join() === 'cat-growth,cat-gov-support,cat-tax-finance',
+    MODULES.filter((m) => m.kind === 'category').map((m) => `${m.key}:${m.group}`).join())
   check('메뉴: 이름 — 고객 관리 · 잠재고객 상담신청 · 전문 모듈 · 특허+벤처 (D-104 · D-127)',
     MODULES.find((m) => m.key === 'client-ops')?.label === '고객 관리' && MODULES.find((m) => m.key === 'inbox')?.label === '잠재고객 상담신청' &&
     MODULE_GROUPS.find((g) => g.key === 'modules')?.title === '전문 모듈' && MODULES.find((m) => m.key === 'consulting-studio')?.label === '특허+벤처')
@@ -185,7 +190,7 @@ check('modules: AX STUDIO 는 전문 모듈의 분야 한 줄(D-127) — 안의 
   check('메뉴: 세금 계산기는 절세·재무 줄 아래', MODULES.find((m) => m.key === 'tool-tax')?.parent === 'cat-tax-finance')
   // 도구를 목록에만 더하고 사이드바에 거는 것을 빠뜨리는 일이 없어야 한다 (D-86)
   check('메뉴: 쓸 수 있는 도구는 전부 사이드바 도구함에 걸린다',
-    liveTools().every((t) => MODULES.some((m) => m.group === 'modules' && m.path === t.path)))
+    liveTools().every((t) => MODULES.some((m) => (m.group === 'modules' || m.group === 'rare') && m.path === t.path)))
   check('메뉴: 아직 없는 도구는 사이드바에 걸리지 않는다',
     plannedTools().every((t) => !MODULES.some((m) => m.key === `tool-${t.key}`)))
   check('메뉴: 없어진 그룹을 가리키는 모듈이 없다', MODULES.every((m) => MODULE_GROUPS.some((g) => g.key === m.group)))

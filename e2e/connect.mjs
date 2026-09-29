@@ -122,6 +122,9 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const orgs = () => page.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith('.organizations')); return k ? JSON.parse(localStorage.getItem(k) ?? '[]') : [] })
   await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
   await page.waitForTimeout(700)
+  // D-136: AX 는 '잘 안 쓰는 기능' — 업체 상세에서도 접혀 있다
+  check('업체 상세: 잘 안 쓰는 모듈(AX)은 접혀 있다', (await page.getByTestId('client-tools').locator('[data-rare="yes"]:visible').count()) === 0 && ((await page.getByTestId('client-tools-more').innerText()) ?? '').includes('잘 안 쓰는 기능'))
+  await page.getByTestId('client-tools-more').click()
   const axRow = page.getByTestId('client-tools').locator('a[data-feature="clients"]')
   check('업체 상세: 모듈 입구에 AX 프로젝트 줄', (await axRow.count()) === 1 && ((await axRow.innerText()) ?? '').includes('AX 프로젝트'))
   check('업체 상세: 이어진 AX 고객사가 없으면 AX 프로젝트 카드는 없다', (await page.getByTestId('ax-projects').count()) === 0)

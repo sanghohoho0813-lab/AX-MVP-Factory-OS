@@ -254,8 +254,8 @@ check('qa: judge 합계는 10축 다 있어야', judgeTotal({ A: 9 }) === null &
   check('model: 기본 제출서류 8종', Object.keys(raw.venture.documents).length === 8)
 }
 check('registry: 특허+벤처 화면이 /studio 로 켜져 있다', MODULES.some((m) => m.path === '/studio' && m.enabled))
-// D-127: 특허+벤처는 전문 모듈 › 기술사업화 분야 줄 아래
-check('registry: 특허+벤처가 전문 모듈 › 기술사업화 아래', MODULES.find((m) => m.path === '/studio')?.group === 'modules' && MODULES.find((m) => m.path === '/studio')?.label === '특허+벤처' && MODULES.find((m) => m.path === '/studio')?.parent === 'cat-tech-biz' && MODULE_GROUPS.find((g) => g.key === 'modules')?.title === '전문 모듈')
+// D-127: 특허+벤처는 기술사업화 분야 줄 아래 — D-136: 그 분야는 '잘 안 쓰는 기능' 묶음으로
+check('registry: 특허+벤처가 잘 안 쓰는 기능 › 기술사업화 아래', MODULES.find((m) => m.path === '/studio')?.group === 'rare' && MODULES.find((m) => m.path === '/studio')?.label === '특허+벤처' && MODULES.find((m) => m.path === '/studio')?.parent === 'cat-tech-biz' && MODULE_GROUPS.find((g) => g.key === 'modules')?.title === '전문 모듈')
 check('registry: /studio/abc → 특허+벤처', moduleForPath('/studio/abc')?.path === '/studio')
 
 console.log(`\n컨설팅 엔진: ${passed} passed, ${failed} failed`)
