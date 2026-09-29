@@ -8,8 +8,11 @@ import type { CheckAnswers, Client, FeasibilityInput, ResearcherCandidate } from
 import { assessCeo, assessFeasibility, requiredForLab } from '../lib/feasibility'
 import { computeLevel, evaluateRisk } from '../lib/riskEngine'
 import { getTaxCreditEstimate } from '../lib/taxCredit'
-import { changeDeadlineOf, ddayOf, nextCheckDate, ymdLocal } from '../lib/deadlines'
-import { DOC_MASTER, buildTempPackage, docProgressOf, missingDocs, stageOf, type SetupDoc } from '../lib/documents'
+import { addMonthsClamped, changeDeadlineOf, daysBetween, ddayOf, isCheckDue, nextCheckDate, parseYmd, ymdLocal, ymLocal } from '../lib/deadlines'
+import { businessAgeLabel, withinStartupYears } from '../lib/startup'
+import { monthsInBusiness } from '../../shared/clientPrefill'
+import { addChangeRecord, currentMonth as storageCurrentMonth, nextCheckDate as storageNextCheckDate } from '../orig/lib/storage'
+import { DOC_MASTER, buildTempPackage, docProgressOf, fewerThanTen, missingDocs, stageOf, type SetupDoc } from '../lib/documents'
 import { RESOURCE_TEMPLATES, fillTemplate } from '../lib/templates'
 import { INSPECTION_ITEMS, INSPECTION_POINTS } from '../lib/inspection'
 import { checkRelevance, currentMonth, enhanceForAudit, generateNoteDraft, NOTE_STATUSES } from '../lib/noteDraft'
@@ -19,7 +22,7 @@ import { monthlyReportText } from '../lib/monthlyReport'
 import { surveyRequestText } from '../lib/surveyText'
 import { BENEFIT_OPTIONS, composeBenefitText } from '../lib/report'
 import { DEFAULT_ANSWERS, REASONS, mapChangeStatus } from '../lib/changes'
-import { newCandidate } from '../lib/assessmentOptions'
+import { isExcludedIndustryText, newCandidate } from '../lib/assessmentOptions'
 
 let passed = 0
 let failed = 0
@@ -315,6 +318,134 @@ check('혜택 문장 조합은 표 순서 유지', composed.split('\n').length =
   check('활동조사 요청: 연도와 세 가지 요청', surveyRequestText('한솔테크(주)', 2026).includes('2026년') && surveyRequestText('한솔테크(주)', 2026).includes('연구전담요원 명단'))
 }
 
+
+/* ---- D-136: 연구소 판정 바로잡기 (창업 3년 · 규모 · 발생일 · 현지 날짜 · 말일 · 확인 필요 · 세액공제) ---- */
+{
+  const day = (y: number, m: number, d: number) => new Date(y, m - 1, d) // 현지 날짜 — TZ 와 관계없이 같은 날
+
+  // 1. 창업 3년 이내 = 설립일 + 3년(그날 포함)까지
+  check('창업: 딱 36개월(3년 되는 날) → 3년 이내', withinStartupYears('2023-09-29', day(2026, 9, 29)) === true)
+  check('창업: 36개월 + 1일 → 3년 지남', withinStartupYears('2023-09-29', day(2026, 9, 30)) === false)
+  check('창업: 36개월 + 1일은 꽉 찬 개월로는 여전히 36 (개월만 보면 틀린다)', monthsInBusiness('2023-09-29', day(2026, 9, 30)) === 36)
+  check('창업: 3년 10개월 → 3년 지남 (예전에는 3년 × 12 = 36 으로 이내)', withinStartupYears('2022-10-30', day(2026, 9, 29)) === false && monthsInBusiness('2022-10-30', day(2026, 9, 29)) === 46)
+  check('창업: 3년 11개월(47개월) → 3년 지남', withinStartupYears('2022-10-29', day(2026, 9, 29)) === false && monthsInBusiness('2022-10-29', day(2026, 9, 29)) === 47)
+  check('창업: 2년 11개월 → 3년 이내', withinStartupYears('2023-10-30', day(2026, 9, 29)) === true)
+  check('창업: 2월 29일 설립 → 3년 뒤 2월 28일까지', withinStartupYears('2024-02-29', day(2027, 2, 28)) === true && withinStartupYears('2024-02-29', day(2027, 3, 1)) === false)
+  check('창업: 설립일 없음 · 틀린 날짜 · 미래 → 모름(null)', withinStartupYears('', day(2026, 9, 29)) === null && withinStartupYears('2026-02-30', day(2026, 9, 29)) === null && withinStartupYears('2026-10-01', day(2026, 9, 29)) === null)
+  check('창업: 업력 글', businessAgeLabel('2022-10-29', day(2026, 9, 29)) === '3년 11개월' && businessAgeLabel('2023-09-29', day(2026, 9, 29)) === '3년' && businessAgeLabel('', day(2026, 9, 29)) === '')
+
+  const small = { ...REQ_BASE, companySize: '소기업' as const }
+  check('인원: 설립일로 3년 이내 → 2명', requiredForLab({ ...small, businessMonths: 36, withinStartup3y: true }) === 2)
+  check('인원: 36개월 + 며칠(설립일로 지남) → 3명', requiredForLab({ ...small, businessMonths: 36, withinStartup3y: false }) === 3)
+  check('인원: 설립일 모름 → 특례 없이 3명', requiredForLab({ ...small, businessMonths: 0, withinStartup3y: null }) === 3)
+  check('인원: 규모 안 고름 → 소기업 특례 없이 3명', requiredForLab({ ...small, businessMonths: 12, withinStartup3y: true, sizeConfirmed: false }) === 3)
+  check('인원: 예전 호출(개월만) 경계 유지 — 36 → 2 · 37 → 3', requiredForLab({ ...small, businessMonths: 36 }) === 2 && requiredForLab({ ...small, businessMonths: 37 }) === 3)
+
+  // 대표자 — 모르면 '가능성 있음' 을 주지 않는다
+  const ceoOver = assessCeo({ companySize: '소기업', industryField: '과학기술 분야', businessMonths: 36, withinStartup3y: false, candidates: [ceoCand] })
+  check('대표자: 36개월 + 며칠 → 인정 어려움', ceoOver.verdict === '인정 어려움', ceoOver.verdict)
+  const ceoUnknown = assessCeo({ companySize: '소기업', industryField: '과학기술 분야', businessMonths: 999, withinStartup3y: null, candidates: [ceoCand] })
+  check('대표자: 설립일 모름 → 추가 확인 필요 + 설립일 안내', ceoUnknown.verdict === '추가 확인 필요' && ceoUnknown.cautions.some((c) => c.includes('설립일을 적어야')), JSON.stringify(ceoUnknown))
+  const ceoNoSize = assessCeo({ companySize: '소기업', industryField: '과학기술 분야', businessMonths: 12, withinStartup3y: true, sizeConfirmed: false, candidates: [ceoCand] })
+  check('대표자: 규모 안 고름 → 추가 확인 필요 (가능성 있음 아님)', ceoNoSize.verdict === '추가 확인 필요', ceoNoSize.verdict)
+  const ceoWithin = assessCeo({ companySize: '소기업', industryField: '과학기술 분야', businessMonths: 36, withinStartup3y: true, candidates: [ceoCand] })
+  check('대표자: 설립일로 3년 이내 소기업 → 가능성 있음 + ★ 세부 요건', ceoWithin.verdict === '가능성 있음' && ceoWithin.cautions.some((c) => c.includes('★')))
+
+  // 2. 규모를 안 골랐으면 '가능' 을 내지 않는다
+  const noSize = assessFeasibility({ ...FULL, sizeConfirmed: false })
+  check('규모 안 고름: 자격 3명이어도 추가 확인 필요', noSize.verdict === '추가 확인 필요', noSize.verdict)
+  check('규모 안 고름: 보완 항목에 ★ 규모', noSize.improvements.some((t) => t.includes('★ 기업 규모')), noSize.improvements.join('|'))
+  const relaxedCand = cand({ education: '전문학사(3년제)', major: '공학계열', researchYears: 2 })
+  const relaxedNoSize = assessFeasibility({ ...FULL, sizeConfirmed: false, candidates: [relaxedCand] })
+  check('규모 안 고름: 중소기업 완화 기준은 인정 가능이 아니라 확인 필요', relaxedNoSize.candidates[0].verdict === '추가 확인 필요' && relaxedNoSize.eligibleCount === 0, relaxedNoSize.candidates[0].verdict)
+  const relaxedSize = assessFeasibility({ ...FULL, candidates: [relaxedCand] })
+  check('규모 고름(소기업): 완화 기준 인정 가능', relaxedSize.candidates[0].verdict === '인정 가능')
+  const partNoSize = assessFeasibility({ ...FULL, sizeConfirmed: false, desiredType: '연구개발전담부서', independentSpace: false, fixedWallsAndDoor: false, spaceUnder50: true })
+  check('규모 안 고름: 50㎡ 칸막이 중소기업 예외를 쓰지 않는다 → 보완 필요', partNoSize.facility.verdict === '보완 필요', partNoSize.facility.verdict)
+  const partSize = assessFeasibility({ ...FULL, desiredType: '연구개발전담부서', independentSpace: false, fixedWallsAndDoor: false, spaceUnder50: true })
+  check('규모 고름: 50㎡ 예외는 확인 필요 + ★', partSize.facility.verdict === '추가 확인 필요' && partSize.facility.notes.some((n) => n.includes('★')), partSize.facility.verdict)
+  const partNot50 = assessFeasibility({ ...FULL, desiredType: '연구개발전담부서', independentSpace: false, fixedWallsAndDoor: false, spaceUnder50: false })
+  check('물적: 50㎡ 이하가 아니면(기본값) 칸막이 예외 없음 → 보완 필요', partNot50.facility.verdict === '보완 필요', partNot50.facility.verdict)
+  const unknownStart = assessFeasibility({ ...FULL, businessMonths: 999, withinStartup3y: null, candidates: [cand({ name: '가' }), cand({ name: '나' })] })
+  check('설립일 모름: 소기업 2명은 연구소 가능이 아니다(3명 기준)', unknownStart.requiredForLab === 3 && unknownStart.verdict !== '기업부설연구소 가능', unknownStart.verdict)
+  check('설립일 모름: 보완 항목에 설립일 안내', unknownStart.improvements.some((t) => t.includes('설립일을 적어야')))
+  const knownStart = assessFeasibility({ ...FULL, businessMonths: 20, withinStartup3y: true, candidates: [cand({ name: '가' }), cand({ name: '나' })] })
+  check('설립일로 3년 이내: 소기업 2명 → 연구소 가능', knownStart.requiredForLab === 2 && knownStart.verdict === '기업부설연구소 가능', knownStart.verdict)
+
+  // 6. 전담부서 먼저 — 확인할 것이 남았으면 '우선 추천' 이 아니다
+  const deptCheckElig = assessFeasibility({ ...FULL, isSubUnit: false, candidates: [cand({ name: '가' })] })
+  check('전담부서 먼저: 신고대상 확인 필요 → 추가 확인 필요', deptCheckElig.verdict === '추가 확인 필요' && deptCheckElig.recommendedType === '전담부서 선설립 후 연구소 전환', deptCheckElig.verdict)
+  const deptCheckFac = assessFeasibility({ ...FULL, fixedWallsAndDoor: false, movableWallPossible: true, candidates: [cand({ name: '가' })] })
+  check('전담부서 먼저: 물적요건 확인 필요 → 추가 확인 필요', deptCheckFac.verdict === '추가 확인 필요', deptCheckFac.verdict)
+  check('전담부서 먼저: 확인할 것 없으면 여전히 우선 추천', oneCand.verdict === '연구개발전담부서 우선 추천')
+
+  // ★ 표시 — 규칙은 그대로, 불확실하다고 적는다
+  const bigCert = assessFeasibility({ ...FULL, companySize: '대기업', candidates: [cand({ education: '고졸 이하', major: '비이공계', cert: '기사 이상' })] })
+  check('★ 기사 이상 · 대기업: 인정 가능은 그대로 두되 ★ 확인', bigCert.candidates[0].verdict === '인정 가능' && bigCert.candidates[0].notes[0].includes('★'))
+  const tech = assessFeasibility({ ...FULL, candidates: [cand({ education: '고졸 이하', major: '비이공계', cert: '기능사', researchYears: 4 })] })
+  check('★ 기능사 + 4년: ★ 확인', tech.candidates[0].notes[0].includes('★ 기능사'))
+  const mid = assessFeasibility({ ...FULL, companySize: '중기업', becameMediumWithinYear: true })
+  check('★ 중기업 전환 1년 이내: 보완 항목에 ★', mid.improvements.some((t) => t.includes('★ 소기업→중기업')))
+
+  // 3. 변경신고 기한 = 발생일 + 30일, D-day 는 그 기한으로
+  check('변경신고: 지난 발생일 → 기한도 그만큼 앞', changeDeadlineOf('2026-08-20') === '2026-09-19')
+  const pastDday = ddayOf(changeDeadlineOf('2026-08-20'), day(2026, 9, 29))
+  check('변경신고: 40일 전 발생 → 기한초과 (예전엔 오늘 기준이라 D-30)', pastDday.tone === 'over' && pastDday.daysLeft === -10, JSON.stringify(pastDday))
+  const soonDday = ddayOf(changeDeadlineOf('2026-09-01'), day(2026, 9, 29))
+  check('변경신고: 28일 전 발생 → D-2', soonDday.label === 'D-2' && soonDday.tone === 'danger', JSON.stringify(soonDday))
+  check('변경신고: 발생일을 못 읽으면 기한 빈 글자 · D-day 는 넉넉하다고 안 함', changeDeadlineOf('2026-02-30') === '' && ddayOf('').tone === 'over')
+  check('변경신고: 월말 넘김 1/31 + 30일 = 3/2', changeDeadlineOf('2026-01-31') === '2026-03-02')
+  const rec = addChangeRecord({ clientId: 'x-d136', reasons: ['연구전담요원 퇴사'], memo: '', occurredDate: '2026-08-20' })
+  check('변경신고: 저장도 발생일 그대로 · 기한 = 발생일 + 30일', rec.occurredDate === '2026-08-20' && rec.deadline === '2026-09-19', JSON.stringify(rec))
+  const recToday = addChangeRecord({ clientId: 'x-d136', reasons: ['연구기자재 변경'], memo: '' })
+  check('변경신고: 발생일을 안 주면 오늘(현지 날짜)', recToday.occurredDate === ymdLocal(new Date()) && recToday.deadline === changeDeadlineOf(recToday.occurredDate))
+  const recBad = addChangeRecord({ clientId: 'x-d136', reasons: ['연구기자재 변경'], memo: '', occurredDate: '2026-13-01' })
+  check('변경신고: 틀린 발생일은 오늘로', recBad.occurredDate === ymdLocal(new Date()))
+
+  // 4. 현지 날짜 — 자정 30분도 그날 (UTC 로 적으면 한국에서는 어제)
+  check('날짜: 1월 1일 0시 30분 → 2026-01-01', ymdLocal(new Date(2026, 0, 1, 0, 30)) === '2026-01-01' && ymLocal(new Date(2026, 0, 1, 0, 30)) === '2026-01')
+  check('날짜: 12월 31일 23시 59분 → 그날', ymdLocal(new Date(2026, 11, 31, 23, 59)) === '2026-12-31')
+  check('날짜: 이번 달 = 현지 달', storageCurrentMonth() === ymLocal(new Date()))
+  check('날짜: 없는 날짜는 못 읽음', parseYmd('2026-02-29') === null && parseYmd('2028-02-29') !== null && parseYmd('26-1-1') === null)
+  check('날짜: 날 수는 날짜끼리', daysBetween(new Date(2026, 8, 29, 23, 59), new Date(2026, 8, 30, 0, 1)) === 1)
+
+  // 5. 다음 확인일 — 그 달 말일로 (1/31 + 1개월 = 2월 말)
+  check('확인 주기: 1/31 + 1개월 → 2월 28일', nextCheckDate({ clientId: 'x', cycleMonths: 1, lastCheck: '2026-01-31' }) === '2026-02-28')
+  check('확인 주기: 윤년 1/31 + 1개월 → 2월 29일', nextCheckDate({ clientId: 'x', cycleMonths: 1, lastCheck: '2028-01-31' }) === '2028-02-29')
+  check('확인 주기: 11/30 + 3개월 → 다음 해 2월 말', nextCheckDate({ clientId: 'x', cycleMonths: 3, lastCheck: '2025-11-30' }) === '2026-02-28')
+  check('확인 주기: 8/31 + 1개월 → 9월 30일', nextCheckDate({ clientId: 'x', cycleMonths: 1, lastCheck: '2026-08-31' }) === '2026-09-30')
+  check('확인 주기: 원본 저장소도 같은 답', storageNextCheckDate({ clientId: 'x', cycleMonths: 1, lastCheck: '2026-01-31' }) === '2026-02-28' && storageNextCheckDate({ clientId: 'x', cycleMonths: 12, lastCheck: '2027-02-28' }) === '2028-02-29')
+  check('확인 주기: addMonthsClamped 1/31 + 1 = 2/28', ymdLocal(addMonthsClamped(day(2026, 1, 31), 1)) === '2026-02-28')
+  check('확인 주기: 도래 — 2월 말 예정이면 2월에 도래 · 1월엔 아직', isCheckDue({ clientId: 'x', cycleMonths: 1, lastCheck: '2026-01-31' }, day(2026, 2, 1)) && !isCheckDue({ clientId: 'x', cycleMonths: 1, lastCheck: '2026-01-31' }, day(2026, 1, 31)))
+
+  // 8. 세액공제 — 음수 · 숫자 아님 · 공제율 범위 · 규모 · 한도 · 증가분
+  const tNeg = getTaxCreditEstimate(client({ researchersPayrollTotal: -50_000_000, rndMaterialCost: 20_000_000, taxCreditCategory: '일반 R&D' }))
+  check('세액: 음수는 0 으로 + 알림', tNeg.payroll === 0 && tNeg.totalRnd === 20_000_000 && tNeg.annual === 5_000_000 && tNeg.warnings.length === 1, JSON.stringify(tNeg))
+  const tNaN = getTaxCreditEstimate(client({ researchersPayrollTotal: Number.NaN, rndMaterialCost: 10_000_000 }))
+  check('세액: 숫자 아님은 0', tNaN.payroll === 0 && tNaN.totalRnd === 10_000_000 && Number.isFinite(tNaN.annual))
+  const tHigh = getTaxCreditEstimate(client({ currentYearRndCost: 100_000_000, estimatedTaxCreditRate: 150 }))
+  check('세액: 공제율 150% → 100% 로 자르고 알림', tHigh.rate === 100 && tHigh.annual === 100_000_000 && tHigh.warnings.some((w) => w.includes('100%')))
+  const tNegRate = getTaxCreditEstimate(client({ currentYearRndCost: 100_000_000, estimatedTaxCreditRate: -5, taxCreditCategory: '일반 R&D' }))
+  check('세액: 음수 공제율은 안 쓰고 기본값 + 알림', tNegRate.rate === 25 && tNegRate.warnings.length === 1)
+  const tMid = getTaxCreditEstimate(client({ currentYearRndCost: 100_000_000, taxCreditCategory: '일반 R&D', taxCompanySize: '중견기업' }))
+  check('세액: 중견기업은 중소기업 공제율로 계산하지 않는다', tMid.available === false && tMid.annual === 0 && tMid.warnings.some((w) => w.includes('중견기업')), JSON.stringify(tMid))
+  const tMidRate = getTaxCreditEstimate(client({ currentYearRndCost: 100_000_000, taxCompanySize: '대기업', estimatedTaxCreditRate: 2 }))
+  check('세액: 대기업도 공제율을 직접 넣으면 계산', tMidRate.available && tMidRate.rate === 2 && tMidRate.annual === 2_000_000)
+  check('세액: 규모 모름 → 중소기업 가정 ★', t25.sizeAssumed && t25.assumptions.some((a) => a.includes('★ 중소기업 기준')))
+  const tSme = getTaxCreditEstimate(client({ currentYearRndCost: 100_000_000, taxCompanySize: '중소기업' }))
+  check('세액: 중소기업 고르면 가정 ★ 없음', !tSme.sizeAssumed && !tSme.assumptions.some((a) => a.includes('★ 중소기업 기준')) && tSme.annual === 25_000_000)
+  check('세액: 낼 세금 · 최저한세 한도 안내', t25.assumptions.some((a) => a.includes('산출세액') && a.includes('최저한세')))
+  const tPrior = getTaxCreditEstimate(client({ currentYearRndCost: 100_000_000, priorYearRndCost: 60_000_000 }))
+  check('세액: 전년 연구개발비가 있으면 증가분 비교 ★', tPrior.assumptions.some((a) => a.includes('★') && a.includes('증가분') && a.includes('60,000,000원')))
+  check('세액: 가정 문구는 여전히 단정하지 않는다', [tNeg, tHigh, tMid, tPrior].every((t) => t.assumptions.every((a) => !a.includes('됩니다'))))
+
+  // 9. '5명 이상' — 인원을 모르면 10인 이상 서류를 지우지 않는다
+  check('서류: 인원 모름 → 안전관리비 준비중(해당 없음 아님)', buildTempPackage({ id: 'u', name: 'U', labType: '기업부설연구소' }).docs.find((d) => d.key === 'safety')?.status === '준비중')
+  check('서류: fewerThanTen 은 확실할 때만', fewerThanTen(3) && !fewerThanTen(undefined) && !fewerThanTen(10) && !fewerThanTen(Number.NaN))
+
+  // 10. 업체 기록에서 채운 업종도 제외 업종 검사
+  check('업종: 제외 업종 글 알아봄', isExcludedIndustryText('유흥주점업') && isExcludedIndustryText('가상자산 거래') && !isExcludedIndustryText('소프트웨어 개발') && !isExcludedIndustryText(''))
+}
 
 console.log(`\nlabcare: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

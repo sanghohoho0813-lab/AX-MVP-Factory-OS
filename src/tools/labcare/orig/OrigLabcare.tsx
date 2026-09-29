@@ -13,6 +13,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { listRows } from '../../../services/moduleData'
 import { useToolClient } from '../../shared/toolClientContext'
 import { hydrateLabStore } from './store'
+import { ymdLocal } from '../lib/deadlines'
 import { getClients } from './lib/storage'
 import StatusBadge from './components/StatusBadge'
 import { getLatestCheck } from './lib/storage'
@@ -68,7 +69,7 @@ async function legacyFromD91(workspaceId: string | null): Promise<Record<string,
     const cur = surveyByClient.get(r.clientId) ?? { clientId: r.clientId, years: {}, logs: [] }
     const st = String(d.status ?? '')
     cur.years[String(d.year ?? '')] = /완료|제출함/.test(st) ? '제출 완료' : /요청/.test(st) ? '자료 요청 중' : '제출 전'
-    if (typeof d.memo === 'string' && d.memo) cur.logs.push({ at: String(d.submittedAt || now).slice(0, 10), text: d.memo })
+    if (typeof d.memo === 'string' && d.memo) cur.logs.push({ at: String(d.submittedAt || ymdLocal(new Date())).slice(0, 10), text: d.memo })
     surveyByClient.set(r.clientId, cur)
   }
   return {

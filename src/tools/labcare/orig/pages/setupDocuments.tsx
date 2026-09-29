@@ -179,8 +179,8 @@ export default function SetupDocumentsPage() {
     const names = missing.map((d) => d.label).join(", ");
     setRequestMsg(
       missing.length
-        ? `대표님, ${pkg!.labType} 설립신고 준비를 위해 현재 누락된 자료를 요청드립니다.\n\n현재 필요한 자료는 ${names}입니다.\n\n준비되는 대로 보내주시면 바로 신고 준비를 이어가겠습니다. 감사합니다.`
-        : `대표님, ${pkg!.labType} 설립신고 서류가 모두 준비되었습니다. 최종 검토 후 신고 일정을 안내드리겠습니다.`,
+        ? `대표님, ${temp?.labTypeUnsure ? "연구소/전담부서" : pkg!.labType} 설립신고 준비를 위해 현재 누락된 자료를 요청드립니다.\n\n현재 필요한 자료는 ${names}입니다.\n\n준비되는 대로 보내주시면 바로 신고 준비를 이어가겠습니다. 감사합니다.`
+        : `대표님, ${temp?.labTypeUnsure ? "연구소/전담부서" : pkg!.labType} 설립신고 서류가 모두 준비되었습니다. 최종 검토 후 신고 일정을 안내드리겠습니다.`,
     );
     setShowFinalCheck(false);
     setCopied(false);
@@ -330,7 +330,7 @@ export default function SetupDocumentsPage() {
             </div>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1.5 text-base sm:grid-cols-4">
-            <Info label="연구소 유형" value={pkg.labType} />
+            <Info label="연구소 유형" value={temp?.labTypeUnsure ? "아직 모름 ★ 유형을 정하세요" : pkg.labType} />
             <Info label="연구과제" value={temp?.projectName ?? "—"} wide />
             <Info label="상태" value="고객사 등록 전 임시 체크" />
           </div>
@@ -345,7 +345,7 @@ export default function SetupDocumentsPage() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h2 className="text-lg font-bold text-slate-900">설립서류 체크리스트</h2>
-                <p className="text-sm text-slate-500">{pkg.labType} · {pkg.stage}</p>
+                <p className="text-sm text-slate-500">{temp?.labTypeUnsure ? "유형 아직 모름 ★" : pkg.labType} · {pkg.stage}</p>
               </div>
               <div className="text-right">
                 <p className="text-4xl font-bold text-navy-700">{progress}%</p>

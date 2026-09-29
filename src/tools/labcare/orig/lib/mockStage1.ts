@@ -4,6 +4,8 @@
 
 import type { LabType } from "../../types";
 import { currentMonth, getChangeRecords, getClients, getNoteTargets, getReminders, isCheckDue, isReportSent, type ChangeRecStatus } from "./storage";
+import { ddayOf as ddayOfLib } from "../../lib/deadlines";
+import { fewerThanTen } from "../../lib/documents";
 
 /* ───────────────── 설립 진행(설립서류 관리) ───────────────── */
 
@@ -120,8 +122,8 @@ export const DOC_MASTER: SetupDocMaster[] = [
   { key: "appoint", label: "인사발령서 또는 업무분장표", group: "optional", cls: "요청시", collapsed: true, tip: "연구전담요원의 연구개발 전담 배치를 증빙. 현장조사에서 명함·업무내용과 일치해야 합니다." },
   { key: "namecard", label: "명함 또는 조직 내 직무표기 자료", group: "optional", cls: "요청시", collapsed: true, tip: "연구원의 직무가 연구업무로 표기되는지 확인하는 자료입니다." },
   { key: "cert", label: "연구전담요원 자격증 사본", group: "optional", cls: "해당시", collapsed: true, tip: "기사 등 국가기술자격으로 자격을 충족하는 경우 제출합니다." },
-  { key: "safety", label: "연구실 안전 및 유지관리비 내역서", group: "optional", cls: "해당시", collapsed: true, tip: "연구전담요원+연구보조원 총 10인 이상인 경우 필요합니다.", na: (c) => (c.researcherCount ?? 0) < 10 },
-  { key: "safetyInsurance", label: "보험가입보고서", group: "optional", cls: "해당시", collapsed: true, tip: "연구전담요원+연구보조원 총 10인 이상인 경우 필요합니다.", na: (c) => (c.researcherCount ?? 0) < 10 },
+  { key: "safety", label: "연구실 안전 및 유지관리비 내역서", group: "optional", cls: "해당시", collapsed: true, tip: "연구전담요원+연구보조원 총 10인 이상인 경우 필요합니다.", na: (c) => fewerThanTen(c.researcherCount) },
+  { key: "safetyInsurance", label: "보험가입보고서", group: "optional", cls: "해당시", collapsed: true, tip: "연구전담요원+연구보조원 총 10인 이상인 경우 필요합니다.", na: (c) => fewerThanTen(c.researcherCount) },
   { key: "midsize", label: "중견기업확인서", group: "optional", cls: "해당시", collapsed: true, tip: "중견기업일 때만 필요합니다. (전담요원 7명 기준)" },
   { key: "founder", label: "연구원·교원창업 관련 서류", group: "optional", cls: "해당시", collapsed: true, tip: "연구원·교원이 휴직·겸직·퇴직 후 3년 이내 창업한 경우 경력(퇴직)증명서·겸직허가서 등." },
   { key: "building", label: "건축물대장 / 임대차계약서 / 사용허가서", group: "optional", cls: "요청시", collapsed: true, tip: "무허가·가건물·주거전용 불인정. 확인 요청 시 적법 건물·점유권원 자료를 제출합니다." },
@@ -252,15 +254,8 @@ export interface DdayInfo {
 
 /** 변경신고 D-day 계산 (사유 발생일 + 30일 기준) */
 export function ddayOf(deadline: string): DdayInfo {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const dl = new Date(deadline + "T00:00:00");
-  const daysLeft = Math.round((dl.getTime() - today.getTime()) / 86400000);
-  if (daysLeft < 0) return { label: "기한초과", daysLeft, tone: "over" };
-  if (daysLeft === 0) return { label: "D-day", daysLeft, tone: "danger" };
-  if (daysLeft <= 7) return { label: `D-${daysLeft}`, daysLeft, tone: "danger" };
-  if (daysLeft <= 14) return { label: `D-${daysLeft}`, daysLeft, tone: "warn" };
-  return { label: `D-${daysLeft}`, daysLeft, tone: "ok" };
+  // D-136: lib/deadlines 한 곳에서 센다 (현지 날짜 · 못 읽는 기한은 넉넉하다고 말하지 않음)
+  return ddayOfLib(deadline);
 }
 
 /** 변경기록 상태 → 화면 표시 상태 매핑 */

@@ -5,6 +5,7 @@
  */
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { downloadSvgAsJpeg, printSvg } from "../lib/download";
+import { ymdLocal } from "../lib/deadlines";
 
 /* ═══════════════════ 상수/타입 ═══════════════════ */
 
@@ -552,7 +553,7 @@ export function FloorPlanner({ company }: { company: string }) {
   const onItemDbl = useCallback((id: string) => beginEdit(id), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const countOf = (t: ItemType) => doc.items.filter((i) => i.type === t).length;
-  const today = new Date().toISOString().slice(0, 10).replace(/-/g, ".");
+  const today = ymdLocal(new Date()).replace(/-/g, ".");
 
   const editingItem = doc.items.find((i) => i.id === editingId);
   const selOffice = sel?.k === "office";

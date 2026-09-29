@@ -249,7 +249,7 @@ export default function ActivitySurveyPage() {
       {/* 안내 */}
       <section className="mt-5 rounded-2xl border border-slate-100 bg-slate-50 p-5">
         <p className="text-sm leading-relaxed text-slate-500">
-          ⚠ 연구개발활동조사표는 매년 4월 30일까지 제출 의무이며, 미제출 시 인정취소 사유입니다 (법 제9조).
+          ⚠ 연구개발활동조사표는 매년 4월 30일까지 제출 의무이며, 미제출 시 인정취소 사유입니다 (법 제9조). ★ 마감일은 해마다 공고로 확인하세요.
           실제 제출·작성은 <a href="https://www.rnd.or.kr/user/main.do" target="_blank" rel="noopener noreferrer" className="font-bold text-navy-700 underline">KOITA 신고관리시스템 ↗</a>에서 진행하세요.
         </p>
       </section>

@@ -26,6 +26,37 @@ import type {
  *  - 대표자·겸직 등 경계 사례는 보수적으로 판정한다.
  */
 
+/* ───────────────── 창업 3년 이내 · 기업 규모 확인 (D-136) ───────────────── */
+
+export type StartupStatus = "within" | "over" | "unknown";
+
+/**
+ * 창업 3년 이내인가.
+ *  - withinStartup3y 가 있으면 그것(설립일 달력으로 센 값). null = 설립일 모름.
+ *  - 없으면(예전 호출) businessMonths ≤ 36 — 개월 수만 아는 경우의 예전 경계를 그대로 둔다.
+ */
+export function startupStatus(input: Pick<FeasibilityInput, "businessMonths" | "withinStartup3y">): StartupStatus {
+  if (input.withinStartup3y === true) return "within";
+  if (input.withinStartup3y === false) return "over";
+  if (input.withinStartup3y === null) return "unknown";
+  return input.businessMonths <= 36 ? "within" : "over";
+}
+
+type SizeStartupInput = Pick<FeasibilityInput, "companySize" | "businessMonths" | "withinStartup3y" | "sizeConfirmed">;
+
+/** 창업 3년 이내 소기업 특례를 적용해도 되는가 — 규모를 골랐고 · 소기업이고 · 3년 이내로 확인될 때만 */
+export function isEarlySmall(input: SizeStartupInput): boolean {
+  return input.sizeConfirmed !== false && input.companySize === "소기업" && startupStatus(input) === "within";
+}
+
+/** 대표자 예외를 '모른다' 고 해야 하는가 — 규모나 설립일을 몰라서 예외 여부를 가를 수 없을 때 */
+function ceoExceptionUnknown(input: SizeStartupInput): boolean {
+  const st = startupStatus(input);
+  if (st === "over") return false;
+  if (input.sizeConfirmed === false) return true;
+  return input.companySize === "소기업" && st === "unknown";
+}
+
 /* ───────────────── 연구전담요원 수 기준 (시행령 제6조 제1항) ───────────────── */
 
 /**
@@ -44,13 +75,16 @@ export function requiredForLab(
     | "businessMonths"
     | "becameMediumWithinYear"
     | "isOverseasLab"
+    | "withinStartup3y"
+    | "sizeConfirmed"
   >,
 ): number {
   if (input.isOverseasLab) return 5;
   if (input.isVenture || input.isResearcherFounded) return 2;
   switch (input.companySize) {
     case "소기업":
-      return input.businessMonths <= 36 ? 2 : 3;
+      // D-136: 설립일로 3년 이내가 확인될 때만 2명. 모르면 3명(엄격).
+      return isEarlySmall(input) ? 2 : 3;
     case "중기업":
       return input.becameMediumWithinYear ? 3 : 5;
     case "중견기업":
@@ -64,11 +98,25 @@ export function requiredForLab(
 
 const VERDICT_BY_RANK: CandidateVerdict[] = ["인정 가능", "추가 확인 필요", "인정 어려움"];
 
-/** 학력·전공·자격·경력 기반 1차 자격 게이트 (rank 0/1/2 + 사유) */
+/**
+ * 학력·전공·자격·경력 기반 1차 자격 게이트 (rank 0/1/2 + 사유).
+ * D-136: 기업 규모를 고르지 않았으면 중소기업 완화 기준으로 '인정 가능' 을 주지 않는다(추가 확인으로).
+ */
 function qualificationGate(
   c: ResearcherCandidate,
-  input: Pick<FeasibilityInput, "companySize" | "industryField">,
+  input: Pick<FeasibilityInput, "companySize" | "industryField" | "sizeConfirmed">,
 ): { rank: number; note: string } {
+  const r = qualificationGateRaw(c, input);
+  if (r.relaxed && r.rank === 0 && input.sizeConfirmed === false) {
+    return { rank: 1, note: `${r.note} — ★ 기업 규모를 골라야 중소기업 완화 기준을 쓸 수 있습니다` };
+  }
+  return { rank: r.rank, note: r.note };
+}
+
+function qualificationGateRaw(
+  c: ResearcherCandidate,
+  input: Pick<FeasibilityInput, "companySize" | "industryField">,
+): { rank: number; note: string; relaxed?: boolean } {
   const isSME = input.companySize === "소기업" || input.companySize === "중기업";
   const natural = c.major !== "비이공계";
   const bachelorPlus = c.education === "박사" || c.education === "석사" || c.education === "학사";
@@ -80,35 +128,43 @@ function qualificationGate(
     return { rank: 0, note: "자연계 분야 학사 이상 — 자격 기준에 해당합니다" };
   }
   if (c.cert === "기사 이상") {
-    return { rank: 0, note: "기사 이상 국가기술자격 보유 — 자격 기준에 해당합니다" };
+    return {
+      rank: 0,
+      note: isSME
+        ? "기사 이상 국가기술자격 보유 — 자격 기준에 해당합니다"
+        : "기사 이상 국가기술자격 보유 — 자격 기준에 해당합니다 (★ 중견·대기업도 같은 기준인지 확인 필요)",
+    };
   }
 
   // 중소기업 완화 기준 (소기업·중기업)
   if (isSME) {
     if (natural && c.education === "전문학사(3년제)") {
       if (c.researchYears >= 1)
-        return { rank: 0, note: "자연계 3년제 전문학사 + 경력 1년 이상 — 중소기업 완화 기준에 해당합니다" };
+        return { rank: 0, relaxed: true, note: "자연계 3년제 전문학사 + 경력 1년 이상 — 중소기업 완화 기준에 해당합니다" };
       return { rank: 1, note: "자연계 3년제 전문학사 — 연구개발 경력 1년 이상 확인 필요" };
     }
     if (natural && c.education === "전문학사(2년제)") {
       if (c.researchYears >= 2)
-        return { rank: 0, note: "자연계 전문학사 + 경력 2년 이상 — 중소기업 완화 기준에 해당합니다" };
+        return { rank: 0, relaxed: true, note: "자연계 전문학사 + 경력 2년 이상 — 중소기업 완화 기준에 해당합니다" };
       return { rank: 1, note: "자연계 전문학사 — 연구개발 경력 2년 이상 확인 필요" };
     }
     if (c.cert === "산업기사") {
       if (c.researchYears >= 2)
-        return { rank: 0, note: "산업기사 + 경력 2년 이상 — 중소기업 완화 기준에 해당합니다" };
+        return { rank: 0, relaxed: true, note: "산업기사 + 경력 2년 이상 — 중소기업 완화 기준에 해당합니다" };
       return { rank: 1, note: "산업기사 — 연구개발 경력 2년 이상 확인 필요" };
     }
     if (c.education === "마이스터고·특성화고 졸업" || c.cert === "기능사") {
+      // ★ 기능사 + 경력 4년 기준은 편람으로 다시 확인할 것 (규칙은 그대로 둔다)
+      const certNote = c.cert === "기능사" && c.education !== "마이스터고·특성화고 졸업" ? " (★ 기능사 + 4년 기준 확인 필요)" : "";
       if (c.researchYears >= 4)
         return {
           rank: 0,
-          note: "마이스터고·특성화고 졸업 또는 기능사 + 경력 4년 이상 — 중소기업 완화 기준에 해당합니다",
+          relaxed: true,
+          note: `마이스터고·특성화고 졸업 또는 기능사 + 경력 4년 이상 — 중소기업 완화 기준에 해당합니다${certNote}`,
         };
       return {
         rank: 1,
-        note: "마이스터고·특성화고/기능사 — 연구개발 경력 4년 이상 확인 필요",
+        note: `마이스터고·특성화고/기능사 — 연구개발 경력 4년 이상 확인 필요${certNote}`,
       };
     }
   }
@@ -127,7 +183,7 @@ function qualificationGate(
 /** 후보자 1명 종합 판정 */
 export function assessCandidate(
   c: ResearcherCandidate,
-  input: Pick<FeasibilityInput, "companySize" | "industryField" | "businessMonths">,
+  input: Pick<FeasibilityInput, "companySize" | "industryField" | "businessMonths" | "withinStartup3y" | "sizeConfirmed">,
 ): CandidateAssessment {
   const notes: string[] = [];
   const gate = qualificationGate(c, input);
@@ -152,10 +208,14 @@ export function assessCandidate(
   // 전담성·겸직 — 연구전담요원은 다른 업무를 겸직할 수 없음
   if (c.isCeo) {
     // 대표자는 별도 카드에서 판정. 후보 목록에서는 보수적으로 처리.
-    const earlySmall = input.companySize === "소기업" && input.businessMonths <= 36;
+    const earlySmall = isEarlySmall(input);
     if (earlySmall && rank === 0) {
       bump(1);
-      notes.push("대표자 — 창업 3년 이내 소기업 예외 가능성 있음 (대표자 카드 참고, 전담성 확인 필요)");
+      notes.push("대표자 — 창업 3년 이내 소기업 예외 가능성 있음 (대표자 카드 참고, 전담성 확인 필요 · ★ 예외 세부 요건 확인)");
+    } else if (rank === 0 && ceoExceptionUnknown(input)) {
+      // D-136: 설립일·규모를 몰라 예외를 가를 수 없다 — 인정 가능으로 세지 않는다
+      bump(1);
+      notes.push("대표자 — 설립일·기업 규모를 확인해야 창업 3년 이내 소기업 예외를 볼 수 있습니다 (지금은 예외를 적용하지 않음)");
     } else {
       bump(2);
       notes.push("대표자 — 창업 3년 이내 소기업 외에는 연구전담요원 인정이 어렵습니다");
@@ -198,7 +258,7 @@ const CEO_THREE_YEAR_NOTE =
   "창업 3년 경과 시 대표자는 연구전담요원에서 제외되므로, 사전에 변경신고 또는 연구전담요원 교체(충원)를 검토해야 합니다.";
 
 export function assessCeo(
-  input: Pick<FeasibilityInput, "companySize" | "industryField" | "businessMonths" | "candidates">,
+  input: Pick<FeasibilityInput, "companySize" | "industryField" | "businessMonths" | "candidates" | "withinStartup3y" | "sizeConfirmed">,
 ): CeoEligibility {
   const ceoCand = input.candidates.find((c) => c.isCeo);
   if (!ceoCand) {
@@ -211,17 +271,35 @@ export function assessCeo(
     };
   }
 
-  const earlySmall = input.companySize === "소기업" && input.businessMonths <= 36;
+  const earlySmall = isEarlySmall(input);
+  const st = startupStatus(input);
   const gate = qualificationGate(ceoCand, input);
   const cautions: string[] = [];
 
   // 원칙: 연구전담요원은 타업무 겸직 불가 → 대표자는 원칙적으로 불가.
   // 유일한 예외: 창업 3년 이내 소기업의 대표자 (자격요건 충족 + 실제 연구업무 수행)
+  if (!earlySmall && ceoExceptionUnknown(input)) {
+    // D-136: 설립일·규모를 모르면 예외를 적용하지 않는다(엄격) — '가능성 있음' 으로 보이지 않게 확인 필요로 둔다
+    const sizeUnknown = input.sizeConfirmed === false;
+    return {
+      applicable: true,
+      verdict: "추가 확인 필요",
+      basis: sizeUnknown
+        ? "기업 규모를 아직 고르지 않아 대표자 예외(창업 3년 이내 소기업)를 적용하지 않았습니다."
+        : "설립일을 몰라 창업 3년 이내인지 알 수 없습니다 — 대표자 예외(창업 3년 이내 소기업)를 적용하지 않았습니다.",
+      cautions: [
+        ...(sizeUnknown ? ["기업 규모를 골라 주세요."] : []),
+        ...(st === "unknown" ? ["설립일을 적어야 창업 3년 이내 특례를 봅니다."] : []),
+        "대표자는 기업경영 업무를 수행하므로 원칙적으로 연구전담요원이 될 수 없습니다.",
+      ],
+      threeYearNote: CEO_THREE_YEAR_NOTE,
+    };
+  }
   if (!earlySmall) {
     const reason =
       input.companySize === "소기업"
         ? "창업일로부터 3년이 경과한 소기업"
-        : `${input.companySize}${input.businessMonths <= 36 ? " (창업 3년 이내라도 소기업이 아님)" : ""}`;
+        : `${input.companySize}${st === "within" ? " (창업 3년 이내라도 소기업이 아님)" : ""}`;
     return {
       applicable: true,
       verdict: "인정 어려움",
@@ -249,6 +327,7 @@ export function assessCeo(
   cautions.push(
     "대표자가 실제로 연구개발 업무를 수행하는지(전담성)에 대한 소명이 필요합니다.",
   );
+  cautions.push("★ 대표자 예외의 세부 요건은 편람으로 다시 확인하세요.");
   if (!ceoCand.insured) cautions.push("대표자의 4대보험 가입 확인이 필요합니다.");
   if (!ceoCand.dutyDescription.trim())
     cautions.push("대표자가 담당할 연구업무 내용을 구체적으로 정리해 두세요.");
@@ -383,6 +462,7 @@ export function assessFacility(
     | "isVenture"
     | "isResearcherFounded"
     | "desiredType"
+    | "sizeConfirmed"
   >,
 ): SectionAssessment<FacilityVerdict> {
   const notes: string[] = [];
@@ -397,8 +477,8 @@ export function assessFacility(
     };
   }
 
-  // 50㎡ 이하 분리구역 예외 대상인지
-  const isSME = input.companySize === "소기업" || input.companySize === "중기업";
+  // 50㎡ 이하 분리구역 예외 대상인지 (D-136: 규모를 안 골랐으면 중소기업 예외를 쓰지 않는다)
+  const isSME = input.sizeConfirmed !== false && (input.companySize === "소기업" || input.companySize === "중기업");
   const partitionException =
     (isSME || input.isVenture || input.isResearcherFounded) ||
     (input.isInfoServiceOrSW && input.desiredType === "연구개발전담부서");
@@ -419,7 +499,7 @@ export function assessFacility(
   } else if (input.spaceUnder50 && partitionException) {
     setWorst("추가 확인 필요");
     notes.push(
-      "50㎡ 이하 + 파티션 구분(분리구역) — 중소·벤처·연구원창업 기업(또는 정보서비스/SW 전담부서) 예외 적용 가능성이 있습니다. 면적·구분 상태 확인 필요.",
+      "50㎡ 이하 + 파티션 구분(분리구역) — 중소·벤처·연구원창업 기업(또는 정보서비스/SW 전담부서) 예외 적용 가능성이 있습니다. 면적·구분 상태 확인 필요. ★ 50㎡ 예외 요건 확인 필요.",
     );
   } else if (!input.independentSpace || !input.fixedWallsAndDoor) {
     setWorst("보완 필요");
@@ -473,8 +553,10 @@ export function assessFeasibility(input: FeasibilityInput): FeasibilityResult {
     facility.verdict === "보완 필요" ||
     facility.verdict === "진행 어려움" ||
     activity.verdict === "보완 필요";
+  // D-136: 기업 규모를 안 골랐으면 인원 기준을 정할 수 없다 — '가능/우선 추천' 을 내지 않는다
+  const sizeUnknown = input.sizeConfirmed === false;
   const needsCheck =
-    eligibility.verdict === "추가 확인 필요" || facility.verdict === "추가 확인 필요";
+    eligibility.verdict === "추가 확인 필요" || facility.verdict === "추가 확인 필요" || sizeUnknown;
 
   const labOk = eligibleCount >= reqLab;
   const deptOk = eligibleCount >= 1;
@@ -521,6 +603,10 @@ export function assessFeasibility(input: FeasibilityInput): FeasibilityResult {
     if (needsFix) {
       verdict = "보완 후 가능";
       recommendedType = "전담부서 선설립 후 연구소 전환";
+    } else if (needsCheck) {
+      // D-136: 신고대상·물적요건·규모에 확인할 것이 남았으면 '우선 추천(현실적)' 이라고 하지 않는다
+      verdict = "추가 확인 필요";
+      recommendedType = "전담부서 선설립 후 연구소 전환";
     } else {
       verdict = "연구개발전담부서 우선 추천";
       recommendedType = "전담부서 선설립 후 연구소 전환";
@@ -536,6 +622,16 @@ export function assessFeasibility(input: FeasibilityInput): FeasibilityResult {
 
   /* 보완해야 할 항목 */
   const improvements: string[] = [];
+  if (sizeUnknown)
+    improvements.push(
+      "★ 기업 규모를 골라 주세요 — 규모마다 연구소 인원 기준이 다릅니다 (소기업 3명·창업 3년 이내 2명 / 중기업 5명 / 중견기업 7명 / 대기업 10명).",
+    );
+  if (!sizeUnknown && input.companySize === "소기업" && startupStatus(input) === "unknown")
+    improvements.push(
+      "설립일을 적어야 창업 3년 이내 특례(연구원 2명 · 대표자 예외)를 봅니다 — 지금은 특례 없이 봤습니다.",
+    );
+  if (!sizeUnknown && input.companySize === "중기업" && input.becameMediumWithinYear)
+    improvements.push("★ 소기업→중기업 전환 1년 이내 3명 기준은 확인 필요 — 아니면 5명입니다.");
   if (eligibility.verdict !== "신고대상으로 보임")
     improvements.push(...eligibility.notes.filter((n) => !n.includes("특이사항이 없습니다")));
   if (activity.verdict !== "연구개발활동 적합")

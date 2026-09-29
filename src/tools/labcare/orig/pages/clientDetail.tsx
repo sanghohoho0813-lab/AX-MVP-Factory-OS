@@ -181,7 +181,7 @@ export default function ClientDetailPage() {
                 const est = getTaxCreditEstimate(client);
                 return est.available ? (
                   <p className="rounded-lg bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-800">
-                    예상 연간 절세 효과: 약 {formatManwon(est.annual)} ({est.taxType}, 검토용)
+                    예상 연간 절세 효과: 약 {formatManwon(est.annual)} ({est.taxType}, 검토용{est.sizeAssumed ? " · ★ 중소기업 기준" : ""})
                   </p>
                 ) : (
                   <p className="text-sm text-slate-400">금액 입력 시 예상 절세액(검토용)이 표시됩니다.</p>

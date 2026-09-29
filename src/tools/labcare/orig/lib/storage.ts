@@ -18,6 +18,15 @@ import type {
   ResearcherInfo,
 } from "../../types";
 import { evaluateRisk } from "../../lib/riskEngine";
+import {
+  addDays,
+  changeDeadlineOf,
+  isCheckDue as isCheckDueLib,
+  nextCheckDate as nextCheckDateLib,
+  parseYmd,
+  ymdLocal,
+  ymLocal,
+} from "../../lib/deadlines";
 
 const CLIENTS_KEY = "pmsaas:clients:v1";
 const CHECKS_KEY = "pmsaas:checks:v1";
@@ -43,9 +52,9 @@ export function uid(prefix = "id"): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** 현재 월 (YYYY-MM) */
+/** 현재 월 (YYYY-MM) — D-136: 현지 날짜로 (UTC 로 적으면 매달 1일 오전 9시 전까지 지난달이 나왔다) */
 export function currentMonth(): string {
-  return new Date().toISOString().slice(0, 7);
+  return ymLocal(new Date());
 }
 
 function read<T>(key: string, fallback: T): T {
@@ -469,18 +478,9 @@ export interface ReminderSetting {
   lastCheck: string;
 }
 
+/** 현지 날짜 YYYY-MM-DD (D-136: toISOString 은 UTC 라 한국 오전 9시 전에는 어제가 찍혔다) */
 function ymd(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-function addDays(base: Date, n: number): Date {
-  const d = new Date(base);
-  d.setDate(d.getDate() + n);
-  return d;
-}
-function addMonths(base: Date, n: number): Date {
-  const d = new Date(base);
-  d.setMonth(d.getMonth() + n);
-  return d;
+  return ymdLocal(d);
 }
 
 export function getChangeRecords(): ChangeRecord[] {
@@ -489,16 +489,21 @@ export function getChangeRecords(): ChangeRecord[] {
 export function getChangeRecordsByClient(clientId: string): ChangeRecord[] {
   return getChangeRecords().filter((r) => r.clientId === clientId);
 }
-export function addChangeRecord(input: { clientId: string; reasons: string[]; memo: string }): ChangeRecord {
-  const today = new Date();
+/**
+ * 변경 기록 추가. D-136: 발생일을 받는다 — 예전에는 늘 '오늘' 이라서
+ * 지난달에 퇴사한 사람을 오늘 적으면 기한이 실제보다 늦게(넉넉하게) 나왔다.
+ * 기한 = 발생일 + 30일. 발생일을 안 주거나 못 읽으면 오늘.
+ */
+export function addChangeRecord(input: { clientId: string; reasons: string[]; memo: string; occurredDate?: string }): ChangeRecord {
+  const occurred = input.occurredDate && parseYmd(input.occurredDate) ? input.occurredDate : ymd(new Date());
   const rec: ChangeRecord = {
     id: uid("cr"),
     clientId: input.clientId,
     reasons: input.reasons,
     memo: input.memo,
     status: "확인 필요",
-    occurredDate: ymd(today),
-    deadline: ymd(addDays(today, 30)),
+    occurredDate: occurred,
+    deadline: changeDeadlineOf(occurred),
   };
   write(CHANGEREC_KEY, [...getChangeRecords(), rec]);
   return rec;
@@ -554,17 +559,13 @@ export function setBenefitKeys(clientId: string, keys: string[]): void {
   const all = read<Record<string, string[]>>(BENEFIT_KEY, {});
   write(BENEFIT_KEY, { ...all, [clientId]: keys });
 }
-/** 다음 확인 예정일 — (마지막 확인 + 주기)가 속한 달의 말일 기준 */
+/** 다음 확인 예정일 — (마지막 확인 + 주기)가 속한 달의 말일 (D-136: 1월 31일 + 1개월 = 2월 말, lib/deadlines 와 같은 규칙) */
 export function nextCheckDate(r: ReminderSetting): string {
-  const base = addMonths(new Date(r.lastCheck + "T00:00:00"), r.cycleMonths);
-  const eom = new Date(base.getFullYear(), base.getMonth() + 1, 0);
-  const mm = String(eom.getMonth() + 1).padStart(2, "0");
-  const dd = String(eom.getDate()).padStart(2, "0");
-  return `${eom.getFullYear()}-${mm}-${dd}`;
+  return nextCheckDateLib(r);
 }
 /** 확인 주기 도래 여부 — 다음 확인 예정일이 이번 달이거나 지났으면 true */
 export function isCheckDue(r: ReminderSetting): boolean {
-  return nextCheckDate(r).slice(0, 7) <= ymd(new Date()).slice(0, 7);
+  return isCheckDueLib(r);
 }
 
 /* ───────────────── 임시 저장 업체 (고객사 등록 전 설립서류 체크) ───────────────── */
@@ -576,7 +577,10 @@ export interface TempCompany {
   businessType?: "법인사업자" | "개인사업자";
   industry?: string;
   labType: LabType;
+  /** D-136: 가능성 체크에서 '아직 모름' 으로 보냈다 — labType 은 자리만 채운 값이라 화면에 ★ 로 알린다 */
+  labTypeUnsure?: boolean;
   projectName?: string;
+  /** 연구 인력 수 — 모르면 비워 둔다(10명 이상 서류를 '해당 없음' 으로 지우지 않게) */
   researcherCount?: number;
   createdAt: string;
 }

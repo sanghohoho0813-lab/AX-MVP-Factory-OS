@@ -72,6 +72,11 @@ export interface Client {
   businessTaxType?: "법인세" | "종합소득세";
   /** 예상 공제율(%) — 미지정 시 공제유형 기본값 */
   estimatedTaxCreditRate?: number;
+  /**
+   * D-136: 세액공제 계산에 쓰는 기업 규모. 비우면 중소기업으로 가정하고 ★ 를 단다.
+   * 중견·대기업은 공제율이 낮아 중소기업 공제율로 계산하지 않는다(공제율 직접 입력 필요).
+   */
+  taxCompanySize?: "중소기업" | "중견기업" | "대기업";
   /** 절세 검토 메모 */
   taxMemo?: string;
   /** 고용지원금 점검 Tip (미지정 시 규칙으로 자동 계산) */
@@ -315,8 +320,19 @@ export interface FeasibilityInput {
   isVenture: boolean;
   /** 연구원·교원 창업기업 여부 */
   isResearcherFounded: boolean;
-  /** 업력 (개월) */
+  /** 업력 (꽉 찬 개월) */
   businessMonths: number;
+  /**
+   * D-136: 창업 3년 이내인가 — 설립일(달력)로 센 값.
+   *  true/false = 설립일로 셌다 · null = 설립일을 모름(특례를 적용하지 않는다)
+   *  undefined = 예전 호출(businessMonths ≤ 36 으로 본다)
+   */
+  withinStartup3y?: boolean | null;
+  /**
+   * D-136: 기업 규모를 사용자가 골랐는가. false 면 규모를 모르는 것으로 보고
+   * 소기업 특례(2명 · 대표자 · 완화 자격 · 칸막이 예외)를 인정 쪽으로 쓰지 않는다. undefined = 골랐음(예전 호출).
+   */
+  sizeConfirmed?: boolean;
   /** 소기업에서 중기업이 된 지 1년 이내 여부 */
   becameMediumWithinYear: boolean;
   employeeCount: number;

@@ -7,6 +7,10 @@ import { downloadSvgAsJpeg, printSvg } from "../../lib/download";
 import { addTempCompany } from "../lib/storage";
 import { assessFeasibility, requiredForLab } from "../../lib/feasibility";
 import { usePrefillFromClient } from "../../../shared/usePrefill";
+import { monthsInBusiness } from "../../../shared/clientPrefill";
+import { isExcludedIndustryText } from "../../lib/assessmentOptions";
+import { businessAgeLabel, withinStartupYears } from "../../lib/startup";
+import { ymdLocal } from "../../lib/deadlines";
 import type { FeasibilityResult } from "../../types";
 import type {
   ActivityNature,
@@ -171,23 +175,39 @@ export default function AssessmentPage() {
   const [customIndustry, setCustomIndustry] = useState(false);
   const [industryField, setIndustryField] = useState<IndustryField>("과학기술 분야");
   const [isExcludedIndustry, setIsExcludedIndustry] = useState(false);
+  // D-136: 규모는 업체 기록에 없다 — '소기업' 을 기본으로 깔지 않고 고르게 한다(고르기 전에는 ★ 규모 확인 필요)
   const [companySize, setCompanySize] = useState<CompanySize>("소기업");
+  const [sizeConfirmed, setSizeConfirmed] = useState(false);
   const [isVenture, setIsVenture] = useState(false);
   const [isResearcherFounded, setIsResearcherFounded] = useState(false);
-  const [years, setYears] = useState(3);
+  // D-136: 업력은 '년' 이 아니라 설립일(달력)로 — 3년 11개월이 '3년 = 36개월' 로 창업 3년 이내가 되던 문제
+  const [establishedAt, setEstablishedAt] = useState("");
   const [becameMediumWithinYear, setBecameMediumWithinYear] = useState(false);
-  const [employeeCount, setEmployeeCount] = useState(10);
+  // 직원 수는 판정에 쓰지 않는다(참고용) — 비워 두고 시작한다
+  const [employeeCount, setEmployeeCount] = useState("");
   const [isOverseasLab, setIsOverseasLab] = useState(false);
-  // D-126: 업체에서 열었으면 회사명 · 업종 · 업력 · 직원 수를 업체 기록에서 채운다(예전엔 직원 10명 · 업력 3년이라는 지어낸 값으로 시작했다)
+  // D-126: 업체에서 열었으면 회사명 · 업종 · 설립일을 업체 기록에서 채운다(예전엔 직원 10명 · 업력 3년이라는 지어낸 값으로 시작했다)
   const { note: prefillNote } = usePrefillFromClient((facts) => {
     const filled: string[] = [];
     // D-134: 이미 적은 회사명 · 업종은 덮지 않는다(업체 기록이 늦게 오면 적던 글이 사라졌다)
     if (facts.companyName && !companyName.trim()) { setCompanyName(facts.companyName); filled.push("회사명"); }
-    if (facts.industryText && !industry.trim()) { setIndustry(facts.industryText); setCustomIndustry(true); filled.push("업종"); }
-    if (facts.years !== null) { setYears(Math.max(0, Math.round(facts.years))); filled.push("업력"); }
-    if (facts.employeeCount !== null) { setEmployeeCount(facts.employeeCount); filled.push("직원 수"); }
+    if (facts.industryText && !industry.trim()) {
+      setIndustry(facts.industryText);
+      setCustomIndustry(true);
+      // D-136: 채운 업종도 직접 적은 것과 같이 제외 업종인지 본다
+      setIsExcludedIndustry(isExcludedIndustryText(facts.industryText));
+      filled.push("업종");
+    }
+    // D-136: 이미 적은 설립일 · 직원 수는 덮지 않는다
+    if (facts.establishedAt && !establishedAt) { setEstablishedAt(facts.establishedAt); filled.push("설립일"); }
+    // 직원 수는 판정에 안 쓰니 채웠다고 알리지 않는다(참고 칸만 채움)
+    if (facts.employeeCount !== null && employeeCount === "") setEmployeeCount(String(facts.employeeCount));
     return filled;
   });
+  const todayDate = new Date();
+  const startupWithin = withinStartupYears(establishedAt, todayDate);
+  const businessMonths = monthsInBusiness(establishedAt, todayDate);
+  const ageLabel = businessAgeLabel(establishedAt, todayDate);
 
   /* 신고대상 */
   const [isForProfit, setIsForProfit] = useState(true);
@@ -204,11 +224,12 @@ export default function AssessmentPage() {
   const [negativeActivities, setNegativeActivities] = useState<NegativeActivity[]>([]);
 
   /* ④ 물적요건 */
-  const [hasSpace] = useState(true);
+  // D-136: 예전에는 숨긴 채 늘 '있음' · '50㎡ 이하' 로 두어 판정이 너그러웠다 — 둘 다 보이게, 50㎡ 는 '아니오' 에서 시작
+  const [hasSpace, setHasSpace] = useState(true);
   const [independentSpace, setIndependentSpace] = useState(true);
   const [fixedWallsAndDoor, setFixedWallsAndDoor] = useState(true);
   const [movableWallPossible, setMovableWallPossible] = useState(false);
-  const [spaceUnder50] = useState(true);
+  const [spaceUnder50, setSpaceUnder50] = useState(false);
   const [adequateArea, setAdequateArea] = useState(true);
   const [equipmentInSpace, setEquipmentInSpace] = useState(true);
   const [isInfoServiceOrSW, setIsInfoServiceOrSW] = useState(false);
@@ -238,11 +259,14 @@ export default function AssessmentPage() {
         industryField,
         isExcludedIndustry,
         companySize,
+        sizeConfirmed,
         isVenture,
         isResearcherFounded,
-        businessMonths: Math.round(years * 12),
+        // 설립일을 모르면 개월 수는 쓰지 않는다(withinStartup3y = null 이 특례를 막는다)
+        businessMonths: businessMonths ?? 999,
+        withinStartup3y: startupWithin,
         becameMediumWithinYear: companySize === "중기업" ? becameMediumWithinYear : false,
-        employeeCount,
+        employeeCount: Number(employeeCount) || 0,
         isOverseasLab,
         isForProfit,
         hasBusinessOps,
@@ -264,7 +288,7 @@ export default function AssessmentPage() {
       }),
     [
       desiredType, companyName, industry, industryField, isExcludedIndustry,
-      companySize, isVenture, isResearcherFounded, years, becameMediumWithinYear,
+      companySize, sizeConfirmed, isVenture, isResearcherFounded, businessMonths, startupWithin, becameMediumWithinYear,
       employeeCount, isOverseasLab, isForProfit, hasBusinessOps, rndOnlyCompany,
       isSubUnit, projectName, preCommercial, activityNature, negativeActivities,
       hasSpace, independentSpace, fixedWallsAndDoor, movableWallPossible,
@@ -304,8 +328,11 @@ export default function AssessmentPage() {
       name: companyName.trim(),
       industry: industry || undefined,
       labType,
+      // D-136: '아직 모름' 을 전담부서로 확정해 넘기지 않는다 — 설립서류 화면에 ★ 로 보인다
+      labTypeUnsure: desiredType === "아직 모름" ? true : undefined,
       projectName: projectName || undefined,
-      researcherCount: pick,
+      // D-136: '5명 이상' 은 5명이 아니다 — 모르면 비워서 10인 이상 서류를 '해당 없음' 으로 지우지 않는다
+      researcherCount: pick < 5 ? pick : candidates.length >= 10 ? candidates.length : undefined,
     });
     setSentMsg(`‘${companyName.trim()}’${particle(companyName.trim(), '이/가')} 설립서류 관리에 임시 저장되었습니다.`);
     return true;
@@ -319,47 +346,64 @@ export default function AssessmentPage() {
     : labReachable
       ? { tone: "green", lines: ["연구소/전담부서 모두 가능성이 있으나, 세액공제·인증 활용 목적에 따라 선택이 필요합니다."] }
       : { tone: "indigo", lines: ["현재 입력 기준으로는 연구개발전담부서 설립이 더 현실적입니다.", "연구소 설립은 연구전담요원 추가 확보 후 검토하는 것이 안전합니다."] };
+  // D-136: 아래 종합 판정이 '가능 · 우선 추천' 이 아니면 추천도 그 사실을 먼저 말한다
+  if (deptReachable && result.verdict !== "기업부설연구소 가능" && result.verdict !== "연구개발전담부서 우선 추천") {
+    firstReco.tone = "amber";
+    firstReco.lines.push(`단, 종합 판정은 '${result.verdict}' 입니다 — 아래 확인 항목을 먼저 보세요.`);
+  }
   const recoToneCls = firstReco.tone === "green" ? "border-green-200 bg-status-normalBg" : firstReco.tone === "indigo" ? "border-indigo-200 bg-indigo-50" : "border-amber-200 bg-amber-50";
 
   /* 후보 수(pick) 기반 UI 추천 — 법령 판정(feasibility)은 그대로, 표시용 계산만 분리 */
   const reqLab = requiredForLab({
     companySize, isVenture, isResearcherFounded,
-    businessMonths: Math.round(years * 12),
+    businessMonths: businessMonths ?? 999,
+    withinStartup3y: startupWithin,
+    sizeConfirmed,
     becameMediumWithinYear: companySize === "중기업" ? becameMediumWithinYear : false,
     isOverseasLab,
   });
-  // 후보 수별 기업부설연구소 가능성 (1명 불가 / 2명 조건부 / 3명↑ requiredForLab 기준)
-  const labState: "가능" | "조건부 검토" | "불가" =
-    pick <= 1 ? "불가"
-    : pick === 2 ? "조건부 검토"
+  // D-136: 후보 수별 연구소 가능성 — 규모별 필요 인원(reqLab)으로만 가른다.
+  // (예전에는 2명이면 규모와 관계없이 '조건부', '5명 이상' 을 5명으로 보고 7·10명 기준도 '불가' 로 잘랐다)
+  const labState: "가능" | "조건부 검토" | "불가" | "확인 필요" =
+    !sizeConfirmed ? "확인 필요"
+    : pick >= 5 && reqLab > 5 ? "확인 필요"
     : pick >= reqLab ? "가능"
     : pick >= reqLab - 1 ? "조건부 검토"
     : "불가";
+  const startupHint =
+    sizeConfirmed && companySize === "소기업" && startupWithin === null && !isVenture && !isResearcherFounded && !isOverseasLab
+      ? " (설립일을 적으면 창업 3년 이내 2명 기준을 봅니다)"
+      : "";
   const pickVerdict =
-    pick <= 1 ? "현재 인원 기준으로는 연구개발전담부서가 현실적입니다."
-    : pick === 2 ? "벤처기업 등 예외 요건에 해당하는 경우에만 기업부설연구소 검토가 가능합니다."
-    : labState === "가능" ? "기업부설연구소도 검토 가능합니다."
-    : labState === "조건부 검토" ? `기업 규모 기준 인원(필요 ${reqLab}명)에 가까워, 추가 인원 확보 시 연구소 검토가 가능합니다.`
-    : `현재 기업 규모 기준(필요 ${reqLab}명)에는 인원이 부족합니다. 연구개발전담부서부터 검토하세요.`;
+    !sizeConfirmed ? "기업 규모를 먼저 고르세요 — 규모마다 연구소 인원 기준이 다릅니다."
+    : labState === "확인 필요" ? `연구소는 ${reqLab}명이 필요합니다 — 실제 인원을 후보자에 적어 확인하세요.`
+    : labState === "가능" ? `인원 수로는 연구소(필요 ${reqLab}명)도 검토할 수 있습니다 — 자격은 아래 후보자에서 확인하세요.${startupHint}`
+    : labState === "조건부 검토" ? `연구소는 ${reqLab}명이 필요합니다 — ${reqLab - pick}명 더 확보하면 검토할 수 있습니다.${startupHint}`
+    : `연구소는 ${reqLab}명이 필요합니다 — 지금은 연구개발전담부서부터 검토하세요.${startupHint}`;
   const LAB_STATE_CLS: Record<string, string> = {
     가능: "border-green-300 bg-status-normalBg text-status-normal",
     "조건부 검토": "border-amber-300 bg-amber-50 text-amber-700",
     불가: "border-red-300 bg-status-dangerBg text-status-danger",
+    "확인 필요": "border-amber-300 bg-amber-50 text-amber-700",
   };
 
   /* 물적요건 체크 — 선택 유형에 따라 필요한 항목만 노출 */
   const isDept = desiredType === "연구개발전담부서";
-  const facilityChecks: { key: string; label: string; value: boolean; set: (v: boolean) => void; showFor: "both" | "lab" | "dept" }[] = [
+  // D-136: 판정에 쓰는 값은 모두 보이게 한다 — 예전에는 전담부서에서 '고정벽체' 를 숨긴 채 '있음' 으로 판정했다.
+  // optional = 해당하면 켜는 예외 항목(꺼져 있어도 '보완 필요' 로 세지 않는다)
+  const facilityChecks: { key: string; label: string; value: boolean; set: (v: boolean) => void; showFor: "both" | "lab" | "dept"; optional?: boolean }[] = [
+    { key: "space", label: "연구공간이 있다", value: hasSpace, set: setHasSpace, showFor: "both" },
     { key: "independent", label: isDept ? "연구공간 또는 좌석이 구분된다" : "독립된 연구공간이다", value: independentSpace, set: setIndependentSpace, showFor: "both" },
-    { key: "walls", label: "고정벽체 + 별도 출입문이 있다", value: fixedWallsAndDoor, set: setFixedWallsAndDoor, showFor: "lab" },
-    { key: "movable", label: "분리·이동형 벽체(2m 이상) 적용 가능", value: movableWallPossible, set: setMovableWallPossible, showFor: "dept" },
+    { key: "walls", label: "고정벽체 + 별도 출입문이 있다", value: fixedWallsAndDoor, set: setFixedWallsAndDoor, showFor: "both" },
+    { key: "movable", label: "분리·이동형 벽체(2m 이상) 적용 가능", value: movableWallPossible, set: setMovableWallPossible, showFor: "both", optional: true },
+    { key: "under50", label: "연구공간 전용면적 50㎡ 이하 (★ 칸막이 예외 확인)", value: spaceUnder50, set: setSpaceUnder50, showFor: "both", optional: true },
     { key: "adequate", label: "전담요원이 상시 근무 가능한 면적이다", value: adequateArea, set: setAdequateArea, showFor: "both" },
     { key: "equip", label: "연구기자재가 연구공간 안에 있다", value: equipmentInSpace, set: setEquipmentInSpace, showFor: "both" },
-    { key: "infosw", label: "정보서비스·SW개발공급 업종이다", value: isInfoServiceOrSW, set: setIsInfoServiceOrSW, showFor: "dept" },
+    { key: "infosw", label: "정보서비스·SW개발공급 업종이다", value: isInfoServiceOrSW, set: setIsInfoServiceOrSW, showFor: "dept", optional: true },
   ];
   const facilityShown = facilityChecks.filter((c) => c.showFor === "both" || (isDept ? c.showFor === "dept" : c.showFor === "lab"));
   const facilityMet = facilityShown.filter((c) => c.value);
-  const facilityGap = facilityShown.filter((c) => !c.value);
+  const facilityGap = facilityShown.filter((c) => !c.value && !c.optional);
 
   return (
     <Layout
@@ -425,7 +469,7 @@ export default function AssessmentPage() {
                   onChange={(e) => {
                     const v = e.target.value;
                     setIndustry(v);
-                    setIsExcludedIndustry(/유흥|카지노|사행|도박|가상자산|블록체인.?매매/.test(v));
+                    setIsExcludedIndustry(isExcludedIndustryText(v));
                   }}
                   placeholder="업종을 직접 입력 (대분류에 없을 때) — 아래 분야 구분도 선택하세요"
                 />
@@ -458,6 +502,7 @@ export default function AssessmentPage() {
                   </button>
                 ))}
               </div>
+              <p className="mt-1 text-xs text-slate-500">★ 제외 업종 목록은 확인 필요 — 여기 없는 업종도 신고대상에서 빠질 수 있습니다.</p>
               {isExcludedIndustry ? (
                 <div className="mt-2 rounded-lg bg-status-dangerBg px-4 py-2.5 text-base font-semibold text-status-danger">
                   ⚠ 제외 업종에 해당할 가능성이 높습니다. 연구소/전담부서 신고대상이 아닐 수 있어 업종 분류 재확인이 필요합니다.
@@ -484,20 +529,42 @@ export default function AssessmentPage() {
                 </div>
               </Field>
               <Field label="기업 규모">
-                <select className={INPUT} value={companySize} onChange={(e) => setCompanySize(e.target.value as CompanySize)}>
+                <select
+                  className={INPUT}
+                  data-testid="lab-size"
+                  value={sizeConfirmed ? companySize : ""}
+                  onChange={(e) => {
+                    const v = e.target.value as CompanySize | "";
+                    if (!v) return;
+                    setCompanySize(v);
+                    setSizeConfirmed(true);
+                  }}
+                >
+                  <option value="" disabled>규모를 고르세요</option>
                   {SIZE_OPTS.map((s) => (
-                    <option key={s}>{s}</option>
+                    <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
-              </Field>
-              <Field label="업력 (년)">
-                <input type="number" min={0} step={0.5} className={INPUT} value={years} onChange={(e) => setYears(Number(e.target.value))} />
-                {companySize === "소기업" && years <= 3 ? (
-                  <p className="mt-1 text-xs text-navy-600">창업 3년 이내 소기업 — 전담요원 2명 기준 + 대표자 예외 검토 대상</p>
+                {!sizeConfirmed ? (
+                  <p className="mt-1 text-xs font-semibold text-amber-700" data-testid="lab-size-note">★ 규모 확인 필요 — 골라야 연구소 인원 기준이 정해집니다 (중소기업확인서로 확인)</p>
                 ) : null}
               </Field>
-              <Field label="상시 종업원 수 (명)">
-                <input type="number" min={0} className={INPUT} value={employeeCount} onChange={(e) => setEmployeeCount(Number(e.target.value))} />
+              <Field label="설립일 (창업일)">
+                <input type="date" className={INPUT} data-testid="lab-established" value={establishedAt} max={ymdLocal(todayDate)} onChange={(e) => setEstablishedAt(e.target.value)} />
+                {startupWithin === null ? (
+                  <p className="mt-1 text-xs font-semibold text-amber-700" data-testid="lab-startup-note">
+                    {establishedAt ? "★ 설립일을 확인해 주세요 (오늘보다 뒤이거나 형식이 틀림)" : "★ 설립일을 적어야 창업 3년 이내 특례를 봅니다"}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-navy-600" data-testid="lab-startup-note">
+                    업력 {ageLabel} — {startupWithin ? "창업 3년 이내" : "창업 3년 지남"}
+                    {startupWithin && sizeConfirmed && companySize === "소기업" ? " · 전담요원 2명 기준 + 대표자 예외 검토 대상" : ""}
+                  </p>
+                )}
+              </Field>
+              <Field label="상시 종업원 수 (명, 참고용)">
+                <input type="number" min={0} className={INPUT} value={employeeCount} onChange={(e) => setEmployeeCount(e.target.value)} />
+                <p className="mt-1 text-xs text-slate-500">판정에는 쓰지 않습니다</p>
               </Field>
             </div>
 
@@ -518,7 +585,7 @@ export default function AssessmentPage() {
                   기업부설연구소 — {labState}
                 </div>
                 <div className="rounded-xl border border-green-300 bg-status-normalBg px-4 py-2.5 text-base font-bold text-status-normal">
-                  연구개발전담부서 — 가능
+                  연구개발전담부서 — 1명부터 검토
                 </div>
               </div>
               <p className="mt-2 rounded-lg bg-navy-50 px-4 py-2.5 text-base font-bold text-navy-800">
@@ -542,7 +609,7 @@ export default function AssessmentPage() {
               <Toggle label="연구원·교원 창업기업" value={isResearcherFounded} onChange={setIsResearcherFounded} />
               <Toggle label="해외소재 연구소로 설립 검토" value={isOverseasLab} onChange={setIsOverseasLab} />
               {companySize === "중기업" ? (
-                <Toggle label="소기업→중기업 전환 1년 이내" value={becameMediumWithinYear} onChange={setBecameMediumWithinYear} />
+                <Toggle label="소기업→중기업 전환 1년 이내 (★ 확인 필요)" value={becameMediumWithinYear} onChange={setBecameMediumWithinYear} />
               ) : null}
             </div>
             <div className="mt-3 rounded-lg bg-slate-50 p-3">
@@ -803,6 +870,12 @@ export default function AssessmentPage() {
                   {result.verdict}
                 </span>
               </div>
+              {!sizeConfirmed ? (
+                <p className="mt-2 text-sm font-bold text-amber-700" data-testid="lab-result-size">★ 규모 확인 필요 — 기업 규모를 고르면 다시 판정합니다</p>
+              ) : null}
+              {sizeConfirmed && companySize === "소기업" && startupWithin === null ? (
+                <p className="mt-2 text-sm font-bold text-amber-700">★ 설립일을 적어야 창업 3년 이내 특례를 봅니다 (지금은 특례 없이 판정)</p>
+              ) : null}
               <p className="mt-3 text-sm leading-relaxed text-slate-600">{result.summary}</p>
               <p className="mt-2 text-xs text-slate-400">
                 추천 추진 유형:{" "}
@@ -927,7 +1000,7 @@ export default function AssessmentPage() {
             companyName={companyName}
             industry={industry}
             industryField={industryField}
-            companySize={companySize}
+            companySize={sizeConfirmed ? companySize : "★ 확인 필요"}
             desiredType={desiredType}
             result={result}
           />
@@ -952,11 +1025,11 @@ function AssessmentReportSvg({
 }: {
   innerRef: React.Ref<SVGSVGElement>;
   companyName: string; industry: string; industryField: IndustryField;
-  companySize: CompanySize; desiredType: LabTypeChoice; result: FeasibilityResult;
+  companySize: string; desiredType: LabTypeChoice; result: FeasibilityResult;
 }) {
   const W = 700;
   const PX = 24;
-  const today = new Date().toISOString().slice(0, 10).replace(/-/g, ".");
+  const today = ymdLocal(new Date()).replace(/-/g, ".");
   const nodes: React.ReactNode[] = [];
   let y = 46;
   const key = () => nodes.length;

@@ -21,6 +21,7 @@ import {
   type ChangeRecStatus,
 } from "../lib/storage";
 import { ddayOf } from "../lib/mockStage1";
+import { changeDeadlineOf, parseYmd, ymdLocal } from "../../lib/deadlines";
 import type { Client } from "../../types";
 
 // 실무에서 자주 쓰는 변경사유 (인력 관련이 가장 빈번 → 상단)
@@ -33,6 +34,11 @@ const REASONS = [
   "연구공간 변경",
   "연구기자재 변경",
 ];
+
+// ★ 변경신고 사유에 들어가는지 법령·편람으로 확인하지 못한 것 — 화면에 ★ 로 표시한다 (D-136)
+const UNSURE_REASONS: Record<string, string> = {
+  "연구원 연봉 변경": "★ 연봉 변경이 변경신고 사유인지 확인 필요",
+};
 
 const STATUSES: ChangeRecStatus[] = ["확인 필요", "변경 예정", "신고 준비중", "신고 완료"];
 const STATUS_STYLE: Record<ChangeRecStatus, string> = {
@@ -89,6 +95,8 @@ export default function ChangesPage() {
   const [pickReasons, setPickReasons] = useState<string[]>([]);
   const [customReason, setCustomReason] = useState("");
   const [memo, setMemo] = useState("");
+  // D-136: 발생일 — 예전에는 늘 '오늘' 이라 지난 일을 적으면 기한이 늦게(넉넉하게) 나왔다
+  const [occurredDate, setOccurredDate] = useState(() => ymdLocal(new Date()));
   const [reqOpen, setReqOpen] = useState(false);
   const [reqText, setReqText] = useState("");
   const [copied, setCopied] = useState(false);
@@ -130,16 +138,17 @@ export default function ChangesPage() {
   function addRecord() {
     const reasons = [...pickReasons];
     if (customReason.trim()) reasons.push(customReason.trim());
-    if (!activeId || !reasons.length) return;
-    addChangeRecord({ clientId: activeId, reasons, memo: memo.trim() });
+    if (!activeId || !reasons.length || !parseYmd(occurredDate)) return;
+    addChangeRecord({ clientId: activeId, reasons, memo: memo.trim(), occurredDate });
     setPickReasons([]);
     setCustomReason("");
     setMemo("");
+    setOccurredDate(ymdLocal(new Date()));
     setTick((t) => t + 1);
   }
 
   function setStatus(id: string, status: ChangeRecStatus) {
-    updateChangeRecord(id, { status, completedDate: status === "신고 완료" ? new Date().toISOString().slice(0, 10) : undefined });
+    updateChangeRecord(id, { status, completedDate: status === "신고 완료" ? ymdLocal(new Date()) : undefined });
     setTick((t) => t + 1);
   }
   function remove(id: string) {
@@ -222,7 +231,7 @@ export default function ChangesPage() {
           <OsAttach
             clientId={active.id}
             title="연구소 기한"
-            verdictLabel={`변경신고 ${records.filter((r) => r.status !== "신고 완료").length}건 · 활동조사 4/30`}
+            verdictLabel={`변경신고 ${records.filter((r) => r.status !== "신고 완료").length}건 · 활동조사 4/30★`}
             summary={[
               `[${active.name} 연구소 기한 안내]`,
               ...changeDeadlines(records, new Date()).map((d) => `· ${d.date.replace(/-/g, ".")} — ${d.title}${d.note ? ` (${d.note})` : ""}`),
@@ -351,16 +360,31 @@ export default function ChangesPage() {
                 return (
                   <button key={r} type="button" onClick={() => toggleReason(r)}
                     className={`rounded-full border px-3.5 py-2 text-sm font-semibold ${on ? "border-navy-600 bg-navy-700 text-white" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
-                    {on ? "✓ " : ""}{r}
+                    {on ? "✓ " : ""}{r}{UNSURE_REASONS[r] ? " ★" : ""}
                   </button>
                 );
               })}
               <input value={customReason} onChange={(e) => setCustomReason(e.target.value)} placeholder="기타 직접입력"
                 className="min-w-[150px] rounded-full border border-dashed border-slate-300 px-3.5 py-2 text-sm focus:border-navy-600 focus:outline-none" />
             </div>
+            {pickReasons.filter((r) => UNSURE_REASONS[r]).map((r) => (
+              <p key={r} className="mt-2 text-sm font-semibold text-amber-700">{UNSURE_REASONS[r]}</p>
+            ))}
+            <div className="mt-3 flex flex-wrap items-end gap-3">
+              <label className="text-sm font-bold text-slate-600">
+                발생일 (사유가 생긴 날)
+                <input type="date" value={occurredDate} onChange={(e) => setOccurredDate(e.target.value)} data-testid="change-occurred"
+                  className="mt-1 block rounded-lg border border-slate-300 px-3 py-2 text-base font-normal focus:border-navy-600 focus:outline-none" />
+              </label>
+              <p className="pb-2 text-sm text-slate-600" data-testid="change-deadline-preview">
+                {parseYmd(occurredDate)
+                  ? <>신고기한 <b>{changeDeadlineOf(occurredDate).replace(/-/g, ".")}</b> ({ddayOf(changeDeadlineOf(occurredDate)).label})</>
+                  : <span className="font-semibold text-status-danger">발생일을 적어 주세요</span>}
+              </p>
+            </div>
             <textarea value={memo} onChange={(e) => setMemo(e.target.value)} rows={2} placeholder="간단 메모 (예: 7/1자 퇴사, 후임 채용 진행)"
               className="mt-2 w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base focus:border-navy-600 focus:outline-none" />
-            <button type="button" onClick={addRecord} disabled={!pickReasons.length && !customReason.trim()}
+            <button type="button" onClick={addRecord} disabled={(!pickReasons.length && !customReason.trim()) || !parseYmd(occurredDate)}
               className="mt-2 rounded-xl bg-navy-700 px-5 py-2.5 text-base font-bold text-white hover:bg-navy-800 disabled:opacity-40">
               변경사항 추가
             </button>
@@ -384,7 +408,7 @@ export default function ChangesPage() {
                   <div key={r.id} className="px-5 py-4">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="text-base font-semibold text-slate-900">{r.reasons.join(", ")}</p>
+                        <p className="text-base font-semibold text-slate-900">{r.reasons.map((x) => (UNSURE_REASONS[x] ? `${x} ★` : x)).join(", ")}</p>
                         {r.memo ? <p className="mt-0.5 text-sm text-slate-600">{r.memo}</p> : null}
                         <p className="mt-0.5 text-sm text-slate-500">발생 {r.occurredDate.replace(/-/g, ".")} · 기한 {r.deadline.replace(/-/g, ".")}</p>
                       </div>

@@ -64,6 +64,15 @@ export const INDUSTRY_CATEGORIES: IndustryCategory[] = [
 // 명백한 제외 업종 (선택 시 경고)
 export const EXCLUDED_INDUSTRIES = ["유흥주점", "카지노/사행시설", "가상자산 매매중개", "기타 제외 업종"];
 
+/**
+ * 직접 적은(또는 업체 기록에서 채운) 업종 글이 제외 업종으로 보이는가.
+ * D-136: 업체 기록에서 채운 업종도 같은 검사를 거친다(예전에는 직접 칠 때만 봤다).
+ * ★ 제외 업종 목록 자체는 확인 필요 — 여기 없다고 신고대상이라는 뜻은 아니다.
+ */
+export function isExcludedIndustryText(text: string): boolean {
+  return /유흥|카지노|사행|도박|가상자산|블록체인.?매매/.test(text ?? "");
+}
+
 // 물적요건 비교 (연구소 / 전담부서)
 export const FACILITY_LAB = [
   "독립된 연구공간",

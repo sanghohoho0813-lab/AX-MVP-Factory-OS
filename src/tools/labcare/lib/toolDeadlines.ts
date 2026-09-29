@@ -33,7 +33,7 @@ export function changeDeadlines(records: readonly ChangeRecord[], today: Date): 
   out.push({
     date: surveyDeadlineDate(today),
     title: '연구개발활동조사표 제출',
-    note: '연구소 보유 기업은 매년 4월 30일까지 (미제출은 인정취소 사유)',
+    note: '연구소 보유 기업은 매년 4월 30일까지 (미제출은 인정취소 사유) ★ 마감일은 해마다 공고로 확인',
   })
   return out
 }

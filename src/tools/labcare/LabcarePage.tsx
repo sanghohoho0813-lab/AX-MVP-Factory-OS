@@ -240,10 +240,12 @@ interface TaxForm {
   category: NonNullable<Client['taxCreditCategory']>
   businessType: NonNullable<Client['businessType']>
   rate: number | ''
+  /** D-136: 기업 규모 — 비우면 중소기업으로 가정(★) · 중견·대기업은 공제율 직접 입력 */
+  size: '' | NonNullable<Client['taxCompanySize']>
   benefitKeys: string[]
 }
 
-const EMPTY_TAX: TaxForm = { payroll: '', material: '', other: '', currentYearRndCost: '', category: '미정', businessType: '법인사업자', rate: '', benefitKeys: [] }
+const EMPTY_TAX: TaxForm = { payroll: '', material: '', other: '', currentYearRndCost: '', category: '미정', businessType: '법인사업자', rate: '', size: '', benefitKeys: [] }
 const TAX_CATEGORIES: TaxForm['category'][] = ['일반 R&D', '신성장·원천기술', '국가전략기술', '미정']
 
 function taxClientOf(f: TaxForm): Client {
@@ -266,6 +268,7 @@ function taxClientOf(f: TaxForm): Client {
     currentYearRndCost: f.currentYearRndCost === '' ? undefined : f.currentYearRndCost,
     taxCreditCategory: f.category,
     estimatedTaxCreditRate: f.rate === '' ? undefined : f.rate,
+    taxCompanySize: f.size === '' ? undefined : f.size,
   }
 }
 
@@ -275,7 +278,8 @@ function TaxTab() {
   const taxKey = clientId ? `${STORE.tax}.${clientId}` : STORE.tax
   const readTax = (k: string) => {
     const s = readStore<TaxForm>(k, EMPTY_TAX)
-    return { ...s, benefitKeys: Array.isArray(s.benefitKeys) ? s.benefitKeys : [] }
+    const size: TaxForm['size'] = s.size === '중소기업' || s.size === '중견기업' || s.size === '대기업' ? s.size : ''
+    return { ...s, size, benefitKeys: Array.isArray(s.benefitKeys) ? s.benefitKeys : [] }
   }
   const [form, setForm] = useState<TaxForm>(() => readTax(taxKey))
   const loadedFor = useRef(taxKey)
@@ -293,7 +297,7 @@ function TaxTab() {
   const est = useMemo(() => getTaxCreditEstimate(taxClientOf(form)), [form])
   const benefitText = composeBenefitText(form.benefitKeys)
   const summaryText = [
-    `[연구개발비 세액공제 예상] ${est.category} · ${est.taxType} · 적용률 ${est.rate}% (예시)`,
+    `[연구개발비 세액공제 예상] ${est.category} · ${est.taxType} · 적용률 ${est.rate}% (예시)${est.sizeAssumed ? ' · ★ 중소기업 기준' : ''}`,
     `당해연도 연구개발비 ${formatKRW(est.totalRnd)} → 연간 예상 ${formatKRW(est.annual)} (월 ${formatManwon(est.monthly)} · 일 ${formatManwon(est.daily)})`,
     ...est.assumptions.map((a) => `- ${a}`),
     ...(benefitText ? ['', '추가 검토 가능 영역', benefitText] : []),
@@ -310,8 +314,9 @@ function TaxTab() {
         <NumField label="기타 연구개발비" value={form.other} onChange={(v) => set('other', v)} unit="원" step={100000} />
         <NumField label="당해연도 연구개발비 합계 (직접 입력 시 위 세 칸 대신 씀)" value={form.currentYearRndCost} onChange={(v) => set('currentYearRndCost', v)} unit="원" step={100000} />
         <ChoiceGroup label="공제 유형" value={form.category} options={TAX_CATEGORIES} onChange={(v) => set('category', v)} labelOf={(v) => `${v} (${CATEGORY_RATES[v]}%)`} hint="유형별 예시 공제율 — 별표 해당 여부·구분경리 요건은 별도 검토" />
+        <ChoiceGroup label="기업 규모" value={form.size === '' ? '모름' : form.size} options={['중소기업', '중견기업', '대기업', '모름'] as const} onChange={(v) => set('size', v === '모름' ? '' : v)} hint="모르면 중소기업 기준(★) · 중견·대기업은 공제율이 낮아 직접 넣어야 계산" />
         <ChoiceGroup label="사업자 유형" value={form.businessType} options={['법인사업자', '개인사업자'] as const} onChange={(v) => set('businessType', v)} hint="법인세 / 종합소득세 구분" />
-        <NumField label="예상 공제율 직접 지정 (선택)" value={form.rate} onChange={(v) => set('rate', v)} unit="%" hint="비우면 공제 유형 기본값" />
+        <NumField label="예상 공제율 직접 지정 (선택)" value={form.rate} onChange={(v) => set('rate', v)} unit="%" hint="비우면 공제 유형 기본값 (0~100)" />
         <Button variant="ghost" size="sm" onClick={() => setForm(EMPTY_TAX)} className="self-start">
           <RotateCcw aria-hidden="true" className="size-4" /> 다시 입력
         </Button>
@@ -320,8 +325,11 @@ function TaxTab() {
       <div className="flex min-w-0 flex-col gap-4" aria-live="polite">
         {!est.available ? (
           <Surface className="flex flex-col items-center justify-center gap-2 p-8 text-center">
-            <span className="t-card font-bold text-slate-700">연구개발비를 적으면 예상 절세 규모가 나옵니다</span>
+            <span className="t-card font-bold text-slate-700">{est.totalRnd > 0 ? '공제율을 정해야 계산합니다' : '연구개발비를 적으면 예상 절세 규모가 나옵니다'}</span>
             <span className="t-sub break-keep text-slate-500">인건비·재료비·기타 중 하나만 있어도 계산합니다. 확정 금액이 아닌 검토용 예상치입니다.</span>
+            {est.warnings.map((w) => (
+              <span key={w} className="t-sub break-keep font-semibold text-amber-700" data-testid="lab-tax-warning">{w}</span>
+            ))}
           </Surface>
         ) : (
           <>
@@ -331,9 +339,13 @@ function TaxTab() {
                 <Badge tone="brand">{est.category}</Badge>
                 <Badge>{est.taxType}</Badge>
                 <Badge>적용률 {est.rate}%</Badge>
+                {est.sizeAssumed && <Badge tone="warning">★ 중소기업 기준</Badge>}
               </div>
               <p className="t-card font-bold break-keep text-slate-900">연간 약 {formatManwon(est.annual)} 절세 검토 가능성</p>
-              <p className="t-sub break-keep text-slate-600">당해연도 연구개발비 {formatKRW(est.totalRnd)} × {est.rate}% — 실제 적용은 연구개발비 범위·구분경리·세무조정에 따라 달라집니다.</p>
+              <p className="t-sub break-keep text-slate-600">당해연도 연구개발비 {formatKRW(est.totalRnd)} × {est.rate}% — 실제 적용은 연구개발비 범위·구분경리·세무조정에 따라 달라집니다. 그해 낼 세금보다 많이 공제받을 수는 없습니다.</p>
+              {est.warnings.map((w) => (
+                <p key={w} className="t-sub break-keep font-semibold text-amber-700" data-testid="lab-tax-warning">⚠ {w}</p>
+              ))}
               <div className="mt-1 flex flex-wrap gap-2">
                 <ToolResultAttach toolKey="labcare" title="세액공제 예상" verdict={null} verdictLabel={`연간 약 ${formatManwon(est.annual)}`} summary={summaryText} data={{ kind: 'tax', form, estimate: est }} />
               </div>

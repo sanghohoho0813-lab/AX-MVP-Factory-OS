@@ -18,6 +18,7 @@ import {
   unmarkReportSent,
 } from "../lib/storage";
 import { formatKRW, formatManwon, getTaxCreditEstimate } from "../../lib/taxCredit";
+import { ymdLocal } from "../../lib/deadlines";
 import type {
   CheckAnswers,
   Client,
@@ -476,7 +477,7 @@ function ReportBody() {
             </p>
             <p className="text-sm text-slate-500">
               담당 컨설턴트 {client.consultant || "—"} · 발행일{" "}
-              {new Date().toISOString().slice(0, 10).replace(/-/g, ".")}
+              {ymdLocal(new Date()).replace(/-/g, ".")}
             </p>
           </div>
         </div>
@@ -671,7 +672,7 @@ function VisitReport({
         {tax.available ? (
           <div className="mt-2 rounded-xl bg-navy-900 px-5 py-3.5 text-white">
             <p className="text-sm text-slate-300">요건 충족 시 연간 {tax.taxType} 절감 검토 가능액</p>
-            <p className="mt-0.5 text-2xl font-bold text-amber-300">약 {formatKRW(tax.annual)} <span className="ml-2 text-sm font-medium text-slate-300">({tax.category} {tax.rate}% 기준 · 사전 검토용)</span></p>
+            <p className="mt-0.5 text-2xl font-bold text-amber-300">약 {formatKRW(tax.annual)} <span className="ml-2 text-sm font-medium text-slate-300">({tax.category} {tax.rate}% 기준 · 사전 검토용{tax.sizeAssumed ? " · ★ 중소기업 기준" : ""})</span></p>
           </div>
         ) : null}
       </ReportSection>

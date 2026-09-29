@@ -5,6 +5,7 @@ import Layout from "../components/Layout";
 import PageGuide from "../components/PageGuide";
 import { FloorPlanner } from "../../screens/FloorPlanner";
 import { downloadSvgAsJpeg, printSvg } from "../../lib/download";
+import { ymdLocal } from "../../lib/deadlines";
 
 /* ═══════════════════ 타입 ═══════════════════ */
 
@@ -249,7 +250,7 @@ function OrgChartSvg({
   ];
   const labBoxH = 92 + labMembers.length * 30;
   const totalH = 150 + Math.max(110, labBoxH) + 16;
-  const today = new Date().toISOString().slice(0, 10).replace(/-/g, ".");
+  const today = ymdLocal(new Date()).replace(/-/g, ".");
 
   return (
     <svg ref={innerRef} viewBox={`0 0 ${totalW} ${totalH}`} className="w-full rounded-lg bg-white ring-1 ring-slate-200">

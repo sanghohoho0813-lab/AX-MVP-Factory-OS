@@ -1,6 +1,7 @@
 // 원본 데이터 백업/복원/초기화 (D-92) — 원본은 localStorage 를 훑었다. 이 OS 에서는 모듈 기록(../store)을 훑는다.
 // 앱 데이터는 모두 "pmsaas:" 접두사를 사용한다.
 import { storeKeys, storeRead, storeRemove, storeWrite } from "../store";
+import { ymdLocal } from "../../lib/deadlines";
 
 const APP_PREFIX = "pmsaas:";
 
@@ -38,7 +39,7 @@ export function exportData(): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `연구소사후관리OS_백업_${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `연구소사후관리OS_백업_${ymdLocal(new Date())}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
