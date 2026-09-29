@@ -29,6 +29,7 @@ import {
   toOrigEmployee,
   type Rec,
 } from './store'
+import { scrubRrnDeep } from '../lib/privacy'
 import './hr-orig.css'
 
 interface Loaded {
@@ -272,7 +273,7 @@ export function EmploymentOrig({
       const cur = ref.current
       if (!cur) return
       const rowId = key === 'programs' ? cur.programsRowId : cur.profileRowId
-      const saved = await saveRow(workspaceId, MODULE, 'orig', { id: rowId, clientId: '', data: { key, value } })
+      const saved = await saveRow(workspaceId, MODULE, 'orig', { id: rowId, clientId: '', data: scrubRrnDeep({ key, value }) })
       if (ref.current) {
         if (key === 'programs') ref.current.programsRowId = saved.id
         else ref.current.profileRowId = saved.id
@@ -309,7 +310,7 @@ export function EmploymentOrig({
       const memos = { ...cur.memos, [dateKey]: list }
       if (!list.length) delete memos[dateKey]
       commit({ ...cur, memos })
-      void saveRow(workspaceId, MODULE, 'calendar', { id: cur.memoRowId, clientId: '', data: { memos } })
+      void saveRow(workspaceId, MODULE, 'calendar', { id: cur.memoRowId, clientId: '', data: scrubRrnDeep({ memos }) })
         .then((saved) => {
           if (ref.current) ref.current.memoRowId = saved.id
         })

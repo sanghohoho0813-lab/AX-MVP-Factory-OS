@@ -5,7 +5,7 @@
  */
 
 import { BOSU_FLOOR_2026, ELIG, EXCL, MIN_WAGE_2026 } from './constants'
-import { calcAgeDetailed, calcMilitaryLimit } from './dates'
+import { YOUTH_MAX_AGE, youthAgeAt, youthByYears, youthLimitLabel } from './dates'
 import type { EmpType, Gender, Program } from './programs'
 
 export type Situation = 'new' | 'retain' | 'childcare'
@@ -35,9 +35,14 @@ export interface DiagnosisRow {
   score: number
   reasons: string[]
   blockers: string[]
+  /** ★ 확인할 것 (D-136) — 있으면 '가능성 높음' 으로 올리지 않는다(capped 일 때) */
+  cautions: string[]
 }
 
 const STATUS_ORDER: Record<DiagnosisStatus, number> = { recommend: 0, maybe: 1, exclude: 2 }
+
+/** 청년일자리도약장려금 참여 기업 — 피보험자 5인 이상 우선지원대상기업(일부 업종 1인 이상 예외) ★ 공고 확인 */
+export const YOUTH_JUMP_MIN_INSURED = 5
 
 export function diagnoseHiring(a: HiringAnswers, programs: readonly Program[]): DiagnosisRow[] {
   const results: DiagnosisRow[] = []
@@ -46,8 +51,10 @@ export function diagnoseHiring(a: HiringAnswers, programs: readonly Program[]): 
     let score = 0
     const reasons: string[] = []
     const blockers: string[] = []
+    const cautions: string[] = []
+    let capped = false
     if (m.deprecated) {
-      results.push({ program: p, status: 'exclude', score: 0, reasons: ['2026년 신규 종료'], blockers: [] })
+      results.push({ program: p, status: 'exclude', score: 0, reasons: ['2026년 신규 종료'], blockers: [], cautions: [] })
       return
     }
     const catHit = (m.cats || []).some((c) => (a.cats || []).indexOf(c) >= 0)
@@ -63,20 +70,31 @@ export function diagnoseHiring(a: HiringAnswers, programs: readonly Program[]): 
       }
     }
     if (m.ageMin != null || m.ageMax != null) {
-      let maxAge = m.ageMax
-      if (m.milExtend && a.gender === 'male' && a.milMonths > 0) {
-        maxAge = calcMilitaryLimit(a.milMonths).maxYears
-      }
-      if (a.age != null) {
-        let ageOk = true
-        if (m.ageMin != null && a.age < m.ageMin) ageOk = false
-        if (maxAge != null && a.age > maxAge) ageOk = false
-        if (ageOk) {
+      const age = a.age != null && Number.isFinite(a.age) ? a.age : null
+      if (age != null) {
+        // D-136: 청년(15~34세 · 병역 가산) 은 자격요건 화면과 같은 규칙(youthByYears)으로 본다
+        const youthRule = !!m.milExtend && m.ageMax === YOUTH_MAX_AGE
+        let verdict: 'ok' | 'fail' | 'border'
+        if (youthRule) {
+          verdict = youthByYears(age, a.gender === 'male' ? a.milMonths : 0) || 'fail'
+          if (m.ageMin != null && age < m.ageMin) verdict = 'fail'
+        } else {
+          verdict = 'ok'
+          if (m.ageMin != null && age < m.ageMin) verdict = 'fail'
+          if (m.ageMax != null && age > m.ageMax) verdict = 'fail'
+        }
+        if (verdict === 'ok') {
           score += 15
           reasons.push('나이 요건 충족')
+        } else if (verdict === 'border') {
+          cautions.push('★ 나이 경계 — 생년월일·입사일·복무기간으로 확인')
+          capped = true
         } else {
           blockers.push('나이 요건 미충족')
         }
+      } else if (catHit) {
+        cautions.push('★ 나이 미입력 — 나이 요건 확인')
+        capped = true
       }
     }
     if (m.gender && m.gender !== 'any' && a.gender && a.gender !== m.gender) {
@@ -112,19 +130,41 @@ export function diagnoseHiring(a: HiringAnswers, programs: readonly Program[]): 
       score += 12
       reasons.push('비수도권: 기업+청년 합산 가능')
     }
+    // D-136: 청년도약은 피보험자 5인 이상 우선지원대상기업 (일부 업종 예외) — 확실하지 않으면 올려 주지 않는다
+    if (p.id === 'youth_jump') {
+      if (a.companySize != null && Number.isFinite(a.companySize)) {
+        if (a.companySize < YOUTH_JUMP_MIN_INSURED) {
+          cautions.push('★ 피보험자 5인 미만 — 참여 가능 업종인지 확인')
+          capped = true
+        }
+      } else {
+        cautions.push('★ 회사 규모 미입력 — 5인 이상 우선지원대상기업인지 확인')
+      }
+    }
     let status: DiagnosisStatus
     if (blockers.length > 0 && !catHit && score < 30) status = 'exclude'
     else if (blockers.length > 0) status = 'maybe'
     else if (score >= 55) status = 'recommend'
     else if (score >= 22) status = 'maybe'
     else status = 'exclude'
-    results.push({ program: p, status: status, score: score, reasons: reasons, blockers: blockers })
+    if (capped && status === 'recommend') status = 'maybe'
+    results.push({ program: p, status: status, score: score, reasons: reasons, blockers: blockers, cautions: cautions })
   })
   results.sort((x, y) => {
     if (STATUS_ORDER[x.status] !== STATUS_ORDER[y.status]) return STATUS_ORDER[x.status] - STATUS_ORDER[y.status]
     return y.score - x.score
   })
   return results
+}
+
+/** 입력 글자 → 0 이상 정수. 비었거나 숫자가 아니면 null ('abc' 가 통과하지 않게) */
+export function parseCount(v: string | number | null | undefined): number | null {
+  if (v == null) return null
+  const s = String(v).trim().replace(/,/g, '')
+  if (!s) return null
+  const n = Number(s)
+  if (!Number.isFinite(n) || n < 0) return null
+  return Math.floor(n)
 }
 
 /**
@@ -156,11 +196,11 @@ export function buildAnswers(input: {
     situation: input.situation,
     cats: cats,
     specials: specials,
-    age: input.age !== '' ? Number(input.age) : null,
+    age: parseCount(input.age),
     gender: input.gender || null,
-    milMonths: Number(input.milMonths) || 0,
+    milMonths: parseCount(input.milMonths) || 0,
     region: input.region,
-    companySize: input.companySize !== '' ? Number(input.companySize) : null,
+    companySize: parseCount(input.companySize),
     empType: input.empType,
     preApply: input.preApply,
     noLayoff: input.noLayoff,
@@ -179,20 +219,30 @@ export interface WageCheck {
   gap: number
 }
 
-/** 월급·주 소정근로시간 → 시급 환산과 최저임금·보수하한 비교 */
+/** 주 소정근로시간 → 월 소정근로시간(주휴 포함). 40시간 이상은 209시간 */
+export function monthlyHoursOf(weeklyHours?: number | null): number {
+  const wh = Number(weeklyHours) > 0 ? Number(weeklyHours) : 40
+  return wh >= 40 ? 209 : Math.round((wh + (wh >= 15 ? (wh / 40) * 8 : 0)) * 4.345)
+}
+
+/**
+ * 월급·주 소정근로시간 → 시급 환산과 최저임금·보수하한 비교.
+ * D-136: 반올림한 시급으로 비교하지 않는다 — 월급 ≥ 최저시급 × 월 시간 을 그대로 비교한다
+ * (2,156,879원 / 209시간 은 반올림하면 10,320원이지만 미달이다). 표시 시급은 버림.
+ */
 export function checkWage(monthlyPay: number | null | undefined, weeklyHours?: number | null): WageCheck | null {
-  if (!monthlyPay || monthlyPay <= 0) return null
-  const wh = weeklyHours || 40
-  const mh = wh >= 40 ? 209 : Math.round((wh + (wh >= 15 ? (wh / 40) * 8 : 0)) * 4.345)
-  const hourlyWage = Math.round(monthlyPay / mh)
-  const minMonthly = Math.round(MIN_WAGE_2026 * mh)
+  const pay = Number(monthlyPay)
+  if (!Number.isFinite(pay) || pay <= 0) return null
+  const mh = monthlyHoursOf(weeklyHours)
+  const hourlyWage = Math.floor(pay / mh)
+  const minMonthly = MIN_WAGE_2026 * mh
   return {
     hourlyWage: hourlyWage,
     monthlyHours: mh,
     minMonthly: minMonthly,
     minHourly: MIN_WAGE_2026,
-    isAboveMin: hourlyWage >= MIN_WAGE_2026,
-    isAboveFloor: monthlyPay >= BOSU_FLOOR_2026,
+    isAboveMin: pay >= minMonthly,
+    isAboveFloor: pay >= BOSU_FLOOR_2026,
     gap: hourlyWage - MIN_WAGE_2026,
   }
 }
@@ -223,31 +273,32 @@ export interface YouthGateResult {
   hasBirth: boolean
 }
 
-/** 청년도약 자격요건 관문 — 원본 EligChk 의 aOk/anyE/allXok/nearBorder 계산 그대로 */
+/** 생년월일을 모를 때 원본 폼이 넣어 두던 자리값 — 이 값이면 '생년월일 미입력' 으로 본다 */
+export const BIRTH_PLACEHOLDER = '2000-01-01'
+
+/**
+ * 청년도약 자격요건 관문 — 원본 EligChk 의 aOk/anyE/allXok/nearBorder.
+ * D-136: 나이는 youthAgeAt(입사일 기준 만 나이, 병역 가산 최대 6년) 하나로 본다 — 채용 진단과 같은 규칙.
+ *        생년월일이 비었거나 자리값(2000-01-01)이면 ok 로 올리지 않는다.
+ */
 export function youthGate(input: YouthGateInput): YouthGateResult {
-  const ageD = calcAgeDetailed(input.birthDate, input.hireDate)
-  const age = ageD ? ageD.years : null
-  const ageMonths = ageD ? ageD.totalMonths : 0
-  const milLimit =
-    input.gender === 'male' ? calcMilitaryLimit(input.milMonths) : { maxTotalMonths: 34 * 12, maxYears: 34, maxRemainMonths: 0 }
-  const aOk = ageD !== null && ageMonths >= 15 * 12 && ageMonths <= milLimit.maxTotalMonths
+  const mil = input.gender === 'male' ? input.milMonths : 0
+  const ya = youthAgeAt(input.birthDate, input.hireDate || null, mil)
+  const aOk = ya.known && ya.ok
   const anyE = ELIG.some((e) => !!input.elig[e.id])
   const failedX = EXCL.filter((x) => input.excl[x.id] === false)
   const allXok = EXCL.every((x) => input.excl[x.id] === true)
-  const ok = aOk && anyE && allXok
-  const has = !!input.birthDate && input.birthDate !== '2000-01-01'
-  const maxLabel =
-    milLimit.maxRemainMonths > 0 ? '만' + milLimit.maxYears + '세' + milLimit.maxRemainMonths + '개월' : '만' + milLimit.maxYears + '세'
-  const nearBorder = !!ageD && input.gender === 'male' && input.milMonths > 0 && ageMonths > 34 * 12 && ageMonths <= milLimit.maxTotalMonths
+  const has = !!input.birthDate && input.birthDate !== BIRTH_PLACEHOLDER
+  const ok = has && aOk && anyE && allXok
   return {
-    age: age,
-    ageMonths: ageMonths,
-    maxLabel: maxLabel,
+    age: ya.age,
+    ageMonths: ya.totalMonths ?? 0,
+    maxLabel: youthLimitLabel(mil),
     ageOk: aOk,
     anyElig: anyE,
     allExclOk: allXok,
     failedExcl: failedX.map((x) => x.label),
-    nearBorder: nearBorder,
+    nearBorder: ya.byService,
     ok: ok,
     hasBirth: has,
   }

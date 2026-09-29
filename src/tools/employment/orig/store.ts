@@ -17,6 +17,7 @@
 
 import type { ClientOpsRecord } from '../../../types/clientOps'
 import type { ModuleRow } from '../../../services/moduleData'
+import { safeBizNo, scrubRrnDeep } from '../lib/privacy'
 
 export type Rec = Record<string, unknown>
 
@@ -89,7 +90,10 @@ export function toOrigCompany(os: ClientOpsRecord, meta: Rec | undefined, create
   return out
 }
 
-/** 원본 업체 → 모듈 기록에 남길 것 (고객 운영 기록과 같은 값은 적지 않는다 — 고객 운영에서 고치면 그대로 따라온다) */
+/**
+ * 원본 업체 → 모듈 기록에 남길 것 (고객 운영 기록과 같은 값은 적지 않는다 — 고객 운영에서 고치면 그대로 따라온다).
+ * D-136: 주민번호 모양은 저장하지 않는다 — 사업자번호 칸이면 비우고, 메모·업무 일지 글자에서는 지운다.
+ */
 export function companyMetaOf(company: Rec, os: ClientOpsRecord | undefined): Rec {
   const base = os ? osCompanyDefaults(os) : {}
   const out: Rec = {}
@@ -98,7 +102,8 @@ export function companyMetaOf(company: Rec, os: ClientOpsRecord | undefined): Re
     if (k in base && base[k] === v) continue
     out[k] = v
   }
-  return out
+  if ('bizNo' in out) out.bizNo = safeBizNo(out.bizNo)
+  return scrubRrnDeep(out)
 }
 
 /* ------------------------------------------------------------------ */
@@ -138,12 +143,12 @@ export function toOrigEmployee(row: Pick<ModuleRow, 'id' | 'clientId' | 'data'>)
   }
 }
 
-/** 원본 직원 → 모듈 기록. D-91 이름(hireDate · stage)도 같이 적어 둔다 */
+/** 원본 직원 → 모듈 기록. D-91 이름(hireDate · stage)도 같이 적어 둔다. 주민번호 모양은 지운다(D-136) */
 export function employeeRowData(emp: Rec): Rec {
   const { id: _id, companyId: _cid, ...rest } = emp
   void _id
   void _cid
-  return { ...rest, _v: 'orig', hireDate: str(emp.startDate), stage: str(emp.status) || 'preparing' }
+  return scrubRrnDeep({ ...rest, _v: 'orig', hireDate: str(emp.startDate), stage: str(emp.status) || 'preparing' })
 }
 
 /* ------------------------------------------------------------------ */

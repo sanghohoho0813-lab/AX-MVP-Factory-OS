@@ -6,11 +6,11 @@
  */
 import { makeSimpleXlsx } from '../../../services/__tests__/xlsxFixture'
 import { BOSU_FLOOR_2026, DIAG_CATS, ELIG, EXCL, MIN_WAGE_2026, MIN_WAGE_MONTH_2026, STS } from '../lib/constants'
-import { COMPANY_DEFAULT_DOCS, DEFAULT_PROGRAMS, PROGRAM_CHECKLISTS, PROGRAM_ENABLED_DEFAULTS, PROGRAM_LIST, type Program } from '../lib/programs'
-import { addMo, calcAgeDetailed, calcMilitaryLimit, formatDday, getDdayFrom, parseJumin } from '../lib/dates'
+import { COMPANY_DEFAULT_DOCS, DEFAULT_PROGRAMS, PROGRAM_CHECKLISTS, PROGRAM_ENABLED_DEFAULTS, PROGRAM_LIST, roundsMismatch, roundsSum, type Program } from '../lib/programs'
+import { addMo, calcAgeDetailed, calcMilitaryLimit, fD, formatDday, getDdayFrom, parseJumin, toYMD, youthAgeAt, youthByYears } from '../lib/dates'
 import { fMan, fProgramAmt, fmtBizNo, fmtPhone, clampMoney, clampRate } from '../lib/format'
 import { buildAnswers, checkWage, diagnoseHiring, youthGate, type HiringAnswers } from '../lib/eligibility'
-import { computePayroll } from '../lib/payroll'
+import { basicIncomeTax, computePayroll, RATE_LABELS, RATES_2026 } from '../lib/payroll'
 import { buildRounds, roundDate, roundSchedule, sumReceived, sumRemaining } from '../lib/schedule'
 import {
   EMP_STAGES,
@@ -30,7 +30,8 @@ import { companyMetaOf, employeeRowData, matchOsClient, memosFromRow, osCompanyD
 import type { ClientOpsRecord } from '../../../types/clientOps'
 import { simulate, simulationText } from '../lib/simulator'
 import { agencyAutoComment, agencyDocRequestText, agencyReportData, agencySummaryText, commissionSummary, companyRanking, companyRiskRanking, ddayAlerts, emptyCompanyMeta, monthlyReceived, pendingPayments, programPipeline } from '../lib/companyMeta'
-import { buildImportPreview, xlAutoMap, xlBizNoCheck, xlDetectHeader, xlNormDate } from '../lib/excelImport'
+import { buildImportPreview, parseBulkPaste, parseMoneyCell, xlAutoMap, xlBizNoCheck, xlDetectHeader, xlNormDate } from '../lib/excelImport'
+import { birthFromCell, looksLikeRrn, safeBizNo } from '../lib/privacy'
 import {
   analyzeRoster,
   buildCopyText,
@@ -48,11 +49,14 @@ import {
   ROSTER_FIELDS,
   rosterStaleness,
   SUBSIDY_DEFS,
+  SUBSIDY_ESTIMATE_NOTE,
   SUBSIDY_MAX_PER_PERSON,
   TAX_CHECKLIST,
   textToGrid,
   detectRoster,
   extractEmployees,
+  idCellKind,
+  normDate,
   type RosterEmployee,
 } from '../lib/payrollDiagnosis'
 
@@ -127,12 +131,13 @@ check('calcAgeDetailed', (() => {
   const d = calcAgeDetailed('1991-01-15', '2026-06-01')
   return !!d && d.years === 35 && d.months === 4 && d.totalMonths === 424
 })())
+// D-136: 상한은 '만 34세 11개월(35번째 생일 전날)' + 복무 개월 · 최대 만 39세 11개월
 check('calcMilitaryLimit 18개월', (() => {
   const m = calcMilitaryLimit(18)
-  return m.maxTotalMonths === 426 && m.maxYears === 35 && m.maxRemainMonths === 6 && m.isBorderline === true
-})())
-check('calcMilitaryLimit 상한 39*12', calcMilitaryLimit(100).maxTotalMonths === 39 * 12 && calcMilitaryLimit(100).maxYears === 39)
-check('calcMilitaryLimit 0', calcMilitaryLimit(0).maxTotalMonths === 408 && calcMilitaryLimit(0).isBorderline === false)
+  return m.maxTotalMonths === 34 * 12 + 11 + 18 && m.extMonths === 18 && m.maxYears === 35 && m.maxRemainMonths === 6 && m.isBorderline === true
+})(), JSON.stringify(calcMilitaryLimit(18)))
+check('calcMilitaryLimit 상한 만 39세 11개월', calcMilitaryLimit(100).maxTotalMonths === 39 * 12 + 11 && calcMilitaryLimit(100).extMonths === 72 && calcMilitaryLimit(100).maxYears === 39, JSON.stringify(calcMilitaryLimit(100)))
+check('calcMilitaryLimit 0', calcMilitaryLimit(0).maxTotalMonths === 34 * 12 + 11 && calcMilitaryLimit(0).isBorderline === false)
 check('parseJumin 9501011', (() => {
   const p = parseJumin('9501011')
   return !!p && p.birthDate === '1995-01-01' && p.gender === 'male' && p.year === 1995
@@ -164,50 +169,66 @@ check('checkWage 20h', (() => {
 check('checkWage 0', checkWage(0, 40) === null)
 
 // ── computePayroll ──────────────────────────────────────
-check('computePayroll 300만/40h/부양0', (() => {
-  const r = computePayroll(3000000, 40, 0)
+// D-136: 2026 요율 (국민연금 4.75% · 상한 637만 · 하한 40만 · 건강 3.595% · 장기요양 13.14% · 고용안정 0.25%)
+check('computePayroll 2026 요율 한 묶음', RATES_2026.pensionEach === 0.0475 && RATES_2026.pensionBaseCap === 6370000 && RATES_2026.pensionBaseFloor === 400000 && RATES_2026.healthEach === 0.03595 && RATES_2026.careOfHealth === 0.1314 && RATES_2026.employEach === 0.009 && RATES_2026.employStabilityEr === 0.0025 && RATES_2026.injuryEr === 0.0143)
+check('computePayroll 표시 글자도 같은 숫자', RATE_LABELS.pension === '4.75%' && RATE_LABELS.health === '3.595%' && RATE_LABELS.care === '건보×13.14%' && RATE_LABELS.injury.includes('★확인') && RATE_LABELS.note.includes('★') && RATE_LABELS.incomeTax.includes('근사치'), JSON.stringify(RATE_LABELS))
+check('computePayroll 300만/40h/부양1', (() => {
+  const r = computePayroll(3000000, 40, 1)
   if (!r) return false
   const monthly = 3000000
-  const pensionBase = Math.min(monthly, 5900000)
-  const pension = Math.round(pensionBase * 0.045)
-  const health = Math.round(monthly * 0.03545)
-  const care = Math.round(health * 0.1295)
+  const pension = Math.round(3000000 * 0.0475)
+  const health = Math.round(monthly * 0.03595)
+  const care = Math.round(health * 0.1314)
   const employ = Math.round(monthly * 0.009)
+  const stab = Math.round(monthly * 0.0025)
   const injury = Math.round(monthly * 0.0143)
+  // 간이세액표 산식 근사: 근로소득공제 · 인적 150만 · 연금보험료 · 특별소득공제 표준(1명) · 근로소득세액공제(한도)
   const annual = monthly * 12
   const emDed = 7500000 + (annual - 15000000) * 0.15
-  const taxBase = Math.max(0, annual - emDed - 1500000 * 1)
+  const special = 3100000 + annual * 0.04 - (annual - 30000000) * 0.05
+  const taxBase = annual - emDed - 1500000 - pension * 12 - special
   const annTax = 840000 + (taxBase - 14000000) * 0.15
-  const credit = Math.min(annTax <= 1300000 ? annTax * 0.55 : 715000 + (annTax - 1300000) * 0.3, 740000)
-  const incomeTax = Math.max(0, Math.round((annTax - credit) / 12))
-  const localTax = Math.round(incomeTax * 0.1)
+  const credit = Math.min(715000 + (annTax - 1300000) * 0.3, 740000 - (annual - 33000000) * 0.008)
+  const incomeTax = Math.round((annTax - credit) / 12)
   return (
     r.pension_ee === pension &&
-    r.pension_ee === 135000 &&
+    r.pension_ee === 142500 &&
     r.health_ee === health &&
+    r.health_ee === 107850 &&
     r.care_ee === care &&
     r.employ_ee === employ &&
     r.total4_ee === pension + health + care + employ &&
     r.pension_er === pension &&
+    r.employStab_er === stab &&
+    r.employStab_er === 7500 &&
     r.injury_er === injury &&
-    r.total4_er === pension + health + care + employ + injury &&
+    r.total4_er === pension + health + care + employ + stab + injury &&
     r.incomeTax === incomeTax &&
-    r.incomeTax === 131458 &&
-    r.localTax === localTax &&
-    r.netPay === monthly - r.total4_ee - incomeTax - localTax &&
+    r.localTax === Math.round(incomeTax * 0.1) &&
+    r.netPay === monthly - r.total4_ee - r.incomeTax - r.localTax &&
     r.totalEmployerCost === monthly + r.total4_er &&
     r.hourlyWage === 14354 &&
     r.isAboveMin
   )
-})(), JSON.stringify(computePayroll(3000000, 40, 0)))
-check('computePayroll 연금 상한 590만', (() => {
+})(), JSON.stringify(computePayroll(3000000, 40, 1)))
+check('computePayroll 소득세: 예전 식(연금·특별공제 빠짐)보다 낮다 · 0 보다 크다', (() => {
+  const r = computePayroll(3000000, 40, 1)
+  return !!r && r.incomeTax > 0 && r.incomeTax < 131458
+})(), String(computePayroll(3000000, 40, 1)?.incomeTax))
+check('computePayroll 연금 상한 637만', (() => {
   const r = computePayroll(8000000, 40, 1)
-  return !!r && r.pension_ee === Math.round(5900000 * 0.045)
+  return !!r && r.pension_ee === Math.round(6370000 * 0.0475)
 })())
-check('computePayroll 저소득 구간(연 500만 이하 70%)', (() => {
+check('computePayroll 연금 하한 40만', (() => {
+  const r = computePayroll(300000, 15, 1)
+  return !!r && r.pension_ee === Math.round(400000 * 0.0475)
+})())
+check('computePayroll 저소득 → 소득세 0', (() => {
   const r = computePayroll(400000, 40, 1)
   return !!r && r.incomeTax === 0 && r.localTax === 0
 })())
+check('computePayroll 음수 급여 → 0 으로 보고 계산 안 함', computePayroll(-3000000, 40, 1) === null)
+check('computePayroll 고소득 세율 구간(3억 초과 40%)', basicIncomeTax(400000000) === 94060000 + 100000000 * 0.4 && basicIncomeTax(150000000) === 37060000)
 check('computePayroll 0 → null', computePayroll(0, 40, 1) === null)
 
 // ── diagnoseHiring ──────────────────────────────────────
@@ -288,7 +309,7 @@ const ALL_ELIG_NONE: Record<string, boolean> = {}
 const ALL_EXCL_OK: Record<string, boolean> = { x1: true, x2: true, x3: true, x4: true, x5: true }
 {
   const g = youthGate({ birthDate: '1991-01-15', gender: 'male', milMonths: 18, elig: { e3: true }, excl: ALL_EXCL_OK, hireDate: '2026-06-01' })
-  check('youthGate 경계선 (35세4개월 · 군 18개월)', g.age === 35 && g.ageOk && g.nearBorder && g.ok && g.maxLabel === '만35세6개월', JSON.stringify(g))
+  check('youthGate 경계선 (35세4개월 · 군 18개월)', g.age === 35 && g.ageOk && g.nearBorder && g.ok && g.maxLabel === '만34세(+복무 18개월 · 최대 39세)', JSON.stringify(g))
   const g2 = youthGate({ birthDate: '1991-01-15', gender: 'male', milMonths: 0, elig: { e3: true }, excl: ALL_EXCL_OK, hireDate: '2026-06-01' })
   check('youthGate 군복무 없으면 미충족', !g2.ageOk && !g2.ok && !g2.nearBorder && g2.maxLabel === '만34세')
   const g3 = youthGate({ birthDate: '1998-03-10', gender: 'female', milMonths: 0, elig: ALL_ELIG_NONE, excl: ALL_EXCL_OK, hireDate: '2026-06-01' })
@@ -327,21 +348,26 @@ const ROSTER: RosterEmployee[] = [
   check('classify 61세 → senior_continue·senior_intern', d1.age === 61 && d1.isSenior && d1.candidates.map((c) => c.key).join() === 'senior_continue,senior_intern' && d1.candidates.every((c) => c.level === 'check'))
   const d2 = classifyEmployee(ROSTER[2], { baseDate: BASE })
   check('classify 여성 40세 · 고용/산재 미가입', d2.age === 40 && d2.isFemale && d2.eiNeedsCheck && d2.wcNeedsCheck && d2.insPartial && d2.onlyNpHi && d2.relSuspect && d2.insMissingCount === 2)
-  check('  후보 saeil_women(check) + 확인 문구', d2.candidates.length === 1 && d2.candidates[0].key === 'saeil_women' && d2.candidates[0].level === 'check' && d2.candidates[0].note.indexOf('고용보험 피보험자격 확인 필요') >= 0 && d2.candidates[0].note.indexOf('특수관계자·대표자·임원 여부 확인 필요') >= 0)
+  // D-136: 김영희는 입사(2020-03-01) 때 만 34세 → 청년. 다만 입사 13개월이 넘어 청년도약은 '추가자료 필요' 로만
+  const sw = d2.candidates.find((c) => c.key === 'saeil_women')
+  const yj2 = d2.candidates.find((c) => c.key === 'youth_jump')
+  check('  후보 saeil_women(check) + 확인 문구', !!sw && sw.level === 'check' && sw.note.indexOf('고용보험 피보험자격 확인 필요') >= 0 && sw.note.indexOf('특수관계자·대표자·임원 여부 확인 필요') >= 0)
+  check('  입사 때 청년이던 오래된 직원 → youth_jump 는 more · 기간 문구', d2.isYouth && d2.hireAge === 34 && !!yj2 && yj2.level === 'more' && yj2.note.includes('입사 13개월 넘음'), JSON.stringify(yj2))
   const d3 = classifyEmployee({ ...ROSTER[0], rel: 'ceo' }, { baseDate: BASE })
   check('classify 대표자 표시 → level more', d3.relMarked && d3.candidates[0].level === 'more')
   const d4 = classifyEmployee({ ...ROSTER[0], statusRaw: '상실' }, { baseDate: BASE })
   check('classify 상실 → active false', !d4.active)
 
   const a = analyzeRoster(ROSTER, { baseDate: BASE })
-  check('analyzeRoster counts', a.counts.totalEmp === 3 && a.counts.activeCount === 3 && a.counts.youthCount === 1 && a.counts.seniorCount === 1 && a.counts.generalCount === 2 && a.counts.newHireCount === 1, JSON.stringify(a.counts))
+  check('analyzeRoster counts (청년은 입사일 기준)', a.counts.totalEmp === 3 && a.counts.activeCount === 3 && a.counts.youthCount === 2 && a.counts.seniorCount === 1 && a.counts.generalCount === 1 && a.counts.newHireCount === 1, JSON.stringify(a.counts))
   check('analyzeRoster 확인 필요 인원', a.eiCheckCount === 1 && a.wcCheckCount === 1 && a.partialInsCount === 1 && a.relCheckCount === 1)
-  check('analyzeRoster 후보 지원금 4건', a.candidateSubsidyCount === 4 && a.checkItemCount === 5, `${a.candidateSubsidyCount}/${a.checkItemCount}`)
+  check('analyzeRoster 후보 지원금 4건', a.candidateSubsidyCount === 4 && a.checkItemCount === 6, `${a.candidateSubsidyCount}/${a.checkItemCount}`)
   const yj = a.subsidySummary.find((s) => s.key === 'youth_jump')
   const pa = a.subsidySummary.find((s) => s.key === 'parental')
   check('summary youth_jump check 1 · level check', !!yj && yj.check === 1 && yj.candidateCount === 1 && yj.level === 'check' && yj.confidence === 'more')
   check('summary parental 는 항상 more', !!pa && pa.level === 'more' && pa.candidateCount === 0)
-  check('estimateSubsidyTotal', estimateSubsidyTotal(a.subsidySummary) === (1200 + 720 + 240 + 380) * 10000)
+  // D-136: 규칙표 총액 하나만 쓴다 (청년도약 720 · 계속고용 720 · 시니어 인턴 550 · 새일 400)
+  check('estimateSubsidyTotal', estimateSubsidyTotal(a.subsidySummary) === (720 + 720 + 550 + 400) * 10000, String(estimateSubsidyTotal(a.subsidySummary)))
   const txt = buildCopyText({ company: '미래상사', totalEmp: 3, youthCount: 1, seniorCount: 1, eiCheckCount: 1, wcCheckCount: 1, partialInsCount: 1, relCheckCount: 1, candidateSubsidyCount: 4 })
   check('buildCopyText 첫줄·주의문구', txt.startsWith('미래상사 4대보험 명부 1차 검토 결과') && txt.indexOf('· 통합고용세액공제 예상: 전년도 인원·소재지 입력 후 검토 가능') >= 0 && txt.indexOf('홍길동') < 0)
 }
@@ -403,7 +429,7 @@ check('estimateTaxCredit 모름 → computable false', (() => {
 check('LEVELS 4 · 라벨', LEVELS.likely.label === '가능성 높음' && LEVELS.check.label === '확인 필요' && LEVELS.more.label === '추가자료 필요' && LEVELS.unknown.label === '판단 불가')
 check('CONFIDENCE_META', CONFIDENCE_META.some.label === '일부 자료 필요' && CONFIDENCE_META.limited.label === '판단 제한')
 check('SUBSIDY_DEFS 6 · parental limited', SUBSIDY_DEFS.length === 6 && SUBSIDY_DEFS[5].key === 'parental' && SUBSIDY_DEFS[5].confidence === 'limited')
-check('SUBSIDY_MAX_PER_PERSON', SUBSIDY_MAX_PER_PERSON.youth_jump === 1200 && SUBSIDY_MAX_PER_PERSON.saeil_women === 380 && SUBSIDY_MAX_PER_PERSON.parental === 0)
+check('SUBSIDY_MAX_PER_PERSON = 규칙표 총액', SUBSIDY_MAX_PER_PERSON.youth_jump * 10000 === DEFAULT_PROGRAMS.youth_jump.totalAmount && SUBSIDY_MAX_PER_PERSON.saeil_women * 10000 === DEFAULT_PROGRAMS.saeil_women.totalAmount && SUBSIDY_MAX_PER_PERSON.senior_intern * 10000 === DEFAULT_PROGRAMS.senior_intern.totalAmount && SUBSIDY_MAX_PER_PERSON.parental === 0 && SUBSIDY_ESTIMATE_NOTE.startsWith('★'))
 check('EMP_DOC_CHECKLIST 7 · TAX_CHECKLIST 7', EMP_DOC_CHECKLIST.length === 7 && TAX_CHECKLIST.length === 7 && TAX_CHECKLIST[6] === '세무대리인(세무사) 최종 검토 필요')
 check('ROSTER_FIELDS 9', ROSTER_FIELDS.length === 9 && ROSTER_FIELDS[0].key === 'name' && ROSTER_FIELDS[1].aliases.indexOf('주민(앞)') >= 0)
 
@@ -597,6 +623,184 @@ check('ROSTER_FIELDS 9', ROSTER_FIELDS.length === 9 && ROSTER_FIELDS[0].key === 
   check('지원금 표: 끈 것은 끈 채로 · 기본값은 원본대로 · 더한 것도', pm?.youth_jump.enabled === false && pm?.work_exp.enabled === false && pm?.my1.enabled === true)
   const memos = memosFromRow({ memos: { '2026-09-05': [{ id: 'a', text: 'x' }], '2026-9-5': [{ id: 'b', text: 'y' }] } })
   check('달력 메모: D-92 날짜 열쇠를 원본 모양으로 모은다', Object.keys(memos).join() === '2026-9-5' && memos['2026-9-5'].length === 2)
+}
+
+
+/* ═══ D-136 고용지원금 바로잡기 — 틀리면 큰일인 곳 ═══ */
+{
+  const RRN_LIKE = /\d{6}\s*-?\s*[1-8]\d{6}/
+  const noRrn = (v: unknown) => {
+    const j = JSON.stringify(v)
+    return !RRN_LIKE.test(j) && !/(?<!\d)\d{13}(?!\d)/.test(j) && j.indexOf('1234567') < 0
+  }
+
+  // ── 1. 주민번호가 사업자번호·메모로 저장되지 않는다 ──
+  const m1 = xlAutoMap(['업체명', '주민등록번호', '성명', '생년월일'])
+  check('RRN: 주민등록번호 칸은 사업자번호로 잡히지 않는다', m1.map.bizNo === -1 && Object.values(m1.map).indexOf(1) < 0, JSON.stringify(m1.map))
+  check('RRN: 느슨한 "등록번호" 칸도 사업자번호가 아니다', xlAutoMap(['업체명', '등록번호', '성명']).map.bizNo === -1)
+  check('RRN: "사업자 등록 번호(필수)" 는 사업자번호', xlAutoMap(['상호', '사업자 등록 번호(필수)', '이름']).map.bizNo === 1)
+  check('RRN: 모양 판별', looksLikeRrn('950115-1234567') && looksLikeRrn('950115-1******') && looksLikeRrn('메모 9501151234567 확인') && !looksLikeRrn('123-45-67890') && !looksLikeRrn('2026-01-15') && !looksLikeRrn('010-1234-5678') && !looksLikeRrn('c1/1727654400000_a.pdf'))
+  check('RRN: 사업자번호 칸 값', safeBizNo('950115-1234567') === '' && safeBizNo('9501151234567') === '' && safeBizNo('123-45-67890') === '123-45-67890')
+  {
+    const grid = [
+      ['업체명', '번호', '성명', '메모', '생년월일'],
+      ['한솔테크', '950115-1234567', '김하나', '주민 9501151234567 확인', '950115-1234567'],
+    ]
+    const pv = buildImportPreview({ grid, headerRow: 0, map: { companyName: 0, bizNo: 1, empName: 2, memo: 3, birthDate: 4, startDate: -1, salary: -1, programName: -1, status: -1 }, clients: [{ id: 'c1', companyName: '한솔테크', businessNumber: '' }], programs: [], existing: [] })
+    const row = pv.rows[0]
+    check('RRN: 사업자번호 칸에 주민번호를 직접 이어도 저장 안 함', row.bizNo === '' && row.messages.some((x) => x.includes('주민번호 모양')), JSON.stringify(row))
+    check('RRN: 생년월일 칸의 주민번호는 생년월일만', row.birthDate === '1995-01-15' && row.messages.some((x) => x.includes('생년월일만')))
+    check('RRN: 미리보기·저장 대상 어디에도 13자리가 없다', noRrn(pv) && row.memo.includes('[주민번호 지움]'), JSON.stringify(pv.toSave))
+  }
+  {
+    const os = { id: 'cli_a', companyName: '한솔테크', businessNumber: '123-45-67890', businessAddress: '서울', corporateNumber: '', representativeName: '', contactName: '', archivedAt: null, createdAt: '' } as unknown as ClientOpsRecord
+    const saved = companyMetaOf({ id: 'cli_a', name: '한솔테크', bizNo: '950115-1234567', memo: '9501151234567', notes: [{ id: 'n1', text: '대표 주민번호 950115-1234567' }], companyDocs: [{ id: 'd', label: '통장', files: [{ path: 'cli_a/1727654400000_a.pdf' }] }] }, os)
+    check('RRN: 업체 저장 — 사업자번호 칸이 주민번호면 비운다', saved.bizNo === '', JSON.stringify(saved))
+    check('RRN: 업체 저장 — 어디에도 13자리 번호가 없다(파일 경로 제외)', noRrn({ ...saved, companyDocs: undefined }), JSON.stringify(saved))
+    check('RRN: 업체 저장 — 파일 경로 숫자는 건드리지 않는다', JSON.stringify(saved).includes('cli_a/1727654400000_a.pdf'))
+    const er = employeeRowData({ id: 'e', companyId: 'c', name: '김', memo: '950115-1234567 / 880202-2******', birthDate: '1995-01-15' })
+    check('RRN: 직원 저장 — 메모의 주민번호를 지운다 · 생년월일은 둔다', noRrn(er) && er.birthDate === '1995-01-15' && !String(er.memo).includes('880202-2'), JSON.stringify(er))
+  }
+  check('RRN: 생년월일 칸 읽기', birthFromCell('9501151', (x) => xlNormDate(x).value).value === '1995-01-15' && birthFromCell('19950115', (x) => xlNormDate(x).value).fromRrn === false && birthFromCell('19950115', (x) => xlNormDate(x).value).value === '1995-01-15')
+
+  // ── 2. 청년 나이: 만 34세 11개월 통과 · 35세 0개월 탈락 · 병역 가산 · 두 화면 같은 답 ──
+  const gate = (birthDate: string, milMonths = 0, gender: 'male' | 'female' = 'male') => youthGate({ birthDate, gender, milMonths, elig: { e1: true }, excl: ALL_EXCL_OK, hireDate: '2026-06-01' })
+  check('청년: 34세 10개월 통과', gate('1991-07-02').ageOk && gate('1991-07-02').ok)
+  check('청년: 34세 11개월(35번째 생일 전날) 통과', gate('1991-06-02').ageOk, JSON.stringify(gate('1991-06-02')))
+  check('청년: 35세 0개월(35번째 생일 당일) 탈락', !gate('1991-06-01').ageOk)
+  check('청년: 15세 미만 탈락 · 15세 통과', !gate('2011-06-02').ageOk && gate('2011-06-01').ageOk)
+  check('청년: 36세 0개월 · 복무 12개월 → 35세 → 탈락', !youthAgeAt('1990-06-01', '2026-06-01', 12).ok)
+  check('청년: 36세 0개월 · 복무 13개월 → 34세 → 통과(복무 덕)', youthAgeAt('1990-06-01', '2026-06-01', 13).ok && youthAgeAt('1990-06-01', '2026-06-01', 13).byService)
+  check('청년: 39세 11개월 · 복무 72개월 → 통과', youthAgeAt('1986-06-02', '2026-06-01', 72).ok)
+  check('청년: 40세 0개월 · 복무 72개월 → 탈락(최대 만 39세)', !youthAgeAt('1986-06-01', '2026-06-01', 72).ok)
+  check('청년: 복무 100개월도 6년까지만', calcMilitaryLimit(100).extMonths === 72)
+  check('청년: 여성은 복무 가산을 쓰지 않는다(입력 화면과 같게)', !gate('1990-06-01', 24, 'female').ageOk && gate('1990-06-01', 24, 'male').ageOk)
+  check('청년: 생년월일 자리값(2000-01-01)이면 대상자 예상으로 올리지 않는다', !gate('2000-01-01').ok && !gate('2000-01-01').hasBirth && !gate('').ok)
+  check('청년: 나이(만 N세)만 알 때', youthByYears(34, 0) === 'ok' && youthByYears(35, 0) === 'fail' && youthByYears(14, 0) === 'fail' && youthByYears(36, 24) === 'ok' && youthByYears(36, 18) === 'border' && youthByYears(40, 72) === 'fail')
+  {
+    // 두 화면이 서로 다른 답을 내지 않는다: 자격요건(생년월일) 통과인데 채용 진단(만 N세)이 막거나, 진단이 '충족' 인데 자격요건이 떨어뜨리는 일 없음
+    let disagree = ''
+    for (let y = 1984; y <= 1994; y++) {
+      for (const md of ['01-15', '05-31', '06-01', '06-02', '12-31']) {
+        for (const mil of [0, 11, 12, 18, 24, 60, 72]) {
+          const b = `${y}-${md}`
+          const g = youthAgeAt(b, '2026-06-01', mil)
+          const v = youthByYears(g.age, mil)
+          if (g.ok && v === 'fail') disagree += `${b}/${mil}:gate ok·diag fail `
+          if (!g.ok && v === 'ok') disagree += `${b}/${mil}:gate fail·diag ok `
+        }
+      }
+    }
+    check('청년: 채용 진단과 자격요건이 같은 규칙', disagree === '', disagree)
+  }
+  {
+    const rows = diagnoseHiring({ ...BASE_ANSWERS, age: 36, milMonths: 18 }, PROGRAM_LIST)
+    const yj = rowOf(rows, 'youth_jump')
+    check('채용 진단: 36세·복무 18개월은 경계 → 막지 않고 ★ 확인', !!yj && yj.status === 'maybe' && yj.blockers.length === 0 && yj.cautions.some((c) => c.includes('나이 경계')), JSON.stringify(yj && { s: yj.status, b: yj.blockers, c: yj.cautions }))
+    const ans = buildAnswers({ situation: 'new', cats: ['청년'], specials: [], age: 'abc', gender: 'male', milMonths: 'x', region: '비수도권', companySize: '10', empType: '정규직', preApply: true, noLayoff: true, aboveFloor: true, youthEligible: true })
+    const yj2 = rowOf(diagnoseHiring(ans, PROGRAM_LIST), 'youth_jump')
+    check('채용 진단: 나이 "abc" 는 통과하지 않는다', ans.age === null && !!yj2 && yj2.reasons.indexOf('나이 요건 충족') < 0 && yj2.status !== 'recommend' && yj2.cautions.some((c) => c.includes('나이 미입력')), JSON.stringify(yj2 && { s: yj2.status, r: yj2.reasons, c: yj2.cautions }))
+  }
+
+  // ── 11. 청년도약 5인 이상 우선지원대상기업 ──
+  {
+    const small = rowOf(diagnoseHiring({ ...BASE_ANSWERS, companySize: 3 }, PROGRAM_LIST), 'youth_jump')
+    check('청년도약: 피보험자 3명 → 가능성 높음으로 올리지 않고 ★', !!small && small.status === 'maybe' && small.cautions.some((c) => c.includes('5인 미만')), JSON.stringify(small && { s: small.status, c: small.cautions }))
+    const unknown = rowOf(diagnoseHiring({ ...BASE_ANSWERS, companySize: null }, PROGRAM_LIST), 'youth_jump')
+    check('청년도약: 규모 모름 → ★ 확인 문구', !!unknown && unknown.cautions.some((c) => c.includes('회사 규모 미입력')))
+    const ok10 = rowOf(diagnoseHiring(BASE_ANSWERS, PROGRAM_LIST), 'youth_jump')
+    check('청년도약: 10명이면 그대로 가능성 높음', !!ok10 && ok10.status === 'recommend' && ok10.cautions.length === 0)
+  }
+
+  // ── 3·4. 명부: 생년월일 칸이 날짜면 날짜로 · 이름 먼저 배치 ──
+  {
+    const grid = textToGrid(['성명,생년월일,자격취득일', '홍길동,1995-01-15,2026-01-05', '김영희,19880202,2025.07.01', '박철수,34714,2025-01-01', '이서준,1995.01.15,2025-02-01'].join('\n'))
+    const emps = extractEmployees(grid, detectRoster(grid))
+    check('명부: 생년월일 1995-01-15 → 그대로 (주민번호로 읽지 않음)', emps[0].birthDate === '1995-01-15' && emps[0].gender === null && emps[0].rrnMasked === null, JSON.stringify(emps[0]))
+    check('명부: 19880202 · 엑셀 날짜 · 점 표기', emps[1].birthDate === '1988-02-02' && emps[2].birthDate === '1995-01-15' && emps[3].birthDate === '1995-01-15', JSON.stringify(emps.map((e) => e.birthDate)))
+    check('명부: 칸 값 종류', idCellKind('950115-1******') === 'rrn' && idCellKind('9501151') === 'rrn' && idCellKind('9501151234567') === 'rrn' && idCellKind('1995-01-15') === 'date' && idCellKind('19950115') === 'date' && idCellKind('abc') === 'none')
+  }
+  {
+    const nameFirst = ['성명 주민등록번호 국민연금 건강보험 산재보험 고용보험', '홍길동 980310-1****** 2026-01-05 2026-01-05 2026-01-05 2026-01-05', '김영희 860201-2****** 2020-03-01 2020-03-01 - -', '박철수 900101-1234567 2025.08.01 2025.08.01 2025.08.01 2025.08.01']
+    for (const [label, text] of [['줄 나눔', nameFirst.join('\n')], ['한 줄', nameFirst.join(' ')]] as const) {
+      const r = parseRosterText(text)
+      const e = r.employees
+      check(`명부 이름 먼저(${label}): 이름이 제자리`, e.length === 3 && e[0].name === '홍길동' && e[1].name === '김영희' && e[2].name === '박철수', JSON.stringify(e.map((x) => x.name)))
+      check(`명부 이름 먼저(${label}): 입사일이 제자리`, e[0]?.hireDate === '2026-01-05' && e[1]?.hireDate === '2020-03-01' && e[2]?.hireDate === '2025-08-01', JSON.stringify(e.map((x) => x.hireDate)))
+      check(`명부 이름 먼저(${label}): 보험 칸`, !!e[1]?.ins && e[1].ins.np && e[1].ins.hi && !e[1].ins.wc && !e[1].ins.ei && !!e[0]?.ins && e[0].ins.ei, JSON.stringify(e.map((x) => x.ins)))
+      check(`명부 이름 먼저(${label}): 생년월일·성별 · 뒷자리 없음`, e[2]?.birthDate === '1990-01-01' && e[2]?.gender === 'M' && e[1]?.gender === 'F' && JSON.stringify(r).indexOf('1234567') < 0)
+    }
+    const glued = parseRosterText('980310-1****** 2026-01-05 2026-01-05 2026-01-05 2026-01-05 홍길동')
+    check('명부: 가린 번호 뒤 날짜를 번호에 붙이지 않는다', glued.employees[0]?.hireDate === '2026-01-05' && glued.employees[0]?.name === '홍길동', JSON.stringify(glued.employees[0]))
+    const glued2 = parseRosterText('홍길동 980310-1234567 2026-01-05 2026-01-05 2026-01-05 2026-01-05')
+    check('명부: 전체 번호 뒤 날짜도 온전', glued2.employees[0]?.hireDate === '2026-01-05' && glued2.employees[0]?.name === '홍길동', JSON.stringify(glued2.employees[0]))
+  }
+
+  // ── 5·6·9. 급여 · 최저임금 ──
+  check('최저임금: 2,156,879원 · 40시간 → 미달', checkWage(2156879, 40)?.isAboveMin === false && checkWage(2156879, 40)?.hourlyWage === 10319, JSON.stringify(checkWage(2156879, 40)))
+  check('최저임금: 2,156,880원 · 40시간 → 충족', checkWage(2156880, 40)?.isAboveMin === true)
+  check('최저임금: 급여 계산기도 같은 판정', computePayroll(2156879, 40, 1)?.isAboveMin === false && computePayroll(2156880, 40, 1)?.isAboveMin === true)
+  check('최저임금: 음수 급여는 계산 안 함', checkWage(-100, 40) === null)
+
+  // ── 7. 세액공제 ──
+  {
+    const e = estimateTaxCredit({ prevTotal: 10, curTotal: 11, prevYouth: 0, curYouth: 3, unitYouth: 1450, unitNormal: 850 })
+    check('세액공제: 청년 증가는 전체 증가를 넘지 않는다', e.incYouth === 1 && e.incNormal === 0 && e.creditYouth === 14500000 && e.creditTotal === 14500000 && e.overYouth, JSON.stringify(e))
+  }
+  {
+    const young = classifyEmployee({ ...ROSTER[0], birthDate: '1991-03-01', hireDate: '2026-01-05' }, { baseDate: BASE })
+    check('세액공제·명부: 입사 때 34세면 청년 (지금 35세여도)', young.age === 35 && young.hireAge === 34 && young.isYouth, JSON.stringify({ a: young.age, h: young.hireAge, y: young.isYouth }))
+    const older = classifyEmployee({ ...ROSTER[0], birthDate: '1990-12-01', hireDate: '2026-01-05' }, { baseDate: BASE })
+    check('명부: 입사 때 35세 남성 → 청년 아님 · 복무 확인 ★', !older.isYouth && older.candidates.some((c) => c.key === 'youth_jump' && c.level === 'more' && c.note.includes('★')))
+  }
+
+  // ── 8·12. 날짜 ──
+  check('날짜: 1월 31일 + 1개월 = 2월 28일', addMo('2026-01-31', 1) === '2026-02-28', addMo('2026-01-31', 1))
+  check('날짜: 윤년 1월 31일 + 1개월 = 2월 29일', addMo('2028-01-31', 1) === '2028-02-29')
+  check('날짜: 2월 29일 + 12개월 = 2월 28일', addMo('2024-02-29', 12) === '2025-02-28', addMo('2024-02-29', 12))
+  check('날짜: 8월 31일 + 6개월 = 2월 28일 · 3월 31일 - 1개월', addMo('2025-08-31', 6) === '2026-02-28' && addMo('2026-03-31', -1) === '2026-02-28')
+  check("날짜: '2026.1.15' · '2026-1-5' · 시각 붙은 값", addMo('2026.1.15', 6) === '2026-07-15' && addMo('2026-1-5', 1) === '2026-02-05' && addMo('2026-01-15T10:30:00', 6) === '2026-07-15' && toYMD('2026년 1월 15일') === '2026-01-15', addMo('2026.1.15', 6))
+  check("날짜: '2026.1.15' D-day 가 하루 앞당겨지지 않는다", getDdayFrom('2026.1.15', new Date(2026, 0, 15, 23, 30)) === 0 && getDdayFrom('2026-01-15', new Date(2026, 0, 15, 0, 5)) === 0 && getDdayFrom('2026-01-16', new Date(2026, 0, 15, 23, 59)) === 1)
+  {
+    const sch = roundSchedule('2026.1.15', DEFAULT_PROGRAMS.youth_jump, new Date(2026, 6, 10, 9, 0), [false, false, false])
+    check("날짜: '2026.1.15' 입사 → 1회차 2026-07-15 · D-5", sch.rows[0].date === '2026-07-15' && sch.rows[0].dday === 5, JSON.stringify(sch.rows[0]))
+  }
+  {
+    let threw = false
+    let out: unknown[] = []
+    try {
+      out = [addMo('2026-02-31', 1), addMo('abc', 3), addMo('2026-13-01', 1), getDdayFrom('abc', new Date()), fD('abc'), calcAgeDetailed('abc', '2026-01-01'), roundSchedule('abc', DEFAULT_PROGRAMS.youth_jump, new Date()).rows[0].dday, simulate(DEFAULT_PROGRAMS.youth_jump, 1, 'abc').monthly.length]
+    } catch {
+      threw = true
+    }
+    check('날짜: 잘못된 날짜는 던지지 않고 빈값', !threw && out[0] === '' && out[1] === '' && out[2] === '' && out[3] === null && out[4] === '' && out[5] === null && out[6] === null && out[7] === 3, JSON.stringify(out))
+  }
+  check('날짜: 명부 normDate 는 2026-02-31 을 거른다', normDate('2026-02-31') === null && normDate('2024-02-29') === '2024-02-29' && normDate('2025-02-29') === null && xlNormDate('2026-02-31').ok === false)
+  check('날짜: parseJumin 은 없는 날짜를 거른다', parseJumin('9513011') === null && parseJumin('9502301') === null)
+  check('날짜: 명부 발급 경과일은 시간대와 무관', rosterStaleness('2026-05-20', new Date(2026, 5, 1, 0, 0))?.days === 12 && rosterStaleness('2026-05-20', new Date(2026, 5, 1, 23, 59))?.days === 12)
+  check('날짜: 월별 수령은 지급일 달 (1일도)', monthlyReceived([{ ...({} as EmpRecord), id: 'm', clientId: 'c', name: 'x', hireDate: '2026-01-01', birthDate: '', empType: '정규직', programId: 'youth_jump', stage: 'inprogress', docs: [], memo: '', rounds: [{ month: 6, amount: 100, label: '1', isPaid: true, received: 100, paidDate: '2026-07-01' }] }], 2026)[6].received === 100)
+
+  // ── 8. 일괄등록: 주민번호가 없으면 모르는 채로 ──
+  {
+    const rows = parseBulkPaste(['이름\t주민번호앞7자리\t입사일\t연락처\t이메일\t지원금ID', '김하나\t\t2026.3.2\t010\ta@b.kr\tyouth_jump', '박둘\t9501011\t2026-03-02\t\t\tyouth_jump', '최셋\t9513011\t2026-02-31\t\t\tnone'].join('\n'), { youth_jump: {} })
+    check('일괄등록: 주민번호 없으면 생년월일·성별 비움 (2000-01-01·남 아님)', rows[0].birthDate === '' && rows[0].gender === '' && rows[0].startDate === '2026-03-02', JSON.stringify(rows[0]))
+    check('일괄등록: 앞 7자리는 생년월일·성별로만', rows[1].birthDate === '1995-01-01' && rows[1].gender === 'male' && JSON.stringify(rows).indexOf('9501011') < 0)
+    check('일괄등록: 없는 날짜 · 모르는 지원금', rows[2].birthDate === '' && rows[2].startDate === '' && rows[2].programId === 'youth_jump')
+  }
+
+  // ── 12. 급여 글자 읽기 ──
+  check('급여 칸: 3,000,000.00 · 2500000.5 · 280만 · 1억2천만 · 음수 · 글자', parseMoneyCell('3,000,000.00') === 3000000 && parseMoneyCell('2500000.5') === 2500000 && parseMoneyCell('280만') === 2800000 && parseMoneyCell('280만 원') === 2800000 && parseMoneyCell('2,800,000원') === 2800000 && parseMoneyCell('1억2천만') === 120000000 && parseMoneyCell('-100') === 0 && parseMoneyCell('abc') === 0 && parseMoneyCell(2800000) === 2800000, [parseMoneyCell('3,000,000.00'), parseMoneyCell('2500000.5'), parseMoneyCell('280만'), parseMoneyCell('1억2천만')].join(','))
+
+  // ── 10. 회차 합 ≠ 규칙표 총액 — 목록을 드러낸다 (금액은 짐작해 고치지 않음 · ★ 표시) ──
+  {
+    const mismatched = PROGRAM_LIST.filter((p) => roundsMismatch(p)).map((p) => `${p.id}(회차 합 ${roundsSum(p)} / 총액 ${p.totalAmount})`)
+    console.log(`  ★ 회차별 금액 확인 필요: ${mismatched.join(' · ')}`)
+    check('회차 합 ≠ 총액 목록이 정확히 이 넷', PROGRAM_LIST.filter((p) => roundsMismatch(p)).map((p) => p.id).join() === 'work_exp,disabled_emp,senior_continue,replace_worker', mismatched.join(' · '))
+    const sim = simulate(DEFAULT_PROGRAMS.work_exp, 2, '2026-01-01')
+    check('시뮬레이터: 1인당 = 회차 합 (총수령액과 같은 숫자) + ★', sim.perPerson === 800000 && sim.total === 1600000 && sim.mismatch && sim.tableTotal === 1400000 && simulationText('미래내일 일경험', 2, sim).includes('★ 회차별 금액 확인 필요'))
+    const yj = simulate(DEFAULT_PROGRAMS.youth_jump, 1, '2026-01-01')
+    check('시뮬레이터: 청년도약은 회차 합 = 총액', !yj.mismatch && yj.perPerson === 7200000 && yj.total === 7200000 && !simulationText('청년', 1, yj).includes('★'))
+  }
 }
 
 console.log(`\nemployment: ${passed} passed, ${failed} failed`)

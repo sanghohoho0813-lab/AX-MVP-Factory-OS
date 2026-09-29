@@ -13,7 +13,7 @@
  * 모듈 기록 `employment/companies` 에 업체(clientId)마다 한 줄을 둔다. 이 파일은 계산만 한다.
  */
 
-import { addMo, getDdayFrom } from './dates'
+import { addMo, getDdayFrom, parseYMD } from './dates'
 import { EMP_STAGE_LABEL, EMP_STAGES, empReceived, type EmpRecord } from './empRecords'
 import { COMPANY_DEFAULT_DOCS } from './programs'
 
@@ -399,8 +399,8 @@ export function monthlyReceived(employees: readonly EmpRecord[], year: number): 
     for (const emp of employees) {
       for (const r of emp.rounds) {
         if (r.isPaid && r.paidDate) {
-          const pd = new Date(r.paidDate)
-          if (pd.getFullYear() === year && pd.getMonth() + 1 === m) rcv += r.received || 0
+          const pd = parseYMD(r.paidDate) // D-136: 달력 날짜로 (시간대에 따라 달이 바뀌지 않게)
+          if (pd && pd.y === year && pd.m === m) rcv += r.received || 0
         }
       }
     }

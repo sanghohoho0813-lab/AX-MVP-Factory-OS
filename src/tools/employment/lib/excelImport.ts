@@ -8,9 +8,13 @@
  * **사업자번호(숫자 10자리) → 업체명** 순으로 고객 운영의 업체에 맞춘다. 못 맞추면 '고객 운영에 없는 업체' 로
  * 저장에서 뺀다(업체를 몰래 만들지 않는다). 업체 화면 안에서 열면 모든 행을 그 업체로 넣는다.
  * 주민등록번호는 받지 않는다 — 생년월일 칸만 읽는다.
+ * D-136: '등록번호' 같은 느슨한 별칭 때문에 '주민등록번호' 칸이 사업자번호로 잡혔다. 이제 사업자번호는 칸 이름에
+ *        '사업자' 가 있어야 하고, 주민번호 칸은 어떤 항목에도 자동으로 잇지 않으며, 값이 주민번호 모양이면 저장하지 않는다.
  */
 
 import { EMP_STAGES, type EmpStage } from './empRecords'
+import { parseJumin, toYMD } from './dates'
+import { birthFromCell, bizNoLooksLikeRrn, isRrnHeader, stripRrn } from './privacy'
 
 export interface XlField {
   key: string
@@ -22,7 +26,7 @@ export interface XlField {
 /** 원본 1582줄 XL_FIELDS (업체 쪽 필수는 '업체 화면 밖에서 열 때' 만 따진다) */
 export const XL_FIELDS: XlField[] = [
   { key: 'companyName', label: '업체명', required: true, aliases: ['업체명', '회사명', '기업명', '고객사명', '거래처명', '사업장명', '법인명', '상호', '상호명'] },
-  { key: 'bizNo', label: '사업자등록번호', required: false, aliases: ['사업자등록번호', '사업자번호', '사업자', '사업자NO', '사업자No', '등록번호', '사업장번호'] },
+  { key: 'bizNo', label: '사업자등록번호', required: false, aliases: ['사업자등록번호', '사업자번호', '사업자', '사업자NO', '사업자No'] },
   { key: 'empName', label: '직원명', required: true, aliases: ['직원명', '근로자명', '성명', '이름', '대상자명', '신청자명', '근로자', '직원', '대상자'] },
   { key: 'birthDate', label: '생년월일', required: false, aliases: ['생년월일', '생일', '생년', '생년월일6자리'] },
   { key: 'startDate', label: '입사일', required: false, aliases: ['입사일', '입사일자', '채용일', '채용일자', '고용일', '고용일자', '근무시작일', '입직일'] },
@@ -44,7 +48,8 @@ export function xlNormHead(h: unknown): string {
 
 /** 원본 1603줄 xlAutoMap */
 export function xlAutoMap(headerCells: readonly unknown[]): { map: Record<string, number>; conf: Record<string, Conf> } {
-  const norm = (headerCells || []).map(xlNormHead)
+  // 주민번호 칸은 비워 둔다 → 어떤 항목에도 잡히지 않는다
+  const norm = (headerCells || []).map((h) => (isRrnHeader(h) ? '' : xlNormHead(h)))
   const map: Record<string, number> = {}
   const conf: Record<string, Conf> = {}
   for (const f of XL_FIELDS) {
@@ -53,6 +58,8 @@ export function xlAutoMap(headerCells: readonly unknown[]): { map: Record<string
     let partialCnt = 0
     norm.forEach((h, idx) => {
       if (!h) return
+      // 사업자번호는 칸 이름에 '사업자' 가 있어야 한다
+      if (f.key === 'bizNo' && h.indexOf('사업자') < 0) return
       if (f.aliases.some((a) => xlNormHead(a) === h)) {
         if (exact === -1) exact = idx
         return
@@ -117,7 +124,10 @@ export function xlDetectHeader(grid: readonly (readonly unknown[])[]): number {
 /** 원본 1640줄 — yyyy-mm-dd / yyyy.mm.dd / yyyy/mm/dd / 20260115 / 엑셀 일련번호 / m/d/yy */
 export function xlNormDate(v: unknown): { value: string; ok: boolean; empty?: boolean } {
   if (v == null || String(v).trim() === '') return { value: '', ok: true, empty: true }
-  let s = String(v).trim()
+  // 뒤에 붙은 시각(2026-01-15 00:00:00 · 2026-01-15T00:00:00Z)은 뗀다
+  let s = String(v)
+    .trim()
+    .replace(/[T\s]\d{1,2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/, '')
   if (/^\d{5}$/.test(s)) {
     const d = new Date(Date.UTC(1899, 11, 30) + Number(s) * 86400000)
     if (!Number.isNaN(d.getTime())) return { value: d.toISOString().split('T')[0], ok: true }
@@ -150,6 +160,39 @@ export function xlBizNoCheck(s: unknown): { ok: boolean; reason?: string } {
   if (d.length !== 10) return { ok: false, reason: '숫자 10자리가 아님' }
   if (raw.includes('-') && !/^\d{3}-\d{2}-\d{5}$/.test(raw)) return { ok: false, reason: '하이픈 위치 이상 (123-45-67890 형식 권장)' }
   return { ok: true }
+}
+
+/**
+ * 월 급여 글자 → 원. '3,000,000' · '3,000,000.00' · '2500000.5' · '280만' · '280만 원' · '1억2천만' 을 받는다.
+ * 음수·글자·빈칸은 0.
+ */
+export function parseMoneyCell(v: unknown): number {
+  if (v == null) return 0
+  if (typeof v === 'number') return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0
+  let s = String(v).trim().replace(/[,\s₩￦]/g, '').replace(/원$/, '')
+  if (!s || /^-/.test(s)) return 0
+  let total = 0
+  const eok = s.match(/^(\d+(?:\.\d+)?)억/)
+  if (eok) {
+    total += Number(eok[1]) * 100000000
+    s = s.slice(eok[0].length)
+  }
+  const man = s.match(/^(\d+(?:\.\d+)?)(천)?만/)
+  if (man) {
+    total += Number(man[1]) * (man[2] ? 1000 : 1) * 10000
+    s = s.slice(man[0].length)
+  }
+  const cheon = s.match(/^(\d+(?:\.\d+)?)천$/)
+  if (cheon) {
+    total += Number(cheon[1]) * 1000
+    s = ''
+  }
+  if (s) {
+    if (!/^\d+(?:\.\d+)?$/.test(s)) return 0
+    total += Number(s)
+  }
+  // 원 미만은 버린다
+  return Number.isFinite(total) && total > 0 ? Math.floor(total) : 0
 }
 
 /** 원본 matchProgramId — 이름이 같거나 별칭이 들어 있으면 */
@@ -291,9 +334,12 @@ export function buildImportPreview(input: {
     const raw = grid[i]
     if (!raw || raw.every((v) => String(v == null ? '' : v).trim() === '')) continue
     const rowNo = i + 1
-    const companyName = cell(raw, 'companyName')
-    const bizNo = cell(raw, 'bizNo')
-    const empName = cell(raw, 'empName')
+    const companyName = stripRrn(cell(raw, 'companyName'))
+    const bizRaw = cell(raw, 'bizNo')
+    // 주민번호 모양은 사업자번호로 쓰지 않는다 (저장도, 업체 맞추기도 안 함)
+    const bizIsRrn = bizNoLooksLikeRrn(bizRaw)
+    const bizNo = bizIsRrn ? '' : bizRaw
+    const empName = stripRrn(cell(raw, 'empName'))
     if (!fixedClientId && !companyName && !bizNo && !empName) {
       junk++
       continue
@@ -307,9 +353,15 @@ export function buildImportPreview(input: {
       continue
     }
     const startD = xlNormDate(cell(raw, 'startDate'))
-    const birthD = xlNormDate(cell(raw, 'birthDate'))
+    const birthC = birthFromCell(cell(raw, 'birthDate'), (x) => {
+      const r = xlNormDate(x)
+      return r.ok && !r.empty ? r.value : ''
+    })
+    const birthD = { ok: birthC.ok, value: birthC.value }
     const programName = cell(raw, 'programName')
     const warns: string[] = []
+    if (bizIsRrn) warns.push('사업자번호 칸에 주민번호 모양 — 저장하지 않음')
+    if (birthC.fromRrn) warns.push('주민번호는 저장하지 않고 생년월일만 씁니다')
     let excluded: string | null = null
     let client: ImportClient | undefined
     if (fixedClientId) client = clients.find((c) => c.id === fixedClientId)
@@ -332,7 +384,7 @@ export function buildImportPreview(input: {
     const rawStatus = cell(raw, 'status')
     const stageKey = findStatusKey(rawStatus)
     if (rawStatus && !stageKey) warns.push('신청상태 미매칭 — 준비중으로 등록')
-    const salary = Number(cell(raw, 'salary').replace(/[^\d]/g, '')) || 0
+    const salary = parseMoneyCell(cell(raw, 'salary'))
     let isDup = false
     if (client && empName) {
       const pairKey = `${client.id}|${empName}`
@@ -362,7 +414,7 @@ export function buildImportPreview(input: {
       programName,
       programId: pid,
       stage: stageKey ?? 'preparing',
-      memo: cell(raw, 'memo'),
+      memo: stripRrn(cell(raw, 'memo')),
       clientId: client?.id ?? '',
       status,
       messages: (excluded ? [excluded] : []).concat(warns),
@@ -389,4 +441,45 @@ export function templateCsv(): string {
     ['바른상사', '987-65-43210', '정새일', '1988-07-21', '2026-03-02', '2500000', '새일여성인턴제', '서류접수', '새일센터 연계'],
   ]
   return `﻿${[headers, ...rows].map((r) => r.map((c) => (/[",\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(',')).join('\r\n')}`
+}
+
+export interface BulkPasteRow {
+  name: string
+  /** 모르면 '' (D-136: 2000-01-01 로 채우지 않는다) */
+  birthDate: string
+  /** 모르면 '' (D-136: 남으로 채우지 않는다) */
+  gender: 'male' | 'female' | ''
+  /** YYYY-MM-DD, 잘못된 날짜는 '' */
+  startDate: string
+  phone: string
+  email: string
+  programId: string
+}
+
+/**
+ * 원본 '직원 일괄 등록' 붙여넣기(이름 · 주민번호 앞 7자리 · 입사일 · 연락처 · 이메일 · 지원금ID, 탭 구분).
+ * 주민번호 앞 7자리는 생년월일·성별로만 바꾸고 버린다. 없거나 틀리면 생년월일·성별은 모른 채로 둔다.
+ */
+export function parseBulkPaste(text: string, programs: Record<string, unknown>): BulkPasteRow[] {
+  const lines = String(text || '').trim().split(/\r?\n/)
+  if (lines.length < 2) return []
+  const out: BulkPasteRow[] = []
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split('\t')
+    if (cols.length < 3) continue
+    const name = stripRrn((cols[0] || '').trim())
+    if (!name) continue
+    const parsed = parseJumin((cols[1] || '').trim())
+    const pid = (cols[5] || 'youth_jump').trim()
+    out.push({
+      name,
+      birthDate: parsed ? parsed.birthDate : '',
+      gender: parsed ? parsed.gender : '',
+      startDate: toYMD((cols[2] || '').trim()),
+      phone: (cols[3] || '').trim(),
+      email: (cols[4] || '').trim(),
+      programId: programs[pid] ? pid : 'youth_jump',
+    })
+  }
+  return out
 }

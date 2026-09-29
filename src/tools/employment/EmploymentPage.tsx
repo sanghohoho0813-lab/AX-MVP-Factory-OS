@@ -25,7 +25,7 @@ import { useToolClient } from '../shared/toolClientContext'
 import { fetchClientDocFile, hasDocFile } from '../shared/clientDocFile'
 import { PrefillNote } from '../shared/PrefillNote'
 import { FactSendButton } from '../shared/FactSendButton'
-import { DEFAULT_PROGRAMS, PROGRAM_LIST } from './lib/programs'
+import { DEFAULT_PROGRAMS, PROGRAM_LIST, ROUNDS_CHECK_NOTE, roundsMismatch, roundsSum } from './lib/programs'
 import { fD, fDFull } from './lib/dates'
 import { fMan, fProgramAmt } from './lib/format'
 import { roundSchedule, type RoundKind } from './lib/schedule'
@@ -43,6 +43,7 @@ import {
   parseRosterFile,
   parseRosterText,
   rosterStaleness,
+  SUBSIDY_ESTIMATE_NOTE,
   TAX_CHECKLIST,
   type LevelKey,
   type RegionType,
@@ -293,6 +294,7 @@ function ScheduleTab() {
         `${program.name} 회차 일정 (입사일 ${fDFull(form.startDate)})`,
         ...sch.rows.map((r) => `· ${r.label}: ${fD(r.date)} ${r.ddayLabel} · ${fMan(r.amount)} · ${r.kind}`),
         `총 ${fMan(sch.total)} · 받은 ${fMan(sch.received)} · 남은 ${fMan(sch.remaining)}`,
+        ...(roundsMismatch(program) ? [`${ROUNDS_CHECK_NOTE} (규칙표 총액 ${fMan(program.totalAmount)})`] : []),
         `신청: ${program.applyUrl}`,
       ].join('\n')
     : ''
@@ -315,6 +317,11 @@ function ScheduleTab() {
         <Surface className="flex flex-col gap-1 p-3">
           <span className="t-body font-medium text-slate-800">{program.name}</span>
           <span className="t-sub break-keep text-slate-600">{program.note}</span>
+          {roundsMismatch(program) && (
+            <span className="t-meta break-keep text-amber-700">
+              {ROUNDS_CHECK_NOTE} — 회차 합 {fMan(roundsSum(program))} · 규칙표 총액 {fMan(program.totalAmount)}
+            </span>
+          )}
           <span className="t-meta text-slate-500">신청: {program.applyUrl}</span>
         </Surface>
         <Disclosure title="필요 서류" hint={`업체 ${program.companyDocs.length} · 직원 ${program.employeeDocs.length}`}>
@@ -653,6 +660,7 @@ function RosterTab() {
               <p className="t-card font-bold break-keep text-slate-900">
                 {analysis.counts.totalEmp}명 중 청년 추정 {analysis.counts.youthCount}명 · 고령 {analysis.counts.seniorCount}명 · 조건 충족 시 최대 {formatWon(estimateSubsidyTotal(analysis.subsidySummary))} 검토 가능성
               </p>
+              <p className="t-meta break-keep text-amber-700">{SUBSIDY_ESTIMATE_NOTE} · 청년은 입사일 기준 나이</p>
               {estimate.computable && estimate.creditTotal != null && (
                 <p className="t-sub text-slate-600">
                   통합고용세액공제 예상 <b className="text-slate-900">약 {formatWon(estimate.creditTotal)}</b> (증가 {estimate.incTotal}명 · 1차 추정 · 확정 아님)
@@ -684,7 +692,7 @@ function RosterTab() {
 
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
               <MetricTile label="총 인원" value={`${analysis.counts.totalEmp}명`} hint={`재직 추정 ${analysis.counts.activeCount}`} />
-              <MetricTile label="청년 추정" value={`${analysis.counts.youthCount}명`} />
+              <MetricTile label="청년 추정" value={`${analysis.counts.youthCount}명`} hint="입사일 기준 나이" />
               <MetricTile label="신규 입사 추정" value={`${analysis.counts.newHireCount}명`} hint="약 13개월 이내" />
               <MetricTile label="고용보험 확인" value={`${analysis.eiCheckCount}명`} tone={analysis.eiCheckCount > 0 ? 'warning' : 'neutral'} hint={`특수관계 확인 ${analysis.relCheckCount}`} />
             </div>

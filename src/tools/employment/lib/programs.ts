@@ -353,6 +353,22 @@ export const DEFAULT_PROGRAMS: Record<string, Program> = {
   },
 }
 
+/** 회차 금액 합 */
+export function roundsSum(p: Pick<Program, 'rounds'> | null | undefined): number {
+  return ((p && p.rounds) || []).reduce((s, r) => s + (Number(r.amount) || 0), 0)
+}
+
+/**
+ * D-136: 회차 합과 규칙표 총액이 다른 지원금 — 금액을 짐작해 고치지 않고, 화면에 ★ 로 알린다.
+ * (월 단위 예시 회차 · 2년/3년 지급 등 회차표가 총액을 다 담지 못한 것)
+ */
+export function roundsMismatch(p: Pick<Program, 'rounds' | 'totalAmount'> | null | undefined): boolean {
+  if (!p || !(p.rounds || []).length) return false
+  return roundsSum(p) !== (Number(p.totalAmount) || 0)
+}
+
+export const ROUNDS_CHECK_NOTE = '★ 회차별 금액 확인 필요'
+
 /** 표 순서 그대로의 배열 (진단·선택 목록용) */
 export const PROGRAM_LIST: readonly Program[] = Object.values(DEFAULT_PROGRAMS)
 
