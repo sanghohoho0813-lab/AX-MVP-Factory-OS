@@ -112,7 +112,9 @@ for (const [width, scale] of [
   await page.goto(BASE + '/ops/clients/cli_hansol?tab=fees', { waitUntil: 'networkidle' })
   await page.evaluate((s) => document.documentElement.setAttribute('data-text-scale', s), scale)
   await page.waitForTimeout(500)
-  await page.locator('input[type="date"]').first().click()
+  // D-140: 수금 항목의 날짜 칸은 '고치기' 를 눌러야 나온다
+  await page.getByRole('button', { name: /고치기$/ }).first().click()
+  await page.getByTestId('fee-editor').locator('input[type="date"]').first().click()
   const cal = page.getByTestId('big-calendar')
   check(`${width} ${scale}: 큰 달력이 뜬다`, (await cal.count()) === 1)
   const box = await cal.locator('[role="dialog"]').boundingBox()

@@ -57,6 +57,8 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
 
   /* 1 · 2 수금 */
   await page.goto(BASE + '/ops/clients/cli_daum?tab=fees', { waitUntil: 'networkidle' })
+  // D-140: 한 줄 직접 넣기는 접혀 있다
+  await page.getByTestId('fee-add-open').click()
   const amount = page.locator('#fee-new-amount')
   await amount.waitFor()
   await amount.fill('3,300,000.00')
@@ -72,6 +74,8 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   const afterAdd = (await clients(page)).find((c) => c.id === 'cli_daum').fees
   check(`수금: 되면 저장 · 칸이 비워진다 ${tag}`, afterAdd.length === before + 1 && afterAdd.some((f) => f.amount === 3_300_000) && (await amount.inputValue()) === '', `${before} → ${afterAdd.length}`)
 
+  // D-140: 지우기는 '고치기' 안에 있다
+  await page.getByTestId('fee-line').first().getByRole('button', { name: /고치기$/ }).click()
   const del = page.getByTestId('fee-delete').first()
   await del.click()
   check(`수금 삭제: 한 번 더 묻는다(아직 그대로) ${tag}`, (await page.getByTestId('fee-delete-yes').count()) === 1 && (await clients(page)).find((c) => c.id === 'cli_daum').fees.length === afterAdd.length)

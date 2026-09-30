@@ -73,21 +73,13 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   check(`계약 완료: 시트가 닫혔다 ${tag}`, (await page.getByTestId('contract-close').count()) === 0)
 
   /* 2 계약 단계 되돌리기 → 영업은 클로징 */
-  const stageSel = page.locator('select:visible', { has: page.locator('option', { hasText: '계약 전' }) }).first()
-  if ((await stageSel.count()) > 0) {
-    await stageSel.selectOption({ label: '계약 전' })
+  // D-140: 회사명 옆 계약 상태 배지 하나(PC · 휴대폰 같음)
+  {
+    await page.getByTestId('stage-badge').click()
+    await page.getByTestId('stage-menu').getByRole('menuitemradio', { name: '계약 전' }).click()
     await page.waitForTimeout(600)
     const back = await one(page, 'cli_mirae')
     check(`계약 단계를 계약 전으로 → 영업은 클로징(두 단계에 있지 않다) ${tag}`, back.status === 'waiting' && back.sales?.stage === 'closing', JSON.stringify({ s: back.status, st: back.sales?.stage }))
-  } else {
-    // 휴대폰에서는 더보기 시트 안에 있다
-    await page.getByRole('button', { name: '더보기' }).first().click()
-    await page.waitForTimeout(300)
-    await page.locator('select:visible', { has: page.locator('option', { hasText: '계약 전' }) }).first().selectOption({ label: '계약 전' })
-    await page.waitForTimeout(600)
-    const back = await one(page, 'cli_mirae')
-    check(`계약 단계를 계약 전으로 → 영업은 클로징(두 단계에 있지 않다) ${tag}`, back.status === 'waiting' && back.sales?.stage === 'closing', JSON.stringify({ s: back.status, st: back.sales?.stage }))
-    await page.keyboard.press('Escape')
   }
 
   /* 3 계약 · 수금 차이 */
