@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CalendarDays, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, Plus, TriangleAlert } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { useToast } from '../components/ui/toastContext'
 import { listClients } from '../services/clientOpsService'
@@ -30,6 +30,8 @@ import { TodoActionSheet, TodoComposer, TodoRow, type TodoAction } from '../comp
 import { Button } from '../components/ui/Button'
 import { PageHeader } from '../components/ui/PageHeader'
 import { ScheduleTabs } from '../components/journal/ScheduleTabs'
+import { CalendarQuickSheet, HolidayImportSheet, type QuickTodoInput } from '../components/journal/CalendarQuickSheet'
+import { addDaysOff, dateLabel, daysOffByDate, listDaysOff, missingPublicHolidays, monthWorkdays, prevWorkday, removeDayOff, type DayOff, type DayOffKind } from '../services/daysOff'
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
 const KINDS: ScheduleKind[] = ['next', 'task', 'funding', 'payment', 'document', 'tool']
@@ -51,6 +53,11 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
   const [picked, setPicked] = useState<string | null>(today)
   /** 눌러서 연 할 일 */
   const [todoPick, setTodoPick] = useState<JournalEntry | null>(null)
+  /** D-139: 쉬는 날(공휴일 · 대체공휴일 · 명절 · 휴무) — 못 읽어도 달력은 뜬다 */
+  const [daysOff, setDaysOff] = useState<DayOff[]>([])
+  /** D-139: 달력에서 바로 적기 창 */
+  const [quick, setQuick] = useState<{ date: string; tab: 'todo' | 'off' } | null>(null)
+  const [holidayImport, setHolidayImport] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -59,6 +66,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
       setRecords(c)
       setJournal(j)
       setLoadError('')
+      setDaysOff(await listDaysOff(workspaceId).catch(() => [] as DayOff[]))
     } catch (cause) {
       // D-120: 못 읽으면 빈 달력 대신 알린다
       setLoadError(cause instanceof Error ? cause.message : '일정을 불러오지 못했습니다.')
@@ -89,6 +97,12 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
     }
     return map
   }, [journal])
+
+  const offMap = useMemo(() => daysOffByDate(daysOff), [daysOff])
+  const offSet = useMemo(() => new Set(daysOff.map((d) => d.date)), [daysOff])
+  const workdays = useMemo(() => monthWorkdays(ym[0], ym[1], offSet), [ym, offSet])
+  const missingHolidays = useMemo(() => missingPublicHolidays(ym[0], daysOff), [ym, daysOff])
+  const pickedOff = picked ? (offMap.get(picked) ?? []) : []
 
   const activeClients = useMemo(
     () => records.filter((r) => r.archivedAt === null).map((r) => ({ id: r.id, companyName: r.companyName })),
@@ -125,6 +139,40 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
 
   const clientNameOf = (id: string) => records.find((r) => r.id === id)?.companyName
 
+  /** D-139: 빠른 적기 — 반복이면 날짜마다 한 줄 */
+  const saveQuickTodos = (input: QuickTodoInput) =>
+    mutate(
+      async () => {
+        for (const d of input.dates) {
+          await createJournalEntry(workspaceId, userId, { entryDate: today, entryType: 'follow_up', content: input.content, clientId: input.clientId, dueDate: d })
+        }
+      },
+      input.dates.length > 1 ? `할 일 ${input.dates.length}개를 넣었습니다 (${dateLabel(input.dates[0])}부터).` : `${dateLabel(input.dates[0])}에 할 일을 넣었습니다.`,
+    )
+  const reloadDaysOff = async () => setDaysOff(await listDaysOff(workspaceId))
+  const saveDaysOff = async (items: { date: string; name: string; kind: DayOffKind }[]): Promise<boolean> => {
+    try {
+      const n = await addDaysOff(workspaceId, items, daysOff)
+      await reloadDaysOff()
+      showToast(n > 0 ? `쉬는 날 ${n}일을 표시했습니다.` : '이미 표시된 날입니다.')
+      return true
+    } catch (cause) {
+      showToast(cause instanceof Error ? cause.message : '표시하지 못했습니다.')
+      return false
+    }
+  }
+  const removeOff = async (d: DayOff): Promise<boolean> => {
+    try {
+      await removeDayOff(workspaceId, d.id)
+      await reloadDaysOff()
+      showToast(`${dateLabel(d.date)} '${d.name}' 표시를 지웠습니다.`)
+      return true
+    } catch (cause) {
+      showToast(cause instanceof Error ? cause.message : '지우지 못했습니다.')
+      return false
+    }
+  }
+
   /** 할 일 시트에서 고른 것을 실행한다 */
   const applyTodoAction = (entry: JournalEntry, action: TodoAction) => {
     setTodoPick(null)
@@ -159,10 +207,17 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
         title="일정"
         description="모든 업체의 마감·신청·수금·서류 만료를 한 달력에서 봅니다."
         actions={
-          <Button variant="secondary" onClick={() => { const [y,m]=today.split('-'); setYm([Number(y),Number(m)]); setPicked(today) }}>
-            <CalendarDays aria-hidden="true" className="size-4" />
-            오늘로
-          </Button>
+          <>
+            <Button variant="secondary" onClick={() => { const [y,m]=today.split('-'); setYm([Number(y),Number(m)]); setPicked(today) }}>
+              <CalendarDays aria-hidden="true" className="size-4" />
+              오늘로
+            </Button>
+            {/* D-139: 어디서든 바로 적기 — 고른 날(없으면 오늘) */}
+            <Button variant="primary" onClick={() => setQuick({ date: picked ?? today, tab: 'todo' })} data-testid="calendar-quick-open">
+              <Plus aria-hidden="true" className="size-4" />
+              적기
+            </Button>
+          </>
         }
       />
       <ScheduleTabs />
@@ -193,9 +248,16 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
             다음 달
             <ChevronRight aria-hidden="true" className="size-4" />
           </button>
-          <span className="w-full text-[0.9rem] whitespace-nowrap text-slate-500 sm:ml-1 sm:w-auto">
-            이 달 남은 일정 {monthOpen.length}건
+          <span className="w-full text-[0.9rem] text-slate-500 sm:ml-1 sm:w-auto" data-testid="calendar-month-summary">
+            <span className="whitespace-nowrap">이 달 남은 일정 {monthOpen.length}건</span> · <span className="whitespace-nowrap">영업일 {workdays.workdays}일</span>
+            {workdays.weekdayOffs > 0 && <span className="whitespace-nowrap text-danger-700"> · 평일 쉬는 날 {workdays.weekdayOffs}일</span>}
           </span>
+          {/* D-139: 법정 공휴일은 자동으로 깔지 않는다 — 대표가 보고 넣는다 */}
+          {missingHolidays.length > 0 && (
+            <button type="button" onClick={() => setHolidayImport(true)} data-testid="holiday-import-open" className="tap t-sub rounded-full border border-danger-200 bg-danger-50 px-3 py-1 font-semibold text-danger-700 hover:bg-white">
+              {ym[0]}년 공휴일 넣기 ({missingHolidays.length}일)
+            </button>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-1.5">
@@ -254,15 +316,19 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                 const isToday = d === today
                 const isPicked = d === picked
                 const dow = new Date(`${d}T00:00:00Z`).getUTCDay()
+                const off = offMap.get(d)
                 return (
                   <button
                     key={d}
                     type="button"
                     data-date={d}
-                    onClick={() => setPicked(d)}
-                    className={`flex min-h-[5.5rem] flex-col gap-1 border-r border-b border-slate-100 p-1.5 text-left last:border-r-0 ${
-                      inMonth ? 'bg-white' : 'bg-slate-50/60'
-                    } ${isPicked ? 'ring-2 ring-brand-400 ring-inset' : ''} hover:bg-brand-50/40`}
+                    data-off={off ? 'true' : undefined}
+                    title={off ? `${off.map((o) => o.name).join(' · ')} — 한 번 더 누르면 바로 적기` : '한 번 더 누르면 바로 적기'}
+                    // D-139: 고른 날을 한 번 더 누르면(두 번 누르기) 바로 적는 창
+                    onClick={() => (isPicked ? setQuick({ date: d, tab: 'todo' }) : setPicked(d))}
+                    className={`flex min-h-[5.5rem] min-w-0 flex-col gap-1 border-r border-b border-slate-100 p-1.5 text-left last:border-r-0 ${
+                      off ? 'day-off' : inMonth ? 'bg-white' : 'bg-slate-50/60'
+                    } ${off && !inMonth ? 'opacity-60' : ''} ${isPicked ? 'ring-2 ring-brand-400 ring-inset' : ''} hover:bg-brand-50/40`}
                   >
                     <span
                       className={`inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[0.875rem] font-semibold ${
@@ -270,7 +336,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                           ? 'bg-brand-600 text-white'
                           : !inMonth
                             ? 'text-slate-400'
-                            : dow === 0
+                            : off || dow === 0
                               ? 'text-weekday-sun'
                               : dow === 6
                                 ? 'text-weekday-sat'
@@ -279,6 +345,12 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                     >
                       {Number(d.slice(8))}
                     </span>
+                    {/* 좁은 화면에서는 이름이 '개…' 로 잘린다 — 빗금만 두고 이름은 달력 아래 '이 달 쉬는 날' 에 */}
+                    {off && (
+                      <span className="t-meta hidden max-w-full truncate leading-tight font-semibold text-danger-700 lg:block" data-testid="day-off-label">
+                        {off[0].name}
+                      </span>
+                    )}
                     {/* 좁은 화면에서는 업체명이 '한..' 처럼 잘려 쓸모가 없다.
                         점만 찍고 내용은 아래 그날 목록에서 읽게 한다. */}
                     <span className="mt-0.5 flex flex-wrap gap-0.5 lg:hidden">
@@ -327,6 +399,20 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
             </div>
           </div>
 
+          {/* D-139: 이 달 쉬는 날 — 누르면 그날로 */}
+          {daysOff.some((d) => d.date.startsWith(monthPrefix)) && (
+            <div className="flex flex-wrap items-center gap-1.5" data-testid="month-days-off">
+              <span className="t-sub mr-1 font-semibold text-slate-700">이 달 쉬는 날</span>
+              {daysOff
+                .filter((d) => d.date.startsWith(monthPrefix))
+                .map((d) => (
+                  <button key={d.id} type="button" onClick={() => setPicked(d.date)} className="day-off tap t-sub rounded-full border border-danger-200 px-2.5 py-1 font-medium text-danger-700">
+                    {Number(d.date.slice(5, 7))}/{Number(d.date.slice(8))} {d.name}
+                  </button>
+                ))}
+            </div>
+          )}
+
           {/*
             선택한 날.
             위는 내가 적은 할 일(고칠 수 있는 것), 아래는 업체에서 자동으로 올라온
@@ -342,6 +428,32 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
               </h2>
               {picked && (
                 <>
+                  {/* D-139: 쉬는 날 · 쉬는 날 마감 */}
+                  {pickedOff.length > 0 && (
+                    <div className="day-off flex flex-wrap items-center gap-x-3 gap-y-1 rounded-(--radius-control) border border-danger-200 px-4 py-2.5" data-testid="picked-day-off">
+                      <span className="t-body font-bold text-danger-700">쉬는 날 · {pickedOff.map((o) => o.name).join(' · ')}</span>
+                      <button type="button" onClick={() => setQuick({ date: picked, tab: 'off' })} className="tap t-sub ml-auto font-semibold text-slate-700 underline">
+                        고치기 · 지우기
+                      </button>
+                    </div>
+                  )}
+                  {(pickedOff.length > 0 || [0, 6].includes(new Date(`${picked}T00:00:00Z`).getUTCDay())) && pickedEvents.some((e) => !e.done) && (
+                    <p className="t-sub flex items-start gap-2 break-keep rounded-(--radius-control) border border-warning-200 bg-warning-50 px-4 py-2.5 text-warning-800" data-testid="picked-off-deadline">
+                      <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                      <span>
+                        쉬는 날에 걸린 업체 마감이 {pickedEvents.filter((e) => !e.done).length}건 있습니다
+                        {prevWorkday(picked, offSet) ? ` — 전 영업일 ${dateLabel(prevWorkday(picked, offSet) as string)}까지 챙기세요.` : '.'}
+                      </span>
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="primary" onClick={() => setQuick({ date: picked, tab: 'todo' })} data-testid="picked-quick-todo">
+                      <Plus aria-hidden="true" className="size-4" />이 날에 적기 · 반복
+                    </Button>
+                    <Button variant="secondary" onClick={() => setQuick({ date: picked, tab: 'off' })} data-testid="picked-quick-off">
+                      {pickedOff.length > 0 ? '쉬는 날 고치기' : '쉬는 날로 표시'}
+                    </Button>
+                  </div>
                   <TodoComposer
                     date={picked}
                     clients={activeClients}
@@ -415,6 +527,22 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
           </section>
         </>
       )}
+
+      {quick && (
+        <CalendarQuickSheet
+          key={`${quick.date}-${quick.tab}`}
+          date={quick.date}
+          initialTab={quick.tab}
+          clients={activeClients}
+          daysOffOn={offMap.get(quick.date) ?? []}
+          offDates={offSet}
+          onSaveTodos={saveQuickTodos}
+          onSaveDaysOff={saveDaysOff}
+          onRemoveDayOff={removeOff}
+          onClose={() => setQuick(null)}
+        />
+      )}
+      {holidayImport && <HolidayImportSheet year={ym[0]} items={missingHolidays} onSave={saveDaysOff} onClose={() => setHolidayImport(false)} />}
 
       {todoPick && (
         <TodoActionSheet

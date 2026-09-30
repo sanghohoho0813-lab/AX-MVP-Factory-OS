@@ -92,6 +92,8 @@ import { withToolResult } from '../clientOpsService'
 import { NEXT_QUICK_DAYS, addDaysLocal, friendlyDate, nextSuggestions, relativeDay, suggestsFirstMeeting, withNextAction } from '../clientOpsNextAction'
 import { buildClientSchedule } from '../clientOpsSchedule'
 import { localDateOf } from '../../lib/appClock'
+import { KR_PUBLIC_HOLIDAYS, addDaysOff, daysOffByDate, listDaysOff, missingPublicHolidays, monthWorkdays, prevWorkday, rangeDates, removeDayOff, toDayOff, weekdayOf } from '../daysOff'
+import { repeatDates } from '../repeatDates'
 import { trialEndDate } from '../moduleAccess'
 import {
   CONTRACT_CHECKLIST,
@@ -1872,6 +1874,38 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   const r2 = attach(r1, [{ date: '2026-11-03', title: '청년도약 참여신청 — 최근청년', note: '', hard: true }])
   const all = r2.toolResults.flatMap((t) => t.deadlines).filter((d) => d.title.startsWith('청년도약 참여신청'))
   check('hard 기한: 같은 명부 결과를 다시 붙이면 옛 기한은 달력에서 내린다(겹치지 않음)', all.length === 1, String(all.length))
+}
+
+// ── D-139: 쉬는 날 · 영업일 · 반복 할 일 ──
+{
+  check('쉬는 날: 모양이 틀린 줄은 버린다(없는 날짜 · 빈 날짜)', toDayOff({ id: 'a', data: { date: '2026-02-30', name: 'x' } }) === null && toDayOff({ id: 'b', data: {} }) === null && toDayOff({ id: 'c', data: { date: '2026-10-05', name: '  ', kind: '???' } })?.name === '쉬는 날' && toDayOff({ id: 'c', data: { date: '2026-10-05', kind: '???' } })?.kind === 'holiday')
+  check('쉬는 날: 연휴 3일 · 달 넘김 · 최대 14일', rangeDates('2026-09-30', 3).join() === '2026-09-30,2026-10-01,2026-10-02' && rangeDates('2026-01-01', 99).length === 14 && rangeDates('bad', 3).length === 0)
+  const W = '일월화수목금토'
+  const subs = [...KR_PUBLIC_HOLIDAYS[2026], ...KR_PUBLIC_HOLIDAYS[2027]].filter((h) => h.kind === 'substitute')
+  check('공휴일 표: 대체공휴일은 모두 월요일(규칙대로 다음 평일)', subs.length === 9 && subs.every((h) => W[weekdayOf(h.date)] === '월'), subs.map((h) => h.date + W[weekdayOf(h.date)]).join(' '))
+  check('공휴일 표: 2026 개천절(토) → 10/5(월) 대체 · 현충일(토)은 대체 없음', KR_PUBLIC_HOLIDAYS[2026].some((h) => h.date === '2026-10-05') && !KR_PUBLIC_HOLIDAYS[2026].some((h) => h.date === '2026-06-08'))
+  const offs = new Set(['2026-10-05', '2026-10-09'])
+  const oct = monthWorkdays(2026, 10, offs)
+  check('영업일: 2026년 10월 = 평일 22일 − 쉬는 날 2일 = 20일', oct.workdays === 20 && oct.weekdayOffs === 2 && oct.days === 31, JSON.stringify(oct))
+  check('영업일: 주말에 표시한 쉬는 날(10/3 토)은 평일 쉬는 날로 세지 않음', monthWorkdays(2026, 10, new Set(['2026-10-03'])).weekdayOffs === 0)
+  check('전 영업일: 10/5(월 대체공휴일) → 10/2(금) · 10/10(토) → 10/8(목, 10/9 한글날 건너뜀)', prevWorkday('2026-10-05', offs) === '2026-10-02' && prevWorkday('2026-10-10', offs) === '2026-10-08')
+  check('반복: 매주 4번', repeatDates('2026-10-06', 'weekly', 4).join() === '2026-10-06,2026-10-13,2026-10-20,2026-10-27')
+  check('반복: 2주마다 3번', repeatDates('2026-10-06', 'biweekly', 3).join() === '2026-10-06,2026-10-20,2026-11-03')
+  check('반복: 매월 31일 → 없는 달은 말일(11/30 · 2/28)', repeatDates('2026-10-31', 'monthly', 5).join() === '2026-10-31,2026-11-30,2026-12-31,2027-01-31,2027-02-28')
+  check('반복: 매월 10일 · 쉬는 날/주말이면 앞 영업일(2026-10-10 토 → 10/9 한글날 → 10/8)', repeatDates('2026-10-10', 'monthly', 2, { skipOff: offs }).join() === '2026-10-08,2026-11-10')
+  check('반복: 한 번 · 한도 24 · 잘못된 날짜', repeatDates('2026-10-10', 'none', 9).length === 1 && repeatDates('2026-10-10', 'weekly', 500).length === 24 && repeatDates('x', 'weekly', 3).length === 0)
+  const existing = [{ id: '1', date: '2026-10-03', name: '개천절', kind: 'holiday' as const }]
+  const miss = missingPublicHolidays(2026, existing)
+  check('공휴일 넣기: 이미 있는 날은 빼고 보여 준다 · 모르는 해는 0', miss.length === KR_PUBLIC_HOLIDAYS[2026].length - 1 && !miss.some((h) => h.date === '2026-10-03') && missingPublicHolidays(2031, []).length === 0)
+  check('날짜별 묶기', daysOffByDate([...existing, { id: '2', date: '2026-10-03', name: '회사 휴무', kind: 'company' }]).get('2026-10-03')?.length === 2)
+  // 저장(로컬) — 같은 날 같은 이름은 두 번 안 들어감 · 지우기
+  const ws = 'ws-dayoff-test'
+  const n1 = await addDaysOff(ws, [{ date: '2026-10-05', name: '대체공휴일', kind: 'substitute' }, { date: '2026-10-06', name: '회사 휴무', kind: 'company' }], [])
+  const l1 = await listDaysOff(ws)
+  const n2 = await addDaysOff(ws, [{ date: '2026-10-05', name: '대체공휴일', kind: 'substitute' }], l1)
+  await removeDayOff(ws, l1[0].id)
+  const l2 = await listDaysOff(ws)
+  check('쉬는 날 저장: 2일 넣고 · 같은 것 다시 0 · 하나 지우면 1일(날짜순)', n1 === 2 && l1.length === 2 && l1[0].date === '2026-10-05' && n2 === 0 && l2.length === 1 && l2[0].date === '2026-10-06', JSON.stringify({ n1, n2, l1: l1.length, l2: l2.length }))
 }
 
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)

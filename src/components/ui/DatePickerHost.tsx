@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { useBackToClose } from '../../lib/backToClose'
 import { parseTypedDate } from '../../lib/typedDate'
+import { cachedDaysOff } from '../../services/daysOff'
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토']
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -131,6 +132,8 @@ function BigCalendar({ input, onClose }: { input: HTMLInputElement; onClose: () 
   const min = input.min || ''
   const max = input.max || ''
   const label = labelOf(input)
+  // D-139: 일정에 표시한 쉬는 날(공휴일 · 명절 · 휴무) — 여기서도 빨간 빗금
+  const offs = useMemo(() => cachedDaysOff(), [])
 
   useEffect(() => {
     panel.current?.focus()
@@ -296,7 +299,8 @@ function BigCalendar({ input, onClose }: { input: HTMLInputElement; onClose: () 
                       type="button"
                       role="gridcell"
                       aria-selected={isSel}
-                      aria-label={`${view.m + 1}월 ${d}일 ${WEEK[dow]}요일${isToday ? ' (오늘)' : ''}`}
+                      aria-label={`${view.m + 1}월 ${d}일 ${WEEK[dow]}요일${isToday ? ' (오늘)' : ''}${offs.has(v) ? ` · ${offs.get(v)}` : ''}`}
+                      title={offs.get(v)}
                       disabled={!ok}
                       onClick={() => pick(v)}
                       data-day={v}
@@ -305,7 +309,9 @@ function BigCalendar({ input, onClose }: { input: HTMLInputElement; onClose: () 
                           ? 'bg-brand-600 text-white'
                           : isToday
                             ? 'border-2 border-brand-500 text-brand-800'
-                            : dow === 0
+                            : offs.has(v)
+                              ? 'day-off text-danger-600 hover:bg-slate-100'
+                              : dow === 0
                               ? 'text-danger-600 hover:bg-slate-100'
                               : dow === 6
                                 ? 'text-brand-700 hover:bg-slate-100'
