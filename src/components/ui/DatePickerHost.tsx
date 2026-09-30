@@ -132,7 +132,7 @@ function BigCalendar({ input, onClose }: { input: HTMLInputElement; onClose: () 
   const min = input.min || ''
   const max = input.max || ''
   const label = labelOf(input)
-  // D-139: 일정에 표시한 쉬는 날(공휴일 · 명절 · 휴무) — 여기서도 빨간 빗금
+  // D-139: 일정에 표시한 쉬는 날(공휴일 · 명절 · 휴무) — 여기서도 일요일처럼 빨간 글자
   const offs = useMemo(() => cachedDaysOff(), [])
 
   useEffect(() => {
@@ -304,13 +304,14 @@ function BigCalendar({ input, onClose }: { input: HTMLInputElement; onClose: () 
                       disabled={!ok}
                       onClick={() => pick(v)}
                       data-day={v}
+                      data-off={offs.has(v) ? 'true' : undefined}
                       className={`mx-auto flex size-12 items-center justify-center rounded-full text-[1.05rem] font-semibold tabular-nums disabled:cursor-not-allowed disabled:opacity-30 ${
                         isSel
                           ? 'bg-brand-600 text-white'
                           : isToday
                             ? 'border-2 border-brand-500 text-brand-800'
                             : offs.has(v)
-                              ? 'day-off text-danger-600 hover:bg-slate-100'
+                              ? 'text-weekday-sun hover:bg-slate-100'
                               : dow === 0
                               ? 'text-danger-600 hover:bg-slate-100'
                               : dow === 6

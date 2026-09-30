@@ -12,6 +12,7 @@
  */
 
 import type { FeeItem } from '../types/clientOps'
+import { isWaiting, NO_FUNDING, type FundingFacts } from './feeStatus'
 
 export interface FeeMath {
   /** 청구액 — 고객에게 받기로 한 돈. 미정이면 null */
@@ -76,15 +77,21 @@ export interface FeeTotals {
   receivedNet: number
   /** 금액을 아직 안 적은 항목 수 (합계에서 빠진다) */
   unknownCount: number
+  /** D-140: 조건 대기 — 아직 받을 시점이 아니라 '못 받은 돈' 에 넣지 않은 청구액 · 내 몫 */
+  waitingGross: number
+  waitingNet: number
 }
 
-export function feeTotals(fees: FeeItem[]): FeeTotals {
+/** D-140: 조건 대기(정책자금 조달 전 성공보수 등)는 '못 받은 돈' 에 넣지 않는다 — 따로 센다 */
+export function feeTotals(fees: FeeItem[], funding: FundingFacts = NO_FUNDING): FeeTotals {
   let gross = 0
   let agent = 0
   let unpaidGross = 0
   let unpaidNet = 0
   let receivedNet = 0
   let unknownCount = 0
+  let waitingGross = 0
+  let waitingNet = 0
 
   for (const f of fees) {
     const m = feeMathOf(f)
@@ -94,7 +101,10 @@ export function feeTotals(fees: FeeItem[]): FeeTotals {
     }
     gross += m.gross
     agent += m.agent
-    if (f.receivedAt === null) {
+    if (f.receivedAt === null && isWaiting(f, funding)) {
+      waitingGross += m.gross
+      waitingNet += m.net ?? 0
+    } else if (f.receivedAt === null) {
       unpaidGross += m.gross
       unpaidNet += m.net ?? 0
     } else {
@@ -111,6 +121,8 @@ export function feeTotals(fees: FeeItem[]): FeeTotals {
     unpaidNet,
     receivedNet,
     unknownCount,
+    waitingGross,
+    waitingNet,
   }
 }
 

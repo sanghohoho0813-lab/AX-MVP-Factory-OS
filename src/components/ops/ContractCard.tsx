@@ -59,13 +59,13 @@ export function ContractCard({
   record,
   today,
   onSave,
-  onAddFee,
+  onPlan,
 }: {
   record: ClientOpsRecord
   today: string
   onSave: (next: ContractInfo) => void | boolean | Promise<boolean | void>
-  /** D-122: 계약 금액이 수금 항목보다 크면 '차이만큼 수금 항목 추가' */
-  onAddFee?: (amount: number) => void
+  /** D-140: 계약금액 중 아직 수금 계획이 없는 돈 → '계약 · 수금 한 번에' 로 (차이만큼 아무 날짜로 넣지 않는다) */
+  onPlan?: () => void
 }) {
   const [editing, setEditing] = useState(false)
   const [open, setOpen] = useState(false)
@@ -85,9 +85,14 @@ export function ContractCard({
       </div>
 
       {!s.hasAny ? (
-        <p className="t-sub mt-2 break-keep text-slate-500">
-          언제 · 어떤 방식으로 · 얼마에 계약했는지 적어 두면 여기서 한눈에 보입니다.
-        </p>
+        <div className="mt-2 flex flex-col items-start gap-2">
+          <p className="t-sub break-keep text-slate-500">얼마짜리 계약인지 · 지금 얼마 받았는지 · 나머지는 언제 받는지만 고르면 수금 계획까지 끝납니다.</p>
+          {onPlan && record.fees.length === 0 && (
+            <Button variant="primary" onClick={onPlan} data-testid="contract-plan-open">
+              계약금액 · 받은 돈 · 남은 돈 정하기
+            </Button>
+          )}
+        </div>
       ) : (
         <>
           {/* 한눈에 — 언제 · 몇 달째 · 어떤 방식 */}
@@ -114,12 +119,19 @@ export function ContractCard({
           {gap && (
             <div data-testid="contract-gap" className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2">
               <span className="t-sub break-keep text-slate-800">
-                계약 현금 {formatKrw(gap.cash)} · 수금 항목 {formatKrw(gap.fees)} ·{' '}
-                <strong className="font-semibold text-warning-800">{gap.gap > 0 ? `${formatKrw(gap.gap)} 덜 적힘` : `${formatKrw(-gap.gap)} 더 적힘`}</strong>
+                {gap.gap > 0 ? (
+                  <>
+                    계약금액 {formatKrw(gap.cash)} 중 <strong className="font-semibold text-warning-800">{formatKrw(gap.gap)}</strong>은 아직 언제 받을지 정하지 않았습니다
+                  </>
+                ) : (
+                  <>
+                    수금 계획이 계약금액보다 <strong className="font-semibold text-warning-800">{formatKrw(-gap.gap)}</strong> 많습니다 — 계약금액을 고칠지 확인하세요
+                  </>
+                )}
               </span>
-              {gap.gap > 0 && onAddFee && (
-                <Button variant="secondary" size="sm" onClick={() => onAddFee(gap.gap)}>
-                  차이만큼 수금 항목 추가
+              {gap.gap > 0 && onPlan && (
+                <Button variant="primary" size="sm" onClick={onPlan}>
+                  남은 돈 받는 방법 정하기
                 </Button>
               )}
             </div>

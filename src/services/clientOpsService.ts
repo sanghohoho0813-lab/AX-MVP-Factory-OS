@@ -54,7 +54,7 @@ import type {
   ServiceKey,
   ServiceState,
 } from '../types/clientOps'
-import { CONTRACT_KIND_LABEL, emptyContract, isCustomDocumentKey, isCustomServiceKey, isProfileGroupKey } from '../types/clientOps'
+import { CONTRACT_KIND_LABEL, FEE_CONDITION_ORDER, emptyContract, isCustomDocumentKey, isCustomServiceKey, isProfileGroupKey, type FeeConditionKind } from '../types/clientOps'
 import { documentMetaOf, makeCustomDocumentKey } from './clientOpsDocuments'
 import { normalizeSales } from './salesPipeline'
 
@@ -286,6 +286,8 @@ function normalizeCustomDocuments(raw: unknown): CustomDocument[] {
     .filter((d) => d.label !== '')
 }
 
+const isFeeConditionKind = (v: unknown): v is FeeConditionKind => typeof v === 'string' && (FEE_CONDITION_ORDER as string[]).includes(v)
+
 function upgradeFees(raw: Partial<ClientOpsRecord> & LegacyShape): FeeItem[] {
   if (Array.isArray(raw.fees)) {
     return raw.fees.map((f) => ({
@@ -301,6 +303,10 @@ function upgradeFees(raw: Partial<ClientOpsRecord> & LegacyShape): FeeItem[] {
       dueDate: typeof f.dueDate === 'string' ? f.dueDate : '',
       receivedAt: typeof f.receivedAt === 'string' ? f.receivedAt : null,
       note: f.note ?? '',
+      // D-140: 받는 조건 — 없던 기록은 그대로 없다(예전처럼 날짜로만 판정)
+      ...(isFeeConditionKind(f.conditionKind) ? { conditionKind: f.conditionKind } : {}),
+      ...(typeof f.conditionText === 'string' && f.conditionText.trim() !== '' ? { conditionText: f.conditionText.slice(0, 80) } : {}),
+      ...(typeof f.conditionMetAt === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(f.conditionMetAt) ? { conditionMetAt: f.conditionMetAt } : {}),
     }))
   }
 
@@ -425,6 +431,9 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
           resultAt: a.resultAt ?? null,
           requestedAmount: typeof a.requestedAmount === 'number' ? a.requestedAmount : null,
           approvedAmount: typeof a.approvedAmount === 'number' ? a.approvedAmount : null,
+          // D-140: 실제 입금(실행)액 — 없던 기록은 그대로 없다
+          ...(typeof a.executedAmount === 'number' && Number.isFinite(a.executedAmount) && a.executedAmount > 0 ? { executedAmount: a.executedAmount } : {}),
+          ...(typeof a.executedAt === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(a.executedAt) ? { executedAt: a.executedAt } : {}),
           note: a.note ?? '',
           createdAt: a.createdAt ?? now,
           updatedAt: a.updatedAt ?? now,
@@ -887,6 +896,9 @@ export function withNewFee(record: ClientOpsRecord, fee: Partial<FeeItem>): Clie
     dueDate: fee.dueDate ?? '',
     receivedAt: fee.receivedAt ?? null,
     note: fee.note ?? '',
+    ...(fee.conditionKind ? { conditionKind: fee.conditionKind } : {}),
+    ...(fee.conditionText ? { conditionText: fee.conditionText } : {}),
+    ...(fee.conditionMetAt ? { conditionMetAt: fee.conditionMetAt } : {}),
   }
   const label = item.amount === null ? item.label : `${item.label} ${item.amount.toLocaleString('ko-KR')}원`
   return withActivity({ ...record, fees: [...record.fees, item] }, 'fee_added', `수금 항목 추가 — ${label}`)

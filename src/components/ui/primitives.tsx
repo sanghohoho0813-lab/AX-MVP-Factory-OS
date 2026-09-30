@@ -287,10 +287,13 @@ export function MetricTile({
   tone = 'neutral',
   onClick,
   active = false,
+  hintOnMobile = false,
 }: {
   label: string
   value: string
   hint?: string
+  /** 휴대폰에서도 보조 설명을 보인다(돈 상태처럼 숫자만으로는 뜻이 모자랄 때 · D-140) */
+  hintOnMobile?: boolean
   tone?: Tone
   onClick?: () => void
   active?: boolean
@@ -321,7 +324,7 @@ export function MetricTile({
       */}
       <span className="t-sub block break-keep text-slate-500">{label}</span>
       <strong className={`t-num mt-0.5 block sm:mt-1 ${valueColor}`}>{value}</strong>
-      {hint && <span className="t-meta mt-0.5 hidden break-keep text-slate-500 sm:block">{hint}</span>}
+      {hint && <span className={`t-meta mt-0.5 break-keep text-slate-500 ${hintOnMobile ? 'block' : 'hidden sm:block'}`}>{hint}</span>}
     </Tag>
   )
 }

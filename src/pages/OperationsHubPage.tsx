@@ -303,7 +303,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     return { unpaid, unpaidGross, overdueCount }
   }, [records, today])
 
-  // 계약 종료만 뺀다 — 계약 전도 챙겨야 할 업체다
+  // 계약 완료(끝남)만 뺀다 — 계약 전도 챙겨야 할 업체다
   const activeCount = records.filter((r) => contractStageOf(r.status) !== 'closed').length
 
   const openAlert = (a: OpsAlert) =>

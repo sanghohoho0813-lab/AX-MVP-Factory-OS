@@ -1,11 +1,11 @@
 /**
  * 일정 달력 — 쉬는 날 · 바로 적기 · 반복 (D-139).
  *
- *  1440  2026년 10월로 → '2026년 공휴일 넣기' → 10/5 대체공휴일 · 10/9 한글날 빗금 · 영업일 20일
+ *  1440  2026년 10월로 → '2026년 공휴일 넣기' → 10/5 대체공휴일 · 10/9 한글날 빨간 날짜 · 영업일 20일
  *        → 10/12 를 두 번 눌러 바로 적기 · 매월 4번(주말이면 앞 영업일) → 할 일 4줄(12/12 토 → 12/11)
  *        → 10/20 부터 2일 '회사 휴무' → 영업일 18일 → 10/21 표시 지우기 → 19일
- *        → 날짜 칸(큰 달력)에도 쉬는 날 빗금 · 오류 0
- *  360 아주 큰 글자  빗금 · 이름 · 두 번 눌러 적기 창 · 가로 넘침 0
+ *        → 날짜 칸(큰 달력)에도 쉬는 날 빨간 날짜 · 오류 0
+ *  360 아주 큰 글자  빨간 날짜 · 이름 · 두 번 눌러 적기 창 · 가로 넘침 0
  *
  *   node e2e/planner.mjs http://localhost:4390
  */
@@ -64,10 +64,10 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByTestId('holiday-import-save').click()
   await page.waitForTimeout(700)
   check('공휴일 넣기: 넣었다고 알림', (await page.locator('body').innerText()).includes('쉬는 날 20일을 표시했습니다'))
-  check('빗금: 10/5 대체공휴일 · 10/9 한글날 · 10/3 개천절(토)', (await cell(page, '2026-10-05').getAttribute('data-off')) === 'true' && (await cell(page, '2026-10-09').getAttribute('data-off')) === 'true' && (await cell(page, '2026-10-03').getAttribute('data-off')) === 'true' && (await cell(page, '2026-10-06').getAttribute('data-off')) === null)
-  check('빗금: 칸 안에 이름', (await cell(page, '2026-10-05').innerText()).includes('대체공휴일'))
-  const bg = await cell(page, '2026-10-05').evaluate((el) => getComputedStyle(el).backgroundImage)
-  check('빗금: 빨간 사선 무늬(과하지 않은 옅은 색)', bg.includes('repeating-linear-gradient'), bg)
+  check('쉬는 날: 10/5 대체공휴일 · 10/9 한글날 · 10/3 개천절(토)', (await cell(page, '2026-10-05').getAttribute('data-off')) === 'true' && (await cell(page, '2026-10-09').getAttribute('data-off')) === 'true' && (await cell(page, '2026-10-03').getAttribute('data-off')) === 'true' && (await cell(page, '2026-10-06').getAttribute('data-off')) === null)
+  check('쉬는 날: 칸 안에 이름', (await cell(page, '2026-10-05').innerText()).includes('대체공휴일'))
+  const look = await cell(page, '2026-10-05').evaluate((el) => ({ bg: getComputedStyle(el).backgroundImage, num: getComputedStyle(el.querySelector('span')).color, sun: getComputedStyle(document.querySelector('main button[data-date="2026-10-04"] span')).color }))
+  check('쉬는 날: 빗금 없이 날짜 숫자만 일요일처럼 빨간 글자', look.bg === 'none' && look.num === look.sun, JSON.stringify(look))
   check('영업일: 10월 20일 · 평일 쉬는 날 2일', (await summary(page)).includes('영업일 20일') && (await summary(page)).includes('평일 쉬는 날 2일'), await summary(page))
   check('공휴일 넣기: 다 넣으면 단추가 사라진다', (await page.getByTestId('holiday-import-open').count()) === 0)
   await cell(page, '2026-10-09').click()
@@ -104,24 +104,24 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/quick-off-1440.png` })
   await page.getByTestId('quick-save-off').click()
   await page.waitForTimeout(700)
-  check('쉬는 날: 10/20 · 10/21 빗금 · 영업일 18일', (await cell(page, '2026-10-21').getAttribute('data-off')) === 'true' && (await summary(page)).includes('영업일 18일'), await summary(page))
+  check('쉬는 날: 10/20 · 10/21 표시 · 영업일 18일', (await cell(page, '2026-10-21').getAttribute('data-off')) === 'true' && (await summary(page)).includes('영업일 18일'), await summary(page))
   check('쉬는 날: 고른 날 아래에 이름', (await page.getByTestId('picked-day-off').innerText()).includes('회사 휴무'))
   await cell(page, '2026-10-21').click()
   await page.getByTestId('picked-quick-off').click()
   await page.waitForTimeout(300)
   await page.getByTestId('quick-off-existing').getByRole('button', { name: '표시 지우기' }).click()
   await page.waitForTimeout(700)
-  check('쉬는 날: 지우면 빗금이 없어지고 영업일 19일', (await cell(page, '2026-10-21').getAttribute('data-off')) === null && (await summary(page)).includes('영업일 19일'), await summary(page))
+  check('쉬는 날: 지우면 표시가 없어지고 영업일 19일', (await cell(page, '2026-10-21').getAttribute('data-off')) === null && (await summary(page)).includes('영업일 19일'), await summary(page))
   await page.keyboard.press('Escape')
   await page.waitForTimeout(200)
 
-  // 큰 달력(날짜 칸)에도 빗금
+  // 큰 달력(날짜 칸)에도 빨간 날짜
   await page.getByTestId('calendar-quick-open').click()
   await page.waitForTimeout(300)
   await page.getByLabel('할 일 날짜').click()
   await page.waitForTimeout(300)
   const big = page.getByTestId('big-calendar')
-  check('큰 달력: 쉬는 날 빗금 · 이름', (await big.locator('[data-day="2026-10-09"]').getAttribute('class'))?.includes('day-off') === true && ((await big.locator('[data-day="2026-10-09"]').getAttribute('aria-label')) ?? '').includes('한글날'))
+  check('큰 달력: 쉬는 날 빨간 글자 · 이름', (await big.locator('[data-day="2026-10-09"]').getAttribute('data-off')) === 'true' && (await big.locator('[data-day="2026-10-09"]').getAttribute('class'))?.includes('text-weekday-sun') === true && ((await big.locator('[data-day="2026-10-09"]').getAttribute('aria-label')) ?? '').includes('한글날'))
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/big-calendar-1440.png` })
   check('JS 오류 없음', errors.length === 0, errors.join(' | '))
   await ctx.close()
@@ -143,7 +143,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(300)
   await page.getByTestId('holiday-import-save').click()
   await page.waitForTimeout(700)
-  check('360: 빗금 · 달력 아래 이 달 쉬는 날 목록', (await cell(page, '2026-10-09').getAttribute('data-off')) === 'true' && (await page.getByTestId('month-days-off').innerText()).includes('10/9 한글날'))
+  check('360: 빨간 날짜 · 달력 아래 이 달 쉬는 날 목록', (await cell(page, '2026-10-09').getAttribute('data-off')) === 'true' && (await page.getByTestId('month-days-off').innerText()).includes('10/9 한글날'))
   check('360: 가로 넘침 없음', (await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 0)
   await page.getByTestId('month-days-off').scrollIntoViewIfNeeded()
   await page.waitForTimeout(2500)

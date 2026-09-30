@@ -327,7 +327,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                     // D-139: 고른 날을 한 번 더 누르면(두 번 누르기) 바로 적는 창
                     onClick={() => (isPicked ? setQuick({ date: d, tab: 'todo' }) : setPicked(d))}
                     className={`flex min-h-[5.5rem] min-w-0 flex-col gap-1 border-r border-b border-slate-100 p-1.5 text-left last:border-r-0 ${
-                      off ? 'day-off' : inMonth ? 'bg-white' : 'bg-slate-50/60'
+                      inMonth ? 'bg-white' : 'bg-slate-50/60'
                     } ${off && !inMonth ? 'opacity-60' : ''} ${isPicked ? 'ring-2 ring-brand-400 ring-inset' : ''} hover:bg-brand-50/40`}
                   >
                     <span
@@ -345,9 +345,9 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                     >
                       {Number(d.slice(8))}
                     </span>
-                    {/* 좁은 화면에서는 이름이 '개…' 로 잘린다 — 빗금만 두고 이름은 달력 아래 '이 달 쉬는 날' 에 */}
+                    {/* 쉬는 날은 일요일처럼 날짜 숫자만 빨갛게(D-139 대표: 빗금은 과하다). 좁은 화면은 이름이 잘려서 달력 아래 '이 달 쉬는 날' 에 */}
                     {off && (
-                      <span className="t-meta hidden max-w-full truncate leading-tight font-semibold text-danger-700 lg:block" data-testid="day-off-label">
+                      <span className="t-meta hidden max-w-full truncate leading-tight font-semibold text-weekday-sun lg:block" data-testid="day-off-label">
                         {off[0].name}
                       </span>
                     )}
@@ -406,7 +406,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
               {daysOff
                 .filter((d) => d.date.startsWith(monthPrefix))
                 .map((d) => (
-                  <button key={d.id} type="button" onClick={() => setPicked(d.date)} className="day-off tap t-sub rounded-full border border-danger-200 px-2.5 py-1 font-medium text-danger-700">
+                  <button key={d.id} type="button" onClick={() => setPicked(d.date)} className="tap t-sub rounded-full border border-slate-200 bg-white px-2.5 py-1 font-medium text-weekday-sun hover:bg-slate-50">
                     {Number(d.date.slice(5, 7))}/{Number(d.date.slice(8))} {d.name}
                   </button>
                 ))}
@@ -430,8 +430,8 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                 <>
                   {/* D-139: 쉬는 날 · 쉬는 날 마감 */}
                   {pickedOff.length > 0 && (
-                    <div className="day-off flex flex-wrap items-center gap-x-3 gap-y-1 rounded-(--radius-control) border border-danger-200 px-4 py-2.5" data-testid="picked-day-off">
-                      <span className="t-body font-bold text-danger-700">쉬는 날 · {pickedOff.map((o) => o.name).join(' · ')}</span>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-(--radius-control) border border-slate-200 bg-white px-4 py-2.5" data-testid="picked-day-off">
+                      <span className="t-body font-bold text-weekday-sun">쉬는 날 · {pickedOff.map((o) => o.name).join(' · ')}</span>
                       <button type="button" onClick={() => setQuick({ date: picked, tab: 'off' })} className="tap t-sub ml-auto font-semibold text-slate-700 underline">
                         고치기 · 지우기
                       </button>

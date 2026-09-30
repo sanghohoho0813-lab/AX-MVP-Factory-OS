@@ -179,6 +179,34 @@ export interface FeeItem {
   /** 실제 입금 확인일 (YYYY-MM-DD). 미수금이면 null */
   receivedAt: string | null
   note: string
+  /**
+   * D-140: 언제 받는가 — 날짜가 아니라 조건으로 받는 돈(성공보수 · 잔금)이 많다.
+   * 없거나 '' 이면 예전처럼 받기로 한 날(dueDate)만 본다 — 예전 기록은 뜻이 바뀌지 않는다.
+   */
+  conditionKind?: FeeConditionKind | ''
+  /** 직접 조건('custom')의 글 — 예: 벤처인증 확인서 발급 시 */
+  conditionText?: string
+  /** 조건이 충족된 날 (사람이 '조건 충족됨' 을 누른 날). 아직이면 null · 없음 */
+  conditionMetAt?: string | null
+}
+
+/**
+ * 받는 조건 (D-140).
+ *  on_contract 계약 시 · date 정한 날 · funding_executed 정책자금 실행(입금) 후 · funding_50m / funding_100m 정책자금 5천만 · 1억 이상 조달 시 ·
+ *  project_done 프로젝트 완료 시 · custom 직접 적은 조건
+ */
+export type FeeConditionKind = 'on_contract' | 'date' | 'funding_executed' | 'funding_50m' | 'funding_100m' | 'project_done' | 'custom'
+
+export const FEE_CONDITION_ORDER: FeeConditionKind[] = ['on_contract', 'date', 'funding_executed', 'funding_50m', 'funding_100m', 'project_done', 'custom']
+
+export const FEE_CONDITION_LABEL: Record<FeeConditionKind, string> = {
+  on_contract: '계약 시',
+  date: '정한 날짜에',
+  funding_executed: '정책자금 실행 후',
+  funding_50m: '정책자금 5천만원 이상 조달 시',
+  funding_100m: '정책자금 1억원 이상 조달 시',
+  project_done: '프로젝트 완료 시',
+  custom: '직접 적은 조건',
 }
 
 /* ------------------------------------------------------------------ */
@@ -211,6 +239,13 @@ export interface FundingApplication {
   requestedAmount: number | null
   /** 확정 금액(원) */
   approvedAmount: number | null
+  /**
+   * D-140: 실제로 입금(실행)된 금액(원) — 선정 · 확정과 다르다. 사람이 확인하고 적은 것만.
+   * 성공보수 조건(정책자금 N원 이상 조달 시)을 이 값으로만 판정한다. 없으면 null.
+   */
+  executedAmount?: number | null
+  /** 실제로 입금된 날 */
+  executedAt?: string | null
   note: string
   createdAt: string
   updatedAt: string
@@ -236,9 +271,9 @@ export type ClientOpsStatus = 'active' | 'waiting' | 'paused' | 'completed'
  * 저장 값은 예전 네 가지를 그대로 쓴다 — DB 의 check 제약을 건드리지 않기 위해서다.
  * (제약을 바꾸려면 사람이 SQL 을 돌려야 하는데, 화면 문구 하나 때문에 그럴 이유가 없다.)
  *   계약 전   ↔ 'waiting'
- *   계약 완료 ↔ 'active'
- *   계약 종료 ↔ 'completed'
- *   'paused'(예전 일시 중지)는 읽을 때 계약 완료로 본다.
+ *   계약 중   ↔ 'active'   (D-139 까지 '계약 완료')
+ *   계약 완료 ↔ 'completed' (D-139 까지 '계약 종료')
+ *   'paused'(예전 일시 중지)는 읽을 때 계약 중으로 본다.
  */
 export type ContractStage = 'pre' | 'signed' | 'closed'
 
@@ -246,8 +281,9 @@ export const CONTRACT_STAGE_ORDER: ContractStage[] = ['pre', 'signed', 'closed']
 
 export const CONTRACT_STAGE_LABEL: Record<ContractStage, string> = {
   pre: '계약 전',
-  signed: '계약 완료',
-  closed: '계약 종료',
+  // D-140: 대표 요청 — 회사명 옆 배지는 '계약 전 · 계약 중 · 계약 완료'. 저장 값은 그대로(active · completed)
+  signed: '계약 중',
+  closed: '계약 완료',
 }
 
 /** 저장 값 → 화면 단계 */

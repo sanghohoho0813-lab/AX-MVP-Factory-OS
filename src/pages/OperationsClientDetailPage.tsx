@@ -36,8 +36,6 @@ import {
   withCustomDocument,
   withCustomField,
   withDocument,
-  withFee,
-  withNewFee,
   withArchived,
   deleteClient,
   withFunding,
@@ -48,7 +46,6 @@ import {
   withService,
   withoutCustomDocument,
   withoutCustomField,
-  withoutFee,
   withoutFunding,
   withoutNote,
   normalizeClientOps,
@@ -67,8 +64,6 @@ import {
 } from '../services/clientOpsMessages'
 import {
   DOCUMENTS,
-  FEE_KIND_LABEL,
-  FEE_KIND_ORDER,
   SERVICES,
   SERVICE_STATUS_LABEL,
   SERVICE_STATUS_ORDER,
@@ -77,11 +72,10 @@ import {
   isServiceOpen,
 } from '../content/clientOpsCatalog'
 import { nowIso, todayLocalDate } from '../lib/appClock'
-import { formatFileSize, formatKrw, krwTile } from '../lib/format'
+import { formatFileSize, krwTile } from '../lib/format'
 import {
   CONTRACT_KIND_LABEL,
   CONTRACT_STAGE_LABEL,
-  CONTRACT_STAGE_ORDER,
   contractStageOf,
   statusForStage,
 } from '../types/clientOps'
@@ -90,7 +84,6 @@ import type {
   ClientOpsRecord,
   ContractStage,
   DocumentKey,
-  FeeKind,
   ServiceKey,
   ServiceStatus,
 } from '../types/clientOps'
@@ -99,12 +92,10 @@ import { NotFoundState } from '../components/ui/NotFoundState'
 import { Modal } from '../components/ui/Modal'
 import { Panel } from '../components/ui/Panel'
 import { useToast } from '../components/ui/toastContext'
-import { AlertRow, ClientStatusChip, statusTone } from '../components/ops/opsParts'
+import { AlertRow, statusTone } from '../components/ops/opsParts'
 import {
   DueDateField,
-  AmountField,
   MessageModal,
-  parseAmount,
   PhoneLink,
   SavedBadge,
 } from '../components/ops/opsControls'
@@ -116,7 +107,8 @@ import { createJournalEntry } from '../services/journalService'
 import { FundingSection } from '../components/ops/FundingSection'
 import { DocImportModal } from '../components/ops/DocImportModal'
 import { BulkDocUploadSheet } from '../components/ops/BulkDocUploadSheet'
-import { agentShares, feeMathOf, feeTotals, marginPct, marginText, netAmountOf } from '../services/feeMath'
+import { netAmountOf } from '../services/feeMath'
+import { fundingFactsOf, isWaiting } from '../services/feeStatus'
 import { withActivity } from '../services/clientOpsActivity'
 import { allDocumentMetas, emptyDocumentState } from '../services/clientOpsDocuments'
 import { ActivityLog } from '../components/ops/ActivityLog'
@@ -124,8 +116,10 @@ import { ClientSalesCard } from '../components/sales/ClientSalesCard'
 import { SalesJourneyCard } from '../components/sales/SalesJourneyCard'
 import { withSalesPath } from '../services/salesJourney'
 import { isProspect, salesStageOf, withSalesStage } from '../services/salesPipeline'
-import { addDaysLocal } from '../services/clientOpsNextAction'
 import { ContractCard } from '../components/ops/ContractCard'
+import { ContractPlanSheet } from '../components/ops/ContractPlanSheet'
+import { ContractStageMenu } from '../components/ops/ContractStageMenu'
+import { FeesPanel } from '../components/ops/FeesPanel'
 import { InlineConfirm } from '../components/ui/InlineConfirm'
 import { ContractCloseSheet } from '../components/sales/ContractCloseSheet'
 import { contractCloseDraft, withContractClose, type ContractCloseDraft } from '../services/salesContract'
@@ -231,6 +225,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const [catalogOpen, setCatalogOpen] = useState(false)
   /** 모바일에서 부가 행동을 담는 시트 */
   const [moreOpen, setMoreOpen] = useState(false)
+  /** D-140: 계약 · 수금 한 번에 (개요의 계약 카드에서) */
+  const [planOpen, setPlanOpen] = useState(false)
   /**
    * 삭제 확인 단계 — 0 닫힘 / 1 첫 번째 물음 / 2 두 번째 물음.
    * 되돌릴 수 없는 일이라 두 번 묻는다. 두 번째에서는 업체 이름을 그대로 적게 해
@@ -501,7 +497,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="t-page min-w-0 break-keep text-slate-900 [overflow-wrap:anywhere]">{record.companyName || '(이름 없음)'}</h1>
-              <ClientStatusChip status={record.status} />
+              {/* D-140: 회사명 옆에서 바로 계약 상태 바꾸기 (계약 전 · 계약 중 · 계약 완료) */}
+              <ContractStageMenu status={record.status} onChange={(s) => changeStage(s)} />
             </div>
             <p className="t-sub mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-slate-500">
               <PhoneLink phone={record.contactPhone} />
@@ -538,22 +535,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           {/* 데스크톱에서만 인라인으로 — 모바일은 아래 '더보기' 시트로 */}
           <div className="hidden items-end gap-2 lg:flex">
             <ScreenGuide screenKey="client_detail" />
-            {/* D-126: 잠재고객은 영업 단계 하나만(계약 단계는 '계약 전' 으로 정해져 있다) */}
-            {!prospect && <label className="t-sub font-medium text-slate-600">
-              계약 단계
-              <select
-                value={contractStageOf(record.status)}
-                onChange={(e) => changeStage(e.target.value as ContractStage)}
-                className="t-body mt-1 block h-10 rounded-(--radius-control) border border-slate-300 px-3"
-              >
-                {CONTRACT_STAGE_ORDER.map((s) => (
-                  <option key={s} value={s}>
-                    {CONTRACT_STAGE_LABEL[s]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            }
+            {/* D-140: 계약 단계는 회사명 옆 배지에서 바꾼다 — 여기 두 번째 선택기는 뺐다 */}
           </div>
         </div>
 
@@ -619,7 +601,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           const badge =
             t.key === 'overview' ? alerts.filter((a) => a.severity === 'critical').length
               : t.key === 'docs' ? urgentDocs.size
-                : t.key === 'fees' ? record.fees.filter((f) => !f.receivedAt).length
+                : t.key === 'fees' ? record.fees.filter((f) => !f.receivedAt && !isWaiting(f, fundingFactsOf(record.fundingApplications))).length
                   : t.key === 'funding' ? record.fundingApplications.filter((a) => a.status === 'watching' || a.status === 'preparing').length
                     : 0
           return (
@@ -799,12 +781,9 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         record={record}
         today={today}
         onSave={(next) => commit(withContract(record, next))}
-        onAddFee={(amount) =>
-          void commit(withNewFee(record, { kind: 'interim', label: '계약 잔금', amount, dueDate: addDaysLocal(today, 7) })).then((ok) => {
-            if (ok) showToast('차이만큼 수금 항목(계약 잔금 · 7일 뒤)을 넣었습니다. 수금 탭에서 고칠 수 있습니다.')
-          })
-        }
+        onPlan={() => setPlanOpen(true)}
       />}
+      {planOpen && <ContractPlanSheet record={record} today={today} onSave={commit} onClose={() => setPlanOpen(false)} />}
 
       <WorkHistoryCard record={record} onOpen={(key) => setTab('work', key)} />
 
@@ -1447,7 +1426,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
       {tab === 'consulting' && <ClientConsultingTab record={record} workspaceId={workspaceId} />}
 
-      {tab === 'fees' && <FeesSection record={record} onChange={commit} today={today} />}
+      {tab === 'fees' && <FeesPanel record={record} onChange={commit} today={today} />}
 
       {tab === 'portal' && <PortalTab record={record} workspaceId={workspaceId} onRecordChange={commit} />}
 
@@ -1469,21 +1448,6 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       {moreOpen && (
         <BottomSheet title="이 업체에서 할 수 있는 것" onClose={() => setMoreOpen(false)}>
           <div className="flex flex-col gap-4">
-            {!prospect && <label className="t-sub font-medium text-slate-600">
-              계약 단계
-              <select
-                value={contractStageOf(record.status)}
-                onChange={(e) => changeStage(e.target.value as ContractStage)}
-                className="t-body mt-1.5 block h-12 w-full rounded-(--radius-control) border border-slate-300 px-3"
-              >
-                {CONTRACT_STAGE_ORDER.map((s) => (
-                  <option key={s} value={s}>
-                    {CONTRACT_STAGE_LABEL[s]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            }
 
             <div className="flex flex-col gap-2">
               <Button
@@ -1837,334 +1801,6 @@ function TextField({
         className={`mt-1 ${inputCls}`}
       />
     </label>
-  )
-}
-
-function FeesSection({
-  record,
-  onChange,
-  today,
-}: {
-  record: ClientOpsRecord
-  onChange: (next: ClientOpsRecord) => void | boolean | Promise<boolean>
-  today: string
-}) {
-  const [kind, setKind] = useState<FeeKind>('deposit')
-  const [serviceKey, setServiceKey] = useState<ServiceKey | ''>('')
-  const [amount, setAmount] = useState(0)
-  const [dueDate, setDueDate] = useState('')
-
-  const [agentFee, setAgentFee] = useState(0)
-  const [agentName, setAgentName] = useState('')
-  const navigate = useNavigate()
-  /*
-   * 청구액과 '진짜 내 돈' 은 다르다.
-   * 성공보수 2,000만원을 받아도 일부는 소개해 준 영업자에게 나간다. 청구액만 보고
-   * 있으면 실제로 남는 돈을 늘 다시 계산하게 된다 — 그래서 둘을 나란히 둔다.
-   */
-  const totals = feeTotals(record.fees)
-  /** 누구한테 얼마 나가는지 — 수수료 칸 아래 한 줄 */
-  const shares = agentShares(record.fees)
-
-  const [adding, setAdding] = useState(false)
-  const add = async () => {
-    if (adding) return
-    setAdding(true)
-    const ok = await onChange(
-      withNewFee(record, {
-        kind,
-        serviceKey: serviceKey === '' ? null : serviceKey,
-        amount: amount > 0 ? amount : null,
-        agentFee: agentFee > 0 ? agentFee : null,
-        agentName,
-        dueDate,
-      }),
-    )
-    setAdding(false)
-    // D-122: 저장이 된 뒤에만 비운다 — 실패하면 적은 금액 · 날짜가 그대로 남는다
-    if (ok === false) return
-    setAmount(0)
-    setAgentFee(0)
-    setAgentName('')
-    setDueDate('')
-  }
-
-  /** 새로 넣을 항목의 이익률 — 적는 동안 계산기처럼 따라 움직인다 */
-  const draftMargin = marginPct(amount > 0 ? amount : null, agentFee)
-
-  return (
-    <section aria-labelledby="fees" className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="fees" className="text-[1.3rem] font-bold text-slate-900">
-          계약금 · 성공보수
-        </h2>
-      </div>
-
-      {/* 돈 세 줄 — 청구액 · 영업자 수수료 · 진짜 내 돈. 이익률은 매번 계산한다 */}
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-        <MetricTile label="청구 합계" value={krwTile(totals.gross)} hint={totals.unknownCount > 0 ? `금액 미정 ${totals.unknownCount}건` : undefined} />
-        <MetricTile
-          label="영업자 수수료"
-          value={krwTile(totals.agent)}
-          hint={shares.length > 0 ? shares.map((s) => `${s.name} ${formatKrw(s.amount)}`).join(' · ') : undefined}
-          onClick={() => navigate('/ops/agents')}
-        />
-        <MetricTile
-          label="내가 받는 돈"
-          value={krwTile(totals.net)}
-          hint={totals.marginPct !== null ? `이익률 ${marginText(totals.marginPct)}` : undefined}
-        />
-        <MetricTile
-          label="못 받은 내 돈"
-          value={krwTile(totals.unpaidNet)}
-          tone={totals.unpaidNet > 0 ? 'danger' : 'neutral'}
-          hint={totals.unpaidGross !== totals.unpaidNet ? `청구 기준 ${krwTile(totals.unpaidGross)}` : undefined}
-        />
-      </div>
-
-      <Panel flush>
-        {record.fees.length === 0 ? (
-          <p className="px-5 py-6 text-[0.95rem] text-slate-500">
-            아직 등록한 수금 항목이 없습니다. 아래에서 계약금·중도금·성공보수를 추가하세요.
-          </p>
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {record.fees.map((fee) => {
-              const left = fee.dueDate ? daysLeftFrom(today, fee.dueDate) : null
-              const overdue = fee.receivedAt === null && left !== null && left < 0
-              return (
-                // 휴대폰: 제목 줄(체크·이름·지우기) → 입력 줄(날짜·금액·+100만) 두 단으로 쌓는다.
-                // 한 줄에 여섯 칸을 밀어 넣으면 이름 칸이 20px 로 짜부라져 글자가 세로로 흐른다.
-                // 데스크톱은 sm:contents 로 감싼 칸을 없애고 order 로 원래 한 줄 순서를 되돌린다.
-                // 데스크톱에서는 줄바꿈을 허용해야 한다 — 영업자 수수료 줄(sm:w-full)이 같은 줄에 끼면
-                // 이름 칸이 0px 로 짜부라져 '08-25 입금' 조각이 날짜 칸 위로 올라탄다(§20-3).
-                <li key={fee.id} className="flex flex-col gap-2.5 px-4 py-3.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:px-5">
-                  <div className="flex min-w-0 flex-wrap items-start gap-2.5 sm:contents">
-                    {/* D-126: 가장 자주 누르는 '입금' 이 작은 체크 칸이었다 — 손가락 크기 단추로 */}
-                    <button
-                      type="button"
-                      aria-pressed={fee.receivedAt !== null}
-                      aria-label={`${fee.label} 입금`}
-                      onClick={() => onChange(withFee(record, fee.id, { receivedAt: fee.receivedAt !== null ? null : today }))}
-                      className={`tap order-1 inline-flex h-10 shrink-0 items-center gap-1.5 rounded-(--radius-control) border px-3 t-sub font-semibold ${
-                        fee.receivedAt !== null ? 'border-success-300 bg-success-50 text-success-800' : 'border-slate-300 bg-white text-slate-700 hover:border-brand-400 hover:text-brand-700'
-                      }`}
-                    >
-                      {fee.receivedAt !== null ? <Check aria-hidden="true" className="size-4" /> : null}
-                      {fee.receivedAt !== null ? '입금됨' : '입금 확인'}
-                    </button>
-                    {/* D-122: 좁으면 '삭제' 단추가 아래 줄로 — 이름 칸이 짜부라지지 않게 */}
-                    <span className="order-2 min-w-0 flex-[1_1_10rem]">
-                    <span className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-[1rem] font-semibold break-keep text-slate-900">{fee.label}</span>
-                      {fee.serviceKey && (
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 t-meta text-slate-500">
-                          {SERVICES.find((s) => s.key === fee.serviceKey)?.shortLabel}
-                        </span>
-                      )}
-                      {overdue && (
-                        <span className="rounded-full border border-danger-200 bg-danger-100 px-1.5 py-0.5 t-meta font-bold text-danger-700">
-                          {dueText(left)}
-                        </span>
-                      )}
-                      {fee.receivedAt && (
-                        // 입금일은 고칠 수 있어야 한다 — 체크한 날이 아니라 실제 들어온 날이 기록이다 (D-81)
-                        <label className="inline-flex items-center gap-1 rounded-full border border-success-200 bg-success-50 px-1.5 py-0.5 t-meta font-semibold text-success-700">
-                          입금
-                          <input
-                            type="date"
-                            aria-label={`${fee.label} 입금일`}
-                            value={fee.receivedAt}
-                            onChange={(e) => {
-                              if (e.target.value) onChange(withFee(record, fee.id, { receivedAt: e.target.value }))
-                            }}
-                            className="bg-transparent t-meta font-semibold text-success-700 tabular-nums"
-                          />
-                        </label>
-                      )}
-                    </span>
-                    </span>
-                    {/* D-122: 한 번에 지우지 않는다 — 입금까지 적힌 항목도 한 번 스치면 사라졌다 */}
-                    <InlineConfirm className="order-6 ml-auto" question={`${fee.label} 지울까요?`} onConfirm={() => void onChange(withoutFee(record, fee.id))} testId="fee-delete" />
-                  </div>
-
-                  {/* 입력 줄 — 휴대폰에서는 제목 아래로 내려오고 왼쪽 여백을 체크칸에 맞춘다 */}
-                  <div className="flex items-center gap-2 pl-[1.9rem] sm:contents sm:pl-0">
-                    <input
-                      type="date"
-                      aria-label={`${fee.label} 받기로 한 날`}
-                      value={fee.dueDate}
-                      onChange={(e) => onChange(withFee(record, fee.id, { dueDate: e.target.value }))}
-                      className="order-3 min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 px-2 py-2 text-[0.92rem] sm:flex-none sm:py-1.5"
-                    />
-                    <input
-                      aria-label={`${fee.label} 금액`}
-                      value={fee.amount === null ? '' : fee.amount.toLocaleString('ko-KR')}
-                      onChange={(e) => {
-                        const n = parseAmount(e.target.value)
-                        onChange(withFee(record, fee.id, { amount: n > 0 ? n : null }))
-                      }}
-                      inputMode="numeric"
-                      placeholder="미정"
-                      className={`order-4 w-24 shrink-0 rounded-(--radius-control) border border-slate-300 px-2 py-2 text-right text-[1rem] font-semibold tabular-nums sm:w-32 sm:border-transparent sm:py-1.5 sm:hover:border-slate-300 sm:focus:border-slate-300 ${
-                        fee.receivedAt ? 'text-slate-500 line-through' : 'text-slate-900'
-                      }`}
-                    />
-                    <button
-                      type="button"
-                      aria-label={`${fee.label} 금액에 100만원 더하기`}
-                      title="누를 때마다 100만원씩 더합니다"
-                      onClick={() => onChange(withFee(record, fee.id, { amount: (fee.amount ?? 0) + 1_000_000 }))}
-                      className="tap order-5 shrink-0 rounded-(--radius-control) border border-slate-200 px-2 py-2 text-[0.875rem] font-semibold whitespace-nowrap text-slate-600 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 sm:py-1.5"
-                    >
-                      +100만
-                    </button>
-                  </div>
-
-                  {/*
-                    영업자 수수료 줄 — 청구액 바로 아래.
-                    이익률은 저장하지 않고 매번 계산한다. 금액을 고치면 그 자리에서 따라 바뀐다.
-                  */}
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pl-[1.9rem] sm:order-7 sm:w-full sm:pl-0">
-                    <label className="t-sub flex items-center gap-1.5 text-slate-500">
-                      영업자 수수료
-                      <input
-                        aria-label={`${fee.label} 영업자 수수료`}
-                        value={fee.agentFee === null ? '' : fee.agentFee.toLocaleString('ko-KR')}
-                        onChange={(e) => {
-                          const n = parseAmount(e.target.value)
-                          onChange(withFee(record, fee.id, { agentFee: n > 0 ? n : null }))
-                        }}
-                        inputMode="numeric"
-                        placeholder="없음"
-                        className="w-24 rounded-(--radius-control) border border-slate-300 px-2 py-1 text-right text-[0.92rem] font-semibold tabular-nums text-slate-700"
-                      />
-                    </label>
-                    {/* 누구한테 나가는 돈인지 — 수수료가 있을 때만 이름 칸을 연다 */}
-                    {(fee.agentFee !== null || fee.agentName !== '') && (
-                      <input
-                        aria-label={`${fee.label} 영업자 이름`}
-                        value={fee.agentName}
-                        onChange={(e) => onChange(withFee(record, fee.id, { agentName: e.target.value }))}
-                        placeholder="영업자 이름"
-                        className="w-24 rounded-(--radius-control) border border-slate-300 px-2 py-1 text-[0.92rem] text-slate-700"
-                      />
-                    )}
-                    {/*
-                      영업자에게 줬는지. 고객이 입금하기 전에는 줄 돈이 아니므로 잠가 둔다 —
-                      먼저 주고 고객이 안 주면 내 돈이 나간다 (D-78).
-                    */}
-                    {fee.agentFee !== null && fee.agentFee > 0 && (
-                      <label className="t-sub inline-flex items-center gap-1.5 text-slate-600">
-                        <input
-                          type="checkbox"
-                          aria-label={`${fee.label} 영업자 지급 완료`}
-                          checked={fee.agentPaidAt !== null}
-                          disabled={fee.receivedAt === null}
-                          onChange={(e) => onChange(withFee(record, fee.id, { agentPaidAt: e.target.checked ? today : null }))}
-                          className="size-4 accent-brand-600 disabled:opacity-40"
-                        />
-                        {fee.receivedAt === null ? (
-                          <span className="text-slate-400">고객 입금 전</span>
-                        ) : fee.agentPaidAt ? (
-                          <span className="inline-flex items-center gap-1">
-                            지급
-                            <input
-                              type="date"
-                              aria-label={`${fee.label} 영업자 지급일`}
-                              value={fee.agentPaidAt}
-                              onChange={(e) => {
-                                if (e.target.value) onChange(withFee(record, fee.id, { agentPaidAt: e.target.value }))
-                              }}
-                              className="bg-transparent t-sub tabular-nums"
-                            />
-                          </span>
-                        ) : (
-                          <span className="font-semibold text-warning-700">영업자에게 줄 돈</span>
-                        )}
-                      </label>
-                    )}
-                    {(() => {
-                      const m = feeMathOf(fee)
-                      if (m.net === null || m.agent === 0) return null
-                      return (
-                        <span className="t-sub text-slate-600">
-                          {fee.agentName.trim() !== '' && <span className="mr-1.5">{fee.agentName.trim()} 몫 빼고</span>}
-                          → 내 몫 <strong className="font-semibold text-slate-900 tabular-nums">{formatKrw(m.net)}</strong>
-                          {m.marginPct !== null && (
-                            <span className="ml-1.5 rounded-full bg-brand-50 px-2 py-0.5 font-bold text-brand-700 tabular-nums">
-                              {marginText(m.marginPct)}
-                            </span>
-                          )}
-                        </span>
-                      )
-                    })()}
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-
-        <div className="flex flex-wrap items-end gap-2 border-t border-slate-100 px-5 py-4">
-          <label className="text-[0.88rem] font-medium text-slate-600">
-            종류
-            <select
-              value={kind}
-              onChange={(e) => setKind(e.target.value as FeeKind)}
-              className="mt-1 block rounded-(--radius-control) border border-slate-300 px-2 py-2 text-[0.95rem]"
-            >
-              {FEE_KIND_ORDER.map((k) => (
-                <option key={k} value={k}>
-                  {FEE_KIND_LABEL[k]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-[0.88rem] font-medium text-slate-600">
-            관련 업무
-            <select
-              value={serviceKey}
-              onChange={(e) => setServiceKey(e.target.value as ServiceKey | '')}
-              className="mt-1 block rounded-(--radius-control) border border-slate-300 px-2 py-2 text-[0.95rem]"
-            >
-              <option value="">전체 계약</option>
-              {SERVICES.map((s) => (
-                <option key={s.key} value={s.key}>
-                  {s.shortLabel}
-                </option>
-              ))}
-            </select>
-          </label>
-          <AmountField id="fee-new-amount" value={amount} onChange={setAmount} />
-          <AmountField id="fee-new-agent" label="영업자 수수료" value={agentFee} onChange={setAgentFee} />
-          {agentFee > 0 && (
-            <label className="text-[0.88rem] font-medium text-slate-600">
-              영업자 이름
-              <input
-                value={agentName}
-                onChange={(e) => setAgentName(e.target.value)}
-                placeholder="누구에게"
-                className="mt-1 block w-28 rounded-(--radius-control) border border-slate-300 px-2 py-2 text-[0.95rem]"
-              />
-            </label>
-          )}
-          {/* 적는 동안 이익률이 따라 움직인다 — 계산기를 따로 두드리지 않게 */}
-          {draftMargin !== null && (
-            <span className="t-sub self-center rounded-full bg-brand-50 px-2.5 py-1 font-bold text-brand-700 tabular-nums">
-              이익률 {marginText(draftMargin)}
-            </span>
-          )}
-          <div className="min-w-0">
-            <DueDateField label="받기로 한 날" value={dueDate} today={today} onChange={setDueDate} />
-          </div>
-          <Button variant="secondary" onClick={() => void add()} disabled={adding}>
-            <Plus aria-hidden="true" className="size-4" />
-            추가
-          </Button>
-        </div>
-      </Panel>
-    </section>
   )
 }
 

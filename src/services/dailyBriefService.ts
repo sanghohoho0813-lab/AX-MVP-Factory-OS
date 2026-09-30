@@ -11,6 +11,7 @@ import type { CustomerEvent, JournalEntry } from '../types/bridge'
 import type { ScheduleEvent } from './clientOpsSchedule'
 import { daysLeftFrom } from './clientOpsAlerts'
 import { netAmountOf } from './feeMath'
+import { fundingFactsOf, isWaiting } from './feeStatus'
 import { localDateOf } from '../lib/appClock'
 import { eventSummary, isOpenEvent, waitingDays, waitingLevel, EVENT_TYPE_LABEL } from './customerBridgeService'
 
@@ -274,8 +275,11 @@ export function buildMoneySignals(clients: ClientOpsRecord[], today: string): Mo
   const out: MoneySignals = { scheduled: { total: 0, gross: 0, count: 0 }, overdue: { total: 0, gross: 0, count: 0, items: [] }, unknownAmount: 0 }
   for (const c of clients) {
     if (c.archivedAt !== null) continue
+    const funding = fundingFactsOf(c.fundingApplications)
     for (const f of c.fees) {
       if (f.receivedAt) continue
+      // D-140: 조건 대기는 받을 시점이 아니다 — 받을 돈 · 늦은 돈 어디에도 넣지 않는다
+      if (isWaiting(f, funding)) continue
       if (f.amount === null) {
         out.unknownAmount += 1
         continue

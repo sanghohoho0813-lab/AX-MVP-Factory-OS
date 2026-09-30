@@ -3,7 +3,7 @@
  *
  * 날짜를 한 번 더 누르거나(휴대폰) 두 번 누르면(컴퓨터) · '＋ 이 날에 적기' 를 누르면 아래에서 올라온다.
  *  - 할 일: 내용 · 업체 · 날짜 · 반복(한 번 · 매주 · 2주마다 · 매월 × 횟수) · 주말·쉬는 날이면 앞 영업일로
- *  - 쉬는 날: 이름(대체공휴일 · 설날 연휴 · 추석 연휴 …) · 며칠 연속 — 달력에 빨간 빗금
+ *  - 쉬는 날: 이름(대체공휴일 · 설날 연휴 · 추석 연휴 …) · 며칠 연속 — 달력에 날짜가 빨간 글자(일요일처럼)
  * 저장이 실패하면 적은 것은 그대로 남는다(onSave 가 false).
  */
 import { useMemo, useState } from 'react'
@@ -194,8 +194,8 @@ export function CalendarQuickSheet({
             {daysOffOn.length > 0 && (
               <ul className="flex flex-col gap-1.5" data-testid="quick-off-existing">
                 {daysOffOn.map((d) => (
-                  <li key={d.id} className="day-off flex items-center justify-between gap-2 rounded-(--radius-control) border border-danger-200 px-3 py-2">
-                    <span className="t-body font-semibold text-danger-700">{d.name}</span>
+                  <li key={d.id} className="flex items-center justify-between gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2">
+                    <span className="t-body font-semibold text-weekday-sun">{d.name}</span>
                     <button
                       type="button"
                       onClick={async () => {
@@ -243,7 +243,7 @@ export function CalendarQuickSheet({
                 ))}
               </div>
               <p className="t-sub break-keep text-slate-500" data-testid="quick-off-preview">
-                {offRange.length > 1 ? `${dateLabel(offRange[0])} ~ ${dateLabel(offRange[offRange.length - 1])}` : dateLabel(offRange[0] ?? date)} — 달력에 빨간 빗금으로 보입니다
+                {offRange.length > 1 ? `${dateLabel(offRange[0])} ~ ${dateLabel(offRange[offRange.length - 1])}` : dateLabel(offRange[0] ?? date)} — 달력에 날짜가 빨간 글자로 보입니다
               </p>
             </div>
           </>

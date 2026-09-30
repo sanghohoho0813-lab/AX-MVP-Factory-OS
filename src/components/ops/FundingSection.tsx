@@ -190,6 +190,22 @@ export function FundingSection({
                         className={`mt-1 w-full ${inputCls}`}
                       />
                     </label>
+                    {/* D-140: 선정 · 확정이 아니라 실제로 입금(실행)된 돈 — 성공보수 조건(정책자금 N원 이상 조달 시)은 이것으로만 판정 */}
+                    <label className="text-[0.875rem] font-medium text-slate-600">
+                      실제 입금(실행)액(원)
+                      <input
+                        inputMode="numeric"
+                        aria-label={`${a.programName || '정책자금'} 실제 입금액`}
+                        value={a.executedAmount ?? ''}
+                        placeholder="통장에 들어온 돈"
+                        onChange={(e) => {
+                          const n = wonOf(e.target.value) ?? 0
+                          const v = Number.isFinite(n) && n > 0 ? n : null
+                          onChange(a.id, { executedAmount: v, executedAt: v === null ? null : (a.executedAt ?? today) })
+                        }}
+                        className={`mt-1 w-full ${inputCls}`}
+                      />
+                    </label>
                     <label className="text-[0.875rem] font-medium text-slate-600">
                       메모
                       <input

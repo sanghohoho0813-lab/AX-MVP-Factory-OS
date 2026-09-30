@@ -40,7 +40,8 @@ npm run qa:taxplan -- http://localhost:4390       # 절세 설계(원하는 결�
 npm run qa:calendar -- http://localhost:4390      # 큰 달력(날짜 칸 → 일요일부터 · 창 위 · Esc · 직접 적기 · 휴대폰)
 npm run qa:connect -- http://localhost:4390       # 모듈 ↔ 업체 잇기(계산기 업체 숫자 채움 · 붙이며 할 일 걸기 · 결과 묶음 · 다시 열기)
 npm run qa:enroll -- http://localhost:4390        # 명부 → 직원 → 참여신청 기한(청년도약 등록 · 겹치지 않음 · 오늘 '놓치면 끝나는 기한' · 직원 D-N)
-npm run qa:planner -- http://localhost:4390       # 일정 달력(쉬는 날 빗금 · 공휴일 넣기 · 영업일 · 두 번 눌러 적기 · 반복 · 쉬는 날 마감 경고)
+npm run qa:planner -- http://localhost:4390       # 일정 달력(쉬는 날 빨간 날짜 · 공휴일 넣기 · 영업일 · 두 번 눌러 적기 · 반복 · 쉬는 날 마감 경고)
+npm run qa:contract -- http://localhost:4390      # 계약 → 받은 돈 → 남은 돈(CASE 1~4 · 조건 대기 ≠ 미수금 · 정책자금 실제 입금 · 입금 확인/되돌리기 · 계약 상태 배지)
 ```
 
 화면을 손댔으면 **실제로 찍어서 눈으로 본다**(`npm run qa:shots -- <url> <dir> --wide`).

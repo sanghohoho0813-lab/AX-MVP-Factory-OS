@@ -233,6 +233,8 @@ check('업무 15개에서도 가로 스크롤 없음', of2.d <= of2.w + 1, `${of
   check('수금 탭: 청구 기준 550만 힌트', feesAll.includes('청구 기준 550만원'), feesAll.slice(0, 300))
   check('수금 탭: 영업자 이름이 항목에 보인다', feesTab.includes('최영업 몫 빼고'), feesTab.slice(0, 400))
   check('수금 탭: 영업자 수수료 칸 아래 누구에게 얼마', feesAll.includes('최영업 2,000,000원'), feesAll.slice(0, 300))
+  // D-140: 입력 칸은 '고치기' 를 눌렀을 때만
+  await page.getByRole('button', { name: '성공보수 고치기' }).click()
   const nameInput = page.getByLabel('성공보수 영업자 이름')
   check('수금 탭: 영업자 이름을 고칠 수 있다', (await nameInput.count()) === 1)
   await nameInput.fill('박영업')
@@ -324,6 +326,7 @@ check('업무 15개에서도 가로 스크롤 없음', of2.d <= of2.w + 1, `${of
   // 입금일 고치기 — 체크한 날이 아니라 실제 들어온 날
   await page.goto(BASE + '/ops/clients/cli_hansol?tab=fees', { waitUntil: 'networkidle' })
   await page.waitForTimeout(800)
+  for (const l of ['계약금', '중도금', '성공보수']) await page.getByRole('button', { name: `${l} 고치기` }).click()
   const recvInput = page.getByLabel('계약금 입금일')
   check('입금일: 고치는 칸이 있다', (await recvInput.count()) === 1)
   await recvInput.fill('2026-08-20')
@@ -468,17 +471,14 @@ check('업무 15개에서도 가로 스크롤 없음', of2.d <= of2.w + 1, `${of
 await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
 await page.waitForTimeout(800)
 
-// 계약 단계 선택기
+// 계약 단계 — D-140: 회사명 옆 배지에서(계약 전 · 계약 중 · 계약 완료)
+await page.getByTestId('stage-badge').click()
+await page.waitForTimeout(200)
+const opts = (await page.getByTestId('stage-menu').getByRole('menuitemradio').allInnerTexts()).map((t) => t.trim())
+check('계약 단계 3가지', JSON.stringify(opts) === JSON.stringify(['계약 전','계약 중','계약 완료']), JSON.stringify(opts))
+await page.keyboard.press('Escape')
 await page.getByRole('button', { name: '더보기' }).first().click()
 await page.waitForTimeout(400)
-const opts = await page.evaluate(() => {
-  const sel = Array.from(document.querySelectorAll('select')).find((s) => s.previousSibling || true)
-  const all = Array.from(document.querySelectorAll('select'))
-  const stage = all.find((s) => Array.from(s.options).some((o) => o.textContent === '계약 전'))
-  void sel
-  return stage ? Array.from(stage.options).map((o) => o.textContent) : null
-})
-check('계약 단계 3가지', JSON.stringify(opts) === JSON.stringify(['계약 전','계약 완료','계약 종료']), JSON.stringify(opts))
 
 // 삭제 — 1차
 await page.getByRole('button', { name: '업체 삭제' }).click()
@@ -690,7 +690,8 @@ check('실제로 지워졌다', left === false)
 {
   await page.goto(BASE + '/ops/clients/cli_wooil?tab=fees', { waitUntil: 'networkidle' })
   await page.waitForTimeout(800)
-  // 우일산업에는 수금 항목이 없으니 하나 넣는다 (2,000만원 · 영업자 200만 → 90%)
+  // 우일산업에는 수금 항목이 없으니 하나 넣는다 (2,000만원 · 영업자 200만 → 90%) — D-140: '직접 넣기' 를 열고
+  await page.getByTestId('fee-add-open').click()
   await page.getByLabel('금액(원)').first().fill('20,000,000')
   await page.getByLabel('영업자 수수료').first().fill('2,000,000')
   await page.waitForTimeout(300)
@@ -701,7 +702,7 @@ check('실제로 지워졌다', left === false)
   await page.waitForTimeout(900)
   const after = (await page.locator('main').innerText()) ?? ''
   check('수금: 청구 합계', after.includes('2,000만원'), after.slice(0, 300))
-  check('수금: 영업자 수수료 합계', after.includes('200만원'))
+  check('수금: 영업자 수수료 합계', after.includes('영업자 수수료 2,000,000원'))
   check('수금: 내가 받는 돈', after.includes('1,800만원'))
   check('수금: 항목에 내 몫과 이익률', after.includes('18,000,000원') && after.includes('90%'))
 

@@ -11,6 +11,7 @@
  * '측정 방법만 정함' 으로 둔다. 목표치는 어디에도 없다.
  */
 
+import { fundingFactsOf, isWaiting } from './feeStatus'
 import { contractStageOf } from '../types/clientOps'
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { CustomerEvent, JournalEntry } from '../types/bridge'
@@ -143,8 +144,11 @@ function revenueMetrics(input: KpiInput): KpiMetric[] {
   const live = input.records.filter((r) => r.archivedAt === null)
   const fees = live.flatMap((r) => r.fees)
 
-  // 지금 못 받은 돈 중 예정일이 지난 것
-  const unpaid = fees.filter((f) => f.receivedAt === null)
+  // 지금 못 받은 돈 중 예정일이 지난 것 — D-140: 조건 대기는 빼고
+  const unpaid = live.flatMap((r) => {
+    const funding = fundingFactsOf(r.fundingApplications)
+    return r.fees.filter((f) => f.receivedAt === null && !isWaiting(f, funding))
+  })
   const overdue = unpaid.filter((f) => {
     if (!f.dueDate) return false
     const left = daysLeftFrom(input.today, f.dueDate)
@@ -212,7 +216,7 @@ function revenueMetrics(input: KpiInput): KpiMetric[] {
 
 function scaleMetrics(input: KpiInput): KpiMetric[] {
   const live = input.records.filter((r) => r.archivedAt === null)
-  // 계약 종료만 뺀다 — 계약 전 업체도 관리 대상이다
+  // 계약 완료(끝남)만 뺀다 — 계약 전 업체도 관리 대상이다
   const active = live.filter((r) => contractStageOf(r.status) !== 'closed')
 
   let openServices = 0

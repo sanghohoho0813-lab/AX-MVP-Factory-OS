@@ -1,7 +1,7 @@
 /**
  * 쉬는 날 (D-139) — 공휴일 · 대체공휴일 · 명절 연휴 · 회사 휴무를 달력에 표시한다.
  *
- * 대표: "대체공휴일이나 명절 같은 날을 직접 표시하고 싶다 — 표시하면 달력에서 너무 과하지 않은 빨간색 빗금으로."
+ * 대표: "대체공휴일이나 명절 같은 날을 직접 표시하고 싶다 — 표시하면 달력에서 빨갛게." → 빗금은 과하다고 해서 일요일처럼 날짜 글자만 빨갛게.
  *
  *  - 한 날 한 줄. 모듈 기록(`moduleData`) 의 `calendar` 상자 · `days_off` 갈래 (로컬이면 이 브라우저, 클라우드면 module_data 표).
  *    업체와 상관없는 기록이라 clientId 는 ''.
@@ -212,7 +212,7 @@ export async function removeDayOff(workspaceId: string | null, id: string): Prom
 
 const CACHE_KEY = 'axmvp.daysOff.cache'
 
-/** 마지막으로 읽은 쉬는 날 — OS 의 모든 날짜 칸(큰 달력)이 빗금을 그릴 때 쓴다. 날짜와 이름만 */
+/** 마지막으로 읽은 쉬는 날 — OS 의 모든 날짜 칸(큰 달력)이 빨간 글자로 그릴 때 쓴다. 날짜와 이름만 */
 export function rememberDaysOff(list: readonly DayOff[]): void {
   try {
     if (typeof localStorage === 'undefined') return

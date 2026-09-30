@@ -13,6 +13,7 @@
  *  6) 진행 중인데 다음 할 일이 비어 있음
  */
 
+import { fundingFactsOf, isWaiting } from './feeStatus'
 import type {
   AlertSeverity,
   ClientOpsRecord,
@@ -174,7 +175,9 @@ export function clientOpsProgress(record: ClientOpsRecord, today: string): Clien
     (d) => documentStatus(d.key, record.documents[d.key] ?? emptyDocumentState(), today, d).usable,
   ).length
 
-  const unpaid = record.fees.filter((f) => f.receivedAt === null)
+  // D-140: 조건 대기(정책자금 조달 전 성공보수 등)는 못 받은 돈이 아니다
+  const funding = fundingFactsOf(record.fundingApplications)
+  const unpaid = record.fees.filter((f) => f.receivedAt === null && !isWaiting(f, funding))
   const unpaidAmount = unpaid.reduce((sum, f) => sum + (f.amount ?? 0), 0)
   const unpaidNet = unpaid.reduce((sum, f) => sum + netAmountOf(f), 0)
   const overduePayments = unpaid.filter((f) => {
@@ -340,9 +343,10 @@ export function buildClientAlerts(record: ClientOpsRecord, today: string): OpsAl
     }
   }
 
-  // 6) 수금
+  // 6) 수금 — D-140: 조건 대기는 받을 시점이 아니므로 알리지 않는다
+  const feeFunding = fundingFactsOf(record.fundingApplications)
   for (const fee of record.fees) {
-    if (fee.receivedAt !== null || !fee.dueDate) continue
+    if (fee.receivedAt !== null || !fee.dueDate || isWaiting(fee, feeFunding)) continue
     const left = daysLeftFrom(today, fee.dueDate)
     if (left === null) continue
     if (left < 0) {
@@ -439,7 +443,7 @@ export function buildClientAlerts(record: ClientOpsRecord, today: string): OpsAl
         kind: 'client_quiet',
         severity: 'info',
         title: `${quiet}일째 아무 기록이 없습니다`,
-        detail: '잊히기 전에 한 번 연락하거나, 끝난 건이면 계약 종료로 바꾸세요.',
+        detail: '잊히기 전에 한 번 연락하거나, 끝난 건이면 계약 완료로 바꾸세요.',
         serviceKey: null,
         dueDate: '',
         daysLeft: null,

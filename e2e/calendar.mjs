@@ -89,7 +89,10 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   // 업체 상세 수금 탭 — 같은 달력
   await page.goto(BASE + '/ops/clients/cli_hansol?tab=fees', { waitUntil: 'networkidle' })
   await page.waitForTimeout(600)
-  const any = page.locator('input[type="date"]').first()
+  // D-140: 수금 항목의 날짜 칸은 '고치기' 를 눌러야 나온다
+  await page.getByRole('button', { name: /고치기$/ }).first().click()
+  await page.waitForTimeout(200)
+  const any = page.getByTestId('fee-editor').locator('input[type="date"]').first()
   await any.click()
   check('업체 상세 수금 탭의 날짜 칸도 큰 달력', (await cal.count()) === 1)
   await page.keyboard.press('Escape')

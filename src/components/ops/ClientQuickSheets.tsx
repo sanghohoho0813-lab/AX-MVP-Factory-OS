@@ -22,6 +22,8 @@ import { withFee, withNewFee, withoutFee, withService } from '../../services/cli
 import { InlineConfirm } from '../ui/InlineConfirm'
 import { daysLeftFrom, dueText } from '../../services/clientOpsAlerts'
 import { netAmountOf } from '../../services/feeMath'
+import { conditionText, feeStateOf, fundingFactsOf, isConditional, isWaiting } from '../../services/feeStatus'
+import { FeeStateBadge } from './FeesPanel'
 import { formatKrw } from '../../lib/format'
 import { BottomSheet } from '../ui/primitives'
 import { Button } from '../ui/Button'
@@ -123,7 +125,10 @@ export function ClientMoneySheet({
   const [due, setDue] = useState('')
 
   // 내 몫 기준 (D-74) — 영업자에게 나갈 돈은 여기서 빼고 센다
-  const unpaid = record.fees.filter((f) => f.receivedAt === null).reduce((n, f) => n + netAmountOf(f), 0)
+  // D-140: 조건 대기(정책자금 조달 전 성공보수 등)는 못 받은 돈이 아니다
+  const funding = fundingFactsOf(record.fundingApplications)
+  const unpaid = record.fees.filter((f) => f.receivedAt === null && !isWaiting(f, funding)).reduce((n, f) => n + netAmountOf(f), 0)
+  const waiting = record.fees.filter((f) => isWaiting(f, funding)).reduce((n, f) => n + (f.amount ?? 0), 0)
 
   const add = async () => {
     const ok = await onSave(withNewFee(record, { kind, label: FEE_KIND_LABEL[kind], amount: amount > 0 ? amount : null, dueDate: due }))
@@ -136,6 +141,7 @@ export function ClientMoneySheet({
     <BottomSheet title={`${record.companyName} · 수금`} onClose={onClose}>
       <p className="t-sub text-slate-600">
         아직 못 받은 돈 <strong className="font-semibold text-slate-900">{formatKrw(unpaid)}</strong>
+        {waiting > 0 && <span className="text-slate-500"> · 조건 대기 {formatKrw(waiting)}(아직 받을 때 아님)</span>}
       </p>
 
       {record.fees.length === 0 ? (
@@ -166,18 +172,20 @@ export function ClientMoneySheet({
                   </label>
                   <span className="t-body min-w-0 flex-1 truncate font-semibold text-slate-900">{fee.label}</span>
                   {overdue && <span className="t-meta shrink-0 font-bold text-danger-700">{dueText(left)}</span>}
+                  {isConditional(fee) && !fee.receivedAt && <FeeStateBadge state={feeStateOf(fee, today, funding)} />}
                   {fee.receivedAt && <span className="t-meta shrink-0 text-success-700">{fee.receivedAt} 입금</span>}
                   {/* D-122: 한 번에 지우지 않는다 — 그 줄에서 한 번 더 묻는다 */}
                   <InlineConfirm question={`${fee.label} 지울까요?`} onConfirm={() => onSave(withoutFee(record, fee.id))} />
                 </div>
+                {isConditional(fee) && <p className="t-sub mt-1 pl-[1.9rem] break-keep text-slate-600">{conditionText(fee)}</p>}
                 <div className="mt-2 flex items-center gap-2 pl-[1.9rem]">
-                  <input
+                  {!isConditional(fee) && <input
                     type="date"
                     aria-label={`${fee.label} 받기로 한 날`}
                     value={fee.dueDate}
                     onChange={(e) => onSave(withFee(record, fee.id, { dueDate: e.target.value }))}
                     className="min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 px-2 py-2 text-[0.92rem]"
-                  />
+                  />}
                   <input
                     aria-label={`${fee.label} 금액`}
                     value={fee.amount === null ? '' : fee.amount.toLocaleString('ko-KR')}

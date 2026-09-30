@@ -216,7 +216,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     void load()
   }, [load])
 
-  // 계약 종료·보관을 뺀 곳이 '지금 챙기는 업체'
+  // 계약 완료(끝남)·보관을 뺀 곳이 '지금 챙기는 업체'
   const active = useMemo(
     () => clients.filter((c) => c.archivedAt === null && contractStageOf(c.status) !== 'closed'),
     [clients],
@@ -257,7 +257,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     () =>
       clients
         .filter((c) => c.archivedAt === null)
-        .flatMap((c) => c.fees.filter((f) => f.receivedAt === null && f.dueDate === '' && (f.amount ?? 0) > 0).map((f) => ({ clientId: c.id, label: f.label }))),
+        // D-140: 조건으로 받는 돈 · 계약 시 받는 돈은 날짜가 없어도 정상 — '받을 날 안 정한' 에 넣지 않는다
+        .flatMap((c) => c.fees.filter((f) => f.receivedAt === null && f.dueDate === '' && !f.conditionKind && (f.amount ?? 0) > 0).map((f) => ({ clientId: c.id, label: f.label }))),
     [clients],
   )
   // D-118: 영업 신호 — 영업 관리 보드와 같은 규칙

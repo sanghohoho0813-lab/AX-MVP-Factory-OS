@@ -49,7 +49,7 @@ import { bsWon, netIncomeSlots, svCurrent, svDefaults, svLoad, svMerge, svSave, 
 import { profileFields, profileFieldsByGroup, regionOf } from '../clientOpsProfile'
 import { CONTRACT_STAGE_ORDER, CONTRACT_STAGE_LABEL, contractStageOf, statusForStage } from '../../types/clientOps'
 import type { ClientOpsStatus, ContractStage } from '../../types/clientOps'
-import { clientOpsProgress } from '../clientOpsAlerts'
+import { buildClientAlerts, clientOpsProgress } from '../clientOpsAlerts'
 import {
   countContractClients,
   daysInStage,
@@ -94,6 +94,8 @@ import { buildClientSchedule } from '../clientOpsSchedule'
 import { localDateOf } from '../../lib/appClock'
 import { KR_PUBLIC_HOLIDAYS, addDaysOff, daysOffByDate, listDaysOff, missingPublicHolidays, monthWorkdays, prevWorkday, rangeDates, removeDayOff, toDayOff, weekdayOf } from '../daysOff'
 import { repeatDates } from '../repeatDates'
+import { feeStateOf, fundingFactsOf, moneyPlanOf, isWaiting } from '../feeStatus'
+import { planLines, recommendedMethod, withContractPlan } from '../contractPlan'
 import { trialEndDate } from '../moduleAccess'
 import {
   CONTRACT_CHECKLIST,
@@ -681,16 +683,16 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
 {
   check('계약: 세 단계', CONTRACT_STAGE_ORDER.join() === 'pre,signed,closed')
   check(
-    '계약: 한글 이름',
-    CONTRACT_STAGE_LABEL.pre === '계약 전' && CONTRACT_STAGE_LABEL.signed === '계약 완료' && CONTRACT_STAGE_LABEL.closed === '계약 종료',
+    '계약: 한글 이름(D-140 계약 전 · 계약 중 · 계약 완료)',
+    CONTRACT_STAGE_LABEL.pre === '계약 전' && CONTRACT_STAGE_LABEL.signed === '계약 중' && CONTRACT_STAGE_LABEL.closed === '계약 완료',
   )
 
   // 예전 네 가지 저장 값이 빠짐없이 세 단계 중 하나로 간다
   const legacy: ClientOpsStatus[] = ['active', 'waiting', 'paused', 'completed']
   check('계약: 예전 값이 모두 옮겨진다', legacy.every((v) => CONTRACT_STAGE_ORDER.includes(contractStageOf(v))))
-  check('계약: 진행 중·일시 중지 → 계약 완료', contractStageOf('active') === 'signed' && contractStageOf('paused') === 'signed')
+  check('계약: 진행 중·일시 중지 → 계약 중', contractStageOf('active') === 'signed' && contractStageOf('paused') === 'signed')
   check('계약: 고객 대기 → 계약 전', contractStageOf('waiting') === 'pre')
-  check('계약: 종료 → 계약 종료', contractStageOf('completed') === 'closed')
+  check('계약: 종료 → 계약 완료', contractStageOf('completed') === 'closed')
 
   // 저장 값은 DB check 제약이 받는 네 가지 안에 있어야 한다 (마이그레이션 없이 쓰기 위해)
   const allowed = new Set<string>(legacy)
@@ -1906,6 +1908,70 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   await removeDayOff(ws, l1[0].id)
   const l2 = await listDaysOff(ws)
   check('쉬는 날 저장: 2일 넣고 · 같은 것 다시 0 · 하나 지우면 1일(날짜순)', n1 === 2 && l1.length === 2 && l1[0].date === '2026-10-05' && n2 === 0 && l2.length === 1 && l2[0].date === '2026-10-06', JSON.stringify({ n1, n2, l1: l1.length, l2: l2.length }))
+}
+
+// ── D-140: 계약 → 받은 돈 → 남은 돈 · 수금 상태 · 미수금 ──
+{
+  const T = '2026-09-30'
+  const base = normalizeClientOps({ id: 'cp', companyName: '가연인터내셔널', status: 'waiting', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  const plan = (portion: number, rest: Parameters<typeof planLines>[0]) => planLines({ ...rest, portion })
+  // CASE 1 — 500만 · 전액 선금 · 500만 입금
+  check('추천: 500만은 전액 선금 · 1,500만 · 3,000만은 선금 + 나머지', recommendedMethod(5_000_000) === 'full_upfront' && recommendedMethod(15_000_000) === 'upfront_rest' && recommendedMethod(30_000_000) === 'upfront_rest')
+  const c1 = withContractPlan(base, plan(5_000_000, { portion: 0, method: 'full_upfront', paidNow: 5_000_000 }), { today: T, total: 5_000_000 })
+  const m1 = moneyPlanOf(c1, T)
+  check('CASE 1: 500만 전액 선금 입금 → 입금 500만 · 미수금 0 · 지금 받을 돈 0 · 계약 중', m1.contract === 5_000_000 && m1.received === 5_000_000 && m1.overdue === 0 && m1.now === 0 && m1.later === 0 && c1.status === 'active' && c1.contract.cashAmount === 5_000_000 && c1.fees[0].receivedAt === T, JSON.stringify(m1))
+  // 전액 선금인데 아직 안 받음 → 청구 가능(미수금 아님)
+  const c1b = withContractPlan(base, plan(5_000_000, { portion: 0, method: 'full_upfront', paidNow: 0 }), { today: T, total: 5_000_000 })
+  check('전액 선금 · 아직 안 받음 → 저장해도 입금 아님 · 청구 가능 500만 · 미수금 0', c1b.fees.every((f) => f.receivedAt === null) && moneyPlanOf(c1b, T).now === 5_000_000 && moneyPlanOf(c1b, T).overdue === 0)
+  // CASE 2 — 1,500만 · 선금 500만 입금 · 잔금 1,000만 정책자금 1억 이상
+  const c2 = withContractPlan(base, plan(15_000_000, { portion: 0, method: 'upfront_rest', paidNow: 5_000_000, rest: { kind: 'funding_100m' } }), { today: T, total: 15_000_000 })
+  const m2 = moneyPlanOf(c2, T)
+  check('CASE 2: 선금 500만 입금 · 잔금 1,000만 조건 대기 → 미수금 0 · 조건부 1,000만', m2.received === 5_000_000 && m2.overdue === 0 && m2.now === 0 && m2.waiting === 10_000_000 && m2.later === 10_000_000, JSON.stringify(m2))
+  const rest2 = c2.fees.find((f) => f.label === '잔금')!
+  check('CASE 2: 잔금은 날짜를 지어내지 않는다(받을 날 없음) · 조건 대기', rest2.dueDate === '' && rest2.conditionKind === 'funding_100m' && feeStateOf(rest2, T) === 'waiting')
+  check('CASE 2: 못 받은 돈 · 늦은 돈 · 경고 어디에도 조건 대기가 없다', feeTotals(c2.fees).unpaidGross === 0 && feeTotals(c2.fees).waitingGross === 10_000_000 && clientOpsProgress(c2, T).unpaidAmount === 0 && !buildClientAlerts(c2, T).some((a) => a.kind === 'payment_overdue'))
+  // 정책자금 연결 — 선정만으로는 충족 아님 · 실제 입금액 1억 이상이면 청구 가능
+  const selected = { ...c2, fundingApplications: [{ id: 'fa', programName: '중진공', institution: '', status: 'selected' as const, applyDueDate: '', submittedAt: null, resultAt: null, requestedAmount: 200_000_000, approvedAmount: 150_000_000, note: '', createdAt: T, updatedAt: T }] }
+  check('정책자금: 선정 · 확정 1.5억만으로는 조건 충족이 아니다(실제 입금액 없음)', feeStateOf(rest2, T, fundingFactsOf(selected.fundingApplications)) === 'waiting')
+  const funded = { ...selected, fundingApplications: [{ ...selected.fundingApplications[0], executedAmount: 120_000_000, executedAt: T }] }
+  check('정책자금: 실제 입금 1.2억 → 잔금 청구 가능(미수금 아님)', feeStateOf(rest2, T, fundingFactsOf(funded.fundingApplications)) === 'claimable' && moneyPlanOf(funded, T).now === 10_000_000 && moneyPlanOf(funded, T).overdue === 0)
+  const half = { ...selected, fundingApplications: [{ ...selected.fundingApplications[0], executedAmount: 60_000_000 }] }
+  check('정책자금: 실제 입금 6천만 → 1억 조건은 대기 · 5천 조건은 충족', feeStateOf(rest2, T, fundingFactsOf(half.fundingApplications)) === 'waiting' && feeStateOf({ ...rest2, conditionKind: 'funding_50m' }, T, fundingFactsOf(half.fundingApplications)) === 'claimable')
+  check('조건 충족됨(사람이 누름) → 청구 가능', feeStateOf({ ...rest2, conditionMetAt: T }, T) === 'claimable' && !isWaiting({ ...rest2, conditionMetAt: T }))
+  // CASE 3 — 3,000만 · 선금(입금) + 중도금(날짜) + 성공보수(조건)
+  const lines3 = planLines({
+    portion: 30_000_000,
+    method: 'split',
+    paidNow: 0,
+    lines: [
+      { label: '계약금', kind: 'deposit', amount: 10_000_000, when: { kind: 'on_contract' }, receivedNow: true },
+      { label: '중도금', kind: 'interim', amount: 10_000_000, when: { kind: 'date', date: '2026-11-30' }, receivedNow: false },
+      { label: '성공보수', kind: 'success', amount: 10_000_000, when: { kind: 'funding_executed' }, receivedNow: false },
+    ],
+  })
+  const c3 = withContractPlan(base, lines3, { today: T, total: 30_000_000 })
+  const st3 = c3.fees.map((f) => `${f.label}:${feeStateOf(f, T)}`).join()
+  check('CASE 3: 계약금 입금 완료 · 중도금 받을 예정 · 성공보수 조건 대기', st3 === '계약금:received,중도금:scheduled,성공보수:waiting', st3)
+  check('CASE 3: 중도금 날짜가 지나면 미수금 · 성공보수는 여전히 조건 대기', c3.fees.map((f) => feeStateOf(f, '2026-12-05')).join() === 'received,overdue,waiting')
+  const m3 = moneyPlanOf(c3, T)
+  check('CASE 3: 숫자 — 입금 1,000만 · 지금 받을 돈 0 · 조건부 · 예정 2,000만', m3.received === 10_000_000 && m3.now === 0 && m3.later === 20_000_000 && m3.scheduled === 10_000_000 && m3.waiting === 10_000_000)
+  // 이미 적힌 항목이 있으면 모자란 만큼만 · 이름 겹치면 번호
+  const again = withContractPlan(c2, planLines({ portion: 1_000_000, method: 'upfront_rest', paidNow: 0, upfront: 0, rest: { kind: 'project_done' } }), { today: T, total: 15_000_000 })
+  check('있는 항목 · 입금 기록은 그대로 · 새 줄은 잔금 2', again.fees.length === 3 && again.fees[0].receivedAt === T && again.fees[2].label === '잔금 2' && again.contract.cashAmount === 15_000_000)
+  // CASE 4 — 예전 기록(조건 칸 없음)은 예전과 같은 판정
+  const legacy = normalizeClientOps({ id: 'lg', companyName: '예전', status: 'active', createdAt: T, updatedAt: T, fees: [
+    { id: 'a', serviceKey: null, kind: 'deposit', label: '계약금', amount: 3_000_000, agentFee: null, agentName: '', agentPaidAt: null, dueDate: '2026-09-01', receivedAt: '2026-09-02', note: '' },
+    { id: 'b', serviceKey: null, kind: 'interim', label: '중도금', amount: 2_000_000, agentFee: null, agentName: '', agentPaidAt: null, dueDate: '2026-09-20', receivedAt: null, note: '' },
+    { id: 'c', serviceKey: null, kind: 'success', label: '성공보수', amount: 5_500_000, agentFee: 1_500_000, agentName: '최영업', agentPaidAt: null, dueDate: '', receivedAt: null, note: '' },
+    { id: 'd', serviceKey: null, kind: 'success', label: '성공보수 2', amount: 1_000_000, agentFee: null, agentName: '', agentPaidAt: null, dueDate: '2026-10-10', receivedAt: null, note: '' },
+  ] })
+  check('CASE 4: 예전 기록은 조건 칸이 생기지 않는다(뜻 그대로)', legacy.fees.every((f) => f.conditionKind === undefined && f.conditionMetAt === undefined))
+  check('CASE 4: 입금 완료는 그대로 · 날짜 지난 것만 미수금 · 날짜 없는 것은 받을 날 미정', legacy.fees.map((f) => feeStateOf(f, T)).join() === 'received,overdue,undated,scheduled')
+  const lt = feeTotals(legacy.fees)
+  check('CASE 4: 못 받은 돈 합계가 D-139 까지와 같다(8,500,000 · 내 몫 7,000,000) · 조건 대기 0', lt.unpaidGross === 8_500_000 && lt.unpaidNet === 7_000_000 && lt.waitingGross === 0, JSON.stringify(lt))
+  check('CASE 4: 예전 기록 저장 · 다시 읽기에서 입금 · 날짜가 풀리지 않는다', JSON.stringify(normalizeClientOps(JSON.parse(JSON.stringify(legacy))).fees) === JSON.stringify(legacy.fees))
+  const kept = normalizeClientOps(JSON.parse(JSON.stringify(c2)))
+  check('새 조건 칸은 저장 · 다시 읽어도 남는다(모르는 조건 이름은 버림)', kept.fees[1].conditionKind === 'funding_100m' && normalizeClientOps({ id: 'x', companyName: 'x', fees: [{ ...kept.fees[1], conditionKind: '???' as never }] }).fees[0].conditionKind === undefined)
 }
 
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)
