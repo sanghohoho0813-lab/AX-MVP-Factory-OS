@@ -59,6 +59,7 @@
     "qa:enroll": "node e2e/enroll.mjs",
     "qa:planner": "node e2e/planner.mjs",
     "qa:contract": "node e2e/contract.mjs",
+    "qa:grants": "node e2e/grants.mjs",
     "qa:squeeze": "node e2e/squeeze.mjs",
     "qa:sales": "node e2e/sales.mjs",
     "qa:journey": "node e2e/journey.mjs",

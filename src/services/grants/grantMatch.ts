@@ -361,7 +361,7 @@ export function matchGrant(notice: GrantNotice, p: CompanyProfile, today: string
   // 지역
   if (r.regions.length === 0 && r.cities.length === 0) add('region', '지역', 'ok', '전국')
   else {
-    const want = [...r.regions, ...r.cities].join(' · ')
+    const want = placeText(r)
     if (!p.sido) add('region', '지역', 'unknown', `${want} 업체만 — 회사 주소를 적으면 바로 확인돼요`)
     else if (r.regions.length && !r.regions.includes(p.sido)) add('region', '지역', 'no', `${want} 업체만 (이 업체는 ${p.sido})`)
     else if (r.cities.length === 0) add('region', '지역', 'ok', `${want} — ${[p.sido, p.city].filter(Boolean).join(' ')}`)
@@ -523,10 +523,15 @@ export function normalizeNotice(raw: unknown, id: string, now: string): GrantNot
   }
 }
 
+/** 지역 조건 글 — '경기 파주시' · '서울 · 경기' · '파주시 · 고양시' */
+function placeText(r: Pick<GrantRules, 'regions' | 'cities'>): string {
+  return [r.regions.join(' · '), r.cities.join(' · ')].filter(Boolean).join(' ')
+}
+
 /** 이 공고가 거는 조건을 사람 말로 (목록 · 공개 화면) */
 export function rulesText(r: GrantRules): string[] {
   const out: string[] = []
-  if (r.regions.length || r.cities.length) out.push([...r.regions, ...r.cities].join(' · '))
+  if (r.regions.length || r.cities.length) out.push(placeText(r))
   if (r.withinYears !== null) out.push(`창업 ${r.withinYears}년 이내`)
   if (r.minYears !== null) out.push(`업력 ${r.minYears}년 이상`)
   if (r.industries.length) out.push(`${r.industries.join(' · ')} 업종`)

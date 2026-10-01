@@ -168,7 +168,7 @@ function section(lines: string[], label: RegExp, max = 4): string {
   const first = lines[i].replace(label, '').trim()
   const out = first ? [first] : []
   for (let j = i + 1; j < lines.length && out.length < max; j++) {
-    if (LABELS.test(lines[j])) break
+    if (LABELS.test(lines[j]) || /^https?:\/\//.test(lines[j])) break
     out.push(lines[j])
   }
   return out.join(' ').trim()

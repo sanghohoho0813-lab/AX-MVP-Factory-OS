@@ -292,9 +292,10 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   check('붙여넣기: 업종 · 규모 · 업력 · 직원', d.rules.industries.includes('제조') && d.rules.sizes.includes('small') && d.rules.withinYears === 7 && d.rules.minEmployees === 5, d.rules)
   check('붙여넣기: 지원 금액 글', /최대 5,000만원/.test(d.amountText), d.amountText)
   check('붙여넣기: 링크', d.url.startsWith('https://www.bizinfo.go.kr/'))
+  check('붙여넣기: 지원대상에 링크 줄이 섞이지 않음', !d.target.includes('http') && d.target.startsWith('파주시 소재'), d.target)
   check('붙여넣기: 갈래 = 개발(스마트공장)', d.category === 'rnd', d.category)
   check('붙여넣기: 청년 조건 없음', d.rules.youthCeo === false && d.rules.womenCeo === false)
-  check('붙여넣기: 조건 글', rulesText(d.rules).join(' / ') === '경기 · 파주시 / 창업 7년 이내 / 제조 업종 / 직원 5명 이상 / 중소기업', rulesText(d.rules))
+  check('붙여넣기: 조건 글', rulesText(d.rules).join(' / ') === '경기 파주시 / 창업 7년 이내 / 제조 업종 / 직원 5명 이상 / 중소기업', rulesText(d.rules))
 
   const t2 = parseNoticeText(`공고명: 2026년 청년 창업기업 판로 지원
 주관기관: 창업진흥원
