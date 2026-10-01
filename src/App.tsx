@@ -5,7 +5,7 @@ import { ToastProvider } from './components/ui/toast'
 import { TextScaleProvider } from './components/ui/TextScaleProvider'
 import { AppearanceProvider } from './components/ui/AppearanceProvider'
 import { getDataModeConfig } from './data/dataMode'
-import { appRouteChildren, publicSurveyRoute, publicTestRoute } from './app/appRouteChildren'
+import { appRouteChildren, PublicGrantFinder, publicSurveyRoute, publicTestRoute } from './app/appRouteChildren'
 import { DatePickerHost } from './components/ui/DatePickerHost'
 import { RouteErrorScreen } from './components/layout/RouteErrorScreen'
 
@@ -21,6 +21,7 @@ const localRouter = createBrowserRouter([
     errorElement: <RouteErrorScreen />,
     children: appRouteChildren,
   },
+  { path: '/grants/find', errorElement: <RouteErrorScreen />, element: <PublicGrantFinder /> },
   publicSurveyRoute,
   publicTestRoute,
 ])

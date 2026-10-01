@@ -246,7 +246,7 @@ export function withSalesStage(record: ClientOpsRecord, stage: SalesStage, at: s
   return withActivity(next, 'sales', text, null, at)
 }
 
-export type SalesInfoPatch = Partial<Pick<SalesInfo, 'source' | 'referrer' | 'interests' | 'concern' | 'expectedFee'>>
+export type SalesInfoPatch = Partial<Pick<SalesInfo, 'source' | 'referrer' | 'interests' | 'concern' | 'expectedFee' | 'grantQuery'>>
 
 /** 유입 경로 · 소개자 · 관심사 · 고민 · 예상 수임료 고치기 (영업 칸이 없으면 지금 단계로 만든다) */
 export function withSalesInfo(record: ClientOpsRecord, patch: SalesInfoPatch, at: string = new Date().toISOString()): ClientOpsRecord {

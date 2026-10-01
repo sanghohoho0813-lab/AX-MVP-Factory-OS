@@ -44,6 +44,14 @@ export function withInboxPayload(record: ClientOpsRecord, payload: Record<string
     ...(message ? { concern: message.slice(0, 300) } : {}),
     ...(interests.length > 0 ? { interests: [...new Set([...(record.sales?.interests ?? []), ...interests])] } : {}),
   })
+  // D-141: 지원사업 찾기에서 온 신청 — 고른 조건(지역 · 업종 · 업력 구간)을 그대로 남겨 맞는 공고를 바로 계산한다
+  const grantQuery = str('grant_query')
+  if (grantQuery && next.sales) {
+    next = withSalesInfo(next, { grantQuery: grantQuery.slice(0, 500), interests: [...new Set([...(next.sales.interests ?? []), ...interestsFromText('정책자금 지원금')])] })
+    const g = new URLSearchParams(grantQuery)
+    const place = [g.get('r') ?? '', g.get('c') ?? ''].filter(Boolean).join(' ')
+    if (place && !next.businessAddress.trim()) next = { ...next, businessAddress: place }
+  }
   const when = str('preferred_contact_time')
   if (when && next.nextAction.trim() === '') {
     next = { ...next, nextAction: `첫 연락 (희망: ${when.slice(0, 40)})`, nextActionDueDate: today }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { TodayGrantAlerts } from '../components/grants/TodayGrantAlerts'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
@@ -488,6 +489,9 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             </ul>
           </div>
         )}
+
+        {/* D-141: 지원사업 — 7일 안에 끝나는 공고 · 맞는 업체 중 아직 안 알린 곳 */}
+        <TodayGrantAlerts workspaceId={workspaceId} clients={clients} today={today} />
 
         {/* D-120: 다음 약속 — 업체마다 적어 둔 '다음에 무엇을, 언제' 가운데 지난 것 · 오늘 · 내일 */}
         {appointments.length > 0 && (

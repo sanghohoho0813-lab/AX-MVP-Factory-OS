@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ClientGrantsCard } from '../components/grants/ClientGrantsCard'
 import { NextStepEditor } from '../components/ops/NextStepEditor'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { LINK_BUTTON } from '../components/sales/salesStyle'
@@ -739,6 +740,17 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           )}
         </Section>
       )}
+
+      {/* D-141: 이 업체 조건에 맞는 지원사업 — 계약 고객 · 잠재고객 같은 카드(영업 연락 이유 · 고객 화면 알림) */}
+      <ClientGrantsCard
+        workspaceId={workspaceId}
+        record={record}
+        today={today}
+        onFill={() => {
+          setInfoOpen(true)
+          window.setTimeout(() => document.getElementById('info')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+        }}
+      />
 
       {/*
         2단계 — 회사 기본 정보.

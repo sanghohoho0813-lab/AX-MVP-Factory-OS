@@ -33,7 +33,7 @@
     "test:facts": "vite build --config vite.facts.config.mjs && node .facts-out/facts.mjs",
     "test:taxplan": "vite build --config vite.taxplan.config.mjs && node .taxplan-out/taxplan.mjs",
     "test:grants": "vite build --config vite.grants.config.mjs && node .grants-out/grants.mjs",
-    "test:sql": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f supabase/tests/bridge_contract.sql && psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f supabase/tests/bridge_hardening.sql && psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f supabase/tests/signup_event.sql",
+    "test:sql": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f supabase/tests/bridge_contract.sql && psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f supabase/tests/bridge_hardening.sql && psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f supabase/tests/signup_event.sql && psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f supabase/tests/grant_finder.sql",
     "e2e:internal": "node e2e/internal.mjs",
     "e2e:roundtrip": "node e2e/roundtrip.mjs",
     "test:all": "npm run test:contract && npm run test:client-ops && npm run test:client-operations && npm run test:progress && npm run test:persistence && npm run test:onboarding && npm run test:client-ops-alerts && npm run test:doc-parser && npm run test:client-ops-stage2 && npm run test:datamode && npm run test:autherrors && npm run test:mirae-os && npm run test:consulting && npm run test:operator && npm run test:startup-tax && npm run test:cretop && npm run test:tools && npm run test:employment && npm run test:labcare && npm run test:xlsx && npm run test:catalog && npm run test:facts && npm run test:taxplan && npm run test:grants",

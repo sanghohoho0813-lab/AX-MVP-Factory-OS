@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import {
+  BellRing,
   BookOpenText,
   Building2,
   CalendarDays,
@@ -197,6 +198,8 @@ export const MODULES: ModuleDefinition[] = [
 
   // D-114: 기업컨설팅 OS(영업 도구 모음)를 옮긴 곳 — 목차는 이 한 줄, 보드 · 미팅 준비 · 상품·견적 · 전략은 안의 탭
   { key: 'sales', label: '영업 관리', path: '/sales/board', icon: KanbanSquare, group: 'sales', accent: 'revenue', enabled: true, alsoPaths: [...SALES_TAB_PATHS, ...SALES_EXTRA_PATHS, ...movedToPaths('/sales/board')], hint: '영업 보드 · 잠재고객 → 미팅 → 계약' },
+  // D-141: 정부지원사업 매칭 알림 — 계약 고객 · 잠재고객 조건에 맞는 공고 · 마감 임박
+  { key: 'grants', label: '지원사업 알림', path: '/grants', icon: BellRing, group: 'sales', accent: 'revenue', enabled: true, hint: '마감 임박 공고 · 업체 조건에 맞는 곳 · 가망고객 찾기 링크' },
   { key: 'agents', label: '영업자 정산', path: '/ops/agents', icon: Handshake, group: 'sales', accent: 'revenue', enabled: true, hint: '누구한테 지금 얼마를 줘야 하는가' },
   // 만들고 있는 프로그램이 들어올 자리 — 들어오면 status 를 지우고 화면만 바꾼다 (docs/DECISIONS D-103)
   { key: 'first-meeting', label: '1차 미팅 체크리스트', path: '/sales/first-meeting', icon: ClipboardCheck, group: 'sales', accent: 'revenue', enabled: true, status: 'soon', badge: 'first-meetings', hint: '영업자용 AX 1차 미팅 체크리스트 — 만드는 중' },

@@ -162,7 +162,7 @@ export function LinkCustomerModal({
             'profile',
             `고객 플랫폼 이벤트(${event.eventType})에서 업체 생성`,
           ),
-          '홈페이지 상담신청',
+          event.sourceType === 'grant_finder' ? '지원사업 찾기' : '홈페이지 상담신청',
         ),
         event.payload,
         todayLocalDate(),

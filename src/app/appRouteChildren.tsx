@@ -40,6 +40,9 @@ const OperationsHubPage = lazy(() => import('../pages/OperationsHubPage').then((
 const OperationsClientDetailPage = lazy(() => import('../pages/OperationsClientDetailPage').then((m) => ({ default: m.OperationsClientDetailPage })))
 const OpsCalendarPage = lazy(() => import('../pages/OpsCalendarPage').then((m) => ({ default: m.OpsCalendarPage })))
 const AgentSettlementPage = lazy(() => import('../pages/AgentSettlementPage').then((m) => ({ default: m.AgentSettlementPage })))
+// D-141: 지원사업 알림(내부) · 지원사업 찾기(가망고객 공개 화면, 로그인 없음)
+const GrantsPage = lazy(() => import('../pages/GrantsPage'))
+const GrantFinderPage = lazy(() => import('../pages/public/GrantFinderPage'))
 // D-103: 영업자용 1차 미팅 체크리스트가 들어올 자리
 const SalesIntakePage = lazy(() => import('../pages/sales/SalesIntakePage').then((m) => ({ default: m.SalesIntakePage })))
 const StrategyLibraryPage = lazy(() => import('../pages/sales/StrategyLibraryPage').then((m) => ({ default: m.StrategyLibraryPage })))
@@ -400,6 +403,7 @@ export const appRouteChildren = [
       { path: 'ops/calendar', element: <OpsCalendarPage /> },
       // 영업자 정산 — 누구한테 지금 얼마를 줘야 하는가 (D-78)
       { path: 'ops/agents', element: <AgentSettlementPage /> },
+      { path: 'grants', element: <GrantsPage /> },
       { path: 'sales/first-meeting', element: <FirstMeetingChecklistPage /> },
       // 영업 관리 (D-114) — 기업컨설팅 OS 를 고객 관리 한 장부 위로. 사이드바 한 줄, 안에서는 탭
       { path: 'sales', element: <Navigate to="/sales/board" replace /> },
@@ -551,6 +555,15 @@ export const publicSurveyRoute = {
       <PublicSurveyPage />
     </Suspense>
   ),
+}
+
+// D-141: 가망고객이 로그인 없이 자기 회사 조건으로 지원사업을 찾는 화면 — 내부 표는 읽지 않는다(공개 함수만)
+export function PublicGrantFinder() {
+  return (
+    <Suspense fallback={<RouteFallback />}>
+      <GrantFinderPage />
+    </Suspense>
+  )
 }
 
 export const publicTestRoute = {
