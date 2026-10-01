@@ -54,3 +54,4 @@ dist-qa*/
 .catalog-out
 .facts-out
 .taxplan-out
+.grants-out

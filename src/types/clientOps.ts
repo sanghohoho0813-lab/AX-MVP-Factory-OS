@@ -567,6 +567,8 @@ export interface SalesInfo {
   ceoAge?: number | null
   /** 매출(백만원) — 원본 단위 그대로 */
   revenueM?: number | null
+  /** D-141: 지원사업 찾기(공개 화면)에서 가망고객이 고른 조건 — 링크 뒤 값 그대로(업력 · 직원 · 매출 구간) */
+  grantQuery?: string
   /** 고객 체크 17가지(가지급금 있음 · 자녀 근무 …) — 켜진 것만 */
   flags?: Record<string, boolean>
   /** 상담 메모 (자유 글) */

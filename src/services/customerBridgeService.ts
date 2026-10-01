@@ -468,6 +468,17 @@ export async function updateEvent(
 }
 
 /**
+ * 로컬 모드 — 이 앱 안의 공개 화면(지원사업 찾기 · D-141)에서 들어온 신청을 이 브라우저 이벤트함에 넣는다.
+ * 클라우드 모드에서는 고객 안전 함수(portal_*)가 넣으므로 여기로 오지 않는다.
+ */
+export function recordLocalEvent(input: Pick<CustomerEvent, 'eventType' | 'sourceType' | 'sourceId' | 'priority' | 'payload'>): CustomerEvent {
+  if (!isLocal()) throw new Error('로컬 모드에서만 씁니다.')
+  const event = normalizeEvent({ ...input, dedupeKey: `${input.sourceType}:${input.sourceId}:${input.eventType}`, occurredAt: nowIso() })
+  local.write(STORAGE_KEYS.customerEvents, [event, ...local.events().filter((e) => e.dedupeKey !== event.dedupeKey)])
+  return event
+}
+
+/**
  * 로컬 데모 전용 — 고객 플랫폼이 없는 로컬 모드에서 흐름을 보여주기 위한 샘플 이벤트.
  * payload 에 demo:true 를 넣어 화면에서 DEMO 로 표시한다. supabase 모드에서는 동작하지 않는다.
  */

@@ -126,6 +126,7 @@ export function normalizeSales(v: unknown): SalesInfo | null {
     out.flags = Object.fromEntries(Object.entries(s.flags as Record<string, unknown>).filter(([, v]) => v === true).map(([k]) => [k, true]))
   }
   if (typeof s.memo === 'string') out.memo = s.memo
+  if (typeof s.grantQuery === 'string' && s.grantQuery.trim()) out.grantQuery = s.grantQuery.trim().slice(0, 500)
   if (Array.isArray(s.meetings)) out.meetings = normalizeMeetings(s.meetings)
   if (s.proposal && typeof s.proposal === 'object') out.proposal = normalizeProposal(s.proposal as Record<string, unknown>)
   if (Array.isArray(s.pastProposals)) {
