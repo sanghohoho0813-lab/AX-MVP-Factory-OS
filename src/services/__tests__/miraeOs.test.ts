@@ -186,8 +186,8 @@ check('modules: AX STUDIO 는 전문 모듈의 분야 한 줄(D-127) — 안의 
   check('메뉴: 오늘과 일정이 한 묶음', inGroup('today').join() === 'today,calendar')
   check('메뉴: 특허+벤처 → 기술사업화 · 자금·지원사업 → 정부지원사업 줄 아래, 모듈 전체가 맨 끝 (D-127) · 검토중 도구가 없으면 도입 검토중 줄도 없다 (D-118)',
     MODULES.find((m) => m.key === 'consulting-studio')?.parent === 'cat-tech-biz' && MODULES.find((m) => m.key === 'funding')?.parent === 'cat-gov-support' && inGroup('modules').slice(-1).join() === 'tools' && !inGroup('modules').includes('tools-review'), inGroup('modules').join())
-  check('메뉴: 영업 묶음 = 영업 관리(D-114) · 영업자 정산 · 1차 미팅 체크리스트(준비 중)',
-    inGroup('sales').join() === 'sales,agents,first-meeting' && MODULES.find((m) => m.key === 'first-meeting')?.status === 'soon', inGroup('sales').join())
+  check('메뉴: 영업 묶음 = 영업 관리(D-114) · 지원사업 알림(D-141) · 영업자 정산 · 1차 미팅 체크리스트(준비 중)',
+    inGroup('sales').join() === 'sales,grants,agents,first-meeting' && MODULES.find((m) => m.key === 'first-meeting')?.status === 'soon', inGroup('sales').join())
   check('메뉴: 고객 묶음에서 영업자 정산이 빠졌다', !inGroup('clients').includes('agents'))
   check('메뉴: 처음 사용 가이드가 이 시스템 맨 위', inGroup('about')[0] === 'guide' && MODULES.find((m) => m.key === 'guide')?.path === '/getting-started')
   check('메뉴: 향후 확장은 눌러도 이동하지 않고 펼쳐진다', MODULES.find((m) => m.key === 'roadmap')?.expand === 'future-items')
@@ -1420,7 +1420,7 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
 
   // 메뉴 — 사이드바는 한 줄, 안에서 탭
   const salesItems = MODULES.filter((m) => m.group === 'sales' && m.enabled).map((m) => m.key)
-  check('영업: 영업 묶음 = 영업 관리 · 영업자 정산 · 1차 미팅 체크리스트 자리', salesItems.join() === 'sales,agents,first-meeting', salesItems.join())
+  check('영업: 영업 묶음 = 영업 관리 · 지원사업 알림 · 영업자 정산 · 1차 미팅 체크리스트 자리', salesItems.join() === 'sales,grants,agents,first-meeting', salesItems.join())
   check('영업: 영업 관리가 탭 주소를 모두 맡는다', SALES_TAB_PATHS.every((p) => moduleForPath(p)?.key === 'sales') && SALES_TABS[0].to === '/sales/board')
   check('영업: 1차 미팅 체크리스트 자리는 따로 남는다', moduleForPath('/sales/first-meeting')?.key === 'first-meeting' && MODULES.find((m) => m.key === 'first-meeting')?.status === 'soon')
   check('영업: 머리줄 — 영업 › 영업 관리', screenGroupForPath('/sales/board')?.title === '영업')
