@@ -1320,7 +1320,7 @@ function Stat({
   return (
     <div>
       <p className={`text-lg font-bold ${color}`}>{value}</p>
-      <p className="text-[11px] text-slate-400">{label}</p>
+      <p className="t-meta text-slate-500">{label}</p>
     </div>
   );
 }

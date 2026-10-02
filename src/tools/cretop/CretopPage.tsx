@@ -104,7 +104,14 @@ export function CretopPage() {
   const section = useModuleSection()
   const meta = toolOf('cretop')?.sections?.find((s) => s.key === section)
 
-  if (section === 'analyze') return <CretopScreen />
+  // D-142: 첫 화면(보고서 분석)에도 다른 모듈처럼 화면 제목 — 제목 없이 카드부터 시작해 다른 앱처럼 보였다
+  if (section === 'analyze')
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader title="크레탑 분석기" description={meta?.hint ? `${meta.label} — ${meta.hint}` : '크레탑 기업종합보고서를 넣으면 핵심 재무와 미팅 포인트를 뽑습니다.'} />
+        <CretopScreen />
+      </div>
+    )
 
   return (
     <div className="flex flex-col gap-6">

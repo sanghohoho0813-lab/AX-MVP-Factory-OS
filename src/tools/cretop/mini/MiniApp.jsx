@@ -34,7 +34,7 @@ function objParticle(word) {
    - 의도적으로 OS(다크·골드)와 다른 밝은 단일제품 톤으로 구성.
    ────────────────────────────────────────────────────────────── */
 
-const FF = "'Pretendard Variable','Pretendard',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
+const FF = "var(--font-sans)"; // [D-142] OS 글꼴 하나로
 const T = {
   bg: "#F8FAFC", surface: "#FFFFFF", ink: "#0F172A", sub: "#475569", mute: "#94A3B8",
   // [D-96] 강조색은 OS 테마를 따른다(원본 #1D4ED8·#EFF4FF). 등급·단계 색은 뜻이 있어 그대로 둔다

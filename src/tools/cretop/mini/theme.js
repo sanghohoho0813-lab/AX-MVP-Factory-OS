@@ -1,6 +1,6 @@
 import { brandHex } from "../../shared/brandHex"; // [D-96]
 // 미니앱 공용 디자인 토큰 — MiniApp.jsx의 T/card/FF와 동일 값(인증/관리자 화면 시각 일관성용).
-export const FF = "'Pretendard Variable','Pretendard',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
+export const FF = "var(--font-sans)"; // [D-142] OS 글꼴 하나로
 export const T = {
   bg: "#F8FAFC", surface: "#FFFFFF", ink: "#0F172A", sub: "#475569", mute: "#94A3B8",
   line: "#E2E8F0", lineSoft: "#EEF2F7", brand: brandHex("700", "#1D4ED8"), brandSoft: brandHex("50", "#EFF4FF"), // [D-96] 강조색은 OS 테마

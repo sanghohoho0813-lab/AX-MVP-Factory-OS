@@ -426,6 +426,8 @@ export const appRouteChildren = [
       // 세금 계산기 9종 — 배포본 HTML 의 계산식을 그대로 옮긴 것 (D-85)
       // 도구 화면은 모두 같은 틀로 감싼다 — 업체에서 열었으면(`?client=`) 띠가 뜨고 결과가 그 업체로 간다 (D-89)
       { path: 'tools/tax', element: toolRoute(<TaxCalculatorsPage />) },
+      // D-142: 예전 · 손으로 친 '/tools/tax/계산기' 주소가 오늘 화면으로 튕기지 않게
+      { path: 'tools/tax/:section', element: <Navigate to="/tools/tax" replace /> },
       { path: 'tools/review', element: <ToolsReviewPage /> },
       ...moduleRoutes('startup-tax', <StartupTaxPage />),
       ...moduleRoutes('cretop', <CretopPage />),

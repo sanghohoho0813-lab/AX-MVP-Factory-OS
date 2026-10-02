@@ -12,7 +12,8 @@
 
 .hr-orig {
   container: hr / inline-size;
-  --ff: 'Pretendard', 'Pretendard Variable', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+  /* [D-142] OS 글꼴 하나로 */
+  --ff: var(--font-sans);
   font-family: var(--ff);
   color: #1E293B;
   -webkit-font-smoothing: antialiased;
@@ -20,6 +21,12 @@
 }
 .hr-orig *, .hr-orig *::before, .hr-orig *::after { box-sizing: border-box; }
 .hr-orig input, .hr-orig select, .hr-orig textarea, .hr-orig button { font-family: inherit; }
+/* [D-142] OS 글자 바닥(14px) — 원본의 11~13px 인라인 글자를 화면에서만 올린다(인쇄 · 내려받는 보고서는 그대로).
+   아래 휴대폰 묶음의 이름 붙은 칸(brief-*)은 뒤에서 따로 정해 그대로 이긴다. */
+@media screen {
+  .hr-orig [style*="font-size: 11px"], .hr-orig [style*="font-size: 11.5px"], .hr-orig [style*="font-size: 12px"],
+  .hr-orig [style*="font-size: 12.5px"], .hr-orig [style*="font-size: 13px"] { font-size: 14px !important; }
+}
 
 /* ── 반응형 폰트 스케일 (모바일 기준값) · --fsm = 전체 글자 크기 배율(설정) ── */
 .hr-app, .hr-portal {

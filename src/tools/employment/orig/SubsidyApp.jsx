@@ -211,7 +211,8 @@ function docEffStatus(d){ if(d.status)return d.status; return d.done?"confirmed"
 function docIsDone(d){ var s=docEffStatus(d); return s==="submitted"||s==="confirmed"||d.done===true&&!d.status; }
 
 // ── 스타일 상수 ──────────────────────────────────────────
-var FF = "'Pretendard','Pretendard Variable',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans KR',sans-serif";
+// [D-142] OS 글꼴 하나로 — 모듈마다 글꼴 순서가 달라 같은 화면 안에서 글자 모양이 갈렸다
+var FF = "var(--font-sans)";
 // 반응형 타이포 스케일 (clamp: 모바일 축소 · 데스크톱 균형)
 var FS_INPUT="clamp(15px,4vw,17px)";   // 입력창·기본 버튼
 var FS_BTN_SM="var(--fs-btn)"; // 보조 버튼 (PC 상향)
@@ -6124,7 +6125,6 @@ function ScreenGuide(props){
   if(!stOpen[0]){
     return(
       <div className="fade-in" style={{display:"flex",alignItems:"center",gap:11,background:"#fff",border:"1px solid #E8EDF3",borderRadius:12,padding:"12px 16px",marginBottom:16,boxShadow:"0 1px 2px rgba(15,23,42,0.03)"}}>
-        <span style={{fontSize:20,flexShrink:0}}>{g.icon}</span>
         <div style={{flex:1,minWidth:0}}>
           <span style={{fontSize:14.5,fontWeight:800,color:"#0F172A"}}>{g.title} 안내</span>
           <span style={{fontSize:13,color:"#94A3B8",marginLeft:8}} className="hide-mobile">{g.desc}</span>
@@ -6138,10 +6138,10 @@ function ScreenGuide(props){
     <div className="fade-in-up" style={{background:"#fff",border:"1px solid #E0EBFB",borderRadius:"var(--radius-panel)",padding:"28px 30px",marginBottom:22,boxShadow:"0 4px 18px color-mix(in srgb, var(--color-brand-600) 7%, transparent)"}}>
       <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
         <div style={{display:"flex",alignItems:"center",gap:14,minWidth:0}}>
-          <span style={{fontSize:42,lineHeight:1,flexShrink:0}}>{g.icon}</span>
+          {/* [D-142] 화면 제목을 큰 글씨로 한 번 더 쓰지 않는다 — 위 머리줄이 이미 제목이다. OS 구역 제목 크기로 '○○ 안내' */}
           <div style={{minWidth:0}}>
-            <div style={{fontSize:27,fontWeight:900,color:"#0F172A",letterSpacing:"-0.6px",lineHeight:1.2}}>{g.title}</div>
-            <div style={{fontSize:16,color:"#64748B",marginTop:6,lineHeight:1.55,wordBreak:"keep-all"}}>{g.desc}</div>
+            <div className="t-section" style={{color:"#0F172A"}}>{g.title} 안내</div>
+            <div className="t-sub" style={{color:"#64748B",marginTop:4,wordBreak:"keep-all"}}>{g.desc}</div>
           </div>
         </div>
         <div style={{display:"flex",gap:6,flexShrink:0}}>
@@ -7132,19 +7132,17 @@ export default function SubsidyApp(props){
             ):(
               <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
                 {/* [D-94] 목차 화면의 ‘← 이전’ 은 뺐다 — OS 목차·브라우저 뒤로 가기와 겹쳤다. 업체 상세에서는 ‘← 업체 목록’ 으로 남긴다 */}
-                <span className="app-title" style={{fontSize:"1.6rem",fontWeight:800,color:"#0F172A",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",letterSpacing:"-0.5px"}}>
-                  {(SIDEBAR_NAV.find(function(n){return n.key===activeKey;})||{label:"대시보드"}).icon}&nbsp;
+                {/* [D-142] OS 화면 제목과 같은 크기 · 그림 글자(이모지) 없이 — 모듈만 다른 앱처럼 보이지 않게 */}
+                <div className="app-title t-page" style={{color:"#0F172A",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
                   {(SIDEBAR_NAV.find(function(n){return n.key===activeKey;})||{label:"대시보드"}).label}
-                </span>
+                </div>
               </div>
             )}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-            <button onClick={function(){stCmdK[1](true);}} title="업체·직원 검색"
-              style={{display:"flex",alignItems:"center",gap:7,padding:"9px 16px",borderRadius:10,border:"1.5px solid #E2E8F0",background:"#F8FAFC",color:"#64748B",fontSize:15,cursor:"pointer",fontFamily:FF,whiteSpace:"nowrap"}}>
-              <span>🔍</span>
-              <span>검색</span>
-              
+            <button onClick={function(){stCmdK[1](true);}} title="업체·직원 찾기"
+              className="hide-mobile inline-flex h-10 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 t-sub font-medium whitespace-nowrap text-slate-700 hover:bg-slate-50">
+              <span>직원 찾기</span>
             </button>
             <NotifBell employees={employees} companies={companies} programs={programs} goCompany={goCompany} settings={profile.settings||{}} tier={tier}/>
             {(stView[0]==="dashboard"||stView[0]==="company")&&!selectedCompany&&(
