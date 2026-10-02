@@ -431,8 +431,9 @@ check('업무 15개에서도 가로 스크롤 없음', of2.d <= of2.w + 1, `${of
   check('한꺼번에: 발급일을 읽어 채운다', (await page.getByLabel('scan001.txt 발급일').inputValue()) === '2026-08-20')
   check('한꺼번에: 등기부등본 칸으로', (await page.getByLabel('등기부.txt 칸 고르기').inputValue()) === 'corporateRegistry')
   check('한꺼번에: 칸이 없는 인감증명서는 새 칸을 제안한다', (await page.getByLabel('seal.txt 칸 고르기').inputValue()) === '__new__' && (await page.getByLabel('seal.txt 새 칸 이름').inputValue()) === '법인인감증명서')
-  check('한꺼번에: 모르는 파일은 안 고른 채로 둔다', (await page.getByLabel('photo_7.txt 칸 고르기').inputValue()) === '')
-  check('한꺼번에: 확실 2 · 고른 것 3', sheet.includes('확실 2') && sheet.includes('고른 것 3'), sheet.slice(-200))
+  // D-146: 모르는 파일도 남기지 않는다 — '기타 · 확인 필요 · 파일이름' 새 칸으로 미리 골라 둔다(확실은 아님) · 인감증명서는 제목으로 찾아 확실
+  check('한꺼번에: 모르는 파일은 기타 · 확인 필요 칸으로(D-146)', (await page.getByLabel('photo_7.txt 칸 고르기').inputValue()) === '__new__' && (await page.getByLabel('photo_7.txt 새 칸 이름').inputValue()) === '기타 · 확인 필요 · photo_7')
+  check('한꺼번에: 확실 3 · 고른 것 4', sheet.includes('확실 3') && sheet.includes('고른 것 4'), sheet.slice(-200))
 
   // 모르는 파일을 사람이 재배치한다
   await page.getByLabel('photo_7.txt 칸 고르기').selectOption('representativeId')

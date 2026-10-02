@@ -292,7 +292,7 @@ check('문구: 미정', dueText(null) === '기한 미정')
 {
   check('카탈로그: 업무 6종', SERVICES.length === 6, String(SERVICES.length))
   // D-129: 사업자등록번호 · 법인번호 · 사업장 주소는 서류가 아니라 회사 기본 정보 — 13 → 10
-  check('카탈로그: 서류 10종 (도구용 3종 포함 · 회사 정보 3종 뺌, D-129)', DOCUMENTS.length === 10, String(DOCUMENTS.length))
+  check('카탈로그: 서류 9종 (도구용 3종 포함 · 회사 정보 3종 · 휴대폰번호 뺌, D-129 · D-146)', DOCUMENTS.length === 9 && !DOCUMENTS.some((d) => d.key === 'representativePhone'), String(DOCUMENTS.length))
   check('카탈로그: 서류 목록에 번호 · 주소가 없다', !DOCUMENTS.some((d) => ['businessNumber', 'corporateNumber', 'businessAddress'].includes(d.key)))
   check('카탈로그: 법인설립 · 정책자금은 주소 · 법인번호를 회사 정보로 요구', SERVICES.find((s) => s.key === 'incorporation')?.requiredFacts?.includes('businessAddress') === true && SERVICES.find((s) => s.key === 'policyFund')?.requiredFacts?.includes('corporateNumber') === true)
   {

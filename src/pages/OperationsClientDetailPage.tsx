@@ -1499,7 +1499,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             서류 칸 추가
           </Button>
           <p className="t-sub w-full break-keep text-slate-500">
-            기본 10종에 없는 서류를 만들어 둡니다. 유효기간을 넣으면 발급일 기준으로 만료를 알려드립니다.
+            기본 서류에 없는 서류를 만들어 둡니다. 유효기간을 넣으면 발급일 기준으로 만료를 알려드립니다.
           </p>
         </div>
 
