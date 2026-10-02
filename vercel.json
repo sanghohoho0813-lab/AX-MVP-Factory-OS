@@ -1,8 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["icn1"],
+  "functions": {
+    "api/grants-feed.js": { "maxDuration": 30 }
+  },
   "rewrites": [
     {
-      "source": "/((?!assets/|favicon\\.svg).*)",
+      "source": "/((?!assets/|favicon\\.svg|api/).*)",
       "destination": "/index.html"
     }
   ]

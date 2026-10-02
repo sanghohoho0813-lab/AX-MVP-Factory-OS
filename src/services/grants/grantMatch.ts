@@ -68,6 +68,8 @@ export interface GrantRules {
   womenCeo: boolean
   /** 인증 중 하나라도 */
   certs: CertKey[]
+  /** D-143: 예비창업자(아직 사업자 없음)만 — 이미 사업 중인 업체는 안 됨 */
+  preStartupOnly: boolean
 }
 
 export const NO_RULES: GrantRules = {
@@ -85,6 +87,7 @@ export const NO_RULES: GrantRules = {
   youthCeo: false,
   womenCeo: false,
   certs: [],
+  preStartupOnly: false,
 }
 
 export type GrantSource = 'manual' | 'paste' | 'bizinfo' | 'example'
@@ -119,6 +122,8 @@ export interface GrantNotice {
   source: GrantSource
   /** 가망고객 공개 화면(/grants/find)에 보인다. 예시 공고는 공개하지 않는다 */
   published: boolean
+  /** D-143: 기업마당 공고 번호(pblancId) — 받아 온 공고만 */
+  externalId?: string
   createdAt: string
   updatedAt: string
 }
@@ -290,9 +295,13 @@ export function deadlineRank(d: Deadline): number {
 /* ------------------------------------------------------------------ */
 
 export type ReasonState = 'ok' | 'no' | 'unknown'
-export type Verdict = 'fit' | 'check' | 'no'
+/**
+ * D-143: 조건 맞음은 '이 업체를 겨냥한 공고' 일 때만 — 지역 · 업력 · 업종을 알고, 공고가 거는 조건 하나 이상(지역 · 업력 · 업종 · 규모 ·
+ * 대표 · 인증)에 이 업체가 들어맞을 때. 아무 조건 없는 공고는 '전국 공통'(누구나) — 추천으로 세지 않는다(1,000건이 다 맞다고 뜨지 않게).
+ */
+export type Verdict = 'fit' | 'general' | 'check' | 'no'
 
-export const VERDICT_LABEL: Record<Verdict, string> = { fit: '조건 맞음', check: '확인 필요', no: '안 맞음' }
+export const VERDICT_LABEL: Record<Verdict, string> = { fit: '조건 맞음', general: '전국 공통', check: '확인 필요', no: '안 맞음' }
 
 export interface Reason {
   key: string
@@ -434,8 +443,24 @@ export function matchGrant(notice: GrantNotice, p: CompanyProfile, today: string
     add('certs', '인증', st, st === 'ok' ? `${want} 중 하나 — ${have.map((c) => CERT_LABEL[c]).join(' · ')} 있음` : st === 'no' ? `${want} 중 하나가 있어야 해요` : `${want} 중 하나 — 인증을 적으면 확인돼요`)
   }
 
+  // 예비창업자 전용 — 이미 사업 중인 업체는 아니다
+  if (r.preStartupOnly) add('preStartup', '대상', 'no', '예비창업자(아직 사업자가 없는 분) 대상 공고')
+
+  // 이 업체를 겨냥한 조건이 하나라도 있나(규모 '중소기업' 하나만으로는 거의 모두라 세지 않는다)
+  const SPECIFIC = new Set(['region', 'years', 'industry', 'employees', 'revenue', 'ceoAge', 'women', 'certs'])
+  const targeted =
+    reasons.some((x) => x.state === 'ok' && SPECIFIC.has(x.key) && !(x.key === 'region' && r.regions.length === 0 && r.cities.length === 0)) ||
+    (r.sizes.includes('micro') && reasons.some((x) => x.key === 'size' && x.state === 'ok'))
+
+  // 맞춤이라고 하려면 업체의 지역 · 업력 · 업종은 알아야 한다
+  const missing = [!p.sido ? '지역(주소)' : '', !p.years ? '업력(설립일)' : '', !p.industry.trim() ? '업종' : ''].filter(Boolean)
+  const hasNo = reasons.some((x) => x.state === 'no')
+  // 겨냥한 조건이 맞아도 업체의 지역 · 업력 · 업종 중 모르는 것이 있으면 '확인 필요'(아무 조건 없는 공고는 누구나라 상관없다)
+  if (!hasNo && targeted && missing.length && !reasons.some((x) => x.state === 'unknown')) {
+    add('profile', '업체 정보', 'unknown', `${missing.join(' · ')}을(를) 적어야 맞춤 여부를 판단할 수 있어요`)
+  }
   const unknownCount = reasons.filter((x) => x.state === 'unknown').length
-  const verdict: Verdict = reasons.some((x) => x.state === 'no') ? 'no' : unknownCount > 0 ? 'check' : 'fit'
+  const verdict: Verdict = hasNo ? 'no' : unknownCount > 0 ? 'check' : targeted ? 'fit' : 'general'
   return { notice, verdict, reasons, unknownCount, deadline: deadlineOf(notice, today) }
 }
 
@@ -448,7 +473,7 @@ export function matchesFor(notices: readonly GrantNotice[], p: CompanyProfile, t
 }
 
 function verdictRank(v: Verdict): number {
-  return v === 'fit' ? 0 : v === 'check' ? 1 : 2
+  return v === 'fit' ? 0 : v === 'check' ? 1 : v === 'general' ? 2 : 3
 }
 
 /** 공고 목록 — 마감 급한 순(닫힌 것 뒤로) */
@@ -489,6 +514,7 @@ export function normalizeRules(raw: unknown): GrantRules {
     youthCeo: r.youthCeo === true,
     womenCeo: r.womenCeo === true,
     certs: strs(r.certs).filter((x): x is CertKey => x in CERT_LABEL),
+    preStartupOnly: r.preStartupOnly === true,
   }
 }
 
@@ -518,6 +544,7 @@ export function normalizeNotice(raw: unknown, id: string, now: string): GrantNot
     source,
     // 예시 공고는 바깥에 보이지 않는다 — 지어낸 공고를 가망고객에게 보여 주지 않는다
     published: source !== 'example' && r.published === true,
+    ...(typeof r.externalId === 'string' && r.externalId.trim() ? { externalId: r.externalId.trim().slice(0, 40) } : {}),
     createdAt: typeof r.createdAt === 'string' ? r.createdAt : now,
     updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : now,
   }
@@ -544,5 +571,6 @@ export function rulesText(r: GrantRules): string[] {
   if (r.youthCeo) out.push('대표 만 39세 이하')
   if (r.womenCeo) out.push('여성 대표')
   if (r.certs.length) out.push(`${r.certs.map((c) => CERT_LABEL[c]).join(' · ')} 중 하나`)
+  if (r.preStartupOnly) out.push('예비창업자 대상')
   return out
 }

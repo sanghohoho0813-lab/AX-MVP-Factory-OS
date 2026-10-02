@@ -40,6 +40,8 @@ import {
 } from '../grants/grantText'
 import { exampleNotices } from '../grants/grantExamples'
 import { alertPayload, publicPayload, sameNotice, validateAlert, type AlertRequest } from '../grants/grantStore'
+import { mergeNotices, noticesFromFeed, slotOf } from '../grants/grantFeed'
+import { withAgencyRegion } from '../grants/grantText'
 
 let pass = 0
 let fail = 0
@@ -76,7 +78,9 @@ function notice(rules: Partial<GrantRules> = {}, over: Partial<GrantNotice> = {}
   }
 }
 const prof = (p: Partial<CompanyProfile>): CompanyProfile => ({ ...EMPTY_PROFILE, ...p })
-const verdictOf = (rules: Partial<GrantRules>, p: Partial<CompanyProfile>) => matchGrant(notice(rules), prof(p), TODAY).verdict
+/** D-143: 판정 시험의 기본 업체 — 지역 · 업력 · 업종을 아는 업체(맞춤 판정의 최소 조건) */
+const BASE: Partial<CompanyProfile> = { sido: '경기', city: '파주시', industry: '제조업', years: exact(3) }
+const verdictOf = (rules: Partial<GrantRules>, p: Partial<CompanyProfile>) => matchGrant(notice(rules), prof({ ...BASE, ...p }), TODAY).verdict
 
 /* ---------------- 마감 ---------------- */
 {
@@ -100,13 +104,13 @@ const verdictOf = (rules: Partial<GrantRules>, p: Partial<CompanyProfile>) => ma
 
 /* ---------------- 조건 하나하나 ---------------- */
 {
-  check('지역: 전국은 누구나', verdictOf({}, {}) === 'fit')
+  check('지역: 아무 조건 없는 공고는 맞춤이 아니라 전국 공통', verdictOf({}, {}) === 'general')
   check('지역: 경기 공고 · 경기 업체', verdictOf({ regions: ['경기'] }, { sido: '경기' }) === 'fit')
   check('지역: 경기 공고 · 서울 업체 = 안 맞음', verdictOf({ regions: ['경기'] }, { sido: '서울' }) === 'no')
-  check('지역: 주소 모름 = 확인 필요(지우지 않는다)', verdictOf({ regions: ['경기'] }, {}) === 'check')
+  check('지역: 주소 모름 = 확인 필요(지우지 않는다)', verdictOf({ regions: ['경기'] }, { sido: '', city: '' }) === 'check')
   check('지역: 파주시 공고 · 파주 업체', verdictOf({ regions: ['경기'], cities: ['파주시'] }, { sido: '경기', city: '파주시' }) === 'fit')
   check('지역: 파주시 공고 · 고양 업체 = 안 맞음', verdictOf({ regions: ['경기'], cities: ['파주시'] }, { sido: '경기', city: '고양시' }) === 'no')
-  check('지역: 파주시 공고 · 시군구 모름 = 확인', verdictOf({ regions: ['경기'], cities: ['파주시'] }, { sido: '경기' }) === 'check')
+  check('지역: 파주시 공고 · 시군구 모름 = 확인', verdictOf({ regions: ['경기'], cities: ['파주시'] }, { sido: '경기', city: '' }) === 'check')
 
   check('업력: 창업 7년 이내 · 만 6년 = 맞음', verdictOf({ withinYears: 7 }, { years: exact(6) }) === 'fit')
   check('업력: 창업 7년 이내 · 만 7년 = 안 맞음', verdictOf({ withinYears: 7 }, { years: exact(7) }) === 'no')
@@ -116,7 +120,7 @@ const verdictOf = (rules: Partial<GrantRules>, p: Partial<CompanyProfile>) => ma
   check('업력: 칩 1~3년 · 3년 이내 = 맞음', verdictOf({ withinYears: 3 }, { years: YEARS_CHIPS[1].range }) === 'fit')
   check('업력: 3년 이상 · 만 3년 = 맞음', verdictOf({ minYears: 3 }, { years: exact(3) }) === 'fit')
   check('업력: 3년 이상 · 만 2년 = 안 맞음', verdictOf({ minYears: 3 }, { years: exact(2) }) === 'no')
-  check('업력: 모름 = 확인', verdictOf({ withinYears: 7 }, {}) === 'check')
+  check('업력: 모름 = 확인', verdictOf({ withinYears: 7 }, { years: null }) === 'check')
 
   check('업종: 제조 공고 · 금속 가공 = 맞음(다른 말)', verdictOf({ industries: ['제조'] }, { industry: '금속 가공' }) === 'fit')
   check('업종: 정보통신 공고 · 소프트웨어 개발 = 맞음', verdictOf({ industries: ['정보통신'] }, { industry: '응용 소프트웨어 개발' }) === 'fit')
@@ -136,15 +140,15 @@ const verdictOf = (rules: Partial<GrantRules>, p: Partial<CompanyProfile>) => ma
   check('규모: 소상공인 · 서비스 3명 = 맞음', verdictOf({ sizes: ['micro'] }, { employees: exact(3), industry: '컨설팅' }) === 'fit')
   check('규모: 소상공인 · 서비스 7명 = 안 맞음', verdictOf({ sizes: ['micro'] }, { employees: exact(7), industry: '컨설팅' }) === 'no')
   check('규모: 소상공인 · 제조 7명 = 맞음(10명 미만)', verdictOf({ sizes: ['micro'] }, { employees: exact(7), industry: '제조' }) === 'fit')
-  check('규모: 중소기업 = 맞음', verdictOf({ sizes: ['small'] }, {}) === 'fit')
+  check('규모: 중소기업만 거는 공고 = 전국 공통(거의 모두라 맞춤으로 안 셈)', verdictOf({ sizes: ['small'] }, {}) === 'general')
 
   check('청년: 만 39세 · 맞음', verdictOf({ youthCeo: true }, { ceoAge: exact(39) }) === 'fit')
   check('청년: 만 40세 · 안 맞음', verdictOf({ youthCeo: true }, { ceoAge: exact(40) }) === 'no')
-  check('청년: 나이 모름 = 확인', verdictOf({ youthCeo: true }, {}) === 'check')
-  check('여성: 여성 대표', verdictOf({ womenCeo: true }, { female: true }) === 'fit' && verdictOf({ womenCeo: true }, { female: false }) === 'no' && verdictOf({ womenCeo: true }, {}) === 'check')
+  check('청년: 나이 모름 = 확인', verdictOf({ youthCeo: true }, { ceoAge: null }) === 'check')
+  check('여성: 여성 대표', verdictOf({ womenCeo: true }, { female: true }) === 'fit' && verdictOf({ womenCeo: true }, { female: false }) === 'no' && verdictOf({ womenCeo: true }, { female: null }) === 'check')
   check('인증: 벤처 있음', verdictOf({ certs: ['venture', 'innobiz'] }, { certs: ['venture'], certsKnown: true }) === 'fit')
   check('인증: 인증 글이 있는데 해당 없음 = 안 맞음', verdictOf({ certs: ['venture'] }, { certs: ['lab'], certsKnown: true }) === 'no')
-  check('인증: 인증을 모름 = 확인', verdictOf({ certs: ['venture'] }, {}) === 'check')
+  check('인증: 인증을 모름 = 확인', verdictOf({ certs: ['venture'] }, { certsKnown: false, certs: [] }) === 'check')
 
   const m = matchGrant(notice({ regions: ['경기'], withinYears: 7, minEmployees: 5 }), prof({ sido: '경기', city: '파주시', years: exact(3) }), TODAY)
   check('이유: 조건마다 한 줄씩', m.reasons.length === 3 && m.reasons.map((r) => r.key).join() === 'region,years,employees', m.reasons)
@@ -165,7 +169,7 @@ const verdictOf = (rules: Partial<GrantRules>, p: Partial<CompanyProfile>) => ma
     notice({}, { id: 'g', title: '사 접수 전', applyStart: '2026-10-10', applyEnd: '2026-10-30' }),
   ]
   const ms = matchesFor(list, p, TODAY)
-  check('목록: 안 맞음 · 마감 · 접수 전은 빠짐', ms.map((x) => x.notice.id).join() === 'b,a,f,d', ms.map((x) => x.notice.id))
+  check('목록: 안 맞음 · 마감 · 접수 전은 빠짐 · 확인 필요 먼저 · 전국 공통은 마감 순으로 뒤', ms.map((x) => x.notice.id).join() === 'd,b,a,f', ms.map((x) => x.notice.id))
   check('목록: 접수 전 포함 옵션', matchesFor(list, p, TODAY, { includeUpcoming: true }).some((x) => x.notice.id === 'g'))
   check('목록: 안 맞음 포함 옵션', matchesFor(list, p, TODAY, { includeNo: true }).some((x) => x.notice.id === 'c'))
   check('지역 거르기: 서울 공고는 경기에서 안 보임 · 전국은 보임', !inRegion(list[2], '경기', '') && inRegion(list[0], '경기', '파주시') && inRegion(list[2], '', ''))
@@ -195,12 +199,16 @@ const verdictOf = (rules: Partial<GrantRules>, p: Partial<CompanyProfile>) => ma
       youthCeo: rnd() < 0.2,
     }
     const wide = prof({
+      sido: '경기',
+      industry: '제조업',
       years: randRange(YEARS_CHIPS.map((c) => c.range)),
       employees: randRange(EMPLOYEE_CHIPS.map((c) => c.range)),
       revenueM: randRange(REVENUE_CHIPS.map((c) => c.range)),
       ceoAge: rnd() < 0.5 ? { lo: 0, hi: 39 } : { lo: 40, hi: OPEN_TOP },
     })
     const narrow = prof({
+      sido: '경기',
+      industry: '제조업',
       years: inside(wide.years as Range),
       employees: inside(wide.employees as Range),
       revenueM: inside(wide.revenueM as Range),
@@ -383,7 +391,7 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   const msg = shareMessage({ companyName: '한빛정밀', profileLine: '경기 파주시 · 제조 · 업력 3년', matches: ms, link: 'https://x.test/grants/find?r=경기', sender: '미래AI랩' })
   check('문구: 회사 · 조건 · 건수 · 링크', /한빛정밀 대표님/.test(msg) && /경기 파주시/.test(msg) && /조건이 맞는 사업 \d+건/.test(msg) && msg.includes('https://x.test/grants/find'), msg)
   check('문구: 서울 소상공인 공고는 없음', !msg.includes('서울 소상공인'))
-  check('문구: 오늘 마감이 맨 위', msg.split('\n').find((l) => l.startsWith('· '))?.includes('오늘 마감') === true, msg)
+  check('문구: 맞춤(경기 북부 제조) 공고가 맨 위 · 전국 공통은 안 넣음', msg.split('\n').find((l) => l.startsWith('· '))?.includes('경기 북부') === true && !msg.includes('지역 중소기업 AI'), msg)
   const one = noticeMessage({ companyName: '한빛정밀', match: ms[0], sender: '미래AI랩' })
   check('공고 한 통: 제목 · 마감', one.includes(ms[0].notice.title) && one.includes('마감:'), one)
   check('공고 한 통: 빈 줄이 겹치지 않음', !/\n\n\n/.test(one))
@@ -402,6 +410,38 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   check('신청: 문의 글에 조건 · 건수 · 공고 3개', /지원사업 알림 신청 — 전북 전주시/.test(pl.message as string) && /맞는 공고 6건/.test(pl.message as string) && (pl.message as string).length <= 300)
   check('신청: 공고 제목 5개까지', (pl.grant_titles as string[]).length === 5)
   check('신청: 주민번호 · 비밀번호 칸 없음', !Object.keys(pl).some((k) => /rrn|resident|password|secret/i.test(k)))
+}
+
+/* ---------------- D-143: 맞춤은 겨냥한 공고만 · 기업마당 ---------------- */
+{
+  const full = prof(BASE)
+  const m1 = matchGrant(notice({ regions: ['경기'] }), prof({ ...BASE, industry: '' }), TODAY)
+  check('맞춤: 겨냥한 공고인데 업종 모르면 확인 필요 · 이유에 업체 정보', m1.verdict === 'check' && m1.reasons.some((r) => r.key === 'profile' && /업종/.test(r.text)), m1.reasons)
+  check('맞춤: 아무 조건 없는 공고는 업체 정보가 비어도 전국 공통', matchGrant(notice({}), prof({}), TODAY).verdict === 'general')
+  check('맞춤: 중소벤처기업부 전국 공고(조건 없음) 1,000건이 다 맞춤으로 뜨지 않는다', matchesFor(Array.from({ length: 50 }, (_, i) => notice({}, { id: `g${i}`, title: `공고 ${i}` })), full, TODAY).every((m) => m.verdict === 'general'))
+  check('예비창업자 전용 = 안 맞음', matchGrant(notice({ preStartupOnly: true }), full, TODAY).verdict === 'no')
+  const pre = parseNoticeText('2026 예비창업패키지 모집\n지원대상 예비창업자(공고일 기준 사업자 등록이 없는 자)')
+  check('읽기: 예비창업자 전용', pre.rules.preStartupOnly === true, pre.rules)
+  const mixed = parseNoticeText('2026 창업 지원\n지원대상 예비창업자 및 창업 3년 이내 기업')
+  check('읽기: 예비창업자 + 기업이면 전용 아님', mixed.rules.preStartupOnly === false && mixed.rules.withinYears === 3, mixed.rules)
+  check('소관 지자체 → 지역: 경기도 파주시', JSON.stringify(withAgencyRegion({ ...NO_RULES, regions: [], cities: [] }, '경기도 파주시')) === JSON.stringify({ ...NO_RULES, regions: ['경기'], cities: ['파주시'] }))
+  check('소관 중앙부처 → 전국 그대로', withAgencyRegion({ ...NO_RULES, regions: [], cities: [] }, '중소벤처기업부').regions.length === 0)
+  check('소관: 이미 지역 조건 있으면 그대로', withAgencyRegion({ ...NO_RULES, regions: ['서울'], cities: [] }, '경기도').regions.join() === '서울')
+  const feed = noticesFromFeed(
+    [
+      { pblancId: 'PBLN_9', pblancNm: '2026 부산 제조혁신 바우처', jrsdInsttNm: '부산광역시', reqstBeginEndDe: '20261001 ~ 20261031', trgetNm: '중소기업', hashtags: '제조,부산' },
+      { pblancId: 'PBLN_10', pblancNm: '2026 수출 첫걸음', jrsdInsttNm: '중소벤처기업부', reqstBeginEndDe: '예산 소진시까지', trgetNm: '중소기업' },
+    ],
+    '2026-10-02T00:00:00Z',
+  )
+  check('기업마당: id 는 공고 번호로 고정 · 공개 · 출처', feed[0].id === 'biz_PBLN_9' && feed[0].published && feed[0].source === 'bizinfo' && feed[0].externalId === 'PBLN_9')
+  check('기업마당: 지자체 공고 → 부산 · 해시태그 제조 → 업종', feed[0].rules.regions.join() === '부산' && feed[0].rules.industries.includes('제조'), feed[0].rules)
+  check('기업마당: 부산 공고는 경기 업체에 안 맞음 · 부산 제조 업체에 맞춤', matchGrant(feed[0], full, TODAY).verdict === 'no' && matchGrant(feed[0], prof({ ...BASE, sido: '부산', city: '해운대구' }), TODAY).verdict === 'fit')
+  check('기업마당: 전국 공고(조건 없음) = 전국 공통', matchGrant(feed[1], full, TODAY).verdict === 'general')
+  const manual = notice({}, { id: 'm1', title: '2026 부산 제조혁신 바우처', applyEnd: '2026-10-31' })
+  const merged = mergeNotices([manual], feed)
+  check('합치기: 같은 공고면 직접 넣은 것을 남김', merged.length === 2 && merged[0].id === 'm1' && merged.some((n) => n.id === 'biz_PBLN_10'))
+  check('9시 칸: 한국 오전 8시 59분 = 어제 칸 · 9시 = 오늘 칸', slotOf(Date.parse('2026-10-01T23:59:00Z')) === '2026-10-01' && slotOf(Date.parse('2026-10-02T00:00:00Z')) === '2026-10-02')
 }
 
 console.log(`\ngrants: ${pass} passed, ${fail} failed`)

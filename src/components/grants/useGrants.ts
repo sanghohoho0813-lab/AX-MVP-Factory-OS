@@ -2,7 +2,7 @@
  * 지원사업 알림 — 불러오기 · 알리기(카톡 문구 · 찾기 링크 · 고객 화면) (D-141).
  * 알림 화면 · 업체 상세 · 오늘이 같은 동작을 쓴다. 알릴 때마다 '보낸 기록' 을 남긴다(다시 보낼 때 날짜가 보인다).
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { brand } from '../../brand/brand.config'
 import { listLinks, publishUpdate } from '../../services/customerBridgeService'
 import { listNotices, listSent, recordSent, type SentChannel, type SentRecord } from '../../services/grants/grantStore'
@@ -10,6 +10,7 @@ import type { GrantMatch, GrantNotice } from '../../services/grants/grantMatch'
 import { noticeMessage, shareMessage } from '../../services/grants/grantText'
 import { profileLine } from '../../services/grants/grantProfile'
 import { copyText, finderLink, type GrantClient } from '../../services/grants/grantView'
+import { mergeNotices, useGrantFeed } from '../../services/grants/grantFeed'
 import type { PortalClientLink } from '../../types/bridge'
 
 export function useGrantData(workspaceId: string | null) {
@@ -35,7 +36,10 @@ export function useGrantData(workspaceId: string | null) {
     void reload()
   }, [reload])
   const linkOf = useCallback((clientId: string) => links.find((l) => l.operationsClientId === clientId && l.status === 'active') ?? null, [links])
-  return { notices, setNotices, sent, setSent, links, linkOf, loaded, error, reload }
+  // D-143: 기업마당에서 받은 공고(모든 화면이 같은 것을 같이 쓴다)를 직접 넣은 공고와 합친다
+  const feed = useGrantFeed()
+  const all = useMemo(() => mergeNotices(notices, feed.notices), [notices, feed.notices])
+  return { notices: all, manualNotices: notices, setNotices, sent, setSent, links, linkOf, loaded, error, reload, feed }
 }
 
 const md = (ymd: string) => (ymd ? `${Number(ymd.slice(5, 7))}월 ${Number(ymd.slice(8, 10))}일` : '')

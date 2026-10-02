@@ -139,6 +139,9 @@ export function rulesFromText(target: string, whole = target, title = ''): Grant
     else r.maxRevenueM = m - (rev[3] === '미만' ? 1 : 0)
   }
 
+  // 예비창업자만 — 대상 글에 예비창업자만 있고 기업 · 사업자 말이 없을 때
+  if (/예비\s*창업/.test(t) && !/(기업|업체|개인사업자|법인사업자|소상공인|법인|창업\s*\d)/.test(t.replace(/예비\s*창업자?/g, ''))) r.preStartupOnly = true
+
   // 지역 — 제목 머리 [경기] · 'OO시 소재' · '관내'
   const head = /^\s*\[([^\]]{2,10})\]/.exec(title)
   if (head) {
@@ -159,6 +162,19 @@ export function rulesFromText(target: string, whole = target, title = ''): Grant
 /* ------------------------------------------------------------------ */
 
 export type NoticeDraft = Omit<GrantNotice, 'id' | 'createdAt' | 'updatedAt' | 'published'>
+
+/**
+ * D-143: 소관이 지자체면 그 지역 공고다 — '경기도 파주시' → 경기 · 파주시, '서울특별시' → 서울.
+ * 중앙부처(중소벤처기업부 · 고용노동부 …)는 지역이 없다(전국). 이미 지역 조건이 있으면 건드리지 않는다.
+ */
+export function withAgencyRegion(rules: GrantRules, agency: string): GrantRules {
+  if (rules.regions.length || rules.cities.length) return rules
+  const parts = agency.trim().split(/\s+/)
+  const sd = parts.length ? sidoOf(parts[0]) : ''
+  if (!sd) return rules
+  const city = parts[1] && /[시군구]$/.test(parts[1]) ? parts[1].replace(/(청|교육청)$/, '') : ''
+  return { ...rules, regions: [sd], cities: city ? [city] : [] }
+}
 
 const LABELS = /^(공고명|사업명|소관\s*부처(?:\s*[·ㆍ]\s*지자체)?|소관\s*기관|주관\s*기관|사업\s*수행\s*기관|수행\s*기관|신청\s*기간|접수\s*기간|모집\s*기간|지원\s*대상|신청\s*대상|사업\s*개요|지원\s*내용|지원\s*규모|문의처|신청\s*방법|사업\s*목적)\s*[:：]?\s*/
 
@@ -201,7 +217,7 @@ export function parseNoticeText(raw: string): NoticeDraft {
     target,
     summary,
     url,
-    rules: rulesFromText(target, whole, title),
+    rules: withAgencyRegion(rulesFromText(target, whole, title), agency),
     source: 'paste',
   }
 }
@@ -255,12 +271,14 @@ export function parseBizinfoJson(text: string): BizinfoParse {
     const target = s('trgetNm')
     const summary = s('bsnsSumryCn').slice(0, 1200)
     const tags = s('hashtags')
-    const rules = rulesFromText(`${target}`, `${summary}`, title)
-    // 해시태그에 시·도가 있으면 지역으로 (전국 공고에는 시·도 태그가 없다)
-    for (const tag of tags.split(/[,#\s]+/)) {
+    let rules = rulesFromText(`${target}`, `${summary}`, title)
+    // 해시태그에 시·도가 있으면 지역으로 (전국 공고에는 시·도 태그가 없다) · 업종 낱말이 있으면 업종으로
+    for (const tag of tags.split(/[,#\s]+/).filter(Boolean)) {
       const sd = SIDO_LIST.includes(tag) ? tag : sidoOf(tag)
       if (sd && !rules.regions.includes(sd)) rules.regions.push(sd)
+      for (const [label, re] of INDUSTRY_WORDS) if (re.test(tag) && !rules.industries.includes(label)) rules.industries.push(label)
     }
+    rules = withAgencyRegion(rules, s('jrsdInsttNm'))
     const urlRaw = s('pblancUrl')
     const url = /^https?:\/\//.test(urlRaw) ? urlRaw : urlRaw.startsWith('/') ? `https://www.bizinfo.go.kr${urlRaw}` : ''
     const realm = s('pldirSportRealmLclasCodeNm')
@@ -276,6 +294,7 @@ export function parseBizinfoJson(text: string): BizinfoParse {
       url,
       rules,
       source: 'bizinfo',
+      ...(s('pblancId') ? { externalId: s('pblancId').slice(0, 40) } : {}),
     })
   }
   return { drafts, skipped }
