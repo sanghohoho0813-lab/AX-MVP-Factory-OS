@@ -315,7 +315,13 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
                         <span className={`t-body font-semibold tabular-nums ${fit > 0 ? 'text-success-700' : 'text-slate-400'}`} data-testid="grant-client-fit">
                           맞음 {fit}
                         </span>
-                        {hot > 0 ? <span className="t-meta font-semibold text-danger-700">7일 안 마감 {hot}</span> : sum.check > 0 ? <span className="t-meta text-warning-800">확인 {sum.check}</span> : null}
+                        {hot > 0 ? (
+                          <span className="t-meta font-semibold text-danger-700">7일 안 마감 {hot}</span>
+                        ) : !c.profile.sido || !c.profile.years || !c.profile.industry.trim() ? (
+                          <span className="t-meta text-warning-800">정보를 적으면 맞춤</span>
+                        ) : sum.check > 0 ? (
+                          <span className="t-meta text-warning-800">확인 {sum.check}</span>
+                        ) : null}
                       </span>
                     </button>
                   </li>

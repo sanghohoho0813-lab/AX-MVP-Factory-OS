@@ -268,7 +268,10 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
    * D-143: '지금 이것부터'(규칙이 고른 셋) 대신 날짜가 정해진 실제 일 — 고객과 약속한 기한 · 미팅 · 업무 마감 · 신청 마감.
    * 위 칸(오늘 할 일 · 업체 약속 · 놓치면 끝나는 기한)에 이미 있는 것은 뺀다.
    */
-  const agenda = useMemo(() => buildAgenda({ schedule, journal, clientNames, prospectIds, today, days: 14 }), [schedule, journal, clientNames, prospectIds, today])
+  const agendaAll = useMemo(() => buildAgenda({ schedule, journal, clientNames, prospectIds, today, days: 14 }), [schedule, journal, clientNames, prospectIds, today])
+  // 앞으로 올 것을 먼저 — 마감이 지난 업무 · 신청은 아래 한 줄로 접는다(다가오는 것을 밀어내지 않게)
+  const agenda = useMemo(() => agendaAll.filter((a) => a.daysLeft >= 0), [agendaAll])
+  const agendaLate = useMemo(() => agendaAll.filter((a) => a.daysLeft < 0).sort((a, b) => b.date.localeCompare(a.date)), [agendaAll])
   /** D-138: 지나면 신청할 수 없는 기한(청년도약 참여신청 등) 7일 안 — 오늘 할 일 칸에 따로 둔다(순위 다툼에 묻히지 않게) */
   const hardDue = useMemo(() => hardDeadlineActions(schedule), [schedule])
   const todayJournal = useMemo(() => applyJournalFilter(journal, { range: 'today' }, today), [journal, today])
@@ -527,7 +530,9 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           {loading ? (
             <p className="t-sub text-slate-500">불러오는 중…</p>
           ) : agenda.length === 0 ? (
-            <Blank title="2주 안에 잡힌 마감 · 약속이 없습니다. 업체에 다음 약속이나 기한을 적어 두면 여기에 날짜 순으로 보여요." icon={<CalendarClock className="size-7" />} />
+            <p className="t-sub break-keep rounded-(--radius-card) border border-dashed border-slate-300 bg-white px-4 py-4 text-slate-500" data-testid="today-agenda-empty">
+              2주 안에 잡힌 마감 · 약속이 없습니다. 업체에 다음 약속이나 기한을 적어 두면 여기에 날짜 순으로 보여요.
+            </p>
           ) : (
             <ol className="ax-stagger flex flex-col gap-2">
               {agenda.slice(0, 8).map((a) => (
@@ -539,6 +544,17 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             <Link to="/ops/calendar" className="tap t-sub inline-flex items-center self-start font-semibold text-brand-700 hover:underline" data-testid="today-agenda-more">
               2주 안 {agenda.length}건 모두 달력에서 보기 →
             </Link>
+          )}
+          {agendaLate.length > 0 && (
+            <div data-testid="today-agenda-late">
+              <Disclosure title="마감 지난 업무 · 신청" hint={`${agendaLate.length}건 — 끝냈으면 업체에서 완료로 바꿔 주세요`}>
+                <ol className="flex flex-col gap-2">
+                  {agendaLate.slice(0, 10).map((a) => (
+                    <AgendaRow key={a.id} item={a} />
+                  ))}
+                </ol>
+              </Disclosure>
+            </div>
           )}
 
           {/* 오늘의 숫자 — 위가 아니라 할 일 아래에 둔다. 숫자는 판단의 근거이지 할 일이 아니다 */}

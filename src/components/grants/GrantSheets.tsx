@@ -178,13 +178,15 @@ export function ClientGrantPanel({
   compact?: number
 }) {
   const [showGeneral, setShowGeneral] = useState(false)
+  const [limit, setLimit] = useState(30)
   // 업체를 겨냥한 공고(맞음 · 확인 필요)를 먼저, 누구나 되는 '전국 공통' 은 접어 둔다
   const targeted = matches.filter((m) => m.verdict === 'fit' || m.verdict === 'check')
   const general = matches.filter((m) => m.verdict === 'general')
   const fit = targeted.filter((m) => m.verdict === 'fit').length
   const check = targeted.length - fit
   const missing = missingForMatch(client.profile)
-  const shown = compact ? targeted.slice(0, compact) : targeted
+  // 1,000건이면 맞는 공고도 수백 건 — 30건씩 이어 본다
+  const shown = compact ? targeted.slice(0, compact) : targeted.slice(0, limit)
   return (
     <div className="flex flex-col gap-3" data-testid="client-grants">
       <p className="t-sub break-keep text-slate-600">
@@ -208,6 +210,11 @@ export function ClientGrantPanel({
         <p className="t-sub break-keep text-slate-500">지역 · 업력 · 업종까지 맞는 공고가 지금은 없습니다. 새 공고가 들어오면 여기에 바로 보여요.</p>
       )}
       {compact && targeted.length > compact && <p className="t-sub text-slate-500">그 외 {targeted.length - compact}건</p>}
+      {!compact && targeted.length > limit && (
+        <Button size="sm" variant="secondary" onClick={() => setLimit((v) => v + 60)} className="self-center" data-testid="client-grants-more">
+          더 보기 (남은 {targeted.length - limit}건)
+        </Button>
+      )}
       {!compact && general.length > 0 && (
         <div className="flex flex-col gap-2">
           <button type="button" onClick={() => setShowGeneral((v) => !v)} aria-expanded={showGeneral} data-testid="client-grants-general" className="tap t-sub self-start font-semibold text-brand-700 hover:underline">

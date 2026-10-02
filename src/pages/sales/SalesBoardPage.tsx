@@ -112,9 +112,9 @@ function SalesCard({ record, today, grants, onOpen, onMove }: { record: ClientOp
       </p>
       {/* D-143: 연락할 이유 — 이 회사 지역 · 업력 · 업종에 맞는 지원사업 */}
       {grants && grants.fit > 0 && (
-        <Link to={`/grants?view=clients&client=${record.id}`} data-testid="sales-card-grants" className="tap t-meta inline-flex items-center gap-1 self-start px-1 font-semibold text-success-700 hover:underline">
+        <Link to={`/grants?view=clients&client=${record.id}`} data-testid="sales-card-grants" className="tap t-meta inline-flex items-center gap-1 self-start px-1 font-semibold whitespace-nowrap text-success-700 hover:underline">
           <BellRing aria-hidden="true" className="size-3.5" />
-          맞는 지원사업 {grants.fit}건{grants.urgentFit > 0 ? ` · 7일 안 ${grants.urgentFit}` : ''}
+          지원사업 {grants.fit}건 맞음
         </Link>
       )}
       <StageSelect record={record} onMove={onMove} />
