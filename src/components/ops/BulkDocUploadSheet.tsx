@@ -15,15 +15,21 @@ import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { useToast } from '../ui/toastContext'
 import { canExtractText, extractTextFromFile } from '../../services/docTextExtract'
-import { CONFIDENCE_LABEL, classifyDocument, type ClassifyResult } from '../../services/docClassify'
+import { OTHER_DOC_LABEL, placeDocument, type DocPlacement } from '../../services/docClassify'
+import { cellForPlacement } from '../../services/docPlacementApply'
 import { allDocumentMetas } from '../../services/clientOpsDocuments'
-import { canUploadFiles, saveClient, storeDocumentFile, withCustomDocument, withDocument } from '../../services/clientOpsService'
+import { canUploadFiles, saveClient, storeDocumentFile, withDocument } from '../../services/clientOpsService'
 import { formatFileSize } from '../../lib/format'
 import { particle } from '../../lib/josa'
 import { generateId } from '../../storage/localStore'
 import { nowIso, todayLocalDate } from '../../lib/appClock'
 import { analyzeUploadedDocs, type DocBatchSummary } from '../../services/docAutoAnalyze'
 import type { ReadDoc, ReadMethod } from '../../services/docAutoFill'
+
+/** '기타 · 확인 필요 · 스캔0003' — 기타 칸을 파일마다 구별하는 짧은 이름 */
+function shortName(fileName: string): string {
+  return fileName.replace(/\.[A-Za-z0-9]{1,5}$/, '').slice(0, 24)
+}
 
 /** '새 칸 만들기' 를 뜻하는 고르는 칸 값 */
 const NEW_CELL = '__new__'
@@ -33,7 +39,8 @@ interface Item {
   file: File
   status: 'queued' | 'reading' | 'ready' | 'uploading' | 'done' | 'error'
   progress: { ratio: number; label: string } | null
-  result: ClassifyResult | null
+  /** D-146: 제목으로 정한 칸(있는 칸 · 새 칸 · 기타) */
+  result: DocPlacement | null
   /** 고른 칸. '' 은 아직 안 고름, NEW_CELL 은 새 칸 */
   target: DocumentKey | '' | typeof NEW_CELL
   newLabel: string
@@ -115,15 +122,16 @@ export function BulkDocUploadSheet({
         // 못 읽어도 멈추지 않는다 — 파일 이름으로 판별한다
         text = ''
       }
-      const result = classifyDocument({ text, fileName: it.file.name }, metas)
+      // D-146: 서류 맨 위 제목으로 칸을 정한다 — 맞는 칸이 없으면 그 이름으로 새 칸, 모르면 '기타 · 확인 필요'(남는 파일 없음)
+      const result = placeDocument({ text, fileName: it.file.name }, metas)
       const next: Partial<Item> = {
         text,
         method,
         status: 'ready',
         progress: null,
         result,
-        target: result.key ?? (result.suggestedLabel ? NEW_CELL : ''),
-        newLabel: result.suggestedLabel ?? '',
+        target: result.kind === 'existing' ? result.key : NEW_CELL,
+        newLabel: result.kind === 'new' ? (result.label === OTHER_DOC_LABEL ? `${OTHER_DOC_LABEL} · ${shortName(it.file.name)}` : result.label) : '',
         issuedAt: result.issuedAt ?? '',
       }
       patch(it.id, next)
@@ -131,11 +139,10 @@ export function BulkDocUploadSheet({
     }
     setBusy(false)
     if (auto) {
-      // 종류가 확실한 것은 저절로 올린다 — 애매한 것만 사람에게
-      const sure = read.filter((it) => it.result?.confidence === 'sure' && it.target !== '' && it.target !== NEW_CELL)
-      const left = read.length - sure.length
-      if (sure.length) await upload(sure, { closeWhenDone: left === 0 })
-      setAutoNote(left > 0 ? `${sure.length ? `확실한 ${sure.length}개는 올리고 읽었습니다. ` : ''}아래 ${left}개는 어느 서류인지 확실하지 않아요 — 칸을 고르고 올려 주세요.` : '')
+      // D-146: 하나도 남기지 않고 전부 올린다 — 칸은 제목으로, 모르면 '기타 · 확인 필요'. 사람은 나중에 서류 탭에서 열어 보고 고친다
+      const others = read.filter((it) => it.newLabel.startsWith(OTHER_DOC_LABEL)).length
+      setAutoNote(`${read.length}개를 모두 서류함에 올립니다${others ? ` · 무슨 서류인지 모르는 ${others}개는 '${OTHER_DOC_LABEL}' 칸으로` : ''}.`)
+      await upload(read, { closeWhenDone: true })
     }
   }
 
@@ -145,7 +152,7 @@ export function BulkDocUploadSheet({
   }
 
   const readyItems = items.filter((it) => it.status === 'ready')
-  const sureItems = readyItems.filter((it) => it.result?.confidence === 'sure' && it.target !== '' && it.target !== NEW_CELL)
+  const sureItems = readyItems.filter((it) => it.result?.sure && it.target !== '')
   const assignedItems = readyItems.filter((it) => it.target !== '' && !(it.target === NEW_CELL && it.newLabel.trim() === ''))
 
   /** 고른 것을 차례로 올린다. 새 칸은 만들면서 올린다 */
@@ -156,16 +163,20 @@ export function BulkDocUploadSheet({
     let okCount = 0
     const doneIds: string[] = []
     const readDocs: ReadDoc[] = []
+    const placed: NonNullable<DocBatchSummary['placed']> = []
+    /** 이번 묶음에서 이미 파일을 넣은 칸 — 같은 칸이면 '(2)' 칸으로 따로(덮지 않는다) */
+    const used = new Set<string>()
     for (const it of targets) {
       patch(it.id, { status: 'uploading', error: '' })
       try {
-        let key: DocumentKey
-        if (it.target === NEW_CELL) {
-          rec = withCustomDocument(rec, { label: it.newLabel })
-          key = rec.customDocuments[rec.customDocuments.length - 1].key
-        } else {
-          key = it.target
-        }
+        const placement: DocPlacement =
+          it.target === NEW_CELL
+            ? { kind: 'new', label: it.newLabel.trim(), sure: true, reason: '', issuedAt: null }
+            : { kind: 'existing', key: it.target as DocumentKey, label: metas.find((m) => m.key === it.target)?.label ?? '', sure: true, reason: '', issuedAt: null }
+        const cell = cellForPlacement(rec, placement, used)
+        rec = cell.record
+        const key: DocumentKey = cell.key
+        placed.push({ fileName: it.file.name, label: cell.label, other: cell.label.startsWith(OTHER_DOC_LABEL), numbered: cell.numbered })
         if (uploadable) {
           // D-120: 파일만 올리고, 기록 저장은 끝에 한 번(파일마다 저장하던 것을 줄였다)
           rec = withDocument(rec, key, await storeDocumentFile(rec, key, it.file))
@@ -175,7 +186,7 @@ export function BulkDocUploadSheet({
         }
         if (it.issuedAt) rec = withDocument(rec, key, { received: true, issuedAt: it.issuedAt })
         // D-144: 읽은 글자는 모아 두었다가 끝에 한 번에 — 회사 정보(확실하면 바로 · 애매하면 표시) · 크레탑 · 명부
-        readDocs.push({ key, fileName: it.file.name, text: it.text, method: it.method, docSure: it.result?.confidence === 'sure' || it.manual || it.target === NEW_CELL })
+        readDocs.push({ key, fileName: it.file.name, text: it.text, method: it.method, docSure: Boolean(it.result?.sure) || it.manual })
         patch(it.id, { status: 'done' })
         doneIds.push(it.id)
         okCount += 1
@@ -192,8 +203,9 @@ export function BulkDocUploadSheet({
     try {
       const analyzed = await analyzeUploadedDocs(rec, readDocs, { now: nowIso(), today: todayLocalDate(), makeId: generateId })
       const saved = await saveClient(analyzed.record)
-      onSaved(saved, analyzed.summary)
+      onSaved(saved, { ...analyzed.summary, placed })
       const sm = analyzed.summary
+      const others = placed.filter((x) => x.other).length
       const tail = [
         sm.entered.length ? `바로 넣은 정보 ${sm.entered.length}건` : '',
         sm.flagged.length ? `확인할 정보 ${sm.flagged.length}건` : '',
@@ -201,7 +213,8 @@ export function BulkDocUploadSheet({
         sm.roster ? `명부 진단(후보 지원금 ${sm.roster.candidates}건)` : '',
       ].filter(Boolean)
       showToast(
-        (uploadable ? `서류 ${okCount}건을 올렸습니다.` : `서류 ${okCount}건을 기록했습니다. 파일 자체는 클라우드 연결 후 보관됩니다.`) +
+        (uploadable ? `서류 ${okCount}건을 서류함에 올렸습니다.` : `서류 ${okCount}건을 서류함에 기록했습니다. 파일 자체는 클라우드 연결 후 보관됩니다.`) +
+          (others ? ` 무슨 서류인지 모르는 ${others}건은 '${OTHER_DOC_LABEL}' 칸에 있습니다.` : '') +
           (tail.length ? ` ${tail.join(' · ')} — 맞춤 추천에서 보세요.` : ''),
       )
       if (opts.closeWhenDone) onClose()
@@ -301,7 +314,7 @@ export function BulkDocUploadSheet({
         {items.length > 0 && (
           <ul className="divide-y divide-slate-100 rounded-(--radius-panel) border border-slate-200">
             {items.map((it) => {
-              const conf = it.result?.confidence ?? null
+              const conf = it.result ? (it.result.sure ? 'sure' : 'maybe') : null
               const targetLabel = it.target === NEW_CELL ? `새 칸: ${it.newLabel || '(이름)'}` : (metas.find((m) => m.key === it.target)?.label ?? '')
               const replacing = it.target !== '' && it.target !== NEW_CELL ? existingFile(it.target) : ''
               return (
@@ -328,7 +341,7 @@ export function BulkDocUploadSheet({
                               : 'border-slate-200 bg-slate-50 text-slate-500'
                         }`}
                       >
-                        {CONFIDENCE_LABEL[conf]}
+                        {conf === 'sure' ? '확실' : '확인 필요'}
                       </span>
                     )}
                     {it.status === 'done' && (
@@ -399,8 +412,8 @@ export function BulkDocUploadSheet({
                         </Button>
                       </div>
                       {replacing && (
-                        <p className="t-sub text-warning-700">
-                          그 칸에 이미 <strong className="font-semibold">{replacing}</strong>{particle(replacing, '이/가')} 있습니다 — 올리면 바뀝니다.
+                        <p className="t-sub text-slate-600">
+                          그 칸에 이미 <strong className="font-semibold">{replacing}</strong>{particle(replacing, '이/가')} 있어요 — 덮지 않고 번호 붙은 칸에 따로 올려요(서류 탭에서 보고 오래된 것을 지우세요).
                         </p>
                       )}
                     </>

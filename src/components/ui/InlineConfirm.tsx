@@ -41,8 +41,8 @@ export function InlineConfirm({
     )
   }
   return (
-    <span role="alertdialog" aria-label={question} className={`inline-flex shrink-0 flex-wrap items-center gap-1.5 rounded-(--radius-control) border border-danger-200 bg-danger-50 px-2 py-1 ${className}`}>
-      <span className="t-sub font-semibold text-danger-800">{question}</span>
+    <span role="alertdialog" aria-label={question} className={`inline-flex max-w-full min-w-0 flex-wrap items-center gap-1.5 rounded-(--radius-control) border border-danger-200 bg-danger-50 px-2 py-1 ${className}`}>
+      <span className="t-sub min-w-0 font-semibold break-keep [overflow-wrap:anywhere] text-danger-800">{question}</span>
       <button
         type="button"
         data-testid={testId ? `${testId}-yes` : undefined}

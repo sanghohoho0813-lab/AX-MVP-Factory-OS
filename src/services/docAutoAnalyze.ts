@@ -29,6 +29,8 @@ export interface DocBatchSummary {
   /** 붙이지 못한 까닭(다른 회사 보고서 등) */
   warnings: string[]
   at: string
+  /** D-146: 파일마다 서류함 어느 칸에 넣었나(올리는 쪽이 채운다) — '다 어디 갔는지 모르겠다' 를 없앤다 */
+  placed?: { fileName: string; label: string; other: boolean; numbered: boolean }[]
 }
 
 const CRETOP_SIGNAL = /크레탑|CRETOP|한국평가데이터|기업종합보고서|KoDATA/i

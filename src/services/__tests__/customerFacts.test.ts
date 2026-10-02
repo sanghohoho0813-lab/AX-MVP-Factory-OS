@@ -8,7 +8,10 @@
  * 실행: npm run test:facts
  */
 
-import { normalizeClientOps } from '../clientOpsService'
+import { normalizeClientOps, withCustomDocument, withDocument, withoutCustomDocument } from '../clientOpsService'
+import { allDocumentMetas } from '../clientOpsDocuments'
+import { OTHER_DOC_LABEL, documentTitle, placeDocument } from '../docClassify'
+import { applyResort, cellForPlacement, resortDecision, withoutDocumentFile } from '../docPlacementApply'
 import {
   FACT_DEFS,
   cretopFacts,
@@ -357,6 +360,69 @@ const withCretop = (r: ClientOpsRecord): ClientOpsRecord => ({
   check('직접 묻기: 정해 둔 답이 없으면 짐작하지 않고 비슷한 질문 · AI 자리 안내', fb.questionId === null && fb.suggestions.length > 0 && fb.steps.some((x) => x.includes('AI')))
   const broken = { ...full, taxProfile: null as unknown as Record<string, string> }
   check('맞춤 추천: 한 모듈이 실패해도 나머지는 나옴', buildInsights(broken, '2026-10-02', []).length >= 6)
+}
+
+// D-146: 서류는 맨 위 제목으로 칸을 정한다 · 맞는 칸이 없으면 그 이름으로 새 칸 · 모르면 '기타 · 확인 필요' · 덮지 않는다
+{
+  const base = normalizeClientOps({ id: 'pl1', companyName: '샤인디자인', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  const metas = allDocumentMetas(base)
+  check('서류함: 대표자 휴대폰번호 칸이 없다', !metas.some((m) => m.key === 'representativePhone'))
+  const oldPhone = normalizeClientOps({ id: 'pl0', companyName: 'x', documents: { representativePhone: { received: true, note: '대표님 010-1234-5678' } } as never })
+  check('예전 서류함 휴대폰번호 → 개요 연락처로 보인다', oldPhone.contactPhone === '010-1234-5678', oldPhone.contactPhone)
+  check('개요 연락처가 있으면 그대로', normalizeClientOps({ id: 'pl0', companyName: 'x', contactPhone: '010-9999-0000', documents: { representativePhone: { received: true, note: '010-1234-5678' } } as never }).contactPhone === '010-9999-0000')
+
+  const GRAD = `졸 업 증 명 서\n성명 : 김샤인\n생년월일 : 1990. 01. 01\n위 사람은 본교 시각디자인학과를 졸업하였음을 증명합니다.\n2026년 9월 1일\n한국대학교 총장`
+  const p1 = placeDocument({ text: GRAD, fileName: 'scan_001.pdf' }, metas)
+  check('제목: 졸업증명서 → 신분증 칸이 아니라 새 칸 졸업증명서', p1.kind === 'new' && p1.label === '졸업증명서' && p1.sure, JSON.stringify(p1))
+  const BIZ = `발급번호 1234-5678\n사 업 자 등 록 증\n(일반과세자)\n등록번호 : 124-81-00998\n상호 : 샤인디자인`
+  const p2 = placeDocument({ text: BIZ, fileName: 'a.pdf' }, metas)
+  check('제목: 띄어 쓴 사업자등록증 · 위에 발급번호 줄 → 사업자등록증 칸', p2.kind === 'existing' && p2.key === 'businessRegistration' && p2.sure, JSON.stringify(p2))
+  const SME = `중소기업 확인서\n기업명 : 샤인디자인\n유효기간 : 2026-04-01 ~ 2027-03-31`
+  const p3 = placeDocument({ text: SME, fileName: '확인서.pdf' }, metas)
+  check('제목: 중소기업 확인서 → 그 칸', p3.kind === 'existing' && p3.key === 'smeCertificate')
+  const p4 = placeDocument({ text: '이 파일은 무엇인지 알 수 없는 메모입니다 그냥 글자만 있어요', fileName: '메모.txt' }, metas)
+  check('제목 없음 · 근거 없음 → 기타 · 확인 필요', p4.kind === 'new' && p4.label === OTHER_DOC_LABEL && !p4.sure, JSON.stringify(p4))
+  const p5 = placeDocument({ text: '', fileName: '법인인감증명서_샤인.jpg' }, metas)
+  check('글자 못 읽음 · 파일 이름에 서류 이름 → 그 이름(확실 아님)', p5.kind === 'new' && /인감증명서/.test(p5.label) && !p5.sure, JSON.stringify(p5))
+  check('제목 찾기: 본문 문장은 제목이 아니다', documentTitle('위 사람은 본교를 졸업하였음을 증명합니다') === null)
+
+  // 덮지 않는다 — 같은 칸이 두 번이면 '(2)' 칸
+  const used = new Set<string>()
+  const c1 = cellForPlacement(base, p2, used)
+  const r1 = withDocument(c1.record, c1.key, { received: true, fileName: '사업자등록증_2025.pdf' })
+  const c2 = cellForPlacement(r1, p2, used)
+  check('겹치면 번호 칸: 두 번째 사업자등록증 → 사업자등록증 (2)', c1.key === 'businessRegistration' && c2.key !== 'businessRegistration' && c2.label === '사업자등록증 (2)' && c2.numbered, JSON.stringify({ k: c2.key, l: c2.label }))
+  const c3 = cellForPlacement(c2.record, { kind: 'new', label: '졸업증명서', sure: true, reason: '', issuedAt: null }, used)
+  const c4 = cellForPlacement(c3.record, { kind: 'new', label: '졸업증명서', sure: true, reason: '', issuedAt: null }, used)
+  check('새 칸도 겹치면 번호: 졸업증명서 · 졸업증명서 (2)', c3.label === '졸업증명서' && c4.label === '졸업증명서 (2)' && c3.key !== c4.key)
+
+  // 다시 분류 — 중소기업 확인서 칸의 졸업증명서와 기타 칸의 중소기업 확인서를 서로 바꾼다(번호 칸 없이)
+  let tangled = withCustomDocument(base, { label: `${OTHER_DOC_LABEL} · 스캔3` })
+  const otherKey = tangled.customDocuments[0].key
+  tangled = withDocument(tangled, 'smeCertificate', { received: true, fileName: '졸업증명서.pdf', storagePath: 'w/c/sme/1', issuedAt: '2020-01-01' })
+  tangled = withDocument(tangled, otherKey, { received: true, fileName: '스캔3.pdf', storagePath: 'w/c/o/2' })
+  tangled = withDocument(tangled, 'representativeId', { received: true, fileName: '신분증.jpg', storagePath: 'w/c/id/3' })
+  const tm = allDocumentMetas(tangled)
+  const d1 = resortDecision('smeCertificate', '중소기업 확인서', '졸업증명서.pdf', placeDocument({ text: GRAD, fileName: '졸업증명서.pdf' }, tm))
+  const d2 = resortDecision(otherKey, `${OTHER_DOC_LABEL} · 스캔3`, '스캔3.pdf', placeDocument({ text: SME, fileName: '스캔3.pdf' }, tm))
+  const d3 = resortDecision('representativeId', '대표자 신분증 사본', '신분증.jpg', placeDocument({ text: '', fileName: '신분증.jpg' }, tm))
+  const d4 = resortDecision('representativeId', '대표자 신분증 사본', 'IMG_0001.jpg', placeDocument({ text: '', fileName: 'IMG_0001.jpg' }, tm))
+  check('다시 분류: 제목이 칸과 다르면 옮기자고 한다', d1.move && d2.move, JSON.stringify([d1.why, d2.why]))
+  check('다시 분류: 맞는 칸 · 근거 없는 파일은 그대로', !d3.move && !d4.move, JSON.stringify([d3.why, d4.why]))
+  const done = applyResort(tangled, [d1, d2], { withDoc: withDocument, withoutCustom: withoutCustomDocument })
+  const sme = done.record.documents.smeCertificate
+  const grad = allDocumentMetas(done.record).find((m) => m.label === '졸업증명서')
+  check('다시 분류: 중소기업 확인서 칸에 진짜 확인서 · 졸업증명서는 새 칸', sme.fileName === '스캔3.pdf' && sme.storagePath === 'w/c/o/2' && !!grad && done.record.documents[grad.key].storagePath === 'w/c/sme/1', JSON.stringify(done.moved))
+  check('다시 분류: 번호 칸이 생기지 않고 비어 버린 기타 칸은 없어짐', !allDocumentMetas(done.record).some((m) => /\(\d+\)$/.test(m.label) || m.label.startsWith(OTHER_DOC_LABEL)))
+  check('다시 분류: 옮기지 않은 신분증은 그대로', done.record.documents.representativeId.storagePath === 'w/c/id/3')
+
+  // 파일 지우기 — 번호 칸은 칸까지, 기본 칸은 '안 받음'
+  const dupKey = c2.key
+  const withDup = withDocument(c2.record, dupKey, { received: true, fileName: '사업자등록증_2026.pdf' })
+  const rm1 = withoutDocumentFile(withDup, dupKey, { withDoc: withDocument, withoutCustom: withoutCustomDocument })
+  check('파일 지우기: 번호 칸은 칸까지 없어짐', !allDocumentMetas(rm1).some((m) => m.key === dupKey) && rm1.documents.businessRegistration.fileName === '사업자등록증_2025.pdf')
+  const rm2 = withoutDocumentFile(withDup, 'businessRegistration', { withDoc: withDocument, withoutCustom: withoutCustomDocument })
+  check('파일 지우기: 기본 칸은 안 받음으로', !rm2.documents.businessRegistration.received && rm2.documents.businessRegistration.fileName === '' && allDocumentMetas(rm2).some((m) => m.key === 'businessRegistration'))
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

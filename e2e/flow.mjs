@@ -125,11 +125,13 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   await page.goto(BASE + '/ops/clients/cli_hansol?tab=docs', { waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
   const main = (await page.locator('main').innerText()) ?? ''
-  check(`서류 탭: 지금 필요 없는 안 받은 서류는 설명 줄을 접는다 ${tag}`, main.includes('대표자 휴대폰번호') && !main.includes('본인인증·서류 발급 때 계속 필요합니다'))
+  // D-146: 대표자 휴대폰번호는 서류가 아니다(개요 연락처) — 서류함에 없다
+  check(`서류 탭: 대표자 휴대폰번호 칸 없음(D-146) ${tag}`, !main.includes('대표자 휴대폰번호'))
+  check(`서류 탭: 지금 필요 없는 안 받은 서류는 설명 줄을 접는다 ${tag}`, main.includes('공동인증서 전달') && !main.includes('비밀번호는 이 시스템에 저장하지 마세요'))
   check(`서류 탭: 지금 필요한 서류는 설명까지 ${tag}`, main.includes('대부분의 기관이 3개월 이내 발급본을'))
-  await page.getByLabel('대표자 휴대폰번호 받음').check()
+  await page.getByLabel('공동인증서 전달 받음').check()
   await page.waitForTimeout(500)
-  check(`서류 탭: 받음을 켜면 그 줄이 펼쳐진다(메모 칸) ${tag}`, ((await page.locator('main').innerText()) ?? '').includes('본인인증·서류 발급 때 계속 필요합니다'))
+  check(`서류 탭: 받음을 켜면 그 줄이 펼쳐진다(메모 칸) ${tag}`, ((await page.locator('main').innerText()) ?? '').includes('비밀번호는 이 시스템에 저장하지 마세요'))
 
   /* 8 (4묶음) 할 일 프리셋 — 이미 적은 글이 있으면 앞에 붙는다 */
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })

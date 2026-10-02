@@ -62,7 +62,7 @@ export const BUILTIN_SERVICES: ServiceMeta[] = [
     label: '법인설립',
     shortLabel: '법인설립',
     description: '개인사업자이거나 법인이 없는 경우에만 진행합니다. 이미 법인이면 "해당 없음"으로 두세요.',
-    requiredDocuments: ['representativeId', 'representativePhone'],
+    requiredDocuments: ['representativeId'],
     requiredFacts: ['businessAddress'],
     recurring: false,
     order: 1,
@@ -365,7 +365,8 @@ const ALL_DOCUMENT_METAS: DocumentMeta[] = [
  * 서류 목록 · 서류 수에서 뺀다. 예전에 '받음' 으로 적어 둔 기록은 지우지 않고 그대로 둔다(읽기만 가능).
  * 값은 회사 기본 정보(businessNumber · corporateNumber · businessAddress)가 유일한 자리다.
  */
-export const COMPANY_INFO_DOCUMENT_KEYS: DocumentKey[] = ['businessNumber', 'corporateNumber', 'businessAddress']
+// D-146: 대표자 휴대폰번호도 서류가 아니다 — 연락처는 개요(업체 정보)에 있다
+export const COMPANY_INFO_DOCUMENT_KEYS: DocumentKey[] = ['businessNumber', 'corporateNumber', 'businessAddress', 'representativePhone']
 
 /** 서류함에 보이는 기본 서류 */
 export const DOCUMENTS: DocumentMeta[] = ALL_DOCUMENT_METAS.filter((d) => !COMPANY_INFO_DOCUMENT_KEYS.includes(d.key))

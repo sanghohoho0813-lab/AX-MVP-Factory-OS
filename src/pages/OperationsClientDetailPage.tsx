@@ -25,6 +25,7 @@ import {
   Upload,
   Wrench,
   Presentation,
+  ArrowRightLeft,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { getDataModeConfig } from '../data/dataMode'
@@ -152,6 +153,8 @@ import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { ClientJournalTab } from '../components/ops/ClientJournalTab'
 import { ClientSharedFiles } from '../components/ops/FilesTab'
 import { DocFileActions } from '../components/ops/DocFileActions'
+import { DocResortSheet } from '../components/ops/DocResortSheet'
+import { withoutDocumentFile } from '../services/docPlacementApply'
 import { generateId } from '../storage/localStore'
 import { ClientConsultingTab } from '../components/consulting/ClientConsultingTab'
 import { listLinksForClient } from '../services/customerBridgeService'
@@ -251,6 +254,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const [renameDraft, setRenameDraft] = useState('')
   /* 서류 한꺼번에 올리기 시트 (D-84) · D-144 머리줄 '서류 올리기'(읽자마자 저절로) */
   const [bulkOpen, setBulkOpen] = useState(false)
+  /* D-146: 올려 둔 파일 다시 읽어 칸 옮기기 */
+  const [resortOpen, setResortOpen] = useState(false)
   const [autoUploadOpen, setAutoUploadOpen] = useState(false)
   /** D-144: 방금 올린 서류에서 읽은 것 — 맞춤 추천 맨 위에 보여 준다 */
   const [lastBatch, setLastBatch] = useState<DocBatchSummary | null>(null)
@@ -1117,8 +1122,28 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               <FileUp aria-hidden="true" className="size-3.5" />
               한꺼번에 올리기
             </Button>
+            {/* D-146: 예전 판별로 엉뚱한 칸에 들어간 파일을 제목으로 다시 가른다 */}
+            {allDocumentMetas(record).some((m) => m.needsFile && record.documents[m.key]?.fileName) && (
+              <Button variant="secondary" size="sm" data-testid="doc-resort" onClick={() => setResortOpen(true)}>
+                <ArrowRightLeft aria-hidden="true" className="size-3.5" />
+                서류 다시 분류
+              </Button>
+            )}
           </div>
         </div>
+
+        {resortOpen && (
+          <DocResortSheet
+            record={record}
+            onClose={() => setResortOpen(false)}
+            onApply={(next, moved) => {
+              setResortOpen(false)
+              void commit(next).then((ok) => {
+                if (ok) showToast(`서류 ${moved}개를 맞는 칸으로 옮겼습니다.`)
+              })
+            }}
+          />
+        )}
 
         {bulkOpen && (
           <BulkDocUploadSheet
@@ -1140,8 +1165,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         )}
 
         <div className="grid gap-3 lg:grid-cols-2">
-          {allDocumentMetas(record)
-            .sort((a, b) => Number(urgentDocs.has(b.key)) - Number(urgentDocs.has(a.key)))
+          {docOrder(allDocumentMetas(record), urgentDocs)
             .map((meta) => {
               const state = record.documents[meta.key] ?? emptyDocumentState()
               const view = documentStatus(meta.key, state, today, meta)
@@ -1260,6 +1284,18 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                           onReplace={meta.needsFile ? () => fileInputs.current[meta.key]?.click() : undefined}
                         />
                       )}
+                      {meta.needsFile && state.fileName && (
+                        <InlineConfirm
+                          label="파일 지우기"
+                          testId={`doc-remove-${meta.key}`}
+                          question={custom ? `'${meta.label}' 칸과 파일을 지울까요?` : `'${meta.label}' 파일을 지울까요?`}
+                          onConfirm={() => {
+                            void commit(withoutDocumentFile(record, meta.key, { withDoc: withDocument, withoutCustom: withoutCustomDocument })).then((ok) => {
+                              if (ok) showToast(`${meta.label} 파일을 서류함에서 지웠습니다.`)
+                            })
+                          }}
+                        />
+                      )}
                       <button
                         type="button"
                         onClick={() => setOpenDocs((cur) => new Set(cur).add(meta.key))}
@@ -1315,12 +1351,26 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                           {state.fileSize > 0 && <span className="shrink-0 text-slate-400">{formatFileSize(state.fileSize)}</span>}
                         </span>
                       )}
-                      <DocFileActions
-                        label={meta.label}
-                        storagePath={state.storagePath}
-                        fileName={state.fileName}
-                        onReplace={() => fileInputs.current[meta.key]?.click()}
-                      />
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        <DocFileActions
+                          label={meta.label}
+                          storagePath={state.storagePath}
+                          fileName={state.fileName}
+                          onReplace={() => fileInputs.current[meta.key]?.click()}
+                        />
+                        {state.fileName && (
+                          <InlineConfirm
+                            label="파일 지우기"
+                            testId={`doc-remove-${meta.key}`}
+                            question={custom ? `'${meta.label}' 칸과 파일을 지울까요?` : `'${meta.label}' 파일을 지울까요?`}
+                            onConfirm={() => {
+                              void commit(withoutDocumentFile(record, meta.key, { withDoc: withDocument, withoutCustom: withoutCustomDocument })).then((ok) => {
+                                if (ok) showToast(`${meta.label} 파일을 서류함에서 지웠습니다.`)
+                              })
+                            }}
+                          />
+                        )}
+                      </span>
                       {!uploadable && !state.fileName && (
                         <span className="t-meta break-keep text-slate-500">파일 첨부는 클라우드를 연결하면 켜집니다.</span>
                       )}
@@ -1381,8 +1431,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                         >
                           이름 고치기
                         </button>
-                        {/* D-122: 칸을 없애기 전에 한 번 묻는다(업체 정보의 직접 만든 칸과 같게) */}
-                        <InlineConfirm
+                        {/* D-122: 칸을 없애기 전에 한 번 묻는다(업체 정보의 직접 만든 칸과 같게) · D-146: 파일이 있으면 '파일 지우기' 하나로 */}
+                        {!state.fileName && <InlineConfirm
                           label="칸 없애기"
                           question={`'${custom.label}' 칸을 없앨까요?`}
                           confirmLabel="없애기"
@@ -1391,7 +1441,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                               if (ok) showToast('서류 칸을 없앴습니다. 올린 파일은 아래 ‘칸이 없어진 서류의 파일’ 에 남아 있습니다.')
                             })
                           }}
-                        />
+                        />}
                       </div>
                     ))}
                 </div>
@@ -1868,6 +1918,20 @@ function TextField({
 function CloudClientDetail() {
   const { currentWorkspaceId, session } = useAuth()
   return <ClientDetailContent workspaceId={currentWorkspaceId} userId={session?.user.id ?? null} />
+}
+
+/** D-146: 서류 칸 순서 — 지금 필요한 것 먼저, 같은 이름 칸('사업자등록증 (2)')은 원래 칸 바로 뒤에(나란히 보고 하나 지운다) */
+function docOrder<T extends { key: string; label: string }>(metas: T[], urgent: ReadonlySet<string>): T[] {
+  const base = (l: string) => l.replace(/\s*\(\d+\)$/, '').replace(/\s/g, '')
+  const first = new Map<string, number>()
+  metas.forEach((m, i) => {
+    if (!first.has(base(m.label))) first.set(base(m.label), i)
+  })
+  const groupUrgent = new Set(metas.filter((m) => urgent.has(m.key)).map((m) => base(m.label)))
+  return metas
+    .map((m, i) => ({ m, i, g: first.get(base(m.label)) ?? i }))
+    .sort((a, b) => Number(groupUrgent.has(base(b.m.label))) - Number(groupUrgent.has(base(a.m.label))) || a.g - b.g || a.i - b.i)
+    .map((x) => x.m)
 }
 
 export function OperationsClientDetailPage() {

@@ -220,6 +220,26 @@ function BatchSummary({ batch }: { batch: DocBatchSummary }) {
           </ul>
         </div>
       )}
+      {batch.placed && batch.placed.length > 0 && (
+        <details open={batch.placed.length <= 8} className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="smart-placed">
+          <summary className="tap t-sub cursor-pointer font-semibold text-slate-800">
+            서류함에 넣은 곳 {batch.placed.length}개{batch.placed.some((x) => x.other) ? ` · 확인 필요 ${batch.placed.filter((x) => x.other).length}` : ''}
+          </summary>
+          <ul className="mt-1.5 flex flex-col gap-1">
+            {batch.placed.map((x, i) => (
+              <li key={`${x.fileName}-${i}`} className="t-sub flex flex-wrap items-baseline gap-x-2 break-keep">
+                <span className="min-w-0 text-slate-600 [overflow-wrap:anywhere]">{x.fileName}</span>
+                <span aria-hidden="true" className="text-slate-400">→</span>
+                <span className={`font-semibold ${x.other ? 'text-warning-800' : 'text-slate-900'}`}>{x.label}</span>
+                {x.numbered && <span className="t-meta text-slate-500">(같은 서류가 이미 있어 따로 둠 — 서류 탭에서 하나 지우세요)</span>}
+              </li>
+            ))}
+          </ul>
+          <Link to="?tab=docs" className="tap t-sub mt-1 inline-flex items-center font-semibold text-brand-700 hover:underline">
+            서류 탭에서 열어 보기
+          </Link>
+        </details>
+      )}
       {batch.cretop && (
         <p className="t-sub break-keep text-slate-700" data-testid="smart-batch-cretop">
           <Check aria-hidden="true" className="mr-1 inline size-4 text-success-600" />

@@ -309,3 +309,91 @@ export function classifyDocument(input: { text: string; fileName: string }, meta
   }
   return { key, confidence: 'unknown', reason: `${why} — 근거가 약합니다`, issuedAt, suggestedLabel: null, scores }
 }
+
+/* ------------------------------------------------------------------ */
+/* D-146: 서류 제목으로 칸 정하기                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 대표 지시(D-146): 서류는 맨 위에 무슨 서류인지 적혀 있다(사업자등록증 · 등기사항전부증명서 …).
+ * 그 제목으로 칸을 정하고, 맞는 칸이 없으면 그 이름으로 새 칸을 만들어 올린다. 도무지 모르겠으면 '기타 · 확인 필요'.
+ * 이름이 맞지 않는 칸(대표자 신분증 칸에 졸업증명서)에는 넣지 않는다 — 낱말 점수만으로 기본 칸을 고르지 않는다.
+ */
+
+export const OTHER_DOC_LABEL = '기타 · 확인 필요'
+
+/** 기본 칸의 제목 — 이 제목이 보이면 그 칸 */
+const TITLE_TO_KEY: [RegExp, DocumentKey][] = [
+  [/^사업자등록증$/, 'businessRegistration'],
+  [/^(?:법인)?등기사항(?:전부|일부)?증명서|^(?:법인)?등기부등본/, 'corporateRegistry'],
+  [/^(?:주민등록증|운전면허증|여권)(?:사본)?$|^(?:대표자)?신분증(?:사본)?$/, 'representativeId'],
+  [/^중소기업(?:\(소상공인\))?확인서/, 'smeCertificate'],
+  [/자격득실확인서$|^건강보험자격득실/, 'healthInsurance'],
+  [/가입자명부$|^4대(?:사회)?보험(?:사업장)?가입자|피보험자명부$/, 'payrollRoster'],
+  [/기업종합보고서$|^CRETOP/i, 'cretopReport'],
+  [/^(?:표준)?재무제표(?:증명(?:원)?)?$|^재무상태표$|^손익계산서$/, 'financialStatements'],
+]
+
+/** 제목이 끝나는 모양 — '…증명서' '…확인서' '…등본' '…명부' … */
+const TITLE_END = /(증명서|증명원|증명|확인서|확인원|인정서|인증서|등록증|등본|초본|명부|보고서|계약서|신고서|신청서|명세서|내역서|결과서|계획서|통지서|사본|정관|원부|대장|면허증|허가증|자격증|증서|재무제표|계산서|상태표|등록증명)$/
+/** 제목이 아닌 줄(머리 · 안내 문구) */
+const NOT_TITLE = /^(발급번호|문서확인번호|접수번호|확인번호|페이지|쪽|page|발행|민원|정부24|홈택스|국세청|대법원|인터넷등기소|본증명서|이증명서|위와같이|아래와같이)/i
+
+function compactTitle(s: string): string {
+  return s.replace(/[\s·ㆍ.,:：\-_()（）\[\]「」『』<>《》"'“”]/g, '')
+}
+
+/** 서류 글 맨 위에서 제목을 찾는다(없으면 null) */
+export function documentTitle(text: string): string | null {
+  const lines = (text ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(0, 18)
+  for (const line of lines) {
+    // '사 업 자 등 록 증' 처럼 띄어 쓴 제목도 붙여서 본다 · 괄호 안 부제(법인사업자)는 뺀다
+    const c = compactTitle(line.replace(/\([^)]{0,20}\)/g, ''))
+    if (c.length < 3 || c.length > 22) continue
+    if (NOT_TITLE.test(c)) continue
+    if (!/^[가-힣A-Za-z0-9]+$/.test(c)) continue
+    if (!/[가-힣]{2}/.test(c)) continue
+    if (TITLE_END.test(c) || TITLE_TO_KEY.some(([re]) => re.test(c))) return c
+  }
+  return null
+}
+
+/** 파일 이름에서 서류 이름 — '사업자등록증_샤인디자인_2026.pdf' → 사업자등록증 */
+export function titleFromFileName(fileName: string): string | null {
+  const base = (fileName ?? '').replace(/\.[A-Za-z0-9]{1,5}$/, '')
+  for (const part of base.split(/[\s_\-.()\[\]]+/)) {
+    const c = compactTitle(part)
+    if (c.length >= 3 && c.length <= 22 && /[가-힣]{2}/.test(c) && (TITLE_END.test(c) || TITLE_TO_KEY.some(([re]) => re.test(c)))) return c
+  }
+  return null
+}
+
+export type DocPlacement =
+  | { kind: 'existing'; key: DocumentKey; label: string; sure: boolean; reason: string; issuedAt: string | null }
+  | { kind: 'new'; label: string; sure: boolean; reason: string; issuedAt: string | null }
+
+/** 서류 하나 → 어느 칸(있는 칸 · 새 칸 · 기타) */
+export function placeDocument(input: { text: string; fileName: string }, metas: DocumentMeta[]): DocPlacement {
+  const text = input.text ?? ''
+  const hasText = compact(text).length >= 10
+  const issuedAt = hasText ? findIssuedDate(text) : null
+  const fileMetas = metas.filter((m) => m.needsFile)
+  const fromText = hasText ? documentTitle(text) : null
+  const title = fromText ?? titleFromFileName(input.fileName)
+  const how = fromText ? '서류 제목' : '파일 이름'
+  if (title) {
+    const builtin = TITLE_TO_KEY.find(([re]) => re.test(title))
+    const meta = builtin ? fileMetas.find((m) => m.key === builtin[1]) : null
+    if (meta) return { kind: 'existing', key: meta.key, label: meta.label, sure: Boolean(fromText), reason: `${how} '${title}'`, issuedAt }
+    // 이름이 같은 칸(직접 만든 칸 · 기본 칸 이름)
+    const same = fileMetas.find((m) => compactTitle(m.label) === title || (title.length >= 4 && compactTitle(m.label).replace(/\(\d+\)$/, '') === title))
+    if (same) return { kind: 'existing', key: same.key, label: same.label, sure: Boolean(fromText), reason: `${how} '${title}' — 같은 이름의 칸`, issuedAt }
+    const known = KNOWN_EXTRA_DOCS.find((k) => compactTitle(k.label) === title || k.signals.some((sg) => sg.weight >= 3 && sg.re.test(title)))
+    return { kind: 'new', label: known?.label ?? title, sure: Boolean(fromText), reason: `${how} '${title}' — 그 이름으로 새 칸`, issuedAt }
+  }
+  // 제목이 없으면 — 낱말 판별이 '확실' 할 때만 기본 칸, 아니면 기타
+  const r = classifyDocument(input, metas)
+  if (r.key && r.confidence === 'sure') return { kind: 'existing', key: r.key, label: fileMetas.find((m) => m.key === r.key)?.label ?? '', sure: true, reason: r.reason, issuedAt }
+  if (r.suggestedLabel && r.confidence !== 'unknown') return { kind: 'new', label: r.suggestedLabel, sure: false, reason: r.reason, issuedAt }
+  return { kind: 'new', label: OTHER_DOC_LABEL, sure: false, reason: hasText ? '제목을 찾지 못했어요 — 열어 보고 맞는 이름으로 바꿔 주세요' : '글자를 읽지 못했어요 — 열어 보고 맞는 이름으로 바꿔 주세요', issuedAt }
+}

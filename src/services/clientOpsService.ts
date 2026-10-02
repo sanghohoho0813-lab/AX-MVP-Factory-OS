@@ -347,6 +347,13 @@ function upgradeFees(raw: Partial<ClientOpsRecord> & LegacyShape): FeeItem[] {
   return out
 }
 
+/** 서류함 '대표자 휴대폰번호' 칸 메모에서 전화번호만(번호 모양이 아니면 '') */
+function phoneFromOldDocument(state: Partial<DocumentState> | undefined): string {
+  const note = (state?.note ?? '').trim()
+  const m = /0\d{1,2}[\s.-]?\d{3,4}[\s.-]?\d{4}/.exec(note)
+  return m ? m[0] : ''
+}
+
 export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape): ClientOpsRecord {
   const now = nowIso()
   const customDocuments = normalizeCustomDocuments(value.customDocuments)
@@ -379,7 +386,8 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
     workspaceId: value.workspaceId ?? null,
     companyName: value.companyName ?? '',
     contactName: value.contactName ?? '',
-    contactPhone: value.contactPhone ?? '',
+    // D-146: 예전 서류함 '대표자 휴대폰번호' 칸에 적어 둔 번호 — 개요 연락처가 비어 있으면 그리로 옮겨 보인다(칸 기록은 지우지 않는다)
+    contactPhone: value.contactPhone || phoneFromOldDocument(documents.representativePhone),
     contactEmail: value.contactEmail ?? '',
     businessNumber: value.businessNumber ?? '',
     corporateNumber: value.corporateNumber ?? '',

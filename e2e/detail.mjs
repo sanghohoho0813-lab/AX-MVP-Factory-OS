@@ -259,11 +259,15 @@ for (const width of [360, 390, 430]) {
   check('머리줄: 서류 올리기 단추', (await page.getByTestId('client-upload').count()) === 1)
   await page.getByTestId('client-upload').click()
   await page.getByLabel('서류 파일 고르기').setInputFiles([BIZ, ROSTER, UNKNOWN])
-  await page.getByTestId('bulk-auto-note').waitFor({ timeout: 20000 })
-  await page.waitForTimeout(800)
-  const note = (await page.getByTestId('bulk-auto-note').innerText()) ?? ''
-  check('읽자마자: 확실한 것은 저절로 올리고 · 애매한 1개만 남김', /확실한 2개는 올리고 읽었습니다/.test(note) && /1개는/.test(note), note)
+  // D-146: 남김없이 전부 올리고 창이 닫힌다 — 모르는 서류는 '기타 · 확인 필요' 칸으로, 어디에 넣었는지 맞춤 추천에 보인다
+  await page.getByTestId('smart-placed').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(600)
+  const placedText = (await page.getByTestId('smart-placed').innerText()) ?? ''
+  check('읽자마자: 3개 모두 서류함에 · 어디 넣었는지 보임 · 모르는 1개는 기타 · 확인 필요(D-146)', /서류함에 넣은 곳 3개/.test(placedText) && /확인 필요 1/.test(placedText) && placedText.includes('메모.txt') && placedText.includes('사업자등록증'), placedText)
   const r = await rec()
+  const labelOf = (x, key) => (x.customDocuments ?? []).find((d) => d.key === key)?.label ?? key
+  const filed = Object.entries(r.documents).filter(([, d]) => d.fileName).map(([k, d]) => `${labelOf(r, k)}=${d.fileName}`)
+  check('서류함: 올린 3개가 모두 칸에 있음(D-146)', filed.length === 3 && filed.includes('businessRegistration=사업자등록증.txt') && filed.some((x) => x.startsWith('기타 · 확인 필요') && x.endsWith('=메모.txt')) && filed.some((x) => x.endsWith('=사업장가입자명부.txt')), filed.join(' | '))
   check('바로 입력: 사업자번호 · 설립일 · 주소(빈 칸이었던 것)', r.businessNumber.replace(/\D/g, '') === '1248100998' && r.establishedAt === '2023-01-10' && r.businessAddress.includes('파주시'), JSON.stringify({ b: r.businessNumber, e: r.establishedAt, a: r.businessAddress }))
   check('바로 입력: 명부 재직 인원 → 직원 수', String(r.employeeCount).includes('2') || String(r.employeeCount).includes('1'), String(r.employeeCount))
   check('명부: 고용지원금 명부 진단이 저절로 붙음', (r.toolResults ?? []).some((t) => t.toolKey === 'employment' && t.title === '4대보험 명부 진단'))
@@ -296,6 +300,77 @@ for (const width of [360, 390, 430]) {
   const notes = await page.getByTestId('fact-note').allInnerTexts()
   check('다른 값: 확인할 정보에 "지금 적힌 값과 달라요" 표시', notes.some((t) => t.includes('지금 적힌 값과 달라요')), notes.join(' | '))
   check('D-144 오류 0', errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
+/* ---------------- D-146 서류 분류 — 제목으로 칸 · 겹치면 번호 칸 · 지우기 · 다시 분류 ---------------- */
+for (const width of [1440, 390]) {
+  const ctx = await browser.newContext({ viewport: { width, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  const tag = `(${width})`
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const rec = () => page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_mirae'))
+  const labelOf = (x, key) => (x.customDocuments ?? []).find((d) => d.key === key)?.label ?? key
+  const filed = (x) => Object.entries(x.documents).filter(([, d]) => d.fileName).map(([k, d]) => `${labelOf(x, k)}=${d.fileName}`)
+  const txt = (name, lines) => ({ name, mimeType: 'text/plain', buffer: Buffer.from(lines.join('\n'), 'utf8') })
+  const GRAD = txt('scan_001.txt', ['졸 업 증 명 서', '성명 : 이대표', '위 사람은 본교 디자인학과를 졸업하였음을 증명합니다.', '2026년 9월 1일'])
+  const BIZ1 = txt('사업자등록증_2025.txt', ['사업자등록증', '(법인사업자)', '등록번호 : 124-81-00998', '법인명(단체명) : 미래바이오랩'])
+  const BIZ2 = txt('사업자등록증_최신.txt', ['사 업 자 등 록 증', '(법인사업자)', '등록번호 : 124-81-00998', '법인명(단체명) : 미래바이오랩'])
+
+  // 1) 폴더째(같은 서류 둘 · 칸이 없는 서류) — 덮지 않고 전부
+  await page.goto(BASE + '/ops/clients/cli_mirae', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([GRAD, BIZ1, BIZ2])
+  await page.getByTestId('smart-placed').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(600)
+  check(`올린 뒤: 겹친 서류는 '하나 지우세요' 안내 ${tag}`, ((await page.getByTestId('smart-placed').innerText()) ?? '').includes('하나 지우세요'))
+  const r1 = await rec()
+  const f1 = filed(r1)
+  check(`제목으로 칸: 졸업증명서는 신분증 칸이 아니라 '졸업증명서' 새 칸 ${tag}`, f1.includes('졸업증명서=scan_001.txt') && !f1.some((x) => x.startsWith('representativeId=')), f1.join(' | '))
+  check(`겹치면 번호 칸: 사업자등록증 둘 다 남음(덮지 않음) ${tag}`, f1.includes('businessRegistration=사업자등록증_2025.txt') && f1.includes('사업자등록증 (2)=사업자등록증_최신.txt'), f1.join(' | '))
+
+  // 2) 서류 탭에서 오래된 쪽 지우기 — 한 번 더 묻는다
+  await page.goto(BASE + '/ops/clients/cli_mirae?tab=docs', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  const dupKey = (r1.customDocuments ?? []).find((d) => d.label === '사업자등록증 (2)')?.key
+  check(`서류 탭: 번호 칸이 보인다 ${tag}`, ((await page.locator('main').innerText()) ?? '').includes('사업자등록증 (2)'))
+  await page.getByTestId('doc-remove-businessRegistration').click()
+  check(`파일 지우기: 바로 지우지 않고 묻는다 ${tag}`, (await page.getByTestId('doc-remove-businessRegistration-yes').count()) === 1 && (await rec()).documents.businessRegistration.fileName !== '')
+  await page.getByTestId('doc-remove-businessRegistration-yes').click()
+  await page.waitForTimeout(600)
+  const r2 = await rec()
+  check(`파일 지우기: 오래된 사업자등록증만 빠지고 최신은 남음 ${tag}`, r2.documents.businessRegistration.fileName === '' && r2.documents[dupKey]?.fileName === '사업자등록증_최신.txt', filed(r2).join(' | '))
+
+  // 3) 서류 다시 분류 — 예전에 엉뚱한 칸에 들어간 파일(중소기업 확인서 칸에 졸업장 · 신분증 칸에 재무제표)
+  await page.evaluate(() => {
+    const all = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+    const x = all.find((r) => r.id === 'cli_mirae')
+    x.documents.smeCertificate = { ...x.documents.smeCertificate, received: true, fileName: '대학교_졸업증명서.pdf', issuedAt: '2020-01-01' }
+    x.documents.representativeId = { ...x.documents.representativeId, received: true, fileName: '표준재무제표증명_2025.pdf' }
+    x.documents.healthInsurance = { ...x.documents.healthInsurance, received: true, fileName: 'IMG_0001.jpg' }
+    localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(all))
+  })
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  check(`다시 분류 전: 중소기업 확인서 만료 표시(엉킨 상태) ${tag}`, ((await page.locator('main').innerText()) ?? '').includes('만료됨'))
+  await page.getByTestId('doc-resort').click()
+  await page.getByTestId('resort-sheet').waitFor()
+  await page.waitForFunction(() => !document.querySelector('[data-testid="resort-reading"]'), null, { timeout: 15000 })
+  const moves = await page.getByTestId('resort-move').allInnerTexts()
+  check(`다시 분류: 졸업증명서 · 재무제표 2개만 옮기자고 함(근거 없는 IMG 는 그대로) ${tag}`, moves.length === 2 && moves.some((t) => t.includes('졸업증명서.pdf') && t.includes('중소기업 확인서')) && moves.some((t) => t.includes('재무제표') && t.includes('최근 3개년 재무제표')), moves.join(' || '))
+  await page.getByTestId('resort-apply').click()
+  await page.waitForTimeout(800)
+  const r3 = await rec()
+  const f3 = filed(r3)
+  check(`다시 분류 후: 졸업증명서는 졸업증명서 칸(이미 하나 있어 (2)) · 재무제표는 재무제표 칸 · 엉뚱한 칸은 비워짐 ${tag}`, f3.includes('졸업증명서 (2)=대학교_졸업증명서.pdf') && f3.includes('졸업증명서=scan_001.txt') && f3.includes('financialStatements=표준재무제표증명_2025.pdf') && !r3.documents.smeCertificate.fileName && !r3.documents.representativeId.fileName && r3.documents.healthInsurance.fileName === 'IMG_0001.jpg', f3.join(' | '))
+  check(`다시 분류 후: 중소기업 확인서 '만료됨' 사라짐 ${tag}`, !((await page.locator('main').innerText()) ?? '').includes('만료됨'))
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  check(`가로 넘침 0 ${tag}`, over <= 0, String(over))
+  check(`D-146 오류 0 ${tag}`, errors.length === 0, errors.join(' | '))
   await ctx.close()
 }
 
