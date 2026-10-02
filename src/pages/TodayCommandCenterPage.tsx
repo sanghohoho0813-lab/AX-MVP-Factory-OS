@@ -87,8 +87,8 @@ function AgendaRow({ item }: { item: AgendaItem }) {
           <span className="t-meta whitespace-nowrap text-slate-500">{w.date}</span>
         </span>
         <span className="min-w-0 flex-1">
-          <span className="t-body block break-keep font-semibold text-slate-900">{item.title}</span>
-          <span className="t-sub block break-keep text-slate-500">
+          <span className="t-body block break-keep font-semibold text-slate-900 [overflow-wrap:anywhere]">{item.title}</span>
+          <span className="t-sub block break-keep text-slate-500 [overflow-wrap:anywhere]">
             {item.kindLabel}
             {item.clientName ? ` · ${item.clientName}` : ''}
             {item.detail && item.kind !== 'next' ? ` · ${item.detail}` : ''}

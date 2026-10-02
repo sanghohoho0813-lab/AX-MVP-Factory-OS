@@ -32,7 +32,7 @@ export function GrantFeedBar({ feed, onRefresh }: { feed: FeedState; onRefresh: 
           {feed.fetchedAt ? `${whenText(feed.fetchedAt)}에 받음 · ` : ''}매일 아침 9시에 저절로 새로 받아요 (다음: {nextRefreshText()})
         </p>
         {bad && feed.message && (
-          <p role="status" className="t-sub break-keep text-warning-800" data-testid="grant-feed-message">
+          <p role="status" className="t-sub break-keep text-warning-800 [overflow-wrap:anywhere]" data-testid="grant-feed-message">
             {feed.message}
           </p>
         )}
