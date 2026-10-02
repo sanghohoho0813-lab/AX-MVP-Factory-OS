@@ -299,6 +299,46 @@ for (const width of [360, 390, 430]) {
   await ctx.close()
 }
 
+/* ---------------- D-145 맞춤 상담 ---------------- */
+for (const width of [1440, 390]) {
+  const ctx = await browser.newContext({ viewport: { width, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.getByTestId('advisor').waitFor({ timeout: 15000 })
+  const groups = await page.getByTestId('advisor-group').count()
+  check(`${width} 상담 목차: 다섯 묶음 · 처음엔 첫 묶음만 펼침`, groups === 5 && (await page.getByTestId('advisor-q').count()) === 2, `${groups}`)
+  await page.getByTestId('advisor-group').nth(1).click()
+  await page.locator('[data-testid="advisor-q"][data-q="policy"]').click()
+  await page.waitForTimeout(300)
+  const pol = (await page.locator('[data-testid="advisor-answer"][data-q="policy"]').innerText().catch(() => '')) ?? ''
+  check(`${width} 상담: 버튼 하나로 정책자금 답(결론 · 순서 · 열기)`, /정책자금/.test(pol) && (/진행 가능성/.test(pol) || /알아야 판정/.test(pol)), pol.slice(0, 200))
+  await page.getByTestId('advisor-input').fill('배당이랑 급여 중에 뭐가 나아?')
+  await page.getByTestId('advisor-send').click()
+  await page.waitForTimeout(300)
+  check(`${width} 직접 묻기: 가장 가까운 질문(급여 · 배당)으로 답`, (await page.locator('[data-testid="advisor-answer"][data-q="salary"]').count()) === 1)
+  await page.getByTestId('advisor-input').fill('오늘 날씨 어때')
+  await page.getByTestId('advisor-send').click()
+  await page.waitForTimeout(300)
+  const sug = page.getByTestId('advisor-suggest').last()
+  check(`${width} 정해 둔 답이 없으면: 비슷한 질문 · AI 자리`, (await sug.locator('button').count()) > 0 && (await page.getByTestId('advisor').getByTestId('ai-soon').count()) === 1)
+  await sug.locator('button').first().click()
+  await page.waitForTimeout(300)
+  check(`${width} 비슷한 질문 누르면 바로 답`, (await page.getByTestId('advisor-answer').count()) === 4)
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.getByTestId('advisor').waitFor({ timeout: 15000 })
+  check(`${width} 다시 열어도 대화가 남음(이 업체)`, (await page.getByTestId('advisor-question').count()) === 4)
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  check(`${width} 상담 가로 넘침 0`, over <= 1, String(over))
+  await page.getByTestId('advisor-clear').click()
+  check(`${width} 대화 지우기`, (await page.getByTestId('advisor-question').count()) === 0)
+  check(`${width} 상담 오류 0`, errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

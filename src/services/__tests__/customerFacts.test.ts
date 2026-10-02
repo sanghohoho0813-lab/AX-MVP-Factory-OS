@@ -36,6 +36,7 @@ import type { ClientOpsRecord } from '../../types/clientOps'
 import { NOTE_CONFLICT, NOTE_OCR, autoFillFromDocs } from '../docAutoFill'
 import { looksLikeCretop, looksLikeRoster } from '../docAutoAnalyze'
 import { buildInsights, recommendNextSteps } from '../clientInsights'
+import { ADVISOR_GROUPS, ALL_QUESTIONS, answerFor, answerText, matchQuestion } from '../clientAdvisor'
 import { classifyDocument } from '../docClassify'
 import { DOCUMENTS } from '../../content/clientOpsCatalog'
 
@@ -332,6 +333,28 @@ const withCretop = (r: ClientOpsRecord): ClientOpsRecord => ({
   check('맞춤 추천: 좋은 것 먼저', ins.findIndex((i) => i.tone === 'need') === -1 || ins.findIndex((i) => i.tone === 'good' || i.tone === 'maybe') < ins.findIndex((i) => i.tone === 'need') || !ins.some((i) => i.tone === 'good' || i.tone === 'maybe'))
   const steps = recommendNextSteps(none, 2)
   check('다음 행동: 확인할 정보가 맨 앞 · 빠진 서류 받기', steps[0]?.id === 'facts' && steps.some((s) => s.id === 'docs'), JSON.stringify(steps.map((s) => s.text)))
+
+  // D-145: 맞춤 상담 — 목차 질문마다 이 회사 기록으로 답한다(규칙 · LLM 없음)
+  check('상담 목차: 다섯 묶음 · 묶음마다 2~3개(무분별하게 많지 않게)', ADVISOR_GROUPS.length === 5 && ADVISOR_GROUPS.every((g) => g.questions.length >= 2 && g.questions.length <= 3) && ALL_QUESTIONS.length <= 15)
+  const ctxFull = { record: full, today: '2026-10-02', notices: [] }
+  const ctxEmpty = { record: empty, today: '2026-10-02', notices: [] }
+  const allOk = ALL_QUESTIONS.every((qq) => {
+    const a1 = answerFor(qq.id, ctxFull)
+    const a2 = answerFor(qq.id, ctxEmpty)
+    return a1.title !== '' && a2.title !== '' && (a1.verdict !== null || a1.steps.length > 0) && (a2.verdict !== null || a2.steps.length > 0)
+  })
+  check('상담: 모든 질문이 정보 있는/없는 업체 둘 다 답한다(오류 없음)', allOk)
+  const pol = answerFor('policy', ctxFull)
+  check('상담 · 정책자금: 사업자등록증만으로 추천 기관 순위 · 준비 서류', pol.steps.some((x) => /1순위/.test(x)) && pol.docs.length > 0 && /진행 가능성/.test(pol.verdict?.text ?? ''), JSON.stringify(pol.steps))
+  check('상담 · 정책자금: 정보 없으면 짐작하지 않고 필요한 것', answerFor('policy', ctxEmpty).verdict?.tone === 'need' && answerFor('policy', ctxEmpty).missing.length > 0)
+  check('상담 · 연구소: 창업 3년 넘은 소기업 → 연구전담요원 3명', /3명/.test(answerFor('lab', ctxFull).verdict?.text ?? ''), answerFor('lab', ctxFull).verdict?.text)
+  check('상담 · 물어볼 것: 빠진 정보가 많을수록 질문이 많다', answerFor('ask', ctxEmpty).steps.length > answerFor('ask', ctxFull).steps.length)
+  check('상담 · 제안 문구: 복사할 글에 회사 이름', answerFor('pitch', ctxFull).copyText.includes('한빛테크') || answerFor('pitch', ctxFull).copyText.includes('주식회사'))
+  check('직접 묻기: "정책자금 어디에 신청해" → 정책자금', matchQuestion('정책자금 어디에 신청해?').best?.id === 'policy')
+  check('직접 묻기: "청년 직원 지원금" → 고용지원금', matchQuestion('청년 직원 뽑으면 지원금 있어?').best?.id === 'employment')
+  check('직접 묻기: "배당이랑 급여" → 급여 · 배당', matchQuestion('배당이랑 급여 중에 뭐가 나아').best?.id === 'salary')
+  const fb = answerText('오늘 날씨 어때', ctxFull)
+  check('직접 묻기: 정해 둔 답이 없으면 짐작하지 않고 비슷한 질문 · AI 자리 안내', fb.questionId === null && fb.suggestions.length > 0 && fb.steps.some((x) => x.includes('AI')))
   const broken = { ...full, taxProfile: null as unknown as Record<string, string> }
   check('맞춤 추천: 한 모듈이 실패해도 나머지는 나옴', buildInsights(broken, '2026-10-02', []).length >= 6)
 }

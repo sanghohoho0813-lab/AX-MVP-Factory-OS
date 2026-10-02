@@ -18,6 +18,7 @@ import { Button } from '../ui/Button'
 import { Badge, Section, Surface, type Tone } from '../ui/primitives'
 import { AlertRow } from './opsParts'
 import { FactInboxCard } from './ClientFactsCards'
+import { ClientAdvisor } from './ClientAdvisor'
 import { ClientGrantsCard } from '../grants/ClientGrantsCard'
 import { useGrantData } from '../grants/useGrants'
 import { useEntitlements } from '../../lib/entitlementsStore'
@@ -126,6 +127,9 @@ export default function ClientSmartTab({
           </ol>
         )}
       </Section>
+
+      {/* 4-1. 맞춤 상담(D-145) — 목차에서 고르거나 직접 묻기 · 이 회사 기록 · 모듈 판정으로 답한다 */}
+      <ClientAdvisor record={record} today={today} notices={notices} insights={insights} onSetNext={setNext} />
 
       {/* 5. 모듈별 판정 */}
       <Section title="모듈별 판정" count={good}>
