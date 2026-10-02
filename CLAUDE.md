@@ -34,7 +34,7 @@ npm run qa:real -- http://localhost:4390           # 실제 데이터처럼(긴 
 npm run qa:squeeze -- http://localhost:4390 --all  # 짜부라진 글자 0
 npm run qa:modules -- http://localhost:4390       # 모듈 전 화면 오류·넘침 0 · 오류 울타리 · 인쇄 · 저장 공간 가득 참
 npm run qa:facts -- http://localhost:4390         # 고객 사실 창고(자료에서 찾은 정보 확인 → 모듈이 다시 씀)
-npm run qa:detail -- http://localhost:4390        # 업체 상세(탭 순서 · 서류 → 회사정보 · 현황 카드 누르기 · 삭제 체크 · 360~430)
+npm run qa:detail -- http://localhost:4390        # 업체 상세(탭 순서 · 서류 올리기 한 번 → 바로 입력/표시/모듈 판정 · 맞춤 추천 · 회사정보 먼저 · 삭제 체크 · 360~430)
 npm run qa:files                                  # 서류 파일(클라우드 흉내 — 미리보기 · 새 창 · 내려받기 · 교체 · 비공개 저장소)
 npm run qa:taxplan -- http://localhost:4390       # 절세 설계(원하는 결과 → 계산기 식으로 거꾸로 · 계산기 열기 · 업체 기록 저장)
 npm run qa:calendar -- http://localhost:4390      # 큰 달력(날짜 칸 → 일요일부터 · 창 위 · Esc · 직접 적기 · 휴대폰)

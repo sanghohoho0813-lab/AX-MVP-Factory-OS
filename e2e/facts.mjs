@@ -69,11 +69,12 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const before = (await page.locator('main').innerText()) ?? ''
   check('확인 전: 정책자금이 자료 후보(매출)를 쓰지 않는다', !before.includes('매출 규모 · ') && !/작년 매출\(2025\)/.test(before), before.slice(0, 200))
 
-  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
-  await page.waitForTimeout(700)
+  // D-144: 확인할 정보는 '맞춤 추천' 탭으로 옮겼다
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(1200)
   const inbox = page.getByTestId('fact-inbox')
   const inboxText = (await inbox.innerText().catch(() => '')) ?? ''
-  check('자료에서 다음 정보를 찾았습니다 — 카드가 뜬다', inboxText.includes('자료에서 다음 정보를 찾았습니다'), inboxText.slice(0, 120))
+  check('확인이 필요한 정보 — 카드가 뜬다(맞춤 추천)', inboxText.includes('확인이 필요한 정보'), inboxText.slice(0, 120))
   check('후보: 매출 12억 3,400만원 · 크레탑 보고서 2025', inboxText.includes('12억 3,400만원') && inboxText.includes('크레탑 보고서 2025'), inboxText.slice(0, 300))
   check('후보: 지금 값과 같은 회사명은 묻지 않는다', !(await inbox.locator('[data-fact="companyName"]').count()))
   check('후보: 다르면 지금 적힌 값을 보여 준다(대표자 김대표 → 박대표)', ((await inbox.locator('[data-fact="representativeName"]').innerText().catch(() => '')) ?? '').includes('지금 적힌 값: 김대표'))
@@ -90,6 +91,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByTestId('fact-save-fixes').click()
   await page.waitForTimeout(900)
   check('확인 뒤: 카드가 사라진다(더 물을 것 없음)', (await page.getByTestId('fact-inbox').count()) === 0 && (await page.getByTestId('fact-inbox-later').count()) === 0)
+  await page.getByRole('tab', { name: /^개요/ }).click()
+  await page.waitForTimeout(600)
   const nums = (await page.getByTestId('fact-numbers').innerText()) ?? ''
   check('숫자 · 인증: 고친 매출 12억 5,000만원 · 직접 적음 · 확인됨', nums.includes('12억 5,000만원') && nums.includes('직접 적음 · 확인됨'), nums.slice(0, 300))
   check('숫자 · 인증: 영업이익 1억 2,000만원 · 크레탑 보고서 2025 · 확인됨', nums.includes('1억 2,000만원') && nums.includes('크레탑 보고서 2025 · 확인됨'), nums.slice(0, 300))
@@ -98,8 +101,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('회사 정보: 대표자(박대표) 옆에 크레탑 보고서 · 확인됨', ((await page.locator('[data-fact-note="representativeName"]').innerText().catch(() => '')) ?? '').includes('크레탑 보고서 · 확인됨'))
 
   // 새로고침해도 다시 묻지 않는다
-  await page.reload({ waitUntil: 'networkidle' })
-  await page.waitForTimeout(600)
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(1000)
   check('새로고침: 뺀 주소 · 고친 매출을 다시 묻지 않는다', (await page.getByTestId('fact-inbox').count()) === 0 && (await page.getByTestId('fact-inbox-later').count()) === 0)
 
   // 모듈이 다시 쓴다 — 정책자금
@@ -145,9 +148,9 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.evaluate(seedScript())
   await page.evaluate(attachCretop)
   for (const scale of ['default', 'extra_large']) {
-    await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+    await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
     await page.evaluate((s) => document.documentElement.setAttribute('data-text-scale', s), scale)
-    await page.waitForTimeout(500)
+    await page.waitForTimeout(1000)
     const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
     check(`390 ${scale}: 가로 넘침 없음`, over <= 1, String(over))
     const small = await page.getByTestId('fact-inbox').locator('button').evaluateAll((els) => els.filter((e) => e.getBoundingClientRect().height < 43.5).map((e) => e.textContent))

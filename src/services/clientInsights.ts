@@ -71,7 +71,7 @@ const grantsInsight: Provider = ({ record, today, notices }) => {
   const urgent = fit.filter((m) => m.deadline.urgent)
   const core = [!profile.sido ? '회사 주소' : '', !profile.years ? '설립일' : '', !profile.industry.trim() ? '업종' : ''].filter(Boolean)
   const open = `/grants?view=clients&client=${encodeURIComponent(record.id)}`
-  if (notices.length === 0) return { key: 'grants', label: '지원사업', tone: 'need', headline: '공고를 받아 오는 중이에요', detail: '기업마당 공고를 받으면 이 업체 조건에 맞는 공고를 바로 골라 드려요.', missing: [], openPath: open, openLabel: '지원사업 알림', action: null }
+  if (notices.length === 0) return { key: 'grants', label: '지원사업', tone: 'need', headline: '아직 받아 둔 공고가 없어요', detail: '기업마당 공고(매일 아침 9시)나 직접 넣은 공고가 있으면 이 업체 조건에 맞는 것을 바로 골라 드려요.', missing: [], openPath: open, openLabel: '지원사업 알림', action: null }
   if (fit.length > 0) {
     const first = urgent[0] ?? fit[0]
     return {
@@ -254,7 +254,7 @@ export interface NextStep {
 export function recommendNextSteps(insights: readonly Insight[], pendingCount: number): NextStep[] {
   const out: NextStep[] = []
   if (pendingCount > 0) out.push({ id: 'facts', text: `서류에서 읽은 정보 ${pendingCount}건 확인하기`, why: '확실하지 않은 것만 남겨 두었어요 — 맞으면 한 번에 넣어요', href: '#fact-inbox' })
-  for (const ins of insights) if ((ins.tone === 'good' || ins.tone === 'maybe') && ins.action) out.push({ id: `ins:${ins.key}`, text: ins.action, why: `${ins.label} · ${ins.headline}`, href: ins.openPath })
+  for (const ins of insights) if ((ins.tone === 'good' || ins.tone === 'maybe') && ins.action) out.push({ id: `ins:${ins.key}`, text: ins.action, why: `${ins.label} — ${ins.detail || ins.headline}`, href: ins.openPath })
   const docs = [...new Set(insights.filter((i) => i.tone === 'need').flatMap((i) => i.missing))]
   if (docs.length) out.push({ id: 'docs', text: `${docs.slice(0, 3).join(' · ')} 받기`, why: '받으면 판정이 바로 나와요(서류 올리기 한 번으로)', href: null })
   return out.slice(0, 5)

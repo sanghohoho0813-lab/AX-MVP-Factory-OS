@@ -46,7 +46,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
   await page.waitForTimeout(700)
   const tabs = await page.getByRole('tab').allInnerTexts()
-  check('탭 순서: 개요 → 서류 → 업무 → 업무 일기 → 고객 플랫폼 → 수금', JSON.stringify(tabs.map((t) => t.split('\n')[0].trim())) === JSON.stringify(['개요', '서류', '업무', '업무 일기', '고객 플랫폼', '수금']), JSON.stringify(tabs))
+  check('탭 순서: 맞춤 추천 → 개요 → 서류 → 업무 → 업무 일기 → 고객 플랫폼 → 수금(D-144)', JSON.stringify(tabs.map((t) => t.split('\n')[0].trim())) === JSON.stringify(['맞춤 추천', '개요', '서류', '업무', '업무 일기', '고객 플랫폼', '수금']), JSON.stringify(tabs))
+  check('개요: 처음 열면 개요 · 맨 위가 회사 정보(D-144)', (await page.getByRole('tab', { name: /^개요/, selected: true }).count()) === 1 && (await page.evaluate(() => { const c = document.querySelector('[data-testid="overview-company"]'); const n = document.querySelector('main section, main [data-testid="overview-company"]'); return !!c && c.getBoundingClientRect().top < 700 })))
   const main = (await page.locator('main').innerText()) ?? ''
   check('개요: 돈 숫자 칸(못 받은 내 돈)을 되풀이하지 않는다', !main.includes('못 받은 내 돈'))
   check('개요: 없는 서류 칸이 없다', !/없는 서류\s*\d/.test(main))
@@ -79,21 +80,18 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(1200)
   await page.keyboard.press('Escape').catch(() => {})
   const r1 = await record(page)
-  check('올리기: 확인 전에는 회사 정보에 칸이 없다(자동 확정 없음)', !(r1.customFields ?? []).some((f) => f.label === '연구개발전담부서'))
-  check('올리기: 인증서 후보가 확인 필요로 남는다', (r1.factInbox ?? []).some((c) => c.key === 'cf:연구개발전담부서' && c.group === 'credential'), JSON.stringify(r1.factInbox))
+  // D-144: 사람이 칸을 골라 올린 인정서(글자 파일)는 확실 — 바로 회사 기본 정보 · 인증서 묶음에 들어간다
+  const field = (r1.customFields ?? []).filter((f) => f.label === '연구개발전담부서')
+  check('올리기: 확실한 인정서는 바로 회사 정보 · 인증서 묶음에(D-144)', field.length === 1 && field[0].group === 'credential' && field[0].value.includes('2024-1234') && field[0].value.includes('한국산업기술진흥협회'), JSON.stringify(r1.customFields))
+  check('올리기: 바로 넣은 것은 확인함에 남지 않는다', !(r1.factInbox ?? []).some((c) => c.key === 'cf:연구개발전담부서'), JSON.stringify(r1.factInbox))
+  await page.getByRole('tab', { name: /맞춤 추천/ }).click()
+  await page.waitForTimeout(900)
+  const batch = (await page.getByTestId('smart-batch').innerText().catch(() => '')) ?? ''
+  check('맞춤 추천: 방금 올린 서류 — 바로 넣은 정보에 연구개발전담부서', batch.includes('바로 넣은 정보') && batch.includes('연구개발전담부서'), batch.slice(0, 300))
 
   await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
   await page.waitForTimeout(700)
-  const inbox = page.getByTestId('fact-inbox')
-  const row = inbox.locator('[data-fact="cf:연구개발전담부서"]')
-  const rowText = (await row.innerText().catch(() => '')) ?? ''
-  check('개요: 자료에서 찾은 정보 — 연구개발전담부서 · 인정번호 · 출처 인증서', rowText.includes('연구개발전담부서') && rowText.includes('2024-1234') && rowText.includes('인증서'), rowText)
-  await page.getByTestId('fact-accept-all').click()
-  await page.waitForTimeout(900)
-  const r2 = await record(page)
-  const field = (r2.customFields ?? []).filter((f) => f.label === '연구개발전담부서')
-  check('확인: 회사 기본 정보 · 인증서 묶음에 칸 하나', field.length === 1 && field[0].group === 'credential' && field[0].value.includes('2024-1234') && field[0].value.includes('한국산업기술진흥협회'), JSON.stringify(field))
-  const shown = (await page.locator('main').innerText()) ?? ''
+  const shown = (await page.getByTestId('overview-company').innerText()) ?? ''
   check('개요: 회사 기본 정보에 연구개발전담부서가 보인다', shown.includes('연구개발전담부서') && shown.includes('인정번호 2024-1234'))
 
   // 다시 올려도 칸이 늘지 않고 묻지 않는다
@@ -110,11 +108,13 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(1200)
   const r3 = await record(page)
   check('같은 인정서 다시: 칸은 하나 · 묻지 않는다', (r3.customFields ?? []).filter((f) => f.label === '연구개발전담부서').length === 1 && !(r3.factInbox ?? []).some((c) => c.key === 'cf:연구개발전담부서' && c.status !== 'confirmed' && c.status !== 'dismissed' && !(r3.factMeta?.['cf:연구개발전담부서'])) )
-  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
-  await page.waitForTimeout(600)
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
   check('같은 인정서 다시: 확인 카드에 연구개발전담부서가 없다', (await page.locator('[data-fact="cf:연구개발전담부서"]').count()) === 0)
 
-  // 대표자 성별 — 고른 것만
+  // 대표자 성별 — 고른 것만(회사 정보는 개요 맨 위)
+  await page.getByRole('tab', { name: /^개요/ }).click()
+  await page.waitForTimeout(500)
   const fillEmpty = page.getByRole('button', { name: /아직 안 적은 \d+칸 채우기/ })
   if ((await fillEmpty.count()) > 0) await fillEmpty.first().click()
   const rest = page.getByRole('button', { name: /^나머지 \d+칸 보기/ })
@@ -229,6 +229,73 @@ for (const width of [360, 390, 430]) {
     const gone = await page.evaluate(() => !JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').some((r) => r.id === 'cli_hansol'))
     check('390 삭제: 실제로 지워지고 목록으로', gone && page.url().endsWith('/ops/clients'), page.url())
   }
+  await ctx.close()
+}
+
+/* ---------------- D-144 서류 올리기 한 번 → 바로 입력 · 표시 · 모듈 판정 ---------------- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  // 업종만 적혀 있는 업체 — 주소 · 설립일 · 사업자번호 없음
+  const BIZ = {
+    name: '사업자등록증.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from(['사업자등록증', '(법인사업자)', '등록번호 : 124-81-00998', '법인명(단체명) : 미래바이오랩', '대표자 : 이대표', '개업연월일 : 2023 년 01 월 10 일', '법인등록번호 : 110111-1234567', '사업장 소재지 : 경기도 파주시 탄현면 평화로 3', '업태 : 제조업', '종목 : 바이오 시약'].join('\n'), 'utf8'),
+  }
+  const ROSTER = {
+    name: '사업장가입자명부.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from(['4대보험 사업장 가입자 명부', '사업장명: 미래바이오랩', '발급일시 2026.09.20', '성명 주민등록번호 국민연금 건강보험 산재보험 고용보험', '980310-1234567 홍길동', '2026-08-05 2026-08-05 2026-08-05 2026-08-05', '860201-2345678 김영희', '2020-03-01 2020-03-01 - -'].join('\n'), 'utf8'),
+  }
+  const UNKNOWN = { name: '메모.txt', mimeType: 'text/plain', buffer: Buffer.from('회의 메모 — 다음 주 화요일 다시 연락', 'utf8') }
+  const rec = () => page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_mirae'))
+
+  await page.goto(BASE + '/ops/clients/cli_mirae', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  check('머리줄: 서류 올리기 단추', (await page.getByTestId('client-upload').count()) === 1)
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([BIZ, ROSTER, UNKNOWN])
+  await page.getByTestId('bulk-auto-note').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(800)
+  const note = (await page.getByTestId('bulk-auto-note').innerText()) ?? ''
+  check('읽자마자: 확실한 것은 저절로 올리고 · 애매한 1개만 남김', /확실한 2개는 올리고 읽었습니다/.test(note) && /1개는/.test(note), note)
+  const r = await rec()
+  check('바로 입력: 사업자번호 · 설립일 · 주소(빈 칸이었던 것)', r.businessNumber.replace(/\D/g, '') === '1248100998' && r.establishedAt === '2023-01-10' && r.businessAddress.includes('파주시'), JSON.stringify({ b: r.businessNumber, e: r.establishedAt, a: r.businessAddress }))
+  check('바로 입력: 명부 재직 인원 → 직원 수', String(r.employeeCount).includes('2') || String(r.employeeCount).includes('1'), String(r.employeeCount))
+  check('명부: 고용지원금 명부 진단이 저절로 붙음', (r.toolResults ?? []).some((t) => t.toolKey === 'employment' && t.title === '4대보험 명부 진단'))
+  check('명부: 주민등록번호 뒷자리를 남기지 않음', !JSON.stringify(r).includes('1234567') || !JSON.stringify(r.toolResults).includes('1234567'))
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(400)
+  check('올린 뒤: 맞춤 추천 탭으로', (await page.getByRole('tab', { name: /맞춤 추천/, selected: true }).count()) === 1)
+  const batch = (await page.getByTestId('smart-batch').innerText()) ?? ''
+  check('맞춤 추천: 방금 올린 서류 — 바로 넣은 정보 · 명부 진단', batch.includes('바로 넣은 정보') && batch.includes('사업자등록번호') && batch.includes('4대보험 명부'), batch.slice(0, 400))
+  const ins = await page.getByTestId('smart-insight').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-key')}:${e.getAttribute('data-tone')}`))
+  check('모듈별 판정: 정책자금 · 고용지원금 · 창업감면 · 지원사업 …', ['policy-funding', 'employment', 'startup-tax', 'grants'].every((k) => ins.some((x) => x.startsWith(k + ':'))), ins.join())
+  check('모듈별 판정: 정책자금은 서류만으로 판정(정보 부족 아님)', ins.some((x) => x.startsWith('policy-funding:') && !x.endsWith(':need')), ins.join())
+  check('모듈별 판정: 고용지원금은 명부로 판정', ins.some((x) => x.startsWith('employment:') && !x.endsWith(':need')), ins.join())
+  check('다음 행동 추천이 있다', (await page.getByTestId('smart-step').count()) >= 1)
+  await page.getByTestId('smart-step-next').first().click()
+  await page.waitForTimeout(600)
+  const r2 = await rec()
+  check('다음 행동 → 다음 약속으로 한 번에', r2.nextAction !== r.nextAction && r2.nextActionDueDate !== '', `${r2.nextAction} ${r2.nextActionDueDate}`)
+
+  // 다른 값이 있으면 덮지 않고 묻는다(사진 · 다른 주소)
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  const before = (await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((x) => x.id === 'cli_hansol'))).businessNumber
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([{ ...BIZ, name: '한솔-사업자등록증.txt', buffer: Buffer.from(BIZ.buffer.toString('utf8').replace('미래바이오랩', '한솔테크(주)'), 'utf8') }])
+  await page.getByTestId('smart-batch').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(600)
+  const after = (await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((x) => x.id === 'cli_hansol'))).businessNumber
+  check('다른 값: 이미 적힌 사업자번호(123-45-67890)는 덮지 않음', after === before && before === '123-45-67890', `${before} → ${after}`)
+  const notes = await page.getByTestId('fact-note').allInnerTexts()
+  check('다른 값: 확인할 정보에 "지금 적힌 값과 달라요" 표시', notes.some((t) => t.includes('지금 적힌 값과 달라요')), notes.join(' | '))
+  check('D-144 오류 0', errors.length === 0, errors.join(' | '))
   await ctx.close()
 }
 

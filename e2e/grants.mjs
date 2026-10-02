@@ -180,8 +180,9 @@ let finderLink = ''
   await page.keyboard.press('Escape')
 
   // 업체 상세
-  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
-  await page.waitForTimeout(600)
+  // D-144: 맞는 지원사업 카드는 '맞춤 추천' 탭으로
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(1200)
   const card = (await page.getByTestId('detail-grants').count()) ? await page.getByTestId('detail-grants').innerText() : ''
   check('업체 상세: 맞는 지원사업 카드', /조건 맞음 1건/.test(card) && /스마트공장/.test(card), card)
 
@@ -372,8 +373,9 @@ function feedItems(n) {
   await page.waitForTimeout(600)
   check('영업 보드: 잠재고객 카드에 맞는 지원사업', (await page.getByTestId('sales-card-grants').count()) >= 1, await page.getByTestId('sales-card-grants').count())
 
-  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
-  await page.waitForTimeout(600)
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(1200)
+  check('맞춤 추천: 지원사업 판정 — 맞는 지원사업 N건', /맞는 지원사업 \d+건/.test((await page.locator('[data-testid="smart-insight"][data-key="grants"]').innerText().catch(() => '')) ?? ''))
   check('업체 상세: 맞는 지원사업 카드에 기업마당 공고', (await page.getByTestId('detail-grants').innerText()).includes('파주시 제조기업 스마트 전환'))
 
   // 오늘 — '지금 이것부터' 없음, 다가오는 마감 · 약속

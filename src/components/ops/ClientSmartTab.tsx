@@ -193,7 +193,7 @@ function BatchSummary({ batch }: { batch: DocBatchSummary }) {
             {batch.entered.map((f, i) => (
               <li key={`${f.key}-${i}`} className="t-sub flex flex-wrap items-baseline gap-x-2 break-keep">
                 <Check aria-hidden="true" className="size-4 shrink-0 self-center text-success-600" />
-                <span className="w-24 shrink-0 text-slate-500">{f.label}</span>
+                <span className="w-28 shrink-0 text-slate-500">{f.label}</span>
                 <span className="min-w-0 font-semibold text-slate-900 [overflow-wrap:anywhere]">{f.display}</span>
                 <span className="t-meta text-slate-400">{f.fileName}</span>
               </li>
@@ -208,7 +208,7 @@ function BatchSummary({ batch }: { batch: DocBatchSummary }) {
             {batch.flagged.map((f, i) => (
               <li key={`${f.key}-${i}`} className="t-sub flex flex-wrap items-baseline gap-x-2 break-keep">
                 <CircleAlert aria-hidden="true" className="size-4 shrink-0 self-center text-warning-600" />
-                <span className="w-24 shrink-0 text-slate-500">{f.label}</span>
+                <span className="w-28 shrink-0 text-slate-500">{f.label}</span>
                 <span className="min-w-0 font-semibold text-slate-900 [overflow-wrap:anywhere]">{f.display}</span>
                 <span className="text-warning-800">{f.note}</span>
               </li>
