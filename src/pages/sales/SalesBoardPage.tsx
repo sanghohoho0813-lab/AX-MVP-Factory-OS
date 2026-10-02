@@ -14,7 +14,8 @@ import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-do
 import { fromState } from '../../lib/navFrom'
 import { useQueryInUrl } from '../../lib/useQueryInUrl'
 import { CallButton } from '../../components/ops/opsControls'
-import { ChevronRight, CirclePlus, KanbanSquare, Presentation, ScanSearch, Search } from 'lucide-react'
+import { BellRing, ChevronRight, CirclePlus, KanbanSquare, Presentation, ScanSearch, Search } from 'lucide-react'
+import { useClientGrantSummaries, type ClientGrantSummary } from '../../components/grants/useGrants'
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useToast } from '../../components/ui/toastContext'
 import { Badge, Disclosure, MetricTile, ScreenTitle } from '../../components/ui/primitives'
@@ -78,7 +79,7 @@ function StageSelect({ record, onMove }: { record: ClientOpsRecord; onMove: (r: 
 }
 
 /** 보드 카드 한 장 — 이름 · 누구 · 어디서 왔나 · 예상 수임료 · 머문 날 · 다음 할 일 */
-function SalesCard({ record, today, onOpen, onMove }: { record: ClientOpsRecord; today: string; onOpen: () => void; onMove: (r: ClientOpsRecord, s: SalesStage) => void }) {
+function SalesCard({ record, today, grants, onOpen, onMove }: { record: ClientOpsRecord; today: string; grants?: ClientGrantSummary; onOpen: () => void; onMove: (r: ClientOpsRecord, s: SalesStage) => void }) {
   const s = record.sales
   const stage = salesStageOf(record)
   const days = daysInStage(record)
@@ -109,6 +110,13 @@ function SalesCard({ record, today, onOpen, onMove }: { record: ClientOpsRecord;
           <span className={overdue ? 'font-semibold text-danger-700' : ''}>다음 {record.nextActionDueDate.slice(5).replace('-', '.')}</span>
         )}
       </p>
+      {/* D-143: 연락할 이유 — 이 회사 지역 · 업력 · 업종에 맞는 지원사업 */}
+      {grants && grants.fit > 0 && (
+        <Link to={`/grants?view=clients&client=${record.id}`} data-testid="sales-card-grants" className="tap t-meta inline-flex items-center gap-1 self-start px-1 font-semibold text-success-700 hover:underline">
+          <BellRing aria-hidden="true" className="size-3.5" />
+          맞는 지원사업 {grants.fit}건{grants.urgentFit > 0 ? ` · 7일 안 ${grants.urgentFit}` : ''}
+        </Link>
+      )}
       <StageSelect record={record} onMove={onMove} />
       {/* D-122: 아이콘만 두지 않는다 — '미팅 준비' 글자로 */}
       {!QUIET_STAGES.includes(stage) && (
@@ -209,6 +217,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
   const { showToast } = useToast()
   const today = todayLocalDate()
   const [records, setRecords] = useState<ClientOpsRecord[]>([])
+  const grantSums = useClientGrantSummaries(workspaceId, records, today)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   // D-119: 크레탑 등록 화면의 '크레탑 없이 직접 입력' → ?new=1 로 들어오면 바로 연다
@@ -400,7 +409,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
       ) : (
         <ul className={`grid gap-2 ${stage === 'hold' || stage === 'lost' ? 'sm:grid-cols-2 2xl:grid-cols-3' : ''}`}>
           {list.map((r) => (
-            <SalesCard key={r.id} record={r} today={today} onOpen={() => open(r)} onMove={(rec, s) => void move(rec, s)} />
+            <SalesCard key={r.id} record={r} today={today} grants={grantSums.get(r.id)} onOpen={() => open(r)} onMove={(rec, s) => void move(rec, s)} />
           ))}
         </ul>
       )}
@@ -554,7 +563,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
             ) : (
               <ul className="grid gap-2 sm:grid-cols-2">
                 {groups[picked].map((r) => (
-                  <SalesCard key={r.id} record={r} today={today} onOpen={() => open(r)} onMove={(rec, s) => void move(rec, s)} />
+                  <SalesCard key={r.id} record={r} today={today} grants={grantSums.get(r.id)} onOpen={() => open(r)} onMove={(rec, s) => void move(rec, s)} />
                 ))}
               </ul>
             )}

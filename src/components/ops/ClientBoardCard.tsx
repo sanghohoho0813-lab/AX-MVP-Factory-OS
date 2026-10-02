@@ -15,7 +15,7 @@
  */
 
 import { useState } from 'react'
-import { ArrowRight, ChevronRight, FileUp } from 'lucide-react'
+import { ArrowRight, BellRing, ChevronRight, FileUp } from 'lucide-react'
 import { CONTRACT_KIND_LABEL, CONTRACT_STAGE_LABEL, SALES_STAGE_LABEL, contractStageOf } from '../../types/clientOps'
 import { salesStageOf } from '../../services/salesPipeline'
 import { formatNumberOf } from '../../lib/format'
@@ -134,7 +134,12 @@ export function ClientBoardCard({
   onMoney,
   onBulkDocs,
   hit = null,
+  grants = null,
+  onGrants,
 }: {
+  /** D-143: 이 업체 지역 · 업력 · 업종에 맞는 지원사업(접수 중) — 0이면 그리지 않는다 */
+  grants?: { fit: number; urgentFit: number } | null
+  onGrants?: () => void
   record: ClientOpsRecord
   /** 검색이 회사명이 아닌 칸에서 맞았을 때 — 왜 나왔는지 한 줄 (D-80) */
   hit?: { label: string; value: string } | null
@@ -266,6 +271,18 @@ export function ClientBoardCard({
             <span className="font-medium">{hit.label}</span>
             <span className="font-semibold break-all">{hit.value}</span>
           </p>
+        )}
+        {grants && grants.fit > 0 && onGrants && (
+          <button
+            type="button"
+            onClick={onGrants}
+            data-testid="client-card-grants"
+            className="tap t-sub inline-flex items-center gap-1.5 self-start font-semibold text-success-700 hover:underline"
+          >
+            <BellRing aria-hidden="true" className="size-4 shrink-0" />
+            맞는 지원사업 {grants.fit}건
+            {grants.urgentFit > 0 && <span className="text-danger-700">· 7일 안 마감 {grants.urgentFit}</span>}
+          </button>
         )}
         {/* 회사 요약 — 대표자·업력은 진하게, 지역·업종은 흐리게, 사업자번호는 숫자 그대로 */}
         {(strongMeta.length > 0 || mutedMeta.length > 0 || bizNo !== '') && (

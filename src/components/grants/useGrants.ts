@@ -9,7 +9,8 @@ import { listNotices, listSent, recordSent, type SentChannel, type SentRecord } 
 import type { GrantMatch, GrantNotice } from '../../services/grants/grantMatch'
 import { noticeMessage, shareMessage } from '../../services/grants/grantText'
 import { profileLine } from '../../services/grants/grantProfile'
-import { copyText, finderLink, type GrantClient } from '../../services/grants/grantView'
+import { copyText, finderLink, fitSummary, grantClients, grantIndex, type GrantClient } from '../../services/grants/grantView'
+import type { ClientOpsRecord } from '../../types/clientOps'
 import { mergeNotices, useGrantFeed } from '../../services/grants/grantFeed'
 import type { PortalClientLink } from '../../types/bridge'
 
@@ -40,6 +41,44 @@ export function useGrantData(workspaceId: string | null) {
   const feed = useGrantFeed()
   const all = useMemo(() => mergeNotices(notices, feed.notices), [notices, feed.notices])
   return { notices: all, manualNotices: notices, setNotices, sent, setSent, links, linkOf, loaded, error, reload, feed }
+}
+
+export interface ClientGrantSummary {
+  fit: number
+  check: number
+  urgentFit: number
+}
+
+/**
+ * 고객 관리 · 영업 보드 · 미팅 준비 — 업체마다 '맞는 지원사업 N건' (D-143).
+ * 공고는 같은 저장소(기업마당 하루 한 번 + 직접 넣은 공고)에서, 업체 × 공고 계산은 한 번만.
+ */
+export function useClientGrantSummaries(workspaceId: string | null, records: readonly ClientOpsRecord[], today: string): Map<string, ClientGrantSummary> {
+  const [manual, setManual] = useState<GrantNotice[]>([])
+  useEffect(() => {
+    let alive = true
+    listNotices(workspaceId)
+      .then((n) => alive && setManual(n))
+      .catch(() => {
+        // 직접 넣은 공고를 못 읽어도 기업마당 공고로 센다
+      })
+    return () => {
+      alive = false
+    }
+  }, [workspaceId])
+  const feed = useGrantFeed()
+  const notices = useMemo(() => mergeNotices(manual, feed.notices), [manual, feed.notices])
+  const clients = useMemo(() => grantClients(records as ClientOpsRecord[], today), [records, today])
+  return useMemo(() => {
+    const out = new Map<string, ClientGrantSummary>()
+    if (notices.length === 0 || clients.length === 0) return out
+    const index = grantIndex(notices, clients, today)
+    for (const [id, ms] of index.byClient) {
+      const s = fitSummary(ms)
+      out.set(id, { fit: s.fit, check: s.check, urgentFit: s.urgentFit })
+    }
+    return out
+  }, [notices, clients, today])
 }
 
 const md = (ymd: string) => (ymd ? `${Number(ymd.slice(5, 7))}월 ${Number(ymd.slice(8, 10))}일` : '')

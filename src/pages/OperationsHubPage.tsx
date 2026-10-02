@@ -75,6 +75,7 @@ import { useToast } from '../components/ui/toastContext'
 import { Modal } from '../components/ui/Modal'
 import { AlertRow, SEVERITY_META } from '../components/ops/opsParts'
 import { useBackToClose } from '../lib/backToClose'
+import { useClientGrantSummaries } from '../components/grants/useGrants'
 
 type ClientSegment = 'contract' | 'prospect' | 'all'
 const SEGMENTS: { key: ClientSegment; label: string }[] = [
@@ -153,6 +154,8 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const restoreRef = useRef<HTMLInputElement>(null)
 
   const today = todayLocalDate()
+  // D-143: 업체마다 맞는 지원사업 수 — 기업마당 공고는 한 번 받아 모든 화면이 같이 쓴다
+  const grantSums = useClientGrantSummaries(workspaceId, records, today)
 
   const load = useCallback(async () => {
     try {
@@ -766,6 +769,8 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                   onMoney={() => setQuick({ id: record.id, kind: 'money' })}
                   onBulkDocs={() => setBulkDocsFor(record.id)}
                   hit={query.trim() !== '' ? searchHit(record, query) : null}
+                  grants={grantSums.get(record.id) ?? null}
+                  onGrants={() => navigate(`/grants?view=clients&client=${record.id}`)}
                 />
               )
             })}

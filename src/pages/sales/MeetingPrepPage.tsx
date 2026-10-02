@@ -15,6 +15,7 @@
  * 모두 규칙 계산이다(LLM 호출 없음). 'AX 1차 미팅 체크리스트'(/sales/first-meeting) 자리와는 따로다.
  */
 
+import { MeetingGrantTalk } from '../../components/grants/MeetingGrantTalk'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { fromState } from '../../lib/navFrom'
@@ -781,6 +782,9 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                   </ul>
                 </Disclosure>
               )}
+
+              {/* D-143: 이 회사에 맞는 지원사업 — 미팅에서 꺼낼 거리 · 연락할 이유 */}
+              <MeetingGrantTalk workspaceId={workspaceId} record={record} today={today} />
 
               <KakaoGroup item={item} record={record} />
             </>

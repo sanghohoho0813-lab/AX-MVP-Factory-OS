@@ -292,6 +292,133 @@ let finderLink = ''
   await ctx.close()
 }
 
+/* ---------------- D-143 기업마당 받아오기(서버 함수 흉내) ---------------- */
+const ymd8 = (offset) => kst(offset).replace(/-/g, '')
+function feedItems(n) {
+  const items = [
+    { pblancId: 'PBLN_P1', pblancNm: '2026 파주시 제조기업 스마트 전환 지원', jrsdInsttNm: '경기도 파주시', excInsttNm: '파주시 기업지원과', reqstBeginEndDe: `${ymd8(-5)} ~ ${ymd8(5)}`, pldirSportRealmLclasCodeNm: '기술', trgetNm: '파주시 소재 제조업 중소기업', bsnsSumryCn: '스마트 설비 도입 비용 지원', pblancUrl: 'https://www.bizinfo.go.kr/x?pblancId=PBLN_P1', hashtags: '제조,파주', creatPnttm: '' },
+    { pblancId: 'PBLN_B1', pblancNm: '2026 부산 해양기업 판로 지원', jrsdInsttNm: '부산광역시', excInsttNm: '', reqstBeginEndDe: `${ymd8(-5)} ~ ${ymd8(9)}`, pldirSportRealmLclasCodeNm: '내수', trgetNm: '부산 소재 중소기업', bsnsSumryCn: '', pblancUrl: '', hashtags: '부산', creatPnttm: '' },
+    { pblancId: 'PBLN_Y1', pblancNm: '2026 예비창업패키지 모집', jrsdInsttNm: '중소벤처기업부', excInsttNm: '', reqstBeginEndDe: `${ymd8(-5)} ~ ${ymd8(9)}`, pldirSportRealmLclasCodeNm: '창업', trgetNm: '예비창업자(사업자 등록이 없는 자)', bsnsSumryCn: '', pblancUrl: '', hashtags: '', creatPnttm: '' },
+  ]
+  for (let i = items.length; i < n; i += 1)
+    items.push({ pblancId: `PBLN_G${i}`, pblancNm: `2026 전국 공통 지원사업 ${String(i).padStart(3, '0')}`, jrsdInsttNm: '중소벤처기업부', excInsttNm: '', reqstBeginEndDe: `${ymd8(-3)} ~ ${ymd8(10 + (i % 20))}`, pldirSportRealmLclasCodeNm: '경영', trgetNm: '중소기업', bsnsSumryCn: '', pblancUrl: '', hashtags: '', creatPnttm: '' })
+  return items
+}
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  const calls = []
+  let size = 120
+  await page.route('**/api/grants-feed*', (route) => {
+    const u = new URL(route.request().url())
+    calls.push(u.search)
+    const items = feedItems(size)
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ fetchedAt: new Date().toISOString(), count: items.length, items }) })
+  })
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(prepClients)
+  await page.goto(BASE + '/grants', { waitUntil: 'networkidle' })
+  await page.getByTestId('grant-feed').waitFor()
+  await page.waitForTimeout(500)
+  check('기업마당: 받은 공고 수 · 다음 자동 갱신 9시', /기업마당 공고 120건/.test(await page.getByTestId('grant-feed').innerText()) && /매일 아침 9시/.test(await page.getByTestId('grant-feed').innerText()), await page.getByTestId('grant-feed').innerText())
+  check('기업마당: 9시 칸(slot)을 붙여 부른다 — 캐시 키', calls.length === 1 && /slot=\d{4}-\d{2}-\d{2}/.test(calls[0]), calls)
+  check('1,000건 대비: 처음엔 50개만 · 더 보기', (await page.getByTestId('grant-row').count()) === 50 && (await page.getByTestId('grant-more').count()) === 1)
+  await page.getByTestId('grant-more').click()
+  await page.waitForTimeout(200)
+  check('더 보기 → 150개까지(남은 것 모두 120)', (await page.getByTestId('grant-row').count()) === 120)
+  await page.getByTestId('grant-search').fill('파주')
+  await page.waitForTimeout(300)
+  const pajuRow = page.getByTestId('grant-row').filter({ hasText: '파주시 제조기업 스마트 전환' })
+  check('찾기: 공고 이름으로 거름', (await page.getByTestId('grant-row').count()) === 1 && (await pajuRow.count()) === 1)
+  check('맞춤: 파주 · 제조 업체 2곳에 맞음(지역 · 업종)', /맞는 업체 2곳/.test(await pajuRow.innerText()), await pajuRow.innerText())
+  await page.getByTestId('grant-search').fill('전국 공통 지원사업 010')
+  await page.waitForTimeout(300)
+  check('전국 공통: 업체 조건 없는 공고는 맞는 업체로 세지 않음', /전국 공통 · 누구나/.test(await page.getByTestId('grant-row').first().innerText()))
+  await page.getByTestId('grant-search').fill('부산 해양')
+  await page.waitForTimeout(300)
+  check('지역: 부산 공고는 경기 업체에 안 맞음', /맞는 업체 없음/.test(await page.getByTestId('grant-row').first().innerText()))
+  await page.getByTestId('grant-search').fill('파주')
+  await page.waitForTimeout(200)
+  await pajuRow.click()
+  await page.getByTestId('notice-sheet').waitFor()
+  check('기업마당 공고: 고치기 · 지우기 없음(매일 새로 받음)', (await page.getByTestId('notice-feed-note').count()) === 1 && (await page.getByTestId('notice-edit').count()) === 0)
+  check('기업마당 공고: 맞는 업체 2곳(+확인 필요) · 업체마다 카톡 문구', /맞는 업체 2곳/.test(await page.getByTestId('notice-reach').innerText()) && (await page.getByTestId('notice-copy').count()) === (await page.getByTestId('notice-client').count()), await page.getByTestId('notice-reach').innerText())
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+
+  // 지금 새로 가져오기 — 캐시 없이 바로
+  size = 130
+  await page.getByTestId('grant-feed-refresh').click()
+  await page.waitForTimeout(800)
+  check('지금 새로 가져오기: fresh 로 한 번 더 부름 · 130건', calls.length === 2 && /fresh=/.test(calls[1]) && /기업마당 공고 130건/.test(await page.getByTestId('grant-feed').innerText()), { calls, t: await page.getByTestId('grant-feed').innerText() })
+
+  // 다른 화면 — 다시 받지 않는다(같은 9시 칸이면 저장된 것)
+  await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  const cardGrant = page.getByTestId('client-card-grants')
+  check('고객 관리: 업체 카드에 맞는 지원사업 N건', (await cardGrant.count()) >= 2, await cardGrant.count())
+  check('고객 관리: 다시 받지 않음(같은 9시 칸)', calls.length === 2, calls)
+  await cardGrant.first().click()
+  await page.waitForURL(/\/grants\?view=clients&client=/)
+  await page.getByTestId('client-sheet').waitFor()
+  check('고객 관리 → 지원사업 알림 업체 창', (await page.getByTestId('client-grants-count').innerText()).includes('조건 맞음'))
+  check('업체 창: 전국 공통은 접어 둠', (await page.getByTestId('client-grants-general').count()) === 1 && /전국 공통 공고 \d+건 보기/.test(await page.getByTestId('client-grants-general').innerText()))
+  check('업체 창: 예비창업자 전용 공고는 안 나옴', !(await page.getByTestId('client-sheet').innerText()).includes('예비창업패키지'))
+
+  await page.goto(BASE + '/sales/board', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  check('영업 보드: 잠재고객 카드에 맞는 지원사업', (await page.getByTestId('sales-card-grants').count()) >= 1, await page.getByTestId('sales-card-grants').count())
+
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  check('업체 상세: 맞는 지원사업 카드에 기업마당 공고', (await page.getByTestId('detail-grants').innerText()).includes('파주시 제조기업 스마트 전환'))
+
+  // 오늘 — '지금 이것부터' 없음, 다가오는 마감 · 약속
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  check('오늘: 지금 이것부터 없음', (await page.getByRole('heading', { name: /지금 이것부터/ }).count()) === 0)
+  check('오늘: 다가오는 마감 · 약속', (await page.getByRole('heading', { name: /다가오는 마감 · 약속/ }).count()) === 1)
+  const agendaText = await page.getByTestId('today-agenda').innerText()
+  check('오늘: 막연한 문구 없음(다음 할 일이 비어 있습니다 등)', !/비어 ?있습니다|이유:/.test(agendaText), agendaText.slice(0, 200))
+  const ar = page.getByTestId('agenda-row')
+  if ((await ar.count()) > 1) {
+    const labels = await ar.evaluateAll((els) => els.map((e) => e.querySelector('.t-meta')?.textContent ?? ''))
+    check('오늘: 다가오는 일은 날짜 순', labels.length > 0, labels)
+  }
+  check('오늘: 지원사업 알림(7일 안 · 맞는 업체 · 아직 안 알림)', (await page.getByTestId('today-grants').innerText()).includes('파주시 제조기업 스마트 전환'))
+  check('기업마당: 여러 화면 돌아도 부른 횟수 2(처음 + 지금 새로)', calls.length === 2, calls)
+
+  // 찾기(가망고객) — 기업마당 공고도 · 꼭 맞는 것 먼저 · 전국 공통 접힘
+  await page.goto(BASE + '/grants/find?r=%EA%B2%BD%EA%B8%B0&c=%ED%8C%8C%EC%A3%BC%EC%8B%9C&i=%EC%A0%9C%EC%A1%B0%EC%97%85&y=3-6', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  const frows = await page.getByTestId('finder-row').allInnerTexts()
+  check('찾기: 꼭 맞는 것만 위에(파주 제조)', frows.length >= 1 && frows.some((t) => t.includes('파주시 제조기업 스마트 전환')) && !frows.some((t) => t.includes('전국 공통 지원사업')), frows.slice(0, 5))
+  check('찾기: 전국 공통은 접어 둠', /전국 공통 사업 \d+개 보기/.test(await page.getByTestId('finder-general').innerText()))
+  check('찾기: 예비창업자 전용 · 부산 공고 안 나옴', !(await page.locator('main').innerText()).includes('예비창업패키지') && !(await page.locator('main').innerText()).includes('부산 해양'))
+  check('기업마당 화면 오류 0', errors.length === 0, errors)
+  await ctx.close()
+}
+{
+  // 키가 없을 때 — 이유를 쉬운 말로 · 화면은 직접 넣은 공고로 돈다
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.route('**/api/grants-feed*', (route) => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'no_key' }) }))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.goto(BASE + '/grants', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  check('키 없음: 무엇을 넣어야 하는지 알려 줌', /BIZINFO_API_KEY/.test(await page.getByTestId('grant-feed-message').innerText()))
+  check('키 없음: 공고 넣기 · 예시는 그대로', (await page.getByTestId('grant-add-open').count()) === 1)
+  check('390: 받아오기 줄 · 단추 화면 안 · 넘침 0', (await overflowX(page)) <= 0 && ((await page.getByTestId('grant-feed-refresh').boundingBox())?.height ?? 0) >= 44)
+  check('키 없음: 오류 0', errors.length === 0, errors)
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\ngrants e2e: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
