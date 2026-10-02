@@ -10,7 +10,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { BellRing, Link2, Plus } from 'lucide-react'
+import { BellRing, Link2, Plus, Search } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { useToast } from '../components/ui/toastContext'
 import { Button } from '../components/ui/Button'
@@ -18,23 +18,28 @@ import { Blank, BottomSheet, ScreenTitle } from '../components/ui/primitives'
 import { AddNoticeSheet, CategoryChips, NoticeRow } from '../components/grants/GrantParts'
 import { ClientGrantPanel, NoticeSheet } from '../components/grants/GrantSheets'
 import { useGrantActions, useGrantData } from '../components/grants/useGrants'
+import { GrantFeedBar } from '../components/grants/GrantFeedBar'
+import { isFeedNotice } from '../services/grants/grantFeed'
 import { listClients } from '../services/clientOpsService'
 import { todayLocalDate } from '../lib/appClock'
 import type { ClientOpsRecord } from '../types/clientOps'
-import { SIDO_LIST, deadlineOf, deadlineRank, inRegion, matchesFor, type GrantCategory, type GrantNotice } from '../services/grants/grantMatch'
+import { SIDO_LIST, deadlineOf, deadlineRank, inRegion, targetsSomeone, type GrantCategory, type GrantMatch, type GrantNotice } from '../services/grants/grantMatch'
 import { exampleNotices } from '../services/grants/grantExamples'
 import { addNotices, removeNotice, saveNotice, sentAt } from '../services/grants/grantStore'
-import { CLIENT_KIND_LABEL, clientsForNotice, grantClients, reachOf, type GrantClient, type NoticeInput } from '../services/grants/grantView'
+import { CLIENT_KIND_LABEL, clientsForNotice, fitSummary, grantClients, grantIndex, reachOf, type GrantClient, type NoticeInput } from '../services/grants/grantView'
 import { profileLine } from '../services/grants/grantProfile'
 
 type View = 'notices' | 'clients'
+
+/** 한 번에 보여 줄 공고 수 — 1,000건도 화면이 무겁지 않게 '더 보기' 로 이어 본다 */
+const PAGE = 50
 
 function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
   const today = todayLocalDate()
   const navigate = useNavigate()
   const { showToast } = useToast()
   const [params, setParams] = useSearchParams()
-  const { notices, setNotices, sent, setSent, linkOf, loaded, error, reload } = useGrantData(workspaceId)
+  const { notices, setNotices, sent, setSent, linkOf, loaded, error, reload, feed } = useGrantData(workspaceId)
   const actions = useGrantActions({ workspaceId, setSent, linkOf, toast: showToast })
   const [records, setRecords] = useState<ClientOpsRecord[]>([])
   const [loadError, setLoadError] = useState('')
@@ -50,6 +55,8 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
   const [onlyReach, setOnlyReach] = useState(false)
   const [kindFilter, setKindFilter] = useState<'all' | 'contract' | 'prospect'>('all')
   const [showClosed, setShowClosed] = useState(false)
+  const [query, setQuery] = useState('')
+  const [paging, setPaging] = useState({ key: '', n: PAGE })
   const [openId, setOpenId] = useState(() => params.get('open') ?? '')
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<GrantNotice | null>(null)
@@ -63,7 +70,9 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
   }
 
   const clients = useMemo(() => grantClients(records, today), [records, today])
-  const reach = useMemo(() => new Map(notices.map((n) => [n.id, clientsForNotice(n, clients, today)])), [notices, clients, today])
+  // 업체 × 공고는 한 번만 계산한다(오늘 · 업체 상세 · 고객 관리가 같은 결과를 다시 쓴다)
+  const index = useMemo(() => grantIndex(notices, clients, today), [notices, clients, today])
+  const reach = index.byNotice
 
   const regional = useMemo(() => notices.filter((n) => inRegion(n, region, '')), [notices, region])
   const open = useMemo(() => regional.filter((n) => deadlineOf(n, today).state !== 'closed'), [regional, today])
@@ -78,20 +87,25 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
       open
         .filter((n) => category === 'all' || n.category === category)
         .filter((n) => !onlyReach || reachOf(reach.get(n.id) ?? []).fit > 0)
+        .filter((n) => !query.trim() || `${n.title} ${n.agency} ${n.operator} ${n.target}`.toLowerCase().includes(query.trim().toLowerCase()))
         .map((n) => ({ n, d: deadlineOf(n, today) }))
         .sort((a, b) => deadlineRank(a.d) - deadlineRank(b.d) || a.n.title.localeCompare(b.n.title))
         .map((x) => x.n),
-    [open, category, onlyReach, reach, today],
+    [open, category, onlyReach, reach, today, query],
   )
   const urgent = open.filter((n) => deadlineOf(n, today).urgent).length
+  // 거르기를 바꾸면 처음 50개부터 다시
+  const pageKey = `${category}|${onlyReach}|${region}|${query}`
+  const limit = paging.key === pageKey ? paging.n : PAGE
 
   const byClient = useMemo(
     () =>
       clients
-        .map((c) => ({ c, ms: matchesFor(notices, c.profile, today) }))
+        .map((c) => ({ c, ms: index.byClient.get(c.record.id) ?? [] }))
         .filter((x) => kindFilter === 'all' || x.c.kind === kindFilter)
-        .sort((a, b) => fitCount(b.ms) - fitCount(a.ms) || b.ms.length - a.ms.length || a.c.record.companyName.localeCompare(b.c.record.companyName)),
-    [clients, notices, today, kindFilter],
+        .map((x) => ({ ...x, sum: fitSummary(x.ms) }))
+        .sort((a, b) => b.sum.fit - a.sum.fit || b.sum.check - a.sum.check || a.c.record.companyName.localeCompare(b.c.record.companyName)),
+    [clients, index, kindFilter],
   )
 
   const saveOne = async (v: NoticeInput, id?: string) => {
@@ -121,7 +135,7 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
     <div className="flex flex-col gap-5">
       <ScreenTitle
         title="지원사업 알림"
-        sub={`공고 ${notices.length}개 · 접수 중 ${open.length}개 · 7일 안에 마감 ${urgent}개`}
+        sub={`공고 ${notices.length.toLocaleString()}개 · 접수 중 ${open.length.toLocaleString()}개 · 7일 안에 마감 ${urgent}개`}
         actions={
           <>
             <Button variant="primary" onClick={() => setAdding(true)} data-testid="grant-add-open">
@@ -139,6 +153,8 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
           {error || loadError}
         </p>
       )}
+
+      <GrantFeedBar feed={feed} onRefresh={() => void feed.refresh()} />
 
       <div role="tablist" className="flex max-w-md rounded-(--radius-control) border border-slate-200 bg-slate-50 p-0.5">
         {(
@@ -171,6 +187,18 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
               에서 접수 중인 지원사업 <span className="text-brand-700">{open.length}개</span>
             </h2>
             <CategoryChips value={category} counts={counts} onChange={setCategory} />
+            <label className="relative flex max-w-md items-center">
+              <span className="sr-only">공고 찾기</span>
+              <Search aria-hidden="true" className="pointer-events-none absolute left-3 size-4 text-slate-400" />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="공고 이름 · 기관으로 찾기"
+                data-testid="grant-search"
+                className="t-body w-full rounded-(--radius-control) border border-slate-300 bg-white py-2.5 pr-3 pl-9 focus:border-brand-500 focus:outline-none"
+              />
+            </label>
             <label className="tap t-sub inline-flex items-center gap-2 self-start text-slate-700">
               <input type="checkbox" checked={onlyReach} onChange={(e) => setOnlyReach(e.target.checked)} className="size-5 accent-brand-600" data-testid="grant-only-reach" />
               맞는 업체가 있는 공고만
@@ -196,7 +224,7 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
             <Blank title={open.length === 0 ? '접수 중인 공고가 없습니다.' : '이 조건에 맞는 공고가 없습니다.'} />
           ) : (
             <ul className="flex flex-col divide-y divide-slate-100 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="grant-list">
-              {listed.map((n) => {
+              {listed.slice(0, limit).map((n) => {
                 const r = reachOf(reach.get(n.id) ?? [])
                 return (
                   <NoticeRow
@@ -210,6 +238,8 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
                           <span className="font-semibold text-success-700">
                             맞는 업체 {r.fit}곳{r.contract && r.prospect ? ` (계약 ${r.contract} · 잠재 ${r.prospect})` : r.prospect ? ' (잠재고객)' : ''}
                           </span>
+                        ) : r.check === 0 && !targetsSomeone(n.rules) ? (
+                          <span className="text-brand-700">전국 공통 · 누구나</span>
                         ) : (
                           <span className="text-slate-400">맞는 업체 없음</span>
                         )}
@@ -220,6 +250,11 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
                 )
               })}
             </ul>
+          )}
+          {listed.length > limit && (
+            <Button variant="secondary" onClick={() => setPaging({ key: pageKey, n: limit + PAGE * 2 })} data-testid="grant-more" className="self-center">
+              더 보기 (남은 {(listed.length - limit).toLocaleString()}개)
+            </Button>
           )}
 
           {closed.length > 0 && (
@@ -261,9 +296,9 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
             <Blank title="업체가 없습니다." />
           ) : (
             <ul className="flex flex-col divide-y divide-slate-100 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="grant-client-list">
-              {byClient.map(({ c, ms }) => {
-                const fit = fitCount(ms)
-                const hot = ms.filter((m) => m.verdict === 'fit' && m.deadline.urgent).length
+              {byClient.map(({ c, sum }) => {
+                const fit = sum.fit
+                const hot = sum.urgentFit
                 const last = sent.find((s) => s.clientId === c.record.id)?.at ?? ''
                 return (
                   <li key={c.record.id}>
@@ -280,7 +315,7 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
                         <span className={`t-body font-semibold tabular-nums ${fit > 0 ? 'text-success-700' : 'text-slate-400'}`} data-testid="grant-client-fit">
                           맞음 {fit}
                         </span>
-                        {hot > 0 ? <span className="t-meta font-semibold text-danger-700">7일 안 마감 {hot}</span> : ms.length - fit > 0 ? <span className="t-meta text-warning-800">확인 {ms.length - fit}</span> : null}
+                        {hot > 0 ? <span className="t-meta font-semibold text-danger-700">7일 안 마감 {hot}</span> : sum.check > 0 ? <span className="t-meta text-warning-800">확인 {sum.check}</span> : null}
                       </span>
                     </button>
                   </li>
@@ -300,6 +335,7 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
           linked={(cid) => linkOf(cid) !== null}
           onCopy={(x) => void actions.copyNotice(x.client, x.match)}
           onPortal={(x) => void actions.toPortal(x.client, [x.match])}
+          readOnly={isFeedNotice(current)}
           onEdit={() => {
             setEditing(current)
             setOpenId('')
@@ -323,7 +359,7 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
       {currentClient && (
         <ClientSheet
           client={currentClient}
-          matches={matchesFor(notices, currentClient.profile, today)}
+          matches={index.byClient.get(currentClient.record.id) ?? []}
           sentOf={sentForClient(currentClient.record.id)}
           linked={linkOf(currentClient.record.id) !== null}
           actions={actions}
@@ -363,7 +399,7 @@ function ClientSheet({
   onClose,
 }: {
   client: GrantClient
-  matches: ReturnType<typeof matchesFor>
+  matches: GrantMatch[]
   sentOf: (noticeId: string) => string
   linked: boolean
   actions: ReturnType<typeof useGrantActions>
@@ -380,9 +416,9 @@ function ClientSheet({
           matches={matches}
           sentOf={sentOf}
           linked={linked}
-          onCopyAll={() => void actions.copyAll(client, matches)}
+          onCopyAll={() => void actions.copyAll(client, matches.filter((m) => m.verdict !== 'general'))}
           onCopyLink={() => void actions.copyLink(client)}
-          onPortal={() => void actions.toPortal(client, matches)}
+          onPortal={() => void actions.toPortal(client, matches.filter((m) => m.verdict !== 'general'))}
           onPick={(m) => onPick(m.notice.id)}
           onFill={onDetail}
         />
@@ -392,10 +428,6 @@ function ClientSheet({
       </div>
     </BottomSheet>
   )
-}
-
-function fitCount(ms: { verdict: string }[]): number {
-  return ms.filter((m) => m.verdict === 'fit').length
 }
 
 export default function GrantsPage() {

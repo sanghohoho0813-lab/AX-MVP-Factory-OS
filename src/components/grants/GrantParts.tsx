@@ -30,6 +30,7 @@ import {
 } from '../../services/grants/grantMatch'
 import { parseBizinfoJson, parseNoticeText } from '../../services/grants/grantText'
 import { emptyNotice, type NoticeInput } from '../../services/grants/grantView'
+import { isFeedNotice } from '../../services/grants/grantFeed'
 import { GRANT_SOURCE_LABEL } from '../../services/grants/grantMatch'
 
 /* ------------------------------------------------------------------ */
@@ -51,7 +52,14 @@ export function DeadlineText({ d }: { d: Deadline }) {
 }
 
 export function VerdictBadge({ v }: { v: Verdict }) {
-  const cls = v === 'fit' ? 'border-success-200 bg-success-50 text-success-700' : v === 'check' ? 'border-warning-200 bg-warning-50 text-warning-800' : 'border-slate-200 bg-slate-50 text-slate-500'
+  const cls =
+    v === 'fit'
+      ? 'border-success-200 bg-success-50 text-success-700'
+      : v === 'check'
+        ? 'border-warning-200 bg-warning-50 text-warning-800'
+        : v === 'general'
+          ? 'border-brand-200 bg-brand-50 text-brand-700'
+          : 'border-slate-200 bg-slate-50 text-slate-500'
   return (
     <span data-testid="grant-verdict" data-verdict={v} className={`t-meta inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-semibold whitespace-nowrap ${cls}`}>
       {VERDICT_LABEL[v]}
@@ -431,7 +439,11 @@ export function NoticeRow({ notice, today, extra, onOpen }: { notice: GrantNotic
           <span className="t-sub flex flex-wrap items-center gap-x-2 gap-y-0.5 text-slate-500">
             <span className="break-keep">{notice.agency || '소관 미기재'}</span>
             {notice.source === 'example' && <span className="t-meta rounded border border-slate-300 px-1.5 font-semibold text-slate-500">{GRANT_SOURCE_LABEL.example}</span>}
-            {notice.published && <span className="t-meta rounded border border-brand-200 bg-brand-50 px-1.5 font-semibold text-brand-700">공개</span>}
+            {isFeedNotice(notice) ? (
+              <span className="t-meta rounded border border-slate-200 px-1.5 font-semibold text-slate-500">기업마당</span>
+            ) : (
+              notice.published && <span className="t-meta rounded border border-brand-200 bg-brand-50 px-1.5 font-semibold text-brand-700">공개</span>
+            )}
           </span>
           {extra}
         </span>

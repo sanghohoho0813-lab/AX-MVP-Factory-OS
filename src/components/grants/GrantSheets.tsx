@@ -26,7 +26,10 @@ export function NoticeSheet({
   onDelete,
   onOpenClient,
   onClose,
+  readOnly,
 }: {
+  /** 기업마당에서 매일 받는 공고 — 고치기 · 지우기 없음 */
+  readOnly?: boolean
   notice: GrantNotice
   today: string
   matches: ClientMatch[]
@@ -71,7 +74,9 @@ export function NoticeSheet({
             맞는 업체 {fit.length}곳{check.length ? ` · 확인 필요 ${check.length}곳` : ''}
           </h4>
           {matches.length === 0 ? (
-            <p className="t-sub text-slate-500">지금 업체 중에는 이 공고 조건에 맞는 곳이 없습니다.</p>
+            <p className="t-sub break-keep text-slate-500">
+              {rules.length === 0 ? '업체를 가려 받는 조건이 없는 전국 공통 공고예요. 업체마다 따로 알리기보다 필요한 곳에 안내해 주세요.' : '지금 업체 중에는 이 공고 조건(지역 · 업력 · 업종 등)에 맞는 곳이 없습니다.'}
+            </p>
           ) : (
             <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-control) border border-slate-200">
               {matches.map((x) => {
@@ -112,6 +117,11 @@ export function NoticeSheet({
           )}
         </section>
 
+        {readOnly ? (
+          <p className="t-sub break-keep border-t border-slate-100 pt-3 text-slate-500" data-testid="notice-feed-note">
+            기업마당에서 매일 아침 9시에 받아 오는 공고라 여기서 고치거나 지우지 않아요. 내용이 바뀌면 다음 받을 때 같이 바뀝니다.
+          </p>
+        ) : (
         <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3">
           <Button size="sm" variant="secondary" onClick={onEdit} data-testid="notice-edit">
             고치기
@@ -137,6 +147,7 @@ export function NoticeSheet({
             </Button>
           )}
         </div>
+        )}
         <p className="t-meta text-slate-400">출처: {GRANT_SOURCE_LABEL[notice.source]} · 판정은 공고 조건과 업체 정보를 맞춰 본 것이며 선정 가능성이 아닙니다.</p>
       </div>
     </BottomSheet>
@@ -166,15 +177,20 @@ export function ClientGrantPanel({
   onFill?: () => void
   compact?: number
 }) {
-  const fit = matches.filter((m) => m.verdict === 'fit').length
-  const check = matches.length - fit
+  const [showGeneral, setShowGeneral] = useState(false)
+  // 업체를 겨냥한 공고(맞음 · 확인 필요)를 먼저, 누구나 되는 '전국 공통' 은 접어 둔다
+  const targeted = matches.filter((m) => m.verdict === 'fit' || m.verdict === 'check')
+  const general = matches.filter((m) => m.verdict === 'general')
+  const fit = targeted.filter((m) => m.verdict === 'fit').length
+  const check = targeted.length - fit
   const missing = missingForMatch(client.profile)
-  const shown = compact ? matches.slice(0, compact) : matches
+  const shown = compact ? targeted.slice(0, compact) : targeted
   return (
     <div className="flex flex-col gap-3" data-testid="client-grants">
       <p className="t-sub break-keep text-slate-600">
         {profileLine(client.profile) || '업체 정보가 아직 비어 있어요'} — 지금 접수 중인 공고 중 <strong className="text-slate-900" data-testid="client-grants-count">조건 맞음 {fit}건</strong>
         {check ? ` · 확인 필요 ${check}건` : ''}
+        {general.length ? ` · 전국 공통 ${general.length}건` : ''}
       </p>
       {missing.length > 0 && (
         <p className="t-sub break-keep rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 text-warning-800" data-testid="client-grants-missing">
@@ -186,10 +202,23 @@ export function ClientGrantPanel({
           )}
         </p>
       )}
-      {shown.length > 0 ? <MatchList matches={shown} sentOf={sentOf} onPick={onPick} /> : <p className="t-sub text-slate-500">지금 맞는 공고가 없습니다. 새 공고가 들어오면 여기에 바로 보여요.</p>}
-      {compact && matches.length > compact && <p className="t-sub text-slate-500">그 외 {matches.length - compact}건</p>}
+      {shown.length > 0 ? (
+        <MatchList matches={shown} sentOf={sentOf} onPick={onPick} />
+      ) : (
+        <p className="t-sub break-keep text-slate-500">지역 · 업력 · 업종까지 맞는 공고가 지금은 없습니다. 새 공고가 들어오면 여기에 바로 보여요.</p>
+      )}
+      {compact && targeted.length > compact && <p className="t-sub text-slate-500">그 외 {targeted.length - compact}건</p>}
+      {!compact && general.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <button type="button" onClick={() => setShowGeneral((v) => !v)} aria-expanded={showGeneral} data-testid="client-grants-general" className="tap t-sub self-start font-semibold text-brand-700 hover:underline">
+            전국 공통 공고 {general.length}건 {showGeneral ? '접기' : '보기'} (누구나 신청 · 업체 조건 없음)
+          </button>
+          {showGeneral && <MatchList matches={general.slice(0, 100)} sentOf={sentOf} onPick={onPick} />}
+          {showGeneral && general.length > 100 && <p className="t-sub text-slate-500">그 외 {general.length - 100}건은 지원사업 알림 화면에서 찾아 보세요.</p>}
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="primary" onClick={onCopyAll} disabled={matches.length === 0} data-testid="client-grants-copy">
+        <Button size="sm" variant="primary" onClick={onCopyAll} disabled={targeted.length === 0} data-testid="client-grants-copy">
           <Copy aria-hidden="true" className="size-4" /> 카톡 문구 복사
         </Button>
         <AiSoonButton size="sm" label="AI로 맞춤 안내문" what="이 업체 사정에 맞춰 공고 안내 문구와 준비 서류 목록을 써 줍니다" />
@@ -197,7 +226,7 @@ export function ClientGrantPanel({
           <Link2 aria-hidden="true" className="size-4" /> 찾기 링크 복사
         </Button>
         {linked && onPortal && (
-          <Button size="sm" variant="secondary" onClick={onPortal} disabled={matches.length === 0} data-testid="client-grants-portal">
+          <Button size="sm" variant="secondary" onClick={onPortal} disabled={targeted.length === 0} data-testid="client-grants-portal">
             <Send aria-hidden="true" className="size-4" /> 고객 화면에 올리기
           </Button>
         )}

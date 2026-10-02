@@ -77,15 +77,16 @@ await step('빠른 기록: 메모 저장', async () => {
   await p.waitForTimeout(400)
   return (await p.getByText('E2E 통화 메모').count()) >= 1
 })
-await step('빠른 기록: 후속조치(오늘 기한) → Top 3 에 등장', async () => {
+await step('빠른 기록: 후속조치(오늘 기한) → 오늘 할 일에 등장', async () => {
   const cap = p.locator('section[data-tour="home-capture"]')
   await cap.getByRole('radio', { name: '할 일' }).click()
   await cap.locator('textarea[aria-label="기록 내용"]').fill('E2E 후속조치 오늘')
   await cap.locator('input[type="date"]').fill(ymd)
   await cap.locator('button:has-text("기록")').click()
   await p.waitForTimeout(500)
-  const top = await p.locator('section[data-tour="home-top3"]').innerText()
-  return top.includes('E2E 후속조치 오늘') && top.includes('이유:')
+  // D-143: '지금 이것부터' 를 없앴다 — 오늘 기한 할 일은 맨 위 '오늘 할 일' 칸에 뜬다
+  const todo = await p.locator('[data-testid="today-todo-grid"]').first().innerText()
+  return todo.includes('E2E 후속조치 오늘')
 })
 
 // 2. 이벤트함

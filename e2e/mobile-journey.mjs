@@ -42,7 +42,7 @@ await page.evaluate(seedScript())
 await page.goto(`${BASE}/`, { waitUntil: 'networkidle' })
 
 await step('오늘 화면이 오늘 할 일부터 보여준다', async () => {
-  await page.getByRole('heading', { name: /지금 이것부터/ }).waitFor({ timeout: 5000 })
+  await page.getByRole('heading', { name: /다가오는 마감 · 약속/ }).waitFor({ timeout: 5000 })
   return true
 })
 

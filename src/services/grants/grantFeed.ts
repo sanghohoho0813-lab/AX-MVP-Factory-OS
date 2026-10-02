@@ -56,6 +56,11 @@ export function noticesFromFeed(items: readonly FeedRaw[], fetchedAt: string): G
   }))
 }
 
+/** 기업마당에서 매일 받아 오는 공고(고치기 · 지우기 대상 아님) */
+export function isFeedNotice(n: Pick<GrantNotice, 'id'>): boolean {
+  return n.id.startsWith('biz_')
+}
+
 /** 직접 넣은 공고 + 기업마당 — 같은 공고면 직접 넣은 것을 남긴다 */
 export function mergeNotices(manual: readonly GrantNotice[], feed: readonly GrantNotice[]): GrantNotice[] {
   const key = (n: Pick<GrantNotice, 'title' | 'applyEnd'>) => `${n.title.replace(/\s+/g, '').replace(/[[\]()·,.]/g, '')}|${n.applyEnd}`

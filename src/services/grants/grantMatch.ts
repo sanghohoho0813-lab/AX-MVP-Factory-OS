@@ -95,7 +95,7 @@ export type GrantSource = 'manual' | 'paste' | 'bizinfo' | 'example'
 export const GRANT_SOURCE_LABEL: Record<GrantSource, string> = {
   manual: '직접 적음',
   paste: '공고문 붙여넣기',
-  bizinfo: '기업마당 파일',
+  bizinfo: '기업마당',
   example: '예시',
 }
 
@@ -344,16 +344,34 @@ export function rangeText(r: Range | null, unit: '년' | '명' | '세' | 'won'):
 }
 
 /** 업종 낱말이 업체 업종 글에 있는가 (띄어쓰기 · 가운뎃점 무시) */
+const SPECIFIC = new Set(['region', 'years', 'industry', 'employees', 'revenue', 'ceoAge', 'women', 'certs'])
+
+/** 업체 업종 글 → 공고가 쓰는 업종 갈래(못 알아보면 빈 목록) */
+const COMPANY_INDUSTRY: [string, RegExp][] = [
+  ['제조', /제조|생산|가공|공장|부품|금속|기계|화학|섬유|식품/],
+  ['정보통신', /정보통신|소프트웨어|ICT|SW|IT|프로그램|플랫폼|앱|시스템\s*개발|웹\s*개발/i],
+  ['지식서비스', /지식\s*서비스|컨설팅|디자인|연구\s*개발|엔지니어링|교육\s*서비스/],
+  ['도소매', /도매|소매|도소매|유통|판매|쇼핑몰|무역|상사/],
+  ['음식·숙박', /음식|식당|카페|요식|숙박|펜션|호텔|외식/],
+  ['건설', /건설|건축|인테리어|토목|공사|시공/],
+  ['농림·수산', /농업|임업|어업|수산|농식품|축산|농산|영농/],
+  ['관광', /관광|여행/],
+  ['콘텐츠', /콘텐츠|문화|영상|게임|출판|방송|공연/],
+]
+
+export function industryClasses(text: string): string[] {
+  return COMPANY_INDUSTRY.filter(([, re]) => re.test(text)).map(([label]) => label)
+}
+
 function industryHit(text: string, words: string[]): boolean {
   const t = text.replace(/[\s·,./]/g, '')
+  const classes = industryClasses(text)
   return words.some((w) => {
     const k = w.replace(/[\s·,./]/g, '')
     if (!k) return false
     if (t.includes(k)) return true
-    // '정보통신' ↔ 소프트웨어 · IT 같은 흔한 다른 말
-    if (/정보통신|ICT|소프트웨어|SW/i.test(k)) return /정보통신|소프트웨어|ICT|SW|IT|프로그램|플랫폼|앱/i.test(t)
-    if (/제조/.test(k)) return /제조|생산|가공|공장/.test(t)
-    return false
+    // '정보통신' ↔ 소프트웨어 · IT 같은 흔한 다른 말 — 같은 갈래면 맞다
+    return classes.some((c) => c.replace(/[\s·,./]/g, '') === k)
   })
 }
 
@@ -362,7 +380,29 @@ function microLimit(industry: string): number {
   return /제조|건설|운수|광업/.test(industry) ? 9 : 4
 }
 
-export function matchGrant(notice: GrantNotice, p: CompanyProfile, today: string): GrantMatch {
+/** 업체를 가려 받는 조건이 있나 — 없으면 누구나(전국 공통) */
+export function targetsSomeone(rules: GrantRules): boolean {
+  const r = { ...NO_RULES, ...rules }
+  return (
+    r.regions.length > 0 ||
+    r.cities.length > 0 ||
+    r.industries.length > 0 ||
+    r.excludeIndustries.length > 0 ||
+    r.withinYears !== null ||
+    r.minYears !== null ||
+    r.minEmployees !== null ||
+    r.maxEmployees !== null ||
+    r.minRevenueM !== null ||
+    r.maxRevenueM !== null ||
+    r.youthCeo ||
+    r.womenCeo ||
+    r.certs.length > 0 ||
+    r.sizes.includes('micro') ||
+    r.preStartupOnly
+  )
+}
+
+export function matchGrant(notice: GrantNotice, p: CompanyProfile, today: string, deadline?: Deadline): GrantMatch {
   const r = { ...NO_RULES, ...notice.rules }
   const reasons: Reason[] = []
   const add = (key: string, label: string, state: ReasonState, text: string) => reasons.push({ key, label, state, text })
@@ -391,7 +431,9 @@ export function matchGrant(notice: GrantNotice, p: CompanyProfile, today: string
     const want = r.industries.length ? `${r.industries.join(' · ')} 업종` : `${r.excludeIndustries.join(' · ')} 제외`
     if (!p.industry.trim()) add('industry', '업종', 'unknown', `${want} — 업종을 적으면 확인돼요`)
     else if (r.excludeIndustries.length && industryHit(p.industry, r.excludeIndustries)) add('industry', '업종', 'no', `${r.excludeIndustries.join(' · ')} 업종은 안 됨 (이 업체: ${p.industry.slice(0, 20)})`)
-    else if (r.industries.length && !industryHit(p.industry, r.industries)) add('industry', '업종', 'unknown', `${want} — 이 업체(${p.industry.slice(0, 20)})가 해당하는지 확인`)
+    else if (r.industries.length && !industryHit(p.industry, r.industries))
+      // 업체 업종을 알아보면(예: 도소매) 다른 업종 공고는 '안 맞음' — 못 알아보는 업종 글이면 확인
+      add('industry', '업종', industryClasses(p.industry).length ? 'no' : 'unknown', industryClasses(p.industry).length ? `${want}만 (이 업체: ${p.industry.slice(0, 20)})` : `${want} — 이 업체(${p.industry.slice(0, 20)})가 해당하는지 확인`)
     else add('industry', '업종', 'ok', `${want} — ${p.industry.slice(0, 20)}`)
   }
 
@@ -447,7 +489,6 @@ export function matchGrant(notice: GrantNotice, p: CompanyProfile, today: string
   if (r.preStartupOnly) add('preStartup', '대상', 'no', '예비창업자(아직 사업자가 없는 분) 대상 공고')
 
   // 이 업체를 겨냥한 조건이 하나라도 있나(규모 '중소기업' 하나만으로는 거의 모두라 세지 않는다)
-  const SPECIFIC = new Set(['region', 'years', 'industry', 'employees', 'revenue', 'ceoAge', 'women', 'certs'])
   const targeted =
     reasons.some((x) => x.state === 'ok' && SPECIFIC.has(x.key) && !(x.key === 'region' && r.regions.length === 0 && r.cities.length === 0)) ||
     (r.sizes.includes('micro') && reasons.some((x) => x.key === 'size' && x.state === 'ok'))
@@ -461,7 +502,7 @@ export function matchGrant(notice: GrantNotice, p: CompanyProfile, today: string
   }
   const unknownCount = reasons.filter((x) => x.state === 'unknown').length
   const verdict: Verdict = hasNo ? 'no' : unknownCount > 0 ? 'check' : targeted ? 'fit' : 'general'
-  return { notice, verdict, reasons, unknownCount, deadline: deadlineOf(notice, today) }
+  return { notice, verdict, reasons, unknownCount, deadline: deadline ?? deadlineOf(notice, today) }
 }
 
 /** 이 업체에 걸리는 공고 — 접수 중(또는 곧 시작) · 안 맞음 제외 · 맞음 먼저, 그다음 마감 급한 순 */
@@ -472,7 +513,7 @@ export function matchesFor(notices: readonly GrantNotice[], p: CompanyProfile, t
     .sort((a, b) => verdictRank(a.verdict) - verdictRank(b.verdict) || deadlineRank(a.deadline) - deadlineRank(b.deadline) || a.notice.title.localeCompare(b.notice.title))
 }
 
-function verdictRank(v: Verdict): number {
+export function verdictRank(v: Verdict): number {
   return v === 'fit' ? 0 : v === 'check' ? 1 : v === 'general' ? 2 : 3
 }
 

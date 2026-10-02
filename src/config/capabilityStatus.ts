@@ -33,7 +33,7 @@ export interface Capability {
 export function currentCapabilities(mode: DataMode): Capability[] {
   const cloud = mode === 'supabase'
   return [
-    { key: 'today', label: '오늘 화면 (지금 이것부터 · 숫자 · 빠른 기록)', level: 'live', note: '규칙으로 순서를 정한다. AI 판단이 아니다.' },
+    { key: 'today', label: '오늘 화면 (오늘 할 일 · 다가오는 마감 · 약속 · 숫자 · 빠른 기록)', level: 'live', note: '날짜 순으로 보여 준다. AI 판단이 아니다.' },
     { key: 'clients', label: '고객 관리 (업체별 현황표 · 업무 6종 + 직접 추가)', level: 'live', note: '마감·서류·수금 경고가 자동으로 붙는다.' },
     { key: 'detail', label: '업체 상세 (업무 · 서류 · 수금 · 자금 · 기록 · 파일)', level: 'live', note: '상태를 바꾸면 활동 기록이 자동으로 남는다.' },
     { key: 'journal', label: '업무 일기 (통화 · 결정 · 후속조치 · 막힘)', level: 'live', note: '고객에게는 어떤 경로로도 보이지 않는다.' },

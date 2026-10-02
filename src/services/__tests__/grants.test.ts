@@ -42,6 +42,7 @@ import { exampleNotices } from '../grants/grantExamples'
 import { alertPayload, publicPayload, sameNotice, validateAlert, type AlertRequest } from '../grants/grantStore'
 import { mergeNotices, noticesFromFeed, slotOf } from '../grants/grantFeed'
 import { withAgencyRegion } from '../grants/grantText'
+import { clientsForNotice, fitSummary, grantClients, grantIndex } from '../grants/grantView'
 
 let pass = 0
 let fail = 0
@@ -124,7 +125,9 @@ const verdictOf = (rules: Partial<GrantRules>, p: Partial<CompanyProfile>) => ma
 
   check('업종: 제조 공고 · 금속 가공 = 맞음(다른 말)', verdictOf({ industries: ['제조'] }, { industry: '금속 가공' }) === 'fit')
   check('업종: 정보통신 공고 · 소프트웨어 개발 = 맞음', verdictOf({ industries: ['정보통신'] }, { industry: '응용 소프트웨어 개발' }) === 'fit')
-  check('업종: 제조 공고 · 음식점 = 확인 필요(업종 글은 사람이 본다)', verdictOf({ industries: ['제조'] }, { industry: '한식 음식점' }) === 'check')
+  check('업종: 제조 공고 · 음식점 = 안 맞음(업종 갈래가 분명히 다름)', verdictOf({ industries: ['제조'] }, { industry: '한식 음식점' }) === 'no')
+  check('업종: 정보통신 공고 · 소프트웨어 개발 = 맞음(같은 갈래 다른 말)', verdictOf({ industries: ['정보통신'] }, { industry: '응용 소프트웨어 개발' }) === 'fit')
+  check('업종: 제조 공고 · 업종 글을 못 알아봄 = 확인 필요', verdictOf({ industries: ['제조'] }, { industry: '기타 개인 서비스' }) === 'check')
   check('업종: 음식·숙박 제외 · 음식점 = 안 맞음', verdictOf({ excludeIndustries: ['음식점'] }, { industry: '한식 음식점' }) === 'no')
 
   check('직원: 5명 이상 · 12명', verdictOf({ minEmployees: 5 }, { employees: exact(12) }) === 'fit')
@@ -442,6 +445,36 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   const merged = mergeNotices([manual], feed)
   check('합치기: 같은 공고면 직접 넣은 것을 남김', merged.length === 2 && merged[0].id === 'm1' && merged.some((n) => n.id === 'biz_PBLN_10'))
   check('9시 칸: 한국 오전 8시 59분 = 어제 칸 · 9시 = 오늘 칸', slotOf(Date.parse('2026-10-01T23:59:00Z')) === '2026-10-01' && slotOf(Date.parse('2026-10-02T00:00:00Z')) === '2026-10-02')
+
+  // 한 번에 계산(공고 × 업체) — 화면마다 다시 계산하지 않고, 1,000건 × 300곳도 빨리
+  const SIDOS = ['경기', '서울', '부산', '대구', '인천']
+  const INDS = ['제조업', '소프트웨어 개발', '도소매', '한식 음식점', '건설업']
+  const recs = Array.from({ length: 300 }, (_, i) =>
+    normalizeClientOps({ id: `c${i}`, companyName: `업체${i}`, status: i % 3 ? 'active' : 'prospect', businessAddress: `${SIDOS[i % 5]} 어딘가시 ${i}`, industry: INDS[i % 5], establishedAt: `20${10 + (i % 15)}-03-01`, sales: i % 3 ? undefined : { stage: 'lead' } }),
+  )
+  const clients = grantClients(recs, TODAY)
+  const big = Array.from({ length: 1000 }, (_, i) =>
+    notice(i % 4 === 0 ? {} : { regions: [SIDOS[i % 5]], industries: i % 2 ? ['제조'] : [], withinYears: i % 3 ? null : 7 }, { id: `b${i}`, title: `공고 ${i}`, applyEnd: `2026-10-${String(2 + (i % 28)).padStart(2, '0')}` }),
+  )
+  const t0 = performance.now()
+  const idx = grantIndex(big, clients, TODAY)
+  const ms = performance.now() - t0
+  console.log(`  index 1,000 공고 × ${clients.length} 업체: ${ms.toFixed(0)}ms`)
+  check('한 번에 계산: 1,000 × 300 이 2초 안', ms < 2000, ms)
+  check('한 번에 계산: 같은 목록이면 다시 계산 안 함', grantIndex(big, clients, TODAY) === idx)
+  const b7 = big[7]
+  check(
+    '한 번에 계산 = 하나씩 계산(공고마다 맞는 업체)',
+    JSON.stringify((idx.byNotice.get(b7.id) ?? []).map((x) => x.client.record.id)) === JSON.stringify(clientsForNotice(b7, clients, TODAY).map((x) => x.client.record.id)),
+  )
+  const c0 = clients[1]
+  check(
+    '한 번에 계산 = 하나씩 계산(업체마다 맞는 공고)',
+    JSON.stringify((idx.byClient.get(c0.record.id) ?? []).map((m) => m.notice.id)) === JSON.stringify(matchesFor(big, c0.profile, TODAY).map((m) => m.notice.id)),
+  )
+  check('공고마다 맞는 업체: 전국 공통은 세지 않음', (idx.byNotice.get('b0') ?? []).length === 0)
+  const sum = fitSummary(idx.byClient.get(c0.record.id) ?? [])
+  check('업체 요약: 맞춤 · 전국 공통 나눠 셈', sum.general === 250 && sum.fit > 0 && sum.fit < 750, sum)
 }
 
 console.log(`\ngrants: ${pass} passed, ${fail} failed`)

@@ -91,6 +91,7 @@ import { SALES_PATH_INFO, buildJourney, journeyTools, requestedDocsStatus, withS
 import { withToolResult } from '../clientOpsService'
 import { NEXT_QUICK_DAYS, addDaysLocal, friendlyDate, nextSuggestions, relativeDay, suggestsFirstMeeting, withNextAction } from '../clientOpsNextAction'
 import { buildClientSchedule } from '../clientOpsSchedule'
+import { agendaWhen, buildAgenda } from '../upcomingAgenda'
 import { localDateOf } from '../../lib/appClock'
 import { KR_PUBLIC_HOLIDAYS, addDaysOff, daysOffByDate, listDaysOff, missingPublicHolidays, monthWorkdays, prevWorkday, rangeDates, removeDayOff, toDayOff, weekdayOf } from '../daysOff'
 import { repeatDates } from '../repeatDates'
@@ -1972,6 +1973,36 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('CASE 4: 예전 기록 저장 · 다시 읽기에서 입금 · 날짜가 풀리지 않는다', JSON.stringify(normalizeClientOps(JSON.parse(JSON.stringify(legacy))).fees) === JSON.stringify(legacy.fees))
   const kept = normalizeClientOps(JSON.parse(JSON.stringify(c2)))
   check('새 조건 칸은 저장 · 다시 읽어도 남는다(모르는 조건 이름은 버림)', kept.fees[1].conditionKind === 'funding_100m' && normalizeClientOps({ id: 'x', companyName: 'x', fees: [{ ...kept.fees[1], conditionKind: '???' as never }] }).fees[0].conditionKind === undefined)
+}
+
+// D-143: 오늘 — '지금 이것부터' 대신 다가오는 마감 · 약속(날짜 있는 실제 일만, 날짜 순)
+{
+  const T = '2026-10-02'
+  const base = normalizeClientOps({ id: 'ag1', companyName: '다가옴', nextAction: '2차 미팅', nextActionDueDate: '2026-10-08', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  const withTools = withToolResult(base, {
+    toolKey: 'employment',
+    title: '명부',
+    verdict: 'candidates',
+    verdictLabel: '',
+    summary: '',
+    data: null,
+    deadlines: [
+      { date: '2026-10-05', title: '청년도약 참여신청 — 급함', note: '', hard: true },
+      { date: '2026-10-10', title: '1회차 신청', note: '' },
+      { date: '2026-11-30', title: '먼 기한', note: '' },
+    ],
+  })
+  const soon = normalizeClientOps({ id: 'ag2', companyName: '내일약속', nextAction: '자료 받기', nextActionDueDate: '2026-10-03', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  const schedule = [...buildClientSchedule(withTools, T), ...buildClientSchedule(soon, T)]
+  const j = (id: string, due: string, done = false) => ({ id, workspaceId: null, ownerId: null, entryDate: T, entryType: 'follow_up' as const, content: `할 일 ${id}\n둘째 줄`, clientId: 'ag1', projectId: null, serviceKey: null, dueDate: due, pinned: false, completed: done, completedAt: null, createdAt: '', updatedAt: '' })
+  const journal = [j('a', '2026-10-02'), j('b', '2026-10-06'), j('c', '2026-10-07', true), j('d', '2026-10-30')]
+  const agenda = buildAgenda({ schedule, journal, clientNames: new Map([['ag1', '다가옴']]), prospectIds: new Set(['ag1']), today: T })
+  const titles = agenda.map((a) => a.title)
+  check('다가오는: 약속(10/8) · 도구 기한(10/10) · 앞으로 할 일(10/6) — 날짜 순', JSON.stringify(titles) === JSON.stringify(['할 일 b', '2차 미팅', '1회차 신청']), JSON.stringify(titles))
+  check('다가오는: 위 칸에 있는 것 뺌 — 내일 약속 · 놓치면 끝나는 기한 · 오늘 할 일', !titles.some((t) => t.includes('자료 받기') || t.includes('급함') || t === '할 일 a'))
+  check('다가오는: 끝낸 할 일 · 14일 넘는 것 뺌', !titles.includes('할 일 c') && !titles.includes('할 일 d') && !titles.includes('먼 기한'))
+  check('다가오는: 잠재고객 약속은 미팅 준비로', agenda.find((a) => a.kind === 'next')?.href === '/sales/meeting?client=ag1')
+  check('다가오는: 날짜 글자 — 내일 · D-6 · 요일', agendaWhen({ date: '2026-10-03', daysLeft: 1 }).label === '내일' && agendaWhen({ date: '2026-10-08', daysLeft: 6 }).label === 'D-6' && agendaWhen({ date: '2026-10-08', daysLeft: 6 }).date === '10/8 목')
 }
 
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)

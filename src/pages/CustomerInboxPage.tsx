@@ -49,7 +49,7 @@ function isNotReadyError(cause: unknown): boolean {
 
 /**
  * 고객 이벤트함 — miraeailab.com 에서 일어난 일(진단·주문·서류·요청)이 여기로 들어온다.
- * 각 이벤트를 고객사에 연결하고 처리 상태를 남기면, 홈의 Top 3 와 업체 상세에도 반영된다.
+ * 각 이벤트를 고객사에 연결하고 처리 상태를 남기면, 오늘 화면과 업체 상세에도 반영된다.
  */
 function InboxContent({ workspaceId }: { workspaceId: string | null }) {
   const { showToast } = useToast()

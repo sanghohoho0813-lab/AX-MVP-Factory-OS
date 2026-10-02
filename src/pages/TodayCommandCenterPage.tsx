@@ -4,7 +4,7 @@ import { TodayCharges } from '../components/money/TodayCharges'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
-  ClipboardCheck,
+  CalendarClock,
   Clock,
   Copy,
   Inbox,
@@ -44,11 +44,10 @@ import { isOpenEvent, listEvents, updateEvent } from '../services/customerBridge
 import {
   buildDaySummary,
   buildMoneySignals,
-  buildTopActions,
   hardDeadlineActions,
   daySummaryText,
-  type BriefAction,
 } from '../services/dailyBriefService'
+import { agendaWhen, buildAgenda, type AgendaItem } from '../services/upcomingAgenda'
 import { nowDate, todayLocalDate } from '../lib/appClock'
 import { krwTile } from '../lib/format'
 import { getDataModeConfig } from '../data/dataMode'
@@ -76,37 +75,23 @@ function greeting(hour: number): string {
   return '좋은 저녁입니다'
 }
 
-function ActionRow({ action, rank }: { action: BriefAction; rank: number }) {
-  /*
-   * 바탕은 칠하지 않는다 (화면 규칙 §2). 왼쪽 선과 순번 원의 색으로만 말한다.
-   * 세 장이 모두 '마감 지남' 인 날이 흔한데, 그때 바탕까지 칠하면 화면 위쪽이 통째로
-   * 빨간 덩어리가 되어 1·2·3 의 차이가 오히려 사라진다. 무게는 순번이 말한다.
-   */
-  const look =
-    action.severity === 'critical'
-      ? { edge: 'bg-danger-500', fill: 'border-slate-200 bg-white', rank: 'bg-danger-600' }
-      : action.severity === 'warning'
-        ? { edge: 'bg-warning-500', fill: 'border-slate-200 bg-white', rank: 'bg-warning-600' }
-        : { edge: 'bg-slate-300', fill: 'border-slate-200 bg-white', rank: 'bg-slate-700' }
+/** 다가오는 마감 · 약속 한 줄 — 날짜가 앞에, 무엇 · 어느 업체가 뒤에 */
+function AgendaRow({ item }: { item: AgendaItem }) {
+  const w = agendaWhen(item)
+  const tone = item.daysLeft < 0 ? 'text-danger-700' : item.daysLeft <= 1 ? 'text-danger-700' : item.daysLeft <= 3 ? 'text-brand-700' : 'text-slate-600'
   return (
-    <li>
-      <Link
-        to={action.href}
-        className={`ax-lift relative flex items-start gap-3 overflow-hidden rounded-(--radius-card) border py-3.5 pr-3 pl-4 ${look.fill}`}
-      >
-        <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${look.edge}`} />
-        <span
-          className={`t-meta mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full font-bold text-white ${look.rank}`}
-        >
-          {rank}
+    <li data-testid="agenda-row" data-kind={item.kind}>
+      <Link to={item.href} className="ax-lift flex items-start gap-3 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3">
+        <span className="flex w-16 shrink-0 flex-col">
+          <span className={`t-body font-bold whitespace-nowrap ${tone}`}>{w.label}</span>
+          <span className="t-meta whitespace-nowrap text-slate-500">{w.date}</span>
         </span>
         <span className="min-w-0 flex-1">
-          <span className="t-card block break-keep text-slate-900">{action.title}</span>
-          {action.detail && <span className="t-sub block break-keep text-slate-600">{action.detail}</span>}
-          {/* 왜 이것이 위에 있는지 — 한 줄을 넘기지 않는다 */}
-          <span className="t-meta mt-0.5 block truncate text-slate-500">
-            {action.clientName ? `${action.clientName} · ` : ''}
-            {action.reason}
+          <span className="t-body block break-keep font-semibold text-slate-900">{item.title}</span>
+          <span className="t-sub block break-keep text-slate-500">
+            {item.kindLabel}
+            {item.clientName ? ` · ${item.clientName}` : ''}
+            {item.detail && item.kind !== 'next' ? ` · ${item.detail}` : ''}
           </span>
         </span>
         <ArrowRight aria-hidden="true" className="size-4 shrink-0 self-center text-slate-300" />
@@ -174,7 +159,7 @@ function SectionTitle({
 
 /**
  * 오늘의 Command Center — 앱을 켠 뒤 5초 안에 "오늘 무엇부터"를 답한다.
- * 위에서부터: 오늘 · Top 3 · 빠른 기록 · 고객 이벤트 · 챙길 업체 · 돈 · 자금 마감 · 오늘 기록 · 하루 정리.
+ * 위에서부터: 오늘 · 다가오는 마감 · 약속 · 빠른 기록 · 고객 이벤트 · 챙길 업체 · 돈 · 자금 마감 · 오늘 기록 · 하루 정리.
  */
 function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; userId: string | null }) {
   const navigate = useNavigate()
@@ -279,30 +264,11 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     () => journal.filter((j) => j.entryType === 'follow_up' && j.dueDate !== '' && j.dueDate <= today),
     [journal, today],
   )
-  // D-125: '지금 이것부터' 는 바로 위 할 일 목록과 겹치지 않게(할 일은 빼고) — 대신 영업에서 멈춘 곳을 함께 세운다.
-  // 다음 약속이 지난 곳은 위 '업체 약속' 에 이미 있으므로 뺀다.
-  const salesTop = useMemo<BriefAction[]>(
-    () =>
-      salesRiskList
-        .filter((r) => !r.reason.startsWith('다음 약속'))
-        .map((r) => ({
-          id: `sales:${r.record.id}`,
-          kind: 'sales' as const,
-          title: `${r.record.companyName} — ${r.action}`,
-          detail: r.reason,
-          reason: '영업 — 여기서 멈춰 있습니다',
-          severity: 'warning' as const,
-          href: salesActionPath(r.action, r.record.id),
-          clientId: r.record.id,
-          clientName: r.record.companyName,
-          score: 80,
-        })),
-    [salesRiskList],
-  )
-  const top = useMemo(
-    () => buildTopActions({ alerts, events, followUps: [], clientNames, today, extra: salesTop }, 3),
-    [alerts, events, clientNames, today, salesTop],
-  )
+  /**
+   * D-143: '지금 이것부터'(규칙이 고른 셋) 대신 날짜가 정해진 실제 일 — 고객과 약속한 기한 · 미팅 · 업무 마감 · 신청 마감.
+   * 위 칸(오늘 할 일 · 업체 약속 · 놓치면 끝나는 기한)에 이미 있는 것은 뺀다.
+   */
+  const agenda = useMemo(() => buildAgenda({ schedule, journal, clientNames, prospectIds, today, days: 14 }), [schedule, journal, clientNames, prospectIds, today])
   /** D-138: 지나면 신청할 수 없는 기한(청년도약 참여신청 등) 7일 안 — 오늘 할 일 칸에 따로 둔다(순위 다툼에 묻히지 않게) */
   const hardDue = useMemo(() => hardDeadlineActions(schedule), [schedule])
   const todayJournal = useMemo(() => applyJournalFilter(journal, { range: 'today' }, today), [journal, today])
@@ -317,7 +283,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
    * 예전에는 규칙이 찾은 경고(마감·서류·수금)를 전부 더해 "반드시 처리할 것 12건"
    * 같은 숫자를 띄웠다. 그런데 그 대부분은 아직 안 받은 서류라 오늘 당장의 일이
    * 아니었다. 매일 두 자리 숫자가 뜨면 그 숫자는 아무 뜻도 없어진다.
-   * 규칙이 찾은 것은 아래 '지금 이것부터' 에서 계속 보인다.
+   * 날짜가 있는 일은 아래 '다가오는 마감 · 약속' 에서 날짜 순으로 보인다.
    */
   const openTodos = useMemo(() => dueToday.filter((e) => !e.completed), [dueToday])
   const overdueTodos = useMemo(() => openTodos.filter((e) => e.dueDate < today), [openTodos, today])
@@ -472,7 +438,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           </ul>
         )}
 
-        {/* D-142: PC 에서는 기한 · 지원사업 · 결제 · 약속을 두 칸으로 — 한 줄씩 쌓이면 아래 '지금 이것부터' 가 화면 밖으로 밀렸다 */}
+        {/* D-142: PC 에서는 기한 · 지원사업 · 결제 · 약속을 두 칸으로 — 한 줄씩 쌓이면 아래 '다가오는 마감 · 약속' 이 화면 밖으로 밀렸다 */}
         <div className="flex flex-col gap-3 empty:hidden lg:grid lg:grid-cols-2 lg:items-start lg:gap-4" data-testid="today-side-grid">
           {/* D-138: 놓치면 끝나는 기한 — 지나면 신청할 수 없는 것만(7일 안) */}
           {hardDue.length > 0 && (
@@ -555,19 +521,24 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
       </section>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-        {/* 2단계 — 지금 이것부터 (최대 3건) */}
-        <section aria-labelledby="top3" data-tour="home-top3" className="flex min-w-0 flex-col gap-3">
-          <SectionTitle title="지금 이것부터" icon={ClipboardCheck} accent="urgent" />
+        {/* 2단계 — 다가오는 마감 · 약속(D-143: 날짜가 있는 실제 일만, 날짜 순) */}
+        <section aria-labelledby="upcoming" data-tour="home-upcoming" data-testid="today-agenda" className="flex min-w-0 flex-col gap-3">
+          <SectionTitle title="다가오는 마감 · 약속" icon={CalendarClock} to="/ops/calendar" count={agenda.length} accent="urgent" />
           {loading ? (
             <p className="t-sub text-slate-500">불러오는 중…</p>
-          ) : top.length === 0 ? (
-            <Blank title="마감 지남 · 막힘 · 오늘 할 일이 없습니다." icon={<ClipboardCheck className="size-7" />} />
+          ) : agenda.length === 0 ? (
+            <Blank title="2주 안에 잡힌 마감 · 약속이 없습니다. 업체에 다음 약속이나 기한을 적어 두면 여기에 날짜 순으로 보여요." icon={<CalendarClock className="size-7" />} />
           ) : (
             <ol className="ax-stagger flex flex-col gap-2">
-              {top.map((a, i) => (
-                <ActionRow key={a.id} action={a} rank={i + 1} />
+              {agenda.slice(0, 8).map((a) => (
+                <AgendaRow key={a.id} item={a} />
               ))}
             </ol>
+          )}
+          {agenda.length > 8 && (
+            <Link to="/ops/calendar" className="tap t-sub inline-flex items-center self-start font-semibold text-brand-700 hover:underline" data-testid="today-agenda-more">
+              2주 안 {agenda.length}건 모두 달력에서 보기 →
+            </Link>
           )}
 
           {/* 오늘의 숫자 — 위가 아니라 할 일 아래에 둔다. 숫자는 판단의 근거이지 할 일이 아니다 */}
@@ -629,7 +600,6 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             </p>
           )}
 
-          <p className="t-meta break-keep text-slate-500">급한 순서대로 셋만 골랐습니다.</p>
         </section>
 
         {/* 3단계 — 빠른 기록 */}

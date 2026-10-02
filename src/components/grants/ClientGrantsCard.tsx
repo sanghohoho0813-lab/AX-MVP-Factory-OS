@@ -21,6 +21,8 @@ export function ClientGrantsCard({ workspaceId, record, today, onFill }: { works
   const actions = useGrantActions({ workspaceId, setSent, linkOf, toast: showToast })
   const client = useMemo(() => grantClients([record], today)[0] ?? null, [record, today])
   const matches = useMemo(() => (client ? matchesFor(notices, client.profile, today) : []), [client, notices, today])
+  // 알릴 것은 이 업체를 겨냥한 공고(맞음 · 확인 필요)만 — 전국 공통은 패널에서 접어 보여 준다
+  const targeted = useMemo(() => matches.filter((m) => m.verdict !== 'general'), [matches])
   if (!loaded || !client) return null
   const more = (
     <button type="button" onClick={() => navigate(`/grants?view=clients&client=${record.id}`)} className="tap t-sub inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline">
@@ -33,7 +35,7 @@ export function ClientGrantsCard({ workspaceId, record, today, onFill }: { works
         {notices.length === 0 ? (
           <p className="t-sub flex items-start gap-2 break-keep text-slate-500">
             <BellRing aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-            지원사업 알림에 공고를 넣으면 이 업체 조건에 맞는 공고를 여기서 바로 보여 드려요.
+            기업마당 공고를 받아 오면(매일 아침 9시) 이 업체 지역 · 업력 · 업종에 맞는 공고를 여기서 바로 보여 드려요.
           </p>
         ) : (
           <ClientGrantPanel
@@ -42,9 +44,9 @@ export function ClientGrantsCard({ workspaceId, record, today, onFill }: { works
             compact={3}
             sentOf={(nid) => sentAt(sent, record.id, nid)}
             linked={linkOf(record.id) !== null}
-            onCopyAll={() => void actions.copyAll(client, matches)}
+            onCopyAll={() => void actions.copyAll(client, targeted)}
             onCopyLink={() => void actions.copyLink(client)}
-            onPortal={() => void actions.toPortal(client, matches)}
+            onPortal={() => void actions.toPortal(client, targeted)}
             onPick={() => navigate(`/grants?view=clients&client=${record.id}`)}
             onFill={onFill}
           />

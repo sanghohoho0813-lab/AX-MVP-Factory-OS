@@ -15,7 +15,8 @@ import { Button } from '../../components/ui/Button'
 import { BottomSheet } from '../../components/ui/primitives'
 import { CategoryChips, DeadlineText, NoticeLink, ReasonList, VerdictBadge } from '../../components/grants/GrantParts'
 import { todayLocalDate } from '../../lib/appClock'
-import { CERT_LABEL, SIDO_LIST, matchesFor, type CertKey, type CompanyProfile, type GrantCategory, type GrantNotice } from '../../services/grants/grantMatch'
+import { CERT_LABEL, SIDO_LIST, matchesFor, type CertKey, type CompanyProfile, type GrantCategory, type GrantMatch, type GrantNotice } from '../../services/grants/grantMatch'
+import { mergeNotices, useGrantFeed } from '../../services/grants/grantFeed'
 import { AGE_CHIPS, EMPLOYEE_CHIPS, INDUSTRY_CHIPS, REVENUE_CHIPS, YEARS_CHIPS, chipOf, profileChipsText, profileFromQuery, profileToQuery, type RangeChip } from '../../services/grants/grantText'
 import { listPublicNotices, submitAlertRequest, validateAlert } from '../../services/grants/grantStore'
 
@@ -64,6 +65,10 @@ export default function GrantFinderPage() {
   const [open, setOpen] = useState('')
   const [asking, setAsking] = useState(false)
   const [done, setDone] = useState(false)
+  const [showGeneral, setShowGeneral] = useState(false)
+  const [generalLimit, setGeneralLimit] = useState(30)
+  // 기업마당 공고(매일 아침 9시 새로 받음)도 같이 — 로그인 없이 받는 공개 공고다
+  const feed = useGrantFeed()
 
   useEffect(() => {
     document.title = `지원사업 찾기 | ${brand.brandNameKo}`
@@ -81,14 +86,43 @@ export default function GrantFinderPage() {
     setParams(new URLSearchParams(profileToQuery(next, { from })), { replace: true })
   }
 
-  const matches = useMemo(() => matchesFor(notices, profile, today), [notices, profile, today])
+  const all = useMemo(() => mergeNotices(notices, feed.notices), [notices, feed.notices])
+  const shownState = state === 'error' && feed.notices.length > 0 ? 'ready' : state === 'loading' && feed.notices.length > 0 ? 'ready' : state
+  const matches = useMemo(() => matchesFor(all, profile, today), [all, profile, today])
   const counts = useMemo(() => {
     const c: Record<string, number> = {}
     for (const m of matches) c[m.notice.category] = (c[m.notice.category] ?? 0) + 1
     return c
   }, [matches])
-  const listed = matches.filter((m) => category === 'all' || m.notice.category === category)
+  const inCat = matches.filter((m) => category === 'all' || m.notice.category === category)
+  // 우리 회사를 겨냥한 공고(지역 · 업력 · 업종 등이 맞음 · 확인 필요) 먼저, 누구나 되는 전국 공통은 아래에 접어 둔다
+  const listed = inCat.filter((m) => m.verdict !== 'general')
+  const general = inCat.filter((m) => m.verdict === 'general')
   const fit = matches.filter((m) => m.verdict === 'fit').length
+  const targetedCount = matches.filter((m) => m.verdict !== 'general').length
+  const row = (m: GrantMatch) => (
+    <li key={m.notice.id} data-testid="finder-row" data-verdict={m.verdict}>
+      <button type="button" onClick={() => setOpen(open === m.notice.id ? '' : m.notice.id)} className="tap flex w-full items-start gap-3 px-4 py-3.5 text-left" aria-expanded={open === m.notice.id}>
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="t-body break-keep font-semibold text-slate-900">{m.notice.title}</span>
+          <span className="t-sub text-slate-500">{m.notice.agency}</span>
+          <span className="flex flex-wrap items-center gap-2">
+            <VerdictBadge v={m.verdict} />
+            {m.verdict === 'check' && <span className="t-sub text-warning-800">확인할 것 {m.unknownCount}가지</span>}
+          </span>
+        </span>
+        <DeadlineText d={m.deadline} />
+      </button>
+      {open === m.notice.id && (
+        <div className="flex flex-col gap-2 px-4 pb-4" data-testid="finder-detail">
+          {m.notice.amountText && <p className="t-body font-semibold text-slate-800">{m.notice.amountText}</p>}
+          <ReasonList reasons={m.reasons} />
+          {m.notice.target && <p className="t-sub break-keep text-slate-600">지원대상: {m.notice.target}</p>}
+          <NoticeLink url={m.notice.url} />
+        </div>
+      )}
+    </li>
+  )
 
   return (
     <div className="min-h-dvh bg-slate-50 pb-28">
@@ -169,54 +203,51 @@ export default function GrantFinderPage() {
                 </div>
               </div>
               <Button variant="primary" onClick={() => setEditing(false)} className="w-full" data-testid="finder-apply">
-                {ready3 ? `맞는 지원사업 ${matches.length}개 보기` : '고른 조건으로 보기'}
+                {ready3 ? `맞는 지원사업 ${targetedCount}개 보기` : '고른 조건으로 보기'}
               </Button>
             </div>
           )}
         </section>
 
-        {state === 'loading' && <p className="t-body text-slate-500">공고를 불러오는 중…</p>}
-        {state === 'error' && (
+        {shownState === 'loading' && <p className="t-body text-slate-500">공고를 불러오는 중…</p>}
+        {shownState === 'error' && (
           <p className="t-body rounded-(--radius-control) border border-warning-200 bg-warning-50 px-4 py-3 text-warning-800" role="alert">
             지금은 공고를 불러오지 못했습니다. 아래 '알림 받기' 를 남겨 주시면 맞는 공고를 직접 보내 드릴게요.
           </p>
         )}
 
-        {state === 'ready' && (
+        {shownState === 'ready' && (
           <section className="flex flex-col gap-3" aria-label="맞는 지원사업">
             <h2 className="t-section break-keep text-slate-900" data-testid="finder-hero">
-              <span className="text-brand-700">{[profile.sido, profile.city].filter(Boolean).join(' ') || '전국'}</span> 에서 지금 신청할 수 있는 지원사업 <span className="text-brand-700">{matches.length}개</span>
-              {fit > 0 && fit < matches.length && <span className="t-sub ml-1 font-normal text-slate-500">(조건 맞음 {fit}개)</span>}
+              <span className="text-brand-700">{[profile.sido, profile.city].filter(Boolean).join(' ') || '전국'}</span> 에서 우리 회사에 맞는 지원사업 <span className="text-brand-700">{targetedCount}개</span>
+              {fit > 0 && fit < targetedCount && <span className="t-sub ml-1 font-normal text-slate-500">(조건 맞음 {fit}개)</span>}
             </h2>
             {matches.length > 0 && <CategoryChips value={category} counts={counts} onChange={setCategory} />}
             {listed.length === 0 ? (
-              <p className="t-body rounded-(--radius-panel) border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-slate-500">지금은 고른 조건에 맞는 공고가 없어요. 알림을 받아 두시면 새 공고가 나올 때 알려 드려요.</p>
+              <p className="t-body rounded-(--radius-panel) border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-slate-500">
+                {ready3 ? '지금은 우리 회사 지역 · 업력 · 업종에 꼭 맞는 공고가 없어요. 알림을 받아 두시면 새 공고가 나올 때 알려 드려요.' : '지역 · 업종 · 업력을 고르시면 꼭 맞는 공고를 골라 드려요.'}
+              </p>
             ) : (
               <ul className="flex flex-col divide-y divide-slate-100 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="finder-list">
-                {listed.map((m) => (
-                  <li key={m.notice.id} data-testid="finder-row" data-verdict={m.verdict}>
-                    <button type="button" onClick={() => setOpen(open === m.notice.id ? '' : m.notice.id)} className="tap flex w-full items-start gap-3 px-4 py-3.5 text-left" aria-expanded={open === m.notice.id}>
-                      <span className="flex min-w-0 flex-1 flex-col gap-1">
-                        <span className="t-body break-keep font-semibold text-slate-900">{m.notice.title}</span>
-                        <span className="t-sub text-slate-500">{m.notice.agency}</span>
-                        <span className="flex flex-wrap items-center gap-2">
-                          <VerdictBadge v={m.verdict} />
-                          {m.verdict === 'check' && <span className="t-sub text-warning-800">확인할 것 {m.unknownCount}가지</span>}
-                        </span>
-                      </span>
-                      <DeadlineText d={m.deadline} />
-                    </button>
-                    {open === m.notice.id && (
-                      <div className="flex flex-col gap-2 px-4 pb-4" data-testid="finder-detail">
-                        {m.notice.amountText && <p className="t-body font-semibold text-slate-800">{m.notice.amountText}</p>}
-                        <ReasonList reasons={m.reasons} />
-                        {m.notice.target && <p className="t-sub break-keep text-slate-600">지원대상: {m.notice.target}</p>}
-                        <NoticeLink url={m.notice.url} />
-                      </div>
-                    )}
-                  </li>
-                ))}
+                {listed.map(row)}
               </ul>
+            )}
+            {general.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <button type="button" onClick={() => setShowGeneral((v) => !v)} aria-expanded={showGeneral} data-testid="finder-general" className="tap t-body self-start font-semibold text-brand-700 hover:underline">
+                  누구나 신청할 수 있는 전국 공통 사업 {general.length}개 {showGeneral ? '접기' : '보기'}
+                </button>
+                {showGeneral && (
+                  <ul className="flex flex-col divide-y divide-slate-100 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="finder-general-list">
+                    {general.slice(0, generalLimit).map(row)}
+                  </ul>
+                )}
+                {showGeneral && general.length > generalLimit && (
+                  <Button variant="secondary" onClick={() => setGeneralLimit((v) => v + 60)} className="self-center">
+                    더 보기 (남은 {general.length - generalLimit}개)
+                  </Button>
+                )}
+              </div>
             )}
             <p className="t-meta break-keep text-slate-500">공고에 적힌 조건과 고르신 정보를 맞춰 본 결과입니다. 실제 선정은 기관 심사로 정해지며, 신청 전 공고 원문을 꼭 확인해 주세요.</p>
           </section>
@@ -241,7 +272,7 @@ export default function GrantFinderPage() {
         <AlertSheet
           profile={profile}
           from={from}
-          titles={matches.map((m) => m.notice.title)}
+          titles={[...listed, ...general].map((m) => m.notice.title)}
           fitCount={fit}
           onClose={() => setAsking(false)}
           onDone={() => {
