@@ -8,7 +8,7 @@
 import type { ClientOpsRecord, DocumentKey, DocumentState } from '../types/clientOps'
 import { allDocumentMetas } from './clientOpsDocuments'
 import { withCustomDocument } from './clientOpsService'
-import type { DocPlacement } from './docClassify'
+import { knownDocValidMonths, type DocPlacement } from './docClassify'
 
 const compact = (s: string) => s.replace(/[\s·ㆍ]/g, '')
 
@@ -54,7 +54,8 @@ export function cellForPlacement(record: ClientOpsRecord, p: DocPlacement, used:
   }
   const taken = allDocumentMetas(rec).some((m) => compact(m.label.replace(/\s*\(\d+\)$/, '')) === compact(label))
   const finalLabel = taken ? nextNumberedLabel(rec, label) : label
-  rec = withCustomDocument(rec, { label: finalLabel })
+  // D-147: 알려진 서류면 유효기간도 함께(인감 3개월 · 납세 30일 …) — 만료 알림이 바로 걸린다
+  rec = withCustomDocument(rec, { label: finalLabel, validMonths: knownDocValidMonths(label) })
   const key = rec.customDocuments[rec.customDocuments.length - 1].key
   used.add(key)
   return { record: rec, key, label: finalLabel, numbered: taken }

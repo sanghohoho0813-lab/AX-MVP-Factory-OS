@@ -24,6 +24,7 @@ import { particle } from '../../lib/josa'
 import { generateId } from '../../storage/localStore'
 import { nowIso, todayLocalDate } from '../../lib/appClock'
 import { analyzeUploadedDocs, type DocBatchSummary } from '../../services/docAutoAnalyze'
+import { isSystemFile } from '../../services/docShelf'
 import type { ReadDoc, ReadMethod } from '../../services/docAutoFill'
 
 /** '기타 · 확인 필요 · 스캔0003' — 기타 칸을 파일마다 구별하는 짧은 이름 */
@@ -75,6 +76,17 @@ export function BulkDocUploadSheet({
   const [items, setItems] = useState<Item[]>([])
   const [busy, setBusy] = useState(false)
   const [autoNote, setAutoNote] = useState('')
+  /*
+   * D-147: 무엇을 하는 중인가 — 읽는 중에 창을 닫으면 남은 파일을 올리지 않고 멈춘다.
+   * 올리는 중에는 닫지 않는다(보관함에는 올라갔는데 업체 기록에 안 적힌 파일이 생긴다).
+   */
+  const [phase, setPhase] = useState<'idle' | 'reading' | 'uploading'>('idle')
+  const stoppedRef = useRef(false)
+  /* D-147: 저장은 '그때의 최신 기록' 위에 — 오래 읽는 동안 다른 데서 고친 것을 덮지 않게 */
+  const recordRef = useRef(record)
+  useEffect(() => {
+    recordRef.current = record
+  }, [record])
   const fileRef = useRef<HTMLInputElement>(null)
   const folderRef = useRef<HTMLInputElement>(null)
   const metas = allDocumentMetas(record).filter((m) => m.needsFile)
@@ -89,8 +101,12 @@ export function BulkDocUploadSheet({
 
   /** 파일을 넣으면 하나씩 읽고 판별한다 — 동시에 여러 OCR 을 돌리면 휴대폰이 멈춘다 */
   const addFiles = async (files: File[]) => {
-    const picked = files.filter((f) => f.size > 0 && !f.name.startsWith('.'))
+    const picked = files.filter((f) => f.size > 0 && !isSystemFile(f))
+    const skipped = files.length - picked.length
+    if (skipped > 0) showToast(`서류가 아닌 컴퓨터 파일 ${skipped}개(빈 파일 · Thumbs.db 같은 것)는 뺐습니다.`)
     if (picked.length === 0) return
+    stoppedRef.current = false
+    setPhase('reading')
     const fresh: Item[] = picked.map((file) => ({
       id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
       file,
@@ -109,6 +125,7 @@ export function BulkDocUploadSheet({
     setBusy(true)
     const read: Item[] = []
     for (const it of fresh) {
+      if (stoppedRef.current) return
       patch(it.id, { status: 'reading', progress: { ratio: 0, label: '읽는 중' } })
       let text = ''
       let method: ReadMethod = 'none'
@@ -138,6 +155,8 @@ export function BulkDocUploadSheet({
       read.push({ ...it, ...next } as Item)
     }
     setBusy(false)
+    setPhase('idle')
+    if (stoppedRef.current) return
     if (auto) {
       // D-146: 하나도 남기지 않고 전부 올린다 — 칸은 제목으로, 모르면 '기타 · 확인 필요'. 사람은 나중에 서류 탭에서 열어 보고 고친다
       const others = read.filter((it) => it.newLabel.startsWith(OTHER_DOC_LABEL)).length
@@ -159,7 +178,10 @@ export function BulkDocUploadSheet({
   const upload = async (targets: Item[], opts: { closeWhenDone?: boolean } = {}) => {
     if (targets.length === 0) return
     setBusy(true)
-    let rec = record
+    setPhase('uploading')
+    let rec = recordRef.current
+    /** D-147: 이미 서류함에 있던 파일(이름 · 크기 같음) — 겹친 줄 알도록 표시만 한다(올리기는 그대로) */
+    const seen = new Set(Object.values(rec.documents).filter((d) => d?.fileName).map((d) => `${d.fileName}|${d.fileSize}`))
     let okCount = 0
     const doneIds: string[] = []
     const readDocs: ReadDoc[] = []
@@ -176,7 +198,9 @@ export function BulkDocUploadSheet({
         const cell = cellForPlacement(rec, placement, used)
         rec = cell.record
         const key: DocumentKey = cell.key
-        placed.push({ fileName: it.file.name, label: cell.label, other: cell.label.startsWith(OTHER_DOC_LABEL), numbered: cell.numbered })
+        const sig = `${it.file.name}|${it.file.size}`
+        placed.push({ fileName: it.file.name, label: cell.label, other: cell.label.startsWith(OTHER_DOC_LABEL), numbered: cell.numbered, same: seen.has(sig) })
+        seen.add(sig)
         if (uploadable) {
           // D-120: 파일만 올리고, 기록 저장은 끝에 한 번(파일마다 저장하던 것을 줄였다)
           rec = withDocument(rec, key, await storeDocumentFile(rec, key, it.file))
@@ -198,6 +222,7 @@ export function BulkDocUploadSheet({
     if (okCount === 0) {
       showToast('올린 서류가 없습니다. 빨간 줄의 까닭을 확인하고 다시 올려 주세요.')
       setBusy(false)
+      setPhase('idle')
       return
     }
     try {
@@ -224,7 +249,21 @@ export function BulkDocUploadSheet({
       showToast(cause instanceof Error ? `${cause.message} — 서류를 다시 올려 주세요.` : '저장하지 못했습니다. 서류를 다시 올려 주세요.')
     } finally {
       setBusy(false)
+      setPhase('idle')
     }
+  }
+
+  /** D-147: 닫기 — 읽는 중이면 멈추고(남은 것 안 올림), 올리는 중이면 기다리게 한다 */
+  const closeSheet = () => {
+    if (phase === 'uploading') {
+      showToast('서류함에 올리는 중입니다 — 끝나면 저절로 닫힙니다.')
+      return
+    }
+    if (phase === 'reading') {
+      stoppedRef.current = true
+      showToast('읽기를 멈췄습니다 — 이번 파일은 하나도 올리지 않았습니다.')
+    }
+    onClose()
   }
 
   const existingFile = (key: string) => record.documents[key]?.fileName ?? ''
@@ -234,14 +273,14 @@ export function BulkDocUploadSheet({
       open
       size="lg"
       title={`${record.companyName} — 서류 한꺼번에 올리기`}
-      onClose={onClose}
+      onClose={closeSheet}
       footer={
         <div className="flex flex-wrap items-center justify-end gap-2">
           <span className="t-sub mr-auto text-slate-500">
             {readyItems.length > 0 && `${readyItems.length}개 중 확실 ${sureItems.length} · 고른 것 ${assignedItems.length}`}
           </span>
-          <Button variant="ghost" onClick={onClose} disabled={busy}>
-            닫기
+          <Button variant="ghost" onClick={closeSheet} disabled={phase === 'uploading'} data-testid="bulk-close">
+            {phase === 'reading' ? '멈추고 닫기' : '닫기'}
           </Button>
           <Button variant="secondary" disabled={busy || sureItems.length === 0} onClick={() => void upload(sureItems)}>
             확실한 것만 올리기{sureItems.length > 0 ? ` (${sureItems.length})` : ''}

@@ -10,7 +10,8 @@
 
 import { normalizeClientOps, withCustomDocument, withDocument, withoutCustomDocument } from '../clientOpsService'
 import { allDocumentMetas } from '../clientOpsDocuments'
-import { OTHER_DOC_LABEL, documentTitle, placeDocument } from '../docClassify'
+import { OTHER_DOC_LABEL, documentTitle, knownDocValidMonths, placeDocument } from '../docClassify'
+import { docShelfSummary, isSystemFile, moveDocTo, moveTargets } from '../docShelf'
 import { applyResort, cellForPlacement, resortDecision, withoutDocumentFile } from '../docPlacementApply'
 import {
   FACT_DEFS,
@@ -423,6 +424,41 @@ const withCretop = (r: ClientOpsRecord): ClientOpsRecord => ({
   check('파일 지우기: 번호 칸은 칸까지 없어짐', !allDocumentMetas(rm1).some((m) => m.key === dupKey) && rm1.documents.businessRegistration.fileName === '사업자등록증_2025.pdf')
   const rm2 = withoutDocumentFile(withDup, 'businessRegistration', { withDoc: withDocument, withoutCustom: withoutCustomDocument })
   check('파일 지우기: 기본 칸은 안 받음으로', !rm2.documents.businessRegistration.received && rm2.documents.businessRegistration.fileName === '' && allDocumentMetas(rm2).some((m) => m.key === 'businessRegistration'))
+}
+
+// D-147: 서류함 고도화 · 안정화 — 시스템 파일 · 알려진 서류 유효기간 · 손볼 것 요약 · 기타 칸 옮기기
+{
+  check('시스템 파일: Thumbs.db · desktop.ini · ~$임시 · .DS_Store · __MACOSX 는 서류가 아니다', isSystemFile({ name: 'Thumbs.db' }) && isSystemFile({ name: 'desktop.ini' }) && isSystemFile({ name: '~$사업계획서.docx' }) && isSystemFile({ name: '.DS_Store' }) && isSystemFile({ name: '사업자등록증.pdf', webkitRelativePath: '샤인/__MACOSX/사업자등록증.pdf' }))
+  check('시스템 파일: 보통 서류는 통과', !isSystemFile({ name: '사업자등록증.pdf', webkitRelativePath: '샤인디자인/사업자등록증.pdf' }) && !isSystemFile({ name: 'thumbs_up.png' }))
+  check('알려진 서류 유효기간: 인감 3 · 납세 1 · 벤처 36 · 모르면 없음', knownDocValidMonths('법인인감증명서') === 3 && knownDocValidMonths('납세증명서') === 1 && knownDocValidMonths('벤처기업확인서') === 36 && knownDocValidMonths('졸업증명서') === null && knownDocValidMonths('법인인감증명서 (2)') === 3)
+  const base0 = normalizeClientOps({ id: 'sh1', companyName: '샤인디자인', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  const seal = cellForPlacement(base0, { kind: 'new', label: '법인인감증명서', sure: true, reason: '', issuedAt: null }, new Set())
+  const sealMeta = seal.record.customDocuments.find((d) => d.key === seal.key)
+  check('새 칸(알려진 서류)에 유효기간이 함께 — 인감 3개월', sealMeta?.validMonths === 3, JSON.stringify(sealMeta))
+  let withSeal = withDocument(seal.record, seal.key, { received: true, fileName: '인감.pdf', issuedAt: '2026-05-01' })
+  check('새 칸 유효기간 → 발급 5개월 지난 인감은 만료', docShelfSummary(withSeal, '2026-10-02', new Set()).expired.includes(seal.key))
+
+  // 손볼 것 요약
+  let shelf = withCustomDocument(base0, { label: `${OTHER_DOC_LABEL} · 스캔3` })
+  const otherKey = shelf.customDocuments.at(-1)!.key
+  shelf = withDocument(shelf, otherKey, { received: true, fileName: '스캔3.pdf', storagePath: 'w/c/o/3' })
+  shelf = withDocument(shelf, 'businessRegistration', { received: true, fileName: '사업자등록증_2025.pdf' })
+  const dup = cellForPlacement(shelf, { kind: 'existing', key: 'businessRegistration', label: '사업자등록증', sure: true, reason: '', issuedAt: null }, new Set())
+  shelf = withDocument(dup.record, dup.key, { received: true, fileName: '사업자등록증_최신.pdf' })
+  const sum = docShelfSummary(shelf, '2026-10-02', new Set(['corporateRegistry']))
+  check('요약: 기타 1 · 겹친 서류 1묶음(사업자등록증 둘) · 지금 필요한데 없음 1', sum.other.length === 1 && sum.other[0] === otherKey && sum.dupGroups.length === 1 && sum.dupGroups[0].length === 2 && sum.missingNow.join() === 'corporateRegistry', JSON.stringify(sum))
+
+  // 기타 칸 옮기기
+  const targets = moveTargets(shelf, otherKey)
+  check('옮길 곳: 이 업체 칸(번호 · 기타 칸 빼고) + 칸 없는 알려진 서류', targets.some((t) => t.value === 'key:smeCertificate') && !targets.some((t) => /\(\d+\)$/.test(t.label) || t.label.startsWith(OTHER_DOC_LABEL)) && targets.some((t) => t.value === 'new:법인인감증명서'))
+  const m1 = moveDocTo(shelf, otherKey, 'key:smeCertificate')
+  check('옮기기: 기본 칸(중소기업 확인서)으로 · 기타 칸은 없어짐', !!m1 && m1.record.documents.smeCertificate.storagePath === 'w/c/o/3' && !allDocumentMetas(m1.record).some((m) => m.key === otherKey) && m1.to === '중소기업 확인서', JSON.stringify(m1?.to))
+  const m2 = moveDocTo(shelf, otherKey, 'new:법인인감증명서')
+  const m2meta = m2 ? allDocumentMetas(m2.record).find((m) => m.label === '법인인감증명서') : undefined
+  check('옮기기: 새 칸(법인인감증명서) · 유효기간 3개월', !!m2meta && m2meta.validMonths === 3 && m2!.record.documents[m2meta.key].storagePath === 'w/c/o/3')
+  const m3 = moveDocTo(shelf, otherKey, 'new:사업자 등록증')
+  check('옮기기: 직접 적은 이름이 있는 칸과 같으면 그 칸 — 파일이 있으면 번호 칸', !!m3 && /^사업자등록증 \(\d\)$/.test(m3.to) && m3.record.documents.businessRegistration.fileName === '사업자등록증_2025.pdf', m3?.to)
+  check('옮기기: 빈 이름 · 파일 없는 칸은 하지 않음', moveDocTo(shelf, otherKey, 'new:  ') === null && moveDocTo(shelf, 'corporateRegistry', 'key:smeCertificate') === null)
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

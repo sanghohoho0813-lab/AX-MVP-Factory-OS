@@ -81,6 +81,8 @@ let row = {
       businessRegistration: { received: true, issuedAt: '2026-09-01', fileName: '사업자등록증.pdf', fileSize: PDF.length, storagePath: `${WS}/${CID}/businessRegistration/a-biz.pdf` },
       customdoc_photo: { received: true, issuedAt: '', fileName: '현장사진.png', fileSize: PNG.length, storagePath: `${WS}/${CID}/customdoc_photo/b-site.png` },
       customdoc_hwp: { received: true, issuedAt: '', fileName: '용역계약서.hwp', fileSize: 2048, storagePath: `${WS}/${CID}/customdoc_hwp/c-contract.hwp` },
+      // D-146/147: 예전 판별이 중소기업 확인서 칸에 넣은 졸업증명서 — 파일 이름으로는 모르고 글자를 읽어야 안다
+      smeCertificate: { received: true, issuedAt: '2020-02-01', fileName: '스캔0001.txt', fileSize: 120, storagePath: `${WS}/${CID}/smeCertificate/d-scan0001.txt` },
     },
     customDocuments: [
       { id: 'cd1', key: 'customdoc_photo', label: '현장 사진', validMonths: null, sensitive: false },
@@ -88,6 +90,8 @@ let row = {
     ],
   },
 }
+const TXT = { 'd-scan0001.txt': '졸 업 증 명 서\n성명 : 이대표\n위 사람은 본교 기계공학과를 졸업하였음을 증명합니다.\n2020년 2월 1일' }
+const deletes = []
 const signed = []
 const uploads = []
 const patches = []
@@ -123,13 +127,19 @@ await ctx.route(`https://${REF}.supabase.co/**`, async (route) => {
   // 서명 주소로 파일 받기
   if (method === 'GET' && path.startsWith('/storage/v1/object/sign/client-documents/')) {
     const key = path.slice('/storage/v1/object/sign/client-documents/'.length)
-    const body = key.endsWith('.png') ? PNG : key.endsWith('.pdf') ? PDF : Buffer.from('HWP-BYTES')
-    const type = key.endsWith('.png') ? 'image/png' : key.endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream'
+    const txt = TXT[key.split('/').pop()]
+    const body = txt ? Buffer.from(txt, 'utf8') : key.endsWith('.png') ? PNG : key.endsWith('.pdf') ? PDF : Buffer.from('HWP-BYTES')
+    const type = txt ? 'text/plain; charset=utf-8' : key.endsWith('.png') ? 'image/png' : key.endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream'
     const dl = url.searchParams.get('download')
     fetched.push({ key, dl })
     const headers = { 'content-type': type, 'access-control-allow-origin': '*' }
     if (dl !== null) headers['content-disposition'] = `attachment; filename*=UTF-8''${encodeURIComponent(dl || key.split('/').pop())}`
     return route.fulfill({ status: 200, headers, body })
+  }
+  // 지우기 — 서류함에서 빼도 보관함 파일은 지우지 않는다(D-146)
+  if (method === 'DELETE' && path.startsWith('/storage/v1/object/')) {
+    deletes.push(path)
+    return route.fulfill(json([]))
   }
   // 올리기
   if (method === 'POST' && path.startsWith('/storage/v1/object/client-documents/')) {
@@ -230,8 +240,36 @@ check('파일 교체: 글자에서 회사 정보 후보(사업자등록번호) �
 const shown = (await page.locator('main').innerText()) ?? ''
 check('파일 교체: 화면에 새 파일 이름', shown.includes('사업자등록증_새.txt'))
 
+// D-146/147: 서류 다시 분류 — 보관함 파일을 서명 주소로 받아 글자를 읽고 제목으로 옮긴다
+await page.goto(`${BASE}/ops/clients/${CID}?tab=docs`, { waitUntil: 'networkidle' })
+await page.waitForTimeout(800)
+check('다시 분류 전: 중소기업 확인서 만료(엉뚱한 서류)', ((await page.locator('main').innerText()) ?? '').includes('만료됨'))
+const fetchedBefore = fetched.length
+await page.getByTestId('doc-resort').click()
+await page.getByTestId('resort-sheet').waitFor()
+await page.waitForFunction(() => !document.querySelector('[data-testid="resort-reading"]'), null, { timeout: 30000 })
+const rmoves = await page.getByTestId('resort-move').allInnerTexts()
+check('다시 분류: 보관함에서 파일을 받아 읽었다', fetched.slice(fetchedBefore).some((f) => f.key.endsWith('d-scan0001.txt')), JSON.stringify(fetched.slice(fetchedBefore)))
+check('다시 분류: 글자 제목으로 — 스캔0001.txt 를 중소기업 확인서 → 졸업증명서', rmoves.length === 1 && rmoves[0].includes('스캔0001.txt') && rmoves[0].includes('졸업증명서') && rmoves[0].includes('서류 제목'), rmoves.join(' || '))
+await page.getByTestId('resort-apply').click()
+await page.waitForTimeout(1500)
+const rdocs = row.payload?.documents ?? {}
+const gradCell = (row.payload?.customDocuments ?? []).find((d) => d.label === '졸업증명서')
+check('다시 분류 후: 졸업증명서 새 칸에 같은 보관함 경로 · 중소기업 확인서 칸은 비움', !!gradCell && rdocs[gradCell.key]?.storagePath === `${WS}/${CID}/smeCertificate/d-scan0001.txt` && !rdocs.smeCertificate?.storagePath, JSON.stringify({ gradCell, sme: rdocs.smeCertificate }))
+check('다시 분류 후: 만료됨 사라짐', !((await page.locator('main').innerText()) ?? '').includes('만료됨'))
+
+// 파일 지우기 — 서류함에서만 빠지고 보관함 파일은 그대로
+await page.getByTestId(`doc-remove-${gradCell?.key}`).click()
+await page.getByTestId(`doc-remove-${gradCell?.key}-yes`).click()
+await page.waitForTimeout(1200)
+check('파일 지우기: 졸업증명서 칸이 서류함에서 빠짐', !(row.payload?.customDocuments ?? []).some((d) => d.key === gradCell?.key))
+check('파일 지우기: 보관함 파일은 지우지 않음(되돌릴 수 없는 삭제 0)', deletes.length === 0, deletes.join(' | '))
+
 check('비공개 저장소: 공개 주소를 한 번도 쓰지 않았다', publicHits.length === 0, publicHits.join(' | '))
-check('JS 오류 없음', errors.length === 0, errors.join(' | '))
+// 이 시험 환경은 바깥 CDN 에 못 나간다 — 사진 글자 인식(tesseract) 일꾼을 못 받아 생기는 오류만 뺀다(실제 사용자 PC 는 받는다).
+// 그래도 다시 분류는 멈추지 않고 끝나야 한다(위에서 확인).
+const realErrors = errors.filter((e) => !/tesseract\.js@.*worker\.min\.js/.test(e))
+check('JS 오류 없음(CDN 못 받는 글자 인식 일꾼 제외)', realErrors.length === 0, realErrors.join(' | '))
 
 await browser.close()
 stop()

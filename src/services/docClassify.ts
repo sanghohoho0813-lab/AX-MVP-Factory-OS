@@ -113,9 +113,14 @@ const BUILTIN_NAME_HINTS: Record<string, RegExp> = {
  * 기본 10종에 없지만 자주 오는 서류.
  * 대표가 같은 이름의 칸을 만들어 두었으면 그 칸으로 가고, 없으면 "이 이름으로 칸을 만들까요" 가 된다.
  */
-export const KNOWN_EXTRA_DOCS: { label: string; signals: Signal[]; nameHint: RegExp }[] = [
+/**
+ * D-147: validMonths — 이 서류로 새 칸을 만들 때 넣는 유효기간(발급일 기준 만료 알림).
+ * 법정 기한이 아니라 기관들이 보통 요구하는 발급 기준이다: 인감 3개월 이내 · 납세 · 완납증명은 발급 후 30일 · 벤처확인 3년.
+ */
+export const KNOWN_EXTRA_DOCS: { label: string; signals: Signal[]; nameHint: RegExp; validMonths?: number }[] = [
   {
     label: '법인인감증명서',
+    validMonths: 3,
     signals: [
       { re: /인감\s*증명서/, weight: 3, say: "제목 '인감증명서'" },
       { re: /인감/, weight: 1, say: "'인감'" },
@@ -124,6 +129,7 @@ export const KNOWN_EXTRA_DOCS: { label: string; signals: Signal[]; nameHint: Reg
   },
   {
     label: '납세증명서',
+    validMonths: 1,
     signals: [
       { re: /납세\s*증명서/, weight: 3, say: "제목 '납세증명서'" },
       { re: /국세\s*완납|체납액?\s*없음|징수\s*유예/, weight: 1, say: "'체납액 없음'" },
@@ -132,11 +138,13 @@ export const KNOWN_EXTRA_DOCS: { label: string; signals: Signal[]; nameHint: Reg
   },
   {
     label: '지방세 납세증명서',
+    validMonths: 1,
     signals: [{ re: /지방세\s*납세\s*증명/, weight: 3, say: "제목 '지방세 납세증명서'" }],
     nameHint: /지방세/,
   },
   {
     label: '4대보험 완납증명서',
+    validMonths: 1,
     signals: [
       { re: /4대\s*(?:사회)?보험/, weight: 2, say: "'4대보험'" },
       { re: /완납\s*증명/, weight: 2, say: "'완납증명'" },
@@ -163,6 +171,7 @@ export const KNOWN_EXTRA_DOCS: { label: string; signals: Signal[]; nameHint: Reg
   },
   {
     label: '벤처기업확인서',
+    validMonths: 36,
     signals: [{ re: /벤처기업\s*확인서/, weight: 3, say: "제목 '벤처기업확인서'" }],
     nameHint: /벤처기업\s*확인/,
   },
@@ -182,6 +191,12 @@ export const KNOWN_EXTRA_DOCS: { label: string; signals: Signal[]; nameHint: Reg
     nameHint: /통장/,
   },
 ]
+
+/** D-147: 알려진 서류 이름 → 새 칸 유효기간(개월). 모르면 null */
+export function knownDocValidMonths(label: string): number | null {
+  const c = label.replace(/\s+/g, '').replace(/\(\d+\)$/, '')
+  return KNOWN_EXTRA_DOCS.find((k) => k.label.replace(/\s+/g, '') === c)?.validMonths ?? null
+}
 
 function compact(s: string): string {
   return s.replace(/\s+/g, '')

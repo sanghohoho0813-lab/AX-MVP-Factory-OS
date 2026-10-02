@@ -154,6 +154,8 @@ import { ClientJournalTab } from '../components/ops/ClientJournalTab'
 import { ClientSharedFiles } from '../components/ops/FilesTab'
 import { DocFileActions } from '../components/ops/DocFileActions'
 import { DocResortSheet } from '../components/ops/DocResortSheet'
+import { DocKindPicker, DocShelfBar } from '../components/ops/DocShelfBar'
+import { docShelfSummary } from '../services/docShelf'
 import { withoutDocumentFile } from '../services/docPlacementApply'
 import { generateId } from '../storage/localStore'
 import { ClientConsultingTab } from '../components/consulting/ClientConsultingTab'
@@ -1164,6 +1166,19 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           </p>
         )}
 
+        {/* D-147: 손볼 것만 한 줄 — 누르면 그 칸으로 */}
+        <DocShelfBar
+          summary={docShelfSummary(record, today, urgentDocs)}
+          onJump={(key) => {
+            setOpenDocs((cur) => new Set(cur).add(key))
+            requestAnimationFrame(() => {
+              const el = document.getElementById(`doc-card-${key}`)
+              el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+              el?.focus({ preventScroll: true })
+            })
+          }}
+        />
+
         <div className="grid gap-3 lg:grid-cols-2">
           {docOrder(allDocumentMetas(record), urgentDocs)
             .map((meta) => {
@@ -1180,7 +1195,10 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               return (
                 <div
                   key={meta.key}
-                  className={`flex flex-col gap-2.5 rounded-(--radius-panel) border p-4 ${
+                  id={`doc-card-${meta.key}`}
+                  data-doc-card={meta.key}
+                  tabIndex={-1}
+                  className={`flex scroll-mt-24 flex-col gap-2.5 rounded-(--radius-panel) border p-4 outline-none focus-visible:ring-2 focus-visible:ring-brand-400 ${
                     view.expired
                       ? 'border-danger-200 bg-danger-50/40'
                       : urgent
@@ -1393,6 +1411,17 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
                     </>
                   )}
+
+                  {/* D-147: 기타 칸 — 무슨 서류인지 고르면 맞는 칸으로 */}
+                  <DocKindPicker
+                    record={record}
+                    docKey={meta.key}
+                    onMove={(next, to) => {
+                      void commit(next).then((ok) => {
+                        if (ok) showToast(`'${to}' 칸으로 옮겼습니다.`)
+                      })
+                    }}
+                  />
 
                   {custom &&
                     (renamingDoc === custom.id ? (

@@ -374,6 +374,77 @@ for (const width of [1440, 390]) {
   await ctx.close()
 }
 
+/* ---------------- D-147 서류함 — 시스템 파일 · 같은 파일 · 유효기간 · 기타 칸 옮기기 · 손볼 것 · 읽다 닫기 ---------------- */
+for (const width of [1440, 390]) {
+  const ctx = await browser.newContext({ viewport: { width, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  const tag = `(${width})`
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const rec = () => page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_mirae'))
+  const labelOf = (x, key) => (x.customDocuments ?? []).find((d) => d.key === key)?.label ?? key
+  const filed = (x) => Object.entries(x.documents).filter(([, d]) => d.fileName).map(([k, d]) => `${labelOf(x, k)}=${d.fileName}`)
+  const txt = (name, lines) => ({ name, mimeType: 'text/plain', buffer: Buffer.from(lines.join('\n'), 'utf8') })
+  const SEAL = txt('인감.txt', ['법인인감증명서', '상호 : 미래바이오랩', '발급일자 : 2026년 05월 01일'])
+  const MEMO = txt('스캔0003.txt', ['회의 메모 — 다음 주 다시 연락'])
+  const JUNK = [txt('Thumbs.db', ['x']), txt('desktop.ini', ['[.ShellClassInfo]']), txt('~$계획서.txt', ['tmp'])]
+
+  await page.goto(BASE + '/ops/clients/cli_mirae', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([SEAL, MEMO, ...JUNK])
+  await page.getByTestId('smart-placed').waitFor({ timeout: 20000 })
+  await page.waitForTimeout(600)
+  const r1 = await rec()
+  const f1 = filed(r1)
+  check(`시스템 파일: Thumbs.db · desktop.ini · ~$ 임시 파일은 올리지 않음 ${tag}`, f1.length === 2 && !f1.some((x) => /Thumbs|desktop\.ini|~\$/.test(x)), f1.join(' | '))
+  const sealCell = (r1.customDocuments ?? []).find((d) => d.label === '법인인감증명서')
+  check(`알려진 서류 새 칸: 법인인감증명서 · 유효기간 3개월 · 발급일 ${tag}`, sealCell?.validMonths === 3 && r1.documents[sealCell.key]?.issuedAt === '2026-05-01', JSON.stringify({ sealCell, st: sealCell && r1.documents[sealCell.key] }))
+
+  // 같은 파일을 한 번 더
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([SEAL])
+  await page.waitForFunction(() => /이름 · 크기가 같은 파일/.test(document.querySelector('[data-testid="smart-placed"]')?.textContent ?? ''), null, { timeout: 20000 })
+  check(`같은 파일: 올리되 '이름 · 크기가 같은 파일이 이미 있어요' 표시 ${tag}`, true)
+
+  // 서류 탭 — 손볼 것 한 줄
+  await page.goto(BASE + '/ops/clients/cli_mirae?tab=docs', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  const shelf = (await page.getByTestId('doc-shelf').innerText()) ?? ''
+  check(`손볼 것: 만료 · 무슨 서류인지 확인 · 겹친 서류 ${tag}`, /만료 [1-9]/.test(shelf) && /무슨 서류인지 확인 1/.test(shelf) && /겹친 서류 1묶음/.test(shelf), shelf)
+  await page.getByTestId('shelf-other').click()
+  await page.waitForTimeout(700)
+  const otherKey = (r1.customDocuments ?? []).find((d) => d.label.startsWith('기타 · 확인 필요'))?.key
+  const inView = await page.evaluate((k) => { const el = document.getElementById(`doc-card-${k}`); if (!el) return false; const b = el.getBoundingClientRect(); return b.top < window.innerHeight && b.bottom > 0 }, otherKey)
+  check(`손볼 것: '무슨 서류인지 확인' 누르면 그 칸으로 ${tag}`, inView)
+
+  // 기타 칸 — 무슨 서류인지 고르기 → 맞는 칸으로
+  await page.getByLabel(/무슨 서류인지 고르기/).first().selectOption({ label: '중소기업 확인서' })
+  await page.waitForTimeout(700)
+  const r2 = await rec()
+  check(`기타 칸 옮기기: 중소기업 확인서 칸으로 · 기타 칸 없어짐 ${tag}`, r2.documents.smeCertificate?.fileName === '스캔0003.txt' && !(r2.customDocuments ?? []).some((d) => d.label.startsWith('기타 · 확인 필요')), filed(r2).join(' | '))
+  check(`옮긴 뒤: '무슨 서류인지 확인' 칩 사라짐 ${tag}`, (await page.getByTestId('shelf-other').count()) === 0)
+
+  // 읽는 중에 닫기 — 남은 파일은 올리지 않는다
+  const PDF = (await import('node:fs')).readFileSync('e2e/fixtures/cretop-sample.pdf')
+  const many = Array.from({ length: 12 }, (_, i) => ({ name: `보고서${i + 1}.pdf`, mimeType: 'application/pdf', buffer: PDF }))
+  const before = filed(await rec()).length
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles(many)
+  await page.getByRole('button', { name: '멈추고 닫기' }).waitFor({ timeout: 10000 })
+  await page.getByRole('button', { name: '멈추고 닫기' }).click()
+  await page.waitForTimeout(6000)
+  const after = filed(await rec()).length
+  check(`읽다가 닫기: 멈추고 하나도 올리지 않음 ${tag}`, after === before && (await page.getByRole('dialog').count()) === 0, `${before} → ${after}`)
+
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  check(`가로 넘침 0 ${tag}`, over <= 0, String(over))
+  check(`D-147 오류 0 ${tag}`, errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 /* ---------------- D-145 맞춤 상담 ---------------- */
 for (const width of [1440, 390]) {
   const ctx = await browser.newContext({ viewport: { width, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
