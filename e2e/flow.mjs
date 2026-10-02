@@ -153,7 +153,7 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   check(`뒤로: 영업 관리에서 연 업체는 '영업 관리로' 단추 ${tag}`, ((await backBtn.innerText()) ?? '').includes('영업 관리로'), await backBtn.innerText())
   const current = await page.locator('[aria-current="page"]').filter({ visible: true }).allInnerTexts()
   check(`뒤로: 메뉴는 영업 관리에 머문다(고객 관리로 바뀌지 않음) ${tag}`, (mob || current.some((t) => t.includes('영업'))) && !current.some((t) => t.includes('고객')), current.join())
-  await page.locator('[role="tab"]').filter({ visible: true }).nth(1).click()
+  await page.locator('[role="tab"]').filter({ visible: true }).nth(2).click() // D-144: 맞춤 추천 · 개요 다음 — 서류 탭
   await page.waitForURL(/tab=/)
   await backBtn.click()
   await page.waitForURL((u) => u.pathname.startsWith('/sales'))
