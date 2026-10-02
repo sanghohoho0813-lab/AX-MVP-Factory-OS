@@ -43,6 +43,7 @@ npm run qa:enroll -- http://localhost:4390        # 명부 → 직원 → 참여
 npm run qa:planner -- http://localhost:4390       # 일정 달력(쉬는 날 빨간 날짜 · 공휴일 넣기 · 영업일 · 두 번 눌러 적기 · 반복 · 쉬는 날 마감 경고)
 npm run qa:contract -- http://localhost:4390      # 계약 → 받은 돈 → 남은 돈(CASE 1~4 · 조건 대기 ≠ 미수금 · 정책자금 실제 입금 · 입금 확인/되돌리기 · 계약 상태 배지)
 npm run qa:grants -- http://localhost:4390        # 지원사업 알림(공고 붙여넣기 · 맞는 업체 계약/잠재 · 카톡 문구 · 오늘 · 가망고객 찾기 화면 · 알림 신청 → 상담신청함 → 잠재고객)
+npm run qa:money -- http://localhost:4390         # 매출 · 비용(계약 수금 → 들어온 돈/예상 · 정기 결제일 · 비용 적기 · CSV · 해지 · 오늘 3일 안 결제 · 오늘 할 일 PC 두 칸 · AI 자리 단추)
 ```
 
 화면을 손댔으면 **실제로 찍어서 눈으로 본다**(`npm run qa:shots -- <url> <dir> --wide`).

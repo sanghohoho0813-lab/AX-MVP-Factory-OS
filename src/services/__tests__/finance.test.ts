@@ -9,6 +9,7 @@
 import { normalizeClientOps } from '../clientOpsService'
 import {
   DEFAULT_SETTINGS,
+  isActiveSub,
   addMonths,
   chargeDateIn,
   costCsv,
@@ -71,6 +72,7 @@ const exp = (p: Partial<Expense>): Expense => ({ id: 'e', date: '2026-10-01', na
   check('결제일: 시작 전 달은 없음', chargeDateIn(sub({ startDate: '2026-10-10' }), '2026-10') === '' && chargeDateIn(sub({ startDate: '2026-10-10' }), '2026-11') === '2026-11-05')
   check('결제일: 해지 뒤 없음', chargeDateIn(sub({ endDate: '2026-10-31' }), '2026-11') === '' && chargeDateIn(sub({ endDate: '2026-10-31' }), '2026-10') === '2026-10-05')
   check('다음 결제: 오늘 이후 첫 날', nextCharge(sub({ billingDay: 1 }), TODAY) === '2026-11-01' && nextCharge(sub({ billingDay: 2 }), TODAY) === '2026-10-02')
+  check('쓰는 중: 오늘 해지하면 해지한 것 · 내일 해지면 아직 쓰는 중', !isActiveSub(sub({ endDate: TODAY }), TODAY) && isActiveSub(sub({ endDate: '2026-10-03' }), TODAY))
   check('다음 결제: 해지했으면 없음', nextCharge(sub({ endDate: '2026-10-01' }), TODAY) === '')
   check('달 넘기기: 12월 + 1 = 다음 해 1월 · 1월 − 1', addMonths('2026-12', 1) === '2027-01' && addMonths('2026-01', -1) === '2025-12')
   const up = upcomingCharges([sub({ id: 'a', billingDay: 2 }), sub({ id: 'b', billingDay: 5 }), sub({ id: 'c', billingDay: 6 }), sub({ id: 'd', billingDay: 3, endDate: '2026-10-01' }), sub({ id: 'z', amount: 0, billingDay: 3 })], TODAY)
@@ -82,7 +84,7 @@ const exp = (p: Partial<Expense>): Expense => ({ id: 'e', date: '2026-10-01', na
   check('달러 환산', toKrw(20, 'USD', S) === 28000 && toKrw(28000, 'KRW', S) === 28000)
   check('연 결제 한 달 치', monthlyEquivalent(sub({ cycle: 'yearly', amount: 120000, currency: 'KRW' }), S) === 10000)
   check('글자: $20 · 28,000원', moneyText(20, 'USD') === '$20' && moneyText(28000, 'KRW') === '28,000원')
-  check('짧게: 1억 2,000만원 · 850만원 · 28,000원', krwShort(120_000_000) === '1억 2,000만원' && krwShort(8_500_000) === '850만원' && krwShort(28000) === '28,000원', [krwShort(120_000_000), krwShort(8_500_000)])
+  check('짧게: 1억 2,000만원 · 850만원 · 28,000원 · 100만 아래는 정확히 336,000원', krwShort(120_000_000) === '1억 2,000만원' && krwShort(8_500_000) === '850만원' && krwShort(28000) === '28,000원' && krwShort(336000) === '336,000원', [krwShort(120_000_000), krwShort(8_500_000)])
   check('금액 읽기: 2.8만 · 1억2천 · 15,000원 · $20 · 20달러', parseAmount('2.8만')?.amount === 28000 && parseAmount('1억2천')?.amount === 120_000_000 && parseAmount('15,000원')?.amount === 15000 && parseAmount('$20')?.currency === 'USD' && parseAmount('20달러')?.amount === 20)
   check('금액 읽기: 3천만 · 500만원', parseAmount('3천만')?.amount === 30_000_000 && parseAmount('500만원')?.amount === 5_000_000, [parseAmount('3천만'), parseAmount('500만원')])
   check('금액 읽기: 1억2천만 · 숫자만', parseAmount('1억2천만')?.amount === 120_000_000 && parseAmount('120000000')?.amount === 120_000_000)

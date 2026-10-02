@@ -16,6 +16,7 @@ import { ChevronRight, FileSignature, PackageSearch, Search } from 'lucide-react
 import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useToast } from '../../components/ui/toastContext'
 import { Badge, Disclosure, MetricTile, ScreenTitle, Surface, type Tone } from '../../components/ui/primitives'
+import { AiSoonButton } from '../../components/ui/AiSoonButton'
 import { Button } from '../../components/ui/Button'
 import { SalesTabs } from '../../components/sales/SalesTabs'
 import { CopyButton, PillList, StageBadge } from '../../components/sales/salesParts'
@@ -570,7 +571,11 @@ function ProposalContent({ workspaceId }: { workspaceId: string | null }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <ScreenTitle title="영업 관리" sub={`${today} · 상품·제안 — 추천 상품 · 제안서 · 업무범위서 · 월납 · 계약 준비`} />
+      <ScreenTitle
+        title="영업 관리"
+        sub={`${today} · 상품·제안 — 추천 상품 · 제안서 · 업무범위서 · 월납 · 계약 준비`}
+        actions={<AiSoonButton size="sm" label="AI로 제안서 문장 다듬기" what="고른 상품과 업체 사정에 맞춰 제안서 문장을 다듬어 줍니다" />}
+      />
       <SalesTabs />
 
       <div role="group" aria-label="상품·제안 보기" data-testid="proposal-view" className="grid grid-cols-2 gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:inline-flex sm:self-start">

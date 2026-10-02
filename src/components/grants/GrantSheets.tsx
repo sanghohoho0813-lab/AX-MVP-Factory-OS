@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { ArrowRight, Copy, Link2, Send } from 'lucide-react'
 import { BottomSheet } from '../ui/primitives'
 import { Button } from '../ui/Button'
+import { AiSoonButton } from '../ui/AiSoonButton'
 import { GRANT_CATEGORY_LABEL, GRANT_SOURCE_LABEL, deadlineOf, rulesText, type GrantMatch, type GrantNotice } from '../../services/grants/grantMatch'
 import { missingForMatch, profileLine } from '../../services/grants/grantProfile'
 import { CLIENT_KIND_LABEL, type ClientMatch, type GrantClient } from '../../services/grants/grantView'
@@ -191,6 +192,7 @@ export function ClientGrantPanel({
         <Button size="sm" variant="primary" onClick={onCopyAll} disabled={matches.length === 0} data-testid="client-grants-copy">
           <Copy aria-hidden="true" className="size-4" /> 카톡 문구 복사
         </Button>
+        <AiSoonButton size="sm" label="AI로 맞춤 안내문" what="이 업체 사정에 맞춰 공고 안내 문구와 준비 서류 목록을 써 줍니다" />
         <Button size="sm" variant="secondary" onClick={onCopyLink} data-testid="client-grants-link">
           <Link2 aria-hidden="true" className="size-4" /> 찾기 링크 복사
         </Button>

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { SlidersHorizontal } from 'lucide-react'
 import { PageHeader } from '../components/ui/PageHeader'
+import { AiSoonButton } from '../components/ui/AiSoonButton'
 import { ScheduleTabs } from '../components/journal/ScheduleTabs'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { useToast } from '../components/ui/toastContext'
@@ -110,9 +111,13 @@ function JournalContent({ workspaceId, userId }: { workspaceId: string | null; u
         title="일정"
         description={`${RANGE_TITLE[range]} — 고객에게는 보이지 않는 나만의 기록입니다.`}
         actions={
-          <span className="hidden lg:inline-flex">
-            <ScreenGuide screenKey="journal" />
-          </span>
+          <>
+            {/* D-142: 나중에 GPT · Claude 를 붙일 자리 — 지금은 아무것도 보내지 않는다 */}
+            <AiSoonButton size="sm" label="AI로 돌아보기" what="이 기간 기록을 요약하고 놓친 후속 연락을 짚어 줍니다" />
+            <span className="hidden lg:inline-flex">
+              <ScreenGuide screenKey="journal" />
+            </span>
+          </>
         }
       />
       <ScheduleTabs />

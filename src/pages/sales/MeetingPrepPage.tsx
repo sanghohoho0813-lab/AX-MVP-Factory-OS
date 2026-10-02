@@ -26,6 +26,7 @@ import { useToast } from '../../components/ui/toastContext'
 import { LINK_BUTTON } from '../../components/sales/salesStyle'
 import { CallButton } from '../../components/ops/opsControls'
 import { Disclosure, ScreenTitle } from '../../components/ui/primitives'
+import { AiSoonButton } from '../../components/ui/AiSoonButton'
 import { Button } from '../../components/ui/Button'
 import { SalesTabs } from '../../components/sales/SalesTabs'
 import { rampAt } from '../../components/sales/salesColor'
@@ -599,7 +600,11 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <ScreenTitle title="영업 관리" sub={`${today} · 미팅 준비 — 1차는 크레탑 분석기, 2차부터 이어서 물을 것 · 대본`} />
+      <ScreenTitle
+        title="영업 관리"
+        sub={`${today} · 미팅 준비 — 1차는 크레탑 분석기, 2차부터 이어서 물을 것 · 대본`}
+        actions={<AiSoonButton size="sm" label="AI로 미팅 질문 다듬기" what="업체 정보와 지난 미팅 메모로 이번 미팅 질문 · 대본을 다듬어 줍니다" />}
+      />
       <SalesTabs />
 
       {error && (

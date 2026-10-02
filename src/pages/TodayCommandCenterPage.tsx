@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { TodayGrantAlerts } from '../components/grants/TodayGrantAlerts'
+import { TodayCharges } from '../components/money/TodayCharges'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
@@ -443,7 +444,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         {overdueTodos.length > 0 && (
           <div className="flex flex-col gap-2">
             <p className="t-sub font-semibold text-danger-700">밀린 것 {overdueTodos.length}건</p>
-            <ul className="ax-stagger flex flex-col gap-2">
+            <ul className="ax-stagger flex flex-col gap-2 lg:grid lg:grid-cols-2" data-testid="today-todo-grid">
               {overdueTodos.map((e) => (
                 <TodoRow
                   key={e.id}
@@ -458,7 +459,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         )}
 
         {todayTodos.length > 0 && (
-          <ul className="ax-stagger flex flex-col gap-2">
+          <ul className="ax-stagger flex flex-col gap-2 lg:grid lg:grid-cols-2" data-testid="today-todo-grid">
             {todayTodos.map((e) => (
               <TodoRow
                 key={e.id}
@@ -471,68 +472,74 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           </ul>
         )}
 
-        {/* D-138: 놓치면 끝나는 기한 — 지나면 신청할 수 없는 것만(7일 안) */}
-        {hardDue.length > 0 && (
-          <div data-testid="today-hard-deadlines" className="flex flex-col gap-2">
-            <p className="t-sub font-semibold text-danger-700">놓치면 끝나는 기한 {hardDue.length}건</p>
-            <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-control) border border-danger-200 bg-white">
-              {hardDue.map((a) => (
-                <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
-                  <span className="t-sub w-20 shrink-0 font-semibold whitespace-nowrap text-danger-700">{a.reason.startsWith('오늘') ? '오늘까지' : a.reason.split(' — ')[0]}</span>
-                  <Link to={a.href} className="tap t-body inline-flex items-center font-bold text-slate-900 hover:text-brand-700 hover:underline">
-                    {a.clientName}
-                  </Link>
-                  <span className="t-body min-w-0 flex-[1_1_10rem] break-keep text-slate-700">{a.title}</span>
-                  <span className="t-sub ml-auto shrink-0 break-keep text-slate-500">지나면 신청 불가</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* D-141: 지원사업 — 7일 안에 끝나는 공고 · 맞는 업체 중 아직 안 알린 곳 */}
-        <TodayGrantAlerts workspaceId={workspaceId} clients={clients} today={today} />
-
-        {/* D-120: 다음 약속 — 업체마다 적어 둔 '다음에 무엇을, 언제' 가운데 지난 것 · 오늘 · 내일 */}
-        {appointments.length > 0 && (
-          <div data-testid="today-appointments" className="flex flex-col gap-2">
-            <p className="t-sub font-semibold text-slate-700">업체 약속 {appointments.length}건</p>
-            <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-control) border border-slate-200 bg-white">
-              {appointments.map((e) => {
-                const late = (e.daysLeft ?? 0) < 0
-                return (
-                  <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
-                    <span className={`t-sub w-20 shrink-0 font-semibold whitespace-nowrap ${late ? 'text-danger-700' : 'text-brand-700'}`}>
-                      {e.daysLeft === 0 ? '오늘' : e.daysLeft === 1 ? '내일' : `${Math.abs(e.daysLeft ?? 0)}일 지남`}
-                    </span>
-                    <Link to={`/ops/clients/${e.clientId}`} className="tap t-body inline-flex items-center font-bold text-slate-900 hover:text-brand-700 hover:underline">
-                      {e.clientName}
+        {/* D-142: PC 에서는 기한 · 지원사업 · 결제 · 약속을 두 칸으로 — 한 줄씩 쌓이면 아래 '지금 이것부터' 가 화면 밖으로 밀렸다 */}
+        <div className="flex flex-col gap-3 empty:hidden lg:grid lg:grid-cols-2 lg:items-start lg:gap-4" data-testid="today-side-grid">
+          {/* D-138: 놓치면 끝나는 기한 — 지나면 신청할 수 없는 것만(7일 안) */}
+          {hardDue.length > 0 && (
+            <div data-testid="today-hard-deadlines" className="flex flex-col gap-2">
+              <p className="t-sub font-semibold text-danger-700">놓치면 끝나는 기한 {hardDue.length}건</p>
+              <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-control) border border-danger-200 bg-white">
+                {hardDue.map((a) => (
+                  <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                    <span className="t-sub w-20 shrink-0 font-semibold whitespace-nowrap text-danger-700">{a.reason.startsWith('오늘') ? '오늘까지' : a.reason.split(' — ')[0]}</span>
+                    <Link to={a.href} className="tap t-body inline-flex items-center font-bold text-slate-900 hover:text-brand-700 hover:underline">
+                      {a.clientName}
                     </Link>
-                    <span className="t-body min-w-0 flex-[1_1_10rem] break-keep text-slate-700">{e.title}</span>
-                    <span className="ml-auto flex shrink-0 items-center gap-2">
-                      {prospectIds.has(e.clientId) ? (
-                        <Link to={`/sales/meeting?client=${e.clientId}`} className="tap t-sub inline-flex items-center font-semibold text-brand-700 hover:underline">
-                          미팅 준비 →
-                        </Link>
-                      ) : (
-                        <Link to={`/ops/clients/${e.clientId}`} className="tap t-sub inline-flex items-center font-semibold text-brand-700 hover:underline">
-                          업체 열기 →
-                        </Link>
-                      )}
-                      {/* D-125: 약속 줄에서 바로 전화 */}
-                      <CallButton phone={phoneOf(e.clientId)} name={e.clientName} />
-                    </span>
+                    <span className="t-body min-w-0 flex-[1_1_10rem] break-keep text-slate-700">{a.title}</span>
+                    <span className="t-sub ml-auto shrink-0 break-keep text-slate-500">지나면 신청 불가</span>
                   </li>
-                )
-              })}
-            </ul>
-          </div>
-        )}
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* D-141: 지원사업 — 7일 안에 끝나는 공고 · 맞는 업체 중 아직 안 알린 곳 */}
+          <TodayGrantAlerts workspaceId={workspaceId} clients={clients} today={today} />
+
+          {/* D-142: 3일 안에 결제될 정기 결제 */}
+          <TodayCharges workspaceId={workspaceId} today={today} />
+
+          {/* D-120: 다음 약속 — 업체마다 적어 둔 '다음에 무엇을, 언제' 가운데 지난 것 · 오늘 · 내일 */}
+          {appointments.length > 0 && (
+            <div data-testid="today-appointments" className="flex flex-col gap-2">
+              <p className="t-sub font-semibold text-slate-700">업체 약속 {appointments.length}건</p>
+              <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-control) border border-slate-200 bg-white">
+                {appointments.map((e) => {
+                  const late = (e.daysLeft ?? 0) < 0
+                  return (
+                    <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                      <span className={`t-sub w-20 shrink-0 font-semibold whitespace-nowrap ${late ? 'text-danger-700' : 'text-brand-700'}`}>
+                        {e.daysLeft === 0 ? '오늘' : e.daysLeft === 1 ? '내일' : `${Math.abs(e.daysLeft ?? 0)}일 지남`}
+                      </span>
+                      <Link to={`/ops/clients/${e.clientId}`} className="tap t-body inline-flex items-center font-bold text-slate-900 hover:text-brand-700 hover:underline">
+                        {e.clientName}
+                      </Link>
+                      <span className="t-body min-w-0 flex-[1_1_10rem] break-keep text-slate-700">{e.title}</span>
+                      <span className="ml-auto flex shrink-0 items-center gap-2">
+                        {prospectIds.has(e.clientId) ? (
+                          <Link to={`/sales/meeting?client=${e.clientId}`} className="tap t-sub inline-flex items-center font-semibold text-brand-700 hover:underline">
+                            미팅 준비 →
+                          </Link>
+                        ) : (
+                          <Link to={`/ops/clients/${e.clientId}`} className="tap t-sub inline-flex items-center font-semibold text-brand-700 hover:underline">
+                            업체 열기 →
+                          </Link>
+                        )}
+                        {/* D-125: 약속 줄에서 바로 전화 */}
+                        <CallButton phone={phoneOf(e.clientId)} name={e.clientName} />
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )}
+        </div>
 
         {/* 끝낸 것은 접어 둔다 — 남은 일이 목록의 전부여야 한다 */}
         {doneTodos.length > 0 && (
           <Disclosure title="끝낸 것" hint={`${doneTodos.length}건`}>
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col gap-2 lg:grid lg:grid-cols-2">
               {doneTodos.map((e) => (
                 <TodoRow
                   key={e.id}

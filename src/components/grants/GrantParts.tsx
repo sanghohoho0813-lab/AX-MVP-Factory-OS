@@ -6,6 +6,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { Check, CircleHelp, ExternalLink, X } from 'lucide-react'
 import { BottomSheet } from '../ui/primitives'
 import { Button } from '../ui/Button'
+import { AiSoonButton } from '../ui/AiSoonButton'
 import {
   CERT_LABEL,
   GRANT_CATEGORY_LABEL,
@@ -370,6 +371,7 @@ export function AddNoticeSheet({
 
         {mode === 'paste' && !draft && (
           <>
+            <AiSoonButton size="sm" label="AI로 공고 PDF 읽기" what="공고문 · 첨부 PDF를 읽어 조건 · 준비 서류 · 지원 금액을 더 정확히 채워 줍니다" className="self-start" />
             <p className="t-sub break-keep text-slate-600">기업마당 · 부처 누리집의 공고 화면을 통째로 복사해서 붙여 넣으세요. 공고명 · 신청기간 · 지원대상 · 조건을 읽어서 칸을 채웁니다. 저장 전에 한 번 보여 드려요.</p>
             <textarea id="grant-paste" value={paste} onChange={(e) => setPaste(e.target.value)} rows={9} className={inputCls} placeholder={'[경기] 2026년 ○○ 지원사업 공고\n소관부처 …\n신청기간 2026.10.01 ~ 2026.10.31\n지원대상 …'} />
           </>

@@ -157,8 +157,9 @@ export function nextCharge(s: Subscription, today: string): string {
   return ''
 }
 
+/** 쓰는 중인가 — 오늘 해지했으면 이미 해지한 것으로 본다(오늘 결제분은 비용에 남는다) */
 export function isActiveSub(s: Pick<Subscription, 'endDate'>, today: string): boolean {
-  return !isYmd(s.endDate) || s.endDate >= today
+  return !isYmd(s.endDate) || s.endDate > today
 }
 
 /* ------------------------------------------------------------------ */
@@ -179,7 +180,8 @@ export function moneyText(amount: number, currency: Currency): string {
 export function krwShort(won: number): string {
   const sign = won < 0 ? '-' : ''
   const a = Math.abs(Math.round(won))
-  if (a < 100_000) return `${sign}${a.toLocaleString('ko-KR')}원`
+  // 100만원 아래는 정확히(비용은 몇천 원 단위가 중요하다), 그 위는 억 · 만
+  if (a < 1_000_000) return `${sign}${a.toLocaleString('ko-KR')}원`
   const eok = Math.floor(a / 1e8)
   const man = Math.round((a % 1e8) / 1e4)
   if (eok > 0) return `${sign}${eok.toLocaleString('ko-KR')}억${man ? ` ${man.toLocaleString('ko-KR')}만` : ''}원`

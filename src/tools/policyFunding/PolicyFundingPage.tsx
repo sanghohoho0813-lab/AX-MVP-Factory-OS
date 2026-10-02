@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useState, type ReactNode, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { AiSoonButton } from '../../components/ui/AiSoonButton'
 import { toolOf } from '../../config/toolRegistry'
 import { ModuleDashboard } from '../shared/ModuleDashboard'
 import { useModuleSection } from '../shared/ModuleRoute'
@@ -335,6 +336,7 @@ export function PolicyFundingPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="정책자금 진단"
+        actions={<AiSoonButton size="sm" label="AI로 사업계획서 초안" what="진단 결과와 업체 정보로 사업계획서 초안을 써 줍니다" />}
         description={
           meta?.hint
             ? `${meta.label} — ${meta.hint}. 규칙과 사례로 계산하며, 승인을 보장하지 않습니다.`
