@@ -446,6 +446,28 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   check('합치기: 같은 공고면 직접 넣은 것을 남김', merged.length === 2 && merged[0].id === 'm1' && merged.some((n) => n.id === 'biz_PBLN_10'))
   check('9시 칸: 한국 오전 8시 59분 = 어제 칸 · 9시 = 오늘 칸', slotOf(Date.parse('2026-10-01T23:59:00Z')) === '2026-10-01' && slotOf(Date.parse('2026-10-02T00:00:00Z')) === '2026-10-02')
 
+  // 실제 기업마당 응답에서 본 모양(2026-10-02, 1,000건)
+  const real = noticesFromFeed(
+    [
+      { pblancId: 'R1', pblancNm: '2026년 중소기업 정책자금 융자계획 변경 공고', jrsdInsttNm: '중소벤처기업부', reqstBeginEndDe: '예산 소진시까지', trgetNm: '중소기업', hashtags: '금융,서울,부산,대구,인천,전남,대전,울산,세종,경기,강원,충북,충남,전북,경북,경남,제주' },
+      { pblancId: 'R2', pblancNm: '[경기] 안산시 2026년 소상공인 특례보증 추가 지원 계획 공고', jrsdInsttNm: '경기도', reqstBeginEndDe: '예산 소진시까지', trgetNm: '소상공인', bsnsSumryCn: '안산시 소재 소상공인', hashtags: '금융,경기,2026,경기도,안산시,소상공인' },
+      { pblancId: 'R3', pblancNm: '[경기] 부천시 2026년 스타트업포럼 참가기업 모집 공고', jrsdInsttNm: '경기도', reqstBeginEndDe: '2026-10-01 ~ 2026-10-20', trgetNm: '중소기업', hashtags: '경기' },
+      { pblancId: 'R4', pblancNm: '2026년 AI 실증 지원 공고', jrsdInsttNm: '전남광주통합특별시', reqstBeginEndDe: '모집 완료시', trgetNm: '중소기업', hashtags: '' },
+      { pblancId: 'R5', pblancNm: '2026년 공공기술 사업화용 기술평가 지원기업 모집 공고', jrsdInsttNm: '지식재산처', reqstBeginEndDe: '2026-10-01 ~ 2026-10-31', trgetNm: '연구개발특구 소재 기업', hashtags: '창업7년이하' },
+      { pblancId: 'R6', pblancNm: '[서울ㆍ경기] 2026년 ESG 컨설팅 지원 사업 공고', jrsdInsttNm: '보건복지부', reqstBeginEndDe: '2026-10-01 ~ 2026-10-31', trgetNm: '중소기업', hashtags: '' },
+    ],
+    '2026-10-02T00:00:00Z',
+  )
+  const byId = (id: string) => real.find((n) => n.id === `biz_${id}`) as GrantNotice
+  check('실제: 해시태그에 시·도 17개 = 전국(지역 조건 아님) → 전국 공통', byId('R1').rules.regions.length === 0 && matchGrant(byId('R1'), full, TODAY).verdict === 'general', byId('R1').rules.regions)
+  check('실제: 날짜 2026-10-01 ~ 2026-10-20(줄표)', byId('R3').applyEnd === '2026-10-20' && byId('R3').applyStart === '2026-10-01')
+  check('실제: 안산시 태그 + 개요에 안산시 → 시 조건 · 파주 업체는 안 맞음', byId('R2').rules.cities.join() === '안산시' && matchGrant(byId('R2'), full, TODAY).verdict === 'no', byId('R2').rules)
+  check('실제: 이름 앞 [경기] 부천시 → 부천시 조건', byId('R3').rules.cities.join() === '부천시', byId('R3').rules)
+  check('실제: 전남광주통합특별시 → 전남 · 광주 둘 다', byId('R4').rules.regions.join() === '전남,광주', byId('R4').rules.regions)
+  check('실제: 모집 완료시 = 선착순(예산 소진형)', byId('R4').deadlineKind === 'first_come')
+  check('실제: 연구개발특구는 시·군·구 아님 · 해시태그 창업7년이하 → 업력', byId('R5').rules.cities.length === 0 && byId('R5').rules.withinYears === 7, byId('R5').rules)
+  check('실제: [서울ㆍ경기] → 서울 · 경기 둘 다', byId('R6').rules.regions.join() === '서울,경기', byId('R6').rules.regions)
+
   // 한 번에 계산(공고 × 업체) — 화면마다 다시 계산하지 않고, 1,000건 × 300곳도 빨리
   const SIDOS = ['경기', '서울', '부산', '대구', '인천']
   const INDS = ['제조업', '소프트웨어 개발', '도소매', '한식 음식점', '건설업']

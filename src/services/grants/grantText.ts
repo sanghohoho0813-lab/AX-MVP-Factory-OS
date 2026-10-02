@@ -13,7 +13,8 @@ import {
   SIDO_LIST,
   certsFromText,
   rangeText,
-  sidoOf,
+  sidosOf,
+  isCityName,
   type CertKey,
   type CompanyProfile,
   type CompanySize,
@@ -59,7 +60,7 @@ export function periodOf(text: string): { applyStart: string; applyEnd: string; 
   const t = text.replace(/\s+/g, ' ')
   const found = datesAt(t)
   const dates = found.map((d) => d.date)
-  const firstCome = /선착순|소진\s*시|예산\s*소진|조기\s*마감/.test(t)
+  const firstCome = /선착순|소진\s*시|예산\s*소진|조기\s*마감|모집\s*(?:완료|마감|규모\s*충족)/.test(t)
   const always = /상시|수시\s*(접수|모집)|연중/.test(t)
   if (dates.length >= 2) return { applyStart: dates[0], applyEnd: dates[1], deadlineKind: firstCome ? 'first_come' : 'date' }
   if (dates.length === 1) {
@@ -145,14 +146,14 @@ export function rulesFromText(target: string, whole = target, title = ''): Grant
   // 지역 — 제목 머리 [경기] · 'OO시 소재' · '관내'
   const head = /^\s*\[([^\]]{2,10})\]/.exec(title)
   if (head) {
-    const s = sidoOf(head[1])
-    if (s) r.regions.push(s)
+    // [서울ㆍ경기] 처럼 둘 이상도 · [전남광주] 는 전남 · 광주
+    for (const part of head[1].split(/[ㆍ·,/\s]+/)) for (const s of sidosOf(part)) if (!r.regions.includes(s)) r.regions.push(s)
   }
   for (const m of all.matchAll(/([가-힣]{1,6}(?:특별자치시|특별자치도|광역시|특별시|도)?)\s*([가-힣]{1,5}[시군구])?\s*(?:내\s*)?(?:소재|관내|에\s*본사|주된\s*사무소)/g)) {
-    const s = sidoOf(m[1])
-    if (s && !r.regions.includes(s)) r.regions.push(s)
-    const city = m[2] ?? (/[시군구]$/.test(m[1]) && !s ? m[1] : '')
-    if (city && !r.cities.includes(city)) r.cities.push(city)
+    const ss = sidosOf(m[1])
+    for (const s of ss) if (!r.regions.includes(s)) r.regions.push(s)
+    const city = m[2] ?? (ss.length === 0 ? m[1] : '')
+    if (city && isCityName(city) && !r.cities.includes(city)) r.cities.push(city)
   }
   return r
 }
@@ -170,10 +171,10 @@ export type NoticeDraft = Omit<GrantNotice, 'id' | 'createdAt' | 'updatedAt' | '
 export function withAgencyRegion(rules: GrantRules, agency: string): GrantRules {
   if (rules.regions.length || rules.cities.length) return rules
   const parts = agency.trim().split(/\s+/)
-  const sd = parts.length ? sidoOf(parts[0]) : ''
-  if (!sd) return rules
-  const city = parts[1] && /[시군구]$/.test(parts[1]) ? parts[1].replace(/(청|교육청)$/, '') : ''
-  return { ...rules, regions: [sd], cities: city ? [city] : [] }
+  const sds = parts.length ? sidosOf(parts[0]) : []
+  if (sds.length === 0) return rules
+  const city = parts[1] && isCityName(parts[1]) ? parts[1] : ''
+  return { ...rules, regions: sds, cities: city ? [city] : [] }
 }
 
 const LABELS = /^(공고명|사업명|소관\s*부처(?:\s*[·ㆍ]\s*지자체)?|소관\s*기관|주관\s*기관|사업\s*수행\s*기관|수행\s*기관|신청\s*기간|접수\s*기간|모집\s*기간|지원\s*대상|신청\s*대상|사업\s*개요|지원\s*내용|지원\s*규모|문의처|신청\s*방법|사업\s*목적)\s*[:：]?\s*/
@@ -272,11 +273,23 @@ export function parseBizinfoJson(text: string): BizinfoParse {
     const summary = s('bsnsSumryCn').slice(0, 1200)
     const tags = s('hashtags')
     let rules = rulesFromText(`${target}`, `${summary}`, title)
-    // 해시태그에 시·도가 있으면 지역으로 (전국 공고에는 시·도 태그가 없다) · 업종 낱말이 있으면 업종으로
-    for (const tag of tags.split(/[,#\s]+/).filter(Boolean)) {
-      const sd = SIDO_LIST.includes(tag) ? tag : sidoOf(tag)
-      if (sd && !rules.regions.includes(sd)) rules.regions.push(sd)
-      for (const [label, re] of INDUSTRY_WORDS) if (re.test(tag) && !rules.industries.includes(label)) rules.industries.push(label)
+    // 해시태그 — 시·도 · 시·군·구 · 업종 · 업력.
+    // 전국 공고는 해시태그에 17개 시·도를 다 적어 둔다(실제 기업마당 응답) — 시·도가 여럿(4개 이상)이면 지역 조건으로 보지 않는다.
+    const tagList = tags.split(/[,#\s]+/).filter(Boolean)
+    const tagSidos = [...new Set(tagList.flatMap((tag) => (SIDO_LIST.includes(tag) ? [tag] : sidosOf(tag))))]
+    if (tagSidos.length > 0 && tagSidos.length <= 3) for (const sd of tagSidos) if (!rules.regions.includes(sd)) rules.regions.push(sd)
+    // 시·군·구 태그(안산시 · 화천군) — 공고 이름 · 대상 · 개요에도 그 이름이 있을 때만(행사 장소 같은 태그는 거른다)
+    const body = `${title} ${target} ${summary}`
+    if (tagSidos.length <= 3)
+      for (const tag of tagList)
+        if (tag.length >= 3 && isCityName(tag) && body.includes(tag) && !rules.cities.includes(tag)) rules.cities.push(tag)
+    // 이름 앞 '[경기] 부천시 …' — 시·군·구 공고
+    const head = /^\s*\[[^\]]{1,12}\]\s*([가-힣]{2,4}[시군구])\s/.exec(title)
+    if (head && isCityName(head[1]) && !rules.cities.includes(head[1])) rules.cities.push(head[1])
+    for (const tag of tagList) for (const [label, re] of INDUSTRY_WORDS) if (re.test(tag) && !rules.industries.includes(label)) rules.industries.push(label)
+    if (rules.withinYears === null) {
+      const y = /(?:창업|업력)\s*(\d{1,2})\s*년\s*(?:이하|이내|미만)/.exec(tags)
+      if (y) rules.withinYears = Number(y[1])
     }
     rules = withAgencyRegion(rules, s('jrsdInsttNm'))
     const urlRaw = s('pblancUrl')

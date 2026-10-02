@@ -204,6 +204,19 @@ export function sidoOf(word: string): string {
   return ''
 }
 
+/** 시·도 이름 → 짧은 이름 목록. 2026년 통합한 '전남광주통합특별시' 는 전남 · 광주 둘 다 */
+export function sidosOf(word: string): string[] {
+  const w = word.trim()
+  if (/^전남광주|^광주전남/.test(w)) return ['전남', '광주']
+  const s = sidoOf(w)
+  return s ? [s] : []
+}
+
+/** 시·군·구 이름인가 — '연구개발특구' · '지정지구' 같은 말은 아니다 */
+export function isCityName(word: string): boolean {
+  return /^[가-힣]{1,4}[시군구]$/.test(word) && !/(특구|지구|특별|광역|자치)/.test(word) && !sidoOf(word)
+}
+
 /** 주소 → 시·도 · 시·군·구 ("경기도 파주시 문산읍 …" → 경기 · 파주시) */
 export function placeOf(address: string): { sido: string; city: string } {
   const parts = address.trim().split(/\s+/).filter(Boolean)
