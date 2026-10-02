@@ -103,14 +103,14 @@ export function FactInboxCard({ record, now, onCommit }: { record: ClientOpsReco
   }
 
   return (
-    <Surface edge="brand" showEdge>
-      <div className="flex flex-col gap-3" data-testid="fact-inbox">
+    <Surface edge="warning" showEdge>
+      <div className="flex flex-col gap-3" data-testid="fact-inbox" id="fact-inbox">
         <div className="flex flex-wrap items-center gap-2">
           <FileSearch aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
-          <h2 className="t-card font-bold break-keep text-slate-900">자료에서 다음 정보를 찾았습니다</h2>
+          <h2 className="t-card font-bold break-keep text-slate-900">확인이 필요한 정보</h2>
           <Badge tone="brand">{pending.length}건</Badge>
         </div>
-        <p className="t-sub break-keep text-slate-600">확인하면 모든 전문 모듈이 이 값을 씁니다. 확인하기 전에는 어디에도 쓰지 않습니다.</p>
+        <p className="t-sub break-keep text-slate-600">서류에서 읽었지만 확실하지 않은 것만 남겼어요(확실한 것은 이미 넣었어요). 확인하면 모든 전문 모듈이 이 값을 씁니다.</p>
         <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-control) border border-slate-200">
           {pending.map((p) => (
             <li key={p.id} className="flex flex-col gap-1.5 px-3 py-2.5" data-fact={p.key}>
@@ -119,6 +119,12 @@ export function FactInboxCard({ record, now, onCommit }: { record: ClientOpsReco
                 {fixing ? null : <span className={`t-body min-w-0 font-bold break-keep [overflow-wrap:anywhere] ${wrong[p.id] ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{p.display}</span>}
                 <span className="t-meta text-slate-500">{p.sourceLabel}</span>
               </div>
+              {/* D-144: 왜 바로 넣지 않았는지 — 사진 글자 · 지금 값과 다름 · 모양이 이상함 */}
+              {p.note && !fixing && (
+                <span className="t-sub break-keep font-medium text-warning-800" data-testid="fact-note">
+                  ⚠ {p.note}
+                </span>
+              )}
               {p.current && !fixing && <span className="t-sub break-keep text-amber-800">지금 적힌 값: {p.current}</span>}
               {fixing && (
                 <div className="flex flex-wrap items-center gap-2">

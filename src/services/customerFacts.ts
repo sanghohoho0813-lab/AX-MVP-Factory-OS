@@ -237,6 +237,8 @@ export interface PendingFact {
   from: 'inbox' | 'cretop'
   /** D-129: 회사 기본 정보의 직접 만든 칸으로 가면 그 묶음(인증서 …) */
   customGroup?: ProfileGroupKey
+  /** D-144: 확인을 묻는 까닭(사진 글자 · 지금 값과 다름 …) */
+  note?: string
 }
 
 /** D-129: 'cf:<칸 이름>' — 직접 만든 칸으로 가는 후보 */
@@ -314,7 +316,7 @@ export function cretopFacts(record: ClientOpsRecord): { key: string; value: stri
 export function pendingFacts(record: ClientOpsRecord): PendingFact[] {
   const out: PendingFact[] = []
   const seen = new Set<string>()
-  const consider = (c: { id: string; key: string; value: string; source: FactSource; asOf: string; ref: string; label?: string; group?: ProfileGroupKey }, from: PendingFact['from']) => {
+  const consider = (c: { id: string; key: string; value: string; source: FactSource; asOf: string; ref: string; label?: string; group?: ProfileGroupKey; note?: string }, from: PendingFact['from']) => {
     if (!c.value.trim()) return
     if (isCustomFactKey(c.key)) {
       // 직접 만든 칸으로 가는 후보 — 같은 이름의 칸에 같은 값이면 묻지 않는다(같은 인증서를 또 올려도 칸이 늘지 않는다)
@@ -324,7 +326,7 @@ export function pendingFacts(record: ClientOpsRecord): PendingFact[] {
       if (record.factMeta?.[c.key]?.dismissed?.includes(c.ref)) return
       if (seen.has(c.key)) return
       seen.add(c.key)
-      out.push({ id: c.id, key: c.key, label, value: c.value, display: c.value, source: c.source, sourceLabel: FACT_SOURCE_LABEL[c.source] + (c.asOf ? ` ${c.asOf}` : ''), asOf: c.asOf, ref: c.ref, current: cur, from, customGroup: c.group ?? 'credential' })
+      out.push({ id: c.id, key: c.key, label, value: c.value, display: c.value, source: c.source, sourceLabel: FACT_SOURCE_LABEL[c.source] + (c.asOf ? ` ${c.asOf}` : ''), asOf: c.asOf, ref: c.ref, current: cur, from, customGroup: c.group ?? 'credential', ...(c.note ? { note: c.note } : {}) })
       return
     }
     const def = factDef(c.key)
@@ -347,6 +349,7 @@ export function pendingFacts(record: ClientOpsRecord): PendingFact[] {
       ref: c.ref,
       current: cur ? displayFact(def, cur) : '',
       from,
+      ...(c.note ? { note: c.note } : {}),
     })
   }
   for (const c of record.factInbox ?? []) consider(c, 'inbox')

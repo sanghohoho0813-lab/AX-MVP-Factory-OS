@@ -77,6 +77,19 @@ const BUILTIN_SIGNALS: Record<string, Signal[]> = {
     { re: /확인서\s*번호|확인\s*번호/, weight: 1, say: "'확인서 번호'" },
     { re: /유효\s*기간/, weight: 1, say: "'유효기간'" },
   ],
+  // D-144: 크레탑 보고서 · 4대보험 명부도 서류 올리기 한 번에 — 모듈이 저절로 읽는다
+  cretopReport: [
+    { re: /기업\s*종합\s*보고서/, weight: 3, say: "제목 '기업종합보고서'" },
+    { re: /CRETOP|크레탑/i, weight: 2, say: "'CRETOP'" },
+    { re: /한국평가데이터|KoDATA/i, weight: 2, say: "'한국평가데이터'" },
+    { re: /신용\s*등급|재무\s*상태표|손익\s*계산서/, weight: 1, say: "'신용등급 · 재무상태표'" },
+  ],
+  payrollRoster: [
+    { re: /가입자\s*명부|피보험자\s*명부|사업장\s*가입자/, weight: 3, say: "제목 '가입자 명부'" },
+    { re: /4대\s*(?:사회)?보험/, weight: 2, say: "'4대보험'" },
+    { re: /자격\s*취득일|취득\s*일자/, weight: 1, say: "'자격취득일'" },
+    { re: /고용\s*보험|산재\s*보험|국민\s*연금/, weight: 1, say: "'고용보험 · 국민연금'" },
+  ],
   healthInsurance: [
     { re: /자격\s*득실\s*확인서/, weight: 3, say: "제목 '자격득실확인서'" },
     { re: /국민건강보험공단/, weight: 2, say: "'국민건강보험공단'" },
@@ -92,6 +105,8 @@ const BUILTIN_NAME_HINTS: Record<string, RegExp> = {
   representativeId: /신분증|주민등록증|운전면허|여권/,
   smeCertificate: /중소기업\s*확인/,
   healthInsurance: /건강보험|득실/,
+  cretopReport: /크레탑|cretop|기업\s*종합\s*보고서|kodata/i,
+  payrollRoster: /가입자|4대\s*보험|피보험자|사원\s*명부|직원\s*명부/,
 }
 
 /**

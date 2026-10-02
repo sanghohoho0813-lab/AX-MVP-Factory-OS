@@ -20,9 +20,10 @@ import { allDocumentMetas } from '../../services/clientOpsDocuments'
 import { canUploadFiles, saveClient, storeDocumentFile, withCustomDocument, withDocument } from '../../services/clientOpsService'
 import { formatFileSize } from '../../lib/format'
 import { particle } from '../../lib/josa'
-import { withDocFacts } from '../../services/docFacts'
 import { generateId } from '../../storage/localStore'
-import { nowIso } from '../../lib/appClock'
+import { nowIso, todayLocalDate } from '../../lib/appClock'
+import { analyzeUploadedDocs, type DocBatchSummary } from '../../services/docAutoAnalyze'
+import type { ReadDoc, ReadMethod } from '../../services/docAutoFill'
 
 /** '새 칸 만들기' 를 뜻하는 고르는 칸 값 */
 const NEW_CELL = '__new__'
@@ -40,22 +41,33 @@ interface Item {
   error: string
   /** D-128: 읽은 글자 — 사업자등록증 · 등기부등본 · 인증서면 회사 정보를 찾아 '확인 필요' 로 남긴다(글자는 저장하지 않는다) */
   text: string
+  /** D-144: 글자를 어떻게 읽었나 — 사진 · 스캔(OCR)이면 읽은 값을 바로 넣지 않고 묻는다 */
+  method: ReadMethod
+  /** D-144: 사람이 칸을 직접 바꿨나 — 바꿨으면 서류 종류는 사람이 확인한 것 */
+  manual: boolean
 }
 
 export function BulkDocUploadSheet({
   record,
   onClose,
   onSaved,
+  auto = false,
 }: {
   record: ClientOpsRecord
   onClose: () => void
-  /** 올린 뒤의 최신 기록 */
-  onSaved: (next: ClientOpsRecord) => void
+  /** 올린 뒤의 최신 기록 · 이번에 읽어 반영한 것 */
+  onSaved: (next: ClientOpsRecord, summary: DocBatchSummary) => void
+  /**
+   * D-144: 업체 머리줄 '서류 올리기' — 읽자마자 종류가 확실한 것은 저절로 올리고 분석한다.
+   * 종류가 애매한 것만 남겨 칸을 고르게 한다. 남은 것이 없으면 창을 닫는다.
+   */
+  auto?: boolean
 }) {
   const { showToast } = useToast()
   const uploadable = canUploadFiles()
   const [items, setItems] = useState<Item[]>([])
   const [busy, setBusy] = useState(false)
+  const [autoNote, setAutoNote] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const folderRef = useRef<HTMLInputElement>(null)
   const metas = allDocumentMetas(record).filter((m) => m.needsFile)
@@ -83,33 +95,48 @@ export function BulkDocUploadSheet({
       issuedAt: '',
       error: '',
       text: '',
+      method: 'none',
+      manual: false,
     }))
     setItems((list) => [...list, ...fresh])
     setBusy(true)
+    const read: Item[] = []
     for (const it of fresh) {
       patch(it.id, { status: 'reading', progress: { ratio: 0, label: '읽는 중' } })
       let text = ''
+      let method: ReadMethod = 'none'
       try {
         if (canExtractText(it.file)) {
           const res = await extractTextFromFile(it.file, (ratio, label) => patch(it.id, { progress: { ratio, label } }))
           text = res.text
+          method = res.method
         }
       } catch {
         // 못 읽어도 멈추지 않는다 — 파일 이름으로 판별한다
         text = ''
       }
       const result = classifyDocument({ text, fileName: it.file.name }, metas)
-      patch(it.id, {
+      const next: Partial<Item> = {
         text,
+        method,
         status: 'ready',
         progress: null,
         result,
         target: result.key ?? (result.suggestedLabel ? NEW_CELL : ''),
         newLabel: result.suggestedLabel ?? '',
         issuedAt: result.issuedAt ?? '',
-      })
+      }
+      patch(it.id, next)
+      read.push({ ...it, ...next } as Item)
     }
     setBusy(false)
+    if (auto) {
+      // 종류가 확실한 것은 저절로 올린다 — 애매한 것만 사람에게
+      const sure = read.filter((it) => it.result?.confidence === 'sure' && it.target !== '' && it.target !== NEW_CELL)
+      const left = read.length - sure.length
+      if (sure.length) await upload(sure, { closeWhenDone: left === 0 })
+      setAutoNote(left > 0 ? `${sure.length ? `확실한 ${sure.length}개는 올리고 읽었습니다. ` : ''}아래 ${left}개는 어느 서류인지 확실하지 않아요 — 칸을 고르고 올려 주세요.` : '')
+    }
   }
 
   const onDrop = (e: React.DragEvent) => {
@@ -122,12 +149,13 @@ export function BulkDocUploadSheet({
   const assignedItems = readyItems.filter((it) => it.target !== '' && !(it.target === NEW_CELL && it.newLabel.trim() === ''))
 
   /** 고른 것을 차례로 올린다. 새 칸은 만들면서 올린다 */
-  const upload = async (targets: Item[]) => {
+  const upload = async (targets: Item[], opts: { closeWhenDone?: boolean } = {}) => {
     if (targets.length === 0) return
     setBusy(true)
     let rec = record
     let okCount = 0
     const doneIds: string[] = []
+    const readDocs: ReadDoc[] = []
     for (const it of targets) {
       patch(it.id, { status: 'uploading', error: '' })
       try {
@@ -146,8 +174,8 @@ export function BulkDocUploadSheet({
           rec = withDocument(rec, key, { received: true, fileName: it.file.name, fileSize: it.file.size })
         }
         if (it.issuedAt) rec = withDocument(rec, key, { received: true, issuedAt: it.issuedAt })
-        // D-128 · D-129: 사업자등록증 · 등기 · 인증서 · 확인서면 회사 정보를 찾아 '확인 필요' 로만 남긴다
-        rec = withDocFacts(rec, key, it.text, nowIso(), generateId).record
+        // D-144: 읽은 글자는 모아 두었다가 끝에 한 번에 — 회사 정보(확실하면 바로 · 애매하면 표시) · 크레탑 · 명부
+        readDocs.push({ key, fileName: it.file.name, text: it.text, method: it.method, docSure: it.result?.confidence === 'sure' || it.manual || it.target === NEW_CELL })
         patch(it.id, { status: 'done' })
         doneIds.push(it.id)
         okCount += 1
@@ -162,11 +190,21 @@ export function BulkDocUploadSheet({
       return
     }
     try {
-      const saved = await saveClient(rec)
-      onSaved(saved)
-      const found = saved.factInbox.length - record.factInbox.length
-      const tail = found > 0 ? ` 자료에서 회사 정보 ${found}건을 찾았습니다 — 개요에서 확인해 주세요.` : ''
-      showToast((uploadable ? `서류 ${okCount}건을 올렸습니다.` : `서류 ${okCount}건을 기록했습니다. 파일 자체는 클라우드 연결 후 보관됩니다.`) + tail)
+      const analyzed = await analyzeUploadedDocs(rec, readDocs, { now: nowIso(), today: todayLocalDate(), makeId: generateId })
+      const saved = await saveClient(analyzed.record)
+      onSaved(saved, analyzed.summary)
+      const sm = analyzed.summary
+      const tail = [
+        sm.entered.length ? `바로 넣은 정보 ${sm.entered.length}건` : '',
+        sm.flagged.length ? `확인할 정보 ${sm.flagged.length}건` : '',
+        sm.cretop ? '크레탑 분석 붙임' : '',
+        sm.roster ? `명부 진단(후보 지원금 ${sm.roster.candidates}건)` : '',
+      ].filter(Boolean)
+      showToast(
+        (uploadable ? `서류 ${okCount}건을 올렸습니다.` : `서류 ${okCount}건을 기록했습니다. 파일 자체는 클라우드 연결 후 보관됩니다.`) +
+          (tail.length ? ` ${tail.join(' · ')} — 맞춤 추천에서 보세요.` : ''),
+      )
+      if (opts.closeWhenDone) onClose()
     } catch (cause) {
       // D-122: 파일은 올라갔는데 업체 기록 저장이 실패했다 — 초록 체크로 두면 다시 올릴 수 없으니 '다시 올리기' 로 되돌린다
       for (const id of doneIds) patch(id, { status: 'ready', error: '업체 기록에 저장하지 못했습니다 — 다시 올려 주세요' })
@@ -202,6 +240,11 @@ export function BulkDocUploadSheet({
       }
     >
       <div className="flex flex-col gap-3">
+        {autoNote && (
+          <p role="status" data-testid="bulk-auto-note" className="rounded-(--radius-control) border border-warning-200 bg-warning-50 px-4 py-3 t-sub break-keep text-warning-800">
+            {autoNote}
+          </p>
+        )}
         {!uploadable && (
           <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-4 py-3 text-[0.92rem] break-keep text-slate-600">
             지금은 이 브라우저에만 저장되는 모드입니다. 종류 판별과 받음·발급일·파일 이름은 기록되고, 파일 자체는 클라우드(Supabase)를
@@ -310,7 +353,7 @@ export function BulkDocUploadSheet({
                           <select
                             aria-label={`${it.file.name} 칸 고르기`}
                             value={it.target}
-                            onChange={(e) => patch(it.id, { target: e.target.value as Item['target'] })}
+                            onChange={(e) => patch(it.id, { target: e.target.value as Item['target'], manual: true })}
                             className={`mt-1 block w-full rounded-(--radius-control) border bg-white px-2 py-2 text-[0.95rem] ${
                               it.target === '' ? 'border-warning-300' : 'border-slate-300'
                             }`}

@@ -679,6 +679,8 @@ export interface FactCandidate {
    */
   label?: string
   group?: ProfileGroupKey
+  /** D-144: 왜 바로 넣지 않고 확인을 묻는가 — '사진 글자라 확인 필요' · '지금 값과 다름' 등 */
+  note?: string
 }
 
 export interface ClientOpsRecord {

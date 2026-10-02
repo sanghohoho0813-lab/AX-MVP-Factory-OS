@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ClientGrantsCard } from '../components/grants/ClientGrantsCard'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { NextStepEditor } from '../components/ops/NextStepEditor'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { LINK_BUTTON } from '../components/sales/salesStyle'
@@ -12,6 +11,7 @@ import {
   Landmark,
   Workflow,
   ChevronRight,
+  ArrowRight,
   MoreHorizontal,
   ClipboardCopy,
   FileUp,
@@ -93,7 +93,7 @@ import { NotFoundState } from '../components/ui/NotFoundState'
 import { Modal } from '../components/ui/Modal'
 import { Panel } from '../components/ui/Panel'
 import { useToast } from '../components/ui/toastContext'
-import { AlertRow, statusTone } from '../components/ops/opsParts'
+import { statusTone } from '../components/ops/opsParts'
 import {
   DueDateField,
   MessageModal,
@@ -101,7 +101,13 @@ import {
   SavedBadge,
 } from '../components/ops/opsControls'
 import { CompanyProfileCard, NotesSection } from '../components/ops/opsProfile'
-import { FactInboxCard, FactNumbersCard } from '../components/ops/ClientFactsCards'
+import { FactNumbersCard } from '../components/ops/ClientFactsCards'
+import type { DocBatchSummary } from '../services/docAutoAnalyze'
+import { analyzeUploadedDocs } from '../services/docAutoAnalyze'
+import { pendingFacts } from '../services/customerFacts'
+
+/** D-144: 맞춤 추천 탭 — 모듈 엔진(정책자금 · 창업감면 …)을 담고 있어 이 탭을 열 때만 불러온다 */
+const ClientSmartTab = lazy(() => import('../components/ops/ClientSmartTab'))
 import { factNoteFor, readFact, withFactValue, withProfileFieldEdit } from '../services/customerFacts'
 import { TodoComposer } from '../components/journal/TodoBoard'
 import { createJournalEntry } from '../services/journalService'
@@ -137,7 +143,6 @@ import {
   Disclosure,
   Dot,
   MetricTile,
-  Section,
   Surface,
   type Tone,
 } from '../components/ui/primitives'
@@ -147,7 +152,6 @@ import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { ClientJournalTab } from '../components/ops/ClientJournalTab'
 import { ClientSharedFiles } from '../components/ops/FilesTab'
 import { DocFileActions } from '../components/ops/DocFileActions'
-import { withDocFacts } from '../services/docFacts'
 import { generateId } from '../storage/localStore'
 import { ClientConsultingTab } from '../components/consulting/ClientConsultingTab'
 import { listLinksForClient } from '../services/customerBridgeService'
@@ -166,13 +170,15 @@ function hasContractInfo(r: ClientOpsRecord): boolean {
   return r.contract.signedAt !== '' || r.contract.kind !== '' || (r.contract.cashAmount ?? 0) > 0 || r.contract.policies.length > 0
 }
 
-type DetailTab = 'overview' | 'work' | 'consulting' | 'docs' | 'fees' | 'funding' | 'portal' | 'journal'
+type DetailTab = 'smart' | 'overview' | 'work' | 'consulting' | 'docs' | 'fees' | 'funding' | 'portal' | 'journal'
 /**
  * D-129: 매일 쓰는 순서 — 개요 → 서류 → 업무 → 업무 일기 → 고객 플랫폼 → 수금.
  * 컨설팅(특허+벤처) · 자금·지원은 기본 줄에서 뺐다(hidden) — 기능 · 데이터 · 주소(?tab=)는 그대로이고, 더보기에서 연다.
  * 예전 '파일' 탭은 서류 탭 안으로 들어갔다(?tab=files 는 서류로 연다).
  */
 const DETAIL_TABS: { key: DetailTab; label: string; hidden?: boolean }[] = [
+  // D-144: 개요 왼쪽 — 서류를 올리면 모든 모듈 판정 · 다음 행동이 여기 먼저(규칙 계산이라 'AI' 라고 부르지 않는다)
+  { key: 'smart', label: '맞춤 추천' },
   { key: 'overview', label: '개요' },
   { key: 'docs', label: '서류' },
   { key: 'work', label: '업무' },
@@ -243,8 +249,11 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const [openDocs, setOpenDocs] = useState<Set<string>>(() => new Set())
   const [renamingDoc, setRenamingDoc] = useState<string | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
-  /* 서류 한꺼번에 올리기 시트 (D-84) */
+  /* 서류 한꺼번에 올리기 시트 (D-84) · D-144 머리줄 '서류 올리기'(읽자마자 저절로) */
   const [bulkOpen, setBulkOpen] = useState(false)
+  const [autoUploadOpen, setAutoUploadOpen] = useState(false)
+  /** D-144: 방금 올린 서류에서 읽은 것 — 맞춤 추천 맨 위에 보여 준다 */
+  const [lastBatch, setLastBatch] = useState<DocBatchSummary | null>(null)
   const [deleting, setDeleting] = useState(false)
 
   const today = todayLocalDate()
@@ -370,9 +379,12 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
     void commit(next)
   }
 
-  const alerts = useMemo(() => (record ? buildClientAlerts(record, today) : []), [record, today])
+  // D-144: 급한 것 먼저(심각 → 주의 → 남은 날)
+  const alerts = useMemo(() => {
+    const SEV: Record<string, number> = { critical: 0, warning: 1, info: 2 }
+    return (record ? buildClientAlerts(record, today) : []).sort((a, b) => (SEV[a.severity] ?? 3) - (SEV[b.severity] ?? 3) || (a.daysLeft ?? 999) - (b.daysLeft ?? 999))
+  }, [record, today])
   /** 개요에서 경고를 전부 펼쳤는지 */
-  const [alertsOpen, setAlertsOpen] = useState(false)
 
   /** 다음 행동이 늦었는지 — 늦었을 때만 색을 쓴다 */
   const nextActionDaysLeft = record?.nextActionDueDate ? daysLeftFrom(today, record.nextActionDueDate) : null
@@ -458,13 +470,24 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       const base = current() ?? record
       const ok = await commit(withDocument(base, key, patch))
       showToast('파일을 보관했습니다.')
-      // D-129: 올린 서류에서 회사 정보(번호 · 인증 …)를 찾아 '확인 필요' 로 — 저절로 확정하지 않는다
+      // D-144: 올린 서류를 읽어 — 확실한 회사 정보는 바로 넣고, 애매한 것은 까닭과 함께 묻는다 · 크레탑 · 명부는 그 엔진이 읽는다
       const reader = ok ? await import('../services/docTextExtract') : null
       if (reader && reader.canExtractText(file)) {
         const res = await reader.extractTextFromFile(file).catch(() => null)
-        const latest = current() ?? record
-        const { record: withFound, found } = withDocFacts(latest, key, res?.text ?? '', nowIso(), generateId)
-        if (found > 0 && (await commit(withFound))) showToast(`서류에서 회사 정보 ${found}건을 찾았습니다 — 개요에서 확인해 주세요.`)
+        if (res && res.text.trim()) {
+          const latest = current() ?? record
+          const out = await analyzeUploadedDocs(latest, [{ key, fileName: file.name, text: res.text, method: res.method, docSure: true }], { now: nowIso(), today: todayLocalDate(), makeId: generateId })
+          const sm = out.summary
+          if ((sm.entered.length || sm.flagged.length || sm.cretop || sm.roster) && (await commit(out.record))) {
+            setLastBatch(sm)
+            showToast(
+              [sm.entered.length ? `바로 넣은 정보 ${sm.entered.length}건` : '', sm.flagged.length ? `확인할 정보 ${sm.flagged.length}건` : '', sm.cretop ? '크레탑 분석 붙임' : '', sm.roster ? '명부 진단 붙임' : '']
+                .filter(Boolean)
+                .join(' · ') + ' — 맞춤 추천에서 보세요.',
+            )
+          }
+          for (const w of sm.warnings) showToast(w)
+        }
       }
     } catch (cause) {
       showToast(cause instanceof Error ? cause.message : '파일을 보관하지 못했습니다.')
@@ -548,8 +571,13 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               미팅 준비
             </Link>
           )}
+          {/* D-144: 서류 올리기 — 파일 · 폴더째. 읽자마자 확실한 것은 바로 넣고, 모듈 판정은 맞춤 추천에 */}
+          <Button variant={prospect ? 'secondary' : 'primary'} onClick={() => setAutoUploadOpen(true)} data-testid="client-upload">
+            <FileUp aria-hidden="true" className="size-4" />
+            서류 올리기
+          </Button>
           <Button
-            variant={prospect ? 'secondary' : 'primary'}
+            variant="secondary"
             onClick={() =>
               setMessage({
                 title: '서류 요청 문구',
@@ -600,7 +628,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       >
         {DETAIL_TABS.filter((t) => !t.hidden || t.key === tab).map((t) => {
           const badge =
-            t.key === 'overview' ? alerts.filter((a) => a.severity === 'critical').length
+            t.key === 'smart' ? pendingFacts(record).length + alerts.filter((a) => a.severity === 'critical').length
+              : t.key === 'overview' ? 0
               : t.key === 'docs' ? urgentDocs.size
                 : t.key === 'fees' ? record.fees.filter((f) => !f.receivedAt && !isWaiting(f, fundingFactsOf(record.fundingApplications))).length
                   : t.key === 'funding' ? record.fundingApplications.filter((a) => a.status === 'watching' || a.status === 'preparing').length
@@ -618,7 +647,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             >
               {t.label}
               {badge > 0 && (
-                <span className={`t-meta rounded-full px-1.5 font-semibold ${t.key === 'overview' ? 'bg-danger-50 text-danger-700' : 'bg-slate-100 text-slate-600'}`}>
+                <span className={`t-meta rounded-full px-1.5 font-semibold ${t.key === 'smart' ? 'bg-danger-50 text-danger-700' : 'bg-slate-100 text-slate-600'}`}>
                   {badge}
                 </span>
               )}
@@ -627,8 +656,69 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         })}
       </ScrollHintRow>
 
+      {tab === 'smart' && (
+        <Suspense fallback={<p className="t-sub text-slate-500">맞춤 추천을 계산하는 중…</p>}>
+          <ClientSmartTab
+            record={record}
+            today={today}
+            workspaceId={workspaceId}
+            alerts={alerts}
+            lastBatch={lastBatch}
+            onUpload={() => setAutoUploadOpen(true)}
+            onCommit={async (next, msg) => {
+              if (await commit(next)) showToast(msg)
+            }}
+            onAlertOpen={(a) => setTab('work', a.serviceKey ?? undefined)}
+            onFill={() => {
+              setTab('overview')
+              setInfoOpen(true)
+              window.setTimeout(() => document.getElementById('info')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
+            }}
+          />
+        </Suspense>
+      )}
+
       {tab === 'overview' && (
         <>
+      {/*
+        D-144: 개요는 회사 정보부터 — 업체를 여는 이유의 절반은 "사업자번호가 뭐였지 · 설립이 몇 년도지" 다.
+        지금 챙길 것 · 맞는 지원사업 · 확인할 정보는 '맞춤 추천' 탭으로 옮겼다(여기는 한 줄로 알려만 준다).
+      */}
+      <div data-testid="overview-company">
+      <Surface>
+        <CompanyProfileCard
+          record={record}
+          today={today}
+          onImport={() => setImportOpen(true)}
+          factNote={(key) => factNoteFor(record, key)}
+          onEdit={(key, value) => void commit(withProfileFieldEdit(record, key, value, nowIso()))}
+          onCustomField={(field) => void commit(withCustomField(record, field))}
+          onRemoveCustomField={(id) => void commit(withoutCustomField(record, id))}
+          bare
+        />
+        {/* D-128: 업체 칸이 없던 사실(매출 · 영업이익 · 인증 …) — 출처와 확인 상태가 한 줄로 */}
+        <div className="mt-4 border-t border-slate-200 pt-4">
+          <FactNumbersCard record={record} now={nowIso()} onCommit={async (next, msg) => { if (await commit(next)) showToast(msg) }} />
+        </div>
+      </Surface>
+      </div>
+
+      {(pendingFacts(record).length > 0 || alerts.length > 0) && (
+        <button
+          type="button"
+          onClick={() => setTab('smart')}
+          data-testid="overview-smart-link"
+          className="tap t-sub flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-4 py-3 text-left font-medium text-brand-800 hover:bg-brand-100/60"
+        >
+          <span className="font-bold">맞춤 추천</span>
+          {pendingFacts(record).length > 0 && <span>확인할 정보 {pendingFacts(record).length}건</span>}
+          {alerts.length > 0 && <span>지금 챙길 것 {alerts.length}건</span>}
+          <span className="ml-auto inline-flex items-center gap-1 font-semibold">
+            보기 <ArrowRight aria-hidden="true" className="size-4" />
+          </span>
+        </button>
+      )}
+
       {/*
         개요는 세 단계로만 말한다.
           1단계  지금 할 일
@@ -718,64 +808,6 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         }
       />
       )}
-
-      {/* D-129: '없는 서류 · 못 받은 내 돈 · 고객 플랫폼' 칸은 뺐다 — 탭 숫자(서류 · 수금)와 머리줄에 이미 있고,
-          급한 것은 '지금 챙길 것' 이 말한다. 개요는 다음 약속 · 지금 챙길 것 · 회사 정보 · 계약 · 활동 기록만. */}
-      {/* 2단계 — 이 업체에서 지금 챙길 것 (상위 3건만) */}
-      {alerts.length > 0 && (
-        <Section title="지금 챙길 것" count={alerts.length}>
-          <ul className="flex flex-col gap-2">
-            {(alertsOpen ? alerts : alerts.slice(0, 3)).map((a) => (
-              <AlertRow key={a.id} alert={a} hideClient onOpen={() => setTab('work', a.serviceKey ?? undefined)} />
-            ))}
-          </ul>
-          {alerts.length > 3 && (
-            <button
-              type="button"
-              onClick={() => setAlertsOpen((v) => !v)}
-              className="tap t-sub self-start rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 font-medium text-slate-600 hover:bg-slate-50"
-            >
-              {alertsOpen ? '접기' : `${alerts.length - 3}건 더 보기`}
-            </button>
-          )}
-        </Section>
-      )}
-
-      {/* D-141: 이 업체 조건에 맞는 지원사업 — 계약 고객 · 잠재고객 같은 카드(영업 연락 이유 · 고객 화면 알림) */}
-      <ClientGrantsCard
-        workspaceId={workspaceId}
-        record={record}
-        today={today}
-        onFill={() => {
-          setInfoOpen(true)
-          window.setTimeout(() => document.getElementById('info')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
-        }}
-      />
-
-      {/*
-        2단계 — 회사 기본 정보.
-        접어 두지 않는다. 업체를 여는 이유의 절반은 "사업자번호가 뭐였지 / 설립이
-        몇 년도지 / 인증서 받았던가" 를 확인하려는 것이고, 그때마다 접힌 칸을 펴야
-        했다. 상담 중에 한 번 더 누르게 만드는 것이 곧 카톡을 뒤지게 만드는 것이다.
-      */}
-      {/* D-128: 자료에서 읽은 값은 확인을 받아야 사실이 된다 — 있을 때만 뜬다 */}
-      <FactInboxCard record={record} now={nowIso()} onCommit={async (next, msg) => { if (await commit(next)) showToast(msg) }} />
-      <Surface>
-        <CompanyProfileCard
-          record={record}
-          today={today}
-          onImport={() => setImportOpen(true)}
-          factNote={(key) => factNoteFor(record, key)}
-          onEdit={(key, value) => void commit(withProfileFieldEdit(record, key, value, nowIso()))}
-          onCustomField={(field) => void commit(withCustomField(record, field))}
-          onRemoveCustomField={(id) => void commit(withoutCustomField(record, id))}
-          bare
-        />
-        {/* D-128: 업체 칸이 없던 사실(매출 · 영업이익 · 인증 …) — 출처와 확인 상태가 한 줄로 */}
-        <div className="mt-4 border-t border-slate-200 pt-4">
-          <FactNumbersCard record={record} now={nowIso()} onCommit={async (next, msg) => { if (await commit(next)) showToast(msg) }} />
-        </div>
-      </Surface>
 
       {/*
         2단계 — 계약과 해 드린 일.
@@ -1092,10 +1124,11 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           <BulkDocUploadSheet
             record={record}
             onClose={() => setBulkOpen(false)}
-            onSaved={(saved) => {
+            onSaved={(saved, summary) => {
               latestRef.current = saved
               setRecord(saved)
               setSavedAt(Date.now())
+              setLastBatch(summary)
             }}
           />
         )}
@@ -1776,6 +1809,22 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           onStageOnly={async () => {
             changeStage('signed', true)
             return true
+          }}
+        />
+      )}
+
+      {/* D-144: 머리줄 '서류 올리기' — 읽자마자 확실한 것은 저절로 올리고 분석 → 맞춤 추천으로 */}
+      {autoUploadOpen && (
+        <BulkDocUploadSheet
+          auto
+          record={record}
+          onClose={() => setAutoUploadOpen(false)}
+          onSaved={(saved, summary) => {
+            latestRef.current = saved
+            setRecord(saved)
+            setSavedAt(Date.now())
+            setLastBatch(summary)
+            setTab('smart')
           }}
         />
       )}

@@ -250,6 +250,7 @@ function normalizeFactInbox(raw: unknown): FactCandidate[] {
       foundAt: str(c.foundAt),
       ...(typeof c.label === 'string' && c.label.trim() !== '' ? { label: c.label.trim() } : {}),
       ...(isProfileGroupKey(c.group) ? { group: c.group } : {}),
+      ...(typeof c.note === 'string' && c.note.trim() !== '' ? { note: c.note.trim().slice(0, 80) } : {}),
     }))
 }
 
