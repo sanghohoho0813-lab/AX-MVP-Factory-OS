@@ -504,5 +504,14 @@ const withCretop = (r: ClientOpsRecord): ClientOpsRecord => ({
   check('고객 파일: 이미 넣은 파일은 또 넣지 않음(같은 칸 그대로)', !!again && again.key === p1!.key && again.record === p1!.record && shelfCellOf(p1!.record, 'w/portal/l1/2.pdf')?.label === '사업자등록증 (2)')
 }
 
+// D-149: 맞춤 추천 다음 행동 — 서류함 손볼 것
+{
+  const none = recommendNextSteps([], 0, { expired: 0, other: 0, dup: 0 })
+  check('다음 행동: 서류함 손볼 것이 없으면 정리하기 없음', !none.some((s) => s.id === 'shelf'))
+  const st = recommendNextSteps([], 2, { expired: 1, other: 2, dup: 1 })
+  const shelfStep = st.find((s) => s.id === 'shelf')
+  check('다음 행동: 확인할 정보 다음에 서류함 정리하기(만료 · 확인 · 겹친 서류) → 서류 탭', st[0].id === 'facts' && st[1]?.id === 'shelf' && !!shelfStep && /만료 1/.test(shelfStep.text) && /무슨 서류인지 확인 2/.test(shelfStep.text) && /겹친 서류 1묶음/.test(shelfStep.text) && shelfStep.href === '?tab=docs', JSON.stringify(st))
+}
+
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

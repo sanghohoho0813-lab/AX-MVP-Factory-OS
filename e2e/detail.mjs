@@ -468,6 +468,15 @@ for (const width of [1440, 390]) {
   await page.waitForTimeout(800)
   const agenda = (await page.getByTestId('agenda-row').allInnerTexts()).join(' | ')
   check(`오늘: 직접 만든 칸 법인인감증명서 만료가 다가오는 기한에 ${tag}`, agenda.includes('법인인감증명서'), agenda.slice(0, 400))
+  // D-149: 맞춤 추천 다음 행동에 '서류함 정리하기' → 열기 누르면 서류 탭
+  await page.goto(BASE + '/ops/clients/cli_mirae?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const stepTexts = await page.getByTestId('smart-step').allInnerTexts()
+  const shelfIdx = stepTexts.findIndex((t) => t.includes('서류함 정리하기'))
+  check(`맞춤 추천: 다음 행동에 '서류함 정리하기 — 만료' ${tag}`, shelfIdx >= 0 && /만료 [1-9]/.test(stepTexts[shelfIdx]), stepTexts.join(' || ').slice(0, 400))
+  if (shelfIdx >= 0) await page.getByTestId('smart-step').nth(shelfIdx).getByRole('link', { name: /열기/ }).click()
+  await page.waitForTimeout(600)
+  check(`맞춤 추천: 서류함 정리하기 → 서류 탭 ${tag}`, (await page.getByRole('tab', { name: /^서류/, selected: true }).count()) === 1)
   await page.goto(BASE + '/ops/clients/cli_mirae?tab=docs', { waitUntil: 'networkidle' })
   await page.waitForTimeout(600)
   const shelf = (await page.getByTestId('doc-shelf').innerText()) ?? ''

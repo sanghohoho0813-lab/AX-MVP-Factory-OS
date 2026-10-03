@@ -251,9 +251,18 @@ export interface NextStep {
 }
 
 /** 맞춤 추천 — 다음 행동(최대 5) · 확인할 정보 → 가능성 높은 모듈 → 빠진 서류 */
-export function recommendNextSteps(insights: readonly Insight[], pendingCount: number): NextStep[] {
+export function recommendNextSteps(
+  insights: readonly Insight[],
+  pendingCount: number,
+  /** D-149: 서류함 손볼 것(만료 · 무슨 서류인지 확인 · 겹친 서류 묶음) — 있으면 서류 탭으로 */
+  shelf?: { expired: number; other: number; dup: number },
+): NextStep[] {
   const out: NextStep[] = []
   if (pendingCount > 0) out.push({ id: 'facts', text: `서류에서 읽은 정보 ${pendingCount}건 확인하기`, why: '확실하지 않은 것만 남겨 두었어요 — 맞으면 한 번에 넣어요', href: '#fact-inbox' })
+  if (shelf && shelf.expired + shelf.other + shelf.dup > 0) {
+    const parts = [shelf.expired ? `만료 ${shelf.expired}` : '', shelf.other ? `무슨 서류인지 확인 ${shelf.other}` : '', shelf.dup ? `겹친 서류 ${shelf.dup}묶음` : ''].filter(Boolean)
+    out.push({ id: 'shelf', text: `서류함 정리하기 — ${parts.join(' · ')}`, why: shelf.expired ? '만료된 서류는 신청 때 막혀요 — 새 발급본을 받아 두세요' : '열어 보고 맞는 칸으로 옮기거나 겹친 것을 지워요', href: '?tab=docs' })
+  }
   for (const ins of insights) if ((ins.tone === 'good' || ins.tone === 'maybe') && ins.action) out.push({ id: `ins:${ins.key}`, text: ins.action, why: `${ins.label} — ${ins.detail || ins.headline}`, href: ins.openPath })
   const docs = [...new Set(insights.filter((i) => i.tone === 'need').flatMap((i) => i.missing))]
   if (docs.length) out.push({ id: 'docs', text: `${docs.slice(0, 3).join(' · ')} 받기`, why: '받으면 판정이 바로 나와요(서류 올리기 한 번으로)', href: null })

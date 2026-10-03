@@ -25,6 +25,7 @@ import { useEntitlements } from '../../lib/entitlementsStore'
 import { pendingFacts } from '../../services/customerFacts'
 import { INSIGHT_TONE_LABEL, buildInsights, recommendNextSteps, type InsightTone } from '../../services/clientInsights'
 import type { DocBatchSummary } from '../../services/docAutoAnalyze'
+import { docShelfSummary } from '../../services/docShelf'
 import { addDaysLocal, withNextAction } from '../../services/clientOpsNextAction'
 import { nowIso } from '../../lib/appClock'
 
@@ -56,7 +57,12 @@ export default function ClientSmartTab({
   const usable = (key: string) => key === 'grants' || ent.feature(key).usable
   const insights = useMemo(() => buildInsights(record, today, notices, usable), [record, today, notices, ent]) // eslint-disable-line react-hooks/exhaustive-deps
   const pending = pendingFacts(record).length
-  const steps = useMemo(() => recommendNextSteps(insights, pending), [insights, pending])
+  // D-149: 서류함 손볼 것도 다음 행동에(만료 · 기타 칸 · 겹친 서류)
+  const shelf = useMemo(() => {
+    const s = docShelfSummary(record, today, new Set())
+    return { expired: s.expired.length, other: s.other.length, dup: s.dupGroups.length }
+  }, [record, today])
+  const steps = useMemo(() => recommendNextSteps(insights, pending, shelf), [insights, pending, shelf])
   const good = insights.filter((i) => i.tone === 'good').length
 
   const setNext = (text: string) => void onCommit(withNextAction(record, text, addDaysLocal(today, 3)), `다음 약속으로 걸었습니다 — ${text.slice(0, 30)}`)
