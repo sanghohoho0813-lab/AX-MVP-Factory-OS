@@ -21,7 +21,7 @@ function countOf(text: string): number | null {
 }
 
 export function profileOfRecord(record: ClientOpsRecord, today: string): CompanyProfile {
-  const { sido, city } = placeOf(record.businessAddress ?? '')
+  const { sido, city, sidoAlt } = placeOf(record.businessAddress ?? '')
   const industry = [record.industry, record.businessCategory, record.businessItem].map((s) => (s ?? '').trim()).filter(Boolean).join(' · ')
   const yrs = record.establishedAt ? yearsInBusiness(record.establishedAt, today) : null
   const emp = countOf(record.employeeCount ?? '')
@@ -32,6 +32,7 @@ export function profileOfRecord(record: ClientOpsRecord, today: string): Company
   const out: CompanyProfile = {
     name: record.companyName,
     sido,
+    ...(sidoAlt ? { sidoAlt } : {}),
     city,
     industry,
     years: yrs ? exact(yrs.fullYears) : null,

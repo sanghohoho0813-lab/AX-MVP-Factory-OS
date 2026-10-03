@@ -6,10 +6,53 @@
  * '3,300,000.00' 을 붙여 넣으면 330,000,000(100배)이 됐다. 숫자가 없으면 null.
  */
 export function wonOf(text: string): number | null {
+  // D-149: '5천만' · '1억' · '1,000만원' 처럼 한국어 단위가 있으면 단위로 읽는다 — 예전에는 숫자만 남겨 5천만이 5원이 됐다
+  if (/[억만천백십]/.test(text)) return koreanWon(text)
   const whole = text.split('.')[0].replace(/[^0-9]/g, '')
   if (whole === '') return null
   const n = Number(whole)
   return Number.isFinite(n) ? n : null
+}
+
+/**
+ * 한국어 금액 → 원 (D-149). '1억 2천' · '1억5000' · '3천5백만' · '2.8만' · '천만' · '15,000원'.
+ * 억 · 만 으로 크게 나누고, 그 안은 천 · 백 · 십 으로 읽는다. 억 뒤에 만 없이 숫자만 오면 만 단위로 본다('1억5000' = 1억 5천만).
+ * 못 읽으면 null.
+ */
+export function koreanWon(text: string): number | null {
+  const t = text.replace(/[\s,]/g, '').replace(/원$/, '')
+  if (!t || !/^[0-9.억만천백십]+$/.test(t)) return null
+  const m = /^(?:([0-9.천백십]*)억)?(?:([0-9.천백십]*)만)?([0-9.천백십]*)$/.exec(t)
+  if (!m) return null
+  const seg = (s: string | undefined, required: boolean): number | null => {
+    if (s === undefined) return 0
+    if (s === '') return required ? 1 : 0 // '억' · '천만' 처럼 앞 숫자 없이 단위만
+    let total = 0
+    let rest = s
+    for (const [u, v] of [['천', 1000], ['백', 100], ['십', 10]] as const) {
+      const i = rest.indexOf(u)
+      if (i < 0) continue
+      const head = rest.slice(0, i)
+      const n = head === '' ? 1 : Number(head)
+      if (!Number.isFinite(n)) return null
+      total += n * v
+      rest = rest.slice(i + 1)
+    }
+    if (rest !== '') {
+      const n = Number(rest)
+      if (!Number.isFinite(n)) return null
+      total += n
+    }
+    return total
+  }
+  const eok = m[1] !== undefined ? seg(m[1], true) : 0
+  const man = m[2] !== undefined ? seg(m[2], true) : 0
+  let tail = seg(m[3], false)
+  if (eok === null || man === null || tail === null) return null
+  // '1억5000' · '1억2천' — 억 바로 뒤의 맨 숫자는 만 단위
+  if (m[1] !== undefined && m[2] === undefined && tail > 0) tail *= 10_000
+  const won = Math.round(eok * 1e8 + man * 1e4 + tail)
+  return won > 0 ? won : null
 }
 
 export function formatKrw(amount: number | null): string {
@@ -26,7 +69,10 @@ export function formatKrwCompact(amount: number | null): string {
     return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)}억원`
   }
   if (amount >= 10_000) {
-    return `${Math.round(amount / 10_000).toLocaleString('ko-KR')}만원`
+    const man = Math.round(amount / 10_000)
+    // D-149: 9,999.5만 같은 반올림이 '10,000만원' 이 되지 않게 — 1억으로 올린다
+    if (man >= 10_000) return '1억원'
+    return `${man.toLocaleString('ko-KR')}만원`
   }
   return `${amount.toLocaleString('ko-KR')}원`
 }

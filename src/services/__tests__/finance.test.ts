@@ -170,5 +170,27 @@ const recs = [
   check('카드번호 같은 칸 없음', !Object.keys(normalizeExpense({ amount: 10, date: '2026-10-01', cardNumber: '1234' }, 'x', 'now') ?? {}).includes('cardNumber'))
 }
 
+// D-149: 돈 검토로 찾은 것
+{
+  check('금액: 1억5000 → 1억 5천만 · 3천5백만 · 3천5백 · 1억2천', parseAmount('1억5000')?.amount === 150_000_000 && parseAmount('3천5백만')?.amount === 35_000_000 && parseAmount('3천5백')?.amount === 3_500 && parseAmount('1억2천')?.amount === 120_000_000, JSON.stringify([parseAmount('1억5000'), parseAmount('3천5백만'), parseAmount('3천5백'), parseAmount('1억2천')]))
+  check('금액: 2.8만 · 천만 · 15,000원 · 1억 (그대로)', parseAmount('2.8만')?.amount === 28_000 && parseAmount('천만')?.amount === 10_000_000 && parseAmount('15,000원')?.amount === 15_000 && parseAmount('1억')?.amount === 100_000_000)
+  check('짧은 금액: 199,995,000 → 2억원(10,000만 아님) · 99,995,000 → 1억원', krwShort(199_995_000) === '2억원' && krwShort(99_995_000) === '1억원', [krwShort(199_995_000), krwShort(99_995_000)])
+  const usd = normalizeExpense({ date: '2026-03-10', name: 'AWS', category: 'software', amount: 100, currency: 'USD', usdKrw: 1300 }, 'e1', '2026-03-10T00:00:00Z')!
+  const later = { ...DEFAULT_SETTINGS, usdKrw: 1450, rateSet: true }
+  const mc = costInMonth({ subscriptions: [], expenses: [usd], records: [], settings: later }, '2026-03')
+  check('달러 비용: 적을 때 환율(1,300원)로 — 나중에 환율을 1,450으로 바꿔도 13만원 그대로', mc.lines[0]?.krw === 130_000, mc.lines[0]?.krw)
+  const old = normalizeExpense({ date: '2026-03-10', name: 'AWS', category: 'software', amount: 100, currency: 'USD' }, 'e2', '2026-03-10T00:00:00Z')!
+  check('달러 비용: 환율 없는 예전 기록만 지금 환율', costInMonth({ subscriptions: [], expenses: [old], records: [], settings: later }, '2026-03').lines[0]?.krw === 145_000)
+  const csv = costCsv(costInMonth({ subscriptions: [], expenses: [normalizeExpense({ date: '2026-03-11', name: '=HYPERLINK("x")', category: 'etc', amount: 1000, currency: 'KRW', memo: '+추가결제\r줄' }, 'e3', '2026-03-11T00:00:00Z')!], records: [], settings: DEFAULT_SETTINGS }, '2026-03'))
+  check("CSV: 수식처럼 보이는 글은 ' 를 붙여 글자로 · \\r 이 든 칸은 따옴표", csv.includes(`"'=HYPERLINK(""x"")"`) && csv.includes(`"'+추가결제\r줄"`), csv.split('\r\n')[1])
+  // 지난 달 — 그 달에 받기로 했는데 못 받은 돈
+  const rec = normalizeClientOps({ id: 'm1', companyName: '샤인', fees: [{ id: 'f1', kind: 'deposit', label: '착수금', amount: 10_000_000, dueDate: '2026-08-15', receivedAt: null }] } as never)
+  const aug = revenueInMonth([rec], '2026-08', '2026-10-03')
+  check('지난 달: 8월에 받기로 한 1,000만원 못 받음 → 8월 화면 미수금 1,000만', aug.overdue === 10_000_000, JSON.stringify(aug))
+  // 조건부 수금 — 숨은 날짜를 두지 않는다
+  const cond = normalizeClientOps({ id: 'm2', companyName: '샤인', fees: [{ id: 'f2', kind: 'success', label: '성공보수', amount: 5_000_000, dueDate: '2026-09-10', receivedAt: null, conditionKind: 'funding_50m' }], fundingApplications: [] } as never)
+  check('조건부 수금: 예전 날짜(9-10)가 남아 있지 않음', cond.fees[0].dueDate === '', cond.fees[0].dueDate)
+}
+
 console.log(`\nfinance: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

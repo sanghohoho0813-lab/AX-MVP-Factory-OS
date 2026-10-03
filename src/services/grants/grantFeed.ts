@@ -129,7 +129,9 @@ async function load(fresh: boolean): Promise<void> {
             ? `기업마당이 공고 대신 안내 글을 보냈습니다(인증키 확인 필요): ${body.sample ?? ''}`
             : body.error === 'timeout'
               ? '기업마당 응답이 늦어 이번에는 못 받았습니다. 잠시 뒤 다시 눌러 주세요.'
-              : '기업마당에서 공고를 받지 못했습니다.'
+              : body.error === 'upstream_empty'
+                ? '기업마당이 공고를 0건 보냈습니다(점검 · 요청 한도일 수 있어요). 지난번에 받은 공고로 보여 드리고, 잠시 뒤 다시 받아 옵니다.'
+                : '기업마당에서 공고를 받지 못했습니다.'
       set({ status: body.error === 'no_key' ? 'no_key' : 'error', message: msg, ...(c ? { fetchedAt: c.fetchedAt, count: c.items.length, notices: noticesFromFeed(c.items, c.fetchedAt) } : {}) })
       return
     }

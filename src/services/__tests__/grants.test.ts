@@ -499,5 +499,23 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   check('업체 요약: 맞춤 · 전국 공통 나눠 셈', sum.general === 250 && sum.fit > 0 && sum.fit < 750, sum)
 }
 
+// D-149: 지원사업 검토로 찾은 것
+{
+  const prof = (o: Partial<CompanyProfile>): CompanyProfile => ({ ...EMPTY_PROFILE, years: exact(3), industry: '제조업', ...o })
+  const mk = (rules: Partial<GrantRules>, title = '공고'): GrantNotice => normalizeNotice({ id: 'g', title, agency: '', applyStart: '', applyEnd: '2099-12-31', deadlineKind: 'date', url: '', summary: '', rules: { ...NO_RULES, regions: [], cities: [], industries: [], excludeIndustries: [], sizes: [], certs: [], ...rules } } as never)
+  const ex = parseNoticeText('공고명: 경기 중소기업 지원\n소관 기관: 경기도\n신청 기간: 2026.10.01 ~ 2026.12.31\n지원 대상: 경기도 소재 중소기업(제조업 제외)')
+  check("'(제조업 제외)' → 제조업은 빼는 조건(예전: 제조업만)", ex.rules.excludeIndustries.includes('제조') || ex.rules.excludeIndustries.some((x) => /제조/.test(x)), JSON.stringify(ex.rules))
+  check("'(제조업 제외)' → 업종 '만' 조건은 없음", !ex.rules.industries.some((x) => /제조/.test(x)), JSON.stringify(ex.rules.industries))
+  const gj = mk({ regions: ['경기'], cities: ['광주시'] }, '[경기] 광주시 기업 지원')
+  check('경기 광주시 공고: 광주광역시 북구 업체는 안 맞음', matchGrant(gj, prof({ sido: '광주', city: '북구' }), '2026-10-03').verdict === 'no')
+  check('경기 광주시 공고: 경기 수원시 업체는 안 맞음 · 경기 광주시 업체는 맞음', matchGrant(gj, prof({ sido: '경기', city: '수원시' }), '2026-10-03').verdict === 'no' && matchGrant(gj, prof({ sido: '경기', city: '광주시' }), '2026-10-03').verdict !== 'no')
+  check("주소 '경기도 광주시 오포읍' → 경기 · 광주시", JSON.stringify(placeOf('경기도 광주시 오포읍 1')) === JSON.stringify({ sido: '경기', city: '광주시', sidoAlt: '' }))
+  const merged = placeOf('전남광주통합특별시 북구 용봉로 1')
+  check("통합 주소 '전남광주통합특별시' → 전남 · 광주 둘 다", merged.sido === '전남' && merged.sidoAlt === '광주', JSON.stringify(merged))
+  check('통합 주소 업체: 광주 공고도 맞음', matchGrant(mk({ regions: ['광주'] }), prof({ sido: '전남', sidoAlt: '광주', city: '북구' }), '2026-10-03').verdict !== 'no')
+  const jung = parseNoticeText('공고명: 중구 소상공인 지원\n소관 기관: 서울특별시 중구\n신청 기간: 2026.10.01 ~ 2026.12.31\n지원 대상: 중구 소재 소상공인')
+  check("'중구 소재' + 소관 서울특별시 중구 → 서울 · 중구(부산 중구 업체는 안 맞음)", jung.rules.regions.includes('서울') && matchGrant({ ...mk({}), rules: jung.rules } as GrantNotice, prof({ sido: '부산', city: '중구' }), '2026-10-03').verdict === 'no', JSON.stringify(jung.rules))
+}
+
 console.log(`\ngrants: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

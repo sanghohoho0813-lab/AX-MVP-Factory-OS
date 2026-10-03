@@ -159,8 +159,8 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
         <MetricTile label="들어온 돈" value={krwShort(sum.revenue.received)} hint="입금 완료(실매출)" hintOnMobile tone={sum.revenue.received > 0 ? 'success' : 'neutral'} onClick={() => setParam('tab', '')} active={tab === 'revenue'} />
         <MetricTile
           label={isPast ? '못 받고 지난 돈' : '들어올 예정'}
-          value={krwShort(isPast ? 0 : sum.revenue.expected)}
-          hint={sum.revenue.overdue > 0 ? `그중 미수금 ${krwShort(sum.revenue.overdue)}` : '받기로 한 날 기준(예상 매출)'}
+          value={krwShort(isPast ? sum.revenue.overdue : sum.revenue.expected)}
+          hint={isPast ? '그 달에 받기로 했는데 아직 못 받은 돈' : sum.revenue.overdue > 0 ? `그중 미수금 ${krwShort(sum.revenue.overdue)}` : '받기로 한 날 기준(예상 매출)'}
           hintOnMobile
           tone={sum.revenue.overdue > 0 ? 'warning' : 'neutral'}
           onClick={() => setParam('tab', '')}
@@ -418,7 +418,9 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
           clients={records.filter((r) => !r.archivedAt).map((r) => ({ id: r.id, name: r.companyName }))}
           onClose={() => setSheet(null)}
           onSave={async (v) => {
-            const saved = await saveExpense(workspaceId, { ...v, id: sheet.item?.id, createdAt: sheet.item?.createdAt })
+            // D-149: 달러 비용은 적는 순간의 환율을 함께 남긴다(고칠 때는 처음 환율 그대로 — 통화를 바꿨으면 지금 환율)
+            const rate = v.currency === 'USD' ? (sheet.item?.currency === 'USD' && sheet.item.usdKrw ? sheet.item.usdKrw : settings.usdKrw) : undefined
+            const saved = await saveExpense(workspaceId, { ...v, ...(rate ? { usdKrw: rate } : {}), id: sheet.item?.id, createdAt: sheet.item?.createdAt })
             setExpenses((prev) => [saved, ...prev.filter((x) => x.id !== saved.id)].sort((a, b) => b.date.localeCompare(a.date)))
             setSheet(null)
             if (ymOf(saved.date) !== ym) setParam('m', ymOf(saved.date))

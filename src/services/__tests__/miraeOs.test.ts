@@ -1885,7 +1885,11 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('쉬는 날: 연휴 3일 · 달 넘김 · 최대 14일', rangeDates('2026-09-30', 3).join() === '2026-09-30,2026-10-01,2026-10-02' && rangeDates('2026-01-01', 99).length === 14 && rangeDates('bad', 3).length === 0)
   const W = '일월화수목금토'
   const subs = [...KR_PUBLIC_HOLIDAYS[2026], ...KR_PUBLIC_HOLIDAYS[2027]].filter((h) => h.kind === 'substitute')
-  check('공휴일 표: 대체공휴일은 모두 월요일(규칙대로 다음 평일)', subs.length === 9 && subs.every((h) => W[weekdayOf(h.date)] === '월'), subs.map((h) => h.date + W[weekdayOf(h.date)]).join(' '))
+  // 대체공휴일은 연휴 다음 첫 평일 — 대부분 월요일, 설날 연휴가 월요일까지 이어진 2027년은 화요일(2/9)
+  const holidaySet = new Set([...KR_PUBLIC_HOLIDAYS[2026], ...KR_PUBLIC_HOLIDAYS[2027]].filter((h) => h.kind !== 'substitute').map((h) => h.date))
+  check('공휴일 표: 대체공휴일은 연휴 다음 첫 평일(쉬는 날 · 주말이 아님 · 전날은 쉬는 날)', subs.length === 9 && subs.every((h) => !['일', '토'].includes(W[weekdayOf(h.date)]) && !holidaySet.has(h.date)), subs.map((h) => h.date + W[weekdayOf(h.date)]).join(' '))
+  // D-149: 2027 설날은 2월 7일(일) — 연휴 2/6~2/8 · 대체공휴일 2/9(화). 2/5(금)는 쉬는 날이 아니다
+  check('공휴일 표: 2027 설날 2/7 · 연휴 2/6~2/8 · 대체 2/9 · 2/5 아님', KR_PUBLIC_HOLIDAYS[2027].some((h) => h.date === '2027-02-07' && h.name === '설날') && ['2027-02-06', '2027-02-08', '2027-02-09'].every((d) => KR_PUBLIC_HOLIDAYS[2027].some((h) => h.date === d)) && !KR_PUBLIC_HOLIDAYS[2027].some((h) => h.date === '2027-02-05'))
   check('공휴일 표: 2026 개천절(토) → 10/5(월) 대체 · 현충일(토)은 대체 없음', KR_PUBLIC_HOLIDAYS[2026].some((h) => h.date === '2026-10-05') && !KR_PUBLIC_HOLIDAYS[2026].some((h) => h.date === '2026-06-08'))
   const offs = new Set(['2026-10-05', '2026-10-09'])
   const oct = monthWorkdays(2026, 10, offs)

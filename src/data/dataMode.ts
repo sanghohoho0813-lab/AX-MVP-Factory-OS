@@ -16,8 +16,18 @@ export interface DataModeConfig {
   missingKeys: string[]
 }
 
-function readEnv(key: string): string {
-  const raw = (import.meta.env as Record<string, string | undefined>)[key]
+/*
+ * D-149: 환경변수는 이름을 하나씩 적어 읽는다. `import.meta.env[key]` 처럼 이름을 변수로 읽으면
+ * Vite 가 VITE_ 로 시작하는 값 전부(배포 정보 · 커밋 글까지)를 공개 번들에 넣는다 — 누가 비밀을 VITE_ 이름으로 넣으면 그대로 새어 나간다.
+ */
+const ENV: Record<'VITE_DATA_MODE' | 'VITE_SUPABASE_URL' | 'VITE_SUPABASE_ANON_KEY', string | undefined> = {
+  VITE_DATA_MODE: import.meta.env.VITE_DATA_MODE,
+  VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
+  VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
+}
+
+function readEnv(key: keyof typeof ENV): string {
+  const raw = ENV[key]
   return typeof raw === 'string' ? raw.trim() : ''
 }
 

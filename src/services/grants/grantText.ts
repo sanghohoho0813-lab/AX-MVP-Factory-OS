@@ -127,7 +127,20 @@ export function rulesFromText(target: string, whole = target, title = ''): Grant
   if (/중소\s*기업|중소\s*·\s*중견|중소·중견/.test(t)) sizes.push('small')
   if (/중견/.test(t)) sizes.push('mid')
   r.sizes = sizes
-  for (const [label, re] of INDUSTRY_WORDS) if (re.test(t)) r.industries.push(label)
+  // D-149: '(제조업 제외)' · '제외 업종: 유흥업' 은 그 업종만 빼는 조건이다 — 예전에는 '그 업종만' 으로 읽어 결과가 정반대였다
+  for (const [label, re] of INDUSTRY_WORDS) {
+    let include = false
+    let exclude = false
+    for (const m of t.matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`))) {
+      const at = m.index ?? 0
+      const after = t.slice(at + m[0].length, at + m[0].length + 12)
+      const before = t.slice(Math.max(0, at - 14), at)
+      if (/^[^.。\n]{0,10}제외/.test(after) || /제외\s*(?:업종|대상|업체)?\s*[:：]\s*[^.\n]{0,12}$/.test(before)) exclude = true
+      else include = true
+    }
+    if (include) r.industries.push(label)
+    else if (exclude) r.excludeIndustries.push(label)
+  }
   const empMin = /(?:상시\s*)?(?:근로자|종업원|직원)\s*(\d{1,4})\s*(?:인|명)\s*이상/.exec(t)
   if (empMin) r.minEmployees = Number(empMin[1])
   const empMax = /(?:상시\s*)?(?:근로자|종업원|직원)\s*(\d{1,4})\s*(?:인|명)\s*(?:이하|미만)/.exec(t)
@@ -169,10 +182,12 @@ export type NoticeDraft = Omit<GrantNotice, 'id' | 'createdAt' | 'updatedAt' | '
  * 중앙부처(중소벤처기업부 · 고용노동부 …)는 지역이 없다(전국). 이미 지역 조건이 있으면 건드리지 않는다.
  */
 export function withAgencyRegion(rules: GrantRules, agency: string): GrantRules {
-  if (rules.regions.length || rules.cities.length) return rules
+  if (rules.regions.length) return rules
   const parts = agency.trim().split(/\s+/)
   const sds = parts.length ? sidosOf(parts[0]) : []
   if (sds.length === 0) return rules
+  // D-149: '중구 소재' 처럼 시·군·구만 있으면 소관 기관의 시·도를 붙인다 — 서울 중구 공고가 부산 중구 업체에 맞던 것
+  if (rules.cities.length) return { ...rules, regions: sds }
   const city = parts[1] && isCityName(parts[1]) ? parts[1] : ''
   return { ...rules, regions: sds, cities: city ? [city] : [] }
 }
@@ -286,7 +301,7 @@ export function parseBizinfoJson(text: string): BizinfoParse {
     // 이름 앞 '[경기] 부천시 …' — 시·군·구 공고
     const head = /^\s*\[[^\]]{1,12}\]\s*([가-힣]{2,4}[시군구])\s/.exec(title)
     if (head && isCityName(head[1]) && !rules.cities.includes(head[1])) rules.cities.push(head[1])
-    for (const tag of tagList) for (const [label, re] of INDUSTRY_WORDS) if (re.test(tag) && !rules.industries.includes(label)) rules.industries.push(label)
+    for (const tag of tagList) for (const [label, re] of INDUSTRY_WORDS) if (re.test(tag) && !rules.industries.includes(label) && !rules.excludeIndustries.includes(label)) rules.industries.push(label)
     if (rules.withinYears === null) {
       const y = /(?:창업|업력)\s*(\d{1,2})\s*년\s*(?:이하|이내|미만)/.exec(tags)
       if (y) rules.withinYears = Number(y[1])

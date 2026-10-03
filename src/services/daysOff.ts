@@ -69,10 +69,11 @@ export const KR_PUBLIC_HOLIDAYS: Record<number, { date: string; name: string; ki
   ],
   2027: [
     { date: '2027-01-01', name: '신정', kind: 'holiday' },
-    { date: '2027-02-05', name: '설날 연휴', kind: 'festive' },
-    { date: '2027-02-06', name: '설날', kind: 'festive' },
-    { date: '2027-02-07', name: '설날 연휴', kind: 'festive' },
-    { date: '2027-02-08', name: '대체공휴일(설날)', kind: 'substitute' },
+    // D-149: 2027 설날은 2월 7일(일) — 한국 시간 그믐 · 초하루 기준(중국 달력은 2월 6일이라 하루 앞당겨 적었었다). 일요일과 겹쳐 대체공휴일 2월 9일(화)
+    { date: '2027-02-06', name: '설날 연휴', kind: 'festive' },
+    { date: '2027-02-07', name: '설날', kind: 'festive' },
+    { date: '2027-02-08', name: '설날 연휴', kind: 'festive' },
+    { date: '2027-02-09', name: '대체공휴일(설날)', kind: 'substitute' },
     { date: '2027-03-01', name: '삼일절', kind: 'holiday' },
     { date: '2027-05-05', name: '어린이날', kind: 'holiday' },
     { date: '2027-05-13', name: '부처님오신날', kind: 'holiday' },

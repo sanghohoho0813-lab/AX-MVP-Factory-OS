@@ -289,9 +289,20 @@ function normalizeCustomDocuments(raw: unknown): CustomDocument[] {
 
 const isFeeConditionKind = (v: unknown): v is FeeConditionKind => typeof v === 'string' && (FEE_CONDITION_ORDER as string[]).includes(v)
 
+/**
+ * D-149: 조건부(정책자금 실행 · 완료 · 직접 조건) 수금 항목에는 받을 날을 두지 않는다.
+ * 화면은 조건부일 때 날짜 칸을 숨기는데, 계약 마무리가 넣어 둔 '계약일 + 7일' 같은 날짜가 남아 있어서
+ * 조건이 충족되자마자 '미수금(늦음)' 이 되고, 조건 대기 중에도 오늘 '이번 주 받을 돈' · 달력에 잡혔다.
+ */
+function withoutHiddenDue<T extends Pick<FeeItem, 'conditionKind' | 'dueDate'>>(fee: T): T {
+  const k = fee.conditionKind
+  const conditional = k === 'funding_executed' || k === 'funding_50m' || k === 'funding_100m' || k === 'project_done' || k === 'custom'
+  return conditional && fee.dueDate ? { ...fee, dueDate: '' } : fee
+}
+
 function upgradeFees(raw: Partial<ClientOpsRecord> & LegacyShape): FeeItem[] {
   if (Array.isArray(raw.fees)) {
-    return raw.fees.map((f) => ({
+    return raw.fees.map((f) => withoutHiddenDue({
       id: f.id ?? generateId(),
       serviceKey: f.serviceKey ?? null,
       kind: f.kind ?? 'deposit',
@@ -308,7 +319,7 @@ function upgradeFees(raw: Partial<ClientOpsRecord> & LegacyShape): FeeItem[] {
       ...(isFeeConditionKind(f.conditionKind) ? { conditionKind: f.conditionKind } : {}),
       ...(typeof f.conditionText === 'string' && f.conditionText.trim() !== '' ? { conditionText: f.conditionText.slice(0, 80) } : {}),
       ...(typeof f.conditionMetAt === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(f.conditionMetAt) ? { conditionMetAt: f.conditionMetAt } : {}),
-    }))
+    }) as FeeItem)
   }
 
   // 예전 계약금·성공보수 두 칸 → 수금 항목으로 승격
@@ -912,14 +923,14 @@ export function withNewFee(record: ClientOpsRecord, fee: Partial<FeeItem>): Clie
     ...(fee.conditionMetAt ? { conditionMetAt: fee.conditionMetAt } : {}),
   }
   const label = item.amount === null ? item.label : `${item.label} ${item.amount.toLocaleString('ko-KR')}원`
-  return withActivity({ ...record, fees: [...record.fees, item] }, 'fee_added', `수금 항목 추가 — ${label}`)
+  return withActivity({ ...record, fees: [...record.fees, withoutHiddenDue(item)] }, 'fee_added', `수금 항목 추가 — ${label}`)
 }
 
 export function withFee(record: ClientOpsRecord, feeId: string, patch: Partial<FeeItem>): ClientOpsRecord {
   const prev = record.fees.find((f) => f.id === feeId)
   const out: ClientOpsRecord = {
     ...record,
-    fees: record.fees.map((f) => (f.id === feeId ? { ...f, ...patch } : f)),
+    fees: record.fees.map((f) => (f.id === feeId ? withoutHiddenDue({ ...f, ...patch }) : f)),
   }
   // 입금 확인은 계약 이행의 증거라 반드시 남긴다(해제는 오기 정정으로 보고 남기지 않는다).
   if (prev && patch.receivedAt !== undefined && patch.receivedAt && !prev.receivedAt) {

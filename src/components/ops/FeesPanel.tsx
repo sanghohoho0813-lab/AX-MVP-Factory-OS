@@ -248,11 +248,14 @@ function FeeLine({
                   type="checkbox"
                   aria-label={`${fee.label} 영업자 지급 완료`}
                   checked={fee.agentPaidAt !== null}
-                  disabled={fee.receivedAt === null}
+                  // D-149: 입금 확인을 되돌려도 '지급' 이 남아 있으면 끌 수 있어야 한다(예전에는 막혀서 못 고쳤다)
+                  disabled={fee.receivedAt === null && fee.agentPaidAt === null}
                   onChange={(e) => void patch({ agentPaidAt: e.target.checked ? today : null })}
                   className="size-5 accent-brand-600 disabled:opacity-40"
                 />
-                {fee.receivedAt === null ? (
+                {fee.receivedAt === null && fee.agentPaidAt !== null ? (
+                  <span className="text-warning-800">고객 입금 전인데 지급으로 적혀 있어요 — 아직 안 줬으면 끄세요</span>
+                ) : fee.receivedAt === null ? (
                   <span className="text-slate-400">고객 입금 전</span>
                 ) : fee.agentPaidAt ? (
                   <span className="inline-flex items-center gap-1">

@@ -3,7 +3,7 @@
  */
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { isContractClient, isProspect } from '../salesPipeline'
-import { NO_RULES, deadlineOf, deadlineRank, matchGrant, verdictRank, type CompanyProfile, type GrantMatch, type GrantNotice } from './grantMatch'
+import { NO_RULES, deadlineOf, deadlineRank, matchGrant, regionHit, verdictRank, type CompanyProfile, type GrantMatch, type GrantNotice } from './grantMatch'
 import { profileOfRecord } from './grantProfile'
 import { FINDER_PATH, profileToQuery, type NoticeDraft } from './grantText'
 
@@ -94,7 +94,7 @@ export function grantIndex(notices: readonly GrantNotice[], clients: readonly Gr
     const regions = notice.rules.regions
     for (const client of clients) {
       // 다른 시·도 공고는 바로 건너뛴다(지역 공고가 대부분이라 계산이 크게 준다) — matchGrant 도 '안 맞음' 으로 판정한다
-      if (regions.length && client.profile.sido && !regions.includes(client.profile.sido)) continue
+      if (regions.length && client.profile.sido && !regionHit(regions, client.profile)) continue
       const match = matchGrant(notice, client.profile, today, d)
       if (match.verdict === 'no') continue
       if (match.verdict !== 'general') list.push({ client, match })

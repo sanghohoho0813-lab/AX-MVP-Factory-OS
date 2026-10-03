@@ -144,6 +144,8 @@ export interface CompanyProfile {
   name: string
   /** 시·도 짧은 이름 */
   sido: string
+  /** D-149: 통합 시·도(전남광주통합특별시)면 다른 하나(광주) — 두 쪽 공고가 다 맞는다 */
+  sidoAlt?: string
   city: string
   /** 업종 · 종목 글(여러 칸을 이은 것) */
   industry: string
@@ -183,7 +185,8 @@ const SIDO_LONG: [RegExp, string][] = [
   [/^부산/, '부산'],
   [/^대구/, '대구'],
   [/^인천/, '인천'],
-  [/^광주/, '광주'],
+  // D-149: '광주시' 는 경기도 광주시다(광주광역시는 '광주' · '광주광역시') — 시·군 이름으로 둔다
+  [/^광주(?!시)/, '광주'],
   [/^대전/, '대전'],
   [/^울산/, '울산'],
   [/^세종/, '세종'],
@@ -218,13 +221,20 @@ export function isCityName(word: string): boolean {
 }
 
 /** 주소 → 시·도 · 시·군·구 ("경기도 파주시 문산읍 …" → 경기 · 파주시) */
-export function placeOf(address: string): { sido: string; city: string } {
+export function placeOf(address: string): { sido: string; city: string; sidoAlt: string } {
   const parts = address.trim().split(/\s+/).filter(Boolean)
-  const sido = parts.length ? sidoOf(parts[0]) : ''
-  if (!sido) return { sido: '', city: '' }
+  // D-149: '전남광주통합특별시 북구 …' 는 전남 · 광주 둘 다(예전에는 전남만 남아 광주 공고가 다 '안 맞음')
+  const sds = parts.length ? sidosOf(parts[0]) : []
+  const sido = sds[0] ?? ''
+  if (!sido) return { sido: '', city: '', sidoAlt: '' }
   // 세종은 시·군·구가 없다. '수원시 영통구' 처럼 두 단계면 시까지만
   const city = parts[1] && /[시군구]$/.test(parts[1]) ? parts[1] : ''
-  return { sido, city }
+  return { sido, city, sidoAlt: sds[1] ?? '' }
+}
+
+/** 공고 지역에 이 업체 시·도가 드는가(통합 시·도는 두 쪽 다 본다) */
+export function regionHit(regions: readonly string[], p: Pick<CompanyProfile, 'sido' | 'sidoAlt'>): boolean {
+  return regions.includes(p.sido) || (!!p.sidoAlt && regions.includes(p.sidoAlt))
 }
 
 /** 업종 글에서 인증 찾기 */
@@ -425,7 +435,7 @@ export function matchGrant(notice: GrantNotice, p: CompanyProfile, today: string
   else {
     const want = placeText(r)
     if (!p.sido) add('region', '지역', 'unknown', `${want} 업체만 — 회사 주소를 적으면 바로 확인돼요`)
-    else if (r.regions.length && !r.regions.includes(p.sido)) add('region', '지역', 'no', `${want} 업체만 (이 업체는 ${p.sido})`)
+    else if (r.regions.length && !regionHit(r.regions, p)) add('region', '지역', 'no', `${want} 업체만 (이 업체는 ${p.sido})`)
     else if (r.cities.length === 0) add('region', '지역', 'ok', `${want} — ${[p.sido, p.city].filter(Boolean).join(' ')}`)
     else if (!p.city) add('region', '지역', 'unknown', `${want} 업체만 — 시·군·구를 확인해야 해요`)
     else if (r.cities.includes(p.city)) add('region', '지역', 'ok', `${want} — ${p.sido} ${p.city}`)

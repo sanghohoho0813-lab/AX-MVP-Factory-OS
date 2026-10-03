@@ -12,6 +12,7 @@
  */
 import type { ClientOpsRecord, FeeItem } from '../../types/clientOps'
 import { feeStateOf, fundingFactsOf } from '../feeStatus'
+import { koreanWon } from '../../lib/format'
 
 /* ------------------------------------------------------------------ */
 /* 모양                                                                  */
@@ -83,6 +84,8 @@ export interface Expense {
   memo: string
   /** 어느 업체 일로 쓴 돈인가(없으면 '') */
   clientId: string
+  /** D-149: 달러로 쓴 돈이면 적을 때의 환율(1달러 = N원) — 나중에 환율을 바꿔도 지난 비용 · CSV 가 바뀌지 않게 */
+  usdKrw?: number
   createdAt: string
   updatedAt: string
 }
@@ -182,8 +185,13 @@ export function krwShort(won: number): string {
   const a = Math.abs(Math.round(won))
   // 100만원 아래는 정확히(비용은 몇천 원 단위가 중요하다), 그 위는 억 · 만
   if (a < 1_000_000) return `${sign}${a.toLocaleString('ko-KR')}원`
-  const eok = Math.floor(a / 1e8)
-  const man = Math.round((a % 1e8) / 1e4)
+  // D-149: 만 자리를 반올림한 뒤 10,000만이 되면 억으로 올린다('1억 10,000만원' 이 나왔다)
+  let eok = Math.floor(a / 1e8)
+  let man = Math.round((a % 1e8) / 1e4)
+  if (man >= 10_000) {
+    eok += 1
+    man = 0
+  }
   if (eok > 0) return `${sign}${eok.toLocaleString('ko-KR')}억${man ? ` ${man.toLocaleString('ko-KR')}만` : ''}원`
   return `${sign}${man.toLocaleString('ko-KR')}만원`
 }
@@ -215,7 +223,7 @@ export interface MonthRevenue {
   ym: string
   received: number
   expected: number
-  /** expected 중 날짜 지난 미수금(이번 달에만) */
+  /** expected 중 날짜 지난 미수금 — 이번 달: 밀린 것 전부 · 지난 달: 그 달에 받기로 한 것 중 아직 못 받은 것 */
   overdue: number
   lines: RevenueLine[]
 }
@@ -242,12 +250,15 @@ export function revenueInMonth(records: readonly ClientOpsRecord[], ym: string, 
       const due = isYmd(f.dueDate) ? f.dueDate : ''
       if (due && ymOf(due) === ym && due >= today) lines.push({ ...base, kind: 'expected', date: due })
       else if (isThisMonth && st === 'overdue') lines.push({ ...base, kind: 'overdue', date: due })
+      // D-149: 지난 달 화면 — 그 달에 받기로 했는데 아직 못 받은 돈(예전에는 늘 0원)
+      else if (!isThisMonth && ym < ymOf(today) && st === 'overdue' && due && ymOf(due) === ym) lines.push({ ...base, kind: 'overdue', date: due })
       else if (isThisMonth && st === 'claimable' && !due) lines.push({ ...base, kind: 'expected', date: '' })
     }
   }
   lines.sort((a, b) => (a.kind === 'received' ? 0 : 1) - (b.kind === 'received' ? 0 : 1) || (a.date || '9').localeCompare(b.date || '9') || a.clientName.localeCompare(b.clientName))
   const sum = (k: RevenueKind[]) => lines.filter((l) => k.includes(l.kind)).reduce((s, l) => s + l.amount, 0)
-  return { ym, received: sum(['received']), expected: sum(['expected', 'overdue']), overdue: sum(['overdue']), lines }
+  // 지난 달의 못 받은 돈은 '예정' 이 아니다(이미 지났다) — overdue 로만 센다
+  return { ym, received: sum(['received']), expected: isThisMonth ? sum(['expected', 'overdue']) : sum(['expected']), overdue: sum(['overdue']), lines }
 }
 
 /** 받을 시기가 정해지지 않은 예상 매출 — 조건 대기 · 날짜 없는 예전 항목 · 아직 수금 항목으로 안 나눈 계약금액 */
@@ -336,7 +347,9 @@ export function costInMonth(
   }
   for (const e of input.expenses) {
     if (!isYmd(e.date) || ymOf(e.date) !== ym || !(e.amount > 0)) continue
-    lines.push({ id: `exp:${e.id}`, source: 'expense', date: e.date, name: e.name, category: e.category, krw: toKrw(e.amount, e.currency, settings), amount: e.amount, currency: e.currency, payMethod: e.payMethod, memo: e.memo, clientId: e.clientId })
+    // D-149: 달러 비용은 적을 때의 환율로(없던 예전 기록만 지금 환율)
+    const krw = e.currency === 'USD' && e.usdKrw ? Math.round(e.amount * e.usdKrw) : toKrw(e.amount, e.currency, settings)
+    lines.push({ id: `exp:${e.id}`, source: 'expense', date: e.date, name: e.name, category: e.category, krw, amount: e.amount, currency: e.currency, payMethod: e.payMethod, memo: e.memo, clientId: e.clientId })
   }
   // 영업자 수수료 — 실제로 준 날 기준(D-108 정산과 같은 돈)
   for (const r of input.records) {
@@ -452,6 +465,7 @@ export function normalizeExpense(raw: unknown, id: string, now: string): Expense
     payMethod: pay(r.payMethod),
     memo: str(r.memo, 300),
     clientId: str(r.clientId, 80),
+    ...(cur(r.currency) === 'USD' && typeof r.usdKrw === 'number' && r.usdKrw >= 100 && r.usdKrw <= 10_000 ? { usdKrw: r.usdKrw } : {}),
     createdAt: str(r.createdAt, 40) || now,
     updatedAt: str(r.updatedAt, 40) || now,
   }
@@ -471,31 +485,21 @@ export function parseAmount(text: string): { amount: number; currency: Currency 
     const n = Number(t.replace(/[^\d.]/g, ''))
     return Number.isFinite(n) && n > 0 ? { amount: Math.round(n * 100) / 100, currency: 'USD' } : null
   }
-  // '1억2천' · '3천만' · '2.8만' · '15000' — 단위를 앞에서부터 하나씩 먹는다
-  const UNITS: [string, number][] = [['억', 1e8], ['천만', 1e7], ['백만', 1e6], ['만', 1e4], ['천', 1e3]]
-  let rest = t.replace(/원$/, '')
-  let won = 0
-  let lastUnit = Infinity
-  while (rest) {
-    const m = /^(\d+(?:\.\d+)?)(억|천만|백만|만|천)?/.exec(rest)
-    if (!m || m[0] === '') return null
-    const n = Number(m[1])
-    let unit = m[2] ? (UNITS.find((u) => u[0] === m[2]) as [string, number])[1] : 1
-    // '1억2천' 의 천은 천만(억 다음 자리) — 억 바로 뒤에 오는 '천' · '백' 은 만 단위로 본다
-    if (m[2] === '천' && lastUnit === 1e8) unit = 1e7
-    if (unit >= lastUnit) return null
-    won += n * unit
-    lastUnit = unit
-    rest = rest.slice(m[0].length)
-  }
-  return won > 0 ? { amount: Math.round(won), currency: 'KRW' } : null
+  // D-149: 한국어 금액은 한 곳(koreanWon)에서 — '1억5000' · '3천5백' 도 읽는다
+  const won = /[억만천백십]/.test(t) ? koreanWon(t) : (() => {
+    const n = Number(t.replace(/원$/, ''))
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  })()
+  return won ? { amount: won, currency: 'KRW' } : null
 }
 
 /** 세무사에게 보낼 한 달 비용 (CSV · 엑셀에서 열림) */
 export function costCsv(cost: MonthCost, clientName: (id: string) => string = () => ''): string {
   const esc = (v: string | number) => {
-    const s = String(v)
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    let s = String(v)
+    // D-149: 엑셀이 수식으로 읽는 글(=HYPERLINK · +추가결제 · -메모 · @)은 앞에 ' 를 붙여 글자로 — 숫자 칸은 그대로
+    if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = `'${s}`
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
   }
   const head = ['날짜', '항목', '분류', '원 환산', '원래 금액', '통화', '결제 수단', '구분', '업체', '메모']
   const src: Record<CostSource, string> = { subscription: '정기 결제', expense: '비용', agent: '영업자 수수료' }

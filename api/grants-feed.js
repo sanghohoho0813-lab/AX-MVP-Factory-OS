@@ -9,7 +9,8 @@
  *  - 다른 파일을 불러오지 않는다(서버 함수 하나로 끝나게). 공고 글 읽기 · 매칭은 화면 쪽 규칙(grantText · grantMatch)이 한다.
  */
 
-const KEY_NAMES = ['BIZINFO_API_KEY', 'BIZINFO_KEY', 'BIZINFO_CRTFC_KEY', 'BIZINFO_API', 'BIZINFO_SERVICE_KEY', 'VITE_BIZINFO_API_KEY', 'VITE_BIZINFO_KEY']
+// D-149: VITE_ 이름은 받지 않는다 — VITE_ 로 넣은 값은 화면 번들에 들어갈 수 있다(키는 서버 이름으로만)
+const KEY_NAMES = ['BIZINFO_API_KEY', 'BIZINFO_KEY', 'BIZINFO_CRTFC_KEY', 'BIZINFO_API', 'BIZINFO_SERVICE_KEY']
 const ENDPOINT = 'https://www.bizinfo.go.kr/uss/rss/bizinfoApi.do'
 const MAX = 1000
 
@@ -103,6 +104,13 @@ export default async function handler(req, res) {
       return
     }
     const items = itemsOf(data).slice(0, MAX).map(slim).filter((x) => x.pblancNm)
+    // D-149: 공고가 0건이면 기업마당 오류(요청 한도 · 점검)로 본다 — 캐시하지 않는다.
+    // 예전에는 0건 응답도 다음 날 9시까지 캐시돼 하루 종일 '공고 0건' 이 보였다
+    if (items.length === 0) {
+      res.setHeader('Cache-Control', 'no-store')
+      res.status(502).json({ error: 'upstream_empty', keys: data && typeof data === 'object' ? Object.keys(data).slice(0, 5) : [] })
+      return
+    }
     res.setHeader('Cache-Control', fresh ? 'no-store' : `public, max-age=0, s-maxage=${secondsUntilNine()}, stale-while-revalidate=300`)
     res.status(200).json({ fetchedAt: new Date().toISOString(), count: items.length, items })
   } catch (e) {
