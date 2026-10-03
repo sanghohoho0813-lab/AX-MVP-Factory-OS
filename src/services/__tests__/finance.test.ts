@@ -24,6 +24,8 @@ import {
   normalizeSubscription,
   outlook,
   parseAmount,
+  rateFor,
+  withRate,
   revenueInMonth,
   toKrw,
   undatedRevenue,
@@ -190,6 +192,18 @@ const recs = [
   // 조건부 수금 — 숨은 날짜를 두지 않는다
   const cond = normalizeClientOps({ id: 'm2', companyName: '샤인', fees: [{ id: 'f2', kind: 'success', label: '성공보수', amount: 5_000_000, dueDate: '2026-09-10', receivedAt: null, conditionKind: 'funding_50m' }], fundingApplications: [] } as never)
   check('조건부 수금: 예전 날짜(9-10)가 남아 있지 않음', cond.fees[0].dueDate === '', cond.fees[0].dueDate)
+}
+
+// D-150: 달러 정기 결제 — 그 달 환율
+{
+  const sub150 = normalizeSubscription({ name: 'Figma', category: 'software', amount: 100, currency: 'USD', cycle: 'monthly', billingDay: 5, startDate: '2026-01-05' }, 's150', '2026-01-01T00:00:00Z')!
+  const s0 = { ...DEFAULT_SETTINGS, usdKrw: 1300, rateSet: true }
+  const s1 = withRate(s0, 1450, '2026-10')
+  check('환율 바꾸기: 10월부터 1,450 · 9월은 1,300 그대로', rateFor(s1, '2026-10') === 1450 && rateFor(s1, '2026-09') === 1300 && s1.usdKrw === 1450, JSON.stringify(s1))
+  const sep = costInMonth({ subscriptions: [sub150], expenses: [], records: [], settings: s1 }, '2026-09')
+  const oct = costInMonth({ subscriptions: [sub150], expenses: [], records: [], settings: s1 }, '2026-10')
+  check('달러 정기 결제: 9월 13만원 · 10월 14.5만원', sep.lines[0]?.krw === 130_000 && oct.lines[0]?.krw === 145_000, [sep.lines[0]?.krw, oct.lines[0]?.krw])
+  check('환율 기록: 저장했다 읽어도 남음', normalizeSettings(JSON.parse(JSON.stringify(s1))).rateHistory?.length === 2)
 }
 
 console.log(`\nfinance: ${pass} passed, ${fail} failed`)

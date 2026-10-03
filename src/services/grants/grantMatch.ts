@@ -10,6 +10,8 @@
  *    그래서 '창업 7년 이내' 와 '3~7년' 처럼 걸치면 '확인 필요' 가 된다(지어내지 않는다).
  */
 
+import { nowDate, todayLocalDate } from '../../lib/appClock'
+
 export type GrantCategory = 'money' | 'hr' | 'marketing' | 'rnd' | 'export' | 'startup' | 'etc'
 
 /** 화면 칩 순서 — 토스 · 카카오 화면과 같은 갈래 */
@@ -111,6 +113,8 @@ export interface GrantNotice {
   applyStart: string
   /** 접수 마감(YYYY-MM-DD 또는 '') */
   applyEnd: string
+  /** D-150: 마감 시각('18:00') — 있으면 마감일 그 시각이 지나면 마감 */
+  applyEndTime?: string
   deadlineKind: DeadlineKind
   /** "최대 5천만원" — 글 그대로. 숫자를 지어내지 않는다 */
   amountText: string
@@ -279,7 +283,14 @@ export function daysBetween(from: string, to: string): number | null {
 
 const md = (ymd: string) => `${Number(ymd.slice(5, 7))}월 ${Number(ymd.slice(8, 10))}일`
 
-export function deadlineOf(n: Pick<GrantNotice, 'applyStart' | 'applyEnd' | 'deadlineKind'>, today: string): Deadline {
+/** 오늘이 실제 오늘이면 지금 시각(HH:MM) — 마감 시각 비교용. 다른 날을 물으면 시각은 모른다 */
+function nowHmIfToday(today: string): string {
+  const now = nowDate()
+  if (todayLocalDate(now) !== today) return ''
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+}
+
+export function deadlineOf(n: Pick<GrantNotice, 'applyStart' | 'applyEnd' | 'deadlineKind'> & { applyEndTime?: string }, today: string, nowHm: string = nowHmIfToday(today)): Deadline {
   const startIn = n.applyStart ? daysBetween(today, n.applyStart) : null
   if (startIn !== null && startIn > 0) {
     return { state: 'upcoming', days: n.applyEnd ? daysBetween(today, n.applyEnd) : null, label: `${md(n.applyStart)} 접수 시작`, urgent: false, open: false }
@@ -292,7 +303,11 @@ export function deadlineOf(n: Pick<GrantNotice, 'applyStart' | 'applyEnd' | 'dea
     return { state: 'first_come', days, label: '선착순 마감', urgent: days !== null && days <= 7, open: true }
   }
   if (days === null) return { state: 'unknown', days: null, label: '마감일 확인 필요', urgent: false, open: true }
-  if (days === 0) return { state: 'today', days, label: '오늘 마감', urgent: true, open: true }
+  if (days === 0) {
+    // D-150: 마감 시각이 지났으면 마감(예전에는 저녁에도 '오늘 마감' · 카톡 권유가 계속 떴다)
+    if (n.applyEndTime && nowHm && nowHm >= n.applyEndTime) return { state: 'closed', days, label: `오늘 ${n.applyEndTime} 마감됨`, urgent: false, open: false }
+    return { state: 'today', days, label: n.applyEndTime ? `오늘 ${n.applyEndTime} 마감` : '오늘 마감', urgent: true, open: true }
+  }
   if (days === 1) return { state: 'tomorrow', days, label: '내일 마감', urgent: true, open: true }
   // 이번 주(일요일까지)
   const dow = new Date(`${today}T00:00:00Z`).getUTCDay()
@@ -599,6 +614,7 @@ export function normalizeNotice(raw: unknown, id: string, now: string): GrantNot
     category,
     applyStart: okDate(r.applyStart),
     applyEnd: okDate(r.applyEnd),
+    ...(typeof r.applyEndTime === 'string' && /^\d{2}:\d{2}$/.test(r.applyEndTime) ? { applyEndTime: r.applyEndTime } : {}),
     deadlineKind,
     amountText: text('amountText', 80),
     target: text('target', 600),

@@ -9,7 +9,7 @@
  */
 
 import type { ClientOpsRecord } from '../types/clientOps'
-import { canUploadFiles, createClient, saveClient, uploadDocumentFile, withToolResult } from './clientOpsService'
+import { canUploadFiles, createClient, saveClient, uploadDocumentFile, withArchived, withToolResult } from './clientOpsService'
 import { listRows, saveRow } from './moduleData'
 import { applyCretopToClient, cretopResultInput, digestCretop } from './salesCretop'
 import { salesStageOf, withSalesStage } from './salesPipeline'
@@ -77,6 +77,11 @@ export async function registerFromCretop(input: CretopIntakeInput): Promise<Cret
       status: 'waiting',
     }))
   if (!created) {
+    // D-150: 보관해 둔 업체에 크레탑을 다시 붙이면 보관을 푼다 — 예전에는 보드 · 목록에 안 보이는 업체에 들어가 '등록했는데 없다' 가 됐다
+    if (base.archivedAt) {
+      base = withArchived(base, false)
+      warnings.push('보관해 둔 같은 업체가 있어 보관을 풀고 그 업체에 붙였습니다.')
+    }
     if (base.contactName.trim() === '' && input.contactName) base = { ...base, contactName: input.contactName.trim() }
     if (base.contactPhone.trim() === '' && input.contactPhone) base = { ...base, contactPhone: input.contactPhone.trim() }
   }

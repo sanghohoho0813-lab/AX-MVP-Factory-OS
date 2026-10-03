@@ -77,7 +77,8 @@ export function printSvg(svg: SVGSVGElement | null, title = "출력"): void {
   const win = window.open("", "_blank");
   if (!win) return;
   win.document.write(
-    `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>` +
+    // D-150: 제목은 글자로만 — 회사 이름 같은 사용자 글이 그대로 HTML 로 들어가면 같은 출처 창에서 스크립트가 돈다
+    `<!doctype html><html><head><meta charset="utf-8"><title>${String(title).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string)}</title>` +
     `<style>` +
     `@page{margin:14mm}` +
     `html,body{margin:0;padding:0;height:100%}` +

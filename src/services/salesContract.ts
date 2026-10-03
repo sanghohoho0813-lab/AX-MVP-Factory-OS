@@ -136,11 +136,16 @@ export function withContractClose(record: ClientOpsRecord, d: ContractCloseDraft
 
   // 수금 항목
   const have = new Set(next.fees.map((f) => f.label))
+  // D-150: 이미 같은 계약 마무리로 넣은 줄(이름 · 금액 같음)만 건너뛴다 — 다시 눌러도 두 번 안 들어가게.
+  // 이름만 같은 다른 줄은 '계약금 (2)' 로 따로 넣는다(예전에는 빠져서 금액 합계와 수금 항목이 안 맞았다)
+  const closedBefore = new Set(next.fees.filter((f) => f.note === '계약 완료에서').map((f) => `${f.label.replace(/\s*\(\d+\)$/, '')}|${f.amount ?? ''}`))
   const rate = d.agentRatePct !== null && d.agentRatePct > 0 ? d.agentRatePct : null
   const added: FeeItem[] = []
   for (const l of d.lines) {
-    const label = l.label.trim() || '계약금'
-    if (have.has(label)) continue
+    const base = l.label.trim() || '계약금'
+    if (closedBefore.has(`${base}|${l.amount ?? ''}`)) continue
+    let label = base
+    for (let n = 2; have.has(label); n += 1) label = `${base} (${n})`
     have.add(label)
     added.push({
       id: newId('fee'),

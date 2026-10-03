@@ -2009,6 +2009,40 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('다가오는: 날짜 글자 — 내일 · D-6 · 요일', agendaWhen({ date: '2026-10-03', daysLeft: 1 }).label === '내일' && agendaWhen({ date: '2026-10-08', daysLeft: 6 }).label === 'D-6' && agendaWhen({ date: '2026-10-08', daysLeft: 6 }).date === '10/8 목')
 }
 
+/* D-150: 영업 · 할 일 검토로 찾은 것 */
+{
+  const at = '2026-10-03T03:00:00.000Z'
+  const ui150 = analyzeCretopText(cretopCompanyText, null)
+  const d150 = digestCretop(ui150)
+  const contracted = normalizeClientOps({ id: 'c150', companyName: '한빛정밀(주)', status: 'active' })
+  const applied = applyCretopToClient(contracted, d150, { at, source: '' })
+  check('크레탑: 영업 칸 없던 계약 고객에 붙여도 계약 완료 그대로(잠재고객으로 안 돌아감)', applied.record.sales?.stage === 'contracted', applied.record.sales?.stage)
+
+  const lead = withNewProspect(normalizeClientOps({ id: 'c151', companyName: '같은줄상사', status: 'waiting' }), '소개', at)
+  const draft = contractCloseDraft(lead, { today: '2026-10-03' })
+  const closed = withContractClose(lead, { ...draft, lines: [{ label: '', amount: 3_000_000 }, { label: '', amount: 2_000_000 }], agentName: '', agentRatePct: null, kind: 'cash', monthlyPremium: null } as never, at)
+  check('계약 완료: 이름 없는 두 줄(300만 · 200만)이 다 들어감 — 계약금 · 계약금 (2)', closed.fees.length === 2 && closed.fees.map((f) => f.label).join() === '계약금,계약금 (2)' && closed.fees.reduce((n, f) => n + (f.amount ?? 0), 0) === 5_000_000, JSON.stringify(closed.fees.map((f) => [f.label, f.amount])))
+  const again = withContractClose(closed, { ...draft, lines: [{ label: '', amount: 3_000_000 }, { label: '', amount: 2_000_000 }], agentName: '', agentRatePct: null, kind: 'cash', monthlyPremium: null } as never, at)
+  check('계약 완료: 다시 눌러도 두 번 안 들어감', again.fees.length === 2)
+
+  const inq = withInboxPayload(lead, { message: '정책자금 지원금 문의', grant_query: 'r=서울&c=강남구' } as never, '2026-10-03')
+  check('상담신청: 문의 글에 관심사가 있어도 지원사업 찾기 조건이 남음', inq.sales?.grantQuery === 'r=서울&c=강남구', String(inq.sales?.grantQuery))
+
+  check('반복: 오늘(토 10/3) 시작한 매주 할 일은 오늘보다 앞서지 않음(다음 평일)', (() => {
+    const ds = repeatDates('2026-10-03', 'weekly', 3, { skipOff: new Set(['2026-10-05']), notBefore: '2026-10-03' })
+    return ds[0] === '2026-10-06'
+  })(), JSON.stringify(repeatDates('2026-10-03', 'weekly', 3, { skipOff: new Set(['2026-10-05']), notBefore: '2026-10-03' })))
+  check('반복: 평일 시작은 예전처럼(쉬는 날이면 앞 평일)', repeatDates('2026-10-07', 'weekly', 2, { skipOff: new Set(['2026-10-14']) }).join() === '2026-10-07,2026-10-13')
+
+  const withNext = { ...lead, nextAction: '2차 미팅', nextActionDueDate: '2026-09-20' }
+  const lost = withSalesStage(withNext, 'lost', at)
+  check('이탈: 다음 약속을 닫고 활동 기록에 남김', lost.nextAction === '' && lost.nextActionDueDate === '' && lost.activity.some((a) => a.text.includes('다음 약속 닫음')))
+  const won = withSalesStage(withNext, 'contracted', at)
+  check('계약 완료: 이미 지난 다음 약속은 닫음', won.nextAction === '')
+  const wonFuture = withSalesStage({ ...lead, nextAction: '계약서 서명', nextActionDueDate: '2026-10-10' }, 'contracted', at)
+  check('계약 완료: 앞으로 남은 약속(계약서 서명)은 그대로', wonFuture.nextAction === '계약서 서명')
+}
+
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
 void (0 as unknown as ClientOpsRecord)

@@ -6,6 +6,7 @@
  *  - 쉬는 날: 이름(대체공휴일 · 설날 연휴 · 추석 연휴 …) · 며칠 연속 — 달력에 날짜가 빨간 글자(일요일처럼)
  * 저장이 실패하면 적은 것은 그대로 남는다(onSave 가 false).
  */
+import { todayLocalDate } from '../../lib/appClock'
 import { useMemo, useState } from 'react'
 import { BottomSheet } from '../ui/primitives'
 import { Button } from '../ui/Button'
@@ -60,7 +61,8 @@ export function CalendarQuickSheet({
   const [offKind, setOffKind] = useState<DayOffKind>('holiday')
   const [offDays, setOffDays] = useState(1)
 
-  const dates = useMemo(() => repeatDates(due, every, count, { skipOff: every !== 'none' && skipOff ? offDates : null }), [due, every, count, skipOff, offDates])
+  // D-150: 쉬는 날을 피해 당기다 오늘보다 앞서면 다음 평일로(넣자마자 '지난 할 일' 이 되지 않게)
+  const dates = useMemo(() => repeatDates(due, every, count, { skipOff: every !== 'none' && skipOff ? offDates : null, notBefore: todayLocalDate() }), [due, every, count, skipOff, offDates])
   const offRange = useMemo(() => rangeDates(date, offDays), [date, offDays])
 
   const saveTodo = async () => {

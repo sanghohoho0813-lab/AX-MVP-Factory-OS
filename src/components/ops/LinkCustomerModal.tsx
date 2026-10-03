@@ -18,6 +18,9 @@ import { normalizeQuery } from '../../lib/format'
  *  - 고객 플랫폼 계정(이메일)이 확인되면 함께 연결(portal_client_links). 확인되지 않으면 고객사에만 붙이고 계정은 나중에.
  * 이메일·전화가 같다는 이유로 자동 연결하지 않는다 — 항상 사람이 이 화면에서 확정한다.
  */
+/** D-150: 신청(이벤트)별로 이미 만든 업체 — 연결이 실패해 창을 다시 열어도 새로 만들지 않는다 */
+const madeFromEvent = new Map<string, { created: ClientOpsRecord; saved: ClientOpsRecord | null }>()
+
 export function LinkCustomerModal({
   event,
   clients,
@@ -134,8 +137,9 @@ export function LinkCustomerModal({
     }
   }
 
-  const createdRef = useRef<ClientOpsRecord | null>(null)
-  const savedRef = useRef<ClientOpsRecord | null>(null)
+  // D-150: 창을 닫았다 다시 열어도 같은 신청으로 업체를 또 만들지 않게 — 이 화면을 연 동안(새로고침 전까지) 신청별로 기억한다
+  const createdRef = useRef<ClientOpsRecord | null>(madeFromEvent.get(event.id)?.created ?? null)
+  const savedRef = useRef<ClientOpsRecord | null>(madeFromEvent.get(event.id)?.saved ?? null)
   const submitNew = async () => {
     if (!form.companyName.trim()) { setError('회사명을 입력해 주세요.'); return }
     setBusy(true); setError('')
@@ -152,6 +156,7 @@ export function LinkCustomerModal({
           status: 'waiting',
         }))
       createdRef.current = created
+      madeFromEvent.set(event.id, { created, saved: savedRef.current })
       const saved =
         savedRef.current ??
         (await saveClient(
@@ -168,6 +173,7 @@ export function LinkCustomerModal({
         todayLocalDate(),
       )))
       savedRef.current = saved
+      madeFromEvent.set(event.id, { created, saved })
       await finish(saved)
     } catch (cause) {
       const msg = cause instanceof Error ? cause.message : '만들지 못했습니다.'

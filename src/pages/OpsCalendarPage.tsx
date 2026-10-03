@@ -137,15 +137,22 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
     return true
   }
 
+  /** D-150: 이번에 넣은 반복 할 일(실패 뒤 다시 누를 때 건너뛰려고) */
+  const savedTodoKeys = useRef(new Set<string>())
   const clientNameOf = (id: string) => records.find((r) => r.id === id)?.companyName
 
   /** D-139: 빠른 적기 — 반복이면 날짜마다 한 줄 */
   const saveQuickTodos = (input: QuickTodoInput) =>
     mutate(
       async () => {
+        // D-150: 반복 할 일을 넣다가 중간에 실패하면 다시 눌렀을 때 이미 들어간 날은 건너뛴다(예전에는 앞의 것이 두 번 들어갔다)
         for (const d of input.dates) {
+          const key = `${input.clientId ?? ''}|${input.content}|${d}`
+          if (savedTodoKeys.current.has(key)) continue
           await createJournalEntry(workspaceId, userId, { entryDate: today, entryType: 'follow_up', content: input.content, clientId: input.clientId, dueDate: d })
+          savedTodoKeys.current.add(key)
         }
+        savedTodoKeys.current.clear()
       },
       input.dates.length > 1 ? `할 일 ${input.dates.length}개를 넣었습니다 (${dateLabel(input.dates[0])}부터).` : `${dateLabel(input.dates[0])}에 할 일을 넣었습니다.`,
     )

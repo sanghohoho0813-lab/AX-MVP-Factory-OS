@@ -95,6 +95,8 @@ export interface FinanceSettings {
   usdKrw: number
   /** 사람이 환율을 바꿨는가(아니면 화면에 '가정' 표시) */
   rateSet: boolean
+  /** D-150: 환율을 바꾼 기록 — 그 달부터 그 환율. 달러 정기 결제의 지난 달 금액이 지금 환율로 바뀌지 않게 */
+  rateHistory?: { from: string; usdKrw: number }[]
 }
 
 export const DEFAULT_SETTINGS: FinanceSettings = { usdKrw: 1400, rateSet: false }
@@ -171,6 +173,25 @@ export function isActiveSub(s: Pick<Subscription, 'endDate'>, today: string): bo
 
 export function toKrw(amount: number, currency: Currency, settings: FinanceSettings): number {
   return Math.round(currency === 'USD' ? amount * settings.usdKrw : amount)
+}
+
+/** D-150: 그 달에 쓰던 환율 — 바꾼 기록 중 그 달 이전의 마지막 것(기록이 없으면 지금 환율) */
+export function rateFor(settings: FinanceSettings, ym: string): number {
+  let rate = settings.usdKrw
+  const h = [...(settings.rateHistory ?? [])].sort((a, b) => a.from.localeCompare(b.from))
+  if (h.length === 0) return rate
+  rate = h[0].from <= ym ? h[0].usdKrw : settings.usdKrw
+  for (const e of h) if (e.from <= ym) rate = e.usdKrw
+  return rate
+}
+
+/** D-150: 환율을 바꾼다 — 이번 달부터 새 환율, 그 전 달은 예전 환율로 남긴다 */
+export function withRate(settings: FinanceSettings, usdKrw: number, ym: string): FinanceSettings {
+  const h = [...(settings.rateHistory ?? [])].filter((e) => e.from !== ym)
+  if (h.length === 0) h.push({ from: '0000-00', usdKrw: settings.usdKrw })
+  h.push({ from: ym, usdKrw })
+  h.sort((a, b) => a.from.localeCompare(b.from))
+  return { ...settings, usdKrw, rateSet: true, rateHistory: h.slice(-36) }
 }
 
 /** "$20" · "28,000원" */
@@ -343,7 +364,9 @@ export function costInMonth(
   for (const s of input.subscriptions) {
     const d = chargeDateIn(s, ym)
     if (!d || !(s.amount > 0)) continue
-    lines.push({ id: `sub:${s.id}`, source: 'subscription', date: d, name: s.name, category: s.category, krw: toKrw(s.amount, s.currency, settings), amount: s.amount, currency: s.currency, payMethod: s.payMethod, memo: s.memo, clientId: '' })
+    // D-150: 달러 정기 결제는 그 달에 쓰던 환율로
+    const subKrw = s.currency === 'USD' ? Math.round(s.amount * rateFor(settings, ym)) : toKrw(s.amount, s.currency, settings)
+    lines.push({ id: `sub:${s.id}`, source: 'subscription', date: d, name: s.name, category: s.category, krw: subKrw, amount: s.amount, currency: s.currency, payMethod: s.payMethod, memo: s.memo, clientId: '' })
   }
   for (const e of input.expenses) {
     if (!isYmd(e.date) || ymOf(e.date) !== ym || !(e.amount > 0)) continue
@@ -474,7 +497,14 @@ export function normalizeExpense(raw: unknown, id: string, now: string): Expense
 export function normalizeSettings(raw: unknown): FinanceSettings {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const rate = typeof r.usdKrw === 'number' && r.usdKrw >= 100 && r.usdKrw <= 10_000 ? r.usdKrw : DEFAULT_SETTINGS.usdKrw
-  return { usdKrw: rate, rateSet: r.rateSet === true }
+  const history = Array.isArray(r.rateHistory)
+    ? (r.rateHistory as unknown[])
+        .map((e) => (e && typeof e === 'object' ? (e as Record<string, unknown>) : {}))
+        .filter((e) => typeof e.from === 'string' && /^\d{4}-\d{2}$/.test(e.from) && typeof e.usdKrw === 'number' && e.usdKrw >= 100 && e.usdKrw <= 10_000)
+        .map((e) => ({ from: e.from as string, usdKrw: e.usdKrw as number }))
+        .slice(-36)
+    : []
+  return { usdKrw: rate, rateSet: r.rateSet === true, ...(history.length ? { rateHistory: history } : {}) }
 }
 
 /** '28,000' · '2.8만' · '1억 2천' · '$20' → 숫자. 못 읽으면 null */

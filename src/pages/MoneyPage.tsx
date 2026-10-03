@@ -38,6 +38,7 @@ import {
   type FinanceSettings,
   type PayMethod,
   type Subscription,
+  withRate,
 } from '../services/finance/financeCore'
 import { listExpenses, listSubscriptions, loadSettings, removeExpense, removeSubscription, saveExpense, saveSettings, saveSubscription } from '../services/finance/financeStore'
 
@@ -470,7 +471,8 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
           settings={settings}
           onClose={() => setSheet(null)}
           onSave={async (s) => {
-            setSettings(await saveSettings(workspaceId, s))
+            // D-150: 환율을 바꾸면 이번 달부터 — 지난 달 달러 정기 결제는 예전 환율 그대로
+            setSettings(await saveSettings(workspaceId, s.usdKrw !== settings.usdKrw ? withRate(settings, s.usdKrw, ymOf(today)) : { ...settings, ...s }))
             setSheet(null)
             showToast(`1달러 = ${s.usdKrw.toLocaleString('ko-KR')}원으로 셉니다`)
           }}

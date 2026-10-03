@@ -242,7 +242,15 @@ export function withSalesStage(record: ClientOpsRecord, stage: SalesStage, at: s
       contract: { ...next.contract, signedAt: next.contract.signedAt || localDate(new Date(at)) },
     }
   }
-  const text = `영업 단계 ${SALES_STAGE_LABEL[from]} → ${SALES_STAGE_LABEL[stage]}`
+  // D-150: 영업이 끝나면(이탈 · 계약 완료) 이미 날짜가 지난 '다음 약속' 은 닫는다 — 예전에는 오늘 '업체 약속' 에 'N일 지남' 이 날마다 남았다.
+  // 이탈은 날짜가 남은 약속도 닫는다(그 업체와 할 약속이 없다). 닫은 약속은 활동 기록에 남긴다.
+  const today = localDate(new Date(at))
+  const closeNext = next.nextAction.trim() !== '' && (stage === 'lost' || (stage === 'contracted' && !!next.nextActionDueDate && next.nextActionDueDate < today))
+  let text = `영업 단계 ${SALES_STAGE_LABEL[from]} → ${SALES_STAGE_LABEL[stage]}`
+  if (closeNext) {
+    text += ` · 다음 약속 닫음(${next.nextAction}${next.nextActionDueDate ? ` · ${next.nextActionDueDate}` : ''})`
+    next = { ...next, nextAction: '', nextActionDueDate: '' }
+  }
   return withActivity(next, 'sales', text, null, at)
 }
 
@@ -258,7 +266,9 @@ export function withSalesInfo(record: ClientOpsRecord, patch: SalesInfoPatch, at
   if (patch.interests !== undefined && merged.interests.join('|') !== base.interests.join('|')) changed.push('관심사')
   if (patch.concern !== undefined && merged.concern !== base.concern) changed.push('대표 고민')
   if (patch.expectedFee !== undefined && merged.expectedFee !== base.expectedFee) changed.push('예상 수임료')
-  if (changed.length === 0 && record.sales) return record
+  // D-150: 지원사업 찾기 조건만 바뀐 것도 바뀐 것이다(예전에는 그냥 돌려줘 조건이 사라졌다) — 활동 기록에는 남기지 않는다
+  const grantChanged = patch.grantQuery !== undefined && merged.grantQuery !== base.grantQuery
+  if (changed.length === 0 && !grantChanged && record.sales) return record
   const next = { ...record, sales: merged }
   return changed.length ? withActivity(next, 'sales', `영업 정보 수정 — ${changed.join(' · ')}`, null, at) : next
 }

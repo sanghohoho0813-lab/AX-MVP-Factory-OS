@@ -42,13 +42,28 @@ function ymd(y: string, m: string, d: string): string {
   return `${y}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`
 }
 
-function datesAt(text: string): { date: string; at: number }[] {
-  const out: { date: string; at: number }[] = []
+function datesAt(text: string): { date: string; at: number; end: number }[] {
+  const out: { date: string; at: number; end: number }[] = []
   for (const m of text.matchAll(DATE_RE)) {
     const v = m[1] ? ymd(m[1], m[2], m[3]) : ymd(m[4], m[5], m[6])
-    if (v) out.push({ date: v, at: m.index ?? 0 })
+    if (v) out.push({ date: v, at: m.index ?? 0, end: (m.index ?? 0) + m[0].length })
   }
   return out
+}
+
+/** D-150: 날짜 바로 뒤의 시각 — '2026.10.15 18:00' · '2026.10.15(목) 18:00' · '10.15 오후 6시' → 'HH:MM' */
+function timeAfter(text: string, from: number): string {
+  const rest = text.slice(from, from + 24)
+  const hm = /^\s*(?:\([^)]{0,4}\)\s*)?(\d{1,2})\s*:\s*(\d{2})/.exec(rest)
+  if (hm && Number(hm[1]) <= 24 && Number(hm[2]) < 60) return `${hm[1].padStart(2, '0')}:${hm[2]}`
+  const kr = /^\s*(?:\([^)]{0,4}\)\s*)?(오전|오후)?\s*(\d{1,2})\s*시(?:\s*(\d{1,2})\s*분)?/.exec(rest)
+  if (kr) {
+    let h = Number(kr[2])
+    if (kr[1] === '오후' && h < 12) h += 12
+    if (h > 24) return ''
+    return `${String(h).padStart(2, '0')}:${(kr[3] ?? '00').padStart(2, '0')}`
+  }
+  return ''
 }
 
 export function datesIn(text: string): string[] {
@@ -56,17 +71,22 @@ export function datesIn(text: string): string[] {
 }
 
 /** '2026.09.01 ~ 2026.09.30' · '~ 2026.10.15 18:00' · '예산 소진 시까지' · '상시' */
-export function periodOf(text: string): { applyStart: string; applyEnd: string; deadlineKind: DeadlineKind } {
+export function periodOf(text: string): { applyStart: string; applyEnd: string; deadlineKind: DeadlineKind; applyEndTime?: string } {
   const t = text.replace(/\s+/g, ' ')
   const found = datesAt(t)
   const dates = found.map((d) => d.date)
   const firstCome = /선착순|소진\s*시|예산\s*소진|조기\s*마감|모집\s*(?:완료|마감|규모\s*충족)/.test(t)
   const always = /상시|수시\s*(접수|모집)|연중/.test(t)
-  if (dates.length >= 2) return { applyStart: dates[0], applyEnd: dates[1], deadlineKind: firstCome ? 'first_come' : 'date' }
+  // D-150: 마감 날짜 뒤에 시각이 있으면 함께(그 시각이 지나면 마감)
+  const endTime = (i: number) => {
+    const tm = found[i] ? timeAfter(t, found[i].end) : ''
+    return tm ? { applyEndTime: tm } : {}
+  }
+  if (dates.length >= 2) return { applyStart: dates[0], applyEnd: dates[1], deadlineKind: firstCome ? 'first_come' : 'date', ...endTime(1) }
   if (dates.length === 1) {
     const before = t.slice(0, found[0].at)
     const isEnd = /[~∼]|까지|마감/.test(before) || /까지|마감/.test(t.slice(found[0].at))
-    return isEnd ? { applyStart: '', applyEnd: dates[0], deadlineKind: firstCome ? 'first_come' : 'date' } : { applyStart: dates[0], applyEnd: '', deadlineKind: firstCome ? 'first_come' : always ? 'always' : 'date' }
+    return isEnd ? { applyStart: '', applyEnd: dates[0], deadlineKind: firstCome ? 'first_come' : 'date', ...endTime(0) } : { applyStart: dates[0], applyEnd: '', deadlineKind: firstCome ? 'first_come' : always ? 'always' : 'date' }
   }
   return { applyStart: '', applyEnd: '', deadlineKind: firstCome ? 'first_come' : always ? 'always' : 'date' }
 }

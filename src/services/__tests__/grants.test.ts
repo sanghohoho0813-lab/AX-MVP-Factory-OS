@@ -517,5 +517,17 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   check("'중구 소재' + 소관 서울특별시 중구 → 서울 · 중구(부산 중구 업체는 안 맞음)", jung.rules.regions.includes('서울') && matchGrant({ ...mk({}), rules: jung.rules } as GrantNotice, prof({ sido: '부산', city: '중구' }), '2026-10-03').verdict === 'no', JSON.stringify(jung.rules))
 }
 
+// D-150: 마감 시각
+{
+  const pr = periodOf('2026.10.01 ~ 2026.10.15 18:00')
+  check("기간: '~ 2026.10.15 18:00' → 마감 시각 18:00", pr.applyEnd === '2026-10-15' && pr.applyEndTime === '18:00', JSON.stringify(pr))
+  check("기간: '2026.10.15(목) 오후 6시' → 18:00", periodOf('~ 2026.10.15(목) 오후 6시까지').applyEndTime === '18:00', JSON.stringify(periodOf('~ 2026.10.15(목) 오후 6시까지')))
+  check('기간: 시각 없으면 없음', periodOf('2026.10.01 ~ 2026.10.15').applyEndTime === undefined)
+  const n = { applyStart: '', applyEnd: '2026-10-15', deadlineKind: 'date' as const, applyEndTime: '18:00' }
+  check('마감 시각: 마감일 17:59 → 오늘 18:00 마감 · 열림', deadlineOf(n, '2026-10-15', '17:59').state === 'today' && deadlineOf(n, '2026-10-15', '17:59').label === '오늘 18:00 마감')
+  check('마감 시각: 마감일 18:00 이 지나면 마감', deadlineOf(n, '2026-10-15', '18:00').state === 'closed' && !deadlineOf(n, '2026-10-15', '19:10').open)
+  check('마감 시각: 저장했다 읽어도 남음', normalizeNotice({ id: 'x', title: '공고', applyEnd: '2026-10-15', applyEndTime: '18:00', deadlineKind: 'date', rules: {} } as never).applyEndTime === '18:00')
+}
+
 console.log(`\ngrants: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

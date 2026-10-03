@@ -297,7 +297,9 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     let unpaid = 0
     let unpaidGross = 0
     let overdueCount = 0
+    // D-150: 보관한 업체는 빼고 센다(오늘 · 보드 · KPI 와 같은 기준)
     for (const r of records) {
+      if (r.archivedAt) continue
       const p = clientOpsProgress(r, today)
       unpaid += p.unpaidNet
       unpaidGross += p.unpaidAmount
@@ -307,7 +309,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   }, [records, today])
 
   // 계약 완료(끝남)만 뺀다 — 계약 전도 챙겨야 할 업체다
-  const activeCount = records.filter((r) => contractStageOf(r.status) !== 'closed').length
+  const activeCount = records.filter((r) => !r.archivedAt && contractStageOf(r.status) !== 'closed').length
 
   const openAlert = (a: OpsAlert) =>
     navigate(a.serviceKey ? `/ops/clients/${a.clientId}?tab=work&svc=${a.serviceKey}` : `/ops/clients/${a.clientId}`)

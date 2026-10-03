@@ -26,15 +26,24 @@ function monthly(start: string, i: number): string {
   return `${first.getUTCFullYear()}-${String(first.getUTCMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
-export function repeatDates(start: string, every: RepeatEvery, count: number, opts?: { skipOff?: ReadonlySet<string> | null }): string[] {
+/**
+ * D-150: `notBefore`(보통 오늘) — 쉬는 날을 피해 앞으로 당기다 이 날보다 앞서면 대신 다음 평일로(넣자마자 '지난 할 일' 이 되지 않게).
+ */
+export function repeatDates(start: string, every: RepeatEvery, count: number, opts?: { skipOff?: ReadonlySet<string> | null; notBefore?: string }): string[] {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) return []
   const n = every === 'none' ? 1 : Math.max(1, Math.min(REPEAT_MAX, Math.floor(count) || 1))
   const out: string[] = []
   for (let i = 0; i < n; i++) {
-    let d = every === 'weekly' ? addDays(start, 7 * i) : every === 'biweekly' ? addDays(start, 14 * i) : every === 'monthly' ? monthly(start, i) : start
+    const planned = every === 'weekly' ? addDays(start, 7 * i) : every === 'biweekly' ? addDays(start, 14 * i) : every === 'monthly' ? monthly(start, i) : start
+    let d = planned
     const off = opts?.skipOff
     if (off) {
       for (let k = 0; k < 20 && (isWeekend(d) || off.has(d)); k++) d = addDays(d, -1)
+      // D-150: 당기다 오늘보다 앞서면(오늘 토요일에 시작한 반복) 뒤로 — 다음 평일. 넣자마자 '지난 할 일' 이 되던 것
+      if (opts?.notBefore && d < opts.notBefore) {
+        d = planned
+        for (let k = 0; k < 20 && (isWeekend(d) || off.has(d)); k++) d = addDays(d, 1)
+      }
     }
     if (!out.includes(d)) out.push(d)
   }

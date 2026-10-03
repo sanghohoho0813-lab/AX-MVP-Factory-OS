@@ -15,6 +15,7 @@
 import { factDef, withFactValue } from './customerFacts'
 import type { ClientOpsRecord, SalesInfo, ToolResult } from '../types/clientOps'
 import { emptySales } from '../types/clientOps'
+import { salesStageOf } from './salesPipeline'
 import { withActivity } from './clientOpsActivity'
 import {
   CONSULTING_STRATEGIES,
@@ -304,7 +305,8 @@ export function applyCretopToClient(record: ClientOpsRecord, d: CretopDigest, op
   fill('establishedAt', c.established, '설립일')
   fill('businessAddress', c.address, '주소')
 
-  const base: SalesInfo = record.sales ?? { ...emptySales('lead', at), source: (opts.source ?? '').trim() }
+  // D-150: 영업 칸이 없던 계약 고객은 지금 단계(계약 완료)로 — 예전에는 '잠재고객' 으로 되돌아갔다
+  const base: SalesInfo = record.sales ?? { ...emptySales(salesStageOf(record), at), source: (opts.source ?? '').trim() }
   const sales: SalesInfo = {
     ...base,
     interests: [...new Set([...base.interests, ...d.interests])],
