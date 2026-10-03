@@ -33,6 +33,7 @@ import {
 } from '../dailyBriefService'
 import { EVENT_TYPE_LABEL, buildProjection, eventSummary, isOpenEvent, sortEvents, waitingDays, waitingLevel } from '../customerBridgeService'
 import signupSql from '../../../supabase/migrations/20260925000014_signup_event.sql?raw'
+import hardenSql from '../../../supabase/migrations/20261004000016_security_hardening.sql?raw'
 import { normalizeClientOps, withContract, withCustomField, withFee, withNewFee, withNewFunding, withService, withoutCustomField, withoutFee } from '../clientOpsService'
 import {
   contractAgeShort,
@@ -358,6 +359,17 @@ check('events: 요약 who 는 회사명 우선', eventSummary(ev({ payload: { co
   check('가입 SQL: 내부 OS 직원 가입은 뺀다', signupSql.includes("'internal_os'"))
   check('가입 SQL: 표 · 열 삭제 없음', !/drop\s+table|drop\s+column|truncate/i.test(signupSql))
   check('가입 SQL: 기존 종류 여덟 가지를 모두 다시 허용', ['diagnosis_completed', 'consultation_requested', 'service_order_created', 'document_uploaded', 'customer_request_created', 'customer_action_completed', 'customer_reply', 'profile_updated', 'customer_signed_up'].every((t) => signupSql.includes(`'${t}'`)))
+}
+// D-150: 보안 단단히 SQL — 막는 장치가 빠지거나 지우는 문장이 들어가면 여기서 먼저 걸린다
+// (실제 동작은 scripts/db-local/run.sh 로 로컬 PostgreSQL 에서 38가지 시험)
+{
+  const sql = hardenSql.toLowerCase()
+  check('보안 SQL: 표 · 열 삭제 · RLS 끄기 없음', !/drop\s+table|drop\s+column|truncate|disable\s+row\s+level|drop\s+policy/.test(sql))
+  check('보안 SQL: 공유 파일은 서류의 워크스페이스 폴더 안만', sql.includes("split_part(object_name, '/', 1) = d.workspace_id::text") && sql.includes('l.workspace_id = d.workspace_id'))
+  check('보안 SQL: portal 네 표에 같은 워크스페이스 검사', ['portal_client_links', 'portal_updates', 'portal_requests', 'portal_documents'].every((t) => new RegExp(`before insert or update of [^;]* on public\\.${t}\\s+for each row execute function public\\.portal_same_workspace_guard`).test(sql)))
+  check('보안 SQL: 소유자 권한은 소유자만 · 주인 줄 보호', sql.includes('before insert or update or delete on public.workspace_members') && sql.includes("new.role = 'owner' and not caller_is_owner") && sql.includes('old.user_id = ws_owner'))
+  check('보안 SQL: 초대 받아도 소유자는 그대로', /role = case when public\.workspace_members\.role = 'owner'/.test(sql))
+  check('보안 SQL: 검사 함수는 앱에서 직접 못 부른다', sql.includes('revoke all on function public.portal_same_workspace_guard() from public, anon, authenticated') && sql.includes('revoke all on function public.workspace_member_role_guard() from public, anon, authenticated'))
 }
 check('events: 값 없으면 고객', eventSummary(ev({ payload: {} })).who === '고객')
 // D-107: 오래 기다린 상담신청 — "N일째 대기" (정오 UTC 로 잡아 시간대가 달라도 같은 날)
