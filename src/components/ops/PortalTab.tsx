@@ -5,6 +5,7 @@ import { CheckCircle2, ExternalLink, Eye, Link2, MessageSquareReply, Plus, Send,
 import { InlineConfirm } from '../ui/InlineConfirm'
 import type { ClientOpsRecord, DocumentKey } from '../../types/clientOps'
 import { withDocument } from '../../services/clientOpsService'
+import { filePortalDocument } from '../../services/docShelf'
 import type { CustomerEvent, PortalClientLink, PortalDocument, PortalProjection, PortalRequest, PortalUpdate } from '../../types/bridge'
 import { Button } from '../ui/Button'
 import { Modal } from '../ui/Modal'
@@ -293,21 +294,23 @@ export function PortalTab({
                         <Button
                           variant="primary"
                           size="sm"
-                          onClick={() =>
+                          onClick={() => {
+                            let filed = ''
                             void run(async () => {
                               await reviewDocument(d, 'verified')
                               // D-122: 내부 서류함도 '받음' — 예전에는 고객 화면만 바뀌어 '없는 서류' 경고 · 서류 요청 문구가 계속 이 서류를 달라고 했다
-                              if (onRecordChange && d.documentType in record.documents) {
-                                await onRecordChange(
-                                  withDocument(record, d.documentType as DocumentKey, {
-                                    received: true,
-                                    ...(d.storagePath ? { storagePath: d.storagePath } : {}),
-                                    ...(d.fileName ? { fileName: d.fileName } : {}),
-                                  }),
-                                )
+                              // D-148: 칸에 이미 파일이 있으면 덮지 않는다('(2)' 칸) · 종류가 '기타' 여도 제목 · 파일 이름으로 칸을 찾아 넣는다
+                              if (!onRecordChange) return
+                              if (d.storagePath && !d.storagePath.startsWith('demo/')) {
+                                const out = filePortalDocument(record, d, '')
+                                if (out && (await onRecordChange(out.record))) filed = out.label
+                              } else if (d.documentType in record.documents && !record.documents[d.documentType as DocumentKey].received) {
+                                if (await onRecordChange(withDocument(record, d.documentType as DocumentKey, { received: true, ...(d.fileName ? { fileName: d.fileName } : {}) }))) filed = DOCUMENTS.find((x) => x.key === d.documentType)?.label ?? ''
                               }
-                            }, d.documentType in record.documents && onRecordChange ? '확인 완료 · 서류함에도 받음으로 넣었습니다.' : '확인 완료로 표시했습니다.')
-                          }
+                            }).then((ok) => {
+                              if (ok) showToast(filed ? `확인 완료 · 서류함 '${filed}' 칸에도 넣었습니다.` : '확인 완료로 표시했습니다.')
+                            })
+                          }}
                         >
                           <CheckCircle2 aria-hidden="true" className="size-4" /> 확인 완료
                         </Button>

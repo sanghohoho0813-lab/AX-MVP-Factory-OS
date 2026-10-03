@@ -445,6 +445,62 @@ for (const width of [1440, 390]) {
   await ctx.close()
 }
 
+/* ---------------- D-148 직접 만든 칸 만료 → 오늘 · 요청 문구 / 빈 새 칸은 확실한 것만에 안 들어감 ---------------- */
+for (const width of [1440, 390]) {
+  const ctx = await browser.newContext({ viewport: { width, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  const tag = `(${width})`
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  // 직접 만든 칸 — 곧 만료(법인인감증명서 3개월 · 발급 7-10 → 10-10, 오늘 화면은 14일 안) · 이미 만료(납세증명서 1개월 · 발급 8-01 → 9-01)
+  await page.evaluate(() => {
+    const all = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+    const x = all.find((r) => r.id === 'cli_mirae')
+    x.documents = x.documents ?? {}
+    x.customDocuments = [...(x.customDocuments ?? []), { id: 'cd_seal', key: 'customdoc_seal148', label: '법인인감증명서', validMonths: 3, sensitive: false }, { id: 'cd_tax', key: 'customdoc_tax148', label: '납세증명서', validMonths: 1, sensitive: false }]
+    x.documents.customdoc_seal148 = { received: true, issuedAt: '2026-07-10', fileName: '인감.pdf', fileSize: 10, storagePath: '', note: '', updatedAt: null }
+    x.documents.customdoc_tax148 = { received: true, issuedAt: '2026-08-01', fileName: '납세.pdf', fileSize: 10, storagePath: '', note: '', updatedAt: null }
+    localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(all))
+  })
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const agenda = (await page.getByTestId('agenda-row').allInnerTexts()).join(' | ')
+  check(`오늘: 직접 만든 칸 법인인감증명서 만료가 다가오는 기한에 ${tag}`, agenda.includes('법인인감증명서'), agenda.slice(0, 400))
+  await page.goto(BASE + '/ops/clients/cli_mirae?tab=docs', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  const shelf = (await page.getByTestId('doc-shelf').innerText()) ?? ''
+  check(`서류 탭 손볼 것: 만료(납세증명서) ${tag}`, /만료 [1-9]/.test(shelf), shelf)
+  await page.getByRole('button', { name: '서류 요청 문구' }).first().click()
+  await page.waitForTimeout(400)
+  const msg = (await page.getByRole('dialog').locator('textarea').inputValue()) ?? ''
+  check(`서류 요청 문구: 만료된 납세증명서 새 발급본도 ${tag}`, msg.includes('납세증명서') && msg.includes('새 발급본'), msg.slice(0, 300))
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+
+  // 한꺼번에 올리기 — 확실한 서류를 '새 칸' 으로 바꾸고 이름을 비우면 '확실한 것만' 에 안 들어간다(예전: 다른 칸을 덮음)
+  await page.getByRole('button', { name: '한꺼번에 올리기' }).click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([{ name: '사업자등록증.txt', mimeType: 'text/plain', buffer: Buffer.from('사업자등록증\n등록번호 : 124-81-00998', 'utf8') }])
+  await page.waitForTimeout(1200)
+  await page.getByLabel('사업자등록증.txt 칸 고르기').selectOption('__new__')
+  await page.waitForTimeout(200)
+  const nameBox = page.getByLabel('사업자등록증.txt 새 칸 이름')
+  if (await nameBox.count()) await nameBox.fill('')
+  await page.waitForTimeout(200)
+  const sureBtn = page.getByRole('button', { name: /^확실한 것만 올리기/ })
+  check(`빈 이름 새 칸: '확실한 것만 올리기' 가 막힘(다른 칸 덮지 않음) ${tag}`, await sureBtn.isDisabled())
+  await page.getByTestId('bulk-close').click()
+  await page.waitForTimeout(300)
+  const r = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((x) => x.id === 'cli_mirae'))
+  check(`빈 이름 새 칸: 납세증명서 칸 파일 그대로 ${tag}`, r.documents.customdoc_tax148.fileName === '납세.pdf')
+
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  check(`가로 넘침 0 ${tag}`, over <= 0, String(over))
+  check(`D-148 오류 0 ${tag}`, errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 /* ---------------- D-145 맞춤 상담 ---------------- */
 for (const width of [1440, 390]) {
   const ctx = await browser.newContext({ viewport: { width, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })

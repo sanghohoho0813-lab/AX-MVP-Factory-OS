@@ -387,7 +387,9 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
     companyName: value.companyName ?? '',
     contactName: value.contactName ?? '',
     // D-146: 예전 서류함 '대표자 휴대폰번호' 칸에 적어 둔 번호 — 개요 연락처가 비어 있으면 그리로 옮겨 보인다(칸 기록은 지우지 않는다)
-    contactPhone: value.contactPhone || phoneFromOldDocument(documents.representativePhone),
+    // D-148: 한 번만 옮긴다 — 옮긴 뒤 사람이 연락처를 지우면 다시 채우지 않는다(예전에는 저장할 때마다 되살아났다)
+    contactPhone: value.contactPhone || (value.legacyPhoneMoved ? '' : phoneFromOldDocument(documents.representativePhone)),
+    legacyPhoneMoved: true,
     contactEmail: value.contactEmail ?? '',
     businessNumber: value.businessNumber ?? '',
     corporateNumber: value.corporateNumber ?? '',

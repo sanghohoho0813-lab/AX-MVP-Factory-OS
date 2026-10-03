@@ -15,7 +15,7 @@ import {
   isServiceStarted,
   serviceMeta,
 } from '../content/clientOpsCatalog'
-import { documentStatus, dueText, daysLeftFrom } from './clientOpsAlerts'
+import { documentStatus, documentsWithExpiry, dueText, daysLeftFrom } from './clientOpsAlerts'
 
 /** 서류별 "어디서 떼는지" 한 줄 안내 */
 const WHERE_TO_GET: Record<DocumentKey, string> = {
@@ -76,7 +76,17 @@ export function collectMissingDocuments(
   }
 
   // 카탈로그 순서 유지
-  return DOCUMENTS.map((d) => byDoc.get(d.key)).filter((x): x is MissingDocLine => x !== undefined)
+  const lines = DOCUMENTS.map((d) => byDoc.get(d.key)).filter((x): x is MissingDocLine => x !== undefined)
+  // D-148: 직접 만든 칸(법인인감증명서 · 납세증명서 …)이 유효기간이 지났으면 새 발급본도 함께 요청한다.
+  // 업무를 지정한 요청(그 업무에 필요한 것만)에는 넣지 않는다. 같은 서류를 이미 새로 받았으면 빠진다(documentsWithExpiry).
+  if (!serviceKeys) {
+    for (const { meta, view } of documentsWithExpiry(record, today)) {
+      if (!view.expired || byDoc.has(meta.key) || !record.customDocuments.some((d) => d.key === meta.key)) continue
+      if (lines.some((l) => l.label === meta.label.replace(/\s*\(\d+\)$/, ''))) continue
+      lines.push({ key: meta.key, label: meta.label.replace(/\s*\(\d+\)$/, ''), reason: 'expired', where: '발급 기관에서 최근 발급본', neededFor: [] })
+    }
+  }
+  return lines
 }
 
 /** 고객에게 그대로 보낼 서류 요청 문구 */

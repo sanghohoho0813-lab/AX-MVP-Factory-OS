@@ -17,11 +17,11 @@ import { ArrowRight, Loader2 } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
-import { canExtractText, extractTextFromFile } from '../../services/docTextExtract'
+import { readStoredText } from '../../services/docStoredText'
 import { placeDocument } from '../../services/docClassify'
 import { applyResort, resortDecision, type ResortItem } from '../../services/docPlacementApply'
 import { allDocumentMetas } from '../../services/clientOpsDocuments'
-import { canUploadFiles, documentFileUrl, withDocument, withoutCustomDocument } from '../../services/clientOpsService'
+import { canUploadFiles, withDocument, withoutCustomDocument } from '../../services/clientOpsService'
 import { analyzeUploadedDocs } from '../../services/docAutoAnalyze'
 import type { ReadDoc, ReadMethod } from '../../services/docAutoFill'
 import { generateId } from '../../storage/localStore'
@@ -30,22 +30,6 @@ import { nowIso, todayLocalDate } from '../../lib/appClock'
 interface Read extends ResortItem {
   text: string
   method: ReadMethod
-}
-
-/** 보관함 파일 → 글자(못 읽으면 '') */
-async function readStored(storagePath: string, fileName: string): Promise<{ text: string; method: ReadMethod }> {
-  if (!canUploadFiles() || !storagePath) return { text: '', method: 'none' }
-  try {
-    const url = await documentFileUrl(storagePath)
-    if (!url) return { text: '', method: 'none' }
-    const blob = await (await fetch(url)).blob()
-    const file = new File([blob], fileName || 'file', { type: blob.type })
-    if (!canExtractText(file)) return { text: '', method: 'none' }
-    const res = await extractTextFromFile(file)
-    return { text: res.text, method: res.method }
-  } catch {
-    return { text: '', method: 'none' }
-  }
 }
 
 export function DocResortSheet({
@@ -78,7 +62,7 @@ export function DocResortSheet({
       const out: Read[] = []
       for (const [i, meta] of cells.entries()) {
         const state = record.documents[meta.key]
-        const { text, method } = await readStored(state.storagePath, state.fileName)
+        const { text, method } = await readStoredText(state.storagePath, state.fileName)
         if (!alive) return
         const placement = placeDocument({ text, fileName: state.fileName }, metas)
         out.push({ ...resortDecision(meta.key, meta.label, state.fileName, placement), text, method })
@@ -108,7 +92,8 @@ export function DocResortSheet({
     const docs: ReadDoc[] = out.moved.flatMap((mv) => {
       const src = chosen.find((c) => c.fromKey === mv.fromKey)
       if (!src || src.text.replace(/\s/g, '').length < 10) return []
-      return [{ key: mv.key, fileName: mv.fileName, text: src.text, method: src.method, docSure: src.placement.sure }]
+      // D-148: '(2)' 칸으로 가도 서류 종류(사업자등록증 …)로 읽는다
+      return [{ key: src.placement.kind === 'existing' ? src.placement.key : mv.key, fileName: mv.fileName, text: src.text, method: src.method, docSure: src.placement.sure }]
     })
     if (docs.length) {
       try {

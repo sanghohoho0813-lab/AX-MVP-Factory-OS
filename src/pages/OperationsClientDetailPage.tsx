@@ -1150,6 +1150,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         {bulkOpen && (
           <BulkDocUploadSheet
             record={record}
+            latest={() => latestRef.current ?? record}
             onClose={() => setBulkOpen(false)}
             onSaved={(saved, summary) => {
               latestRef.current = saved
@@ -1533,7 +1534,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         </div>
 
         {/* D-129: 예전 '파일' 탭 — 고객과 주고받은 파일 · 칸이 없어진 서류의 파일도 서류 탭 아래에서 */}
-        <ClientSharedFiles record={record} workspaceId={workspaceId} />
+        <ClientSharedFiles record={record} workspaceId={workspaceId} onCommit={commit} />
       </section>
 
       )}
@@ -1897,6 +1898,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         <BulkDocUploadSheet
           auto
           record={record}
+          latest={() => latestRef.current ?? record}
           onClose={() => setAutoUploadOpen(false)}
           onSaved={(saved, summary) => {
             latestRef.current = saved

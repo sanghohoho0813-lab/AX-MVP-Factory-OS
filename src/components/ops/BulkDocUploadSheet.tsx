@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Check, FileUp, FolderUp, Loader2, X } from 'lucide-react'
-import type { ClientOpsRecord, DocumentKey } from '../../types/clientOps'
+import type { ClientOpsRecord, DocumentKey, DocumentState } from '../../types/clientOps'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { useToast } from '../ui/toastContext'
@@ -60,6 +60,7 @@ export function BulkDocUploadSheet({
   onClose,
   onSaved,
   auto = false,
+  latest,
 }: {
   record: ClientOpsRecord
   onClose: () => void
@@ -70,6 +71,8 @@ export function BulkDocUploadSheet({
    * 종류가 애매한 것만 남겨 칸을 고르게 한다. 남은 것이 없으면 창을 닫는다.
    */
   auto?: boolean
+  /** D-148: 저장할 때의 최신 업체 기록(페이지가 들고 있는 것) — 없으면 받은 record */
+  latest?: () => ClientOpsRecord
 }) {
   const { showToast } = useToast()
   const uploadable = canUploadFiles()
@@ -167,11 +170,17 @@ export function BulkDocUploadSheet({
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault()
+    // D-148: 읽거나 올리는 중에 또 넣으면 두 묶음이 서로의 저장을 덮을 수 있다 — 끝난 뒤에 넣게 한다
+    if (phase !== 'idle') {
+      showToast('지금 넣은 서류를 처리하는 중입니다 — 끝난 뒤에 더 넣어 주세요.')
+      return
+    }
     void addFiles(Array.from(e.dataTransfer.files ?? []))
   }
 
   const readyItems = items.filter((it) => it.status === 'ready')
-  const sureItems = readyItems.filter((it) => it.result?.sure && it.target !== '')
+  // D-148: 이름 없는 새 칸은 '확실' 에도 넣지 않는다(고른 것 전부와 같은 기준)
+  const sureItems = readyItems.filter((it) => it.result?.sure && it.target !== '' && !(it.target === NEW_CELL && it.newLabel.trim() === ''))
   const assignedItems = readyItems.filter((it) => it.target !== '' && !(it.target === NEW_CELL && it.newLabel.trim() === ''))
 
   /** 고른 것을 차례로 올린다. 새 칸은 만들면서 올린다 */
@@ -179,44 +188,54 @@ export function BulkDocUploadSheet({
     if (targets.length === 0) return
     setBusy(true)
     setPhase('uploading')
-    let rec = recordRef.current
-    /** D-147: 이미 서류함에 있던 파일(이름 · 크기 같음) — 겹친 줄 알도록 표시만 한다(올리기는 그대로) */
-    const seen = new Set(Object.values(rec.documents).filter((d) => d?.fileName).map((d) => `${d.fileName}|${d.fileSize}`))
     let okCount = 0
     const doneIds: string[] = []
-    const readDocs: ReadDoc[] = []
-    const placed: NonNullable<DocBatchSummary['placed']> = []
-    /** 이번 묶음에서 이미 파일을 넣은 칸 — 같은 칸이면 '(2)' 칸으로 따로(덮지 않는다) */
-    const used = new Set<string>()
+    /*
+     * D-148: 두 단계로 — (1) 파일만 보관함에 올린다 (2) 다 올린 뒤 '그때의 최신 기록' 위에 칸을 정해 적는다.
+     * 예전에는 시작할 때 기록을 들고 칸부터 만들었다 — 그 사이 다른 데서 저장한 것(카드 하나 올리기 · 다른 묶음)을 덮었고,
+     * 올리기에 실패한 파일의 빈 칸이 남았다.
+     */
+    const stored: { it: Item; placement: DocPlacement; patch: Partial<DocumentState> }[] = []
     for (const it of targets) {
       patch(it.id, { status: 'uploading', error: '' })
       try {
+        const label = it.newLabel.trim()
+        // D-148: 이름 없는 '새 칸' 은 기타 칸으로 — 예전에는 다른 직접 만든 칸에 들어가 그 파일을 덮었다
         const placement: DocPlacement =
-          it.target === NEW_CELL
-            ? { kind: 'new', label: it.newLabel.trim(), sure: true, reason: '', issuedAt: null }
+          it.target === NEW_CELL || it.target === ''
+            ? { kind: 'new', label: label || `${OTHER_DOC_LABEL} · ${shortName(it.file.name)}`, sure: true, reason: '', issuedAt: null }
             : { kind: 'existing', key: it.target as DocumentKey, label: metas.find((m) => m.key === it.target)?.label ?? '', sure: true, reason: '', issuedAt: null }
-        const cell = cellForPlacement(rec, placement, used)
-        rec = cell.record
-        const key: DocumentKey = cell.key
-        const sig = `${it.file.name}|${it.file.size}`
-        placed.push({ fileName: it.file.name, label: cell.label, other: cell.label.startsWith(OTHER_DOC_LABEL), numbered: cell.numbered, same: seen.has(sig) })
-        seen.add(sig)
-        if (uploadable) {
-          // D-120: 파일만 올리고, 기록 저장은 끝에 한 번(파일마다 저장하던 것을 줄였다)
-          rec = withDocument(rec, key, await storeDocumentFile(rec, key, it.file))
-        } else {
-          // 이 브라우저 모드에는 파일 보관이 없다 — 받았다는 사실과 이름·발급일만 남긴다
-          rec = withDocument(rec, key, { received: true, fileName: it.file.name, fileSize: it.file.size })
-        }
-        if (it.issuedAt) rec = withDocument(rec, key, { received: true, issuedAt: it.issuedAt })
-        // D-144: 읽은 글자는 모아 두었다가 끝에 한 번에 — 회사 정보(확실하면 바로 · 애매하면 표시) · 크레탑 · 명부
-        readDocs.push({ key, fileName: it.file.name, text: it.text, method: it.method, docSure: Boolean(it.result?.sure) || it.manual })
+        const pathKey: DocumentKey = placement.kind === 'existing' ? placement.key : 'customdoc_new'
+        const filePatch: Partial<DocumentState> = uploadable
+          ? // D-120: 파일만 올리고, 기록 저장은 끝에 한 번
+            await storeDocumentFile(recordRef.current, pathKey, it.file)
+          : // 이 브라우저 모드에는 파일 보관이 없다 — 받았다는 사실과 이름·발급일만 남긴다
+            { received: true, fileName: it.file.name, fileSize: it.file.size }
+        stored.push({ it, placement, patch: it.issuedAt ? { ...filePatch, received: true, issuedAt: it.issuedAt } : filePatch })
         patch(it.id, { status: 'done' })
         doneIds.push(it.id)
         okCount += 1
       } catch (cause) {
         patch(it.id, { status: 'error', error: cause instanceof Error ? cause.message : '올리지 못했습니다.' })
       }
+    }
+    // (2) 최신 기록 위에 칸을 정해 적는다 — 이번 묶음에서 이미 넣은 칸은 '(2)' 칸으로(덮지 않는다)
+    let rec = latest ? latest() : recordRef.current
+    /** D-147: 이미 서류함에 있던 파일(이름 · 크기 같음) — 겹친 줄 알도록 표시만 한다(올리기는 그대로) */
+    const seen = new Set(Object.values(rec.documents).filter((d) => d?.fileName).map((d) => `${d.fileName}|${d.fileSize}`))
+    const readDocs: ReadDoc[] = []
+    const placed: NonNullable<DocBatchSummary['placed']> = []
+    const used = new Set<string>()
+    for (const { it, placement, patch: filePatch } of stored) {
+      const cell = cellForPlacement(rec, placement, used)
+      rec = withDocument(cell.record, cell.key, filePatch)
+      const sig = `${it.file.name}|${it.file.size}`
+      placed.push({ fileName: it.file.name, label: cell.label, other: cell.label.startsWith(OTHER_DOC_LABEL), numbered: cell.numbered, same: seen.has(sig) })
+      seen.add(sig)
+      // D-144: 읽은 글자는 끝에 한 번에 — 회사 정보 · 크레탑 · 명부.
+      // D-148: '사업자등록증 (2)' 칸에 들어가도 사업자등록증으로 읽는다(칸 키가 아니라 서류 종류로)
+      const factKey: DocumentKey = placement.kind === 'existing' ? placement.key : cell.key
+      readDocs.push({ key: factKey, fileName: it.file.name, text: it.text, method: it.method, docSure: Boolean(it.result?.sure) || it.manual })
     }
     // D-122: 하나도 못 올렸으면 저장하지 않는다('0건을 올렸습니다' 라고 하지 않게)
     if (okCount === 0) {

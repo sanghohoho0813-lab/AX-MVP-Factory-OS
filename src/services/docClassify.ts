@@ -362,9 +362,12 @@ function compactTitle(s: string): string {
 export function documentTitle(text: string): string | null {
   const lines = (text ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(0, 18)
   for (const line of lines) {
+    // D-148: '1. 근로계약서' · '① 첨부 서류' 같은 목록 줄은 제목이 아니다
+    if (/^(?:\d{1,2}|[①-⑳]|[가-하])\s*[.)]\s*\S/.test(line)) continue
     // '사 업 자 등 록 증' 처럼 띄어 쓴 제목도 붙여서 본다 · 괄호 안 부제(법인사업자)는 뺀다
     const c = compactTitle(line.replace(/\([^)]{0,20}\)/g, ''))
-    if (c.length < 3 || c.length > 22) continue
+    // D-148: '정 관' 은 두 글자지만 제목이다
+    if ((c.length < 3 && c !== '정관') || c.length > 22) continue
     if (NOT_TITLE.test(c)) continue
     if (!/^[가-힣A-Za-z0-9]+$/.test(c)) continue
     if (!/[가-힣]{2}/.test(c)) continue
@@ -373,14 +376,38 @@ export function documentTitle(text: string): string | null {
   return null
 }
 
-/** 파일 이름에서 서류 이름 — '사업자등록증_샤인디자인_2026.pdf' → 사업자등록증 */
+/** D-148: 끝말만 남은 이름 — 이것만으로는 무슨 서류인지 모른다('사업자 등록증' 을 띄어 쓰면 '등록증' 만 남았다) */
+const GENERIC_TITLE = /^(등록증|확인서|확인원|증명서|증명원|증명|사본|명부|보고서|계약서|신고서|신청서|명세서|내역서|결과서|계획서|통지서|등본|초본|원부|대장|증서|계산서|인증서|인정서)$/
+
+/** 파일 이름에서 서류 이름 — '사업자등록증_샤인디자인_2026.pdf' → 사업자등록증 · '사업자 등록증.pdf' → 사업자등록증 */
 export function titleFromFileName(fileName: string): string | null {
   const base = (fileName ?? '').replace(/\.[A-Za-z0-9]{1,5}$/, '')
-  for (const part of base.split(/[\s_\-.()\[\]]+/)) {
-    const c = compactTitle(part)
-    if (c.length >= 3 && c.length <= 22 && /[가-힣]{2}/.test(c) && (TITLE_END.test(c) || TITLE_TO_KEY.some(([re]) => re.test(c)))) return c
+  const parts = base.split(/[\s_\-.()\[\]]+/).filter(Boolean)
+  // 띄어 쓴 이름은 붙여서 본다 — 이어진 1~4 낱말을 모두 후보로
+  const cands: { c: string; n: number }[] = []
+  for (let n = 1; n <= Math.min(4, parts.length); n += 1) {
+    for (let i = 0; i + n <= parts.length; i += 1) {
+      const c = compactTitle(parts.slice(i, i + n).join(''))
+      if (c.length >= 3 && c.length <= 22 && /[가-힣]{2}/.test(c) && (TITLE_END.test(c) || TITLE_TO_KEY.some(([re]) => re.test(c)))) cands.push({ c, n })
+    }
   }
-  return null
+  // 기본 칸 · 알려진 서류 이름이 먼저(가장 짧게), 그다음 끝말만 남지 않은 가장 짧은 이름
+  const known = cands.find(({ c }) => TITLE_TO_KEY.some(([re]) => re.test(c)) || KNOWN_EXTRA_DOCS.some((k) => compactTitle(k.label) === c))
+  if (known) return known.c
+  return cands.find(({ c }) => !GENERIC_TITLE.test(c))?.c ?? null
+}
+
+/** D-148: 제목 → 알려진 서류. 맞는 신호 점수가 3 이상인 것 중 가장 높은 것(같으면 이름이 긴 것 — '지방세 납세증명서' 가 '납세증명서' 보다 먼저) */
+function knownDocForTitle(title: string): (typeof KNOWN_EXTRA_DOCS)[number] | undefined {
+  const exact = KNOWN_EXTRA_DOCS.find((k) => compactTitle(k.label) === title)
+  if (exact) return exact
+  let best: { k: (typeof KNOWN_EXTRA_DOCS)[number]; score: number } | null = null
+  for (const k of KNOWN_EXTRA_DOCS) {
+    const score = k.signals.reduce((sum, sg) => sum + (sg.re.test(title) ? sg.weight : 0), 0)
+    if (score < 3) continue
+    if (!best || score > best.score || (score === best.score && k.label.length > best.k.label.length)) best = { k, score }
+  }
+  return best?.k
 }
 
 export type DocPlacement =
@@ -403,7 +430,7 @@ export function placeDocument(input: { text: string; fileName: string }, metas: 
     // 이름이 같은 칸(직접 만든 칸 · 기본 칸 이름)
     const same = fileMetas.find((m) => compactTitle(m.label) === title || (title.length >= 4 && compactTitle(m.label).replace(/\(\d+\)$/, '') === title))
     if (same) return { kind: 'existing', key: same.key, label: same.label, sure: Boolean(fromText), reason: `${how} '${title}' — 같은 이름의 칸`, issuedAt }
-    const known = KNOWN_EXTRA_DOCS.find((k) => compactTitle(k.label) === title || k.signals.some((sg) => sg.weight >= 3 && sg.re.test(title)))
+    const known = knownDocForTitle(title)
     return { kind: 'new', label: known?.label ?? title, sure: Boolean(fromText), reason: `${how} '${title}' — 그 이름으로 새 칸`, issuedAt }
   }
   // 제목이 없으면 — 낱말 판별이 '확실' 할 때만 기본 칸, 아니면 기타

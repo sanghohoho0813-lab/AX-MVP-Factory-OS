@@ -92,6 +92,11 @@ let row = {
 }
 const TXT = { 'd-scan0001.txt': '졸 업 증 명 서\n성명 : 이대표\n위 사람은 본교 기계공학과를 졸업하였음을 증명합니다.\n2020년 2월 1일' }
 const deletes = []
+let portalRows = [
+  { id: 'pd1', workspace_id: WS, portal_client_link_id: 'lnk1', operations_client_id: CID, document_type: 'etc', title: '고객이 올린 재무제표', storage_path: `${WS}/portal/lnk1/123-fin.png`, file_name: '2025 재무제표.png', file_size: PNG.length, mime_type: 'image/png', source: 'customer', visibility: 'customer', status: 'verified', uploaded_at: '2026-09-20T00:00:00Z', created_at: '2026-09-20T00:00:00Z', updated_at: '2026-09-20T00:00:00Z' },
+  // D-148: 고객이 사업자등록증 요청에 올린 새 파일 — 확인 완료하면 서류함 칸을 덮지 않고 '(2)' 칸으로
+  { id: 'pd2', workspace_id: WS, portal_client_link_id: 'lnk1', operations_client_id: CID, document_type: 'businessRegistration', title: '사업자등록증', storage_path: `${WS}/portal/lnk1/456-biz.pdf`, file_name: '사업자등록증_고객.pdf', file_size: PDF.length, mime_type: 'application/pdf', source: 'customer', visibility: 'customer', status: 'uploaded', uploaded_at: '2026-09-28T00:00:00Z', created_at: '2026-09-28T00:00:00Z', updated_at: '2026-09-28T00:00:00Z' },
+]
 const signed = []
 const uploads = []
 const patches = []
@@ -150,7 +155,14 @@ await ctx.route(`https://${REF}.supabase.co/**`, async (route) => {
     return route.fulfill(json([{ id: 'lnk1', workspace_id: WS, operations_client_id: CID, profile_id: 'p1', status: 'active', customer_stage: 'contracted', display_name: '', consultant_name: '', linked_at: '2026-09-01T00:00:00Z', created_at: '2026-09-01T00:00:00Z', updated_at: '2026-09-01T00:00:00Z', profiles: { email: 'c@x.kr', name: '고객' } }]))
   }
   if (path.includes('/rest/v1/portal_documents')) {
-    return route.fulfill(json([{ id: 'pd1', workspace_id: WS, portal_client_link_id: 'lnk1', operations_client_id: CID, document_type: 'etc', title: '고객이 올린 재무제표', storage_path: `${WS}/portal/lnk1/123-fin.png`, file_name: '2025 재무제표.png', file_size: PNG.length, mime_type: 'image/png', source: 'customer', visibility: 'customer', status: 'uploaded', uploaded_at: '2026-09-20T00:00:00Z', created_at: '2026-09-20T00:00:00Z', updated_at: '2026-09-20T00:00:00Z' }]))
+    // D-148: 확인 완료(PATCH) → 그 한 줄을 돌려준다(.single())
+    if (method === 'PATCH') {
+      const body = JSON.parse(req.postData() ?? '{}')
+      portalRows = portalRows.map((r) => (url.searchParams.get('id') === `eq.${r.id}` ? { ...r, ...body } : r))
+      const hit = portalRows.find((r) => url.searchParams.get('id') === `eq.${r.id}`) ?? portalRows[0]
+      return route.fulfill(json(hit))
+    }
+    return route.fulfill(json(portalRows))
   }
   if (path.includes('/rest/v1/workspace_members')) {
     return route.fulfill(json([{ workspace_id: WS, user_id: OWNER, role: 'owner', workspaces: { id: WS, name: '미래AI랩', owner_id: OWNER, created_at: '2026-01-01T00:00:00Z' } }]))
@@ -239,6 +251,26 @@ const inbox = row.payload?.factInbox ?? []
 check('파일 교체: 글자에서 회사 정보 후보(사업자등록번호) — 확정하지 않는다', inbox.some((c) => c.key === 'businessNumber' && c.value === '214-88-01234') && row.payload.businessNumber === '123-45-67890', JSON.stringify(inbox).slice(0, 300))
 const shown = (await page.locator('main').innerText()) ?? ''
 check('파일 교체: 화면에 새 파일 이름', shown.includes('사업자등록증_새.txt'))
+
+// D-148: 고객 플랫폼 '확인 완료' — 서류함 사업자등록증 칸(이미 파일 있음)을 덮지 않고 '사업자등록증 (2)' 칸으로
+const bizBefore = row.payload?.documents?.businessRegistration?.storagePath
+await page.goto(`${BASE}/ops/clients/${CID}?tab=portal`, { waitUntil: 'networkidle' })
+await page.waitForTimeout(1000)
+await page.getByRole('button', { name: '확인 완료' }).first().click()
+await page.waitForTimeout(1500)
+const afterVerify = row.payload ?? {}
+const biz2 = (afterVerify.customDocuments ?? []).find((d) => d.label === '사업자등록증 (2)')
+check('확인 완료: 사업자등록증 칸의 기존 파일은 그대로(덮지 않음)', !!bizBefore && afterVerify.documents?.businessRegistration?.storagePath === bizBefore, `${bizBefore} → ${afterVerify.documents?.businessRegistration?.storagePath}`)
+check("확인 완료: 고객 파일은 '사업자등록증 (2)' 칸에", !!biz2 && afterVerify.documents?.[biz2.key]?.storagePath === `${WS}/portal/lnk1/456-biz.pdf`, JSON.stringify(biz2))
+
+// D-148: 고객과 주고받은 파일 → [서류함에 넣기] (종류 '기타' · 파일 이름 '2025 재무제표.png' → 재무제표 칸)
+await page.goto(`${BASE}/ops/clients/${CID}?tab=docs`, { waitUntil: 'networkidle' })
+await page.waitForTimeout(800)
+await page.getByTestId('portal-file-pd1').click()
+await page.waitForFunction(() => !!document.querySelector('[data-testid="portal-filed-pd1"]'), null, { timeout: 30000 })
+const fin = row.payload?.documents?.financialStatements ?? {}
+check('서류함에 넣기: 고객 파일이 재무제표 칸에(같은 보관함 경로)', fin.storagePath === `${WS}/portal/lnk1/123-fin.png` && fin.fileName === '2025 재무제표.png', JSON.stringify(fin))
+check("서류함에 넣기: '서류함 … 칸에 있음' 으로 바뀜", ((await page.getByTestId('portal-filed-pd1').innerText()) ?? '').includes('재무제표'))
 
 // D-146/147: 서류 다시 분류 — 보관함 파일을 서명 주소로 받아 글자를 읽고 제목으로 옮긴다
 await page.goto(`${BASE}/ops/clients/${CID}?tab=docs`, { waitUntil: 'networkidle' })

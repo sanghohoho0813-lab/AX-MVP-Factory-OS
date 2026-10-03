@@ -10,8 +10,8 @@
 
 import { normalizeClientOps, withCustomDocument, withDocument, withoutCustomDocument } from '../clientOpsService'
 import { allDocumentMetas } from '../clientOpsDocuments'
-import { OTHER_DOC_LABEL, documentTitle, knownDocValidMonths, placeDocument } from '../docClassify'
-import { docShelfSummary, isSystemFile, moveDocTo, moveTargets } from '../docShelf'
+import { OTHER_DOC_LABEL, documentTitle, knownDocValidMonths, placeDocument, titleFromFileName } from '../docClassify'
+import { docShelfSummary, filePortalDocument, isSystemFile, moveDocTo, moveTargets, shelfCellOf } from '../docShelf'
 import { applyResort, cellForPlacement, resortDecision, withoutDocumentFile } from '../docPlacementApply'
 import {
   FACT_DEFS,
@@ -459,6 +459,49 @@ const withCretop = (r: ClientOpsRecord): ClientOpsRecord => ({
   const m3 = moveDocTo(shelf, otherKey, 'new:사업자 등록증')
   check('옮기기: 직접 적은 이름이 있는 칸과 같으면 그 칸 — 파일이 있으면 번호 칸', !!m3 && /^사업자등록증 \(\d\)$/.test(m3.to) && m3.record.documents.businessRegistration.fileName === '사업자등록증_2025.pdf', m3?.to)
   check('옮기기: 빈 이름 · 파일 없는 칸은 하지 않음', moveDocTo(shelf, otherKey, 'new:  ') === null && moveDocTo(shelf, 'corporateRegistry', 'key:smeCertificate') === null)
+}
+
+// D-148: 검토에서 찾은 것 — 띄어 쓴 파일 이름 · 목록 줄 · 정관 · 지방세 · 빈 새 칸 · 연락처 지우기 · 고객이 올린 파일
+{
+  const base0 = normalizeClientOps({ id: 'rv1', companyName: '샤인디자인', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  const metas = allDocumentMetas(base0)
+  const byName = (n: string) => placeDocument({ text: '', fileName: n }, metas)
+  const a = byName('사업자 등록증.pdf'), b = byName('중소기업 확인서.pdf'), c = byName('등기사항 전부 증명서.pdf'), d = byName('샤인 졸업 증명서.jpg')
+  check('띄어 쓴 파일 이름: 사업자 등록증 → 사업자등록증 칸(예전 "등록증" 칸)', a.kind === 'existing' && a.key === 'businessRegistration', JSON.stringify(a))
+  check('띄어 쓴 파일 이름: 중소기업 확인서 · 등기사항 전부 증명서 → 그 칸', b.kind === 'existing' && b.key === 'smeCertificate' && c.kind === 'existing' && c.key === 'corporateRegistry', JSON.stringify([b, c]))
+  check('띄어 쓴 파일 이름: 샤인 졸업 증명서 → 졸업증명서(끝말 "증명서" 만 남기지 않음)', d.kind === 'new' && d.label === '졸업증명서', JSON.stringify(d))
+  check('끝말만 있는 파일 이름(확인서.pdf)은 제목으로 안 봄', titleFromFileName('확인서.pdf') === null)
+  check('목록 줄 "1. 근로계약서" 는 제목이 아님', documentTitle('첨부 서류 목록\n1. 근로계약서\n2. 통장 사본') === null)
+  check("'정 관' 두 글자 제목", documentTitle('정 관\n제1조 (상호) 이 회사는') === '정관')
+  const lt = placeDocument({ text: '지방세 납세증명서\n납세자 : 샤인디자인', fileName: 'a.pdf' }, metas)
+  check('지방세 납세증명서는 납세증명서와 다른 칸', lt.kind === 'new' && lt.label === '지방세 납세증명서', JSON.stringify(lt))
+  const ins = placeDocument({ text: '4대사회보험 완납증명서\n사업장명 : 샤인디자인', fileName: 'b.pdf' }, metas)
+  check('4대사회보험 완납증명서 → 알려진 이름(유효기간 1개월)', ins.kind === 'new' && ins.label === '4대보험 완납증명서' && knownDocValidMonths(ins.label) === 1, JSON.stringify(ins))
+
+  // 빈 이름 새 칸 → 다른 칸에 덮지 않고 기타 칸
+  let withSeal = withCustomDocument(base0, { label: '법인인감증명서' })
+  const sealKey = withSeal.customDocuments.at(-1)!.key
+  withSeal = withDocument(withSeal, sealKey, { received: true, fileName: '인감.pdf', storagePath: 'w/c/seal' })
+  const blank = cellForPlacement(withSeal, { kind: 'new', label: '  ', sure: true, reason: '', issuedAt: null }, new Set())
+  check('빈 이름 새 칸: 인감 칸을 덮지 않고 기타 · 확인 필요 칸', blank.key !== sealKey && blank.label.startsWith(OTHER_DOC_LABEL), JSON.stringify(blank.label))
+
+  // 연락처 — 한 번만 옮기고, 지우면 다시 안 채움
+  const legacy = { id: 'rv2', companyName: 'x', documents: { representativePhone: { received: true, note: '010-1234-5678' } } } as never
+  const once = normalizeClientOps(legacy)
+  check('예전 휴대폰번호는 한 번 연락처로', once.contactPhone === '010-1234-5678' && once.legacyPhoneMoved === true)
+  const cleared = normalizeClientOps({ ...once, contactPhone: '' })
+  check('연락처를 지우면 저장해도 다시 채우지 않음', cleared.contactPhone === '', cleared.contactPhone)
+
+  // 고객이 올린 파일 → 서류함
+  let shelf = withDocument(base0, 'businessRegistration', { received: true, fileName: '사업자등록증_2025.pdf', storagePath: 'w/c/biz/1' })
+  const p1 = filePortalDocument(shelf, { documentType: 'businessRegistration', title: '사업자등록증', storagePath: 'w/portal/l1/2.pdf', fileName: '사업자등록증_최신.pdf', fileSize: 100 }, '')
+  check('고객 파일: 요청 종류가 사업자등록증 · 이미 파일 있음 → 덮지 않고 사업자등록증 (2)', !!p1 && p1.label === '사업자등록증 (2)' && p1.record.documents.businessRegistration.storagePath === 'w/c/biz/1' && p1.record.documents[p1.key].storagePath === 'w/portal/l1/2.pdf', JSON.stringify(p1?.label))
+  const p2 = filePortalDocument(shelf, { documentType: 'etc', title: '2025 재무제표', storagePath: 'w/portal/l1/3.png', fileName: 'IMG_2231.png', fileSize: 10 }, '')
+  check('고객 파일: 종류 "기타" · 이름으로 모름 → 요청 제목 칸(2025 재무제표)', !!p2 && p2.label === '2025 재무제표', JSON.stringify(p2?.label))
+  const p3 = filePortalDocument(shelf, { documentType: 'etc', title: '서류', storagePath: 'w/portal/l1/4.pdf', fileName: '스캔.pdf', fileSize: 10 }, '중소기업 확인서\n기업명 : 샤인디자인')
+  check('고객 파일: 글자 제목이 있으면 그 칸(중소기업 확인서)', !!p3 && p3.key === 'smeCertificate', JSON.stringify(p3?.label))
+  const again = p1 ? filePortalDocument(p1.record, { documentType: 'businessRegistration', title: '사업자등록증', storagePath: 'w/portal/l1/2.pdf', fileName: '사업자등록증_최신.pdf', fileSize: 100 }, '') : null
+  check('고객 파일: 이미 넣은 파일은 또 넣지 않음(같은 칸 그대로)', !!again && again.key === p1!.key && again.record === p1!.record && shelfCellOf(p1!.record, 'w/portal/l1/2.pdf')?.label === '사업자등록증 (2)')
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

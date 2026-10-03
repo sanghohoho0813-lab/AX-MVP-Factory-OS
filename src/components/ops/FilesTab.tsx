@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { FileText, Paperclip } from 'lucide-react'
+import { FileText, FolderInput, Loader2, Paperclip } from 'lucide-react'
 import type { ClientOpsRecord, DocumentKey } from '../../types/clientOps'
 import type { PortalDocument } from '../../types/bridge'
 import { allDocumentMetas, documentMetaOf } from '../../services/clientOpsDocuments'
@@ -7,6 +7,9 @@ import { DOCUMENT_STATUS_LABEL, listDocuments, listLinksForClient } from '../../
 import { activityTimeText } from '../../services/clientOpsActivity'
 import { formatFileSize } from '../../lib/format'
 import { DocFileActions } from './DocFileActions'
+import { filePortalDocument, shelfCellOf } from '../../services/docShelf'
+import { readStoredText } from '../../services/docStoredText'
+import { useToast } from '../ui/toastContext'
 
 /**
  * 서류 탭 아래 — 서류 칸 밖의 파일 (D-129, 예전 '파일' 탭).
@@ -15,8 +18,32 @@ import { DocFileActions } from './DocFileActions'
  *  - 칸이 없어진 서류의 파일: 직접 만든 서류 칸을 없앴어도 올린 파일은 남는다
  * 내 서류함 파일은 서류 칸마다 바로 열리므로 여기서 다시 늘어놓지 않는다.
  */
-export function ClientSharedFiles({ record, workspaceId }: { record: ClientOpsRecord; workspaceId: string | null }) {
+export function ClientSharedFiles({
+  record,
+  workspaceId,
+  onCommit,
+}: {
+  record: ClientOpsRecord
+  workspaceId: string | null
+  /** D-148: 고객이 올린 파일을 서류함 칸에 넣을 때 업체 기록 저장 */
+  onCommit?: (next: ClientOpsRecord) => Promise<boolean>
+}) {
   const [portalDocs, setPortalDocs] = useState<PortalDocument[]>([])
+  const [filing, setFiling] = useState<string | null>(null)
+  const { showToast } = useToast()
+
+  /** D-148: 고객이 올린 파일 → 서류함(요청 종류 → 글자 제목 · 파일 이름 → 요청 제목 칸 · 덮지 않음) */
+  const fileToShelf = async (d: PortalDocument) => {
+    if (!onCommit) return
+    setFiling(d.id)
+    try {
+      const { text } = await readStoredText(d.storagePath, d.fileName)
+      const out = filePortalDocument(record, d, text)
+      if (out && (await onCommit(out.record))) showToast(`서류함 '${out.label}' 칸에 넣었습니다.`)
+    } finally {
+      setFiling(null)
+    }
+  }
 
   const load = useCallback(async () => {
     try {
@@ -61,6 +88,24 @@ export function ClientSharedFiles({ record, workspaceId }: { record: ClientOpsRe
                 </span>
               </span>
               {d.storagePath && !d.storagePath.startsWith('demo/') && <DocFileActions label={d.title} storagePath={d.storagePath} fileName={d.fileName} />}
+              {/* D-148: 고객이 올린 파일도 서류함 칸으로 — 이미 넣었으면 어느 칸인지 */}
+              {d.source === 'customer' && d.storagePath && !d.storagePath.startsWith('demo/') && onCommit && (() => {
+                const cell = shelfCellOf(record, d.storagePath)
+                return cell ? (
+                  <span className="t-sub text-success-700" data-testid={`portal-filed-${d.id}`}>서류함 '{cell.label}' 칸에 있음</span>
+                ) : (
+                  <button
+                    type="button"
+                    data-testid={`portal-file-${d.id}`}
+                    disabled={filing !== null}
+                    onClick={() => void fileToShelf(d)}
+                    className="tap t-sub inline-flex min-h-11 items-center gap-1.5 self-start rounded-(--radius-control) border border-brand-300 bg-brand-50 px-3 font-semibold text-brand-800 disabled:opacity-60"
+                  >
+                    {filing === d.id ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : <FolderInput aria-hidden="true" className="size-4" />}
+                    서류함에 넣기
+                  </button>
+                )
+              })()}
             </li>
           ))}
         </ul>

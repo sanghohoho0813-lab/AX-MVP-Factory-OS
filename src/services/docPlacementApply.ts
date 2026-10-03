@@ -8,7 +8,7 @@
 import type { ClientOpsRecord, DocumentKey, DocumentState } from '../types/clientOps'
 import { allDocumentMetas } from './clientOpsDocuments'
 import { withCustomDocument } from './clientOpsService'
-import { knownDocValidMonths, type DocPlacement } from './docClassify'
+import { OTHER_DOC_LABEL, knownDocValidMonths, type DocPlacement } from './docClassify'
 
 const compact = (s: string) => s.replace(/[\s·ㆍ]/g, '')
 
@@ -46,7 +46,8 @@ export function cellForPlacement(record: ClientOpsRecord, p: DocPlacement, used:
     used.add(p.key)
     return { record: rec, key: p.key, label: p.label, numbered: false }
   }
-  const label = p.label
+  // D-148: 이름이 비면 기타 칸 — 빈 이름으로는 칸이 안 만들어져 엉뚱한 칸 키를 집었다
+  const label = p.label.trim() || OTHER_DOC_LABEL
   const empty = emptyCellNamed(rec, label, used)
   if (empty) {
     used.add(empty)
@@ -55,7 +56,10 @@ export function cellForPlacement(record: ClientOpsRecord, p: DocPlacement, used:
   const taken = allDocumentMetas(rec).some((m) => compact(m.label.replace(/\s*\(\d+\)$/, '')) === compact(label))
   const finalLabel = taken ? nextNumberedLabel(rec, label) : label
   // D-147: 알려진 서류면 유효기간도 함께(인감 3개월 · 납세 30일 …) — 만료 알림이 바로 걸린다
+  const before = rec.customDocuments.length
   rec = withCustomDocument(rec, { label: finalLabel, validMonths: knownDocValidMonths(label) })
+  // 새 칸이 정말 생겼을 때만 그 키를 쓴다 — 아니면 마지막 칸(다른 서류)에 덮어 쓰게 된다
+  if (rec.customDocuments.length !== before + 1) throw new Error(`'${finalLabel}' 칸을 만들지 못했습니다.`)
   const key = rec.customDocuments[rec.customDocuments.length - 1].key
   used.add(key)
   return { record: rec, key, label: finalLabel, numbered: taken }

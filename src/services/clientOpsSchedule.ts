@@ -7,12 +7,11 @@
 
 import type { ClientOpsRecord, ServiceKey } from '../types/clientOps'
 import {
-  DOCUMENTS,
   SERVICES,
   SERVICE_STATUS_LABEL,
   isServiceOpen,
 } from '../content/clientOpsCatalog'
-import { documentStatus, daysLeftFrom } from './clientOpsAlerts'
+import { documentsWithExpiry, daysLeftFrom } from './clientOpsAlerts'
 import { todayLocalDate } from '../lib/appClock'
 
 export type ScheduleKind = 'next' | 'task' | 'funding' | 'payment' | 'document' | 'tool'
@@ -137,9 +136,8 @@ export function buildClientSchedule(record: ClientOpsRecord, today: string): Sch
   }
 
   // 서류 만료
-  for (const meta of DOCUMENTS) {
-    const view = documentStatus(meta.key, record.documents[meta.key], today)
-    if (!view.received || view.expiresOn === null) continue
+  // D-148: 직접 만든 칸(법인인감증명서 · 납세증명서 …)도 달력 · 오늘에
+  for (const { meta, view } of documentsWithExpiry(record, today)) {
     out.push({
       id: `${record.id}:doc:${meta.key}`,
       date: view.expiresOn,

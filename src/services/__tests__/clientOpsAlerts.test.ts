@@ -21,7 +21,8 @@ import {
   buildStatusReportMessage,
   collectMissingDocuments,
 } from '../clientOpsMessages'
-import { normalizeClientOps, withService } from '../clientOpsService'
+import { normalizeClientOps, withCustomDocument, withDocument, withService } from '../clientOpsService'
+import { buildClientSchedule } from '../clientOpsSchedule'
 import { DOCUMENTS, SERVICES } from '../../content/clientOpsCatalog'
 import type { ClientOpsRecord, DocumentKey } from '../../types/clientOps'
 
@@ -385,6 +386,37 @@ check('문구: 미정', dueText(null) === '기한 미정')
   const finished = client({ id: 'z', companyName: 'Z', status: 'completed' })
   const sorted = sortClientsByUrgency([finished, active], TODAY)
   check('정렬: 종료 업체는 뒤로', sorted[0].id === 'a')
+}
+
+/* ---------------- D-148 직접 만든 칸 유효기간 → 경고 · 달력 · 요청 문구 ---------------- */
+{
+  const T = '2026-10-03'
+  let r = normalizeClientOps({ id: 'cx1', companyName: '샤인디자인', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  r = withCustomDocument(r, { label: '법인인감증명서', validMonths: 3 })
+  const seal = r.customDocuments.at(-1)!.key
+  r = withDocument(r, seal, { received: true, fileName: '인감.pdf', issuedAt: '2026-05-01' })
+  r = withCustomDocument(r, { label: '납세증명서', validMonths: 1 })
+  const tax = r.customDocuments.at(-1)!.key
+  r = withDocument(r, tax, { received: true, fileName: '납세.pdf', issuedAt: '2026-09-20' })
+  const al = buildClientAlerts(r, T)
+  check('직접 만든 칸: 만료된 법인인감증명서 → 서류 만료 경고', al.some((a) => a.kind === 'doc_expired' && a.title.includes('법인인감증명서')), JSON.stringify(al.map((a) => a.title)))
+  check('직접 만든 칸: 곧 만료 납세증명서(10-20) → 만료 임박 경고', al.some((a) => a.kind === 'doc_expiring' && a.title.includes('납세증명서')), JSON.stringify(al.map((a) => a.title)))
+  const sch = buildClientSchedule(r, T)
+  check('직접 만든 칸: 달력 · 오늘에 만료일', sch.some((e) => e.kind === 'document' && e.title === '법인인감증명서 만료' && e.date === '2026-08-01') && sch.some((e) => e.kind === 'document' && e.title === '납세증명서 만료'), JSON.stringify(sch.filter((e) => e.kind === 'document')))
+  const msg = buildDocumentRequestMessage(r, T)
+  check('요청 문구: 만료된 직접 만든 칸 서류도 새 발급본으로', msg.includes('법인인감증명서') && msg.includes('새 발급본') && !msg.includes('납세증명서'), msg)
+  check('업무를 지정한 요청에는 직접 만든 칸을 넣지 않음', !buildDocumentRequestMessage(r, T, ['incorporation']).includes('법인인감증명서'))
+  // 같은 서류를 새로 받았으면(법인인감증명서 (2) · 유효) 옛 칸 만료는 경고 · 달력 · 요청에서 빠진다
+  let r2 = withCustomDocument(r, { label: '법인인감증명서 (2)', validMonths: 3 })
+  const seal2 = r2.customDocuments.at(-1)!.key
+  r2 = withDocument(r2, seal2, { received: true, fileName: '인감_새.pdf', issuedAt: '2026-09-25' })
+  check('새로 받았으면: 옛 칸 만료 경고 없음', !buildClientAlerts(r2, T).some((a) => a.kind === 'doc_expired' && a.title.includes('법인인감')))
+  check('새로 받았으면: 옛 칸 만료가 달력에서 빠지고 새 칸 만료일이 뜬다', !buildClientSchedule(r2, T).some((e) => e.date === '2026-08-01') && buildClientSchedule(r2, T).some((e) => e.title === '법인인감증명서 (2) 만료' && e.date === '2026-12-25'))
+  check('새로 받았으면: 요청 문구에서 빠진다', !buildDocumentRequestMessage(r2, T).includes('법인인감'))
+  check('기본 서류 만료는 그대로 경고', (() => {
+    const b = withDocument(normalizeClientOps({ id: 'cx2', companyName: 'x' }), 'smeCertificate', { received: true, issuedAt: '2025-01-01' })
+    return buildClientAlerts(b, T).some((a) => a.kind === 'doc_expired' && a.title.includes('중소기업 확인서'))
+  })())
 }
 
 console.log(`\nclient-ops-alerts: ${passed} passed, ${failed} failed`)

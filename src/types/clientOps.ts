@@ -689,6 +689,8 @@ export interface ClientOpsRecord {
   companyName: string
   contactName: string
   contactPhone: string
+  /** D-148: 예전 서류함 '대표자 휴대폰번호' 메모를 연락처로 한 번 옮겼다 — 그 뒤에 지운 연락처는 다시 채우지 않는다 */
+  legacyPhoneMoved?: boolean
   contactEmail: string
   businessNumber: string
   corporateNumber: string

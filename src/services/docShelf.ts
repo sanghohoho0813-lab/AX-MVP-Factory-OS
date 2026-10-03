@@ -10,10 +10,10 @@
  * 옮기기는 '서류 다시 분류' 와 같은 길(applyResort)을 쓴다 — 파일은 그대로, 경로만.
  */
 import type { ClientOpsRecord, DocumentKey } from '../types/clientOps'
-import { allDocumentMetas, emptyDocumentState } from './clientOpsDocuments'
-import { documentStatus } from './clientOpsAlerts'
-import { KNOWN_EXTRA_DOCS, OTHER_DOC_LABEL, type DocPlacement } from './docClassify'
-import { applyResort } from './docPlacementApply'
+import { allDocumentMetas } from './clientOpsDocuments'
+import { documentsWithExpiry } from './clientOpsAlerts'
+import { KNOWN_EXTRA_DOCS, OTHER_DOC_LABEL, placeDocument, type DocPlacement } from './docClassify'
+import { applyResort, cellForPlacement } from './docPlacementApply'
 import { withDocument, withoutCustomDocument } from './clientOpsService'
 
 /**
@@ -53,7 +53,8 @@ export function docShelfSummary(record: ClientOpsRecord, today: string, urgent: 
     groups.set(base(m.label), g)
   }
   const dupGroups = [...groups.values()].filter((g) => g.length > 1)
-  const expired = metas.filter((m) => documentStatus(m.key, record.documents[m.key] ?? emptyDocumentState(), today, m).expired).map((m) => m.key)
+  // D-148: 같은 서류를 새로 받았으면 옛 칸 만료는 세지 않는다(경고 · 달력과 같은 기준)
+  const expired = documentsWithExpiry(record, today).filter((x) => x.view.expired).map((x) => x.meta.key)
   const missingNow = metas.filter((m) => urgent.has(m.key) && !record.documents[m.key]?.received).map((m) => m.key)
   return { other, dupGroups, expired, missingNow }
 }
@@ -102,4 +103,48 @@ export function moveDocTo(record: ClientOpsRecord, fromKey: DocumentKey, value: 
   )
   const moved = out.moved[0]
   return moved ? { record: out.record, to: moved.to } : null
+}
+
+/* ------------------------------------------------------------------ */
+/* D-148: 고객이 고객 플랫폼에 올린 파일 → 서류함                           */
+/* ------------------------------------------------------------------ */
+
+export interface PortalFileLike {
+  documentType: string
+  title: string
+  storagePath: string
+  fileName: string
+  fileSize: number | null
+}
+
+/** 이 파일(같은 보관함 경로)이 이미 서류함 어느 칸에 있나 */
+export function shelfCellOf(record: ClientOpsRecord, storagePath: string): { key: DocumentKey; label: string } | null {
+  if (!storagePath) return null
+  const meta = allDocumentMetas(record).find((m) => record.documents[m.key]?.storagePath === storagePath)
+  return meta ? { key: meta.key, label: meta.label } : null
+}
+
+/**
+ * 고객이 올린 파일을 서류함 칸에 넣는다 — 파일은 그대로(같은 보관함 경로), 칸만.
+ * 요청할 때 고른 서류 종류(사업자등록증 …)가 이 업체의 칸이면 그 칸, 아니면 글자 제목 · 파일 이름(D-146 규칙),
+ * 그래도 모르면 요청 제목('2025 재무제표') 이름의 칸. 이미 파일이 있는 칸은 덮지 않고 '(2)' 칸.
+ */
+export function filePortalDocument(record: ClientOpsRecord, doc: PortalFileLike, text: string): { record: ClientOpsRecord; key: DocumentKey; label: string } | null {
+  if (!doc.storagePath) return null
+  const already = shelfCellOf(record, doc.storagePath)
+  if (already) return { record, ...already }
+  const metas = allDocumentMetas(record)
+  const typed = metas.find((m) => m.needsFile && m.key === doc.documentType)
+  let placement: DocPlacement
+  if (typed) {
+    placement = { kind: 'existing', key: typed.key, label: typed.label, sure: true, reason: '요청한 서류 종류', issuedAt: null }
+  } else {
+    const p = placeDocument({ text, fileName: doc.fileName }, metas)
+    const title = doc.title.trim()
+    placement = p.kind === 'new' && p.label === OTHER_DOC_LABEL && title ? { kind: 'new', label: title, sure: false, reason: '요청 제목', issuedAt: p.issuedAt } : p
+  }
+  const cell = cellForPlacement(record, placement, new Set())
+  let rec = withDocument(cell.record, cell.key, { received: true, fileName: doc.fileName, fileSize: doc.fileSize ?? 0, storagePath: doc.storagePath })
+  if (placement.issuedAt) rec = withDocument(rec, cell.key, { issuedAt: placement.issuedAt })
+  return { record: rec, key: cell.key, label: cell.label }
 }

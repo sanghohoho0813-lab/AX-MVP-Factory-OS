@@ -24,7 +24,6 @@ import type {
 } from '../types/clientOps'
 import type { DocumentMeta } from '../content/clientOpsCatalog'
 import {
-  DOCUMENTS,
   DOC_EXPIRING_DAYS,
   DUE_SOON_DAYS,
   SERVICES,
@@ -129,6 +128,21 @@ export function documentStatus(
     expiringSoon,
     usable: state.received && !expired,
   }
+}
+
+/**
+ * D-148: 유효기간을 따질 서류 칸 전부 — 기본 9종 + 직접 만든 칸(법인인감증명서 · 납세증명서 …).
+ * 예전에는 기본 9종만 봐서 직접 만든 칸은 만료돼도 경고 · 달력에 안 떴다.
+ * 같은 서류의 새 칸('법인인감증명서 (2)')이 쓸 수 있는 상태면 옛 칸의 만료는 빼다 — 이미 새로 받았다.
+ */
+export function documentsWithExpiry(record: ClientOpsRecord, today: string): { meta: DocumentMeta; view: DocumentStatusView & { expiresOn: string } }[] {
+  const base = (l: string) => l.replace(/\s*\(\d+\)$/, '').replace(/[\s·ㆍ]/g, '')
+  const all = allDocumentMetas(record).map((meta) => ({ meta, view: documentStatus(meta.key, record.documents[meta.key] ?? emptyDocumentState(), today, meta) }))
+  const usableBase = new Set(all.filter((x) => x.view.usable).map((x) => base(x.meta.label)))
+  return all.filter(
+    (x): x is { meta: DocumentMeta; view: DocumentStatusView & { expiresOn: string } } =>
+      x.view.received && x.view.expiresOn !== null && !(x.view.expired && usableBase.has(base(x.meta.label))),
+  )
 }
 
 /** 어떤 업무에 필요한 서류 중 지금 못 쓰는 것들 */
@@ -304,10 +318,8 @@ export function buildClientAlerts(record: ClientOpsRecord, today: string): OpsAl
     }
   }
 
-  // 5) 서류 유효기간
-  for (const meta of DOCUMENTS) {
-    const view = documentStatus(meta.key, record.documents[meta.key], today)
-    if (!view.received || view.expiresOn === null) continue
+  // 5) 서류 유효기간 — D-148: 직접 만든 칸까지(같은 서류를 새로 받았으면 옛 칸은 뺌)
+  for (const { meta, view } of documentsWithExpiry(record, today)) {
     const needed = SERVICES.filter(
       (s) => s.requiredDocuments.includes(meta.key) && isServiceOpen(record.services[s.key].status),
     )
