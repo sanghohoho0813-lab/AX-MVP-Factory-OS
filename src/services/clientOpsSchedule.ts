@@ -38,7 +38,7 @@ export interface ScheduleEvent {
 export const SCHEDULE_KIND_LABEL: Record<ScheduleKind, string> = {
   next: '다음 약속',
   task: '업무 마감',
-  funding: '정책자금 신청',
+  funding: '자금 · 지원사업 신청',
   payment: '수금 예정',
   document: '서류 만료',
   tool: '도구 기한',

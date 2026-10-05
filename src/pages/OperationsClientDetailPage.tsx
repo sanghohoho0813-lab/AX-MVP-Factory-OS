@@ -164,6 +164,7 @@ import { buildClientSchedule } from '../services/clientOpsSchedule'
 import { brand } from '../brand/brand.config'
 import { SERVICE_STATUS_LOOK } from '../components/ops/serviceStatusLook'
 import { josa } from '../lib/josa'
+import { openApplications, withApplyDocDone } from '../services/grants/grantApply'
 
 
 
@@ -191,7 +192,8 @@ const DETAIL_TABS: { key: DetailTab; label: string; hidden?: boolean }[] = [
   { key: 'portal', label: '고객 플랫폼' },
   { key: 'fees', label: '수금' },
   { key: 'consulting', label: '컨설팅', hidden: true },
-  { key: 'funding', label: '자금·지원', hidden: true },
+  // D-151: 공고에서 '신청 준비' 를 건 업체는 줄에 보인다(아래 showTab)
+  { key: 'funding', label: '지원사업 신청', hidden: true },
 ]
 function isDetailTab(v: string | null): v is DetailTab {
   return DETAIL_TABS.some((t) => t.key === v)
@@ -633,7 +635,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         className="sticky top-16 z-20 -mx-4 bg-slate-50/95 backdrop-blur sm:-mx-6 lg:-mx-10"
         innerClassName="flex gap-1 border-b border-slate-200 px-4 sm:px-6 lg:px-10"
       >
-        {DETAIL_TABS.filter((t) => !t.hidden || t.key === tab).map((t) => {
+        {DETAIL_TABS.filter((t) => !t.hidden || t.key === tab || (t.key === 'funding' && openApplications(record).length > 0)).map((t) => {
           const badge =
             t.key === 'smart' ? pendingFacts(record).length + alerts.filter((a) => a.severity === 'critical').length
               : t.key === 'overview' ? 0
@@ -1546,6 +1548,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           onAdd={(input) => commit(withNewFunding(record, input))}
           onChange={(id, patch) => void commit(withFunding(record, id, patch))}
           onRemove={(id) => void commit(withoutFunding(record, id))}
+          onToggleDoc={(id, label, done) => void commit(withApplyDocDone(current() ?? record, id, label, done))}
+          docsHref={`/ops/clients/${record.id}?tab=docs`}
         />
       )}
 

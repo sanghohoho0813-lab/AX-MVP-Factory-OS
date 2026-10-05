@@ -28,6 +28,7 @@ import type { DocBatchSummary } from '../../services/docAutoAnalyze'
 import { docShelfSummary } from '../../services/docShelf'
 import { addDaysLocal, withNextAction } from '../../services/clientOpsNextAction'
 import { nowIso } from '../../lib/appClock'
+import { applyReadiness, openApplications } from '../../services/grants/grantApply'
 
 const TONE: Record<InsightTone, Tone> = { good: 'success', maybe: 'brand', done: 'neutral', need: 'warning', no: 'neutral' }
 
@@ -62,7 +63,16 @@ export default function ClientSmartTab({
     const s = docShelfSummary(record, today, new Set())
     return { expired: s.expired.length, other: s.other.length, dup: s.dupGroups.length }
   }, [record, today])
-  const steps = useMemo(() => recommendNextSteps(insights, pending, shelf), [insights, pending, shelf])
+  // D-151: 신청 준비 중인 지원사업의 모자란 서류
+  const applying = useMemo(
+    () =>
+      openApplications(record).map((a) => {
+        const r = applyReadiness(record, a, today)
+        return { name: a.programName, daysLeft: r.daysLeft, missing: r.needFromClient.length }
+      }),
+    [record, today],
+  )
+  const steps = useMemo(() => recommendNextSteps(insights, pending, shelf, applying), [insights, pending, shelf, applying])
   const good = insights.filter((i) => i.tone === 'good').length
 
   const setNext = (text: string) => void onCommit(withNextAction(record, text, addDaysLocal(today, 3)), `다음 약속으로 걸었습니다 — ${text.slice(0, 30)}`)

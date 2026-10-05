@@ -2,7 +2,7 @@
  * 지원사업 알림 — 공고 창(맞는 업체 · 알리기) · 업체 창(맞는 공고 · 문구 · 링크) (D-141).
  */
 import { useState } from 'react'
-import { ArrowRight, Copy, Link2, Send } from 'lucide-react'
+import { ArrowRight, ClipboardCheck, Copy, Link2, Send } from 'lucide-react'
 import { BottomSheet } from '../ui/primitives'
 import { Button } from '../ui/Button'
 import { AiSoonButton } from '../ui/AiSoonButton'
@@ -10,6 +10,7 @@ import { GRANT_CATEGORY_LABEL, GRANT_SOURCE_LABEL, deadlineOf, rulesText, type G
 import { missingForMatch, profileLine } from '../../services/grants/grantProfile'
 import { CLIENT_KIND_LABEL, type ClientMatch, type GrantClient } from '../../services/grants/grantView'
 import { DeadlineText, MatchList, NoticeLink, ReasonList, VerdictBadge } from './GrantParts'
+import { applicationFor, applyReadiness } from '../../services/grants/grantApply'
 
 const mdOf = (iso: string) => (iso ? `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}` : '')
 
@@ -27,7 +28,13 @@ export function NoticeSheet({
   onOpenClient,
   onClose,
   readOnly,
+  onApply,
+  onOpenApply,
 }: {
+  /** D-151: 이 업체로 신청 준비 — 없으면 단추를 숨긴다 */
+  onApply?: (x: ClientMatch) => void
+  /** 이미 신청 준비 중인 건 열기(업체 상세 · 신청 탭) */
+  onOpenApply?: (clientId: string) => void
   /** 기업마당에서 매일 받는 공고 — 고치기 · 지우기 없음 */
   readOnly?: boolean
   notice: GrantNotice
@@ -82,6 +89,8 @@ export function NoticeSheet({
               {matches.map((x) => {
                 const id = x.client.record.id
                 const sent = sentOf(id)
+                const applied = applicationFor(x.client.record, notice)
+                const ready = applied?.docs ? applyReadiness(x.client.record, applied, today) : null
                 return (
                   <li key={id} className="flex flex-col gap-2 px-3 py-3" data-testid="notice-client" data-client={id}>
                     <div className="flex items-start gap-2">
@@ -109,7 +118,24 @@ export function NoticeSheet({
                           <Send aria-hidden="true" className="size-4" /> 고객 화면에 올리기
                         </Button>
                       )}
+                      {onApply && d.state !== 'closed' && !ready && (
+                        <Button size="sm" variant="primary" onClick={() => onApply(x)} data-testid="notice-apply">
+                          <ClipboardCheck aria-hidden="true" className="size-4" /> 신청 준비
+                        </Button>
+                      )}
                     </div>
+                    {ready && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenApply?.(id)}
+                        className="tap t-sub inline-flex items-center gap-1.5 self-start rounded-full border border-brand-200 bg-brand-50 px-3 py-1 font-semibold text-brand-800 hover:bg-brand-100"
+                        data-testid="notice-applied"
+                      >
+                        <ClipboardCheck aria-hidden="true" className="size-4 shrink-0" />
+                        신청 준비 중 · {ready.ready === ready.total ? '서류 다 모음' : `서류 ${ready.ready}/${ready.total}`}
+                        <ArrowRight aria-hidden="true" className="size-4 shrink-0" />
+                      </button>
+                    )}
                   </li>
                 )
               })}

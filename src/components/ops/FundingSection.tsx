@@ -7,6 +7,7 @@ import { daysLeftFrom, dueText } from '../../services/clientOpsAlerts'
 import { formatKrw, wonOf } from '../../lib/format'
 import { Button } from '../ui/Button'
 import { Panel } from '../ui/Panel'
+import { GrantApplyChecklist } from '../grants/GrantApplyChecklist'
 
 const FUNDING_STATUS_ORDER: FundingStatus[] = [
   'watching',
@@ -39,9 +40,14 @@ export function FundingSection({
   onChange,
   onAdd,
   onRemove,
+  onToggleDoc,
+  docsHref,
 }: {
   record: ClientOpsRecord
   today: string
+  /** D-151: 공고에서 만든 신청 준비 — 서류함에 없는 서류(신청서 …) 체크 */
+  onToggleDoc?: (id: string, label: string, done: boolean) => void
+  docsHref?: string
   onChange: (id: string, patch: Record<string, unknown>) => void
   onAdd: (input: Record<string, unknown>) => void | boolean | Promise<boolean>
   onRemove: (id: string) => void
@@ -215,6 +221,10 @@ export function FundingSection({
                       />
                     </label>
                   </div>
+
+                  {a.docs && openStage && onToggleDoc && (
+                    <GrantApplyChecklist record={record} app={a} today={today} onToggle={(label, done) => onToggleDoc(a.id, label, done)} docsHref={docsHref} />
+                  )}
 
                   {(a.submittedAt || a.resultAt) && (
                     <p className="text-[0.875rem] text-slate-500">

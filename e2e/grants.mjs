@@ -421,6 +421,108 @@ function feedItems(n) {
   await ctx.close()
 }
 
+/* ---------------- D-151 신청 준비 ---------------- */
+{
+  const DUE = kst(5)
+  const APPLY = `[경기] 파주시 수출기업 해외인증 지원사업 공고
+소관부처·지자체 경기도 파주시
+신청기간 ${dot(kst(-3))} ~ ${dot(DUE)} 18:00
+지원대상 파주시 소재 제조업 중소기업
+제출서류
+① 사업신청서 1부(서식 1)
+② 사업자등록증 사본 1부
+③ 국세 · 지방세 완납증명서 각 1부
+④ 4대보험 가입자 명부
+문의처 031-000-0000`
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul', permissions: ['clipboard-read', 'clipboard-write'] })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(prepClients)
+  // 한솔: 사업자등록증 있음 · 4대보험 명부는 오래돼 만료
+  await page.evaluate(() => {
+    const list = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+    for (const c of list) {
+      if (c.id !== 'cli_hansol') continue
+      c.documents = c.documents ?? {}
+      c.documents.businessRegistration = { ...(c.documents.businessRegistration ?? {}), received: true, issuedAt: '2024-03-02', fileName: '사업자등록증.pdf' }
+      c.documents.payrollRoster = { ...(c.documents.payrollRoster ?? {}), received: true, issuedAt: '2026-01-05', fileName: '명부.pdf' }
+      c.fundingApplications = []
+    }
+    localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(list))
+  })
+  await page.goto(BASE + '/grants', { waitUntil: 'networkidle' })
+  await page.getByTestId('grant-add-open').click()
+  await page.locator('#grant-paste').fill(APPLY)
+  await page.getByTestId('grant-read').click()
+  await page.getByTestId('grant-read-done').waitFor()
+  await page.getByTestId('grant-save').click()
+  await page.getByTestId('grant-row').filter({ hasText: '해외인증' }).first().click()
+  await page.getByTestId('notice-sheet').waitFor()
+  const row = page.locator('[data-testid="notice-client"][data-client="cli_hansol"]')
+  check('신청 준비: 맞는 업체 줄에 [신청 준비] 단추', (await row.getByTestId('notice-apply').count()) === 1)
+  await row.getByTestId('notice-apply').click()
+  await row.getByTestId('notice-applied').waitFor()
+  const applied = await row.getByTestId('notice-applied').innerText()
+  check('신청 준비: 누르면 바로 \'신청 준비 중 · 서류 1/5\'', /신청 준비 중 · 서류 1\/5/.test(applied), applied)
+  check('신청 준비: 단추는 사라짐(두 번 안 만듦)', (await row.getByTestId('notice-apply').count()) === 0)
+
+  await row.getByTestId('notice-applied').click()
+  await page.waitForURL(/\/ops\/clients\/cli_hansol\?tab=funding/)
+  await page.getByTestId('apply-checklist').waitFor()
+  const states = await page.getByTestId('apply-doc').evaluateAll((els) => els.map((e) => e.getAttribute('data-state')))
+  check('업체 상세: 낼 서류 5가지 · 있음 1 · 만료 1 · 없음 2 · 우리 1', JSON.stringify([...states].sort()) === JSON.stringify(['expired', 'manual_todo', 'missing', 'missing', 'ok']), states)
+  check('업체 상세: 마감 시각 · 공고 서류 수', /낼 서류 1\/5/.test(await page.getByTestId('apply-count').innerText()) && /18:00/.test(await page.getByTestId('apply-count').innerText()), await page.getByTestId('apply-count').innerText())
+  check('업체 상세: 탭 줄에 \'지원사업 신청\'', (await page.getByRole('tab', { name: /지원사업 신청/ }).count()) === 1)
+  await page.getByLabel('사업신청서 준비됨').check()
+  await page.waitForTimeout(400)
+  check('체크: 사업신청서 준비됨 → 2/5', /낼 서류 2\/5/.test(await page.getByTestId('apply-count').innerText()))
+  await page.getByTestId('apply-copy').click()
+  await page.waitForTimeout(300)
+  const msg = await clip(page)
+  check('카톡 문구: 모자란 셋만 · 발급처 · 마감 시각', msg.includes('아래 서류를 보내 주세요.') && msg.includes('국세 완납증명서 (발급: 홈택스)') && msg.includes('4대보험 가입자 명부') && msg.includes('갖고 있는 것이 만료') && msg.includes('18:00') && !msg.includes('사업신청서') && msg.includes('이미 받은 서류: 사업자등록증 사본'), msg)
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.getByTestId('apply-checklist').waitFor()
+  check('다시 열어도: 체크 남음 2/5', /낼 서류 2\/5/.test(await page.getByTestId('apply-count').innerText()))
+
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  const smart = await page.locator('main').innerText()
+  check('맞춤 추천: 다음 행동 맨 위에 \'서류 3가지 받기 · 5일 남음\'', /해외인증 지원사업 공고 — 서류 3가지 받기 · 5일 남음/.test(smart), smart.split('\n').filter((l) => /받기|확인하기|정리하기/.test(l)).slice(0, 6))
+
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  const agenda = await page.getByTestId('agenda-row').allInnerTexts()
+  check('오늘: 다가오는 마감에 \'서류 2/5 · 18:00 마감\'', agenda.some((t) => t.includes('해외인증') && t.includes('서류 2/5') && t.includes('18:00 마감')), agenda.slice(0, 8))
+
+  await page.goto(BASE + '/grants', { waitUntil: 'networkidle' })
+  await page.getByTestId('grant-row').filter({ hasText: '해외인증' }).first().click()
+  await page.getByTestId('notice-sheet').waitFor()
+  check('공고 다시 열면: 신청 준비 중 · 서류 2/5', /서류 2\/5/.test(await page.locator('[data-testid="notice-client"][data-client="cli_hansol"]').getByTestId('notice-applied').innerText()))
+  check('신청 준비 화면 오류 0', errors.length === 0, errors)
+  await ctx.close()
+
+  // 390 아주 큰 글자 — 체크 목록 넘침 0 · 체크 칸 44px
+  const m = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul', deviceScaleFactor: 2 })
+  const mp = await m.newPage()
+  await mp.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await mp.evaluate(seedScript())
+  await mp.evaluate(() => {
+    const list = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+    const c = list.find((x) => x.id === 'cli_hansol')
+    c.fundingApplications = [{ id: 'fa1', programName: '[경기] 아주 긴 이름의 파주시 수출기업 해외인증 · 해외규격 획득 지원사업 2차 추가 공고', institution: '경기도 파주시', status: 'preparing', applyDueDate: '', submittedAt: null, resultAt: null, requestedAmount: null, approvedAmount: null, note: '', noticeId: 'x', applyDueTime: '18:00', docs: [{ label: '사업신청서', done: false }, { label: '국세 · 지방세 완납증명서 및 4대 사회보험 완납증명서(신청일 기준 발급분)', done: false }, { label: '사업자등록증 사본', done: false }], createdAt: '2026-10-01T00:00:00Z', updatedAt: '2026-10-01T00:00:00Z' }]
+    localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(list))
+    localStorage.setItem('axmvp.ui.text_scale', 'extra_large')
+  })
+  await mp.goto(BASE + '/ops/clients/cli_hansol?tab=funding', { waitUntil: 'networkidle' })
+  await mp.getByTestId('apply-checklist').waitFor()
+  const box = await mp.getByLabel('사업신청서 준비됨').evaluate((el) => el.closest('label').getBoundingClientRect().height)
+  check('390: 체크 목록 가로 넘침 0 · 체크 줄 44px 이상', (await overflowX(mp)) <= 0 && box >= 44, { o: await overflowX(mp), box })
+  await m.close()
+}
+
 await browser.close()
 console.log(`\ngrants e2e: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

@@ -18,6 +18,7 @@ import { allDocumentMetas } from '../clientOpsDocuments'
 import { daysLeftFrom, documentStatus } from '../clientOpsAlerts'
 import { withFunding, withNewFunding } from '../clientOpsService'
 import type { GrantNotice } from './grantMatch'
+import { nowDate } from '../../lib/appClock'
 
 /** 공고 글에 제출서류가 없을 때 — 정부 지원사업에 흔히 내는 것 */
 export const DEFAULT_APPLY_DOCS: readonly string[] = [
@@ -106,6 +107,13 @@ function shelfMatch(record: ClientOpsRecord, label: string, today: string) {
   return views[0]
 }
 
+/** 'YYYY-MM-DD' → '4/5' (해가 다르면 '2025. 4/5') */
+const md = (iso: string | null) => {
+  if (!iso) return ''
+  const [y, m, d] = iso.split('-').map(Number)
+  return `${y !== nowDate().getFullYear() ? `${y}. ` : ''}${m}/${d}`
+}
+
 const emptyState = () => ({ received: false, issuedAt: '', fileName: '', fileSize: 0, storagePath: '', note: '', updatedAt: null })
 const rank = (v: { usable: boolean; received: boolean; expiresOn: string | null }) =>
   (v.usable ? 4 : v.received ? 2 : 0) + (v.usable && v.expiresOn === null ? 1 : 0) + (v.expiresOn ? Number(v.expiresOn.replace(/-/g, '')) / 1e9 : 0)
@@ -129,9 +137,9 @@ export function applyDocViews(record: ClientOpsRecord, app: Pick<FundingApplicat
     const { meta, view } = hit
     const base = { label: d.label, docKey: meta.key, docLabel: meta.label, expiresOn: view.expiresOn }
     if (!view.received) return { ...base, state: 'missing', note: '서류함에 없음' }
-    if (view.expired) return { ...base, state: 'expired', note: `만료됨(${view.expiresOn}) — 새로 발급` }
-    if (view.expiresOn && view.expiresOn < due) return { ...base, state: 'expires_before_due', note: `마감 전 ${view.expiresOn} 에 만료 — 마감 가까이 다시 발급` }
-    return { ...base, state: 'ok', note: view.expiresOn ? `${view.expiresOn} 까지 쓸 수 있음` : '있음' }
+    if (view.expired) return { ...base, state: 'expired', note: `${md(view.expiresOn)} 만료 — 새로 발급` }
+    if (view.expiresOn && view.expiresOn < due) return { ...base, state: 'expires_before_due', note: `마감 전 ${md(view.expiresOn)}에 만료 — 마감 가까이 다시 발급` }
+    return { ...base, state: 'ok', note: view.expiresOn ? `${md(view.expiresOn)}까지 쓸 수 있음` : '있음' }
   })
 }
 

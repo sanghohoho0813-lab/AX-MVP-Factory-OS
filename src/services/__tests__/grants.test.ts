@@ -46,6 +46,7 @@ import { clientsForNotice, fitSummary, grantClients, grantIndex } from '../grant
 import { applyDocViews, applyDocsFor, applyReadiness, docIdentity, grantDocRequestMessage, openApplications, withApplyDocDone, withGrantApplication } from '../grants/grantApply'
 import { documentsOf } from '../grants/grantText'
 import { buildClientSchedule } from '../clientOpsSchedule'
+import { recommendNextSteps } from '../clientInsights'
 
 let pass = 0
 let fail = 0
@@ -594,6 +595,8 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   check('요청 문구: 이미 받은 서류', msg.includes('이미 받은 서류: 사업자등록증 사본 · 중소기업(소상공인)확인서'), msg)
   const ev = buildClientSchedule(done, TODAY).find((e) => e.kind === 'funding')
   check('오늘 · 달력: 마감 10-30 · 서류 3/6 · 18:00 마감', ev?.date === '2026-10-30' && ev?.detail === '중소벤처기업부 · 서류 3/6 · 18:00 마감' && ev?.done === false, ev)
+  const steps = recommendNextSteps([], 0, undefined, [{ name: '나중 사업', daysLeft: 20, missing: 1 }, { name: '급한 사업', daysLeft: 3, missing: 2 }, { name: '다 모음', daysLeft: 1, missing: 0 }, { name: '지난 사업', daysLeft: -2, missing: 4 }])
+  check('맞춤 추천: 서류 모자란 신청 준비 — 마감 가까운 것부터 · 다 모은 것 · 지난 것은 빼기', steps.map((x) => x.text).join(' | ') === '급한 사업 — 서류 2가지 받기 · 3일 남음 | 나중 사업 — 서류 1가지 받기 · 20일 남음' && steps[0].href === '?tab=funding', steps)
   check('진행 중: 신청 준비만', openApplications(made.record).length === 1 && openApplications(base).length === 0)
   const saved = normalizeClientOps(JSON.parse(JSON.stringify(done)))
   check('저장했다 읽어도: 공고 · 시각 · 서류 · 준비됨', saved.fundingApplications[0].noticeId === 'n-smart' && saved.fundingApplications[0].applyDueTime === '18:00' && saved.fundingApplications[0].docs?.find((d) => d.label === '사업신청서')?.done === true)

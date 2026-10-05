@@ -20,7 +20,8 @@ import { ClientGrantPanel, NoticeSheet } from '../components/grants/GrantSheets'
 import { useGrantActions, useGrantData } from '../components/grants/useGrants'
 import { GrantFeedBar } from '../components/grants/GrantFeedBar'
 import { isFeedNotice } from '../services/grants/grantFeed'
-import { listClients } from '../services/clientOpsService'
+import { listClients, saveClient } from '../services/clientOpsService'
+import { applicationFor, applyReadiness, withGrantApplication } from '../services/grants/grantApply'
 import { todayLocalDate } from '../lib/appClock'
 import type { ClientOpsRecord } from '../types/clientOps'
 import { SIDO_LIST, deadlineOf, deadlineRank, inRegion, targetsSomeone, type GrantCategory, type GrantMatch, type GrantNotice } from '../services/grants/grantMatch'
@@ -48,6 +49,30 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
       .then(setRecords)
       .catch((cause) => setLoadError(cause instanceof Error ? cause.message : '업체를 불러오지 못했습니다.'))
   }, [workspaceId])
+
+  // D-151: 공고 → 이 업체로 신청 준비(업체의 자금 · 지원사업 신청 건). 저장 직전에 업체를 다시 읽어 다른 화면에서 고친 것을 덮지 않는다
+  const [applying, setApplying] = useState('')
+  const applyFor = async (notice: GrantNotice, record: ClientOpsRecord) => {
+    if (applying) return
+    setApplying(record.id)
+    try {
+      const fresh = (await listClients(workspaceId)).find((r) => r.id === record.id) ?? record
+      const out = withGrantApplication(fresh, notice)
+      const saved = out.record === fresh ? fresh : await saveClient(out.record)
+      setRecords((prev) => prev.map((r) => (r.id === saved.id ? saved : r)))
+      const app = applicationFor(saved, notice) ?? out.app
+      const rd = applyReadiness(saved, app, today)
+      showToast(
+        out.created
+          ? `${saved.companyName} — 신청 준비를 시작했어요 · 서류 ${rd.ready}/${rd.total}`
+          : `${saved.companyName} — 이미 신청 준비 중이에요 · 서류 ${rd.ready}/${rd.total}`,
+      )
+    } catch (cause) {
+      showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다. 다시 눌러 주세요.')
+    } finally {
+      setApplying('')
+    }
+  }
 
   const view: View = params.get('view') === 'clients' ? 'clients' : 'notices'
   const region = SIDO_LIST.includes(params.get('r') ?? '') ? (params.get('r') as string) : ''
@@ -342,6 +367,8 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
           onCopy={(x) => void actions.copyNotice(x.client, x.match)}
           onPortal={(x) => void actions.toPortal(x.client, [x.match])}
           readOnly={isFeedNotice(current)}
+          onApply={(x) => void applyFor(current, x.client.record)}
+          onOpenApply={(cid) => navigate(`/ops/clients/${cid}?tab=funding`)}
           onEdit={() => {
             setEditing(current)
             setOpenId('')

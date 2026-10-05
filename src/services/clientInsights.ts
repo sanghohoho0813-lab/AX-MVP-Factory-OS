@@ -256,8 +256,14 @@ export function recommendNextSteps(
   pendingCount: number,
   /** D-149: 서류함 손볼 것(만료 · 무슨 서류인지 확인 · 겹친 서류 묶음) — 있으면 서류 탭으로 */
   shelf?: { expired: number; other: number; dup: number },
+  /** D-151: 신청 준비 중인 지원사업 — 마감이 가까운 것부터, 서류가 모자라면 맨 위 */
+  applying?: readonly { name: string; daysLeft: number | null; missing: number }[],
 ): NextStep[] {
   const out: NextStep[] = []
+  for (const a of [...(applying ?? [])].filter((x) => x.missing > 0 && (x.daysLeft === null || x.daysLeft >= 0)).sort((x, y) => (x.daysLeft ?? 999) - (y.daysLeft ?? 999)).slice(0, 2)) {
+    const when = a.daysLeft === null ? '' : a.daysLeft === 0 ? ' · 오늘 마감' : ` · ${a.daysLeft}일 남음`
+    out.push({ id: `apply:${a.name}`, text: `${a.name} — 서류 ${a.missing}가지 받기${when}`, why: '모자란 서류만 카톡 문구로 보낼 수 있어요', href: '?tab=funding' })
+  }
   if (pendingCount > 0) out.push({ id: 'facts', text: `서류에서 읽은 정보 ${pendingCount}건 확인하기`, why: '확실하지 않은 것만 남겨 두었어요 — 맞으면 한 번에 넣어요', href: '#fact-inbox' })
   if (shelf && shelf.expired + shelf.other + shelf.dup > 0) {
     const parts = [shelf.expired ? `만료 ${shelf.expired}` : '', shelf.other ? `무슨 서류인지 확인 ${shelf.other}` : '', shelf.dup ? `겹친 서류 ${shelf.dup}묶음` : ''].filter(Boolean)
