@@ -33,6 +33,12 @@ async function goMonth(page, y, m) {
   return false
 }
 const cell = (page, d) => page.locator(`main button[data-date="${d}"]`)
+// 오늘 칸은 '오늘' 모양(흰 숫자 · 처음부터 골라 둠)이라 — 시험할 날은 오늘이 아닌 날로 고른다
+const TODAY_KST = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10)
+const notToday = (...days) => days.find((d) => d !== TODAY_KST) ?? days[0]
+const OFF_WEEKDAY = notToday('2026-10-05', '2026-10-09')
+const TAP_DAY = OFF_WEEKDAY
+const OFF_NAME = OFF_WEEKDAY === '2026-10-05' ? '대체공휴일' : '한글날'
 const summary = (page) => page.getByTestId('calendar-month-summary').innerText()
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
@@ -66,7 +72,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('공휴일 넣기: 넣었다고 알림', (await page.locator('body').innerText()).includes('쉬는 날 20일을 표시했습니다'))
   check('쉬는 날: 10/5 대체공휴일 · 10/9 한글날 · 10/3 개천절(토)', (await cell(page, '2026-10-05').getAttribute('data-off')) === 'true' && (await cell(page, '2026-10-09').getAttribute('data-off')) === 'true' && (await cell(page, '2026-10-03').getAttribute('data-off')) === 'true' && (await cell(page, '2026-10-06').getAttribute('data-off')) === null)
   check('쉬는 날: 칸 안에 이름', (await cell(page, '2026-10-05').innerText()).includes('대체공휴일'))
-  const look = await cell(page, '2026-10-05').evaluate((el) => ({ bg: getComputedStyle(el).backgroundImage, num: getComputedStyle(el.querySelector('span')).color, sun: getComputedStyle(document.querySelector('main button[data-date="2026-10-04"] span')).color }))
+  const look = await cell(page, OFF_WEEKDAY).evaluate((el) => ({ bg: getComputedStyle(el).backgroundImage, num: getComputedStyle(el.querySelector('span')).color, sun: getComputedStyle(document.querySelector('main button[data-date="2026-10-04"] span')).color }))
   check('쉬는 날: 빗금 없이 날짜 숫자만 일요일처럼 빨간 글자', look.bg === 'none' && look.num === look.sun, JSON.stringify(look))
   check('영업일: 10월 20일 · 평일 쉬는 날 2일', (await summary(page)).includes('영업일 20일') && (await summary(page)).includes('평일 쉬는 날 2일'), await summary(page))
   check('공휴일 넣기: 다 넣으면 단추가 사라진다', (await page.getByTestId('holiday-import-open').count()) === 0)
@@ -148,15 +154,15 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByTestId('month-days-off').scrollIntoViewIfNeeded()
   await page.waitForTimeout(2500)
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/calendar-oct-360.png` })
-  await cell(page, '2026-10-05').click()
-  await cell(page, '2026-10-05').click()
+  await cell(page, TAP_DAY).click()
+  await cell(page, TAP_DAY).click()
   await page.waitForTimeout(300)
   check('360: 두 번 눌러 적기 창', (await page.getByTestId('calendar-quick-sheet').count()) === 1)
   check('360: 적기 창 가로 넘침 없음', (await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 0)
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/quick-todo-360.png` })
   await page.getByTestId('calendar-quick-sheet').getByRole('tab', { name: '쉬는 날' }).click()
   await page.waitForTimeout(200)
-  check('360: 쉬는 날 탭에 이미 표시된 이름', (await page.getByTestId('quick-off-existing').innerText()).includes('대체공휴일'))
+  check('360: 쉬는 날 탭에 이미 표시된 이름', (await page.getByTestId('quick-off-existing').innerText()).includes(OFF_NAME))
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/quick-off-360.png` })
   check('360: JS 오류 없음', errors.length === 0, errors.join(' | '))
   await ctx.close()
