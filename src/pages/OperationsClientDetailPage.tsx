@@ -164,7 +164,8 @@ import { buildClientSchedule } from '../services/clientOpsSchedule'
 import { brand } from '../brand/brand.config'
 import { SERVICE_STATUS_LOOK } from '../components/ops/serviceStatusLook'
 import { josa } from '../lib/josa'
-import { openApplications, withApplyDocDone } from '../services/grants/grantApply'
+import { activeApplications, withApplyDocDone } from '../services/grants/grantApply'
+import { usePortalDocRequests } from '../components/grants/usePortalDocRequests'
 
 
 
@@ -226,6 +227,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const [portalLinked, setPortalLinked] = useState<boolean | null>(null)
   const [infoOpen, setInfoOpen] = useState(false)
   const { showToast } = useToast()
+  // D-152: 지원사업 신청 탭에서만 고객 플랫폼 연결 · 요청해 둔 서류를 읽는다
+  const portalReq = usePortalDocRequests(workspaceId, clientId, '지원사업 신청에 필요한 서류입니다', tab === 'funding')
   const [record, setRecord] = useState<ClientOpsRecord | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
@@ -635,7 +638,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         className="sticky top-16 z-20 -mx-4 bg-slate-50/95 backdrop-blur sm:-mx-6 lg:-mx-10"
         innerClassName="flex gap-1 border-b border-slate-200 px-4 sm:px-6 lg:px-10"
       >
-        {DETAIL_TABS.filter((t) => !t.hidden || t.key === tab || (t.key === 'funding' && openApplications(record).length > 0)).map((t) => {
+        {DETAIL_TABS.filter((t) => !t.hidden || t.key === tab || (t.key === 'funding' && activeApplications(record).length > 0)).map((t) => {
           const badge =
             t.key === 'smart' ? pendingFacts(record).length + alerts.filter((a) => a.severity === 'critical').length
               : t.key === 'overview' ? 0
@@ -1550,6 +1553,9 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           onRemove={(id) => void commit(withoutFunding(record, id))}
           onToggleDoc={(id, label, done) => void commit(withApplyDocDone(current() ?? record, id, label, done))}
           docsHref={`/ops/clients/${record.id}?tab=docs`}
+          onUpdate={(change, message) => void commit(change(current() ?? record)).then((ok) => ok && showToast(message))}
+          feesHref={`/ops/clients/${record.id}?tab=fees`}
+          portal={portalReq}
         />
       )}
 

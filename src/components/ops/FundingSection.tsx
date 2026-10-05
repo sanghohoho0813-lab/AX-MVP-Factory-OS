@@ -8,6 +8,7 @@ import { formatKrw, wonOf } from '../../lib/format'
 import { Button } from '../ui/Button'
 import { Panel } from '../ui/Panel'
 import { GrantApplyChecklist } from '../grants/GrantApplyChecklist'
+import { ApplyStageBar } from '../grants/ApplyStageBar'
 
 const FUNDING_STATUS_ORDER: FundingStatus[] = [
   'watching',
@@ -42,7 +43,14 @@ export function FundingSection({
   onRemove,
   onToggleDoc,
   docsHref,
+  onUpdate,
+  feesHref,
+  portal,
 }: {
+  portal?: { requested: string[]; request: (items: { title: string; documentType: string }[]) => Promise<number> } | null
+  /** D-152: 다음 단계 단추(접수 · 결과 · 성공보수) — 최신 기록 위에서 바꾼다 */
+  onUpdate?: (change: (r: ClientOpsRecord) => ClientOpsRecord, message: string) => void
+  feesHref?: string
   record: ClientOpsRecord
   today: string
   /** D-151: 공고에서 만든 신청 준비 — 서류함에 없는 서류(신청서 …) 체크 */
@@ -223,8 +231,10 @@ export function FundingSection({
                   </div>
 
                   {a.docs && openStage && onToggleDoc && (
-                    <GrantApplyChecklist record={record} app={a} today={today} onToggle={(label, done) => onToggleDoc(a.id, label, done)} docsHref={docsHref} />
+                    <GrantApplyChecklist record={record} app={a} today={today} onToggle={(label, done) => onToggleDoc(a.id, label, done)} docsHref={docsHref} portal={portal} />
                   )}
+
+                  {onUpdate && <ApplyStageBar record={record} app={a} today={today} onUpdate={onUpdate} feesHref={feesHref ?? '?tab=fees'} />}
 
                   {(a.submittedAt || a.resultAt) && (
                     <p className="text-[0.875rem] text-slate-500">

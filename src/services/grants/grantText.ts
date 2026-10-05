@@ -269,36 +269,81 @@ export function parseNoticeText(raw: string): NoticeDraft {
  * 붙임 · 서식 번호 · '1부' · '사본' 같은 꼬리는 뗀다. 못 읽으면 빈 목록(신청 준비가 기본 목록을 쓴다).
  */
 export function documentsOf(lines: string[]): string[] {
-  const label = /^(?:[-·•○◦▪■□※*]\s*)?(?:제출|신청|구비|필요|증빙)\s*서류(?:\s*\([^)]*\))?\s*[:：]?\s*/
-  const i = lines.findIndex((l) => label.test(l))
+  // 머리말: 앞에 글머리(□ · 1. · 가. · (1))가 있어도 되고, 뒤가 '는/은/를 …' 로 이어지는 문장('제출서류는 반환하지 않음')은 머리말이 아니다
+  const BULLET = /^(?:[-·•○◦▪■□◎◆▶※*]\s*|\d{1,2}[.)]\s*|[가-하][.)]\s*|\(\d{1,2}\)\s*)/
+  const label = /^(?:제출|신청|구비|필요|증빙)\s*서류(?:\s*\([^)]*\))?/
+  const headerAt = (l: string) => {
+    const body = l.replace(BULLET, '')
+    const m = label.exec(body)
+    if (!m) return null
+    const rest = body.slice(m[0].length)
+    if (/^\s*(?:는|은|를|을|의|가|이|와|과|도|에|만)(?![가-힣])/.test(rest) || /^[는은를을의가이와과도에만]/.test(rest)) return null
+    return rest.replace(/^\s*[:：]?\s*/, '')
+  }
+  // 다음 칸 머리(□ 신청방법 · 4. 유의사항 · 문의처 …)에서 멈춘다 — 서류가 아닌 줄을 서류로 세지 않게
+  const SECTION = /^(?:신청|접수|제출)\s*방법|^문의|^유의\s*사항|^추진\s*일정|^선정|^평가|^지원\s*(?:내용|규모|대상|조건)|^사업\s*(?:기간|개요|목적)|^접수\s*(?:처|기간)|^신청\s*(?:기간|대상)|^참고|^기타\s*사항|^붙임/
+  const stopAt = (l: string) => {
+    if (LABELS.test(l) || /^https?:\/\//.test(l) || /^[□■◆▶◎]/.test(l)) return true
+    const body = l.replace(BULLET, '')
+    return SECTION.test(body) || (/^\d{1,2}\.\s/.test(l) && !/서류|증명|확인서|등록증|등본|명부|계획서|신청서|재무|사본|인정서|정관/.test(body))
+  }
+  const i = lines.findIndex((l) => headerAt(l) !== null)
   if (i < 0) return []
   const chunk: string[] = []
-  const first = lines[i].replace(label, '').trim()
+  const first = headerAt(lines[i]) ?? ''
   if (first) chunk.push(first)
   for (let j = i + 1; j < lines.length && chunk.length < 12; j++) {
-    if (LABELS.test(lines[j]) || /^https?:\/\//.test(lines[j])) break
+    if (stopAt(lines[j])) break
     chunk.push(lines[j])
   }
+  // 괄호 밖 쉼표에서만 나눈다 — '납세증명서(국세, 지방세)' 는 한 서류
+  const splitOutside = (line: string): string[] => {
+    const out: string[] = []
+    let depth = 0
+    let cur = ''
+    for (const ch of line) {
+      if (ch === '(' || ch === '[' || ch === '【') depth += 1
+      if ((ch === ')' || ch === ']' || ch === '】') && depth > 0) depth -= 1
+      if (depth === 0 && /[,，;]/.test(ch)) {
+        out.push(cur)
+        cur = ''
+        continue
+      }
+      cur += ch
+    }
+    out.push(cur)
+    return out.flatMap((x) => x.split(/(?=[①-⑳])|\s[-•○◦▪]\s/))
+  }
   const out: string[] = []
-  // 줄마다 → 줄 안에서는 쉼표 · 동그라미 번호 · ' - ' 로 나눈다(가운뎃점 '·' 은 '국세 · 지방세' 처럼 한 서류 안에도 쓰여 나누지 않는다)
-  const pieces = chunk.flatMap((line) => (/^\s*[※*]/.test(line) ? [] : line.split(/[,，;]|(?=[①-⑳])|\s[-•○◦▪]\s/)))
-  for (const raw of pieces) {
-    const name = raw
+  const add = (n: string) => {
+    if (!out.some((x) => x.replace(/\s/g, '') === n.replace(/\s/g, ''))) out.push(n)
+  }
+  // '국세, 지방세 납세증명서' 처럼 쉼표로 갈라진 앞 조각('국세')은 뒤 서류 이름을 빌려 '국세 납세증명서' 로
+  const pieces = chunk.flatMap((line) => (/^\s*[※*]/.test(line) ? [] : splitOutside(line)))
+  for (const [k, raw] of pieces.entries()) {
+    let name = raw
       .replace(/^[\s①-⑳\-·•○◦▪■□]+/, '')
-      .replace(/^\d{1,2}[.)]\s*/, '')
+      .replace(/^(?:\d{1,2}[.)]|[가-하][.)]|\(\d{1,2}\))\s*/, '')
       .replace(/\[[^\]]*\]|【[^】]*】|<[^>]*>/g, '')
       .replace(/\(\s*(?:서식|붙임|별지|양식)[^)]*\)/g, '')
       .replace(/\s*(?:각\s*)?\d+\s*부(?![가-힣]).*$/, '')
       .replace(/\s*원본\s*$/, '')
       .replace(/\s+/g, ' ')
       .trim()
-    if (name.length < 3 || name.length > 40) continue
-    if (/^(?:등|기타|해당\s*시|필요\s*시)/.test(name)) continue
-    // '국세 · 지방세 완납증명서' 는 둘로
-    const both = /^국세\s*[·ㆍ및,]?\s*지방세\s*(완납|납세)\s*증명서$/.exec(name)
-    for (const n of both ? [`국세 ${both[1]}증명서`, `지방세 ${both[1]}증명서`] : [name]) {
-      if (!out.some((x) => x.replace(/\s/g, '') === n.replace(/\s/g, ''))) out.push(n)
+    if (/^국세$/.test(name)) {
+      const next = (pieces[k + 1] ?? '').replace(/\s+/g, ' ').trim()
+      const m = /^지방세\s*(완납|납세)\s*증명서/.exec(next)
+      if (m) name = `국세 ${m[1]}증명서`
     }
+    if (name.length < 3 || name.length > 40) continue
+    if (/^(?:등\s|등$|기타|해당\s*시|필요\s*시)/.test(name)) continue
+    // '국세 · 지방세 완납증명서(신청일 기준)' · '납세증명서(국세, 지방세)' 는 둘로
+    const plain = name.replace(/\([^)]*\)/g, '').trim()
+    const both = /국세\s*[·ㆍ및,]?\s*지방세\s*(완납|납세)\s*증명서/.exec(plain) ?? (/(완납|납세)\s*증명서\s*\(\s*국세\s*[·ㆍ및,]\s*지방세\s*\)/.exec(name) ? [name, /완납/.test(name) ? '완납' : '납세'] : null)
+    if (both) {
+      add(`국세 ${both[1]}증명서`)
+      add(`지방세 ${both[1]}증명서`)
+    } else add(name)
     if (out.length >= 15) break
   }
   return out

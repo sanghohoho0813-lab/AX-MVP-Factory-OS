@@ -657,5 +657,28 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   check('진행판: 선정됐는데 성공보수 안 건 것 1 → 걸면 0', board.feeMissing === 1 && applicationBoard([{ ...fee1.record, id: 'p2' }], TODAY).feeMissing === 0)
 }
 
+// D-152: D-151 검토로 찾은 것 — 다음 칸까지 먹던 제출서류 · 등기 · 괄호 안 쉼표 · 이름 겹침 · 작년 탈락 건 · 서류함 밖에서 받은 것
+{
+  const real = documentsOf(['□ 제출서류', '- 사업자등록증 1부', '- 등기사항전부증명서 1부', '□ 신청방법', '- 온라인 접수(www.k-startup.go.kr)', '□ 문의처: 중진공 1357', '4. 유의사항', '- 허위 제출 시 선정 취소'])
+  check('검토 1 · 2: □ 신청방법 · 문의처 · 유의사항에서 멈춤 · 등기 서류 살림', JSON.stringify(real) === JSON.stringify(['사업자등록증', '등기사항전부증명서']), real)
+  const paren = documentsOf(['제출서류: 납세증명서(국세, 지방세), 4대보험 가입자 명부'])
+  check('검토 3: 괄호 안 쉼표는 한 서류 → 국세 · 지방세 둘로', JSON.stringify(paren) === JSON.stringify(['국세 납세증명서', '지방세 납세증명서', '4대보험 가입자 명부']), paren)
+  const comma = documentsOf(['구비서류: 국세, 지방세 납세증명서 각 1부'])
+  check('검토 3: \'국세, 지방세 납세증명서\' 에서 국세가 빠지지 않음', JSON.stringify(comma) === JSON.stringify(['국세 납세증명서', '지방세 납세증명서']), comma)
+  const tail = documentsOf(['제출서류', '① 국세·지방세 완납증명서(신청일 기준)', '② 가. 중소기업확인서', '(3) 사업계획서'])
+  check('검토 3 · 번호: 괄호 꼬리가 있어도 둘로 · \'가.\' \'(3)\' 떼기', JSON.stringify(tail) === JSON.stringify(['국세 완납증명서', '지방세 완납증명서', '중소기업확인서', '사업계획서']), tail)
+  check('검토: \'※ 제출서류는 반환하지 않음\' 은 머리말이 아님', JSON.stringify(documentsOf(['※ 제출서류는 반환하지 않음', '3. 제출서류', '- 사업자등록증'])) === JSON.stringify(['사업자등록증']), documentsOf(['※ 제출서류는 반환하지 않음', '3. 제출서류', '- 사업자등록증']))
+  check('검토 4: 4대보험료 · 건강보험료 완납은 국세가 아님', docIdentity('4대보험료 완납증명서') === docIdentity('4대보험 완납증명서') && docIdentity('건강보험료 완납증명서') !== docIdentity('국세 완납증명서') && docIdentity('완납증명서') === docIdentity('국세 납세증명서'))
+  check('검토 4: 국세 · 4대보험료 완납 둘 다 남음 · 통장 거래내역 ≠ 통장 사본 · 개인인감 ≠ 법인인감', applyDocsFor({ documents: ['국세 완납증명서', '4대보험료 완납증명서'] }).length === 3 && docIdentity('통장 거래내역') !== docIdentity('통장 사본') && docIdentity('대표자 개인인감증명서') !== docIdentity('법인인감증명서'))
+  const old = normalizeClientOps({ id: 'c20', companyName: 'x', fundingApplications: [{ id: 'old', programName: '청년창업사관학교', status: 'rejected', applyDueDate: '2025-03-01' }] } as never)
+  const again = withGrantApplication(old, notice({}, { id: 'n-new', title: '청년창업사관학교', applyEnd: '2026-11-01' }))
+  check('검토 5: 작년 탈락 건에 붙지 않고 새로 만듦(마감 2026-11-01)', again.created && again.record.fundingApplications.length === 2 && again.app.applyDueDate === '2026-11-01' && again.app.status === 'preparing')
+  const manual = normalizeClientOps({ id: 'c21', companyName: 'x', fundingApplications: [{ id: 'm', programName: '청년창업사관학교', status: 'watching', applyDueDate: '2026-10-01' }] } as never)
+  check('검토 5: 손으로 적은 진행 중 건에 붙으면 공고 마감으로', withGrantApplication(manual, notice({}, { id: 'n-new', title: '청년창업사관학교', applyEnd: '2026-11-01' })).app.applyDueDate === '2026-11-01')
+  const outside = withGrantApplication(normalizeClientOps({ id: 'c22', companyName: 'x' } as never), notice({}, { id: 'n-o', documents: ['국세 납세증명서'] }))
+  const marked = withApplyDocDone(outside.record, outside.app.id, '국세 납세증명서', true)
+  check('서류함 밖에서 받은 서류: \'받았어요\' 표시 → 준비됨', applyDocViews(outside.record, outside.app, TODAY)[0].state === 'missing' && applyDocViews(marked, marked.fundingApplications[0], TODAY)[0].state === 'manual_done')
+}
+
 console.log(`\ngrants: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

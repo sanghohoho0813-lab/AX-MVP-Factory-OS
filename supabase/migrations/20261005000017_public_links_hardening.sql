@@ -11,7 +11,8 @@
 --      제출한 설문도 링크만 있으면 다시 열어 답을 덮어쓸 수 있었다.
 --   2. 시험(로컬 테스트) 링크 — 마친 뒤에도 피드백을 다시 내 덮어쓸 수 있었다 · 만료 시각을 안 봤다.
 --   3. 지원사업 알림 신청 — 10분에 30번이 '전체' 기준이라, 한 사람이 30번 누르면 10분 동안 아무도 신청 못 했다.
---      이제 접속 주소마다 10분에 5번 · 같은 연락처는 하루에 한 번만 상담신청함에 들어간다.
+--      이제 접속 주소마다 10분에 5번 · 같은 연락처 + 같은 회사는 하루에 한 번만 상담신청함에 들어간다.
+--      전체 기준은 10분에 300번으로 올려 마지막 둑으로만 둔다(D-152 고침 — 이미 실행했어도 이 파일을 다시 실행하면 된다).
 -- 운영 DB 에는 대표가 Supabase SQL Editor 에서 이 파일을 한 번 실행해야 켜진다.
 -- =====================================================================
 
@@ -324,16 +325,19 @@ begin
   if v_ws is null then
     return false; -- 받을 워크스페이스가 없는 환경(설정 전)
   end if;
+  -- D-152: 전체 기준은 크게(10분에 300번) — 넘쳐도 서버가 버티게 하는 마지막 둑. 한 사람은 아래 주소별 제한(5번)에서 막힌다
   if (select count(*) from public.customer_events e
        where e.workspace_id = v_ws and e.source_type = 'grant_finder'
-         and e.received_at > now() - interval '10 minutes') >= 30 then
+         and e.received_at > now() - interval '10 minutes') >= 300 then
     raise exception 'too many requests' using errcode = '54000';
   end if;
 
   -- D-151: 한 곳(접속 주소)에서 10분에 5번까지 — 한 사람이 장난으로 막아 다른 사람 신청이 막히지 않게.
   --        같은 연락처는 하루에 한 번만 상담신청함에 들어간다(다시 눌러도 '접수됨').
   --        주소 · 연락처 원문은 남기지 않고 해시만 남긴다.
+  --        접속 주소는 앞단(Cloudflare)이 넣는 cf-connecting-ip 를 먼저 — x-forwarded-for 맨 앞은 보내는 쪽이 꾸밀 수 있다
   v_ip := btrim(split_part(coalesce(
+            nullif(current_setting('request.headers', true), '')::jsonb ->> 'cf-connecting-ip',
             nullif(current_setting('request.headers', true), '')::jsonb ->> 'x-forwarded-for',
             nullif(current_setting('request.headers', true), '')::jsonb ->> 'x-real-ip', ''), ',', 1));
   if v_ip <> '' then
@@ -344,7 +348,8 @@ begin
     end if;
     insert into public.public_intake_log (kind, key_hash) values ('grant_alert_ip', public.hash_access_token(v_ip));
   end if;
-  v_contact := lower(coalesce(nullif(regexp_replace(v_phone, '[^0-9]', '', 'g'), ''), v_email));
+  -- D-152: 같은 연락처라도 회사가 다르면 따로 받는다(컨설턴트 한 사람이 여러 회사를 넣는 경우)
+  v_contact := lower(coalesce(nullif(regexp_replace(v_phone, '[^0-9]', '', 'g'), ''), v_email)) || '|' || lower(regexp_replace(v_company, '\s', '', 'g'));
   if exists (select 1 from public.public_intake_log g
               where g.kind = 'grant_alert_contact' and g.key_hash = public.hash_access_token(v_contact)
                 and g.at > now() - interval '1 day') then

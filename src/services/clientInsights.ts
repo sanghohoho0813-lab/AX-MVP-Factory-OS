@@ -258,8 +258,11 @@ export function recommendNextSteps(
   shelf?: { expired: number; other: number; dup: number },
   /** D-151: 신청 준비 중인 지원사업 — 마감이 가까운 것부터, 서류가 모자라면 맨 위 */
   applying?: readonly { name: string; daysLeft: number | null; missing: number }[],
+  /** D-152: 선정됐는데 성공보수를 수금에 안 건 사업 */
+  feeToSet?: readonly string[],
 ): NextStep[] {
   const out: NextStep[] = []
+  for (const name of (feeToSet ?? []).slice(0, 2)) out.push({ id: `fee:${name}`, text: `${name} 선정 — 성공보수 수금에 걸기`, why: '걸어 두면 협약 · 입금 뒤 받을 돈으로 수금 · 매출에 잡혀요', href: '?tab=funding' })
   for (const a of [...(applying ?? [])].filter((x) => x.missing > 0 && (x.daysLeft === null || x.daysLeft >= 0)).sort((x, y) => (x.daysLeft ?? 999) - (y.daysLeft ?? 999)).slice(0, 2)) {
     const when = a.daysLeft === null ? '' : a.daysLeft === 0 ? ' · 오늘 마감' : ` · ${a.daysLeft}일 남음`
     out.push({ id: `apply:${a.name}`, text: `${a.name} — 서류 ${a.missing}가지 받기${when}`, why: '모자란 서류만 카톡 문구로 보낼 수 있어요', href: '?tab=funding' })

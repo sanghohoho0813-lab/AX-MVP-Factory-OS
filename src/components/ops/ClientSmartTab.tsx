@@ -28,7 +28,7 @@ import type { DocBatchSummary } from '../../services/docAutoAnalyze'
 import { docShelfSummary } from '../../services/docShelf'
 import { addDaysLocal, withNextAction } from '../../services/clientOpsNextAction'
 import { nowIso } from '../../lib/appClock'
-import { applyReadiness, openApplications } from '../../services/grants/grantApply'
+import { activeApplications, applyReadiness, applyStage, openApplications } from '../../services/grants/grantApply'
 
 const TONE: Record<InsightTone, Tone> = { good: 'success', maybe: 'brand', done: 'neutral', need: 'warning', no: 'neutral' }
 
@@ -72,7 +72,8 @@ export default function ClientSmartTab({
       }),
     [record, today],
   )
-  const steps = useMemo(() => recommendNextSteps(insights, pending, shelf, applying), [insights, pending, shelf, applying])
+  const feeToSet = useMemo(() => activeApplications(record).filter((a) => applyStage(a) === 'selected').map((a) => a.programName || '지원사업'), [record])
+  const steps = useMemo(() => recommendNextSteps(insights, pending, shelf, applying, feeToSet), [insights, pending, shelf, applying, feeToSet])
   const good = insights.filter((i) => i.tone === 'good').length
 
   const setNext = (text: string) => void onCommit(withNextAction(record, text, addDaysLocal(today, 3)), `다음 약속으로 걸었습니다 — ${text.slice(0, 30)}`)

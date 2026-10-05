@@ -37,12 +37,13 @@ export const DEFAULT_APPLY_DOCS: readonly string[] = [
  */
 const SAME_DOC: ReadonlyArray<{ name: string; alias: readonly string[] }> = [
   { name: '지방세납세증명서', alias: ['지방세납세증명', '지방세완납증명'] },
-  { name: '4대보험완납증명서', alias: ['4대보험완납', '4대사회보험완납', '사회보험료완납'] },
-  { name: '국세납세증명서', alias: ['국세납세증명', '국세완납증명', '납세증명서', '완납증명서'] },
+  // D-152: '4대보험료 완납증명서' · '건강보험료 완납증명서' 가 국세로 묶이던 것 — 보험료 · 연금 완납은 국세가 아니다
+  { name: '4대보험완납증명서', alias: ['4대보험완납', '4대보험료완납', '4대사회보험완납', '사회보험료완납'] },
+  { name: '국세납세증명서', alias: ['국세납세증명', '국세완납증명', '납세증명서'] },
   { name: '4대보험가입자명부', alias: ['가입자명부', '피보험자명부', '사업장가입자'] },
   { name: '건강보험득실확인서', alias: ['득실확인'] },
   { name: '법인등기부등본', alias: ['등기부등본', '등기사항전부증명', '법인등기'] },
-  { name: '법인인감증명서', alias: ['인감증명'] },
+  { name: '법인인감증명서', alias: ['법인인감'] },
   { name: '중소기업확인서', alias: ['중소기업확인', '소상공인확인', '중소기업(소상공인)확인'] },
   { name: '벤처기업확인서', alias: ['벤처기업확인', '벤처확인'] },
   { name: '기업부설연구소인정서', alias: ['연구소인정', '연구개발전담부서'] },
@@ -51,7 +52,7 @@ const SAME_DOC: ReadonlyArray<{ name: string; alias: readonly string[] }> = [
   { name: '대표자신분증', alias: ['신분증'] },
   { name: '주주명부', alias: ['주주명부'] },
   { name: '정관', alias: ['정관'] },
-  { name: '통장사본', alias: ['통장사본', '통장'] },
+  { name: '통장사본', alias: ['통장사본'] },
   { name: '특허증', alias: ['특허증', '특허등록'] },
 ]
 
@@ -67,6 +68,8 @@ const squash = (s: string) =>
 /** 서류 이름을 비교용 한 이름으로 — 모르는 서류는 글자 그대로(띄어쓰기 · 꼬리 뗀 것) */
 export function docIdentity(label: string): string {
   const s = squash(label)
+  // 아무 말 없는 '완납증명서' 만 국세로 — '건강보험료 완납증명서' 같은 것은 따로
+  if (s === '완납증명서' || s === '국세완납증명서') return '국세납세증명서'
   for (const d of SAME_DOC) if (d.alias.some((a) => s.includes(a.replace(/[\s()]/g, '')))) return d.name
   return s
 }
@@ -126,9 +129,11 @@ export function applyDocViews(record: ClientOpsRecord, app: Pick<FundingApplicat
   const due = app.applyDueDate && app.applyDueDate >= today ? app.applyDueDate : today
   return (app.docs ?? []).map((d) => {
     const hit = shelfMatch(record, d.label, today)
+    // D-152: 서류함에 올리지 않고 카톡 · 메일로 받은 것 — 손으로 '받았어요' 표시하면 준비된 것으로 센다
+    const outside = { label: d.label, state: 'manual_done' as const, docKey: null, docLabel: '', expiresOn: null, note: '받았다고 표시함(서류함에는 없음)' }
     if (!hit) {
       if (SHELF_KINDS.has(docIdentity(d.label))) {
-        return { label: d.label, state: 'missing', docKey: null, docLabel: '', expiresOn: null, note: '서류함에 없음' }
+        return d.done ? outside : { label: d.label, state: 'missing', docKey: null, docLabel: '', expiresOn: null, note: '서류함에 없음' }
       }
       return d.done
         ? { label: d.label, state: 'manual_done', docKey: null, docLabel: '', expiresOn: null, note: '준비됨' }
@@ -136,7 +141,7 @@ export function applyDocViews(record: ClientOpsRecord, app: Pick<FundingApplicat
     }
     const { meta, view } = hit
     const base = { label: d.label, docKey: meta.key, docLabel: meta.label, expiresOn: view.expiresOn }
-    if (!view.received) return { ...base, state: 'missing', note: '서류함에 없음' }
+    if (!view.received) return d.done ? outside : { ...base, state: 'missing', note: '서류함에 없음' }
     if (view.expired) return { ...base, state: 'expired', note: `${md(view.expiresOn)} 만료 — 새로 발급` }
     if (view.expiresOn && view.expiresOn < due) return { ...base, state: 'expires_before_due', note: `마감 전 ${md(view.expiresOn)}에 만료 — 마감 가까이 다시 발급` }
     return { ...base, state: 'ok', note: view.expiresOn ? `${md(view.expiresOn)}까지 쓸 수 있음` : '있음' }
@@ -184,11 +189,15 @@ export function applyDocsFor(notice: Pick<GrantNotice, 'documents'>): ApplyDoc[]
 
 const sameProgram = (a: string, b: string) => a.replace(/[\s[\]()·]/g, '') === b.replace(/[\s[\]()·]/g, '')
 
-/** 이 업체가 이 공고로 이미 신청 준비 중인 건 */
+/**
+ * 이 업체가 이 공고로 진행 중인 건. 끝난 건(탈락 · 포기)은 보지 않는다 — 같은 이름의 작년 탈락 건에 붙어
+ * '이미 신청 준비 중' 이라고 하고 아무 데도 안 보이던 것(D-152). 이름으로 찾는 것은 서류 준비 중인 건만.
+ */
 export function applicationFor(record: Pick<ClientOpsRecord, 'fundingApplications'>, notice: Pick<GrantNotice, 'id' | 'title'>): FundingApplication | null {
+  const live = (a: FundingApplication) => a.status !== 'rejected' && a.status !== 'given_up'
   return (
-    record.fundingApplications.find((a) => a.noticeId === notice.id) ??
-    record.fundingApplications.find((a) => !a.noticeId && sameProgram(a.programName, notice.title)) ??
+    record.fundingApplications.find((a) => a.noticeId === notice.id && live(a)) ??
+    record.fundingApplications.find((a) => !a.noticeId && (a.status === 'watching' || a.status === 'preparing') && sameProgram(a.programName, notice.title)) ??
     null
   )
 }
@@ -209,7 +218,8 @@ export function withGrantApplication(
   const existing = applicationFor(record, notice)
   if (existing) {
     if (existing.noticeId === notice.id && existing.docs) return { record, app: existing, created: false }
-    const patch: Partial<FundingApplication> = { ...extra, ...(existing.docs ? {} : { docs: applyDocsFor(notice) }), ...(!existing.applyDueDate && due ? { applyDueDate: due } : {}) }
+    // 공고에 마감이 있으면 공고 마감으로(손으로 적은 옛 날짜보다 공고가 맞다)
+    const patch: Partial<FundingApplication> = { ...extra, ...(existing.docs ? {} : { docs: applyDocsFor(notice) }), ...(due ? { applyDueDate: due } : {}) }
     const next = withFunding(record, existing.id, patch)
     return { record: next, app: next.fundingApplications.find((a) => a.id === existing.id) ?? existing, created: false }
   }
@@ -418,4 +428,14 @@ export function portalRequestTitles(record: ClientOpsRecord, app: FundingApplica
   return applyReadiness(record, app, today)
     .needFromClient.map((v) => v.label)
     .filter((l) => !asked.has(docIdentity(l)))
+}
+
+/** 업체 상세에 '지원사업 신청' 탭을 보일 건 — 공고에서 만든 건이 준비 · 결과 기다림이거나, 선정됐는데 성공보수를 안 걸었을 때 */
+export function activeApplications(record: Pick<ClientOpsRecord, 'fundingApplications' | 'fees'>): FundingApplication[] {
+  return record.fundingApplications.filter((a) => {
+    if (!a.docs && !a.noticeId) return false
+    const st = applyStage(a)
+    if (st === 'preparing' || st === 'waiting') return true
+    return st === 'selected' && !(a.successFeeId && record.fees.some((f) => f.id === a.successFeeId))
+  })
 }

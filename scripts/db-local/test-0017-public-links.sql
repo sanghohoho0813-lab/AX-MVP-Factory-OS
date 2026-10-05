@@ -71,12 +71,15 @@ select qa.ok('알림: 같은 곳 5번째', $q$select public.portal_grant_alert_r
 select qa.no('알림: 같은 곳 6번째(10분에 5번까지)', $q$select public.portal_grant_alert_request('{"consent":true,"company_name":"가","phone":"010-1111-0006"}')$q$);
 select set_config('request.headers', '{"x-forwarded-for":"2.2.2.2"}', false);
 select qa.ok('알림: 다른 곳은 그대로 됨', $q$select public.portal_grant_alert_request('{"consent":true,"company_name":"나","phone":"010-2222-0001"}')$q$);
-select qa.eq('알림: 같은 연락처 다시 신청(하루) → 접수됨', public.portal_grant_alert_request('{"consent":true,"company_name":"나","phone":"01022220001"}')::text, 'true');
+select qa.eq('알림: 같은 연락처 · 같은 회사 다시 신청(하루) → 접수됨', public.portal_grant_alert_request('{"consent":true,"company_name":"나","phone":"01022220001"}')::text, 'true');
+select qa.ok('알림: 같은 연락처라도 다른 회사는 따로 받음', $q$select public.portal_grant_alert_request('{"consent":true,"company_name":"나 두번째 회사","phone":"010-2222-0001"}')$q$);
+select set_config('request.headers', '{"x-forwarded-for":"9.9.9.9","cf-connecting-ip":"1.1.1.1"}', false);
+select qa.no('알림: 앞단 주소(cf)로 셈 — 꾸민 x-forwarded-for 로 못 피함', $q$select public.portal_grant_alert_request('{"consent":true,"company_name":"꾸밈","phone":"010-3333-0001"}')$q$);
 select set_config('request.headers', '', false);
 select qa.ok('알림: 주소를 모를 때(로컬)도 됨', $q$select public.portal_grant_alert_request('{"consent":true,"company_name":"다","email":"d@x.kr"}')$q$);
 select qa.no('알림: 동의 없으면 막힘', $q$select public.portal_grant_alert_request('{"consent":false,"company_name":"다","email":"e@x.kr"}')$q$);
 reset role;
-select qa.eq('알림: 상담신청함에 들어간 건수(5 + 1 + 1)', ((select count(*) from public.customer_events where source_type = 'grant_finder') - :before_events)::text, '7');
+select qa.eq('알림: 상담신청함에 들어간 건수(5 + 1 + 1 + 1)', ((select count(*) from public.customer_events where source_type = 'grant_finder') - :before_events)::text, '8');
 select qa.eq('알림: 기록 표에는 원문이 없음', (select count(*)::text from public.public_intake_log where key_hash like '%010%' or key_hash like '%1.1.1.1%'), '0');
 set role anon;
 select qa.none('알림: 기록 표는 공개 계정이 못 읽음', $q$select count(*) from public.public_intake_log$q$);

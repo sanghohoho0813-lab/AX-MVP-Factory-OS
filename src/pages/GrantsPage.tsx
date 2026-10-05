@@ -21,7 +21,8 @@ import { useGrantActions, useGrantData } from '../components/grants/useGrants'
 import { GrantFeedBar } from '../components/grants/GrantFeedBar'
 import { isFeedNotice } from '../services/grants/grantFeed'
 import { listClients, saveClient } from '../services/clientOpsService'
-import { applicationFor, applyReadiness, withGrantApplication } from '../services/grants/grantApply'
+import { applicationBoard, applicationFor, applyReadiness, withGrantApplication } from '../services/grants/grantApply'
+import { ApplyBoardView } from '../components/grants/ApplyBoardView'
 import { todayLocalDate } from '../lib/appClock'
 import type { ClientOpsRecord } from '../types/clientOps'
 import { SIDO_LIST, deadlineOf, deadlineRank, inRegion, targetsSomeone, type GrantCategory, type GrantMatch, type GrantNotice } from '../services/grants/grantMatch'
@@ -30,7 +31,7 @@ import { addNotices, removeNotice, saveNotice, sentAt } from '../services/grants
 import { CLIENT_KIND_LABEL, clientsForNotice, fitSummary, grantClients, grantIndex, reachOf, type GrantClient, type NoticeInput } from '../services/grants/grantView'
 import { profileLine } from '../services/grants/grantProfile'
 
-type View = 'notices' | 'clients'
+type View = 'notices' | 'clients' | 'applying'
 
 /** 한 번에 보여 줄 공고 수 — 1,000건도 화면이 무겁지 않게 '더 보기' 로 이어 본다 */
 const PAGE = 50
@@ -74,7 +75,12 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
     }
   }
 
-  const view: View = params.get('view') === 'clients' ? 'clients' : 'notices'
+  // D-152: 신청 진행 — 준비 · 접수 · 성공보수 안 건 선정 수
+  const applyingCount = useMemo(() => {
+    const b = applicationBoard(records, today)
+    return b.preparing.length + b.waiting.length + b.feeMissing
+  }, [records, today])
+  const view: View = params.get('view') === 'clients' ? 'clients' : params.get('view') === 'applying' ? 'applying' : 'notices'
   const region = SIDO_LIST.includes(params.get('r') ?? '') ? (params.get('r') as string) : ''
   const [category, setCategory] = useState<GrantCategory | 'all'>('all')
   const [onlyReach, setOnlyReach] = useState(false)
@@ -186,6 +192,7 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
           [
             ['notices', '공고별'],
             ['clients', '업체별'],
+            ['applying', applyingCount ? `신청 진행 ${applyingCount}` : '신청 진행'],
           ] as [View, string][]
         ).map(([k, l]) => (
           <button key={k} type="button" role="tab" aria-selected={view === k} data-testid={`grant-view-${k}`} onClick={() => setParam('view', k === 'notices' ? '' : k)} className={`tap t-body flex-1 rounded-[8px] px-3 py-2 font-semibold ${view === k ? 'bg-white text-slate-900 shadow-(--shadow-card)' : 'text-slate-500'}`}>
@@ -193,6 +200,8 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
           </button>
         ))}
       </div>
+
+      {view === 'applying' && <ApplyBoardView records={records} today={today} />}
 
       {view === 'notices' && (
         <>
