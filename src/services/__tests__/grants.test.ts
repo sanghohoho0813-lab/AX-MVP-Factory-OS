@@ -43,6 +43,9 @@ import { alertPayload, publicPayload, sameNotice, validateAlert, type AlertReque
 import { mergeNotices, noticesFromFeed, slotOf } from '../grants/grantFeed'
 import { withAgencyRegion } from '../grants/grantText'
 import { clientsForNotice, fitSummary, grantClients, grantIndex } from '../grants/grantView'
+import { applyDocViews, applyDocsFor, applyReadiness, docIdentity, grantDocRequestMessage, openApplications, withApplyDocDone, withGrantApplication } from '../grants/grantApply'
+import { documentsOf } from '../grants/grantText'
+import { buildClientSchedule } from '../clientOpsSchedule'
 
 let pass = 0
 let fail = 0
@@ -527,6 +530,84 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   check('마감 시각: 마감일 17:59 → 오늘 18:00 마감 · 열림', deadlineOf(n, '2026-10-15', '17:59').state === 'today' && deadlineOf(n, '2026-10-15', '17:59').label === '오늘 18:00 마감')
   check('마감 시각: 마감일 18:00 이 지나면 마감', deadlineOf(n, '2026-10-15', '18:00').state === 'closed' && !deadlineOf(n, '2026-10-15', '19:10').open)
   check('마감 시각: 저장했다 읽어도 남음', normalizeNotice({ id: 'x', title: '공고', applyEnd: '2026-10-15', applyEndTime: '18:00', deadlineKind: 'date', rules: {} } as never).applyEndTime === '18:00')
+}
+
+// D-151: 신청 준비 — 공고 제출서류 읽기 · 서류함 대조(마감일 기준) · 두 번 안 만듦 · 요청 문구
+{
+  const docsText = `[서울] 2026 스마트공장 지원사업
+신청기간 2026.10.01 ~ 2026.10.30 18:00
+지원대상 서울 소재 제조업
+제출서류
+① 사업신청서 1부(서식 1)
+② 사업자등록증 사본 1부
+③ 국세 · 지방세 완납증명서 각 1부
+④ 4대보험 가입자 명부, 중소기업(소상공인)확인서
+※ 서류는 마감일 기준 발급분
+문의처 02-000-0000`
+  const draft = parseNoticeText(docsText)
+  check('제출서류: 번호 목록을 서류 이름으로', JSON.stringify(draft.documents) === JSON.stringify(['사업신청서', '사업자등록증 사본', '국세 완납증명서', '지방세 완납증명서', '4대보험 가입자 명부', '중소기업(소상공인)확인서']), draft.documents)
+  check('제출서류: 문의처에서 멈춤 · 대상 글을 먹지 않음', draft.target === '서울 소재 제조업', draft.target)
+  check('제출서류: 한 줄에 쉼표로', JSON.stringify(documentsOf(['구비서류: 사업자등록증, 법인 등기사항전부증명서 1부, 재무제표(최근 3년)'])) === JSON.stringify(['사업자등록증', '법인 등기사항전부증명서', '재무제표(최근 3년)']), documentsOf(['구비서류: 사업자등록증, 법인 등기사항전부증명서 1부, 재무제표(최근 3년)']))
+  check('제출서류: 없으면 빈 목록 · 공고에 칸 없음', documentsOf(['신청기간 2026.10.01 ~ 2026.10.30']).length === 0 && parseNoticeText('공고명 시험 공고\n신청기간 2026.10.01 ~ 2026.10.30').documents === undefined)
+  check('제출서류: 저장했다 읽어도 남음', JSON.stringify(normalizeNotice({ title: '공고', documents: ['사업자등록증', '', 3] }, 'x', TODAY)?.documents) === JSON.stringify(['사업자등록증']))
+
+  check('같은 서류: 등기사항전부증명서 = 법인등기부등본', docIdentity('법인 등기사항전부증명서') === docIdentity('법인등기부등본'))
+  check('같은 서류: 국세 완납증명서 = 납세증명서 · 지방세는 다름', docIdentity('국세 완납증명서') === docIdentity('납세증명서') && docIdentity('지방세 완납증명서') !== docIdentity('국세 완납증명서'))
+  check('같은 서류: 최근 3개년 재무제표 = 재무제표(최근 3년) = 표준재무제표증명', new Set(['최근 3개년 재무제표', '재무제표(최근 3년)', '표준재무제표증명']).size === 3 && new Set(['최근 3개년 재무제표', '재무제표(최근 3년)', '표준재무제표증명'].map(docIdentity)).size === 1)
+  check('같은 서류: 4대보험 완납증명서 ≠ 가입자 명부', docIdentity('4대보험 완납증명서') !== docIdentity('4대보험 가입자 명부'))
+  check('같은 서류: 사업자등록증 사본 = 사업자등록증 (2)', docIdentity('사업자등록증 사본') === docIdentity('사업자등록증 (2)'))
+
+  const n = notice({}, { id: 'n-smart', title: '[서울] 2026 스마트공장 지원사업', applyEnd: '2026-10-30', applyEndTime: '18:00', url: 'https://www.bizinfo.go.kr/x', documents: draft.documents })
+  const base = normalizeClientOps({
+    id: 'c1', companyName: '샤인디자인', representativeName: '김대표',
+    customDocuments: [{ id: 'cd1', key: 'customdoc_tax', label: '납세증명서', validMonths: 1, sensitive: false }],
+    documents: {
+      businessRegistration: { received: true, issuedAt: '2024-01-02', fileName: 'a.pdf' },
+      smeCertificate: { received: true, issuedAt: '2025-11-20', fileName: 'b.pdf' },
+      payrollRoster: { received: true, issuedAt: '2026-05-01', fileName: 'c.pdf' },
+      customdoc_tax: { received: true, issuedAt: '2026-09-20', fileName: 'd.pdf' },
+    },
+  } as never)
+  const made = withGrantApplication(base, n)
+  const app = made.app
+  check('신청 준비: 공고로 한 건 · 서류 준비 중 · 마감 · 시각 · 링크', made.created && app.status === 'preparing' && app.applyDueDate === '2026-10-30' && app.applyDueTime === '18:00' && app.noticeId === 'n-smart' && app.noticeUrl === 'https://www.bizinfo.go.kr/x' && app.programName === n.title, app)
+  check('신청 준비: 활동 기록', made.record.activity[0]?.text === '지원사업 신청 준비 — [서울] 2026 스마트공장 지원사업', made.record.activity[0])
+  const again = withGrantApplication(made.record, n)
+  check('신청 준비: 같은 공고를 또 눌러도 한 건', !again.created && again.record.fundingApplications.length === 1 && again.app.id === app.id)
+  check('신청 준비: 사업신청서가 있으면 신청서 · 사업계획서를 더 넣지 않음', !app.docs?.some((d) => d.label === '신청서 · 사업계획서') && app.docs?.length === 6, app.docs)
+
+  const views = applyDocViews(made.record, app, TODAY)
+  const st = (l: string) => views.find((v) => v.label === l)?.state
+  check('대조: 사업자등록증(유효기간 없음) → 있음', st('사업자등록증 사본') === 'ok')
+  check('대조: 중소기업 확인서(12개월 · 2026-11-20 까지) → 있음', st('중소기업(소상공인)확인서') === 'ok', views)
+  check('대조: 4대보험 명부(3개월 · 2026-08-01 만료) → 만료', st('4대보험 가입자 명부') === 'expired', views)
+  check('대조: 납세증명서(1개월 · 2026-10-20 만료) → 마감(10-30) 전에 만료', st('국세 완납증명서') === 'expires_before_due', views)
+  check('대조: 지방세 완납증명서 → 서류함에 없음', st('지방세 완납증명서') === 'missing')
+  check('대조: 사업신청서 → 우리가 챙길 것', st('사업신청서') === 'manual_todo')
+  const r = applyReadiness(made.record, app, TODAY)
+  check('준비: 2/6 · 고객에게 받을 것 3 · 우리 1', r.ready === 2 && r.total === 6 && r.needFromClient.length === 3 && r.needFromUs.length === 1 && r.daysLeft === 29, { ready: r.ready, c: r.needFromClient.length, u: r.needFromUs.length, d: r.daysLeft })
+  const done = withApplyDocDone(made.record, app.id, '사업신청서', true)
+  check('준비: 신청서 준비됨 표시 → 3/6', applyReadiness(done, done.fundingApplications[0], TODAY).ready === 3)
+  const msg = grantDocRequestMessage(made.record, app, TODAY)
+  check('요청 문구: 대표님 · 사업명 · 마감 10월 30일(금) 18:00 (D-29)', msg.startsWith('안녕하세요, 김대표 대표님.') && msg.includes("'[서울] 2026 스마트공장 지원사업'") && msg.includes('마감: 10월 30일(금) 18:00 (D-29)'), msg)
+  check('요청 문구: 모자란 셋만 · 발급처 · 이유', msg.includes('1. 국세 완납증명서 (발급: 홈택스) — 마감 전에 유효기간이 끝나') && msg.includes('2. 지방세 완납증명서 (발급: 위택스 · 정부24)') && msg.includes('3. 4대보험 가입자 명부 (발급: 4대사회보험 정보연계센터) — 갖고 있는 것이 만료') && !msg.includes('사업신청서'), msg)
+  check('요청 문구: 이미 받은 서류', msg.includes('이미 받은 서류: 사업자등록증 사본 · 중소기업(소상공인)확인서'), msg)
+  const ev = buildClientSchedule(done, TODAY).find((e) => e.kind === 'funding')
+  check('오늘 · 달력: 마감 10-30 · 서류 3/6 · 18:00 마감', ev?.date === '2026-10-30' && ev?.detail === '중소벤처기업부 · 서류 3/6 · 18:00 마감' && ev?.done === false, ev)
+  check('진행 중: 신청 준비만', openApplications(made.record).length === 1 && openApplications(base).length === 0)
+  const saved = normalizeClientOps(JSON.parse(JSON.stringify(done)))
+  check('저장했다 읽어도: 공고 · 시각 · 서류 · 준비됨', saved.fundingApplications[0].noticeId === 'n-smart' && saved.fundingApplications[0].applyDueTime === '18:00' && saved.fundingApplications[0].docs?.find((d) => d.label === '사업신청서')?.done === true)
+  check('예전 기록(서류 목록 없음)은 그대로', normalizeClientOps({ id: 'c2', companyName: 'x', fundingApplications: [{ id: 'f', programName: 'p' }] } as never).fundingApplications[0].docs === undefined)
+  // 손으로 적은 같은 이름 건이 있으면 새로 만들지 않고 공고 정보를 붙인다
+  const manual = normalizeClientOps({ id: 'c3', companyName: 'x', fundingApplications: [{ id: 'f1', programName: '[서울] 2026 스마트공장 지원사업', status: 'watching', applyDueDate: '' }] } as never)
+  const linked = withGrantApplication(manual, n)
+  check('손으로 적은 같은 사업: 한 건 그대로 · 공고 · 마감 · 서류 붙음', !linked.created && linked.record.fundingApplications.length === 1 && linked.app.noticeId === 'n-smart' && linked.app.applyDueDate === '2026-10-30' && (linked.app.docs?.length ?? 0) === 6)
+  // 제출서류가 없는 공고(기업마당) → 기본 목록 7
+  check('제출서류 없는 공고: 기본 목록 7개(신청서 · 사업계획서 포함)', applyDocsFor({}).length === 7 && applyDocsFor({}).some((d) => d.label === '신청서 · 사업계획서'))
+  check('상시 공고: 마감 없음', withGrantApplication(base, { ...n, id: 'n2', title: '상시 공고', deadlineKind: 'always', applyEnd: '' }).app.applyDueDate === '')
+  const allOk = normalizeClientOps({ id: 'c4', companyName: '다있음', documents: { businessRegistration: { received: true, issuedAt: '2024-01-02', fileName: 'a.pdf' } } } as never)
+  const one = withGrantApplication(allOk, { ...n, documents: ['사업자등록증'] })
+  check('다 있으면: 모두 받았다는 문구', grantDocRequestMessage(one.record, one.app, TODAY).includes('필요한 서류는 모두 받았습니다'), grantDocRequestMessage(one.record, one.app, TODAY))
 }
 
 console.log(`\ngrants: ${pass} passed, ${fail} failed`)

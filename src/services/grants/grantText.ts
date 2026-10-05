@@ -212,7 +212,7 @@ export function withAgencyRegion(rules: GrantRules, agency: string): GrantRules 
   return { ...rules, regions: sds, cities: city ? [city] : [] }
 }
 
-const LABELS = /^(공고명|사업명|소관\s*부처(?:\s*[·ㆍ]\s*지자체)?|소관\s*기관|주관\s*기관|사업\s*수행\s*기관|수행\s*기관|신청\s*기간|접수\s*기간|모집\s*기간|지원\s*대상|신청\s*대상|사업\s*개요|지원\s*내용|지원\s*규모|문의처|신청\s*방법|사업\s*목적)\s*[:：]?\s*/
+const LABELS = /^(공고명|사업명|소관\s*부처(?:\s*[·ㆍ]\s*지자체)?|소관\s*기관|주관\s*기관|사업\s*수행\s*기관|수행\s*기관|신청\s*기간|접수\s*기간|모집\s*기간|지원\s*대상|신청\s*대상|사업\s*개요|지원\s*내용|지원\s*규모|문의처|신청\s*방법|사업\s*목적|(?:제출|신청|구비|필요|증빙)\s*서류)\s*[:：]?\s*/
 
 function section(lines: string[], label: RegExp, max = 4): string {
   const i = lines.findIndex((l) => label.test(l))
@@ -255,7 +255,53 @@ export function parseNoticeText(raw: string): NoticeDraft {
     url,
     rules: withAgencyRegion(rulesFromText(target, whole, title), agency),
     source: 'paste',
+    ...(() => {
+      const documents = documentsOf(lines)
+      return documents.length ? { documents } : {}
+    })(),
   }
+}
+
+/**
+ * D-151: 공고 글의 '제출서류 · 구비서류' 를 서류 이름 목록으로.
+ *   제출서류: 사업자등록증 1부, 중소기업확인서 1부
+ *   ① 국세 · 지방세 완납증명서 ② 4대보험 가입자 명부
+ * 붙임 · 서식 번호 · '1부' · '사본' 같은 꼬리는 뗀다. 못 읽으면 빈 목록(신청 준비가 기본 목록을 쓴다).
+ */
+export function documentsOf(lines: string[]): string[] {
+  const label = /^(?:[-·•○◦▪■□※*]\s*)?(?:제출|신청|구비|필요|증빙)\s*서류(?:\s*\([^)]*\))?\s*[:：]?\s*/
+  const i = lines.findIndex((l) => label.test(l))
+  if (i < 0) return []
+  const chunk: string[] = []
+  const first = lines[i].replace(label, '').trim()
+  if (first) chunk.push(first)
+  for (let j = i + 1; j < lines.length && chunk.length < 12; j++) {
+    if (LABELS.test(lines[j]) || /^https?:\/\//.test(lines[j])) break
+    chunk.push(lines[j])
+  }
+  const out: string[] = []
+  // 줄마다 → 줄 안에서는 쉼표 · 동그라미 번호 · ' - ' 로 나눈다(가운뎃점 '·' 은 '국세 · 지방세' 처럼 한 서류 안에도 쓰여 나누지 않는다)
+  const pieces = chunk.flatMap((line) => (/^\s*[※*]/.test(line) ? [] : line.split(/[,，;]|(?=[①-⑳])|\s[-•○◦▪]\s/)))
+  for (const raw of pieces) {
+    const name = raw
+      .replace(/^[\s①-⑳\-·•○◦▪■□]+/, '')
+      .replace(/^\d{1,2}[.)]\s*/, '')
+      .replace(/\[[^\]]*\]|【[^】]*】|<[^>]*>/g, '')
+      .replace(/\(\s*(?:서식|붙임|별지|양식)[^)]*\)/g, '')
+      .replace(/\s*(?:각\s*)?\d+\s*부(?![가-힣]).*$/, '')
+      .replace(/\s*원본\s*$/, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (name.length < 3 || name.length > 40) continue
+    if (/^(?:등|기타|해당\s*시|필요\s*시)/.test(name)) continue
+    // '국세 · 지방세 완납증명서' 는 둘로
+    const both = /^국세\s*[·ㆍ및,]?\s*지방세\s*(완납|납세)\s*증명서$/.exec(name)
+    for (const n of both ? [`국세 ${both[1]}증명서`, `지방세 ${both[1]}증명서`] : [name]) {
+      if (!out.some((x) => x.replace(/\s/g, '') === n.replace(/\s/g, ''))) out.push(n)
+    }
+    if (out.length >= 15) break
+  }
+  return out
 }
 
 /* ------------------------------------------------------------------ */

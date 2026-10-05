@@ -456,6 +456,18 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
           // D-140: 실제 입금(실행)액 — 없던 기록은 그대로 없다
           ...(typeof a.executedAmount === 'number' && Number.isFinite(a.executedAmount) && a.executedAmount > 0 ? { executedAmount: a.executedAmount } : {}),
           ...(typeof a.executedAt === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(a.executedAt) ? { executedAt: a.executedAt } : {}),
+          // D-151: 공고에서 만든 신청 준비 — 없던 기록은 그대로 없다
+          ...(typeof a.noticeId === 'string' && a.noticeId ? { noticeId: a.noticeId.slice(0, 80) } : {}),
+          ...(typeof a.noticeUrl === 'string' && /^https?:\/\//.test(a.noticeUrl) ? { noticeUrl: a.noticeUrl.slice(0, 500) } : {}),
+          ...(typeof a.applyDueTime === 'string' && /^\d{2}:\d{2}$/.test(a.applyDueTime) ? { applyDueTime: a.applyDueTime } : {}),
+          ...(Array.isArray(a.docs)
+            ? {
+                docs: a.docs
+                  .filter((d) => d && typeof d.label === 'string' && d.label.trim())
+                  .slice(0, 30)
+                  .map((d) => ({ label: d.label.trim().slice(0, 60), done: d.done === true })),
+              }
+            : {}),
           note: a.note ?? '',
           createdAt: a.createdAt ?? now,
           updatedAt: a.updatedAt ?? now,

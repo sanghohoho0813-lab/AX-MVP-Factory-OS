@@ -13,6 +13,7 @@ import {
 } from '../content/clientOpsCatalog'
 import { documentsWithExpiry, daysLeftFrom } from './clientOpsAlerts'
 import { todayLocalDate } from '../lib/appClock'
+import { applyDocViews } from './grants/grantApply'
 
 export type ScheduleKind = 'next' | 'task' | 'funding' | 'payment' | 'document' | 'tool'
 
@@ -111,7 +112,7 @@ export function buildClientSchedule(record: ClientOpsRecord, today: string): Sch
       clientId: record.id,
       clientName: name,
       title: app.programName || '정책자금 신청',
-      detail: app.institution || '',
+      detail: fundingDetail(record, app, today, open),
       serviceKey: 'policyFund',
       done: !open,
       daysLeft: daysLeftFrom(today, app.applyDueDate),
@@ -224,4 +225,16 @@ export function overdueEvents(events: ScheduleEvent[]): ScheduleEvent[] {
 export function shiftMonth(year: number, month1to12: number, delta: number): [number, number] {
   const m = month1to12 - 1 + delta
   return [year + Math.floor(m / 12), ((m % 12) + 12) % 12 + 1]
+}
+
+/** D-151: 신청 준비 건은 '서류 3/6 · 18:00 마감' 을 함께 — 오늘 · 달력에서 무엇이 모자란지 바로 보이게 */
+function fundingDetail(record: ClientOpsRecord, app: ClientOpsRecord['fundingApplications'][number], today: string, open: boolean): string {
+  const parts = [app.institution || '']
+  if (open && app.docs?.length) {
+    const views = applyDocViews(record, app, today)
+    const ready = views.filter((v) => v.state === 'ok' || v.state === 'manual_done').length
+    parts.push(ready === views.length ? '서류 다 모음' : `서류 ${ready}/${views.length}`)
+  }
+  if (app.applyDueTime) parts.push(`${app.applyDueTime} 마감`)
+  return parts.filter(Boolean).join(' · ')
 }

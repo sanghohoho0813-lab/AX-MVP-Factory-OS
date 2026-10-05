@@ -247,8 +247,21 @@ export interface FundingApplication {
   /** 실제로 입금된 날 */
   executedAt?: string | null
   note: string
+  /** D-151: 지원사업 알림의 공고에서 '신청 준비' 로 만든 건 — 그 공고 · 마감 시각 · 낼 서류 */
+  noticeId?: string
+  noticeUrl?: string
+  /** 마감 시각 'HH:MM' (공고에 있을 때만) */
+  applyDueTime?: string
+  /** 낼 서류 — 서류함에 있는 서류는 서류함을 보고, 신청서 · 사업계획서처럼 없는 것은 done 으로 챙긴다 */
+  docs?: ApplyDoc[]
   createdAt: string
   updatedAt: string
+}
+
+export interface ApplyDoc {
+  label: string
+  /** 서류함에 없는 서류(신청서 · 사업계획서 …)를 손으로 '준비됨' 표시 */
+  done: boolean
 }
 
 /* ------------------------------------------------------------------ */

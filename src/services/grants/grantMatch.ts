@@ -128,6 +128,8 @@ export interface GrantNotice {
   published: boolean
   /** D-143: 기업마당 공고 번호(pblancId) — 받아 온 공고만 */
   externalId?: string
+  /** D-151: 공고 글의 '제출서류' — 신청 준비에서 서류함과 맞춰 본다(없으면 기본 목록) */
+  documents?: string[]
   createdAt: string
   updatedAt: string
 }
@@ -625,6 +627,9 @@ export function normalizeNotice(raw: unknown, id: string, now: string): GrantNot
     // 예시 공고는 바깥에 보이지 않는다 — 지어낸 공고를 가망고객에게 보여 주지 않는다
     published: source !== 'example' && r.published === true,
     ...(typeof r.externalId === 'string' && r.externalId.trim() ? { externalId: r.externalId.trim().slice(0, 40) } : {}),
+    ...(Array.isArray(r.documents) && r.documents.some((d) => typeof d === 'string' && d.trim())
+      ? { documents: (r.documents as unknown[]).filter((d): d is string => typeof d === 'string' && d.trim() !== '').map((d) => d.trim().slice(0, 60)).slice(0, 15) }
+      : {}),
     createdAt: typeof r.createdAt === 'string' ? r.createdAt : now,
     updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : now,
   }
