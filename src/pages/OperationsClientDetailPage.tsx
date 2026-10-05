@@ -1539,7 +1539,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         </div>
 
         {/* D-129: 예전 '파일' 탭 — 고객과 주고받은 파일 · 칸이 없어진 서류의 파일도 서류 탭 아래에서 */}
-        <ClientSharedFiles record={record} workspaceId={workspaceId} onCommit={commit} />
+        <ClientSharedFiles record={record} workspaceId={workspaceId} onCommit={commit} latest={() => current() ?? record} />
       </section>
 
       )}
@@ -1563,7 +1563,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
       {tab === 'fees' && <FeesPanel record={record} onChange={commit} today={today} />}
 
-      {tab === 'portal' && <PortalTab record={record} workspaceId={workspaceId} onRecordChange={commit} />}
+      {tab === 'portal' && <PortalTab record={record} workspaceId={workspaceId} onRecordChange={commit} latest={() => current() ?? record} />}
 
       {tab === 'journal' && (
         <>

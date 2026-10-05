@@ -258,6 +258,8 @@ export interface FundingApplication {
   resultDueDate?: string
   /** D-152: 선정 뒤 건 성공보수 수금 항목 — 두 번 걸지 않게 */
   successFeeId?: string
+  /** D-153: 고객 화면에 올린 소식(접수 · 선정 · 탈락) — 두 번 올리지 않게 */
+  newsPosted?: ('submitted' | 'selected' | 'rejected')[]
   createdAt: string
   updatedAt: string
 }

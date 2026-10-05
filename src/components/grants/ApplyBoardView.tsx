@@ -6,7 +6,8 @@
 import { Link } from 'react-router-dom'
 import { ArrowRight, Copy } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
-import { applicationBoard, grantDocRequestMessage, type BoardRow } from '../../services/grants/grantApply'
+import { applicationBoard, grantDocRequestMessage, grantYearStats, type BoardRow } from '../../services/grants/grantApply'
+import { formatKrwCompact } from '../../lib/format'
 import { dueText } from '../../services/clientOpsAlerts'
 import { copyText } from '../consulting/studioParts'
 import { useToast } from '../ui/toastContext'
@@ -90,11 +91,36 @@ function Group({ title, rows, records, today, empty, testId }: { title: string; 
   )
 }
 
+/** D-153: 올해 지원사업 성과 — 접수 · 선정(선정률) · 선정 금액 · 성공보수(받은 돈 / 건 돈) */
+function YearStats({ records, today }: { records: ClientOpsRecord[]; today: string }) {
+  const st = grantYearStats(records, Number(today.slice(0, 4)))
+  const tiles: [string, string, string][] = [
+    ['접수', `${st.submitted}건`, 'stat-submitted'],
+    ['선정', st.selectionRate === null ? `${st.selected}건` : `${st.selected}건 · 선정률 ${Math.round(st.selectionRate * 100)}%`, 'stat-selected'],
+    ['선정 금액', st.approvedTotal ? formatKrwCompact(st.approvedTotal) : '0원', 'stat-approved'],
+    ['성공보수', st.feeTotal ? `${formatKrwCompact(st.feeReceived) || '0원'} 받음 / ${formatKrwCompact(st.feeTotal)}` : '0원', 'stat-fee'],
+  ]
+  return (
+    <section aria-label={`${st.year}년 지원사업 성과`} className="flex flex-col gap-2" data-testid="board-stats">
+      <h3 className="t-body font-semibold text-slate-900">{st.year}년 지원사업 성과</h3>
+      <dl className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        {tiles.map(([k, v, id]) => (
+          <div key={k} className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid={id}>
+            <dt className="t-sub text-slate-500">{k}</dt>
+            <dd className="t-body font-bold [overflow-wrap:anywhere] text-slate-900">{v}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  )
+}
+
 export function ApplyBoardView({ records, today }: { records: ClientOpsRecord[]; today: string }) {
   const board = applicationBoard(records, today)
   const byId = new Map(records.map((r) => [r.id, r]))
   return (
     <div className="flex flex-col gap-5" data-testid="apply-board">
+      <YearStats records={records} today={today} />
       <p className="t-sub break-keep text-slate-600">
         공고 창에서 [신청 준비] 를 누른 업체가 여기 모입니다. 줄을 누르면 그 업체의 낼 서류 · 접수 · 결과 · 성공보수를 고칠 수 있어요.
         {board.feeMissing > 0 && <b className="text-warning-800"> 선정됐는데 성공보수를 안 건 곳 {board.feeMissing}곳.</b>}

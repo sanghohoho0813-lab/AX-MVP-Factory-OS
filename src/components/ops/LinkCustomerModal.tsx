@@ -194,7 +194,7 @@ export function LinkCustomerModal({
             계정 이메일
             <input
               value={accountEmail}
-              onChange={(e) => { setAccountEmail(e.target.value); setProfileChecked(false) }}
+              onChange={(e) => { setAccountEmail(e.target.value); setProfile(null); setProfileChecked(false) }}
               placeholder="고객이 miraeailab.com 에 가입한 이메일"
               className="mt-1 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.95rem] focus:border-brand-500 focus:outline-none"
             />
@@ -209,7 +209,7 @@ export function LinkCustomerModal({
       {profile && (
         <label className="mt-2 flex cursor-pointer items-center gap-2 text-[0.9rem] text-slate-700">
           <input type="checkbox" checked={linkAccount} onChange={(e) => setLinkAccount(e.target.checked)} className="size-4 accent-brand-600" />
-          이 계정을 업체와 연결해 고객 화면(My MIRAE)을 열어 준다
+          이 계정({profile.email})을 업체와 연결해 고객 화면(My MIRAE)을 열어 준다
         </label>
       )}
     </div>
@@ -224,7 +224,7 @@ export function LinkCustomerModal({
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>취소</Button>
-          <Button variant="primary" onClick={() => void (tab === 'existing' ? submitExisting() : submitNew())} disabled={busy}>
+          <Button variant="primary" onClick={() => void (tab === 'existing' ? submitExisting() : submitNew())} disabled={busy || (!event.profileId && !!accountEmail.trim() && !profileChecked)}>
             {busy ? '연결 중…' : tab === 'existing' ? '이 업체에 연결' : '만들고 연결'}
           </Button>
         </>

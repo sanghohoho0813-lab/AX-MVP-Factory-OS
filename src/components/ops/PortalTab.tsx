@@ -46,7 +46,8 @@ import { brand } from '../../brand/brand.config'
 function isNotReadyError(cause: unknown): boolean {
   const o = cause as { message?: unknown; code?: unknown; details?: unknown } | null
   const msg = [o?.message, o?.code, o?.details].filter((v) => typeof v === 'string').join(' ') || String(cause)
-  return /relation .* does not exist|portal_|42P01|schema cache|PGRST/i.test(msg)
+  // D-153: 표가 아직 없을 때만 — 예전에는 'PGRST' · 'portal_' 이 들어간 모든 오류(로그인 만료 PGRST301 · 권한 오류)를 '아직 안 켬' 으로 숨겼다
+  return /relation .* does not exist|42P01|PGRST205|schema cache|Could not find the (?:table|function)/i.test(msg)
 }
 
 /**
@@ -58,9 +59,12 @@ export function PortalTab({
   record,
   workspaceId,
   onRecordChange,
+  latest,
 }: {
   record: ClientOpsRecord
   workspaceId: string | null
+  /** D-153: 확인 완료를 기다리는 동안 고친 것을 덮지 않게 — 저장 직전의 최신 기록 */
+  latest?: () => ClientOpsRecord
   /** D-122: 고객이 올린 서류를 확인하면 내부 서류함에도 '받음' 으로 — 업체 기록 저장 */
   onRecordChange?: (next: ClientOpsRecord) => Promise<boolean>
 }) {
@@ -301,11 +305,12 @@ export function PortalTab({
                               // D-122: 내부 서류함도 '받음' — 예전에는 고객 화면만 바뀌어 '없는 서류' 경고 · 서류 요청 문구가 계속 이 서류를 달라고 했다
                               // D-148: 칸에 이미 파일이 있으면 덮지 않는다('(2)' 칸) · 종류가 '기타' 여도 제목 · 파일 이름으로 칸을 찾아 넣는다
                               if (!onRecordChange) return
+                              const fresh = latest?.() ?? record
                               if (d.storagePath && !d.storagePath.startsWith('demo/')) {
-                                const out = filePortalDocument(record, d, '')
+                                const out = filePortalDocument(fresh, d, '')
                                 if (out && (await onRecordChange(out.record))) filed = out.label
-                              } else if (d.documentType in record.documents && !record.documents[d.documentType as DocumentKey].received) {
-                                if (await onRecordChange(withDocument(record, d.documentType as DocumentKey, { received: true, ...(d.fileName ? { fileName: d.fileName } : {}) }))) filed = DOCUMENTS.find((x) => x.key === d.documentType)?.label ?? ''
+                              } else if (d.documentType in fresh.documents && !fresh.documents[d.documentType as DocumentKey].received) {
+                                if (await onRecordChange(withDocument(fresh, d.documentType as DocumentKey, { received: true, ...(d.fileName ? { fileName: d.fileName } : {}) }))) filed = DOCUMENTS.find((x) => x.key === d.documentType)?.label ?? ''
                               }
                             }).then((ok) => {
                               if (ok) showToast(filed ? `확인 완료 · 서류함 '${filed}' 칸에도 넣었습니다.` : '확인 완료로 표시했습니다.')

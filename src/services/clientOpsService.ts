@@ -462,6 +462,7 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
           ...(typeof a.applyDueTime === 'string' && /^\d{2}:\d{2}$/.test(a.applyDueTime) ? { applyDueTime: a.applyDueTime } : {}),
           ...(typeof a.resultDueDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(a.resultDueDate) ? { resultDueDate: a.resultDueDate } : {}),
           ...(typeof a.successFeeId === 'string' && a.successFeeId ? { successFeeId: a.successFeeId } : {}),
+          ...(Array.isArray(a.newsPosted) ? { newsPosted: a.newsPosted.filter((k) => k === 'submitted' || k === 'selected' || k === 'rejected') } : {}),
           ...(Array.isArray(a.docs)
             ? {
                 docs: a.docs

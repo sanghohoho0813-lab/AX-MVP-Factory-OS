@@ -22,9 +22,12 @@ export function ClientSharedFiles({
   record,
   workspaceId,
   onCommit,
+  latest,
 }: {
   record: ClientOpsRecord
   workspaceId: string | null
+  /** D-153: 파일을 읽는 동안 다른 칸을 고쳐도 덮지 않게 — 저장 직전의 최신 기록 */
+  latest?: () => ClientOpsRecord
   /** D-148: 고객이 올린 파일을 서류함 칸에 넣을 때 업체 기록 저장 */
   onCommit?: (next: ClientOpsRecord) => Promise<boolean>
 }) {
@@ -38,7 +41,7 @@ export function ClientSharedFiles({
     setFiling(d.id)
     try {
       const { text } = await readStoredText(d.storagePath, d.fileName)
-      const out = filePortalDocument(record, d, text)
+      const out = filePortalDocument(latest?.() ?? record, d, text)
       if (out && (await onCommit(out.record))) showToast(`서류함 '${out.label}' 칸에 넣었습니다.`)
     } finally {
       setFiling(null)
@@ -89,7 +92,8 @@ export function ClientSharedFiles({
               </span>
               {d.storagePath && !d.storagePath.startsWith('demo/') && <DocFileActions label={d.title} storagePath={d.storagePath} fileName={d.fileName} />}
               {/* D-148: 고객이 올린 파일도 서류함 칸으로 — 이미 넣었으면 어느 칸인지 */}
-              {d.source === 'customer' && d.storagePath && !d.storagePath.startsWith('demo/') && onCommit && (() => {
+              {/* D-153: '다시 요청' 한 파일은 서류함에 넣지 않는다(받은 것으로 잡혀 경고가 꺼지던 것) */}
+              {d.source === 'customer' && d.status !== 'rejected' && d.storagePath && !d.storagePath.startsWith('demo/') && onCommit && (() => {
                 const cell = shelfCellOf(record, d.storagePath)
                 return cell ? (
                   <span className="t-sub text-success-700" data-testid={`portal-filed-${d.id}`}>서류함 '{cell.label}' 칸에 있음</span>

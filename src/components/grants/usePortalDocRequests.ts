@@ -3,7 +3,7 @@
  * 연결이 없으면 null(단추를 숨긴다). 고객이 올린 파일은 고객 플랫폼 탭의 [서류함에 넣기](D-148)로 서류함에 들어온다.
  */
 import { useCallback, useEffect, useState } from 'react'
-import { listDocuments, listLinksForClient, requestDocument } from '../../services/customerBridgeService'
+import { listDocuments, listLinksForClient, publishUpdate, requestDocument } from '../../services/customerBridgeService'
 
 export function usePortalDocRequests(workspaceId: string | null, clientId: string, note: string, enabled = true) {
   const [linkId, setLinkId] = useState<string | null>(null)
@@ -44,5 +44,13 @@ export function usePortalDocRequests(workspaceId: string | null, clientId: strin
     },
     [linkId, workspaceId, clientId, note],
   )
-  return linkId ? { requested, request } : null
+  // D-153: 접수 · 결과 소식을 고객 화면에 올린다
+  const publish = useCallback(
+    async (title: string, body: string, result: boolean) => {
+      if (!linkId) return
+      await publishUpdate(workspaceId, { linkId, category: result ? 'result' : 'progress', title, body, customerActionRequired: false })
+    },
+    [linkId, workspaceId],
+  )
+  return linkId ? { requested, request, publish } : null
 }

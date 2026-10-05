@@ -43,9 +43,10 @@ import { alertPayload, publicPayload, sameNotice, validateAlert, type AlertReque
 import { mergeNotices, noticesFromFeed, slotOf } from '../grants/grantFeed'
 import { withAgencyRegion } from '../grants/grantText'
 import { clientsForNotice, fitSummary, grantClients, grantIndex } from '../grants/grantView'
-import { applicationBoard, applyDocViews, applyDocsFor, applyReadiness, applyStage, docIdentity, grantDocRequestMessage, openApplications, portalRequestTitles, successFeeAmount, withApplyDocDone, withApplyResult, withApplySubmitted, withGrantApplication, withResultDueDate, withSuccessFee } from '../grants/grantApply'
+import { applyNews, grantYearStats, withApplyExecuted, applicationBoard, applyDocViews, applyDocsFor, applyReadiness, applyStage, docIdentity, grantDocRequestMessage, openApplications, portalRequestTitles, successFeeAmount, withApplyDocDone, withApplyResult, withApplySubmitted, withGrantApplication, withResultDueDate, withSuccessFee } from '../grants/grantApply'
 import { documentsOf } from '../grants/grantText'
 import { buildClientSchedule } from '../clientOpsSchedule'
+import { feeStateOf, fundingFactsOf } from '../feeStatus'
 import { recommendNextSteps } from '../clientInsights'
 
 let pass = 0
@@ -678,6 +679,36 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   const outside = withGrantApplication(normalizeClientOps({ id: 'c22', companyName: 'x' } as never), notice({}, { id: 'n-o', documents: ['국세 납세증명서'] }))
   const marked = withApplyDocDone(outside.record, outside.app.id, '국세 납세증명서', true)
   check('서류함 밖에서 받은 서류: \'받았어요\' 표시 → 준비됨', applyDocViews(outside.record, outside.app, TODAY)[0].state === 'missing' && applyDocViews(marked, marked.fundingApplications[0], TODAY)[0].state === 'manual_done')
+}
+
+// D-153: 지원금 입금 → 성공보수 받을 돈 · 고객에게 알릴 소식 · 올해 성과
+{
+  const n = notice({}, { id: 'n-ex', title: '2026 수출바우처', applyEnd: '2026-10-20', documents: ['사업자등록증'] })
+  const base = normalizeClientOps({ id: 'c30', companyName: '라마테크', representativeName: '박대표' } as never)
+  let rec = withGrantApplication(base, n).record
+  const id = rec.fundingApplications[0].id
+  rec = withApplyResult(withApplySubmitted(rec, id, '2026-11-30'), id, 'selected', 30_000_000)
+  rec = withSuccessFee(rec, id, 3_000_000, 10).record
+  const feeId = rec.fundingApplications[0].successFeeId as string
+  const facts = () => fundingFactsOf(rec.fundingApplications)
+  check('입금 전: 성공보수는 조건 대기', feeStateOf(rec.fees.find((f) => f.id === feeId)!, TODAY, facts()) === 'waiting')
+  const ex = withApplyExecuted(rec, id, 30_000_000, '2026-12-10')
+  rec = ex.record
+  const fee = rec.fees.find((f) => f.id === feeId)!
+  check('입금: 실제 입금액 · 날짜 · 성공보수 조건 충족 → 지금 받을 돈', ex.feeUnlocked && rec.fundingApplications[0].executedAmount === 30_000_000 && rec.fundingApplications[0].executedAt === '2026-12-10' && fee.conditionMetAt === '2026-12-10' && feeStateOf(fee, TODAY, facts()) === 'claimable', fee)
+  check('입금: 다시 적어도 충족일 그대로 · 잘못된 값은 무시', !withApplyExecuted(rec, id, 31_000_000, '2026-12-11').feeUnlocked && withApplyExecuted(rec, id, 31_000_000, '2026-12-11').record.fees.find((f) => f.id === feeId)!.conditionMetAt === '2026-12-10' && withApplyExecuted(rec, id, 0, '2026-12-11').record === rec && withApplyExecuted(rec, id, 1, '12/11').record === rec)
+  const app = rec.fundingApplications[0]
+  const sub = applyNews(rec, { ...app, approvedAmount: null }, 'submitted')
+  check('고객 소식 — 접수: 결과 발표 날짜 · 대표님 이름 · 카톡 같은 글', sub.title === "'2026 수출바우처' 신청을 접수했습니다" && sub.body.startsWith('결과 발표는 11월 30일(월) 예정입니다.') && sub.kakao.startsWith('안녕하세요, 박대표 대표님.'), sub)
+  const sel = applyNews(rec, app, 'selected')
+  check('고객 소식 — 선정: 선정 금액 · 성공보수 · 요율은 안 보임', sel.body.includes('30,000,000원') && !/성공보수|요율|10%|3,000,000/.test(sel.title + sel.body + sel.kakao), sel)
+  check('고객 소식 — 탈락: 다음 공고 안내', applyNews(rec, app, 'rejected').body.includes('다음 공고'))
+  const r2 = withGrantApplication(rec, { ...n, id: 'n-r', title: '떨어진 사업' }).record
+  const rid = r2.fundingApplications[0].id
+  const yr = withApplyResult(withApplySubmitted(r2, rid), rid, 'rejected')
+  const st = grantYearStats([{ ...yr, fundingApplications: yr.fundingApplications.map((a) => ({ ...a, resultAt: a.resultAt ? '2026' + a.resultAt.slice(4) : a.resultAt, submittedAt: a.submittedAt ? '2026' + a.submittedAt.slice(4) : a.submittedAt })) }], 2026)
+  check('올해 성과: 접수 2 · 선정 1 · 탈락 1 · 선정률 50% · 선정 3천만 · 성공보수 300만(받은 돈 0)', st.submitted === 2 && st.selected === 1 && st.rejected === 1 && st.selectionRate === 0.5 && st.approvedTotal === 30_000_000 && st.feeTotal === 3_000_000 && st.feeReceived === 0, st)
+  check('올해 성과: 결과 없으면 선정률 없음', grantYearStats([base], 2026).selectionRate === null)
 }
 
 console.log(`\ngrants: ${pass} passed, ${fail} failed`)

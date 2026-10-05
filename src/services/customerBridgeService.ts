@@ -558,7 +558,15 @@ export async function findProfileByEmail(email: string): Promise<{ id: string; e
     // 로컬 데모: 이메일을 그대로 가짜 계정으로 취급한다(DEMO)
     return { id: `demo-profile:${q}`, email: q }
   }
-  const { data, error } = await getSupabaseClient().from('profiles').select('id, email').ilike('email', q).limit(1)
+  // D-153: 정확히 같은 이메일만(예전 ilike 는 '_' 를 아무 글자로 봐 kim_a@ 가 kim.a@ 와 이어질 수 있었다).
+  //        직원은 고객 계정 표를 못 읽으므로(RLS) 직원 전용 조회 함수(0018)를 먼저 쓰고, 없으면 같은 이메일로 직접 찾는다.
+  const sb = getSupabaseClient()
+  const viaRpc = await sb.rpc('staff_find_customer_profile', { p_email: q })
+  if (!viaRpc.error) {
+    const row = (Array.isArray(viaRpc.data) ? viaRpc.data[0] : viaRpc.data) as { id: string; email: string } | null | undefined
+    return row?.id ? { id: row.id, email: row.email } : null
+  }
+  const { data, error } = await sb.from('profiles').select('id, email').eq('email', q).limit(1)
   if (error) throw new Error('고객 계정을 조회하지 못했습니다. 관리자 권한이 필요할 수 있습니다.')
   const row = (data ?? [])[0] as { id: string; email: string } | undefined
   return row ? { id: row.id, email: row.email } : null
@@ -684,6 +692,14 @@ export async function publishUpdate(workspaceId: string | null, input: PublishUp
   }
   if (!workspaceId) throw new Error('선택된 작업공간이 없습니다.')
   const client = getSupabaseClient()
+  // D-153: 단계 먼저 바꾸고 소식을 넣는다 — 예전 순서(소식 → 단계)는 단계가 실패하면 오류가 나 창이 남고, 다시 누르면 소식이 두 번 올라갔다
+  if (input.customerStage) {
+    const { error: stageError } = await client
+      .from('portal_client_links')
+      .update({ customer_stage: input.customerStage })
+      .eq('id', input.linkId)
+    if (stageError) throw stageError
+  }
   const { data, error } = await client
     .from('portal_updates')
     .insert({
@@ -701,13 +717,6 @@ export async function publishUpdate(workspaceId: string | null, input: PublishUp
     .select()
     .single()
   if (error) throw error
-  if (input.customerStage) {
-    const { error: stageError } = await client
-      .from('portal_client_links')
-      .update({ customer_stage: input.customerStage })
-      .eq('id', input.linkId)
-    if (stageError) throw stageError
-  }
   return updateFromRow(data as Record<string, unknown>)
 }
 
@@ -777,6 +786,8 @@ export function seedDemoRequest(linkId: string, workspaceId: string | null): Por
   const event = normalizeEvent({
     workspaceId,
     portalClientLinkId: linkId,
+    // D-153: 연결된 고객의 신청은 업체도 안다 — 없으면 상담신청함이 '새 업체로 만들기' 를 띄워 같은 업체가 또 생겼다
+    operationsClientId: local.links().find((l) => l.id === linkId)?.operationsClientId || null,
     eventType: 'customer_request_created',
     sourceType: 'portal_request',
     sourceId: request.id,
@@ -940,6 +951,7 @@ export function seedDemoUpload(doc: PortalDocument): PortalDocument {
   const event = normalizeEvent({
     workspaceId: doc.workspaceId,
     portalClientLinkId: doc.portalClientLinkId,
+    operationsClientId: doc.operationsClientId || null,
     eventType: 'document_uploaded',
     sourceType: 'portal_document',
     sourceId: `${doc.id}:${now}`,

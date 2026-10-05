@@ -292,7 +292,8 @@ function adoptionMetrics(input: KpiInput): KpiMetric[] {
 
   // 고객이 플랫폼에서 한 행동 중 내부에서 처리한 비율
   const recent = input.events.filter((e) => dayOf(e.occurredAt) >= since30)
-  const handled = recent.filter((e) => e.status === 'resolved' || e.status === 'in_progress' || e.status === 'linked')
+  // D-153: 'linked' 는 처리가 아니다 — 이미 연결된 고객이 올린 서류 · 요청은 들어오자마자 linked 라 처리한 것으로 셌다
+  const handled = recent.filter((e) => e.status === 'resolved' || e.status === 'in_progress' || e.handledAt !== null)
   const eventsHandled: KpiMetric = {
     key: 'events_handled_30',
     group: 'adoption',

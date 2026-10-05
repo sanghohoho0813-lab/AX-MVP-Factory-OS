@@ -16,7 +16,7 @@
 import type { ApplyDoc, ClientOpsRecord, DocumentKey, FundingApplication } from '../../types/clientOps'
 import { allDocumentMetas } from '../clientOpsDocuments'
 import { daysLeftFrom, documentStatus } from '../clientOpsAlerts'
-import { withFunding, withNewFee, withNewFunding } from '../clientOpsService'
+import { withFee, withFunding, withNewFee, withNewFunding } from '../clientOpsService'
 import type { GrantNotice } from './grantMatch'
 import { nowDate } from '../../lib/appClock'
 
@@ -438,4 +438,90 @@ export function activeApplications(record: Pick<ClientOpsRecord, 'fundingApplica
     if (st === 'preparing' || st === 'waiting') return true
     return st === 'selected' && !(a.successFeeId && record.fees.some((f) => f.id === a.successFeeId))
   })
+}
+
+/* ------------------------------------------------------------------ */
+/* D-153: 지원금 입금 → 성공보수 · 고객에게 알릴 소식 · 올해 성과          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 지원금이 실제로 들어왔다 — 신청 건에 실제 입금액 · 날짜를 적고, 이 신청에 걸린 성공보수(조건 대기)를
+ * '조건 충족' 으로 바꿔 지금 받을 돈으로 만든다. 이미 받은 성공보수 · 이미 충족된 것은 그대로.
+ */
+export function withApplyExecuted(record: ClientOpsRecord, appId: string, amount: number, date: string): { record: ClientOpsRecord; feeUnlocked: boolean } {
+  const app = record.fundingApplications.find((a) => a.id === appId)
+  if (!app || !(amount > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return { record, feeUnlocked: false }
+  let next = withFunding(record, appId, { executedAmount: amount, executedAt: date })
+  const fee = app.successFeeId ? next.fees.find((f) => f.id === app.successFeeId) : undefined
+  if (fee && !fee.receivedAt && !fee.conditionMetAt) {
+    next = withFee(next, fee.id, { conditionMetAt: date })
+    return { record: next, feeUnlocked: true }
+  }
+  return { record: next, feeUnlocked: false }
+}
+
+export type ApplyNewsKind = 'submitted' | 'selected' | 'rejected'
+
+/**
+ * 고객에게 알릴 소식 — 고객 화면 소식 · 카톡에 같은 글. 고객에게 보이는 글이라 우리 쪽 사정(성공보수 · 요율 · 메모)은 넣지 않는다.
+ */
+export function applyNews(record: Pick<ClientOpsRecord, 'representativeName' | 'companyName'>, app: FundingApplication, kind: ApplyNewsKind): { title: string; body: string; kakao: string } {
+  const name = app.programName || '지원사업'
+  const dayText = (iso?: string | null) => {
+    if (!iso) return ''
+    const [y, m, d] = iso.split('-').map(Number)
+    return `${m}월 ${d}일(${DOW[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]})`
+  }
+  let title = ''
+  let body = ''
+  if (kind === 'submitted') {
+    title = `'${name}' 신청을 접수했습니다`
+    body = app.resultDueDate ? `결과 발표는 ${dayText(app.resultDueDate)} 예정입니다. 결과가 나오면 바로 알려 드리겠습니다.` : '결과가 나오면 바로 알려 드리겠습니다.'
+  } else if (kind === 'selected') {
+    title = `'${name}'에 선정되었습니다`
+    body = `${app.approvedAmount ? `선정 금액은 ${app.approvedAmount.toLocaleString('ko-KR')}원입니다. ` : ''}협약 · 지원금 수령 절차를 이어서 안내드리겠습니다. 축하드립니다.`
+  } else {
+    title = `'${name}' 결과 안내`
+    body = '아쉽게도 이번에는 선정되지 않았습니다. 평가 의견을 확인해 보완하고, 맞는 다음 공고를 함께 준비하겠습니다.'
+  }
+  const who = record.representativeName ? `${record.representativeName} 대표님` : `${record.companyName} 담당자님`
+  return { title, body, kakao: `안녕하세요, ${who}.\n${title}.\n${body}` }
+}
+
+export interface GrantYearStats {
+  year: number
+  /** 그해 접수한 건 */
+  submitted: number
+  selected: number
+  rejected: number
+  /** 선정 ÷ (선정 + 탈락), 결과가 하나도 없으면 null */
+  selectionRate: number | null
+  /** 선정 금액 합계(그해 선정) */
+  approvedTotal: number
+  /** 그해 선정 건에 건 성공보수 합계 · 그중 받은 돈 */
+  feeTotal: number
+  feeReceived: number
+}
+
+/** 올해 지원사업 성과 — 결과가 난 날(선정 · 탈락) · 접수한 날 기준. 보관한 업체도 성과에는 넣는다 */
+export function grantYearStats(records: readonly ClientOpsRecord[], year: number): GrantYearStats {
+  const y = String(year)
+  const s: GrantYearStats = { year, submitted: 0, selected: 0, rejected: 0, selectionRate: null, approvedTotal: 0, feeTotal: 0, feeReceived: 0 }
+  for (const r of records) {
+    for (const a of r.fundingApplications) {
+      if (a.submittedAt?.startsWith(y)) s.submitted += 1
+      if (!a.resultAt?.startsWith(y)) continue
+      if (a.status === 'selected') {
+        s.selected += 1
+        s.approvedTotal += a.approvedAmount ?? 0
+        const fee = a.successFeeId ? r.fees.find((f) => f.id === a.successFeeId) : undefined
+        if (fee?.amount) {
+          s.feeTotal += fee.amount
+          if (fee.receivedAt) s.feeReceived += fee.amount
+        }
+      } else if (a.status === 'rejected') s.rejected += 1
+    }
+  }
+  s.selectionRate = s.selected + s.rejected > 0 ? s.selected / (s.selected + s.rejected) : null
+  return s
 }

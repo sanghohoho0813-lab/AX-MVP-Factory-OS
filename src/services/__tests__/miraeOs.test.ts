@@ -35,6 +35,7 @@ import { EVENT_TYPE_LABEL, buildProjection, eventSummary, isOpenEvent, sortEvent
 import signupSql from '../../../supabase/migrations/20260925000014_signup_event.sql?raw'
 import hardenSql from '../../../supabase/migrations/20261004000016_security_hardening.sql?raw'
 import publicLinksSql from '../../../supabase/migrations/20261005000017_public_links_hardening.sql?raw'
+import staffLookupSql from '../../../supabase/migrations/20261006000018_staff_customer_lookup.sql?raw'
 import { normalizeClientOps, withContract, withCustomField, withFee, withNewFee, withNewFunding, withService, withoutCustomField, withoutFee } from '../clientOpsService'
 import {
   contractAgeShort,
@@ -380,6 +381,13 @@ check('events: 요약 who 는 회사명 우선', eventSummary(ev({ payload: { co
   check('공개 링크 SQL: 낸 설문 · 마친 시험은 다시 못 낸다', sql.includes("raise exception '이미 제출된 설문입니다.'") && sql.includes("raise exception '이미 마친 테스트입니다.'"))
   check('공개 링크 SQL: 알림 신청은 접속 주소마다 10분에 5번 · 같은 연락처 하루 한 번', sql.includes("interval '10 minutes') >= 5") && sql.includes("'grant_alert_contact'") && sql.includes("interval '1 day'"))
   check('공개 링크 SQL: 기록 표는 해시만 · 앱에서 못 읽음', sql.includes('alter table public.public_intake_log enable row level security') && sql.includes('revoke all on table public.public_intake_log from public, anon, authenticated') && !/create policy[^;]*public_intake_log/.test(sql))
+}
+// D-153: 직원의 고객 계정 찾기 SQL — 정확히 같은 이메일 · 직원만 · 두 칸만
+{
+  const sql = staffLookupSql.toLowerCase()
+  check('계정 찾기 SQL: 표 · 정책 바꾸지 않음', !/drop\s|truncate|alter\s+table|create\s+policy|disable\s+row/.test(sql))
+  check('계정 찾기 SQL: 정확히 같은 이메일만(like 없음) · 직원만 · id · email 만', sql.includes("lower(p.email) = lower(btrim(coalesce(p_email, '')))") && !/\blike\b|ilike/.test(sql) && sql.includes("m.role in ('owner', 'admin', 'editor')") && sql.includes('returns table (id uuid, email text)'))
+  check('계정 찾기 SQL: 로그인 안 한 사람은 못 부름', sql.includes('revoke all on function public.staff_find_customer_profile(text) from public, anon'))
 }
 check('events: 값 없으면 고객', eventSummary(ev({ payload: {} })).who === '고객')
 // D-107: 오래 기다린 상담신청 — "N일째 대기" (정오 UTC 로 잡아 시간대가 달라도 같은 날)

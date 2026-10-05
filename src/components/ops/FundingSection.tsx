@@ -47,7 +47,7 @@ export function FundingSection({
   feesHref,
   portal,
 }: {
-  portal?: { requested: string[]; request: (items: { title: string; documentType: string }[]) => Promise<number> } | null
+  portal?: { requested: string[]; request: (items: { title: string; documentType: string }[]) => Promise<number>; publish?: (title: string, body: string, result: boolean) => Promise<void> } | null
   /** D-152: 다음 단계 단추(접수 · 결과 · 성공보수) — 최신 기록 위에서 바꾼다 */
   onUpdate?: (change: (r: ClientOpsRecord) => ClientOpsRecord, message: string) => void
   feesHref?: string
@@ -234,7 +234,7 @@ export function FundingSection({
                     <GrantApplyChecklist record={record} app={a} today={today} onToggle={(label, done) => onToggleDoc(a.id, label, done)} docsHref={docsHref} portal={portal} />
                   )}
 
-                  {onUpdate && <ApplyStageBar record={record} app={a} today={today} onUpdate={onUpdate} feesHref={feesHref ?? '?tab=fees'} />}
+                  {onUpdate && <ApplyStageBar record={record} app={a} today={today} onUpdate={onUpdate} feesHref={feesHref ?? '?tab=fees'} publish={portal?.publish ?? null} />}
 
                   {(a.submittedAt || a.resultAt) && (
                     <p className="text-[0.875rem] text-slate-500">

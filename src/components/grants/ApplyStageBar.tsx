@@ -4,9 +4,12 @@
  */
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, CheckCircle2, Send, XCircle } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Copy, Megaphone, Send, Wallet, XCircle } from 'lucide-react'
 import type { ClientOpsRecord, FundingApplication } from '../../types/clientOps'
-import { applyStage, successFeeAmount, withApplyResult, withApplySubmitted, withResultDueDate, withSuccessFee } from '../../services/grants/grantApply'
+import { applyNews, applyStage, successFeeAmount, withApplyExecuted, withApplyResult, withApplySubmitted, withResultDueDate, withSuccessFee, type ApplyNewsKind } from '../../services/grants/grantApply'
+import { withFunding } from '../../services/clientOpsService'
+import { copyText } from '../consulting/studioParts'
+import { useToast } from '../ui/toastContext'
 import { daysLeftFrom, dueText } from '../../services/clientOpsAlerts'
 import { formatKrwCompact as formatKrw, wonOf } from '../../lib/format'
 import { Button } from '../ui/Button'
@@ -21,7 +24,10 @@ export function ApplyStageBar({
   today,
   onUpdate,
   feesHref,
+  publish,
 }: {
+  /** D-153: 고객 플랫폼 소식 올리기(연결된 업체만) */
+  publish?: ((title: string, body: string, result: boolean) => Promise<void>) | null
   record: ClientOpsRecord
   app: FundingApplication
   today: string
@@ -82,6 +88,7 @@ export function ApplyStageBar({
             <XCircle aria-hidden="true" className="size-4" /> 탈락
           </Button>
         </div>
+        <NewsRow record={record} app={app} kind="submitted" publish={publish} onUpdate={onUpdate} />
       </div>
     )
   }
@@ -90,11 +97,17 @@ export function ApplyStageBar({
     const fee = app.successFeeId ? record.fees.find((f) => f.id === app.successFeeId) : undefined
     if (fee) {
       return (
-        <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2.5" data-testid="apply-stage" data-stage="fee-set">
-          <span className="t-sub font-semibold text-success-700">선정 {app.resultAt ? md(app.resultAt) : ''} · 성공보수 {fee.amount ? formatKrw(fee.amount) : '금액 미정'} 수금에 걸림</span>
-          <Link to={feesHref} className="tap t-sub inline-flex min-h-11 items-center gap-1 font-semibold text-brand-700 hover:underline">
-            수금 보기 <ArrowRight aria-hidden="true" className="size-4" />
-          </Link>
+        <div className="flex flex-col gap-2 border-t border-slate-100 pt-2.5" data-testid="apply-stage" data-stage="fee-set">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="t-sub font-semibold text-success-700">
+              선정 {app.resultAt ? md(app.resultAt) : ''} · 성공보수 {fee.amount ? formatKrw(fee.amount) : '금액 미정'} {fee.receivedAt ? '받음' : fee.conditionMetAt ? '— 지금 받을 돈' : '수금에 걸림(지원금 입금 뒤)'}
+            </span>
+            <Link to={feesHref} className="tap t-sub inline-flex min-h-11 items-center gap-1 font-semibold text-brand-700 hover:underline">
+              수금 보기 <ArrowRight aria-hidden="true" className="size-4" />
+            </Link>
+          </div>
+          <ExecutedRow app={app} today={today} onUpdate={onUpdate} />
+          <NewsRow record={record} app={app} kind="selected" publish={publish} onUpdate={onUpdate} />
         </div>
       )
     }
@@ -148,8 +161,99 @@ export function ApplyStageBar({
             {feeAmount ? `${formatKrw(feeAmount)} 수금에 걸기` : '금액을 적어 주세요'}
           </Button>
         </div>
+        <NewsRow record={record} app={app} kind="selected" publish={publish} onUpdate={onUpdate} />
+      </div>
+    )
+  }
+  if (app.status === 'rejected' && (app.docs || app.noticeId)) {
+    return (
+      <div className="flex flex-col gap-2 border-t border-slate-100 pt-2.5" data-testid="apply-stage" data-stage="rejected">
+        <NewsRow record={record} app={app} kind="rejected" publish={publish} onUpdate={onUpdate} />
       </div>
     )
   }
   return null
+}
+
+/** D-153: 고객에게 알리기 — 카톡 문구 복사 · 고객 플랫폼에 연결돼 있으면 고객 화면 소식(한 번만) */
+function NewsRow({ record, app, kind, publish, onUpdate }: { record: ClientOpsRecord; app: FundingApplication; kind: ApplyNewsKind; publish?: ((title: string, body: string, result: boolean) => Promise<void>) | null; onUpdate: (change: (r: ClientOpsRecord) => ClientOpsRecord, message: string) => void }) {
+  const { showToast } = useToast()
+  const [busy, setBusy] = useState(false)
+  const news = applyNews(record, app, kind)
+  const posted = app.newsPosted?.includes(kind) ?? false
+  return (
+    <div className="flex flex-wrap items-center gap-2" data-testid="apply-news" data-kind={kind}>
+      <span className="t-sub font-medium text-slate-600">고객에게 알리기</span>
+      <Button
+        size="sm"
+        variant="secondary"
+        data-testid="apply-news-copy"
+        onClick={async () => showToast((await copyText(news.kakao)) ? '고객에게 보낼 카톡 문구를 복사했습니다' : '복사하지 못했습니다')}
+      >
+        <Copy aria-hidden="true" className="size-4" /> 카톡 문구
+      </Button>
+      {publish &&
+        (posted ? (
+          <span className="t-sub font-semibold text-success-700" data-testid="apply-news-posted">고객 화면에 올림</span>
+        ) : (
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={busy}
+            data-testid="apply-news-post"
+            onClick={async () => {
+              setBusy(true)
+              try {
+                await publish(news.title, news.body, kind !== 'submitted')
+                onUpdate((r) => withFunding(r, app.id, { newsPosted: [...(r.fundingApplications.find((a) => a.id === app.id)?.newsPosted ?? []), kind] }), '고객 화면에 소식을 올렸습니다')
+              } catch (cause) {
+                showToast(cause instanceof Error ? cause.message : '올리지 못했습니다')
+              } finally {
+                setBusy(false)
+              }
+            }}
+          >
+            <Megaphone aria-hidden="true" className="size-4" /> 고객 화면에 소식 올리기
+          </Button>
+        ))}
+    </div>
+  )
+}
+
+/** D-153: 지원금이 실제로 들어왔다 — 성공보수가 걸려 있으면 '지금 받을 돈' 이 된다 */
+function ExecutedRow({ app, today, onUpdate }: { app: FundingApplication; today: string; onUpdate: (change: (r: ClientOpsRecord) => ClientOpsRecord, message: string) => void }) {
+  const [amount, setAmount] = useState(app.approvedAmount ? app.approvedAmount.toLocaleString('ko-KR') : '')
+  const [date, setDate] = useState(today)
+  if (app.executedAmount) {
+    return (
+      <p className="t-sub font-semibold text-slate-700" data-testid="apply-executed">
+        <Wallet aria-hidden="true" className="mr-1 inline size-4 text-success-600" />
+        지원금 입금 {md(app.executedAt)} · {formatKrw(app.executedAmount)}
+      </p>
+    )
+  }
+  const won = wonOf(amount) ?? 0
+  return (
+    <div className="flex flex-wrap items-end gap-2">
+      <label className="t-sub font-medium text-slate-600">
+        지원금 실제 입금액
+        <input inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} className={`mt-1 block w-36 ${inputCls}`} aria-label="지원금 실제 입금액" />
+      </label>
+      <label className="t-sub font-medium text-slate-600">
+        입금일
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`mt-1 block ${inputCls}`} aria-label="지원금 입금일" />
+      </label>
+      <Button
+        size="sm"
+        variant="secondary"
+        disabled={!(won > 0) || !date}
+        data-testid="apply-executed-save"
+        onClick={() =>
+          onUpdate((r) => withApplyExecuted(r, app.id, won, date).record, app.successFeeId ? '지원금 입금 — 성공보수가 지금 받을 돈이 됐습니다' : '지원금 입금을 적었습니다')
+        }
+      >
+        <Wallet aria-hidden="true" className="size-4" /> 입금됐어요
+      </Button>
+    </div>
+  )
 }
