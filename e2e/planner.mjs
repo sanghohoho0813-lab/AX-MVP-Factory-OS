@@ -34,8 +34,9 @@ async function goMonth(page, y, m) {
 }
 const cell = (page, d) => page.locator(`main button[data-date="${d}"]`)
 // 오늘 칸은 '오늘' 모양(흰 숫자 · 처음부터 골라 둠)이라 — 시험할 날은 오늘이 아닌 날로 고른다
-const TODAY_KST = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10)
-const notToday = (...days) => days.find((d) => d !== TODAY_KST) ?? days[0]
+// 시험 브라우저의 시간대에 따라 '오늘' 이 한국 날짜일 수도 UTC 날짜일 수도 있다 — 둘 다 피한다
+const TODAYS = [new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10), new Date().toISOString().slice(0, 10)]
+const notToday = (...days) => days.find((d) => !TODAYS.includes(d)) ?? days[0]
 const OFF_WEEKDAY = notToday('2026-10-05', '2026-10-09')
 const TAP_DAY = OFF_WEEKDAY
 const OFF_NAME = OFF_WEEKDAY === '2026-10-05' ? '대체공휴일' : '한글날'
