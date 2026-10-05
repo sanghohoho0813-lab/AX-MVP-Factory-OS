@@ -81,6 +81,7 @@ export function SupabasePublicSurvey() {
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [hasLocalDraft, setHasLocalDraft] = useState(false)
+  const [unavailableStatus, setUnavailableStatus] = useState('')
 
   // 최초 로드
   useEffect(() => {
@@ -94,6 +95,8 @@ export function SupabasePublicSurvey() {
           return
         }
         if (!rpc.available) {
+          // D-151: 이미 낸 설문은 '만료' 가 아니라 '제출 완료' 로 알린다
+          setUnavailableStatus(String(rpc.status ?? ''))
           setPhase('unavailable')
           return
         }
@@ -237,6 +240,9 @@ export function SupabasePublicSurvey() {
   }
   if (loadError) {
     return <PublicSurveyNotice title="설문을 불러올 수 없습니다." description={loadError} />
+  }
+  if (phase === 'unavailable' && unavailableStatus === 'submitted') {
+    return <PublicSurveyNotice title="이미 제출된 설문입니다." description="응답해 주셔서 감사합니다. 고칠 내용이 있으면 담당 컨설턴트에게 알려 주세요." />
   }
   if (phase === 'unavailable') {
     return (

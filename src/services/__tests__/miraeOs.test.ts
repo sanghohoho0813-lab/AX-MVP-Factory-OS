@@ -34,6 +34,7 @@ import {
 import { EVENT_TYPE_LABEL, buildProjection, eventSummary, isOpenEvent, sortEvents, waitingDays, waitingLevel } from '../customerBridgeService'
 import signupSql from '../../../supabase/migrations/20260925000014_signup_event.sql?raw'
 import hardenSql from '../../../supabase/migrations/20261004000016_security_hardening.sql?raw'
+import publicLinksSql from '../../../supabase/migrations/20261005000017_public_links_hardening.sql?raw'
 import { normalizeClientOps, withContract, withCustomField, withFee, withNewFee, withNewFunding, withService, withoutCustomField, withoutFee } from '../clientOpsService'
 import {
   contractAgeShort,
@@ -370,6 +371,15 @@ check('events: 요약 who 는 회사명 우선', eventSummary(ev({ payload: { co
   check('보안 SQL: 소유자 권한은 소유자만 · 주인 줄 보호', sql.includes('before insert or update or delete on public.workspace_members') && sql.includes("new.role = 'owner' and not caller_is_owner") && sql.includes('old.user_id = ws_owner'))
   check('보안 SQL: 초대 받아도 소유자는 그대로', /role = case when public\.workspace_members\.role = 'owner'/.test(sql))
   check('보안 SQL: 검사 함수는 앱에서 직접 못 부른다', sql.includes('revoke all on function public.portal_same_workspace_guard() from public, anon, authenticated') && sql.includes('revoke all on function public.workspace_member_role_guard() from public, anon, authenticated'))
+}
+// D-151: 공개 링크 SQL — 만료 · 제출 뒤 잠금 · 신청 횟수 장치가 빠지면 여기서 먼저 걸린다
+{
+  const sql = publicLinksSql.toLowerCase()
+  check('공개 링크 SQL: 표 · 열 삭제 · RLS 끄기 없음', !/drop\s+table|drop\s+column|truncate|disable\s+row\s+level|drop\s+policy/.test(sql))
+  check('공개 링크 SQL: 설문 · 시험 넷 모두 만료 시각을 본다', (sql.match(/public\.public_link_expired\(/g) ?? []).length >= 4)
+  check('공개 링크 SQL: 낸 설문 · 마친 시험은 다시 못 낸다', sql.includes("raise exception '이미 제출된 설문입니다.'") && sql.includes("raise exception '이미 마친 테스트입니다.'"))
+  check('공개 링크 SQL: 알림 신청은 접속 주소마다 10분에 5번 · 같은 연락처 하루 한 번', sql.includes("interval '10 minutes') >= 5") && sql.includes("'grant_alert_contact'") && sql.includes("interval '1 day'"))
+  check('공개 링크 SQL: 기록 표는 해시만 · 앱에서 못 읽음', sql.includes('alter table public.public_intake_log enable row level security') && sql.includes('revoke all on table public.public_intake_log from public, anon, authenticated') && !/create policy[^;]*public_intake_log/.test(sql))
 }
 check('events: 값 없으면 고객', eventSummary(ev({ payload: {} })).who === '고객')
 // D-107: 오래 기다린 상담신청 — "N일째 대기" (정오 UTC 로 잡아 시간대가 달라도 같은 날)

@@ -1,5 +1,5 @@
 import type { Organization } from '../types/domain'
-import { STORAGE_KEYS, generateId, notifyStoreChanged, readJson, writeJson } from '../storage/localStore'
+import { STORAGE_KEYS, notifyStoreChanged, readJson, writeJson } from '../storage/localStore'
 
 export const CLIENT_SETUP_TASKS = [
   { key: 'patent', label: '특허 출원', description: '발명 내용 정리, 선행기술 검토, 출원 진행' },
@@ -157,47 +157,4 @@ export function buildClientOperationsSummary(record: ClientOperationsRecord): Cl
     paymentAttentionCount,
     missingLabels: CLIENT_DOCUMENTS.filter(({ key }) => !record.documents[key].received).slice(0, 4).map(({ label }) => label),
   }
-}
-
-function filePath(organizationId: string, file: File): string {
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-100) || 'document'
-  return `${organizationId}/${generateId()}-${safeName}`
-}
-
-/**
- * 민감 서류는 로컬에 보관하지 않고, Supabase Storage 업로드가 성공할 때만 첨부 상태를 기록한다.
- * 인증서 비밀번호처럼 비밀값은 이 서비스에서 취급하지 않는다.
- */
-export async function uploadClientDocument(
-  organization: Organization,
-  key: ClientDocumentKey,
-  file: File,
-): Promise<ClientOperationsRecord> {
-  const { getDataModeConfig } = await import('../data/dataMode')
-  const config = getDataModeConfig()
-  if (config.mode !== 'supabase') {
-    throw new Error('서류 첨부는 Supabase 클라우드 저장 모드에서 사용할 수 있습니다.')
-  }
-  const { getSupabaseClient } = await import('../lib/supabase/client')
-  const bucket = (import.meta.env.VITE_SUPABASE_DOCUMENTS_BUCKET as string | undefined)?.trim() || 'client-documents'
-  const path = filePath(organization.id, file)
-  const { error } = await getSupabaseClient().storage.from(bucket).upload(path, file, {
-    cacheControl: '3600',
-    upsert: false,
-    contentType: file.type || undefined,
-  })
-  if (error) throw new Error(`서류 업로드에 실패했습니다: ${error.message}`)
-  return updateClientOperations(organization, (current) => ({
-    ...current,
-    documents: {
-      ...current.documents,
-      [key]: {
-        ...current.documents[key],
-        received: true,
-        fileName: file.name,
-        storagePath: path,
-        uploadedAt: new Date().toISOString(),
-      },
-    },
-  }))
 }
