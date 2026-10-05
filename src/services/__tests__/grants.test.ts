@@ -43,7 +43,7 @@ import { alertPayload, publicPayload, sameNotice, validateAlert, type AlertReque
 import { mergeNotices, noticesFromFeed, slotOf } from '../grants/grantFeed'
 import { withAgencyRegion } from '../grants/grantText'
 import { clientsForNotice, fitSummary, grantClients, grantIndex } from '../grants/grantView'
-import { applyDocViews, applyDocsFor, applyReadiness, docIdentity, grantDocRequestMessage, openApplications, withApplyDocDone, withGrantApplication } from '../grants/grantApply'
+import { applicationBoard, applyDocViews, applyDocsFor, applyReadiness, applyStage, docIdentity, grantDocRequestMessage, openApplications, portalRequestTitles, successFeeAmount, withApplyDocDone, withApplyResult, withApplySubmitted, withGrantApplication, withResultDueDate, withSuccessFee } from '../grants/grantApply'
 import { documentsOf } from '../grants/grantText'
 import { buildClientSchedule } from '../clientOpsSchedule'
 import { recommendNextSteps } from '../clientInsights'
@@ -611,6 +611,50 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   const allOk = normalizeClientOps({ id: 'c4', companyName: '다있음', documents: { businessRegistration: { received: true, issuedAt: '2024-01-02', fileName: 'a.pdf' } } } as never)
   const one = withGrantApplication(allOk, { ...n, documents: ['사업자등록증'] })
   check('다 있으면: 모두 받았다는 문구', grantDocRequestMessage(one.record, one.app, TODAY).includes('필요한 서류는 모두 받았습니다'), grantDocRequestMessage(one.record, one.app, TODAY))
+}
+
+// D-152: 접수 → 결과 발표 → 선정 → 성공보수 · 신청 진행판 · 고객 화면 요청
+{
+  const n = notice({}, { id: 'n-life', title: '2026 수출바우처', applyEnd: '2026-10-20', documents: ['사업자등록증', '국세 납세증명서', '사업계획서'] })
+  const base = normalizeClientOps({ id: 'c10', companyName: '가나테크', documents: { businessRegistration: { received: true, issuedAt: '2024-01-02', fileName: 'a.pdf' } } } as never)
+  let rec = withGrantApplication(base, n).record
+  const id = rec.fundingApplications[0].id
+  check('단계: 처음은 서류 준비', applyStage(rec.fundingApplications[0]) === 'preparing')
+  check('고객 화면 요청: 모자란 것만 · 이미 요청한 같은 서류는 빼기', JSON.stringify(portalRequestTitles(rec, rec.fundingApplications[0], TODAY, [])) === JSON.stringify(['국세 납세증명서']) && portalRequestTitles(rec, rec.fundingApplications[0], TODAY, ['납세증명서(국세)']).length === 0)
+  rec = withApplySubmitted(rec, id, '2026-11-30')
+  const sub = rec.fundingApplications[0]
+  check('접수: 상태 · 접수일 오늘 · 결과 발표 예정일', sub.status === 'submitted' && sub.submittedAt !== null && sub.resultDueDate === '2026-11-30' && applyStage(sub) === 'waiting', sub)
+  const evs = buildClientSchedule(rec, TODAY).filter((e) => e.kind === 'funding')
+  check('일정: 결과 발표 11/30 · 마감 줄은 끝난 것으로', evs.some((e) => e.date === '2026-11-30' && e.title === '결과 발표 — 2026 수출바우처' && !e.done) && evs.some((e) => e.date === '2026-10-20' && e.done), evs)
+  check('결과 발표일 고치기 · 지우기', withResultDueDate(rec, id, '2026-12-05').fundingApplications[0].resultDueDate === '2026-12-05' && normalizeClientOps(JSON.parse(JSON.stringify(withResultDueDate(rec, id, '')))).fundingApplications[0].resultDueDate === undefined)
+  rec = withApplyResult(rec, id, 'selected', 30_000_000)
+  const sel = rec.fundingApplications[0]
+  check('선정: 상태 · 확정 금액 · 결과일', sel.status === 'selected' && sel.approvedAmount === 30_000_000 && sel.resultAt !== null && applyStage(sel) === 'selected')
+  check('일정: 선정 뒤 결과 발표 줄은 사라짐', !buildClientSchedule(rec, TODAY).some((e) => e.title.startsWith('결과 발표')))
+  check('성공보수: 3,000만 × 10% = 300만 · 천 원 아래 버림 · 잘못된 요율은 없음', successFeeAmount(30_000_000, 10) === 3_000_000 && successFeeAmount(12_345_678, 7) === 864_000 && successFeeAmount(null, 10) === null && successFeeAmount(1000, 0) === null && successFeeAmount(1000, 150) === null)
+  const fee1 = withSuccessFee(rec, id, 3_000_000, 10)
+  const f = fee1.record.fees[fee1.record.fees.length - 1]
+  check('성공보수 걸기: 성공 · 300만 · 조건(협약 · 입금 뒤) · 메모', fee1.created && f.kind === 'success' && f.amount === 3_000_000 && f.label === '2026 수출바우처 성공보수' && f.conditionKind === 'custom' && f.dueDate === '' && f.note === '선정 금액 30,000,000원 × 10%', f)
+  check('성공보수: 다시 눌러도 하나', !withSuccessFee(fee1.record, id, 3_000_000, 10).created && withSuccessFee(fee1.record, id, 3_000_000, 10).record.fees.length === fee1.record.fees.length)
+  const saved = normalizeClientOps(JSON.parse(JSON.stringify(fee1.record)))
+  check('저장했다 읽어도: 결과 발표일 · 성공보수 연결', saved.fundingApplications[0].resultDueDate === '2026-11-30' && saved.fundingApplications[0].successFeeId === f.id)
+  const r0 = withGrantApplication(base, { ...n, id: 'n2', title: '떨어진 사업' }).record
+  const rid = r0.fundingApplications[0].id
+  const rej = withApplyResult(withApplySubmitted(r0, rid), rid, 'rejected', 5_000_000)
+  check('탈락: 끝 · 확정 금액 안 적음', applyStage(rej.fundingApplications[0]) === 'closed' && rej.fundingApplications[0].approvedAmount === null)
+
+  // 신청 진행판
+  const prep = withGrantApplication(base, { ...n, id: 'n3', title: '준비 중 사업', applyEnd: '2026-10-08' }).record
+  const board = applicationBoard([
+    { ...prep, id: 'p1', companyName: '준비상사' },
+    { ...rec, id: 'p2', companyName: '선정상사' },
+    { ...withApplySubmitted(prep, prep.fundingApplications[0].id, '2026-10-25'), id: 'p3', companyName: '대기상사' },
+    { ...prep, id: 'p4', companyName: '보관상사', archivedAt: '2026-09-01T00:00:00Z' },
+  ], TODAY)
+  check('진행판: 준비 1 · 기다림 1 · 결과 1 · 보관 업체 빠짐', board.preparing.length === 1 && board.waiting.length === 1 && board.done.length === 1 && board.preparing[0].clientName === '준비상사', { p: board.preparing.length, w: board.waiting.length, d: board.done.length })
+  check('진행판: 준비 줄 서류 1/3 · 고객에게 받을 것 1(사업계획서는 우리 것) · 마감 D-7', board.preparing[0].ready === 1 && board.preparing[0].total === 3 && board.preparing[0].needFromClient === 1 && board.preparing[0].daysLeft === 7, board.preparing[0])
+  check('진행판: 기다림 줄 결과 발표까지 24일', board.waiting[0].daysLeft === 24)
+  check('진행판: 선정됐는데 성공보수 안 건 것 1 → 걸면 0', board.feeMissing === 1 && applicationBoard([{ ...fee1.record, id: 'p2' }], TODAY).feeMissing === 0)
 }
 
 console.log(`\ngrants: ${pass} passed, ${fail} failed`)

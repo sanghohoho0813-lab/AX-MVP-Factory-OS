@@ -119,6 +119,23 @@ export function buildClientSchedule(record: ClientOpsRecord, today: string): Sch
     })
   }
 
+  // D-152: 접수한 신청의 결과 발표 예정일 — 지나면 '결과 적기' 를 챙기게 남는다
+  for (const app of record.fundingApplications) {
+    if (!app.resultDueDate || !(app.status === 'submitted' || app.status === 'reviewing')) continue
+    out.push({
+      id: `${record.id}:funding-result:${app.id}`,
+      date: app.resultDueDate,
+      kind: 'funding',
+      clientId: record.id,
+      clientName: name,
+      title: `결과 발표 — ${app.programName || '지원사업'}`,
+      detail: app.institution || '',
+      serviceKey: 'policyFund',
+      done: false,
+      daysLeft: daysLeftFrom(today, app.resultDueDate),
+    })
+  }
+
   // 수금 예정
   for (const fee of record.fees) {
     if (!fee.dueDate) continue

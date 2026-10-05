@@ -16,7 +16,7 @@
 import type { ApplyDoc, ClientOpsRecord, DocumentKey, FundingApplication } from '../../types/clientOps'
 import { allDocumentMetas } from '../clientOpsDocuments'
 import { daysLeftFrom, documentStatus } from '../clientOpsAlerts'
-import { withFunding, withNewFunding } from '../clientOpsService'
+import { withFunding, withNewFee, withNewFunding } from '../clientOpsService'
 import type { GrantNotice } from './grantMatch'
 import { nowDate } from '../../lib/appClock'
 
@@ -291,4 +291,131 @@ export function grantDocRequestMessage(record: ClientOpsRecord, app: FundingAppl
 /** 진행 중인 신청 준비(접수 전)만 — 오늘 · 맞춤 추천에서 쓴다 */
 export function openApplications(record: Pick<ClientOpsRecord, 'fundingApplications'>): FundingApplication[] {
   return record.fundingApplications.filter((a) => (a.status === 'watching' || a.status === 'preparing') && Array.isArray(a.docs))
+}
+
+/* ------------------------------------------------------------------ */
+/* D-152: 접수 → 결과 → 성공보수 — 신청 건의 다음 단계                    */
+/* ------------------------------------------------------------------ */
+
+export type ApplyStage = 'preparing' | 'waiting' | 'selected' | 'closed'
+
+/** 서류 준비 중 · 접수 뒤 결과 기다림 · 선정 · 끝(탈락 · 포기) */
+export function applyStage(app: Pick<FundingApplication, 'status'>): ApplyStage {
+  if (app.status === 'watching' || app.status === 'preparing') return 'preparing'
+  if (app.status === 'submitted' || app.status === 'reviewing') return 'waiting'
+  if (app.status === 'selected') return 'selected'
+  return 'closed'
+}
+
+/** 접수했다 — 접수일은 오늘(이미 있으면 그대로), 결과 발표 예정일은 알면 적는다 */
+export function withApplySubmitted(record: ClientOpsRecord, appId: string, resultDueDate = ''): ClientOpsRecord {
+  const ok = /^\d{4}-\d{2}-\d{2}$/.test(resultDueDate)
+  return withFunding(record, appId, { status: 'submitted', ...(ok ? { resultDueDate } : {}) })
+}
+
+/** 결과 발표 예정일만 고친다(접수 뒤 공고가 바뀐 경우) — 빈 값이면 지운다 */
+export function withResultDueDate(record: ClientOpsRecord, appId: string, resultDueDate: string): ClientOpsRecord {
+  const ok = /^\d{4}-\d{2}-\d{2}$/.test(resultDueDate)
+  return withFunding(record, appId, { resultDueDate: ok ? resultDueDate : undefined })
+}
+
+/** 결과가 나왔다 — 선정이면 확정 금액(알면)도 */
+export function withApplyResult(record: ClientOpsRecord, appId: string, result: 'selected' | 'rejected', approvedAmount: number | null = null): ClientOpsRecord {
+  return withFunding(record, appId, { status: result, ...(result === 'selected' && approvedAmount && approvedAmount > 0 ? { approvedAmount } : {}) })
+}
+
+/** 성공보수 금액 — 확정 금액 × 요율(%), 천 원 아래는 버린다 */
+export function successFeeAmount(approvedAmount: number | null, ratePercent: number): number | null {
+  if (!approvedAmount || approvedAmount <= 0 || !(ratePercent > 0) || ratePercent > 100) return null
+  return Math.floor((approvedAmount * ratePercent) / 100 / 1000) * 1000
+}
+
+/**
+ * 선정 → 성공보수를 수금에 건다. '언제 받나' 는 날짜가 아니라 조건(협약 · 지원금 입금 뒤)이라
+ * 미수금으로 잡히지 않고 '조건 대기' 로 들어간다(D-140). 이미 걸었으면 그대로.
+ */
+export function withSuccessFee(
+  record: ClientOpsRecord,
+  appId: string,
+  amount: number,
+  ratePercent: number | null = null,
+): { record: ClientOpsRecord; created: boolean } {
+  const app = record.fundingApplications.find((a) => a.id === appId)
+  if (!app || !(amount > 0)) return { record, created: false }
+  if (app.successFeeId && record.fees.some((f) => f.id === app.successFeeId)) return { record, created: false }
+  const withFeeRec = withNewFee(record, {
+    kind: 'success',
+    label: `${app.programName || '지원사업'} 성공보수`,
+    amount,
+    conditionKind: 'custom',
+    conditionText: '지원사업 협약 · 지원금 입금 뒤',
+    note: ratePercent && app.approvedAmount ? `선정 금액 ${app.approvedAmount.toLocaleString('ko-KR')}원 × ${ratePercent}%` : '',
+  })
+  const fee = withFeeRec.fees[withFeeRec.fees.length - 1]
+  return { record: withFunding(withFeeRec, appId, { successFeeId: fee.id }), created: true }
+}
+
+export interface BoardRow {
+  clientId: string
+  clientName: string
+  app: FundingApplication
+  stage: ApplyStage
+  /** 서류 준비 중일 때만 */
+  ready: number | null
+  total: number | null
+  needFromClient: number
+  /** 마감까지(준비 중) · 결과 발표까지(기다림) · 결과 난 지(끝) */
+  daysLeft: number | null
+}
+
+export interface ApplyBoard {
+  preparing: BoardRow[]
+  waiting: BoardRow[]
+  /** 최근 90일 안에 결과 난 것 */
+  done: BoardRow[]
+  /** 선정됐는데 성공보수를 아직 안 건 것 */
+  feeMissing: number
+}
+
+/**
+ * 모든 업체의 신청 건을 한 판으로 — 서류 준비(마감 가까운 순) · 결과 기다림(발표 가까운 순) · 최근 결과.
+ * 보관한 업체는 뺀다.
+ */
+export function applicationBoard(records: readonly ClientOpsRecord[], today: string): ApplyBoard {
+  const board: ApplyBoard = { preparing: [], waiting: [], done: [], feeMissing: 0 }
+  for (const r of records) {
+    if (r.archivedAt) continue
+    for (const app of r.fundingApplications) {
+      const stage = applyStage(app)
+      const base = { clientId: r.id, clientName: r.companyName, app, stage }
+      if (stage === 'preparing') {
+        const rd = app.docs ? applyReadiness(r, app, today) : null
+        board.preparing.push({ ...base, ready: rd?.ready ?? null, total: rd?.total ?? null, needFromClient: rd?.needFromClient.length ?? 0, daysLeft: app.applyDueDate ? daysLeftFrom(today, app.applyDueDate) : null })
+      } else if (stage === 'waiting') {
+        board.waiting.push({ ...base, ready: null, total: null, needFromClient: 0, daysLeft: app.resultDueDate ? daysLeftFrom(today, app.resultDueDate) : null })
+      } else {
+        const ago = app.resultAt ? daysLeftFrom(app.resultAt, today) : null
+        if (ago !== null && ago > 90) continue
+        if (ago === null && stage === 'closed') continue
+        board.done.push({ ...base, ready: null, total: null, needFromClient: 0, daysLeft: ago })
+        if (stage === 'selected' && !(app.successFeeId && r.fees.some((f) => f.id === app.successFeeId))) board.feeMissing += 1
+      }
+    }
+  }
+  const byDays = (a: BoardRow, b: BoardRow) => (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999)
+  board.preparing.sort(byDays)
+  board.waiting.sort(byDays)
+  board.done.sort((a, b) => (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999))
+  return board
+}
+
+/**
+ * 고객 화면에 올릴 서류 요청 — 모자란 것 중 이미 요청해 둔 것(같은 서류 이름)은 뺀다.
+ * 고객이 올린 파일은 서류함으로 들어오고(D-148), 들어오면 이 목록에서 저절로 '있음' 이 된다.
+ */
+export function portalRequestTitles(record: ClientOpsRecord, app: FundingApplication, today: string, alreadyRequested: readonly string[]): string[] {
+  const asked = new Set(alreadyRequested.map(docIdentity))
+  return applyReadiness(record, app, today)
+    .needFromClient.map((v) => v.label)
+    .filter((l) => !asked.has(docIdentity(l)))
 }

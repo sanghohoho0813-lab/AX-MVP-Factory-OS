@@ -254,6 +254,10 @@ export interface FundingApplication {
   applyDueTime?: string
   /** 낼 서류 — 서류함에 있는 서류는 서류함을 보고, 신청서 · 사업계획서처럼 없는 것은 done 으로 챙긴다 */
   docs?: ApplyDoc[]
+  /** D-152: 결과 발표 예정일(접수할 때 공고에서 보고 적는다) — 오늘 · 달력에 '결과 발표' 로 */
+  resultDueDate?: string
+  /** D-152: 선정 뒤 건 성공보수 수금 항목 — 두 번 걸지 않게 */
+  successFeeId?: string
   createdAt: string
   updatedAt: string
 }
