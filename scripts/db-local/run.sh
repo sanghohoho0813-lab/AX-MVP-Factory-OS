@@ -5,14 +5,15 @@
 set -u
 cd "$(dirname "$0")/../.."
 DIR=scripts/db-local
-psqlq() { su postgres -c "psql -q -v ON_ERROR_STOP=1 -d axqa"; }
-su postgres -c "dropdb --if-exists axqa; createdb axqa" || exit 1
+DB=${AXQA_DB:-axqa}
+psqlq() { su postgres -c "psql -q -v ON_ERROR_STOP=1 -d $DB"; }
+su postgres -c "dropdb --if-exists $DB; createdb $DB" || exit 1
 psqlq < $DIR/supabase-shim.sql > /dev/null || exit 1
 for f in supabase/migrations/*.sql; do
   if ! psqlq < "$f" > /dev/null 2> /tmp/db-local-err.txt; then echo "적용 실패: $f"; cat /tmp/db-local-err.txt; exit 1; fi
 done
 echo "마이그레이션 $(ls supabase/migrations/*.sql | wc -l)개 적용"
-out=$(for t in $DIR/test-*.sql; do su postgres -c "psql -d axqa" < "$t" 2>&1; done | grep -E "PASS|FAIL|ERROR" | sed 's/^NOTICE:  //')
+out=$(for t in $DIR/test-*.sql; do su postgres -c "psql -d $DB" < "$t" 2>&1; done | grep -E "PASS|FAIL|ERROR" | sed 's/^NOTICE:  //')
 echo "$out"
 pass=$(echo "$out" | grep -c '^PASS'); bad=$(echo "$out" | grep -cE '^FAIL|ERROR')
 echo "통과 $pass · 실패 $bad"

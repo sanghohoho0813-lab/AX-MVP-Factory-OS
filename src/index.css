@@ -660,7 +660,9 @@ input:is([type="date"], [type="month"], [type="time"], [type="datetime-local"]):
 html[data-text-scale="large"] .hdr-wide-search,
 html[data-text-scale="extra_large"] .hdr-wide-search,
 html[data-text-scale="large"] .hdr-opt,
-html[data-text-scale="extra_large"] .hdr-opt {
+html[data-text-scale="extra_large"] .hdr-opt,
+html[data-text-scale="large"] .hdr-opt-label,
+html[data-text-scale="extra_large"] .hdr-opt-label {
   display: none !important;
 }
 html[data-text-scale="large"] .hdr-compact-search,

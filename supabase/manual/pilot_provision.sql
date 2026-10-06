@@ -44,9 +44,13 @@ begin
   else
     raise notice '이미 Pilot 작업공간이 있습니다: %', v_ws;
   end if;
+  -- D-164: 0020 이 있으면 대표도 이 작업공간 편집자로 — 대표 화면 오른쪽 위에서 팀장 화면을 바로 본다(대표 → 팀장 방향만)
+  if to_regprocedure('public.os_access_link_owner_to_pilots()') is not null then
+    perform public.os_access_link_owner_to_pilots();
+  end if;
 end $$;
 
--- 확인: Pilot 작업공간의 멤버는 Pilot 한 사람뿐이어야 한다 · 업체 0
+-- 확인: Pilot 작업공간의 멤버는 Pilot(owner) — 0020 뒤에는 대표(editor)도 · 업체 0
 select w.name, p.email, m.role, (select count(*) from public.operations_clients c where c.workspace_id = w.id) as clients
 from public.workspaces w join public.workspace_members m on m.workspace_id = w.id left join public.profiles p on p.id = m.user_id
 where w.owner_id in (select user_id from public.os_access where tier = 'pilot');

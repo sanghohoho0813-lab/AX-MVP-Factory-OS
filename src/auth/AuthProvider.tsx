@@ -31,7 +31,7 @@ import {
   unauthenticatedState,
   type BootstrapState,
 } from './bootstrap'
-import { fetchMyAccess, type OsAccess } from './osAccess'
+import { fetchMyAccess, fetchPilotViews, type OsAccess, type PilotView } from './osAccess'
 import { vaultSignOut, vaultSwitchTo } from './storageVault'
 import { getCurrentSession, onAuthStateChange, signOut as authSignOut } from './authService'
 import { listMyWorkspaces, type WorkspaceMembership } from './workspaceService'
@@ -49,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [workspaces, setWorkspaces] = useState<WorkspaceMembership[]>([])
   const [access, setAccess] = useState<OsAccess | null>(null)
+  const [pilotViews, setPilotViews] = useState<PilotView[]>([])
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(() => {
     try {
       return window.localStorage.getItem(WORKSPACE_STORAGE_KEY)
@@ -90,9 +91,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           window.location.reload()
           return
         }
-        const memberships = await listMyWorkspaces()
+        // 같은 작업공간의 다른 구성원 줄도 읽히므로 내 줄만(대표가 팀장 작업공간에 들어가 있어도 역할이 섞이지 않게)
+        const memberships = (await listMyWorkspaces()).filter((m) => m.userId === nextSession.user.id)
+        // D-164: 대표면 바로 볼 수 있는 팀장 화면 목록(0020 전이면 빈 목록)
+        const views = tier === 'full' ? await fetchPilotViews() : []
         if (!mounted.current) return
         setWorkspaces(memberships)
+        setPilotViews(views)
         if (memberships.length === 0) {
           // 0019 전(legacy)에는 새 작업공간을 만들지 않는다 — 공개 사이트 가입자가 내부 OS 를 여는 길을 막는다
           setBootstrap(tier === 'legacy' ? noAccessState('supabase') : noWorkspaceState('supabase'))
@@ -191,11 +196,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       workspaces,
       currentWorkspaceId,
       access,
+      pilotViews,
       selectWorkspace,
       refreshWorkspaces,
       signOut,
     }),
-    [bootstrap, session, workspaces, currentWorkspaceId, access, selectWorkspace, refreshWorkspaces, signOut],
+    [bootstrap, session, workspaces, currentWorkspaceId, access, pilotViews, selectWorkspace, refreshWorkspaces, signOut],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

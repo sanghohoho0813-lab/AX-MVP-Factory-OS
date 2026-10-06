@@ -11,6 +11,9 @@ export function useCurrentUser(): UserIdentity {
   // AuthProvider 가 없는 로컬 모드에서는 null — 그때는 대표 이름
   const auth = useContext(AuthContext)
   if (!auth || !auth.session) return ownerIdentity()
+  // D-164: 대표가 팀장 화면으로 바꿔 보면 이름 칸도 팀장 — 팀장이 보는 그대로
+  const view = auth.access === 'full' ? auth.pilotViews.find((v) => v.workspaceId === auth.currentWorkspaceId) : undefined
+  if (view) return { name: view.personName, title: view.personTitle, initial: view.personName.slice(0, 1) }
   const role = auth.workspaces.find((w) => w.workspaceId === auth.currentWorkspaceId)?.role ?? null
   return identityFromSession(auth.session.user, role, auth.access)
 }
@@ -22,6 +25,7 @@ export function useCurrentUser(): UserIdentity {
 export function useSenderLine(): string {
   const auth = useContext(AuthContext)
   const me = useCurrentUser()
-  if (auth?.access === 'pilot') return me.title ? `${me.name} ${me.title}` : me.name
+  const viewing = auth?.access === 'full' && auth.pilotViews.some((v) => v.workspaceId === auth.currentWorkspaceId)
+  if (auth?.access === 'pilot' || viewing) return me.title ? `${me.name} ${me.title}` : me.name
   return `${brand.brandNameKo} ${brand.ownerName} ${brand.ownerTitle}`
 }

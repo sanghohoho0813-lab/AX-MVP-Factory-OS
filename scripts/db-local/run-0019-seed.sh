@@ -7,7 +7,7 @@ DB=axqa19seed
 q() { su postgres -c "psql -q -v ON_ERROR_STOP=1 -d $DB"; }
 su postgres -c "dropdb --if-exists $DB; createdb $DB" || exit 1
 q < scripts/db-local/supabase-shim.sql > /dev/null || exit 1
-for f in $(ls supabase/migrations/*.sql | grep -v 000019); do q < "$f" > /dev/null 2>/tmp/s19 || { echo "적용 실패 $f"; cat /tmp/s19; exit 1; }; done
+for f in $(ls supabase/migrations/*.sql | grep -v -E '0000(19|20)'); do q < "$f" > /dev/null 2>/tmp/s19 || { echo "적용 실패 $f"; cat /tmp/s19; exit 1; }; done
 q <<'SQL' > /dev/null || { echo "상황 만들기 실패"; exit 1; }
 insert into auth.users (id, email) values ('5e000000-0000-0000-0000-0000000000a1','ceo@x.kr'),('5e000000-0000-0000-0000-0000000000a2','staff@x.kr'),('5e000000-0000-0000-0000-0000000000c1','random@x.kr') on conflict (id) do update set email = excluded.email;
 insert into public.profiles (id, email) values ('5e000000-0000-0000-0000-0000000000a1','ceo@x.kr'),('5e000000-0000-0000-0000-0000000000a2','staff@x.kr'),('5e000000-0000-0000-0000-0000000000c1','random@x.kr') on conflict (id) do update set email = excluded.email;
@@ -45,7 +45,7 @@ DB2=axqa19inflate
 q2() { su postgres -c "psql -q -v ON_ERROR_STOP=1 -d $DB2"; }
 su postgres -c "dropdb --if-exists $DB2; createdb $DB2" || exit 1
 q2 < scripts/db-local/supabase-shim.sql > /dev/null || exit 1
-for f in $(ls supabase/migrations/*.sql | grep -v 000019); do q2 < "$f" > /dev/null 2>/tmp/s19 || { echo "적용 실패 $f"; cat /tmp/s19; exit 1; }; done
+for f in $(ls supabase/migrations/*.sql | grep -v -E '0000(19|20)'); do q2 < "$f" > /dev/null 2>/tmp/s19 || { echo "적용 실패 $f"; cat /tmp/s19; exit 1; }; done
 q2 <<'SQL' > /dev/null || { echo "상황 만들기 실패(부풀림)"; exit 1; }
 insert into auth.users (id, email, created_at) values ('6e000000-0000-0000-0000-0000000000a1','ceo@x.kr','2026-01-01'),('6e000000-0000-0000-0000-0000000000c1','evil@x.kr','2026-09-01');
 insert into public.workspaces (id, name, owner_id, created_at) values

@@ -21,6 +21,7 @@ import { FUTURE_ITEMS, type FutureItem } from '../../config/capabilityStatus'
 import { FutureItemDialog } from './FutureItemDialog'
 import { futureIcon } from './futureIcons'
 import { useCurrentUser } from './useCurrentUser'
+import { ViewAsSwitch } from './ViewAsSwitch'
 import { useNavCounts, type NavCounts } from './useNavCounts'
 import { useIsPilot } from '../../auth/osAccess'
 import { useBackToClose } from '../../lib/backToClose'
@@ -236,6 +237,12 @@ function SidebarContent({
       */}
       <div className="shrink-0 border-t border-navy-800 px-3 py-3">
         {/* D-158: 휴대폰 서랍의 글자 크기는 뺐다(대표: 설정에 있으니 굳이) */}
+        {/* D-164: 휴대폰 서랍에서도 대표 ↔ 팀장 화면(PC 는 머리줄 오른쪽 위) */}
+        {!collapsed && (
+          <div className="mb-2 px-1.5 lg:hidden">
+            <ViewAsSwitch stacked />
+          </div>
+        )}
         <SidebarAccount collapsed={collapsed} />
         {!collapsed && (
           <p className="t-meta truncate px-3 pt-2 pb-1 text-navy-300" title={`${brand.productSubtitle} · ${APP_VERSION}`}>

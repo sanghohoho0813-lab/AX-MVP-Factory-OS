@@ -44,8 +44,16 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)
 
-  const btn = page.getByTestId('text-scale-quick').first()
-  check('글자 크기: 머리줄에 단추가 있다(기본)', (await btn.count()) === 1 && (await btn.getAttribute('data-scale')) === 'default')
+  // D-164: 머리줄 글자 크기 단추는 뺐다(대표: 설정에 있으니) — 글자 크기는 설정 › 화면에서
+  check('글자 크기: 머리줄에 단추가 없다(설정에 있다)', (await page.locator('header [data-testid="text-scale-quick"]').count()) === 0 && (await page.locator('header').getByText('글자 크기').count()) === 0)
+  const scaleAt = () => page.evaluate(() => document.documentElement.getAttribute('data-text-scale') ?? 'default')
+  const pickScale = async (label) => {
+    await page.goto(BASE + '/settings', { waitUntil: 'networkidle' })
+    await page.getByRole('main').getByRole('radiogroup', { name: '글자 크기' }).first().getByRole('radio', { name: new RegExp(label) }).first().click()
+    await page.waitForTimeout(200)
+    await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
+    await page.waitForTimeout(300)
+  }
   const metaSize = await page.locator('.t-meta').first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
   check('글자: 배지 · 메타 글자 14px 이상(기본)', metaSize >= 14, String(metaSize))
   const gray = await page.evaluate(() => {
@@ -66,15 +74,13 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   // 예전 13px 고정이던 글(업체 카드) — 글자 크기를 따라 커지는가
   const probe = page.locator('[class*="text-[0.875rem]"]').first()
   const s1 = await probe.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
-  await btn.click()
-  await page.waitForTimeout(200)
-  const s2 = await probe.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
-  check('글자 크기: 한 번 누르면 크게 · 예전 고정 글자도 커진다', (await btn.getAttribute('data-scale')) === 'large' && s2 > s1 + 1, `${s1} → ${s2}`)
+  await pickScale('^크게')
+  const s2 = await page.locator('[class*="text-[0.875rem]"]').first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
+  check('글자 크기: 설정에서 크게 · 예전 고정 글자도 커진다', (await scaleAt()) === 'large' && s2 > s1 + 1, `${s1} → ${s2}`)
   await page.reload({ waitUntil: 'networkidle' })
-  check('글자 크기: 새로고침해도 남는다', (await page.evaluate(() => document.documentElement.getAttribute('data-text-scale'))) === 'large')
-  await page.getByTestId('text-scale-quick').first().click()
-  await page.getByTestId('text-scale-quick').first().click()
-  check('글자 크기: 매우 크게 → 다시 기본', (await page.evaluate(() => document.documentElement.getAttribute('data-text-scale'))) === 'default')
+  check('글자 크기: 새로고침해도 남는다', (await scaleAt()) === 'large')
+  await pickScale('^기본')
+  check('글자 크기: 다시 기본', (await scaleAt()) === 'default')
 
   // 목차 — 고급 기능은 기본으로 빠져 있다 (D-127: 분야 줄을 펼쳐서 본다 — 기관 전략은 기업성장(D-163), 검증 · 사례는 AX 스튜디오)
   const openCats = async () => {
@@ -232,8 +238,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('휴대폰 영업 보드: 단추 이름이 다 보인다(크레탑으로 등록 · 새 잠재고객)', heads.includes('크레탑으로 등록') && heads.includes('새 잠재고객'))
   await page.getByRole('button', { name: '메뉴 열기' }).click()
   await page.waitForTimeout(300)
-  const drawerBtn = page.getByTestId('text-scale-quick').filter({ hasText: '글자' })
-  check('휴대폰 서랍: 글자 크기 단추(지금 크기가 글로)', (await drawerBtn.count()) >= 1 && ((await drawerBtn.first().innerText()) ?? '').includes('글자 기본'))
+  // D-158 · D-164: 서랍 · 머리줄 모두 글자 크기 단추 없음 — 설정 › 화면에만
+  check('휴대폰: 서랍 · 머리줄에 글자 크기 단추 없음(설정에 있다)', (await page.getByTestId('text-scale-quick').count()) === 0)
   await ctx.close()
 }
 

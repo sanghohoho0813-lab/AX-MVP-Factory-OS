@@ -9,6 +9,7 @@ import { isUserScopedKey, vaultSignOut, vaultSwitchTo } from '../storageVault'
 import { MODULES, enabledModulesByGroup, isPilotHiddenPath } from '../../config/moduleRegistry'
 import { identityFromSession } from '../currentUser'
 import { brand } from '../../brand/brand.config'
+import { isStageExcluded, stripFrame } from '../../lib/deviceView'
 
 let passed = 0
 let failed = 0
@@ -261,6 +262,15 @@ check('키: 상관없는 다른 사이트 값은 옮기지 않는다', !isUserSc
   check('이름: Pilot(이름 있음) → 그 이름', pilotNamed.name === '최은혜' && pilotNamed.title === '')
   const owner = identityFromSession({ email: 'ceo@x.kr', user_metadata: {} }, 'owner', 'full')
   check('이름: 대표(full · 이름 없음) → 지금처럼 대표 이름', owner.name === brand.ownerName)
+}
+
+// ---------- 보기 방식(D-164): iframe 주소 표시를 떼어 같은 주소로 맞춘다 · 공개 화면은 무대 없음 ----------
+{
+  check('보기 방식: frame 표시만 뗀다(다른 값 · # 는 그대로)', stripFrame('/ops/clients?frame=mobile&tab=docs#a') === '/ops/clients?tab=docs#a', stripFrame('/ops/clients?frame=mobile&tab=docs#a'))
+  check('보기 방식: frame 만 있으면 주소만', stripFrame('/today?frame=pc') === '/today')
+  check('보기 방식: 바깥 주소로 바뀌지 않는다', stripFrame('//evil.example/x?frame=pc').startsWith('/') && !stripFrame('//evil.example/x?frame=pc').startsWith('//'), stripFrame('//evil.example/x?frame=pc'))
+  check('보기 방식: 설문 · 시험 · 지원사업 찾기(공개 화면)는 무대 없음', isStageExcluded('/survey/abc') && isStageExcluded('/test/abc') && isStageExcluded('/grants/find'))
+  check('보기 방식: 내부 화면은 무대', !isStageExcluded('/ops/clients') && !isStageExcluded('/grants') && !isStageExcluded('/'))
 }
 
 console.log(`pilot: ${passed} passed, ${failed} failed`)

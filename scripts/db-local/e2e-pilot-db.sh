@@ -9,12 +9,12 @@
 set -eu
 cd "$(dirname "$0")/../.."
 DIR=scripts/db-local
-DB=axe2e
+DB=${AXE2E_DB:-axe2e}
 psqlq() { su postgres -c "psql -q -v ON_ERROR_STOP=1 -d $DB"; }
 su postgres -c "dropdb --if-exists $DB; createdb $DB"
 psqlq < $DIR/supabase-shim.sql > /dev/null
 for f in supabase/migrations/*.sql; do
-  case "$f" in *_os_access_pilot.sql) continue ;; esac
+  case "$f" in *_os_access_pilot.sql|*_owner_views_pilot.sql) continue ;; esac
   psqlq < "$f" > /dev/null
 done
 
@@ -55,6 +55,9 @@ psqlq < supabase/migrations/20261007000019_os_access_pilot.sql > /dev/null
 
 # 대표가 SQL Editor 에서 하는 일 그대로 — 이메일 한 줄만 바꿔서
 sed "s/여기에_Pilot_이메일@example.com/pilot@e2e.kr/; s/'Pilot 작업공간'/'최은혜 Pilot'/" supabase/manual/pilot_provision.sql | psqlq > /dev/null
+
+# 0020 — 대표가 팀장 화면을 바로 본다(대표를 Pilot 작업공간 편집자로)
+psqlq < supabase/migrations/20261008000020_owner_views_pilot.sql > /dev/null
 
 # PostgREST 가 붙을 역할(로컬 시험용 비밀번호)
 psqlq > /dev/null <<'SQL'

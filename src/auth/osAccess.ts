@@ -23,8 +23,42 @@ export async function fetchMyAccess(): Promise<OsAccess> {
   return data === 'full' || data === 'pilot' ? data : 'none'
 }
 
-/** 지금 계정이 Pilot 인가 — 로컬 모드 · 로그인 전은 아니다 */
+/** D-164: 대표가 바로 볼 수 있는 Pilot(팀장) 화면 — 서버 0020. 함수가 없거나(0020 전) 실패하면 빈 목록 */
+export interface PilotView {
+  workspaceId: string
+  workspaceName: string
+  personName: string
+  personTitle: string
+}
+
+export async function fetchPilotViews(): Promise<PilotView[]> {
+  try {
+    const { data, error } = await getSupabaseClient().rpc('my_pilot_views')
+    if (error || !Array.isArray(data)) return []
+    return (data as Record<string, unknown>[]).map((r) => ({
+      workspaceId: String(r.workspace_id ?? ''),
+      workspaceName: String(r.workspace_name ?? ''),
+      personName: String(r.person_name ?? 'Pilot'),
+      personTitle: String(r.person_title ?? ''),
+    })).filter((v) => v.workspaceId)
+  } catch {
+    return []
+  }
+}
+
+/** 지금 팀장(Pilot) 화면으로 보고 있는가 — 대표가 팀장 화면으로 바꿔 본 경우(D-164) */
+export function useViewingPilot(): PilotView | null {
+  const auth = useContext(AuthContext)
+  if (!auth || auth.access !== 'full') return null
+  return auth.pilotViews.find((v) => v.workspaceId === auth.currentWorkspaceId) ?? null
+}
+
+/**
+ * 지금 계정이 Pilot 인가 — 로컬 모드 · 로그인 전은 아니다.
+ * D-164: 대표가 팀장 화면으로 바꿔 보면 팀장과 똑같은 메뉴 · 화면(같은 판정을 쓴다).
+ */
 export function useIsPilot(): boolean {
   const auth = useContext(AuthContext)
-  return auth?.access === 'pilot'
+  const viewing = useViewingPilot()
+  return auth?.access === 'pilot' || viewing !== null
 }

@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
 import { useIsPilot } from '../../auth/osAccess'
 import { useNavPath } from '../../lib/navFrom'
-import { TextScaleQuickButton } from '../ui/TextScaleQuickButton'
+import { DeviceSwitch, DeviceSwitchCompact } from './DeviceView'
+import { ViewAsSwitch, ViewAsSwitchCompact } from './ViewAsSwitch'
 import {
   Building,
   Check,
@@ -255,14 +256,29 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
         <span className="hdr-opt hidden min-[2100px]:inline-flex">
           <CloudSaveStatus state={isSupabase ? 'saved' : 'local'} compact={false} />
         </span>
-        {/* D-120: 글자 크기를 머리줄에서 바로 — 설정 깊숙이 있었다. 휴대폰은 서랍 메뉴에 */}
-        <span className="hidden lg:inline-flex">
-          <TextScaleQuickButton />
+        {/* D-164: 머리줄 글자 크기 단추는 뺐다(설정 › 화면에 있다 · 휴대폰은 서랍 메뉴). 그 자리에 보기 방식 — PC · Mobile · PC+Mobile */}
+        {/* 1440px 아래에서는 단추 하나 + 고르기 창(머리줄이 옆으로 넘치지 않게) */}
+        <span className="hidden min-[1440px]:inline-flex">
+          <DeviceSwitch />
+        </span>
+        <span className="hidden lg:max-[1440px]:inline-flex">
+          <DeviceSwitchCompact />
         </span>
         {/* D-120: 1360px 아래에서도 찾기 — 예전에는 Ctrl+K 로만 열렸다 */}
         <span className="hdr-compact-search inline-flex min-[1360px]:hidden">
           <GlobalSearch compact />
         </span>
+        {/* D-164: 대표 ↔ 최은혜 팀장 화면 — 대표 계정에서만(다시 로그인 없이) */}
+        {isSupabase && (
+          <>
+            <span className="hidden min-[1440px]:inline-flex">
+              <ViewAsSwitch />
+            </span>
+            <span className="hidden lg:max-[1440px]:inline-flex">
+              <ViewAsSwitchCompact />
+            </span>
+          </>
+        )}
         <SignalBell />
         <Link
           to="/settings"

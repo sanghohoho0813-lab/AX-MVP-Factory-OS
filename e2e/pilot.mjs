@@ -19,10 +19,11 @@ import { existsSync, mkdirSync } from 'node:fs'
 const SHOTS = process.argv[2] ?? ''
 if (SHOTS) mkdirSync(SHOTS, { recursive: true })
 const REF = 'qapilot'
-const PORT = 4537
-const PGRST_PORT = 4536
+const PORT = Number(process.env.PILOT_PORT ?? 4537)
+const PGRST_PORT = Number(process.env.PGRST_PORT ?? 4536)
+const E2E_DB = process.env.AXE2E_DB ?? 'axe2e'
 const BASE = `http://localhost:${PORT}`
-const OUT = 'dist-qa-pilot'
+const OUT = process.env.PILOT_OUT ?? 'dist-qa-pilot'
 const SECRET = 'e2e-local-jwt-secret-at-least-32-characters-long'
 let pass = 0
 let fail = 0
@@ -42,7 +43,7 @@ const SECRETS = ['대표비밀', '김비밀', '111-22-33333', '010-1111-2222']
 
 // ---------- DB · PostgREST ----------
 execSync('bash scripts/db-local/e2e-pilot-db.sh', { stdio: 'ignore' })
-const sql = (q) => execSync('su postgres -c "psql -At -q -d axe2e"', { input: q }).toString().trim()
+const sql = (q) => execSync(`su postgres -c "psql -At -q -d ${E2E_DB}"`, { input: q }).toString().trim()
 const PILOT_WS = sql(`select id from public.workspaces where owner_id = '${PILOT.id}'`)
 check('준비: pilot_provision.sql 로 Pilot 작업공간 하나 · 업체 0', PILOT_WS.length === 36 && sql(`select count(*) from public.operations_clients where workspace_id = '${PILOT_WS}'`) === '0', PILOT_WS)
 check('준비: 0019 씨앗 — 대표 full · Pilot pilot · 가입자 없음', sql(`select string_agg(tier || ':' || user_id, ',' order by tier) from public.os_access`) === `full:${OWNER.id},pilot:${PILOT.id}`)
@@ -56,7 +57,7 @@ if (!existsSync(PGRST)) {
 const pgrst = spawn(PGRST, [], {
   stdio: 'ignore',
   detached: true,
-  env: { ...process.env, PGRST_DB_URI: 'postgres://authenticator:e2e-local@127.0.0.1:5432/axe2e', PGRST_DB_SCHEMAS: 'public', PGRST_DB_ANON_ROLE: 'anon', PGRST_JWT_SECRET: SECRET, PGRST_SERVER_PORT: String(PGRST_PORT), PGRST_DB_POOL: '5' },
+  env: { ...process.env, PGRST_DB_URI: `postgres://authenticator:e2e-local@127.0.0.1:5432/${E2E_DB}`, PGRST_DB_SCHEMAS: 'public', PGRST_DB_ANON_ROLE: 'anon', PGRST_JWT_SECRET: SECRET, PGRST_SERVER_PORT: String(PGRST_PORT), PGRST_DB_POOL: '5' },
 })
 
 execSync(`npx vite build --outDir ${OUT} --emptyOutDir`, {
@@ -121,7 +122,11 @@ async function route(r) {
     if (!u) return r.fulfill(json({ msg: 'no' }, 401))
     if (method === 'PUT') {
       const body = JSON.parse(req.postData() ?? '{}')
-      if (body.data) meta.set(u.id, { ...(meta.get(u.id) ?? {}), ...body.data })
+      if (body.data) {
+        meta.set(u.id, { ...(meta.get(u.id) ?? {}), ...body.data })
+        // 진짜 Supabase 처럼 auth.users 에도 남긴다(0020 의 팀장 이름이 여기서 읽는다)
+        sql(`update auth.users set raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) || '${JSON.stringify(body.data).replace(/'/g, "''")}'::jsonb where id = '${u.id}'`)
+      }
     }
     return r.fulfill(json(userObj(u)))
   }
@@ -259,6 +264,8 @@ try {
   check('Pilot 메뉴: 영업자 정산 · 1차 미팅 체크리스트 · 상담신청 없음', !nav.includes('영업자 정산') && !nav.includes('1차 미팅') && !nav.includes('상담신청'))
   check('Pilot 메뉴: 오늘 · 고객 관리 · 일정 · 매출 · 전문 모듈(기업성장 · 절세·재무) · 설정은 있음', ['오늘', '고객 관리', '매출', '기업성장', '절세·재무', '설정'].every((s) => nav.includes(s)), nav.replace(/\n/g, '|').slice(0, 400))
   check('메뉴(D-163): 정부지원사업 줄 없음 · 영업 묶음에 지원사업 알림 없음', !nav.includes('정부지원사업') && !/영업 관리\n지원사업 알림/.test(nav), nav.replace(/\n/g, '|').slice(0, 400))
+  check('Pilot(D-164): 대표 ↔ 팀장 전환 단추 없음', (await page.getByTestId('view-as-switch').count()) === 0)
+  check('Pilot(D-164): 머리줄 글자 크기 단추 없음 · 보기 방식(PC · Mobile · PC+Mobile) 단추 있음', (await page.locator('header [data-testid="text-scale-quick"]').count()) === 0 && (await page.locator('header [data-testid="device-switch"]').count()) === 1)
   check('Pilot 머리줄: 고객 플랫폼 링크 없음', (await page.locator('header').innerText()).includes('고객 플랫폼') === false)
 
   // 교차 — 대표 업체 · 숨긴 화면 주소
@@ -427,7 +434,90 @@ try {
   check('대표 다시: 찾기 — 내 업체는 찾힌다(같은 시험이 대표에게는 보인다는 대조)', (await searchFor(page, '대표비밀')).includes('대표비밀정밀'))
   check('대표 다시: 찾기 — Pilot 업체는 안 찾힌다', !(await searchFor(page, '은혜테스트')).includes('은혜테스트정밀'))
   await go(page, '/journal')
-  check('대표 다시: 업무 일기에 Pilot 기록 없음', !(await bodyText(page)).includes('은혜'))
+  check('대표 다시: 업무 일기에 Pilot 기록 없음', !((await page.locator('main').innerText()) ?? '').includes('은혜테스트정밀') && !((await page.locator('main').innerText()) ?? '').includes('박대표와 통화'))
+
+  /* ---------- D-164: 대표 → 최은혜 팀장 화면 바로 보기(다시 로그인 없이) ---------- */
+  await go(page, '/ops/clients')
+  const vs = page.locator('header [data-testid="view-as-switch"]')
+  check('대표(D-164): 머리줄에 [대표 | 최은혜 팀장] 단추', (await vs.count()) === 1 && /최은혜\s*팀장/.test(await vs.innerText()), await vs.innerText().catch(() => ''))
+  restLog = []
+  await vs.locator('[data-view="pilot"]').click()
+  await page.waitForLoadState('networkidle')
+  await page.waitForTimeout(1500)
+  const pv = await bodyText(page)
+  check('대표 → 팀장 화면: 팀장 업체(은혜테스트정밀)가 보인다', pv.includes('은혜테스트정밀'), pv.slice(0, 300))
+  check('대표 → 팀장 화면: 대표 업체는 안 보인다(팀장 작업공간 자료만)', leaked(pv).length === 0, leaked(pv).join())
+  check('대표 → 팀장 화면: "최은혜 팀장 화면을 보고 있습니다" 줄', (await page.getByTestId('viewing-pilot').count()) === 1)
+  await shot(page, 'owner-as-pilot')
+  const pnav = (await page.locator('aside').first().innerText()) ?? ''
+  check('대표 → 팀장 화면: 메뉴가 팀장과 같다(영업자 정산 · 상담신청 · 이 시스템 없음)', !pnav.includes('영업자 정산') && !pnav.includes('상담신청') && !pnav.includes('이 시스템'), pnav.replace(/\n/g, '|').slice(0, 300))
+  check('대표 → 팀장 화면: 이름 칸 "최은혜 팀장"', /최은혜\s*팀장/.test(await page.locator('[data-testid="sidebar-account"]').innerText()))
+  await go(page, '/ops/agents')
+  check('대표 → 팀장 화면: 대표 전용 주소도 팀장처럼 막힘', (await bodyText(page)).includes('화면을 찾지 못했습니다'))
+  await go(page, '/')
+  await page.locator('header [data-testid="view-as-switch"] [data-view="owner"]').click()
+  await page.waitForLoadState('networkidle')
+  await page.waitForTimeout(1500)
+  await go(page, '/ops/clients')
+  const back2 = await bodyText(page)
+  check('팀장 → 대표 화면: 대표 업체 다시 · 팀장 줄 없음 · 대표 메뉴', back2.includes('대표비밀정밀') && (await page.getByTestId('viewing-pilot').count()) === 0 && ((await page.locator('aside').first().innerText()) ?? '').includes('영업자 정산'))
+  check('DB(D-164): 팀장 작업공간 구성원 = 팀장(owner) · 대표(editor)', sql(`select string_agg(m.role::text, ',' order by m.role::text) from public.workspace_members m where m.workspace_id = '${PILOT_WS}'`) === 'editor,owner')
+  check('DB(D-164): 팀장은 여전히 대표 작업공간 구성원 아님', sql(`select count(*) from public.workspace_members where workspace_id = '${OWNER_WS}' and user_id = '${PILOT.id}'`) === '0')
+
+  // 대표 머리줄(전환 단추 · 보기 방식 단추가 함께) — 1024~1920 × 글자 3단계에서 옆으로 넘치지 않는다
+  {
+    const bad = []
+    for (const w of [1024, 1280, 1366, 1440, 1920]) {
+      await page.setViewportSize({ width: w, height: 900 })
+      await page.waitForTimeout(250)
+      for (const scale of ['default', 'large', 'extra_large']) {
+        await page.evaluate((sc) => document.documentElement.setAttribute('data-text-scale', sc), scale)
+        await page.waitForTimeout(150)
+        const r = await page.evaluate(() => {
+          const hdr = document.querySelector('header')
+          const hb = hdr.getBoundingClientRect()
+          const cut = [...hdr.querySelectorAll('a,button')].filter((e) => e.offsetParent !== null && e.getBoundingClientRect().right > hb.right + 1).length
+          const sw = [...hdr.querySelectorAll('[data-testid="view-as-switch"],[data-testid="view-as-compact"]')].filter((e) => e.offsetParent !== null).length
+          return { over: hdr.scrollWidth - hdr.clientWidth, cut, sw }
+        })
+        if (r.over > 0 || r.cut > 0 || r.sw !== 1) bad.push(`${w}/${scale} ${JSON.stringify(r)}`)
+      }
+    }
+    await page.evaluate(() => document.documentElement.setAttribute('data-text-scale', 'default'))
+    check('대표 머리줄(D-164): 5폭 × 글자 3단계 넘침 0 · 전환 단추 늘 하나', bad.length === 0, bad.join(' | '))
+    // 좁은 PC(1280) — 단추 하나 → 고르기 창 → 팀장 화면 → 다시 대표
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.waitForTimeout(300)
+    const vc = page.locator('header [data-testid="view-as-compact"]')
+    await vc.locator('button[aria-haspopup]').click()
+    await shot(page, 'owner-1280-viewas-menu')
+    await vc.locator('[data-view="pilot"]').click()
+    await page.waitForLoadState('networkidle')
+    await page.waitForTimeout(1500)
+    const pv2 = await bodyText(page)
+    check('대표 1280(D-164): 단추 하나로 팀장 화면 · 대표 업체 안 보임', (await page.getByTestId('viewing-pilot').count()) === 1 && pv2.includes('은혜테스트정밀') && leaked(pv2).length === 0)
+    await vc.locator('button[aria-haspopup]').click()
+    await vc.locator('[data-view="owner"]').click()
+    await page.waitForLoadState('networkidle')
+    await page.waitForTimeout(1500)
+    await go(page, '/ops/clients')
+    check('대표 1280(D-164): 다시 대표 화면', (await page.getByTestId('viewing-pilot').count()) === 0 && (await bodyText(page)).includes('대표비밀정밀'))
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.waitForTimeout(300)
+  }
+
+  /* ---------- D-164: 보기 방식 — PC+Mobile(같은 로그인 · 같은 자료) ---------- */
+  await page.locator('header [data-testid="device-switch"] [data-mode="dual"]').click()
+  await page.waitForTimeout(3500)
+  const dualPc = page.frameLocator('[data-testid="dual-pc"] iframe')
+  const dualMo = page.frameLocator('[data-testid="device-frame"] iframe')
+  const dpcText = await dualPc.locator('body').innerText().catch(() => '')
+  const dmoText = await dualMo.locator('body').innerText().catch(() => '')
+  check('PC+Mobile: 양쪽 모두 로그인된 같은 자료(대표 업체)', dpcText.includes('대표비밀정밀') && dmoText.includes('대표비밀정밀'), `${dpcText.slice(0, 80)} || ${dmoText.slice(0, 80)}`)
+  await shot(page, 'owner-dual')
+  check('PC+Mobile: 휴대폰 칸은 진짜 390px · 안에 보기 단추 없음(재귀 없음)', (await dualMo.locator('body').evaluate(() => window.innerWidth)) === 390 && (await dualMo.locator('[data-testid="device-switch"]').count()) === 0)
+  await page.locator('[data-testid="device-switch"] [data-mode="pc"]').first().click()
+  await page.waitForTimeout(2500)
   await logout(page)
   await ctx.close()
 

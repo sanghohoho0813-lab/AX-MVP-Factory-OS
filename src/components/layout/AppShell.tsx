@@ -17,6 +17,8 @@ import { ModuleBoundary } from '../modules/ModuleBoundary'
 import { useIsPilot } from '../../auth/osAccess'
 import { isPilotHiddenPath } from '../../config/moduleRegistry'
 import { NotFoundState } from '../ui/NotFoundState'
+import { FrameBridge } from './DeviceView'
+import { ViewingPilotBanner } from './ViewAsSwitch'
 
 function PilotRouteGuard({ pathname, children }: { pathname: string; children: React.ReactNode }) {
   const pilot = useIsPilot()
@@ -47,6 +49,8 @@ export function AppShell() {
     <ActiveProjectProvider>
       <RouteProjectSync />
       <BackToCloseGuard />
+      {/* D-164: 보기 무대(iframe) 안에서 주소 · 저장을 바깥과 맞춘다 */}
+      <FrameBridge />
       <DemoTourProvider>
       <OnboardingProvider>
       <div className="flex min-h-screen">
@@ -64,6 +68,8 @@ export function AppShell() {
             {/* key: 화면이 바뀔 때마다 등장 효과를 한 번씩 다시 준다.
                 모듈(/tools/<모듈>/<화면>) 안에서 화면만 바꿀 때는 그대로 둔다 — 원본 앱의 고른 고객·열린 창이 살아 있어야 한다 (D-93) */}
             <StorageFullNotice />
+            {/* D-164: 대표가 팀장 화면을 보는 동안 */}
+            <ViewingPilotBanner />
             <div key={shellKeyOf(location.pathname)} className="ax-rise">
               {/* D-95: 한 화면이 넘어져도 사이드바·머리줄은 남는다. 다른 화면으로 옮기면 풀린다 */}
               <ContentErrorBoundary resetKey={location.pathname}>
