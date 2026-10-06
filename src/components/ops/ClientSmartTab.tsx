@@ -10,7 +10,7 @@
  *
  * 판정은 규칙 계산이다(모듈 화면과 같은 엔진) — 'AI' 라고 부르지 않는다. 선정 · 승인 가능성을 보장하지 않는다.
  */
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, CalendarPlus, Check, CircleAlert, FileUp, Sparkles } from 'lucide-react'
 import type { ClientOpsRecord, OpsAlert } from '../../types/clientOps'
@@ -61,7 +61,10 @@ export default function ClientSmartTab({
   onFill: () => void
 }) {
   const { ent } = useEntitlements()
-  const { notices } = useGrantData(workspaceId)
+  // D-161: 되돌리기는 알림이 뜬 뒤에 누른다 — 그때의 기록 위에 되돌린다
+  const recordRef = useRef(record)
+  recordRef.current = record
+  const { notices, linkOf } = useGrantData(workspaceId)
   const usable = (key: string) => key === 'grants' || ent.feature(key).usable
   const insights = useMemo(() => buildInsights(record, today, notices, usable), [record, today, notices, ent]) // eslint-disable-line react-hooks/exhaustive-deps
   const pending = pendingFacts(record).length
@@ -89,8 +92,9 @@ export default function ClientSmartTab({
     userId: userId ?? null,
     today,
     notices,
-    latest: () => record,
+    latest: () => recordRef.current,
     save: async (next) => ((await (onCommitQuiet ?? (async () => false))(next)) ? next : null),
+    linkOf,
   })
 
   const setNext = (text: string) => void onCommit(withNextAction(record, text, addDaysLocal(today, 3)), `다음 약속으로 걸었습니다 — ${text.slice(0, 30)}`)
@@ -123,7 +127,7 @@ export default function ClientSmartTab({
       {decisions.length > 0 && (
         <Section title="프로그램이 준비했어요 — 맞나요?" count={decisions.length}>
           <div data-testid="smart-decisions">
-            <DecisionList decisions={decisions} busy={busy} showClient={false} onAnswer={(d, a) => void answer(d, a)} />
+            <DecisionList decisions={decisions} busy={busy} showClient={false} linked={(id) => !!linkOf(id)} onAnswer={(d, a) => void answer(d, a)} />
           </div>
         </Section>
       )}

@@ -54,7 +54,7 @@ export type DecisionEffect =
   | { type: 'todo'; text: string; dueInDays: number }
   | { type: 'grant'; noticeId: string }
   /** log: 맞아요(복사)를 누르면 활동 기록에 남길 한 줄 */
-  | { type: 'copy'; text: string; log?: string }
+  | { type: 'copy'; text: string; log?: string; docs?: { key: string; label: string }[] }
   | { type: 'next'; text: string; date: string }
   | { type: 'due'; serviceKey: ServiceKey; date: string }
 
@@ -116,7 +116,10 @@ export function buildDecisions(record: ClientOpsRecord, today: string, notices: 
   const out: Decision[] = []
   const base = { clientId: record.id, clientName: record.companyName }
   const push = (d: Omit<Decision, 'clientId' | 'clientName'>) => {
-    if (!answered[d.id]) out.push({ ...base, ...d })
+    const prev = answered[d.id]
+    // D-161: 받을 돈 · 서류는 답한 뒤 14일이 지나도 그대로면 다시 묻는다(나중에 = 영영 아님). 다른 종류는 한 번 답하면 끝
+    if (prev && !((d.kind === 'money' || d.kind === 'doc') && isYmd(prev.at.slice(0, 10)) && daysBetween(prev.at.slice(0, 10), today) >= 14)) return
+    out.push({ ...base, ...d })
   }
 
   // 1) 자료에서 읽은 정보 — 맞나요?
@@ -189,13 +192,15 @@ export function buildDecisions(record: ClientOpsRecord, today: string, notices: 
     const first = due[0]
     const names = due.map((d) => d.meta.label).slice(0, 3).join(' · ')
     push({
-      id: `doc:${due.map((d) => `${d.meta.key}@${d.view.expiresOn}`).join(',')}`,
+      // D-161: 서류가 많아도 이름이 길어지지 않게(400자를 넘으면 저장할 때 답이 버려졌다)
+      id: `doc:${sig(due.map((d) => `${d.meta.key}@${d.view.expiresOn}`).join(','))}`,
       kind: 'doc',
       title: `${names}${due.length > 3 ? ` 외 ${due.length - 3}가지` : ''} 새로 받기 — 요청할까요?`,
       why: (first.view.daysLeft ?? 0) < 0 ? `${first.meta.label} 유효기간이 ${md(first.view.expiresOn)}에 끝났습니다` : `${first.meta.label} 유효기간이 ${md(first.view.expiresOn)}에 끝납니다`,
       yesLabel: '요청 문구 복사',
       noLabel: '나중에',
-      effect: { type: 'copy', text: buildDocumentRequestMessage(record, today) },
+      // D-161: 고객 플랫폼이 연결된 업체면 고객 화면 '요청받은 서류' 에도 올린다(서류마다 한 줄)
+      effect: { type: 'copy', text: buildDocumentRequestMessage(record, today), docs: due.map((x) => ({ key: x.meta.key, label: x.meta.label })) },
       openPath: `/ops/clients/${record.id}?tab=docs`,
       rank: (first.view.daysLeft ?? 0) < 0 ? 15 : 35,
     })
@@ -292,10 +297,15 @@ export function buildDecisions(record: ClientOpsRecord, today: string, notices: 
   // 8) 다시 연락 — 오래 조용한 잠재고객(계약 고객은 오늘 '안부 챙길 계약 고객' 이 맡는다)
   if (!contracted && stage !== 'contracted') {
     try {
-      const rc = salesRecontacts([record], new Date(`${today}T12:00:00`))[0]
+      // D-161: 조용한지는 실제 연락(활동 · 미팅 · 단계 옮김)으로만 — 저장만 해도 바뀌는 updatedAt 은 등록한 날로 대신한다
+      // (예전: 다른 결정에 [아니에요] 만 눌러도 '연락한 것' 이 되어 이 질문이 두 달 동안 사라졌다)
+      const real = record.activity.length > 0 || (record.sales?.meetings?.length ?? 0) > 0 || !!record.sales?.movedAt
+      const quiet = { ...record, updatedAt: real ? '' : record.createdAt }
+      const rc = salesRecontacts([quiet], new Date(`${today}T12:00:00`))[0]
       if (rc) {
         push({
-          id: `followup:${(lastSalesTouch(record) ?? '').slice(0, 10)}`,
+          // 보류는 보류한 날로 — 답한 뒤 저장하면 '마지막 연락' 이 바뀌어 같은 질문이 새로 나왔다
+          id: stage === 'hold' ? `followup:hold:${(record.sales?.movedAt ?? '').slice(0, 10)}` : `followup:${(lastSalesTouch(quiet) ?? '').slice(0, 10)}`,
           kind: 'followup',
           title: `${rc.days >= 999 ? '연락 기록이 없어요' : `${rc.days}일째 연락이 없어요`} — 다시 연락 문구를 보낼까요?`,
           why: rc.reasons.join(' · '),
@@ -344,4 +354,45 @@ export function withDecisionAnswer(record: ClientOpsRecord, d: Pick<Decision, 'i
   const keys = Object.keys(decided)
   if (keys.length > 300) for (const k of keys.sort((x, y) => decided[x].at.localeCompare(decided[y].at)).slice(0, keys.length - 300)) delete decided[k]
   return { ...next, decided }
+}
+
+/**
+ * D-161: 답 되돌리기 — 그 답이 바꾼 것만 되돌린다(그 사이 다른 답 · 다른 화면에서 고친 것은 그대로).
+ *   prev  답하기 직전 기록 · next 답이 만든 기록 · latest 지금 기록
+ *   - 답 기록(decided)은 이 결정 하나만 지운다
+ *   - 활동 기록은 이 답이 더한 줄만 뺀다
+ *   - 업무(services)는 이 답이 바꾼 업무만 되돌린다
+ *   - 그 밖의 칸(다음 약속 · 사실 창고 · 신청 건 …)은 이 답이 바꾼 칸만 예전 값으로
+ */
+export function undoDecision(latest: ClientOpsRecord, prev: ClientOpsRecord, next: ClientOpsRecord, decisionId: string): ClientOpsRecord {
+  const out: Record<string, unknown> = { ...latest }
+  const L = latest as unknown as Record<string, unknown>
+  const P = prev as unknown as Record<string, unknown>
+  const N = next as unknown as Record<string, unknown>
+  for (const k of new Set([...Object.keys(P), ...Object.keys(N)])) {
+    if (k === 'updatedAt' || P[k] === N[k]) continue
+    if (k === 'decided') {
+      const d = { ...(latest.decided ?? {}) }
+      delete d[decisionId]
+      if (prev.decided?.[decisionId]) d[decisionId] = prev.decided[decisionId]
+      out.decided = d
+    } else if (k === 'activity') {
+      const added = new Set(next.activity.filter((a) => !prev.activity.some((b) => b.id === a.id)).map((a) => a.id))
+      out.activity = latest.activity.filter((a) => !added.has(a.id))
+    } else if (k === 'services') {
+      const svc = { ...latest.services }
+      for (const key of Object.keys(next.services) as ServiceKey[]) {
+        const a = latest.services[key]
+        const b = next.services[key]
+        // 저장하면서 칸이 다듬어질 수 있어 사람이 보는 값(상태 · 기한 · 다음 단계 · 메모)만 비교한다
+        const same = !!a && !!b && a.status === b.status && a.dueDate === b.dueDate && a.nextStep === b.nextStep && a.note === b.note
+        if (prev.services[key] !== b && same) svc[key] = prev.services[key]
+      }
+      out.services = svc
+    } else {
+      // 그 사이 다른 데서 이 칸을 또 고쳤으면 그대로 둔다(남이 고친 것을 덮지 않게)
+      out[k] = L[k] === N[k] || JSON.stringify(L[k]) === JSON.stringify(N[k]) ? P[k] : L[k]
+    }
+  }
+  return out as unknown as ClientOpsRecord
 }

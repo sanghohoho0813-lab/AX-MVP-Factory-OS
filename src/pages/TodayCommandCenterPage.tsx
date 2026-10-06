@@ -186,7 +186,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const [pendingDelete, setPendingDelete] = useState<JournalEntry | null>(null)
   const [deleting, setDeleting] = useState(false)
   // D-158: 확인할 것 — 공고 · 요금제 권한
-  const { notices: grantNotices } = useGrantData(workspaceId)
+  const { notices: grantNotices, linkOf } = useGrantData(workspaceId)
   const { ent } = useEntitlements()
   const usable = useCallback((key: string) => key === 'grants' || ent.feature(key).usable, [ent])
 
@@ -547,6 +547,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         usable={usable}
         onSaved={(r) => setClients((cs) => cs.map((c) => (c.id === r.id ? r : c)))}
         onTodo={(e) => setJournal((js) => [e, ...js])}
+        linkOf={linkOf}
+        onTodosRemoved={(ids) => setJournal((js) => js.filter((j) => !ids.includes(j.id)))}
       />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">

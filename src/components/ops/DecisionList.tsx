@@ -2,15 +2,16 @@
  * 확인함 줄 (D-158) — 프로그램이 준비한 것에 '맞아요 / 아니에요' 만 고른다.
  * 맞아요: 정보 넣기 · 할 일 걸기 · 도전 체크 · 요청 문구 복사(결정마다 다름). 아니에요: 다시 묻지 않는다.
  */
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Check, CheckCheck, X } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
-import type { JournalEntry } from '../../types/bridge'
-import { DECISION_KIND_LABEL, buildAllDecisions, withDecisionAnswer, type Decision, type DecisionKind } from '../../services/decisions'
+import type { JournalEntry, PortalClientLink } from '../../types/bridge'
+import { DECISION_KIND_LABEL, buildAllDecisions, undoDecision, weekdayOnOrAfter, withDecisionAnswer, type Decision, type DecisionKind } from '../../services/decisions'
 import { saveClient } from '../../services/clientOpsService'
 import type { GrantNotice } from '../../services/grants/grantMatch'
-import { createJournalEntry } from '../../services/journalService'
+import { createJournalEntry, deleteJournalEntry } from '../../services/journalService'
+import { listDocuments, requestDocument } from '../../services/customerBridgeService'
 import { addDaysLocal } from '../../services/clientOpsNextAction'
 import { nowIso } from '../../lib/appClock'
 import { copyText } from '../consulting/studioParts'
@@ -39,6 +40,8 @@ export function useDecisionAnswer({
   notices,
   latest,
   save,
+  linkOf,
+  onTodosRemoved,
 }: {
   workspaceId: string | null
   userId: string | null
@@ -46,12 +49,66 @@ export function useDecisionAnswer({
   notices: readonly GrantNotice[]
   latest: (clientId: string) => ClientOpsRecord | undefined
   save: (next: ClientOpsRecord) => Promise<ClientOpsRecord | null>
+  /** D-161: 고객 플랫폼 연결 — 있으면 서류 요청을 고객 화면에도 올린다 */
+  linkOf?: (clientId: string) => PortalClientLink | null
+  /** D-161: 되돌리기로 지운 할 일(화면 목록에서 빼게) */
+  onTodosRemoved?: (ids: string[]) => void
 }) {
   const { showToast } = useToast()
   const [busy, setBusy] = useState<string | null>(null)
+  // 되돌리기는 알림이 뜬 뒤에 누른다 — 그때의 최신 기록을 읽어야 한다
+  const latestRef = useRef(latest)
+  latestRef.current = latest
+  const saveRef = useRef(save)
+  saveRef.current = save
+
+  /** D-161: 그 답이 바꾼 것만 되돌린다(기록 · 할 일). 복사한 문구 · 고객 화면에 올린 요청은 되돌리지 않는다 */
+  const undo = async (steps: { d: Decision; prev: ClientOpsRecord; next: ClientOpsRecord }[], todos: JournalEntry[]) => {
+    try {
+      const fresh = new Map<string, ClientOpsRecord>()
+      for (const st of [...steps].reverse()) {
+        const cur = fresh.get(st.d.clientId) ?? latestRef.current(st.d.clientId)
+        if (!cur) continue
+        const saved = await saveRef.current(undoDecision(cur, st.prev, st.next, st.d.id))
+        if (saved) fresh.set(saved.id, saved)
+      }
+      for (const t of todos) await deleteJournalEntry(t)
+      if (todos.length) onTodosRemoved?.(todos.map((t) => t.id))
+      showToast(steps.length > 1 ? `${steps.length}건을 되돌렸습니다` : '되돌렸습니다')
+    } catch (cause) {
+      showToast(cause instanceof Error ? `되돌리지 못했습니다 — ${cause.message}` : '되돌리지 못했습니다')
+    }
+  }
+
+  /** 고객 화면 '요청받은 서류' 에 올리기 — 이미 요청 중인 서류는 또 올리지 않는다. 올린 개수 */
+  const postDocs = async (d: Decision): Promise<number> => {
+    if (d.effect.type !== 'copy' || !d.effect.docs?.length) return 0
+    const link = linkOf?.(d.clientId)
+    if (!link) return 0
+    const have = await listDocuments(workspaceId, link.id).catch(() => [])
+    let n = 0
+    for (const doc of d.effect.docs) {
+      if (have.some((x) => x.documentType === doc.key && x.status === 'requested')) continue
+      await requestDocument(workspaceId, { linkId: link.id, operationsClientId: d.clientId, documentType: doc.key, title: doc.label, customerNote: '유효기간이 지났거나 곧 끝나 새로 받아야 합니다.' })
+      n += 1
+    }
+    return n
+  }
+
+  const makeTodo = (d: Decision) =>
+    d.effect.type === 'todo'
+      ? createJournalEntry(workspaceId, userId, {
+          entryDate: today,
+          entryType: 'follow_up',
+          content: d.effect.text,
+          clientId: d.clientId,
+          // D-161: 할 일 기한도 주말을 피한다
+          dueDate: weekdayOnOrAfter(addDaysLocal(today, d.effect.dueInDays)),
+        })
+      : Promise.resolve(null)
+
   const answer = async (d: Decision, a: 'yes' | 'no'): Promise<JournalEntry | null> => {
-    const rec = latest(d.clientId)
-    if (!rec || busy) return null
+    if (!latest(d.clientId) || busy) return null
     setBusy(d.id)
     let made: JournalEntry | null = null
     try {
@@ -59,34 +116,53 @@ export function useDecisionAnswer({
       if (a === 'yes' && d.effect.type === 'copy') {
         const ok = await copyText(d.effect.text)
         if (!ok) {
-          showToast('복사하지 못했습니다 — 서류 탭의 서류 요청 문구에서 복사해 주세요')
+          showToast(d.kind === 'doc' ? '복사하지 못했습니다 — 서류 탭의 서류 요청 문구에서 복사해 주세요' : '복사하지 못했습니다 — 다시 눌러 주세요')
           return null
         }
       }
-      const saved = await save(withDecisionAnswer(rec, d, a, notices, nowIso()))
-      if (!saved) return null
-      if (a === 'yes' && d.effect.type === 'todo') {
-        made = await createJournalEntry(workspaceId, userId, {
-          entryDate: today,
-          entryType: 'follow_up',
-          content: d.effect.text,
-          clientId: d.clientId,
-          dueDate: addDaysLocal(today, d.effect.dueInDays),
-        })
+      // D-161: 기록은 복사가 끝난 뒤의 최신 것으로(그 사이 올라간 서류를 덮지 않게)
+      const rec = latest(d.clientId)
+      if (!rec) return null
+      // D-161: 할 일을 먼저 만든다 — 기록부터 저장하면 할 일 만들기가 실패했을 때 질문만 사라졌다
+      if (a === 'yes') made = await makeTodo(d)
+      const next = withDecisionAnswer(rec, d, a, notices, nowIso())
+      let saved: ClientOpsRecord | null = null
+      try {
+        saved = await save(next)
+      } catch (cause) {
+        if (made) await deleteJournalEntry(made).catch(() => undefined)
+        throw cause
       }
-      showToast(
+      if (!saved) {
+        if (made) await deleteJournalEntry(made).catch(() => undefined)
+        return null
+      }
+      let posted = 0
+      if (a === 'yes') {
+        try {
+          posted = await postDocs(d)
+        } catch {
+          showToast('고객 화면에 올리지 못했습니다 — 문구는 복사했습니다. 카톡으로 보내 주세요')
+          return made
+        }
+      }
+      const text =
         a === 'no'
           ? '다시 묻지 않습니다'
-          : d.doneText
-            ? d.doneText
-            : d.effect.type === 'fact'
-            ? '업체 정보에 넣었습니다'
-            : d.effect.type === 'todo'
-              ? `할 일로 걸었습니다 — ${addDaysLocal(today, d.effect.dueInDays).slice(5).replace('-', '/')}`
-              : d.effect.type === 'grant'
-                ? '도전 체크 — 마감을 일정 · 오늘에 띄웁니다'
-                : '서류 요청 문구를 복사했습니다 — 카톡에 붙여 보내세요',
-      )
+          : posted > 0
+            ? `요청 문구를 복사하고 고객 화면에도 서류 ${posted}건을 요청했습니다`
+            : d.doneText
+              ? d.doneText
+              : d.effect.type === 'fact'
+                ? '업체 정보에 넣었습니다'
+                : d.effect.type === 'todo'
+                  ? `할 일로 걸었습니다 — ${weekdayOnOrAfter(addDaysLocal(today, d.effect.dueInDays)).slice(5).replace('-', '/')}`
+                  : d.effect.type === 'grant'
+                    ? '도전 체크 — 마감을 일정 · 오늘에 띄웁니다'
+                    : '서류 요청 문구를 복사했습니다 — 카톡에 붙여 보내세요'
+      // 고객 화면에 올린 요청은 되돌리기로 거둘 수 없어 단추를 두지 않는다
+      const todos = made ? [made] : []
+      showToast(text, posted > 0 ? undefined : { label: '되돌리기', onClick: () => void undo([{ d, prev: rec, next: saved ?? next }], todos) })
     } catch (cause) {
       showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다. 다시 눌러 주세요.')
     } finally {
@@ -94,6 +170,7 @@ export function useDecisionAnswer({
     }
     return made
   }
+
   /**
    * D-160: 같은 종류 여러 건을 한 번에 [맞아요] — 복사(카톡 문구)는 하나씩 보내야 하므로 부르는 쪽에서 뺀다.
    * 같은 업체 결정이 여럿이면 앞에서 저장한 기록 위에 이어서 적는다(덮지 않게).
@@ -103,31 +180,35 @@ export function useDecisionAnswer({
     setBusy('many')
     const fresh = new Map<string, ClientOpsRecord>()
     const made: JournalEntry[] = []
+    const steps: { d: Decision; prev: ClientOpsRecord; next: ClientOpsRecord }[] = []
     let ok = 0
     try {
       for (const d of ds) {
         if (d.effect.type === 'copy') continue
         const rec = fresh.get(d.clientId) ?? latest(d.clientId)
         if (!rec) continue
-        const saved = await save(withDecisionAnswer(rec, d, 'yes', notices, nowIso()))
-        if (!saved) break
-        fresh.set(saved.id, saved)
-        ok += 1
-        if (d.effect.type === 'todo') {
-          made.push(
-            await createJournalEntry(workspaceId, userId, {
-              entryDate: today,
-              entryType: 'follow_up',
-              content: d.effect.text,
-              clientId: d.clientId,
-              dueDate: addDaysLocal(today, d.effect.dueInDays),
-            }),
-          )
+        // 할 일 먼저 — 기록 저장이 실패하면 지운다
+        const todo = await makeTodo(d)
+        const next = withDecisionAnswer(rec, d, 'yes', notices, nowIso())
+        let saved: ClientOpsRecord | null = null
+        try {
+          saved = await save(next)
+        } catch (cause) {
+          if (todo) await deleteJournalEntry(todo).catch(() => undefined)
+          throw cause
         }
+        if (!saved) {
+          if (todo) await deleteJournalEntry(todo).catch(() => undefined)
+          break
+        }
+        if (todo) made.push(todo)
+        fresh.set(saved.id, saved)
+        steps.push({ d, prev: rec, next: saved })
+        ok += 1
       }
-      showToast(ok === ds.length ? `${ok}건 모두 처리했습니다` : `${ok}건 처리했습니다 — 나머지는 다시 눌러 주세요`)
+      showToast(ok === ds.length ? `${ok}건 모두 처리했습니다` : `${ok}건 처리했습니다 — 나머지는 다시 눌러 주세요`, ok > 0 ? { label: '되돌리기', onClick: () => void undo(steps, [...made]) } : undefined)
     } catch (cause) {
-      showToast(cause instanceof Error ? `${ok}건 처리 · ${cause.message}` : `${ok}건 처리했습니다 — 나머지는 저장하지 못했습니다`)
+      showToast(cause instanceof Error ? `${ok}건 처리 · ${cause.message}` : `${ok}건 처리했습니다 — 나머지는 저장하지 못했습니다`, ok > 0 ? { label: '되돌리기', onClick: () => void undo(steps, [...made]) } : undefined)
     } finally {
       setBusy(null)
     }
@@ -142,12 +223,15 @@ export function DecisionList({
   onAnswer,
   showClient = true,
   limit,
+  linked,
 }: {
   decisions: Decision[]
   busy: string | null
   onAnswer: (d: Decision, a: 'yes' | 'no') => void
   showClient?: boolean
   limit?: number
+  /** D-161: 고객 플랫폼이 연결된 업체 — 서류 요청은 고객 화면에도 올라간다고 단추에 밝힌다 */
+  linked?: (clientId: string) => boolean
 }) {
   const shown = limit ? decisions.slice(0, limit) : decisions
   return (
@@ -166,7 +250,7 @@ export function DecisionList({
           <p className="t-sub break-keep [overflow-wrap:anywhere] text-slate-600">{d.why}</p>
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="primary" disabled={busy !== null} onClick={() => onAnswer(d, 'yes')} data-testid="decision-yes">
-              <Check aria-hidden="true" className="size-4" /> {d.yesLabel}
+              <Check aria-hidden="true" className="size-4" /> {d.kind === 'doc' && linked?.(d.clientId) ? '요청 보내기(문구 · 고객 화면)' : d.yesLabel}
             </Button>
             <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => onAnswer(d, 'no')} data-testid="decision-no">
               <X aria-hidden="true" className="size-4" /> {d.noLabel}
@@ -195,7 +279,11 @@ export function TodayDecisions({
   usable,
   onSaved,
   onTodo,
+  linkOf,
+  onTodosRemoved,
 }: {
+  linkOf?: (clientId: string) => PortalClientLink | null
+  onTodosRemoved?: (ids: string[]) => void
   clients: ClientOpsRecord[]
   today: string
   workspaceId: string | null
@@ -217,6 +305,8 @@ export function TodayDecisions({
       onSaved(saved)
       return saved
     },
+    linkOf,
+    onTodosRemoved,
   })
   if (all.length === 0) return null
   return (
@@ -238,6 +328,7 @@ export function TodayDecisions({
         decisions={all}
         busy={busy}
         limit={3}
+        linked={(id) => !!linkOf?.(id)}
         onAnswer={(d, a) =>
           void answer(d, a).then((made) => {
             if (made) onTodo(made)

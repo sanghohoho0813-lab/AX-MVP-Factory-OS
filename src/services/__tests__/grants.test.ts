@@ -49,7 +49,7 @@ import { buildClientSchedule } from '../clientOpsSchedule'
 import { feeStateOf, fundingFactsOf } from '../feeStatus'
 import { recommendNextSteps } from '../clientInsights'
 import { buildClientReport } from '../clientReport'
-import { DECISION_BULK_KINDS, buildDecisions, paymentReminderMessage, weekdayOnOrAfter, withDecisionAnswer } from '../decisions'
+import { DECISION_BULK_KINDS, buildDecisions, paymentReminderMessage, undoDecision, weekdayOnOrAfter, withDecisionAnswer } from '../decisions'
 import { buildClientAlerts } from '../clientOpsAlerts'
 import { isGrantBookmark } from '../../types/clientOps'
 
@@ -832,6 +832,63 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   let chain = { ...svc, fees: base.fees }
   for (const d of all.filter((x) => x.kind === 'stale' || x.kind === 'next')) chain = withDecisionAnswer(chain, d, 'yes', [], at)
   check('같은 업체 두 건을 이어서 적어도 둘 다 남음(기한 · 다음 약속)', chain.services.venture.dueDate === '2026-10-20' && chain.nextActionDueDate === '2026-10-13')
+}
+
+// D-161: 되돌리기 — 그 답이 바꾼 것만
+{
+  const T = '2026-10-06'
+  const at = '2026-10-06T01:00:00Z'
+  const base = normalizeClientOps({
+    id: 'u1', companyName: '되돌림상사', status: 'active', nextAction: '', nextActionDueDate: '',
+    customDocuments: [{ id: 'cd', key: 'customdoc_tax', label: '납세증명서', validMonths: 1, sensitive: false }],
+    documents: { customdoc_tax: { received: true, issuedAt: '2026-08-01', fileName: 't.pdf' } },
+  } as never)
+  const svc = { ...base, services: { ...base.services, venture: { ...base.services.venture, status: 'in_progress' as const, dueDate: '2026-09-10' } } }
+  const ds = buildDecisions(svc, T, [])
+  const next = ds.find((d) => d.kind === 'next')!
+  const stale = ds.find((d) => d.kind === 'stale')!
+  const a1 = withDecisionAnswer(svc, next, 'yes', [], at)
+  const a2 = withDecisionAnswer(a1, stale, 'yes', [], at)
+  // 다음 약속 답만 되돌린다 — 뒤에 한 밀린 업무 답(기한 · 답 기록 · 활동)은 남는다
+  const u = undoDecision(a2, svc, a1, next.id)
+  check('되돌리기: 다음 약속이 비고 · 그 답 기록만 빠짐', u.nextAction === '' && u.nextActionDueDate === '' && !u.decided?.[next.id] && !!u.decided?.[stale.id])
+  check('되돌리기: 뒤에 한 답(업무 기한 10/20)은 그대로', u.services.venture.dueDate === '2026-10-20' && u.activity.some((x) => x.kind === 'service_due'))
+  check('되돌리기: 이 답이 더한 활동 줄만 빠짐', !u.activity.some((x) => x.text.includes('다음 할 일')) && u.activity.length === a2.activity.length - (a1.activity.length - svc.activity.length))
+  check('되돌리기 뒤 다시 묻는다', buildDecisions(u, T, []).some((d) => d.id === next.id))
+  const u2 = undoDecision(a2, a1, a2, stale.id)
+  check('되돌리기: 업무 기한도 예전 값(9/10)으로', u2.services.venture.dueDate === '2026-09-10' && !u2.decided?.[stale.id] && u2.nextActionDueDate === a2.nextActionDueDate)
+  const edited = { ...a2, nextAction: '대표가 직접 고친 약속' }
+  check('되돌리기: 그 사이 사람이 고친 칸은 덮지 않음', undoDecision(edited, svc, a1, next.id).nextAction === '대표가 직접 고친 약속')
+  const no = withDecisionAnswer(svc, next, 'no', [], at)
+  check('[아니에요] 도 되돌리면 다시 묻는다', buildDecisions(undoDecision(no, svc, no, next.id), T, []).some((d) => d.id === next.id))
+  const doc = ds.find((d) => d.kind === 'doc')!
+  check('서류 기한: 고객 화면에 올릴 서류 목록(납세증명서)', doc.effect.type === 'copy' && doc.effect.docs?.map((x) => x.label).join() === '납세증명서', doc.effect)
+}
+
+// D-161: 점검에서 찾은 것 — 다시 연락 · 나중에 · 긴 이름
+{
+  const T = '2026-10-06'
+  const at = '2026-10-06T01:00:00Z'
+  const hold = normalizeClientOps({ id: 'h1', companyName: '보류상사', representativeName: '정대표', status: 'waiting', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-06-01T00:00:00Z', sales: { stage: 'hold', movedAt: '2026-06-01T00:00:00Z' }, activity: [{ id: 'a0', kind: 'sales', text: '보류', serviceKey: null, at: '2026-06-01T00:00:00Z' }] } as never)
+  const f1 = buildDecisions(hold, T, []).find((d) => d.kind === 'followup')!
+  const answeredHold = { ...withDecisionAnswer(hold, f1, 'no', [], at), updatedAt: at }
+  check('보류 업체: [안 함] 뒤 저장해도 같은 질문이 새로 나오지 않음', !!f1 && !buildDecisions(answeredHold, T, []).some((d) => d.kind === 'followup'), buildDecisions(answeredHold, T, []).map((d) => d.id))
+  const lead = normalizeClientOps({ id: 'l1', companyName: '조용리드', status: 'waiting', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-05-01T00:00:00Z', activity: [{ id: 'a1', kind: 'sales', text: '첫 연락', serviceKey: null, at: '2026-05-01T00:00:00Z' }] } as never)
+  const empty = buildDecisions(lead, T, []).find((d) => d.kind === 'next')!
+  const afterNo = { ...withDecisionAnswer(lead, empty, 'no', [], at), updatedAt: at }
+  check('다른 질문에 [아니에요] 해도 다시 연락 질문은 남는다(저장 ≠ 연락)', buildDecisions(afterNo, T, []).some((d) => d.kind === 'followup'))
+  const m = normalizeClientOps({ id: 'mm', companyName: '나중상사', status: 'active', fees: [{ id: 'f1', label: '계약금', amount: 1_000_000, dueDate: '2026-09-20', receivedAt: null }] } as never)
+  const md = buildDecisions(m, T, []).find((d) => d.kind === 'money')!
+  const later = withDecisionAnswer(m, md, 'no', [], at)
+  check('받을 돈 [나중에]: 14일 안에는 안 묻고 14일 뒤 아직 안 받았으면 다시', !buildDecisions(later, '2026-10-19', []).some((d) => d.kind === 'money') && buildDecisions(later, '2026-10-20', []).some((d) => d.kind === 'money'))
+  const many = normalizeClientOps({
+    id: 'dd', companyName: '서류많은상사', status: 'active',
+    customDocuments: Array.from({ length: 14 }, (_, i) => ({ id: `c${i}`, key: `customdoc_longname_${i}_abcdef`, label: `서류${i}`, validMonths: 1, sensitive: false })),
+    documents: Object.fromEntries(Array.from({ length: 14 }, (_, i) => [`customdoc_longname_${i}_abcdef`, { received: true, issuedAt: '2026-07-01', fileName: 'x.pdf' }])),
+  } as never)
+  const dd = buildDecisions(many, T, []).find((d) => d.kind === 'doc')!
+  const kept = normalizeClientOps(JSON.parse(JSON.stringify(withDecisionAnswer(many, dd, 'no', [], at))))
+  check('서류 14개 만료여도 답이 저장해 읽은 뒤 남는다(이름 짧게)', dd.id.length < 40 && !!kept.decided?.[dd.id], dd.id.length)
 }
 
 console.log(`\ngrants: ${pass} passed, ${fail} failed`)

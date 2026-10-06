@@ -29,7 +29,7 @@ function DecideContent({ workspaceId, userId }: { workspaceId: string | null; us
   recordsRef.current = records
   const [loaded, setLoaded] = useState(false)
   const [kind, setKind] = useState<DecisionKind | 'all'>('all')
-  const { notices } = useGrantData(workspaceId)
+  const { notices, linkOf } = useGrantData(workspaceId)
   const { ent } = useEntitlements()
   const usable = useCallback((key: string) => key === 'grants' || ent.feature(key).usable, [ent])
 
@@ -53,6 +53,7 @@ function DecideContent({ workspaceId, userId }: { workspaceId: string | null; us
       setRecords((prev) => prev.map((r) => (r.id === saved.id ? saved : r)))
       return saved
     },
+    linkOf,
   })
   const clients = new Set(all.map((d) => d.clientId)).size
 
@@ -107,7 +108,7 @@ function DecideContent({ workspaceId, userId }: { workspaceId: string | null; us
           }
         />
       ) : (
-        shown.length > 0 && <DecisionList decisions={shown} busy={busy} onAnswer={(d, a) => void answer(d, a)} />
+        shown.length > 0 && <DecisionList decisions={shown} busy={busy} linked={(id) => !!linkOf(id)} onAnswer={(d, a) => void answer(d, a)} />
       )}
     </div>
   )

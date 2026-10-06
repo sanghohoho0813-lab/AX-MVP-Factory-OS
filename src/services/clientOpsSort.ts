@@ -11,6 +11,11 @@
 import type { ClientOpsRecord } from '../types/clientOps'
 import { sortClientsByUrgency } from './clientOpsAlerts'
 import { todayLocalDate } from '../lib/appClock'
+
+const localDateOf = (iso: string) => {
+  const x = new Date(iso)
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+}
 import { yearsInBusiness } from './clientOpsProfile'
 import { monthsSinceContract } from './contractSummary'
 
@@ -54,7 +59,9 @@ export function activityScore(r: ClientOpsRecord, today: string): { score: numbe
   let last = ''
   const touch = (iso: string | null | undefined) => {
     if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return
-    const d = iso.slice(0, 10)
+    // D-161: 시각이 붙은 기록은 이 기기의 날짜로(한국 새벽 0~9시 기록이 전날로 세지던 것) · 앞날 기록은 세지 않는다
+    const d = iso.length > 10 && !Number.isNaN(Date.parse(iso)) ? localDateOf(iso) : iso.slice(0, 10)
+    if (d > today) return
     if (d > last) last = d
     const ago = t - dayNum(d)
     if (ago >= 0 && ago <= 30) score += ago <= 7 ? 2 : 1

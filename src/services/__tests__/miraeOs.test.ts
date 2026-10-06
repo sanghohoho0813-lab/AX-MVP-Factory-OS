@@ -1456,6 +1456,7 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('요즘 순: 이번 주 두 번(2+2) + 지난달 한 번(1) = 5', activityScore(busy, T).score === 5, JSON.stringify(activityScore(busy, T)))
   check('요즘 순: 14일 안 약속 2점 · 지난 약속 3점', activityScore(soon, T).score === 2 && activityScore(late, T).score === 3)
   check('요즘 순: 한 달 묵은 마감은 1점(급한 순이 따로 보여 줌)', activityScore({ ...late, nextActionDueDate: '2026-08-10' }, T).score === 1)
+  check('요즘 순: 앞날 기록은 세지 않음 · 마지막 날로도 안 씀', activityScore({ ...list[0], activity: [act('2027-01-01')] }, T).score === 0 && activityScore({ ...list[0], activity: [act('2027-01-01')] }, T).last !== '2027-01-01')
   check('요즘 순: 보관한 업체는 맨 뒤(-1)', activityScore({ ...busy, archivedAt: '2026-09-01T00:00:00Z' }, T).score === -1)
   const byActive = sortClients([soon, late, busy], 'active', T).map((r) => r.id)
   check('요즘 순: 많이 챙긴 곳 → 지난 마감 → 다가오는 약속', byActive.join() === 'c,a,b', byActive.join())

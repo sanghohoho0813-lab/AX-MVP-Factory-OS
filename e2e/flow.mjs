@@ -17,6 +17,7 @@
  *  14. (D-158) 확인할 것 — 오늘 칸 · 모두 보기 · 맞아요(정보 넣기 · 문구 복사) · 아니에요 · 업체 상세에서 다시 안 물음
  *  15. (D-159) 고객 관리 기본 '요즘 챙기는 순' · 휴대폰 카드 접힘(펼쳐보기 · 진행 % 없음 · 빈 곳 누르면 업체) · 오늘 할 일 번호 · 4건 넘으면 두 칸
  *  16. (D-160) 확인할 것 넓히기 — 받을 돈(입금 요청 문구 복사) · 밀린 업무(종류 골라 '모두 맞아요' → 기한 2주 뒤) · 다음 약속 다시 잡기 · 업체 상세에도
+ *  17. (D-161) 되돌리기(한 건 · 모두 맞아요) · 고객 플랫폼 연결 업체는 서류 요청이 고객 화면 '요청받은 서류' 에도
  *  13. (D-155) 오늘 '안부 챙길 계약 고객' — 한 달 넘게 조용 · 계약 1주년 · 안부 카톡 · 연락했어요 · 다음에 · 성과 보고서 바로 열기
  */
 
@@ -564,6 +565,73 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   check(`업체 상세(다움): 받을 돈 · 다음 약속 같은 결정도 보인다 ${tag}`, sk.some((k) => k === 'money' || k === 'next'), sk)
   const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   check(`D-160: 가로 넘침 0 · 오류 0 ${tag}`, over <= 0 && errors.length === 0, `${over} ${errors.join(' | ')}`)
+  await ctx.close()
+}
+
+/* 17 (D-161) 되돌리기 · 서류 요청을 고객 화면에도 */
+for (const [w, mob] of [[1440, false], [390, true]]) {
+  const ctx = await browser.newContext({ viewport: { width: w, height: 900 }, isMobile: mob, hasTouch: mob, locale: 'ko-KR', timezoneId: 'Asia/Seoul', permissions: ['clipboard-read', 'clipboard-write'] })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e).slice(0, 160)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const tag = `(${w})`
+  // 한솔: 고객 플랫폼 연결 · 납세증명서(1개월) 만료
+  await page.evaluate((k) => {
+    const now = new Date().toISOString()
+    localStorage.setItem('axmvp.v1.portal_client_links', JSON.stringify([{ id: 'lnk_hansol', operationsClientId: 'cli_hansol', profileId: 'p_hansol', status: 'active', displayName: '한솔테크', profileEmail: 'ceo@hansol.kr', linkedAt: now, createdAt: now, updatedAt: now }]))
+    const list = JSON.parse(localStorage.getItem(k))
+    const h = list.find((c) => c.id === 'cli_hansol')
+    h.customDocuments = [...(h.customDocuments ?? []), { id: 'cd-e2e', key: 'customdoc_tax161', label: '납세증명서', validMonths: 1, sensitive: false }]
+    h.documents = { ...(h.documents ?? {}), customdoc_tax161: { received: true, issuedAt: '2026-08-01', fileName: '납세.pdf' } }
+    localStorage.setItem(k, JSON.stringify(list))
+  }, CLIENTS)
+  await page.goto(BASE + '/ops/decide', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  // 1) 밀린 업무 한 건 [2주 뒤로] → [되돌리기] → 예전 기한 · 다시 묻는다
+  await page.getByTestId('decide-kind-stale').click()
+  await page.waitForTimeout(300)
+  const st = page.getByTestId('decision').first()
+  const sid = await st.getAttribute('data-client')
+  // 업무마다 기한만 비교(처음 저장할 때 빈 칸이 채워지므로 통째로 비교하지 않는다)
+  const dues = async () => JSON.stringify(Object.entries((await one(page, sid)).services).map(([k, v]) => [k, v.dueDate ?? '']))
+  const before = await dues()
+  const n0 = await page.getByTestId('decision').count()
+  await st.getByTestId('decision-yes').click()
+  await page.waitForTimeout(600)
+  check(`[2주 뒤로] → 줄 하나 줄고 알림에 [되돌리기] ${tag}`, (await page.getByTestId('decision').count()) === n0 - 1 && (await page.getByTestId('toast-action').last().innerText()).includes('되돌리기'))
+  await page.getByTestId('toast-action').last().click()
+  await page.waitForTimeout(900)
+  check(`[되돌리기] → 업무 기한이 예전 그대로 · 다시 묻는다 ${tag}`, (await dues()) === before && (await page.getByTestId('decision').count()) === n0, `${n0} → ${await page.getByTestId('decision').count()}`)
+  // 2) 다음 약속 [모두 맞아요] → [되돌리기] → 모두 예전 그대로
+  await page.getByTestId('decide-kind-next').click()
+  await page.waitForTimeout(300)
+  const snap = async () => JSON.stringify((await clients(page)).map((c) => [c.id, c.nextAction, c.nextActionDueDate]))
+  const s0 = await snap()
+  const m0 = await page.getByTestId('decision').count()
+  await page.getByTestId('decide-bulk-yes').click()
+  await page.waitForTimeout(1200)
+  check(`다음 약속 ${m0}건 모두 맞아요 → 다 바뀜 ${tag}`, (await snap()) !== s0 && (await page.getByTestId('decision').count()) === 0)
+  await page.getByTestId('toast-action').last().click()
+  await page.waitForTimeout(1500)
+  check(`[되돌리기] → ${m0}건 모두 예전 약속 그대로 · 다시 묻는다 ${tag}`, (await snap()) === s0 && (await page.getByTestId('decision').count()) === m0, await snap())
+  // 3) 고객 플랫폼 연결 업체(한솔) — 서류 요청이 고객 화면에도
+  await page.getByTestId('decide-kind-doc').click()
+  await page.waitForTimeout(300)
+  const doc = page.locator('[data-testid="decision"][data-kind="doc"][data-client="cli_hansol"]').first()
+  check(`한솔 서류 기한: 단추가 '요청 보내기(문구 · 고객 화면)' ${tag}`, (await doc.getByTestId('decision-yes').innerText()).includes('고객 화면'))
+  await doc.getByTestId('decision-yes').click()
+  await page.waitForTimeout(900)
+  const pdocs = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.portal_documents') ?? '[]'))
+  const req = pdocs.filter((d) => d.operationsClientId === 'cli_hansol' && d.status === 'requested' && d.documentType === 'customdoc_tax161')
+  const clip = await page.evaluate(() => navigator.clipboard.readText())
+  check(`[요청 보내기] → 고객 화면 '요청받은 서류' 에 납세증명서 1건 · 문구도 복사 ${tag}`, req.length === 1 && req[0].title === '납세증명서' && clip.includes('납세증명서'), pdocs.map((d) => `${d.title}:${d.status}`))
+  // 고객 플랫폼이 없는 업체는 예전처럼 문구 복사만
+  const other = page.locator('[data-testid="decision"][data-kind="doc"]:not([data-client="cli_hansol"])').first()
+  if (await other.count()) check(`연결 안 된 업체는 '요청 문구 복사' 그대로 ${tag}`, (await other.getByTestId('decision-yes').innerText()).includes('요청 문구 복사'))
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  check(`D-161: 가로 넘침 0 · 오류 0 ${tag}`, over <= 0 && errors.length === 0, `${over} ${errors.join(' | ')}`)
   await ctx.close()
 }
 
