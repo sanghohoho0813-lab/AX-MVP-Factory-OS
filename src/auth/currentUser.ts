@@ -26,6 +26,11 @@ export function ownerIdentity(): UserIdentity {
   return { name: brand.ownerName, title: brand.ownerTitle, initial: brand.ownerName.slice(0, 1) }
 }
 
+function metaText(user: SessionUserLike, key: string): string {
+  const v = (user.user_metadata ?? {})[key]
+  return typeof v === 'string' ? v.trim() : ''
+}
+
 export interface SessionUserLike {
   email?: string | null
   user_metadata?: Record<string, unknown> | null
@@ -48,11 +53,13 @@ export function identityFromSession(user: SessionUserLike | null | undefined, ro
   const email = (user.email ?? '').trim()
   const emailLocal = email.split('@')[0] ?? ''
   const named = metaName(user, emailLocal)
+  const metaTitle = metaText(user, 'title')
   if (access === 'pilot') {
-    const name = named || emailLocal || '사용자'
-    return { name, title: '', initial: name.slice(0, 1).toUpperCase() }
+    // D-163: Pilot 은 이메일 앞부분(ceh 등)을 이름으로 보이지 않는다 — 설정 › 내 정보에서 적은 이름 · 직함
+    const name = named || '사용자'
+    return { name, title: metaTitle, initial: name.slice(0, 1).toUpperCase() }
   }
-  const title = role === 'owner' ? brand.ownerTitle : (role ? (ROLE_TITLE[role] ?? role) : '')
+  const title = metaTitle || (role === 'owner' ? brand.ownerTitle : (role ? (ROLE_TITLE[role] ?? role) : ''))
   if (named) return { name: named, title, initial: named.slice(0, 1) }
   if (role === 'owner') return ownerIdentity()
   const name = emailLocal || '사용자'

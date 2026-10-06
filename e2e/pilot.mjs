@@ -90,7 +90,9 @@ function jwt(u) {
   const p = b64({ sub: u.id, email: u.email, role: 'authenticated', aud: 'authenticated', exp: 4102444800 })
   return `${h}.${p}.${createHmac('sha256', SECRET).update(`${h}.${p}`).digest('base64url')}`
 }
-const userObj = (u) => ({ id: u.id, aud: 'authenticated', role: 'authenticated', email: u.email, app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' })
+/** 사람별 user_metadata(설정 › 내 정보에서 이름 · 직함 저장) — 로그인 · 새로 받기에도 그대로 */
+const meta = new Map()
+const userObj = (u) => ({ id: u.id, aud: 'authenticated', role: 'authenticated', email: u.email, app_metadata: {}, user_metadata: meta.get(u.id) ?? {}, created_at: '2026-01-01T00:00:00Z' })
 const sessionOf = (u) => ({ access_token: jwt(u), token_type: 'bearer', expires_in: 3600, expires_at: 4102444800, refresh_token: `refresh-${u.id}`, user: userObj(u) })
 const whoOf = (auth) => {
   const t = (auth ?? '').replace(/^Bearer /, '')
@@ -116,7 +118,12 @@ async function route(r) {
   }
   if (path === '/auth/v1/user') {
     const u = whoOf(headers['authorization'])
-    return u ? r.fulfill(json(userObj(u))) : r.fulfill(json({ msg: 'no' }, 401))
+    if (!u) return r.fulfill(json({ msg: 'no' }, 401))
+    if (method === 'PUT') {
+      const body = JSON.parse(req.postData() ?? '{}')
+      if (body.data) meta.set(u.id, { ...(meta.get(u.id) ?? {}), ...body.data })
+    }
+    return r.fulfill(json(userObj(u)))
   }
   if (path === '/auth/v1/logout') return r.fulfill({ status: 204, body: '' })
   if (path.startsWith('/storage/v1/')) {
@@ -250,7 +257,8 @@ try {
   const nav = (await page.locator('aside').first().innerText().catch(() => '')) ?? ''
   check('Pilot 메뉴: 잘 안 쓰는 기능 · 이 시스템 묶음 없음', !nav.includes('잘 안 쓰는 기능') && !nav.includes('이 시스템'), nav.replace(/\n/g, '|').slice(0, 400))
   check('Pilot 메뉴: 영업자 정산 · 1차 미팅 체크리스트 · 상담신청 없음', !nav.includes('영업자 정산') && !nav.includes('1차 미팅') && !nav.includes('상담신청'))
-  check('Pilot 메뉴: 오늘 · 고객 관리 · 일정 · 매출 · 지원사업 · 모듈 · 설정은 있음', ['오늘', '고객 관리', '매출', '지원사업', '설정'].every((s) => nav.includes(s)), nav.replace(/\n/g, '|').slice(0, 400))
+  check('Pilot 메뉴: 오늘 · 고객 관리 · 일정 · 매출 · 전문 모듈(기업성장 · 절세·재무) · 설정은 있음', ['오늘', '고객 관리', '매출', '기업성장', '절세·재무', '설정'].every((s) => nav.includes(s)), nav.replace(/\n/g, '|').slice(0, 400))
+  check('메뉴(D-163): 정부지원사업 줄 없음 · 영업 묶음에 지원사업 알림 없음', !nav.includes('정부지원사업') && !/영업 관리\n지원사업 알림/.test(nav), nav.replace(/\n/g, '|').slice(0, 400))
   check('Pilot 머리줄: 고객 플랫폼 링크 없음', (await page.locator('header').innerText()).includes('고객 플랫폼') === false)
 
   // 교차 — 대표 업체 · 숨긴 화면 주소
@@ -267,6 +275,13 @@ try {
   }
   await go(page, '/settings')
   const st = await bodyText(page)
+  // D-163: 이름 · 직함 — 이메일 앞부분(pilot)을 이름으로 보이지 않고, 적은 이름이 사이드바 · 머리줄에
+  check('Pilot 이름: 저장 전에는 이메일 앞부분을 이름으로 쓰지 않음', !(await page.locator('[data-testid="sidebar-account"]').innerText()).includes('pilot'), await page.locator('[data-testid="sidebar-account"]').innerText())
+  await page.getByTestId('name-input').fill('최은혜')
+  await page.getByTestId('title-input').fill('팀장')
+  await page.getByTestId('name-save').click()
+  await page.waitForTimeout(900)
+  check('Pilot 이름: 설정에서 저장하면 사이드바에 "최은혜 팀장"', /최은혜\s*팀장/.test(await page.locator('[data-testid="sidebar-account"]').innerText()), await page.locator('[data-testid="sidebar-account"]').innerText())
   check('Pilot 설정: 내 정보 · 화면만(구성원 · 요금제 · 고객 이벤트 받는 곳 없음)', (await page.getByTestId('settings-pilot').count()) === 1 && !st.includes('구성원') && !st.includes('요금제') && !st.includes('받는 곳'), st.slice(0, 300))
 
   // 찾기 · 알림 종
@@ -398,6 +413,7 @@ try {
   await go(page, '/ops/clients')
   const again = await bodyText(page)
   check('다시 로그인: 내 업체 그대로 · 대표 업체 없음', again.includes('은혜테스트정밀') && leaked(again).length === 0, again.slice(0, 200))
+  check('다시 로그인: 이름 "최은혜 팀장" 그대로', /최은혜\s*팀장/.test(await page.locator('[data-testid="sidebar-account"]').innerText()))
   check('다시 로그인: 내가 남긴 브라우저 값이 돌아옴', (await page.evaluate(() => localStorage.getItem('axmvp.qa.pilotDraft'))) === '은혜 작성 중')
   await logout(page)
 

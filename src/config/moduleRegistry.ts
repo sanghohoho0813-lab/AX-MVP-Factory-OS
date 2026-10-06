@@ -119,7 +119,7 @@ export const MODULE_GROUPS: ModuleGroup[] = [
   { key: 'clients', title: '고객', accent: 'ops' },
   // D-103: 영업자 일(정산 · 1차 미팅 체크리스트)을 고객 운영과 나눈다
   { key: 'sales', title: '영업', accent: 'revenue' },
-  // D-127: 전문 모듈 — 분야 여섯 줄(기업성장 · 정부지원사업 · 절세·재무 · 기술사업화 · AX STUDIO · WEB STUDIO).
+  // D-127: 전문 모듈 — 분야 줄(D-163 부터 기업성장 · 절세·재무 둘. 기술사업화 · AX · WEB 은 '잘 안 쓰는 기능').
   // 도구는 분야 줄 아래에 접혀 있다. 도구가 늘어도 이 묶음의 줄 수는 늘지 않는다(예전 컨설팅 작업실 + AX 스튜디오)
   { key: 'modules', title: '전문 모듈', accent: 'system' },
   // D-136: 대표 "특허·벤처 · AX 스튜디오는 거의 안 쓴다" — 지우지 않고 접힌 한 묶음으로(주소 · 데이터 · 기능 그대로)
@@ -161,6 +161,8 @@ const FEATURE_NAV: Omit<ModuleDefinition, 'group' | 'parent'>[] = [
   { key: 'website-studio', label: '홈페이지 설계', path: '/website-studio', icon: Palette, accent: 'ai', enabled: true },
   // D-104: 예전 '컨설팅 작업실'(임시 이름 특허+벤처)
   { key: 'consulting-studio', label: '특허+벤처', path: '/studio', icon: Workflow, accent: 'ai', enabled: true, hint: '특허 · 벤처인증 · MVP 단계 관리 (예전 이름: 컨설팅 작업실)' },
+  // D-141 지원사업 알림 — D-163 부터 전문 모듈 › 기업성장 안(대표 · Pilot 같은 메뉴)
+  { key: 'grants', label: '지원사업 알림', path: '/grants', icon: BellRing, accent: 'revenue', enabled: true, hint: '마감 임박 공고 · 업체 조건에 맞는 곳 · 신청 준비' },
   { key: 'funding', label: '자금·지원사업', path: '/funding', icon: Landmark, accent: 'revenue', enabled: true },
   { key: 'institutions', label: '기관 전략', path: '/funding/catalog', icon: Landmark, accent: 'ai', enabled: true, hint: '기관·프로그램 목록', advanced: true },
 ]
@@ -207,8 +209,6 @@ export const MODULES: ModuleDefinition[] = [
 
   // D-114: 기업컨설팅 OS(영업 도구 모음)를 옮긴 곳 — 목차는 이 한 줄, 보드 · 미팅 준비 · 상품·견적 · 전략은 안의 탭
   { key: 'sales', label: '영업 관리', path: '/sales/board', icon: KanbanSquare, group: 'sales', accent: 'revenue', enabled: true, alsoPaths: [...SALES_TAB_PATHS, ...SALES_EXTRA_PATHS, ...movedToPaths('/sales/board')], hint: '영업 보드 · 잠재고객 → 미팅 → 계약' },
-  // D-141: 정부지원사업 매칭 알림 — 계약 고객 · 잠재고객 조건에 맞는 공고 · 마감 임박
-  { key: 'grants', label: '지원사업 알림', path: '/grants', icon: BellRing, group: 'sales', accent: 'revenue', enabled: true, hint: '마감 임박 공고 · 업체 조건에 맞는 곳 · 가망고객 찾기 링크' },
   { key: 'agents', label: '영업자 정산', path: '/ops/agents', icon: Handshake, group: 'sales', accent: 'revenue', enabled: true, hint: '누구한테 지금 얼마를 줘야 하는가', ownerOnly: true },
   // D-142: 매출(계약 수금에서 저절로) · 비용(정기 결제 · 쓴 돈 · 영업자 수수료)
   { key: 'money', label: '매출 · 비용', path: '/money', icon: Wallet, group: 'sales', accent: 'revenue', enabled: true, hint: '들어온 돈 · 들어올 예정 · 정기 결제일 · 쓴 돈' },

@@ -254,7 +254,9 @@ check('키: 상관없는 다른 사이트 값은 옮기지 않는다', !isUserSc
 // ---------- 이름: Pilot 은 대표 이름을 빌리지 않는다 ----------
 {
   const pilotNoName = identityFromSession({ email: 'eunhye@x.kr', user_metadata: {} }, 'owner', 'pilot')
-  check('이름: Pilot(이름 없음 · 자기 작업공간 소유자) → 이메일 앞부분 · 대표 직함 없음', pilotNoName.name === 'eunhye' && pilotNoName.title === '' && pilotNoName.name !== brand.ownerName, JSON.stringify(pilotNoName))
+  check('이름: Pilot(이름 없음 · 자기 작업공간 소유자) → 이메일 앞부분도 대표 이름도 아닌 "사용자"(D-163)', pilotNoName.name === '사용자' && pilotNoName.title === '' && pilotNoName.name !== brand.ownerName, JSON.stringify(pilotNoName))
+  const pilotTitled = identityFromSession({ email: 'eunhye@x.kr', user_metadata: { display_name: '최은혜', title: '팀장' } }, 'owner', 'pilot')
+  check('이름: Pilot 이 적은 이름 · 직함 → "최은혜 팀장"(D-163)', pilotTitled.name === '최은혜' && pilotTitled.title === '팀장')
   const pilotNamed = identityFromSession({ email: 'eunhye@x.kr', user_metadata: { display_name: '최은혜' } }, 'owner', 'pilot')
   check('이름: Pilot(이름 있음) → 그 이름', pilotNamed.name === '최은혜' && pilotNamed.title === '')
   const owner = identityFromSession({ email: 'ceo@x.kr', user_metadata: {} }, 'owner', 'full')

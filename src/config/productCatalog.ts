@@ -104,8 +104,8 @@ export const MODULE_CATALOG: CatalogModule[] = [
   {
     key: 'growth',
     name: '기업성장',
-    description: '기업인증 · 정책자금 · 고용지원금 · 연구소 업무를 한 업체 기록으로 잇습니다.',
-    covers: ['기업인증', '정책자금', '보증', '고용지원금', '연구소'],
+    description: '정책자금 · 고용지원금 · 연구소 · 지원사업 공고까지 한 업체 기록으로 잇습니다.',
+    covers: ['정책자금', '고용지원금', '연구소', '지원사업', '기업인증', '보증'],
     upcoming: ['기업인증', '보증'],
     category: 'growth',
     route: '/modules/growth',
@@ -134,7 +134,8 @@ export const MODULE_CATALOG: CatalogModule[] = [
     listPrice: null,
     entitlementKey: 'module.gov-support',
     dependencies: [],
-    visible: true,
+    // D-163: 전문 모듈은 기업성장 · 절세·재무 둘만 — 지원사업(공고 알림 · 자금 연계)은 기업성장 안으로. 권한 이름은 예전 기록 때문에 그대로 둔다
+    visible: false,
     order: 2,
   },
   {
@@ -248,10 +249,12 @@ export const FEATURE_CATALOG: CatalogFeature[] = [
   { key: 'policy-funding', source: 'tool', module: 'growth', lockedPreview: 'first-section', clientEntry: { topic: '정책자금', verb: '진단하기', path: '/tools/policy-funding' } },
   { key: 'employment', source: 'tool', module: 'growth', lockedPreview: 'first-section', clientEntry: { topic: '고용지원금', verb: '확인하기', path: '/tools/employment' } },
   { key: 'labcare', source: 'tool', module: 'growth', lockedPreview: 'first-section', clientEntry: { topic: '기업부설연구소', verb: '검토하기', path: '/tools/labcare' } },
+  // D-163: 지원사업 알림 — 영업 목차에서 기업성장 안으로(요금제와 상관없이 늘 열림)
+  { key: 'grants', source: 'nav', module: 'growth', lockedPreview: 'full', summary: '업체 조건에 맞는 공고 · 마감 임박 · 신청 준비를 봅니다.' },
   { key: 'cert-os', source: 'tool', module: 'growth', lockedPreview: 'intro' },
-  // 정부지원사업
-  { key: 'funding', source: 'nav', module: 'gov-support', lockedPreview: 'intro', summary: '지원사업 신청 흐름과 필요한 서류를 업체별로 관리합니다.' },
-  { key: 'institutions', source: 'nav', module: 'gov-support', lockedPreview: 'intro', summary: '기관 · 프로그램 목록과 기관별 전략을 봅니다.' },
+  // 예전 '정부지원사업' 모듈의 기능 — D-163 부터 기업성장 안
+  { key: 'funding', source: 'nav', module: 'growth', lockedPreview: 'intro', summary: '지원사업 신청 흐름과 필요한 서류를 업체별로 관리합니다.' },
+  { key: 'institutions', source: 'nav', module: 'growth', lockedPreview: 'intro', summary: '기관 · 프로그램 목록과 기관별 전략을 봅니다.' },
   // 절세·재무
   { key: 'tax', source: 'tool', module: 'tax-finance', lockedPreview: 'full', clientEntry: { topic: '절세', verb: '계산하기', path: '/tools/tax' } },
   { key: 'startup-tax', source: 'tool', module: 'tax-finance', lockedPreview: 'first-section', clientEntry: { topic: '창업감면', verb: '판정하기', path: '/tools/startup-tax' } },

@@ -2,7 +2,7 @@
  * 자동 생성 파일 — 직접 수정하지 말 것.
  * 생성: node scripts/gen-theme-css.mjs
  *
- * 마스터 규격의 CANONICAL 9 THEME(각 6색)을 앱 전역 색 토큰으로 확장한 결과다.
+ * 마스터 규격의 CANONICAL 9 THEME(각 7색 — 7번째는 흰 바탕)을 앱 전역 색 토큰으로 확장한 결과다.
  * - Theme 토큰(navy/brand/accent/second/highlight/soft)만 테마에 따라 바뀐다.
  * - 본문 중립색(slate)과 의미색(success/warning/danger)은 테마와 분리되어 고정이다.
  */
@@ -15,6 +15,7 @@ html[data-theme='navy-blue'] {
   --theme-accent: #17A889;
   --theme-highlight: #E7C873;
   --theme-soft: #DCE8F7;
+  --theme-surface: #FFFFFF;
   --color-navy-950: #01071D;
   --color-navy-900: #0B1830;
   --color-navy-800: #1A2740;
@@ -51,6 +52,7 @@ html[data-theme='navy-gold'] {
   --theme-accent: #D0A84B;
   --theme-highlight: #F0D995;
   --theme-soft: #EFE8D7;
+  --theme-surface: #FFFFFF;
   --color-navy-950: #03091A;
   --color-navy-900: #111A2D;
   --color-navy-800: #20293C;
@@ -87,6 +89,7 @@ html[data-theme='emerald-gold'] {
   --theme-accent: #B4862A;
   --theme-highlight: #E8CE88;
   --theme-soft: #E2F0EA;
+  --theme-surface: #FFFFFF;
   --color-navy-950: #001A13;
   --color-navy-900: #11332B;
   --color-navy-800: #224139;
@@ -123,6 +126,7 @@ html[data-theme='forest-sage'] {
   --theme-accent: #A58E4D;
   --theme-highlight: #D9D2AA;
   --theme-soft: #E5ECE5;
+  --theme-surface: #FFFFFF;
   --color-navy-950: #001B13;
   --color-navy-900: #17352C;
   --color-navy-800: #27433A;
@@ -154,19 +158,20 @@ html[data-theme='forest-sage'] {
 /* 딥 틸 */
 html:not([data-theme]),
 html[data-theme='deep-teal'] {
-  --theme-shell: #08323A;
+  --theme-shell: #06262D;
   --theme-primary: #087A83;
   --theme-secondary: #1597A3;
   --theme-accent: #D2704C;
   --theme-highlight: #E9B59B;
   --theme-soft: #DDEDEF;
-  --color-navy-950: #001920;
-  --color-navy-900: #08323A;
-  --color-navy-800: #1C4148;
-  --color-navy-700: #2D5057;
-  --color-navy-600: #43636A;
-  --color-navy-300: #96ADB2;
-  --color-navy-200: #B4C7CB;
+  --theme-surface: #FFFFFF;
+  --color-navy-950: #001118;
+  --color-navy-900: #06262D;
+  --color-navy-800: #18353C;
+  --color-navy-700: #29444B;
+  --color-navy-600: #3F595F;
+  --color-navy-300: #BDC0C1;
+  --color-navy-200: #E4E6E7;
   --color-brand-50: #E8FAFC;
   --color-brand-100: #D3F0F2;
   --color-brand-200: #B7DFE3;
@@ -196,6 +201,7 @@ html[data-theme='onyx-gold'] {
   --theme-accent: #B89032;
   --theme-highlight: #E0C76F;
   --theme-soft: #E6E8EC;
+  --theme-surface: #FFFFFF;
   --color-navy-950: #06080C;
   --color-navy-900: #15171C;
   --color-navy-800: #24262B;
@@ -226,19 +232,20 @@ html[data-theme='onyx-gold'] {
 
 /* 버건디 슬레이트 */
 html[data-theme='burgundy'] {
-  --theme-shell: #3A1724;
+  --theme-shell: #26101A;
   --theme-primary: #7A2C49;
   --theme-secondary: #667085;
   --theme-accent: #A85C72;
   --theme-highlight: #E6B6A5;
   --theme-soft: #EEE4E8;
-  --color-navy-950: #22030F;
-  --color-navy-900: #3A1724;
-  --color-navy-800: #492633;
-  --color-navy-700: #593642;
-  --color-navy-600: #6D4B56;
-  --color-navy-300: #B79CA4;
-  --color-navy-200: #D0B9C0;
+  --theme-surface: #FFFFFF;
+  --color-navy-950: #14030A;
+  --color-navy-900: #26101A;
+  --color-navy-800: #361F29;
+  --color-navy-700: #462F39;
+  --color-navy-600: #5B444E;
+  --color-navy-300: #BEBBBC;
+  --color-navy-200: #E6E4E5;
   --color-brand-50: #FFEDF3;
   --color-brand-100: #FBDAE3;
   --color-brand-200: #ECBFCB;
@@ -262,19 +269,20 @@ html[data-theme='burgundy'] {
 
 /* 플럼 인디고 */
 html[data-theme='plum-indigo'] {
-  --theme-shell: #291A3D;
+  --theme-shell: #1C1430;
   --theme-primary: #573F91;
   --theme-secondary: #4E63A8;
   --theme-accent: #8B5AA6;
   --theme-highlight: #C4B0E6;
   --theme-soft: #E9E5F3;
-  --color-navy-950: #140526;
-  --color-navy-900: #291A3D;
-  --color-navy-800: #38294C;
-  --color-navy-700: #47395B;
-  --color-navy-600: #5B4E6F;
-  --color-navy-300: #A89FB8;
-  --color-navy-200: #C3BBD1;
+  --theme-surface: #FFFFFF;
+  --color-navy-950: #0C041D;
+  --color-navy-900: #1C1430;
+  --color-navy-800: #2B2340;
+  --color-navy-700: #3A344F;
+  --color-navy-600: #4F4964;
+  --color-navy-300: #BDBCC0;
+  --color-navy-200: #E5E5E7;
   --color-brand-50: #F4F1FF;
   --color-brand-100: #E6E0FF;
   --color-brand-200: #D0C8F4;
@@ -298,19 +306,20 @@ html[data-theme='plum-indigo'] {
 
 /* 스틸 플래티넘 */
 html[data-theme='steel'] {
-  --theme-shell: #24303B;
+  --theme-shell: #19222B;
   --theme-primary: #44647A;
   --theme-secondary: #6D8899;
   --theme-accent: #4C9AAA;
   --theme-highlight: #C9D6DE;
   --theme-soft: #E7EDF1;
-  --color-navy-950: #0B1620;
-  --color-navy-900: #24303B;
-  --color-navy-800: #323E49;
-  --color-navy-700: #414D58;
-  --color-navy-600: #55606B;
-  --color-navy-300: #A2AAB3;
-  --color-navy-200: #BEC5CB;
+  --theme-surface: #FFFFFF;
+  --color-navy-950: #060E16;
+  --color-navy-900: #19222B;
+  --color-navy-800: #28313A;
+  --color-navy-700: #374049;
+  --color-navy-600: #4C545D;
+  --color-navy-300: #BEBFC0;
+  --color-navy-200: #E5E6E7;
   --color-brand-50: #EFF6FC;
   --color-brand-100: #DDE9F2;
   --color-brand-200: #C5D6E2;

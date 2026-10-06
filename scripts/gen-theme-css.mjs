@@ -1,7 +1,10 @@
 /**
  * 9종 Canonical Theme 의 CSS 변수 램프를 생성한다.
  *
- * 입력: 마스터 규격의 Theme × 6색(Shell/Primary/Secondary/Accent/Highlight/Soft).
+ * 입력: 마스터 규격의 Theme × 7색(Shell/Primary/Secondary/Accent/Highlight/Soft/Surface).
+ *   D-163: 7번째 Surface = 완전한 흰색(본문 바탕) — 모든 테마 같음.
+ *   D-163: crisp — 사이드바 글자가 바탕색에 물들어 뿌옇게 보이던 테마(딥 틸 · 버건디 · 플럼 · 스틸):
+ *          바탕을 더 짙게, 사이드바 글자는 색기를 거의 빼고 더 밝게.
  * 출력: src/styles/themes.generated.css
  *
  * 램프는 OKLab 공간에서 흰색/검은색과 섞어 만든다. 결과는 정적 hex 로 고정하므로
@@ -17,15 +20,17 @@ const THEMES = [
   { key: 'navy-gold',     label: '네이비 골드',   shell: '#111A2D', primary: '#2847A7', secondary: '#A37A28', accent: '#D0A84B', highlight: '#F0D995', soft: '#EFE8D7' },
   { key: 'emerald-gold',  label: '에메랄드 골드', shell: '#11332B', primary: '#0E7663', secondary: '#2C9277', accent: '#B4862A', highlight: '#E8CE88', soft: '#E2F0EA' },
   { key: 'forest-sage',   label: '포레스트 세이지', shell: '#17352C', primary: '#356E58', secondary: '#73977E', accent: '#A58E4D', highlight: '#D9D2AA', soft: '#E5ECE5' },
-  { key: 'deep-teal',     label: '딥 틸',        shell: '#08323A', primary: '#087A83', secondary: '#1597A3', accent: '#D2704C', highlight: '#E9B59B', soft: '#DDEDEF' },
+  { key: 'deep-teal',     label: '딥 틸',        shell: '#06262D', crisp: true, primary: '#087A83', secondary: '#1597A3', accent: '#D2704C', highlight: '#E9B59B', soft: '#DDEDEF' },
   { key: 'onyx-gold',     label: '오닉스 골드',   shell: '#15171C', primary: '#343942', secondary: '#6A717C', accent: '#B89032', highlight: '#E0C76F', soft: '#E6E8EC' },
-  { key: 'burgundy',      label: '버건디 슬레이트', shell: '#3A1724', primary: '#7A2C49', secondary: '#667085', accent: '#A85C72', highlight: '#E6B6A5', soft: '#EEE4E8' },
-  { key: 'plum-indigo',   label: '플럼 인디고',   shell: '#291A3D', primary: '#573F91', secondary: '#4E63A8', accent: '#8B5AA6', highlight: '#C4B0E6', soft: '#E9E5F3' },
-  { key: 'steel',         label: '스틸 플래티넘', shell: '#24303B', primary: '#44647A', secondary: '#6D8899', accent: '#4C9AAA', highlight: '#C9D6DE', soft: '#E7EDF1' },
+  { key: 'burgundy',      label: '버건디 슬레이트', shell: '#26101A', crisp: true, primary: '#7A2C49', secondary: '#667085', accent: '#A85C72', highlight: '#E6B6A5', soft: '#EEE4E8' },
+  { key: 'plum-indigo',   label: '플럼 인디고',   shell: '#1C1430', crisp: true, primary: '#573F91', secondary: '#4E63A8', accent: '#8B5AA6', highlight: '#C4B0E6', soft: '#E9E5F3' },
+  { key: 'steel',         label: '스틸 플래티넘', shell: '#19222B', crisp: true, primary: '#44647A', secondary: '#6D8899', accent: '#4C9AAA', highlight: '#C9D6DE', soft: '#E7EDF1' },
 ]
 
 /** 기본 테마 — 브랜드 로고(짙은 청록)와 공개 사이트 웜 액센트에 가장 가까운 팔레트 */
 const DEFAULT_THEME = 'deep-teal'
+/** D-163: 7번째 색 — 본문 바탕은 모든 테마에서 완전한 흰색 */
+const SURFACE = '#FFFFFF'
 
 /* ---------- sRGB ↔ OKLab ---------- */
 const toLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
@@ -71,6 +76,11 @@ function tint(hex, amt) {
   const keep = (1 - amt) ** 0.55
   return rgbToHex(oklabToRgb([L + (1 - L) * amt, a * keep, b * keep]))
 }
+/** 사이드바 글자용 — 밝게 하면서 색기는 거의 뺀다(chroma 를 keep 배로) */
+function tintNeutral(hex, amt, keep) {
+  const [L, a, b] = rgbToOklab(hexToRgb(hex))
+  return rgbToHex(oklabToRgb([L + (1 - L) * amt, a * keep, b * keep]))
+}
 /** 밝기만 검은색 쪽으로 옮기고 채도는 유지한다. */
 function shade(hex, amt) {
   const [L, a, b] = rgbToOklab(hexToRgb(hex))
@@ -93,6 +103,7 @@ function ramp(t) {
     '--theme-accent': t.accent,
     '--theme-highlight': t.highlight,
     '--theme-soft': t.soft,
+    '--theme-surface': SURFACE,
 
     /* Shell 램프 — 사이드바 표면과 그 위 글자 */
     '--color-navy-950': darken(t.shell, 0.35),
@@ -100,8 +111,8 @@ function ramp(t) {
     '--color-navy-800': lighten(t.shell, 0.08),
     '--color-navy-700': lighten(t.shell, 0.16),
     '--color-navy-600': lighten(t.shell, 0.26),
-    '--color-navy-300': lighten(t.shell, 0.62),
-    '--color-navy-200': lighten(t.shell, 0.74),
+    '--color-navy-300': t.crisp ? tintNeutral(t.shell, 0.74, 0.1) : lighten(t.shell, 0.62),
+    '--color-navy-200': t.crisp ? tintNeutral(t.shell, 0.9, 0.06) : lighten(t.shell, 0.74),
 
     /* Primary 램프 — 주 버튼·활성 상태·링크 */
     '--color-brand-50': lighten(t.primary, 0.94),
@@ -136,7 +147,7 @@ const header = `/*
  * 자동 생성 파일 — 직접 수정하지 말 것.
  * 생성: node scripts/gen-theme-css.mjs
  *
- * 마스터 규격의 CANONICAL 9 THEME(각 6색)을 앱 전역 색 토큰으로 확장한 결과다.
+ * 마스터 규격의 CANONICAL 9 THEME(각 7색 — 7번째는 흰 바탕)을 앱 전역 색 토큰으로 확장한 결과다.
  * - Theme 토큰(navy/brand/accent/second/highlight/soft)만 테마에 따라 바뀐다.
  * - 본문 중립색(slate)과 의미색(success/warning/danger)은 테마와 분리되어 고정이다.
  */
@@ -173,7 +184,7 @@ for (const t of THEMES) {
   const r = ramp(t)
   const checks = [
     ['navy-300 on shell', r['--color-navy-300'], r['--color-navy-900'], 4.5],
-    ['navy-200 on shell', r['--color-navy-200'], r['--color-navy-900'], 4.5],
+    ['navy-200 on shell', r['--color-navy-200'], r['--color-navy-900'], t.crisp ? 11 : 4.5],
     ['white on brand-600', '#FFFFFF', r['--color-brand-600'], 4.5],
     ['brand-700 on brand-50', r['--color-brand-700'], r['--color-brand-50'], 4.5],
   ]

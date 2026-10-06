@@ -26,10 +26,10 @@ export function ThemeControl() {
                 : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
             }`}
           >
-            {/* 6색 미리보기 — Shell / Primary / Secondary / Accent / Highlight / Soft */}
+            {/* 7색 미리보기 — Shell / Primary / Secondary / Accent / Highlight / Soft / 흰 바탕(D-163) */}
             <span aria-hidden="true" className="flex shrink-0 overflow-hidden rounded-md ring-1 ring-slate-900/10">
               {t.swatch.map((c, i) => (
-                <span key={i} className="block size-5" style={{ backgroundColor: c }} />
+                <span key={i} className={`block h-5 w-4 ${c.toUpperCase() === '#FFFFFF' ? 'border-l border-slate-200' : ''}`} style={{ backgroundColor: c }} />
               ))}
             </span>
             <span className="min-w-0 flex-1">

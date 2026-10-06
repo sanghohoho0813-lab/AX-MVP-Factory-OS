@@ -257,7 +257,9 @@ html {
 }
 
 body {
-  @apply bg-slate-50 text-slate-800 antialiased;
+  /* D-163: 본문 바탕은 테마의 7번째 색(완전한 흰색) */
+  @apply text-slate-800 antialiased;
+  background-color: var(--theme-surface, #ffffff);
   font-feature-settings: "tnum";
   line-height: 1.6;
 }

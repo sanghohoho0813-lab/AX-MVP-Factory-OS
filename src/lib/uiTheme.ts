@@ -12,8 +12,8 @@ export interface UiThemeMeta {
   key: UiThemeKey
   label: string
   hint: string
-  /** 미리보기 점 — Shell / Primary / Secondary / Accent / Highlight / Soft 순 */
-  swatch: [string, string, string, string, string, string]
+  /** 미리보기 점 — Shell / Primary / Secondary / Accent / Highlight / Soft / Surface(흰 바탕, D-163) 순 */
+  swatch: [string, string, string, string, string, string, string]
 }
 
 export const UI_THEMES: UiThemeMeta[] = [
@@ -21,55 +21,55 @@ export const UI_THEMES: UiThemeMeta[] = [
     key: 'navy-blue',
     label: '딥 네이비 블루',
     hint: '차분한 남색',
-    swatch: ['#0B1830', '#2457D6', '#1687A7', '#17A889', '#E7C873', '#DCE8F7'],
+    swatch: ['#0B1830', '#2457D6', '#1687A7', '#17A889', '#E7C873', '#DCE8F7', '#FFFFFF'],
   },
   {
     key: 'navy-gold',
     label: '네이비 골드',
     hint: '남색 + 금색 강조',
-    swatch: ['#111A2D', '#2847A7', '#A37A28', '#D0A84B', '#F0D995', '#EFE8D7'],
+    swatch: ['#111A2D', '#2847A7', '#A37A28', '#D0A84B', '#F0D995', '#EFE8D7', '#FFFFFF'],
   },
   {
     key: 'emerald-gold',
     label: '에메랄드 골드',
     hint: '짙은 초록 + 금색',
-    swatch: ['#11332B', '#0E7663', '#2C9277', '#B4862A', '#E8CE88', '#E2F0EA'],
+    swatch: ['#11332B', '#0E7663', '#2C9277', '#B4862A', '#E8CE88', '#E2F0EA', '#FFFFFF'],
   },
   {
     key: 'forest-sage',
     label: '포레스트 세이지',
     hint: '숲색 · 부드러운 톤',
-    swatch: ['#17352C', '#356E58', '#73977E', '#A58E4D', '#D9D2AA', '#E5ECE5'],
+    swatch: ['#17352C', '#356E58', '#73977E', '#A58E4D', '#D9D2AA', '#E5ECE5', '#FFFFFF'],
   },
   {
     key: 'deep-teal',
     label: '딥 틸',
     hint: '기본값 · 브랜드 청록 + 웜 포인트',
-    swatch: ['#08323A', '#087A83', '#1597A3', '#D2704C', '#E9B59B', '#DDEDEF'],
+    swatch: ['#06262D', '#087A83', '#1597A3', '#D2704C', '#E9B59B', '#DDEDEF', '#FFFFFF'],
   },
   {
     key: 'onyx-gold',
     label: '오닉스 골드',
     hint: '무채색 + 금색',
-    swatch: ['#15171C', '#343942', '#6A717C', '#B89032', '#E0C76F', '#E6E8EC'],
+    swatch: ['#15171C', '#343942', '#6A717C', '#B89032', '#E0C76F', '#E6E8EC', '#FFFFFF'],
   },
   {
     key: 'burgundy',
     label: '버건디 슬레이트',
     hint: '와인색 · 무게감',
-    swatch: ['#3A1724', '#7A2C49', '#667085', '#A85C72', '#E6B6A5', '#EEE4E8'],
+    swatch: ['#26101A', '#7A2C49', '#667085', '#A85C72', '#E6B6A5', '#EEE4E8', '#FFFFFF'],
   },
   {
     key: 'plum-indigo',
     label: '플럼 인디고',
     hint: '보라 + 남보라',
-    swatch: ['#291A3D', '#573F91', '#4E63A8', '#8B5AA6', '#C4B0E6', '#E9E5F3'],
+    swatch: ['#1C1430', '#573F91', '#4E63A8', '#8B5AA6', '#C4B0E6', '#E9E5F3', '#FFFFFF'],
   },
   {
     key: 'steel',
     label: '스틸 플래티넘',
     hint: '강철빛 · 가장 옅음',
-    swatch: ['#24303B', '#44647A', '#6D8899', '#4C9AAA', '#C9D6DE', '#E7EDF1'],
+    swatch: ['#19222B', '#44647A', '#6D8899', '#4C9AAA', '#C9D6DE', '#E7EDF1', '#FFFFFF'],
   },
 ]
 

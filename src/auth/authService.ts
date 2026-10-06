@@ -75,6 +75,17 @@ export async function updatePassword(newPassword: string): Promise<{ ok: boolean
   }
 }
 
+/** D-163: 내 이름 · 직함 — 화면 사용자 칸 · 고객에게 가는 글 서명에 쓴다(로그인 계정 정보에 저장) */
+export async function updateMyName(name: string, title: string): Promise<{ ok: boolean; errorMessage?: string }> {
+  try {
+    const { error } = await getSupabaseClient().auth.updateUser({ data: { display_name: name.trim().slice(0, 30), title: title.trim().slice(0, 20) } })
+    if (error) return { ok: false, errorMessage: toFriendlyAuthError(error).message }
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, errorMessage: toFriendlyAuthError(err).message }
+  }
+}
+
 export async function signOut(): Promise<void> {
   try {
     await getSupabaseClient().auth.signOut()

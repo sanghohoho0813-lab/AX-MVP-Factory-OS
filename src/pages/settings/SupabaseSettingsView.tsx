@@ -20,6 +20,41 @@ import { useCurrentUser } from '../../components/layout/useCurrentUser'
 import { TabNav, SettingRow, AppearancePanel, TextScalePanel, FeatureVisibilityPanel, SystemPanel, type TabKey } from './parts'
 import { OnboardingSettingsPanel } from './OnboardingSettingsPanel'
 import { SupabaseHealthPanel } from './SupabaseHealthPanel'
+import { updateMyName } from '../../auth/authService'
+
+/** D-163: 이름 · 직함 고치기 — 사이드바 · 머리줄 · 고객에게 가는 글 서명이 같이 바뀐다(대표 · Pilot 같은 화면) */
+function NameEditor() {
+  const { session } = useAuth()
+  const me = useCurrentUser()
+  const { showToast } = useToast()
+  const meta = (session?.user.user_metadata ?? {}) as Record<string, unknown>
+  const [name, setName] = useState(typeof meta.display_name === 'string' ? meta.display_name : me.name === '사용자' ? '' : me.name)
+  const [title, setTitle] = useState(typeof meta.title === 'string' ? meta.title : me.title)
+  const [saving, setSaving] = useState(false)
+  const save = async () => {
+    if (!name.trim()) return showToast('이름을 적어 주세요.')
+    setSaving(true)
+    const r = await updateMyName(name, title)
+    setSaving(false)
+    showToast(r.ok ? '이름을 바꿨습니다.' : (r.errorMessage ?? '저장하지 못했습니다.'))
+  }
+  const input = 'mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2.5 text-[1rem]'
+  return (
+    <div className="flex flex-wrap items-end gap-3 border-b border-slate-50 py-3" data-testid="name-editor">
+      <label className="min-w-[10rem] flex-1 text-[0.875rem] text-slate-500">
+        이름
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 최은혜" className={input} data-testid="name-input" />
+      </label>
+      <label className="w-32 text-[0.875rem] text-slate-500">
+        직함
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 팀장" className={input} data-testid="title-input" />
+      </label>
+      <Button variant="primary" onClick={() => void save()} disabled={saving} data-testid="name-save">
+        {saving ? '저장 중…' : '이름 저장'}
+      </Button>
+    </div>
+  )
+}
 
 function DataPanelSupabase() {
   const { showToast } = useToast()
@@ -78,8 +113,6 @@ export function SupabaseSettingsView() {
   const { session, workspaces, currentWorkspaceId } = useAuth()
   const current = workspaces.find((w) => w.workspaceId === currentWorkspaceId)
   const roleLabel: Record<string, string> = { owner: '소유자', admin: '관리자', editor: '편집자', viewer: '뷰어' }
-  // D-103: 사이드바 아래·머리줄과 같은 이름 (프로필 이름이 없으면 대표 이름)
-  const me = useCurrentUser()
   // D-162: Pilot 에게는 '내 설정' 하나만 — 구성원 · 데이터 가져오기(이 브라우저 자료를 작업공간으로) · 시스템 · 고급 기능 · 사용법 설정은 없다
   const pilot = useIsPilot()
   if (pilot) {
@@ -87,7 +120,7 @@ export function SupabaseSettingsView() {
       <div className="mx-auto flex w-full max-w-[1000px] flex-col gap-5" data-testid="settings-pilot">
         <PageHeader title="설정" description="내 계정과 화면 표시를 바꿉니다." />
         <Panel title="내 정보">
-          <SettingRow label="이름">{me.name} {me.title}</SettingRow>
+          <NameEditor />
           <SettingRow label="이메일">{session?.user.email ?? '—'}</SettingRow>
           <SettingRow label="작업공간">{current?.workspace?.name ?? '—'}</SettingRow>
         </Panel>
@@ -103,7 +136,7 @@ export function SupabaseSettingsView() {
       {tab === 'me' && (
         <>
           <Panel title="내 정보">
-            <SettingRow label="이름">{me.name} {me.title}</SettingRow>
+            <NameEditor />
             <SettingRow label="이메일">{session?.user.email ?? '—'}</SettingRow>
             <SettingRow label="현재 작업공간">{current?.workspace?.name ?? '—'}</SettingRow>
             <SettingRow label="내 역할">{current ? roleLabel[current.role] : '—'}</SettingRow>
