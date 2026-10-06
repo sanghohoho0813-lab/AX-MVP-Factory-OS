@@ -35,6 +35,7 @@ import { EVENT_TYPE_LABEL, buildProjection, eventSummary, isOpenEvent, sortEvent
 import signupSql from '../../../supabase/migrations/20260925000014_signup_event.sql?raw'
 import hardenSql from '../../../supabase/migrations/20261004000016_security_hardening.sql?raw'
 import publicLinksSql from '../../../supabase/migrations/20261005000017_public_links_hardening.sql?raw'
+import { buildClientReport, reportFrom, reportKakao } from '../clientReport'
 import staffLookupSql from '../../../supabase/migrations/20261006000018_staff_customer_lookup.sql?raw'
 import { normalizeClientOps, withContract, withCustomField, withFee, withNewFee, withNewFunding, withService, withoutCustomField, withoutFee } from '../clientOpsService'
 import {
@@ -388,6 +389,46 @@ check('events: 요약 who 는 회사명 우선', eventSummary(ev({ payload: { co
   check('계정 찾기 SQL: 표 · 정책 바꾸지 않음', !/drop\s|truncate|alter\s+table|create\s+policy|disable\s+row/.test(sql))
   check('계정 찾기 SQL: 정확히 같은 이메일만(like 없음) · 직원만 · id · email 만', sql.includes("lower(p.email) = lower(btrim(coalesce(p_email, '')))") && !/\blike\b|ilike/.test(sql) && sql.includes("m.role in ('owner', 'admin', 'editor')") && sql.includes('returns table (id uuid, email text)'))
   check('계정 찾기 SQL: 로그인 안 한 사람은 못 부름', sql.includes('revoke all on function public.staff_find_customer_profile(text) from public, anon'))
+}
+// D-154: 업체 성과 보고서 — 기간 · 확보 자금 · 끝낸 업무 · 도구 요약 · 서류 · 다음 할 일 · 내부 정보 없음
+{
+  const T = '2026-10-06'
+  const rec = normalizeClientOps({
+    id: 'r1', companyName: '보고상사', representativeName: '최대표', createdAt: '2025-03-01T00:00:00Z',
+    contract: { signedAt: '2025-03-10', kind: 'cash', cashAmount: 5_000_000, policies: [], note: '비밀 계약 메모' },
+    services: {
+      venture: { status: 'done', completedAt: '2026-04-20T09:00:00Z', dueDate: '', nextStep: '', note: '내부 메모 벤처', startedAt: null, waitingSince: null },
+      patent: { status: 'in_progress', completedAt: null, dueDate: '2026-11-10', nextStep: '명세서 회신 받기', note: '', startedAt: null, waitingSince: null },
+      incorporation: { status: 'done', completedAt: '2025-05-01T00:00:00Z', dueDate: '', nextStep: '', note: '', startedAt: null, waitingSince: null },
+    },
+    fundingApplications: [
+      { id: 'f1', programName: '수출바우처', status: 'selected', resultAt: '2026-06-01', approvedAmount: 30_000_000, executedAmount: 30_000_000, executedAt: '2026-07-15', applyDueDate: '', submittedAt: '2026-05-01' },
+      { id: 'f2', programName: '스마트공장', status: 'submitted', resultDueDate: '2026-10-30', applyDueDate: '2026-09-30', submittedAt: '2026-09-29' },
+    ],
+    toolResults: [
+      { id: 't1', toolKey: 'startup-tax', title: '창업감면 판정', verdict: 'good', verdictLabel: '감면 가능성 높음', summary: '예전 요약', data: { secret: 1 }, deadlines: [], createdAt: '2026-02-01T00:00:00Z' },
+      { id: 't2', toolKey: 'startup-tax', title: '창업감면 판정', verdict: 'good', verdictLabel: '감면 가능성 높음', summary: '5년간 법인세 50% 감면 대상', data: { secret: 2 }, deadlines: [], createdAt: '2026-08-01T00:00:00Z' },
+    ],
+    fees: [{ id: 'fee1', kind: 'success', label: '수출바우처 성공보수', amount: 3_000_000, agentFee: 500_000, agentName: '홍영업', dueDate: '', receivedAt: null, note: '' }],
+    notes_list: [{ id: 'n1', text: '대표 성격 까다로움', pinned: false }],
+    documents: { businessRegistration: { received: true, issuedAt: '2024-01-02', fileName: 'a.pdf' }, corporateRegistry: { received: true, issuedAt: '2026-08-01', fileName: 'b.pdf' } },
+  } as never)
+  check('성과 보고서: 기간 시작 — 올해 1/1 · 최근 12개월 · 계약일', reportFrom(rec, 'year', T) === '2026-01-01' && reportFrom(rec, 'last12', T) === '2025-10-07' && reportFrom(rec, 'contract', T) === '2025-03-10')
+  const r = buildClientReport(rec, T, 'year')
+  check('성과 보고서(올해): 확보 자금 = 실제 입금 3천만 · 선정 1건', r.headline.securedTotal === 30_000_000 && r.headline.securedBasis === 'executed' && r.headline.selectedCount === 1, r.headline)
+  check('성과 보고서(올해): 끝낸 업무는 올해 것만(벤처) · 진행 중 특허(다음 단계)', JSON.stringify(r.done.map((d) => d.label)) === JSON.stringify(['벤처기업 인증']) || (r.done.length === 1 && r.done[0].date === '2026-04-20'), r.done)
+  check('성과 보고서: 진행 중 업무 · 다음 단계', r.inProgress.length === 1 && r.inProgress[0].nextStep === '명세서 회신 받기' && r.inProgress[0].dueDate === '2026-11-10', r.inProgress)
+  check('성과 보고서: 같은 도구는 최근 요약 하나', r.tools.length === 1 && r.tools[0].summary === '5년간 법인세 50% 감면 대상')
+  check('성과 보고서: 정리된 서류 2 · 다음에 챙길 것(결과 발표 · 특허 · 등기 만료) 날짜 순', r.headline.documentsReady === 2 && JSON.stringify(r.next.map((n) => n.date)) === JSON.stringify(['2026-10-30', '2026-11-01', '2026-11-10']), r.next)
+  check('성과 보고서: 선정 뒤 입금된 사업은 한 줄(입금 · 선정일 함께) — 두 번 세지 않음', r.money.length === 1 && r.money[0].kind === 'executed' && r.money[0].selectedAt === '2026-06-01' && r.money[0].amount === 30_000_000, r.money)
+  const all = buildClientReport(rec, T, 'contract')
+  check('성과 보고서(계약 뒤 전체): 2025 법인 설립도 끝낸 업무', all.done.length === 2)
+  const text = JSON.stringify(r) + reportKakao(r)
+  check('성과 보고서: 수수료 · 영업자 · 메모 · 계약 메모 · 도구 입력값 없음', !/성공보수|홍영업|500,000|까다로움|내부 메모|비밀 계약|secret/.test(text), text.slice(0, 300))
+  const k = reportKakao(r)
+  check('카톡 요약: 대표님 · 기간 · 확보 자금 3,000만원 · 다음에 챙길 것', k.startsWith('안녕하세요, 최대표 대표님.') && k.includes('올해(1/1 ~ 10/6)') && k.includes('확보한 자금(입금): 3,000만원') && k.includes('10/30 스마트공장 결과 발표'), k)
+  const empty = buildClientReport(normalizeClientOps({ id: 'e', companyName: '빈상사' } as never), T, 'year')
+  check('성과 보고서: 아무것도 없으면 0 · 확보 자금 없음', empty.headline.securedBasis === 'none' && empty.money.length === 0 && empty.done.length === 0)
 }
 check('events: 값 없으면 고객', eventSummary(ev({ payload: {} })).who === '고객')
 // D-107: 오래 기다린 상담신청 — "N일째 대기" (정오 UTC 로 잡아 시간대가 달라도 같은 날)

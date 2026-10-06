@@ -26,6 +26,7 @@ import {
   Wrench,
   Presentation,
   ArrowRightLeft,
+  FileText,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { getDataModeConfig } from '../data/dataMode'
@@ -166,6 +167,7 @@ import { SERVICE_STATUS_LOOK } from '../components/ops/serviceStatusLook'
 import { josa } from '../lib/josa'
 import { activeApplications, withApplyDocDone } from '../services/grants/grantApply'
 import { usePortalDocRequests } from '../components/grants/usePortalDocRequests'
+import { ClientReportSheet } from '../components/ops/ClientReportSheet'
 
 
 
@@ -242,6 +244,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const [catalogOpen, setCatalogOpen] = useState(false)
   /** 모바일에서 부가 행동을 담는 시트 */
   const [moreOpen, setMoreOpen] = useState(false)
+  // D-154: 성과 보고서 한 장
+  const [reportOpen, setReportOpen] = useState(false)
   /** D-140: 계약 · 수금 한 번에 (개요의 계약 카드에서) */
   const [planOpen, setPlanOpen] = useState(false)
   /**
@@ -1580,6 +1584,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       )}
 
 
+      {reportOpen && <ClientReportSheet record={record} today={today} onClose={() => setReportOpen(false)} />}
+
       {moreOpen && (
         <BottomSheet title="이 업체에서 할 수 있는 것" onClose={() => setMoreOpen(false)}>
           <div className="flex flex-col gap-4">
@@ -1599,6 +1605,19 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               >
                 <ClipboardCopy aria-hidden="true" className="size-4" />
                 진행 상황 보고 문구
+              </Button>
+              {/* D-154: 고객 미팅 · 재계약 때 드리는 '함께 만든 성과' 한 장 */}
+              <Button
+                variant="secondary"
+                className="w-full justify-start"
+                data-testid="more-report"
+                onClick={() => {
+                  setMoreOpen(false)
+                  setReportOpen(true)
+                }}
+              >
+                <FileText aria-hidden="true" className="size-4" />
+                성과 보고서 한 장(인쇄 · PDF)
               </Button>
               {/* D-129: 기본 탭 줄에서 뺀 두 영역 — 기능과 기록은 그대로, 여기서 연다 */}
               <Button

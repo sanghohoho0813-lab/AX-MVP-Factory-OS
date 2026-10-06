@@ -550,6 +550,48 @@ for (const width of [1440, 390]) {
   await ctx.close()
 }
 
+/* ---------------- D-154 성과 보고서 한 장 ---------------- */
+for (const width of [1440, 390]) {
+  const ctx = await browser.newContext({ viewport: { width, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul', permissions: ['clipboard-read', 'clipboard-write'] })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const year = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 4)
+  await page.evaluate((y) => {
+    const list = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+    const c = list.find((x) => x.id === 'cli_hansol')
+    c.fundingApplications = [{ id: 'rp1', programName: '수출바우처', institution: 'KOTRA', status: 'selected', applyDueDate: '', submittedAt: `${y}-03-02`, resultAt: `${y}-04-10`, requestedAmount: null, approvedAmount: 30000000, executedAmount: 30000000, executedAt: `${y}-05-20`, note: '내부 메모 보이면 안 됨', createdAt: `${y}-03-01T00:00:00Z`, updatedAt: `${y}-03-01T00:00:00Z` }]
+    c.notes_list = [{ id: 'nn', text: '비밀 메모 보이면 안 됨', pinned: false, createdAt: `${y}-01-01T00:00:00Z`, updatedAt: `${y}-01-01T00:00:00Z` }]
+    localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(list))
+  }, year)
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  await page.getByRole('button', { name: '더보기' }).first().click()
+  await page.getByTestId('more-report').click()
+  await page.getByTestId('report-preview').waitFor()
+  const prev = await page.getByTestId('report-preview').innerText()
+  const tile = await page.getByTestId('report-preview').getByTestId('report-tile-확보한 자금').innerText()
+  check(`${width} 성과 보고서: 업체 · 머리 숫자 3,000만원 · 한 사업 한 줄(선정 → 입금 30,000,000원)`, prev.includes('한솔테크') && tile.trim() === '3,000만원' && prev.includes('30,000,000원') && /선정 \d+\/\d+ → 입금/.test(prev) && (prev.match(/수출바우처/g) ?? []).length === 1, `${tile} | ${prev.slice(0, 300)}`)
+  check(`${width} 성과 보고서: 수수료 · 메모 · 영업자 없음`, !/보이면 안 됨|성공보수|수수료|영업자/.test(prev))
+  await page.getByTestId('report-period-contract').click()
+  await page.waitForTimeout(200)
+  check(`${width} 기간 바꾸기: 계약 뒤 전체`, (await page.getByTestId('report-preview').innerText()).includes('계약 뒤 전체 함께 만든 성과'))
+  await page.getByTestId('report-kakao').click()
+  await page.waitForTimeout(300)
+  const k = await page.evaluate(() => navigator.clipboard.readText())
+  check(`${width} 카톡 요약: 확보한 자금 3,000만원`, k.includes('확보한 자금(입금): 3,000만원') && !k.includes('보이면 안 됨'), k)
+  // 인쇄 모양: 인쇄용 종이만 보이고 내용이 같다
+  await page.emulateMedia({ media: 'print' })
+  const printVisible = await page.getByTestId('report-print').isVisible()
+  const printText = await page.getByTestId('report-print').innerText()
+  await page.emulateMedia({ media: 'screen' })
+  check(`${width} 인쇄: 보고서 종이가 찍힘 · 같은 금액`, printVisible && printText.includes('30,000,000원'), printText.slice(0, 120))
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  check(`${width} 성과 보고서 가로 넘침 0 · 오류 0`, over <= 1 && errors.length === 0, `${over} ${errors.join(' | ')}`)
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

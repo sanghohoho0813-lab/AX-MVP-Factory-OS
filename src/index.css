@@ -506,6 +506,14 @@ textarea {
   .no-print * {
     display: none !important;
   }
+  /* D-154: 맨 바깥에 붙인 인쇄 종이(.print-solo)가 있으면 나머지 화면은 자리도 차지하지 않게 뺀다 —
+     보이지만 않게(visibility) 하면 긴 화면 높이만큼 빈 쪽이 뒤에 붙었다(성과 보고서 1쪽 + 빈 4쪽) */
+  body:has(> .print-solo) > *:not(.print-solo) {
+    display: none !important;
+  }
+  body:has(> .print-solo) .print-solo {
+    position: static;
+  }
   .print-document pre {
     white-space: pre-wrap !important;
     word-break: break-word;
