@@ -393,7 +393,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(700)
   const accessList = page.getByTestId('module-access-list')
   const row = (k) => accessList.locator(`[data-module="${k}"]`)
-  check('요금제: 전문 모듈 여섯 줄', (await accessList.locator('[data-module]').count()) === 6, String(await accessList.locator('[data-module]').count()))
+  // D-163: 정부지원사업 모듈을 기업성장 안으로 — 보이는 전문 모듈 다섯
+  check('요금제: 전문 모듈 다섯 줄', (await accessList.locator('[data-module]').count()) === 5, String(await accessList.locator('[data-module]').count()))
   check('요금제: 처음에는 ALL — 전부 요금제에 포함', (await page.getByTestId('plan-picker').locator('[aria-checked="true"]').getAttribute('data-plan')) === 'ALL' && (await row('growth').innerText()).includes('요금제에 포함'))
   check('요금제: 사는 단추 · 가격이 없다', !/구매|결제하기|원\/월|만원/.test((await page.getByTestId('plan-panel').innerText()) ?? ''))
   await page.getByTestId('plan-picker').locator('[data-plan="BASIC"]').click()

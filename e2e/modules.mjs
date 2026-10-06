@@ -604,8 +604,8 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
         return m ? m.slice(1).map(Number) : null
       }),
     )
-    // D-136: 잘 안 쓰는 기능(기술사업화 · AX · 웹 스튜디오)이 접혀 있어 보이는 아이콘은 넷(분야 셋 + 모듈 전체)
-    const ok = ramp.length >= 4 && ramp.every(Boolean)
+    // D-136 · D-163: 잘 안 쓰는 기능이 접혀 있고 전문 모듈은 기업성장 · 절세·재무 둘 — 보이는 아이콘은 셋(분야 둘 + 모듈 전체)
+    const ok = ramp.length >= 3 && ramp.every(Boolean)
     const sameTone = ok && ramp.every((c) => c[0] === ramp[0][0] && c[1] === ramp[0][1])
     const steps = ok ? ramp.slice(1).map((c, i) => (c[2] - ramp[i][2] + 360) % 360) : []
     check(`${theme}: 도구함 아이콘 ${ramp.length}개가 밝기·채도는 같고`, sameTone, JSON.stringify(ramp[0]))
