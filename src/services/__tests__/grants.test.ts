@@ -49,7 +49,7 @@ import { buildClientSchedule } from '../clientOpsSchedule'
 import { feeStateOf, fundingFactsOf } from '../feeStatus'
 import { recommendNextSteps } from '../clientInsights'
 import { buildClientReport } from '../clientReport'
-import { buildDecisions, withDecisionAnswer } from '../decisions'
+import { DECISION_BULK_KINDS, buildDecisions, paymentReminderMessage, weekdayOnOrAfter, withDecisionAnswer } from '../decisions'
 import { buildClientAlerts } from '../clientOpsAlerts'
 import { isGrantBookmark } from '../../types/clientOps'
 
@@ -773,6 +773,65 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   let many = rec
   for (let i = 0; i < 305; i++) many = withDecisionAnswer(many, { id: `x${i}`, effect: { type: 'copy', text: '' } }, 'no', ns, `2026-10-06T00:${String(Math.floor(i / 60)).padStart(2, '0')}:${String(i % 60).padStart(2, '0')}Z`)
   check('확인함: 답은 300개까지(오래된 것부터 지움)', Object.keys(many.decided ?? {}).length === 300 && !many.decided?.x0 && !!many.decided?.x304)
+}
+
+// D-160: 확인할 것 넓히기 — 받을 돈 · 밀린 업무 · 다음 약속 · 다시 연락
+{
+  const T = '2026-10-06' // 화요일
+  const at = '2026-10-06T01:00:00Z'
+  const base = normalizeClientOps({
+    id: 'm1', companyName: '수금상사', representativeName: '박대표', status: 'active',
+    fees: [
+      { id: 'f1', label: '계약금', amount: 3_000_000, dueDate: '2026-09-20', receivedAt: null },
+      { id: 'f2', label: '잔금', amount: 2_000_000, dueDate: '2026-10-20', receivedAt: null },
+      { id: 'f3', label: '성공보수', amount: 5_000_000, dueDate: '', receivedAt: null, conditionKind: 'funding_executed' },
+      { id: 'f4', label: '착수금', amount: 1_000_000, dueDate: '2026-09-01', receivedAt: '2026-09-02T00:00:00Z' },
+    ],
+    nextAction: '', nextActionDueDate: '',
+  } as never)
+  const ds = buildDecisions(base, T, [])
+  const money = ds.filter((d) => d.kind === 'money')
+  check('받을 돈: 날짜 지난 계약금만(예정 · 조건 대기 · 입금 완료는 아님)', money.length === 1 && money[0].title.startsWith('계약금 3,000,000원'), money.map((d) => d.title))
+  check('받을 돈: 16일 지남 · 입금 요청 문구(대표님 · 9월 20일 · 금액)', money[0].why.includes('16일') && money[0].effect.type === 'copy' && /박대표 대표님.*계약금 3,000,000원.*9월 20일/.test(money[0].effect.text), money[0])
+  const myes = withDecisionAnswer(base, money[0], 'yes', [], at)
+  check('받을 돈 [요청 문구 복사] → 활동 기록에 남김 · 다시 안 물음', myes.activity[0]?.text.includes('입금 요청 문구') && !buildDecisions(myes, T, []).some((d) => d.kind === 'money'))
+  check('받을 돈: 날짜를 바꾸면(다시 지나면) 다시 묻는다', buildDecisions({ ...myes, fees: myes.fees.map((f) => (f.id === 'f1' ? { ...f, dueDate: '2026-09-25' } : f)) }, T, []).some((d) => d.kind === 'money'))
+  check('받을 돈: 문구에 안쪽 말 없음', !/미수금|내 몫|영업자/.test(paymentReminderMessage(base, '계약금', 3_000_000, '2026-09-20')))
+
+  // 다음 약속 — 없으면 단계에 맞는 약속을 7일 뒤(평일)로 · 지났으면 3일 뒤로 다시
+  const empty = ds.find((d) => d.kind === 'next')!
+  check('다음 약속: 비어 있으면 7일 뒤 평일로 제안', !!empty && empty.effect.type === 'next' && empty.effect.date === '2026-10-13', empty)
+  const nyes = withDecisionAnswer(base, empty, 'yes', [], at)
+  check('다음 약속 [잡기] → 업체 다음 약속 · 날짜가 들어감', nyes.nextAction !== '' && nyes.nextActionDueDate === '2026-10-13' && !buildDecisions(nyes, T, []).some((d) => d.kind === 'next'))
+  const nno = withDecisionAnswer(base, empty, 'no', [], at)
+  check('다음 약속 [안 잡음] → 이번 달은 안 묻고 다음 달에 다시', !buildDecisions(nno, T, []).some((d) => d.kind === 'next') && buildDecisions(nno, '2026-11-03', []).some((d) => d.kind === 'next'))
+  const lateRec = { ...base, nextAction: '2차 미팅', nextActionDueDate: '2026-09-25' }
+  const late = buildDecisions(lateRec, T, []).find((d) => d.kind === 'next')!
+  check("다음 약속: 일주일 넘게 지난 '2차 미팅' → 3일 뒤(금)로 다시 잡기", late.title.includes('2차 미팅') && late.effect.type === 'next' && late.effect.date === '2026-10-09', late)
+  check('다음 약속: 지난 지 일주일 안이면 묻지 않음', !buildDecisions({ ...base, nextAction: '통화', nextActionDueDate: '2026-10-01' }, T, []).some((d) => d.kind === 'next'))
+  check('주말 피하기: 토 → 월 · 일 → 월 · 평일 그대로', weekdayOnOrAfter('2026-10-10') === '2026-10-12' && weekdayOnOrAfter('2026-10-11') === '2026-10-12' && weekdayOnOrAfter('2026-10-08') === '2026-10-08')
+
+  // 밀린 업무 — 진행 중인데 기한이 일주일 넘게 지남 → 2주 뒤(평일)로 다시 잡기
+  const svc = { ...base, services: { ...base.services, venture: { ...base.services.venture, status: 'in_progress' as const, dueDate: '2026-09-10' }, patent: { ...base.services.patent, status: 'in_progress' as const, dueDate: '2026-10-02' } } }
+  const stale = buildDecisions(svc, T, []).filter((d) => d.kind === 'stale')
+  check('밀린 업무: 26일 지난 벤처인증만(4일 지난 특허는 아직)', stale.length === 1 && stale[0].title.startsWith('벤처') && stale[0].why.includes('26일'), stale.map((d) => d.title))
+  const syes = withDecisionAnswer(svc, stale[0], 'yes', [], at)
+  check('밀린 업무 [2주 뒤로 다시 잡기] → 기한 10/20 · 활동 기록', syes.services.venture.dueDate === '2026-10-20' && syes.activity.some((a) => a.kind === 'service_due') && !buildDecisions(syes, T, []).some((d) => d.kind === 'stale'))
+  check('밀린 업무: 완료 · 시작 전은 묻지 않음', !buildDecisions({ ...svc, services: { ...svc.services, venture: { ...svc.services.venture, status: 'done' as const } } }, T, []).some((d) => d.kind === 'stale'))
+
+  // 다시 연락 — 오래 조용한 잠재고객만
+  const quiet = normalizeClientOps({ id: 'p1', companyName: '조용상사', representativeName: '최대표', status: 'waiting', updatedAt: '2026-07-01T00:00:00Z', activity: [{ id: 'a', kind: 'sales', text: '1차 미팅', serviceKey: null, at: '2026-07-01T00:00:00Z' }] } as never)
+  const fu = buildDecisions(quiet, T, []).find((d) => d.kind === 'followup')
+  check('다시 연락: 97일 조용한 잠재고객 → 연락 문구(최대표 대표님)', !!fu && fu.title.includes('97일') && fu.effect.type === 'copy' && fu.effect.text.includes('최대표 대표님'), fu)
+  check('다시 연락: 계약 고객은 아님(안부 칸이 맡는다)', !buildDecisions({ ...quiet, status: 'active' }, T, []).some((d) => d.kind === 'followup'))
+
+  // 순서 · 한 번에
+  const all = buildDecisions({ ...svc, fees: base.fees }, T, [])
+  check('순서: 받을 돈 → 밀린 업무 → 다음 약속', all.findIndex((d) => d.kind === 'money') < all.findIndex((d) => d.kind === 'stale') && all.findIndex((d) => d.kind === 'stale') < all.findIndex((d) => d.kind === 'next'), all.map((d) => d.kind))
+  check('한 번에 [모두 맞아요]: 복사(받을 돈 · 다시 연락 · 서류)는 빠진다', !DECISION_BULK_KINDS.includes('money') && !DECISION_BULK_KINDS.includes('followup') && !DECISION_BULK_KINDS.includes('doc') && DECISION_BULK_KINDS.includes('next'))
+  let chain = { ...svc, fees: base.fees }
+  for (const d of all.filter((x) => x.kind === 'stale' || x.kind === 'next')) chain = withDecisionAnswer(chain, d, 'yes', [], at)
+  check('같은 업체 두 건을 이어서 적어도 둘 다 남음(기한 · 다음 약속)', chain.services.venture.dueDate === '2026-10-20' && chain.nextActionDueDate === '2026-10-13')
 }
 
 console.log(`\ngrants: ${pass} passed, ${fail} failed`)

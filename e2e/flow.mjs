@@ -16,6 +16,7 @@
  *  12. (D-125) 전화 단추(오늘 약속 줄 · 영업 보드 카드) · 고객 관리 '다음 약속 지남' 보기 · 휴대폰 하단 '영업'
  *  14. (D-158) 확인할 것 — 오늘 칸 · 모두 보기 · 맞아요(정보 넣기 · 문구 복사) · 아니에요 · 업체 상세에서 다시 안 물음
  *  15. (D-159) 고객 관리 기본 '요즘 챙기는 순' · 휴대폰 카드 접힘(펼쳐보기 · 진행 % 없음 · 빈 곳 누르면 업체) · 오늘 할 일 번호 · 4건 넘으면 두 칸
+ *  16. (D-160) 확인할 것 넓히기 — 받을 돈(입금 요청 문구 복사) · 밀린 업무(종류 골라 '모두 맞아요' → 기한 2주 뒤) · 다음 약속 다시 잡기 · 업체 상세에도
  *  13. (D-155) 오늘 '안부 챙길 계약 고객' — 한 달 넘게 조용 · 계약 1주년 · 안부 카톡 · 연락했어요 · 다음에 · 성과 보고서 바로 열기
  */
 
@@ -506,6 +507,63 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   await page.keyboard.press('Escape')
   const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   check(`D-159: 가로 넘침 0 · 오류 0 ${tag}`, over <= 0 && errors.length === 0, `${over} ${errors.join(' | ')}`)
+  await ctx.close()
+}
+
+/* 16 (D-160) 확인할 것 넓히기 — 받을 돈 · 밀린 업무 · 다음 약속 */
+for (const [w, mob] of [[1440, false], [390, true]]) {
+  const ctx = await browser.newContext({ viewport: { width: w, height: 900 }, isMobile: mob, hasTouch: mob, locale: 'ko-KR', timezoneId: 'Asia/Seoul', permissions: ['clipboard-read', 'clipboard-write'] })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e).slice(0, 160)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const tag = `(${w})`
+  const T = await page.evaluate(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })
+  await page.goto(BASE + '/ops/decide', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  const kinds = await page.getByTestId('decision').evaluateAll((els) => [...new Set(els.map((e) => e.getAttribute('data-kind')))])
+  check(`확인할 것: 받을 돈 · 밀린 업무 · 다음 약속이 모인다 ${tag}`, ['money', 'stale', 'next'].every((k) => kinds.includes(k)), kinds)
+  // 받을 돈 — 한솔 미수금 → 입금 요청 문구 복사
+  const money = page.locator('[data-testid="decision"][data-kind="money"][data-client="cli_hansol"]').first()
+  check(`받을 돈: 한솔 '입금 요청 문구를 보낼까요?' ${tag}`, (await money.count()) === 1 && (await money.innerText()).includes('입금 요청'), await money.innerText().catch(() => ''))
+  await money.getByTestId('decision-yes').click()
+  await page.waitForTimeout(600)
+  const clip = await page.evaluate(() => navigator.clipboard.readText())
+  const h = await one(page, 'cli_hansol')
+  check(`[요청 문구 복사] → 카톡 문구 · 활동 기록 · 줄 사라짐 ${tag}`, /입금 예정일/.test(clip) && /대표님/.test(clip) && h.activity.some((a) => a.text.includes('입금 요청 문구')) && (await page.locator('[data-testid="decision"][data-kind="money"][data-client="cli_hansol"]').count()) < 2, clip.slice(0, 80))
+  // 밀린 업무 — 종류를 고르면 '이 n건 모두 맞아요'
+  await page.getByTestId('decide-kind-stale').click()
+  await page.waitForTimeout(300)
+  const n = await page.getByTestId('decision').count()
+  const bulk = page.getByTestId('decide-bulk-yes')
+  check(`밀린 업무 ${n}건 → '이 ${n}건 모두 맞아요' 단추 ${tag}`, n >= 2 && (await bulk.count()) === 1 && (await bulk.innerText()).includes(`${n}건`), n)
+  await bulk.click()
+  await page.waitForTimeout(1200)
+  const after = await clients(page)
+  // 일주일 넘게 지난 진행 중 · 고객 대기 업무가 하나도 남지 않는다
+  const weekAgo = await page.evaluate(() => { const d = new Date(); d.setDate(d.getDate() - 7); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })
+  const lateLeft = after.flatMap((c) => (c.archivedAt ? [] : Object.values(c.services ?? {}).filter((s) => (s.status === 'in_progress' || s.status === 'waiting_client') && s.dueDate && s.dueDate <= weekAgo)))
+  const moved = after.flatMap((c) => Object.values(c.services ?? {}).filter((s) => s.dueDate && s.dueDate > T))
+  check(`모두 맞아요 → 밀린 업무가 남지 않음 · 기한이 앞날로 ${tag}`, (await page.getByTestId('decision').count()) === 0 && moved.length >= n && lateLeft.length === 0, { left: lateLeft.length, moved: moved.length })
+  // 다음 약속 — 하나 다시 잡기
+  await page.getByTestId('decide-kind-next').click()
+  await page.waitForTimeout(300)
+  const nx = page.getByTestId('decision').first()
+  const nid = await nx.getAttribute('data-client')
+  const before = (await one(page, nid)).nextActionDueDate
+  await nx.getByTestId('decision-yes').click()
+  await page.waitForTimeout(600)
+  const nrec = await one(page, nid)
+  check(`다음 약속 [다시 잡기] → 업체 다음 약속 날짜가 앞날로 ${tag}`, nrec.nextActionDueDate > T && nrec.nextActionDueDate !== before, `${before} → ${nrec.nextActionDueDate}`)
+  // 업체 상세 맞춤 추천에도 같은 종류가 보인다
+  await page.goto(BASE + '/ops/clients/cli_daum?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const smart = page.getByTestId('smart-decisions')
+  const sk = (await smart.count()) ? await smart.getByTestId('decision').evaluateAll((els) => els.map((e) => e.getAttribute('data-kind'))) : []
+  check(`업체 상세(다움): 받을 돈 · 다음 약속 같은 결정도 보인다 ${tag}`, sk.some((k) => k === 'money' || k === 'next'), sk)
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  check(`D-160: 가로 넘침 0 · 오류 0 ${tag}`, over <= 0 && errors.length === 0, `${over} ${errors.join(' | ')}`)
   await ctx.close()
 }
 

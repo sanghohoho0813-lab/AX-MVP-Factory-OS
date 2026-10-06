@@ -22,6 +22,10 @@ const KIND_CLASS: Record<DecisionKind, string> = {
   module: 'border-cat-plan-200 bg-cat-plan-50 text-cat-plan-700',
   grant: 'border-cat-fund-200 bg-cat-fund-50 text-cat-fund-700',
   doc: 'border-cat-doc-200 bg-cat-doc-50 text-cat-doc-700',
+  money: 'border-cat-money-200 bg-cat-money-50 text-cat-money-700',
+  stale: 'border-warning-200 bg-warning-50 text-warning-800',
+  next: 'border-brand-200 bg-brand-50 text-brand-700',
+  followup: 'border-slate-300 bg-slate-50 text-slate-700',
 }
 
 /**
@@ -73,7 +77,9 @@ export function useDecisionAnswer({
       showToast(
         a === 'no'
           ? '다시 묻지 않습니다'
-          : d.effect.type === 'fact'
+          : d.doneText
+            ? d.doneText
+            : d.effect.type === 'fact'
             ? '업체 정보에 넣었습니다'
             : d.effect.type === 'todo'
               ? `할 일로 걸었습니다 — ${addDaysLocal(today, d.effect.dueInDays).slice(5).replace('-', '/')}`
@@ -88,7 +94,46 @@ export function useDecisionAnswer({
     }
     return made
   }
-  return { answer, busy }
+  /**
+   * D-160: 같은 종류 여러 건을 한 번에 [맞아요] — 복사(카톡 문구)는 하나씩 보내야 하므로 부르는 쪽에서 뺀다.
+   * 같은 업체 결정이 여럿이면 앞에서 저장한 기록 위에 이어서 적는다(덮지 않게).
+   */
+  const answerMany = async (ds: Decision[]): Promise<JournalEntry[]> => {
+    if (busy || ds.length === 0) return []
+    setBusy('many')
+    const fresh = new Map<string, ClientOpsRecord>()
+    const made: JournalEntry[] = []
+    let ok = 0
+    try {
+      for (const d of ds) {
+        if (d.effect.type === 'copy') continue
+        const rec = fresh.get(d.clientId) ?? latest(d.clientId)
+        if (!rec) continue
+        const saved = await save(withDecisionAnswer(rec, d, 'yes', notices, nowIso()))
+        if (!saved) break
+        fresh.set(saved.id, saved)
+        ok += 1
+        if (d.effect.type === 'todo') {
+          made.push(
+            await createJournalEntry(workspaceId, userId, {
+              entryDate: today,
+              entryType: 'follow_up',
+              content: d.effect.text,
+              clientId: d.clientId,
+              dueDate: addDaysLocal(today, d.effect.dueInDays),
+            }),
+          )
+        }
+      }
+      showToast(ok === ds.length ? `${ok}건 모두 처리했습니다` : `${ok}건 처리했습니다 — 나머지는 다시 눌러 주세요`)
+    } catch (cause) {
+      showToast(cause instanceof Error ? `${ok}건 처리 · ${cause.message}` : `${ok}건 처리했습니다 — 나머지는 저장하지 못했습니다`)
+    } finally {
+      setBusy(null)
+    }
+    return made
+  }
+  return { answer, answerMany, busy }
 }
 
 export function DecisionList({

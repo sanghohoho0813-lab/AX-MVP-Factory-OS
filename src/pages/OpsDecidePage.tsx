@@ -2,27 +2,31 @@
  * 확인할 것 (D-158) — 모든 업체에서 프로그램이 준비한 것을 한 화면에.
  * 대표는 '맞아요 / 아니에요' 만 고른다. 서류를 올리면 여기로 결정 거리가 모인다.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CheckCheck } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { PageHeader } from '../components/ui/PageHeader'
+import { Button } from '../components/ui/Button'
 import { Blank } from '../components/ui/primitives'
 import { useToast } from '../components/ui/toastContext'
 import { DecisionList, useDecisionAnswer } from '../components/ops/DecisionList'
 import { useGrantData } from '../components/grants/useGrants'
 import { useEntitlements } from '../lib/entitlementsStore'
 import { listClients, saveClient } from '../services/clientOpsService'
-import { DECISION_KIND_LABEL, buildAllDecisions, type DecisionKind } from '../services/decisions'
+import { DECISION_BULK_KINDS, DECISION_KIND_LABEL, buildAllDecisions, type DecisionKind } from '../services/decisions'
 import { todayLocalDate } from '../lib/appClock'
 import type { ClientOpsRecord } from '../types/clientOps'
 
-const KINDS: DecisionKind[] = ['fact', 'doc', 'module', 'grant']
+const KINDS: DecisionKind[] = ['fact', 'money', 'doc', 'stale', 'module', 'next', 'grant', 'followup']
 
 function DecideContent({ workspaceId, userId }: { workspaceId: string | null; userId: string | null }) {
   const { showToast } = useToast()
   const today = todayLocalDate()
   const [records, setRecords] = useState<ClientOpsRecord[]>([])
+  // D-160: 한 번에 여러 건 답할 때도 저장 직전의 최신 기록 위에 적는다
+  const recordsRef = useRef(records)
+  recordsRef.current = records
   const [loaded, setLoaded] = useState(false)
   const [kind, setKind] = useState<DecisionKind | 'all'>('all')
   const { notices } = useGrantData(workspaceId)
@@ -38,12 +42,12 @@ function DecideContent({ workspaceId, userId }: { workspaceId: string | null; us
 
   const all = useMemo(() => buildAllDecisions(records, today, notices, usable), [records, today, notices, usable])
   const shown = kind === 'all' ? all : all.filter((d) => d.kind === kind)
-  const { answer, busy } = useDecisionAnswer({
+  const { answer, answerMany, busy } = useDecisionAnswer({
     workspaceId,
     userId,
     today,
     notices,
-    latest: (id) => records.find((r) => r.id === id),
+    latest: (id) => recordsRef.current.find((r) => r.id === id),
     save: async (next) => {
       const saved = await saveClient(next)
       setRecords((prev) => prev.map((r) => (r.id === saved.id ? saved : r)))
@@ -79,6 +83,17 @@ function DecideContent({ workspaceId, userId }: { workspaceId: string | null; us
               </button>
             )
           })}
+        </div>
+      )}
+      {/* D-160: 종류를 고르면 그 종류를 한 번에 — 카톡 문구(복사)는 하나씩 보내야 하므로 없다 */}
+      {kind !== 'all' && DECISION_BULK_KINDS.includes(kind) && shown.length >= 2 && (
+        <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50/50 px-4 py-3 sm:flex-row sm:items-center" data-testid="decide-bulk">
+          <p className="t-sub min-w-0 flex-1 break-keep text-slate-700">
+            {DECISION_KIND_LABEL[kind]} {shown.length}건을 다 읽어 보셨으면 한 번에 처리할 수 있어요.
+          </p>
+          <Button size="sm" variant="primary" className="self-start sm:self-auto" disabled={busy !== null} onClick={() => void answerMany(shown)} data-testid="decide-bulk-yes">
+            <CheckCheck aria-hidden="true" className="size-4" /> 이 {shown.length}건 모두 맞아요
+          </Button>
         </div>
       )}
       {loaded && all.length === 0 ? (
