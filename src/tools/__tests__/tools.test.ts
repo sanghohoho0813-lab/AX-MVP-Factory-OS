@@ -18,6 +18,8 @@ import { loadStartupTaxForm, saveStartupTaxForm, startupTaxKey, STARTUP_TAX_STOR
 import { moduleForPath, moduleMatchLength, screenTitleForPath } from '../../config/moduleRegistry'
 import { changeColor, CRETOP_C, TREND_COMMENT_TONE } from '../cretop/lib/tones'
 import { mapHref as labHref } from '../labcare/orig/nav'
+import { sharedToolKey } from '../shared/toolStorage'
+import { osCompanyDefaults } from '../employment/orig/store'
 import { mapHref as pfHref } from '../policyFunding/orig/nav'
 import { buildCustomerFromDiagnosis, customerFromRow, getStoredCustomerById, resetPolicyStoreForTest, todayStr } from '../policyFunding/orig/storage'
 import { aiReasoning, oneLineConclusion, todayTasks } from '../policyFunding/coach'
@@ -1141,6 +1143,32 @@ check('칸 이름: 설명문처럼 긴 글은 이름으로 쓰지 않는다', cl
   const gaps = orgGapsFromClient(org({ id: 'o5', industry: '', address: '서울 어딘가', foundedAt: null, employeeCount: null, businessRegistrationNumber: '123-45-67890' }), rec)
   check('채우기: 빈 칸만(고객사에서 적은 주소는 그대로) · 끈 잇기', gaps.industry === '제조업' && gaps.address === undefined && gaps.foundedAt === '2015-03-02' && gaps.employeeCount === 12 && gaps.clientOpsId === 'cli_ax', JSON.stringify(gaps))
   check('채우기: 다 차 있고 이어져 있으면 바꿀 것 없음', Object.keys(orgGapsFromClient(linked, rec)).length === 1 && Object.keys(orgGapsFromClient({ ...linked, businessRegistrationNumber: '123-45-67890' }, rec)).length === 0)
+}
+
+/* ---- D-165: 업체 없이 쓰는 도구 칸 — 작업공간마다 따로 · 업종은 업태/종목으로 · 직원 수는 첫 숫자 ---- */
+{
+  const store = new Map<string, string>()
+  ;(globalThis as unknown as { localStorage: unknown }).localStorage = {
+    get length() {
+      return store.size
+    },
+    key: (i: number) => [...store.keys()][i] ?? null,
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => void store.set(k, v),
+    removeItem: (k: string) => void store.delete(k),
+    clear: () => store.clear(),
+  }
+  store.set('axmvp.tools.policyFunding', '{"company":"대표 쪽"}')
+  check('D-165 로컬 모드(작업공간 없음)는 예전 칸 그대로', sharedToolKey('axmvp.tools.policyFunding', null) === 'axmvp.tools.policyFunding' && store.has('axmvp.tools.policyFunding'))
+  const kA = sharedToolKey('axmvp.tools.policyFunding', 'ws-A')
+  check('D-165 처음 연 작업공간 칸으로 예전 값을 옮긴다(잃지 않음)', kA === 'axmvp.tools.policyFunding@ws.ws-A' && store.get(kA) === '{"company":"대표 쪽"}' && !store.has('axmvp.tools.policyFunding'))
+  const kB = sharedToolKey('axmvp.tools.policyFunding', 'ws-B')
+  check('D-165 다른 작업공간에는 그 값이 보이지 않는다', store.get(kB) === undefined && store.get(kA) === '{"company":"대표 쪽"}')
+  check('D-165 칸 이름은 여전히 axmvp.tools. 로 시작(백업 · 사람별 금고)', kB.startsWith('axmvp.tools.'))
+
+  const base = normalizeClientOps({ id: 'x', companyName: '가', industry: '', businessCategory: '제조업', businessItem: '정밀기계', employeeCount: '12명(2025.6 기준)' } as Record<string, unknown>)
+  check('D-165 업종 칸이 비면 업태 · 종목으로(업체 카드와 같은 업종)', clientFacts(base, new Date('2026-09-23T00:00:00')).industryText === '제조업 정밀기계', clientFacts(base, new Date('2026-09-23T00:00:00')).industryText)
+  check('D-165 고용지원금 직원 수: 첫 숫자만(1220256 이 아님)', osCompanyDefaults(base).empCount === '12', osCompanyDefaults(base).empCount)
 }
 
 console.log(`\ntools: ${passed} passed, ${failed} failed`)

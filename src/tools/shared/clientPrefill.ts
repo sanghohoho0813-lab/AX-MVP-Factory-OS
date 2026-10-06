@@ -145,7 +145,8 @@ export function clientFacts(record: ClientOpsRecord, today: Date): ClientFacts {
     representativeBirth: birth,
     establishedAt: established,
     industry: industryValueOf(record.industry || record.businessItem || record.businessCategory),
-    industryText: record.industry ?? '',
+    // D-165: 업종 칸이 비면 사업자등록증의 업태 · 종목으로 — 업체 상세 판정 카드와 도구가 같은 업종을 쓴다
+    industryText: (record.industry ?? '').trim() || [record.businessCategory, record.businessItem].map((v) => (v ?? '').trim()).filter(Boolean).join(' '),
     employeeCount: employeeCountOf(usableFactValue(record, 'employeeCount')),
     years: yearsInBusiness(established, today),
     months: monthsInBusiness(established, today),

@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useToolClient } from '../tools/shared/toolClientContext'
 import { useSearchParams } from 'react-router-dom'
+import { sharedToolKey } from '../tools/shared/toolStorage'
 import { useOutsideTap } from '../lib/useDismissable'
 import { Check, ChevronDown, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { PageHeader } from '../components/ui/PageHeader'
@@ -59,7 +60,7 @@ function displayDefaults(calc: Calculator): Values {
 }
 
 /** D-126: 업체마다 따로 기억한다 — 다른 업체로 열면 앞 업체 숫자가 남지 않는다 */
-const storeKey = (calc: Calculator, clientId: string | null | undefined) => STORAGE_PREFIX + calc.key + (clientId ? `.${clientId}` : '')
+const storeKey = (calc: Calculator, clientId: string | null | undefined) => (clientId ? `${STORAGE_PREFIX}${calc.key}.${clientId}` : sharedToolKey(STORAGE_PREFIX + calc.key))
 
 /** 업체 숫자도 기본값처럼 금액 칸은 쉼표로 보여 준다 */
 function prefillShown(calc: Calculator, values: Record<string, string>): Values {
@@ -72,6 +73,12 @@ function prefillShown(calc: Calculator, values: Record<string, string>): Values 
 function loadValuesWithPrefill(calc: Calculator, clientId: string | null | undefined, record: ClientOpsRecord | null): { values: Values; prefilled: string[] } {
   try {
     if (clientId && record && !localStorage.getItem(storeKey(calc, clientId))) {
+      // D-165: 이 업체에 붙여 둔 이 계산기 결과(새것이 앞)가 있으면 그 입력값으로(다른 기기 · 다른 업체에서 붙인 결과를 '다시 열기')
+      const last = (record.toolResults ?? [])
+        .filter((r) => r.toolKey === 'tax')
+        .map((r) => r.data as { calc?: unknown; values?: unknown } | null)
+        .find((d): d is { calc: string; values: Values } => !!d && d.calc === calc.key && !!d.values && typeof d.values === 'object')
+      if (last) return { values: { ...displayDefaults(calc), ...last.values }, prefilled: [] }
       const pf = calcPrefill(calc.key, record)
       return { values: { ...displayDefaults(calc), ...prefillShown(calc, pf.values) }, prefilled: pf.names }
     }
@@ -158,23 +165,27 @@ export function TaxCalculatorsPage() {
     return () => document.removeEventListener('keydown', onKey)
   }, [pickerOpen])
   // 계산기 · 업체가 바뀌면 그 칸의 값을 읽는다 — 읽기 전에는 저장하지 않는다(앞 업체 숫자가 뒤 업체 칸에 들어가지 않게)
-  const loadKey = `${calc.key}|${clientId ?? ''}|${recordReady ? 'ok' : 'wait'}`
+  // D-165: 절세 설계(plan) 화면에서는 계산기 칸을 읽지도 저장하지도 않는다 — 전에는 업체 기록이 비어 있을 때
+  // 계산기 01 예시 숫자가 업체 칸에 저장돼, 절세 설계에서 급여를 적은 뒤 계산기를 열어도 예시가 남았다
+  const mode: 'plan' | 'calc' = params.get('m') === 'plan' || (params.get('client') && !params.get('c') && params.get('m') !== 'calc') ? 'plan' : 'calc'
+  const loadKey = `${mode}|${calc.key}|${clientId ?? ''}|${recordReady ? 'ok' : 'wait'}`
   const loadedFor = useRef(loadKey)
   useEffect(() => {
+    if (mode === 'plan') return
     if (loadedFor.current === loadKey) return
     loadedFor.current = loadKey
     const r = loadValuesWithPrefill(calc, clientId, clientRecord)
     setValues(r.values)
     setPrefilled(r.prefilled)
-  }, [calc, clientId, clientRecord, loadKey])
+  }, [calc, clientId, clientRecord, loadKey, mode])
   useEffect(() => {
-    if (!recordReady || loadedFor.current !== loadKey) return
+    if (mode === 'plan' || !recordReady || loadedFor.current !== loadKey) return
     try {
       localStorage.setItem(storeKey(calc, clientId), JSON.stringify(values))
     } catch {
       /* 저장 못 해도 계산은 된다 */
     }
-  }, [values, calc, clientId, recordReady, loadKey])
+  }, [values, calc, clientId, recordReady, loadKey, mode])
 
   const out = useMemo(() => {
     try {
@@ -188,7 +199,6 @@ export function TaxCalculatorsPage() {
    * D-130: 업체로 열면(?client=) 먼저 '원하는 결과로 찾기'. 계산기를 고르면(?c=) 예전 그대로.
    * 업체 없이 열면 예전처럼 계산기부터(원본 대조 qa:tax 가 이 화면을 연다) — 위 두 칸으로 오갈 수 있다.
    */
-  const mode: 'plan' | 'calc' = params.get('m') === 'plan' || (params.get('client') && !params.get('c') && params.get('m') !== 'calc') ? 'plan' : 'calc'
   const setMode = (m: 'plan' | 'calc') => {
     const next = new URLSearchParams()
     const client = params.get('client')
@@ -207,7 +217,7 @@ export function TaxCalculatorsPage() {
     } catch {
       /* 저장 못 하면 아래에서 바로 넣는다 */
     }
-    loadedFor.current = `${target.key}|${clientId ?? ''}|${recordReady ? 'ok' : 'wait'}`
+    loadedFor.current = `calc|${target.key}|${clientId ?? ''}|${recordReady ? 'ok' : 'wait'}`
     setValues(merged)
     setPrefilled([])
     const next = new URLSearchParams()
@@ -553,6 +563,7 @@ export function TaxCalculatorsPage() {
                   verdictLabel={headlineOf(out.blocks)}
                   summary={summaryOf(calc.title, calc.subs.length > 1 ? sub.label : '', out.blocks)}
                   data={{ calc: calc.key, sub: sub.key, values }}
+                  openPathFor={(cid) => `/tools/tax?client=${encodeURIComponent(cid)}&m=calc&c=${calc.key}${calc.subs.length > 1 ? `&s=${sub.key}` : ''}`}
                 />
               </div>
             )}

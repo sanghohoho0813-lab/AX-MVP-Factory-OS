@@ -2,7 +2,7 @@
  * 지원사업 알림 — 불러오기 · 알리기(카톡 문구 · 찾기 링크 · 고객 화면) (D-141).
  * 알림 화면 · 업체 상세 · 오늘이 같은 동작을 쓴다. 알릴 때마다 '보낸 기록' 을 남긴다(다시 보낼 때 날짜가 보인다).
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { brand } from '../../brand/brand.config'
 import { listLinks, publishUpdate } from '../../services/customerBridgeService'
 import { listNotices, listSent, recordSent, type SentChannel, type SentRecord } from '../../services/grants/grantStore'
@@ -21,17 +21,22 @@ export function useGrantData(workspaceId: string | null) {
   const [links, setLinks] = useState<PortalClientLink[]>([])
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState('')
+  // D-165: 작업공간이 바뀌면 앞 작업공간의 늦은 답은 버린다(새 목록을 덮지 않게)
+  const latest = useRef(0)
   const reload = useCallback(async () => {
+    const ticket = ++latest.current
     try {
       const [n, s, l] = await Promise.all([listNotices(workspaceId), listSent(workspaceId).catch(() => [] as SentRecord[]), listLinks(workspaceId).catch(() => [] as PortalClientLink[])])
+      if (ticket !== latest.current) return
       setNotices(n)
       setSent(s)
       setLinks(l)
       setError('')
     } catch (cause) {
+      if (ticket !== latest.current) return
       setError(cause instanceof Error ? cause.message : '지원사업 공고를 불러오지 못했습니다.')
     } finally {
-      setLoaded(true)
+      if (ticket === latest.current) setLoaded(true)
     }
   }, [workspaceId])
   useEffect(() => {

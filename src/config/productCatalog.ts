@@ -246,7 +246,7 @@ export interface CatalogFeature {
 
 export const FEATURE_CATALOG: CatalogFeature[] = [
   // 기업성장
-  { key: 'policy-funding', source: 'tool', module: 'growth', lockedPreview: 'first-section', clientEntry: { topic: '정책자금', verb: '진단하기', path: '/tools/policy-funding' } },
+  { key: 'policy-funding', source: 'tool', module: 'growth', lockedPreview: 'first-section', clientEntry: { topic: '정책자금', verb: '진단하기', path: '/tools/policy-funding/diagnosis' } },
   { key: 'employment', source: 'tool', module: 'growth', lockedPreview: 'first-section', clientEntry: { topic: '고용지원금', verb: '확인하기', path: '/tools/employment' } },
   { key: 'labcare', source: 'tool', module: 'growth', lockedPreview: 'first-section', clientEntry: { topic: '기업부설연구소', verb: '검토하기', path: '/tools/labcare' } },
   // D-163: 지원사업 알림 — 영업 목차에서 기업성장 안으로(요금제와 상관없이 늘 열림)

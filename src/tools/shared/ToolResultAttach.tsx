@@ -53,6 +53,8 @@ function openPathFor(pathname: string, search: string, clientId: string): string
 }
 
 export interface ToolResultAttachProps {
+  /** D-165: '다시 열기' 주소를 도구가 정한다(없으면 지금 주소 + client) — 세금 계산기는 계산기 · 탭까지 */
+  openPathFor?: (clientId: string) => string
   toolKey: string
   title: string
   verdict: string | null
@@ -123,7 +125,8 @@ export function ToolResultAttach(props: ToolResultAttachProps) {
 
   /** 실제로 붙이는 일 — 시트에서 고른 업체든, 주소로 물고 온 업체든 같은 길을 쓴다 */
   const attachTo = async (targetId: string, alsoPublish: boolean, confirmed = false) => {
-    const list = clients.length > 0 ? clients : await loadClients()
+    // D-165: 늘 지금 기록을 다시 읽는다 — 시트를 처음 열 때 받아 둔 목록으로 저장하면 그 뒤에 붙인 결과 · 할 일이 지워졌다
+    const list = await loadClients()
     const target = list.find((c) => c.id === targetId)
     if (!target) {
       showToast('업체를 찾지 못했습니다.')
@@ -143,7 +146,7 @@ export function ToolResultAttach(props: ToolResultAttachProps) {
         summary: props.summary,
         data: props.data,
         deadlines: props.deadlines ?? [],
-        openPath: openPathFor(location.pathname, location.search, target.id),
+        openPath: props.openPathFor ? props.openPathFor(target.id) : openPathFor(location.pathname, location.search, target.id),
       })
       const saved = await saveClient(next)
       next = saved

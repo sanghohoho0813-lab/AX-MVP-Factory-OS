@@ -753,6 +753,61 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   }
 }
 
+/* ---- D-165 모듈 안정화 — 절세 설계 · 창업감면 결과서 · 연구소 체크 남기기 · 정책자금 입구 ---- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  const errs = []
+  page.on('pageerror', (e) => errs.push(String(e).slice(0, 160)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const ls = (k) => page.evaluate((key) => localStorage.getItem(key), k)
+
+  // 절세 설계로 열기만 해서는 계산기 01 예시 숫자가 업체 칸에 저장되지 않는다
+  await page.evaluate(() => localStorage.removeItem('axmvp.tax.t2.cli_hansol'))
+  await page.goto(BASE + '/tools/tax?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check('D-165 절세 설계로 열기: 계산기 01 칸에 예시 숫자를 저장하지 않는다', (await page.getByTestId('tax-plan').count()) === 1 && (await ls('axmvp.tax.t2.cli_hansol')) === null)
+  await page.goto(BASE + '/tools/tax?client=cli_hansol&m=calc&c=t2', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check('D-165 계산기로 열면 그때 그 업체 칸에 남긴다', (await ls('axmvp.tax.t2.cli_hansol')) !== null)
+
+  // 창업감면: 판정 화면을 열기만 하면 결과서는 '아직 판정한 내용이 없습니다'
+  await page.evaluate(() => {
+    for (const k of Object.keys(localStorage)) if (k.startsWith('axmvp.tools.startupTax.client.cli_hansol')) localStorage.removeItem(k)
+  })
+  await page.goto(BASE + '/tools/startup-tax/judge?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  await page.goto(BASE + '/tools/startup-tax/report?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  check('D-165 창업감면: 판정을 누르기 전에는 결과서가 없다', (await page.getByTestId('startup-report-empty').count()) === 1 && (await page.getByTestId('startup-report').count()) === 0)
+  await page.goto(BASE + '/tools/startup-tax/judge?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  await page.getByRole('button', { name: /1분 판정하기/ }).first().click()
+  await page.waitForTimeout(600)
+  await page.goto(BASE + '/tools/startup-tax/report?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  check('D-165 창업감면: 판정을 누른 뒤에는 결과서', (await page.getByTestId('startup-report').count()) === 1)
+
+  // 연구소 설립 가능성 체크: 적은 것이 새로 고쳐도 남는다(업체마다)
+  await page.goto(BASE + '/tools/labcare/assessment?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const proj = page.getByPlaceholder('예) 추천엔진 정확도 고도화 연구')
+  await proj.fill('D165 연구과제 남기기')
+  await page.waitForTimeout(400)
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check('D-165 연구소 체크: 적은 연구과제명이 새로 고쳐도 남는다', (await page.getByPlaceholder('예) 추천엔진 정확도 고도화 연구').inputValue()) === 'D165 연구과제 남기기')
+
+  // 정책자금: 업체에서 여는 입구는 대시보드가 아니라 진단 화면으로(모듈 대시보드 '이 업체로 바로 열기' 도 같은 주소를 쓴다)
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  const hrefs = await page.evaluate(() => [...document.querySelectorAll('a[href^="/tools/policy-funding"]')].map((a) => a.getAttribute('href')))
+  check('D-165 업체 → 정책자금: 진단 화면으로 바로', hrefs.length > 0 && hrefs.every((h) => h === '/tools/policy-funding/diagnosis?client=cli_hansol'), hrefs.join())
+  check('D-165 화면 오류 없음', errs.length === 0, errs.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n도구함(도구·붙이기·업체 연동·서류 부족·기한·검색): ${pass} passed, ${fail} failed`)
 process.exit(fail > 0 ? 1 : 0)

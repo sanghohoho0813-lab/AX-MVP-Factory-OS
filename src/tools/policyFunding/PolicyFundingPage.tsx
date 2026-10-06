@@ -18,6 +18,7 @@ import { ModuleDashboard } from '../shared/ModuleDashboard'
 import { useModuleSection } from '../shared/ModuleRoute'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
 import { useToolClient } from '../shared/toolClientContext'
+import { sharedToolKey } from '../shared/toolStorage'
 import { PolicyDashboardExtra } from './screens/DashboardExtra'
 import { usePrefillFromClient } from '../shared/usePrefill'
 import { PrefillNote } from '../shared/PrefillNote'
@@ -33,7 +34,7 @@ import { STAGE_BADGE } from './orig/stages'
 
 const STORAGE_KEY = 'axmvp.tools.policyFunding'
 /** D-126: 업체마다 따로 기억한다 — 예전에는 브라우저에 하나라 다른 업체로 열어도 앞 업체 답이 그대로 보였다 */
-const keyFor = (clientId: string | null | undefined) => (clientId ? `${STORAGE_KEY}.${clientId}` : STORAGE_KEY)
+const keyFor = (clientId: string | null | undefined) => (clientId ? `${STORAGE_KEY}.${clientId}` : sharedToolKey(STORAGE_KEY))
 
 function loadInput(clientId: string | null | undefined): DiagnosisInput {
   try {
@@ -91,7 +92,7 @@ function OrigPolicy({ children }: { children: ReactNode }) {
 
 function DiagnosisScreen() {
   const [params] = useSearchParams()
-  const { clientId } = useToolClient()
+  const { clientId, clientRecord } = useToolClient()
   const autoSample = params.get('sample') === '1'
   const [seed, setSeed] = useState<{ input: DiagnosisInput; key: number }>(() => ({ input: loadInput(clientId), key: 0 }))
   const loadedFor = useRef<string | null | undefined>(clientId)
@@ -100,6 +101,22 @@ function DiagnosisScreen() {
     loadedFor.current = clientId
     setSeed((s) => ({ input: loadInput(clientId), key: s.key + 1 }))
   }, [clientId])
+  // D-165: 이 브라우저에 이 업체 입력이 없으면 마지막으로 붙인 진단 결과의 입력으로(다른 기기 · 다른 업체에서 붙인 결과 '다시 열기')
+  const restoredFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (autoSample || !clientId || !clientRecord || clientRecord.id !== clientId || restoredFor.current === clientId) return
+    restoredFor.current = clientId
+    try {
+      if (localStorage.getItem(keyFor(clientId))) return
+    } catch {
+      return
+    }
+    const last = (clientRecord.toolResults ?? [])
+      .filter((r) => r.toolKey === 'policy-funding')
+      .map((r) => (r.data as { input?: Partial<DiagnosisInput> } | null)?.input)
+      .find((i): i is Partial<DiagnosisInput> => !!i && typeof i === 'object')
+    if (last) setSeed((s) => ({ input: { ...DEFAULT_INPUT, ...last }, key: s.key + 1 }))
+  }, [autoSample, clientId, clientRecord])
 
   // 업체에서 열었으면 아는 것을 채운다 (D-90).
   // 이 도구는 기본값이 빈 값이 아니라서(개인사업자·1~3년 …), **아직 손대지 않은 칸만** 바꾼다.

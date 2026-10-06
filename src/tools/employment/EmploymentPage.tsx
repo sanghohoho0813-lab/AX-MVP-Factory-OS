@@ -22,6 +22,7 @@ import { Badge, Disclosure, MetricTile, Section, Surface, type Tone } from '../.
 import { ToolResultAttach } from '../shared/ToolResultAttach'
 import { usePrefillFromClient } from '../shared/usePrefill'
 import { useToolClient } from '../shared/toolClientContext'
+import { sharedToolKey } from '../shared/toolStorage'
 import { fetchClientDocFile, hasDocFile } from '../shared/clientDocFile'
 import { PrefillNote } from '../shared/PrefillNote'
 import { FactSendButton } from '../shared/FactSendButton'
@@ -60,7 +61,7 @@ import {
 const STORAGE_PREFIX = 'axmvp.tools.employment.'
 
 /** D-126: 업체마다 따로 기억한다(업체 없이 열면 공용 칸) */
-const keyFor = (tab: string, clientId: string | null | undefined) => STORAGE_PREFIX + tab + (clientId ? `.${clientId}` : '')
+const keyFor = (tab: string, clientId: string | null | undefined) => (clientId ? `${STORAGE_PREFIX}${tab}.${clientId}` : sharedToolKey(STORAGE_PREFIX + tab))
 
 function loadStored<T>(tab: string, fallback: T, clientId?: string | null): T {
   try {

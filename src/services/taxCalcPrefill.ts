@@ -11,6 +11,7 @@
 import type { ClientOpsRecord } from '../types/clientOps'
 import { computeSalary } from './taxCalc'
 import { ceoOf, shareValueOf, viewProfile } from './taxPlan'
+import { todayLocalDate } from '../lib/appClock'
 
 /** 모르는 칸을 0 으로 둔 것을 알리는 이름 */
 export const ZERO_NOTE = '모르는 칸은 0(절세 설계와 같게)'
@@ -23,7 +24,7 @@ export interface CalcPrefill {
 
 const s = (n: number) => String(Math.round(n))
 
-export function calcPrefill(calcKey: string, record: Pick<ClientOpsRecord, 'companyName' | 'taxProfile' | 'shareholderRegister'> | null): CalcPrefill {
+export function calcPrefill(calcKey: string, record: Pick<ClientOpsRecord, 'companyName' | 'taxProfile' | 'shareholderRegister'> | null, today: string = todayLocalDate()): CalcPrefill {
   const out: CalcPrefill = { values: {}, names: [] }
   if (!record) return out
   const p = viewProfile(record.taxProfile ?? {})
@@ -57,6 +58,13 @@ export function calcPrefill(calcKey: string, record: Pick<ClientOpsRecord, 'comp
       put('q_pay', s(annual), '대표 연 보수(월 급여 × 12)')
       put('r_start', p.ceoStartDate, '대표 취임일')
       put('t_start', p.ceoStartDate, '대표 취임일')
+      // D-165: 끝나는 날 · 평균 급여도 절세 설계(퇴직금 한도)와 같게 — 전에는 예시(2021 · 2022 년 끝)가 남아
+      // 근속연수가 0 이 되거나 한도가 2021 년에서 끊겼다
+      if (p.ceoStartDate) {
+        put('r_end', today, '오늘(퇴직 기준일)')
+        put('t_end', today, '오늘(퇴직 기준일)')
+      }
+      if (annual > 0) for (const id of ['r_avg1', 'r_avg2', 'r_avg3']) put(id, s(annual), '최근 3년 연 급여(월 급여 × 12)')
       break
     case 't9':
       put('inc_a_salary', s(annual), '대표 총급여(월 급여 × 12)')

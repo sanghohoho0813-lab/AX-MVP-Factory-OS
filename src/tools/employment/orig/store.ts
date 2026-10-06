@@ -42,7 +42,8 @@ export function regionOfAddress(addr: string): string {
 
 /** 고객 운영 업체 → 원본 업체 칸 기본값 */
 export function osCompanyDefaults(os: ClientOpsRecord): Rec {
-  const count = String(os.employeeCount ?? '').replace(/[^\d]/g, '')
+  // D-165: 첫 숫자만 — 전에는 숫자가 아닌 글자를 다 지워 '12명(2025.6 기준)' 이 1220256 이 됐다
+  const count = /(\d+)/.exec(String(os.employeeCount ?? ''))?.[1] ?? ''
   return {
     name: os.companyName,
     bizNo: os.businessNumber || '',

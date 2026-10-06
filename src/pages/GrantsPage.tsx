@@ -46,9 +46,14 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
   const [records, setRecords] = useState<ClientOpsRecord[]>([])
   const [loadError, setLoadError] = useState('')
   useEffect(() => {
+    let alive = true
+    setLoadError('')
     listClients(workspaceId)
-      .then(setRecords)
-      .catch((cause) => setLoadError(cause instanceof Error ? cause.message : '업체를 불러오지 못했습니다.'))
+      .then((list) => alive && setRecords(list))
+      .catch((cause) => alive && setLoadError(cause instanceof Error ? cause.message : '업체를 불러오지 못했습니다.'))
+    return () => {
+      alive = false
+    }
   }, [workspaceId])
 
   // D-151: 공고 → 이 업체로 신청 준비(업체의 자금 · 지원사업 신청 건). 저장 직전에 업체를 다시 읽어 다른 화면에서 고친 것을 덮지 않는다

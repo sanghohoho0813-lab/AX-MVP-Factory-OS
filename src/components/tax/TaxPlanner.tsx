@@ -12,6 +12,7 @@ import { Button } from '../ui/Button'
 import { useToast } from '../ui/toastContext'
 import { copyText } from '../consulting/studioParts'
 import { useToolClient } from '../../tools/shared/toolClientContext'
+import { sharedToolKey } from '../../tools/shared/toolStorage'
 import { listClients, saveClient, withToolResult } from '../../services/clientOpsService'
 import { generateId } from '../../storage/localStore'
 import { formatWon } from '../../services/customerFacts'
@@ -64,6 +65,8 @@ interface PlanState {
   cashTarget: string
   salary: { mode: SalaryMode; rate: string; net: string }
   gift: { recipientId: string; mode: GiftMode; amount: string }
+  /** D-165: 이 초안을 시작한(또는 마지막으로 저장한) 업체 기록의 주주명부 · 현황 — 업체 기록이 그 뒤에 바뀌었는지 본다 */
+  base?: string
 }
 
 const EMPTY: PlanState = {
@@ -79,7 +82,7 @@ const EMPTY: PlanState = {
 const GOAL_ORDER: GoalKey[] = ['cash', 'salary', 'gift', 'inherit', 'loan', 'retire']
 const EXAMPLES = ['1억 현금화하고 싶어', '급여 실효세율 20%로', '세후 월 800만원 받게 급여', '자녀에게 지분 10% 증여', '가업승계 준비', '가지급금 3억 정리', '퇴직금 얼마까지 되나']
 
-const draftKey = (clientId: string | null) => `axmvp.taxplan.${clientId ?? 'none'}`
+const draftKey = (clientId: string | null) => (clientId ? `axmvp.taxplan.${clientId}` : sharedToolKey('axmvp.taxplan.none'))
 
 function readDraft(clientId: string | null): PlanState | null {
   try {
@@ -90,6 +93,16 @@ function readDraft(clientId: string | null): PlanState | null {
   } catch {
     return null
   }
+}
+
+/** 주주명부 · 현황만 비교용 글자로(빈 칸은 뺀다) */
+function snapOf(profile: TaxProfile, register: readonly ShareholderRow[]): string {
+  const p = Object.fromEntries(
+    Object.entries(profile ?? {})
+      .filter(([, v]) => typeof v === 'string' && v.trim() !== '')
+      .sort(([a], [b]) => a.localeCompare(b)),
+  )
+  return JSON.stringify({ p, r: register.map((r) => ({ n: r.name, rel: r.relation, s: r.shares, a: r.acquirePrice })) })
 }
 
 const todayIso = () => {
@@ -117,12 +130,43 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
   const today = todayIso()
 
   // 업체 기록을 읽으면 — 적는 중인 것이 없을 때만 — 업체 기록의 주주명부 · 현황으로 시작한다
+  // D-165: 초안이 있어도 이 화면에서 고치지 않았으면 업체 기록의 새 값으로 바꾼다(다른 화면 · 휴대폰에서 고친 것).
+  //        이 화면에서도 고쳤고 업체 기록도 바뀌었으면 덮지 않고 알린다 — '업체 기록으로 다시 채우기'.
   const seeded = useRef(false)
+  const [recordChanged, setRecordChanged] = useState(false)
+  const seedFromRecord = (rec: NonNullable<typeof clientRecord>) =>
+    setSt((cur) => ({ ...cur, profile: { ...rec.taxProfile }, register: rec.shareholderRegister.map((r) => ({ ...r })), base: snapOf(rec.taxProfile ?? {}, rec.shareholderRegister ?? []) }))
   useEffect(() => {
     if (!clientRecord || seeded.current) return
     seeded.current = true
-    if (hadDraft.current) return
-    setSt((cur) => ({ ...cur, profile: { ...clientRecord.taxProfile }, register: clientRecord.shareholderRegister.map((r) => ({ ...r })) }))
+    const recSnap = snapOf(clientRecord.taxProfile ?? {}, clientRecord.shareholderRegister ?? [])
+    if (!hadDraft.current) {
+      seedFromRecord(clientRecord)
+      // D-165: 이 브라우저에 적던 것이 없으면 마지막으로 붙인 절세 설계의 목표로(다른 기기에서 '다시 열기')
+      const last = (clientRecord.toolResults ?? [])
+        .filter((r) => r.toolKey === 'tax')
+        .map((r) => r.data as Partial<Pick<PlanState, 'goals' | 'cashTarget' | 'salary' | 'gift'>> & { plan?: unknown } | null)
+        .find((d) => !!d && d.plan === true && Array.isArray(d.goals))
+      if (last)
+        setSt((cur) => ({
+          ...cur,
+          goals: (last.goals ?? []).filter((g): g is GoalKey => (GOAL_ORDER as string[]).includes(g)),
+          cashTarget: typeof last.cashTarget === 'string' ? last.cashTarget : cur.cashTarget,
+          salary: last.salary ? { ...cur.salary, ...last.salary } : cur.salary,
+          gift: last.gift ? { ...cur.gift, ...last.gift } : cur.gift,
+        }))
+      return
+    }
+    setSt((cur) => {
+      const mine = snapOf(cur.profile, cur.register)
+      if (mine === recSnap) return cur.base === recSnap ? cur : { ...cur, base: recSnap }
+      const untouched = cur.base !== undefined ? mine === cur.base : mine === snapOf({}, [])
+      if (untouched) return { ...cur, profile: { ...clientRecord.taxProfile }, register: clientRecord.shareholderRegister.map((r) => ({ ...r })), base: recSnap }
+      setRecordChanged(true)
+      return cur
+    })
+    // seedFromRecord 는 setSt 만 부른다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientRecord])
 
   useEffect(() => {
@@ -154,7 +198,7 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
   const [splitOpen, setSplitOpen] = useState(false)
   const split = useMemo(() => (splitOpen && cash ? splitPlan(p, st.register, sv, cashTarget, today) : null), [splitOpen, cash, p, st.register, sv, cashTarget, today])
   const salary = useMemo(
-    () => (wantSalary ? salaryPlan(p, { mode: st.salary.mode, ratePct: Number(st.salary.rate) || 0, netMonthly: wonOf(st.salary.net) }) : null),
+    () => (wantSalary ? salaryPlan(p, { mode: st.salary.mode, ratePct: Number(st.salary.rate.replace(/[%\s]/g, '')) || 0, netMonthly: wonOf(st.salary.net) }) : null),
     [wantSalary, st.salary, p],
   )
   const giftAmount = st.gift.mode === 'pct' || st.gift.mode === 'shares' ? Number(st.gift.amount.replace(/[,%\s주]/g, '')) || 0 : wonOf(st.gift.amount)
@@ -247,12 +291,14 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
           verdict: null,
           verdictLabel: cash?.best ? `추천 ${cash.best.label}` : st.goals.map((g) => GOAL_LABEL[g]).join(' · '),
           summary: planSummary(parts),
-          data: { plan: true, goals: st.goals },
+          data: { plan: true, goals: st.goals, cashTarget: st.cashTarget, salary: st.salary, gift: st.gift },
           openPath: `/tools/tax?client=${encodeURIComponent(clientId)}`,
         })
       }
       const saved = await saveClient(next)
       replaceClient(saved)
+      setSt((cur) => ({ ...cur, base: snapOf(saved.taxProfile ?? {}, saved.shareholderRegister ?? []) }))
+      setRecordChanged(false)
       showToast(`${saved.companyName} 기록에 주주명부 · 절세 현황${parts.length > 0 ? ' · 결과' : ''}를 저장했습니다.`)
     } catch (cause) {
       showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다 — 적은 것은 이 브라우저에 남아 있습니다.')
@@ -385,6 +431,29 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
   return (
     <NeedCtx.Provider value={needSet}>
     <div className="flex flex-col gap-5" data-testid="tax-plan">
+      {recordChanged && clientRecord && (
+        <div className="no-print flex flex-col gap-2 rounded-(--radius-panel) border border-amber-300 bg-amber-50 px-4 py-3 lg:flex-row lg:items-center lg:gap-3" data-testid="tax-plan-record-changed">
+          <p className="t-sub min-w-0 break-keep text-amber-900 lg:flex-1">
+            이 업체 기록의 주주명부 · 절세 현황이 다른 화면에서 바뀌었습니다. 여기에 적던 것을 그대로 저장하면 그 내용을 덮습니다.
+          </p>
+          <div className="flex flex-wrap gap-2 lg:shrink-0">
+            <Button
+              size="sm"
+              variant="secondary"
+              className={wrapBtn}
+              onClick={() => {
+                seedFromRecord(clientRecord)
+                setRecordChanged(false)
+              }}
+            >
+              업체 기록으로 다시 채우기
+            </Button>
+            <Button size="sm" variant="ghost" className={wrapBtn} onClick={() => setRecordChanged(false)}>
+              여기 적은 것 유지
+            </Button>
+          </div>
+        </div>
+      )}
       {/* ① 원하는 것 */}
       <section className="no-print flex flex-col gap-3 rounded-(--radius-panel) border border-brand-200 bg-brand-50 p-4" aria-labelledby="plan-want">
         <h2 id="plan-want" className="t-card font-bold text-slate-900">

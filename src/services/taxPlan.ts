@@ -104,8 +104,9 @@ export function wonOf(text: string | undefined): number {
 
 function numOf(text: string | undefined, fallback = 0): number {
   if (!text || text.trim() === '') return fallback
-  const n = Number(text.replace(/[,%\s]/g, ''))
-  return Number.isFinite(n) ? n : fallback
+  // D-165: '62세' · '15년' · '10,000주' · '2명' 처럼 뒤에 단위를 붙여 적어도 숫자로(전에는 0 이 됐다)
+  const n = Number(text.replace(/[,%\s]/g, '').replace(/[^\d.]+$/, ''))
+  return Number.isFinite(n) && text.replace(/[,%\s]/g, '').replace(/[^\d.]+$/, '') !== '' ? n : fallback
 }
 
 export interface ProfileView {
@@ -171,8 +172,8 @@ export function viewProfile(p: TaxProfile): ProfileView {
     children: Math.max(0, Math.floor(numOf(p.children, 0))),
     priorGift: Math.max(0, wonOf(p.priorGift)),
     retireMult: Math.min(Number(ASSUMPTIONS.retireMultPost), Math.max(0, numOf(p.retireMult, Number(ASSUMPTIONS.retireMultPost)))),
-    ceoAge: p.ceoAge && p.ceoAge.trim() !== '' ? Math.floor(numOf(p.ceoAge)) : null,
-    bizYears: p.bizYears && p.bizYears.trim() !== '' ? numOf(p.bizYears) : null,
+    ceoAge: p.ceoAge && p.ceoAge.trim() !== '' && !Number.isNaN(numOf(p.ceoAge, NaN)) ? Math.floor(numOf(p.ceoAge)) : null,
+    bizYears: p.bizYears && p.bizYears.trim() !== '' && !Number.isNaN(numOf(p.bizYears, NaN)) ? numOf(p.bizYears) : null,
     bizAssetRatio: p.bizAssetRatio && p.bizAssetRatio.trim() !== '' ? Math.min(100, Math.max(0, numOf(p.bizAssetRatio))) / 100 : 1,
     bizAssetRatioGiven: !!(p.bizAssetRatio && p.bizAssetRatio.trim() !== ''),
   }
@@ -708,6 +709,8 @@ function dividendRoute(c: Ctx, target: number): CashRoute {
   const ceo = ceoOf(c.reg)
   const total = c.sv.totalShares
   const ratio = ceo && total > 0 ? ceo.shares / total : 1
+  // D-165: 주주명부에 대표가 있는데 주식이 0주면 배당으로는 대표에게 한 푼도 가지 않는다(전에는 배당 전부가 대표 몫으로 계산됐다)
+  if (ceo && total > 0 && ceo.shares <= 0) return failRoute('dividend', '배당', '주주명부에 대표 주식이 0주라 배당으로는 대표가 받을 수 없습니다.', DIVIDEND_BASIS)
   const r0 = computeSalary(c.p.monthlySalary)
   const got = dividendToCeo(c, r0.annual, r0.insTotal, target)
   if (!got) return failRoute('dividend', '배당', '찾지 못했습니다.', DIVIDEND_BASIS)
@@ -954,6 +957,8 @@ function mixRoute(c: Ctx, target: number): CashRoute | null {
   const ceo = ceoOf(c.reg)
   const total = c.sv.totalShares
   const ratio = ceo && total > 0 ? ceo.shares / total : 1
+  // 대표 주식 0주 — 배당 몫이 없으니 섞기도 없다
+  if (ceo && total > 0 && ceo.shares <= 0) return null
   let best: { a: number; burden: number; sal: ReturnType<typeof salaryRoute>; div: NonNullable<ReturnType<typeof dividendToCeo>> } | null = null
   for (let k = 1; k <= 9; k++) {
     const a = k / 10

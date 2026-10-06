@@ -15,7 +15,7 @@ import { Badge, MetricTile, Section, Surface, type Tone } from '../../../compone
 import { judge, VERDICT_EMOJI, VERDICT_LABEL } from '../lib/judgement'
 import { buildSummaryText } from '../lib/summary'
 import type { Verdict } from '../types'
-import { loadStartupTaxForm } from '../lib/formStore'
+import { loadStartupTaxForm, isStartupTaxJudged } from '../lib/formStore'
 import { withoutPlaceholders } from '../lib/formDefaults'
 import { useToolClient } from '../../shared/toolClientContext'
 import { ToolResultAttach } from '../../shared/ToolResultAttach'
@@ -35,7 +35,8 @@ export function StartupTaxReportScreen() {
   // D-136: 화면의 예시 날짜(1980-01-01 · 2020-01-01)는 안 적은 것으로 보고 판정한다
   const form = useMemo(() => {
     const saved = loadStartupTaxForm(clientId)
-    return saved ? withoutPlaceholders(saved) : null
+    // D-165: 판정을 누른 폼만 결과서로(열기만 한 빈 폼은 '아직 판정한 내용이 없습니다')
+    return saved && isStartupTaxJudged(clientId, saved) ? withoutPlaceholders(saved) : null
   }, [clientId])
   const result = useMemo(() => (form ? judge(form) : null), [form])
 

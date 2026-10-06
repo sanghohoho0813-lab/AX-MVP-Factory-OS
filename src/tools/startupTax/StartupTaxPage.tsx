@@ -20,7 +20,7 @@ import { usePrefillFromClient } from '../shared/usePrefill'
 import { PrefillNote } from '../shared/PrefillNote'
 import { FactSendButton } from '../shared/FactSendButton'
 import { useToolClient } from '../shared/toolClientContext'
-import { loadStartupTaxForm, saveStartupTaxForm } from './lib/formStore'
+import { loadStartupTaxForm, saveStartupTaxForm, markStartupTaxJudged } from './lib/formStore'
 import type { FormData as StartupTaxForm, JudgementResult } from './types'
 import { EMPTY_ADVANCED, EMPTY_FORM, PLACEHOLDER_BIRTH, PLACEHOLDER_STARTUP, withoutPlaceholders } from './lib/formDefaults'
 import { judge, VERDICT_EMOJI, VERDICT_LABEL } from './lib/judgement'
@@ -102,11 +102,13 @@ function StartupTaxScreen() {
   // D-94: 판정하면 결과 첫 칸으로 — 위의 업체 띠·안내·제목을 건너뛴다(휴대폰에서 결과가 화면 아래로 밀리던 것)
   const handleSubmit = () => {
     setSubmitted(true)
+    markStartupTaxJudged(clientId, true)
     window.setTimeout(() => document.getElementById('startup-result')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0)
   }
   const handleReset = () => {
     setForm(freshForm())
     setSubmitted(false)
+    markStartupTaxJudged(clientId, false)
     top()
   }
   const handleBack = () => {

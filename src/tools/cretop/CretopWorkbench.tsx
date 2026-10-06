@@ -123,7 +123,13 @@ export function CretopWorkbench({ embedded = false, onAnalyzed, actions, attachS
     let timer: number | undefined
     const flush = () => {
       for (const p of pending.values()) {
-        const row = (rowsRef.current ?? []).find((r) => (p.bizNo && r.data.bizNo === p.bizNo) || r.data.company === p.company)
+        // D-165: 저장할 때(onSaved)와 같은 규칙 — 사업자번호가 있으면 번호로만, 없으면 번호 없는 같은 이름 줄만
+        // (전에는 이름이 같으면 사업자번호가 다른 회사 줄에도 주식 가치 설정이 들어갔다)
+        const mine = digits(p.bizNo)
+        const rows = rowsRef.current ?? []
+        const row =
+          rows.find((r) => mine !== '' && digits(String(r.data.bizNo ?? '')) === mine) ??
+          rows.find((r) => r.data.company === p.company && (mine === '' || digits(String(r.data.bizNo ?? '')) === ''))
         if (!row) continue
         void saveRef.current({ id: row.id, clientId: row.clientId, data: { ...row.data, sv: p.entry } }).catch(() => {
           /* 이력 저장에 실패해도 이 브라우저에는 남아 있다 */

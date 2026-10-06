@@ -381,5 +381,24 @@ if (process.env.SHOW) {
   console.log('gift10', g10.tax, g10.lines, 'inh', inh.taxNow, inh.withGift)
   console.log('loan', loan.yearLoss, loan.tenYear, 'retire', ret.limit, ret.tax, 's20', s20.monthly, 'net800', net.monthly, 'min', mn.monthly)
 }
+/* ---- D-165 안정화 ---- */
+{
+  const u = viewProfile({ ...raw, ceoAge: '62세', bizYears: '15년', totalShares: '10,000주', children: '2명' })
+  check('D-165 단위 붙여 적기: 62세 · 15년 · 10,000주 · 2명', u.ceoAge === 62 && u.bizYears === 15 && u.totalShares === 10000 && u.children === 2, [u.ceoAge, u.bizYears, u.totalShares, u.children])
+  check('D-165 숫자 없는 나이는 모름(0 이 아님)', viewProfile({ ceoAge: '모름' }).ceoAge === null && viewProfile({ bizYears: '잘 모름' }).bizYears === null)
+  const reg0: ShareholderRow[] = [
+    { id: 'a', name: '김대표', relation: 'ceo', shares: 0, acquirePrice: 5000 },
+    { id: 'b', name: '이배우', relation: 'spouse', shares: 10000, acquirePrice: 5000 },
+  ]
+  const c0 = cashPlan(p, reg0, shareValueOf(p, reg0), 1e8, TODAY)
+  const d0 = c0.routes.find((r) => r.key === 'dividend')
+  check('D-165 대표 0주: 배당은 안 됨(대표가 받을 몫이 없다)', !!d0 && !d0.ok && d0.reason.includes('0주'), d0?.reason)
+  check('D-165 대표 0주: 섞기(급여 + 배당)도 추천하지 않는다', !c0.routes.some((r) => r.key === 'mix' && r.ok))
+  const pf6 = calcPrefill('t6', { companyName: '가', taxProfile: raw, shareholderRegister: reg }, '2026-09-28')
+  check('D-165 퇴직급여(02): 끝나는 날 = 오늘 · 최근 3년 연 급여 = 월 급여 × 12', pf6.values.r_end === '2026-09-28' && pf6.values.t_end === '2026-09-28' && pf6.values.r_avg1 === String(8e6 * 12) && pf6.values.r_avg3 === String(8e6 * 12), pf6.values)
+  const pf6none = calcPrefill('t6', { companyName: '가', taxProfile: {}, shareholderRegister: [] }, '2026-09-28')
+  check('D-165 퇴직급여(02): 취임일 · 급여를 모르면 끝나는 날도 채우지 않는다', pf6none.values.r_end === undefined && pf6none.values.r_avg1 === undefined)
+}
+
 console.log(`\ntax-plan: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

@@ -10,6 +10,7 @@
  */
 
 import { useToolClient } from '../shared/toolClientContext'
+import { sharedToolKey } from '../shared/toolStorage'
 import { useEffect, useMemo, useState, type ReactNode, useRef } from 'react'
 import { Check, Copy, RotateCcw } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
@@ -275,7 +276,7 @@ function taxClientOf(f: TaxForm): Client {
 function TaxTab() {
   // D-126: 업체마다 따로 기억한다 — 다른 업체로 열면 그 업체 답(없으면 빈 칸)
   const { clientId } = useToolClient()
-  const taxKey = clientId ? `${STORE.tax}.${clientId}` : STORE.tax
+  const taxKey = clientId ? `${STORE.tax}.${clientId}` : sharedToolKey(STORE.tax)
   const readTax = (k: string) => {
     const s = readStore<TaxForm>(k, EMPTY_TAX)
     const size: TaxForm['size'] = s.size === '중소기업' || s.size === '중견기업' || s.size === '대기업' ? s.size : ''

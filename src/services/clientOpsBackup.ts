@@ -24,7 +24,9 @@ export const TOOL_INPUT_PREFIX = 'axmvp.tools.'
  * 같은 `toolInputs` 칸에 함께 담는다 — 옛 파일과 모양이 같다.
  */
 export const MODULE_DATA_PREFIX = 'axmvp.module.'
-const BACKUP_PREFIXES = [TOOL_INPUT_PREFIX, MODULE_DATA_PREFIX]
+/** D-165: 세금 계산기 9종 입력값(`axmvp.tax.<계산기>`) · 절세 설계 작성 중(`axmvp.taxplan.<업체>`)도 함께 — 전에는 백업에서 빠졌다 */
+export const TAX_INPUT_PREFIXES = ['axmvp.tax.', 'axmvp.taxplan.']
+const BACKUP_PREFIXES = [TOOL_INPUT_PREFIX, MODULE_DATA_PREFIX, ...TAX_INPUT_PREFIXES]
 const isBackupKey = (key: string) => BACKUP_PREFIXES.some((p) => key.startsWith(p))
 
 export interface BackupFile {

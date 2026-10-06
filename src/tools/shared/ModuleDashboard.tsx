@@ -16,6 +16,7 @@ import { Link } from 'react-router-dom'
 import { AlertTriangle, ArrowRight, Building2, CalendarClock, FileWarning } from 'lucide-react'
 import { Badge, MetricTile, Section, Surface, type Tone } from '../../components/ui/primitives'
 import { toolOf } from '../../config/toolRegistry'
+import { FEATURE_CATALOG } from '../../config/productCatalog'
 import { toolReadiness } from '../../services/toolReadiness'
 import { todayLocalDate } from '../../lib/appClock'
 import { daysLeftFrom } from '../../services/clientOpsAlerts'
@@ -131,7 +132,8 @@ export function ModuleDashboard({ toolKey, children }: ModuleDashboardProps) {
 
   const upcoming = sum.dues.filter((d) => d.daysLeft !== null && d.daysLeft <= 30)
   const overdue = sum.dues.filter((d) => d.daysLeft !== null && d.daysLeft < 0)
-  const basePath = tool?.path ?? '/tools'
+  // D-165: '이 업체로 바로 열기' 는 업체 상세의 모듈 입구와 같은 화면으로(정책자금은 대시보드가 아니라 진단)
+  const basePath = FEATURE_CATALOG.find((f) => f.key === toolKey)?.clientEntry?.path ?? tool?.path ?? '/tools'
 
   return (
     <div className="flex flex-col gap-5" data-testid="module-dashboard" data-module={toolKey}>

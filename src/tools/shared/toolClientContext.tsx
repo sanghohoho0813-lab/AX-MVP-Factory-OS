@@ -16,6 +16,7 @@ import { useAuth } from '../../auth/AuthProvider'
 import { getDataModeConfig } from '../../data/dataMode'
 import { listClients } from '../../services/clientOpsService'
 import type { ClientOpsRecord } from '../../types/clientOps'
+import { setToolWorkspace } from './toolStorage'
 
 export interface ToolClientValue {
   /** 주소에 실린 업체 id (없으면 null) */
@@ -64,7 +65,13 @@ export function ToolClientFrame({ children }: { children: ReactNode }) {
 
 function CloudFrame({ children }: { children: ReactNode }) {
   const { currentWorkspaceId } = useAuth()
-  return <FrameInner workspaceId={currentWorkspaceId}>{children}</FrameInner>
+  // D-165: 업체 없이 쓰는 도구 칸은 작업공간마다 따로 — 작업공간이 바뀌면 도구 화면을 새로 그린다(앞 작업공간 입력이 남지 않게)
+  setToolWorkspace(currentWorkspaceId)
+  return (
+    <FrameInner key={currentWorkspaceId ?? 'none'} workspaceId={currentWorkspaceId}>
+      {children}
+    </FrameInner>
+  )
 }
 
 function FrameInner({ workspaceId, children }: { workspaceId: string | null; children: ReactNode }) {

@@ -12,6 +12,7 @@
 import type { Customer, CustomerStage, DiagnosisInput, DiagnosisResult } from '../types'
 import { CUSTOMER_STAGES } from '../types'
 import { deleteRow, listRows, saveRow } from '../../../services/moduleData'
+import { generateId } from '../../../storage/localStore'
 import type { ClientOpsRecord } from '../../../types/clientOps'
 
 const MODULE = 'policy-funding'
@@ -62,11 +63,10 @@ function emit(): void {
 function persist(c: Customer): void {
   // D-91 화면·대시보드가 읽던 이름(topAgency)도 같이 적어 둔다
   const data = { ...c, topAgency: c.recommendedAgency } as unknown as Record<string, unknown>
-  void saveRow(workspace, MODULE, BUCKET, { id: rowIdOf.get(c.id), clientId: c.id, data })
-    .then((row) => {
-      rowIdOf.set(c.id, row.id)
-    })
-    .catch(() => undefined)
+  // D-165: 줄 id 를 저장 전에 정한다 — 첫 저장이 돌아오기 전에 또 저장하면 같은 업체 줄이 둘 생겼다
+  const id = rowIdOf.get(c.id) ?? generateId()
+  rowIdOf.set(c.id, id)
+  void saveRow(workspace, MODULE, BUCKET, { id, clientId: c.id, data }).catch(() => undefined)
 }
 
 // 캐시된 스냅샷 — 값이 바뀔 때만 새 배열이다 (useSyncExternalStore 무한 렌더 방지)
@@ -174,6 +174,8 @@ export async function hydratePolicyStore(workspaceId: string | null, clients: Cl
     const os = byId.get(r.clientId)
     // 고객 운영에서 지운 업체의 상담 기록은 보이지 않는다 (기록 자체는 남는다)
     if (!os) continue
+    // 새것부터 온다 — 같은 업체 줄이 둘이면(예전 겹친 줄) 새것 하나만
+    if (rowIdOf.has(r.clientId)) continue
     rowIdOf.set(r.clientId, r.id)
     list.push(customerFromRow(r.clientId, r.data, os))
   }

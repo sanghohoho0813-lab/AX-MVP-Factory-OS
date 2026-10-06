@@ -12,6 +12,7 @@
  */
 
 import { listRows, saveRow } from '../../../services/moduleData'
+import { generateId } from '../../../storage/localStore'
 import type { ClientOpsRecord } from '../../../types/clientOps'
 
 const MODULE = 'labcare'
@@ -53,8 +54,10 @@ export function storeKeys(): string[] {
 
 async function persist(key: string): Promise<void> {
   try {
-    const row = await saveRow(workspace, MODULE, BUCKET, { id: rowIdOf.get(key), clientId: '', data: { key, value: mem.get(key) ?? null } })
-    rowIdOf.set(key, row.id)
+    // D-165: 줄 id 를 저장 전에 정한다 — 첫 저장이 돌아오기 전에 또 저장하면 줄이 둘 생겼다
+    const id = rowIdOf.get(key) ?? generateId()
+    rowIdOf.set(key, id)
+    await saveRow(workspace, MODULE, BUCKET, { id, clientId: '', data: { key, value: mem.get(key) ?? null } })
   } catch {
     /* 저장 실패는 다음 쓰기 때 다시 시도된다 */
   }
@@ -104,7 +107,8 @@ export async function hydrateLabStore(input: HydrateInput): Promise<void> {
   const rows = await listRows(workspace, MODULE, BUCKET)
   for (const r of rows) {
     const key = typeof r.data.key === 'string' ? r.data.key : ''
-    if (!key) continue
+    // 새것부터 온다 — 같은 칸이 둘이면(예전 겹친 줄) 새것을 쓴다
+    if (!key || rowIdOf.has(key)) continue
     rowIdOf.set(key, r.id)
     if (r.data.value !== null && r.data.value !== undefined) mem.set(key, r.data.value)
   }

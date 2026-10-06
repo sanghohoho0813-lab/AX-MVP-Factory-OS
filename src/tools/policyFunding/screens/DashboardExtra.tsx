@@ -15,9 +15,9 @@ import type { ClientOpsRecord } from '../../../types/clientOps'
 import { daysSinceContact, isOpenStage, summarizeConsults, type ConsultData } from '../lib/consultRecord'
 
 export function PolicyDashboardExtra() {
-  const { loadClients } = useToolClient()
+  const { loadClients, clientId } = useToolClient()
   const consults = useModuleBucket<ConsultData>('policy-funding', 'consults')
-  const [clients, setClients] = useState<ClientOpsRecord[]>([])
+  const [clients, setClients] = useState<ClientOpsRecord[] | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -30,25 +30,32 @@ export function PolicyDashboardExtra() {
   }, [loadClients])
 
   const today = useMemo(() => new Date(), [])
+  // D-165: 지운 · 보관한 업체의 상담 줄은 세지 않는다(업체 목록을 읽기 전에는 다 센다)
+  const liveRows = useMemo(() => {
+    const rows = consults.rows ?? []
+    if (!clients) return rows
+    const live = new Set(clients.map((c) => c.id))
+    return rows.filter((r) => live.has(r.clientId))
+  }, [consults.rows, clients])
   const sum = useMemo(
-    () => summarizeConsults((consults.rows ?? []).map((r) => ({ stage: r.data.stage, lastContactedAt: r.data.lastContactedAt })), today),
-    [consults.rows, today],
+    () => summarizeConsults(liveRows.map((r) => ({ stage: r.data.stage, lastContactedAt: r.data.lastContactedAt })), today),
+    [liveRows, today],
   )
 
   const stale = useMemo(
     () =>
-      (consults.rows ?? [])
+      liveRows
         .filter((r) => isOpenStage(r.data.stage))
         .map((r) => ({
           clientId: r.clientId,
-          name: clients.find((c) => c.id === r.clientId)?.companyName ?? '업체',
+          name: clients?.find((c) => c.id === r.clientId)?.companyName ?? '업체',
           stage: r.data.stage,
           nextAction: r.data.nextAction,
           days: daysSinceContact(r.data.lastContactedAt, today),
         }))
         .filter((r) => r.days === null || r.days >= 14)
         .sort((a, b) => (b.days ?? 9999) - (a.days ?? 9999)),
-    [consults.rows, clients, today],
+    [liveRows, clients, today],
   )
 
   if (consults.rows === null) return null
@@ -58,7 +65,7 @@ export function PolicyDashboardExtra() {
       <Surface>
         <p className="t-sub break-keep text-slate-600">
           아직 상담으로 저장한 업체가 없습니다.{' '}
-          <Link to="/tools/policy-funding/diagnosis" className="font-bold text-brand-700 hover:underline">
+          <Link to={clientId ? `/tools/policy-funding/diagnosis?client=${clientId}` : '/tools/policy-funding/diagnosis'} className="font-bold text-brand-700 hover:underline">
             진단하기
           </Link>{' '}
           에서 업체를 물고 진단한 뒤 <b>이 업체 상담으로 저장</b> 을 누르면 여기에 단계별로 모입니다.
@@ -82,7 +89,7 @@ export function PolicyDashboardExtra() {
             {stale.slice(0, 6).map((s) => (
               <li key={s.clientId}>
                 <Surface as="div" edge="warning" showEdge padded={false}>
-                  <Link to={`/tools/policy-funding/customers`} className="tap flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5">
+                  <Link to={`/tools/policy-funding/customers?cid=${s.clientId}&client=${s.clientId}`} className="tap flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5">
                     <Clock aria-hidden="true" className="size-4 shrink-0 text-amber-500" />
                     <span className="t-sub font-bold text-slate-900">{s.name}</span>
                     <Badge tone="neutral">{s.stage}</Badge>
