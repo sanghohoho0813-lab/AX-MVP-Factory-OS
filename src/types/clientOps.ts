@@ -298,14 +298,29 @@ export type ContractStage = 'pre' | 'signed' | 'closed'
 
 export const CONTRACT_STAGE_ORDER: ContractStage[] = ['pre', 'signed', 'closed']
 
+/**
+ * D-157: 대표 요청 — 화면의 계약 상태는 '계약 전 · 계약 완료' 둘뿐. 계약 고객은 '계약 완료', 잠재고객은 '계약 전'.
+ * (D-140 의 '계약 중' 을 '계약 완료' 로 부른다.) 예전에 '끝남'(completed)으로 둔 업체도 '계약 완료' 로 보이고,
+ * 고르는 칸에는 둘만 있다 — 저장 값은 그대로(waiting · active · completed), 지우거나 바꾸지 않는다.
+ */
 export const CONTRACT_STAGE_LABEL: Record<ContractStage, string> = {
   pre: '계약 전',
-  // D-140: 대표 요청 — 회사명 옆 배지는 '계약 전 · 계약 중 · 계약 완료'. 저장 값은 그대로(active · completed)
-  signed: '계약 중',
+  signed: '계약 완료',
   closed: '계약 완료',
 }
 
+/** D-157: 화면에서 고를 수 있는 계약 상태 — 둘 */
+export const CONTRACT_STAGE_CHOICES: ContractStage[] = ['pre', 'signed']
+
 /** 저장 값 → 화면 단계 */
+/**
+ * D-157: '도전해 볼 만함' 으로 고른 공고(아직 신청 준비 전) — 공고에서 만들었고 낼 서류 목록이 없는 '지켜보는 중' 건.
+ * 대표 혼자 고른 것이라 고객 보고서 · 놓친 마감 경고 · 마감 놓친 신청 숫자에는 넣지 않는다. 마감 전까지 일정 · 오늘에만 뜬다.
+ */
+export function isGrantBookmark(a: Pick<FundingApplication, 'status' | 'noticeId' | 'docs'>): boolean {
+  return a.status === 'watching' && !!a.noticeId && !a.docs
+}
+
 export function contractStageOf(status: ClientOpsStatus): ContractStage {
   if (status === 'waiting') return 'pre'
   if (status === 'completed') return 'closed'

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type LiHTMLAttributes } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CalendarDays, ChevronLeft, ChevronRight, Plus, TriangleAlert } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
@@ -88,17 +88,21 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
   const monthPrefix = `${ym[0]}-${String(ym[1]).padStart(2, '0')}`
   const pickedEvents = picked ? (byDate.get(picked) ?? []) : []
   const pickedTodos = useMemo(() => (picked ? todosOn(journal, picked) : []), [journal, picked])
-  /** 날짜별 내가 적은 할 일 — 안 끝낸 것 먼저(todosOn 순서). 휴대폰은 점, PC 는 칸 안에 글로 (D-156) */
+  /** 날짜별 내가 적은 할 일 — 안 끝낸 것 먼저(todosOn 과 같은 순서). 휴대폰은 점, PC 는 칸 안에 글로 (D-156) */
   const todosByDate = useMemo(() => {
     const map = new Map<string, JournalEntry[]>()
     for (const e of journal) {
-      if (e.entryType !== 'follow_up' || e.dueDate === '' || map.has(e.dueDate)) continue
-      map.set(e.dueDate, todosOn(journal, e.dueDate))
+      if (e.entryType !== 'follow_up' || e.dueDate === '') continue
+      const list = map.get(e.dueDate)
+      if (list) list.push(e)
+      else map.set(e.dueDate, [e])
     }
+    for (const [d, list] of map) map.set(d, todosOn(list, d))
     return map
   }, [journal])
+  const nameById = useMemo(() => new Map(records.map((r) => [r.id, r.companyName])), [records])
   const shortName = (n: string) => n.replace(/\(주\)|㈜|주식회사/g, '').trim()
-  const clientNameOfId = (id: string | null | undefined) => (id ? (records.find((r) => r.id === id)?.companyName ?? '') : '')
+  const clientNameOfId = (id: string | null | undefined) => (id ? (nameById.get(id) ?? '') : '')
 
   const offMap = useMemo(() => daysOffByDate(daysOff), [daysOff])
   const offSet = useMemo(() => new Set(daysOff.map((d) => d.date)), [daysOff])
@@ -197,6 +201,29 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
       return
     }
     void mutate(() => updateJournalEntry(entry, { completed: action === 'done' }))
+  }
+
+  /**
+   * D-157: PC 에서 할 일을 끌어 다른 날짜 칸에 놓으면 그 날로 옮긴다(오른쪽 목록 · 칸 안의 할 일 줄).
+   * 끝낸 할 일 · 같은 날은 그대로. 옮긴 날을 골라 목록이 따라가게 한다.
+   */
+  const TODO_DRAG = 'application/x-ax-todo'
+  const [dropDay, setDropDay] = useState<string | null>(null)
+  const dragTodo = (entry: JournalEntry) => ({
+    draggable: !entry.completed,
+    onDragStart: (e: DragEvent) => {
+      e.dataTransfer.setData(TODO_DRAG, entry.id)
+      e.dataTransfer.effectAllowed = 'move'
+    },
+    onDragEnd: () => setDropDay(null),
+  })
+  const moveTodo = (id: string, day: string) => {
+    setDropDay(null)
+    const entry = journal.find((x) => x.id === id)
+    if (!entry || entry.dueDate === day || entry.completed) return
+    void mutate(() => updateJournalEntry(entry, { dueDate: day }), `'${entry.content.slice(0, 20)}' — ${Number(day.slice(5, 7))}월 ${Number(day.slice(8))}일로 옮겼습니다.`).then((ok) => {
+      if (ok) setPicked(day)
+    })
   }
 
   const monthEvents = events.filter((e) => e.date.startsWith(monthPrefix))
@@ -305,7 +332,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
       ) : (
         <>
           {/* D-156: PC 에서는 달력을 왼쪽에 줄여 두고 고른 날의 할 일을 오른쪽에 — 한눈에. 휴대폰은 위아래 그대로 */}
-          <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(19rem,22rem)] lg:items-start">
+          <div className="flex flex-col gap-5 xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(19rem,22rem)] xl:items-start">
           <div className="flex min-w-0 flex-col gap-5">
           {/* 달력 */}
           <div className="overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="month-calendar">
@@ -331,10 +358,11 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                 const off = offMap.get(d)
                 const todos = todosByDate.get(d) ?? []
                 // PC 칸: 할 일 → 업체 일정 순으로 3줄까지, 나머지는 +n건
+                // D-157: 끝낸 것은 맨 뒤로 — 끝낸 할 일 셋이 열린 업체 일정을 '+n건' 으로 밀어내지 않게
                 const lines = [
-                  ...todos.map((t) => ({ key: t.id, kind: 'todo' as const, title: t.content, who: shortName(clientNameOfId(t.clientId)), done: t.completed })),
-                  ...list.map((e) => ({ key: e.id, kind: e.kind, title: e.title, who: shortName(e.clientName), done: e.done })),
-                ]
+                  ...todos.map((t) => ({ key: t.id, kind: 'todo' as const, title: t.content, who: shortName(clientNameOfId(t.clientId)), done: t.completed, entry: t })),
+                  ...list.map((e) => ({ key: e.id, kind: e.kind, title: e.title, who: shortName(e.clientName), done: e.done, entry: null as JournalEntry | null })),
+                ].sort((a, b) => Number(a.done) - Number(b.done))
                 return (
                   <button
                     key={d}
@@ -344,9 +372,23 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                     title={off ? `${off.map((o) => o.name).join(' · ')} — 한 번 더 누르면 바로 적기` : '한 번 더 누르면 바로 적기'}
                     // D-139: 고른 날을 한 번 더 누르면(두 번 누르기) 바로 적는 창
                     onClick={() => (isPicked ? setQuick({ date: d, tab: 'todo' }) : setPicked(d))}
+                    onDragOver={(e) => {
+                      if (!e.dataTransfer.types.includes(TODO_DRAG)) return
+                      e.preventDefault()
+                      e.dataTransfer.dropEffect = 'move'
+                      if (dropDay !== d) setDropDay(d)
+                    }}
+                    onDragLeave={() => setDropDay((v) => (v === d ? null : v))}
+                    onDrop={(e) => {
+                      const id = e.dataTransfer.getData(TODO_DRAG)
+                      if (!id) return
+                      e.preventDefault()
+                      moveTodo(id, d)
+                    }}
+                    data-drop={dropDay === d ? 'true' : undefined}
                     className={`flex min-h-[5.5rem] min-w-0 flex-col gap-1 border-r border-b lg:min-h-[6.75rem] lg:p-1 border-slate-100 p-1.5 text-left last:border-r-0 ${
                       inMonth ? 'bg-white' : 'bg-slate-50/60'
-                    } ${off && !inMonth ? 'opacity-60' : ''} ${isPicked ? 'ring-2 ring-brand-400 ring-inset' : ''} hover:bg-brand-50/40`}
+                    } ${off && !inMonth ? 'opacity-60' : ''} ${isPicked ? 'ring-2 ring-brand-400 ring-inset' : ''} ${dropDay === d ? 'bg-brand-100 ring-2 ring-brand-600 ring-inset' : ''} hover:bg-brand-50/40`}
                   >
                     <span
                       className={`inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[0.875rem] font-semibold ${
@@ -391,6 +433,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                           key={l.key}
                           title={l.who ? `${l.who} · ${l.title}` : l.title}
                           data-kind={l.kind}
+                          {...(l.entry ? dragTodo(l.entry) : {})}
                           className={`flex min-w-0 flex-col rounded border px-1 py-0.5 leading-tight ${
                             l.done
                               ? 'border-slate-100 bg-white text-slate-400 line-through'
@@ -432,7 +475,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
             마감(고칠 수 없는 것). 순서가 곧 "내가 뭘 할 수 있나" 다.
           */}
           </div>
-          <section aria-label="선택한 날짜" className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-4 lg:max-h-[calc(100dvh-2rem)] lg:overflow-y-auto lg:rounded-(--radius-panel) lg:border lg:border-slate-200 lg:bg-slate-50/60 lg:p-4" data-testid="picked-panel">
+          <section aria-label="선택한 날짜" className="flex min-w-0 flex-col gap-4 xl:sticky xl:top-20 xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto xl:rounded-(--radius-panel) xl:border xl:border-slate-200 xl:bg-slate-50/60 xl:p-4" data-testid="picked-panel">
             <div className="flex flex-col gap-2">
               <h2 className="text-[1.15rem] font-bold text-slate-900">
                 {picked ? `${Number(picked.slice(5, 7))}월 ${Number(picked.slice(8))}일 할 일` : '날짜를 선택하세요'}
@@ -485,6 +528,9 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                       )
                     }
                   />
+                  {pickedTodos.some((t) => !t.completed) && (
+                    <p className="t-sub hidden break-keep text-slate-500 lg:block" data-testid="drag-hint">할 일을 끌어 왼쪽 달력의 다른 날짜에 놓으면 그 날로 옮겨져요.</p>
+                  )}
                   {pickedTodos.length > 0 && (
                     <ul className="flex flex-col gap-2">
                       {pickedTodos.map((e) => (
@@ -492,6 +538,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                           key={e.id}
                           entry={e}
                           today={today}
+                          dragProps={{ ...dragTodo(e), 'data-todo-id': e.id } as LiHTMLAttributes<HTMLLIElement>}
                           clientName={
                             e.clientId ? records.find((r) => r.id === e.clientId)?.companyName : undefined
                           }

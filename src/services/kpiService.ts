@@ -12,7 +12,7 @@
  */
 
 import { fundingFactsOf, isWaiting } from './feeStatus'
-import { contractStageOf } from '../types/clientOps'
+import { contractStageOf, isGrantBookmark } from '../types/clientOps'
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { CustomerEvent, JournalEntry } from '../types/bridge'
 import { SERVICES, isServiceStarted } from '../content/clientOpsCatalog'
@@ -189,7 +189,8 @@ function revenueMetrics(input: KpiInput): KpiMetric[] {
   }
 
   // 자금 신청 마감 누락 — 마감이 지났는데 접수하지 않은 건
-  const apps = live.flatMap((r) => r.fundingApplications)
+  // D-157: 도전 체크만 한 공고는 '신청' 이 아니다
+  const apps = live.flatMap((r) => r.fundingApplications).filter((a) => !isGrantBookmark(a))
   const missed = apps.filter((a) => {
     if (!a.applyDueDate) return false
     if (a.status !== 'watching' && a.status !== 'preparing') return false

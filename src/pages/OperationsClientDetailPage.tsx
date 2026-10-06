@@ -247,6 +247,11 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   // D-154: 성과 보고서 한 장
   // D-155: 오늘 '안부 챙길 계약 고객' 의 [성과 보고서] 는 ?report=1 로 들어와 바로 연다
   const [reportOpen, setReportOpen] = useState(() => searchParams.get('report') === '1')
+  // 같은 화면이 떠 있는 채 다른 업체의 ?report=1 로 와도 연다
+  const reportParam = searchParams.get('report') === '1'
+  useEffect(() => {
+    if (reportParam) setReportOpen(true)
+  }, [reportParam, clientId])
   /** D-140: 계약 · 수금 한 번에 (개요의 계약 카드에서) */
   const [planOpen, setPlanOpen] = useState(false)
   /**
@@ -266,9 +271,16 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const [renameDraft, setRenameDraft] = useState('')
   /* 서류 한꺼번에 올리기 시트 (D-84) · D-144 머리줄 '서류 올리기'(읽자마자 저절로) */
   const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkShow, setBulkShow] = useState(0)
   /* D-146: 올려 둔 파일 다시 읽어 칸 옮기기 */
   const [resortOpen, setResortOpen] = useState(false)
   const [autoUploadOpen, setAutoUploadOpen] = useState(false)
+  // D-157: 창을 숨기고 뒤에서 올리는 중에 [서류 올리기] 를 또 누르면 그 창을 다시 보인다
+  const [uploadShow, setUploadShow] = useState(0)
+  const openUpload = () => {
+    setAutoUploadOpen(true)
+    setUploadShow((n) => n + 1)
+  }
   /** D-144: 방금 올린 서류에서 읽은 것 — 맞춤 추천 맨 위에 보여 준다 */
   const [lastBatch, setLastBatch] = useState<DocBatchSummary | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -589,7 +601,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             </Link>
           )}
           {/* D-144: 서류 올리기 — 파일 · 폴더째. 읽자마자 확실한 것은 바로 넣고, 모듈 판정은 맞춤 추천에 */}
-          <Button variant={prospect ? 'secondary' : 'primary'} onClick={() => setAutoUploadOpen(true)} data-testid="client-upload">
+          <Button variant={prospect ? 'secondary' : 'primary'} onClick={openUpload} data-testid="client-upload">
             <FileUp aria-hidden="true" className="size-4" />
             서류 올리기
           </Button>
@@ -681,7 +693,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             workspaceId={workspaceId}
             alerts={alerts}
             lastBatch={lastBatch}
-            onUpload={() => setAutoUploadOpen(true)}
+            onUpload={openUpload}
             onCommit={async (next, msg) => {
               if (await commit(next)) showToast(msg)
             }}
@@ -1130,7 +1142,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           </h2>
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-[0.9rem] text-slate-500">발급일을 넣으면 유효기간이 지났는지 자동으로 알려드립니다.</p>
-            <Button variant="secondary" size="sm" onClick={() => setBulkOpen(true)}>
+            <Button variant="secondary" size="sm" onClick={() => { setBulkOpen(true); setBulkShow((n) => n + 1) }}>
               <FileUp aria-hidden="true" className="size-3.5" />
               한꺼번에 올리기
             </Button>
@@ -1159,6 +1171,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
         {bulkOpen && (
           <BulkDocUploadSheet
+            showSignal={bulkShow}
             record={record}
             latest={() => latestRef.current ?? record}
             onClose={() => setBulkOpen(false)}
@@ -1633,6 +1646,19 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 <FileText aria-hidden="true" className="size-4" />
                 성과 보고서 한 장(인쇄 · PDF)
               </Button>
+              {/* D-157: 업체 홈 더보기에서도 서류 한꺼번에 올리기(대표 요청) */}
+              <Button
+                variant="secondary"
+                className="w-full justify-start"
+                data-testid="more-upload"
+                onClick={() => {
+                  setMoreOpen(false)
+                  openUpload()
+                }}
+              >
+                <FileUp aria-hidden="true" className="size-4" />
+                서류 한꺼번에 올리기(파일 · 폴더)
+              </Button>
               {/* D-129: 기본 탭 줄에서 뺀 두 영역 — 기능과 기록은 그대로, 여기서 연다 */}
               <Button
                 variant="secondary"
@@ -1940,6 +1966,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       {autoUploadOpen && (
         <BulkDocUploadSheet
           auto
+          showSignal={uploadShow}
           record={record}
           latest={() => latestRef.current ?? record}
           onClose={() => setAutoUploadOpen(false)}

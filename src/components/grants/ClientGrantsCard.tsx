@@ -51,8 +51,10 @@ export function ClientGrantsCard({
           setBusy(true)
           try {
             const on = applicationFor(record, notice)
-            if (on) await onCommit(withoutGrantChallenge(record, notice), `도전 체크를 풀었습니다 — ${notice.title.slice(0, 30)}`)
-            else await onCommit(withGrantChallenge(record, notice).record, `도전 체크 — ${notice.title.slice(0, 30)} · 마감을 일정 · 오늘에 띄웁니다`)
+            const next = on ? withoutGrantChallenge(record, notice) : withGrantChallenge(record, notice).record
+            // 신청 준비 · 손으로 적은 건이면 바뀌지 않는다 — '풀었습니다' 라고 거짓으로 말하지 않는다
+            if (next === record) showToast('이미 신청 건이 있어요 — 자금 · 지원사업 탭에서 고쳐 주세요')
+            else await onCommit(next, on ? `도전 체크를 풀었습니다 — ${notice.title.slice(0, 30)}` : `도전 체크 — ${notice.title.slice(0, 30)} · 마감을 일정 · 오늘에 띄웁니다`)
           } finally {
             setBusy(false)
           }

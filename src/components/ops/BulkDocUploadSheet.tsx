@@ -61,7 +61,10 @@ export function BulkDocUploadSheet({
   onSaved,
   auto = false,
   latest,
+  showSignal,
 }: {
+  /** D-157: 숨긴 창을 다시 보이게 — 바뀔 때마다(같은 업체에서 [서류 올리기] 를 또 누름) */
+  showSignal?: number
   record: ClientOpsRecord
   onClose: () => void
   /** 올린 뒤의 최신 기록 · 이번에 읽어 반영한 것 */
@@ -85,6 +88,14 @@ export function BulkDocUploadSheet({
    */
   const [phase, setPhase] = useState<'idle' | 'reading' | 'uploading'>('idle')
   const stoppedRef = useRef(false)
+  /*
+   * D-157: 창을 닫아도(X · Esc · 뒤로가기) 읽기 · 올리기는 뒤에서 계속한다 — 40% 올리다 바깥을 눌렀더니 없었던 일이 됐다(대표).
+   * 창만 숨기고 화면 위에 '서류 올리는 중 n/m' 을 띄워 다시 열 수 있게 한다. 멈추는 것은 [읽기 멈추기] 를 눌렀을 때만.
+   */
+  const [hidden, setHidden] = useState(false)
+  useEffect(() => {
+    if (showSignal) setHidden(false)
+  }, [showSignal])
   /* D-147: 저장은 '그때의 최신 기록' 위에 — 오래 읽는 동안 다른 데서 고친 것을 덮지 않게 */
   const recordRef = useRef(record)
   useEffect(() => {
@@ -272,24 +283,52 @@ export function BulkDocUploadSheet({
     }
   }
 
-  /** D-147: 닫기 — 읽는 중이면 멈추고(남은 것 안 올림), 올리는 중이면 기다리게 한다 */
+  /** 아직 올리지 않은 읽은 서류(고르던 것) */
+  const pending = items.filter((it) => it.status === 'ready' || it.status === 'error').length
+  /**
+   * D-157: X · Esc · 뒤로가기 — 하던 일이 있으면 지우지 않고 창만 숨긴다(뒤에서 계속). 하던 일이 없으면 닫는다.
+   */
   const closeSheet = () => {
-    if (phase === 'uploading') {
-      showToast('서류함에 올리는 중입니다 — 끝나면 저절로 닫힙니다.')
+    if (phase !== 'idle' || pending > 0) {
+      setHidden(true)
+      showToast(phase !== 'idle' ? '창만 닫았습니다 — 서류는 뒤에서 계속 올립니다. 화면 위 \'서류 올리는 중\' 을 누르면 다시 볼 수 있어요.' : '고르던 서류는 그대로 둡니다 — 화면 위 \'올릴 서류\' 를 누르면 이어서 할 수 있어요.')
       return
-    }
-    if (phase === 'reading') {
-      stoppedRef.current = true
-      showToast('읽기를 멈췄습니다 — 이번 파일은 하나도 올리지 않았습니다.')
     }
     onClose()
   }
+  /** [읽기 멈추기] — 일부러 멈출 때만. 이번 파일은 하나도 올리지 않는다 */
+  const stopReading = () => {
+    stoppedRef.current = true
+    showToast('읽기를 멈췄습니다 — 이번 파일은 하나도 올리지 않았습니다.')
+    onClose()
+  }
+  const doneCount = items.filter((it) => it.status === 'done').length
+  const readCount = items.filter((it) => it.status !== 'queued' && it.status !== 'reading').length
 
   const existingFile = (key: string) => record.documents[key]?.fileName ?? ''
 
   return (
+    <>
+    {hidden && (
+      <button
+        type="button"
+        onClick={() => setHidden(false)}
+        data-testid="bulk-minimized"
+        data-phase={phase}
+        className="tap t-sub fixed top-20 left-1/2 z-40 inline-flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-2 rounded-full border border-brand-300 bg-white px-4 py-2.5 font-semibold text-brand-800 shadow-(--shadow-overlay)"
+      >
+        <span aria-hidden="true" className={`size-2.5 shrink-0 rounded-full ${phase === 'idle' ? 'bg-warning-500' : 'animate-pulse bg-brand-600'}`} />
+        <span className="truncate">
+          {phase === 'reading'
+            ? `서류 읽는 중 ${readCount}/${items.length}`
+            : phase === 'uploading'
+              ? `서류함에 올리는 중 ${doneCount}/${items.length}`
+              : `올릴 서류 ${pending}개 — 이어서 하기`}
+        </span>
+      </button>
+    )}
     <Modal
-      open
+      open={!hidden}
       size="lg"
       title={`${record.companyName} — 서류 한꺼번에 올리기`}
       onClose={closeSheet}
@@ -298,8 +337,18 @@ export function BulkDocUploadSheet({
           <span className="t-sub mr-auto text-slate-500">
             {readyItems.length > 0 && `${readyItems.length}개 중 확실 ${sureItems.length} · 고른 것 ${assignedItems.length}`}
           </span>
-          <Button variant="ghost" onClick={closeSheet} disabled={phase === 'uploading'} data-testid="bulk-close">
-            {phase === 'reading' ? '멈추고 닫기' : '닫기'}
+          {phase === 'reading' && (
+            <Button variant="ghost" onClick={stopReading} data-testid="bulk-stop">
+              읽기 멈추기
+            </Button>
+          )}
+          {phase === 'idle' && pending > 0 && (
+            <Button variant="ghost" onClick={onClose} data-testid="bulk-discard">
+              안 올리고 닫기
+            </Button>
+          )}
+          <Button variant="ghost" onClick={closeSheet} data-testid="bulk-close">
+            {phase !== 'idle' ? '창 닫기(뒤에서 계속)' : pending > 0 ? '나중에 하기' : '닫기'}
           </Button>
           <Button variant="secondary" disabled={busy || sureItems.length === 0} onClick={() => void upload(sureItems)}>
             확실한 것만 올리기{sureItems.length > 0 ? ` (${sureItems.length})` : ''}
@@ -376,7 +425,7 @@ export function BulkDocUploadSheet({
               const targetLabel = it.target === NEW_CELL ? `새 칸: ${it.newLabel || '(이름)'}` : (metas.find((m) => m.key === it.target)?.label ?? '')
               const replacing = it.target !== '' && it.target !== NEW_CELL ? existingFile(it.target) : ''
               return (
-                <li key={it.id} className="flex flex-col gap-2 px-4 py-3">
+                <li key={it.id} className="flex flex-col gap-2 px-4 py-3" data-testid="bulk-item" data-status={it.status}>
                   <div className="flex flex-wrap items-center gap-2">
                     {it.status === 'done' ? (
                       <Check aria-hidden="true" className="size-4 shrink-0 text-success-600" />
@@ -483,5 +532,6 @@ export function BulkDocUploadSheet({
         )}
       </div>
     </Modal>
+    </>
   )
 }

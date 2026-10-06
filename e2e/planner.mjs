@@ -111,6 +111,24 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('PC: 고른 날 목록이 달력 오른쪽(한 화면에)', !!calBox && !!panelBox && panelBox.x >= calBox.x + calBox.width - 1 && panelBox.y < calBox.y + calBox.height, { calBox, panelBox })
   check('PC: 달력 높이가 화면 안(900)', !!calBox && calBox.y + calBox.height < 1400, calBox)
 
+  // D-157: 오른쪽 목록의 할 일을 끌어 다른 날짜 칸에 놓으면 그 날로 옮겨진다(이미 고른 날을 또 누르면 적기 창이라 다른 날을 거쳐 고른다)
+  await cell(page, '2026-10-13').click()
+  await page.waitForTimeout(150)
+  await cell(page, '2026-10-12').click()
+  await page.waitForTimeout(300)
+  check('끌어 옮기기: PC 목록에 안내 한 줄', await page.getByTestId('drag-hint').isVisible())
+  const dragSrc = page.getByTestId('picked-panel').locator('li[draggable="true"]').filter({ hasText: '급여 증빙 요청' }).first()
+  await dragSrc.dragTo(cell(page, '2026-10-14'))
+  await page.waitForTimeout(800)
+  const moved = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]').filter((x) => x.content === '급여 증빙 요청').map((x) => x.dueDate).sort())
+  check('끌어 옮기기: 10/12 할 일이 10/14 로(다른 달 반복분은 그대로)', moved.join() === '2026-10-14,2026-11-12,2026-12-11,2027-01-12', moved.join())
+  check('끌어 옮기기: 옮긴 날이 골라지고 칸에 글이 보임', (await cell(page, '2026-10-14').innerText()).includes('급여 증빙 요청') && !(await cell(page, '2026-10-12').innerText()).includes('급여 증빙 요청') && (await page.getByTestId('picked-panel').innerText()).includes('10월 14일'))
+  // 칸 안의 할 일 줄도 끌 수 있다 — 다시 10/12 로
+  await cell(page, '2026-10-14').locator('[data-kind="todo"][draggable="true"]').filter({ hasText: '급여 증빙 요청' }).first().dragTo(cell(page, '2026-10-12'))
+  await page.waitForTimeout(800)
+  const back = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]').filter((x) => x.content === '급여 증빙 요청').map((x) => x.dueDate).sort())
+  check('끌어 옮기기: 칸 안의 할 일 줄로도 옮김(10/14 → 10/12)', back[0] === '2026-10-12', back.join())
+
   // 쉬는 날 직접 표시 — 2일 연속 · 지우기
   await cell(page, '2026-10-20').click()
   await page.getByTestId('picked-quick-off').click()

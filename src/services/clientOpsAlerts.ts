@@ -22,6 +22,7 @@ import type {
   OpsAlert,
   ServiceKey,
 } from '../types/clientOps'
+import { isGrantBookmark } from '../types/clientOps'
 import type { DocumentMeta } from '../content/clientOpsCatalog'
 import {
   DOC_EXPIRING_DAYS,
@@ -398,6 +399,8 @@ export function buildClientAlerts(record: ClientOpsRecord, today: string): OpsAl
     if (left === null) continue
     const name = app.programName || '정책자금 공고'
     if (left < 0) {
+      // D-157: 도전 체크만 한 공고는 마감이 지나면 조용히 내려놓는다(접수 안 했다고 빨간 경고를 쌓지 않는다)
+      if (isGrantBookmark(app)) continue
       push(out, {
         id: `${record.id}:funding:${app.id}:overdue`,
         clientId: record.id,

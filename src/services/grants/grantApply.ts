@@ -14,6 +14,7 @@
  */
 
 import type { ApplyDoc, ClientOpsRecord, DocumentKey, FundingApplication } from '../../types/clientOps'
+import { isGrantBookmark } from '../../types/clientOps'
 import { allDocumentMetas } from '../clientOpsDocuments'
 import { daysLeftFrom, documentStatus } from '../clientOpsAlerts'
 import { withFee, withFunding, withNewFee, withNewFunding, withoutFunding } from '../clientOpsService'
@@ -269,7 +270,8 @@ export function withGrantChallenge(record: ClientOpsRecord, notice: GrantNotice)
 /** 체크 풀기 — 아직 '지켜보는 중' 이고 낼 서류를 만들지 않은 건만 지운다(신청 준비 뒤로는 신청 탭에서) */
 export function withoutGrantChallenge(record: ClientOpsRecord, notice: Pick<GrantNotice, 'id' | 'title'>): ClientOpsRecord {
   const app = applicationFor(record, notice)
-  if (!app || app.status !== 'watching' || app.docs) return record
+  // 공고에서 체크한 건만 — 손으로 적은 같은 이름 건(공고 없음)은 지우지 않는다
+  if (!app || !isGrantBookmark(app) || app.noticeId !== notice.id) return record
   return withActivity(withoutFunding(record, app.id), 'funding_status', `지원사업 도전 체크 풀기 — ${app.programName}`)
 }
 
@@ -417,6 +419,8 @@ export interface BoardRow {
 }
 
 export interface ApplyBoard {
+  /** D-157: 도전 체크만 한 공고(아직 신청 준비 전 · 마감 전) */
+  challenged: BoardRow[]
   preparing: BoardRow[]
   waiting: BoardRow[]
   /** 최근 90일 안에 결과 난 것 */
@@ -430,13 +434,16 @@ export interface ApplyBoard {
  * 보관한 업체는 뺀다.
  */
 export function applicationBoard(records: readonly ClientOpsRecord[], today: string): ApplyBoard {
-  const board: ApplyBoard = { preparing: [], waiting: [], done: [], feeMissing: 0 }
+  const board: ApplyBoard = { challenged: [], preparing: [], waiting: [], done: [], feeMissing: 0 }
   for (const r of records) {
     if (r.archivedAt) continue
     for (const app of r.fundingApplications) {
       const stage = applyStage(app)
       const base = { clientId: r.id, clientName: r.companyName, app, stage }
-      if (stage === 'preparing') {
+      if (isGrantBookmark(app)) {
+        const left = app.applyDueDate ? daysLeftFrom(today, app.applyDueDate) : null
+        if (left === null || left >= 0) board.challenged.push({ ...base, ready: null, total: null, needFromClient: 0, daysLeft: left })
+      } else if (stage === 'preparing') {
         const rd = app.docs ? applyReadiness(r, app, today) : null
         board.preparing.push({ ...base, ready: rd?.ready ?? null, total: rd?.total ?? null, needFromClient: rd?.needFromClient.length ?? 0, daysLeft: app.applyDueDate ? daysLeftFrom(today, app.applyDueDate) : null })
       } else if (stage === 'waiting') {
@@ -451,6 +458,7 @@ export function applicationBoard(records: readonly ClientOpsRecord[], today: str
     }
   }
   const byDays = (a: BoardRow, b: BoardRow) => (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999)
+  board.challenged.sort(byDays)
   board.preparing.sort(byDays)
   board.waiting.sort(byDays)
   board.done.sort((a, b) => (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999))

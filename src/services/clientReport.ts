@@ -10,6 +10,7 @@
  */
 
 import type { ClientOpsRecord, ServiceKey } from '../types/clientOps'
+import { isGrantBookmark } from '../types/clientOps'
 import { SERVICES, SERVICE_STATUS_LABEL } from '../content/clientOpsCatalog'
 import { allDocumentMetas } from './clientOpsDocuments'
 import { daysLeftFrom, documentStatus, documentsWithExpiry } from './clientOpsAlerts'
@@ -142,7 +143,8 @@ export function buildClientReport(record: ClientOpsRecord, today: string, period
     if (date && date >= today && date <= until) next.push({ date, daysLeft: daysLeftFrom(today, date), text })
   }
   for (const a of record.fundingApplications) {
-    if ((a.status === 'watching' || a.status === 'preparing') && a.applyDueDate) push(a.applyDueDate, `${a.programName || '지원사업'} 신청 마감`)
+    // D-157: 대표가 '도전해 볼 만함' 으로만 고른 공고는 고객 종이에 '신청 마감' 으로 적지 않는다
+    if ((a.status === 'watching' || a.status === 'preparing') && a.applyDueDate && !isGrantBookmark(a)) push(a.applyDueDate, `${a.programName || '지원사업'} 신청 마감`)
     if ((a.status === 'submitted' || a.status === 'reviewing') && a.resultDueDate) push(a.resultDueDate, `${a.programName || '지원사업'} 결과 발표`)
   }
   for (const s of inProgress) if (s.dueDate) push(s.dueDate, `${s.label}${s.nextStep ? ` — ${s.nextStep}` : ''}`)

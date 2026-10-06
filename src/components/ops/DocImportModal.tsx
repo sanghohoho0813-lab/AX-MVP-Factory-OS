@@ -103,7 +103,8 @@ export function DocImportModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button type="button" aria-label="닫기" onClick={onClose} className="absolute inset-0 cursor-default bg-navy-950/50" />
+      {/* D-157: 바깥을 눌러도 닫지 않는다 — 고르던 것이 사라지지 않게(닫기는 창 안의 단추로) */}
+      <div aria-hidden="true" className="absolute inset-0 cursor-default bg-navy-950/50" />
       <div
         role="dialog"
         aria-modal="true"

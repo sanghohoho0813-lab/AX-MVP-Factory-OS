@@ -405,6 +405,14 @@ export function BottomSheet({
 }) {
   // D-124: 휴대폰 뒤로가기는 시트만 닫는다
   useBackToClose(true, onClose)
+  // D-157: 어두운 바깥을 눌러도 닫지 않는다 — 살짝 흔들어 '닫기는 오른쪽 위' 를 알린다
+  // key 로 다시 그리면 안의 적던 칸이 지워진다 — 클래스만 잠깐 붙였다 뗀다
+  const [nudge, setNudge] = useState<'pop' | 'shake' | 'still'>('pop')
+  useEffect(() => {
+    if (nudge !== 'shake') return
+    const t = window.setTimeout(() => setNudge('still'), 420)
+    return () => window.clearTimeout(t)
+  }, [nudge])
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -425,10 +433,11 @@ export function BottomSheet({
       aria-modal="true"
       aria-label={title}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
+        if (e.target === e.currentTarget) setNudge('shake')
       }}
+      data-testid="sheet-backdrop"
     >
-      <div className="ax-pop flex max-h-[92vh] w-full flex-col rounded-t-2xl bg-white sm:max-w-lg sm:rounded-(--radius-panel)">
+      <div className={`${nudge === 'shake' ? 'ax-nudge' : nudge === 'pop' ? 'ax-pop' : ''} flex max-h-[92vh] w-full flex-col rounded-t-2xl bg-white sm:max-w-lg sm:rounded-(--radius-panel)`}>
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
           <h2 className="t-section min-w-0 break-keep text-slate-900">{title}</h2>
           <button

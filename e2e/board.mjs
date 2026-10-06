@@ -472,11 +472,11 @@ check('업무 15개에서도 가로 스크롤 없음', of2.d <= of2.w + 1, `${of
 await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
 await page.waitForTimeout(800)
 
-// 계약 단계 — D-140: 회사명 옆 배지에서(계약 전 · 계약 중 · 계약 완료)
+// 계약 단계 — D-140: 회사명 옆 배지에서. D-157: 계약 전 · 계약 완료 둘
 await page.getByTestId('stage-badge').click()
 await page.waitForTimeout(200)
 const opts = (await page.getByTestId('stage-menu').getByRole('menuitemradio').allInnerTexts()).map((t) => t.trim())
-check('계약 단계 3가지', JSON.stringify(opts) === JSON.stringify(['계약 전','계약 중','계약 완료']), JSON.stringify(opts))
+check('계약 단계 2가지(계약 전 · 계약 완료)', JSON.stringify(opts) === JSON.stringify(['계약 전','계약 완료']), JSON.stringify(opts))
 await page.keyboard.press('Escape')
 await page.getByRole('button', { name: '더보기' }).first().click()
 await page.waitForTimeout(400)

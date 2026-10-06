@@ -52,7 +52,8 @@ import { mergeServices, normalizeCustomService, toServiceMeta } from '../customS
 import { buildKpis, kpisByGroup, kpiStatusSummary } from '../kpiService'
 import { bsWon, netIncomeSlots, svCurrent, svDefaults, svLoad, svMerge, svSave, svSummaryLines } from '../../tools/cretop/mini/stockValueCalc.js'
 import { profileFields, profileFieldsByGroup, regionOf } from '../clientOpsProfile'
-import { CONTRACT_STAGE_ORDER, CONTRACT_STAGE_LABEL, contractStageOf, statusForStage } from '../../types/clientOps'
+import { CONTRACT_STAGE_ORDER, CONTRACT_STAGE_CHOICES,
+  CONTRACT_STAGE_LABEL, contractStageOf, statusForStage } from '../../types/clientOps'
 import type { ClientOpsStatus, ContractStage } from '../../types/clientOps'
 import { buildClientAlerts, clientOpsProgress } from '../clientOpsAlerts'
 import {
@@ -792,9 +793,10 @@ check('지역: 빈 주소는 빈 값', regionOf('') === '' && regionOf('   ') ==
 {
   check('계약: 세 단계', CONTRACT_STAGE_ORDER.join() === 'pre,signed,closed')
   check(
-    '계약: 한글 이름(D-140 계약 전 · 계약 중 · 계약 완료)',
-    CONTRACT_STAGE_LABEL.pre === '계약 전' && CONTRACT_STAGE_LABEL.signed === '계약 중' && CONTRACT_STAGE_LABEL.closed === '계약 완료',
+    '계약: 한글 이름(D-157 계약 전 · 계약 완료 — 계약 고객은 계약 완료, 예전 끝남도 계약 완료)',
+    CONTRACT_STAGE_LABEL.pre === '계약 전' && CONTRACT_STAGE_LABEL.signed === '계약 완료' && CONTRACT_STAGE_LABEL.closed === '계약 완료',
   )
+  check('계약: 고르는 칸은 둘(계약 전 · 계약 완료)', CONTRACT_STAGE_CHOICES.join() === 'pre,signed')
 
   // 예전 네 가지 저장 값이 빠짐없이 세 단계 중 하나로 간다
   const legacy: ClientOpsStatus[] = ['active', 'waiting', 'paused', 'completed']

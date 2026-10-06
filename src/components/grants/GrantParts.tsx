@@ -4,7 +4,7 @@
  */
 import { useMemo, useState, type ReactNode } from 'react'
 import { Check, CircleHelp, ExternalLink, Star, X } from 'lucide-react'
-import type { FundingApplication } from '../../types/clientOps'
+import { isGrantBookmark, type FundingApplication } from '../../types/clientOps'
 import { BottomSheet } from '../ui/primitives'
 import { Button } from '../ui/Button'
 import { AiSoonButton } from '../ui/AiSoonButton'
@@ -466,10 +466,11 @@ export interface ChallengeControl {
 }
 
 export function ChallengeButton({ app, onToggle, busy, closed }: { app: FundingApplication | null; onToggle: () => void; busy?: boolean; closed?: boolean }) {
-  if (app && app.status !== 'watching') {
+  // 체크한 공고(지켜보는 중 · 공고에서 만듦 · 서류 목록 없음)만 풀 수 있다. 신청 준비 · 손으로 적은 같은 이름 건은 글자로만 (D-157)
+  if (app && !isGrantBookmark(app)) {
     return (
       <span className="t-sub inline-flex min-h-10 items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-3 font-semibold text-brand-800" data-testid="challenge-state">
-        {app.status === 'preparing' ? '신청 준비 중' : '신청 진행 중'}
+        {app.status === 'watching' ? (app.docs ? '신청 준비 중' : '신청 건 있음') : app.status === 'preparing' ? '신청 준비 중' : '신청 진행 중'}
       </span>
     )
   }

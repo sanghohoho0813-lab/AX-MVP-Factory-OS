@@ -427,17 +427,33 @@ for (const width of [1440, 390]) {
   check(`기타 칸 옮기기: 중소기업 확인서 칸으로 · 기타 칸 없어짐 ${tag}`, r2.documents.smeCertificate?.fileName === '스캔0003.txt' && !(r2.customDocuments ?? []).some((d) => d.label.startsWith('기타 · 확인 필요')), filed(r2).join(' | '))
   check(`옮긴 뒤: '무슨 서류인지 확인' 칩 사라짐 ${tag}`, (await page.getByTestId('shelf-other').count()) === 0)
 
-  // 읽는 중에 닫기 — 남은 파일은 올리지 않는다
+  // D-157: 읽는 중에 바깥을 눌러도 · 창을 닫아도 뒤에서 계속 올린다(40% 하다 바깥 한 번에 없던 일이 됐다 — 대표)
   const PDF = (await import('node:fs')).readFileSync('e2e/fixtures/cretop-sample.pdf')
-  const many = Array.from({ length: 12 }, (_, i) => ({ name: `보고서${i + 1}.pdf`, mimeType: 'application/pdf', buffer: PDF }))
+  const few = Array.from({ length: 12 }, (_, i) => ({ name: `보고서${i + 1}.pdf`, mimeType: 'application/pdf', buffer: PDF }))
   const before = filed(await rec()).length
   await page.getByTestId('client-upload').click()
-  await page.getByLabel('서류 파일 고르기').setInputFiles(many)
-  await page.getByRole('button', { name: '멈추고 닫기' }).waitFor({ timeout: 10000 })
-  await page.getByRole('button', { name: '멈추고 닫기' }).click()
-  await page.waitForTimeout(6000)
+  await page.getByLabel('서류 파일 고르기').setInputFiles(few)
+  await page.getByTestId('bulk-stop').waitFor({ timeout: 10000 })
+  await page.getByTestId('modal-backdrop').click({ position: { x: 5, y: 5 } })
+  await page.waitForTimeout(300)
+  check(`읽는 중 바깥 누름: 창이 그대로 ${tag}`, (await page.getByRole('dialog').count()) === 1)
+  await page.getByTestId('bulk-close').click()
+  check(`창 닫기: 창은 숨고 화면 위에 '서류 … 중' 표시 ${tag}`, (await page.getByRole('dialog').count()) === 0 && (await page.getByTestId('bulk-minimized').isVisible()))
+  await page.getByTestId('bulk-minimized').click({ timeout: 3000 })
+  check(`표시를 누르면 창이 다시(하던 것 그대로 12개) ${tag}`, (await page.getByRole('dialog').count()) === 1 && (await page.getByTestId('bulk-item').count()) === 12)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  for (let i = 0; i < 60 && (await page.getByTestId('bulk-minimized').count()); i++) await page.waitForTimeout(500)
   const after = filed(await rec()).length
-  check(`읽다가 닫기: 멈추고 하나도 올리지 않음 ${tag}`, after === before && (await page.getByRole('dialog').count()) === 0, `${before} → ${after}`)
+  check(`닫아도 끝까지: 12개 모두 서류함에 · 표시 사라짐 ${tag}`, after === before + 12 && (await page.getByTestId('bulk-minimized').count()) === 0, `${before} → ${after}`)
+  // 일부러 [읽기 멈추기] 를 누른 때만 멈춘다
+  const before2 = filed(await rec()).length
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles(few.map((f, i) => ({ ...f, name: `멈춤${i + 1}.pdf` })))
+  await page.getByTestId('bulk-stop').waitFor({ timeout: 10000 })
+  await page.getByTestId('bulk-stop').click()
+  await page.waitForTimeout(5000)
+  check(`[읽기 멈추기]: 하나도 올리지 않음 ${tag}`, filed(await rec()).length === before2 && (await page.getByRole('dialog').count()) === 0)
 
   const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   check(`가로 넘침 0 ${tag}`, over <= 0, String(over))
@@ -499,7 +515,7 @@ for (const width of [1440, 390]) {
   await page.waitForTimeout(200)
   const sureBtn = page.getByRole('button', { name: /^확실한 것만 올리기/ })
   check(`빈 이름 새 칸: '확실한 것만 올리기' 가 막힘(다른 칸 덮지 않음) ${tag}`, await sureBtn.isDisabled())
-  await page.getByTestId('bulk-close').click()
+  await page.getByTestId('bulk-discard').click()
   await page.waitForTimeout(300)
   const r = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((x) => x.id === 'cli_mirae'))
   check(`빈 이름 새 칸: 납세증명서 칸 파일 그대로 ${tag}`, r.documents.customdoc_tax148.fileName === '납세.pdf')
@@ -589,6 +605,16 @@ for (const width of [1440, 390]) {
   check(`${width} 인쇄: 보고서 종이가 찍힘 · 같은 금액`, printVisible && printText.includes('30,000,000원'), printText.slice(0, 120))
   const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
   check(`${width} 성과 보고서 가로 넘침 0 · 오류 0`, over <= 1 && errors.length === 0, `${over} ${errors.join(' | ')}`)
+  // D-157: 업체 홈 더보기에도 '서류 한꺼번에 올리기'
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+  await page.getByRole('button', { name: '더보기' }).first().click()
+  await page.getByTestId('more-upload').click()
+  await page.waitForTimeout(300)
+  check(`${width} 더보기 → 서류 한꺼번에 올리기 창`, (await page.getByRole('dialog').filter({ hasText: '서류 한꺼번에 올리기' }).count()) === 1)
+  await page.getByTestId('bulk-close').click()
+  await page.waitForTimeout(200)
+  check(`${width} 아무것도 안 넣고 닫으면 그냥 닫힘(표시 없음)`, (await page.getByTestId('bulk-minimized').count()) === 0 && (await page.getByRole('dialog').count()) === 0)
   await ctx.close()
 }
 

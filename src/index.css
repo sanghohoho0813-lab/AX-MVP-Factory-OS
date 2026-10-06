@@ -419,6 +419,18 @@ html[data-motion="reduced"] *::after {
 }
 
 /* 겹쳐 뜨는 창 — 조금 더 빠르게, 살짝 커지며 */
+/* D-157: 창 밖을 눌렀을 때 — 닫지 않고 살짝 흔든다 */
+@keyframes ax-nudge {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+.ax-nudge {
+  animation: ax-nudge 360ms ease-in-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ax-nudge { animation: none; outline: 3px solid var(--color-brand-400); }
+}
 .ax-pop {
   animation: ax-pop 380ms cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
 }

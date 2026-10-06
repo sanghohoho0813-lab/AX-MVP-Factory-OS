@@ -1,19 +1,21 @@
 /**
- * 회사명 옆 계약 상태 (D-140) — [계약 중 ▼] 를 눌러 바로 바꾼다.
- * 저장 값은 예전 그대로(waiting · active · completed) — 화면 이름만 '계약 전 · 계약 중 · 계약 완료'.
+ * 회사명 옆 계약 상태 (D-140) — [계약 완료 ▼] 를 눌러 바로 바꾼다.
+ * D-157: 고르는 것은 '계약 전 · 계약 완료' 둘. 저장 값은 예전 그대로(waiting · active · completed).
  */
 import { useEffect, useRef, useState } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
-import { CONTRACT_STAGE_LABEL, CONTRACT_STAGE_ORDER, contractStageOf, type ClientOpsStatus, type ContractStage } from '../../types/clientOps'
+import { CONTRACT_STAGE_CHOICES, CONTRACT_STAGE_LABEL, contractStageOf, type ClientOpsStatus, type ContractStage } from '../../types/clientOps'
 
 const CLS: Record<ContractStage, string> = {
   pre: 'border-slate-300 bg-slate-100 text-slate-700',
   signed: 'border-brand-300 bg-brand-50 text-brand-800',
-  closed: 'border-success-300 bg-success-50 text-success-800',
+  closed: 'border-brand-300 bg-brand-50 text-brand-800',
 }
 
 export function ContractStageMenu({ status, onChange }: { status: ClientOpsStatus; onChange: (stage: ContractStage) => void }) {
-  const stage = contractStageOf(status)
+  const real = contractStageOf(status)
+  // 예전 '끝남'(completed) 업체도 '계약 완료' 로 보이고 고른 칸도 같다
+  const stage: ContractStage = real === 'closed' ? 'signed' : real
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -47,7 +49,7 @@ export function ContractStageMenu({ status, onChange }: { status: ClientOpsStatu
       </button>
       {open && (
         <div role="menu" aria-label="계약 상태" className="absolute top-full left-0 z-30 mt-1 w-44 overflow-hidden rounded-(--radius-control) border border-slate-200 bg-white shadow-(--shadow-overlay)" data-testid="stage-menu">
-          {CONTRACT_STAGE_ORDER.map((s) => (
+          {CONTRACT_STAGE_CHOICES.map((s) => (
             <button
               key={s}
               type="button"

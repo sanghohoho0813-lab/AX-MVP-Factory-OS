@@ -125,6 +125,8 @@ export function ApplyBoardView({ records, today }: { records: ClientOpsRecord[];
         공고 창에서 [신청 준비] 를 누른 업체가 여기 모입니다. 줄을 누르면 그 업체의 낼 서류 · 접수 · 결과 · 성공보수를 고칠 수 있어요.
         {board.feeMissing > 0 && <b className="text-warning-800"> 선정됐는데 성공보수를 안 건 곳 {board.feeMissing}곳.</b>}
       </p>
+      {/* D-157: 도전 체크만 한 공고(아직 신청 준비 전) — 서류 준비와 섞지 않는다. 마감이 지나면 저절로 빠진다 */}
+      <Group title="도전 체크 — 아직 신청 준비 전" rows={board.challenged} records={byId} today={today} testId="board-challenged" empty="도전 체크한 공고가 없습니다. 공고 창 · 업체 상세에서 ☆ 도전해 볼 만함 을 누르면 여기 모입니다." />
       <Group title="서류 준비" rows={board.preparing} records={byId} today={today} testId="board-preparing" empty="서류 준비 중인 신청이 없습니다. 지원사업 알림 공고 창에서 업체 옆 [신청 준비] 를 눌러 시작하세요." />
       <Group title="접수 · 결과 기다림" rows={board.waiting} records={byId} today={today} testId="board-waiting" empty="접수하고 결과를 기다리는 신청이 없습니다." />
       <Group title="최근 결과(90일)" rows={board.done} records={byId} today={today} testId="board-done" empty="최근 90일 안에 결과가 난 신청이 없습니다." />

@@ -48,6 +48,9 @@ import { documentsOf } from '../grants/grantText'
 import { buildClientSchedule } from '../clientOpsSchedule'
 import { feeStateOf, fundingFactsOf } from '../feeStatus'
 import { recommendNextSteps } from '../clientInsights'
+import { buildClientReport } from '../clientReport'
+import { buildClientAlerts } from '../clientOpsAlerts'
+import { isGrantBookmark } from '../../types/clientOps'
 
 let pass = 0
 let fail = 0
@@ -626,6 +629,17 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   const unpicked = withoutGrantChallenge(pick.record, n)
   check('체크 풀기: 지켜보는 건은 지움 · 활동 기록', unpicked.fundingApplications.length === 0 && unpicked.activity[0]?.text.startsWith('지원사업 도전 체크 풀기'))
   check('체크 풀기: 신청 준비 뒤로는 지우지 않음', withoutGrantChallenge(upgraded.record, n) === upgraded.record)
+
+  // D-157 검토: 체크만 한 공고는 대표 혼자 고른 것 — 손으로 적은 건을 지우지 않고, 고객 종이 · 놓친 마감 경고에 넣지 않는다
+  const handMade = normalizeClientOps({ id: 'c9', companyName: '손으로', fundingApplications: [{ id: 'm1', programName: '[서울] 2026 스마트공장 지원사업', status: 'watching', applyDueDate: '2026-10-30', note: '대표가 적은 메모' }] } as never)
+  check('손으로 적은 같은 이름 건: 체크 풀기로 지워지지 않음', withoutGrantChallenge(handMade, n) === handMade)
+  check('isGrantBookmark: 공고에서 체크한 것만', isGrantBookmark(pick.app) && !isGrantBookmark(handMade.fundingApplications[0]) && !isGrantBookmark(upgraded.app))
+  const reportNext = buildClientReport(pick.record, TODAY, 'year').next.map((x) => x.text).join(' | ')
+  check('고객 보고서: 체크만 한 공고는 다음에 챙길 것에 없음', !reportNext.includes('스마트공장'), reportNext)
+  const pastPick = withGrantChallenge(base, { ...n, applyEnd: '2026-09-20' }).record
+  check('체크만 한 공고 마감 지남: 빨간 경고 없음 · 일정에서도 내려놓음', buildClientAlerts(pastPick, TODAY).every((a) => a.kind !== 'funding_overdue') && buildClientSchedule(pastPick, TODAY).every((e) => e.kind !== 'funding'))
+  const board = applicationBoard([pick.record, upgraded.record], TODAY)
+  check('신청 진행판: 체크만 한 공고는 \'도전 체크\' 칸 · 신청 준비는 서류 준비 칸', board.challenged.length === 1 && board.preparing.length === 1 && board.challenged[0].clientId === 'c1')
 }
 
 // D-152: 접수 → 결과 발표 → 선정 → 성공보수 · 신청 진행판 · 고객 화면 요청

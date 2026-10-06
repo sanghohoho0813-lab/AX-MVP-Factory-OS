@@ -12,7 +12,7 @@
  *   아니므로 일정 화면·일기 화면·업체 상세에서 같은 것이 보인다.
  */
 
-import { useState } from 'react'
+import { useState, type LiHTMLAttributes } from 'react'
 import { ArrowRight, Check, ChevronDown, Pencil, Plus, X } from 'lucide-react'
 import type { JournalEntry } from '../../types/bridge'
 import { TODO_PRESETS } from '../../services/journalService'
@@ -154,19 +154,23 @@ export function TodoRow({
   today,
   clientName,
   onPick,
+  dragProps,
 }: {
   entry: JournalEntry
   today: string
   clientName?: string
   /** 상태 시트를 연다 — 업체로 가는 길도 그 안에 있다 */
   onPick: () => void
+  /** D-157: 일정 달력(PC)에서 끌어 다른 날로 옮기기 */
+  dragProps?: LiHTMLAttributes<HTMLLIElement>
 }) {
   const left = entry.dueDate ? daysLeftFrom(today, entry.dueDate) : null
   const overdue = !entry.completed && left !== null && left < 0
 
   return (
     <li
-      className={`flex items-start gap-3 rounded-(--radius-card) border px-4 py-3.5 ${
+      {...dragProps}
+      className={`flex items-start gap-3 rounded-(--radius-card) border px-4 py-3.5 ${dragProps?.draggable ? 'lg:cursor-grab ' : ''}${
         entry.completed
           ? 'border-slate-200 bg-white'
           : overdue

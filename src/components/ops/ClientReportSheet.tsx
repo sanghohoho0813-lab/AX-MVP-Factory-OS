@@ -163,6 +163,11 @@ export function ClientReportSheet({ record, today, onClose }: { record: ClientOp
             ))}
           </div>
           <p className="t-sub break-keep text-slate-600">고객에게 드리는 종이입니다 — 수수료 · 영업자 · 메모 · 업무 일기는 들어가지 않습니다.</p>
+          {r.inProgress.some((d) => d.nextStep) && (
+            <p className="t-sub break-keep rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 text-warning-800" data-testid="report-nextstep-note">
+              진행 중 업무의 '다음 단계' 글은 적어 둔 그대로 들어갑니다. 고객이 보면 안 되는 말이 있으면 업무 탭에서 고친 뒤 인쇄하세요.
+            </p>
+          )}
           <div className="rounded-(--radius-control) border border-slate-200 bg-white p-4">
             <ReportDocument r={r} />
           </div>

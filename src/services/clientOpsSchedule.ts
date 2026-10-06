@@ -6,6 +6,7 @@
  */
 
 import type { ClientOpsRecord, ServiceKey } from '../types/clientOps'
+import { isGrantBookmark } from '../types/clientOps'
 import {
   SERVICES,
   SERVICE_STATUS_LABEL,
@@ -106,6 +107,8 @@ export function buildClientSchedule(record: ClientOpsRecord, today: string): Sch
   for (const app of record.fundingApplications) {
     if (!app.applyDueDate) continue
     const open = app.status === 'watching' || app.status === 'preparing'
+    // D-157: 도전 체크만 한 공고는 마감이 지나면 일정에서 내려놓는다('마감 지난 신청' 으로 남지 않게)
+    if (isGrantBookmark(app) && app.applyDueDate < today) continue
     out.push({
       id: `${record.id}:funding:${app.id}`,
       date: app.applyDueDate,
