@@ -67,10 +67,16 @@ let finderLink = ''
 
   // 메뉴 → 지원사업 알림
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
-  await page.getByRole('link', { name: '지원사업 알림' }).first().click()
+  // D-163: 지원사업 알림은 전문 모듈 › 기업성장 안 — 기업성장 줄을 펴서 누른다
+  {
+    const cat = page.locator('aside nav').getByRole('button', { name: /기업성장/ }).first()
+    if ((await cat.getAttribute('aria-expanded')) !== 'true') await cat.click()
+    await page.waitForTimeout(200)
+  }
+  await page.locator('aside nav').getByRole('link', { name: '지원사업 알림' }).first().click()
   await page.waitForURL(/\/grants$/)
   await page.waitForTimeout(400)
-  check('메뉴: 영업 묶음에 지원사업 알림', page.url().endsWith('/grants'))
+  check('메뉴: 전문 모듈 › 기업성장 안에 지원사업 알림(D-163)', page.url().endsWith('/grants'))
   check('빈 화면: 공고 넣기 · 예시 넣기', (await page.getByTestId('grant-examples').count()) === 1)
 
   // 붙여넣기 → 읽기

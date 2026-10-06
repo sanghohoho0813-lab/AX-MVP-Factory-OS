@@ -76,10 +76,10 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByTestId('text-scale-quick').first().click()
   check('글자 크기: 매우 크게 → 다시 기본', (await page.evaluate(() => document.documentElement.getAttribute('data-text-scale'))) === 'default')
 
-  // 목차 — 고급 기능은 기본으로 빠져 있다 (D-127: 분야 줄을 펼쳐서 본다 — 기관 전략은 정부지원사업, 검증 · 사례는 AX 스튜디오)
+  // 목차 — 고급 기능은 기본으로 빠져 있다 (D-127: 분야 줄을 펼쳐서 본다 — 기관 전략은 기업성장(D-163), 검증 · 사례는 AX 스튜디오)
   const openCats = async () => {
     // D-136: AX 스튜디오는 '잘 안 쓰는 기능' 묶음 안 — 묶음부터 편다
-    for (const name of [/정부지원사업/, /잘 안 쓰는 기능/, /AX 스튜디오/]) {
+    for (const name of [/기업성장/, /잘 안 쓰는 기능/, /AX 스튜디오/]) {
       const b = page.locator('aside nav').getByRole('button', { name })
       if ((await b.getAttribute('aria-expanded')) !== 'true') await b.click()
     }

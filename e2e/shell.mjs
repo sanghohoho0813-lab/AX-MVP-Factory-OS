@@ -35,8 +35,10 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('메뉴: 가끔 쓰는 것 묶음이 없다 (D-104)', at('가끔 쓰는 것') === -1)
   // D-127: 전문 모듈은 분야 여섯 줄 + 모듈 전체 — 도구는 분야 줄 아래에 접혀 있다(모듈이 늘어도 줄이 늘지 않는다)
   // D-136: 자주 쓰는 분야 셋 + 모듈 전체, 그 아래 접힌 '잘 안 쓰는 기능'(기술사업화 · AX 스튜디오 · 웹 스튜디오)
-  const cats = ['기업성장', '정부지원사업', '절세·재무', '모듈 전체', '잘 안 쓰는 기능']
-  check('메뉴: 분야 셋 · 모듈 전체 · 잘 안 쓰는 기능 순서', cats.every((c, i) => at(c) > at('전문 모듈') && (i === 0 || at(c) > at(cats[i - 1]))), navText.slice(0, 700))
+  // D-163: 전문 모듈은 기업성장 · 절세·재무 둘(정부지원사업은 기업성장 안)
+  const cats = ['기업성장', '절세·재무', '모듈 전체', '잘 안 쓰는 기능']
+  check('메뉴: 정부지원사업 줄 없음(D-163)', at('정부지원사업') === -1, navText.slice(0, 700))
+  check('메뉴: 분야 둘 · 모듈 전체 · 잘 안 쓰는 기능 순서', cats.every((c, i) => at(c) > at('전문 모듈') && (i === 0 || at(c) > at(cats[i - 1]))), navText.slice(0, 700))
   check('메뉴: 잘 안 쓰는 기능은 처음에 접혀 있다(기술사업화 · AX 스튜디오 · 웹 스튜디오 안 보임)', at('기술사업화') === -1 && at('AX 스튜디오') === -1 && at('웹 스튜디오') === -1, navText.slice(0, 700))
   await nav.getByRole('button', { name: /잘 안 쓰는 기능/ }).click()
   await page.waitForTimeout(200)
@@ -182,7 +184,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.goto(BASE + '/tools', { waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
   const tools = (await page.locator('main').innerText()) ?? ''
-  check('모듈 전체: 모듈 카드 여섯', (await page.getByTestId('module-cards').locator('[data-module-card]').count()) === 6)
+  check('모듈 전체: 모듈 카드 다섯(정부지원사업은 기업성장 안, D-163)', (await page.getByTestId('module-cards').locator('[data-module-card]').count()) === 5)
   check('모듈 전체: 세금 계산기는 절세·재무 카드 안', ((await page.locator('[data-module-card="tax-finance"]').innerText()) ?? '').includes('세금 계산기'))
   check('모듈 전체: 앞으로 붙을 것을 적어 둔다 (크레탑은 들어와서 빠짐)', tools.includes('기업인증 검토') && tools.includes('준비 중') && tools.includes('크레탑 분석기'))
   check('도구함: 아직 없는 것은 누를 수 없다', (await page.getByRole('link', { name: /기업인증 검토/ }).count()) === 0)
