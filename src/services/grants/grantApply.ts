@@ -16,7 +16,8 @@
 import type { ApplyDoc, ClientOpsRecord, DocumentKey, FundingApplication } from '../../types/clientOps'
 import { allDocumentMetas } from '../clientOpsDocuments'
 import { daysLeftFrom, documentStatus } from '../clientOpsAlerts'
-import { withFee, withFunding, withNewFee, withNewFunding } from '../clientOpsService'
+import { withFee, withFunding, withNewFee, withNewFunding, withoutFunding } from '../clientOpsService'
+import { withActivity } from '../clientOpsActivity'
 import type { GrantNotice } from './grantMatch'
 import { nowDate } from '../../lib/appClock'
 
@@ -218,8 +219,13 @@ export function withGrantApplication(
   const existing = applicationFor(record, notice)
   if (existing) {
     if (existing.noticeId === notice.id && existing.docs) return { record, app: existing, created: false }
-    // 공고에 마감이 있으면 공고 마감으로(손으로 적은 옛 날짜보다 공고가 맞다)
-    const patch: Partial<FundingApplication> = { ...extra, ...(existing.docs ? {} : { docs: applyDocsFor(notice) }), ...(due ? { applyDueDate: due } : {}) }
+    // 공고에 마감이 있으면 공고 마감으로(손으로 적은 옛 날짜보다 공고가 맞다). D-156: '도전해 볼 만함' 으로 체크해 둔 건이면 신청 준비로 올린다
+    const patch: Partial<FundingApplication> = {
+      ...extra,
+      ...(existing.docs ? {} : { docs: applyDocsFor(notice) }),
+      ...(due ? { applyDueDate: due } : {}),
+      ...(existing.status === 'watching' ? { status: 'preparing' as const } : {}),
+    }
     const next = withFunding(record, existing.id, patch)
     return { record: next, app: next.fundingApplications.find((a) => a.id === existing.id) ?? existing, created: false }
   }
@@ -233,6 +239,38 @@ export function withGrantApplication(
   const app: FundingApplication = { ...first, ...extra, docs: applyDocsFor(notice) }
   const activity = made.activity.map((x, i) => (i === 0 && x.kind === 'funding_added' ? { ...x, text: `지원사업 신청 준비 — ${notice.title}` } : x))
   return { record: { ...made, fundingApplications: [app, ...rest], activity }, app, created: true }
+}
+
+/**
+ * D-156: '도전해 볼 만함' — 맞는 공고를 모두 알림으로 띄우지 않고, 대표가 직접 고른 공고만 챙긴다.
+ * 업체의 자금 · 지원사업 건(지켜보는 중)으로 남겨 마감이 일정 · 오늘 · 지금 챙길 것에 뜬다. 낼 서류는 [신청 준비] 때 만든다.
+ * 이미 이 공고로 건이 있으면(신청 준비 · 접수 …) 그대로 둔다.
+ */
+export function withGrantChallenge(record: ClientOpsRecord, notice: GrantNotice): { record: ClientOpsRecord; app: FundingApplication; created: boolean } {
+  const existing = applicationFor(record, notice)
+  if (existing) return { record, app: existing, created: false }
+  const made = withNewFunding(record, {
+    programName: notice.title,
+    institution: notice.agency || notice.operator,
+    status: 'watching',
+    applyDueDate: notice.deadlineKind === 'date' ? notice.applyEnd : '',
+  })
+  const [first, ...rest] = made.fundingApplications
+  const app: FundingApplication = {
+    ...first,
+    noticeId: notice.id,
+    ...(notice.url ? { noticeUrl: notice.url } : {}),
+    ...(notice.applyEndTime ? { applyDueTime: notice.applyEndTime } : {}),
+  }
+  const activity = made.activity.map((x, i) => (i === 0 && x.kind === 'funding_added' ? { ...x, text: `지원사업 도전 체크 — ${notice.title}` } : x))
+  return { record: { ...made, fundingApplications: [app, ...rest], activity }, app, created: true }
+}
+
+/** 체크 풀기 — 아직 '지켜보는 중' 이고 낼 서류를 만들지 않은 건만 지운다(신청 준비 뒤로는 신청 탭에서) */
+export function withoutGrantChallenge(record: ClientOpsRecord, notice: Pick<GrantNotice, 'id' | 'title'>): ClientOpsRecord {
+  const app = applicationFor(record, notice)
+  if (!app || app.status !== 'watching' || app.docs) return record
+  return withActivity(withoutFunding(record, app.id), 'funding_status', `지원사업 도전 체크 풀기 — ${app.programName}`)
 }
 
 /** 서류함에 없는 서류(신청서 …)를 '준비됨' 으로 · 되돌리기 */

@@ -43,7 +43,7 @@ import { alertPayload, publicPayload, sameNotice, validateAlert, type AlertReque
 import { mergeNotices, noticesFromFeed, slotOf } from '../grants/grantFeed'
 import { withAgencyRegion } from '../grants/grantText'
 import { clientsForNotice, fitSummary, grantClients, grantIndex } from '../grants/grantView'
-import { applyNews, grantYearStats, withApplyExecuted, applicationBoard, applyDocViews, applyDocsFor, applyReadiness, applyStage, docIdentity, grantDocRequestMessage, openApplications, portalRequestTitles, successFeeAmount, withApplyDocDone, withApplyResult, withApplySubmitted, withGrantApplication, withResultDueDate, withSuccessFee } from '../grants/grantApply'
+import { applyNews, grantYearStats, withApplyExecuted, applicationBoard, applyDocViews, applyDocsFor, applyReadiness, applyStage, docIdentity, grantDocRequestMessage, openApplications, portalRequestTitles, successFeeAmount, withApplyDocDone, withApplyResult, withApplySubmitted, withGrantApplication, withGrantChallenge, withoutGrantChallenge, withResultDueDate, withSuccessFee } from '../grants/grantApply'
 import { documentsOf } from '../grants/grantText'
 import { buildClientSchedule } from '../clientOpsSchedule'
 import { feeStateOf, fundingFactsOf } from '../feeStatus'
@@ -612,6 +612,20 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   const allOk = normalizeClientOps({ id: 'c4', companyName: '다있음', documents: { businessRegistration: { received: true, issuedAt: '2024-01-02', fileName: 'a.pdf' } } } as never)
   const one = withGrantApplication(allOk, { ...n, documents: ['사업자등록증'] })
   check('다 있으면: 모두 받았다는 문구', grantDocRequestMessage(one.record, one.app, TODAY).includes('필요한 서류는 모두 받았습니다'), grantDocRequestMessage(one.record, one.app, TODAY))
+
+  // D-156: '도전해 볼 만함' — 고른 공고만 마감을 챙긴다
+  const pick = withGrantChallenge(base, n)
+  check('도전 체크: 지켜보는 중 한 건 · 공고 · 마감 · 시각 · 서류 목록은 아직 없음', pick.created && pick.app.status === 'watching' && pick.app.noticeId === 'n-smart' && pick.app.applyDueDate === '2026-10-30' && pick.app.applyDueTime === '18:00' && pick.app.docs === undefined, pick.app)
+  check('도전 체크: 활동 기록', pick.record.activity[0]?.text === '지원사업 도전 체크 — [서울] 2026 스마트공장 지원사업')
+  check('도전 체크: 또 눌러도 한 건', withGrantChallenge(pick.record, n).record.fundingApplications.length === 1)
+  const pickEv = buildClientSchedule(pick.record, TODAY).find((e) => e.kind === 'funding')
+  check('도전 체크: 마감이 일정에 뜸(10-30)', pickEv?.date === '2026-10-30', pickEv)
+  check('도전 체크 안 한 공고: 일정에 마감 없음', buildClientSchedule(base, TODAY).every((e) => e.kind !== 'funding'))
+  const upgraded = withGrantApplication(pick.record, n)
+  check('도전 체크 → [신청 준비]: 같은 건이 신청 준비로 · 서류 목록 생김', !upgraded.created && upgraded.record.fundingApplications.length === 1 && upgraded.app.status === 'preparing' && (upgraded.app.docs?.length ?? 0) === 6, upgraded.app)
+  const unpicked = withoutGrantChallenge(pick.record, n)
+  check('체크 풀기: 지켜보는 건은 지움 · 활동 기록', unpicked.fundingApplications.length === 0 && unpicked.activity[0]?.text.startsWith('지원사업 도전 체크 풀기'))
+  check('체크 풀기: 신청 준비 뒤로는 지우지 않음', withoutGrantChallenge(upgraded.record, n) === upgraded.record)
 }
 
 // D-152: 접수 → 결과 발표 → 선정 → 성공보수 · 신청 진행판 · 고객 화면 요청

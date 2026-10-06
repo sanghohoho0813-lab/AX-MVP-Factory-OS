@@ -15,13 +15,13 @@ import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
 import { useToast } from '../components/ui/toastContext'
 import { Button } from '../components/ui/Button'
 import { Blank, BottomSheet, ScreenTitle } from '../components/ui/primitives'
-import { AddNoticeSheet, CategoryChips, NoticeRow } from '../components/grants/GrantParts'
+import { AddNoticeSheet, CategoryChips, NoticeRow, type ChallengeControl } from '../components/grants/GrantParts'
 import { ClientGrantPanel, NoticeSheet } from '../components/grants/GrantSheets'
 import { useGrantActions, useGrantData } from '../components/grants/useGrants'
 import { GrantFeedBar } from '../components/grants/GrantFeedBar'
 import { isFeedNotice } from '../services/grants/grantFeed'
 import { listClients, saveClient } from '../services/clientOpsService'
-import { applicationBoard, applicationFor, applyReadiness, withGrantApplication } from '../services/grants/grantApply'
+import { applicationBoard, applicationFor, applyReadiness, withGrantApplication, withGrantChallenge, withoutGrantChallenge } from '../services/grants/grantApply'
 import { ApplyBoardView } from '../components/grants/ApplyBoardView'
 import { todayLocalDate } from '../lib/appClock'
 import type { ClientOpsRecord } from '../types/clientOps'
@@ -72,6 +72,29 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
       showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다. 다시 눌러 주세요.')
     } finally {
       setApplying('')
+    }
+  }
+
+  // D-156: '도전해 볼 만함' 체크 · 풀기 — 체크한 공고만 마감이 일정 · 오늘에 뜬다. 신청 준비와 같이 저장 직전에 업체를 다시 읽는다
+  const [challenging, setChallenging] = useState(false)
+  const challengeFor = async (notice: GrantNotice, record: ClientOpsRecord) => {
+    if (challenging) return
+    setChallenging(true)
+    try {
+      const fresh = (await listClients(workspaceId)).find((r) => r.id === record.id) ?? record
+      const on = applicationFor(fresh, notice)
+      const next = on ? withoutGrantChallenge(fresh, notice) : withGrantChallenge(fresh, notice).record
+      if (next === fresh) {
+        showToast(`${fresh.companyName} — 이미 신청 준비 중이라 신청 탭에서 고쳐 주세요`)
+        return
+      }
+      const saved = await saveClient(next)
+      setRecords((prev) => prev.map((r) => (r.id === saved.id ? saved : r)))
+      showToast(on ? `${saved.companyName} — 도전 체크를 풀었습니다` : `${saved.companyName} — 도전 체크 · 마감을 일정 · 오늘에 띄웁니다`)
+    } catch (cause) {
+      showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다. 다시 눌러 주세요.')
+    } finally {
+      setChallenging(false)
     }
   }
 
@@ -332,7 +355,8 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
             <ul className="flex flex-col divide-y divide-slate-100 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="grant-client-list">
               {byClient.map(({ c, sum }) => {
                 const fit = sum.fit
-                const hot = sum.urgentFit
+                // D-156: '7일 안 마감' 을 자동으로 세지 않는다 — 대표가 도전 체크한 공고 수만
+                const picked = c.record.fundingApplications.filter((a) => a.noticeId && a.status === 'watching').length
                 const last = sent.find((s) => s.clientId === c.record.id)?.at ?? ''
                 return (
                   <li key={c.record.id}>
@@ -349,8 +373,8 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
                         <span className={`t-body font-semibold tabular-nums ${fit > 0 ? 'text-success-700' : 'text-slate-400'}`} data-testid="grant-client-fit">
                           맞음 {fit}
                         </span>
-                        {hot > 0 ? (
-                          <span className="t-meta font-semibold text-danger-700">7일 안 마감 {hot}</span>
+                        {picked > 0 ? (
+                          <span className="t-meta font-semibold text-amber-800" data-testid="grant-client-picked">★ 도전 체크 {picked}</span>
                         ) : !c.profile.sido || !c.profile.years || !c.profile.industry.trim() ? (
                           <span className="t-meta text-warning-800">정보를 적으면 맞춤</span>
                         ) : sum.check > 0 ? (
@@ -377,6 +401,8 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
           onPortal={(x) => void actions.toPortal(x.client, [x.match])}
           readOnly={isFeedNotice(current)}
           onApply={(x) => void applyFor(current, x.client.record)}
+          onChallenge={(x) => void challengeFor(current, x.client.record)}
+          challengeBusy={challenging}
           onOpenApply={(cid) => navigate(`/ops/clients/${cid}?tab=funding`)}
           onEdit={() => {
             setEditing(current)
@@ -405,6 +431,15 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
           sentOf={sentForClient(currentClient.record.id)}
           linked={linkOf(currentClient.record.id) !== null}
           actions={actions}
+          challenge={{
+            busy: challenging,
+            of: (nid) => {
+              const n = notices.find((x) => x.id === nid)
+              const rec = records.find((r) => r.id === currentClient.record.id) ?? currentClient.record
+              return n ? applicationFor(rec, n) : null
+            },
+            toggle: (m) => void challengeFor(m.notice, records.find((r) => r.id === currentClient.record.id) ?? currentClient.record),
+          }}
           onPick={(id) => {
             setParam('client', '')
             setOpenId(id)
@@ -439,7 +474,9 @@ function ClientSheet({
   onPick,
   onDetail,
   onClose,
+  challenge,
 }: {
+  challenge?: ChallengeControl
   client: GrantClient
   matches: GrantMatch[]
   sentOf: (noticeId: string) => string
@@ -463,6 +500,7 @@ function ClientSheet({
           onPortal={() => void actions.toPortal(client, matches.filter((m) => m.verdict !== 'general'))}
           onPick={(m) => onPick(m.notice.id)}
           onFill={onDetail}
+          challenge={challenge}
         />
         <Button variant="ghost" onClick={onDetail} className="self-start">
           업체 상세 열기

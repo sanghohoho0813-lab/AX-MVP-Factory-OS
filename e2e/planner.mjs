@@ -101,6 +101,16 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('반복: 할 일 4줄이 날짜마다', made.join() === '2026-10-12,2026-11-12,2026-12-11,2027-01-12', made.join())
   check('반복: 창이 닫히고 알림', (await page.getByTestId('calendar-quick-sheet').count()) === 0 && (await page.locator('body').innerText()).includes('할 일 4개를 넣었습니다'))
 
+  // D-156: PC 달력 칸에 '할 일 N' 숫자 대신 무슨 일인지 · 업체 일정은 종류색 · 고른 날 목록은 달력 오른쪽
+  const c12 = await cell(page, '2026-10-12').innerText()
+  check('PC 달력 칸: 적은 할 일 내용이 보임(할 일 N 숫자 아님)', c12.includes('급여 증빙 요청') && !/할 일 \d/.test(c12), c12)
+  const lineKinds = await page.locator('main [data-testid="cell-lines"] [data-kind]').evaluateAll((els) => [...new Set(els.map((e) => e.getAttribute('data-kind')))])
+  check('PC 달력 칸: 할 일 · 업체 일정 종류가 함께(색 구분)', lineKinds.includes('todo') && lineKinds.some((k) => k !== 'todo'), lineKinds)
+  const calBox = await page.getByTestId('month-calendar').boundingBox()
+  const panelBox = await page.getByTestId('picked-panel').boundingBox()
+  check('PC: 고른 날 목록이 달력 오른쪽(한 화면에)', !!calBox && !!panelBox && panelBox.x >= calBox.x + calBox.width - 1 && panelBox.y < calBox.y + calBox.height, { calBox, panelBox })
+  check('PC: 달력 높이가 화면 안(900)', !!calBox && calBox.y + calBox.height < 1400, calBox)
+
   // 쉬는 날 직접 표시 — 2일 연속 · 지우기
   await cell(page, '2026-10-20').click()
   await page.getByTestId('picked-quick-off').click()

@@ -3,7 +3,8 @@
  * 큰 글자 · 누르기 44px · 쉬운 말. 판정은 '조건 맞음 · 확인 필요' 만 말한다(선정 가능성 아님).
  */
 import { useMemo, useState, type ReactNode } from 'react'
-import { Check, CircleHelp, ExternalLink, X } from 'lucide-react'
+import { Check, CircleHelp, ExternalLink, Star, X } from 'lucide-react'
+import type { FundingApplication } from '../../types/clientOps'
 import { BottomSheet } from '../ui/primitives'
 import { Button } from '../ui/Button'
 import { AiSoonButton } from '../ui/AiSoonButton'
@@ -457,7 +458,41 @@ export function NoticeRow({ notice, today, extra, onOpen }: { notice: GrantNotic
 /* 맞는 공고 목록 (업체 하나)                                              */
 /* ------------------------------------------------------------------ */
 
-export function MatchList({ matches, sentOf, onPick }: { matches: GrantMatch[]; sentOf?: (noticeId: string) => string; onPick?: (m: GrantMatch) => void }) {
+/** D-156: 공고 하나를 '도전해 볼 만함' 으로 체크 · 풀기. 체크한 것만 마감이 일정 · 오늘에 뜬다 */
+export interface ChallengeControl {
+  of: (noticeId: string) => FundingApplication | null
+  toggle: (m: Pick<GrantMatch, 'notice'>) => void
+  busy?: boolean
+}
+
+export function ChallengeButton({ app, onToggle, busy, closed }: { app: FundingApplication | null; onToggle: () => void; busy?: boolean; closed?: boolean }) {
+  if (app && app.status !== 'watching') {
+    return (
+      <span className="t-sub inline-flex min-h-10 items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-3 font-semibold text-brand-800" data-testid="challenge-state">
+        {app.status === 'preparing' ? '신청 준비 중' : '신청 진행 중'}
+      </span>
+    )
+  }
+  if (!app && closed) return null
+  const on = app !== null
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={busy}
+      aria-pressed={on}
+      data-testid="challenge-toggle"
+      className={`tap t-sub inline-flex h-10 items-center gap-1.5 rounded-full border px-3 font-semibold disabled:opacity-50 ${
+        on ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+      }`}
+    >
+      <Star aria-hidden="true" className={`size-4 ${on ? 'fill-amber-400 text-amber-500' : ''}`} />
+      {on ? `도전 체크됨${app?.applyDueDate ? ` · 마감 ${Number(app.applyDueDate.slice(5, 7))}/${Number(app.applyDueDate.slice(8, 10))}` : ''}` : '도전해 볼 만함'}
+    </button>
+  )
+}
+
+export function MatchList({ matches, sentOf, onPick, challenge }: { matches: GrantMatch[]; sentOf?: (noticeId: string) => string; onPick?: (m: GrantMatch) => void; challenge?: ChallengeControl }) {
   return (
     <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-control) border border-slate-200 bg-white" data-testid="grant-match-list">
       {matches.map((m) => {
@@ -478,6 +513,7 @@ export function MatchList({ matches, sentOf, onPick }: { matches: GrantMatch[]; 
               <VerdictBadge v={m.verdict} />
               {m.notice.amountText && <span className="t-sub text-slate-600">{m.notice.amountText}</span>}
               {sent && <span className="t-meta text-slate-500">알림 보냄 {Number(sent.slice(5, 7))}/{Number(sent.slice(8, 10))}</span>}
+              {challenge && <ChallengeButton app={challenge.of(m.notice.id)} onToggle={() => challenge.toggle(m)} busy={challenge.busy} closed={m.deadline.state === 'closed'} />}
             </div>
             {m.verdict === 'check' && (
               <p className="t-sub break-keep text-warning-800">

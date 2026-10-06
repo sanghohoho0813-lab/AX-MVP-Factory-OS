@@ -102,7 +102,8 @@ check('할 일: 기한을 옮기면 오늘 할 일에서 빠진다', !todoBox.in
 // 3) 일정 화면에서도 같은 것이 보인다
 await page.goto(BASE + '/ops/calendar', { waitUntil: 'networkidle' })
 await page.waitForTimeout(900)
-check('일정 화면에도 같은 할 일이 보인다', await page.getByText('테스트 할 일 하나').first().isVisible())
+// D-156: PC 달력 칸에도 할 일 글이 들어가므로(휴대폰은 숨김) 고른 날 목록에서 찾는다
+check('일정 화면에도 같은 할 일이 보인다', await page.getByLabel('선택한 날짜').getByText('테스트 할 일 하나').first().isVisible())
 
 // 4) 일정에서 적으면 오늘에도 보인다
 await page.getByRole('button', { name: '할 일 적기' }).first().click()
@@ -110,7 +111,7 @@ await page.waitForTimeout(300)
 await page.getByLabel('할 일 내용').fill('일정에서 적은 할 일')
 await page.getByRole('button', { name: '넣기', exact: true }).click()
 await page.waitForTimeout(800)
-check('일정에서 할 일이 추가된다', await page.getByText('일정에서 적은 할 일').first().isVisible())
+check('일정에서 할 일이 추가된다', await page.getByLabel('선택한 날짜').getByText('일정에서 적은 할 일').first().isVisible())
 
 await page.goto(BASE + '/', { waitUntil: 'networkidle' })
 await page.waitForTimeout(900)

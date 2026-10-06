@@ -68,22 +68,28 @@ const grantsInsight: Provider = ({ record, today, notices }) => {
   const ms = matchesFor(notices, profile, today)
   const fit = ms.filter((m) => m.verdict === 'fit')
   const check = ms.filter((m) => m.verdict === 'check')
-  const urgent = fit.filter((m) => m.deadline.urgent)
+  // D-156: 도전 체크(지켜보는 중)한 공고 — 마감은 이것만 말한다
+  const picked = record.fundingApplications.filter((a) => a.noticeId && a.status === 'watching')
   const core = [!profile.sido ? '회사 주소' : '', !profile.years ? '설립일' : '', !profile.industry.trim() ? '업종' : ''].filter(Boolean)
   const open = `/grants?view=clients&client=${encodeURIComponent(record.id)}`
   if (notices.length === 0) return { key: 'grants', label: '지원사업', tone: 'need', headline: '아직 받아 둔 공고가 없어요', detail: '기업마당 공고(매일 아침 9시)나 직접 넣은 공고가 있으면 이 업체 조건에 맞는 것을 바로 골라 드려요.', missing: [], openPath: open, openLabel: '지원사업 알림', action: null }
   if (fit.length > 0) {
-    const first = urgent[0] ?? fit[0]
+    // D-156: 맞는 공고 수는 알리되 마감은 자동으로 띄우지 않는다. 대표가 '도전해 볼 만함' 으로 고른 공고만 마감을 말한다
+    const next = [...picked].filter((a) => a.applyDueDate).sort((a, b) => a.applyDueDate.localeCompare(b.applyDueDate))[0]
     return {
       key: 'grants',
       label: '지원사업',
       tone: 'good',
-      headline: `맞는 지원사업 ${fit.length}건${urgent.length ? ` · 7일 안 마감 ${urgent.length}건` : ''}`,
-      detail: `${first.notice.title} — ${first.deadline.label}`,
+      headline: `가능성 높은 지원사업 ${fit.length}건${picked.length ? ` · 도전 체크 ${picked.length}건` : ''}`,
+      detail: next
+        ? `${next.programName} — 마감 ${Number(next.applyDueDate.slice(5, 7))}/${Number(next.applyDueDate.slice(8, 10))}`
+        : picked.length
+          ? picked[0].programName
+          : '해 볼 만한 공고에 ☆ 도전해 볼 만함 을 누르면 그 마감만 챙겨 드려요',
       missing: missingForMatch(profile).filter((m) => m === '직원 수' || m === '매출'),
       openPath: open,
       openLabel: '맞는 공고 보기',
-      action: `맞는 지원사업 안내 — ${first.notice.title.slice(0, 40)}(${first.deadline.label})`,
+      action: null,
     }
   }
   if (core.length) return { key: 'grants', label: '지원사업', tone: 'need', headline: `${core.join(' · ')}을(를) 알면 맞는 공고를 골라요`, detail: `지금 확인 필요 ${check.length}건`, missing: core, openPath: open, openLabel: '지원사업 알림', action: null }

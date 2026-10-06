@@ -192,7 +192,7 @@ export default function ClientSmartTab({
       )}
 
       {/* 7. 맞는 지원사업 */}
-      <ClientGrantsCard workspaceId={workspaceId} record={record} today={today} onFill={onFill} />
+      <ClientGrantsCard workspaceId={workspaceId} record={record} today={today} onFill={onFill} onCommit={onCommit} />
     </div>
   )
 }

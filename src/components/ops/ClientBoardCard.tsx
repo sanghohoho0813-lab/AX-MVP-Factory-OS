@@ -280,8 +280,8 @@ export function ClientBoardCard({
             className="tap t-sub inline-flex items-center gap-1.5 self-start font-semibold text-success-700 hover:underline"
           >
             <BellRing aria-hidden="true" className="size-4 shrink-0" />
+            {/* D-156: 마감 임박은 자동으로 세지 않는다 — 대표가 도전 체크한 공고만 마감이 '지금 챙길 것' 에 뜬다 */}
             맞는 지원사업 {grants.fit}건
-            {grants.urgentFit > 0 && <span className="text-danger-700">· 7일 안 마감 {grants.urgentFit}</span>}
           </button>
         )}
         {/* 회사 요약 — 대표자·업력은 진하게, 지역·업종은 흐리게, 사업자번호는 숫자 그대로 */}

@@ -88,15 +88,17 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
   const monthPrefix = `${ym[0]}-${String(ym[1]).padStart(2, '0')}`
   const pickedEvents = picked ? (byDate.get(picked) ?? []) : []
   const pickedTodos = useMemo(() => (picked ? todosOn(journal, picked) : []), [journal, picked])
-  /** 달력 칸에 점을 찍기 위한 날짜별 할 일 개수 */
-  const todoCountByDate = useMemo(() => {
-    const map = new Map<string, number>()
+  /** 날짜별 내가 적은 할 일 — 안 끝낸 것 먼저(todosOn 순서). 휴대폰은 점, PC 는 칸 안에 글로 (D-156) */
+  const todosByDate = useMemo(() => {
+    const map = new Map<string, JournalEntry[]>()
     for (const e of journal) {
-      if (e.entryType !== 'follow_up' || e.dueDate === '') continue
-      map.set(e.dueDate, (map.get(e.dueDate) ?? 0) + 1)
+      if (e.entryType !== 'follow_up' || e.dueDate === '' || map.has(e.dueDate)) continue
+      map.set(e.dueDate, todosOn(journal, e.dueDate))
     }
     return map
   }, [journal])
+  const shortName = (n: string) => n.replace(/\(주\)|㈜|주식회사/g, '').trim()
+  const clientNameOfId = (id: string | null | undefined) => (id ? (records.find((r) => r.id === id)?.companyName ?? '') : '')
 
   const offMap = useMemo(() => daysOffByDate(daysOff), [daysOff])
   const offSet = useMemo(() => new Set(daysOff.map((d) => d.date)), [daysOff])
@@ -302,8 +304,11 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
         </p>
       ) : (
         <>
+          {/* D-156: PC 에서는 달력을 왼쪽에 줄여 두고 고른 날의 할 일을 오른쪽에 — 한눈에. 휴대폰은 위아래 그대로 */}
+          <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(19rem,22rem)] lg:items-start">
+          <div className="flex min-w-0 flex-col gap-5">
           {/* 달력 */}
-          <div className="overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white">
+          <div className="overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="month-calendar">
             <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/80">
               {WEEKDAYS.map((w, i) => (
                 <div
@@ -324,6 +329,12 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                 const isPicked = d === picked
                 const dow = new Date(`${d}T00:00:00Z`).getUTCDay()
                 const off = offMap.get(d)
+                const todos = todosByDate.get(d) ?? []
+                // PC 칸: 할 일 → 업체 일정 순으로 3줄까지, 나머지는 +n건
+                const lines = [
+                  ...todos.map((t) => ({ key: t.id, kind: 'todo' as const, title: t.content, who: shortName(clientNameOfId(t.clientId)), done: t.completed })),
+                  ...list.map((e) => ({ key: e.id, kind: e.kind, title: e.title, who: shortName(e.clientName), done: e.done })),
+                ]
                 return (
                   <button
                     key={d}
@@ -333,7 +344,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                     title={off ? `${off.map((o) => o.name).join(' · ')} — 한 번 더 누르면 바로 적기` : '한 번 더 누르면 바로 적기'}
                     // D-139: 고른 날을 한 번 더 누르면(두 번 누르기) 바로 적는 창
                     onClick={() => (isPicked ? setQuick({ date: d, tab: 'todo' }) : setPicked(d))}
-                    className={`flex min-h-[5.5rem] min-w-0 flex-col gap-1 border-r border-b border-slate-100 p-1.5 text-left last:border-r-0 ${
+                    className={`flex min-h-[5.5rem] min-w-0 flex-col gap-1 border-r border-b lg:min-h-[6.75rem] lg:p-1 border-slate-100 p-1.5 text-left last:border-r-0 ${
                       inMonth ? 'bg-white' : 'bg-slate-50/60'
                     } ${off && !inMonth ? 'opacity-60' : ''} ${isPicked ? 'ring-2 ring-brand-400 ring-inset' : ''} hover:bg-brand-50/40`}
                   >
@@ -362,7 +373,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                         점만 찍고 내용은 아래 그날 목록에서 읽게 한다. */}
                     <span className="mt-0.5 flex flex-wrap gap-0.5 lg:hidden">
                       {/* 내가 적은 할 일은 브랜드색 점으로 — 마감(회사 일정)과 구분된다 */}
-                      {Array.from({ length: Math.min(todoCountByDate.get(d) ?? 0, 3) }, (_, i) => (
+                      {Array.from({ length: Math.min(todos.length, 3) }, (_, i) => (
                         <span key={`t${i}`} aria-hidden="true" className="size-1.5 rounded-full bg-brand-500" />
                       ))}
                       {list.slice(0, 4).map((e) => (
@@ -373,32 +384,27 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                         />
                       ))}
                     </span>
-                    <span className="hidden flex-col gap-0.5 lg:flex">
-                      {(todoCountByDate.get(d) ?? 0) > 0 && (
-                        <span className="t-meta flex items-center gap-1 truncate rounded border border-brand-200 bg-brand-50/60 px-1 py-0.5 text-brand-700">
-                          <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-brand-500" />
-                          <span className="truncate">할 일 {todoCountByDate.get(d)}</span>
-                        </span>
-                      )}
-                      {list.slice(0, 3).map((e) => (
+                    {/* D-156: '할 일 4' 숫자 대신 무슨 일인지 — 윗줄 할 일(진하게), 아랫줄 업체(작게). 내가 적은 할 일은 진한 브랜드색, 업체 일정은 종류색 */}
+                    <span className="hidden min-w-0 flex-col gap-0.5 lg:flex" data-testid="cell-lines">
+                      {lines.slice(0, 3).map((l) => (
                         <span
-                          key={e.id}
-                          title={`${e.clientName} · ${e.title}`}
+                          key={l.key}
+                          title={l.who ? `${l.who} · ${l.title}` : l.title}
+                          data-kind={l.kind}
                           className={`flex min-w-0 flex-col rounded border px-1 py-0.5 leading-tight ${
-                            e.done ? 'border-slate-100 text-slate-500 line-through' : SCHEDULE_KIND_CLASS[e.kind].chip
+                            l.done
+                              ? 'border-slate-100 bg-white text-slate-400 line-through'
+                              : l.kind === 'todo'
+                                ? 'border-brand-600 bg-brand-600 text-white'
+                                : SCHEDULE_KIND_CLASS[l.kind].cell
                           }`}
                         >
-                          {/* D-120: 업체 이름만 보여서 무슨 일인지 몰랐다 — 윗줄 무슨 일(성공보수 · 1차 미팅 …), 아랫줄 업체 */}
-                          <span className="t-meta flex min-w-0 items-center gap-1 font-semibold">
-                            <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${SCHEDULE_KIND_CLASS[e.kind].dot}`} />
-                            <span className="truncate">{e.title}</span>
-                          </span>
-                          <span className="t-meta truncate pl-2.5 opacity-80">{e.clientName.replace(/\(주\)|㈜|주식회사/g, '').trim()}</span>
+                          {/* 두 줄까지 — 한 줄로 자르면 '대표님…' 처럼 무슨 일인지 안 보였다 */}
+                          <span className="t-meta line-clamp-2 font-semibold [overflow-wrap:anywhere]">{l.title}</span>
+                          {l.who && <span className="t-meta truncate opacity-80">{l.who}</span>}
                         </span>
                       ))}
-                      {list.length > 3 && (
-                        <span className="t-meta px-1 text-slate-500">+{list.length - 3}건</span>
-                      )}
+                      {lines.length > 3 && <span className="t-meta px-1 font-semibold text-slate-600">+{lines.length - 3}건 더</span>}
                     </span>
                   </button>
                 )
@@ -425,7 +431,8 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
             위는 내가 적은 할 일(고칠 수 있는 것), 아래는 업체에서 자동으로 올라온
             마감(고칠 수 없는 것). 순서가 곧 "내가 뭘 할 수 있나" 다.
           */}
-          <section aria-label="선택한 날짜" className="flex flex-col gap-4">
+          </div>
+          <section aria-label="선택한 날짜" className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-4 lg:max-h-[calc(100dvh-2rem)] lg:overflow-y-auto lg:rounded-(--radius-panel) lg:border lg:border-slate-200 lg:bg-slate-50/60 lg:p-4" data-testid="picked-panel">
             <div className="flex flex-col gap-2">
               <h2 className="text-[1.15rem] font-bold text-slate-900">
                 {picked ? `${Number(picked.slice(5, 7))}월 ${Number(picked.slice(8))}일 할 일` : '날짜를 선택하세요'}
@@ -532,6 +539,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
               )}
             </div>
           </section>
+          </div>
         </>
       )}
 
@@ -589,7 +597,7 @@ export function EventRow({
       <button
         type="button"
         onClick={onOpen}
-        className={`flex w-full items-start gap-3 rounded-(--radius-card) border bg-white px-4 py-3 text-left hover:bg-slate-50 ${
+        className={`flex w-full items-start gap-3 rounded-(--radius-card) border border-l-4 bg-white px-4 py-3 text-left hover:bg-slate-50 ${cls.bar} ${
           event.done ? 'border-slate-200 opacity-60' : 'border-slate-200'
         }`}
       >

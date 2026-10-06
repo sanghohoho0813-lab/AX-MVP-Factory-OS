@@ -51,13 +51,14 @@ export const SCHEDULE_KIND_LABEL: Record<ScheduleKind, string> = {
  * 종류는 작은 점 하나로만 구분한다. 칸 전체를 종류색으로 칠하면 달력이
  * 색 모자이크가 되어 정작 '오늘 뭐가 있나' 가 보이지 않는다.
  */
-export const SCHEDULE_KIND_CLASS: Record<ScheduleKind, { dot: string; chip: string }> = {
-  next: { dot: 'bg-brand-600', chip: 'border-brand-200 bg-brand-50 text-brand-800' },
-  task: { dot: 'bg-cat-plan-500', chip: 'border-slate-200 bg-white text-slate-600' },
-  funding: { dot: 'bg-cat-fund-500', chip: 'border-slate-200 bg-white text-slate-600' },
-  payment: { dot: 'bg-cat-money-500', chip: 'border-slate-200 bg-white text-slate-600' },
-  document: { dot: 'bg-cat-doc-500', chip: 'border-slate-200 bg-white text-slate-600' },
-  tool: { dot: 'bg-cat-client-500', chip: 'border-slate-200 bg-white text-slate-600' },
+export const SCHEDULE_KIND_CLASS: Record<ScheduleKind, { dot: string; chip: string; cell: string; bar: string }> = {
+  // cell · bar (D-156): PC 달력 칸의 한 줄 · 그날 목록 왼쪽 띠 — 대표 요청 '색을 입혀 눈에 들어오게'. 옅은 바탕 + 진한 글씨로 글은 읽히게
+  next: { dot: 'bg-brand-600', chip: 'border-brand-200 bg-brand-50 text-brand-800', cell: 'border-brand-200 bg-brand-50 text-brand-800', bar: 'border-l-brand-600' },
+  task: { dot: 'bg-cat-plan-500', chip: 'border-slate-200 bg-white text-slate-600', cell: 'border-cat-plan-200 bg-cat-plan-50 text-cat-plan-700', bar: 'border-l-cat-plan-500' },
+  funding: { dot: 'bg-cat-fund-500', chip: 'border-slate-200 bg-white text-slate-600', cell: 'border-cat-fund-200 bg-cat-fund-50 text-cat-fund-700', bar: 'border-l-cat-fund-500' },
+  payment: { dot: 'bg-cat-money-500', chip: 'border-slate-200 bg-white text-slate-600', cell: 'border-cat-money-200 bg-cat-money-50 text-cat-money-700', bar: 'border-l-cat-money-500' },
+  document: { dot: 'bg-cat-doc-500', chip: 'border-slate-200 bg-white text-slate-600', cell: 'border-cat-doc-200 bg-cat-doc-50 text-cat-doc-700', bar: 'border-l-cat-doc-500' },
+  tool: { dot: 'bg-cat-client-500', chip: 'border-slate-200 bg-white text-slate-600', cell: 'border-cat-client-200 bg-cat-client-50 text-cat-client-700', bar: 'border-l-cat-client-500' },
 }
 
 /** 한 업체의 일정 */

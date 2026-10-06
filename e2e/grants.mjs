@@ -128,14 +128,14 @@ let finderLink = ''
   check('갈래 개발: 스마트공장만', (await page.getByTestId('grant-row').count()) === 1)
   await page.getByTestId('grant-cat-all').click()
 
-  // 오늘 — 맞는 업체에 알릴 공고
+  // D-156: 오늘에 '맞는 업체에 알릴 공고(7일 안 마감)' 를 자동으로 띄우지 않는다
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.waitForTimeout(600)
-  const today1 = (await page.getByTestId('today-grants').count()) ? await page.getByTestId('today-grants').innerText() : ''
-  check('오늘: 맞는 업체에 알릴 공고(파주 스마트공장)', /스마트공장/.test(today1) && /한솔테크/.test(today1) && /미래바이오랩/.test(today1), today1)
-  await page.getByTestId('today-grants').getByRole('link').first().click()
+  check('오늘: 맞는 공고 자동 알림 없음(D-156)', (await page.getByTestId('today-grants').count()) === 0)
+  await page.goto(BASE + '/grants', { waitUntil: 'networkidle' })
+  await page.getByTestId('grant-row').filter({ hasText: '스마트공장' }).first().click()
   await page.getByTestId('notice-sheet').waitFor()
-  check('오늘 → 공고 창 바로 열림', true)
+  check('공고 목록 → 공고 창 열림', true)
 
   // 공고 창 — 맞는 업체 · 이유 · 카톡 문구
   const sheet = page.getByTestId('notice-sheet')
@@ -152,12 +152,31 @@ let finderLink = ''
   check('카톡 문구: 업체 · 공고 · 마감 · 원문', /한솔테크\(주\) 대표님/.test(msg) && /스마트공장/.test(msg) && /마감:/.test(msg) && /bizinfo\.go\.kr/.test(msg), msg)
   check('카톡 문구: AI 라는 말 없음', !/AI 분석|인공지능이/.test(msg))
   check('보낸 기록: 알림 보냄 날짜', (await hansol.getByTestId('notice-sent').count()) === 1)
-  await page.keyboard.press('Escape')
 
-  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
-  await page.waitForTimeout(600)
-  const today2 = (await page.getByTestId('today-grants').count()) ? await page.getByTestId('today-grants').innerText() : ''
-  check('오늘: 알린 업체(한솔테크)는 빠지고 잠재고객만 남음', !/한솔테크/.test(today2) && /미래바이오랩/.test(today2), today2)
+  // D-156: 도전해 볼 만함 — 고른 공고만 마감을 챙긴다
+  const hansolApps = async () => (await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((c) => c.id === 'cli_hansol')?.fundingApplications ?? []))
+  const before = (await hansolApps()).length
+  await hansol.getByTestId('challenge-toggle').click()
+  await page.waitForTimeout(500)
+  const picked = (await hansolApps()).find((a) => /스마트공장/.test(a.programName) && a.noticeId)
+  check('도전 체크: 한솔테크에 지켜보는 중 한 건 · 공고 · 마감', !!picked && picked.status === 'watching' && /^\d{4}-\d{2}-\d{2}$/.test(picked.applyDueDate ?? '') && (await hansolApps()).length === before + 1, picked)
+  check('도전 체크: 단추가 \'도전 체크됨 · 마감\' 으로', /도전 체크됨 · 마감/.test(await hansol.getByTestId('challenge-toggle').innerText()) && (await hansol.getByTestId('challenge-toggle').getAttribute('aria-pressed')) === 'true')
+  await page.keyboard.press('Escape')
+  await page.goto(BASE + '/ops/calendar', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  const ym = picked?.applyDueDate?.slice(0, 7) ?? ''
+  const nowYm = await page.evaluate(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` })
+  if (ym && ym !== nowYm) await page.getByRole('button', { name: '다음 달' }).click()
+  await page.waitForTimeout(300)
+  const dueCell = page.locator(`main button[data-date="${picked?.applyDueDate}"]`)
+  check('도전 체크: 일정 달력 마감일 칸에 공고가 뜸', (await dueCell.innerText()).includes('스마트공장') || (await dueCell.innerText()).includes('한솔'), await dueCell.innerText().catch(() => ''))
+  await page.goto(BASE + '/grants', { waitUntil: 'networkidle' })
+  await page.getByTestId('grant-row').filter({ hasText: '스마트공장' }).first().click()
+  await page.getByTestId('notice-sheet').waitFor()
+  await page.getByTestId('notice-sheet').locator('[data-testid="notice-client"][data-client="cli_hansol"]').getByTestId('challenge-toggle').click()
+  await page.waitForTimeout(500)
+  check('체크 풀기: 한솔테크 신청 건 다시 없음', (await hansolApps()).length === before)
+  await page.keyboard.press('Escape')
 
   // 업체별 — 잠재고객
   await page.goto(BASE + '/grants?view=clients', { waitUntil: 'networkidle' })
@@ -375,7 +394,7 @@ function feedItems(n) {
 
   await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
   await page.waitForTimeout(1200)
-  check('맞춤 추천: 지원사업 판정 — 맞는 지원사업 N건', /맞는 지원사업 \d+건/.test((await page.locator('[data-testid="smart-insight"][data-key="grants"]').innerText().catch(() => '')) ?? ''))
+  check('맞춤 추천: 지원사업 판정 — 가능성 높은 지원사업 N건(마감 자동 표시 없음)', /가능성 높은 지원사업 \d+건/.test((await page.locator('[data-testid="smart-insight"][data-key="grants"]').innerText().catch(() => '')) ?? ''))
   check('업체 상세: 맞는 지원사업 카드에 기업마당 공고', (await page.getByTestId('detail-grants').innerText()).includes('파주시 제조기업 스마트 전환'))
 
   // 오늘 — '지금 이것부터' 없음, 다가오는 마감 · 약속
@@ -390,7 +409,7 @@ function feedItems(n) {
     const labels = await ar.evaluateAll((els) => els.map((e) => e.querySelector('.t-meta')?.textContent ?? ''))
     check('오늘: 다가오는 일은 날짜 순', labels.length > 0, labels)
   }
-  check('오늘: 지원사업 알림(7일 안 · 맞는 업체 · 아직 안 알림)', (await page.getByTestId('today-grants').innerText()).includes('파주시 제조기업 스마트 전환'))
+  check('오늘: 기업마당 공고도 자동 알림 없음(D-156)', (await page.getByTestId('today-grants').count()) === 0)
   check('기업마당: 여러 화면 돌아도 부른 횟수 2(처음 + 지금 새로)', calls.length === 2, calls)
 
   // 찾기(가망고객) — 기업마당 공고도 · 꼭 맞는 것 먼저 · 전국 공통 접힘

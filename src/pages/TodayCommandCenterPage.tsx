@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { TodayGrantAlerts } from '../components/grants/TodayGrantAlerts'
 import { TodayCharges } from '../components/money/TodayCharges'
 import { TodayCare } from '../components/ops/TodayCare'
 import { Link, useNavigate } from 'react-router-dom'
@@ -463,8 +462,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             </div>
           )}
 
-          {/* D-141: 지원사업 — 7일 안에 끝나는 공고 · 맞는 업체 중 아직 안 알린 곳 */}
-          <TodayGrantAlerts workspaceId={workspaceId} clients={clients} today={today} />
+          {/* D-156: '맞는 업체에 알릴 공고(7일 안 마감)' 자동 알림은 뺐다(대표: 다 뜨면 오히려 안 보게 된다).
+              도전 체크한 공고의 마감은 업체의 신청 건으로 위 '다가오는 마감 · 약속' 에 뜬다 */}
 
           {/* D-142: 3일 안에 결제될 정기 결제 */}
           <TodayCharges workspaceId={workspaceId} today={today} />

@@ -9,7 +9,7 @@ import { AiSoonButton } from '../ui/AiSoonButton'
 import { GRANT_CATEGORY_LABEL, GRANT_SOURCE_LABEL, deadlineOf, rulesText, type GrantMatch, type GrantNotice } from '../../services/grants/grantMatch'
 import { missingForMatch, profileLine } from '../../services/grants/grantProfile'
 import { CLIENT_KIND_LABEL, type ClientMatch, type GrantClient } from '../../services/grants/grantView'
-import { DeadlineText, MatchList, NoticeLink, ReasonList, VerdictBadge } from './GrantParts'
+import { ChallengeButton, DeadlineText, MatchList, NoticeLink, ReasonList, VerdictBadge, type ChallengeControl } from './GrantParts'
 import { applicationFor, applyReadiness } from '../../services/grants/grantApply'
 
 const mdOf = (iso: string) => (iso ? `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}` : '')
@@ -30,7 +30,12 @@ export function NoticeSheet({
   readOnly,
   onApply,
   onOpenApply,
+  onChallenge,
+  challengeBusy,
 }: {
+  /** D-156: 이 업체에 '도전해 볼 만함' 체크 · 풀기 */
+  onChallenge?: (x: ClientMatch) => void
+  challengeBusy?: boolean
   /** D-151: 이 업체로 신청 준비 — 없으면 단추를 숨긴다 */
   onApply?: (x: ClientMatch) => void
   /** 이미 신청 준비 중인 건 열기(업체 상세 · 신청 탭) */
@@ -110,6 +115,9 @@ export function NoticeSheet({
                     </button>
                     {open === id && <ReasonList reasons={x.match.reasons} />}
                     <div className="flex flex-wrap gap-2">
+                      {onChallenge && !ready && (
+                        <ChallengeButton app={applied} onToggle={() => onChallenge(x)} busy={challengeBusy} closed={d.state === 'closed'} />
+                      )}
                       <Button size="sm" variant="secondary" onClick={() => onCopy(x)} data-testid="notice-copy">
                         <Copy aria-hidden="true" className="size-4" /> 카톡 문구 복사
                       </Button>
@@ -191,7 +199,10 @@ export function ClientGrantPanel({
   onPick,
   onFill,
   compact,
+  challenge,
 }: {
+  /** D-156: 공고마다 '도전해 볼 만함' 체크 */
+  challenge?: ChallengeControl
   client: GrantClient
   matches: GrantMatch[]
   sentOf: (noticeId: string) => string
@@ -215,6 +226,11 @@ export function ClientGrantPanel({
   const shown = compact ? targeted.slice(0, compact) : targeted.slice(0, limit)
   return (
     <div className="flex flex-col gap-3" data-testid="client-grants">
+      {challenge && (
+        <p className="t-sub break-keep text-slate-500" data-testid="challenge-hint">
+          맞는 공고는 알림으로 띄우지 않아요. 해 볼 만한 공고만 <b className="font-semibold text-slate-700">☆ 도전해 볼 만함</b> 을 누르면 그 마감만 일정 · 오늘에 뜹니다.
+        </p>
+      )}
       <p className="t-sub break-keep text-slate-600">
         {profileLine(client.profile) || '업체 정보가 아직 비어 있어요'} — 지금 접수 중인 공고 중 <strong className="text-slate-900" data-testid="client-grants-count">조건 맞음 {fit}건</strong>
         {check ? ` · 확인 필요 ${check}건` : ''}
@@ -231,7 +247,7 @@ export function ClientGrantPanel({
         </p>
       )}
       {shown.length > 0 ? (
-        <MatchList matches={shown} sentOf={sentOf} onPick={onPick} />
+        <MatchList matches={shown} sentOf={sentOf} onPick={onPick} challenge={challenge} />
       ) : (
         <p className="t-sub break-keep text-slate-500">지역 · 업력 · 업종까지 맞는 공고가 지금은 없습니다. 새 공고가 들어오면 여기에 바로 보여요.</p>
       )}
@@ -246,7 +262,7 @@ export function ClientGrantPanel({
           <button type="button" onClick={() => setShowGeneral((v) => !v)} aria-expanded={showGeneral} data-testid="client-grants-general" className="tap t-sub self-start font-semibold text-brand-700 hover:underline">
             전국 공통 공고 {general.length}건 {showGeneral ? '접기' : '보기'} (누구나 신청 · 업체 조건 없음)
           </button>
-          {showGeneral && <MatchList matches={general.slice(0, 100)} sentOf={sentOf} onPick={onPick} />}
+          {showGeneral && <MatchList matches={general.slice(0, 100)} sentOf={sentOf} onPick={onPick} challenge={challenge} />}
           {showGeneral && general.length > 100 && <p className="t-sub text-slate-500">그 외 {general.length - 100}건은 지원사업 알림 화면에서 찾아 보세요.</p>}
         </div>
       )}
