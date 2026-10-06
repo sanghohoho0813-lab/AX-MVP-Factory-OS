@@ -31,6 +31,28 @@ const ctx = await browser.newContext({
 const page = await ctx.newPage()
 page.on('pageerror', (e) => check('JS 오류 없음', false, String(e).slice(0, 160)))
 
+/*
+ * D-159: 휴대폰 업체 카드는 처음에 접혀 있다(업무 조각 · 돈 · 사업자번호는 [펼쳐보기] 안).
+ * 이 시험은 카드 속 단추를 누르므로 고객 관리를 열 때마다 카드를 모두 편다.
+ */
+const expandCards = async () => {
+  if (!new URL(page.url()).pathname.startsWith('/ops/clients') || /\/ops\/clients\/./.test(new URL(page.url()).pathname)) return
+  await page.waitForTimeout(500)
+  const closed = page.locator('[data-testid="card-toggle"][aria-expanded="false"]')
+  for (let i = 0; i < 40 && (await closed.count()) > 0; i++) {
+    if (!(await closed.first().isVisible())) break
+    await closed.first().click()
+  }
+}
+for (const m of ['goto', 'reload']) {
+  const orig = page[m].bind(page)
+  page[m] = async (...a) => {
+    const r = await orig(...a)
+    await expandCards()
+    return r
+  }
+}
+
 await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' })
 await page.evaluate(seedScript())
 await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
@@ -661,7 +683,7 @@ check('실제로 지워졌다', left === false)
   const picker = page.locator('select[aria-label="업체 정렬 기준"]')
   check('정렬: 고르는 칸이 있다', (await picker.count()) > 0)
   const opts = await picker.locator('option').allInnerTexts()
-  check('정렬: 네 가지', opts.length === 4 && opts.includes('가나다순') && opts.includes('업력순') && opts.includes('계약 오래된 순'), JSON.stringify(opts))
+  check('정렬: 다섯 가지 — 맨 앞(기본) 요즘 챙기는 순(D-159)', opts.length === 5 && opts[0] === '요즘 챙기는 순' && opts.includes('가나다순') && opts.includes('업력순') && opts.includes('계약 오래된 순'), JSON.stringify(opts))
 
   const names = async () =>
     page.evaluate(() =>

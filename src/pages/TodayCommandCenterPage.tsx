@@ -59,6 +59,9 @@ import { contractStageOf } from '../types/clientOps'
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { CustomerEvent, CustomerEventStatus, JournalEntry } from '../types/bridge'
 
+/** D-159: 할 일이 4건 넘으면 휴대폰에서도 두 칸 — 여섯 건이면 세 줄로 끝난다 */
+const todoGridClass = (n: number) => `ax-stagger grid gap-2 ${n >= 4 ? 'grid-cols-2' : 'grid-cols-1'} lg:grid-cols-2`
+
 const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토']
 
 /** 실제 로컬 시각 — 하드코딩하지 않고 30초마다 갱신한다 */
@@ -296,8 +299,10 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
    * 날짜가 있는 일은 아래 '다가오는 마감 · 약속' 에서 날짜 순으로 보인다.
    */
   const openTodos = useMemo(() => dueToday.filter((e) => !e.completed), [dueToday])
-  const overdueTodos = useMemo(() => openTodos.filter((e) => e.dueDate < today), [openTodos, today])
-  const todayTodos = useMemo(() => openTodos.filter((e) => e.dueDate >= today), [openTodos, today])
+  // D-159: 적은 순서대로 번호(일정 달력과 같게) — 밀린 것부터 이어서 센다
+  const byCreated = (a: JournalEntry, b: JournalEntry) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)
+  const overdueTodos = useMemo(() => openTodos.filter((e) => e.dueDate < today).sort(byCreated), [openTodos, today])
+  const todayTodos = useMemo(() => openTodos.filter((e) => e.dueDate >= today).sort(byCreated), [openTodos, today])
   const doneTodos = useMemo(() => dueToday.filter((e) => e.completed), [dueToday])
   const todoCount = openTodos.length
 
@@ -420,10 +425,11 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         {overdueTodos.length > 0 && (
           <div className="flex flex-col gap-2">
             <p className="t-sub font-semibold text-danger-700">밀린 것 {overdueTodos.length}건</p>
-            <ul className="ax-stagger flex flex-col gap-2 lg:grid lg:grid-cols-2" data-testid="today-todo-grid">
-              {overdueTodos.map((e) => (
+            <ul className={todoGridClass(overdueTodos.length)} data-testid="today-todo-grid">
+              {overdueTodos.map((e, i) => (
                 <TodoRow
                   key={e.id}
+                  number={i + 1}
                   entry={e}
                   today={today}
                   clientName={e.clientId ? clientNames.get(e.clientId) : undefined}
@@ -435,10 +441,11 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         )}
 
         {todayTodos.length > 0 && (
-          <ul className="ax-stagger flex flex-col gap-2 lg:grid lg:grid-cols-2" data-testid="today-todo-grid">
-            {todayTodos.map((e) => (
+          <ul className={todoGridClass(todayTodos.length)} data-testid="today-todo-grid">
+            {todayTodos.map((e, i) => (
               <TodoRow
                 key={e.id}
+                number={overdueTodos.length + i + 1}
                 entry={e}
                 today={today}
                 clientName={e.clientId ? clientNames.get(e.clientId) : undefined}
@@ -515,7 +522,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         {/* 끝낸 것은 접어 둔다 — 남은 일이 목록의 전부여야 한다 */}
         {doneTodos.length > 0 && (
           <Disclosure title="끝낸 것" hint={`${doneTodos.length}건`}>
-            <ul className="flex flex-col gap-2 lg:grid lg:grid-cols-2">
+            <ul className={todoGridClass(doneTodos.length)}>
               {doneTodos.map((e) => (
                 <TodoRow
                   key={e.id}

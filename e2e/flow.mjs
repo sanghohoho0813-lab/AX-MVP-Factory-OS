@@ -15,6 +15,7 @@
  *  11. (D-124) 창이 열려 있을 때 뒤로가기는 창만 닫는다 · 뒤로 오면 보던 자리 · 찾던 말 그대로
  *  12. (D-125) 전화 단추(오늘 약속 줄 · 영업 보드 카드) · 고객 관리 '다음 약속 지남' 보기 · 휴대폰 하단 '영업'
  *  14. (D-158) 확인할 것 — 오늘 칸 · 모두 보기 · 맞아요(정보 넣기 · 문구 복사) · 아니에요 · 업체 상세에서 다시 안 물음
+ *  15. (D-159) 고객 관리 기본 '요즘 챙기는 순' · 휴대폰 카드 접힘(펼쳐보기 · 진행 % 없음 · 빈 곳 누르면 업체) · 오늘 할 일 번호 · 4건 넘으면 두 칸
  *  13. (D-155) 오늘 '안부 챙길 계약 고객' — 한 달 넘게 조용 · 계약 1주년 · 안부 카톡 · 연락했어요 · 다음에 · 성과 보고서 바로 열기
  */
 
@@ -426,6 +427,85 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   check(`업체 상세 맞춤 추천: 답한 것은 다시 안 물음 ${tag}`, !(await page.getByTestId('smart-tab').innerText()).includes('납세증명서 새로 받기'))
   const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   check(`확인할 것: 가로 넘침 0 · 오류 0 ${tag}`, over <= 0 && errors.length === 0, `${over} ${errors.join(' | ')}`)
+  await ctx.close()
+}
+
+/* 15 (D-159) 고객 관리 요즘 순 · 접힌 카드 · 오늘 할 일 번호 · 두 칸 */
+for (const [w, mob] of [[1440, false], [390, true]]) {
+  const ctx = await browser.newContext({ viewport: { width: w, height: 900 }, isMobile: mob, hasTouch: mob, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e).slice(0, 160)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const tag = `(${w})`
+  const T = await page.evaluate(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })
+  await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  const ids0 = await page.getByTestId('client-card').evaluateAll((els) => els.map((e) => e.getAttribute('data-client-id')))
+  const lastId = ids0[ids0.length - 1]
+  // 맨 뒤 업체에 오늘 통화 다섯 번 — 요즘 챙기는 순이면 맨 위로
+  await page.evaluate(({ k, id, T }) => {
+    const list = JSON.parse(localStorage.getItem(k))
+    const c = list.find((x) => x.id === id)
+    c.activity = [...(c.activity ?? []), ...[1, 2, 3, 4, 5].map((i) => ({ id: `e2e-act-${i}`, kind: 'note', text: '통화', serviceKey: null, at: `${T}T0${i}:00:00.000Z` }))]
+    localStorage.setItem(k, JSON.stringify(list))
+  }, { k: CLIENTS, id: lastId, T })
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  if (mob) {
+    const toggle = page.getByTestId('client-filters-toggle')
+    if (await toggle.count()) await toggle.click()
+  }
+  const sel = page.getByLabel('업체 정렬 기준')
+  check(`고객 관리: 기본 정렬 '요즘 챙기는 순' ${tag}`, (await sel.inputValue()) === 'active' && (await sel.locator('option:checked').innerText()).includes('요즘 챙기는 순'))
+  const ids1 = await page.getByTestId('client-card').evaluateAll((els) => els.map((e) => e.getAttribute('data-client-id')))
+  check(`요즘 순: 오늘 다섯 번 챙긴 업체가 맨 위 ${tag}`, ids1[0] === lastId, `${lastId} → ${ids1.slice(0, 3).join()}`)
+  const cardsText = await page.getByTestId('client-card').allInnerTexts()
+  check(`카드: 진행 % 없음 ${tag}`, !cardsText.some((t) => /진행\s*\d+%/.test(t)), cardsText[0]?.slice(0, 200))
+  const card = page.locator('[data-testid="client-card"][data-client-id="cli_hansol"]')
+  if (mob) {
+    const h0 = (await card.boundingBox()).height
+    check(`휴대폰 카드: 처음엔 접힘 — 사업자등록번호 안 보임 · 펼쳐보기 단추 ${tag}`, !(await card.innerText()).includes('사업자등록번호') && (await card.getByTestId('card-toggle').isVisible()))
+    check(`휴대폰 카드: 이름 · 년차 · 다음 약속 · 진행 중이 보임 ${tag}`, /년차/.test(await card.innerText()) && (await card.getByTestId('card-doing').count()) === 1, await card.innerText())
+    await card.getByTestId('card-toggle').click()
+    await page.waitForTimeout(200)
+    const h1 = (await card.boundingBox()).height
+    check(`펼쳐보기 → 사업자등록번호 · 업무 조각 · 카드가 길어짐(${Math.round(h0)} → ${Math.round(h1)}) ${tag}`, (await card.innerText()).includes('사업자등록번호') && (await card.locator('[data-chip-status]').count()) > 0 && h1 > h0 * 1.4)
+    await card.getByTestId('card-toggle').click()
+    await page.waitForTimeout(200)
+    // 이름 · 펼쳐보기 말고 빈 곳(진행 중 줄)을 누르면 업체 상세로
+    await card.getByTestId('card-doing').click()
+    await page.waitForURL(/\/ops\/clients\/cli_hansol/)
+    check(`휴대폰 카드: 빈 곳 누르면 업체 상세 ${tag}`, page.url().includes('/ops/clients/cli_hansol'))
+  } else {
+    check(`PC 카드: 접지 않음 — 사업자등록번호 보임 · 펼쳐보기 없음 ${tag}`, (await card.innerText()).includes('사업자등록번호') && !(await card.getByTestId('card-toggle').isVisible()))
+  }
+
+  // 오늘 할 일 여섯 건 — 적은 순서로 번호 · 4건 넘으면 두 칸 · 동그라미 단추 없음
+  await page.evaluate(({ T }) => {
+    const k = 'axmvp.v1.ops_journal_entries'
+    const list = JSON.parse(localStorage.getItem(k) ?? '[]').filter((e) => !(e.entryType === 'follow_up' && e.dueDate === T))
+    const order = [3, 1, 6, 2, 5, 4]
+    for (const n of order) list.push({ id: `e2e-t${n}`, workspaceId: null, userId: null, entryDate: T, entryType: 'follow_up', content: `할 일 ${n}번째로 적음`, clientId: null, dueDate: T, completed: false, pinned: false, createdAt: `${T}T0${n}:00:00.000Z`, updatedAt: `${T}T0${n}:00:00.000Z` })
+    localStorage.setItem(k, JSON.stringify(list))
+  }, { T })
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  const grid = page.getByTestId('today-todo-grid').last()
+  const g = await grid.evaluate((el) => ({ d: getComputedStyle(el).display, c: getComputedStyle(el).gridTemplateColumns.split(' ').length, n: el.children.length }))
+  check(`오늘 할 일: 여섯 건이면 두 칸 그리드 ${tag}`, g.d === 'grid' && g.c === 2 && g.n >= 6, g)
+  const rows = await grid.locator('li').allInnerTexts()
+  const mine = rows.filter((t) => t.includes('번째로 적음')).map((t) => t.replace(/\s+/g, ' ').trim())
+  check(`오늘 할 일: 적은 순서대로 번호 1~6 ${tag}`, mine.length === 6 && mine.every((t, i) => t.includes(`할 일 ${i + 1}번째로 적음`) && parseInt(t, 10) === parseInt(mine[0], 10) + i), mine)
+  check(`오늘 할 일: 왼쪽 동그라미 단추 없음 — 줄마다 단추 하나 ${tag}`, (await grid.locator('li').first().locator('button').count()) === 1)
+  await grid.locator('li').filter({ hasText: '할 일 2번째로 적음' }).getByRole('button').click()
+  await page.waitForTimeout(300)
+  const sheet = await page.getByRole('dialog').innerText().catch(() => '')
+  check(`할 일 누르면 진행 중 · 완료 · 내일로 · 지우기 ${tag}`, ['진행 중', '완료', '내일', '삭제'].every((x) => sheet.includes(x)) || ['진행 중', '완료', '내일', '지우기'].every((x) => sheet.includes(x)), sheet.slice(0, 200))
+  await page.keyboard.press('Escape')
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  check(`D-159: 가로 넘침 0 · 오류 0 ${tag}`, over <= 0 && errors.length === 0, `${over} ${errors.join(' | ')}`)
   await ctx.close()
 }
 

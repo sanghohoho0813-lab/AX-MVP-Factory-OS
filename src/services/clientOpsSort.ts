@@ -14,11 +14,13 @@ import { todayLocalDate } from '../lib/appClock'
 import { yearsInBusiness } from './clientOpsProfile'
 import { monthsSinceContract } from './contractSummary'
 
-export type ClientSortKey = 'urgency' | 'name' | 'years' | 'contract'
+export type ClientSortKey = 'active' | 'urgency' | 'name' | 'years' | 'contract'
 
-export const CLIENT_SORT_ORDER: ClientSortKey[] = ['urgency', 'name', 'years', 'contract']
+/** D-159: 기본은 '요즘 챙기는 순'(대표) — 최근에 한 일 · 다가오는 일정 · 급한 경고가 많은 업체가 위로 */
+export const CLIENT_SORT_ORDER: ClientSortKey[] = ['active', 'urgency', 'name', 'years', 'contract']
 
 export const CLIENT_SORT_LABEL: Record<ClientSortKey, string> = {
+  active: '요즘 챙기는 순',
   urgency: '급한 순',
   name: '가나다순',
   years: '업력순',
@@ -26,6 +28,7 @@ export const CLIENT_SORT_LABEL: Record<ClientSortKey, string> = {
 }
 
 export const CLIENT_SORT_HINT: Record<ClientSortKey, string> = {
+  active: '최근에 한 일 · 다가오는 일정이 많은 곳이 위로',
   urgency: '마감 지남·연체가 위로',
   name: '업체 이름 순서대로',
   years: '오래된 회사가 위로',
@@ -34,6 +37,43 @@ export const CLIENT_SORT_HINT: Record<ClientSortKey, string> = {
 
 export function isClientSortKey(v: unknown): v is ClientSortKey {
   return typeof v === 'string' && (CLIENT_SORT_ORDER as string[]).includes(v)
+}
+
+const DAY_MS = 86_400_000
+const dayNum = (ymd: string) => Date.UTC(+ymd.slice(0, 4), +ymd.slice(5, 7) - 1, +ymd.slice(8, 10)) / DAY_MS
+
+/**
+ * D-159: '요즘 챙기는' 점수 — 최근 30일에 한 일(활동 기록 · 메모 · 미팅) 1점씩(가까울수록 더) +
+ * 앞으로 14일 안 일정(다음 약속 · 업무 마감 · 수금 · 신청 마감) 2점씩 + 14일 안에 지난 마감 3점씩(더 묵은 것 1점). 계약 끝남 · 보관은 맨 뒤.
+ * 같으면 마지막으로 손댄 날이 최근인 곳 먼저.
+ */
+export function activityScore(r: ClientOpsRecord, today: string): { score: number; last: string } {
+  if (r.archivedAt !== null || r.status === 'completed') return { score: -1, last: '' }
+  const t = dayNum(today)
+  let score = 0
+  let last = ''
+  const touch = (iso: string | null | undefined) => {
+    if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return
+    const d = iso.slice(0, 10)
+    if (d > last) last = d
+    const ago = t - dayNum(d)
+    if (ago >= 0 && ago <= 30) score += ago <= 7 ? 2 : 1
+  }
+  for (const a of r.activity) touch(a.at)
+  for (const n of r.notes_list) touch(n.createdAt)
+  for (const m of r.sales?.meetings ?? []) touch(m.at)
+  const ahead = (d: string | null | undefined, open = true) => {
+    if (!open || !d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return
+    const left = dayNum(d) - t
+    // 막 지난 마감(14일 안)은 지금 챙길 일 — 오래 묵은 마감은 '급한 순' 이 따로 보여 준다(여기서는 1점)
+    if (left < 0) score += left >= -14 ? 3 : 1
+    else if (left <= 14) score += 2
+  }
+  ahead(r.nextActionDueDate)
+  for (const s of Object.values(r.services)) ahead(s?.dueDate, s?.status === 'in_progress' || s?.status === 'waiting_client')
+  for (const f of r.fees) ahead(f.dueDate, f.receivedAt === null)
+  for (const a of r.fundingApplications) ahead(a.applyDueDate, a.status === 'watching' || a.status === 'preparing')
+  return { score, last: last || (r.updatedAt ?? '').slice(0, 10) }
 }
 
 /**
@@ -54,6 +94,14 @@ export function sortClients(
 ): ClientOpsRecord[] {
   const list = [...records]
   switch (key) {
+    case 'active': {
+      const score = new Map(list.map((r) => [r.id, activityScore(r, today)]))
+      return list.sort((a, b) => {
+        const sa = score.get(a.id)!
+        const sb = score.get(b.id)!
+        return sb.score - sa.score || sb.last.localeCompare(sa.last) || a.companyName.localeCompare(b.companyName, 'ko')
+      })
+    }
     case 'urgency':
       return sortClientsByUrgency(list, today)
     case 'name':

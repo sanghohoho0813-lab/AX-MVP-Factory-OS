@@ -124,7 +124,7 @@ import { catalogWithPrices, cleanPrices, feeSum, toProposalItem, withContractFro
 import { digitsOf, formatNumberOf, numberSegments } from '../../lib/format'
 import { agentLedger, agentLedgerTotals, agentShares, feeMathOf, feeTotals, marginPct, marginText, netAmountOf } from '../feeMath'
 import { CLIENT_FILTER_ORDER, filterClients, isClientFilterKey, matchesClientFilter } from '../clientOpsFilter'
-import { CLIENT_SORT_ORDER, isClientSortKey, sortClients } from '../clientOpsSort'
+import { CLIENT_SORT_ORDER, activityScore, isClientSortKey, sortClients } from '../clientOpsSort'
 import { clientSearchText, matchesClientSearch, searchHit } from '../clientOpsSearch'
 import { allDocumentMetas, customDocumentMeta, documentMetaOf, makeCustomDocumentKey } from '../clientOpsDocuments'
 import { withCustomDocument, withDocument, withoutCustomDocument } from '../clientOpsService'
@@ -1432,7 +1432,7 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
     mk('c', '나라산업', '', ''),
   ]
 
-  check('정렬: 네 가지', CLIENT_SORT_ORDER.length === 4)
+  check('정렬: 다섯 가지 — 기본(맨 앞)은 요즘 챙기는 순(D-159)', CLIENT_SORT_ORDER.length === 5 && CLIENT_SORT_ORDER[0] === 'active')
   check('정렬: 모르는 값은 거른다', isClientSortKey('name') && !isClientSortKey('아무거나'))
   check('정렬: 원본을 건드리지 않는다', sortClients(list, 'name', T) !== list && list[0]?.id === 'a')
 
@@ -1447,6 +1447,20 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('정렬: 계약 오래된 순', byContract[0] === 'b' && byContract[1] === 'a', JSON.stringify(byContract))
   check('정렬: 계약일이 없으면 맨 뒤', byContract[2] === 'c')
   check('정렬: 급한 순도 모두 돌려준다', sortClients(list, 'urgency', T).length === 3)
+
+  // D-159: 요즘 챙기는 순 — 최근에 한 일 · 다가오는 일정 · 지난 마감이 많은 곳이 위로
+  const act = (at: string) => ({ id: `x${at}`, at: `${at}T09:00:00.000Z`, kind: 'note', text: '통화' }) as never
+  const busy = { ...list[2], activity: [act('2026-09-13'), act('2026-09-12'), act('2026-09-01')] }
+  const soon = { ...list[1], nextAction: '2차 미팅', nextActionDueDate: '2026-09-18' }
+  const late = { ...list[0], nextAction: '서류 받기', nextActionDueDate: '2026-09-10' }
+  check('요즘 순: 이번 주 두 번(2+2) + 지난달 한 번(1) = 5', activityScore(busy, T).score === 5, JSON.stringify(activityScore(busy, T)))
+  check('요즘 순: 14일 안 약속 2점 · 지난 약속 3점', activityScore(soon, T).score === 2 && activityScore(late, T).score === 3)
+  check('요즘 순: 한 달 묵은 마감은 1점(급한 순이 따로 보여 줌)', activityScore({ ...late, nextActionDueDate: '2026-08-10' }, T).score === 1)
+  check('요즘 순: 보관한 업체는 맨 뒤(-1)', activityScore({ ...busy, archivedAt: '2026-09-01T00:00:00Z' }, T).score === -1)
+  const byActive = sortClients([soon, late, busy], 'active', T).map((r) => r.id)
+  check('요즘 순: 많이 챙긴 곳 → 지난 마감 → 다가오는 약속', byActive.join() === 'c,a,b', byActive.join())
+  const quiet = sortClients([list[1], list[0]], 'active', T).map((r) => r.id)
+  check('요즘 순: 점수가 같으면 가나다', quiet.join() === 'b,a', quiet.join())
 }
 
 

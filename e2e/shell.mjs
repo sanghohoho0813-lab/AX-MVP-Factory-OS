@@ -215,7 +215,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   // D-103: 예전 '이 기기 · 계정' 칸(고객 플랫폼 열기 · 처음 사용 가이드) 없음 — 아래는 이름 한 줄 + 아이콘
   // D-120: 글자 크기만 서랍으로 되돌렸다 — 휴대폰 머리줄에 자리가 없고, 50~60대가 설정까지 찾아가지 않는다
   const whole = (await page.locator('.fixed.inset-0.z-50').first().innerText()) ?? ''
-  check('휴대폰 서랍: 이 기기 · 계정 칸 없음 · 글자 크기는 있다(D-120)', !whole.includes('이 기기') && whole.includes('글자 크기') && !whole.includes('고객 플랫폼 열기'), whole.slice(-200))
+  check('휴대폰 서랍: 이 기기 · 계정 칸 없음 · 글자 크기도 없다(D-158 — 설정에 있다)', !whole.includes('이 기기') && !whole.includes('글자 크기') && !whole.includes('고객 플랫폼 열기'), whole.slice(-200))
   check('휴대폰 서랍: 아래에 김상호 대표', whole.replace(/\s+/g, ' ').includes('김상호 대표'))
   await page.keyboard.press('Escape').catch(() => {})
   await page.goto(BASE + '/journal', { waitUntil: 'networkidle' })

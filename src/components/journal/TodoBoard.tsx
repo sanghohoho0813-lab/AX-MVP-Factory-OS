@@ -13,7 +13,7 @@
  */
 
 import { useState, type LiHTMLAttributes } from 'react'
-import { ArrowRight, Check, ChevronDown, Pencil, Plus, X } from 'lucide-react'
+import { ArrowRight, Check, Pencil, Plus, X } from 'lucide-react'
 import type { JournalEntry } from '../../types/bridge'
 import { TODO_PRESETS } from '../../services/journalService'
 import { ScrollHintRow } from '../ui/ScrollHintRow'
@@ -145,9 +145,9 @@ export function TodoComposer({
 /**
  * 할 일 한 줄.
  *
- * 왼쪽 동그라미는 지금 상태를 보여 주고, 누르면 무엇을 할 수 있는지 시트로 펼친다.
- * 예전에는 체크상자였는데 눌러 보기 전에는 무슨 일이 일어나는지 알 수 없었다 —
- * 완료되는 건지, 지워지는 건지. 이름을 붙여 고르게 하는 편이 확실하다.
+ * 줄을 누르면 무엇을 할 수 있는지(진행 중 · 완료 · 내일로 · 지우기) 시트로 펼친다.
+ * 체크상자는 눌러 보기 전에는 완료인지 삭제인지 알 수 없었다 — 이름을 붙여 고르게 한다.
+ * D-159: 왼쪽 동그라미도 뺐다 — 휴대폰 두 칸 그리드에 글이 들어갈 자리를 준다.
  */
 export function TodoRow({
   entry,
@@ -173,7 +173,7 @@ export function TodoRow({
   return (
     <li
       {...dragProps}
-      className={`flex items-start gap-3 rounded-(--radius-card) border px-4 py-3.5 ${dragProps?.draggable ? 'lg:cursor-grab ' : ''}${
+      className={`flex min-w-0 items-start rounded-(--radius-card) border px-3 py-3 sm:px-4 sm:py-3.5 ${dragProps?.draggable ? 'lg:cursor-grab ' : ''}${
         entry.completed
           ? 'border-slate-200 bg-white'
           : overdue
@@ -183,29 +183,18 @@ export function TodoRow({
     >
       <button
         type="button"
-        aria-label={`${entry.content} — ${entry.completed ? '완료' : '진행 중'}. 눌러서 바꾸기`}
         onClick={onPick}
-        className={`tap mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full border-2 ${
-          entry.completed
-            ? 'border-success-500 bg-success-500 text-white'
-            : 'border-slate-300 bg-white text-slate-400 hover:border-brand-500 hover:text-brand-600'
-        }`}
+        aria-label={`${entry.content} — ${entry.completed ? '완료' : '진행 중'}. 눌러서 바꾸기`}
+        className="tap min-w-0 flex-1 text-left"
       >
-        {entry.completed ? (
-          <Check aria-hidden="true" className="size-4" />
-        ) : (
-          <ChevronDown aria-hidden="true" className="size-4" />
-        )}
-      </button>
-
-      <button type="button" onClick={onPick} className="tap min-w-0 flex-1 text-left">
-        <span className={`t-body flex items-start gap-2 break-keep ${entry.completed ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
+        {/* D-159: 번호는 글 앞에 붙여 흐르게 — 두 칸 그리드에서 번호 칸만큼 글 폭이 줄지 않게 */}
+        <span className={`t-body block break-keep [overflow-wrap:anywhere] ${entry.completed ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
           {number !== undefined && (
-            <span aria-hidden="true" data-testid="todo-number" className={`mt-0.5 inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full px-1.5 text-[0.85rem] font-bold no-underline ${entry.completed ? 'bg-slate-100 text-slate-400' : 'bg-brand-600 text-white'}`}>
+            <span aria-hidden="true" data-testid="todo-number" className={`mr-1.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 align-[0.1em] text-[0.85rem] leading-none font-bold ${entry.completed ? 'bg-slate-100 text-slate-400' : 'bg-brand-600 text-white'}`}>
               {number}
             </span>
           )}
-          <span className="min-w-0">{entry.content}</span>
+          {entry.content}
         </span>
         <span className="t-meta mt-0.5 flex flex-wrap items-center gap-x-2 text-slate-500">
           {overdue && <span className="font-semibold text-danger-700">{dueText(left)}</span>}
@@ -213,7 +202,6 @@ export function TodoRow({
           {clientName && <span>{clientName}</span>}
         </span>
       </button>
-
     </li>
   )
 }

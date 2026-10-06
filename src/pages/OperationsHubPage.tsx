@@ -19,7 +19,8 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { ServiceCatalogModal } from '../components/ops/ServiceCatalogModal'
-const SORT_KEY = 'axmvp.clients.sort'
+// D-159: 기본 정렬을 '요즘 챙기는 순' 으로 바꾸며 새 이름에 기억한다(예전에 기억해 둔 '급한 순' 에 묶이지 않게)
+const SORT_KEY = 'axmvp.clients.sort.v2'
 const FILTER_KEY = 'axmvp.clients.filter'
 const SEGMENT_KEY = 'axmvp.clients.segment'
 
@@ -215,7 +216,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     try {
       const f = localStorage.getItem(FILTER_KEY)
       const so = localStorage.getItem(SORT_KEY)
-      return (isClientFilterKey(f) && f !== 'all') || (so !== null && so !== 'urgency')
+      return (isClientFilterKey(f) && f !== 'all') || (so !== null && so !== 'active')
     } catch {
       return false
     }
@@ -272,9 +273,9 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const [sortKey, setSortKey] = useState<ClientSortKey>(() => {
     try {
       const v = localStorage.getItem(SORT_KEY)
-      return isClientSortKey(v) ? v : 'urgency'
+      return isClientSortKey(v) ? v : 'active'
     } catch {
-      return 'urgency'
+      return 'active'
     }
   })
   useEffect(() => {
@@ -612,7 +613,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
             data-testid="client-filters-toggle"
             onClick={() => setFiltersOpen((v) => !v)}
             className={`tap inline-flex items-center gap-1.5 rounded-(--radius-control) border px-3 py-2 text-[0.92rem] font-medium sm:hidden ${
-              filterKey !== 'all' || sortKey !== 'urgency' ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600'
+              filterKey !== 'all' || sortKey !== 'active' ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600'
             }`}
           >
             <SlidersHorizontal aria-hidden="true" className="size-4" />
@@ -642,7 +643,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
             <select
               value={sortKey}
               aria-label="업체 정렬 기준"
-              onChange={(e) => setSortKey(isClientSortKey(e.target.value) ? e.target.value : 'urgency')}
+              onChange={(e) => setSortKey(isClientSortKey(e.target.value) ? e.target.value : 'active')}
               className="rounded-(--radius-control) border border-slate-300 bg-white px-2 py-2 text-[0.92rem] font-medium text-slate-700 focus:border-brand-500 focus:outline-none sm:py-1.5"
             >
               {CLIENT_SORT_ORDER.map((k) => (

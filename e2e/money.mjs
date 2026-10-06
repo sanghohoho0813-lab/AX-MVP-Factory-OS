@@ -211,8 +211,9 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('390 정기 결제: 넘침 0', (await overflowX(page)) <= 0)
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)
-  const g = await page.getByTestId('today-todo-grid').first().evaluate((el) => getComputedStyle(el).display)
-  check('390 오늘 할 일: 한 칸(flex)', g === 'flex', g)
+  // D-159: 휴대폰도 grid — 4건 넘으면 두 칸, 적으면 한 칸
+  const g = await page.getByTestId('today-todo-grid').first().evaluate((el) => ({ d: getComputedStyle(el).display, c: getComputedStyle(el).gridTemplateColumns.split(' ').length, n: el.children.length }))
+  check('390 오늘 할 일: 4건 넘으면 두 칸 · 적으면 한 칸', g.d === 'grid' && g.c === (g.n >= 4 ? 2 : 1), g)
   check('390: 오류 0', errors.length === 0, errors)
   await ctx.close()
 }
