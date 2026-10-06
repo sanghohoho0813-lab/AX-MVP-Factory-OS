@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useIsPilot } from '../../auth/osAccess'
 import { useNavPath } from '../../lib/navFrom'
 import { TextScaleQuickButton } from '../ui/TextScaleQuickButton'
 import {
@@ -157,6 +158,7 @@ function UserMenu() {
 
 export function Header({ onOpenMobileMenu }: HeaderProps) {
   const isSupabase = getDataModeConfig().mode === 'supabase'
+  const pilot = useIsPilot()
   // D-124: 영업에서 온 업체 화면은 머리줄도 '영업 관리' 그대로
   const pathname = useNavPath()
   const screenTitle = screenTitleForPath(pathname) ?? brand.brandNameKo
@@ -230,8 +232,8 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
         <span className="hdr-clock hidden lg:inline-flex">
           <HeaderClock />
         </span>
-        {/* 고객이 보는 표면으로 건너가는 문 — 새 탭. 로그인 세션은 공유하지 않는다(가짜 SSO 금지). */}
-        <a
+        {/* 고객이 보는 표면으로 건너가는 문 — 새 탭. 로그인 세션은 공유하지 않는다(가짜 SSO 금지). D-162: Pilot 에게는 없다(대표 고객 플랫폼) */}
+        {!pilot && <a
           href={brand.customerPlatformUrl}
           target="_blank"
           rel="noopener noreferrer"
@@ -242,11 +244,13 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
           <ExternalLink aria-hidden="true" className="size-4 text-slate-400" />
           {/* D-120: 1700px 아래에서는 아이콘만 — 머리줄이 옆으로 넘치지 않게 */}
           <span className="hidden min-[1700px]:inline">{brand.customerPlatformLabel}</span>
-        </a>
+        </a>}
         {/* 가이드·저장상태·설정·계정은 모바일에서 서랍/더보기 로 옮겼다 */}
-        <span className="hdr-opt hidden 2xl:inline-flex">
-          <GuideButton />
-        </span>
+        {!pilot && (
+          <span className="hdr-opt hidden 2xl:inline-flex">
+            <GuideButton />
+          </span>
+        )}
         {/* D-120: 저장 상태 글은 아주 넓은 화면에서만(글자 크기 단추 자리를 냈다) — 서랍 · 설정에도 있다 */}
         <span className="hdr-opt hidden min-[2100px]:inline-flex">
           <CloudSaveStatus state={isSupabase ? 'saved' : 'local'} compact={false} />

@@ -83,7 +83,7 @@ export function ClientGrantsCard({
             sentOf={(nid) => sentAt(sent, record.id, nid)}
             linked={linkOf(record.id) !== null}
             onCopyAll={() => void actions.copyAll(client, targeted)}
-            onCopyLink={() => void actions.copyLink(client)}
+            onCopyLink={actions.copyLink ? () => void actions.copyLink?.(client) : undefined}
             onPortal={() => void actions.toPortal(client, targeted)}
             onPick={() => navigate(`/grants?view=clients&client=${record.id}`)}
             onFill={onFill}

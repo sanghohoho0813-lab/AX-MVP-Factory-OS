@@ -1,13 +1,15 @@
 -- D-150 보안 SQL(0016) 시험 — 로컬 시험 DB(axqa)에서만. scripts/db-local/run.sh 가 부른다.
 \set QUIET 1
 \set ON_ERROR_STOP 1
-grant all on all tables in schema public to authenticated; grant all on all sequences in schema public to authenticated;
+-- 표 권한은 흉내 장치(supabase-shim.sql)가 Supabase 기본값처럼 준다 — 여기서 한꺼번에 다시 주면 0019 의 os_access 권한 거두기가 풀린다
 \set A '''aaaaaaaa-0000-0000-0000-000000000001'''
 \set V '''bbbbbbbb-0000-0000-0000-000000000002'''
 \set M '''cccccccc-0000-0000-0000-000000000003'''
 \set C '''dddddddd-0000-0000-0000-000000000004'''
 insert into auth.users (id, email) values (:A,'a@x.kr'),(:V,'v@x.kr'),(:M,'m@x.kr'),(:C,'c@x.kr');
 insert into public.profiles (id) values (:A),(:V),(:M),(:C) on conflict do nothing;
+-- D-162: 0019(접근 허용 목록)가 있으면 이 시험의 사람들은 대표 쪽 계정(full) — 작업공간을 만들 수 있게
+do $$ begin if to_regclass('public.os_access') is not null then execute 'insert into public.os_access (user_id, tier) select id, ''full'' from auth.users where email in (''a@x.kr'',''v@x.kr'',''m@x.kr'',''c@x.kr'') on conflict do nothing'; end if; end $$;
 
 create schema if not exists qa;
 create or replace function qa.ok(label text, q text) returns void language plpgsql as $$
@@ -34,15 +36,24 @@ select id as wv2 from public.workspaces where name='WV2' \gset
 
 -- 2. 멤버 권한
 select set_config('request.jwt.claim.sub', :V, false); set role authenticated;
-select qa.ok('주인 V 가 M 을 관리자로', format($q$insert into public.workspace_members (workspace_id,user_id,role) values (%L,%L,'admin')$q$, :'wv', :M));
-select qa.ok('주인 V 가 M 을 WV2 관리자로', format($q$insert into public.workspace_members (workspace_id,user_id,role) values (%L,%L,'admin')$q$, :'wv2', :M));
+-- D-162: 0019 가 있으면 남을 멤버로 바로 넣기는 막힌다(초대로만) — 막히는지 보고, 이어지는 시험을 위해 서버 작업(SQL Editor)으로 넣는다
+select case when to_regclass('public.os_access') is null
+  then qa.ok('주인 V 가 M 을 관리자로', format($q$insert into public.workspace_members (workspace_id,user_id,role) values (%L,%L,'admin')$q$, :'wv', :M))
+  else qa.no('(0019) 주인 V 도 M 을 바로 넣지 못함 — 초대로만', format($q$insert into public.workspace_members (workspace_id,user_id,role) values (%L,%L,'admin')$q$, :'wv', :M)) end;
+select case when to_regclass('public.os_access') is null
+  then qa.ok('주인 V 가 M 을 WV2 관리자로', format($q$insert into public.workspace_members (workspace_id,user_id,role) values (%L,%L,'admin')$q$, :'wv2', :M))
+  else qa.no('(0019) WV2 에도 바로 넣지 못함', format($q$insert into public.workspace_members (workspace_id,user_id,role) values (%L,%L,'admin')$q$, :'wv2', :M)) end;
 reset role;
+select set_config('request.jwt.claim.sub', '', false);
+insert into public.workspace_members (workspace_id,user_id,role) values (:'wv', :M, 'admin'), (:'wv2', :M, 'admin') on conflict do nothing;
 select set_config('request.jwt.claim.sub', :M, false); set role authenticated;
 select qa.no('관리자 M 이 자기를 소유자로', format($q$update public.workspace_members set role='owner' where workspace_id=%L and user_id=%L$q$, :'wv', :M));
 select qa.no('관리자 M 이 A 를 소유자로 넣기', format($q$insert into public.workspace_members (workspace_id,user_id,role) values (%L,%L,'owner')$q$, :'wv', :A));
 select qa.no('관리자 M 이 주인 V 를 관리자로 낮추기', format($q$update public.workspace_members set role='admin' where workspace_id=%L and user_id=%L$q$, :'wv', :V));
 select qa.no('관리자 M 이 주인 V 를 내보내기', format($q$delete from public.workspace_members where workspace_id=%L and user_id=%L$q$, :'wv', :V));
-select qa.ok('관리자 M 이 A 를 멤버로 넣기', format($q$insert into public.workspace_members (workspace_id,user_id,role) values (%L,%L,'editor')$q$, :'wv', :A));
+select case when to_regclass('public.os_access') is null
+  then qa.ok('관리자 M 이 A 를 멤버로 넣기', format($q$insert into public.workspace_members (workspace_id,user_id,role) values (%L,%L,'editor')$q$, :'wv', :A))
+  else qa.no('(0019) 관리자 M 도 A 를 바로 넣지 못함 — 초대로만', format($q$insert into public.workspace_members (workspace_id,user_id,role) values (%L,%L,'editor')$q$, :'wv', :A)) end;
 select qa.ok('관리자 M 이 A 를 내보내기', format($q$delete from public.workspace_members where workspace_id=%L and user_id=%L$q$, :'wv', :A));
 reset role;
 select set_config('request.jwt.claim.sub', :V, false); set role authenticated;

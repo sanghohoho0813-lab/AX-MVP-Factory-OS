@@ -7,7 +7,7 @@ import { createPortal } from 'react-dom'
 import { Copy, Printer } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { buildClientReport, reportKakao, REPORT_PERIOD_LABEL, type ClientReport, type ReportPeriod } from '../../services/clientReport'
-import { brand } from '../../brand/brand.config'
+import { useSenderLine } from '../layout/useCurrentUser'
 import { formatKrwCompact } from '../../lib/format'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
@@ -18,7 +18,7 @@ const won = (n: number) => `${n.toLocaleString('ko-KR')}원`
 const ymd = (d: string) => (d ? `${d.slice(0, 4)}. ${Number(d.slice(5, 7))}. ${Number(d.slice(8, 10))}.` : '')
 const md = (d: string) => (d ? `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}` : '')
 
-function ReportDocument({ r, printing }: { r: ClientReport; printing?: boolean }) {
+function ReportDocument({ r, printing, sender }: { r: ClientReport; printing?: boolean; sender: string }) {
   const tiles: [string, string][] = [
     [r.headline.securedBasis === 'selected' ? '선정된 지원금' : '확보한 자금', r.headline.securedBasis === 'none' ? '—' : formatKrwCompact(r.headline.securedTotal)],
     ['지원사업 선정', `${r.headline.selectedCount}건`],
@@ -119,13 +119,15 @@ function ReportDocument({ r, printing }: { r: ClientReport; printing?: boolean }
       )}
 
       <footer className="mt-6 border-t border-slate-200 pt-2 text-[0.8rem] text-slate-500">
-        {brand.brandNameKo} · {brand.ownerName} {brand.ownerTitle} — 업체 기록을 바탕으로 정리했습니다. 금액은 실제로 확인된 것만 담았습니다.
+        {sender} — 업체 기록을 바탕으로 정리했습니다. 금액은 실제로 확인된 것만 담았습니다.
       </footer>
     </article>
   )
 }
 
 export function ClientReportSheet({ record, today, onClose }: { record: ClientOpsRecord; today: string; onClose: () => void }) {
+  // D-162: 보고서 서명 — Pilot 은 자기 이름(대표 이름으로 나가지 않는다)
+  const sender = useSenderLine()
   const { showToast } = useToast()
   const [period, setPeriod] = useState<ReportPeriod>('year')
   const r = useMemo(() => buildClientReport(record, today, period), [record, today, period])
@@ -169,14 +171,14 @@ export function ClientReportSheet({ record, today, onClose }: { record: ClientOp
             </p>
           )}
           <div className="rounded-(--radius-control) border border-slate-200 bg-white p-4">
-            <ReportDocument r={r} />
+            <ReportDocument r={r} sender={sender} />
           </div>
         </div>
       </Modal>
       {/* 인쇄 종이는 화면 맨 바깥(body 바로 아래)에 — 인쇄할 때 나머지 화면을 통째로 빼서 빈 쪽이 생기지 않게(index.css .print-solo) */}
       {createPortal(
         <div className="print-document print-solo hidden bg-white text-slate-900 print:block" aria-hidden="true">
-          <ReportDocument r={r} printing />
+          <ReportDocument r={r} printing sender={sender} />
         </div>,
         document.body,
       )}

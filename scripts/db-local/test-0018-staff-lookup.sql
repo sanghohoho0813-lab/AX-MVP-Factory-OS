@@ -19,6 +19,8 @@ insert into public.profiles (id, email) values
   ('f3000000-0000-0000-0000-000000000003', 'nobody@x.kr') on conflict (id) do update set email = excluded.email;
 insert into public.workspaces (id, name, owner_id) values ('f9000000-0000-0000-0000-0000000000aa', 'W18', 'f1000000-0000-0000-0000-000000000001') on conflict do nothing;
 insert into public.workspace_members (workspace_id, user_id, role) values ('f9000000-0000-0000-0000-0000000000aa', 'f1000000-0000-0000-0000-000000000001', 'owner') on conflict do nothing;
+-- D-162: 0019 가 있으면 고객 계정 찾기는 full 계정만 — 이 시험의 직원은 대표 쪽(full)
+do $$ begin if to_regclass('public.os_access') is not null then execute 'insert into public.os_access (user_id, tier) values (''f1000000-0000-0000-0000-000000000001'', ''full'') on conflict do nothing'; end if; end $$;
 
 select set_config('request.jwt.claim.sub', 'f1000000-0000-0000-0000-000000000001', false);
 set role authenticated;

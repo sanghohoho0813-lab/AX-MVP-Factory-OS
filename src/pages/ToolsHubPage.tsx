@@ -1,9 +1,11 @@
 import { ArrowRight } from 'lucide-react'
+import { useIsPilot } from '../auth/osAccess'
 import { Link } from 'react-router-dom'
 import { PageHeader } from '../components/ui/PageHeader'
 import { ModuleAccessPanel } from '../components/tools/ModuleAccessPanel'
 import { Badge } from '../components/ui/primitives'
 import { REVIEW_HUB_PATH, TOOLS, type ToolDefinition } from '../config/toolRegistry'
+import { isPilotHiddenPath } from '../config/moduleRegistry'
 import { featuresOfModule, visibleModules, type CatalogModule } from '../config/productCatalog'
 import { featureIcon, featureLabel, featurePath } from '../config/featurePaths'
 import { useEntitlements } from '../lib/entitlementsStore'
@@ -59,7 +61,9 @@ export function ToolCard({ t }: { t: ToolDefinition }) {
 function ModuleCard({ m }: { m: CatalogModule }) {
   const { ent } = useEntitlements()
   const e = ent.module(m.key)
-  const features = featuresOfModule(m.key)
+  // D-162: Pilot 에게 막힌 화면(AX 프로젝트 자금 연계 등)은 줄째 뺀다
+  const pilot = useIsPilot()
+  const features = featuresOfModule(m.key).filter((f) => !(pilot && featurePath(f) && isPilotHiddenPath(featurePath(f) as string)))
   return (
     <li className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-4" data-module-card={m.key}>
       <div className="flex flex-wrap items-center gap-2">
@@ -99,6 +103,9 @@ function ModuleCard({ m }: { m: CatalogModule }) {
 }
 
 export function ToolsHubPage() {
+  // D-162: Pilot 에게는 잘 안 쓰는 모듈 · AX 스튜디오 안쪽 화면 · 요금제와 모듈 관리를 보이지 않는다
+  const pilot = useIsPilot()
+  const modules = visibleModules().filter((m) => !(pilot && m.rarelyUsed))
   const review = TOOLS.filter((t) => t.status === 'review')
   const moved = TOOLS.filter((t) => t.status === 'moved')
   return (
@@ -110,13 +117,14 @@ export function ToolsHubPage() {
 
       <section aria-labelledby="modules-list" className="flex flex-col gap-3">
         <h2 id="modules-list" className="t-section text-slate-900">
-          모듈 <span className="t-meta font-medium text-slate-500">{visibleModules().length}개</span>
+          모듈 <span className="t-meta font-medium text-slate-500">{modules.length}개</span>
         </h2>
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="module-cards">
-          {visibleModules().map((m) => (
+          {modules.map((m) => (
             <ModuleCard key={m.key} m={m} />
           ))}
         </ul>
+        {!pilot && (
         <p className="t-sub flex flex-wrap items-center gap-x-3 gap-y-1 break-keep text-slate-600">
           <span className="font-semibold text-slate-700">AX 스튜디오 안쪽 화면</span>
           {STUDIO_LINKS.map(([label, to]) => (
@@ -125,6 +133,7 @@ export function ToolsHubPage() {
             </Link>
           ))}
         </p>
+        )}
       </section>
 
       {/* D-118: 다른 곳으로 옮겨 간 것 — 카드가 아니라 한 줄 안내. 예전 화면은 기록 보기용으로 열린다 */}
@@ -159,7 +168,7 @@ export function ToolsHubPage() {
         </section>
       )}
 
-      <ModuleAccessPanel />
+      {!pilot && <ModuleAccessPanel />}
     </div>
   )
 }

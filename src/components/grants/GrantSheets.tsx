@@ -208,7 +208,8 @@ export function ClientGrantPanel({
   sentOf: (noticeId: string) => string
   linked: boolean
   onCopyAll: () => void
-  onCopyLink: () => void
+  /** 없으면 '찾기 링크 복사' 단추를 그리지 않는다(Pilot) */
+  onCopyLink?: () => void
   onPortal?: () => void
   onPick?: (m: GrantMatch) => void
   onFill?: () => void
@@ -271,9 +272,11 @@ export function ClientGrantPanel({
           <Copy aria-hidden="true" className="size-4" /> 카톡 문구 복사
         </Button>
         <AiSoonButton size="sm" label="AI로 맞춤 안내문" what="이 업체 사정에 맞춰 공고 안내 문구와 준비 서류 목록을 써 줍니다" />
-        <Button size="sm" variant="secondary" onClick={onCopyLink} data-testid="client-grants-link">
-          <Link2 aria-hidden="true" className="size-4" /> 찾기 링크 복사
-        </Button>
+        {onCopyLink && (
+          <Button size="sm" variant="secondary" onClick={onCopyLink} data-testid="client-grants-link">
+            <Link2 aria-hidden="true" className="size-4" /> 찾기 링크 복사
+          </Button>
+        )}
         {linked && onPortal && (
           <Button size="sm" variant="secondary" onClick={onPortal} disabled={targeted.length === 0} data-testid="client-grants-portal">
             <Send aria-hidden="true" className="size-4" /> 고객 화면에 올리기

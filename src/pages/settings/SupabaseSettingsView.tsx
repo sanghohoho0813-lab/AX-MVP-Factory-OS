@@ -2,6 +2,7 @@
  * supabase 모드 설정 화면 (세션·워크스페이스 사용). lazy 로 로드되어 local entry 에 영향 없음.
  */
 
+import { useIsPilot } from '../../auth/osAccess'
 import { useState } from 'react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Panel } from '../../components/ui/Panel'
@@ -79,6 +80,22 @@ export function SupabaseSettingsView() {
   const roleLabel: Record<string, string> = { owner: '소유자', admin: '관리자', editor: '편집자', viewer: '뷰어' }
   // D-103: 사이드바 아래·머리줄과 같은 이름 (프로필 이름이 없으면 대표 이름)
   const me = useCurrentUser()
+  // D-162: Pilot 에게는 '내 설정' 하나만 — 구성원 · 데이터 가져오기(이 브라우저 자료를 작업공간으로) · 시스템 · 고급 기능 · 사용법 설정은 없다
+  const pilot = useIsPilot()
+  if (pilot) {
+    return (
+      <div className="mx-auto flex w-full max-w-[1000px] flex-col gap-5" data-testid="settings-pilot">
+        <PageHeader title="설정" description="내 계정과 화면 표시를 바꿉니다." />
+        <Panel title="내 정보">
+          <SettingRow label="이름">{me.name} {me.title}</SettingRow>
+          <SettingRow label="이메일">{session?.user.email ?? '—'}</SettingRow>
+          <SettingRow label="작업공간">{current?.workspace?.name ?? '—'}</SettingRow>
+        </Panel>
+        <AppearancePanel />
+        <TextScalePanel />
+      </div>
+    )
+  }
   return (
     <div className="mx-auto flex w-full max-w-[1000px] flex-col gap-5">
       <PageHeader title="설정" description="내 계정·작업공간·데이터·시스템을 관리합니다." />

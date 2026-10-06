@@ -1,4 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useIsPilot } from '../auth/osAccess'
 import { NextStepEditor } from '../components/ops/NextStepEditor'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { LINK_BUTTON } from '../components/sales/salesStyle'
@@ -198,6 +199,7 @@ const DETAIL_TABS: { key: DetailTab; label: string; hidden?: boolean }[] = [
   // D-151: 공고에서 '신청 준비' 를 건 업체는 줄에 보인다(아래 showTab)
   { key: 'funding', label: '지원사업 신청', hidden: true },
 ]
+const PILOT_HIDDEN_TABS = new Set<DetailTab>(['portal', 'consulting'])
 function isDetailTab(v: string | null): v is DetailTab {
   return DETAIL_TABS.some((t) => t.key === v)
 }
@@ -208,7 +210,10 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const [searchParams, setSearchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
   // D-129: 예전 '파일' 탭 주소는 서류로 — 고객과 주고받은 파일도 서류 탭 아래에 있다
-  const tab: DetailTab = tabParam === 'files' ? 'docs' : isDetailTab(tabParam) ? tabParam : 'overview'
+  // D-162: Pilot 에게는 고객 플랫폼(대표 공개 사이트와 이어짐) · 컨설팅(특허+벤처) 탭이 없다 — 주소로 와도 개요로
+  const pilot = useIsPilot()
+  const requested: DetailTab = tabParam === 'files' ? 'docs' : isDetailTab(tabParam) ? tabParam : 'overview'
+  const tab: DetailTab = pilot && PILOT_HIDDEN_TABS.has(requested) ? 'overview' : requested
   /** 개요에서 항목을 누르면 그 항목이 열린 채로 업무 탭이 뜨도록 svc 를 함께 싣는다 */
   const location = useLocation()
   /** D-124: 영업에서 왔으면 돌아갈 곳 — 탭을 바꿔도 잃지 않게 state 를 함께 싣는다 */
@@ -563,7 +568,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                   {contractAge}
                 </button>
               )}
-              {portalLinked !== null && (
+              {portalLinked !== null && !pilot && (
                 <button
                   type="button"
                   onClick={() => setTab('portal')}
@@ -655,7 +660,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         className="sticky top-16 z-20 -mx-4 bg-slate-50/95 backdrop-blur sm:-mx-6 lg:-mx-10"
         innerClassName="flex gap-1 border-b border-slate-200 px-4 sm:px-6 lg:px-10"
       >
-        {DETAIL_TABS.filter((t) => !t.hidden || t.key === tab || (t.key === 'funding' && activeApplications(record).length > 0)).map((t) => {
+        {DETAIL_TABS.filter((t) => !(pilot && PILOT_HIDDEN_TABS.has(t.key)) && (!t.hidden || t.key === tab || (t.key === 'funding' && activeApplications(record).length > 0))).map((t) => {
           const badge =
             t.key === 'smart' ? pendingFacts(record).length + alerts.filter((a) => a.severity === 'critical').length
               : t.key === 'overview' ? 0
@@ -1662,18 +1667,20 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 서류 한꺼번에 올리기(파일 · 폴더)
               </Button>
               {/* D-129: 기본 탭 줄에서 뺀 두 영역 — 기능과 기록은 그대로, 여기서 연다 */}
-              <Button
-                variant="secondary"
-                className="w-full justify-start"
-                data-testid="more-consulting"
-                onClick={() => {
-                  setMoreOpen(false)
-                  setTab('consulting')
-                }}
-              >
-                <Workflow aria-hidden="true" className="size-4" />
-                컨설팅(특허 · 벤처) 보기
-              </Button>
+              {!pilot && (
+                <Button
+                  variant="secondary"
+                  className="w-full justify-start"
+                  data-testid="more-consulting"
+                  onClick={() => {
+                    setMoreOpen(false)
+                    setTab('consulting')
+                  }}
+                >
+                  <Workflow aria-hidden="true" className="size-4" />
+                  컨설팅(특허 · 벤처) 보기
+                </Button>
+              )}
               <Button
                 variant="secondary"
                 className="w-full justify-start"

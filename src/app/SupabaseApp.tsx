@@ -15,6 +15,8 @@ import {
   ConfigurationErrorScreen,
   ConnectionErrorScreen,
   InitializingScreen,
+  NoAccessScreen,
+  StorageBlockedScreen,
 } from '../auth/ui/BootstrapScreens'
 import { WorkspaceOnboarding } from '../auth/ui/WorkspaceOnboarding'
 import { LoginPage } from '../auth/ui/LoginPage'
@@ -28,7 +30,7 @@ import { RouteErrorScreen } from '../components/layout/RouteErrorScreen'
 /** 로그인·회원가입 등 게스트 전용 라우트 가드 (로그인 상태면 홈으로) */
 function GuestOnly({ children }: { children: ReactNode }) {
   const { bootstrap } = useAuth()
-  if (bootstrap.status === 'ready' || bootstrap.status === 'authenticated_no_workspace') {
+  if (bootstrap.status === 'ready' || bootstrap.status === 'authenticated_no_workspace' || bootstrap.status === 'no_access' || bootstrap.status === 'storage_blocked') {
     return <Navigate to="/" replace />
   }
   return <>{children}</>
@@ -36,10 +38,13 @@ function GuestOnly({ children }: { children: ReactNode }) {
 
 /** 보호 경로 셸 — 세션·워크스페이스가 준비된 경우에만 AppShell 을 연다. */
 function ProtectedShell() {
-  const { bootstrap, currentWorkspaceId } = useAuth()
+  const { bootstrap, currentWorkspaceId, signOut } = useAuth()
   if (bootstrap.status === 'unauthenticated') {
     return <Navigate to="/login" replace />
   }
+  // D-162: 접근 목록에 없는 계정 · 다른 계정 자료가 남은 브라우저 — 앱을 열지 않는다
+  if (bootstrap.status === 'no_access') return <NoAccessScreen onSignOut={() => void signOut()} />
+  if (bootstrap.status === 'storage_blocked') return <StorageBlockedScreen onSignOut={() => void signOut()} />
   if (bootstrap.status === 'authenticated_no_workspace') {
     return <WorkspaceOnboarding />
   }

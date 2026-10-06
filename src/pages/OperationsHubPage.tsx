@@ -18,6 +18,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
+import { useIsPilot } from '../auth/osAccess'
 import { ServiceCatalogModal } from '../components/ops/ServiceCatalogModal'
 // D-159: 기본 정렬을 '요즘 챙기는 순' 으로 바꾸며 새 이름에 기억한다(예전에 기억해 둔 '급한 순' 에 묶이지 않게)
 const SORT_KEY = 'axmvp.clients.sort.v2'
@@ -109,11 +110,13 @@ function clientTone(dLeft: number | null, overduePayments: number, critical: num
 
 function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const navigate = useNavigate()
+  const pilot = useIsPilot()
   const [records, setRecords] = useState<ClientOpsRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [formOpen, setFormOpen] = useState(false)
+  // D-162: 오늘 화면의 '첫 업체 등록' 이 ?new=1 로 등록 창을 바로 연다
+  const [formOpen, setFormOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1')
   /** D-125: 이번 등록에서 이미 만든 업체(영업 칸 저장만 실패한 경우 다시 쓰려고) */
   const createdRef = useRef<ClientOpsRecord | null>(null)
   useEffect(() => {
@@ -187,12 +190,14 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
    */
   useEffect(() => {
     if (getDataModeConfig().mode !== 'supabase') return
+    // D-162: Pilot 은 이 브라우저의 예전 로컬 자료를 옮겨 받지 않는다(처음부터 0)
+    if (pilot) return
     try {
       setLeftover(pendingLocalClients(records))
     } catch {
       setLeftover([])
     }
-  }, [records])
+  }, [records, pilot])
 
   /*
    * 보기 조건도 기억한다(D-79). '못 받은 돈 있음' 으로 두고 수금 전화를 도는 날은
@@ -447,10 +452,12 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
               <CalendarDays aria-hidden="true" className="size-4" />
               일정 보기
             </Button>
-            <Button variant="secondary" className="w-full justify-start" onClick={() => { setMoreOpen(false); navigate('/ops/agents') }}>
-              <Handshake aria-hidden="true" className="size-4" />
-              영업자 정산
-            </Button>
+            {!pilot && (
+              <Button variant="secondary" className="w-full justify-start" onClick={() => { setMoreOpen(false); navigate('/ops/agents') }}>
+                <Handshake aria-hidden="true" className="size-4" />
+                영업자 정산
+              </Button>
+            )}
             <Button
               variant="secondary"
               className="w-full justify-start"
@@ -712,16 +719,16 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
         </div>
 
         {records.length === 0 ? (
-          <div className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-12 text-center">
+          // D-162: 빈 화면 자체가 다음 행동을 알려 준다 — 안내 창을 따로 띄우지 않는다
+          <div data-testid="clients-empty" className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-12 text-center">
             <Building2 aria-hidden="true" className="mx-auto size-9 text-brand-400" />
-            <p className="mt-3 text-[1.25rem] font-bold text-slate-900">첫 업체를 등록해 보세요</p>
-            <p className="mx-auto mt-2 max-w-xl text-[1rem] break-keep text-slate-600">
-              업체를 만들면 법인설립·업종추가·특허·벤처인증·AX 개발·정책자금 6가지 업무와 서류 10종이 자동으로 준비됩니다.
-              이후에는 마감이 지났거나 서류가 빠진 것을 이 화면이 알아서 찾아 올려 드립니다.
-            </p>
-            <Button variant="primary" className="mt-5" onClick={() => setFormOpen(true)}>
+            <p className="mt-3 text-[1.25rem] font-bold text-slate-900">등록된 업체가 없습니다</p>
+            <Button variant="primary" className="mt-4" onClick={() => setFormOpen(true)} data-testid="clients-empty-add">
               <CirclePlus aria-hidden="true" className="size-4" />첫 업체 등록
             </Button>
+            <p className="mx-auto mt-4 max-w-xl text-[1rem] break-keep text-slate-600">
+              업체를 등록하면 일정 · 서류 · 업무 · 수금을 한곳에서 관리할 수 있습니다.
+            </p>
           </div>
         ) : (
           <>

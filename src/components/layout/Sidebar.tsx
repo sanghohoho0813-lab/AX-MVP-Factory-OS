@@ -22,6 +22,7 @@ import { FutureItemDialog } from './FutureItemDialog'
 import { futureIcon } from './futureIcons'
 import { useCurrentUser } from './useCurrentUser'
 import { useNavCounts, type NavCounts } from './useNavCounts'
+import { useIsPilot } from '../../auth/osAccess'
 import { useBackToClose } from '../../lib/backToClose'
 import { useEntitlements } from '../../lib/entitlementsStore'
 
@@ -75,7 +76,9 @@ function SidebarContent({
   const navPath = useNavPath()
   // D-120: 설정 '고급 운영 기능 보기' 를 따른다(끄면 검증 · 기관 전략 · 사례를 목차에서 뺀다). 바꾸면 바로 다시 그린다
   useStoreVersion()
-  const groups = enabledModulesByGroup({ advanced: isAdvancedVisible() })
+  // D-162: Pilot 에게는 대표 전용 묶음 · 줄을 빼고 보인다(같은 메뉴 표에서)
+  const pilot = useIsPilot()
+  const groups = enabledModulesByGroup({ advanced: isAdvancedVisible(), pilot })
   const counts = useNavCounts()
   const [userCollapsed, setUserCollapsed] = useState<Set<ModuleGroupKey> | null>(null)
 

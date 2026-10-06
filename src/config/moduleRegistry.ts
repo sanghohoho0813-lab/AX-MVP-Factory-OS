@@ -58,6 +58,8 @@ export interface ModuleGroup {
   accent: NavAccent
   /** 접을 수 있는 그룹(전문 기능 묶음) */
   collapsible?: boolean
+  /** D-162: 대표 · 기존 구성원(full)에게만 — Pilot 에게는 묶음째 보이지 않고 주소로도 열리지 않는다 */
+  ownerOnly?: boolean
   /** 처음에는 접어 둔다 */
   defaultCollapsed?: boolean
 }
@@ -102,6 +104,8 @@ export interface ModuleDefinition {
   kind?: 'category'
   parent?: string
   moduleKey?: string
+  /** D-162: 대표 · 기존 구성원(full)에게만 — Pilot 에게는 메뉴에도 없고 주소로도 열리지 않는다 */
+  ownerOnly?: boolean
 }
 
 /*
@@ -119,8 +123,8 @@ export const MODULE_GROUPS: ModuleGroup[] = [
   // 도구는 분야 줄 아래에 접혀 있다. 도구가 늘어도 이 묶음의 줄 수는 늘지 않는다(예전 컨설팅 작업실 + AX 스튜디오)
   { key: 'modules', title: '전문 모듈', accent: 'system' },
   // D-136: 대표 "특허·벤처 · AX 스튜디오는 거의 안 쓴다" — 지우지 않고 접힌 한 묶음으로(주소 · 데이터 · 기능 그대로)
-  { key: 'rare', title: '잘 안 쓰는 기능', accent: 'system', collapsible: true, defaultCollapsed: true },
-  { key: 'about', title: '이 시스템', accent: 'system', collapsible: true, defaultCollapsed: true },
+  { key: 'rare', title: '잘 안 쓰는 기능', accent: 'system', collapsible: true, defaultCollapsed: true, ownerOnly: true },
+  { key: 'about', title: '이 시스템', accent: 'system', collapsible: true, defaultCollapsed: true, ownerOnly: true },
   { key: 'settings', title: '설정', accent: 'system' },
 ]
 
@@ -198,17 +202,18 @@ export const MODULES: ModuleDefinition[] = [
 
   // D-104: '고객 운영' → '고객 관리', '고객 이벤트함' → '잠재고객 상담신청' (주소는 그대로)
   { key: 'client-ops', label: '고객 관리', path: '/ops/clients', icon: ListChecks, group: 'clients', accent: 'ops', enabled: true, badge: 'clients' },
-  { key: 'inbox', label: '잠재고객 상담신청', path: '/ops/inbox', icon: Inbox, group: 'clients', accent: 'alert', enabled: true, badge: 'requests', hint: '고객 이벤트함' },
+  // D-162: 공개 사이트(고객 플랫폼) 상담신청은 대표 작업공간으로만 들어온다 — Pilot 에게는 없다
+  { key: 'inbox', label: '잠재고객 상담신청', path: '/ops/inbox', icon: Inbox, group: 'clients', accent: 'alert', enabled: true, badge: 'requests', hint: '고객 이벤트함', ownerOnly: true },
 
   // D-114: 기업컨설팅 OS(영업 도구 모음)를 옮긴 곳 — 목차는 이 한 줄, 보드 · 미팅 준비 · 상품·견적 · 전략은 안의 탭
   { key: 'sales', label: '영업 관리', path: '/sales/board', icon: KanbanSquare, group: 'sales', accent: 'revenue', enabled: true, alsoPaths: [...SALES_TAB_PATHS, ...SALES_EXTRA_PATHS, ...movedToPaths('/sales/board')], hint: '영업 보드 · 잠재고객 → 미팅 → 계약' },
   // D-141: 정부지원사업 매칭 알림 — 계약 고객 · 잠재고객 조건에 맞는 공고 · 마감 임박
   { key: 'grants', label: '지원사업 알림', path: '/grants', icon: BellRing, group: 'sales', accent: 'revenue', enabled: true, hint: '마감 임박 공고 · 업체 조건에 맞는 곳 · 가망고객 찾기 링크' },
-  { key: 'agents', label: '영업자 정산', path: '/ops/agents', icon: Handshake, group: 'sales', accent: 'revenue', enabled: true, hint: '누구한테 지금 얼마를 줘야 하는가' },
+  { key: 'agents', label: '영업자 정산', path: '/ops/agents', icon: Handshake, group: 'sales', accent: 'revenue', enabled: true, hint: '누구한테 지금 얼마를 줘야 하는가', ownerOnly: true },
   // D-142: 매출(계약 수금에서 저절로) · 비용(정기 결제 · 쓴 돈 · 영업자 수수료)
   { key: 'money', label: '매출 · 비용', path: '/money', icon: Wallet, group: 'sales', accent: 'revenue', enabled: true, hint: '들어온 돈 · 들어올 예정 · 정기 결제일 · 쓴 돈' },
   // 만들고 있는 프로그램이 들어올 자리 — 들어오면 status 를 지우고 화면만 바꾼다 (docs/DECISIONS D-103)
-  { key: 'first-meeting', label: '1차 미팅 체크리스트', path: '/sales/first-meeting', icon: ClipboardCheck, group: 'sales', accent: 'revenue', enabled: true, status: 'soon', badge: 'first-meetings', hint: '영업자용 AX 1차 미팅 체크리스트 — 만드는 중' },
+  { key: 'first-meeting', label: '1차 미팅 체크리스트', path: '/sales/first-meeting', icon: ClipboardCheck, group: 'sales', accent: 'revenue', enabled: true, status: 'soon', badge: 'first-meetings', hint: '영업자용 AX 1차 미팅 체크리스트 — 만드는 중', ownerOnly: true },
 
 
   // 이 시스템이 왜 있는지 · 성과를 어떻게 재는지 · 다음에 무엇을 만들지 — 규격이 요구하는 '찾을 수 있는 이야기'
@@ -231,12 +236,34 @@ export const MODULES: ModuleDefinition[] = [
  * 목차 묶음. opts.advanced 가 false 면 '고급 운영 기능' 메뉴(검증 · 기관 전략 · 사례)를 뺀다(D-120) —
  * 설정의 '고급 운영 기능 보기' 가 말한 대로. 주소로는 계속 열린다. opts 를 안 주면 전부(시험 · 옛 호출).
  */
-export function enabledModulesByGroup(opts: { advanced?: boolean } = {}): { group: ModuleGroup; items: ModuleDefinition[] }[] {
+export function enabledModulesByGroup(opts: { advanced?: boolean; pilot?: boolean } = {}): { group: ModuleGroup; items: ModuleDefinition[] }[] {
   const showAdvanced = opts.advanced ?? true
-  return MODULE_GROUPS.map((group) => ({
+  const pilot = opts.pilot ?? false
+  return MODULE_GROUPS.filter((group) => !(pilot && group.ownerOnly)).map((group) => ({
     group,
-    items: MODULES.filter((m) => m.enabled && m.group === group.key && (showAdvanced || !m.advanced)),
+    // D-162: Pilot 에게는 대표 전용 줄 · 고급 운영 기능(검증 · 기관 전략 · 사례)을 빼고 보인다
+    items: MODULES.filter((m) => m.enabled && m.group === group.key && (showAdvanced || !m.advanced) && !(pilot && (m.ownerOnly || m.advanced || isPilotHiddenPath(m.path)))),
   })).filter((g) => g.items.length > 0)
+}
+
+/**
+ * D-162: Pilot 에게 열지 않는 주소 — 메뉴의 대표 전용 줄(묶음째 · 그 안의 도구 · 함께 맡는 주소) + 메뉴에 없는 내부 · 관리 화면.
+ * 메뉴와 같은 표에서 계산한다(메뉴를 두 벌 만들지 않는다). 데이터는 이미 서버(RLS)에서 나뉘어 있고, 이건 화면 정리다.
+ */
+const PILOT_HIDDEN_EXTRA = [
+  '/getting-started', '/why', '/kpi', '/roadmap', // 이 시스템
+  '/today/legacy', // 옛 오늘 화면
+  '/studio', '/ax', '/clients', '/projects', '/diagnosis', '/selection', '/mvp-design', '/validation', '/deliverables', '/website-studio', '/cases', // AX · 웹 스튜디오 · 특허+벤처
+  '/funding', '/reports', // AX 프로젝트에 붙는 자금 연계(프로젝트 없이는 빈 화면) · 옛 리포트 — 기관 전략(고급) 포함
+  '/tools/review', // 도입 검토중(대표가 고르는 곳)
+  '/modules/tech-biz', '/modules/ax-studio', '/modules/web-studio',
+]
+const underBase = (pathname: string, base: string) => pathname === base || pathname.startsWith(`${base}/`)
+
+export function isPilotHiddenPath(pathname: string): boolean {
+  if (PILOT_HIDDEN_EXTRA.some((b) => underBase(pathname, b))) return true
+  const ownerGroups = new Set(MODULE_GROUPS.filter((g) => g.ownerOnly).map((g) => g.key))
+  return MODULES.some((m) => m.enabled && (m.ownerOnly || m.advanced || ownerGroups.has(m.group)) && moduleMatchLength(m, pathname) > 0)
 }
 
 const underPath = (pathname: string, base: string) => pathname === base || pathname.startsWith(`${base}/`)

@@ -119,6 +119,8 @@ await ctx.route(`https://${REF}.supabase.co/**`, async (route) => {
   const method = req.method()
   if (path.endsWith('/auth/v1/token')) return route.fulfill(json(session))
   if (path.endsWith('/auth/v1/user')) return route.fulfill(json(session.user))
+  // D-162: 내부 OS 접근 등급 — 대표(full)
+  if (path.endsWith('/rest/v1/rpc/my_os_access')) return route.fulfill(json('full'))
   if (path.includes('/storage/v1/object/public/')) {
     publicHits.push(path)
     return route.fulfill({ status: 400, body: 'private bucket' })

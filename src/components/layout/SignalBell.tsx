@@ -6,6 +6,7 @@ import { useStoreVersion } from '../../lib/useStoreVersion'
 import { WorkspaceScope } from '../workspace/WorkspaceScope'
 import { todayLocalDate } from '../../lib/appClock'
 import type { OpsAlert } from '../../types/clientOps'
+import { useIsPilot } from '../../auth/osAccess'
 
 /**
  * 헤더 알림 종 — 데모 상수가 아니라 실제 경고(마감·서류·수금)와 열린 고객 이벤트 수를 보여준다.
@@ -13,6 +14,8 @@ import type { OpsAlert } from '../../types/clientOps'
 function BellContent({ workspaceId }: { workspaceId: string | null }) {
   const { open, setOpen, containerRef } = useDismissable<HTMLDivElement>()
   const version = useStoreVersion()
+  // D-162: Pilot 은 고객 플랫폼 상담신청을 쓰지 않는다 — 종에도 넣지 않는다
+  const pilot = useIsPilot()
   const [alerts, setAlerts] = useState<OpsAlert[]>([])
   /** 종 목록에 보일 상담신청 한 줄 (누구 · 종류) — 읽을 때 한 번 만든다 */
   const [events, setEvents] = useState<{ id: string; text: string }[]>([])
@@ -31,6 +34,10 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
       } catch {
         if (alive) setAlerts([])
       }
+      if (pilot) {
+        if (alive) setEvents([])
+        return
+      }
       try {
         const { EVENT_TYPE_LABEL, eventSummary, isOpenEvent, listEvents } = await import('../../services/customerBridgeService')
         const ev = await listEvents(workspaceId)
@@ -41,7 +48,7 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
       }
     })()
     return () => { alive = false }
-  }, [workspaceId, version])
+  }, [workspaceId, version, pilot])
 
   const critical = useMemo(() => alerts.filter((a) => a.severity === 'critical'), [alerts])
   const count = critical.length + events.length
@@ -66,7 +73,7 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
         <div className="absolute top-full right-0 z-30 mt-1.5 w-80 max-w-[calc(100vw-2rem)] rounded-(--radius-card) border border-slate-200 bg-white shadow-(--shadow-overlay)">
           <p className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-900">지금 챙길 것</p>
           {count === 0 ? (
-            <p className="px-4 py-4 text-[0.9rem] text-slate-500">급한 경고와 새 상담신청이 없습니다.</p>
+            <p className="px-4 py-4 text-[0.9rem] text-slate-500">{pilot ? '급한 경고가 없습니다.' : '급한 경고와 새 상담신청이 없습니다.'}</p>
           ) : (
             <ul className="max-h-80 overflow-y-auto">
               {events.slice(0, 4).map((e) => (

@@ -6,6 +6,8 @@
  * 사는 단추 · 가격은 없다 — 결제가 붙기 전이다.
  */
 
+import { useIsPilot } from '../auth/osAccess'
+import { isPilotHiddenPath } from '../config/moduleRegistry'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowRight, Check, Clock, Lock, Sparkles } from 'lucide-react'
 import { PageHeader } from '../components/ui/PageHeader'
@@ -26,11 +28,13 @@ export function ModuleOverviewPage() {
   const clientId = params.get('client')
   const { ent, workspaceId } = useEntitlements()
   const { showToast } = useToast()
+  // D-162: Pilot 에게는 잘 안 쓰는 모듈(기술사업화 · AX · 웹 스튜디오)과 요금제 말을 보이지 않는다
+  const pilot = useIsPilot()
   const m = catalogModule(moduleKey)
   if (!m || !m.visible) return <NotFoundState title="모듈을 찾지 못했습니다" description="주소가 바뀌었거나 없는 모듈입니다." backTo="/tools" backLabel="모듈 전체로" />
 
   const e = ent.module(m.key)
-  const features = featuresOfModule(m.key)
+  const features = featuresOfModule(m.key).filter((f) => !(pilot && featurePath(f) && isPilotHiddenPath(featurePath(f) as string)))
   const startTrial = async () => {
     await setAccess(workspaceId, m.entitlementKey, 'trial', todayLocalDate())
     notifyEntitlementsChanged()
@@ -117,7 +121,7 @@ export function ModuleOverviewPage() {
         <p className="t-sub font-semibold text-slate-600">다른 전문 모듈</p>
         <div className="flex flex-wrap gap-2">
           {visibleModules()
-            .filter((x) => x.key !== m.key)
+            .filter((x) => x.key !== m.key && !(pilot && x.rarelyUsed))
             .map((x) => (
               <Link
                 key={x.key}
@@ -130,7 +134,7 @@ export function ModuleOverviewPage() {
               </Link>
             ))}
           <Link to="/tools" className="tap t-body inline-flex items-center px-2 py-2 font-medium text-brand-700 hover:underline">
-            모듈 전체 · 요금제
+            {pilot ? '모듈 전체' : '모듈 전체 · 요금제'}
           </Link>
         </div>
       </nav>

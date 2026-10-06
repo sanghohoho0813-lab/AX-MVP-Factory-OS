@@ -16,6 +16,8 @@ import { useActiveProject } from '../../context/activeProject'
 import { peekProjectCache } from '../../domain/consulting/projectCache'
 import { searchTools } from '../../config/toolRegistry'
 import { AuthContext } from '../../auth/authContext'
+import { useIsPilot } from '../../auth/osAccess'
+import { isPilotHiddenPath } from '../../config/moduleRegistry'
 import { listClients } from '../../services/clientOpsService'
 import { matchesClientSearch } from '../../services/clientOpsSearch'
 import { isProspect } from '../../services/salesPipeline'
@@ -49,6 +51,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
   const inputRef = useRef<HTMLInputElement>(null)
   // D-120: 고객 관리 업체 — 열 때마다 새로 읽는다(못 읽으면 이 묶음만 빠진다)
   const auth = useContext(AuthContext)
+  const pilot = useIsPilot()
   const workspaceId = auth?.currentWorkspaceId ?? null
   const [opsClients, setOpsClients] = useState<ClientOpsRecord[]>([])
   useEffect(() => {
@@ -113,8 +116,9 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
   const hits = useMemo<Hit[]>(() => {
     if (!open) return []
     const q = normalizeQuery(query)
-    const orgs = organizationRepository.getAll()
-    const projects = projectRepository.getAll().filter((p) => p.status !== 'archived')
+    // D-162: Pilot 에게는 AX 고객사 · 프로젝트 · 특허+벤처 · 결과자료(대표 전용 화면)를 찾아 주지 않는다
+    const orgs = pilot ? [] : organizationRepository.getAll()
+    const projects = pilot ? [] : projectRepository.getAll().filter((p) => p.status !== 'archived')
     const out: Hit[] = []
 
     // 고객 관리 업체 — 회사명 · 대표자 · 담당자 · 사업자번호 · 전화 뒷자리 · 직접 만든 칸
@@ -142,7 +146,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
       }
     }
     // 컨설팅 작업실 (특허·벤처·MVP) — 마지막으로 읽은 목록에서 (화면을 한 번 연 뒤부터 잡힌다)
-    for (const c of peekProjectCache()) {
+    for (const c of pilot ? [] : peekProjectCache()) {
       if (c.status === 'archived') continue
       if (!q || `${c.clientName} ${c.title} ${c.currentStage}`.toLowerCase().includes(q)) {
         out.push({ group: '특허+벤처', label: `${c.clientName} · ${c.title}`, sublabel: `현재 ${c.currentStage}`, onSelect: () => { navigate(`/studio/${c.id}`); close() } })
@@ -158,18 +162,18 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
     }
     // 도구함 — "부채비율" 처럼 도구 이름이 아닌 말로도 찾게 한다 (D-89)
     for (const t of searchTools(query)) {
-      if (!t.path) continue
+      if (!t.path || (pilot && isPilotHiddenPath(t.path))) continue
       const path = t.path
       out.push({ group: '전문 모듈', label: t.label, sublabel: t.navHint ?? t.desc.slice(0, 40), onSelect: () => { navigate(path); close() } })
     }
-    for (const s of RESULT_SHORTCUTS) {
+    for (const s of pilot ? [] : RESULT_SHORTCUTS) {
       if (!q || s.keywords.includes(q) || s.label.toLowerCase().includes(q)) {
         out.push({ group: '결과·자료', label: s.label, onSelect: () => { navigate(s.path); close() } })
       }
     }
     return out.slice(0, 24)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, query, opsClients])
+  }, [open, query, opsClients, pilot])
 
   useEffect(() => { setActive(0) }, [query])
 

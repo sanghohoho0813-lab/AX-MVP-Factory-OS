@@ -12,6 +12,7 @@
  * 도구를 막지는 않는다 — 손으로 붙여넣어 쓰는 길이 늘 있기 때문이다.
  */
 
+import { useIsPilot } from '../../auth/osAccess'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertTriangle, ArrowRight, Check, FileUp, History, Lock } from 'lucide-react'
@@ -40,6 +41,7 @@ export function ClientToolsCard({
   const tools = liveTools().filter((t) => t.path !== null)
   /** D-136: 잘 안 쓰는 모듈(기술사업화 · AX · 웹 스튜디오)은 접어 둔다 — 누르면 펼친다. 자주 쓰는 모듈은 휴대폰에서도 다 보인다 */
   const [showAll, setShowAll] = useState(false)
+  const pilot = useIsPilot()
 
   const readiness = readinessOf(record, tools, today)
   const readyOf = new Map(readiness.map((r) => [r.tool.key, r]))
@@ -47,7 +49,9 @@ export function ClientToolsCard({
   const missingAll = missingDocsForTools(record, tools, today)
 
   // 업체에서 여는 기능이 있는 모듈만, 카탈로그 순서대로
+  // D-162: Pilot 에게는 잘 안 쓰는 모듈(기술사업화 · AX · 웹 스튜디오) 입구를 두지 않는다
   const groups = visibleModules()
+    .filter((m) => !(pilot && m.rarelyUsed))
     .map((m) => ({ m, features: FEATURE_CATALOG.filter((f) => f.module === m.key && f.clientEntry) }))
     .filter((g) => g.features.length > 0)
   const count = groups.reduce((n, g) => n + g.features.length, 0)

@@ -8,6 +8,8 @@
  * 1024px 이상에서는 왼쪽 사이드바가 그 역할을 하므로 나타나지 않는다.
  */
 
+import { useIsPilot } from '../../auth/osAccess'
+import { isPilotHiddenPath } from '../../config/moduleRegistry'
 import { useNavCounts } from './useNavCounts'
 import { Link } from 'react-router-dom'
 import { useNavPath } from '../../lib/navFrom'
@@ -55,6 +57,9 @@ export function MobileNav({ onOpenMore }: { onOpenMore: () => void }) {
   // D-124: 영업에서 온 업체 화면이면 '고객' 칸에 불을 켜지 않는다
   const pathname = useNavPath()
   const counts = useNavCounts()
+  // D-162: Pilot 에게는 상담신청(공개 사이트 → 대표 작업공간) 칸이 없다 — 메뉴 표의 대표 전용 주소를 그대로 따른다
+  const pilot = useIsPilot()
+  const items = pilot ? ITEMS.filter((i) => !isPilotHiddenPath(i.to)) : ITEMS
 
   return (
     <nav
@@ -62,7 +67,7 @@ export function MobileNav({ onOpenMore }: { onOpenMore: () => void }) {
       className="no-print pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur lg:hidden"
     >
       <ul className="flex items-stretch">
-        {ITEMS.map((item) => {
+        {items.map((item) => {
           const active = isActive(pathname, item)
           const Icon = item.icon
           const requests = item.to === '/ops/inbox' ? (counts.requests ?? 0) : 0

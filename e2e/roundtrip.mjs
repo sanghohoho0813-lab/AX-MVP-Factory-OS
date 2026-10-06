@@ -213,6 +213,8 @@ await ops.route(`https://${REF}.supabase.co/**`, async (route) => {
 
   if (path.endsWith('/auth/v1/token')) return route.fulfill(json(session(OWNER, 'owner-test@miraeailab.com')))
   if (path.endsWith('/auth/v1/user')) return route.fulfill(json(session(OWNER, 'owner-test@miraeailab.com').user))
+  // D-162: 내부 OS 접근 등급 — 대표(full)
+  if (path.endsWith('/rest/v1/rpc/my_os_access')) return route.fulfill(json('full'))
 
   if (path.includes('/rest/v1/customer_events')) {
     if (method === 'PATCH') { eventsPatched += 1; return route.fulfill(json([{ ...P.inbox_events[0], status: 'resolved' }])) }

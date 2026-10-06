@@ -181,9 +181,10 @@ export function withCareSnooze(record: ClientOpsRecord, until: string): ClientOp
 const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`
 
 /** 안부 카톡 문구 — 고객이 봐도 되는 것만(성과 보고서와 같은 규칙) */
-export function careMessage(record: ClientOpsRecord, item: CareItem, today: string): string {
+export function careMessage(record: ClientOpsRecord, item: CareItem, today: string, sender?: string): string {
   const who = record.representativeName ? `${record.representativeName} 대표님` : `${record.companyName} 담당자님`
-  const me = `${brand.brandNameKo} ${brand.ownerName} ${brand.ownerTitle}`
+  // D-162: 보내는 사람 — 주지 않으면 대표(지금처럼). Pilot 화면은 자기 이름을 넘긴다
+  const me = sender?.trim() || `${brand.brandNameKo} ${brand.ownerName} ${brand.ownerTitle}`
   const r = buildClientReport(record, today, item.reason === 'anniversary' ? 'last12' : 'contract')
   const lines = [`안녕하세요, ${who}. ${me}입니다.`]
   if (item.reason === 'anniversary' && item.anniversary) {

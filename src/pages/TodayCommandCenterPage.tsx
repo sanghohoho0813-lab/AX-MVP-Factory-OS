@@ -7,6 +7,8 @@ import { useEntitlements } from '../lib/entitlementsStore'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
+  Building2,
+  CirclePlus,
   CalendarClock,
   Clock,
   Copy,
@@ -55,6 +57,7 @@ import { nowDate, todayLocalDate } from '../lib/appClock'
 import { krwTile } from '../lib/format'
 import { getDataModeConfig } from '../data/dataMode'
 import { brand } from '../brand/brand.config'
+import { useIsPilot } from '../auth/osAccess'
 import { contractStageOf } from '../types/clientOps'
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { CustomerEvent, CustomerEventStatus, JournalEntry } from '../types/bridge'
@@ -173,6 +176,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const now = useClock()
   const today = todayLocalDate(now)
   const isLocal = getDataModeConfig().mode === 'local'
+  // D-162: Pilot 은 고객 플랫폼 상담신청 · 영업자 정산을 쓰지 않는다 — 그 칸을 그리지 않는다
+  const pilot = useIsPilot()
 
   const [clients, setClients] = useState<ClientOpsRecord[]>([])
   const [journal, setJournal] = useState<JournalEntry[]>([])
@@ -403,6 +408,18 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         </div>
       </section>
 
+      {/* D-162: 업체가 하나도 없으면 빈 화면 자체가 다음 행동을 알려 준다(안내 창 없이) */}
+      {!loading && clients.length === 0 && (
+        <section data-testid="today-first-client" className="flex flex-col items-center gap-3 rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-8 text-center">
+          <Building2 aria-hidden="true" className="size-8 text-brand-400" />
+          <p className="text-[1.2rem] font-bold text-slate-900">등록된 업체가 없습니다</p>
+          <Button variant="primary" onClick={() => navigate('/ops/clients?new=1')} data-testid="today-first-client-add">
+            <CirclePlus aria-hidden="true" className="size-4" />첫 업체 등록
+          </Button>
+          <p className="t-body max-w-xl break-keep text-slate-600">업체를 등록하면 일정 · 서류 · 업무 · 수금을 한곳에서 관리할 수 있습니다.</p>
+        </section>
+      )}
+
       {/*
         B. 오늘 할 일 — 내가 적은 것.
         규칙이 찾아 주는 경고보다 위에 둔다. 하루를 실제로 굴리는 것은 내가 적어 둔
@@ -586,7 +603,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           )}
 
           {/* 오늘의 숫자 — 위가 아니라 할 일 아래에 둔다. 숫자는 판단의 근거이지 할 일이 아니다 */}
-          <div className="ax-stagger mt-1 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          <div className={`ax-stagger mt-1 grid grid-cols-2 gap-2.5 ${pilot ? 'sm:grid-cols-3' : 'sm:grid-cols-4'}`}>
             <MetricTile
               label="이번 주 마감"
               value={`${weekDue.length}건`}
@@ -620,18 +637,20 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               onClick={() => navigate(money.overdue.items[0] ? `/ops/clients/${money.overdue.items[0].clientId}?tab=fees` : money.scheduled.count > 0 ? '/ops/clients?filter=unpaid' : '/ops/clients')}
             />
             {/* 새 요청은 '급한 일' 이 아니라 '새로 온 것' 이다 — 빨강 대신 브랜드색 */}
-            <MetricTile
-              label="새 상담신청"
-              value={`${openEvents.length}건`}
-              tone={openEvents.length > 0 ? 'brand' : 'neutral'}
-              onClick={() => navigate('/ops/inbox')}
-            />
+            {!pilot && (
+              <MetricTile
+                label="새 상담신청"
+                value={`${openEvents.length}건`}
+                tone={openEvents.length > 0 ? 'brand' : 'neutral'}
+                onClick={() => navigate('/ops/inbox')}
+              />
+            )}
           </div>
 
           {/* D-122: 오늘 화면에 안 보이던 돈 두 가지 — 영업자에게 줄 돈 · 받을 날을 안 정한 수금 */}
-          {(agentPayable > 0 || noDueFees.length > 0) && (
+          {((!pilot && agentPayable > 0) || noDueFees.length > 0) && (
             <p data-testid="today-money-notes" className="t-sub flex flex-wrap gap-x-4 gap-y-1 break-keep text-slate-600">
-              {agentPayable > 0 && (
+              {!pilot && agentPayable > 0 && (
                 <Link to="/ops/agents" className="tap inline-flex items-center font-semibold text-warning-700 hover:underline">
                   영업자에게 줄 돈 {krwTile(agentPayable)} (고객 입금됨) →
                 </Link>
@@ -675,7 +694,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        {/* 4단계 — 고객 이벤트 */}
+        {/* 4단계 — 고객 이벤트(Pilot 은 고객 플랫폼을 쓰지 않는다) */}
+        {!pilot && (
         <section aria-labelledby="events" data-tour="home-events" className="flex min-w-0 flex-col gap-3">
           <SectionTitle title="상담신청" icon={Inbox} to="/ops/inbox" count={openEvents.length} accent="event" />
           {openEvents.length === 0 ? (
@@ -707,6 +727,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             </ul>
           )}
         </section>
+        )}
 
         {/* D-118: 영업 — 영업 관리 보드의 '지금 챙길 영업' 을 오늘에서도. 없으면 다시 연락할 곳 */}
         <section aria-labelledby="today-sales" data-testid="today-sales" className="flex min-w-0 flex-col gap-3">

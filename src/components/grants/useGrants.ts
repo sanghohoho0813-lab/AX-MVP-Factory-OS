@@ -13,6 +13,7 @@ import { copyText, finderLink, fitSummary, grantClients, grantIndex, type GrantC
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { mergeNotices, useGrantFeed } from '../../services/grants/grantFeed'
 import type { PortalClientLink } from '../../types/bridge'
+import { useIsPilot } from '../../auth/osAccess'
 
 export function useGrantData(workspaceId: string | null) {
   const [notices, setNotices] = useState<GrantNotice[]>([])
@@ -90,6 +91,8 @@ export function useGrantActions(o: {
   toast: (msg: string) => void
 }) {
   const { workspaceId, setSent, linkOf, toast } = o
+  // D-162: 공개 찾기 화면의 알림 신청은 대표 상담신청함으로 들어간다 — Pilot 은 그 링크를 나누지 않는다
+  const pilot = useIsPilot()
   const remember = useCallback(
     async (clientId: string, ids: string[], channel: SentChannel) => {
       try {
@@ -113,22 +116,23 @@ export function useGrantActions(o: {
 
   const copyAll = useCallback(
     async (client: GrantClient, matches: GrantMatch[]) => {
-      const link = finderLink(window.location.origin, client.profile)
+      const link = pilot ? '' : finderLink(window.location.origin, client.profile)
       const text = shareMessage({ companyName: client.record.companyName, profileLine: profileLine(client.profile), matches, link, sender: brand.brandNameKo })
       const ok = await copyText(text)
       toast(ok ? `${client.record.companyName} — 맞는 공고 ${matches.length}건 문구를 복사했습니다` : '복사하지 못했습니다')
       if (ok) await remember(client.record.id, matches.slice(0, 5).map((m) => m.notice.id), 'kakao')
     },
-    [remember, toast],
+    [remember, toast, pilot],
   )
 
   const copyLink = useCallback(
     async (client: GrantClient | null) => {
+      if (pilot) return
       const ok = await copyText(finderLink(window.location.origin, client?.profile ?? null))
       toast(ok ? (client ? `${client.record.companyName} 조건으로 찾기 링크를 복사했습니다` : '지원사업 찾기 링크를 복사했습니다') : '복사하지 못했습니다')
       if (ok && client) await remember(client.record.id, [], 'link')
     },
-    [remember, toast],
+    [remember, toast, pilot],
   )
 
   /** 계약 고객(고객 화면 계정이 연결된 업체) — 고객 화면 '안내' 로 올린다 */
@@ -160,5 +164,5 @@ export function useGrantActions(o: {
     [linkOf, workspaceId, remember, toast],
   )
 
-  return { copyNotice, copyAll, copyLink, toPortal }
+  return { copyNotice, copyAll, copyLink: pilot ? null : copyLink, toPortal }
 }

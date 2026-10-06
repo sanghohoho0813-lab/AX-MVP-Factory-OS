@@ -195,9 +195,11 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
             <Button variant="primary" onClick={() => setAdding(true)} data-testid="grant-add-open">
               <Plus aria-hidden="true" className="size-4" /> 공고 넣기
             </Button>
-            <Button variant="secondary" onClick={() => void actions.copyLink(null)} data-testid="grant-finder-link">
-              <Link2 aria-hidden="true" className="size-4" /> 가망고객용 찾기 링크
-            </Button>
+            {actions.copyLink && (
+              <Button variant="secondary" onClick={() => void actions.copyLink?.(null)} data-testid="grant-finder-link">
+                <Link2 aria-hidden="true" className="size-4" /> 가망고객용 찾기 링크
+              </Button>
+            )}
           </>
         }
       />
@@ -496,7 +498,7 @@ function ClientSheet({
           sentOf={sentOf}
           linked={linked}
           onCopyAll={() => void actions.copyAll(client, matches.filter((m) => m.verdict !== 'general'))}
-          onCopyLink={() => void actions.copyLink(client)}
+          onCopyLink={actions.copyLink ? () => void actions.copyLink?.(client) : undefined}
           onPortal={() => void actions.toPortal(client, matches.filter((m) => m.verdict !== 'general'))}
           onPick={(m) => onPick(m.notice.id)}
           onFill={onDetail}

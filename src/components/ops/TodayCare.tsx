@@ -12,11 +12,13 @@ import { saveClient } from '../../services/clientOpsService'
 import { copyText } from '../consulting/studioParts'
 import { useToast } from '../ui/toastContext'
 import { Button } from '../ui/Button'
+import { useSenderLine } from '../layout/useCurrentUser'
 
 const SHOW = 4
 
 export function TodayCare({ clients, today, onSaved }: { clients: ClientOpsRecord[]; today: string; onSaved: (record: ClientOpsRecord) => void }) {
   const { showToast } = useToast()
+  const sender = useSenderLine()
   const items = useMemo(() => careList(clients, today), [clients, today])
   const [busy, setBusy] = useState<string | null>(null)
   const [all, setAll] = useState(false)
@@ -69,7 +71,7 @@ export function TodayCare({ clients, today, onSaved }: { clients: ClientOpsRecor
                     size="sm"
                     variant="secondary"
                     data-testid="care-kakao"
-                    onClick={async () => showToast((await copyText(careMessage(rec, it, today))) ? `${it.companyName} 안부 문구를 복사했습니다` : '복사하지 못했습니다')}
+                    onClick={async () => showToast((await copyText(careMessage(rec, it, today, sender))) ? `${it.companyName} 안부 문구를 복사했습니다` : '복사하지 못했습니다')}
                   >
                     <Copy aria-hidden="true" className="size-4" /> 안부 카톡
                   </Button>

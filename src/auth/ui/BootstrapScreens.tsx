@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react'
-import { Check, Copy, Loader2, RefreshCw, Settings2, WifiOff } from 'lucide-react'
+import { Check, Copy, Loader2, LogOut, RefreshCw, Settings2, ShieldAlert, WifiOff } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 
 function CenteredCard({ children }: { children: React.ReactNode }) {
@@ -120,6 +120,40 @@ export function ConnectionErrorScreen({ detail, onRetry }: { detail?: string; on
       </p>
       <Button variant="primary" className="mt-5 w-full" onClick={onRetry}>
         <RefreshCw aria-hidden="true" className="size-4" /> 다시 시도
+      </Button>
+    </CenteredCard>
+  )
+}
+
+/** D-162: 로그인은 됐지만 내부 OS 접근 목록에 없는 계정(공개 사이트 가입자 등) — 아무 화면도 열지 않는다 */
+export function NoAccessScreen({ onSignOut }: { onSignOut: () => void }) {
+  return (
+    <CenteredCard>
+      <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-slate-100 text-slate-600">
+        <ShieldAlert aria-hidden="true" className="size-6" />
+      </span>
+      <h1 className="mt-4 text-lg font-bold text-slate-900" data-testid="no-access">이 계정은 MIRAE AI LAB OS 를 쓸 수 없습니다</h1>
+      <p className="mt-2 text-sm break-keep text-slate-600">사용 권한이 필요하면 관리자에게 문의해 주세요.</p>
+      <Button variant="primary" className="mt-5 w-full" onClick={onSignOut}>
+        <LogOut aria-hidden="true" className="size-4" /> 로그아웃
+      </Button>
+    </CenteredCard>
+  )
+}
+
+/** D-162: 이 브라우저에 다른 계정 자료가 남아 있는데 옮기지 못했다(저장 공간 가득 등) — 섞이지 않게 열지 않는다 */
+export function StorageBlockedScreen({ onSignOut }: { onSignOut: () => void }) {
+  return (
+    <CenteredCard>
+      <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-warning-100 text-warning-800">
+        <ShieldAlert aria-hidden="true" className="size-6" />
+      </span>
+      <h1 className="mt-4 text-lg font-bold text-slate-900" data-testid="storage-blocked">이 브라우저에서는 열 수 없습니다</h1>
+      <p className="mt-2 text-sm break-keep text-slate-600">
+        이 브라우저의 저장 공간이 가득 차서 다른 계정이 쓰던 자료를 따로 넣어 두지 못했습니다. 섞이지 않도록 열지 않았습니다(아무것도 지우지 않았습니다). 다른 브라우저나 기기에서 로그인해 주세요.
+      </p>
+      <Button variant="primary" className="mt-5 w-full" onClick={onSignOut}>
+        <LogOut aria-hidden="true" className="size-4" /> 로그아웃
       </Button>
     </CenteredCard>
   )

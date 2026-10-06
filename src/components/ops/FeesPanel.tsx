@@ -23,6 +23,7 @@ import { InlineConfirm } from '../ui/InlineConfirm'
 import { MetricTile } from '../ui/primitives'
 import { AmountField, DueDateField, parseAmount } from './opsControls'
 import { ContractPlanSheet } from './ContractPlanSheet'
+import { useIsPilot } from '../../auth/osAccess'
 
 const STATE_CLASS: Record<FeeState, string> = {
   received: 'border-success-200 bg-success-50 text-success-800',
@@ -285,6 +286,7 @@ export function FeesPanel({
   today: string
 }) {
   const navigate = useNavigate()
+  const pilot = useIsPilot()
   const funding = fundingFactsOf(record.fundingApplications)
   const m = moneyPlanOf(record, today)
   const totals = feeTotals(record.fees, funding)
@@ -379,9 +381,11 @@ export function FeesPanel({
               {shares.length > 0 && ` (${shares.map((s) => `${s.name} ${formatKrw(s.amount)}`).join(' · ')})`} → 내 몫 {formatKrw(totals.net)}
               {totals.marginPct !== null && ` · 이익률 ${marginText(totals.marginPct)}`} · 못 받은 내 돈 {krwTile(totals.unpaidNet)}
               {totals.unpaidGross !== totals.unpaidNet && ` (청구 기준 ${krwTile(totals.unpaidGross)})`}{' '}
-              <button type="button" onClick={() => navigate('/ops/agents')} className="tap font-medium text-brand-700 underline">
-                영업자 정산
-              </button>
+              {!pilot && (
+                <button type="button" onClick={() => navigate('/ops/agents')} className="tap font-medium text-brand-700 underline">
+                  영업자 정산
+                </button>
+              )}
             </p>
           )}
 

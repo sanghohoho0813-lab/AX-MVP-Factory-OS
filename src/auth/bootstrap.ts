@@ -12,6 +12,8 @@ export type BootstrapStatus =
   | 'connection_error' // Supabase 연결/네트워크 실패
   | 'unauthenticated' // supabase 모드: 로그인 필요
   | 'authenticated_no_workspace' // 로그인됨, 워크스페이스 없음/미선택
+  | 'no_access' // D-162: 로그인됨, 내부 OS 접근 목록에 없음(공개 사이트 가입자 등)
+  | 'storage_blocked' // D-162: 이 브라우저에 다른 계정 자료가 남아 옮기지 못함 — 열지 않는다
   | 'ready' // 사용 준비 완료 (local 모드는 항상 여기)
 
 export interface BootstrapState {
@@ -50,4 +52,12 @@ export function readyState(mode: DataMode): BootstrapState {
 /** local 모드는 로그인·워크스페이스 없이 항상 준비 완료 상태다. */
 export function localReadyState(): BootstrapState {
   return { status: 'ready', mode: 'local' }
+}
+
+export function noAccessState(mode: DataMode): BootstrapState {
+  return { status: 'no_access', mode }
+}
+
+export function storageBlockedState(mode: DataMode): BootstrapState {
+  return { status: 'storage_blocked', mode }
 }

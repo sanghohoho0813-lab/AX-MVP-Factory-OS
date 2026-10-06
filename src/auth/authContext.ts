@@ -5,12 +5,15 @@ import { createContext } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import type { BootstrapState } from './bootstrap'
 import type { WorkspaceMembership } from './workspaceService'
+import type { OsAccess } from './osAccess'
 
 export interface AuthContextValue {
   bootstrap: BootstrapState
   session: Session | null
   workspaces: WorkspaceMembership[]
   currentWorkspaceId: string | null
+  /** D-162: 내부 OS 접근 등급(서버 0019) — 로컬 모드 · 로그인 전은 null */
+  access: OsAccess | null
   selectWorkspace: (workspaceId: string) => void
   refreshWorkspaces: () => Promise<void>
   signOut: () => Promise<void>

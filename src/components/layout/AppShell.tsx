@@ -14,6 +14,17 @@ import { BackToCloseGuard } from '../../lib/backToClose'
 import { useScrollMemory } from '../../lib/scrollMemory'
 import { EntitlementsProvider } from '../../lib/entitlementsContext'
 import { ModuleBoundary } from '../modules/ModuleBoundary'
+import { useIsPilot } from '../../auth/osAccess'
+import { isPilotHiddenPath } from '../../config/moduleRegistry'
+import { NotFoundState } from '../ui/NotFoundState'
+
+function PilotRouteGuard({ pathname, children }: { pathname: string; children: React.ReactNode }) {
+  const pilot = useIsPilot()
+  if (pilot && isPilotHiddenPath(pathname)) {
+    return <NotFoundState title="화면을 찾지 못했습니다" description="주소가 바뀌었거나 없는 화면입니다." backTo="/" backLabel="오늘로" />
+  }
+  return <>{children}</>
+}
 
 function ShellFallback() {
   return (
@@ -59,7 +70,10 @@ export function AppShell() {
                 <Suspense fallback={<ShellFallback />}>
                   {/* D-127: 잠긴 모듈의 화면은 여기 한 곳에서 모듈 소개로 바꾼다 — 화면마다 요금제를 묻지 않는다 */}
                   <ModuleBoundary pathname={location.pathname}>
-                    <Outlet />
+                    {/* D-162: Pilot 에게는 대표 전용 · 내부 화면을 주소로도 열지 않는다(없는 화면처럼) */}
+                    <PilotRouteGuard pathname={location.pathname}>
+                      <Outlet />
+                    </PilotRouteGuard>
                   </ModuleBoundary>
                 </Suspense>
               </ContentErrorBoundary>

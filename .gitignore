@@ -52,7 +52,9 @@ dist-qa*/
 .labcare-out
 .xlsx-out
 .catalog-out
+.pilot-out
 .facts-out
 .taxplan-out
 .grants-out
 .finance-out
+.cache/
