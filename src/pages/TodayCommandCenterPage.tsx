@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { TodayGrantAlerts } from '../components/grants/TodayGrantAlerts'
 import { TodayCharges } from '../components/money/TodayCharges'
+import { TodayCare } from '../components/ops/TodayCare'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
@@ -720,6 +721,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           )}
         </section>
 
+        {/* D-155: 계약 고객 돌봄 — 한 달 넘게 조용 · 계약 1주년. 없으면 칸 없음 */}
+        <TodayCare clients={clients} today={today} onSaved={(r) => setClients((cs) => cs.map((c) => (c.id === r.id ? r : c)))} />
       </div>
 
       {/* 하루의 끝에 누르는 버튼이라 모바일에서는 화면 맨 아래에 둔다 */}

@@ -245,7 +245,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   /** 모바일에서 부가 행동을 담는 시트 */
   const [moreOpen, setMoreOpen] = useState(false)
   // D-154: 성과 보고서 한 장
-  const [reportOpen, setReportOpen] = useState(false)
+  // D-155: 오늘 '안부 챙길 계약 고객' 의 [성과 보고서] 는 ?report=1 로 들어와 바로 연다
+  const [reportOpen, setReportOpen] = useState(() => searchParams.get('report') === '1')
   /** D-140: 계약 · 수금 한 번에 (개요의 계약 카드에서) */
   const [planOpen, setPlanOpen] = useState(false)
   /**
@@ -1584,7 +1585,20 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       )}
 
 
-      {reportOpen && <ClientReportSheet record={record} today={today} onClose={() => setReportOpen(false)} />}
+      {reportOpen && (
+        <ClientReportSheet
+          record={record}
+          today={today}
+          onClose={() => {
+            setReportOpen(false)
+            if (searchParams.has('report')) {
+              const next = new URLSearchParams(searchParams)
+              next.delete('report')
+              setSearchParams(next, { replace: true, state: location.state })
+            }
+          }}
+        />
+      )}
 
       {moreOpen && (
         <BottomSheet title="이 업체에서 할 수 있는 것" onClose={() => setMoreOpen(false)}>

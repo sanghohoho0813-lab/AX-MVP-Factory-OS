@@ -36,6 +36,7 @@ import signupSql from '../../../supabase/migrations/20260925000014_signup_event.
 import hardenSql from '../../../supabase/migrations/20261004000016_security_hardening.sql?raw'
 import publicLinksSql from '../../../supabase/migrations/20261005000017_public_links_hardening.sql?raw'
 import { buildClientReport, reportFrom, reportKakao } from '../clientReport'
+import { careItemFor, careList, careMessage, careSnoozeUntil, lastTouchOf, nextAnniversary, withCareContact, withCareSnooze } from '../clientCare'
 import staffLookupSql from '../../../supabase/migrations/20261006000018_staff_customer_lookup.sql?raw'
 import { normalizeClientOps, withContract, withCustomField, withFee, withNewFee, withNewFunding, withService, withoutCustomField, withoutFee } from '../clientOpsService'
 import {
@@ -429,6 +430,42 @@ check('events: 요약 who 는 회사명 우선', eventSummary(ev({ payload: { co
   check('카톡 요약: 대표님 · 기간 · 확보 자금 3,000만원 · 다음에 챙길 것', k.startsWith('안녕하세요, 최대표 대표님.') && k.includes('올해(1/1 ~ 10/6)') && k.includes('확보한 자금(입금): 3,000만원') && k.includes('10/30 스마트공장 결과 발표'), k)
   const empty = buildClientReport(normalizeClientOps({ id: 'e', companyName: '빈상사' } as never), T, 'year')
   check('성과 보고서: 아무것도 없으면 0 · 확보 자금 없음', empty.headline.securedBasis === 'none' && empty.money.length === 0 && empty.done.length === 0)
+}
+
+// D-155: 계약 고객 돌봄 — 조용함 · 1주년 · 연락했어요 · 미루기 · 안부 문구
+{
+  const T = '2026-10-06'
+  const mk = (id: string, extra: Record<string, unknown>) =>
+    normalizeClientOps({ id, companyName: `${id}상사`, representativeName: '박대표', status: 'active', createdAt: '2026-01-01T00:00:00Z', ...extra } as never)
+  const quiet = mk('q', { contract: { signedAt: '2026-02-01', kind: 'cash', cashAmount: null, policies: [], note: '' }, notes_list: [{ id: 'n', text: '전화함', createdAt: '2026-08-20T03:00:00Z' }] })
+  const fresh = mk('f', { contract: { signedAt: '2026-02-01', kind: 'cash', cashAmount: null, policies: [], note: '' }, activity: [{ id: 'a', kind: 'fee_received', text: '입금', serviceKey: null, at: '2026-09-30T01:00:00Z' }] })
+  const profileOnly = mk('p', { contract: { signedAt: '2026-02-01', kind: 'cash', cashAmount: null, policies: [], note: '' }, notes_list: [{ id: 'n', text: '메모', createdAt: '2026-07-01T00:00:00Z' }], activity: [{ id: 'a', kind: 'profile', text: '주소 고침', serviceKey: null, at: '2026-10-01T00:00:00Z' }] })
+  const ann = mk('y', { contract: { signedAt: '2025-10-20', kind: 'cash', cashAmount: null, policies: [], note: '' }, activity: [{ id: 'a', kind: 'document', text: '서류', serviceKey: null, at: '2026-10-01T00:00:00Z' }] })
+  const prospect = mk('w', { status: 'waiting', notes_list: [{ id: 'n', text: '메모', createdAt: '2026-01-01T00:00:00Z' }] })
+  const archived = { ...quiet, id: 'qa', archivedAt: '2026-09-01T00:00:00Z' }
+  check('돌봄: 마지막으로 챙긴 날 — 메모 8/20', lastTouchOf(quiet).date === '2026-08-20' && lastTouchOf(quiet).what === '메모', lastTouchOf(quiet))
+  check('돌봄: 회사 정보 고침은 챙긴 날로 세지 않음', lastTouchOf(profileOnly).date === '2026-07-01')
+  const q = careItemFor(quiet, T)
+  check('돌봄: 47일 조용 → 한 달 넘게 조용(급함 아님)', q?.reason === 'quiet' && q.quietDays === 47 && !q.urgent && q.text.startsWith('47일째 조용'), q)
+  check('돌봄: 97일 조용 → 급함', careItemFor(profileOnly, T)?.urgent === true)
+  check('돌봄: 6일 전에 입금 확인 → 목록에 없음', careItemFor(fresh, T) === null)
+  check('돌봄: 계약 전 · 보관 업체는 대상 아님', careItemFor(prospect, T) === null && careItemFor(archived as never, T) === null)
+  const y = careItemFor(ann, T)
+  check('돌봄: 계약 1주년 10/20(14일 남음) — 최근 챙겼어도 1주년으로', y?.reason === 'anniversary' && y.anniversary?.years === 1 && y.anniversary.daysLeft === 14 && !y.urgent && y.text.includes('1주년 10/20(14일 남음)'), y)
+  check('돌봄: 올해 계약은 내년이 1주년 · 2/29 계약은 평년 2/28', nextAnniversary('2026-03-01', T)?.date === '2027-03-01' && nextAnniversary('2026-03-01', T)?.years === 1 && nextAnniversary('2024-02-29', '2027-02-20')?.date === '2027-02-28')
+  check('돌봄: 1주년 지난 지 7일까지는 남고 8일째부터 다음 해', nextAnniversary('2025-09-29', T)?.daysLeft === -7 && nextAnniversary('2025-09-28', T)?.date === '2027-09-28')
+  const contacted = withCareContact(ann, T, '2026-10-06T01:00:00Z')
+  check('돌봄: [연락했어요] → 1주년도 챙긴 것 · 활동 기록 한 줄 · 저장 형태 그대로', careItemFor(contacted, T) === null && contacted.activity[0].kind === 'care' && normalizeClientOps(contacted as never).care?.lastContactAt === T)
+  const snoozed = withCareSnooze(quiet, '2026-10-20')
+  check('돌봄: [2주 뒤에] → 그 날까지 빠지고 그 날 다시', careItemFor(snoozed, T) === null && careItemFor(snoozed, '2026-10-20')?.reason === 'quiet')
+  check('돌봄: 이상한 값은 버림', normalizeClientOps({ id: 'x', companyName: 'x', care: { lastContactAt: 'yesterday', snoozeUntil: 3 } } as never).care === undefined)
+  const list = careList([fresh, quiet, ann, profileOnly, prospect], T)
+  check('돌봄 목록: 급한 것 먼저 — 97일 조용 → 1주년 14일 → 47일 조용', JSON.stringify(list.map((i) => i.clientId)) === JSON.stringify(['p', 'y', 'q']), list.map((i) => i.clientId))
+  const withFee = { ...ann, fees: [{ id: 'fee', kind: 'success', label: '성공보수', amount: 1_000_000, agentFee: 200_000, agentName: '홍영업', dueDate: '', receivedAt: null, note: '' }], notes_list: [{ id: 'n', text: '까다로운 대표', pinned: false, createdAt: '2026-01-01T00:00:00Z', updatedAt: '' }] }
+  const msg = careMessage(withFee as never, y as never, T)
+  check('안부 문구(1주년): 대표님 · 1년 · 보고서 · 30분 — 수수료 · 영업자 · 메모 없음', msg.startsWith('안녕하세요, 박대표 대표님.') && msg.includes('함께한 지 1년') && msg.includes('30분') && !/성공보수|홍영업|까다로운|1,000,000|100만원/.test(msg), msg)
+  check('안부 문구(조용): 안부 여쭙니다', careMessage(quiet, q as never, T).includes('안부 여쭙니다'))
+  check('다음에: 조용함은 2주 · 1주년은 그 날 + 7일을 넘기지 않음(1주년 4일 앞 → 10/17)', careSnoozeUntil(q as never, T) === '2026-10-20' && careSnoozeUntil(y as never, T) === '2026-10-20' && careSnoozeUntil({ ...(y as object), anniversary: { date: '2026-10-10', years: 1, daysLeft: 4 } } as never, T) === '2026-10-17')
 }
 check('events: 값 없으면 고객', eventSummary(ev({ payload: {} })).who === '고객')
 // D-107: 오래 기다린 상담신청 — "N일째 대기" (정오 UTC 로 잡아 시간대가 달라도 같은 날)

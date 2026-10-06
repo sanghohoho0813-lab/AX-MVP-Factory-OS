@@ -14,6 +14,7 @@
  *  10. (D-124) 세금 계산기 목록을 펼친 채 화면을 밀어도 목록이 닫히며 튀지 않는다(누르면 닫힘)
  *  11. (D-124) 창이 열려 있을 때 뒤로가기는 창만 닫는다 · 뒤로 오면 보던 자리 · 찾던 말 그대로
  *  12. (D-125) 전화 단추(오늘 약속 줄 · 영업 보드 카드) · 고객 관리 '다음 약속 지남' 보기 · 휴대폰 하단 '영업'
+ *  13. (D-155) 오늘 '안부 챙길 계약 고객' — 한 달 넘게 조용 · 계약 1주년 · 안부 카톡 · 연락했어요 · 다음에 · 성과 보고서 바로 열기
  */
 
 import { chromium } from 'playwright'
@@ -307,6 +308,69 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   }
 
   check(`JS 오류 없음 ${tag}`, errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
+/* 13 (D-155) 계약 고객 돌봄 */
+for (const [w, mob] of [[1440, false], [390, true]]) {
+  const ctx = await browser.newContext({ viewport: { width: w, height: 900 }, isMobile: mob, hasTouch: mob, locale: 'ko-KR', timezoneId: 'Asia/Seoul', permissions: ['clipboard-read', 'clipboard-write'] })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e).slice(0, 160)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const tag = `(${w})`
+  const T = await page.evaluate(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })
+  const shift = (ymd, n) => { const d = new Date(`${ymd}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10) }
+  // 한솔: 계약 1주년 14일 앞(최근 서류 받음) · 다움: 45일째 조용(메모뿐) · 나머지 계약 고객: 어제 챙김
+  await page.evaluate(({ k, T, ann, quietAt, recent }) => {
+    const list = JSON.parse(localStorage.getItem(k))
+    for (const c of list) {
+      if (c.status !== 'active') continue
+      c.activity = [{ id: `a-${c.id}`, kind: 'document', text: '서류 받음', serviceKey: null, at: `${recent}T01:00:00Z` }]
+      c.notes_list = []
+      delete c.care
+    }
+    const h = list.find((c) => c.id === 'cli_hansol')
+    h.contract = { ...(h.contract ?? {}), signedAt: ann }
+    const d = list.find((c) => c.id === 'cli_daum')
+    d.activity = []
+    d.notes_list = [{ id: 'n-q', text: '전화 드림', pinned: false, createdAt: `${quietAt}T01:00:00Z`, updatedAt: `${quietAt}T01:00:00Z` }]
+    d.contract = { ...(d.contract ?? {}), signedAt: `${T.slice(0, 4)}-01-15` <= T ? `${T.slice(0, 4)}-01-15` : `${Number(T.slice(0, 4)) - 1}-12-15` }
+    localStorage.setItem(k, JSON.stringify(list))
+  }, { k: CLIENTS, T, ann: `${Number(T.slice(0, 4)) - 1}-${shift(T, 14).slice(5)}`, quietAt: shift(T, -45), recent: shift(T, -1) })
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  const care = page.getByTestId('today-care')
+  const row = (id) => care.locator(`[data-testid="care-row"][data-client="${id}"]`)
+  check(`돌봄: 오늘에 '안부 챙길 계약 고객' 칸 ${tag}`, (await care.count()) === 1)
+  check(`돌봄: 1주년 업체가 먼저 · 14일 남음 ${tag}`, (await care.getByTestId('care-row').first().getAttribute('data-client')) === 'cli_hansol' && (await row('cli_hansol').getAttribute('data-reason')) === 'anniversary' && (await row('cli_hansol').innerText()).includes('14일 남음'), await care.innerText().catch(() => ''))
+  check(`돌봄: 45일째 조용한 업체 · 마지막 메모 ${tag}`, (await row('cli_daum').getAttribute('data-reason')) === 'quiet' && (await row('cli_daum').getByTestId('care-text').innerText()).includes('45일째 조용') && (await row('cli_daum').innerText()).includes('메모'))
+  check(`돌봄: 어제 챙긴 업체는 없음 ${tag}`, (await care.getByTestId('care-row').count()) === 2, await care.getByTestId('care-row').count())
+  await row('cli_daum').getByTestId('care-kakao').click()
+  await page.waitForTimeout(200)
+  const msg = await page.evaluate(() => navigator.clipboard.readText())
+  check(`돌봄: 안부 카톡 문구 복사 — 대표님 · 안부 ${tag}`, msg.startsWith('안녕하세요,') && msg.includes('안부 여쭙니다') && !/수수료|성공보수|영업자/.test(msg), msg.slice(0, 120))
+  await row('cli_daum').getByTestId('care-contacted').click()
+  await page.waitForTimeout(500)
+  const daum = await one(page, 'cli_daum')
+  check(`돌봄: [연락했어요] → 줄 사라짐 · 업체 기록에 오늘 연락 · 활동 기록 ${tag}`, (await row('cli_daum').count()) === 0 && daum.care?.lastContactAt === T && daum.activity?.[0]?.kind === 'care', JSON.stringify(daum.care))
+  await row('cli_hansol').getByTestId('care-report').click()
+  await page.waitForURL(/\/ops\/clients\/cli_hansol\?report=1/)
+  await page.getByTestId('report-preview').waitFor({ timeout: 5000 }).catch(() => {})
+  check(`돌봄: [성과 보고서] → 업체 상세에서 보고서가 바로 열림 ${tag}`, await page.getByTestId('report-preview').isVisible())
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(400)
+  check(`돌봄: 보고서를 닫으면 주소에서 report 빠짐 ${tag}`, !page.url().includes('report=1') && !(await page.getByTestId('report-preview').isVisible()), page.url())
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  await row('cli_hansol').getByTestId('care-snooze').click()
+  await page.waitForTimeout(500)
+  const hansol = await one(page, 'cli_hansol')
+  check(`돌봄: [다음에] → 줄 사라짐 · 14일 뒤까지(1주년 마지막 날보다 앞) ${tag}`, (await page.getByTestId('today-care').count()) === 0 && hansol.care?.snoozeUntil === shift(T, 14), JSON.stringify(hansol.care))
+  check(`돌봄: 다 챙기면 칸이 사라짐 ${tag}`, (await page.getByTestId('today-care').count()) === 0)
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  check(`돌봄: 가로 넘침 0 · JS 오류 0 ${tag}`, over <= 0 && errors.length === 0, `${over} ${errors.join(' | ')}`)
   await ctx.close()
 }
 

@@ -365,6 +365,17 @@ function phoneFromOldDocument(state: Partial<DocumentState> | undefined): string
   return m ? m[0] : ''
 }
 
+/** D-155: 돌봄 기록 — 날짜 모양만 남긴다. 둘 다 없으면 칸을 만들지 않는다 */
+function normalizeCare(value: unknown): { care?: { lastContactAt?: string; snoozeUntil?: string } } {
+  if (!value || typeof value !== 'object') return {}
+  const v = value as Record<string, unknown>
+  const day = (x: unknown) => (typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x) ? x : '')
+  const care: { lastContactAt?: string; snoozeUntil?: string } = {}
+  if (day(v.lastContactAt)) care.lastContactAt = day(v.lastContactAt)
+  if (day(v.snoozeUntil)) care.snoozeUntil = day(v.snoozeUntil)
+  return Object.keys(care).length ? { care } : {}
+}
+
 export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape): ClientOpsRecord {
   const now = nowIso()
   const customDocuments = normalizeCustomDocuments(value.customDocuments)
@@ -490,6 +501,7 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
           }))
           .slice(0, ACTIVITY_LIMIT)
       : [],
+    ...normalizeCare(value.care),
     archivedAt: typeof value.archivedAt === 'string' ? value.archivedAt : null,
     createdAt: value.createdAt ?? now,
     updatedAt: value.updatedAt ?? now,

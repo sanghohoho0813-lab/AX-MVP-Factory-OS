@@ -452,6 +452,7 @@ export type ActivityKind =
   | 'archive' // 보관·보관 해제
   | 'tool' // 도구함 결과를 붙임 (창업감면 판정 · 크레탑 분석 · 정책자금 진단 …)
   | 'sales' // 영업 단계 변경 · 영업 정보 수정 (D-114)
+  | 'care' // 계약 고객 안부 연락 (D-155)
 
 /**
  * 도구함 결과 한 건 (D-88).
@@ -793,6 +794,11 @@ export interface ClientOpsRecord {
   shareholderRegister: ShareholderRow[]
   /** D-130: 절세 설계 현황(대표 급여 · 가지급금 · 잉여금 · 평가 재료 …) — 값은 글자 그대로. 뜻은 services/taxPlan.ts 가 정한다 */
   taxProfile: Record<string, string>
+  /**
+   * D-155: 계약 고객 돌봄 — 마지막 안부 연락일 · 이 날까지 돌봄 목록에서 빼기(YYYY-MM-DD).
+   * payload 에 함께 저장된다(DB 변경 없음). 없으면 아직 돌봄 기록이 없는 것.
+   */
+  care?: { lastContactAt?: string; snoozeUntil?: string }
   /** 보관 처리 시각 (보관하면 목록·경고에서 빠진다) */
   archivedAt: string | null
   createdAt: string

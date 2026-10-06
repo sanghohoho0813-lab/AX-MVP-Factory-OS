@@ -5,6 +5,7 @@ import {
   CalendarClock,
   FileCheck2,
   FileSignature,
+  HeartHandshake,
   History,
   Landmark,
   ListChecks,
@@ -35,6 +36,7 @@ const KIND_ICON: Record<ActivityKind, LucideIcon> = {
   archive: Archive,
   tool: Wrench,
   sales: TrendingUp,
+  care: HeartHandshake,
 }
 
 /** 종류별 색 — 화면 테마와 분리된 고정 분류색을 쓴다 */
@@ -52,6 +54,7 @@ const KIND_CLASS: Record<ActivityKind, string> = {
   archive: 'bg-slate-100 text-slate-600',
   tool: 'bg-slate-100 text-slate-600',
   sales: 'bg-brand-50 text-brand-700',
+  care: 'bg-brand-50 text-brand-700',
 }
 
 const PAGE = 12

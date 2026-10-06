@@ -170,14 +170,15 @@ export function buildClientReport(record: ClientOpsRecord, today: string, period
   }
 }
 
-const won = (n: number) => (n >= 100_000_000 ? `${Math.round((n / 100_000_000) * 10) / 10}억원` : n >= 10_000 ? `${Math.round(n / 10_000).toLocaleString('ko-KR')}만원` : `${n.toLocaleString('ko-KR')}원`)
+/** 짧은 원 표기 — 1.2억원 · 3,000만원 · 5,000원 (카톡 글에 쓴다) */
+export const wonShort = (n: number) => (n >= 100_000_000 ? `${Math.round((n / 100_000_000) * 10) / 10}억원` : n >= 10_000 ? `${Math.round(n / 10_000).toLocaleString('ko-KR')}만원` : `${n.toLocaleString('ko-KR')}원`)
 const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`
 
 /** 카톡으로 보낼 짧은 요약 */
 export function reportKakao(r: ClientReport): string {
   const who = r.representativeName ? `${r.representativeName} 대표님` : `${r.companyName} 담당자님`
   const lines = [`안녕하세요, ${who}.`, `${REPORT_PERIOD_LABEL[r.period]}(${md(r.from)} ~ ${md(r.to)}) 함께 만든 성과를 정리해 드립니다.`, '']
-  if (r.headline.securedBasis !== 'none') lines.push(`· ${r.headline.securedBasis === 'executed' ? '확보한 자금(입금)' : '선정된 지원금'}: ${won(r.headline.securedTotal)}`)
+  if (r.headline.securedBasis !== 'none') lines.push(`· ${r.headline.securedBasis === 'executed' ? '확보한 자금(입금)' : '선정된 지원금'}: ${wonShort(r.headline.securedTotal)}`)
   if (r.headline.selectedCount) lines.push(`· 지원사업 선정: ${r.headline.selectedCount}건`)
   if (r.done.length) lines.push(`· 끝낸 업무: ${r.done.map((d) => d.label).join(' · ')}`)
   if (r.inProgress.length) lines.push(`· 진행 중: ${r.inProgress.map((d) => d.label).join(' · ')}`)
