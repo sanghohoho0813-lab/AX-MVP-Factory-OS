@@ -190,7 +190,7 @@ check('modules: AX STUDIO 는 전문 모듈의 분야 한 줄(D-127) — 안의 
   check('메뉴: 숫자 — 고객 관리(고객사 수) · 상담신청 · 1차 미팅',
     MODULES.find((m) => m.key === 'client-ops')?.badge === 'clients' && MODULES.find((m) => m.key === 'inbox')?.badge === 'requests' && MODULES.find((m) => m.key === 'first-meeting')?.badge === 'first-meetings')
   const inGroup = (g: string) => MODULES.filter((m) => m.group === g).map((m) => m.key)
-  check('메뉴: 오늘과 일정이 한 묶음', inGroup('today').join() === 'today,calendar')
+  check('메뉴: 오늘 · 확인할 것(D-158) · 일정이 한 묶음', inGroup('today').join() === 'today,decide,calendar')
   check('메뉴: 특허+벤처 → 기술사업화 · 자금·지원사업 → 정부지원사업 줄 아래, 모듈 전체가 맨 끝 (D-127) · 검토중 도구가 없으면 도입 검토중 줄도 없다 (D-118)',
     MODULES.find((m) => m.key === 'consulting-studio')?.parent === 'cat-tech-biz' && MODULES.find((m) => m.key === 'funding')?.parent === 'cat-gov-support' && inGroup('modules').slice(-1).join() === 'tools' && !inGroup('modules').includes('tools-review'), inGroup('modules').join())
   check('메뉴: 영업 묶음 = 영업 관리(D-114) · 지원사업 알림(D-141) · 영업자 정산 · 매출 · 비용(D-142) · 1차 미팅 체크리스트(준비 중)',

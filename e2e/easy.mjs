@@ -194,7 +194,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.goto(BASE + '/ops/calendar', { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)
   const cal = (await page.locator('main').innerText()) ?? ''
-  check('일정: 다음 약속 종류 · 달력 칸에 무슨 일인지(1차 미팅)', cal.includes('다음 약속') && cal.includes('1차 미팅'), '')
+  // D-158: '다음 약속' 종류 이름은 '일정' 으로
+  check('일정: 일정 종류 · 달력 칸에 무슨 일인지(1차 미팅) · 다음 약속이란 종류 이름 없음', cal.includes('일정') && cal.includes('1차 미팅') && !cal.includes('다음 약속'), '')
 
   // 미팅 메모 — 차수를 바꿔도 남고, 저장한 뒤에만 비워진다
   await page.goto(BASE + '/sales/meeting?client=cli_mirae&round=1', { waitUntil: 'networkidle' })

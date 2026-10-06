@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { TodayCharges } from '../components/money/TodayCharges'
 import { TodayCare } from '../components/ops/TodayCare'
+import { TodayDecisions } from '../components/ops/DecisionList'
+import { useGrantData } from '../components/grants/useGrants'
+import { useEntitlements } from '../lib/entitlementsStore'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
@@ -179,6 +182,10 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   /** D-122: 지우기 전에 한 번 묻는다 — 일기 화면 · 업체 기록과 같게 */
   const [pendingDelete, setPendingDelete] = useState<JournalEntry | null>(null)
   const [deleting, setDeleting] = useState(false)
+  // D-158: 확인할 것 — 공고 · 요금제 권한
+  const { notices: grantNotices } = useGrantData(workspaceId)
+  const { ent } = useEntitlements()
+  const usable = useCallback((key: string) => key === 'grants' || ent.feature(key).usable, [ent])
 
   const load = useCallback(async () => {
     try {
@@ -522,6 +529,18 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           </Disclosure>
         )}
       </section>
+
+      {/* D-158: 확인할 것 — 프로그램이 준비한 것에 맞다 · 아니다만(없으면 칸 없음) */}
+      <TodayDecisions
+        clients={clients}
+        today={today}
+        workspaceId={workspaceId}
+        userId={userId}
+        notices={grantNotices}
+        usable={usable}
+        onSaved={(r) => setClients((cs) => cs.map((c) => (c.id === r.id ? r : c)))}
+        onTodo={(e) => setJournal((js) => [e, ...js])}
+      />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
         {/* 2단계 — 다가오는 마감 · 약속(D-143: 날짜가 있는 실제 일만, 날짜 순) */}

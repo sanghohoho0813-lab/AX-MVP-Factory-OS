@@ -128,6 +128,10 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(800)
   const back = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]').filter((x) => x.content === '급여 증빙 요청').map((x) => x.dueDate).sort())
   check('끌어 옮기기: 칸 안의 할 일 줄로도 옮김(10/14 → 10/12)', back[0] === '2026-10-12', back.join())
+  // D-158: 그날 할 일에 적은 순서 번호
+  const nums = await page.getByTestId('picked-panel').getByTestId('todo-number').allInnerTexts()
+  check('그날 할 일: 1 · 2 … 번호(적은 순서)', nums.length >= 1 && nums.map((n) => n.trim()).join() === nums.map((_, i) => String(i + 1)).join(), nums.join())
+  check('종류 이름: 다음 약속 → 일정', (await page.getByTestId('calendar-kind-chips').innerText()).includes('일정') && !(await page.getByTestId('calendar-kind-chips').innerText()).includes('다음 약속'))
 
   // 쉬는 날 직접 표시 — 2일 연속 · 지우기
   await cell(page, '2026-10-20').click()

@@ -155,7 +155,10 @@ export function TodoRow({
   clientName,
   onPick,
   dragProps,
+  number,
 }: {
+  /** D-158: 그날 적은 순서 번호(일정 달력) — 눈에 잘 띄게 */
+  number?: number
   entry: JournalEntry
   today: string
   clientName?: string
@@ -196,8 +199,13 @@ export function TodoRow({
       </button>
 
       <button type="button" onClick={onPick} className="tap min-w-0 flex-1 text-left">
-        <span className={`t-body block break-keep ${entry.completed ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
-          {entry.content}
+        <span className={`t-body flex items-start gap-2 break-keep ${entry.completed ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
+          {number !== undefined && (
+            <span aria-hidden="true" data-testid="todo-number" className={`mt-0.5 inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full px-1.5 text-[0.85rem] font-bold no-underline ${entry.completed ? 'bg-slate-100 text-slate-400' : 'bg-brand-600 text-white'}`}>
+              {number}
+            </span>
+          )}
+          <span className="min-w-0">{entry.content}</span>
         </span>
         <span className="t-meta mt-0.5 flex flex-wrap items-center gap-x-2 text-slate-500">
           {overdue && <span className="font-semibold text-danger-700">{dueText(left)}</span>}

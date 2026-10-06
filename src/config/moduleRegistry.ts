@@ -26,6 +26,7 @@ import {
   Settings,
   Sun,
   Workflow,
+  CheckCheck,
 } from 'lucide-react'
 import { SALES_EXTRA_PATHS, SALES_TAB_PATHS } from './salesTabs'
 import { REVIEW_HUB_PATH, type ToolDefinition, liveTools, movedTools, reviewTools } from './toolRegistry'
@@ -191,6 +192,8 @@ function movedToPaths(target: string): string[] {
 export const MODULES: ModuleDefinition[] = [
   { key: 'today', label: '오늘', path: '/', icon: Sun, group: 'today', accent: 'overview', enabled: true, exact: true },
   // D-103: 오늘 기록 · 주간 돌아보기 · 전체 기록은 일정 안의 탭이다 — 그 주소에서도 '일정' 에 불이 켜진다
+  // D-158: 프로그램이 준비한 것에 맞다 · 아니다만 고르는 곳
+  { key: 'decide', label: '확인할 것', path: '/ops/decide', icon: CheckCheck, group: 'today', accent: 'overview', enabled: true, hint: '자료에서 읽은 정보 · 해 볼 만한 일 · 맞는 지원사업 · 서류 기한' },
   { key: 'calendar', label: '일정', path: '/ops/calendar', icon: CalendarDays, group: 'today', accent: 'evidence', enabled: true, alsoPaths: ['/journal'], hint: '달력 · 오늘 기록 · 주간 돌아보기 · 전체 기록' },
 
   // D-104: '고객 운영' → '고객 관리', '고객 이벤트함' → '잠재고객 상담신청' (주소는 그대로)

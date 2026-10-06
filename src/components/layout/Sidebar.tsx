@@ -1,5 +1,4 @@
 import type { CSSProperties } from 'react'
-import { TextScaleQuickButton } from '../ui/TextScaleQuickButton'
 import { useStoreVersion } from '../../lib/useStoreVersion'
 import { isAdvancedVisible } from '../../lib/featureVisibility'
 import { useEffect, useState } from 'react'
@@ -233,13 +232,7 @@ function SidebarContent({
         가이드는 '이 시스템' 묶음으로, 글자 크기는 설정으로 갔다.
       */}
       <div className="shrink-0 border-t border-navy-800 px-3 py-3">
-        {/* D-120: 휴대폰 서랍에서는 글자 크기를 바로 — 머리줄에 자리가 없다 */}
-        {onCloseMobile && (
-          <div className="mb-2 flex items-center justify-between gap-2 px-1">
-            <span className="text-[0.9rem] text-navy-200">글자 크기</span>
-            <TextScaleQuickButton showLabel />
-          </div>
-        )}
+        {/* D-158: 휴대폰 서랍의 글자 크기는 뺐다(대표: 설정에 있으니 굳이) */}
         <SidebarAccount collapsed={collapsed} />
         {!collapsed && (
           <p className="t-meta truncate px-3 pt-2 pb-1 text-navy-300" title={`${brand.productSubtitle} · ${APP_VERSION}`}>

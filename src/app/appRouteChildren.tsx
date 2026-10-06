@@ -39,6 +39,7 @@ const TodayOpsPage = lazy(() =>
 const OperationsHubPage = lazy(() => import('../pages/OperationsHubPage').then((m) => ({ default: m.OperationsHubPage })))
 const OperationsClientDetailPage = lazy(() => import('../pages/OperationsClientDetailPage').then((m) => ({ default: m.OperationsClientDetailPage })))
 const OpsCalendarPage = lazy(() => import('../pages/OpsCalendarPage').then((m) => ({ default: m.OpsCalendarPage })))
+const OpsDecidePage = lazy(() => import('../pages/OpsDecidePage').then((m) => ({ default: m.OpsDecidePage })))
 const AgentSettlementPage = lazy(() => import('../pages/AgentSettlementPage').then((m) => ({ default: m.AgentSettlementPage })))
 // D-141: 지원사업 알림(내부) · 지원사업 찾기(가망고객 공개 화면, 로그인 없음)
 const GrantsPage = lazy(() => import('../pages/GrantsPage'))
@@ -403,6 +404,7 @@ export const appRouteChildren = [
       { path: 'ops/inbox', element: <CustomerInboxPage /> },
       { path: 'ops/clients', element: <OperationsHubPage /> },
       { path: 'ops/calendar', element: <OpsCalendarPage /> },
+      { path: 'ops/decide', element: <OpsDecidePage /> },
       // 영업자 정산 — 누구한테 지금 얼마를 줘야 하는가 (D-78)
       { path: 'ops/agents', element: <AgentSettlementPage /> },
       { path: 'grants', element: <GrantsPage /> },

@@ -49,6 +49,7 @@ import { buildClientSchedule } from '../clientOpsSchedule'
 import { feeStateOf, fundingFactsOf } from '../feeStatus'
 import { recommendNextSteps } from '../clientInsights'
 import { buildClientReport } from '../clientReport'
+import { buildDecisions, withDecisionAnswer } from '../decisions'
 import { buildClientAlerts } from '../clientOpsAlerts'
 import { isGrantBookmark } from '../../types/clientOps'
 
@@ -737,6 +738,41 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   const st = grantYearStats([{ ...yr, fundingApplications: yr.fundingApplications.map((a) => ({ ...a, resultAt: a.resultAt ? '2026' + a.resultAt.slice(4) : a.resultAt, submittedAt: a.submittedAt ? '2026' + a.submittedAt.slice(4) : a.submittedAt })) }], 2026)
   check('올해 성과: 접수 2 · 선정 1 · 탈락 1 · 선정률 50% · 선정 3천만 · 성공보수 300만(받은 돈 0)', st.submitted === 2 && st.selected === 1 && st.rejected === 1 && st.selectionRate === 0.5 && st.approvedTotal === 30_000_000 && st.feeTotal === 3_000_000 && st.feeReceived === 0, st)
   check('올해 성과: 결과 없으면 선정률 없음', grantYearStats([base], 2026).selectionRate === null)
+}
+
+// D-158: 확인함 — 프로그램이 준비한 것에 맞다 · 아니다만
+{
+  const T = '2026-10-06'
+  const rec = normalizeClientOps({
+    id: 'd1', companyName: '확인상사', status: 'active', businessAddress: '경기도 파주시 문산읍 1', industry: '제조업', establishedAt: '2022-03-01',
+    customDocuments: [{ id: 'cd', key: 'customdoc_tax', label: '납세증명서', validMonths: 1, sensitive: false }],
+    documents: { customdoc_tax: { received: true, issuedAt: '2026-09-01', fileName: 't.pdf' } },
+    factInbox: [{ id: 'fi1', key: 'revenue', value: '1200000000', source: 'document', asOf: '2025-12-31', ref: '재무제표', foundAt: '2026-10-01T00:00:00Z' }],
+  } as never)
+  const ns = [notice({ regions: ['경기'] }, { id: 'nd1', title: '경기 제조 혁신 바우처', applyEnd: '2026-10-25' }), notice({ regions: ['서울'] }, { id: 'nd2', title: '서울 공고' })]
+  const ds = buildDecisions(rec, T, ns)
+  const kinds = ds.map((d) => d.kind)
+  check('확인함: 자료에서 읽은 정보 · 서류 기한(납세증명서 만료) · 맞는 공고(경기만) 가 모인다', kinds.includes('fact') && kinds.includes('doc') && ds.filter((d) => d.kind === 'grant').map((d) => d.title).join() === '경기 제조 혁신 바우처 — 도전해 볼까요?', ds.map((d) => `${d.kind}:${d.title}`))
+  check('확인함: 급한 것 먼저(정보 확인 → 만료 서류 → 공고)', ds[0].kind === 'fact' && ds.findIndex((d) => d.kind === 'doc') < ds.findIndex((d) => d.kind === 'grant'))
+  const g = ds.find((d) => d.kind === 'grant')!
+  const yes = withDecisionAnswer(rec, g, 'yes', ns, '2026-10-06T01:00:00Z')
+  check('확인함: 공고 [도전해 볼 만함] → 도전 체크 · 다시 묻지 않음', yes.fundingApplications.some((a) => a.noticeId === 'nd1' && a.status === 'watching') && !buildDecisions(yes, T, ns).some((d) => d.id === g.id) && yes.decided?.[g.id]?.a === 'yes')
+  const f = ds.find((d) => d.kind === 'fact')!
+  const fyes = withDecisionAnswer(rec, f, 'yes', ns, '2026-10-06T01:00:00Z')
+  check('확인함: 정보 [맞아요] → 업체 정보로 · 후보 빠짐', fyes.factInbox.length === 0 && !buildDecisions(fyes, T, ns).some((d) => d.kind === 'fact'))
+  const fno = withDecisionAnswer(rec, f, 'no', ns, '2026-10-06T01:00:00Z')
+  check('확인함: 정보 [틀려요] → 넣지 않고 다시 묻지 않음', fno.factInbox.length === 0 && !buildDecisions(fno, T, ns).some((d) => d.kind === 'fact'))
+  const d = ds.find((x) => x.kind === 'doc')!
+  check('확인함: 서류 기한 → 요청 문구(납세증명서) 복사 효과', d.effect.type === 'copy' && d.effect.text.includes('납세증명서'), d)
+  const dno = withDecisionAnswer(rec, d, 'no', ns, '2026-10-06T01:00:00Z')
+  check('확인함: 서류 [나중에] → 같은 만료일에는 다시 묻지 않음', !buildDecisions(dno, T, ns).some((x) => x.kind === 'doc'))
+  check('확인함: 보관 · 계약 끝난 업체는 묻지 않음', buildDecisions({ ...rec, archivedAt: '2026-10-01T00:00:00Z' }, T, ns).length === 0 && buildDecisions({ ...rec, status: 'completed' }, T, ns).length === 0)
+  check('확인함: 지원사업 권한 없으면 공고 결정 없음', !buildDecisions(rec, T, ns, (k) => k !== 'grants').some((x) => x.kind === 'grant'))
+  const saved = normalizeClientOps(JSON.parse(JSON.stringify(yes)))
+  check('확인함: 답은 저장해 읽어도 그대로 · 이상한 값은 버림', saved.decided?.[g.id]?.a === 'yes' && normalizeClientOps({ id: 'x', companyName: 'x', decided: { a: { a: 'maybe', at: 1 } } } as never).decided === undefined)
+  let many = rec
+  for (let i = 0; i < 305; i++) many = withDecisionAnswer(many, { id: `x${i}`, effect: { type: 'copy', text: '' } }, 'no', ns, `2026-10-06T00:${String(Math.floor(i / 60)).padStart(2, '0')}:${String(i % 60).padStart(2, '0')}Z`)
+  check('확인함: 답은 300개까지(오래된 것부터 지움)', Object.keys(many.decided ?? {}).length === 300 && !many.decided?.x0 && !!many.decided?.x304)
 }
 
 console.log(`\ngrants: ${pass} passed, ${fail} failed`)

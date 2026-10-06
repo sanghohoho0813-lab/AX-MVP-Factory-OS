@@ -697,6 +697,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             onCommit={async (next, msg) => {
               if (await commit(next)) showToast(msg)
             }}
+            userId={userId}
+            onCommitQuiet={commit}
             onAlertOpen={(a) => setTab('work', a.serviceKey ?? undefined)}
             onFill={() => {
               setTab('overview')

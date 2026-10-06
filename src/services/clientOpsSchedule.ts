@@ -37,7 +37,8 @@ export interface ScheduleEvent {
 }
 
 export const SCHEDULE_KIND_LABEL: Record<ScheduleKind, string> = {
-  next: '다음 약속',
+  // D-158: 대표 — '다음 약속' 보다 그냥 '일정'
+  next: '일정',
   task: '업무 마감',
   funding: '자금 · 지원사업 신청',
   payment: '수금 예정',
@@ -77,7 +78,7 @@ export function buildClientSchedule(record: ClientOpsRecord, today: string): Sch
       clientId: record.id,
       clientName: name,
       title: record.nextAction || '다음 할 일',
-      detail: '다음 약속',
+      detail: '',
       serviceKey: null,
       done: false,
       daysLeft: daysLeftFrom(today, record.nextActionDueDate),

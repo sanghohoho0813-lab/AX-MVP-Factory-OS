@@ -14,6 +14,7 @@
  *  10. (D-124) 세금 계산기 목록을 펼친 채 화면을 밀어도 목록이 닫히며 튀지 않는다(누르면 닫힘)
  *  11. (D-124) 창이 열려 있을 때 뒤로가기는 창만 닫는다 · 뒤로 오면 보던 자리 · 찾던 말 그대로
  *  12. (D-125) 전화 단추(오늘 약속 줄 · 영업 보드 카드) · 고객 관리 '다음 약속 지남' 보기 · 휴대폰 하단 '영업'
+ *  14. (D-158) 확인할 것 — 오늘 칸 · 모두 보기 · 맞아요(정보 넣기 · 문구 복사) · 아니에요 · 업체 상세에서 다시 안 물음
  *  13. (D-155) 오늘 '안부 챙길 계약 고객' — 한 달 넘게 조용 · 계약 1주년 · 안부 카톡 · 연락했어요 · 다음에 · 성과 보고서 바로 열기
  */
 
@@ -371,6 +372,60 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   check(`돌봄: 다 챙기면 칸이 사라짐 ${tag}`, (await page.getByTestId('today-care').count()) === 0)
   const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   check(`돌봄: 가로 넘침 0 · JS 오류 0 ${tag}`, over <= 0 && errors.length === 0, `${over} ${errors.join(' | ')}`)
+  await ctx.close()
+}
+
+/* 14 (D-158) 확인할 것 — 프로그램이 준비한 것에 맞다 · 아니다만 */
+for (const [w, mob] of [[1440, false], [390, true]]) {
+  const ctx = await browser.newContext({ viewport: { width: w, height: 900 }, isMobile: mob, hasTouch: mob, locale: 'ko-KR', timezoneId: 'Asia/Seoul', permissions: ['clipboard-read', 'clipboard-write'] })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e).slice(0, 160)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const tag = `(${w})`
+  const T = await page.evaluate(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })
+  // 한솔: 자료에서 읽은 매출 후보 하나 · 납세증명서(1개월) 이미 만료
+  await page.evaluate(({ k, T }) => {
+    const list = JSON.parse(localStorage.getItem(k))
+    const h = list.find((c) => c.id === 'cli_hansol')
+    h.factInbox = [{ id: 'fi-e2e', key: 'revenue', value: '1200000000', source: 'document', asOf: '2025-12-31', ref: '재무제표', foundAt: `${T}T00:00:00Z` }]
+    h.customDocuments = [...(h.customDocuments ?? []), { id: 'cd-e2e', key: 'customdoc_tax158', label: '납세증명서', validMonths: 1, sensitive: false }]
+    h.documents = { ...(h.documents ?? {}), customdoc_tax158: { received: true, issuedAt: '2026-08-01', fileName: '납세.pdf' } }
+    localStorage.setItem(k, JSON.stringify(list))
+  }, { k: CLIENTS, T })
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  const box = page.getByTestId('today-decide')
+  check(`확인할 것: 오늘에 칸 · 위 셋까지 ${tag}`, (await box.count()) === 1 && (await box.getByTestId('decision').count()) <= 3 && (await box.getByTestId('decision').count()) >= 1)
+  await box.getByTestId('today-decide-all').click()
+  await page.waitForURL(/\/ops\/decide/)
+  await page.waitForTimeout(500)
+  const fact = page.locator('[data-testid="decision"][data-kind="fact"][data-client="cli_hansol"]').first()
+  check(`확인할 것 화면: 한솔 매출 정보 '맞나요?' ${tag}`, (await fact.count()) === 1 && (await fact.innerText()).includes('맞나요'), await page.getByTestId('decision-list').innerText().catch(() => ''))
+  await fact.getByTestId('decision-yes').click()
+  await page.waitForTimeout(600)
+  const h1 = await one(page, 'cli_hansol')
+  check(`[맞아요] → 업체 정보로 · 후보 빠짐 · 줄 사라짐 ${tag}`, (h1.factInbox ?? []).length === 0 && (await page.locator('[data-testid="decision"][data-kind="fact"][data-client="cli_hansol"]').count()) === 0, JSON.stringify(h1.factValues ?? {}).slice(0, 200))
+  const doc = page.locator('[data-testid="decision"][data-kind="doc"][data-client="cli_hansol"]').first()
+  check(`서류 기한: 납세증명서 새로 받기 ${tag}`, (await doc.count()) === 1 && (await doc.innerText()).includes('납세증명서'))
+  await doc.getByTestId('decision-yes').click()
+  await page.waitForTimeout(500)
+  const clip = await page.evaluate(() => navigator.clipboard.readText())
+  check(`[요청 문구 복사] → 카톡 문구 복사 · 다시 묻지 않음 ${tag}`, clip.includes('납세증명서') && (await page.locator('[data-testid="decision"][data-kind="doc"][data-client="cli_hansol"]').count()) === 0 && !!(await one(page, 'cli_hansol')).decided, clip.slice(0, 80))
+  const next = page.getByTestId('decision').first()
+  if (await next.count()) {
+    const id = await next.getAttribute('data-client')
+    const before = await page.getByTestId('decision').count()
+    await next.getByTestId('decision-no').click()
+    await page.waitForTimeout(500)
+    check(`[아니에요] → 줄 하나 줄어듦 · 그 업체에 답 남음 ${tag}`, (await page.getByTestId('decision').count()) === before - 1 && Object.values((await one(page, id)).decided ?? {}).some((x) => x.a === 'no'))
+  }
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check(`업체 상세 맞춤 추천: 답한 것은 다시 안 물음 ${tag}`, !(await page.getByTestId('smart-tab').innerText()).includes('납세증명서 새로 받기'))
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  check(`확인할 것: 가로 넘침 0 · 오류 0 ${tag}`, over <= 0 && errors.length === 0, `${over} ${errors.join(' | ')}`)
   await ctx.close()
 }
 

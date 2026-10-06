@@ -87,7 +87,11 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
   const days = useMemo(() => monthGrid(ym[0], ym[1]), [ym])
   const monthPrefix = `${ym[0]}-${String(ym[1]).padStart(2, '0')}`
   const pickedEvents = picked ? (byDate.get(picked) ?? []) : []
-  const pickedTodos = useMemo(() => (picked ? todosOn(journal, picked) : []), [journal, picked])
+  // D-158: 그날 할 일은 적은 순서대로 1 · 2 · 3 번호를 붙인다(대표) — 끝낸 것도 자리 그대로(줄만 그어짐)
+  const pickedTodos = useMemo(
+    () => (picked ? todosOn(journal, picked).sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)) : []),
+    [journal, picked],
+  )
   /** 날짜별 내가 적은 할 일 — 안 끝낸 것 먼저(todosOn 과 같은 순서). 휴대폰은 점, PC 는 칸 안에 글로 (D-156) */
   const todosByDate = useMemo(() => {
     const map = new Map<string, JournalEntry[]>()
@@ -296,7 +300,8 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
           )}
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
+        {/* D-158: 휴대폰은 종류 칩을 한 줄(옆으로 밀기) — 세 줄을 차지해 달력이 아래로 밀렸다 */}
+        <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0" data-testid="calendar-kind-chips">
           {KINDS.map((k) => {
             const on = !hidden.has(k)
             return (
@@ -305,7 +310,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                 type="button"
                 aria-pressed={on}
                 onClick={() => toggleKind(k)}
-                className={`tap inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.875rem] font-medium ${
+                className={`tap inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.875rem] font-medium whitespace-nowrap ${
                   on ? SCHEDULE_KIND_CLASS[k].chip : 'border-slate-200 bg-white text-slate-400'
                 }`}
               >
@@ -386,7 +391,8 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                       moveTodo(id, d)
                     }}
                     data-drop={dropDay === d ? 'true' : undefined}
-                    className={`flex min-h-[5.5rem] min-w-0 flex-col gap-1 border-r border-b lg:min-h-[6.75rem] lg:p-1 border-slate-100 p-1.5 text-left last:border-r-0 ${
+                    // D-158: 휴대폰은 칸을 낮게(점만) — 달력이 세로로 길어 그날 할 일이 너무 늦게 보였다(대표)
+                    className={`flex min-h-[3.25rem] min-w-0 flex-col items-center gap-0.5 border-r border-b lg:min-h-[6.75rem] lg:items-stretch lg:gap-1 lg:p-1 border-slate-100 p-1 text-left last:border-r-0 ${
                       inMonth ? 'bg-white' : 'bg-slate-50/60'
                     } ${off && !inMonth ? 'opacity-60' : ''} ${isPicked ? 'ring-2 ring-brand-400 ring-inset' : ''} ${dropDay === d ? 'bg-brand-100 ring-2 ring-brand-600 ring-inset' : ''} hover:bg-brand-50/40`}
                   >
@@ -533,9 +539,10 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                   )}
                   {pickedTodos.length > 0 && (
                     <ul className="flex flex-col gap-2">
-                      {pickedTodos.map((e) => (
+                      {pickedTodos.map((e, i) => (
                         <TodoRow
                           key={e.id}
+                          number={i + 1}
                           entry={e}
                           today={today}
                           dragProps={{ ...dragTodo(e), 'data-todo-id': e.id } as LiHTMLAttributes<HTMLLIElement>}

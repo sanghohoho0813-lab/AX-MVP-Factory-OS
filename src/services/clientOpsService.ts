@@ -365,6 +365,18 @@ function phoneFromOldDocument(state: Partial<DocumentState> | undefined): string
   return m ? m[0] : ''
 }
 
+/** D-158: 확인함 답 — 모양이 맞는 것만, 300개까지 */
+function normalizeDecided(value: unknown): { decided?: Record<string, { a: 'yes' | 'no'; at: string }> } {
+  if (!value || typeof value !== 'object') return {}
+  const out: Record<string, { a: 'yes' | 'no'; at: string }> = {}
+  for (const [k, v] of Object.entries(value as Record<string, unknown>).slice(-300)) {
+    const x = v as { a?: unknown; at?: unknown } | null
+    if (!k || k.length > 400 || !x || (x.a !== 'yes' && x.a !== 'no') || typeof x.at !== 'string') continue
+    out[k] = { a: x.a, at: x.at }
+  }
+  return Object.keys(out).length ? { decided: out } : {}
+}
+
 /** D-155: 돌봄 기록 — 날짜 모양만 남긴다. 둘 다 없으면 칸을 만들지 않는다 */
 function normalizeCare(value: unknown): { care?: { lastContactAt?: string; snoozeUntil?: string } } {
   if (!value || typeof value !== 'object') return {}
@@ -502,6 +514,7 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
           .slice(0, ACTIVITY_LIMIT)
       : [],
     ...normalizeCare(value.care),
+    ...normalizeDecided(value.decided),
     archivedAt: typeof value.archivedAt === 'string' ? value.archivedAt : null,
     createdAt: value.createdAt ?? now,
     updatedAt: value.updatedAt ?? now,

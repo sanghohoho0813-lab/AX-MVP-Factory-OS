@@ -22,6 +22,8 @@ import { ClientAdvisor } from './ClientAdvisor'
 import { ClientGrantsCard } from '../grants/ClientGrantsCard'
 import { useGrantData } from '../grants/useGrants'
 import { useEntitlements } from '../../lib/entitlementsStore'
+import { buildDecisions } from '../../services/decisions'
+import { DecisionList, useDecisionAnswer } from './DecisionList'
 import { pendingFacts } from '../../services/customerFacts'
 import { INSIGHT_TONE_LABEL, buildInsights, recommendNextSteps, type InsightTone } from '../../services/clientInsights'
 import type { DocBatchSummary } from '../../services/docAutoAnalyze'
@@ -42,7 +44,12 @@ export default function ClientSmartTab({
   onCommit,
   onAlertOpen,
   onFill,
+  userId,
+  onCommitQuiet,
 }: {
+  /** D-158: 확인할 것 — 할 일 만들 사람 · 알림 없이 저장(답마다 알림은 확인함이 띄운다) */
+  userId?: string | null
+  onCommitQuiet?: (next: ClientOpsRecord) => Promise<boolean>
   record: ClientOpsRecord
   today: string
   workspaceId: string | null
@@ -75,6 +82,16 @@ export default function ClientSmartTab({
   const feeToSet = useMemo(() => activeApplications(record).filter((a) => applyStage(a) === 'selected').map((a) => a.programName || '지원사업'), [record])
   const steps = useMemo(() => recommendNextSteps(insights, pending, shelf, applying, feeToSet), [insights, pending, shelf, applying, feeToSet])
   const good = insights.filter((i) => i.tone === 'good').length
+  // D-158: 확인할 것 — 이 업체 것만(자료에서 읽은 정보는 위 '확인이 필요한 정보' 칸이 맡는다)
+  const decisions = useMemo(() => buildDecisions(record, today, notices, usable).filter((d) => d.kind !== 'fact'), [record, today, notices, ent]) // eslint-disable-line react-hooks/exhaustive-deps
+  const { answer, busy } = useDecisionAnswer({
+    workspaceId,
+    userId: userId ?? null,
+    today,
+    notices,
+    latest: () => record,
+    save: async (next) => ((await (onCommitQuiet ?? (async () => false))(next)) ? next : null),
+  })
 
   const setNext = (text: string) => void onCommit(withNextAction(record, text, addDaysLocal(today, 3)), `다음 약속으로 걸었습니다 — ${text.slice(0, 30)}`)
 
@@ -101,6 +118,15 @@ export default function ClientSmartTab({
 
       {/* 3. 확인이 필요한 정보 */}
       <FactInboxCard record={record} now={nowIso()} onCommit={onCommit} />
+
+      {/* 3-1. D-158: 프로그램이 준비한 것 — 맞다 · 아니다만(정보 확인은 위 칸이 맡는다) */}
+      {decisions.length > 0 && (
+        <Section title="프로그램이 준비했어요 — 맞나요?" count={decisions.length}>
+          <div data-testid="smart-decisions">
+            <DecisionList decisions={decisions} busy={busy} showClient={false} onAnswer={(d, a) => void answer(d, a)} />
+          </div>
+        </Section>
+      )}
 
       {/* 4. 다음 행동 */}
       <Section title="다음 행동 추천" count={steps.length}>

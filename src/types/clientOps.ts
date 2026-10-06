@@ -814,6 +814,8 @@ export interface ClientOpsRecord {
    * payload 에 함께 저장된다(DB 변경 없음). 없으면 아직 돌봄 기록이 없는 것.
    */
   care?: { lastContactAt?: string; snoozeUntil?: string }
+  /** D-158: 확인함에서 답한 것 — 결정 이름 → 맞아요(yes) · 아니에요(no) · 답한 시각. 다시 묻지 않는다(payload, DB 변경 없음) */
+  decided?: Record<string, { a: 'yes' | 'no'; at: string }>
   /** 보관 처리 시각 (보관하면 목록·경고에서 빠진다) */
   archivedAt: string | null
   createdAt: string
