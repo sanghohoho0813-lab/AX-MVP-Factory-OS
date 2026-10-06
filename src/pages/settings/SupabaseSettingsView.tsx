@@ -2,7 +2,7 @@
  * supabase 모드 설정 화면 (세션·워크스페이스 사용). lazy 로 로드되어 local entry 에 영향 없음.
  */
 
-import { useIsPilot } from '../../auth/osAccess'
+import { useIsPilot, useViewingPilot } from '../../auth/osAccess'
 import { useState } from 'react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Panel } from '../../components/ui/Panel'
@@ -31,6 +31,15 @@ function NameEditor() {
   const [name, setName] = useState(typeof meta.display_name === 'string' ? meta.display_name : me.name === '사용자' ? '' : me.name)
   const [title, setTitle] = useState(typeof meta.title === 'string' ? meta.title : me.title)
   const [saving, setSaving] = useState(false)
+  // D-164: 대표가 팀장 화면을 보는 중 — 여기서 저장하면 대표 계정 이름이 바뀐다. 팀장 이름은 팀장 계정에서.
+  const viewing = useViewingPilot()
+  if (viewing) {
+    return (
+      <p className="t-sub border-b border-slate-50 py-3 text-slate-600" data-testid="name-editor-viewing">
+        지금은 팀장님 화면을 보는 중입니다. 이름 · 직함은 팀장님 계정으로 들어가서 바꿉니다(여기서 바꾸면 대표님 계정 이름이 바뀝니다).
+      </p>
+    )
+  }
   const save = async () => {
     if (!name.trim()) return showToast('이름을 적어 주세요.')
     setSaving(true)

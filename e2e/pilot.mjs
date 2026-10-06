@@ -454,6 +454,8 @@ try {
   check('대표 → 팀장 화면: 이름 칸 "최은혜 팀장"', /최은혜\s*팀장/.test(await page.locator('[data-testid="sidebar-account"]').innerText()))
   await go(page, '/ops/agents')
   check('대표 → 팀장 화면: 대표 전용 주소도 팀장처럼 막힘', (await bodyText(page)).includes('화면을 찾지 못했습니다'))
+  await go(page, '/settings')
+  check('대표 → 팀장 화면: 설정 이름 칸 대신 안내(여기서 저장하면 대표 이름이 바뀌므로)', (await page.getByTestId('name-editor-viewing').count()) === 1 && (await page.getByTestId('name-input').count()) === 0)
   await go(page, '/')
   await page.locator('header [data-testid="view-as-switch"] [data-view="owner"]').click()
   await page.waitForLoadState('networkidle')
@@ -516,6 +518,18 @@ try {
   check('PC+Mobile: 양쪽 모두 로그인된 같은 자료(대표 업체)', dpcText.includes('대표비밀정밀') && dmoText.includes('대표비밀정밀'), `${dpcText.slice(0, 80)} || ${dmoText.slice(0, 80)}`)
   await shot(page, 'owner-dual')
   check('PC+Mobile: 휴대폰 칸은 진짜 390px · 안에 보기 단추 없음(재귀 없음)', (await dualMo.locator('body').evaluate(() => window.innerWidth)) === 390 && (await dualMo.locator('[data-testid="device-switch"]').count()) === 0)
+  // 클라우드 저장 → 다른 쪽 화면도 새로 읽는다(손대지 않은 쪽만 새로 연다)
+  await dualPc.locator('aside').getByRole('link', { name: '오늘' }).first().click()
+  await page.waitForTimeout(3000)
+  const memo = '동시보기 확인 메모 ' + Date.now().toString().slice(-5)
+  await dualPc.getByLabel('기록 내용').first().fill(memo)
+  await dualPc.getByRole('button', { name: /^기록$/ }).first().click()
+  let moSaw = false
+  for (let i = 0; i < 16 && !moSaw; i += 1) {
+    await page.waitForTimeout(500)
+    moSaw = ((await dualMo.locator('body').innerText().catch(() => '')) ?? '').includes(memo)
+  }
+  check('PC+Mobile(클라우드): PC 쪽에서 적은 기록이 휴대폰 쪽에도 보인다', moSaw && sql(`select count(*) from public.ops_journal_entries where content = '${memo}'`) === '1')
   await page.locator('[data-testid="device-switch"] [data-mode="pc"]').first().click()
   await page.waitForTimeout(2500)
   await logout(page)

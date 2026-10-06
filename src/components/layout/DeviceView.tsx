@@ -9,6 +9,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { ChevronDown, Columns2, Monitor, Smartphone } from 'lucide-react'
 import { useDismissable } from '../../lib/useDismissable'
 import {
+  CLOUD_WRITE_EVENT,
   FRAME_KIND,
   MSG_NAVIGATE,
   MSG_REFRESH,
@@ -46,7 +47,7 @@ export function DeviceSwitch({ wide = false }: { wide?: boolean }) {
             onClick={() => setDeviceMode(m)}
             title={label}
             aria-label={label}
-            className={`inline-flex h-full min-w-9 items-center justify-center gap-1 rounded-[calc(var(--radius-control)-2px)] px-2 text-[0.85rem] font-semibold whitespace-nowrap ${on ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+            className={`inline-flex h-full min-w-9 items-center justify-center gap-1 rounded-[calc(var(--radius-control)-2px)] px-2 text-[0.85rem] font-semibold whitespace-nowrap ${on ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-300 ring-inset' : 'text-slate-600 hover:bg-slate-100'}`}
           >
             <Icon aria-hidden="true" className="size-4" />
             {/* 넓은 화면에서만 글자 — 머리줄이 옆으로 넘치지 않게(무대 위쪽 줄에서는 늘 글자) */}
@@ -73,7 +74,7 @@ export function DeviceSwitchCompact() {
         aria-label={`보기 방식: ${cur.label}`}
         title={`보기 방식: ${cur.label}`}
         onClick={() => setOpen((v) => !v)}
-        className={`inline-flex h-10 items-center gap-0.5 rounded-(--radius-control) border px-2 ${mode === 'pc' ? 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50' : 'border-brand-600 bg-brand-600 text-white'}`}
+        className={`inline-flex h-10 items-center gap-0.5 rounded-(--radius-control) border px-2 ${mode === 'pc' ? 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50' : 'border-brand-300 bg-brand-50 text-brand-700'}`}
       >
         <cur.Icon aria-hidden="true" className="size-4" />
         <ChevronDown aria-hidden="true" className="size-3.5 opacity-70" />
@@ -108,6 +109,7 @@ export function FrameBridge() {
   const location = useLocation()
   const navigate = useNavigate()
   const relaying = useRef(false)
+  const reloadTimer = useRef(0)
   const framed = inFrame()
 
   useEffect(() => {
@@ -128,14 +130,29 @@ export function FrameBridge() {
         relaying.current = true
         notifyStoreChanged()
         relaying.current = false
+        // 클라우드 자료는 화면이 저장소 신호로 다시 읽지 않는다 — 지금 손대고 있지 않은 화면만 새로 연다
+        if ((d as { cloud?: unknown }).cloud === true && !document.hasFocus()) {
+          if (reloadTimer.current) window.clearTimeout(reloadTimer.current)
+          reloadTimer.current = window.setTimeout(() => window.location.reload(), 300)
+        }
       }
     }
     window.addEventListener('message', onMessage)
     const unsub = subscribeStore(() => {
       if (!relaying.current) window.parent.postMessage({ type: MSG_SAVED, frame: FRAME_KIND }, window.location.origin)
     })
+    // 클라우드에 쓴 것 — 사람이 손대고 있는 화면에서 쓴 것만 알린다(새로 열린 화면끼리 서로 새로 고치지 않게)
+    let cloudTimer = 0
+    const onCloudWrite = () => {
+      if (!document.hasFocus()) return
+      window.clearTimeout(cloudTimer)
+      cloudTimer = window.setTimeout(() => window.parent.postMessage({ type: MSG_SAVED, frame: FRAME_KIND, cloud: true }, window.location.origin), 400)
+    }
+    window.addEventListener(CLOUD_WRITE_EVENT, onCloudWrite)
     return () => {
       window.removeEventListener('message', onMessage)
+      window.removeEventListener(CLOUD_WRITE_EVENT, onCloudWrite)
+      window.clearTimeout(cloudTimer)
       unsub()
     }
   }, [framed, navigate])
@@ -195,14 +212,15 @@ export function DeviceStage() {
       const from = frames().find((f) => f.contentWindow === e.source)
       if (!from) return
       const d = e.data as { type?: string; path?: unknown }
-      if (d?.type === MSG_ROUTE && typeof d.path === 'string' && d.path.startsWith('/')) {
+      if (d?.type === MSG_ROUTE && typeof d.path === 'string' && d.path.startsWith('/') && !d.path.startsWith('//')) {
         if (d.path === lastPath.current) return
         lastPath.current = d.path
         // 새로고침해도 같은 화면 — 무대 주소도 따라간다
         window.history.replaceState(null, '', d.path)
         for (const f of frames()) if (f !== from) f.contentWindow?.postMessage({ type: MSG_NAVIGATE, path: d.path }, window.location.origin)
       } else if (d?.type === MSG_SAVED) {
-        for (const f of frames()) if (f !== from) f.contentWindow?.postMessage({ type: MSG_REFRESH }, window.location.origin)
+        const cloud = (d as { cloud?: unknown }).cloud === true
+        for (const f of frames()) if (f !== from) f.contentWindow?.postMessage({ type: MSG_REFRESH, cloud }, window.location.origin)
       }
     }
     window.addEventListener('message', onMessage)

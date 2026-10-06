@@ -118,3 +118,5 @@ export const MSG_ROUTE = 'axmvp-route'
 export const MSG_NAVIGATE = 'axmvp-navigate'
 export const MSG_SAVED = 'axmvp-saved'
 export const MSG_REFRESH = 'axmvp-refresh'
+/** 클라우드 모드에서 자료를 썼을 때(창 안 이벤트) — 보기 무대의 다른 화면이 새로 읽게 */
+export const CLOUD_WRITE_EVENT = 'axmvp-cloud-write'
