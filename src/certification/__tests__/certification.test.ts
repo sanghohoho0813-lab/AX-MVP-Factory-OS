@@ -29,6 +29,17 @@ import { labcareFactsOf } from '../integration/labcareAdapter'
 import { factPatchOf, withCertCompletion } from '../integration/useCertData'
 import { factCandidatesFromDocText } from '../../services/docFacts'
 import { withFactCandidates, withFactDecisions } from '../../services/customerFacts'
+import { buildInspectionPackage, inspectionPackageText, ownerKey, ownerQuestionMessage } from '../core/inspectionPackage'
+import { BANNED_WORDS } from '../core/answerGuide'
+import { buildSubmitGate, missingDocsRequest, submissionDocs } from '../core/submitGate'
+import { buildVenturePack } from '../core/venturePack'
+import { buildClientSummary, clientSummaryText } from '../core/clientSummary'
+import { handoffText, HANDOFF_RULES, inspectionHandoff, ventureHandoff } from '../core/handoff'
+import { companyFitLine } from '../core/explain'
+import { INNOBIZ_BANK } from '../innobiz/innobizGuides'
+import { MAINBIZ_BANK } from '../mainbiz/mainbizGuides'
+import { RULE_CHANGES } from '../rules/ruleChanges'
+import type { BasisItem } from '../core/types'
 
 let pass = 0
 let fail = 0
@@ -324,6 +335,102 @@ check('어댑터: 설정 읽기 — 이상한 값은 모름', JSON.stringify(nor
   const legacy = normalizeClientOps({ id: 'lg', companyName: '예전상사', customFields: [{ id: 'cf1', group: 'credential', label: '이노비즈 확인서', value: '인증번호 1 · 2027-01-01까지' }] } as never)
   check('릴리스: 예전 이름 칸 + PDF → 한 칸으로', innoFields(acceptPdf(legacy)).length === 1)
   check('릴리스: 갱신 일정은 같은 인증 다시 기록해도 한 묶음(겹치지 않음)', (withCertCompletion(r2, 'innobiz', life, { toProfile: true, today: TODAY, clientId: 'pdf1' }).toolResults ?? []).filter((t) => t.toolKey === 'cert-os').length === 1)
+}
+
+
+// ---------------- P2 — 실사 준비 패키지 · 대표 확인 · 제출 전 확인 · 벤처 패키지 · AI 넘기기 · 고객 요약 ----------------
+{
+  const B = (field: BasisItem['field'], label: string, value: string, from = '회사 정보(확인)'): BasisItem => ({ field, label, value, state: 'confirmed', from })
+  const richBasis: BasisItem[] = [
+    B('years', '업력', '7년(설립 2019-03-02)', '사업자등록증'),
+    B('industry', '업종', '정밀기계 부품 제조', '사업자등록증'),
+    B('employees', '직원', '35명'),
+    B('revenue', '매출', '90억원', '재무제표(2025)'),
+    B('researchUnit', '연구조직', '기업부설연구소', '연구소 관리 기록(인정 2021-05-10)'),
+    B('researchers', '연구전담요원', '4명', '연구소 관리 기록'),
+    B('patents', '특허', '3건', '회사 정보 인증서 칸(특허증)'),
+    { field: 'exclusion', label: '제외 사유', value: '없음', state: 'estimated', from: '컨설턴트 확인(신청 전 증명서로 최종 확인)' },
+    { field: 'size', label: '규모', value: '소기업', state: 'estimated', from: '컨설턴트 선택(회사 정보 미확인)' },
+  ]
+  const rich = ctx({ ...tech, basis: richBasis, held: [{ key: 'venture', validUntil: '2027-05-01', note: '' }] })
+  const richPkg = buildInspectionPackage({ cert: 'innobiz', bank: INNOBIZ_BANK, selfCheck: INNOBIZ_CHECK, answers: {}, ctx: rich, prep: {}, labelOf: label })
+  const allSourced = [...richPkg.company, ...richPkg.strengths, ...richPkg.questions.flatMap((x) => [...x.guide.core, ...x.guide.points])]
+  const basisText = richBasis.map((b) => b.value).join(' ') + ' ' + rich.companyName
+  const numbersOk = allSourced.every((x) => (x.text.match(/\d[\d,.]*/g) ?? []).every((n) => basisText.includes(n)))
+  // G 사실 많은 이노비즈 업체
+  check('G 사실 많은 업체: 예상 질문 5~8개 · 핵심 답 초안이 생긴다', richPkg.questions.length >= 5 && richPkg.questions.length <= 8 && richPkg.questions.filter((x) => x.guide.core.length > 0).length >= 3, richPkg.questions.map((x) => [x.q.id, x.guide.core.length]))
+  check('G 모든 문장에 근거가 붙는다(빈 근거 0)', allSourced.length > 0 && allSourced.every((x) => x.basis.trim().length > 0), allSourced.filter((x) => !x.basis))
+  check('G 숫자는 근거 값에 있는 것만(지어낸 수치 0)', numbersOk, allSourced.map((x) => x.text))
+  check('G 금지 말 0(업계 최고 · 유일 · 1위 …)', !allSourced.some((x) => BANNED_WORDS.test(x.text)) && !BANNED_WORDS.test(inspectionPackageText(richPkg)))
+  check('G 업체 핵심정보: 회사명 · 업력 · 매출 · 연구소 · 특허 · 인증', ['한빛정밀', '7년', '90억원', '기업부설연구소', '3건', '벤처기업'].every((w) => richPkg.company.some((x) => x.text.includes(w))), richPkg.company)
+  check('G 강점: 연구소 · 특허 · 보유 인증', richPkg.strengths.length >= 3)
+  check('G 질문마다 묻는 이유 한 줄 · 처음 3개는 늘 묻는 질문', richPkg.questions.every((x) => x.why.length > 0) && richPkg.questions.slice(0, 3).every((x) => (x.q.weight ?? 2) === 3))
+  check('G 가져갈 자료 ✓/△/? · 실사 전날 체크 5개 이하', richPkg.bring.some((b) => b.state === 'ready') && richPkg.dayBefore.length >= 1 && richPkg.dayBefore.length <= 5)
+  check('G 30초 설명이 이 업체 사실로(연구조직과 특허)', companyFitLine('innobiz', rich) === '귀사는 연구조직과 특허가 이미 확보되어 있어 이노비즈 준비에서 기술혁신 근거를 만들기 유리한 상태입니다.' && explainFor(T.innobiz, rich, 'X').thirty.startsWith('귀사는 연구조직과 특허가'))
+  check('G 추정 · 칩 값으로는 고객 맞춤 문장을 만들지 않는다', companyFitLine('innobiz', ctx({ ...tech, basis: [{ ...richBasis[4], state: 'estimated', from: '컨설턴트 선택(회사 정보 미확인)' }] })) === '')
+
+  // H 정보 거의 없는 업체
+  const sparse = ctx({ companyName: '처음상사', basis: [] })
+  const sp = buildInspectionPackage({ cert: 'innobiz', bank: INNOBIZ_BANK, selfCheck: INNOBIZ_CHECK, answers: {}, ctx: sparse, prep: {}, labelOf: label })
+  check('H 빈 업체: 지어낸 답 0(핵심 답 전부 비어 대표 확인)', sp.questions.every((x) => x.guide.core.length === 0 && x.guide.needsOwner))
+  check('H 빈 업체: 업체 핵심정보는 회사명뿐 · 강점 0', sp.company.length === 1 && sp.strengths.length === 0, sp.company)
+  check('H 빈 업체: 대표 확인 질문이 생긴다(3~8개 · 중복 없음)', sp.ownerQuestions.length >= 3 && sp.ownerQuestions.length <= 8 && new Set(sp.ownerQuestions.map(ownerKey)).size === sp.ownerQuestions.length, sp.ownerQuestions)
+  check('H 빈 업체: 제외 사유 · 중소기업 여부를 묻는다', sp.ownerQuestions.some((q) => /체납/.test(q)) && sp.ownerQuestions.some((q) => /중소기업확인서/.test(q)))
+  check("H 글에도 '대표 확인 후 보완이 필요합니다'", /대표 확인 후 보완이 필요합니다/.test(inspectionPackageText(sp)))
+  const msg = ownerQuestionMessage('처음상사', '이노비즈', sp.ownerQuestions, '홍길동 팀장')
+  check('H 대표에게 질문 보내기: □ 목록 카톡 문구 · 보낸 사람', msg.startsWith('대표님, 홍길동 팀장입니다.') && msg.split('\n').filter((l) => l.startsWith('□ ')).length === sp.ownerQuestions.length)
+  // 대표 답을 적으면 질문이 빠지고 '대표 답' 근거 문장이 된다
+  const q1 = sp.questions[0].guide.ownerAsk[0]
+  const sp2 = buildInspectionPackage({ cert: 'innobiz', bank: INNOBIZ_BANK, selfCheck: INNOBIZ_CHECK, answers: {}, ctx: sparse, prep: {}, labelOf: label, notes: { [ownerKey(q1)]: '금형 냉각 설계를 자체 개발' } })
+  check('H 대표 답 적기 → 그 질문은 목록에서 빠지고 핵심 답(근거: 대표 답)', !sp2.ownerQuestions.includes(q1) && sp2.questions.some((x) => x.guide.core.some((c) => c.text === '금형 냉각 설계를 자체 개발' && c.basis.startsWith('대표 답'))))
+  const gateSp = buildSubmitGate({ cert: 'innobiz', ctx: sparse, selfCheck: INNOBIZ_CHECK, answers: {}, pkg: sp })
+  check("H 제출 전 확인: '먼저 확인 필요' · 퍼센트 없음 · 공식 점수는 따로", gateSp.verdict === 'check_first' && !gateSp.items.some((x) => /%|점/.test(x.text)) && gateSp.official.some((o) => /650/.test(o.value)))
+
+  // I 이미 있는 자료는 요청에서 빠진다
+  const docs = submissionDocs('innobiz', tech)
+  const req = missingDocsRequest('한빛정밀', 'innobiz', docs, '김상호 대표')
+  check('I 제출자료 정리: 서류함에 있는 7개는 ✓, 없는 것만 △', docs.have.length === 7 && docs.need.map((d) => d.label).join() === '품질 · 인증 현황(ISO 등)', docs)
+  check('I 요청 문구: 없는 것만 번호 · 이미 받은 것은 다시 안 주셔도 됨', /1\. 품질 · 인증 현황/.test(req) && !/2\. /.test(req) && /다시 안 주셔도/.test(req))
+  const staleDocs = submissionDocs('innobiz', ctx({ ...tech, evidence: [...tech.evidence.filter((e) => e.id !== 'fin3'), { id: 'fin3', label: 'fin3', have: true, stale: true }] }))
+  check('I 기간 지난 자료는 새로 발급 요청', staleDocs.need.some((d) => d.label === '최근 3년 재무제표' && d.stale))
+  const gateRich = buildSubmitGate({ cert: 'innobiz', ctx: rich, selfCheck: INNOBIZ_CHECK, answers: Object.fromEntries(INNOBIZ_CHECK.map((i) => [i.id, 'yes' as const])), pkg: richPkg })
+  check('I 제출 전 확인 항목은 ✓/△ 한 줄씩 · 판정은 두 가지뿐', gateRich.items.length === 7 && ['ready', 'check_first'].includes(gateRich.verdict))
+
+  // J 벤처 준비 패키지
+  const vp = buildVenturePack(rich)
+  const vpBlank = buildVenturePack(sparse)
+  check('J 벤처 패키지: 9칸', vp.length === 9 && vp.map((x) => x.title).join('|') === '회사 기본정보|해결하려는 문제|제품 · 서비스|기술 · 차별성|시장|매출 · 성장|연구개발|지식재산|실증 · 성과')
+  check('J 사실 많은 업체: 기본정보 · 기술 · 연구개발 · 지식재산 ✓, 문제 · 시장은 ? 대표 확인', ['basic', 'tech', 'rnd', 'ip'].every((id) => vp.find((x) => x.id === id)!.state === 'ok') && ['problem', 'market'].every((id) => vp.find((x) => x.id === id)!.state === 'ask'), vp.map((x) => [x.id, x.state]))
+  check('J 빈 업체: 지어낸 내용 0 — 회사명 말고는 줄이 없다', vpBlank.flatMap((x) => x.lines).every((l) => l.text === '회사명 처음상사') && vpBlank.filter((x) => x.state === 'ask').length === 8)
+  check('J 대표 답을 적으면 그 칸은 ✓(근거: 대표 답)', buildVenturePack(sparse, { 'venture:problem': '중소 제조사의 불량 검사 시간을 줄임' }).find((x) => x.id === 'problem')!.state === 'ok')
+  const vh = ventureHandoff('처음상사', vpBlank, null, { have: [], missing: [] })
+  check('J AI 넘기기(벤처): 빈 칸은 대표 확인 필요로 · 지어내지 말라는 지시', /\[대표 확인 필요: 어떤 고객의/.test(handoffText(vh)) && HANDOFF_RULES.every((r) => handoffText(vh).includes(r)))
+
+  // K 인증 받은 업체 → 다음 할 일 3개 이하 · 이유 한 줄
+  for (const [k, c] of [['innobiz', tech], ['venture', service], ['lab', startup], ['mainbiz', service], ['iso9001', factory]] as const) {
+    const after = nextAfterCertified(k, c)
+    check(`K ${k} 취득 뒤 다음 할 일 3개 이하 · 이유 한 줄('취득 완료')`, after.length >= 1 && after.length <= 3 && after.every((x) => x.because.startsWith(`${{ innobiz: '이노비즈', venture: '벤처', lab: '연구소', mainbiz: '메인비즈', iso9001: 'ISO 9001' }[k]} 취득 완료`) && !x.because.includes('\n')), after)
+  }
+  check("K 정책자금 이유: '이노비즈 취득 완료 + 정책자금 계획 있음'", nextAfterCertified('innobiz', tech)[0].because === '이노비즈 취득 완료 + 정책자금 계획 있음')
+  check('K 모르는 특허 수는 0건이라고 쓰지 않는다', !nextAfterCertified('innobiz', ctx({ ...service, patents: null })).some((x) => x.because.includes('0건')))
+
+  // L 고객 요약에 내부 정보 없음
+  const secret = ctx({ ...rich, exclusionFlags: ['국세 체납'] })
+  const listL = assessAll(secret)
+  const sum = buildClientSummary(listL, secret, buildRoadmap(listL, secret))
+  const sumText = clientSummaryText(sum, '미래경영 홍길동 대표')
+  check('L 고객 요약: 8칸 이내(검토 · 추천 · 이유 · 준비 · 자료 · 혜택 · 순서 · 유의)', sum.sections.length >= 5 && sum.sections.length <= 8 && sum.sections.some((x) => x.id === 'notice'))
+  check('L 고객 요약: 실사 질문 · 대표 답 · 체납 · 내부 · 공식 점수 숫자 없음', !/체납|실사|대표 답|내부|컨설턴트 메모|650|700점|%|점수/.test(sumText), sumText)
+  check('L 고객 요약: 결과를 보장하지 않는다는 유의사항', /결과를 보장하지 않습니다/.test(sumText))
+  const ih = inspectionHandoff(richPkg, T.innobiz, runSelfCheck(INNOBIZ_CHECK, rich, {}))
+  check('AI 넘기기: 구조 묶음(버전 · 사실 · 판정 · 자가진단 · 증빙 · 질문 · 금지 지시)', ih.version === 'cert-handoff/1' && ih.facts.length > 0 && !!ih.judgment && ih.selfCheck.length > 0 && ih.questions.length === richPkg.questions.length && ih.rules === HANDOFF_RULES)
+  check('AI 넘기기: 다른 업체 이름이 섞이지 않는다', !handoffText(ih).includes('처음상사') && handoffText(ih).includes('한빛정밀'))
+
+  // 메인비즈도 같은 틀
+  const mPkg = buildInspectionPackage({ cert: 'mainbiz', bank: MAINBIZ_BANK, selfCheck: MAINBIZ_CHECK, answers: {}, ctx: rich, prep: {}, labelOf: label })
+  check('메인비즈 패키지: 질문 5~8개 · 문장마다 근거', mPkg.questions.length >= 5 && mPkg.questions.length <= 8 && mPkg.questions.flatMap((x) => [...x.guide.core, ...x.guide.points]).every((x) => x.basis.length > 0))
+  check('질문 은행: 이노비즈 10 · 메인비즈 10 · 가이드 전부 있음', INNOBIZ_BANK.length === 10 && MAINBIZ_BANK.length === 10 && [...INNOBIZ_BANK, ...MAINBIZ_BANK].every((q) => !!q.guide && !!q.topic))
+  check('기준 바뀐 기록: 인증 · 기준 · 확인일 · 바뀐 것', RULE_CHANGES.length >= 4 && RULE_CHANGES.every((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.checkedAt) && r.rule && r.change && CERT_RULES[r.cert]))
 }
 
 // Core 는 OS 를 모른다 — core · rules · innobiz · mainbiz · iso 는 그 밖(services · pages · components · tools · types)을 import 하지 않는다

@@ -85,3 +85,20 @@ ISO 9001 · 14001 · 45001 을 업종 · B2B · 조달 · 수출로 검토 추�
 연장 기간(이노비즈 · 메인비즈 제15조①) · 벤처 확인요령 별표1(업종별 연구개발 투자비율) · 연구소 시행규칙(50㎡ 칸막이 예외 · 자격) ·
 ISO 14001:2026 전환(Global ACI) 반영. 남은 미확인: Kibo 개별기술 평가표 항목별 배점 · 벤처확인서 번호 형식 · ISO 45001 개정판 발행 시점.
 공식 안내끼리 다른 것이 생기면 `CertRule.conflicts` → 화면에 '공식 안내 상이 — 제출 전 확인 필요'.
+
+## P2 — 전문가 보조 · 결과물 (2026-10-07, Preview 까지)
+
+| 무엇 | 어디(Core → UI) | 원칙 |
+|---|---|---|
+| 말하기 가이드 | `core/answerGuide.ts` · `innobiz/innobizGuides.ts` · `mainbiz/mainbizGuides.ts` | 질문 은행 10개씩. 문장마다 근거. 확인 전 값 · 금지 말 · 근거 없는 숫자 0 |
+| 실사 준비 패키지 | `core/inspectionPackage.ts` → `ui/PrepPanels.tsx` InspectionPackPanel | A 핵심정보 · B 질문 5~8 · C 가이드 · D 가져갈 자료 ✓△? · E 전날 체크 ≤5 · 대표 확인 |
+| 대표님께 확인할 것 | `buildOwnerQuestions` · `ownerQuestionMessage` → OwnerAskBox | 자격 → 가이드 빈칸 → 자가진단 모름, 최대 8. 답 적기(`cert-os/work.notes`) → '대표 답' 근거 |
+| 제출 전 최종 확인 | `core/submitGate.ts` → SubmitGatePanel | 제출 준비 가능 / 먼저 확인 필요 · ✓△ 7줄 · 공식 점수 따로 · 모자란 자료만 요청 |
+| 벤처 준비 패키지 | `core/venturePack.ts` → VenturePackPanel | 9칸 ✓△? · 지어내지 않음 |
+| AI 로 넘기기 | `core/handoff.ts` (HandoffPackage → handoffText) | API 0 · 복사만 · 금지 지시 늘 포함 |
+| 고객용 진단 요약 | `core/clientSummary.ts` → `ui/ClientSummarySheet.tsx` | 내부 정보 제외 · 미리보기 · 복사 · 인쇄 |
+| 맞춤 설명 한 줄 | `core/explain.ts` companyFitLine | confirmed 사실만 |
+| 공식 기준 보기 · 바뀐 기록 | `rules/officialRules.ts` · `rules/ruleChanges.ts` | OfficialSource(version · effective) · checkedAt 유지 |
+| 다음 할 일 이유 | `core/nextAfter.ts` because | '…취득 완료 + …' 한 줄, 최대 3 |
+
+P3 로 남긴 것은 docs/DECISIONS.md D-173 과 보고서에.

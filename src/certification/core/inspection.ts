@@ -16,6 +16,12 @@ export interface InspectionQuestion {
   evidence: string[]
   /** 답변 초안 — 근거가 없으면 null(대표 확인 필요) */
   draft: (c: CertificationClientContext) => string | null
+  /** P2: 짧은 주제 이름(대표 확인 문장 · 요약에) */
+  topic?: string
+  /** P2: 중요도 1~3(3 = 거의 늘 묻는 핵심) */
+  weight?: 1 | 2 | 3
+  /** P2: 말하기 가이드 — 근거가 붙은 문장만. 없으면 대표 확인 */
+  guide?: (k: import('./answerGuide').FactKit) => import('./answerGuide').GuideParts
 }
 
 export type PrepState = 'ok' | 'edited' | 'confirm' | 'pending'

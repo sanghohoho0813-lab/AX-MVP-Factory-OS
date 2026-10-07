@@ -1,0 +1,139 @@
+/**
+ * 이노비즈 실사 질문 은행 + 말하기 가이드 (P2). 엔진은 core/answerGuide · core/inspectionPackage.
+ * 앞 5개(INNOBIZ_INSPECTION)는 P1 실사 대비 흐름 그대로, 뒤 5개는 업체에 따라 골라 쓰는 질문.
+ * 가이드는 근거가 있는 문장만 — 없으면 대표 확인 질문으로.
+ */
+import type { InspectionQuestion } from '../core/inspection'
+import type { FactKit, GuideParts, Sourced } from '../core/answerGuide'
+import { INNOBIZ_INSPECTION } from './innobizCheck'
+
+const s = (text: string, basis: string): Sourced => ({ text, basis })
+const has = (v: string | undefined) => !!v && !/^없음/.test(v)
+
+function unitLine(k: FactKit): Sourced | null {
+  const u = k.fact('researchUnit')
+  return u && has(u.value) ? s(`${u.value}에서 직접 개발합니다.`, u.basis) : null
+}
+
+const GUIDES: Record<string, Pick<InspectionQuestion, 'topic' | 'weight' | 'guide'>> = {
+  q_tech: {
+    topic: '핵심 기술 · 차별점',
+    weight: 3,
+    guide: (k): GuideParts => {
+      const p = k.fact('patents')
+      const core = [p && has(p.value) ? s(`특허 ${p.value}으로 기술을 보호하고 있습니다.`, p.basis) : null, unitLine(k)].filter(Boolean) as Sourced[]
+      const ind = k.fact('industry')
+      const points = [ind ? s(`업종: ${ind.value}`, ind.basis) : null, k.held.length ? s(`보유 인증: ${k.held.join(' · ')}`, '회사 정보 인증서 칸 · 진행 기록') : null].filter(Boolean) as Sourced[]
+      return { core, points, ownerAsk: ['핵심 기술 이름과 경쟁사와 다른 점(대표님 말로 한 줄)', ...(p && has(p.value) ? [] : ['특허 · 출원 중인 기술이 있나요?'])] }
+    },
+  },
+  q_org: {
+    topic: '연구 조직 · 인력',
+    weight: 3,
+    guide: (k) => {
+      const u = k.fact('researchUnit')
+      const r = k.fact('researchers')
+      const core = u && has(u.value) ? [s(`${u.value}에서${r ? ` 연구전담요원 ${r.value}이` : ''} 개발을 맡고 있습니다.`, [u.basis, r?.basis].filter(Boolean).join(' · '))] : []
+      const points = k.hasEvidence('lab_cert') ? [s('연구소 · 전담부서 인정서 원본을 보여 드립니다.', '서류함: 인정서')] : []
+      return { core, points, ownerAsk: [...(core.length ? [] : ['연구개발을 맡는 사람 · 조직이 따로 있나요?']), '연구공간 위치와 넓이(다른 공간과 구분돼 있는지)'] }
+    },
+  },
+  q_records: {
+    topic: '최근 개발 과제 · 기록',
+    weight: 3,
+    guide: (k) => ({
+      core: k.hasEvidence('rnd_records') ? [s('연구노트 · 과제 기록을 보관하고 있어 바로 보여 드릴 수 있습니다.', '서류함: 연구노트 · 과제 기록')] : [],
+      points: [],
+      ownerAsk: ['최근 1~2년 개발 과제 이름 · 기간 · 결과'],
+    }),
+  },
+  q_sales: {
+    topic: '기술 사업화 매출',
+    weight: 2,
+    guide: (k) => {
+      const r = k.fact('revenue')
+      return { core: r ? [s(`작년 매출은 ${r.value}입니다.`, r.basis)] : [], points: [], ownerAsk: ['그 가운데 기술 제품 · 서비스 매출 비중', ...(r ? [] : ['작년 매출(재무제표)'])] }
+    },
+  },
+  q_plan: {
+    topic: '3년 기술 개발 계획',
+    weight: 2,
+    guide: () => ({ core: [], points: [], ownerAsk: ['앞으로 3년 기술 개발 계획(어떤 제품 · 언제)'] }),
+  },
+}
+
+const MORE: InspectionQuestion[] = [
+  {
+    id: 'q_ip',
+    question: '지식재산(특허 · 상표)은 어떻게 관리하시나요?',
+    intent: '기술 축적 — 성과를 권리로 남기는지',
+    topic: '지식재산 관리',
+    weight: 2,
+    facts: (c) => (c.patents ? [`특허 ${c.patents}건`] : []),
+    evidence: ['patent'],
+    draft: () => null,
+    guide: (k) => {
+      const p = k.fact('patents')
+      return { core: p && has(p.value) ? [s(`등록 · 출원한 특허가 ${p.value} 있습니다.`, p.basis)] : [], points: k.hasEvidence('patent') ? [s('특허증 사본을 준비했습니다.', '서류함: 특허 등록증')] : [], ownerAsk: ['출원 중 · 준비 중인 특허 · 상표가 있나요?'] }
+    },
+  },
+  {
+    id: 'q_rnd_cost',
+    question: '연구개발에 돈을 얼마나, 어떻게 쓰고 있나요?',
+    intent: '연구개발 투자 — 꾸준한지',
+    topic: '연구개발 투자',
+    weight: 2,
+    facts: () => [],
+    evidence: ['fin3'],
+    draft: () => null,
+    guide: (k) => {
+      const r = k.fact('rndExpense')
+      return { core: r && has(r.value) ? [s(`작년 연구개발비는 ${r.value} 정도입니다.`, r.basis)] : [], points: [], ownerAsk: ['연구개발비 내역(연구원 인건비 · 재료비 · 외주)'] }
+    },
+  },
+  {
+    id: 'q_quality',
+    question: '품질이나 공정을 개선한 사례가 있나요?',
+    intent: '기술 사업화 — 생산 · 품질 관리',
+    topic: '품질 · 공정 개선',
+    weight: 1,
+    facts: () => [],
+    evidence: ['quality'],
+    draft: () => null,
+    guide: (k) => {
+      const iso = k.held.filter((h) => /ISO/.test(h))
+      return { core: iso.length ? [s(`${iso.join(' · ')} 인증으로 품질을 관리하고 있습니다.`, '회사 정보 인증서 칸')] : [], points: k.hasEvidence('quality') ? [s('품질 관리 자료를 준비했습니다.', '서류함: 품질 · 인증 현황')] : [], ownerAsk: ['최근 품질 · 공정 개선 사례 1가지(무엇을 바꿔 무엇이 좋아졌는지)'] }
+    },
+  },
+  {
+    id: 'q_people_tech',
+    question: '기술 인력은 어떻게 키우고 계신가요?',
+    intent: '기술혁신 경영 — 인력 육성',
+    topic: '기술 인력 육성',
+    weight: 1,
+    facts: (c) => (c.employees !== null ? [`직원 ${c.employees}명`] : []),
+    evidence: ['org_chart'],
+    draft: () => null,
+    guide: (k) => {
+      const e = k.fact('employees')
+      return { core: [], points: e ? [s(`직원 ${e.value}`, e.basis)] : [], ownerAsk: ['기술 인력 교육 · 자격 취득을 어떻게 돕고 있나요?'] }
+    },
+  },
+  {
+    id: 'q_market',
+    question: '주요 고객과 시장은 어디인가요?',
+    intent: '기술 사업화 — 판로',
+    topic: '고객 · 시장',
+    weight: 2,
+    facts: () => [],
+    evidence: ['biz_plan'],
+    draft: () => null,
+    guide: (k) => {
+      const b = k.fact('b2b')
+      return { core: b && b.value === '예' ? [s('기업 · 공공 고객에 납품합니다.', b.basis)] : [], points: [], ownerAsk: ['주요 고객 3곳과 그 고객이 우리를 고른 이유'] }
+    },
+  },
+]
+
+/** 패키지에 쓰는 이노비즈 질문 전부(앞 5개 = P1 흐름) */
+export const INNOBIZ_BANK: InspectionQuestion[] = [...INNOBIZ_INSPECTION.map((q) => ({ ...q, ...GUIDES[q.id] })), ...MORE]

@@ -128,12 +128,18 @@ async function copy(text: string): Promise<boolean> {
 /** 고객에게 설명하기 — 30초 · 카톡 · 준비서류 · 미팅용(누르면 내용이 보이고 복사) */
 export function ExplainBox({ set }: { set: ExplainSet }) {
   const { showToast } = useToast()
-  const [k, setK] = useState<keyof ExplainSet>('thirty')
-  const LABEL: Record<keyof ExplainSet, string> = { thirty: '30초 설명', kakao: '카톡으로 설명', docRequest: '준비서류 요청', meeting: '미팅용 설명' }
+  type Tab = Exclude<keyof ExplainSet, 'fit'>
+  const [k, setK] = useState<Tab>('thirty')
+  const LABEL: Record<Tab, string> = { thirty: '30초 설명', kakao: '카톡으로 설명', docRequest: '준비서류 요청', meeting: '미팅용 설명' }
   return (
     <div className="flex flex-col gap-2" data-testid="cert-explain">
+      {set.fit && (
+        <p className="t-sub rounded-(--radius-control) bg-brand-50 px-3 py-2 break-keep text-brand-700" data-testid="cert-explain-fit">
+          {set.fit}
+        </p>
+      )}
       <div className="flex flex-wrap gap-2" role="tablist">
-        {(Object.keys(LABEL) as (keyof ExplainSet)[]).map((key) => (
+        {(Object.keys(LABEL) as Tab[]).map((key) => (
           <button key={key} type="button" role="tab" aria-selected={k === key} onClick={() => setK(key)} className={`tap t-sub min-h-10 rounded-full border px-3 font-semibold ${k === key ? 'border-slate-800 bg-slate-800 text-white' : 'border-slate-300 bg-white text-slate-700'}`} data-testid={`cert-explain-${key}`}>
             {LABEL[key]}
           </button>

@@ -4,7 +4,7 @@
  */
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ChevronDown, ChevronRight, Info, Route } from 'lucide-react'
+import { ChevronDown, ChevronRight, FileText, Info, Route } from 'lucide-react'
 import { Blank, Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { ClientPickerOptions } from '../../components/ops/ClientPickerOptions'
@@ -17,6 +17,7 @@ import type { CertProfile } from '../integration/clientContext'
 import { ExpiredBadge, BenefitPicks, ReadinessBadge, ReasonList, RecBadge } from './certParts'
 import { ProfileQuestions } from './ProfileQuestions'
 import { sectionHref } from './certNav'
+import { ClientSummarySheet } from './ClientSummarySheet'
 
 /** 카드 단추 하나 — 인증마다 가장 자연스러운 다음 걸음 */
 const CTA: Record<CertificationKey, { label: string; section: string }> = {
@@ -215,6 +216,7 @@ export function CertOverview({
   const order: CertificationKey[] = ['venture', 'lab', 'innobiz', 'mainbiz', 'iso9001']
   const main = order.map((k) => list.find((a) => a.key === k)).filter((a): a is CertificationAssessment => !!a)
   const stale = Object.values(CERT_RULES).some((r) => rulesStale(r, ctx.today))
+  const [summary, setSummary] = useState(false)
   return (
     <div className="flex flex-col gap-4">
       <RoadmapCard roadmap={roadmap} />
@@ -224,6 +226,10 @@ export function CertOverview({
           <CertCard key={a.key} a={a} clientId={clientId} />
         ))}
       </ul>
+      <Button variant="secondary" className="self-start" onClick={() => setSummary(true)} data-testid="cert-summary-open">
+        <FileText aria-hidden="true" className="size-4" /> 고객용 진단 요약
+      </Button>
+      {summary && <ClientSummarySheet list={list} ctx={ctx} roadmap={roadmap} onClose={() => setSummary(false)} />}
       <p className={`t-sub inline-flex items-start gap-1.5 break-keep ${stale ? 'text-warning-800' : 'text-slate-500'}`} data-testid="cert-freshness">
         <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
         {stale ? '최신 기준 확인 필요 — ' : ''}공식 기준 마지막 확인 {RULES_CHECKED_AT}(중소벤처기업부 고시 · 법령 · 이노비즈넷 · 중소벤처24 · ISO). 준비도는 MIRAE 자체 5단계이고, 공식 점수는 인증별 화면에 따로 적었습니다.

@@ -233,16 +233,79 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.goto(BASE + '/tools/cert-os/innobiz?client=cli_wooil', { waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
   check('C 다시 열면 실제 진행 단계부터(진행 기록이 있으니)', (await page.getByTestId('cert-step-body-2').count()) === 1 && (await page.getByTestId('cert-life').getAttribute('data-status')) === 'certified')
-  // D — 메인비즈 실사 직전 3분 요약
+  check("K 다음 할 일마다 이유 한 줄('이노비즈 취득 완료 + …')", /이노비즈 취득 완료/.test(await page.getByTestId('cert-after-because').first().innerText()))
+  // D — P2 메인비즈 실사 준비 패키지(3분 요약이 자란 것)
   await page.goto(BASE + '/tools/cert-os/mainbiz?client=cli_wooil', { waitUntil: 'networkidle' })
   await page.getByTestId('cert-step-2').click()
-  await page.getByTestId('cert-pre-summary').click()
+  check('D 실제 진행: 실사 준비하기 · 자가진단 · 제출 전 최종 확인 — Primary 는 하나', (await page.getByTestId('cert-prep-actions').locator('button').count()) === 3 && (await page.getByTestId('cert-prep-actions').locator('button.bg-brand-600').count()) === 1)
+  await page.getByTestId('cert-prep-pack').click()
   await page.waitForTimeout(300)
-  const pre = await page.getByTestId('pre-inspection').innerText()
-  check('D 실사 직전 요약: 준비된 것 · 보완할 것 · 대표에게 물어볼 것 · 가져갈 자료', ['준비된 것', '보완할 것', '대표에게 물어볼 것', '가져갈 자료'].every((w) => pre.includes(w)) && !/\d+\s*점/.test(pre), pre.slice(0, 300))
-  await page.getByTestId('pre-copy').click()
+  const packText = await page.getByTestId('cert-pack').innerText()
+  const nq = await page.getByTestId('pack-question').count()
+  check('D 실사 준비 패키지: 업체 핵심정보 · 예상 핵심질문 5~8 · 가져갈 자료 · 전날 체크 · 대표 확인', ['업체 핵심정보', '예상 핵심질문', '가져갈 자료', '실사 전날 체크', '대표님께 확인할 것'].every((w) => packText.includes(w)) && nq >= 5 && nq <= 8, { nq })
+  const bases = await page.getByTestId('sourced-line').evaluateAll((els) => els.map((e) => e.getAttribute('data-basis') ?? ''))
+  check('D 문장마다 근거(빈 근거 0) · 점수 · 퍼센트 없음', bases.length > 0 && bases.every((b) => b.trim().length > 0) && !/\d+\s*%|\d+\s*점\s*\(/.test(packText), bases.length)
+  await page.getByTestId('pack-question').first().locator('summary').click()
+  check('D 질문을 누르면 말하기 가이드(묻는 이유 · 핵심 답 · 대표 확인)', /묻는 이유/.test(await page.getByTestId('pack-question').first().innerText()) && /핵심 답/.test(await page.getByTestId('pack-question').first().innerText()))
+  await page.getByTestId('pack-copy').click()
   await page.waitForTimeout(200)
-  check('D 요약 복사(한 장 글)', /실사 직전 3분 요약/.test(await page.evaluate(() => navigator.clipboard.readText())))
+  check('D 복사: 한 장 글(내부)', /\[내부\] .*메인비즈 실사 준비/.test(await page.evaluate(() => navigator.clipboard.readText())))
+  await page.getByTestId('cert-handoff-copy').click()
+  await page.waitForTimeout(200)
+  const hand = await page.evaluate(() => navigator.clipboard.readText())
+  check('D AI로 다듬기: 구조 자료 복사 · 지어내지 말 것 · 이 업체만', /cert-handoff\/1/.test(hand) && /꼭 지킬 것/.test(hand) && /만들지 마세요/.test(hand) && !/한솔|다움/.test(hand), hand.slice(0, 200))
+  const askBefore = await page.getByTestId('owner-ask-item').count()
+  await page.getByTestId('owner-ask-send').click()
+  await page.waitForTimeout(200)
+  const askMsg = await page.evaluate(() => navigator.clipboard.readText())
+  check('D 대표에게 질문 보내기: □ 목록 카톡 문구', askMsg.startsWith('대표님, ') && askMsg.split('\n').filter((l) => l.startsWith('□ ')).length === askBefore, { askBefore })
+  // 실사 질문에서 온 대표 확인(3번째 — 앞 둘은 신청 자격)에 답을 적는다
+  const askedQ = (await page.getByTestId('owner-ask-item').nth(2).innerText()).split('\n').find((l) => l.length > 3)
+  await page.getByTestId('owner-answer-open').nth(2).click()
+  await page.getByTestId('owner-answer-input').fill('작년 고객 불만 처리 기록을 월별로 정리해 둠')
+  await page.getByTestId('owner-answer-save').click()
+  await page.waitForTimeout(600)
+  const askTexts = () => page.getByTestId('owner-ask-item').evaluateAll((els) => els.map((e) => e.innerText))
+  check('D 대표 답 적기 → 그 질문은 목록에서 빠짐', !(await askTexts()).some((t) => t.includes(askedQ)), askedQ)
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.getByTestId('cert-step-2').click()
+  await page.getByTestId('cert-prep-pack').click()
+  await page.waitForTimeout(300)
+  check('D 대표 답은 저장됨(다시 열어도 빠져 있고 근거 "대표 답")', !(await askTexts()).some((t) => t.includes(askedQ)) && (await page.locator('[data-testid="sourced-line"][data-basis^="대표 답"]').count()) >= 1)
+  await page.getByTestId('pack-close').click()
+  // 제출 전 최종 확인
+  await page.getByTestId('cert-gate-open').click()
+  await page.waitForTimeout(300)
+  const gateText = await page.getByTestId('cert-gate').innerText()
+  check("D 제출 전 최종 확인: '제출 준비 가능' / '먼저 확인 필요' · ✓/△ · 퍼센트 없음", ['제출 준비 가능', '먼저 확인 필요'].includes(await page.getByTestId('cert-gate-verdict').innerText()) && (await page.getByTestId('cert-gate-item').count()) === 7 && !/%/.test(gateText))
+  const haveDocs = await page.locator('[data-testid="submit-doc"][data-have="true"]').count()
+  const needDocs = await page.locator('[data-testid="submit-doc"][data-have="false"]').count()
+  if (needDocs > 0) {
+    await page.getByTestId('cert-gate-request').click()
+    await page.waitForTimeout(600)
+    const gateReq = await page.evaluate(() => navigator.clipboard.readText())
+    check('I 제출자료: 서류함에 있는 것은 다시 요청 안 함(요청 줄 = △ 수)', (gateReq.match(/^\d+\. /gm) ?? []).length === needDocs && (haveDocs === 0 || /다시 안 주셔도/.test(gateReq)), { haveDocs, needDocs })
+  } else check('I 제출자료: 모두 있음', haveDocs > 0)
+  check('D 공식 기준은 따로(접힘)', (await page.getByTestId('cert-gate-official').count()) === 1)
+  await page.getByTestId('cert-gate-close').click()
+  // 벤처 준비 패키지
+  await page.goto(BASE + '/tools/cert-os/venture?client=cli_wooil', { waitUntil: 'networkidle' })
+  await page.getByTestId('cert-step-2').click()
+  await page.getByTestId('cert-venture-pack').click()
+  await page.waitForTimeout(300)
+  const states = await page.getByTestId('venture-section').evaluateAll((els) => els.map((e) => e.getAttribute('data-state')))
+  check('J 벤처 준비 패키지: 9칸 · ✓/△/? · 해결 문제는 대표 확인(지어내지 않음)', states.length === 9 && states.every((x) => ['ok', 'partly', 'ask'].includes(x)) && (await page.locator('[data-testid="venture-section"][data-id="problem"]').getAttribute('data-state')) === 'ask', states)
+  // 고객용 진단 요약
+  await page.goto(BASE + '/tools/cert-os?client=cli_wooil', { waitUntil: 'networkidle' })
+  await page.getByTestId('cert-summary-open').click()
+  await page.waitForTimeout(300)
+  const sumText = await page.getByTestId('cert-summary-preview').innerText()
+  check('L 고객용 진단 요약: 검토 · 추천 · 이유 · 준비 · 자료 · 혜택 · 순서 · 유의', ['검토한 인증', '유의사항'].every((w) => sumText.includes(w)) && (await page.getByTestId('cert-summary-section').count()) >= 5)
+  check('L 고객용 요약에 내부 정보 없음(실사 · 대표 답 · 체납 · 내부 · 점수)', !/실사|대표 답|체납|내부|650|700점|%/.test(sumText), sumText.slice(0, 400))
+  await page.getByTestId('cert-summary-copy').click()
+  await page.waitForTimeout(200)
+  check('L 복사 · 인쇄 종이(같은 내용)', /기업인증 진단 요약/.test(await page.evaluate(() => navigator.clipboard.readText())) && (await page.getByTestId('cert-summary-print').count()) === 1)
+  await page.keyboard.press('Escape')
   // E — 만료된 인증은 보유 중으로 안 보인다
   await page.evaluate(() => {
     const list = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
@@ -303,7 +366,9 @@ for (const vp of [
   { w: 360, s: 'normal' },
   { w: 390, s: 'normal' },
   { w: 430, s: 'normal' },
+  { w: 360, s: 'large' },
   { w: 390, s: 'extra_large' },
+  { w: 430, s: 'extra_large' },
   { w: 1440, s: 'large' },
 ]) {
   const ctx = await browser.newContext({ viewport: { width: vp.w, height: 844 }, locale: 'ko-KR', isMobile: vp.w < 1000, hasTouch: vp.w < 1000 })
@@ -325,12 +390,23 @@ for (const vp of [
     if (sec === 'innobiz') {
       await page.getByTestId('cert-step-2').click()
       await page.getByTestId('cert-selfcheck-start').click()
+      worst = Math.max(worst, await overflowX(page))
+      await page.getByTestId('cert-step-2').click()
+      await page.getByTestId('cert-prep-pack').click()
+      await page.getByTestId('pack-question').first().locator('summary').click()
+      worst = Math.max(worst, await overflowX(page))
+      await page.getByTestId('pack-close').click()
+      await page.getByTestId('cert-gate-open').click()
+    }
+    if (sec === 'venture') {
+      await page.getByTestId('cert-step-2').click()
+      await page.getByTestId('cert-venture-pack').click()
     }
     worst = Math.max(worst, await overflowX(page))
     if (vp.w < 1000) {
       const tiny = await page.evaluate(() =>
         [...document.querySelectorAll('main button, main a, main [role="radio"]')]
-          .filter((el) => el.closest('[data-testid^="cert"],[data-testid^="selfcheck"],[data-testid^="flow"]'))
+          .filter((el) => el.closest('[data-testid^="cert"],[data-testid^="selfcheck"],[data-testid^="flow"],[data-testid^="venture"],[data-testid^="owner"]'))
           .map((el) => el.getBoundingClientRect())
           .filter((r) => r.width > 0 && r.height > 0 && r.height < 40)
           .length,

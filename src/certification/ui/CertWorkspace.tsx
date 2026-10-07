@@ -3,7 +3,7 @@
  *   1 받을 수 있나요?  2 무엇을 준비하나요?  3 실제 진행  4 받으면 무엇이 달라지나요?
  * 벤처 · 연구소는 기존 화면(특허+벤처 · 연구소 관리)으로 이어 준다 — 다시 만들지 않는다.
  */
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ExternalLink } from 'lucide-react'
 import { Surface } from '../../components/ui/primitives'
@@ -11,6 +11,7 @@ import { Button } from '../../components/ui/Button'
 import { ToolResultAttach } from '../../tools/shared/ToolResultAttach'
 import { CERT_RULES, rulesStale } from '../rules/officialRules'
 import { explainFor } from '../core/explain'
+import { ruleChangesOf } from '../rules/ruleChanges'
 import { READINESS_LABEL, RECOMMENDATION_LABEL, type CertificationAssessment, type CertificationClientContext } from '../core/types'
 import type { Answer } from '../core/selfCheck'
 import type { PreparedAnswer } from '../core/inspection'
@@ -18,11 +19,18 @@ import { INNOBIZ_CHECK, INNOBIZ_INSPECTION } from '../innobiz/innobizCheck'
 import { MAINBIZ_CHECK, MAINBIZ_INSPECTION } from '../mainbiz/mainbizCheck'
 import { ExpiredBadge, BenefitPicks, ExplainBox, ReadinessBadge, ReasonList, RecBadge, StepTabs } from './certParts'
 import { InspectionFlow, SelfCheckFlow } from './SelfCheckFlow'
-import { brand } from '../../brand/brand.config'
 import { useToast } from '../../components/ui/toastContext'
 import type { CertLifecycle, CertStatus, CompletionInput } from '../core/lifecycle'
 import { LifecyclePanel } from './LifecyclePanel'
-import { PreInspectionPanel } from './PreInspectionPanel'
+import { InspectionPackPanel, SubmitGatePanel, VenturePackPanel } from './PrepPanels'
+import { buildInspectionPackage } from '../core/inspectionPackage'
+import { buildSubmitGate } from '../core/submitGate'
+import { buildVenturePack } from '../core/venturePack'
+import { inspectionHandoff, ventureHandoff } from '../core/handoff'
+import { runSelfCheck } from '../core/selfCheck'
+import { INNOBIZ_BANK } from '../innobiz/innobizGuides'
+import { MAINBIZ_BANK } from '../mainbiz/mainbizGuides'
+import { useSenderLine } from '../../components/layout/useCurrentUser'
 import { BasisBox } from './BasisBox'
 
 const EVIDENCE_LABEL = Object.fromEntries(Object.values(CERT_RULES).flatMap((r) => r.evidence.map((e) => [e.id, e.label])))
@@ -34,8 +42,10 @@ export function CertWorkspace({
   clientId,
   answers,
   prep,
+  notes,
   onAnswer,
   onPrep,
+  onNote,
   life,
   onStatus,
   onComplete,
@@ -47,8 +57,11 @@ export function CertWorkspace({
   clientId: string
   answers: Record<string, Answer>
   prep: Record<string, PreparedAnswer>
+  /** P2: 대표 답(받아 적은 것) */
+  notes: Record<string, string>
   onAnswer: (id: string, v: Answer) => void
   onPrep: (id: string, p: PreparedAnswer) => void
+  onNote: (key: string, text: string) => Promise<void>
   life: CertLifecycle
   onStatus: (s: CertStatus) => Promise<void>
   onComplete: (input: CompletionInput, toProfile: boolean) => Promise<void>
@@ -60,7 +73,8 @@ export function CertWorkspace({
   const { showToast } = useToast()
   // P1: 진행 중인 인증은 '실제 진행' 단계에서 연다(진행 기록이 거기 있다)
   const [step, setStep] = useState(life.status !== 'preparing' || life.history.length > 0 ? 2 : 0)
-  const [flow, setFlow] = useState<'none' | 'self' | 'inspect' | 'summary'>('none')
+  const [flow, setFlow] = useState<'none' | 'self' | 'inspect' | 'pack' | 'gate' | 'venture'>('none')
+  const sender = useSenderLine()
   const requestDocs = async () => {
     const text = explain.docRequest
     const added = a.missingEvidence.length ? await onRequestDocs(a.missingEvidence).catch(() => -1) : 0
@@ -69,7 +83,14 @@ export function CertWorkspace({
   }
   const selfItems = a.key === 'innobiz' ? INNOBIZ_CHECK : a.key === 'mainbiz' ? MAINBIZ_CHECK : null
   const inspectQs = a.key === 'innobiz' ? INNOBIZ_INSPECTION : a.key === 'mainbiz' ? MAINBIZ_INSPECTION : null
-  const explain = explainFor(a, ctx, `${brand.ownerName} 대표`)
+  const explain = explainFor(a, ctx, sender)
+  const bank = a.key === 'innobiz' ? INNOBIZ_BANK : a.key === 'mainbiz' ? MAINBIZ_BANK : null
+  // P2: 실사 준비 패키지 · 제출 전 확인 · 벤처 준비 — 판단은 Core, 화면은 보여 주기만
+  const pkg = useMemo(() => (bank && selfItems ? buildInspectionPackage({ cert: a.key, bank, selfCheck: selfItems, answers, ctx, prep, labelOf, notes }) : null), [bank, selfItems, a.key, answers, ctx, prep, notes])
+  const gate = useMemo(() => (pkg && selfItems ? buildSubmitGate({ cert: a.key, ctx, selfCheck: selfItems, answers, pkg }) : null), [pkg, selfItems, a.key, ctx, answers])
+  const venture = useMemo(() => (a.key === 'venture' ? buildVenturePack(ctx, notes) : null), [a.key, ctx, notes])
+  const answeredSelf = Object.keys(answers).length > 0
+  const unconfirmed = (ctx.basis ?? []).filter((b) => b.state === 'estimated' && !b.from.startsWith('컨설턴트')).length
   const existingTool = a.key === 'venture' ? { label: '특허+벤처 화면 열기', href: `/ops/clients/${clientId}?tab=consulting` } : a.key === 'lab' ? { label: '연구소 관리 열기', href: `/tools/labcare?client=${clientId}` } : null
   const deadlines = a.renewal
     ? [
@@ -162,26 +183,53 @@ export function CertWorkspace({
               ))}
             </ol>
             {rule.fee && <p className="t-sub text-slate-600">수수료(공식 안내): {rule.fee}</p>}
-            {selfItems && inspectQs ? (
-              <div className="flex flex-wrap gap-2">
-                <Button variant="primary" onClick={() => setFlow('self')} data-testid="cert-selfcheck-start">
-                  {Object.keys(answers).length ? '자가진단 이어서' : '자가진단 시작'}
-                </Button>
-                <Button variant="secondary" onClick={() => setFlow('inspect')} data-testid="cert-inspection-start">
-                  실사 대비 시작
-                </Button>
-                <Button variant="secondary" onClick={() => setFlow('summary')} data-testid="cert-pre-summary">
-                  실사 준비 요약 보기
-                </Button>
+            {selfItems && pkg && gate ? (
+              <div className="flex flex-col gap-2" data-testid="cert-prep-actions">
+                {/* 한 상태에 Primary 하나 — 자가진단 전에는 자가진단, 뒤에는 실사 준비 */}
+                <div className="flex flex-wrap gap-2">
+                  {answeredSelf ? (
+                    <>
+                  <Button variant={answeredSelf ? 'primary' : 'secondary'} onClick={() => setFlow('pack')} data-testid="cert-prep-pack">
+                    실사 준비하기
+                  </Button>
+                  <Button variant={answeredSelf ? 'secondary' : 'primary'} onClick={() => setFlow('self')} data-testid="cert-selfcheck-start">
+                    {answeredSelf ? '자가진단 이어서' : '자가진단 시작'}
+                  </Button>
+                    </>
+                  ) : (
+                    <>
+                  <Button variant={answeredSelf ? 'secondary' : 'primary'} onClick={() => setFlow('self')} data-testid="cert-selfcheck-start">
+                    {answeredSelf ? '자가진단 이어서' : '자가진단 시작'}
+                  </Button>
+                  <Button variant={answeredSelf ? 'primary' : 'secondary'} onClick={() => setFlow('pack')} data-testid="cert-prep-pack">
+                    실사 준비하기
+                  </Button>
+                    </>
+                  )}
+                  <Button variant="secondary" onClick={() => setFlow('gate')} data-testid="cert-gate-open">
+                    제출 전 최종 확인
+                  </Button>
+                </div>
+                <p className="t-meta break-keep text-slate-500" data-testid="cert-prep-status">
+                  {gate.verdict === 'ready' ? '✓ 제출 준비 가능' : `△ 먼저 확인 ${gate.items.filter((x) => !x.ok).length}개`}
+                  {pkg.ownerQuestions.length ? ` · 대표님께 확인할 것 ${pkg.ownerQuestions.length}개` : ''}
+                </p>
               </div>
             ) : existingTool ? (
               <div className="flex flex-col gap-2">
                 <p className="t-sub break-keep text-slate-600">{rule.label} 진행은 이미 있는 화면에서 합니다(같은 업체 기록).</p>
-                <Link to={existingTool.href} className="contents">
-                  <Button variant="primary" className="self-start" data-testid="cert-existing-tool">
-                    <ExternalLink aria-hidden="true" className="size-4" /> {existingTool.label}
-                  </Button>
-                </Link>
+                <div className="flex flex-wrap gap-2">
+                  <Link to={existingTool.href} className="contents">
+                    <Button variant="primary" data-testid="cert-existing-tool">
+                      <ExternalLink aria-hidden="true" className="size-4" /> {existingTool.label}
+                    </Button>
+                  </Link>
+                  {venture && (
+                    <Button variant="secondary" onClick={() => setFlow('venture')} data-testid="cert-venture-pack">
+                      벤처 준비 패키지
+                    </Button>
+                  )}
+                </div>
               </div>
             ) : null}
           </div>
@@ -189,7 +237,25 @@ export function CertWorkspace({
       )}
       {step === 2 && flow === 'self' && selfItems && <SelfCheckFlow rule={rule} items={selfItems} ctx={ctx} answers={answers} onAnswer={onAnswer} onDone={() => setFlow('inspect')} />}
       {step === 2 && flow === 'inspect' && inspectQs && <InspectionFlow qs={inspectQs} ctx={ctx} labelOf={labelOf} prep={prep} onPrep={onPrep} />}
-      {step === 2 && flow === 'summary' && inspectQs && <PreInspectionPanel title={`${ctx.companyName} ${rule.label}`} qs={inspectQs} ctx={ctx} labelOf={labelOf} prep={prep} onClose={() => setFlow('none')} />}
+      {step === 2 && flow === 'pack' && pkg && selfItems && (
+        <InspectionPackPanel unconfirmed={unconfirmed} clientId={clientId} pkg={pkg} handoff={inspectionHandoff(pkg, a, runSelfCheck(selfItems, ctx, answers))} notes={notes} onNote={onNote} sender={sender} onPractice={() => setFlow('inspect')} onClose={() => setFlow('none')} />
+      )}
+      {step === 2 && flow === 'gate' && gate && pkg && (
+        <SubmitGatePanel gate={gate} companyName={ctx.companyName} certLabel={rule.label} ownerQuestions={pkg.ownerQuestions} notes={notes} onNote={onNote} sender={sender} onRequestDocs={onRequestDocs} onClose={() => setFlow('none')} />
+      )}
+      {step === 2 && flow === 'venture' && venture && (
+        <VenturePackPanel
+          unconfirmed={unconfirmed}
+          clientId={clientId}
+          companyName={ctx.companyName}
+          sections={venture}
+          handoff={ventureHandoff(ctx.companyName, venture, a, { have: a.haveEvidence, missing: a.missingEvidence })}
+          notes={notes}
+          onNote={onNote}
+          sender={sender}
+          onClose={() => setFlow('none')}
+        />
+      )}
 
       {step === 3 && (
         <Surface>
@@ -237,18 +303,22 @@ export function CertWorkspace({
 function Sources({ ruleKey, today }: { ruleKey: keyof typeof CERT_RULES; today: string }) {
   const rule = CERT_RULES[ruleKey]
   const stale = rulesStale(rule, today)
+  const changes = ruleChangesOf(ruleKey)
   return (
     <details className="rounded-(--radius-control) border border-slate-200" data-testid="cert-sources">
       <summary className={`tap t-sub cursor-pointer px-3 py-2 font-semibold ${stale ? 'text-warning-800' : 'text-slate-700'}`}>
-        {stale ? '최신 기준 확인 필요 — ' : ''}공식 출처 · 마지막 확인 {rule.checkedAt}
+        {stale ? '최신 기준 확인 필요 — ' : ''}공식 기준 보기 · 마지막 확인 {rule.checkedAt}
       </summary>
-      <ul className="flex flex-col gap-1 px-3 pb-3">
+      <ul className="flex flex-col gap-1.5 px-3 pb-3">
         {rule.sources.map((s) => (
-          <li key={s.name} className="t-sub break-keep text-slate-700">
-            · {s.name} · {s.version} · 시행 {s.effective}{' '}
-            <a href={s.url} target="_blank" rel="noreferrer noopener" className="tap inline-flex min-h-10 items-center font-semibold text-brand-700 underline">
-              원문
-            </a>
+          <li key={s.name} className="t-sub break-keep text-slate-700" data-testid="cert-source">
+            <b className="font-semibold text-slate-900">{s.name}</b>
+            <span className="t-meta block text-slate-600">
+              {s.version} · 시행 {s.effective} · 마지막 확인 {rule.checkedAt}{' '}
+              <a href={s.url} target="_blank" rel="noreferrer noopener" className="tap inline-flex min-h-10 items-center font-semibold text-brand-700 underline">
+                공식 출처
+              </a>
+            </span>
           </li>
         ))}
         {(rule.conflicts ?? []).map((u) => (
@@ -257,10 +327,20 @@ function Sources({ ruleKey, today }: { ruleKey: keyof typeof CERT_RULES; today: 
           </li>
         ))}
         {rule.unverified.map((u) => (
-          <li key={u} className="t-sub break-keep text-warning-800">
-            · 확인 못 함: {u}
+          <li key={u} className="t-sub break-keep text-warning-800" data-testid="cert-unverified">
+            · 공식 기준 추가 확인 필요: {u}
           </li>
         ))}
+        {changes.length > 0 && (
+          <li className="mt-1 flex flex-col gap-1 border-t border-slate-200 pt-2" data-testid="cert-rule-changes">
+            <span className="t-meta font-semibold text-slate-600">기준 바뀐 기록</span>
+            {changes.map((c) => (
+              <span key={c.rule + c.checkedAt} className="t-meta break-keep text-slate-600">
+                {c.checkedAt} · {c.rule} — {c.change}
+              </span>
+            ))}
+          </li>
+        )}
       </ul>
     </details>
   )

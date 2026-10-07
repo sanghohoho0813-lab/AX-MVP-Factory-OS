@@ -147,6 +147,7 @@ export function LifecyclePanel({
                   const body = (
                     <>
                       <span className="t-sub font-semibold text-slate-900">{x.label}</span>
+                      <span className="t-meta block break-keep font-medium text-brand-700" data-testid="cert-after-because">{x.because}</span>
                       <span className="t-meta block break-keep text-slate-600">{x.why}</span>
                     </>
                   )

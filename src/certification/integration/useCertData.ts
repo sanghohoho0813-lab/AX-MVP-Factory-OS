@@ -30,7 +30,7 @@ import { labcareFactsOf } from './labcareAdapter'
 export const CERT_MODULE = 'cert-os'
 
 type ProfileRow = { profile: CertProfile } & Record<string, unknown>
-type WorkRow = { cert: CertificationKey; answers: Record<string, Answer>; prep: Record<string, PreparedAnswer> } & Record<string, unknown>
+type WorkRow = { cert: CertificationKey; answers: Record<string, Answer>; prep: Record<string, PreparedAnswer>; notes?: Record<string, string> } & Record<string, unknown>
 type LifeRow = { cert: CertificationKey; life: CertLifecycle } & Record<string, unknown>
 
 /**
@@ -127,16 +127,17 @@ export function useCertData() {
   const workOf = useCallback(
     (cert: CertificationKey) => {
       const row = clientId ? (works.rows ?? []).find((r) => r.clientId === clientId && r.data.cert === cert) ?? null : null
-      return { row, answers: row?.data.answers ?? {}, prep: row?.data.prep ?? {} }
+      return { row, answers: row?.data.answers ?? {}, prep: row?.data.prep ?? {}, notes: row?.data.notes ?? {} }
     },
     [clientId, works.rows],
   )
 
   const saveWork = useCallback(
-    async (cert: CertificationKey, patch: { answers?: Record<string, Answer>; prep?: Record<string, PreparedAnswer> }) => {
+    async (cert: CertificationKey, patch: { answers?: Record<string, Answer>; prep?: Record<string, PreparedAnswer>; notes?: Record<string, string> }) => {
       if (!clientId) return
       const cur = workOf(cert)
-      await works.save({ id: cur.row?.id, clientId, data: { cert, answers: patch.answers ?? cur.answers, prep: patch.prep ?? cur.prep } })
+      // P2: 대표 답(notes) — 다른 칸을 저장할 때 지워지지 않게 늘 같이 쓴다
+      await works.save({ id: cur.row?.id, clientId, data: { ...(cur.row?.data ?? {}), cert, answers: patch.answers ?? cur.answers, prep: patch.prep ?? cur.prep, notes: patch.notes ?? cur.notes } })
     },
     [clientId, works, workOf],
   )

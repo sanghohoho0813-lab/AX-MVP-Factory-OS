@@ -57,8 +57,10 @@ export default function CertPage() {
           clientId={d.clientId}
           answers={work.answers}
           prep={work.prep}
+          notes={work.notes}
           onAnswer={(id, v) => void d.saveWork(a.key, { answers: { ...work.answers, [id]: v } })}
           onPrep={(id, p) => void d.saveWork(a.key, { prep: { ...work.prep, [id]: p } })}
+          onNote={(k, text) => d.saveWork(a.key, { notes: { ...work.notes, [k]: text } })}
           life={d.lifeOf(a.key).life}
           onStatus={(s) => d.setStatus(a.key, s)}
           onComplete={(input, toProfile) => d.complete(a.key, input, { toProfile })}
