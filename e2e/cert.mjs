@@ -363,12 +363,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 
 /* ---------------- 휴대폰 360 · 390 · 430 · 큰 글자 ---------------- */
 for (const vp of [
-  { w: 360, s: 'normal' },
-  { w: 390, s: 'normal' },
-  { w: 430, s: 'normal' },
-  { w: 360, s: 'large' },
-  { w: 390, s: 'extra_large' },
-  { w: 430, s: 'extra_large' },
+  ...[360, 390, 430].flatMap((w) => ['normal', 'large', 'extra_large'].map((s) => ({ w, s }))),
   { w: 1440, s: 'large' },
 ]) {
   const ctx = await browser.newContext({ viewport: { width: vp.w, height: 844 }, locale: 'ko-KR', isMobile: vp.w < 1000, hasTouch: vp.w < 1000 })
