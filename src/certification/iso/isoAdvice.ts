@@ -18,8 +18,9 @@ const FIELD_FIT: Record<IsoKey, (c: CertificationClientContext) => { rec: Recomm
     // FV: B2B 하나만으로는 추천하지 않는다 — 조달 · 입찰이 있거나, 납품하는 제조 · 건설일 때만
     const goods = c.industryGroup === 'manufacturing' || c.industryGroup === 'construction'
     const want = c.procurement === true || (c.b2b === true && goods)
-    const rec: Recommendation = c.b2b === null && c.industryGroup === '' ? 'need_info' : want ? 'possible' : 'low_priority'
-    const line = want ? (c.procurement ? '조달 · 입찰과 납품 거래처에 품질 체계를 보여 줄 때 — 검토 추천' : '제조 납품 거래처가 품질 체계를 보는 업체 — 검토 추천') : rec === 'need_info' ? '거래처 인증 요구가 있는지 확인 필요' : c.b2b ? '거래처가 ISO 를 요구하면 그때 검토' : '지금은 우선순위 낮음 — 거래처 요구가 생기면'
+    // 납품하는 업종인데 거래처 요구를 모르면 '낮음' 이라고 단정하지 않고 묻는다
+    const rec: Recommendation = want ? 'possible' : c.b2b === null && (c.industryGroup === '' || goods) ? 'need_info' : 'low_priority'
+    const line = want ? (c.procurement ? '조달 · 입찰과 납품 거래처에 품질 체계를 보여 줄 때 — 검토 추천' : '제조 납품 거래처가 품질 체계를 보는 업체 — 검토 추천') : rec === 'need_info' ? '납품 거래처가 ISO 를 요구하는지 확인 필요' : c.b2b ? '거래처가 ISO 를 요구하면 그때 검토' : '지금은 우선순위 낮음 — 거래처 요구가 생기면'
     return { rec, line, checks }
   },
   iso14001: (c) => {

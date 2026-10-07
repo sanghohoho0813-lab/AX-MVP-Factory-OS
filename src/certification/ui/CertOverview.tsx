@@ -14,7 +14,7 @@ import { CERT_RULES, rulesStale, RULES_CHECKED_AT } from '../rules/officialRules
 import type { CertificationAssessment, CertificationClientContext, CertificationKey } from '../core/types'
 import type { Roadmap } from '../core/roadmap'
 import type { CertProfile } from '../integration/clientContext'
-import { ExpiredBadge, BenefitPicks, ReadinessBadge, ReasonList, RecBadge } from './certParts'
+import { ExpiredBadge, BenefitPicks, ReadinessBadge, ReasonList, RecBadge, showReadiness } from './certParts'
 import { ProfileQuestions } from './ProfileQuestions'
 import { sectionHref } from './certNav'
 import { ClientSummarySheet } from './ClientSummarySheet'
@@ -130,7 +130,7 @@ function CertCard({ a, clientId }: { a: CertificationAssessment; clientId: strin
           <h3 className="t-section font-bold text-slate-900">{a.label}</h3>
           <RecBadge rec={a.recommendation} />
           {a.expired && <ExpiredBadge />}
-          {!(a.recommendation === 'need_info' && a.readiness === 'unknown') && <ReadinessBadge r={a.readiness} />}
+          {showReadiness(a) && <ReadinessBadge r={a.readiness} />}
         </div>
         <p className="t-body font-semibold break-keep text-slate-800" data-testid="cert-oneline">
           {a.oneLine}

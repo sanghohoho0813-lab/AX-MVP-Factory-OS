@@ -277,7 +277,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByTestId('cert-gate-open').click()
   await page.waitForTimeout(300)
   const gateText = await page.getByTestId('cert-gate').innerText()
-  check("D 제출 전 최종 확인: '제출 준비 가능' / '먼저 확인 필요' · ✓/△ · 퍼센트 없음", ['제출 준비 가능', '먼저 확인 필요'].includes(await page.getByTestId('cert-gate-verdict').innerText()) && (await page.getByTestId('cert-gate-item').count()) === 7 && !/%/.test(gateText))
+  check("D 제출 전 최종 확인: '제출 준비 가능' / '먼저 확인 필요' · 반드시 확인 4 · 보완 권장 4 · 퍼센트 없음", ['제출 준비 가능', '먼저 확인 필요'].includes(await page.getByTestId('cert-gate-verdict').innerText()) && (await page.getByTestId('cert-gate-item').count()) === 8 && (await page.locator('[data-testid="cert-gate-item"][data-level="must"]').count()) === 4 && /반드시 확인/.test(gateText) && /보완 권장/.test(gateText) && !/%/.test(gateText))
   const haveDocs = await page.locator('[data-testid="submit-doc"][data-have="true"]').count()
   const needDocs = await page.locator('[data-testid="submit-doc"][data-have="false"]').count()
   if (needDocs > 0) {

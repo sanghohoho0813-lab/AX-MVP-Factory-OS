@@ -17,7 +17,7 @@ import type { Answer } from '../core/selfCheck'
 import type { PreparedAnswer } from '../core/inspection'
 import { INNOBIZ_CHECK, INNOBIZ_INSPECTION } from '../innobiz/innobizCheck'
 import { MAINBIZ_CHECK, MAINBIZ_INSPECTION } from '../mainbiz/mainbizCheck'
-import { ExpiredBadge, BenefitPicks, ExplainBox, ReadinessBadge, ReasonList, RecBadge, StepTabs } from './certParts'
+import { ExpiredBadge, BenefitPicks, ExplainBox, ReadinessBadge, ReasonList, RecBadge, showReadiness, StepTabs } from './certParts'
 import { InspectionFlow, SelfCheckFlow } from './SelfCheckFlow'
 import { useToast } from '../../components/ui/toastContext'
 import type { CertLifecycle, CertStatus, CompletionInput } from '../core/lifecycle'
@@ -106,7 +106,7 @@ export function CertWorkspace({
             <h2 className="t-section font-bold text-slate-900">{rule.label}</h2>
             <RecBadge rec={a.recommendation} />
             {a.expired && <ExpiredBadge />}
-            {!(a.recommendation === 'need_info' && a.readiness === 'unknown') && <ReadinessBadge r={a.readiness} />}
+            {showReadiness(a) && <ReadinessBadge r={a.readiness} />}
           </div>
           <p className="t-body font-semibold break-keep text-slate-800">{a.oneLine}</p>
           <p className="t-sub break-keep text-slate-600">{rule.summary}</p>
@@ -173,16 +173,6 @@ export function CertWorkspace({
       {step === 2 && flow === 'none' && (
         <Surface>
           <div className="flex flex-col gap-3" data-testid="cert-step-body-2">
-            <LifecyclePanel cert={a.key} life={life} ctx={ctx} clientId={clientId} onStatus={onStatus} onComplete={onComplete} onPatch={onPatchLife} />
-            <p className="t-sub font-semibold text-slate-800">절차</p>
-            <ol className="flex flex-col gap-1">
-              {rule.procedure.map((p, i) => (
-                <li key={p} className="t-body break-keep text-slate-800">
-                  {i + 1}. {p}
-                </li>
-              ))}
-            </ol>
-            {rule.fee && <p className="t-sub text-slate-600">수수료(공식 안내): {rule.fee}</p>}
             {selfItems && pkg && gate ? (
               <div className="flex flex-col gap-2" data-testid="cert-prep-actions">
                 {/* 한 상태에 Primary 하나 — 자가진단 전에는 자가진단, 뒤에는 실사 준비 */}
@@ -211,7 +201,7 @@ export function CertWorkspace({
                   </Button>
                 </div>
                 <p className="t-meta break-keep text-slate-500" data-testid="cert-prep-status">
-                  {gate.verdict === 'ready' ? '✓ 제출 준비 가능' : `△ 먼저 확인 ${gate.items.filter((x) => !x.ok).length}개`}
+                  {gate.verdict === 'ready' ? '✓ 제출 준비 가능' : `△ 반드시 확인 ${gate.items.filter((x) => x.level === 'must' && !x.ok).length}개`}
                   {pkg.ownerQuestions.length ? ` · 대표님께 확인할 것 ${pkg.ownerQuestions.length}개` : ''}
                 </p>
               </div>
@@ -232,6 +222,19 @@ export function CertWorkspace({
                 </div>
               </div>
             ) : null}
+            {/* FV: 다음 행동(단추)을 맨 위에 — 진행 기록 · 절차는 그 아래, 절차는 접어 둔다 */}
+            <LifecyclePanel cert={a.key} life={life} ctx={ctx} clientId={clientId} onStatus={onStatus} onComplete={onComplete} onPatch={onPatchLife} />
+            <details className="rounded-(--radius-control) border border-slate-200" data-testid="cert-procedure">
+              <summary className="tap t-sub cursor-pointer px-3 py-2 font-semibold text-slate-700">신청 절차 보기({rule.procedure.length}단계)</summary>
+              <ol className="flex flex-col gap-1 px-3 pb-3">
+                {rule.procedure.map((p, i) => (
+                  <li key={p} className="t-body break-keep text-slate-800">
+                    {i + 1}. {p}
+                  </li>
+                ))}
+              </ol>
+              {rule.fee && <p className="t-sub px-3 pb-3 text-slate-600">수수료(공식 안내): {rule.fee}</p>}
+            </details>
           </div>
         </Surface>
       )}

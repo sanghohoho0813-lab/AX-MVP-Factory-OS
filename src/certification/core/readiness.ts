@@ -8,7 +8,8 @@
 import type { CheckState, Readiness, Reason } from './types'
 
 export interface Check {
-  weight: 'must' | 'core'
+  /** note: 근거에 보이기만 하고 준비도 계산에는 넣지 않는 줄(FV — 예: 제외 사유는 제출 전 확인에서 막는다) */
+  weight: 'must' | 'core' | 'note'
   state: CheckState
   text: string
 }

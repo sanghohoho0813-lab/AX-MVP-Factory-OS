@@ -33,6 +33,12 @@ const READY_TONE: Record<Readiness, Tone> = {
   unknown: 'warning',
 }
 
+/** FV: 준비도 배지는 진행할 인증에만 — '우선순위 낮음 · 필요 없음 · 추가 확인 필요' 에는 배지를 하나만(덜 복잡하게) */
+export function showReadiness(a: { recommendation: Recommendation; readiness: Readiness }): boolean {
+  if (a.recommendation === 'need_info' && a.readiness === 'unknown') return false
+  return a.recommendation !== 'low_priority' && a.recommendation !== 'not_needed'
+}
+
 export function RecBadge({ rec }: { rec: Recommendation }) {
   return (
     <Badge tone={REC_TONE[rec]} className="font-semibold">

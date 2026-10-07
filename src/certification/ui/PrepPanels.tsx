@@ -377,9 +377,13 @@ export function SubmitGatePanel({
         </Block>
 
         {ownerQuestions.length > 0 && (
-          <Block title={`대표님께 확인할 것 (${ownerQuestions.length})`} testid="cert-gate-owner">
-            <OwnerAskBox questions={ownerQuestions} notes={notes} onNote={onNote} companyName={companyName} certLabel={certLabel} sender={sender} />
-          </Block>
+          // FV: 실사 준비 패키지에도 같은 목록이 있다 — 여기서는 접어 두고 필요할 때 연다
+          <details className="rounded-(--radius-control) border border-slate-200" data-testid="cert-gate-owner">
+            <summary className="tap t-sub cursor-pointer px-3 py-2 font-semibold text-slate-800">대표님께 확인할 것 ({ownerQuestions.length})</summary>
+            <div className="px-3 pb-3">
+              <OwnerAskBox questions={ownerQuestions} notes={notes} onNote={onNote} companyName={companyName} certLabel={certLabel} sender={sender} />
+            </div>
+          </details>
         )}
 
         {gate.official.length > 0 && (

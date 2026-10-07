@@ -97,7 +97,7 @@ function yearsCheck(c: CertificationClientContext, need: number): Check {
 function exclusionCheck(c: CertificationClientContext): Check {
   if (c.exclusionFlags.length) return { weight: 'must', state: 'no', text: `제외 사유: ${c.exclusionFlags.join(' · ')}` }
   // FV: 근거 목록이 있는데 제외 사유를 누구도 확인하지 않았으면 ✓ 로 보이지 않게(아는 척 금지) — 판정을 막지는 않는다
-  if (c.basis && !c.basis.some((b) => b.field === 'exclusion' && b.state !== 'missing')) return { weight: 'core', state: 'unknown', text: '체납 · 회생 같은 제외 사유 — 신청 전 확인 필요' }
+  if (c.basis && !c.basis.some((b) => b.field === 'exclusion' && b.state !== 'missing')) return { weight: 'note', state: 'unknown', text: '체납 · 회생 같은 제외 사유 — 신청 전 확인 필요' }
   return { weight: 'must', state: 'ok', text: '체납 · 회생 같은 제외 사유 확인된 것 없음(신청 전 최종 확인)' }
 }
 
