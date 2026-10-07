@@ -44,7 +44,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     check(`도구함: ${k} 카드가 누를 수 있다`, (await page.locator(`a[data-tool="${k}"]`).count()) === 1)
   }
   check('도구함: 영업 도구 모음은 카드 대신 옮겨 간 곳 안내(D-118)', (await page.locator('a[data-tool="sales-kit"]').count()) === 0 && ((await page.getByTestId('tools-moved').innerText()) ?? '').includes('영업 › 영업 관리'))
-  check('도구함: 기업인증 검토는 누를 수 없다', (await page.locator('div[data-tool="cert-os"]').count()) === 1)
+  // D-170: 기업인증 모듈이 열렸다(cert 브랜치) — 예전 '준비 중(누를 수 없음)' 카드가 아니라 누르는 카드
+  check('도구함: 기업인증 카드가 누를 수 있다(D-170)', (await page.locator('a[data-tool="cert-os"]').count()) === 1 && (await page.locator('div[data-tool="cert-os"]').count()) === 0)
   check('사이드바: 도입 검토중 줄이 없다 · 영업 관리가 있다 (D-118)', !(await page.getByRole('navigation', { name: '주 메뉴' }).innerText()).includes('도입 검토중') && (await page.getByRole('navigation', { name: '주 메뉴' }).innerText()).includes('영업 관리'))
 
   // 창업감면 판정기
