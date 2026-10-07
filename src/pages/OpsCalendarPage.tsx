@@ -197,6 +197,10 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
       void mutate(() => deleteJournalEntry(entry), '지웠습니다.')
       return
     }
+    if (action === 'today') {
+      void mutate(() => updateJournalEntry(entry, { dueDate: today, completed: false }), '오늘 할 일로 옮겼습니다.')
+      return
+    }
     if (action === 'tomorrow') {
       void mutate(
         () => updateJournalEntry(entry, { dueDate: postponedDue(entry.dueDate, today), completed: false }),

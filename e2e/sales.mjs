@@ -228,20 +228,26 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   const level1 = Number((await lvl.getAttribute('data-level')) ?? '0')
   check('미팅 준비: 중요도 5단계(점수 숫자는 안 보임) · 계산은 20~88', level1 >= 1 && level1 <= 5 && !/\d+점/.test((await lvl.innerText()) ?? '') && score1 >= 20 && score1 <= 88, `${level1} / ${score1}`)
   // D-121: 1차 탭 = 크레탑 분석기 · 엔진 대본(오프닝 · 질문 · 전략 TOP3)은 '영업 대본' 으로 접혀 있다
-  check('미팅 준비: 1차는 크레탑 분석기 · 영업 대본은 접힘', (await page.getByTestId('meeting-cretop').count()) === 1 && (await page.getByTestId('meeting-plan').count()) === 0)
-  await page.getByRole('button', { name: /영업 대본 — 오프닝/ }).click()
+  check('미팅 준비: 1차는 크레탑 분석기 · 1차 포인트는 접힘', (await page.getByTestId('meeting-cretop').count()) === 1 && (await page.getByTestId('meeting-plan').count()) === 0)
+  // D-167: 영업 흐름 카드 · 첫 연락 차수 · 카톡 문구 묶음은 숨김 — 1차 · 2차 · 3차 세 칸
+  check('미팅 준비(D-167): 영업 흐름 · 첫 연락 · 카톡 문구 없음 · 차수 세 칸', (await page.getByTestId('sales-journey').count()) === 0 && (await page.getByTestId('meeting-kakao').count()) === 0 && (await page.getByTestId('meeting-rounds').getByRole('button').count()) === 3 && (await page.getByTestId('meeting-rounds').getByRole('button', { name: '첫 연락' }).count()) === 0)
+  await page.getByRole('button', { name: /1차 포인트 —/ }).click()
   const main1 = (await page.locator('main').innerText()) ?? ''
   check('미팅 준비: 전략 TOP3 — 가업승계 먼저', main1.includes('먼저 볼 전략 3가지') && main1.indexOf('가업승계') > 0)
-  check('미팅 준비: 1차 미팅 예정 → 1차 대본이 먼저 (질문 · 오프닝 · 요청 자료)', ((await page.getByTestId('meeting-rounds').getByRole('button', { name: '1차 미팅' }).getAttribute('aria-pressed')) === 'true') && main1.includes('오프닝') && /질문 \d+개/.test(main1) && main1.includes('미팅정밀'))
-  for (const [name, word] of [['첫 연락', '전화 대본'], ['2차 미팅', '핵심 이슈 3가지'], ['3차 클로징', '가격 이야기']]) {
+  check('미팅 준비(D-167): 1차는 포인트만 — 질문 · 요청할 자료(오프닝 멘트 없음)', ((await page.getByTestId('meeting-rounds').getByRole('button', { name: '1차 미팅' }).getAttribute('aria-pressed')) === 'true') && !((await page.getByTestId('meeting-plan').innerText()) ?? '').includes('오프닝') && /질문 \d+개/.test(main1) && main1.includes('요청할 자료') && main1.includes('미팅정밀'))
+  // D-167: 크레탑 없이 항목만 바로 고르기 — 고르면 업체 기록에 남는다
+  await page.getByTestId('prep-mode').getByRole('radio', { name: '항목만 바로 고르기' }).click()
+  await page.getByTestId('direct-pick').getByRole('button', { name: '가업승계', exact: true }).click()
+  await page.waitForTimeout(500)
+  const picked = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients')).find((c) => c.id === 'cli_meet').sales.picks)
+  check('미팅 준비(D-167): 항목 바로 고르기 → 업체 기록(sales.picks) · 고른 항목 포인트', Array.isArray(picked) && picked.includes('가업승계') && (await page.getByTestId('meeting-cretop').count()) === 0 && ((await page.getByTestId('direct-pick-points').innerText()) ?? '').includes('가업승계'), JSON.stringify(picked))
+  await page.getByTestId('prep-mode').getByRole('radio', { name: '크레탑 분석기로' }).click()
+  for (const [name, word, gone] of [['2차 미팅', '핵심 이슈 3가지', '마무리 말'], ['3차 클로징', '계약 준비', '가격 이야기']]) {
     await page.getByTestId('meeting-rounds').getByRole('button', { name }).click()
     await page.waitForTimeout(150)
-    check(`미팅 준비: ${name} 대본`, ((await page.getByTestId('meeting-plan').innerText()) ?? '').includes(word))
+    const t = (await page.getByTestId('meeting-plan').innerText()) ?? ''
+    check(`미팅 준비: ${name} — 포인트만(멘트 '${gone}' 없음)`, t.includes(word) && !t.includes(gone), t.slice(0, 160))
   }
-  // 미팅에서 알게 된 회사 사정을 적으면 중요도 계산이 바뀐다 (D-123: 미팅 기록 아래로 옮김)
-  await page.getByTestId('meeting-rounds').getByRole('button', { name: '첫 연락' }).click()
-  await page.waitForTimeout(150)
-  check('미팅 준비: 첫 연락 탭에는 회사 사정 칸이 없다(미팅 뒤에 적는 것)', (await page.getByRole('button', { name: /미팅에서 알게 된 회사 사정/ }).count()) === 0)
   // D-124: 아직 오지 않은 차수(1차 미팅 예정인데 3차)는 미리 보기만 — 기록 · 회사 사정 칸이 없다
   await page.getByTestId('meeting-rounds').getByRole('button', { name: '3차 클로징' }).click()
   await page.waitForTimeout(150)
@@ -273,10 +279,13 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   // D-125: 저장하면 마무리 카드 — 감사 카톡(+ 받을 자료)을 한 덩어리로 · 보내기 · 전화 · 다음 차수는 누를 때
   const wrap = page.getByTestId('meeting-wrapup')
   const wrapText = (await wrap.innerText().catch(() => '')) ?? ''
-  check('미팅 기록: 저장 뒤 마무리 카드 — 카톡 문구 · 보내기 · 다음 약속', (await wrap.count()) === 1 && ((await page.getByTestId('wrapup-kakao').innerText()) ?? '').length > 20 && (await page.getByTestId('wrapup-share').count()) === 1 && wrapText.includes('다음 약속'), wrapText.slice(0, 200))
+  // D-167: 감사 카톡은 숨김 — 받기로 한 자료가 있으면 '요청 자료' 만
+  check('미팅 기록: 저장 뒤 마무리 카드 — 다음 약속 · 카톡 인사 없음(요청 자료만)', (await wrap.count()) === 1 && wrapText.includes('다음 약속') && !wrapText.includes('보낼 카톡') && ((await page.getByTestId('wrapup-kakao').count()) === 0 || wrapText.includes('요청 자료')), wrapText.slice(0, 200))
   await page.getByTestId('wrapup-next').click()
   await page.waitForTimeout(400)
-  check('미팅 기록: 마무리 카드에서 누르면 2차 대본으로', ((await page.getByTestId('meeting-rounds').getByRole('button', { name: '2차 미팅' }).getAttribute('aria-pressed')) === 'true'))
+  check('미팅 기록: 마무리 카드에서 누르면 2차 준비로', ((await page.getByTestId('meeting-rounds').getByRole('button', { name: '2차 미팅' }).getAttribute('aria-pressed')) === 'true'))
+  const prevPts = (await page.getByTestId('meeting-prev-points').innerText().catch(() => '')) ?? ''
+  check('미팅 준비(D-167): 2차에 1차 메모가 올라온다(앞 미팅에서 적은 것)', prevPts.includes('1차') && prevPts.includes('가지급금'), prevPts.slice(0, 200))
   // 업체 상세 → 미팅 준비 링크
   await page.goto(BASE + '/ops/clients/cli_meet', { waitUntil: 'networkidle' })
   await page.getByTestId('client-sales-card').getByRole('link', { name: '미팅 준비' }).click()
@@ -298,7 +307,7 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   await page.waitForTimeout(500)
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   check('미팅 준비 390: 옆으로 넘치지 않는다', overflow <= 1, String(overflow))
-  check('미팅 준비 390: 차수 네 칸이 한 줄', (await page.getByTestId('meeting-rounds').getByRole('button').count()) === 4)
+  check('미팅 준비 390: 차수 세 칸이 한 줄(D-167 첫 연락 숨김)', (await page.getByTestId('meeting-rounds').getByRole('button').count()) === 3)
   await ctx.close()
 }
 
@@ -326,11 +335,13 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   check('상품·제안: 추천 3이 골라진 채 시작 — 가업승계 사전점검 먼저', (await rec.getByRole('button', { pressed: true }).count()) === 3 && ((await rec.innerText()) ?? '').indexOf('가업승계 사전점검') >= 0)
   check('상품·제안: 합계 = 원본 가격 합 (500 + 200 + 200 = 900만원)', ((await page.getByTestId('proposal-sum').innerText()) ?? '').includes('900만원'), await page.getByTestId('proposal-sum').innerText())
   const doc1 = (await page.getByTestId('proposal-doc').innerText()) ?? ''
-  check('상품·제안: 공유용 제안서 — 추천 1 이 첫 상품', doc1.includes('[제안정밀 법인컨설팅 제안 초안]') && doc1.includes('대표님 공유용') && !doc1.includes('[내부]') && doc1.includes('1. 가업승계 사전점검 패키지'))
+  // D-167: 문서는 방문 리포트 · 필요 서류(요청 자료) 둘 — 제안서 · 업무범위서 · 견적 카톡 · 상황별 카톡은 숨김
+  check('상품·제안(D-167): 문서 두 가지 — 방문 리포트가 먼저', (await page.getByTestId('proposal-docs').getByRole('button').count()) === 2 && doc1.includes('[법인컨설팅 사전 점검 리포트]') && doc1.includes('제안정밀'), doc1.slice(0, 120))
+  check('상품·제안(D-167): 추천 기준 보기', ((await page.getByTestId('recommend-basis').innerText()) ?? '').includes('추천 기준'))
   await page.getByRole('button', { name: '상품 더 고르기 (40종)' }).click()
   await page.getByRole('button', { name: /^정관정비 패키지 · 150만/ }).click()
   check('상품·제안: 더 고르면 합계가 는다 (1,050만원)', ((await page.getByTestId('proposal-sum').innerText()) ?? '').includes('1,050만원'))
-  for (const [name, word] of [['제안서 (내부용)', '[내부]'], ['업무범위서', '[업무 범위]'], ['견적 카톡', '예상 진행 기간'], ['상황별 카톡', '[1차 연락용]'], ['자료 요청', '확인하면 좋겠습니다']]) {
+  for (const [name, word] of [['필요 서류 · 요청 자료', '확인하면 좋겠습니다']]) {
     await page.getByTestId('proposal-docs').getByRole('button', { name }).click()
     check(`상품·제안: ${name}`, ((await page.getByTestId('proposal-doc').innerText()) ?? '').includes(word))
   }
@@ -339,8 +350,12 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   await page.getByLabel('직전년도 순이익 (만원)').fill('31000')
   const mr = (await page.getByTestId('monthly-result').innerText()) ?? ''
   check('월납: 84개월 2억 5,200만원 · 초록', mr.includes('2억 5,200만원') && mr.includes('초록'), mr.slice(0, 200))
-  await page.getByTestId('proposal-docs').getByRole('button', { name: '제안서 (대표님 공유용)' }).click()
-  check('월납: 제안서에 월납 플랜이 들어간다', ((await page.getByTestId('proposal-doc').innerText()) ?? '').includes('월납 플랜 검토안'))
+  // D-167: 월납 시뮬레이션 — 후보 금액 표 · 지금 금액 줄이 눌린 채 · 다른 줄을 누르면 그 금액으로
+  const simTbl = page.getByTestId('monthly-sim')
+  check('월납 시뮬레이션(D-167): 후보 표 · 300만원 줄 선택 · 적정성', (await simTbl.getByRole('button', { name: /^300만원/, pressed: true }).count()) === 1 && ((await simTbl.innerText()) ?? '').includes('2억 5,200만원') && ((await simTbl.innerText()) ?? '').includes('초록'))
+  await simTbl.getByRole('button', { name: /^500만원/ }).click()
+  check('월납 시뮬레이션: 줄을 누르면 그 금액으로', (await page.getByLabel('월납 (만원)').inputValue()) === '500')
+  await page.getByLabel('월납 (만원)').fill('300')
   await page.getByLabel('제안 상태').selectOption('견적 전달')
   await page.getByRole('button', { name: '제안 저장' }).click()
   await page.waitForTimeout(600)
@@ -369,11 +384,16 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   await page.goto(BASE + '/sales/proposal?view=catalog', { waitUntil: 'networkidle' })
   const cat = page.getByTestId('catalog')
   check('상품표: 40종 · 8분류', (await cat.locator('li').count()) === 40 && (await page.getByRole('group', { name: '상품 분류' }).getByRole('button').count()) === 9)
+  // D-167: 기본값 표시 · 수수료/보험 고르기
+  check('상품표(D-167): 가격은 임의 기본값이라고 알림 · 상품마다 기본값 표시', (await page.getByTestId('catalog-default-note').count()) === 1 && (await cat.getByTestId('catalog-default-badge').count()) === 40)
+  await cat.getByRole('radiogroup', { name: '법인보험/대표 퇴직금 플랜 검토 패키지 금액 종류' }).getByRole('radio', { name: '보험' }).click()
+  await page.waitForTimeout(400)
+  check('상품표(D-167): 보험으로 바꾸면 금액 앞에 보험 · 저장', ((await cat.getByRole('button', { name: '법인보험/대표 퇴직금 플랜 검토 패키지 가격 고치기' }).innerText()) ?? '').startsWith('보험') && (await page.evaluate(() => JSON.stringify(localStorage.getItem('axmvp.module.sales-os.catalog') ?? ''))).includes('insurance'))
   await cat.getByRole('button', { name: '정관정비 패키지 가격 고치기' }).click()
   await cat.getByLabel('정관정비 패키지 가격(만원)').fill('180')
   await cat.getByRole('button', { name: '저장' }).click()
   await page.waitForTimeout(400)
-  check('상품표: 가격 고침 → 표에 반영 · 저장', ((await cat.innerText()) ?? '').includes('180만원 ·고침') && (await page.evaluate(() => JSON.stringify(localStorage.getItem('axmvp.module.sales-os.catalog') ?? ''))).includes('180'))
+  check('상품표: 가격 고침 → 표에 반영 · 저장', ((await cat.innerText()) ?? '').includes('180만원') && ((await cat.innerText()) ?? '').includes('·고침') && (await page.evaluate(() => JSON.stringify(localStorage.getItem('axmvp.module.sales-os.catalog') ?? ''))).includes('180'))
   await page.goto(BASE + '/sales/proposal?client=cli_prop', { waitUntil: 'networkidle' })
   await page.getByRole('button', { name: '상품 더 고르기 (40종)' }).click()
   check('상품표: 고친 가격이 제안에도', await page.getByRole('button', { name: /^정관정비 패키지 · 180만/ }).count() === 1)
@@ -435,15 +455,17 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   await page.goto(BASE + '/sales/strategy', { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)
   check('전략: 영업 관리 안의 네 번째 탭', ((await page.getByTestId('sales-tabs').innerText()) ?? '').includes('전략') && ((await page.locator('aside a[aria-current="page"]').innerText()) ?? '').includes('영업 관리'))
-  check('전략: 전체 76 (영업 전략 17 · 크레탑 무기 34 · 절세 전략 25)', ((await page.getByTestId('library-count').innerText()) ?? '').trim() === '76개')
-  await page.getByTestId('library-source').getByRole('button', { name: /크레탑 무기/ }).click()
-  check('전략: 크레탑 무기만 34', ((await page.getByTestId('library-count').innerText()) ?? '').trim() === '34개')
-  await page.getByTestId('library-source').getByRole('button', { name: /^전체/ }).click()
+  // D-167: 영업 전략 17 · 크레탑 무기 34 · 절세 전략 25(76) → 같은 주제는 하나로
+  const libN = Number(((await page.getByTestId('library-count').innerText()) ?? '').replace(/\D/g, ''))
+  check('전략(D-167): 세 목록을 주제 하나로 합쳤다(76보다 적다 · 종류 고르기 없음)', libN > 30 && libN < 76 && (await page.getByTestId('library-source').count()) === 0, String(libN))
   await page.getByLabel('전략 찾기').fill('가지급금')
   const n = Number(((await page.getByTestId('library-count').innerText()) ?? '').replace(/\D/g, ''))
-  check('전략: 찾기로 좁힌다', n > 0 && n < 76, String(n))
-  await page.getByTestId('library-list').locator('li').first().getByRole('button').first().click()
-  check('전략: 펼치면 복사 단추', (await page.getByTestId('library-list').getByRole('button', { name: '복사' }).count()) >= 1)
+  check('전략: 찾기로 좁힌다', n > 0 && n < libN, String(n))
+  const firstEntry = page.getByTestId('library-list').locator('li').first()
+  check('전략(D-167): 가지급금은 영업 · 절세 · 크레탑이 한 줄로', ((await firstEntry.getAttribute('data-sources')) ?? '').split(',').length >= 2, await firstEntry.getAttribute('data-sources'))
+  await firstEntry.getByRole('button').first().click()
+  const opened = (await firstEntry.innerText()) ?? ''
+  check('전략(D-167): 펼치면 포인트만(물어볼 것 · 받을 자료) · 멘트 없음', opened.includes('물어볼 것') && opened.includes('받을 자료') && !opened.includes('이렇게 꺼낸다') && !opened.includes('마무리 말') && !opened.includes('연락 멘트'), opened.slice(0, 200))
   const topics = (await page.getByTestId('topic-list').innerText()) ?? ''
   check('전략: 주제별 연락할 고객 — 연구소 관심 · 제조 업종', /연구소\/인증[\s\S]*날짜지남상사/.test(topics) && topics.includes('조용한정밀'), topics.slice(0, 300))
 

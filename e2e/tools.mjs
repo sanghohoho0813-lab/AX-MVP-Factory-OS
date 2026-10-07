@@ -789,6 +789,18 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(600)
   check('D-165 창업감면: 판정을 누른 뒤에는 결과서', (await page.getByTestId('startup-report').count()) === 1)
 
+  // D-167: 창업감면 판정기 글자 — 기본 '보통'(넓은 화면 0.85배, 예전 1.25배는 혼자 컸다) · 판정기 안에서 고르면 남는다
+  await page.goto(BASE + '/tools/startup-tax/judge?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  const zoomOf = () => page.getByTestId('startup-orig').evaluate((el) => ({ z: el.getAttribute('data-zoom'), css: getComputedStyle(el).zoom, w: window.innerWidth }))
+  const z0 = await zoomOf()
+  check('D-167 창업감면 글자: 기본 보통 · 넓은 화면은 OS 글자에 맞춰 0.85배', z0.z === 'm' && (z0.w < 1024 || Number(z0.css) === 0.85), JSON.stringify(z0))
+  await page.getByTestId('startup-zoom').getByRole('radio', { name: '크게', exact: true }).click()
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  check('D-167 창업감면 글자: 고른 크기가 남는다', (await zoomOf()).z === 'l')
+  await page.getByTestId('startup-zoom').getByRole('radio', { name: '보통', exact: true }).click()
+
   // 연구소 설립 가능성 체크: 적은 것이 새로 고쳐도 남는다(업체마다)
   await page.goto(BASE + '/tools/labcare/assessment?client=cli_hansol', { waitUntil: 'networkidle' })
   await page.waitForTimeout(800)

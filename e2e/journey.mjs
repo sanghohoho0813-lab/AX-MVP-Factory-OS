@@ -83,26 +83,9 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const hist = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.module.cretop.analyses') ?? '[]'))
   check('등록: 크레탑 분석 이력에도 이 업체로', hist.some((h) => h.clientId === id && h.data.company === '한빛정밀(주)'), JSON.stringify(hist.map((h) => h.clientId)))
 
-  // 미팅 준비 — 영업 흐름 (D-121: 한 줄로 접혀 있다 → 펼치기)
-  const journey = page.getByTestId('sales-journey')
-  await journey.waitFor()
-  const fold = (await journey.innerText()) ?? ''
-  check('영업 흐름: 한 줄로 접혀 있다 — 지금 걸음 · 다음 할 일', (await journey.getAttribute('data-folded')) === '1' && fold.includes('1/6 1차 미팅 준비') && fold.includes('다음 할 일'), fold.slice(0, 120))
-  await page.getByTestId('journey-unfold').click()
-  check('영업 흐름: 지금 1차 미팅 준비', ((await journey.locator('[data-journey-step="prep"]').getAttribute('data-state')) ?? '') === 'now')
-  const prep = page.getByTestId('journey-open')
-  check('영업 흐름: 크레탑 분석 · 1차 미팅 날짜 자동 체크', (await prep.locator('[data-journey-task="크레탑 분석"]').getAttribute('data-done')) === '1' && (await prep.locator('[data-journey-task="1차 미팅 날짜"]').getAttribute('data-done')) === '1')
-  check('영업 흐름: 1차 미팅 체크리스트(AX) 자리 — 준비 중', ((await prep.locator('[data-journey-task="1차 미팅 체크리스트 (AX)"]').innerText()) ?? '').includes('준비 중'))
-  await journey.locator('[data-journey-step="m1"]').click()
-  const tools = page.getByTestId('journey-open').locator('[data-journey-tool]')
-  const toolKeys = await tools.evaluateAll((els) => els.map((e) => e.getAttribute('data-journey-tool')))
-  check('작업실 도구: 1차 미팅 걸음에 정책자금 진단 · 주식가치 · 세금 계산기', toolKeys.includes('policy-funding') && toolKeys.includes('cretop-value') && toolKeys.includes('tax'), toolKeys.join())
-  const href = await page.getByTestId('journey-open').locator('[data-journey-tool="policy-funding"] a').getAttribute('href')
-  check('작업실 도구: 이 업체로 열린다', href === `/tools/policy-funding/diagnosis?client=${id}`, href)
-  check('작업실 도구: 크레탑 근거를 이유로', ((await page.getByTestId('journey-open').locator('[data-journey-tool="policy-funding"]').innerText()) ?? '').includes('크레탑 · 정책자금'))
-
-  // D-124: 계약 경로는 2차 · 3차 미팅에서 정한다 — 1차 미팅 준비 때는 안 보인다
-  check('계약 경로: 1차 미팅 준비 때는 안 보인다', (await page.getByTestId('sales-path').count()) === 0 && !((await journey.innerText()) ?? '').includes('계약 경로'))
+  // D-167: 영업 흐름(6단계 걸음 카드)은 숨김 — 대표: "영업 보드 하나로 충분, 오히려 헷갈린다"
+  await page.getByTestId('meeting-rounds').waitFor()
+  check('영업 흐름(D-167): 미팅 준비에 영업 흐름 카드 없음 · 계약 경로 고르기 없음', (await page.getByTestId('sales-journey').count()) === 0 && (await page.getByTestId('sales-path').count()) === 0)
 
   // 미팅 준비 1차 = 크레탑 분석기 그대로 (D-121) — 등록 때 넣은 분석으로 바로 열린다
   const mc = page.getByTestId('meeting-cretop')
@@ -119,7 +102,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('크레탑 탭 바꾸기: 맨 위로 튀지 않고 분석기 첫머리 근처', yAfter > 300 && yAfter <= miniTop + 5, `scrollY ${yAfter} · 분석기 ${Math.round(miniTop)}`)
   await mc.getByTestId('cretop-mini-tabs').locator('[data-tab="overview"]').click()
   await page.waitForTimeout(300)
-  check('1차: 옛 전략 목록 · 흩어진 카톡은 없다(한 묶음으로 접힘)', (await page.getByTestId('cretop-meeting').count()) === 0 && (await page.getByTestId('meeting-kakao').count()) === 0 && (await page.getByRole('button', { name: /카톡 문구/ }).count()) === 1)
+  check('1차: 옛 전략 목록 · 카톡 문구 없음(D-167 카톡 숨김)', (await page.getByTestId('cretop-meeting').count()) === 0 && (await page.getByTestId('meeting-kakao').count()) === 0 && (await page.getByRole('button', { name: /카톡 문구/ }).count()) === 0)
   await page.getByTestId('meeting-rounds').getByRole('button', { name: '2차 미팅' }).click()
   await page.waitForTimeout(300)
   const fu = page.getByTestId('cretop-followup')
@@ -130,23 +113,10 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(300)
   check('3차: 이어서 물을 것 = E 다음 액션', ((await page.getByTestId('cretop-followup').innerText()) ?? '').includes('E 다음 액션'))
 
-  // 모듈 잠금 — 감추지 않고 잠김
-  await page.evaluate(() => {
-    const now = new Date().toISOString()
-    localStorage.setItem('axmvp.module.system.access', JSON.stringify([{ id: 'acc1', clientId: '', data: { moduleKey: 'policy-funding', state: 'locked', trialEndsAt: '' }, createdAt: now, updatedAt: now }]))
-  })
-  await page.reload({ waitUntil: 'networkidle' })
-  await page.getByTestId('journey-unfold').click()
-  await page.getByTestId('sales-journey').locator('[data-journey-step="m1"]').click()
-  await page.waitForTimeout(300)
-  const lockedRow = await page.getByTestId('journey-open').locator('[data-journey-tool="policy-funding"]').innerText()
-  check('모듈 잠금: 잠긴 도구는 보이되 잠김', lockedRow.includes('잠김'), lockedRow)
-  await page.evaluate(() => localStorage.removeItem('axmvp.module.system.access'))
-
-  // 고객 상세
+  // 고객 상세 — D-167: 영업 흐름 카드 숨김
   await page.goto(`${BASE}/ops/clients/${id}`, { waitUntil: 'networkidle' })
-  await page.getByTestId('sales-journey').waitFor()
-  check('고객 상세: 영업 흐름 카드', ((await page.getByTestId('sales-journey').innerText()) ?? '').includes('1차 미팅 준비'))
+  await page.getByTestId('client-sales-card').waitFor()
+  check('고객 상세(D-167): 영업 흐름 카드 없음', (await page.getByTestId('sales-journey').count()) === 0)
 
   // D-124: 단계에 맞춰 보이는 것 — 1차 미팅 예정인 잠재고객
   check('단계별: 계약 전 · 계약 정보 없음 → 업체 화면에 빈 계약 카드 없음', (await page.getByTestId('contract-card').count()) === 0)
@@ -155,9 +125,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(400)
   check('단계별: 1차 미팅 전 제안 화면 — 안내 한 줄 · 계약 준비는 아직', (await page.getByTestId('proposal-early').count()) === 1 && (await page.getByTestId('contract-prep').count()) === 0 && (await page.getByTestId('contract-prep-later').count()) === 1)
   await page.goto(`${BASE}/sales/meeting?client=${id}&round=1`, { waitUntil: 'networkidle' })
-  await page.getByRole('button', { name: /카톡 문구/ }).click()
-  const kakao = (await page.getByTestId('meeting-kakao').innerText()) ?? ''
-  check('단계별: 1차 미팅 전 카톡 — 통화 뒤 · 1차 미팅 뒤는 있고 계약 안내는 없다', kakao.includes('통화 뒤 카톡') && kakao.includes('1차 미팅 뒤 카톡') && !kakao.includes('계약 안내 카톡'), kakao.slice(0, 120))
+  await page.getByTestId('meeting-rounds').waitFor()
+  check('단계별(D-167): 카톡 문구 묶음 없음', (await page.getByRole('button', { name: /카톡 문구/ }).count()) === 0)
   await page.getByTestId('meeting-rounds').getByRole('button', { name: '3차 클로징' }).click()
   await page.waitForTimeout(200)
   check('단계별: 아직 오지 않은 3차는 미리 보기 — 기록 칸 없음', (await page.getByTestId('round-ahead').count()) === 1 && (await page.getByTestId('meeting-recorder').count()) === 0)
@@ -234,8 +203,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const r1 = (await clients(page)).find((c) => c.id === id)
   check('1차 기록: 확인한 관심사만 남는다 · 1차 미팅 완료로', r1.sales.stage === 'm1done' && r1.sales.interests.length === want.length && want.every((w) => r1.sales.interests.includes(w)), JSON.stringify({ st: r1.sales.stage, i: r1.sales.interests, want }))
   await page.reload({ waitUntil: 'networkidle' })
-  await page.getByTestId('journey-unfold').click()
-  check('1차 미팅 완료: 계약 경로는 아직 안 보인다', (await page.getByTestId('sales-path').count()) === 0)
+  check('1차 미팅 완료: 계약 경로는 안 보인다', (await page.getByTestId('sales-path').count()) === 0)
   await page.goto(`${BASE}/sales/meeting?client=${id}&round=2`, { waitUntil: 'networkidle' })
   const rec2 = page.getByTestId('meeting-recorder')
   await rec2.getByLabel('미팅에서 나온 말 · 메모').fill('제안서 보고 긍정적. 비용은 한 번에 내는 쪽이 좋다고 함')
@@ -243,16 +211,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('2차 기록: 관심사 확인 줄은 1차에만', (await page.getByTestId('meeting-interests').count()) === 0)
   await rec2.getByRole('button', { name: '기록 저장' }).click()
   await page.waitForTimeout(700)
-  await page.reload({ waitUntil: 'networkidle' })
-  await page.getByTestId('journey-unfold').click()
-  const journey2 = page.getByTestId('sales-journey')
-  check('2차 미팅: 계약 경로가 보인다', (await page.getByTestId('sales-path').count()) === 1)
-  await page.getByTestId('sales-path').getByRole('button', { name: '현금 계약' }).click()
-  await page.waitForTimeout(400)
-  check('계약 경로: 현금 → 3차 · 클로징은 건너뛸 수 있음', (await journey2.locator('[data-journey-step="closing"]').getAttribute('data-state')) === 'optional' && ((await journey2.innerText()) ?? '').includes('2차 미팅에서 계약'))
-  await page.reload({ waitUntil: 'networkidle' })
-  await page.getByTestId('journey-unfold').click()
-  check('계약 경로: 새로고침해도 남는다', (await page.getByTestId('sales-path').getByRole('button', { name: '현금 계약' }).getAttribute('aria-pressed')) === 'true')
+  const r2 = (await clients(page)).find((c) => c.id === id)
+  check('2차 기록: 저장 · 2차 미팅 단계로(D-167: 계약 경로 고르기는 영업 흐름과 함께 숨김)', r2.sales.stage === 'm2' && (await page.getByTestId('sales-path').count()) === 0, r2.sales.stage)
 
   // (마지막에 — 다른 회사 번호가 붙으므로 앞의 '같은 업체' 시험과 섞이지 않게) 1차 탭에서 바로 분석 — 다른 회사 보고서면 저절로 붙이지 않고, '이 업체에 반영' 을 누르면 붙인다
   await page.goto(BASE + '/sales/meeting?client=cli_mirae&round=1', { waitUntil: 'networkidle' })
@@ -293,7 +253,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('390: 확인 화면 넘침 0', (await overflowX(page)) <= 0, String(await overflowX(page)))
   await page.getByTestId('intake-save').click()
   await page.waitForURL(/\/sales\/meeting\?client=/)
-  await page.getByTestId('sales-journey').waitFor()
+  await page.getByTestId('meeting-rounds').waitFor()
   await page.getByTestId('meeting-cretop').getByTestId('cretop-result-bar').waitFor()
   check('390: 미팅 준비 1차(크레탑 분석기) 넘침 0', (await overflowX(page)) <= 0, String(await overflowX(page)))
   await page.getByTestId('meeting-rounds').getByRole('button', { name: '2차 미팅' }).click()

@@ -242,6 +242,11 @@ export interface CatalogFeature {
   clientEntry?: { topic: string; verb: string; path: string }
   /** 모듈 살펴보기에 적을 한 줄 (없으면 도구 설명) */
   summary?: string
+  /**
+   * D-167: 메뉴 · 모듈 살펴보기에서 숨김(대표: "지원사업 알림 · 정책자금 진단이 따로 있어 오히려 헷갈린다").
+   * 지우지 않는다 — 화면 · 저장된 자료 · 요금제 계산은 그대로이고 주소로는 열린다. 되돌리려면 이 표시만 뺀다.
+   */
+  hidden?: boolean
 }
 
 export const FEATURE_CATALOG: CatalogFeature[] = [
@@ -253,8 +258,8 @@ export const FEATURE_CATALOG: CatalogFeature[] = [
   { key: 'grants', source: 'nav', module: 'growth', lockedPreview: 'full', summary: '업체 조건에 맞는 공고 · 마감 임박 · 신청 준비를 봅니다.' },
   { key: 'cert-os', source: 'tool', module: 'growth', lockedPreview: 'intro' },
   // 예전 '정부지원사업' 모듈의 기능 — D-163 부터 기업성장 안
-  { key: 'funding', source: 'nav', module: 'growth', lockedPreview: 'intro', summary: '지원사업 신청 흐름과 필요한 서류를 업체별로 관리합니다.' },
-  { key: 'institutions', source: 'nav', module: 'growth', lockedPreview: 'intro', summary: '기관 · 프로그램 목록과 기관별 전략을 봅니다.' },
+  { key: 'funding', source: 'nav', module: 'growth', lockedPreview: 'intro', hidden: true, summary: '지원사업 신청 흐름과 필요한 서류를 업체별로 관리합니다.' },
+  { key: 'institutions', source: 'nav', module: 'growth', lockedPreview: 'intro', hidden: true, summary: '기관 · 프로그램 목록과 기관별 전략을 봅니다.' },
   // 절세·재무
   { key: 'tax', source: 'tool', module: 'tax-finance', lockedPreview: 'full', clientEntry: { topic: '절세', verb: '계산하기', path: '/tools/tax' } },
   { key: 'startup-tax', source: 'tool', module: 'tax-finance', lockedPreview: 'first-section', clientEntry: { topic: '창업감면', verb: '판정하기', path: '/tools/startup-tax' } },
@@ -358,7 +363,7 @@ export function selectableModules(): CatalogModule[] {
 }
 
 export function featuresOfModule(moduleKey: string): CatalogFeature[] {
-  return FEATURE_CATALOG.filter((f) => f.module === moduleKey)
+  return FEATURE_CATALOG.filter((f) => f.module === moduleKey && !f.hidden)
 }
 
 export function categoryName(key: ModuleCategoryKey): string {

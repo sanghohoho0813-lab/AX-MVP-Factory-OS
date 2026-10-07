@@ -124,6 +124,7 @@ import { allDocumentMetas, emptyDocumentState } from '../services/clientOpsDocum
 import { ActivityLog } from '../components/ops/ActivityLog'
 import { ClientSalesCard } from '../components/sales/ClientSalesCard'
 import { SalesJourneyCard } from '../components/sales/SalesJourneyCard'
+import { SALES_SIMPLE } from '../config/salesSimple'
 import { withSalesPath } from '../services/salesJourney'
 import { isProspect, salesStageOf, withSalesStage } from '../services/salesPipeline'
 import { ContractCard } from '../components/ops/ContractCard'
@@ -854,7 +855,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       */}
       {/* D-114: 영업 — 잠재고객이면 펼쳐서, 계약 고객이면 접어서 */}
       {/* D-119: 영업 흐름 — 1차 준비 → 1·2·3차 → 계약 → 계약 뒤 추가 제안, 걸음마다 할 일 · 작업실 도구 */}
-      <SalesJourneyCard record={record} today={today} compact foldable onPathChange={(path) => void commit(withSalesPath(record, path))} />
+      {/* D-167: 숨김(대표: 영업 흐름은 오히려 헷갈린다) — config/salesSimple 에서 다시 켤 수 있다 */}
+      {SALES_SIMPLE.showJourney && <SalesJourneyCard record={record} today={today} compact foldable onPathChange={(path) => void commit(withSalesPath(record, path))} />}
 
       <ClientSalesCard record={record} onSave={(next) => void commit(next)} onContract={openClose} />
 

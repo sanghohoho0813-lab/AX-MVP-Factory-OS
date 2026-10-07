@@ -88,7 +88,7 @@ function InfoTile({ label, value }: { label: string; value: string }) {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <section className="mx-auto w-full max-w-4xl px-6 pt-10 pb-20 @min-[640px]:pt-14">
+    <section className="mx-auto w-full max-w-6xl px-6 pt-10 pb-20 @min-[640px]:pt-14">
       {children}
     </section>
   );

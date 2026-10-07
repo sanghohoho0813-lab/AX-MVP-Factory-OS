@@ -240,9 +240,11 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
 
   await page.goto(BASE + '/sales/strategy', { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)
-  check(`전략: 처음엔 12개 + 더 보기 ${tag}`, (await page.getByTestId('library-list').locator('> li').count()) === 12 && ((await page.getByTestId('library-more').innerText()) ?? '').includes('64개 더 보기'))
+  // D-167: 세 목록을 주제 하나로 합쳐 76개보다 적다 — 개수는 화면의 'n개' 로 맞춘다
+  const libTotal = Number(((await page.getByTestId('library-count').innerText()) ?? '').replace(/\D/g, ''))
+  check(`전략: 처음엔 12개 + 더 보기 ${tag}`, (await page.getByTestId('library-list').locator('> li').count()) === 12 && ((await page.getByTestId('library-more').innerText()) ?? '').includes(`${libTotal - 12}개 더 보기`), String(libTotal))
   await page.getByTestId('library-more').click()
-  check(`전략: 더 보기를 누르면 76개 전부 ${tag}`, (await page.getByTestId('library-list').locator('> li').count()) === 76)
+  check(`전략: 더 보기를 누르면 전부(${libTotal}개) ${tag}`, (await page.getByTestId('library-list').locator('> li').count()) === libTotal && libTotal < 76)
 
   await page.goto(BASE + '/ops/agents', { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)

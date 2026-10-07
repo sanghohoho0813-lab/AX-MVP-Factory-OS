@@ -26,6 +26,7 @@ import { EMPTY_ADVANCED, EMPTY_FORM, PLACEHOLDER_BIRTH, PLACEHOLDER_STARTUP, wit
 import { judge, VERDICT_EMOJI, VERDICT_LABEL } from './lib/judgement'
 import { buildSummaryText } from './lib/summary'
 import InputForm from './orig/components/InputForm'
+import { StartupZoomPicker, useStartupZoom } from './StartupZoom'
 import ResultCards from './orig/components/ResultCards'
 import PrintSheet from './orig/components/PrintSheet'
 
@@ -50,6 +51,7 @@ function StartupTaxScreen() {
   // 업체마다 따로 적어 둔다 (D-94) — 다른 업체로 열면 그 업체의 답(없으면 빈 폼)으로 바뀐다
   const { clientId } = useToolClient()
   const [form, setForm] = useState<StartupTaxForm>(() => formFor(clientId))
+  const [zoom, setZoom] = useStartupZoom()
   const loadedFor = useRef<string | null>(clientId)
   const [submitted, setSubmitted] = useState(false)
   // 진단 기준일 (오늘) — 마운트 시 1회 고정
@@ -119,9 +121,13 @@ function StartupTaxScreen() {
   return (
     <div className="st-orig flex flex-col gap-4">
       <PrefillNote note={prefillNote} />
-      {/* 화면 UI — 원본 그대로 (원본은 글자 기준 20px · 폭 max-w-xl) */}
-      <div className="st-zoom" data-testid="startup-orig">
-        <div className="mx-auto max-w-xl px-1 pb-10 pt-2">
+      {/* D-167: 판정기 안에서만 글자 크기 고르기 — 기본은 OS 글자와 어울리게(예전 1.25배는 따로 노는 느낌) */}
+      <div className="flex justify-end">
+        <StartupZoomPicker value={zoom} onChange={setZoom} />
+      </div>
+      {/* 화면 UI — 원본 그대로 (원본은 글자 기준 20px). D-167: 폭 max-w-xl → max-w-5xl(양쪽 여백 줄이기) */}
+      <div className="st-zoom" data-testid="startup-orig" data-zoom={zoom}>
+        <div className="mx-auto max-w-5xl px-1 pb-10 pt-2">
           <header className="mb-6 px-1">
             {/* D-96: 제목 크기를 OS 화면 제목에 맞춘다 (원본 text-4xl 은 넓은 화면 1.25배 확대와 겹쳐 45px 였다) */}
             <h1 className="t-page break-keep text-slate-900">창업감면 1분 판정기</h1>

@@ -163,11 +163,19 @@
   --color-blue-800: var(--color-brand-700);
   --color-blue-900: var(--color-brand-700);
 }
-/* 넓은 화면에서만 1.25배 — 휴대폰 폭에서 키우면 칸이 좁아져 글자가 잘린다 */
+/*
+ * D-167: 판정기 글자 크기는 판정기 안에서 고른다(작게 · 보통 · 크게 · 아주 크게).
+ * 원본 글자는 20px 이라, 넓은 화면 기본 '보통' 은 0.85배(≈17px)로 OS 글자와 맞춘다(예전 1.25배는 혼자 컸다).
+ * 휴대폰은 칸이 좁아 크게 줄이지 않는다 — 보통은 그대로(1배).
+ */
+.st-zoom[data-zoom='s'] { zoom: 0.9; }
+.st-zoom[data-zoom='l'] { zoom: 1.08; }
+.st-zoom[data-zoom='xl'] { zoom: 1.15; }
 @media screen and (min-width: 1024px) {
-  .st-zoom {
-    zoom: 1.25;
-  }
+  .st-zoom[data-zoom='s'] { zoom: 0.75; }
+  .st-zoom[data-zoom='m'] { zoom: 0.85; }
+  .st-zoom[data-zoom='l'] { zoom: 1; }
+  .st-zoom[data-zoom='xl'] { zoom: 1.15; }
 }
 @media screen {
   /* 결과서 미리보기 — 원본은 인쇄할 때만 보였다 */

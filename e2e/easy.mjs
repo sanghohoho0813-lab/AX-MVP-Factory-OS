@@ -102,7 +102,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.reload({ waitUntil: 'networkidle' })
   await openCats()
   const nav2 = (await page.locator('aside nav').innerText()) ?? ''
-  check('목차: 고급 기능을 켜면 기관 전략 · 사례가 보인다', nav2.includes('기관 전략') && nav2.includes('사례'), nav2.slice(0, 400))
+  check('목차: 고급 기능을 켜면 사례가 보인다(D-167: 기관 전략은 숨김)', !nav2.includes('기관 전략') && nav2.includes('사례'), nav2.slice(0, 400))
   await page.evaluate(() => {
     const k = 'axmvp.ui.preferences'
     const p = JSON.parse(localStorage.getItem(k) ?? '{}')

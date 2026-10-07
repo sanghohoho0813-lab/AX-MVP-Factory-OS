@@ -327,6 +327,10 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
       void journalMutate(() => deleteJournalEntry(entry), '지웠습니다.')
       return
     }
+    if (action === 'today') {
+      void journalMutate(() => updateJournalEntry(entry, { dueDate: today, completed: false }), '오늘 할 일로 옮겼습니다.')
+      return
+    }
     if (action === 'tomorrow') {
       void journalMutate(
         () => updateJournalEntry(entry, { dueDate: postponedDue(entry.dueDate, today), completed: false }),

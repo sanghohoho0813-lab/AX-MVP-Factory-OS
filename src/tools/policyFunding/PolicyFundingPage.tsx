@@ -202,7 +202,7 @@ function DiagnosisScreen() {
       <PrefillNote note={prefillNote} />
       {/* D-126: 다른 화면과 같은 제목 크기 · 왼쪽 정렬(가운데 큰 배너는 이 OS 에서 이 화면만 달랐다) */}
       <section className="w-full px-2 pt-4 pb-4">
-        <div className="mx-auto max-w-4xl">
+        <div className="mx-auto max-w-6xl">
           <h1 className="t-page break-keep text-slate-900">정책자금 진단</h1>
           <p className="t-sub mt-1 max-w-2xl break-keep text-slate-500">
             이 업체를 어떤 기관으로 안내하고 어떤 말로 상담할지 바로 확인합니다.
@@ -231,7 +231,7 @@ function DiagnosisScreen() {
 function ReportPicker() {
   const list = getStoredCustomers()
   return (
-    <section className="mx-auto w-full max-w-4xl px-2 pt-6 pb-16" data-testid="pf-report-picker">
+    <section className="mx-auto w-full max-w-6xl px-2 pt-6 pb-16" data-testid="pf-report-picker">
       <h1 className="t-page break-keep text-slate-900">결과서</h1>
       <p className="mt-2 text-slate-600">고객을 고르면 대표님용 한 페이지 요약 + 상세 리포트가 열립니다.</p>
       {list.length === 0 ? (
@@ -266,7 +266,7 @@ function ClientReport({ id }: { id: string }) {
   if (getStoredCustomers().some((c) => c.id === id)) return <ReportView id={id} initialCustomer={null} />
   return (
     <>
-      <section className="mx-auto w-full max-w-4xl px-2 pt-6" data-testid="pf-report-none">
+      <section className="mx-auto w-full max-w-6xl px-2 pt-6" data-testid="pf-report-none">
         <div className="rounded-2xl border border-slate-100 bg-white p-6 text-center shadow-sm">
           <p className="break-keep font-semibold text-slate-800">
             {clientName || '이 업체'}로 저장한 정책자금 상담이 아직 없습니다.

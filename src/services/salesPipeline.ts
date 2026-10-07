@@ -134,6 +134,11 @@ export function normalizeSales(v: unknown): SalesInfo | null {
   }
   if (Array.isArray(s.contractPrep)) out.contractPrep = [...new Set(strList(s.contractPrep))]
   if (isSalesPath(s.path)) out.path = s.path
+  // D-167: 크레탑 없이 바로 고른 제안 항목
+  if (Array.isArray(s.picks)) {
+    const picks = [...new Set(s.picks.filter((x): x is string => typeof x === 'string' && x.trim() !== '').map((x) => x.trim()))].slice(0, 26)
+    if (picks.length > 0) out.picks = picks
+  }
   return out
 }
 
@@ -254,7 +259,7 @@ export function withSalesStage(record: ClientOpsRecord, stage: SalesStage, at: s
   return withActivity(next, 'sales', text, null, at)
 }
 
-export type SalesInfoPatch = Partial<Pick<SalesInfo, 'source' | 'referrer' | 'interests' | 'concern' | 'expectedFee' | 'grantQuery'>>
+export type SalesInfoPatch = Partial<Pick<SalesInfo, 'source' | 'referrer' | 'interests' | 'concern' | 'expectedFee' | 'grantQuery' | 'picks'>>
 
 /** 유입 경로 · 소개자 · 관심사 · 고민 · 예상 수임료 고치기 (영업 칸이 없으면 지금 단계로 만든다) */
 export function withSalesInfo(record: ClientOpsRecord, patch: SalesInfoPatch, at: string = new Date().toISOString()): ClientOpsRecord {
@@ -268,6 +273,8 @@ export function withSalesInfo(record: ClientOpsRecord, patch: SalesInfoPatch, at
   if (patch.expectedFee !== undefined && merged.expectedFee !== base.expectedFee) changed.push('예상 수임료')
   // D-150: 지원사업 찾기 조건만 바뀐 것도 바뀐 것이다(예전에는 그냥 돌려줘 조건이 사라졌다) — 활동 기록에는 남기지 않는다
   const grantChanged = patch.grantQuery !== undefined && merged.grantQuery !== base.grantQuery
+  // D-167: 바로 고른 제안 항목
+  if (patch.picks !== undefined && (merged.picks ?? []).join('|') !== (base.picks ?? []).join('|')) changed.push('미팅 항목')
   if (changed.length === 0 && !grantChanged && record.sales) return record
   const next = { ...record, sales: merged }
   return changed.length ? withActivity(next, 'sales', `영업 정보 수정 — ${changed.join(' · ')}`, null, at) : next

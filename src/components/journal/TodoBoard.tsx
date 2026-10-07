@@ -209,11 +209,11 @@ export function TodoRow({
 /**
  * 할 일로 무엇을 할지 고르는 시트.
  *
- * 네 가지만 둔다 — 진행 중 / 완료 / 내일로 미루기 / 삭제.
+ * 네 가지만 둔다 — 진행 중 / 완료 / 내일로 미루기 / 삭제(D-167: 밀린 것은 맨 위에 '오늘 할 일로 바꾸기' 하나 더).
  * '내일로 미루기' 가 있는 이유: 오늘 못 한 일을 그냥 두면 다음 날에도 빨갛게
  * 남아 목록이 밀린 것으로 뒤덮인다. 미루는 것도 정직한 처리다.
  */
-export type TodoAction = 'open' | 'done' | 'tomorrow' | 'delete'
+export type TodoAction = 'open' | 'done' | 'today' | 'tomorrow' | 'delete'
 
 export function TodoActionSheet({
   entry,
@@ -266,7 +266,10 @@ export function TodoActionSheet({
   /** 삭제는 한 번 더 묻는다(D-122) */
   const [confirmDelete, setConfirmDelete] = useState(false)
 
+  // D-167: 밀린(빨간) 할 일은 맨 위에 '오늘 할 일로' — 기한을 오늘로 옮겨 밀린 것에서 뺀다(대표 요청)
+  const overdue = !entry.completed && entry.dueDate < today
   const rows: { action: TodoAction; label: string; hint: string; tone?: 'danger' }[] = [
+    ...(overdue ? [{ action: 'today' as const, label: '오늘 할 일로 바꾸기', hint: `기한을 오늘로 옮깁니다 (지금 ${entry.dueDate})` }] : []),
     { action: 'open', label: '진행 중', hint: '아직 안 끝났습니다 (목록에 남습니다)' },
     { action: 'done', label: '완료', hint: '끝났습니다 (아래로 접힙니다)' },
     { action: 'tomorrow', label: '내일로 미루기', hint: '기한을 내일로 옮깁니다' },

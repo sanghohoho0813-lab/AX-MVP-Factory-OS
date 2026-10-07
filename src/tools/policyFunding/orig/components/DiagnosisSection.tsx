@@ -163,7 +163,7 @@ export default function DiagnosisSection({
   const topAgencies = result?.agencies.map((a) => a.name) ?? [];
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="mx-auto max-w-6xl">
       <QuickDiagnosisForm
         value={input}
         onChange={setInput}

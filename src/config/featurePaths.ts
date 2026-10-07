@@ -7,7 +7,7 @@
 
 import { FEATURE_CATALOG, type CatalogFeature } from './productCatalog'
 import { TOOLS } from './toolRegistry'
-import { MODULES } from './moduleRegistry'
+import { MODULES, navFeatureDef } from './moduleRegistry'
 
 /** 기능이 맡는 주소들 (접두) */
 export function featurePaths(f: CatalogFeature): string[] {
@@ -15,7 +15,8 @@ export function featurePaths(f: CatalogFeature): string[] {
     const t = TOOLS.find((x) => x.key === f.key)
     return t?.path ? [t.path] : []
   }
-  const m = MODULES.find((x) => x.key === f.key)
+  // D-167: 메뉴에서 숨긴 기능(hidden)은 MODULES 에 없다 — 정의에서 주소를 읽는다(주소로는 열리고 요금제 잠금도 그대로)
+  const m = MODULES.find((x) => x.key === f.key) ?? navFeatureDef(f.key)
   return m ? [m.path, ...(m.alsoPaths ?? [])] : []
 }
 
@@ -27,7 +28,7 @@ export function featurePath(f: CatalogFeature): string | null {
 /** 기능 이름 — 도구 · 메뉴 줄의 이름 그대로 */
 export function featureLabel(f: CatalogFeature): string {
   if (f.source === 'tool') return TOOLS.find((x) => x.key === f.key)?.label ?? f.key
-  return MODULES.find((x) => x.key === f.key)?.label ?? f.key
+  return (MODULES.find((x) => x.key === f.key) ?? navFeatureDef(f.key))?.label ?? f.key
 }
 
 const under = (pathname: string, base: string) => pathname === base || pathname.startsWith(`${base}/`)

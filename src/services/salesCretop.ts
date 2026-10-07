@@ -347,9 +347,15 @@ export interface CretopForMeeting {
 }
 
 /** 붙여 둔 크레탑 결과 → 미팅 준비가 쓰는 모양. 예전(D-118 이전) 결과는 추천 5개 이름만 있어 순위 없이 싣는다 */
-export function cretopForMeeting(record: Pick<ClientOpsRecord, 'toolResults'>): CretopForMeeting | null {
+export function cretopForMeeting(record: Pick<ClientOpsRecord, 'toolResults'> & Partial<Pick<ClientOpsRecord, 'sales'>>): CretopForMeeting | null {
   const r = latestCretopResult(record)
-  if (!r) return null
+  // D-167: 크레탑 없이 바로 고른 제안 항목 — 크레탑 결과가 없어도 2 · 3차가 이어서 쓴다
+  const manual = (record.sales?.picks ?? []).filter((x): x is string => typeof x === 'string' && x.trim() !== '')
+  if (!r) {
+    if (manual.length === 0) return null
+    const picks = manual.map((name) => toPick({ name, score: 0, reasons: ['직접 고름'], held: false })).filter((p): p is CretopPick => p !== null)
+    return picks.length > 0 ? { at: '', diagnosis: [], selected: manual, picks } : null
+  }
   const d = (r.data ?? {}) as Partial<CretopResultData>
   const selected = Array.isArray(d.selected) ? d.selected.filter((x): x is string => typeof x === 'string') : []
   let refs: CretopPickRef[] = Array.isArray(d.ranked) ? d.ranked : []
@@ -358,7 +364,9 @@ export function cretopForMeeting(record: Pick<ClientOpsRecord, 'toolResults'>): 
   }
   const picks = refs.map(toPick).filter((p): p is CretopPick => p !== null)
   const diagnosis = Array.isArray(d.diagnosis) ? d.diagnosis : (d.oneLiner?.risks ?? []).map((text) => ({ text, tone: 'warn' as CretopTone }))
-  return { at: r.createdAt, diagnosis, selected, picks }
+  // 크레탑 결과에서 고른 것 뒤에 직접 고른 것을 잇는다(겹치면 한 번)
+  const allSelected = [...selected, ...manual.filter((x) => !selected.includes(x))]
+  return { at: r.createdAt, diagnosis, selected: allSelected, picks }
 }
 
 /** 미팅에서 꺼낼 전략 — 선택한 것이 있으면 그것, 없으면 '검토 권장' 이상 · 보유 아님 · 위에서 n개 */

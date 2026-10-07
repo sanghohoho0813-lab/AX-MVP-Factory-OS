@@ -73,10 +73,22 @@ import {
 import { todayLocalDate, localDateOf } from '../../lib/appClock'
 import { SALES_STAGE_LABEL, SALES_STAGE_ORDER, type ClientOpsRecord, type SalesStage } from '../../types/clientOps'
 import { josa } from '../../lib/josa'
+import { SALES_SIMPLE } from '../../config/salesSimple'
+import { DirectPickPanel } from '../../components/sales/DirectPickPanel'
+
+/** D-167: 1차 미팅 준비 방법 — 고른 쪽을 이 브라우저에 남긴다(크레탑을 안 쓰는 사람은 매번 고르지 않게) */
+const PREP_MODE_KEY = 'axmvp.ui.meeting_prep_mode'
+function readPrepMode(): 'cretop' | 'direct' {
+  try {
+    return localStorage.getItem(PREP_MODE_KEY) === 'direct' ? 'direct' : 'cretop'
+  } catch {
+    return 'cretop'
+  }
+}
 
 type Round = 0 | 1 | 2 | 3
 const ROUNDS: { key: Round; label: string }[] = [
-  { key: 0, label: '첫 연락' },
+  ...(SALES_SIMPLE.showFirstContact ? [{ key: 0 as Round, label: '첫 연락' }] : []),
   { key: 1, label: '1차 미팅' },
   { key: 2, label: '2차 미팅' },
   { key: 3, label: '3차 클로징' },
@@ -325,7 +337,10 @@ function MeetingRecorder({ record, round, today, onSave, onNextRound }: { record
       writeDraft(record.id, round, '')
       setWrap({
         // 감사 인사는 한 번만 — 자료 요청 쪽의 인사 줄은 뺀다
-        kakao: [result.kakao, result.nextDocs.length > 0 ? docRequestText(record, result.nextDocs, false) : ''].filter(Boolean).join('\n\n'),
+        // D-167: 카톡 인사 문구는 숨기고 받을 자료 요청만(대표: 요청 자료는 있으면 좋다)
+        kakao: SALES_SIMPLE.showKakao
+          ? [result.kakao, result.nextDocs.length > 0 ? docRequestText(record, result.nextDocs, false) : ''].filter(Boolean).join('\n\n')
+          : result.nextDocs.length > 0 ? docRequestText(record, result.nextDocs, true) : '',
         phone: record.contactPhone.trim() || record.companyPhone.trim(),
         nextAction: next.trim(),
         due,
@@ -348,11 +363,15 @@ function MeetingRecorder({ record, round, today, onSave, onNextRound }: { record
           {[wrap.moved ? `영업 단계 → ${wrap.moved}` : '', wrap.docs > 0 ? `서류함에 칸 ${wrap.docs}개` : '', wrap.nextAction ? `다음 약속 ${wrap.due} · ${wrap.nextAction}` : ''].filter(Boolean).join(' · ')}
         </p>
         <div className="rounded-(--radius-control) border border-slate-200 bg-white p-3">
-          <p className="t-sub font-semibold text-slate-700">보낼 카톡 — 감사 인사{wrap.kakao.includes('자료') ? ' · 받을 자료' : ''}를 한 번에</p>
-          <pre data-testid="wrapup-kakao" className="t-sub mt-1.5 font-[inherit] break-keep whitespace-pre-wrap text-slate-700">{wrap.kakao}</pre>
+          {wrap.kakao !== '' && (
+            <>
+              <p className="t-sub font-semibold text-slate-700">{SALES_SIMPLE.showKakao ? `보낼 카톡 — 감사 인사${wrap.kakao.includes('자료') ? ' · 받을 자료' : ''}를 한 번에` : '요청 자료 — 받기로 한 자료'}</p>
+              <pre data-testid="wrapup-kakao" className="t-sub mt-1.5 font-[inherit] break-keep whitespace-pre-wrap text-slate-700">{wrap.kakao}</pre>
+            </>
+          )}
           <div className="mt-2 flex flex-wrap gap-2">
-            <ShareTextButton text={wrap.kakao} />
-            <CopyButton text={wrap.kakao} />
+            {wrap.kakao !== '' && <ShareTextButton text={wrap.kakao} />}
+            {wrap.kakao !== '' && <CopyButton text={wrap.kakao} />}
             {wrap.phone && (
               <a href={`tel:${wrap.phone.replace(/[^0-9+]/g, '')}`} className={LINK_BUTTON.secondary}>
                 <Phone aria-hidden="true" className="size-4" />
@@ -553,10 +572,20 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
   const stage: SalesStage = record ? salesStageOf(record) : 'lead'
   // 차수 — 고르지 않았으면 단계로 정한다(잠재 고객은 첫 연락부터)
   const rp = params.get('round')
-  const round: Round = rp === '0' || rp === '1' || rp === '2' || rp === '3' ? (Number(rp) as Round) : stage === 'lead' ? 0 : roundForStage(stage)
+  // D-167: '첫 연락' 차수를 숨기면 잠재고객도 1차 미팅부터(예전 주소 round=0 도 1차로)
+  const round: Round = (rp === '0' && SALES_SIMPLE.showFirstContact) || rp === '1' || rp === '2' || rp === '3' ? (Number(rp) as Round) : stage === 'lead' && SALES_SIMPLE.showFirstContact ? 0 : roundForStage(stage)
   // D-124: 지금 기록할 수 있는 차수 — 그보다 뒤는 미리 보기
   const liveRound: Round = roundForStage(stage)
   const ahead = round > liveRound
+  const [prepMode, setPrepModeState] = useState<'cretop' | 'direct'>(readPrepMode)
+  const setPrepMode = (m: 'cretop' | 'direct') => {
+    setPrepModeState(m)
+    try {
+      localStorage.setItem(PREP_MODE_KEY, m)
+    } catch {
+      /* 저장 못 해도 이번 화면에는 적용 */
+    }
+  }
 
   // D-124: 업체를 바꾸면 기록을 남긴다 — 뒤로가기로 앞 업체에 돌아온다(예전엔 한 번에 영업 관리 밖으로 나갔다)
   const pick = (id: string) => setParams((p) => { const n = new URLSearchParams(p); n.set('client', id); n.delete('round'); return n })
@@ -603,7 +632,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
     <div className="flex flex-col gap-4">
       <ScreenTitle
         title="영업 관리"
-        sub={`${today} · 미팅 준비 — 1차는 크레탑 분석기, 2차부터 이어서 물을 것 · 대본`}
+        sub={`${today} · 미팅 준비 — 1차는 크레탑 분석기 또는 항목 바로 고르기, 2차부터 앞 미팅 메모 · 이어서 물을 것`}
         actions={<AiSoonButton size="sm" label="AI로 미팅 질문 다듬기" what="업체 정보와 지난 미팅 메모로 이번 미팅 질문 · 대본을 다듬어 줍니다" />}
       />
       <SalesTabs />
@@ -665,16 +694,16 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                 </div>
               </section>
 
-              {/* 영업 흐름 — 한 줄로 접어 둔다(펼치면 걸음 · 할 일 · 작업실 도구) */}
-              <SalesJourneyCard
+              {/* 영업 흐름 — 한 줄로 접어 둔다(펼치면 걸음 · 할 일 · 작업실 도구). D-167: 숨김(대표: 오히려 헷갈린다) */}
+              {SALES_SIMPLE.showJourney && <SalesJourneyCard
                 record={record}
                 today={today}
                 foldable
                 onPathChange={(path) => void persist(withSalesPath(record, path), path ? '계약 경로를 정했습니다.' : '계약 경로를 비웠습니다.')}
-              />
+              />}
 
               {/* 차수 고르기 */}
-              <div role="group" aria-label="미팅 차수" data-testid="meeting-rounds" className="grid grid-cols-4 gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:inline-flex sm:self-start">
+              <div role="group" aria-label="미팅 차수" data-testid="meeting-rounds" className={`grid ${ROUNDS.length === 4 ? 'grid-cols-4' : 'grid-cols-3'} gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:inline-flex sm:self-start`}>
                 {ROUNDS.map((r) => (
                   <button
                     key={r.key}
@@ -716,8 +745,17 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
               )}
               {round === 1 && (
                 <>
+                  {/* D-167: 1차 준비 방법 둘 — 크레탑 분석기로 · 크레탑 없이 항목만 바로 고르기(경험 많은 컨설턴트) */}
+                  <div role="radiogroup" aria-label="1차 미팅 준비 방법" data-testid="prep-mode" className="grid grid-cols-2 gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:inline-flex sm:self-start">
+                    {([['cretop', '크레탑 분석기로'], ['direct', '항목만 바로 고르기']] as const).map(([k, label]) => (
+                      <button key={k} type="button" role="radio" aria-checked={prepMode === k} onClick={() => setPrepMode(k)} className={`tap rounded-[8px] px-3 py-2 text-[0.9rem] font-semibold break-keep sm:px-4 ${prepMode === k ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {prepMode === 'direct' && <DirectPickPanel record={record} onSave={(n, m) => persist(n, m)} />}
                   {/* D-121: 1차 미팅 준비 = 크레탑 분석기 그대로(단독 판매 부품) — 분석하면 이 업체에 바로 반영 */}
-                  <section aria-label="크레탑 분석기" data-testid="meeting-cretop" className="flex flex-col gap-2">
+                  {prepMode === 'cretop' && <section aria-label="크레탑 분석기" data-testid="meeting-cretop" className="flex flex-col gap-2">
                     <h2 className="t-section flex items-center gap-2 text-slate-900">
                       <ScanSearch aria-hidden="true" className="size-5 text-brand-600" />
                       크레탑 분석기
@@ -747,7 +785,9 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                         )}
                       />
                     </ToolClientScope>
-                  </section>
+                  </section>}
+                  {/* D-167: 이야기할 지원사업은 1차 미팅에 같이 */}
+                  <MeetingGrantTalk workspaceId={workspaceId} record={record} today={today} />
                   <FirstMeetingScript item={item} />
                 </>
               )}
@@ -783,10 +823,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                 </Disclosure>
               )}
 
-              {/* D-143: 이 회사에 맞는 지원사업 — 미팅에서 꺼낼 거리 · 연락할 이유 */}
-              <MeetingGrantTalk workspaceId={workspaceId} record={record} today={today} />
-
-              <KakaoGroup item={item} record={record} />
+              {SALES_SIMPLE.showKakao && <KakaoGroup item={item} record={record} />}
             </>
           )}
         </>
@@ -847,10 +884,11 @@ function FirstMeetingScript({ item }: { item: EngineItem }) {
   const p = buildMeetingPlan(item, 'm1')
   const strategies = recommendedStrategiesFor(item)
   return (
-    <Disclosure title="영업 대본 — 오프닝 · 질문 · 요청 자료" hint={`질문 ${p.questions.length}개 · 전략 3가지`}>
+    <Disclosure title={SALES_SIMPLE.showScripts ? '영업 대본 — 오프닝 · 질문 · 요청 자료' : '1차 포인트 — 질문 · 요청할 자료 · 전략 3가지'} hint={`질문 ${p.questions.length}개 · 전략 3가지`}>
       <div data-testid="meeting-plan" className="flex flex-col gap-3">
-        <ScriptBlock title="목표" text={p.goal} />
-        <ScriptBlock title="오프닝" text={p.opening} copy />
+        {SALES_SIMPLE.showScripts && <ScriptBlock title="목표" text={p.goal} />}
+        {/* D-167: 멘트(오프닝 · 피할 것 · 다음 단계 말)는 숨기고 포인트만 */}
+        {SALES_SIMPLE.showScripts && <ScriptBlock title="오프닝" text={p.opening} copy />}
         <ScriptBlock title={`질문 ${p.questions.length}개`}>
           <MoreList items={p.questions} />
         </ScriptBlock>
@@ -874,8 +912,8 @@ function FirstMeetingScript({ item }: { item: EngineItem }) {
             ))}
           </ol>
         </ScriptBlock>
-        <ScriptBlock title="피할 것" text={p.avoid} />
-        <ScriptBlock title="다음 단계" text={p.next} />
+        {SALES_SIMPLE.showScripts && <ScriptBlock title="피할 것" text={p.avoid} />}
+        {SALES_SIMPLE.showScripts && <ScriptBlock title="다음 단계" text={p.next} />}
       </div>
     </Disclosure>
   )
@@ -916,24 +954,29 @@ function LaterRoundPlan({ record, item, round, onGoFirst }: { record: ClientOpsR
       <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
     </Link>
   )
+  // D-167: 앞 미팅에서 적은 것 — 2차 · 3차는 이걸 가지고 한 번 더(자세히) 짚는다
+  const prevNotes = <PrevMeetingPoints record={record} round={round} />
   if (round === 2) {
     const p = buildMeetingPlan(item, 'm2')
     return (
       <>
         {followUp}
+        {prevNotes}
         <div data-testid="meeting-plan" className="flex flex-col gap-3">
           <ScriptBlock title="핵심 이슈 3가지">
             <NumberedList items={p.topIssues.map((t) => t.replace(/^\d+\.\s*/, ''))} />
           </ScriptBlock>
-          <ScriptBlock title="마무리 말" text={p.close} copy />
+          {SALES_SIMPLE.showScripts && <ScriptBlock title="마무리 말" text={p.close} copy />}
           {nextLink}
-          <Disclosure title="더 보기 — 목표 · 진행 순서 · 거절과 답 · 받을 자료 · 수임료">
+          <Disclosure title={SALES_SIMPLE.showScripts ? '더 보기 — 목표 · 진행 순서 · 거절과 답 · 받을 자료 · 수임료' : '더 보기 — 목표 · 받을 자료 · 수임료'}>
             <div className="flex flex-col gap-3">
               <ScriptBlock title="목표" text={p.goal} />
-              <ScriptBlock title="진행 순서" text={p.approach} />
-              <ScriptBlock title="거절과 답">
-                <ObjectionList items={p.objections} />
-              </ScriptBlock>
+              {SALES_SIMPLE.showScripts && <ScriptBlock title="진행 순서" text={p.approach} />}
+              {SALES_SIMPLE.showScripts && (
+                <ScriptBlock title="거절과 답">
+                  <ObjectionList items={p.objections} />
+                </ScriptBlock>
+              )}
               <ScriptBlock title="받을 자료">
                 <PillList items={p.docs} />
               </ScriptBlock>
@@ -948,10 +991,11 @@ function LaterRoundPlan({ record, item, round, onGoFirst }: { record: ClientOpsR
   return (
     <>
       {followUp}
+      {prevNotes}
       <div data-testid="meeting-plan" className="flex flex-col gap-3">
-        <ScriptBlock title="1차 계약 제안" text={p.proposal} copy />
-        <ScriptBlock title="가격 이야기" text={p.priceTalk} copy />
-        <ScriptBlock title="'생각해 볼게요' 에 대한 답" text={p.holdTalk} copy />
+        {SALES_SIMPLE.showScripts && <ScriptBlock title="1차 계약 제안" text={p.proposal} copy />}
+        {SALES_SIMPLE.showScripts && <ScriptBlock title="가격 이야기" text={p.priceTalk} copy />}
+        {SALES_SIMPLE.showScripts && <ScriptBlock title="'생각해 볼게요' 에 대한 답" text={p.holdTalk} copy />}
         {nextLink}
         <Disclosure title="더 보기 — 목표 · 전략">
           <div className="flex flex-col gap-3">
@@ -961,6 +1005,33 @@ function LaterRoundPlan({ record, item, round, onGoFirst }: { record: ClientOpsR
         </Disclosure>
       </div>
     </>
+  )
+}
+
+/**
+ * D-167: 앞 미팅에서 적은 것 — 대표: "1차 미팅 때 메모를 남기면 2차 때 그걸 가지고 한 번 더 짚어 주면 된다".
+ * 앞 차수마다 가장 최근 기록 하나 — 메모 · 나온 주제 · 망설인 점 · 받기로 한 자료. 없으면 그리지 않는다.
+ */
+function PrevMeetingPoints({ record, round }: { record: ClientOpsRecord; round: 2 | 3 }) {
+  const notes = record.sales?.meetings ?? []
+  const prev = ([1, 2] as const)
+    .filter((r) => r < round)
+    .map((r) => notes.find((m) => m.round === r))
+    .filter((m): m is NonNullable<typeof m> => !!m)
+  if (prev.length === 0) return null
+  return (
+    <section aria-label="앞 미팅에서 적은 것" data-testid="meeting-prev-points" className="flex flex-col gap-2 rounded-(--radius-panel) border border-brand-200 bg-brand-50/40 p-4">
+      <h2 className="t-section text-slate-900">앞 미팅에서 적은 것 <span className="t-sub font-medium text-slate-500">· 이걸 짚고 시작</span></h2>
+      {prev.map((m) => (
+        <div key={m.id} className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white p-3">
+          <p className="t-meta font-semibold text-slate-500">{m.round}차 · {localDateOf(m.at)}{m.reaction ? ` · ${m.reaction}` : ''}</p>
+          {m.text.trim() !== '' && <p className="t-sub break-keep whitespace-pre-line text-slate-700">{m.text}</p>}
+          {m.issues.length > 0 && <p className="t-sub break-keep text-slate-700"><b>나온 주제</b> · {m.issues.join(' · ')}</p>}
+          {m.hesitant.length > 0 && <p className="t-sub break-keep text-warning-800"><b>망설인 점</b> · {m.hesitant.join(' · ')}</p>}
+          {m.nextDocs.length > 0 && <p className="t-sub break-keep text-slate-700"><b>받기로 한 자료</b> · {m.nextDocs.join(' · ')}</p>}
+        </div>
+      ))}
+    </section>
   )
 }
 

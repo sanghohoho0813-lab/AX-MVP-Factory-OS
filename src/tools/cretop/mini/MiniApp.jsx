@@ -1425,7 +1425,7 @@ const TABS = [["overview", "개요", "🏢"], ["detail", "재무상세", "📊"]
 function BottomNav({ tab, onTab }) {
   return (
     <nav className="cretop-mini-tabs" data-testid="cretop-mini-tabs" style={{ position: "sticky", bottom: 0, background: "#fff", borderTop: `1px solid ${T.line}`, boxShadow: "0 -2px 12px rgba(15,23,42,.08)", zIndex: 30, borderRadius: "0 0 var(--radius-panel) var(--radius-panel)" }}>
-      <div style={{ maxWidth: 760, margin: "0 auto", display: "flex" }}>
+      <div style={{ maxWidth: 1180, margin: "0 auto", display: "flex" }}>{/* [D-167] OS 화면 폭에 맞춰 넓게(대표: 양쪽 여백이 너무 많다) */}
         {TABS.map(([k, label, icon]) => (
           <button key={k} data-tab={k} aria-current={tab === k ? "page" : undefined} onClick={() => onTab(k)} style={{ flex: "1 1 20%", minWidth: 0, border: "none", background: tab === k ? T.brandSoft : "transparent", cursor: "pointer", padding: "9px 1px 11px", fontFamily: FF, color: tab === k ? T.brand : T.sub, fontWeight: tab === k ? 800 : 600, fontSize: "calc(14px * var(--fs,1))", borderTop: `2px solid ${tab === k ? T.brand : "transparent"}`, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, whiteSpace: "nowrap" }}>
             <span style={{ fontSize: "calc(18px * var(--fs,1))", lineHeight: 1 }}>{icon}</span><span>{label}</span>
@@ -1665,7 +1665,7 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
     <div ref={rootRef} className="cretop-mini" data-testid="cretop-mini" style={{ fontFamily: FF, background: T.bg, color: T.ink, overflowX: "clip", "--fs": 1, borderRadius: "var(--radius-panel)", border: `1px solid ${T.line}` }}>{/* [D-94] hidden → clip: hidden 이면 이 상자가 스크롤 상자가 되어 하단 탭이 화면에 붙지 않고 맨 끝 내용을 가렸다 */}
       {/* 상단: 햄버거 + 서비스명 + 글자 크기 (정상 크기 — 콘텐츠만 확대) */}
       <header style={{ background: T.surface, borderBottom: `1px solid ${T.line}`, borderRadius: "var(--radius-panel) var(--radius-panel) 0 0" }}>
-        <div style={{ maxWidth: 1040, margin: "0 auto", padding: "10px 12px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "10px 12px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           {/* [D-94] OS 모듈 머리줄이 이미 '크레탑 분석기' 를 보여 준다 — 원본의 로고·'법인 재무진단' 제목은 겹쳐서 뺐다. ☰ 는 무엇을 여는지 글로 적는다 */}
           <button onClick={() => setSidebar(true)} title="분석 이력" data-testid="cretop-mini-menu" style={{ border: `1px solid ${T.line}`, background: "#fff", cursor: "pointer", borderRadius: 9, height: 44, padding: "0 12px", fontSize: "calc(14px * var(--fs,1))", fontWeight: 800, fontFamily: FF, color: T.ink, flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}><span aria-hidden="true" style={{ fontSize: "calc(16px * var(--fs,1))" }}>☰</span>분석 이력{history.length ? ` ${history.length}` : ""}</button>
           {osScale ? null : <div style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6 }}>
@@ -1683,7 +1683,7 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
 
       {/* 안내 (원본 상단 안내에서 '정식 출시 전·기기별 저장' 부분은 이 OS 에 맞지 않아 뺐다) */}
       <div style={{ background: "#FFF7ED", borderBottom: `1px solid #F59E0B40` }}>
-        <div style={{ maxWidth: 1040, margin: "0 auto", padding: "11px 14px", color: "#92400E", fontSize: 14, lineHeight: 1.6 }}>
+        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "11px 14px", color: "#92400E", fontSize: 14, lineHeight: 1.6 }}>
           분석 결과는 참고용이며, 실제 상담 전 원문 확인이 필요합니다. 규칙 계산이며 외부 호출은 없습니다.
         </div>
       </div>
@@ -1692,7 +1692,7 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
       {rawViewOpen ? <RawTextModal text={text} pages={pdfPages} onClose={() => setRawViewOpen(false)} /> : null}
 
       {/* 콘텐츠(main)만 --fs로 글자 확대 → 박스는 그대로, 헤더/하단탭/사이드바는 정상 크기 */}
-      <div style={{ maxWidth: tab === "reco" ? 980 : 720, margin: "0 auto", padding: "16px 14px 16px", width: "100%", boxSizing: "border-box", overflowX: "hidden", "--fs": effScale }}>
+      <div style={{ maxWidth: tab === "reco" ? 1280 : 1180, margin: "0 auto", padding: "16px 14px 16px", width: "100%", boxSizing: "border-box", overflowX: "hidden", "--fs": effScale }}>
         {/* 개요 탭에서만 입력/업로드 영역 노출.
             [D-113] 분석이 끝나면 한 줄로 접는다 — 휴대폰에서 결과를 보려면 입력 칸을 한참 내려야 했다. 누르면 다시 펼친다. */}
         {tab === "overview" && ui && !inputOpen ? (

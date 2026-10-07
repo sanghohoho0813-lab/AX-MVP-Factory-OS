@@ -33,6 +33,35 @@ export function cleanPrices(prices: Record<string, unknown>): Record<string, num
   return out
 }
 
+/**
+ * D-167: 상품 금액이 수수료인지 보험인지 — 대표가 상품표에서 고른다(기본은 수수료).
+ * 보험으로 고른 상품은 제안 합계에서 수수료와 따로 센다. 고른 것만 따로 둔다(기본과 같으면 뺀다).
+ */
+export type FeeKind = 'fee' | 'insurance'
+export const FEE_KIND_LABEL: Record<FeeKind, string> = { fee: '수수료', insurance: '보험' }
+
+export function cleanKinds(raw: Record<string, unknown> | null | undefined): Record<string, FeeKind> {
+  const out: Record<string, FeeKind> = {}
+  for (const pkg of DEFAULT_PACKAGES) if ((raw ?? {})[pkg.id] === 'insurance') out[pkg.id] = 'insurance'
+  return out
+}
+
+export function kindOf(pkg: SalesPackage, kinds: Record<string, FeeKind> | null | undefined): FeeKind {
+  return kinds?.[pkg.id] === 'insurance' ? 'insurance' : 'fee'
+}
+
+/** 고른 상품 합계를 수수료 · 보험으로 나눠(만원) */
+export function feeSplit(pkgs: SalesPackage[], kinds: Record<string, FeeKind> | null | undefined): { fee: number; insurance: number } {
+  let fee = 0
+  let insurance = 0
+  for (const p of pkgs) {
+    const v = Number(p.fee) || 0
+    if (kindOf(p, kinds) === 'insurance') insurance += v
+    else fee += v
+  }
+  return { fee, insurance }
+}
+
 /** 고객 기록 → 제안 문서가 읽는 한 줄 (월납 제안 값 포함) */
 export function toProposalItem(record: ClientOpsRecord, today: Date = new Date()): ProposalItem {
   const m = record.sales?.proposal?.monthly

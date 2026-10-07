@@ -27,7 +27,8 @@ import { listClients, saveClient } from '../../services/clientOpsService'
 import { listRows, saveRow } from '../../services/moduleData'
 import { salesStageOf, stageReached } from '../../services/salesPipeline'
 import { SALES_PATH_INFO } from '../../services/salesJourney'
-import { catalogWithPrices, cleanPrices, feeSum, toProposalItem, withContractPrep, withProposal } from '../../services/salesOffer'
+import { catalogWithPrices, cleanKinds, cleanPrices, feeSplit, FEE_KIND_LABEL, kindOf, toProposalItem, withContractPrep, withProposal, type FeeKind } from '../../services/salesOffer'
+import { SALES_SIMPLE } from '../../config/salesSimple'
 import { contractCloseDraft, withContractClose, type ContractCloseDraft } from '../../services/salesContract'
 import { ContractCloseSheet } from '../../components/sales/ContractCloseSheet'
 import {
@@ -59,15 +60,20 @@ const CATALOG_BUCKET = 'catalog'
 const inputClass = 'mt-1 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.95rem] text-slate-800 focus:border-brand-500 focus:outline-none'
 
 type DocKey = 'visit' | 'client' | 'internal' | 'scope' | 'quote' | 'kakao' | 'docs'
-const DOCS: { key: DocKey; label: string }[] = [
+const ALL_DOCS: { key: DocKey; label: string }[] = [
   { key: 'visit', label: '방문 리포트' },
   { key: 'client', label: '제안서 (대표님 공유용)' },
   { key: 'internal', label: '제안서 (내부용)' },
   { key: 'scope', label: '업무범위서' },
   { key: 'quote', label: '견적 카톡' },
   { key: 'kakao', label: '상황별 카톡' },
-  { key: 'docs', label: '자료 요청' },
+  { key: 'docs', label: '필요 서류 · 요청 자료' },
 ]
+/**
+ * D-167: 방문 리포트 · 필요 서류(요청 자료)만 — 대표: "어차피 저렇게 보내지 않는다. 현장에서 얘기하고, 리포트를 만들어 방문하는 게 낫다."
+ * 제안서 · 업무범위서 · 견적 카톡 · 상황별 카톡은 숨긴다(config/salesSimple 에서 다시 켤 수 있다).
+ */
+const DOCS = SALES_SIMPLE.showKakao ? ALL_DOCS : ALL_DOCS.filter((d) => d.key === 'visit' || d.key === 'docs')
 
 /** 월납 적정성 색 — 초록/노랑/빨강을 운영 OS 의 성공 · 경고 · 위험색으로 */
 const AFFORD_TONE: Record<string, Tone> = { green: 'success', yellow: 'warning', red: 'danger', none: 'neutral' }
@@ -76,7 +82,7 @@ const AFFORD_TONE: Record<string, Tone> = { green: 'success', yellow: 'warning',
 /* 상품표                                                               */
 /* ------------------------------------------------------------------ */
 
-function CatalogView({ catalog, prices, onSavePrice }: { catalog: SalesPackage[]; prices: Record<string, number>; onSavePrice: (id: string, fee: number | null) => void }) {
+function CatalogView({ catalog, prices, kinds, onSavePrice, onSaveKind }: { catalog: SalesPackage[]; prices: Record<string, number>; kinds: Record<string, FeeKind>; onSavePrice: (id: string, fee: number | null) => void; onSaveKind: (id: string, kind: FeeKind) => void }) {
   const [cat, setCat] = useState<string>('전체')
   const [q, setQ] = useState('')
   const [editing, setEditing] = useState<string | null>(null)
@@ -84,6 +90,10 @@ function CatalogView({ catalog, prices, onSavePrice }: { catalog: SalesPackage[]
   const list = catalog.filter((p) => (cat === '전체' || p.cat === cat) && (q.trim() === '' || `${p.name} ${p.desc} ${p.fit}`.includes(q.trim())))
   return (
     <div className="flex flex-col gap-3" data-testid="catalog">
+      {/* D-167: 처음 들어 있는 가격은 임의로 넣어 둔 기본값 — 우리 가격으로 고쳐 쓰도록 맨 위에 알린다 */}
+      <p data-testid="catalog-default-note" className="t-sub break-keep rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3.5 py-2.5 text-warning-800">
+        <b>가격은 처음 넣어 둔 기본값(임의 예시)입니다.</b> 우리 회사 가격으로 고쳐 쓰세요 — 가격을 누르면 고칠 수 있고, 금액마다 <b>수수료 · 보험</b> 중 무엇인지 고를 수 있습니다.
+      </p>
       <div className="flex flex-wrap gap-1.5" role="group" aria-label="상품 분류">
         {['전체', ...PKG_CATEGORIES].map((c, ci) => (
           <button
@@ -105,6 +115,7 @@ function CatalogView({ catalog, prices, onSavePrice }: { catalog: SalesPackage[]
       <ul className="grid gap-2 lg:grid-cols-2">
         {list.map((p) => {
           const changed = prices[p.id] !== undefined
+          const kind = kindOf(p, kinds)
           return (
             <li key={p.id} className="flex flex-col gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-3.5">
               <div className="flex items-start justify-between gap-2">
@@ -117,9 +128,18 @@ function CatalogView({ catalog, prices, onSavePrice }: { catalog: SalesPackage[]
                   </span>
                 ) : (
                   <button type="button" onClick={() => { setEditing(p.id); setDraft(String(p.fee)) }} className="t-sub shrink-0 font-semibold text-slate-800 tabular-nums hover:text-brand-700" aria-label={`${p.name} 가격 고치기`}>
-                    {p.fee.toLocaleString('ko-KR')}만원{changed ? ' ·고침' : ''}
+                    {FEE_KIND_LABEL[kind]} {p.fee.toLocaleString('ko-KR')}만원
+                    {changed ? <span className="t-meta ml-1 font-semibold text-brand-700">·고침</span> : <span className="t-meta ml-1 rounded-full bg-slate-100 px-1.5 font-medium text-slate-500" data-testid="catalog-default-badge">기본값</span>}
                   </button>
                 )}
+              </div>
+              {/* D-167: 이 금액이 수수료인지 보험인지 — 눌러서 바로 */}
+              <div role="radiogroup" aria-label={`${p.name} 금액 종류`} className="flex gap-1" data-testid="catalog-kind">
+                {(['fee', 'insurance'] as FeeKind[]).map((k) => (
+                  <button key={k} type="button" role="radio" aria-checked={kind === k} onClick={() => kind !== k && onSaveKind(p.id, k)} className={`tap t-meta rounded-full border px-2.5 py-0.5 font-semibold ${kind === k ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}>
+                    {FEE_KIND_LABEL[k]}
+                  </button>
+                ))}
               </div>
               <p className="t-meta text-slate-500"><span className="ramp-text font-semibold" style={rampAt(PKG_CATEGORIES.indexOf(p.cat), PKG_CATEGORIES.length)}>{p.cat}</span> · 기간 {pkgDuration(p)}</p>
               <p className="t-sub break-keep text-slate-700">{p.desc}</p>
@@ -133,7 +153,58 @@ function CatalogView({ catalog, prices, onSavePrice }: { catalog: SalesPackage[]
           )
         })}
       </ul>
-      <p className="t-meta break-keep text-slate-400">가격 · 설명은 기업컨설팅 OS 원본 그대로입니다. 가격을 누르면 고칠 수 있고, 고친 값만 따로 저장됩니다.</p>
+      <p className="t-meta break-keep text-slate-400">설명은 기업컨설팅 OS 원본 그대로입니다. 고친 가격 · 고른 금액 종류만 따로 저장됩니다.</p>
+    </div>
+  )
+}
+
+/**
+ * D-167: 월납 보험료 시뮬레이션 — 월납 후보를 여러 개 한 표로(총 납입 · 목적자금 · 이익 대비 적정성).
+ * 순이익을 넣으면 그 회사에 맞는 '초록(적정)' 상한 근처 금액을 후보에 넣는다. 줄을 누르면 그 금액으로 채운다.
+ * 계산은 원본 식(insuranceSim · affordability) 그대로 — 새 식이 없다.
+ */
+function MonthlySimulation({ months, rate, net, current, onPick }: { months: number; rate: number; net: number | null; current: number; onPick: (premium: number) => void }) {
+  const settings = getAffordSettings(null)
+  const base = [30, 50, 100, 200, 300, 500]
+  // 순이익(만원)이 있으면 1억당 초록 기준의 월 상한(=연 순이익 × 초록/억 ÷ 12) 근처를 더한다
+  const greenMonthly = net && net > 0 ? Math.max(10, Math.round((net / 10000) * settings.greenPerEok / 12 / 10) * 10) : null
+  const candidates = [...new Set([...base, ...(greenMonthly ? [greenMonthly] : []), ...(current > 0 ? [current] : [])])].sort((a, b) => a - b)
+  return (
+    <div data-testid="monthly-sim" className="flex flex-col gap-1.5">
+      <p className="t-sub font-semibold text-slate-700">
+        시뮬레이션 <span className="t-meta font-medium text-slate-500">· {months}개월 · 환급률 {rate}%{net ? ` · 순이익 ${net.toLocaleString('ko-KR')}만원 기준` : ' · 순이익을 넣으면 적정성도 나옵니다'}</span>
+      </p>
+      <div className="overflow-x-auto rounded-(--radius-control) border border-slate-200">
+        <table className="w-full min-w-[30rem] text-left text-[0.9rem]">
+          <thead className="bg-slate-50 text-slate-500">
+            <tr>
+              <th className="px-3 py-2 font-semibold">월납</th>
+              <th className="px-3 py-2 font-semibold">총 납입</th>
+              <th className="px-3 py-2 font-semibold">목적자금({rate}%)</th>
+              <th className="px-3 py-2 font-semibold">적정성</th>
+            </tr>
+          </thead>
+          <tbody>
+            {candidates.map((c) => {
+              const sim = insuranceSim(c, months, rate)
+              const aff = affordability(c, net, settings)
+              const on = c === current
+              return (
+                <tr key={c} className={`border-t border-slate-100 ${on ? 'bg-brand-50' : ''}`}>
+                  <td className="px-3 py-1.5">
+                    <button type="button" onClick={() => onPick(c)} aria-pressed={on} className="tap font-semibold text-brand-700 tabular-nums hover:underline">
+                      {c.toLocaleString('ko-KR')}만원{c === greenMonthly ? ' · 적정 상한' : ''}
+                    </button>
+                  </td>
+                  <td className="px-3 py-1.5 tabular-nums text-slate-700">{manToText(sim.total)}</td>
+                  <td className="px-3 py-1.5 tabular-nums text-slate-700">{manToText(sim.base)}</td>
+                  <td className={`px-3 py-1.5 font-semibold ${aff.level === 'green' ? 'text-success-700' : aff.level === 'yellow' ? 'text-warning-700' : aff.level === 'red' ? 'text-danger-700' : 'text-slate-400'}`}>{aff.hasBase ? aff.label : '—'}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
@@ -146,11 +217,13 @@ function ProposalWork({
   record,
   records,
   catalog,
+  kinds,
   onSave,
 }: {
   record: ClientOpsRecord
   records: ClientOpsRecord[]
   catalog: SalesPackage[]
+  kinds: Record<string, FeeKind>
   onSave: (next: ClientOpsRecord, msg: string) => void | boolean | Promise<boolean>
 }) {
   /** D-122: 계약 완료 확인 시트(받을 날 · 영업자 · 계약 방식 · 보험 · 업무까지 한 번에) */
@@ -182,13 +255,15 @@ function ProposalWork({
     setSeenKey(savedKey)
     resetD()
   }
-  const [doc, setDoc] = useState<DocKey>('client')
+  const [doc, setDoc] = useState<DocKey>(DOCS.some((x) => x.key === 'client') ? 'client' : 'visit')
   const [scopePkg, setScopePkg] = useState(0)
   const [addOpen, setAddOpen] = useState(false)
 
   // 고른 순서대로 (추천 1이 제안서 첫 줄)
   const picked = d.names.map((n) => catalog.find((p) => p.name === n)).filter((p): p is SalesPackage => p !== undefined)
-  const sum = feeSum(picked)
+  // D-167: 보험으로 고른 상품은 수수료와 따로 센다(합계 = 수수료)
+  const split = feeSplit(picked, kinds)
+  const sum = split.fee
   const toggle = (name: string) => setD((prev) => ({ ...prev, names: prev.names.includes(name) ? prev.names.filter((n) => n !== name) : [...prev.names, name] }))
 
   const premium = Number(d.premium) || 0
@@ -250,9 +325,20 @@ function ProposalWork({
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="t-section text-slate-900">제안 상품</h2>
           <p className="t-sub text-slate-500">
-            <span data-testid="proposal-count">{picked.length}개</span> · 합계 <strong data-testid="proposal-sum" className="font-bold text-slate-900 tabular-nums">{sum.toLocaleString('ko-KR')}만원</strong>
+            <span data-testid="proposal-count">{picked.length}개</span> · 수수료 합계 <strong data-testid="proposal-sum" className="font-bold text-slate-900 tabular-nums">{sum.toLocaleString('ko-KR')}만원</strong>
+            {split.insurance > 0 && <> · 보험 <strong data-testid="proposal-insurance" className="font-bold text-slate-900 tabular-nums">{split.insurance.toLocaleString('ko-KR')}만원</strong></>}
           </p>
         </div>
+        {/* D-167: 추천 1 · 2 · 3 을 어떻게 골랐는지 — 대표: "어떤 기준으로 들어간지 모르겠다" */}
+        <details data-testid="recommend-basis" className="t-sub rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2 text-slate-600">
+          <summary className="tap cursor-pointer font-semibold text-slate-700">추천 기준 보기</summary>
+          <ul className="mt-1.5 flex list-disc flex-col gap-0.5 pl-5 break-keep">
+            <li>미팅에서 확인한 <b>관심사</b>와 맞는 주제 +15점</li>
+            <li>고민 · 메모 · 업종에 나온 <b>낱말</b>(가지급금 · 승계 · 연구소 …) +10점</li>
+            <li>대표 50세 이상 · 업력 10년 이상이면 <b>가업승계</b> +20점, 제조 · IT 업종이면 <b>연구소</b> +10점</li>
+            <li>점수 높은 주제 순으로 상품표에서 맞는 상품을 골랐고, 3개가 안 되면 상품표 앞쪽 상품으로 채웁니다.</li>
+          </ul>
+        </details>
         <ul className="grid gap-2 lg:grid-cols-3" data-testid="recommended">
           {recommended.map(({ pkg, reason }, i) => {
             const on = d.names.includes(pkg.name)
@@ -269,7 +355,7 @@ function ProposalWork({
                     추천 {i + 1} · {pkg.cat}
                   </span>
                   <span className="t-sub font-bold text-slate-900">{pkg.name}</span>
-                  <span className="t-meta tabular-nums text-slate-600">{pkg.fee.toLocaleString('ko-KR')}만원 · {pkgDuration(pkg)}</span>
+                  <span className="t-meta tabular-nums text-slate-600">{FEE_KIND_LABEL[kindOf(pkg, kinds)]} {pkg.fee.toLocaleString('ko-KR')}만원 · {pkgDuration(pkg)}</span>
                   <span className="t-meta break-keep text-slate-500">{reason}</span>
                 </button>
               </li>
@@ -379,8 +465,9 @@ function ProposalWork({
             {aff.note && <p className="t-meta break-keep text-slate-400">{aff.note}</p>}
           </div>
         ) : (
-          <p className="t-sub text-slate-400">월납 금액을 넣으면 총 납입 · 목적자금 · 적정성(순이익 1억당 초록 300만 · 노랑 600만 기준)이 나옵니다. 제안서 · 업무범위서에도 들어갑니다.</p>
+          <p className="t-sub text-slate-400">월납 금액을 넣으면 총 납입 · 목적자금 · 적정성(순이익 1억당 초록 300만 · 노랑 600만 기준)이 나옵니다. 아래 시뮬레이션에서 골라도 됩니다.</p>
         )}
+        <MonthlySimulation months={months} rate={rate} net={net} current={premium} onPick={(v) => setD({ ...d, premium: String(v) })} />
       </Surface>
 
       {/* 제안 상태 · 저장 */}
@@ -499,6 +586,9 @@ function ProposalContent({ workspaceId }: { workspaceId: string | null }) {
   const [records, setRecords] = useState<ClientOpsRecord[]>([])
   const [prices, setPrices] = useState<Record<string, number>>({})
   const [priceRowId, setPriceRowId] = useState<string | undefined>(undefined)
+  // D-167: 상품마다 금액 종류(수수료 · 보험) — 고른 것만 따로 저장
+  const [kinds, setKinds] = useState<Record<string, FeeKind>>({})
+  const [kindRowId, setKindRowId] = useState<string | undefined>(undefined)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -511,6 +601,9 @@ function ProposalContent({ workspaceId }: { workspaceId: string | null }) {
       const row = rows.find((r) => r.data.key === 'prices')
       setPriceRowId(row?.id)
       setPrices(cleanPrices((row?.data.value as Record<string, unknown>) ?? {}))
+      const kindRow = rows.find((r) => r.data.key === 'kinds')
+      setKindRowId(kindRow?.id)
+      setKinds(cleanKinds((kindRow?.data.value as Record<string, unknown>) ?? {}))
       setError('')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '업체 목록을 불러오지 못했습니다.')
@@ -569,11 +662,23 @@ function ProposalContent({ workspaceId }: { workspaceId: string | null }) {
     }
   }
 
+  const saveKind = async (id: string, kind: FeeKind) => {
+    const clean = cleanKinds({ ...kinds, [id]: kind })
+    setKinds(clean)
+    try {
+      const row = await saveRow(workspaceId, CATALOG_MODULE, CATALOG_BUCKET, { id: kindRowId, clientId: '', data: { key: 'kinds', value: clean } })
+      setKindRowId(row.id)
+      showToast(`${FEE_KIND_LABEL[kind]}(으)로 바꿨습니다.`)
+    } catch (cause) {
+      showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
+    }
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <ScreenTitle
         title="영업 관리"
-        sub={`${today} · 상품·제안 — 추천 상품 · 제안서 · 업무범위서 · 월납 · 계약 준비`}
+        sub={`${today} · 상품·제안 — 추천 상품 · 방문 리포트 · 필요 서류 · 월납 · 계약 준비`}
         actions={<AiSoonButton size="sm" label="AI로 제안서 문장 다듬기" what="고른 상품과 업체 사정에 맞춰 제안서 문장을 다듬어 줍니다" />}
       />
       <SalesTabs />
@@ -595,7 +700,7 @@ function ProposalContent({ workspaceId }: { workspaceId: string | null }) {
       {loading ? (
         <p className="t-sub text-slate-500">불러오는 중…</p>
       ) : view === 'catalog' ? (
-        <CatalogView catalog={catalog} prices={prices} onSavePrice={(id, fee) => void savePrice(id, fee)} />
+        <CatalogView catalog={catalog} prices={prices} kinds={kinds} onSavePrice={(id, fee) => void savePrice(id, fee)} onSaveKind={(id, k) => void saveKind(id, k)} />
       ) : live.length === 0 ? (
         <div className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-12 text-center">
           <PackageSearch aria-hidden="true" className="mx-auto size-9 text-brand-400" />
@@ -630,7 +735,7 @@ function ProposalContent({ workspaceId }: { workspaceId: string | null }) {
                 {record.sales?.proposal && <Badge tone="brand">{record.sales.proposal.status}</Badge>}
                 {(record.sales?.interests?.length ?? 0) > 0 && stageReached(record, 'm1done') && <PillList items={record.sales?.interests ?? []} />}
               </p>
-              <ProposalWork key={record.id} record={record} records={records} catalog={catalog} onSave={(n, m) => persist(n, m)} />
+              <ProposalWork key={record.id} record={record} records={records} catalog={catalog} kinds={kinds} onSave={(n, m) => persist(n, m)} />
             </>
           )}
         </>

@@ -167,6 +167,11 @@ const FEATURE_NAV: Omit<ModuleDefinition, 'group' | 'parent'>[] = [
   { key: 'institutions', label: '기관 전략', path: '/funding/catalog', icon: Landmark, accent: 'ai', enabled: true, hint: '기관·프로그램 목록', advanced: true },
 ]
 
+/** D-167: 메뉴에서 숨긴 기능(자금·지원사업 · 기관 전략)도 주소 → 기능 · 이름은 그대로 찾는다 */
+export function navFeatureDef(key: string): Omit<ModuleDefinition, 'group' | 'parent'> | null {
+  return FEATURE_NAV.find((x) => x.key === key) ?? null
+}
+
 function moduleRows(): ModuleDefinition[] {
   const tools = liveTools().filter((t): t is ToolDefinition & { path: string } => t.path !== null)
   const rows: ModuleDefinition[] = []
@@ -175,7 +180,7 @@ function moduleRows(): ModuleDefinition[] {
     // D-136: 잘 안 쓰는 모듈(기술사업화 · AX 스튜디오 · 웹 스튜디오)은 접힌 '잘 안 쓰는 기능' 묶음으로
     const group: ModuleGroupKey = m.rarelyUsed ? 'rare' : 'modules'
     const children: ModuleDefinition[] = []
-    for (const f of FEATURE_CATALOG.filter((x) => x.module === m.key)) {
+    for (const f of FEATURE_CATALOG.filter((x) => x.module === m.key && !x.hidden)) {
       if (f.source === 'tool') {
         const t = tools.find((x) => x.key === f.key)
         if (t) children.push({ ...toolModule(t, parent), group })

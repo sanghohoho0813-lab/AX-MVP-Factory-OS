@@ -191,8 +191,8 @@ check('modules: AX STUDIO 는 전문 모듈의 분야 한 줄(D-127) — 안의 
     MODULES.find((m) => m.key === 'client-ops')?.badge === 'clients' && MODULES.find((m) => m.key === 'inbox')?.badge === 'requests' && MODULES.find((m) => m.key === 'first-meeting')?.badge === 'first-meetings')
   const inGroup = (g: string) => MODULES.filter((m) => m.group === g).map((m) => m.key)
   check('메뉴: 오늘 · 확인할 것(D-158) · 일정이 한 묶음', inGroup('today').join() === 'today,decide,calendar')
-  check('메뉴: 특허+벤처 → 기술사업화 · 지원사업 알림 · 자금·지원사업 → 기업성장 줄 아래(D-163), 모듈 전체가 맨 끝 (D-127) · 검토중 도구가 없으면 도입 검토중 줄도 없다 (D-118)',
-    MODULES.find((m) => m.key === 'consulting-studio')?.parent === 'cat-tech-biz' && MODULES.find((m) => m.key === 'funding')?.parent === 'cat-growth' && MODULES.find((m) => m.key === 'grants')?.parent === 'cat-growth' && MODULES.find((m) => m.key === 'grants')?.group === 'modules' && !MODULES.some((m) => m.key === 'cat-gov-support') && inGroup('modules').slice(-1).join() === 'tools' && !inGroup('modules').includes('tools-review'), inGroup('modules').join())
+  check('메뉴: 특허+벤처 → 기술사업화 · 지원사업 알림 → 기업성장 줄 아래(D-163) · 자금·지원사업 · 기관 전략은 숨김(D-167), 모듈 전체가 맨 끝 (D-127) · 검토중 도구가 없으면 도입 검토중 줄도 없다 (D-118)',
+    MODULES.find((m) => m.key === 'consulting-studio')?.parent === 'cat-tech-biz' && !MODULES.some((m) => m.key === 'funding' || m.key === 'institutions') && MODULES.find((m) => m.key === 'grants')?.parent === 'cat-growth' && MODULES.find((m) => m.key === 'grants')?.group === 'modules' && !MODULES.some((m) => m.key === 'cat-gov-support') && inGroup('modules').slice(-1).join() === 'tools' && !inGroup('modules').includes('tools-review'), inGroup('modules').join())
   check('메뉴: 영업 묶음 = 영업 관리(D-114) · 영업자 정산 · 매출 · 비용(D-142) · 1차 미팅 체크리스트(준비 중) — 지원사업 알림은 기업성장으로(D-163)',
     inGroup('sales').join() === 'sales,agents,money,first-meeting' && MODULES.find((m) => m.key === 'first-meeting')?.status === 'soon', inGroup('sales').join())
   check('메뉴: 고객 묶음에서 영업자 정산이 빠졌다', !inGroup('clients').includes('agents'))
@@ -251,7 +251,7 @@ check('modules: AX STUDIO 는 전문 모듈의 분야 한 줄(D-127) — 안의 
 }
 check('modules: 전문 모듈 묶음이 이 시스템 · 설정보다 앞 (D-127)', grouped.findIndex((g) => g.group.key === 'modules') < grouped.findIndex((g) => g.group.key === 'about'))
 check('moduleForPath: 정확 일치 홈', moduleForPath('/')?.key === 'today')
-check('moduleForPath: 하위 경로 → 가장 긴 접두', moduleForPath('/funding/catalog/programs/x')?.key === 'institutions')
+check('moduleForPath: 하위 경로 → 가장 긴 접두', moduleForPath('/tools/policy-funding/diagnosis/x')?.key === MODULES.find((m) => m.path === '/tools/policy-funding')?.key, moduleForPath('/tools/policy-funding/diagnosis/x')?.key)
 check('moduleForPath: 업체 상세 → 고객 운영', moduleForPath('/ops/clients/abc')?.key === 'client-ops')
 check('moduleForPath: 홈은 접두 매칭하지 않음', moduleForPath('/nowhere') === null)
 

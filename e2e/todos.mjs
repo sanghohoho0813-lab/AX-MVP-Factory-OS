@@ -150,6 +150,34 @@ const moved = await page.evaluate(() => {
 })
 check('내일로 미루면 기한이 내일이 된다', moved === true, String(moved))
 
+// D-167: 밀린(빨간) 할 일 → '오늘 할 일로 바꾸기' 하나로 기한을 오늘로
+await page.evaluate(() => {
+  const k = 'axmvp.v1.ops_journal_entries'
+  const list = JSON.parse(localStorage.getItem(k) ?? '[]')
+  const e = list.find((x) => x.content === '테스트 할 일 하나')
+  const d = new Date(); d.setDate(d.getDate() - 3)
+  e.dueDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  localStorage.setItem(k, JSON.stringify(list))
+})
+await page.reload({ waitUntil: 'networkidle' })
+await page.waitForTimeout(900)
+await page.getByText('테스트 할 일 하나').first().click()
+await page.waitForTimeout(400)
+check("밀린 할 일 시트: '오늘 할 일로 바꾸기' 가 맨 위에", ((await page.getByRole('dialog').innerText()) ?? '').indexOf('오늘 할 일로 바꾸기') >= 0 && ((await page.getByRole('dialog').innerText()) ?? '').indexOf('오늘 할 일로 바꾸기') < ((await page.getByRole('dialog').innerText()) ?? '').indexOf('진행 중'))
+await page.getByRole('dialog').getByText('오늘 할 일로 바꾸기', { exact: true }).click()
+await page.waitForTimeout(800)
+const toToday = await page.evaluate(() => {
+  const e = JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]').find((x) => x.content === '테스트 할 일 하나')
+  const d = new Date()
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return e && e.dueDate === today && !e.completed
+})
+check('오늘 할 일로 바꾸면 기한이 오늘이 된다', toToday === true, String(toToday))
+await page.getByText('테스트 할 일 하나').first().click()
+await page.waitForTimeout(400)
+check("오늘 할 일에는 '오늘 할 일로 바꾸기' 가 없다(밀린 것만)", (await page.getByRole('dialog').getByText('오늘 할 일로 바꾸기', { exact: true }).count()) === 0)
+await page.keyboard.press('Escape')
+
 // 6) 서류 없음 경고가 어디에도 없다
 await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
 await page.waitForTimeout(900)
