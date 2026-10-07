@@ -34,23 +34,31 @@ export function cleanPrices(prices: Record<string, unknown>): Record<string, num
 }
 
 /**
- * D-167: 상품 금액이 수수료인지 보험인지 — 대표가 상품표에서 고른다(기본은 수수료).
- * 보험으로 고른 상품은 제안 합계에서 수수료와 따로 센다. 고른 것만 따로 둔다(기본과 같으면 뺀다).
+ * 상품 금액이 수수료인지 보험인지 — 대표가 상품표에서 고른다.
+ * D-168: 기본은 **보험**(대표: "앞으로 쓰는 사람들은 보험이 많을 것") — 보험 금액은 '월납 200만원' 처럼 보인다.
+ * 수수료로 바꾼 상품만 따로 둔다(기본과 같으면 뺀다). D-167 에 보험으로 저장한 값은 이제 기본과 같아 그대로 보험.
  */
 export type FeeKind = 'fee' | 'insurance'
 export const FEE_KIND_LABEL: Record<FeeKind, string> = { fee: '수수료', insurance: '보험' }
+/** 금액 앞말 — 보험은 '월납', 수수료는 '수수료' */
+export const FEE_AMOUNT_PREFIX: Record<FeeKind, string> = { fee: '수수료', insurance: '월납' }
 
 export function cleanKinds(raw: Record<string, unknown> | null | undefined): Record<string, FeeKind> {
   const out: Record<string, FeeKind> = {}
-  for (const pkg of DEFAULT_PACKAGES) if ((raw ?? {})[pkg.id] === 'insurance') out[pkg.id] = 'insurance'
+  for (const pkg of DEFAULT_PACKAGES) if ((raw ?? {})[pkg.id] === 'fee') out[pkg.id] = 'fee'
   return out
 }
 
 export function kindOf(pkg: SalesPackage, kinds: Record<string, FeeKind> | null | undefined): FeeKind {
-  return kinds?.[pkg.id] === 'insurance' ? 'insurance' : 'fee'
+  return kinds?.[pkg.id] === 'fee' ? 'fee' : 'insurance'
 }
 
-/** 고른 상품 합계를 수수료 · 보험으로 나눠(만원) */
+/** '월납 200만원' · '수수료 150만원' */
+export function amountText(pkg: SalesPackage, kinds: Record<string, FeeKind> | null | undefined): string {
+  return `${FEE_AMOUNT_PREFIX[kindOf(pkg, kinds)]} ${(Number(pkg.fee) || 0).toLocaleString('ko-KR')}만원`
+}
+
+/** 고른 상품 합계를 수수료 · 보험(월납)으로 나눠(만원) */
 export function feeSplit(pkgs: SalesPackage[], kinds: Record<string, FeeKind> | null | undefined): { fee: number; insurance: number } {
   let fee = 0
   let insurance = 0

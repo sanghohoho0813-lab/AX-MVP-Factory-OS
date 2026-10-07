@@ -8,6 +8,7 @@ import { buildCustomerFromDiagnosis, getStoredCustomerById, pfOsClients, saveCus
 import QuickDiagnosisForm from "./QuickDiagnosisForm";
 import DeepDiagnosisForm from "./DeepDiagnosisForm";
 import ResultCard from "./ResultCard";
+import { ClientPickerOptions } from '../../../../components/ops/ClientPickerOptions'
 
 // 진단 결과를 고객으로 저장하는 카드. result 가 바뀌면 key 로 리셋된다.
 // 이 OS 에서는 고객 = 고객 운영 업체 — 저장할 업체를 고른다(업체에서 열었으면 그 업체가 골라져 있다).
@@ -70,9 +71,7 @@ function SaveCustomerBar({
               className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-900 focus:border-blue-500 focus:outline-none"
             >
               <option value="">업체 고르기</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>{c.companyName}</option>
-              ))}
+              <ClientPickerOptions clients={clients} />
             </select>
           </label>
           {clients.length === 0 ? (

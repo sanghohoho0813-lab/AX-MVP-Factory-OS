@@ -33,6 +33,9 @@ import { parseBizinfoJson, parseNoticeText } from '../../services/grants/grantTe
 import { emptyNotice, type NoticeInput } from '../../services/grants/grantView'
 import { isFeedNotice } from '../../services/grants/grantFeed'
 import { GRANT_SOURCE_LABEL } from '../../services/grants/grantMatch'
+import { manText, type FilterVerdict, type GrantFacts } from '../../services/grants/grantFilter'
+import { CATEGORY_TONE } from './grantTone'
+
 
 /* ------------------------------------------------------------------ */
 /* 작은 조각                                                             */
@@ -90,14 +93,14 @@ export function ReasonList({ reasons }: { reasons: Reason[] }) {
   )
 }
 
-function Chip({ on, onClick, children, testid }: { on: boolean; onClick: () => void; children: ReactNode; testid?: string }) {
+function Chip({ on, onClick, children, testid, onCls }: { on: boolean; onClick: () => void; children: ReactNode; testid?: string; onCls?: string }) {
   return (
     <button
       type="button"
       aria-pressed={on}
       data-testid={testid}
       onClick={onClick}
-      className={`tap t-sub shrink-0 rounded-full border px-3 py-1.5 font-semibold whitespace-nowrap ${on ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white text-slate-700 hover:border-brand-300'}`}
+      className={`tap t-sub shrink-0 rounded-full border px-3 py-1.5 font-semibold whitespace-nowrap ${on ? (onCls ?? 'border-brand-600 bg-brand-600 text-white') : 'border-slate-300 bg-white text-slate-700 hover:border-brand-300'}`}
     >
       {children}
     </button>
@@ -430,13 +433,42 @@ export function AddNoticeSheet({
 /* 공고 한 줄                                                            */
 /* ------------------------------------------------------------------ */
 
-export function NoticeRow({ notice, today, extra, onOpen }: { notice: GrantNotice; today: string; extra?: ReactNode; onOpen: () => void }) {
+export function NoticeRow({ notice, today, extra, onOpen, facts, verdict }: { notice: GrantNotice; today: string; extra?: ReactNode; onOpen: () => void; facts?: GrantFacts; verdict?: FilterVerdict }) {
   const d = deadlineOf(notice, today)
+  const tone = CATEGORY_TONE[notice.category] ?? CATEGORY_TONE.etc
+  const filtered = verdict && !verdict.pass
   return (
-    <li>
-      <button type="button" onClick={onOpen} data-testid="grant-row" data-id={notice.id} className="tap flex w-full items-start gap-3 px-4 py-3.5 text-left hover:bg-slate-50 sm:px-5">
-        <span className="flex min-w-0 flex-1 flex-col gap-1">
+    <li className={filtered ? 'bg-slate-50/80' : ''}>
+      <button
+        type="button"
+        onClick={onOpen}
+        data-testid="grant-row"
+        data-id={notice.id}
+        data-filtered={filtered ? verdict?.stage : undefined}
+        className={`tap relative flex w-full items-start gap-3 px-4 py-3.5 text-left before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-r hover:bg-slate-50 sm:px-5 ${filtered ? 'before:bg-slate-200' : tone.bar}`}
+      >
+        <span className={`flex min-w-0 flex-1 flex-col gap-1 ${filtered ? 'opacity-70' : ''}`}>
           <span className="t-body line-clamp-2 break-keep font-semibold text-slate-900">{notice.title}</span>
+          {(facts || filtered) && (
+            <span className="flex flex-wrap items-center gap-1.5" data-testid="grant-facts">
+              <span className={`t-meta rounded-full border px-2 py-0.5 font-semibold whitespace-nowrap ${tone.pill}`}>{GRANT_CATEGORY_LABEL[notice.category]}</span>
+              {facts?.amount.man != null && (
+                <span className="t-meta rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-semibold whitespace-nowrap text-amber-900" data-testid="grant-amount">
+                  {facts.amount.text && facts.amount.text.length <= 18 ? facts.amount.text : `최대 ${manText(facts.amount.man)}`}
+                </span>
+              )}
+              {facts?.slots != null && (
+                <span className="t-meta rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 font-semibold whitespace-nowrap text-violet-800" data-testid="grant-slots">
+                  선정 {facts.slots.toLocaleString()}곳
+                </span>
+              )}
+              {filtered && (
+                <span className="t-meta rounded-full border border-slate-300 bg-white px-2 py-0.5 font-semibold whitespace-nowrap text-slate-600" data-testid="grant-filtered-why">
+                  {verdict?.stage}차에서 거름 · {verdict?.why}
+                </span>
+              )}
+            </span>
+          )}
           <span className="t-sub flex flex-wrap items-center gap-x-2 gap-y-0.5 text-slate-500">
             <span className="break-keep">{notice.agency || '소관 미기재'}</span>
             {notice.source === 'example' && <span className="t-meta rounded border border-slate-300 px-1.5 font-semibold text-slate-500">{GRANT_SOURCE_LABEL.example}</span>}
@@ -544,7 +576,8 @@ export function CategoryChips({ value, counts, onChange }: { value: GrantCategor
       {keys
         .filter((k) => k === 'all' || (counts[k] ?? 0) > 0)
         .map((k) => (
-          <Chip key={k} on={value === k} onClick={() => onChange(k)} testid={`grant-cat-${k}`}>
+          <Chip key={k} on={value === k} onClick={() => onChange(k)} testid={`grant-cat-${k}`} onCls={k === 'all' ? undefined : CATEGORY_TONE[k].on}>
+            {k !== 'all' && value !== k && <span aria-hidden="true" className={`mr-1.5 inline-block size-2 rounded-full align-middle ${CATEGORY_TONE[k].dot}`} />}
             {k === 'all' ? '전체' : GRANT_CATEGORY_LABEL[k]}
             {k !== 'all' && <span className="ml-1 opacity-75">{counts[k]}</span>}
           </Chip>

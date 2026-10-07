@@ -57,6 +57,7 @@ import {
   type RosterMeta,
   type SizeType,
 } from './lib/payrollDiagnosis'
+import { ClientPickerOptions } from '../../components/ops/ClientPickerOptions'
 
 const STORAGE_PREFIX = 'axmvp.tools.employment.'
 
@@ -528,11 +529,7 @@ function YouthEnrollPanel({ items }: { items: YouthEnrollItem[] }) {
           {!clientRecord && (
             <select aria-label="등록할 업체" value={pick} onChange={(e) => setPick(e.target.value)} className="t-sub h-11 max-w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3 text-slate-800">
               <option value="">업체 고르기</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.companyName}
-                </option>
-              ))}
+              <ClientPickerOptions clients={clients} />
             </select>
           )}
           <Button variant="secondary" disabled={!pick || busy} onClick={() => void register()} data-testid="youth-enroll-register">

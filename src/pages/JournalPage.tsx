@@ -24,6 +24,7 @@ import {
 import { todayLocalDate } from '../lib/appClock'
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { JournalEntry, JournalEntryType } from '../types/bridge'
+import { ClientPickerOptions } from '../components/ops/ClientPickerOptions'
 
 const RANGE_TITLE: Record<JournalRange, string> = { today: '오늘 기록', week: '주간 돌아보기', all: '전체 기록' }
 
@@ -154,9 +155,7 @@ function JournalContent({ workspaceId, userId }: { workspaceId: string | null; u
             className="t-sub h-11 rounded-(--radius-control) border border-slate-300 px-2.5 text-slate-700 sm:h-10"
           >
             <option value="">모든 업체</option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>{c.companyName}</option>
-            ))}
+            <ClientPickerOptions clients={clients} />
           </select>
           <select
             value={typeFilter}

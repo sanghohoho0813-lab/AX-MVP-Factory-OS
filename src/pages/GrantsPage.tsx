@@ -30,6 +30,8 @@ import { exampleNotices } from '../services/grants/grantExamples'
 import { addNotices, removeNotice, saveNotice, sentAt } from '../services/grants/grantStore'
 import { CLIENT_KIND_LABEL, clientsForNotice, fitSummary, grantClients, grantIndex, reachOf, type GrantClient, type NoticeInput } from '../services/grants/grantView'
 import { profileLine } from '../services/grants/grantProfile'
+import { factsOf, judgeGrant, loadGrantFilter, saveGrantFilter, type GrantFilterSettings } from '../services/grants/grantFilter'
+import { GrantFilterSheet, GrantFunnel } from '../components/grants/GrantFilterPanel'
 
 type View = 'notices' | 'clients' | 'applying'
 
@@ -113,6 +115,16 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
   const region = SIDO_LIST.includes(params.get('r') ?? '') ? (params.get('r') as string) : ''
   const [category, setCategory] = useState<GrantCategory | 'all'>('all')
   const [onlyReach, setOnlyReach] = useState(false)
+  // D-168: 2차(금액) · 3차(선정 규모 · 행사 · 마감 여유) 거르기 — 기준은 쓰는 사람 브라우저에 기억
+  const filterScope = workspaceId ?? 'local'
+  const [filter, setFilterState] = useState<GrantFilterSettings>(() => loadGrantFilter(filterScope))
+  useEffect(() => setFilterState(loadGrantFilter(filterScope)), [filterScope])
+  const setFilter = (v: GrantFilterSettings) => {
+    setFilterState(v)
+    saveGrantFilter(filterScope, v)
+  }
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [showHidden, setShowHidden] = useState(false)
   const [kindFilter, setKindFilter] = useState<'all' | 'contract' | 'prospect'>('all')
   const [showClosed, setShowClosed] = useState(false)
   const [query, setQuery] = useState('')
@@ -142,30 +154,39 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
     for (const n of open) c[n.category] = (c[n.category] ?? 0) + 1
     return c
   }, [open])
+  // 공고 글에서 읽은 금액 · 선정 규모 · 행사 낱말(공고가 바뀔 때만 다시 읽는다)
+  const facts = useMemo(() => new Map(notices.map((n) => [n.id, factsOf(n)])), [notices])
+  const verdicts = useMemo(() => new Map(notices.map((n) => [n.id, judgeGrant(n, facts.get(n.id) ?? factsOf(n), filter, today)])), [notices, facts, filter, today])
+  const funnel = useMemo(() => {
+    const base = open
+      .filter((n) => category === 'all' || n.category === category)
+      .filter((n) => !query.trim() || `${n.title} ${n.agency} ${n.operator} ${n.target}`.toLowerCase().includes(query.trim().toLowerCase()))
+    const s1 = onlyReach ? base.filter((n) => reachOf(reach.get(n.id) ?? []).fit > 0) : base
+    const s2 = s1.filter((n) => verdicts.get(n.id)?.stage !== 2)
+    const s3 = s2.filter((n) => verdicts.get(n.id)?.pass !== false)
+    return { base, s1, s2, s3 }
+  }, [open, category, query, onlyReach, reach, verdicts])
   const listed = useMemo(
     () =>
-      open
-        .filter((n) => category === 'all' || n.category === category)
-        .filter((n) => !onlyReach || reachOf(reach.get(n.id) ?? []).fit > 0)
-        .filter((n) => !query.trim() || `${n.title} ${n.agency} ${n.operator} ${n.target}`.toLowerCase().includes(query.trim().toLowerCase()))
+      (showHidden ? funnel.s1 : funnel.s3)
         .map((n) => ({ n, d: deadlineOf(n, today) }))
         .sort((a, b) => deadlineRank(a.d) - deadlineRank(b.d) || a.n.title.localeCompare(b.n.title, 'ko', { numeric: true }))
         .map((x) => x.n),
-    [open, category, onlyReach, reach, today, query],
+    [funnel, showHidden, today],
   )
   const urgent = open.filter((n) => deadlineOf(n, today).urgent).length
   // 거르기를 바꾸면 처음 50개부터 다시
-  const pageKey = `${category}|${onlyReach}|${region}|${query}`
+  const pageKey = `${category}|${onlyReach}|${region}|${query}|${JSON.stringify(filter)}|${showHidden}`
   const limit = paging.key === pageKey ? paging.n : PAGE
 
   const byClient = useMemo(
     () =>
       clients
-        .map((c) => ({ c, ms: index.byClient.get(c.record.id) ?? [] }))
+        .map((c) => ({ c, ms: (index.byClient.get(c.record.id) ?? []).filter((m) => verdicts.get(m.notice.id)?.pass !== false) }))
         .filter((x) => kindFilter === 'all' || x.c.kind === kindFilter)
         .map((x) => ({ ...x, sum: fitSummary(x.ms) }))
         .sort((a, b) => b.sum.fit - a.sum.fit || b.sum.check - a.sum.check || a.c.record.companyName.localeCompare(b.c.record.companyName)),
-    [clients, index, kindFilter],
+    [clients, index, kindFilter, verdicts],
   )
 
   const saveOne = async (v: NoticeInput, id?: string) => {
@@ -236,7 +257,7 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
 
       {view === 'notices' && (
         <>
-          <section className="flex flex-col gap-3" aria-label="지역 · 갈래">
+          <section className="flex flex-col gap-3 rounded-(--radius-panel) border border-brand-100 bg-gradient-to-br from-brand-50 via-white to-sky-50 p-3 sm:p-4" aria-label="지역 · 갈래">
             <h2 className="t-section break-keep text-slate-900" data-testid="grant-hero">
               <label className="inline-flex items-center">
                 <span className="sr-only">지역</span>
@@ -264,11 +285,18 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
                 className="t-body w-full rounded-(--radius-control) border border-slate-300 bg-white py-2.5 pr-3 pl-9 focus:border-brand-500 focus:outline-none"
               />
             </label>
-            <label className="tap t-sub inline-flex items-center gap-2 self-start text-slate-700">
-              <input type="checkbox" checked={onlyReach} onChange={(e) => setOnlyReach(e.target.checked)} className="size-5 accent-brand-600" data-testid="grant-only-reach" />
-              맞는 업체가 있는 공고만
-            </label>
           </section>
+          {open.length > 0 && (
+            <GrantFunnel
+              counts={{ base: funnel.base.length, stage1: onlyReach ? funnel.s1.length : null, stage2: funnel.s2.length, stage3: funnel.s3.length }}
+              settings={filter}
+              onlyReach={onlyReach}
+              onToggleReach={setOnlyReach}
+              onOpenSettings={() => setFilterOpen(true)}
+              showHidden={showHidden}
+              onToggleHidden={() => setShowHidden((v) => !v)}
+            />
+          )}
 
           {loaded && notices.length === 0 ? (
             <Blank
@@ -297,10 +325,12 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
                     notice={n}
                     today={today}
                     onOpen={() => setOpenId(n.id)}
+                    facts={facts.get(n.id)}
+                    verdict={verdicts.get(n.id)}
                     extra={
                       <span className="t-sub flex flex-wrap gap-x-2" data-testid="grant-reach">
                         {r.fit > 0 ? (
-                          <span className="font-semibold text-success-700">
+                          <span className="rounded-full bg-success-50 px-2 font-semibold text-success-700">
                             맞는 업체 {r.fit}곳{r.contract && r.prospect ? ` (계약 ${r.contract} · 잠재 ${r.prospect})` : r.prospect ? ' (잠재고객)' : ''}
                           </span>
                         ) : r.check === 0 && !targetsSomeone(n.rules) ? (
@@ -435,7 +465,7 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
       {currentClient && (
         <ClientSheet
           client={currentClient}
-          matches={index.byClient.get(currentClient.record.id) ?? []}
+          matches={(index.byClient.get(currentClient.record.id) ?? []).filter((m) => verdicts.get(m.notice.id)?.pass !== false)}
           sentOf={sentForClient(currentClient.record.id)}
           linked={linkOf(currentClient.record.id) !== null}
           actions={actions}
@@ -456,6 +486,8 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
           onClose={() => setParam('client', '')}
         />
       )}
+
+      {filterOpen && <GrantFilterSheet value={filter} onChange={setFilter} left={funnel.s3.length} onClose={() => setFilterOpen(false)} />}
 
       {(adding || editing) && (
         <AddNoticeSheet

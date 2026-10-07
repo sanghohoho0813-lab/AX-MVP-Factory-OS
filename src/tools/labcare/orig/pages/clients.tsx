@@ -17,6 +17,7 @@ import {
 import { riskSummary } from "../../lib/riskEngine";
 import { getHiringSupportTip } from "../lib/hiringTip";
 import type { Client, ClientStatus, LabType } from "../../types";
+import { ClientPickerOptions } from '../../../../components/ops/ClientPickerOptions'
 
 interface Row extends Client {
   status: ClientStatus;
@@ -382,9 +383,7 @@ function AddClientModal({
               <select className={field} value={form.osId} required data-testid="lab-client-pick"
                 onChange={(e) => setForm((f) => fillFromOs(f, e.target.value))}>
                 <option value="">업체 고르기</option>
-                {osClientList().filter((c) => c.archivedAt === null && !getClients().some((x) => x.id === c.id)).map((c) => (
-                  <option key={c.id} value={c.id}>{c.companyName}</option>
-                ))}
+                <ClientPickerOptions clients={osClientList().filter((c) => c.archivedAt === null && !getClients().some((x) => x.id === c.id))} />
               </select>
               <p className="mt-1 text-xs text-slate-400">업체가 없으면 먼저 <a href="/ops/clients" className="font-bold text-navy-700 underline">고객 관리</a>에 등록하세요.</p>
             </div>

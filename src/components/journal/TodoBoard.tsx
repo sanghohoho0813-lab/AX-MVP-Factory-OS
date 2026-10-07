@@ -13,6 +13,7 @@
  */
 
 import { useState, type LiHTMLAttributes } from 'react'
+import { ClientPickerOptions } from '../ops/ClientPickerOptions'
 import { ArrowRight, Check, Pencil, Plus, X } from 'lucide-react'
 import type { JournalEntry } from '../../types/bridge'
 import { TODO_PRESETS } from '../../services/journalService'
@@ -44,7 +45,7 @@ export function TodoComposer({
   compact = false,
 }: {
   date: string
-  clients: { id: string; companyName: string }[]
+  clients: { id: string; companyName: string; businessNumber?: string; corporateNumber?: string }[]
   /** false 를 돌려주면(저장 실패) 적은 글을 비우지 않는다 — D-120 */
   onAdd: (draft: TodoDraft) => void | boolean | Promise<void | boolean>
   autoFocus?: boolean
@@ -126,11 +127,7 @@ export function TodoComposer({
             className="min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 bg-white px-2 py-2 text-[0.92rem] sm:flex-none"
           >
             <option value="">업체 없음</option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.companyName}
-              </option>
-            ))}
+            <ClientPickerOptions clients={clients} />
           </select>
         )}
         <Button variant="primary" size="sm" className="ml-auto" disabled={text.trim() === ''} onClick={submit}>
@@ -227,7 +224,7 @@ export function TodoActionSheet({
   entry: JournalEntry
   clientName?: string
   /** 고치기 화면에서 업체를 바꿀 수 있게 — 없으면 업체 칸을 숨긴다 */
-  clients?: { id: string; companyName: string }[]
+  clients?: { id: string; companyName: string; businessNumber?: string; corporateNumber?: string }[]
   onPick: (action: TodoAction) => void
   /** 적어 둔 내용·기한·업체를 고칠 때 */
   onSave?: (patch: { content: string; dueDate: string; clientId: string | null }) => unknown
@@ -329,11 +326,7 @@ export function TodoActionSheet({
                 className="t-body mt-1 h-12 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3"
               >
                 <option value="">업체 없음</option>
-                {clientOptions.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.companyName}
-                  </option>
-                ))}
+                <ClientPickerOptions clients={clientOptions} />
               </select>
             </label>
           )}

@@ -25,6 +25,7 @@ import {
   type Range,
 } from '../grants/grantMatch'
 import { missingForMatch, profileOfRecord } from '../grants/grantProfile'
+import { DEFAULT_GRANT_FILTER, amountOf, eventWord, factsOf, judgeGrant, manText, normalizeFilter, slotsOf, type GrantFilterSettings } from '../grants/grantFilter'
 import {
   EMPLOYEE_CHIPS,
   REVENUE_CHIPS,
@@ -889,6 +890,39 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   const dd = buildDecisions(many, T, []).find((d) => d.kind === 'doc')!
   const kept = normalizeClientOps(JSON.parse(JSON.stringify(withDecisionAnswer(many, dd, 'no', [], at))))
   check('서류 14개 만료여도 답이 저장해 읽은 뒤 남는다(이름 짧게)', dd.id.length < 40 && !!kept.decided?.[dd.id], dd.id.length)
+}
+
+// D-168: 2차 · 3차 거르기 — 금액 · 선정 규모 · 행사 · 마감 여유
+{
+  const A = (amountText: string, summary = '', title = '공고') => amountOf({ amountText, title, summary }).man
+  check('금액: 최대 5천만원 → 5,000만', A('최대 5천만원') === 5000, A('최대 5천만원'))
+  check('금액: 1억 5천만원 → 15,000만', A('', '기업당 최대 1억 5천만원 이내') === 15000, A('', '기업당 최대 1억 5천만원 이내'))
+  check('금액: 2,000만원 · 10,000,000원 · 50백만원 · 5,000천원', A('', '업체당 2,000만원') === 2000 && A('', '최대 10,000,000원') === 1000 && A('', '최대 50백만원') === 5000 && A('', '최대 5,000천원') === 500)
+  check('금액: 총 예산 · 매출 조건은 지원금이 아니다', A('', '총 사업비 10억원, 매출액 50억원 이상 기업, 업체당 최대 3천만원') === 3000, A('', '총 사업비 10억원, 매출액 50억원 이상 기업, 업체당 최대 3천만원'))
+  check('금액: 총 예산만 적혔으면 못 읽음', A('', '총 예산 5억원') === null, A('', '총 예산 5억원'))
+  check('금액: 월 80만원 × 12개월 = 960만', A('', '1인당 월 최대 80만원, 최대 12개월 지원') === 960, A('', '1인당 월 최대 80만원, 최대 12개월 지원'))
+  check('금액: 안 적힘 → null', A('', '중소기업의 수출을 돕습니다') === null)
+  const S = (summary: string, title = '공고') => slotsOf({ title, summary, target: '' })
+  check('선정 규모: 30개사 내외 · 10개 기업 · 50곳', S('30개사 내외 선정') === 30 && S('10개 기업 지원') === 10 && S('50곳 선정') === 50)
+  check('선정 규모: 1개사당 금액은 규모가 아니다', S('1개사당 최대 2천만원') === null, S('1개사당 최대 2천만원'))
+  check('선정 규모: 안 적힘 → null', S('수출 지원') === null)
+  check('행사: 설명회 · 교육생 모집 · 수요조사 · 공모전은 행사', ['2026 수출바우처 사업설명회', 'AI 실무 교육생 모집', '스마트공장 수요조사', '창업 아이디어 공모전'].every((t) => eventWord({ title: t }) !== ''))
+  check('행사: 해외 전시회 참가 지원 · 교육 지원금은 행사가 아니다', eventWord({ title: '수출 초보기업 해외 전시회 참가 지원' }) === '' && eventWord({ title: '직업능력개발 훈련비 지원' }) === '')
+  const T0 = '2026-10-07'
+  const n = (over: Partial<GrantNotice>) => notice({}, { applyEnd: '2026-10-30', deadlineKind: 'date', ...over })
+  const J = (x: GrantNotice, s: Partial<GrantFilterSettings> = {}) => judgeGrant(x, factsOf(x), { ...DEFAULT_GRANT_FILTER, ...s }, T0)
+  check('기본 기준: 300만원 미만은 2차에서 거름', J(n({ amountText: '최대 200만원' })).stage === 2)
+  check('기본 기준: 금액 안 적힘은 남김', J(n({ amountText: '' })).pass)
+  check('기본 기준: 설명회는 3차에서 거름', J(n({ title: '정책자금 설명회 안내', amountText: '' })).stage === 3)
+  check('기준 1,000만: 5천만원 통과 · 500만원 거름', J(n({ amountText: '최대 5천만원' }), { minAmount: 1000 }).pass && !J(n({ amountText: '최대 500만원' }), { minAmount: 1000 }).pass)
+  check('금액 안 적힌 것 숨기기', J(n({ amountText: '' }), { hideNoAmount: true }).stage === 2)
+  check('선정 10곳 이상: 5개사 거름 · 30개사 통과', J(n({ summary: '5개사 선정' }), { minSlots: 10 }).stage === 3 && J(n({ summary: '30개사 선정' }), { minSlots: 10 }).pass)
+  check('마감 여유 7일: 3일 남은 공고 거름 · 선착순은 그대로', J(n({ applyEnd: '2026-10-10' }), { minDays: 7 }).stage === 3 && J(n({ applyEnd: '', deadlineKind: 'first_come' }), { minDays: 7 }).pass)
+  check('거르기 끄기: 전부 통과', J(n({ amountText: '최대 100만원', title: '설명회' }), { on: false }).pass)
+  check('설정 읽기: 이상한 값은 기본값', JSON.stringify(normalizeFilter({ minAmount: 777, on: 'x', minSlots: 10 })) === JSON.stringify({ ...DEFAULT_GRANT_FILTER, minSlots: 10 }))
+  check('금액 글: 1억 5천만원 · 3천만원 · 300만원', manText(15000) === '1억 5천만원' && manText(3000) === '3천만원' && manText(300) === '300만원' && manText(10000) === '1억원')
+  const ex = exampleNotices(T0).map((x, i) => ({ ...x, id: `e${i}`, createdAt: '', updatedAt: '' }) as GrantNotice)
+  check('예시 공고 6개는 기본 기준에서 다 남는다', ex.every((x) => J(x).pass), ex.filter((x) => !J(x).pass).map((x) => x.title))
 }
 
 console.log(`\ngrants: ${pass} passed, ${fail} failed`)

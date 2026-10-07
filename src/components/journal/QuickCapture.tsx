@@ -6,6 +6,7 @@ import { JOURNAL_TYPES, JOURNAL_TYPE_LABEL, type CreateJournalInput } from '../.
 import { DueDateField } from '../ops/opsControls'
 import { todayLocalDate } from '../../lib/appClock'
 import { useSessionDraft } from '../../lib/useSessionDraft'
+import { ClientPickerOptions } from '../ops/ClientPickerOptions'
 
 /**
  * 빠른 기록 — "무슨 일이 있었나요?" 한 줄이면 저장된다.
@@ -141,11 +142,7 @@ export function QuickCapture({
               className="t-sub h-11 min-w-0 max-w-full rounded-(--radius-control) border border-slate-300 px-2.5 text-slate-700 focus:border-brand-500 focus:outline-none sm:h-10"
             >
               <option value="">업체 연결 안 함</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.companyName}
-                </option>
-              ))}
+              <ClientPickerOptions clients={clients} />
             </select>
             {type === 'follow_up' && (
               <div className="min-w-0">

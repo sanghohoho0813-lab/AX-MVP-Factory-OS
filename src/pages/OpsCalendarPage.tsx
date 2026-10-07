@@ -115,7 +115,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
   const pickedOff = picked ? (offMap.get(picked) ?? []) : []
 
   const activeClients = useMemo(
-    () => records.filter((r) => r.archivedAt === null).map((r) => ({ id: r.id, companyName: r.companyName })),
+    () => records.filter((r) => r.archivedAt === null).map((r) => ({ id: r.id, companyName: r.companyName, businessNumber: r.businessNumber, corporateNumber: r.corporateNumber })),
     [records],
   )
 

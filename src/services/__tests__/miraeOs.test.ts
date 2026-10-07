@@ -137,6 +137,7 @@ import { formatYmd, profileAsText, yearsInBusiness } from '../clientOpsProfile'
 import { SERVICE_STATUS_ORDER, isServiceOpen, isServiceNotApplicable, normalizeServiceStatus } from '../../content/clientOpsCatalog'
 import { BUILTIN_SERVICES, SERVICES, registerCustomServices } from '../../content/clientOpsCatalog'
 import type { CustomerEvent, JournalEntry, PortalClientLink, PortalDocument, PortalRequest, PortalUpdate } from '../../types/bridge'
+import { entityKindOf, orderForPicker, pickerGroups } from '../clientOrder'
 
 let passed = 0
 let failed = 0
@@ -2166,6 +2167,22 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('계약 완료: 이미 지난 다음 약속은 닫음', won.nextAction === '')
   const wonFuture = withSalesStage({ ...lead, nextAction: '계약서 서명', nextActionDueDate: '2026-10-10' }, 'contracted', at)
   check('계약 완료: 앞으로 남은 약속(계약서 서명)은 그대로', wonFuture.nextAction === '계약서 서명')
+}
+
+/* ---- D-168: 업체 고르는 칸 — 개인사업자 먼저 · 법인 가나다 ---- */
+{
+  check('업체 구분: 법인번호 → 법인', entityKindOf({ companyName: '하늘', corporateNumber: '110111-1234567' }) === 'corporation')
+  check('업체 구분: 사업자번호 가운데 81 · 86 → 법인, 12 · 95 → 개인', entityKindOf({ companyName: 'a', businessNumber: '123-81-45678' }) === 'corporation' && entityKindOf({ companyName: 'a', businessNumber: '1238645678' }) === 'corporation' && entityKindOf({ companyName: 'a', businessNumber: '123-12-45678' }) === 'individual' && entityKindOf({ companyName: 'a', businessNumber: '123-95-45678' }) === 'individual')
+  check('업체 구분: 이름의 (주) · 주식회사 → 법인, 아무것도 없으면 구분 모름', entityKindOf({ companyName: '(주)가나' }) === 'corporation' && entityKindOf({ companyName: '다라 주식회사' }) === 'corporation' && entityKindOf({ companyName: '마바상회' }) === 'unknown')
+  const list = [
+    { id: '1', companyName: '하나정밀(주)' },
+    { id: '2', companyName: '나무식당', businessNumber: '123-45-67890' },
+    { id: '3', companyName: '㈜가람' },
+    { id: '4', companyName: '마바상회' },
+    { id: '5', companyName: '가게하나', businessNumber: '123-01-67890' },
+  ]
+  check('정렬: 개인사업자(가나다) → 법인(가나다 · ㈜ 앞말 빼고) → 구분 모름', orderForPicker(list).map((c) => c.id).join() === '5,2,3,1,4', orderForPicker(list).map((c) => c.companyName).join())
+  check('묶음: 개인사업자 2 · 법인 2 · 구분 모름 1', pickerGroups(list).map((g) => `${g.label}${g.items.length}`).join() === '개인사업자2,법인2,구분 모름1')
 }
 
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)

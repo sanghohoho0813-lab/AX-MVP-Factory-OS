@@ -27,7 +27,7 @@ import { listClients, saveClient } from '../../services/clientOpsService'
 import { listRows, saveRow } from '../../services/moduleData'
 import { salesStageOf, stageReached } from '../../services/salesPipeline'
 import { SALES_PATH_INFO } from '../../services/salesJourney'
-import { catalogWithPrices, cleanKinds, cleanPrices, feeSplit, FEE_KIND_LABEL, kindOf, toProposalItem, withContractPrep, withProposal, type FeeKind } from '../../services/salesOffer'
+import { amountText, catalogWithPrices, cleanKinds, cleanPrices, feeSplit, feeSum, FEE_KIND_LABEL, kindOf, toProposalItem, withContractPrep, withProposal, type FeeKind } from '../../services/salesOffer'
 import { SALES_SIMPLE } from '../../config/salesSimple'
 import { contractCloseDraft, withContractClose, type ContractCloseDraft } from '../../services/salesContract'
 import { ContractCloseSheet } from '../../components/sales/ContractCloseSheet'
@@ -92,7 +92,7 @@ function CatalogView({ catalog, prices, kinds, onSavePrice, onSaveKind }: { cata
     <div className="flex flex-col gap-3" data-testid="catalog">
       {/* D-167: 처음 들어 있는 가격은 임의로 넣어 둔 기본값 — 우리 가격으로 고쳐 쓰도록 맨 위에 알린다 */}
       <p data-testid="catalog-default-note" className="t-sub break-keep rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3.5 py-2.5 text-warning-800">
-        <b>가격은 처음 넣어 둔 기본값(임의 예시)입니다.</b> 우리 회사 가격으로 고쳐 쓰세요 — 가격을 누르면 고칠 수 있고, 금액마다 <b>수수료 · 보험</b> 중 무엇인지 고를 수 있습니다.
+        <b>가격은 처음 넣어 둔 기본값(임의 예시)입니다.</b> 우리 회사 가격으로 고쳐 쓰세요 — 가격을 누르면 고칠 수 있습니다. 금액은 기본이 <b>보험(월납)</b>이고, 수수료인 상품은 <b>수수료</b>를 누르세요.
       </p>
       <div className="flex flex-wrap gap-1.5" role="group" aria-label="상품 분류">
         {['전체', ...PKG_CATEGORIES].map((c, ci) => (
@@ -128,14 +128,14 @@ function CatalogView({ catalog, prices, kinds, onSavePrice, onSaveKind }: { cata
                   </span>
                 ) : (
                   <button type="button" onClick={() => { setEditing(p.id); setDraft(String(p.fee)) }} className="t-sub shrink-0 font-semibold text-slate-800 tabular-nums hover:text-brand-700" aria-label={`${p.name} 가격 고치기`}>
-                    {FEE_KIND_LABEL[kind]} {p.fee.toLocaleString('ko-KR')}만원
+                    {amountText(p, kinds)}
                     {changed ? <span className="t-meta ml-1 font-semibold text-brand-700">·고침</span> : <span className="t-meta ml-1 rounded-full bg-slate-100 px-1.5 font-medium text-slate-500" data-testid="catalog-default-badge">기본값</span>}
                   </button>
                 )}
               </div>
               {/* D-167: 이 금액이 수수료인지 보험인지 — 눌러서 바로 */}
               <div role="radiogroup" aria-label={`${p.name} 금액 종류`} className="flex gap-1" data-testid="catalog-kind">
-                {(['fee', 'insurance'] as FeeKind[]).map((k) => (
+                {(['insurance', 'fee'] as FeeKind[]).map((k) => (
                   <button key={k} type="button" role="radio" aria-checked={kind === k} onClick={() => kind !== k && onSaveKind(p.id, k)} className={`tap t-meta rounded-full border px-2.5 py-0.5 font-semibold ${kind === k ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}>
                     {FEE_KIND_LABEL[k]}
                   </button>
@@ -261,9 +261,9 @@ function ProposalWork({
 
   // 고른 순서대로 (추천 1이 제안서 첫 줄)
   const picked = d.names.map((n) => catalog.find((p) => p.name === n)).filter((p): p is SalesPackage => p !== undefined)
-  // D-167: 보험으로 고른 상품은 수수료와 따로 센다(합계 = 수수료)
+  // 합계는 고른 상품 전부(계약 완료 · 수금으로 그대로 이어진다) — D-168: 월납(보험) · 수수료로 나눠 함께 보인다
   const split = feeSplit(picked, kinds)
-  const sum = split.fee
+  const sum = feeSum(picked)
   const toggle = (name: string) => setD((prev) => ({ ...prev, names: prev.names.includes(name) ? prev.names.filter((n) => n !== name) : [...prev.names, name] }))
 
   const premium = Number(d.premium) || 0
@@ -325,8 +325,8 @@ function ProposalWork({
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="t-section text-slate-900">제안 상품</h2>
           <p className="t-sub text-slate-500">
-            <span data-testid="proposal-count">{picked.length}개</span> · 수수료 합계 <strong data-testid="proposal-sum" className="font-bold text-slate-900 tabular-nums">{sum.toLocaleString('ko-KR')}만원</strong>
-            {split.insurance > 0 && <> · 보험 <strong data-testid="proposal-insurance" className="font-bold text-slate-900 tabular-nums">{split.insurance.toLocaleString('ko-KR')}만원</strong></>}
+            <span data-testid="proposal-count">{picked.length}개</span> · 합계 <strong data-testid="proposal-sum" className="font-bold text-slate-900 tabular-nums">{sum.toLocaleString('ko-KR')}만원</strong>
+            <span data-testid="proposal-split" className="tabular-nums"> (월납 {split.insurance.toLocaleString('ko-KR')}만 · 수수료 {split.fee.toLocaleString('ko-KR')}만)</span>
           </p>
         </div>
         {/* D-167: 추천 1 · 2 · 3 을 어떻게 골랐는지 — 대표: "어떤 기준으로 들어간지 모르겠다" */}
@@ -355,7 +355,7 @@ function ProposalWork({
                     추천 {i + 1} · {pkg.cat}
                   </span>
                   <span className="t-sub font-bold text-slate-900">{pkg.name}</span>
-                  <span className="t-meta tabular-nums text-slate-600">{FEE_KIND_LABEL[kindOf(pkg, kinds)]} {pkg.fee.toLocaleString('ko-KR')}만원 · {pkgDuration(pkg)}</span>
+                  <span className="t-meta tabular-nums text-slate-600">{amountText(pkg, kinds)} · {pkgDuration(pkg)}</span>
                   <span className="t-meta break-keep text-slate-500">{reason}</span>
                 </button>
               </li>

@@ -386,9 +386,11 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   check('상품표: 40종 · 8분류', (await cat.locator('li').count()) === 40 && (await page.getByRole('group', { name: '상품 분류' }).getByRole('button').count()) === 9)
   // D-167: 기본값 표시 · 수수료/보험 고르기
   check('상품표(D-167): 가격은 임의 기본값이라고 알림 · 상품마다 기본값 표시', (await page.getByTestId('catalog-default-note').count()) === 1 && (await cat.getByTestId('catalog-default-badge').count()) === 40)
-  await cat.getByRole('radiogroup', { name: '법인보험/대표 퇴직금 플랜 검토 패키지 금액 종류' }).getByRole('radio', { name: '보험' }).click()
+  // D-168: 기본은 보험 — 금액은 '월납 200만원'. 수수료로 바꾼 것만 저장
+  check('상품표(D-168): 기본은 보험 — 금액 앞에 월납', ((await cat.getByRole('button', { name: '법인보험/대표 퇴직금 플랜 검토 패키지 가격 고치기' }).innerText()) ?? '').startsWith('월납 200만원'))
+  await cat.getByRole('radiogroup', { name: '정관정비 패키지 금액 종류' }).getByRole('radio', { name: '수수료' }).click()
   await page.waitForTimeout(400)
-  check('상품표(D-167): 보험으로 바꾸면 금액 앞에 보험 · 저장', ((await cat.getByRole('button', { name: '법인보험/대표 퇴직금 플랜 검토 패키지 가격 고치기' }).innerText()) ?? '').startsWith('보험') && (await page.evaluate(() => JSON.stringify(localStorage.getItem('axmvp.module.sales-os.catalog') ?? ''))).includes('insurance'))
+  check('상품표(D-168): 수수료로 바꾸면 금액 앞에 수수료 · 저장', ((await cat.getByRole('button', { name: '정관정비 패키지 가격 고치기' }).innerText()) ?? '').startsWith('수수료') && (await page.evaluate(() => JSON.stringify(localStorage.getItem('axmvp.module.sales-os.catalog') ?? ''))).includes('"fee"'))
   await cat.getByRole('button', { name: '정관정비 패키지 가격 고치기' }).click()
   await cat.getByLabel('정관정비 패키지 가격(만원)').fill('180')
   await cat.getByRole('button', { name: '저장' }).click()

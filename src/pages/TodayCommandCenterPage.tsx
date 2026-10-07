@@ -59,7 +59,6 @@ import { krwTile } from '../lib/format'
 import { getDataModeConfig } from '../data/dataMode'
 import { brand } from '../brand/brand.config'
 import { useIsPilot } from '../auth/osAccess'
-import { contractStageOf } from '../types/clientOps'
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { CustomerEvent, CustomerEventStatus, JournalEntry } from '../types/bridge'
 
@@ -226,10 +225,9 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   }, [load])
 
   // 계약 완료(끝남)·보관을 뺀 곳이 '지금 챙기는 업체'
-  const active = useMemo(
-    () => clients.filter((c) => c.archivedAt === null && contractStageOf(c.status) !== 'closed'),
-    [clients],
-  )
+  // D-168: 할 일에 붙일 업체 — 보관하지 않은 업체 전부. 예전에는 예전 '끝남'(completed) 업체를 뺐는데,
+  // D-157 부터 그 업체도 화면에는 '계약 완료' 로 보여 8곳 중 6곳만 고를 수 있었다(대표 지적).
+  const active = useMemo(() => clients.filter((c) => c.archivedAt === null), [clients])
   const clientNames = useMemo(() => new Map(clients.map((c) => [c.id, c.companyName])), [clients])
   const alerts = useMemo(() => buildAllAlerts(clients, today), [clients, today])
   const schedule = useMemo(() => buildAllSchedule(clients, today), [clients, today])

@@ -6,6 +6,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { BottomSheet } from '../ui/primitives'
 import { Button } from '../ui/Button'
 import { AiSoonButton } from '../ui/AiSoonButton'
+import { ClientPickerOptions } from '../ops/ClientPickerOptions'
 import {
   COST_CATEGORY_LABEL,
   COST_CATEGORY_ORDER,
@@ -201,11 +202,7 @@ export function ExpenseSheet({
           <Row label="어느 업체 일인가요(선택)">
             <select value={clientId} onChange={(e) => setClientId(e.target.value)} className={inputCls} data-testid="expense-client">
               <option value="">업체와 상관없음</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
+              <ClientPickerOptions clients={clients.map((c) => ({ id: c.id, companyName: c.name }))} />
             </select>
           </Row>
         )}

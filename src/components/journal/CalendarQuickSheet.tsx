@@ -7,6 +7,7 @@
  * 저장이 실패하면 적은 것은 그대로 남는다(onSave 가 false).
  */
 import { todayLocalDate } from '../../lib/appClock'
+import { ClientPickerOptions } from '../ops/ClientPickerOptions'
 import { useMemo, useState } from 'react'
 import { BottomSheet } from '../ui/primitives'
 import { Button } from '../ui/Button'
@@ -37,7 +38,7 @@ export function CalendarQuickSheet({
 }: {
   date: string
   initialTab?: 'todo' | 'off'
-  clients: { id: string; companyName: string }[]
+  clients: { id: string; companyName: string; businessNumber?: string; corporateNumber?: string }[]
   /** 이 날에 이미 표시된 쉬는 날 */
   daysOffOn: DayOff[]
   /** 모든 쉬는 날 — 반복을 앞 영업일로 당길 때 */
@@ -152,11 +153,7 @@ export function CalendarQuickSheet({
                   <span className="t-sub font-semibold text-slate-700">업체</span>
                   <select aria-label="관련 업체" value={clientId} onChange={(e) => setClientId(e.target.value)} className="t-body rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2.5">
                     <option value="">업체 없음</option>
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.companyName}
-                      </option>
-                    ))}
+                    <ClientPickerOptions clients={clients} />
                   </select>
                 </label>
               )}
