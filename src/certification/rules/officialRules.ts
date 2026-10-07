@@ -363,3 +363,47 @@ export function rulesStale(rule: CertRule, today: string): boolean {
   const b = Date.parse(`${today}T00:00:00Z`)
   return Number.isFinite(a) && Number.isFinite(b) && (b - a) / 86_400_000 > FRESH_DAYS
 }
+
+/**
+ * FV: 고객에게 자료를 부탁할 때 쓰는 말 — 내부 용어 대신 '무엇을 보내면 되는지'. 없는 자료를 새로 만들라고 하지 않는다.
+ * 증빙 id 하나에 한 줄(인증마다 이름이 조금 달라도 같은 자료).
+ */
+export const EVIDENCE_ASK: Record<string, string> = {
+  biz_reg: '사업자등록증 사본',
+  fin3: '최근 3년 재무제표(세무사 사무실에 요청하시면 바로 받을 수 있습니다)',
+  lab_cert: '기업부설연구소(또는 연구개발전담부서) 인정서',
+  patent: '특허 · 상표 등록증 사본',
+  rnd_records: '최근 개발 과제나 연구 기록이 있다면 보내 주세요. 예: 연구노트, 개발 보고서, 시험 성적서',
+  org_chart: '조직도와 직원 명단(부서 · 직책). 엑셀이나 사진도 괜찮습니다',
+  biz_plan: '회사 소개서나 사업계획서(최근 것)',
+  quality: '품질 관련 인증서(ISO 등)나 검사 기록이 있다면 보내 주세요',
+  vision: '올해 사업계획이나 목표를 적어 둔 자료가 있다면 보내 주세요',
+  kpi: '목표 · 실적을 점검한 자료가 있다면 보내 주세요. 예: 월간 회의록, 실적 보고 엑셀',
+  hr_rules: '취업규칙과 직원 교육을 한 기록(교육 일지 · 사진 등)',
+  esg: '봉사 · 기부 · 안전교육 같은 활동 기록이 있다면 보내 주세요. 예: 사진, 영수증, 교육 일지',
+  customer: '고객 불만 처리나 만족도 조사 기록이 있다면 보내 주세요. 예: 상담 기록, 설문 결과',
+  researchers: '연구원 학력 · 경력 자료(졸업증명서 · 경력증명서)',
+  lab_space: '연구 공간 사진과 간단한 도면(손으로 그린 것도 괜찮습니다)',
+  env: '환경 관련 인허가 서류나 배출 관리 기록',
+  safety: '안전보건 관리 기록(안전교육 일지 · 점검표 등)',
+}
+
+/** FV: 신청에 꼭 쓰는 자료(OS 기준 — 이게 없으면 제출 준비가 안 된 것). 나머지는 실사 · 평가 보강 자료 */
+export const REQUIRED_EVIDENCE: Partial<Record<CertificationKey, readonly string[]>> = {
+  innobiz: ['fin3', 'biz_reg', 'biz_plan'],
+  mainbiz: ['fin3', 'biz_reg', 'vision'],
+}
+
+/** 화면 이름(라벨) → 증빙 id(여러 인증에서 같은 자료를 한 번만 부탁하려고) */
+export function evidenceIdOf(label: string): string | null {
+  for (const r of Object.values(CERT_RULES)) for (const e of r.evidence) if (e.label === label) return e.id
+  return null
+}
+
+/** 고객에게 부탁할 말(없으면 화면 이름 그대로) */
+export function evidenceAsk(idOrLabel: string): string {
+  return EVIDENCE_ASK[idOrLabel] ?? EVIDENCE_ASK[evidenceIdOf(idOrLabel) ?? ''] ?? idOrLabel
+}
+
+/** 없는 자료를 만들라고 하지 않는다는 한 줄 — 자료 요청 글 끝에 */
+export const NO_FABRICATE_LINE = '없는 자료는 "없음"이라고만 알려 주셔도 됩니다. 새로 만드실 필요는 없습니다.'

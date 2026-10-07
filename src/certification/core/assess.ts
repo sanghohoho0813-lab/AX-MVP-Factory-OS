@@ -95,9 +95,26 @@ function yearsCheck(c: CertificationClientContext, need: number): Check {
 }
 
 function exclusionCheck(c: CertificationClientContext): Check {
-  return c.exclusionFlags.length
-    ? { weight: 'must', state: 'no', text: `제외 사유: ${c.exclusionFlags.join(' · ')}` }
-    : { weight: 'must', state: 'ok', text: '체납 · 회생 같은 제외 사유 확인된 것 없음(신청 전 최종 확인)' }
+  if (c.exclusionFlags.length) return { weight: 'must', state: 'no', text: `제외 사유: ${c.exclusionFlags.join(' · ')}` }
+  // FV: 근거 목록이 있는데 제외 사유를 누구도 확인하지 않았으면 ✓ 로 보이지 않게(아는 척 금지) — 판정을 막지는 않는다
+  if (c.basis && !c.basis.some((b) => b.field === 'exclusion' && b.state !== 'missing')) return { weight: 'core', state: 'unknown', text: '체납 · 회생 같은 제외 사유 — 신청 전 확인 필요' }
+  return { weight: 'must', state: 'ok', text: '체납 · 회생 같은 제외 사유 확인된 것 없음(신청 전 최종 확인)' }
+}
+
+const RANK: Record<Readiness, number> = { very_high: 5, high: 4, medium: 3, low: 2, very_low: 1, unknown: 0 }
+/** 준비도 상한 — 모르는 것('추가 확인 필요')은 그대로 둔다 */
+function capReadiness(r: Readiness, max: Readiness): Readiness {
+  return r !== 'unknown' && RANK[r] > RANK[max] ? max : r
+}
+
+/**
+ * FV: 준비도는 '신청 준비' 다 — 제출 자료가 덜 모였으면 요건이 좋아도 한계가 있다(공통 규칙, 업체 이름 무관).
+ *   자료 3분의 1 미만 → 최대 '보통' · 4분의 3 미만 → 최대 '높음'
+ */
+function evidenceCap(have: number, total: number): Readiness {
+  if (total === 0) return 'very_high'
+  const r = have / total
+  return r < 1 / 3 ? 'medium' : r < 0.75 ? 'high' : 'very_high'
 }
 
 function finish(
@@ -119,13 +136,17 @@ function finish(
     const daysLeft = daysBetween(c.today, held.validUntil)
     renewal = { validUntil: held.validUntil, daysLeft, prepareFrom: plan ? plan.noticeOn : addDays(held.validUntil, -rule.prepareDaysBefore), note: rule.renewalNote }
   }
+  const raw = readinessOverride ?? readinessOf(checks)
+  const capped = rec === 'held' ? raw : capReadiness(raw, evidenceCap(ev.have.length, ev.have.length + ev.missing.length))
+  const reasons = reasonsOf(checks)
+  if (capped !== raw) reasons.push({ state: 'warn', text: `제출 자료 ${ev.have.length}/${ev.have.length + ev.missing.length} 준비 — 자료가 더 모이면 준비도가 올라갑니다` })
   return {
     key: rule.key,
     label: rule.label,
-    readiness: readinessOverride ?? readinessOf(checks),
+    readiness: capped,
     recommendation: rec,
     oneLine,
-    reasons: reasonsOf(checks),
+    reasons,
     missingFacts,
     missingEvidence: ev.missing,
     haveEvidence: ev.have,
@@ -190,7 +211,10 @@ export function assessInnobiz(c: CertificationClientContext): CertificationAsses
   checks.push(c.rndExpense === null && c.rndPlan === null ? { weight: 'core', state: 'unknown', text: '연구개발 활동 · 비용 — 확인 필요' } : t.rnd ? { weight: 'core', state: 'ok', text: c.rndExpense ? `연구개발비 ${won(c.rndExpense)}` : '연구개발 계획 있음' } : { weight: 'core', state: 'warn', text: '연구개발 활동 기록이 약함' })
   checks.push(c.revenue === null ? { weight: 'core', state: 'unknown', text: '매출 · 재무 — 재무제표 필요' } : c.operatingProfit !== null && c.operatingProfit < 0 ? { weight: 'core', state: 'warn', text: '영업손실 — 재무 지표 보강 필요' } : { weight: 'core', state: 'ok', text: `매출 ${won(c.revenue)}` })
 
-  const readiness = readinessOf(checks)
+  // FV: 기술 근거 3가지(연구조직 · 특허 · 연구개발)가 없으면 '낮음', 하나뿐이면 '보통' 까지만
+  const techKnown = c.researchUnit !== null && c.patents !== null && (c.rndExpense !== null || c.rndPlan !== null)
+  const rawReadiness = readinessOf(checks)
+  const readiness = techKnown && t.count === 0 ? capReadiness(rawReadiness, 'low') : t.count === 1 ? capReadiness(rawReadiness, 'medium') : rawReadiness
   const missingFacts = checks.filter((x) => x.state === 'unknown').map((x) => x.text.split(' — ')[0])
   const tooEarly = c.years !== null && c.years < 3
   const mustNo = checks.some((x) => x.weight === 'must' && x.state === 'no')
@@ -214,10 +238,11 @@ export function assessInnobiz(c: CertificationClientContext): CertificationAsses
     oneLine = `${missingFacts.slice(0, 2).join(' · ')} 확인이 먼저 필요`
     timing = '정보를 채우면 바로 다시 판정'
     next = { label: '모자란 정보 채우기', kind: 'confirm_facts' }
-  } else if (t.count === 0 && (c.industryGroup === 'service' || c.industryGroup === 'retail')) {
+  } else if (t.count === 0 && techKnown) {
+    // FV: 이노비즈는 기술혁신 평가(기술혁신능력 · 성과) — 연구조직 · 특허 · 연구개발이 하나도 없으면 업력 · 업종만으로 추천하지 않는다
     rec = 'low_priority'
-    oneLine = '기술 기반(연구조직 · 특허 · R&D)이 약해 메인비즈가 더 맞을 수 있음'
-    timing = '다른 인증(메인비즈)을 먼저 추천'
+    oneLine = '연구조직 · 특허 · 연구개발이 아직 없어 이노비즈는 나중에 — 메인비즈가 더 맞을 수 있음'
+    timing = '기술 기반(연구조직 · 특허 · 연구개발)이 생기면 다시 검토'
     next = { label: '메인비즈 살펴보기', kind: 'self_check' }
   } else if (readiness === 'very_high' || readiness === 'high') {
     rec = 'now'
@@ -348,6 +373,11 @@ export function assessVenture(c: CertificationClientContext): CertificationAsses
     rec = 'possible'
     oneLine = '혁신성장유형 검토 추천 — 기술성 · 성장성 평가'
     timing = '사업계획서를 갖추고 검토'
+  } else if (!lab && c.rndPlan === false && (c.rndExpense ?? 0) === 0) {
+    // FV: 연구개발 계획도 특허도 없으면 연구소를 만들라고 밀지 않는다
+    rec = 'low_priority'
+    oneLine = '연구개발 · 특허 · 혁신 제품 계획이 생기면 검토 — 지금은 우선순위 낮음'
+    timing = '기술 · 혁신 계획이 생기면'
   } else if (!lab) {
     rec = 'after_fix'
     oneLine = '연구소(또는 전담부서)를 먼저 — 연구개발유형 길이 열림'
@@ -358,7 +388,7 @@ export function assessVenture(c: CertificationClientContext): CertificationAsses
     timing = '연구개발비 5천만원 이상 쌓인 뒤'
   }
   // 혁신성장유형은 확인기관 평가로 정해진다 — 요건형(연구개발유형)이 아니면 '매우 높음' 까지는 말하지 않는다
-  const shown: Readiness = rec !== 'now' && readiness === 'very_high' ? 'high' : readiness
+  const shown: Readiness = rec === 'low_priority' ? capReadiness(readiness, 'low') : rec !== 'now' && readiness === 'very_high' ? 'high' : readiness
   return finish(rule, c, checks, rec, oneLine, timing, { label: '벤처 화면 열기', kind: 'open_tool' }, missingFacts, shown)
 }
 
@@ -389,10 +419,12 @@ export function assessLab(c: CertificationClientContext): CertificationAssessmen
   const readiness = readinessOf(checks)
   const missingFacts = checks.filter((x) => x.state === 'unknown').map((x) => x.text.split(' — ')[0])
   const deptOnly = c.researchers !== null && need !== null && c.researchers < need && c.researchers >= 1
-  const rec: Recommendation = c.researchUnit === 'dept' ? 'possible' : readiness === 'very_low' ? 'after_fix' : deptOnly ? 'possible' : readiness === 'unknown' ? 'need_info' : 'now'
+  // FV: 연구 인력도 연구개발 계획도 없으면 '보완 후 추천' 이 아니라 '지금은 필요 없음'(연구소를 위해 연구소를 만들지 않는다)
+  const noRnd = c.researchers === 0 && c.rndPlan === false && (c.rndExpense ?? 0) === 0
+  const rec: Recommendation = c.researchUnit === 'dept' ? 'possible' : noRnd ? 'not_needed' : readiness === 'very_low' ? 'after_fix' : deptOnly ? 'possible' : readiness === 'unknown' ? 'need_info' : 'now'
   const oneLine =
-    c.researchUnit === 'dept' ? '전담부서 보유 — 인원이 늘면 연구소로 전환 검토' : deptOnly ? '연구개발전담부서부터 — 인원이 늘면 연구소로' : rec === 'need_info' ? '연구 인력 · 공간 조건 확인 필요' : rec === 'after_fix' ? '연구 인력을 먼저 갖춰야 함' : '연구 인력 조건 충족 — 공간 · 서류 준비'
-  return finish(rule, c, checks, rec, oneLine, rec === 'now' ? '지금 진행 추천 — 벤처 · 이노비즈의 바탕' : '인력 · 공간을 갖춘 뒤', { label: '연구소 화면 열기', kind: 'open_tool' }, missingFacts, readiness)
+    c.researchUnit === 'dept' ? '전담부서 보유 — 인원이 늘면 연구소로 전환 검토' : noRnd ? '연구개발 계획이 생기면 검토 — 지금은 필요 없음' : deptOnly ? '연구개발전담부서부터 — 인원이 늘면 연구소로' : rec === 'need_info' ? '연구 인력 · 공간 조건 확인 필요' : rec === 'after_fix' ? '연구 인력을 먼저 갖춰야 함' : '연구 인력 조건 충족 — 공간 · 서류 준비'
+  return finish(rule, c, checks, rec, oneLine, rec === 'now' ? '지금 진행 추천 — 벤처 · 이노비즈의 바탕' : rec === 'not_needed' ? '연구개발을 시작할 때' : '인력 · 공간을 갖춘 뒤', { label: '연구소 화면 열기', kind: 'open_tool' }, missingFacts, readiness)
 }
 
 /* ------------------------------------------------------------------ */

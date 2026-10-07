@@ -8,6 +8,7 @@
  * 수치는 근거 값에 있는 것만 쓴다. '업계 최고' 같은 평가 말은 쓰지 않는다.
  */
 import type { BasisField, CertificationClientContext } from './types'
+import { eunNeun } from './josa'
 import type { InspectionQuestion, PreparedAnswer } from './inspection'
 
 /** 근거가 붙은 한 문장 */
@@ -95,5 +96,5 @@ export function buildAnswerGuide(q: InspectionQuestion, c: CertificationClientCo
 
 /** 핵심 답 근거가 없을 때 화면 · 글에 쓰는 한 줄 */
 export function ownerPlaceholder(q: InspectionQuestion): string {
-  return `${q.topic ?? '이 질문'}은(는) 대표 확인 후 보완이 필요합니다.`
+  return `${eunNeun(q.topic ?? '이 질문')} 대표 확인 후 보완이 필요합니다.`
 }

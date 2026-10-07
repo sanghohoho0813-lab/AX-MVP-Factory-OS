@@ -40,6 +40,9 @@ import { INNOBIZ_BANK } from '../innobiz/innobizGuides'
 import { MAINBIZ_BANK } from '../mainbiz/mainbizGuides'
 import { RULE_CHANGES } from '../rules/ruleChanges'
 import type { BasisItem } from '../core/types'
+import { FIELD_COS } from './fieldFixtures'
+import { eunNeun, euroRo, iGa } from '../core/josa'
+import { evidenceAsk, REQUIRED_EVIDENCE } from '../rules/officialRules'
 
 let pass = 0
 let fail = 0
@@ -120,7 +123,9 @@ check('기술기업 로드맵: 벤처 → 이노비즈 → 정책자금 → ISO 
 
 check('서비스기업: 이노비즈는 우선순위 낮음 · 메인비즈 추천', V.innobiz.recommendation === 'low_priority' && ['now', 'possible'].includes(V.mainbiz.recommendation), [V.innobiz.recommendation, V.mainbiz.recommendation])
 check('서비스기업: ISO 14001 · 45001 굳이 필요 없음', V.iso14001.recommendation === 'not_needed' && V.iso45001.recommendation === 'not_needed')
-check('서비스기업: 연구소는 연구 인력이 없어 보완 후', V.lab.recommendation === 'after_fix', V.lab)
+// FV: 연구 인력도 연구개발 계획도 없는 서비스기업에 연구소를 '보완 후 추천' 하지 않는다 — 지금은 필요 없음
+check('서비스기업: 연구 인력 · 연구개발 계획 없음 → 연구소는 지금 필요 없음', V.lab.recommendation === 'not_needed', V.lab)
+check('연구 인력은 없지만 연구개발 계획이 있으면 → 연구소 보완 후 추천(예전 길 유지)', assessLab(ctx({ ...service, rndPlan: true })).recommendation === 'after_fix')
 const rV = buildRoadmap(assessAll(service), service)
 check('서비스기업 로드맵: 메인비즈가 들어 있고 이노비즈는 없다', rV.steps.some((s) => s.id === 'mainbiz') && !rV.steps.some((s) => s.id === 'innobiz'), rV.steps)
 
@@ -390,11 +395,11 @@ check('어댑터: 설정 읽기 — 이상한 값은 모름', JSON.stringify(nor
   const docs = submissionDocs('innobiz', tech)
   const req = missingDocsRequest('한빛정밀', 'innobiz', docs, '김상호 대표')
   check('I 제출자료 정리: 서류함에 있는 7개는 ✓, 없는 것만 △', docs.have.length === 7 && docs.need.map((d) => d.label).join() === '품질 · 인증 현황(ISO 등)', docs)
-  check('I 요청 문구: 없는 것만 번호 · 이미 받은 것은 다시 안 주셔도 됨', /1\. 품질 · 인증 현황/.test(req) && !/2\. /.test(req) && /다시 안 주셔도/.test(req))
+  check('I 요청 문구: 없는 것만 번호(고객이 알아듣는 말) · 이미 받은 것은 다시 안 주셔도 됨 · 없는 자료는 만들지 않아도 됨', /1\. 품질 관련 인증서/.test(req) && !/2\. /.test(req) && /다시 안 주셔도/.test(req) && /새로 만드실 필요는 없습니다/.test(req), req)
   const staleDocs = submissionDocs('innobiz', ctx({ ...tech, evidence: [...tech.evidence.filter((e) => e.id !== 'fin3'), { id: 'fin3', label: 'fin3', have: true, stale: true }] }))
   check('I 기간 지난 자료는 새로 발급 요청', staleDocs.need.some((d) => d.label === '최근 3년 재무제표' && d.stale))
   const gateRich = buildSubmitGate({ cert: 'innobiz', ctx: rich, selfCheck: INNOBIZ_CHECK, answers: Object.fromEntries(INNOBIZ_CHECK.map((i) => [i.id, 'yes' as const])), pkg: richPkg })
-  check('I 제출 전 확인 항목은 ✓/△ 한 줄씩 · 판정은 두 가지뿐', gateRich.items.length === 7 && ['ready', 'check_first'].includes(gateRich.verdict))
+  check('I 제출 전 확인 항목은 ✓/△ 한 줄씩(반드시 4 · 권장 4) · 판정은 두 가지뿐', gateRich.items.length === 8 && gateRich.items.filter((x) => x.level === 'must').length === 4 && ['ready', 'check_first'].includes(gateRich.verdict), gateRich.items)
 
   // J 벤처 준비 패키지
   const vp = buildVenturePack(rich)
@@ -421,7 +426,7 @@ check('어댑터: 설정 읽기 — 이상한 값은 모름', JSON.stringify(nor
   const sumText = clientSummaryText(sum, '미래경영 홍길동 대표')
   check('L 고객 요약: 8칸 이내(검토 · 추천 · 이유 · 준비 · 자료 · 혜택 · 순서 · 유의)', sum.sections.length >= 5 && sum.sections.length <= 8 && sum.sections.some((x) => x.id === 'notice'))
   check('L 고객 요약: 실사 질문 · 대표 답 · 체납 · 내부 · 공식 점수 숫자 없음', !/체납|실사|대표 답|내부|컨설턴트 메모|650|700점|%|점수/.test(sumText), sumText)
-  check('L 고객 요약: 결과를 보장하지 않는다는 유의사항', /결과를 보장하지 않습니다/.test(sumText))
+  check('L 고객 요약: 인증은 기관 심사로 정해진다는 유의사항(짧게)', /기관의 심사로 정해집니다/.test(sumText))
   const ih = inspectionHandoff(richPkg, T.innobiz, runSelfCheck(INNOBIZ_CHECK, rich, {}))
   check('AI 넘기기: 구조 묶음(버전 · 사실 · 판정 · 자가진단 · 증빙 · 질문 · 금지 지시)', ih.version === 'cert-handoff/1' && ih.facts.length > 0 && !!ih.judgment && ih.selfCheck.length > 0 && ih.questions.length === richPkg.questions.length && ih.rules === HANDOFF_RULES)
   check('AI 넘기기: 다른 업체 이름이 섞이지 않는다', !handoffText(ih).includes('처음상사') && handoffText(ih).includes('한빛정밀'))
@@ -431,6 +436,76 @@ check('어댑터: 설정 읽기 — 이상한 값은 모름', JSON.stringify(nor
   check('메인비즈 패키지: 질문 5~8개 · 문장마다 근거', mPkg.questions.length >= 5 && mPkg.questions.length <= 8 && mPkg.questions.flatMap((x) => [...x.guide.core, ...x.guide.points]).every((x) => x.basis.length > 0))
   check('질문 은행: 이노비즈 10 · 메인비즈 10 · 가이드 전부 있음', INNOBIZ_BANK.length === 10 && MAINBIZ_BANK.length === 10 && [...INNOBIZ_BANK, ...MAINBIZ_BANK].every((q) => !!q.guide && !!q.topic))
   check('기준 바뀐 기록: 인증 · 기준 · 확인일 · 바뀐 것', RULE_CHANGES.length >= 4 && RULE_CHANGES.every((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.checkedAt) && r.rule && r.change && CERT_RULES[r.cert]))
+}
+
+
+// ---------------- FV — 현장 검증(업체 5유형 · 공통 규칙만 · 업체 이름 예외 없음) ----------------
+{
+  const R = (k: keyof typeof FIELD_COS) => by(assessAll(FIELD_COS[k]))
+  const A = R('A'), Bs = R('B'), C = R('C'), D = R('D'), E = R('E')
+  const ACTIVE = ['now', 'possible']
+  // A 기술기업 — 벤처 · 이노비즈가 먼저, 메인비즈는 뒤로
+  check('FV A 기술기업: 벤처 · 이노비즈 지금 추천 · 메인비즈 우선순위 낮음 · 연구소 보유', A.venture.recommendation === 'now' && A.innobiz.recommendation === 'now' && A.mainbiz.recommendation === 'low_priority' && A.lab.recommendation === 'held')
+  check('FV A 자료 절반(4/8)이면 이노비즈 준비도는 높음까지(매우 높음 아님) · 이유 한 줄', A.innobiz.readiness === 'high' && A.innobiz.reasons.some((r) => /제출 자료 4\/8/.test(r.text)), A.innobiz.readiness)
+  check('FV A 제조 28명: ISO 14001 · 45001 은 업종만으로 추천하지 않음', !ACTIVE.includes(A.iso14001.recommendation) && !ACTIVE.includes(A.iso45001.recommendation))
+  // B 서비스 — 이노비즈를 밀지 않고 메인비즈
+  check('FV B 서비스: 메인비즈 지금 추천 · 이노비즈 우선순위 낮음(준비도 낮음 이하)', Bs.mainbiz.recommendation === 'now' && Bs.innobiz.recommendation === 'low_priority' && ['low', 'very_low'].includes(Bs.innobiz.readiness))
+  check('FV B 서비스: 연구소 지금 필요 없음 · 벤처 우선순위 낮음(연구소를 밀지 않음)', Bs.lab.recommendation === 'not_needed' && Bs.venture.recommendation === 'low_priority')
+  check('FV B B2B 서비스: ISO 9001 자동 추천 안 함', !ACTIVE.includes(Bs.iso9001.recommendation))
+  // C 정보 부족 — 아는 척하지 않음
+  check('FV C 정보 부족: 인증 7개 전부 추가 확인 필요', Object.values(C).every((a) => a.recommendation === 'need_info'), Object.values(C).map((a) => a.recommendation))
+  check('FV C 아무도 확인 안 한 제외 사유를 ✓ 로 보이지 않음', !C.innobiz.reasons.some((r) => r.state === 'ok' && /제외 사유/.test(r.text)))
+  check('FV C ISO 한 줄이 판정과 같은 말(추가 확인 필요인데 "필요 없음" 이라고 하지 않음)', !/필요 없음/.test(C.iso14001.oneLine + C.iso45001.oneLine))
+  // D 제조 B2B — 기술 근거 없으면 이노비즈 대신 메인비즈 · ISO 는 이유가 있어 추천
+  check('FV D 제조 B2B(연구조직 · 특허 · R&D 없음): 이노비즈 업력만으로 추천 안 함 · 메인비즈 지금', D.innobiz.recommendation === 'low_priority' && ['low', 'very_low'].includes(D.innobiz.readiness) && D.mainbiz.recommendation === 'now')
+  check('FV D 조달 · 금속 가공 · 60명: ISO 9001 · 14001 · 45001 검토(이유 있음)', D.iso9001.recommendation === 'possible' && D.iso14001.recommendation === 'possible' && D.iso45001.recommendation === 'possible')
+  check('FV D 문서 0~1개: ISO 준비도 매우 높음 아님', [D.iso9001, D.iso14001, D.iso45001].every((a) => a.readiness !== 'very_high'))
+  // E 보유 · 만료 — 유지 · 갱신이 먼저
+  check('FV E 보유: 벤처 · 연구소 보유 중 · 이노비즈는 만료 표시 + 다시 신청(보유 중 아님)', E.venture.recommendation === 'held' && E.lab.recommendation === 'held' && E.innobiz.recommendation !== 'held' && E.innobiz.expired === true)
+  // 다섯 유형의 추천이 서로 다르다
+  const sigs = Object.keys(FIELD_COS).map((k) => ['lab', 'venture', 'innobiz', 'mainbiz', 'iso9001'].map((x) => R(k as keyof typeof FIELD_COS)[x].recommendation).join('/'))
+  check('FV 다섯 유형의 추천 조합이 모두 다름', new Set(sigs).size === 5, sigs)
+  // 패키지 · 질문 · 요청 품질
+  const pkgOf = (k: keyof typeof FIELD_COS, cert: 'innobiz' | 'mainbiz') => buildInspectionPackage({ cert, bank: cert === 'innobiz' ? INNOBIZ_BANK : MAINBIZ_BANK, selfCheck: cert === 'innobiz' ? INNOBIZ_CHECK : MAINBIZ_CHECK, answers: {}, ctx: FIELD_COS[k], prep: {}, labelOf: label })
+  const pB = pkgOf('B', 'mainbiz')
+  check("FV B 강점에 '특허 0건' · '연구조직 없음' 같은 없는 것을 내세우지 않음", !pB.strengths.some((x) => /0건|없음/.test(x.text)) && !pB.company.some((x) => /0건|없음/.test(x.text)), pB.strengths)
+  const allOwner = [...pkgOf('A', 'innobiz').ownerQuestions, ...pB.ownerQuestions, ...pkgOf('C', 'innobiz').ownerQuestions, ...pkgOf('D', 'mainbiz').ownerQuestions]
+  check('FV 대표 질문은 모두 물음표로 끝나는 질문(조각 말 아님)', allOwner.every((q) => /\?(\(.*\))?$/.test(q)), allOwner.filter((q) => !/\?(\(.*\))?$/.test(q)))
+  check('FV 대표 질문에 체불 질문이 두 번 나오지 않음', pB.ownerQuestions.filter((q) => /체불/.test(q)).length <= 1, pB.ownerQuestions)
+  check('FV 크기를 아는 업체(A)에는 중소기업확인서를 묻지 않음', !pkgOf('A', 'innobiz').ownerQuestions.some((q) => /중소기업확인서/.test(q)))
+  const dPkg = pkgOf('D', 'mainbiz')
+  check('FV D 납품 제조업: 고객 관리 질문이 이유와 함께 올라옴', dPkg.questions.some((x) => x.q.id === 'q_customer' && /납품/.test(x.why)))
+  const aPkg = pkgOf('A', 'innobiz')
+  check('FV A 제조: 품질 · 공정 질문이 이유와 함께 들어옴', aPkg.questions.some((x) => x.q.id === 'q_quality' && /제조업/.test(x.why)))
+  check("FV 말하기 가이드에 '업종: …' 같은 채움 말 없음", !aPkg.questions.some((x) => x.guide.points.some((p) => /^업종:/.test(p.text))))
+  const txt = [inspectionPackageText(aPkg), inspectionPackageText(pB), explainFor(A.innobiz, FIELD_COS.A, 'X').thirty, explainFor(Bs.mainbiz, FIELD_COS.B, 'X').thirty].join('\n')
+  check("FV '은(는)' 같은 기계 조사 없음", !/은\(는\)|이\(가\)/.test(txt))
+  check('FV 조사: 이노비즈는 · 메인비즈는 · 연구소는 · 업력 9년으로 · 특허가', eunNeun('이노비즈') === '이노비즈는' && eunNeun('기업부설연구소') === '기업부설연구소는' && eunNeun('최근 개발 과제 · 기록') === '최근 개발 과제 · 기록은' && euroRo('업력 9년') === '업력 9년으로' && euroRo('업력 7년') === '업력 7년으로' && iGa('특허') === '특허가')
+  // 자료 요청 · 제출 전 확인
+  const reqD = missingDocsRequest('대성정밀', 'mainbiz', submissionDocs('mainbiz', FIELD_COS.D), 'X')
+  check('FV 자료 요청: 고객이 알아듣는 말(예: …) · 없는 자료는 만들 필요 없음', /예: 월간 회의록/.test(reqD) && /새로 만드실 필요는 없습니다/.test(reqD) && !/성과 관리 기록\(목표/.test(reqD), reqD)
+  check('FV 신청에 꼭 쓰는 자료는 요청 맨 앞', submissionDocs('mainbiz', FIELD_COS.D).need[0].required === true && (REQUIRED_EVIDENCE.mainbiz ?? []).includes(submissionDocs('mainbiz', FIELD_COS.D).need[0].id))
+  // 반드시 확인이 다 되면 보완 권장이 남아도 '제출 준비 가능'
+  const readyCtx = { ...FIELD_COS.B, basis: [...(FIELD_COS.B.basis ?? []), { field: 'exclusion' as const, label: '제외 사유', value: '없음', state: 'confirmed' as const, from: '납세증명서' }] }
+  const allYes = Object.fromEntries(MAINBIZ_CHECK.map((i) => [i.id, 'yes' as const]))
+  const readyPkg = buildInspectionPackage({ cert: 'mainbiz', bank: MAINBIZ_BANK, selfCheck: MAINBIZ_CHECK, answers: allYes, ctx: readyCtx, prep: {}, labelOf: label })
+  const readyGate = buildSubmitGate({ cert: 'mainbiz', ctx: readyCtx, selfCheck: MAINBIZ_CHECK, answers: allYes, pkg: readyPkg })
+  check('FV 제출 전 확인: 자격 · 제외 사유 · 꼭 쓰는 자료 · 자가진단 OK 면 보완 권장이 남아도 제출 준비 가능', readyGate.verdict === 'ready' && readyGate.items.some((x) => x.level === 'recommend' && !x.ok), readyGate.items)
+  check('FV 제출 전 확인: 꼭 쓰는 자료가 없으면 먼저 확인 필요', buildSubmitGate({ cert: 'mainbiz', ctx: { ...readyCtx, evidence: readyCtx.evidence.filter((e) => e.id !== 'fin3') }, selfCheck: MAINBIZ_CHECK, answers: allYes, pkg: readyPkg }).verdict === 'check_first')
+  check('FV 제출 전 확인: 제외 사유가 있으면 먼저 확인 필요', buildSubmitGate({ cert: 'mainbiz', ctx: { ...readyCtx, exclusionFlags: ['국세 체납'] }, selfCheck: MAINBIZ_CHECK, answers: allYes, pkg: readyPkg }).verdict === 'check_first')
+  // 고객 요약
+  const sumC = clientSummaryText(buildClientSummary(assessAll(FIELD_COS.C), FIELD_COS.C, buildRoadmap(assessAll(FIELD_COS.C), FIELD_COS.C)), 'X')
+  check("FV C 고객 요약: 아무것도 안 받았는데 '다 받아 두었습니다' 라고 하지 않음 · 기본 자료부터", !/다 받아 두었습니다/.test(sumC) && /사업자등록증/.test(sumC), sumC)
+  const listA = assessAll(FIELD_COS.A)
+  const sumA = buildClientSummary(listA, FIELD_COS.A, buildRoadmap(listA, FIELD_COS.A))
+  check('FV 고객 요약 첫 다섯 칸: 추천 · 이유 · 지금 준비할 자료 · 기대 혜택 · 다음 순서', sumA.sections.slice(0, 5).map((x) => x.id).join() === 'recommend,why,docs,benefits,next', sumA.sections.map((x) => x.id))
+  const docLines = sumA.sections.find((x) => x.id === 'docs')!.lines.filter((l) => l.startsWith('□'))
+  check('FV 고객 요약: 같은 자료가 이름만 달리 두 번 나오지 않음(조직도 · 사업계획서)', docLines.filter((l) => /조직도/.test(l)).length <= 1 && docLines.filter((l) => /사업계획서|소개서/.test(l)).length <= 1, docLines)
+  check('FV 고객 요약: 맞춤 한 줄은 한 번만', (clientSummaryText(sumA, 'X').match(/귀사는/g) ?? []).length === 1)
+  // AI 묶음 — 짧고, 금지 지시 포함, 민감 정보 없음
+  const hA = handoffText(inspectionHandoff(aPkg, A.innobiz, runSelfCheck(INNOBIZ_CHECK, FIELD_COS.A, {})))
+  check('FV AI 묶음: 3,000자 안 · 금지 지시 포함 · 주민번호 꼴 없음', hA.length < 3000 && /만들지 마세요/.test(hA) && !/\d{6}-\d{7}/.test(hA), hA.length)
+  check('FV 자료 부탁 말이 모든 인증 자료에 있음', Object.values(CERT_RULES).flatMap((r) => r.evidence).every((e) => evidenceAsk(e.id) !== e.id))
 }
 
 // Core 는 OS 를 모른다 — core · rules · innobiz · mainbiz · iso 는 그 밖(services · pages · components · tools · types)을 import 하지 않는다

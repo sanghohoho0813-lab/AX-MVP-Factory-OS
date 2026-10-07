@@ -5,7 +5,7 @@
  * 점수 · 퍼센트 없음. 없는 사실은 만들지 않는다.
  */
 import { CERT_RULES } from '../rules/officialRules'
-import { buildAnswerGuide, factKit, OWNER_BASIS, type AnswerGuide, type Sourced } from './answerGuide'
+import { buildAnswerGuide, factKit, OWNER_BASIS, ownerPlaceholder, type AnswerGuide, type Sourced } from './answerGuide'
 import type { InspectionQuestion, PreparedAnswer } from './inspection'
 import { runSelfCheck, type Answer, type SelfCheckItem } from './selfCheck'
 import type { BasisField, CertificationClientContext, CertificationKey } from './types'
@@ -40,6 +40,8 @@ export interface InspectionPackage {
   ownerQuestions: string[]
 }
 
+/** '없음' · '0건' · '0명' — 내세울 사실이 아님 */
+const NONE = /없음|^0\s*(건|명|원)?$|^0건/
 const COMPANY_FIELDS: BasisField[] = ['years', 'industry', 'revenue', 'employees', 'researchUnit', 'patents']
 const CERT_NAME: Record<CertificationKey, string> = { venture: '벤처기업', lab: '기업부설연구소', innobiz: '이노비즈', mainbiz: '메인비즈', iso9001: 'ISO 9001', iso14001: 'ISO 14001', iso45001: 'ISO 45001' }
 
@@ -55,15 +57,16 @@ export function companyFacts(c: CertificationClientContext): { company: Sourced[
   if (c.companyName) company.push({ text: `회사명 ${c.companyName}`, basis: '업체 기록' })
   for (const f of COMPANY_FIELDS) {
     const b = confirmed(f)
-    if (b) company.push({ text: `${b.label} ${b.value}`, basis: b.from })
+    // FV: '연구조직 없음 · 특허 0건' 은 핵심정보가 아니다(실사에서 내세울 사실만)
+    if (b && !NONE.test(b.value)) company.push({ text: `${b.label} ${b.value}`, basis: b.from })
   }
   const live = c.held.filter((h) => !h.validUntil || h.validUntil >= c.today)
   if (live.length) company.push({ text: `인증 ${live.map((h) => CERT_NAME[h.key]).join(' · ')}`, basis: '회사 정보 인증서 칸 · 진행 기록' })
   const strengths: Sourced[] = []
   const unit = confirmed('researchUnit')
-  if (unit && !/없음/.test(unit.value)) strengths.push({ text: `${unit.value} 보유 — 기술개발 체제를 보여 줄 수 있음`, basis: unit.from })
+  if (unit && !NONE.test(unit.value)) strengths.push({ text: `${unit.value} 보유 — 기술개발 체제를 보여 줄 수 있음`, basis: unit.from })
   const pat = confirmed('patents')
-  if (pat && !/없음/.test(pat.value)) strengths.push({ text: `특허 ${pat.value} — 기술 성과 증빙`, basis: pat.from })
+  if (pat && !NONE.test(pat.value)) strengths.push({ text: `특허 ${pat.value} — 기술 성과 증빙`, basis: pat.from })
   if (live.length) strengths.push({ text: `${live.map((h) => CERT_NAME[h.key]).join(' · ')} 보유 — 이미 검증받은 이력`, basis: '회사 정보 인증서 칸 · 진행 기록' })
   return { company, strengths }
 }
@@ -85,13 +88,16 @@ export function withOwnerNotes(g: AnswerGuide, notes: Record<string, string>): A
 
 /** B — 이 업체에 특히 중요한 질문(5~8개). 늘 묻는 핵심 + 강점을 보여 줄 질문 + 자료가 모자란 질문 */
 export function prioritizeQuestions(bank: readonly InspectionQuestion[], c: CertificationClientContext, labelOf: (id: string) => string, prep: Record<string, PreparedAnswer>, max = 8, notes: Record<string, string> = {}): PackageQuestion[] {
+  const kit = factKit(c)
   const scored = bank.map((q, i) => {
     const guide = withOwnerNotes(buildAnswerGuide(q, c, labelOf, prep[q.id]), notes)
     const weight = q.weight ?? 2
     const strong = guide.core.length > 0
     const gap = guide.evidenceMissing.length > 0
-    const score = weight * 2 + (strong ? 1 : 0) + (gap ? 1 : 0)
-    const why = weight === 3 ? '거의 늘 묻는 질문' : strong ? '이 업체 강점을 보여 줄 수 있음' : gap ? '자료를 보완해 두면 좋은 질문' : '업체 사정에 따라 물을 수 있음'
+    // FV: 업체 사실 때문에 더 중요해진 질문은 한 칸 올리고, 이유를 그대로 보여 준다
+    const boosted = q.boost?.(kit) ?? null
+    const score = weight * 2 + (strong ? 1 : 0) + (gap ? 1 : 0) + (boosted ? 2 : 0)
+    const why = weight === 3 ? '거의 늘 묻는 질문' : boosted ?? (strong ? '이 업체 강점을 보여 줄 수 있음' : gap ? '자료를 보완해 두면 좋은 질문' : '업체 사정에 따라 물을 수 있음')
     const prepared = prep[q.id]?.state === 'ok' || prep[q.id]?.state === 'edited'
     return { q, guide, why, prepared, score, i }
   })
@@ -120,10 +126,12 @@ export function buildInspectionPackage(input: {
   const used = new Set(questions.flatMap((x) => x.q.evidence))
   const ids = [...new Set([...rule.evidence.map((e) => e.id), ...used])]
   const kit = factKit(c)
+  // 이 인증의 자료 이름을 먼저(인증마다 이름이 조금 달라 화면끼리 어긋나지 않게)
+  const nameOf = (id: string) => rule.evidence.find((e) => e.id === id)?.label ?? labelOf(id)
   const bring = ids.map((id) => {
     const doc = c.evidence.find((e) => e.id === id)
     const state: BringState = doc?.have && !doc.stale ? 'ready' : doc?.stale || used.has(id) ? 'fix' : 'check'
-    return { label: labelOf(id), state }
+    return { label: nameOf(id), state }
   })
   const ownerQuestions = buildOwnerQuestions({ questions, selfCheck: input.selfCheck, answers: input.answers, ctx: c, notes })
   // E — 실사 전날 체크(최대 5)
@@ -148,7 +156,7 @@ export function buildOwnerQuestions(input: { questions: readonly PackageQuestion
   // 신청 자격(제외 사유 · 중소기업)부터 — 이게 막히면 나머지는 의미가 없다
   const b = (f: BasisField) => (input.ctx.basis ?? []).find((x) => x.field === f && x.state !== 'missing')
   if (!b('exclusion')) out.push('최근 3년 국세 체납 · 회생 · 임금 체불 · 산재 공표가 있었나요?')
-  if (!b('size')) out.push('중소기업확인서가 있나요?(있으면 사진으로)')
+  if (input.ctx.size === null && !b('size')) out.push('중소기업확인서가 있나요?(있으면 사진으로)')
   for (const x of input.questions) if (!x.prepared) out.push(...x.guide.ownerAsk)
   if (input.selfCheck) {
     const r = runSelfCheck(input.selfCheck, input.ctx, input.answers ?? {})
@@ -182,7 +190,7 @@ export function inspectionPackageText(p: InspectionPackage): string {
   p.questions.forEach((x, i) => {
     lines.push(`${i + 1}. ${x.q.question}`)
     if (x.guide.core.length) lines.push(`   핵심 답: ${x.guide.core.map((s) => s.text).join(' ')}`)
-    else lines.push(`   핵심 답: ${x.q.topic ?? '이 질문'}은(는) 대표 확인 후 보완이 필요합니다.`)
+    else lines.push(`   핵심 답: ${ownerPlaceholder(x.q)}`)
     if (x.guide.points.length) lines.push(`   꼭 말할 것: ${x.guide.points.map((s) => s.text).join(' / ')}`)
     if (x.guide.evidenceHave.length) lines.push(`   증빙: ${x.guide.evidenceHave.join(' · ')}`)
     if (x.guide.ownerAsk.length && !x.prepared) lines.push(`   대표 확인: ${x.guide.ownerAsk.join(' / ')}`)

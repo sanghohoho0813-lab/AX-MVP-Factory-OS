@@ -13,9 +13,9 @@ import { Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/toastContext'
 import { copyText } from '../../components/consulting/studioParts'
-import type { Sourced } from '../core/answerGuide'
+import { ownerPlaceholder, type Sourced } from '../core/answerGuide'
 import { BRING_LABEL, BRING_MARK, inspectionPackageText, ownerKey, ownerQuestionMessage, type InspectionPackage, type PackageQuestion } from '../core/inspectionPackage'
-import { GATE_VERDICT_LABEL, missingDocsRequest, type SubmitGate } from '../core/submitGate'
+import { GATE_LEVEL_LABEL, GATE_VERDICT_LABEL, missingDocsRequest, type SubmitGate } from '../core/submitGate'
 import { PACK_LABEL, PACK_MARK, venturePackText, type VentureSection } from '../core/venturePack'
 import { handoffText, type HandoffPackage } from '../core/handoff'
 
@@ -161,7 +161,7 @@ function QuestionCard({ x, n }: { x: PackageQuestion; n: number }) {
             </ul>
           ) : (
             <p className="t-sub break-keep text-warning-800" data-testid="pack-core-missing">
-              {x.q.topic ?? '이 질문'}은(는) 대표 확인 후 보완이 필요합니다.
+              {ownerPlaceholder(x.q)}
             </p>
           )}
         </div>
@@ -331,15 +331,29 @@ export function SubmitGatePanel({
           <p className={`t-section font-bold ${ready ? 'text-success-700' : 'text-warning-800'}`} data-testid="cert-gate-verdict">
             {GATE_VERDICT_LABEL[gate.verdict]}
           </p>
-          <p className="t-sub break-keep text-slate-700">{ready ? '아래 항목이 모두 확인됐습니다. 공식 점수는 기관 평가로 정해집니다.' : `△ 항목 ${gate.items.filter((x) => !x.ok).length}개를 먼저 확인해 주세요.`}</p>
+          <p className="t-sub break-keep text-slate-700">
+            {ready
+              ? `신청 자격과 꼭 쓰는 자료가 갖춰졌습니다.${gate.items.some((x) => !x.ok) ? ` 보완 권장 ${gate.items.filter((x) => !x.ok).length}개는 실사 전까지 채우면 됩니다.` : ''}`
+              : `반드시 확인할 것 ${gate.items.filter((x) => x.level === 'must' && !x.ok).length}개를 먼저 해결해 주세요.`}
+          </p>
         </div>
-        <ul className="flex flex-col gap-1" data-testid="cert-gate-items">
-          {gate.items.map((x) => (
-            <li key={x.id} className={`t-sub break-keep ${x.ok ? 'text-success-700' : 'text-warning-800'}`} data-testid="cert-gate-item" data-ok={x.ok}>
-              <b className="font-semibold">{x.ok ? '✓' : '△'}</b> {x.text}
-            </li>
-          ))}
-        </ul>
+        {(['must', 'recommend'] as const).map((lv) => (
+          <div key={lv} className="flex flex-col gap-1" data-testid={`cert-gate-${lv}`}>
+            <p className="t-meta font-semibold text-slate-600">
+              {GATE_LEVEL_LABEL[lv]}
+              {lv === 'recommend' && <span className="font-normal"> — 실사 전까지 채우면 됩니다</span>}
+            </p>
+            <ul className="flex flex-col gap-1" data-testid="cert-gate-items">
+              {gate.items
+                .filter((x) => x.level === lv)
+                .map((x) => (
+                  <li key={x.id} className={`t-sub break-keep ${x.ok ? 'text-success-700' : lv === 'must' ? 'text-danger-700' : 'text-warning-800'}`} data-testid="cert-gate-item" data-ok={x.ok} data-level={lv}>
+                    <b className="font-semibold">{x.ok ? '✓' : '△'}</b> {x.text}
+                  </li>
+                ))}
+            </ul>
+          </div>
+        ))}
 
         <Block title="제출자료 정리" testid="cert-submit-docs">
           <ul className="flex flex-col gap-0.5">
@@ -349,8 +363,8 @@ export function SubmitGatePanel({
               </li>
             ))}
             {gate.docs.need.map((d) => (
-              <li key={d.label} className="t-sub break-keep text-warning-800" data-testid="submit-doc" data-have="false">
-                △ {d.label} <span className="t-meta">({d.stale ? '새로 발급 필요' : '받을 것'})</span>
+              <li key={d.label} className={`t-sub break-keep ${d.required ? 'text-danger-700' : 'text-warning-800'}`} data-testid="submit-doc" data-have="false" data-required={d.required}>
+                △ {d.label} <span className="t-meta">({d.stale ? '새로 발급 필요' : d.required ? '신청에 꼭 필요' : '받으면 좋음'})</span>
               </li>
             ))}
           </ul>

@@ -22,6 +22,8 @@ export interface InspectionQuestion {
   weight?: 1 | 2 | 3
   /** P2: 말하기 가이드 — 근거가 붙은 문장만. 없으면 대표 확인 */
   guide?: (k: import('./answerGuide').FactKit) => import('./answerGuide').GuideParts
+  /** FV: 이 업체 사실 때문에 더 중요해지면 그 이유(한 줄) — 없으면 null */
+  boost?: (k: import('./answerGuide').FactKit) => string | null
 }
 
 export type PrepState = 'ok' | 'edited' | 'confirm' | 'pending'

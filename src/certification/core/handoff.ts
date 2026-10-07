@@ -39,7 +39,7 @@ export interface HandoffPackage {
 }
 
 const judgmentOf = (a: CertificationAssessment | null) =>
-  a ? { recommendation: RECOMMENDATION_LABEL[a.recommendation], readiness: READINESS_LABEL[a.readiness], oneLine: a.oneLine, reasons: a.reasons.map((r) => r.text) } : null
+  a ? { recommendation: RECOMMENDATION_LABEL[a.recommendation], readiness: READINESS_LABEL[a.readiness], oneLine: a.oneLine, reasons: a.reasons.slice(0, 6).map((r) => r.text) } : null
 
 export function inspectionHandoff(pkg: InspectionPackage, a: CertificationAssessment | null, sc: SelfCheckResult | null): HandoffPackage {
   const ownerAnswers = pkg.questions.flatMap((x) => [...x.guide.core, ...x.guide.points].filter((s) => s.basis === OWNER_BASIS))
@@ -48,9 +48,11 @@ export function inspectionHandoff(pkg: InspectionPackage, a: CertificationAssess
     task: 'inspection_answers',
     certLabel: pkg.certLabel,
     companyName: pkg.companyName,
-    facts: [...pkg.company, ...pkg.strengths],
+    // FV: 강점은 사실을 다시 쓴 것이라 빼고(중복), 사실만 — 묶음이 길어지지 않게
+    facts: pkg.company,
     judgment: judgmentOf(a),
-    selfCheck: (sc?.items ?? []).map((r) => ({ question: r.item.question, answer: ANSWER_LABEL[r.answer], verdict: r.verdict })),
+    // 자가진단은 '모름' 이 아닌 답만(모름은 아래 '아직 대표 확인 전' 에 이미 있다)
+    selfCheck: (sc?.items ?? []).filter((r) => r.answer !== 'unknown').map((r) => ({ question: r.item.question, answer: ANSWER_LABEL[r.answer], verdict: r.verdict })),
     evidence: { have: pkg.bring.filter((b) => b.state === 'ready').map((b) => b.label), missing: pkg.bring.filter((b) => b.state !== 'ready').map((b) => b.label) },
     questions: pkg.questions.map((x) => ({ question: x.q.question, intent: x.q.intent, core: x.guide.core, points: x.guide.points, ownerAsk: x.prepared ? [] : x.guide.ownerAsk })),
     ownerAnswers,
