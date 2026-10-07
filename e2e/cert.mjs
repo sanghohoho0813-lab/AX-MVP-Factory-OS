@@ -375,6 +375,15 @@ for (const vp of [
   await page.evaluate((s) => localStorage.setItem('axmvp.ui.text_scale', JSON.stringify(s)), vp.s)
   let worst = 0
   let small = []
+  const tinyNow = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll('main button, main a, main [role="radio"], main summary')]
+        .filter((el) => el.closest('[data-testid^="cert"],[data-testid^="selfcheck"],[data-testid^="flow"],[data-testid^="venture"],[data-testid^="owner"],[data-testid^="pack"],[data-testid^="submit"]'))
+        .map((el) => [el.getBoundingClientRect(), (el.getAttribute('data-testid') || el.textContent || '').trim().slice(0, 20)])
+        .filter(([r]) => r.width > 0 && r.height > 0 && r.height < 43.5)
+        .map(([r, t]) => `${t}(${Math.round(r.height)})`),
+    )
+
   for (const sec of ['overview', 'innobiz', 'mainbiz', 'venture', 'lab', 'iso']) {
     await page.goto(`${BASE}/tools/cert-os/${sec}?client=cli_hansol`, { waitUntil: 'networkidle' })
     await page.waitForTimeout(400)
@@ -390,6 +399,7 @@ for (const vp of [
       await page.getByTestId('cert-prep-pack').click()
       await page.getByTestId('pack-question').first().locator('summary').click()
       worst = Math.max(worst, await overflowX(page))
+      if (vp.w < 1000) { const t = await tinyNow(); if (t.length) small.push(`pack:${t.join(',')}`) }
       await page.getByTestId('pack-close').click()
       await page.getByTestId('cert-gate-open').click()
     }
@@ -399,18 +409,12 @@ for (const vp of [
     }
     worst = Math.max(worst, await overflowX(page))
     if (vp.w < 1000) {
-      const tiny = await page.evaluate(() =>
-        [...document.querySelectorAll('main button, main a, main [role="radio"]')]
-          .filter((el) => el.closest('[data-testid^="cert"],[data-testid^="selfcheck"],[data-testid^="flow"],[data-testid^="venture"],[data-testid^="owner"]'))
-          .map((el) => el.getBoundingClientRect())
-          .filter((r) => r.width > 0 && r.height > 0 && r.height < 40)
-          .length,
-      )
-      if (tiny) small.push(`${sec}:${tiny}`)
+      const tiny = await tinyNow()
+      if (tiny.length) small.push(`${sec}:${tiny.join(',')}`)
     }
   }
   check(`${vp.w}px · 글자 ${vp.s}: 기업인증 6화면 가로 넘침 0`, worst <= 0, worst)
-  if (vp.w < 1000) check(`${vp.w}px · 글자 ${vp.s}: 누르는 곳 40px 이상(카드 · 칩 · 단추)`, small.length === 0, small)
+  if (vp.w < 1000) check(`${vp.w}px · 글자 ${vp.s}: 누르는 곳 44px 이상(카드 · 칩 · 단추)`, small.length === 0, small)
   check(`${vp.w}px · 글자 ${vp.s}: JS 오류 없음`, errors.length === 0, errors.join(' | '))
   await ctx.close()
 }
