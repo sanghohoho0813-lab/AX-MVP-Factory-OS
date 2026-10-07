@@ -46,6 +46,8 @@ const GrantsPage = lazy(() => import('../pages/GrantsPage'))
 const GrantFinderPage = lazy(() => import('../pages/public/GrantFinderPage'))
 // D-142: 매출 · 비용
 const MoneyPage = lazy(() => import('../pages/MoneyPage'))
+const UpcomingPage = lazy(() => import('../pages/UpcomingPage'))
+const MarketingSoonPage = lazy(() => import('../pages/MarketingSoonPage'))
 // D-103: 영업자용 1차 미팅 체크리스트가 들어올 자리
 const SalesIntakePage = lazy(() => import('../pages/sales/SalesIntakePage').then((m) => ({ default: m.SalesIntakePage })))
 const StrategyLibraryPage = lazy(() => import('../pages/sales/StrategyLibraryPage').then((m) => ({ default: m.StrategyLibraryPage })))
@@ -409,6 +411,9 @@ export const appRouteChildren = [
       { path: 'ops/agents', element: <AgentSettlementPage /> },
       { path: 'grants', element: <GrantsPage /> },
       { path: 'money', element: <MoneyPage /> },
+      { path: 'upcoming', element: <UpcomingPage /> },
+      { path: 'upcoming/:key', element: <UpcomingPage /> },
+      { path: 'marketing', element: <MarketingSoonPage /> },
       { path: 'sales/first-meeting', element: <FirstMeetingChecklistPage /> },
       // 영업 관리 (D-114) — 기업컨설팅 OS 를 고객 관리 한 장부 위로. 사이드바 한 줄, 안에서는 탭
       { path: 'sales', element: <Navigate to="/sales/board" replace /> },

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AiClientAssistantButton } from '../components/ops/AiClientAssistant'
 import { useSerialSave } from '../lib/useSerialSave'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryInUrl } from '../lib/useQueryInUrl'
@@ -436,6 +437,8 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
               <span className="hidden sm:inline">새 업체 등록</span>
               <span className="sm:hidden">등록</span>
             </Button>
+            {/* D-169: AI 비서 자리 — 이번 주 고객 · 우선순위 · PDF · 메일(연결 준비 중) */}
+            <AiClientAssistantButton />
             {/* D-122: 점 세 개만 두지 않는다 — 백업 · 일정 · 정산이 여기 숨어 있었다 */}
             <Button variant="ghost" onClick={() => setMoreOpen(true)}>
               <MoreHorizontal aria-hidden="true" className="size-5" />

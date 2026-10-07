@@ -174,7 +174,7 @@ const none = new Map<string, ModuleAccess>()
   const mod = groups.find((g) => g.group.key === 'modules')
   const top = mod?.items.filter((i) => !i.parent) ?? []
   const rare = groups.find((g) => g.group.key === 'rare')?.items.filter((i) => !i.parent) ?? []
-  check('메뉴: 전문 모듈 맨 윗줄 = 자주 쓰는 분야 + 모듈 전체, 나머지 분야는 잘 안 쓰는 기능 (D-136)', top.length === visibleModules().filter((m) => !m.rarelyUsed).length + 1 && rare.length === visibleModules().filter((m) => m.rarelyUsed).length && rare.length === 3, `${top.map((i) => i.label).join('|')} / ${rare.map((i) => i.label).join('|')}`)
+  check('메뉴: 전문 모듈 맨 윗줄 = 자주 쓰는 분야 + 출시 예정(D-169) + 모듈 전체, 나머지 분야는 잘 안 쓰는 기능 (D-136)', top.length === visibleModules().filter((m) => !m.rarelyUsed).length + 2 && top.some((i) => i.key === 'cat-upcoming') && rare.length === visibleModules().filter((m) => m.rarelyUsed).length && rare.length === 3, `${top.map((i) => i.label).join('|')} / ${rare.map((i) => i.label).join('|')}`)
   check('메뉴: 도구는 분야 줄 아래에 든다', (mod?.items.filter((i) => i.parent === 'cat-growth').map((i) => i.key) ?? []).includes('tool-employment'))
   check('메뉴: 옛 컨설팅 작업실 · AX 스튜디오 묶음이 없다', !groups.some((g) => g.group.key === 'tools' || g.group.key === 'studio'))
   check('머리줄 묶음: 세금 계산기 → 절세·재무', screenGroupForPath('/tools/tax')?.title === '절세·재무', screenGroupForPath('/tools/tax')?.title)

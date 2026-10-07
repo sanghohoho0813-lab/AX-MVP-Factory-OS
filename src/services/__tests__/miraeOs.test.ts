@@ -54,6 +54,7 @@ import { bsWon, netIncomeSlots, svCurrent, svDefaults, svLoad, svMerge, svSave, 
 import { profileFields, profileFieldsByGroup, regionOf } from '../clientOpsProfile'
 import { CONTRACT_STAGE_ORDER, CONTRACT_STAGE_CHOICES,
   CONTRACT_STAGE_LABEL, contractStageOf, statusForStage } from '../../types/clientOps'
+import { UPCOMING_PRODUCTS } from '../../config/upcomingProducts'
 import type { ClientOpsStatus, ContractStage } from '../../types/clientOps'
 import { buildClientAlerts, clientOpsProgress } from '../clientOpsAlerts'
 import {
@@ -183,7 +184,7 @@ check('modules: AX STUDIO 는 전문 모듈의 분야 한 줄(D-127) — 안의 
   check('메뉴: 잘 안 쓰는 기능 = 기술사업화(특허·벤처) · AX 스튜디오 · 웹 스튜디오 — 처음엔 접힘 (D-136)',
     MODULES.filter((m) => m.group === 'rare' && m.kind === 'category').map((m) => m.key).join() === 'cat-tech-biz,cat-ax-studio,cat-web-studio' &&
       MODULE_GROUPS.find((g) => g.key === 'rare')?.defaultCollapsed === true &&
-      MODULES.filter((m) => m.group === 'modules' && m.kind === 'category').map((m) => m.key).join() === 'cat-growth,cat-tax-finance',
+      MODULES.filter((m) => m.group === 'modules' && m.kind === 'category').map((m) => m.key).join() === 'cat-growth,cat-tax-finance,cat-upcoming',
     MODULES.filter((m) => m.kind === 'category').map((m) => `${m.key}:${m.group}`).join())
   check('메뉴: 이름 — 고객 관리 · 잠재고객 상담신청 · 전문 모듈 · 특허+벤처 (D-104 · D-127)',
     MODULES.find((m) => m.key === 'client-ops')?.label === '고객 관리' && MODULES.find((m) => m.key === 'inbox')?.label === '잠재고객 상담신청' &&
@@ -195,7 +196,7 @@ check('modules: AX STUDIO 는 전문 모듈의 분야 한 줄(D-127) — 안의 
   check('메뉴: 특허+벤처 → 기술사업화 · 지원사업 알림 → 기업성장 줄 아래(D-163) · 자금·지원사업 · 기관 전략은 숨김(D-167), 모듈 전체가 맨 끝 (D-127) · 검토중 도구가 없으면 도입 검토중 줄도 없다 (D-118)',
     MODULES.find((m) => m.key === 'consulting-studio')?.parent === 'cat-tech-biz' && !MODULES.some((m) => m.key === 'funding' || m.key === 'institutions') && MODULES.find((m) => m.key === 'grants')?.parent === 'cat-growth' && MODULES.find((m) => m.key === 'grants')?.group === 'modules' && !MODULES.some((m) => m.key === 'cat-gov-support') && inGroup('modules').slice(-1).join() === 'tools' && !inGroup('modules').includes('tools-review'), inGroup('modules').join())
   check('메뉴: 영업 묶음 = 영업 관리(D-114) · 영업자 정산 · 매출 · 비용(D-142) · 1차 미팅 체크리스트(준비 중) — 지원사업 알림은 기업성장으로(D-163)',
-    inGroup('sales').join() === 'sales,agents,money,first-meeting' && MODULES.find((m) => m.key === 'first-meeting')?.status === 'soon', inGroup('sales').join())
+    inGroup('sales').join() === 'sales,agents,money,marketing,first-meeting' && MODULES.find((m) => m.key === 'marketing')?.status === 'soon' && MODULES.find((m) => m.key === 'first-meeting')?.status === 'soon', inGroup('sales').join())
   check('메뉴: 고객 묶음에서 영업자 정산이 빠졌다', !inGroup('clients').includes('agents'))
   check('메뉴: 처음 사용 가이드가 이 시스템 맨 위', inGroup('about')[0] === 'guide' && MODULES.find((m) => m.key === 'guide')?.path === '/getting-started')
   check('메뉴: 향후 확장은 눌러도 이동하지 않고 펼쳐진다', MODULES.find((m) => m.key === 'roadmap')?.expand === 'future-items')
@@ -1547,7 +1548,7 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
 
   // 메뉴 — 사이드바는 한 줄, 안에서 탭
   const salesItems = MODULES.filter((m) => m.group === 'sales' && m.enabled).map((m) => m.key)
-  check('영업: 영업 묶음 = 영업 관리 · 영업자 정산 · 매출 · 비용 · 1차 미팅 체크리스트 자리(지원사업 알림은 기업성장, D-163)', salesItems.join() === 'sales,agents,money,first-meeting', salesItems.join())
+  check('영업: 영업 묶음 = 영업 관리 · 영업자 정산 · 매출 · 비용 · 1차 미팅 체크리스트 자리(지원사업 알림은 기업성장, D-163)', salesItems.join() === 'sales,agents,money,marketing,first-meeting', salesItems.join())
   check('영업: 영업 관리가 탭 주소를 모두 맡는다', SALES_TAB_PATHS.every((p) => moduleForPath(p)?.key === 'sales') && SALES_TABS[0].to === '/sales/board')
   check('영업: 1차 미팅 체크리스트 자리는 따로 남는다', moduleForPath('/sales/first-meeting')?.key === 'first-meeting' && MODULES.find((m) => m.key === 'first-meeting')?.status === 'soon')
   check('영업: 머리줄 — 영업 › 영업 관리', screenGroupForPath('/sales/board')?.title === '영업')
@@ -2185,6 +2186,16 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('묶음: 개인사업자 2 · 법인 2 · 구분 모름 1', pickerGroups(list).map((g) => `${g.label}${g.items.length}`).join() === '개인사업자2,법인2,구분 모름1')
 }
 
+
+// D-169: 출시 예정 — 결과물이 나오는 컨설팅 상품을 가나다 순으로 · 내용은 상품표 그대로
+{
+  const kids = MODULES.filter((m) => m.parent === 'cat-upcoming')
+  const names = kids.map((m) => m.label)
+  check('출시 예정: 15가지 · 가나다 순', kids.length === 15 && names.join() === [...names].sort((a, b) => a.localeCompare(b, 'ko')).join(), names.join())
+  check('출시 예정: 상품표에 모두 있다(기간 · 설명을 거기서 읽는다)', UPCOMING_PRODUCTS.every((p) => DEFAULT_PACKAGES.some((x) => x.name === p.pkgName)), UPCOMING_PRODUCTS.filter((p) => !DEFAULT_PACKAGES.some((x) => x.name === p.pkgName)).map((p) => p.pkgName).join())
+  check('출시 예정: 이미 모듈이 있는 것 · 검토만 하는 것은 없다', !names.some((n) => /정책자금|고용|지원사업|연구소|벤처|메인비즈|ISO|신용등급|리파이낸싱|주주간|스마트공장/.test(n)), names.join())
+  check('출시 예정: 주소 /upcoming/{key}', kids.every((m) => m.path.startsWith('/upcoming/')))
+}
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
 void (0 as unknown as ClientOpsRecord)

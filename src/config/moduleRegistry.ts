@@ -27,10 +27,14 @@ import {
   Sun,
   Workflow,
   CheckCheck,
+  Megaphone,
+  Rocket,
+  CircleDashed,
 } from 'lucide-react'
 import { SALES_EXTRA_PATHS, SALES_TAB_PATHS } from './salesTabs'
 import { REVIEW_HUB_PATH, type ToolDefinition, liveTools, movedTools, reviewTools } from './toolRegistry'
 import { FEATURE_CATALOG, visibleModules } from './productCatalog'
+import { UPCOMING_PATH, UPCOMING_PRODUCTS } from './upcomingProducts'
 
 /**
  * 모듈 레지스트리 — 이 제품이 어떤 화면 묶음으로 구성되는지의 목록.
@@ -217,6 +221,8 @@ export const MODULES: ModuleDefinition[] = [
   { key: 'agents', label: '영업자 정산', path: '/ops/agents', icon: Handshake, group: 'sales', accent: 'revenue', enabled: true, hint: '누구한테 지금 얼마를 줘야 하는가', ownerOnly: true },
   // D-142: 매출(계약 수금에서 저절로) · 비용(정기 결제 · 쓴 돈 · 영업자 수수료)
   { key: 'money', label: '매출 · 비용', path: '/money', icon: Wallet, group: 'sales', accent: 'revenue', enabled: true, hint: '들어온 돈 · 들어올 예정 · 정기 결제일 · 쓴 돈' },
+  // D-169: 마케팅 · 브랜딩(블로그 · 유튜브 · SNS) — 도입 예정. 지금은 안내 화면만
+  { key: 'marketing', label: '마케팅 · 브랜딩', path: '/marketing', icon: Megaphone, group: 'sales', accent: 'revenue', enabled: true, status: 'soon', hint: '블로그 · 유튜브 · SNS — 도입 예정' },
   // 만들고 있는 프로그램이 들어올 자리 — 들어오면 status 를 지우고 화면만 바꾼다 (docs/DECISIONS D-103)
   { key: 'first-meeting', label: '1차 미팅 체크리스트', path: '/sales/first-meeting', icon: ClipboardCheck, group: 'sales', accent: 'revenue', enabled: true, status: 'soon', badge: 'first-meetings', hint: '영업자용 AX 1차 미팅 체크리스트 — 만드는 중', ownerOnly: true },
 
@@ -228,6 +234,9 @@ export const MODULES: ModuleDefinition[] = [
   { key: 'roadmap', label: '향후 확장', path: '/roadmap', icon: Compass, group: 'about', accent: 'system', enabled: true, status: 'next', expand: 'future-items', hint: '아직 없는 기능과 계획 — 눌러서 펼치기' },
 
   ...moduleRows(),
+  // D-169: 출시 예정 — 결과물이 나오는 컨설팅 상품(상품표)을 가나다 순으로. 하나씩 모듈이 되면 여기서 빠진다
+  { key: 'cat-upcoming', label: '출시 예정', path: UPCOMING_PATH, icon: Rocket, group: 'modules', accent: 'system', enabled: true, kind: 'category', hint: '결과물이 나오는 컨설팅 — 하나씩 모듈로 들어옵니다' },
+  ...UPCOMING_PRODUCTS.map((p): ModuleDefinition => ({ key: `up-${p.key}`, label: p.title, path: `${UPCOMING_PATH}/${p.key}`, icon: CircleDashed, group: 'modules', accent: 'system', enabled: true, parent: 'cat-upcoming' })),
   // 도입 검토중 — 검토중인 도구가 하나라도 있을 때만 한 줄 (D-88)
   ...(reviewTools().length > 0
     ? [{ key: 'tools-review', label: '도입 검토중', path: REVIEW_HUB_PATH, icon: FlaskRound, group: 'modules' as const, accent: 'system' as const, enabled: true, hint: '쓸 수는 있지만 아직 정식으로 들이지 않은 것', alsoPaths: reviewTools().flatMap((t) => (t.path ? [t.path] : [])) }]

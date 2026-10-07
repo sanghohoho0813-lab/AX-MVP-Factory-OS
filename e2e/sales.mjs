@@ -390,7 +390,7 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   check('상품표(D-168): 기본은 보험 — 금액 앞에 월납', ((await cat.getByRole('button', { name: '법인보험/대표 퇴직금 플랜 검토 패키지 가격 고치기' }).innerText()) ?? '').startsWith('월납 200만원'))
   await cat.getByRole('radiogroup', { name: '정관정비 패키지 금액 종류' }).getByRole('radio', { name: '수수료' }).click()
   await page.waitForTimeout(400)
-  check('상품표(D-168): 수수료로 바꾸면 금액 앞에 수수료 · 저장', ((await cat.getByRole('button', { name: '정관정비 패키지 가격 고치기' }).innerText()) ?? '').startsWith('수수료') && (await page.evaluate(() => JSON.stringify(localStorage.getItem('axmvp.module.sales-os.catalog') ?? ''))).includes('"fee"'))
+  check('상품표(D-168): 수수료로 바꾸면 금액 앞에 수수료 · 저장', ((await cat.getByRole('button', { name: '정관정비 패키지 가격 고치기' }).innerText()) ?? '').startsWith('수수료') && (await page.evaluate(() => localStorage.getItem('axmvp.module.sales-os.catalog') ?? '')).includes('"fee"'))
   await cat.getByRole('button', { name: '정관정비 패키지 가격 고치기' }).click()
   await cat.getByLabel('정관정비 패키지 가격(만원)').fill('180')
   await cat.getByRole('button', { name: '저장' }).click()
@@ -542,6 +542,40 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   await page.goto(BASE + '/tools', { waitUntil: 'networkidle' })
   check('작업실 전체: 옮겨 간 것 한 줄', ((await page.getByTestId('tools-moved').innerText()) ?? '').includes('영업 도구 모음'))
   check('JS 오류 없음 (D-118)', errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
+/* ---------------- D-169: 출시 예정 · 마케팅 · 브랜딩 · AI 비서 자리 ---------------- */
+for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
+  const ctx = await browser.newContext({ viewport: { width: w, height: h }, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.goto(BASE + '/upcoming', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  const titles = await page.getByTestId('upcoming-card').locator('span.font-bold').allInnerTexts()
+  check(`출시 예정(${tag}): 15가지 · 가나다 순 · 카드마다 기간 · 설명`, titles.length === 15 && titles.join() === [...titles].sort((a, b) => a.localeCompare(b, 'ko')).join() && (await page.getByTestId('upcoming-period').count()) === 15 && (await page.getByTestId('upcoming-desc').count()) === 15, titles.join())
+  await page.getByTestId('upcoming-card').filter({ hasText: '직무발명보상제도' }).click()
+  await page.waitForTimeout(300)
+  check(`출시 예정(${tag}): 누르면 그 상품의 기간 · 상품표 설명`, page.url().endsWith('/upcoming/job-invention') && /임직원 발명에 대한 보상 규정/.test(await page.getByTestId('upcoming-desc').innerText()))
+  await page.goto(BASE + '/marketing', { waitUntil: 'networkidle' })
+  check(`마케팅 · 브랜딩(${tag}): 도입 예정 안내`, (await page.getByTestId('marketing-planned').locator('li').count()) === 4)
+  await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
+  await page.getByTestId('ai-client-assistant').click()
+  await page.waitForTimeout(400)
+  check(`고객 관리(${tag}): AI 비서 자리 — 예시 6가지 · 밖으로 보내지 않음`, (await page.getByTestId('ai-example').count()) === 6 && /아무 내용도 밖으로 보내지 않습니다/.test(await page.getByTestId('ai-client-assistant-sheet').innerText()))
+  check(`D-169(${tag}): 가로 넘침 0 · JS 오류 없음`, (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0 && errors.length === 0, errors.join(' | '))
+  if (tag === 'PC') {
+    await page.keyboard.press('Escape')
+    const nav = page.locator('aside nav')
+    check('메뉴: 영업 묶음에 마케팅 · 브랜딩(준비 중)', /준비 중/.test(await nav.getByRole('link', { name: /마케팅 · 브랜딩/ }).innerText()))
+    const up = nav.getByRole('button', { name: /출시 예정/ }).first()
+    if ((await up.getAttribute('aria-expanded')) !== 'true') await up.click()
+    await page.waitForTimeout(200)
+    check('메뉴: 전문 모듈 › 출시 예정 펼치면 15줄', (await nav.locator('a[href^="/upcoming/"]').count()) === 15)
+  }
   await ctx.close()
 }
 
