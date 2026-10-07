@@ -217,6 +217,27 @@ try {
   await go(page, `/ops/clients/${OWNER_CLIENT}?tab=work`)
   const ownWork = await bodyText(page)
   check('대표(D-171): 내가 만든 업무 항목(세무기장 · 모두의 창업 2차)은 내 화면에 보인다', ownWork.includes('세무기장') && ownWork.includes('모두의 창업'), ownWork.slice(0, 300))
+  // P1 릴리스: 클라우드(진짜 RLS)에서 연구소 관리 기록 → 기업인증 판정 · 진행 기록 · 인증 완료가 DB 로
+  sql(`insert into public.module_data (id, workspace_id, module_key, bucket, client_id, payload) values ('qa-lab-orig', '${OWNER_WS}', 'labcare', 'orig', null, '{"key":"pmsaas:clients:v1","value":[{"id":"${OWNER_CLIENT}","labType":"기업부설연구소","labName":"대표비밀연구소","certifiedDate":"2024-05-10","labRegistrationNumber":"2024-777","researcherCount":4}]}'::jsonb) on conflict (id) do nothing`)
+  await go(page, `/tools/cert-os?client=${OWNER_CLIENT}`)
+  await page.waitForTimeout(900)
+  check('클라우드(P1): 연구소 관리 기록 → 기업인증 연구소 보유(다시 묻지 않음)', (await page.locator('[data-testid="cert-card"][data-key="lab"] [data-testid="cert-rec"]').getAttribute('data-rec').catch(() => '')) === 'held')
+  await go(page, `/tools/cert-os/innobiz?client=${OWNER_CLIENT}`)
+  await page.waitForTimeout(700)
+  await page.getByTestId('cert-step-2').click()
+  await page.getByTestId('cert-life-applied').click()
+  await page.waitForTimeout(1200)
+  check('클라우드(P1): 진행 상태 → module_data(cert-os/life) 대표 작업공간에 저장', sql(`select count(*) from public.module_data where workspace_id = '${OWNER_WS}' and module_key = 'cert-os' and bucket = 'life' and client_id = '${OWNER_CLIENT}'`) === '1')
+  await page.getByTestId('cert-complete-open').click()
+  await page.getByTestId('cert-complete-number').fill('260315-00999')
+  await page.getByTestId('cert-complete-date').fill('2026-03-15')
+  await page.getByTestId('cert-complete-fill').click()
+  await page.getByTestId('cert-complete-save').click()
+  await page.waitForTimeout(1500)
+  const certPay = JSON.parse(sql(`select payload::text from public.operations_clients where id = '${OWNER_CLIENT}'`) || '{}')
+  const innoCred = (certPay.customFields ?? []).filter((f) => f.group === 'credential' && /이노비즈/.test(f.label))
+  check('클라우드(P1): 인증 완료 → 업체 기록(DB) 인증서 칸 1개 · 갱신 일정 3줄', innoCred.length === 1 && innoCred[0].value.includes('2029-03-14까지') && ((certPay.toolResults ?? []).find((t) => t.toolKey === 'cert-os')?.deadlines?.length ?? 0) === 3, JSON.stringify(innoCred))
+
   // 대표가 브라우저에 남긴 값(작성 중 메모 · 도구 입력) — 다음 사람에게 보이면 안 된다
   await page.evaluate(() => {
     localStorage.setItem('axmvp.qa.ownerDraft', '대표비밀 작성 중 메모')

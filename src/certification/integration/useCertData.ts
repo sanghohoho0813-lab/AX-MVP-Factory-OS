@@ -33,21 +33,59 @@ type ProfileRow = { profile: CertProfile } & Record<string, unknown>
 type WorkRow = { cert: CertificationKey; answers: Record<string, Answer>; prep: Record<string, PreparedAnswer> } & Record<string, unknown>
 type LifeRow = { cert: CertificationKey; life: CertLifecycle } & Record<string, unknown>
 
-/** 인증별 증서 이름(회사 정보 '인증서' 칸 이름) */
-const CERT_DOC_LABEL: Record<CertificationKey, string> = {
-  venture: '벤처기업확인서',
-  innobiz: '이노비즈 확인서',
-  mainbiz: '메인비즈 확인서',
-  lab: '기업부설연구소 인정서',
-  iso9001: 'ISO 9001 인증서',
-  iso14001: 'ISO 14001 인증서',
-  iso45001: 'ISO 45001 인증서',
+/**
+ * 인증별 회사 정보 '인증서' 칸 이름 — 확인서 PDF 를 올렸을 때 서류 읽기(certDocParser)가 붙이는 이름과 같게 둔다.
+ * 그래야 서류 먼저 · 진행 기록 먼저 어느 쪽이든 한 칸으로 모인다(P1 릴리스 확인: 중복 칸 방지).
+ */
+export const CERT_DOC_LABEL: Record<CertificationKey, string> = {
+  venture: '벤처기업',
+  innobiz: '이노비즈',
+  mainbiz: '메인비즈',
+  lab: '기업부설연구소',
+  iso9001: 'ISO 9001',
+  iso14001: 'ISO 14001',
+  iso45001: 'ISO 45001',
 }
 
-/** 회사 정보 '인증서' 칸 값 — 서류에서 읽은 값과 같은 꼴(번호 · 인증일 · 끝날짜) */
-function credentialValue(cert: CertificationKey, l: CertLifecycle): string {
+/**
+ * 회사 정보 '인증서' 칸 값 — 서류에서 읽은 값과 같은 꼴(번호 · 인증일 · 끝날짜 · 기관).
+ * 이미 있던 칸이면 번호 · 날짜 · 끝날짜는 진행 기록 값으로 바꾸고, 기관처럼 진행 기록에 없는 조각은 남긴다.
+ */
+export function credentialValue(cert: CertificationKey, l: CertLifecycle, existing = ''): string {
   const verb = cert === 'venture' ? '확인' : cert === 'lab' ? '인정' : '인증'
-  return [l.number && `${verb}번호 ${l.number}`, l.certifiedAt && `${verb}일 ${l.certifiedAt}`, l.validUntil && `${l.validUntil}까지`].filter(Boolean).join(' · ')
+  const mine = [l.number && `${verb}번호 ${l.number}`, l.certifiedAt && `${verb}일 ${l.certifiedAt}`, l.validUntil && `${l.validUntil}까지`].filter(Boolean) as string[]
+  const keep = existing
+    .split(' · ')
+    .map((x) => x.trim())
+    .filter((x) => x && x !== '있음' && !/번호|(인정|확인|인증|등록|지정)일|까지|만료|\d{4}-\d{2}-\d{2}/.test(x))
+  return [...mine, ...keep].join(' · ')
+}
+
+/**
+ * 인증 완료 → 업체 기록(순수 함수 · 시험 가능): 회사 정보 '인증서' 칸(같은 인증이면 한 칸으로) + 갱신 일정(결과 묶음 · 달력 · 오늘).
+ */
+export function withCertCompletion(record: ClientOpsRecord, cert: CertificationKey, life: CertLifecycle, opts: { toProfile: boolean; today: string; clientId: string }): ClientOpsRecord {
+  const rule = CERT_RULES[cert]
+  let rec = record
+  if (opts.toProfile) {
+    const existing = (rec.customFields ?? []).find((f) => f.group === 'credential' && certKeyOf(f.label) === cert)
+    const value = credentialValue(cert, life, existing?.value ?? '')
+    if (value && value !== existing?.value) rec = withCustomField(rec, { id: existing?.id, group: 'credential', label: existing?.label ?? CERT_DOC_LABEL[cert], value })
+  }
+  const plan = life.validUntil ? renewalPlan(cert, life.validUntil, opts.today) : null
+  const title = `${rule.label} 인증 · 갱신`
+  // 인증 정보를 고쳐 다시 저장하면 앞 결과(갱신 할 일 포함)를 바꾼다 — 달력 · 오늘에 같은 할 일이 두 번 뜨지 않게
+  rec = { ...rec, toolResults: (rec.toolResults ?? []).filter((t) => !(t.toolKey === CERT_MODULE && t.title === title)) }
+  return withToolResult(rec, {
+    toolKey: CERT_MODULE,
+    title,
+    verdict: 'held',
+    verdictLabel: '인증 완료',
+    summary: [`${rule.label} 인증 완료`, life.certifiedAt && `인증일 ${life.certifiedAt}`, life.validUntil ? `${life.validUntil}까지` : rule.validYears ? '유효기간 미입력' : '', plan ? `갱신 준비 ${plan.noticeOn}부터` : ''].filter(Boolean).join(' · '),
+    data: { kind: 'certified', cert, number: life.number, certifiedAt: life.certifiedAt, validUntil: life.validUntil },
+    deadlines: plan ? renewalDeadlines(plan, rule.label) : [],
+    openPath: `/tools/cert-os/${cert}?client=${opts.clientId}`,
+  })
 }
 
 /** 칩으로 고른 사실 → 사실 창고 값(사실 창고에 칸이 있는 것만: 특허 · 연구소) */
@@ -162,24 +200,7 @@ export function useCertData() {
       const at = nowIso()
       const life = withCompletion(lifeOf(cert).life, input, at)
       await saveLife(cert, life)
-      const rule = CERT_RULES[cert]
-      let rec = clientRecord
-      if (opts.toProfile) {
-        const existing = (rec.customFields ?? []).find((f) => f.group === 'credential' && certKeyOf(f.label) === cert)
-        const value = credentialValue(cert, life)
-        if (value) rec = withCustomField(rec, { id: existing?.id, group: 'credential', label: existing?.label ?? CERT_DOC_LABEL[cert], value })
-      }
-      const plan = life.validUntil ? renewalPlan(cert, life.validUntil, today) : null
-      rec = withToolResult(rec, {
-        toolKey: CERT_MODULE,
-        title: `${rule.label} 인증 · 갱신`,
-        verdict: 'held',
-        verdictLabel: '인증 완료',
-        summary: [`${rule.label} 인증 완료`, life.certifiedAt && `인증일 ${life.certifiedAt}`, life.validUntil ? `${life.validUntil}까지` : rule.validYears ? '유효기간 미입력' : '', plan ? `갱신 준비 ${plan.noticeOn}부터` : ''].filter(Boolean).join(' · '),
-        data: { kind: 'certified', cert, number: life.number, certifiedAt: life.certifiedAt, validUntil: life.validUntil },
-        deadlines: plan ? renewalDeadlines(plan, rule.label) : [],
-        openPath: `/tools/cert-os/${cert}?client=${clientId}`,
-      })
+      const rec = withCertCompletion(clientRecord, cert, life, { toProfile: opts.toProfile, today, clientId })
       await commit(rec)
     },
     [clientRecord, clientId, lifeOf, saveLife, commit, today],

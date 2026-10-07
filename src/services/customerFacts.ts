@@ -247,7 +247,8 @@ export function isCustomFactKey(key: string): boolean {
   return key.startsWith(CUSTOM_FACT_PREFIX)
 }
 function customFieldOf(record: ClientOpsRecord, label: string) {
-  const norm = (v: string) => v.replace(/\s/g, '')
+  // '이노비즈' 와 '이노비즈 확인서' 는 같은 칸 — 서류 읽기 · 기업인증 진행 기록이 같은 인증으로 칸을 두 개 만들지 않게
+  const norm = (v: string) => v.replace(/\s/g, '').replace(/(확인서|인증서|인정서)$/, '')
   return record.customFields.find((f) => norm(f.label) === norm(label))
 }
 

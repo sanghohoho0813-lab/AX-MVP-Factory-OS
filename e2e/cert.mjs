@@ -268,6 +268,28 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('F 빈 업체: 근거 전부 모름 · 갱신 줄 없음 · 추가 확인 필요', fStates.length > 0 && fStates.every((x) => x === 'missing') && (await page.getByTestId('cert-renewal').count()) === 0 && (await page.getByTestId('cert-rec').first().getAttribute('data-rec')) === 'need_info', fStates)
   check('공식 출처: 상이 표시는 없고 미확인 1가지만(Kibo 항목별 배점)', (await page.getByTestId('cert-conflict').count()) === 0)
 
+  // P1 릴리스 — 확인서 PDF 로 들어온 인증(회사 정보 인증서 칸)은 진행 기록 없이도 인증 완료로 · 고쳐 저장해도 칸 1개
+  await page.evaluate(() => {
+    const list = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+    const c = list.find((x) => x.id === 'cli_daum')
+    c.customFields = [...(c.customFields ?? []).filter((f) => !/이노비즈/.test(f.label)), { id: 'cf_ib', group: 'credential', label: '이노비즈', value: '확인번호 260315-00123 · 확인일 2026-03-15 · 2029-03-14까지 · 중소벤처기업부' }]
+    localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(list))
+  })
+  await page.goto(BASE + '/tools/cert-os/innobiz?client=cli_daum', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  await page.getByTestId('cert-step-2').click()
+  check('릴리스: 확인서로 들어온 이노비즈 → 진행 기록 인증 완료(회사 정보) · 갱신 줄', (await page.getByTestId('cert-life-done').getAttribute('data-source')) === 'profile' && (await page.getByTestId('cert-renewal').count()) === 1)
+  await page.getByTestId('cert-life-edit').click()
+  check('릴리스: 고치기 칸에 확인서 값이 미리(번호 · 인증일 · 끝날짜)', (await page.getByTestId('cert-complete-number').inputValue()) === '260315-00123' && (await page.getByTestId('cert-complete-date').inputValue()) === '2026-03-15' && (await page.getByTestId('cert-complete-valid').inputValue()) === '2029-03-14')
+  await page.getByTestId('cert-complete-save').click()
+  await page.waitForTimeout(800)
+  await page.getByTestId('cert-life-edit').click()
+  await page.getByTestId('cert-complete-save').click()
+  await page.waitForTimeout(800)
+  const daum = await recOf('cli_daum')
+  const ibFields = (daum.customFields ?? []).filter((f) => f.group === 'credential' && /이노비즈/.test(f.label))
+  check('릴리스: 두 번 저장해도 인증서 칸 1개(기관 남음) · 갱신 결과 1개', ibFields.length === 1 && ibFields[0].value.includes('중소벤처기업부') && (daum.toolResults ?? []).filter((t) => t.toolKey === 'cert-os').length === 1, { ibFields, n: (daum.toolResults ?? []).filter((t) => t.toolKey === 'cert-os').length })
+
   // 업체 상세 모듈 입구
   await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)

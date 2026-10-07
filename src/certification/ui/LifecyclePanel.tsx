@@ -12,7 +12,7 @@ import { CERT_RULES } from '../rules/officialRules'
 import { CERT_STATUS_LABEL, CERT_STATUS_ORDER, COMPLETION_PROBLEM_LABEL, completionProblems, validUntilByYears, type CertLifecycle, type CertStatus, type CompletionInput } from '../core/lifecycle'
 import { RENEWAL_PHASE_LABEL, renewalPlan } from '../core/renewal'
 import { nextAfterCertified, type AfterKind } from '../core/nextAfter'
-import type { CertificationClientContext, CertificationKey } from '../core/types'
+import type { CertificationClientContext, CertificationKey, HeldCertification } from '../core/types'
 
 const inputCls = 't-body h-11 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 focus:border-brand-500 focus:outline-none'
 
@@ -40,7 +40,7 @@ const PHASE_TONE = { ok: 'success', notice: 'brand', todo: 'warning', grace: 'da
 
 export function LifecyclePanel({
   cert,
-  life,
+  life: stored,
   ctx,
   clientId,
   onStatus,
@@ -57,6 +57,20 @@ export function LifecyclePanel({
 }) {
   const rule = CERT_RULES[cert]
   const { showToast } = useToast()
+  // P1 릴리스: 확인서 PDF 로 회사 정보 '인증서' 칸에 이미 있으면(진행 기록은 아직 없음) 그것을 인증 완료로 보여 준다 — 다시 적게 하지 않는다
+  const held: HeldCertification | undefined = ctx.held.find((h) => h.key === cert)
+  const heldPlan = held?.validUntil ? renewalPlan(cert, held.validUntil, ctx.today) : null
+  const viaProfile = stored.status === 'preparing' && stored.history.length === 0 && !!held && heldPlan?.phase !== 'expired'
+  const shown: CertLifecycle = viaProfile
+    ? {
+        ...stored,
+        status: 'certified',
+        number: /번호\s*([^\s·]+)/.exec(held!.note)?.[1] ?? '',
+        certifiedAt: /(?:인정|확인|인증)일\s*(\d{4}-\d{2}-\d{2})/.exec(held!.note)?.[1] ?? '',
+        validUntil: held!.validUntil,
+      }
+    : stored
+  const life = shown
   const done = life.status === 'certified' || life.status === 'renewal'
   const [form, setForm] = useState<CompletionInput | null>(null)
   const [toProfile, setToProfile] = useState(true)
@@ -90,6 +104,7 @@ export function LifecyclePanel({
         </h3>
         <Badge tone={done ? 'success' : 'brand'}>
           <span data-testid="cert-life-status">{CERT_STATUS_LABEL[life.status]}</span>
+          {viaProfile && <span className="sr-only">(회사 정보 인증서 칸)</span>}
         </Badge>
       </div>
       <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={`${rule.label} 진행 상태`}>
@@ -109,7 +124,8 @@ export function LifecyclePanel({
       </div>
 
       {done && !form && (
-        <div className="flex flex-col gap-2" data-testid="cert-life-done">
+        <div className="flex flex-col gap-2" data-testid="cert-life-done" data-source={viaProfile ? 'profile' : 'life'}>
+          {viaProfile && <p className="t-sub break-keep text-slate-700">회사 정보 '인증서' 칸(확인서)에 이미 있습니다 — 다시 적지 않아도 됩니다.</p>}
           <p className="t-sub break-keep text-slate-800">
             {[life.number && `번호 ${life.number}`, life.certifiedAt && `인증일 ${life.certifiedAt}`, life.validUntil ? `${life.validUntil}까지` : rule.validYears ? '유효기간 — 아직 안 적음' : '유효기간 없음(요건 유지 · 변경 신고)'].filter(Boolean).join(' · ')}
           </p>

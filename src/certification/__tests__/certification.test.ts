@@ -26,7 +26,9 @@ import { preInspectionSummary, preInspectionText } from '../core/preInspection'
 import { basisFor } from '../core/basis'
 import { ventureRndRatio } from '../rules/officialRules'
 import { labcareFactsOf } from '../integration/labcareAdapter'
-import { factPatchOf } from '../integration/useCertData'
+import { factPatchOf, withCertCompletion } from '../integration/useCertData'
+import { factCandidatesFromDocText } from '../../services/docFacts'
+import { withFactCandidates, withFactDecisions } from '../../services/customerFacts'
 
 let pass = 0
 let fail = 0
@@ -291,6 +293,37 @@ check('어댑터: 설정 읽기 — 이상한 값은 모름', JSON.stringify(nor
   check('공식 재확인: 메인비즈 3영역(상이 아님) · 연장 기간 확인 · 미확인 목록에서 빠짐', CERT_RULES.mainbiz.unverified.length === 0 && (CERT_RULES.mainbiz.officialScores ?? []).some((x) => x.value.includes('350')) && CERT_RULES.mainbiz.renewalNote.includes('만료 90일 전부터 만료 후 30일'))
   check('공식 재확인: 연구소 50㎡ 칸막이 · 30일 변경 신고 · 남은 미확인 3가지(번호 형식 · Kibo 배점 · ISO 45001 일정)', JSON.stringify(CERT_RULES.lab).includes('50㎡') && CERT_RULES.lab.renewalNote.includes('30일') && CERT_RULES.venture.unverified.length === 1 && CERT_RULES.innobiz.unverified.length === 1 && CERT_RULES.iso45001.unverified.length === 1)
   check('공식 재확인: 공식 안내 상이 없음(있으면 화면에 따로)', Object.values(CERT_RULES).every((r) => (r.conflicts ?? []).length === 0))
+}
+
+
+/* ================= P1 릴리스 확인 — 확인서 PDF ↔ 진행 기록 중복 없음 ================= */
+{
+  const NOW = '2026-10-07T00:00:00Z'
+  let n = 0
+  const mk = () => `cand_${++n}`
+  const pdf = ['기술혁신형 중소기업(INNO-BIZ) 확인서', '확인번호 : 260315-00123', '확인일자 : 2026년 03월 15일', '유효기간 : 2026.03.15 ~ 2029.03.14', '중소벤처기업부'].join('\n')
+  const acceptPdf = (r: ReturnType<typeof normalizeClientOps>) => {
+    const found = factCandidatesFromDocText('custom_doc' as never, pdf, 'file1')
+    const withInbox = withFactCandidates(r, found, NOW, mk)
+    return withFactDecisions(withInbox, (withInbox.factInbox ?? []).map((c) => ({ id: c.id, action: 'accept' as const })), NOW)
+  }
+  const innoFields = (r: ReturnType<typeof normalizeClientOps>) => (r.customFields ?? []).filter((f) => f.group === 'credential' && /이노비즈/.test(f.label))
+  const life = withCompletion(emptyLifecycle('innobiz'), { number: '260315-00123', certifiedAt: '2026-03-15', validUntil: '2029-03-14' }, NOW)
+  // PDF 먼저 → 진행 기록
+  const r0 = normalizeClientOps({ id: 'pdf1', companyName: '확인서상사' } as never)
+  const r1 = acceptPdf(r0)
+  check('릴리스: 확인서 PDF → 회사 정보 인증서 칸 1개(이노비즈 · 2029-03-14까지 · 기관)', innoFields(r1).length === 1 && innoFields(r1)[0].value.includes('2029-03-14까지') && innoFields(r1)[0].value.includes('중소벤처기업부'), innoFields(r1))
+  check('릴리스: PDF 만 있어도 보유 인증(유효기간)으로 읽힌다', heldCertifications(r1).some((h) => h.key === 'innobiz' && h.validUntil === '2029-03-14'))
+  const r2 = withCertCompletion(r1, 'innobiz', life, { toProfile: true, today: TODAY, clientId: 'pdf1' })
+  check('릴리스: PDF 뒤 인증 완료 기록 → 칸 그대로 1개 · 기관 조각 남음', innoFields(r2).length === 1 && innoFields(r2)[0].value.includes('중소벤처기업부') && innoFields(r2)[0].value.includes('260315-00123'), innoFields(r2))
+  // 진행 기록 먼저 → PDF
+  const r3 = withCertCompletion(r0, 'innobiz', life, { toProfile: true, today: TODAY, clientId: 'pdf1' })
+  const r4 = acceptPdf(r3)
+  check('릴리스: 진행 기록 먼저 → PDF 받아도 칸 1개(서류 읽기와 같은 이름 "이노비즈")', innoFields(r3).length === 1 && innoFields(r3)[0].label === '이노비즈' && innoFields(r4).length === 1, innoFields(r4))
+  // 예전 이름('이노비즈 확인서') 칸이 있어도 PDF 가 같은 칸으로
+  const legacy = normalizeClientOps({ id: 'lg', companyName: '예전상사', customFields: [{ id: 'cf1', group: 'credential', label: '이노비즈 확인서', value: '인증번호 1 · 2027-01-01까지' }] } as never)
+  check('릴리스: 예전 이름 칸 + PDF → 한 칸으로', innoFields(acceptPdf(legacy)).length === 1)
+  check('릴리스: 갱신 일정은 같은 인증 다시 기록해도 한 묶음(겹치지 않음)', (withCertCompletion(r2, 'innobiz', life, { toProfile: true, today: TODAY, clientId: 'pdf1' }).toolResults ?? []).filter((t) => t.toolKey === 'cert-os').length === 1)
 }
 
 // Core 는 OS 를 모른다 — core · rules · innobiz · mainbiz · iso 는 그 밖(services · pages · components · tools · types)을 import 하지 않는다
