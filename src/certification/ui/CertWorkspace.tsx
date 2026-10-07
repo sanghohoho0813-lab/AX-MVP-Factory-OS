@@ -6,7 +6,7 @@
  */
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ExternalLink } from 'lucide-react'
+import { ChevronDown, ExternalLink } from 'lucide-react'
 import { Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { ToolResultAttach } from '../../tools/shared/ToolResultAttach'
@@ -106,26 +106,28 @@ export function CertWorkspace({
   const ownerDone = Object.values(notes).filter((v) => v.trim()).length
   const docsTotal = a.haveEvidence.length + a.missingEvidence.length
   const submitted = life.status === 'applied' || life.status === 'review' || life.status === 'supplement'
-  const done = life.status === 'certified' || life.status === 'renewal'
+  // 확인서로 들어온 보유 인증(진행 기록 없음)도 완료로 본다 — LifecyclePanel 이 같은 기준으로 보여 준다
+  const done = life.status === 'certified' || life.status === 'renewal' || a.recommendation === 'held'
   const [lifeOpen, setLifeOpen] = useState(submitted || done)
   const openLife = () => {
     setLifeOpen(true)
     window.setTimeout(() => document.querySelector('[data-testid="cert-life-box"]')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 0)
   }
   type Next = { stage: string; label: string; testid: string; go: () => void }
-  const next: Next | null = done
-    ? { stage: '인증 완료', label: '인증 완료 기록', testid: 'cert-next-complete', go: openLife }
-    : submitted
-      ? { stage: '심사 중', label: '심사 일정 기록', testid: 'cert-next-review', go: openLife }
-      : selfItems && pkg
-        ? !answeredSelf
+  // 벤처 · 연구소는 기존 화면이 다음 행동(아래) — 진행 기록은 완료 · 심사 중이면 펼쳐 둔다
+  const next: Next | null = !(selfItems && pkg)
+    ? null
+    : done
+      ? { stage: '인증 완료', label: '인증 완료 기록', testid: 'cert-next-complete', go: openLife }
+      : submitted
+        ? { stage: '심사 중', label: '심사 일정 기록', testid: 'cert-next-review', go: openLife }
+        : !answeredSelf
           ? { stage: '사전진단 전', label: '사전진단 시작', testid: 'cert-selfcheck-start', go: () => setFlow('self') }
           : ownerLeft > 0
             ? { stage: '대표 확인', label: `대표 확인 ${ownerLeft}개`, testid: 'cert-next-owner', go: () => setFlow('pack') }
             : Object.keys(prep).length === 0
               ? { stage: '실사 준비', label: '실사 준비', testid: 'cert-prep-pack', go: () => setFlow('pack') }
               : { stage: '제출 준비', label: '제출 전 최종 확인', testid: 'cert-gate-open', go: () => setFlow('gate') }
-        : null
   const keyReasons = [...a.reasons.filter((r) => r.state === 'no'), ...a.reasons.filter((r) => r.state === 'ok').slice(0, 2), ...a.reasons.filter((r) => r.state === 'warn').slice(0, 1), ...a.reasons.filter((r) => r.state === 'unknown').slice(0, 1)].slice(0, 4)
   // AX: 준비자료 — 그룹 제목이 공식 / MIRAE 뜻을 맡는다(줄마다 꼬리표 없음)
   const firstDocs = rule.evidence.filter((e) => !a.haveEvidence.includes(e.label) && EVIDENCE_CLASS[a.key] && ['official', 'process'].includes(evidenceClassOf(a.key, e.id).basis))
@@ -159,7 +161,7 @@ export function CertWorkspace({
               {showReadiness(a) && <span className="text-slate-600"> · 준비도 {READINESS_LABEL[a.readiness]}(MIRAE)</span>}
             </p>
             <ReasonList reasons={keyReasons} />
-            {a.missingFacts.length > 0 && <p className="t-sub break-keep text-warning-800">확인 필요 · {a.missingFacts.slice(0, 3).join(' · ')}</p>}
+            {a.missingFacts.length > 0 && <p className="t-sub break-keep text-warning-800">확인 필요 · {a.missingFacts.slice(0, 3).join(', ')}</p>}
             {selfItems ? (
               <Button
                 variant="primary"
@@ -273,7 +275,9 @@ export function CertWorkspace({
                 </Button>
                 {selfItems && pkg && gate && (
                   <details data-testid="cert-other-actions">
-                    <summary className="tap t-sub inline-flex cursor-pointer items-center font-semibold text-slate-600">다른 작업</summary>
+                    <summary className="tap t-sub inline-flex cursor-pointer list-none items-center gap-1 font-semibold text-slate-600 [&::-webkit-details-marker]:hidden">
+                      <ChevronDown aria-hidden="true" className="size-4" /> 다른 작업
+                    </summary>
                     <div className="flex flex-wrap gap-2 pt-1">
                       {next.testid !== 'cert-selfcheck-start' && (
                         <Button variant="secondary" size="sm" onClick={() => setFlow('self')} data-testid="cert-selfcheck-again">

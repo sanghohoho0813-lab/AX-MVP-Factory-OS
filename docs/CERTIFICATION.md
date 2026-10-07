@@ -104,3 +104,11 @@ ISO 14001:2026 전환(Global ACI) 반영. 남은 미확인: Kibo 개별기술 �
 P3 로 남긴 것은 docs/DECISIONS.md D-173 과 보고서에.
 
 **자료 근거(D-175)**: `rules/officialRules.ts` `EVIDENCE_CLASS` — 공식 제출서류만 '반드시 확인' 에서 막는다. 나머지는 '공식 목록 · 해당 시' · '공식 절차에서 작성' · 'MIRAE 실무 준비자료' · '공식 필수 여부 확인 필요' 로 보이고 보완 권장.
+
+## AX — 판단 정확도 + 화면 단순화 (2026-10-07, Preview 까지 · D-176)
+
+- 업종은 `rules/industryMap.ts`: KSIC 로만 확정(이노비즈 8 평가표 · 별표2 · 메인비즈 제외). 없으면 '세부 업종 확인 필요'.
+- 연구개발비: 범위(`rndRange`)와 정확한 금액(`rndExpense`)을 섞지 않는다(`core/rnd.ts`). 벤처 비율은 KSIC 별표1(`ventureRndRatio(ksic, revenue)` — 모르면 null).
+- 중소기업: 확인서(`smeDoc`) 또는 확인서 기준 규모만 ✓.
+- 사실 우선순위: 공식 서류 > 전문 모듈 > 확인한 사실 > 칩 > 추정 — 다르면 `ctx.conflicts`.
+- 화면: 첫 화면 1순위 하나 · 질문 1/3 스테퍼(`ProfileQuestions.tsx`) · 상세는 단계마다 다음 행동 하나 · 근거 · 출처 · 설명 · 진행 기록은 접기 · 시트(`RulesSheet.tsx` · `ExplainButton`).

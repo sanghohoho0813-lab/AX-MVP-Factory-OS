@@ -595,6 +595,12 @@ check('어댑터: 설정 읽기 — 이상한 값은 모름', JSON.stringify(nor
   check('AX 혜택: 설명에 출처 없는 숫자(%p · 점) 없음 · 숫자는 출처와 함께만', Object.values(CERT_RULES).every((r) => r.benefits.every((b) => !/\d\s*(%p|점)/.test(b.detail) && (!b.figure || !!b.source))), Object.values(CERT_RULES).flatMap((r) => r.benefits.filter((b) => /\d\s*(%p|점)/.test(b.detail)).map((b) => b.id)))
   check('AX 벤처 재확인: 지금(2027-02-19까지) 2개월 전 ~ 1개월 후 · 2027-02-20부터 140일 전', CERT_RULES.venture.renewalNote.includes('2027-02-19') && CERT_RULES.venture.renewalNote.includes('140일'))
   check('AX 메인비즈: 공식 안내 상이(제외 업종 각 호 없음)를 화면에 따로', (CERT_RULES.mainbiz.conflicts ?? []).some((x) => x.includes('각 호')))
+  // 진행 순서 — 전담부서가 이미 있어 '연구소 전환 검토' 이면 연구소를 맨 앞에 두지 않는다
+  const deptCo = { ...sm, researchUnit: 'dept' as const, researchers: 2, rndPlan: true, ksic: '29199' }
+  const rmDept = buildRoadmap(assessAll(deptCo), deptCo)
+  check('AX 진행 순서: 전담부서 보유 → 연구소는 뒤(바탕일 때만 맨 앞)', rmDept.steps[0]?.id !== 'lab', rmDept.steps.map((x) => x.id))
+  const noLabCo = { ...sm, researchUnit: 'none' as const, researchers: 3, rndPlan: true }
+  check('AX 진행 순서: 연구조직이 없고 기술 인증을 노리면 연구소가 먼저', buildRoadmap(assessAll(noLabCo), noLabCo).steps[0]?.id === 'lab', buildRoadmap(assessAll(noLabCo), noLabCo).steps.map((x) => x.id))
   // 짧은 제출 전 확인
   const rows = gateRows(gSme)
   check('AX 제출 전 확인 요약: 네 줄(신청자격 · 공식 필수자료 · 대표 확인 · 보강) · 먼저 확인할 것은 반드시 확인부터', rows.map((r) => r.label).join() === '신청자격,공식 필수자료,대표 확인,보강' && rows[0].mark === 'check' && gateFirst(gSme)?.level === 'must')

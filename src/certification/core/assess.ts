@@ -94,6 +94,11 @@ function smeCheck(c: CertificationClientContext): Check {
   return { weight: 'must', state: 'unknown', text: `중소기업 여부 · 확인 필요${hint}(중소기업확인서로 확인)` }
 }
 
+/** 모르는 것의 이름만(뒤 설명 · '· 확인 필요' 꼬리는 뺀다) — '중소기업 여부, 체납 · 회생 같은 제외 사유 확인이 먼저 필요' */
+function factsOf(checks: readonly Check[]): string[] {
+  return checks.filter((x) => x.state === 'unknown').map((x) => x.text.split(' — ')[0].replace(/\s*·?\s*확인 필요.*$/, '').replace(/\(.*\)$/, '').trim())
+}
+
 function yearsCheck(c: CertificationClientContext, need: number): Check {
   if (c.years === null) return { weight: 'must', state: 'unknown', text: `업력 ${need}년 이상 — 설립일 확인 필요` }
   if (c.years >= need) return { weight: 'must', state: 'ok', text: `업력 ${need}년 이상 충족(${c.years}년)` }
@@ -217,7 +222,7 @@ export function assessInnobiz(c: CertificationClientContext): CertificationAsses
   const techKnown = c.researchUnit !== null && c.patents !== null && (rndPositive(c) !== null || c.rndPlan !== null)
   const rawReadiness = readinessOf(checks)
   const readiness = techKnown && t.count === 0 ? capReadiness(rawReadiness, 'low') : t.count === 1 ? capReadiness(rawReadiness, 'medium') : rawReadiness
-  const missingFacts = checks.filter((x) => x.state === 'unknown').map((x) => x.text.split(' — ')[0])
+  const missingFacts = factsOf(checks)
   const tooEarly = c.years !== null && c.years < 3
   const mustNo = checks.some((x) => x.weight === 'must' && x.state === 'no')
   let rec: Recommendation
@@ -237,7 +242,7 @@ export function assessInnobiz(c: CertificationClientContext): CertificationAsses
     next = { label: '제외 사유 확인', kind: 'confirm_facts' }
   } else if (readiness === 'unknown') {
     rec = 'need_info'
-    oneLine = `${missingFacts.slice(0, 2).join(' · ')} 확인이 먼저 필요`
+    oneLine = `${missingFacts.slice(0, 2).join(', ')} 확인이 먼저 필요`
     timing = '정보를 채우면 바로 다시 판정'
     next = { label: '모자란 정보 채우기', kind: 'confirm_facts' }
   } else if (t.count === 0 && techKnown) {
@@ -248,14 +253,14 @@ export function assessInnobiz(c: CertificationClientContext): CertificationAsses
     next = { label: '메인비즈 살펴보기', kind: 'self_check' }
   } else if (readiness === 'very_high' || readiness === 'high') {
     rec = 'now'
-    oneLine = `업력 요건 충족${t.lab ? ' · 연구조직 보유' : ''}${t.patents ? ' · 특허 보유' : ''} — 자가진단부터`
+    oneLine = `업력 요건 충족${t.lab ? ' · 연구조직 보유' : ''}${t.patents ? ' · 특허 보유' : ''} — 사전진단부터`
     timing = c.policyFundPlan ? '정책자금 신청 전에 준비 추천' : '지금 진행 추천'
-    next = { label: '자가진단 시작', kind: 'self_check' }
+    next = { label: '사전진단 시작', kind: 'self_check' }
   } else if (readiness === 'medium') {
     rec = 'possible'
     oneLine = `진행 가능 · ${checks.filter((x) => x.state === 'warn').map((x) => x.text.split(' — ')[0]).slice(0, 2).join(' · ') || '증빙'} 보강 권장`
     timing = '3개월 안에 증빙을 갖추고 검토'
-    next = { label: '자가진단 시작', kind: 'self_check' }
+    next = { label: '사전진단 시작', kind: 'self_check' }
   } else {
     rec = 'after_fix'
     oneLine = '연구조직 · 특허 · R&D 기록을 먼저 보강'
@@ -289,7 +294,7 @@ export function assessMainbiz(c: CertificationClientContext, innobiz?: Certifica
   checks.push(hr?.have ? { weight: 'core', state: 'ok', text: '취업규칙 · 인사 기록 있음' } : { weight: 'core', state: 'warn', text: '취업규칙 · 인사 · 교육 기록 보강' })
 
   const readiness = readinessOf(checks)
-  const missingFacts = checks.filter((x) => x.state === 'unknown').map((x) => x.text.split(' — ')[0])
+  const missingFacts = factsOf(checks)
   const mustNo = checks.find((x) => x.weight === 'must' && x.state === 'no')
   const tooEarly = c.years !== null && c.years < 3
   const tech = techSignals(c)
@@ -310,7 +315,7 @@ export function assessMainbiz(c: CertificationClientContext, innobiz?: Certifica
     next = { label: '제외 사유 확인', kind: 'confirm_facts' }
   } else if (readiness === 'unknown') {
     rec = 'need_info'
-    oneLine = `${missingFacts.slice(0, 2).join(' · ')} 확인이 먼저 필요`
+    oneLine = `${missingFacts.slice(0, 2).join(', ')} 확인이 먼저 필요`
     timing = '재무제표 · 직원 수를 채우면 바로 다시 판정'
     next = { label: '모자란 정보 채우기', kind: 'confirm_facts' }
   } else if (innobiz && (innobiz.recommendation === 'now' || innobiz.recommendation === 'held') && tech.count >= 2) {
@@ -322,12 +327,12 @@ export function assessMainbiz(c: CertificationClientContext, innobiz?: Certifica
     rec = 'now'
     oneLine = '업력 · 재무 요건 충족 — 경영 혁신 증빙만 갖추면 진행'
     timing = c.policyFundPlan || c.procurement ? '정책자금 · 조달 전에 준비 추천' : '지금 진행 추천'
-    next = { label: '자가진단 시작', kind: 'self_check' }
+    next = { label: '사전진단 시작', kind: 'self_check' }
   } else if (readiness === 'medium') {
     rec = 'possible'
     oneLine = '진행 가능 · 경영 기록(계획 · 성과 · 인사) 보강 권장'
     timing = '3개월 안에 검토'
-    next = { label: '자가진단 시작', kind: 'self_check' }
+    next = { label: '사전진단 시작', kind: 'self_check' }
   } else {
     rec = 'after_fix'
     oneLine = '재무 · 조직 기록을 먼저 보강'
@@ -365,7 +370,7 @@ export function assessVenture(c: CertificationClientContext): CertificationAsses
   }
   checks.push(c.patents === null ? { weight: 'core', state: 'unknown', text: '특허 — 확인 필요' } : c.patents > 0 ? { weight: 'core', state: 'ok', text: `특허 ${c.patents}건 — 혁신성 증빙` } : { weight: 'core', state: 'warn', text: '특허 없음 — 혁신성장유형은 사업계획 · 기술성으로 평가' })
   const readiness = readinessOf(checks)
-  const missingFacts = checks.filter((x) => x.state === 'unknown').map((x) => x.text.split(' — ')[0])
+  const missingFacts = factsOf(checks)
   const rndType = lab && (c.rndExpense ?? 0) >= VENTURE_RND.minExpenseWon
   const rndMaybe = lab && rndNeedsExact(c)
   let rec: Recommendation
@@ -373,7 +378,7 @@ export function assessVenture(c: CertificationClientContext): CertificationAsses
   let timing: string
   if (readiness === 'unknown') {
     rec = 'need_info'
-    oneLine = `${missingFacts.slice(0, 2).join(' · ')} 확인이 먼저 필요`
+    oneLine = `${missingFacts.slice(0, 2).join(', ')} 확인이 먼저 필요`
     timing = '정보를 채우면 유형을 골라 드립니다'
   } else if (rndType) {
     rec = 'now'
@@ -431,7 +436,7 @@ export function assessLab(c: CertificationClientContext): CertificationAssessmen
   checks.push({ weight: 'core', state: 'unknown', text: '독립된 연구공간 — 현장 확인 필요' })
   checks.push(rndPositive(c) === true ? { weight: 'core', state: 'ok', text: '연구개발 활동 · 비용 있음' } : c.rndPlan ? { weight: 'core', state: 'ok', text: '연구개발 계획 있음' } : { weight: 'core', state: 'unknown', text: '연구개발 활동 — 확인 필요' })
   const readiness = readinessOf(checks)
-  const missingFacts = checks.filter((x) => x.state === 'unknown').map((x) => x.text.split(' — ')[0])
+  const missingFacts = factsOf(checks)
   const deptOnly = c.researchers !== null && need !== null && c.researchers < need && c.researchers >= 1
   // FV: 연구 인력도 연구개발 계획도 없으면 '보완 후 추천' 이 아니라 '지금은 필요 없음'(연구소를 위해 연구소를 만들지 않는다)
   const noRnd = c.researchers === 0 && c.rndPlan === false && rndPositive(c) !== true

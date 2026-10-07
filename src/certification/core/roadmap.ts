@@ -33,12 +33,14 @@ export function buildRoadmap(list: readonly CertificationAssessment[], c: Certif
   const steps: RoadmapStep[] = []
   const labUnit = c.researchUnit === 'lab' || c.researchUnit === 'dept'
   const techTarget = on('venture') || on('innobiz')
-  if (on('lab') && techTarget && !labUnit) steps.push({ id: 'lab', label: '기업부설연구소', why: '벤처(연구개발유형) · 이노비즈 평가의 바탕 — 연구조직이 먼저 있어야 다음이 쉽습니다.' })
-  else if (on('lab')) steps.push({ id: 'lab', label: '기업부설연구소', why: '연구 인력 조건이 맞아 지금 갖춰 두면 세액공제 · 다른 인증에 함께 쓰입니다.' })
+  // 연구소가 다음 인증의 바탕일 때만 맨 앞 — 이미 전담부서가 있어 '전환 검토' 인 연구소는 뒤로(AX)
+  const labFirst = on('lab') && techTarget && !labUnit
+  if (labFirst) steps.push({ id: 'lab', label: '기업부설연구소', why: '벤처(연구개발유형) · 이노비즈 평가의 바탕 — 연구조직이 먼저 있어야 다음이 쉽습니다.' })
   if (techTarget && c.patents === 0) steps.push({ id: 'patent', label: '특허 보강', why: '기술 성과 증빙이 약합니다 — 출원 1건이라도 있으면 벤처 · 이노비즈 평가가 달라집니다.' })
   if (on('venture')) steps.push({ id: 'venture', label: '벤처기업', why: by.get('venture')!.oneLine })
   if (on('innobiz')) steps.push({ id: 'innobiz', label: '이노비즈', why: on('venture') ? '벤처 확인 뒤 기술혁신 체계를 인정받는 다음 단계.' : by.get('innobiz')!.oneLine })
   if (on('mainbiz') && by.get('mainbiz')!.recommendation !== 'after_fix') steps.push({ id: 'mainbiz', label: '메인비즈', why: on('innobiz') ? '이노비즈와 함께 경영혁신도 인정받으려면.' : by.get('mainbiz')!.oneLine })
+  if (on('lab') && !labFirst) steps.push({ id: 'lab', label: '기업부설연구소', why: c.researchUnit === 'dept' ? '전담부서가 있어 인원이 늘면 연구소로 바꿀 수 있습니다 — 세액공제 · 다른 인증에 함께 쓰입니다.' : '연구 인력 조건이 맞아 지금 갖춰 두면 세액공제 · 다른 인증에 함께 쓰입니다.' })
   if (c.policyFundPlan && steps.length) steps.push({ id: 'policy_fund', label: '정책자금', why: '인증을 받은 뒤 신청하면 보증 · 우대를 함께 쓸 수 있습니다.' })
   if (on('iso9001') && (c.b2b || c.procurement)) steps.push({ id: 'iso9001', label: 'ISO 9001', why: '거래처 · 입찰에서 품질 체계를 보여 줄 때.' })
   const later = list

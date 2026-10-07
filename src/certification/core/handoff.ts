@@ -102,7 +102,7 @@ export function handoffText(p: HandoffPackage): string {
     ...(p.facts.length ? p.facts.map(src) : ['- (확인된 사실 없음)']),
   ]
   if (p.judgment) out.push('', '## 검토 결과(규칙 판정)', `- ${p.judgment.recommendation} · 준비 정도 ${p.judgment.readiness}`, `- ${p.judgment.oneLine}`, ...p.judgment.reasons.map((r) => `- ${r}`))
-  if (p.selfCheck.length) out.push('', '## 자가진단', ...p.selfCheck.map((x) => `- ${x.question} → ${x.answer}`))
+  if (p.selfCheck.length) out.push('', '## MIRAE 사전진단(공식 자가진단 아님)', ...p.selfCheck.map((x) => `- ${x.question} → ${x.answer}`))
   out.push('', '## 증빙', `- 있음: ${p.evidence.have.join(', ') || '없음'}`, `- 없음 · 보완: ${p.evidence.missing.join(', ') || '없음'}`)
   if (p.questions.length) {
     out.push('', '## 예상 질문')

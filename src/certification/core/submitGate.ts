@@ -93,9 +93,9 @@ export function buildSubmitGate(input: {
   const fix = r.items.filter((x) => x.verdict === 'fix').length
   // 자가진단은 절반 넘게 '모름' 이면 제출 판단을 할 수 없다(반드시) — 그 아래는 보완 권장
   const tooUnknown = unknown * 2 > r.items.length
-  items.push(unknown ? { id: 'selfcheck_unknown', level: tooUnknown ? 'must' : 'recommend', ok: false, text: `자가진단 ${unknown}개 항목 '모름' — 대표 확인${tooUnknown ? '(절반이 넘음)' : ''}` } : { id: 'selfcheck_unknown', level: 'must', ok: true, text: '자가진단 모든 항목 답함' })
+  items.push(unknown ? { id: 'selfcheck_unknown', level: tooUnknown ? 'must' : 'recommend', ok: false, text: `사전진단 ${unknown}개 항목 '모름' — 대표 확인${tooUnknown ? '(절반이 넘음)' : ''}` } : { id: 'selfcheck_unknown', level: 'must', ok: true, text: '사전진단 모든 항목 답함' })
   // 보완 권장 — 실사 설명 · 참고 증빙
-  items.push(fix ? { id: 'selfcheck_fix', level: 'recommend', ok: false, text: `자가진단 ${fix}개 항목 보완 필요` } : { id: 'selfcheck_fix', level: 'recommend', ok: true, text: '자가진단 보완 필요 항목 없음' })
+  items.push(fix ? { id: 'selfcheck_fix', level: 'recommend', ok: false, text: `사전진단 ${fix}개 항목 보완 필요` } : { id: 'selfcheck_fix', level: 'recommend', ok: true, text: '사전진단 보완 필요 항목 없음' })
   const optMissing = docs.need.filter((d) => !d.required)
   items.push(optMissing.length ? { id: 'docs', level: 'recommend', ok: false, text: `기본 준비자료 ${optMissing.length}개 보완(공식 목록 해당 시 · MIRAE 실무 준비자료)` } : { id: 'docs', level: 'recommend', ok: true, text: '기본 준비자료 모두 있음' })
   const open = pkg.questions.filter((x) => x.guide.needsOwner && !x.prepared).length

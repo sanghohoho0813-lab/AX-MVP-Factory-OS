@@ -6,7 +6,7 @@
  */
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { AlertTriangle, ChevronRight, FileText, Lightbulb } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronRight, FileText, Lightbulb } from 'lucide-react'
 import { Blank, Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { ClientPickerOptions } from '../../components/ops/ClientPickerOptions'
@@ -156,7 +156,8 @@ function RoadmapLine({ roadmap }: { roadmap: Roadmap }) {
       {roadmap.later.length > 0 && <p className="t-sub break-keep text-slate-500">나중에 · {roadmap.later.map((l) => `${l.label}(${l.when})`).join(' · ')}</p>}
       {roadmap.steps.length >= 2 && (
         <details data-testid="cert-roadmap-why-box">
-          <summary className="tap t-sub inline-flex cursor-pointer items-center font-semibold text-brand-700" data-testid="cert-roadmap-why">
+          <summary className="tap t-sub inline-flex cursor-pointer list-none items-center gap-1 font-semibold text-brand-700 [&::-webkit-details-marker]:hidden" data-testid="cert-roadmap-why">
+            <ChevronDown aria-hidden="true" className="size-4" />
             왜 이 순서인가요?
           </summary>
           <ol className="flex flex-col gap-1 pt-1">
@@ -186,7 +187,7 @@ function CertRow({ a, clientId }: { a: CertificationAssessment; clientId: string
             <RecBadge rec={a.recommendation} />
             {a.expired && <ExpiredBadge />}
           </span>
-          <span className="t-sub line-clamp-2 break-keep text-slate-600">{a.oneLine}</span>
+          <span className="t-sub line-clamp-2 break-keep text-slate-600" data-testid="cert-oneline">{a.oneLine}</span>
         </span>
         <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-slate-400" />
       </Link>
@@ -256,16 +257,14 @@ export function CertOverview({
           <div className="flex flex-col gap-2" data-testid="cert-questions">
             {asking ? (
               <QuestionStepper qs={qs} profile={profile} onChange={onProfile} />
-            ) : (
+            ) : needInfo ? null : (
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="t-sub break-keep text-slate-700">
                   <b className="font-semibold text-slate-900">더 정확하게</b> · {Math.min(3, open.length)}가지를 확인하면 판단이 정확해집니다
                 </p>
-                {!needInfo && (
-                  <Button variant="secondary" size="sm" onClick={() => setAsking(true)} data-testid="cert-ask-open">
-                    정보 확인하기
-                  </Button>
-                )}
+                <Button variant="secondary" size="sm" onClick={() => setAsking(true)} data-testid="cert-ask-open">
+                  정보 확인하기
+                </Button>
               </div>
             )}
             <MoreQuestions qs={qs} profile={profile} onChange={onProfile} pendingFacts={pendingFacts} onConfirmFacts={onConfirmFacts} />

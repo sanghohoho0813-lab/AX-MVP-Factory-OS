@@ -20,7 +20,7 @@ export function RulesInfoButton({ cert, today }: { cert?: CertificationKey; toda
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`tap t-sub inline-flex items-center gap-1.5 self-start font-semibold ${stale ? 'text-warning-800' : 'text-slate-500 hover:text-slate-800'}`}
+        className={`tap t-sub inline-flex items-center gap-1.5 font-semibold ${stale ? 'text-warning-800' : 'text-slate-500 hover:text-slate-800'}`}
         data-testid="cert-freshness"
       >
         {stale ? '최신 기준 확인 필요 · ' : ''}기준 확인일 {checked}

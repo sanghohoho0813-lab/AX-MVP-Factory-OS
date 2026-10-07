@@ -56,10 +56,10 @@ export function SelfCheckFlow({ rule, items, ctx, answers, onAnswer, onDone }: {
       <Surface>
         <div className="flex flex-col gap-3" data-testid="selfcheck-result">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="t-section font-bold text-slate-900">{rule.label} 준비 점검 결과</h3>
+            <h3 className="t-section font-bold text-slate-900">{rule.label} MIRAE 사전진단 결과</h3>
             <ReadinessBadge r={result.readiness} />
           </div>
-          <p className="t-sub break-keep text-slate-600">MIRAE 준비 점검(자체 5단계)입니다. 공식 점수는 아래 공식 기준으로 확인하세요.</p>
+          <p className="t-sub break-keep text-slate-600">MIRAE 사전진단(자체 5단계)입니다 — 공식 자가진단이 아닙니다. 공식 점수는 아래 공식 기준으로 확인하세요.</p>
           {rule.officialScores && (
             <div className="rounded-(--radius-control) border border-slate-200 bg-slate-50 p-3" data-testid="selfcheck-official">
               <p className="t-sub font-semibold text-slate-800">공식 기준</p>
