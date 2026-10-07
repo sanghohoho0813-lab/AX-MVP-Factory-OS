@@ -245,7 +245,8 @@ export function ClientBoardCard({
             </span>
           )}
           <button type="button" onClick={onOpen} className="tap flex min-w-0 flex-[1_1_11rem] items-center gap-2 text-left">
-            <span className="t-card truncate font-bold text-slate-900 hover:text-brand-700 hover:underline">
+            {/* D-166: 두 줄까지 — 한 줄 말줄임이면 '…(주) 제1공장 · 제2공장' 처럼 뒤가 다른 업체끼리 구분이 안 됐다 */}
+            <span className="t-card line-clamp-2 font-bold text-slate-900 hover:text-brand-700 hover:underline [overflow-wrap:anywhere]">
               {record.companyName || '(이름 없음)'}
             </span>
             <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-slate-400" />

@@ -22,14 +22,16 @@ export function GrantFeedBar({ feed, onRefresh }: { feed: FeedState; onRefresh: 
       aria-label="기업마당 공고 받아오기"
       data-testid="grant-feed"
       data-status={feed.status}
-      className="flex flex-col gap-2 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-5"
+      className="flex flex-row items-center gap-3 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-2.5 sm:gap-4 sm:px-5 sm:py-3"
     >
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <p className="t-body break-keep font-semibold text-slate-900" data-testid="grant-feed-count">
           {loading && feed.count === 0 ? '기업마당 공고를 받아 오는 중…' : feed.count > 0 ? `기업마당 공고 ${feed.count.toLocaleString()}건` : '기업마당 공고 아직 없음'}
         </p>
+        {/* D-166: 휴대폰은 언제 받았는지만 — 자동 갱신 설명은 넓은 화면에서 */}
         <p className="t-sub break-keep text-slate-500">
-          {feed.fetchedAt ? `${whenText(feed.fetchedAt)}에 받음 · ` : ''}매일 아침 9시에 저절로 새로 받아요 (다음: {nextRefreshText()})
+          {feed.fetchedAt ? `${whenText(feed.fetchedAt)}에 받음` : ''}
+          <span className="max-sm:hidden">{feed.fetchedAt ? ' · ' : ''}매일 아침 9시에 저절로 새로 받아요 (다음: {nextRefreshText()})</span>
         </p>
         {bad && feed.message && (
           <p role="status" className="t-sub break-keep text-warning-800 [overflow-wrap:anywhere]" data-testid="grant-feed-message">
@@ -37,9 +39,10 @@ export function GrantFeedBar({ feed, onRefresh }: { feed: FeedState; onRefresh: 
           </p>
         )}
       </div>
-      <Button variant="secondary" onClick={onRefresh} disabled={feed.status === 'loading'} data-testid="grant-feed-refresh" className="self-start sm:self-center">
+      <Button variant="secondary" onClick={onRefresh} disabled={feed.status === 'loading'} data-testid="grant-feed-refresh" aria-label={feed.status === 'loading' ? '받는 중' : '지금 새로 가져오기'}>
         <RefreshCw aria-hidden="true" className={`size-4 ${feed.status === 'loading' ? 'animate-spin' : ''}`} />
-        {feed.status === 'loading' ? '받는 중…' : '지금 새로 가져오기'}
+        <span className="max-sm:hidden">{feed.status === 'loading' ? '받는 중…' : '지금 새로 가져오기'}</span>
+        <span className="sm:hidden">{feed.status === 'loading' ? '받는 중' : '새로'}</span>
       </Button>
     </section>
   )

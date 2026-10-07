@@ -46,6 +46,7 @@ npm run qa:grants -- http://localhost:4390        # 지원사업 알림(공고 �
 npm run qa:money -- http://localhost:4390         # 매출 · 비용(계약 수금 → 들어온 돈/예상 · 정기 결제일 · 비용 적기 · CSV · 해지 · 오늘 3일 안 결제 · 오늘 할 일 PC 두 칸 · AI 자리 단추)
 npm run qa:db                                     # DB 보안(로컬 PostgreSQL · 마이그레이션 전부 · RLS · 0016~0019 공격 · 모든 표 격리) — pg_ctlcluster 16 main start 먼저
 npm run qa:pilot                                  # 1인 Pilot 교차(로컬 DB + PostgREST 진짜 RLS · 대표 ↔ Pilot ↔ 가입자 · 같은 브라우저 · 주소 · 찾기 · 업무 흐름 · 390)
+npm run qa:phone -- http://localhost:4390         # 휴대폰 전반(360 · 390 · 430 · 긴 이름 · 공고 300건 — 넘침 · 글자가 칸보다 넓음 · 짜부라짐 · 칩 겹침 0)
 ```
 
 화면을 손댔으면 **실제로 찍어서 눈으로 본다**(`npm run qa:shots -- <url> <dir> --wide`).

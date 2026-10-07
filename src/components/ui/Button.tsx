@@ -34,10 +34,13 @@ export function Button({
   children,
   ...rest
 }: ButtonProps) {
+  // D-166: 밖에서 'hidden sm:inline-flex' 처럼 숨김을 주면 기본 inline-flex 를 빼야 숨는다
+  // (같은 층 유틸리티끼리는 inline-flex 가 이겨 PC 전용 단추가 휴대폰에도 보였다)
+  const display = /(^|\s)hidden(\s|$)/.test(className) ? '' : 'inline-flex '
   return (
     <button
       type={type}
-      className={`inline-flex shrink-0 cursor-pointer items-center justify-center rounded-(--radius-control) font-medium whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${VARIANT_CLASS[variant]} ${SIZE_CLASS[size]} ${className}`}
+      className={`btn-fit ${display}shrink-0 cursor-pointer items-center justify-center rounded-(--radius-control) font-medium whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${VARIANT_CLASS[variant]} ${SIZE_CLASS[size]} ${className}`}
       {...rest}
     >
       {children}

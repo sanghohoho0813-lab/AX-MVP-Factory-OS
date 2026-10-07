@@ -497,7 +497,12 @@ for (const width of [1440, 390]) {
   await page.waitForTimeout(600)
   const shelf = (await page.getByTestId('doc-shelf').innerText()) ?? ''
   check(`서류 탭 손볼 것: 만료(납세증명서) ${tag}`, /만료 [1-9]/.test(shelf), shelf)
-  await page.getByRole('button', { name: '서류 요청 문구' }).first().click()
+  // D-166: 휴대폰은 머리 단추를 줄여 '서류 요청 문구' 가 더보기 안에 있다
+  if (width < 640) {
+    check(`휴대폰 머리에는 서류 요청 문구 단추가 숨는다 ${tag}`, (await page.getByRole('button', { name: '서류 요청 문구', exact: true }).filter({ visible: true }).count()) === 0)
+    await page.locator('main').getByRole('button', { name: '더보기', exact: true }).first().click()
+    await page.getByTestId('more-doc-request').click()
+  } else await page.getByRole('button', { name: '서류 요청 문구' }).first().click()
   await page.waitForTimeout(400)
   const msg = (await page.getByRole('dialog').locator('textarea').inputValue()) ?? ''
   check(`서류 요청 문구: 만료된 납세증명서 새 발급본도 ${tag}`, msg.includes('납세증명서') && msg.includes('새 발급본'), msg.slice(0, 300))

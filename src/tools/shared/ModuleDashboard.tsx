@@ -22,6 +22,7 @@ import { todayLocalDate } from '../../lib/appClock'
 import { daysLeftFrom } from '../../services/clientOpsAlerts'
 import type { ClientOpsRecord, ToolResult } from '../../types/clientOps'
 import { useToolClient } from './toolClientContext'
+import { useIsPhone } from '../../lib/useIsPhone'
 
 /** 이 모듈이 만든 기한 한 줄 — 어느 업체의 것인지까지 */
 interface ModuleDue {
@@ -107,6 +108,8 @@ export interface ModuleDashboardProps {
 
 export function ModuleDashboard({ toolKey, children }: ModuleDashboardProps) {
   const { loadClients } = useToolClient()
+  // D-166: 휴대폰은 서류 빠진 업체를 4곳만(같은 사유가 수십 줄 반복됐다) — 나머지는 '몇 곳 더'
+  const phone = useIsPhone()
   const [clients, setClients] = useState<ClientOpsRecord[] | null>(null)
   const tool = toolOf(toolKey)
   const today = todayLocalDate()
@@ -184,7 +187,7 @@ export function ModuleDashboard({ toolKey, children }: ModuleDashboardProps) {
                     >
                       <CalendarClock aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
                       <span className="t-sub font-bold text-slate-900">{d.clientName}</span>
-                      <span className="t-sub min-w-0 flex-1 break-keep text-slate-600">{d.title}</span>
+                      <span className="t-sub min-w-[10rem] flex-1 break-keep text-slate-600">{d.title}</span>
                       <span className="t-meta text-slate-400">{d.date}</span>
                       <Badge tone={tone.tone}>{tone.text}</Badge>
                     </Link>
@@ -199,7 +202,7 @@ export function ModuleDashboard({ toolKey, children }: ModuleDashboardProps) {
       {sum.gaps.length > 0 && (
         <Section title="서류부터 받아야 하는 업체" count={sum.gaps.length}>
           <ul className="flex flex-col gap-2" data-testid="module-gaps">
-            {sum.gaps.slice(0, 8).map((g) => (
+            {sum.gaps.slice(0, phone ? 4 : 8).map((g) => (
               <li key={g.clientId}>
                 <Surface as="div" edge="warning" showEdge padded={false}>
                   <Link
@@ -208,13 +211,18 @@ export function ModuleDashboard({ toolKey, children }: ModuleDashboardProps) {
                   >
                     <FileWarning aria-hidden="true" className="size-4 shrink-0 text-amber-500" />
                     <span className="t-sub font-bold text-slate-900">{g.clientName}</span>
-                    <span className="t-sub min-w-0 flex-1 break-keep text-amber-700">{g.missing.join(' · ')} 없음</span>
+                    <span className="t-sub min-w-[10rem] flex-1 break-keep text-amber-700">{g.missing.join(' · ')} 없음</span>
                     <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-slate-300" />
                   </Link>
                 </Surface>
               </li>
             ))}
           </ul>
+          {sum.gaps.length > (phone ? 4 : 8) && (
+            <Link to="/ops/clients" className="tap t-sub mt-1 inline-flex items-center font-semibold text-brand-700 hover:underline" data-testid="module-gaps-more">
+              그 밖에 {sum.gaps.length - (phone ? 4 : 8)}곳 — 고객 관리에서 보기 →
+            </Link>
+          )}
         </Section>
       )}
 

@@ -34,8 +34,8 @@ function LocalSettings() {
             <SettingRow label="이름">{CURRENT_USER.name}</SettingRow>
             <SettingRow label="역할">{CURRENT_USER.role}</SettingRow>
           </Panel>
-          <AppearancePanel />
           <TextScalePanel />
+          <AppearancePanel />
           <FeatureVisibilityPanel />
           <OnboardingSettingsPanel />
         </>

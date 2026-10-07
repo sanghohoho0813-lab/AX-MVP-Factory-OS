@@ -323,7 +323,7 @@ export function MetricTile({
         설명을 감추고 여백을 줄여 높이를 벌었다(네 칸 230px → 155px).
       */}
       <span className="t-sub block break-keep text-slate-500">{label}</span>
-      <strong className={`t-num mt-0.5 block sm:mt-1 ${valueColor}`}>{value}</strong>
+      <strong className={`t-num t-num-wrap mt-0.5 block sm:mt-1 ${valueColor}`}>{value}</strong>
       {hint && <span className={`t-meta mt-0.5 break-keep text-slate-500 ${hintOnMobile ? 'block' : 'hidden sm:block'}`}>{hint}</span>}
     </Tag>
   )

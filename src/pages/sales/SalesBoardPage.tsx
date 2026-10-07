@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useIsPhone } from '../../lib/useIsPhone'
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { fromState } from '../../lib/navFrom'
 import { useQueryInUrl } from '../../lib/useQueryInUrl'
@@ -67,7 +68,7 @@ function StageSelect({ record, onMove }: { record: ClientOpsRecord; onMove: (r: 
       value={stage}
       aria-label={`${record.companyName} 영업 단계`}
       onChange={(e) => onMove(record, e.target.value as SalesStage)}
-      className="t-meta w-full min-w-0 rounded-(--radius-control) border border-slate-200 bg-white px-2 py-1.5 font-medium text-slate-700 focus:border-brand-500 focus:outline-none"
+      className="tap t-meta w-full min-w-0 rounded-(--radius-control) border border-slate-200 bg-white px-2 py-1.5 font-medium text-slate-700 focus:border-brand-500 focus:outline-none"
     >
       {SALES_STAGE_ORDER.map((s) => (
         <option key={s} value={s}>
@@ -212,6 +213,8 @@ function NewProspectModal({ open, busy, onClose, onSubmit }: { open: boolean; bu
 }
 
 function BoardContent({ workspaceId }: { workspaceId: string | null }) {
+  const phone = useIsPhone()
+  const [allRisks, setAllRisks] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const { showToast } = useToast()
@@ -462,7 +465,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
           {risks.length > 0 && (
             <Disclosure title="지금 챙길 영업" hint={`${risks.length}곳 · ${risks[0].record.companyName} — ${risks[0].reason}`} badge={<Badge tone="warning">{risks.length}</Badge>} defaultOpen>
               <ul className="flex flex-col divide-y divide-slate-100">
-                {risks.map((r) => (
+                {(phone && !allRisks ? risks.slice(0, 3) : risks).map((r) => (
                   <li key={r.record.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5">
                     <button type="button" onClick={() => open(r.record)} className="tap t-sub inline-flex items-center font-bold text-slate-900 hover:text-brand-700 hover:underline">{r.record.companyName}</button>
                     <span className="t-sub text-warning-700">{r.reason}</span>
@@ -473,6 +476,12 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
                   </li>
                 ))}
               </ul>
+              {/* D-166: 휴대폰은 3곳만 — 열 곳이 펼쳐져 찾기 칸 · 단계 보드가 한참 아래로 밀렸다 */}
+              {phone && !allRisks && risks.length > 3 && (
+                <button type="button" onClick={() => setAllRisks(true)} className="tap t-sub inline-flex items-center font-semibold text-brand-700 hover:underline" data-testid="sales-risks-more">
+                  {risks.length - 3}곳 더 보기
+                </button>
+              )}
             </Disclosure>
           )}
           {recontacts.length > 0 && (

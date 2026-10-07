@@ -449,6 +449,18 @@ try {
   check('대표 → 팀장 화면: 대표 업체는 안 보인다(팀장 작업공간 자료만)', leaked(pv).length === 0, leaked(pv).join())
   check('대표 → 팀장 화면: "최은혜 팀장 화면을 보고 있습니다" 줄', (await page.getByTestId('viewing-pilot').count()) === 1)
   await shot(page, 'owner-as-pilot')
+  // D-166: 휴대폰에서는 이 띠가 한 줄(대표가 폰에서 본 세 줄짜리 큰 띠)
+  {
+    const vp0 = page.viewportSize()
+    await page.setViewportSize({ width: 390, height: 844 })
+    await go(page, '/grants')
+    const band = page.getByTestId('viewing-pilot')
+    const bh = (await band.boundingBox())?.height ?? 999
+    check('휴대폰(D-166): 팀장 화면 띠가 한 줄(56px 이하) · 돌아가기 단추 있음', bh <= 56 && (await band.getByRole('button').count()) === 1, String(bh))
+    if (SHOTS) await page.screenshot({ path: `${SHOTS}/owner-as-pilot-390.png` })
+    await page.setViewportSize(vp0)
+    await go(page, '/ops/clients')
+  }
   const pnav = (await page.locator('aside').first().innerText()) ?? ''
   check('대표 → 팀장 화면: 메뉴가 팀장과 같다(영업자 정산 · 상담신청 · 이 시스템 없음)', !pnav.includes('영업자 정산') && !pnav.includes('상담신청') && !pnav.includes('이 시스템'), pnav.replace(/\n/g, '|').slice(0, 300))
   check('대표 → 팀장 화면: 이름 칸 "최은혜 팀장"', /최은혜\s*팀장/.test(await page.locator('[data-testid="sidebar-account"]').innerText()))

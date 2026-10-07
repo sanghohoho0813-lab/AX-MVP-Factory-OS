@@ -133,7 +133,8 @@ function FrameInner({ workspaceId, children }: { workspaceId: string | null; chi
           >
             {/* D-98: 휴대폰에서는 한 줄로 — 전에는 아이콘 한 줄 · 글 두 줄 · 돌아가기 한 줄로 모든 모듈 화면 위를 약 110px 차지했다 */}
             <Building2 aria-hidden="true" className="size-4 shrink-0 text-brand-600" />
-            <span className="t-sub min-w-0 flex-1 break-keep text-slate-700 sm:flex-none">
+            {/* D-166: 업체 이름이 길면(띄어쓰기 없는 긴 이름) 말줄임 — 전에는 '← 업체로' 와 겹쳤다 */}
+            <span className="t-sub min-w-0 flex-1 truncate text-slate-700 sm:flex-none sm:whitespace-normal">
               <b className="font-bold text-slate-900">{clientName || '이 업체'}</b> 일로 열었습니다.
               <span className="max-sm:hidden"> 결과는 이 업체 기록으로 갑니다.</span>
             </span>

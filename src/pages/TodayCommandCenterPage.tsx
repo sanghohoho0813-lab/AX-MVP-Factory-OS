@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useIsPhone } from '../lib/useIsPhone'
 import { TodayCharges } from '../components/money/TodayCharges'
 import { TodayCare } from '../components/ops/TodayCare'
 import { TodayDecisions } from '../components/ops/DecisionList'
@@ -121,6 +122,9 @@ function AgendaRow({ item }: { item: AgendaItem }) {
  */
 type SectionAccent = 'todo' | 'urgent' | 'journal' | 'event' | 'client' | 'money' | 'fund' | 'sales'
 
+/** 휴대폰에서 처음 보여 줄 줄 수(D-166) */
+const PHONE_ROWS = 3
+
 const SECTION_CHIP: Record<SectionAccent, string> = {
   todo: 'bg-brand-50 text-brand-600',
   urgent: 'bg-danger-50 text-danger-600',
@@ -180,6 +184,9 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const pilot = useIsPilot()
 
   const [clients, setClients] = useState<ClientOpsRecord[]>([])
+  // D-166: 휴대폰에서는 목록을 짧게(3건 · 4건) — '더 보기' 로 펼친다. PC 는 그대로
+  const phone = useIsPhone()
+  const [showAllAppts, setShowAllAppts] = useState(false)
   const [journal, setJournal] = useState<JournalEntry[]>([])
   const [events, setEvents] = useState<CustomerEvent[]>([])
   const [loading, setLoading] = useState(true)
@@ -504,7 +511,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             <div data-testid="today-appointments" className="flex flex-col gap-2">
               <p className="t-sub font-semibold text-slate-700">업체 약속 {appointments.length}건</p>
               <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-control) border border-slate-200 bg-white">
-                {appointments.map((e) => {
+                {(phone && !showAllAppts ? appointments.slice(0, PHONE_ROWS) : appointments).map((e) => {
                   const late = (e.daysLeft ?? 0) < 0
                   return (
                     <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
@@ -532,6 +539,11 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                   )
                 })}
               </ul>
+              {phone && !showAllAppts && appointments.length > PHONE_ROWS && (
+                <button type="button" onClick={() => setShowAllAppts(true)} className="tap t-sub self-start font-semibold text-brand-700 hover:underline" data-testid="today-appointments-more">
+                  업체 약속 {appointments.length - PHONE_ROWS}건 더 보기
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -580,12 +592,12 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             </p>
           ) : (
             <ol className="ax-stagger flex flex-col gap-2">
-              {agenda.slice(0, 8).map((a) => (
+              {agenda.slice(0, phone ? 4 : 8).map((a) => (
                 <AgendaRow key={a.id} item={a} />
               ))}
             </ol>
           )}
-          {agenda.length > 8 && (
+          {agenda.length > (phone ? 4 : 8) && (
             <Link to="/ops/calendar" className="tap t-sub inline-flex items-center self-start font-semibold text-brand-700 hover:underline" data-testid="today-agenda-more">
               2주 안 {agenda.length}건 모두 달력에서 보기 →
             </Link>
@@ -738,7 +750,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             {salesRecontactList.length > 0 && <> · 다시 연락할 곳 {salesRecontactList.length}</>}
             {' · '}
             {/* D-119: 크레탑 보고서 한 번으로 잠재고객 등록 */}
-            <Link to="/sales/new" data-testid="today-cretop-intake" className="font-semibold whitespace-nowrap text-brand-700 hover:underline">
+            <Link to="/sales/new" data-testid="today-cretop-intake" className="tap inline-flex items-center font-semibold whitespace-nowrap text-brand-700 hover:underline">
               + 크레탑으로 등록
             </Link>
           </p>
@@ -758,11 +770,11 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                 ? salesRiskList.slice(0, 3).map((r) => ({ id: r.record.id, name: r.record.companyName, why: r.reason, tone: 'text-warning-700', go: r.action }))
                 : salesRecontactList.slice(0, 3).map((r) => ({ id: r.record.id, name: r.record.companyName, why: r.reasons[0], tone: 'text-slate-500', go: '연락하기' }))
               ).map((x) => (
-                <li key={x.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-2.5">
-                  <Link to={`/ops/clients/${x.id}`} className="t-sub font-bold text-slate-900 hover:text-brand-700 hover:underline">{x.name}</Link>
+                <li key={x.id} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-4 py-1.5">
+                  <Link to={`/ops/clients/${x.id}`} className="tap t-sub inline-flex items-center font-bold text-slate-900 hover:text-brand-700 hover:underline">{x.name}</Link>
                   {/* 12rem 아래로는 줄이지 않고 다음 줄로 — 좁은 화면 · 큰 글자에서 한 줄에 두세 자씩 짜부라지지 않게 */}
                   <span className={`t-sub min-w-0 flex-[1_1_12rem] break-keep ${x.tone}`}>{x.why}</span>
-                  <Link to={salesActionPath(x.go, x.id)} className="t-meta ml-auto shrink-0 font-semibold text-brand-700 hover:underline">{x.go} →</Link>
+                  <Link to={salesActionPath(x.go, x.id)} className="tap t-meta ml-auto inline-flex shrink-0 items-center font-semibold text-brand-700 hover:underline">{x.go} →</Link>
                 </li>
               ))}
             </ul>

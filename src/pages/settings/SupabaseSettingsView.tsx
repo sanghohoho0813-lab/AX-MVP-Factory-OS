@@ -133,8 +133,8 @@ export function SupabaseSettingsView() {
           <SettingRow label="이메일">{session?.user.email ?? '—'}</SettingRow>
           <SettingRow label="작업공간">{current?.workspace?.name ?? '—'}</SettingRow>
         </Panel>
-        <AppearancePanel />
         <TextScalePanel />
+        <AppearancePanel />
       </div>
     )
   }
@@ -150,8 +150,8 @@ export function SupabaseSettingsView() {
             <SettingRow label="현재 작업공간">{current?.workspace?.name ?? '—'}</SettingRow>
             <SettingRow label="내 역할">{current ? roleLabel[current.role] : '—'}</SettingRow>
           </Panel>
-          <AppearancePanel />
           <TextScalePanel />
+          <AppearancePanel />
           <FeatureVisibilityPanel />
           <OnboardingSettingsPanel />
         </>

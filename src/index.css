@@ -262,6 +262,10 @@ body {
   background-color: var(--theme-surface, #ffffff);
   font-feature-settings: "tnum";
   line-height: 1.6;
+  /* D-166: 한국어는 낱말 단위로 줄을 바꾼다 — 휴대폰에서 '컨/설팅' · '미/정' · '23,455,500/원' 처럼 낱말 중간에서 끊겼다.
+     칸보다 긴 한 덩어리(주소 · 이메일 · URL)는 break-word 로 칸 안에서 끊는다(넘치지 않게) */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 /* Visible keyboard focus everywhere */
@@ -691,4 +695,19 @@ html[data-text-scale="extra_large"] .hdr-mclock {
   }
 }
 
+/* D-166: 휴대폰에서 단추 글이 화면보다 길면(긴 업체 이름 · 큰 글자) 옆으로 밀려 화면이 넘치지 않고 줄을 바꾼다.
+   화면 안에 들어가는 단추는 그대로 한 줄 — 넓이가 화면(부모)을 넘을 때만 줄바꿈이 생긴다. */
+@media (max-width: 639px) {
+  .btn-fit {
+    max-width: 100%;
+    height: auto;
+    min-height: 2.75rem;
+    white-space: normal;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
+}
 
+/* 큰 숫자 칸(D-166) — 360px 휴대폰에서 '3억 2,997만원' 이 칸을 넘으면 '억' 뒤에서 한 번 접는다(단위는 안 쪼갠다) */
+@media (max-width: 639px) { .t-num.t-num-wrap { white-space: normal; word-break: keep-all; } }

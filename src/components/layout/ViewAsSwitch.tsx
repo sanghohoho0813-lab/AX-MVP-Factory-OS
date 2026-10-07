@@ -11,6 +11,12 @@ import { useDismissable } from '../../lib/useDismissable'
 import { AuthContext } from '../../auth/authContext'
 import { brand } from '../../brand/brand.config'
 
+/** 보이는 이름 — 팀장님이 아직 이름을 저장하지 않았으면(서버가 'Pilot' 을 준다) '팀장님' */
+function whoOf(v: { personName: string; personTitle: string }): string {
+  if (v.personTitle) return `${v.personName} ${v.personTitle}`
+  return !v.personName || v.personName === 'Pilot' ? '팀장님' : v.personName
+}
+
 function reloadAll(): void {
   try {
     ;(window.top ?? window).location.reload()
@@ -60,7 +66,7 @@ export function ViewAsSwitch({ stacked = false }: { stacked?: boolean }) {
         return (
           <button key={v.workspaceId} type="button" role="radio" aria-checked={on} data-view="pilot" onClick={() => t.go(v.workspaceId)} className={`${pill(on)} ${stacked ? 'flex-1' : ''}`}>
             <UsersRound aria-hidden="true" className="size-4" />
-            {v.personTitle ? `${v.personName} ${v.personTitle}` : v.personName}
+            {whoOf(v)}
           </button>
         )
       })}
@@ -74,7 +80,7 @@ export function ViewAsSwitchCompact() {
   const { open, setOpen, containerRef } = useDismissable<HTMLDivElement>()
   if (!t) return null
   const viewing = t.views.find((v) => v.workspaceId === t.current)
-  const short = viewing ? viewing.personTitle || viewing.personName : brand.ownerTitle
+  const short = viewing ? viewing.personTitle || (viewing.personName === 'Pilot' ? '팀장님' : viewing.personName) : brand.ownerTitle
   const item = (on: boolean) => `tap flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[0.9rem] font-semibold whitespace-nowrap ${on ? 'bg-slate-100 text-navy-900' : 'text-slate-700 hover:bg-slate-50'}`
   return (
     <div ref={containerRef} className="relative inline-flex" data-testid="view-as-compact">
@@ -82,7 +88,7 @@ export function ViewAsSwitchCompact() {
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`보는 화면: ${viewing ? (viewing.personTitle ? `${viewing.personName} ${viewing.personTitle}` : viewing.personName) : brand.ownerTitle}`}
+        aria-label={`보는 화면: ${viewing ? whoOf(viewing) : brand.ownerTitle}`}
         onClick={() => setOpen((v) => !v)}
         className={`inline-flex h-10 items-center gap-1 rounded-(--radius-control) border px-2 text-[0.875rem] font-semibold whitespace-nowrap ${viewing ? 'border-navy-900 bg-navy-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
       >
@@ -99,7 +105,7 @@ export function ViewAsSwitchCompact() {
           {t.views.map((v) => (
             <button key={v.workspaceId} type="button" role="menuitemradio" aria-checked={v.workspaceId === t.current} data-view="pilot" onClick={() => { setOpen(false); t.go(v.workspaceId) }} className={item(v.workspaceId === t.current)}>
               <UsersRound aria-hidden="true" className="size-4" />
-              {v.personTitle ? `${v.personName} ${v.personTitle}` : v.personName} 화면
+              {whoOf(v)} 화면
             </button>
           ))}
         </div>
@@ -114,15 +120,18 @@ export function ViewingPilotBanner() {
   if (!t) return null
   const v = t.views.find((x) => x.workspaceId === t.current)
   if (!v) return null
-  const who = v.personTitle ? `${v.personName} ${v.personTitle}` : v.personName
+  const who = whoOf(v)
+  // D-166: 휴대폰에서는 한 줄(누구 화면인지 + 돌아가기) — 설명 글은 넓은 화면에서만
   return (
-    <div data-testid="viewing-pilot" className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-(--radius-control) border border-navy-900/20 bg-navy-900 px-4 py-2.5 text-white">
+    <div data-testid="viewing-pilot" className="mb-4 flex items-center gap-3 rounded-(--radius-control) border border-navy-900/20 bg-navy-900 px-3 py-2 text-white sm:px-4 sm:py-2.5">
       <UsersRound aria-hidden="true" className="size-4 shrink-0" />
       <p className="t-sub min-w-0 flex-1 break-keep">
-        <b>{who}</b> 화면을 보고 있습니다 — 팀장님 작업공간의 자료입니다(업무 일기는 사람마다 따로라 보이지 않습니다).
+        <b>{who}</b> 화면 보는 중
+        <span className="hidden sm:inline"> — 팀장님 작업공간의 자료입니다(업무 일기는 사람마다 따로라 보이지 않습니다).</span>
       </p>
-      <button type="button" onClick={() => t.go(t.own?.workspaceId)} className="tap t-sub shrink-0 rounded-(--radius-control) bg-white px-3 py-1.5 font-semibold text-navy-900 hover:bg-slate-100">
-        {brand.ownerTitle} 화면으로
+      <button type="button" onClick={() => t.go(t.own?.workspaceId)} className="tap t-sub shrink-0 rounded-(--radius-control) bg-white px-3 py-1.5 font-semibold whitespace-nowrap text-navy-900 hover:bg-slate-100">
+        {brand.ownerTitle}로
+        <span className="hidden sm:inline"> 돌아가기</span>
       </button>
     </div>
   )

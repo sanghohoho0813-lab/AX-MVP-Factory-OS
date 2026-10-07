@@ -241,7 +241,7 @@ export function DecisionList({
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className={`t-meta rounded-full border px-2 py-0.5 font-semibold ${KIND_CLASS[d.kind]}`}>{DECISION_KIND_LABEL[d.kind]}</span>
             {showClient && (
-              <Link to={`/ops/clients/${d.clientId}?tab=smart`} className="t-sub font-semibold [overflow-wrap:anywhere] text-slate-700 hover:text-brand-700 hover:underline">
+              <Link to={`/ops/clients/${d.clientId}?tab=smart`} className="tap t-sub inline-flex items-center font-semibold [overflow-wrap:anywhere] text-slate-700 hover:text-brand-700 hover:underline">
                 {d.clientName}
               </Link>
             )}

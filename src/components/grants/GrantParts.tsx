@@ -97,7 +97,7 @@ function Chip({ on, onClick, children, testid }: { on: boolean; onClick: () => v
       aria-pressed={on}
       data-testid={testid}
       onClick={onClick}
-      className={`tap t-sub rounded-full border px-3 py-1.5 font-semibold whitespace-nowrap ${on ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white text-slate-700 hover:border-brand-300'}`}
+      className={`tap t-sub shrink-0 rounded-full border px-3 py-1.5 font-semibold whitespace-nowrap ${on ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white text-slate-700 hover:border-brand-300'}`}
     >
       {children}
     </button>

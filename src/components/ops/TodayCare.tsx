@@ -58,7 +58,7 @@ export function TodayCare({ clients, today, onSaved }: { clients: ClientOpsRecor
           return (
             <li key={it.clientId} className="flex flex-col gap-2 px-4 py-3" data-testid="care-row" data-reason={it.reason} data-client={it.clientId}>
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                <Link to={`/ops/clients/${it.clientId}`} className="t-sub font-bold [overflow-wrap:anywhere] text-slate-900 hover:text-brand-700 hover:underline">
+                <Link to={`/ops/clients/${it.clientId}`} className="tap t-sub inline-flex items-center font-bold [overflow-wrap:anywhere] text-slate-900 hover:text-brand-700 hover:underline">
                   {it.companyName}
                 </Link>
                 <span className={`t-sub min-w-0 flex-[1_1_12rem] break-keep ${it.urgent ? 'font-semibold text-warning-800' : 'text-slate-600'}`} data-testid="care-text">

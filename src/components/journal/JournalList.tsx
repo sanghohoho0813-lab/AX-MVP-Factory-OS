@@ -102,7 +102,7 @@ export function JournalList({
               {showDate && <span className="text-slate-500">{e.entryDate}</span>}
               <span className="text-slate-400">{timeOf(e.createdAt)}</span>
               {showClient && clientName && e.clientId && (
-                <Link to={`/ops/clients/${e.clientId}`} className="font-semibold text-brand-700 hover:underline">
+                <Link to={`/ops/clients/${e.clientId}`} className="min-w-0 font-semibold [overflow-wrap:anywhere] text-brand-700 hover:underline">
                   {clientName}
                 </Link>
               )}

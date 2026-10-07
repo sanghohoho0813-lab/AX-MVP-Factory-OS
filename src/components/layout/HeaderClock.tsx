@@ -44,8 +44,9 @@ export function HeaderClock() {
     <>
       {/* 휴대폰 — D-96: 오늘 날짜도 늘 보이게(대표 요청). 짧은 날짜를 시각 위에 작게 얹어 폭은 그대로 둔다 */}
       <span aria-label={`지금 ${date} ${time}`} className="flex shrink-0 flex-col items-end leading-tight lg:hidden">
-        <span className="text-[0.875rem] font-semibold whitespace-nowrap text-slate-500">{formatClockDateShort(now)}</span>
-        <span className="text-[0.95rem] font-bold whitespace-nowrap text-slate-700 tabular-nums">{time}</span>
+        <span className="text-[0.875rem] font-semibold whitespace-nowrap text-slate-500 max-[379px]:hidden">{formatClockDateShort(now)}</span>
+        {/* D-166: 380px 밑(작은 폰)은 날짜 줄을 접어 화면 제목 자리를 낸다. 휴대폰은 시 · 분만 — 초가 화면 제목 자리를 먹어 '잠재고객 상…' 처럼 제목이 잘렸다(PC 는 초까지 그대로) */}
+        <span className="text-[0.95rem] font-bold whitespace-nowrap text-slate-700 tabular-nums">{time.slice(0, 5)}</span>
       </span>
       {/* 데스크톱 — 날짜는 작게 위, 시각은 크게 아래 */}
       <span aria-label={`지금 ${date} ${time}`} className="hidden shrink-0 flex-col items-end leading-tight lg:flex">

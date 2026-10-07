@@ -97,7 +97,7 @@ export function MobileNav({ onOpenMore }: { onOpenMore: () => void }) {
                 <span className="flex items-baseline gap-0.5 whitespace-nowrap">
                   <span
                     className={`t-meta ${
-                      active ? 'font-semibold text-slate-900' : requests > 0 ? 'font-semibold text-danger-600' : 'font-medium text-slate-500'
+                      active ? 'font-semibold text-slate-900' : requests > 0 ? 'font-semibold text-slate-700' : 'font-medium text-slate-500'
                     }`}
                   >
                     {item.label}

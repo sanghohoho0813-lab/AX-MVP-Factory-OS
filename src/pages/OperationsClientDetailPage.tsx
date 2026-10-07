@@ -610,8 +610,10 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             <FileUp aria-hidden="true" className="size-4" />
             서류 올리기
           </Button>
+          {/* D-166: 휴대폰은 머리 단추를 줄인다 — 서류 요청 문구는 '더보기' 안에(PC 는 그대로) */}
           <Button
             variant="secondary"
+            className="hidden sm:inline-flex"
             onClick={() =>
               setMessage({
                 title: '서류 요청 문구',
@@ -1487,7 +1489,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                             setRenamingDoc(custom.id)
                             setRenameDraft(custom.label)
                           }}
-                          className="t-sub font-medium text-slate-500 hover:text-brand-700 hover:underline"
+                          className="tap t-sub inline-flex items-center font-medium text-slate-500 hover:text-brand-700 hover:underline"
                         >
                           이름 고치기
                         </button>
@@ -1625,6 +1627,22 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           <div className="flex flex-col gap-4">
 
             <div className="flex flex-col gap-2">
+              <Button
+                variant="secondary"
+                className="w-full justify-start sm:hidden"
+                data-testid="more-doc-request"
+                onClick={() => {
+                  setMoreOpen(false)
+                  setMessage({
+                    title: '서류 요청 문구',
+                    description: '지금 진행 중인 업무에 필요한데 아직 없는 서류만 골라 정리했습니다.',
+                    text: buildDocumentRequestMessage(record, today),
+                  })
+                }}
+              >
+                <Send aria-hidden="true" className="size-4" />
+                서류 요청 문구
+              </Button>
               <Button
                 variant="secondary"
                 className="w-full justify-start sm:hidden"

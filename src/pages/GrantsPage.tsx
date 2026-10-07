@@ -34,7 +34,8 @@ import { profileLine } from '../services/grants/grantProfile'
 type View = 'notices' | 'clients' | 'applying'
 
 /** 한 번에 보여 줄 공고 수 — 1,000건도 화면이 무겁지 않게 '더 보기' 로 이어 본다 */
-const PAGE = 50
+/** 처음에 보여 줄 공고 수 — 휴대폰은 20개(D-166: 50개가 한꺼번에 펼쳐져 화면이 13,000px 이었다) */
+const PAGE = typeof window !== 'undefined' && window.matchMedia?.('(max-width: 639px)').matches ? 20 : 50
 
 function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
   const today = todayLocalDate()
@@ -148,7 +149,7 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
         .filter((n) => !onlyReach || reachOf(reach.get(n.id) ?? []).fit > 0)
         .filter((n) => !query.trim() || `${n.title} ${n.agency} ${n.operator} ${n.target}`.toLowerCase().includes(query.trim().toLowerCase()))
         .map((n) => ({ n, d: deadlineOf(n, today) }))
-        .sort((a, b) => deadlineRank(a.d) - deadlineRank(b.d) || a.n.title.localeCompare(b.n.title))
+        .sort((a, b) => deadlineRank(a.d) - deadlineRank(b.d) || a.n.title.localeCompare(b.n.title, 'ko', { numeric: true }))
         .map((x) => x.n),
     [open, category, onlyReach, reach, today, query],
   )
