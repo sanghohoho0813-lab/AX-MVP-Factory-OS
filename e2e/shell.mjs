@@ -186,8 +186,9 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const tools = (await page.locator('main').innerText()) ?? ''
   check('모듈 전체: 모듈 카드 다섯(정부지원사업은 기업성장 안, D-163)', (await page.getByTestId('module-cards').locator('[data-module-card]').count()) === 5)
   check('모듈 전체: 세금 계산기는 절세·재무 카드 안', ((await page.locator('[data-module-card="tax-finance"]').innerText()) ?? '').includes('세금 계산기'))
-  check('모듈 전체: 앞으로 붙을 것을 적어 둔다 (크레탑은 들어와서 빠짐)', tools.includes('기업인증 검토') && tools.includes('준비 중') && tools.includes('크레탑 분석기'))
-  check('도구함: 아직 없는 것은 누를 수 없다', (await page.getByRole('link', { name: /기업인증 검토/ }).count()) === 0)
+  // D-170: 기업인증이 들어와 '준비 중' 카드가 없어졌다(cert 브랜치) — 이제 누르는 카드
+  check('모듈 전체: 기업인증 · 크레탑 분석기가 들어와 있다(준비 중 카드 없음)', tools.includes('기업인증') && !tools.includes('기업인증 검토') && tools.includes('크레탑 분석기'))
+  check('도구함: 기업인증은 누를 수 있다(D-170)', (await page.getByRole('link', { name: /기업인증/ }).count()) >= 1)
   await page.getByRole('link', { name: /세금 계산기/ }).first().click()
   await page.waitForTimeout(700)
   check('도구함: 세금 계산기로 간다', page.url().includes('/tools/tax'), page.url())
