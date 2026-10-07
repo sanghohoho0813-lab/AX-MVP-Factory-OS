@@ -77,11 +77,33 @@ function shapeOk(key: string, value: string): boolean {
   return v.length > 0 && v.length <= 200
 }
 
-function noteFor(doc: ReadDoc, key: string, value: string): string {
-  if (!doc.docSure) return NOTE_DOC_UNSURE
+function noteFor(doc: ReadDoc, key: string, value: string, agreed: boolean): string {
   if (!shapeOk(key, value)) return NOTE_SHAPE
+  // D-168: 서로 다른 두 서류가 같은 값을 말하면 — 종류가 애매하거나 스캔이어도 믿는다
+  if (agreed) return ''
+  if (!doc.docSure) return NOTE_DOC_UNSURE
   if (doc.method === 'ocr' && key !== 'businessNumber') return NOTE_OCR
   return ''
+}
+
+/** 비교용 값 — 번호는 숫자만, 글은 띄어쓰기 · (주) 표기를 뺀다 */
+function sameKey(key: string, value: string): string {
+  if (key === 'businessNumber' || key === 'corporateNumber') return value.replace(/\D/g, '')
+  return value.replace(/\s+/g, '').replace(/\(주\)|㈜|주식회사/g, '').toLowerCase()
+}
+
+/** 두 서류 이상이 같은 값을 말한 사실(키|값) */
+function agreedFacts(docs: readonly ReadDoc[]): Set<string> {
+  const seen = new Map<string, Set<number>>()
+  docs.forEach((doc, i) => {
+    for (const c of factCandidatesFromDocText(doc.key, doc.text, 'agree')) {
+      const k = `${c.key}|${sameKey(c.key, c.value)}`
+      const s = seen.get(k) ?? new Set<number>()
+      s.add(i)
+      seen.set(k, s)
+    }
+  })
+  return new Set([...seen].filter(([, s]) => s.size >= 2).map(([k]) => k))
 }
 
 /** 올린 서류들 → 바로 넣기 · 확인 필요 */
@@ -89,10 +111,11 @@ export function autoFillFromDocs(record: ClientOpsRecord, docs: readonly ReadDoc
   let rec = record
   const entered: FilledFact[] = []
   const flagged: FlaggedFact[] = []
+  const agreed = agreedFacts(docs)
   docs.forEach((doc, i) => {
     const ref = `doc:${doc.key}:${now}:${i}`
     const found = factCandidatesFromDocText(doc.key, doc.text, ref).map((c) => {
-      const note = noteFor(doc, c.key, c.value)
+      const note = noteFor(doc, c.key, c.value, agreed.has(`${c.key}|${sameKey(c.key, c.value)}`))
       return note ? { ...c, note } : c
     })
     if (found.length === 0) return

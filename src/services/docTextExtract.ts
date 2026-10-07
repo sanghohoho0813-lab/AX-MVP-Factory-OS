@@ -10,6 +10,7 @@
  */
 
 import { isXlsxFile, readXlsxText } from './xlsxText'
+import { pdfItemsToText } from './pdfTextLines'
 
 export type ExtractMethod = 'pdf_text' | 'ocr' | 'text' | 'xlsx'
 
@@ -39,10 +40,8 @@ async function extractPdfText(file: File, onProgress?: ProgressFn): Promise<stri
     onProgress?.(i / maxPages, `PDF ${i}/${maxPages}쪽 읽는 중`)
     const page = await doc.getPage(i)
     const content = await page.getTextContent()
-    const line = content.items
-      .map((item) => (typeof item === 'object' && item !== null && 'str' in item ? String(item.str) : ''))
-      .join(' ')
-    chunks.push(line)
+    // D-168: 줄을 살린다(높이 · 줄 끝) — 서류 맨 위 제목 줄을 찾을 수 있게
+    chunks.push(pdfItemsToText(content.items))
   }
   await task.destroy()
   return chunks.join('\n')

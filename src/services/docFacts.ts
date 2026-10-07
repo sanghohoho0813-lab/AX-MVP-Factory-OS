@@ -12,6 +12,7 @@ import type { ClientOpsRecord, DocumentKey, FactCandidate, FactSource } from '..
 import { parseKoreanBusinessDocument } from './koreanDocParser'
 import { certificateValue, parseCertificateDocument } from './certDocParser'
 import { CUSTOM_FACT_PREFIX, withFactCandidates } from './customerFacts'
+import { parseFinancialStatement } from './finStatementParser'
 
 const BUSINESS_DOC: Record<string, FactSource> = { businessRegistration: 'businessRegistration', corporateRegistry: 'corporateRegistry' }
 
@@ -33,6 +34,15 @@ export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: s
       ['businessItem', p.businessItem],
     ]
     for (const [k, v] of pairs) if (typeof v === 'string' && v.trim() !== '') out.push({ key: k, value: v, source: bizSource, asOf: '', ref })
+    return out
+  }
+  // D-168: 재무제표 → 매출 · 영업이익 · 순이익 · 자산 · 부채(당기)
+  if (key === 'financialStatements') {
+    const f = parseFinancialStatement(text)
+    for (const k of ['revenue', 'operatingProfit', 'netIncome', 'totalAssets', 'totalLiabilities'] as const) {
+      const v = f[k]
+      if (typeof v === 'number') out.push({ key: k, value: String(v), source: 'financialStatements', asOf: f.year ?? '', ref })
+    }
     return out
   }
   const cert = parseCertificateDocument(text)

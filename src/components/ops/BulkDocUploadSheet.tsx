@@ -8,6 +8,7 @@
  * 규칙 계산이다 — 외부 호출 없음. 사진·스캔본은 처음 한 번 한글 인식 준비가 걸린다.
  */
 
+import { DROP_FILE_LIMIT, filesFromDrop } from '../../lib/dropFiles'
 import { useEffect, useRef, useState } from 'react'
 import { Check, FileUp, FolderUp, Loader2, X } from 'lucide-react'
 import type { ClientOpsRecord, DocumentKey, DocumentState } from '../../types/clientOps'
@@ -186,7 +187,11 @@ export function BulkDocUploadSheet({
       showToast('지금 넣은 서류를 처리하는 중입니다 — 끝난 뒤에 더 넣어 주세요.')
       return
     }
-    void addFiles(Array.from(e.dataTransfer.files ?? []))
+    // D-168: 폴더를 끌어다 놓아도 안의 파일을 다 읽는다(하위 폴더 포함)
+    void filesFromDrop(e.dataTransfer).then(({ files, folders, capped }) => {
+      if (folders > 0) showToast(`폴더 ${folders}개에서 파일 ${files.length}개를 찾았습니다${capped ? ` — 한 번에 ${DROP_FILE_LIMIT}개까지만 읽어요` : ''}.`)
+      return addFiles(files)
+    })
   }
 
   const readyItems = items.filter((it) => it.status === 'ready')

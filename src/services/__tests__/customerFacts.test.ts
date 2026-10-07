@@ -38,6 +38,9 @@ import { factCandidatesFromDocText, withDocFacts } from '../docFacts'
 import { previewKindOf } from '../../lib/filePreview'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { NOTE_CONFLICT, NOTE_OCR, autoFillFromDocs } from '../docAutoFill'
+import { pdfItemsToText } from '../pdfTextLines'
+import { filesFromDrop } from '../../lib/dropFiles'
+import { parseFinancialStatement } from '../finStatementParser'
 import { looksLikeCretop, looksLikeRoster } from '../docAutoAnalyze'
 import { buildInsights, recommendNextSteps } from '../clientInsights'
 import { ADVISOR_GROUPS, ALL_QUESTIONS, answerFor, answerText, matchQuestion } from '../clientAdvisor'
@@ -512,6 +515,76 @@ const withCretop = (r: ClientOpsRecord): ClientOpsRecord => ({
   const shelfStep = st.find((s) => s.id === 'shelf')
   check('다음 행동: 확인할 정보 다음에 서류함 정리하기(만료 · 확인 · 겹친 서류) → 서류 탭', st[0].id === 'facts' && st[1]?.id === 'shelf' && !!shelfStep && /만료 1/.test(shelfStep.text) && /무슨 서류인지 확인 2/.test(shelfStep.text) && /겹친 서류 1묶음/.test(shelfStep.text) && shelfStep.href === '?tab=docs', JSON.stringify(st))
 }
+
+// D-168: 서류 자동 분류 정확도 — PDF 줄 살리기 · 두 신호 일치 · 검증 맞는 사업자번호 · 두 서류 같은 값 · 재무제표
+{
+  const it = (str: string, x: number, y: number, w: number, h = 12, eol = false) => ({ str, transform: [h, 0, 0, h, x, y], width: w, height: h, hasEOL: eol })
+  const page = [
+    it('발급번호 2026-001', 40, 800, 120, 9, true),
+    ...'사업자등록증'.split('').map((c, i) => it(c, 200 + i * 18, 760, 14, 16)),
+    it('(법인사업자)', 200, 740, 80, 10, true),
+    it('등록번호', 40, 700, 50), it(':', 96, 700, 4), it('124-81-00998', 106, 700, 90, 12, true),
+    it('상호', 40, 680, 26), it('샤인디자인 주식회사', 80, 680, 120),
+  ]
+  const txt = pdfItemsToText(page)
+  const lines = txt.split('\n')
+  check('PDF 줄: 높이가 바뀌면 줄을 바꾼다(한 쪽이 한 줄이 아니다)', lines.length === 5, JSON.stringify(lines))
+  check('PDF 줄: 글자마다 조각인 제목이 한 줄로 붙는다', lines[1] === '사업자등록증', lines[1])
+  check('PDF 줄: 벌어진 조각은 띄어 쓴다', lines[3] === '등록번호 : 124-81-00998' && lines[4] === '상호 샤인디자인 주식회사', `${lines[3]} / ${lines[4]}`)
+  check('PDF 줄: 위치 없는 조각도 읽힌다', pdfItemsToText([{ str: '가' }, { str: '나', hasEOL: true }, { str: '다' }]) === '가 나\n다')
+  check('PDF 줄 → 제목 사업자등록증', documentTitle(txt) === '사업자등록증', String(documentTitle(txt)))
+  const metas2 = allDocumentMetas(normalizeClientOps({ id: 'cx', companyName: 'x' } as never))
+  const placed = placeDocument({ text: txt, fileName: 'scan.pdf' }, metas2)
+  check('PDF 줄 → 사업자등록증 칸 확실', placed.kind === 'existing' && placed.key === 'businessRegistration' && placed.sure, JSON.stringify(placed))
+  // 예전처럼 한 줄로 이으면 제목을 못 찾았다
+  check('(예전 방식) 한 줄로 이으면 제목을 못 찾는다', documentTitle(page.map((p) => p.str).join(' ')) === null)
+
+  const OCRBIZ = '상 호 샤인디자인\n사업자 등록번호 124-81-00998\n대표자 김샤인'
+  const ob = placeDocument({ text: OCRBIZ, fileName: 'IMG_2031.jpg' }, metas2)
+  check('검증 맞는 사업자번호 + 등록번호 낱말 → 사업자등록증 확실(제목 없어도)', ob.kind === 'existing' && ob.key === 'businessRegistration' && ob.sure, JSON.stringify(ob))
+  const tax = placeDocument({ text: '납 세 사 실 확 인\n사업자 등록번호 124-81-00998\n부가가치세 신고', fileName: 'IMG_1.jpg' }, metas2)
+  check('사업자번호가 있어도 다른 서류 낱말(납세 · 신고)이면 사업자등록증으로 확실하지 않다', !(tax.kind === 'existing' && tax.key === 'businessRegistration' && tax.sure), JSON.stringify(tax))
+  const bad = placeDocument({ text: OCRBIZ.replace('00998', '00999'), fileName: 'IMG_2031.jpg' }, metas2)
+  check('검증이 틀린 번호면 확실로 올리지 않는다', !(bad.kind === 'existing' && bad.key === 'businessRegistration' && bad.sure), JSON.stringify(bad))
+  const nameAgree = placeDocument({ text: '등록번호 124-81-00998 상호 샤인디자인 개업연월일 2019년 3월 2일 사업의 종류 업태 서비스', fileName: '사업자등록증_샤인.pdf' }, metas2)
+  check('파일 이름 + 내용 낱말이 같은 서류 → 확실', nameAgree.kind === 'existing' && nameAgree.sure && /내용도 같은 서류/.test(nameAgree.reason), JSON.stringify(nameAgree))
+
+  const mk2 = (() => { let n = 0; return () => `ag${(n += 1)}` })()
+  const blank = normalizeClientOps({ id: 'ag', companyName: '' } as never)
+  const one = autoFillFromDocs(blank, [{ key: 'businessRegistration', fileName: 'a.jpg', text: OCRBIZ, method: 'ocr', docSure: false }], '2026-10-07T00:00:00.000Z', mk2)
+  check('서류 하나 · 종류 애매 → 사업자번호는 확인으로', !one.entered.some((e) => e.key === 'businessNumber'), JSON.stringify(one.entered))
+  const two = autoFillFromDocs(
+    blank,
+    [
+      { key: 'businessRegistration', fileName: 'a.jpg', text: OCRBIZ, method: 'ocr', docSure: false },
+      { key: 'corporateRegistry', fileName: 'b.pdf', text: '등기사항전부증명서\n상호 샤인디자인\n등록번호 124-81-00998\n대표이사 김샤인', method: 'pdf_text', docSure: false },
+    ],
+    '2026-10-07T00:00:00.000Z',
+    mk2,
+  )
+  check('두 서류가 같은 사업자번호 → 바로 채움', two.entered.some((e) => e.key === 'businessNumber'), JSON.stringify(two.entered.map((e) => e.key)))
+
+  const FIN = '표준재무제표증명\n(단위 : 천원)\n제 7(당)기 2025년 12월 31일 현재\n자산총계 3,200,000 2,900,000\n부채총계 1,100,000 1,000,000\nⅠ. 매출액 5,400,000 4,800,000\nⅣ. 영업이익 420,000 380,000\nⅩ. 당기순손실 (35,000) 120,000'
+  const fv = parseFinancialStatement(FIN)
+  check('재무제표: 단위 천원 · 당기 값', fv.revenue === 5_400_000_000 && fv.operatingProfit === 420_000_000 && fv.totalAssets === 3_200_000_000 && fv.totalLiabilities === 1_100_000_000, JSON.stringify(fv))
+  check('재무제표: 당기순손실 (35,000) → 음수 · 결산 연도 2025', fv.netIncome === -35_000_000 && fv.year === '2025', JSON.stringify(fv))
+  check('재무제표: 영업손실 부호 없어도 음수', parseFinancialStatement('손익계산서\n영업손실 12,000,000').operatingProfit === -12_000_000)
+  check('재무제표: 글자가 없으면 아무것도 안 냄', Object.keys(parseFinancialStatement('메모')).length === 0)
+  const fin = autoFillFromDocs(blank, [{ key: 'financialStatements', fileName: '재무제표.pdf', text: FIN, method: 'pdf_text', docSure: true }], '2026-10-07T00:00:00.000Z', mk2)
+  check('재무제표 올리기 → 매출 · 영업이익 · 순이익 · 자산 · 부채 바로 채움', ['revenue', 'operatingProfit', 'netIncome', 'totalAssets', 'totalLiabilities'].every((k) => fin.entered.some((e) => e.key === k)), JSON.stringify(fin.entered.map((e) => e.key)))
+}
+
+// D-168: 폴더 끌어다 놓기 — 하위 폴더까지 파일을 다 꺼낸다
+await (async () => {
+  const f = (name: string) => ({ isFile: true, isDirectory: false, name, file: (ok: (x: File) => void) => ok({ name, size: 10 } as File) })
+  const dir = (name: string, kids: unknown[]) => ({ isFile: false, isDirectory: true, name, createReader: () => { let done = false; return { readEntries: (ok: (l: unknown[]) => void) => { ok(done ? [] : kids); done = true } } } })
+  const tree = dir('샤인디자인', [f('사업자등록증.pdf'), dir('재무', [f('2025 재무제표.pdf'), f('2024 재무제표.pdf')]), f('정관.pdf')])
+  const dt = { files: [{ name: '샤인디자인', size: 0 }], items: [{ kind: 'file', webkitGetAsEntry: () => tree }] } as unknown as DataTransfer
+  const r = await filesFromDrop(dt)
+  check('폴더 끌어다 놓기: 하위 폴더까지 파일 4개', r.files.length === 4 && r.folders === 1 && r.files.some((x) => x.name === '2024 재무제표.pdf'), JSON.stringify(r.files.map((x) => x.name)))
+  const plain = { files: [{ name: 'a.pdf', size: 5 }], items: [{ kind: 'file', webkitGetAsEntry: () => f('a.pdf') }] } as unknown as DataTransfer
+  check('파일만 놓으면 그대로', (await filesFromDrop(plain)).files.length === 1)
+})()
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

@@ -14,6 +14,7 @@
 import type { DocumentMeta } from '../content/clientOpsCatalog'
 import type { DocumentKey } from '../types/clientOps'
 import { parseKoreanDate } from './koreanDocParser'
+import { bizNoChecksumOk } from './docAutoFill'
 
 export type ClassifyConfidence = 'sure' | 'maybe' | 'unknown'
 
@@ -426,7 +427,12 @@ export function placeDocument(input: { text: string; fileName: string }, metas: 
   if (title) {
     const builtin = TITLE_TO_KEY.find(([re]) => re.test(title))
     const meta = builtin ? fileMetas.find((m) => m.key === builtin[1]) : null
-    if (meta) return { kind: 'existing', key: meta.key, label: meta.label, sure: Boolean(fromText), reason: `${how} '${title}'`, issuedAt }
+    if (meta) {
+      // D-168: 파일 이름으로 정했어도 내용 낱말 판별이 같은 칸을 가리키면 '확실'
+      const agree = !fromText && hasText ? classifyDocument(input, metas) : null
+      const both = Boolean(agree && agree.key === meta.key && agree.confidence !== 'unknown')
+      return { kind: 'existing', key: meta.key, label: meta.label, sure: Boolean(fromText) || both, reason: `${how} '${title}'${both ? ' · 내용도 같은 서류' : ''}`, issuedAt }
+    }
     // 이름이 같은 칸(직접 만든 칸 · 기본 칸 이름)
     const same = fileMetas.find((m) => compactTitle(m.label) === title || (title.length >= 4 && compactTitle(m.label).replace(/\(\d+\)$/, '') === title))
     if (same) return { kind: 'existing', key: same.key, label: same.label, sure: Boolean(fromText), reason: `${how} '${title}' — 같은 이름의 칸`, issuedAt }
@@ -435,6 +441,11 @@ export function placeDocument(input: { text: string; fileName: string }, metas: 
   }
   // 제목이 없으면 — 낱말 판별이 '확실' 할 때만 기본 칸, 아니면 기타
   const r = classifyDocument(input, metas)
+  // D-168: 사업자등록번호가 검증 숫자까지 맞고 '사업자' · '등록번호' 낱말이 같이 있으면 사업자등록증으로 확실(스캔이어도)
+  if ((r.key === 'businessRegistration' || r.key === null) && r.confidence !== 'sure' && /사업자|등록번호/.test(compact(text)) && !/(증명|확인서|신고|납세|부가가치세|원천|보험|재무|계약|명부|등기)/.test(compact(text)) && (text.match(/\d{3}\s*-\s*\d{2}\s*-\s*\d{5}/g) ?? []).some((v) => bizNoChecksumOk(v))) {
+    const meta = fileMetas.find((m) => m.key === 'businessRegistration')
+    if (meta) return { kind: 'existing', key: meta.key, label: meta.label, sure: true, reason: `${r.reason} · 사업자등록번호 검증 맞음`, issuedAt }
+  }
   if (r.key && r.confidence === 'sure') return { kind: 'existing', key: r.key, label: fileMetas.find((m) => m.key === r.key)?.label ?? '', sure: true, reason: r.reason, issuedAt }
   if (r.suggestedLabel && r.confidence !== 'unknown') return { kind: 'new', label: r.suggestedLabel, sure: false, reason: r.reason, issuedAt }
   return { kind: 'new', label: OTHER_DOC_LABEL, sure: false, reason: hasText ? '제목을 찾지 못했어요 — 열어 보고 맞는 이름으로 바꿔 주세요' : '글자를 읽지 못했어요 — 열어 보고 맞는 이름으로 바꿔 주세요', issuedAt }
