@@ -436,6 +436,21 @@ try {
   await go(page, '/journal')
   check('대표 다시: 업무 일기에 Pilot 기록 없음', !((await page.locator('main').innerText()) ?? '').includes('은혜테스트정밀') && !((await page.locator('main').innerText()) ?? '').includes('박대표와 통화'))
 
+  /* ---------- D-168: 연구소 메뉴를 여러 번 오가도 화면이 멈추지 않는다(클라우드 모드에서 연구노트 뒤 멈춤) ---------- */
+  {
+    await go(page, '/tools/labcare')
+    const labNames = ['한눈에 보기', '오늘 할 일', '업체 목록', '설립 가능성 체크', '설립서류 관리', '조직도·도면', '연구노트', '변경사항 관리', '활동조사 관리', '월간 점검', '현장조사 대비', '결과서', '안내문·자료실', '설정·백업']
+    const labKey = { '한눈에 보기': 'dashboard', '오늘 할 일': 'tasks', '업체 목록': 'clients', '설립 가능성 체크': 'assessment', '설립서류 관리': 'setup-docs', '조직도·도면': 'org-diagram', '연구노트': 'notes', '변경사항 관리': 'changes', '활동조사 관리': 'survey', '월간 점검': 'check', '현장조사 대비': 'inspection', '결과서': 'reports', '안내문·자료실': 'resources', '설정·백업': 'settings' }
+    const stuck = []
+    for (const name of [...labNames, ...[...labNames].reverse()]) {
+      await page.getByRole('link', { name, exact: true }).first().click()
+      await page.waitForTimeout(450)
+      const shown = await page.locator('[data-testid="lab-orig"]').getAttribute('data-section').catch(() => null)
+      if (shown !== labKey[name]) stuck.push(`${name}→${shown}`)
+    }
+    check('연구소(D-168): 메뉴 28번 오가도 화면이 그 메뉴로 바뀐다(멈춤 없음)', stuck.length === 0, stuck.slice(0, 4).join(' · '))
+  }
+
   /* ---------- D-164: 대표 → 최은혜 팀장 화면 바로 보기(다시 로그인 없이) ---------- */
   await go(page, '/ops/clients')
   const vs = page.locator('header [data-testid="view-as-switch"]')

@@ -4,6 +4,7 @@
  *   /diagnosis → 진단하기 · / → 대시보드
  */
 
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 const BASE = '/tools/policy-funding'
@@ -29,10 +30,14 @@ export function mapHref(href: string): string {
 
 export function useRouter() {
   const navigate = useNavigate()
-  return {
-    push: (href: string) => navigate(mapHref(href)),
-    replace: (href: string) => navigate(mapHref(href), { replace: true }),
-    back: () => navigate(-1),
-    refresh: () => undefined,
-  }
+  // D-168: 그릴 때마다 새 값을 주지 않는다(지켜보는 화면이 끝없이 다시 그리지 않게)
+  return useMemo(
+    () => ({
+      push: (href: string) => navigate(mapHref(href)),
+      replace: (href: string) => navigate(mapHref(href), { replace: true }),
+      back: () => navigate(-1),
+      refresh: () => undefined,
+    }),
+    [navigate],
+  )
 }
