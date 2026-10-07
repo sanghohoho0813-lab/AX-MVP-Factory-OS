@@ -101,6 +101,26 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('반복: 할 일 4줄이 날짜마다', made.join() === '2026-10-12,2026-11-12,2026-12-11,2027-01-12', made.join())
   check('반복: 창이 닫히고 알림', (await page.getByTestId('calendar-quick-sheet').count()) === 0 && (await page.locator('body').innerText()).includes('할 일 4개를 넣었습니다'))
 
+  // D-171: 고른 날 할 일 적기 — 자주 쓰는 문구 칩 줄 오른쪽 '›' 는 누르면 옆으로 넘어간다(예전엔 단추처럼 보였는데 안 눌렸다) · '‹' 로 돌아온다
+  {
+    await cell(page, '2026-10-15').click()
+    await page.waitForTimeout(300)
+    await page.getByTestId('picked-panel').getByRole('button', { name: '할 일 적기' }).click()
+    await page.waitForTimeout(300)
+    const panel = page.getByTestId('picked-panel')
+    const sl = () => panel.getByTestId('scroll-more').or(panel.getByTestId('scroll-less')).first().evaluate((e) => e.parentElement.firstElementChild.scrollLeft)
+    const has = (await panel.getByTestId('scroll-more').count()) === 1
+    const before = has ? await sl() : -1
+    if (has) await panel.getByTestId('scroll-more').click()
+    await page.waitForTimeout(700)
+    const after = has ? await sl() : -1
+    check('할 일 문구 칩: › 를 누르면 옆으로 넘어간다 · ‹ 가 생긴다', has && after > before && (await panel.getByTestId('scroll-less').count()) === 1, `${before} → ${after}`)
+    if (has) await panel.getByTestId('scroll-less').click()
+    await page.waitForTimeout(700)
+    check('할 일 문구 칩: ‹ 로 처음으로', has && (await sl()) === 0)
+    await panel.getByRole('button', { name: '닫기' }).first().click().catch(() => {})
+  }
+
   // D-156: PC 달력 칸에 '할 일 N' 숫자 대신 무슨 일인지 · 업체 일정은 종류색 · 고른 날 목록은 달력 오른쪽
   const c12 = await cell(page, '2026-10-12').innerText()
   check('PC 달력 칸: 적은 할 일 내용이 보임(할 일 N 숫자 아님)', c12.includes('급여 증빙 요청') && !/할 일 \d/.test(c12), c12)

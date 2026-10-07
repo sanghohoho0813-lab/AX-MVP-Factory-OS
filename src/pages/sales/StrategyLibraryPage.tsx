@@ -14,13 +14,13 @@ import { ScreenTitle, Surface } from '../../components/ui/primitives'
 import { SalesTabs } from '../../components/sales/SalesTabs'
 import { NumberedList, PillList } from '../../components/sales/salesParts'
 import { listClients } from '../../services/clientOpsService'
-import { salesStageOf } from '../../services/salesPipeline'
+import { salesStageLabelOf } from '../../services/salesPipeline'
 import { STRATEGY_LIBRARY } from '../../services/salesEngine'
 import { CRETOP_WEAPONS, PROPOSAL_TOPICS, TAX_STRATEGIES } from '../../services/salesLibrary'
 import { customersForTopic } from '../../services/salesSignals'
 import { rampAt } from '../../components/sales/salesColor'
 import { todayLocalDate } from '../../lib/appClock'
-import { SALES_STAGE_LABEL, type ClientOpsRecord } from '../../types/clientOps'
+import type { ClientOpsRecord } from '../../types/clientOps'
 
 type SourceKey = 'strategy' | 'cretop' | 'tax'
 
@@ -220,7 +220,7 @@ function LibraryContent({ workspaceId }: { workspaceId: string | null }) {
                   {cs.slice(0, 4).map((c) => (
                     <Link key={c.id} to={`/sales/meeting?client=${c.id}`} className="font-medium text-slate-700 hover:text-brand-700 hover:underline">
                       {c.companyName}
-                      <span className="text-slate-400"> · {SALES_STAGE_LABEL[salesStageOf(c)]}</span>
+                      <span className="text-slate-400"> · {salesStageLabelOf(c)}</span>
                     </Link>
                   ))}
                   {cs.length > 4 && <span className="text-slate-400">외 {cs.length - 4}</span>}

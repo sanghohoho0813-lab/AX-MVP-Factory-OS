@@ -14,10 +14,11 @@
  *   둘 다 실제 업체 기록에 그대로 저장된다 — 화면용 사본이 아니다.
  */
 
+import { useMoneyWords } from './useMoneyWords'
 import { useState } from 'react'
 import { ArrowRight, BellRing, ChevronRight, FileUp } from 'lucide-react'
-import { CONTRACT_KIND_LABEL, CONTRACT_STAGE_LABEL, SALES_STAGE_LABEL, contractStageOf } from '../../types/clientOps'
-import { salesStageOf } from '../../services/salesPipeline'
+import { CONTRACT_KIND_LABEL, CONTRACT_STAGE_LABEL, contractStageOf } from '../../types/clientOps'
+import { salesStageLabelOf } from '../../services/salesPipeline'
 import { formatNumberOf } from '../../lib/format'
 import type { ClientOpsRecord, ServiceKey, ServiceStatus } from '../../types/clientOps'
 import { SERVICES, SERVICE_STATUS_LABEL, isServiceOpen } from '../../content/clientOpsCatalog'
@@ -156,6 +157,7 @@ export function ClientBoardCard({
   /** 서류를 한꺼번에 올리는 시트 열기 (D-84) — 없으면 단추를 그리지 않는다 */
   onBulkDocs?: () => void
 }) {
+  const moneyWords = useMoneyWords()
   const [allChips, setAllChips] = useState(false)
   // D-159: 휴대폰은 처음에 접어 둔다(대표) — 이름 · 회사 정보 한 줄 · 다음 약속 · 진행 중인 일만. [펼쳐보기] 로 나머지
   const [open, setOpen] = useState(false)
@@ -206,7 +208,7 @@ export function ClientBoardCard({
   /* 계약한 지 얼마나 됐는지 — 계약 전이면 단계를, 계약했으면 개월수를 보여 준다 */
   const age = contractAgeShort(record.contract.signedAt, today)
   // D-114: 계약 전이면 '계약 전' 대신 영업 단계(잠재 · 1차 미팅 예정 …)를 쓴다 — 어디까지 왔는지가 더 쓸모 있다
-  const contractMeta = stage === 'signed' ? (age === '' ? '' : `계약 ${age}`) : stage === 'pre' ? `잠재 · ${SALES_STAGE_LABEL[salesStageOf(record)]}` : CONTRACT_STAGE_LABEL[stage]
+  const contractMeta = stage === 'signed' ? (age === '' ? '' : `계약 ${age}`) : stage === 'pre' ? `잠재 · ${salesStageLabelOf(record)}` : CONTRACT_STAGE_LABEL[stage]
   const strongMeta = [repLine, contractMeta].filter((v) => v.trim() !== '')
   /* D-129: 계약 종류는 이름 옆 작은 배지로 — 현금 계약 · 보험 계약 · 혼합 계약 */
   const kindBadge = record.contract.kind === '' ? '' : record.contract.kind === 'mixed' ? '혼합 계약' : `${CONTRACT_KIND_LABEL[record.contract.kind]} 계약`
@@ -420,7 +422,7 @@ export function ClientBoardCard({
                   : 'border-slate-200 bg-white text-slate-700'
               }`}
             >
-              못 받은 내 돈 {formatKrw(p.unpaidNet)}
+              {moneyWords.unpaid} {formatKrw(p.unpaidNet)}
               {p.overduePayments > 0 && ` · 예정일 지남 ${p.overduePayments}`}
             </button>
           )}

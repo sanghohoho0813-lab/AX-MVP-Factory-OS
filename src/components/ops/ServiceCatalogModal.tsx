@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { Archive, RotateCcw } from 'lucide-react'
+import { Archive, Plus, RotateCcw } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { ACCENT_CLASS, BUILTIN_SERVICES, type ServiceAccent } from '../../content/clientOpsCatalog'
 import {
@@ -21,6 +21,24 @@ import {
   type CustomService,
 } from '../../services/customServiceService'
 import { useBackToClose } from '../../lib/backToClose'
+import { DEFAULT_PACKAGES, PKG_CATEGORIES } from '../../services/salesProposal'
+
+/**
+ * D-171 대표: "항목 추가는 웬만하면 클릭으로 — 모듈 · 상품표에 있는 40개 정도에서 골라 바로 만들게, 직접 쓰기도 되게".
+ * 상품표(영업 제안 40종) 이름에서 '패키지' 꼬리만 떼어 항목 이름으로 쓴다. 분류 → 색 구분.
+ */
+const CAT_ACCENT: Record<string, ServiceAccent> = {
+  '인증/연구소': 'doc',
+  '자금/지원금': 'money',
+  '세무/정관': 'plan',
+  '승계/지분': 'plan',
+  '복지/노무': 'client',
+  '보험/퇴직금': 'money',
+  '지식재산/브랜딩': 'doc',
+  '신용/보증/성장지원': 'fund',
+}
+const pkgItemLabel = (name: string) => name.replace(/\s*패키지$/, '').trim()
+const PKG_ITEMS = DEFAULT_PACKAGES.map((p) => ({ label: pkgItemLabel(p.name), cat: p.cat, description: p.desc }))
 
 const ACCENTS: { key: ServiceAccent; label: string }[] = [
   { key: 'neutral', label: '기본' },
@@ -88,7 +106,28 @@ export function ServiceCatalogModal({
     }
   }
 
+  // 상품표에서 한 번 눌러 바로 만든다(이미 있는 이름이면 되살리기만)
+  const addFromCatalog = async (item: { label: string; cat: string; description: string }) => {
+    setError('')
+    const same = list.find((c) => c.label === item.label)
+    if (same) {
+      if (same.archived) await toggleArchive(same)
+      return
+    }
+    setBusy(true)
+    try {
+      await createCustomService(workspaceId, { label: item.label, description: item.description, accent: CAT_ACCENT[item.cat] ?? 'neutral' })
+      await reload()
+      onChanged()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '항목을 추가하지 못했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const live = list.filter((c) => !c.archived)
+  const liveLabels = new Set([...live.map((c) => c.label), ...BUILTIN_SERVICES.map((s) => s.label)])
   const archived = list.filter((c) => c.archived)
 
   return (
@@ -105,8 +144,8 @@ export function ServiceCatalogModal({
           </button>
         </div>
         <p className="mt-1 text-[0.95rem] break-keep text-slate-500">
-          여기서 만든 항목은 모든 업체의 현황표에 열로 추가됩니다. 해당 없는 업체에서는 상태를
-          &lsquo;보류&rsquo;로 두면 경고에서 빠집니다.
+          여기서 만든 항목은 <b className="font-semibold text-slate-700">내 작업공간</b>의 모든 업체 현황표에 열로 추가됩니다(다른 사람
+          화면에는 보이지 않습니다). 해당 없는 업체에서는 상태를 &lsquo;보류&rsquo;로 두면 경고에서 빠집니다.
         </p>
 
         {/* 기본 항목 — 지울 수 없다 */}
@@ -180,9 +219,48 @@ export function ServiceCatalogModal({
           </div>
         )}
 
+        {/* 상품표에서 골라 추가 — 누르면 바로 만들어진다 */}
+        <div className="mt-6 border-t border-slate-200 pt-5" data-testid="service-pkg-picker">
+          <p className="text-[1rem] font-bold text-slate-900">상품표에서 골라 추가</p>
+          <p className="mt-1 text-[0.92rem] break-keep text-slate-500">누르면 바로 항목이 생깁니다. 이미 있는 항목은 회색입니다.</p>
+          <div className="mt-3 flex flex-col gap-3">
+            {PKG_CATEGORIES.map((cat) => {
+              const items = PKG_ITEMS.filter((i) => i.cat === cat)
+              if (items.length === 0) return null
+              return (
+                <div key={cat}>
+                  <p className="text-[0.88rem] font-semibold text-slate-600">{cat}</p>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {items.map((i) => {
+                      const have = liveLabels.has(i.label)
+                      return (
+                        <button
+                          key={i.label}
+                          type="button"
+                          disabled={have || busy}
+                          title={i.description}
+                          onClick={() => void addFromCatalog(i)}
+                          className={`tap inline-flex min-h-10 items-center gap-1 rounded-full border px-3 text-[0.9rem] font-medium break-keep ${
+                            have ? 'border-slate-200 bg-slate-100 text-slate-400' : `${ACCENT_CLASS[CAT_ACCENT[cat] ?? 'neutral'].chip} hover:ring-2 hover:ring-brand-300`
+                          }`}
+                          data-testid="service-pkg"
+                          data-have={have}
+                        >
+                          {!have && <Plus aria-hidden="true" className="size-3.5 shrink-0" />}
+                          {i.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
         {/* 새 항목 */}
         <div className="mt-6 border-t border-slate-200 pt-5">
-          <p className="text-[1rem] font-bold text-slate-900">새 항목 추가</p>
+          <p className="text-[1rem] font-bold text-slate-900">직접 써서 추가</p>
           <div className="mt-3 grid gap-3">
             <label className="text-[0.95rem] font-medium text-slate-700">
               항목 이름

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { ensureCustomServiceCatalog } from '../../services/customServiceService'
 import { getDataModeConfig } from '../../data/dataMode'
 import { useAuth } from '../../auth/AuthProvider'
 
@@ -21,5 +22,7 @@ export function WorkspaceScope({ children }: { children: (ctx: WorkspaceContextV
 
 function CloudScope({ children }: { children: (ctx: WorkspaceContextValue) => ReactNode }) {
   const { currentWorkspaceId, session } = useAuth()
+  // D-171: 작업공간이 바뀌면 직접 만든 업무 항목 목록도 그 작업공간 것으로(다른 사람 항목이 남지 않게)
+  ensureCustomServiceCatalog(currentWorkspaceId)
   return <>{children({ workspaceId: currentWorkspaceId, userId: session?.user.id ?? null })}</>
 }

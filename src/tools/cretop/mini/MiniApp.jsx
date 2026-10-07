@@ -1470,9 +1470,23 @@ const FONT_SCALES = [["기본", 1.3], ["크게", 1.55]];
 // 사이드 패널 — 계정(Supabase Auth) + 분석 이력(서버) + 새 분석/로그아웃.
 function Sidebar({ history, onClose, onOpen, onNew, onDelete }) {
   useBackClose(true, onClose); // [D-124] 휴대폰 뒤로가기는 이력 패널만 닫는다
+  // [D-171] 휴대폰 · 태블릿(OS 하단 메뉴가 있는 폭)에서는 하단 메뉴 높이만큼 짧게 — 패널 아랫부분이 메뉴 뒤에 숨지 않게
+  const narrow = typeof window !== "undefined" && window.innerWidth < 1024;
+  // [D-171] 열 때 패널 아래가 화면 밖이면 그만큼만 내려 준다(머리줄 아래까지만) — 맨 아래 안내까지 한 화면에
+  const panelRef = useRef(null);
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const bottomLimit = window.innerHeight - (narrow ? 72 : 0);
+    const over = r.bottom - bottomLimit;
+    if (over > 0) window.scrollBy({ top: Math.min(over, Math.max(0, r.top - 64)), behavior: "smooth" });
+  }, [narrow]);
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.38)", zIndex: 60 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: "min(86vw,340px)", background: "#fff", boxShadow: "2px 0 18px rgba(15,23,42,.2)", display: "flex", flexDirection: "column", overflowY: "auto", "--fs": 1.15 }}>
+    // [D-171] 대표: "분석 이력이 OS 왼쪽 목차 · 햄버거를 가리면 안 된다 — 크레탑 분석기 영역 안에서만".
+    //   예전엔 화면 전체(fixed)를 덮었다 → 분석기 상자(position: relative) 안에만 깔고, 패널은 OS 머리줄(64px) 바로 아래에 붙어(sticky) 따라온다. isolation 으로 OS 머리줄 · 메뉴보다 위로 올라가지 않는다.
+    <div onClick={onClose} data-testid="cretop-history" style={{ position: "absolute", inset: 0, background: "rgba(15,23,42,.38)", zIndex: 40, borderRadius: "var(--radius-panel)" }}>
+      <div ref={panelRef} onClick={(e) => e.stopPropagation()} style={{ position: "sticky", top: 64, height: "100%", maxHeight: narrow ? "calc(100dvh - 64px - 4.5rem - env(safe-area-inset-bottom))" : "calc(100dvh - 64px)", width: "min(86%,340px)", background: "#fff", boxShadow: "2px 0 18px rgba(15,23,42,.2)", display: "flex", flexDirection: "column", overflowY: "auto", borderRadius: "var(--radius-panel) 0 0 var(--radius-panel)", "--fs": 1.15 }}>
         <div style={{ padding: "16px 16px 14px", borderBottom: `1px solid ${T.line}` }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ fontSize: "calc(15px * var(--fs,1))", fontWeight: 900, color: T.ink }}>분석 이력</div>
@@ -1662,7 +1676,7 @@ export function CretopMiniApp({ history = [], onSaved, onDelete, extraInput, res
   }
 
   return (
-    <div ref={rootRef} className="cretop-mini" data-testid="cretop-mini" style={{ fontFamily: FF, background: T.bg, color: T.ink, overflowX: "clip", "--fs": 1, borderRadius: "var(--radius-panel)", border: `1px solid ${T.line}` }}>{/* [D-94] hidden → clip: hidden 이면 이 상자가 스크롤 상자가 되어 하단 탭이 화면에 붙지 않고 맨 끝 내용을 가렸다 */}
+    <div ref={rootRef} className="cretop-mini" data-testid="cretop-mini" style={{ position: "relative", isolation: "isolate", fontFamily: FF, background: T.bg, color: T.ink, overflowX: "clip", "--fs": 1, borderRadius: "var(--radius-panel)", border: `1px solid ${T.line}` }}>{/* [D-94] hidden → clip: hidden 이면 이 상자가 스크롤 상자가 되어 하단 탭이 화면에 붙지 않고 맨 끝 내용을 가렸다 */}
       {/* 상단: 햄버거 + 서비스명 + 글자 크기 (정상 크기 — 콘텐츠만 확대) */}
       <header style={{ background: T.surface, borderBottom: `1px solid ${T.line}`, borderRadius: "var(--radius-panel) var(--radius-panel) 0 0" }}>
         <div style={{ maxWidth: 1280, margin: "0 auto", padding: "10px 12px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>

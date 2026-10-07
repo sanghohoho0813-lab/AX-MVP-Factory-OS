@@ -507,7 +507,7 @@ function ProposalWork({
 
       {!showPrep && (
         <p data-testid="contract-prep-later" className="t-meta break-keep text-slate-500">
-          계약 준비(계약 전 확인 · 받을 서류 · 계약 완료로)는 3차 클로징부터 보입니다{path && SALES_PATH_INFO[path].skipClosing ? '' : ' — 현금 · 단계별 계약이면 2차 미팅부터'}.
+          계약 준비(계약 전 확인 · 받을 서류 · 계약 완료로)는 클로징 미팅(3 · 4 · 5차 중 고른 차수)부터 보입니다{path && SALES_PATH_INFO[path].skipClosing ? '' : ' — 현금 · 단계별 계약이면 2차 미팅부터'}.
         </p>
       )}
       {showPrep && (

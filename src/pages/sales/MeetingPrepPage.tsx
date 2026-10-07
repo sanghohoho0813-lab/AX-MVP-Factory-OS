@@ -43,7 +43,7 @@ import { registerFromCretop } from '../../services/salesIntake'
 import { companyKey } from '../../services/salesCretop'
 import { withSalesPath } from '../../services/salesJourney'
 import { listClients, saveClient } from '../../services/clientOpsService'
-import { salesStageOf, stageReached, withSalesStage } from '../../services/salesPipeline'
+import { CLOSING_ROUNDS, closingRoundOf, salesStageOf, stageReached, withClosingRound, withSalesStage } from '../../services/salesPipeline'
 import { SALES_INTERESTS } from '../../content/salesCatalog'
 import {
   interestsFromIssues,
@@ -298,6 +298,9 @@ function ShareTextButton({ text }: { text: string }) {
 function MeetingRecorder({ record, round, today, onSave, onNextRound }: { record: ClientOpsRecord; round: 1 | 2 | 3; today: string; onSave: (next: ClientOpsRecord, msg: string) => Promise<boolean>; onNextRound: () => void }) {
   const stage = salesStageOf(record)
   const target = stageAfterMeeting(round)
+  // D-171: 클로징은 3차가 아닐 수도 — 고른 차수(3 · 4 · 5)로 부른다
+  const roundNo = round === 3 ? closingRoundOf(record) : round
+  const targetLabel = target === 'closing' ? `${closingRoundOf(record)}차 클로징` : SALES_STAGE_LABEL[target]
   const canMove = SALES_STAGE_ORDER.indexOf(target) > SALES_STAGE_ORDER.indexOf(stage) && stage !== 'contracted' && stage !== 'hold' && stage !== 'lost'
   const [text, setTextState] = useState(() => readDraft(record.id, round))
   const setText = (v: string) => {
@@ -326,11 +329,11 @@ function MeetingRecorder({ record, round, today, onSave, onNextRound }: { record
   }
   const save = async () => {
     if (!result || saving) return
-    let rec = withMeetingNote(record, { round, text, analysis: result, nextAction: next, nextActionDueDate: due, ...(round === 1 ? { interests } : {}) })
+    let rec = withMeetingNote(record, { round, roundNo, text, analysis: result, nextAction: next, nextActionDueDate: due, ...(round === 1 ? { interests } : {}) })
     if (slots.length > 0) rec = withDocSlots(rec, slots)
     if (canMove && move) rec = withSalesStage(rec, target)
     setSaving(true)
-    const ok = await onSave(rec, `${round}차 미팅을 기록했습니다${canMove && move ? ` · ${SALES_STAGE_LABEL[target]}로 옮김` : ''}${slots.length > 0 ? ` · 서류함에 칸 ${slots.length}개` : ''}.`)
+    const ok = await onSave(rec, `${roundNo}차 미팅을 기록했습니다${canMove && move ? ` · ${targetLabel}로 옮김` : ''}${slots.length > 0 ? ` · 서류함에 칸 ${slots.length}개` : ''}.`)
     setSaving(false)
     // D-120: 저장이 된 뒤에만 비운다 — 실패하면 적은 메모가 그대로 남는다
     if (ok) {
@@ -344,7 +347,7 @@ function MeetingRecorder({ record, round, today, onSave, onNextRound }: { record
         phone: record.contactPhone.trim() || record.companyPhone.trim(),
         nextAction: next.trim(),
         due,
-        moved: canMove && move ? SALES_STAGE_LABEL[target] : null,
+        moved: canMove && move ? targetLabel : null,
         docs: slots.length,
       })
       setTextState('')
@@ -357,7 +360,7 @@ function MeetingRecorder({ record, round, today, onSave, onNextRound }: { record
       <section aria-label="미팅 마무리" data-testid="meeting-wrapup" className="flex flex-col gap-3 rounded-(--radius-panel) border border-success-200 bg-success-50/40 p-4 sm:p-5">
         <h2 className="t-section flex items-center gap-2 text-slate-900">
           <Check aria-hidden="true" className="size-5 text-success-600" />
-          {round}차 미팅을 기록했습니다
+          {roundNo}차 미팅을 기록했습니다
         </h2>
         <p className="t-sub break-keep text-slate-600">
           {[wrap.moved ? `영업 단계 → ${wrap.moved}` : '', wrap.docs > 0 ? `서류함에 칸 ${wrap.docs}개` : '', wrap.nextAction ? `다음 약속 ${wrap.due} · ${wrap.nextAction}` : ''].filter(Boolean).join(' · ')}
@@ -406,7 +409,7 @@ function MeetingRecorder({ record, round, today, onSave, onNextRound }: { record
     <section aria-label="미팅 기록" data-testid="meeting-recorder" className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5">
       <h2 className="t-section flex items-center gap-2 text-slate-900">
         <NotebookPen aria-hidden="true" className="size-5 text-brand-600" />
-        {round}차 미팅 기록
+        {roundNo}차 미팅 기록
       </h2>
       <label className="block text-[0.875rem] text-slate-500">
         미팅에서 나온 말 · 메모
@@ -516,7 +519,7 @@ function MeetingRecorder({ record, round, today, onSave, onNextRound }: { record
           {canMove && (
             <label className="t-sub flex items-center gap-2 text-slate-700">
               <input type="checkbox" checked={move} onChange={(e) => setMove(e.target.checked)} className="size-4 accent-brand-600" />
-              영업 단계를 <strong className="font-semibold">{SALES_STAGE_LABEL[target]}</strong>로 옮기기
+              영업 단계를 <strong className="font-semibold">{targetLabel}</strong>로 옮기기
             </label>
           )}
           <div className="flex justify-end">
@@ -576,6 +579,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
   const round: Round = (rp === '0' && SALES_SIMPLE.showFirstContact) || rp === '1' || rp === '2' || rp === '3' ? (Number(rp) as Round) : stage === 'lead' && SALES_SIMPLE.showFirstContact ? 0 : roundForStage(stage)
   // D-124: 지금 기록할 수 있는 차수 — 그보다 뒤는 미리 보기
   const liveRound: Round = roundForStage(stage)
+  const closingN = record ? closingRoundOf(record) : 3
   const ahead = round > liveRound
   const [prepMode, setPrepModeState] = useState<'cretop' | 'direct'>(readPrepMode)
   const setPrepMode = (m: 'cretop' | 'direct') => {
@@ -704,7 +708,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
 
               {/* 차수 고르기 */}
               <div role="group" aria-label="미팅 차수" data-testid="meeting-rounds" className={`grid ${ROUNDS.length === 4 ? 'grid-cols-4' : 'grid-cols-3'} gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:inline-flex sm:self-start`}>
-                {ROUNDS.map((r) => (
+                {ROUNDS.map((r) => ({ ...r, label: r.key === 3 ? `${closingN}차 클로징` : r.label })).map((r) => (
                   <button
                     key={r.key}
                     type="button"
@@ -718,10 +722,29 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                 ))}
               </div>
 
+              {/* D-171: 클로징이 3차가 아닐 수도(4 · 5차) — 한 번 눌러 고른다. 단계는 그대로 '클로징' 하나 */}
+              {round === 3 && (
+                <div role="radiogroup" aria-label="클로징 차수" data-testid="closing-round" className="flex flex-wrap items-center gap-1.5">
+                  <span className="t-sub font-semibold text-slate-600">몇 차 미팅에서 클로징하나요?</span>
+                  {CLOSING_ROUNDS.map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      role="radio"
+                      aria-checked={closingN === n}
+                      onClick={() => closingN !== n && void persist(withClosingRound(record, n), `클로징을 ${n}차 미팅으로 정했습니다.`)}
+                      className={`tap t-sub min-h-10 rounded-full border px-3.5 font-semibold ${closingN === n ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white text-slate-700 hover:border-brand-400'}`}
+                    >
+                      {n}차
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {/* D-124: 아직 오지 않은 차수는 미리 보기만 — 기록 · 회사 사정 칸은 그 미팅을 마친 뒤에 */}
               {ahead && (
                 <p data-testid="round-ahead" className="t-sub break-keep rounded-(--radius-control) border border-dashed border-slate-300 bg-slate-50 px-3.5 py-2.5 text-slate-600">
-                  아직 {liveRound}차 미팅 단계입니다. {round}차 미팅은 미리 보기만 — 기록은 그 미팅을 마친 뒤에 남깁니다.
+                  아직 {liveRound === 3 ? closingN : liveRound}차 미팅 단계입니다. {round === 3 ? closingN : round}차 미팅은 미리 보기만 — 기록은 그 미팅을 마친 뒤에 남깁니다.
                 </p>
               )}
 
@@ -813,7 +836,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                     {record.sales?.meetings?.map((m) => (
                       <li key={m.id} className="rounded-(--radius-control) border border-slate-200 bg-white p-3">
                         <p className="t-meta text-slate-500">
-                          {localDateOf(m.at)} · {m.round}차 · {m.reaction}
+                          {localDateOf(m.at)} · {m.roundNo ?? m.round}차 · {m.reaction}
                         </p>
                         <p className="t-sub mt-1 break-keep whitespace-pre-line text-slate-700">{m.text}</p>
                         {m.issues.length > 0 && <div className="mt-1.5"><PillList items={m.issues} /></div>}
@@ -1024,7 +1047,7 @@ function PrevMeetingPoints({ record, round }: { record: ClientOpsRecord; round: 
       <h2 className="t-section text-slate-900">앞 미팅에서 적은 것 <span className="t-sub font-medium text-slate-500">· 이걸 짚고 시작</span></h2>
       {prev.map((m) => (
         <div key={m.id} className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white p-3">
-          <p className="t-meta font-semibold text-slate-500">{m.round}차 · {localDateOf(m.at)}{m.reaction ? ` · ${m.reaction}` : ''}</p>
+          <p className="t-meta font-semibold text-slate-500">{m.roundNo ?? m.round}차 · {localDateOf(m.at)}{m.reaction ? ` · ${m.reaction}` : ''}</p>
           {m.text.trim() !== '' && <p className="t-sub break-keep whitespace-pre-line text-slate-700">{m.text}</p>}
           {m.issues.length > 0 && <p className="t-sub break-keep text-slate-700"><b>나온 주제</b> · {m.issues.join(' · ')}</p>}
           {m.hesitant.length > 0 && <p className="t-sub break-keep text-warning-800"><b>망설인 점</b> · {m.hesitant.join(' · ')}</p>}

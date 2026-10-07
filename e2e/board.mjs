@@ -142,6 +142,23 @@ const chips = await page.evaluate(() => document.querySelectorAll('button').leng
 const of2 = await page.evaluate(() => ({ d: document.documentElement.scrollWidth, w: window.innerWidth }))
 check('업무 15개에서도 가로 스크롤 없음', of2.d <= of2.w + 1, `${of2.d} > ${of2.w} (버튼 ${chips}개)`)
 
+/* ---------------- D-171: 업무 항목 — 상품표 40개에서 눌러 바로 만들기 · 직접 쓰기도 그대로 ---------------- */
+{
+  const keep = await page.evaluate(() => localStorage.getItem('axmvp.v1.custom_services'))
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=work', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  await page.getByRole('button', { name: '업무 항목 추가' }).click()
+  await page.waitForTimeout(400)
+  const picker = page.getByTestId('service-pkg-picker')
+  check('업무 항목(D-171): 상품표에서 골라 추가 — 40개 칩 · 직접 써서 추가도 있다', (await picker.getByTestId('service-pkg').count()) === 40 && (await page.getByText('직접 써서 추가').count()) === 1 && (await page.getByPlaceholder('예: ISO 인증').count()) === 1)
+  await picker.getByRole('button', { name: '정관정비', exact: true }).click()
+  await page.waitForTimeout(600)
+  const made = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.custom_services') ?? '[]').filter((c) => c.label === '정관정비'))
+  check('업무 항목(D-171): 한 번 누르면 바로 생긴다(설명 · 색 같이) · 칩은 회색(이미 있음)', made.length === 1 && made[0].description.length > 0 && (await picker.getByRole('button', { name: '정관정비', exact: true }).getAttribute('data-have')) === 'true', JSON.stringify(made))
+  await page.getByRole('button', { name: '닫기' }).first().click().catch(() => {})
+  await page.evaluate((v) => (v === null ? localStorage.removeItem('axmvp.v1.custom_services') : localStorage.setItem('axmvp.v1.custom_services', v)), keep)
+}
+
 /* ---------------- 계약 정보 · 해 드린 일 ---------------- */
 {
   // 한솔테크 — 현금 + 보험 혼합, 2025-03-15 계약

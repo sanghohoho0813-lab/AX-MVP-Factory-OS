@@ -271,3 +271,19 @@ export async function loadCustomServicesIntoCatalog(
   registerCustomServices(list.filter((c) => !c.archived).map(toServiceMeta))
   return list
 }
+
+/**
+ * D-171 대표: "내가 만든 업무 항목(세무기장 · 모두의 창업 2차)이 팀장 · 다른 사람 화면에 보이면 안 된다".
+ * 저장은 이미 작업공간마다 따로다(RLS). 다만 항목 목록은 화면 메모리에 한 벌만 있어서, 같은 창에서 작업공간이
+ * 바뀌면(팀장 화면으로 보기 · 다른 계정) 앞 작업공간 항목이 남을 수 있었다 → 작업공간이 바뀌는 순간 기본 6종으로 비우고 그 작업공간 것만 다시 읽는다.
+ */
+let catalogWorkspace: string | null | undefined
+export function ensureCustomServiceCatalog(workspaceId: string | null): void {
+  if (catalogWorkspace === workspaceId) return
+  catalogWorkspace = workspaceId
+  registerCustomServices([])
+  void loadCustomServicesIntoCatalog(workspaceId).then(() => {
+    // 읽는 사이 작업공간이 또 바뀌었으면 그 결과는 버린다
+    if (catalogWorkspace !== workspaceId) registerCustomServices([])
+  })
+}

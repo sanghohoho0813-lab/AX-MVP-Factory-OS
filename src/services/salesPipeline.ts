@@ -81,7 +81,9 @@ function normalizeMeetings(list: unknown[]): SalesMeetingNote[] {
     const m = raw as Record<string, unknown>
     if (typeof m.id !== 'string' || typeof m.at !== 'string') continue
     const round = m.round === 2 || m.round === 3 ? m.round : 1
-    out.push({ id: m.id, at: m.at, round, text: str(m.text), reaction: str(m.reaction), issues: strList(m.issues), hesitant: strList(m.hesitant), nextDocs: strList(m.nextDocs) })
+    // D-171: 클로징 미팅의 실제 차수(4 · 5차) — 있을 때만
+    const roundNo = round === 3 && typeof m.roundNo === 'number' && m.roundNo >= 4 && m.roundNo <= 5 ? Math.floor(m.roundNo) : undefined
+    out.push({ id: m.id, at: m.at, round, ...(roundNo ? { roundNo } : {}), text: str(m.text), reaction: str(m.reaction), issues: strList(m.issues), hesitant: strList(m.hesitant), nextDocs: strList(m.nextDocs) })
   }
   return out.slice(0, MEETING_LIMIT)
 }
@@ -126,6 +128,8 @@ export function normalizeSales(v: unknown): SalesInfo | null {
     out.flags = Object.fromEntries(Object.entries(s.flags as Record<string, unknown>).filter(([, v]) => v === true).map(([k]) => [k, true]))
   }
   if (typeof s.memo === 'string') out.memo = s.memo
+  // D-171: 클로징 차수(3 · 4 · 5) — 있을 때만
+  if (typeof s.closingRound === 'number' && s.closingRound >= 3 && s.closingRound <= 5) out.closingRound = Math.floor(s.closingRound)
   if (typeof s.grantQuery === 'string' && s.grantQuery.trim()) out.grantQuery = s.grantQuery.trim().slice(0, 500)
   if (Array.isArray(s.meetings)) out.meetings = normalizeMeetings(s.meetings)
   if (s.proposal && typeof s.proposal === 'object') out.proposal = normalizeProposal(s.proposal as Record<string, unknown>)
@@ -150,6 +154,26 @@ export function normalizeSales(v: unknown): SalesInfo | null {
  * 이 업체의 영업 단계.
  * 영업 칸이 없는 예전 업체는 계약 단계로 짐작한다 — 계약 전이면 '잠재 고객', 계약했으면 '계약 완료'.
  */
+/** D-171: 클로징 차수 — 3 · 4 · 5차 중 고른 것(없거나 이상하면 3차) */
+export const CLOSING_ROUNDS = [3, 4, 5] as const
+export function closingRoundOf(record: Pick<ClientOpsRecord, 'sales'>): number {
+  const n = record.sales?.closingRound
+  return typeof n === 'number' && n >= 3 && n <= 5 ? Math.floor(n) : 3
+}
+/** 클로징 차수 바꾸기 — 활동 기록 한 줄. 같은 값이면 그대로 */
+export function withClosingRound(record: ClientOpsRecord, n: number, at: string = new Date().toISOString()): ClientOpsRecord {
+  const v = Math.min(5, Math.max(3, Math.floor(n)))
+  if (closingRoundOf(record) === v && record.sales?.closingRound !== undefined) return record
+  const base = record.sales ?? emptySales(salesStageOf(record), at)
+  return withActivity({ ...record, sales: { ...base, closingRound: v } }, 'sales', `클로징 차수 — ${v}차`, null, at)
+}
+
+/** 업체 하나의 영업 단계 이름 — 클로징이면 고른 차수로('4차 클로징') */
+export function salesStageLabelOf(record: Pick<ClientOpsRecord, 'sales' | 'status'>): string {
+  const st = salesStageOf(record)
+  return st === 'closing' ? `${closingRoundOf(record)}차 클로징` : SALES_STAGE_LABEL[st]
+}
+
 export function salesStageOf(record: Pick<ClientOpsRecord, 'sales' | 'status'>): SalesStage {
   if (record.sales) return record.sales.stage
   return contractStageOf(record.status) === 'pre' ? 'lead' : 'contracted'

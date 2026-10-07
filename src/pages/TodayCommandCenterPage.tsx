@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMoneyWords } from '../components/ops/useMoneyWords'
 import { useIsPhone } from '../lib/useIsPhone'
 import { TodayCharges } from '../components/money/TodayCharges'
 import { TodayCare } from '../components/ops/TodayCare'
@@ -246,6 +247,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     [alerts],
   )
   const money = useMemo(() => buildMoneySignals(clients, today), [clients, today])
+  const moneyWords = useMoneyWords()
   const agentPayable = useMemo(() => agentLedgerTotals(agentLedger(clients)).payable, [clients])
   const phoneOf = (id: string) => {
     const c = clients.find((x) => x.id === id)
@@ -632,7 +634,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               onClick={() => navigate(waiting > 0 ? '/ops/clients?filter=waiting' : '/ops/clients')}
             />
             <MetricTile
-              label="못 받은 내 돈"
+              label={moneyWords.unpaid}
               value={krwTile(money.scheduled.total + money.overdue.total)}
               tone={money.overdue.count > 0 ? 'danger' : 'neutral'}
               hint={

@@ -48,7 +48,7 @@ import {
   summarizeContract,
 } from '../contractSummary'
 import type { ClientOpsRecord, OpsAlert } from '../../types/clientOps'
-import { mergeServices, normalizeCustomService, toServiceMeta } from '../customServiceService'
+import { ensureCustomServiceCatalog, mergeServices, normalizeCustomService, toServiceMeta } from '../customServiceService'
 import { buildKpis, kpisByGroup, kpiStatusSummary } from '../kpiService'
 import { bsWon, netIncomeSlots, svCurrent, svDefaults, svLoad, svMerge, svSave, svSummaryLines } from '../../tools/cretop/mini/stockValueCalc.js'
 import { profileFields, profileFieldsByGroup, regionOf } from '../clientOpsProfile'
@@ -73,6 +73,7 @@ import {
   withSalesInfo,
   withSalesStage,
 } from '../salesPipeline'
+import { closingRoundOf, salesStageLabelOf, withClosingRound } from '../salesPipeline'
 import { SALES_FLOW_STAGES, SALES_STAGE_ORDER } from '../../types/clientOps'
 import { SALES_TABS, SALES_TAB_PATHS } from '../../config/salesTabs'
 import {
@@ -2174,7 +2175,7 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
 {
   check('업체 구분: 법인번호 → 법인', entityKindOf({ companyName: '하늘', corporateNumber: '110111-1234567' }) === 'corporation')
   check('업체 구분: 사업자번호 가운데 81 · 86 → 법인, 12 · 95 → 개인', entityKindOf({ companyName: 'a', businessNumber: '123-81-45678' }) === 'corporation' && entityKindOf({ companyName: 'a', businessNumber: '1238645678' }) === 'corporation' && entityKindOf({ companyName: 'a', businessNumber: '123-12-45678' }) === 'individual' && entityKindOf({ companyName: 'a', businessNumber: '123-95-45678' }) === 'individual')
-  check('업체 구분: 이름의 (주) · 주식회사 → 법인, 아무것도 없으면 구분 모름', entityKindOf({ companyName: '(주)가나' }) === 'corporation' && entityKindOf({ companyName: '다라 주식회사' }) === 'corporation' && entityKindOf({ companyName: '마바상회' }) === 'unknown')
+  check('업체 구분(D-171): 이름의 (주) · 주식회사 → 법인, 아무것도 없으면 개인사업자', entityKindOf({ companyName: '(주)가나' }) === 'corporation' && entityKindOf({ companyName: '다라 주식회사' }) === 'corporation' && entityKindOf({ companyName: '마바상회' }) === 'individual')
   const list = [
     { id: '1', companyName: '하나정밀(주)' },
     { id: '2', companyName: '나무식당', businessNumber: '123-45-67890' },
@@ -2182,8 +2183,8 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
     { id: '4', companyName: '마바상회' },
     { id: '5', companyName: '가게하나', businessNumber: '123-01-67890' },
   ]
-  check('정렬: 개인사업자(가나다) → 법인(가나다 · ㈜ 앞말 빼고) → 구분 모름', orderForPicker(list).map((c) => c.id).join() === '5,2,3,1,4', orderForPicker(list).map((c) => c.companyName).join())
-  check('묶음: 개인사업자 2 · 법인 2 · 구분 모름 1', pickerGroups(list).map((g) => `${g.label}${g.items.length}`).join() === '개인사업자2,법인2,구분 모름1')
+  check('정렬: 개인사업자(가나다) → 법인(가나다 · ㈜ 앞말 빼고)', orderForPicker(list).map((c) => c.id).join() === '5,2,4,3,1', orderForPicker(list).map((c) => c.companyName).join())
+  check('묶음(D-171): 개인사업자 3 · 법인 2 — 구분 모름 없음', pickerGroups(list).map((g) => `${g.label}${g.items.length}`).join() === '개인사업자3,법인2')
 }
 
 
@@ -2195,6 +2196,33 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('출시 예정: 상품표에 모두 있다(기간 · 설명을 거기서 읽는다)', UPCOMING_PRODUCTS.every((p) => DEFAULT_PACKAGES.some((x) => x.name === p.pkgName)), UPCOMING_PRODUCTS.filter((p) => !DEFAULT_PACKAGES.some((x) => x.name === p.pkgName)).map((p) => p.pkgName).join())
   check('출시 예정: 이미 모듈이 있는 것 · 검토만 하는 것은 없다', !names.some((n) => /정책자금|고용|지원사업|연구소|벤처|메인비즈|ISO|신용등급|리파이낸싱|주주간|스마트공장/.test(n)), names.join())
   check('출시 예정: 주소 /upcoming/{key}', kids.every((m) => m.path.startsWith('/upcoming/')))
+}
+
+/* ---- D-171: 클로징 차수 · 직접 만든 업무 항목은 작업공간마다 ---- */
+{
+  const base = normalizeClientOps({ id: 'cls', workspaceId: null, companyName: '클로징상사', status: 'waiting', createdAt: '2026-10-01T00:00:00Z', updatedAt: '2026-10-01T00:00:00Z', sales: { stage: 'closing', source: '', referrer: '', interests: [], concern: '', expectedFee: null, history: [], movedAt: '2026-10-01T00:00:00Z' } })
+  check('클로징 차수: 고르지 않으면 3차 · 이름 "3차 클로징"', closingRoundOf(base) === 3 && salesStageLabelOf(base) === '3차 클로징')
+  const four = withClosingRound(base, 4, '2026-10-02T00:00:00Z')
+  check('클로징 차수: 4차로 고르면 "4차 클로징" · 활동 기록 한 줄 · 단계는 그대로 closing', closingRoundOf(four) === 4 && salesStageLabelOf(four) === '4차 클로징' && four.sales?.stage === 'closing' && four.activity.some((a) => a.text.includes('클로징 차수 — 4차')))
+  check('클로징 차수: 범위 밖 값은 3 ~ 5 안으로', closingRoundOf(withClosingRound(base, 9)) === 5 && closingRoundOf(withClosingRound(base, 1)) === 3 && closingRoundOf({ sales: { ...base.sales!, closingRound: 7 } }) === 3)
+  check('클로징 차수: 클로징이 아닌 단계는 원래 이름', salesStageLabelOf({ ...base, sales: { ...base.sales!, stage: 'm2', closingRound: 5 } }) === '2차 미팅')
+  const a = { reaction: '긍정', issues: [], hesitant: [], nextDocs: [], kakao: '' } as unknown as Parameters<typeof withMeetingNote>[1]['analysis']
+  const m5 = withMeetingNote(four, { round: 3, roundNo: 5, text: '조건 정리', analysis: a }, '2026-10-03T00:00:00Z')
+  check('미팅 기록: 클로징 미팅을 5차로 남기면 기록 · 활동에 5차', m5.sales?.meetings?.[0]?.roundNo === 5 && m5.activity.some((x) => x.text.startsWith('5차 미팅 기록')))
+  const m2 = withMeetingNote(four, { round: 2, roundNo: 2, text: 'x', analysis: a })
+  const back = normalizeClientOps(JSON.parse(JSON.stringify(m5)))
+  check('클로징 차수 · 미팅 5차: 저장 → 다시 읽기에서 살아남는다', back.sales?.closingRound === 4 && back.sales?.meetings?.[0]?.roundNo === 5)
+  check('미팅 기록: 1 · 2차는 차수 덧붙이지 않음', m2.sales?.meetings?.[0]?.roundNo === undefined && m2.activity.some((x) => x.text.startsWith('2차 미팅 기록')))
+
+  // 대표가 만든 항목(세무기장)이 다른 작업공간(팀장 화면)으로 넘어가지 않는다
+  ensureCustomServiceCatalog('ws-owner')
+  registerCustomServices([{ ...BUILTIN_SERVICES[0], key: 'custom_tax', label: '세무기장', shortLabel: '세무기장', order: 101 }])
+  check('업무 항목: 대표 작업공간에서는 세무기장이 보인다', SERVICES.some((x) => x.label === '세무기장'))
+  ensureCustomServiceCatalog('ws-pilot')
+  check('업무 항목(D-171): 작업공간이 바뀌는 순간 기본 6종만 — 앞 사람 항목 남지 않음', SERVICES.length === BUILTIN_SERVICES.length && !SERVICES.some((x) => x.label === '세무기장'))
+  ensureCustomServiceCatalog('ws-pilot')
+  check('업무 항목: 같은 작업공간이면 다시 비우지 않는다', SERVICES.length === BUILTIN_SERVICES.length)
+  registerCustomServices([])
 }
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

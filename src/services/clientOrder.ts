@@ -5,7 +5,7 @@
  *   1. 법인번호가 있으면 법인
  *   2. 사업자등록번호 가운데 두 자리 — 81 · 82 · 84 · 85 · 86 · 87 · 88 은 법인, 01~79 · 90~99 는 개인(국세청 구분)
  *   3. 이름에 (주) · 주식회사 · ㈜ · (유) · 유한회사 · 합자 · 합명 · 회사법인 이 있으면 법인
- * 어느 것으로도 모르면 '구분 모름' — 맨 뒤에 따로 둔다(법인이라고 잘못 부르지 않게).
+ * D-171 대표: "주식회사라고 안 쓰여 있으면 개인사업자" — 위 셋에 걸리지 않으면 개인사업자. 묶음은 개인사업자 · 법인 둘뿐.
  */
 
 export type EntityKind = 'individual' | 'corporation' | 'unknown'
@@ -27,7 +27,7 @@ export function entityKindOf(c: OrderableClient): EntityKind {
     if ((mid >= 1 && mid <= 79) || (mid >= 90 && mid <= 99)) return 'individual'
   }
   if (CORP_NAME.test(c.companyName)) return 'corporation'
-  return 'unknown'
+  return 'individual'
 }
 
 const RANK: Record<EntityKind, number> = { individual: 0, corporation: 1, unknown: 2 }
@@ -38,7 +38,7 @@ function sortName(name: string): string {
   return name.replace(/^\s*(\(주\)|㈜|주식회사|\(유\)|유한회사)\s*/, '').trim()
 }
 
-/** 개인사업자 → 법인 → 구분 모름, 묶음 안에서는 가나다 순 */
+/** 개인사업자 → 법인, 묶음 안에서는 가나다 순 */
 export function orderForPicker<T extends OrderableClient>(list: readonly T[]): T[] {
   return [...list].sort(
     (a, b) => RANK[entityKindOf(a)] - RANK[entityKindOf(b)] || sortName(a.companyName).localeCompare(sortName(b.companyName), 'ko'),
@@ -48,7 +48,7 @@ export function orderForPicker<T extends OrderableClient>(list: readonly T[]): T
 /** 고르는 칸에 묶음 이름까지 붙여 — 빈 묶음은 뺀다 */
 export function pickerGroups<T extends OrderableClient>(list: readonly T[]): { kind: EntityKind; label: string; items: T[] }[] {
   const ordered = orderForPicker(list)
-  return (['individual', 'corporation', 'unknown'] as EntityKind[])
+  return (['individual', 'corporation'] as EntityKind[])
     .map((kind) => ({ kind, label: ENTITY_GROUP_LABEL[kind], items: ordered.filter((c) => entityKindOf(c) === kind) }))
     .filter((g) => g.items.length > 0)
 }

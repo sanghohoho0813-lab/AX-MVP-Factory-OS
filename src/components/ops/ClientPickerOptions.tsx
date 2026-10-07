@@ -1,5 +1,5 @@
 /**
- * 업체 고르는 칸의 <option> 들 (D-168) — 개인사업자 → 법인 → 구분 모름 묶음, 묶음 안 가나다 순.
+ * 업체 고르는 칸의 <option> 들 (D-168) — 개인사업자 → 법인 묶음, 묶음 안 가나다 순.
  * 묶음이 하나뿐이면 묶음 이름 없이 그대로 늘어놓는다.
  */
 import { pickerGroups, type OrderableClient } from '../../services/clientOrder'
