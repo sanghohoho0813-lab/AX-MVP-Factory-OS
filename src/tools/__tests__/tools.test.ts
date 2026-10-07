@@ -564,14 +564,14 @@ function check(name: string, cond: boolean, detail?: string): void {
 
 /* ---- 5. 도구 목록 ---- */
 {
-  check('도구목록: 쓸 수 있는 도구 6개 (세금·창업감면·크레탑·고용지원금·연구소·정책자금)', liveTools().length === 6, liveTools().map((t) => t.key).join())
-  check('도구목록: 검토중 0개 · 옮겨 감 1개(영업 도구 모음 → 영업 관리, D-118) · 자리만 1개', reviewTools().length === 0 && TOOLS.filter((t) => t.status === 'moved').length === 1 && plannedTools().length === 1)
+  check('도구목록: 쓸 수 있는 도구 7개 (세금·창업감면·크레탑·고용지원금·연구소·정책자금·기업인증 D-170)', liveTools().length === 7, liveTools().map((t) => t.key).join())
+  check('도구목록: 검토중 0개 · 옮겨 감 1개(영업 도구 모음 → 영업 관리, D-118) · 자리만 0개(기업인증이 들어왔다, D-170)', reviewTools().length === 0 && TOOLS.filter((t) => t.status === 'moved').length === 1 && plannedTools().length === 0)
   check('도구목록: 키가 겹치지 않는다', new Set(TOOLS.map((t) => t.key)).size === TOOLS.length)
   check('도구목록: 옮겨 온 것은 원본을 적는다', TOOLS.filter((t) => t.status !== 'planned').every((t) => !!t.origin))
   check('도구목록: toolOf 로 찾는다', toolOf('cretop')?.path === '/tools/cretop' && toolOf('nope') === undefined)
 
   // 검색 (D-89) — 대표는 도구 이름이 아니라 하고 싶은 일로 찾는다
-  check('도구검색: 빈 말이면 쓸 수 있는 것 + 검토중 (자리만 잡은 것 · 옮겨 간 것은 빼고)', searchTools('').length === 6 && searchTools('').every((t) => t.path !== null))
+  check('도구검색: 빈 말이면 쓸 수 있는 것 + 검토중 (자리만 잡은 것 · 옮겨 간 것은 빼고)', searchTools('').length === 7 && searchTools('').every((t) => t.path !== null))
   check('도구검색: 이름으로', searchTools('크레탑').map((t) => t.key).join() === 'cretop')
   check('도구검색: 이름에 없는 말로도 — 부채비율 → 크레탑', searchTools('부채비율').map((t) => t.key).join() === 'cretop')
   check('도구검색: 지원금 → 고용지원금', searchTools('장려금').map((t) => t.key).join() === 'employment')

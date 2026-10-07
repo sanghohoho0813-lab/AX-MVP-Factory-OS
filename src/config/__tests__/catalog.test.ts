@@ -163,7 +163,7 @@ const none = new Map<string, ModuleAccess>()
   const st = FEATURE_CATALOG.find((f) => f.key === 'consulting-studio')!
   check('업체로 열기: 업체 안 탭은 {client} 를 바꾼다', clientEntryHref(st, 'c1') === '/ops/clients/c1?tab=consulting')
   const cert = FEATURE_CATALOG.find((f) => f.key === 'cert-os')!
-  check('업체로 열기: 아직 없는 기능은 주소가 없다', clientEntryHref(cert, 'c1') === null)
+  check('업체로 열기: 기업인증(D-170) — 업체로 열면 ?client=', clientEntryHref(cert, 'c1') === '/tools/cert-os?client=c1', clientEntryHref(cert, 'c1'))
   const topics = FEATURE_CATALOG.filter((f) => f.clientEntry).map((f) => `${f.clientEntry!.topic}:${f.clientEntry!.verb}`)
   check('업체로 열기: 고용지원금 확인하기 · 정책자금 진단하기 · 절세 계산하기', topics.includes('고용지원금:확인하기') && topics.includes('정책자금:진단하기') && topics.includes('절세:계산하기'), topics.join())
 }

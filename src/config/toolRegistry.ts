@@ -285,11 +285,24 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     key: 'cert-os',
-    label: '기업인증 검토',
-    desc: '벤처 · 이노비즈 · 메인비즈 같은 기업인증의 준비 상태를 검토합니다 — 아직 없습니다. 들어오면 이 자리에 붙습니다.',
-    path: null,
+    label: '기업인증',
+    desc: '업체 하나를 열면 벤처 · 연구소 · 이노비즈 · 메인비즈 · ISO 가운데 무엇을 왜, 언제, 무엇을 준비해 할지 — 준비도 5단계와 근거 · 자가진단 · 실사 대비까지.',
+    navHint: '어떤 인증을 왜 · 언제 · 무엇을 준비해서',
+    path: '/tools/cert-os',
     icon: BadgeCheck,
-    status: 'planned',
+    status: 'live',
+    origin: 'MIRAE 기업인증 Core (src/certification)',
+    keywords: '기업인증 이노비즈 메인비즈 벤처 연구소 ISO 9001 14001 45001 자가진단 현장평가 실사 갱신',
+    requiredDocs: ['businessRegistration'],
+    recommendedDocs: ['financialStatements', 'smeCertificate'],
+    sections: [
+      { key: 'overview', label: '인증 한눈에', icon: LayoutDashboard, group: '한눈에', hint: '추천 인증 · 준비도 · 진행 순서' },
+      { key: 'innobiz', label: '이노비즈', icon: Target, group: '인증별', accent: 'customer', hint: '자격 → 자가진단 → 증빙 → 실사 대비' },
+      { key: 'mainbiz', label: '메인비즈', icon: TrendingUp, group: '인증별', accent: 'customer', hint: '자격 → 자가진단 → 증빙 → 실사 대비' },
+      { key: 'venture', label: '벤처기업', icon: Sparkles, group: '인증별', accent: 'customer', hint: '유형 판단 → 특허+벤처 화면으로' },
+      { key: 'lab', label: '기업부설연구소', icon: FlaskConical, group: '인증별', accent: 'customer', hint: '인력 기준 → 연구소 관리 화면으로' },
+      { key: 'iso', label: 'ISO', icon: ClipboardCheck, group: '인증별', accent: 'customer', hint: '어떤 ISO 를 검토할지 · 상담 요청' },
+    ],
   },
 ]
 

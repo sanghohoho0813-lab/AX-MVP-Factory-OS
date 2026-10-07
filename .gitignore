@@ -56,5 +56,6 @@ dist-qa*/
 .facts-out
 .taxplan-out
 .grants-out
+.cert-out
 .finance-out
 .cache/

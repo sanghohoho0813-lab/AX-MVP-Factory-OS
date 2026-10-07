@@ -234,7 +234,7 @@ check('modules: AX STUDIO 는 전문 모듈의 분야 한 줄(D-127) — 안의 
   check('도구함: 세금 계산기는 지금 쓸 수 있다', liveTools().some((t) => t.path === '/tools/tax'))
   check('도구함: 자리만 잡아 둔 것은 주소가 없다', plannedTools().every((t) => t.path === null))
   check('도구함: 자리만 잡아 둔 것은 그렇게 적는다', plannedTools().every((t) => t.desc.includes('아직 없습니다')))
-  check('도구함: 자리만 잡아 둔 것은 기업인증 검토 하나 (크레탑은 들어왔다)', plannedTools().map((t) => t.label).join() === '기업인증 검토')
+  check('도구함: 자리만 잡아 둔 것 없음 — 기업인증도 들어왔다(D-170)', plannedTools().length === 0)
   check('도구함: 옮겨 온 다섯 도구가 전부 쓸 수 있다', ['startup-tax', 'cretop', 'employment', 'labcare', 'policy-funding'].every((k) => liveTools().some((t) => t.key === k)))
   check('도구함: 영업 도구 모음은 영업 관리로 옮겨 감(D-118) — 검토중 도구 없음', reviewTools().length === 0 && TOOLS.find((t) => t.key === 'sales-kit')?.status === 'moved' && TOOLS.find((t) => t.key === 'sales-kit')?.movedTo?.path === '/sales/board')
   check('메뉴: 검토중 도구가 없으면 도입 검토중 줄도 없다', !MODULES.some((m) => m.key === 'tools-review' || m.path === REVIEW_HUB_PATH))

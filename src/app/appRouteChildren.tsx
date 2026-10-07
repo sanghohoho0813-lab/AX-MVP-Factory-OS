@@ -64,6 +64,7 @@ const StartupTaxPage = lazy(() => import('../tools/startupTax/StartupTaxPage').t
 const CretopPage = lazy(() => import('../tools/cretop/CretopPage').then((m) => ({ default: m.CretopPage })))
 const EmploymentPage = lazy(() => import('../tools/employment/EmploymentPage').then((m) => ({ default: m.EmploymentPage })))
 const LabcarePage = lazy(() => import('../tools/labcare/LabcarePage').then((m) => ({ default: m.LabcarePage })))
+const CertPage = lazy(() => import('../certification/ui/CertPage'))
 const PolicyFundingPage = lazy(() => import('../tools/policyFunding/PolicyFundingPage').then((m) => ({ default: m.PolicyFundingPage })))
 const SalesKitPage = lazy(() => import('../tools/salesKit/SalesKitPage').then((m) => ({ default: m.SalesKitPage })))
 const TodayCommandCenterPage = lazy(() => import('../pages/TodayCommandCenterPage').then((m) => ({ default: m.TodayCommandCenterPage })))
@@ -440,6 +441,7 @@ export const appRouteChildren = [
       ...moduleRoutes('cretop', <CretopPage />),
       ...moduleRoutes('employment', <EmploymentPage />),
       ...moduleRoutes('labcare', <LabcarePage />),
+      ...moduleRoutes('cert-os', <CertPage />),
       ...moduleRoutes('policy-funding', <PolicyFundingPage />),
       ...moduleRoutes('sales-kit', <SalesKitPage />),
       { path: 'why', element: <WhyAxPage /> },

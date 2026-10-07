@@ -14,6 +14,7 @@ import type { ClientOpsRecord } from '../types/clientOps'
 import { clientFacts, type ClientFacts } from '../tools/shared/clientPrefill'
 import { usableFactValue } from './customerFacts'
 import { latestToolResult } from './toolResultGroups'
+import { certInsightOf } from '../certification/integration/certInsight'
 import { matchesFor, type GrantNotice } from './grants/grantMatch'
 import { profileOfRecord, missingForMatch } from './grants/grantProfile'
 import { runDiagnosis } from '../tools/policyFunding/diagnosis'
@@ -218,12 +219,19 @@ const taxInsight: Provider = ({ record }) => {
  * 맞춤 추천에 들어오는 모듈 — 위에서부터. 새 모듈을 들이면 판정 함수를 여기에 더한다.
  * (요금제에 없는 모듈은 화면이 뺀다 — 키가 기능 권한 키와 같다)
  */
+// D-170: 기업인증 — 기업인증 Core 판정 그대로(업체 사정 칩은 화면에서 더 정확해진다)
+const certInsight: Provider = ({ record, today }) => {
+  const c = certInsightOf(record, today)
+  return { key: 'cert-os', label: '기업인증', tone: c.tone, headline: c.headline, detail: c.detail, missing: c.missing, openPath: `/tools/cert-os${q(record)}`, openLabel: '인증 한눈에', action: null }
+}
+
 export const INSIGHT_PROVIDERS: { key: string; run: Provider }[] = [
   { key: 'grants', run: grantsInsight },
   { key: 'policy-funding', run: policyInsight },
   { key: 'employment', run: employmentInsight },
   { key: 'startup-tax', run: startupInsight },
   { key: 'labcare', run: labInsight },
+  { key: 'cert-os', run: certInsight },
   { key: 'cretop', run: cretopInsight },
   { key: 'tax', run: taxInsight },
 ]
