@@ -221,10 +221,12 @@ try {
   sql(`insert into public.module_data (id, workspace_id, module_key, bucket, client_id, payload) values ('qa-lab-orig', '${OWNER_WS}', 'labcare', 'orig', null, '{"key":"pmsaas:clients:v1","value":[{"id":"${OWNER_CLIENT}","labType":"기업부설연구소","labName":"대표비밀연구소","certifiedDate":"2024-05-10","labRegistrationNumber":"2024-777","researcherCount":4}]}'::jsonb) on conflict (id) do nothing`)
   await go(page, `/tools/cert-os?client=${OWNER_CLIENT}`)
   await page.waitForTimeout(900)
-  check('클라우드(P1): 연구소 관리 기록 → 기업인증 연구소 보유(다시 묻지 않음)', (await page.locator('[data-testid="cert-card"][data-key="lab"] [data-testid="cert-rec"]').getAttribute('data-rec').catch(() => '')) === 'held')
+  check('클라우드(P1): 연구소 관리 기록 → 기업인증 연구소 보유(다시 묻지 않음)', (await page.locator('[data-testid="cert-hero"][data-key="lab"] [data-testid="cert-rec"], [data-testid="cert-row"][data-key="lab"] [data-testid="cert-rec"]').first().getAttribute('data-rec').catch(() => '')) === 'held')
   await go(page, `/tools/cert-os/innobiz?client=${OWNER_CLIENT}`)
   await page.waitForTimeout(700)
   await page.getByTestId('cert-step-2').click()
+  // AX: 진행 기록은 접혀 있다(준비 중) — 펼치고 상태를 바꾼다
+  if (!(await page.getByTestId('cert-life-box').evaluate((e) => e.open))) await page.getByTestId('cert-life-box').locator('summary').first().click()
   await page.getByTestId('cert-life-applied').click()
   await page.waitForTimeout(1200)
   check('클라우드(P1): 진행 상태 → module_data(cert-os/life) 대표 작업공간에 저장', sql(`select count(*) from public.module_data where workspace_id = '${OWNER_WS}' and module_key = 'cert-os' and bucket = 'life' and client_id = '${OWNER_CLIENT}'`) === '1')
