@@ -52,6 +52,20 @@ export type CompanySize = 'small' | 'medium' | 'mid_large' | 'large'
 
 export type ResearchUnit = 'lab' | 'dept' | 'none'
 
+/**
+ * 연구개발비 범위(AX) — 칩으로 고른 범위는 대표 금액(3천만 · 7천만 …)으로 바꾸지 않는다.
+ * 첫 추천과 질문 순서에만 쓰고, 벤처 공식 판단(5천만원 이상 · 매출 대비 비율)은 정확한 금액이 있어야 한다.
+ */
+export type RndRange = 'none' | 'under_50m' | '50m_100m' | 'over_100m' | 'unknown'
+
+export const RND_RANGE_LABEL: Record<RndRange, string> = {
+  none: '없음',
+  under_50m: '5천만원 미만',
+  '50m_100m': '5천만~1억원',
+  over_100m: '1억원 이상',
+  unknown: '모름',
+}
+
 /** 업체가 가진 인증 하나 */
 export interface HeldCertification {
   key: CertificationKey
@@ -83,7 +97,7 @@ export interface CertificationClientContext {
   months: number | null
   industryText: string
   /** 제조 · 건설 · SW · 바이오 · 서비스 … 대분류(모르면 '') */
-  industryGroup: 'manufacturing' | 'construction' | 'software' | 'bio' | 'environment' | 'design' | 'service' | 'retail' | 'food' | 'other' | ''
+  industryGroup: 'manufacturing' | 'construction' | 'agriculture' | 'software' | 'bio' | 'environment' | 'design' | 'service' | 'retail' | 'food' | 'other' | ''
   employees: number | null
   size: CompanySize | null
   /** 원 */
@@ -92,8 +106,16 @@ export interface CertificationClientContext {
   netIncome: number | null
   totalAssets: number | null
   totalLiabilities: number | null
-  /** 직전 연도 연구개발비(원) */
+  /** 직전 연도 연구개발비(원) — 정확한 금액만(범위 칩은 넣지 않는다) */
   rndExpense: number | null
+  /** AX: 연구개발비 범위(정확한 금액을 모를 때) */
+  rndRange?: RndRange | null
+  /** AX: 한국표준산업분류(KSIC) 코드 숫자(2~5자리) — 확인된 것만. 없으면 세부 업종 판정은 '확인 필요' */
+  ksic?: string | null
+  /** AX: 중소기업확인서(유효)가 서류함 · 인증서 칸에 있다 */
+  smeDoc?: boolean
+  /** AX: 기존 입력값과 확인된 정보가 달라 확인된 정보를 쓴 것(화면 안내) */
+  conflicts?: string[]
   researchUnit: ResearchUnit | null
   /** 연구전담요원 수 */
   researchers: number | null

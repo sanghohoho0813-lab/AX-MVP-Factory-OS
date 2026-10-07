@@ -2,12 +2,14 @@
  * 인증별 판정 (D-170) — 업체 사정(CertificationClientContext) → 준비도 5단계 · 추천 · 한 줄 이유 · 근거 · 모자란 것 · 혜택 · 타이밍 · 다음 행동.
  * 기준 숫자는 rules/officialRules.ts 에서만 읽는다. 모르는 값은 '?' 로 두고 추측하지 않는다.
  */
-import { CERT_RULES, INNOBIZ_INDUSTRY_OK, LAB_RESEARCHERS, MAINBIZ_EXCLUDED_WORDS, VENTURE_RND, ventureRndRatio, type CertRule } from '../rules/officialRules'
+import { CERT_RULES, LAB_RESEARCHERS, VENTURE_RND, ventureRndRatio, type CertRule } from '../rules/officialRules'
+import { innobizIndustry, mainbizIndustry } from '../rules/industryMap'
 import { renewalPlan, RENEWAL_PHASE_LABEL } from './renewal'
 import { pickBenefits } from './benefits'
 import { readinessOf, reasonsOf, type Check } from './readiness'
 import { assessIso } from '../iso/isoAdvice'
-import type { CertificationAssessment, CertificationClientContext, CertificationKey, NextAction, Readiness, Recommendation } from './types'
+import { rndNeedsExact, rndPositive, rndText } from './rnd'
+import { RND_RANGE_LABEL, type CertificationAssessment, type CertificationClientContext, type CertificationKey, type NextAction, type Readiness, type Recommendation } from './types'
 
 const DAY = 86_400_000
 
@@ -80,11 +82,16 @@ function evidenceSplit(rule: CertRule, c: CertificationClientContext) {
   return { have, missing }
 }
 
+/**
+ * AX: 중소기업 여부 — 직원 수 · 매출만으로는 '충족' 으로 확정하지 않는다(독립성 · 관계기업 · 업종별 매출 기준은 확인서로만 알 수 있다).
+ * 중소기업확인서(서류함 · 인증서 칸) 또는 확인서를 보고 고른 규모가 있어야 ✓.
+ */
 function smeCheck(c: CertificationClientContext): Check {
-  if (c.size === 'small' || c.size === 'medium') return { weight: 'must', state: 'ok', text: '중소기업' }
   if (c.size === 'mid_large' || c.size === 'large') return { weight: 'must', state: 'no', text: '중소기업이 아님(중견 · 대기업)' }
-  if (c.employees !== null && c.employees < 50 && (c.revenue === null || c.revenue < 40_000_000_000)) return { weight: 'must', state: 'ok', text: `직원 ${c.employees}명 — 중소기업으로 보임(중소기업확인서로 확인)` }
-  return { weight: 'must', state: 'unknown', text: '중소기업 여부 — 중소기업확인서 필요' }
+  if (c.smeDoc) return { weight: 'must', state: 'ok', text: '중소기업(중소기업확인서 있음)' }
+  if (c.size === 'small' || c.size === 'medium') return { weight: 'must', state: 'ok', text: `${c.size === 'small' ? '소기업' : '중기업'}(중소기업확인서 기준으로 확인함)` }
+  const hint = c.employees !== null && c.employees < 50 && (c.revenue === null || c.revenue < 40_000_000_000) ? ` — 직원 ${c.employees}명으로 중소기업으로 보이지만 확정 아님` : ''
+  return { weight: 'must', state: 'unknown', text: `중소기업 여부 · 확인 필요${hint}(중소기업확인서로 확인)` }
 }
 
 function yearsCheck(c: CertificationClientContext, need: number): Check {
@@ -189,7 +196,7 @@ function heldAssessment(rule: CertRule, c: CertificationClientContext): Certific
 function techSignals(c: CertificationClientContext) {
   const lab = c.researchUnit === 'lab' || c.researchUnit === 'dept'
   const patents = (c.patents ?? 0) > 0
-  const rnd = (c.rndExpense ?? 0) > 0 || c.rndPlan === true
+  const rnd = rndPositive(c) === true || c.rndPlan === true
   return { lab, patents, rnd, count: [lab, patents, rnd].filter(Boolean).length }
 }
 
@@ -198,21 +205,16 @@ export function assessInnobiz(c: CertificationClientContext): CertificationAsses
   if (liveHeld(c, 'innobiz')) return heldAssessment(rule, c)
   const t = techSignals(c)
   const checks: Check[] = [smeCheck(c), yearsCheck(c, 3), exclusionCheck(c)]
-  const g = c.industryGroup
-  checks.push(
-    g === ''
-      ? { weight: 'core', state: 'unknown', text: '업종 — 확인 필요' }
-      : (INNOBIZ_INDUSTRY_OK as readonly string[]).includes(g)
-        ? { weight: 'core', state: 'ok', text: '신청 가능한 업종' }
-        : { weight: 'core', state: 'warn', text: '업종이 기술혁신형과 거리가 있음 — 메인비즈 검토' },
-  )
+  // AX: 이노비즈는 제조 · 건설 · 농업 · 비제조업 · SW · 바이오 · 환경 · 전문디자인 8가지 평가표 — 도소매 · 서비스도 '비제조업' 으로 신청 가능.
+  //     떨어뜨리는 것은 별표2 제외 업종(KSIC 코드 확인)뿐. KSIC 가 없으면 '세부 업종 확인 필요'(준비도에 넣지 않음).
+  checks.push(innobizIndustry(c.ksic, c.industryGroup, c.industryText))
   checks.push(c.researchUnit === null ? { weight: 'core', state: 'unknown', text: '연구조직(연구소 · 전담부서) — 확인 필요' } : t.lab ? { weight: 'core', state: 'ok', text: c.researchUnit === 'lab' ? '기업부설연구소 보유' : '연구개발전담부서 보유' } : { weight: 'core', state: 'warn', text: '연구조직 없음 — 연구소 · 전담부서가 있으면 크게 유리' })
   checks.push(c.patents === null ? { weight: 'core', state: 'unknown', text: '특허 · 지식재산 — 확인 필요' } : c.patents > 0 ? { weight: 'core', state: 'ok', text: `특허 ${c.patents}건 보유` } : { weight: 'core', state: 'warn', text: '특허 없음 — 기술 성과 증빙 보강 필요' })
-  checks.push(c.rndExpense === null && c.rndPlan === null ? { weight: 'core', state: 'unknown', text: '연구개발 활동 · 비용 — 확인 필요' } : t.rnd ? { weight: 'core', state: 'ok', text: c.rndExpense ? `연구개발비 ${won(c.rndExpense)}` : '연구개발 계획 있음' } : { weight: 'core', state: 'warn', text: '연구개발 활동 기록이 약함' })
+  checks.push(rndPositive(c) === null && c.rndPlan === null ? { weight: 'core', state: 'unknown', text: '연구개발 활동 · 비용 — 확인 필요' } : t.rnd ? { weight: 'core', state: 'ok', text: rndPositive(c) ? `연구개발비 ${rndText(c)}` : '연구개발 계획 있음' } : { weight: 'core', state: 'warn', text: '연구개발 활동 기록이 약함' })
   checks.push(c.revenue === null ? { weight: 'core', state: 'unknown', text: '매출 · 재무 — 재무제표 필요' } : c.operatingProfit !== null && c.operatingProfit < 0 ? { weight: 'core', state: 'warn', text: '영업손실 — 재무 지표 보강 필요' } : { weight: 'core', state: 'ok', text: `매출 ${won(c.revenue)}` })
 
   // FV: 기술 근거 3가지(연구조직 · 특허 · 연구개발)가 없으면 '낮음', 하나뿐이면 '보통' 까지만
-  const techKnown = c.researchUnit !== null && c.patents !== null && (c.rndExpense !== null || c.rndPlan !== null)
+  const techKnown = c.researchUnit !== null && c.patents !== null && (rndPositive(c) !== null || c.rndPlan !== null)
   const rawReadiness = readinessOf(checks)
   const readiness = techKnown && t.count === 0 ? capReadiness(rawReadiness, 'low') : t.count === 1 ? capReadiness(rawReadiness, 'medium') : rawReadiness
   const missingFacts = checks.filter((x) => x.state === 'unknown').map((x) => x.text.split(' — ')[0])
@@ -271,7 +273,8 @@ export function assessMainbiz(c: CertificationClientContext, innobiz?: Certifica
   const rule = CERT_RULES.mainbiz
   if (liveHeld(c, 'mainbiz')) return heldAssessment(rule, c)
   const checks: Check[] = [smeCheck(c), yearsCheck(c, 3), exclusionCheck(c)]
-  checks.push(MAINBIZ_EXCLUDED_WORDS.test(c.industryText) ? { weight: 'must', state: 'no', text: '제외 업종(게임 · 사행성 · 불건전 소비)' } : c.industryText ? { weight: 'must', state: 'ok', text: '제외 업종 아님' } : { weight: 'must', state: 'unknown', text: '업종 — 확인 필요' })
+  // AX: 낱말로 떨어뜨리지 않는다 — 제외는 KSIC 코드가 확인될 때만, 낱말은 '세부 업종 확인 필요' 신호
+  checks.push(mainbizIndustry(c.ksic, c.industryText))
   if (c.totalAssets !== null && c.totalLiabilities !== null) {
     const equity = c.totalAssets - c.totalLiabilities
     if (equity <= 0) checks.push({ weight: 'must', state: 'no', text: '완전자본잠식 — 신청 제외' })
@@ -344,20 +347,27 @@ export function assessVenture(c: CertificationClientContext): CertificationAsses
   const lab = c.researchUnit === 'lab' || c.researchUnit === 'dept'
   const checks: Check[] = []
   checks.push(c.researchUnit === null ? { weight: 'core', state: 'unknown', text: '연구조직 — 확인 필요' } : lab ? { weight: 'core', state: 'ok', text: '연구조직 보유 — 연구개발유형 가능성' } : { weight: 'core', state: 'warn', text: '연구조직 없음 — 연구개발유형은 연구소 · 전담부서 필요' })
-  if (c.rndExpense === null) checks.push({ weight: 'core', state: 'unknown', text: `연구개발비 — ${won(VENTURE_RND.minExpenseWon)} 이상인지 확인 필요` })
-  else checks.push(c.rndExpense >= VENTURE_RND.minExpenseWon ? { weight: 'core', state: 'ok', text: `연구개발비 ${won(c.rndExpense)}(${won(VENTURE_RND.minExpenseWon)} 이상)` } : { weight: 'core', state: 'warn', text: `연구개발비 ${won(c.rndExpense)} — ${won(VENTURE_RND.minExpenseWon)} 미만` })
+  // AX: 공식 판단(5천만원 이상 · 매출 대비 비율)은 정확한 금액으로만 — 고른 범위는 '정확한 연구개발비 확인 필요'
+  const min = won(VENTURE_RND.minExpenseWon)
+  if (c.rndExpense !== null) checks.push(c.rndExpense >= VENTURE_RND.minExpenseWon ? { weight: 'core', state: 'ok', text: `연구개발비 ${won(c.rndExpense)}(${min} 이상)` } : { weight: 'core', state: 'warn', text: `연구개발비 ${won(c.rndExpense)} — ${min} 미만` })
+  else if (c.rndRange === 'none' || c.rndRange === 'under_50m') checks.push({ weight: 'core', state: 'warn', text: `연구개발비 ${rndText(c)} — ${min} 미만이면 연구개발유형 기준 미달` })
+  else if (rndNeedsExact(c)) checks.push({ weight: 'core', state: 'unknown', text: `정확한 연구개발비 확인 필요 — 고른 범위(${RND_RANGE_LABEL[c.rndRange!]})로는 공식 판단 불가(${min} 이상 · 매출 대비 비율)` })
+  else checks.push({ weight: 'core', state: 'unknown', text: `연구개발비 — ${min} 이상인지 확인 필요` })
   const young = c.years !== null && c.years < 3
-  if (c.rndExpense !== null && c.revenue !== null && c.revenue > 0 && !young) {
+  if (young) checks.push({ weight: 'core', state: 'ok', text: '창업 3년 미만 — 매출 대비 비율 미적용(법 제2조의2 단서 · 5천만원 이상은 그대로)' })
+  else if (c.rndExpense !== null && c.revenue !== null && c.revenue > 0) {
     const r = c.rndExpense / c.revenue
-    // 확인요령 별표1 — 업종 · 매출 구간별 비율(업종은 대분류로 가장 가까운 줄)
-    const need = ventureRndRatio(c.industryGroup, c.revenue)
     const pct = (x: number) => `${Math.round(x * 1000) / 10}%`
-    checks.push(r >= need.ratio ? { weight: 'core', state: 'ok', text: `매출 대비 연구개발비 ${pct(r)}(기준 ${pct(need.ratio)} 이상 · 별표1 '${need.row.split('(')[0]}' — 세부 업종 확인)` } : { weight: 'core', state: 'warn', text: `매출 대비 연구개발비 ${pct(r)} — 기준 ${pct(need.ratio)} 미만(별표1 '${need.row.split('(')[0]}')` })
-  } else if (young) checks.push({ weight: 'core', state: 'ok', text: '창업 3년 미만 — 매출 대비 비율 미적용' })
+    // 확인요령 별표1 — 세부 업종(KSIC) · 매출 구간별 비율. 세부 업종을 모르면 비율을 고르지 않는다
+    const need = ventureRndRatio(c.ksic, c.revenue)
+    if (!need) checks.push({ weight: 'core', state: 'unknown', text: `세부 업종 확인 필요 — 매출 대비 연구개발비 ${pct(r)} · 기준 비율은 세부 업종(KSIC)과 매출 구간으로 정해짐(5~10%)` })
+    else checks.push(r >= need.ratio ? { weight: 'core', state: 'ok', text: `매출 대비 연구개발비 ${pct(r)}(기준 ${pct(need.ratio)} 이상 · 별표1 '${need.row}')` } : { weight: 'core', state: 'warn', text: `매출 대비 연구개발비 ${pct(r)} — 기준 ${pct(need.ratio)} 미만(별표1 '${need.row}')` })
+  }
   checks.push(c.patents === null ? { weight: 'core', state: 'unknown', text: '특허 — 확인 필요' } : c.patents > 0 ? { weight: 'core', state: 'ok', text: `특허 ${c.patents}건 — 혁신성 증빙` } : { weight: 'core', state: 'warn', text: '특허 없음 — 혁신성장유형은 사업계획 · 기술성으로 평가' })
   const readiness = readinessOf(checks)
   const missingFacts = checks.filter((x) => x.state === 'unknown').map((x) => x.text.split(' — ')[0])
   const rndType = lab && (c.rndExpense ?? 0) >= VENTURE_RND.minExpenseWon
+  const rndMaybe = lab && rndNeedsExact(c)
   let rec: Recommendation
   let oneLine: string
   let timing: string
@@ -369,11 +379,15 @@ export function assessVenture(c: CertificationClientContext): CertificationAsses
     rec = 'now'
     oneLine = '연구개발유형 요건에 가까움 — 연구소 · 연구개발비 증빙으로'
     timing = c.policyFundPlan ? '정책자금 신청 전에 준비 추천' : '지금 진행 추천'
+  } else if (rndMaybe) {
+    rec = 'possible'
+    oneLine = '연구개발유형 가능성 — 정확한 연구개발비 확인 필요'
+    timing = '재무제표로 정확한 연구개발비를 확인한 뒤'
   } else if ((c.patents ?? 0) > 0 || c.rndPlan) {
     rec = 'possible'
     oneLine = '혁신성장유형 검토 추천 — 기술성 · 성장성 평가'
     timing = '사업계획서를 갖추고 검토'
-  } else if (!lab && c.rndPlan === false && (c.rndExpense ?? 0) === 0) {
+  } else if (!lab && c.rndPlan === false && rndPositive(c) !== true) {
     // FV: 연구개발 계획도 특허도 없으면 연구소를 만들라고 밀지 않는다
     rec = 'low_priority'
     oneLine = '연구개발 · 특허 · 혁신 제품 계획이 생기면 검토 — 지금은 우선순위 낮음'
@@ -415,12 +429,12 @@ export function assessLab(c: CertificationClientContext): CertificationAssessmen
   else if (c.researchers >= LAB_RESEARCHERS.dept) checks.push({ weight: 'core', state: 'warn', text: `연구전담요원 ${c.researchers}명 — 연구소 기준(${need ?? '?'}명) 미만, 전담부서는 가능` })
   else checks.push({ weight: 'must', state: 'no', text: '연구전담요원 없음 — 최소 1명(전담부서)' })
   checks.push({ weight: 'core', state: 'unknown', text: '독립된 연구공간 — 현장 확인 필요' })
-  checks.push(c.rndExpense !== null && c.rndExpense > 0 ? { weight: 'core', state: 'ok', text: '연구개발 활동 · 비용 있음' } : c.rndPlan ? { weight: 'core', state: 'ok', text: '연구개발 계획 있음' } : { weight: 'core', state: 'unknown', text: '연구개발 활동 — 확인 필요' })
+  checks.push(rndPositive(c) === true ? { weight: 'core', state: 'ok', text: '연구개발 활동 · 비용 있음' } : c.rndPlan ? { weight: 'core', state: 'ok', text: '연구개발 계획 있음' } : { weight: 'core', state: 'unknown', text: '연구개발 활동 — 확인 필요' })
   const readiness = readinessOf(checks)
   const missingFacts = checks.filter((x) => x.state === 'unknown').map((x) => x.text.split(' — ')[0])
   const deptOnly = c.researchers !== null && need !== null && c.researchers < need && c.researchers >= 1
   // FV: 연구 인력도 연구개발 계획도 없으면 '보완 후 추천' 이 아니라 '지금은 필요 없음'(연구소를 위해 연구소를 만들지 않는다)
-  const noRnd = c.researchers === 0 && c.rndPlan === false && (c.rndExpense ?? 0) === 0
+  const noRnd = c.researchers === 0 && c.rndPlan === false && rndPositive(c) !== true
   const rec: Recommendation = c.researchUnit === 'dept' ? 'possible' : noRnd ? 'not_needed' : readiness === 'very_low' ? 'after_fix' : deptOnly ? 'possible' : readiness === 'unknown' ? 'need_info' : 'now'
   const oneLine =
     c.researchUnit === 'dept' ? '전담부서 보유 — 인원이 늘면 연구소로 전환 검토' : noRnd ? '연구개발 계획이 생기면 검토 — 지금은 필요 없음' : deptOnly ? '연구개발전담부서부터 — 인원이 늘면 연구소로' : rec === 'need_info' ? '연구 인력 · 공간 조건 확인 필요' : rec === 'after_fix' ? '연구 인력을 먼저 갖춰야 함' : '연구 인력 조건 충족 — 공간 · 서류 준비'

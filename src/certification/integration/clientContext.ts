@@ -10,8 +10,9 @@ import { clientFacts } from '../../tools/shared/clientPrefill'
 import { FACT_SOURCE_LABEL, readFact, usableFactValue } from '../../services/customerFacts'
 import { allDocumentMetas } from '../../services/clientOpsDocuments'
 import { documentStatus } from '../../services/clientOpsAlerts'
-import type { BasisField, BasisItem, CertificationClientContext, CertificationKey, CompanySize, EvidenceDoc, HeldCertification, ResearchUnit } from '../core/types'
+import { RND_RANGE_LABEL, type BasisField, type BasisItem, type CertificationClientContext, type CertificationKey, type CompanySize, type EvidenceDoc, type HeldCertification, type ResearchUnit, type RndRange } from '../core/types'
 import { BASIS_LABEL } from '../core/basis'
+import { parseKsic } from '../rules/industryMap'
 import type { CertLifecycle } from '../core/lifecycle'
 import type { LabcareFacts } from './labcareAdapter'
 import { CERT_RULES } from '../rules/officialRules'
@@ -23,8 +24,12 @@ export interface CertProfile {
   exportPlan: boolean | null
   policyFundPlan: boolean | null
   rndPlan: boolean | null
-  /** 연구개발비(만원) */
-  rndExpenseMan: number | null
+  /** AX: 연구개발비 범위(칩) — 대표 금액으로 바꾸지 않는다 */
+  rndRange: RndRange | null
+  /** AX: 정확한 연구개발비(만원) — 재무제표 · 대표 확인으로 직접 적은 것만 */
+  rndExactMan: number | null
+  /** AX: 업종코드(KSIC 숫자 2~5자리) — 직접 적은 것 */
+  ksic: string | null
   researchers: number | null
   researchUnit: ResearchUnit | null
   patents: number | null
@@ -39,12 +44,24 @@ export const EMPTY_CERT_PROFILE: CertProfile = {
   exportPlan: null,
   policyFundPlan: null,
   rndPlan: null,
-  rndExpenseMan: null,
+  rndRange: null,
+  rndExactMan: null,
+  ksic: null,
   researchers: null,
   researchUnit: null,
   patents: null,
   size: null,
   exclusion: null,
+}
+
+const RANGES: readonly RndRange[] = ['none', 'under_50m', '50m_100m', 'over_100m', 'unknown']
+
+/** AX: 예전 칩(rndExpenseMan 0 · 3000 · 7000 · 15000 만원 — 범위의 '대표 금액')은 범위로만 옮긴다(정확한 금액이 아니었다) */
+function rangeOf(r: Record<string, unknown>): RndRange | null {
+  if (typeof r.rndRange === 'string' && (RANGES as readonly string[]).includes(r.rndRange)) return r.rndRange as RndRange
+  const old = r.rndExpenseMan
+  if (typeof old !== 'number' || !Number.isFinite(old) || old < 0) return null
+  return old === 0 ? 'none' : old < 5000 ? 'under_50m' : old < 10000 ? '50m_100m' : 'over_100m'
 }
 
 export function normalizeCertProfile(raw: unknown): CertProfile {
@@ -57,7 +74,9 @@ export function normalizeCertProfile(raw: unknown): CertProfile {
     exportPlan: b(r.exportPlan),
     policyFundPlan: b(r.policyFundPlan),
     rndPlan: b(r.rndPlan),
-    rndExpenseMan: n(r.rndExpenseMan),
+    rndRange: rangeOf(r),
+    rndExactMan: n(r.rndExactMan),
+    ksic: typeof r.ksic === 'string' && /^\d{2,5}$/.test(r.ksic) ? r.ksic : null,
     researchers: n(r.researchers),
     researchUnit: r.researchUnit === 'lab' || r.researchUnit === 'dept' || r.researchUnit === 'none' ? r.researchUnit : null,
     patents: n(r.patents),
@@ -188,6 +207,7 @@ export function industryGroupOf(text: string): CertificationClientContext['indus
   const t = text.replace(/\s+/g, '')
   if (!t) return ''
   if (/소프트웨어|SW|정보통신|IT|플랫폼|앱|시스템통합|데이터/i.test(t)) return 'software'
+  if (/농업|영농|재배|축산|원예|작물|농산물생산/.test(t)) return 'agriculture'
   if (/바이오|의약|제약|의료기기/.test(t)) return 'bio'
   if (/환경|폐기물|재활용|수처리/.test(t)) return 'environment'
   if (/디자인/.test(t)) return 'design'
@@ -221,6 +241,96 @@ function heldFromLives(lives: readonly CertLifecycle[]): HeldCertification[] {
     .map((l) => ({ key: l.cert, validUntil: l.validUntil, note: [l.number && `번호 ${l.number}`, l.certifiedAt && `인증일 ${l.certifiedAt}`].filter(Boolean).join(' · ') }))
 }
 
+const UNIT_LABEL: Record<ResearchUnit, string> = { lab: '기업부설연구소', dept: '연구개발전담부서', none: '없음' }
+const unitOfText = (t: string): ResearchUnit | null => (/기업부설연구소|연구소/.test(t) && !/없음|없다|미보유/.test(t) ? 'lab' : /전담부서/.test(t) ? 'dept' : /없음|없다|미보유/.test(t) ? 'none' : null)
+/** 서류 · 인증서에서 온 사실(1순위) — 직접 적음 · 상담 메모는 '사람이 확인한 사실'(3순위) */
+const DOC_SOURCES = new Set(['businessRegistration', 'corporateRegistry', 'cretop', 'financialStatements', 'payrollRoster', 'certificate'])
+export const CONFLICT_LINE = '기존 입력값과 현재 확인된 정보가 달라 최신 확인정보를 사용합니다.'
+
+/**
+ * AX 사실 우선순위(SSOT) — 공식 서류 사실 > 전문 모듈 기록(연구소 관리 · 특허 · 인증 완료) > 사람이 확인한 사실 > 컨설턴트 칩 > 추정.
+ * 확인된 값이 있으면 칩이 이기지 못한다. 서로 다르면 conflicts 에 남겨 화면이 알려 준다.
+ */
+interface Resolved<T> {
+  value: T | null
+  item: BasisItem | null
+  conflict?: string
+}
+
+function resolveUnit(record: ClientOpsRecord, p: CertProfile, extra: CertExtra, held: HeldCertification[]): Resolved<ResearchUnit> {
+  const fact = readFact(record, 'researchLab')
+  const factUnit = fact && fact.status === 'confirmed' ? unitOfText(fact.value) : null
+  const factItem2 = factUnit ? factItem(record, 'researchLab', 'researchUnit', UNIT_LABEL[factUnit]) : null
+  const credLab = held.some((h) => h.key === 'lab' && !/연구소 관리 기록/.test(h.note))
+  const credentialText = (record.customFields ?? []).filter((f) => f.group === 'credential').map((f) => f.label).join(' ')
+  const credUnit: ResearchUnit | null = credLab || /기업부설연구소/.test(credentialText) ? 'lab' : /전담부서/.test(credentialText) ? 'dept' : null
+  const ranked: Resolved<ResearchUnit>[] = []
+  if (factUnit && fact && DOC_SOURCES.has(fact.source ?? '')) ranked.push({ value: factUnit, item: factItem2 })
+  if (credUnit) ranked.push({ value: credUnit, item: { field: 'researchUnit', label: BASIS_LABEL.researchUnit, value: UNIT_LABEL[credUnit], state: 'confirmed', from: '회사 정보 인증서 칸' } })
+  if (extra.lab) ranked.push({ value: extra.lab.unit, item: { field: 'researchUnit', label: BASIS_LABEL.researchUnit, value: UNIT_LABEL[extra.lab.unit], state: 'confirmed', from: `연구소 관리 기록(인정 ${extra.lab.recognizedAt})` } })
+  if (factUnit) ranked.push({ value: factUnit, item: factItem2 })
+  const top = ranked[0]
+  if (top) {
+    if (p.researchUnit && p.researchUnit !== top.value) return { ...top, conflict: `연구조직 — 고른 값 '${UNIT_LABEL[p.researchUnit]}' 대신 ${top.item?.from ?? '확인된 정보'} '${UNIT_LABEL[top.value!]}'` }
+    return top
+  }
+  if (p.researchUnit) return { value: p.researchUnit, item: chip('researchUnit', UNIT_LABEL[p.researchUnit]) }
+  const guess = researchUnitOf(record, held)
+  return { value: guess, item: guess ? (factItem(record, 'researchLab', 'researchUnit') ?? null) : null }
+}
+
+function resolveResearchers(p: CertProfile, extra: CertExtra): Resolved<number> {
+  if (extra.lab?.researchers) {
+    const item: BasisItem = { field: 'researchers', label: BASIS_LABEL.researchers, value: `${extra.lab.researchers}명`, state: 'confirmed', from: '연구소 관리 기록' }
+    if (p.researchers !== null && p.researchers !== extra.lab.researchers) return { value: extra.lab.researchers, item, conflict: `연구전담요원 — 고른 값 ${p.researchers}명 대신 연구소 관리 기록 ${extra.lab.researchers}명` }
+    return { value: extra.lab.researchers, item }
+  }
+  return p.researchers !== null ? { value: p.researchers, item: chip('researchers', `${p.researchers}명`) } : { value: null, item: null }
+}
+
+function resolvePatents(record: ClientOpsRecord, p: CertProfile): Resolved<number> {
+  const fact = readFact(record, 'patents')
+  const credCount = (record.customFields ?? []).filter((x) => x.group === 'credential' && /특허/.test(x.label)).length
+  if (fact && fact.status === 'confirmed') {
+    const n = patentsOf(record)
+    const item = factItem(record, 'patents', 'patents')
+    if (p.patents !== null && n !== null && p.patents !== n && factPatchValue('patents', p) !== fact.value) return { value: n, item, conflict: `특허 — 고른 값 ${factPatchValue('patents', p)} 대신 회사 정보(확인) ${fact.display}` }
+    return { value: n, item }
+  }
+  // 인증서 칸 특허증 수는 '적어도' 그만큼 — 칩이 더 많으면 칩(올리지 않은 특허가 있을 수 있음), 더 적으면 확인된 쪽
+  if (credCount > 0) {
+    const item: BasisItem = { field: 'patents', label: BASIS_LABEL.patents, value: `${credCount}건`, state: 'confirmed', from: '회사 정보 인증서 칸(특허증)' }
+    if (p.patents !== null && p.patents >= credCount) return { value: p.patents, item: chip('patents', factPatchValue('patents', p)) }
+    if (p.patents !== null) return { value: credCount, item, conflict: `특허 — 고른 값 ${factPatchValue('patents', p)} 대신 인증서 칸 특허증 ${credCount}건` }
+    return { value: credCount, item }
+  }
+  if (p.patents !== null) return { value: p.patents, item: chip('patents', factPatchValue('patents', p)) }
+  const n = patentsOf(record)
+  return { value: n, item: factItem(record, 'patents', 'patents') }
+}
+
+/** 중소기업확인서 — 서류함(받음 · 유효) · 인증서 칸 · 보유 인증 글 */
+function smeDocOf(record: ClientOpsRecord, today: string): boolean {
+  const re = /중소기업\s*(확인서|기준\s*확인|확인)/
+  for (const m of allDocumentMetas(record)) {
+    if (!re.test(m.label)) continue
+    const st = record.documents?.[m.key]
+    if (st?.received && documentStatus(m.key, st, today, m).usable) return true
+  }
+  if ((record.customFields ?? []).some((f) => f.group === 'credential' && re.test(`${f.label} ${f.value}`))) return true
+  return re.test(usableFactValue(record, 'certifications'))
+}
+
+/** 업종 코드(KSIC) — 서류 · 회사 정보 글에 코드가 있으면 그것, 없으면 직접 적은 코드 */
+function ksicOf(record: ClientOpsRecord, f: ReturnType<typeof clientFacts>, p: CertProfile): string | null {
+  const texts = [f.industryText, usableFactValue(record, 'businessItem'), usableFactValue(record, 'businessCategory'), ...(record.customFields ?? []).map((x) => `${x.label} ${x.value}`)]
+  for (const t of texts) {
+    const k = t ? parseKsic(t) : null
+    if (k) return k
+  }
+  return p.ksic
+}
+
 export function certContextOf(record: ClientOpsRecord, today: string, profile: CertProfile = EMPTY_CERT_PROFILE, extra: CertExtra = {}): CertificationClientContext {
   const f = clientFacts(record, new Date(`${today}T00:00:00`))
   const held = heldCertifications(record)
@@ -231,8 +341,11 @@ export function certContextOf(record: ClientOpsRecord, today: string, profile: C
     else if (!cur.validUntil && h.validUntil) cur.validUntil = h.validUntil
   }
   if (extra.lab && extra.lab.unit === 'lab' && !held.some((h) => h.key === 'lab')) held.push({ key: 'lab', validUntil: '', note: `연구소 관리 기록 · 인정 ${extra.lab.recognizedAt}${extra.lab.number ? ` · ${extra.lab.number}` : ''}` })
-  const unit = profile.researchUnit ?? extra.lab?.unit ?? researchUnitOf(record, held)
-  const recordPatents = patentsOf(record)
+  const unit = resolveUnit(record, profile, extra, held)
+  const researchers = resolveResearchers(profile, extra)
+  const patents = resolvePatents(record, profile)
+  const smeDoc = smeDocOf(record, today)
+  const conflicts = [unit.conflict, researchers.conflict, patents.conflict].filter((x): x is string => Boolean(x))
   const policyService = record.services?.policyFund
   const ventureService = record.services?.venture
   return {
@@ -242,17 +355,21 @@ export function certContextOf(record: ClientOpsRecord, today: string, profile: C
     months: f.months,
     industryText: f.industryText,
     industryGroup: industryGroupOf(f.industryText),
+    ksic: ksicOf(record, f, profile),
     employees: f.employeeCount,
     size: profile.size,
+    smeDoc,
     revenue: f.revenue?.won ?? null,
     operatingProfit: f.operatingProfit?.won ?? null,
     netIncome: f.netIncome?.won ?? null,
     totalAssets: f.totalAssets?.won ?? null,
     totalLiabilities: f.totalLiabilities?.won ?? null,
-    rndExpense: profile.rndExpenseMan !== null ? profile.rndExpenseMan * 10_000 : null,
-    researchUnit: unit,
-    researchers: profile.researchers ?? extra.lab?.researchers ?? null,
-    patents: profile.patents ?? recordPatents,
+    // AX: 정확한 금액만 — 범위 칩은 rndRange 로 따로(대표 금액으로 바꾸지 않는다)
+    rndExpense: profile.rndExactMan !== null ? profile.rndExactMan * 10_000 : null,
+    rndRange: profile.rndRange,
+    researchUnit: unit.value,
+    researchers: researchers.value,
+    patents: patents.value,
     held,
     b2b: profile.b2b,
     procurement: profile.procurement,
@@ -262,7 +379,8 @@ export function certContextOf(record: ClientOpsRecord, today: string, profile: C
     rndPlan: profile.rndPlan ?? (ventureService && ACTIVE_SERVICE.has(ventureService.status) ? true : null),
     exclusionFlags: profile.exclusion ? ['제외 사유 있음(체납 · 회생 · 체불 · 산재 공표 등 — 내용 확인)'] : [],
     evidence: evidenceOf(record, today),
-    basis: basisOf(record, f, profile, extra, held),
+    basis: basisOf(record, f, profile, { unit, researchers, patents, smeDoc }),
+    ...(conflicts.length ? { conflicts } : {}),
     today,
   }
 }
@@ -294,29 +412,22 @@ export function factPatchValue(key: 'patents' | 'researchLab', p: CertProfile): 
 const chip = (field: BasisField, value: string): BasisItem => ({ field, label: BASIS_LABEL[field], value, state: 'estimated', from: CHIP_FROM })
 const yn = (v: boolean | null) => (v === null ? '' : v ? '예' : '아니오')
 
-function basisOf(record: ClientOpsRecord, f: ReturnType<typeof clientFacts>, p: CertProfile, extra: CertExtra, held: HeldCertification[]): BasisItem[] {
+function basisOf(record: ClientOpsRecord, f: ReturnType<typeof clientFacts>, p: CertProfile, r: { unit: Resolved<ResearchUnit>; researchers: Resolved<number>; patents: Resolved<number>; smeDoc: boolean }): BasisItem[] {
   const out: BasisItem[] = []
   const push = (b: BasisItem | null) => b && out.push(b)
   push(factItem(record, 'establishedAt', 'years', f.years !== null ? `${f.years}년(설립 ${usableFactValue(record, 'establishedAt')})` : undefined))
   push(factItem(record, 'businessItem', 'industry') ?? factItem(record, 'businessCategory', 'industry') ?? (f.industryText ? { field: 'industry', label: BASIS_LABEL.industry, value: f.industryText, state: 'estimated', from: '업체 기본 정보 · 확인 전' } : null))
   push(factItem(record, 'employeeCount', 'employees'))
-  if (p.size) push(chip('size', { small: '소기업', medium: '중기업', mid_large: '중견 이상', large: '대기업' }[p.size]))
-  else if (f.employeeCount !== null && f.employeeCount < 50) push({ field: 'size', label: BASIS_LABEL.size, value: '중소기업으로 보임', state: 'estimated', from: `직원 ${f.employeeCount}명으로 추정 — 중소기업확인서로 확인` })
+  // AX: 직원 수로 '중소기업' 을 확정하지 않는다 — 확인서가 있거나 확인서를 보고 고른 규모만 ✓ 쪽
+  if (r.smeDoc) push({ field: 'size', label: BASIS_LABEL.size, value: p.size ? { small: '소기업', medium: '중기업', mid_large: '중견 이상', large: '대기업' }[p.size] : '중소기업', state: 'confirmed', from: '중소기업확인서' })
+  else if (p.size) push({ ...chip('size', { small: '소기업', medium: '중기업', mid_large: '중견 이상', large: '대기업' }[p.size]), from: '컨설턴트 선택(중소기업확인서 기준) · 서류함에 확인서 없음' })
+  else if (f.employeeCount !== null && f.employeeCount < 50) push({ field: 'size', label: BASIS_LABEL.size, value: '중소기업으로 보임(확정 아님)', state: 'estimated', from: `직원 ${f.employeeCount}명으로 추정 — 중소기업확인서로 확인` })
   for (const [k, field] of [['revenue', 'revenue'], ['operatingProfit', 'operatingProfit'], ['totalAssets', 'totalAssets'], ['totalLiabilities', 'totalLiabilities']] as const) push(factItem(record, k, field))
-  if (p.rndExpenseMan !== null) push(chip('rndExpense', p.rndExpenseMan === 0 ? '없음' : `약 ${p.rndExpenseMan.toLocaleString()}만원`))
-  // 연구조직 — 연구소 관리 기록 > 회사 정보(확인) > 인증서 칸 > 칩
-  // 확인된 것이 칩보다 먼저 — [회사 정보에 확인된 사실로 저장] 을 누르면 ✓ 로 바뀐다
-  const labFact = factItem(record, 'researchLab', 'researchUnit')
-  if (extra.lab && !p.researchUnit) push({ field: 'researchUnit', label: BASIS_LABEL.researchUnit, value: extra.lab.unit === 'lab' ? '기업부설연구소' : '연구개발전담부서', state: 'confirmed', from: `연구소 관리 기록(인정 ${extra.lab.recognizedAt})` })
-  else if (labFact?.state === 'confirmed' && (!p.researchUnit || factPatchValue('researchLab', p) === readFact(record, 'researchLab')?.value)) push(labFact)
-  else if (p.researchUnit) push(chip('researchUnit', { lab: '기업부설연구소', dept: '연구개발전담부서', none: '없음' }[p.researchUnit]))
-  else push(labFact ?? (held.some((h) => h.key === 'lab') ? { field: 'researchUnit', label: BASIS_LABEL.researchUnit, value: '기업부설연구소', state: 'confirmed', from: '회사 정보 인증서 칸' } : null))
-  if (p.researchers !== null) push(chip('researchers', `${p.researchers}명`))
-  else if (extra.lab?.researchers) push({ field: 'researchers', label: BASIS_LABEL.researchers, value: `${extra.lab.researchers}명`, state: 'confirmed', from: '연구소 관리 기록' })
-  const patFact = factItem(record, 'patents', 'patents')
-  if (patFact?.state === 'confirmed' && (p.patents === null || factPatchValue('patents', p) === readFact(record, 'patents')?.value)) push(patFact)
-  else if (p.patents !== null) push(chip('patents', factPatchValue('patents', p)))
-  else push(patFact ?? ((record.customFields ?? []).some((x) => x.group === 'credential' && /특허/.test(x.label)) ? { field: 'patents', label: BASIS_LABEL.patents, value: `${patentsOf(record) ?? 0}건`, state: 'confirmed', from: '회사 정보 인증서 칸(특허증)' } : null))
+  if (p.rndExactMan !== null) push({ field: 'rndExpense', label: BASIS_LABEL.rndExpense, value: p.rndExactMan === 0 ? '없음' : `${p.rndExactMan.toLocaleString()}만원`, state: 'estimated', from: '직접 적은 정확한 금액(재무제표로 최종 확인)' })
+  else if (p.rndRange && p.rndRange !== 'unknown') push(chip('rndExpense', p.rndRange === 'none' ? '없음' : `${RND_RANGE_LABEL[p.rndRange]}(범위 — 정확한 금액 확인 필요)`))
+  push(r.unit.item)
+  push(r.researchers.item)
+  push(r.patents.item)
   for (const [k, field] of [['b2b', 'b2b'], ['procurement', 'procurement'], ['exportPlan', 'exportPlan']] as const) if (p[k] !== null) push(chip(field, yn(p[k])))
   if (p.exclusion !== null) push({ field: 'exclusion', label: BASIS_LABEL.exclusion, value: p.exclusion ? '있음' : '없음', state: 'estimated', from: '컨설턴트 확인(신청 전 증명서로 최종 확인)' })
   return out

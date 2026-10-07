@@ -4,6 +4,7 @@
  */
 import type { BenefitDef, BenefitTag } from '../rules/officialRules'
 import type { BenefitPick, CertificationClientContext } from './types'
+import { rndPositive } from './rnd'
 
 const WHY: Record<BenefitTag, (c: CertificationClientContext) => string | null> = {
   funding: (c) => (c.policyFundPlan ? '정책자금 계획이 있어 자금 · 보증 심사에 활용할 가능성이 높습니다.' : null),
@@ -11,7 +12,7 @@ const WHY: Record<BenefitTag, (c: CertificationClientContext) => string | null> 
   procurement: (c) => (c.procurement ? '공공 조달 · 입찰 계획이 있어 가점이 직접 도움이 됩니다.' : c.b2b ? 'B2B 납품이 많아 대외 평가에서 쓰일 수 있습니다.' : null),
   rnd: (c) => (c.rndPlan ? '정부 R&D 과제 계획이 있어 우대 · 가점이 도움이 됩니다.' : c.researchUnit === 'lab' || c.researchUnit === 'dept' ? '연구조직이 있어 R&D 과제와 이어 쓰기 좋습니다.' : null),
   tax_audit: (c) => (c.revenue !== null && c.revenue >= 5_000_000_000 ? '매출 규모가 커서 세무조사 유예의 실익이 있을 수 있습니다.' : null),
-  tax_credit: (c) => (c.rndExpense !== null && c.rndExpense > 0 ? '연구개발비가 있어 세액공제 · 감면을 함께 검토할 만합니다.' : null),
+  tax_credit: (c) => (rndPositive(c) ? '연구개발비가 있어 세액공제 · 감면을 함께 검토할 만합니다.' : null),
   trust: (c) => (c.b2b ? '거래처 · 납품처에 내미는 신뢰 자료가 됩니다.' : null),
   hiring: (c) => (c.employees !== null && c.employees >= 10 ? '직원이 늘어나는 중이라 인력 지원 가점을 쓸 수 있습니다.' : null),
   ip: (c) => (c.patents !== null && c.patents > 0 ? '특허가 있어 지식재산 우대를 바로 쓸 수 있습니다.' : null),

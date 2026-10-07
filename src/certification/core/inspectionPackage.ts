@@ -156,7 +156,8 @@ export function buildOwnerQuestions(input: { questions: readonly PackageQuestion
   // 신청 자격(제외 사유 · 중소기업)부터 — 이게 막히면 나머지는 의미가 없다
   const b = (f: BasisField) => (input.ctx.basis ?? []).find((x) => x.field === f && x.state !== 'missing')
   if (!b('exclusion')) out.push('최근 3년 국세 체납 · 회생 · 임금 체불 · 산재 공표가 있었나요?')
-  if (input.ctx.size === null && !b('size')) out.push('중소기업확인서가 있나요?(있으면 사진으로)')
+  // AX: '직원 수로 보임' 은 확인이 아니다 — 확인서가 없고 규모도 안 골랐으면 묻는다
+  if (input.ctx.size === null && !input.ctx.smeDoc) out.push('중소기업확인서가 있나요?(있으면 사진으로)')
   for (const x of input.questions) if (!x.prepared) out.push(...x.guide.ownerAsk)
   if (input.selfCheck) {
     const r = runSelfCheck(input.selfCheck, input.ctx, input.answers ?? {})

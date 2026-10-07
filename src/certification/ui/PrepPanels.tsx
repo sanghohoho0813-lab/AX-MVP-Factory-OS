@@ -15,7 +15,7 @@ import { useToast } from '../../components/ui/toastContext'
 import { copyText } from '../../components/consulting/studioParts'
 import { ownerPlaceholder, type Sourced } from '../core/answerGuide'
 import { BRING_LABEL, BRING_MARK, inspectionPackageText, ownerKey, ownerQuestionMessage, type InspectionPackage, type PackageQuestion } from '../core/inspectionPackage'
-import { GATE_LEVEL_LABEL, GATE_VERDICT_LABEL, missingDocsRequest, type SubmitGate } from '../core/submitGate'
+import { GATE_LEVEL_LABEL, GATE_VERDICT_LABEL, gateFirst, gateRows, missingDocsRequest, type GateItem, type SubmitGate } from '../core/submitGate'
 import { EVIDENCE_BASIS_LABEL } from '../rules/officialRules'
 import { PACK_LABEL, PACK_MARK, venturePackText, type VentureSection } from '../core/venturePack'
 import { handoffText, type HandoffPackage } from '../core/handoff'
@@ -305,6 +305,7 @@ export function SubmitGatePanel({
   onNote,
   sender,
   onRequestDocs,
+  onAct,
   onClose,
 }: {
   gate: SubmitGate
@@ -315,10 +316,23 @@ export function SubmitGatePanel({
   onNote: (key: string, text: string) => Promise<void>
   sender: string
   onRequestDocs: (labels: string[]) => Promise<number>
+  /** AX: [확인하기] — 자격(첫 화면 질문) · 사전진단 · 실사 답 연습으로 */
+  onAct?: (id: GateItem['id']) => void
   onClose: () => void
 }) {
   const { showToast } = useToast()
   const ready = gate.verdict === 'ready'
+  const rows = gateRows(gate)
+  const first = gateFirst(gate)
+  const [ownerOpen, setOwnerOpen] = useState(false)
+  const [allOpen, setAllOpen] = useState(false)
+  const act = (id: GateItem['id']) => {
+    if (id === 'docs_required' || id === 'docs') void request()
+    else if (id === 'owner' || id === 'selfcheck_unknown') {
+      if (ownerQuestions.length) setOwnerOpen(true)
+      else onAct?.(id)
+    } else onAct?.(id)
+  }
   const request = async () => {
     const added = await onRequestDocs(gate.docs.need.map((d) => d.label)).catch(() => -1)
     const copied = await copyText(missingDocsRequest(companyName, gate.cert, gate.docs, sender))
@@ -338,6 +352,29 @@ export function SubmitGatePanel({
               : `반드시 확인할 것 ${gate.items.filter((x) => x.level === 'must' && !x.ok).length}개를 먼저 해결해 주세요.`}
           </p>
         </div>
+        {/* AX: 네 줄 요약 + 먼저 확인할 것 하나 — 전체 항목은 접어 둔다 */}
+        <ul className="grid grid-cols-2 gap-x-3 gap-y-1.5 sm:grid-cols-4" data-testid="cert-gate-rows">
+          {rows.map((r) => (
+            <li key={r.key} className={`t-sub flex items-center gap-1.5 font-semibold ${r.mark === 'ok' ? 'text-success-700' : r.mark === 'check' ? 'text-danger-700' : 'text-slate-600'}`} data-testid="cert-gate-row" data-mark={r.mark}>
+              <span aria-hidden="true">{r.mark === 'ok' ? '✓' : r.mark === 'check' ? '△' : '○'}</span>
+              <span className="sr-only">{r.mark === 'ok' ? '충족' : r.mark === 'check' ? '반드시 확인' : '보완 권장'}: </span>
+              {r.label}
+            </li>
+          ))}
+        </ul>
+        {first && (
+          <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 px-3 py-2" data-testid="cert-gate-first">
+            <p className="t-sub min-w-0 flex-1 break-keep text-slate-800">
+              <b className="font-semibold">먼저 확인할 것</b> · {first.text}
+            </p>
+            <Button variant="primary" size="sm" onClick={() => act(first.id)} data-testid="cert-gate-first-go">
+              확인하기
+            </Button>
+          </div>
+        )}
+        <details open={allOpen} onToggle={(e) => setAllOpen((e.currentTarget as HTMLDetailsElement).open)} className="rounded-(--radius-control) border border-slate-200" data-testid="cert-gate-all">
+          <summary className="tap t-sub cursor-pointer px-3 py-2 font-semibold text-slate-700">전체 항목 · 제출자료 보기</summary>
+          <div className="flex flex-col gap-4 px-3 pb-3">
         {(['must', 'recommend'] as const).map((lv) => (
           <div key={lv} className="flex flex-col gap-1" data-testid={`cert-gate-${lv}`}>
             <p className="t-meta font-semibold text-slate-600">
@@ -376,10 +413,12 @@ export function SubmitGatePanel({
           )}
           <p className="t-meta break-keep text-slate-500">'공식 제출서류' 는 기관 안내에서 확인한 것, 'MIRAE 실무 준비자료' 는 공식 필수는 아니지만 평가 준비에 도움이 되는 자료입니다. 서류함에 이미 있는 자료는 다시 요청하지 않습니다.</p>
         </Block>
+          </div>
+        </details>
 
         {ownerQuestions.length > 0 && (
           // FV: 실사 준비 패키지에도 같은 목록이 있다 — 여기서는 접어 두고 필요할 때 연다
-          <details className="rounded-(--radius-control) border border-slate-200" data-testid="cert-gate-owner">
+          <details open={ownerOpen} onToggle={(e) => setOwnerOpen((e.currentTarget as HTMLDetailsElement).open)} className="rounded-(--radius-control) border border-slate-200" data-testid="cert-gate-owner">
             <summary className="tap t-sub cursor-pointer px-3 py-2 font-semibold text-slate-800">대표님께 확인할 것 ({ownerQuestions.length})</summary>
             <div className="px-3 pb-3">
               <OwnerAskBox questions={ownerQuestions} notes={notes} onNote={onNote} companyName={companyName} certLabel={certLabel} sender={sender} />

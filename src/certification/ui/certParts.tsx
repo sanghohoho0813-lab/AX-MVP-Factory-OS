@@ -3,8 +3,8 @@
  * 색만으로 뜻을 전하지 않는다 — 모든 등급 · 상태에 글자가 같이 있다.
  */
 import { useState, type ReactNode } from 'react'
-import { Check, CircleHelp, Copy, Triangle, X } from 'lucide-react'
-import { Badge } from '../../components/ui/primitives'
+import { Check, CircleHelp, Copy, MessageSquareText, Triangle, X } from 'lucide-react'
+import { Badge, BottomSheet } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/toastContext'
 import { READINESS_LABEL, RECOMMENDATION_LABEL, type BenefitPick, type CheckState, type Readiness, type Reason, type Recommendation } from '../core/types'
@@ -132,10 +132,10 @@ async function copy(text: string): Promise<boolean> {
 }
 
 /** 고객에게 설명하기 — 30초 · 카톡 · 준비서류 · 미팅용(누르면 내용이 보이고 복사) */
-export function ExplainBox({ set }: { set: ExplainSet }) {
+export function ExplainBox({ set, first = 'thirty' }: { set: ExplainSet; first?: Exclude<keyof ExplainSet, 'fit'> }) {
   const { showToast } = useToast()
   type Tab = Exclude<keyof ExplainSet, 'fit'>
-  const [k, setK] = useState<Tab>('thirty')
+  const [k, setK] = useState<Tab>(first)
   const LABEL: Record<Tab, string> = { thirty: '30초 설명', kakao: '카톡으로 설명', docRequest: '준비서류 요청', meeting: '미팅용 설명' }
   return (
     <div className="flex flex-col gap-2" data-testid="cert-explain">
@@ -166,6 +166,23 @@ export function ExplainBox({ set }: { set: ExplainSet }) {
   )
 }
 
+
+/** AX: [고객에게 설명하기] — 탭 넷을 늘 펼쳐 두지 않고 단추 하나 → 시트 */
+export function ExplainButton({ set, first = 'thirty', variant = 'secondary' }: { set: ExplainSet; first?: Exclude<keyof ExplainSet, 'fit'>; variant?: 'secondary' | 'ghost' }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <Button variant={variant} size="sm" className="self-start" onClick={() => setOpen(true)} data-testid="cert-explain-open">
+        <MessageSquareText aria-hidden="true" className="size-4" /> 고객에게 설명하기
+      </Button>
+      {open && (
+        <BottomSheet title="고객에게 설명하기" onClose={() => setOpen(false)}>
+          <ExplainBox set={set} first={first} />
+        </BottomSheet>
+      )}
+    </>
+  )
+}
 
 export function StepTabs({ step, onStep }: { step: number; onStep: (n: number) => void }) {
   return (

@@ -4,6 +4,7 @@
  */
 import type { SelfCheckItem } from '../core/selfCheck'
 import type { InspectionQuestion } from '../core/inspection'
+import { rndPositive, rndText } from '../core/rnd'
 
 const won = (n: number) => (Math.abs(n) >= 1e8 ? `${Math.round(n / 1e7) / 10}억원` : `${Math.round(n / 1e4).toLocaleString()}만원`)
 
@@ -23,7 +24,7 @@ export const INNOBIZ_CHECK: SelfCheckItem[] = [
     question: '연구개발에 꾸준히 돈을 쓰고 있나요?',
     plain: '재무제표의 연구개발비 · 인건비 중 연구 인력 몫을 봅니다.',
     evidence: [{ id: 'fin3', label: '최근 3년 재무제표' }],
-    suggest: (c) => (c.rndExpense === null ? null : c.rndExpense > 0 ? { answer: 'yes', because: `연구개발비 ${won(c.rndExpense)}` } : { answer: 'no', because: '연구개발비 0원' }),
+    suggest: (c) => (rndPositive(c) === null ? null : rndPositive(c) ? { answer: 'yes', because: `연구개발비 ${rndText(c)}` } : { answer: 'no', because: '연구개발비 없음' }),
   },
   {
     id: 'ib_ip',

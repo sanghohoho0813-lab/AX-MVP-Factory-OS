@@ -80,9 +80,10 @@ export function buildSubmitGate(input: {
   if (c.exclusionFlags.length) items.push({ id: 'exclusion', level: 'must', ok: false, text: '신청 제외 사유가 있습니다 — 먼저 해결해야 합니다' })
   else if (!basis('exclusion')) items.push({ id: 'exclusion', level: 'must', ok: false, text: '체납 · 회생 같은 제외 사유 확인 전(회사 정보에 확인 저장)' })
   else items.push({ id: 'exclusion', level: 'must', ok: true, text: '신청 제외 사유 없음 확인' })
-  if (c.size === null) items.push({ id: 'size', level: 'must', ok: false, text: '중소기업 여부 확인 전(중소기업확인서)' })
-  else if (c.size === 'small' || c.size === 'medium') items.push({ id: 'size', level: 'must', ok: true, text: '중소기업 확인' })
-  else items.push({ id: 'size', level: 'must', ok: false, text: '중소기업이 아님 — 신청 대상인지 확인' })
+  // AX: 직원 수로 중소기업을 확정하지 않는다 — 확인서(서류함)나 확인서를 보고 고른 규모만
+  if (c.size === 'mid_large' || c.size === 'large') items.push({ id: 'size', level: 'must', ok: false, text: '중소기업이 아님 — 신청 대상인지 확인' })
+  else if (c.smeDoc || c.size === 'small' || c.size === 'medium') items.push({ id: 'size', level: 'must', ok: true, text: c.smeDoc ? '중소기업 확인(중소기업확인서)' : '중소기업 확인' })
+  else items.push({ id: 'size', level: 'must', ok: false, text: '중소기업 여부 확인 전(중소기업확인서)' })
   const docs = submissionDocs(cert, c)
   const reqMissing = docs.need.filter((d) => d.required)
   const fresh = OFFICIAL_FRESH_DOCS[cert]
@@ -101,4 +102,36 @@ export function buildSubmitGate(input: {
   items.push(open ? { id: 'answers', level: 'recommend', ok: false, text: `실사 핵심질문 ${open}개 답 근거 없음` } : { id: 'answers', level: 'recommend', ok: true, text: '실사 핵심질문 답 근거 있음' })
   items.push(pkg.ownerQuestions.length ? { id: 'owner', level: 'recommend', ok: false, text: `대표님께 확인할 것 ${pkg.ownerQuestions.length}개 남음` } : { id: 'owner', level: 'recommend', ok: true, text: '대표님께 확인할 것 없음' })
   return { cert, verdict: items.every((x) => x.level !== 'must' || x.ok) ? 'ready' : 'check_first', items, docs, official: CERT_RULES[cert].officialScores ?? [] }
+}
+
+/* ------------------------------------------------------------------ */
+/* AX: 짧은 제출 전 확인 — 네 줄 + 먼저 확인할 것 하나                        */
+/* ------------------------------------------------------------------ */
+
+export type GateRowKey = 'eligibility' | 'required_docs' | 'owner' | 'improve'
+export interface GateRow {
+  key: GateRowKey
+  label: string
+  /** ok ✓ · check △(반드시 확인이 남음) · todo ○(보완 권장이 남음) */
+  mark: 'ok' | 'check' | 'todo'
+}
+
+const GROUP: Record<GateRowKey, { label: string; ids: GateItem['id'][] }> = {
+  eligibility: { label: '신청자격', ids: ['exclusion', 'size'] },
+  required_docs: { label: '공식 필수자료', ids: ['docs_required'] },
+  owner: { label: '대표 확인', ids: ['owner', 'selfcheck_unknown'] },
+  improve: { label: '보강', ids: ['selfcheck_fix', 'docs', 'answers'] },
+}
+
+export function gateRows(g: SubmitGate): GateRow[] {
+  return (Object.keys(GROUP) as GateRowKey[]).map((key) => {
+    const its = g.items.filter((x) => GROUP[key].ids.includes(x.id))
+    const mark: GateRow['mark'] = its.some((x) => !x.ok && x.level === 'must') ? 'check' : its.some((x) => !x.ok) ? 'todo' : 'ok'
+    return { key, label: GROUP[key].label, mark }
+  })
+}
+
+/** 먼저 확인할 것 하나 — 반드시 확인 먼저, 없으면 보완 권장 첫째 */
+export function gateFirst(g: SubmitGate): GateItem | null {
+  return g.items.find((x) => x.level === 'must' && !x.ok) ?? g.items.find((x) => !x.ok) ?? null
 }

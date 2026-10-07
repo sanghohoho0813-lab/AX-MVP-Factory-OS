@@ -1,26 +1,26 @@
 /**
  * 인증 하나 — 벤처 · 연구소 · 이노비즈 · 메인비즈가 같은 4단계 문법 (D-170).
  *   1 받을 수 있나요?  2 무엇을 준비하나요?  3 실제 진행  4 받으면 무엇이 달라지나요?
+ * AX: 단계마다 '지금 할 것 하나' 가 먼저 — 근거 · 공식 기준 · 진행 기록 · 절차 · 설명 문구는 접거나 시트 뒤로(지우지 않음).
  * 벤처 · 연구소는 기존 화면(특허+벤처 · 연구소 관리)으로 이어 준다 — 다시 만들지 않는다.
  */
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ExternalLink } from 'lucide-react'
 import { Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { ToolResultAttach } from '../../tools/shared/ToolResultAttach'
-import { CERT_RULES, EVIDENCE_BASIS_LABEL, EVIDENCE_CLASS, evidenceClassOf, rulesStale } from '../rules/officialRules'
+import { CERT_RULES, EVIDENCE_CLASS, evidenceClassOf } from '../rules/officialRules'
 import { explainFor } from '../core/explain'
-import { ruleChangesOf } from '../rules/ruleChanges'
 import { READINESS_LABEL, RECOMMENDATION_LABEL, type CertificationAssessment, type CertificationClientContext } from '../core/types'
 import type { Answer } from '../core/selfCheck'
 import type { PreparedAnswer } from '../core/inspection'
 import { INNOBIZ_CHECK, INNOBIZ_INSPECTION } from '../innobiz/innobizCheck'
 import { MAINBIZ_CHECK, MAINBIZ_INSPECTION } from '../mainbiz/mainbizCheck'
-import { ExpiredBadge, BenefitPicks, ExplainBox, ReadinessBadge, ReasonList, RecBadge, showReadiness, StepTabs } from './certParts'
+import { ExpiredBadge, BenefitPicks, ExplainButton, ReasonList, RecBadge, showReadiness, StepTabs } from './certParts'
 import { InspectionFlow, SelfCheckFlow } from './SelfCheckFlow'
 import { useToast } from '../../components/ui/toastContext'
-import type { CertLifecycle, CertStatus, CompletionInput } from '../core/lifecycle'
+import { CERT_STATUS_LABEL, type CertLifecycle, type CertStatus, type CompletionInput } from '../core/lifecycle'
 import { LifecyclePanel } from './LifecyclePanel'
 import { InspectionPackPanel, SubmitGatePanel, VenturePackPanel } from './PrepPanels'
 import { buildInspectionPackage } from '../core/inspectionPackage'
@@ -32,6 +32,8 @@ import { INNOBIZ_BANK } from '../innobiz/innobizGuides'
 import { MAINBIZ_BANK } from '../mainbiz/mainbizGuides'
 import { useSenderLine } from '../../components/layout/useCurrentUser'
 import { BasisBox } from './BasisBox'
+import { RulesInfoButton } from './RulesSheet'
+import { sectionHref } from './certNav'
 
 const EVIDENCE_LABEL = Object.fromEntries(Object.values(CERT_RULES).flatMap((r) => r.evidence.map((e) => [e.id, e.label])))
 const labelOf = (id: string) => EVIDENCE_LABEL[id] ?? id
@@ -75,6 +77,7 @@ export function CertWorkspace({
   const [step, setStep] = useState(life.status !== 'preparing' || life.history.length > 0 ? 2 : 0)
   const [flow, setFlow] = useState<'none' | 'self' | 'inspect' | 'pack' | 'gate' | 'venture'>('none')
   const sender = useSenderLine()
+  const navigate = useNavigate()
   const requestDocs = async () => {
     const text = explain.docRequest
     const added = a.missingEvidence.length ? await onRequestDocs(a.missingEvidence).catch(() => -1) : 0
@@ -98,6 +101,36 @@ export function CertWorkspace({
         { date: a.renewal.validUntil, title: `${rule.label} 유효기간 끝`, note: '', hard: true as const },
       ]
     : []
+  // AX: 실제 진행 — 지금 단계 · 다음 행동 하나 · 진행 상태(사전진단 · 대표 확인 · 서류)
+  const ownerLeft = pkg?.ownerQuestions.length ?? 0
+  const ownerDone = Object.values(notes).filter((v) => v.trim()).length
+  const docsTotal = a.haveEvidence.length + a.missingEvidence.length
+  const submitted = life.status === 'applied' || life.status === 'review' || life.status === 'supplement'
+  const done = life.status === 'certified' || life.status === 'renewal'
+  const [lifeOpen, setLifeOpen] = useState(submitted || done)
+  const openLife = () => {
+    setLifeOpen(true)
+    window.setTimeout(() => document.querySelector('[data-testid="cert-life-box"]')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 0)
+  }
+  type Next = { stage: string; label: string; testid: string; go: () => void }
+  const next: Next | null = done
+    ? { stage: '인증 완료', label: '인증 완료 기록', testid: 'cert-next-complete', go: openLife }
+    : submitted
+      ? { stage: '심사 중', label: '심사 일정 기록', testid: 'cert-next-review', go: openLife }
+      : selfItems && pkg
+        ? !answeredSelf
+          ? { stage: '사전진단 전', label: '사전진단 시작', testid: 'cert-selfcheck-start', go: () => setFlow('self') }
+          : ownerLeft > 0
+            ? { stage: '대표 확인', label: `대표 확인 ${ownerLeft}개`, testid: 'cert-next-owner', go: () => setFlow('pack') }
+            : Object.keys(prep).length === 0
+              ? { stage: '실사 준비', label: '실사 준비', testid: 'cert-prep-pack', go: () => setFlow('pack') }
+              : { stage: '제출 준비', label: '제출 전 최종 확인', testid: 'cert-gate-open', go: () => setFlow('gate') }
+        : null
+  const keyReasons = [...a.reasons.filter((r) => r.state === 'no'), ...a.reasons.filter((r) => r.state === 'ok').slice(0, 2), ...a.reasons.filter((r) => r.state === 'warn').slice(0, 1), ...a.reasons.filter((r) => r.state === 'unknown').slice(0, 1)].slice(0, 4)
+  // AX: 준비자료 — 그룹 제목이 공식 / MIRAE 뜻을 맡는다(줄마다 꼬리표 없음)
+  const firstDocs = rule.evidence.filter((e) => !a.haveEvidence.includes(e.label) && EVIDENCE_CLASS[a.key] && ['official', 'process'].includes(evidenceClassOf(a.key, e.id).basis))
+  const haveDocs = rule.evidence.filter((e) => a.haveEvidence.includes(e.label))
+  const helpDocs = rule.evidence.filter((e) => !a.haveEvidence.includes(e.label) && !firstDocs.includes(e))
   return (
     <div className="flex flex-col gap-4" data-testid="cert-workspace" data-key={a.key}>
       <Surface>
@@ -106,67 +139,112 @@ export function CertWorkspace({
             <h2 className="t-section font-bold text-slate-900">{rule.label}</h2>
             <RecBadge rec={a.recommendation} />
             {a.expired && <ExpiredBadge />}
-            {showReadiness(a) && <ReadinessBadge r={a.readiness} />}
           </div>
           <p className="t-body font-semibold break-keep text-slate-800">{a.oneLine}</p>
-          <p className="t-sub break-keep text-slate-600">{rule.summary}</p>
         </div>
       </Surface>
-      <StepTabs step={step} onStep={(n) => { setStep(n); setFlow('none') }} />
+      <StepTabs
+        step={step}
+        onStep={(n) => {
+          setStep(n)
+          setFlow('none')
+        }}
+      />
 
       {step === 0 && (
         <Surface>
           <div className="flex flex-col gap-3" data-testid="cert-step-body-0">
-            <p className="t-sub break-keep text-slate-600">
-              판단: <b className="font-semibold text-slate-800">{RECOMMENDATION_LABEL[a.recommendation]}</b> · 준비도 <b className="font-semibold text-slate-800">{READINESS_LABEL[a.readiness]}</b>(MIRAE 자체 5단계) · {a.timing}
+            <p className="t-body break-keep text-slate-800" data-testid="cert-judgment">
+              현재 판단 <b className="font-bold">{RECOMMENDATION_LABEL[a.recommendation]}</b>
+              {showReadiness(a) && <span className="text-slate-600"> · 준비도 {READINESS_LABEL[a.readiness]}(MIRAE)</span>}
             </p>
-            <ReasonList reasons={a.reasons} />
-            {a.missingFacts.length > 0 && <p className="t-sub break-keep text-warning-800">대표 확인 필요 · {a.missingFacts.join(' · ')}</p>}
-            {rule.officialScores && (
-              <div className="rounded-(--radius-control) border border-slate-200 bg-slate-50 p-3" data-testid="cert-official">
-                <p className="t-sub font-semibold text-slate-800">공식 기준(숫자는 공식 점수만)</p>
-                <ul className="mt-1 flex flex-col gap-0.5">
-                  {rule.officialScores.map((s) => (
-                    <li key={s.label} className="t-sub break-keep text-slate-700">
-                      · {s.label}: <b className="font-semibold">{s.value}</b>
-                    </li>
-                  ))}
-                </ul>
+            <ReasonList reasons={keyReasons} />
+            {a.missingFacts.length > 0 && <p className="t-sub break-keep text-warning-800">확인 필요 · {a.missingFacts.slice(0, 3).join(' · ')}</p>}
+            {selfItems ? (
+              <Button
+                variant="primary"
+                className="self-start"
+                onClick={() => {
+                  setStep(2)
+                  setFlow('self')
+                }}
+                data-testid="cert-step0-self"
+              >
+                {answeredSelf ? '사전진단 이어서' : '사전진단 시작'}
+              </Button>
+            ) : existingTool ? (
+              <Link to={existingTool.href} className="contents">
+                <Button variant="primary" className="self-start" data-testid="cert-step0-tool">
+                  <ExternalLink aria-hidden="true" className="size-4" /> {existingTool.label}
+                </Button>
+              </Link>
+            ) : null}
+            <details className="rounded-(--radius-control) border border-slate-200" data-testid="cert-basis-more">
+              <summary className="tap t-sub cursor-pointer px-3 py-2 font-semibold text-slate-700">판단 근거 · 공식 기준 보기</summary>
+              <div className="flex flex-col gap-3 px-3 pb-3">
+                <p className="t-sub break-keep text-slate-600">
+                  {rule.summary} · {a.timing}
+                </p>
+                <ReasonList reasons={a.reasons} />
+                {rule.officialScores && (
+                  <div className="rounded-(--radius-control) border border-slate-200 bg-slate-50 p-3" data-testid="cert-official">
+                    <p className="t-sub font-semibold text-slate-800">공식 기준(기관 점수 — MIRAE 판단과 별개)</p>
+                    <ul className="mt-1 flex flex-col gap-0.5">
+                      {rule.officialScores.map((x) => (
+                        <li key={x.label} className="t-sub break-keep text-slate-700">
+                          · {x.label}: <b className="font-semibold">{x.value}</b>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <BasisBox cert={a.key} ctx={ctx} />
+                <RulesInfoButton cert={a.key} today={ctx.today} />
               </div>
-            )}
-            <BasisBox cert={a.key} ctx={ctx} />
-            <Sources ruleKey={a.key} today={ctx.today} />
+            </details>
           </div>
         </Surface>
       )}
 
       {step === 1 && (
         <Surface>
-          <div className="flex flex-col gap-3" data-testid="cert-step-body-1">
-            <ul className="flex flex-col gap-1.5">
-              {rule.evidence.map((e) => {
-                const have = a.haveEvidence.includes(e.label)
-                return (
-                  <li key={e.id} className={`t-sub flex flex-wrap items-baseline gap-x-2 break-keep ${have ? 'text-success-700' : 'text-slate-800'}`} data-testid="cert-evidence" data-have={have}>
-                    <b className="font-semibold">{have ? '✓ 있음' : '받을 것'}</b> {e.label}
-                    <span className="text-slate-500">— {e.why}</span>
-                    {EVIDENCE_CLASS[a.key] && <span className="t-meta text-slate-500" data-testid="cert-evidence-basis">[{EVIDENCE_BASIS_LABEL[evidenceClassOf(a.key, e.id).basis]}]</span>}
-                  </li>
-                )
-              })}
-            </ul>
-            <p className="t-sub break-keep text-slate-600">이미 서류함 · 회사 정보에 있는 자료는 다시 받지 않습니다.</p>
-            <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-4" data-testid="cert-step-body-1">
+            {(
+              [
+                ['first', '먼저 준비', '공식 제출서류 — 기관 안내에 있는 것', firstDocs, 'text-slate-900'],
+                ['have', '이미 있음', '서류함 · 회사 정보에 있음 — 다시 받지 않습니다', haveDocs, 'text-success-700'],
+                ['help', '있으면 도움됨', 'MIRAE 실무 준비자료 — 공식 필수는 아님', helpDocs, 'text-slate-700'],
+              ] as const
+            )
+              .filter(([, , , list]) => list.length > 0)
+              .map(([id, title, hint, list, tone]) => (
+                <section key={id} className="flex flex-col gap-1" data-testid={`cert-evidence-${id}`}>
+                  <h3 className={`t-body font-bold ${tone}`}>
+                    {title} <span className="t-sub font-normal text-slate-500">· {hint}</span>
+                  </h3>
+                  <ul className="flex flex-col gap-1">
+                    {list.map((e) => (
+                      <li key={e.id} className="t-sub break-keep text-slate-800" data-testid="cert-evidence" data-have={id === 'have'} data-basis={evidenceClassOf(a.key, e.id).basis}>
+                        {id === 'have' ? '✓ ' : '· '}
+                        <b className="font-semibold">{e.label}</b> <span className="text-slate-500">— {e.why}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            <div className="flex flex-wrap items-center gap-2">
               {a.missingEvidence.length > 0 && (
                 <Button variant="primary" onClick={() => void requestDocs()} data-testid="cert-request-docs">
-                  고객에게 자료 요청({a.missingEvidence.length})
+                  모자란 자료 요청({a.missingEvidence.length})
                 </Button>
               )}
               <Link to={`/ops/clients/${clientId}?tab=docs`} className="contents">
-                <Button variant="secondary">서류함 열기</Button>
+                <Button variant="ghost" size="sm">
+                  서류함 열기
+                </Button>
               </Link>
+              <ExplainButton set={explain} first="docRequest" variant="ghost" />
             </div>
-            <ExplainBox set={{ ...explain, thirty: explain.docRequest }} />
           </div>
         </Surface>
       )}
@@ -174,37 +252,47 @@ export function CertWorkspace({
       {step === 2 && flow === 'none' && (
         <Surface>
           <div className="flex flex-col gap-3" data-testid="cert-step-body-2">
-            {selfItems && pkg && gate ? (
-              <div className="flex flex-col gap-2" data-testid="cert-prep-actions">
-                {/* 한 상태에 Primary 하나 — 자가진단 전에는 자가진단, 뒤에는 실사 준비 */}
-                <div className="flex flex-wrap gap-2">
-                  {answeredSelf ? (
-                    <>
-                  <Button variant={answeredSelf ? 'primary' : 'secondary'} onClick={() => setFlow('pack')} data-testid="cert-prep-pack">
-                    실사 준비하기
-                  </Button>
-                  <Button variant={answeredSelf ? 'secondary' : 'primary'} onClick={() => setFlow('self')} data-testid="cert-selfcheck-start">
-                    {answeredSelf ? '자가진단 이어서' : '자가진단 시작'}
-                  </Button>
-                    </>
-                  ) : (
-                    <>
-                  <Button variant={answeredSelf ? 'secondary' : 'primary'} onClick={() => setFlow('self')} data-testid="cert-selfcheck-start">
-                    {answeredSelf ? '자가진단 이어서' : '자가진단 시작'}
-                  </Button>
-                  <Button variant={answeredSelf ? 'primary' : 'secondary'} onClick={() => setFlow('pack')} data-testid="cert-prep-pack">
-                    실사 준비하기
-                  </Button>
-                    </>
-                  )}
-                  <Button variant="secondary" onClick={() => setFlow('gate')} data-testid="cert-gate-open">
-                    제출 전 최종 확인
-                  </Button>
-                </div>
-                <p className="t-meta break-keep text-slate-500" data-testid="cert-prep-status">
-                  {gate.verdict === 'ready' ? '✓ 제출 준비 가능' : `△ 반드시 확인 ${gate.items.filter((x) => x.level === 'must' && !x.ok).length}개`}
-                  {pkg.ownerQuestions.length ? ` · 대표님께 확인할 것 ${pkg.ownerQuestions.length}개` : ''}
+            {next ? (
+              <div className="flex flex-col gap-2.5" data-testid="cert-prep-actions">
+                <p className="t-sub text-slate-600">
+                  현재 단계 <b className="t-body font-bold text-slate-900" data-testid="cert-stage">{next.stage}</b>
                 </p>
+                {selfItems && pkg && (
+                  <p className="t-sub flex flex-wrap gap-x-3 gap-y-1 break-keep text-slate-700" data-testid="cert-prep-status">
+                    <span>{answeredSelf ? '✓ 사전진단 완료' : '○ 사전진단 전'}</span>
+                    <span>
+                      {ownerLeft === 0 && ownerDone > 0 ? '✓' : '△'} 대표 확인 {ownerDone}/{ownerDone + ownerLeft}
+                    </span>
+                    <span>
+                      {docsTotal > 0 && a.haveEvidence.length === docsTotal ? '✓' : '△'} 서류 {a.haveEvidence.length}/{docsTotal}
+                    </span>
+                  </p>
+                )}
+                <Button variant="primary" className="self-start" onClick={next.go} data-testid={next.testid}>
+                  {next.label}
+                </Button>
+                {selfItems && pkg && gate && (
+                  <details data-testid="cert-other-actions">
+                    <summary className="tap t-sub inline-flex cursor-pointer items-center font-semibold text-slate-600">다른 작업</summary>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {next.testid !== 'cert-selfcheck-start' && (
+                        <Button variant="secondary" size="sm" onClick={() => setFlow('self')} data-testid="cert-selfcheck-again">
+                          {answeredSelf ? '사전진단 이어서' : '사전진단 시작'}
+                        </Button>
+                      )}
+                      {next.testid !== 'cert-prep-pack' && (
+                        <Button variant="secondary" size="sm" onClick={() => setFlow('pack')} data-testid="cert-prep-pack-more">
+                          실사 준비
+                        </Button>
+                      )}
+                      {next.testid !== 'cert-gate-open' && (
+                        <Button variant="secondary" size="sm" onClick={() => setFlow('gate')} data-testid="cert-gate-open-more">
+                          제출 전 최종 확인 · {gate.verdict === 'ready' ? '✓ 가능' : `△ ${gate.items.filter((x) => x.level === 'must' && !x.ok).length}개`}
+                        </Button>
+                      )}
+                    </div>
+                  </details>
+                )}
               </div>
             ) : existingTool ? (
               <div className="flex flex-col gap-2">
@@ -223,18 +311,23 @@ export function CertWorkspace({
                 </div>
               </div>
             ) : null}
-            {/* FV: 다음 행동(단추)을 맨 위에 — 진행 기록 · 절차는 그 아래, 절차는 접어 둔다 */}
-            <LifecyclePanel cert={a.key} life={life} ctx={ctx} clientId={clientId} onStatus={onStatus} onComplete={onComplete} onPatch={onPatchLife} />
+            {/* AX: 진행 기록 · 절차는 접어 둔다 — 제출 뒤 · 완료면 열어 둔다 */}
+            <details open={lifeOpen} onToggle={(e) => setLifeOpen((e.currentTarget as HTMLDetailsElement).open)} className="rounded-(--radius-control) border border-slate-200" data-testid="cert-life-box">
+              <summary className="tap t-sub cursor-pointer px-3 py-2 font-semibold text-slate-700">진행 기록 · 상태 바꾸기 · {CERT_STATUS_LABEL[life.status]}</summary>
+              <div className="px-2 pb-2">
+                <LifecyclePanel cert={a.key} life={life} ctx={ctx} clientId={clientId} onStatus={onStatus} onComplete={onComplete} onPatch={onPatchLife} />
+              </div>
+            </details>
             <details className="rounded-(--radius-control) border border-slate-200" data-testid="cert-procedure">
-              <summary className="tap t-sub cursor-pointer px-3 py-2 font-semibold text-slate-700">신청 절차 보기({rule.procedure.length}단계)</summary>
+              <summary className="tap t-sub cursor-pointer px-3 py-2 font-semibold text-slate-700">전체 절차 보기({rule.procedure.length}단계)</summary>
               <ol className="flex flex-col gap-1 px-3 pb-3">
-                {rule.procedure.map((p, i) => (
-                  <li key={p} className="t-body break-keep text-slate-800">
-                    {i + 1}. {p}
+                {rule.procedure.map((x, i) => (
+                  <li key={x} className="t-body break-keep text-slate-800">
+                    {i + 1}. {x}
                   </li>
                 ))}
               </ol>
-              {rule.fee && <p className="t-sub px-3 pb-3 text-slate-600">수수료(공식 안내): {rule.fee}</p>}
+              {rule.fee && <p className="t-sub px-3 pb-3 break-keep text-slate-600">수수료(공식 안내): {rule.fee}</p>}
             </details>
           </div>
         </Surface>
@@ -245,7 +338,18 @@ export function CertWorkspace({
         <InspectionPackPanel unconfirmed={unconfirmed} clientId={clientId} pkg={pkg} handoff={inspectionHandoff(pkg, a, runSelfCheck(selfItems, ctx, answers))} notes={notes} onNote={onNote} sender={sender} onPractice={() => setFlow('inspect')} onClose={() => setFlow('none')} />
       )}
       {step === 2 && flow === 'gate' && gate && pkg && (
-        <SubmitGatePanel gate={gate} companyName={ctx.companyName} certLabel={rule.label} ownerQuestions={pkg.ownerQuestions} notes={notes} onNote={onNote} sender={sender} onRequestDocs={onRequestDocs} onClose={() => setFlow('none')} />
+        <SubmitGatePanel
+          gate={gate}
+          companyName={ctx.companyName}
+          certLabel={rule.label}
+          ownerQuestions={pkg.ownerQuestions}
+          notes={notes}
+          onNote={onNote}
+          sender={sender}
+          onRequestDocs={onRequestDocs}
+          onAct={(id) => (id === 'exclusion' || id === 'size' ? navigate(sectionHref('overview', clientId)) : id === 'answers' ? setFlow('inspect') : setFlow('self'))}
+          onClose={() => setFlow('none')}
+        />
       )}
       {step === 2 && flow === 'venture' && venture && (
         <VenturePackPanel
@@ -269,11 +373,17 @@ export function CertWorkspace({
               <summary className="tap t-sub cursor-pointer px-3 py-2 font-semibold text-slate-800" data-testid="cert-all-benefits">
                 모든 혜택 보기({rule.benefits.length})
               </summary>
-              <ul className="flex flex-col gap-1 px-3 pb-3">
-                {rule.benefits.map((b) => (
-                  <li key={b.id} className="t-sub break-keep text-slate-700">
-                    · <b className="font-semibold">{b.title}</b> — {b.detail}
-                    {b.conditional && <span className="text-warning-800"> (적용 여부 추가 확인 필요)</span>}
+              <ul className="flex flex-col gap-2 px-3 pb-3">
+                {rule.benefits.map((x) => (
+                  <li key={x.id} className="t-sub break-keep text-slate-700" data-testid="cert-benefit-row">
+                    · <b className="font-semibold">{x.title}</b> — {x.detail}
+                    {x.target && <span className="text-slate-600"> · 대상: {x.target}</span>}
+                    {x.figure && x.source && (
+                      <span className="block pl-3 text-slate-600" data-testid="cert-benefit-figure">
+                        기관 안내 숫자: {x.figure} <span className="text-slate-500">({x.source})</span>
+                      </span>
+                    )}
+                    {x.conditional && <span className="block pl-3 text-warning-800">활용 가능 · 공고별 확인 — 적용 여부는 기관 · 시기에 따라 달라집니다</span>}
                   </li>
                 ))}
               </ul>
@@ -286,16 +396,15 @@ export function CertWorkspace({
             ) : (
               <p className="t-sub break-keep text-slate-600">인증을 받으면 '3. 실제 진행' 의 [인증 완료 기록] 에 번호 · 인증일 · 유효기간을 적어 주세요 — 갱신 일정이 달력 · 오늘에 걸립니다(확인서를 서류함에 올려도 읽습니다).</p>
             )}
-            {(a.recommendation === 'held' || a.recommendation === 'now') && (
-              <Link to={`/tools/policy-funding/diagnosis?client=${clientId}`} className="contents">
-                <Button variant="secondary" className="self-start" data-testid="cert-next-fund">
-                  인증 활용 — 정책자금 검토하기
-                </Button>
-              </Link>
-            )}
-            <div className="border-t border-slate-100 pt-3">
-              <p className="t-sub mb-2 font-semibold text-slate-800">고객에게 설명하기</p>
-              <ExplainBox set={explain} />
+            <div className="flex flex-wrap items-center gap-2">
+              {(a.recommendation === 'held' || a.recommendation === 'now') && (
+                <Link to={`/tools/policy-funding/diagnosis?client=${clientId}`} className="contents">
+                  <Button variant="secondary" data-testid="cert-next-fund">
+                    인증 활용 — 정책자금 검토하기
+                  </Button>
+                </Link>
+              )}
+              <ExplainButton set={explain} />
             </div>
           </div>
         </Surface>
@@ -304,48 +413,3 @@ export function CertWorkspace({
   )
 }
 
-function Sources({ ruleKey, today }: { ruleKey: keyof typeof CERT_RULES; today: string }) {
-  const rule = CERT_RULES[ruleKey]
-  const stale = rulesStale(rule, today)
-  const changes = ruleChangesOf(ruleKey)
-  return (
-    <details className="rounded-(--radius-control) border border-slate-200" data-testid="cert-sources">
-      <summary className={`tap t-sub cursor-pointer px-3 py-2 font-semibold ${stale ? 'text-warning-800' : 'text-slate-700'}`}>
-        {stale ? '최신 기준 확인 필요 — ' : ''}공식 기준 보기 · 마지막 확인 {rule.checkedAt}
-      </summary>
-      <ul className="flex flex-col gap-1.5 px-3 pb-3">
-        {rule.sources.map((s) => (
-          <li key={s.name} className="t-sub break-keep text-slate-700" data-testid="cert-source">
-            <b className="font-semibold text-slate-900">{s.name}</b>
-            <span className="t-meta block text-slate-600">
-              {s.version} · 시행 {s.effective} · 마지막 확인 {rule.checkedAt}{' '}
-              <a href={s.url} target="_blank" rel="noreferrer noopener" className="tap inline-flex min-h-10 items-center font-semibold text-brand-700 underline">
-                공식 출처
-              </a>
-            </span>
-          </li>
-        ))}
-        {(rule.conflicts ?? []).map((u) => (
-          <li key={u} className="t-sub break-keep text-danger-700" data-testid="cert-conflict">
-            · 공식 안내 상이 — 제출 전 확인 필요: {u}
-          </li>
-        ))}
-        {rule.unverified.map((u) => (
-          <li key={u} className="t-sub break-keep text-warning-800" data-testid="cert-unverified">
-            · 공식 기준 추가 확인 필요: {u}
-          </li>
-        ))}
-        {changes.length > 0 && (
-          <li className="mt-1 flex flex-col gap-1 border-t border-slate-200 pt-2" data-testid="cert-rule-changes">
-            <span className="t-meta font-semibold text-slate-600">기준 바뀐 기록</span>
-            {changes.map((c) => (
-              <span key={c.rule + c.checkedAt} className="t-meta break-keep text-slate-600">
-                {c.checkedAt} · {c.rule} — {c.change}
-              </span>
-            ))}
-          </li>
-        )}
-      </ul>
-    </details>
-  )
-}

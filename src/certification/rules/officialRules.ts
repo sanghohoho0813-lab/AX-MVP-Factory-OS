@@ -26,6 +26,12 @@ export interface BenefitDef {
   tags: BenefitTag[]
   /** 기관 · 시기 · 조건에 따라 달라짐 */
   conditional: boolean
+  /** AX: 공식 안내에 적힌 숫자 — 출처와 같이만 보인다(출처 없는 숫자는 쓰지 않는다) */
+  figure?: string
+  /** AX: 어디서 확인했나 — 없으면 '공고별 확인' */
+  source?: string
+  /** AX: 누구에게 · 언제 해당하나 */
+  target?: string
 }
 
 export type BenefitTag = 'funding' | 'guarantee' | 'procurement' | 'rnd' | 'tax_audit' | 'tax_credit' | 'trust' | 'hiring' | 'ip' | 'export'
@@ -76,6 +82,10 @@ export const RULES_CHECKED_AT = '2026-10-07'
 /** 이 날수가 지나면 '최신 기준 확인 필요' */
 export const FRESH_DAYS = 180
 
+/** 혜택 숫자는 관리기관(협회) 안내에서 확인 — 각 기관 규정 원문 대조는 못 함(unverified) */
+const INNOBIZ_BENEFIT_SRC = '이노비즈넷 혜택 안내(innobiz.net, 2026-02 갱신) — 2026-10-07 확인 · 기관 규정 원문 대조 전'
+const MAINBIZ_BENEFIT_SRC = '중소벤처24 메인비즈 혜택 안내(smes.go.kr/mainbiz) — 2026-10-07 확인 · 기관 규정 원문 대조 전'
+
 const INNOBIZ: CertRule = {
   key: 'innobiz',
   label: '이노비즈',
@@ -87,7 +97,11 @@ const INNOBIZ: CertRule = {
   ],
   checkedAt: RULES_CHECKED_AT,
   // P1 재확인(2026-10-07): 별표3 기술혁신시스템 평가표(4부문 1,000점 · 업종별 배점) · 별표4 연장 평가표(100점 · 60점 이상) 원문 확인
-  unverified: ['기술보증기금 개별기술수준 평가표의 항목별 배점(이노비즈넷 한글 파일 — 4영역 · 약 34항목 · 14등급까지만 확인)'],
+  unverified: [
+    '기술보증기금 개별기술수준 평가표의 항목별 배점(이노비즈넷 한글 파일 — 4영역 · 약 34항목 · 14등급까지만 확인)',
+    '혜택 숫자(보증료 · 조달 가점 · 세무조사 유예 기간)는 이노비즈넷 안내 기준 — 기보 · 조달청 · 국세청 규정 원문 대조 전',
+    '소프트웨어업 · 바이오업 · 환경업 평가표에 해당하는 KSIC 범위(별표1 산업분류표) — 화면은 KSIC 로 제조 · 건설 · 농업 · 전문디자인 · 비제조업까지만 정함',
+  ],
   validYears: 3,
   renewalNote: '확인서 발급일부터 3년(제12조④). 만료 90일 전부터 만료 후 30일까지 연장 신청(제15조①) — 만료 전에 확정되려면 만료 35일 전까지 신청. 연장은 기술 · 경영진단 60점 이상(별표4). 만료 후 30일이 지나면 신규로. 연장되면 번호 앞에 R.',
   prepareDaysBefore: 90,
@@ -100,15 +114,15 @@ const INNOBIZ: CertRule = {
     { label: '연장(별표4 기술 · 경영진단)', value: '100점 중 60점 이상' },
   ],
   procedure: ['이노비즈넷 가입 · 재무 입력', '온라인 자가진단(650점 이상)', '기술사업계획서 작성', '수수료 납부(신규 77만원)', '기술보증기금 현장평가', '지방중소벤처기업청 확인서 발급'],
-  fee: '신규 77만원 · 연장 44만원(부가세 포함)',
+  fee: '신규 77만원 · 연장 44만원(부가세 포함 · 운영규정 제18조 70만 · 40만원 + 부가세). 벤처(연구개발기업 유형) 확인 6개월 안이면 신규 55만 · 연장 33만원',
   benefits: [
-    { id: 'kibo', title: '기술보증 우대', detail: '기술보증기금 보증 한도 상향 · 보증료 0.2%p 감면', tags: ['guarantee', 'funding'], conditional: true },
-    { id: 'procurement', title: '조달 · 공공 입찰 가점', detail: '조달청 적격심사 가점(물품 2.0~2.5점 · 용역 1.5점)', tags: ['procurement', 'trust'], conditional: true },
-    { id: 'tax_audit', title: '정기 세무조사 유예', detail: '국세청 정기 세무조사 선정 유예', tags: ['tax_audit'], conditional: true },
-    { id: 'patent_fast', title: '특허 우선심사', detail: '특허 출원 우선심사 대상', tags: ['ip'], conditional: true },
-    { id: 'rnd', title: '정부 R&D 우대', detail: '중기부 R&D 과제 우대', tags: ['rnd'], conditional: true },
-    { id: 'military', title: '병역지정업체 가점', detail: '산업기능요원 · 전문연구요원 지정 가점', tags: ['hiring'], conditional: true },
-    { id: 'escrow', title: '기술임치 수수료 감면', detail: '기술임치 수수료 1/3 감면', tags: ['ip'], conditional: true },
+    { id: 'kibo', title: '기술보증 우대', detail: '기술보증기금 보증에서 우대받을 수 있음(한도 · 보증료 — 기보 심사로 정해짐)', tags: ['guarantee', 'funding'], conditional: true, figure: '한도 30억→50억(최대 70억) · 보증료 0.2%p 감면', source: INNOBIZ_BENEFIT_SRC, target: '기보 보증을 쓰는 업체 · 심사 결과에 따라' },
+    { id: 'procurement', title: '조달 · 공공 입찰 가점', detail: '조달청 적격심사 신인도 가점을 받을 수 있음 — 공고별 확인', tags: ['procurement', 'trust'], conditional: true, figure: '물품 2.0~2.5점 · 일반용역 1.5점', source: INNOBIZ_BENEFIT_SRC, target: '조달 입찰에 참여하는 업체' },
+    { id: 'tax_audit', title: '정기 세무조사 유예', detail: '국세청 정기 세무조사 선정에서 유예될 수 있음', tags: ['tax_audit'], conditional: true, figure: '수도권 2년 · 지방 3년 · 관세조사 1년', source: INNOBIZ_BENEFIT_SRC, target: '국세청 요건에 맞는 업체' },
+    { id: 'patent_fast', title: '특허 우선심사', detail: '특허 출원 우선심사를 신청할 수 있음', tags: ['ip'], conditional: true, source: INNOBIZ_BENEFIT_SRC, target: '특허를 출원하는 업체' },
+    { id: 'rnd', title: '정부 R&D 우대', detail: '중기부 R&D 과제에서 우대되는 사업이 있음 — 공고별 확인', tags: ['rnd'], conditional: true, source: INNOBIZ_BENEFIT_SRC },
+    { id: 'military', title: '병역지정업체 가점', detail: '산업기능요원 · 전문연구요원 지정에 가점이 있음', tags: ['hiring'], conditional: true, figure: '산업기능요원 4점 · 전문연구요원 5점', source: INNOBIZ_BENEFIT_SRC, target: '병역지정업체를 신청하는 업체' },
+    { id: 'escrow', title: '기술임치 수수료 감면', detail: '기술임치 수수료를 감면받을 수 있음', tags: ['ip'], conditional: true, figure: '1/3 감면', source: INNOBIZ_BENEFIT_SRC },
   ],
   evidence: [
     { id: 'fin3', label: '최근 3년 재무제표', why: '이노비즈넷 재무 입력 · 현장평가 재무 지표' },
@@ -135,7 +149,9 @@ const MAINBIZ: CertRule = {
   checkedAt: RULES_CHECKED_AT,
   // P1 재확인(2026-10-07): 별표1 원문 — 평가 영역은 3영역(경영혁신인프라 350 · 활동 400 · 성과 250). '4영역' 으로 보였던 것은
   // 중소벤처24 '현장평가 질문 예시'(전략기획 · 성과관리 · 조직인력 · 사회신뢰) — 3영역 안의 지표다(상이 아님).
-  unverified: [],
+  // AX 재확인(2026-10-07): 별표1 은 2022-04-01 개정판 그대로 — 2026 개정(06-22)은 법령위반 제외 조항만 더했다. '2026 새 평가지표' 공식 근거 없음.
+  unverified: ['혜택 숫자(보증료 · 조달 가점 · 세무조사 유예 기간)는 중소벤처24 안내 기준 — 기관 규정 원문 대조 전'],
+  conflicts: ['제외 업종 — 운영규정 제3조①은 "게임 · 도박 · 사행성 · 불건전 소비업종에 해당하는 다음 각 호" 라고만 하고 각 호가 없음. KSIC 목록은 메인비즈넷 제도안내에만 있음 → 코드가 확인될 때만 제외로 판정'],
   validYears: 3,
   renewalNote: '확인서 발급일부터 3년(제12조③). 만료 90일 전부터 만료 후 30일까지 연장 신청(제15조①) — 만료 전에 확정되려면 만료 35일 전까지 신청. 연장은 경영혁신 진단 700점 이상(별표2). 연장되면 번호 앞에 R.',
   prepareDaysBefore: 90,
@@ -145,15 +161,17 @@ const MAINBIZ: CertRule = {
     { label: '현장평가(신용보증기금 · 기술보증기금 · 한국생산성본부 중 선택)', value: '1,000점 중 700점 이상' },
     { label: '다른 길', value: '생산성경영시스템(PMS) 3등급 이상 · 인증 후 1년 이내면 자가진단 없이 신청' },
     { label: '평가 영역(별표1)', value: '경영혁신인프라 350 · 경영혁신활동 400 · 경영혁신성과 250 = 1,000점(가족친화기업 가점 20)' },
+    { label: '업종 구분(제4조③)', value: '제조 · 도소매 · 건설 · 지식서비스 · 일반서비스 — 지표는 업종별, 영역 배점은 같음' },
+    { label: '신청 제외(제3조②)', value: '부채비율 1,000% 이상 · 완전자본잠식 · 연체 · 어음 거래정지 · 파산 · 회생 · 최근 3년 체불 명단공개 · 산재 공표 등' },
   ],
   procedure: ['중소벤처24 기업 등록', '자가진단(600점 이상)', '현장평가 신청 · 평가기관 선택', '현장평가(700점 이상)', '지방중소벤처기업청 선정', '중소벤처24에서 확인서 발급'],
-  fee: '신규 55만원 · 연장 44만원(부가세 포함)',
+  fee: '신규 55만원 · 연장 44만원(부가세 포함 · 운영규정 제18조 50만 · 40만원 + 부가세)',
   benefits: [
-    { id: 'tax_audit', title: '정기 세무조사 유예', detail: '국세청 정기 세무조사 유예 · 관세조사 1년 유예', tags: ['tax_audit'], conditional: true },
-    { id: 'guarantee', title: '보증료 감면', detail: '신용보증기금 보증료 0.1~0.2%p · 기술보증기금 0.1%p 감면', tags: ['guarantee', 'funding'], conditional: true },
-    { id: 'procurement', title: '조달 적격심사 가점', detail: '물품 2점 · 제조 2.5점 · 용역 1.5점', tags: ['procurement', 'trust'], conditional: true },
-    { id: 'rnd', title: '중기부 R&D 가점', detail: '중소벤처기업부 R&D 과제 가점 1점', tags: ['rnd'], conditional: true },
-    { id: 'military', title: '병역지정업체 가점', detail: '산업기능요원 지정 가점 4점', tags: ['hiring'], conditional: true },
+    { id: 'tax_audit', title: '정기 세무조사 유예', detail: '국세청 정기 세무조사에서 유예될 수 있음', tags: ['tax_audit'], conditional: true, figure: '수도권 최대 2년 · 지방 최대 3년 · 관세조사 1년', source: MAINBIZ_BENEFIT_SRC, target: '처음 받은 확인서 유효기간(3년) 안에서만' },
+    { id: 'guarantee', title: '보증료 감면', detail: '신용보증기금 · 기술보증기금 보증료를 감면받을 수 있음', tags: ['guarantee', 'funding'], conditional: true, figure: '신보 0.1%p(협회 정회원 0.2%p) · 기보 0.1%p', source: MAINBIZ_BENEFIT_SRC, target: '보증을 쓰는 업체' },
+    { id: 'procurement', title: '조달 적격심사 가점', detail: '조달청 적격심사 신인도 가점을 받을 수 있음 — 공고별 확인', tags: ['procurement', 'trust'], conditional: true, figure: '물품 2점(제조기업 자기 제품 2.5점) · 일반용역 1.5점', source: MAINBIZ_BENEFIT_SRC, target: '조달 입찰에 참여하는 업체' },
+    { id: 'rnd', title: '중기부 R&D · 수출 사업 가점', detail: '중기부 R&D · 수출 지원사업에서 가점이 있는 사업이 있음 — 공고별 확인', tags: ['rnd'], conditional: true, figure: '가점 1점(사업별)', source: MAINBIZ_BENEFIT_SRC },
+    { id: 'military', title: '병역지정업체 가점', detail: '산업기능요원 지정에 가점이 있음', tags: ['hiring'], conditional: true, figure: '산업기능요원 4점', source: MAINBIZ_BENEFIT_SRC, target: '병역지정업체를 신청하는 업체' },
   ],
   evidence: [
     { id: 'fin3', label: '최근 3년 재무제표', why: '부채비율 · 자본잠식 확인 · 경영 성과' },
@@ -175,14 +193,15 @@ const VENTURE: CertRule = {
   sources: [
     { name: '벤처기업육성에 관한 특별법 · 시행령', version: '법률 제21447호 · 대통령령 제36480호', effective: '2026-07-01', url: 'https://www.law.go.kr' },
     { name: '벤처기업확인요령', version: '중소벤처기업부고시 제2026-68호', effective: '2026-08-20', url: 'https://www.law.go.kr/LSW/admRulLsInfoR.do?admRulSeq=2100000284090' },
+    { name: '벤처기업확인제도 가이드북(별표1 업종 코드)', version: '2023 · 벤처확인종합관리시스템', effective: '2023-01-01', url: 'https://www.smes.go.kr/venturein' },
   ],
   checkedAt: RULES_CHECKED_AT,
   // P1 재확인(2026-10-07): 확인요령 별표1(업종별 연구개발 투자비율) 원문 확인 → VENTURE_RND_RATIO
-  unverified: ['벤처기업확인서 발급번호 형식(고시에 형식 없음 — 서식은 "제 호" 뿐)'],
+  unverified: ['벤처기업확인서 발급번호 형식(고시에 형식 없음 — 서식은 "제 호" 뿐)', "별표1 '인터넷산업' 줄의 업종 코드(가이드북에도 코드 없음 — 기타 산업과 같은 5%)"],
   validYears: 3,
-  renewalNote: '확인일부터 3년(시행령 제18조의4). 만료 6개월 전에 확인기관이 안내 — 끊김 없이 이어가려면 만료 140일 전까지 재확인 신청(확인요령 제19조).',
+  renewalNote: '확인일부터 3년(시행령 제18조의4). 2027-02-19까지는 만료 2개월 전 ~ 만료 후 1개월 안에 재확인을 신청하면 이어짐(이전 확인요령 제19조). 2027-02-20부터는 만료 6개월 전 안내 · 만료 전에 확인받으려면 만료 140일 전까지 신청(고시 제2026-68호 제19조, 고시 후 6개월 뒤 시행). 화면 준비일은 더 이른 쪽(140일 전)으로 잡음.',
   prepareDaysBefore: 150,
-  renewal: { noticeDays: 180, todoDays: 150, graceDaysAfter: 0, why: '확인요령 제19조 — 만료 140일 전까지 재확인을 신청해야 끊김 없이 이어짐(6개월 전 안내)' },
+  renewal: { noticeDays: 180, todoDays: 150, graceDaysAfter: 0, why: '확인요령 제19조(2027-02-20 시행) — 만료 140일 전까지 재확인 신청해야 만료 전 확인(6개월 전 안내). 그 전까지는 만료 2개월 전 ~ 만료 후 1개월' },
   procedure: ['유형 고르기(투자 · 연구개발 · 혁신성장 · 예비벤처)', '벤처확인종합관리시스템 신청', '확인기관 평가', '벤처기업확인위원회 심의', '확인서 발급'],
   benefits: [
     { id: 'tax_credit', title: '세제 혜택 검토', detail: '창업벤처 세액감면 등 — 요건 · 시기 확인 필요', tags: ['tax_credit'], conditional: true },
@@ -212,16 +231,16 @@ const LAB: CertRule = {
   // P1 재확인(2026-10-07): 시행규칙(과기정통부령 제163호) 연구공간 · 연구전담요원 자격 원문 확인
   unverified: [],
   validYears: null,
-  renewalNote: '유효기간은 없음. 연구전담요원 수 · 독립 공간을 계속 지키고, 바뀌면 30일 안에 변경 신고(시행령 제7조②) — 1년 넘게 안 하면 인정이 취소될 수 있음(법 제8조①5호).',
+  renewalNote: '유효기간은 없음. 연구전담요원 수 · 독립 공간을 계속 지키고, 회사(이름 · 소재지 · 대표자 · 업종) · 연구소(연구소장 · 연구개발인력 · 연구공간)가 바뀌면 30일 안에 변경 신고(시행령 제7조④ · 시행규칙 제5조①) — 1년 넘게 안 하면 인정이 취소될 수 있음(법 제8조①).',
   prepareDaysBefore: 0,
   procedure: ['연구전담요원 · 공간 갖추기', 'KOITA 신청', '서류 · 현장 확인', '인정서 발급', '변경 신고 · 요건 유지'],
   benefits: [
-    { id: 'tax_credit', title: '연구개발 세액공제', detail: '연구 · 인력개발비 세액공제 — 요건 · 금액 세무사 확인', tags: ['tax_credit', 'rnd'], conditional: true },
+    { id: 'tax_credit', title: '연구개발 세액공제', detail: '연구 · 인력개발비 세액공제를 검토할 수 있음 — 요건 · 금액은 세무사 확인', tags: ['tax_credit', 'rnd'], conditional: true, figure: '일반 연구 · 인력개발비 당기분 중소기업 25%', source: '조세특례제한법 제10조(2026-09-18 시행) — 2026-10-07 확인 · 인건비 인정 범위(시행령 별표6)는 확인 전', target: '연구소 · 전담부서 인력의 연구개발비' },
     { id: 'venture_path', title: '벤처 연구개발유형 · 이노비즈 기반', detail: '연구조직이 벤처 · 이노비즈 평가의 핵심 증빙', tags: ['rnd', 'trust'], conditional: false },
     { id: 'hiring', title: '전문연구요원', detail: '병역특례 전문연구요원 신청 기반', tags: ['hiring'], conditional: true },
   ],
   officialScores: [
-    { label: '연구전담요원(시행령 제6조)', value: '소기업 3명(창업 3년 안 2명) · 중기업 5명 · 연구원 · 교원 창업 · 벤처 2명 · 중견 7명 · 그 밖 10명 · 전담부서 1명' },
+    { label: '연구전담요원(시행령 제6조①)', value: '소기업 3명(창업 3년 안 2명) · 중기업 5명(소기업에서 커진 뒤 1년은 3명) · 연구원 · 교원 창업 · 벤처 2명 · 중견 7명 · 그 밖 10명 · 전담부서 1명' },
     { label: '연구공간(시행규칙 제2조②)', value: '고정 벽 · 별도 출입문. 중소 · 벤처 · SW 기업이 50㎡ 넘게 확보할 수 없으면 칸막이로 구분 가능' },
     { label: '연구전담요원 자격(시행규칙 제2조④)', value: '자연계 학사 이상 · 기사 이상(중소기업은 전문학사 + 경력 2년 · 산업기사 + 2년 등도)' },
   ],
@@ -249,7 +268,9 @@ const ISO9001: CertRule = {
   law: '국제표준(인증은 KAB 인정 인증기관)',
   sources: [
     { name: 'ISO 9001:2026 (제6판)', version: '2026-09-16 발행', effective: '2026-09-16', url: 'https://committee.iso.org/sites/tc176/home/news/content-left-area/news-and-updates/news.html' },
-    { name: '한국인정평가원(KAB) 인정 인증기관', version: '공식 누리집', effective: '2026-01-01', url: 'https://kab.or.kr/kor/main/contents.do?menuNo=400064' },
+    { name: 'Global ACI 전환 요건(ISO 9001:2026)', version: 'Global ACI-TECH-3-TR 2029-09-30 (M)', effective: '2026-09-16', url: 'https://global-aci.org/en/news/global-aci-publishes-transition-requirements-for-iso-90012026/' },
+    { name: '한국인정평가원 ISO 9001:2026 전환지침 공고', version: 'KAB-TR-QMS/26-6', effective: '2026-10-07', url: 'https://kab.or.kr/kor/bbs/B0000092/view.do?nttId=8233&menuNo=400014' },
+    { name: '한국인정평가원(KAB) 인증기관 현황', version: '공식 누리집', effective: '2026-10-07', url: 'https://kab.or.kr/kor/kcn/kcn/list.do?pSiteId=kor&schParent=1&menuNo=400010' },
   ],
   unverified: [],
   renewalNote: '2028-03-31 부터 신규 인증은 2026판으로만. 2015판 인증은 2029-09-30 까지 2026판으로 전환. 매년 사후심사 · 3년 갱신.',
@@ -272,10 +293,12 @@ const ISO14001: CertRule = {
   summary: '환경경영시스템 — 환경 관리 요구가 있는 업종(제조 · 건설 · 화학 등)에서 검토',
   law: '국제표준(인증은 KAB 인정 인증기관)',
   sources: [
-    { name: 'ISO 14001:2026 (제4판)', version: '2026-04 발행', effective: '2026-04-15', url: 'https://www.iso.org/news/2026/04/iso-14001-2026-published' },
+    { name: 'ISO 14001:2026 (제4판)', version: '2026-04-15 발행', effective: '2026-04-15', url: 'https://www.iso.org/news/2026/04/iso-14001-2026-published' },
     { name: 'Global ACI 전환 요건(ISO 14001:2026)', version: 'Global ACI-TECH-3-TR 2029-04-30 (M)', effective: '2026-09-14', url: 'https://global-aci.org/en/news/global-aci-publishes-transition-requirements-for-iso-140012026/' },
+    { name: '한국인정평가원 ISO 14001:2026 전환지침 공고', version: 'KAB-TR-EMS 26-5', effective: '2026-10-07', url: 'https://kab.or.kr/kor/bbs/B0000092/view.do?nttId=8232&menuNo=400014' },
   ],
-  unverified: ['정확한 발행일(ISO 누리집 접속 막힘 — 발행 달은 Global ACI 안내)'],
+    // AX: 발행일은 ISO 소식(2026-04-15)으로 확인 — 예전 '발행일 확인 못 함' 은 출처와 모순이라 지웠다
+  unverified: [],
   renewalNote: '2027-10-31 부터 신규 인증은 2026판으로만. 2015판 인증은 2029-04-30 까지 2026판으로 전환(Global ACI — IAF 를 이은 국제인정협력기구). 매년 사후심사 · 3년 갱신.',
   benefits: [
     { id: 'trust', title: '거래처 환경 요구 대응', detail: '대기업 협력사 · 해외 바이어 환경 요구', tags: ['trust', 'export'], conditional: false },
@@ -295,9 +318,10 @@ const ISO45001: CertRule = {
   law: '국제표준(인증은 KAB 인정 인증기관)',
   sources: [
     { name: 'ISO 45001:2018 + Amd 1:2024', version: '현재 유효판', effective: '2024-02-01', url: 'https://www.iso.org/standard/88428.html' },
-    { name: 'ISO/TC 283 소식(개정 DIS 투표)', version: 'ISO/DIS 45001 — 투표 2026-08-09 마감', effective: '2026-06-18', url: 'https://committee.iso.org/sites/tc283/home/news/content-left-area/news-and-updates/news.html' },
+    { name: 'ISO/TC 283 개정 소식', version: '개정판 준비 중(ISO 안내: 2027년 상반기 예상)', effective: '2026-06-18', url: 'https://committee.iso.org/sites/tc283/home/news/content-left-area/news-and-updates/news.html' },
   ],
-  unverified: ['개정판 발행 시점 — ISO/TC 283 은 DIS 투표(2026-08-09 마감)까지만 공지, 발행 목표일 공식 발표 없음'],
+  // AX: 투표 마감일 같은 개정 과정 날짜는 화면에 내지 않는다 — 발행 전까지 2018 + Amd 1:2024 가 유효
+  unverified: ['개정판 발행 시점 — ISO 는 2027년 상반기 예상으로만 안내(확정 발표 없음) · 발행 전까지 지금 판으로 인증'],
   benefits: [
     { id: 'trust', title: '안전보건 체계 증빙', detail: '원청 · 발주처 안전보건 요구 대응', tags: ['trust', 'procurement'], conditional: false },
     { id: 'procurement', title: '입찰 · 협력사 평가', detail: '협력사 평가 · 입찰에서 쓰이는 경우가 있음', tags: ['procurement'], conditional: true },
@@ -318,11 +342,7 @@ export const CERT_RULES: Record<CertificationKey, CertRule> = {
   iso45001: ISO45001,
 }
 
-/** 업종(대분류) — 이노비즈 신청 가능 업종(운영규정 제3조①) */
-export const INNOBIZ_INDUSTRY_OK = ['manufacturing', 'construction', 'software', 'bio', 'environment', 'design', 'service', 'food'] as const
-
-/** 메인비즈 제외 업종 낱말(게임 · 도박 · 사행성 · 불건전 소비) */
-export const MAINBIZ_EXCLUDED_WORDS = /도박|사행|카지노|경마|복권|유흥|주점|게임장|성인/
+// 업종(이노비즈 8가지 평가표 · 별표2 제외 · 메인비즈 제외)은 rules/industryMap.ts — KSIC 코드로만 확정한다(AX)
 
 /** 기업부설연구소 연구전담요원 기준(시행령 제6조) */
 export const LAB_RESEARCHERS = {
@@ -340,22 +360,43 @@ export const LAB_RESEARCHERS = {
 export const VENTURE_RND = { minExpenseWon: 50_000_000, minRatio: 0.05 } as const
 
 /**
- * 벤처 연구개발유형 — 업종별 연구개발 투자비율(%) · 매출 50억 미만 / 50~100억 / 100억 이상 (확인요령 별표1, 고시 제2026-68호).
- * 업체 업종은 대분류로만 알기 때문에 가장 가까운 줄을 쓰고 화면에 '세부 업종 확인' 을 붙인다.
+ * 벤처 연구개발유형 — 업종별 연구개발 투자비율(%) · 매출 50억 미만 / 50~100억 / 100억 이상
+ * (확인요령 별표1, 고시 제2026-68호 — 업종 코드는 벤처기업확인제도 가이드북 2023 p.12).
+ * AX: 세부 업종(KSIC)을 모르면 비율을 고르지 않는다 — '제조업이면 5%' 같은 기본값 없음(기계 7% · 의료 · 정밀 8% 등 업종마다 다르다).
+ * 법 제2조의2①2호나목 단서: 창업 3년 미만은 매출 대비 비율 미적용(5천만원 이상은 그대로).
  */
-export const VENTURE_RND_RATIO: { row: string; groups: string[]; pct: [number, number, number] }[] = [
-  { row: '소프트웨어 개발 · 공급업 · 정보서비스업', groups: ['software'], pct: [10, 8, 8] },
-  { row: '의약품', groups: ['bio'], pct: [6, 6, 6] },
-  { row: '기타 제조업(세부 업종: 기계 7/5/5 · 전기장비 6/5/5 · 반도체 · 전자부품 6/5/5 · 의료 · 정밀 · 광학 8/7/6)', groups: ['manufacturing', 'food'], pct: [5, 5, 5] },
-  { row: '도매 및 소매업', groups: ['retail'], pct: [5, 5, 5] },
-  { row: '기타 산업', groups: [], pct: [5, 5, 5] },
+export const VENTURE_RND_RATIO: { row: string; ksic: string[]; pct: [number, number, number] }[] = [
+  { row: '의약품', ksic: ['21'], pct: [6, 6, 6] },
+  { row: '사무용기계 및 장비', ksic: ['2918'], pct: [6, 6, 5] },
+  { row: '기계 및 장비 제조(사무용기계 제외)', ksic: ['29'], pct: [7, 5, 5] },
+  { row: '컴퓨터 및 주변장치', ksic: ['263'], pct: [6, 6, 5] },
+  { row: '반도체 및 전자부품', ksic: ['261', '262'], pct: [6, 5, 5] },
+  { row: '전기장비', ksic: ['28'], pct: [6, 5, 5] },
+  { row: '의료 · 정밀 · 광학기기 및 시계', ksic: ['27'], pct: [8, 7, 6] },
+  { row: '도매 및 소매업', ksic: ['45', '46', '47'], pct: [5, 5, 5] },
+  { row: '통신업', ksic: ['61'], pct: [7, 5, 5] },
+  { row: '소프트웨어 개발 · 공급업', ksic: ['582'], pct: [10, 8, 8] },
+  { row: '컴퓨터 프로그래밍 · 시스템 통합 관리업', ksic: ['62'], pct: [10, 8, 8] },
+  { row: '정보서비스업', ksic: ['63'], pct: [10, 8, 8] },
 ]
+const VENTURE_OTHER_MFG = { row: '기타 제조업', pct: [5, 5, 5] as [number, number, number] }
+const VENTURE_OTHER = { row: '기타 산업', pct: [5, 5, 5] as [number, number, number] }
 
-/** 매출(원)과 업종 대분류 → 별표1 비율(소수) · 그 줄 이름 */
-export function ventureRndRatio(group: string, revenue: number | null): { ratio: number; row: string } {
-  const line = VENTURE_RND_RATIO.find((r) => r.groups.includes(group)) ?? VENTURE_RND_RATIO[VENTURE_RND_RATIO.length - 1]
+/**
+ * KSIC(숫자) · 매출(원) → 별표1 비율(소수) · 그 줄 이름. KSIC 가 없거나 너무 짧아 줄이 갈리면(예: '29' → 기계 7% · 사무용기계 6%) null = 세부 업종 확인 필요.
+ */
+export function ventureRndRatio(ksic: string | null | undefined, revenue: number | null): { ratio: number; row: string } | null {
+  if (!ksic || !/^\d{2,5}$/.test(ksic)) return null
   const band = revenue === null || revenue < 5_000_000_000 ? 0 : revenue < 10_000_000_000 ? 1 : 2
-  return { ratio: line.pct[band] / 100, row: line.row }
+  let best: { p: string; line: (typeof VENTURE_RND_RATIO)[number] } | null = null
+  for (const line of VENTURE_RND_RATIO) for (const p of line.ksic) if (ksic.startsWith(p) && (!best || p.length > best.p.length)) best = { p, line }
+  // 더 세부 줄이 이 코드 아래에 있고 비율이 다르면 아직 모른다
+  const deeper = VENTURE_RND_RATIO.filter((l) => l.ksic.some((p) => p.length > ksic.length && p.startsWith(ksic)))
+  const pick = best ? best.line : null
+  const mfg = Number(ksic.slice(0, 2)) >= 10 && Number(ksic.slice(0, 2)) <= 34
+  const base = pick ?? (mfg ? VENTURE_OTHER_MFG : VENTURE_OTHER)
+  if (deeper.some((l) => l.pct.join() !== base.pct.join())) return null
+  return { ratio: base.pct[band] / 100, row: base.row }
 }
 
 /** 공식 기준 신선도 — 마지막 확인에서 FRESH_DAYS 넘게 지났나 */
