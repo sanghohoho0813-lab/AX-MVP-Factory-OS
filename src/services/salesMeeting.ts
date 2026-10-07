@@ -158,6 +158,8 @@ function noteId(): string {
 
 export interface MeetingRecordOptions {
   round: 1 | 2 | 3
+  /** D-171: 클로징 미팅의 실제 차수(4 · 5차) — round 3 일 때만 */
+  roundNo?: number
   text: string
   analysis: TranscriptAnalysis
   /** 다음 할 일 · 날짜 — 비우면 그대로 둔다 */
@@ -174,6 +176,7 @@ export function withMeetingNote(record: ClientOpsRecord, opts: MeetingRecordOpti
     id: noteId(),
     at,
     round: opts.round,
+    ...(opts.round === 3 && opts.roundNo && opts.roundNo > 3 ? { roundNo: opts.roundNo } : {}),
     text: opts.text.trim(),
     reaction: opts.analysis.reaction,
     issues: opts.analysis.issues,
@@ -189,7 +192,7 @@ export function withMeetingNote(record: ClientOpsRecord, opts: MeetingRecordOpti
     next = { ...next, nextAction: opts.nextAction.trim(), nextActionDueDate: opts.nextActionDueDate ?? next.nextActionDueDate }
   }
   const topics = note.issues.slice(0, 3).join(' · ')
-  return withActivity(next, 'sales', `${opts.round}차 미팅 기록 — ${note.reaction}${topics ? ` · ${topics}` : ''}${confirmed ? ` · 관심사 확인: ${confirmed.join(' · ') || '없음'}` : learned.length ? ` · 관심사 더함: ${learned.join(' · ')}` : ''}`, null, at)
+  return withActivity(next, 'sales', `${opts.round === 3 && opts.roundNo && opts.roundNo > 3 ? opts.roundNo : opts.round}차 미팅 기록 — ${note.reaction}${topics ? ` · ${topics}` : ''}${confirmed ? ` · 관심사 확인: ${confirmed.join(' · ') || '없음'}` : learned.length ? ` · 관심사 더함: ${learned.join(' · ')}` : ''}`, null, at)
 }
 
 /** 미팅 주제(원본 규칙 이름) → 영업 관심사 (D-122) */

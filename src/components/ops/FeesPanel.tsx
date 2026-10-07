@@ -7,6 +7,7 @@
  * 입력 칸은 '고치기' 를 눌렀을 때만. 입금은 한 번 더 묻고(오늘 N원 입금으로 처리할까요?), 되돌릴 수 있다.
  * 영업자 수수료는 값이 있을 때만 한 줄로 — 핵심 숫자와 다투지 않게.
  */
+import { useMoneyWords } from './useMoneyWords'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Check, Pencil, Plus, Undo2 } from 'lucide-react'
@@ -285,6 +286,7 @@ export function FeesPanel({
   onChange: (next: ClientOpsRecord) => void | boolean | Promise<boolean>
   today: string
 }) {
+  const moneyWords = useMoneyWords()
   const navigate = useNavigate()
   const pilot = useIsPilot()
   const funding = fundingFactsOf(record.fundingApplications)
@@ -379,7 +381,7 @@ export function FeesPanel({
             <p className="t-sub break-keep text-slate-500" data-testid="fees-agent">
               영업자 수수료 {formatKrw(totals.agent)}
               {shares.length > 0 && ` (${shares.map((s) => `${s.name} ${formatKrw(s.amount)}`).join(' · ')})`} → 내 몫 {formatKrw(totals.net)}
-              {totals.marginPct !== null && ` · 이익률 ${marginText(totals.marginPct)}`} · 못 받은 내 돈 {krwTile(totals.unpaidNet)}
+              {totals.marginPct !== null && ` · 이익률 ${marginText(totals.marginPct)}`} · {moneyWords.unpaid} {krwTile(totals.unpaidNet)}
               {totals.unpaidGross !== totals.unpaidNet && ` (청구 기준 ${krwTile(totals.unpaidGross)})`}{' '}
               {!pilot && (
                 <button type="button" onClick={() => navigate('/ops/agents')} className="tap font-medium text-brand-700 underline">

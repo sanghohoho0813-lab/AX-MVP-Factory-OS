@@ -122,6 +122,18 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByTestId('cretop-mini-menu').click()
   await page.waitForTimeout(400)
   check('크레탑: 분석 이력에 남는다(모듈 기록)', (await page.getByTestId('cretop-mini-history').innerText()).includes('세방형'))
+  {
+    // D-171: 분석 이력 창은 크레탑 분석기 상자 안에만 — OS 왼쪽 목차 · 머리줄을 가리지 않는다
+    const miniBox = await page.getByTestId('cretop-mini').boundingBox()
+    const histBox = await page.getByTestId('cretop-history').boundingBox()
+    const covers = await page.evaluate(() => {
+      const aside = document.querySelector('aside')
+      const header = document.querySelector('header')
+      const hit = (el) => { if (!el) return false; const r = el.getBoundingClientRect(); if (r.width === 0) return false; const t = document.elementFromPoint(r.left + r.width / 2, r.top + Math.min(r.height / 2, 30)); return !!t?.closest('[data-testid="cretop-history"]') }
+      return { aside: hit(aside), header: hit(header), asideShown: !!aside && aside.getBoundingClientRect().width > 0 }
+    })
+    check('크레탑(D-171): 분석 이력 창이 분석기 상자 안 — OS 목차 · 머리줄을 덮지 않음', !!miniBox && !!histBox && histBox.x >= miniBox.x - 1 && histBox.x + histBox.width <= miniBox.x + miniBox.width + 1 && !covers.aside && !covers.header, JSON.stringify({ miniBox, histBox, covers }))
+  }
   await page.keyboard.press('Escape')
 
   // D-94: PDF 로 올려도 재무제표 연도가 '?' 없이 뜬다 (원본과 같은 pdf.js 4 계열로 글자를 뽑는다)

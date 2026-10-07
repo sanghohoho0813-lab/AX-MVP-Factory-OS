@@ -41,7 +41,7 @@ export function preInspectionText(title: string, s: PreInspectionSummary): strin
     block('준비된 것', s.ready),
     block('보완할 것', s.fix),
     block('대표에게 물어볼 것', s.ask),
-    block('가져갈 자료(원본)', s.bring),
+    block('가져갈 자료 · 원본', s.bring),
     s.untouched ? `※ 아직 보지 않은 질문 ${s.untouched}개` : '',
   ]
     .filter(Boolean)

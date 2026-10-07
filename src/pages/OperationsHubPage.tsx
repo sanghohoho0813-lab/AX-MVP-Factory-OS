@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useMoneyWords } from '../components/ops/useMoneyWords'
 import { AiClientAssistantButton } from '../components/ops/AiClientAssistant'
 import { useSerialSave } from '../lib/useSerialSave'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -258,6 +259,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   }, [segment])
   const contractCount = records.filter(isContractClient).length
   const prospectCount = records.filter(isProspect).length
+  const moneyWords = useMoneyWords()
 
   const visible = useMemo(() => {
     return records.filter((r) => {
@@ -643,7 +645,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
             >
               {CLIENT_FILTER_ORDER.map((k) => (
                 <option key={k} value={k}>
-                  {CLIENT_FILTER_LABEL[k]}
+                  {k === 'unpaid' ? moneyWords.unpaidFilter : CLIENT_FILTER_LABEL[k]}
                 </option>
               ))}
             </select>
@@ -672,7 +674,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       )}
 
       {/* 요약 — 0 일 때는 색을 쓰지 않는다 */}
-      <section aria-label="요약" className="ax-stagger grid grid-cols-2 gap-2.5 xl:grid-cols-4">
+      <section aria-label="요약" className="ax-stagger grid grid-cols-2 gap-2.5 xl:grid-cols-5">
         <MetricTile
           label="지금 처리할 일"
           value={`${summary.critical}건`}
@@ -688,8 +690,10 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
           onClick={() => { setTab('warning'); setAlertsOpen(true) }}
         />
         <MetricTile label="관리 중인 업체" value={`${activeCount}곳`} hint={`전체 ${records.length}곳`} />
+        {/* D-171: 잠재고객(가망고객) — 누르면 잠재고객만 */}
+        <MetricTile label="잠재고객" value={`${prospectCount}곳`} hint="계약 전 · 영업 중" onClick={() => setSegment('prospect')} />
         <MetricTile
-          label="못 받은 내 돈"
+          label={moneyWords.unpaid}
           value={krwTile(money.unpaid)}
           tone={money.overdueCount > 0 ? 'danger' : 'neutral'}
           hint={

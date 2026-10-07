@@ -48,7 +48,7 @@ export function PreInspectionPanel({ title, qs, ctx, labelOf, prep, onClose }: {
           <Block title="준비된 것" lines={s.ready} tone="text-success-700" testid="pre-ready" />
           <Block title="보완할 것" lines={s.fix} tone="text-warning-800" testid="pre-fix" />
           <Block title="대표에게 물어볼 것" lines={s.ask} tone="text-danger-700" testid="pre-ask" />
-          <Block title="가져갈 자료(원본)" lines={s.bring} tone="text-slate-900" testid="pre-bring" />
+          <Block title="가져갈 자료 · 원본" lines={s.bring} tone="text-slate-900" testid="pre-bring" />
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={copy} data-testid="pre-copy">

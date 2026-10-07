@@ -39,7 +39,8 @@ const OUTSIDER = { id: '0e000000-0000-4000-8000-0000000000c1', email: 'outsider@
 const USERS = [OWNER, PILOT, OUTSIDER]
 const OWNER_WS = '0e0000aa-0000-4000-8000-00000000000a'
 const OWNER_CLIENT = 'owner-secret-1'
-const SECRETS = ['대표비밀', '김비밀', '111-22-33333', '010-1111-2222']
+// D-171: 대표가 직접 만든 업무 항목(세무기장 · 모두의 창업 2차)도 팀장 화면 · 응답에 나오면 안 된다
+const SECRETS = ['대표비밀', '김비밀', '111-22-33333', '010-1111-2222', '세무기장', '모두의 창업 2차']
 
 // ---------- DB · PostgREST ----------
 execSync('bash scripts/db-local/e2e-pilot-db.sh', { stdio: 'ignore' })
@@ -47,6 +48,9 @@ const sql = (q) => execSync(`su postgres -c "psql -At -q -d ${E2E_DB}"`, { input
 const PILOT_WS = sql(`select id from public.workspaces where owner_id = '${PILOT.id}'`)
 check('준비: pilot_provision.sql 로 Pilot 작업공간 하나 · 업체 0', PILOT_WS.length === 36 && sql(`select count(*) from public.operations_clients where workspace_id = '${PILOT_WS}'`) === '0', PILOT_WS)
 check('준비: 0019 씨앗 — 대표 full · Pilot pilot · 가입자 없음', sql(`select string_agg(tier || ':' || user_id, ',' order by tier) from public.os_access`) === `full:${OWNER.id},pilot:${PILOT.id}`)
+// D-171: 대표 작업공간에만 직접 만든 업무 항목 두 개(대표가 실제로 쓰는 이름 그대로)
+sql(`insert into public.ops_custom_services (workspace_id, key, label, short_label, sort_order) values ('${OWNER_WS}', 'custom_d171tax', '세무기장', '세무기장', 101), ('${OWNER_WS}', 'custom_d171start', '모두의 창업 2차', '모두의 창업', 102) on conflict (workspace_id, key) do nothing`)
+check('준비(D-171): 대표 작업공간에 직접 만든 업무 항목 2개', sql(`select count(*) from public.ops_custom_services where workspace_id = '${OWNER_WS}' and key like 'custom_d171%'`) === '2')
 
 let PGRST = process.env.POSTGREST_BIN ?? '.cache/postgrest/postgrest'
 if (!existsSync(PGRST)) {
@@ -210,6 +214,9 @@ try {
   const ownerList = await bodyText(page)
   check('대표: 자기 업체가 보인다(대표비밀정밀)', ownerList.includes('대표비밀정밀'), ownerList.slice(0, 300))
   check('대표: 메뉴 그대로(잘 안 쓰는 기능 · 이 시스템 · 영업자 정산)', ['잘 안 쓰는 기능', '이 시스템', '영업자 정산'].every((s) => ownerList.includes(s)))
+  await go(page, `/ops/clients/${OWNER_CLIENT}?tab=work`)
+  const ownWork = await bodyText(page)
+  check('대표(D-171): 내가 만든 업무 항목(세무기장 · 모두의 창업 2차)은 내 화면에 보인다', ownWork.includes('세무기장') && ownWork.includes('모두의 창업'), ownWork.slice(0, 300))
   // 대표가 브라우저에 남긴 값(작성 중 메모 · 도구 입력) — 다음 사람에게 보이면 안 된다
   await page.evaluate(() => {
     localStorage.setItem('axmvp.qa.ownerDraft', '대표비밀 작성 중 메모')
@@ -398,6 +405,19 @@ try {
   const todayAfter = await bodyText(page)
   check('흐름: 오늘 화면에 내 할 일 · 기록', todayAfter.includes('서류 받기') && todayAfter.includes('박대표와 통화') && leaked(todayAfter).length === 0)
   await shot(page, 'pilot-05-today-after')
+  check('팀장(D-171): 오늘 돈 칸 이름이 "미수금"("못 받은 내 돈" 아님)', todayAfter.includes('미수금') && !todayAfter.includes('못 받은 내 돈'))
+  await go(page, `/ops/clients/${pc}?tab=work`)
+  const pWork = await bodyText(page)
+  check('팀장(D-171): 업무 탭에 대표가 만든 항목(세무기장 · 모두의 창업 2차) 없음', leaked(pWork).length === 0, leaked(pWork).join())
+  await page.getByRole('button', { name: '업무 항목 추가' }).click()
+  await page.waitForTimeout(800)
+  const pCat = await bodyText(page)
+  check('팀장(D-171): 업무 항목 창 — 대표 항목 없음 · 상품표 40개에서 고르기', leaked(pCat).length === 0 && (await page.getByTestId('service-pkg').count()) === 40, leaked(pCat).join())
+  await page.getByRole('button', { name: '닫기' }).first().click().catch(() => {})
+  await go(page, '/ops/clients')
+  const pHub = await bodyText(page)
+  check('팀장(D-171): 고객 관리 — "잠재고객" 칸 · 돈 칸은 "미수금"', pHub.includes('잠재고객') && pHub.includes('미수금') && !pHub.includes('못 받은 내 돈'), pHub.slice(0, 300))
+
   await go(page, '/ops/calendar')
   const cal = await bodyText(page)
   check('흐름: 일정 달력 — 내 업체만(대표 자료 0)', leaked(cal).length === 0 && (cal.includes('은혜테스트정밀') || cal.includes('서류 받기')), cal.slice(0, 200))

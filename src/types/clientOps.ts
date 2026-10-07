@@ -613,6 +613,8 @@ export interface SalesInfo {
   flags?: Record<string, boolean>
   /** 상담 메모 (자유 글) */
   memo?: string
+  /** D-171: 클로징이 몇 차 미팅인지(3 · 4 · 5) — 없으면 3차. 단계는 그대로 'closing' 하나다 */
+  closingRound?: number
   /** 미팅 기록 — 최신이 앞 */
   meetings?: SalesMeetingNote[]
   /** 제안 (D-114 3단계) — 고른 상품 · 합계 · 상태 · 월납 */
@@ -654,6 +656,8 @@ export interface SalesMeetingNote {
   at: string
   /** 몇 차 미팅 */
   round: 1 | 2 | 3
+  /** D-171: 클로징 미팅이 실제로 몇 차였는지(4 · 5차) — round 3 일 때만, 없으면 3차 */
+  roundNo?: number
   text: string
   /** 반응 추정 · 언급된 주제 · 망설임 · 다음 자료 */
   reaction: string

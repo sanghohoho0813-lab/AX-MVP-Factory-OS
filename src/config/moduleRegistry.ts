@@ -222,7 +222,7 @@ export const MODULES: ModuleDefinition[] = [
   // D-142: 매출(계약 수금에서 저절로) · 비용(정기 결제 · 쓴 돈 · 영업자 수수료)
   { key: 'money', label: '매출 · 비용', path: '/money', icon: Wallet, group: 'sales', accent: 'revenue', enabled: true, hint: '들어온 돈 · 들어올 예정 · 정기 결제일 · 쓴 돈' },
   // D-169: 마케팅 · 브랜딩(블로그 · 유튜브 · SNS) — 도입 예정. 지금은 안내 화면만
-  { key: 'marketing', label: '마케팅 · 브랜딩', path: '/marketing', icon: Megaphone, group: 'sales', accent: 'revenue', enabled: true, status: 'soon', hint: '블로그 · 유튜브 · SNS — 도입 예정' },
+  { key: 'marketing', label: '마케팅 · 브랜딩', path: '/marketing', icon: Megaphone, group: 'sales', accent: 'revenue', enabled: true, status: 'soon', hint: '블로그 · 유튜브 · 릴스 · SNS — 도입 예정' },
   // 만들고 있는 프로그램이 들어올 자리 — 들어오면 status 를 지우고 화면만 바꾼다 (docs/DECISIONS D-103)
   { key: 'first-meeting', label: '1차 미팅 체크리스트', path: '/sales/first-meeting', icon: ClipboardCheck, group: 'sales', accent: 'revenue', enabled: true, status: 'soon', badge: 'first-meetings', hint: '영업자용 AX 1차 미팅 체크리스트 — 만드는 중', ownerOnly: true },
 
