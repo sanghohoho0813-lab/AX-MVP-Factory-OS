@@ -42,7 +42,7 @@ import { RULE_CHANGES } from '../rules/ruleChanges'
 import type { BasisItem } from '../core/types'
 import { FIELD_COS } from './fieldFixtures'
 import { eunNeun, euroRo, iGa } from '../core/josa'
-import { evidenceAsk, REQUIRED_EVIDENCE } from '../rules/officialRules'
+import { evidenceAsk, EVIDENCE_CLASS, evidenceClassOf } from '../rules/officialRules'
 
 let pass = 0
 let fail = 0
@@ -484,7 +484,37 @@ check('어댑터: 설정 읽기 — 이상한 값은 모름', JSON.stringify(nor
   // 자료 요청 · 제출 전 확인
   const reqD = missingDocsRequest('대성정밀', 'mainbiz', submissionDocs('mainbiz', FIELD_COS.D), 'X')
   check('FV 자료 요청: 고객이 알아듣는 말(예: …) · 없는 자료는 만들 필요 없음', /예: 월간 회의록/.test(reqD) && /새로 만드실 필요는 없습니다/.test(reqD) && !/성과 관리 기록\(목표/.test(reqD), reqD)
-  check('FV 신청에 꼭 쓰는 자료는 요청 맨 앞', submissionDocs('mainbiz', FIELD_COS.D).need[0].required === true && (REQUIRED_EVIDENCE.mainbiz ?? []).includes(submissionDocs('mainbiz', FIELD_COS.D).need[0].id))
+  // FV Final: 공식 제출서류는 요청 맨 앞(없는 업체 C 로 확인 — D 는 공식 제출서류를 이미 가짐)
+  const needC = submissionDocs('innobiz', FIELD_COS.C).need
+  check('FV 공식 제출서류는 요청 맨 앞', needC.length > 0 && needC[0].required === true && needC[0].basis === 'official', needC.map((d) => [d.id, d.basis]))
+  // ---- FV Final: 공식 필수자료 vs MIRAE 실무 준비자료 ----
+  const yesI = Object.fromEntries(INNOBIZ_CHECK.map((i) => [i.id, 'yes' as const]))
+  const exOk: BasisItem = { field: 'exclusion', label: '제외 사유', value: '없음', state: 'confirmed', from: '납세증명서' }
+  const gateFor = (cert: 'innobiz' | 'mainbiz', c: typeof FIELD_COS.A) => {
+    const sc = cert === 'innobiz' ? INNOBIZ_CHECK : MAINBIZ_CHECK
+    const ans = Object.fromEntries(sc.map((i) => [i.id, 'yes' as const]))
+    const pk = buildInspectionPackage({ cert, bank: cert === 'innobiz' ? INNOBIZ_BANK : MAINBIZ_BANK, selfCheck: sc, answers: ans, ctx: c, prep: {}, labelOf: label })
+    return buildSubmitGate({ cert, ctx: c, selfCheck: sc, answers: ans, pkg: pk })
+  }
+  // Case A — 공식 제출서류(이노비즈 사업자등록증)가 없으면 반드시 확인
+  const caseA = { ...FIELD_COS.A, basis: [...(FIELD_COS.A.basis ?? []), exOk], evidence: [...FIELD_COS.A.evidence.filter((e) => e.id !== 'biz_reg'), { id: 'org_chart', label: 'org_chart', have: true }] }
+  const gA = gateFor('innobiz', caseA)
+  check('Final Case A: 공식 제출서류(사업자등록증) 없음 → 반드시 확인 · 먼저 확인 필요', gA.verdict === 'check_first' && gA.items.some((x) => x.id === 'docs_required' && x.level === 'must' && !x.ok && /공식 제출서류/.test(x.text)), gA.items)
+  // Case B — 공식 서류는 다 있고 MIRAE 실무 준비자료(연구노트 · 기술사업계획서 파일 등)만 없음 → 보완 권장, 제출 준비는 막지 않음
+  const caseB = { ...caseA, evidence: [...caseA.evidence, { id: 'biz_reg', label: 'biz_reg', have: true }] }
+  const gB = gateFor('innobiz', caseB)
+  check('Final Case B: MIRAE 실무 준비자료만 없음 → 보완 권장 · 제출 준비 가능', gB.verdict === 'ready' && gB.items.some((x) => x.id === 'docs' && x.level === 'recommend' && !x.ok) && gB.docs.need.every((d) => !d.required), gB.items)
+  check('Final Case B: 기술사업계획서 파일이 없어도 막지 않음(이노비즈넷에서 작성하는 공식 절차)', gB.docs.need.some((d) => d.id === 'biz_plan' && d.basis === 'process' && !d.required))
+  // Case C — 자료가 거의 없는 업체는 제출 준비 가능이 되지 않음
+  check('Final Case C: 정보 · 자료 없는 업체 → 먼저 확인 필요', gateFor('innobiz', FIELD_COS.C).verdict === 'check_first' && gateFor('mainbiz', FIELD_COS.C).verdict === 'check_first')
+  // Case D — 공식 필수 여부를 확인 못 한 자료(메인비즈 사업자등록증)는 '공식' 이라고 하지 않음
+  const mBiz = evidenceClassOf('mainbiz', 'biz_reg')
+  const reqDmain = missingDocsRequest('대성정밀', 'mainbiz', submissionDocs('mainbiz', { ...FIELD_COS.D, evidence: FIELD_COS.D.evidence.filter((e) => e.id !== 'biz_reg') }), 'X')
+  check('Final Case D: 메인비즈 사업자등록증 = 공식 필수 여부 확인 필요(필수 아님 · 막지 않음)', mBiz.basis === 'unverified' && !submissionDocs('mainbiz', { ...FIELD_COS.D, evidence: [] }).need.find((d) => d.id === 'biz_reg')!.required && !/필수/.test(reqDmain), reqDmain)
+  check("Final: '공식 제출서류' 로 분류한 자료는 모두 공식 운영기관 출처가 붙어 있음", Object.values(EVIDENCE_CLASS).flatMap((m) => Object.values(m ?? {})).filter((x) => x.basis === 'official').every((x) => /innobiz\.net|smes\.go\.kr/.test(x.source)))
+  check('Final: 메인비즈에서 반드시 확인으로 막는 자료는 재무제표 하나뿐(사업자등록증 · 사업계획은 막지 않음)', Object.entries(EVIDENCE_CLASS.mainbiz ?? {}).filter(([, v]) => v.basis === 'official').map(([k]) => k).join() === 'fin3')
+  check("Final: 화면 · 요청 글에 '신청에 꼭' · '필수서류' 같은 말 없음", ![gA, gB].some((g) => g.items.some((x) => /신청에 꼭|필수서류|반드시 제출|신청 불가/.test(x.text))))
+  void yesI
   // 반드시 확인이 다 되면 보완 권장이 남아도 '제출 준비 가능'
   const readyCtx = { ...FIELD_COS.B, basis: [...(FIELD_COS.B.basis ?? []), { field: 'exclusion' as const, label: '제외 사유', value: '없음', state: 'confirmed' as const, from: '납세증명서' }] }
   const allYes = Object.fromEntries(MAINBIZ_CHECK.map((i) => [i.id, 'yes' as const]))

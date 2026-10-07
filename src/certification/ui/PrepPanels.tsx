@@ -16,6 +16,7 @@ import { copyText } from '../../components/consulting/studioParts'
 import { ownerPlaceholder, type Sourced } from '../core/answerGuide'
 import { BRING_LABEL, BRING_MARK, inspectionPackageText, ownerKey, ownerQuestionMessage, type InspectionPackage, type PackageQuestion } from '../core/inspectionPackage'
 import { GATE_LEVEL_LABEL, GATE_VERDICT_LABEL, missingDocsRequest, type SubmitGate } from '../core/submitGate'
+import { EVIDENCE_BASIS_LABEL } from '../rules/officialRules'
 import { PACK_LABEL, PACK_MARK, venturePackText, type VentureSection } from '../core/venturePack'
 import { handoffText, type HandoffPackage } from '../core/handoff'
 
@@ -363,8 +364,8 @@ export function SubmitGatePanel({
               </li>
             ))}
             {gate.docs.need.map((d) => (
-              <li key={d.label} className={`t-sub break-keep ${d.required ? 'text-danger-700' : 'text-warning-800'}`} data-testid="submit-doc" data-have="false" data-required={d.required}>
-                △ {d.label} <span className="t-meta">({d.stale ? '새로 발급 필요' : d.required ? '신청에 꼭 필요' : '받으면 좋음'})</span>
+              <li key={d.label} className={`t-sub break-keep ${d.required ? 'text-danger-700' : 'text-warning-800'}`} data-testid="submit-doc" data-have="false" data-required={d.required} data-basis={d.basis}>
+                △ {d.label} <span className="t-meta">({d.stale ? '새로 발급 필요 · ' : ''}{EVIDENCE_BASIS_LABEL[d.basis]})</span>
               </li>
             ))}
           </ul>
@@ -373,7 +374,7 @@ export function SubmitGatePanel({
               모자란 자료만 요청({gate.docs.need.length})
             </Button>
           )}
-          <p className="t-meta break-keep text-slate-500">서류함에 이미 있는 자료는 다시 요청하지 않습니다. 파일은 서류함에서 한 장씩 내려받을 수 있습니다.</p>
+          <p className="t-meta break-keep text-slate-500">'공식 제출서류' 는 기관 안내에서 확인한 것, 'MIRAE 실무 준비자료' 는 공식 필수는 아니지만 평가 준비에 도움이 되는 자료입니다. 서류함에 이미 있는 자료는 다시 요청하지 않습니다.</p>
         </Block>
 
         {ownerQuestions.length > 0 && (

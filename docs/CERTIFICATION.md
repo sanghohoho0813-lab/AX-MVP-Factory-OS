@@ -102,3 +102,5 @@ ISO 14001:2026 전환(Global ACI) 반영. 남은 미확인: Kibo 개별기술 �
 | 다음 할 일 이유 | `core/nextAfter.ts` because | '…취득 완료 + …' 한 줄, 최대 3 |
 
 P3 로 남긴 것은 docs/DECISIONS.md D-173 과 보고서에.
+
+**자료 근거(D-175)**: `rules/officialRules.ts` `EVIDENCE_CLASS` — 공식 제출서류만 '반드시 확인' 에서 막는다. 나머지는 '공식 목록 · 해당 시' · '공식 절차에서 작성' · 'MIRAE 실무 준비자료' · '공식 필수 여부 확인 필요' 로 보이고 보완 권장.

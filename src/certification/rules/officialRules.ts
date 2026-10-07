@@ -130,6 +130,7 @@ const MAINBIZ: CertRule = {
   sources: [
     { name: '경영혁신형 중소기업(Main-Biz) 제도 운영규정', version: '중소벤처기업부고시 제2026-45호', effective: '2026-06-22', url: 'https://www.law.go.kr/LSW/admRulLsInfoR.do?admRulSeq=2100000280984' },
     { name: '중소벤처24 메인비즈 안내', version: '공식 누리집', effective: '2026-06-22', url: 'https://www.smes.go.kr/mainbiz' },
+    { name: '중소벤처24 메인비즈 절차 및 방법(현장평가 준비서류)', version: '공식 누리집', effective: '2026-10-07', url: 'https://www.smes.go.kr/mainbiz/usr/mainbizInfo/mainbizGuide.do' },
   ],
   checkedAt: RULES_CHECKED_AT,
   // P1 재확인(2026-10-07): 별표1 원문 — 평가 영역은 3영역(경영혁신인프라 350 · 활동 400 · 성과 250). '4영역' 으로 보였던 것은
@@ -388,10 +389,67 @@ export const EVIDENCE_ASK: Record<string, string> = {
   safety: '안전보건 관리 기록(안전교육 일지 · 점검표 등)',
 }
 
-/** FV: 신청에 꼭 쓰는 자료(OS 기준 — 이게 없으면 제출 준비가 안 된 것). 나머지는 실사 · 평가 보강 자료 */
-export const REQUIRED_EVIDENCE: Partial<Record<CertificationKey, readonly string[]>> = {
-  innobiz: ['fin3', 'biz_reg', 'biz_plan'],
-  mainbiz: ['fin3', 'biz_reg', 'vision'],
+/**
+ * 자료의 근거 구분 (FV Final) — OS 가 '필수' 라고 말하는 것은 정말 공식 필수여야 한다.
+ *   official  : 공식 기관 안내의 제출서류 목록에 '권장' 표시 없이 있는 것 — 없으면 제출 전 확인에서 '반드시 확인'
+ *   if_held   : 공식 목록에 있지만 보유한 경우에만 내는 것(특허 등록원부 · 연구소 인정서 등)
+ *   process   : 공식 절차 안에서 작성 · 입력하는 것(서류함 파일이 아니라 기관 시스템에서 작성)
+ *   mirae     : 공식 필수라고 확인되지 않았지만 MIRAE 실무상 준비를 권하는 자료
+ *   unverified: 공식 필수 여부를 확인하지 못함 — '필수' 라고 말하지 않는다
+ * 공식 근거 순서: 법령 · 행정규칙 → 중소벤처기업부 → 운영기관(이노비즈넷 · 중소벤처24) → 평가기관. 블로그 · 컨설팅 글은 쓰지 않는다.
+ */
+export type EvidenceBasis = 'official' | 'if_held' | 'process' | 'mirae' | 'unverified'
+
+export const EVIDENCE_BASIS_LABEL: Record<EvidenceBasis, string> = {
+  official: '공식 제출서류',
+  if_held: '공식 목록 · 해당 시',
+  process: '공식 절차에서 작성',
+  mirae: 'MIRAE 실무 준비자료',
+  unverified: '공식 필수 여부 확인 필요',
+}
+
+export interface EvidenceClass {
+  basis: EvidenceBasis
+  /** 어디서 확인했나(공식 출처 · 확인일) — mirae · unverified 는 왜 그렇게 두었나 */
+  source: string
+}
+
+const INNOBIZ_DOCS = '이노비즈넷 신규신청 · 현장평가 제출서류 표(innobiz.net/authen/authen2_1.asp, 2026-10-07 확인)'
+const MAINBIZ_DOCS = '중소벤처24 메인비즈 절차 및 방법 · 현장평가 준비서류 표(smes.go.kr/mainbiz/usr/mainbizInfo/mainbizGuide.do, 2026-10-07 확인)'
+
+/** 인증별 자료 근거 — 여기에 없는 이노비즈 · 메인비즈 자료는 'mirae'(실무 준비자료)로 본다 */
+export const EVIDENCE_CLASS: Partial<Record<CertificationKey, Record<string, EvidenceClass>>> = {
+  innobiz: {
+    biz_reg: { basis: 'official', source: `${INNOBIZ_DOCS} 1번 — 사업자등록증 사본 또는 사업자등록증명원` },
+    org_chart: { basis: 'official', source: `${INNOBIZ_DOCS} 3번 — 주주명부, 회사 조직도` },
+    fin3: { basis: 'official', source: `${INNOBIZ_DOCS} 4번 — 표준재무제표증명원(최근 3개년)` },
+    patent: { basis: 'if_held', source: `${INNOBIZ_DOCS} 10번 — 지식재산권 등록원부(보유 시)` },
+    lab_cert: { basis: 'if_held', source: `${INNOBIZ_DOCS} 11번 — 연구소 · 전담부서 인정서(미보유 시 연구부서 증빙)` },
+    biz_plan: { basis: 'process', source: '이노비즈넷 신청 절차 3단계 — 기술사업계획서는 이노비즈넷에서 작성(첨부 서류 아님)' },
+    rnd_records: { basis: 'mirae', source: '공식 제출서류 표에 따로 없음 — 실사(기술혁신 활동) 설명용 실무 준비' },
+    quality: { basis: 'if_held', source: `${INNOBIZ_DOCS} 13번 — 기타 증빙(각종 인증 등, 권장 · 보유 시)` },
+  },
+  mainbiz: {
+    fin3: { basis: 'official', source: `${MAINBIZ_DOCS} 기본서류 — 표준재무제표 증명원(최근 3년)` },
+    biz_reg: { basis: 'unverified', source: '중소벤처24 현장평가 준비서류 표에 없음 — 기업등록 단계에서 쓰지만 제출서류로는 확인 못 함' },
+    vision: { basis: 'if_held', source: `${MAINBIZ_DOCS} 경영관련 — 경영계획서(필수 표시 없음)` },
+    org_chart: { basis: 'if_held', source: `${MAINBIZ_DOCS} 경영관련 — 기업소개자료 · 조직도(자유양식)` },
+    hr_rules: { basis: 'if_held', source: `${MAINBIZ_DOCS} 조직관리 — 기업 경영방침 · 사내규정` },
+    customer: { basis: 'if_held', source: `${MAINBIZ_DOCS} 조직관리 — 고객관리 매뉴얼 등` },
+    kpi: { basis: 'mirae', source: '공식 준비서류 표에 따로 없음 — 성과 관리(경영혁신 활동) 설명용 실무 준비' },
+    esg: { basis: 'mirae', source: '공식 준비서류 표에 따로 없음 — 사회적 책임 설명용 실무 준비' },
+  },
+}
+
+/** 자료 하나의 근거(인증별) — 표에 없으면 MIRAE 실무 준비자료 */
+export function evidenceClassOf(cert: CertificationKey, id: string): EvidenceClass {
+  return EVIDENCE_CLASS[cert]?.[id] ?? { basis: 'mirae', source: '공식 필수로 확인되지 않음 — MIRAE 실무 준비자료' }
+}
+
+/** 공식 안내에는 있지만 OS 서류함이 따로 챙기지 않는 서류(신청 직전 발급 · 1개월 이내 등) — 제출 전 확인에 한 줄로 */
+export const OFFICIAL_FRESH_DOCS: Partial<Record<CertificationKey, string>> = {
+  innobiz: '법인등기부등본 · 부가세 과세표준증명 · 국세 · 지방세 납세증명 · 4대보험 완납증명 · 가입자 명부(대부분 1개월 이내 발급분)',
+  mainbiz: '법인등기부등본 · 신용정보조회서 · 산업재해율 조회(제조 · 건설)',
 }
 
 /** 화면 이름(라벨) → 증빙 id(여러 인증에서 같은 자료를 한 번만 부탁하려고) */

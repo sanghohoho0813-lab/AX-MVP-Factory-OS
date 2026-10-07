@@ -1,11 +1,12 @@
 /**
  * 제출 전 최종 확인 (P2) — 이노비즈 · 메인비즈. 판정은 두 가지뿐: '제출 준비 가능' · '먼저 확인 필요'.
- * FV: 항목을 '반드시 확인'(신청 자격 · 제외 사유 · 신청에 꼭 쓰는 자료 · 자가진단 절반 이상) 과 '보완 권장'(실사 설명 · 참고 증빙) 으로 나눈다.
+ * FV: 항목을 '반드시 확인'(신청 자격 · 제외 사유 · 공식 제출서류 · 자가진단 절반 이상) 과 '보완 권장'(실사 설명 · 참고 증빙 · MIRAE 실무 준비자료) 으로 나눈다.
+ * FV Final: '반드시' 로 막는 자료는 공식 기관 안내에서 확인된 것(EVIDENCE_CLASS 'official')뿐 — MIRAE 가 권하는 자료가 없다고 제출 불가처럼 보이지 않게.
  *     판정은 '반드시 확인' 만 본다 — 보완 권장이 남아도 제출은 할 수 있다(실사 전까지 채우면 된다). 새 점수는 없다.
  * 퍼센트 · 자체 점수 없음. 항목마다 ✓ / △ 한 줄. 공식 점수(650/700 · 600/700)는 따로 '공식 기준' 으로만 보인다.
  * 제출자료 정리도 여기서 — 서류함에 이미 있는 것은 다시 요청하지 않는다.
  */
-import { CERT_RULES, evidenceAsk, NO_FABRICATE_LINE, REQUIRED_EVIDENCE } from '../rules/officialRules'
+import { CERT_RULES, evidenceAsk, evidenceClassOf, NO_FABRICATE_LINE, OFFICIAL_FRESH_DOCS, type EvidenceBasis } from '../rules/officialRules'
 import type { InspectionPackage } from './inspectionPackage'
 import { runSelfCheck, type Answer, type SelfCheckItem } from './selfCheck'
 import type { CertificationClientContext, CertificationKey } from './types'
@@ -25,8 +26,8 @@ export interface GateItem {
 
 export interface SubmissionDocs {
   have: string[]
-  /** 서류함에 없거나 기간이 지난 것만 — required: 신청에 꼭 쓰는 자료 */
-  need: { id: string; label: string; stale: boolean; required: boolean }[]
+  /** 서류함에 없거나 기간이 지난 것만 — required: 공식 제출서류(basis 'official') */
+  need: { id: string; label: string; stale: boolean; required: boolean; basis: EvidenceBasis }[]
 }
 
 export interface SubmitGate {
@@ -41,11 +42,11 @@ export interface SubmitGate {
 export function submissionDocs(cert: CertificationKey, c: CertificationClientContext): SubmissionDocs {
   const have: string[] = []
   const need: SubmissionDocs['need'] = []
-  const required = REQUIRED_EVIDENCE[cert] ?? []
   for (const e of CERT_RULES[cert].evidence) {
     const doc = c.evidence.find((d) => d.id === e.id)
+    const basis = evidenceClassOf(cert, e.id).basis
     if (doc?.have && !doc.stale) have.push(e.label)
-    else need.push({ id: e.id, label: e.label, stale: !!doc?.stale, required: required.includes(e.id) })
+    else need.push({ id: e.id, label: e.label, stale: !!doc?.stale, required: basis === 'official', basis })
   }
   // 꼭 쓰는 자료를 먼저
   need.sort((a, b) => Number(b.required) - Number(a.required))
@@ -84,7 +85,8 @@ export function buildSubmitGate(input: {
   else items.push({ id: 'size', level: 'must', ok: false, text: '중소기업이 아님 — 신청 대상인지 확인' })
   const docs = submissionDocs(cert, c)
   const reqMissing = docs.need.filter((d) => d.required)
-  items.push(reqMissing.length ? { id: 'docs_required', level: 'must', ok: false, text: `신청에 꼭 쓰는 자료 ${reqMissing.length}개 없음: ${reqMissing.map((d) => d.label).join(' · ')}` } : { id: 'docs_required', level: 'must', ok: true, text: '신청에 꼭 쓰는 자료 있음' })
+  const fresh = OFFICIAL_FRESH_DOCS[cert]
+  items.push(reqMissing.length ? { id: 'docs_required', level: 'must', ok: false, text: `공식 제출서류 ${reqMissing.length}개 없음: ${reqMissing.map((d) => d.label).join(' · ')}` } : { id: 'docs_required', level: 'must', ok: true, text: `공식 제출서류(서류함으로 챙기는 것) 있음${fresh ? ` — ${fresh} 은 신청 직전 발급` : ''}` })
   const r = runSelfCheck(input.selfCheck, c, input.answers)
   const unknown = r.items.filter((x) => x.verdict === 'confirm').length
   const fix = r.items.filter((x) => x.verdict === 'fix').length
@@ -94,7 +96,7 @@ export function buildSubmitGate(input: {
   // 보완 권장 — 실사 설명 · 참고 증빙
   items.push(fix ? { id: 'selfcheck_fix', level: 'recommend', ok: false, text: `자가진단 ${fix}개 항목 보완 필요` } : { id: 'selfcheck_fix', level: 'recommend', ok: true, text: '자가진단 보완 필요 항목 없음' })
   const optMissing = docs.need.filter((d) => !d.required)
-  items.push(optMissing.length ? { id: 'docs', level: 'recommend', ok: false, text: `실사 · 평가에 쓰면 좋은 자료 ${optMissing.length}개 보완` } : { id: 'docs', level: 'recommend', ok: true, text: '실사 · 평가 참고 자료 모두 있음' })
+  items.push(optMissing.length ? { id: 'docs', level: 'recommend', ok: false, text: `기본 준비자료 ${optMissing.length}개 보완(공식 목록 해당 시 · MIRAE 실무 준비자료)` } : { id: 'docs', level: 'recommend', ok: true, text: '기본 준비자료 모두 있음' })
   const open = pkg.questions.filter((x) => x.guide.needsOwner && !x.prepared).length
   items.push(open ? { id: 'answers', level: 'recommend', ok: false, text: `실사 핵심질문 ${open}개 답 근거 없음` } : { id: 'answers', level: 'recommend', ok: true, text: '실사 핵심질문 답 근거 있음' })
   items.push(pkg.ownerQuestions.length ? { id: 'owner', level: 'recommend', ok: false, text: `대표님께 확인할 것 ${pkg.ownerQuestions.length}개 남음` } : { id: 'owner', level: 'recommend', ok: true, text: '대표님께 확인할 것 없음' })

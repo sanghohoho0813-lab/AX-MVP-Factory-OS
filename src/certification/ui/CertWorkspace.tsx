@@ -9,7 +9,7 @@ import { ExternalLink } from 'lucide-react'
 import { Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { ToolResultAttach } from '../../tools/shared/ToolResultAttach'
-import { CERT_RULES, rulesStale } from '../rules/officialRules'
+import { CERT_RULES, EVIDENCE_BASIS_LABEL, EVIDENCE_CLASS, evidenceClassOf, rulesStale } from '../rules/officialRules'
 import { explainFor } from '../core/explain'
 import { ruleChangesOf } from '../rules/ruleChanges'
 import { READINESS_LABEL, RECOMMENDATION_LABEL, type CertificationAssessment, type CertificationClientContext } from '../core/types'
@@ -150,6 +150,7 @@ export function CertWorkspace({
                   <li key={e.id} className={`t-sub flex flex-wrap items-baseline gap-x-2 break-keep ${have ? 'text-success-700' : 'text-slate-800'}`} data-testid="cert-evidence" data-have={have}>
                     <b className="font-semibold">{have ? '✓ 있음' : '받을 것'}</b> {e.label}
                     <span className="text-slate-500">— {e.why}</span>
+                    {EVIDENCE_CLASS[a.key] && <span className="t-meta text-slate-500" data-testid="cert-evidence-basis">[{EVIDENCE_BASIS_LABEL[evidenceClassOf(a.key, e.id).basis]}]</span>}
                   </li>
                 )
               })}
