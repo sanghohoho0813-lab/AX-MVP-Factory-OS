@@ -5,6 +5,8 @@
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { Surface } from '../../components/ui/primitives'
+import { Button } from '../../components/ui/Button'
+import { useToast } from '../../components/ui/toastContext'
 import type { CertificationClientContext, CompanySize, ResearchUnit } from '../core/types'
 import type { CertProfile } from '../integration/clientContext'
 
@@ -36,7 +38,22 @@ const QUESTIONS: Q[] = [
   { key: 'exclusion', label: '체납 · 회생 · 임금체불 · 산재 공표가 최근 3년 안에 있나요?', known: () => false, options: [{ label: '없음(확인)', value: false }, { label: '있음', value: true }, { label: '모름', value: null }] },
 ]
 
-export function ProfileQuestions({ ctx, profile, onChange }: { ctx: CertificationClientContext; profile: CertProfile; onChange: (patch: Partial<CertProfile>) => void }) {
+export function ProfileQuestions({
+  ctx,
+  profile,
+  onChange,
+  pendingFacts,
+  onConfirmFacts,
+}: {
+  ctx: CertificationClientContext
+  profile: CertProfile
+  onChange: (patch: Partial<CertProfile>) => void
+  /** P1: 칩으로 고른 것 중 회사 정보(사실 창고)에 확인된 값으로 넣을 수 있는 것 */
+  pendingFacts: { label: string; value: string }[]
+  onConfirmFacts: () => Promise<number>
+}) {
+  const { showToast } = useToast()
+  const [saving, setSaving] = useState(false)
   // 기록에서 이미 아는 것은 빼고, 컨설턴트가 고른 것은 남겨 고칠 수 있게
   const asked = QUESTIONS.filter((q) => profile[q.key] !== null || !q.known(ctx))
   const unanswered = asked.filter((q) => profile[q.key] === null).length
@@ -76,6 +93,29 @@ export function ProfileQuestions({ ctx, profile, onChange }: { ctx: Certificatio
               </div>
             </li>
           ))}
+          {/* P1: 칩은 기업인증 판정에만 쓴다 — 회사 정보(다른 모듈이 읽는 사실)로는 대표가 눌렀을 때만 '확인됨' 으로 */}
+          {pendingFacts.length > 0 && (
+            <li className="flex flex-col gap-1.5 border-t border-slate-100 pt-3" data-testid="cert-facts-confirm">
+              <span className="t-sub break-keep text-slate-700">
+                고른 값({pendingFacts.map((f) => `${f.label} ${f.value}`).join(' · ')})은 아직 기업인증에서만 씁니다. 대표님께 확인했으면 회사 정보에 넣어 다른 모듈도 같이 쓰게 하세요.
+              </span>
+              <Button
+                variant="secondary"
+                className="self-start"
+                disabled={saving}
+                onClick={() => {
+                  setSaving(true)
+                  void onConfirmFacts()
+                    .then((n) => showToast(n ? `회사 정보에 확인된 사실 ${n}개를 저장했습니다` : '바뀐 것이 없습니다'))
+                    .catch(() => showToast('저장하지 못했습니다 — 다시 눌러 주세요'))
+                    .finally(() => setSaving(false))
+                }}
+                data-testid="cert-facts-save"
+              >
+                {saving ? '저장 중…' : '회사 정보에 확인된 사실로 저장'}
+              </Button>
+            </li>
+          )}
         </ul>
       )}
     </Surface>

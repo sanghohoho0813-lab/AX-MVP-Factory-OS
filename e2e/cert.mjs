@@ -167,6 +167,107 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const clip = await page.evaluate(() => navigator.clipboard.readText())
   check('ISO 상담 요청 문구: 업체명 · 업종 · 직원 수 · 관심 ISO · 보유 자료', /\[ISO 상담 요청\]/.test(clip) && /직원 수/.test(clip) && /ISO 9001/.test(clip) && !/010|사업자번호/.test(clip), clip)
 
+  /* ================= P1 — 연구소 연결 · 사실 확인 저장 · 진행 기록 · 갱신 · 실사 요약 · 근거 · 자료 요청 · 만료 · 빈 업체 ================= */
+  const recOf = (id) => page.evaluate((cid) => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((c) => c.id === cid), id)
+  // A — 연구소 관리(labcare) 기록이 있으면 묻지 않는다
+  await page.evaluate(() => {
+    const now = new Date().toISOString()
+    localStorage.setItem('axmvp.module.labcare.orig', JSON.stringify([{ id: 'lr1', clientId: '', data: { key: 'pmsaas:clients:v1', value: [{ id: 'cli_wooil', labType: '기업부설연구소', certifiedDate: '2024-05-10', labRegistrationNumber: '2024-123', labName: '우일연구소', researcherCount: 4 }] }, createdAt: now, updatedAt: now }]))
+  })
+  await page.goto(BASE + '/tools/cert-os?client=cli_wooil', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  check('A 연구소 관리 기록 → 연구소 카드 보유 중(다시 묻지 않음)', (await page.locator('[data-testid="cert-card"][data-key="lab"] [data-testid="cert-rec"]').getAttribute('data-rec')) === 'held')
+  await page.getByTestId('cert-profile-toggle').click()
+  check('A 연구조직 · 연구원 수 질문 없음(이미 앎)', (await page.locator('[data-testid="cert-q-researchUnit"]').count()) === 0 && (await page.locator('[data-testid="cert-q-researchers"]').count()) === 0)
+  // B — 특허 칩 → 판정에 바로, 회사 정보에는 [확인 저장] 눌러야
+  await page.locator('[data-testid="cert-q-patents"]', { hasText: /^2건$/ }).first().click()
+  await page.waitForTimeout(500)
+  const beforeFact = (await recOf('cli_wooil'))?.factValues?.patents ?? ''
+  check('B 칩만 고르면 회사 정보(사실 창고)는 그대로', beforeFact !== '2건' && (await page.getByTestId('cert-facts-confirm').count()) === 1, beforeFact)
+  await page.getByTestId('cert-facts-save').click()
+  await page.waitForTimeout(700)
+  const wf = await recOf('cli_wooil')
+  check('B [회사 정보에 확인된 사실로 저장] → 특허 2건 · 확인됨 · 활동 기록', wf.factValues?.patents === '2건' && wf.factMeta?.patents?.status === 'confirmed' && wf.activity?.[0]?.text?.includes('기업인증에서 확인한 사실'), { v: wf.factValues, m: wf.factMeta?.patents })
+  check('B 저장하면 확인 단추가 사라진다', (await page.getByTestId('cert-facts-confirm').count()) === 0)
+  // 근거
+  await page.goto(BASE + '/tools/cert-os/innobiz?client=cli_wooil', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  await page.getByTestId('cert-basis').locator('summary').click()
+  const basis = await page.getByTestId('cert-basis-item').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-state')}:${e.textContent}`))
+  check('근거: 연구조직 ✓ 연구소 관리 기록 · 특허 ✓(확인 저장 뒤) · 모르는 것은 ?', basis.some((b) => b.startsWith('confirmed') && b.includes('연구소 관리')) && basis.some((b) => b.startsWith('confirmed') && b.includes('특허')) && basis.some((b) => b.startsWith('missing')), basis)
+  // 자료 요청
+  await page.getByTestId('cert-step-1').click()
+  const wantDocs = await page.locator('[data-testid="cert-evidence"][data-have="false"]').count()
+  const docsBefore = (await recOf('cli_wooil'))?.customDocuments?.length ?? 0
+  await page.getByTestId('cert-request-docs').click()
+  await page.waitForTimeout(700)
+  const docsAfter = (await recOf('cli_wooil'))?.customDocuments?.length ?? 0
+  const reqClip = await page.evaluate(() => navigator.clipboard.readText())
+  const listed = (reqClip.match(/^\d+\. /gm) ?? []).length
+  check('자료 요청: 받을 것만 문구(화면의 받을 것과 같은 수) · 서류함에 없는 칸만 새로', docsAfter > docsBefore && docsAfter - docsBefore <= wantDocs && listed === wantDocs && /부탁드립니다/.test(reqClip), { wantDocs, listed, docsBefore, docsAfter })
+  await page.getByTestId('cert-request-docs').click()
+  await page.waitForTimeout(600)
+  check('자료 요청: 다시 눌러도 칸이 겹치지 않음', ((await recOf('cli_wooil'))?.customDocuments?.length ?? 0) === docsAfter)
+  // C — 진행 기록 → 인증 완료 → 갱신 일정 → 다음 할 일
+  await page.getByTestId('cert-step-2').click()
+  await page.getByTestId('cert-life-applied').click()
+  await page.waitForTimeout(600)
+  check('C 상태 칩 → 신청 · 활동 기록 한 줄', (await page.getByTestId('cert-life-status').innerText()) === '신청' && (await recOf('cli_wooil')).activity?.[0]?.text === '이노비즈 진행 — 신청')
+  await page.getByTestId('cert-complete-open').click()
+  await page.getByTestId('cert-complete-number').fill('260315-00123')
+  check('C 인증 완료 기록: 인증일 없으면 저장 못 함(날짜를 만들지 않음)', await page.getByTestId('cert-complete-save').isDisabled())
+  await page.getByTestId('cert-complete-date').fill('2026-03-15')
+  await page.getByTestId('cert-complete-fill').click()
+  check('C 인증일 + 3년 채우기(누를 때만) → 2029-03-14', (await page.getByTestId('cert-complete-valid').inputValue()) === '2029-03-14')
+  await page.getByTestId('cert-complete-save').click()
+  await page.waitForTimeout(900)
+  const wc = await recOf('cli_wooil')
+  const cred = (wc.customFields ?? []).find((f) => f.group === 'credential' && /이노비즈/.test(f.label))
+  const tr = (wc.toolResults ?? []).find((t) => t.toolKey === 'cert-os' && /이노비즈/.test(t.title))
+  check('C 회사 정보 인증서 칸 · 번호 · 2029-03-14까지', !!cred && cred.value.includes('260315-00123') && cred.value.includes('2029-03-14까지'), cred)
+  check('C 갱신 일정: 갱신 준비 시기(D-120) · 갱신 서류 준비(D-90, 할 일) · 유효기간 끝', !!tr && tr.deadlines.length === 3 && tr.deadlines[0].date === '2028-11-14' && tr.deadlines[1].date === '2028-12-14' && tr.deadlines[1].todo === true && tr.deadlines[2].hard === true, tr?.deadlines)
+  check('C 완료 뒤: 진행 기록 인증 완료 · 갱신 줄 · 다음 할 일 1~3(정책자금 먼저)', (await page.getByTestId('cert-life-status').innerText()) === '인증 완료' && (await page.getByTestId('cert-renewal').count()) === 1 && (await page.getByTestId('cert-after-item').count()) >= 1 && (await page.getByTestId('cert-after-item').count()) <= 3 && /정책자금/.test(await page.getByTestId('cert-after-item').first().innerText()))
+  await page.goto(BASE + '/tools/cert-os?client=cli_wooil', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  check('C 한눈에: 이노비즈 보유 중', (await page.locator('[data-testid="cert-card"][data-key="innobiz"] [data-testid="cert-rec"]').getAttribute('data-rec')) === 'held')
+  await page.goto(BASE + '/tools/cert-os/innobiz?client=cli_wooil', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  check('C 다시 열면 실제 진행 단계부터(진행 기록이 있으니)', (await page.getByTestId('cert-step-body-2').count()) === 1 && (await page.getByTestId('cert-life').getAttribute('data-status')) === 'certified')
+  // D — 메인비즈 실사 직전 3분 요약
+  await page.goto(BASE + '/tools/cert-os/mainbiz?client=cli_wooil', { waitUntil: 'networkidle' })
+  await page.getByTestId('cert-step-2').click()
+  await page.getByTestId('cert-pre-summary').click()
+  await page.waitForTimeout(300)
+  const pre = await page.getByTestId('pre-inspection').innerText()
+  check('D 실사 직전 요약: 준비된 것 · 보완할 것 · 대표에게 물어볼 것 · 가져갈 자료', ['준비된 것', '보완할 것', '대표에게 물어볼 것', '가져갈 자료'].every((w) => pre.includes(w)) && !/\d+\s*점/.test(pre), pre.slice(0, 300))
+  await page.getByTestId('pre-copy').click()
+  await page.waitForTimeout(200)
+  check('D 요약 복사(한 장 글)', /실사 직전 3분 요약/.test(await page.evaluate(() => navigator.clipboard.readText())))
+  // E — 만료된 인증은 보유 중으로 안 보인다
+  await page.evaluate(() => {
+    const list = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+    const c = list.find((x) => x.id === 'cli_wooil')
+    c.customFields = [...(c.customFields ?? []), { id: 'cf_v', group: 'credential', label: '벤처기업확인서', value: '확인번호 20230101 · 확인일 2023-01-01 · 2025-12-31까지' }]
+    localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(list))
+  })
+  await page.goto(BASE + '/tools/cert-os?client=cli_wooil', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  const vCard = page.locator('[data-testid="cert-card"][data-key="venture"]')
+  check('E 벤처 만료(2025-12-31): 보유 중 아님 · 이전 인증 만료 표시', (await vCard.getByTestId('cert-rec').getAttribute('data-rec')) !== 'held' && (await vCard.getByTestId('cert-expired').count()) === 1 && /이전 인증 만료/.test(await vCard.getByTestId('cert-oneline').innerText()))
+  // F — 빈 업체: 날짜 · 사실을 만들지 않는다
+  await page.evaluate(() => {
+    const list = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+    const now = new Date().toISOString()
+    list.push({ ...list[0], id: 'cli_empty', companyName: '빈상사', representativeName: '', businessNumber: '', corporateNumber: '', establishedAt: '', industry: '', businessCategory: '', businessItem: '', employeeCount: '', customFields: [], factValues: {}, factMeta: {}, factInbox: [], documents: {}, customDocuments: [], toolResults: [], activity: [], fees: [], sales: null, createdAt: now, updatedAt: now })
+    localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(list))
+  })
+  await page.goto(BASE + '/tools/cert-os/innobiz?client=cli_empty', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  await page.getByTestId('cert-basis').locator('summary').click()
+  const fStates = await page.getByTestId('cert-basis-item').evaluateAll((els) => els.map((e) => e.getAttribute('data-state')))
+  check('F 빈 업체: 근거 전부 모름 · 갱신 줄 없음 · 추가 확인 필요', fStates.length > 0 && fStates.every((x) => x === 'missing') && (await page.getByTestId('cert-renewal').count()) === 0 && (await page.getByTestId('cert-rec').first().getAttribute('data-rec')) === 'need_info', fStates)
+  check('공식 출처: 상이 표시는 없고 미확인 1가지만(Kibo 항목별 배점)', (await page.getByTestId('cert-conflict').count()) === 0)
+
   // 업체 상세 모듈 입구
   await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)

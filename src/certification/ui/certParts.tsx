@@ -53,6 +53,15 @@ export function ReadinessBadge({ r }: { r: Readiness }) {
   )
 }
 
+/** P1: 이전 인증 만료(연장 기간도 지남) — 보유 중으로 보이지 않게 */
+export function ExpiredBadge() {
+  return (
+    <Badge tone="danger" className="font-semibold">
+      <span data-testid="cert-expired">이전 인증 만료</span>
+    </Badge>
+  )
+}
+
 const MARK: Record<CheckState, { icon: ReactNode; cls: string; sr: string }> = {
   ok: { icon: <Check aria-hidden="true" className="size-4 shrink-0 text-success-600" />, cls: 'text-slate-800', sr: '충족' },
   warn: { icon: <Triangle aria-hidden="true" className="size-3.5 shrink-0 text-warning-600" />, cls: 'text-warning-800', sr: '보강 필요' },

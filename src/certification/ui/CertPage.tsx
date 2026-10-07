@@ -9,7 +9,8 @@ import { PageHeader } from '../../components/ui/PageHeader'
 import { useModuleSection } from '../../tools/shared/ModuleRoute'
 import { toolOf } from '../../config/toolRegistry'
 import type { CertificationKey } from '../core/types'
-import { useCertData } from '../integration/useCertData'
+import { factPatchOf, useCertData } from '../integration/useCertData'
+import { readFact } from '../../services/customerFacts'
 import { CertOverview, PickClient } from './CertOverview'
 import { CertWorkspace } from './CertWorkspace'
 import { IsoScreen } from './IsoScreen'
@@ -38,13 +39,15 @@ export default function CertPage() {
       </div>
     )
   }
+  // P1: 칩으로 고른 특허 · 연구소 중 회사 정보(확인)와 다른 것 — [회사 정보에 확인된 사실로 저장] 대상
+  const pendingFacts = d.clientRecord ? factPatchOf(d.profile).filter((f) => { const cur = readFact(d.clientRecord!, f.key); return !cur || cur.status !== 'confirmed' || cur.value !== f.value }) : []
   const key = section as CertificationKey
   const a = d.list.find((x) => x.key === key)
   const work = a ? d.workOf(key) : null
   return (
     <div className="flex flex-col gap-5" data-testid="cert-page">
       {head}
-      {section === 'overview' && <CertOverview ctx={d.ctx} list={d.list} roadmap={d.roadmap} profile={d.profile} onProfile={(p) => void d.saveProfile(p)} clientId={d.clientId} />}
+      {section === 'overview' && <CertOverview ctx={d.ctx} list={d.list} roadmap={d.roadmap} profile={d.profile} onProfile={(p) => void d.saveProfile(p)} clientId={d.clientId} pendingFacts={pendingFacts} onConfirmFacts={d.confirmFacts} />}
       {section === 'iso' && <IsoScreen list={d.list} ctx={d.ctx} />}
       {a && work && (
         <CertWorkspace
@@ -56,6 +59,11 @@ export default function CertPage() {
           prep={work.prep}
           onAnswer={(id, v) => void d.saveWork(a.key, { answers: { ...work.answers, [id]: v } })}
           onPrep={(id, p) => void d.saveWork(a.key, { prep: { ...work.prep, [id]: p } })}
+          life={d.lifeOf(a.key).life}
+          onStatus={(s) => d.setStatus(a.key, s)}
+          onComplete={(input, toProfile) => d.complete(a.key, input, { toProfile })}
+          onPatchLife={(patch) => d.patchLife(a.key, patch)}
+          onRequestDocs={(labels) => d.requestDocs(labels)}
         />
       )}
     </div>

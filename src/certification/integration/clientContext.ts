@@ -7,10 +7,13 @@
  */
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { clientFacts } from '../../tools/shared/clientPrefill'
-import { usableFactValue } from '../../services/customerFacts'
+import { FACT_SOURCE_LABEL, readFact, usableFactValue } from '../../services/customerFacts'
 import { allDocumentMetas } from '../../services/clientOpsDocuments'
 import { documentStatus } from '../../services/clientOpsAlerts'
-import type { CertificationClientContext, CertificationKey, CompanySize, EvidenceDoc, HeldCertification, ResearchUnit } from '../core/types'
+import type { BasisField, BasisItem, CertificationClientContext, CertificationKey, CompanySize, EvidenceDoc, HeldCertification, ResearchUnit } from '../core/types'
+import { BASIS_LABEL } from '../core/basis'
+import type { CertLifecycle } from '../core/lifecycle'
+import type { LabcareFacts } from './labcareAdapter'
 import { CERT_RULES } from '../rules/officialRules'
 
 /** 컨설턴트가 칩으로 고르는 업체 사정(기록에 없을 때만) — null = 모름 */
@@ -203,10 +206,32 @@ export function industryGroupOf(text: string): CertificationClientContext['indus
 /** 진행 중인 업무 상태 — 시작했으면 그 계획이 있다고 본다 */
 const ACTIVE_SERVICE = new Set<string>(['in_progress', 'waiting_client', 'done'])
 
-export function certContextOf(record: ClientOpsRecord, today: string, profile: CertProfile = EMPTY_CERT_PROFILE): CertificationClientContext {
+/** P1: 다른 모듈 · 진행 기록에서 이미 아는 것 */
+export interface CertExtra {
+  /** 연구소 관리(labcare) 기록 */
+  lab?: LabcareFacts | null
+  /** 기업인증 진행 기록(인증 완료 · 유효기간) */
+  lives?: readonly CertLifecycle[]
+}
+
+/** 진행 기록에서 '인증 완료 · 갱신 준비' 인 것 → 보유 인증(사람이 적은 날짜만) */
+function heldFromLives(lives: readonly CertLifecycle[]): HeldCertification[] {
+  return lives
+    .filter((l) => l.status === 'certified' || l.status === 'renewal')
+    .map((l) => ({ key: l.cert, validUntil: l.validUntil, note: [l.number && `번호 ${l.number}`, l.certifiedAt && `인증일 ${l.certifiedAt}`].filter(Boolean).join(' · ') }))
+}
+
+export function certContextOf(record: ClientOpsRecord, today: string, profile: CertProfile = EMPTY_CERT_PROFILE, extra: CertExtra = {}): CertificationClientContext {
   const f = clientFacts(record, new Date(`${today}T00:00:00`))
   const held = heldCertifications(record)
-  const unit = profile.researchUnit ?? researchUnitOf(record, held)
+  // 진행 기록 · 연구소 관리에서 아는 보유 인증을 더한다(회사 정보 '인증서' 칸이 먼저 — 유효기간이 비었으면 진행 기록 날짜로)
+  for (const h of heldFromLives(extra.lives ?? [])) {
+    const cur = held.find((x) => x.key === h.key)
+    if (!cur) held.push(h)
+    else if (!cur.validUntil && h.validUntil) cur.validUntil = h.validUntil
+  }
+  if (extra.lab && extra.lab.unit === 'lab' && !held.some((h) => h.key === 'lab')) held.push({ key: 'lab', validUntil: '', note: `연구소 관리 기록 · 인정 ${extra.lab.recognizedAt}${extra.lab.number ? ` · ${extra.lab.number}` : ''}` })
+  const unit = profile.researchUnit ?? extra.lab?.unit ?? researchUnitOf(record, held)
   const recordPatents = patentsOf(record)
   const policyService = record.services?.policyFund
   const ventureService = record.services?.venture
@@ -226,7 +251,7 @@ export function certContextOf(record: ClientOpsRecord, today: string, profile: C
     totalLiabilities: f.totalLiabilities?.won ?? null,
     rndExpense: profile.rndExpenseMan !== null ? profile.rndExpenseMan * 10_000 : null,
     researchUnit: unit,
-    researchers: profile.researchers,
+    researchers: profile.researchers ?? extra.lab?.researchers ?? null,
     patents: profile.patents ?? recordPatents,
     held,
     b2b: profile.b2b,
@@ -237,6 +262,62 @@ export function certContextOf(record: ClientOpsRecord, today: string, profile: C
     rndPlan: profile.rndPlan ?? (ventureService && ACTIVE_SERVICE.has(ventureService.status) ? true : null),
     exclusionFlags: profile.exclusion ? ['제외 사유 있음(체납 · 회생 · 체불 · 산재 공표 등 — 내용 확인)'] : [],
     evidence: evidenceOf(record, today),
+    basis: basisOf(record, f, profile, extra, held),
     today,
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* 근거 — 판정에 쓴 사실이 어디서 왔고 확인됐는지 (P1)                     */
+/* ------------------------------------------------------------------ */
+
+const CHIP_FROM = '컨설턴트 선택(회사 정보 미확인)'
+
+function factItem(record: ClientOpsRecord, factKey: string, field: BasisField, display?: string): BasisItem | null {
+  const fact = readFact(record, factKey)
+  if (!fact || fact.status === 'missing') return null
+  return {
+    field,
+    label: BASIS_LABEL[field],
+    value: display ?? fact.display,
+    state: fact.status === 'confirmed' ? 'confirmed' : 'estimated',
+    from: `${fact.source ? FACT_SOURCE_LABEL[fact.source] : '직접 적음'}${fact.asOf ? ` ${fact.asOf}` : ''}${fact.status === 'confirmed' ? '' : ' · 확인 전'}`,
+  }
+}
+
+/** 칩 값 → 사실 창고에 넣을 글(특허 · 연구소) — 저장 단추와 같은 글이어야 '확인됨' 으로 알아본다 */
+export function factPatchValue(key: 'patents' | 'researchLab', p: CertProfile): string {
+  if (key === 'patents') return p.patents === null ? '' : p.patents === 0 ? '없음' : `${p.patents}건${p.patents >= 3 ? ' 이상' : ''}`
+  return p.researchUnit === null ? '' : { lab: '기업부설연구소', dept: '연구개발전담부서', none: '없음' }[p.researchUnit]
+}
+
+const chip = (field: BasisField, value: string): BasisItem => ({ field, label: BASIS_LABEL[field], value, state: 'estimated', from: CHIP_FROM })
+const yn = (v: boolean | null) => (v === null ? '' : v ? '예' : '아니오')
+
+function basisOf(record: ClientOpsRecord, f: ReturnType<typeof clientFacts>, p: CertProfile, extra: CertExtra, held: HeldCertification[]): BasisItem[] {
+  const out: BasisItem[] = []
+  const push = (b: BasisItem | null) => b && out.push(b)
+  push(factItem(record, 'establishedAt', 'years', f.years !== null ? `${f.years}년(설립 ${usableFactValue(record, 'establishedAt')})` : undefined))
+  push(factItem(record, 'businessItem', 'industry') ?? factItem(record, 'businessCategory', 'industry') ?? (f.industryText ? { field: 'industry', label: BASIS_LABEL.industry, value: f.industryText, state: 'estimated', from: '업체 기본 정보 · 확인 전' } : null))
+  push(factItem(record, 'employeeCount', 'employees'))
+  if (p.size) push(chip('size', { small: '소기업', medium: '중기업', mid_large: '중견 이상', large: '대기업' }[p.size]))
+  else if (f.employeeCount !== null && f.employeeCount < 50) push({ field: 'size', label: BASIS_LABEL.size, value: '중소기업으로 보임', state: 'estimated', from: `직원 ${f.employeeCount}명으로 추정 — 중소기업확인서로 확인` })
+  for (const [k, field] of [['revenue', 'revenue'], ['operatingProfit', 'operatingProfit'], ['totalAssets', 'totalAssets'], ['totalLiabilities', 'totalLiabilities']] as const) push(factItem(record, k, field))
+  if (p.rndExpenseMan !== null) push(chip('rndExpense', p.rndExpenseMan === 0 ? '없음' : `약 ${p.rndExpenseMan.toLocaleString()}만원`))
+  // 연구조직 — 연구소 관리 기록 > 회사 정보(확인) > 인증서 칸 > 칩
+  // 확인된 것이 칩보다 먼저 — [회사 정보에 확인된 사실로 저장] 을 누르면 ✓ 로 바뀐다
+  const labFact = factItem(record, 'researchLab', 'researchUnit')
+  if (extra.lab && !p.researchUnit) push({ field: 'researchUnit', label: BASIS_LABEL.researchUnit, value: extra.lab.unit === 'lab' ? '기업부설연구소' : '연구개발전담부서', state: 'confirmed', from: `연구소 관리 기록(인정 ${extra.lab.recognizedAt})` })
+  else if (labFact?.state === 'confirmed' && (!p.researchUnit || factPatchValue('researchLab', p) === readFact(record, 'researchLab')?.value)) push(labFact)
+  else if (p.researchUnit) push(chip('researchUnit', { lab: '기업부설연구소', dept: '연구개발전담부서', none: '없음' }[p.researchUnit]))
+  else push(labFact ?? (held.some((h) => h.key === 'lab') ? { field: 'researchUnit', label: BASIS_LABEL.researchUnit, value: '기업부설연구소', state: 'confirmed', from: '회사 정보 인증서 칸' } : null))
+  if (p.researchers !== null) push(chip('researchers', `${p.researchers}명`))
+  else if (extra.lab?.researchers) push({ field: 'researchers', label: BASIS_LABEL.researchers, value: `${extra.lab.researchers}명`, state: 'confirmed', from: '연구소 관리 기록' })
+  const patFact = factItem(record, 'patents', 'patents')
+  if (patFact?.state === 'confirmed' && (p.patents === null || factPatchValue('patents', p) === readFact(record, 'patents')?.value)) push(patFact)
+  else if (p.patents !== null) push(chip('patents', factPatchValue('patents', p)))
+  else push(patFact ?? ((record.customFields ?? []).some((x) => x.group === 'credential' && /특허/.test(x.label)) ? { field: 'patents', label: BASIS_LABEL.patents, value: `${patentsOf(record) ?? 0}건`, state: 'confirmed', from: '회사 정보 인증서 칸(특허증)' } : null))
+  for (const [k, field] of [['b2b', 'b2b'], ['procurement', 'procurement'], ['exportPlan', 'exportPlan']] as const) if (p[k] !== null) push(chip(field, yn(p[k])))
+  if (p.exclusion !== null) push({ field: 'exclusion', label: BASIS_LABEL.exclusion, value: p.exclusion ? '있음' : '없음', state: 'estimated', from: '컨설턴트 확인(신청 전 증명서로 최종 확인)' })
+  return out
 }

@@ -14,7 +14,7 @@ import { CERT_RULES, rulesStale, RULES_CHECKED_AT } from '../rules/officialRules
 import type { CertificationAssessment, CertificationClientContext, CertificationKey } from '../core/types'
 import type { Roadmap } from '../core/roadmap'
 import type { CertProfile } from '../integration/clientContext'
-import { BenefitPicks, ReadinessBadge, ReasonList, RecBadge } from './certParts'
+import { ExpiredBadge, BenefitPicks, ReadinessBadge, ReasonList, RecBadge } from './certParts'
 import { ProfileQuestions } from './ProfileQuestions'
 import { sectionHref } from './certNav'
 
@@ -128,6 +128,7 @@ function CertCard({ a, clientId }: { a: CertificationAssessment; clientId: strin
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="t-section font-bold text-slate-900">{a.label}</h3>
           <RecBadge rec={a.recommendation} />
+          {a.expired && <ExpiredBadge />}
           {!(a.recommendation === 'need_info' && a.readiness === 'unknown') && <ReadinessBadge r={a.readiness} />}
         </div>
         <p className="t-body font-semibold break-keep text-slate-800" data-testid="cert-oneline">
@@ -199,6 +200,8 @@ export function CertOverview({
   profile,
   onProfile,
   clientId,
+  pendingFacts,
+  onConfirmFacts,
 }: {
   ctx: CertificationClientContext
   list: CertificationAssessment[]
@@ -206,6 +209,8 @@ export function CertOverview({
   profile: CertProfile
   onProfile: (patch: Partial<CertProfile>) => void
   clientId: string | null
+  pendingFacts: { label: string; value: string }[]
+  onConfirmFacts: () => Promise<number>
 }) {
   const order: CertificationKey[] = ['venture', 'lab', 'innobiz', 'mainbiz', 'iso9001']
   const main = order.map((k) => list.find((a) => a.key === k)).filter((a): a is CertificationAssessment => !!a)
@@ -213,7 +218,7 @@ export function CertOverview({
   return (
     <div className="flex flex-col gap-4">
       <RoadmapCard roadmap={roadmap} />
-      <ProfileQuestions ctx={ctx} profile={profile} onChange={onProfile} />
+      <ProfileQuestions ctx={ctx} profile={profile} onChange={onProfile} pendingFacts={pendingFacts} onConfirmFacts={onConfirmFacts} />
       <ul className="flex flex-col gap-3" data-testid="cert-cards">
         {main.map((a) => (
           <CertCard key={a.key} a={a} clientId={clientId} />

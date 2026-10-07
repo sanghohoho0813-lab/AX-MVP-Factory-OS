@@ -19,6 +19,14 @@ import { MAINBIZ_CHECK } from '../mainbiz/mainbizCheck'
 import { isoConsultSummary } from '../iso/isoAdvice'
 import { certContextOf, heldCertifications, industryGroupOf, normalizeCertProfile } from '../integration/clientContext'
 import { normalizeClientOps } from '../../services/clientOpsService'
+import { completionProblems, emptyLifecycle, normalizeLifecycle, validUntilByYears, withCertStatus, withCompletion } from '../core/lifecycle'
+import { renewalDeadlines, renewalPlan } from '../core/renewal'
+import { nextAfterCertified } from '../core/nextAfter'
+import { preInspectionSummary, preInspectionText } from '../core/preInspection'
+import { basisFor } from '../core/basis'
+import { ventureRndRatio } from '../rules/officialRules'
+import { labcareFactsOf } from '../integration/labcareAdapter'
+import { factPatchOf } from '../integration/useCertData'
 
 let pass = 0
 let fail = 0
@@ -126,9 +134,9 @@ check('공식 점수는 규칙 데이터에만 — 이노비즈 650 · 700 · B�
 // 보유 · 갱신
 const heldCtx = ctx({ ...tech, held: [{ key: 'innobiz', validUntil: '2026-12-01', note: '' }] })
 const heldI = assessInnobiz(heldCtx)
-check('보유 이노비즈: 갱신 임박(90일 안) → 갱신 준비', heldI.recommendation === 'held' && heldI.nextAction.kind === 'renew' && heldI.renewal?.prepareFrom === '2026-09-02', heldI)
-const expired = assessMainbiz(ctx({ ...service, held: [{ key: 'mainbiz', validUntil: '2026-09-01', note: '' }] }))
-check('만료된 메인비즈: 다시 신청(지금 추천)', expired.recommendation === 'now' && /만료됨/.test(expired.timing), expired.timing)
+check('보유 이노비즈: 갱신 임박(90일 안) → 갱신 준비 · 갱신 준비 시기는 D-120(P1)', heldI.recommendation === 'held' && heldI.nextAction.kind === 'renew' && heldI.renewal?.prepareFrom === '2026-08-03', heldI)
+const expired = assessAll(ctx({ ...service, held: [{ key: 'mainbiz', validUntil: '2026-09-01', note: '' }] })).find((x) => x.key === 'mainbiz')!
+check('만료된 메인비즈(연장 30일도 지남): 보유 중 아님 · 새로 판정 + 이전 인증 만료(P1)', expired.recommendation !== 'held' && expired.expired === true && expired.oneLine.includes('이전 인증 만료'), expired.oneLine)
 
 // 제외 사유 · 부채비율
 check('제외 사유 → 지금은 필요 없음(이유 그대로)', assessInnobiz(ctx({ ...tech, exclusionFlags: ['체납'] })).recommendation === 'not_needed')
@@ -171,7 +179,7 @@ check('ISO 상담 요청: 업체명 · 업종 · 직원 수 · 관심 ISO · 보
 check('ISO: 발급 · 자동 인증처럼 말하지 않는다', Object.values(CERT_RULES).every((r) => !/자동\s*(발급|인증)|OS\s*가\s*발급/.test(JSON.stringify(r))))
 
 // 공식 기준 신선도
-check('공식 기준: 마지막 확인 2026-10-07 · 출처 URL 이 공식 기관', Object.values(CERT_RULES).every((r) => r.checkedAt === '2026-10-07' && r.sources.every((s) => /law\.go\.kr|innobiz\.net|smes\.go\.kr|iso\.org|kab\.or\.kr/.test(s.url))))
+check('공식 기준: 마지막 확인 2026-10-07 · 출처 URL 이 공식 기관', Object.values(CERT_RULES).every((r) => r.checkedAt === '2026-10-07' && r.sources.every((s) => /law\.go\.kr|innobiz\.net|smes\.go\.kr|iso\.org|kab\.or\.kr|global-aci\.org/.test(s.url))))
 check('공식 기준: 180일 지나면 최신 기준 확인 필요', !rulesStale(CERT_RULES.innobiz, '2026-12-01') && rulesStale(CERT_RULES.innobiz, '2027-05-01'))
 
 // 어댑터
@@ -195,11 +203,101 @@ check('어댑터: 연구소 인정서 증빙 = 인증서 칸으로 있음', rc.e
 check('어댑터: 모르는 것은 null(매출 · 특허 · 조달)', rc.revenue === null && rc.patents === null && rc.procurement === null)
 check('어댑터: 설정 읽기 — 이상한 값은 모름', JSON.stringify(normalizeCertProfile({ b2b: 'yes', researchers: -1, size: 'huge' })) === JSON.stringify(normalizeCertProfile({})))
 
+
+/* ================= P1 ================= */
+{
+  // 진행 기록
+  const l0 = emptyLifecycle('innobiz')
+  const l1 = withCertStatus(l0, 'applied', '2026-10-01T00:00:00Z')
+  check('P1 진행: 상태 바꾸면 기록 · 같은 상태면 그대로', l1.status === 'applied' && l1.history.length === 1 && withCertStatus(l1, 'applied', 'x') === l1)
+  const done = withCompletion(l1, { number: ' 260101-00123 ', certifiedAt: '2026-03-15', validUntil: '2029-03-14' }, '2026-10-02T00:00:00Z')
+  check('P1 완료 기록: 번호 · 인증일 · 유효기간만', done.status === 'certified' && done.number === '260101-00123' && done.certifiedAt === '2026-03-15' && done.validUntil === '2029-03-14')
+  check('P1 완료 기록: 이상한 날짜는 비운다(만들지 않는다)', withCompletion(l0, { number: '', certifiedAt: '2026-13-40', validUntil: 'abc' }, 'x').certifiedAt === '' && withCompletion(l0, { number: '', certifiedAt: '2026-13-40', validUntil: 'abc' }, 'x').validUntil === '')
+  check('P1 완료 기록: 인증일 없음 · 미래 · 끝날짜가 앞 → 고치라고만', completionProblems({ number: '', certifiedAt: '', validUntil: '' }, TODAY, true).join() === 'certified_missing' && completionProblems({ number: '', certifiedAt: '2027-01-01', validUntil: '' }, TODAY, true).includes('certified_in_future') && completionProblems({ number: '', certifiedAt: '2026-01-01', validUntil: '2025-12-31' }, TODAY, true).includes('valid_before_certified'))
+  check('P1 완료 기록: 인증일 + 3년은 누를 때만 계산(2026-03-15 → 2029-03-14)', validUntilByYears('2026-03-15', 3) === '2029-03-14' && validUntilByYears('', 3) === '')
+  check('P1 진행: 저장값 읽기 — 모르는 상태는 준비 중', normalizeLifecycle({ status: 'weird', number: 1 }, 'mainbiz').status === 'preparing' && normalizeLifecycle(JSON.parse(JSON.stringify(done)), 'innobiz').validUntil === '2029-03-14')
+
+  // 갱신 일정 — D-120 알림 · D-90 할 일 · 만료 · 연장 기간
+  const far = renewalPlan('innobiz', '2027-06-30', TODAY)!
+  check('P1 갱신: 아직 멀면 유효 · 알림 D-120 · 할 일 D-90', far.phase === 'ok' && far.noticeOn === '2027-03-02' && far.todoOn === '2027-04-01', far)
+  check('P1 갱신: D-120 안이면 갱신 준비 시기', renewalPlan('innobiz', '2027-01-20', TODAY)!.phase === 'notice')
+  check('P1 갱신: D-90 안이면 진짜 할 일', renewalPlan('mainbiz', '2026-12-01', TODAY)!.phase === 'todo')
+  const grace = renewalPlan('innobiz', '2026-09-20', TODAY)!
+  check('P1 갱신: 만료 후 30일 안 = 연장 신청 가능(이노비즈 제15조①)', grace.phase === 'grace' && grace.graceUntil === '2026-10-20' && renewalDeadlines(grace, '이노비즈').length === 1 && renewalDeadlines(grace, '이노비즈')[0].hard === true)
+  check('P1 갱신: 벤처는 6개월 전 알림 · 150일 전 할 일(140일 전까지 재확인 신청)', renewalPlan('venture', '2027-06-30', TODAY)!.noticeOn === '2027-01-01' && renewalPlan('venture', '2027-06-30', TODAY)!.todoOn === '2027-01-31')
+  check('P1 갱신: 연구소(유효기간 없음) · 날짜 모름 → 일정 안 만듦', renewalPlan('lab', '2027-01-01', TODAY) === null && renewalPlan('innobiz', '', TODAY) === null)
+  const dl = renewalDeadlines(far, '이노비즈')
+  check('P1 갱신 일정: 알림 · 할 일(todo) · 만료(hard) 세 줄', dl.length === 3 && dl[0].title.includes('갱신 준비 시기') && !dl[0].todo && dl[1].todo === true && dl[2].hard === true && dl[2].date === '2027-06-30', dl)
+  check('P1 갱신 일정: 만료(연장 기간도 지남)면 만들지 않음', renewalDeadlines(renewalPlan('venture', '2025-01-01', TODAY)!, '벤처').length === 0)
+
+  // 시나리오 A — 연구소 관리 기록이 있으면 묻지 않고 인정으로
+  const labRows = [{ data: { key: 'pmsaas:clients:v1', value: [{ id: 'c1', labType: '기업부설연구소', certifiedDate: '2024-05-10', labRegistrationNumber: '2024-123', labName: '한빛연구소', researcherCount: 4 }, { id: 'c2', labType: '기업부설연구소', certifiedDate: '', researcherCount: 2 }, { id: 'c3', isSample: true, certifiedDate: '2020-01-01' }] } }]
+  const lf = labcareFactsOf(labRows, 'c1')
+  check('A 연구소 관리 → 인정 · 연구전담요원 4명', !!lf && lf.unit === 'lab' && lf.recognizedAt === '2024-05-10' && lf.researchers === 4 && lf.number === '2024-123', lf)
+  check('A 인정일 없음 · 예시 업체는 인정으로 보지 않음', labcareFactsOf(labRows, 'c2') === null && labcareFactsOf(labRows, 'c3') === null && labcareFactsOf(null, 'c1') === null)
+  const recA = normalizeClientOps({ id: 'c1', companyName: '한빛(주)', establishedAt: '2018-01-01', industry: '소프트웨어 개발', employeeCount: '20' } as never)
+  const ctxA = certContextOf(recA, TODAY, normalizeCertProfile({}), { lab: lf })
+  const labA = assessAll(ctxA).find((x) => x.key === 'lab')!
+  check('A 연구소: 다시 묻지 않고 보유 중 · 연구전담요원 4명 · 근거 ✓ 연구소 관리 기록', labA.recommendation === 'held' && ctxA.researchUnit === 'lab' && ctxA.researchers === 4 && basisFor('lab', ctxA).some((b) => b.field === 'researchUnit' && b.state === 'confirmed' && b.from.includes('연구소 관리')), { rec: labA.recommendation, basis: basisFor('lab', ctxA) })
+  check('A 연구소 → 이노비즈 판정에 연구조직 ✓', assessAll(ctxA).find((x) => x.key === 'innobiz')!.reasons.some((r) => r.state === 'ok' && r.text.includes('기업부설연구소')))
+
+  // 시나리오 B — 특허를 칩으로 고르면 판정엔 바로, 회사 정보에는 [확인 저장]을 눌러야
+  const pB = normalizeCertProfile({ patents: 2, researchUnit: 'dept' })
+  const ctxB = certContextOf(recA, TODAY, pB)
+  check('B 칩: 판정엔 바로 반영(특허 2건) · 근거는 △ 컨설턴트 선택', ctxB.patents === 2 && basisFor('innobiz', ctxB).some((b) => b.field === 'patents' && b.state === 'estimated' && b.from.includes('컨설턴트 선택')))
+  const fp = factPatchOf(pB)
+  check('B 확인 저장 대상: 특허 2건 · 연구소 = 연구개발전담부서(사실 창고 칸이 있는 것만)', fp.map((f) => `${f.key}=${f.value}`).join() === 'patents=2건,researchLab=연구개발전담부서', fp)
+
+  // 시나리오 C — 이노비즈 전체 흐름 → 인증 완료 → 갱신 → 정책자금 다음
+  const ctxC = { ...base, years: 7, months: 84, industryGroup: 'manufacturing' as const, industryText: '정밀기계 제조', size: 'small' as const, employees: 30, researchUnit: 'lab' as const, patents: 3, rndExpense: 200_000_000, revenue: 5_000_000_000, operatingProfit: 300_000_000, policyFundPlan: true, procurement: true }
+  check('C 이노비즈: 지금 추천', assessInnobiz(ctxC).recommendation === 'now')
+  const heldC = { ...ctxC, held: [{ key: 'innobiz' as const, validUntil: '2029-03-14', note: '번호 260101-00123' }] }
+  const aC = assessAll(heldC).find((x) => x.key === 'innobiz')!
+  check('C 완료 뒤: 보유 중 · 갱신 준비 2028-11-14부터', aC.recommendation === 'held' && aC.renewal?.prepareFrom === '2028-11-14', aC.renewal)
+  const afterC = nextAfterCertified('innobiz', heldC)
+  check('C 다음 할 일: 정책자금 · 조달 가점(1~3개)', afterC.length >= 1 && afterC.length <= 3 && afterC[0].kind === 'policy_fund' && afterC.some((x) => x.kind === 'procurement'), afterC)
+  check('C 다음 할 일: 연구소는 세액공제 · 벤처 · 유지', nextAfterCertified('lab', { ...ctxC, held: [] }).map((x) => x.kind).join() === 'tax_credit,venture,lab_keep')
+  check('C 다음 할 일: 정책자금 계획 없음(false)이면 빼고, 3개를 넘지 않음', !nextAfterCertified('mainbiz', { ...ctxC, policyFundPlan: false }).some((x) => x.kind === 'policy_fund') && ['innobiz', 'mainbiz', 'venture', 'lab', 'iso9001'].every((k) => nextAfterCertified(k as never, ctxC).length <= 3))
+
+  // 시나리오 D — 메인비즈 실사 직전 요약(대표 확인 필요가 '물어볼 것' 으로)
+  const cardsD = inspectionCards(INNOBIZ_INSPECTION, { ...ctxC, patents: 0, evidence: [{ id: 'patent', label: '특허', have: true }] }, (id) => id)
+  const sumD = preInspectionSummary(cardsD, { [cardsD[0].q.id]: { state: 'confirm' }, [cardsD[1].q.id]: { state: 'edited', text: '연구소에서 4명이' } })
+  check('D 실사 요약: 대표 확인 필요 → 물어볼 것 · 고친 답 → 준비/보완 · 안 본 질문 수', sumD.ask.includes(cardsD[0].q.question) && (sumD.ready.includes(cardsD[1].q.question) || sumD.fix.some((x) => x.startsWith(cardsD[1].q.question))) && sumD.untouched === cardsD.length - 2, sumD)
+  check('D 실사 요약: 가져갈 자료 = 서류함에 있는 증빙 · 글 한 장', sumD.bring.includes('patent') && preInspectionText('한빛 이노비즈', sumD).includes('■ 대표에게 물어볼 것'))
+
+  // 시나리오 E — 만료된 인증은 보유 중으로 안 보인다
+  const expC = { ...ctxC, held: [{ key: 'innobiz' as const, validUntil: '2025-12-31', note: '' }] }
+  const aE = assessAll(expC).find((x) => x.key === 'innobiz')!
+  check('E 만료(연장 기간도 지남): 보유 중 아님 · 이전 인증 만료 표시 · 근거 첫 줄 ✗', aE.recommendation !== 'held' && aE.expired === true && aE.reasons[0].state === 'no' && aE.oneLine.includes('이전 인증 만료') && aE.renewal!.daysLeft < 0, aE)
+  const graceC = { ...ctxC, held: [{ key: 'innobiz' as const, validUntil: '2026-09-25', note: '' }] }
+  const aG = assessAll(graceC).find((x) => x.key === 'innobiz')!
+  check('E 만료 30일 안: 지금 연장 신청(보유로 보되 경고)', aG.recommendation === 'now' && !aG.expired && aG.oneLine.includes('연장 신청'), aG)
+  const expV = assessAll({ ...ctxC, held: [{ key: 'venture' as const, validUntil: '2026-01-01', note: '' }] }).find((x) => x.key === 'venture')!
+  check('E 벤처 만료: 다시 판정 + 만료 표시', expV.expired === true && expV.recommendation !== 'held')
+
+  // 시나리오 F — 빈 업체: 날짜 · 사실을 만들지 않는다
+  const recF = normalizeClientOps({ id: 'f', companyName: '빈상사' } as never)
+  const ctxF = certContextOf(recF, TODAY)
+  const allF = assessAll(ctxF)
+  check('F 빈 업체: 보유 인증 0 · 갱신 정보 0 · 근거는 모름', ctxF.held.length === 0 && allF.every((x) => !x.renewal && !x.expired) && basisFor('innobiz', ctxF).every((b) => b.state === 'missing'))
+  check('F 빈 업체: 퍼센트 · 점수 없음', allF.every((x) => !/%|점(?!검)/.test(x.oneLine)))
+
+  // 벤처 연구개발유형 별표1
+  check('별표1: SW 매출 30억 → 10% · 80억 → 8% · 제조 → 5% · 모름 → 기타 5%', ventureRndRatio('software', 3e9).ratio === 0.1 && ventureRndRatio('software', 8e9).ratio === 0.08 && ventureRndRatio('manufacturing', 2e10).ratio === 0.05 && ventureRndRatio('', null).ratio === 0.05)
+  const vSW = assessVenture({ ...base, years: 5, months: 60, industryGroup: 'software', researchUnit: 'lab', rndExpense: 200_000_000, revenue: 3_000_000_000, patents: 1 })
+  check('벤처 SW 연구개발비 6.7% → 기준 10% 미만(별표1)', vSW.reasons.some((r) => r.state === 'warn' && r.text.includes('기준 10%')), vSW.reasons)
+
+  // 공식 기준 재확인 반영
+  check('공식 재확인: 메인비즈 3영역(상이 아님) · 연장 기간 확인 · 미확인 목록에서 빠짐', CERT_RULES.mainbiz.unverified.length === 0 && (CERT_RULES.mainbiz.officialScores ?? []).some((x) => x.value.includes('350')) && CERT_RULES.mainbiz.renewalNote.includes('만료 90일 전부터 만료 후 30일'))
+  check('공식 재확인: 연구소 50㎡ 칸막이 · 30일 변경 신고 · 남은 미확인 3가지(번호 형식 · Kibo 배점 · ISO 45001 일정)', JSON.stringify(CERT_RULES.lab).includes('50㎡') && CERT_RULES.lab.renewalNote.includes('30일') && CERT_RULES.venture.unverified.length === 1 && CERT_RULES.innobiz.unverified.length === 1 && CERT_RULES.iso45001.unverified.length === 1)
+  check('공식 재확인: 공식 안내 상이 없음(있으면 화면에 따로)', Object.values(CERT_RULES).every((r) => (r.conflicts ?? []).length === 0))
+}
+
 // Core 는 OS 를 모른다 — core · rules · innobiz · mainbiz · iso 는 그 밖(services · pages · components · tools · types)을 import 하지 않는다
 {
   const files = import.meta.glob(['../core/*.ts', '../rules/*.ts', '../innobiz/*.ts', '../mainbiz/*.ts', '../iso/*.ts'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>
   const bad = Object.entries(files).filter(([, src]) => /from\s+'\.\.\/\.\.\//.test(src)).map(([f]) => f)
-  check(`Core 독립: ${Object.keys(files).length}개 파일이 OS 를 import 하지 않는다`, Object.keys(files).length >= 9 && bad.length === 0, bad)
+  check(`Core 독립: ${Object.keys(files).length}개 파일이 OS 를 import 하지 않는다`, Object.keys(files).length >= 14 && bad.length === 0, bad)
 }
 
 console.log(`\ncert: ${pass} passed, ${fail} failed`)

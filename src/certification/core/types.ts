@@ -110,8 +110,25 @@ export interface CertificationClientContext {
   exclusionFlags: string[]
   /** 서류함 증빙 */
   evidence: EvidenceDoc[]
+  /** P1: 판정에 쓴 사실의 출처 · 확인 여부(OS 연결층이 채운다 — 없으면 '모름') */
+  basis?: BasisItem[]
   /** 오늘 'YYYY-MM-DD' */
   today: string
+}
+
+export type BasisField =
+  | 'years' | 'industry' | 'size' | 'employees' | 'revenue' | 'operatingProfit' | 'totalAssets' | 'totalLiabilities'
+  | 'rndExpense' | 'researchUnit' | 'researchers' | 'patents' | 'b2b' | 'procurement' | 'exportPlan' | 'exclusion'
+
+/** 근거 한 줄 — ✓ confirmed · △ estimated · ? missing */
+export interface BasisItem {
+  field: BasisField
+  label: string
+  /** 화면에 보일 값(없으면 '') */
+  value: string
+  state: 'confirmed' | 'estimated' | 'missing'
+  /** 어디서 — '사업자등록증' · '회사 정보(확인)' · '연구소 관리 기록' · '컨설턴트 선택(회사 정보 미확인)' … */
+  from: string
 }
 
 /** 이 업체에 특히 쓸 만한 혜택 */
@@ -150,4 +167,6 @@ export interface CertificationAssessment {
   nextAction: NextAction
   /** 보유 중이면 만료 · 갱신 */
   renewal?: { validUntil: string; daysLeft: number; prepareFrom: string; note: string }
+  /** P1: 이전 인증이 만료(연장 기간도 지남) — 새로 신청할 대상 */
+  expired?: true
 }

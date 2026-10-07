@@ -56,6 +56,13 @@ export interface CertRule {
   renewalNote: string
   /** 갱신 준비 시작(만료 n일 전) */
   prepareDaysBefore: number
+  /**
+   * P1: 갱신 일정 — 만료 몇 일 전에 '갱신 준비 시기'(알림) · '갱신 서류 준비'(할 일) · 만료 뒤 며칠까지 연장 가능한지.
+   * 유효기간이 없는 인증(연구소)은 없음.
+   */
+  renewal?: { noticeDays: number; todoDays: number; graceDaysAfter: number; why: string }
+  /** 공식 안내끼리 서로 다른 것 — 화면에 '공식 안내 상이 — 제출 전 확인 필요' */
+  conflicts?: string[]
   /** 공식 점수 기준(있을 때만 숫자) */
   officialScores?: { label: string; value: string }[]
   procedure: string[]
@@ -79,14 +86,18 @@ const INNOBIZ: CertRule = {
     { name: '이노비즈넷 인증 안내', version: '공식 누리집', effective: '2026-02-01', url: 'https://www.innobiz.net/authen/authen2_1.asp' },
   ],
   checkedAt: RULES_CHECKED_AT,
-  unverified: ['자가진단 · 현장평가 지표 이름과 배점(운영규정 별표 — 제출 전에는 공개되지 않음)'],
+  // P1 재확인(2026-10-07): 별표3 기술혁신시스템 평가표(4부문 1,000점 · 업종별 배점) · 별표4 연장 평가표(100점 · 60점 이상) 원문 확인
+  unverified: ['기술보증기금 개별기술수준 평가표의 항목별 배점(이노비즈넷 한글 파일 — 4영역 · 약 34항목 · 14등급까지만 확인)'],
   validYears: 3,
-  renewalNote: '만료 90일 전부터 만료 후 30일까지 연장 신청. 공백 없이 이어가려면 만료 35일 전까지 신청. 만료 후 30일이 지나면 신규로.',
+  renewalNote: '확인서 발급일부터 3년(제12조④). 만료 90일 전부터 만료 후 30일까지 연장 신청(제15조①) — 만료 전에 확정되려면 만료 35일 전까지 신청. 연장은 기술 · 경영진단 60점 이상(별표4). 만료 후 30일이 지나면 신규로. 연장되면 번호 앞에 R.',
   prepareDaysBefore: 90,
+  renewal: { noticeDays: 120, todoDays: 90, graceDaysAfter: 30, why: '운영규정 제15조① — 만료 90일 전부터 만료 후 30일까지 연장 신청(만료 전 확정은 35일 전까지 신청)' },
   officialScores: [
     { label: '온라인 자가진단', value: '1,000점 중 650점 이상이어야 현장평가 신청' },
     { label: '현장평가(기술보증기금)', value: '기술혁신시스템 700점 이상 그리고 기술평가등급 B등급 이상' },
     { label: '확인서 등급', value: '700~799점 A · 800~899점 AA · 900점 이상 AAA' },
+    { label: '기술혁신시스템 평가표(별표3, 제조업)', value: '기술혁신능력 300 · 기술사업화능력 300 · 기술혁신경영능력 200 · 기술혁신성과 200(업종마다 배점 다름)' },
+    { label: '연장(별표4 기술 · 경영진단)', value: '100점 중 60점 이상' },
   ],
   procedure: ['이노비즈넷 가입 · 재무 입력', '온라인 자가진단(650점 이상)', '기술사업계획서 작성', '수수료 납부(신규 77만원)', '기술보증기금 현장평가', '지방중소벤처기업청 확인서 발급'],
   fee: '신규 77만원 · 연장 44만원(부가세 포함)',
@@ -121,17 +132,21 @@ const MAINBIZ: CertRule = {
     { name: '중소벤처24 메인비즈 안내', version: '공식 누리집', effective: '2026-06-22', url: 'https://www.smes.go.kr/mainbiz' },
   ],
   checkedAt: RULES_CHECKED_AT,
-  unverified: ['평가 영역 구성 — 공식 안내 두 곳이 3영역(경영혁신인프라 · 활동 · 성과)과 4영역(전략기획 · 성과관리 · 조직인적자원 · 사회적신뢰)으로 다름(운영규정 별표1 원문 확인 필요)', '연장 신청 기간'],
+  // P1 재확인(2026-10-07): 별표1 원문 — 평가 영역은 3영역(경영혁신인프라 350 · 활동 400 · 성과 250). '4영역' 으로 보였던 것은
+  // 중소벤처24 '현장평가 질문 예시'(전략기획 · 성과관리 · 조직인력 · 사회신뢰) — 3영역 안의 지표다(상이 아님).
+  unverified: [],
   validYears: 3,
-  renewalNote: '유효기간 3년. 연장 신청 기간은 공식 안내에서 확인하지 못했다 — 만료 90일 전부터 준비를 권장(최신 기준 확인 필요).',
+  renewalNote: '확인서 발급일부터 3년(제12조③). 만료 90일 전부터 만료 후 30일까지 연장 신청(제15조①) — 만료 전에 확정되려면 만료 35일 전까지 신청. 연장은 경영혁신 진단 700점 이상(별표2). 연장되면 번호 앞에 R.',
   prepareDaysBefore: 90,
+  renewal: { noticeDays: 120, todoDays: 90, graceDaysAfter: 30, why: '운영규정 제15조① — 만료 90일 전부터 만료 후 30일까지 연장 신청(만료 전 확정은 35일 전까지 신청)' },
   officialScores: [
     { label: '자가진단', value: '600점 이상' },
     { label: '현장평가(신용보증기금 · 기술보증기금 · 한국생산성본부 중 선택)', value: '1,000점 중 700점 이상' },
     { label: '다른 길', value: '생산성경영시스템(PMS) 3등급 이상 · 인증 후 1년 이내면 자가진단 없이 신청' },
+    { label: '평가 영역(별표1)', value: '경영혁신인프라 350 · 경영혁신활동 400 · 경영혁신성과 250 = 1,000점(가족친화기업 가점 20)' },
   ],
   procedure: ['중소벤처24 기업 등록', '자가진단(600점 이상)', '현장평가 신청 · 평가기관 선택', '현장평가(700점 이상)', '지방중소벤처기업청 선정', '중소벤처24에서 확인서 발급'],
-  fee: '신규 55만원 · 연장 44만원',
+  fee: '신규 55만원 · 연장 44만원(부가세 포함)',
   benefits: [
     { id: 'tax_audit', title: '정기 세무조사 유예', detail: '국세청 정기 세무조사 유예 · 관세조사 1년 유예', tags: ['tax_audit'], conditional: true },
     { id: 'guarantee', title: '보증료 감면', detail: '신용보증기금 보증료 0.1~0.2%p · 기술보증기금 0.1%p 감면', tags: ['guarantee', 'funding'], conditional: true },
@@ -161,10 +176,12 @@ const VENTURE: CertRule = {
     { name: '벤처기업확인요령', version: '중소벤처기업부고시 제2026-68호', effective: '2026-08-20', url: 'https://www.law.go.kr/LSW/admRulLsInfoR.do?admRulSeq=2100000284090' },
   ],
   checkedAt: RULES_CHECKED_AT,
-  unverified: ['연구개발유형 업종별 연구개발비 비율 표(확인요령 별표1)'],
+  // P1 재확인(2026-10-07): 확인요령 별표1(업종별 연구개발 투자비율) 원문 확인 → VENTURE_RND_RATIO
+  unverified: ['벤처기업확인서 발급번호 형식(고시에 형식 없음 — 서식은 "제 호" 뿐)'],
   validYears: 3,
-  renewalNote: '확인일부터 3년. 만료 6개월 안에 재확인 안내가 온다 — 공백 없이 미리 재확인 신청.',
-  prepareDaysBefore: 180,
+  renewalNote: '확인일부터 3년(시행령 제18조의4). 만료 6개월 전에 확인기관이 안내 — 끊김 없이 이어가려면 만료 140일 전까지 재확인 신청(확인요령 제19조).',
+  prepareDaysBefore: 150,
+  renewal: { noticeDays: 180, todoDays: 150, graceDaysAfter: 0, why: '확인요령 제19조 — 만료 140일 전까지 재확인을 신청해야 끊김 없이 이어짐(6개월 전 안내)' },
   procedure: ['유형 고르기(투자 · 연구개발 · 혁신성장 · 예비벤처)', '벤처확인종합관리시스템 신청', '확인기관 평가', '벤처기업확인위원회 심의', '확인서 발급'],
   benefits: [
     { id: 'tax_credit', title: '세제 혜택 검토', detail: '창업벤처 세액감면 등 — 요건 · 시기 확인 필요', tags: ['tax_credit'], conditional: true },
@@ -186,17 +203,26 @@ const LAB: CertRule = {
   label: '기업부설연구소',
   summary: '기업부설연구소 · 연구개발전담부서 인정',
   law: '기업부설연구소등의 연구개발 지원에 관한 법률(2026-02-01 시행)',
-  sources: [{ name: '기업부설연구소등의 연구개발 지원에 관한 법률 · 시행령', version: '법률 제21309호 · 대통령령 제36055호', effective: '2026-02-01', url: 'https://www.law.go.kr' }],
+  sources: [
+    { name: '기업부설연구소등의 연구개발 지원에 관한 법률 · 시행령', version: '법률 제21309호 · 대통령령 제36055호', effective: '2026-02-01', url: 'https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=282553' },
+    { name: '같은 법 시행규칙(연구공간 · 연구전담요원 자격)', version: '과학기술정보통신부령 제163호', effective: '2026-02-01', url: 'https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=283223' },
+  ],
   checkedAt: RULES_CHECKED_AT,
-  unverified: ['시행규칙의 연구공간 면적 · 연구전담요원 자격 세부 기준'],
+  // P1 재확인(2026-10-07): 시행규칙(과기정통부령 제163호) 연구공간 · 연구전담요원 자격 원문 확인
+  unverified: [],
   validYears: null,
-  renewalNote: '유효기간은 없지만 요건(연구전담요원 수 · 독립 공간)을 계속 지켜야 하고 바뀌면 변경 신고.',
+  renewalNote: '유효기간은 없음. 연구전담요원 수 · 독립 공간을 계속 지키고, 바뀌면 30일 안에 변경 신고(시행령 제7조②) — 1년 넘게 안 하면 인정이 취소될 수 있음(법 제8조①5호).',
   prepareDaysBefore: 0,
   procedure: ['연구전담요원 · 공간 갖추기', 'KOITA 신청', '서류 · 현장 확인', '인정서 발급', '변경 신고 · 요건 유지'],
   benefits: [
     { id: 'tax_credit', title: '연구개발 세액공제', detail: '연구 · 인력개발비 세액공제 — 요건 · 금액 세무사 확인', tags: ['tax_credit', 'rnd'], conditional: true },
     { id: 'venture_path', title: '벤처 연구개발유형 · 이노비즈 기반', detail: '연구조직이 벤처 · 이노비즈 평가의 핵심 증빙', tags: ['rnd', 'trust'], conditional: false },
     { id: 'hiring', title: '전문연구요원', detail: '병역특례 전문연구요원 신청 기반', tags: ['hiring'], conditional: true },
+  ],
+  officialScores: [
+    { label: '연구전담요원(시행령 제6조)', value: '소기업 3명(창업 3년 안 2명) · 중기업 5명 · 연구원 · 교원 창업 · 벤처 2명 · 중견 7명 · 그 밖 10명 · 전담부서 1명' },
+    { label: '연구공간(시행규칙 제2조②)', value: '고정 벽 · 별도 출입문. 중소 · 벤처 · SW 기업이 50㎡ 넘게 확보할 수 없으면 칸막이로 구분 가능' },
+    { label: '연구전담요원 자격(시행규칙 제2조④)', value: '자연계 학사 이상 · 기사 이상(중소기업은 전문학사 + 경력 2년 · 산업기사 + 2년 등도)' },
   ],
   evidence: [
     { id: 'researchers', label: '연구전담요원 학력 · 경력 자료', why: '인원 요건' },
@@ -208,6 +234,7 @@ const LAB: CertRule = {
 const ISO_COMMON = {
   checkedAt: RULES_CHECKED_AT,
   prepareDaysBefore: 90,
+  renewal: { noticeDays: 120, todoDays: 90, graceDaysAfter: 0, why: '인증기관 갱신심사 일정(3년) — 인증기관과 심사 날짜를 먼저 잡기' },
   renewalNote: '인증 후 매년 사후심사 · 3년마다 갱신심사(인증기관 일정).',
   validYears: 3,
   procedure: ['필요한 표준 고르기', '인증기관(KAB 인정) 선택 · 견적', '문서 · 절차 갖추기(매뉴얼 · 기록)', '내부심사 · 경영검토', '인증심사(1 · 2단계)', '인증서 · 매년 사후심사'],
@@ -243,8 +270,12 @@ const ISO14001: CertRule = {
   label: 'ISO 14001',
   summary: '환경경영시스템 — 환경 관리 요구가 있는 업종(제조 · 건설 · 화학 등)에서 검토',
   law: '국제표준(인증은 KAB 인정 인증기관)',
-  sources: [{ name: 'ISO 14001:2026 (제4판)', version: '2026-04-15 발행', effective: '2026-04-15', url: 'https://www.iso.org/news/2026/04/iso-14001-2026-published' }],
-  unverified: ['2015판 → 2026판 전환 마감일(IAF)'],
+  sources: [
+    { name: 'ISO 14001:2026 (제4판)', version: '2026-04 발행', effective: '2026-04-15', url: 'https://www.iso.org/news/2026/04/iso-14001-2026-published' },
+    { name: 'Global ACI 전환 요건(ISO 14001:2026)', version: 'Global ACI-TECH-3-TR 2029-04-30 (M)', effective: '2026-09-14', url: 'https://global-aci.org/en/news/global-aci-publishes-transition-requirements-for-iso-140012026/' },
+  ],
+  unverified: ['정확한 발행일(ISO 누리집 접속 막힘 — 발행 달은 Global ACI 안내)'],
+  renewalNote: '2027-10-31 부터 신규 인증은 2026판으로만. 2015판 인증은 2029-04-30 까지 2026판으로 전환(Global ACI — IAF 를 이은 국제인정협력기구). 매년 사후심사 · 3년 갱신.',
   benefits: [
     { id: 'trust', title: '거래처 환경 요구 대응', detail: '대기업 협력사 · 해외 바이어 환경 요구', tags: ['trust', 'export'], conditional: false },
     { id: 'procurement', title: '입찰 · 녹색 조달', detail: '공공 입찰 평가에 쓰이는 경우가 있음', tags: ['procurement'], conditional: true },
@@ -261,8 +292,11 @@ const ISO45001: CertRule = {
   label: 'ISO 45001',
   summary: '안전보건경영시스템 — 현장 · 제조 · 건설처럼 안전보건 관리가 중요한 사업장에서 검토',
   law: '국제표준(인증은 KAB 인정 인증기관)',
-  sources: [{ name: 'ISO 45001:2018 + Amd 1:2024', version: '개정 작업 중(ISO/DIS 45001, 2027 목표)', effective: '2024-02-01', url: 'https://www.iso.org/standard/88428.html' }],
-  unverified: ['개정판(2027 목표) 진행 단계'],
+  sources: [
+    { name: 'ISO 45001:2018 + Amd 1:2024', version: '현재 유효판', effective: '2024-02-01', url: 'https://www.iso.org/standard/88428.html' },
+    { name: 'ISO/TC 283 소식(개정 DIS 투표)', version: 'ISO/DIS 45001 — 투표 2026-08-09 마감', effective: '2026-06-18', url: 'https://committee.iso.org/sites/tc283/home/news/content-left-area/news-and-updates/news.html' },
+  ],
+  unverified: ['개정판 발행 시점 — ISO/TC 283 은 DIS 투표(2026-08-09 마감)까지만 공지, 발행 목표일 공식 발표 없음'],
   benefits: [
     { id: 'trust', title: '안전보건 체계 증빙', detail: '원청 · 발주처 안전보건 요구 대응', tags: ['trust', 'procurement'], conditional: false },
     { id: 'procurement', title: '입찰 · 협력사 평가', detail: '협력사 평가 · 입찰에서 쓰이는 경우가 있음', tags: ['procurement'], conditional: true },
@@ -303,6 +337,25 @@ export const LAB_RESEARCHERS = {
 
 /** 벤처 연구개발유형(시행령 제2조의3) */
 export const VENTURE_RND = { minExpenseWon: 50_000_000, minRatio: 0.05 } as const
+
+/**
+ * 벤처 연구개발유형 — 업종별 연구개발 투자비율(%) · 매출 50억 미만 / 50~100억 / 100억 이상 (확인요령 별표1, 고시 제2026-68호).
+ * 업체 업종은 대분류로만 알기 때문에 가장 가까운 줄을 쓰고 화면에 '세부 업종 확인' 을 붙인다.
+ */
+export const VENTURE_RND_RATIO: { row: string; groups: string[]; pct: [number, number, number] }[] = [
+  { row: '소프트웨어 개발 · 공급업 · 정보서비스업', groups: ['software'], pct: [10, 8, 8] },
+  { row: '의약품', groups: ['bio'], pct: [6, 6, 6] },
+  { row: '기타 제조업(세부 업종: 기계 7/5/5 · 전기장비 6/5/5 · 반도체 · 전자부품 6/5/5 · 의료 · 정밀 · 광학 8/7/6)', groups: ['manufacturing', 'food'], pct: [5, 5, 5] },
+  { row: '도매 및 소매업', groups: ['retail'], pct: [5, 5, 5] },
+  { row: '기타 산업', groups: [], pct: [5, 5, 5] },
+]
+
+/** 매출(원)과 업종 대분류 → 별표1 비율(소수) · 그 줄 이름 */
+export function ventureRndRatio(group: string, revenue: number | null): { ratio: number; row: string } {
+  const line = VENTURE_RND_RATIO.find((r) => r.groups.includes(group)) ?? VENTURE_RND_RATIO[VENTURE_RND_RATIO.length - 1]
+  const band = revenue === null || revenue < 5_000_000_000 ? 0 : revenue < 10_000_000_000 ? 1 : 2
+  return { ratio: line.pct[band] / 100, row: line.row }
+}
 
 /** 공식 기준 신선도 — 마지막 확인에서 FRESH_DAYS 넘게 지났나 */
 export function rulesStale(rule: CertRule, today: string): boolean {

@@ -16,9 +16,14 @@ import type { Answer } from '../core/selfCheck'
 import type { PreparedAnswer } from '../core/inspection'
 import { INNOBIZ_CHECK, INNOBIZ_INSPECTION } from '../innobiz/innobizCheck'
 import { MAINBIZ_CHECK, MAINBIZ_INSPECTION } from '../mainbiz/mainbizCheck'
-import { BenefitPicks, ExplainBox, ReadinessBadge, ReasonList, RecBadge, StepTabs } from './certParts'
+import { ExpiredBadge, BenefitPicks, ExplainBox, ReadinessBadge, ReasonList, RecBadge, StepTabs } from './certParts'
 import { InspectionFlow, SelfCheckFlow } from './SelfCheckFlow'
 import { brand } from '../../brand/brand.config'
+import { useToast } from '../../components/ui/toastContext'
+import type { CertLifecycle, CertStatus, CompletionInput } from '../core/lifecycle'
+import { LifecyclePanel } from './LifecyclePanel'
+import { PreInspectionPanel } from './PreInspectionPanel'
+import { BasisBox } from './BasisBox'
 
 const EVIDENCE_LABEL = Object.fromEntries(Object.values(CERT_RULES).flatMap((r) => r.evidence.map((e) => [e.id, e.label])))
 const labelOf = (id: string) => EVIDENCE_LABEL[id] ?? id
@@ -31,6 +36,11 @@ export function CertWorkspace({
   prep,
   onAnswer,
   onPrep,
+  life,
+  onStatus,
+  onComplete,
+  onPatchLife,
+  onRequestDocs,
 }: {
   a: CertificationAssessment
   ctx: CertificationClientContext
@@ -39,10 +49,24 @@ export function CertWorkspace({
   prep: Record<string, PreparedAnswer>
   onAnswer: (id: string, v: Answer) => void
   onPrep: (id: string, p: PreparedAnswer) => void
+  life: CertLifecycle
+  onStatus: (s: CertStatus) => Promise<void>
+  onComplete: (input: CompletionInput, toProfile: boolean) => Promise<void>
+  onPatchLife: (patch: Partial<Pick<CertLifecycle, 'memo' | 'postAuditAt'>>) => Promise<void>
+  /** 서류함에 빈 칸(없는 것만) — 만든 칸 수 */
+  onRequestDocs: (labels: string[]) => Promise<number>
 }) {
   const rule = CERT_RULES[a.key]
-  const [step, setStep] = useState(0)
-  const [flow, setFlow] = useState<'none' | 'self' | 'inspect'>('none')
+  const { showToast } = useToast()
+  // P1: 진행 중인 인증은 '실제 진행' 단계에서 연다(진행 기록이 거기 있다)
+  const [step, setStep] = useState(life.status !== 'preparing' || life.history.length > 0 ? 2 : 0)
+  const [flow, setFlow] = useState<'none' | 'self' | 'inspect' | 'summary'>('none')
+  const requestDocs = async () => {
+    const text = explain.docRequest
+    const added = a.missingEvidence.length ? await onRequestDocs(a.missingEvidence).catch(() => -1) : 0
+    const copied = await navigator.clipboard.writeText(text).then(() => true).catch(() => false)
+    showToast(added < 0 ? '서류함에 칸을 만들지 못했습니다 — 문구는 아래에서 복사해 주세요' : `${copied ? '요청 문구를 복사했습니다' : '요청 문구는 아래에서 복사해 주세요'}${added > 0 ? ` · 서류함에 칸 ${added}개` : ''}`)
+  }
   const selfItems = a.key === 'innobiz' ? INNOBIZ_CHECK : a.key === 'mainbiz' ? MAINBIZ_CHECK : null
   const inspectQs = a.key === 'innobiz' ? INNOBIZ_INSPECTION : a.key === 'mainbiz' ? MAINBIZ_INSPECTION : null
   const explain = explainFor(a, ctx, `${brand.ownerName} 대표`)
@@ -60,6 +84,7 @@ export function CertWorkspace({
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="t-section font-bold text-slate-900">{rule.label}</h2>
             <RecBadge rec={a.recommendation} />
+            {a.expired && <ExpiredBadge />}
             {!(a.recommendation === 'need_info' && a.readiness === 'unknown') && <ReadinessBadge r={a.readiness} />}
           </div>
           <p className="t-body font-semibold break-keep text-slate-800">{a.oneLine}</p>
@@ -88,6 +113,7 @@ export function CertWorkspace({
                 </ul>
               </div>
             )}
+            <BasisBox cert={a.key} ctx={ctx} />
             <Sources ruleKey={a.key} today={ctx.today} />
           </div>
         </Surface>
@@ -109,6 +135,11 @@ export function CertWorkspace({
             </ul>
             <p className="t-sub break-keep text-slate-600">이미 서류함 · 회사 정보에 있는 자료는 다시 받지 않습니다.</p>
             <div className="flex flex-wrap gap-2">
+              {a.missingEvidence.length > 0 && (
+                <Button variant="primary" onClick={() => void requestDocs()} data-testid="cert-request-docs">
+                  고객에게 자료 요청({a.missingEvidence.length})
+                </Button>
+              )}
               <Link to={`/ops/clients/${clientId}?tab=docs`} className="contents">
                 <Button variant="secondary">서류함 열기</Button>
               </Link>
@@ -121,6 +152,8 @@ export function CertWorkspace({
       {step === 2 && flow === 'none' && (
         <Surface>
           <div className="flex flex-col gap-3" data-testid="cert-step-body-2">
+            <LifecyclePanel cert={a.key} life={life} ctx={ctx} clientId={clientId} onStatus={onStatus} onComplete={onComplete} onPatch={onPatchLife} />
+            <p className="t-sub font-semibold text-slate-800">절차</p>
             <ol className="flex flex-col gap-1">
               {rule.procedure.map((p, i) => (
                 <li key={p} className="t-body break-keep text-slate-800">
@@ -136,6 +169,9 @@ export function CertWorkspace({
                 </Button>
                 <Button variant="secondary" onClick={() => setFlow('inspect')} data-testid="cert-inspection-start">
                   실사 대비 시작
+                </Button>
+                <Button variant="secondary" onClick={() => setFlow('summary')} data-testid="cert-pre-summary">
+                  실사 준비 요약 보기
                 </Button>
               </div>
             ) : existingTool ? (
@@ -153,6 +189,7 @@ export function CertWorkspace({
       )}
       {step === 2 && flow === 'self' && selfItems && <SelfCheckFlow rule={rule} items={selfItems} ctx={ctx} answers={answers} onAnswer={onAnswer} onDone={() => setFlow('inspect')} />}
       {step === 2 && flow === 'inspect' && inspectQs && <InspectionFlow qs={inspectQs} ctx={ctx} labelOf={labelOf} prep={prep} onPrep={onPrep} />}
+      {step === 2 && flow === 'summary' && inspectQs && <PreInspectionPanel title={`${ctx.companyName} ${rule.label}`} qs={inspectQs} ctx={ctx} labelOf={labelOf} prep={prep} onClose={() => setFlow('none')} />}
 
       {step === 3 && (
         <Surface>
@@ -174,10 +211,10 @@ export function CertWorkspace({
             <p className="t-sub break-keep text-slate-700">
               <b className="font-semibold">사후관리 · 갱신</b> · {rule.renewalNote}
             </p>
-            {a.renewal ? (
+            {a.renewal && life.status !== 'certified' && life.status !== 'renewal' ? (
               <ToolResultAttach toolKey="cert-os" title={`${rule.label} 유효기간 · 갱신`} verdict={a.recommendation} verdictLabel={RECOMMENDATION_LABEL[a.recommendation]} summary={`${rule.label} ${a.renewal.validUntil} 까지 · 갱신 준비 ${a.renewal.prepareFrom} 부터`} data={{ kind: 'renewal', cert: a.key, ...a.renewal }} deadlines={deadlines} followUp={{ text: `${rule.label} 갱신 서류 준비`, days: Math.max(1, Math.min(90, a.renewal.daysLeft - 30)) }} openPathFor={(cid) => `/tools/cert-os/${a.key}?client=${cid}`} />
             ) : (
-              <p className="t-sub break-keep text-slate-600">인증을 받으면 회사 정보 '인증서' 칸에 넣어 주세요(서류를 올리면 자동으로 읽습니다) — 유효기간 · 갱신일이 달력에 뜹니다.</p>
+              <p className="t-sub break-keep text-slate-600">인증을 받으면 '3. 실제 진행' 의 [인증 완료 기록] 에 번호 · 인증일 · 유효기간을 적어 주세요 — 갱신 일정이 달력 · 오늘에 걸립니다(확인서를 서류함에 올려도 읽습니다).</p>
             )}
             {(a.recommendation === 'held' || a.recommendation === 'now') && (
               <Link to={`/tools/policy-funding/diagnosis?client=${clientId}`} className="contents">
@@ -212,6 +249,11 @@ function Sources({ ruleKey, today }: { ruleKey: keyof typeof CERT_RULES; today: 
             <a href={s.url} target="_blank" rel="noreferrer noopener" className="tap inline-flex min-h-10 items-center font-semibold text-brand-700 underline">
               원문
             </a>
+          </li>
+        ))}
+        {(rule.conflicts ?? []).map((u) => (
+          <li key={u} className="t-sub break-keep text-danger-700" data-testid="cert-conflict">
+            · 공식 안내 상이 — 제출 전 확인 필요: {u}
           </li>
         ))}
         {rule.unverified.map((u) => (

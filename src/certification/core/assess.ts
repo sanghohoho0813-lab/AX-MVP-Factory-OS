@@ -2,7 +2,8 @@
  * 인증별 판정 (D-170) — 업체 사정(CertificationClientContext) → 준비도 5단계 · 추천 · 한 줄 이유 · 근거 · 모자란 것 · 혜택 · 타이밍 · 다음 행동.
  * 기준 숫자는 rules/officialRules.ts 에서만 읽는다. 모르는 값은 '?' 로 두고 추측하지 않는다.
  */
-import { CERT_RULES, INNOBIZ_INDUSTRY_OK, LAB_RESEARCHERS, MAINBIZ_EXCLUDED_WORDS, VENTURE_RND, type CertRule } from '../rules/officialRules'
+import { CERT_RULES, INNOBIZ_INDUSTRY_OK, LAB_RESEARCHERS, MAINBIZ_EXCLUDED_WORDS, VENTURE_RND, ventureRndRatio, type CertRule } from '../rules/officialRules'
+import { renewalPlan, RENEWAL_PHASE_LABEL } from './renewal'
 import { pickBenefits } from './benefits'
 import { readinessOf, reasonsOf, type Check } from './readiness'
 import { assessIso } from '../iso/isoAdvice'
@@ -34,6 +35,38 @@ const won = (n: number) => (Math.abs(n) >= 1e8 ? `${Math.round(n / 1e7) / 10}억
 
 function heldOf(c: CertificationClientContext, key: CertificationKey) {
   return c.held.find((h) => h.key === key) ?? null
+}
+
+/** 보유했지만 유효기간이 지났고 연장 신청 기간도 지난 인증 — '보유 중' 이 아니라 다시 신청할 대상 (P1) */
+function expiredHeld(c: CertificationClientContext, key: CertificationKey) {
+  const h = heldOf(c, key)
+  if (!h || !h.validUntil) return null
+  const plan = renewalPlan(key, h.validUntil, c.today)
+  return plan && (plan.phase === 'expired' || plan.phase === 'grace') ? { h, plan } : null
+}
+
+/** 보유 중으로 볼 인증(만료 · 연장 기간 안 포함) */
+function liveHeld(c: CertificationClientContext, key: CertificationKey) {
+  const h = heldOf(c, key)
+  if (!h) return null
+  const ex = expiredHeld(c, key)
+  return ex && ex.plan.phase === 'expired' ? null : h
+}
+
+/**
+ * 만료된 인증 — 새로 판정한 결과 위에 '이전 인증 만료' 를 얹는다. 보유 중 · 매우 높음으로 보이지 않게(P1 시나리오 E).
+ */
+function withExpired(a: CertificationAssessment, c: CertificationClientContext): CertificationAssessment {
+  const ex = expiredHeld(c, a.key)
+  if (!ex || ex.plan.phase !== 'expired') return a
+  const ago = -ex.plan.daysLeft
+  return {
+    ...a,
+    oneLine: `이전 인증 만료(${ex.h.validUntil}, ${ago}일 지남) — 다시 신청해야 합니다 · ${a.oneLine}`,
+    reasons: [{ state: 'no', text: `이전 ${a.label} 만료 ${ex.h.validUntil}(${ago}일 지남)${ex.plan.graceUntil ? ` · 연장 신청 기간(${ex.plan.graceUntil}까지)도 지남` : ''} — 신규로 신청` }, ...a.reasons],
+    renewal: { validUntil: ex.h.validUntil, daysLeft: ex.plan.daysLeft, prepareFrom: ex.plan.todoOn, note: CERT_RULES[a.key].renewalNote },
+    expired: true,
+  }
 }
 
 function evidenceSplit(rule: CertRule, c: CertificationClientContext) {
@@ -82,8 +115,9 @@ function finish(
   const held = heldOf(c, rule.key)
   let renewal: CertificationAssessment['renewal']
   if (held && held.validUntil) {
+    const plan = renewalPlan(rule.key, held.validUntil, c.today)
     const daysLeft = daysBetween(c.today, held.validUntil)
-    renewal = { validUntil: held.validUntil, daysLeft, prepareFrom: addDays(held.validUntil, -rule.prepareDaysBefore), note: rule.renewalNote }
+    renewal = { validUntil: held.validUntil, daysLeft, prepareFrom: plan ? plan.noticeOn : addDays(held.validUntil, -rule.prepareDaysBefore), note: rule.renewalNote }
   }
   return {
     key: rule.key,
@@ -102,16 +136,29 @@ function finish(
   }
 }
 
-/** 보유 중인 인증 — 갱신 시기로 판정 */
+/** 보유 중인 인증 — 갱신 시기로 판정(날짜는 사람이 적은 유효기간만 쓴다) */
 function heldAssessment(rule: CertRule, c: CertificationClientContext): CertificationAssessment {
   const h = heldOf(c, rule.key)!
   const checks: Check[] = [{ weight: 'must', state: 'ok', text: `${rule.label} 보유${h.note ? ` · ${h.note}` : ''}` }]
   if (!h.validUntil && rule.validYears) checks.push({ weight: 'core', state: 'unknown', text: '유효기간 — 확인서로 확인 필요' })
-  const days = h.validUntil ? daysBetween(c.today, h.validUntil) : null
-  const timing =
-    days === null ? (rule.validYears ? '유효기간을 적어 두면 갱신 준비일을 알려 드립니다' : '요건 유지 · 변경 신고 관리') : days < 0 ? `만료됨(${-days}일 지남) — 다시 신청` : days <= rule.prepareDaysBefore ? `갱신 임박 — ${days}일 남음` : `유효 · ${h.validUntil} 까지(갱신 준비 ${addDays(h.validUntil, -rule.prepareDaysBefore)} 부터)`
-  const next: NextAction = days !== null && days <= rule.prepareDaysBefore ? { label: '갱신 준비 시작', kind: 'renew' } : { label: '보유 인증 관리', kind: 'wait' }
-  return finish(rule, c, checks, days !== null && days < 0 ? 'now' : 'held', days !== null && days <= rule.prepareDaysBefore ? '갱신 시기가 다가왔습니다' : '이미 보유 중입니다', timing, next, h.validUntil || !rule.validYears ? [] : ['유효기간'], 'very_high')
+  const plan = h.validUntil ? renewalPlan(rule.key, h.validUntil, c.today) : null
+  let timing: string
+  let oneLine = '이미 보유 중입니다'
+  let rec: Recommendation = 'held'
+  let next: NextAction = { label: '보유 인증 관리', kind: 'wait' }
+  if (!plan) timing = rule.validYears ? '유효기간을 적어 두면 갱신 준비일을 알려 드립니다' : '요건 유지 · 변경 신고 관리'
+  else if (plan.phase === 'grace') {
+    timing = `만료 ${-plan.daysLeft}일 지남 — ${plan.graceUntil}까지 연장 신청 가능`
+    oneLine = `유효기간이 지났지만 ${plan.graceUntil}까지 연장 신청할 수 있습니다`
+    rec = 'now'
+    next = { label: '지금 연장 신청', kind: 'renew' }
+    checks.push({ weight: 'core', state: 'warn', text: `유효기간 ${plan.validUntil} 지남 · 연장 신청 마지막 날 ${plan.graceUntil}` })
+  } else if (plan.phase === 'todo' || plan.phase === 'notice') {
+    timing = `${RENEWAL_PHASE_LABEL[plan.phase]} — 만료까지 ${plan.daysLeft}일(${plan.validUntil})`
+    oneLine = plan.phase === 'todo' ? '갱신 서류를 준비할 때입니다' : '갱신 준비 시기가 다가왔습니다'
+    next = { label: '갱신 준비 시작', kind: 'renew' }
+  } else timing = `유효 · ${plan.validUntil} 까지(갱신 준비 ${plan.noticeOn} 부터)`
+  return finish(rule, c, checks, rec, oneLine, timing, next, h.validUntil || !rule.validYears ? [] : ['유효기간'], 'very_high')
 }
 
 /* ------------------------------------------------------------------ */
@@ -127,7 +174,7 @@ function techSignals(c: CertificationClientContext) {
 
 export function assessInnobiz(c: CertificationClientContext): CertificationAssessment {
   const rule = CERT_RULES.innobiz
-  if (heldOf(c, 'innobiz')) return heldAssessment(rule, c)
+  if (liveHeld(c, 'innobiz')) return heldAssessment(rule, c)
   const t = techSignals(c)
   const checks: Check[] = [smeCheck(c), yearsCheck(c, 3), exclusionCheck(c)]
   const g = c.industryGroup
@@ -197,7 +244,7 @@ export function assessInnobiz(c: CertificationClientContext): CertificationAsses
 
 export function assessMainbiz(c: CertificationClientContext, innobiz?: CertificationAssessment): CertificationAssessment {
   const rule = CERT_RULES.mainbiz
-  if (heldOf(c, 'mainbiz')) return heldAssessment(rule, c)
+  if (liveHeld(c, 'mainbiz')) return heldAssessment(rule, c)
   const checks: Check[] = [smeCheck(c), yearsCheck(c, 3), exclusionCheck(c)]
   checks.push(MAINBIZ_EXCLUDED_WORDS.test(c.industryText) ? { weight: 'must', state: 'no', text: '제외 업종(게임 · 사행성 · 불건전 소비)' } : c.industryText ? { weight: 'must', state: 'ok', text: '제외 업종 아님' } : { weight: 'must', state: 'unknown', text: '업종 — 확인 필요' })
   if (c.totalAssets !== null && c.totalLiabilities !== null) {
@@ -268,7 +315,7 @@ export function assessMainbiz(c: CertificationClientContext, innobiz?: Certifica
 
 export function assessVenture(c: CertificationClientContext): CertificationAssessment {
   const rule = CERT_RULES.venture
-  if (heldOf(c, 'venture')) return heldAssessment(rule, c)
+  if (liveHeld(c, 'venture')) return heldAssessment(rule, c)
   const lab = c.researchUnit === 'lab' || c.researchUnit === 'dept'
   const checks: Check[] = []
   checks.push(c.researchUnit === null ? { weight: 'core', state: 'unknown', text: '연구조직 — 확인 필요' } : lab ? { weight: 'core', state: 'ok', text: '연구조직 보유 — 연구개발유형 가능성' } : { weight: 'core', state: 'warn', text: '연구조직 없음 — 연구개발유형은 연구소 · 전담부서 필요' })
@@ -277,7 +324,10 @@ export function assessVenture(c: CertificationClientContext): CertificationAsses
   const young = c.years !== null && c.years < 3
   if (c.rndExpense !== null && c.revenue !== null && c.revenue > 0 && !young) {
     const r = c.rndExpense / c.revenue
-    checks.push(r >= VENTURE_RND.minRatio ? { weight: 'core', state: 'ok', text: `매출 대비 연구개발비 ${Math.round(r * 1000) / 10}%(5% 이상 · 업종 비율은 확인)` } : { weight: 'core', state: 'warn', text: `매출 대비 연구개발비 ${Math.round(r * 1000) / 10}% — 5% 미만` })
+    // 확인요령 별표1 — 업종 · 매출 구간별 비율(업종은 대분류로 가장 가까운 줄)
+    const need = ventureRndRatio(c.industryGroup, c.revenue)
+    const pct = (x: number) => `${Math.round(x * 1000) / 10}%`
+    checks.push(r >= need.ratio ? { weight: 'core', state: 'ok', text: `매출 대비 연구개발비 ${pct(r)}(기준 ${pct(need.ratio)} 이상 · 별표1 '${need.row.split('(')[0]}' — 세부 업종 확인)` } : { weight: 'core', state: 'warn', text: `매출 대비 연구개발비 ${pct(r)} — 기준 ${pct(need.ratio)} 미만(별표1 '${need.row.split('(')[0]}')` })
   } else if (young) checks.push({ weight: 'core', state: 'ok', text: '창업 3년 미만 — 매출 대비 비율 미적용' })
   checks.push(c.patents === null ? { weight: 'core', state: 'unknown', text: '특허 — 확인 필요' } : c.patents > 0 ? { weight: 'core', state: 'ok', text: `특허 ${c.patents}건 — 혁신성 증빙` } : { weight: 'core', state: 'warn', text: '특허 없음 — 혁신성장유형은 사업계획 · 기술성으로 평가' })
   const readiness = readinessOf(checks)
@@ -351,6 +401,6 @@ export function assessLab(c: CertificationClientContext): CertificationAssessmen
 
 
 export function assessAll(c: CertificationClientContext): CertificationAssessment[] {
-  const innobiz = assessInnobiz(c)
-  return [assessLab(c), assessVenture(c), innobiz, assessMainbiz(c, innobiz), ...assessIso(c)]
+  const innobiz = withExpired(assessInnobiz(c), c)
+  return [assessLab(c), withExpired(assessVenture(c), c), innobiz, withExpired(assessMainbiz(c, innobiz), c), ...assessIso(c)]
 }
