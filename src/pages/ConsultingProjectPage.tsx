@@ -288,7 +288,7 @@ function ProjectContent({ workspaceId, userId }: { workspaceId: string | null; u
 
   if (missing) return <TablesMissingNotice />
   if (loading && !project) return <p className="t-sub py-10 text-center text-slate-500">불러오는 중…</p>
-  if (notFound || !project || !value) return <NotFoundState title="프로젝트를 찾지 못했습니다" description="지워졌거나 다른 작업공간의 프로젝트입니다." backTo="/studio" backLabel="특허+벤처" />
+  if (notFound || !project || !value) return <NotFoundState title="프로젝트를 찾지 못했습니다" description="지워졌거나 다른 작업공간의 프로젝트입니다." backTo="/studio" backLabel="특허·MVP" />
 
   const task = resolveCurrentTask(project, { artifacts, prompts, evidence, today })
   const tabs = advanced ? ADV_TABS : SIMPLE_TABS
@@ -311,7 +311,7 @@ function ProjectContent({ workspaceId, userId }: { workspaceId: string | null; u
         <div className={`flex flex-col gap-2 ${narrow}`}>
           <div className="flex items-center justify-between gap-2">
             <Link to="/studio" className="t-sub inline-flex min-w-0 items-center gap-1 text-slate-500 hover:text-slate-800">
-              <ArrowLeft aria-hidden="true" className="size-4 shrink-0" /> <span className="truncate">특허+벤처</span>
+              <ArrowLeft aria-hidden="true" className="size-4 shrink-0" /> <span className="truncate">특허·MVP</span>
             </Link>
             <div className="flex shrink-0 items-center gap-1">
               <Button variant="ghost" size="sm" aria-label={advanced ? '간단히 보기' : '고급 보기'} onClick={() => setSearchParams(advanced ? {} : { adv: '1' }, { replace: true })}>

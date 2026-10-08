@@ -184,7 +184,7 @@ function hasContractInfo(r: ClientOpsRecord): boolean {
 type DetailTab = 'smart' | 'overview' | 'work' | 'consulting' | 'docs' | 'fees' | 'funding' | 'portal' | 'journal'
 /**
  * D-129: 매일 쓰는 순서 — 개요 → 서류 → 업무 → 업무 일기 → 고객 플랫폼 → 수금.
- * 컨설팅(특허+벤처) · 자금·지원은 기본 줄에서 뺐다(hidden) — 기능 · 데이터 · 주소(?tab=)는 그대로이고, 더보기에서 연다.
+ * 컨설팅(특허·MVP) · 자금·지원은 기본 줄에서 뺐다(hidden) — 기능 · 데이터 · 주소(?tab=)는 그대로이고, 더보기에서 연다.
  * 예전 '파일' 탭은 서류 탭 안으로 들어갔다(?tab=files 는 서류로 연다).
  */
 const DETAIL_TABS: { key: DetailTab; label: string; hidden?: boolean }[] = [
@@ -211,7 +211,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const [searchParams, setSearchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
   // D-129: 예전 '파일' 탭 주소는 서류로 — 고객과 주고받은 파일도 서류 탭 아래에 있다
-  // D-162: Pilot 에게는 고객 플랫폼(대표 공개 사이트와 이어짐) · 컨설팅(특허+벤처) 탭이 없다 — 주소로 와도 개요로
+  // D-162: Pilot 에게는 고객 플랫폼(대표 공개 사이트와 이어짐) · 컨설팅(특허·MVP) 탭이 없다 — 주소로 와도 개요로
   const pilot = useIsPilot()
   const requested: DetailTab = tabParam === 'files' ? 'docs' : isDetailTab(tabParam) ? tabParam : 'overview'
   const tab: DetailTab = pilot && PILOT_HIDDEN_TABS.has(requested) ? 'overview' : requested
@@ -1698,7 +1698,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                   }}
                 >
                   <Workflow aria-hidden="true" className="size-4" />
-                  컨설팅 프로젝트(특허 · MVP) 보기
+                  컨설팅 프로젝트(특허·MVP) 보기
                 </Button>
               )}
               <Button

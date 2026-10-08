@@ -45,6 +45,13 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const navRare = (await nav.innerText()) ?? ''
   const atR = (t) => navRare.indexOf(t)
   check('메뉴: 잘 안 쓰는 기능을 펴면 기술사업화 · AX 스튜디오 · 웹 스튜디오', ['기술사업화', 'AX 스튜디오', '웹 스튜디오'].every((t, i, a) => atR(t) > atR('잘 안 쓰는 기능') && (i === 0 || atR(t) > atR(a[i - 1]))), navRare.slice(0, 900))
+  // D-178: 예전 '특허+벤처' → '특허·MVP'(벤처기업 확인은 기업인증). 기술사업화를 펴면 새 이름만
+  await nav.getByRole('button', { name: /기술사업화/ }).click()
+  await page.waitForTimeout(200)
+  const navTech = (await nav.innerText()) ?? ''
+  check('메뉴: 기술사업화 › 특허·MVP(예전 이름 특허+벤처 없음)', navTech.includes('특허·MVP') && !/특허\s*\+\s*벤처/.test(navTech), navTech.slice(0, 900))
+  await nav.getByRole('button', { name: /기술사업화/ }).click()
+  await page.waitForTimeout(200)
   await nav.getByRole('button', { name: /잘 안 쓰는 기능/ }).click()
   await page.waitForTimeout(200)
   check('메뉴: 처음에는 도구 줄이 접혀 있다', at('세금 계산기') === -1 && at('정책자금 진단') === -1, navText.slice(0, 700))

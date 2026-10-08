@@ -117,7 +117,7 @@ function StudioContent({ workspaceId }: { workspaceId: string | null }) {
   return (
     <div className="flex flex-col gap-5">
       <ScreenTitle
-        title="특허+벤처"
+        title="특허·MVP"
         sub="특허 → MVP → 실사. 다음에 무엇을 할지는 시스템이 정합니다."
         actions={
           !missing && (

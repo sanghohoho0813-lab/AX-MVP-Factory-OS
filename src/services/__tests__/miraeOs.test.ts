@@ -187,14 +187,14 @@ check('modules: AX STUDIO 는 전문 모듈의 분야 한 줄(D-127) — 안의 
       MODULE_GROUPS.find((g) => g.key === 'rare')?.defaultCollapsed === true &&
       MODULES.filter((m) => m.group === 'modules' && m.kind === 'category').map((m) => m.key).join() === 'cat-growth,cat-tax-finance,cat-upcoming',
     MODULES.filter((m) => m.kind === 'category').map((m) => `${m.key}:${m.group}`).join())
-  check('메뉴: 이름 — 고객 관리 · 잠재고객 상담신청 · 전문 모듈 · 특허+벤처 (D-104 · D-127)',
+  check('메뉴: 이름 — 고객 관리 · 잠재고객 상담신청 · 전문 모듈 · 특허·MVP (D-104 · D-127 · D-178)',
     MODULES.find((m) => m.key === 'client-ops')?.label === '고객 관리' && MODULES.find((m) => m.key === 'inbox')?.label === '잠재고객 상담신청' &&
-    MODULE_GROUPS.find((g) => g.key === 'modules')?.title === '전문 모듈' && MODULES.find((m) => m.key === 'consulting-studio')?.label === '특허+벤처')
+    MODULE_GROUPS.find((g) => g.key === 'modules')?.title === '전문 모듈' && MODULES.find((m) => m.key === 'consulting-studio')?.label === '특허·MVP')
   check('메뉴: 숫자 — 고객 관리(고객사 수) · 상담신청 · 1차 미팅',
     MODULES.find((m) => m.key === 'client-ops')?.badge === 'clients' && MODULES.find((m) => m.key === 'inbox')?.badge === 'requests' && MODULES.find((m) => m.key === 'first-meeting')?.badge === 'first-meetings')
   const inGroup = (g: string) => MODULES.filter((m) => m.group === g).map((m) => m.key)
   check('메뉴: 오늘 · 확인할 것(D-158) · 일정이 한 묶음', inGroup('today').join() === 'today,decide,calendar')
-  check('메뉴: 특허+벤처 → 기술사업화 · 지원사업 알림 → 기업성장 줄 아래(D-163) · 자금·지원사업 · 기관 전략은 숨김(D-167), 모듈 전체가 맨 끝 (D-127) · 검토중 도구가 없으면 도입 검토중 줄도 없다 (D-118)',
+  check('메뉴: 특허·MVP → 기술사업화 · 지원사업 알림 → 기업성장 줄 아래(D-163) · 자금·지원사업 · 기관 전략은 숨김(D-167), 모듈 전체가 맨 끝 (D-127) · 검토중 도구가 없으면 도입 검토중 줄도 없다 (D-118)',
     MODULES.find((m) => m.key === 'consulting-studio')?.parent === 'cat-tech-biz' && !MODULES.some((m) => m.key === 'funding' || m.key === 'institutions') && MODULES.find((m) => m.key === 'grants')?.parent === 'cat-growth' && MODULES.find((m) => m.key === 'grants')?.group === 'modules' && !MODULES.some((m) => m.key === 'cat-gov-support') && inGroup('modules').slice(-1).join() === 'tools' && !inGroup('modules').includes('tools-review'), inGroup('modules').join())
   check('메뉴: 영업 묶음 = 영업 관리(D-114) · 영업자 정산 · 매출 · 비용(D-142) · 1차 미팅 체크리스트(준비 중) — 지원사업 알림은 기업성장으로(D-163)',
     inGroup('sales').join() === 'sales,agents,money,marketing,first-meeting' && MODULES.find((m) => m.key === 'marketing')?.status === 'soon' && MODULES.find((m) => m.key === 'first-meeting')?.status === 'soon', inGroup('sales').join())

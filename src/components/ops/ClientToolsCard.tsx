@@ -128,7 +128,7 @@ export function ClientToolsCard({
             onClick={() => setShowAll((v) => !v)}
             className="tap t-sub inline-flex w-full items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white py-2 font-semibold text-slate-700 hover:bg-slate-50"
           >
-            {showAll ? '잘 안 쓰는 기능 접기' : `잘 안 쓰는 기능 ${rareCount}개 보기 (특허·벤처 · AX · 웹 스튜디오)`}
+            {showAll ? '잘 안 쓰는 기능 접기' : `잘 안 쓰는 기능 ${rareCount}개 보기 (특허·MVP · AX · 웹 스튜디오)`}
           </button>
         )}
 

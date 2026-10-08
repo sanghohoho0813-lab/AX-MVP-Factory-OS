@@ -47,7 +47,7 @@ const isLocal = () => getDataModeConfig().mode === 'local'
 /** 마이그레이션 0012 미적용 — 화면은 이 오류를 잡아 READY 안내를 보인다 */
 export class ConsultingTablesMissingError extends Error {
   constructor() {
-    super('특허+벤처 작업실 표가 아직 없습니다. supabase/migrations/20260908000012_consulting_studio.sql 을 적용한 뒤 사용할 수 있습니다.')
+    super('특허·MVP 작업실 표가 아직 없습니다. supabase/migrations/20260908000012_consulting_studio.sql 을 적용한 뒤 사용할 수 있습니다.')
     this.name = 'ConsultingTablesMissingError'
   }
 }
@@ -156,7 +156,7 @@ export async function createProject(
     workspaceId,
     clientId: input.clientId,
     clientName: input.clientName,
-    title: (input.title ?? '').trim() || '특허 · 벤처 · MVP',
+    title: (input.title ?? '').trim() || '특허 · MVP',
     createdAt: now,
     updatedAt: now,
   })

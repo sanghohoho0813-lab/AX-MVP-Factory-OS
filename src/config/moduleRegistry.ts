@@ -163,8 +163,8 @@ const FEATURE_NAV: Omit<ModuleDefinition, 'group' | 'parent'>[] = [
   { key: 'cases', label: '사례', path: '/cases', icon: Library, accent: 'ai', enabled: true, advanced: true },
   { key: 'clients', label: '고객사·프로젝트', path: '/clients', icon: Building2, accent: 'ai', enabled: true, hint: 'AX 프로젝트 단위 관리' },
   { key: 'website-studio', label: '홈페이지 설계', path: '/website-studio', icon: Palette, accent: 'ai', enabled: true },
-  // D-104: 예전 '컨설팅 작업실'(임시 이름 특허+벤처)
-  { key: 'consulting-studio', label: '특허+벤처', path: '/studio', icon: Workflow, accent: 'ai', enabled: true, hint: '특허 · MVP 단계 관리 — 벤처기업 확인은 기업인증 (예전 이름: 컨설팅 작업실)' },
+  // D-104: 예전 '컨설팅 작업실' → 예전 '특허+벤처' → D-178 '특허·MVP'(벤처기업 확인은 기업인증). key · 주소는 기존 데이터 호환으로 그대로
+  { key: 'consulting-studio', label: '특허·MVP', path: '/studio', icon: Workflow, accent: 'ai', enabled: true, hint: '특허 출원 · MVP 단계 관리' },
   // D-141 지원사업 알림 — D-163 부터 전문 모듈 › 기업성장 안(대표 · Pilot 같은 메뉴)
   { key: 'grants', label: '지원사업 알림', path: '/grants', icon: BellRing, accent: 'revenue', enabled: true, hint: '마감 임박 공고 · 업체 조건에 맞는 곳 · 신청 준비' },
   { key: 'funding', label: '자금·지원사업', path: '/funding', icon: Landmark, accent: 'revenue', enabled: true },
@@ -267,7 +267,7 @@ export function enabledModulesByGroup(opts: { advanced?: boolean; pilot?: boolea
 const PILOT_HIDDEN_EXTRA = [
   '/getting-started', '/why', '/kpi', '/roadmap', // 이 시스템
   '/today/legacy', // 옛 오늘 화면
-  '/studio', '/ax', '/clients', '/projects', '/diagnosis', '/selection', '/mvp-design', '/validation', '/deliverables', '/website-studio', '/cases', // AX · 웹 스튜디오 · 특허+벤처
+  '/studio', '/ax', '/clients', '/projects', '/diagnosis', '/selection', '/mvp-design', '/validation', '/deliverables', '/website-studio', '/cases', // AX · 웹 스튜디오 · 특허·MVP
   '/funding', '/reports', // AX 프로젝트에 붙는 자금 연계(프로젝트 없이는 빈 화면) · 옛 리포트 — 기관 전략(고급) 포함
   '/tools/review', // 도입 검토중(대표가 고르는 곳)
   '/modules/tech-biz', '/modules/ax-studio', '/modules/web-studio',

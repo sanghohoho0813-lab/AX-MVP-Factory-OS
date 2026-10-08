@@ -265,7 +265,7 @@ export const FEATURE_CATALOG: CatalogFeature[] = [
   { key: 'startup-tax', source: 'tool', module: 'tax-finance', lockedPreview: 'first-section', clientEntry: { topic: '창업감면', verb: '판정하기', path: '/tools/startup-tax' } },
   { key: 'cretop', source: 'tool', module: 'tax-finance', lockedPreview: 'first-section', clientEntry: { topic: '재무 분석(크레탑)', verb: '분석하기', path: '/tools/cretop' } },
   // 기술사업화
-  { key: 'consulting-studio', source: 'nav', module: 'tech-biz', lockedPreview: 'intro', clientEntry: { topic: '특허 · MVP 프로젝트', verb: '관리하기', path: '/ops/clients/{client}?tab=consulting' }, summary: '특허 출원 · MVP 단계를 프로젝트별로 관리합니다(벤처기업 확인은 기업성장 › 기업인증).' },
+  { key: 'consulting-studio', source: 'nav', module: 'tech-biz', lockedPreview: 'intro', clientEntry: { topic: '특허·MVP 프로젝트', verb: '관리하기', path: '/ops/clients/{client}?tab=consulting' }, summary: '특허 출원 · MVP 단계를 프로젝트별로 관리합니다(벤처기업 확인은 기업성장 › 기업인증).' },
   // AX STUDIO
   { key: 'diagnosis', source: 'nav', module: 'ax-studio', lockedPreview: 'intro', summary: '설문으로 업체의 업무를 진단하고 AX 기회를 찾습니다.' },
   { key: 'selection', source: 'nav', module: 'ax-studio', lockedPreview: 'intro', summary: '진단 결과에서 먼저 만들 업무를 고릅니다.' },

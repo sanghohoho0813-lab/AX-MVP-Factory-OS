@@ -33,7 +33,7 @@ await page.evaluate(seedScript())
 // 1) 작업실이 열리고 비어 있다
 await page.goto(BASE + '/studio', { waitUntil: 'networkidle' })
 await wait(700)
-check('1 작업실 화면 열림 (D-104 이름: 특허+벤처)', (await page.getByRole('heading', { name: '특허+벤처' }).count()) > 0)
+check('1 작업실 화면 열림 (D-178 이름: 특허·MVP · 예전 이름 안 보임)', (await page.getByRole('heading', { name: '특허·MVP' }).count()) > 0 && !/특허\+벤처/.test(await page.locator('body').innerText()))
 check('1 씨앗 프로젝트 카드', (await page.getByText('작업지연 위험분석 특허').count()) > 0)
 
 // 2) 새 프로젝트 — 고객 고르기
@@ -226,7 +226,7 @@ check('17 컨설팅 작업실로 가는 길은 살아 있다', !page.url().inclu
 // 18) 고객 상세 — 컨설팅 탭
 await page.goto(BASE + `/ops/clients/${SEED_CLIENT_ID}?tab=consulting`, { waitUntil: 'networkidle' })
 await wait(900)
-check('18 고객 상세 컨설팅 탭에 프로젝트', (await page.getByText('특허 · 벤처 · MVP').count()) > 0)
+check('18 고객 상세 컨설팅 탭에 프로젝트(새 프로젝트 기본 이름 특허 · MVP)', (await page.getByText('특허 · MVP', { exact: true }).count()) > 0)
 
 // 19) 전역 검색
 await page.goto(BASE + '/studio', { waitUntil: 'networkidle' })
@@ -235,7 +235,7 @@ await page.keyboard.press('Control+K')
 await wait(400)
 await page.keyboard.type('한솔')
 await wait(400)
-check('19 검색에 특허+벤처 그룹', (await page.getByRole('dialog').getByText('특허+벤처').count()) >= 1)
+check('19 검색에 특허·MVP 그룹(예전 이름 없음)', (await page.getByRole('dialog').getByText('특허·MVP').count()) >= 1 && (await page.getByRole('dialog').getByText('특허+벤처').count()) === 0)
 await page.keyboard.press('Escape')
 
 // 20) 모바일 390 — 새 화면들 가로 넘침 0 · JS 오류 0

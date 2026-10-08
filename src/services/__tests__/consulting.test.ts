@@ -253,10 +253,10 @@ check('qa: judge 합계는 10축 다 있어야', judgeTotal({ A: 9 }) === null &
   check('model: 진행도', projectProgress(raw).done === 1 && projectProgress(raw).total === 17)
   check('model: 기본 제출서류 8종', Object.keys(raw.venture.documents).length === 8)
 }
-check('registry: 특허+벤처 화면이 /studio 로 켜져 있다', MODULES.some((m) => m.path === '/studio' && m.enabled))
-// D-127: 특허+벤처는 기술사업화 분야 줄 아래 — D-136: 그 분야는 '잘 안 쓰는 기능' 묶음으로
-check('registry: 특허+벤처가 잘 안 쓰는 기능 › 기술사업화 아래', MODULES.find((m) => m.path === '/studio')?.group === 'rare' && MODULES.find((m) => m.path === '/studio')?.label === '특허+벤처' && MODULES.find((m) => m.path === '/studio')?.parent === 'cat-tech-biz' && MODULE_GROUPS.find((g) => g.key === 'modules')?.title === '전문 모듈')
-check('registry: /studio/abc → 특허+벤처', moduleForPath('/studio/abc')?.path === '/studio')
+check('registry: 특허·MVP 화면이 /studio 로 켜져 있다(D-178 이름만 바꿈 · 주소 그대로)', MODULES.some((m) => m.path === '/studio' && m.enabled))
+// D-127: 예전 '특허+벤처'(D-178 '특허·MVP')는 기술사업화 분야 줄 아래 — D-136: 그 분야는 '잘 안 쓰는 기능' 묶음으로
+check('registry: 특허·MVP 가 잘 안 쓰는 기능 › 기술사업화 아래 · 이름에 벤처 없음', MODULES.find((m) => m.path === '/studio')?.group === 'rare' && MODULES.find((m) => m.path === '/studio')?.label === '특허·MVP' && MODULES.find((m) => m.path === '/studio')?.hint === '특허 출원 · MVP 단계 관리' && !/벤처/.test(`${MODULES.find((m) => m.path === '/studio')?.label} ${MODULES.find((m) => m.path === '/studio')?.hint}`) && MODULES.find((m) => m.path === '/studio')?.parent === 'cat-tech-biz' && MODULE_GROUPS.find((g) => g.key === 'modules')?.title === '전문 모듈')
+check('registry: /studio/abc → 특허·MVP', moduleForPath('/studio/abc')?.path === '/studio')
 
 console.log(`\n컨설팅 엔진: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

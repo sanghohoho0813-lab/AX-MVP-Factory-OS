@@ -25,7 +25,7 @@ import type { ClientOpsRecord } from '../../types/clientOps'
 import { useBackToClose } from '../../lib/backToClose'
 
 interface Hit {
-  group: '고객 관리' | '고객사' | '프로젝트' | '특허+벤처' | '지금 해야 할 일' | '전문 모듈' | '결과·자료'
+  group: '고객 관리' | '고객사' | '프로젝트' | '특허·MVP' | '지금 해야 할 일' | '전문 모듈' | '결과·자료'
   label: string
   sublabel?: string
   onSelect: () => void
@@ -116,7 +116,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
   const hits = useMemo<Hit[]>(() => {
     if (!open) return []
     const q = normalizeQuery(query)
-    // D-162: Pilot 에게는 AX 고객사 · 프로젝트 · 특허+벤처 · 결과자료(대표 전용 화면)를 찾아 주지 않는다
+    // D-162: Pilot 에게는 AX 고객사 · 프로젝트 · 특허·MVP · 결과자료(대표 전용 화면)를 찾아 주지 않는다
     const orgs = pilot ? [] : organizationRepository.getAll()
     const projects = pilot ? [] : projectRepository.getAll().filter((p) => p.status !== 'archived')
     const out: Hit[] = []
@@ -145,11 +145,11 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
         out.push({ group: '프로젝트', label: p.name, sublabel: `${orgName} · ${p.projectCode}`, onSelect: () => { setActiveProject(p.id); navigate(`/projects/${p.id}`); close() } })
       }
     }
-    // 컨설팅 작업실 (특허·벤처·MVP) — 마지막으로 읽은 목록에서 (화면을 한 번 연 뒤부터 잡힌다)
+    // 특허·MVP(예전 컨설팅 작업실) — 마지막으로 읽은 목록에서 (화면을 한 번 연 뒤부터 잡힌다)
     for (const c of pilot ? [] : peekProjectCache()) {
       if (c.status === 'archived') continue
       if (!q || `${c.clientName} ${c.title} ${c.currentStage}`.toLowerCase().includes(q)) {
-        out.push({ group: '특허+벤처', label: `${c.clientName} · ${c.title}`, sublabel: `현재 ${c.currentStage}`, onSelect: () => { navigate(`/studio/${c.id}`); close() } })
+        out.push({ group: '특허·MVP', label: `${c.clientName} · ${c.title}`, sublabel: `현재 ${c.currentStage}`, onSelect: () => { navigate(`/studio/${c.id}`); close() } })
       }
     }
     // 지금 해야 할 일 (행동이 필요한 프로젝트)
