@@ -164,7 +164,7 @@ const FEATURE_NAV: Omit<ModuleDefinition, 'group' | 'parent'>[] = [
   { key: 'clients', label: '고객사·프로젝트', path: '/clients', icon: Building2, accent: 'ai', enabled: true, hint: 'AX 프로젝트 단위 관리' },
   { key: 'website-studio', label: '홈페이지 설계', path: '/website-studio', icon: Palette, accent: 'ai', enabled: true },
   // D-104: 예전 '컨설팅 작업실'(임시 이름 특허+벤처)
-  { key: 'consulting-studio', label: '특허+벤처', path: '/studio', icon: Workflow, accent: 'ai', enabled: true, hint: '특허 · 벤처인증 · MVP 단계 관리 (예전 이름: 컨설팅 작업실)' },
+  { key: 'consulting-studio', label: '특허+벤처', path: '/studio', icon: Workflow, accent: 'ai', enabled: true, hint: '특허 · MVP 단계 관리 — 벤처기업 확인은 기업인증 (예전 이름: 컨설팅 작업실)' },
   // D-141 지원사업 알림 — D-163 부터 전문 모듈 › 기업성장 안(대표 · Pilot 같은 메뉴)
   { key: 'grants', label: '지원사업 알림', path: '/grants', icon: BellRing, accent: 'revenue', enabled: true, hint: '마감 임박 공고 · 업체 조건에 맞는 곳 · 신청 준비' },
   { key: 'funding', label: '자금·지원사업', path: '/funding', icon: Landmark, accent: 'revenue', enabled: true },

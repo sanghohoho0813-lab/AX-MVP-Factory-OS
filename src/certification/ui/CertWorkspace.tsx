@@ -2,7 +2,7 @@
  * 인증 하나 — 벤처 · 연구소 · 이노비즈 · 메인비즈가 같은 4단계 문법 (D-170).
  *   1 받을 수 있나요?  2 무엇을 준비하나요?  3 실제 진행  4 받으면 무엇이 달라지나요?
  * AX: 단계마다 '지금 할 것 하나' 가 먼저 — 근거 · 공식 기준 · 진행 기록 · 절차 · 설명 문구는 접거나 시트 뒤로(지우지 않음).
- * 벤처 · 연구소는 기존 화면(특허+벤처 · 연구소 관리)으로 이어 준다 — 다시 만들지 않는다.
+ * 연구소는 기존 연구소 관리로 이어 준다(다시 만들지 않음). 벤처는 기업인증 안에서 시작해 끝난다(AX Hotfix — 예전 '특허+벤처' 화면은 기록만 읽음).
  */
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -17,15 +17,15 @@ import type { Answer } from '../core/selfCheck'
 import type { PreparedAnswer } from '../core/inspection'
 import { INNOBIZ_CHECK, INNOBIZ_INSPECTION } from '../innobiz/innobizCheck'
 import { MAINBIZ_CHECK, MAINBIZ_INSPECTION } from '../mainbiz/mainbizCheck'
-import { ExpiredBadge, BenefitPicks, ExplainButton, ReasonList, RecBadge, showReadiness, StepTabs } from './certParts'
+import { ExpiredBadge, BenefitPicks, ExplainButton, OfficialStructure, ReasonList, RecBadge, showReadiness, StepTabs } from './certParts'
 import { InspectionFlow, SelfCheckFlow } from './SelfCheckFlow'
 import { useToast } from '../../components/ui/toastContext'
 import { CERT_STATUS_LABEL, type CertLifecycle, type CertStatus, type CompletionInput } from '../core/lifecycle'
 import { LifecyclePanel } from './LifecyclePanel'
-import { InspectionPackPanel, SubmitGatePanel, VenturePackPanel } from './PrepPanels'
+import { InspectionPackPanel, SubmitGatePanel, VentureCheckPanel, VenturePackPanel } from './PrepPanels'
 import { buildInspectionPackage } from '../core/inspectionPackage'
 import { buildSubmitGate } from '../core/submitGate'
-import { buildVenturePack } from '../core/venturePack'
+import { buildVenturePack, VENTURE_REVIEWED_KEY, VENTURE_STAGE_LABEL, ventureProgress, ventureRoutes, ventureSubmitCheck } from '../core/venturePack'
 import { inspectionHandoff, ventureHandoff } from '../core/handoff'
 import { runSelfCheck } from '../core/selfCheck'
 import { INNOBIZ_BANK } from '../innobiz/innobizGuides'
@@ -75,7 +75,7 @@ export function CertWorkspace({
   const { showToast } = useToast()
   // P1: 진행 중인 인증은 '실제 진행' 단계에서 연다(진행 기록이 거기 있다)
   const [step, setStep] = useState(life.status !== 'preparing' || life.history.length > 0 ? 2 : 0)
-  const [flow, setFlow] = useState<'none' | 'self' | 'inspect' | 'pack' | 'gate' | 'venture'>('none')
+  const [flow, setFlow] = useState<'none' | 'self' | 'inspect' | 'pack' | 'gate' | 'venture' | 'vcheck'>('none')
   const sender = useSenderLine()
   const navigate = useNavigate()
   const requestDocs = async () => {
@@ -94,7 +94,8 @@ export function CertWorkspace({
   const venture = useMemo(() => (a.key === 'venture' ? buildVenturePack(ctx, notes) : null), [a.key, ctx, notes])
   const answeredSelf = Object.keys(answers).length > 0
   const unconfirmed = (ctx.basis ?? []).filter((b) => b.state === 'estimated' && !b.from.startsWith('컨설턴트')).length
-  const existingTool = a.key === 'venture' ? { label: '특허+벤처 화면 열기', href: `/ops/clients/${clientId}?tab=consulting` } : a.key === 'lab' ? { label: '연구소 관리 열기', href: `/tools/labcare?client=${clientId}` } : null
+  // AX Hotfix: 벤처는 기업인증 안에서 끝난다 — 예전 '특허+벤처' 화면으로 보내지 않는다. 연구소는 살아 있는 연구소 관리로 잇는다.
+  const existingTool = a.key === 'lab' ? { label: '연구소 관리 열기', href: `/tools/labcare?client=${clientId}` } : null
   const deadlines = a.renewal
     ? [
         { date: a.renewal.prepareFrom, title: `${rule.label} 갱신 준비 시작`, note: rule.renewalNote, todo: true as const },
@@ -114,8 +115,28 @@ export function CertWorkspace({
     window.setTimeout(() => document.querySelector('[data-testid="cert-life-box"]')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 0)
   }
   type Next = { stage: string; label: string; testid: string; go: () => void }
-  // 벤처 · 연구소는 기존 화면이 다음 행동(아래) — 진행 기록은 완료 · 심사 중이면 펼쳐 둔다
-  const next: Next | null = !(selfItems && pkg)
+  // AX Hotfix: 벤처 — 준비 확인 → 대표 확인 → 사업계획 준비 → 제출 전 확인 → 신청 · 평가 → 완료(새 엔진 없이 준비 패키지를 흐름에 넣음)
+  const openVenturePack = () => {
+    if (!(notes[VENTURE_REVIEWED_KEY] ?? '').trim()) void onNote(VENTURE_REVIEWED_KEY, ctx.today).catch(() => undefined)
+    setFlow('venture')
+  }
+  const vRoutes = a.key === 'venture' ? ventureRoutes(ctx) : []
+  const vProg = venture ? ventureProgress({ sections: venture, notes, hasBizPlan: a.haveEvidence.some((x) => /사업계획/.test(x)) || (!!ctx.legacyVenture && ctx.legacyVenture.planDone >= ctx.legacyVenture.planTotal), status: done ? 'done' : submitted ? 'submitted' : 'preparing' }) : null
+  const ventureNext: Next | null = !vProg
+    ? null
+    : vProg.stage === 'done'
+      ? { stage: VENTURE_STAGE_LABEL.done, label: '벤처 확인 완료 기록', testid: 'cert-next-complete', go: openLife }
+      : vProg.stage === 'applied'
+        ? { stage: VENTURE_STAGE_LABEL.applied, label: '벤처 확인 완료 기록', testid: 'cert-next-complete', go: openLife }
+        : vProg.stage === 'check'
+          ? { stage: VENTURE_STAGE_LABEL.check, label: '벤처 준비 확인', testid: 'cert-venture-start', go: openVenturePack }
+          : vProg.stage === 'owner'
+            ? { stage: VENTURE_STAGE_LABEL.owner, label: `대표 확인 ${vProg.ownerLeft}개`, testid: 'cert-venture-owner', go: openVenturePack }
+            : vProg.stage === 'plan'
+              ? { stage: VENTURE_STAGE_LABEL.plan, label: '사업계획 준비', testid: 'cert-venture-plan', go: () => setStep(1) }
+              : { stage: VENTURE_STAGE_LABEL.submit, label: '제출 전 확인', testid: 'cert-venture-check', go: () => setFlow('vcheck') }
+  // 연구소는 기존 연구소 관리가 다음 행동(아래) — 진행 기록은 완료 · 심사 중이면 펼쳐 둔다
+  const next: Next | null = ventureNext ?? (!(selfItems && pkg)
     ? null
     : done
       ? { stage: '인증 완료', label: '인증 완료 기록', testid: 'cert-next-complete', go: openLife }
@@ -127,7 +148,7 @@ export function CertWorkspace({
             ? { stage: '대표 확인', label: `대표 확인 ${ownerLeft}개`, testid: 'cert-next-owner', go: () => setFlow('pack') }
             : Object.keys(prep).length === 0
               ? { stage: '실사 준비', label: '실사 준비', testid: 'cert-prep-pack', go: () => setFlow('pack') }
-              : { stage: '제출 준비', label: '제출 전 최종 확인', testid: 'cert-gate-open', go: () => setFlow('gate') }
+              : { stage: '제출 준비', label: '제출 전 최종 확인', testid: 'cert-gate-open', go: () => setFlow('gate') })
   const keyReasons = [...a.reasons.filter((r) => r.state === 'no'), ...a.reasons.filter((r) => r.state === 'ok').slice(0, 2), ...a.reasons.filter((r) => r.state === 'warn').slice(0, 1), ...a.reasons.filter((r) => r.state === 'unknown').slice(0, 1)].slice(0, 4)
   // AX: 준비자료 — 그룹 제목이 공식 / MIRAE 뜻을 맡는다(줄마다 꼬리표 없음)
   const firstDocs = rule.evidence.filter((e) => !a.haveEvidence.includes(e.label) && EVIDENCE_CLASS[a.key] && ['official', 'process'].includes(evidenceClassOf(a.key, e.id).basis))
@@ -174,6 +195,18 @@ export function CertWorkspace({
               >
                 {answeredSelf ? '사전진단 이어서' : '사전진단 시작'}
               </Button>
+            ) : a.key === 'venture' ? (
+              <Button
+                variant="primary"
+                className="self-start"
+                onClick={() => {
+                  setStep(2)
+                  if (ventureNext && ventureNext.testid !== 'cert-venture-plan') ventureNext.go()
+                }}
+                data-testid="cert-step0-venture"
+              >
+                {ventureNext?.label ?? '벤처 준비 확인'}
+              </Button>
             ) : existingTool ? (
               <Link to={existingTool.href} className="contents">
                 <Button variant="primary" className="self-start" data-testid="cert-step0-tool">
@@ -187,19 +220,20 @@ export function CertWorkspace({
                 <p className="t-sub break-keep text-slate-600">
                   {rule.summary} · {a.timing}
                 </p>
-                <ReasonList reasons={a.reasons} />
-                {rule.officialScores && (
-                  <div className="rounded-(--radius-control) border border-slate-200 bg-slate-50 p-3" data-testid="cert-official">
-                    <p className="t-sub font-semibold text-slate-800">공식 기준(기관 점수 — MIRAE 판단과 별개)</p>
-                    <ul className="mt-1 flex flex-col gap-0.5">
-                      {rule.officialScores.map((x) => (
-                        <li key={x.label} className="t-sub break-keep text-slate-700">
-                          · {x.label}: <b className="font-semibold">{x.value}</b>
+                {vRoutes.length > 0 && (
+                  <div className="flex flex-col gap-1" data-testid="cert-venture-routes">
+                    <p className="t-sub font-semibold text-slate-800">유형별로 보면</p>
+                    <ul className="flex flex-col gap-0.5">
+                      {vRoutes.map((r) => (
+                        <li key={r.type} className={`t-sub break-keep ${r.state === 'fit' ? 'text-slate-800' : r.state === 'check' ? 'text-warning-800' : 'text-slate-500'}`} data-testid="cert-venture-route" data-state={r.state}>
+                          {r.state === 'fit' ? '✓' : r.state === 'check' ? '?' : '–'} <b className="font-semibold">{r.label}</b> — {r.text}
                         </li>
                       ))}
                     </ul>
                   </div>
                 )}
+                <ReasonList reasons={a.reasons} />
+                <OfficialStructure rule={rule} />
                 <BasisBox cert={a.key} ctx={ctx} />
                 <RulesInfoButton cert={a.key} today={ctx.today} />
               </div>
@@ -270,9 +304,53 @@ export function CertWorkspace({
                     </span>
                   </p>
                 )}
+                {vProg && venture && (
+                  <p className="t-sub flex flex-wrap gap-x-3 gap-y-1 break-keep text-slate-700" data-testid="cert-prep-status">
+                    <span>
+                      {vProg.okCount === vProg.sectionCount ? '✓' : '△'} 준비 칸 {vProg.okCount}/{vProg.sectionCount}
+                    </span>
+                    <span>
+                      {vProg.ownerLeft === 0 ? '✓' : '△'} 대표 확인 {vProg.ownerTotal - vProg.ownerLeft}/{vProg.ownerTotal}
+                    </span>
+                    <span>
+                      {docsTotal > 0 && a.haveEvidence.length === docsTotal ? '✓' : '△'} 서류 {a.haveEvidence.length}/{docsTotal}
+                    </span>
+                  </p>
+                )}
+                {vProg && ctx.legacyVenture && (
+                  <p className="t-sub flex flex-wrap gap-x-2 gap-y-0.5 break-keep text-slate-600" data-testid="cert-venture-legacy">
+                    {['이전 컨설팅 기록', ctx.legacyVenture.planDone ? `사업계획 초안 ${ctx.legacyVenture.planDone}/${ctx.legacyVenture.planTotal}` : '', ctx.legacyVenture.patentStatus !== 'none' ? `특허 ${ctx.legacyVenture.patentStatus === 'registered' ? '등록' : '출원 중'}` : '', ctx.legacyVenture.submittedAt ? `신청 기록 ${ctx.legacyVenture.submittedAt}(진행 기록에 '신청' 으로 적어 두세요)` : '']
+                      .filter(Boolean)
+                      .map((x, i) => (
+                        <span key={x}>
+                          {i > 0 ? '· ' : ''}
+                          {x}
+                        </span>
+                      ))}
+                  </p>
+                )}
                 <Button variant="primary" className="self-start" onClick={next.go} data-testid={next.testid}>
                   {next.label}
                 </Button>
+                {vProg && venture && (
+                  <details data-testid="cert-other-actions">
+                    <summary className="tap t-sub inline-flex cursor-pointer list-none items-center gap-1 font-semibold text-slate-600 [&::-webkit-details-marker]:hidden">
+                      <ChevronDown aria-hidden="true" className="size-4" /> 다른 작업
+                    </summary>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {!['cert-venture-start', 'cert-venture-owner'].includes(next.testid) && (
+                        <Button variant="secondary" size="sm" onClick={openVenturePack} data-testid="cert-venture-pack">
+                          벤처 준비 보기
+                        </Button>
+                      )}
+                      {next.testid !== 'cert-venture-check' && (
+                        <Button variant="secondary" size="sm" onClick={() => setFlow('vcheck')} data-testid="cert-venture-check-more">
+                          제출 전 확인
+                        </Button>
+                      )}
+                    </div>
+                  </details>
+                )}
                 {selfItems && pkg && gate && (
                   <details data-testid="cert-other-actions">
                     <summary className="tap t-sub inline-flex cursor-pointer list-none items-center gap-1 font-semibold text-slate-600 [&::-webkit-details-marker]:hidden">
@@ -307,11 +385,6 @@ export function CertWorkspace({
                       <ExternalLink aria-hidden="true" className="size-4" /> {existingTool.label}
                     </Button>
                   </Link>
-                  {venture && (
-                    <Button variant="secondary" onClick={() => setFlow('venture')} data-testid="cert-venture-pack">
-                      벤처 준비 패키지
-                    </Button>
-                  )}
                 </div>
               </div>
             ) : null}
@@ -352,6 +425,16 @@ export function CertWorkspace({
           sender={sender}
           onRequestDocs={onRequestDocs}
           onAct={(id) => (id === 'exclusion' || id === 'size' ? navigate(sectionHref('overview', clientId)) : id === 'answers' ? setFlow('inspect') : setFlow('self'))}
+          onClose={() => setFlow('none')}
+        />
+      )}
+      {step === 2 && flow === 'vcheck' && venture && vProg && (
+        <VentureCheckPanel
+          rows={ventureSubmitCheck({ routes: vRoutes, progress: vProg, missingEvidence: a.missingEvidence, haveEvidence: a.haveEvidence })}
+          applied={submitted || done}
+          onRequestDocs={() => void requestDocs()}
+          onOwner={openVenturePack}
+          onApplied={() => void onStatus('applied').then(() => showToast('벤처기업 — 신청(활동 기록에 남김)')).then(() => { setFlow('none'); setLifeOpen(true) })}
           onClose={() => setFlow('none')}
         />
       )}

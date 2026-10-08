@@ -59,7 +59,7 @@ ISO 9001 · 14001 · 45001 을 업종 · B2B · 조달 · 수출로 검토 추�
 
 ## 7. 남은 것(P1 · P2)
 
-- 벤처 · 연구소 판정을 기존 화면(특허+벤처 · 연구소 관리)의 결과와 서로 잇기(지금은 기존 화면으로 보내기만).
+- (D-177 에서 끝남) 벤처는 기업인증 안에서 끝나고 예전 '특허+벤처' 기록은 읽기만 · 연구소는 연구소 관리 기록을 읽는다.
 - 업체 사정 칩에서 고른 사실(연구소 · 특허)을 사실 창고에 '확인' 으로 되돌리기(지금은 모듈 기록에만).
 - 인증 받은 뒤 인증번호 · 최초 인증일 · 사후심사 일정을 따로 적는 칸.
 - 메인비즈 평가 영역 · 연장 기간 공식 원문 확인 뒤 문항 손질.
@@ -112,3 +112,17 @@ P3 로 남긴 것은 docs/DECISIONS.md D-173 과 보고서에.
 - 중소기업: 확인서(`smeDoc`) 또는 확인서 기준 규모만 ✓.
 - 사실 우선순위: 공식 서류 > 전문 모듈 > 확인한 사실 > 칩 > 추정 — 다르면 `ctx.conflicts`.
 - 화면: 첫 화면 1순위 하나 · 질문 1/3 스테퍼(`ProfileQuestions.tsx`) · 상세는 단계마다 다음 행동 하나 · 근거 · 출처 · 설명 · 진행 기록은 접기 · 시트(`RulesSheet.tsx` · `ExplainButton`).
+
+## Hotfix — 공식기준 · 벤처 예전 경로 은퇴 (D-177, Preview 까지)
+
+| 무엇 | 어디 | 원칙 |
+|---|---|---|
+| 메인비즈 2026-06-22 평가지표 | `rules/officialRules.ts` `officialStructure` · `ui/certParts.tsx` `OfficialStructure` | 업종별 지표 수 · 영역 배점은 [공식 평가구조 보기](접힘)에만. MIRAE 사전진단과 섞지 않음 |
+| 메인비즈 제외 업종 | `rules/industryMap.ts` `mainbizIndustry` | 전부 제외 3개만 탈락 · '중'(일부) · 숙박 · 음식점은 '세부 사업내용 확인 필요' · 낱말은 신호만 |
+| 신청 제외(제3조②) | `officialRules` · `ProfileQuestions` · `inspectionPackage` | 최근 3년 체불 명단 공개 · 산재 공표 · 공정거래 시정명령 · 보조금 참여제한 |
+| 벤처 재확인 | `CertRule.renewalRules` · `core/renewal.ts` `renewalRuleFor` | 오늘 날짜로 규칙 선택(2027-02-20 까지 옛 · 2027-02-21 부터 새) |
+| 이노비즈 업종표 | `industryMap.ts` `innobizSectorOfKsic` | SW 7코드 · 디자인 M732 확정, 바이오 · 환경은 후보만(기술 분야로 정함) |
+| 벤처 흐름 | `core/venturePack.ts` `ventureRoutes` · `ventureProgress` · `ventureSubmitCheck` · `ui/PrepPanels.tsx` `VentureCheckPanel` | 네 길 · 다음 행동 하나 · 제출 전 네 줄 · 신청 상태 기록 → 완료 기록 |
+| 예전 기록 읽기 | `integration/legacyConsulting.ts` → `ctx.legacyVenture` | 읽기만 · 출원 중은 보유 아님 · 등록은 확인된 전문 기록 |
+| 예전 화면 안내 | `components/consulting/LegacyVentureNotice.tsx` | `/studio` · 업체 상세 컨설팅 탭 · 프로젝트 벤처 탭에 안내 + [기업인증 벤처 열기]. 돌려보내기 없음 |
+

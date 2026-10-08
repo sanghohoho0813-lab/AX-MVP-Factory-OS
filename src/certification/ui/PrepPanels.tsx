@@ -17,7 +17,7 @@ import { ownerPlaceholder, type Sourced } from '../core/answerGuide'
 import { BRING_LABEL, BRING_MARK, inspectionPackageText, ownerKey, ownerQuestionMessage, type InspectionPackage, type PackageQuestion } from '../core/inspectionPackage'
 import { GATE_LEVEL_LABEL, GATE_VERDICT_LABEL, gateFirst, gateRows, missingDocsRequest, type GateItem, type SubmitGate } from '../core/submitGate'
 import { EVIDENCE_BASIS_LABEL } from '../rules/officialRules'
-import { PACK_LABEL, PACK_MARK, venturePackText, type VentureSection } from '../core/venturePack'
+import { PACK_LABEL, PACK_MARK, venturePackText, type VentureCheckRow, type VentureSection } from '../core/venturePack'
 import { handoffText, type HandoffPackage } from '../core/handoff'
 
 function useCopy() {
@@ -450,6 +450,68 @@ export function SubmitGatePanel({
 /* 벤처 준비 패키지                                                       */
 /* ------------------------------------------------------------------ */
 
+/** AX Hotfix: 벤처 제출 전 확인 — 네 줄 · 먼저 할 것 하나 · [신청 상태 기록]. 공식 점수 · 확률 없음 */
+export function VentureCheckPanel({
+  rows,
+  applied,
+  onRequestDocs,
+  onOwner,
+  onApplied,
+  onClose,
+}: {
+  rows: VentureCheckRow[]
+  applied: boolean
+  onRequestDocs: () => void
+  onOwner: () => void
+  onApplied: () => void
+  onClose: () => void
+}) {
+  const first = rows.find((r) => r.mark === 'check') ?? rows.find((r) => r.mark === 'todo') ?? null
+  const ready = !rows.some((r) => r.mark === 'check')
+  const act = (r: VentureCheckRow) => (r.key === 'owner' ? onOwner() : r.key === 'route' ? onClose() : onRequestDocs())
+  return (
+    <Surface>
+      <div className="flex flex-col gap-4" data-testid="cert-venture-gate" data-ready={ready}>
+        <div className={`flex flex-col gap-1 rounded-(--radius-control) border px-3 py-3 ${ready ? 'border-success-200 bg-success-50' : 'border-warning-200 bg-warning-50'}`}>
+          <p className="t-sub font-semibold text-slate-600">벤처기업 제출 전 확인</p>
+          <p className={`t-section font-bold ${ready ? 'text-success-700' : 'text-warning-800'}`}>{ready ? '신청 준비 가능' : '먼저 확인 필요'}</p>
+          <p className="t-sub break-keep text-slate-700">확인기관 평가 결과는 미리 알 수 없습니다 — 여기서는 신청 전에 빠진 것만 봅니다.</p>
+        </div>
+        <ul className="flex flex-col gap-1.5" data-testid="cert-venture-gate-rows">
+          {rows.map((r) => (
+            <li key={r.key} className={`t-sub flex items-start gap-1.5 break-keep ${r.mark === 'ok' ? 'text-success-700' : r.mark === 'check' ? 'text-danger-700' : 'text-slate-700'}`} data-testid="cert-venture-gate-row" data-mark={r.mark}>
+              <span aria-hidden="true" className="font-semibold">{r.mark === 'ok' ? '✓' : r.mark === 'check' ? '△' : '○'}</span>
+              <span>
+                <b className="font-semibold">{r.label}</b> · {r.text}
+              </span>
+            </li>
+          ))}
+        </ul>
+        {first && (
+          <div className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 px-3 py-2" data-testid="cert-venture-gate-first">
+            <p className="t-sub min-w-0 flex-1 break-keep text-slate-800">
+              <b className="font-semibold">먼저 할 것</b> · {first.text}
+            </p>
+            <Button variant={ready ? 'secondary' : 'primary'} size="sm" onClick={() => act(first)}>
+              {first.key === 'owner' ? '대표 답 적기' : first.key === 'route' ? '판단 다시 보기' : '자료 요청'}
+            </Button>
+          </div>
+        )}
+        <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+          {ready && !applied && (
+            <Button variant="primary" onClick={onApplied} data-testid="cert-venture-applied">
+              신청 상태 기록
+            </Button>
+          )}
+          <Button variant="ghost" onClick={onClose} data-testid="cert-venture-gate-close">
+            닫기
+          </Button>
+        </div>
+      </div>
+    </Surface>
+  )
+}
+
 export function VenturePackPanel({
   companyName,
   sections,
@@ -480,8 +542,8 @@ export function VenturePackPanel({
     <Surface>
       <div className="flex flex-col gap-4" data-testid="venture-pack">
         <div className="flex flex-col gap-1">
-          <h3 className="t-section font-bold break-keep text-slate-900">{companyName} 벤처 준비 패키지</h3>
-          <p className="t-sub break-keep text-slate-600">벤처확인 신청 · 사업계획서에 들어갈 사실을 9칸으로 모았습니다. 비어 있는 칸은 지어내지 않고 대표님께 묻습니다.</p>
+          <h3 className="t-section font-bold break-keep text-slate-900">{companyName} 벤처 준비</h3>
+          <p className="t-sub break-keep text-slate-600">벤처확인 신청 · 사업계획서에 들어갈 사실을 9칸으로 모았습니다(연구소 · 특허 · 재무는 회사 기록에서). 비어 있는 칸은 지어내지 않고 대표님께 묻습니다.</p>
           <p className="t-sub font-semibold text-slate-800" data-testid="venture-pack-count">
             ✓ {sections.filter((s) => s.state === 'ok').length} · △ {sections.filter((s) => s.state === 'partly').length} · ? {sections.filter((s) => s.state === 'ask').length}
           </p>
@@ -534,7 +596,7 @@ export function VenturePackPanel({
               <Send aria-hidden="true" className="size-4" /> 대표에게 질문 보내기
             </Button>
           )}
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose} data-testid="venture-pack-close">
             닫기
           </Button>
         </div>

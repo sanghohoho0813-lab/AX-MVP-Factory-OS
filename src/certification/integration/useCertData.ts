@@ -7,7 +7,7 @@
  *   - [고객에게 자료 요청] → 서류함에 빈 칸(없는 것만)
  * 새 표 · 마이그레이션 없음.
  */
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useToolClient } from '../../tools/shared/toolClientContext'
 import { useModuleBucket } from '../../tools/shared/useModuleBucket'
 import { nowIso, todayLocalDate } from '../../lib/appClock'
@@ -26,6 +26,9 @@ import { renewalDeadlines, renewalPlan } from '../core/renewal'
 import { CERT_RULES } from '../rules/officialRules'
 import { certContextOf, certKeyOf, factPatchValue, normalizeCertProfile, type CertProfile } from './clientContext'
 import { labcareFactsOf } from './labcareAdapter'
+import { legacyVentureFactsOf } from './legacyConsulting'
+import { listProjectsForClient } from '../../services/consultingStudioService'
+import type { ConsultingProject } from '../../types/consulting'
 
 export const CERT_MODULE = 'cert-os'
 
@@ -97,7 +100,7 @@ export function factPatchOf(p: CertProfile): { key: 'patents' | 'researchLab'; v
 }
 
 export function useCertData() {
-  const { clientId, clientRecord, clientName, replaceClient } = useToolClient()
+  const { clientId, clientRecord, clientName, replaceClient, workspaceId } = useToolClient()
   const profiles = useModuleBucket<ProfileRow>(CERT_MODULE, 'profile')
   const works = useModuleBucket<WorkRow>(CERT_MODULE, 'work')
   const lifeRows = useModuleBucket<LifeRow>(CERT_MODULE, 'life')
@@ -112,7 +115,20 @@ export function useCertData() {
     () => (clientId ? (lifeRows.rows ?? []).filter((r) => r.clientId === clientId && CERT_RULES[r.data.cert]).map((r) => normalizeLifecycle(r.data.life, r.data.cert)) : []),
     [lifeRows.rows, clientId],
   )
-  const ctx = useMemo(() => (clientRecord ? certContextOf(clientRecord, today, profile, { lab, lives }) : null), [clientRecord, today, profile, lab, lives])
+  // AX Hotfix(LEGACY): 예전 '특허+벤처' 컨설팅 프로젝트에 남은 특허 · 사업계획 · 신청 기록을 읽기만 한다 — 그 화면으로 보내지 않는다
+  const [legacyProjects, setLegacyProjects] = useState<ConsultingProject[] | null>(null)
+  useEffect(() => {
+    if (!clientId) return
+    let alive = true
+    listProjectsForClient(workspaceId, clientId)
+      .then((l) => alive && setLegacyProjects(l))
+      .catch(() => alive && setLegacyProjects([]))
+    return () => {
+      alive = false
+    }
+  }, [workspaceId, clientId])
+  const legacy = useMemo(() => (clientId ? legacyVentureFactsOf(legacyProjects, clientId) : null), [legacyProjects, clientId])
+  const ctx = useMemo(() => (clientRecord ? certContextOf(clientRecord, today, profile, { lab, lives, legacy }) : null), [clientRecord, today, profile, lab, lives, legacy])
   const list = useMemo(() => (ctx ? assessAll(ctx) : []), [ctx])
   const roadmap = useMemo(() => (ctx ? buildRoadmap(list, ctx) : { steps: [], later: [] }), [ctx, list])
 

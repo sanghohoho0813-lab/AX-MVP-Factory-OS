@@ -86,6 +86,20 @@ export interface EvidenceDoc {
   stale?: boolean
 }
 
+/** LEGACY 컨설팅 프로젝트에서 읽은 벤처 · 특허 기록(어댑터가 채운다 — 없으면 null) */
+export interface LegacyVentureFacts {
+  projectTitle: string
+  patentStatus: 'none' | 'filed' | 'registered'
+  applicationNumber: string
+  filedAt: string
+  /** 사업계획서 7항목 중 끝낸 것 */
+  planDone: number
+  planTotal: number
+  submittedAt: string
+  /** 사실표 '현재 자금조달'(투자 유치 여부 단서) */
+  fundingNow: string
+}
+
 /**
  * Core 가 받는 업체 사정 — 모르면 null. 어댑터가 업체 기록 · 사실 창고 · 서류함에서 채운다.
  */
@@ -116,6 +130,8 @@ export interface CertificationClientContext {
   smeDoc?: boolean
   /** AX: 기존 입력값과 확인된 정보가 달라 확인된 정보를 쓴 것(화면 안내) */
   conflicts?: string[]
+  /** AX Hotfix: 예전 '특허+벤처'(컨설팅 프로젝트)에 남은 기록 — 읽기만(LEGACY) */
+  legacyVenture?: LegacyVentureFacts | null
   researchUnit: ResearchUnit | null
   /** 연구전담요원 수 */
   researchers: number | null

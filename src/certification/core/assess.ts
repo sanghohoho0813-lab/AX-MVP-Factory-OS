@@ -343,7 +343,7 @@ export function assessMainbiz(c: CertificationClientContext, innobiz?: Certifica
 }
 
 /* ------------------------------------------------------------------ */
-/* 벤처 · 연구소 — 기존 화면(특허+벤처 · 연구소 관리)으로 이어 준다                */
+/* 벤처 · 연구소 — 벤처는 기업인증 안에서(유형별 길 · 준비 · 제출 전 확인), 연구소는 연구소 관리로 */
 /* ------------------------------------------------------------------ */
 
 export function assessVenture(c: CertificationClientContext): CertificationAssessment {
@@ -368,7 +368,9 @@ export function assessVenture(c: CertificationClientContext): CertificationAsses
     if (!need) checks.push({ weight: 'core', state: 'unknown', text: `세부 업종 확인 필요 — 매출 대비 연구개발비 ${pct(r)} · 기준 비율은 세부 업종(KSIC)과 매출 구간으로 정해짐(5~10%)` })
     else checks.push(r >= need.ratio ? { weight: 'core', state: 'ok', text: `매출 대비 연구개발비 ${pct(r)}(기준 ${pct(need.ratio)} 이상 · 별표1 '${need.row}')` } : { weight: 'core', state: 'warn', text: `매출 대비 연구개발비 ${pct(r)} — 기준 ${pct(need.ratio)} 미만(별표1 '${need.row}')` })
   }
-  checks.push(c.patents === null ? { weight: 'core', state: 'unknown', text: '특허 — 확인 필요' } : c.patents > 0 ? { weight: 'core', state: 'ok', text: `특허 ${c.patents}건 — 혁신성 증빙` } : { weight: 'core', state: 'warn', text: '특허 없음 — 혁신성장유형은 사업계획 · 기술성으로 평가' })
+  // 출원 중(예전 컨설팅 기록)은 보유로 세지 않는다 — 등록 여부 확인 필요
+  const filed = c.legacyVenture?.patentStatus === 'filed' && !(c.patents ?? 0) ? `특허 출원 중${c.legacyVenture.applicationNumber ? `(${c.legacyVenture.applicationNumber})` : ''}` : ''
+  checks.push(filed && c.patents === null ? { weight: 'core', state: 'unknown', text: `특허 등록 여부 — ${filed} · 등록 확인 필요(출원도 기술성 자료)` } : c.patents === null ? { weight: 'core', state: 'unknown', text: '특허 — 확인 필요' } : c.patents > 0 ? { weight: 'core', state: 'ok', text: `특허 ${c.patents}건 — 혁신성 증빙` } : { weight: 'core', state: 'warn', text: filed ? `등록 특허 없음 · ${filed} — 혁신성장유형은 사업계획 · 기술성으로 평가` : '특허 없음 — 혁신성장유형은 사업계획 · 기술성으로 평가' })
   const readiness = readinessOf(checks)
   const missingFacts = factsOf(checks)
   const rndType = lab && (c.rndExpense ?? 0) >= VENTURE_RND.minExpenseWon
@@ -408,7 +410,7 @@ export function assessVenture(c: CertificationClientContext): CertificationAsses
   }
   // 혁신성장유형은 확인기관 평가로 정해진다 — 요건형(연구개발유형)이 아니면 '매우 높음' 까지는 말하지 않는다
   const shown: Readiness = rec === 'low_priority' ? capReadiness(readiness, 'low') : rec !== 'now' && readiness === 'very_high' ? 'high' : readiness
-  return finish(rule, c, checks, rec, oneLine, timing, { label: '벤처 화면 열기', kind: 'open_tool' }, missingFacts, shown)
+  return finish(rule, c, checks, rec, oneLine, timing, { label: '벤처 준비 확인', kind: 'collect_docs' }, missingFacts, shown)
 }
 
 /** 연구전담요원 기준 — 규모 · 업력 · 벤처 여부 */

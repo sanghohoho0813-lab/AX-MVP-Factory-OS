@@ -106,7 +106,7 @@ function Hero({ a, clientId }: { a: CertificationAssessment; clientId: string | 
         {why && <p className="t-sub break-keep text-slate-600">✓ {why.text}</p>}
         {benefit && (
           <p className="t-sub break-keep text-slate-600" data-testid="cert-hero-benefit">
-            쓸모 · {benefit.title}
+            주요 활용 · {benefit.title}
           </p>
         )}
         <Link to={sectionHref(SECTION[a.key], clientId)} className="contents">

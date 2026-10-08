@@ -3,7 +3,8 @@
  *  - 업체 없이 열면 업체부터 · 업체로 열면 인증 한눈에(AX: 1순위 하나 · 나머지 줄 · Primary 하나 · 혜택 칩 · 근거 없음 · 기준일 ⓘ 시트)
  *  - AX: 질문은 한 번에 하나(1/3 · 최대 3개) → 나머지는 '더 확인할 정보' · 고르면 판정이 바뀐다(저장 · 다시 열어도)
  *  - 이노비즈 4단계 · 자가진단 한 질문씩(기록으로 미리 고름 · 증빙) → 결과(공식 기준 숫자 따로) → 실사 대비 → 모의 실사(점수 없음)
- *  - 메인비즈는 다른 문항 · 벤처/연구소는 기존 화면으로 · ISO 상담 요청(업체 기록 활동)
+ *  - 메인비즈는 다른 문항 · 연구소는 연구소 관리로 · 벤처는 기업인증 안에서 끝(예전 '특허+벤처' 로 안 감) · ISO 상담 요청(업체 기록 활동)
+ *  - Hotfix V1~V6: 한눈에 → 벤처 → 진행 · 예전 특허 기록 읽기 · 연구소/특허/재무 · 완료까지 · 예전 기록 그대로 · 예전 화면 안내(돌려보내기 고리 없음)
  *  - 첫 사용 테스트(설명서 없이): 고객 선택 → 기업인증 → 순서 이해 → 이유 → 준비자료 → 자가진단 → 부족자료 → 실사 준비
  *  - 360 · 390 · 430 · 글자 1.30(아주 크게)에서 가로 넘침 0 · 44px 누르기 · JS 오류 0
  */
@@ -125,6 +126,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('AX 1단계: 핵심 이유 4줄 이하 · Primary 하나(사전진단)', (await page.getByTestId('cert-reasons').first().locator('li').count()) <= 4 && (await primaries()) === 1 && /사전진단/.test(await page.getByTestId('cert-step0-self').innerText()))
   check('AX 1단계: 공식 기준 · 전체 근거는 접혀 있다', !(await page.getByTestId('cert-basis-more').evaluate((e) => e.open)))
   await page.getByTestId('cert-basis-more').locator('summary').first().click()
+  check('HF 공식 평가구조는 한 번 더 접혀 있다(MIRAE 판단과 섞지 않음)', !(await page.getByTestId('cert-official-box').evaluate((e) => e.open)))
+  await page.getByTestId('cert-official-box').locator('summary').click()
   check('공식 기준은 따로 — 650점 · 700점 · B등급', /650점/.test(await page.getByTestId('cert-official').innerText()) && /B등급/.test(await page.getByTestId('cert-official').innerText()))
   await page.getByTestId('cert-basis-more').getByTestId('cert-freshness').click()
   await page.waitForTimeout(200)
@@ -149,7 +152,9 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     await page.waitForTimeout(150)
   }
   const res = await page.getByTestId('selfcheck-result').innerText()
-  check('자가진단 결과: 5단계 · 공식 기준 따로 · 준비할 자료', /준비도|추가 확인 필요/.test(res) && /650점/.test(res) && /실사 전에 준비할 자료|보완/.test(res))
+  check('자가진단 결과: 5단계 · 준비할 자료 · 공식 평가구조는 접힘', /준비도|추가 확인 필요/.test(res) && /실사 전에 준비할 자료|보완/.test(res) && /공식 평가구조 보기/.test(res) && !(await page.getByTestId('selfcheck-official-box').evaluate((e) => e.open)))
+  await page.getByTestId('selfcheck-official-box').locator('summary').click()
+  check('자가진단 결과: [공식 평가구조 보기] → 650점', /650점/.test(await page.getByTestId('selfcheck-official').innerText()))
   check('자가진단 결과: 자체 점수 없음', !/\d+\s*점\s*\(MIRAE|자체\s*\d+점/.test(res))
   await page.getByTestId('selfcheck-to-inspection').click()
   await page.waitForTimeout(300)
@@ -187,18 +192,21 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.goto(BASE + '/tools/cert-os/mainbiz?client=cli_hansol', { waitUntil: 'networkidle' })
   await page.getByTestId('cert-step-0').click()
   await page.getByTestId('cert-basis-more').locator('summary').first().click()
+  await page.getByTestId('cert-official-box').locator('summary').click()
   check('메인비즈: 공식 기준 600점 · 700점', /600점/.test(await page.getByTestId('cert-official').innerText()))
+  const mbStruct = await page.getByTestId('cert-official-structure').innerText()
+  check('HF 메인비즈 2026-06-22 개편 지표: 제조 45 · 건설 45 · 도소매 44 · 지식서비스 44 · 일반서비스 43', /2026-06-22/.test(mbStruct) && /제조업[^\n]*45/.test(mbStruct) && /건설업[^\n]*45/.test(mbStruct) && /도소매업[^\n]*44/.test(mbStruct) && /지식서비스업[^\n]*44/.test(mbStruct) && /일반서비스업[^\n]*43/.test(mbStruct), mbStruct)
   await page.getByTestId('cert-step-2').click()
   await page.getByTestId('cert-selfcheck-start').click()
   check('메인비즈 자가진단: 다른 문항(전략기획)', /전략기획/.test(await page.getByTestId('selfcheck-card').innerText()))
 
-  // 벤처 · 연구소 — 기존 화면으로
+  // 연구소 — 기존 연구소 관리로 · 벤처 — 기업인증 안에서(Hotfix: 예전 '특허+벤처' 로 보내지 않음)
   await page.goto(BASE + '/tools/cert-os/lab?client=cli_hansol', { waitUntil: 'networkidle' })
   await page.getByTestId('cert-step-2').click()
   check('연구소: 진행은 기존 연구소 관리로(복제 없음)', (await page.getByTestId('cert-existing-tool').getAttribute('class')) !== null && /연구소 관리 열기/.test(await page.getByTestId('cert-existing-tool').innerText()))
   await page.goto(BASE + '/tools/cert-os/venture?client=cli_hansol', { waitUntil: 'networkidle' })
   await page.getByTestId('cert-step-2').click()
-  check('벤처: 진행은 기존 특허+벤처로(복제 없음)', /특허\+벤처 화면 열기/.test(await page.getByTestId('cert-existing-tool').innerText()))
+  check('HF 벤처: 진행은 기업인증 안에서 — 예전 화면 단추 · 링크 없음', (await page.getByTestId('cert-existing-tool').count()) === 0 && (await page.getByTestId('cert-venture-start').count()) === 1 && (await page.locator('main a[href*="/studio"], main a[href*="tab=consulting"]').count()) === 0 && !/특허\+벤처/.test(await page.locator('main').innerText()))
 
   // ISO 상담 요청
   await page.goto(BASE + '/tools/cert-os/iso?client=cli_hansol', { waitUntil: 'networkidle' })
@@ -345,7 +353,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   // 벤처 준비 패키지
   await page.goto(BASE + '/tools/cert-os/venture?client=cli_wooil', { waitUntil: 'networkidle' })
   await page.getByTestId('cert-step-2').click()
-  await page.getByTestId('cert-venture-pack').click()
+  await page.getByTestId('cert-venture-start').click()
   await page.waitForTimeout(300)
   const states = await page.getByTestId('venture-section').evaluateAll((els) => els.map((e) => e.getAttribute('data-state')))
   check('J 벤처 준비 패키지: 9칸 · ✓/△/? · 해결 문제는 대표 확인(지어내지 않음)', states.length === 9 && states.every((x) => ['ok', 'partly', 'ask'].includes(x)) && (await page.locator('[data-testid="venture-section"][data-id="problem"]').getAttribute('data-state')) === 'ask', states)
@@ -416,6 +424,127 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await ctx.close()
 }
 
+/* ---------------- Hotfix V1~V6 — 벤처는 기업인증 안에서 시작해 기업인증 안에서 끝난다 ---------------- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul', permissions: ['clipboard-read', 'clipboard-write'] })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  const visited = []
+  page.on('framenavigated', (f) => { if (f === page.mainFrame()) visited.push(new URL(f.url()).pathname) })
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  // 예전 '특허+벤처' 프로젝트 기록(특허 출원 · 사업계획 초안 7칸 다 씀 · 자금) + 연구소 관리 기록 + 사업자등록증 · 재무제표
+  const legacyProject = {
+    id: 'proj_wooil_legacy', workspaceId: null, clientId: 'cli_wooil', clientName: '우일산업', moduleKey: 'patent_venture_mvp',
+    title: '우일 정밀가공 특허 · 벤처', status: 'active', currentStage: 'S10', stages: { S10: { status: 'in_progress' } },
+    factsheet: { fundingNow: { value: '엔젤 투자 협의 중', status: 'unverified', source: '인터뷰', asOfDate: '2026-08-01', note: '', updatedAt: '2026-08-01T00:00:00.000Z' } },
+    patent: { filingStatus: 'filed', applicationNumber: '10-2026-0012345', filedAt: '2026-08-01' },
+    venture: { sections: Object.fromEntries([1, 2, 3, 4, 5, 6, 7].map((n) => [n, { done: true, text: `초안 ${n}` }])), documents: {}, judgeScores: {}, redFlagsCleared: {}, submittedAt: '', submissionNote: '' },
+    createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-09-20T00:00:00.000Z',
+  }
+  await page.evaluate((proj) => {
+    const list = JSON.parse(localStorage.getItem('axmvp.v1.consulting_projects') ?? '[]')
+    localStorage.setItem('axmvp.v1.consulting_projects', JSON.stringify([...list, proj]))
+    const now = new Date().toISOString()
+    localStorage.setItem('axmvp.module.labcare.orig', JSON.stringify([{ id: 'lr1', clientId: '', data: { key: 'pmsaas:clients:v1', value: [{ id: 'cli_wooil', labType: '기업부설연구소', certifiedDate: '2024-05-10', labRegistrationNumber: '2024-123', labName: '우일연구소', researcherCount: 4 }] }, createdAt: now, updatedAt: now }]))
+    const clients = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+    const c = clients.find((x) => x.id === 'cli_wooil')
+    c.documents = { ...(c.documents ?? {}), businessRegistration: { received: true, issuedAt: '2026-09-01' }, financialStatements: { received: true, issuedAt: '2026-09-01' } }
+    localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(clients))
+  }, legacyProject)
+  const legacyBefore = await page.evaluate(() => localStorage.getItem('axmvp.v1.consulting_projects'))
+
+  // V1 — 한눈에 → 벤처기업 → 진행: 예전 화면 주소로 가지 않는다
+  await page.goto(BASE + '/tools/cert-os?client=cli_wooil', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  const vEntry = page.locator('[data-testid="cert-hero"][data-key="venture"] [data-testid="cert-cta"], [data-testid="cert-row"][data-key="venture"]').first()
+  await vEntry.click()
+  await page.waitForURL(/\/tools\/cert-os\/venture/)
+  await page.waitForTimeout(500)
+  check('V1 한눈에 → 벤처기업: 기업인증 벤처 화면(4단계)', /\/tools\/cert-os\/venture/.test(page.url()) && (await page.getByTestId('cert-steps').count()) === 1)
+  check('V1 벤처 화면에 예전 화면 이름 · 링크 없음', !/특허\+벤처/.test(await page.locator('main').innerText()) && (await page.locator('main a[href*="/studio"], main a[href*="tab=consulting"]').count()) === 0)
+  check('V1 1단계 Primary 하나 = 벤처 준비 확인', (await page.locator('main button.bg-brand-600:visible').count()) === 1 && /벤처 준비 확인/.test(await page.getByTestId('cert-step0-venture').innerText()))
+  await page.getByTestId('cert-basis-more').locator('summary').first().click()
+  const routes = await page.getByTestId('cert-venture-route').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-state')}:${e.textContent}`))
+  check('V1 유형별 길 4개 — 하나로 정하지 않음(혁신성장 ✓ · 투자 ? 이전 기록 확인)', routes.length === 4 && routes.some((r) => r.startsWith('fit') && r.includes('혁신성장')) && routes.some((r) => r.startsWith('check') && r.includes('엔젤 투자 협의 중')), routes)
+  await page.getByTestId('cert-step0-venture').click()
+  await page.waitForTimeout(400)
+  check('V1 [벤처 준비 확인] → 같은 화면 3단계 · 준비 패키지(주소 그대로)', /\/tools\/cert-os\/venture/.test(page.url()) && (await page.getByTestId('venture-pack').count()) === 1)
+
+  // V2 — 예전 특허 기록을 읽는다(다시 묻지 않음)
+  const ipText = await page.locator('[data-testid="venture-section"][data-id="ip"]').innerText()
+  check('V2 지식재산 칸: 예전 기록의 특허 출원(10-2026-0012345)', /출원 중\(10-2026-0012345\)/.test(ipText), ipText)
+  // V3 — 연구소 · 특허 · 재무는 회사 기록에서
+  const rndText = await page.locator('[data-testid="venture-section"][data-id="rnd"]').innerText()
+  const growthText = await page.locator('[data-testid="venture-section"][data-id="growth"]').innerText()
+  check('V3 연구개발 칸: 연구소 관리 기록(기업부설연구소)', /연구조직/.test(rndText), rndText)
+  check('V3 매출 · 성장 칸: 재무제표(서류함)', /재무제표\(서류함\)/.test(growthText), growthText)
+  check('V3 해결 문제 · 제품 · 시장 · 성과는 대표 확인(지어내지 않음)', (await page.locator('[data-testid="venture-section"][data-state="ask"]').count()) >= 3)
+
+  // V4 — 대표 확인 → 사업계획(예전 초안 7칸) → 제출 전 확인 → 신청 상태 기록 → 벤처 확인 완료(전부 기업인증 안)
+  await page.getByTestId('venture-pack-close').click()
+  await page.waitForTimeout(300)
+  check('V4 단계: 대표 확인(준비 확인을 본 뒤)', /대표 확인/.test(await page.getByTestId('cert-stage').innerText()) && (await page.getByTestId('cert-venture-owner').count()) === 1)
+  check('V4 예전 기록 줄(사업계획 초안 7/7 · 특허 출원 중)', /사업계획 초안 7\/7/.test(await page.getByTestId('cert-venture-legacy').innerText()) && /특허 출원 중/.test(await page.getByTestId('cert-venture-legacy').innerText()))
+  await page.getByTestId('cert-venture-owner').click()
+  await page.waitForTimeout(300)
+  for (const id of ['problem', 'product', 'market', 'proof']) {
+    const sec = page.locator(`[data-testid="venture-section"][data-id="${id}"]`)
+    await sec.getByTestId('venture-answer-open').click()
+    await sec.getByTestId('venture-answer-input').fill(`대표 답 — ${id}`)
+    await sec.getByTestId('venture-answer-save').click()
+    await page.waitForTimeout(350)
+  }
+  await page.getByTestId('venture-pack-close').click()
+  await page.waitForTimeout(300)
+  check('V4 대표 답 4칸 → 사업계획은 예전 초안으로 → 제출 전 확인', /제출 전 확인/.test(await page.getByTestId('cert-stage').innerText()) && (await page.getByTestId('cert-venture-check').count()) === 1, await page.getByTestId('cert-stage').innerText())
+  check('V4 Primary 하나', (await page.locator('main button.bg-brand-600:visible').count()) === 1, await page.locator('main button.bg-brand-600:visible').allInnerTexts())
+  await page.getByTestId('cert-venture-check').click()
+  await page.waitForTimeout(300)
+  const gateRows = await page.getByTestId('cert-venture-gate-row').evaluateAll((els) => els.map((e) => e.getAttribute('data-mark')))
+  check('V4 제출 전 확인: 4줄 · 빠진 것 없음 → 신청 준비 가능', gateRows.length === 4 && (await page.getByTestId('cert-venture-gate').getAttribute('data-ready')) === 'true', gateRows)
+  await page.getByTestId('cert-venture-applied').click()
+  await page.waitForTimeout(800)
+  const life1 = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((c) => c.id === 'cli_wooil'))
+  check('V4 [신청 상태 기록] → 진행 기록 신청 · 활동 기록', /신청 · 확인기관 평가 중/.test(await page.getByTestId('cert-stage').innerText()) && (life1.activity ?? []).some((a) => /벤처/.test(a.text)), await page.getByTestId('cert-stage').innerText())
+  check('V4 다음 행동: 벤처 확인 완료 기록', (await page.getByTestId('cert-next-complete').count()) === 1)
+  await page.getByTestId('cert-next-complete').click()
+  await page.waitForTimeout(300)
+  await page.getByTestId('cert-complete-open').click()
+  await page.getByTestId('cert-complete-number').fill('20261001-0001')
+  await page.getByTestId('cert-complete-date').fill('2026-10-01')
+  await page.getByTestId('cert-complete-fill').click()
+  await page.getByTestId('cert-complete-save').click()
+  await page.waitForTimeout(900)
+  const wv = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((c) => c.id === 'cli_wooil'))
+  check('V4 완료 기록 → 회사 정보 벤처기업확인서 칸(번호 · 유효기간)', (wv.customFields ?? []).some((f) => f.group === 'credential' && /벤처/.test(f.label) && f.value.includes('20261001-0001')), (wv.customFields ?? []).filter((f) => f.group === 'credential'))
+  check('V4 벤처 확인 완료까지 기업인증 안 — 예전 화면을 한 번도 안 거침', /벤처 확인 완료/.test(await page.getByTestId('cert-stage').innerText()) && visited.every((u) => !/^\/studio|^\/ops\/clients/.test(u)), { stage: await page.getByTestId('cert-stage').innerText(), visited })
+
+  // V5 — 예전 화면에 저장된 기록은 그대로(지우지도 고치지도 않음)
+  const legacyAfter = await page.evaluate(() => localStorage.getItem('axmvp.v1.consulting_projects'))
+  check('V5 예전 컨설팅 프로젝트 기록 그대로(바이트 같음)', legacyAfter === legacyBefore)
+  await page.goto(BASE + '/studio/proj_wooil_legacy', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  check('V5 예전 프로젝트 화면도 그대로 열림(특허 · MVP 업무)', /우일 정밀가공 특허 · 벤처/.test(await page.locator('main').innerText()) && /\/studio\/proj_wooil_legacy/.test(page.url()))
+
+  // V6 — 예전 주소로 와도: 다른 업무(특허 · MVP)가 있으니 화면은 그대로, 벤처는 안내 → 기업인증으로. 돌려보내기 고리 없음
+  const before6 = visited.length
+  await page.goto(BASE + '/ops/clients/cli_wooil?tab=consulting', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check('V6 업체 상세 컨설팅 탭: 그대로 열림 · 벤처 안내 하나', /\/ops\/clients\/cli_wooil/.test(page.url()) && (await page.getByTestId('legacy-venture-notice').count()) === 1)
+  check('V6 자동으로 튕기지 않음(주소 이동 1번)', visited.length - before6 <= 2, visited.slice(before6))
+  await page.getByTestId('legacy-venture-open').click()
+  await page.waitForURL(/\/tools\/cert-os\/venture\?client=cli_wooil/)
+  await page.waitForTimeout(500)
+  check('V6 [기업인증 벤처 열기] → 그 업체 벤처(완료 상태 그대로)', /client=cli_wooil/.test(page.url()) && (await page.getByTestId('cert-steps').count()) === 1 && /벤처 확인 완료|보유 중/.test(await page.locator('main').innerText()), (await page.locator('main').innerText()).slice(0, 300))
+  await page.goto(BASE + '/studio', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  check('V6 /studio 직접 열기: 특허 · MVP 목록은 그대로 · 튕기지 않음', /\/studio$/.test(new URL(page.url()).pathname) && (await page.locator('main').count()) === 1)
+  check('V JS 오류 없음', errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 /* ---------------- 휴대폰 360 · 390 · 430 · 큰 글자 ---------------- */
 for (const vp of [
   ...[360, 390, 430].flatMap((w) => ['normal', 'large', 'extra_large'].map((s) => ({ w, s }))),
@@ -470,8 +599,18 @@ for (const vp of [
       await page.getByTestId('cert-gate-all').locator('summary').click()
     }
     if (sec === 'venture') {
+      await page.getByTestId('cert-step-0').click()
+      await page.getByTestId('cert-basis-more').locator('summary').first().click()
+      worst = Math.max(worst, await overflowX(page))
       await page.getByTestId('cert-step-2').click()
-      await page.getByTestId('cert-venture-pack').click()
+      await page.getByTestId('cert-venture-check-more').click().catch(async () => {
+        await page.getByTestId('cert-other-actions').locator('summary').click()
+        await page.getByTestId('cert-venture-check-more').click()
+      })
+      worst = Math.max(worst, await overflowX(page))
+      if (vp.w < 1000) { const t = await tinyNow(); if (t.length) small.push(`vcheck:${t.join(',')}`) }
+      await page.getByTestId('cert-venture-gate-close').click()
+      await page.getByTestId('cert-venture-start').click()
     }
     worst = Math.max(worst, await overflowX(page))
     if (vp.w < 1000) {

@@ -32,7 +32,7 @@ export function RulesInfoButton({ cert, today }: { cert?: CertificationKey; toda
             <section className="flex flex-col gap-1">
               <h3 className="t-body font-bold text-slate-900">공식 기준과 MIRAE 판단은 다릅니다</h3>
               <p className="t-sub break-keep text-slate-700">
-                준비도(매우 높음 ~ 매우 낮음)와 사전진단은 MIRAE 가 업체 기록으로 만든 판단입니다. 공식 점수(이노비즈 650 · 700점, 메인비즈 600 · 700점)와 섞지 않고, 공식 점수는 인증 화면의 [판단 근거 · 공식 기준 보기] 에 따로 적었습니다.
+                준비도(매우 높음 ~ 매우 낮음)와 사전진단은 MIRAE 가 업체 기록으로 만든 판단입니다. 공식 점수(이노비즈 650 · 700점, 메인비즈 600 · 700점)와 섞지 않고, 공식 점수 · 업종별 평가지표는 인증 화면의 [공식 평가구조 보기] 에 접어서 따로 적었습니다.
               </p>
               <p className="t-sub break-keep text-slate-700">확인된 사실(서류 · 전문 모듈 기록)이 고른 값보다 먼저입니다. 확인되지 않은 것은 '확인 필요' 로 둡니다.</p>
             </section>

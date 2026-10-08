@@ -12,6 +12,7 @@ import { freshnessOk, redFlagsRemaining } from '../../domain/consulting/gateEngi
 import type { JudgeAxis, VentureWorkspace } from '../../types/consulting'
 import { Block, CheckRow, TextField } from './studioParts'
 import { FreshnessBlock } from './FreshnessBlock'
+import { LegacyVentureNotice } from './LegacyVentureNotice'
 
 export function VentureTab({ focus }: { focus?: string }) {
   const { project: p, update, goTo, today, decide } = useEditor()
@@ -23,6 +24,8 @@ export function VentureTab({ focus }: { focus?: string }) {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* LEGACY — 새 벤처 업무는 cert-os/venture 사용 */}
+      <LegacyVentureNotice clientId={p.clientId} />
       <Surface edge="brand" showEdge>
         <h2 className="t-section text-slate-900">벤처기업확인 (혁신성장유형) — 사업계획서 · QA · 신청</h2>
         <p className="t-sub mt-1 break-keep text-slate-500">

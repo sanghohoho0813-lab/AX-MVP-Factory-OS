@@ -26,13 +26,14 @@ import { preInspectionSummary, preInspectionText } from '../core/preInspection'
 import { basisFor } from '../core/basis'
 import { ventureRndRatio } from '../rules/officialRules'
 import { labcareFactsOf } from '../integration/labcareAdapter'
+import { legacyVentureFactsOf } from '../integration/legacyConsulting'
 import { factPatchOf, withCertCompletion } from '../integration/useCertData'
 import { factCandidatesFromDocText } from '../../services/docFacts'
 import { withFactCandidates, withFactDecisions } from '../../services/customerFacts'
 import { buildInspectionPackage, inspectionPackageText, ownerKey, ownerQuestionMessage } from '../core/inspectionPackage'
 import { BANNED_WORDS } from '../core/answerGuide'
 import { buildSubmitGate, gateFirst, gateRows, missingDocsRequest, submissionDocs } from '../core/submitGate'
-import { buildVenturePack } from '../core/venturePack'
+import { buildVenturePack, VENTURE_OWNER_SECTIONS, VENTURE_REVIEWED_KEY, ventureProgress, ventureRoutes, ventureSubmitCheck } from '../core/venturePack'
 import { buildClientSummary, clientSummaryText } from '../core/clientSummary'
 import { handoffText, HANDOFF_RULES, inspectionHandoff, ventureHandoff } from '../core/handoff'
 import { companyFitLine } from '../core/explain'
@@ -43,6 +44,7 @@ import type { BasisItem } from '../core/types'
 import { FIELD_COS } from './fieldFixtures'
 import { eunNeun, euroRo, iGa } from '../core/josa'
 import { evidenceAsk, EVIDENCE_CLASS, evidenceClassOf } from '../rules/officialRules'
+import { innobizSectorOfKsic } from '../rules/industryMap'
 
 let pass = 0
 let fail = 0
@@ -243,7 +245,8 @@ check('어댑터: 설정 읽기 — 이상한 값은 모름', JSON.stringify(nor
   check('P1 갱신: D-90 안이면 진짜 할 일', renewalPlan('mainbiz', '2026-12-01', TODAY)!.phase === 'todo')
   const grace = renewalPlan('innobiz', '2026-09-20', TODAY)!
   check('P1 갱신: 만료 후 30일 안 = 연장 신청 가능(이노비즈 제15조①)', grace.phase === 'grace' && grace.graceUntil === '2026-10-20' && renewalDeadlines(grace, '이노비즈').length === 1 && renewalDeadlines(grace, '이노비즈')[0].hard === true)
-  check('P1 갱신: 벤처는 6개월 전 알림 · 150일 전 할 일(140일 전까지 재확인 신청)', renewalPlan('venture', '2027-06-30', TODAY)!.noticeOn === '2027-01-01' && renewalPlan('venture', '2027-06-30', TODAY)!.todoOn === '2027-01-31')
+  check('HF 갱신: 벤처 — 2026-10 판정은 지금 고시(만료 2개월 전 할 일 · 만료 후 1개월까지) · 만료가 2027-02-21 뒤면 새 기준 안내 한 줄', renewalPlan('venture', '2027-06-30', TODAY)!.todoOn === '2027-05-01' && renewalPlan('venture', '2027-06-30', TODAY)!.graceUntil === '2027-07-30' && renewalPlan('venture', '2027-06-30', TODAY)!.why.includes('2027-02-21부터는 새 기준') && !renewalPlan('venture', '2026-12-31', TODAY)!.why.includes('새 기준'))
+  check('HF 갱신: 벤처 — 2027-03 판정은 새 기준(6개월 전 알림 · 150일 전 할 일 · 만료 뒤 연장 없음)', renewalPlan('venture', '2027-09-30', '2027-03-10')!.noticeOn === '2027-04-03' && renewalPlan('venture', '2027-09-30', '2027-03-10')!.todoOn === '2027-05-03' && renewalPlan('venture', '2027-09-30', '2027-03-10')!.graceUntil === '' && renewalPlan('venture', '2027-09-30', '2027-03-10')!.why.includes('140일'))
   check('P1 갱신: 연구소(유효기간 없음) · 날짜 모름 → 일정 안 만듦', renewalPlan('lab', '2027-01-01', TODAY) === null && renewalPlan('innobiz', '', TODAY) === null)
   const dl = renewalDeadlines(far, '이노비즈')
   check('P1 갱신 일정: 알림 · 할 일(todo) · 만료(hard) 세 줄', dl.length === 3 && dl[0].title.includes('갱신 준비 시기') && !dl[0].todo && dl[1].todo === true && dl[2].hard === true && dl[2].date === '2027-06-30', dl)
@@ -307,9 +310,9 @@ check('어댑터: 설정 읽기 — 이상한 값은 모름', JSON.stringify(nor
   check('벤처 SW 연구개발비 6.7% → 기준 10% 미만(별표1)', vSW.reasons.some((r) => r.state === 'warn' && r.text.includes('기준 10%')), vSW.reasons)
 
   // 공식 기준 재확인 반영
-  check('공식 재확인: 메인비즈 3영역(상이 아님) · 연장 기간 확인 · 미확인은 혜택 숫자 원문 대조 하나', CERT_RULES.mainbiz.unverified.length === 1 && CERT_RULES.mainbiz.unverified[0].includes('혜택') && (CERT_RULES.mainbiz.officialScores ?? []).some((x) => x.value.includes('350')) && CERT_RULES.mainbiz.renewalNote.includes('만료 90일 전부터 만료 후 30일'))
-  check('공식 재확인(AX): 연구소 50㎡ 칸막이 · 30일 변경 신고 · 남은 미확인(번호 형식 · 인터넷산업 코드 · Kibo 배점 · 혜택 원문 · SW/바이오/환경 범위 · ISO 45001 일정)', JSON.stringify(CERT_RULES.lab).includes('50㎡') && CERT_RULES.lab.renewalNote.includes('30일') && CERT_RULES.venture.unverified.length === 2 && CERT_RULES.innobiz.unverified.length === 3 && CERT_RULES.iso45001.unverified.length === 1)
-  check('공식 재확인(AX): 공식 안내 상이는 메인비즈 제외 업종 하나뿐(화면에 따로)', Object.values(CERT_RULES).filter((r) => (r.conflicts ?? []).length > 0).map((r) => r.key).join() === 'mainbiz')
+  check('공식 재확인(HF): 메인비즈 3영역 350/400/250 · 연장 기간 · 미확인 = 혜택 원문 대조 · 음식점업 제외 여부', CERT_RULES.mainbiz.unverified.length === 2 && CERT_RULES.mainbiz.unverified[0].includes('혜택') && CERT_RULES.mainbiz.unverified[1].includes('음식점업') && (CERT_RULES.mainbiz.officialScores ?? []).some((x) => x.value.includes('350')) && CERT_RULES.mainbiz.renewalNote.includes('만료 90일 전부터 만료 후 30일'))
+  check('공식 재확인(AX): 연구소 50㎡ 칸막이 · 30일 변경 신고 · 남은 미확인(번호 형식 · 인터넷산업 코드 · Kibo 배점 · 혜택 원문 · SW/바이오/환경 범위 · ISO 45001 일정)', JSON.stringify(CERT_RULES.lab).includes('50㎡') && CERT_RULES.lab.renewalNote.includes('30일') && CERT_RULES.venture.unverified.length === 3 && CERT_RULES.innobiz.unverified.length === 2 && CERT_RULES.iso45001.unverified.length === 1)
+  check('공식 재확인(HF): 공식 안내 상이는 벤처 재확인 시기 하나뿐(메인비즈 제외 업종은 운영규정 본문 표로 확인 — 상이 아님)', Object.values(CERT_RULES).filter((r) => (r.conflicts ?? []).length > 0).map((r) => r.key).join() === 'venture')
 }
 
 
@@ -560,11 +563,14 @@ check('어댑터: 설정 읽기 — 이상한 값은 모름', JSON.stringify(nor
   check('AX 이노비즈: 도소매 → 탈락 · 경고 아님(세부 업종 확인 필요 · 비제조업 평가표)', retail.recommendation !== 'not_needed' && !retail.reasons.some((r) => /거리가 있음/.test(r.text)) && retail.reasons.some((r) => r.text.includes('세부 업종 확인 필요') && r.text.includes('비제조업')), retail.reasons)
   const svc = assessInnobiz({ ...sm, industryText: '교육 서비스', industryGroup: 'service', ksic: '85501' })
   check('AX 이노비즈: 서비스(KSIC 85501) → 비제조업 평가표로 신청 가능', svc.reasons.some((r) => r.state === 'ok' && r.text.includes('비제조업 평가표')))
-  check("AX 이노비즈: 농업 — '작물 재배' 는 농업 · KSIC 01110 → 농업 평가표", industryGroupOf('작물 재배업') === 'agriculture' && assessInnobiz({ ...sm, industryText: '작물 재배업', industryGroup: 'agriculture', ksic: '01110' }).reasons.some((r) => r.state === 'ok' && r.text.includes('농업 평가표')))
+  check("AX 이노비즈: 농업 — '작물 재배' 는 농업 · KSIC 01110 → 신청 가능 · 평가표는 농업 또는 바이오(별표1 A01) 확인 필요", industryGroupOf('작물 재배업') === 'agriculture' && assessInnobiz({ ...sm, industryText: '작물 재배업', industryGroup: 'agriculture', ksic: '01110' }).reasons.some((r) => r.state === 'ok' && r.text.includes('업종 평가표 추가 확인 필요') && r.text.includes('농업') && r.text.includes('바이오업')))
+  check('HF 이노비즈: 소프트웨어업은 세세분류 7개(58222 → 소프트웨어 평가표) · J631 은 소프트웨어업 아님', innobizSectorOfKsic('58222').sector === 'software' && innobizSectorOfKsic('63120').sector !== 'software' && innobizSectorOfKsic('62090').sector === null && innobizSectorOfKsic('62090').candidates.includes('bio'))
+  check('HF 이노비즈: 바이오 · 환경 후보 코드(C21 의약품 · E38 폐기물)는 평가표 확정 안 함 — 미확인을 비제조업으로 임의 확정 X', innobizSectorOfKsic('21210').sector === null && innobizSectorOfKsic('21210').candidates.join() === 'bio,environment,manufacturing' && innobizSectorOfKsic('38220').sector === null && innobizSectorOfKsic('38220').candidates.includes('environment'))
+  check('HF 이노비즈: 후보 아닌 코드는 일반 업종 확정(C25 → 제조 · F42 → 건설 · G46 → 비제조 · M732 → 전문디자인)', innobizSectorOfKsic('25920').sector === 'manufacturing' && innobizSectorOfKsic('42201').sector === 'construction' && innobizSectorOfKsic('46510').sector === 'non_manufacturing' && innobizSectorOfKsic('73201').sector === 'design')
   check('AX 이노비즈: 별표2(KSIC 56111 음식점) 확인되면 제외 · 낱말(식당)만이면 확인 필요', assessInnobiz({ ...sm, industryText: '한식 음식점', industryGroup: 'service', ksic: '56111' }).recommendation === 'not_needed' && assessInnobiz({ ...sm, industryText: '한식 식당', industryGroup: 'service' }).recommendation !== 'not_needed')
   check('AX 이노비즈: KSIC 없으면 제외업종 여부 확인 필요 문구', assessInnobiz(sm).reasons.some((r) => r.text.includes('제외 업종(별표2) 여부는 KSIC')))
   // 메인비즈 — 낱말 신호 · 일부만 제외 코드
-  check("AX 메인비즈: KSIC 33402('중' 일부만 제외) → 확정 제외 아님 · 세부 업종 확인", (() => { const m = assessMainbiz({ ...sm, ksic: '33402' }); return m.recommendation !== 'not_needed' && m.reasons.some((r) => r.text.includes('세부 업종 확인 필요')) })())
+  check("AX 메인비즈: KSIC 33402('중' 일부만 제외) → 확정 제외 아님 · 세부 업종 확인", (() => { const m = assessMainbiz({ ...sm, ksic: '33402' }); return m.recommendation !== 'not_needed' && m.reasons.some((r) => r.text.includes('세부 사업내용 확인 필요')) })())
   // 벤처 — 세부 업종 · 범위값 · 3년 미만
   const vMach = assessVenture({ ...sm, ksic: '29199', rndExpense: 180_000_000, revenue: 3_000_000_000 })
   check('AX 벤처: 기계 제조(29199) 매출 30억 · 연구개발비 6% → 기준 7% 미만(기타 제조 5% 로 보지 않음)', vMach.reasons.some((r) => r.state === 'warn' && r.text.includes('기준 7%')) && !vMach.reasons.some((r) => r.text.includes('기준 5%')), vMach.reasons)
@@ -593,8 +599,11 @@ check('어댑터: 설정 읽기 — 이상한 값은 모름', JSON.stringify(nor
   check('AX ISO 45001: 지금 판 2018 + Amd 1:2024 · 개정 과정 날짜(DIS 투표일) 없음 · 2027 상반기 예상', CERT_RULES.iso45001.sources[0].name.includes('Amd 1:2024') && !JSON.stringify(CERT_RULES.iso45001).includes('2026-08-09') && !JSON.stringify(CERT_RULES.iso45001).includes('DIS 투표') && CERT_RULES.iso45001.unverified[0].includes('2027년 상반기'))
   check('AX ISO 9001: 2026-09-16 발행 · 전환 2028-03-31 / 2029-09-30 · KAB 전환지침', CERT_RULES.iso9001.sources[0].effective === '2026-09-16' && CERT_RULES.iso9001.renewalNote.includes('2028-03-31') && CERT_RULES.iso9001.renewalNote.includes('2029-09-30') && CERT_RULES.iso9001.sources.some((x) => x.version.includes('KAB-TR-QMS')))
   check('AX 혜택: 설명에 출처 없는 숫자(%p · 점) 없음 · 숫자는 출처와 함께만', Object.values(CERT_RULES).every((r) => r.benefits.every((b) => !/\d\s*(%p|점)/.test(b.detail) && (!b.figure || !!b.source))), Object.values(CERT_RULES).flatMap((r) => r.benefits.filter((b) => /\d\s*(%p|점)/.test(b.detail)).map((b) => b.id)))
-  check('AX 벤처 재확인: 지금(2027-02-19까지) 2개월 전 ~ 1개월 후 · 2027-02-20부터 140일 전', CERT_RULES.venture.renewalNote.includes('2027-02-19') && CERT_RULES.venture.renewalNote.includes('140일'))
-  check('AX 메인비즈: 공식 안내 상이(제외 업종 각 호 없음)를 화면에 따로', (CERT_RULES.mainbiz.conflicts ?? []).some((x) => x.includes('각 호')))
+  check('AX 벤처 재확인: 지금(2027-02-20까지) 2개월 전 ~ 1개월 후 · 2027-02-21부터 140일 전 · 시스템 공지(2026-09-28)와 고시 부칙 상이는 화면에 따로', CERT_RULES.venture.renewalNote.includes('2027-02-20까지') && CERT_RULES.venture.renewalNote.includes('2027-02-21') && CERT_RULES.venture.renewalNote.includes('140일') && (CERT_RULES.venture.conflicts ?? []).some((x) => x.includes('2026-09-28')))
+  check('HF 메인비즈 2026 평가지표: 출처 2026-06-22 개편 · 업종별 지표 수(제조 · 건설 45 · 도소매 · 지식서비스 44 · 일반서비스 43) · 상이 표시 없음', CERT_RULES.mainbiz.sources.some((x) => x.effective === '2026-06-22' && x.name.includes('<개정 2026. 06. 22.>')) && ['제조업:45', '건설업:45', '도소매업:44', '지식서비스업:44', '일반서비스업:43'].every((k) => { const [l, n] = k.split(':'); return CERT_RULES.mainbiz.officialStructure!.rows.some((r) => r.label === l && r.value.startsWith(`${n}개`)) }) && !(CERT_RULES.mainbiz.conflicts ?? []).length)
+  check('HF 메인비즈 제외: 주점(56211) · 주류도매(46331) 확정 제외 · 숙박(55101) · 음식점(56111) · 게임SW(58211)는 세부 사업내용 확인(자동 탈락 X)', assessMainbiz({ ...sm, ksic: '56211' }).recommendation === 'not_needed' && assessMainbiz({ ...sm, ksic: '46331' }).recommendation === 'not_needed' && ['55101', '56111', '58211'].every((k) => assessMainbiz({ ...sm, ksic: k }).recommendation !== 'not_needed' && assessMainbiz({ ...sm, ksic: k }).reasons.some((r) => r.text.includes('세부 사업내용 확인 필요'))))
+  check('HF 메인비즈 제외: 낱말(숙박 · 담배)만으로 탈락 X', ['모텔 숙박업', '담배 소매'].every((t) => assessMainbiz({ ...sm, industryText: t }).recommendation !== 'not_needed'))
+  check('HF 신청 제외(2026-06-22 신설): 이노비즈 · 메인비즈 공식 기준에 최근 3년 · 명단 공개 · 공표 · 시정명령 · 참여제한', ['innobiz', 'mainbiz'].every((k) => (CERT_RULES[k as 'innobiz'].officialScores ?? []).some((x) => x.label.startsWith('신청 제외') && ['최근 3년', '명단 공개', '공표', '시정명령', '참여제한'].every((w) => x.value.includes(w)))))
   // 진행 순서 — 전담부서가 이미 있어 '연구소 전환 검토' 이면 연구소를 맨 앞에 두지 않는다
   const deptCo = { ...sm, researchUnit: 'dept' as const, researchers: 2, rndPlan: true, ksic: '29199' }
   const rmDept = buildRoadmap(assessAll(deptCo), deptCo)
@@ -604,6 +613,42 @@ check('어댑터: 설정 읽기 — 이상한 값은 모름', JSON.stringify(nor
   // 짧은 제출 전 확인
   const rows = gateRows(gSme)
   check('AX 제출 전 확인 요약: 네 줄(신청자격 · 공식 필수자료 · 대표 확인 · 보강) · 먼저 확인할 것은 반드시 확인부터', rows.map((r) => r.label).join() === '신청자격,공식 필수자료,대표 확인,보강' && rows[0].mark === 'check' && gateFirst(gSme)?.level === 'must')
+}
+
+/* ================= AX Hotfix — 벤처는 기업인증 안에서(유형별 길 · 진행 단계 · 제출 전 확인) ================= */
+{
+  const vc = ctx({ companyName: '벤처랩', years: 4, months: 50, industryText: '산업용 기계 제조', industryGroup: 'manufacturing', employees: 15, size: 'small', revenue: 2_000_000_000, researchUnit: 'lab', researchers: 3, patents: 2, rndRange: '50m_100m', evidence: ev('biz_reg', 'fin3', 'lab_cert', 'patent') })
+  const routes = ventureRoutes(vc)
+  check('HF 벤처 유형: 연구조직 · 범위만 → 연구개발유형은 확인 필요(확정 안 함) · 특허/연구소 → 혁신성장 검토 · 예비벤처 해당 없음', routes.find((r) => r.type === 'rnd')?.state === 'check' && routes.find((r) => r.type === 'growth')?.state === 'fit' && routes.find((r) => r.type === 'pre')?.state === 'no' && routes.find((r) => r.type === 'investment')?.state === 'check', routes)
+  check('HF 벤처 유형: 연구조직 없음 → 연구개발유형 해당 없음 · 정보 없음 → 확인 필요', ventureRoutes({ ...vc, researchUnit: 'none' }).find((r) => r.type === 'rnd')?.state === 'no' && ventureRoutes(ctx({})).every((r) => r.state === 'check'))
+  const sections = buildVenturePack(vc, {})
+  check('HF 벤처 준비: 연구소 · 특허 · 재무가 회사 기록에서 칸에 들어감(다시 받지 않음)', sections.find((x) => x.id === 'ip')!.lines.some((l) => /특허/.test(l.text)) && sections.find((x) => x.id === 'rnd')!.lines.some((l) => /연구조직|인정서/.test(l.text)) && sections.find((x) => x.id === 'growth')!.lines.some((l) => /매출|재무제표/.test(l.text)))
+  const p0 = ventureProgress({ sections, notes: {}, hasBizPlan: false, status: 'preparing' })
+  const p1 = ventureProgress({ sections, notes: { [VENTURE_REVIEWED_KEY]: TODAY }, hasBizPlan: false, status: 'preparing' })
+  const allOwner = Object.fromEntries(VENTURE_OWNER_SECTIONS.map((id) => [`venture:${id}`, '대표 답']))
+  const p2 = ventureProgress({ sections: buildVenturePack(vc, allOwner), notes: { [VENTURE_REVIEWED_KEY]: TODAY, ...allOwner }, hasBizPlan: false, status: 'preparing' })
+  const p3 = ventureProgress({ sections: buildVenturePack(vc, allOwner), notes: { [VENTURE_REVIEWED_KEY]: TODAY, ...allOwner }, hasBizPlan: true, status: 'preparing' })
+  check('HF 벤처 단계: 준비 확인 → 대표 확인 → 사업계획 준비 → 제출 전 확인 → 신청 · 평가 → 완료', p0.stage === 'check' && p1.stage === 'owner' && p1.ownerLeft === 4 && p2.stage === 'plan' && p3.stage === 'submit' && ventureProgress({ sections, notes: {}, hasBizPlan: true, status: 'submitted' }).stage === 'applied' && ventureProgress({ sections, notes: {}, hasBizPlan: true, status: 'done' }).stage === 'done', [p0.stage, p1.stage, p2.stage, p3.stage])
+  const rows = ventureSubmitCheck({ routes, progress: p1, missingEvidence: ['사업계획서'], haveEvidence: ['사업자등록증', '최근 재무제표'] })
+  check('HF 벤처 제출 전 확인: 네 줄(신청 유형 · 기본 자료 · 대표 확인 · 사업계획) · 점수 · 확률 없음', rows.map((r) => r.label).join() === '신청 유형,기본 자료,대표 확인,사업계획' && rows[0].mark === 'ok' && rows[2].mark === 'todo' && rows[3].mark === 'todo' && !rows.some((r) => /%|점/.test(r.text)))
+  check('HF 벤처 다음 행동: 판정의 다음 행동도 기업인증 안(옛 화면 열기 아님)', assessVenture(vc).nextAction.label === '벤처 준비 확인' && assessVenture(vc).nextAction.kind !== 'open_tool')
+
+  // LEGACY 어댑터 — 예전 '특허+벤처' 프로젝트는 읽기만 · 출원 중은 보유로 세지 않음
+  const proj = (over: Record<string, unknown>) => ({ id: 'p', clientId: 'c1', title: '예전 특허 · 벤처', status: 'active', updatedAt: '2026-09-01T00:00:00.000Z', factsheet: {}, patent: { filingStatus: 'none' }, venture: { sections: {} }, ...over }) as never
+  const filedProj = proj({ patent: { filingStatus: 'filed', applicationNumber: '10-2026-0000001', filedAt: '2026-08-01' }, venture: { sections: { 1: { done: true }, 2: { done: true } }, submittedAt: '' } })
+  const snapshot = JSON.stringify(filedProj)
+  const lf = legacyVentureFactsOf([proj({ id: 'other', clientId: 'c2' }), proj({ id: 'empty' }), filedProj, proj({ id: 'arch', status: 'archived', patent: { filingStatus: 'registered' } })], 'c1')
+  check('HF legacy 읽기: 같은 업체 · 보관 제외 · 기록 많은 것 하나(출원 중 · 초안 2칸)', lf?.patentStatus === 'filed' && lf.applicationNumber === '10-2026-0000001' && lf.planDone === 2 && lf.projectTitle === '예전 특허 · 벤처', lf)
+  check('HF legacy 읽기: 원본을 고치지 않음 · 빈 프로젝트만 있으면 null', JSON.stringify(filedProj) === snapshot && legacyVentureFactsOf([proj({})], 'c1') === null && legacyVentureFactsOf(null, 'c1') === null)
+  const recL = normalizeClientOps({ id: 'c1', companyName: '예전상사', establishedAt: '2020-01-01', industry: '소프트웨어 개발' } as never)
+  const cFiled = certContextOf(recL, TODAY, normalizeCertProfile({}), { legacy: lf })
+  check('HF 출원 중은 특허 보유로 세지 않음(patents null) · 벤처 판단은 등록 확인 필요', cFiled.patents === null && assessVenture(cFiled).reasons.some((x) => x.state === 'unknown' && /^특허 등록 여부 — 특허 출원 중\(10-2026-0000001\) · 등록 확인 필요/.test(x.text)) && !assessVenture(cFiled).reasons.some((x) => /특허 1건/.test(x.text)), assessVenture(cFiled).reasons)
+  const packL = buildVenturePack(cFiled, {})
+  check('HF 출원 중 → 벤처 준비 지식재산 · 기술 칸에 출처와 함께(다시 묻지 않음) · 혁신성장유형 검토', packL.find((x) => x.id === 'ip')!.lines.some((l) => /출원 중/.test(l.text) && /이전 컨설팅/.test(l.basis)) && packL.find((x) => x.id === 'tech')!.lines.some((l) => /출원 중/.test(l.text)) && ventureRoutes(cFiled).find((r) => r.type === 'growth')?.state === 'fit')
+  const lfReg = { ...lf!, patentStatus: 'registered' as const }
+  const cReg = certContextOf(recL, TODAY, normalizeCertProfile({}), { legacy: lfReg })
+  const cRegChip0 = certContextOf(recL, TODAY, normalizeCertProfile({ patents: 0 }), { legacy: lfReg })
+  check('HF 등록 기록은 확인된 전문 기록(1건 이상) · 칩 \'없음\' 과 다르면 충돌로 보여 줌', cReg.patents === 1 && cRegChip0.patents === 1 && cRegChip0.conflicts.some((x) => /이전 컨설팅 프로젝트 기록/.test(x)))
 }
 
 // Core 는 OS 를 모른다 — core · rules · innobiz · mainbiz · iso 는 그 밖(services · pages · components · tools · types)을 import 하지 않는다

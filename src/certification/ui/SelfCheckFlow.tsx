@@ -11,7 +11,7 @@ import { ANSWER_LABEL, ITEM_VERDICT_LABEL, runSelfCheck, type Answer, type SelfC
 import { inspectionCards, mockInspection, PREP_STATE_LABEL, type InspectionQuestion, type PreparedAnswer } from '../core/inspection'
 import type { CertificationClientContext } from '../core/types'
 import type { CertRule } from '../rules/officialRules'
-import { ReadinessBadge } from './certParts'
+import { ReadinessBadge, OfficialStructure } from './certParts'
 
 function Pager({ i, n, onPrev, onNext, nextLabel }: { i: number; n: number; onPrev: () => void; onNext: () => void; nextLabel: string }) {
   return (
@@ -60,18 +60,7 @@ export function SelfCheckFlow({ rule, items, ctx, answers, onAnswer, onDone }: {
             <ReadinessBadge r={result.readiness} />
           </div>
           <p className="t-sub break-keep text-slate-600">MIRAE 사전진단(자체 5단계)입니다 — 공식 자가진단이 아닙니다. 공식 점수는 아래 공식 기준으로 확인하세요.</p>
-          {rule.officialScores && (
-            <div className="rounded-(--radius-control) border border-slate-200 bg-slate-50 p-3" data-testid="selfcheck-official">
-              <p className="t-sub font-semibold text-slate-800">공식 기준</p>
-              <ul className="mt-1 flex flex-col gap-0.5">
-                {rule.officialScores.map((s) => (
-                  <li key={s.label} className="t-sub break-keep text-slate-700">
-                    · {s.label}: <b className="font-semibold">{s.value}</b>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <OfficialStructure rule={rule} testid="selfcheck-official" />
           {result.strengths.length > 0 && <Block title="강점" tone="text-success-700" lines={result.strengths} />}
           {result.gaps.length > 0 && <Block title="보완 · 증빙 보강" tone="text-warning-800" lines={result.gaps} />}
           {result.confirm.length > 0 && <Block title="대표 확인 필요" tone="text-warning-800" lines={result.confirm} />}

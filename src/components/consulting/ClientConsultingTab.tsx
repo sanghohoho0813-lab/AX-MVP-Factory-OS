@@ -12,6 +12,7 @@ import { Badge, Blank, ListRow, ListSurface } from '../ui/primitives'
 import { Button } from '../ui/Button'
 import { useToast } from '../ui/toastContext'
 import { createProject, isTablesMissing, listProjectsForClient } from '../../services/consultingStudioService'
+import { LegacyVentureNotice } from './LegacyVentureNotice'
 import { projectProgress } from '../../domain/consulting/projectModel'
 import { STAGE_STATUS_LABEL, TablesMissingNotice, stageTitle } from './studioParts'
 
@@ -56,8 +57,10 @@ export function ClientConsultingTab({ record, workspaceId }: { record: ClientOps
 
   return (
     <div className="flex flex-col gap-3">
+      {/* LEGACY — 벤처기업 확인은 기업인증에서(이 탭의 특허 · MVP · 실사 프로젝트는 그대로) */}
+      <LegacyVentureNotice clientId={record.id} />
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="t-sub break-keep text-slate-500">특허 → MVP → 벤처인증 → 실사를 한 줄기로 끌고 가는 단계 프로젝트입니다. 회사 정보는 사실표로 가져갑니다.</p>
+        <p className="t-sub break-keep text-slate-500">특허 → MVP → 실사를 단계로 끌고 가는 프로젝트입니다(예전 벤처 기록도 여기 남아 있습니다). 회사 정보는 사실표로 가져갑니다.</p>
         <Button variant="primary" size="sm" disabled={busy} onClick={() => void create()}>
           <Plus aria-hidden="true" className="size-4" /> 새 프로젝트
         </Button>

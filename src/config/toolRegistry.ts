@@ -299,7 +299,7 @@ export const TOOLS: ToolDefinition[] = [
       { key: 'overview', label: '인증 한눈에', icon: LayoutDashboard, group: '한눈에', hint: '추천 인증 · 준비도 · 진행 순서' },
       { key: 'innobiz', label: '이노비즈', icon: Target, group: '인증별', accent: 'customer', hint: '자격 → 사전진단 → 증빙 → 실사 대비' },
       { key: 'mainbiz', label: '메인비즈', icon: TrendingUp, group: '인증별', accent: 'customer', hint: '자격 → 사전진단 → 증빙 → 실사 대비' },
-      { key: 'venture', label: '벤처기업', icon: Sparkles, group: '인증별', accent: 'customer', hint: '유형 판단 → 특허+벤처 화면으로' },
+      { key: 'venture', label: '벤처기업', icon: Sparkles, group: '인증별', accent: 'customer', hint: '유형 판단 → 준비 → 신청 · 완료' },
       { key: 'lab', label: '기업부설연구소', icon: FlaskConical, group: '인증별', accent: 'customer', hint: '인력 기준 → 연구소 관리 화면으로' },
       { key: 'iso', label: 'ISO', icon: ClipboardCheck, group: '인증별', accent: 'customer', hint: '어떤 ISO 를 검토할지 · 상담 요청' },
     ],

@@ -2,7 +2,7 @@
  * 갱신 일정 (P1) — 유효기간 끝(사람이 적은 날짜)에서 '갱신 준비 시기'(알림) · '갱신 서류 준비'(진짜 할 일) · 만료를 낸다.
  * 날짜를 모르면 아무것도 만들지 않는다. 날 수는 rules 의 인증별 기준(공식 연장 · 재확인 기간)에서 읽는다.
  */
-import { CERT_RULES } from '../rules/officialRules'
+import { CERT_RULES, type RenewalRule } from '../rules/officialRules'
 import type { CertificationKey } from './types'
 
 const DAY = 86_400_000
@@ -38,8 +38,22 @@ export interface RenewalPlan {
   why: string
 }
 
+/**
+ * AX Hotfix: 판정 날짜(today)에 시행 중인 갱신 규칙 — 시행일로 갈리는 인증(벤처 재확인 2027-02-20)은 renewalRules 에서 고른다.
+ * 미래 규정을 오늘 규정처럼 쓰지 않는다. 고른 규칙 밖으로 만료일이 넘어가면(전환기) why 에 한 줄을 덧붙인다.
+ */
+export function renewalRuleFor(cert: CertificationKey, today: string, validUntil = ''): RenewalRule | null {
+  const rule = CERT_RULES[cert]
+  const list = rule.renewalRules ?? []
+  const hit = list.find((x) => (!x.from || today >= x.from) && (!x.until || today <= x.until))
+  if (!hit) return rule.renewal ?? null
+  const nextRule = hit.until ? list.find((x) => x.from && x.from > hit.until!) : undefined
+  if (nextRule && validUntil && validUntil >= nextRule.from!) return { ...hit, why: `${hit.why} · ${nextRule.from}부터는 새 기준(${nextRule.why.split(' — ')[1] ?? nextRule.why}) — 신청일이 그 뒤면 새 기준으로 확인` }
+  return hit
+}
+
 export function renewalPlan(cert: CertificationKey, validUntil: string, today: string): RenewalPlan | null {
-  const r = CERT_RULES[cert].renewal
+  const r = renewalRuleFor(cert, today, validUntil)
   if (!r || !/^\d{4}-\d{2}-\d{2}$/.test(validUntil) || !Number.isFinite(Date.parse(`${validUntil}T00:00:00Z`))) return null
   const left = days(today, validUntil)
   const noticeOn = add(validUntil, -r.noticeDays)

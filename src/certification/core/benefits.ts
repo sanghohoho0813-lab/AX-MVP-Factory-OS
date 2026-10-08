@@ -8,7 +8,7 @@ import { rndPositive } from './rnd'
 
 const WHY: Record<BenefitTag, (c: CertificationClientContext) => string | null> = {
   funding: (c) => (c.policyFundPlan ? '정책자금 계획이 있어 자금 · 보증 심사에 활용할 가능성이 높습니다.' : null),
-  guarantee: (c) => (c.policyFundPlan ? '보증을 끼고 자금을 쓰실 계획이라 보증 우대가 쓸모 있을 수 있습니다.' : null),
+  guarantee: (c) => (c.policyFundPlan ? '보증을 끼고 자금을 쓰실 계획이라 보증 우대를 활용할 수 있습니다.' : null),
   procurement: (c) => (c.procurement ? '공공 조달 · 입찰 계획이 있어 가점이 직접 도움이 됩니다.' : c.b2b ? 'B2B 납품이 많아 대외 평가에서 쓰일 수 있습니다.' : null),
   rnd: (c) => (c.rndPlan ? '정부 R&D 과제 계획이 있어 우대 · 가점이 도움이 됩니다.' : c.researchUnit === 'lab' || c.researchUnit === 'dept' ? '연구조직이 있어 R&D 과제와 이어 쓰기 좋습니다.' : null),
   tax_audit: (c) => (c.revenue !== null && c.revenue >= 5_000_000_000 ? '매출 규모가 커서 세무조사 유예의 실익이 있을 수 있습니다.' : null),

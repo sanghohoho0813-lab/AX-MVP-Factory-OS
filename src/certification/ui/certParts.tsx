@@ -9,6 +9,7 @@ import { Button } from '../../components/ui/Button'
 import { useToast } from '../../components/ui/toastContext'
 import { READINESS_LABEL, RECOMMENDATION_LABEL, type BenefitPick, type CheckState, type Readiness, type Reason, type Recommendation } from '../core/types'
 import type { ExplainSet } from '../core/explain'
+import type { CertRule } from '../rules/officialRules'
 import { STEP_LABEL } from './certNav'
 
 type Tone = 'neutral' | 'brand' | 'danger' | 'warning' | 'success'
@@ -193,5 +194,41 @@ export function StepTabs({ step, onStep }: { step: number; onStep: (n: number) =
         </button>
       ))}
     </div>
+  )
+}
+
+/**
+ * AX Hotfix: [공식 평가구조 보기] — 공식 점수 기준 · 업종별 지표(메인비즈 2026 개편)를 접어서. MIRAE 사전진단과 섞지 않는다.
+ */
+export function OfficialStructure({ rule, testid = 'cert-official' }: { rule: CertRule; testid?: string }) {
+  if (!rule.officialScores && !rule.officialStructure) return null
+  return (
+    <details className="rounded-(--radius-control) border border-slate-200 bg-slate-50" data-testid={`${testid}-box`}>
+      <summary className="tap t-sub cursor-pointer px-3 py-2 font-semibold text-slate-800">공식 평가구조 보기(기관 점수 — MIRAE 판단과 별개)</summary>
+      <div className="flex flex-col gap-2 px-3 pb-3" data-testid={testid}>
+        {rule.officialScores && (
+          <ul className="flex flex-col gap-0.5">
+            {rule.officialScores.map((x) => (
+              <li key={x.label} className="t-sub break-keep text-slate-700">
+                · {x.label}: <b className="font-semibold">{x.value}</b>
+              </li>
+            ))}
+          </ul>
+        )}
+        {rule.officialStructure && (
+          <div className="flex flex-col gap-1 border-t border-slate-200 pt-2" data-testid="cert-official-structure">
+            <p className="t-sub font-semibold text-slate-800">{rule.officialStructure.title}</p>
+            <ul className="flex flex-col gap-0.5">
+              {rule.officialStructure.rows.map((r) => (
+                <li key={r.label} className="t-sub break-keep text-slate-700">
+                  · <b className="font-semibold">{r.label}</b> — {r.value}
+                </li>
+              ))}
+            </ul>
+            <p className="t-sub break-keep text-slate-500">{rule.officialStructure.note}</p>
+          </div>
+        )}
+      </div>
+    </details>
   )
 }

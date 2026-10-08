@@ -10,7 +10,7 @@ import { clientFacts } from '../../tools/shared/clientPrefill'
 import { FACT_SOURCE_LABEL, readFact, usableFactValue } from '../../services/customerFacts'
 import { allDocumentMetas } from '../../services/clientOpsDocuments'
 import { documentStatus } from '../../services/clientOpsAlerts'
-import { RND_RANGE_LABEL, type BasisField, type BasisItem, type CertificationClientContext, type CertificationKey, type CompanySize, type EvidenceDoc, type HeldCertification, type ResearchUnit, type RndRange } from '../core/types'
+import { RND_RANGE_LABEL, type LegacyVentureFacts, type BasisField, type BasisItem, type CertificationClientContext, type CertificationKey, type CompanySize, type EvidenceDoc, type HeldCertification, type ResearchUnit, type RndRange } from '../core/types'
 import { BASIS_LABEL } from '../core/basis'
 import { parseKsic } from '../rules/industryMap'
 import type { CertLifecycle } from '../core/lifecycle'
@@ -232,6 +232,8 @@ export interface CertExtra {
   lab?: LabcareFacts | null
   /** 기업인증 진행 기록(인증 완료 · 유효기간) */
   lives?: readonly CertLifecycle[]
+  /** AX Hotfix(LEGACY): 예전 '특허+벤처' 컨설팅 프로젝트 기록 — 읽기만 */
+  legacy?: LegacyVentureFacts | null
 }
 
 /** 진행 기록에서 '인증 완료 · 갱신 준비' 인 것 → 보유 인증(사람이 적은 날짜만) */
@@ -288,7 +290,7 @@ function resolveResearchers(p: CertProfile, extra: CertExtra): Resolved<number> 
   return p.researchers !== null ? { value: p.researchers, item: chip('researchers', `${p.researchers}명`) } : { value: null, item: null }
 }
 
-function resolvePatents(record: ClientOpsRecord, p: CertProfile): Resolved<number> {
+function resolvePatents(record: ClientOpsRecord, p: CertProfile, legacy?: LegacyVentureFacts | null): Resolved<number> {
   const fact = readFact(record, 'patents')
   const credCount = (record.customFields ?? []).filter((x) => x.group === 'credential' && /특허/.test(x.label)).length
   if (fact && fact.status === 'confirmed') {
@@ -303,6 +305,15 @@ function resolvePatents(record: ClientOpsRecord, p: CertProfile): Resolved<numbe
     if (p.patents !== null && p.patents >= credCount) return { value: p.patents, item: chip('patents', factPatchValue('patents', p)) }
     if (p.patents !== null) return { value: credCount, item, conflict: `특허 — 고른 값 ${factPatchValue('patents', p)} 대신 인증서 칸 특허증 ${credCount}건` }
     return { value: credCount, item }
+  }
+  // LEGACY 컨설팅 프로젝트의 등록 기록(전문 기록) — 칩보다 먼저, 칩이 더 많으면 칩(다른 특허가 있을 수 있음).
+  // 출원 중은 '보유' 가 아니다 — 숫자로 세지 않고 벤처 판단 · 준비 칸에서 '출원 중 · 등록 확인 필요' 로만 쓴다(ctx.legacyVenture)
+  if (legacy && legacy.patentStatus === 'registered') {
+    const label = '등록 1건 이상'
+    const item: BasisItem = { field: 'patents', label: BASIS_LABEL.patents, value: label, state: 'confirmed', from: `이전 컨설팅 프로젝트 기록(${legacy.projectTitle})` }
+    if (p.patents !== null && p.patents >= 1) return { value: p.patents, item: chip('patents', factPatchValue('patents', p)) }
+    if (p.patents === 0) return { value: 1, item, conflict: `특허 — 고른 값 '없음' 대신 이전 컨설팅 프로젝트 기록 '${label}'` }
+    return { value: 1, item }
   }
   if (p.patents !== null) return { value: p.patents, item: chip('patents', factPatchValue('patents', p)) }
   const n = patentsOf(record)
@@ -343,7 +354,7 @@ export function certContextOf(record: ClientOpsRecord, today: string, profile: C
   if (extra.lab && extra.lab.unit === 'lab' && !held.some((h) => h.key === 'lab')) held.push({ key: 'lab', validUntil: '', note: `연구소 관리 기록 · 인정 ${extra.lab.recognizedAt}${extra.lab.number ? ` · ${extra.lab.number}` : ''}` })
   const unit = resolveUnit(record, profile, extra, held)
   const researchers = resolveResearchers(profile, extra)
-  const patents = resolvePatents(record, profile)
+  const patents = resolvePatents(record, profile, extra.legacy)
   const smeDoc = smeDocOf(record, today)
   const conflicts = [unit.conflict, researchers.conflict, patents.conflict].filter((x): x is string => Boolean(x))
   const policyService = record.services?.policyFund
@@ -377,10 +388,11 @@ export function certContextOf(record: ClientOpsRecord, today: string, profile: C
     // 진행 중인 정책자금 업무가 있으면 계획이 있는 것으로
     policyFundPlan: profile.policyFundPlan ?? (policyService && ACTIVE_SERVICE.has(policyService.status) ? true : null),
     rndPlan: profile.rndPlan ?? (ventureService && ACTIVE_SERVICE.has(ventureService.status) ? true : null),
-    exclusionFlags: profile.exclusion ? ['제외 사유 있음(체납 · 회생 · 체불 · 산재 공표 등 — 내용 확인)'] : [],
+    exclusionFlags: profile.exclusion ? ['제외 사유 있음(체납 · 회생 · 체불 명단 공개 · 산재 공표 등 — 운영규정 제3조② 조건과 기간 확인)'] : [],
     evidence: evidenceOf(record, today),
     basis: basisOf(record, f, profile, { unit, researchers, patents, smeDoc }),
     ...(conflicts.length ? { conflicts } : {}),
+    ...(extra.legacy ? { legacyVenture: extra.legacy } : {}),
     today,
   }
 }

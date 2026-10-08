@@ -1698,7 +1698,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                   }}
                 >
                   <Workflow aria-hidden="true" className="size-4" />
-                  컨설팅(특허 · 벤처) 보기
+                  컨설팅 프로젝트(특허 · MVP) 보기
                 </Button>
               )}
               <Button

@@ -30,7 +30,8 @@ function afterHref(kind: AfterKind, clientId: string): string | null {
     case 'lab_keep':
       return `/tools/labcare?client=${clientId}`
     case 'patent':
-      return `/ops/clients/${clientId}?tab=consulting`
+      // AX Hotfix: 특허는 예전 '특허+벤처' 화면으로 보내지 않는다 — 회사 정보 · 서류함의 사실로 읽는다(할 일 줄만)
+      return null
     default:
       return null
   }

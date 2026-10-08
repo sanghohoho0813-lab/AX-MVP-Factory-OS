@@ -80,6 +80,8 @@ const TOOL: Record<string, ToolDef> = {
   labcare: { key: 'labcare', label: '기업부설연구소 관리', path: (id) => `/tools/labcare/assessment?client=${id}`, accessKey: 'labcare', resultKey: 'labcare' },
   'policy-funding': { key: 'policy-funding', label: '정책자금 진단', path: (id) => `/tools/policy-funding/diagnosis?client=${id}`, accessKey: 'policy-funding', resultKey: 'policy-funding' },
   studio: { key: 'studio', label: '특허+벤처', path: (id) => `/ops/clients/${id}?tab=consulting`, accessKey: null, resultKey: null },
+  // AX Hotfix: 벤처인증 관심 → 새 기업인증 벤처(예전 '특허+벤처' 화면으로 보내지 않는다)
+  'cert-venture': { key: 'cert-venture', label: '기업인증 · 벤처기업', path: (id) => `/tools/cert-os/venture?client=${id}`, accessKey: 'cert-os', resultKey: 'cert-os' },
 }
 
 /** 관심사 → 도구 (앞에 있는 것이 먼저) */
@@ -87,7 +89,7 @@ const INTEREST_TOOLS: Record<string, string[]> = {
   정책자금: ['policy-funding'],
   고용지원금: ['employment'],
   연구소: ['labcare'],
-  벤처인증: ['studio'],
+  벤처인증: ['cert-venture'],
   가지급금: ['tax'],
   임원퇴직금: ['tax'],
   법인세: ['tax'],

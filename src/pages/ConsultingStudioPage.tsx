@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { LegacyVentureNotice } from '../components/consulting/LegacyVentureNotice'
 import { useNavigate } from 'react-router-dom'
 import { ArrowRight, Plus, Workflow, X } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
@@ -117,7 +118,7 @@ function StudioContent({ workspaceId }: { workspaceId: string | null }) {
     <div className="flex flex-col gap-5">
       <ScreenTitle
         title="특허+벤처"
-        sub="특허 → MVP → 벤처인증 → 실사. 다음에 무엇을 할지는 시스템이 정합니다."
+        sub="특허 → MVP → 실사. 다음에 무엇을 할지는 시스템이 정합니다."
         actions={
           !missing && (
             <Button variant="primary" onClick={() => setCreating(true)}>
@@ -127,6 +128,8 @@ function StudioContent({ workspaceId }: { workspaceId: string | null }) {
           )
         }
       />
+      {/* LEGACY — 새 벤처 업무는 cert-os/venture 사용 */}
+      <LegacyVentureNotice />
 
       {/*
         처음 오는 사람에게 딱 세 줄 (§20). 모달도 튜토리얼도 아니다 —
