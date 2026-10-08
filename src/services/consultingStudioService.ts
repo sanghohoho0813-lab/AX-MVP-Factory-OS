@@ -35,6 +35,7 @@ import { normalizeProject, projectPayload } from '../domain/consulting/projectMo
 import { seedFactsFromClient } from '../domain/consulting/factsheetSchema'
 import { isStageKey } from '../domain/consulting/workflowDefinition'
 import { emptyPrivacyReport } from '../domain/consulting/privacyFilter'
+import { isLegacyVentureArtifactType, isLegacyVentureStage, LEGACY_VENTURE_LOCKED, LEGACY_VENTURE_MESSAGE } from '../domain/consulting/legacyVenture'
 import { createJournalEntry } from './journalService'
 import { setProjectCache } from '../domain/consulting/projectCache'
 
@@ -274,6 +275,8 @@ export function nextVersion(existing: ConsultingArtifact[], projectId: string, t
 }
 
 export async function createArtifact(workspaceId: string | null, input: CreateArtifactInput): Promise<ConsultingArtifact> {
+  // D-179: 벤처 단계(S10~S16) 산출물은 새로 만들지 않는다 — 기업인증에서 진행
+  if (isLegacyVentureArtifactType(input.type)) throw new Error(LEGACY_VENTURE_MESSAGE)
   const existing = await listArtifacts(workspaceId, input.projectId)
   const version = nextVersion(existing, input.projectId, input.type)
   const art = normalizeArtifact({
@@ -385,6 +388,8 @@ export async function savePromptPackage(
   workspaceId: string | null,
   input: Omit<ConsultingPromptPackage, 'id' | 'workspaceId' | 'createdAt'>,
 ): Promise<ConsultingPromptPackage> {
+  // D-179: 벤처 단계 프롬프트 꾸러미는 새로 기록하지 않는다
+  if (isLegacyVentureStage(input.stageKey)) throw new Error(LEGACY_VENTURE_MESSAGE)
   const pkg = normalizePrompt({ ...input, workspaceId })
   if (isLocal()) {
     writeJson(STORAGE_KEYS.consultingPromptPackages, [pkg, ...promptsLocal()])
@@ -535,6 +540,8 @@ export async function listEvidence(workspaceId: string | null, projectId?: strin
 }
 
 export async function upsertEvidence(workspaceId: string | null, item: Partial<ConsultingEvidence> & { projectId: string }): Promise<ConsultingEvidence> {
+  // D-179: 증빙 10슬롯은 벤처 신청 첨부 — 이전 기록은 읽기만(코드는 남기고 잠금)
+  if (LEGACY_VENTURE_LOCKED) throw new Error(LEGACY_VENTURE_MESSAGE)
   const next = normalizeEvidence({ ...item, workspaceId, updatedAt: nowIso() })
   if (isLocal()) {
     const list = evidenceLocal()
@@ -550,6 +557,8 @@ export async function upsertEvidence(workspaceId: string | null, item: Partial<C
 }
 
 export async function deleteEvidence(item: ConsultingEvidence): Promise<void> {
+  // D-179: 이전 벤처 증빙은 지우지 않는다
+  if (LEGACY_VENTURE_LOCKED) throw new Error(LEGACY_VENTURE_MESSAGE)
   if (isLocal()) {
     writeJson(STORAGE_KEYS.consultingEvidence, evidenceLocal().filter((e) => e.id !== item.id))
     notifyStoreChanged()

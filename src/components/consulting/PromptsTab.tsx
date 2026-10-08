@@ -28,6 +28,11 @@ import { formatDateTime } from '../../lib/format'
 import type { ConsultingPromptPackage, PromptPackageType, PromptTarget } from '../../types/consulting'
 import { copyText, downloadText } from './studioParts'
 import { ImportResultSheet } from './ImportResultSheet'
+import { isLegacyVentureStage } from '../../domain/consulting/legacyVenture'
+import { LegacyVentureNotice } from './LegacyVentureNotice'
+
+/** D-179: 벤처 단계(S10~S16) 프롬프트는 새로 만들지 않는다 — 기업인증에서 진행 */
+const OPEN_TYPES = PROMPT_TYPES.filter((t) => !isLegacyVentureStage(PROMPT_DEFAULT_STAGE[t]))
 
 const OPEN_URL: Partial<Record<PromptTarget, string>> = {
   chatgpt: 'https://chatgpt.com/',
@@ -43,11 +48,13 @@ export function PromptsTab({ focus }: { focus?: string }) {
   const [saved, setSaved] = useState<ConsultingPromptPackage | null>(null)
   const [importFor, setImportFor] = useState<ConsultingPromptPackage | null>(null)
   const [showContext, setShowContext] = useState(false)
+  const [ventureAsked, setVentureAsked] = useState(false)
 
   useEffect(() => {
     if (!focus) return
     const [t, s] = focus.split(':')
-    if ((PROMPT_TYPES as string[]).includes(t)) setType(t as PromptPackageType)
+    if ((OPEN_TYPES as string[]).includes(t)) setType(t as PromptPackageType)
+    else if ((PROMPT_TYPES as string[]).includes(t)) setVentureAsked(true)
     if (s && /^[1-7]$/.test(s)) setSection(Number(s) as 1 | 2 | 3 | 4 | 5 | 6 | 7)
   }, [focus])
 
@@ -100,11 +107,13 @@ export function PromptsTab({ focus }: { focus?: string }) {
         </p>
       </Surface>
 
+      {ventureAsked && <LegacyVentureNotice clientId={p.clientId} variant="record" />}
+
       <div className="grid gap-3 md:grid-cols-[1fr_1fr] lg:grid-cols-[2fr_1fr_1fr]">
         <label className="block">
           <span className="t-sub block font-medium text-slate-600">종류</span>
           <select aria-label="프롬프트 종류" value={type} onChange={(e) => setType(e.target.value as PromptPackageType)} className="t-body mt-1 h-11 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3">
-            {PROMPT_TYPES.map((t) => (
+            {OPEN_TYPES.map((t) => (
               <option key={t} value={t}>{PROMPT_DEFAULT_STAGE[t]} · {PROMPT_TYPE_LABEL[t]}</option>
             ))}
           </select>
@@ -186,14 +195,15 @@ export function PromptsTab({ focus }: { focus?: string }) {
           {prompts.length === 0 && <ListRow title="아직 없습니다" meta="복사·다운로드·열기를 누르면 여기 기록됩니다." />}
           {prompts.map((k) => {
             const hasResult = artifacts.some((a) => a.promptPackageId === k.id)
+            const legacy = isLegacyVentureStage(k.stageKey)
             return (
               <ListRow
                 key={k.id}
                 title={k.title}
                 meta={`${PROMPT_TYPE_LABEL[k.type]} · ${PROMPT_TARGET_LABEL[k.target]} · ${k.stageKey}${k.section ? ` · ${k.section}번` : ''} · ${privacySummary(k.privacy)}`}
-                badge={hasResult ? <Badge tone="success">결과 있음</Badge> : <Badge tone="warning">결과 대기</Badge>}
+                badge={legacy ? <Badge tone="neutral">예전 벤처 기록</Badge> : hasResult ? <Badge tone="success">결과 있음</Badge> : <Badge tone="warning">결과 대기</Badge>}
                 right={formatDateTime(k.createdAt)}
-                onClick={() => setImportFor(k)}
+                onClick={legacy ? undefined : () => setImportFor(k)}
               />
             )
           })}

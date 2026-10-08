@@ -18,6 +18,7 @@ import { parsePastedResult, artifactHeaderLine } from '../../domain/consulting/r
 import { KIPO_REFERENCES, kipoSelectionIssues, searchKipo, kipoPdfUrl } from '../../domain/consulting/kipoReferences'
 import { RED_FLAGS, JUDGE_AXES, EVIDENCE_SLOTS, PLAN_SECTIONS, findForbiddenPhrases, judgeTotal, judgeVerdict } from '../../domain/consulting/qaRules'
 import { artifactTypeForPrompt } from '../../domain/consulting/artifactDefinitions'
+import { isLegacyVentureArtifactType, isLegacyVentureStage, keepLegacyVenture } from '../../domain/consulting/legacyVenture'
 import { nextVersion } from '../consultingStudioService'
 import { MODULES, MODULE_GROUPS, moduleForPath } from '../../config/moduleRegistry'
 import type { ConsultingArtifact, ConsultingProject } from '../../types/consulting'
@@ -257,6 +258,25 @@ check('registry: 특허·MVP 화면이 /studio 로 켜져 있다(D-178 이름만
 // D-127: 예전 '특허+벤처'(D-178 '특허·MVP')는 기술사업화 분야 줄 아래 — D-136: 그 분야는 '잘 안 쓰는 기능' 묶음으로
 check('registry: 특허·MVP 가 잘 안 쓰는 기능 › 기술사업화 아래 · 이름에 벤처 없음', MODULES.find((m) => m.path === '/studio')?.group === 'rare' && MODULES.find((m) => m.path === '/studio')?.label === '특허·MVP' && MODULES.find((m) => m.path === '/studio')?.hint === '특허 출원 · MVP 단계 관리' && !/벤처/.test(`${MODULES.find((m) => m.path === '/studio')?.label} ${MODULES.find((m) => m.path === '/studio')?.hint}`) && MODULES.find((m) => m.path === '/studio')?.parent === 'cat-tech-biz' && MODULE_GROUPS.find((g) => g.key === 'modules')?.title === '전문 모듈')
 check('registry: /studio/abc → 특허·MVP', moduleForPath('/studio/abc')?.path === '/studio')
+
+// D-179 — 예전 벤처 기록 읽기 전용: 벤처 전용 기록 · S10~S16 · 벤처 문장은 되돌리고, 특허 · MVP · 사실표 · 다른 단계는 그대로
+{
+  const base = project({})
+  const withPlan = { ...base, venture: { ...base.venture, sections: { ...base.venture.sections, 1: { ...base.venture.sections[1], outline: '예전 사업계획 요지', done: true } }, submittedAt: '2026-08-01' }, coreThread: { ...base.coreThread, ventureSentence: '예전 벤처 문장' } }
+  const tryEdit = keepLegacyVenture(withPlan, { ...withPlan, venture: { ...withPlan.venture, submittedAt: '2026-10-08', sections: { ...withPlan.venture.sections, 1: { ...withPlan.venture.sections[1], outline: '고친 요지' } } } })
+  check('D-179 벤처 사업계획 · 신청일은 고쳐도 되돌아감(L2 · L3)', tryEdit.venture.submittedAt === '2026-08-01' && tryEdit.venture.sections[1].outline === '예전 사업계획 요지')
+  const stageEdit = keepLegacyVenture(withPlan, { ...withPlan, stages: { ...withPlan.stages, S14: { ...withPlan.stages.S14, status: 'completed' } } })
+  check('D-179 벤처 단계(S14 신청 완료) 상태는 바뀌지 않음(L4)', stageEdit.stages.S14.status === withPlan.stages.S14.status)
+  const frEdit = keepLegacyVenture(withPlan, { ...withPlan, fieldReview: { ...withPlan.fieldReview, result: '선정' }, coreThread: { ...withPlan.coreThread, ventureSentence: '새 문장', coreTech: '새 기술' } })
+  check('D-179 현장실사 결과 · 벤처 문장은 되돌아가고 같은 수정의 핵심 기술(공용)은 남음', frEdit.fieldReview.result === '' && frEdit.coreThread.ventureSentence === '예전 벤처 문장' && frEdit.coreThread.coreTech === '새 기술')
+  const patentEdit = keepLegacyVenture(withPlan, { ...withPlan, patent: { ...withPlan.patent, applicationNumber: '10-2026-0000009', filingStatus: 'filed' }, mvp: { ...withPlan.mvp, productName: '새 MVP' }, stages: { ...withPlan.stages, S7: { ...withPlan.stages.S7, status: 'completed' }, S9: { ...withPlan.stages.S9, status: 'in_progress' } }, currentStage: 'S10' })
+  check('D-179 특허 · MVP · S0~S9 · 현재 단계 이동은 그대로 저장(L6 · L7)', patentEdit.patent.applicationNumber === '10-2026-0000009' && patentEdit.mvp.productName === '새 MVP' && patentEdit.stages.S7.status === 'completed' && patentEdit.stages.S9.status === 'in_progress' && patentEdit.currentStage === 'S10')
+  const same = { ...withPlan, mvp: { ...withPlan.mvp, demo: '시연 동선' } }
+  check('D-179 벤처를 건드리지 않은 수정은 그대로(같은 객체)', keepLegacyVenture(withPlan, same) === same)
+  const fresh = keepLegacyVenture(withPlan, { ...withPlan, freshness: [{ scope: 'venture_application', checkedAt: '2026-10-08', source: 'x', differences: '' }, { scope: 'patent_filing', checkedAt: '2026-10-08', source: '특허로', differences: '' }] })
+  check('D-179 신청 직전 기준 확인(venture_application)은 되돌리고 특허 출원 기준 확인은 남김', fresh.freshness.length === 1 && fresh.freshness[0].scope === 'patent_filing')
+  check('D-179 벤처 단계 · 산출물 · 프롬프트 판별(S10~S16)', isLegacyVentureStage('S11') && isLegacyVentureStage('S16') && !isLegacyVentureStage('S9') && !isLegacyVentureStage('S1') && isLegacyVentureArtifactType('VENTURE_PLAN_SECTION') && isLegacyVentureArtifactType('FIELD_REVIEW_QA') && !isLegacyVentureArtifactType('PATENT_SPEC_DRAFT') && !isLegacyVentureArtifactType('MVP_SPEC') && PROMPT_TYPES.filter((t) => isLegacyVentureStage(PROMPT_DEFAULT_STAGE[t])).length === 6)
+}
 
 console.log(`\n컨설팅 엔진: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

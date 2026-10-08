@@ -15,6 +15,9 @@ import { GATE_ITEMS, NO_GO_SIGNALS } from '../../domain/consulting/qaRules'
 import { nowIso } from '../../lib/appClock'
 import type { GateDecision, StageKey, StageStatus } from '../../types/consulting'
 import { CheckRow, STAGE_STATUS_LABEL, StageBadge, TextField, stageTitle } from './studioParts'
+import { isLegacyVentureStage } from '../../domain/consulting/legacyVenture'
+import { LegacyVentureNotice } from './LegacyVentureNotice'
+import { ReadRow } from './legacyRead'
 
 export function StagesTab({ focus }: { focus?: string }) {
   const ed = useEditor()
@@ -31,6 +34,8 @@ export function StagesTab({ focus }: { focus?: string }) {
   const prev = prevStageKey(selected)
   const next = nextStageKey(selected)
   const checklistDone = def.exitChecklist.every((_, i) => checked[`${selected}-${i}`])
+  // D-179: S10~S16(벤처 단계)는 예전 기록 — 상태 · 체크리스트 · 메모를 바꾸지 않는다(기업인증에서 진행)
+  const legacy = isLegacyVentureStage(selected)
 
   const setStatus = (status: StageStatus, extra: Partial<typeof state> = {}) => {
     const at = nowIso()
@@ -120,7 +125,7 @@ export function StagesTab({ focus }: { focus?: string }) {
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="t-section text-slate-900">{stageTitle(selected)}</h2>
             <StageBadge status={state.status} />
-            {selected === p.currentStage ? <Badge tone="brand">현재</Badge> : (
+            {legacy ? <Badge tone="neutral">예전 벤처 기록 · 읽기 전용</Badge> : selected === p.currentStage ? <Badge tone="brand">현재</Badge> : (
               <button type="button" onClick={makeCurrent} className="t-meta font-medium text-brand-700 hover:underline">
                 이 단계로 옮기기
               </button>
@@ -134,6 +139,18 @@ export function StagesTab({ focus }: { focus?: string }) {
 
         {selected === 'S1' && <GateBlock />}
 
+        {legacy ? (
+          <div className="flex flex-col gap-4" data-testid="legacy-stage">
+            <LegacyVentureNotice clientId={p.clientId} variant="record" />
+            <Surface>
+              <dl>
+                <ReadRow label="단계 상태(예전 기록)" value={STAGE_STATUS_LABEL[state.status]} />
+                <ReadRow label="단계 메모" value={state.note} />
+              </dl>
+            </Surface>
+          </div>
+        ) : (
+        <>
         <Surface>
           <h3 className="t-card text-slate-900">완료 조건</h3>
           {gate.ok ? (
@@ -202,6 +219,8 @@ export function StagesTab({ focus }: { focus?: string }) {
         </div>
 
         <TextField label="단계 메모" value={state.note} multiline rows={3} onCommit={(v) => update((cur) => ({ ...cur, stages: { ...cur.stages, [selected]: { ...cur.stages[selected], note: v, updatedAt: nowIso() } } }))} />
+        </>
+        )}
       </div>
 
       {listOpen && (

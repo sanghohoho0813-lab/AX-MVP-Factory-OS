@@ -17,6 +17,8 @@ import { parseReturnBlock } from '../../../domain/consulting/returnBlock'
 import type { ConsultingPromptPackage } from '../../../types/consulting'
 import type { DocFactRead } from '../../../domain/consulting/companyDocFacts'
 import { TaskCard } from './TaskCard'
+import { isLegacyVentureStage } from '../../../domain/consulting/legacyVenture'
+import { LegacyVentureNotice } from '../LegacyVentureNotice'
 import { PromptResultPanel } from './PromptResultPanel'
 import { QuickImportSheet } from './QuickImportSheet'
 import { CompanyDocSheet } from './CompanyDocSheet'
@@ -145,15 +147,23 @@ export function ProgressTab({ onOpenAdvanced }: { onOpenAdvanced: () => void }) 
 
       {generated && <PromptResultPanel pkg={generated} />}
 
-      <TaskCard
-        task={task}
-        project={p}
-        busy={busy}
-        quiet={generated !== null}
-        onSubmit={(sub) => void submit(sub)}
-        onEditItem={onOpenAdvanced}
-        onImportDoc={() => setDocOpen(true)}
-      />
+      {/* D-179: 특허 · MVP 다음(S10~S16)은 벤처 단계 — 여기서 진행하지 않고 기업인증으로 */}
+      {isLegacyVentureStage(task.stageKey) ? (
+        <div className="flex flex-col gap-2" data-testid="legacy-progress">
+          <p className="t-section font-bold break-keep text-slate-900">특허 · MVP 단계는 여기까지입니다</p>
+          <LegacyVentureNotice clientId={p.clientId} variant="record" />
+        </div>
+      ) : (
+        <TaskCard
+          task={task}
+          project={p}
+          busy={busy}
+          quiet={generated !== null}
+          onSubmit={(sub) => void submit(sub)}
+          onEditItem={onOpenAdvanced}
+          onImportDoc={() => setDocOpen(true)}
+        />
+      )}
 
       {/*
         나중에 확인하기로 한 것 (§6).

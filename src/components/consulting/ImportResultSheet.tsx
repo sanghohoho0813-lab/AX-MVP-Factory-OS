@@ -9,6 +9,7 @@ import { Badge, BottomSheet } from '../ui/primitives'
 import { Button } from '../ui/Button'
 import { useEditor } from './editorContext'
 import { ARTIFACT_DEFS, artifactDef, artifactTypeForPrompt } from '../../domain/consulting/artifactDefinitions'
+import { isLegacyVentureStage } from '../../domain/consulting/legacyVenture'
 import { defaultArtifactTitle, parsePastedResult } from '../../domain/consulting/resultImport'
 import { STAGE_ORDER } from '../../domain/consulting/workflowDefinition'
 import { createArtifact, nextVersion } from '../../services/consultingStudioService'
@@ -124,7 +125,7 @@ export function ImportResultSheet({
         {detected && <Badge tone="neutral">{detected}</Badge>}
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <SelectField label="종류" value={type} options={ARTIFACT_DEFS.map((d) => ({ value: d.type, label: d.label }))} onChange={(v) => { setType(v); setStage(artifactDef(v).stage) }} />
+          <SelectField label="종류" value={type} options={ARTIFACT_DEFS.filter((d) => !isLegacyVentureStage(d.stage)).map((d) => ({ value: d.type, label: d.label }))} onChange={(v) => { setType(v); setStage(artifactDef(v).stage) }} />
           <SelectField label="단계" value={stage} options={STAGE_ORDER.map((k) => ({ value: k, label: stageTitle(k) }))} onChange={setStage} />
         </div>
         <label className="block">

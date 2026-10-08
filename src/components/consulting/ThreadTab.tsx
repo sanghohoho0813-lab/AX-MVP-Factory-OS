@@ -8,6 +8,7 @@ import { useEditor } from './editorContext'
 import { CORE_THREAD_HINT, CORE_THREAD_KEYS, CORE_THREAD_LABEL } from '../../domain/consulting/projectModel'
 import { coreThreadToText, coreThreadWarnings } from '../../domain/consulting/coreThread'
 import { CopyButton, TextField } from './studioParts'
+import { ReadRow } from './legacyRead'
 
 export function ThreadTab({ focus }: { focus?: string }) {
   const { project: p, update, goTo } = useEditor()
@@ -45,15 +46,22 @@ export function ThreadTab({ focus }: { focus?: string }) {
       <div className="grid gap-3 md:grid-cols-2">
         {CORE_THREAD_KEYS.map((k, i) => (
           <div key={k} id={`thread-${k}`} className={`rounded-(--radius-card) border bg-white p-3 ${focus === k ? 'border-brand-400 ring-1 ring-brand-300' : 'border-slate-200'}`}>
-            <TextField
-              id={`thread-input-${k}`}
-              label={`${i + 1}. ${CORE_THREAD_LABEL[k]}`}
-              value={p.coreThread[k]}
-              multiline
-              rows={3}
-              placeholder={CORE_THREAD_HINT[k]}
-              onCommit={(v) => update((cur) => ({ ...cur, coreThread: { ...cur.coreThread, [k]: v } }))}
-            />
+            {k === 'ventureSentence' ? (
+              // D-179: 벤처 사업계획서 문장은 예전 벤처 기록 — 읽기만(기업인증에서 진행)
+              <dl data-testid="legacy-venture-sentence">
+                <ReadRow label={`${i + 1}. ${CORE_THREAD_LABEL[k]} · 예전 벤처 기록`} value={p.coreThread[k]} />
+              </dl>
+            ) : (
+              <TextField
+                id={`thread-input-${k}`}
+                label={`${i + 1}. ${CORE_THREAD_LABEL[k]}`}
+                value={p.coreThread[k]}
+                multiline
+                rows={3}
+                placeholder={CORE_THREAD_HINT[k]}
+                onCommit={(v) => update((cur) => ({ ...cur, coreThread: { ...cur.coreThread, [k]: v } }))}
+              />
+            )}
           </div>
         ))}
       </div>

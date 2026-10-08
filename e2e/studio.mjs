@@ -183,33 +183,23 @@ await wait(900)
 check('13 1종이면 부족 안내', (await page.getByText(/최소 2종/).count()) > 0)
 check('13 PDF 미첨부 안내', (await page.getByText(/PDF 를 아직 받지 않은/).count()) > 0)
 
-// 14) 벤처 — P0 Red Flag 12개 · Judge
+// 14) 벤처 — D-179 예전 벤처 기록은 읽기 전용(Red Flag · Judge 는 보이기만)
 await page.goto(projectUrl + '?adv=1&tab=venture&focus=redflags', { waitUntil: 'networkidle' })
 await wait(600)
-check('14 P0 12개 표시', (await page.getByText(/남은 것 12\/12/).count()) > 0)
-check('14 Judge 10축', (await page.locator('input[type=number]').count()) === 10)
+check('14 P0 12개 표시(읽기 전용 · 확인 0/12)', /Red Flag 확인 0\/12/.test(await page.getByTestId('legacy-venture-more').innerText()))
+check('14 Judge 입력칸 없음(예전 기록 읽기 전용)', (await page.locator('input[type=number]').count()) === 0)
 
 // 15) 증빙 — 10슬롯
 await page.goto(projectUrl + '?adv=1&tab=evidence', { waitUntil: 'networkidle' })
 await wait(600)
-check('15 빈 슬롯 10', (await page.getByText('빈 슬롯 10').count()) > 0)
-await page.getByRole('button', { name: /이 슬롯에 주장·첨부 추가/ }).first().click()
-await wait(900)
-check('15 슬롯 1에 항목 추가 → 빈 슬롯 9', (await page.getByText('빈 슬롯 9').count()) > 0)
+check('15 빈 슬롯 10(읽기 전용 · 채운 슬롯 0/10)', /채운 슬롯 0\/10/.test(await page.getByTestId('legacy-evidence').innerText()))
+check('15 슬롯 추가 단추 없음(D-179 — 벤처 증빙은 기업인증에서)', (await page.getByRole('button', { name: /이 슬롯에 주장·첨부 추가/ }).count()) === 0 && (await page.getByTestId('legacy-venture-record-open').count()) === 1)
 
-// 16) 실사 — 질문 풀에서 고르기 · 금지어 탐지
+// 16) 실사 — D-179 예전 벤처 현장실사는 읽기 전용(질문 추가 · Script 입력 없음) · 금지어 탐지는 예전 글에도(아래 L 에서)
 await page.goto(projectUrl + '?adv=1&tab=review&focus=qa', { waitUntil: 'networkidle' })
 await wait(600)
-await page.getByText('기본 질문 풀 15개에서 고르기').click()
-await wait(300)
-await page.getByRole('button', { name: '이 기술을 왜 개발했습니까?' }).click()
-await wait(900)
-check('16 예상질문 추가', (await page.getByText(/예상질문 · 답변 Key Point — 1개/).count()) > 0)
-const script = page.getByLabel('Script (대표자 말투로)')
-await script.fill('저희는 국내 최초로 특허 등록 완료한 …')
-await script.blur()
-await wait(900)
-check('16 금지 표현 탐지', (await page.getByText('금지 표현이 들어 있습니다').count()) > 0)
+check('16 예상질문 추가 없음(읽기 전용 · 기록 0개)', (await page.getByText('기본 질문 풀 15개에서 고르기').count()) === 0 && /예상질문 · 답변 Key Point \(0개\)/.test(await page.getByTestId('legacy-field-review').innerText()))
+check('16 Script 입력칸 없음 · 기업인증 벤처 열기 하나', (await page.getByLabel('Script (대표자 말투로)').count()) === 0 && (await page.getByTestId('legacy-venture-record-open').count()) === 1)
 
 /*
  * 17) 오늘 화면에는 '컨설팅 다음 행동' 을 두지 않는다 (D-70).
@@ -237,6 +227,87 @@ await page.keyboard.type('한솔')
 await wait(400)
 check('19 검색에 특허·MVP 그룹(예전 이름 없음)', (await page.getByRole('dialog').getByText('특허·MVP').count()) >= 1 && (await page.getByRole('dialog').getByText('특허+벤처').count()) === 0)
 await page.keyboard.press('Escape')
+
+// L) D-179 예전 벤처 기록 읽기 전용 — 읽기는 두 곳(특허·MVP · 기업인증), 수정은 기업인증 한 곳
+{
+  const PROJ = 'proj_hansol'
+  const KEY = 'axmvp.v1.consulting_projects'
+  await page.evaluate(({ key, id }) => {
+    const list = JSON.parse(localStorage.getItem(key) ?? '[]')
+    const p = list.find((x) => x.id === id)
+    p.fieldReview = { ...(p.fieldReview ?? {}), script: '저희는 국내 최초로 특허 등록 완료한 …', qa: [{ question: '이 기술을 왜 개발했습니까?', keyPoint: '' }] }
+    p.venture = { ...(p.venture ?? {}), sections: { 1: { outline: '현장 납기 지연을 늦게 아는 문제 — 예전 사업계획 요지', done: true }, 2: { outline: '작업지연 위험 점수로 먼저 알려 주는 솔루션', done: false } }, documents: { bizReg: true }, judgeScores: {}, redFlagsCleared: {}, submittedAt: '2026-08-20', submissionNote: '접수번호 2026-123' }
+    localStorage.setItem(key, JSON.stringify(list))
+  }, { key: KEY, id: PROJ })
+  // 예전 벤처 기록의 내용(저장할 때 빈 칸 기본값이 채워지는 것은 내용이 아니므로 뺀다)
+  const ventureOf = () => page.evaluate(({ key, id }) => {
+    const p = JSON.parse(localStorage.getItem(key) ?? '[]').find((x) => x.id === id) ?? {}
+    const v = p.venture ?? {}
+    const fr = p.fieldReview ?? {}
+    return JSON.stringify({ s: [1, 2, 3, 4, 5, 6, 7].map((n) => [v.sections?.[n]?.outline ?? '', !!v.sections?.[n]?.done]), at: v.submittedAt ?? '', note: v.submissionNote ?? '', docs: Object.entries(v.documents ?? {}).filter(([, on]) => on).map(([k]) => k).sort(), script: fr.script ?? '', qa: (fr.qa ?? []).length, s14: p.stages?.S14?.status ?? 'not_started' })
+  }, { key: KEY, id: PROJ })
+  const before = await ventureOf()
+  const pUrl = BASE + '/studio/' + PROJ
+  await page.goto(pUrl + '?adv=1&tab=venture', { waitUntil: 'networkidle' })
+  await wait(700)
+  const rec = page.getByTestId('legacy-venture-record')
+  check('L1 예전 벤처 사업계획이 화면에 보임(1번 요지 · 초안 완료 · 빈 칸은 기록 없음)', /현장 납기 지연을 늦게 아는 문제/.test(await page.locator('[data-testid="legacy-plan-section"][data-no="1"]').innerText()) && /초안 완료/.test(await page.locator('[data-testid="legacy-plan-section"][data-no="1"]').innerText()) && /기록 없음/.test(await page.locator('[data-testid="legacy-plan-section"][data-no="3"]').innerText()))
+  check('L2 예전 벤처 영역에 입력칸 · 체크 · 고르기 0', (await rec.locator('input, textarea, select, [contenteditable="true"]').count()) === 0)
+  check('L3 신청일은 글로만(2026-08-20) · 날짜 입력칸 없음', /2026-08-20/.test(await page.getByTestId('legacy-submitted-at').innerText()) && (await rec.locator('input[type="date"]').count()) === 0 && /현재 진행상태는 기업인증에서 확인하세요/.test(await rec.innerText()))
+  check('L2 Primary 단추 하나 = 기업인증 벤처 열기', (await page.locator('main button.bg-brand-600:visible').count()) === 1 && /기업인증 벤처 열기/.test(await page.getByTestId('legacy-venture-record-open').innerText()))
+  await page.goto(pUrl + '?adv=1&tab=stages&focus=S14', { waitUntil: 'networkidle' })
+  await wait(600)
+  check('L4 벤처 단계(S14 신청 완료) — 상태 · 완료 · 막힘 · 건너뛰기 단추 없음 · 예전 기록 안내', (await page.getByTestId('legacy-stage').count()) === 1 && (await page.getByRole('button', { name: /완료로 넘기기|진행 중으로|검토 대기로|막힘으로 표시|건너뜀으로 표시|이 단계로 옮기기/ }).count()) === 0)
+  await page.goto(pUrl + '?adv=1&tab=review', { waitUntil: 'networkidle' })
+  await wait(500)
+  check('L4 현장실사 · 결과도 읽기 전용(입력칸 0) · 예전 Script · 질문은 글로 보임', (await page.getByTestId('legacy-field-review').count()) === 1 && (await page.getByTestId('legacy-field-review').locator('input, textarea, select').count()) === 0 && /국내 최초/.test(await page.getByTestId('legacy-field-review').innerText()) && /이 기술을 왜 개발했습니까/.test(await page.getByTestId('legacy-field-review').innerText()))
+  check('16 금지 표현 탐지(예전 글에도 알려 줌)', /국내 최초/.test(await page.getByTestId('legacy-forbidden').innerText().catch(() => '')))
+  await page.goto(pUrl + '?adv=1&tab=prompts&focus=VENTURE_PLAN_SECTION', { waitUntil: 'networkidle' })
+  await wait(500)
+  check('L4 벤처 프롬프트는 새로 못 만듦(종류 목록에 없음 · 안내)', (await page.getByLabel('프롬프트 종류').locator('option', { hasText: /사업계획서|Judge|Claim|인포그래픽|실사/ }).count()) === 0 && (await page.getByTestId('legacy-venture-record-notice').count()) === 1)
+  check('L3 · L4 화면을 돌아다녀도 예전 벤처 기록 그대로(사업계획 · 신청일 · 메모 · 실사 · S14 상태)', (await ventureOf()) === before)
+  // L6 특허 · L7 MVP 는 계속 편집
+  await page.goto(pUrl + '?adv=1&tab=patent', { waitUntil: 'networkidle' })
+  await wait(500)
+  await page.getByLabel('발명자 (실제 기여 기준)').fill('김발명')
+  await page.getByLabel('발명자 (실제 기여 기준)').press('Tab')
+  await wait(1300)
+  const pt = await page.evaluate(({ key, id }) => JSON.parse(localStorage.getItem(key) ?? '[]').find((x) => x.id === id)?.patent?.inventors, { key: KEY, id: PROJ })
+  check('L6 특허 필드는 계속 편집 · 저장(발명자)', pt === '김발명', pt)
+  await page.goto(pUrl + '?adv=1&tab=mvp', { waitUntil: 'networkidle' })
+  await wait(500)
+  await page.getByLabel('PRODUCT').fill('납기 레이더')
+  await page.getByLabel('PRODUCT').press('Tab')
+  await wait(1300)
+  const mv = await page.evaluate(({ key, id }) => JSON.parse(localStorage.getItem(key) ?? '[]').find((x) => x.id === id)?.mvp?.productName, { key: KEY, id: PROJ })
+  check('L7 MVP 필드는 계속 편집 · 저장(PRODUCT)', mv === '납기 레이더', mv)
+  check('L6 · L7 특허 · MVP 를 저장해도 예전 벤처 기록 그대로', (await ventureOf()) === before)
+  // L5 기업인증으로 — 같은 업체
+  await page.goto(pUrl + '?adv=1&tab=venture', { waitUntil: 'networkidle' })
+  await wait(500)
+  await page.getByTestId('legacy-venture-record-open').click()
+  await page.waitForURL(/\/tools\/cert-os\/venture/)
+  await wait(700)
+  check('L5 [기업인증 벤처 열기] → 같은 업체(client=cli_hansol)', /\/tools\/cert-os\/venture\?client=cli_hansol/.test(page.url()), page.url())
+  // L8 기업인증이 예전 기록을 계속 읽음
+  await page.getByTestId('cert-step-2').click()
+  await wait(400)
+  const lg = await page.getByTestId('cert-venture-legacy').innerText().catch(() => '')
+  check('L8 기업인증 벤처가 예전 사업계획 초안(1/7)을 계속 읽음', /사업계획 초안 1\/7/.test(lg), lg)
+  // L9 다른 업체에는 안 섞임(같은 작업공간 안 업체 구분 — 작업공간 사이 격리는 qa:db 모든 표 · qa:pilot)
+  await page.goto(BASE + '/tools/cert-os/venture?client=cli_wooil', { waitUntil: 'networkidle' })
+  await wait(500)
+  await page.getByTestId('cert-step-2').click()
+  await wait(300)
+  check('L9 다른 업체(우일산업)에는 한솔의 예전 벤처 기록이 안 보임', (await page.getByTestId('cert-venture-legacy').count()) === 0)
+  // 예전 주소 · 돌려보내기 없음
+  await page.goto(BASE + `/ops/clients/${SEED_CLIENT_ID}?tab=consulting`, { waitUntil: 'networkidle' })
+  await wait(700)
+  check('L 예전 주소(업체 상세 컨설팅 탭) 그대로 열림 · 튕기지 않음', page.url().includes('tab=consulting') && (await page.getByTestId('legacy-venture-notice').count()) === 1)
+  await page.goto(pUrl, { waitUntil: 'networkidle' })
+  await wait(600)
+  check('L 간단 화면 진행 탭도 정상(특허 · MVP 단계는 그대로)', (await page.locator('main').innerText()).length > 0 && !page.url().includes('/404'))
+}
 
 // 20) 모바일 390 — 새 화면들 가로 넘침 0 · JS 오류 0
 let overflow = 0

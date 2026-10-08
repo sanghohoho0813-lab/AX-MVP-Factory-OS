@@ -47,6 +47,7 @@ import {
   saveProject,
 } from '../services/consultingStudioService'
 import { applyTask } from '../domain/consulting/applyTask'
+import { keepLegacyVenture } from '../domain/consulting/legacyVenture'
 import { resolveCurrentTask } from '../domain/consulting/currentTask'
 import { nowIso, todayLocalDate } from '../lib/appClock'
 import type { ConsultingArtifact, ConsultingDecision, ConsultingEvidence, ConsultingProject, ConsultingPromptPackage, ProjectStatus } from '../types/consulting'
@@ -154,7 +155,9 @@ function ProjectContent({ workspaceId, userId }: { workspaceId: string | null; u
   const update = useCallback(
     (fn: (p: ConsultingProject) => ConsultingProject) => {
       if (!latest.current) return
-      const next = fn(latest.current)
+      // D-179: 예전 벤처 전용 기록은 이 화면에서 바뀌지 않는다(기업인증에서만 수정) — 그것만 바꾸려던 수정이면 아무것도 하지 않는다
+      const next = keepLegacyVenture(latest.current, fn(latest.current))
+      if (JSON.stringify(next) === JSON.stringify(latest.current)) return
       latest.current = next
       dirty.current = true
       setProject(next)
@@ -218,7 +221,8 @@ function ProjectContent({ workspaceId, userId }: { workspaceId: string | null; u
         evidence,
         today,
       }
-      const outcome = applyTask(base, task, sub, ctx, at)
+      const applied = applyTask(base, task, sub, ctx, at)
+      const outcome = { ...applied, project: keepLegacyVenture(base, applied.project) }
       latest.current = outcome.project
       setProject(outcome.project)
       dirty.current = false
