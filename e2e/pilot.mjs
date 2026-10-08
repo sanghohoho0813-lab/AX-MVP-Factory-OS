@@ -240,6 +240,23 @@ try {
   const innoCred = (certPay.customFields ?? []).filter((f) => f.group === 'credential' && /이노비즈/.test(f.label))
   check('클라우드(P1): 인증 완료 → 업체 기록(DB) 인증서 칸 1개 · 갱신 일정 3줄', innoCred.length === 1 && innoCred[0].value.includes('2029-03-14까지') && ((certPay.toolResults ?? []).find((t) => t.toolKey === 'cert-os')?.deadlines?.length ?? 0) === 3, JSON.stringify(innoCred))
 
+  // D-180: 클라우드(진짜 RLS) — 앱이 특허를 저장해도 DB 에 있는 예전 벤처 기록은 그대로(서비스가 저장 전에 DB 를 한 번 읽고 잠긴 칸만 되돌린다)
+  const LV = 'qa-legacy-venture'
+  const lvPay = { clientName: '잠금시험', venture: { submittedAt: '2026-08-01', submissionNote: '예전 제출 메모' }, coreThread: { ventureSentence: '예전 벤처 문장' }, stages: { S14: { status: 'in_progress', note: '예전 S14 메모' } } }
+  sql(`insert into public.consulting_projects (id, workspace_id, client_id, title, current_stage, payload) values ('${LV}', '${OWNER_WS}', '${OWNER_CLIENT}', '특허·MVP 잠금 시험', 'S14', '${JSON.stringify(lvPay)}'::jsonb) on conflict (id) do nothing`)
+  await go(page, `/studio/${LV}?adv=1&tab=patent`)
+  // 화면이 연 뒤 DB 의 벤처 기록이 달라진 상황(다른 기기 · 예전 화면) — 화면이 들고 있는 값으로 덮으면 안 된다
+  sql(`update public.consulting_projects set payload = jsonb_set(jsonb_set(payload, '{venture,submittedAt}', '"2026-07-15"'), '{coreThread,ventureSentence}', '"DB 벤처 문장"') where id = '${LV}'`)
+  const lvLogFrom = restLog.length
+  await page.getByLabel('발명자 (실제 기여 기준)').fill('클라우드발명')
+  await page.getByLabel('발명자 (실제 기여 기준)').press('Tab')
+  await page.waitForTimeout(1800)
+  const lv = JSON.parse(sql(`select payload::text from public.consulting_projects where id = '${LV}'`) || '{}')
+  check('클라우드(D-180): 특허(발명자)는 DB 에 저장', lv.patent?.inventors === '클라우드발명', JSON.stringify(lv.patent ?? {}).slice(0, 200))
+  check('클라우드(D-180): 같은 저장에서 DB 의 신청일 · 제출 메모 · 벤처 문장 · S14 상태/메모는 그대로', lv.venture?.submittedAt === '2026-07-15' && lv.venture?.submissionNote === '예전 제출 메모' && lv.coreThread?.ventureSentence === 'DB 벤처 문장' && lv.stages?.S14?.status === 'in_progress' && lv.stages?.S14?.note === '예전 S14 메모', JSON.stringify({ v: lv.venture?.submittedAt, n: lv.venture?.submissionNote, s: lv.coreThread?.ventureSentence, s14: lv.stages?.S14 }))
+  const lvReq = restLog.slice(lvLogFrom).filter((x) => x.url.startsWith('/rest/v1/consulting_projects'))
+  check('클라우드(D-180): 저장 한 번 = 읽기 1 · 쓰기 1(되풀이 없음)', lvReq.filter((x) => x.method === 'GET').length === 1 && lvReq.filter((x) => x.method === 'PATCH').length === 1, lvReq.map((x) => x.method).join(','))
+
   // 대표가 브라우저에 남긴 값(작성 중 메모 · 도구 입력) — 다음 사람에게 보이면 안 된다
   await page.evaluate(() => {
     localStorage.setItem('axmvp.qa.ownerDraft', '대표비밀 작성 중 메모')
@@ -352,8 +369,10 @@ try {
     out.insert = await fetch(`${base}/operations_clients`, { method: 'POST', headers: h, body: JSON.stringify({ id: 'pilot-into-owner', workspace_id: ws, company_name: '몰래 넣기' }) }).then((r) => r.status)
     out.ws2 = await fetch(`${base}/rpc/create_workspace`, { method: 'POST', headers: h, body: JSON.stringify({ p_name: '두 번째' }) }).then((r) => r.status)
     out.tier = await fetch(`${base}/os_access?user_id=eq.${s.user.id}`, { method: 'PATCH', headers: h, body: JSON.stringify({ tier: 'full' }) }).then((r) => r.status)
+    out.lvPatch = await fetch(`${base}/consulting_projects?id=eq.qa-legacy-venture`, { method: 'PATCH', headers: h, body: JSON.stringify({ payload: { venture: { submittedAt: '2099-01-01' } } }) }).then((r) => r.text())
     return out
   }, [REF, OWNER_WS, OWNER_CLIENT])
+  check('Pilot REST(D-180 S8): 대표의 예전 벤처 기록 고치기 = 0줄 · DB 그대로', direct.lvPatch === '[]' && sql(`select payload->'venture'->>'submittedAt' from public.consulting_projects where id = 'qa-legacy-venture'`) === '2026-07-15', direct.lvPatch)
   check('Pilot REST: 표 8개 어디에도 대표 자료 없음', Object.entries(direct).filter(([k]) => !['patch', 'del', 'insert', 'ws2', 'tier'].includes(k)).every(([, v]) => leaked(String(v)).length === 0 && !String(v).includes(OWNER_WS)), JSON.stringify(direct).slice(0, 400))
   check('Pilot REST: 대표 업체 id 로 읽기 = []', direct.byId === '[]', direct.byId)
   check('Pilot REST: 대표 업체 고치기 · 지우기 = 0줄', direct.patch === '[]' && direct.del === '[]', `${direct.patch} ${direct.del}`)

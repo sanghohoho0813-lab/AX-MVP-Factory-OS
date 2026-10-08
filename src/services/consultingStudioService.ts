@@ -35,7 +35,7 @@ import { normalizeProject, projectPayload } from '../domain/consulting/projectMo
 import { seedFactsFromClient } from '../domain/consulting/factsheetSchema'
 import { isStageKey } from '../domain/consulting/workflowDefinition'
 import { emptyPrivacyReport } from '../domain/consulting/privacyFilter'
-import { isLegacyVentureArtifactType, isLegacyVentureStage, LEGACY_VENTURE_LOCKED, LEGACY_VENTURE_MESSAGE } from '../domain/consulting/legacyVenture'
+import { isLegacyVentureArtifactType, isLegacyVentureStage, keepLegacyVenture, LEGACY_VENTURE_LOCKED, LEGACY_VENTURE_MESSAGE } from '../domain/consulting/legacyVenture'
 import { createJournalEntry } from './journalService'
 import { setProjectCache } from '../domain/consulting/projectCache'
 
@@ -174,15 +174,25 @@ export async function createProject(
   return projectFromRow(data as Record<string, unknown>)
 }
 
+/**
+ * 프로젝트 저장. D-180: 어떤 화면·코드에서 불러도 예전 벤처 기록(S10~S16 · 벤처 탭 · 현장실사 · 벤처 핵심문장 ·
+ * 벤처 신청 최신 기준)은 지금 저장된 값 그대로 둔다 — 저장된 것을 한 번 읽고 → 잠긴 칸만 되돌리고 → 쓴다.
+ */
 export async function saveProject(project: ConsultingProject): Promise<ConsultingProject> {
-  const next = normalizeProject({ ...project, updatedAt: nowIso() })
+  const incoming = normalizeProject({ ...project, updatedAt: nowIso() })
   if (isLocal()) {
-    writeProjectsLocal(projectsLocal().map((p) => (p.id === next.id ? next : p)))
+    const list = projectsLocal()
+    const stored = list.find((p) => p.id === incoming.id)
+    const next = stored ? keepLegacyVenture(stored, incoming) : incoming
+    writeProjectsLocal(list.map((p) => (p.id === next.id ? next : p)))
     return next
   }
-  const ws = needWs(next.workspaceId)
-  const row = projectToRow(next, ws)
-  const { data, error } = await getSupabaseClient().from('consulting_projects').update(row).eq('id', next.id).eq('workspace_id', ws).select().single()
+  const ws = needWs(incoming.workspaceId)
+  const db = getSupabaseClient()
+  const cur = await db.from('consulting_projects').select('*').eq('id', incoming.id).eq('workspace_id', ws).maybeSingle()
+  if (cur.error) wrap(cur.error)
+  const next = cur.data ? keepLegacyVenture(projectFromRow(cur.data as Record<string, unknown>), incoming) : incoming
+  const { data, error } = await db.from('consulting_projects').update(projectToRow(next, ws)).eq('id', next.id).eq('workspace_id', ws).select().single()
   if (error) wrap(error)
   return projectFromRow(data as Record<string, unknown>)
 }
@@ -274,9 +284,28 @@ export function nextVersion(existing: ConsultingArtifact[], projectId: string, t
   return vs.length === 0 ? 1 : Math.max(...vs) + 1
 }
 
+/** 벤처 단계(S10~S16) 산출물 — 종류나 단계 어느 쪽이든 벤처면 예전 기록이다 */
+function isLegacyArtifact(a: { type: ArtifactType; stageKey: StageKey }): boolean {
+  return isLegacyVentureArtifactType(a.type) || isLegacyVentureStage(a.stageKey)
+}
+
+/** D-180: 고치거나 지우기 전에 저장된 산출물을 본다 — 넘겨받은 값이 아니라 저장된 종류·단계로 판단한다 */
+async function assertArtifactWritable(art: ConsultingArtifact): Promise<void> {
+  if (isLegacyArtifact(art)) throw new Error(LEGACY_VENTURE_MESSAGE)
+  if (isLocal()) {
+    const stored = artifactsLocal().find((a) => a.id === art.id)
+    if (stored && isLegacyArtifact(stored)) throw new Error(LEGACY_VENTURE_MESSAGE)
+    return
+  }
+  const ws = needWs(art.workspaceId)
+  const { data, error } = await getSupabaseClient().from('consulting_artifacts').select('type, stage_key').eq('id', art.id).eq('workspace_id', ws).maybeSingle()
+  if (error) wrap(error)
+  if (data && isLegacyArtifact({ type: data.type as ArtifactType, stageKey: data.stage_key as StageKey })) throw new Error(LEGACY_VENTURE_MESSAGE)
+}
+
 export async function createArtifact(workspaceId: string | null, input: CreateArtifactInput): Promise<ConsultingArtifact> {
-  // D-179: 벤처 단계(S10~S16) 산출물은 새로 만들지 않는다 — 기업인증에서 진행
-  if (isLegacyVentureArtifactType(input.type)) throw new Error(LEGACY_VENTURE_MESSAGE)
+  // D-179 · D-180: 벤처 단계(S10~S16) 산출물은 새로 만들지 않는다 — 기업인증에서 진행
+  if (isLegacyArtifact({ type: input.type, stageKey: input.stageKey })) throw new Error(LEGACY_VENTURE_MESSAGE)
   const existing = await listArtifacts(workspaceId, input.projectId)
   const version = nextVersion(existing, input.projectId, input.type)
   const art = normalizeArtifact({
@@ -315,6 +344,7 @@ export async function createArtifact(workspaceId: string | null, input: CreateAr
 }
 
 export async function updateArtifact(art: ConsultingArtifact, patch: Partial<Pick<ConsultingArtifact, 'title' | 'status' | 'content'>>): Promise<ConsultingArtifact> {
+  await assertArtifactWritable(art)
   const next = normalizeArtifact({ ...art, ...patch, updatedAt: nowIso() })
   if (isLocal()) {
     writeJson(STORAGE_KEYS.consultingArtifacts, artifactsLocal().map((a) => (a.id === art.id ? next : a)))
@@ -328,6 +358,7 @@ export async function updateArtifact(art: ConsultingArtifact, patch: Partial<Pic
 }
 
 export async function deleteArtifact(art: ConsultingArtifact): Promise<void> {
+  await assertArtifactWritable(art)
   if (isLocal()) {
     writeJson(STORAGE_KEYS.consultingArtifacts, artifactsLocal().filter((a) => a.id !== art.id))
     notifyStoreChanged()

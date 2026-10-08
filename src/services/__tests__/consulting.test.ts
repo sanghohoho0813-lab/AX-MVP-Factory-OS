@@ -19,7 +19,9 @@ import { KIPO_REFERENCES, kipoSelectionIssues, searchKipo, kipoPdfUrl } from '..
 import { RED_FLAGS, JUDGE_AXES, EVIDENCE_SLOTS, PLAN_SECTIONS, findForbiddenPhrases, judgeTotal, judgeVerdict } from '../../domain/consulting/qaRules'
 import { artifactTypeForPrompt } from '../../domain/consulting/artifactDefinitions'
 import { isLegacyVentureArtifactType, isLegacyVentureStage, keepLegacyVenture } from '../../domain/consulting/legacyVenture'
-import { nextVersion } from '../consultingStudioService'
+import { createArtifact, createProject, deleteArtifact, getProject, listArtifacts, nextVersion, saveProject, savePromptPackage, updateArtifact, upsertEvidence } from '../consultingStudioService'
+import { readJson, STORAGE_KEYS, writeJson } from '../../storage/localStore'
+import { emptyPrivacyReport } from '../../domain/consulting/privacyFilter'
 import { MODULES, MODULE_GROUPS, moduleForPath } from '../../config/moduleRegistry'
 import type { ConsultingArtifact, ConsultingProject } from '../../types/consulting'
 import type { ClientOpsRecord } from '../../types/clientOps'
@@ -276,6 +278,65 @@ check('registry: /studio/abc → 특허·MVP', moduleForPath('/studio/abc')?.pat
   const fresh = keepLegacyVenture(withPlan, { ...withPlan, freshness: [{ scope: 'venture_application', checkedAt: '2026-10-08', source: 'x', differences: '' }, { scope: 'patent_filing', checkedAt: '2026-10-08', source: '특허로', differences: '' }] })
   check('D-179 신청 직전 기준 확인(venture_application)은 되돌리고 특허 출원 기준 확인은 남김', fresh.freshness.length === 1 && fresh.freshness[0].scope === 'patent_filing')
   check('D-179 벤처 단계 · 산출물 · 프롬프트 판별(S10~S16)', isLegacyVentureStage('S11') && isLegacyVentureStage('S16') && !isLegacyVentureStage('S9') && !isLegacyVentureStage('S1') && isLegacyVentureArtifactType('VENTURE_PLAN_SECTION') && isLegacyVentureArtifactType('FIELD_REVIEW_QA') && !isLegacyVentureArtifactType('PATENT_SPEC_DRAFT') && !isLegacyVentureArtifactType('MVP_SPEC') && PROMPT_TYPES.filter((t) => isLegacyVentureStage(PROMPT_DEFAULT_STAGE[t])).length === 6)
+}
+
+// D-180 — 서비스 저장 경로 잠금: 편집 화면을 거치지 않고 saveProject() 를 바로 불러도 예전 벤처 기록은 저장된 값 그대로(로컬 저장소)
+{
+  const S10_16 = ['S10', 'S11', 'S12', 'S13', 'S14', 'S15', 'S16'] as const
+  const base = project({ id: 'legacy-a', workspaceId: 'ws-a' })
+  const legacy: ConsultingProject = {
+    ...base,
+    venture: { ...base.venture, sections: { ...base.venture.sections, 1: { ...base.venture.sections[1], outline: '예전 사업계획 요지', done: true } }, submittedAt: '2026-08-01', submissionNote: '예전 제출 메모' },
+    fieldReview: { ...base.fieldReview, result: '보완 요청' },
+    coreThread: { ...base.coreThread, ventureSentence: '예전 벤처 문장' },
+    stages: { ...base.stages, S14: { ...base.stages.S14, status: 'in_progress', note: '예전 S14 메모' } },
+    freshness: [{ scope: 'venture_application', checkedAt: '2026-07-30', source: '벤처확인 누리집', differences: '' }],
+  }
+  const otherBase = project({ id: 'other-b', workspaceId: 'ws-b', clientId: 'c2', clientName: '다른회사' })
+  const other: ConsultingProject = { ...otherBase, venture: { ...otherBase.venture, submittedAt: '2026-05-05' } }
+  // D-179 이전에 만든 기록과 같은 모양으로 저장소에 바로 심는다
+  writeJson(STORAGE_KEYS.consultingProjects, [legacy, other])
+  const all = () => readJson<ConsultingProject[]>(STORAGE_KEYS.consultingProjects, [])
+  const stored = () => all().find((p) => p.id === 'legacy-a') as ConsultingProject
+  const otherRaw = JSON.stringify(all().find((p) => p.id === 'other-b'))
+  const cur = () => normalizeProject(stored())
+
+  const r1 = await saveProject({ ...cur(), venture: { ...cur().venture, sections: { ...cur().venture.sections, 1: { ...cur().venture.sections[1], outline: '몰래 바꾼 요지', done: false } } } })
+  check('D-180 S1 saveProject 직접 — 벤처 사업계획은 원래 값(돌려준 값 · 저장소 둘 다)', r1.venture.sections[1].outline === '예전 사업계획 요지' && stored().venture.sections[1].outline === '예전 사업계획 요지' && stored().venture.sections[1].done === true)
+  const r2 = await saveProject({ ...cur(), venture: { ...cur().venture, submittedAt: '2026-10-08', submissionNote: '바꾼 메모' } })
+  check('D-180 S2 신청일 · 제출 메모는 원래 값', r2.venture.submittedAt === '2026-08-01' && stored().venture.submittedAt === '2026-08-01' && stored().venture.submissionNote === '예전 제출 메모')
+  const allDone = { ...cur().stages }
+  for (const k of S10_16) allDone[k] = { ...allDone[k], status: 'completed', note: '몰래 완료' }
+  await saveProject({ ...cur(), stages: allDone })
+  check('D-180 S3 S10~S16 상태 · 메모는 원래 값', S10_16.every((k) => stored().stages[k].status === legacy.stages[k].status && stored().stages[k].note === legacy.stages[k].note) && stored().stages.S14.note === '예전 S14 메모')
+  await saveProject({ ...cur(), coreThread: { ...cur().coreThread, ventureSentence: '몰래 바꾼 문장' }, fieldReview: { ...cur().fieldReview, result: '선정' }, freshness: [] })
+  check('D-180 S4 벤처 핵심문장 · 현장실사 결과 · 신청 직전 기준 확인은 원래 값', stored().coreThread.ventureSentence === '예전 벤처 문장' && stored().fieldReview.result === '보완 요청' && stored().freshness.length === 1 && stored().freshness[0].checkedAt === '2026-07-30')
+  const r5 = await saveProject({ ...cur(), patent: { ...cur().patent, applicationNumber: '10-2026-0000123', filingStatus: 'filed' }, gate: { ...cur().gate, decision: 'hold', reason: '자료 더' } })
+  check('D-180 S5 특허(출원번호 · 상태) · S1 GO/HOLD 는 그대로 저장', r5.patent.applicationNumber === '10-2026-0000123' && stored().patent.applicationNumber === '10-2026-0000123' && stored().patent.filingStatus === 'filed' && stored().gate.decision === 'hold')
+  await saveProject({ ...cur(), mvp: { ...cur().mvp, productName: '현장 예약 MVP' }, stages: { ...cur().stages, S8: { ...cur().stages.S8, status: 'completed' }, S9: { ...cur().stages.S9, status: 'in_progress' } } })
+  check('D-180 S6 MVP · S0~S9 단계는 그대로 저장', stored().mvp.productName === '현장 예약 MVP' && stored().stages.S8.status === 'completed' && stored().stages.S9.status === 'in_progress')
+  const fk = FACTS[0].key
+  await saveProject({ ...cur(), factsheet: { ...cur().factsheet, [fk]: { value: '바뀐 사실값', status: 'confirmed', source: '사업자등록증', asOfDate: '2026-10-08', note: '' } } })
+  check('D-180 S7 사실표는 그대로 저장', stored().factsheet[fk]?.value === '바뀐 사실값')
+  const mixed = await saveProject({ ...cur(), patent: { ...cur().patent, applicationNumber: '10-2026-0000456' }, venture: { ...cur().venture, submittedAt: '2027-01-01' }, coreThread: { ...cur().coreThread, coreTech: '공용 핵심 기술', ventureSentence: '같이 바꾼 문장' } })
+  check('D-180 섞인 저장 — 특허 · 공용 핵심 기술은 저장, 같은 저장의 벤처 칸만 원래 값', mixed.patent.applicationNumber === '10-2026-0000456' && stored().coreThread.coreTech === '공용 핵심 기술' && stored().venture.submittedAt === '2026-08-01' && stored().coreThread.ventureSentence === '예전 벤처 문장')
+  check('D-180 S8 다른 작업공간 프로젝트는 한 글자도 안 바뀜', JSON.stringify(all().find((p) => p.id === 'other-b')) === otherRaw)
+  const fresh = await createProject('ws-a', { clientId: 'c3', clientName: '새회사' })
+  const savedNew = await saveProject({ ...fresh, patent: { ...fresh.patent, applicationNumber: '10-2026-0000789' } })
+  check('D-180 새 특허·MVP 프로젝트도 그대로 저장(벤처 칸은 빈 기본값)', savedNew.patent.applicationNumber === '10-2026-0000789' && savedNew.venture.submittedAt === '' && (await getProject('ws-a', fresh.id))?.patent.applicationNumber === '10-2026-0000789')
+
+  // 산출물: 벤처 산출물은 고치기 · 지우기 막힘(넘겨받은 값이 아니라 저장된 종류로 판단) · 특허 산출물은 그대로
+  const vArt = { id: 'art-venture', workspaceId: 'ws-a', projectId: 'legacy-a', type: 'VENTURE_PLAN_SECTION', title: '사업계획 1', stageKey: 'S12', version: 1, status: 'approved', content: '예전 사업계획 본문', source: 'manual', promptPackageId: null, fileName: '', createdAt: NOW, updatedAt: NOW } as ConsultingArtifact
+  const pArt = { ...vArt, id: 'art-patent', type: 'PATENT_SPEC_DRAFT', title: '명세서', stageKey: 'S6', content: '명세서 초안' } as ConsultingArtifact
+  writeJson(STORAGE_KEYS.consultingArtifacts, [vArt, pArt])
+  const refused = async (f: () => Promise<unknown>) => f().then(() => false, (e: unknown) => e instanceof Error && e.message.includes('기업인증'))
+  const artNow = async (id: string) => (await listArtifacts('ws-a', 'legacy-a')).find((a) => a.id === id)
+  check('D-180 벤처 산출물 고치기 막힘(내용 그대로)', (await refused(() => updateArtifact(vArt, { content: '몰래 고친 본문' }))) && (await artNow('art-venture'))?.content === '예전 사업계획 본문')
+  check('D-180 벤처 산출물 종류를 속여 넘겨도 저장된 종류로 막힘', (await refused(() => updateArtifact({ ...vArt, type: 'NOTE', stageKey: 'S2' }, { status: 'superseded' }))) && (await artNow('art-venture'))?.status === 'approved')
+  check('D-180 벤처 산출물 지우기 막힘(그대로 남음)', (await refused(() => deleteArtifact({ ...vArt, type: 'NOTE', stageKey: 'S2' }))) && !!(await artNow('art-venture')))
+  check('D-180 특허 산출물은 고치기 그대로', (await updateArtifact(pArt, { content: '명세서 2차' })).content === '명세서 2차' && (await artNow('art-patent'))?.content === '명세서 2차')
+  check('D-180 벤처 단계(S12)로 메모 산출물 새로 만들기 막힘 · MVP 단계는 그대로', (await refused(() => createArtifact('ws-a', { projectId: 'legacy-a', type: 'NOTE', title: '메모', stageKey: 'S12', content: 'x', source: 'manual' }))) && (await createArtifact('ws-a', { projectId: 'legacy-a', type: 'NOTE', title: '메모', stageKey: 'S8', content: 'MVP 메모', source: 'manual' })).stageKey === 'S8')
+  check('D-180 벤처 증빙 · 벤처 프롬프트 기록 막힘(D-179 그대로)', (await refused(() => upsertEvidence('ws-a', { projectId: 'legacy-a' }))) && (await refused(() => savePromptPackage('ws-a', { projectId: 'legacy-a', type: 'VENTURE_PLAN_SECTION', target: 'general', stageKey: 'S12', title: 'x', prompt: 'x', context: '', privacy: emptyPrivacyReport(), section: 1 }))))
 }
 
 console.log(`\n컨설팅 엔진: ${passed} passed, ${failed} failed`)
