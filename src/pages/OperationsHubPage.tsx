@@ -6,6 +6,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryInUrl } from '../lib/useQueryInUrl'
 import {
   Archive,
+  BriefcaseBusiness,
   Building2,
   CalendarDays,
   ChevronRight,
@@ -26,6 +27,8 @@ import { ServiceCatalogModal } from '../components/ops/ServiceCatalogModal'
 const SORT_KEY = 'axmvp.clients.sort.v2'
 const FILTER_KEY = 'axmvp.clients.filter'
 const SEGMENT_KEY = 'axmvp.clients.segment'
+// D-181: 중소기업 고객 · 컨설턴트 고객(대표만) — 지난번에 보던 쪽을 기억한다
+const TYPE_KEY = 'axmvp.clients.type'
 
 import { ClientBoardCard } from '../components/ops/ClientBoardCard'
 import { matchesClientSearch, searchHit } from '../services/clientOpsSearch'
@@ -80,6 +83,20 @@ import { Modal } from '../components/ui/Modal'
 import { AlertRow, SEVERITY_META } from '../components/ops/opsParts'
 import { useBackToClose } from '../lib/backToClose'
 import { useClientGrantSummaries } from '../components/grants/useGrants'
+import { CLIENT_TYPE_LABEL, CLIENT_TYPES, clientTypeOf, isClientType, type ClientType } from '../services/clientType'
+
+/** D-181: 처음 열 때 고객 종류 — 주소(?type=consultant)가 먼저, 없으면 지난번에 보던 쪽 */
+function initialClientType(): ClientType {
+  if (typeof window === 'undefined') return 'sme'
+  const fromUrl = new URLSearchParams(window.location.search).get('type')
+  if (isClientType(fromUrl)) return fromUrl
+  try {
+    const v = localStorage.getItem(TYPE_KEY)
+    return isClientType(v) ? v : 'sme'
+  } catch {
+    return 'sme'
+  }
+}
 
 type ClientSegment = 'contract' | 'prospect' | 'all'
 const SEGMENTS: { key: ClientSegment; label: string }[] = [
@@ -146,6 +163,8 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const [form, setForm] = useState({ companyName: '', contactName: '', contactPhone: '', businessNumber: '' })
   /** D-122: 새로 넣는 업체는 기본 잠재고객 — 예전에는 계약 고객으로 들어가 계약 숫자가 부풀고 영업 보드 '계약 완료' 칸에 떴다 */
   const [asProspect, setAsProspect] = useState(true)
+  /** D-181: 새로 넣는 고객의 종류 — 보고 있던 쪽(대표만 고른다) */
+  const [newType, setNewType] = useState<ClientType>(initialClientType)
   // D-124: 찾던 말은 주소(?q=)에 — 업체를 열었다가 뒤로 와도 그대로
   const [searchParams, setSearchParams] = useSearchParams()
   const [query, setQuery] = useState(() => searchParams.get('q') ?? '')
@@ -237,6 +256,38 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   }, [filterKey])
 
   /*
+   * D-181: 고객 종류 — 중소기업 고객 · 컨설턴트 고객을 따로 본다(대표만).
+   * 이 화면의 숫자 · 목록 · 경고는 고른 쪽만 센다. 팀장(Pilot) 화면은 구분 없이 전부(고르는 칸도 없다).
+   */
+  const [ctype, setCtype] = useState<ClientType>(initialClientType)
+  useEffect(() => {
+    try {
+      localStorage.setItem(TYPE_KEY, ctype)
+    } catch {
+      /* 저장 못 해도 화면은 돈다 */
+    }
+  }, [ctype])
+  const switchType = (t: ClientType) => {
+    setCtype(t)
+    // 주소에 ?type= 이 남아 있으면 지운다 — 새로 열 때 방금 고른 쪽이 그대로 보이게
+    if (searchParams.has('type')) {
+      const next = new URLSearchParams(searchParams)
+      next.delete('type')
+      setSearchParams(next, { replace: true })
+    }
+  }
+  const typed = useMemo(() => (pilot ? records : records.filter((r) => clientTypeOf(r) === ctype)), [records, pilot, ctype])
+  const typeCount = useMemo(() => {
+    const n: Record<ClientType, number> = { sme: 0, consultant: 0 }
+    for (const r of records) if (r.archivedAt === null) n[clientTypeOf(r)] += 1
+    return n
+  }, [records])
+  const openForm = () => {
+    setNewType(pilot ? 'sme' : ctype)
+    setFormOpen(true)
+  }
+
+  /*
    * D-114: 계약 고객 · 잠재고객 · 전체. 메뉴 옆 숫자는 계약 고객만 세고, 잠재고객은 여기 들어와서 본다.
    * 보관함을 볼 때는 구분 없이 보관한 업체 전부.
    */
@@ -257,12 +308,12 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       /* 저장 못 해도 화면은 돈다 */
     }
   }, [segment])
-  const contractCount = records.filter(isContractClient).length
-  const prospectCount = records.filter(isProspect).length
+  const contractCount = typed.filter(isContractClient).length
+  const prospectCount = typed.filter(isProspect).length
   const moneyWords = useMoneyWords()
 
   const visible = useMemo(() => {
-    return records.filter((r) => {
+    return typed.filter((r) => {
       if (!showArchived && r.archivedAt !== null) return false
       if (showArchived && r.archivedAt === null) return false
       if (!showArchived && segment === 'contract' && !isContractClient(r)) return false
@@ -271,8 +322,8 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       // 회사명뿐 아니라 담당자·번호·직접 만든 칸·영업자 이름까지 (D-76)
       return matchesClientSearch(r, query)
     })
-  }, [records, query, showArchived, filterKey, today, segment])
-  const archivedCount = records.filter((r) => r.archivedAt !== null).length
+  }, [typed, query, showArchived, filterKey, today, segment])
+  const archivedCount = typed.filter((r) => r.archivedAt !== null).length
 
   /*
    * 정렬 기준은 기억한다 — 매번 다시 고르게 하면 결국 기본값만 쓰게 된다.
@@ -294,7 +345,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     }
   }, [sortKey])
   const ordered = useMemo(() => sortClients(visible, sortKey, today), [visible, sortKey, today])
-  const alerts = useMemo(() => buildAllAlerts(records, today), [records, today])
+  const alerts = useMemo(() => buildAllAlerts(typed, today), [typed, today])
   const summary = useMemo(() => summarizeAlerts(alerts), [alerts])
   const visibleAlerts = useMemo(
     () => (tab === 'all' ? alerts : alerts.filter((a) => a.severity === tab)),
@@ -307,7 +358,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     let unpaidGross = 0
     let overdueCount = 0
     // D-150: 보관한 업체는 빼고 센다(오늘 · 보드 · KPI 와 같은 기준)
-    for (const r of records) {
+    for (const r of typed) {
       if (r.archivedAt) continue
       const p = clientOpsProgress(r, today)
       unpaid += p.unpaidNet
@@ -315,10 +366,10 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       overdueCount += p.overduePayments
     }
     return { unpaid, unpaidGross, overdueCount }
-  }, [records, today])
+  }, [typed, today])
 
   // 계약 완료(끝남)만 뺀다 — 계약 전도 챙겨야 할 업체다
-  const activeCount = records.filter((r) => !r.archivedAt && contractStageOf(r.status) !== 'closed').length
+  const activeCount = typed.filter((r) => !r.archivedAt && contractStageOf(r.status) !== 'closed').length
 
   const openAlert = (a: OpsAlert) =>
     navigate(a.serviceKey ? `/ops/clients/${a.clientId}?tab=work&svc=${a.serviceKey}` : `/ops/clients/${a.clientId}`)
@@ -415,10 +466,21 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     try {
       setSaving(true)
       // D-125: 업체는 만들어졌는데 영업 칸 저장이 실패하면, 다시 눌러도 새로 만들지 않고 그 업체로 다시 한다(중복 업체 방지)
-      const created = createdRef.current ?? (await createClient(workspaceId, { ...form, ...(asProspect ? { status: 'waiting' as const } : {}) }))
+      const asConsultant = !pilot && newType === 'consultant'
+      const created =
+        createdRef.current ??
+        (await createClient(workspaceId, { ...form, ...(asProspect ? { status: 'waiting' as const } : {}), ...(asConsultant ? { clientType: 'consultant' as const } : {}) }))
       createdRef.current = created
       const record = asProspect ? await saveClient(withNewProspect(created, '')) : created
       createdRef.current = null
+      // D-181: 업체 화면에서 뒤로 오면 방금 넣은 고객이 있는 쪽이 보이게
+      if (!pilot) {
+        try {
+          localStorage.setItem(TYPE_KEY, newType)
+        } catch {
+          /* 기억 못 해도 등록은 된다 */
+        }
+      }
       navigate(`/ops/clients/${record.id}`)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '고객을 등록하지 못했습니다.')
@@ -431,12 +493,12 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
     <div className="flex flex-col gap-6">
       <ScreenTitle
         title="고객 관리"
-        sub={`${today} · 계약 고객 ${contractCount}곳 · 잠재고객 ${prospectCount}곳`}
+        sub={`${today} · ${!pilot && ctype === 'consultant' ? '컨설턴트 고객 · ' : ''}계약 고객 ${contractCount}곳 · 잠재고객 ${prospectCount}곳`}
         actions={
           <>
-            <Button variant="primary" onClick={() => setFormOpen(true)}>
+            <Button variant="primary" onClick={openForm} data-testid="clients-add">
               <CirclePlus aria-hidden="true" className="size-4" />
-              <span className="hidden sm:inline">새 업체 등록</span>
+              <span className="hidden sm:inline">{!pilot && ctype === 'consultant' ? '새 컨설턴트 고객 등록' : '새 업체 등록'}</span>
               <span className="sm:hidden">등록</span>
             </Button>
             {/* D-169: AI 비서 자리 — 이번 주 고객 · 우선순위 · PDF · 메일(연결 준비 중) */}
@@ -561,8 +623,35 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
         </ul>
       </Modal>
 
+      {/* D-181: 고객 종류 — 중소기업 고객 · 컨설턴트 고객(대표만 · 팀장 화면에는 없다) */}
+      {!pilot && records.length > 0 && (
+        <div role="tablist" aria-label="고객 종류" data-testid="client-type-tabs" className="flex gap-1 overflow-x-auto border-b border-slate-200">
+          {CLIENT_TYPES.map((t) => {
+            const on = ctype === t
+            const Icon = t === 'sme' ? Building2 : BriefcaseBusiness
+            return (
+              <button
+                key={t}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                data-testid={`client-type-${t}`}
+                onClick={() => switchType(t)}
+                className={`tap -mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[1rem] font-semibold whitespace-nowrap ${
+                  on ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Icon aria-hidden="true" className="size-4" />
+                {CLIENT_TYPE_LABEL[t]}
+                <span className={`t-meta tabular-nums ${on ? 'text-brand-600' : 'text-slate-400'}`}>{typeCount[t]}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {/* D-114: 계약 고객 · 잠재고객 · 전체 */}
-      {records.length > 0 && !showArchived && (
+      {typed.length > 0 && !showArchived && (
         <div role="group" aria-label="고객 구분" data-testid="client-segment" className="grid grid-cols-3 gap-1 rounded-(--radius-control) border border-slate-200 bg-white p-1 sm:inline-flex sm:w-auto sm:self-start">
           {SEGMENTS.map((sg) => {
             const n = sg.key === 'contract' ? contractCount : sg.key === 'prospect' ? prospectCount : contractCount + prospectCount
@@ -584,7 +673,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       )}
 
       {/* 검색 · 보관 */}
-      {records.length > 0 && (
+      {typed.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           {/* 휴대폰에서는 검색칸이 한 줄을 다 쓴다 — 보관함 단추와 나눠 쓰면
               안내 문구가 '…번호로' 에서 잘렸다 */}
@@ -689,7 +778,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
           hint={`${DUE_SOON_DAYS}일 이내 마감·만료`}
           onClick={() => { setTab('warning'); setAlertsOpen(true) }}
         />
-        <MetricTile label="관리 중인 업체" value={`${activeCount}곳`} hint={`전체 ${records.length}곳`} />
+        <MetricTile label="관리 중인 업체" value={`${activeCount}곳`} hint={`전체 ${typed.length}곳`} />
         {/* D-171: 잠재고객(가망고객) — 누르면 잠재고객만 */}
         <MetricTile label="잠재고객" value={`${prospectCount}곳`} hint="계약 전 · 영업 중" onClick={() => setSegment('prospect')} />
         <MetricTile
@@ -725,12 +814,24 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
           </div>
         </div>
 
-        {records.length === 0 ? (
+        {typed.length === 0 && !pilot && ctype === 'consultant' ? (
+          // D-181: 컨설턴트 고객이 아직 없을 때 — 새로 넣거나, 이미 넣은 업체를 옮기는 길을 알려 준다
+          <div data-testid="clients-empty-consultant" className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-12 text-center">
+            <BriefcaseBusiness aria-hidden="true" className="mx-auto size-9 text-brand-400" />
+            <p className="mt-3 text-[1.25rem] font-bold text-slate-900">아직 컨설턴트 고객이 없습니다</p>
+            <Button variant="primary" className="mt-4" onClick={openForm} data-testid="clients-empty-consultant-add">
+              <CirclePlus aria-hidden="true" className="size-4" />컨설턴트 고객 등록
+            </Button>
+            <p className="mx-auto mt-4 max-w-xl text-[1rem] break-keep text-slate-600">
+              이미 등록한 고객이 컨설턴트라면 그 고객 화면 › 더보기 › <strong>컨설턴트 고객으로 옮기기</strong> 를 누르세요. 중소기업 고객 목록에서 빠지고 여기로 옵니다.
+            </p>
+          </div>
+        ) : typed.length === 0 ? (
           // D-162: 빈 화면 자체가 다음 행동을 알려 준다 — 안내 창을 따로 띄우지 않는다
           <div data-testid="clients-empty" className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-12 text-center">
             <Building2 aria-hidden="true" className="mx-auto size-9 text-brand-400" />
             <p className="mt-3 text-[1.25rem] font-bold text-slate-900">등록된 업체가 없습니다</p>
-            <Button variant="primary" className="mt-4" onClick={() => setFormOpen(true)} data-testid="clients-empty-add">
+            <Button variant="primary" className="mt-4" onClick={openForm} data-testid="clients-empty-add">
               <CirclePlus aria-hidden="true" className="size-4" />첫 업체 등록
             </Button>
             <p className="mx-auto mt-4 max-w-xl text-[1rem] break-keep text-slate-600">
@@ -751,7 +852,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
             <div data-testid="clients-empty-filter" className="flex flex-col items-center gap-3 rounded-(--radius-panel) border border-dashed border-slate-300 bg-white px-5 py-10 text-center">
               <p className="text-[1.1rem] font-bold text-slate-800">조건에 맞는 업체가 없습니다</p>
               <p className="t-body break-keep text-slate-600">
-                {query.trim() ? `'${query.trim()}' 로 찾은 업체가 없습니다. ` : ''}보기 · 검색 조건을 풀면 전체 {records.length}곳이 보입니다.
+                {query.trim() ? `'${query.trim()}' 로 찾은 업체가 없습니다. ` : ''}보기 · 검색 조건을 풀면 전체 {typed.length}곳이 보입니다.
               </p>
               <Button
                 variant="secondary"
@@ -941,7 +1042,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
             className="ax-pop w-full max-w-lg rounded-(--radius-panel) bg-white p-6 shadow-(--shadow-overlay)"
           >
             <div className="flex items-center justify-between">
-              <h2 className="text-[1.3rem] font-bold text-slate-900">새 업체 등록</h2>
+              <h2 className="text-[1.3rem] font-bold text-slate-900">{!pilot && newType === 'consultant' ? '새 컨설턴트 고객 등록' : '새 업체 등록'}</h2>
               <button
                 type="button"
                 className="tap text-[0.95rem] text-slate-500 hover:text-slate-800"
@@ -951,11 +1052,32 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
               </button>
             </div>
             <p className="mt-1 text-[0.95rem] break-keep text-slate-500">
-              업체명만 넣어도 됩니다. 나머지는 나중에 채울 수 있습니다.
+              {!pilot && newType === 'consultant' ? '이름(회사명)만 넣어도 됩니다.' : '업체명만 넣어도 됩니다.'} 나머지는 나중에 채울 수 있습니다.
             </p>
             <div className="mt-5 grid gap-4">
+              {/* D-181: 고객 종류 — 대표만 고른다(팀장 화면은 늘 중소기업 고객) */}
+              {!pilot && (
+                <fieldset data-testid="new-client-type">
+                  <legend className="text-[0.95rem] font-medium text-slate-700">고객 종류</legend>
+                  <div className="mt-1.5 grid grid-cols-2 gap-2">
+                    {CLIENT_TYPES.map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        aria-pressed={newType === t}
+                        data-testid={`new-client-type-${t}`}
+                        onClick={() => setNewType(t)}
+                        className={`tap flex flex-col items-start rounded-(--radius-control) border px-3 py-2 text-left ${newType === t ? 'border-brand-600 bg-brand-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+                      >
+                        <span className="text-[0.98rem] font-bold text-slate-900">{t === 'sme' ? '중소기업 대표님' : '컨설턴트'}</span>
+                        <span className="t-meta text-slate-500">{t === 'sme' ? '지금까지 고객' : '따로 관리'}</span>
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
               <label className="text-[0.95rem] font-medium text-slate-700">
-                업체명
+                {!pilot && newType === 'consultant' ? '이름(회사명)' : '업체명'}
                 <input
                   autoFocus
                   required
@@ -993,7 +1115,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                 />
               </label>
               <fieldset>
-                <legend className="text-[0.95rem] font-medium text-slate-700">어떤 업체인가요</legend>
+                <legend className="text-[0.95rem] font-medium text-slate-700">{!pilot && newType === 'consultant' ? '계약했나요' : '어떤 업체인가요'}</legend>
                 <div className="mt-1.5 grid grid-cols-2 gap-2">
                   {[
                     { on: true, label: '잠재고객', hint: '아직 계약 전 — 영업 보드로' },

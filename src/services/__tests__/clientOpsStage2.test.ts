@@ -31,6 +31,7 @@ import {
   withService,
   withoutFunding,
 } from '../clientOpsService'
+import { clientTypeOf, isClientType, withClientType } from '../clientType'
 import type { ClientOpsRecord, DocumentKey } from '../../types/clientOps'
 
 let passed = 0
@@ -243,6 +244,21 @@ function withDocs(r: ClientOpsRecord, keys: DocumentKey[], issuedAt = TODAY): Cl
   check('백업(D-94): 모듈 기록도 담긴다', withModule['axmvp.module.sales-kit.accounts.local'] === '[{"id":"r1"}]')
   localStorage.removeItem('axmvp.module.sales-kit.accounts.local')
   check('백업(D-94): 모듈 기록도 되돌아온다', writeToolInputs({ 'axmvp.module.employment.employees.local': '[]' }) === 1 && localStorage.getItem('axmvp.module.employment.employees.local') === '[]')
+}
+
+// D-181: 고객 종류 — 컨설턴트만 표시가 남고, 예전 기록 · 이상한 값은 중소기업 대표님 고객
+{
+  const old = normalizeClientOps({ id: 'k1', companyName: '예전업체' })
+  check('고객 종류(D-181): 예전 기록은 표시 없이 중소기업', clientTypeOf(old) === 'sme' && !('clientType' in old))
+  const odd = normalizeClientOps({ id: 'k2', companyName: '이상한값', clientType: 'vip' as never })
+  check('고객 종류(D-181): 모르는 값은 버리고 중소기업', clientTypeOf(odd) === 'sme' && !('clientType' in odd))
+  const c = withClientType(old, 'consultant')
+  const again = normalizeClientOps(JSON.parse(JSON.stringify(c)))
+  check('고객 종류(D-181): 컨설턴트로 옮기면 저장 · 다시 읽어도 컨설턴트', clientTypeOf(c) === 'consultant' && clientTypeOf(again) === 'consultant' && again.clientType === 'consultant')
+  const back = withClientType(again, 'sme')
+  check('고객 종류(D-181): 되돌리면 표시가 지워져 예전 기록과 같은 모양', !('clientType' in back) && JSON.stringify(normalizeClientOps(back)) === JSON.stringify(normalizeClientOps({ ...again, clientType: undefined })))
+  check('고객 종류(D-181): 다른 칸은 그대로(이름 · 서류 · 업무)', back.companyName === '예전업체' && JSON.stringify(back.documents) === JSON.stringify(old.documents) && JSON.stringify(back.services) === JSON.stringify(old.services))
+  check('고객 종류(D-181): 이름 판별', isClientType('sme') && isClientType('consultant') && !isClientType('all') && !isClientType(null))
 }
 
 console.log(`\nclient-ops-stage2: ${passed} passed, ${failed} failed`)

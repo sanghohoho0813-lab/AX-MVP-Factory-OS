@@ -825,6 +825,11 @@ export interface ClientOpsRecord {
   care?: { lastContactAt?: string; snoozeUntil?: string }
   /** D-158: 확인함에서 답한 것 — 결정 이름 → 맞아요(yes) · 아니에요(no) · 답한 시각. 다시 묻지 않는다(payload, DB 변경 없음) */
   decided?: Record<string, { a: 'yes' | 'no'; at: string }>
+  /**
+   * D-181: 고객 종류 — 컨설턴트 고객만 'consultant' 로 적는다. 없으면 지금까지처럼 중소기업 대표님 고객.
+   * 나누고 보는 것은 대표(full) 화면만 — 팀장(Pilot) 화면에는 이 구분이 없다. payload 에 함께 저장된다(DB 변경 없음).
+   */
+  clientType?: 'consultant'
   /** 보관 처리 시각 (보관하면 목록·경고에서 빠진다) */
   archivedAt: string | null
   createdAt: string
@@ -854,6 +859,8 @@ export interface CreateClientOpsInput {
   status?: ClientOpsStatus
   /** 영업 칸 — 잠재고객으로 만들 때 (D-114) */
   sales?: SalesInfo | null
+  /** D-181: 컨설턴트 고객으로 만들 때 */
+  clientType?: 'consultant'
 }
 
 /* ------------------------------------------------------------------ */

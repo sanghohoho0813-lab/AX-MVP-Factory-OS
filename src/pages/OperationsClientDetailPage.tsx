@@ -9,6 +9,8 @@ import {
   Check,
   ChevronDown,
   Archive,
+  BriefcaseBusiness,
+  Building2,
   Landmark,
   Workflow,
   ChevronRight,
@@ -120,6 +122,7 @@ import { BulkDocUploadSheet } from '../components/ops/BulkDocUploadSheet'
 import { netAmountOf } from '../services/feeMath'
 import { fundingFactsOf, isWaiting } from '../services/feeStatus'
 import { withActivity } from '../services/clientOpsActivity'
+import { CLIENT_TYPE_LABEL, clientTypeOf, withClientType } from '../services/clientType'
 import { allDocumentMetas, emptyDocumentState } from '../services/clientOpsDocuments'
 import { ActivityLog } from '../components/ops/ActivityLog'
 import { ClientSalesCard } from '../components/sales/ClientSalesCard'
@@ -558,6 +561,13 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               <h1 className="t-page min-w-0 break-keep text-slate-900 [overflow-wrap:anywhere]">{record.companyName || '(이름 없음)'}</h1>
               {/* D-140: 회사명 옆에서 바로 계약 상태 바꾸기 (계약 전 · 계약 중 · 계약 완료) */}
               <ContractStageMenu status={record.status} onChange={(s) => changeStage(s)} />
+              {/* D-181: 컨설턴트 고객 표시 — 대표 화면만 */}
+              {!pilot && clientTypeOf(record) === 'consultant' && (
+                <span data-testid="client-type-badge" className="t-meta inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-2.5 py-1 font-semibold whitespace-nowrap text-brand-700">
+                  <BriefcaseBusiness aria-hidden="true" className="size-3.5" />
+                  {CLIENT_TYPE_LABEL.consultant}
+                </span>
+              )}
             </div>
             <p className="t-sub mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-slate-500">
               <PhoneLink phone={record.contactPhone} />
@@ -1724,6 +1734,32 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 <Upload aria-hidden="true" className="size-4" />
                 서류에서 회사 정보 불러오기
               </Button>
+              {/* D-181: 고객 종류 옮기기 — 대표만(팀장 화면에는 없다). 기록은 그대로, 고객 관리에서 보이는 쪽만 바뀐다 */}
+              {!pilot && (
+                <Button
+                  variant="secondary"
+                  className="w-full justify-start"
+                  data-testid="more-client-type"
+                  onClick={() => {
+                    const to = clientTypeOf(record) === 'consultant' ? 'sme' : 'consultant'
+                    const next = withActivity(withClientType(record, to), 'profile', `고객 종류 → ${CLIENT_TYPE_LABEL[to]}`)
+                    setMoreOpen(false)
+                    void commit(next).then((ok) => {
+                      if (!ok) return
+                      // 고객 관리로 돌아가면 옮긴 쪽이 보이게
+                      try {
+                        localStorage.setItem('axmvp.clients.type', to)
+                      } catch {
+                        /* 기억 못 해도 옮기기는 됐다 */
+                      }
+                      showToast(`${CLIENT_TYPE_LABEL[to]}으로 옮겼습니다. 고객 관리 › ${CLIENT_TYPE_LABEL[to]}에서 봅니다.`)
+                    })
+                  }}
+                >
+                  {clientTypeOf(record) === 'consultant' ? <Building2 aria-hidden="true" className="size-4" /> : <BriefcaseBusiness aria-hidden="true" className="size-4" />}
+                  {clientTypeOf(record) === 'consultant' ? '중소기업 고객으로 되돌리기' : '컨설턴트 고객으로 옮기기'}
+                </Button>
+              )}
               <Button
                 variant="secondary"
                 className="w-full justify-start"

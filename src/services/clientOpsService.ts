@@ -515,6 +515,8 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
       : [],
     ...normalizeCare(value.care),
     ...normalizeDecided(value.decided),
+    // D-181: 컨설턴트 고객만 표시가 남는다 — 예전 기록 · 다른 값은 중소기업 대표님 고객(칸 없음)
+    ...(value.clientType === 'consultant' ? { clientType: 'consultant' as const } : {}),
     archivedAt: typeof value.archivedAt === 'string' ? value.archivedAt : null,
     createdAt: value.createdAt ?? now,
     updatedAt: value.updatedAt ?? now,
@@ -645,6 +647,7 @@ export async function createClient(
     industry: input.industry?.trim() ?? '',
     status: input.status ?? 'active',
     sales: input.sales ?? null,
+    ...(input.clientType === 'consultant' ? { clientType: 'consultant' as const } : {}),
     createdAt: now,
     updatedAt: now,
   })

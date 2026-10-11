@@ -257,6 +257,24 @@ try {
   const lvReq = restLog.slice(lvLogFrom).filter((x) => x.url.startsWith('/rest/v1/consulting_projects'))
   check('클라우드(D-180): 저장 한 번 = 읽기 1 · 쓰기 1(되풀이 없음)', lvReq.filter((x) => x.method === 'GET').length === 1 && lvReq.filter((x) => x.method === 'PATCH').length === 1, lvReq.map((x) => x.method).join(','))
 
+  // D-181: 대표 — 고객 관리 '중소기업 고객 · 컨설턴트 고객'(클라우드 · payload 에 저장 · DB 변경 없음)
+  await page.evaluate(() => localStorage.removeItem('axmvp.clients.type'))
+  await go(page, '/ops/clients')
+  check('대표(D-181): 고객 관리에 중소기업 고객 · 컨설턴트 고객 탭', (await page.getByTestId('client-type-tabs').count()) === 1 && /2/.test(await page.getByTestId('client-type-sme').innerText()) && /0/.test(await page.getByTestId('client-type-consultant').innerText()))
+  await go(page, `/ops/clients/${OWNER_CLIENT}`)
+  await page.getByRole('button', { name: '더보기' }).first().click()
+  await page.getByTestId('more-client-type').click()
+  await page.waitForTimeout(1200)
+  check('대표(D-181): 컨설턴트 고객으로 옮기기 → DB payload clientType', sql(`select payload->>'clientType' from public.operations_clients where id = '${OWNER_CLIENT}'`) === 'consultant')
+  await go(page, '/ops/clients')
+  check('대표(D-181): 고객 관리 컨설턴트 쪽에 1 · 중소기업 쪽 1', /1/.test(await page.getByTestId('client-type-consultant').innerText()) && /1/.test(await page.getByTestId('client-type-sme').innerText()) && (await bodyText(page)).includes('대표비밀정밀'))
+  await go(page, `/ops/clients/${OWNER_CLIENT}`)
+  await page.getByRole('button', { name: '더보기' }).first().click()
+  await page.getByTestId('more-client-type').click()
+  await page.waitForTimeout(1200)
+  check('대표(D-181): 되돌리면 DB payload 에서 표시가 지워짐', sql(`select coalesce(payload->>'clientType', '없음') from public.operations_clients where id = '${OWNER_CLIENT}'`) === '없음')
+  await page.evaluate(() => localStorage.removeItem('axmvp.clients.type'))
+
   // 대표가 브라우저에 남긴 값(작성 중 메모 · 도구 입력) — 다음 사람에게 보이면 안 된다
   await page.evaluate(() => {
     localStorage.setItem('axmvp.qa.ownerDraft', '대표비밀 작성 중 메모')
@@ -387,6 +405,7 @@ try {
   await page.getByTestId('today-first-client-add').click()
   await page.waitForTimeout(600)
   check('흐름: 첫 업체 등록 → 등록 창이 바로 열림', await page.getByLabel('업체명').isVisible().catch(() => false))
+  check('팀장(D-181): 등록 창에 고객 종류(중소기업 · 컨설턴트) 고르기 없음', (await page.getByTestId('new-client-type').count()) === 0)
   await page.getByLabel('업체명').fill('은혜테스트정밀(주)')
   await page.getByLabel('대표자·담당자').fill('박은혜')
   await page.getByRole('button', { name: '등록하고 열기' }).click()
@@ -395,6 +414,12 @@ try {
   const pc = sql(`select id from public.operations_clients where workspace_id = '${PILOT_WS}' and company_name = '은혜테스트정밀(주)'`)
   check('흐름: 업체가 Pilot 작업공간에 저장(DB)', pc.length > 0, pc)
   check('흐름: 등록하면 그 업체 화면', page.url().includes(`/ops/clients/${pc}`), page.url())
+  check('팀장(D-181): 등록한 업체는 중소기업(표시 없음 · DB 에 clientType 없음)', (await page.getByTestId('client-type-badge').count()) === 0 && sql(`select coalesce(payload->>'clientType', '없음') from public.operations_clients where id = '${pc}'`) === '없음')
+  await page.getByRole('button', { name: '더보기' }).first().click()
+  await page.waitForTimeout(400)
+  check('팀장(D-181): 업체 더보기에 "컨설턴트 고객으로 옮기기" 없음', (await page.getByTestId('more-client-type').count()) === 0 && (await page.getByTestId('more-report').count()) === 1)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
   await shot(page, 'pilot-02-first-client')
 
   // 서류 올리기 → 읽기 → 회사 정보
@@ -459,6 +484,7 @@ try {
   await go(page, '/ops/clients')
   const pHub = await bodyText(page)
   check('팀장(D-171): 고객 관리 — "잠재고객" 칸 · 돈 칸은 "미수금"', pHub.includes('잠재고객') && pHub.includes('미수금') && !pHub.includes('못 받은 내 돈'), pHub.slice(0, 300))
+  check('팀장(D-181): 고객 관리에 중소기업 · 컨설턴트 고객 탭 없음 · 내 업체는 그대로 보임', (await page.getByTestId('client-type-tabs').count()) === 0 && !pHub.includes('컨설턴트 고객') && pHub.includes('은혜테스트정밀'))
 
   await go(page, '/ops/calendar')
   const cal = await bodyText(page)
