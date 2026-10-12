@@ -1331,7 +1331,11 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                   {compact ? (
                     <div data-doc-compact={meta.key} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-[1.9rem]">
                       <span className="t-sub font-medium text-success-700">받음</span>
-                      {view.expiresOn && <span className="t-sub text-slate-600">{view.expiresOn}까지 유효</span>}
+                      {view.expiresOn && (
+                        <span data-testid={`doc-compact-expiry-${meta.key}`} className="t-sub text-slate-600">
+                          {view.expiresOn}까지 유효{state.validUntil ? ' · 서류에 적힌 날짜' : ''}
+                        </span>
+                      )}
                       {state.fileName && (
                         <span className="t-sub inline-flex min-w-0 items-center gap-1 text-slate-600">
                           <Paperclip aria-hidden="true" className="size-3.5 shrink-0" />
@@ -1371,19 +1375,22 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                     <>
                   {state.received && (
                     <div className="grid gap-2 sm:grid-cols-2">
-                      {meta.validMonths !== null && (
+                      {(meta.validMonths !== null || !!state.validUntil) && (
                         <label className="text-[0.88rem] font-medium text-slate-600">
                           발급일
                           <input
                             type="date"
                             value={state.issuedAt}
-                            onChange={(e) => void commit(withDocument(record, meta.key, { issuedAt: e.target.value }))}
+                            // D-181: 발급일을 손으로 고치면 서류에서 읽은 유효기간 끝은 지운다(새 서류일 수 있다)
+                            onChange={(e) => void commit(withDocument(record, meta.key, { issuedAt: e.target.value, validUntil: undefined }))}
                             className={`mt-1 ${inputCls}`}
                           />
-                          <span className="mt-1 block text-[0.875rem] text-slate-500">
-                            {view.expiresOn
-                              ? `${view.expiresOn}까지 유효 (${meta.validMonths}개월)`
-                              : `유효 ${meta.validMonths}개월 — 발급일을 넣어주세요`}
+                          <span data-testid={`doc-expiry-${meta.key}`} className="mt-1 block text-[0.875rem] text-slate-500">
+                            {state.validUntil && view.expiresOn
+                              ? `${view.expiresOn}까지 유효 (서류에 적힌 유효기간)`
+                              : view.expiresOn
+                                ? `${view.expiresOn}까지 유효 (${meta.validMonths}개월)`
+                                : `유효 ${meta.validMonths}개월 — 발급일을 넣어주세요`}
                           </span>
                         </label>
                       )}

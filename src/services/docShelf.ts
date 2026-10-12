@@ -144,7 +144,8 @@ export function filePortalDocument(record: ClientOpsRecord, doc: PortalFileLike,
     placement = p.kind === 'new' && p.label === OTHER_DOC_LABEL && title ? { kind: 'new', label: title, sure: false, reason: '요청 제목', issuedAt: p.issuedAt } : p
   }
   const cell = cellForPlacement(record, placement, new Set())
-  let rec = withDocument(cell.record, cell.key, { received: true, fileName: doc.fileName, fileSize: doc.fileSize ?? 0, storagePath: doc.storagePath })
+  // D-181: 서류에 찍힌 유효기간 끝도 함께(없으면 비운다)
+  let rec = withDocument(cell.record, cell.key, { received: true, fileName: doc.fileName, fileSize: doc.fileSize ?? 0, storagePath: doc.storagePath, validUntil: placement.validUntil ?? undefined })
   if (placement.issuedAt) rec = withDocument(rec, cell.key, { issuedAt: placement.issuedAt })
   return { record: rec, key: cell.key, label: cell.label }
 }

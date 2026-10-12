@@ -227,7 +227,9 @@ export function BulkDocUploadSheet({
             await storeDocumentFile(recordRef.current, pathKey, it.file)
           : // 이 브라우저 모드에는 파일 보관이 없다 — 받았다는 사실과 이름·발급일만 남긴다
             { received: true, fileName: it.file.name, fileSize: it.file.size }
-        stored.push({ it, placement, patch: it.issuedAt ? { ...filePatch, received: true, issuedAt: it.issuedAt } : filePatch })
+        // D-181: 서류에 찍힌 유효기간 끝도 함께 — 없으면 그 칸의 예전 값을 지운다(새 파일로 바뀌었다)
+        const validUntil = it.result?.validUntil ?? undefined
+        stored.push({ it, placement, patch: { ...(it.issuedAt ? { ...filePatch, received: true, issuedAt: it.issuedAt } : filePatch), validUntil } })
         patch(it.id, { status: 'done' })
         doneIds.push(it.id)
         okCount += 1

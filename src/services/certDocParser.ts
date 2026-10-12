@@ -23,6 +23,8 @@ export interface ParsedCertificate {
   issuer: string
   /** 번호 · 날짜 앞에 붙는 말('인정' · '확인' · '인증' · '등록') */
   verb: string
+  /** D-181: 중소기업 확인서의 기업 규모(적혀 있을 때만) — '소기업(소상공인)' · '소기업' · '중기업' · '소상공인' */
+  size?: string
 }
 
 /** 알아보는 인증 — 제목 글자(느슨하게) → 칸 이름 · 동사 */
@@ -86,7 +88,8 @@ export function parseCertificateDocument(raw: string): ParsedCertificate | null 
   let validUntil = ''
   const vl = /유\s*효\s*기\s*간\s*[:：]?\s*([^\n]{6,60})/.exec(text)
   if (vl) {
-    const dates = [...vl[1].matchAll(/(\d{4})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})/g)].map((m) => parseKoreanDate(m[0]) ?? '').filter(Boolean)
+    // D-181: '2026년 4월 1일' 의 '일' 까지 잡는다 — 예전에는 '일' 이 빠져 한글 날짜 유효기간을 못 읽었다
+    const dates = [...vl[1].matchAll(/(\d{4})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})\s*일?/g)].map((m) => parseKoreanDate(m[0]) ?? '').filter(Boolean)
     if (dates.length >= 2) {
       if (!date) date = dates[0]
       validUntil = dates[dates.length - 1]
@@ -99,13 +102,31 @@ export function parseCertificateDocument(raw: string): ParsedCertificate | null 
   if (il) issuer = il[1].trim().split(/\s{2,}|\n/)[0].trim()
   if (!issuer) issuer = ISSUERS.find((n) => text.replace(/\s/g, '').includes(n)) ?? ''
 
-  if (!number && !date && !issuer) return { name: kind.name, number: '', date: '', validUntil: '', issuer: '', verb: kind.verb }
-  return { name: kind.name, number, date, validUntil, issuer, verb: kind.verb }
+  // D-181: 중소기업 확인서 — 기업 규모(소기업 · 중기업 · 소상공인). 적힌 그대로만, 못 찾으면 비운다
+  const size = kind.name === '중소기업 확인' ? smeSizeOf(text) : ''
+
+  if (!number && !date && !issuer) return { name: kind.name, number: '', date: '', validUntil: '', issuer: '', verb: kind.verb, ...(size ? { size } : {}) }
+  return { name: kind.name, number, date, validUntil, issuer, verb: kind.verb, ...(size ? { size } : {}) }
+}
+
+/**
+ * D-181: 중소기업 확인서의 기업 규모 — '기업규모 : 소기업(소상공인)' · '구분 : 중기업' · 제목 '중소기업(소상공인) 확인서'.
+ * 라벨 뒤 값을 먼저, 없으면 제목의 '(소상공인)'. 표기는 '소기업(소상공인)' · '소기업' · '중기업' · '소상공인' 넷.
+ */
+export function smeSizeOf(text: string): string {
+  const t = text.replace(/\r/g, '')
+  const labeled = /(?:기\s*업\s*규\s*모|규\s*모|구\s*분)\s*[:：]?\s*(소\s*기\s*업\s*\(?\s*소\s*상\s*공\s*인\s*\)?|소\s*상\s*공\s*인|소\s*기\s*업|중\s*기\s*업)/.exec(t)
+  const raw = labeled?.[1] ?? (/중\s*소\s*기\s*업\s*\(\s*소\s*상\s*공\s*인\s*\)\s*확\s*인\s*서/.test(t) ? '소상공인' : '')
+  const c = raw.replace(/\s+/g, '')
+  if (/^소기업\(?소상공인\)?$/.test(c)) return '소기업(소상공인)'
+  return c === '소상공인' || c === '소기업' || c === '중기업' ? c : ''
 }
 
 /** 회사 기본 정보 한 칸의 값 — '인정번호 2024-1234 · 인정일 2024-03-05 · 한국산업기술진흥협회' */
 export function certificateValue(c: ParsedCertificate): string {
   const parts = [
+    // D-181: 중소기업 확인서는 규모를 맨 앞에(회사 정보 · 기업인증에서 바로 보이게)
+    c.size ?? '',
     c.number ? `${c.verb}번호 ${c.number}` : '',
     c.date ? `${c.verb}일 ${c.date}` : '',
     c.validUntil ? `${c.validUntil}까지` : '',

@@ -403,6 +403,22 @@ for (const width of [1440, 390]) {
   const sealCell = (r1.customDocuments ?? []).find((d) => d.label === '법인인감증명서')
   check(`알려진 서류 새 칸: 법인인감증명서 · 유효기간 3개월 · 발급일 ${tag}`, sealCell?.validMonths === 3 && r1.documents[sealCell.key]?.issuedAt === '2026-05-01', JSON.stringify({ sealCell, st: sealCell && r1.documents[sealCell.key] }))
 
+  // D-181: 인증서에 찍힌 유효기간 끝 → 서류함 만료(발급일 + 개월이 아니라) · 발급일은 유효기간 끝이 아니라 시작
+  const VENT = txt('벤처확인서.txt', ['벤처기업확인서', '기업명 : 미래바이오랩', '확인번호 : 20240501-01', '유효기간 : 2024.05.01 ~ 2027.04.30'])
+  await page.getByTestId('client-upload').click()
+  await page.getByLabel('서류 파일 고르기').setInputFiles([VENT])
+  await page.waitForFunction(() => Object.values(JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_mirae')?.documents ?? {}).some((d) => d.fileName === '벤처확인서.txt'), null, { timeout: 20000 })
+  await page.waitForTimeout(600)
+  const rv = await rec()
+  const [ventKey, ventDoc] = Object.entries(rv.documents).find(([, d]) => d.fileName === '벤처확인서.txt') ?? []
+  check(`유효기간(D-181): 벤처기업확인서 → 서류함에 찍힌 끝 2027-04-30 · 발급일 2024-05-01 ${tag}`, ventDoc?.validUntil === '2027-04-30' && ventDoc?.issuedAt === '2024-05-01', JSON.stringify(ventDoc))
+  await page.goto(BASE + '/ops/clients/cli_mirae?tab=docs', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  const ventExpiry = (await page.getByTestId(`doc-compact-expiry-${ventKey}`).innerText().catch(() => '')) ?? ''
+  check(`유효기간(D-181): 서류 탭에 '2027-04-30까지 유효 · 서류에 적힌 날짜' ${tag}`, /2027-04-30까지 유효/.test(ventExpiry) && /서류에 적힌 날짜/.test(ventExpiry), ventExpiry)
+  await page.goto(BASE + '/ops/clients/cli_mirae', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+
   // 같은 파일을 한 번 더
   await page.getByTestId('client-upload').click()
   await page.getByLabel('서류 파일 고르기').setInputFiles([SEAL])

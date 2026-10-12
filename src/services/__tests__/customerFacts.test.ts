@@ -10,7 +10,9 @@
 
 import { normalizeClientOps, withCustomDocument, withDocument, withoutCustomDocument } from '../clientOpsService'
 import { allDocumentMetas } from '../clientOpsDocuments'
-import { OTHER_DOC_LABEL, documentTitle, knownDocValidMonths, placeDocument, titleFromFileName } from '../docClassify'
+import { OTHER_DOC_LABEL, documentTitle, findIssuedDate, findValidUntil, knownDocValidMonths, placeDocument, titleFromFileName } from '../docClassify'
+import { smeSizeOf } from '../certDocParser'
+import { documentStatus, documentsWithExpiry } from '../clientOpsAlerts'
 import { docShelfSummary, filePortalDocument, isSystemFile, moveDocTo, moveTargets, shelfCellOf } from '../docShelf'
 import { applyResort, cellForPlacement, resortDecision, withoutDocumentFile } from '../docPlacementApply'
 import {
@@ -585,6 +587,53 @@ await (async () => {
   const plain = { files: [{ name: 'a.pdf', size: 5 }], items: [{ kind: 'file', webkitGetAsEntry: () => f('a.pdf') }] } as unknown as DataTransfer
   check('파일만 놓으면 그대로', (await filesFromDrop(plain)).files.length === 1)
 })()
+
+// D-181: 로드맵 1단계 마무리 — 인증서 유효기간 → 서류 만료 · 대표 생년월일 · 중소기업 확인서 → 기업 규모
+{
+  const venture = ['벤처기업확인서', '확인번호 : 20240501-01', '기업명 : 한솔테크(주)', '유효기간 : 2024.05.01 ~ 2027.04.30', '벤처기업확인기관장'].join('\n')
+  check('D-181 유효기간 끝: 범위면 ~ 뒤 날짜(점 표기)', findValidUntil(venture) === '2027-04-30', String(findValidUntil(venture)))
+  check('D-181 유효기간 끝: 한글 날짜 · 줄이 바뀌어도', findValidUntil('유효기간\n2026년 4월 1일 ~ 2027년 3월 31일') === '2027-03-31' && findValidUntil('유효기간 : 2028-02-29 까지') === '2028-02-29')
+  check('D-181 유효기간 끝: 없으면 짐작하지 않음', findValidUntil('사업자등록증\n개업연월일 2019년 3월 2일') === null && findValidUntil('') === null)
+  const sme = ['중소기업 확인서', '기업명 : 한솔테크(주)', '구 분 : 소기업(소상공인)', '유효기간 : 2026년 4월 1일 ~ 2027년 3월 31일'].join('\n')
+  check('D-181 발급일 버그: 라벨이 없을 때 유효기간 끝(2027-03-31)을 발급일로 잡지 않고 범위 시작(2026-04-01)', findIssuedDate(sme) === '2026-04-01', String(findIssuedDate(sme)))
+  check('D-181 발급일: 유효기간 밖 날짜가 있으면 그것(발급 라벨 없음)', findIssuedDate(`${sme}\n2026년 4월 2일\n중소벤처기업부장관`) === '2026-04-02' && findIssuedDate(`${sme}\n발급일자 : 2026.04.03`) === '2026-04-03')
+  const metas = allDocumentMetas(normalizeClientOps({ id: 'v1', companyName: '한솔테크(주)' }))
+  const pv = placeDocument({ text: venture, fileName: 'scan.pdf' }, metas)
+  check('D-181 서류 놓기: 벤처기업확인서 → 유효기간 끝을 같이 들고 온다', pv.validUntil === '2027-04-30')
+  // 서류함: 찍힌 유효기간 끝이 있으면 그 날짜로 만료(발급일 + 개월 대신) — 개월이 없는 칸(이노비즈 같은)도 만료를 알린다
+  const rec = normalizeClientOps({ id: 'v2', companyName: '한솔테크(주)' })
+  const smeKey = metas.find((m) => /중소기업/.test(m.label))?.key
+  if (smeKey) {
+    const withPrinted = withDocument(rec, smeKey, { received: true, issuedAt: '2026-04-01', validUntil: '2027-03-31' })
+    const withoutPrinted = withDocument(rec, smeKey, { received: true, issuedAt: '2026-04-01' })
+    check('D-181 만료: 찍힌 유효기간 끝(2027-03-31)이 발급일 + 12개월보다 먼저', documentStatus(smeKey, withPrinted.documents[smeKey], '2026-10-11').expiresOn === '2027-03-31' && documentStatus(smeKey, withoutPrinted.documents[smeKey], '2026-10-11').expiresOn === '2027-04-01')
+  } else check('D-181 만료: 중소기업 확인서 칸이 있다', false)
+  const inno = withCustomDocument(rec, { label: '이노비즈 확인서', validMonths: null })
+  const innoKey = inno.customDocuments[0].key
+  const innoDone = withDocument(inno, innoKey, { received: true, issuedAt: '2024-03-15', validUntil: '2026-11-01', fileName: 'inno.pdf' })
+  const exp = documentsWithExpiry(innoDone, '2026-10-11').find((x) => x.meta.key === innoKey)
+  check('D-181 만료: 유효개월이 없는 칸도 찍힌 날짜로 만료 · 21일 남음(곧 만료)', exp?.view.expiresOn === '2026-11-01' && exp.view.daysLeft === 21 && exp.view.expiringSoon === true)
+  check('D-181 만료: 찍힌 날짜가 없으면 예전처럼 만료 없음', documentsWithExpiry(withDocument(inno, innoKey, { received: true, issuedAt: '2024-03-15' }), '2026-10-11').every((x) => x.meta.key !== innoKey))
+  // 다시 분류로 옮기면 유효기간 끝도 파일을 따라간다
+  const moved = applyResort(innoDone, [{ fromKey: innoKey, fromLabel: '이노비즈 확인서', fileName: 'a.pdf', placement: { kind: 'new', label: '메인비즈 확인서', sure: true, reason: '', issuedAt: null }, move: true, why: '' } as never], { withDoc: withDocument, withoutCustom: withoutCustomDocument })
+  const movedKey = moved.record.customDocuments.find((d) => d.label === '메인비즈 확인서')?.key
+  check('D-181 다시 분류: 옮긴 칸에 유효기간 끝이 따라감', !!movedKey && moved.record.documents[movedKey]?.validUntil === '2026-11-01', JSON.stringify({ moved: moved.moved, labels: moved.record.customDocuments.map((d) => d.label), docs: Object.entries(moved.record.documents).filter(([k]) => k.startsWith('customdoc')) }))
+
+  // 중소기업 확인서 → 기업 규모
+  check('D-181 규모: 구분 · 기업규모 · 제목', smeSizeOf(sme) === '소기업(소상공인)' && smeSizeOf('중소기업 확인서\n기업규모 : 중기업') === '중기업' && smeSizeOf('중소기업(소상공인) 확인서\n기업명 : 가') === '소상공인' && smeSizeOf('구분 : 소기업') === '소기업')
+  check('D-181 규모: 적혀 있지 않거나 "중소기업" 만 있으면 비운다(짐작하지 않음)', smeSizeOf('중소기업 확인서\n구분 : 중소기업') === '' && smeSizeOf('중소기업 확인서') === '')
+  const cert = parseCertificateDocument(sme)
+  check('D-181 규모: 확인서 읽기 → 회사 정보 칸 글 맨 앞에 규모', cert?.size === '소기업(소상공인)' && certificateValue(cert).startsWith('소기업(소상공인) · ') && certificateValue(cert).includes('2027-03-31까지'), cert ? certificateValue(cert) : 'null')
+  check('D-181 규모: 다른 인증서에는 규모가 붙지 않음', parseCertificateDocument(venture)?.size === undefined)
+
+  // 대표 생년월일 — 등기부(앞 6자리 날짜만) → 업로드 흐름 후보
+  const reg = ['법인등기부등본', '상호 한솔테크 주식회사', '등록번호 110111-1234567', '대표이사 김대표 801231-1******', '회사성립연월일 2019년 03월 02일'].join('\n')
+  const found = factCandidatesFromDocText('corporateRegistry', reg, 'doc:x')
+  const birth = found.find((c) => c.key === 'representativeBirth')
+  check('D-181 대표 생년월일: 등기부 → 후보 1980-12-31 · 주민등록번호 뒷자리는 어디에도 없음', birth?.value === '1980-12-31' && !JSON.stringify(found).includes('1******') && !JSON.stringify(found).includes('801231-1'), JSON.stringify(birth))
+  const af = autoFillFromDocs(normalizeClientOps({ id: 'b1', companyName: '한솔테크(주)' }), [{ key: 'corporateRegistry', fileName: '등기부.pdf', text: reg, method: 'pdf_text', docSure: true }], '2026-10-11T00:00:00.000Z', (() => { let n = 0; return () => `bf${(n += 1)}` })())
+  check('D-181 대표 생년월일: 확실한 등기부(PDF 글자)면 바로 입력', af.record.representativeBirth === '1980-12-31' && af.entered.some((e) => e.key === 'representativeBirth'), JSON.stringify({ rb: af.record.representativeBirth, entered: af.entered.map((e) => e.key), flagged: af.flagged.map((f) => `${f.key}:${f.note}`) }))
+}
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

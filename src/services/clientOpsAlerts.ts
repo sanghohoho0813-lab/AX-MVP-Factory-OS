@@ -115,7 +115,9 @@ export function documentStatus(
   metaOverride?: DocumentMeta,
 ): DocumentStatusView {
   const meta = metaOverride ?? documentMeta(key)
-  const expiresOn = state.received ? expiryDate(state.issuedAt, meta.validMonths) : null
+  // D-181: 서류에 찍힌 유효기간 끝이 있으면 그 날짜 — 없으면 발급일 + 유효 개월
+  const printed = typeof state.validUntil === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(state.validUntil) ? state.validUntil : null
+  const expiresOn = state.received ? (printed ?? expiryDate(state.issuedAt, meta.validMonths)) : null
   const daysLeft = expiresOn ? daysLeftFrom(today, expiresOn) : null
   const expired = daysLeft !== null && daysLeft < 0
   const expiringSoon = daysLeft !== null && daysLeft >= 0 && daysLeft <= DOC_EXPIRING_DAYS

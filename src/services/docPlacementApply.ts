@@ -113,7 +113,7 @@ export function applyResort(
     const state = rec.documents[m.fromKey]
     if (!state || !(state.fileName || state.storagePath)) continue
     taken.push({ m, state })
-    rec = ops.withDoc(rec, m.fromKey, { received: false, fileName: '', fileSize: 0, storagePath: '', issuedAt: '', note: '' })
+    rec = ops.withDoc(rec, m.fromKey, { received: false, fileName: '', fileSize: 0, storagePath: '', issuedAt: '', validUntil: undefined, note: '' })
   }
   const used = new Set<string>()
   const moved: { fileName: string; from: string; to: string; key: DocumentKey; fromKey: DocumentKey }[] = []
@@ -125,6 +125,8 @@ export function applyResort(
       fileSize: state.fileSize,
       storagePath: state.storagePath,
       issuedAt: m.placement.issuedAt ?? state.issuedAt,
+      // D-181: 서류에 찍힌 유효기간 끝은 파일을 따라 옮긴다
+      validUntil: m.placement.validUntil ?? state.validUntil,
       note: state.note,
     })
     moved.push({ fileName: state.fileName, from: m.fromLabel, to: cell.label, key: cell.key, fromKey: m.fromKey })

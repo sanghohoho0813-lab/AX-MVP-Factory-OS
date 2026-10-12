@@ -332,6 +332,13 @@ function smeDocOf(record: ClientOpsRecord, today: string): boolean {
   return re.test(usableFactValue(record, 'certifications'))
 }
 
+/** D-181: 중소기업 확인서에서 읽은 기업 규모(회사 정보 '중소기업 확인' 칸 글) — 적혀 있지 않으면 '' */
+function smeSizeTextOf(record: ClientOpsRecord): string {
+  const f = (record.customFields ?? []).find((x) => x.group === 'credential' && /중소기업\s*확인/.test(x.label))
+  const m = f ? /(소기업\(소상공인\)|소상공인|소기업|중기업)/.exec(f.value) : null
+  return m ? m[1] : ''
+}
+
 /** 업종 코드(KSIC) — 서류 · 회사 정보 글에 코드가 있으면 그것, 없으면 직접 적은 코드 */
 function ksicOf(record: ClientOpsRecord, f: ReturnType<typeof clientFacts>, p: CertProfile): string | null {
   const texts = [f.industryText, usableFactValue(record, 'businessItem'), usableFactValue(record, 'businessCategory'), ...(record.customFields ?? []).map((x) => `${x.label} ${x.value}`)]
@@ -431,7 +438,8 @@ function basisOf(record: ClientOpsRecord, f: ReturnType<typeof clientFacts>, p: 
   push(factItem(record, 'businessItem', 'industry') ?? factItem(record, 'businessCategory', 'industry') ?? (f.industryText ? { field: 'industry', label: BASIS_LABEL.industry, value: f.industryText, state: 'estimated', from: '업체 기본 정보 · 확인 전' } : null))
   push(factItem(record, 'employeeCount', 'employees'))
   // AX: 직원 수로 '중소기업' 을 확정하지 않는다 — 확인서가 있거나 확인서를 보고 고른 규모만 ✓ 쪽
-  if (r.smeDoc) push({ field: 'size', label: BASIS_LABEL.size, value: p.size ? { small: '소기업', medium: '중기업', mid_large: '중견 이상', large: '대기업' }[p.size] : '중소기업', state: 'confirmed', from: '중소기업확인서' })
+  // D-181: 고른 규모가 없으면 확인서에 적힌 규모(소기업 · 중기업 · 소상공인)를 보여 준다 — 판정은 바꾸지 않는다
+  if (r.smeDoc) push({ field: 'size', label: BASIS_LABEL.size, value: p.size ? { small: '소기업', medium: '중기업', mid_large: '중견 이상', large: '대기업' }[p.size] : smeSizeTextOf(record) || '중소기업', state: 'confirmed', from: '중소기업확인서' })
   else if (p.size) push({ ...chip('size', { small: '소기업', medium: '중기업', mid_large: '중견 이상', large: '대기업' }[p.size]), from: '컨설턴트 선택(중소기업확인서 기준) · 서류함에 확인서 없음' })
   else if (f.employeeCount !== null && f.employeeCount < 50) push({ field: 'size', label: BASIS_LABEL.size, value: '중소기업으로 보임(확정 아님)', state: 'estimated', from: `직원 ${f.employeeCount}명으로 추정 — 중소기업확인서로 확인` })
   for (const [k, field] of [['revenue', 'revenue'], ['operatingProfit', 'operatingProfit'], ['totalAssets', 'totalAssets'], ['totalLiabilities', 'totalLiabilities']] as const) push(factItem(record, k, field))

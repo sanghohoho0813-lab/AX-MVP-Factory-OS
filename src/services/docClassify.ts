@@ -203,14 +203,59 @@ function compact(s: string): string {
   return s.replace(/\s+/g, '')
 }
 
-/** 서류의 발급일 — 라벨 뒤의 날짜를 먼저, 없으면 마지막에 나오는 'YYYY년 MM월 DD일' */
+const dateMatches = (s: string) => [...s.matchAll(/(\d{4})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})\s*일?/g)]
+
+/** '유효기간 …' 부분(라벨 뒤 — 줄이 바뀌어도 날짜 둘까지). start · end 는 라벨부터 그 부분 끝까지의 글자 위치 */
+function validityWindow(text: string): { start: number; end: number; body: string } | null {
+  const m = /유\s*효\s*기\s*간/.exec(text)
+  if (!m) return null
+  const from = m.index + m[0].length
+  const rest = text.slice(from, from + 90)
+  // 라벨 바로 뒤의 ':' · 줄바꿈은 건너뛰고, 날짜가 있는 그 한 줄까지만(다음 줄의 발급일 · 서명 날짜는 넣지 않는다)
+  const lead = /^[\s:：]*/.exec(rest)?.[0].length ?? 0
+  const lineEnd = rest.indexOf('\n', lead)
+  let body = lineEnd >= 0 ? rest.slice(0, lineEnd) : rest
+  // 같은 줄에 다음 라벨(발급일 · 확인번호 · 기관 …)이 나오면 거기까지만
+  const stop = /(?:발급|발행|교부|출력|확인|인정|인증|등록)\s*(?:일자?|번\s*호)|기\s*관/.exec(body)
+  if (stop) body = body.slice(0, stop.index)
+  return { start: m.index, end: from + body.length, body }
+}
+
+/**
+ * D-181: 서류에 찍힌 유효기간의 끝 — '유효기간 : 2024.05.01 ~ 2027.04.30' · '유효기간 2027년 4월 30일까지'.
+ * 범위면 '~' 뒤 날짜, 하나뿐이면 그 날짜. 없으면 null(짐작하지 않는다).
+ */
+export function findValidUntil(text: string): string | null {
+  const w = validityWindow(text ?? '')
+  if (!w) return null
+  const tilde = w.body.search(/[~∼〜]/)
+  for (const m of dateMatches(tilde >= 0 ? w.body.slice(tilde) : w.body)) {
+    const d = parseKoreanDate(m[0])
+    if (d && plausibleUntil(d)) return d
+  }
+  return null
+}
+
+/**
+ * 서류의 발급일 — 라벨 뒤의 날짜를 먼저, 없으면 마지막에 나오는 'YYYY년 MM월 DD일'.
+ * D-181: 유효기간 부분의 날짜는 발급일로 쓰지 않는다(예전에는 '~ 2027년 4월 30일' 이 발급일이 되어 만료가 3년 늦게 잡혔다).
+ * 라벨도 다른 날짜도 없으면 유효기간 범위의 시작일.
+ */
 export function findIssuedDate(text: string): string | null {
   const labeled = /(?:발급\s*일자?|발행\s*일자?|교부\s*일자?|출력\s*일자?)\s*[:：]?\s*([0-9년월일.\-/\s]{6,24})/.exec(text)
   const fromLabel = labeled ? parseKoreanDate(labeled[1]) : undefined
   if (fromLabel && plausible(fromLabel)) return fromLabel
-  const all = [...text.matchAll(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/g)]
+  const w = validityWindow(text)
+  const body = w ? `${text.slice(0, w.start)} ${text.slice(w.end)}` : text
+  const all = [...body.matchAll(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/g)]
   for (let i = all.length - 1; i >= 0; i -= 1) {
     const d = parseKoreanDate(all[i][0])
+    if (d && plausible(d)) return d
+  }
+  const tilde = w ? w.body.search(/[~∼〜]/) : -1
+  if (w && tilde > 0) {
+    const first = dateMatches(w.body.slice(0, tilde))[0]
+    const d = first ? parseKoreanDate(first[0]) : undefined
     if (d && plausible(d)) return d
   }
   return null
@@ -219,6 +264,12 @@ export function findIssuedDate(text: string): string | null {
 function plausible(ymd: string): boolean {
   const y = Number(ymd.slice(0, 4))
   return y >= 2000 && y <= new Date().getFullYear() + 1
+}
+
+/** 유효기간 끝은 앞으로 몇 년 뒤일 수 있다 */
+function plausibleUntil(ymd: string): boolean {
+  const y = Number(ymd.slice(0, 4))
+  return y >= 2000 && y <= new Date().getFullYear() + 12
 }
 
 /**
@@ -412,11 +463,18 @@ function knownDocForTitle(title: string): (typeof KNOWN_EXTRA_DOCS)[number] | un
 }
 
 export type DocPlacement =
-  | { kind: 'existing'; key: DocumentKey; label: string; sure: boolean; reason: string; issuedAt: string | null }
-  | { kind: 'new'; label: string; sure: boolean; reason: string; issuedAt: string | null }
+  | { kind: 'existing'; key: DocumentKey; label: string; sure: boolean; reason: string; issuedAt: string | null; validUntil?: string | null }
+  | { kind: 'new'; label: string; sure: boolean; reason: string; issuedAt: string | null; validUntil?: string | null }
 
-/** 서류 하나 → 어느 칸(있는 칸 · 새 칸 · 기타) */
+/** 서류 하나 → 어느 칸(있는 칸 · 새 칸 · 기타). D-181: 서류에 유효기간 끝이 찍혀 있으면 함께 */
 export function placeDocument(input: { text: string; fileName: string }, metas: DocumentMeta[]): DocPlacement {
+  const p = placeDocumentBase(input, metas)
+  const text = input.text ?? ''
+  const validUntil = compact(text).length >= 10 ? findValidUntil(text) : null
+  return validUntil ? { ...p, validUntil } : p
+}
+
+function placeDocumentBase(input: { text: string; fileName: string }, metas: DocumentMeta[]): DocPlacement {
   const text = input.text ?? ''
   const hasText = compact(text).length >= 10
   const issuedAt = hasText ? findIssuedDate(text) : null

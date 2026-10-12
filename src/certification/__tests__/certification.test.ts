@@ -553,6 +553,10 @@ check('어댑터: 설정 읽기 — 이상한 값은 모름', JSON.stringify(nor
   check('AX 중소기업: 확인서 기준으로 고른 규모(소기업)면 ✓ · 중견이면 ✗', assessInnobiz({ ...mature, size: 'small' }).recommendation !== 'need_info' && assessInnobiz({ ...mature, size: 'mid_large' }).recommendation === 'not_needed')
   const recSme = normalizeClientOps({ id: 's1', companyName: '확인서상사', customFields: [{ id: 'c', group: 'credential', label: '중소기업확인서', value: '2026.04.01 ~ 2027.03.31' }] } as never)
   check('AX 중소기업: 인증서 칸의 중소기업확인서 → 확인됨 · 근거 ✓', certContextOf(recSme, TODAY).smeDoc === true && basisFor('innobiz', certContextOf(recSme, TODAY)).some((b) => b.field === 'size' && b.state === 'confirmed'))
+  // D-181: 확인서를 올려 읽은 규모(회사 정보 '중소기업 확인' 칸 글 맨 앞) — 근거에 그대로, 고른 규모가 있으면 고른 것
+  const recSize = normalizeClientOps({ id: 's2', companyName: '규모상사', customFields: [{ id: 'c', group: 'credential', label: '중소기업 확인', value: '소기업(소상공인) · 확인번호 0001 · 2027-03-31까지' }] } as never)
+  check('D-181 중소기업: 확인서에 적힌 규모 소기업(소상공인)을 근거에 · 고른 규모(중기업)가 있으면 그것', basisFor('innobiz', certContextOf(recSize, TODAY)).some((b) => b.field === 'size' && b.value === '소기업(소상공인)' && b.state === 'confirmed') && basisFor('innobiz', certContextOf(recSize, TODAY, normalizeCertProfile({ size: 'medium' }))).some((b) => b.field === 'size' && b.value === '중기업'))
+  check('D-181 중소기업: 규모가 안 적힌 확인서는 그대로 "중소기업"', basisFor('innobiz', certContextOf(recSme, TODAY)).some((b) => b.field === 'size' && b.value === '중소기업'))
   const recEmp = normalizeClientOps({ id: 's2', companyName: '직원만', employeeCount: '20' } as never)
   check("AX 중소기업: 직원 수만 있으면 근거는 △ '확정 아님'", basisFor('innobiz', certContextOf(recEmp, TODAY)).some((b) => b.field === 'size' && b.state === 'estimated' && b.value.includes('확정 아님')))
   const gSme = buildSubmitGate({ cert: 'innobiz', ctx: mature, selfCheck: INNOBIZ_CHECK, answers: {}, pkg: buildInspectionPackage({ cert: 'innobiz', bank: INNOBIZ_BANK, selfCheck: INNOBIZ_CHECK, answers: {}, ctx: mature, prep: {}, labelOf: (x) => x }) })

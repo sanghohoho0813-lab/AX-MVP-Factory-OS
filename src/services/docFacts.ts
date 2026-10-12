@@ -28,6 +28,8 @@ export function factCandidatesFromDocText(key: DocumentKey, text: string, ref: s
       ['businessNumber', p.businessNumber],
       ['corporateNumber', p.corporateNumber],
       ['representativeName', p.representativeName],
+      // D-181: 대표 생년월일 — 등기부 '홍길동 801231-1******' · 개인사업자 등록증 '생년월일' 줄(날짜만 남기고 주민등록번호는 남기지 않는다)
+      ['representativeBirth', p.representativeBirth],
       ['establishedAt', p.establishedAt],
       ['businessAddress', p.address],
       ['businessCategory', p.businessCategory],

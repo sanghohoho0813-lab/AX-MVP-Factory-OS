@@ -136,6 +136,11 @@ export interface DocumentState {
   received: boolean
   /** 발급일 (YYYY-MM-DD) — 유효기간 계산 기준. 없으면 '' */
   issuedAt: string
+  /**
+   * D-181: 서류에 찍힌 유효기간 끝(YYYY-MM-DD) — 인증서 · 확인서를 올리면 읽어 둔다.
+   * 있으면 '발급일 + 유효 개월' 대신 이 날짜로 만료를 본다. 발급일을 손으로 고치면 지운다(새 서류일 수 있다).
+   */
+  validUntil?: string
   /** 첨부 파일명 (업로드한 경우) */
   fileName: string
   /** 첨부 파일 크기(byte). 예전에 올린 파일은 0 */
