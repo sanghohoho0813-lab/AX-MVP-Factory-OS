@@ -624,7 +624,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       </Modal>
 
       {/* D-181: 고객 종류 — 중소기업 고객 · 컨설턴트 고객(대표만 · 팀장 화면에는 없다) */}
-      {!pilot && records.length > 0 && (
+      {!pilot && (records.length > 0 || ctype === 'consultant') && (
         <div role="tablist" aria-label="고객 종류" data-testid="client-type-tabs" className="flex gap-1 overflow-x-auto border-b border-slate-200">
           {CLIENT_TYPES.map((t) => {
             const on = ctype === t
