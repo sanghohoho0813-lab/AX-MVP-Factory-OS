@@ -13,7 +13,7 @@ import type { ClientOpsRecord, DocumentKey } from '../types/clientOps'
 import { allDocumentMetas } from './clientOpsDocuments'
 import { documentsWithExpiry } from './clientOpsAlerts'
 import { KNOWN_EXTRA_DOCS, OTHER_DOC_LABEL, placeDocument, type DocPlacement } from './docClassify'
-import { applyResort, cellForPlacement } from './docPlacementApply'
+import { applyResort, cellForPlacement, withoutDocumentFile } from './docPlacementApply'
 import { withDocument, withoutCustomDocument } from './clientOpsService'
 
 /**
@@ -103,6 +103,60 @@ export function moveDocTo(record: ClientOpsRecord, fromKey: DocumentKey, value: 
   )
   const moved = out.moved[0]
   return moved ? { record: out.record, to: moved.to } : null
+}
+
+/* ------------------------------------------------------------------ */
+/* D-183: 확인할 것에서 서류함 정리 — 기타 칸 옮기기 · 겹친 서류            */
+/* ------------------------------------------------------------------ */
+
+/** 기타 칸 파일을 파일 이름으로 보면 갈 곳 — 모르면 null(사람이 고른다) */
+export function otherCellSuggestion(record: ClientOpsRecord, fromKey: DocumentKey): MoveTarget | null {
+  const st = record.documents[fromKey]
+  if (!st?.fileName) return null
+  const metas = allDocumentMetas(record).filter((m) => m.key !== fromKey && !isOtherCell(m.label))
+  const p = placeDocument({ text: '', fileName: st.fileName }, metas)
+  if (!p.label.trim() || isOtherCell(p.label)) return null
+  if (p.kind === 'existing') return { value: `key:${p.key}`, label: p.label, kind: 'existing' }
+  return { value: `new:${p.label}`, label: p.label, kind: 'new' }
+}
+
+const numberOf = (label: string) => Number(/\((\d+)\)$/.exec(label)?.[1] ?? '1')
+
+/** 겹친 서류 묶음에서 남길 칸 — 발급일이 늦은 것 → 올린 때가 늦은 것 → 번호가 큰 칸 */
+export function newestOf(record: ClientOpsRecord, keys: readonly DocumentKey[]): DocumentKey {
+  const metas = allDocumentMetas(record)
+  const label = (k: DocumentKey) => metas.find((m) => m.key === k)?.label ?? ''
+  return [...keys].sort((a, b) => {
+    const da = record.documents[a]
+    const db = record.documents[b]
+    return (db?.issuedAt ?? '').localeCompare(da?.issuedAt ?? '') || (db?.updatedAt ?? '').localeCompare(da?.updatedAt ?? '') || numberOf(label(b)) - numberOf(label(a))
+  })[0]
+}
+
+/**
+ * 겹친 서류 정리 — 남길 파일을 번호 없는 칸에 두고 나머지 칸은 서류함에서 뺀다.
+ * 파일 자체(보관함)는 지우지 않는다 — 서류함 칸에서만 빠진다(되돌리기 · 다시 올리기 가능).
+ */
+export function withDedupedShelf(record: ClientOpsRecord, keys: readonly DocumentKey[], keep: DocumentKey): ClientOpsRecord {
+  if (!keys.includes(keep) || keys.length < 2) return record
+  const metas = allDocumentMetas(record)
+  const primary = keys.find((k) => !/\(\d+\)$/.test(metas.find((m) => m.key === k)?.label ?? '')) ?? keys[0]
+  const kept = record.documents[keep]
+  const ops = { withDoc: withDocument, withoutCustom: withoutCustomDocument }
+  let rec = record
+  for (const k of keys) if (k !== primary) rec = withoutDocumentFile(rec, k, ops)
+  if (keep !== primary && kept) {
+    rec = withDocument(rec, primary, {
+      received: true,
+      fileName: kept.fileName,
+      fileSize: kept.fileSize,
+      storagePath: kept.storagePath,
+      issuedAt: kept.issuedAt,
+      validUntil: kept.validUntil,
+      note: kept.note,
+    })
+  }
+  return rec
 }
 
 /* ------------------------------------------------------------------ */

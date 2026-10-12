@@ -38,6 +38,7 @@ import type {
   ContractInfo,
   CustomDocument,
   CustomProfileField,
+  DocUploadLog,
   FactCandidate,
   ShareholderRelation,
   ShareholderRow,
@@ -377,6 +378,41 @@ function normalizeDecided(value: unknown): { decided?: Record<string, { a: 'yes'
   return Object.keys(out).length ? { decided: out } : {}
 }
 
+/** D-183: 서류 올리기 기록 — 모양이 맞는 것만, 최근 5번 · 줄 수 상한(기록이 끝없이 커지지 않게) */
+export const DOC_UPLOAD_LIMIT = 5
+function normalizeDocUploads(value: unknown): { docUploads?: DocUploadLog[] } {
+  if (!Array.isArray(value)) return {}
+  const str = (v: unknown, max = 200) => (typeof v === 'string' ? v.slice(0, max) : '')
+  const arr = <T,>(v: unknown, max: number, f: (x: Record<string, unknown>) => T | null): T[] =>
+    Array.isArray(v) ? v.filter((x) => x && typeof x === 'object').slice(0, max).map((x) => f(x as Record<string, unknown>)).filter((x): x is T => x !== null) : []
+  const out: DocUploadLog[] = []
+  for (const raw of value.slice(0, DOC_UPLOAD_LIMIT)) {
+    if (!raw || typeof raw !== 'object') continue
+    const v = raw as Record<string, unknown>
+    if (typeof v.id !== 'string' || typeof v.at !== 'string') continue
+    const cretop = v.cretop && typeof v.cretop === 'object' ? (v.cretop as Record<string, unknown>) : null
+    const roster = v.roster && typeof v.roster === 'object' ? (v.roster as Record<string, unknown>) : null
+    const n = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : 0)
+    out.push({
+      id: v.id,
+      at: v.at,
+      files: n(v.files),
+      placed: arr(v.placed, 60, (x) => (typeof x.fileName === 'string' ? { fileName: str(x.fileName), label: str(x.label), other: x.other === true, numbered: x.numbered === true, ...(x.same === true ? { same: true } : {}) } : null)),
+      entered: arr(v.entered, 40, (x) => (typeof x.key === 'string' ? { key: str(x.key, 80), label: str(x.label, 80), display: str(x.display), ...(typeof x.value === 'string' ? { value: str(x.value) } : {}), fileName: str(x.fileName) } : null)),
+      flagged: arr(v.flagged, 40, (x) => (typeof x.key === 'string' ? { key: str(x.key, 80), label: str(x.label, 80), display: str(x.display), fileName: str(x.fileName), note: str(x.note) } : null)),
+      ...(cretop && typeof cretop.fileName === 'string' ? { cretop: { fileName: str(cretop.fileName), filled: Array.isArray(cretop.filled) ? cretop.filled.filter((s): s is string => typeof s === 'string').slice(0, 20) : [] } } : {}),
+      ...(roster && typeof roster.fileName === 'string' ? { roster: { fileName: str(roster.fileName), employees: n(roster.employees), active: n(roster.active), candidates: n(roster.candidates), youthDeadlines: n(roster.youthDeadlines) } } : {}),
+      warnings: Array.isArray(v.warnings) ? v.warnings.filter((s): s is string => typeof s === 'string').slice(0, 5).map((s) => s.slice(0, 300)) : [],
+    })
+  }
+  return out.length ? { docUploads: out } : {}
+}
+
+/** D-183: 서류 올리기 기록을 맨 앞에 — 최근 5번만 */
+export function withDocUploadLog(record: ClientOpsRecord, log: DocUploadLog): ClientOpsRecord {
+  return { ...record, docUploads: [log, ...(record.docUploads ?? []).filter((x) => x.id !== log.id)].slice(0, DOC_UPLOAD_LIMIT) }
+}
+
 /** D-155: 돌봄 기록 — 날짜 모양만 남긴다. 둘 다 없으면 칸을 만들지 않는다 */
 function normalizeCare(value: unknown): { care?: { lastContactAt?: string; snoozeUntil?: string } } {
   if (!value || typeof value !== 'object') return {}
@@ -515,6 +551,7 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
       : [],
     ...normalizeCare(value.care),
     ...normalizeDecided(value.decided),
+    ...normalizeDocUploads(value.docUploads),
     // D-181: 컨설턴트 고객만 표시가 남는다 — 예전 기록 · 다른 값은 중소기업 대표님 고객(칸 없음)
     ...(value.clientType === 'consultant' ? { clientType: 'consultant' as const } : {}),
     archivedAt: typeof value.archivedAt === 'string' ? value.archivedAt : null,

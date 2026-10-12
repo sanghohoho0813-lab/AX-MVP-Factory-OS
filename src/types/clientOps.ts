@@ -835,10 +835,32 @@ export interface ClientOpsRecord {
    * 나누고 보는 것은 대표(full) 화면만 — 팀장(Pilot) 화면에는 이 구분이 없다. payload 에 함께 저장된다(DB 변경 없음).
    */
   clientType?: 'consultant'
+  /**
+   * D-183: 서류 올리기 기록(최근 5번) — 무엇을 어느 칸에 넣었고 무엇을 바로 넣었나.
+   * 예전에는 올린 직후 화면에만 보이고 새로고침하면 사라졌다. '확인할 것' 이 이 기록으로 '바로 넣은 값 — 맞나요?' 를 묻는다.
+   * payload 에 함께 저장된다(DB 변경 없음). 파일 글자 · 주민등록번호는 남기지 않는다.
+   */
+  docUploads?: DocUploadLog[]
   /** 보관 처리 시각 (보관하면 목록·경고에서 빠진다) */
   archivedAt: string | null
   createdAt: string
   updatedAt: string
+}
+
+/** D-183: 서류 올리기 한 번의 기록 */
+export interface DocUploadLog {
+  id: string
+  at: string
+  files: number
+  /** 파일마다 서류함 어느 칸에 넣었나 */
+  placed: { fileName: string; label: string; other: boolean; numbered: boolean; same?: boolean }[]
+  /** 바로 넣은 회사 정보(값은 저장한 그대로 — '아니요' 를 누르면 이 값일 때만 되돌린다) */
+  entered: { key: string; label: string; display: string; value?: string; fileName: string }[]
+  /** 확인을 물은 정보(까닭) */
+  flagged: { key: string; label: string; display: string; fileName: string; note: string }[]
+  cretop?: { fileName: string; filled: string[] }
+  roster?: { fileName: string; employees: number; active: number; candidates: number; youthDeadlines: number }
+  warnings: string[]
 }
 
 /** D-130: 주주와 대표의 관계 — 증여공제 · 상속 · 특수관계 판단에 쓴다 */

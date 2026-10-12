@@ -28,6 +28,8 @@ const KIND_CLASS: Record<DecisionKind, string> = {
   stale: 'border-warning-200 bg-warning-50 text-warning-800',
   next: 'border-brand-200 bg-brand-50 text-brand-700',
   followup: 'border-slate-300 bg-slate-50 text-slate-700',
+  shelf: 'border-cat-doc-200 bg-cat-doc-50 text-cat-doc-700',
+  autofill: 'border-cat-client-200 bg-cat-client-50 text-cat-client-700',
 }
 
 /**
@@ -149,7 +151,7 @@ export function useDecisionAnswer({
       }
       const text =
         a === 'no'
-          ? '다시 묻지 않습니다'
+          ? (d.noText ?? '다시 묻지 않습니다')
           : posted > 0
             ? `요청 문구를 복사하고 고객 화면에도 서류 ${posted}건을 요청했습니다`
             : d.doneText
@@ -277,6 +279,21 @@ function GrantBriefPanel({ b, morePath }: { b: GrantBrief; morePath: string | nu
   )
 }
 
+/** D-183: 펼친 줄(바로 넣은 값 하나하나 · 겹친 서류 하나하나) */
+function RowsPanel({ rows }: { rows: NonNullable<Decision['rows']> }) {
+  return (
+    <ul data-testid="decision-rows" className="flex flex-col divide-y divide-slate-100 rounded-(--radius-control) border border-slate-200 bg-slate-50/60">
+      {rows.map((r, i) => (
+        <li key={`${r.label}-${i}`} className="flex flex-col gap-0.5 px-3 py-2 sm:flex-row sm:items-baseline sm:gap-3">
+          <span className="t-meta w-32 shrink-0 font-semibold text-slate-500">{r.label}</span>
+          <span className="t-sub min-w-0 flex-1 font-semibold break-keep [overflow-wrap:anywhere] text-slate-900">{r.value}</span>
+          {r.note && <span className="t-meta min-w-0 break-keep [overflow-wrap:anywhere] text-slate-500">{r.note}</span>}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 export function DecisionList({
   decisions,
   busy,
@@ -296,6 +313,8 @@ export function DecisionList({
   const shown = limit ? decisions.slice(0, limit) : decisions
   // D-182: 펼친 공고 하나(다시 누르면 접힌다)
   const [openId, setOpenId] = useState<string | null>(null)
+  // D-183: 고르는 결정 — 고른 칸(결정마다)
+  const [picked, setPicked] = useState<Record<string, string>>({})
   return (
     <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="decision-list">
       {shown.map((d) => (
@@ -310,14 +329,43 @@ export function DecisionList({
           </div>
           <p className="t-body font-semibold break-keep [overflow-wrap:anywhere] text-slate-900" data-testid="decision-title">{d.title}</p>
           <p className="t-sub break-keep [overflow-wrap:anywhere] text-slate-600">{d.why}</p>
+          {d.choices && (
+            <label className="t-sub flex min-w-0 flex-col gap-1 text-slate-600 sm:flex-row sm:items-center sm:gap-2">
+              <span className="shrink-0 font-semibold text-slate-700">이 파일은</span>
+              <select
+                value={picked[`${d.clientId}:${d.id}`] ?? ''}
+                onChange={(e) => setPicked((p) => ({ ...p, [`${d.clientId}:${d.id}`]: e.target.value }))}
+                data-testid="decision-choice"
+                aria-label="무슨 서류인지 고르기"
+                className="tap t-sub min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-2 py-2 text-slate-800 focus:border-brand-500 focus:outline-none sm:max-w-xs"
+              >
+                <option value="">서류 종류 고르기</option>
+                {d.choices.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="primary" disabled={busy !== null} onClick={() => onAnswer(d, 'yes')} data-testid="decision-yes">
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={busy !== null || (!!d.choices && !picked[`${d.clientId}:${d.id}`])}
+              onClick={() => {
+                const choice = picked[`${d.clientId}:${d.id}`]
+                // D-183: 고르는 결정은 고른 칸으로 — 결정마다 effect 의 to 를 채워 넘긴다
+                onAnswer(d.choices && choice && d.effect.type === 'shelf-move' ? { ...d, effect: { ...d.effect, to: choice } } : d, 'yes')
+              }}
+              data-testid="decision-yes"
+            >
               <Check aria-hidden="true" className="size-4" /> {d.kind === 'doc' && linked?.(d.clientId) ? '요청 보내기(문구 · 고객 화면)' : d.yesLabel}
             </Button>
             <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => onAnswer(d, 'no')} data-testid="decision-no">
               <X aria-hidden="true" className="size-4" /> {d.noLabel}
             </Button>
-            {d.grant ? (
+            {d.grant || d.rows ? (
               <button
                 type="button"
                 aria-expanded={openId === `${d.clientId}:${d.id}`}
@@ -337,6 +385,7 @@ export function DecisionList({
             )}
           </div>
           {d.grant && openId === `${d.clientId}:${d.id}` && <GrantBriefPanel b={d.grant} morePath={d.openPath} />}
+          {!d.grant && d.rows && openId === `${d.clientId}:${d.id}` && <RowsPanel rows={d.rows} />}
         </li>
       ))}
     </ul>

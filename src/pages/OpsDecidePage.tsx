@@ -18,7 +18,7 @@ import { DECISION_BULK_KINDS, DECISION_KIND_LABEL, buildAllDecisions, type Decis
 import { todayLocalDate } from '../lib/appClock'
 import type { ClientOpsRecord } from '../types/clientOps'
 
-const KINDS: DecisionKind[] = ['fact', 'money', 'doc', 'stale', 'module', 'next', 'grant', 'followup']
+const KINDS: DecisionKind[] = ['fact', 'autofill', 'money', 'doc', 'shelf', 'stale', 'module', 'next', 'grant', 'followup']
 
 function DecideContent({ workspaceId, userId }: { workspaceId: string | null; userId: string | null }) {
   const { showToast } = useToast()

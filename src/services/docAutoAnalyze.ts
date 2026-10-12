@@ -15,9 +15,10 @@
  *
  * 무거운 엔진(크레탑 · 명부)은 필요할 때만 불러온다. 규칙 계산 — 외부 호출 없음. 저장은 부르는 쪽.
  */
-import type { ClientOpsRecord } from '../types/clientOps'
+import type { ClientOpsRecord, DocUploadLog } from '../types/clientOps'
 import { withToolResult } from './clientOpsService'
 import { pendingFacts, readFact, withFactDecisions, withFactValue } from './customerFacts'
+import { withDocUploadLog } from './clientOpsService'
 import { autoFillFromDocs, type FilledFact, type FlaggedFact, type ReadDoc } from './docAutoFill'
 
 export interface DocBatchSummary {
@@ -31,6 +32,44 @@ export interface DocBatchSummary {
   at: string
   /** D-146: 파일마다 서류함 어느 칸에 넣었나(올리는 쪽이 채운다) — '다 어디 갔는지 모르겠다' 를 없앤다 */
   placed?: { fileName: string; label: string; other: boolean; numbered: boolean; same?: boolean }[]
+}
+
+/**
+ * D-183: 올리기 한 번 → 업체 기록에 남길 모양. 바로 넣은 값은 저장된 값 그대로도 남긴다 —
+ * '확인할 것' 에서 [아니요] 를 누르면 지금 값이 이 값일 때만 다시 확인으로 돌린다(그 사이 고친 값은 그대로).
+ * 파일 글자는 남기지 않는다.
+ */
+export function docUploadLogOf(record: ClientOpsRecord, summary: DocBatchSummary, id: string): DocUploadLog {
+  return {
+    id,
+    at: summary.at,
+    files: summary.files,
+    placed: (summary.placed ?? []).slice(0, 60),
+    entered: summary.entered.slice(0, 40).map((e) => ({ ...e, value: readFact(record, e.key)?.value || e.display })),
+    flagged: summary.flagged.slice(0, 40),
+    ...(summary.cretop ? { cretop: { fileName: summary.cretop.fileName, filled: summary.cretop.filled.slice(0, 20) } } : {}),
+    ...(summary.roster ? { roster: summary.roster } : {}),
+    warnings: summary.warnings.slice(0, 5),
+  }
+}
+
+/** D-183: 업체 기록에 남긴 올리기 → 화면에 보일 모양(맞춤 추천 '올린 서류') */
+export function batchOfLog(log: DocUploadLog): DocBatchSummary {
+  return {
+    files: log.files,
+    entered: log.entered.map(({ key, label, display, fileName }) => ({ key, label, display, fileName })),
+    flagged: log.flagged,
+    cretop: log.cretop ? { fileName: log.cretop.fileName, company: '', filled: log.cretop.filled } : null,
+    roster: log.roster ?? null,
+    warnings: log.warnings,
+    at: log.at,
+    placed: log.placed,
+  }
+}
+
+/** 올리기 한 번을 업체 기록에 남긴다(최근 5번) */
+export function withUploadSummary(record: ClientOpsRecord, summary: DocBatchSummary, id: string): ClientOpsRecord {
+  return withDocUploadLog(record, docUploadLogOf(record, summary, id))
 }
 
 const CRETOP_SIGNAL = /크레탑|CRETOP|한국평가데이터|기업종합보고서|KoDATA/i

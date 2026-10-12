@@ -8,7 +8,11 @@
  * 실행: npm run test:facts
  */
 
-import { normalizeClientOps, withCustomDocument, withDocument, withoutCustomDocument } from '../clientOpsService'
+import { normalizeClientOps, withCustomDocument, withDocument, withDocUploadLog, withoutCustomDocument } from '../clientOpsService'
+import { buildDecisions, undoDecision, withDecisionAnswer, isImportantFactKey } from '../decisions'
+import { docUploadLogOf, batchOfLog } from '../docAutoAnalyze'
+import { newestOf, otherCellSuggestion, withDedupedShelf } from '../docShelf'
+import { NOTE_RECHECK, withRecheckFacts } from '../customerFacts'
 import { allDocumentMetas } from '../clientOpsDocuments'
 import { OTHER_DOC_LABEL, documentTitle, findIssuedDate, findValidUntil, knownDocValidMonths, placeDocument, titleFromFileName } from '../docClassify'
 import { smeSizeOf } from '../certDocParser'
@@ -633,6 +637,84 @@ await (async () => {
   check('D-181 대표 생년월일: 등기부 → 후보 1980-12-31 · 주민등록번호 뒷자리는 어디에도 없음', birth?.value === '1980-12-31' && !JSON.stringify(found).includes('1******') && !JSON.stringify(found).includes('801231-1'), JSON.stringify(birth))
   const af = autoFillFromDocs(normalizeClientOps({ id: 'b1', companyName: '한솔테크(주)' }), [{ key: 'corporateRegistry', fileName: '등기부.pdf', text: reg, method: 'pdf_text', docSure: true }], '2026-10-11T00:00:00.000Z', (() => { let n = 0; return () => `bf${(n += 1)}` })())
   check('D-181 대표 생년월일: 확실한 등기부(PDF 글자)면 바로 입력', af.record.representativeBirth === '1980-12-31' && af.entered.some((e) => e.key === 'representativeBirth'), JSON.stringify({ rb: af.record.representativeBirth, entered: af.entered.map((e) => e.key), flagged: af.flagged.map((f) => `${f.key}:${f.note}`) }))
+}
+
+// D-183: '확인할 것' 한 곳 — 올리기 기록 · 바로 넣은 값 최종 확인 · 서류함 정리(기타 칸 · 겹친 서류)
+{
+  const T = '2026-10-12'
+  const NOW = '2026-10-12T03:00:00.000Z'
+  // 1) 올리기 기록 — 모양 · 최근 5번 · 이상한 값 버림
+  const junk = normalizeClientOps({ id: 'u0', companyName: '기록상사', docUploads: [{ id: 'up1', at: NOW, files: 2, placed: [{ fileName: 'a.pdf', label: '사업자등록증', other: false, numbered: false }, 'x'], entered: [{ key: 'businessNumber', label: '사업자등록번호', display: '123-45-67890', value: '1234567890', fileName: 'a.pdf' }], flagged: [], warnings: ['w'] }, { at: NOW }, 'bad'] } as never)
+  check('D-183 올리기 기록: 모양이 맞는 것만 남김(이상한 줄 · id 없는 기록 버림)', junk.docUploads?.length === 1 && junk.docUploads[0].placed.length === 1 && junk.docUploads[0].entered[0].value === '1234567890', JSON.stringify(junk.docUploads))
+  let many = normalizeClientOps({ id: 'u1', companyName: '많이상사' })
+  for (let i = 1; i <= 7; i += 1) many = withDocUploadLog(many, { id: `up${i}`, at: NOW, files: i, placed: [], entered: [], flagged: [], warnings: [] })
+  check('D-183 올리기 기록: 최근 5번만 · 새것이 맨 앞', many.docUploads?.length === 5 && many.docUploads[0].id === 'up7' && many.docUploads[4].id === 'up3')
+  check('D-183 올리기 기록: 저장했다 다시 읽어도 그대로', JSON.stringify(normalizeClientOps(JSON.parse(JSON.stringify(many))).docUploads) === JSON.stringify(many.docUploads))
+
+  // 2) 바로 넣은 값 → 확인할 것 '바로 넣은 값 N개 — 맞나요?'
+  const base = normalizeClientOps({ id: 'af1', companyName: '한솔테크(주)', status: 'active' })
+  const filled = withFactValue(withFactValue(withFactValue(base, 'businessNumber', '1248100998', { source: 'businessRegistration', status: 'confirmed', now: NOW }), 'establishedAt', '2019-03-02', { source: 'businessRegistration', status: 'confirmed', now: NOW }), 'businessCategory', '제조업', { source: 'businessRegistration', status: 'confirmed', now: NOW })
+  const summary = { files: 1, entered: [{ key: 'businessNumber', label: '사업자등록번호', display: '124-81-00998', fileName: '사업자등록증.pdf' }, { key: 'establishedAt', label: '설립일', display: '2019-03-02', fileName: '사업자등록증.pdf' }, { key: 'businessCategory', label: '업태', display: '제조업', fileName: '사업자등록증.pdf' }], flagged: [], cretop: null, roster: null, warnings: [], at: NOW, placed: [{ fileName: '사업자등록증.pdf', label: '사업자등록증', other: false, numbered: false }] }
+  const log = docUploadLogOf(filled, summary, 'upA')
+  check('D-183 올리기 기록: 바로 넣은 값은 저장된 값 그대로도 남긴다(번호는 숫자만)', log.entered[0].value === '1248100998' && log.entered[1].value === '2019-03-02', JSON.stringify(log.entered))
+  check('D-183 올리기 기록 → 화면 모양(맞춤 추천 지난 올리기)', batchOfLog(log).files === 1 && batchOfLog(log).placed?.[0].label === '사업자등록증')
+  const rec = withDocUploadLog(filled, log)
+  const ds = buildDecisions(rec, T, [])
+  const af = ds.find((d) => d.kind === 'autofill')
+  check('D-183 바로 넣은 값: 중요한 값만(사업자번호 · 설립일) — 업태는 묻지 않음', !!af && af.title.startsWith('서류에서 읽어 바로 넣은 값 2개') && af.rows?.length === 2 && !af.rows.some((r) => r.label === '업태'), JSON.stringify(af?.rows))
+  check('D-183 중요한 값: 신청에 쓰는 사실 + 대표 생년월일', isImportantFactKey('businessNumber') && isImportantFactKey('representativeBirth') && isImportantFactKey('revenue') && !isImportantFactKey('businessCategory') && !isImportantFactKey('netIncome'))
+  const yes = withDecisionAnswer(rec, af!, 'yes', [], NOW)
+  check('D-183 [모두 맞아요] → 값 그대로 · 다시 안 물음', yes.businessNumber === '1248100998' && yes.establishedAt === '2019-03-02' && !buildDecisions(yes, T, []).some((d) => d.kind === 'autofill'))
+  const no = withDecisionAnswer(rec, af!, 'no', [], NOW)
+  const pend = pendingFacts(no)
+  check('D-183 [하나씩 다시 볼게요] → 두 값을 비우고 확인 후보로(까닭 · 출처 그대로)', no.businessNumber === '' && no.establishedAt === '' && no.businessCategory === '제조업' && pend.filter((p) => p.note === NOTE_RECHECK).map((p) => p.key).sort().join() === 'businessNumber,establishedAt' && pend.every((p) => p.source === 'businessRegistration'), JSON.stringify(pend.map((p) => [p.key, p.value, p.note, p.source])))
+  const nds = buildDecisions(no, T, [])
+  check('D-183 다시 확인 → 확인할 것에 하나씩 "맞나요?"(바로 넣은 값 줄은 사라짐)', nds.filter((d) => d.kind === 'fact').length === 2 && !nds.some((d) => d.kind === 'autofill'), nds.map((d) => `${d.kind}:${d.title}`).join(' | '))
+  const back = undoDecision(no, rec, no, af!.id)
+  check('D-183 [하나씩 다시 볼게요] 되돌리기 → 값 · 후보 원래대로', back.businessNumber === '1248100998' && back.establishedAt === '2019-03-02' && pendingFacts(back).length === 0)
+  const changed = withFactValue(rec, 'establishedAt', '2019-04-01', { now: NOW })
+  const afc = buildDecisions(changed, T, []).find((d) => d.kind === 'autofill')
+  check('D-183 그 사이 사람이 고친 값은 묻지도 · 되돌리지도 않음', afc?.rows?.length === 1 && afc.rows[0].label === '사업자등록번호' && withRecheckFacts(changed, [{ key: 'establishedAt', value: '2019-03-02' }], 'x', NOW).establishedAt === '2019-04-01', JSON.stringify(afc?.rows))
+
+  // 3) 서류함 — 기타 칸 파일을 파일 이름으로 옮기기
+  const otherLabel = `${OTHER_DOC_LABEL} · 사업자등록증_한솔`
+  let shelfRec = withCustomDocument(normalizeClientOps({ id: 'sh1', companyName: '서류상사', status: 'active' }), { label: otherLabel, validMonths: null })
+  const otherKey = shelfRec.customDocuments[shelfRec.customDocuments.length - 1].key
+  shelfRec = withDocument(shelfRec, otherKey, { received: true, fileName: '사업자등록증_한솔.pdf', fileSize: 1000, storagePath: 'ws/sh1/a.pdf' })
+  const sug = otherCellSuggestion(shelfRec, otherKey)
+  check('D-183 기타 칸: 파일 이름이 "사업자등록증" → 사업자등록증 칸 제안', sug?.value === 'key:businessRegistration', JSON.stringify(sug))
+  const mv = buildDecisions(shelfRec, T, []).find((d) => d.kind === 'shelf')
+  check('D-183 기타 칸 → 확인할 것 "\'사업자등록증_한솔.pdf\' — \'사업자등록증\' 칸으로 옮길까요?"', !!mv && mv.title.includes('사업자등록증_한솔.pdf') && mv.effect.type === 'shelf-move' && !mv.choices, mv?.title)
+  const moved = withDecisionAnswer(shelfRec, mv!, 'yes', [], NOW)
+  check('D-183 [옮기기] → 사업자등록증 칸에 그 파일 · 기타 칸은 없어짐 · 보관 경로 그대로', moved.documents.businessRegistration?.fileName === '사업자등록증_한솔.pdf' && moved.documents.businessRegistration?.storagePath === 'ws/sh1/a.pdf' && !moved.customDocuments.some((c) => c.key === otherKey))
+  const mvBack = undoDecision(moved, shelfRec, moved, mv!.id)
+  check('D-183 옮기기 되돌리기 → 기타 칸 그대로', mvBack.customDocuments.some((c) => c.key === otherKey) && !mvBack.documents.businessRegistration?.fileName)
+  // 이름으로 모르는 파일 → 고르기
+  let pickRec = withCustomDocument(normalizeClientOps({ id: 'sh2', companyName: '고르기상사', status: 'active' }), { label: `${OTHER_DOC_LABEL} · scan`, validMonths: null })
+  const pickKey = pickRec.customDocuments[pickRec.customDocuments.length - 1].key
+  pickRec = withDocument(pickRec, pickKey, { received: true, fileName: 'scan_0012.pdf', fileSize: 10, storagePath: 'ws/sh2/s.pdf' })
+  const pk = buildDecisions(pickRec, T, []).find((d) => d.kind === 'shelf')
+  check('D-183 이름으로 모르는 파일 → "무슨 서류인가요?" + 고를 칸 목록', !!pk && pk.title.includes('무슨 서류인가요') && (pk.choices?.length ?? 0) > 5 && !!pk.choices?.find((c) => c.value === 'key:corporateRegistry'), pk?.title)
+  const picked = withDecisionAnswer(pickRec, { ...pk!, effect: { type: 'shelf-move', fromKey: pickKey, to: 'key:corporateRegistry' } }, 'yes', [], NOW)
+  check('D-183 고른 칸(법인등기부등본)으로 옮김', picked.documents.corporateRegistry?.fileName === 'scan_0012.pdf' && !picked.customDocuments.some((c) => c.key === pickKey))
+  const untouched = withDecisionAnswer(pickRec, pk!, 'yes', [], NOW)
+  check('D-183 고르지 않고 누르면 아무것도 옮기지 않음', untouched.customDocuments.some((c) => c.key === pickKey))
+
+  // 4) 겹친 서류 — 최신 것만(번호 없는 칸에), 나머지는 서류함에서만 빠짐
+  let dup = normalizeClientOps({ id: 'dp1', companyName: '겹친상사', status: 'active' })
+  dup = withDocument(dup, 'businessRegistration', { received: true, fileName: '사업자등록증_2023.pdf', fileSize: 1, storagePath: 'ws/dp1/old.pdf', issuedAt: '2023-01-05' })
+  dup = withCustomDocument(dup, { label: '사업자등록증 (2)', validMonths: null })
+  const k2 = dup.customDocuments[dup.customDocuments.length - 1].key
+  dup = withDocument(dup, k2, { received: true, fileName: '사업자등록증_2026.pdf', fileSize: 2, storagePath: 'ws/dp1/new.pdf', issuedAt: '2026-09-01' })
+  check('D-183 겹친 서류: 발급일이 늦은 것을 남긴다', newestOf(dup, ['businessRegistration', k2]) === k2)
+  const dd = buildDecisions(dup, T, []).find((d) => d.kind === 'shelf')
+  check('D-183 겹친 서류 → "사업자등록증 2개가 겹쳐 있어요 — 최신 것만 남길까요?" · 남길 파일 이름', !!dd && dd.title.startsWith('사업자등록증 2개가 겹쳐') && dd.why.includes('사업자등록증_2026.pdf') && dd.rows?.length === 2, dd?.title)
+  const deduped = withDecisionAnswer(dup, dd!, 'yes', [], NOW)
+  check('D-183 [최신 것만 남기기] → 사업자등록증 칸에 2026 파일 · (2) 칸 없어짐', deduped.documents.businessRegistration?.storagePath === 'ws/dp1/new.pdf' && deduped.documents.businessRegistration?.issuedAt === '2026-09-01' && !deduped.customDocuments.some((c) => c.key === k2))
+  check('D-183 겹친 서류 정리 뒤 서류함에 겹친 것 0 · 다시 묻지 않음', docShelfSummary(deduped, T, new Set()).dupGroups.length === 0 && !buildDecisions(deduped, T, []).some((d) => d.kind === 'shelf'))
+  const ddBack = undoDecision(deduped, dup, deduped, dd!.id)
+  check('D-183 정리 되돌리기 → 두 칸 그대로', ddBack.documents.businessRegistration?.storagePath === 'ws/dp1/old.pdf' && ddBack.customDocuments.some((c) => c.key === k2))
+  check('D-183 남길 것이 이미 번호 없는 칸이면 (2) 칸만 뺀다', withDedupedShelf(dup, ['businessRegistration', k2], 'businessRegistration').documents.businessRegistration?.storagePath === 'ws/dp1/old.pdf')
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

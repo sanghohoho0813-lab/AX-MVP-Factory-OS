@@ -466,6 +466,28 @@ export function withFactDecisions(record: ClientOpsRecord, decisions: FactDecisi
   return next
 }
 
+/**
+ * D-183: 서류에서 바로 넣은 값을 '다시 확인' 으로 돌린다 — 지금 값이 그때 넣은 값 그대로일 때만(그 사이 고친 값은 건드리지 않는다).
+ * 값은 비우고 같은 값을 확인 후보로 다시 올린다(출처 · 까닭과 함께) → '맞나요?' 로 하나씩 묻는다.
+ */
+export const NOTE_RECHECK = '다시 확인하기로 한 값이에요 — 원본과 비교해 주세요'
+export function withRecheckFacts(record: ClientOpsRecord, items: readonly { key: string; value: string }[], ref: string, now: string): ClientOpsRecord {
+  let next = record
+  const back: Omit<FactCandidate, 'id' | 'foundAt'>[] = []
+  for (const it of items) {
+    const def = factDef(it.key)
+    if (!def || !it.value) continue
+    const cur = rawValue(next, def)
+    if (!cur || !sameFactValue(def, cur, it.value)) continue
+    const meta = next.factMeta?.[it.key]
+    back.push({ key: it.key, value: cur, source: meta?.source && meta.source !== 'manual' ? meta.source : 'businessRegistration', asOf: meta?.asOf ?? '', ref: `${ref}:${it.key}`, note: NOTE_RECHECK })
+    next = withFactValue(next, it.key, '', { now })
+  }
+  if (back.length === 0) return record
+  let n = 0
+  return withFactCandidates(next, back, now, () => `recheck_${ref}_${(n += 1)}`)
+}
+
 /* ------------------------------------------------------------------ */
 /* 사람이 적은 글 → 저장할 값                                             */
 /* ------------------------------------------------------------------ */

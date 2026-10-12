@@ -10,6 +10,8 @@
  *   stale  (D-160) 기한이 일주일 넘게 지난 진행 중 업무 — 맞으면 기한을 2주 뒤로 다시 잡는다
  *   next   (D-160) 다음 약속이 없거나 일주일 넘게 지남 — 맞으면 프로그램이 고른 약속 · 날짜로 잡는다
  *   followup (D-160) 오래 조용한 잠재고객 — 맞으면 다시 연락 문구를 복사(활동 기록에 남김)
+ *   shelf    (D-183) 서류함 정리 — 기타 칸 파일을 맞는 칸으로(파일 이름으로 제안 · 모르면 고르기) · 겹친 서류는 최신 것만
+ *   autofill (D-183) 서류에서 바로 넣은 중요한 값 — 맞으면 끝, 아니면 하나씩 다시 확인(값을 비우고 '맞나요?' 로)
  * 한 번 답한 것은 업체 기록 `decided` 에 남아 다시 묻지 않는다. 판정 글이 바뀌면(새 서류) 다시 묻는다.
  *
  * 규칙 계산이다 — 외부 호출 · LLM 0. 저장은 업체 기록 payload 하나(DB 변경 없음).
@@ -17,7 +19,10 @@
 
 import type { ClientOpsRecord } from '../types/clientOps'
 import { contractStageOf } from '../types/clientOps'
-import { pendingFacts, withFactDecisions } from './customerFacts'
+import { factDef, pendingFacts, readFact, sameFactValue, withFactDecisions, withRecheckFacts } from './customerFacts'
+import { docShelfSummary, moveDocTo, moveTargets, newestOf, otherCellSuggestion, withDedupedShelf } from './docShelf'
+import { allDocumentMetas } from './clientOpsDocuments'
+import { OTHER_DOC_LABEL } from './docClassify'
 import { buildInsights } from './clientInsights'
 import { documentsWithExpiry } from './clientOpsAlerts'
 import { buildDocumentRequestMessage } from './clientOpsMessages'
@@ -34,7 +39,7 @@ import { salesRecontacts, lastSalesTouch } from './salesSignals'
 import { SERVICES } from '../content/clientOpsCatalog'
 import type { ServiceKey } from '../types/clientOps'
 
-export type DecisionKind = 'fact' | 'module' | 'grant' | 'doc' | 'money' | 'stale' | 'next' | 'followup'
+export type DecisionKind = 'fact' | 'module' | 'grant' | 'doc' | 'money' | 'stale' | 'next' | 'followup' | 'shelf' | 'autofill'
 
 export const DECISION_KIND_LABEL: Record<DecisionKind, string> = {
   fact: '자료에서 읽은 정보',
@@ -45,10 +50,12 @@ export const DECISION_KIND_LABEL: Record<DecisionKind, string> = {
   stale: '밀린 업무',
   next: '다음 약속',
   followup: '다시 연락',
+  shelf: '서류함 정리',
+  autofill: '바로 넣은 값',
 }
 
 /** D-160: 한 번에 '모두 맞아요' 해도 되는 종류 — 복사(카톡 문구)는 하나씩 보내야 하므로 뺀다 */
-export const DECISION_BULK_KINDS: DecisionKind[] = ['fact', 'module', 'stale', 'next']
+export const DECISION_BULK_KINDS: DecisionKind[] = ['fact', 'module', 'stale', 'next', 'autofill']
 
 export type DecisionEffect =
   | { type: 'fact'; pendingId: string }
@@ -58,6 +65,12 @@ export type DecisionEffect =
   | { type: 'copy'; text: string; log?: string; docs?: { key: string; label: string }[] }
   | { type: 'next'; text: string; date: string }
   | { type: 'due'; serviceKey: ServiceKey; date: string }
+  /** D-183: 서류함 파일 옮기기 — to 는 moveTargets 의 값(고르는 결정이면 답할 때 채운다) */
+  | { type: 'shelf-move'; fromKey: string; to: string }
+  /** D-183: 겹친 서류 — keep 만 남긴다(파일은 보관함에 그대로) */
+  | { type: 'shelf-dedupe'; keys: string[]; keep: string }
+  /** D-183: 바로 넣은 값 — [아니요] 면 이 값들을 다시 확인으로 */
+  | { type: 'recheck'; logId: string; items: { key: string; value: string }[] }
 
 export interface Decision {
   /** 업체 안에서 변하지 않는 이름 — 답을 이 이름으로 남긴다 */
@@ -80,6 +93,17 @@ export interface Decision {
   doneText?: string
   /** D-182: 맞는 공고 — '자세히' 를 누르면 그 자리에서 펼칠 핵심(금액 · 기간 · 대상 · 맞는 조건) */
   grant?: GrantBrief
+  /** D-183: '자세히' 로 펼칠 줄(바로 넣은 값 하나하나 등) */
+  rows?: { label: string; value: string; note?: string }[]
+  /** D-183: 고르는 결정 — 고른 값으로 [맞아요] (기타 칸 '무슨 서류인가요?') */
+  choices?: { value: string; label: string }[]
+  /** D-183: [아니에요] 뒤 알림 글(없으면 '다시 묻지 않습니다') */
+  noText?: string
+}
+
+/** D-183: 서류에서 바로 넣었을 때 한 번 더 보는 값 — 신청 · 제출에 쓰는 사실 + 대표 생년월일(창업감면 나이) */
+export function isImportantFactKey(key: string): boolean {
+  return key === 'representativeBirth' || Boolean(factDef(key)?.hard)
 }
 
 export interface DecisionAnswer {
@@ -327,6 +351,90 @@ export function buildDecisions(record: ClientOpsRecord, today: string, notices: 
     }
   }
 
+  // 9) D-183: 서류함 정리 — 기타 칸 파일 옮기기 · 겹친 서류 최신 것만
+  try {
+    const shelf = docShelfSummary(record, today, new Set())
+    const metas = allDocumentMetas(record)
+    const labelOf = (k: string) => metas.find((m) => m.key === k)?.label ?? k
+    const docsPath = `/ops/clients/${record.id}?tab=docs`
+    for (const key of shelf.other.slice(0, 3)) {
+      const fileName = record.documents[key]?.fileName || '파일'
+      const sug = otherCellSuggestion(record, key)
+      if (sug) {
+        push({
+          id: `shelf:move:${sig(`${key}@${fileName}>${sug.value}`)}`,
+          kind: 'shelf',
+          title: `'${fileName}' — '${sug.label}' 칸으로 옮길까요?`,
+          why: `파일 이름으로 보면 ${sug.label}입니다 · 지금은 '${OTHER_DOC_LABEL}' 칸에 있어요`,
+          yesLabel: '옮기기',
+          noLabel: '그대로 둠',
+          effect: { type: 'shelf-move', fromKey: key, to: sug.value },
+          openPath: docsPath,
+          rank: 34,
+          doneText: `'${sug.label}' 칸으로 옮겼습니다`,
+        })
+      } else {
+        push({
+          id: `shelf:pick:${sig(`${key}@${fileName}`)}`,
+          kind: 'shelf',
+          title: `'${fileName}' — 무슨 서류인가요?`,
+          why: `제목을 읽지 못해 '${OTHER_DOC_LABEL}' 칸에 두었어요 — 고르면 그 칸으로 옮깁니다`,
+          yesLabel: '이 칸으로 옮기기',
+          noLabel: '그대로 둠',
+          effect: { type: 'shelf-move', fromKey: key, to: '' },
+          choices: moveTargets(record, key).map((t) => ({ value: t.value, label: t.kind === 'new' ? `${t.label} (새 칸)` : t.label })),
+          openPath: docsPath,
+          rank: 36,
+          doneText: '그 칸으로 옮겼습니다',
+        })
+      }
+    }
+    for (const g of shelf.dupGroups.slice(0, 2)) {
+      const keep = newestOf(record, g)
+      const st = record.documents[keep]
+      const base = labelOf(g[0]).replace(/\s*\(\d+\)$/, '')
+      push({
+        id: `shelf:dup:${sig(g.map((k) => `${k}@${record.documents[k]?.fileName ?? ''}`).join(','))}`,
+        kind: 'shelf',
+        title: `${base} ${g.length}개가 겹쳐 있어요 — 최신 것만 남길까요?`,
+        why: `남길 것: ${st?.fileName || labelOf(keep)}${st?.issuedAt ? ` (발급 ${st.issuedAt})` : ''} · 나머지는 서류함에서만 빠지고 파일은 보관함에 남아요`,
+        yesLabel: '최신 것만 남기기',
+        noLabel: '다 둠',
+        effect: { type: 'shelf-dedupe', keys: g, keep },
+        rows: g.map((k) => ({ label: labelOf(k), value: record.documents[k]?.fileName || '-', note: [k === keep ? '남김' : '서류함에서 뺌', record.documents[k]?.issuedAt ? `발급 ${record.documents[k]?.issuedAt}` : ''].filter(Boolean).join(' · ') })),
+        openPath: docsPath,
+        rank: 38,
+        doneText: `${base} — 최신 것만 남겼습니다`,
+      })
+    }
+  } catch {
+    // 서류함 계산이 실패해도 다른 결정 거리는 보인다
+  }
+
+  // 10) D-183: 서류에서 바로 넣은 중요한 값 — 한 번 더(지금 값이 그때 넣은 값 그대로인 것만)
+  for (const log of (record.docUploads ?? []).slice(0, 2)) {
+    const items = log.entered.filter((e) => {
+      if (!isImportantFactKey(e.key) || !e.value) return false
+      const cur = readFact(record, e.key)
+      return !!cur && cur.value !== '' && sameFactValue(factDef(e.key), cur.value, e.value)
+    })
+    if (items.length === 0) continue
+    push({
+      id: `autofill:${log.id}`,
+      kind: 'autofill',
+      title: `서류에서 읽어 바로 넣은 값 ${items.length}개 — 맞나요?`,
+      why: `${items.slice(0, 3).map((e) => `${e.label} ${e.display}`).join(' · ')}${items.length > 3 ? ` 외 ${items.length - 3}개` : ''}`,
+      yesLabel: '모두 맞아요',
+      noLabel: '하나씩 다시 볼게요',
+      effect: { type: 'recheck', logId: log.id, items: items.map((e) => ({ key: e.key, value: e.value ?? '' })) },
+      rows: items.map((e) => ({ label: e.label, value: e.display, note: e.fileName })),
+      openPath: `/ops/clients/${record.id}?tab=smart`,
+      rank: 32,
+      doneText: '바로 넣은 값을 확인했습니다',
+      noText: `${items.length}개를 '확인할 정보' 로 돌렸습니다 — 하나씩 맞는지 골라 주세요`,
+    })
+  }
+
   return out.sort((a, b) => a.rank - b.rank)
 }
 
@@ -350,6 +458,12 @@ export function withDecisionAnswer(record: ClientOpsRecord, d: Pick<Decision, 'i
     next = withNextAction(next, d.effect.text, d.effect.date, { at: now })
   } else if (d.effect.type === 'due' && answer === 'yes') {
     if (next.services[d.effect.serviceKey]) next = withService(next, d.effect.serviceKey, { dueDate: d.effect.date })
+  } else if (d.effect.type === 'shelf-move' && answer === 'yes' && d.effect.to) {
+    next = moveDocTo(next, d.effect.fromKey, d.effect.to)?.record ?? next
+  } else if (d.effect.type === 'shelf-dedupe' && answer === 'yes') {
+    next = withDedupedShelf(next, d.effect.keys, d.effect.keep)
+  } else if (d.effect.type === 'recheck' && answer === 'no') {
+    next = withRecheckFacts(next, d.effect.items, d.effect.logId, now)
   } else if (d.effect.type === 'copy' && answer === 'yes' && d.effect.log) {
     // 입금 요청은 고객에게 연락한 것(안부와 같은 칸) · 다시 연락은 영업 기록
     next = withActivity(next, d.effect.log.startsWith('입금') ? 'care' : 'sales', d.effect.log, null, now)

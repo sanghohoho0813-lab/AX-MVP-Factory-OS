@@ -26,7 +26,7 @@ import { buildDecisions } from '../../services/decisions'
 import { DecisionList, useDecisionAnswer } from './DecisionList'
 import { pendingFacts } from '../../services/customerFacts'
 import { INSIGHT_TONE_LABEL, buildInsights, recommendNextSteps, type InsightTone } from '../../services/clientInsights'
-import type { DocBatchSummary } from '../../services/docAutoAnalyze'
+import { batchOfLog, type DocBatchSummary } from '../../services/docAutoAnalyze'
 import { docShelfSummary } from '../../services/docShelf'
 import { addDaysLocal, withNextAction } from '../../services/clientOpsNextAction'
 import { nowIso } from '../../lib/appClock'
@@ -117,8 +117,8 @@ export default function ClientSmartTab({
         </Button>
       </Surface>
 
-      {/* 2. 방금 올린 서류 */}
-      {lastBatch && <BatchSummary batch={lastBatch} />}
+      {/* 2. 방금 올린 서류 — D-183: 새로고침해도 지난 올리기 기록이 보인다(업체 기록에 남김) */}
+      {lastBatch ? <BatchSummary batch={lastBatch} fresh /> : record.docUploads?.[0] ? <BatchSummary batch={batchOfLog(record.docUploads[0])} fresh={false} /> : null}
 
       {/* 3. 확인이 필요한 정보 */}
       <FactInboxCard record={record} now={nowIso()} onCommit={onCommit} />
@@ -227,14 +227,15 @@ export default function ClientSmartTab({
   )
 }
 
-function BatchSummary({ batch }: { batch: DocBatchSummary }) {
-  const time = batch.at ? new Date(batch.at).toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' }) : ''
+function BatchSummary({ batch, fresh }: { batch: DocBatchSummary; fresh: boolean }) {
+  const when = batch.at ? new Date(batch.at) : null
+  const time = when ? (fresh ? when.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' }) : when.toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })) : ''
   return (
-    <div data-testid="smart-batch">
+    <div data-testid="smart-batch" data-fresh={fresh ? '1' : '0'}>
     <Surface edge="success" showEdge className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
         <Sparkles aria-hidden="true" className="size-5 text-success-600" />
-        <h2 className="t-card font-bold text-slate-900">방금 올린 서류 {batch.files}개를 읽었어요</h2>
+        <h2 className="t-card font-bold text-slate-900">{fresh ? `방금 올린 서류 ${batch.files}개를 읽었어요` : `지난번에 올린 서류 ${batch.files}개`}</h2>
         {time && <span className="t-meta text-slate-500">{time}</span>}
       </div>
       {batch.entered.length > 0 && (
@@ -279,9 +280,9 @@ function BatchSummary({ batch }: { batch: DocBatchSummary }) {
                 <span aria-hidden="true" className="text-slate-400">→</span>
                 <span className={`font-semibold ${x.other ? 'text-warning-800' : 'text-slate-900'}`}>{x.label}</span>
                 {x.same ? (
-                  <span className="t-meta text-warning-800">(이름 · 크기가 같은 파일이 이미 있어요 — 서류 탭에서 하나 지우세요)</span>
+                  <span className="t-meta text-warning-800">(이름 · 크기가 같은 파일이 이미 있어요 — '확인할 것' 에서 최신 것만 남길 수 있어요)</span>
                 ) : (
-                  x.numbered && <span className="t-meta text-slate-500">(같은 서류가 이미 있어 따로 둠 — 서류 탭에서 하나 지우세요)</span>
+                  x.numbered && <span className="t-meta text-slate-500">(같은 서류가 이미 있어 따로 둠 — '확인할 것' 에서 최신 것만 남길 수 있어요)</span>
                 )}
               </li>
             ))}

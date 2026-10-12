@@ -24,7 +24,7 @@ import { formatFileSize } from '../../lib/format'
 import { particle } from '../../lib/josa'
 import { generateId } from '../../storage/localStore'
 import { nowIso, todayLocalDate } from '../../lib/appClock'
-import { analyzeUploadedDocs, type DocBatchSummary } from '../../services/docAutoAnalyze'
+import { analyzeUploadedDocs, withUploadSummary, type DocBatchSummary } from '../../services/docAutoAnalyze'
 import { isSystemFile } from '../../services/docShelf'
 import type { ReadDoc, ReadMethod } from '../../services/docAutoFill'
 
@@ -264,8 +264,10 @@ export function BulkDocUploadSheet({
     }
     try {
       const analyzed = await analyzeUploadedDocs(rec, readDocs, { now: nowIso(), today: todayLocalDate(), makeId: generateId })
-      const saved = await saveClient(analyzed.record)
-      onSaved(saved, { ...analyzed.summary, placed })
+      // D-183: 올리기 기록을 업체에 남긴다 — 새로고침해도 '올린 서류' 가 보이고, '확인할 것' 이 바로 넣은 값을 한 번 더 묻는다
+      const summary = { ...analyzed.summary, files: okCount, placed }
+      const saved = await saveClient(withUploadSummary(analyzed.record, summary, `up_${generateId()}`))
+      onSaved(saved, summary)
       const sm = analyzed.summary
       const others = placed.filter((x) => x.other).length
       const tail = [
