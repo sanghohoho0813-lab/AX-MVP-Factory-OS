@@ -361,7 +361,7 @@ for (const [w, h, mob] of [[1440, 900, false], [390, 844, true]]) {
       return { n, ex }
     }, old)
   for (const path of ['/tools/sales-kit/briefing', '/tools/cretop/analyze']) {
-    await page.evaluate(() => localStorage.setItem('axmvp.ui.preferences', JSON.stringify({ theme: 'deep-teal' })))
+    await page.evaluate(() => localStorage.setItem('axmvp.ui.preferences', JSON.stringify({ theme: 'deep-teal', themeChosen: true })))
     await page.goto(BASE + path, { waitUntil: 'networkidle' })
     await page.waitForTimeout(400)
     const oldRgb = await brandRgb()
@@ -597,7 +597,7 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
 
   const hues = []
   for (const theme of ['navy-blue', 'burgundy']) {
-    await page.evaluate((t) => localStorage.setItem('axmvp.ui.preferences', JSON.stringify({ theme: t })), theme)
+    await page.evaluate((t) => localStorage.setItem('axmvp.ui.preferences', JSON.stringify({ theme: t, themeChosen: true })), theme)
     await page.goto(BASE + '/', { waitUntil: 'networkidle' })
     const ramp = await page.evaluate(() =>
       [...document.querySelectorAll('aside svg.nav-ramp')].map((el) => {

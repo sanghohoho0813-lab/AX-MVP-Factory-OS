@@ -67,8 +67,8 @@ export const brand: BrandConfig = {
   supportEmail: 'sanghohoho0813@gmail.com',
   ownerName: '김상호',
   ownerTitle: '대표',
-  // 로고의 짙은 청록 M 과 공개 사이트의 웜 액센트에 가장 가까운 팔레트
-  defaultThemeId: 'deep-teal',
+  // D-186: 운영 OS 기본 색은 오닉스 골드(대표 지시). 예전 기본은 딥 틸
+  defaultThemeId: 'onyx-gold',
 }
 
 /** 브라우저 탭 제목 — "화면 이름 | 제품명" 형식으로 통일한다 */

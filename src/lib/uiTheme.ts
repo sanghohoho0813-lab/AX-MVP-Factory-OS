@@ -44,13 +44,13 @@ export const UI_THEMES: UiThemeMeta[] = [
   {
     key: 'deep-teal',
     label: '딥 틸',
-    hint: '기본값 · 브랜드 청록 + 웜 포인트',
+    hint: '브랜드 청록 + 웜 포인트',
     swatch: ['#06262D', '#087A83', '#1597A3', '#D2704C', '#E9B59B', '#DDEDEF', '#FFFFFF'],
   },
   {
     key: 'onyx-gold',
     label: '오닉스 골드',
-    hint: '무채색 + 금색',
+    hint: '기본값 · 무채색 + 금색',
     swatch: ['#15171C', '#343942', '#6A717C', '#B89032', '#E0C76F', '#E6E8EC', '#FFFFFF'],
   },
   {
@@ -73,7 +73,11 @@ export const UI_THEMES: UiThemeMeta[] = [
   },
 ]
 
-export const DEFAULT_THEME: UiThemeKey = 'deep-teal'
+/** D-186: 기본은 오닉스 골드(대표 지시 — 처음 들어온 사람부터 모두) */
+export const DEFAULT_THEME: UiThemeKey = 'onyx-gold'
+
+/** 예전 기본값 — 직접 고른 적 없이 저절로 저장된 이 값은 새 기본으로 읽는다(D-186) */
+export const LEGACY_DEFAULT_THEME: UiThemeKey = 'deep-teal'
 
 const THEME_KEYS = new Set<string>(UI_THEMES.map((t) => t.key))
 

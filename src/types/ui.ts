@@ -27,8 +27,10 @@ export interface UiPreferences {
   textScale: UiTextScale
   /** 기존 저장값에 없을 수 있으므로 optional — 기본 core */
   featureVisibility?: FeatureVisibilityMode
-  /** 기존 저장값에 없을 수 있으므로 optional — 기본 navy-blue */
+  /** 기존 저장값에 없을 수 있으므로 optional — 기본 onyx-gold(D-186) */
   theme?: UiThemeKey
+  /** 설정 › 화면에서 직접 고른 테마인가(D-186) — 없으면 예전 기본(딥 틸)은 새 기본으로 읽는다 */
+  themeChosen?: boolean
   /** 기존 저장값에 없을 수 있으므로 optional — 기본 full */
   motion?: UiMotionMode
   updatedAt: string

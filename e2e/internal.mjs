@@ -278,7 +278,7 @@ await step('홈 투어 시작·종료 후 backdrop 없음', async () => {
 for (const key of ['navy-blue', 'navy-gold', 'emerald-gold', 'forest-sage', 'deep-teal', 'onyx-gold', 'burgundy', 'plum-indigo', 'steel']) {
   await step(`테마 ${key}`, async () => {
     await p.evaluate((k) => {
-      const r = JSON.parse(localStorage.getItem('axmvp.ui.preferences') || '{}'); r.theme = k
+      const r = JSON.parse(localStorage.getItem('axmvp.ui.preferences') || '{}'); r.theme = k; r.themeChosen = true
       localStorage.setItem('axmvp.ui.preferences', JSON.stringify(r))
     }, key)
     await go('/')
@@ -290,7 +290,7 @@ for (const key of ['navy-blue', 'navy-gold', 'emerald-gold', 'forest-sage', 'dee
     return `shell=${shell} body=${bodyColor}`
   })
 }
-await p.evaluate(() => { const r = JSON.parse(localStorage.getItem('axmvp.ui.preferences') || '{}'); r.theme = 'deep-teal'; localStorage.setItem('axmvp.ui.preferences', JSON.stringify(r)) })
+await p.evaluate(() => { const r = JSON.parse(localStorage.getItem('axmvp.ui.preferences') || '{}'); r.theme = 'onyx-gold'; localStorage.setItem('axmvp.ui.preferences', JSON.stringify(r)) })
 
 // 7. 반응형 — 가로 넘침 0
 const widths = [360, 390, 430, 768, 1024, 1280, 1440, 1920]

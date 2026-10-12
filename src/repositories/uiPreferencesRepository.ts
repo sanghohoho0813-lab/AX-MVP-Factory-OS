@@ -1,6 +1,6 @@
 import type { FeatureVisibilityMode, UiMotionMode, UiPreferences, UiTextScale, UiThemeKey } from '../types/ui'
 import { isTextScale } from '../lib/uiTextScale'
-import { DEFAULT_THEME, isThemeKey } from '../lib/uiTheme'
+import { DEFAULT_THEME, LEGACY_DEFAULT_THEME, isThemeKey } from '../lib/uiTheme'
 import { notifyStoreChanged, readRaw, writeRaw } from '../storage/localStore'
 
 /**
@@ -53,10 +53,14 @@ export const uiPreferencesRepository = {
       const featureVisibility: FeatureVisibilityMode = isVisibilityMode(parsed.featureVisibility)
         ? parsed.featureVisibility
         : 'core'
+      const chosen = parsed.themeChosen === true
+      const saved = isThemeKey(parsed.theme) ? parsed.theme : DEFAULT_THEME
       return {
         textScale,
         featureVisibility,
-        theme: isThemeKey(parsed.theme) ? parsed.theme : DEFAULT_THEME,
+        // D-186: 예전 기본값(딥 틸)은 글자 크기 등을 바꿀 때 함께 저장됐을 뿐 — 직접 고른 표시가 없으면 새 기본(오닉스 골드)
+        theme: saved === LEGACY_DEFAULT_THEME && !chosen ? DEFAULT_THEME : saved,
+        ...(chosen ? { themeChosen: true } : {}),
         motion: isMotionMode(parsed.motion) ? parsed.motion : 'full',
         updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : nowIso(),
       }
@@ -72,7 +76,8 @@ export const uiPreferencesRepository = {
 
   setTheme(theme: UiThemeKey): UiPreferences {
     const current = this.get()
-    return persist({ ...current, theme, updatedAt: nowIso() })
+    // 설정 › 화면에서 직접 고른 것 — 딥 틸을 골라도 그대로 둔다(D-186)
+    return persist({ ...current, theme, themeChosen: true, updatedAt: nowIso() })
   },
 
   setMotion(motion: UiMotionMode): UiPreferences {

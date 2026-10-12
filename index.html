@@ -18,7 +18,7 @@
           'onyx-gold', 'burgundy', 'plum-indigo', 'steel',
         ]
         var scale = 'default'
-        var theme = 'deep-teal'
+        var theme = 'onyx-gold'
         var motion = 'full'
         try {
           var raw = localStorage.getItem('axmvp.ui.preferences')
@@ -26,6 +26,8 @@
             var p = JSON.parse(raw)
             if (p.textScale === 'large' || p.textScale === 'extra_large') scale = p.textScale
             if (THEMES.indexOf(p.theme) !== -1) theme = p.theme
+            /* D-186: 예전 기본값(딥 틸)이 저절로 저장된 것은 새 기본(오닉스 골드)으로 — 직접 고른 것(themeChosen)만 그대로 */
+            if (theme === 'deep-teal' && p.themeChosen !== true) theme = 'onyx-gold'
             if (p.motion === 'reduced') motion = 'reduced'
           }
         } catch (e) {

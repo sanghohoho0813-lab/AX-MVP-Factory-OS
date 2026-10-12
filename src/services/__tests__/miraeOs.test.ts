@@ -9,6 +9,8 @@
 
 import { brand, documentTitle } from '../../brand/brand.config'
 import { UI_THEMES, isThemeKey } from '../../lib/uiTheme'
+import { uiPreferencesRepository } from '../../repositories/uiPreferencesRepository'
+import { readRaw, writeRaw } from '../../storage/localStore'
 import { MODULES, MODULE_GROUPS, enabledModulesByGroup, moduleForPath, screenGroupForPath, screenTitleForPath } from '../../config/moduleRegistry'
 import { identityFromSession } from '../../auth/currentUser'
 import { FUTURE_ITEMS } from '../../config/capabilityStatus'
@@ -158,11 +160,30 @@ const TODAY = '2026-09-03'
 /* ------------------------------------------------------------------ */
 check('brand: 제품명이 Factory 를 포함하지 않는다', !/factory/i.test(brand.productName + brand.productNameKo + brand.productSubtitle))
 check('brand: 기본 테마는 9종 중 하나', isThemeKey(brand.defaultThemeId))
-check('brand: 기본 테마는 deep-teal', brand.defaultThemeId === 'deep-teal')
+check('brand: 기본 테마는 onyx-gold(D-186)', brand.defaultThemeId === 'onyx-gold')
 check('brand: 고객 플랫폼 URL 은 https', brand.customerPlatformUrl.startsWith('https://'))
 check('brand: 로고 경로는 /brand 아래', brand.logoLight.startsWith('/brand/') && brand.logoDark.startsWith('/brand/'))
 check('brand: 문서 제목 형식', documentTitle('오늘') === `오늘 | ${brand.productName}` && documentTitle() === brand.productName)
 check('theme: 9종', UI_THEMES.length === 9 && new Set(UI_THEMES.map((t) => t.key)).size === 9)
+// D-186: 기본 색은 오닉스 골드 — 처음 들어온 사람 · 예전에 저절로 저장된 딥 틸 · 직접 고른 딥 틸
+{
+  const K = 'axmvp.ui.preferences'
+  const before = readRaw(K)
+  const put = (v: unknown) => writeRaw(K, typeof v === 'string' ? v : JSON.stringify(v))
+  writeRaw(K, '{')
+  check('theme: 깨진 저장값 → 오닉스 골드', uiPreferencesRepository.get().theme === 'onyx-gold')
+  put({ textScale: 'large', theme: 'deep-teal', updatedAt: 'x' })
+  check('theme: 글자 크기와 함께 저절로 저장된 딥 틸 → 오닉스 골드(글자 크기는 그대로)', uiPreferencesRepository.get().theme === 'onyx-gold' && uiPreferencesRepository.get().textScale === 'large')
+  put({ theme: 'navy-gold' })
+  check('theme: 직접 고른 다른 테마(네이비 골드)는 그대로', uiPreferencesRepository.get().theme === 'navy-gold')
+  uiPreferencesRepository.setTheme('deep-teal')
+  check('theme: 설정에서 딥 틸을 고르면 딥 틸 · 고른 표시가 남는다', uiPreferencesRepository.get().theme === 'deep-teal' && JSON.parse(readRaw(K) ?? '{}').themeChosen === true)
+  uiPreferencesRepository.update('extra_large')
+  check('theme: 고른 딥 틸은 글자 크기를 바꿔도 남는다', uiPreferencesRepository.get().theme === 'deep-teal' && uiPreferencesRepository.get().textScale === 'extra_large')
+  uiPreferencesRepository.reset()
+  check('theme: 처음으로 되돌리면 오닉스 골드', uiPreferencesRepository.get().theme === 'onyx-gold' && JSON.parse(readRaw(K) ?? '{}').themeChosen === undefined)
+  if (before === null) put({}); else writeRaw(K, before)
+}
 
 /* ------------------------------------------------------------------ */
 /* 2. 모듈 레지스트리                                                     */

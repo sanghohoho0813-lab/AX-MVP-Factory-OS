@@ -27,8 +27,8 @@ const THEMES = [
   { key: 'steel',         label: '스틸 플래티넘', shell: '#19222B', crisp: true, primary: '#44647A', secondary: '#6D8899', accent: '#4C9AAA', highlight: '#C9D6DE', soft: '#E7EDF1' },
 ]
 
-/** 기본 테마 — 브랜드 로고(짙은 청록)와 공개 사이트 웜 액센트에 가장 가까운 팔레트 */
-const DEFAULT_THEME = 'deep-teal'
+/** 기본 테마 — 오닉스 골드(D-186 대표 지시: 처음 들어온 사람부터 모두 오닉스 골드). 예전 기본은 딥 틸 */
+const DEFAULT_THEME = 'onyx-gold'
 /** D-163: 7번째 색 — 본문 바탕은 모든 테마에서 완전한 흰색 */
 const SURFACE = '#FFFFFF'
 

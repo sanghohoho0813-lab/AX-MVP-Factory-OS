@@ -156,7 +156,6 @@ html[data-theme='forest-sage'] {
 }
 
 /* 딥 틸 */
-html:not([data-theme]),
 html[data-theme='deep-teal'] {
   --theme-shell: #06262D;
   --theme-primary: #087A83;
@@ -194,6 +193,7 @@ html[data-theme='deep-teal'] {
 }
 
 /* 오닉스 골드 */
+html:not([data-theme]),
 html[data-theme='onyx-gold'] {
   --theme-shell: #15171C;
   --theme-primary: #343942;
