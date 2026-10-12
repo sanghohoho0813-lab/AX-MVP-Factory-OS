@@ -348,6 +348,31 @@ try {
   await page.keyboard.press('Escape')
   await page.waitForTimeout(400)
   check('Pilot(D-185): Esc 로 닫힘', (await tut.count()) === 0)
+  // 팀장 머리줄([안내 영상] 단추가 늘 있다) — 5폭 × 글자 3단계에서 넘치지 않는다
+  {
+    const bad = []
+    for (const w of [1024, 1280, 1366, 1440, 1920]) {
+      await page.setViewportSize({ width: w, height: 900 })
+      await page.waitForTimeout(250)
+      for (const scale of ['default', 'large', 'extra_large']) {
+        await page.evaluate((sc) => document.documentElement.setAttribute('data-text-scale', sc), scale)
+        await page.waitForTimeout(150)
+        const r = await page.evaluate(() => {
+          const hdr = document.querySelector('header')
+          const hb = hdr.getBoundingClientRect()
+          const cut = [...hdr.querySelectorAll('a,button')].filter((e) => e.offsetParent !== null && e.getBoundingClientRect().right > hb.right + 1).length
+          const tb = document.querySelector('[data-testid="tutorial-open"]')
+          return { over: hdr.scrollWidth - hdr.clientWidth, cut, btn: !!tb && tb.offsetParent !== null }
+        })
+        // 아주 큰 글자 · 좁은 PC 에서는 머리줄이 덜 급한 단추(hdr-tight)를 접는다 — 그때는 사용자 메뉴의 [안내 영상 보기]
+        if (r.over > 0 || r.cut > 0 || (!r.btn && scale === 'default')) bad.push(`${w}/${scale} ${JSON.stringify(r)}`)
+      }
+    }
+    await page.evaluate(() => document.documentElement.setAttribute('data-text-scale', 'default'))
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.waitForTimeout(300)
+    check('Pilot 머리줄(D-185): 5폭 × 글자 3단계 넘침 0 · 기본 글자에서는 [안내 영상] 단추 보임', bad.length === 0, bad.join(' | '))
+  }
   const today = await bodyText(page)
   check('Pilot: 로그인하면 오늘 화면', !page.url().includes('/login') && (await page.getByTestId('no-access').count()) === 0, page.url())
   check('Pilot: 오늘 — "등록된 업체가 없습니다 · 첫 업체 등록"', (await page.getByTestId('today-first-client').count()) === 1 && today.includes('업체를 등록하면 일정 · 서류 · 업무 · 수금을 한곳에서 관리할 수 있습니다'))

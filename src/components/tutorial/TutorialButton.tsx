@@ -1,7 +1,7 @@
 /**
  * D-185: 머리줄 [안내 영상] — 언제든 다시 보기. 휴대폰은 아이콘만(이름은 읽어 준다).
- * 글자는 넓은 PC 에서만 — 대표 머리줄은 화면 전환 · 고객 화면 단추가 더 있어 1700px 부터(넘치지 않게).
- * 대표 머리줄은 1024~1279px 에서 단추도 숨긴다(자리가 없다 — 사용자 메뉴 · 서랍에서 연다).
+ * 글자는 넓은 PC 에서만 — 팀장 1440px · 대표 1700px 부터(대표 머리줄은 화면 전환 · 고객 화면 단추가 더 있다).
+ * 대표 머리줄은 1024~1365px 에서 단추도 숨긴다(아주 큰 글자에서 자리가 없다 — 사용자 메뉴에서 연다).
  */
 import { PlayCircle } from 'lucide-react'
 import { useTutorial } from './tutorialContext'
@@ -16,10 +16,10 @@ export function TutorialButton({ roomy = false }: { roomy?: boolean }) {
       aria-label="안내 영상 보기"
       title="안내 영상 보기"
       onClick={() => t.open()}
-      className={`${roomy ? '' : 'lg:max-xl:hidden '}tap hdr-tight flex size-11 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-(--radius-control) text-slate-600 hover:bg-slate-100 hover:text-slate-900 lg:h-10 lg:w-auto lg:border lg:border-slate-200 lg:px-2.5 lg:text-[0.9rem] lg:font-medium`}
+      className={`${roomy ? '' : 'lg:max-[1365px]:hidden '}tap hdr-tight flex size-11 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-(--radius-control) text-slate-600 hover:bg-slate-100 hover:text-slate-900 lg:h-10 lg:w-auto lg:border lg:border-slate-200 lg:px-2.5 lg:text-[0.9rem] lg:font-medium`}
     >
       <PlayCircle aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
-      <span className={roomy ? 'hidden xl:inline' : 'hidden min-[1700px]:inline'}>안내 영상</span>
+      <span className={roomy ? 'hidden min-[1440px]:inline' : 'hidden min-[1700px]:inline'}>안내 영상</span>
     </button>
   )
 }
