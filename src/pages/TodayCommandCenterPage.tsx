@@ -60,6 +60,7 @@ import { krwTile } from '../lib/format'
 import { getDataModeConfig } from '../data/dataMode'
 import { brand } from '../brand/brand.config'
 import { useIsPilot } from '../auth/osAccess'
+import { CLIENT_TYPE_LABEL, clientTypeOf } from '../services/clientType'
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { CustomerEvent, CustomerEventStatus, JournalEntry } from '../types/bridge'
 
@@ -880,11 +881,18 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           workspaceId={workspaceId}
           initialTab={linking.tab}
           onClose={() => setLinking(null)}
-          onDone={(updated) => {
+          onDone={(updated, _link, created) => {
             setLinking(null)
             setEvents((list) => list.map((e) => (e.id === updated.id ? updated : e)))
             const cid = updated.operationsClientId
-            showToast('업체에 연결했습니다.', cid ? { label: '미팅 준비 →', onClick: () => navigate(`/sales/meeting?client=${cid}&round=1`) } : undefined)
+            // D-182: 새로 만들었으면 어디로 들어갔는지 말한다(대표 화면)
+            const made = created && !pilot ? clientTypeOf(created) : null
+            showToast(
+              made ? `${created?.companyName} — ${CLIENT_TYPE_LABEL[made]}으로 등록하고 연결했습니다.` : '업체에 연결했습니다.',
+              made === 'consultant'
+                ? { label: '컨설턴트 고객 보기 →', onClick: () => navigate('/ops/clients?type=consultant') }
+                : cid ? { label: '미팅 준비 →', onClick: () => navigate(`/sales/meeting?client=${cid}&round=1`) } : undefined,
+            )
             void load()
           }}
         />

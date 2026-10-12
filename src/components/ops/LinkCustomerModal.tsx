@@ -6,7 +6,10 @@ import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { createClient, saveClient } from '../../services/clientOpsService'
 import { withNewProspect } from '../../services/salesPipeline'
-import { withInboxPayload } from '../../services/inboxToSales'
+import { splitContact, withInboxPayload } from '../../services/inboxToSales'
+import { CLIENT_TYPE_LABEL, clientTypeOf, rememberClientTypeView, suggestClientType, withClientType, type ClientType } from '../../services/clientType'
+import { useIsPilot } from '../../auth/osAccess'
+import { ClientTypePicker } from './ClientTypePicker'
 import { todayLocalDate } from '../../lib/appClock'
 import { withActivity } from '../../services/clientOpsActivity'
 import { createLink, findProfileByEmail, listLinksForClient, updateEvent } from '../../services/customerBridgeService'
@@ -34,14 +37,18 @@ export function LinkCustomerModal({
   workspaceId: string | null
   initialTab?: 'existing' | 'new'
   onClose: () => void
-  onDone: (updated: CustomerEvent, link: PortalClientLink | null) => void
+  /** created — '새 업체 만들기' 로 만든 업체(기존 업체에 붙였으면 null) */
+  onDone: (updated: CustomerEvent, link: PortalClientLink | null, created: ClientOpsRecord | null) => void
 }) {
+  const pilot = useIsPilot()
   const p = event.payload
   const str = (k: string) => (typeof p[k] === 'string' ? (p[k] as string) : '')
   const guessName = str('company_name') || str('company')
   const guessContact = str('representative_name') || str('buyer_name') || str('name')
-  const guessPhone = str('phone') || str('buyer_phone') || str('contact')
-  const guessEmail = str('email') || str('buyer_email')
+  // D-182: 한 칸에 '메일 / 전화' 를 같이 적어 보낸 신청도 휴대폰 · 이메일 칸으로 나눠 채운다
+  const contact = splitContact(str('phone') || str('buyer_phone') || str('contact'), str('email') || str('buyer_email'))
+  const guessPhone = contact.phone
+  const guessEmail = contact.email
   const guessIndustry = str('industry')
 
   const [tab, setTab] = useState<'existing' | 'new'>(initialTab)
@@ -52,6 +59,10 @@ export function LinkCustomerModal({
   const [profile, setProfile] = useState<{ id: string; email: string } | null>(null)
   const [profileChecked, setProfileChecked] = useState(false)
   const [linkAccount, setLinkAccount] = useState(true)
+  // D-182: 어디로 분류할지(대표만) — 신청서에 컨설턴트라고 드러나 있으면 컨설턴트로 골라 둔다. 고르는 것은 사람이
+  const suggested = useMemo(() => suggestClientType(p, event.sourceType), [p, event.sourceType])
+  const [ctype, setCtype] = useState<ClientType>(suggested.type)
+  const asType: ClientType = pilot ? 'sme' : ctype
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -97,9 +108,9 @@ export function LinkCustomerModal({
       .sort((a, b) => b.s - a.s || a.c.companyName.localeCompare(b.c.companyName))
   }, [clients, query, guessName, guessPhone, guessEmail])
 
-  const suggested = candidates.filter((x) => x.s > 0)
+  const likely = candidates.filter((x) => x.s > 0)
 
-  const finish = async (client: ClientOpsRecord) => {
+  const finish = async (client: ClientOpsRecord, created: ClientOpsRecord | null = null) => {
     let link: PortalClientLink | null = null
     if (linkAccount && profile) {
       try {
@@ -121,7 +132,7 @@ export function LinkCustomerModal({
       operationsClientId: client.id,
       portalClientLinkId: link?.id ?? event.portalClientLinkId,
     })
-    onDone(updated, link)
+    onDone(updated, link, created)
   }
 
   const submitExisting = async () => {
@@ -154,27 +165,35 @@ export function LinkCustomerModal({
           contactPhone: form.contactPhone,
           industry: form.industry,
           status: 'waiting',
+          ...(asType === 'consultant' ? { clientType: 'consultant' as const } : {}),
         }))
       createdRef.current = created
       madeFromEvent.set(event.id, { created, saved: savedRef.current })
-      const saved =
+      let saved =
         savedRef.current ??
         (await saveClient(
         // D-122: 고객이 적어 보낸 문의 · 진행 방식 · 희망 연락 시간도 영업 칸으로
         withInboxPayload(withNewProspect(
           withActivity(
-            { ...created, contactEmail: form.contactEmail.trim() },
+            // D-182: 만든 뒤 종류를 바꿔 다시 눌러도 고른 쪽으로 저장한다(팀장 화면은 손대지 않는다)
+            pilot ? { ...created, contactEmail: form.contactEmail.trim() } : withClientType({ ...created, contactEmail: form.contactEmail.trim() }, asType),
             'profile',
-            `고객 플랫폼 이벤트(${event.eventType})에서 업체 생성`,
+            `고객 플랫폼 이벤트(${event.eventType})에서 업체 생성${pilot ? '' : ` · ${CLIENT_TYPE_LABEL[asType]}`}`,
           ),
           event.sourceType === 'grant_finder' ? '지원사업 찾기' : '홈페이지 상담신청',
         ),
         event.payload,
         todayLocalDate(),
       )))
+      // 연결이 실패한 뒤 종류를 바꿔 다시 누른 경우 — 이미 저장한 업체를 고른 쪽으로 옮겨 둔다
+      if (!pilot && clientTypeOf(saved) !== asType) {
+        saved = await saveClient(withActivity(withClientType(saved, asType), 'profile', `고객 종류 → ${CLIENT_TYPE_LABEL[asType]}`))
+      }
       savedRef.current = saved
       madeFromEvent.set(event.id, { created, saved })
-      await finish(saved)
+      // 고객 관리를 열면 방금 넣은 쪽이 바로 보이게
+      if (!pilot) rememberClientTypeView(clientTypeOf(saved))
+      await finish(saved, saved)
     } catch (cause) {
       const msg = cause instanceof Error ? cause.message : '만들지 못했습니다.'
       setError(createdRef.current ? `${msg} — 업체는 이미 만들었습니다. 다시 누르면 새로 만들지 않고 이어서 연결합니다.` : msg)
@@ -247,7 +266,7 @@ export function LinkCustomerModal({
 
       {tab === 'existing' ? (
         <div className="mt-4">
-          {suggested.length > 0 && !query && (
+          {likely.length > 0 && !query && (
             <p className="mb-2 text-[0.88rem] text-slate-500">
               회사명·연락처가 같은 업체가 위에 있습니다. 맞는지 확인하고 고르세요 — 자동으로 합치지 않습니다.
             </p>
@@ -274,7 +293,10 @@ export function LinkCustomerModal({
                   className={`flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-slate-50 ${selectedId === c.id ? 'bg-brand-50' : ''}`}
                 >
                   <span className="min-w-0">
-                    <span className="block truncate text-[0.95rem] font-semibold text-slate-800">{c.companyName}</span>
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className="truncate text-[0.95rem] font-semibold text-slate-800">{c.companyName}</span>
+                      {!pilot && clientTypeOf(c) === 'consultant' && <span className="shrink-0 rounded-full bg-slate-100 px-1.5 t-meta font-semibold text-slate-600">컨설턴트</span>}
+                    </span>
                     <span className="block truncate text-[0.875rem] text-slate-500">{[c.contactName, c.contactPhone, c.industry].filter(Boolean).join(' · ') || '정보 없음'}</span>
                   </span>
                   {s > 0 && <span className="shrink-0 rounded-full bg-highlight-100 px-2 py-0.5 t-meta font-semibold text-highlight-700">후보</span>}
@@ -286,11 +308,20 @@ export function LinkCustomerModal({
         </div>
       ) : (
         <div className="mt-4">
-          <p className="text-[0.88rem] break-keep text-slate-500">고객이 제출한 값으로 채웠습니다. 저장 전 확인하세요. 계약 전이라 <strong className="font-semibold text-slate-700">잠재고객</strong>으로 등록되고, 영업 관리 보드의 '잠재 고객' 칸에 올라갑니다.</p>
+          {/* D-182: 어디로 분류할지 먼저 — 고른 쪽(고객 관리 › 중소기업 고객 · 컨설턴트 고객)으로 바로 들어간다 */}
+          {!pilot && (
+            <div className="mb-4">
+              <ClientTypePicker value={ctype} onChange={setCtype} testId="link-client-type" hint={ctype === suggested.type ? suggested.reason : ''} />
+            </div>
+          )}
+          <p className="text-[0.88rem] break-keep text-slate-500">
+            고객이 제출한 값으로 채웠습니다. 저장 전 확인하세요. 계약 전이라 <strong className="font-semibold text-slate-700">잠재고객</strong>으로 등록되고,{' '}
+            {pilot ? '' : <>고객 관리 <strong className="font-semibold text-slate-700">'{CLIENT_TYPE_LABEL[asType]}'</strong> 쪽과 </>}영업 관리 보드의 '잠재 고객' 칸에 올라갑니다.
+          </p>
           <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
             {(
               [
-                ['companyName', '회사명 *'],
+                ['companyName', asType === 'consultant' ? '이름(회사명) *' : '회사명 *'],
                 ['contactName', '대표자·담당자'],
                 ['contactPhone', '휴대폰번호'],
                 ['contactEmail', '이메일'],

@@ -485,6 +485,14 @@ try {
   const pHub = await bodyText(page)
   check('팀장(D-171): 고객 관리 — "잠재고객" 칸 · 돈 칸은 "미수금"', pHub.includes('잠재고객') && pHub.includes('미수금') && !pHub.includes('못 받은 내 돈'), pHub.slice(0, 300))
   check('팀장(D-181): 고객 관리에 중소기업 · 컨설턴트 고객 탭 없음 · 내 업체는 그대로 보임', (await page.getByTestId('client-type-tabs').count()) === 0 && !pHub.includes('컨설턴트 고객') && pHub.includes('은혜테스트정밀'))
+  // D-182: 영업 보드 새 잠재고객 — 팀장 화면에는 '어디로 분류할까요?' 도 · 카드의 '컨설턴트' 표시도 없다
+  await go(page, '/sales/board')
+  const npBtn = page.getByRole('button', { name: /새 잠재고객/ })
+  if (await npBtn.count()) {
+    await npBtn.first().click()
+    await page.waitForTimeout(400)
+  }
+  check('팀장(D-182): 영업 보드 새 잠재고객 창에 "어디로 분류할까요?" 없음', (await npBtn.count()) > 0 && (await page.getByRole('dialog').count()) === 1 && (await page.getByTestId('prospect-client-type').count()) === 0 && (await page.getByTestId('sales-card-consultant').count()) === 0)
 
   await go(page, '/ops/calendar')
   const cal = await bodyText(page)

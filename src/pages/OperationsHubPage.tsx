@@ -27,8 +27,6 @@ import { ServiceCatalogModal } from '../components/ops/ServiceCatalogModal'
 const SORT_KEY = 'axmvp.clients.sort.v2'
 const FILTER_KEY = 'axmvp.clients.filter'
 const SEGMENT_KEY = 'axmvp.clients.segment'
-// D-181: 중소기업 고객 · 컨설턴트 고객(대표만) — 지난번에 보던 쪽을 기억한다
-const TYPE_KEY = 'axmvp.clients.type'
 
 import { ClientBoardCard } from '../components/ops/ClientBoardCard'
 import { matchesClientSearch, searchHit } from '../services/clientOpsSearch'
@@ -83,7 +81,8 @@ import { Modal } from '../components/ui/Modal'
 import { AlertRow, SEVERITY_META } from '../components/ops/opsParts'
 import { useBackToClose } from '../lib/backToClose'
 import { useClientGrantSummaries } from '../components/grants/useGrants'
-import { CLIENT_TYPE_LABEL, CLIENT_TYPES, clientTypeOf, isClientType, type ClientType } from '../services/clientType'
+import { CLIENT_TYPE_LABEL, CLIENT_TYPE_VIEW_KEY, CLIENT_TYPES, clientTypeOf, isClientType, rememberClientTypeView, type ClientType } from '../services/clientType'
+import { ClientTypePicker } from '../components/ops/ClientTypePicker'
 
 /** D-181: 처음 열 때 고객 종류 — 주소(?type=consultant)가 먼저, 없으면 지난번에 보던 쪽 */
 function initialClientType(): ClientType {
@@ -91,7 +90,7 @@ function initialClientType(): ClientType {
   const fromUrl = new URLSearchParams(window.location.search).get('type')
   if (isClientType(fromUrl)) return fromUrl
   try {
-    const v = localStorage.getItem(TYPE_KEY)
+    const v = localStorage.getItem(CLIENT_TYPE_VIEW_KEY)
     return isClientType(v) ? v : 'sme'
   } catch {
     return 'sme'
@@ -261,11 +260,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
    */
   const [ctype, setCtype] = useState<ClientType>(initialClientType)
   useEffect(() => {
-    try {
-      localStorage.setItem(TYPE_KEY, ctype)
-    } catch {
-      /* 저장 못 해도 화면은 돈다 */
-    }
+    rememberClientTypeView(ctype)
   }, [ctype])
   const switchType = (t: ClientType) => {
     setCtype(t)
@@ -474,13 +469,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       const record = asProspect ? await saveClient(withNewProspect(created, '')) : created
       createdRef.current = null
       // D-181: 업체 화면에서 뒤로 오면 방금 넣은 고객이 있는 쪽이 보이게
-      if (!pilot) {
-        try {
-          localStorage.setItem(TYPE_KEY, newType)
-        } catch {
-          /* 기억 못 해도 등록은 된다 */
-        }
-      }
+      if (!pilot) rememberClientTypeView(newType)
       navigate(`/ops/clients/${record.id}`)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '고객을 등록하지 못했습니다.')
@@ -1056,26 +1045,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
             </p>
             <div className="mt-5 grid gap-4">
               {/* D-181: 고객 종류 — 대표만 고른다(팀장 화면은 늘 중소기업 고객) */}
-              {!pilot && (
-                <fieldset data-testid="new-client-type">
-                  <legend className="text-[0.95rem] font-medium text-slate-700">고객 종류</legend>
-                  <div className="mt-1.5 grid grid-cols-2 gap-2">
-                    {CLIENT_TYPES.map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        aria-pressed={newType === t}
-                        data-testid={`new-client-type-${t}`}
-                        onClick={() => setNewType(t)}
-                        className={`tap flex flex-col items-start rounded-(--radius-control) border px-3 py-2 text-left ${newType === t ? 'border-brand-600 bg-brand-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
-                      >
-                        <span className="text-[0.98rem] font-bold text-slate-900">{t === 'sme' ? '중소기업 대표님' : '컨설턴트'}</span>
-                        <span className="t-meta text-slate-500">{t === 'sme' ? '지금까지 고객' : '따로 관리'}</span>
-                      </button>
-                    ))}
-                  </div>
-                </fieldset>
-              )}
+              {!pilot && <ClientTypePicker value={newType} onChange={setNewType} />}
               <label className="text-[0.95rem] font-medium text-slate-700">
                 {!pilot && newType === 'consultant' ? '이름(회사명)' : '업체명'}
                 <input

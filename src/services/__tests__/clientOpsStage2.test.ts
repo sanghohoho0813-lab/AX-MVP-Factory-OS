@@ -31,7 +31,8 @@ import {
   withService,
   withoutFunding,
 } from '../clientOpsService'
-import { clientTypeOf, isClientType, withClientType } from '../clientType'
+import { clientTypeOf, isClientType, suggestClientType, withClientType } from '../clientType'
+import { splitContact } from '../inboxToSales'
 import type { ClientOpsRecord, DocumentKey } from '../../types/clientOps'
 
 let passed = 0
@@ -259,6 +260,30 @@ function withDocs(r: ClientOpsRecord, keys: DocumentKey[], issuedAt = TODAY): Cl
   check('고객 종류(D-181): 되돌리면 표시가 지워져 예전 기록과 같은 모양', !('clientType' in back) && JSON.stringify(normalizeClientOps(back)) === JSON.stringify(normalizeClientOps({ ...again, clientType: undefined })))
   check('고객 종류(D-181): 다른 칸은 그대로(이름 · 서류 · 업무)', back.companyName === '예전업체' && JSON.stringify(back.documents) === JSON.stringify(old.documents) && JSON.stringify(back.services) === JSON.stringify(old.services))
   check('고객 종류(D-181): 이름 판별', isClientType('sme') && isClientType('consultant') && !isClientType('all') && !isClientType(null))
+}
+
+// D-182: 신청서로 고객 종류 미리 고르기 · 한 칸에 섞인 메일/전화 나누기
+{
+  const sug = (payload: Record<string, unknown>, src = '') => suggestClientType(payload, src)
+  check('신청 종류(D-182): 아무 표시 없으면 중소기업 · 이유 없음', sug({ company_name: '알에이비즈파트너스', message: '정책자금 상담 원합니다' }).type === 'sme' && sug({}).reason === '')
+  check('신청 종류(D-182): 신청서 종류 칸이 consultant → 컨설턴트', sug({ client_type: 'consultant' }).type === 'consultant' && sug({ audience: '컨설턴트' }).type === 'consultant')
+  check('신청 종류(D-182): 들어온 곳이 컨설턴트 쪽 → 컨설턴트', sug({}, 'consultant_signup').type === 'consultant' && /컨설턴트 쪽/.test(sug({}, 'consultant_signup').reason))
+  check('신청 종류(D-182): 직업 칸 경영지도사 · 컨설턴트 → 컨설턴트(이유에 적힌 말)', sug({ job: '경영 컨설턴트' }).type === 'consultant' && /경영 컨설턴트/.test(sug({ job: '경영 컨설턴트' }).reason))
+  check('신청 종류(D-182): 문의 글에 "저는 정책자금 컨설턴트입니다" → 컨설턴트', sug({ message: '안녕하세요 저는 정책자금 컨설턴트입니다. 협업 문의드려요' }).type === 'consultant')
+  check('신청 종류(D-182): "컨설턴트님과 상담하고 싶어요" 는 우리 쪽을 부르는 말 → 중소기업', sug({ message: '컨설턴트님과 상담하고 싶어요' }).type === 'sme' && sug({ message: '저는 대표인데 컨설턴트님 연락 부탁드려요' }).type === 'sme')
+  check('신청 종류(D-182): 숫자 · 이상한 값은 무시', sug({ client_type: 3, job: null }).type === 'sme')
+
+  const a = splitContact('rabiz020701@gmail.com / 01054991067', '')
+  check('연락처 나누기(D-182): "메일 / 전화" 한 칸 → 휴대폰 010-5499-1067 · 이메일', a.phone === '010-5499-1067' && a.email === 'rabiz020701@gmail.com', JSON.stringify(a))
+  const b = splitContact('010-1234-5678, kim@corp.co.kr', 'other@x.com')
+  check('연락처 나누기(D-182): 이메일 칸이 이미 있으면 그대로 두고 휴대폰만 정리', b.phone === '010-1234-5678' && b.email === 'other@x.com', JSON.stringify(b))
+  const c = splitContact('', '01098765432')
+  check('연락처 나누기(D-182): 이메일 칸에 전화만 → 휴대폰으로', c.phone === '010-9876-5432' && c.email === '', JSON.stringify(c))
+  const d = splitContact('02-555-1234', 'lee@corp.kr')
+  check('연락처 나누기(D-182): 나눌 것이 없으면 그대로', d.phone === '02-555-1234' && d.email === 'lee@corp.kr', JSON.stringify(d))
+  const e = splitContact('', 'park@corp.kr 010 2222 3333')
+  check('연락처 나누기(D-182): 이메일 칸에 메일 + 전화 → 둘로', e.email === 'park@corp.kr' && e.phone === '010-2222-3333', JSON.stringify(e))
+  check('연락처 나누기(D-182): 빈 칸은 빈 칸', JSON.stringify(splitContact('', '')) === JSON.stringify({ phone: '', email: '' }))
 }
 
 console.log(`\nclient-ops-stage2: ${passed} passed, ${failed} failed`)

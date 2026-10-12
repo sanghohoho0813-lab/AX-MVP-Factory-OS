@@ -651,6 +651,92 @@ for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
   await ctx.close()
 }
 
+/* ---------------- D-182: 새 업체 만드는 곳마다 '어디로 분류할까요?' (대표만) ---------------- */
+for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
+  const ctx = await browser.newContext({ viewport: { width: w, height: h }, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(() => {
+    localStorage.removeItem('axmvp.clients.type')
+    const k = 'axmvp.v1.customer_events'
+    const all = JSON.parse(localStorage.getItem(k) ?? '[]')
+    const at = new Date().toISOString()
+    // 컨설턴트가 홈페이지 상담신청 — 직업 칸에 컨설턴트, 연락처 칸에 메일과 전화를 같이 적었다(대표가 보낸 화면 그대로)
+    all.unshift({
+      id: 'ev_c1', eventType: 'consultation_requested', sourceType: 'homepage_consult', sourceId: 'c1', dedupeKey: 'homepage_consult:c1:consultation_requested',
+      priority: 'high', status: 'new', payload: { company_name: '알에이비즈파트너스', representative_name: '김지만', phone: 'rabiz020701@gmail.com / 01054991067', job: '경영 컨설턴트', message: '협업 상담 원합니다' },
+      occurredAt: at, receivedAt: at,
+    })
+    // 아무 표시 없는 보통 상담신청 — 중소기업이 기본
+    all.unshift({
+      id: 'ev_c2', eventType: 'consultation_requested', sourceType: 'homepage_consult', sourceId: 'c2', dedupeKey: 'homepage_consult:c2:consultation_requested',
+      priority: 'medium', status: 'new', payload: { company_name: '평범제조', representative_name: '박대표', phone: '01011112222', message: '정책자금 상담' },
+      occurredAt: at, receivedAt: at,
+    })
+    localStorage.setItem(k, JSON.stringify(all))
+  })
+  const byName = (name) => page.evaluate((n) => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((c) => c.companyName === n) ?? null, name)
+  await page.goto(BASE + '/ops/inbox', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+
+  // 보통 신청 — 고르는 칸은 보이고 중소기업이 골라져 있다(만들지는 않음)
+  await page.locator('article', { hasText: '평범제조' }).first().getByRole('button', { name: /새 업체로 만들기/ }).click()
+  let dlg = page.getByRole('dialog')
+  await dlg.waitFor()
+  check(`분류(${tag}): 상담신청 › 새 업체 만들기 — '어디로 분류할까요?' 가 보이고 보통 신청은 중소기업`, (await dlg.getByTestId('link-client-type').count()) === 1 && (await dlg.getByTestId('link-client-type-sme').getAttribute('aria-pressed')) === 'true' && (await dlg.getByTestId('link-client-type-hint').count()) === 0)
+  check(`분류(${tag}): 전화만 적힌 칸은 010-1111-2222 로`, (await dlg.getByLabel('휴대폰번호', { exact: true }).inputValue()) === '010-1111-2222')
+  await dlg.getByRole('button', { name: '취소' }).click()
+  await page.waitForTimeout(300)
+
+  // 컨설턴트 신청 — 컨설턴트로 골라 두고 이유를 보여 준다 · 메일/전화를 나눠 채운다
+  await page.locator('article', { hasText: '알에이비즈파트너스' }).first().getByRole('button', { name: /새 업체로 만들기/ }).click()
+  dlg = page.getByRole('dialog')
+  await dlg.waitFor()
+  await page.waitForTimeout(300)
+  check(`분류(${tag}): 신청서 직업 칸 '경영 컨설턴트' → 컨설턴트로 골라 두고 이유 한 줄`, (await dlg.getByTestId('link-client-type-consultant').getAttribute('aria-pressed')) === 'true' && /경영 컨설턴트/.test(await dlg.getByTestId('link-client-type-hint').innerText()))
+  check(`분류(${tag}): '메일 / 전화' 한 칸 → 휴대폰 010-5499-1067 · 이메일 따로`, (await dlg.getByLabel('휴대폰번호', { exact: true }).inputValue()) === '010-5499-1067' && (await dlg.getByLabel('이메일', { exact: true }).inputValue()) === 'rabiz020701@gmail.com')
+  check(`분류(${tag}): 컨설턴트면 칸 이름 '이름(회사명)' · 어디로 들어가는지 안내`, (await dlg.getByLabel('이름(회사명) *').count()) === 1 && /'컨설턴트 고객' 쪽/.test(await dlg.innerText()))
+  check(`분류(${tag}): 창 안 가로 넘침 0`, (await dlg.evaluate((el) => el.scrollWidth - el.clientWidth)) <= 1 && (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0)
+  if (tag === 'PC') {
+    await dlg.getByTestId('link-client-type-sme').click()
+    check('분류: 중소기업으로 바꾸면 이유 줄은 사라지고 칸 이름도 회사명', (await dlg.getByTestId('link-client-type-hint').count()) === 0 && (await dlg.getByLabel('회사명 *').count()) === 1)
+    await dlg.getByTestId('link-client-type-consultant').click()
+  }
+  await dlg.getByRole('button', { name: '만들고 연결' }).click()
+  await page.waitForTimeout(900)
+  const made = await byName('알에이비즈파트너스')
+  check(`분류(${tag}): 만들면 컨설턴트 고객 · 잠재고객 · 연락처 나뉘어 저장 · 활동 기록에 종류`, made?.clientType === 'consultant' && made?.status === 'waiting' && made?.sales?.stage === 'lead' && made?.contactPhone === '010-5499-1067' && made?.contactEmail === 'rabiz020701@gmail.com' && /컨설턴트 고객/.test(JSON.stringify(made?.activity ?? [])), JSON.stringify({ t: made?.clientType, p: made?.contactPhone, e: made?.contactEmail }))
+  const toast = page.getByTestId('toast-stack')
+  check(`분류(${tag}): 알림이 어디로 갔는지 말한다 · '컨설턴트 고객 보기'`, /컨설턴트 고객으로 등록/.test(await toast.innerText()) && (await toast.getByTestId('toast-action').innerText()).includes('컨설턴트 고객 보기'))
+  check(`분류(${tag}): 상담신청 카드에도 '컨설턴트 고객'`, (await page.locator('article', { hasText: '알에이비즈파트너스' }).first().getByTestId('event-client-type').innerText()) === '컨설턴트 고객')
+  await toast.getByTestId('toast-action').click()
+  await page.waitForURL(/\/ops\/clients\?type=consultant/)
+  await page.waitForTimeout(500)
+  check(`분류(${tag}): 누르면 고객 관리 › 컨설턴트 고객 쪽 · 방금 만든 업체가 보인다`, (await page.getByTestId('client-type-consultant').getAttribute('aria-selected')) === 'true' && (await page.locator('main').innerText()).includes('알에이비즈파트너스'))
+
+  if (tag === 'PC') {
+    // 영업 보드 › 새 잠재고객 — 같은 고르기, 고른 쪽으로
+    await page.goto(BASE + '/sales/board', { waitUntil: 'networkidle' })
+    await page.waitForTimeout(400)
+    await page.getByRole('button', { name: /새 잠재고객/ }).click()
+    const pd = page.getByRole('dialog', { name: '새 잠재고객' })
+    check('분류: 영업 보드 새 잠재고객 — 고르는 칸 · 기본 중소기업', (await pd.getByTestId('prospect-client-type-sme').getAttribute('aria-pressed')) === 'true')
+    await pd.getByTestId('prospect-client-type-consultant').click()
+    await pd.getByLabel('이름(회사명) *').fill('보드컨설팅')
+    await pd.getByRole('button', { name: '잠재고객 등록' }).click()
+    await page.waitForTimeout(700)
+    const bc = await byName('보드컨설팅')
+    check('분류: 보드에서 만든 것도 컨설턴트 고객 · 잠재 고객 칸', bc?.clientType === 'consultant' && bc?.sales?.stage === 'lead')
+    check('분류: 보드 카드에 "컨설턴트" 표시(중소기업 카드는 없음)', (await page.locator('[data-testid="sales-card"]', { hasText: '보드컨설팅' }).getByTestId('sales-card-consultant').count()) >= 1 && (await page.locator('[data-testid="sales-card"]', { hasText: '한솔테크' }).getByTestId('sales-card-consultant').count()) === 0)
+    // 크레탑 등록 화면 — 새로 만들 때만 고르는 칸(붙이기에는 없음)은 qa:journey 의 크레탑 흐름이 그대로 지나가는지로 본다
+  }
+  check(`분류(${tag}): JS 오류 없음`, errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\nsales: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

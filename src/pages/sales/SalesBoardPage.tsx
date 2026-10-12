@@ -55,6 +55,9 @@ import {
   type SalesStage,
 } from '../../types/clientOps'
 import { josa } from '../../lib/josa'
+import { useIsPilot } from '../../auth/osAccess'
+import { CLIENT_TYPE_LABEL, clientTypeOf, rememberClientTypeView, type ClientType } from '../../services/clientType'
+import { ClientTypePicker } from '../../components/ops/ClientTypePicker'
 
 const PICK_KEY = 'axmvp.sales.board.stage'
 
@@ -80,7 +83,7 @@ function StageSelect({ record, onMove }: { record: ClientOpsRecord; onMove: (r: 
 }
 
 /** 보드 카드 한 장 — 이름 · 누구 · 어디서 왔나 · 예상 수임료 · 머문 날 · 다음 할 일 */
-function SalesCard({ record, today, grants, onOpen, onMove }: { record: ClientOpsRecord; today: string; grants?: ClientGrantSummary; onOpen: () => void; onMove: (r: ClientOpsRecord, s: SalesStage) => void }) {
+function SalesCard({ record, today, grants, consultant = false, onOpen, onMove }: { record: ClientOpsRecord; today: string; grants?: ClientGrantSummary; consultant?: boolean; onOpen: () => void; onMove: (r: ClientOpsRecord, s: SalesStage) => void }) {
   const s = record.sales
   const stage = salesStageOf(record)
   const days = daysInStage(record)
@@ -98,8 +101,12 @@ function SalesCard({ record, today, grants, onOpen, onMove }: { record: ClientOp
         {/* D-125: 카드에서 바로 전화 */}
         <CallButton phone={record.contactPhone.trim() || record.companyPhone.trim()} name={record.companyName} />
       </div>
-      {(who || s?.source) && (
-        <p className="t-meta truncate text-slate-500">{[who, s?.source, s?.referrer ? `소개 ${s.referrer}` : ''].filter(Boolean).join(' · ')}</p>
+      {(who || s?.source || consultant) && (
+        <p className="t-meta truncate text-slate-500">
+          {/* D-182: 컨설턴트 고객이면 보드에서도 보이게(대표 화면) */}
+          {consultant && <span data-testid="sales-card-consultant" className="mr-1 rounded-full bg-slate-100 px-1.5 font-semibold text-slate-600">컨설턴트</span>}
+          {[who, s?.source, s?.referrer ? `소개 ${s.referrer}` : ''].filter(Boolean).join(' · ')}
+        </p>
       )}
       {s && s.interests.length > 0 && stageReached(record, 'm1done') && (
         <p className="t-meta truncate text-slate-600">{s.interests.slice(0, 3).join(' · ')}{s.interests.length > 3 ? ` 외 ${s.interests.length - 3}` : ''}</p>
@@ -143,14 +150,17 @@ interface ProspectForm {
   interests: string[]
   concern: string
   feeManwon: string
+  /** D-182: 어디로 분류할지(대표만 고른다) */
+  clientType: ClientType
 }
 
-const EMPTY_FORM: ProspectForm = { companyName: '', contactName: '', contactPhone: '', source: '', referrer: '', interests: [], concern: '', feeManwon: '' }
+const EMPTY_FORM: ProspectForm = { companyName: '', contactName: '', contactPhone: '', source: '', referrer: '', interests: [], concern: '', feeManwon: '', clientType: 'sme' }
 
 const inputClass = 'mt-1 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.95rem] text-slate-800 focus:border-brand-500 focus:outline-none'
 
 function NewProspectModal({ open, busy, onClose, onSubmit }: { open: boolean; busy: boolean; onClose: () => void; onSubmit: (f: ProspectForm) => void }) {
   const [f, setF] = useState<ProspectForm>(EMPTY_FORM)
+  const pilot = useIsPilot()
   useEffect(() => {
     if (open) setF(EMPTY_FORM)
   }, [open])
@@ -170,10 +180,17 @@ function NewProspectModal({ open, busy, onClose, onSubmit }: { open: boolean; bu
         </>
       }
     >
-      <p className="t-sub break-keep text-slate-500">계약 전 업체로 등록됩니다. 고객 관리 '잠재고객' 에도 같이 보이고, 계약하면 계약 고객으로 넘어갑니다.</p>
+      {!pilot && (
+        <div className="mb-3">
+          <ClientTypePicker value={f.clientType} onChange={(t) => set('clientType', t)} testId="prospect-client-type" />
+        </div>
+      )}
+      <p className="t-sub break-keep text-slate-500">
+        계약 전 업체로 등록됩니다. 고객 관리{!pilot ? ` '${CLIENT_TYPE_LABEL[f.clientType]}' 쪽` : ''} '잠재고객' 에도 같이 보이고, 계약하면 계약 고객으로 넘어갑니다.
+      </p>
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="block text-[0.875rem] text-slate-500">
-          회사명 *
+          {!pilot && f.clientType === 'consultant' ? '이름(회사명) *' : '회사명 *'}
           <input value={f.companyName} onChange={(e) => set('companyName', e.target.value)} className={inputClass} />
         </label>
         <label className="block text-[0.875rem] text-slate-500">
@@ -214,6 +231,7 @@ function NewProspectModal({ open, busy, onClose, onSubmit }: { open: boolean; bu
 
 function BoardContent({ workspaceId }: { workspaceId: string | null }) {
   const phone = useIsPhone()
+  const pilot = useIsPilot()
   const [allRisks, setAllRisks] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
@@ -356,12 +374,15 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
     if (!f.companyName.trim()) return
     setBusy(true)
     let created: ClientOpsRecord | null = null
+    // D-182: 대표가 고른 쪽으로 바로 — 팀장 화면은 늘 중소기업 고객
+    const asType: ClientType = pilot ? 'sme' : f.clientType
     try {
       created = await createClient(workspaceId, {
         companyName: f.companyName,
         contactName: f.contactName,
         contactPhone: f.contactPhone,
         status: 'waiting',
+        ...(asType === 'consultant' ? { clientType: 'consultant' as const } : {}),
       })
       const fee = parseInt(f.feeManwon, 10)
       const next = withSalesInfo(withNewProspect(created, f.source), {
@@ -374,7 +395,8 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
       setRecords((list) => [saved, ...list])
       setFormOpen(false)
       setPicked('lead')
-      showToast(`${saved.companyName} — 잠재고객으로 등록했습니다.`)
+      if (!pilot) rememberClientTypeView(asType)
+      showToast(asType === 'consultant' ? `${saved.companyName} — 컨설턴트 고객 · 잠재고객으로 등록했습니다.` : `${saved.companyName} — 잠재고객으로 등록했습니다.`)
     } catch (cause) {
       const msg = cause instanceof Error ? cause.message : '등록하지 못했습니다.'
       if (created) {
@@ -412,7 +434,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
       ) : (
         <ul className={`grid gap-2 ${stage === 'hold' || stage === 'lost' ? 'sm:grid-cols-2 2xl:grid-cols-3' : ''}`}>
           {list.map((r) => (
-            <SalesCard key={r.id} record={r} today={today} grants={grantSums.get(r.id)} onOpen={() => open(r)} onMove={(rec, s) => void move(rec, s)} />
+            <SalesCard key={r.id} record={r} today={today} grants={grantSums.get(r.id)} consultant={!pilot && clientTypeOf(r) === 'consultant'} onOpen={() => open(r)} onMove={(rec, s) => void move(rec, s)} />
           ))}
         </ul>
       )}
@@ -572,7 +594,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
             ) : (
               <ul className="grid gap-2 sm:grid-cols-2">
                 {groups[picked].map((r) => (
-                  <SalesCard key={r.id} record={r} today={today} grants={grantSums.get(r.id)} onOpen={() => open(r)} onMove={(rec, s) => void move(rec, s)} />
+                  <SalesCard key={r.id} record={r} today={today} grants={grantSums.get(r.id)} consultant={!pilot && clientTypeOf(r) === 'consultant'} onOpen={() => open(r)} onMove={(rec, s) => void move(rec, s)} />
                 ))}
               </ul>
             )}

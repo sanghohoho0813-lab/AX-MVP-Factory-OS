@@ -68,6 +68,7 @@ const FIELD_LABEL: Record<string, string> = {
 export function EventCard({
   event,
   clientName,
+  clientTag = null,
   onLink,
   onCreateClient,
   onStatus,
@@ -75,6 +76,8 @@ export function EventCard({
 }: {
   event: CustomerEvent
   clientName: string | null
+  /** D-182: 연결된 업체가 어느 쪽인지(대표 화면에서 컨설턴트 고객일 때만 '컨설턴트 고객') */
+  clientTag?: string | null
   onLink: () => void
   onCreateClient: () => void
   onStatus: (status: CustomerEventStatus) => void
@@ -134,6 +137,11 @@ export function EventCard({
         ) : (
           <span className="inline-flex items-center gap-1 text-slate-500">
             <Link2 aria-hidden="true" className="size-3.5" /> 아직 업체와 연결되지 않음
+          </span>
+        )}
+        {event.operationsClientId && clientTag && (
+          <span data-testid="event-client-type" className="t-meta rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">
+            {clientTag}
           </span>
         )}
         {suggestion && <span className="text-slate-500">· 추천: {suggestion.shortLabel}</span>}

@@ -4,12 +4,13 @@
  */
 import { useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Check, CheckCheck, X } from 'lucide-react'
+import { ArrowRight, Check, CheckCheck, ChevronDown, ExternalLink, X } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import type { JournalEntry, PortalClientLink } from '../../types/bridge'
 import { DECISION_KIND_LABEL, buildAllDecisions, undoDecision, weekdayOnOrAfter, withDecisionAnswer, type Decision, type DecisionKind } from '../../services/decisions'
 import { saveClient } from '../../services/clientOpsService'
 import type { GrantNotice } from '../../services/grants/grantMatch'
+import type { GrantBrief } from '../../services/grants/grantBrief'
 import { createJournalEntry, deleteJournalEntry } from '../../services/journalService'
 import { listDocuments, requestDocument } from '../../services/customerBridgeService'
 import { addDaysLocal } from '../../services/clientOpsNextAction'
@@ -217,6 +218,65 @@ export function useDecisionAnswer({
   return { answer, answerMany, busy }
 }
 
+/**
+ * D-182: 맞는 공고 한 장 핵심 — '자세히' 를 누르면 그 자리에서 펼친다(다른 화면으로 가지 않는다).
+ * 금액을 맨 앞 · 크게. 다른 공고까지 보려면 아래 '이 업체 공고 더 보기'.
+ */
+function GrantBriefPanel({ b, morePath }: { b: GrantBrief; morePath: string | null }) {
+  const row = (label: string, value: string, strong = false) =>
+    value ? (
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <dt className="t-meta font-semibold text-slate-500">{label}</dt>
+        <dd className={`break-keep [overflow-wrap:anywhere] ${strong ? 'text-[1.05rem] font-bold text-slate-900' : 't-sub text-slate-800'}`}>{value}</dd>
+      </div>
+    ) : null
+  return (
+    <div data-testid="decision-grant-brief" className="flex flex-col gap-3 rounded-(--radius-control) border border-cat-fund-200 bg-cat-fund-50/50 p-3 sm:p-4">
+      <dl className="grid grid-cols-1 gap-x-4 gap-y-2.5 sm:grid-cols-2">
+        <div data-testid="grant-brief-amount">{row('지원 금액', b.amount || '공고에 금액이 안 적혀 있어요', !!b.amount)}</div>
+        {row('접수 기간', [b.period, b.deadline].filter(Boolean).join(' · '))}
+        {row('선정 규모', b.slots)}
+        {row('분야 · 기관', [b.category, b.agency].filter(Boolean).join(' · '))}
+      </dl>
+      {b.target && (
+        <div className="flex flex-col gap-0.5">
+          <p className="t-meta font-semibold text-slate-500">지원 대상</p>
+          <p className="t-sub break-keep [overflow-wrap:anywhere] text-slate-800">{b.target}</p>
+        </div>
+      )}
+      {(b.fits.length > 0 || b.conditions.length > 0) && (
+        <div className="flex flex-col gap-1">
+          <p className="t-meta font-semibold text-slate-500">{b.fits.length > 0 ? '이 업체와 맞는 조건' : '공고 조건'}</p>
+          <ul className="flex flex-col gap-0.5" data-testid="grant-brief-fits">
+            {(b.fits.length > 0 ? b.fits : b.conditions).map((t) => (
+              <li key={t} className="t-sub flex items-start gap-1.5 break-keep [overflow-wrap:anywhere] text-slate-800">
+                <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-success-600" />
+                <span className="min-w-0">{t}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {b.checks.length > 0 && (
+        <p className="t-sub break-keep [overflow-wrap:anywhere] text-warning-800">더 확인할 것 — {b.checks.join(' · ')}</p>
+      )}
+      {b.summary && <p className="t-sub break-keep [overflow-wrap:anywhere] text-slate-600">{b.summary}</p>}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        {b.url && (
+          <a href={b.url} target="_blank" rel="noreferrer noopener" data-testid="grant-brief-source" className="tap t-sub inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline">
+            공고 원문 <ExternalLink aria-hidden="true" className="size-4" />
+          </a>
+        )}
+        {morePath && (
+          <Link to={morePath} data-testid="grant-brief-more" className="tap t-sub inline-flex items-center gap-1 font-semibold text-slate-600 hover:text-brand-700 hover:underline">
+            이 업체 공고 더 보기 <ArrowRight aria-hidden="true" className="size-4" />
+          </Link>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function DecisionList({
   decisions,
   busy,
@@ -234,6 +294,8 @@ export function DecisionList({
   linked?: (clientId: string) => boolean
 }) {
   const shown = limit ? decisions.slice(0, limit) : decisions
+  // D-182: 펼친 공고 하나(다시 누르면 접힌다)
+  const [openId, setOpenId] = useState<string | null>(null)
   return (
     <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-panel) border border-slate-200 bg-white" data-testid="decision-list">
       {shown.map((d) => (
@@ -255,12 +317,26 @@ export function DecisionList({
             <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => onAnswer(d, 'no')} data-testid="decision-no">
               <X aria-hidden="true" className="size-4" /> {d.noLabel}
             </Button>
-            {d.openPath && (
-              <Link to={d.openPath} className="tap t-sub ml-auto inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline">
-                자세히 <ArrowRight aria-hidden="true" className="size-4" />
-              </Link>
+            {d.grant ? (
+              <button
+                type="button"
+                aria-expanded={openId === `${d.clientId}:${d.id}`}
+                data-testid="decision-more"
+                onClick={() => setOpenId((cur) => (cur === `${d.clientId}:${d.id}` ? null : `${d.clientId}:${d.id}`))}
+                className="tap t-sub ml-auto inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline"
+              >
+                {openId === `${d.clientId}:${d.id}` ? '접기' : '자세히'}
+                <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${openId === `${d.clientId}:${d.id}` ? 'rotate-180' : ''}`} />
+              </button>
+            ) : (
+              d.openPath && (
+                <Link to={d.openPath} className="tap t-sub ml-auto inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline">
+                  자세히 <ArrowRight aria-hidden="true" className="size-4" />
+                </Link>
+              )
             )}
           </div>
+          {d.grant && openId === `${d.clientId}:${d.id}` && <GrantBriefPanel b={d.grant} morePath={d.openPath} />}
         </li>
       ))}
     </ul>

@@ -10,6 +10,8 @@ import { EventCard } from '../components/ops/EventCard'
 import { LinkCustomerModal } from '../components/ops/LinkCustomerModal'
 import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { listClients } from '../services/clientOpsService'
+import { CLIENT_TYPE_LABEL, clientTypeOf } from '../services/clientType'
+import { useIsPilot } from '../auth/osAccess'
 import { EVENT_TYPE_LABEL, isOpenEvent, listEvents, seedDemoEvents, updateEvent, waitingDays } from '../services/customerBridgeService'
 import { todayLocalDate } from '../lib/appClock'
 import { getDataModeConfig } from '../data/dataMode'
@@ -54,6 +56,7 @@ function isNotReadyError(cause: unknown): boolean {
 function InboxContent({ workspaceId }: { workspaceId: string | null }) {
   const { showToast } = useToast()
   const navigate = useNavigate()
+  const pilot = useIsPilot()
   const isLocal = getDataModeConfig().mode === 'local'
   const [events, setEvents] = useState<CustomerEvent[]>([])
   const [clients, setClients] = useState<ClientOpsRecord[]>([])
@@ -109,6 +112,8 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
   }, [load])
 
   const clientNames = useMemo(() => new Map(clients.map((c) => [c.id, c.companyName])), [clients])
+  // D-182: 연결된 업체가 컨설턴트 고객이면 카드에 표시(대표 화면)
+  const consultantIds = useMemo(() => new Set(pilot ? [] : clients.filter((c) => clientTypeOf(c) === 'consultant').map((c) => c.id)), [clients, pilot])
 
   const visible = useMemo(() => {
     const list = events.filter((e) => matchesStatus(e, filter) && (typeFilter === 'all' || e.eventType === typeFilter))
@@ -310,6 +315,7 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
               <EventCard
                 event={e}
                 clientName={e.operationsClientId ? (clientNames.get(e.operationsClientId) ?? null) : null}
+                clientTag={e.operationsClientId && consultantIds.has(e.operationsClientId) ? CLIENT_TYPE_LABEL.consultant : null}
                 onLink={() => setLinking({ event: e, tab: 'existing' })}
                 onCreateClient={() => setLinking({ event: e, tab: 'new' })}
                 onStatus={(status) => void setStatus(e, status)}
@@ -326,12 +332,22 @@ function InboxContent({ workspaceId }: { workspaceId: string | null }) {
           workspaceId={workspaceId}
           initialTab={linking.tab}
           onClose={() => setLinking(null)}
-          onDone={(updated, link) => {
+          onDone={(updated, link, created) => {
             setLinking(null)
             setEvents((list) => list.map((e) => (e.id === updated.id ? updated : e)))
             // D-122: 다음 걸음 — 미팅 준비(1차 = 크레탑 분석기)로 바로
             const cid = updated.operationsClientId
-            showToast(link ? '업체와 고객 계정을 연결했습니다.' : '업체에 연결했습니다.', cid ? { label: '미팅 준비 →', onClick: () => navigate(`/sales/meeting?client=${cid}&round=1`) } : undefined)
+            // D-182: 새로 만들었으면 어디로 들어갔는지 말한다 — 컨설턴트 고객은 고객 관리 › 컨설턴트 고객으로 바로
+            const made = created && !pilot ? clientTypeOf(created) : null
+            const text = made
+              ? `${created?.companyName} — ${CLIENT_TYPE_LABEL[made]}으로 등록하고 ${link ? '고객 계정까지 ' : ''}연결했습니다.`
+              : link ? '업체와 고객 계정을 연결했습니다.' : '업체에 연결했습니다.'
+            showToast(
+              text,
+              made === 'consultant'
+                ? { label: '컨설턴트 고객 보기 →', onClick: () => navigate('/ops/clients?type=consultant') }
+                : cid ? { label: '미팅 준비 →', onClick: () => navigate(`/sales/meeting?client=${cid}&round=1`) } : undefined,
+            )
             void load()
           }}
         />

@@ -52,6 +52,7 @@ import { recommendNextSteps } from '../clientInsights'
 import { buildClientReport } from '../clientReport'
 import { DECISION_BULK_KINDS, buildDecisions, paymentReminderMessage, undoDecision, weekdayOnOrAfter, withDecisionAnswer } from '../decisions'
 import { buildClientAlerts } from '../clientOpsAlerts'
+import { clip, grantBriefOf } from '../grants/grantBrief'
 import { isGrantBookmark } from '../../types/clientOps'
 
 let pass = 0
@@ -923,6 +924,39 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   check('금액 글: 1억 5천만원 · 3천만원 · 300만원', manText(15000) === '1억 5천만원' && manText(3000) === '3천만원' && manText(300) === '300만원' && manText(10000) === '1억원')
   const ex = exampleNotices(T0).map((x, i) => ({ ...x, id: `e${i}`, createdAt: '', updatedAt: '' }) as GrantNotice)
   check('예시 공고 6개는 기본 기준에서 다 남는다', ex.every((x) => J(x).pass), ex.filter((x) => !J(x).pass).map((x) => x.title))
+}
+
+// D-182: 오늘 · 확인할 것 '자세히' — 그 공고 하나 핵심만(금액 · 기간 · 대상 · 맞는 조건 · 원문)
+{
+  const T = '2026-10-06'
+  const rec = normalizeClientOps({ id: 'b1', companyName: '요약상사', status: 'active', businessAddress: '경기도 파주시 문산읍 1', industry: '제조업', establishedAt: '2022-03-01' } as never)
+  const n1 = notice(
+    { regions: ['경기'], industries: ['제조업'] },
+    {
+      id: 'nb1', title: '경기 제조 혁신 바우처', applyStart: '2026-10-01', applyEnd: '2026-10-25', applyEndTime: '18:00', amountText: '기업당 최대 5천만원',
+      operator: '경기테크노파크', target: '경기도 소재 제조업 중소기업(업력 7년 이내)으로서 공고일 현재 휴·폐업 중이 아닌 기업. 단, 국세 체납 기업은 제외합니다. 세부 요건은 공고문을 확인하세요.',
+      summary: '제조 공정 개선 · 스마트화를 위한 바우처를 지원합니다. 총 20개사 내외 선정.', url: 'https://www.bizinfo.go.kr/x',
+    },
+  )
+  const ds = buildDecisions(rec, T, [n1])
+  const g = ds.find((d) => d.kind === 'grant')
+  const b = g?.grant
+  check('공고 요약(D-182): 맞는 공고 결정에 요약이 붙는다(다른 화면으로 가지 않아도 됨)', !!b && b.noticeId === 'nb1', ds.map((d) => d.kind))
+  check('공고 요약(D-182): 지원 금액 — 글 그대로 · 맨 앞', b?.amount === '기업당 최대 5천만원' || b?.amount === '최대 5천만원', b?.amount)
+  check('공고 요약(D-182): 접수 기간 10.01 ~ 10.25 18:00 · 마감까지', b?.period === '10.01 ~ 10.25 18:00' && /마감|D-/.test(b?.deadline ?? ''), [b?.period, b?.deadline])
+  check('공고 요약(D-182): 선정 규모 20곳 · 분야 · 기관(소관 · 수행)', b?.slots === '선정 20곳' && b?.category !== '' && b?.agency === '중소벤처기업부 · 경기테크노파크', [b?.slots, b?.agency])
+  check('공고 요약(D-182): 이 업체와 맞는 조건(지역 · 업종)', !!b && b.fits.some((t) => t.startsWith('지역')) && b.fits.some((t) => t.startsWith('업종')), b?.fits)
+  check('공고 요약(D-182): 지원 대상은 짧게(140자 안 · …)', !!b && b.target.length <= 141 && b.target.length > 20, b?.target.length)
+  check('공고 요약(D-182): 원문 주소 · 더 보기 길은 따로(openPath 그대로)', b?.url === 'https://www.bizinfo.go.kr/x' && g?.openPath === '/grants?view=clients&client=b1')
+  // 금액을 못 읽으면 지어내지 않는다
+  const n2 = notice({ regions: ['경기'] }, { id: 'nb2', title: '경기 판로 지원', amountText: '' })
+  const b2 = grantBriefOf(matchGrant(n2, prof(BASE), T))
+  check('공고 요약(D-182): 금액이 안 적힌 공고는 빈 칸(숫자를 지어내지 않음) · 선정 규모 없음', b2.amount === '' && b2.slots === '', [b2.amount, b2.slots])
+  const b3 = grantBriefOf(matchGrant(notice({}, { id: 'nb3', deadlineKind: 'always', applyEnd: '' }), prof(BASE), T))
+  const b4 = grantBriefOf(matchGrant(notice({}, { id: 'nb4', deadlineKind: 'first_come', applyStart: '2026-10-02', applyEnd: '' }), prof(BASE), T))
+  check('공고 요약(D-182): 상시 접수 · 예산 소진 시까지', b3.period === '상시 접수' && b4.period === '10.02부터 예산 소진 시까지', [b3.period, b4.period])
+  check('공고 요약(D-182): 다른 결정(정보 · 서류)에는 요약이 없다', ds.filter((d) => d.kind !== 'grant').every((d) => d.grant === undefined))
+  check('공고 요약(D-182): 자르기 — 짧으면 그대로 · 길면 …', clip('짧은 글', 10) === '짧은 글' && clip('가'.repeat(50), 10).endsWith('…') && clip('가'.repeat(50), 10).length === 11)
 }
 
 console.log(`\ngrants: ${pass} passed, ${fail} failed`)

@@ -24,6 +24,7 @@ import { buildDocumentRequestMessage } from './clientOpsMessages'
 import { matchesFor, type GrantNotice } from './grants/grantMatch'
 import { profileOfRecord } from './grants/grantProfile'
 import { applicationFor, withGrantChallenge } from './grants/grantApply'
+import { grantBriefOf, type GrantBrief } from './grants/grantBrief'
 import { feeStateOf, fundingFactsOf } from './feeStatus'
 import { withService } from './clientOpsService'
 import { withActivity } from './clientOpsActivity'
@@ -77,6 +78,8 @@ export interface Decision {
   rank: number
   /** D-160: [맞아요] 뒤 알림 글(없으면 효과 종류로 정한다) */
   doneText?: string
+  /** D-182: 맞는 공고 — '자세히' 를 누르면 그 자리에서 펼칠 핵심(금액 · 기간 · 대상 · 맞는 조건) */
+  grant?: GrantBrief
 }
 
 export interface DecisionAnswer {
@@ -177,8 +180,10 @@ export function buildDecisions(record: ClientOpsRecord, today: string, notices: 
           yesLabel: '도전해 볼 만함',
           noLabel: '안 함',
           effect: { type: 'grant', noticeId: m.notice.id },
+          // 다른 공고까지 보는 곳 — '자세히' 는 그 자리에서 이 공고만 펼친다(D-182)
           openPath: `/grants?view=clients&client=${encodeURIComponent(record.id)}`,
           rank: 40,
+          grant: grantBriefOf(m),
         })
       }
     } catch {

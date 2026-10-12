@@ -122,7 +122,7 @@ import { BulkDocUploadSheet } from '../components/ops/BulkDocUploadSheet'
 import { netAmountOf } from '../services/feeMath'
 import { fundingFactsOf, isWaiting } from '../services/feeStatus'
 import { withActivity } from '../services/clientOpsActivity'
-import { CLIENT_TYPE_LABEL, clientTypeOf, withClientType } from '../services/clientType'
+import { CLIENT_TYPE_LABEL, clientTypeOf, rememberClientTypeView, withClientType } from '../services/clientType'
 import { allDocumentMetas, emptyDocumentState } from '../services/clientOpsDocuments'
 import { ActivityLog } from '../components/ops/ActivityLog'
 import { ClientSalesCard } from '../components/sales/ClientSalesCard'
@@ -1754,11 +1754,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                     void commit(next).then((ok) => {
                       if (!ok) return
                       // 고객 관리로 돌아가면 옮긴 쪽이 보이게
-                      try {
-                        localStorage.setItem('axmvp.clients.type', to)
-                      } catch {
-                        /* 기억 못 해도 옮기기는 됐다 */
-                      }
+                      rememberClientTypeView(to)
                       showToast(`${CLIENT_TYPE_LABEL[to]}으로 옮겼습니다. 고객 관리 › ${CLIENT_TYPE_LABEL[to]}에서 봅니다.`)
                     })
                   }}

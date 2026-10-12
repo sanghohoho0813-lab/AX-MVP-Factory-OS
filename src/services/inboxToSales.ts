@@ -10,6 +10,7 @@
 import type { ClientOpsRecord } from '../types/clientOps'
 import { SALES_INTERESTS } from '../content/salesCatalog'
 import { withSalesInfo } from './salesPipeline'
+import { formatPhone } from '../lib/format'
 
 const INTEREST_WORDS: [string, RegExp][] = [
   ['절세', /절세|세금/],
@@ -33,6 +34,36 @@ export function interestsFromText(text: string): string[] {
     if ((SALES_INTERESTS as readonly string[]).includes(name) && re.test(text) && !out.includes(name)) out.push(name)
   }
   return out
+}
+
+const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/
+const trimSeparators = (s: string) => s.replace(/^[\s/,·|;]+|[\s/,·|;]+$/g, '').trim()
+
+/**
+ * D-182: 고객이 한 칸에 '메일 / 전화' 를 같이 적어 보낸 것을 나눈다 — 휴대폰 칸에 메일이 들어가 있지 않게.
+ * 이메일 칸이 비어 있을 때만 옮기고, 남은 전화번호는 010-0000-0000 으로. 나눌 것이 없으면 그대로.
+ */
+export function splitContact(phone: string, email: string): { phone: string; email: string } {
+  let p = phone.trim()
+  let e = email.trim()
+  const inPhone = EMAIL_RE.exec(p)
+  if (inPhone) {
+    if (!e) e = inPhone[0]
+    p = trimSeparators(p.replace(inPhone[0], ' '))
+  }
+  // 이메일 칸에 전화번호만 들어온 경우(골뱅이 없음 · 숫자 9자리 이상)
+  if (e && !e.includes('@') && e.replace(/\D/g, '').length >= 9) {
+    if (!p) p = e
+    e = ''
+  }
+  const inEmail = EMAIL_RE.exec(e)
+  if (inEmail && inEmail[0] !== e) {
+    const rest = trimSeparators(e.replace(inEmail[0], ' '))
+    if (!p && rest.replace(/\D/g, '').length >= 9) p = rest
+    e = inEmail[0]
+  }
+  if (p && /^[\d\s()+-]+$/.test(p)) p = formatPhone(p)
+  return { phone: p, email: e }
 }
 
 export function withInboxPayload(record: ClientOpsRecord, payload: Record<string, unknown>, today: string): ClientOpsRecord {

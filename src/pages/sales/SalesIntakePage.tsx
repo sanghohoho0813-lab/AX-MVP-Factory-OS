@@ -35,6 +35,9 @@ import type { CretopMiniUi } from '../../tools/cretop/mini/MiniApp.jsx'
 import { SALES_SOURCES } from '../../content/salesCatalog'
 import { todayLocalDate } from '../../lib/appClock'
 import type { ClientOpsRecord } from '../../types/clientOps'
+import { useIsPilot } from '../../auth/osAccess'
+import { rememberClientTypeView, type ClientType } from '../../services/clientType'
+import { ClientTypePicker } from '../../components/ops/ClientTypePicker'
 
 const inputClass = 'mt-1 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-[0.95rem] text-slate-800 focus:border-brand-500 focus:outline-none'
 const TIER_TONE: Record<CretopTier, Tone> = { top: 'brand', rec: 'success', cond: 'warning', low: 'neutral' }
@@ -101,6 +104,9 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
   const [contactPhone, setContactPhone] = useState('')
   const [meetingDate, setMeetingDate] = useState('')
   const [asNew, setAsNew] = useState(false)
+  // D-182: 새로 만들 때 어디로 분류할지(대표만) — 크레탑은 회사 보고서라 기본은 중소기업
+  const pilot = useIsPilot()
+  const [ctype, setCtype] = useState<ClientType>('sme')
   const [saving, setSaving] = useState(false)
   // D-120: 분석해 놓고 등록 전에 다른 곳으로 가면 묻는다(읽은 보고서 · 적은 칸이 사라지므로)
   const { blocker, allowNavigation } = useUnsavedChangesGuard(ui !== null && !saving)
@@ -175,7 +181,9 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
     if (!ui) return
     setSaving(true)
     try {
-      const res = await registerFromCretop({ workspaceId, ui, existing, source, contactName, contactPhone, meetingDate, file })
+      const asType: ClientType = pilot || existing ? 'sme' : ctype
+      const res = await registerFromCretop({ workspaceId, ui, existing, source, contactName, contactPhone, meetingDate, file, ...(asType === 'consultant' ? { clientType: 'consultant' as const } : {}) })
+      if (!pilot && res.created) rememberClientTypeView(asType)
       const what = res.created ? '잠재고객으로 등록했습니다' : `${res.record.companyName}에 붙였습니다`
       showToast(`${what} — 기본 정보 ${res.filled.length}칸${res.uploaded ? ' · 서류함에 보고서' : ''}.`)
       for (const w of res.warnings) showToast(w)
@@ -319,6 +327,7 @@ function IntakeContent({ workspaceId }: { workspaceId: string | null }) {
                   {c.creditGrade && <Badge tone="neutral">신용 {c.creditGrade}</Badge>}
                 </div>
                 <p className="t-meta -mt-2 text-slate-500">{existing ? '이 업체의 빈 칸에 채웁니다' : '새 잠재고객의 기본 정보로 들어갑니다'}</p>
+                {!existing && !pilot && <ClientTypePicker value={ctype} onChange={setCtype} testId="intake-client-type" />}
                 <dl className="flex flex-col divide-y divide-slate-100">
                   <Row label="사업자번호" value={c.bizNo} kept={has(existing?.businessNumber ?? '')} />
                   <Row label="법인번호" value={c.corpRegNo} kept={has(existing?.corporateNumber ?? '')} />

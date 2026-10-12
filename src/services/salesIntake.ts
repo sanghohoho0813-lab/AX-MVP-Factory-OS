@@ -32,6 +32,8 @@ export interface CretopIntakeInput {
   at?: string
   /** false 면 크레탑 분석 이력은 건드리지 않는다 — 크레탑 작업대가 이미 저장한 경우(D-121) */
   saveHistory?: boolean
+  /** D-182: 새로 만들 때 컨설턴트 고객으로(대표가 고른 경우만) — 붙이기에는 쓰지 않는다 */
+  clientType?: 'consultant'
 }
 
 export interface CretopIntakeResult {
@@ -75,6 +77,7 @@ export async function registerFromCretop(input: CretopIntakeInput): Promise<Cret
       contactPhone: input.contactPhone ?? '',
       businessNumber: d.company.bizNo,
       status: 'waiting',
+      ...(input.clientType === 'consultant' ? { clientType: 'consultant' as const } : {}),
     }))
   if (!created) {
     // D-150: 보관해 둔 업체에 크레탑을 다시 붙이면 보관을 푼다 — 예전에는 보드 · 목록에 안 보이는 업체에 들어가 '등록했는데 없다' 가 됐다

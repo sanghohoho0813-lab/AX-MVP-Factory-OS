@@ -657,6 +657,68 @@ function feedItems(n) {
   await m.close()
 }
 
+/* ---------------- D-182: 오늘 · 확인할 것 '자세히' — 그 자리에서 공고 핵심만 ---------------- */
+for (const [w, mob] of [[1440, false], [390, true]]) {
+  const tag = `(${w})`
+  const ctx = await browser.newContext({ viewport: { width: w, height: 900 }, isMobile: mob, hasTouch: mob, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e).slice(0, 160)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(prepClients)
+  await page.evaluate(({ start, end }) => {
+    const now = new Date().toISOString()
+    localStorage.setItem('axmvp.module.grants.notices', JSON.stringify([{
+      id: 'gn_brief', clientId: '', createdAt: now, updatedAt: now,
+      data: {
+        title: '[경기] 파주 제조 현장 자동화 지원', agency: '경기도 파주시', operator: '파주시 기업지원과', category: 'money',
+        applyStart: start, applyEnd: end, deadlineKind: 'date', amountText: '기업당 최대 5,000만원',
+        target: '파주시 소재 제조업 중소기업(창업 10년 이내) — 총 20개사 선정',
+        summary: '제조 현장 자동화 설비 도입 비용을 지원합니다.', url: 'https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_BRIEF',
+        rules: { regions: ['경기'], cities: ['파주시'], industries: ['제조'] }, source: 'manual', published: false,
+      },
+    }]))
+  }, { start: kst(-5), end: kst(4) })
+  await page.goto(BASE + '/ops/decide', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  const row = page.locator('[data-testid="decision"][data-kind="grant"][data-client="cli_hansol"]').first()
+  check(`공고 자세히${tag}: 한솔 — 맞는 지원사업 줄 · '자세히' 는 다른 화면으로 가는 링크가 아니라 펼치기 단추`, (await row.count()) === 1 && (await row.getByTestId('decision-more').count()) === 1 && (await row.getByTestId('decision-more').getAttribute('aria-expanded')) === 'false' && (await row.locator('a', { hasText: '자세히' }).count()) === 0)
+  const url0 = page.url()
+  await row.getByTestId('decision-more').click()
+  await page.waitForTimeout(300)
+  const brief = row.getByTestId('decision-grant-brief')
+  const text = (await brief.innerText()) ?? ''
+  check(`공고 자세히${tag}: 누르면 그 자리에서 펼침(주소 그대로) · 단추는 '접기'`, page.url() === url0 && (await brief.count()) === 1 && (await row.getByTestId('decision-more').innerText()).includes('접기'))
+  check(`공고 자세히${tag}: 지원 금액이 맨 앞 · 최대 5천만원`, /5[,]?000만원|5천만원/.test(await brief.getByTestId('grant-brief-amount').innerText()), await brief.getByTestId('grant-brief-amount').innerText())
+  check(`공고 자세히${tag}: 접수 기간 · 마감 · 선정 20곳 · 지원 대상`, text.includes(kst(4).slice(5).replace('-', '.')) && /마감|D-/.test(text) && text.includes('선정 20곳') && text.includes('지원 대상'), text.slice(0, 300))
+  check(`공고 자세히${tag}: 이 업체와 맞는 조건(지역 · 업종)`, /지역/.test(await brief.getByTestId('grant-brief-fits').innerText()) && /업종/.test(await brief.getByTestId('grant-brief-fits').innerText()))
+  check(`공고 자세히${tag}: 공고 원문(새 창) · 다른 공고는 '이 업체 공고 더 보기' 로 따로`, (await brief.getByTestId('grant-brief-source').getAttribute('target')) === '_blank' && /PBLN_BRIEF/.test(await brief.getByTestId('grant-brief-source').getAttribute('href')) && /\/grants\?view=clients&client=cli_hansol/.test(await brief.getByTestId('grant-brief-more').getAttribute('href')))
+  check(`공고 자세히${tag}: 펼쳐도 가로 넘침 0`, (await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0)
+  await row.getByTestId('decision-more').click()
+  await page.waitForTimeout(200)
+  check(`공고 자세히${tag}: 다시 누르면 접힘`, (await row.getByTestId('decision-grant-brief').count()) === 0)
+  // 오늘 화면에 맞는 공고가 위 셋 안에 있으면 거기서도 같은 펼치기
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  const todayRow = page.getByTestId('today-decide').locator('[data-testid="decision"][data-kind="grant"]').first()
+  if (await todayRow.count()) {
+    await todayRow.getByTestId('decision-more').click()
+    await page.waitForTimeout(300)
+    check(`공고 자세히${tag}: 오늘 화면에서도 그 자리에서 펼침`, page.url().endsWith('/') && (await todayRow.getByTestId('decision-grant-brief').count()) === 1)
+  }
+  // 더 보기 → 지원사업 알림(그 업체)
+  await page.goto(BASE + '/ops/decide', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  const row2 = page.locator('[data-testid="decision"][data-kind="grant"][data-client="cli_hansol"]').first()
+  await row2.getByTestId('decision-more').click()
+  await row2.getByTestId('grant-brief-more').click()
+  await page.waitForURL(/\/grants\?view=clients/)
+  check(`공고 자세히${tag}: '이 업체 공고 더 보기' → 지원사업 알림(그 업체)`, /client=cli_hansol/.test(page.url()))
+  check(`공고 자세히${tag}: JS 오류 없음`, errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\ngrants e2e: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
