@@ -184,7 +184,7 @@ def _marks(segs, focus, tags):
         s = scale_at(segs, t0 + .7)
         pad = 8 / s
         out.append(f'<div class="focus" style="left:{fx - pad:.1f}px;top:{fy - pad:.1f}px;width:{fw + 2 * pad:.1f}px;height:{fh + 2 * pad:.1f}px;'
-                   f'border-width:{max(2, 5 / s):.2f}px;border-radius:{14 / s:.1f}px;box-shadow:0 0 0 9999px rgba(10,14,18,.3),0 0 {26 / s:.0f}px rgba(210,164,95,.6)" {at(t0, t1, "fast")}></div>')
+                   f'border-width:{max(2, 5 / s):.2f}px;border-radius:{14 / s:.1f}px;box-shadow:0 0 0 9999px rgba(12,13,16,.3),0 0 {26 / s:.0f}px rgba(184,144,50,.6)" {at(t0, t1, "fast")}></div>')
     for g in tags:
         t0, t1, text, (tx, ty) = g[:4]
         s = scale_at(segs, t0 + .7)
@@ -302,9 +302,9 @@ def hub(sc, x, y, d, text, tin, fs=None, tout=None):
 
 
 def person(sc, x, y, d, initial, label, tin, hi=False, tout=None, dim=None, lfs=None):
-    bg = 'radial-gradient(circle at 35% 30%, #e8c995, #d2a45f 55%, #b97935)' if hi else 'linear-gradient(160deg,#3a434d,#262d35)'
-    col = '#171b20' if hi else 'rgba(244,241,236,.85)'
-    ring = 'box-shadow:0 0 0 10px rgba(210,164,95,.18),0 24px 48px -20px rgba(0,0,0,.7);' if hi else 'box-shadow:0 24px 48px -20px rgba(0,0,0,.7);border:1px solid rgba(255,255,255,.14);'
+    bg = 'radial-gradient(circle at 35% 30%, #E0C76F, #B89032 55%, #8C6B1F)' if hi else 'linear-gradient(160deg,#3E434C,#2B2F37)'
+    col = '#15171C' if hi else 'rgba(244,241,236,.85)'
+    ring = 'box-shadow:0 0 0 10px rgba(184,144,50,.18),0 24px 48px -20px rgba(0,0,0,.7);' if hi else 'box-shadow:0 24px 48px -20px rgba(0,0,0,.7);border:1px solid rgba(255,255,255,.14);'
     dm = f' data-dim="{dim:.2f}"' if dim else ''
     centered(sc, x, y, f'<div {at(tin, tout, "scale")}{dm} style="display:flex;flex-direction:column;align-items:center;gap:16px">'
              f'<div class="person" style="width:{d}px;height:{d}px;background:{bg};color:{col};font-size:{d * .38:.0f}px;{ring}">{fmt(initial)}</div>'
@@ -313,7 +313,7 @@ def person(sc, x, y, d, initial, label, tin, hi=False, tout=None, dim=None, lfs=
 
 def line(sc, x1, y1, x2, y2, t0, t1, w=5, dash=False):
     d = ' stroke-dasharray="2 14"' if dash else ''
-    sc.add(f'<svg class="abs" style="left:0;top:0;overflow:visible" width="{W}" height="{H}"><path d="M{x1:.0f} {y1:.0f} L{x2:.0f} {y2:.0f}" stroke="#d2a45f" stroke-opacity=".75" stroke-width="{w}" fill="none" stroke-linecap="round" data-draw="{t0:.2f},{t1:.2f}"{d}/></svg>')
+    sc.add(f'<svg class="abs" style="left:0;top:0;overflow:visible" width="{W}" height="{H}"><path d="M{x1:.0f} {y1:.0f} L{x2:.0f} {y2:.0f}" stroke="#B89032" stroke-opacity=".75" stroke-width="{w}" fill="none" stroke-linecap="round" data-draw="{t0:.2f},{t1:.2f}"{d}/></svg>')
 
 
 def card(sc, box, inner, tin, tout=None, a='card', style=''):
@@ -348,7 +348,7 @@ def video_a():
     sc = scene(0, T(7))
     header(sc, '안내 영상 1편', '**은혜 팀장님**,\n안녕하세요', tin=.2)
     pair(sc, 'pc-today', [(0, 0, 0, 1440)], 'mo-today', [(T(3), 0), (T(5), 380)], tin_pc=T(2) - .2, tin_mo=T(3) + .1)
-    chips(sc, [(T(3) + .5, '써 보실 수 있는 단계', '#3f8585'), (T(4), '어디까지 만들었는지'), (T(5), '지금 쓸 수 있는 기능')],
+    chips(sc, [(T(3) + .5, '써 보실 수 있는 단계', '#A9B1BC'), (T(4), '어디까지 만들었는지'), (T(5), '지금 쓸 수 있는 기능')],
           box=A(BZ, (110, 380, 560, 400)))
     note(sc)
 
@@ -457,7 +457,7 @@ def video_a():
     browser(sc, 'pc-client-smart', [(T(43), 320, 340, 1080), (T(44), 330, 470, 1000), (T(46), 330, 690, 1000)],
             focus=[(T(43) + .5, T(44), (328, 365, 1057, 120)), (T(44) + 1.0, T(46), (349, 578, 1015, 112)), (T(46) + 1.0, T(47) + .4, (349, 1003, 1015, 226))],
             tags=[(T(44) + 1.2, T(46), '바로 넣은 정보', (900, 540)), (T(46) + 1.2, T(47) + .4, '사람이 한 번 확인', (900, 960))])
-    chips(sc, [(T(44), '회사 정보에 연결'), (T(45), '바로 넣어도 되는 정보', '#3f8585'), (T(46), '확인이 필요한 정보', '#d2a45f')], gap=14)
+    chips(sc, [(T(44), '회사 정보에 연결'), (T(45), '바로 넣어도 되는 정보', '#5F6670'), (T(46), '확인이 필요한 정보', '#B89032')], gap=14)
     note(sc)
 
     # A8b 서류 정리 · 업체 기록
@@ -490,7 +490,7 @@ def video_a():
     sc = scene(T(59), T(64))
     header(sc, '외부 일정이 많을 때', '밖에서도\n**바로 확인**')
     phone(sc, 'mo-client-overview', [(T(59), 0), (T(62), 560), (T(63), 1240)], A((337, 424, 405), (1110, 64, 360)), tin=T(59) + .2)
-    chips(sc, [(T(61), '미팅 중', '#3f8585'), (Wd('이동', T(61)), '이동 중', '#3f8585'), (T(62), '기본 정보'), (Wd('진행', T(62)), '진행 상황'), (Wd('받아', T(62)), '받아 둔 서류'),
+    chips(sc, [(T(61), '미팅 중', '#A9B1BC'), (Wd('이동', T(61)), '이동 중', '#A9B1BC'), (T(62), '기본 정보'), (Wd('진행', T(62)), '진행 상황'), (Wd('받아', T(62)), '받아 둔 서류'),
                (T(63), '바로 확인', None)], gap=14)
     note(sc)
 
@@ -511,7 +511,7 @@ def video_a():
     header(sc, 'PC · 휴대폰 같은 정보', '**누락**을\n줄입니다')
     pair(sc, 'pc-client-docs', [(T(68), 300, 330, 1120)], 'mo-client-smart', [(T(68), 0), (T(70), 560)], tin_pc=T(68) - .2, tin_mo=T(68) + .3,
          pc_focus=[(T(68) + .7, T(69) + .2, (328, 405, 1057, 335)), (T(69) + .4, T(70) + .6, (331, 760, 1058, 500))])
-    chips(sc, [(T(68), '빠진 서류', '#c0563f'), (T(69), '받은 서류', '#3f8585'), (Wd('다음에', T(69)), '다음 할 일'), (T(71), '누락 줄이기', None)], gap=14)
+    chips(sc, [(T(68), '빠진 서류', '#c0563f'), (T(69), '받은 서류', '#5F6670'), (Wd('다음에', T(69)), '다음 할 일'), (T(71), '누락 줄이기', None)], gap=14)
     note(sc)
 
     # A13 영업 관리 — 상담 → 미팅 → 제안 → 계약
@@ -687,7 +687,7 @@ def video_b():
     pos = A([(.28, .1), (.78, .16), (.2, .34), (.62, .38), (.34, .56), (.8, .6), (.18, .78), (.62, .82)],
             [(.25, .12), (.72, .1), (.15, .38), (.5, .32), (.85, .4), (.3, .62), (.68, .66), (.45, .88)])
     for i, (lab, (fx, fy)) in enumerate(zip(var, pos)):
-        centered(sc, VZ[0] + fx * VZ[2], VZ[1] + fy * VZ[3] * A(.82, 1), f'<div class="chip" style="font-size:{A(40, 42)}px;--c:{["#d2a45f", "#3f8585", "#8cc4c4"][i % 3]}" {at(T(10) + i * .3, a="scale")}>{lab}</div>')
+        centered(sc, VZ[0] + fx * VZ[2], VZ[1] + fy * VZ[3] * A(.82, 1), f'<div class="chip" style="font-size:{A(40, 42)}px;--c:{["#B89032", "#A9B1BC", "#D9DDE3"][i % 3]}" {at(T(10) + i * .3, a="scale")}>{lab}</div>')
     chips(sc, [(T(12), '아직 더 다듬는 중', None)], box=A(BZ, (110, 400, 560, 200)), cls='chip hi', align=A('center', 'flex-start'))
 
     # B4a 기업인증 — 여러 인증을 한 업체 기준으로
@@ -739,7 +739,7 @@ def video_b():
     # B8 주제 → 계획 → 올렸는지
     sc = scene(T(37), T(40))
     header(sc, '마케팅 · 브랜딩', '주제 → 계획 →\n**올렸는지**')
-    chain(sc, [(T(37), '주제 정하기'), (T(38), '계획하기'), (Wd('올렸는지', T(39)), '올렸는지 ✓')], vertical=TALL, fs=A(52, 50), gap=A(24, 24), colors=['#3f8585', '#8cc4c4', '#d2a45f'])
+    chain(sc, [(T(37), '주제 정하기'), (T(38), '계획하기'), (Wd('올렸는지', T(39)), '올렸는지 ✓')], vertical=TALL, fs=A(52, 50), gap=A(24, 24), colors=['#A9B1BC', '#D9DDE3', '#B89032'])
 
     # B9 AX 1차 미팅 체크리스트
     sc = scene(T(40), T(46), 'S')
@@ -784,21 +784,21 @@ def video_b():
     cases = [(Wd('AX구축', T(63)), 'AX 구축 사례'), (Wd('정책자금', T(64)), '정책자금 · 보증 사례'), (Wd('투자', T(64)), '투자 사례')]
     inner = '<div style="font-size:28px;font-weight:800;color:var(--hi);letter-spacing:.08em">비슷한 사례 · 준비 중</div>' + ''.join(
         f'<div style="padding:16px 20px;border-radius:16px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);font-size:36px;font-weight:750" {at(t, a="left")}>{lab}</div>' for t, lab in cases)
-    sc.add(div(pb, inner, 'padding:30px;display:flex;flex-direction:column;gap:16px;background:#171d24;border-radius:26px;box-shadow:0 40px 90px -30px rgba(0,0,0,.6);color:#f4f1ec', at(T(62) + .8, a='card')))
+    sc.add(div(pb, inner, 'padding:30px;display:flex;flex-direction:column;gap:16px;background:#1C1F25;border-radius:26px;box-shadow:0 40px 90px -30px rgba(0,0,0,.6);color:#f4f1ec', at(T(62) + .8, a='card')))
     chips(sc, [(T(65), '바로 찾아볼 수 있게', None)], box=A(BZ, (110, 400, 560, 200)), cls='chip hi', align=A('center', 'flex-start'))
 
     # B13b 처음부터 찾지 않고 바로 준비
     sc = scene(T(66), T(69), 'L')
     header(sc, '미팅 전 준비', '처음부터 찾지 않고\n**바로 준비**')
     chain(sc, [(T(66) + .2, '자료를 처음부터 찾기'), (T(67), '시스템 안에서 유사 사례'), (T(68), '바로 미팅 준비')], vertical=True, fs=A(44, 46), gap=18,
-          colors=['#8a95a1', '#d2a45f', '#3f8585'])
+          colors=['#8a95a1', '#B89032', '#343942'])
 
     # B14a 법인 컨설팅 모듈들
     sc = scene(T(69), T(74))
     header(sc, '추가 예정 ④', '**법인 컨설팅**\n모듈들')
     mods = [('정관', '정관 정비'), ('가지급금', '가지급금 정리'), ('미처분', '미처분 이익잉여금'), ('이익소각', '이익소각 · 자기주식'), ('임원보수', '임원보수 · 퇴직금 규정'),
             ('법인전환', '법인전환'), ('사내근로복지기금', '사내근로복지기금'), ('주식가치평가', '주식가치평가'), ('직무발명', '직무발명보상')]
-    chips(sc, [(Wd(w, T(69)), lab, ['#d2a45f', '#3f8585', '#8cc4c4'][i % 3]) for i, (w, lab) in enumerate(mods)], box=A((70, 480, 940, 820), (740, 80, 1110, 780)),
+    chips(sc, [(Wd(w, T(69)), lab, ['#B89032', '#A9B1BC', '#D9DDE3'][i % 3]) for i, (w, lab) in enumerate(mods)], box=A((70, 480, 940, 820), (740, 80, 1110, 780)),
           cls='chip', align='center', valign='center', gap=A(18, 20), fs=A(40, 42), a='scale')
     chips(sc, [(T(74) - .6, '법인 컨설팅', None)], box=A(BZ, (110, 400, 560, 200)), cls='chip hi', align=A('center', 'flex-start'))
 
@@ -869,7 +869,7 @@ def video_b():
     sc = scene(T(115), T(120))
     header(sc, '오히려', '**불편한 부분**을\n많이')
     chain(sc, [(T(115) + .2, '좋게 말씀하기'), (T(116), '불편한 부분 많이'), (T(117), '빨리 고치기'), (T(118), '판매할 수 있는 수준')], vertical=True, fs=A(44, 44), gap=A(14, 12),
-          colors=['#8a95a1', '#d2a45f', '#3f8585', '#d2a45f'])
+          colors=['#5F6670', '#B89032', '#A9B1BC', '#B89032'])
 
     # B21a 중요한 기준
     sc = scene(T(120), T(124), 'S')

@@ -22,6 +22,8 @@ const E2E_DB = 'axe2e'
 const BASE = `http://localhost:${PORT}`
 const OUT = 'dist-qa-tutorial'
 const SECRET = 'e2e-local-jwt-secret-at-least-32-characters-long'
+const THEME = process.env.THEME ?? 'onyx-gold'
+const THEME_LABEL = { 'onyx-gold': '오닉스 골드', 'deep-teal': '딥 틸' }[THEME] ?? THEME
 
 const OWNER = { id: '0e000000-0000-4000-8000-0000000000a1', email: 'owner@e2e.kr', password: 'owner-pass' }
 const PILOT = { id: '0e000000-0000-4000-8000-0000000000b1', email: 'pilot@e2e.kr', password: 'pilot-pass' }
@@ -300,6 +302,15 @@ async function newCtx(kind) {
   await page.getByRole('button', { name: /^로그인/ }).click()
   await page.waitForURL((x) => !x.pathname.startsWith('/login'), { timeout: 20000 }).catch(() => {})
   await page.waitForLoadState('networkidle')
+  // 예시 색상은 오닉스 골드(대표 지시) — 팀장님이 하듯 설정 화면에서 테마를 고른다(사람별 저장소에 그대로 남는다)
+  await page.goto(`${BASE}/settings`, { waitUntil: 'networkidle' })
+  const radio = page.getByRole('radio', { name: new RegExp(THEME_LABEL) })
+  if (!(await radio.count())) await page.getByRole('tab', { name: /화면/ }).first().click().catch(() => {})
+  await radio.first().click()
+  await page.waitForTimeout(400)
+  await page.goto(`${BASE}/`, { waitUntil: 'networkidle' })
+  const applied = await page.evaluate(() => document.documentElement.dataset.theme)
+  if (applied !== THEME) throw new Error(`테마가 ${THEME} 로 바뀌지 않음: ${applied}`)
   await page.waitForTimeout(1500)
   return { ctx, page }
 }
