@@ -283,7 +283,7 @@ try {
   })
   await logout(page)
   check('대표 로그아웃: 로그인 화면', page.url().includes('/login'))
-  const afterOut = await page.evaluate(() => Object.keys(localStorage).filter((k) => !k.startsWith('axmvp.u.') && !k.startsWith('sb-') && /^(axmvp|planChecklist)/.test(k) && !['axmvp.schema_version', 'axmvp.staleChunkReloadAt', 'axmvp.grants.feed.v1'].includes(k)))
+  const afterOut = await page.evaluate(() => Object.keys(localStorage).filter((k) => !k.startsWith('axmvp.u.') && !k.startsWith('sb-') && /^(axmvp|planChecklist)/.test(k) && !['axmvp.schema_version', 'axmvp.staleChunkReloadAt', 'axmvp.grants.feed.v1', 'axmvp.auth.recent', 'axmvp.auth.switch_to'].includes(k)))
   check('대표 로그아웃: 사람별 값이 꺼내진 채 남지 않음(금고로)', afterOut.length === 0, afterOut.join(','))
 
   /* ================= 2. 공개 사이트 가입자 — 접근 목록에 없음 ================= */
@@ -532,6 +532,54 @@ try {
   await go(page, '/journal')
   check('대표 다시: 업무 일기에 Pilot 기록 없음', !((await page.locator('main').innerText()) ?? '').includes('은혜테스트정밀') && !((await page.locator('main').innerText()) ?? '').includes('박대표와 통화'))
 
+  /* ---------- D-184: 계정 바꾸기 — 이 기기에서 로그인했던 계정(이메일 · 이름만) → 비밀번호만 넣고 대표 ↔ 팀장 ---------- */
+  {
+    const store = await page.evaluate(() => ({ recent: localStorage.getItem('axmvp.auth.recent') ?? '', all: JSON.stringify(Object.entries(localStorage)) + JSON.stringify(Object.entries(sessionStorage)) }))
+    const recent = JSON.parse(store.recent || '[]')
+    check('계정(D-184): 이 기기 계정 목록 = 대표 · 팀장 둘(접근 없는 가입자는 남기지 않음)', recent.map((r) => r.email).sort().join() === [OWNER.email, PILOT.email].sort().join(), store.recent)
+    check('계정(D-184): 남긴 칸은 이메일 · 이름 · 직함 · 시각뿐', recent.every((r) => Object.keys(r).sort().join() === 'at,email,name,title'), store.recent)
+    check('계정(D-184): 브라우저 저장소 어디에도 비밀번호 없음', USERS.every((u) => !store.all.includes(u.password)))
+    const switchVia = async (who) => {
+      await page.getByRole('button', { name: '사용자 메뉴' }).click()
+      const sw = page.getByTestId('account-switch-to')
+      const info = { n: await sw.count(), email: await sw.first().getAttribute('data-email').catch(() => ''), text: await sw.first().innerText().catch(() => ''), out: await page.getByTestId('account-signout').count() }
+      if (who === PILOT) await shot(page, 'acct-01-owner-menu')
+      await sw.first().click()
+      await page.waitForURL((x) => x.pathname.startsWith('/login'), { timeout: 15000 }).catch(() => {})
+      await page.waitForTimeout(700)
+      const pre = await page.evaluate(() => ({ email: document.getElementById('email')?.value ?? '', focus: document.activeElement?.id ?? '', text: document.body.innerText }))
+      return { info, pre }
+    }
+    const toPilot = await switchVia(PILOT)
+    check('계정(D-184): 대표 메뉴에 "최은혜 팀장 계정으로 바꾸기" 하나 · 로그아웃 하나', toPilot.info.n === 1 && toPilot.info.email === PILOT.email && /최은혜 팀장 계정으로 바꾸기/.test(toPilot.info.text) && toPilot.info.out === 1, JSON.stringify(toPilot.info))
+    check('계정(D-184): 바꾸기 → 로그인 화면 · 팀장 이메일이 미리 들어감 · 비밀번호 칸에 커서', page.url().includes('/login') && toPilot.pre.email === PILOT.email && toPilot.pre.focus === 'password', JSON.stringify({ u: page.url(), e: toPilot.pre.email, f: toPilot.pre.focus }))
+    check('계정(D-184): 로그인 화면 안내 "최은혜 팀장 계정으로 로그인합니다" · 계정 둘', toPilot.pre.text.includes('최은혜 팀장 계정으로 로그인합니다') && (await page.getByTestId('recent-account').count()) === 2)
+    check('계정(D-184): 로그인 화면에 대표 자료 0(이메일 · 이름만)', leaked(toPilot.pre.text).length === 0, leaked(toPilot.pre.text).join())
+    await shot(page, 'acct-02-login-switch')
+    currentWho = PILOT
+    await page.getByLabel('비밀번호').fill(PILOT.password)
+    await page.getByRole('button', { name: /^로그인/ }).click()
+    await page.waitForURL((x) => !x.pathname.startsWith('/login'), { timeout: 15000 }).catch(() => {})
+    await page.waitForLoadState('networkidle')
+    await page.waitForTimeout(900)
+    check('계정(D-184): 로그인하면 바꿀 계정 표시는 지움', (await page.evaluate(() => localStorage.getItem('axmvp.auth.switch_to'))) === null)
+    await go(page, '/ops/clients')
+    const asPilot = await bodyText(page)
+    check('계정(D-184): 비밀번호만 넣고 팀장으로 — 팀장 업체만 · 대표 자료 0 · 이름 최은혜 팀장', asPilot.includes('은혜테스트정밀') && leaked(asPilot).length === 0 && /최은혜\s*팀장/.test(await page.locator('[data-testid="sidebar-account"]').innerText()), leaked(asPilot).join())
+    const toOwner = await switchVia(OWNER)
+    check('계정(D-184): 팀장 메뉴에는 "김상호 대표 계정으로 바꾸기"(돌아가기)', toOwner.info.n === 1 && toOwner.info.email === OWNER.email && /대표 계정으로 바꾸기/.test(toOwner.info.text), JSON.stringify(toOwner.info))
+    check('계정(D-184): 돌아가기 → 대표 이메일이 미리 들어감', toOwner.pre.email === OWNER.email && toOwner.pre.focus === 'password', JSON.stringify({ e: toOwner.pre.email, f: toOwner.pre.focus }))
+    currentWho = OWNER
+    await page.getByLabel('비밀번호').fill(OWNER.password)
+    await page.getByRole('button', { name: /^로그인/ }).click()
+    await page.waitForURL((x) => !x.pathname.startsWith('/login'), { timeout: 15000 }).catch(() => {})
+    await page.waitForLoadState('networkidle')
+    await page.waitForTimeout(900)
+    await go(page, '/ops/clients')
+    const backOwner = await bodyText(page)
+    check('계정(D-184): 대표로 돌아옴 — 내 업체 그대로 · 팀장 업체 없음 · 내 브라우저 값 그대로', backOwner.includes('대표비밀정밀') && !backOwner.includes('은혜테스트정밀') && (await page.evaluate(() => localStorage.getItem('axmvp.qa.ownerDraft'))) === '대표비밀 작성 중 메모', backOwner.slice(0, 200))
+  }
+
   /* ---------- D-168: 연구소 메뉴를 여러 번 오가도 화면이 멈추지 않는다(클라우드 모드에서 연구노트 뒤 멈춤) ---------- */
   {
     await go(page, '/tools/labcare')
@@ -673,6 +721,9 @@ try {
   const drawer = await bodyText(mp)
   check('390 Pilot: 메뉴 열어도 숨긴 묶음 없음', !drawer.includes('잘 안 쓰는 기능') && !drawer.includes('이 시스템') && !drawer.includes('영업자 정산'))
   await shot(mp, 'pilot-m02-menu')
+  // D-184: 휴대폰 서랍에 로그아웃(예전에는 휴대폰에서 로그아웃할 곳이 없었다) — 이 기기에는 팀장 계정 하나뿐이라 '바꾸기' 줄은 없다
+  check('390 Pilot(D-184): 서랍에 로그아웃 단추 · 다른 계정 줄 없음(이 기기엔 팀장만)', (await mp.getByTestId('account-signout').count()) === 1 && (await mp.getByTestId('account-switch-to').count()) === 0)
+  check('390 Pilot(D-184): 서랍의 로그아웃 단추 높이 44 이상', ((await mp.getByTestId('account-signout').boundingBox())?.height ?? 0) >= 44)
   await mp.keyboard.press('Escape')
   await go(mp, '/ops/clients')
   check('390 Pilot: 업체 목록 — 내 업체만 · 넘침 0', (await bodyText(mp)).includes('은혜테스트정밀') && leaked(await bodyText(mp)).length === 0 && (await overflowX(mp)) <= 0)
@@ -682,6 +733,23 @@ try {
   await shot(mp, 'pilot-m04-detail')
   await go(mp, `/ops/clients/${OWNER_CLIENT}`)
   check('390 Pilot: 대표 업체 주소 — 대표 자료 0', leaked(await bodyText(mp)).length === 0)
+  // D-184: 서랍 → 로그아웃 → 로그인 화면에 이 기기 계정(팀장) · 누르면 이메일 · 이 기기에서 지우기
+  await mp.getByRole('button', { name: /더보기|메뉴/ }).last().click().catch(() => {})
+  await mp.waitForTimeout(500)
+  await mp.getByTestId('account-signout').click()
+  await mp.waitForURL((x) => x.pathname.startsWith('/login'), { timeout: 15000 }).catch(() => {})
+  await mp.waitForTimeout(700)
+  check('390(D-184): 서랍 로그아웃 → 로그인 화면 · 이 기기 계정 1개(팀장)', mp.url().includes('/login') && (await mp.getByTestId('recent-account').count()) === 1 && (await mp.getByTestId('recent-account').getAttribute('data-email')) === PILOT.email)
+  check('390(D-184): 로그인 화면 넘침 0', (await overflowX(mp)) <= 0, String(await overflowX(mp)))
+  await mp.getByTestId('recent-account').click()
+  await mp.waitForTimeout(300)
+  check('390(D-184): 계정 누르면 이메일이 들어가고 비밀번호 칸에 커서', (await mp.locator('#email').inputValue()) === PILOT.email && (await mp.evaluate(() => document.activeElement?.id)) === 'password')
+  await shot(mp, 'pilot-m05-login-accounts')
+  await mp.getByTestId('recent-forget').click()
+  await mp.waitForTimeout(300)
+  check('390(D-184): 이 기기에서 지우기 → 목록에서 빠지고 이메일 칸도 비움', (await mp.getByTestId('recent-account').count()) === 0 && (await mp.locator('#email').inputValue()) === '')
+  await mp.reload({ waitUntil: 'networkidle' })
+  check('390(D-184): 새로 열어도 지운 그대로', (await mp.getByTestId('recent-accounts').count()) === 0)
   await m.close()
 
   check('화면 오류(pageerror) 0', errors.length === 0, errors.slice(0, 3).join(' | '))

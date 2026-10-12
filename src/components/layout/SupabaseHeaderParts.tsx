@@ -6,12 +6,13 @@
 
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Building, Check, ChevronDown, LogOut, Plus, Settings } from 'lucide-react'
+import { Building, Check, ChevronDown, Plus, Settings } from 'lucide-react'
 import { useDismissable } from '../../lib/useDismissable'
 import { useToast } from '../ui/toastContext'
 import { useAuth } from '../../auth/AuthProvider'
 import { createWorkspace } from '../../auth/workspaceService'
 import { useCurrentUser } from './useCurrentUser'
+import { AccountSwitchItems } from './AccountSwitch'
 
 const ROLE_LABEL: Record<string, string> = { owner: '소유자', admin: '관리자', editor: '편집자', viewer: '뷰어' }
 
@@ -118,7 +119,7 @@ export function SupabaseWorkspaceSelector() {
 
 export function SupabaseUserMenu() {
   const { open, setOpen, containerRef } = useDismissable<HTMLDivElement>()
-  const { session, signOut } = useAuth()
+  const { session } = useAuth()
   const email = session?.user.email ?? ''
   // D-103: 이메일 대신 이름(없으면 대표 이름) — 사이드바 아래와 같은 이름
   const me = useCurrentUser()
@@ -142,7 +143,7 @@ export function SupabaseUserMenu() {
         <ChevronDown aria-hidden="true" className="hidden size-4 text-slate-400 xl:block" />
       </button>
       {open && (
-        <div className="absolute top-full right-0 z-30 mt-1.5 w-56 rounded-(--radius-card) border border-slate-200 bg-white p-1.5 shadow-(--shadow-overlay)">
+        <div className="absolute top-full right-0 z-30 mt-1.5 w-72 max-w-[calc(100vw-2rem)] rounded-(--radius-card) border border-slate-200 bg-white p-1.5 shadow-(--shadow-overlay)">
           <div className="border-b border-slate-100 px-3 py-2.5">
             <p className="truncate text-sm font-semibold text-slate-800">{me.name} {me.title}</p>
             <p className="truncate text-[0.875rem] text-slate-400">{email}</p>
@@ -150,13 +151,8 @@ export function SupabaseUserMenu() {
           <Link to="/settings" onClick={() => setOpen(false)} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
             <Settings aria-hidden="true" className="size-4 text-slate-400" /> 설정
           </Link>
-          <button
-            type="button"
-            onClick={() => { setOpen(false); void signOut() }}
-            className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-          >
-            <LogOut aria-hidden="true" className="size-4 text-slate-400" /> 로그아웃
-          </button>
+          {/* D-184: 이 기기에서 로그인했던 다른 계정으로 바꾸기 · 로그아웃 */}
+          <AccountSwitchItems tone="light" onPick={() => setOpen(false)} />
         </div>
       )}
     </div>

@@ -14,6 +14,8 @@
  * Supabase 로그인 토큰(sb-*)과 공용 값(화면 판 번호 · 공개 공고 캐시 등)은 옮기지 않는다.
  */
 
+import { RECENT_ACCOUNTS_KEY, SWITCH_TO_KEY } from './recentAccounts'
+
 export type VaultTier = 'full' | 'pilot'
 
 const LIVE_KEY = 'axmvp.vault.live'
@@ -21,7 +23,8 @@ const UNCLAIMED = 'unclaimed'
 const VAULT_PREFIX = 'axmvp.u.'
 
 /** 사람과 상관없는 공용 값 — 옮기지 않는다 */
-const GLOBAL_KEYS = new Set(['axmvp.schema_version', 'axmvp.staleChunkReloadAt', 'axmvp.grants.feed.v1', LIVE_KEY])
+// D-184: 이 기기에서 로그인했던 계정(이메일 · 이름만) · 바꿀 계정 — 로그아웃한 뒤 로그인 화면이 읽어야 한다
+const GLOBAL_KEYS = new Set(['axmvp.schema_version', 'axmvp.staleChunkReloadAt', 'axmvp.grants.feed.v1', LIVE_KEY, RECENT_ACCOUNTS_KEY, SWITCH_TO_KEY])
 
 /** 이 앱이 쓰는 키인가(사람마다 옮길 것) — 'axmvp.' 로 시작하는 것 + 옛 도구가 쓰는 이름들 */
 export function isUserScopedKey(key: string): boolean {

@@ -33,6 +33,8 @@ import {
 } from './bootstrap'
 import { fetchMyAccess, fetchPilotViews, type OsAccess, type PilotView } from './osAccess'
 import { vaultSignOut, vaultSwitchTo } from './storageVault'
+import { identityFromSession } from './currentUser'
+import { clearSwitchTarget, rememberAccount } from './recentAccounts'
 import { getCurrentSession, onAuthStateChange, signOut as authSignOut } from './authService'
 import { listMyWorkspaces, type WorkspaceMembership } from './workspaceService'
 import { AuthContext, type AuthContextValue } from './authContext'
@@ -112,6 +114,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const chosen = valid?.workspaceId ?? owned[0]?.workspaceId ?? memberships[0].workspaceId
         setCurrentWorkspaceId(chosen)
         safeWriteWorkspace(chosen)
+        // D-184: 이 기기에서 연 계정(이메일 · 이름만, 비밀번호 없음) — 다음에 로그인 화면 · 메뉴에서 눌러 바꾼다
+        const who = identityFromSession(nextSession.user, owned.length > 0 ? 'owner' : memberships.find((m) => m.workspaceId === chosen)?.role, tier)
+        rememberAccount({ email: nextSession.user.email, name: who.name === '사용자' ? '' : who.name, title: who.title })
+        clearSwitchTarget()
         setBootstrap(readyState('supabase'))
       } catch {
         if (mounted.current) {

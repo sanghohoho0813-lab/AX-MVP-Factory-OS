@@ -10,6 +10,20 @@ import { MODULES, enabledModulesByGroup, isPilotHiddenPath } from '../../config/
 import { identityFromSession } from '../currentUser'
 import { brand } from '../../brand/brand.config'
 import { isStageExcluded, stripFrame } from '../../lib/deviceView'
+import {
+  RECENT_ACCOUNTS_KEY,
+  RECENT_LIMIT,
+  SWITCH_TO_KEY,
+  SWITCH_TTL_MS,
+  accountLabel,
+  clearSwitchTarget,
+  forgetAccount,
+  otherAccounts,
+  peekSwitchTarget,
+  readRecentAccounts,
+  rememberAccount,
+  setSwitchTarget,
+} from '../recentAccounts'
 
 let passed = 0
 let failed = 0
@@ -271,6 +285,77 @@ check('키: 상관없는 다른 사이트 값은 옮기지 않는다', !isUserSc
   check('보기 방식: 바깥 주소로 바뀌지 않는다', stripFrame('//evil.example/x?frame=pc').startsWith('/') && !stripFrame('//evil.example/x?frame=pc').startsWith('//'), stripFrame('//evil.example/x?frame=pc'))
   check('보기 방식: 설문 · 시험 · 지원사업 찾기(공개 화면)는 무대 없음', isStageExcluded('/survey/abc') && isStageExcluded('/test/abc') && isStageExcluded('/grants/find'))
   check('보기 방식: 내부 화면은 무대', !isStageExcluded('/ops/clients') && !isStageExcluded('/grants') && !isStageExcluded('/'))
+}
+
+// ---------- D-184: 이 기기에서 로그인했던 계정 — 이메일 · 이름만(비밀번호 없음) · 금고로 옮기지 않음 ----------
+{
+  const L = new FakeStorage()
+  const t0 = new Date('2026-10-12T09:00:00Z')
+  const t1 = new Date('2026-10-12T09:05:00Z')
+  rememberAccount({ email: ' CEO@Mirae.KR ', name: '김상호', title: '대표' }, t0, L)
+  rememberAccount({ email: 'ceh@mirae.kr', name: '최은혜', title: '팀장' }, t1, L)
+  let list = readRecentAccounts(L)
+  check('계정: 두 계정 · 최근에 연 것부터', list.length === 2 && list[0].email === 'ceh@mirae.kr' && list[1].email === 'ceo@mirae.kr', JSON.stringify(list))
+  check('계정: 이메일은 소문자 · 앞뒤 빈칸 없이', list[1].email === 'ceo@mirae.kr')
+  check('계정: 보이는 이름 "최은혜 팀장" · 이름 없으면 이메일', accountLabel(list[0]) === '최은혜 팀장' && accountLabel({ email: 'x@y.kr', name: '', title: '', at: '' }) === 'x@y.kr')
+  check('계정: 메뉴에는 지금 계정이 아닌 것만', otherAccounts(list, 'CEO@mirae.kr').map((a) => a.email).join() === 'ceh@mirae.kr')
+
+  // 비밀번호 같은 다른 값이 섞여 들어와도 저장하지 않는다
+  rememberAccount({ email: 'ceo@mirae.kr', name: '김상호', title: '대표', password: 'pw-SECRET-123' } as never, new Date('2026-10-12T09:10:00Z'), L)
+  const raw = L.getItem(RECENT_ACCOUNTS_KEY) ?? ''
+  check('계정: 저장된 값에 비밀번호 없음 · 칸은 email/name/title/at 넷뿐', !raw.includes('pw-SECRET-123') && !raw.toLowerCase().includes('password') && JSON.parse(raw).every((r: Record<string, unknown>) => Object.keys(r).sort().join() === 'at,email,name,title'), raw)
+  list = readRecentAccounts(L)
+  check('계정: 다시 열면 맨 앞으로 · 겹치지 않음', list.length === 2 && list[0].email === 'ceo@mirae.kr')
+
+  // 이름을 모를 때(이름 아직 안 적음)는 예전 이름을 지우지 않는다
+  rememberAccount({ email: 'ceh@mirae.kr', name: '', title: '' }, new Date('2026-10-12T09:20:00Z'), L)
+  check('계정: 이름 없이 다시 열려도 예전 이름 · 직함 그대로', accountLabel(readRecentAccounts(L)[0]) === '최은혜 팀장', JSON.stringify(readRecentAccounts(L)[0]))
+
+  // 이메일이 아니면 남기지 않는다 · 깨진 값은 건너뛴다
+  rememberAccount({ email: 'not-an-email', name: '이상' }, t1, L)
+  check('계정: 이메일이 아니면 남기지 않음', readRecentAccounts(L).length === 2)
+  const B = new FakeStorage()
+  B.setItem(RECENT_ACCOUNTS_KEY, '{깨짐')
+  check('계정: 깨진 값이면 빈 목록(화면이 멈추지 않음)', readRecentAccounts(B).length === 0)
+  B.setItem(RECENT_ACCOUNTS_KEY, JSON.stringify([null, 3, { email: 'a@b.kr', name: 5 }, { email: 'A@B.kr' }]))
+  check('계정: 이상한 줄은 건너뛰고 · 같은 이메일은 하나', readRecentAccounts(B).length === 1 && readRecentAccounts(B)[0].name === '')
+
+  // 많아야 RECENT_LIMIT 개
+  const M = new FakeStorage()
+  for (let i = 0; i < RECENT_LIMIT + 3; i += 1) rememberAccount({ email: `u${i}@x.kr` }, new Date(Date.UTC(2026, 9, 12, 9, i)), M)
+  check(`계정: 많아야 ${RECENT_LIMIT}개 · 오래된 것부터 빠짐`, readRecentAccounts(M).length === RECENT_LIMIT && readRecentAccounts(M)[0].email === `u${RECENT_LIMIT + 2}@x.kr`)
+
+  // 이 기기에서 지우기
+  setSwitchTarget('ceh@mirae.kr', L)
+  forgetAccount('CEH@mirae.kr', L)
+  check('계정: 이 기기에서 지우기 → 목록에서 빠지고 바꿀 계정 표시도 지움', readRecentAccounts(L).map((a) => a.email).join() === 'ceo@mirae.kr' && peekSwitchTarget(L) === '')
+
+  // 바꿀 계정: 넣고 · 읽고(지우지 않음) · 지운다
+  setSwitchTarget(' CEH@mirae.kr', L)
+  check('바꾸기: 로그인 화면이 미리 넣을 이메일', peekSwitchTarget(L) === 'ceh@mirae.kr' && peekSwitchTarget(L) === 'ceh@mirae.kr')
+  clearSwitchTarget(L)
+  check('바꾸기: 한 번 쓰면 지운다', peekSwitchTarget(L) === '' && L.getItem(SWITCH_TO_KEY) === null)
+  setSwitchTarget('javascript:alert(1)', L)
+  check('바꾸기: 이메일이 아닌 값은 넣지 않음', peekSwitchTarget(L) === '')
+  const at = new Date('2026-10-12T09:00:00Z')
+  setSwitchTarget('ceh@mirae.kr', L, at)
+  check('바꾸기: 9분 뒤에는 아직 · 11분 뒤에는 잊음', peekSwitchTarget(L, new Date(at.getTime() + 9 * 60000)) === 'ceh@mirae.kr' && peekSwitchTarget(L, new Date(at.getTime() + SWITCH_TTL_MS + 60000)) === '')
+  L.setItem(SWITCH_TO_KEY, 'ceh@mirae.kr')
+  check('바꾸기: 예전 모양 · 깨진 값이면 미리 넣지 않음', peekSwitchTarget(L) === '')
+  clearSwitchTarget(L)
+
+  // 금고: 로그인했던 계정 목록 · 바꿀 계정은 사람 것이 아니다(로그아웃해도 로그인 화면에 남는다)
+  check('금고: 계정 목록 · 바꿀 계정 키는 옮기지 않는다', !isUserScopedKey(RECENT_ACCOUNTS_KEY) && !isUserScopedKey(SWITCH_TO_KEY))
+  const V = new FakeStorage()
+  const VS = new FakeStorage()
+  vaultSwitchTo(OWNER, 'full', V, VS)
+  rememberAccount({ email: 'ceo@mirae.kr', name: '김상호', title: '대표' }, t0, V)
+  V.setItem('axmvp.clients', 'OWNER-CLIENTS')
+  setSwitchTarget('ceh@mirae.kr', V)
+  vaultSignOut(V, VS, OWNER)
+  check('금고: 대표 로그아웃 → 업체 값은 금고로 · 계정 목록 · 바꿀 계정은 그대로', V.getItem('axmvp.clients') === null && readRecentAccounts(V).length === 1 && peekSwitchTarget(V) === 'ceh@mirae.kr')
+  vaultSwitchTo(PILOT, 'pilot', V, VS)
+  check('금고: 팀장 로그인 → 대표 업체 값은 안 보임 · 계정 목록은 그대로', V.getItem('axmvp.clients') === null && readRecentAccounts(V).length === 1)
 }
 
 console.log(`pilot: ${passed} passed, ${failed} failed`)

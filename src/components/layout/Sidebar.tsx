@@ -22,6 +22,7 @@ import { FutureItemDialog } from './FutureItemDialog'
 import { futureIcon } from './futureIcons'
 import { useCurrentUser } from './useCurrentUser'
 import { ViewAsSwitch } from './ViewAsSwitch'
+import { AccountSwitchItems } from './AccountSwitch'
 import { useNavCounts, type NavCounts } from './useNavCounts'
 import { useIsPilot } from '../../auth/osAccess'
 import { useBackToClose } from '../../lib/backToClose'
@@ -244,6 +245,12 @@ function SidebarContent({
           </div>
         )}
         <SidebarAccount collapsed={collapsed} />
+        {/* D-184: 휴대폰 서랍 — 다른 계정으로 바꾸기 · 로그아웃(PC 는 머리줄 오른쪽 위 사용자 메뉴) */}
+        {onCloseMobile && (
+          <div className="mt-1.5">
+            <AccountSwitchItems tone="dark" />
+          </div>
+        )}
         {!collapsed && (
           <p className="t-meta truncate px-3 pt-2 pb-1 text-navy-300" title={`${brand.productSubtitle} · ${APP_VERSION}`}>
             {brand.productSubtitle} · <span className="text-navy-200">{APP_VERSION}</span>
