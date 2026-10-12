@@ -19,7 +19,6 @@ import {
   Landmark,
   LayoutGrid,
   Library,
-  LifeBuoy,
   ListChecks,
   Palette,
   PencilRuler,
@@ -228,7 +227,6 @@ export const MODULES: ModuleDefinition[] = [
 
 
   // 이 시스템이 왜 있는지 · 성과를 어떻게 재는지 · 다음에 무엇을 만들지 — 규격이 요구하는 '찾을 수 있는 이야기'
-  { key: 'guide', label: '처음 사용 가이드', path: '/getting-started', icon: LifeBuoy, group: 'about', accent: 'system', enabled: true, hint: '처음 쓰는 순서 · 화면별 안내' },
   { key: 'why', label: '기획의도', path: '/why', icon: BookOpenText, group: 'about', accent: 'system', enabled: true, hint: '이 시스템을 왜 만들었는가' },
   { key: 'kpi', label: '성과 지표', path: '/kpi', icon: Gauge, group: 'about', accent: 'system', enabled: true, hint: '돈·시간·규모·사용 지표' },
   { key: 'roadmap', label: '향후 확장', path: '/roadmap', icon: Compass, group: 'about', accent: 'system', enabled: true, status: 'next', expand: 'future-items', hint: '아직 없는 기능과 계획 — 눌러서 펼치기' },

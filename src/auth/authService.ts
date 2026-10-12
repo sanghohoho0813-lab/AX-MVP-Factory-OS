@@ -86,6 +86,16 @@ export async function updateMyName(name: string, title: string): Promise<{ ok: b
   }
 }
 
+/** D-185: 안내 영상 '앞으로 보지 않기' — 로그인 계정 정보에 남겨 다른 기기에서도 저절로 뜨지 않게 */
+export async function setTutorialHidden(hidden: boolean): Promise<{ ok: boolean }> {
+  try {
+    const { error } = await getSupabaseClient().auth.updateUser({ data: { tutorial_hidden: hidden } })
+    return { ok: !error }
+  } catch {
+    return { ok: false }
+  }
+}
+
 export async function signOut(): Promise<void> {
   try {
     await getSupabaseClient().auth.signOut()

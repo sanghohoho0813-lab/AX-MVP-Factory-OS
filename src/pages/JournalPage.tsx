@@ -9,7 +9,6 @@ import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { useToast } from '../components/ui/toastContext'
 import { QuickCapture } from '../components/journal/QuickCapture'
 import { JournalList } from '../components/journal/JournalList'
-import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { listClients } from '../services/clientOpsService'
 import {
   JOURNAL_TYPES,
@@ -115,9 +114,6 @@ function JournalContent({ workspaceId, userId }: { workspaceId: string | null; u
           <>
             {/* D-142: 나중에 GPT · Claude 를 붙일 자리 — 지금은 아무것도 보내지 않는다 */}
             <AiSoonButton size="sm" label="AI로 돌아보기" what="이 기간 기록을 요약하고 놓친 후속 연락을 짚어 줍니다" />
-            <span className="hidden lg:inline-flex">
-              <ScreenGuide screenKey="journal" />
-            </span>
           </>
         }
       />

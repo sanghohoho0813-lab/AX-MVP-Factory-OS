@@ -27,7 +27,6 @@ import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { Modal } from '../components/ui/Modal'
 import { useToast } from '../components/ui/toastContext'
 import { NextActionHero } from '../components/workspace/NextActionHero'
-import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { StatusPill, toFriendlyStatus } from '../components/workspace/StatusPill'
 import { useActiveProject } from '../context/activeProject'
 
@@ -87,9 +86,6 @@ export function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex justify-end">
-        <ScreenGuide screenKey="home" />
-      </div>
       {/* A. 오늘 가장 먼저 할 일 */}
       <div data-tour="home-next-actions">
       {hero ? (

@@ -155,7 +155,6 @@ import {
 } from '../components/ui/primitives'
 import { loadCustomServicesIntoCatalog } from '../services/customServiceService'
 import { ServiceCatalogModal } from '../components/ops/ServiceCatalogModal'
-import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { ClientJournalTab } from '../components/ops/ClientJournalTab'
 import { ClientSharedFiles } from '../components/ops/FilesTab'
 import { DocFileActions } from '../components/ops/DocFileActions'
@@ -600,11 +599,6 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 )}
               </p>
             )}
-          </div>
-          {/* 데스크톱에서만 인라인으로 — 모바일은 아래 '더보기' 시트로 */}
-          <div className="hidden items-end gap-2 lg:flex">
-            <ScreenGuide screenKey="client_detail" />
-            {/* D-140: 계약 단계는 회사명 옆 배지에서 바꾼다 — 여기 두 번째 선택기는 뺐다 */}
           </div>
         </div>
 
@@ -1789,10 +1783,6 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 <Trash2 aria-hidden="true" className="size-4" />
                 업체 삭제
               </Button>
-            </div>
-
-            <div className="border-t border-slate-100 pt-4">
-              <ScreenGuide screenKey="client_detail" />
             </div>
           </div>
         </BottomSheet>

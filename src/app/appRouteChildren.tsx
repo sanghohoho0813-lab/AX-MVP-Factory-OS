@@ -30,9 +30,6 @@ const ProjectFormPage = lazy(() =>
 const SettingsPage = lazy(() =>
   import('../pages/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 )
-const GettingStartedPage = lazy(() =>
-  import('../pages/GettingStartedPage').then((m) => ({ default: m.GettingStartedPage })),
-)
 const TodayOpsPage = lazy(() =>
   import('../pages/TodayOpsPage').then((m) => ({ default: m.TodayOpsPage })),
 )
@@ -399,7 +396,8 @@ export const appRouteChildren = [
       { path: 'projects/:projectId', element: <ProjectDetailPage /> },
       { path: 'projects/:projectId/edit', element: <ProjectFormPage /> },
       { path: 'settings', element: <SettingsPage /> },
-      { path: 'getting-started', element: <GettingStartedPage /> },
+      // D-185: 처음 사용 가이드는 없앴다(대표 지시) — 예전 주소는 오늘로
+      { path: 'getting-started', element: <Navigate to="/" replace /> },
       { path: 'today', element: <Navigate to="/" replace /> },
       { path: 'today/legacy', element: <TodayOpsPage /> },
       { path: 'journal', element: <JournalPage /> },
@@ -447,7 +445,7 @@ export const appRouteChildren = [
       { path: 'why', element: <WhyAxPage /> },
       { path: 'kpi', element: <KpiPage /> },
       { path: 'roadmap', element: <RoadmapPage /> },
-      { path: 'guide', element: <Navigate to="/getting-started" replace /> },
+      { path: 'guide', element: <Navigate to="/" replace /> },
 
       { path: 'diagnosis', element: <DiagnosisStudioPage /> },
       { path: 'diagnosis/questions', element: <QuestionBankPage /> },

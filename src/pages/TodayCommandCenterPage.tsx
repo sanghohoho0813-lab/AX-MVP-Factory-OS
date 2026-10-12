@@ -30,7 +30,6 @@ import { TodoActionSheet, TodoComposer, TodoRow, type TodoAction } from '../comp
 import { JournalList } from '../components/journal/JournalList'
 import { EventCard } from '../components/ops/EventCard'
 import { LinkCustomerModal } from '../components/ops/LinkCustomerModal'
-import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { listClients } from '../services/clientOpsService'
 import { salesActionPath, salesRecontacts, salesRisks } from '../services/salesSignals'
 import { agentLedger, agentLedgerTotals, netAmountOf } from '../services/feeMath'
@@ -408,9 +407,6 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             </h1>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2 self-start sm:self-auto">
-            <span className="hidden lg:inline-flex">
-              <ScreenGuide screenKey="home" />
-            </span>
             <span className="hidden sm:inline-flex">
               <Button variant="primary" onClick={() => setSummaryOpen(true)}>
                 <Moon aria-hidden="true" className="size-4" /> 오늘 정리하기

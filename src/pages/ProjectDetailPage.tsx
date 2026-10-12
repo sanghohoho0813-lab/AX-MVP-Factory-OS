@@ -53,7 +53,6 @@ import { DropdownMenu } from '../components/ui/DropdownMenu'
 import { NotFoundState } from '../components/ui/NotFoundState'
 import { Panel } from '../components/ui/Panel'
 import { StatusBadge } from '../components/ui/StatusBadge'
-import { ScreenGuide } from '../components/onboarding/ScreenGuide'
 import { useToast } from '../components/ui/toastContext'
 
 function SummaryItem({ label, value }: { label: string; value: string }) {
@@ -264,7 +263,6 @@ export function ProjectDetailPage() {
         }
         actions={
           <>
-            <ScreenGuide screenKey="project_detail" />
             <Button
               variant="secondary"
               onClick={() => navigate(`/projects/${project.id}/edit`)}

@@ -147,7 +147,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await nav2.getByRole('button', { name: /이 시스템/ }).click()
   await page.waitForTimeout(200)
   const sys = (await nav2.innerText()) ?? ''
-  check('이 시스템: 처음 사용 가이드가 맨 위', sys.indexOf('처음 사용 가이드') > sys.indexOf('이 시스템') && sys.indexOf('처음 사용 가이드') < sys.indexOf('기획의도'), sys.slice(-300))
+  check('이 시스템(D-185): 처음 사용 가이드는 없다 · 기획의도가 맨 위', !sys.includes('처음 사용 가이드') && sys.indexOf('기획의도') > sys.indexOf('이 시스템'), sys.slice(-300))
+  check('머리줄(D-185): 처음 사용 가이드 단추 없음', (await page.locator('header').getByText('처음 사용 가이드').count()) === 0)
   const before = page.url()
   const roadmapBtn = nav2.getByRole('button', { name: /향후 확장/ })
   await roadmapBtn.click()

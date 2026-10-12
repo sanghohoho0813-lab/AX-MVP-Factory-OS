@@ -4,7 +4,7 @@ import { Header } from './Header'
 import { Sidebar } from './Sidebar'
 import { MobileNav } from './MobileNav'
 import { DemoTourProvider } from '../demo/DemoTourProvider'
-import { OnboardingProvider } from '../onboarding/OnboardingProvider'
+import { TutorialProvider } from '../tutorial/TutorialProvider'
 import { ActiveProjectProvider } from '../../context/ActiveProjectProvider'
 import { RouteProjectSync } from '../../context/RouteProjectSync'
 import { ContentErrorBoundary } from './ContentErrorBoundary'
@@ -52,7 +52,8 @@ export function AppShell() {
       {/* D-164: 보기 무대(iframe) 안에서 주소 · 저장을 바깥과 맞춘다 */}
       <FrameBridge />
       <DemoTourProvider>
-      <OnboardingProvider>
+      {/* D-185: 안내 영상 — 팀장님 로그인 때 먼저 · 머리줄 [안내 영상] */}
+      <TutorialProvider>
       <div className="flex min-h-screen">
         <Sidebar
           collapsed={collapsed}
@@ -89,7 +90,7 @@ export function AppShell() {
         <MobileNav onOpenMore={() => setMobileOpen(true)} />
         <ScrollTopButton />
       </div>
-      </OnboardingProvider>
+      </TutorialProvider>
       </DemoTourProvider>
     </ActiveProjectProvider>
     </EntitlementsProvider>

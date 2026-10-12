@@ -34,7 +34,6 @@ import {
   useAnalysisData,
   useRunAnalysis,
 } from './analysisShared'
-import { ScreenGuide } from '../../../components/onboarding/ScreenGuide'
 
 export function AnalysisMainPage() {
   const { projectId = '' } = useParams()
@@ -132,9 +131,6 @@ export function AnalysisMainPage() {
   return (
     <DiagnosisFlowShell projectId={projectId} step="result">
       <div className="flex flex-col gap-5">
-        <div className="flex justify-end">
-          <ScreenGuide screenKey="diagnosis" />
-        </div>
         <ReanalysisBanner show={context.needsReanalysisFlag} onRun={runAnalysis} />
 
         {/* 의사결정 히어로 */}

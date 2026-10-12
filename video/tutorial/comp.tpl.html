@@ -1,0 +1,176 @@
+<!doctype html>
+<!--
+  안내 영상(D-185) 기본 틀 — 가이드 v4.1 14-1 을 두 비율(세로 1080×1920 · 가로 1920×1080)로 넓혔다.
+  모든 움직임은 render(t) 한 함수로 정해진다(결정적 렌더). CSS 애니메이션 · 트랜지션 없음.
+  /*W*/ /*H*/ /*SUBS*/ /*DUR*/ /*ASPECT*/ 와 <!--SCENES--> 자리에 build.py 가 값을 넣는다.
+-->
+<html lang="ko"><head><meta charset="utf-8">
+<style>
+  @font-face { font-family: 'Pretendard Variable'; font-weight: 45 920; font-style: normal; font-display: block; src: url('fonts/PretendardVariable.woff2') format('woff2-variations'); }
+  :root { --gold:#d2a45f; --gold2:#b97935; --gold-soft:#e8c995; --secondary:#3f8585; --sec-soft:#8cc4c4;
+          --acc:var(--gold); --acc2:var(--gold2); --hi:var(--gold-soft); --ink:#f4f1ec; --ink2:rgba(244,241,236,.74); --ink3:rgba(244,241,236,.5); --line:rgba(255,255,255,.07); }
+  * { box-sizing:border-box; margin:0; padding:0; animation:none !important; transition:none !important; }
+  html,body { width:/*W*/px; height:/*H*/px; overflow:hidden; background:#10171e; color:var(--ink);
+              font-family:'Pretendard Variable',sans-serif; -webkit-font-smoothing:antialiased; word-break:keep-all; }
+  #stage { position:absolute; inset:0; overflow:hidden; }
+  .scene { position:absolute; inset:0; opacity:0; overflow:hidden; }
+  .abs { position:absolute; }
+  /* 배경 3계열 (가이드 3장) */
+  .bgD, .bgL, .bgS { position:absolute; inset:-6%; }
+  .bgD { background: radial-gradient(70% 42% at 86% 8%, rgba(210,164,95,.16), transparent 62%), linear-gradient(165deg, #10171e 0%, #171f28 52%, #0d1218 100%); }
+  .bgL { background: radial-gradient(58% 34% at 90% 8%, rgba(210,164,95,.16), transparent 62%), linear-gradient(165deg, #fbf7f0 0%, #f3ece2 55%, #ece2d5 100%); }
+  .bgS { background: radial-gradient(55% 38% at 12% 90%, rgba(63,133,133,.16), transparent 62%), linear-gradient(160deg, #1b2630 0%, #22303a 55%, #172129 100%); }
+  .grid { position:absolute; inset:0; opacity:.5; background-image:linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+          background-size:90px 90px; -webkit-mask-image:radial-gradient(80% 60% at 50% 40%, #000 30%, transparent 85%); }
+  .light { --ink:#171b20; --ink2:rgba(23,27,32,.74); --ink3:rgba(23,27,32,.52); --hi:#a96a27; --line:rgba(23,27,32,.05); color:var(--ink); }
+
+  .eyebrow { font-size:26px; font-weight:700; letter-spacing:.3em; color:var(--hi); text-transform:uppercase; }
+  .h0 { font-size:150px; font-weight:850; letter-spacing:-.035em; line-height:1.06; }
+  .h1 { font-size:96px; font-weight:800; letter-spacing:-.03em; line-height:1.12; }
+  .h2 { font-size:68px; font-weight:800; letter-spacing:-.02em; line-height:1.2; }
+  .h3 { font-size:52px; font-weight:700; letter-spacing:-.01em; line-height:1.28; }
+  .p  { font-size:52px; font-weight:500; color:var(--ink2); line-height:1.42; }
+  .acc { color:var(--hi); font-weight:850; }
+  .num { font-size:240px; font-weight:850; letter-spacing:-.05em; line-height:1; color:var(--hi); }
+  .note { font-size:22px; font-weight:500; color:var(--ink3); line-height:1.45; }
+  .glass { background:linear-gradient(160deg, rgba(255,255,255,.08), rgba(255,255,255,.03)); border:1px solid rgba(255,255,255,.13); border-radius:28px; box-shadow:0 40px 80px -30px rgba(0,0,0,.7); }
+  .light .glass { background:#fff; border-color:rgba(23,27,32,.09); box-shadow:0 30px 60px -32px rgba(70,45,20,.30); }
+  .chip { display:inline-flex; align-items:center; gap:14px; padding:14px 26px; border-radius:999px; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.15); font-size:52px; font-weight:700; white-space:nowrap; }
+  .chip::before { content:''; width:14px; height:14px; border-radius:50%; background:var(--c, var(--acc)); flex:none; }
+  .chip.sm { font-size:40px; padding:12px 22px; }
+  .chip.hi { border-color:rgba(232,201,149,.6); color:var(--hi); }
+  .light .chip { background:#fff; border-color:rgba(23,27,32,.12); box-shadow:0 18px 36px -24px rgba(70,45,20,.35); }
+  .numtag { display:flex; align-items:center; gap:20px; padding:16px 28px 16px 16px; border-radius:22px; background:rgba(15,18,22,.55); border:1px solid rgba(232,201,149,.4); font-size:52px; font-weight:700; line-height:1.22; }
+  .numtag .n { flex:none; width:68px; height:68px; border-radius:50%; background:var(--c, var(--acc)); color:#16110d; display:flex; align-items:center; justify-content:center; font-size:34px; font-weight:850; }
+  .light .numtag { background:#fff; border-color:rgba(23,27,32,.1); box-shadow:0 24px 50px -30px rgba(70,45,20,.3); }
+  .node { padding:22px 26px; border-radius:22px; text-align:center; font-size:48px; font-weight:750; background:linear-gradient(160deg, #262b32, #1b1f25); border:1px solid rgba(255,255,255,.14); border-top:5px solid var(--c, rgba(255,255,255,.14)); box-shadow:0 30px 60px -30px rgba(0,0,0,.7); white-space:nowrap; }
+  .light .node { background:#fff; border-color:rgba(23,27,32,.08); border-top:5px solid var(--c, #d2a45f); color:var(--ink); box-shadow:0 24px 50px -28px rgba(70,45,20,.35); }
+  .hub { border-radius:50%; background:radial-gradient(circle at 35% 30%, #e8c995, var(--acc) 55%, var(--acc2)); display:flex; align-items:center; justify-content:center; text-align:center; font-weight:850; color:#171b20; box-shadow:0 0 0 14px rgba(210,164,95,.14), 0 30px 60px -20px rgba(0,0,0,.7); line-height:1.15; }
+  .bubble { padding:22px 32px; border-radius:28px 28px 28px 8px; font-size:48px; font-weight:700; line-height:1.3; background:rgba(255,255,255,.08); border:1px solid rgba(232,201,149,.4); }
+  .light .bubble { background:#fff; border-color:rgba(169,106,39,.35); box-shadow:0 24px 50px -30px rgba(70,45,20,.3); }
+  .strike { position:absolute; left:-6px; top:52%; height:6px; width:0; border-radius:3px; background:var(--acc); }
+  .bar { height:28px; border-radius:14px; background:rgba(255,255,255,.08); overflow:hidden; }
+  .light .bar { background:rgba(23,27,32,.08); }
+  .fill { height:100%; width:0; border-radius:14px; background:linear-gradient(90deg, var(--acc2), var(--acc)); }
+  .fill.dash { background:rgba(232,201,149,.16); border:3px dashed var(--gold-soft); }
+  .logo-img { display:block; }
+  .person { border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:850; }
+
+  /* 기기 틀 */
+  .browser { border-radius:18px; overflow:hidden; border:1px solid rgba(255,255,255,.16); background:#f5f7fa; box-shadow:0 50px 100px -30px rgba(0,0,0,.85); }
+  .light .browser { border-color:rgba(23,27,32,.12); box-shadow:0 40px 90px -36px rgba(40,30,20,.5); }
+  .browser .barr { height:40px; background:#1b1f25; display:flex; align-items:center; gap:9px; padding:0 18px; }
+  .browser .barr i { width:12px; height:12px; border-radius:50%; background:rgba(255,255,255,.24); }
+  .browser .barr span { margin-left:14px; padding:4px 14px; border-radius:8px; background:rgba(255,255,255,.08); font-size:16px; font-weight:700; letter-spacing:.06em; color:rgba(244,241,236,.55); }
+  .view { position:relative; overflow:hidden; background:#fff; }
+  .phone { border:14px solid #07090b; border-radius:56px; background:#000; overflow:hidden; box-shadow:0 50px 100px -30px rgba(0,0,0,.85), 0 0 0 1px rgba(255,255,255,.12); }
+  .phone .view { border-radius:42px; }
+  .phone .notch { position:absolute; top:0; left:50%; transform:translateX(-50%); width:34%; height:26px; background:#07090b; border-radius:0 0 18px 18px; z-index:2; }
+  img.shot { position:absolute; left:0; top:0; max-width:none; transform-origin:0 0; }
+  .focus { position:absolute; border-radius:14px; border:4px solid var(--gold); box-shadow:0 0 0 9999px rgba(10,14,18,.28), 0 0 28px rgba(210,164,95,.55); opacity:0; pointer-events:none; }
+  .tag { position:absolute; padding:8px 18px; border-radius:999px; background:#171b20; color:#f4f1ec; font-size:24px; font-weight:800; letter-spacing:.08em; }
+
+  /* 자막 — 밝은 장면에서도 같은 어두운 상자 */
+  #sub { position:absolute; display:flex; align-items:flex-end; justify-content:center; z-index:50; }
+  #sub span { padding:16px 30px; border-radius:20px; background:rgba(15,18,22,.82); border:1px solid rgba(255,255,255,.10);
+              font-weight:700; letter-spacing:-.01em; line-height:1.38; text-align:center; white-space:pre-line; color:#f4f1ec; }
+  #sub b { color:#e8c995; font-weight:850; }
+  .tall #sub { left:132px; right:132px; top:1330px; height:180px; }
+  .tall #sub span { max-width:816px; font-size:52px; }
+  .wide #sub { left:140px; right:140px; top:900px; height:150px; }
+  .wide #sub span { max-width:1640px; font-size:46px; white-space:nowrap; }
+  .guide { position:absolute; pointer-events:none; outline:2px dashed rgba(255,80,80,.7); display:none; z-index:99; }
+  body.show-guide .guide { display:block; }
+</style></head>
+<body class="/*ASPECT*/"><div id="stage">
+<!--SCENES-->
+  <div id="sub"><span></span></div>
+<!--GUIDES-->
+</div>
+<script>
+  const SUBS = /*SUBS*/;
+  const DUR = /*DUR*/;
+  if (new URLSearchParams(location.search).get('guide')) document.body.classList.add('show-guide');
+  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+  const eo = (x) => 1 - Math.pow(1 - x, 3);
+  const eio = (x) => (x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+  const lerp = (a, b, x) => a + (b - a) * x;
+  const vis = (t, tin, tout, d = .6) => Math.min(eo(clamp((t - tin) / d)), 1 - eio(clamp((t - (tout - d * .8)) / (d * .8))));
+  const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const nums = (s) => s.split(',').map(Number)
+  // 여러 구간 키 — "t0,t1,a0,a1;t2,t3,a1,a2" → t 에서의 값(구간 사이에는 앞 값 유지)
+  const keys = (spec) => spec.split(';').map(nums)
+  function keyed(spec, t, dims) {
+    let cur = spec[0].slice(2, 2 + dims)
+    for (const k of spec) {
+      const [a, b] = k
+      const from = k.slice(2, 2 + dims), to = k.slice(2 + dims, 2 + 2 * dims)
+      if (t < a) break
+      const p = eio(clamp((t - a) / Math.max(.001, b - a)))
+      cur = from.map((v, i) => lerp(v, to[i], p))
+    }
+    return cur
+  }
+  const animated = [...document.querySelectorAll('[data-in]')]
+  const draws = [...document.querySelectorAll('[data-draw]')].map((p) => ({ p, L: p.getTotalLength(), r: nums(p.dataset.draw) }))
+  const grows = [...document.querySelectorAll('[data-grow]')]
+  const strikes = [...document.querySelectorAll('[data-strike]')]
+  const pans = [...document.querySelectorAll('[data-pan]')].map((el) => ({ el, k: keys(el.dataset.pan) }))   // 화면 속 위치 · 배율: t0,t1,x0,y0,s0,x1,y1,s1
+  const moves = [...document.querySelectorAll('[data-move]')].map((el) => ({ el, k: keys(el.dataset.move) })) // 요소 이동: t0,t1,dx0,dy0,dx1,dy1
+  const counts = [...document.querySelectorAll('[data-count]')]
+  const subEl = document.querySelector('#sub span')
+  let subIdx = -2
+  function render(t) {
+    for (const el of animated) {
+      const tin = +el.dataset.in, tout = +el.dataset.out, a = el.dataset.a || 'fade'
+      const isScene = el.classList.contains('scene')
+      const p = eo(clamp((t - tin) / .8))
+      let op = vis(t, tin, tout, isScene ? .55 : (a === 'fast' ? .35 : .7))
+      if (el.dataset.dim) op *= lerp(1, .5, eo(clamp((t - +el.dataset.dim) / .4)))
+      if (el.dataset.blink) { const b = +el.dataset.blink; op *= t >= b ? 1 : 1 }
+      el.style.opacity = op
+      let tr = ''
+      if (a === 'up') tr = `translateY(${(1 - p) * 34}px)`
+      else if (a === 'left') tr = `translateX(${(1 - p) * -60}px)`
+      else if (a === 'right') tr = `translateX(${(1 - p) * 60}px)`
+      else if (a === 'scale') tr = `scale(${lerp(.92, 1, p)})`
+      else if (a === 'card') tr = `translateY(${(1 - p) * 70}px) scale(${lerp(.93, 1, p)})`
+      else if (a === 'push') tr = `translateY(${(1 - eo(clamp((t - tin) / 1.2))) * 220}px) scale(${lerp(.82, 1, eo(clamp((t - tin) / 1.2)))})`
+      if (el.dataset.move) continue
+      if (tr) el.style.transform = tr
+    }
+    for (const { el, k } of moves) {
+      const [dx, dy] = keyed(k, t, 2)
+      const a = el.dataset.a, tin = +el.dataset.in
+      const p = eo(clamp((t - tin) / .8))
+      const extra = a === 'scale' ? ` scale(${lerp(.92, 1, p)})` : ''
+      el.style.transform = `translate(${dx}px, ${dy}px)${extra}`
+    }
+    for (const { p, L, r } of draws) { p.style.strokeDasharray = L; p.style.strokeDashoffset = L * (1 - eio(clamp((t - r[0]) / (r[1] - r[0])))) }
+    for (const g of grows) { const [a, b, w] = nums(g.dataset.grow); g.style.width = `${lerp(0, w, eio(clamp((t - a) / (b - a))))}px` }
+    for (const s of strikes) { const p = eio(clamp((t - +s.dataset.strike) / .8)); s.style.width = p <= 0 ? '0px' : `calc(${p * 100}% + ${12 * p}px)` }
+    for (const { el, k } of pans) { const [x, y, s] = keyed(k, t, 3); el.style.transform = `scale(${s}) translate(${-x}px, ${-y}px)` }
+    for (const c of counts) {
+      const [a, b, v0, v1] = nums(c.dataset.count)
+      const v = lerp(v0, v1, eio(clamp((t - a) / (b - a))))
+      c.textContent = (c.dataset.fmt || '{}').replace('{}', Math.round(v).toLocaleString('ko-KR'))
+    }
+    // 자막 — 바로 이어지는 줄은 깜빡이지 않게 그대로 바꾸고, 말이 쉬는 곳에서만 살짝 사라진다
+    let i = -1
+    for (let k = 0; k < SUBS.length && t >= SUBS[k][0] - .08; k++) i = k
+    let op = 0
+    if (i >= 0) {
+      const [a, b] = SUBS[i], prev = SUBS[i - 1], next = SUBS[i + 1]
+      const joinPrev = prev && a - prev[1] < .35, joinNext = next && next[0] - b < .35
+      const end = joinNext ? next[0] - .08 : b + .22
+      if (t < end) op = Math.min(joinPrev ? 1 : clamp((t - a + .08) / .14), joinNext ? 1 : clamp((end - t) / .16))
+      else i = -1
+    }
+    if (i !== subIdx && i >= 0) { subIdx = i; subEl.innerHTML = esc(SUBS[i][2]).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>') }
+    subEl.parentElement.style.opacity = op
+  }
+  window.render = render
+  window.DUR = DUR
+  render(+(new URLSearchParams(location.search).get('t') || 0))
+</script>
+</body></html>

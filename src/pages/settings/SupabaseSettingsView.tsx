@@ -18,7 +18,6 @@ import { WorkspaceMembersPanel } from '../../components/data/WorkspaceMembersPan
 import { ImportWizard } from '../../components/data/ImportWizard'
 import { useCurrentUser } from '../../components/layout/useCurrentUser'
 import { TabNav, SettingRow, AppearancePanel, TextScalePanel, FeatureVisibilityPanel, SystemPanel, type TabKey } from './parts'
-import { OnboardingSettingsPanel } from './OnboardingSettingsPanel'
 import { SupabaseHealthPanel } from './SupabaseHealthPanel'
 import { updateMyName } from '../../auth/authService'
 
@@ -153,7 +152,6 @@ export function SupabaseSettingsView() {
           <TextScalePanel />
           <AppearancePanel />
           <FeatureVisibilityPanel />
-          <OnboardingSettingsPanel />
         </>
       )}
       {tab === 'workspace' && (

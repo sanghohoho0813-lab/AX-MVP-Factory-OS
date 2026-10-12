@@ -199,7 +199,7 @@ check('modules: AX STUDIO 는 전문 모듈의 분야 한 줄(D-127) — 안의 
   check('메뉴: 영업 묶음 = 영업 관리(D-114) · 영업자 정산 · 매출 · 비용(D-142) · 1차 미팅 체크리스트(준비 중) — 지원사업 알림은 기업성장으로(D-163)',
     inGroup('sales').join() === 'sales,agents,money,marketing,first-meeting' && MODULES.find((m) => m.key === 'marketing')?.status === 'soon' && MODULES.find((m) => m.key === 'first-meeting')?.status === 'soon', inGroup('sales').join())
   check('메뉴: 고객 묶음에서 영업자 정산이 빠졌다', !inGroup('clients').includes('agents'))
-  check('메뉴: 처음 사용 가이드가 이 시스템 맨 위', inGroup('about')[0] === 'guide' && MODULES.find((m) => m.key === 'guide')?.path === '/getting-started')
+  check('메뉴(D-185): 처음 사용 가이드는 없앴다 — 이 시스템 맨 위는 기획의도', !MODULES.some((m) => m.key === 'guide' || m.path === '/getting-started') && inGroup('about')[0] === 'why', inGroup('about').join())
   check('메뉴: 향후 확장은 눌러도 이동하지 않고 펼쳐진다', MODULES.find((m) => m.key === 'roadmap')?.expand === 'future-items')
   check('메뉴: 전문 모듈은 영업 다음', order.indexOf('modules') === order.indexOf('sales') + 1 && order.indexOf('sales') === order.indexOf('clients') + 1)
   check('메뉴: 세금 계산기는 절세·재무 줄 아래', MODULES.find((m) => m.key === 'tool-tax')?.parent === 'cat-tax-finance')

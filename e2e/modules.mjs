@@ -283,7 +283,7 @@ for (const [w, h, mob] of [[1440, 900, false], [390, 844, true]]) {
 {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
   const page = await ctx.newPage()
-  for (const path of ['/settings', '/getting-started']) {
+  for (const path of ['/settings']) {
     await page.goto(BASE + path, { waitUntil: 'networkidle' })
     const n = await page.getByRole('button', { name: /샘플로 전체 흐름|샘플 전체 흐름|샘플 프로젝트로 체험/ }).count()
     check(`${path}: 시연 데이터가 없으면 '샘플 체험' 단추가 없다`, n === 0, String(n))
@@ -587,11 +587,12 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
   check('첫 파일: 샘플 체험 준비 코드(작업실 서비스 묶음)가 없다', !!entry && !entry.text.includes('시연용 진단 질문을 찾을 수 없습니다'))
   check('첫 화면: 샘플 체험 준비 코드를 아예 받지 않는다', !seen.some((r) => r.text.includes('시연용 진단 질문을 찾을 수 없습니다')))
   check('첫 파일: 처음 사용 안내창 글이 없다', !!entry && !entry.text.includes('가이드 챕터'))
+  // D-185: 처음 사용 가이드는 없앴다 — 예전 주소는 오늘로 · 화면 어디에도 '이 화면 사용법' 단추 없음
   await page.goto(BASE + '/getting-started', { waitUntil: 'networkidle' })
-  await page.getByRole('main').getByRole('button', { name: /안내 다시 보기/ }).first().click()
-  await page.waitForTimeout(800)
-  check('처음 사용 가이드: 누르면 그때 불러와 열린다', (await page.getByRole('dialog').count()) >= 1)
-  await page.keyboard.press('Escape')
+  check('처음 사용 가이드(D-185): 예전 주소는 오늘 화면으로', new URL(page.url()).pathname === '/', page.url())
+  check('처음 사용 가이드(D-185): 이 화면 사용법 · 따라 해보기 단추 없음', (await page.getByRole('button', { name: /이 화면 사용법|따라 해보기|처음 사용 가이드/ }).count()) === 0)
+  await page.goto(BASE + '/settings', { waitUntil: 'networkidle' })
+  check('처음 사용 가이드(D-185): 설정에도 없음', !((await page.getByRole('main').innerText()) ?? '').includes('처음 사용 가이드'))
   await page.evaluate(seedScript())
 
   const hues = []

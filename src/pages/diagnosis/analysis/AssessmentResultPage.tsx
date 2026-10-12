@@ -34,7 +34,6 @@ import {
   ProjectNotFound,
   useAnalysisData,
 } from './analysisShared'
-import { ScreenGuide } from '../../../components/onboarding/ScreenGuide'
 
 function BulletPanel({
   title,
@@ -145,9 +144,6 @@ export function AssessmentResultPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex justify-end">
-        <ScreenGuide screenKey="assessment_result" />
-      </div>
       {header}
       <AnalysisNav projectId={projectId} />
 

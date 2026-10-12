@@ -16,10 +16,10 @@ import { Suspense, lazy, useState } from 'react'
 import { CURRENT_USER, WORKSPACES } from '../../data/demo'
 import { useDismissable } from '../../lib/useDismissable'
 import { GlobalSearch } from '../search/GlobalSearch'
-import { GuideButton } from '../onboarding/GuideButton'
 import { getDataModeConfig } from '../../data/dataMode'
 import { CloudSaveStatus } from '../cloud/CloudSaveStatus'
 import { SignalBell } from './SignalBell'
+import { TutorialButton } from '../tutorial/TutorialButton'
 import { HeaderClock } from './HeaderClock'
 import { brand } from '../../brand/brand.config'
 import { screenGroupForPath, screenTitleForPath, type NavAccent } from '../../config/moduleRegistry'
@@ -247,11 +247,6 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
           <span className="hidden min-[1700px]:inline">{brand.customerPlatformLabel}</span>
         </a>}
         {/* 가이드·저장상태·설정·계정은 모바일에서 서랍/더보기 로 옮겼다 */}
-        {!pilot && (
-          <span className="hdr-opt hidden 2xl:inline-flex">
-            <GuideButton />
-          </span>
-        )}
         {/* D-120: 저장 상태 글은 아주 넓은 화면에서만(글자 크기 단추 자리를 냈다) — 서랍 · 설정에도 있다 */}
         <span className="hdr-opt hidden min-[2100px]:inline-flex">
           <CloudSaveStatus state={isSupabase ? 'saved' : 'local'} compact={false} />
@@ -279,6 +274,8 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
             </span>
           </>
         )}
+        {/* D-185: 안내 영상 — 언제든 다시 보기 */}
+        <TutorialButton roomy={pilot} />
         <SignalBell />
         <Link
           to="/settings"

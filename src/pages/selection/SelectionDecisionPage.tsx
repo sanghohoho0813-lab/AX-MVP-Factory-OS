@@ -38,7 +38,6 @@ import {
   SelectionProjectNotFound,
   } from './selectionShared'
 import { useSelectionData } from './useSelectionData'
-import { ScreenGuide } from '../../components/onboarding/ScreenGuide'
 import { particle } from '../../lib/josa'
 
 const KPI_OPTIONS = ['월 처리시간', '월 처리 가능 건수', '오류·누락 건수', '사용 횟수·사용자 수', '고객 응답시간']
@@ -101,9 +100,6 @@ export function SelectionDecisionPage() {
   if (candidates.length === 0) {
     return (
       <div className="flex flex-col gap-5">
-        <div className="flex justify-end">
-          <ScreenGuide screenKey="selection_decision" />
-        </div>
         {header}
         <SelectionNav projectId={projectId} />
         <Panel title="핵심 과제 선정">
@@ -119,9 +115,6 @@ export function SelectionDecisionPage() {
   if (!decision || decision.status === 'superseded') {
     return (
       <div className="flex flex-col gap-5">
-        <div className="flex justify-end">
-          <ScreenGuide screenKey="selection_decision" />
-        </div>
         {header}
         <SelectionNav projectId={projectId} />
         <Panel title="핵심 과제 선정">

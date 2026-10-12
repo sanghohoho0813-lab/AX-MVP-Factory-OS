@@ -24,6 +24,18 @@ import {
   rememberAccount,
   setSwitchTarget,
 } from '../recentAccounts'
+import {
+  TUTORIAL_PREFS_KEY,
+  TUTORIAL_SHOWN_KEY,
+  hideTutorialForever,
+  hideTutorialToday,
+  markShownThisSession,
+  readTutorialPrefs,
+  resetTutorialPrefs,
+  shouldAutoOpenTutorial,
+  wasShownThisSession,
+} from '../../services/tutorialPrefs'
+import { TUTORIAL_VIDEOS, minutesLabel } from '../../config/tutorialVideos'
 
 let passed = 0
 let failed = 0
@@ -356,6 +368,36 @@ check('키: 상관없는 다른 사이트 값은 옮기지 않는다', !isUserSc
   check('금고: 대표 로그아웃 → 업체 값은 금고로 · 계정 목록 · 바꿀 계정은 그대로', V.getItem('axmvp.clients') === null && readRecentAccounts(V).length === 1 && peekSwitchTarget(V) === 'ceh@mirae.kr')
   vaultSwitchTo(PILOT, 'pilot', V, VS)
   check('금고: 팀장 로그인 → 대표 업체 값은 안 보임 · 계정 목록은 그대로', V.getItem('axmvp.clients') === null && readRecentAccounts(V).length === 1)
+}
+
+// D-185: 안내 영상 — 팀장님(Pilot)이 들어오면 먼저 영상부터 · 오늘 하루 안 보기 · 앞으로 보지 않기 · 머리줄로 언제든
+{
+  const L = new FakeStorage()
+  const S = new FakeStorage()
+  const base = { access: 'pilot', prefs: readTutorialPrefs(L), today: '2026-10-12', hiddenInAccount: false, shownThisSession: wasShownThisSession(S) }
+  check('안내 영상: 팀장님 첫 로그인 → 저절로 띄운다', shouldAutoOpenTutorial(base))
+  check('안내 영상: 대표(full) · 고객 · 접근 없음에는 저절로 띄우지 않는다', ['full', 'portal', 'none', null, undefined].every((a) => !shouldAutoOpenTutorial({ ...base, access: a as string | null })))
+  markShownThisSession(S)
+  check('안내 영상: 한 번 띄운 창(탭)에서는 화면을 옮겨도 다시 안 뜬다', wasShownThisSession(S) && !shouldAutoOpenTutorial({ ...base, shownThisSession: wasShownThisSession(S) }) && S.getItem(TUTORIAL_SHOWN_KEY) === '1')
+  hideTutorialToday('2026-10-12', L)
+  check('안내 영상: 오늘 하루 안 보기 → 오늘은 안 뜬다', !shouldAutoOpenTutorial({ ...base, prefs: readTutorialPrefs(L) }))
+  check('안내 영상: 오늘 하루 안 보기 → 내일은 다시 뜬다', shouldAutoOpenTutorial({ ...base, prefs: readTutorialPrefs(L), today: '2026-10-13' }))
+  hideTutorialForever(L)
+  check('안내 영상: 앞으로 보지 않기 → 날이 바뀌어도 안 뜬다', !shouldAutoOpenTutorial({ ...base, prefs: readTutorialPrefs(L), today: '2027-01-01' }))
+  check('안내 영상: 다른 기기에서 앞으로 보지 않기(계정 정보) → 이 기기에서도 안 뜬다', !shouldAutoOpenTutorial({ ...base, hiddenInAccount: true }))
+  resetTutorialPrefs(L)
+  check('안내 영상: 되돌리면 다시 뜬다', shouldAutoOpenTutorial({ ...base, prefs: readTutorialPrefs(L) }))
+  L.setItem(TUTORIAL_PREFS_KEY, '{"hiddenOn":"<script>","never":"yes"}')
+  check('안내 영상: 깨진 값은 무시(날짜 모양 · true 만)', JSON.stringify(readTutorialPrefs(L)) === '{}')
+  L.setItem(TUTORIAL_PREFS_KEY, 'not json')
+  check('안내 영상: 읽을 수 없는 값이어도 멈추지 않는다', JSON.stringify(readTutorialPrefs(L)) === '{}')
+  const full = new FakeStorage()
+  full.quota = 0
+  hideTutorialToday('2026-10-12', full)
+  check('안내 영상: 저장 공간이 가득해도 멈추지 않는다', JSON.stringify(readTutorialPrefs(full)) === '{}')
+  check('안내 영상: 키는 사람별 금고로 나뉜다(대표가 끈 것이 팀장님 쪽에 번지지 않음)', isUserScopedKey(TUTORIAL_PREFS_KEY) && isUserScopedKey(TUTORIAL_SHOWN_KEY))
+  check('안내 영상: 1편 · 2편 — 가로(16:9) · 세로(9:16) 두 벌씩', TUTORIAL_VIDEOS.length === 2 && TUTORIAL_VIDEOS.every((v) => /-wide\.mp4$/.test(v.wide) && /-tall\.mp4$/.test(v.tall) && v.seconds > 60))
+  check('안내 영상: 길이 표시 "약 5분"', minutesLabel(309) === '약 5분' && minutesLabel(20) === '약 1분')
 }
 
 console.log(`pilot: ${passed} passed, ${failed} failed`)
