@@ -280,9 +280,9 @@ function BatchSummary({ batch, fresh }: { batch: DocBatchSummary; fresh: boolean
                 <span aria-hidden="true" className="text-slate-400">→</span>
                 <span className={`font-semibold ${x.other ? 'text-warning-800' : 'text-slate-900'}`}>{x.label}</span>
                 {x.same ? (
-                  <span className="t-meta text-warning-800">(이름 · 크기가 같은 파일이 이미 있어요 — '확인할 것' 에서 최신 것만 남길 수 있어요)</span>
+                  <span className="t-meta text-warning-800">(이름 · 크기가 같은 파일이 이미 있어요 — '확인할 것' 에서 최신 것만 남기거나 서류 탭에서 하나 지우세요)</span>
                 ) : (
-                  x.numbered && <span className="t-meta text-slate-500">(같은 서류가 이미 있어 따로 둠 — '확인할 것' 에서 최신 것만 남길 수 있어요)</span>
+                  x.numbered && <span className="t-meta text-slate-500">(같은 서류가 이미 있어 따로 둠 — '확인할 것' 에서 최신 것만 남기거나 서류 탭에서 하나 지우세요)</span>
                 )}
               </li>
             ))}
