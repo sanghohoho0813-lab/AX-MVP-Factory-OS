@@ -19,7 +19,7 @@ import { GlobalSearch } from '../search/GlobalSearch'
 import { getDataModeConfig } from '../../data/dataMode'
 import { CloudSaveStatus } from '../cloud/CloudSaveStatus'
 import { SignalBell } from './SignalBell'
-import { TutorialButton } from '../tutorial/TutorialButton'
+import { TutorialButton, TutorialMenuItem } from '../tutorial/TutorialButton'
 import { HeaderClock } from './HeaderClock'
 import { brand } from '../../brand/brand.config'
 import { screenGroupForPath, screenTitleForPath, type NavAccent } from '../../config/moduleRegistry'
@@ -151,6 +151,7 @@ function UserMenu() {
             <Settings aria-hidden="true" className="size-4 text-slate-400" />
             설정
           </Link>
+          <TutorialMenuItem onPick={() => setOpen(false)} />
         </div>
       )}
     </div>

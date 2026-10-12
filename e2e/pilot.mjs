@@ -211,6 +211,17 @@ try {
   /* ================= 1. 대표 — 몇 달 쓴 자료가 보인다 ================= */
   await login(page, OWNER)
   check('대표(D-185): 안내 영상은 저절로 안 뜸(팀장님 계정만) · 머리줄 [안내 영상] 단추는 있음', (await page.getByTestId('tutorial-dialog').count()) === 0 && (await page.getByTestId('tutorial-open').count()) === 1)
+  // 좁은 PC(1100) — 대표 머리줄은 자리가 없어 단추를 숨기고, 사용자 메뉴의 [안내 영상 보기] 로 연다
+  await page.setViewportSize({ width: 1100, height: 900 })
+  await page.waitForTimeout(300)
+  const tutHidden = !(await page.getByTestId('tutorial-open').isVisible())
+  await page.getByRole('button', { name: '사용자 메뉴' }).click()
+  await page.getByTestId('tutorial-menu-open').click()
+  await page.waitForTimeout(400)
+  check('대표(D-185): 1100px — 머리줄 단추 대신 사용자 메뉴 [안내 영상 보기] 로 열림', tutHidden && (await page.getByTestId('tutorial-dialog').getAttribute('data-auto')) === '0')
+  await page.keyboard.press('Escape')
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.waitForTimeout(300)
   await go(page, '/ops/clients')
   const ownerList = await bodyText(page)
   check('대표: 자기 업체가 보인다(대표비밀정밀)', ownerList.includes('대표비밀정밀'), ownerList.slice(0, 300))

@@ -13,6 +13,7 @@ import { useAuth } from '../../auth/AuthProvider'
 import { createWorkspace } from '../../auth/workspaceService'
 import { useCurrentUser } from './useCurrentUser'
 import { AccountSwitchItems } from './AccountSwitch'
+import { TutorialMenuItem } from '../tutorial/TutorialButton'
 
 const ROLE_LABEL: Record<string, string> = { owner: '소유자', admin: '관리자', editor: '편집자', viewer: '뷰어' }
 
@@ -151,6 +152,7 @@ export function SupabaseUserMenu() {
           <Link to="/settings" onClick={() => setOpen(false)} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
             <Settings aria-hidden="true" className="size-4 text-slate-400" /> 설정
           </Link>
+          <TutorialMenuItem onPick={() => setOpen(false)} />
           {/* D-184: 이 기기에서 로그인했던 다른 계정으로 바꾸기 · 로그아웃 */}
           <AccountSwitchItems tone="light" onPick={() => setOpen(false)} />
         </div>
