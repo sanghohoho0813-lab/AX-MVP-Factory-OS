@@ -470,14 +470,21 @@ for (const width of [1440, 390]) {
   const tag = `(${width})`
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
-  // 직접 만든 칸 — 곧 만료(법인인감증명서 3개월 · 발급 7-10 → 10-10, 오늘 화면은 14일 안) · 이미 만료(납세증명서 1개월 · 발급 8-01 → 9-01)
+  // 직접 만든 칸 — 곧 만료(법인인감증명서 3개월 · 오늘 기준 3개월 전 + 10일에 발급 → 10일 뒤 만료, 오늘 화면은 14일 안) · 이미 만료(납세증명서 1개월 · 40일 전 발급)
+  // D-181: 예전에는 날짜를 '2026-07-10' 으로 박아 두어 10-10 이 지나자 '다가오는' 이 아니게 되어 떨어졌다 — 오늘 기준으로 계산한다
   await page.evaluate(() => {
+    const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const seal = new Date()
+    seal.setDate(seal.getDate() + 10)
+    seal.setMonth(seal.getMonth() - 3)
+    const tax = new Date()
+    tax.setDate(tax.getDate() - 40)
     const all = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
     const x = all.find((r) => r.id === 'cli_mirae')
     x.documents = x.documents ?? {}
     x.customDocuments = [...(x.customDocuments ?? []), { id: 'cd_seal', key: 'customdoc_seal148', label: '법인인감증명서', validMonths: 3, sensitive: false }, { id: 'cd_tax', key: 'customdoc_tax148', label: '납세증명서', validMonths: 1, sensitive: false }]
-    x.documents.customdoc_seal148 = { received: true, issuedAt: '2026-07-10', fileName: '인감.pdf', fileSize: 10, storagePath: '', note: '', updatedAt: null }
-    x.documents.customdoc_tax148 = { received: true, issuedAt: '2026-08-01', fileName: '납세.pdf', fileSize: 10, storagePath: '', note: '', updatedAt: null }
+    x.documents.customdoc_seal148 = { received: true, issuedAt: ymd(seal), fileName: '인감.pdf', fileSize: 10, storagePath: '', note: '', updatedAt: null }
+    x.documents.customdoc_tax148 = { received: true, issuedAt: ymd(tax), fileName: '납세.pdf', fileSize: 10, storagePath: '', note: '', updatedAt: null }
     localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(all))
   })
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
