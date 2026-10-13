@@ -27,6 +27,7 @@ import { nowIso, todayLocalDate } from '../../lib/appClock'
 import { analyzeUploadedDocs, withUploadSummary, type DocBatchSummary } from '../../services/docAutoAnalyze'
 import { isSystemFile } from '../../services/docShelf'
 import type { ReadDoc, ReadMethod } from '../../services/docAutoFill'
+import type { HandoffDoc } from '../../services/docHandoff'
 
 /** '기타 · 확인 필요 · 스캔0003' — 기타 칸을 파일마다 구별하는 짧은 이름 */
 function shortName(fileName: string): string {
@@ -63,6 +64,7 @@ export function BulkDocUploadSheet({
   auto = false,
   latest,
   showSignal,
+  initialDocs,
 }: {
   /** D-157: 숨긴 창을 다시 보이게 — 바뀔 때마다(같은 업체에서 [서류 올리기] 를 또 누름) */
   showSignal?: number
@@ -77,6 +79,8 @@ export function BulkDocUploadSheet({
   auto?: boolean
   /** D-148: 저장할 때의 최신 업체 기록(페이지가 들고 있는 것) — 없으면 받은 record */
   latest?: () => ClientOpsRecord
+  /** D-187: 새 업체 등록 창에서 넣은 서류 — 창이 열리자마자 넣는다(이미 읽은 글자는 다시 읽지 않는다) */
+  initialDocs?: readonly HandoffDoc[]
 }) {
   const { showToast } = useToast()
   const uploadable = canUploadFiles()
@@ -115,7 +119,11 @@ export function BulkDocUploadSheet({
   const patch = (id: string, p: Partial<Item>) => setItems((list) => list.map((it) => (it.id === id ? { ...it, ...p } : it)))
 
   /** 파일을 넣으면 하나씩 읽고 판별한다 — 동시에 여러 OCR 을 돌리면 휴대폰이 멈춘다 */
-  const addFiles = async (files: File[]) => {
+  const addFiles = async (input: readonly (File | HandoffDoc)[]) => {
+    // D-187: 등록 창이 이미 읽은 글자는 그대로 쓴다
+    const given: HandoffDoc[] = input.map((x) => (x instanceof File ? { file: x } : x))
+    const prereadOf = new Map(given.filter((g) => g.text !== undefined).map((g) => [g.file, g]))
+    const files = given.map((g) => g.file)
     const picked = files.filter((f) => f.size > 0 && !isSystemFile(f))
     const skipped = files.length - picked.length
     if (skipped > 0) showToast(`서류가 아닌 컴퓨터 파일 ${skipped}개(빈 파일 · Thumbs.db 같은 것)는 뺐습니다.`)
@@ -144,8 +152,12 @@ export function BulkDocUploadSheet({
       patch(it.id, { status: 'reading', progress: { ratio: 0, label: '읽는 중' } })
       let text = ''
       let method: ReadMethod = 'none'
+      const pre = prereadOf.get(it.file)
       try {
-        if (canExtractText(it.file)) {
+        if (pre) {
+          text = pre.text ?? ''
+          method = pre.method ?? 'none'
+        } else if (canExtractText(it.file)) {
           const res = await extractTextFromFile(it.file, (ratio, label) => patch(it.id, { progress: { ratio, label } }))
           text = res.text
           method = res.method
@@ -179,6 +191,15 @@ export function BulkDocUploadSheet({
       await upload(read, { closeWhenDone: true })
     }
   }
+
+  /* D-187: 등록 창에서 넘겨받은 서류 — 열리자마자 한 번만 넣는다 */
+  const startedRef = useRef(false)
+  useEffect(() => {
+    if (startedRef.current || !initialDocs || initialDocs.length === 0) return
+    startedRef.current = true
+    void addFiles(initialDocs)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialDocs])
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault()

@@ -1,7 +1,7 @@
 # QA_REPORT — MIRAE AI LAB OS · 2026-09-05
 
 규격: `AX + Platform Unified Design & Development System v3.0` (2026-09-02)
-브랜치 `main` · Production https://ax-mvp-factory-os.vercel.app (supabase 모드)
+브랜치 `main` · Production **https://os.miraeailab.com** (2026-10-13~ · 예전 https://ax-mvp-factory-os.vercel.app 도 같은 화면) (supabase 모드)
 이전 보고(2026-09-03)는 브릿지 READY 시점의 기록이다. 그 뒤 브릿지 Production 적용·실왕복 확인·모바일 재구축·v3.0 채점 화면 신설이 있었다.
 
 ---

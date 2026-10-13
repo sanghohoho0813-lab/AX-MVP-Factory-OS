@@ -83,6 +83,9 @@ import { useBackToClose } from '../lib/backToClose'
 import { useClientGrantSummaries } from '../components/grants/useGrants'
 import { CLIENT_TYPE_LABEL, CLIENT_TYPE_VIEW_KEY, CLIENT_TYPES, clientTypeOf, isClientType, rememberClientTypeView, type ClientType } from '../services/clientType'
 import { ClientTypePicker } from '../components/ops/ClientTypePicker'
+import { NewClientDocDrop } from '../components/ops/NewClientDocDrop'
+import { EMPTY_DOCS_READ, applyNewClientGuess, type NewClientDocsRead, type NewClientField, type NewClientGuess } from '../services/newClientFromDocs'
+import { handDocsTo } from '../services/docHandoff'
 
 /** D-181: 처음 열 때 고객 종류 — 주소(?type=consultant)가 먼저, 없으면 지난번에 보던 쪽 */
 function initialClientType(): ClientType {
@@ -137,8 +140,24 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const [formOpen, setFormOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1')
   /** D-125: 이번 등록에서 이미 만든 업체(영업 칸 저장만 실패한 경우 다시 쓰려고) */
   const createdRef = useRef<ClientOpsRecord | null>(null)
+  /** D-187: 등록 창에 넣은 서류 — 읽은 글자 · 찾은 값. 등록하면 업체 상세로 넘긴다 */
+  const [docsRead, setDocsRead] = useState<NewClientDocsRead>(EMPTY_DOCS_READ)
+  /** D-187: 서류로 채운 칸(그 값 그대로일 때만 '서류에서' 표시) · 사람이 적은 값과 서류 값이 다른 칸 */
+  const [docFilled, setDocFilled] = useState<NewClientGuess>({})
+  const [docDiffers, setDocDiffers] = useState<NewClientGuess>({})
+  const docFilledRef = useRef<NewClientGuess>({})
+  docFilledRef.current = docFilled
   useEffect(() => {
-    if (!formOpen) createdRef.current = null
+    if (formOpen) return
+    createdRef.current = null
+    // D-187: 창을 닫으면 넣은 서류는 버린다 — 서류로 채운 그대로인 칸도 비운다(사람이 적은 것은 둔다)
+    setDocsRead(EMPTY_DOCS_READ)
+    setDocDiffers({})
+    const filled = docFilledRef.current
+    if (Object.keys(filled).length > 0) {
+      setForm((f) => applyNewClientGuess(f, {}, filled).form)
+      setDocFilled({})
+    }
   }, [formOpen])
   useBackToClose(formOpen, () => setFormOpen(false))
   const [tab, setTab] = useState<AlertSeverity | 'all'>('all')
@@ -160,6 +179,50 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const bulkRecord = bulkDocsFor ? (records.find((r) => r.id === bulkDocsFor) ?? null) : null
   const [showAllAlerts, setShowAllAlerts] = useState(false)
   const [form, setForm] = useState({ companyName: '', contactName: '', contactPhone: '', businessNumber: '' })
+  // D-187: 서류에서 값을 찾을 때마다 빈 칸을 채운다(사람이 적은 칸은 덮지 않고 '다름' 으로)
+  useEffect(() => {
+    const res = applyNewClientGuess(form, docsRead.guess, docFilledRef.current)
+    setForm(res.form)
+    setDocFilled(res.filled)
+    setDocDiffers(res.differs)
+    // 찾은 값이 바뀔 때만 — 사람이 칸을 고칠 때마다 다시 채우지 않는다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docsRead.guess])
+  /** 칸 밑 한 줄 — 서류에서 채움 · 한 번 봐 주세요 · 서류 값과 다름 */
+  const docLine = (field: NewClientField) => {
+    const f = docFilled[field]
+    if (f && form[field] === f.value) {
+      return (
+        <span data-testid={`new-client-from-doc-${field}`} className={`t-meta mt-1 block break-keep font-normal ${f.note ? 'text-warning-800' : 'text-success-700'}`}>
+          {f.note ? `⚠ ${f.note}` : `✓ ${f.docLabel}에서 채움`}
+        </span>
+      )
+    }
+    const d = docDiffers[field]
+    if (d && form[field].trim() !== '') {
+      return (
+        <span data-testid={`new-client-differs-${field}`} className="t-meta mt-1 flex flex-wrap items-center gap-x-2 font-normal break-keep text-slate-600">
+          <span>{d.docLabel}에는 ‘{d.value}’</span>
+          <button
+            type="button"
+            className="tap font-semibold text-brand-700 underline"
+            onClick={() => {
+              setForm((cur) => ({ ...cur, [field]: d.value }))
+              setDocFilled((cur) => ({ ...cur, [field]: d }))
+              setDocDiffers((cur) => {
+                const next = { ...cur }
+                delete next[field]
+                return next
+              })
+            }}
+          >
+            서류 값으로
+          </button>
+        </span>
+      )
+    }
+    return null
+  }
   /** D-122: 새로 넣는 업체는 기본 잠재고객 — 예전에는 계약 고객으로 들어가 계약 숫자가 부풀고 영업 보드 '계약 완료' 칸에 떴다 */
   const [asProspect, setAsProspect] = useState(true)
   /** D-181: 새로 넣는 고객의 종류 — 보고 있던 쪽(대표만 고른다) */
@@ -470,6 +533,8 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       createdRef.current = null
       // D-181: 업체 화면에서 뒤로 오면 방금 넣은 고객이 있는 쪽이 보이게
       if (!pilot) rememberClientTypeView(newType)
+      // D-187: 등록 창에 넣은 서류 — 업체를 열자마자 서류함에 올리고 회사 정보 · 크레탑 · 명부까지 분석한다
+      handDocsTo(record.id, docsRead.docs)
       navigate(`/ops/clients/${record.id}`)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '고객을 등록하지 못했습니다.')
@@ -1028,7 +1093,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
         <div className="ax-fade fixed inset-0 z-50 flex items-end justify-center bg-navy-950/50 p-4 sm:items-center">
           <form
             onSubmit={submit}
-            className="ax-pop w-full max-w-lg rounded-(--radius-panel) bg-white p-6 shadow-(--shadow-overlay)"
+            className="ax-pop max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-(--radius-panel) bg-white p-6 shadow-(--shadow-overlay)"
           >
             <div className="flex items-center justify-between">
               <h2 className="text-[1.3rem] font-bold text-slate-900">{!pilot && newType === 'consultant' ? '새 컨설턴트 고객 등록' : '새 업체 등록'}</h2>
@@ -1046,6 +1111,8 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
             <div className="mt-5 grid gap-4">
               {/* D-181: 고객 종류 — 대표만 고른다(팀장 화면은 늘 중소기업 고객) */}
               {!pilot && <ClientTypePicker value={newType} onChange={setNewType} />}
+              {/* D-187: 서류만 넣어도 — 사업자등록증 · 크레탑 · 등기부등본을 읽어 아래 칸을 채운다 */}
+              <NewClientDocDrop onChange={setDocsRead} />
               <label className="text-[0.95rem] font-medium text-slate-700">
                 {!pilot && newType === 'consultant' ? '이름(회사명)' : '업체명'}
                 <input
@@ -1055,6 +1122,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                   onChange={(e) => setForm({ ...form, companyName: e.target.value })}
                   className="mt-1.5 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2.5 text-[1rem]"
                 />
+                {docLine('companyName')}
               </label>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="text-[0.95rem] font-medium text-slate-700">
@@ -1064,6 +1132,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                     onChange={(e) => setForm({ ...form, contactName: e.target.value })}
                     className="mt-1.5 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2.5 text-[1rem]"
                   />
+                  {docLine('contactName')}
                 </label>
                 <label className="text-[0.95rem] font-medium text-slate-700">
                   휴대폰번호
@@ -1083,6 +1152,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                   placeholder="000-00-00000"
                   className="mt-1.5 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2.5 text-[1rem]"
                 />
+                {docLine('businessNumber')}
               </label>
               <fieldset>
                 <legend className="text-[0.95rem] font-medium text-slate-700">{!pilot && newType === 'consultant' ? '계약했나요' : '어떤 업체인가요'}</legend>
@@ -1107,20 +1177,29 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
               {dupe && (
                 <p role="status" data-testid="new-client-dupe" className="t-sub rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2 break-keep text-slate-800">
                   같은 업체가 이미 있습니다 —{' '}
-                  <Link to={`/ops/clients/${dupe.id}`} className="font-semibold text-brand-700 underline">
-                    {dupe.companyName} 열기
+                  {/* D-187: 넣은 서류가 있으면 그 업체 서류함으로 함께 넘긴다 */}
+                  <Link to={`/ops/clients/${dupe.id}`} onClick={() => handDocsTo(dupe.id, docsRead.docs)} className="font-semibold text-brand-700 underline">
+                    {dupe.companyName} 열기{docsRead.docs.length > 0 ? `(넣은 서류 ${docsRead.docs.length}개도 그 업체로)` : ''}
                   </Link>
                   . 다른 업체면 그대로 등록하세요.
                 </p>
               )}
             </div>
-            <div className="mt-6 flex justify-end gap-2">
+            {/* D-187: 서류를 넣으면 창이 길어진다 — 등록 단추는 늘 보이게 바닥에 붙인다 */}
+            <div className="sticky -bottom-6 -mx-6 mt-6 -mb-6 border-t border-slate-200 bg-white px-6 pt-3 pb-6">
+            {docsRead.reading && (
+              <p role="status" data-testid="new-client-docs-reading" className="t-meta mb-2 break-keep text-slate-600">
+                서류를 읽는 중이에요 — 지금 등록해도 남은 서류는 업체를 연 뒤 마저 읽어 서류함에 넣어요.
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
               <Button type="button" variant="secondary" onClick={() => setFormOpen(false)}>
                 취소
               </Button>
               <Button type="submit" variant="primary" disabled={saving}>
                 {saving ? '등록 중…' : '등록하고 열기'}
               </Button>
+            </div>
             </div>
           </form>
         </div>

@@ -12,6 +12,9 @@ npm run test:all       # 모든 계약 테스트 (아래 test:* 전부)
 
 Vercel 환경변수(supabase 모드): `VITE_DATA_MODE=supabase`, `VITE_SUPABASE_URL=https://<ref>.supabase.co`, `VITE_SUPABASE_ANON_KEY=<anon 또는 sb_publishable_…>`. `sb_secret_`/service_role 키는 절대 넣지 않는다(앱이 거부한다).
 
+운영 주소(2026-10-13~): **https://os.miraeailab.com** — Vercel 프로젝트 이름은 그대로 두고 도메인만 붙였다(D-187). 예전 `ax-mvp-factory-os.vercel.app` 도 같은 화면이다.
+Supabase › Authentication › URL Configuration › **Redirect URLs 에 `https://os.miraeailab.com/**` 를 더한다**(비밀번호 재설정 메일 링크가 새 주소로 돌아오게). **Site URL 은 바꾸지 않는다** — 같은 Supabase 를 쓰는 고객 플랫폼(miraeailab.com) 가입 · 메일이 그 값을 쓴다.
+
 ## 2. 고객 플랫폼 (`../mirae-ai-lab-homepage`)
 
 ```

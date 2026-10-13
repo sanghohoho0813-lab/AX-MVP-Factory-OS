@@ -119,6 +119,7 @@ import { createJournalEntry } from '../services/journalService'
 import { FundingSection } from '../components/ops/FundingSection'
 import { DocImportModal } from '../components/ops/DocImportModal'
 import { BulkDocUploadSheet } from '../components/ops/BulkDocUploadSheet'
+import { takeHandedDocs, type HandoffDoc } from '../services/docHandoff'
 import { netAmountOf } from '../services/feeMath'
 import { fundingFactsOf, isWaiting } from '../services/feeStatus'
 import { withActivity } from '../services/clientOpsActivity'
@@ -289,6 +290,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
     setAutoUploadOpen(true)
     setUploadShow((n) => n + 1)
   }
+  /** D-187: 새 업체 등록 창에서 넣은 서류 — 업체를 열자마자 서류함에 올리고 분석한다 */
+  const [handedDocs, setHandedDocs] = useState<HandoffDoc[]>([])
   /** D-144: 방금 올린 서류에서 읽은 것 — 맞춤 추천 맨 위에 보여 준다 */
   const [lastBatch, setLastBatch] = useState<DocBatchSummary | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -334,6 +337,16 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   useEffect(() => {
     void load()
   }, [load])
+
+  // D-187: 등록 창에서 넘겨받은 서류가 있으면 업체를 읽은 뒤 바로 '서류 올리기' 를 연다(한 번만 꺼낸다)
+  useEffect(() => {
+    if (!record || record.id !== clientId) return
+    const docs = takeHandedDocs(clientId)
+    if (docs.length === 0) return
+    setHandedDocs(docs)
+    setAutoUploadOpen(true)
+    setUploadShow((n) => n + 1)
+  }, [record, clientId])
 
   // 고객 플랫폼 연결 여부 — 헤더 칩용. 브릿지 미적용이면 null(표시 안 함)
   useEffect(() => {
@@ -2027,7 +2040,11 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           showSignal={uploadShow}
           record={record}
           latest={() => latestRef.current ?? record}
-          onClose={() => setAutoUploadOpen(false)}
+          initialDocs={handedDocs}
+          onClose={() => {
+            setAutoUploadOpen(false)
+            setHandedDocs([])
+          }}
           onSaved={(saved, summary) => {
             latestRef.current = saved
             setRecord(saved)

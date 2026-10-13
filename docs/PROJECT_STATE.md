@@ -1,6 +1,6 @@
 # PROJECT_STATE — MIRAE AI LAB OS × Customer Platform (2026-09-08)
 
-브랜치: `main` (Production 직행 — DECISIONS D-16). Production: https://ax-mvp-factory-os.vercel.app (supabase 모드)
+브랜치: `main` (Production 직행 — DECISIONS D-16). Production: **https://os.miraeailab.com** (2026-10-13 대표가 구매해 연결 · supabase 모드) — 예전 주소 https://ax-mvp-factory-os.vercel.app 도 같은 화면
 고객 플랫폼: https://miraeailab.com (`main` 직행)
 
 ## 다음 단계 — 안정화 · 쉬운 화면 · 흐름 잇기 (D-122) (2026-09-26)

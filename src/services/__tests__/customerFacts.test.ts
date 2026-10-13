@@ -51,6 +51,8 @@ import { looksLikeCretop, looksLikeRoster } from '../docAutoAnalyze'
 import { buildInsights, recommendNextSteps } from '../clientInsights'
 import { ADVISOR_GROUPS, ALL_QUESTIONS, answerFor, answerText, matchQuestion } from '../clientAdvisor'
 import { classifyDocument } from '../docClassify'
+import { NOTE_BIZNO_CHECK, NOTE_DIFFERS, NOTE_FROM_PHOTO, applyNewClientGuess, guessNewClientFromDocs, looksLikeCretopForNewClient } from '../newClientFromDocs'
+import { handDocsTo, peekHandedDocs, takeHandedDocs } from '../docHandoff'
 import { DOCUMENTS } from '../../content/clientOpsCatalog'
 
 let passed = 0
@@ -715,6 +717,63 @@ await (async () => {
   const ddBack = undoDecision(deduped, dup, deduped, dd!.id)
   check('D-183 정리 되돌리기 → 두 칸 그대로', ddBack.documents.businessRegistration?.storagePath === 'ws/dp1/old.pdf' && ddBack.customDocuments.some((c) => c.key === k2))
   check('D-183 남길 것이 이미 번호 없는 칸이면 (2) 칸만 뺀다', withDedupedShelf(dup, ['businessRegistration', k2], 'businessRegistration').documents.businessRegistration?.storagePath === 'ws/dp1/old.pdf')
+}
+
+// D-187: 새 업체 등록 창 — 서류만 넣어도 업체명 · 대표자 · 사업자등록번호가 채워진다
+{
+  const BIZ = ['사업자등록증', '(법인사업자)', '등록번호 : 124-81-00998', '법인명(단체명) : 미래바이오랩', '대표자 : 이대표', '개업연월일 : 2023 년 01 월 10 일', '사업장 소재지 : 경기도 파주시 탄현면 평화로 3', '업태 : 제조업', '종목 : 바이오 시약'].join('\n')
+  const REG = ['등기사항전부증명서(현재 유효사항)', '상 호 미래바이오랩', '등록번호 110111-1234567', '대표이사 이대표 801231-1******', '본 점 경기도 파주시 탄현면 평화로 3'].join('\n')
+  const one = guessNewClientFromDocs([{ fileName: '사업자등록증.pdf', text: BIZ, method: 'pdf_text' }])
+  check('D-187 사업자등록증 하나 → 업체명 · 대표자 · 사업자번호 채움(까닭 없음)', one.guess.companyName?.value === '미래바이오랩' && one.guess.contactName?.value === '이대표' && one.guess.businessNumber?.value === '124-81-00998' && !one.guess.companyName?.note && !one.guess.businessNumber?.note, JSON.stringify(one.guess))
+  check('D-187 파일마다 무엇으로 읽었는지(사업자등록증 · 셋 찾음 · 칸 순서)', one.files[0]?.docLabel === '사업자등록증' && one.files[0]?.found.join() === 'companyName,contactName,businessNumber', JSON.stringify(one.files))
+  check('D-187 휴대폰번호는 서류에서 채우지 않는다', !('contactPhone' in one.guess))
+  const photo = guessNewClientFromDocs([{ fileName: '사업자.jpg', text: BIZ, method: 'ocr' }])
+  check('D-187 사진(OCR) → 이름 · 대표자는 "한 번 봐 주세요", 검증 맞는 사업자번호는 그대로', photo.guess.companyName?.note === NOTE_FROM_PHOTO && photo.guess.contactName?.note === NOTE_FROM_PHOTO && photo.guess.businessNumber?.note === '')
+  const badNo = guessNewClientFromDocs([{ fileName: 'a.pdf', text: BIZ.replace('124-81-00998', '124-81-00999'), method: 'pdf_text' }])
+  check('D-187 검증 숫자가 틀린 사업자번호 → 채우되 "번호 검증이 맞지 않아요"', badNo.guess.businessNumber?.value === '124-81-00999' && badNo.guess.businessNumber?.note === NOTE_BIZNO_CHECK)
+  const both = guessNewClientFromDocs([
+    { fileName: '등기.pdf', text: REG, method: 'pdf_text' },
+    { fileName: '사업자.jpg', text: BIZ, method: 'ocr' },
+  ])
+  check('D-187 사업자등록증이 등기보다 먼저(뒤에 넣어도)', both.guess.companyName?.fileName === '사업자.jpg', JSON.stringify(both.guess.companyName))
+  check('D-187 두 서류가 같은 값이면 사진이어도 까닭 없음', both.guess.companyName?.note === '' && both.guess.contactName?.note === '', JSON.stringify(both.guess))
+  const diff = guessNewClientFromDocs([
+    { fileName: '사업자등록증.pdf', text: BIZ, method: 'pdf_text' },
+    { fileName: '등기.pdf', text: REG.replace('미래바이오랩', '미래바이오'), method: 'pdf_text' },
+  ])
+  check('D-187 서류마다 이름이 다르면 사업자등록증 값 + "서류마다 달라요"', diff.guess.companyName?.value === '미래바이오랩' && diff.guess.companyName?.note === NOTE_DIFFERS)
+  const cret = guessNewClientFromDocs([{ fileName: '크레탑.pdf', text: 'x'.repeat(900), method: 'pdf_text' }], [{ fileName: '크레탑.pdf', method: 'pdf_text', name: '한빛정밀', bizNo: '2148735291', ceo: '김한빛' }])
+  check('D-187 크레탑 보고서 → 업체명 · 대표자 · 사업자번호(하이픈 넣어서)', cret.guess.companyName?.value === '한빛정밀' && cret.guess.contactName?.value === '김한빛' && cret.guess.businessNumber?.value === '214-87-35291' && cret.files[0]?.docLabel === '크레탑 보고서', JSON.stringify(cret.guess))
+  const mixed = guessNewClientFromDocs([{ fileName: '사업자등록증.pdf', text: BIZ, method: 'pdf_text' }, { fileName: '크레탑.pdf', text: 'x'.repeat(900), method: 'pdf_text' }], [{ fileName: '크레탑.pdf', method: 'pdf_text', name: '미래바이오랩', bizNo: '124-81-00998', ceo: '이대표' }])
+  check('D-187 사업자등록증 + 크레탑 같은 회사 → 사업자등록증 값 · 까닭 없음', mixed.guess.companyName?.fileName === '사업자등록증.pdf' && mixed.guess.businessNumber?.note === '')
+  const memo = guessNewClientFromDocs([{ fileName: '메모.txt', text: '회의 메모 — 다음 주 화요일 다시 연락', method: 'text' }, { fileName: '빈.jpg', text: '', method: 'none' }])
+  check('D-187 회사 정보가 없는 서류 → 아무 칸도 채우지 않음(서류함에는 넣음)', Object.keys(memo.guess).length === 0 && memo.files.length === 2)
+  check('D-187 크레탑처럼 보이는 글(이름 · 글자 수)', looksLikeCretopForNewClient({ fileName: '크레탑_한빛.pdf', method: 'pdf_text', text: `기업종합보고서 ${'가'.repeat(900)}` }) && !looksLikeCretopForNewClient({ fileName: '사업자등록증.pdf', method: 'pdf_text', text: BIZ }))
+
+  // 칸에 넣기 — 빈 칸만 · 사람이 적은 것은 덮지 않음 · 서류를 빼면 서류로 채운 것만 비움
+  const blank = { companyName: '', contactName: '', contactPhone: '010-1234-5678', businessNumber: '' }
+  const a1 = applyNewClientGuess(blank, one.guess, {})
+  check('D-187 빈 칸 셋을 채우고 휴대폰은 그대로', a1.form.companyName === '미래바이오랩' && a1.form.contactName === '이대표' && a1.form.businessNumber === '124-81-00998' && a1.form.contactPhone === '010-1234-5678' && Object.keys(a1.filled).length === 3)
+  const typed = { ...blank, companyName: '미래 바이오랩(주)' }
+  const a2 = applyNewClientGuess(typed, one.guess, {})
+  check('D-187 사람이 적은 이름이 같은 회사(띄어쓰기 · (주))면 그대로 두고 "서류에서" 표시', a2.form.companyName === '미래 바이오랩(주)' && a2.filled.companyName?.value === '미래 바이오랩(주)' && !a2.differs.companyName)
+  const typed2 = { ...blank, companyName: '다른상사' }
+  const a3 = applyNewClientGuess(typed2, one.guess, {})
+  check('D-187 사람이 적은 값이 다르면 덮지 않고 "다름"', a3.form.companyName === '다른상사' && a3.differs.companyName?.value === '미래바이오랩')
+  const a4 = applyNewClientGuess(a1.form, cret.guess, a1.filled)
+  check('D-187 서류로 채운 그대로인 칸은 새 서류 값으로 바뀐다', a4.form.companyName === '한빛정밀')
+  const a5 = applyNewClientGuess({ ...a1.form, contactName: '최담당' }, {}, a1.filled)
+  check('D-187 서류를 빼면 서류로 채운 그대로인 칸만 비우고 고친 칸은 둔다', a5.form.companyName === '' && a5.form.businessNumber === '' && a5.form.contactName === '최담당' && a5.form.contactPhone === '010-1234-5678')
+
+  // 넘기기 — 업체 id 앞으로 맡기고 한 번만 꺼낸다
+  const f = new File(['x'], 'a.txt', { type: 'text/plain' })
+  handDocsTo('new1', [{ file: f, text: 'x', method: 'text' }])
+  handDocsTo('new1', [{ file: f }])
+  handDocsTo('', [{ file: f }])
+  handDocsTo('new2', [])
+  check('D-187 넘기기: 같은 업체에 또 맡기면 뒤에 붙고 빈 것은 안 맡김', peekHandedDocs('new1').length === 2 && peekHandedDocs('').length === 0 && peekHandedDocs('new2').length === 0)
+  const taken = takeHandedDocs('new1')
+  check('D-187 넘기기: 한 번 꺼내면 다시 꺼내도 없음(두 번 올리지 않음)', taken.length === 2 && taken[0].text === 'x' && takeHandedDocs('new1').length === 0)
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)
