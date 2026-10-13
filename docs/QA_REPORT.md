@@ -2758,3 +2758,15 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 - 게이트 36단계 전부 녹색(8374cef): tsc · lint · build · test:all · simple · studio · board · todos · mobile · tools · tax · shell · modules · sales · journey · easy · steady · flow · real · squeeze · phone · facts · detail · files · taxplan · calendar · connect · enroll · planner · contract · grants · money · db · pilot · isolation · cert.
 - 운영 주소: https://os.miraeailab.com 과 https://ax-mvp-factory-os.vercel.app 가 같은 진입 번들을 내보내는 것을 curl 로 확인(배포 전 index-qr4Yrz-z.js 로 같음).
 - 확인하지 못한 것: 실제 운영 Supabase 의 Redirect URLs 설정(대시보드 권한 없음) · 진짜 스캔 PDF · 사진 OCR 로 등록 창을 채우는 실제 속도(시험은 글자 파일 · 로컬).
+
+## §124 D-188 팀장 업무 항목(기본 6종 숨김 · 상품표 40) · 개발자에게 피드백 / 받은 피드백함 (2026-10-13)
+
+- 상품표 점검: 영업 상품표 40종 → 업무 항목 창 40개 모두(이름에서 '패키지' 뗌 · 겹침 0 · 분류 8개 모두). 빠진 것 없음.
+- 단위: mirae-os 838(D-188 9 — 팀장 화면 숨김 · 저장 → 다시 읽기에도 6종 칸 그대로 · 기록 있는 항목만 다시 보임 · '해당 없음' 은 기록 아님 · 계약 완료 시작할 업무 · 대표 화면 그대로) · pilot 134(피드백 설문 규칙 6).
+- 팀장 클라우드(qa:pilot, 로컬 DB + PostgREST 진짜 RLS): 208 passed — D-188 21건:
+  업무 탭 기본 6종 없음 · 빈 화면 안내 · 상품표 40개 '패키지' 없음 · 누르면 팀장 작업공간에 항목(DB) · 대표 작업공간엔 없음 · 6종 칸은 업체 기록에 그대로(DB) · 대표 화면은 6종 그대로 · 대표가 팀장 화면 볼 때도 팀장처럼 /
+  사이드바 버전 글자 없음 · [개발자에게 피드백] '새 설문' · 9문항 · 답 5개 → 보내기 → 팀장 작업공간 저장(DB · 답 그대로) · '아직 안 읽음' · 휴대폰 390 넘침 0 · 받은 피드백함 주소 팀장 막힘 /
+  대표 사이드바 [받은 피드백함] 새 1 · 종 "최은혜 팀장 — 새 피드백 1건" · 받은 피드백함 정리(보낸 사람 · 새로 · 점수 · 고른 것 · 직접 쓴 말) · 평균 4/5 · 열면 읽음(DB readAt) · 숫자 사라짐 · 대표가 팀장 화면 볼 때 설문은 미리 보기만.
+- 화면 육안: 팀장 업무 탭(PC) · 설문(PC · 390) · 보낸 뒤 · 대표 받은 피드백함(PC).
+- 게이트 36단계 전부 녹색(c608706).
+- 확인하지 못한 것: 운영 DB 의 실제 팀장 작업공간에 기본 6종으로 적어 둔 기록이 있는지(있으면 그 항목만 계속 보인다) · 실제 팀장 계정으로 운영에서 보낸 피드백.
