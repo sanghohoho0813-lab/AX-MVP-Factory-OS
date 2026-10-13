@@ -12,7 +12,7 @@
 import { useEffect, useState } from 'react'
 import { Archive, Plus, RotateCcw } from 'lucide-react'
 import { Button } from '../ui/Button'
-import { ACCENT_CLASS, BUILTIN_SERVICES, type ServiceAccent } from '../../content/clientOpsCatalog'
+import { ACCENT_CLASS, BUILTIN_SERVICES, SERVICES, builtinServicesHidden, type ServiceAccent } from '../../content/clientOpsCatalog'
 import {
   archiveCustomService,
   createCustomService,
@@ -127,7 +127,9 @@ export function ServiceCatalogModal({
   }
 
   const live = list.filter((c) => !c.archived)
-  const liveLabels = new Set([...live.map((c) => c.label), ...BUILTIN_SERVICES.map((s) => s.label)])
+  // D-188: 팀장 화면은 기본 6종을 쓰지 않는다 — 기록이 있어 남아 있는 것만 보인다
+  const shownBuiltins = builtinServicesHidden() ? BUILTIN_SERVICES.filter((b) => SERVICES.some((s) => s.key === b.key)) : BUILTIN_SERVICES
+  const liveLabels = new Set([...live.map((c) => c.label), ...shownBuiltins.map((s) => s.label)])
   const archived = list.filter((c) => c.archived)
 
   return (
@@ -148,11 +150,12 @@ export function ServiceCatalogModal({
           화면에는 보이지 않습니다). 해당 없는 업체에서는 상태를 &lsquo;보류&rsquo;로 두면 경고에서 빠집니다.
         </p>
 
-        {/* 기본 항목 — 지울 수 없다 */}
-        <div className="mt-5">
-          <p className="text-[0.9rem] font-semibold text-slate-500">기본 항목 (고정)</p>
+        {/* 기본 항목 — 지울 수 없다(팀장 화면은 쓰지 않아 대개 비어 있다) */}
+        {shownBuiltins.length > 0 && (
+        <div className="mt-5" data-testid="service-builtins">
+          <p className="text-[0.9rem] font-semibold text-slate-500">{builtinServicesHidden() ? '예전에 적어 둔 기본 항목' : '기본 항목 (고정)'}</p>
           <ul className="mt-2 flex flex-wrap gap-1.5">
-            {BUILTIN_SERVICES.map((s) => (
+            {shownBuiltins.map((s) => (
               <li
                 key={s.key}
                 className={`rounded-full border px-2.5 py-1 text-[0.875rem] font-medium ${ACCENT_CLASS[s.accent].chip}`}
@@ -162,12 +165,13 @@ export function ServiceCatalogModal({
             ))}
           </ul>
         </div>
+        )}
 
         {/* 직접 만든 항목 */}
         <div className="mt-5">
-          <p className="text-[0.9rem] font-semibold text-slate-500">직접 만든 항목 {live.length}개</p>
+          <p className="text-[0.9rem] font-semibold text-slate-500">{builtinServicesHidden() ? '내 업무 항목' : '직접 만든 항목'} {live.length}개</p>
           {live.length === 0 ? (
-            <p className="mt-2 text-[0.95rem] text-slate-400">아직 없습니다.</p>
+            <p className="mt-2 text-[0.95rem] break-keep text-slate-400">아직 없습니다. 아래 상품표에서 누르면 바로 생깁니다.</p>
           ) : (
             <ul className="mt-2 flex flex-col gap-1.5">
               {live.map((c) => (

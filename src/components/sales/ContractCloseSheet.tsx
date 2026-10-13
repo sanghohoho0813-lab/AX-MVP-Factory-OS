@@ -12,7 +12,7 @@ import { Button } from '../ui/Button'
 import { formatKrw, wonOf } from '../../lib/format'
 import { addDaysLocal } from '../../services/clientOpsNextAction'
 import type { ContractCloseDraft } from '../../services/salesContract'
-import { BUILTIN_SERVICES } from '../../content/clientOpsCatalog'
+import { BUILTIN_SERVICES, SERVICES, builtinServicesHidden } from '../../content/clientOpsCatalog'
 import { CONTRACT_KIND_LABEL, CONTRACT_KIND_ORDER, type ClientOpsRecord } from '../../types/clientOps'
 
 const inputCls = 'mt-1 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2.5 text-[1rem] text-slate-900 focus:border-brand-500 focus:outline-none'
@@ -42,7 +42,8 @@ export function ContractCloseSheet({
   const total = d.lines.reduce((s, l) => s + (l.amount ?? 0), 0)
   const wantsIns = d.kind === 'insurance' || d.kind === 'mixed'
   const agentTotal = d.agentRatePct ? Math.round((total * d.agentRatePct) / 100) : 0
-  const startable = BUILTIN_SERVICES.filter((s) => record.services[s.key]?.status === 'not_started')
+  // D-188: 팀장 화면은 기본 6종 대신 팀장이 상품표에서 고른 업무 항목에서 시작할 것을 고른다
+  const startable = (builtinServicesHidden() ? SERVICES : BUILTIN_SERVICES).filter((s) => (record.services[s.key]?.status ?? 'not_started') === 'not_started')
 
   const run = async (fn: () => Promise<boolean>) => {
     if (busy) return

@@ -145,15 +145,78 @@ export const SERVICES: ServiceMeta[] = [...BUILTIN_SERVICES]
 
 export const SERVICE_KEYS: ServiceKey[] = SERVICES.map((s) => s.key)
 
-/** 직접 만든 항목을 목록에 반영한다. 화면을 그리기 전에 한 번 불러 준다. */
-export function registerCustomServices(custom: ServiceMeta[]): void {
-  const merged = [...BUILTIN_SERVICES, ...custom].sort((a, b) => a.order - b.order)
+/**
+ * D-188 대표: "기본 6종(법인설립 · 업종/목적 · 특허 · 벤처 · AX · 정책자금)은 내가 쓰려고 넣은 것 — 최은혜 팀장 화면에서는 빼 줘.
+ * 팀장은 [업무 항목 추가] 에서 상품표 40가지 중에 골라 쓴다."
+ *  - 팀장 화면(Pilot · 대표가 팀장 화면 보기)에서는 기본 6종을 화면 목록(SERVICES)에서 뺀다. 대표 화면은 그대로.
+ *  - **업체 기록 안의 값은 그대로 둔다** — 기본 6종 칸은 저장 모양에 늘 남는다(allServiceKeys). 지우지 않는다.
+ *  - 이미 진행 기록이 있는 기본 항목(상태 · 마감 · 메모 …)은 그 작업공간에서 계속 보인다 — 적어 둔 일이 사라져 보이지 않게.
+ */
+let builtinsHidden = false
+const usedBuiltins = new Set<ServiceKey>()
+let customMetas: ServiceMeta[] = []
+
+function rebuildServices(): void {
+  const builtins = builtinsHidden ? BUILTIN_SERVICES.filter((s) => usedBuiltins.has(s.key)) : BUILTIN_SERVICES
+  const merged = [...builtins, ...customMetas].sort((a, b) => a.order - b.order)
   SERVICES.splice(0, SERVICES.length, ...merged)
   SERVICE_KEYS.splice(0, SERVICE_KEYS.length, ...merged.map((s) => s.key))
 }
 
+/** 직접 만든 항목을 목록에 반영한다. 화면을 그리기 전에 한 번 불러 준다. */
+export function registerCustomServices(custom: ServiceMeta[]): void {
+  customMetas = custom
+  rebuildServices()
+}
+
+/** D-188: 팀장 화면이면 기본 6종을 화면 목록에서 뺀다(바뀔 때만 다시 만든다) */
+export function setBuiltinServicesHidden(hidden: boolean): void {
+  if (builtinsHidden === hidden) return
+  builtinsHidden = hidden
+  usedBuiltins.clear()
+  rebuildServices()
+}
+
+export function builtinServicesHidden(): boolean {
+  return builtinsHidden
+}
+
+/** 업무 칸에 적어 둔 것이 있나 — '해당 없음' 만 고른 칸은 적어 둔 것으로 보지 않는다 */
+export function isServiceTouched(state: { status?: string; dueDate?: string; nextStep?: string; note?: string } | undefined): boolean {
+  if (!state) return false
+  const written = Boolean(state.dueDate?.trim() || state.nextStep?.trim() || state.note?.trim())
+  return written || (state.status !== undefined && state.status !== 'not_started' && state.status !== 'not_applicable')
+}
+
+/** D-188: 숨긴 상태에서 업체들을 읽으면 — 기록이 있는 기본 항목은 다시 보이게 한다 */
+export function noteBuiltinServiceUse(records: readonly { services?: Record<string, { status?: string; dueDate?: string; nextStep?: string; note?: string }> }[]): void {
+  if (!builtinsHidden) return
+  let changed = false
+  for (const r of records) {
+    for (const s of BUILTIN_SERVICES) {
+      if (usedBuiltins.has(s.key) || !isServiceTouched(r.services?.[s.key])) continue
+      usedBuiltins.add(s.key)
+      changed = true
+    }
+  }
+  if (changed) rebuildServices()
+}
+
+/** 작업공간이 바뀌면 '기록 있는 기본 항목' 을 새로 센다 */
+export function clearBuiltinServiceUse(): void {
+  if (usedBuiltins.size === 0) return
+  usedBuiltins.clear()
+  rebuildServices()
+}
+
+/** 업체 기록이 늘 지니는 업무 칸 — 화면에서 숨긴 기본 6종도 포함(저장 모양은 그대로) */
+export function allServiceMetas(): ServiceMeta[] {
+  const extra = BUILTIN_SERVICES.filter((b) => !SERVICES.some((s) => s.key === b.key))
+  return [...SERVICES, ...extra]
+}
+
 export function serviceMeta(key: ServiceKey): ServiceMeta {
-  return SERVICES.find((s) => s.key === key) ?? SERVICES[0]
+  return SERVICES.find((s) => s.key === key) ?? BUILTIN_SERVICES.find((s) => s.key === key) ?? SERVICES[0] ?? BUILTIN_SERVICES[0]
 }
 
 /* 업무 상태 표시 */

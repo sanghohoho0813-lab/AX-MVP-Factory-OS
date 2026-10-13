@@ -15,7 +15,8 @@ import {
   DOCUMENTS,
   COMPANY_INFO_DOCUMENT_KEYS,
   FEE_KIND_LABEL,
-  SERVICES,
+  allServiceMetas,
+  noteBuiltinServiceUse,
   serviceMeta,
   normalizeServiceStatus,
 } from '../content/clientOpsCatalog'
@@ -76,7 +77,8 @@ function defaultService(): ServiceState {
 }
 
 function defaultServices(): Record<ServiceKey, ServiceState> {
-  return Object.fromEntries(SERVICES.map((s) => [s.key, defaultService()])) as Record<
+  // D-188: 화면에서 숨긴 기본 6종도 저장 모양에는 늘 둔다(팀장 화면에서 저장해도 그 칸 값이 사라지지 않게)
+  return Object.fromEntries(allServiceMetas().map((s) => [s.key, defaultService()])) as Record<
     ServiceKey,
     ServiceState
   >
@@ -114,7 +116,7 @@ function upgradeServices(
     const stored = raw.services as Record<string, Partial<ServiceState>>
     // 직접 만든 항목이 아직 목록에 올라오기 전에 저장되는 일이 없도록,
     // 저장돼 있던 custom_ 키는 목록에 없어도 그대로 지킨다.
-    const keys = new Set<ServiceKey>([...SERVICES.map((s) => s.key), ...Object.keys(stored).filter(isCustomServiceKey)])
+    const keys = new Set<ServiceKey>([...allServiceMetas().map((s) => s.key), ...Object.keys(stored).filter(isCustomServiceKey)])
     for (const key of keys) {
       const v = stored[key]
       base[key] ??= defaultService()
@@ -127,7 +129,7 @@ function upgradeServices(
 
   // 예전 tasks → services 승격 (completed:true → 완료)
   if (raw.tasks && typeof raw.tasks === 'object') {
-    for (const s of SERVICES) {
+    for (const s of allServiceMetas()) {
       const legacy = raw.tasks[s.key]
       if (!legacy) continue
       base[s.key] = {
@@ -666,7 +668,10 @@ export async function listClients(workspaceId: string | null): Promise<ClientOps
     .eq('workspace_id', workspaceId)
     .order('updated_at', { ascending: false })
   if (error) throw error
-  return (data ?? []).map((row) => fromRow(row as Record<string, unknown>))
+  const list = (data ?? []).map((row) => fromRow(row as Record<string, unknown>))
+  // D-188: 팀장 화면에서 숨긴 기본 6종이라도 적어 둔 기록이 있으면 다시 보이게
+  noteBuiltinServiceUse(list)
+  return list
 }
 
 export async function createClient(

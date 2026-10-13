@@ -944,6 +944,19 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           1600px 폭을 가로로 다 쓰면 글자 사이가 텅 비어 오히려 읽기 어렵다.
           펼친 카드는 내용이 길어지므로 두 열을 다 쓰게 한다(아래 col-span).
         */}
+        {/* D-188: 팀장 화면은 기본 6종이 없다 — 처음에는 상품표에서 골라 넣게 안내 */}
+        {SERVICES.length === 0 && (
+          <div data-testid="work-empty" className="flex flex-col items-start gap-3 rounded-(--radius-panel) border border-dashed border-slate-300 bg-slate-50/60 px-5 py-5">
+            <p className="text-[1rem] font-semibold break-keep text-slate-800">아직 업무 항목이 없습니다</p>
+            <p className="t-sub break-keep text-slate-600">
+              [업무 항목 추가]를 누르면 상품표 40가지(기업부설연구소 설립 · 정책자금 컨설팅 · 가업승계 사전점검 …)에서 골라 바로 넣을 수 있어요.
+            </p>
+            <Button variant="primary" onClick={() => setCatalogOpen(true)} data-testid="work-empty-add">
+              <Plus aria-hidden="true" className="size-4" />
+              업무 항목 추가
+            </Button>
+          </div>
+        )}
         <div className="grid grid-cols-1 gap-2.5 xl:grid-cols-2 xl:items-start">
           {SERVICES.map((meta) => {
             const state = record.services[meta.key]

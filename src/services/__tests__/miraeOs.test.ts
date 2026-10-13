@@ -91,7 +91,7 @@ import {
   scoreTier,
 } from '../salesEngine'
 import { engineIndustry, interestsFromIssues, missingDocSlots, profileFromMemo, roundForStage, stageAfterMeeting, toEngineItem, withDocSlots, withMeetingNote, withSalesProfile } from '../salesMeeting'
-import { PATH_TO_KIND, agentRateOf, contractCloseDraft, contractGap, withContractClose } from '../salesContract'
+import { PATH_TO_KIND, agentRateOf, contractCloseDraft, contractGap, servicesForProducts, withContractClose } from '../salesContract'
 import { withInboxPayload } from '../inboxToSales'
 import salesAppSource from '../../tools/salesKit/orig/SalesApp.jsx?raw'
 import cretopCompanyText from '../../../e2e/fixtures/cretop-company.txt?raw'
@@ -139,7 +139,7 @@ import { classifyDocument, findIssuedDate, KNOWN_EXTRA_DOCS } from '../docClassi
 import { TAX_CALCULATORS, calculatorOf, unlistedShareValuation, computeSalary, corpTaxLocal, defaultValues, giftDeduction, incomeTax9, inheritGiftTax, oldBracketTax, pct, salaryBracketTax, won, yearsRoundUp9 } from '../taxCalc'
 import { formatYmd, profileAsText, yearsInBusiness } from '../clientOpsProfile'
 import { SERVICE_STATUS_ORDER, isServiceOpen, isServiceNotApplicable, normalizeServiceStatus } from '../../content/clientOpsCatalog'
-import { BUILTIN_SERVICES, SERVICES, registerCustomServices } from '../../content/clientOpsCatalog'
+import { BUILTIN_SERVICES, SERVICES, builtinServicesHidden, clearBuiltinServiceUse, isServiceTouched, noteBuiltinServiceUse, registerCustomServices, setBuiltinServicesHidden } from '../../content/clientOpsCatalog'
 import type { CustomerEvent, JournalEntry, PortalClientLink, PortalDocument, PortalRequest, PortalUpdate } from '../../types/bridge'
 import { entityKindOf, orderForPicker, pickerGroups } from '../clientOrder'
 
@@ -2243,6 +2243,26 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('업무 항목(D-171): 작업공간이 바뀌는 순간 기본 6종만 — 앞 사람 항목 남지 않음', SERVICES.length === BUILTIN_SERVICES.length && !SERVICES.some((x) => x.label === '세무기장'))
   ensureCustomServiceCatalog('ws-pilot')
   check('업무 항목: 같은 작업공간이면 다시 비우지 않는다', SERVICES.length === BUILTIN_SERVICES.length)
+  registerCustomServices([])
+
+  // D-188: 팀장 화면은 기본 6종을 화면에서 뺀다 — 업체 기록 안의 값은 그대로
+  const pkgItem = { ...BUILTIN_SERVICES[0], key: 'custom_lab', label: '기업부설연구소 설립', shortLabel: '연구소 설립', order: 101 }
+  setBuiltinServicesHidden(true)
+  registerCustomServices([pkgItem])
+  check('D-188 팀장 화면: 기본 6종 빠지고 상품표에서 고른 항목만', builtinServicesHidden() && SERVICES.length === 1 && SERVICES[0].key === 'custom_lab')
+  const pilotRec = normalizeClientOps({ id: 'p1', companyName: '팀장업체', services: { policyFund: { status: 'in_progress', dueDate: '2026-11-01', nextStep: '', note: '서류 받는 중', startedAt: null, completedAt: null, waitingSince: null } } as never })
+  check('D-188 팀장 화면에서 읽어도 기본 6종 칸은 업체 기록에 그대로(저장해도 안 사라짐)', BUILTIN_SERVICES.every((b) => pilotRec.services[b.key] !== undefined) && pilotRec.services.policyFund.note === '서류 받는 중' && pilotRec.services.custom_lab !== undefined)
+  const again = normalizeClientOps(JSON.parse(JSON.stringify(pilotRec)))
+  check('D-188 저장 → 다시 읽기: 정책자금 진행 기록 그대로', again.services.policyFund.status === 'in_progress' && again.services.policyFund.dueDate === '2026-11-01')
+  noteBuiltinServiceUse([pilotRec])
+  check('D-188 적어 둔 기록이 있는 기본 항목(정책자금)은 다시 보인다 · 나머지 5종은 숨김', SERVICES.some((x) => x.key === 'policyFund') && SERVICES.filter((x) => BUILTIN_SERVICES.some((b) => b.key === x.key)).length === 1)
+  check('D-188 "해당 없음" 만 고른 칸 · 빈 칸은 기록으로 보지 않음', !isServiceTouched({ status: 'not_applicable' }) && !isServiceTouched({ status: 'not_started', note: ' ' }) && isServiceTouched({ status: 'not_started', note: '메모' }) && isServiceTouched({ status: 'done' }))
+  check('D-188 계약 완료 "시작할 업무": 상품 이름(패키지 뗀 것)이 같은 팀장 항목을 고른다 · 숨긴 기본 항목은 안 고름', JSON.stringify(servicesForProducts(['기업부설연구소 설립 패키지', '특허/상표/디자인권 검토'])) === JSON.stringify(['custom_lab']))
+  clearBuiltinServiceUse()
+  check('D-188 작업공간이 바뀌면 기록 있는 기본 항목도 새로 센다', !SERVICES.some((x) => x.key === 'policyFund'))
+  setBuiltinServicesHidden(false)
+  check('D-188 대표 화면: 기본 6종 그대로 + 내 항목', BUILTIN_SERVICES.every((b) => SERVICES.some((x) => x.key === b.key)) && SERVICES.some((x) => x.key === 'custom_lab'))
+  check('D-188 대표 화면 계약 완료: 예전처럼 이름으로 기본 항목(특허) + 같은 이름 내 항목', JSON.stringify(servicesForProducts(['기업부설연구소 설립 패키지', '특허/상표/디자인권 검토']).sort()) === JSON.stringify(['custom_lab', 'patent'].sort()))
   registerCustomServices([])
 }
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)

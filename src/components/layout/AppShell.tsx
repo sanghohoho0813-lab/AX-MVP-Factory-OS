@@ -19,9 +19,12 @@ import { isPilotHiddenPath } from '../../config/moduleRegistry'
 import { NotFoundState } from '../ui/NotFoundState'
 import { FrameBridge } from './DeviceView'
 import { ViewingPilotBanner } from './ViewAsSwitch'
+import { setBuiltinServicesHidden } from '../../content/clientOpsCatalog'
 
 function PilotRouteGuard({ pathname, children }: { pathname: string; children: React.ReactNode }) {
   const pilot = useIsPilot()
+  // D-188: 팀장 화면은 기본 업무 6종을 빼고 그린다(화면 목록만 — 업체 기록은 그대로). 화면을 그리기 전에 정한다
+  setBuiltinServicesHidden(pilot)
   if (pilot && isPilotHiddenPath(pathname)) {
     return <NotFoundState title="화면을 찾지 못했습니다" description="주소가 바뀌었거나 없는 화면입니다." backTo="/" backLabel="오늘로" />
   }
@@ -37,6 +40,8 @@ function ShellFallback() {
 }
 
 export function AppShell() {
+  // D-188: 머리줄 · 메뉴 숫자까지 같은 목록을 보게 — 화면을 그리는 맨 위에서 먼저 정한다
+  setBuiltinServicesHidden(useIsPilot())
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()

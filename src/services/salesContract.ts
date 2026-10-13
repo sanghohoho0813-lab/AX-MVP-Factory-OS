@@ -16,6 +16,8 @@
  */
 
 import type { ClientOpsRecord, ContractKind, FeeItem, InsurancePolicy, SalesPath, ServiceKey } from '../types/clientOps'
+import { isCustomServiceKey } from '../types/clientOps'
+import { SERVICES } from '../content/clientOpsCatalog'
 import { localDateOf } from '../lib/appClock'
 import { withActivity } from './clientOpsActivity'
 import { withContract, withService } from './clientOpsService'
@@ -56,9 +58,17 @@ const SERVICE_WORDS: [ServiceKey, RegExp][] = [
   ['policyFund', /정책\s*자금|지원\s*금|지원\s*사업|보증|R&D|바우처/],
 ]
 
-export function servicesForProducts(names: string[]): ServiceKey[] {
+export function servicesForProducts(names: string[], visible: readonly { key: ServiceKey; label: string }[] = SERVICES): ServiceKey[] {
   const out: ServiceKey[] = []
-  for (const [key, re] of SERVICE_WORDS) if (names.some((n) => re.test(n))) out.push(key)
+  const shown = new Set(visible.map((s) => s.key))
+  // D-188: 팀장 화면처럼 기본 6종을 숨긴 곳에서는 숨긴 항목을 고르지 않는다
+  for (const [key, re] of SERVICE_WORDS) if (shown.has(key) && names.some((n) => re.test(n))) out.push(key)
+  // D-188: 상품표에서 만든 업무 항목(상품 이름에서 '패키지' 만 뗀 이름)은 이름이 같으면 그 항목으로
+  const bare = (v: string) => v.replace(/\s*패키지$/, '').replace(/\s+/g, '')
+  for (const s of visible) {
+    if (out.includes(s.key) || !isCustomServiceKey(s.key)) continue
+    if (names.some((n) => bare(n) === bare(s.label))) out.push(s.key)
+  }
   return out
 }
 

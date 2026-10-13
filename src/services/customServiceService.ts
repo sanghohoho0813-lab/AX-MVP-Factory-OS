@@ -12,7 +12,7 @@
  */
 
 import type { ServiceAccent, ServiceMeta } from '../content/clientOpsCatalog'
-import { SERVICES, registerCustomServices } from '../content/clientOpsCatalog'
+import { SERVICES, clearBuiltinServiceUse, registerCustomServices } from '../content/clientOpsCatalog'
 import type { ServiceKey } from '../types/clientOps'
 import { getDataModeConfig } from '../data/dataMode'
 import { getSupabaseClient } from '../lib/supabase/client'
@@ -281,6 +281,7 @@ let catalogWorkspace: string | null | undefined
 export function ensureCustomServiceCatalog(workspaceId: string | null): void {
   if (catalogWorkspace === workspaceId) return
   catalogWorkspace = workspaceId
+  clearBuiltinServiceUse()
   registerCustomServices([])
   void loadCustomServicesIntoCatalog(workspaceId).then(() => {
     // 읽는 사이 작업공간이 또 바뀌었으면 그 결과는 버린다
