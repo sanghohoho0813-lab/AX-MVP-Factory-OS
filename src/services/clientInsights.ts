@@ -257,6 +257,45 @@ export function buildInsights(record: ClientOpsRecord, today: string, notices: r
   return out.map((x, i) => ({ x, i })).sort((a, b) => TONE_RANK[a.x.tone] - TONE_RANK[b.x.tone] || a.i - b.i).map((v) => v.x)
 }
 
+/* ------------------------------------------------------------------ */
+/* D-190 먼저 제안할 것 — 업체 상세 맨 위 · 고객 관리 카드 · 추천 많은 순        */
+/* ------------------------------------------------------------------ */
+
+/** 제안할 만한 판정인가 — 가능성 높음 · 검토해 볼 만함만(분석 있음 · 정보 더 필요 · 어려움은 제안이 아니다) */
+export const isPick = (i: Pick<Insight, 'tone'>): boolean => i.tone === 'good' || i.tone === 'maybe'
+
+/** 업체 상세 맨 위 — 먼저 제안할 것 많아야 n개(판정은 이미 좋은 것 먼저 · 같으면 모듈 순서) */
+export function topPicks(insights: readonly Insight[], n = 3): Insight[] {
+  return insights.filter(isPick).slice(0, n)
+}
+
+/** 아직 판정 못 한 모듈에 필요한 서류 · 정보 — 겹치지 않게, 많아야 n개 */
+export function missingForPicks(insights: readonly Insight[], n = 3): string[] {
+  return [...new Set(insights.filter((i) => i.tone === 'need').flatMap((i) => i.missing))].slice(0, n)
+}
+
+export interface RecoChip {
+  key: string
+  label: string
+  tone: 'good' | 'maybe'
+}
+
+/**
+ * 고객 관리 카드의 추천 띠 — 업체마다 모듈 판정을 돌리되 지원사업은 목록이 한 번에 센 '맞는 공고 수' 를 쓴다
+ * (업체마다 공고 1,000건을 다시 대 보지 않는다).
+ */
+export function cardRecoChips(record: ClientOpsRecord, today: string, grantFit: number, usable: (key: string) => boolean = () => true): RecoChip[] {
+  const ins = buildInsights(record, today, [], (k) => k !== 'grants' && usable(k)).filter(isPick)
+  const chips: RecoChip[] = ins.map((i) => ({ key: i.key, label: i.label, tone: i.tone as RecoChip['tone'] }))
+  if (grantFit > 0 && usable('grants')) chips.unshift({ key: 'grants', label: `지원사업 ${grantFit}건`, tone: 'good' })
+  return chips.map((c, i) => ({ c, i })).sort((a, b) => TONE_RANK[a.c.tone] - TONE_RANK[b.c.tone] || a.i - b.i).map((v) => v.c)
+}
+
+/** 추천 많은 순 — 가능성 높음 2점 · 검토해 볼 만함 1점 */
+export function recoScore(chips: readonly Pick<RecoChip, 'tone'>[]): number {
+  return chips.reduce((s, c) => s + (c.tone === 'good' ? 2 : 1), 0)
+}
+
 export interface NextStep {
   id: string
   text: string

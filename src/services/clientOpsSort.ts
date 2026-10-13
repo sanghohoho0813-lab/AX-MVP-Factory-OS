@@ -19,13 +19,15 @@ const localDateOf = (iso: string) => {
 import { yearsInBusiness } from './clientOpsProfile'
 import { monthsSinceContract } from './contractSummary'
 
-export type ClientSortKey = 'active' | 'urgency' | 'name' | 'years' | 'contract'
+export type ClientSortKey = 'active' | 'reco' | 'urgency' | 'name' | 'years' | 'contract'
 
 /** D-159: 기본은 '요즘 챙기는 순'(대표) — 최근에 한 일 · 다가오는 일정 · 급한 경고가 많은 업체가 위로 */
-export const CLIENT_SORT_ORDER: ClientSortKey[] = ['active', 'urgency', 'name', 'years', 'contract']
+// D-190: '추천 많은 순' — 먼저 제안할 모듈이 많은 업체가 위로(맞춤 추천 판정 그대로)
+export const CLIENT_SORT_ORDER: ClientSortKey[] = ['active', 'reco', 'urgency', 'name', 'years', 'contract']
 
 export const CLIENT_SORT_LABEL: Record<ClientSortKey, string> = {
   active: '요즘 챙기는 순',
+  reco: '추천 많은 순',
   urgency: '급한 순',
   name: '가나다순',
   years: '업력순',
@@ -34,6 +36,7 @@ export const CLIENT_SORT_LABEL: Record<ClientSortKey, string> = {
 
 export const CLIENT_SORT_HINT: Record<ClientSortKey, string> = {
   active: '최근에 한 일 · 다가오는 일정이 많은 곳이 위로',
+  reco: '먼저 제안할 모듈(가능성 높음 · 검토해 볼 만함)이 많은 곳이 위로',
   urgency: '마감 지남·연체가 위로',
   name: '업체 이름 순서대로',
   years: '오래된 회사가 위로',
@@ -98,9 +101,17 @@ export function sortClients(
   records: ClientOpsRecord[],
   key: ClientSortKey,
   today: string = todayLocalDate(),
+  /** D-190: 업체별 추천 점수(가능성 높음 2 · 검토해 볼 만함 1) — '추천 많은 순' 에서만 쓴다 */
+  recoScores?: ReadonlyMap<string, number>,
 ): ClientOpsRecord[] {
   const list = [...records]
   switch (key) {
+    case 'reco': {
+      // 계약 끝남 · 보관은 추천이 있어도 맨 뒤(지금 제안할 곳이 아니다) · 같으면 요즘 챙기는 순
+      const rank = (r: ClientOpsRecord) => (r.archivedAt !== null || r.status === 'completed' ? -1 : recoScores?.get(r.id) ?? 0)
+      const act = new Map(list.map((r) => [r.id, activityScore(r, today)]))
+      return list.sort((a, b) => rank(b) - rank(a) || act.get(b.id)!.score - act.get(a.id)!.score || a.companyName.localeCompare(b.companyName, 'ko'))
+    }
     case 'active': {
       const score = new Map(list.map((r) => [r.id, activityScore(r, today)]))
       return list.sort((a, b) => {

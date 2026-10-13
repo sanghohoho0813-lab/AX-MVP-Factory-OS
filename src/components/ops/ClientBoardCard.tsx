@@ -16,7 +16,7 @@
 
 import { useMoneyWords } from './useMoneyWords'
 import { useState } from 'react'
-import { ArrowRight, BellRing, ChevronRight, FileUp } from 'lucide-react'
+import { ArrowRight, BellRing, ChevronRight, FileUp, Sparkles } from 'lucide-react'
 import { CONTRACT_KIND_LABEL, CONTRACT_STAGE_LABEL, contractStageOf } from '../../types/clientOps'
 import { salesStageLabelOf } from '../../services/salesPipeline'
 import { formatNumberOf } from '../../lib/format'
@@ -29,6 +29,7 @@ import { contractAgeShort } from '../../services/contractSummary'
 import { formatKrw } from '../../lib/format'
 import { SERVICE_OVERDUE_LOOK, SERVICE_STATUS_LOOK } from './serviceStatusLook'
 import { Badge, type Tone } from '../ui/primitives'
+import type { RecoChip } from '../../services/clientInsights'
 
 /* ------------------------------------------------------------------ */
 /* 업무 조각                                                            */
@@ -137,7 +138,10 @@ export function ClientBoardCard({
   hit = null,
   grants = null,
   onGrants,
+  reco,
 }: {
+  /** D-190: 먼저 제안할 모듈(가능성 높음 · 검토해 볼 만함) — 주면 '추천' 띠로 그리고, 맞는 지원사업도 그 띠 안에 */
+  reco?: RecoChip[]
   /** D-143: 이 업체 지역 · 업력 · 업종에 맞는 지원사업(접수 중) — 0이면 그리지 않는다 */
   grants?: { fit: number; urgentFit: number } | null
   onGrants?: () => void
@@ -278,9 +282,42 @@ export function ClientBoardCard({
             <span className="font-semibold break-all">{hit.value}</span>
           </p>
         )}
+        {/*
+          D-190: 추천 띠 — 이 업체에 먼저 제안할 모듈. 휴대폰에서 접어 둔 카드에도 보인다(대표 지시: 모듈 추천이 먼저, 눈에 잘 띄게).
+          지원사업 칩은 누르면 그 업체의 맞는 공고로, 나머지는 카드를 눌러 업체 상세 맨 위 '먼저 제안할 것' 으로.
+        */}
+        {reco && reco.length > 0 && (
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5" data-testid="card-reco">
+            <span className="t-meta inline-flex shrink-0 items-center gap-1 font-bold text-brand-700">
+              <Sparkles aria-hidden="true" className="size-3.5" />
+              추천
+            </span>
+            {reco.slice(0, 3).map((c) => {
+              const look = c.tone === 'good' ? 'border-success-200 bg-success-50 text-success-800' : 'border-brand-200 bg-brand-50 text-brand-800'
+              return c.key === 'grants' && onGrants ? (
+                <button
+                  key={c.key}
+                  type="button"
+                  onClick={onGrants}
+                  data-testid="client-card-grants"
+                  data-tone={c.tone}
+                  className={`tap t-meta inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-semibold whitespace-nowrap hover:underline ${look}`}
+                >
+                  <BellRing aria-hidden="true" className="size-3.5 shrink-0" />
+                  {c.label}
+                </button>
+              ) : (
+                <span key={c.key} data-reco={c.key} data-tone={c.tone} className={`t-meta rounded-full border px-2 py-0.5 font-semibold whitespace-nowrap ${look}`}>
+                  {c.label}
+                </span>
+              )
+            })}
+            {reco.length > 3 && <span className="t-meta font-semibold text-slate-500">+{reco.length - 3}</span>}
+          </div>
+        )}
         {/* D-159: 맞는 지원사업 · 사업자번호 · 업무 조각 · 돈 줄은 휴대폰에서 접어 둔다(펼쳐보기) */}
         <div className={open ? 'contents' : 'hidden sm:contents'} data-testid="card-more">
-        {grants && grants.fit > 0 && onGrants && (
+        {!reco && grants && grants.fit > 0 && onGrants && (
           <button
             type="button"
             onClick={onGrants}

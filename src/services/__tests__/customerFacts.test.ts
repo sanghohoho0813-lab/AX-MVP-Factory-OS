@@ -48,7 +48,8 @@ import { pdfItemsToText } from '../pdfTextLines'
 import { filesFromDrop } from '../../lib/dropFiles'
 import { parseFinancialStatement } from '../finStatementParser'
 import { looksLikeCretop, looksLikeRoster } from '../docAutoAnalyze'
-import { buildInsights, recommendNextSteps } from '../clientInsights'
+import { buildInsights, cardRecoChips, isPick, missingForPicks, recoScore, recommendNextSteps, topPicks, type Insight } from '../clientInsights'
+import { sortClients } from '../clientOpsSort'
 import { ADVISOR_GROUPS, ALL_QUESTIONS, answerFor, answerText, matchQuestion } from '../clientAdvisor'
 import { classifyDocument } from '../docClassify'
 import { NOTE_BIZNO_CHECK, NOTE_DIFFERS, NOTE_FROM_PHOTO, applyNewClientGuess, guessNewClientFromDocs, looksLikeCretopForNewClient } from '../newClientFromDocs'
@@ -779,6 +780,37 @@ await (async () => {
   check('D-187 넘기기: 같은 업체에 또 맡기면 뒤에 붙고 빈 것은 안 맡김', peekHandedDocs('new1').length === 2 && peekHandedDocs('').length === 0 && peekHandedDocs('new2').length === 0)
   const taken = takeHandedDocs('new1')
   check('D-187 넘기기: 한 번 꺼내면 다시 꺼내도 없음(두 번 올리지 않음)', taken.length === 2 && taken[0].text === 'x' && takeHandedDocs('new1').length === 0)
+}
+
+// D-190: 먼저 제안할 것 — 업체 상세 맨 위 3개 · 고객 관리 카드 추천 띠 · 추천 많은 순
+{
+  const mk = (key: string, tone: Insight['tone'], missing: string[] = []): Insight => ({ key, label: key, tone, headline: `${key} 판정`, detail: '', missing, openPath: `/tools/${key}`, openLabel: '열기', action: null })
+  const list = [mk('a', 'good'), mk('b', 'maybe'), mk('c', 'done'), mk('d', 'maybe'), mk('e', 'need', ['명부', '크레탑']), mk('f', 'no'), mk('g', 'need', ['크레탑', '주주명부']), mk('h', 'good')]
+  check('D-190 제안할 만한 것: 가능성 높음 · 검토해 볼 만함만(분석 있음 · 정보 더 필요 · 어려움은 아님)', isPick(mk('x', 'good')) && isPick(mk('x', 'maybe')) && !isPick(mk('x', 'done')) && !isPick(mk('x', 'need')) && !isPick(mk('x', 'no')))
+  check('D-190 먼저 제안할 것: 많아야 3개 · 받은 순서 그대로', topPicks(list).map((i) => i.key).join() === 'a,b,d' && topPicks(list, 5).length === 4)
+  check('D-190 먼저 제안할 것이 없으면 빈 목록', topPicks([mk('c', 'done'), mk('e', 'need')]).length === 0)
+  check('D-190 아직 판정 못 한 모듈에 필요한 것 — 겹치지 않게 · 많아야 3개', missingForPicks(list).join() === '명부,크레탑,주주명부' && missingForPicks(list, 1).join() === '명부')
+  check('D-190 추천 점수: 가능성 높음 2 · 검토해 볼 만함 1', recoScore([{ tone: 'good' }, { tone: 'maybe' }, { tone: 'good' }]) === 5 && recoScore([]) === 0)
+
+  const T = '2026-10-13'
+  const rec = normalizeClientOps({ id: 'reco1', companyName: '추천정밀', establishedAt: '2024-03-02', businessCategory: '제조업', businessItem: '정밀기계 부품', businessAddress: '경기도 화성시 동탄대로 1', representativeBirth: '1990-05-05', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  const same = buildInsights(rec, T, [], (k) => k !== 'grants').filter(isPick).map((i) => i.label)
+  const chips = cardRecoChips(rec, T, 3)
+  check('D-190 카드 추천 띠: 맞는 지원사업 수가 있으면 맨 앞 "지원사업 3건"(가능성 높음)', chips[0]?.key === 'grants' && chips[0]?.label === '지원사업 3건' && chips[0]?.tone === 'good', JSON.stringify(chips))
+  check('D-190 카드 추천 띠: 나머지는 맞춤 추천 판정과 같은 것(엔진 하나)', JSON.stringify(chips.slice(1).map((c) => c.label).sort()) === JSON.stringify([...same].sort()), JSON.stringify({ chips, same }))
+  check('D-190 카드 추천 띠: 좋은 것 먼저', chips.every((c, i) => i === 0 || !(c.tone === 'good' && chips[i - 1].tone === 'maybe')))
+  check('D-190 카드 추천 띠: 맞는 공고 0건이면 지원사업 칩 없음 · 요금제에 없으면 없음', !cardRecoChips(rec, T, 0).some((c) => c.key === 'grants') && !cardRecoChips(rec, T, 3, (k) => k !== 'grants').some((c) => c.key === 'grants'))
+  check('D-190 카드 추천 띠: 판정 칩은 가능성 높음 · 검토해 볼 만함만', chips.every((c) => c.tone === 'good' || c.tone === 'maybe'))
+  const empty = normalizeClientOps({ id: 'reco0', companyName: '빈업체', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  check('D-190 정보가 없으면 짐작해서 추천하지 않음(칩 0)', cardRecoChips(empty, T, 0).length === 0, JSON.stringify(cardRecoChips(empty, T, 0)))
+
+  const a1 = { ...rec, id: 's1', companyName: '가나' }
+  const a2 = { ...rec, id: 's2', companyName: '다라' }
+  const a3 = { ...rec, id: 's3', companyName: '마바', status: 'completed' as const }
+  const a4 = { ...rec, id: 's4', companyName: '사아' }
+  const scores = new Map([['s1', 1], ['s2', 5], ['s3', 9], ['s4', 3]])
+  check('D-190 추천 많은 순: 점수 높은 곳 위로 · 계약 끝난 곳은 점수가 높아도 맨 뒤', sortClients([a1, a2, a3, a4], 'reco', T, scores).map((r) => r.id).join() === 's2,s4,s1,s3')
+  check('D-190 추천 많은 순: 점수를 아직 모르면 0점으로(멈추지 않음)', sortClients([a1, a2], 'reco', T).length === 2)
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

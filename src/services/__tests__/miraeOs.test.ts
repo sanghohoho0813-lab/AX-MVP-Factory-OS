@@ -1456,7 +1456,7 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
     mk('c', '나라산업', '', ''),
   ]
 
-  check('정렬: 다섯 가지 — 기본(맨 앞)은 요즘 챙기는 순(D-159)', CLIENT_SORT_ORDER.length === 5 && CLIENT_SORT_ORDER[0] === 'active')
+  check('정렬: 여섯 가지 — 기본(맨 앞)은 요즘 챙기는 순(D-159) · 다음 추천 많은 순(D-190)', CLIENT_SORT_ORDER.length === 6 && CLIENT_SORT_ORDER[0] === 'active' && CLIENT_SORT_ORDER[1] === 'reco')
   check('정렬: 모르는 값은 거른다', isClientSortKey('name') && !isClientSortKey('아무거나'))
   check('정렬: 원본을 건드리지 않는다', sortClients(list, 'name', T) !== list && list[0]?.id === 'a')
 

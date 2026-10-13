@@ -700,7 +700,7 @@ check('실제로 지워졌다', left === false)
   const picker = page.locator('select[aria-label="업체 정렬 기준"]')
   check('정렬: 고르는 칸이 있다', (await picker.count()) > 0)
   const opts = await picker.locator('option').allInnerTexts()
-  check('정렬: 다섯 가지 — 맨 앞(기본) 요즘 챙기는 순(D-159)', opts.length === 5 && opts[0] === '요즘 챙기는 순' && opts.includes('가나다순') && opts.includes('업력순') && opts.includes('계약 오래된 순'), JSON.stringify(opts))
+  check('정렬: 여섯 가지 — 맨 앞(기본) 요즘 챙기는 순(D-159) · 둘째 추천 많은 순(D-190)', opts.length === 6 && opts[0] === '요즘 챙기는 순' && opts[1] === '추천 많은 순' && opts.includes('가나다순') && opts.includes('업력순') && opts.includes('계약 오래된 순'), JSON.stringify(opts))
 
   const names = async () =>
     page.evaluate(() =>

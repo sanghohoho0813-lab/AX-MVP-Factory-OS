@@ -1,6 +1,7 @@
 /**
  * 업체 상세 '맞춤 추천' 탭 (D-144) — 개요 왼쪽, 서류를 올리면 가장 먼저 보는 곳.
  *
+ *  0. D-190: 이 업체에 먼저 제안할 것 — 모듈 판정 중 좋은 것 3개를 맨 위에 크게(누르면 그 모듈)
  *  1. 서류 올리기(파일 · 폴더째) — 머리줄 단추와 같은 창
  *  2. 방금 올린 서류 — 바로 넣은 정보 · 확인할 정보(까닭) · 크레탑 · 명부 진단
  *  3. 확인이 필요한 정보 — 확실하지 않은 것만(사진 글자 · 지금 값과 다름 …)
@@ -20,6 +21,7 @@ import { AlertRow } from './opsParts'
 import { FactInboxCard } from './ClientFactsCards'
 import { ClientAdvisor } from './ClientAdvisor'
 import { ClientGrantsCard } from '../grants/ClientGrantsCard'
+import { TopPicksCard } from './ClientTopPicks'
 import { useGrantData } from '../grants/useGrants'
 import { useEntitlements } from '../../lib/entitlementsStore'
 import { buildDecisions } from '../../services/decisions'
@@ -101,6 +103,9 @@ export default function ClientSmartTab({
 
   return (
     <div className="flex flex-col gap-5" data-testid="smart-tab">
+      {/* 0. D-190: 먼저 제안할 것 — 아래 '모듈별 판정' 중 좋은 것 3개를 맨 위에 */}
+      <TopPicksCard insights={insights} onUpload={onUpload} showUpload={false} onShowAll={() => document.getElementById('module-verdicts')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+
       {/* 1. 서류 올리기 */}
       <Surface className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
         <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -179,6 +184,7 @@ export default function ClientSmartTab({
       <ClientAdvisor record={record} today={today} notices={notices} insights={insights} onSetNext={setNext} />
 
       {/* 5. 모듈별 판정 */}
+      <div id="module-verdicts" className="scroll-mt-32">
       <Section title="모듈별 판정" count={good}>
         <p className="t-sub -mt-1 break-keep text-slate-500">업체 정보로 각 모듈을 미리 돌려 본 결과예요 — 모듈을 따로 열지 않아도 됩니다. 규칙으로 계산한 1차 판정이며 선정 · 승인을 보장하지 않아요.</p>
         <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2" data-testid="smart-insights">
@@ -209,6 +215,7 @@ export default function ClientSmartTab({
           ))}
         </ul>
       </Section>
+      </div>
 
       {/* 6. 지금 챙길 것 */}
       {alerts.length > 0 && (

@@ -113,6 +113,8 @@ import { pendingFacts } from '../services/customerFacts'
 
 /** D-144: 맞춤 추천 탭 — 모듈 엔진(정책자금 · 창업감면 …)을 담고 있어 이 탭을 열 때만 불러온다 */
 const ClientSmartTab = lazy(() => import('../components/ops/ClientSmartTab'))
+// D-190: 개요 맨 위 '이 업체에 먼저 제안할 것' — 판정 엔진(정책자금 · 창업감면 …)은 따로 받아 첫 화면을 무겁게 하지 않는다
+const ClientTopPicks = lazy(() => import('../components/ops/ClientTopPicks'))
 import { factNoteFor, readFact, withFactValue, withProfileFieldEdit } from '../services/customerFacts'
 import { TodoComposer } from '../components/journal/TodoBoard'
 import { createJournalEntry } from '../services/journalService'
@@ -737,7 +739,23 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       {tab === 'overview' && (
         <>
       {/*
-        D-144: 개요는 회사 정보부터 — 업체를 여는 이유의 절반은 "사업자번호가 뭐였지 · 설립이 몇 년도지" 다.
+        D-190: 맨 위는 '이 업체에 먼저 제안할 것' — 대표 지시(고도화 목표 2) "서류가 다 들어오면 모듈 추천이 먼저, 눈에 잘 띄게".
+        좋은 판정 3개만 크게, 누르면 그 모듈. 모든 판정은 맞춤 추천 탭에.
+      */}
+      <Suspense fallback={null}>
+        <ClientTopPicks
+          record={record}
+          today={today}
+          workspaceId={workspaceId}
+          onUpload={openUpload}
+          onShowAll={() => {
+            setTab('smart')
+            window.setTimeout(() => document.getElementById('module-verdicts')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 350)
+          }}
+        />
+      </Suspense>
+      {/*
+        D-144: 그다음 회사 정보 — 업체를 여는 이유의 절반은 "사업자번호가 뭐였지 · 설립이 몇 년도지" 다.
         지금 챙길 것 · 맞는 지원사업 · 확인할 정보는 '맞춤 추천' 탭으로 옮겼다(여기는 한 줄로 알려만 준다).
       */}
       <div data-testid="overview-company">

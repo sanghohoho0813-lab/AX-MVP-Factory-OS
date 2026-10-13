@@ -59,7 +59,8 @@ export interface ClientGrantSummary {
  * 고객 관리 · 영업 보드 · 미팅 준비 — 업체마다 '맞는 지원사업 N건' (D-143).
  * 공고는 같은 저장소(기업마당 하루 한 번 + 직접 넣은 공고)에서, 업체 × 공고 계산은 한 번만.
  */
-export function useClientGrantSummaries(workspaceId: string | null, records: readonly ClientOpsRecord[], today: string): Map<string, ClientGrantSummary> {
+/** 공고만 — 직접 넣은 공고 + 기업마당(보낸 기록 · 고객 화면 연결은 읽지 않는다) */
+export function useGrantNotices(workspaceId: string | null): GrantNotice[] {
   const [manual, setManual] = useState<GrantNotice[]>([])
   useEffect(() => {
     let alive = true
@@ -73,7 +74,11 @@ export function useClientGrantSummaries(workspaceId: string | null, records: rea
     }
   }, [workspaceId])
   const feed = useGrantFeed()
-  const notices = useMemo(() => mergeNotices(manual, feed.notices), [manual, feed.notices])
+  return useMemo(() => mergeNotices(manual, feed.notices), [manual, feed.notices])
+}
+
+export function useClientGrantSummaries(workspaceId: string | null, records: readonly ClientOpsRecord[], today: string): Map<string, ClientGrantSummary> {
+  const notices = useGrantNotices(workspaceId)
   const clients = useMemo(() => grantClients(records as ClientOpsRecord[], today), [records, today])
   return useMemo(() => {
     const out = new Map<string, ClientGrantSummary>()

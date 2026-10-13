@@ -47,7 +47,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(700)
   const tabs = await page.getByRole('tab').allInnerTexts()
   check('탭 순서: 맞춤 추천 → 개요 → 서류 → 업무 → 업무 일기 → 고객 플랫폼 → 수금(D-144)', JSON.stringify(tabs.map((t) => t.split('\n')[0].trim())) === JSON.stringify(['맞춤 추천', '개요', '서류', '업무', '업무 일기', '고객 플랫폼', '수금']), JSON.stringify(tabs))
-  check('개요: 처음 열면 개요 · 맨 위가 회사 정보(D-144)', (await page.getByRole('tab', { name: /^개요/, selected: true }).count()) === 1 && (await page.evaluate(() => { const c = document.querySelector('[data-testid="overview-company"]'); const n = document.querySelector('main section, main [data-testid="overview-company"]'); return !!c && c.getBoundingClientRect().top < 700 })))
+  await page.getByTestId('top-picks').waitFor({ timeout: 5000 }).catch(() => {})
+  check('개요: 처음 열면 개요 · 맨 위 "먼저 제안할 것"(D-190) 바로 아래 회사 정보(D-144)', (await page.getByRole('tab', { name: /^개요/, selected: true }).count()) === 1 && (await page.evaluate(() => { const c = document.querySelector('[data-testid="overview-company"]'); const t = document.querySelector('[data-testid="top-picks"]'); return !!c && !!t && t.getBoundingClientRect().top < c.getBoundingClientRect().top && c.getBoundingClientRect().top < 900 })))
   const main = (await page.locator('main').innerText()) ?? ''
   check('개요: 돈 숫자 칸(못 받은 내 돈)을 되풀이하지 않는다', !main.includes('못 받은 내 돈'))
   check('개요: 없는 서류 칸이 없다', !/없는 서류\s*\d/.test(main))
@@ -818,6 +819,75 @@ for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
   const moved = (await all()).find((r) => r.id === made?.id)
   check(`D-187 '그 업체 열기' → 넣은 서류가 그 업체 서류함으로(업체는 새로 안 생김) ${tag}`, !!moved && Object.values(moved.documents).some((d) => d.fileName === '사업자등록증_한번더.txt') && (await all()).length === before + 1)
   check(`D-187 오류 0 ${tag}`, errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
+/* ---------------- D-190 먼저 제안할 것 — 업체 상세 맨 위 · 고객 관리 카드 추천 띠 · 추천 많은 순 ---------------- */
+for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
+  const ctx = await browser.newContext({ viewport: { width: w, height: h }, locale: 'ko-KR', timezoneId: 'Asia/Seoul', ...(w < 500 ? { isMobile: true, hasTouch: true } : {}) })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+
+  // 업체 상세 — 개요 맨 위
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  const top = page.getByTestId('top-picks')
+  await top.waitFor({ timeout: 6000 })
+  const picks = page.getByTestId('top-pick')
+  const n = await picks.count()
+  const tones = await picks.evaluateAll((els) => els.map((e) => e.getAttribute('data-tone')))
+  check(`D-190 ${tag} 개요 맨 위 "이 업체에 먼저 제안할 것" — 1~3개 · 가능성 높음/검토해 볼 만함만`, n >= 1 && n <= 3 && tones.every((t) => t === 'good' || t === 'maybe') && (await top.innerText()).includes('이 업체에 먼저 제안할 것'), JSON.stringify(tones))
+  check(`D-190 ${tag} 좋은 것 먼저(가능성 높음 → 검토해 볼 만함)`, tones.every((t, i) => i === 0 || !(t === 'good' && tones[i - 1] === 'maybe')))
+  check(`D-190 ${tag} 'AI' 라고 부르지 않음`, !/AI/.test(await top.innerText()))
+  check(`D-190 ${tag} 받으면 더 추천(빠진 서류) 칩`, (await page.getByTestId('top-picks-need').count()) === 1 && /명부|크레탑|주주명부|연구/.test(await page.getByTestId('top-picks-need').innerText()))
+  check(`D-190 ${tag} 제안할 것이 있으면 카드 안 [서류 올리기]는 없음(머리줄과 겹치지 않게)`, (await page.getByTestId('top-picks-upload').count()) === 0)
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  check(`D-190 ${tag} 가로 넘침 0`, over <= 1, String(over))
+  if (tag === '390') await page.screenshot({ path: '/tmp/claude-0/d190-detail-390.png' }).catch(() => {})
+
+  // 맞춤 추천 탭으로 — 모든 판정
+  await page.getByTestId('top-picks-all').click()
+  await page.waitForTimeout(900)
+  check(`D-190 ${tag} [모듈별 판정 n개] → 맞춤 추천 탭 · 판정 목록으로`, /tab=smart/.test(page.url()) && (await page.getByTestId('smart-insight').count()) >= 3, page.url())
+  const firstSmart = await page.evaluate(() => document.querySelector('[data-testid="smart-tab"]')?.firstElementChild?.getAttribute('data-testid'))
+  check(`D-190 ${tag} 맞춤 추천 탭도 맨 위가 "먼저 제안할 것"`, firstSmart === 'top-picks', String(firstSmart))
+  const sameKeys = await page.evaluate(() => {
+    const top = [...document.querySelectorAll('[data-testid="top-pick"]')].map((e) => e.getAttribute('data-key'))
+    const good = [...document.querySelectorAll('[data-testid="smart-insight"]')].filter((e) => ['good', 'maybe'].includes(e.getAttribute('data-tone'))).map((e) => e.getAttribute('data-key')).slice(0, 3)
+    return JSON.stringify(top) === JSON.stringify(good)
+  })
+  check(`D-190 ${tag} 맨 위 3개 = 아래 모듈별 판정의 좋은 것 3개(엔진 하나)`, sameKeys)
+
+  // 누르면 그 모듈이 이 업체로
+  const key = await picks.first().getAttribute('data-key')
+  await picks.first().locator('a').click()
+  await page.waitForURL(/\/(tools|grants)\//, { timeout: 8000 }).catch(() => {})
+  check(`D-190 ${tag} 첫 제안(${key}) 누르면 그 모듈이 이 업체로 열림`, /client=cli_hansol/.test(page.url()) && /\/(tools|grants)/.test(page.url()), page.url())
+
+  // 고객 관리 카드 — 추천 띠(휴대폰 접힌 카드에도) · 추천 많은 순
+  await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(1200)
+  const card = page.locator('[data-testid="client-card"][data-client-id="cli_hansol"]')
+  const band = card.getByTestId('card-reco')
+  check(`D-190 ${tag} 고객 관리 카드에 "추천" 띠 — ${tag === '390' ? '접힌 카드에서도 보임' : 'PC'}`, (await band.count()) === 1 && (await band.isVisible()) && /추천/.test(await band.innerText()), (await band.count()) ? await band.innerText() : 'none')
+  check(`D-190 ${tag} 띠 칩은 많아야 3개(+n)`, (await band.locator('[data-reco], [data-testid="client-card-grants"]').count()) <= 3)
+  const tg = page.getByTestId('client-filters-toggle')
+  if ((await tg.count()) && (await tg.isVisible()) && (await tg.getAttribute('aria-expanded')) !== 'true') await tg.click()
+  const sel = page.getByLabel('업체 정렬 기준')
+  await sel.selectOption('reco')
+  await page.waitForTimeout(700)
+  const order = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-testid="client-card"]')].map((c) => {
+      const chips = [...c.querySelectorAll('[data-testid="card-reco"] [data-tone]')].map((x) => x.getAttribute('data-tone'))
+      return chips.reduce((s, t) => s + (t === 'good' ? 2 : 1), 0)
+    }),
+  )
+  check(`D-190 ${tag} '추천 많은 순' — 추천 점수 높은 업체가 위(띠 3개까지 보이는 점수 기준)`, order.length >= 2 && order.every((v, i) => i === 0 || v <= order[i - 1] || order[i - 1] >= 6), JSON.stringify(order))
+  check(`D-190 ${tag} '추천 많은 순' 안내 문구`, /먼저 제안할 모듈/.test((await page.locator('main').innerText()) ?? ''))
+  await sel.selectOption('active')
+  check(`D-190 오류 0 ${tag}`, errors.length === 0, errors.join(' | '))
   await ctx.close()
 }
 

@@ -81,6 +81,7 @@ import { Modal } from '../components/ui/Modal'
 import { AlertRow, SEVERITY_META } from '../components/ops/opsParts'
 import { useBackToClose } from '../lib/backToClose'
 import { useClientGrantSummaries } from '../components/grants/useGrants'
+import { useClientReco } from '../components/ops/useClientReco'
 import { CLIENT_TYPE_LABEL, CLIENT_TYPE_VIEW_KEY, CLIENT_TYPES, clientTypeOf, isClientType, rememberClientTypeView, type ClientType } from '../services/clientType'
 import { ClientTypePicker } from '../components/ops/ClientTypePicker'
 import { NewClientDocDrop } from '../components/ops/NewClientDocDrop'
@@ -248,6 +249,9 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const today = todayLocalDate()
   // D-143: 업체마다 맞는 지원사업 수 — 기업마당 공고는 한 번 받아 모든 화면이 같이 쓴다
   const grantSums = useClientGrantSummaries(workspaceId, records, today)
+  // D-190: 카드 추천 띠 · '추천 많은 순' — 맞춤 추천과 같은 판정(지원사업은 위에서 센 맞는 공고 수)
+  const grantFit = useCallback((id: string) => grantSums.get(id)?.fit ?? 0, [grantSums])
+  const reco = useClientReco(records, today, grantFit)
 
   const load = useCallback(async () => {
     try {
@@ -407,7 +411,8 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       /* 저장을 막아 둔 브라우저도 화면은 돌아가야 한다 */
     }
   }, [sortKey])
-  const ordered = useMemo(() => sortClients(visible, sortKey, today), [visible, sortKey, today])
+  const recoScores = sortKey === 'reco' ? reco.scores : undefined
+  const ordered = useMemo(() => sortClients(visible, sortKey, today, recoScores), [visible, sortKey, today, recoScores])
   const alerts = useMemo(() => buildAllAlerts(typed, today), [typed, today])
   const summary = useMemo(() => summarizeAlerts(alerts), [alerts])
   const visibleAlerts = useMemo(
@@ -947,6 +952,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                   onBulkDocs={() => setBulkDocsFor(record.id)}
                   hit={query.trim() !== '' ? searchHit(record, query) : null}
                   grants={grantSums.get(record.id) ?? null}
+                  reco={reco.chips.get(record.id) ?? []}
                   onGrants={() => navigate(`/grants?view=clients&client=${record.id}`)}
                 />
               )
