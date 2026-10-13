@@ -891,6 +891,52 @@ for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
   await ctx.close()
 }
 
+/* ---------------- D-191 추천에 금액(엔진이 계산한 것만) · 빠진 자료 → 요청 문구 ---------------- */
+for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
+  const ctx = await browser.newContext({ viewport: { width: w, height: h }, locale: 'ko-KR', timezoneId: 'Asia/Seoul', ...(w < 500 ? { isMobile: true, hasTouch: true } : {}) })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+
+  // 빠진 자료 → 요청 문구
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  await page.getByTestId('top-picks').waitFor({ timeout: 6000 })
+  const reqBtn = page.getByTestId('top-picks-request')
+  check(`D-191 ${tag} '받으면 더 추천' 옆 [요청 문구] 단추`, (await reqBtn.count()) === 1 && (await reqBtn.isVisible()))
+  await reqBtn.click()
+  const ta = page.locator('[role="dialog"] textarea').first()
+  await ta.waitFor({ timeout: 4000 })
+  const text = await ta.inputValue()
+  check(`D-191 ${tag} 요청 문구: 대표님 · 회사 이름 · 4대보험 명부(어디서 떼는지) · 무엇 확인용`, /^안녕하세요, .+ 대표님\./.test(text) && text.includes('한솔테크') && text.includes('4대보험 사업장 가입자 명부') && text.includes('4insure.or.kr') && /확인용/.test(text), text.slice(0, 300))
+  check(`D-191 ${tag} 요청 문구: 크레탑은 빼고(저희가 조회) · 주민등록번호 요구 없음`, !text.includes('크레탑') && !/주민등록번호를 (보내|알려)/.test(text))
+  check(`D-191 ${tag} 요청 문구 창 제목`, ((await page.locator('[role="dialog"]').first().innerText()) ?? '').includes('받을 자료 요청 문구'))
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+
+  // 금액 — 명부 진단이 계산한 최대 지원금
+  await page.evaluate(() => {
+    const k = 'axmvp.v1.operations_clients'
+    const list = JSON.parse(localStorage.getItem(k) ?? '[]')
+    const r = list.find((x) => x.id === 'cli_hansol')
+    r.toolResults = [...(r.toolResults ?? []), { id: 'tr-d191', toolKey: 'employment', title: '4대보험 명부 진단', verdict: 'candidates', verdictLabel: '후보 지원금 2건 · 확인 항목 1', summary: '[4대보험 명부 진단] 12명 중 재직 12명', data: { tab: 'roster', subsidyTotal: 14400000 }, deadlines: [], createdAt: new Date().toISOString(), publishedUpdateId: null }]
+    localStorage.setItem(k, JSON.stringify(list))
+  })
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  await page.getByTestId('top-picks').waitFor({ timeout: 6000 })
+  const emp = page.locator('[data-testid="top-pick"][data-key="employment"]')
+  check(`D-191 ${tag} 명부 진단 뒤 고용지원금이 먼저 제안할 것에 · 금액 "최대 1,440만원 검토(1차 추정)"`, (await emp.count()) === 1 && /최대 1,440만원 검토\(1차 추정\)/.test(await emp.innerText()), (await emp.count()) ? await emp.innerText() : 'none')
+  check(`D-191 ${tag} 금액은 계산한 모듈에만(정책자금 카드에는 금액 줄 없음)`, (await page.locator('[data-testid="top-pick"][data-key="policy-funding"] [data-testid="top-pick-amount"]').count()) === 0)
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(1200)
+  check(`D-191 ${tag} 맞춤 추천 탭 모듈별 판정에도 금액`, /최대 1,440만원/.test((await page.locator('[data-testid="smart-insight"][data-key="employment"]').innerText().catch(() => '')) ?? ''))
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  check(`D-191 ${tag} 가로 넘침 0`, over <= 1, String(over))
+  check(`D-191 오류 0 ${tag}`, errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

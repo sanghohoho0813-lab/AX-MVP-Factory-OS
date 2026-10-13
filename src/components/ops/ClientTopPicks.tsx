@@ -9,18 +9,32 @@
  */
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, FileUp, Sparkles } from 'lucide-react'
+import { ArrowRight, FileUp, Send, Sparkles } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { Badge, type Tone } from '../ui/primitives'
 import { Button } from '../ui/Button'
 import { useEntitlements } from '../../lib/entitlementsStore'
 import { useGrantNotices } from '../grants/useGrants'
 import { INSIGHT_TONE_LABEL, buildInsights, isPick, missingForPicks, topPicks, type Insight, type InsightTone } from '../../services/clientInsights'
+import { recoRequestMessage } from '../../services/recoRequest'
 
 const TONE: Record<InsightTone, Tone> = { good: 'success', maybe: 'brand', done: 'neutral', need: 'warning', no: 'neutral' }
 
 /** 이미 계산한 판정으로 그린다(맞춤 추천 탭은 자기 판정을 넘긴다) */
-export function TopPicksCard({ insights, onUpload, onShowAll, showUpload = true }: { insights: readonly Insight[]; onUpload: () => void; onShowAll?: () => void; showUpload?: boolean }) {
+export function TopPicksCard({
+  insights,
+  onUpload,
+  onShowAll,
+  showUpload = true,
+  onRequest,
+}: {
+  insights: readonly Insight[]
+  onUpload: () => void
+  onShowAll?: () => void
+  showUpload?: boolean
+  /** D-191: '받으면 더 추천' → 고객에게 보낼 자료 요청 문구(없으면 단추를 그리지 않는다) */
+  onRequest?: () => void
+}) {
   const picks = topPicks(insights)
   const more = insights.filter(isPick).length - picks.length
   const need = missingForPicks(insights)
@@ -55,6 +69,12 @@ export function TopPicksCard({ insights, onUpload, onShowAll, showUpload = true 
                   <Badge tone={TONE[p.tone]}>{INSIGHT_TONE_LABEL[p.tone]}</Badge>
                 </span>
                 <span className="t-sub line-clamp-3 break-keep text-slate-700 [overflow-wrap:anywhere]">{p.headline}</span>
+                {/* D-191: 엔진이 계산한 금액만(명부 진단 최대 지원금 · 세액공제 · 공고 금액 글) */}
+                {p.amount && (
+                  <span data-testid="top-pick-amount" className="t-sub font-bold break-keep text-success-700 [overflow-wrap:anywhere]">
+                    {p.amount}
+                  </span>
+                )}
                 <span className="t-sub mt-auto inline-flex items-center gap-1 pt-0.5 font-semibold text-brand-700 group-hover:underline">
                   {p.openLabel} <ArrowRight aria-hidden="true" className="size-4" />
                 </span>
@@ -85,6 +105,12 @@ export function TopPicksCard({ insights, onUpload, onShowAll, showUpload = true 
               ))}
             </span>
           )}
+          {/* D-191: 빠진 자료를 고객에게 — 어디서 떼는지 · 왜 필요한지 붙은 카톡 문구 */}
+          {need.length > 0 && onRequest && (
+            <Button size="sm" variant="secondary" onClick={onRequest} data-testid="top-picks-request">
+              <Send aria-hidden="true" className="size-4" /> 요청 문구
+            </Button>
+          )}
           {/* 서류 올리기 단추는 제안할 것이 아직 없을 때만 — 있으면 머리줄 [서류 올리기] 와 겹친다 */}
           {need.length > 0 && picks.length === 0 && showUpload && (
             <Button size="sm" variant="primary" onClick={onUpload} className="sm:ml-auto" data-testid="top-picks-upload">
@@ -98,9 +124,24 @@ export function TopPicksCard({ insights, onUpload, onShowAll, showUpload = true 
 }
 
 /** 개요 탭 맨 위 — 판정을 스스로 계산한다(공고 · 요금제 권한 포함) */
-export default function ClientTopPicks({ record, today, workspaceId, onUpload, onShowAll }: { record: ClientOpsRecord; today: string; workspaceId: string | null; onUpload: () => void; onShowAll: () => void }) {
+export default function ClientTopPicks({
+  record,
+  today,
+  workspaceId,
+  onUpload,
+  onShowAll,
+  onRequestText,
+}: {
+  record: ClientOpsRecord
+  today: string
+  workspaceId: string | null
+  onUpload: () => void
+  onShowAll: () => void
+  onRequestText?: (text: string) => void
+}) {
   const { ent } = useEntitlements()
   const notices = useGrantNotices(workspaceId)
   const insights = useMemo(() => buildInsights(record, today, notices, (key) => key === 'grants' || ent.feature(key).usable), [record, today, notices, ent])
-  return <TopPicksCard insights={insights} onUpload={onUpload} onShowAll={onShowAll} />
+  const text = useMemo(() => recoRequestMessage(record, insights), [record, insights])
+  return <TopPicksCard insights={insights} onUpload={onUpload} onShowAll={onShowAll} onRequest={onRequestText && text ? () => onRequestText(text) : undefined} />
 }

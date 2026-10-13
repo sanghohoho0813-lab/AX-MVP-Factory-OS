@@ -183,6 +183,8 @@ export async function analyzeUploadedDocs(
             counts: analysis.counts,
             subsidySummary: analysis.subsidySummary.map((s) => ({ key: s.key, name: s.name, candidateCount: s.candidateCount, level: s.level })),
             issueDate: parsed.meta?.issueDate ?? null,
+            // D-191: 최대 예상 지원금(원) — 맞춤 추천이 엔진 없이 금액을 보여 준다
+            subsidyTotal: total,
             from: 'upload',
           },
           deadlines: enroll.youthEnrollDeadlines(youth),

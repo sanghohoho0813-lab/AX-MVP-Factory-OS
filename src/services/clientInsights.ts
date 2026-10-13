@@ -47,6 +47,15 @@ export interface Insight {
   openLabel: string
   /** 다음 행동으로 걸 만한 한 줄(없으면 null) */
   action: string | null
+  /** D-191: 엔진이 이미 계산한 금액만(명부 진단 최대 지원금 · 연구소 세액공제 · 공고 금액 글) — 없으면 짐작하지 않는다 */
+  amount?: string
+}
+
+/** 원 → '1,440만원' · 1억 이상은 '1.2억원' */
+export function manwonText(won: number): string {
+  if (!Number.isFinite(won) || won <= 0) return ''
+  if (won >= 100_000_000) return `${(won / 100_000_000).toLocaleString('ko-KR', { maximumFractionDigits: 1 })}억원`
+  return `${Math.round(won / 10_000).toLocaleString('ko-KR')}만원`
 }
 
 export interface InsightContext {
@@ -77,7 +86,10 @@ const grantsInsight: Provider = ({ record, today, notices }) => {
   if (fit.length > 0) {
     // D-156: 맞는 공고 수는 알리되 마감은 자동으로 띄우지 않는다. 대표가 '도전해 볼 만함' 으로 고른 공고만 마감을 말한다
     const next = [...picked].filter((a) => a.applyDueDate).sort((a, b) => a.applyDueDate.localeCompare(b.applyDueDate))[0]
+    // D-191: 가장 맞는 공고의 금액 글 그대로(숫자를 지어내지 않는다)
+    const amt = fit.map((m) => m.notice.amountText.trim()).find(Boolean)
     return {
+      amount: amt ? `공고 금액 ${amt}` : undefined,
       key: 'grants',
       label: '지원사업',
       tone: 'good',
@@ -168,7 +180,12 @@ const employmentInsight: Provider = ({ record }) => {
   const roster = last && (last.data as { tab?: string } | null)?.tab === 'roster' ? last : null
   if (!roster) return { key: 'employment', label: '고용지원금', tone: 'need', headline: '4대보험 가입자 명부를 올리면 직원별 지원금 후보를 바로 봐요', detail: '청년 · 고령 · 신규 입사 후보와 청년도약 참여신청 기한까지.', missing: ['4대보험 가입자 명부'], openPath: open, openLabel: '명부 진단', action: null }
   const hard = roster.deadlines.filter((d) => d.hard).length
+  // D-191: 명부 진단이 계산한 최대 예상 지원금 — 저장된 값, 옛 결과는 요약 글의 '최대 n만원'
+  const saved = (roster.data as { subsidyTotal?: unknown } | null)?.subsidyTotal
+  const fromText = /최대\s*([\d,]+)\s*만원/.exec(roster.summary)?.[1]
+  const total = typeof saved === 'number' && saved > 0 ? saved : fromText ? Number(fromText.replace(/,/g, '')) * 10_000 : 0
   return {
+    amount: roster.verdict === 'candidates' && total > 0 ? `최대 ${manwonText(total)} 검토(1차 추정)` : undefined,
     key: 'employment',
     label: '고용지원금',
     tone: roster.verdict === 'candidates' ? 'good' : 'no',
@@ -185,7 +202,12 @@ const labInsight: Provider = ({ record, facts }) => {
   const open = `/tools/labcare${q(record)}`
   if (usableFactValue(record, 'researchLab')) return { key: 'labcare', label: '연구소', tone: 'done', headline: '연구소(전담부서)가 있어요 — 사후관리 · 세액공제를 챙길 때', detail: String(usableFactValue(record, 'researchLab')), missing: [], openPath: open, openLabel: '연구소 관리', action: null }
   const last = latestToolResult(record, 'labcare')
-  if (last) return { key: 'labcare', label: '연구소', tone: /가능|추천/.test(last.verdictLabel) ? 'good' : 'maybe', headline: last.verdictLabel || last.title, detail: last.summary.split('\n')[0] ?? '', missing: [], openPath: open, openLabel: '연구소 진단 보기', action: null }
+  if (last) {
+    // D-191: 세액공제 계산 결과가 붙어 있으면 연간 금액
+    const d = last.data as { kind?: unknown; estimate?: { annual?: unknown } } | null
+    const annual = d?.kind === 'tax' && typeof d.estimate?.annual === 'number' ? d.estimate.annual : 0
+    return { key: 'labcare', label: '연구소', tone: /가능|추천/.test(last.verdictLabel) ? 'good' : 'maybe', headline: last.verdictLabel || last.title, detail: last.summary.split('\n')[0] ?? '', missing: [], openPath: open, openLabel: '연구소 진단 보기', action: null, amount: annual > 0 ? `세액공제 연간 약 ${manwonText(annual)}` : undefined }
+  }
   const emp = facts.employeeCount
   return {
     key: 'labcare',

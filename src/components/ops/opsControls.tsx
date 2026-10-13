@@ -165,9 +165,10 @@ export function MessageModal({
             className="w-full resize-none rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-3 font-mono text-[0.92rem] leading-relaxed text-slate-800"
           />
         </div>
-        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-100 px-5 py-3.5">
-          <span className="text-[0.88rem] text-slate-500">복사해서 카카오톡·문자·메일에 붙여넣으세요.</span>
-          <div className="flex gap-2">
+        {/* D-191: 휴대폰에서 [복사] 가 창 밖으로 삐져나왔다 — 좁으면 안내 글 아래로 단추 줄을 내린다 */}
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-5 py-3.5">
+          <span className="min-w-0 flex-[1_1_12rem] text-[0.88rem] break-keep text-slate-500">복사해서 카카오톡·문자·메일에 붙여넣으세요.</span>
+          <div className="ml-auto flex shrink-0 gap-2">
             <Button variant="secondary" onClick={onClose}>
               닫기
             </Button>

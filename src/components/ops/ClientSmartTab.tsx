@@ -22,6 +22,7 @@ import { FactInboxCard } from './ClientFactsCards'
 import { ClientAdvisor } from './ClientAdvisor'
 import { ClientGrantsCard } from '../grants/ClientGrantsCard'
 import { TopPicksCard } from './ClientTopPicks'
+import { recoRequestMessage } from '../../services/recoRequest'
 import { useGrantData } from '../grants/useGrants'
 import { useEntitlements } from '../../lib/entitlementsStore'
 import { buildDecisions } from '../../services/decisions'
@@ -48,7 +49,10 @@ export default function ClientSmartTab({
   onFill,
   userId,
   onCommitQuiet,
+  onRequestText,
 }: {
+  /** D-191: '받으면 더 추천' 자료 요청 문구를 띄운다(업체 상세의 문구 창) */
+  onRequestText?: (text: string) => void
   /** D-158: 확인할 것 — 할 일 만들 사람 · 알림 없이 저장(답마다 알림은 확인함이 띄운다) */
   userId?: string | null
   onCommitQuiet?: (next: ClientOpsRecord) => Promise<boolean>
@@ -87,6 +91,7 @@ export default function ClientSmartTab({
   const feeToSet = useMemo(() => activeApplications(record).filter((a) => applyStage(a) === 'selected').map((a) => a.programName || '지원사업'), [record])
   const steps = useMemo(() => recommendNextSteps(insights, pending, shelf, applying, feeToSet), [insights, pending, shelf, applying, feeToSet])
   const good = insights.filter((i) => i.tone === 'good').length
+  const requestText = useMemo(() => recoRequestMessage(record, insights), [record, insights])
   // D-158: 확인할 것 — 이 업체 것만(자료에서 읽은 정보는 위 '확인이 필요한 정보' 칸이 맡는다)
   const decisions = useMemo(() => buildDecisions(record, today, notices, usable).filter((d) => d.kind !== 'fact'), [record, today, notices, ent]) // eslint-disable-line react-hooks/exhaustive-deps
   const { answer, busy } = useDecisionAnswer({
@@ -104,7 +109,7 @@ export default function ClientSmartTab({
   return (
     <div className="flex flex-col gap-5" data-testid="smart-tab">
       {/* 0. D-190: 먼저 제안할 것 — 아래 '모듈별 판정' 중 좋은 것 3개를 맨 위에 */}
-      <TopPicksCard insights={insights} onUpload={onUpload} showUpload={false} onShowAll={() => document.getElementById('module-verdicts')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+      <TopPicksCard insights={insights} onUpload={onUpload} showUpload={false} onRequest={onRequestText && requestText ? () => onRequestText(requestText) : undefined} onShowAll={() => document.getElementById('module-verdicts')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
 
       {/* 1. 서류 올리기 */}
       <Surface className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
@@ -196,6 +201,7 @@ export default function ClientSmartTab({
                   <Badge tone={TONE[ins.tone]}>{INSIGHT_TONE_LABEL[ins.tone]}</Badge>
                 </div>
                 <p className="t-body break-keep font-semibold text-slate-800 [overflow-wrap:anywhere]">{ins.headline}</p>
+                {ins.amount && <p className="t-sub font-bold break-keep text-success-700" data-testid="smart-insight-amount">{ins.amount}</p>}
                 {ins.detail && <p className="t-sub break-keep text-slate-600 [overflow-wrap:anywhere]">{ins.detail}</p>}
                 {ins.missing.length > 0 && (
                   <p className="t-sub flex flex-wrap items-center gap-1.5 text-slate-600">

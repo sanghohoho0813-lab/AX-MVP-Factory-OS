@@ -50,6 +50,8 @@ import { parseFinancialStatement } from '../finStatementParser'
 import { looksLikeCretop, looksLikeRoster } from '../docAutoAnalyze'
 import { buildInsights, cardRecoChips, isPick, missingForPicks, recoScore, recommendNextSteps, topPicks, type Insight } from '../clientInsights'
 import { sortClients } from '../clientOpsSort'
+import { recoRequestMessage, requestItemsFrom } from '../recoRequest'
+import { manwonText } from '../clientInsights'
 import { ADVISOR_GROUPS, ALL_QUESTIONS, answerFor, answerText, matchQuestion } from '../clientAdvisor'
 import { classifyDocument } from '../docClassify'
 import { NOTE_BIZNO_CHECK, NOTE_DIFFERS, NOTE_FROM_PHOTO, applyNewClientGuess, guessNewClientFromDocs, looksLikeCretopForNewClient } from '../newClientFromDocs'
@@ -811,6 +813,38 @@ await (async () => {
   const scores = new Map([['s1', 1], ['s2', 5], ['s3', 9], ['s4', 3]])
   check('D-190 추천 많은 순: 점수 높은 곳 위로 · 계약 끝난 곳은 점수가 높아도 맨 뒤', sortClients([a1, a2, a3, a4], 'reco', T, scores).map((r) => r.id).join() === 's2,s4,s1,s3')
   check('D-190 추천 많은 순: 점수를 아직 모르면 0점으로(멈추지 않음)', sortClients([a1, a2], 'reco', T).length === 2)
+}
+
+// D-191: 추천에 금액(엔진이 계산한 것만) · 빠진 자료 → 고객 요청 문구
+{
+  check('D-191 금액 글: 만원 · 억원 · 0이면 빈 글', manwonText(14_400_000) === '1,440만원' && manwonText(120_000_000) === '1.2억원' && manwonText(0) === '')
+  const T = '2026-10-13'
+  const base = normalizeClientOps({ id: 'amt1', companyName: '금액정밀', establishedAt: '2024-03-02', businessCategory: '제조업', businessAddress: '경기도 화성시 동탄대로 1', contactName: '박대표', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  const roster = (data: Record<string, unknown>, summary: string) => ({ id: 'tr-emp', toolKey: 'employment', title: '4대보험 명부 진단', verdict: 'candidates', verdictLabel: '후보 지원금 2건 · 확인 항목 1', summary, data: { tab: 'roster', ...data }, deadlines: [], createdAt: '2026-10-10T00:00:00.000Z', publishedUpdateId: null })
+  const withRoster = normalizeClientOps({ ...base, toolResults: [roster({ subsidyTotal: 14_400_000 }, '[4대보험 명부 진단] 8명')] } as never)
+  const emp = buildInsights(withRoster, T, []).find((i) => i.key === 'employment')
+  check('D-191 고용지원금: 명부 진단이 계산한 최대 지원금 → "최대 1,440만원 검토(1차 추정)"', emp?.tone === 'good' && emp?.amount === '최대 1,440만원 검토(1차 추정)', JSON.stringify(emp))
+  const oldRoster = normalizeClientOps({ ...base, toolResults: [roster({}, '[4대보험 명부 진단] 8명\n조건 충족 시 최대 720만원 검토 가능성(1차 추정)')] } as never)
+  check('D-191 고용지원금: 옛 결과(금액 칸 없음)는 요약 글의 "최대 n만원"', buildInsights(oldRoster, T, []).find((i) => i.key === 'employment')?.amount === '최대 720만원 검토(1차 추정)')
+  const noAmt = normalizeClientOps({ ...base, toolResults: [roster({}, '[4대보험 명부 진단] 8명')] } as never)
+  check('D-191 고용지원금: 금액을 모르면 짐작하지 않음(없음)', buildInsights(noAmt, T, []).find((i) => i.key === 'employment')?.amount === undefined)
+  const lab = normalizeClientOps({ ...base, toolResults: [{ id: 'tr-lab', toolKey: 'labcare', title: '세액공제 예상', verdict: null, verdictLabel: '연간 약 2,500만원', summary: '연구개발비 1억', data: { kind: 'tax', estimate: { annual: 25_000_000 } }, deadlines: [], createdAt: '2026-10-10T00:00:00.000Z', publishedUpdateId: null }] } as never)
+  check('D-191 연구소: 세액공제 계산이 붙어 있으면 "세액공제 연간 약 2,500만원"', buildInsights(lab, T, []).find((i) => i.key === 'labcare')?.amount === '세액공제 연간 약 2,500만원')
+  check('D-191 정책자금 · 창업감면 · 절세는 금액을 지어내지 않음', buildInsights(withRoster, T, []).filter((i) => ['policy-funding', 'startup-tax', 'tax'].includes(i.key)).every((i) => i.amount === undefined))
+
+  const mk = (key: string, label: string, tone: Insight['tone'], missing: string[]): Insight => ({ key, label, tone, headline: '', detail: '', missing, openPath: '', openLabel: '', action: null })
+  const ins = [mk('employment', '고용지원금', 'need', ['4대보험 가입자 명부']), mk('cretop', '크레탑', 'need', ['크레탑 기업종합보고서']), mk('tax', '절세 설계', 'need', ['주주명부', '대표 급여']), mk('policy-funding', '정책자금', 'need', ['설립일', '업종']), mk('startup-tax', '창업감면', 'need', ['설립일(창업일)', '대표 생년월일']), mk('grants', '지원사업', 'good', ['직원 수'])]
+  const r = requestItemsFrom(ins)
+  check('D-191 요청 자료: 크레탑은 우리가 조회 — 고객 요청에서 빼고 따로', r.ours.join() === '크레탑 기업종합보고서' && !r.items.some((x) => /크레탑/.test(x.label)))
+  const reg = r.items.find((x) => x.label === '사업자등록증 사본')
+  check('D-191 요청 자료: 설립일 · 업종 · 창업일은 사업자등록증 하나로 묶고 어느 모듈 때문인지', !!reg && reg.for.join() === '정책자금,창업감면' && r.items.filter((x) => x.label === '사업자등록증 사본').length === 1, JSON.stringify(r.items))
+  check('D-191 요청 자료: 판정이 이미 나온 모듈(지원사업)의 항목은 받지 않음', !r.items.some((x) => x.for.includes('지원사업')))
+  const msg = recoRequestMessage(base, ins)
+  check('D-191 요청 문구: 대표님 · 회사 이름 · 번호 · 어디서 떼는지 · 무엇 확인용', msg.startsWith('안녕하세요, 박대표 대표님.') && msg.includes('금액정밀에 맞는 지원 제도') && /1\. 4대보험 사업장 가입자 명부 — 고용지원금 확인용/.test(msg) && msg.includes('4insure.or.kr') && msg.includes('홈택스'), msg)
+  check('D-191 요청 문구: 주민등록번호를 달라고 하지 않음 · 크레탑 없음', !/주민등록번호를 (보내|알려)/.test(msg) && msg.includes('주민등록번호는 받지 않습니다') && !msg.includes('크레탑'))
+  const cert = requestItemsFrom([mk('cert-os', '기업인증', 'need', ['연구조직', '연구개발비', '매출 · 재무', '특허 등록 여부'])]).items
+  check('D-191 기업인증 빠진 항목도 고객이 알아듣는 서류 이름 · 어디서(연구소 인정서 · 연구개발비 · 재무제표 · 특허)', cert.map((x) => x.label).join() === '연구소(전담부서) 인정서,연구개발비 · 하고 있는 연구 내용,최근 재무제표(표준재무제표증명),특허 · 상표 등록 현황' && cert.every((x) => x.where !== ''), JSON.stringify(cert))
+  check('D-191 받을 것이 없으면 빈 문구(단추 없음)', recoRequestMessage(base, [mk('grants', '지원사업', 'good', [])]) === '')
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

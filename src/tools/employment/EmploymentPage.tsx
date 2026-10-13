@@ -785,6 +785,8 @@ function RosterTab() {
                     company: form.company,
                     counts: analysis.counts,
                     subsidySummary: analysis.subsidySummary.map((s) => ({ key: s.key, name: s.name, candidateCount: s.candidateCount, level: s.level })),
+                    // D-191: 최대 예상 지원금(원) — 업체 상세 '먼저 제안할 것' 에 금액으로
+                    subsidyTotal: estimateSubsidyTotal(analysis.subsidySummary),
                     estimate,
                     issueDate: meta?.issueDate ?? null,
                     employees: analysis.rows.map((r) => ({ name: r.emp.name, age: r.diag.age, candidates: r.diag.candidates.map((c) => `${c.key}:${c.level}`) })),
