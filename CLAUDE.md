@@ -42,7 +42,7 @@ npm run qa:todos  -- http://localhost:4390
 npm run e2e:mobile -- http://localhost:4390
 npm run qa:sales  -- http://localhost:4390         # 영업 관리(보드 · 잠재고객 · 계약 고객 숫자)
 npm run qa:journey -- http://localhost:4390        # 영업 흐름(크레탑 → 잠재고객 → 미팅 준비 · 작업실 도구)
-npm run qa:easy -- http://localhost:4390           # 쉽고 튼튼하게(글자 크기 · 대비 · 머리줄 넘침 · 다음 약속 · 찾기 · 미팅 메모)
+npm run qa:easy -- http://localhost:4390           # 쉽고 튼튼하게(글자 크기 · 대비 · 머리줄 넘침 · 다음 약속 · 찾기 · 미팅 메모 · 목차 접기 · 목차 설명 ⓘ · 모두 펼치기)
 npm run qa:steady -- http://localhost:4390         # 튼튼하게(저장 실패해도 적은 것 남음 · 삭제는 한 번 더 묻기)
 npm run qa:flow -- http://localhost:4390           # 흐름 잇기(계약 완료 한 번에 · 상태 하나 · 미팅 → 서류함 · 오늘 돈 줄)
 npm run qa:real -- http://localhost:4390           # 실제 데이터처럼(긴 이름 · 많은 항목 · 360~430 · 큰 글자에서 잘림 · 넘침 0)

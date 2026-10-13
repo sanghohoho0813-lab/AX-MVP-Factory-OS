@@ -60,9 +60,12 @@ export function ContractCard({
   today,
   onSave,
   onPlan,
+  hideTitle = false,
 }: {
   record: ClientOpsRecord
   today: string
+  /** D-192: 바깥 접는 목차가 제목 · 테두리를 그린다 */
+  hideTitle?: boolean
   onSave: (next: ContractInfo) => void | boolean | Promise<boolean | void>
   /** D-140: 계약금액 중 아직 수금 계획이 없는 돈 → '계약 · 수금 한 번에' 로 (차이만큼 아무 날짜로 넣지 않는다) */
   onPlan?: () => void
@@ -75,9 +78,9 @@ export function ContractCard({
   const gap = contractGap(record)
 
   return (
-    <section data-testid="contract-card" className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5">
-      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
-        <h2 className="t-section text-slate-900">계약</h2>
+    <section data-testid="contract-card" className={hideTitle ? '' : 'rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5'}>
+      <div className={`flex flex-wrap items-start gap-x-3 gap-y-2 ${hideTitle ? 'justify-end' : 'justify-between'}`}>
+        {!hideTitle && <h2 className="t-section text-slate-900">계약</h2>}
         <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
           <Pencil aria-hidden="true" className="size-3.5" />
           {s.hasAny ? '계약 고치기' : '계약 정보 적기'}

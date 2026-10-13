@@ -75,6 +75,8 @@ import { SALES_STAGE_LABEL, SALES_STAGE_ORDER, type ClientOpsRecord, type SalesS
 import { josa } from '../../lib/josa'
 import { SALES_SIMPLE } from '../../config/salesSimple'
 import { DirectPickPanel } from '../../components/sales/DirectPickPanel'
+import { HintTip } from '../../components/ui/fold'
+import { hintFor } from '../../content/sectionHints'
 
 /** D-167: 1차 미팅 준비 방법 — 고른 쪽을 이 브라우저에 남긴다(크레탑을 안 쓰는 사람은 매번 고르지 않게) */
 const PREP_MODE_KEY = 'axmvp.ui.meeting_prep_mode'
@@ -407,10 +409,12 @@ function MeetingRecorder({ record, round, today, onSave, onNextRound }: { record
 
   return (
     <section aria-label="미팅 기록" data-testid="meeting-recorder" className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5">
-      <h2 className="t-section flex items-center gap-2 text-slate-900">
-        <NotebookPen aria-hidden="true" className="size-5 text-brand-600" />
-        {roundNo}차 미팅 기록
-      </h2>
+      <HintTip tip={hintFor('미팅 기록')} label={`${roundNo}차 미팅 기록`}>
+        <h2 className="t-section flex items-center gap-2 text-slate-900">
+          <NotebookPen aria-hidden="true" className="size-5 text-brand-600" />
+          {roundNo}차 미팅 기록
+        </h2>
+      </HintTip>
       <label className="block text-[0.875rem] text-slate-500">
         미팅에서 나온 말 · 메모
         <textarea
@@ -779,11 +783,13 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                   {prepMode === 'direct' && <DirectPickPanel record={record} onSave={(n, m) => persist(n, m)} />}
                   {/* D-121: 1차 미팅 준비 = 크레탑 분석기 그대로(단독 판매 부품) — 분석하면 이 업체에 바로 반영 */}
                   {prepMode === 'cretop' && <section aria-label="크레탑 분석기" data-testid="meeting-cretop" className="flex flex-col gap-2">
-                    <h2 className="t-section flex items-center gap-2 text-slate-900">
-                      <ScanSearch aria-hidden="true" className="size-5 text-brand-600" />
-                      크레탑 분석기
-                      <span className="t-sub font-medium text-slate-500">· 1차 미팅 준비</span>
-                    </h2>
+                    <HintTip tip={hintFor('크레탑 분석기')} label="크레탑 분석기">
+                      <h2 className="t-section flex items-center gap-2 text-slate-900">
+                        <ScanSearch aria-hidden="true" className="size-5 text-brand-600" />
+                        크레탑 분석기
+                        <span className="t-sub font-medium text-slate-500">· 1차 미팅 준비</span>
+                      </h2>
+                    </HintTip>
                     <ToolClientScope workspaceId={workspaceId} client={record}>
                       <CretopWorkbench
                         embedded
@@ -951,9 +957,11 @@ function LaterRoundPlan({ record, item, round, onGoFirst }: { record: ClientOpsR
   const prep = record.sales?.contractPrep?.length ?? 0
   const followUp = (
     <section aria-label="이어서 물을 것" className="flex flex-col gap-2">
+      <HintTip tip={hintFor('이어서 물을 것')} label="이어서 물을 것">
       <h2 className="t-section text-slate-900">
         이어서 물을 것 <span className="t-sub font-medium text-slate-500">· 크레탑 전략 {round === 2 ? 'D 제안 연결' : 'E 다음 액션'}</span>
       </h2>
+      </HintTip>
       <CretopFollowUp record={record} round={round} onGoFirst={onGoFirst} />
     </section>
   )
@@ -1044,7 +1052,9 @@ function PrevMeetingPoints({ record, round }: { record: ClientOpsRecord; round: 
   if (prev.length === 0) return null
   return (
     <section aria-label="앞 미팅에서 적은 것" data-testid="meeting-prev-points" className="flex flex-col gap-2 rounded-(--radius-panel) border border-brand-200 bg-brand-50/40 p-4">
-      <h2 className="t-section text-slate-900">앞 미팅에서 적은 것 <span className="t-sub font-medium text-slate-500">· 이걸 짚고 시작</span></h2>
+      <HintTip tip={hintFor('앞 미팅에서 적은 것')} label="앞 미팅에서 적은 것">
+        <h2 className="t-section text-slate-900">앞 미팅에서 적은 것 <span className="t-sub font-medium text-slate-500">· 이걸 짚고 시작</span></h2>
+      </HintTip>
       {prev.map((m) => (
         <div key={m.id} className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white p-3">
           <p className="t-meta font-semibold text-slate-500">{m.roundNo ?? m.round}차 · {localDateOf(m.at)}{m.reaction ? ` · ${m.reaction}` : ''}</p>

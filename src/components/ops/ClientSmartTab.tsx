@@ -13,7 +13,7 @@
  */
 import { useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, CalendarPlus, Check, CircleAlert, FileUp, Sparkles } from 'lucide-react'
+import { ArrowRight, CalendarPlus, Check, CircleAlert, FileUp } from 'lucide-react'
 import type { ClientOpsRecord, OpsAlert } from '../../types/clientOps'
 import { Button } from '../ui/Button'
 import { Badge, Section, Surface, type Tone } from '../ui/primitives'
@@ -22,6 +22,8 @@ import { FactInboxCard } from './ClientFactsCards'
 import { ClientAdvisor } from './ClientAdvisor'
 import { ClientGrantsCard } from '../grants/ClientGrantsCard'
 import { TopPicksCard } from './ClientTopPicks'
+import { Fold, FoldAllButton, HintTip, openFold } from '../ui/fold'
+import { hintFor } from '../../content/sectionHints'
 import { recoRequestMessage } from '../../services/recoRequest'
 import { useGrantData } from '../grants/useGrants'
 import { useEntitlements } from '../../lib/entitlementsStore'
@@ -90,7 +92,6 @@ export default function ClientSmartTab({
   )
   const feeToSet = useMemo(() => activeApplications(record).filter((a) => applyStage(a) === 'selected').map((a) => a.programName || '지원사업'), [record])
   const steps = useMemo(() => recommendNextSteps(insights, pending, shelf, applying, feeToSet), [insights, pending, shelf, applying, feeToSet])
-  const good = insights.filter((i) => i.tone === 'good').length
   const requestText = useMemo(() => recoRequestMessage(record, insights), [record, insights])
   // D-158: 확인할 것 — 이 업체 것만(자료에서 읽은 정보는 위 '확인이 필요한 정보' 칸이 맡는다)
   const decisions = useMemo(() => buildDecisions(record, today, notices, usable).filter((d) => d.kind !== 'fact'), [record, today, notices, ent]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -107,22 +108,25 @@ export default function ClientSmartTab({
   const setNext = (text: string) => void onCommit(withNextAction(record, text, addDaysLocal(today, 3)), `다음 약속으로 걸었습니다 — ${text.slice(0, 30)}`)
 
   return (
-    <div className="flex flex-col gap-5" data-testid="smart-tab">
+    <div className="flex flex-col gap-4" data-testid="smart-tab">
       {/* 0. D-190: 먼저 제안할 것 — 아래 '모듈별 판정' 중 좋은 것 3개를 맨 위에 */}
-      <TopPicksCard insights={insights} onUpload={onUpload} showUpload={false} onRequest={onRequestText && requestText ? () => onRequestText(requestText) : undefined} onShowAll={() => document.getElementById('module-verdicts')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+      <TopPicksCard insights={insights} onUpload={onUpload} showUpload={false} onRequest={onRequestText && requestText ? () => onRequestText(requestText) : undefined} onShowAll={() => {
+          openFold('smart.verdicts')
+          window.setTimeout(() => document.getElementById('module-verdicts')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+        }} />
 
-      {/* 1. 서류 올리기 */}
-      <Surface className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
-          <FileUp aria-hidden="true" className="mt-0.5 size-6 shrink-0 text-brand-600" />
-          <div className="min-w-0">
-            <p className="t-card font-bold break-keep text-slate-900">서류만 올리면 저절로 분석해요</p>
-            <p className="t-sub break-keep text-slate-600">
-              사업자등록증 · 등기 · 크레탑 보고서 · 4대보험 명부 · 인증서를 파일이나 폴더째 넣으면 회사 정보를 채우고, 아래 판정이 바로 바뀝니다.
-            </p>
-          </div>
-        </div>
-        <Button variant="primary" onClick={onUpload} data-testid="smart-upload" className="self-start sm:self-center">
+      {/* D-192: 아래 목차는 접어 두고 제목 줄만 — 한 번에 펼치거나 접기(맨 위 '먼저 제안할 것' 은 그대로 맨 위) */}
+      <FoldAllButton className="-my-2 self-end" />
+
+      {/* 1. 서류 올리기 — D-192: 설명 글은 ⓘ 로, 한 줄만 */}
+      <Surface className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 sm:py-3">
+        <HintTip tip={hintFor('서류만 올리면 저절로 분석해요')} label="서류만 올리면 저절로 분석해요" className="min-w-0 flex-1">
+          <p className="t-card flex min-w-0 items-center gap-2 font-bold break-keep text-slate-900">
+            <FileUp aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
+            서류만 올리면 저절로 분석해요
+          </p>
+        </HintTip>
+        <Button variant="primary" onClick={onUpload} data-testid="smart-upload">
           <FileUp aria-hidden="true" className="size-4" /> 서류 올리기
         </Button>
       </Surface>
@@ -135,7 +139,7 @@ export default function ClientSmartTab({
 
       {/* 3-1. D-158: 프로그램이 준비한 것 — 맞다 · 아니다만(정보 확인은 위 칸이 맡는다) */}
       {decisions.length > 0 && (
-        <Section title="프로그램이 준비했어요 — 맞나요?" count={decisions.length}>
+        <Section title="프로그램이 준비했어요 — 맞나요?" count={decisions.length} fold={{ id: 'smart.decisions' }}>
           <div data-testid="smart-decisions">
             <DecisionList decisions={decisions} busy={busy} showClient={false} linked={(id) => !!linkOf(id)} onAnswer={(d, a) => void answer(d, a)} />
           </div>
@@ -143,7 +147,7 @@ export default function ClientSmartTab({
       )}
 
       {/* 4. 다음 행동 */}
-      <Section title="다음 행동 추천" count={steps.length}>
+      <Section title="다음 행동 추천" count={steps.length} fold={{ id: 'smart.steps', open: true }}>
         {steps.length === 0 ? (
           <p className="t-sub break-keep text-slate-500">지금 추천할 행동이 없어요. 서류를 올리면 판정이 나오고 할 일을 골라 드려요.</p>
         ) : (
@@ -185,13 +189,15 @@ export default function ClientSmartTab({
         )}
       </Section>
 
-      {/* 4-1. 맞춤 상담(D-145) — 목차에서 고르거나 직접 묻기 · 이 회사 기록 · 모듈 판정으로 답한다 */}
-      <ClientAdvisor record={record} today={today} notices={notices} insights={insights} onSetNext={setNext} />
+      {/* 4-1. 맞춤 상담(D-145) — 목차에서 고르거나 직접 묻기 · 이 회사 기록 · 모듈 판정으로 답한다. D-192: 접어 둔다 */}
+      <Fold id="smart.advisor" title="맞춤 상담">
+        <ClientAdvisor record={record} today={today} notices={notices} insights={insights} onSetNext={setNext} bare />
+      </Fold>
 
       {/* 5. 모듈별 판정 */}
       <div id="module-verdicts" className="scroll-mt-32">
-      <Section title="모듈별 판정" count={good}>
-        <p className="t-sub -mt-1 break-keep text-slate-500">업체 정보로 각 모듈을 미리 돌려 본 결과예요 — 모듈을 따로 열지 않아도 됩니다. 규칙으로 계산한 1차 판정이며 선정 · 승인을 보장하지 않아요.</p>
+      {/* D-192: 위 '먼저 제안할 것' 이 좋은 것 3개를 보여 준다 — 전부는 접어 둔다(설명은 ⓘ) */}
+      <Section title="모듈별 판정" count={insights.length} fold={{ id: 'smart.verdicts' }}>
         <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2" data-testid="smart-insights">
           {insights.map((ins) => (
             <li key={ins.key} data-testid="smart-insight" data-key={ins.key} data-tone={ins.tone}>
@@ -225,7 +231,7 @@ export default function ClientSmartTab({
 
       {/* 6. 지금 챙길 것 */}
       {alerts.length > 0 && (
-        <Section title="지금 챙길 것" count={alerts.length}>
+        <Section title="지금 챙길 것" count={alerts.length} fold={{ id: 'smart.alerts' }}>
           <ul className="flex flex-col gap-2" data-testid="smart-alerts">
             {alerts.slice(0, 6).map((a) => (
               <AlertRow key={a.id} alert={a} hideClient onOpen={() => onAlertOpen(a)} />
@@ -235,7 +241,7 @@ export default function ClientSmartTab({
       )}
 
       {/* 7. 맞는 지원사업 */}
-      <ClientGrantsCard workspaceId={workspaceId} record={record} today={today} onFill={onFill} onCommit={onCommit} />
+      <ClientGrantsCard workspaceId={workspaceId} record={record} today={today} onFill={onFill} onCommit={onCommit} fold={{ id: 'smart.grants' }} />
     </div>
   )
 }
@@ -243,14 +249,16 @@ export default function ClientSmartTab({
 function BatchSummary({ batch, fresh }: { batch: DocBatchSummary; fresh: boolean }) {
   const when = batch.at ? new Date(batch.at) : null
   const time = when ? (fresh ? when.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' }) : when.toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })) : ''
+  // D-192: 방금 올린 것은 펼쳐 두고, 지난번 것은 접어 둔다(한 줄 제목만)
   return (
     <div data-testid="smart-batch" data-fresh={fresh ? '1' : '0'}>
+    <Fold
+      id={fresh ? 'smart.batch.fresh' : 'smart.batch.last'}
+      title={fresh ? `방금 올린 서류 ${batch.files}개를 읽었어요` : `지난번에 올린 서류 ${batch.files}개`}
+      defaultOpen={fresh}
+      action={time ? <span className="t-meta text-slate-500">{time}</span> : undefined}
+    >
     <Surface edge="success" showEdge className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <Sparkles aria-hidden="true" className="size-5 text-success-600" />
-        <h2 className="t-card font-bold text-slate-900">{fresh ? `방금 올린 서류 ${batch.files}개를 읽었어요` : `지난번에 올린 서류 ${batch.files}개`}</h2>
-        {time && <span className="t-meta text-slate-500">{time}</span>}
-      </div>
       {batch.entered.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <p className="t-sub font-semibold text-success-700">바로 넣은 정보 {batch.entered.length}건</p>
@@ -327,6 +335,7 @@ function BatchSummary({ batch, fresh }: { batch: DocBatchSummary; fresh: boolean
         <p className="t-sub break-keep text-slate-500">이 서류에서는 회사 정보를 더 찾지 못했어요 — 서류함에 잘 올라갔어요.</p>
       )}
     </Surface>
+    </Fold>
     </div>
   )
 }

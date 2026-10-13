@@ -25,6 +25,8 @@ import { MetricTile } from '../ui/primitives'
 import { AmountField, DueDateField, parseAmount } from './opsControls'
 import { ContractPlanSheet } from './ContractPlanSheet'
 import { useIsPilot } from '../../auth/osAccess'
+import { HintTip } from '../ui/fold'
+import { hintFor } from '../../content/sectionHints'
 
 const STATE_CLASS: Record<FeeState, string> = {
   received: 'border-success-200 bg-success-50 text-success-800',
@@ -333,9 +335,11 @@ export function FeesPanel({
   return (
     <section aria-labelledby="fees" className="flex flex-col gap-3" data-testid="fees-panel">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="fees" className="text-[1.3rem] font-bold text-slate-900">
-          계약 · 수금
-        </h2>
+        <HintTip tip={hintFor('계약 · 수금')} label="계약 · 수금">
+          <h2 id="fees" className="text-[1.3rem] font-bold text-slate-900">
+            계약 · 수금
+          </h2>
+        </HintTip>
         {!empty && (
           <Button onClick={() => setPlanOpen(true)} data-testid="plan-open">
             계약 · 수금 한 번에

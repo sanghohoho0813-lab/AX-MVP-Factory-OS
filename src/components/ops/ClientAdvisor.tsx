@@ -55,12 +55,14 @@ export function ClientAdvisor({
   notices,
   insights,
   onSetNext,
+  bare = false,
 }: {
   record: ClientOpsRecord
   today: string
   notices: readonly GrantNotice[]
   insights: Insight[]
   onSetNext: (text: string) => void
+  bare?: boolean
 }) {
   const { showToast } = useToast()
   const [turns, setTurns] = useState<Turn[]>(() => loadTurns(record.id))
@@ -86,13 +88,16 @@ export function ClientAdvisor({
 
   return (
     <section aria-labelledby="advisor-title" className="flex flex-col gap-3" data-testid="advisor">
-      <div className="flex flex-wrap items-center gap-2">
-        <MessageCircleQuestion aria-hidden="true" className="size-5 text-brand-600" />
-        <h2 id="advisor-title" className="text-[1.15rem] font-bold text-slate-900">
-          맞춤 상담
-        </h2>
-        <span className="t-sub text-slate-500">— {record.companyName || '이 회사'} 기록으로 답해요</span>
-      </div>
+      {/* D-192: 접는 목차 안에 넣을 때는 제목 줄을 빼고 내용만(bare) */}
+      {!bare && (
+        <div className="flex flex-wrap items-center gap-2">
+          <MessageCircleQuestion aria-hidden="true" className="size-5 text-brand-600" />
+          <h2 id="advisor-title" className="text-[1.15rem] font-bold text-slate-900">
+            맞춤 상담
+          </h2>
+          <span className="t-sub text-slate-500">— {record.companyName || '이 회사'} 기록으로 답해요</span>
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         {/* 목차 */}
         <nav aria-label="상담 목차" className="flex flex-col gap-2" data-testid="advisor-toc">

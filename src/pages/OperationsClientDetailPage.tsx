@@ -85,7 +85,9 @@ import {
   contractStageOf,
   statusForStage,
 } from '../types/clientOps'
-import { contractAgeShort } from '../services/contractSummary'
+import { contractAgeShort, doneWorks, summarizeContract } from '../services/contractSummary'
+import { Fold, FoldAllButton, HintTip, openFold } from '../components/ui/fold'
+import { hintFor } from '../content/sectionHints'
 import type {
   ClientOpsRecord,
   ContractStage,
@@ -106,7 +108,7 @@ import {
   SavedBadge,
 } from '../components/ops/opsControls'
 import { CompanyProfileCard, NotesSection } from '../components/ops/opsProfile'
-import { FactNumbersCard } from '../components/ops/ClientFactsCards'
+import { FactNumbersCard, factNumbersCount } from '../components/ops/ClientFactsCards'
 import type { DocBatchSummary } from '../services/docAutoAnalyze'
 import { analyzeUploadedDocs } from '../services/docAutoAnalyze'
 import { pendingFacts } from '../services/customerFacts'
@@ -436,7 +438,13 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
     const SEV: Record<string, number> = { critical: 0, warning: 1, info: 2 }
     return (record ? buildClientAlerts(record, today) : []).sort((a, b) => (SEV[a.severity] ?? 3) - (SEV[b.severity] ?? 3) || (a.daysLeft ?? 999) - (b.daysLeft ?? 999))
   }, [record, today])
-  /** 개요에서 경고를 전부 펼쳤는지 */
+  /** D-192: 접힌 목차 옆 숫자 · 한 줄 요약 */
+  const factCount = useMemo(() => (record ? factNumbersCount(record) : { filled: 0, toConfirm: 0 }), [record])
+  const contractLine = useMemo(() => {
+    if (!record) return ''
+    const c = summarizeContract(record.contract, today)
+    return [c.kindLabel, c.moneyText, c.ageText].filter((v) => v !== '').join(' · ')
+  }, [record, today])
 
   /** 다음 행동이 늦었는지 — 늦었을 때만 색을 쓴다 */
   const nextActionDaysLeft = record?.nextActionDueDate ? daysLeftFrom(today, record.nextActionDueDate) : null
@@ -761,6 +769,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             text,
           })}
           onShowAll={() => {
+            openFold('smart.verdicts')
             setTab('smart')
             window.setTimeout(() => document.getElementById('module-verdicts')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 350)
           }}
@@ -770,23 +779,34 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         D-144: 그다음 회사 정보 — 업체를 여는 이유의 절반은 "사업자번호가 뭐였지 · 설립이 몇 년도지" 다.
         지금 챙길 것 · 맞는 지원사업 · 확인할 정보는 '맞춤 추천' 탭으로 옮겼다(여기는 한 줄로 알려만 준다).
       */}
-      <div data-testid="overview-company">
-      <Surface>
-        <CompanyProfileCard
-          record={record}
-          today={today}
-          onImport={() => setImportOpen(true)}
-          factNote={(key) => factNoteFor(record, key)}
-          onEdit={(key, value) => void commit(withProfileFieldEdit(record, key, value, nowIso()))}
-          onCustomField={(field) => void commit(withCustomField(record, field))}
-          onRemoveCustomField={(id) => void commit(withoutCustomField(record, id))}
-          bare
-        />
+      <FoldAllButton className="-my-2 self-end" />
+      {/* D-192: 카드마다 접는 목차 — 제목 줄(▸ · 숫자 · 한 줄 요약)만 보이고, 마우스를 올리면 무슨 칸인지. 회사 정보만 펼친 채로 */}
+      <div data-testid="overview-company" className="flex flex-col gap-3">
+        <Fold panel id="overview.company" title="회사 기본 정보" defaultOpen testId="fold-company">
+          <CompanyProfileCard
+            record={record}
+            today={today}
+            onImport={() => setImportOpen(true)}
+            factNote={(key) => factNoteFor(record, key)}
+            onEdit={(key, value) => void commit(withProfileFieldEdit(record, key, value, nowIso()))}
+            onCustomField={(field) => void commit(withCustomField(record, field))}
+            onRemoveCustomField={(id) => void commit(withoutCustomField(record, id))}
+            bare
+            hideTitle
+          />
+        </Fold>
         {/* D-128: 업체 칸이 없던 사실(매출 · 영업이익 · 인증 …) — 출처와 확인 상태가 한 줄로 */}
-        <div className="mt-4 border-t border-slate-200 pt-4">
-          <FactNumbersCard record={record} now={nowIso()} onCommit={async (next, msg) => { if (await commit(next)) showToast(msg) }} />
-        </div>
-      </Surface>
+        <Fold
+          panel
+          id="overview.numbers"
+          title="숫자 · 인증"
+          testId="fold-numbers"
+          count={factCount.filled}
+          countTone={factCount.toConfirm > 0 ? 'warning' : 'neutral'}
+          summary={factCount.toConfirm > 0 ? `확인할 숫자 ${factCount.toConfirm}개` : undefined}
+        >
+          <FactNumbersCard record={record} now={nowIso()} hideTitle onCommit={async (next, msg) => { if (await commit(next)) showToast(msg) }} />
+        </Fold>
       </div>
 
       {(pendingFacts(record).length > 0 || alerts.length > 0) && (
@@ -908,24 +928,25 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       <ClientSalesCard record={record} onSave={(next) => void commit(next)} onContract={openClose} />
 
       {/* D-124: 계약 전(잠재고객)이고 적힌 계약 정보도 없으면 빈 계약 카드를 띄우지 않는다 — 계약은 영업 카드의 '계약 완료' 에서 */}
-      {(!isProspect(record) || hasContractInfo(record)) && <ContractCard
-        record={record}
-        today={today}
-        onSave={(next) => commit(withContract(record, next))}
-        onPlan={() => setPlanOpen(true)}
-      />}
+      {(!isProspect(record) || hasContractInfo(record)) && (
+        <Fold panel id="overview.contract" title="계약" testId="fold-contract" summary={contractLine || '아직 적은 계약 정보가 없습니다'}>
+          <ContractCard record={record} today={today} hideTitle onSave={(next) => commit(withContract(record, next))} onPlan={() => setPlanOpen(true)} />
+        </Fold>
+      )}
       {planOpen && <ContractPlanSheet record={record} today={today} onSave={commit} onClose={() => setPlanOpen(false)} />}
 
-      <WorkHistoryCard record={record} onOpen={(key) => setTab('work', key)} />
+      <Fold panel id="overview.history" title="해 드린 일" testId="fold-history" count={doneWorks(record).length} countTone="brand">
+        <WorkHistoryCard record={record} hideTitle onOpen={(key) => setTab('work', key)} />
+      </Fold>
 
       {/* 도구함에서 붙인 결과 — 창업감면 판정·크레탑 분석·정책자금 진단 … (D-88) */}
-      <ToolResultsCard record={record} onChange={(next) => void commit(next)} />
+      <ToolResultsCard record={record} fold={{ id: 'overview.results', panel: true }} onChange={(next) => void commit(next)} />
 
       {/* 이 업체로 도구 열기 — 결과가 다시 여기로 돌아온다 (D-89). 없는 서류는 여기서 빨갛게 (D-90) */}
-      <ClientToolsCard record={record} today={today} onOpenDocs={() => setTab('docs')} />
+      <ClientToolsCard record={record} today={today} fold={{ id: 'overview.tools', panel: true }} onOpenDocs={() => setTab('docs')} />
 
       {/* D-135: 이 업체와 이어진 AX 스튜디오 프로젝트 */}
-      <AxProjectsCard record={record} />
+      <AxProjectsCard record={record} fold={{ id: 'overview.ax', panel: true }} />
 
       {/* 3단계 — 나머지는 접어 둔다 */}
       <Disclosure
@@ -956,9 +977,11 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       {tab === 'work' && (
       <section aria-labelledby="svc" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="svc" className="t-section text-slate-900">
-            진행 업무
-          </h2>
+          <HintTip tip={hintFor('진행 업무')} label="진행 업무">
+            <h2 id="svc" className="t-section text-slate-900">
+              진행 업무
+            </h2>
+          </HintTip>
           <button
             type="button"
             onClick={() => setCatalogOpen(true)}
@@ -1208,11 +1231,13 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       {tab === 'docs' && (
       <section aria-labelledby="docs" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="docs" className="text-[1.3rem] font-bold text-slate-900">
-            서류함
-          </h2>
+          {/* D-192: '발급일을 넣으면 유효기간…' 설명은 목차 설명(ⓘ)으로 */}
+          <HintTip tip={hintFor('서류함')} label="서류함">
+            <h2 id="docs" className="text-[1.3rem] font-bold text-slate-900">
+              서류함
+            </h2>
+          </HintTip>
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-[0.9rem] text-slate-500">발급일을 넣으면 유효기간이 지났는지 자동으로 알려드립니다.</p>
             <Button variant="secondary" size="sm" onClick={() => { setBulkOpen(true); setBulkShow((n) => n + 1) }}>
               <FileUp aria-hidden="true" className="size-3.5" />
               한꺼번에 올리기
@@ -1257,7 +1282,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
         {!uploadable && (
           <p className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-4 py-3 text-[0.92rem] break-keep text-slate-600">
-            지금은 이 브라우저에만 저장되는 모드입니다. 받았는지 여부·발급일·보관 위치는 지금도 기록되고, 실제 파일 첨부는 클라우드 저장을 연결하면 켜집니다.
+            이 브라우저에만 저장 중 — 받음 · 발급일은 기록되고, 파일 첨부는 클라우드 연결 뒤에 켜집니다.
           </p>
         )}
 
@@ -1608,6 +1633,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               className={`mt-1 ${inputCls}`}
             />
           </label>
+          {/* D-192: '기본 서류에 없는 서류를…' 설명은 단추 옆 ⓘ 로 */}
+          <HintTip tip="기본 서류에 없는 서류 칸을 만듭니다. 유효기간을 넣으면 발급일 기준으로 만료를 알려 드립니다." label="서류 칸 추가">
           <Button
             variant="secondary"
             disabled={newDocLabel.trim() === ''}
@@ -1629,9 +1656,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             <Plus aria-hidden="true" className="size-4" />
             서류 칸 추가
           </Button>
-          <p className="t-sub w-full break-keep text-slate-500">
-            기본 서류에 없는 서류를 만들어 둡니다. 유효기간을 넣으면 발급일 기준으로 만료를 알려드립니다.
-          </p>
+          </HintTip>
         </div>
 
         {/* D-129: 예전 '파일' 탭 — 고객과 주고받은 파일 · 칸이 없어진 서류의 파일도 서류 탭 아래에서 */}
@@ -1957,20 +1982,23 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       {/* 업체 정보 — 개요 아래에 접어 둔다 */}
       {tab === 'overview' && (
       <section aria-labelledby="info" className="flex flex-col gap-3">
-        <h2 id="info" className="t-section text-slate-900">
-          <button
-            type="button"
-            onClick={() => setInfoOpen((v) => !v)}
-            aria-expanded={infoOpen}
-            className="tap inline-flex items-center gap-2"
-          >
-            <ChevronRight
-              aria-hidden="true"
-              className={`size-4 text-slate-400 transition-transform duration-200 ${infoOpen ? 'rotate-90' : ''}`}
-            />
-            업체 정보 수정
-          </button>
-        </h2>
+        {/* D-192: 목차에 마우스를 올리면 무슨 칸인지 */}
+        <HintTip tip={hintFor('업체 정보 수정')} label="업체 정보 수정">
+          <h2 id="info" className="t-section text-slate-900">
+            <button
+              type="button"
+              onClick={() => setInfoOpen((v) => !v)}
+              aria-expanded={infoOpen}
+              className="tap inline-flex min-h-11 items-center gap-1.5"
+            >
+              <ChevronRight
+                aria-hidden="true"
+                className={`size-5 text-slate-400 transition-transform duration-200 ${infoOpen ? 'rotate-90' : ''}`}
+              />
+              업체 정보 수정
+            </button>
+          </h2>
+        </HintTip>
         {/* 펼쳤을 때만 그린다 — 늘 펼쳐 두면 개요 화면이 입력폼으로 뒤덮인다 */}
         {infoOpen && (
         <Panel>

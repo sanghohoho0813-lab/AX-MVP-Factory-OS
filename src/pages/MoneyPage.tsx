@@ -41,6 +41,7 @@ import {
   withRate,
 } from '../services/finance/financeCore'
 import { listExpenses, listSubscriptions, loadSettings, removeExpense, removeSubscription, saveExpense, saveSettings, saveSubscription } from '../services/finance/financeStore'
+import { hintFor } from '../content/sectionHints'
 
 type Tab = 'revenue' | 'cost' | 'subs'
 
@@ -192,7 +193,7 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
 
       {tab === 'revenue' && (
         <>
-          <Section title={`${Number(ym.slice(5, 7))}월 매출`} count={sum.revenue.lines.length}>
+          <Section title={`${Number(ym.slice(5, 7))}월 매출`} hint={hintFor('매출 상세')} count={sum.revenue.lines.length}>
             {sum.revenue.lines.length === 0 ? (
               <Blank title={isPast ? '이 달에 들어온 돈이 없습니다.' : '이 달에 받을 돈이 없습니다. 업체 수금 탭에서 계약 · 수금을 적으면 여기 저절로 들어옵니다.'} />
             ) : (

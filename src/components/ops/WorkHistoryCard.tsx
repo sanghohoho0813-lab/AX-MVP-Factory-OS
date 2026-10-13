@@ -16,25 +16,30 @@ import { doneWorks } from '../../services/contractSummary'
 export function WorkHistoryCard({
   record,
   onOpen,
+  hideTitle = false,
 }: {
   record: ClientOpsRecord
   onOpen: (key: ServiceKey) => void
+  /** D-192: 바깥 접는 목차가 제목 · 테두리를 그린다 */
+  hideTitle?: boolean
 }) {
   const done = doneWorks(record)
 
   return (
-    <section className="rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="t-section text-slate-900">해 드린 일</h2>
-        {done.length > 0 && <span className="t-sub text-slate-500">끝낸 일 {done.length}건</span>}
-      </div>
+    <section data-testid="work-history" className={hideTitle ? '' : 'rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5'}>
+      {!hideTitle && (
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <h2 className="t-section text-slate-900">해 드린 일</h2>
+          {done.length > 0 && <span className="t-sub text-slate-500">끝낸 일 {done.length}건</span>}
+        </div>
+      )}
 
       {done.length === 0 ? (
-        <p className="t-sub mt-2 break-keep text-slate-500">
+        <p className={`t-sub break-keep text-slate-500 ${hideTitle ? '' : 'mt-2'}`}>
           아직 끝낸 일이 없습니다. 업무 탭에서 상태를 '완료' 로 바꾸면 여기에 쌓입니다.
         </p>
       ) : (
-        <ul className="mt-3 flex flex-col gap-1.5">
+        <ul className={`flex flex-col gap-1.5 ${hideTitle ? '' : 'mt-3'}`}>
           {done.map((w) => (
             <li key={w.key}>
               <button

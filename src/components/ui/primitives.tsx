@@ -20,6 +20,8 @@ import { useEffect, useId, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ChevronRight, X } from 'lucide-react'
 import { screenTitleForPath } from '../../config/moduleRegistry'
+import { hintFor } from '../../content/sectionHints'
+import { Fold, HintTip } from './fold'
 import { useBackToClose } from '../../lib/backToClose'
 
 /* ------------------------------------------------------------------ */
@@ -159,48 +161,68 @@ export function ScreenTitle({
   )
 }
 
-/** 구역 제목 + 오른쪽 보조 행동 (예: 모두 보기) */
+/** 구역 제목 + 오른쪽 보조 행동 (예: 모두 보기). D-192: 마우스를 올리거나 ⓘ 를 누르면 무슨 기능인지(사전) */
 export function SectionTitle({
   title,
   count,
   action,
   id,
+  hint,
 }: {
   title: string
   count?: number
   action?: ReactNode
   id?: string
+  hint?: string
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <h2 id={id} className="t-section flex items-center gap-2 break-keep text-slate-900">
-        {title}
-        {typeof count === 'number' && count > 0 && (
-          <span className="t-meta rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-500">{count}</span>
-        )}
-      </h2>
+      <HintTip tip={hint ?? hintFor(title)} label={title}>
+        <h2 id={id} className="t-section flex items-center gap-2 break-keep text-slate-900">
+          {title}
+          {typeof count === 'number' && count > 0 && (
+            <span className="t-meta rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-500">{count}</span>
+          )}
+        </h2>
+      </HintTip>
       {action}
     </div>
   )
 }
 
-/** 화면 구역 — 제목과 내용 사이 간격을 한 곳에서 정한다 */
+/**
+ * 화면 구역 — 제목과 내용 사이 간격을 한 곳에서 정한다.
+ * D-192: fold 를 주면 접는 목차(▸ 제목 줄만 보이고 누르면 펼침 · 이 기기에 기억).
+ */
 export function Section({
   title,
   count,
   action,
   children,
   className = '',
+  hint,
+  fold,
+  testId,
 }: {
   title?: string
   count?: number
   action?: ReactNode
   children: ReactNode
   className?: string
+  hint?: string
+  /** 접는 목차 — id 는 기억 열쇠, open 은 처음 펼침 여부 */
+  fold?: { id: string; open?: boolean; force?: boolean; panel?: boolean }
+  testId?: string
 }) {
+  if (fold && title)
+    return (
+      <Fold id={fold.id} title={title} hint={hint} count={count} defaultOpen={fold.open ?? false} forceOpen={fold.force} panel={fold.panel} action={action} className={className} testId={testId}>
+        <div className="flex flex-col gap-3">{children}</div>
+      </Fold>
+    )
   return (
-    <section className={`flex flex-col gap-3 ${className}`}>
-      {title && <SectionTitle title={title} count={count} action={action} />}
+    <section className={`flex flex-col gap-3 ${className}`} data-testid={testId}>
+      {title && <SectionTitle title={title} count={count} action={action} hint={hint} />}
       {children}
     </section>
   )
@@ -354,25 +376,30 @@ export function Disclosure({
 }) {
   const [open, setOpen] = useState(defaultOpen)
   const id = useId()
+  const longHint = !!hint && hint.length > 18
+  const tip = longHint ? hint : hintFor(title)
   return (
-    <div className="overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white">
+    <div className="rounded-(--radius-panel) border border-slate-200 bg-white">
+      <HintTip tip={tip} label={title} className="w-full pr-2">
+      {/* D-192: 한 줄로 — ▸ 제목 · 짧은 말(건수). 긴 설명은 ⓘ · 마우스를 올리면 */}
       <button
         type="button"
         aria-expanded={open}
         aria-controls={id}
         onClick={() => setOpen((v) => !v)}
-        className="tap flex w-full items-center gap-2 px-4 py-3.5 text-left sm:px-5"
+        className="tap flex min-h-12 w-full items-center gap-2 px-3 py-2 text-left sm:px-4"
       >
         <ChevronRight
           aria-hidden="true"
-          className={`size-4 shrink-0 text-slate-400 transition-transform duration-200 ${open ? 'rotate-90' : ''}`}
+          className={`size-5 shrink-0 text-slate-400 transition-transform duration-200 ${open ? 'rotate-90' : ''}`}
         />
-        <span className="min-w-0 flex-1">
-          <span className="t-card block break-keep text-slate-900">{title}</span>
-          {hint && !open && <span className="t-sub mt-0.5 block break-keep text-slate-500">{hint}</span>}
+        <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
+          <span className="t-card font-bold break-keep text-slate-900">{title}</span>
+          {hint && !open && !longHint && <span className="t-sub break-keep text-slate-500">{hint}</span>}
         </span>
         {badge}
       </button>
+      </HintTip>
       {open && (
         <div id={id} className="border-t border-slate-100 px-4 py-4 sm:px-5">
           {children}

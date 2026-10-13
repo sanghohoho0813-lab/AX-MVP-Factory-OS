@@ -207,7 +207,9 @@ check('업무 15개에서도 가로 스크롤 없음', of2.d <= of2.w + 1, `${of
   await page.waitForTimeout(800)
   const w = (await page.locator('main').innerText()) ?? ''
   check('해 드린 일: 카드가 있다', w.includes('해 드린 일'))
-  check('해 드린 일: 끝낸 건수를 센다', w.includes('끝낸 일 4건'), w.slice(0, 300))
+  // D-192: 접는 목차 '해 드린 일' 옆 숫자로 센다
+  const histHead = ((await page.getByTestId('fold-history').getByTestId('fold-toggle').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+  check('해 드린 일: 끝낸 건수를 센다(목차 옆 숫자)', histHead.includes('해 드린 일 4'), histHead)
   check('해 드린 일: 언제 끝냈는지 보인다', w.includes('2026-09-02') && w.includes('2024-11-08'))
   check('해 드린 일: 최근 것이 위', w.indexOf('2026-09-02') < w.indexOf('2024-11-08'))
   // '지금 하는 일' 은 맨 위 '지금 할 일' 카드에 이미 있다 — 여기서 되풀이하지 않는다

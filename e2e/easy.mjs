@@ -11,6 +11,8 @@
  *   5. 미팅 메모는 차수를 바꿔도 남고, 저장한 뒤에만 비워진다
  *   6. 설정 '고급 운영 기능 보기' 를 끄면(기본) 검증 · 기관 전략 · 사례가 목차에 없다
  *   7. 조건에 맞는 업체가 없으면 빈 화면 대신 안내
+ *   8. D-192 목차 — 처음엔 핵심만 펼치고 나머지는 접힘 · 목차에 마우스를 올리면(휴대폰은 ⓘ) 무슨 칸인지 ·
+ *      모두 펼치기/접기 · 이 기기에 기억 · 화면 목차 전부에 설명 · 휴대폰 넘침 0
  */
 
 import { chromium } from 'playwright'
@@ -240,6 +242,153 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(300)
   // D-158 · D-164: 서랍 · 머리줄 모두 글자 크기 단추 없음 — 설정 › 화면에만
   check('휴대폰: 서랍 · 머리줄에 글자 크기 단추 없음(설정에 있다)', (await page.getByTestId('text-scale-quick').count()) === 0)
+  await ctx.close()
+}
+
+/* ---- 5. D-192 목차 접기 · 목차 설명(PC) ---- */
+const clearFolds = (page) =>
+  page.evaluate(() => {
+    for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+      const k = localStorage.key(i)
+      if (k && k.startsWith('axmvp.fold.')) localStorage.removeItem(k)
+    }
+  })
+const foldState = (page, id) => page.evaluate((x) => document.querySelector(`[data-fold="${x}"]`)?.getAttribute('data-open') ?? 'none', id)
+/** 화면 목차(h2) 가운데 설명이 없는 것 — 달 이름처럼 목차가 아닌 글자는 뺀다 */
+const headsWithoutHint = (page) =>
+  page.evaluate(() => {
+    const main = document.querySelector('main') ?? document.body
+    return [...main.querySelectorAll('h2')]
+      .filter((h) => h.offsetParent && !h.closest('[role=dialog]') && !h.classList.contains('sr-only') && !h.querySelector('select'))
+      .filter((h) => !h.closest('.group\\/hint')?.querySelector('[data-testid=hint-tip]'))
+      .map((h) => h.innerText.trim().split('\n')[0])
+  })
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await clearFolds(page)
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+
+  // 오늘 — 마감 · 약속 · 확인할 것 · 빠른 기록(PC)은 펼침, 상담신청 · 영업 · 안부는 접힘
+  const today = {
+    agenda: await foldState(page, 'today.agenda'),
+    decide: await foldState(page, 'today.decide'),
+    capture: await foldState(page, 'today.capture'),
+    events: await foldState(page, 'today.events'),
+    sales: await foldState(page, 'today.sales'),
+    care: await foldState(page, 'today.care'),
+  }
+  check('D-192 오늘: 마감 · 약속 · 확인할 것 · 빠른 기록은 펼침, 상담신청 · 영업 · 안부는 접힘', today.agenda === '1' && today.decide === '1' && today.capture === '1' && today.events === '0' && today.sales === '0' && ['0', 'none'].includes(today.care), JSON.stringify(today))
+  check('D-192 오늘: 접힌 목차도 숫자는 보인다(상담신청 3)', ((await page.getByTestId('today-events').getByTestId('fold-toggle').innerText()) ?? '').replace(/\s+/g, ' ').includes('상담신청 3'))
+  check("D-192 오늘: 늘 깔리던 설명 글이 없다('프로그램이 먼저 준비했어요' 는 목차 설명으로)", !((await page.locator('main').innerText()) ?? '').includes('프로그램이 먼저 준비했어요'))
+
+  // 마우스를 올리면 설명 — 펼치기 전에 무슨 칸인지
+  const salesHead = page.getByTestId('today-sales').getByTestId('fold-toggle')
+  check('D-192 오늘: 설명은 처음엔 숨김', !(await page.getByTestId('today-sales').getByTestId('hint-tip').isVisible()))
+  await salesHead.hover()
+  await page.waitForTimeout(200)
+  const tip = page.getByTestId('today-sales').getByTestId('hint-tip')
+  const tipBox = await tip.boundingBox()
+  check('D-192 오늘: 목차에 마우스를 올리면 설명이 바로 뜬다(영업)', (await tip.isVisible()) && ((await tip.innerText()) ?? '').includes('영업'), await tip.innerText().catch(() => ''))
+  check('D-192 오늘: 설명 창이 화면 밖으로 나가지 않는다', !!tipBox && tipBox.x >= 0 && tipBox.x + tipBox.width <= 1440, JSON.stringify(tipBox))
+  check('D-192 오늘: 마우스를 올려도 접힌 채(펼칠지 말지는 내가)', (await foldState(page, 'today.sales')) === '0')
+
+  // 누르면 펼침 · 이 기기에 기억
+  await salesHead.click()
+  await page.waitForTimeout(200)
+  check('D-192 오늘: 목차를 누르면 펼친다', (await foldState(page, 'today.sales')) === '1' && ((await page.getByTestId('today-sales').innerText()) ?? '').includes('진행 중'))
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  check('D-192 오늘: 펼친 것은 다시 열어도 펼친 채(이 기기에 기억)', (await foldState(page, 'today.sales')) === '1')
+  check('D-192 오늘: 화면 목차 전부에 설명', (await headsWithoutHint(page)).length === 0, (await headsWithoutHint(page)).join(' · '))
+
+  // 업체 상세 개요 — 회사 정보만 펼침, 나머지는 한 줄(숫자 · 요약)
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const ov = {
+    company: await foldState(page, 'overview.company'),
+    numbers: await foldState(page, 'overview.numbers'),
+    contract: await foldState(page, 'overview.contract'),
+    history: await foldState(page, 'overview.history'),
+    tools: await foldState(page, 'overview.tools'),
+  }
+  check('D-192 개요: 회사 기본 정보만 펼침 · 숫자 · 계약 · 해 드린 일 · 전문 모듈은 접힘', ov.company === '1' && ov.numbers === '0' && ov.contract === '0' && ov.history === '0' && ov.tools === '0', JSON.stringify(ov))
+  const cSum = (await page.getByTestId('fold-contract').getByTestId('fold-summary').innerText().catch(() => '')) ?? ''
+  check('D-192 개요: 접힌 계약 목차 옆에 한 줄 요약(펼치지 않고도 금액 · 몇 달째)', /원/.test(cSum) && /개월|년/.test(cSum), cSum)
+  check("D-192 개요: '번호는 조각마다 따로 복사' 설명은 목차 설명으로", !((await page.locator('main').innerText()) ?? '').includes('조각마다'))
+  await page.getByTestId('fold-company').getByTestId('hint-dot').click()
+  check("D-192 개요: ⓘ 를 누르면 설명(회사 기본 정보 → '조각마다 따로 복사')", ((await page.getByTestId('fold-company').getByTestId('hint-tip').innerText().catch(() => '')) ?? '').includes('조각마다'))
+  check('D-192 개요: 화면 목차 전부에 설명', (await headsWithoutHint(page)).length === 0, (await headsWithoutHint(page)).join(' · '))
+
+  // 모두 펼치기 · 모두 접기
+  await page.getByTestId('fold-all-open').first().click()
+  await page.waitForTimeout(300)
+  const allOpen = await page.evaluate(() => [...document.querySelectorAll('[data-fold]')].every((e) => e.getAttribute('data-open') === '1'))
+  check('D-192 개요: [모두 펼치기] → 목차 전부 펼침', allOpen)
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  check('D-192 모두 펼치기는 다른 화면에도 이어진다(맞춤 추천 탭)', await page.evaluate(() => [...document.querySelectorAll('[data-fold]')].every((e) => e.getAttribute('data-open') === '1')))
+  await page.getByTestId('fold-all-close').first().click()
+  await page.waitForTimeout(300)
+  check('D-192 맞춤 추천: [모두 접기] → 목차 전부 접힘 · 맨 위 "먼저 제안할 것" 은 그대로', (await page.evaluate(() => [...document.querySelectorAll('[data-fold]')].every((e) => e.getAttribute('data-open') === '0'))) && (await page.getByTestId('top-picks').isVisible()))
+  check('D-192 맞춤 추천: 맨 위는 그대로 "먼저 제안할 것"', (await page.evaluate(() => document.querySelector('[data-testid="smart-tab"]')?.firstElementChild?.getAttribute('data-testid'))) === 'top-picks')
+  // '모듈별 판정 n개 →' 는 접혀 있어도 펼쳐서 데려간다
+  await page.getByTestId('top-picks-all').click()
+  await page.waitForTimeout(500)
+  check("D-192 맞춤 추천: '모듈별 판정 n개' 를 누르면 그 목차가 펼쳐진 채로", (await foldState(page, 'smart.verdicts')) === '1' && (await page.getByTestId('smart-insight').count()) >= 5)
+  check('D-192 맞춤 추천: 화면 목차 전부에 설명', (await headsWithoutHint(page)).length === 0, (await headsWithoutHint(page)).join(' · '))
+
+  // 다른 화면 — 목차 설명
+  for (const r of ['/ops/clients', '/ops/clients/cli_hansol?tab=docs', '/ops/clients/cli_hansol?tab=work', '/ops/clients/cli_hansol?tab=fees', '/sales/board', '/ops/calendar', '/grants', '/journal', '/ops/decide']) {
+    await page.goto(BASE + r, { waitUntil: 'networkidle' })
+    await page.waitForTimeout(600)
+    const miss = await headsWithoutHint(page)
+    check(`D-192 ${r}: 화면 목차 전부에 설명`, miss.length === 0, miss.join(' · '))
+  }
+  check('D-192 JS 오류 없음', errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
+/* ---- 6. D-192 휴대폰(390 · 360) — ⓘ 누르기 · 넘침 0 · 머리줄 한 줄 ---- */
+for (const width of [390, 360]) {
+  const ctx = await browser.newContext({ viewport: { width, height: 844 }, locale: 'ko-KR', isMobile: true, hasTouch: true })
+  const page = await ctx.newPage()
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await clearFolds(page)
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  check(`D-192 ${width} 오늘: 휴대폰은 빠른 기록도 접힘(화면이 짧게)`, (await foldState(page, 'today.capture')) === '0')
+  const dot = page.getByTestId('today-sales').getByTestId('hint-dot')
+  const db = await dot.boundingBox()
+  check(`D-192 ${width}: ⓘ 는 누르기 쉬운 크기(44px)`, !!db && db.width >= 44 && db.height >= 44, JSON.stringify(db))
+  await dot.tap()
+  await page.waitForTimeout(200)
+  const tip = page.getByTestId('today-sales').getByTestId('hint-tip')
+  const tb = await tip.boundingBox()
+  check(`D-192 ${width}: ⓘ 를 누르면 설명이 뜨고 화면 안에 들어간다`, (await tip.isVisible()) && !!tb && tb.x >= 0 && tb.x + tb.width <= width, JSON.stringify(tb))
+  await dot.tap()
+  await page.waitForTimeout(200)
+  check(`D-192 ${width}: ⓘ 를 한 번 더 누르면 닫힌다`, !(await tip.isVisible()))
+  // 머리줄 한 줄 — '모두 보기' 가 제목과 같은 줄
+  const sameLine = await page.evaluate(() => {
+    const f = document.querySelector('[data-fold="today.agenda"]')
+    const t = f?.querySelector('[data-testid="fold-toggle"]')?.getBoundingClientRect()
+    const a = f?.querySelector('a')?.getBoundingClientRect()
+    return !!t && !!a && Math.abs(t.top + t.height / 2 - (a.top + a.height / 2)) < 12
+  })
+  check(`D-192 ${width} 오늘: 목차 줄 하나에 제목 · ⓘ · '모두 보기'`, sameLine)
+  for (const r of ['/', '/ops/clients/cli_hansol', '/ops/clients/cli_hansol?tab=smart']) {
+    await page.goto(BASE + r, { waitUntil: 'networkidle' })
+    await page.waitForTimeout(600)
+    const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+    check(`D-192 ${width} ${r}: 옆으로 넘침 0`, over <= 0, String(over))
+  }
   await ctx.close()
 }
 

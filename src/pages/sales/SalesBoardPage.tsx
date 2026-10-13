@@ -58,6 +58,7 @@ import { josa } from '../../lib/josa'
 import { useIsPilot } from '../../auth/osAccess'
 import { CLIENT_TYPE_LABEL, clientTypeOf, rememberClientTypeView, type ClientType } from '../../services/clientType'
 import { ClientTypePicker } from '../../components/ops/ClientTypePicker'
+import { HintTip } from '../../components/ui/fold'
 
 const PICK_KEY = 'axmvp.sales.board.stage'
 
@@ -424,10 +425,13 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
       <span aria-hidden="true" data-stage-bar className={`absolute inset-x-0 top-0 h-[3px] ${c.bar}`} style={c.style} />
       <div data-stage-head className={`-mx-2 -mt-3 flex flex-col gap-0.5 px-3 pt-3.5 pb-2 ${c.soft}`} style={c.style}>
         <div className="flex items-baseline justify-between gap-2">
-          <h2 className={`t-sub min-w-0 truncate font-bold ${c.text}`} style={c.style}>{SALES_STAGE_LABEL[stage]}</h2>
+          {/* D-192: 좁은 칸 머리 — ⓘ 없이 마우스를 올리면 단계 설명(아래 한 줄은 휴대폰에서만) */}
+          <HintTip tip={SALES_STAGE_HINT[stage]} label={SALES_STAGE_LABEL[stage]} dot={false}>
+            <h2 className={`t-sub min-w-0 truncate font-bold ${c.text}`} style={c.style}>{SALES_STAGE_LABEL[stage]}</h2>
+          </HintTip>
           <span className={`t-meta shrink-0 rounded-full bg-white px-2 font-semibold tabular-nums ${list.length > 0 ? c.text : 'text-slate-400'}`} style={list.length > 0 ? c.style : undefined}>{list.length}</span>
         </div>
-        <p className="t-meta break-keep text-slate-500">{SALES_STAGE_HINT[stage]}</p>
+        <p className="t-meta break-keep text-slate-500 sm:hidden">{SALES_STAGE_HINT[stage]}</p>
       </div>
       {list.length === 0 ? (
         <p className="t-meta rounded-(--radius-control) border border-dashed border-slate-200 px-2 py-4 text-center text-slate-400">없음</p>

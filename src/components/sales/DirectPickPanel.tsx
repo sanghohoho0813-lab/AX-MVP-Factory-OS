@@ -10,6 +10,8 @@ import { CONSULTING_CATEGORIES, CONSULTING_STRATEGIES } from '../../tools/cretop
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { withSalesInfo } from '../../services/salesPipeline'
 import { PillList } from './salesParts'
+import { HintTip } from '../ui/fold'
+import { hintFor } from '../../content/sectionHints'
 
 export function DirectPickPanel({ record, onSave }: { record: ClientOpsRecord; onSave: (next: ClientOpsRecord, msg: string) => unknown }) {
   const picks = record.sales?.picks ?? []
@@ -21,7 +23,9 @@ export function DirectPickPanel({ record, onSave }: { record: ClientOpsRecord; o
   return (
     <section aria-label="제안 항목 바로 고르기" data-testid="direct-pick" className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="t-section text-slate-900">오늘 꺼낼 항목 고르기</h2>
+        <HintTip tip={hintFor('오늘 꺼낼 항목 고르기')} label="오늘 꺼낼 항목 고르기">
+          <h2 className="t-section text-slate-900">오늘 꺼낼 항목 고르기</h2>
+        </HintTip>
         <span className="t-sub text-slate-500" data-testid="direct-pick-count">{picks.length}개 골랐음 · 컨설팅 항목 {CONSULTING_STRATEGIES.length}개</span>
       </div>
       <div className="flex flex-col gap-2.5">

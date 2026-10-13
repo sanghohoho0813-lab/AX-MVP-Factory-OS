@@ -13,6 +13,7 @@ import { copyText } from '../consulting/studioParts'
 import { useToast } from '../ui/toastContext'
 import { Button } from '../ui/Button'
 import { useSenderLine } from '../layout/useCurrentUser'
+import { Fold } from '../ui/fold'
 
 const SHOW = 4
 
@@ -41,17 +42,19 @@ export function TodayCare({ clients, today, onSaved }: { clients: ClientOpsRecor
 
   const shown = all ? items : items.slice(0, SHOW)
   return (
-    <section aria-labelledby="today-care-title" data-testid="today-care" className="flex min-w-0 flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
-        <h2 id="today-care-title" className="flex items-center gap-2 text-[1.15rem] font-bold text-slate-900">
-          <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-nav-ops">
-            <HeartHandshake className="size-4" />
-          </span>
-          안부 챙길 계약 고객
-          <span className="text-[0.95rem] font-semibold text-slate-500">{items.length}</span>
-        </h2>
-      </div>
-      <p className="t-sub break-keep text-slate-500">한 달 넘게 연락이 없거나 계약 1주년이 다가오는 곳입니다. 연락했으면 [연락했어요] 를 눌러 주세요.</p>
+    // D-192: 접어 두고 숫자만 — 설명은 목차에 마우스를 올리거나 ⓘ
+    <Fold
+      id="today.care"
+      title="안부 챙길 계약 고객"
+      headingId="today-care-title"
+      testId="today-care"
+      icon={
+        <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-nav-ops">
+          <HeartHandshake className="size-4" />
+        </span>
+      }
+      count={items.length}
+    >
       <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-panel) border border-slate-200 bg-white">
         {shown.map((it) => {
           const rec = byId.get(it.clientId)
@@ -110,6 +113,6 @@ export function TodayCare({ clients, today, onSaved }: { clients: ClientOpsRecor
           {all ? '접기' : `${items.length - SHOW}곳 더 보기`}
         </button>
       )}
-    </section>
+    </Fold>
   )
 }

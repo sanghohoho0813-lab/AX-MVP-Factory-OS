@@ -74,7 +74,7 @@ export function ClientSharedFiles({
         <Paperclip aria-hidden="true" className="size-4 text-slate-400" /> 고객과 주고받은 파일 <span className="t-sub font-medium text-slate-500">{portalDocs.length}</span>
       </h3>
       {portalDocs.length === 0 ? (
-        <p className="t-sub break-keep text-slate-500">고객이 올렸거나 고객에게 공유한 파일이 없습니다. 고객 플랫폼 탭에서 요청 · 공유할 수 있습니다.</p>
+        <p className="t-sub break-keep text-slate-500">주고받은 파일이 없습니다.</p>
       ) : (
         <ul className="flex flex-col divide-y divide-slate-100">
           {portalDocs.map((d) => (

@@ -31,11 +31,14 @@ export function ClientToolsCard({
   record,
   today,
   onOpenDocs,
+  fold,
 }: {
   record: ClientOpsRecord
   today: string
   /** 서류함 탭으로 보내기 */
   onOpenDocs: () => void
+  /** D-192: 접는 목차로 */
+  fold?: { id: string; open?: boolean; panel?: boolean }
 }) {
   const { ent } = useEntitlements()
   const tools = liveTools().filter((t) => t.path !== null)
@@ -59,7 +62,7 @@ export function ClientToolsCard({
   if (count === 0) return null
 
   return (
-    <Section title="이 업체로 전문 모듈 열기" count={count}>
+    <Section title="이 업체로 전문 모듈 열기" count={count} fold={fold}>
       <div className="flex flex-col gap-2.5" data-testid="client-tools">
         {/* 없는 서류를 맨 위에 한 줄로 — 무엇을 받아야 하는지가 먼저다 */}
         {missingAll.length > 0 && (

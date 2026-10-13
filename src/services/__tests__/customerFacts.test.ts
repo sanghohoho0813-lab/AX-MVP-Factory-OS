@@ -56,6 +56,7 @@ import { ADVISOR_GROUPS, ALL_QUESTIONS, answerFor, answerText, matchQuestion } f
 import { classifyDocument } from '../docClassify'
 import { NOTE_BIZNO_CHECK, NOTE_DIFFERS, NOTE_FROM_PHOTO, applyNewClientGuess, guessNewClientFromDocs, looksLikeCretopForNewClient } from '../newClientFromDocs'
 import { handDocsTo, peekHandedDocs, takeHandedDocs } from '../docHandoff'
+import { SECTION_HINT_COUNT, SECTION_HINT_KEYS, hintFor } from '../../content/sectionHints'
 import { DOCUMENTS } from '../../content/clientOpsCatalog'
 
 let passed = 0
@@ -845,6 +846,15 @@ await (async () => {
   const cert = requestItemsFrom([mk('cert-os', '기업인증', 'need', ['연구조직', '연구개발비', '매출 · 재무', '특허 등록 여부'])]).items
   check('D-191 기업인증 빠진 항목도 고객이 알아듣는 서류 이름 · 어디서(연구소 인정서 · 연구개발비 · 재무제표 · 특허)', cert.map((x) => x.label).join() === '연구소(전담부서) 인정서,연구개발비 · 하고 있는 연구 내용,최근 재무제표(표준재무제표증명),특허 · 상표 등록 현황' && cert.every((x) => x.where !== ''), JSON.stringify(cert))
   check('D-191 받을 것이 없으면 빈 문구(단추 없음)', recoRequestMessage(base, [mk('grants', '지원사업', 'good', [])]) === '')
+}
+
+/* D-192 목차 설명 사전 — 목차 이름(숫자가 붙어도)으로 찾는다 */
+{
+  check('D-192 목차 설명: 이름 그대로 찾는다', (hintFor('맞는 지원사업') ?? '').includes('공고'))
+  check('D-192 목차 설명: 꼬리가 붙어도(— 맞나요? · 숫자) 앞부분으로 찾는다', hintFor('프로그램이 준비했어요 — 맞나요?') === hintFor('프로그램이 준비했어요') && !!hintFor('안부 챙길 계약 고객 3'))
+  check('D-192 목차 설명: 모르는 목차 · 빈 글자는 설명 없음', hintFor('없는 목차') === undefined && hintFor('') === undefined && hintFor(undefined) === undefined)
+  check("D-192 목차 설명: '회사 기본 정보' 는 '조각마다 따로 복사' 를 말한다", (hintFor('회사 기본 정보') ?? '').includes('조각마다'))
+  check('D-192 목차 설명: 사전이 비어 있지 않고 설명마다 두 줄 안(110자 이하)', SECTION_HINT_COUNT >= 60 && SECTION_HINT_KEYS.every((k) => (hintFor(k) ?? '').length <= 110), String(SECTION_HINT_COUNT))
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

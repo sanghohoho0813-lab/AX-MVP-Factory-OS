@@ -261,6 +261,10 @@ export const SEED_NEW_PROJECT_ID = 'proj_new'
 /** 같은 상태의 두 번째 빈 프로젝트 — 서류 채우기 시험이 앞 시험에 영향받지 않게 */
 export const SEED_DOC_PROJECT_ID = 'proj_doc'
 
+/**
+ * D-192: 화면 목차는 기본으로 접혀 있다 — 예전 시험(내용을 바로 찾는 시험)은 '모두 펼치기' 한 상태로 돈다.
+ * 접힘 · 목차 설명 자체는 easy.mjs 의 D-192 시험이 이 값을 지우고 따로 본다.
+ */
 export function seedScript() {
   return `
     localStorage.setItem('axmvp.v1.consulting_projects', ${JSON.stringify(JSON.stringify(consultingProjects))});
@@ -268,6 +272,7 @@ export function seedScript() {
     localStorage.setItem('axmvp.v1.operations_clients', ${JSON.stringify(JSON.stringify(clients))});
     localStorage.setItem('axmvp.v1.ops_journal_entries', ${JSON.stringify(JSON.stringify(journal))});
     localStorage.setItem('axmvp.v1.customer_events', ${JSON.stringify(JSON.stringify(events))});
+    localStorage.setItem('axmvp.fold.all', 'open');
   `
 }
 

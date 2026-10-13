@@ -61,6 +61,7 @@ function DecideContent({ workspaceId, userId }: { workspaceId: string | null; us
     <div className="flex flex-col gap-5">
       <PageHeader
         title="확인할 것"
+        descriptionAsHint
         description="올린 서류 · 업체 기록 · 받아 둔 공고를 읽고 프로그램이 먼저 준비했습니다. 맞으면 [맞아요], 아니면 [아니에요] 만 누르세요."
       />
       <p className="t-body text-slate-700" data-testid="decide-summary">

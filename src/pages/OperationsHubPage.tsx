@@ -87,6 +87,8 @@ import { ClientTypePicker } from '../components/ops/ClientTypePicker'
 import { NewClientDocDrop } from '../components/ops/NewClientDocDrop'
 import { EMPTY_DOCS_READ, applyNewClientGuess, type NewClientDocsRead, type NewClientField, type NewClientGuess } from '../services/newClientFromDocs'
 import { handDocsTo } from '../services/docHandoff'
+import { HintTip } from '../components/ui/fold'
+import { hintFor } from '../content/sectionHints'
 
 /** D-181: 처음 열 때 고객 종류 — 주소(?type=consultant)가 먼저, 없으면 지난번에 보던 쪽 */
 function initialClientType(): ClientType {
@@ -864,9 +866,11 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       {/* B. 업체별 현황표 */}
       <section aria-labelledby="ops-matrix" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="ops-matrix" className="t-section text-slate-900">
-            업체별 현황표
-          </h2>
+          <HintTip tip={hintFor('업체별 현황표')} label="업체별 현황표">
+            <h2 id="ops-matrix" className="t-section text-slate-900">
+              업체별 현황표
+            </h2>
+          </HintTip>
           <div className="flex items-center gap-3">
             <button
               type="button"

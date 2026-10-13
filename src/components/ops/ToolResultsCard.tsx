@@ -18,7 +18,16 @@ import { ConfirmModal } from '../ui/ConfirmModal'
  * 고객 플랫폼에 발행한 것은 그렇게 표시한다 — 두 번 발행하지 않기 위해.
  * 도구가 기한을 함께 심었으면 그것도 한 줄로 알려 준다 (D-89) — 달력에 이미 올라가 있다.
  */
-export function ToolResultsCard({ record, onChange }: { record: ClientOpsRecord; onChange: (next: ClientOpsRecord) => void }) {
+export function ToolResultsCard({
+  record,
+  onChange,
+  fold,
+}: {
+  record: ClientOpsRecord
+  onChange: (next: ClientOpsRecord) => void
+  /** D-192: 접는 목차로 — '보러 가기'(#tool-results)로 오면 펼친 채로 */
+  fold?: { id: string; open?: boolean; panel?: boolean }
+}) {
   const [open, setOpen] = useState<string | null>(null)
   const [olderOpen, setOlderOpen] = useState<string | null>(null)
   const [removing, setRemoving] = useState<ToolResult | null>(null)
@@ -78,7 +87,7 @@ export function ToolResultsCard({ record, onChange }: { record: ClientOpsRecord;
   return (
     // 머리줄 · 탭 줄이 위에 붙어 있어 제목까지 보이게 넉넉히 띄운다
     <div ref={boxRef} id="tool-results" className="scroll-mt-36">
-    <Section title="도구 결과" count={groups.length}>
+    <Section title="도구 결과" count={groups.length} fold={fold && { ...fold, force: window.location.hash === '#tool-results' }}>
       <div className="flex flex-col gap-2" data-testid="tool-results">
         {groups.map((g) => {
           const showOlder = olderOpen === g.toolKey

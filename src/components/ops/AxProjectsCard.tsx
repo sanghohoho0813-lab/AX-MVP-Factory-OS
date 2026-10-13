@@ -16,7 +16,7 @@ import { Section, Surface } from '../ui/primitives'
 import { ProgressBar } from '../ui/ProgressBar'
 import { HEALTH_META } from '../../lib/statusMeta'
 
-export function AxProjectsCard({ record }: { record: ClientOpsRecord }) {
+export function AxProjectsCard({ record, fold }: { record: ClientOpsRecord; /** D-192: 접는 목차로 */ fold?: { id: string; open?: boolean; panel?: boolean } }) {
   const version = useStoreVersion()
   const org = useMemo(
     () => linkedOrgOf(record),
@@ -31,7 +31,7 @@ export function AxProjectsCard({ record }: { record: ClientOpsRecord }) {
   )
   if (!org) return null
   return (
-    <Section title="AX 프로젝트" count={projects.length}>
+    <Section title="AX 프로젝트" count={projects.length} fold={fold}>
       <div className="flex flex-col gap-2" data-testid="ax-projects">
         {projects.length === 0 ? (
           <Surface className="t-sub flex flex-wrap items-center gap-2 p-4 break-keep text-slate-600">

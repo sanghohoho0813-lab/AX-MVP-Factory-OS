@@ -21,7 +21,10 @@ export function ClientGrantsCard({
   today,
   onFill,
   onCommit,
+  fold,
 }: {
+  /** D-192: 접는 목차로(맞춤 추천 탭) */
+  fold?: { id: string; open?: boolean }
   workspaceId: string | null
   record: ClientOpsRecord
   today: string
@@ -68,7 +71,7 @@ export function ClientGrantsCard({
     </button>
   )
   return (
-    <Section title="맞는 지원사업" count={matches.filter((m) => m.verdict === 'fit').length} action={more}>
+    <Section title="맞는 지원사업" count={matches.filter((m) => m.verdict === 'fit').length} action={more} fold={fold}>
       <div data-testid="detail-grants">
         {notices.length === 0 ? (
           <p className="t-sub flex items-start gap-2 break-keep text-slate-500">

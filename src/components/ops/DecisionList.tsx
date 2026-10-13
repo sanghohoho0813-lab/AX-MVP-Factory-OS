@@ -18,6 +18,7 @@ import { nowIso } from '../../lib/appClock'
 import { copyText } from '../consulting/studioParts'
 import { useToast } from '../ui/toastContext'
 import { Button } from '../ui/Button'
+import { Fold } from '../ui/fold'
 
 const KIND_CLASS: Record<DecisionKind, string> = {
   fact: 'border-cat-client-200 bg-cat-client-50 text-cat-client-700',
@@ -435,20 +436,26 @@ export function TodayDecisions({
   })
   if (all.length === 0) return null
   return (
-    <section aria-labelledby="today-decide-title" data-testid="today-decide" className="flex min-w-0 flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
-        <h2 id="today-decide-title" className="flex items-center gap-2 text-[1.15rem] font-bold text-slate-900">
-          <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
-            <CheckCheck className="size-4" />
-          </span>
-          확인할 것
-          <span className="text-[0.95rem] font-semibold text-slate-500">{all.length}</span>
-        </h2>
+    // D-192: 접는 목차 — 설명 글은 목차에 마우스를 올리거나 ⓘ 를 누르면
+    <Fold
+      id="today.decide"
+      title="확인할 것"
+      headingId="today-decide-title"
+      testId="today-decide"
+      defaultOpen
+      icon={
+        <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
+          <CheckCheck className="size-4" />
+        </span>
+      }
+      count={all.length}
+      countTone="brand"
+      action={
         <Link to="/ops/decide" className="tap inline-flex items-center text-[0.9rem] font-medium text-brand-700 hover:underline" data-testid="today-decide-all">
           모두 보기
         </Link>
-      </div>
-      <p className="t-sub break-keep text-slate-500">서류 · 업체 기록 · 공고를 읽고 프로그램이 먼저 준비했어요. 맞으면 [맞아요], 아니면 [아니에요] 만 누르세요.</p>
+      }
+    >
       <DecisionList
         decisions={all}
         busy={busy}
@@ -460,6 +467,6 @@ export function TodayDecisions({
           })
         }
       />
-    </section>
+    </Fold>
   )
 }

@@ -32,6 +32,8 @@ import { PageHeader } from '../components/ui/PageHeader'
 import { ScheduleTabs } from '../components/journal/ScheduleTabs'
 import { CalendarQuickSheet, HolidayImportSheet, type QuickTodoInput } from '../components/journal/CalendarQuickSheet'
 import { addDaysOff, dateLabel, daysOffByDate, listDaysOff, missingPublicHolidays, monthWorkdays, prevWorkday, removeDayOff, type DayOff, type DayOffKind } from '../services/daysOff'
+import { HintTip } from '../components/ui/fold'
+import { hintFor } from '../content/sectionHints'
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
 const KINDS: ScheduleKind[] = ['next', 'task', 'funding', 'payment', 'document', 'tool']
@@ -249,6 +251,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
     <div className="flex flex-col gap-5">
       <PageHeader
         title="일정"
+        descriptionAsHint
         description="모든 업체의 마감·신청·수금·서류 만료를 한 달력에서 봅니다."
         actions={
           <>
@@ -487,12 +490,14 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
           </div>
           <section aria-label="선택한 날짜" className="flex min-w-0 flex-col gap-4 xl:sticky xl:top-20 xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto xl:rounded-(--radius-panel) xl:border xl:border-slate-200 xl:bg-slate-50/60 xl:p-4" data-testid="picked-panel">
             <div className="flex flex-col gap-2">
+              <HintTip tip={hintFor('그날 할 일')} label="고른 날 할 일">
               <h2 className="text-[1.15rem] font-bold text-slate-900">
                 {picked ? `${Number(picked.slice(5, 7))}월 ${Number(picked.slice(8))}일 할 일` : '날짜를 선택하세요'}
                 {picked && pickedTodos.length > 0 && (
                   <span className="ml-2 text-[0.95rem] font-medium text-slate-500">{pickedTodos.length}건</span>
                 )}
               </h2>
+              </HintTip>
               {picked && (
                 <>
                   {/* D-139: 쉬는 날 · 쉬는 날 마감 */}
@@ -563,10 +568,12 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
             </div>
 
             <div className="flex flex-col gap-2">
-              <h2 className="text-[1.15rem] font-bold text-slate-900">
-                업체 일정
-                {picked && <span className="ml-2 text-[0.95rem] font-medium text-slate-500">{pickedEvents.length}건</span>}
-              </h2>
+              <HintTip tip={hintFor('업체 일정')} label="업체 일정">
+                <h2 className="text-[1.15rem] font-bold text-slate-900">
+                  업체 일정
+                  {picked && <span className="ml-2 text-[0.95rem] font-medium text-slate-500">{pickedEvents.length}건</span>}
+                </h2>
+              </HintTip>
               {pickedEvents.length === 0 ? (
                 <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-6 text-[0.95rem] text-slate-500">
                   이 날에는 업체 쪽 마감이 없습니다.

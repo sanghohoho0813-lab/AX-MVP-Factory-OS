@@ -112,6 +112,7 @@ export function ToolsHubPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="전문 모듈"
+        descriptionAsHint
         description="기본 OS 위에 더하는 전문 업무입니다. 분야마다 모듈 하나 — 업체 화면에서 바로 열리고, 업체 정보를 다시 적지 않습니다. 전부 규칙 계산이고 외부 호출이 없습니다."
       />
 

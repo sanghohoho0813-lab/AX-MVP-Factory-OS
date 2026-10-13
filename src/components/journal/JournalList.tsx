@@ -68,7 +68,7 @@ export function JournalList({
         <NotebookPen aria-hidden="true" className="size-6 shrink-0 text-slate-300 sm:size-7" />
         <div className="min-w-0">
           <p className="text-[0.98rem] font-medium break-keep text-slate-600">{emptyTitle}</p>
-          <p className="mt-0.5 max-w-md text-[0.9rem] break-keep text-slate-500">{emptyHint}</p>
+          {emptyHint && <p className="mt-0.5 max-w-md text-[0.9rem] break-keep text-slate-500">{emptyHint}</p>}
         </div>
       </div>
     )

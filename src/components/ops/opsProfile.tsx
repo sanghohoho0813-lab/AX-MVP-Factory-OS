@@ -45,6 +45,7 @@ export function CompanyProfileCard({
   factNote,
   /** 접이식 구역 안에 들어갈 때 — 카드 안 카드가 되지 않도록 테두리·제목을 뺀다 */
   bare = false,
+  hideTitle = false,
 }: {
   record: ClientOpsRecord
   today: string
@@ -58,6 +59,8 @@ export function CompanyProfileCard({
   /** D-128: 칸의 출처 · 확인 상태 한 줄 (자료로 확인한 값 · 예상값만 — 평범하게 적은 값은 조용히) */
   factNote?: (key: string) => { text: string; confirmed: boolean } | null
   bare?: boolean
+  /** D-192: 제목은 바깥 접는 목차(Fold)가 그린다 — 여기선 'n/m 입력됨' 과 단추만 */
+  hideTitle?: boolean
 }) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const [editingKey, setEditingKey] = useState<string | null>(null)
@@ -146,16 +149,22 @@ export function CompanyProfileCard({
 
   return (
     <section
-      aria-labelledby="profile"
+      aria-labelledby={hideTitle ? undefined : 'profile'}
       className={bare ? '' : 'rounded-(--radius-panel) border border-slate-200 bg-white p-5'}
     >
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <h2 id="profile" className="t-section min-w-0 text-slate-900">
-          회사 기본 정보
-          <span className="t-meta ml-2 font-medium text-slate-500">
+        {hideTitle ? (
+          <span className="t-sub font-medium text-slate-500" data-testid="profile-filled">
             {filled}/{fields.length} 입력됨
           </span>
-        </h2>
+        ) : (
+          <h2 id="profile" className="t-section min-w-0 text-slate-900">
+            회사 기본 정보
+            <span className="t-meta ml-2 font-medium text-slate-500">
+              {filled}/{fields.length} 입력됨
+            </span>
+          </h2>
+        )}
         {/* 글자를 크게 쓰는 설정에서는 단추 두 개가 한 줄을 넘는다 — 줄여도 되고 접혀도 되게 둔다 */}
         {/* D-124: 휴대폰에서는 두 줄 격자(불러오기 한 줄 · 복사 둘) — 크기가 제각각인 단추 셋이 들쭉날쭉 쌓였다 */}
         <div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
@@ -179,9 +188,12 @@ export function CompanyProfileCard({
           </Button>
         </div>
       </div>
-      <p className="t-sub mt-0.5 break-keep text-slate-500">
-        번호는 <strong className="font-semibold">조각마다 따로</strong> 복사됩니다 — 칸이 나뉜 신청서에 하나씩 붙이세요.
-      </p>
+      {/* D-192: '번호는 조각마다 따로 복사' 설명은 목차 설명(ⓘ)으로 옮겼다 */}
+      {!hideTitle && (
+        <p className="t-sub mt-0.5 break-keep text-slate-500">
+          번호는 <strong className="font-semibold">조각마다 따로</strong> 복사됩니다 — 칸이 나뉜 신청서에 하나씩 붙이세요.
+        </p>
+      )}
 
       {groups.map((g, gi) => (
         <div key={g.group} className={`mt-4 first:mt-3 ${gi > 0 && !showAllGroups ? 'hidden sm:block' : ''}`}>

@@ -17,6 +17,8 @@ import { useEntitlements } from '../../lib/entitlementsStore'
 import { useGrantNotices } from '../grants/useGrants'
 import { INSIGHT_TONE_LABEL, buildInsights, isPick, missingForPicks, topPicks, type Insight, type InsightTone } from '../../services/clientInsights'
 import { recoRequestMessage } from '../../services/recoRequest'
+import { HintTip } from '../ui/fold'
+import { hintFor } from '../../content/sectionHints'
 
 const TONE: Record<InsightTone, Tone> = { good: 'success', maybe: 'brand', done: 'neutral', need: 'warning', no: 'neutral' }
 
@@ -42,10 +44,12 @@ export function TopPicksCard({
     <section data-testid="top-picks" aria-labelledby="top-picks-title" className="rounded-(--radius-panel) border border-brand-200 bg-gradient-to-br from-brand-50 via-white to-white px-4 py-4 shadow-sm sm:px-5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <Sparkles aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
-        <h2 id="top-picks-title" className="text-[1.15rem] font-bold break-keep text-slate-900">
-          이 업체에 먼저 제안할 것
-        </h2>
-        <span className="t-meta text-slate-500">서류 · 회사 정보로 모듈을 미리 돌려 본 1차 판정</span>
+        {/* D-192: 설명은 화면에 깔지 않고 ⓘ · 마우스를 올리면 */}
+        <HintTip tip={hintFor('이 업체에 먼저 제안할 것')} label="이 업체에 먼저 제안할 것">
+          <h2 id="top-picks-title" className="text-[1.15rem] font-bold break-keep text-slate-900">
+            이 업체에 먼저 제안할 것
+          </h2>
+        </HintTip>
         {onShowAll && insights.length > 0 && (
           <button type="button" onClick={onShowAll} data-testid="top-picks-all" className="tap t-sub ml-auto inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline">
             모듈별 판정 {insights.length}개 <ArrowRight aria-hidden="true" className="size-4" />

@@ -57,7 +57,7 @@ import { agendaWhen, buildAgenda, type AgendaItem } from '../services/upcomingAg
 import { nowDate, todayLocalDate } from '../lib/appClock'
 import { krwTile } from '../lib/format'
 import { getDataModeConfig } from '../data/dataMode'
-import { brand } from '../brand/brand.config'
+import { Fold } from '../components/ui/fold'
 import { useIsPilot } from '../auth/osAccess'
 import { CLIENT_TYPE_LABEL, clientTypeOf } from '../services/clientType'
 import type { ClientOpsRecord } from '../types/clientOps'
@@ -136,37 +136,21 @@ const SECTION_CHIP: Record<SectionAccent, string> = {
   sales: 'bg-amber-50 text-nav-revenue',
 }
 
-function SectionTitle({
-  title,
-  to,
-  count,
-  icon: Icon,
-  accent,
-}: {
-  title: string
-  to?: string
-  count?: number
-  icon: typeof Clock
-  accent: SectionAccent
-}) {
+/** 목차 앞 색 칩(D-192: 접는 목차 Fold 의 icon 으로) */
+function SectionChip({ icon: Icon, accent }: { icon: typeof Clock; accent: SectionAccent }) {
   return (
-    <div className="flex items-center justify-between gap-2">
-      <h2 className="flex items-center gap-2 text-[1.15rem] font-bold text-slate-900">
-        <span
-          aria-hidden="true"
-          className={`flex size-7 shrink-0 items-center justify-center rounded-lg ${SECTION_CHIP[accent]}`}
-        >
-          <Icon className="size-4" />
-        </span>
-        {title}
-        {typeof count === 'number' && <span className="text-[0.95rem] font-semibold text-slate-500">{count}</span>}
-      </h2>
-      {to && (
-        <Link to={to} className="tap inline-flex items-center text-[0.9rem] font-medium text-brand-700 hover:underline">
-          모두 보기
-        </Link>
-      )}
-    </div>
+    <span aria-hidden="true" className={`flex size-7 shrink-0 items-center justify-center rounded-lg ${SECTION_CHIP[accent]}`}>
+      <Icon className="size-4" />
+    </span>
+  )
+}
+
+/** 목차 오른쪽 '모두 보기' — 접혀 있어도 바로 간다 */
+function AllLink({ to }: { to: string }) {
+  return (
+    <Link to={to} className="tap inline-flex items-center text-[0.9rem] font-medium text-brand-700 hover:underline">
+      모두 보기
+    </Link>
   )
 }
 
@@ -583,13 +567,24 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
         {/* 2단계 — 다가오는 마감 · 약속(D-143: 날짜가 있는 실제 일만, 날짜 순) */}
-        <section aria-labelledby="upcoming" data-tour="home-upcoming" data-testid="today-agenda" className="flex min-w-0 flex-col gap-3">
-          <SectionTitle title="다가오는 마감 · 약속" icon={CalendarClock} to="/ops/calendar" count={agenda.length} accent="urgent" />
+        {/* D-192: 목차마다 접기 · 마우스를 올리면 무슨 칸인지. 마감 · 약속은 펼친 채로 시작 */}
+        <Fold
+          id="today.agenda"
+          title="다가오는 마감 · 약속"
+          headingId="upcoming"
+          tour="home-upcoming"
+          testId="today-agenda"
+          defaultOpen
+          icon={<SectionChip icon={CalendarClock} accent="urgent" />}
+          count={agenda.length}
+          countTone={agenda.length > 0 ? 'danger' : 'neutral'}
+          action={<AllLink to="/ops/calendar" />}
+        >
           {loading ? (
             <p className="t-sub text-slate-500">불러오는 중…</p>
           ) : agenda.length === 0 ? (
             <p className="t-sub break-keep rounded-(--radius-card) border border-dashed border-slate-300 bg-white px-4 py-4 text-slate-500" data-testid="today-agenda-empty">
-              2주 안에 잡힌 마감 · 약속이 없습니다. 업체에 다음 약속이나 기한을 적어 두면 여기에 날짜 순으로 보여요.
+              2주 안에 잡힌 마감 · 약속이 없습니다.
             </p>
           ) : (
             <ol className="ax-stagger flex flex-col gap-2">
@@ -605,7 +600,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           )}
           {agendaLate.length > 0 && (
             <div data-testid="today-agenda-late">
-              <Disclosure title="마감 지난 업무 · 신청" hint={`${agendaLate.length}건 — 끝냈으면 업체에서 완료로 바꿔 주세요`}>
+              <Disclosure title="마감 지난 업무 · 신청" hint={`${agendaLate.length}건`}>
                 <ol className="flex flex-col gap-2">
                   {agendaLate.slice(0, 10).map((a) => (
                     <AgendaRow key={a.id} item={a} />
@@ -675,12 +670,20 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               )}
             </p>
           )}
+        </Fold>
 
-        </section>
-
-        {/* 3단계 — 빠른 기록 */}
-        <section aria-labelledby="capture" data-tour="home-capture" className="flex min-w-0 flex-col gap-3">
-          <SectionTitle title="무슨 일이 있었나요?" icon={NotebookPen} to="/journal" count={todayJournal.length} accent="journal" />
+        {/* 3단계 — 빠른 기록(D-192: 접어 두고 필요할 때 펼친다) */}
+        <Fold
+          id="today.capture"
+          title="무슨 일이 있었나요?"
+          headingId="capture"
+          tour="home-capture"
+          testId="today-capture"
+          defaultOpen={!phone}
+          icon={<SectionChip icon={NotebookPen} accent="journal" />}
+          count={todayJournal.length}
+          action={<AllLink to="/journal" />}
+        >
           <QuickCapture
             clients={active}
             compact
@@ -696,24 +699,33 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             onEdit={(e, content) => journalMutate(() => updateJournalEntry(e, { content }))}
             onDelete={(e) => setPendingDelete(e)}
             emptyTitle="오늘 기록된 업무가 없습니다."
-            emptyHint="통화 · 결정 · 할 일을 바로 남겨 두면 나중에 고객별 이력이 이어집니다."
+            emptyHint=""
           />
           {todayJournal.length > 4 && (
             <Link to="/journal" className="tap t-sub inline-flex items-center font-medium text-brand-700 hover:underline">
               오늘 기록 {todayJournal.length}건 모두 보기
             </Link>
           )}
-        </section>
+        </Fold>
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         {/* 4단계 — 고객 이벤트(Pilot 은 고객 플랫폼을 쓰지 않는다) */}
         {!pilot && (
-        <section aria-labelledby="events" data-tour="home-events" className="flex min-w-0 flex-col gap-3">
-          <SectionTitle title="상담신청" icon={Inbox} to="/ops/inbox" count={openEvents.length} accent="event" />
+        <Fold
+          id="today.events"
+          title="상담신청"
+          headingId="events"
+          tour="home-events"
+          testId="today-events"
+          icon={<SectionChip icon={Inbox} accent="event" />}
+          count={openEvents.length}
+          countTone="brand"
+          action={<AllLink to="/ops/inbox" />}
+        >
           {openEvents.length === 0 ? (
             <Blank
-              title={`새 고객 요청이 없습니다. ${brand.customerPlatformLabel}에서 요청이 오면 여기에 뜹니다.`}
+              title="새 상담신청이 없습니다."
               icon={<Inbox className="size-7" />}
               action={
                 isLocal ? (
@@ -739,12 +751,20 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               ))}
             </ul>
           )}
-        </section>
+        </Fold>
         )}
 
         {/* D-118: 영업 — 영업 관리 보드의 '지금 챙길 영업' 을 오늘에서도. 없으면 다시 연락할 곳 */}
-        <section aria-labelledby="today-sales" data-testid="today-sales" className="flex min-w-0 flex-col gap-3">
-          <SectionTitle title="영업" icon={KanbanSquare} to="/sales/board" count={salesRiskList.length} accent="sales" />
+        <Fold
+          id="today.sales"
+          title="영업"
+          headingId="today-sales"
+          testId="today-sales"
+          icon={<SectionChip icon={KanbanSquare} accent="sales" />}
+          count={salesRiskList.length}
+          countTone="warning"
+          action={<AllLink to="/sales/board" />}
+        >
           <p className="t-sub text-slate-500">
             진행 중 <strong className="font-semibold text-slate-800 tabular-nums">{salesFlow.count}곳</strong>
             {salesFlow.fee > 0 && <> · 예상 수임료 <strong className="font-semibold text-slate-800 tabular-nums">{krwTile(salesFlow.fee)}</strong></>}
@@ -780,7 +800,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               ))}
             </ul>
           )}
-        </section>
+        </Fold>
 
         {/* D-155: 계약 고객 돌봄 — 한 달 넘게 조용 · 계약 1주년. 없으면 칸 없음 */}
         <TodayCare clients={clients} today={today} onSaved={(r) => setClients((cs) => cs.map((c) => (c.id === r.id ? r : c)))} />

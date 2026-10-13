@@ -182,7 +182,13 @@ export function FactInboxCard({ record, now, onCommit }: { record: ClientOpsReco
 
 const STORE_FACTS = FACT_DEFS.filter((d) => !d.field)
 
-export function FactNumbersCard({ record, now, onCommit }: { record: ClientOpsRecord; now: string; onCommit: Commit }) {
+/** D-192: 접힌 목차 '숫자 · 인증' 옆 숫자 — 적힌 것 · 확인을 기다리는 것 */
+export function factNumbersCount(record: ClientOpsRecord): { filled: number; toConfirm: number } {
+  const filled = STORE_FACTS.map((d) => readFact(record, d.key)!).filter((f) => f.status !== 'missing').length
+  return { filled, toConfirm: hardFactsToConfirm(record).filter((f) => f.status === 'entered').length }
+}
+
+export function FactNumbersCard({ record, now, onCommit, hideTitle = false }: { record: ClientOpsRecord; now: string; onCommit: Commit; hideTitle?: boolean }) {
   const facts = STORE_FACTS.map((d) => readFact(record, d.key)!)
   const filled = facts.filter((f) => f.status !== 'missing')
   const empty = facts.filter((f) => f.status === 'missing')
@@ -263,8 +269,8 @@ export function FactNumbersCard({ record, now, onCommit }: { record: ClientOpsRe
   }
 
   return (
-    <section aria-labelledby="fact-numbers" className="flex flex-col gap-2" data-testid="fact-numbers">
-      <h2 id="fact-numbers" className="t-section text-slate-900">숫자 · 인증</h2>
+    <section aria-labelledby={hideTitle ? undefined : 'fact-numbers'} className="flex flex-col gap-2" data-testid="fact-numbers">
+      {!hideTitle && <h2 id="fact-numbers" className="t-section text-slate-900">숫자 · 인증</h2>}
       {filled.length > 0 ? (
         <ul className="flex flex-col divide-y divide-slate-100">{filled.map((f) => row(f.key))}</ul>
       ) : (
