@@ -269,6 +269,7 @@ const PILOT_HIDDEN_EXTRA = [
   '/funding', '/reports', // AX 프로젝트에 붙는 자금 연계(프로젝트 없이는 빈 화면) · 옛 리포트 — 기관 전략(고급) 포함
   '/tools/review', // 도입 검토중(대표가 고르는 곳)
   '/modules/tech-biz', '/modules/ax-studio', '/modules/web-studio',
+  '/feedback/inbox', // D-188: 받은 피드백함은 대표만(팀장은 /feedback 에서 보내기만)
 ]
 const underBase = (pathname: string, base: string) => pathname === base || pathname.startsWith(`${base}/`)
 

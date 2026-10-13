@@ -36,6 +36,7 @@ import {
   wasShownThisSession,
 } from '../../services/tutorialPrefs'
 import { TUTORIAL_VIDEOS, minutesLabel } from '../../config/tutorialVideos'
+import { FEEDBACK_QUESTIONS, answeredCount, cleanAnswers, feedbackRound, summarizeFeedback, type FeedbackEntry } from '../../services/feedbackSurvey'
 
 let passed = 0
 let failed = 0
@@ -270,9 +271,10 @@ check('키: 상관없는 다른 사이트 값은 옮기지 않는다', !isUserSc
     '/ops/agents', '/sales/first-meeting', '/ops/inbox', '/getting-started', '/why', '/kpi', '/roadmap',
     '/studio', '/studio/abc', '/ax/open', '/clients', '/clients/org-1', '/projects/p1', '/diagnosis/surveys', '/website-studio',
     '/modules/tech-biz', '/modules/ax-studio', '/modules/web-studio', '/funding', '/funding/catalog', '/reports', '/tools/review', '/today/legacy',
+    '/feedback/inbox',
   ]
   for (const p of blocked) check(`주소: Pilot 에게 ${p} 막힘`, isPilotHiddenPath(p))
-  const open = ['/', '/today', '/journal', '/ops/clients', '/ops/clients/abc', '/ops/calendar', '/ops/decide', '/grants', '/money', '/sales/board', '/sales/new', '/tools', '/tools/tax', '/settings']
+  const open = ['/', '/today', '/journal', '/ops/clients', '/ops/clients/abc', '/ops/calendar', '/ops/decide', '/grants', '/money', '/sales/board', '/sales/new', '/tools', '/tools/tax', '/settings', '/feedback']
   for (const p of open) check(`주소: Pilot 에게 ${p} 열림`, !isPilotHiddenPath(p))
   check('주소: 비슷한 이름이 잘못 막히지 않음(/ops/clients 와 /clients)', !isPilotHiddenPath('/ops/clients/x') && isPilotHiddenPath('/clients/x'))
   check('표: 대표 전용 줄이 메뉴 표에 표시돼 있음(한 표에서 계산)', MODULES.filter((m) => m.ownerOnly).length >= 3)
@@ -398,6 +400,21 @@ check('키: 상관없는 다른 사이트 값은 옮기지 않는다', !isUserSc
   check('안내 영상: 키는 사람별 금고로 나뉜다(대표가 끈 것이 팀장님 쪽에 번지지 않음)', isUserScopedKey(TUTORIAL_PREFS_KEY) && isUserScopedKey(TUTORIAL_SHOWN_KEY))
   check('안내 영상: 1편 · 2편 — 가로(16:9) · 세로(9:16) 두 벌씩', TUTORIAL_VIDEOS.length === 2 && TUTORIAL_VIDEOS.every((v) => /-wide\.mp4$/.test(v.wide) && /-tall\.mp4$/.test(v.tall) && v.seconds > 60))
   check('안내 영상: 길이 표시 "약 5분"', minutesLabel(309) === '약 5분' && minutesLabel(20) === '약 1분')
+}
+
+// ---------- D-188: 개발자에게 피드백 — 설문 규칙 ----------
+{
+  check('피드백 회차: 1~15일 = 1차 · 16일~ = 2차(2주마다)', feedbackRound('2026-10-13').id === '2026-10-A' && feedbackRound('2026-10-13').label === '10월 1차 설문' && feedbackRound('2026-10-16').id === '2026-10-B' && feedbackRound('2026-12-31').label === '12월 2차 설문')
+  const kinds = FEEDBACK_QUESTIONS.map((q) => q.kind)
+  check('피드백 설문: 1~5점 · 여러 개 고르기 · 하나 고르기 · 직접 쓰기가 다 있다(마지막은 직접 쓰기)', ['rating', 'multi', 'single', 'text'].every((k) => kinds.includes(k as never)) && kinds[kinds.length - 1] === 'text')
+  check('피드백 설문: 여러 개 고르기 질문은 보기 5개 이상', FEEDBACK_QUESTIONS.filter((q) => q.kind === 'multi').every((q) => q.kind === 'multi' && q.options.length >= 5))
+  const raw = { easy: 4, docs: 9, reco: 2.5, used: ['고객 관리', '없는 보기', '서류 올리기'], pain: [], first: '서류함', note: '  업체 상세가 길어요  ' }
+  const clean = cleanAnswers(raw)
+  check('피드백 답 정리: 1~5 정수만 · 보기 밖 값 · 빈 고르기 · 앞뒤 빈칸 정리', clean.easy === 4 && clean.docs === undefined && clean.reco === undefined && JSON.stringify(clean.used) === JSON.stringify(['고객 관리', '서류 올리기']) && clean.pain === undefined && clean.first === '서류함' && clean.note === '업체 상세가 길어요')
+  check('피드백: 답한 질문 수 · 아무것도 안 했으면 0', answeredCount(raw) === 4 && answeredCount({}) === 0 && answeredCount({ note: '   ' }) === 0)
+  const mk = (id: string, answers: Record<string, unknown>): FeedbackEntry => ({ id, workspaceId: 'w', round: '2026-10-A', roundLabel: '10월 1차 설문', answers: cleanAnswers(answers as never), author: { id: 'u', name: '최은혜', title: '팀장', email: '' }, at: `2026-10-1${id}T09:00:00Z`, readAt: null, device: 'PC' })
+  const sum = summarizeFeedback([mk('1', { easy: 4, used: ['고객 관리', '서류 올리기'], note: '좋아요' }), mk('2', { easy: 5, used: ['고객 관리'], first: '서류함' })])
+  check('피드백 모아 보기: 점수 평균(4.5) · 많이 고른 것 순 · 하나 고르기 · 직접 쓴 말', sum.responses === 2 && sum.ratings.find((r) => r.id === 'easy')?.average === 4.5 && sum.ratings.find((r) => r.id === 'docs')?.average === null && sum.choices.find((c) => c.id === 'used')?.counts[0]?.option === '고객 관리' && sum.choices.find((c) => c.id === 'used')?.counts[0]?.count === 2 && sum.choices.find((c) => c.id === 'first')?.counts[0]?.option === '서류함' && sum.texts.length === 1 && sum.texts[0].text === '좋아요')
 }
 
 console.log(`pilot: ${passed} passed, ${failed} failed`)

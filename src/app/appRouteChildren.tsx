@@ -12,6 +12,9 @@ import { ModuleRoute } from '../tools/shared/ModuleRoute'
 import { EmptyModulePage } from '../pages/EmptyModulePage'
 import { ReportsRedirectPage } from '../pages/ReportsRedirectPage'
 
+// D-188: 개발자에게 피드백(팀장) · 받은 피드백함(대표)
+const FeedbackPage = lazy(() => import('../pages/FeedbackPage').then((m) => ({ default: m.FeedbackPage })))
+const FeedbackInboxPage = lazy(() => import('../pages/FeedbackInboxPage').then((m) => ({ default: m.FeedbackInboxPage })))
 const ClientsListPage = lazy(() =>
   import('../pages/ClientsListPage').then((m) => ({ default: m.ClientsListPage })),
 )
@@ -396,6 +399,8 @@ export const appRouteChildren = [
       { path: 'projects/:projectId', element: <ProjectDetailPage /> },
       { path: 'projects/:projectId/edit', element: <ProjectFormPage /> },
       { path: 'settings', element: <SettingsPage /> },
+      { path: 'feedback', element: <FeedbackPage /> },
+      { path: 'feedback/inbox', element: <FeedbackInboxPage /> },
       // D-185: 처음 사용 가이드는 없앴다(대표 지시) — 예전 주소는 오늘로
       { path: 'getting-started', element: <Navigate to="/" replace /> },
       { path: 'today', element: <Navigate to="/" replace /> },

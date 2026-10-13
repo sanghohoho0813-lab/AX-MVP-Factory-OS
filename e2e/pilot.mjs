@@ -575,6 +575,43 @@ try {
   check('팀장(D-188): 업무 탭에 고른 항목(기업부설연구소 설립)이 보이고 기본 6종은 여전히 없음', pWork2.includes('기업부설연구소 설립') && BUILTIN_WORDS.every((w) => !pWork2.includes(w)) && (await page.getByTestId('work-empty').count()) === 0)
   check('팀장(D-188): 업무 탭을 열고 저장해도 업체 기록의 기본 6종 칸은 그대로(DB)', ['incorporation', 'businessScope', 'patent', 'venture', 'ax', 'policyFund'].every((k) => JSON.parse(sql(`select payload::text from public.operations_clients where id = '${pc}'`) || '{}').services?.[k] !== undefined) && pkBefore.length > 0)
   await shot(page, 'pilot-06-work-items')
+
+  // D-188: 사이드바 아래 — 버전 글자 대신 [개발자에게 피드백](이번 회차 아직이면 '새 설문')
+  const side = (await page.locator('aside').first().innerText()) ?? ''
+  const fbBtn = page.locator('aside [data-testid="feedback-open"]').first()
+  check('팀장(D-188): 사이드바 아래 버전 글자(컨설팅 운영 · AX 스튜디오 · v0.1.0) 없음 · [개발자에게 피드백] · 새 설문 표시', !side.includes('v0.1.0') && !side.includes('컨설팅 운영 · AX 스튜디오') && (await fbBtn.count()) === 1 && (await fbBtn.getAttribute('data-fresh')) === '1' && (await fbBtn.innerText()).includes('개발자에게 피드백'), side.replace(/\n/g, '|').slice(-160))
+  await fbBtn.click()
+  await page.waitForURL(/\/feedback$/, { timeout: 10000 })
+  await page.waitForTimeout(600)
+  check('팀장(D-188): 설문 9문항(1~5점 4 · 여러 개 3 · 하나 1 · 직접 쓰기 1) · 보내기는 답하기 전 꺼짐', (await page.getByTestId('feedback-q').count()) === 9 && (await page.locator('[data-testid="feedback-q"][data-kind="rating"]').count()) === 4 && (await page.locator('[data-testid="feedback-q"][data-kind="multi"]').count()) === 3 && (await page.getByTestId('feedback-send').isDisabled()))
+  const q = (i) => page.getByTestId('feedback-q').nth(i)
+  await q(0).getByRole('radio', { name: '4점' }).click()
+  await q(4).getByRole('button', { name: '고객 관리', exact: true }).click()
+  await q(4).getByRole('button', { name: '서류 올리기', exact: true }).click()
+  await q(5).getByRole('button', { name: '휴대폰에서 쓰기 불편' }).click()
+  await q(7).getByRole('button', { name: '서류함', exact: true }).click()
+  await page.getByLabel(/그 밖에 하고 싶은 말/).fill('업체 상세에서 서류 탭이 바로 보였으면 좋겠어요')
+  check('팀장(D-188): 답한 질문 수 5 / 9 · 여러 개 고르기 두 개 다 켜짐', /5\s*\/\s*9/.test(await page.getByTestId('feedback-count').innerText()) && (await q(4).locator('[aria-pressed="true"]').count()) === 2)
+  await shot(page, 'pilot-07a-feedback-form')
+  {
+    const vp0 = page.viewportSize()
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.waitForTimeout(400)
+    check('팀장(D-188): 설문 휴대폰 390 — 가로 넘침 0 · 보내기 단추 화면 안', (await overflowX(page)) <= 0 && (await page.getByTestId('feedback-send').isVisible()))
+    if (SHOTS) await page.screenshot({ path: `${SHOTS}/pilot-07b-feedback-390.png` })
+    await page.setViewportSize(vp0)
+    await page.waitForTimeout(300)
+  }
+  await page.getByTestId('feedback-send').click()
+  await page.getByTestId('feedback-sent').waitFor({ timeout: 15000 }).catch(() => {})
+  const fbRow = JSON.parse(sql(`select coalesce((select payload::text from public.module_data where workspace_id = '${PILOT_WS}' and module_key = 'feedback' and bucket = 'responses' order by created_at desc limit 1), '{}')`) || '{}')
+  check('팀장(D-188): 보내면 "보냈어요" · 팀장 작업공간에 저장(DB) · 답 그대로 · 대표 작업공간엔 없음', (await page.getByTestId('feedback-sent').count()) === 1 && fbRow.answers?.easy === 4 && JSON.stringify(fbRow.answers?.used) === JSON.stringify(['고객 관리', '서류 올리기']) && fbRow.answers?.first === '서류함' && String(fbRow.answers?.note ?? '').includes('서류 탭') && fbRow.readAt === null && sql(`select count(*) from public.module_data where workspace_id = '${OWNER_WS}' and module_key = 'feedback'`) === '0', JSON.stringify(fbRow).slice(0, 300))
+  check('팀장(D-188): 내가 보낸 피드백 — "아직 안 읽음"', ((await page.getByTestId('feedback-history').innerText()) ?? '').includes('아직 안 읽음'))
+  await shot(page, 'pilot-07-feedback-sent')
+  await go(page, '/feedback/inbox')
+  check('팀장(D-188): 받은 피드백함 주소는 막힘(대표만)', (await bodyText(page)).includes('화면을 찾지 못했습니다'))
+  await go(page, '/')
+  check('팀장(D-188): 보낸 뒤 사이드바 "새 설문" 표시 사라짐', (await page.locator('aside [data-testid="feedback-open"]').first().getAttribute('data-fresh')) === '0')
   await go(page, '/ops/clients')
   const pHub = await bodyText(page)
   check('팀장(D-171): 고객 관리 — "잠재고객" 칸 · 돈 칸은 "미수금"', pHub.includes('잠재고객') && pHub.includes('미수금') && !pHub.includes('못 받은 내 돈'), pHub.slice(0, 300))
@@ -689,6 +726,29 @@ try {
     check('연구소(D-168): 메뉴 28번 오가도 화면이 그 메뉴로 바뀐다(멈춤 없음)', stuck.length === 0, stuck.slice(0, 4).join(' · '))
   }
 
+  /* ---------- D-188: 대표 — 받은 피드백함 · 빨간 숫자 · 종 · 읽음 ---------- */
+  {
+    await go(page, '/ops/clients')
+    const oside = (await page.locator('aside').first().innerText()) ?? ''
+    const inboxBtn = page.locator('aside [data-testid="feedback-inbox-open"]').first()
+    check('대표(D-188): 사이드바 아래 버전 글자 없음 · [받은 피드백함] + 새 피드백 1', !oside.includes('v0.1.0') && (await inboxBtn.count()) === 1 && (await inboxBtn.getAttribute('data-unread')) === '1', oside.replace(/\n/g, '|').slice(-160))
+    await page.locator('header button[aria-label^="챙길 것"]').first().click()
+    await page.waitForTimeout(300)
+    const bellFb = page.getByTestId('bell-feedback')
+    check('대표(D-188): 종에 "최은혜 팀장 — 새 피드백 1건"', (await bellFb.count()) === 1 && /최은혜.*새 피드백 1건/.test(await bellFb.innerText()), await bellFb.innerText().catch(() => ''))
+    await bellFb.click()
+    await page.waitForURL(/\/feedback\/inbox$/, { timeout: 10000 })
+    await page.getByTestId('feedback-entry').first().waitFor({ timeout: 10000 }).catch(() => {})
+    await page.waitForTimeout(1200)
+    const ent = page.getByTestId('feedback-entry').first()
+    const entText = (await ent.innerText()) ?? ''
+    check('대표(D-188): 받은 피드백함 — 보낸 사람 · 새로 표시 · 점수 · 고른 것 · 직접 쓴 말이 정리돼 보임', (await ent.getAttribute('data-fresh')) === '1' && entText.includes('최은혜') && entText.includes('고객 관리') && entText.includes('서류함') && entText.includes('서류 탭이 바로 보였으면'), entText.slice(0, 300))
+    check('대표(D-188): 모아 보기 — 편한가 평균 4 / 5', ((await page.getByTestId('feedback-avg').first().innerText()) ?? '').includes('4 / 5'))
+    const readAt = sql(`select coalesce(payload->>'readAt', '') from public.module_data where workspace_id = '${PILOT_WS}' and module_key = 'feedback' order by created_at desc limit 1`)
+    check('대표(D-188): 열면 읽음으로 적힘(DB readAt) · 사이드바 숫자 사라짐', readAt.length > 10 && (await page.locator('aside [data-testid="feedback-inbox-open"]').first().getAttribute('data-unread')) === '0', readAt)
+    await shot(page, 'owner-feedback-inbox')
+  }
+
   /* ---------- D-164: 대표 → 최은혜 팀장 화면 바로 보기(다시 로그인 없이) ---------- */
   await go(page, '/ops/clients')
   const vs = page.locator('header [data-testid="view-as-switch"]')
@@ -706,6 +766,9 @@ try {
     await go(page, `/ops/clients/${ec}?tab=work`)
     const vw = await bodyText(page)
     check('대표 → 팀장 화면(D-188): 업무 탭도 팀장처럼 — 기본 6종 없음 · 팀장이 고른 항목만', !vw.includes('특허 출원') && !vw.includes('AX 기획 및 개발') && vw.includes('기업부설연구소 설립'), vw.slice(0, 300))
+    await go(page, '/feedback')
+    await page.getByTestId('feedback-q').first().getByRole('radio', { name: '3점' }).click()
+    check('대표 → 팀장 화면(D-188): 피드백 설문은 미리 보기만(보내기 꺼짐 · 안내)', (await page.getByTestId('feedback-viewing').count()) === 1 && (await page.getByTestId('feedback-send').isDisabled()))
     await go(page, '/ops/clients')
   }
   await shot(page, 'owner-as-pilot')

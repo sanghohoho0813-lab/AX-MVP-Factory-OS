@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useNavPath } from '../../lib/navFrom'
 import { ChevronDown, ChevronsLeft, ChevronsRight, ExternalLink, X } from 'lucide-react'
-import { APP_VERSION } from '../../data/navigation'
+import { FeedbackNavButton } from '../feedback/FeedbackNavButton'
 import { brand } from '../../brand/brand.config'
 import { BrandLogo } from '../brand/BrandLogo'
 import {
@@ -251,11 +251,10 @@ function SidebarContent({
             <AccountSwitchItems tone="dark" />
           </div>
         )}
-        {!collapsed && (
-          <p className="t-meta truncate px-3 pt-2 pb-1 text-navy-300" title={`${brand.productSubtitle} · ${APP_VERSION}`}>
-            {brand.productSubtitle} · <span className="text-navy-200">{APP_VERSION}</span>
-          </p>
-        )}
+        {/* D-188: 예전 '컨설팅 운영 · AX 스튜디오 · v0.1.0' 글자 자리 — 팀장은 [개발자에게 피드백], 대표는 [받은 피드백함] */}
+        <div className="mt-2">
+          <FeedbackNavButton collapsed={collapsed} onNavigate={onNavigate} />
+        </div>
         {onToggleCollapsed && (
           <button
             type="button"

@@ -7,6 +7,7 @@ import { WorkspaceScope } from '../workspace/WorkspaceScope'
 import { todayLocalDate } from '../../lib/appClock'
 import type { OpsAlert } from '../../types/clientOps'
 import { useIsPilot } from '../../auth/osAccess'
+import { useFeedbackInbox } from '../feedback/useFeedback'
 
 /**
  * 헤더 알림 종 — 데모 상수가 아니라 실제 경고(마감·서류·수금)와 열린 고객 이벤트 수를 보여준다.
@@ -51,7 +52,10 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
   }, [workspaceId, version, pilot])
 
   const critical = useMemo(() => alerts.filter((a) => a.severity === 'critical'), [alerts])
-  const count = critical.length + events.length
+  // D-188: 팀장이 보낸 새 피드백 — 대표 종에도
+  const { entries: feedback, unread: feedbackUnread } = useFeedbackInbox()
+  const feedbackFrom = [...new Set((feedback ?? []).filter((e) => !e.readAt).map((e) => e.person))].join(' · ')
+  const count = critical.length + events.length + feedbackUnread
 
   return (
     <div ref={containerRef} className="relative">
@@ -76,6 +80,16 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
             <p className="px-4 py-4 text-[0.9rem] text-slate-500">{pilot ? '급한 경고가 없습니다.' : '급한 경고와 새 상담신청이 없습니다.'}</p>
           ) : (
             <ul className="max-h-80 overflow-y-auto">
+              {feedbackUnread > 0 && (
+                <li className="border-b border-slate-50">
+                  <Link to="/feedback/inbox" onClick={() => setOpen(false)} data-testid="bell-feedback" className="block px-4 py-2.5 hover:bg-slate-50">
+                    <span className="block text-[0.875rem] font-semibold text-amber-700">받은 피드백</span>
+                    <span className="block truncate text-[0.9rem] text-slate-700">
+                      {feedbackFrom || '팀장님'} — 새 피드백 {feedbackUnread}건
+                    </span>
+                  </Link>
+                </li>
+              )}
               {events.slice(0, 4).map((e) => (
                 <li key={e.id} className="border-b border-slate-50">
                   <Link to="/ops/inbox" onClick={() => setOpen(false)} className="block px-4 py-2.5 hover:bg-slate-50">
