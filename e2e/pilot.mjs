@@ -864,6 +864,13 @@ try {
   // 클라우드 저장 → 다른 쪽 화면도 새로 읽는다(손대지 않은 쪽만 새로 연다)
   await dualPc.locator('aside').getByRole('link', { name: '오늘' }).first().click()
   await page.waitForTimeout(3000)
+  // D-192: 휴대폰 오늘 화면은 '무슨 일이 있었나요?' 가 접혀 시작한다 — 펼쳐 둔다(이 기기에 기억 → 새로 읽어도 펼친 채)
+  const moCapture = dualMo.locator('[data-fold="today.capture"]')
+  await moCapture.waitFor({ timeout: 8000 }).catch(() => {})
+  if ((await moCapture.getAttribute('data-open').catch(() => '1')) === '0') {
+    await moCapture.getByTestId('fold-toggle').click()
+    await page.waitForTimeout(300)
+  }
   const memo = '동시보기 확인 메모 ' + Date.now().toString().slice(-5)
   await dualPc.getByLabel('기록 내용').first().fill(memo)
   await dualPc.getByRole('button', { name: /^기록$/ }).first().click()
