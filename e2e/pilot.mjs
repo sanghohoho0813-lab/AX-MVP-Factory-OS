@@ -697,10 +697,18 @@ try {
     await go(page, '/ops/clients')
     const asPilot = await bodyText(page)
     check('계정(D-184): 비밀번호만 넣고 팀장으로 — 팀장 업체만 · 대표 자료 0 · 이름 최은혜 팀장', asPilot.includes('은혜테스트정밀') && leaked(asPilot).length === 0 && /최은혜\s*팀장/.test(await page.locator('[data-testid="sidebar-account"]').innerText()), leaked(asPilot).join())
-    const toOwner = await switchVia(OWNER)
-    check('계정(D-184): 팀장 메뉴에는 "김상호 대표 계정으로 바꾸기"(돌아가기)', toOwner.info.n === 1 && toOwner.info.email === OWNER.email && /대표 계정으로 바꾸기/.test(toOwner.info.text), JSON.stringify(toOwner.info))
-    check('계정(D-184): 돌아가기 → 대표 이메일이 미리 들어감', toOwner.pre.email === OWNER.email && toOwner.pre.focus === 'password', JSON.stringify({ e: toOwner.pre.email, f: toOwner.pre.focus }))
+    // D-189: 팀장 메뉴에는 다른 계정으로 바꾸기가 없다(대표만 바꾼다) — 로그아웃만
+    await page.getByRole('button', { name: '사용자 메뉴' }).click()
+    await page.waitForTimeout(300)
+    const pMenu = (await page.getByTestId('account-switch').first().innerText()) ?? ''
+    check('계정(D-189): 팀장 메뉴에는 "김상호 대표 계정으로 바꾸기" 없음 · 다른 계정 줄 0 · 로그아웃만', (await page.getByTestId('account-switch-to').count()) === 0 && (await page.getByTestId('account-signout').count()) === 1 && !pMenu.includes('계정으로 바꾸기'), pMenu.replace(/\n/g, '|'))
+    await shot(page, 'acct-03-pilot-menu')
+    await page.getByTestId('account-signout').click()
+    await page.waitForURL((x) => x.pathname.startsWith('/login'), { timeout: 15000 }).catch(() => {})
+    await page.waitForTimeout(700)
+    check('계정(D-189): 팀장 로그아웃 → 로그인 화면(바꿀 계정 미리 넣기 없음)', page.url().includes('/login') && (await page.evaluate(() => document.getElementById('email')?.value ?? '')) === '')
     currentWho = OWNER
+    await page.locator('#email').fill(OWNER.email)
     await page.getByLabel('비밀번호').fill(OWNER.password)
     await page.getByRole('button', { name: /^로그인/ }).click()
     await page.waitForURL((x) => !x.pathname.startsWith('/login'), { timeout: 15000 }).catch(() => {})

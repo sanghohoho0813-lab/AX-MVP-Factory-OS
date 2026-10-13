@@ -231,7 +231,7 @@ export function FeedbackPage() {
           </span>
           <Button variant="primary" className="ml-auto" disabled={count === 0 || sending || Boolean(viewing)} onClick={() => void send()} data-testid="feedback-send">
             <Send aria-hidden="true" className="size-4" />
-            {sending ? '보내는 중…' : '대표님께 보내기'}
+            {sending ? '보내는 중…' : '피드백 보내기'}
           </Button>
         </div>
       </div>

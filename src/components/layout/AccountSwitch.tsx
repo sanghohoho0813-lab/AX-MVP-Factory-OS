@@ -16,7 +16,10 @@ import { accountLabel, clearSwitchTarget, otherAccounts, readRecentAccounts, set
 export function AccountSwitchItems({ tone, onPick }: { tone: 'light' | 'dark'; onPick?: () => void }) {
   const auth = useContext(AuthContext)
   const myEmail = auth?.session?.user.email ?? ''
-  const [others] = useState(() => otherAccounts(readRecentAccounts(), myEmail))
+  // D-189 대표: "팀장 아이디로 들어갔을 때는 본인 것 말고 다른 계정으로 바꿀 수 있는 게 없어야 — 오직 김상호 대표만."
+  // 계정 바꾸기는 대표(full) 계정에서만. 팀장(Pilot)은 로그아웃만 보인다.
+  const canSwitch = auth?.access === 'full'
+  const [others] = useState(() => (canSwitch ? otherAccounts(readRecentAccounts(), myEmail) : []))
   if (!auth || !auth.session) return null
   const row =
     tone === 'dark'
