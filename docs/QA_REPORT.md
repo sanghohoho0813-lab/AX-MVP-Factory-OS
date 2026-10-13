@@ -2746,3 +2746,15 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 - 팀장 격리: 새 `qa:isolation` 24개 전부 녹색 — API 55개 표 전수 공격 · 대표 작업공간 id 필터 · 저장소 조작 · 무작위 80걸음 · 검색 · REST 응답 전수 · JS 오류 0 · 대조(대표는 자기 업체 보임). 실패 스크린샷 0. 눈으로 본 것: 팀장 오늘 화면(오닉스 골드 · 등록된 업체 없음 · 대표 메뉴/전환 단추 없음). 판정(check)만으로 성공/실패를 센다 — 게이트 부하에서 종료 중 난 Playwright 시간 초과(격리 판정과 무관)는 결과를 가리지 않게 했고, 대조는 깨끗한 창에서 새로 로그인해 돌린다. pilot → isolation 을 잇따라 돌려도(게이트 순서) pilot 183 · isolation 24 녹색.
 - 게이트: 36단계 전부 녹색(53fee86) — tsc · lint · build · `test:all`(mirae-os 829 · pilot 126) · 화면 E2E 전부 · `qa:pilot` 183 · `qa:isolation` 24 · `modules` 896 · `db` ok · `cert` 153.
 - 확인 못 한 것: 실제 Supabase 로그인 · 실제 기기 동작은 확인하지 못했다(로컬 DB + 운영과 같은 빌드로 시험).
+
+## §123 D-187 새 업체 등록 창 — 서류만 넣어도 칸 채움 · 등록하면 서류함 · 분석 · 운영 주소 os.miraeailab.com (2026-10-13)
+
+- 단위(test:facts): 229 passed — D-187 22건(사업자등록증 · 등기 · 크레탑 읽기 · 믿는 순서 · 사진/검증/서류마다 다름 까닭 · 칸 순서 · 빈 칸만 채움 · 사람이 적은/손댄 칸 안 덮음 · 서류 빼면 서류로 채운 칸만 비움 · 넘기기 한 번만).
+- 업체 상세 e2e(qa:detail, 로컬): 248 passed — D-187 23건 × PC 1440 · 390:
+  서류 셋(사업자등록증 · 명부 · 메모) → 업체명 · 대표자 · 사업자번호 채움 · 휴대폰 안 채움 · 파일마다 읽은 것 → [등록하고 열기] → 업체 1곳만 · 서류 셋 모두 서류함 · 설립일 · 주소 · 명부 진단 · 맞춤 추천 탭 · 새로 고쳐도 서류 안 늘어남 /
+  크레탑만 → 셋 채움 · 검증 안 맞는 번호 안내 / 취소하면 서류 · 서류로 채운 값 버림 / 적어 둔 이름 안 덮음 · [서류 값으로] / 같은 업체 '열기' 에 넣은 서류도 그 업체로 / 가로 넘침 0 · 오류 0.
+- 팀장 클라우드(qa:pilot, 로컬 DB + PostgREST 진짜 RLS): 187 passed — D-187 4건: 팀장이 사업자등록증만 넣고 등록 → 팀장 작업공간에 저장 · 사업자번호 · 설립일 · 주소(DB) · 파일은 팀장 폴더로만 1건 · 대표 작업공간 업체 수 그대로.
+- 화면 육안: PC 1440 · 390 · 360 — 등록 창(서류 넣은 뒤) · 업체 상세 맞춤 추천. 서류를 넣으면 창이 길어져 [등록하고 열기] 가 화면 밖으로 나가던 것을 바닥 고정으로 고침 · 휴대폰에서 제목이 좁게 꺾이던 것을 단추를 글 밑으로 내려 고침.
+- 게이트 36단계 전부 녹색(8374cef): tsc · lint · build · test:all · simple · studio · board · todos · mobile · tools · tax · shell · modules · sales · journey · easy · steady · flow · real · squeeze · phone · facts · detail · files · taxplan · calendar · connect · enroll · planner · contract · grants · money · db · pilot · isolation · cert.
+- 운영 주소: https://os.miraeailab.com 과 https://ax-mvp-factory-os.vercel.app 가 같은 진입 번들을 내보내는 것을 curl 로 확인(배포 전 index-qr4Yrz-z.js 로 같음).
+- 확인하지 못한 것: 실제 운영 Supabase 의 Redirect URLs 설정(대시보드 권한 없음) · 진짜 스캔 PDF · 사진 OCR 로 등록 창을 채우는 실제 속도(시험은 글자 파일 · 로컬).
