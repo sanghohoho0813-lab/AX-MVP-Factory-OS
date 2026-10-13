@@ -765,6 +765,11 @@ await (async () => {
   const a5 = applyNewClientGuess({ ...a1.form, contactName: '최담당' }, {}, a1.filled)
   check('D-187 서류를 빼면 서류로 채운 그대로인 칸만 비우고 고친 칸은 둔다', a5.form.companyName === '' && a5.form.businessNumber === '' && a5.form.contactName === '최담당' && a5.form.contactPhone === '010-1234-5678')
 
+  const a6 = applyNewClientGuess({ ...blank, companyName: '' }, one.guess, {}, new Set(['companyName'] as const))
+  check('D-187 사람이 지운 칸(손댄 칸)은 비어 있어도 저절로 채우지 않고 "다름" 으로만', a6.form.companyName === '' && a6.differs.companyName?.value === '미래바이오랩' && a6.form.businessNumber === '124-81-00998')
+  const a7 = applyNewClientGuess(a1.form, {}, a1.filled, new Set(['businessNumber'] as const))
+  check('D-187 서류를 빼도 손댄 칸은 비우지 않음', a7.form.businessNumber === '124-81-00998' && a7.form.companyName === '')
+
   // 넘기기 — 업체 id 앞으로 맡기고 한 번만 꺼낸다
   const f = new File(['x'], 'a.txt', { type: 'text/plain' })
   handDocsTo('new1', [{ file: f, text: 'x', method: 'text' }])

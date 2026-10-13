@@ -533,6 +533,25 @@ try {
   check('흐름: 오늘 화면에 내 할 일 · 기록', todayAfter.includes('서류 받기') && todayAfter.includes('박대표와 통화') && leaked(todayAfter).length === 0)
   await shot(page, 'pilot-05-today-after')
   check('팀장(D-171): 오늘 돈 칸 이름이 "미수금"("못 받은 내 돈" 아님)', todayAfter.includes('미수금') && !todayAfter.includes('못 받은 내 돈'))
+
+  // D-187(클라우드 · 진짜 RLS): 팀장이 새 업체 등록 창에 사업자등록증만 넣으면 칸이 채워지고, 등록하면 서류함 · 회사 정보까지
+  await go(page, '/ops/clients?new=1')
+  await page.getByLabel('등록할 업체 서류 고르기').setInputFiles([{ name: '사업자등록증_은혜서류.txt', mimeType: 'text/plain', buffer: Buffer.from(['사업자등록증', '(법인사업자)', '등록번호 : 305-88-12340', '법인명(단체명) : 은혜서류정밀', '대표자 : 최서류', '개업연월일 : 2022 년 07 월 01 일', '사업장 소재지 : 경기도 수원시 영통구 광교로 7', '업태 : 제조업', '종목 : 정밀부품'].join('\n'), 'utf8') }])
+  await page.getByTestId('new-client-from-doc-companyName').waitFor({ timeout: 20000 }).catch(() => {})
+  check('팀장(D-187): 서류만 넣어도 업체명 · 대표자 · 사업자번호가 채워짐', (await page.getByLabel('업체명').inputValue()) === '은혜서류정밀' && (await page.getByLabel('대표자·담당자').inputValue()) === '최서류' && (await page.getByLabel('사업자등록번호').inputValue()) === '305-88-12340')
+  const upBefore = uploads.length
+  await page.getByRole('button', { name: '등록하고 열기' }).click()
+  await page.waitForURL(/\/ops\/clients\/[^/?]+/, { timeout: 15000 }).catch(() => {})
+  await page.getByTestId('smart-placed').waitFor({ timeout: 25000 }).catch(() => {})
+  await page.waitForTimeout(1200)
+  const dc = sql(`select id from public.operations_clients where workspace_id = '${PILOT_WS}' and company_name = '은혜서류정밀'`)
+  const dpay = JSON.parse(sql(`select payload::text from public.operations_clients where id = '${dc}'`) || '{}')
+  check('팀장(D-187): 업체가 팀장 작업공간에 저장 · 사업자번호 · 설립일 · 주소까지(DB)', dc.length > 0 && String(dpay.businessNumber ?? '') === '305-88-12340' && dpay.establishedAt === '2022-07-01' && String(dpay.businessAddress ?? '').includes('수원시'), JSON.stringify({ dc, b: dpay.businessNumber, e: dpay.establishedAt }))
+  const dbiz = dpay.documents?.businessRegistration
+  const newUps = uploads.slice(upBefore)
+  check('팀장(D-187): 넣은 서류가 다시 고르지 않아도 서류함에 · 팀장 폴더로만 올라감', !!dbiz?.fileName && String(dbiz?.storagePath ?? '').startsWith(`${PILOT_WS}/`) && newUps.length === 1 && newUps.every((u) => u.key.startsWith(`${PILOT_WS}/`) && u.who === PILOT.email), JSON.stringify({ dbiz, newUps }))
+  check('팀장(D-187): 대표 작업공간 업체 수 그대로 2', sql(`select count(*) from public.operations_clients where workspace_id = '${OWNER_WS}'`) === '2')
+  await shot(page, 'pilot-05b-new-client-docs')
   await go(page, `/ops/clients/${pc}?tab=work`)
   const pWork = await bodyText(page)
   check('팀장(D-171): 업무 탭에 대표가 만든 항목(세무기장 · 모두의 창업 2차) 없음', leaked(pWork).length === 0, leaked(pWork).join())

@@ -22,6 +22,7 @@ import {
   looksLikeCretopForNewClient,
   type CretopCompanyLite,
   type NewClientDocsRead,
+  type NewClientGuess,
 } from '../../services/newClientFromDocs'
 
 /** 한 창에서 받는 파일 수 — 등록 창은 기본 서류 몇 개를 넣는 곳(더 많으면 업체 상세에서) */
@@ -57,12 +58,18 @@ export function NewClientDocDrop({ onChange }: { onChange: (read: NewClientDocsR
   // 읽을 때마다 부르는 쪽에 알린다 — 사업자등록증을 읽자마자 칸이 채워진다
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
+  /** 찾은 값이 그대로면 같은 것을 넘긴다 — 읽는 중 진행률이 바뀔 때마다 칸을 다시 채우지 않게 */
+  const lastGuess = useRef<{ key: string; guess: NewClientGuess }>({ key: '{}', guess: {} })
   useEffect(() => {
     const done = items.filter((it) => it.status === 'done')
-    const { guess, files } = guessNewClientFromDocs(
+    const found = guessNewClientFromDocs(
       done.map((it) => ({ fileName: it.file.name, text: it.text, method: it.method })),
       cretop.filter((c) => done.some((it) => it.file.name === c.fileName)),
     )
+    const key = JSON.stringify(found.guess)
+    if (key !== lastGuess.current.key) lastGuess.current = { key, guess: found.guess }
+    const { guess } = lastGuess.current
+    const { files } = found
     onChangeRef.current({
       docs: items.map((it) => (it.status === 'done' ? { file: it.file, text: it.text, method: it.method } : { file: it.file })),
       guess,

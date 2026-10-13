@@ -203,11 +203,13 @@ export function guessNewClientFromDocs(
  * 찾은 값 → 등록 창 칸. 빈 칸 · 앞서 서류로 채운 그대로인 칸만 바꾼다(사람이 적은 것은 덮지 않는다).
  * 사람이 적은 값과 다르면 '다름' 으로 돌려준다 — 칸 밑에 [서류 값으로] 를 보인다.
  * 서류를 빼서 더 이상 찾지 못한 값은, 서류로 채운 그대로면 비운다.
+ * locked: 사람이 손댄 칸 — 비워 두었어도 저절로 채우지 않는다(다시 적으려고 지운 칸을 되채우지 않게).
  */
 export function applyNewClientGuess<F extends Record<NewClientField, string>>(
   form: F,
   guess: NewClientGuess,
   prevFilled: NewClientGuess,
+  locked: ReadonlySet<NewClientField> = new Set(),
 ): { form: F; filled: NewClientGuess; differs: NewClientGuess } {
   const next = { ...form }
   const filled: NewClientGuess = {}
@@ -216,9 +218,9 @@ export function applyNewClientGuess<F extends Record<NewClientField, string>>(
     const g = guess[field]
     const now = form[field] ?? ''
     const prev = prevFilled[field]
-    const untouched = now.trim() === '' || (prev !== undefined && now === prev.value)
+    const untouched = !locked.has(field) && (now.trim() === '' || (prev !== undefined && now === prev.value))
     if (!g) {
-      if (prev && now === prev.value) next[field] = '' as F[typeof field]
+      if (prev && now === prev.value && !locked.has(field)) next[field] = '' as F[typeof field]
       continue
     }
     if (untouched) {

@@ -147,9 +147,13 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const [docDiffers, setDocDiffers] = useState<NewClientGuess>({})
   const docFilledRef = useRef<NewClientGuess>({})
   docFilledRef.current = docFilled
+  /** D-187: 사람이 손댄 칸 — 서류가 저절로 채우지 않는다([서류 값으로] 를 누르면 다시 맡긴다) */
+  const touchedRef = useRef<Set<NewClientField>>(new Set())
+  const touch = (field: NewClientField) => touchedRef.current.add(field)
   useEffect(() => {
     if (formOpen) return
     createdRef.current = null
+    touchedRef.current = new Set()
     // D-187: 창을 닫으면 넣은 서류는 버린다 — 서류로 채운 그대로인 칸도 비운다(사람이 적은 것은 둔다)
     setDocsRead(EMPTY_DOCS_READ)
     setDocDiffers({})
@@ -181,7 +185,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
   const [form, setForm] = useState({ companyName: '', contactName: '', contactPhone: '', businessNumber: '' })
   // D-187: 서류에서 값을 찾을 때마다 빈 칸을 채운다(사람이 적은 칸은 덮지 않고 '다름' 으로)
   useEffect(() => {
-    const res = applyNewClientGuess(form, docsRead.guess, docFilledRef.current)
+    const res = applyNewClientGuess(form, docsRead.guess, docFilledRef.current, touchedRef.current)
     setForm(res.form)
     setDocFilled(res.filled)
     setDocDiffers(res.differs)
@@ -199,7 +203,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       )
     }
     const d = docDiffers[field]
-    if (d && form[field].trim() !== '') {
+    if (d) {
       return (
         <span data-testid={`new-client-differs-${field}`} className="t-meta mt-1 flex flex-wrap items-center gap-x-2 font-normal break-keep text-slate-600">
           <span>{d.docLabel}에는 ‘{d.value}’</span>
@@ -207,6 +211,7 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
             type="button"
             className="tap font-semibold text-brand-700 underline"
             onClick={() => {
+              touchedRef.current.delete(field)
               setForm((cur) => ({ ...cur, [field]: d.value }))
               setDocFilled((cur) => ({ ...cur, [field]: d }))
               setDocDiffers((cur) => {
@@ -1119,7 +1124,10 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                   autoFocus
                   required
                   value={form.companyName}
-                  onChange={(e) => setForm({ ...form, companyName: e.target.value })}
+                  onChange={(e) => {
+                    touch('companyName')
+                    setForm({ ...form, companyName: e.target.value })
+                  }}
                   className="mt-1.5 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2.5 text-[1rem]"
                 />
                 {docLine('companyName')}
@@ -1129,7 +1137,10 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                   대표자·담당자
                   <input
                     value={form.contactName}
-                    onChange={(e) => setForm({ ...form, contactName: e.target.value })}
+                    onChange={(e) => {
+                      touch('contactName')
+                      setForm({ ...form, contactName: e.target.value })
+                    }}
                     className="mt-1.5 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2.5 text-[1rem]"
                   />
                   {docLine('contactName')}
@@ -1148,7 +1159,10 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
                 사업자등록번호
                 <input
                   value={form.businessNumber}
-                  onChange={(e) => setForm({ ...form, businessNumber: e.target.value })}
+                  onChange={(e) => {
+                    touch('businessNumber')
+                    setForm({ ...form, businessNumber: e.target.value })
+                  }}
                   placeholder="000-00-00000"
                   className="mt-1.5 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2.5 text-[1rem]"
                 />
