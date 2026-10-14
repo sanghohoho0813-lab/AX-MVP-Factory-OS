@@ -48,11 +48,18 @@ for (const [w, h, mob] of [[1440, 900, false], [390, 844, true]]) {
   })
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
+  // 2026-10-14: 한 탭에서 전체 새로 읽기를 100번 가까이 하면, 버린 화면이 들고 있던 공유 메모리 임시 파일
+  //   (Playwright 크로미움은 /tmp 에 둔다 · 파일 하나에 약 2MB · 화면 한 번에 약 110MB)이 가비지 정리 전까지 쌓여
+  //   디스크가 모자라면 ERR_INSUFFICIENT_RESOURCES 로 실패한다(앱 문제 아님 — 앱 안 이동은 새로 읽지 않는다).
+  //   몇 화면마다 가비지 정리를 한 번 부른다(검사 내용은 그대로).
+  const cdp = await ctx.newCDPSession(page)
+  let visited = 0
   for (const [tool, secs] of Object.entries(SECTIONS)) {
     for (const s of secs) {
       for (const q of ['', '?client=cli_hansol']) {
         bucket = []
         const path = `/tools/${tool}/${s}${q}`
+        if (++visited % 8 === 0) await cdp.send('HeapProfiler.collectGarbage').catch(() => {})
         await page.goto(BASE + path, { waitUntil: 'networkidle' })
         await page.waitForTimeout(400)
         const r = await page.evaluate(() => ({
