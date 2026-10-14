@@ -272,11 +272,16 @@ check('키: 상관없는 다른 사이트 값은 옮기지 않는다', !isUserSc
     '/studio', '/studio/abc', '/ax/open', '/clients', '/clients/org-1', '/projects/p1', '/diagnosis/surveys', '/website-studio',
     '/modules/tech-biz', '/modules/ax-studio', '/modules/web-studio', '/funding', '/funding/catalog', '/reports', '/tools/review', '/today/legacy',
     '/feedback/inbox',
+    // D-195: 마케팅 · 브랜딩(콘텐츠 레이더)은 대표 전용
+    '/marketing', '/marketing/youtube',
   ]
   for (const p of blocked) check(`주소: Pilot 에게 ${p} 막힘`, isPilotHiddenPath(p))
   const open = ['/', '/today', '/journal', '/ops/clients', '/ops/clients/abc', '/ops/calendar', '/ops/decide', '/grants', '/money', '/sales/board', '/sales/new', '/tools', '/tools/tax', '/settings', '/feedback']
   for (const p of open) check(`주소: Pilot 에게 ${p} 열림`, !isPilotHiddenPath(p))
   check('주소: 비슷한 이름이 잘못 막히지 않음(/ops/clients 와 /clients)', !isPilotHiddenPath('/ops/clients/x') && isPilotHiddenPath('/clients/x'))
+  check('메뉴(D-195): Pilot 메뉴에 마케팅 · 브랜딩 없음 · 대표 메뉴에는 있음', !labels.includes('마케팅 · 브랜딩') && ownerMenu.flatMap((g) => g.items).some((m) => m.label === '마케팅 · 브랜딩'))
+  check('주소(D-195): 마케팅 아래 모든 주소 막힘 · 비슷한 이름(/marketingx)은 따로', isPilotHiddenPath('/marketing/youtube/x') && !isPilotHiddenPath('/marketingx'))
+  check('표(D-195): 마케팅은 대표 전용 줄(ownerOnly) — 따로 만든 권한 없이 같은 표', MODULES.find((m) => m.key === 'marketing')?.ownerOnly === true)
   check('표: 대표 전용 줄이 메뉴 표에 표시돼 있음(한 표에서 계산)', MODULES.filter((m) => m.ownerOnly).length >= 3)
 }
 

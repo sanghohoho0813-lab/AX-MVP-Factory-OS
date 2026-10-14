@@ -50,6 +50,9 @@ check('준비: pilot_provision.sql 로 Pilot 작업공간 하나 · 업체 0', P
 check('준비: 0019 씨앗 — 대표 full · Pilot pilot · 가입자 없음', sql(`select string_agg(tier || ':' || user_id, ',' order by tier) from public.os_access`) === `full:${OWNER.id},pilot:${PILOT.id}`)
 // D-171: 대표 작업공간에만 직접 만든 업무 항목 두 개(대표가 실제로 쓰는 이름 그대로)
 sql(`insert into public.ops_custom_services (workspace_id, key, label, short_label, sort_order) values ('${OWNER_WS}', 'custom_d171tax', '세무기장', '세무기장', 101), ('${OWNER_WS}', 'custom_d171start', '모두의 창업 2차', '모두의 창업', 102) on conflict (workspace_id, key) do nothing`)
+// D-195: 대표 작업공간의 콘텐츠 레이더 기록(수첩 아이디어 · 숨긴 주제) — 팀장에게는 화면도 REST 도 안 보여야 한다
+sql(`insert into public.module_data (id, workspace_id, module_key, bucket, payload) values ('idea_qa_owner_mkt', '${OWNER_WS}', 'marketing', 'ideas', '{"topic":"대표비밀 콘텐츠 주제","status":"selected","key":"axai:claude"}'::jsonb), ('radarprefs_${OWNER_WS}', '${OWNER_WS}', 'marketing', 'radar_prefs', '{"muted":["axai:claude"]}'::jsonb) on conflict (id) do nothing`)
+check('준비(D-195): 대표 작업공간에 콘텐츠 레이더 기록 2줄(수첩 · 설정)', sql(`select count(*) from public.module_data where workspace_id = '${OWNER_WS}' and module_key = 'marketing'`) === '2')
 check('준비(D-171): 대표 작업공간에 직접 만든 업무 항목 2개', sql(`select count(*) from public.ops_custom_services where workspace_id = '${OWNER_WS}' and key like 'custom_d171%'`) === '2')
 
 let PGRST = process.env.POSTGREST_BIN ?? '.cache/postgrest/postgrest'
@@ -391,6 +394,7 @@ try {
   check('Pilot 메뉴: 오늘 · 고객 관리 · 일정 · 매출 · 전문 모듈(기업성장 · 절세·재무) · 설정은 있음', ['오늘', '고객 관리', '매출', '기업성장', '절세·재무', '설정'].every((s) => nav.includes(s)), nav.replace(/\n/g, '|').slice(0, 400))
   check('메뉴(D-163): 정부지원사업 줄 없음 · 영업 묶음에 지원사업 알림 없음', !nav.includes('정부지원사업') && !/영업 관리\n지원사업 알림/.test(nav), nav.replace(/\n/g, '|').slice(0, 400))
   check('Pilot(D-164): 대표 ↔ 팀장 전환 단추 없음', (await page.getByTestId('view-as-switch').count()) === 0)
+  check('P3 Pilot 메뉴(D-195): 마케팅 · 브랜딩 없음(대표 전용)', !nav.includes('마케팅'), nav.replace(/\n/g, '|').slice(0, 400))
   check('Pilot(D-164): 머리줄 글자 크기 단추 없음 · 보기 방식(PC · Mobile · PC+Mobile) 단추 있음', (await page.locator('header [data-testid="text-scale-quick"]').count()) === 0 && (await page.locator('header [data-testid="device-switch"]').count()) === 1)
   check('Pilot 머리줄: 고객 플랫폼 링크 없음', (await page.locator('header').innerText()).includes('고객 플랫폼') === false)
 
@@ -402,7 +406,7 @@ try {
   }
   await go(page, `/ops/clients/${OWNER_CLIENT}`)
   check('Pilot 교차: 대표 업체 주소 → "찾지 못했습니다"', /찾지 못|없는 업체|없습니다/.test(await bodyText(page)))
-  for (const p of ['/ops/inbox', '/ops/agents', '/sales/first-meeting', '/getting-started', '/why', '/kpi', '/roadmap', '/studio', '/clients', '/ax/open?client=' + OWNER_CLIENT, '/website-studio', '/modules/tech-biz', '/funding', '/tools/review']) {
+  for (const p of ['/ops/inbox', '/ops/agents', '/sales/first-meeting', '/getting-started', '/why', '/kpi', '/roadmap', '/studio', '/clients', '/ax/open?client=' + OWNER_CLIENT, '/website-studio', '/modules/tech-biz', '/funding', '/tools/review', '/marketing', '/marketing/youtube', '/marketing/youtube?view=analysis', '/marketing/youtube?view=channels&p=month']) {
     await go(page, p)
     check(`Pilot 주소 막힘: ${p}`, (await bodyText(page)).includes('화면을 찾지 못했습니다'), (await bodyText(page)).slice(0, 120))
   }
@@ -427,6 +431,13 @@ try {
     await page.waitForTimeout(700)
     check(`Pilot 찾기: "${q}" → 대표 자료 0`, (await search.isVisible()) && leaked(await bodyText(page)).length === 0, leaked(await bodyText(page)).join())
   }
+  // D-195 P4: 찾기(Ctrl+K)로도 마케팅 · 콘텐츠 레이더가 안 나온다
+  for (const q of ['마케팅', '유튜브', '콘텐츠 레이더']) {
+    await search.fill(q)
+    await page.waitForTimeout(700)
+    const t = await bodyText(page)
+    check(`P4 Pilot 찾기: "${q}" → 마케팅 · 콘텐츠 레이더 결과 0`, (await search.isVisible()) && !t.includes('마케팅 · 브랜딩') && !t.includes('콘텐츠 레이더') && (await page.locator('a[href^="/marketing"]').count()) === 0, t.slice(0, 200))
+  }
   await page.keyboard.press('Escape')
   await page.getByRole('button', { name: /챙길 것/ }).first().click().catch(() => {})
   await page.waitForTimeout(500)
@@ -448,12 +459,15 @@ try {
     out.insert = await fetch(`${base}/operations_clients`, { method: 'POST', headers: h, body: JSON.stringify({ id: 'pilot-into-owner', workspace_id: ws, company_name: '몰래 넣기' }) }).then((r) => r.status)
     out.ws2 = await fetch(`${base}/rpc/create_workspace`, { method: 'POST', headers: h, body: JSON.stringify({ p_name: '두 번째' }) }).then((r) => r.status)
     out.tier = await fetch(`${base}/os_access?user_id=eq.${s.user.id}`, { method: 'PATCH', headers: h, body: JSON.stringify({ tier: 'full' }) }).then((r) => r.status)
+    out.mkt = await fetch(`${base}/module_data?module_key=eq.marketing&select=*`, { headers: h }).then((r) => r.text())
+    out.mktById = await fetch(`${base}/module_data?id=eq.idea_qa_owner_mkt`, { headers: h }).then((r) => r.text())
     out.lvPatch = await fetch(`${base}/consulting_projects?id=eq.qa-legacy-venture`, { method: 'PATCH', headers: h, body: JSON.stringify({ payload: { venture: { submittedAt: '2099-01-01' } } }) }).then((r) => r.text())
     return out
   }, [REF, OWNER_WS, OWNER_CLIENT])
   check('Pilot REST(D-180 S8): 대표의 예전 벤처 기록 고치기 = 0줄 · DB 그대로', direct.lvPatch === '[]' && sql(`select payload->'venture'->>'submittedAt' from public.consulting_projects where id = 'qa-legacy-venture'`) === '2026-07-15', direct.lvPatch)
   check('Pilot REST: 표 8개 어디에도 대표 자료 없음', Object.entries(direct).filter(([k]) => !['patch', 'del', 'insert', 'ws2', 'tier'].includes(k)).every(([, v]) => leaked(String(v)).length === 0 && !String(v).includes(OWNER_WS)), JSON.stringify(direct).slice(0, 400))
   check('Pilot REST: 대표 업체 id 로 읽기 = []', direct.byId === '[]', direct.byId)
+  check('P9 Pilot REST(D-195): 대표 콘텐츠 레이더 기록(module_data · marketing) 읽기 = [] · id 로도 []', direct.mkt === '[]' && direct.mktById === '[]', `${direct.mkt} ${direct.mktById}`)
   check('Pilot REST: 대표 업체 고치기 · 지우기 = 0줄', direct.patch === '[]' && direct.del === '[]', `${direct.patch} ${direct.del}`)
   check('Pilot REST: 대표 작업공간으로 업체 넣기 막힘', direct.insert >= 400, String(direct.insert))
   check('Pilot REST: 작업공간 하나 더 만들기 막힘', direct.ws2 >= 400, String(direct.ws2))
@@ -795,8 +809,14 @@ try {
   const pnav = (await page.locator('aside').first().innerText()) ?? ''
   check('대표 → 팀장 화면: 메뉴가 팀장과 같다(영업자 정산 · 상담신청 · 이 시스템 없음)', !pnav.includes('영업자 정산') && !pnav.includes('상담신청') && !pnav.includes('이 시스템'), pnav.replace(/\n/g, '|').slice(0, 300))
   check('대표 → 팀장 화면: 이름 칸 "최은혜 팀장"', /최은혜\s*팀장/.test(await page.locator('[data-testid="sidebar-account"]').innerText()))
+  check('P7 대표 → 팀장 화면(D-195): 마케팅 · 브랜딩 메뉴 없음', !pnav.includes('마케팅'), pnav.replace(/\n/g, '|').slice(0, 300))
   await go(page, '/ops/agents')
   check('대표 → 팀장 화면: 대표 전용 주소도 팀장처럼 막힘', (await bodyText(page)).includes('화면을 찾지 못했습니다'))
+  for (const p of ['/marketing', '/marketing/youtube', '/marketing/youtube?view=analysis']) {
+    await go(page, p)
+    const t = await bodyText(page)
+    check(`P8 대표 → 팀장 화면(D-195): ${p} 막힘 · 대표 콘텐츠 기록 0`, t.includes('화면을 찾지 못했습니다') && (await page.getByTestId('yt-page').count()) === 0 && leaked(t).length === 0, t.slice(0, 120))
+  }
   await go(page, '/settings')
   check('대표 → 팀장 화면: 설정 이름 칸 대신 안내(여기서 저장하면 대표 이름이 바뀌므로)', (await page.getByTestId('name-editor-viewing').count()) === 1 && (await page.getByTestId('name-input').count()) === 0)
   await go(page, '/')
@@ -806,6 +826,11 @@ try {
   await go(page, '/ops/clients')
   const back2 = await bodyText(page)
   check('팀장 → 대표 화면: 대표 업체 다시 · 팀장 줄 없음 · 대표 메뉴', back2.includes('대표비밀정밀') && (await page.getByTestId('viewing-pilot').count()) === 0 && ((await page.locator('aside').first().innerText()) ?? '').includes('영업자 정산'))
+  check('P1 대표(D-195): 마케팅 · 브랜딩 메뉴 보임', ((await page.locator('aside').first().innerText()) ?? '').includes('마케팅 · 브랜딩'))
+  await go(page, '/marketing/youtube')
+  check('P2 대표(D-195): /marketing/youtube 열림(콘텐츠 레이더 화면)', (await page.getByTestId('yt-page').count()) === 1 && !(await bodyText(page)).includes('화면을 찾지 못했습니다'))
+  check('대표 데이터 그대로(D-195): 대표 콘텐츠 레이더 기록 2줄 · 지워지거나 옮겨지지 않음', sql(`select count(*) from public.module_data where workspace_id = '${OWNER_WS}' and module_key = 'marketing'`) === '2')
+  await go(page, '/ops/clients')
   check('DB(D-164): 팀장 작업공간 구성원 = 팀장(owner) · 대표(editor)', sql(`select string_agg(m.role::text, ',' order by m.role::text) from public.workspace_members m where m.workspace_id = '${PILOT_WS}'`) === 'editor,owner')
   check('DB(D-164): 팀장은 여전히 대표 작업공간 구성원 아님', sql(`select count(*) from public.workspace_members where workspace_id = '${OWNER_WS}' and user_id = '${PILOT.id}'`) === '0')
 
@@ -914,6 +939,7 @@ try {
   await mp.waitForTimeout(500)
   const drawer = await bodyText(mp)
   check('390 Pilot: 메뉴 열어도 숨긴 묶음 없음', !drawer.includes('잘 안 쓰는 기능') && !drawer.includes('이 시스템') && !drawer.includes('영업자 정산'))
+  check('P3 390 Pilot(D-195): 휴대폰 메뉴 · 하단 메뉴에 마케팅 없음', !drawer.includes('마케팅') && !bottom.includes('마케팅'))
   await shot(mp, 'pilot-m02-menu')
   // D-184: 휴대폰 서랍에 로그아웃(예전에는 휴대폰에서 로그아웃할 곳이 없었다) — 이 기기에는 팀장 계정 하나뿐이라 '바꾸기' 줄은 없다
   check('390 Pilot(D-184): 서랍에 로그아웃 단추 · 다른 계정 줄 없음(이 기기엔 팀장만)', (await mp.getByTestId('account-signout').count()) === 1 && (await mp.getByTestId('account-switch-to').count()) === 0)

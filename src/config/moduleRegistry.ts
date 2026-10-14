@@ -222,7 +222,9 @@ export const MODULES: ModuleDefinition[] = [
   { key: 'money', label: '매출 · 비용', path: '/money', icon: Wallet, group: 'sales', accent: 'revenue', enabled: true, hint: '들어온 돈 · 들어올 예정 · 정기 결제일 · 쓴 돈' },
   // D-169: 마케팅 · 브랜딩(블로그 · 유튜브 · SNS) — 도입 예정. 지금은 안내 화면만
   // D-193: 유튜브 벤치마킹이 들어와 '준비 중' 을 뗐다(블로그 · 릴스 · SNS 는 화면 안에서 도입 예정)
-  { key: 'marketing', label: '마케팅 · 브랜딩', path: '/marketing', icon: Megaphone, group: 'sales', accent: 'revenue', enabled: true, hint: '콘텐츠 레이더(YouTube 벤치마킹) · 블로그 · 릴스 · SNS(도입 예정)' },
+  // D-195: 마케팅 · 브랜딩은 대표(full) 전용 — 대표의 콘텐츠 전략 · 내 채널 분석이 들어 있다. 팀장(Pilot) · 대표가 팀장 화면으로 볼 때는
+  //   메뉴 · 찾기 · 휴대폰 메뉴 · 직접 주소(/marketing/…) 모두 닫힌다(isPilotHiddenPath · PilotRouteGuard 한 곳에서 — 권한 판정을 두 벌 만들지 않는다)
+  { key: 'marketing', label: '마케팅 · 브랜딩', path: '/marketing', icon: Megaphone, group: 'sales', accent: 'revenue', enabled: true, hint: '콘텐츠 레이더(YouTube 벤치마킹) · 블로그 · 릴스 · SNS(도입 예정)', ownerOnly: true },
   // 만들고 있는 프로그램이 들어올 자리 — 들어오면 status 를 지우고 화면만 바꾼다 (docs/DECISIONS D-103)
   { key: 'first-meeting', label: '1차 미팅 체크리스트', path: '/sales/first-meeting', icon: ClipboardCheck, group: 'sales', accent: 'revenue', enabled: true, status: 'soon', badge: 'first-meetings', hint: '영업자용 AX 1차 미팅 체크리스트 — 만드는 중', ownerOnly: true },
 

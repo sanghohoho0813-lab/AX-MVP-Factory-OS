@@ -621,6 +621,15 @@ function opportunity(axis: ContentAxis, c: Cluster, hot: readonly PatternStat[],
   }
 }
 
+/** 후보 키('축:주제') → 화면 이름(숨긴 주제 목록 · 데이터가 없어 후보에 없을 때도) */
+export function opportunityLabel(key: string): { axis: ContentAxis | null; label: string } {
+  const [axis, id] = key.split(':')
+  const def = TOPIC_BY_ID.get(id ?? '')
+  const ax = axis === 'market' || axis === 'axai' || axis === 'bridge' ? axis : null
+  if (!def) return { axis: ax, label: key }
+  return { axis: ax, label: ax === 'bridge' && def.bridge?.name ? `${def.label} × ${def.bridge.name}` : def.label }
+}
+
 export interface RadarPlan {
   /** 최대 10개 — 앞 5개가 '이번 주 찍을 것' */
   picks: Opportunity[]

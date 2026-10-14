@@ -59,7 +59,7 @@ npm run qa:planner -- http://localhost:4390       # 일정 달력(쉬는 날 빨
 npm run qa:contract -- http://localhost:4390      # 계약 → 받은 돈 → 남은 돈(CASE 1~4 · 조건 대기 ≠ 미수금 · 정책자금 실제 입금 · 입금 확인/되돌리기 · 계약 상태 배지)
 npm run qa:grants -- http://localhost:4390        # 지원사업 알림(공고 붙여넣기 · 맞는 업체 계약/잠재 · 카톡 문구 · 오늘 · 가망고객 찾기 화면 · 알림 신청 → 상담신청함 → 잠재고객 · 기업마당 받아오기 · 맞춤 기준 · 고객 관리/보드/오늘 연결 · 신청 준비 → 서류 대조 · 카톡 요청)
 npm run qa:money -- http://localhost:4390         # 매출 · 비용(계약 수금 → 들어온 돈/예상 · 정기 결제일 · 비용 적기 · CSV · 해지 · 오늘 3일 안 결제 · 오늘 할 일 PC 두 칸 · AI 자리 단추)
-npm run qa:youtube -- http://localhost:4390       # 콘텐츠 레이더(이번 주 찍을 것 · 근거 · 상세 · 수첩 저장/다시 읽기 · 채널 네 묶음 · 비중 가이드 · 금지 문구 · LLM 주소 0 · 키 번들 0 · 360/390/430) + D-193 벤치마킹(키워드 · 순위 · 분석 · CSV · googleapis 직접 호출 0)
+npm run qa:youtube -- http://localhost:4390       # 콘텐츠 레이더(1순위 HERO · 2·3 작게 · 근거 보기 · 이번 주로 확정 · 관심 없음/되살리기 · 수첩 · 채널 네 묶음 · 추천 기준 · 금지 문구 · LLM 주소 0 · 키 번들 0 · 360/390/430) + D-193 벤치마킹(키워드 · 순위 · 분석 · CSV · googleapis 직접 호출 0) — 마케팅은 대표 전용(팀장 막힘은 qa:pilot · qa:isolation)
 npm run qa:db                                     # DB 보안(로컬 PostgreSQL · 마이그레이션 전부 · RLS · 0016~0019 공격 · 모든 표 격리) — pg_ctlcluster 16 main start 먼저
 npm run qa:pilot                                  # 1인 Pilot 교차(로컬 DB + PostgREST 진짜 RLS · 대표 ↔ Pilot ↔ 가입자 · 같은 브라우저 · 주소 · 찾기 · 업무 흐름 · 390 · 팀장 업무 항목(기본 6종 숨김 · 상품표 40) · 피드백 → 받은 피드백함)
 npm run qa:isolation                              # 팀장 격리 집중(진짜 RLS · 모든 표 API 공격 · 저장소 조작 · 무작위 80걸음 — 팀장은 대표 화면/자료 0) — pg_ctlcluster 16 main start 먼저

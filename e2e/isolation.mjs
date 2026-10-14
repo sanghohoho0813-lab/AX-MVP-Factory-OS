@@ -192,8 +192,8 @@ try {
   check('저장소 조작: 저장된 작업공간이 내 것으로 되돌려짐(대표 id 아님)', tamperWs !== OWNER_WS && tamperWs !== null, String(tamperWs))
 
   /* ===== 3. 무작위 UI 두드리기 — 허용 · 숨김 · 대표 전용 주소를 섞어 ===== */
-  const PILOT_OK = ['/', '/ops/clients', '/ops/decide', '/ops/calendar', '/journal', '/money', '/grants', '/marketing', '/settings', '/tools', '/tools/tax', '/tools/employment', '/tools/labcare', '/tools/cert-os', '/tools/startup-tax', '/tools/policy-funding']
-  const OWNER_ONLY = ['/studio', '/diagnosis', '/validation', '/selection', '/mvp-design', '/deliverables', '/website-studio', '/funding', '/reports', '/cases', '/sales/board', '/sales/first-meeting', '/ops/inbox', '/kpi', '/roadmap', '/why', '/getting-started', '/tools/cretop', '/tools/sales-kit', '/tools/review', '/modules/tech-biz']
+  const PILOT_OK = ['/', '/ops/clients', '/ops/decide', '/ops/calendar', '/journal', '/money', '/grants', '/settings', '/tools', '/tools/tax', '/tools/employment', '/tools/labcare', '/tools/cert-os', '/tools/startup-tax', '/tools/policy-funding']
+  const OWNER_ONLY = ['/studio', '/diagnosis', '/validation', '/selection', '/mvp-design', '/deliverables', '/website-studio', '/funding', '/reports', '/cases', '/sales/board', '/sales/first-meeting', '/ops/inbox', '/kpi', '/roadmap', '/why', '/getting-started', '/tools/cretop', '/tools/sales-kit', '/tools/review', '/modules/tech-biz', '/marketing', '/marketing/youtube', '/marketing/youtube?view=analysis']
   const DEEP = [`/ops/clients/${OWNER_CLIENT}`, `/tools/tax?client=${OWNER_CLIENT}`, `/tools/cert-os?client=${OWNER_CLIENT}`, `/ops/clients/${OWNER_CLIENT}?tab=consulting`, `/ops/clients/${OWNER_CLIENT}?tab=portal`, `/journal/day`, `/ops/clients?new=1`]
   const POOL = [...PILOT_OK, ...OWNER_ONLY, ...DEEP]
   const STEPS = Number(process.env.ISO_STEPS ?? 80)
@@ -213,7 +213,7 @@ try {
     const vas = (await page.getByTestId('view-as-switch').count()) + (await page.getByTestId('view-as-compact').count())
     const banner = await page.getByTestId('viewing-pilot').count()
     const nav = (await page.locator('aside').first().innerText().catch(() => '')) ?? ''
-    const ownerMenu = ['영업자 정산', '이 시스템', '잘 안 쓰는 기능', '정부지원사업'].filter((m) => nav.includes(m))
+    const ownerMenu = ['영업자 정산', '이 시스템', '잘 안 쓰는 기능', '정부지원사업', '마케팅 · 브랜딩'].filter((m) => nav.includes(m))
     trail.push(act)
     if (lk.length || ownerName || vas > 0 || banner > 0 || ownerMenu.length) {
       check(`무작위 ${i} (${act}): 대표 자료 · 이름 · 전환단추 · 대표메뉴 0`, false, `leak=${lk.join()} name=${ownerName} vas=${vas} banner=${banner} menu=${ownerMenu.join()}`)

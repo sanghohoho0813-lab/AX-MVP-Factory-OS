@@ -284,7 +284,17 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
   check('레이더: 이번 주 5개에 시장수요 · AX·AI · BRIDGE 가 섞인다(비중 가이드 45 · 35 · 20)', ['market', 'axai', 'bridge'].every((a) => axes.includes(a)), axes)
   const first = tops.first()
   const strengthText = (await first.getByTestId('radar-strength').innerText()) ?? ''
-  check('레이더 카드: 신호 세기(강함 · 보통 · 초기 — 점수 없음) · 왜 지금 2줄 넘게 · 증거 · MIRAE 관점', /신호 (강함|보통)|초기 신호/.test(strengthText) && !/\d+점/.test(strengthText) && (await first.getByTestId('radar-why').locator('li').count()) >= 2 && ((await first.getByTestId('radar-evidence').innerText()) ?? '').includes('관련 영상') && ((await first.getByTestId('radar-view').innerText()) ?? '').length > 15)
+  // D-195 UX 3.0 — 1순위 하나만 크게 · 2 · 3 작게 · 기본 상태는 결정 → 이유(한 문장 · 근거 2개) → MIRAE 관점
+  const heroBox = await page.locator('[data-testid="radar-opp"][data-size="hero"]').boundingBox()
+  const subBoxes = await page.locator('[data-testid="radar-opp"][data-size="sub"]').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().width * e.getBoundingClientRect().height))
+  check('U1 1순위 HERO 하나 · "이번 주 1순위" · 맨 앞 카드', (await page.locator('[data-size="hero"]').count()) === 1 && (await first.getAttribute('data-size')) === 'hero' && (await first.getByTestId('radar-rank1').innerText()).includes('이번 주 1순위'))
+  check('U2 2 · 3순위는 작게(카드 넓이가 1순위보다 작음)', subBoxes.length === 2 && !!heroBox && subBoxes.every((a) => a < heroBox.width * heroBox.height), { hero: heroBox && heroBox.width * heroBox.height, subBoxes })
+  check('U3 기본 상태에서는 벤치마킹 썸네일을 보이지 않는다(위 3장)', (await page.getByTestId('radar-top').getByTestId('radar-bench-thumb').count()) === 0)
+  const why = ((await first.getByTestId('radar-why').innerText()) ?? '').trim()
+  check('U5 왜 지금은 사람이 읽는 한 문장 · 핵심 근거는 2개까지', /채널/.test(why) && why.endsWith('.') && !why.includes('\n') && (why.match(/\./g) ?? []).length <= 2 && (await first.getByTestId('radar-fact').count()) >= 1 && (await first.getByTestId('radar-fact').count()) <= 2, why)
+  check('레이더 카드: 신호 세기(강함 · 보통 · 초기 — 점수 없음) · MIRAE 관점 · 제목 예', /신호 (강함|보통)|초기 신호/.test(strengthText) && !/\d+점/.test(strengthText) && ((await first.getByTestId('radar-view').innerText()) ?? '').length > 15 && ((await first.innerText()) ?? '').includes('제목 예'))
+  check('U6 4 · 5위는 한 줄 · U7 6~10위는 [후보 더 보기] 뒤', (await page.getByTestId('radar-opp-compact').count()) === 2 && (await page.getByTestId('radar-more-list').count()) === 0 && ((await page.getByTestId('radar-more').count()) === 1 || (await page.getByTestId('radar-more-list').count()) === 0))
+  check('첫 화면 머리: 받은 때 · 채널 수는 작은 글 · 비중 가이드는 [추천 기준] 뒤', (await page.getByTestId('radar-mix-panel').count()) === 0 && ((await page.getByTestId('radar-mix').innerText()) ?? '').includes('추천 기준') && (await page.getByTestId('yt-feedline').evaluate((e) => parseFloat(getComputedStyle(e).fontSize))) < (await page.locator('#radar-plan-h').evaluate((e) => parseFloat(getComputedStyle(e).fontSize))))
   check('레이더: AI · AX 채널이 있으니 "AI 데이터 부족" 안내는 없다', (await page.getByTestId('radar-ai-short').count()) === 0)
   const mainText = (await page.locator('main').innerText()) ?? ''
   check('문구: "AI 추천 · AI가 분석 · 성공 가능 % · 이 영상은 뜹니다" 같은 말이 없다(근거 → 제안)', FORBIDDEN.every((w) => !mainText.includes(w)), FORBIDDEN.filter((w) => mainText.includes(w)))
@@ -293,7 +303,9 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
 
   await first.getByTestId('radar-opp-more').click()
   await page.waitForTimeout(200)
-  check('카드 펼치기: 제목 후보 3 · 썸네일 문구 2 · 추천 접근 · 대표 벤치마킹', (await first.getByTestId('radar-title').count()) === 3 && (await first.getByTestId('radar-thumb-text').count()) === 2 && ((await first.getByTestId('radar-approach').innerText()) ?? '').includes('추천 접근') && (await first.getByTestId('radar-video-row').count()) >= 2)
+  const nBench = await first.getByTestId('radar-bench-thumb').count()
+  check('U4 근거 보기: 벤치마킹 영상(썸네일 · 배수 · 제목) 1~3편 · 제목 후보 3 · 썸네일 문구 2 · 추천 접근', nBench >= 1 && nBench <= 3 && (await first.getByTestId('radar-title').count()) === 3 && (await first.getByTestId('radar-thumb-text').count()) === 2 && ((await first.getByTestId('radar-approach').innerText()) ?? '').includes('추천 접근'), nBench)
+  check('근거 보기: 숫자는 여기에 다 있다(관련 영상 · 채널 · 묶음별 n곳 중 m곳)', ((await first.getByTestId('radar-evidence').innerText()) ?? '').includes('관련 영상') && /\d+곳 중 \d+곳/.test((await first.getByTestId('radar-coverage').innerText()) ?? ''))
   await first.getByTestId('radar-bench-thumb').first().click()
   await page.waitForTimeout(300)
   const det = page.getByTestId('radar-video-detail')
@@ -302,7 +314,7 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
   await page.waitForTimeout(200)
   check('영상 상세: Esc 로 닫힘', (await det.count()) === 0)
 
-  // 수첩 — 저장 · 다시 읽기 · 단계 · 브리프 · 빼기
+  // 수첩 — 저장 · 다시 읽기 · 단계 · 브리프 · 빼기([아이디어로 담기] 는 근거 보기 안)
   const topic = ((await first.getByTestId('radar-opp-topic').innerText()) ?? '').trim()
   await first.getByTestId('radar-save').click()
   await page.waitForTimeout(400)
@@ -325,8 +337,52 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
   await page.waitForTimeout(400)
   check('빼면 수첩에서 사라진다', (await page.getByTestId('radar-idea').count()) === 0)
 
+  // U8 · U9 — [이번 주로 확정] → 기존 수첩에 '제작 예정' · 다시 눌러도 줄이 늘지 않음
+  const heroCard = page.locator('[data-testid="radar-opp"][data-size="hero"]')
+  const heroTopic = ((await heroCard.getByTestId('radar-opp-topic').innerText()) ?? '').trim()
+  await heroCard.getByTestId('radar-confirm').click()
+  await page.waitForTimeout(500)
+  check('U8 이번 주로 확정 → 수첩에 "제작 예정" 1줄 · 카드에 "이번 주 제작 예정" · 위에 작은 제작 예정 줄', (await page.getByTestId('radar-idea').count()) === 1 && (await page.getByTestId('radar-idea').first().getAttribute('data-status')) === 'selected' && ((await heroCard.getByTestId('radar-confirmed').innerText()) ?? '').includes('제작 예정') && ((await page.getByTestId('radar-selected').innerText()) ?? '').includes(heroTopic))
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check('U8 다시 열어도 제작 예정 그대로', (await page.getByTestId('radar-idea').count()) === 1 && (await page.getByTestId('radar-idea').first().getAttribute('data-status')) === 'selected' && (await page.getByTestId('radar-selected-item').count()) === 1)
+  await page.getByTestId('radar-idea-status').first().selectOption('idea')
+  await page.waitForTimeout(400)
+  await page.locator('[data-testid="radar-opp"][data-size="hero"]').getByTestId('radar-confirm').click()
+  await page.waitForTimeout(500)
+  check('U9 이미 담긴 아이디어(단계 아이디어)를 확정 → 줄을 새로 만들지 않고 단계만 제작 예정', (await page.getByTestId('radar-idea').count()) === 1 && (await page.getByTestId('radar-idea').first().getAttribute('data-status')) === 'selected')
+  await page.locator('[data-testid="radar-opp"][data-size="hero"]').getByTestId('radar-opp-more').click()
+  await page.waitForTimeout(200)
+  check('U9 수첩에 있으면 [아이디어로 담기] 대신 "수첩에 있음"(같은 후보를 두 줄로 담지 않음)', (await page.locator('[data-testid="radar-opp"][data-size="hero"]').getByTestId('radar-save').count()) === 0 && (await page.locator('[data-testid="radar-opp"][data-size="hero"]').getByTestId('radar-saved').count()) === 1)
+  await page.getByTestId('radar-idea-remove').first().click()
+  await page.getByTestId('radar-idea-confirm').getByRole('button', { name: '빼기' }).click()
+  await page.waitForTimeout(400)
+
+  // U10 · U11 — [관심 없음] → 그 후보만 빠짐 · 추천 기준 › 숨긴 주제에서 되살림
+  const sub2 = page.locator('[data-testid="radar-opp"][data-size="sub"]').first()
+  const mutedTopic = ((await sub2.getByTestId('radar-opp-topic').innerText()) ?? '').trim()
+  await sub2.getByTestId('radar-opp-more').click()
+  await page.waitForTimeout(200)
+  await sub2.getByTestId('radar-mute').click()
+  await page.waitForTimeout(600)
+  const topicsNow = await page.locator('[data-testid="radar-opp-topic"]').allInnerTexts()
+  const compactNow = await page.getByTestId('radar-opp-compact').allInnerTexts()
+  check('U10 관심 없음 → 그 후보가 후보 목록에서 사라짐 · "숨긴 주제 1"', !topicsNow.map((t) => t.trim()).includes(mutedTopic) && !compactNow.some((t) => t.includes(mutedTopic)) && ((await page.getByTestId('radar-muted-chip').innerText()) ?? '').includes('1'), { mutedTopic, topicsNow })
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check('U10 다시 열어도 숨긴 그대로(설정 저장)', !(await page.locator('[data-testid="radar-opp-topic"]').allInnerTexts()).map((t) => t.trim()).includes(mutedTopic))
+  await page.getByTestId('radar-muted-chip').click()
+  await page.waitForTimeout(200)
+  check('U11 추천 기준 › 숨긴 주제에 그 후보 하나', (await page.getByTestId('radar-muted-row').count()) === 1 && ((await page.getByTestId('radar-muted-row').innerText()) ?? '').includes(mutedTopic.split(' × ')[0]))
+  await page.getByTestId('radar-unmute').click()
+  await page.waitForTimeout(600)
+  check('U11 다시 보기 → 후보로 돌아온다 · 숨긴 주제 0', (await page.locator('[data-testid="radar-opp-topic"]').allInnerTexts()).map((t) => t.trim()).includes(mutedTopic) && (await page.getByTestId('radar-muted-chip').count()) === 0)
+  await page.getByTestId('radar-mix').click()
+  await page.waitForTimeout(200)
+
   // 시장 신호
   check('시장 신호: 급상승 주제 · 평소보다 터진 영상(🔥 평소보다 n배)', (await page.getByTestId('radar-rising-row').count()) >= 1 && (await page.getByTestId('radar-breakouts').getByTestId('radar-breakout-chip').count()) >= 1)
+  check('시장 신호: 첫 화면에는 각 4개까지(나머지는 더 보기) · 후보보다 작은 제목', (await page.getByTestId('radar-rising-row').count()) <= 4 && (await page.getByTestId('radar-breakouts').getByTestId('radar-video-row').count()) <= 4 && (await page.locator('#radar-signals-h').evaluate((e) => parseFloat(getComputedStyle(e).fontSize))) < (await page.locator('#radar-plan-h').evaluate((e) => parseFloat(getComputedStyle(e).fontSize))))
 
   // 비중 가이드 — 시장 100 이면 앞 3장이 시장수요
   await page.getByTestId('radar-mix').click()

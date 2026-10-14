@@ -7,6 +7,9 @@
  *    내 채널 비교 · 주목 주제 · 제목 아이디어 · CSV · 새로 가져오기 · 키 없음 · 예시 데이터. 자리만 옮기고 접어 두었다(필요할 때 펼침).
  *  - 계산은 모두 규칙(ytBench · ytRadar) — 'AI' 라고 부르지 않는다. 대본 만들기 · 외부 AI 호출은 없다(브리프 복사만).
  *  - 저장(콘텐츠 수첩 · 채널 설정)은 기존 모듈 기록(moduleData) — 작업공간마다 따로. 팀장 화면을 보는 중이면 읽기만.
+ *  - D-195: 마케팅 · 브랜딩은 대표(full) 전용 — 팀장(Pilot) · 대표가 팀장 화면으로 볼 때는 메뉴 · 찾기 · 주소 모두 닫힌다
+ *    (moduleRegistry ownerOnly · AppShell 의 PilotRouteGuard 한 곳에서). 이 화면 안에서 따로 숨기지 않는다.
+ *  - D-195 UX 3.0: 첫 화면은 1순위 하나만 크게 · 받은 때 · 채널 수는 작은 글로 · 비중 가이드는 [추천 기준] 안으로.
  */
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -23,7 +26,7 @@ import { useViewingPilot } from '../../auth/osAccess'
 import { useYtFeed } from '../../services/marketing/ytFeed'
 import { mergeFeeds, useYtExtra } from '../../services/marketing/ytExtra'
 import { useIdeas, useRadarPrefs } from '../../services/marketing/useRadarStore'
-import { ideaFromOpportunity, type ContentIdea, type IdeaStatus, type RadarPrefs } from '../../services/marketing/radarStore'
+import { IDEA_STATUS_LABEL, confirmInput, ideaFromOpportunity, type ContentIdea, type IdeaStatus, type RadarPrefs } from '../../services/marketing/radarStore'
 import {
   PERIOD_HINT,
   PERIOD_LABEL,
@@ -120,13 +123,12 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const fullFeed = useMemo(() => (yt.feed ? mergeFeeds(yt.feed, extra.feed, groupsOfAdded) : null), [yt.feed, extra.feed, groupsOfAdded])
   const feed = useMemo(() => (fullFeed ? withoutDisabled(fullFeed, prefs.overrides) : null), [fullFeed, prefs.overrides])
   const prepared = useMemo(() => (feed ? prepareFeed(feed) : null), [feed])
-  const opts = useMemo(() => ({ overrides: prefs.overrides, mix: prefs.mix }), [prefs.overrides, prefs.mix])
+  const opts = useMemo(() => ({ overrides: prefs.overrides, mix: prefs.mix, muted: prefs.muted }), [prefs.overrides, prefs.mix, prefs.muted])
   const rvideos = useMemo(() => (prepared ? radarVideos(prepared, opts) : []), [prepared, opts])
   const rvById = useMemo(() => new Map(rvideos.map((v) => [v.id, v])), [rvideos])
   const plan = useMemo(() => (prepared ? radarPlan(prepared, opts, rvideos) : null), [prepared, opts, rvideos])
   const rising = useMemo(() => (prepared && plan ? risingTopics(prepared, rvideos, plan.clusters) : []), [prepared, rvideos, plan])
   const breakouts = useMemo(() => breakoutVideos(rvideos), [rvideos])
-  const savedKeys = useMemo(() => new Set(notebook.ideas.map((i) => i.key)), [notebook.ideas])
   const loading = yt.status === 'loading'
 
   const refresh = () => {
@@ -146,6 +148,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
 
   const saveOpp = async (o: Opportunity) => {
     if (readOnly) return showToast('팀장 화면을 보는 중에는 저장하지 않습니다.')
+    if (notebook.ideas.some((i) => i.key === o.key)) return showToast(`'${o.topic}' 은 이미 수첩에 있습니다.`)
     try {
       await notebook.save(ideaFromOpportunity(o))
       // 담은 것이 바로 보이게 — 접혀 있던 수첩을 연다
@@ -154,6 +157,33 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
     } catch {
       showToast('수첩에 담지 못했습니다 — 잠시 뒤 다시 눌러 주세요.')
     }
+  }
+  /** [이번 주로 확정] — 수첩에 '제작 예정' 으로(이미 있으면 그 줄의 단계만 · D-195) */
+  const confirmOpp = async (o: Opportunity) => {
+    if (readOnly) return showToast('팀장 화면을 보는 중에는 저장하지 않습니다.')
+    const c = confirmInput(o, notebook.ideas)
+    if (!c.changed) return showToast(`'${o.topic}' 은 이미 '${IDEA_STATUS_LABEL[c.input.status ?? 'idea']}' 단계입니다.`)
+    try {
+      await notebook.save(c.input)
+      showToast(`'${o.topic}' 을 이번 주 제작 예정으로 담았습니다 — 콘텐츠 수첩에서 단계를 바꿀 수 있습니다.`)
+    } catch {
+      showToast('담지 못했습니다 — 잠시 뒤 다시 눌러 주세요.')
+    }
+  }
+  /** [관심 없음] — 정확히 이 후보만 다음 추천에서 뺀다(추천 기준 › 숨긴 주제에서 되살림) */
+  const muteOpp = async (o: Opportunity) => {
+    if (readOnly) return showToast('팀장 화면을 보는 중에는 바꾸지 않습니다.')
+    const ok = await updatePrefs({ ...prefs, muted: [...prefs.muted.filter((k) => k !== o.key), o.key] })
+    showToast(ok ? `'${o.topic}' 을 후보에서 뺐습니다 — 추천 기준 › 숨긴 주제에서 되살릴 수 있습니다.` : '숨기지 못했습니다.')
+  }
+  const unmute = async (key: string) => {
+    if (readOnly) return showToast('팀장 화면을 보는 중에는 바꾸지 않습니다.')
+    const ok = await updatePrefs({ ...prefs, muted: prefs.muted.filter((k) => k !== key) })
+    if (!ok) showToast('되살리지 못했습니다.')
+  }
+  const goNotebook = () => {
+    openFold('radar.notebook')
+    window.setTimeout(() => document.querySelector('[data-testid="radar-notebook"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
   }
   const setStatus = async (i: ContentIdea, status: IdeaStatus) => {
     try {
@@ -206,8 +236,12 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
             </>
           }
         />
-        <p className="t-sub break-keep text-slate-500" data-testid="radar-subtitle">
-          YouTube 벤치마킹 · 잘되는 콘텐츠를 보고 이번 주에 찍을 주제를 고릅니다.
+        {/* 보조 이름 · 받은 때 · 채널 수는 작은 글 한 줄(D-195 — '이번 주 찍을 것' 보다 먼저 눈을 끌지 않게) */}
+        <p className="t-meta flex flex-wrap items-center gap-x-3 gap-y-0.5 text-slate-500">
+          <span className="font-semibold text-slate-600" data-testid="radar-subtitle">
+            YouTube 벤치마킹
+          </span>
+          {prepared && <FeedMeta prepared={prepared} fetchedAt={yt.feed?.fetchedAt ?? ''} failed={yt.feed?.failed ?? []} />}
         </p>
       </div>
 
@@ -215,7 +249,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
         <SetupCard status={yt.status} message={yt.message} onSample={yt.showSample} />
       ) : (
         <>
-          <FeedLine prepared={prepared} fetchedAt={yt.feed?.fetchedAt ?? ''} failed={yt.feed?.failed ?? []} sample={yt.sample} message={yt.status === 'ready' || yt.status === 'sample' ? '' : yt.message} extraMessage={extra.status === 'error' ? extra.message : ''} />
+          <FeedNotices sample={yt.sample} message={yt.status === 'ready' || yt.status === 'sample' ? '' : yt.message} extraMessage={extra.status === 'error' ? extra.message : ''} />
 
           <div role="tablist" className="flex max-w-2xl rounded-(--radius-control) border border-slate-200 bg-slate-50 p-0.5" data-testid="yt-views">
             {VIEWS.map(([k, l, short]) => (
@@ -233,14 +267,18 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
                 rising={rising}
                 breakouts={breakouts}
                 basis={`최근 30일 영상 ${fmt(recent30)}편 · 벤치마킹 채널 ${benchChannels}곳(AI · AX ${aiAx}곳) — 점수가 아니라 근거로 고릅니다`}
-                savedKeys={savedKeys}
+                ideas={notebook.ideas}
                 readOnly={readOnly}
                 noThumb={yt.sample}
+                onConfirm={(o) => void confirmOpp(o)}
                 onSave={(o) => void saveOpp(o)}
+                onMute={(o) => void muteOpp(o)}
+                onUnmute={(k) => void unmute(k)}
                 onCopy={(t) => copy(t)}
                 onOpenVideo={openVideo}
                 onMix={(mix) => void savePrefs({ ...prefs, mix })}
                 onGoChannels={() => setParam({ view: 'channels' })}
+                onGoNotebook={goNotebook}
               />
               <IdeaNotebook ideas={notebook.ideas} readOnly={readOnly} onStatus={(i, s) => void setStatus(i, s)} onMemo={(i, m) => void setMemo(i, m)} onRemove={(i) => void removeIdea(i)} onCopy={(t, what) => copy(t, what)} />
             </>
@@ -307,9 +345,23 @@ function SetupCard({ status, message, onSample }: { status: string; message: str
   )
 }
 
-function FeedLine({ prepared, fetchedAt, failed, sample, message, extraMessage }: { prepared: Prepared; fetchedAt: string; failed: string[]; sample: boolean; message: string; extraMessage: string }) {
+/** 받은 때 · 채널 · 영상 · 못 받은 채널 — 머리 아래 작은 글 */
+function FeedMeta({ prepared, fetchedAt, failed }: { prepared: Prepared; fetchedAt: string; failed: string[] }) {
   const t = Date.parse(fetchedAt)
   const when = Number.isFinite(t) ? new Date(t + 9 * 3_600_000).toISOString().slice(5, 16).replace('-', '월 ').replace('T', '일 ') : ''
+  return (
+    <span className="flex flex-wrap gap-x-3 gap-y-0.5" data-testid="yt-feedline">
+      {when && <span>받은 때 {when}</span>}
+      <span>채널 {prepared.channels.length}곳</span>
+      <span>영상 {fmt(prepared.videos.length)}편</span>
+      {failed.length > 0 && <span className="text-warning-700" data-testid="yt-failed">못 받은 채널 {failed.join(' · ')}</span>}
+    </span>
+  )
+}
+
+/** 예시 데이터 띠 · 받기 문제 안내(있을 때만) */
+function FeedNotices({ sample, message, extraMessage }: { sample: boolean; message: string; extraMessage: string }) {
+  if (!sample && !message && !extraMessage) return null
   return (
     <div className="flex flex-col gap-2">
       {sample && (
@@ -323,12 +375,6 @@ function FeedLine({ prepared, fetchedAt, failed, sample, message, extraMessage }
         </p>
       )}
       {extraMessage && <p className="t-meta break-keep text-warning-700">{extraMessage}</p>}
-      <p className="t-sub flex flex-wrap gap-x-3 gap-y-1 text-slate-500" data-testid="yt-feedline">
-        {when && <span>받은 때 {when}</span>}
-        <span>채널 {prepared.channels.length}곳</span>
-        <span>영상 {fmt(prepared.videos.length)}편</span>
-        {failed.length > 0 && <span className="text-warning-700" data-testid="yt-failed">못 받은 채널 {failed.join(' · ')}</span>}
-      </p>
     </div>
   )
 }
