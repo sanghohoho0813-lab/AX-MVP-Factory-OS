@@ -2859,3 +2859,8 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 - **스크린샷 육안** — 자동 받기 실패: PC 1440 · 휴대폰 390 에서 지난번 데이터 그대로 + '지난번 받은 데이터로 보여드리고 있습니다. 받은 때 … — (이유)'. 가로 넘침 0.
 - **전체 게이트(18ece1a) — 37단계 전부 녹색.** unit(test:all · youtube 142 · mirae-os 838 · pilot 134 · cert 243) · modules 896 · youtube 103 · pilot 208 · isolation 24 · cert 153 · db · 나머지 전부.
 - 확인하지 못한 것: Production 실제 YouTube · Vercel 캐시(6시간 칸이 실제로 칸 끝까지 캐시되는지 · 배포 뒤 캐시)는 Preview 가 Vercel 로그인 보호라 이 환경에서 직접 재지 못했다 — 서버 함수가 내보내는 Cache-Control 값까지만 시험으로 확인.
+
+## §133 D-195 + D-196 합쳐서 main 병합 (2026-10-14)
+
+- 대표: "둘 다 main 병합해 줘". D-196(6시간 자동 갱신)을 D-195(UX 3.0 · 대표 전용) 위에 합침(merge 커밋 · 기록 다시 쓰기 없음). 겹친 곳은 CLAUDE.md qa:youtube 줄 · 결정 기록 · QA 기록 · youtube 시험 머리(import)뿐 — 둘 다 살림.
+- **합친 커밋(1ceef16) 전체 게이트 — 37단계 전부 녹색.** unit(youtube 168 = D-195 135 + D-196 33 · pilot 139 · mirae-os 838 · cert 243) · qa:youtube 119(D-195 104 + D-196 15 — 6시간 시험이 D-195 새 화면에서도 그대로 통과 · PC/휴대폰 같은 추천) · pilot 226 · isolation 24 · modules 896 · sales 173 · phone 174 · simple 88 · cert 153 · db · 나머지 전부.
