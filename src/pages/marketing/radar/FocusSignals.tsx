@@ -17,11 +17,13 @@ import {
   ratioLine,
   type AiKeywordStat,
   type AiVendor,
+  type AiWorkflowSignal,
   type DomainSignal,
   type NewAiKeyword,
   type RadarVideo,
   type SideBreakout,
 } from '../../../services/marketing/ytRadar'
+import { Peek } from './EvidencePeek'
 import { IconChip, RatioChip, Thumb } from './RadarParts'
 
 /** 영역마다 무엇을 보나(빈 칸일 때 한 줄로) */
@@ -64,12 +66,16 @@ export function DomainBoard({ signals }: { signals: readonly DomainSignal[] }) {
                   <li key={x.topicId} className="flex min-w-0 flex-col gap-0.5 py-1.5" data-testid="radar-domain-row" data-topic={x.topicId}>
                     <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
                       <span className="t-sub min-w-0 font-semibold break-keep text-slate-800 [overflow-wrap:anywhere]">{x.label}</span>
-                      {x.breakouts > 0 && <Badge tone="danger">터진 영상 {x.breakouts}</Badge>}
+                      {x.breakouts > 0 && (
+                        <Peek videos={x.hot} title={x.label} basis="평소보다 터진 영상(최근 30일)" kind="domain-hot">
+                          <Badge tone="danger">터진 영상 {x.breakouts}</Badge>
+                        </Peek>
+                      )}
                       {x.growing && <Badge tone="brand">늘어남</Badge>}
                     </span>
-                    <span className="t-meta text-slate-500">
+                    <Peek videos={x.recent} title={x.label} basis="최근 2주" kind="domain" className="t-meta self-start text-slate-500">
                       2주 {x.channels14}개 채널 · {x.videos14}편
-                    </span>
+                    </Peek>
                     {x.focus && <span className="t-meta break-keep text-brand-800">→ {x.focus}</span>}
                   </li>
                 ))}
@@ -91,7 +97,7 @@ export function AiKeywordBoard({
   fresh,
 }: {
   keywords: readonly AiKeywordStat[]
-  workflow: ReadonlyArray<{ topicId: string; label: string; channels: number; videos: number; breakouts: number }>
+  workflow: readonly AiWorkflowSignal[]
   fresh: readonly NewAiKeyword[]
 }) {
   if (keywords.length === 0 && workflow.length === 0 && fresh.length === 0) return null
@@ -116,10 +122,14 @@ export function AiKeywordBoard({
                   <li key={k.id} className="flex min-w-0 flex-col gap-0.5 py-1.5" data-testid="radar-ai-kw" data-kw={k.id}>
                     <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
                       <span className="t-sub font-bold text-slate-900">{k.label}</span>
-                      <span className="t-meta text-slate-600">
+                      <Peek videos={k.hits} title={k.label} basis="최근 30일 제목에 나온 영상" kind="ai-kw" className="t-meta text-slate-600">
                         {k.channels}개 채널 · {k.videos}편
-                      </span>
-                      {k.breakouts > 0 && <Badge tone="danger">터진 영상 {k.breakouts}</Badge>}
+                      </Peek>
+                      {k.breakouts > 0 && (
+                        <Peek videos={k.hot} title={k.label} basis="평소보다 터진 영상(최근 30일)" kind="ai-kw-hot">
+                          <Badge tone="danger">터진 영상 {k.breakouts}</Badge>
+                        </Peek>
+                      )}
                     </span>
                     {k.focus && <span className="t-meta break-keep text-brand-800">→ {k.focus}</span>}
                   </li>
@@ -134,7 +144,10 @@ export function AiKeywordBoard({
           <span className="t-meta font-bold text-slate-500">업무 흐름</span>
           {workflow.map((w) => (
             <span key={w.topicId} className="t-meta inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 break-keep text-slate-700" data-testid="radar-ai-flow">
-              <span className="font-semibold text-slate-800">{w.label}</span> {w.channels}개 채널 · {w.videos}편
+              <span className="font-semibold text-slate-800">{w.label}</span>
+              <Peek videos={w.hits} title={w.label} basis="최근 30일" kind="ai-flow">
+                {w.channels}개 채널 · {w.videos}편
+              </Peek>
             </span>
           ))}
         </div>
@@ -147,7 +160,10 @@ export function AiKeywordBoard({
           <div className="flex flex-wrap gap-1.5">
             {fresh.map((k) => (
               <span key={k.word} className="t-meta inline-flex items-center gap-1 rounded-full border border-brand-200 bg-white px-2.5 py-1 text-slate-700" data-testid="radar-ai-new-kw">
-                <span className="font-bold text-slate-900">{k.word}</span> AI · AX {k.channels}개 채널 · {k.videos}편
+                <span className="font-bold text-slate-900">{k.word}</span>
+                <Peek videos={k.hits} title={k.word} basis="AI · AX 채널 최근 2주" kind="ai-new">
+                  AI · AX {k.channels}개 채널 · {k.videos}편
+                </Peek>
               </span>
             ))}
           </div>

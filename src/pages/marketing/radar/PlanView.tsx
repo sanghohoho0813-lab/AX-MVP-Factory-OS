@@ -26,11 +26,14 @@ import {
   PATTERN_LABEL,
   SMALL_CHANNEL_SUBS,
   WHY_LABEL,
+  clusterHot,
+  coverageHits,
   coverageLine,
   normalizeMix,
   opportunityLabel,
   whyRecommended,
   type AiKeywordStat,
+  type AiWorkflowSignal,
   type DomainSignal,
   type MixGuide,
   type NewAiKeyword,
@@ -40,6 +43,7 @@ import {
   type RisingTopic,
   type SideBreakout,
 } from '../../../services/marketing/ytRadar'
+import { Peek } from './EvidencePeek'
 import { AiKeywordBoard, DomainBoard, SideBreakouts } from './FocusSignals'
 import { AxisBadge, DomainBadge, IconChip, RatioChip, StrengthMeter, Thumb, VideoRow } from './RadarParts'
 
@@ -202,7 +206,7 @@ export function PlanView({
 export interface FocusData {
   domains: DomainSignal[]
   aiKeywords: AiKeywordStat[]
-  workflow: Array<{ topicId: string; label: string; channels: number; videos: number; breakouts: number }>
+  workflow: AiWorkflowSignal[]
   fresh: NewAiKeyword[]
   side: SideBreakout[]
 }
@@ -239,12 +243,15 @@ function ConfirmButton({ o, status, readOnly, onConfirm, quiet }: Pick<CardProps
   )
 }
 
+/** 핵심 근거 칩 — 숫자가 센 영상이 있으면 마우스를 올리거나 누르면 그 영상 목록(D-198) */
 function Facts({ o, size = 'md' }: { o: Opportunity; size?: 'md' | 'sm' }) {
   return (
     <ul className="flex flex-wrap gap-1.5" aria-label="핵심 근거">
-      {o.facts.map((f) => (
-        <li key={f} className={`${size === 'md' ? 't-sub' : 't-meta'} rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 font-semibold break-keep text-slate-700`} data-testid="radar-fact">
-          {f}
+      {o.facts.map((f, i) => (
+        <li key={f} className={`${size === 'md' ? 't-sub' : 't-meta'} min-w-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 font-semibold break-keep text-slate-700`} data-testid="radar-fact">
+          <Peek videos={o.factHits[i] ?? []} title={o.topic} basis={f} kind="fact">
+            {f}
+          </Peek>
         </li>
       ))}
     </ul>
@@ -416,16 +423,26 @@ function Details({ o, status, readOnly, noThumb, onSave, onMute, onCopy, onOpenV
             </li>
           ))}
         </ul>
-        <p className="t-meta flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600" data-testid="radar-evidence">
-          <span>관련 영상 {c.videos30}편(30일)</span>
-          <span>채널 {c.channels30}곳</span>
-          {c.breakouts > 0 && <span className="font-semibold text-red-700">평소보다 터진 영상 {c.breakouts}편</span>}
+        <p className="t-meta flex flex-wrap items-center gap-x-3 gap-y-0.5 text-slate-600" data-testid="radar-evidence">
+          <Peek videos={c.hits} title={o.topic} basis="최근 30일 관련 영상" kind="related">
+            관련 영상 {c.videos30}편(30일)
+          </Peek>
+          <Peek videos={c.hits} title={o.topic} basis="최근 30일 관련 영상" kind="channels">
+            채널 {c.channels30}곳
+          </Peek>
+          {c.breakouts > 0 && (
+            <Peek videos={clusterHot(c)} title={o.topic} basis="평소보다 터진 영상(최근 30일)" kind="hot" className="font-semibold text-red-700">
+              평소보다 터진 영상 {c.breakouts}편
+            </Peek>
+          )}
         </p>
         {c.coverage.length > 0 && (
-          <p className="t-meta flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600" data-testid="radar-coverage">
+          <p className="t-meta flex flex-wrap items-center gap-x-3 gap-y-0.5 text-slate-600" data-testid="radar-coverage">
             <span className="text-slate-400">최근 {c.coverageDays === 14 ? '2주' : '30일'} 묶음별</span>
             {c.coverage.map((g) => (
-              <span key={g.group}>{coverageLine(g)}</span>
+              <Peek key={g.group} videos={coverageHits(c, g.group)} title={o.topic} basis={`${coverageLine(g)} · 최근 ${c.coverageDays === 14 ? '2주' : '30일'}`} kind="coverage">
+                {coverageLine(g)}
+              </Peek>
             ))}
           </p>
         )}
@@ -618,7 +635,9 @@ function MarketSignals({ rising, breakouts, focus, noThumb, onOpenVideo }: { ris
             경제 · 경영 · AI 시장 신호
           </h2>
         </HintTip>
-        <span className="t-meta text-slate-500">다음 후보를 찾는 곳</span>
+        <span className="t-meta break-keep text-slate-500" data-testid="radar-peek-hint">
+          다음 후보를 찾는 곳 · 밑줄 친 숫자에 마우스를 올리면(휴대폰은 누르면) 그 영상이 바로 보입니다
+        </span>
       </div>
       <DomainBoard signals={focus.domains} />
       <AiKeywordBoard keywords={focus.aiKeywords} workflow={focus.workflow} fresh={focus.fresh} />
@@ -637,11 +656,15 @@ function MarketSignals({ rising, breakouts, focus, noThumb, onOpenVideo }: { ris
                 {shownRising.map((r) => (
                   <li key={r.label} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 py-2" data-testid="radar-rising-row">
                     <span className="t-sub min-w-0 flex-[1_1_8rem] font-semibold break-keep text-slate-800">{r.label}</span>
-                    <span className="t-meta text-slate-600">
+                    <Peek videos={r.recent} title={r.label} basis="최근 2주" kind="rising" className="t-meta text-slate-600">
                       2주 {r.videos14}편 · {r.channels14}채널
-                    </span>
+                    </Peek>
                     {r.growing && <Badge tone="brand">빠르게 늘어남</Badge>}
-                    {r.breakouts > 0 && <Badge tone="danger">터진 영상 {r.breakouts}</Badge>}
+                    {r.breakouts > 0 && (
+                      <Peek videos={r.hot} title={r.label} basis={r.fit ? '평소보다 터진 영상(최근 30일)' : '평소보다 터진 영상(최근 2주)'} kind="rising-hot">
+                        <Badge tone="danger">터진 영상 {r.breakouts}</Badge>
+                      </Peek>
+                    )}
                     {!r.fit && <Badge>MIRAE 분야 밖 · 참고</Badge>}
                   </li>
                 ))}

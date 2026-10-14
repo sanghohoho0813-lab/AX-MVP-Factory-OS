@@ -302,6 +302,27 @@ export function ratioLine(v: Pick<RadarVideo, 'ratio' | 'adjusted' | 'young' | '
 /** 화면용 배수 숫자(나이 반영) — 7일 안 영상은 '같은 나이 기대치' 대비 */
 export const tierLabel: Record<VideoTier, string> = { breakout: '평소보다 터짐', above: '평소보다 잘됨', normal: '평소 수준', below: '평소보다 낮음', unknown: '기준 부족' }
 
+const TIER_RANK: Record<VideoTier, number> = { breakout: 0, above: 1, normal: 2, below: 3, unknown: 4 }
+
+/**
+ * 숫자 뒤 영상 목록 순서(D-198) — 터진 것 → 잘된 것 → 나머지, 같은 등급이면 나이 반영 배수 · 최근 순.
+ * 목록은 그 숫자가 센 영상 그대로다(빼거나 더하지 않는다) — 화면 숫자와 목록 길이가 늘 같다.
+ */
+export function evidenceOrder<T extends Pick<RadarVideo, 'tier' | 'adjusted' | 'publishedAt'>>(videos: readonly T[]): T[] {
+  return [...videos].sort((a, b) => TIER_RANK[a.tier] - TIER_RANK[b.tier] || (b.adjusted ?? -1) - (a.adjusted ?? -1) || b.publishedAt - a.publishedAt)
+}
+
+/** 목록에 든 채널 — 영상 많은 순('해피AI 12 · 교양식 5') */
+export function evidenceChannels(videos: readonly Pick<RadarVideo, 'channelId' | 'channelName'>[]): Array<{ id: string; name: string; count: number }> {
+  const m = new Map<string, { id: string; name: string; count: number }>()
+  for (const v of videos) {
+    const e = m.get(v.channelId) ?? { id: v.channelId, name: v.channelName, count: 0 }
+    e.count += 1
+    m.set(v.channelId, e)
+  }
+  return [...m.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'ko'))
+}
+
 /* ------------------------------------------------------------------ */
 /* 주제 묶음 · 신호                                                        */
 /* ------------------------------------------------------------------ */
@@ -355,6 +376,13 @@ export const GROUP_SHORT: Record<BenchmarkChannelGroup, string> = { direct: '직
 
 /** '직접 경쟁 채널 18곳 중 6곳' */
 export const coverageLine = (g: GroupCoverage) => `${GROUP_SHORT[g.group]} 채널 ${g.total}곳 중 ${g.covered}곳`
+
+/** 이 주제 최근 n일 영상(숫자 뒤 근거 목록 · D-198) — 'n일' 은 30일 안에서만 */
+export const clusterRecent = (c: Pick<Cluster, 'hits'>, days = 14): RadarVideo[] => c.hits.filter((v) => v.ageDays <= days)
+/** 이 주제 30일 안 평소보다 터진 영상 — 'Cluster.breakouts' 가 센 영상 */
+export const clusterHot = (c: Pick<Cluster, 'hits'>): RadarVideo[] => c.hits.filter((v) => v.tier === 'breakout')
+/** '그 묶음 채널 n곳 중 m곳' 이 센 영상 — 그 묶음 · 그 기간(2주 또는 30일) */
+export const coverageHits = (c: Pick<Cluster, 'hits' | 'coverageDays'>, g: BenchmarkChannelGroup): RadarVideo[] => clusterRecent(c, c.coverageDays).filter((v) => v.group === g)
 
 const isBench = (v: RadarVideo) => !v.mine && v.group !== 'format'
 
@@ -423,7 +451,7 @@ function clusterOf(def: TopicDef, all: readonly RadarVideo[], totals: ReadonlyMa
   }
   if (dominant) reasons.push(`대부분 한 채널(${dominant})이 올린 주제 — 여러 채널 흐름은 아직 아닙니다`)
 
-  const bridgeHits = def.area === 'market' ? hits.filter((v) => v.topics.some((t) => TOPIC_BY_ID.get(t)?.area !== 'market')).length : 0
+  const bridgeHits = def.area === 'market' ? bridgeVideos({ hits }).length : 0
   // 묶음 크기 보정 — 같은 채널이 여러 편 올려도 한 곳으로 센다
   const coverageDays: 14 | 30 = ch14.size >= 2 ? 14 : 30
   const win = coverageDays === 14 ? in14 : hits
@@ -504,6 +532,8 @@ export interface Opportunity {
   summary: string
   /** 핵심 근거 1~2개(카드 기본 상태) — 나머지 숫자는 [근거 보기] 에 다 있다 */
   facts: string[]
+  /** facts 와 같은 순서 — 그 근거의 숫자가 센 영상(마우스를 올리거나 누르면 보인다 · 빈 목록이면 영상 없는 근거 · D-198) */
+  factHits: RadarVideo[][]
   /** 근거 문장 전부([근거 보기] · 수첩 · 브리프) */
   whyNow: string[]
   cluster: Cluster
@@ -591,26 +621,38 @@ function summaryOf(axis: ContentAxis, c: Cluster, label: string, axSignal: Clust
   return `${spread}, ${tail}.`
 }
 
-/** 핵심 근거 1~2개 — 카드 기본 상태에 보이는 것(나머지는 근거 보기) */
-function factsOf(axis: ContentAxis, c: Cluster, label: string, axSignal: Cluster | undefined): string[] {
-  if (c.dominant) return [`${c.dominant} 혼자 ${c.videos30}편`]
+/** BRIDGE 근거 — 시장 주제 영상 중 AI · 자동화 주제도 함께 다룬 것('bridgeHits' 가 센 영상) */
+const bridgeVideos = (c: Pick<Cluster, 'hits'>) => c.hits.filter((v) => v.topics.some((t) => TOPIC_BY_ID.get(t)?.area !== 'market'))
+
+/**
+ * 핵심 근거 1~2개 — 카드 기본 상태에 보이는 것(나머지는 근거 보기).
+ * D-198: 글마다 그 숫자가 센 영상을 함께 낸다 — 마우스를 올리거나 누르면 그 영상이 그대로 보인다(숫자 = 목록 길이).
+ */
+function factsOf(axis: ContentAxis, c: Cluster, label: string, axSignal: Cluster | undefined): Array<{ text: string; hits: RadarVideo[] }> {
+  if (c.dominant) {
+    const mine = c.hits.filter((v) => v.channelName === c.dominant).length
+    return [{ text: mine === c.videos30 ? `${c.dominant} 혼자 ${c.videos30}편` : `${c.dominant} ${mine}편 · 전체 ${c.videos30}편`, hits: c.hits }]
+  }
   const cov = topCoverage(c)
-  const spread = cov ? `${coverageLine(cov)}이 다룸` : `${c.channels14 >= 2 ? c.channels14 : c.channels30}개 채널에서 다룸`
+  const wide = c.channels14 >= 2
+  const spread = cov
+    ? { text: `${coverageLine(cov)}이 다룸`, hits: coverageHits(c, cov.group) }
+    : { text: `${wide ? c.channels14 : c.channels30}개 채널에서 다룸`, hits: wide ? clusterRecent(c) : c.hits }
   const heat =
     c.breakouts > 0
-      ? `평소보다 터진 영상 ${c.breakouts}편`
+      ? { text: `평소보다 터진 영상 ${c.breakouts}편`, hits: clusterHot(c) }
       : c.above > 0
-        ? `평소보다 잘된 영상 ${c.above}편`
+        ? { text: `평소보다 잘된 영상 ${c.above}편`, hits: c.hits.filter((v) => v.tier === 'breakout' || v.tier === 'above') }
         : c.growing
-          ? `최근 2주 ${c.videos14}편 · 빠르게 늘어남`
-          : `최근 7일 ${c.videos7}편`
+          ? { text: `최근 2주 ${c.videos14}편 · 빠르게 늘어남`, hits: clusterRecent(c) }
+          : { text: `최근 7일 ${c.videos7}편`, hits: clusterRecent(c, 7) }
   if (axis === 'bridge') {
     const why =
       c.bridgeHits > 0
-        ? `'${label} + AI · 자동화' 영상 ${c.bridgeHits}편`
+        ? { text: `'${label} + AI · 자동화' 영상 ${c.bridgeHits}편`, hits: bridgeVideos(c) }
         : axSignal && axSignal.strength !== 'early'
-          ? `AI 실무에서 '${axSignal.label}' 상승`
-          : `'${label} + AI' 영상 아직 없음`
+          ? { text: `AI 실무에서 '${axSignal.label}' 상승`, hits: axSignal.channels14 >= 2 ? clusterRecent(axSignal) : axSignal.hits }
+          : { text: `'${label} + AI' 영상 아직 없음`, hits: [] }
     return [why, spread]
   }
   return [spread, heat]
@@ -634,6 +676,7 @@ function opportunity(axis: ContentAxis, c: Cluster, hot: readonly PatternStat[],
     else if (axSignal && axSignal.strength !== 'early') whyNow.unshift(`AI 실무 채널에서는 지금 '${axSignal.label}' 이 오릅니다(${axSignal.channels14 || axSignal.channels30}개 채널) — 이 주제에 붙여 말하기 좋은 때입니다`)
     else whyNow.unshift(`'${def.label} + AI' 를 다룬 벤치마킹 영상은 아직 없습니다 — 먼저 말할 수 있는 자리입니다`)
   }
+  const facts = factsOf(axis, c, def.label, axSignal)
   const hold = c.strength === 'early' && (c.dominant !== '' || c.videos14 === 0)
   const approach: Approach = hold ? 'hold' : axis === 'market' ? 'market' : 'ax'
   const approachWhy = hold
@@ -653,7 +696,8 @@ function opportunity(axis: ContentAxis, c: Cluster, hot: readonly PatternStat[],
     topic: axis === 'bridge' && angle.name ? `${def.label} × ${angle.name}` : def.label,
     strength: c.strength,
     summary: summaryOf(axis, c, def.label, axSignal),
-    facts: factsOf(axis, c, def.label, axSignal),
+    facts: facts.map((f) => f.text),
+    factHits: facts.map((f) => f.hits),
     whyNow: whyNow.slice(0, 4),
     cluster: c,
     benchmarks: pickBenchmarks(c),
@@ -808,30 +852,38 @@ export interface RisingTopic {
   growing: boolean
   breakouts: number
   fit: boolean
+  /** '2주 n편 · m채널' 이 센 영상(D-198) */
+  recent: RadarVideo[]
+  /** '터진 영상 n' 이 센 영상 — 분류표 주제는 30일 · 분류표 밖 낱말은 2주 */
+  hot: RadarVideo[]
 }
 
 /** 급상승 주제 — 분류표 주제(늘어나는 것) + 분류표에 없는 단어(D-193 주목 주제, 최근 14일) */
 export function risingTopics(p: Prepared, videos: readonly RadarVideo[], cs: readonly Cluster[], max = 6): RisingTopic[] {
   const out: RisingTopic[] = cs
     .filter((c) => c.videos14 >= 2 && (c.growing || c.channels14 >= 2))
-    .map((c) => ({ label: c.label, topicId: c.topicId, videos14: c.videos14, channels14: c.channels14, growing: c.growing, breakouts: c.breakouts, fit: true }))
-  const ids = new Set(videos.filter((v) => isBench(v)).map((v) => v.id))
+    .map((c) => ({ label: c.label, topicId: c.topicId, videos14: c.videos14, channels14: c.channels14, growing: c.growing, breakouts: c.breakouts, fit: true, recent: clusterRecent(c), hot: clusterHot(c) }))
+  const byId = new Map(videos.filter((v) => isBench(v)).map((v) => [v.id, v]))
   const recent = periodVideos(
-    p.videos.filter((v) => ids.has(v.id)),
+    p.videos.filter((v) => byId.has(v.id)),
     'month',
   ).filter((v) => v.daysAgo <= 14)
   for (const t of extractTopics(recent, p.channelWords, 6)) {
     const norm = normalizeTitle(t.keyword)
     if (TOPICS.some((d) => d.match.test(norm))) continue
-    const hitIds = new Set(recent.filter((v) => t.keyword.split(' ').every((w) => v.title.includes(w))).map((v) => v.id))
+    // 숫자(편 · 채널)를 센 그 영상 그대로 — 낱말을 다시 찾지 않는다
+    const hits = t.hits.map((v) => byId.get(v.id)).filter((v): v is RadarVideo => v !== undefined)
+    const hot = hits.filter((v) => v.tier === 'breakout')
     out.push({
       label: t.keyword,
       topicId: '',
       videos14: t.videos,
       channels14: t.channels,
       growing: false,
-      breakouts: videos.filter((v) => hitIds.has(v.id) && v.tier === 'breakout').length,
+      breakouts: hot.length,
       fit: false,
+      recent: hits,
+      hot,
     })
   }
   return out.slice(0, max)
@@ -863,7 +915,19 @@ export const isCore = (v: Pick<RadarVideo, 'domains'>) => v.domains.some((d) => 
 export interface DomainSignal {
   domain: ContentDomain
   /** 최근 데이터가 있는 주제만(없으면 빈 칸 — 억지로 채우지 않는다) */
-  items: Array<{ topicId: string; label: string; channels14: number; videos14: number; breakouts: number; growing: boolean; focus: string }>
+  items: Array<{
+    topicId: string
+    label: string
+    channels14: number
+    videos14: number
+    breakouts: number
+    growing: boolean
+    focus: string
+    /** '2주 n개 채널 · m편' 이 센 영상(D-198) */
+    recent: RadarVideo[]
+    /** '터진 영상 n' 이 센 영상(30일) */
+    hot: RadarVideo[]
+  }>
 }
 
 /** 지금 강한 흐름 — 경제 · 경영 · AI 마다 최근 2주 2곳 넘게 다뤘거나 평소보다 터진 영상이 있는 주제만(센 순 · 영역마다 3개까지) */
@@ -873,7 +937,17 @@ export function domainSignals(cs: readonly Cluster[], perDomain = 3): DomainSign
     items: cs
       .filter((c) => c.domain === domain && !c.dominant && (c.channels14 >= 2 || (c.breakouts >= 1 && c.videos14 >= 1)))
       .slice(0, perDomain)
-      .map((c) => ({ topicId: c.topicId, label: c.label, channels14: c.channels14, videos14: c.videos14, breakouts: c.breakouts, growing: c.growing, focus: TOPIC_BY_ID.get(c.topicId)?.focus ?? '' })),
+      .map((c) => ({
+        topicId: c.topicId,
+        label: c.label,
+        channels14: c.channels14,
+        videos14: c.videos14,
+        breakouts: c.breakouts,
+        growing: c.growing,
+        focus: TOPIC_BY_ID.get(c.topicId)?.focus ?? '',
+        recent: clusterRecent(c),
+        hot: clusterHot(c),
+      })),
   }))
 }
 
@@ -886,6 +960,10 @@ export interface AiKeywordStat {
   breakouts: number
   /** MIRAE 관점 짧게(그 이름이 주제 자신일 때만 — Opus · Sonnet 은 Claude 줄에 이미 있다) */
   focus: string
+  /** 'n개 채널 · m편' 이 센 영상(D-198) */
+  hits: RadarVideo[]
+  /** '터진 영상 n' 이 센 영상 */
+  hot: RadarVideo[]
 }
 
 /** AI 핵심 키워드 칸에 보일 최소 신호 — 30일에 2편 넘게 나왔거나 평소보다 터진 영상이 1편 넘게(없으면 화면에 없음) */
@@ -900,19 +978,30 @@ export function aiKeywordBoard(videos: readonly RadarVideo[], days = 30): AiKeyw
   return AI_KEYWORDS.map((k) => {
     const hits = pool.filter((v) => v.aiKeywords.includes(k.id))
     const focus = k.topic === k.id ? (TOPIC_BY_ID.get(k.topic)?.focus ?? '') : ''
-    return { id: k.id, label: k.label, vendor: k.vendor, videos: hits.length, channels: new Set(hits.map((v) => v.channelId)).size, breakouts: hits.filter((v) => v.tier === 'breakout').length, focus }
+    const hot = hits.filter((v) => v.tier === 'breakout')
+    return { id: k.id, label: k.label, vendor: k.vendor, videos: hits.length, channels: new Set(hits.map((v) => v.channelId)).size, breakouts: hot.length, focus, hits, hot }
   })
     .filter((x) => x.videos >= AI_KEYWORD_MIN_VIDEOS || x.breakouts >= 1)
     .sort((a, b) => b.channels - a.channels || b.videos - a.videos || b.breakouts - a.breakouts)
 }
 
+export interface AiWorkflowSignal {
+  topicId: string
+  label: string
+  channels: number
+  videos: number
+  breakouts: number
+  /** 'n개 채널 · m편'(30일)이 센 영상(D-198) */
+  hits: RadarVideo[]
+}
+
 /** AI 업무 흐름 키워드 — 도구 이름이 아닌 AI · AX 주제(업무자동화 · 에이전트 · 노코드 · 바이브코딩 …) 중 최근 신호가 있는 것 */
-export function aiWorkflowSignals(cs: readonly Cluster[], max = 5): Array<{ topicId: string; label: string; channels: number; videos: number; breakouts: number }> {
+export function aiWorkflowSignals(cs: readonly Cluster[], max = 5): AiWorkflowSignal[] {
   const toolIds = new Set(AI_KEYWORDS.map((k) => k.topic))
   return cs
     .filter((c) => c.domain === 'ai' && !toolIds.has(c.topicId) && c.topicId !== 'ai_work' && (c.videos30 >= AI_KEYWORD_MIN_VIDEOS || c.breakouts >= 1))
     .slice(0, max)
-    .map((c) => ({ topicId: c.topicId, label: c.label, channels: c.channels30, videos: c.videos30, breakouts: c.breakouts }))
+    .map((c) => ({ topicId: c.topicId, label: c.label, channels: c.channels30, videos: c.videos30, breakouts: c.breakouts, hits: c.hits }))
 }
 
 /** 새 AI 키워드 후보에서 빼는 흔한 영문 낱말 · 회사 이름 · 형식 말 */
@@ -925,6 +1014,8 @@ export interface NewAiKeyword {
   word: string
   channels: number
   videos: number
+  /** 'n개 채널 · m편' 이 센 영상(D-198) */
+  hits: RadarVideo[]
 }
 
 /**
@@ -950,22 +1041,26 @@ export function newAiKeywords(p: Prepared, videos: readonly RadarVideo[], days =
     for (const [w, n] of cnt) if (n / list.length >= 0.4) tagWords.add(w)
   }
   const known = (w: string) => AI_KEYWORDS.some((k) => k.match.test(normalizeTitle(w))) || TOPICS.some((t) => t.area !== 'market' && t.match.test(normalizeTitle(` ${w} `)))
-  const seen = new Map<string, { forms: Map<string, number>; ch: Set<string>; vids: number }>()
+  const seen = new Map<string, { forms: Map<string, number>; ch: Set<string>; vids: number; hits: RadarVideo[] }>()
   for (const v of videos) {
     if (v.ageDays > days || !aiCh.has(v.channelId)) continue
+    // 한 제목에 'Dots · DOTS' 처럼 두 번 나와도 영상은 한 편으로(숫자 = 영상 목록 길이 · D-198)
+    const once = new Set<string>()
     for (const raw of tokensOf(v.title)) {
       const w = raw.toLowerCase()
-      if (w.length < 3 || /^\d/.test(w) || NEW_KW_STOP.has(w) || chanWords.has(w) || tagWords.has(w)) continue
-      const e = seen.get(w) ?? { forms: new Map(), ch: new Set(), vids: 0 }
+      if (once.has(w) || w.length < 3 || /^\d/.test(w) || NEW_KW_STOP.has(w) || chanWords.has(w) || tagWords.has(w)) continue
+      once.add(w)
+      const e = seen.get(w) ?? { forms: new Map<string, number>(), ch: new Set<string>(), vids: 0, hits: [] as RadarVideo[] }
       e.forms.set(raw, (e.forms.get(raw) ?? 0) + 1)
       e.ch.add(v.channelId)
       e.vids += 1
+      e.hits.push(v)
       seen.set(w, e)
     }
   }
   return [...seen.entries()]
     .filter(([w, e]) => e.ch.size >= minChannels && e.vids >= 3 && !known(w))
-    .map(([, e]) => ({ word: [...e.forms.entries()].sort((a, b) => b[1] - a[1])[0][0], channels: e.ch.size, videos: e.vids }))
+    .map(([, e]) => ({ word: [...e.forms.entries()].sort((a, b) => b[1] - a[1])[0][0], channels: e.ch.size, videos: e.vids, hits: e.hits }))
     .sort((a, b) => b.channels - a.channels || b.videos - a.videos)
     .slice(0, max)
 }

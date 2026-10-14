@@ -17,8 +17,15 @@ import { mergeFeeds } from '../marketing/ytExtra'
 import { enabledModulesByGroup, isPilotHiddenPath } from '../../config/moduleRegistry'
 import {
   aiKeywordBoard,
+  aiWorkflowSignals,
   breakoutVideos,
+  clusterHot,
   clusterOrder,
+  clusterRecent,
+  coverageHits,
+  evidenceChannels,
+  evidenceOrder,
+  risingTopics,
   domainSignals,
   isCore,
   isCoreKeyword,
@@ -914,6 +921,98 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   check('지금 강한 흐름: 데이터가 있는 영역만 채운다(경제 영상이 없으면 경제 칸은 비어 있음) · 경영 · AI 는 채워짐', ds.map((d) => d.domain).join() === 'economy,business,ai' && ds[0].items.length === 0 && ds[1].items.some((x) => x.topicId === 'policy_fund') && ds[2].items.some((x) => x.topicId === 'claude'), ds.map((d) => `${d.domain}:${d.items.map((x) => x.topicId)}`))
   check('인기 탭 핵심 키워드: 클로드 · 정책자금 · 부동산 = 핵심 / 다이어트 · 캠핑 = 기타 · 반드시 · 직장인을 · 충격적인 · 뒤집힌다 · 알아서 = 흔한 말', isCoreKeyword('클로드') && isCoreKeyword('정책자금') && isCoreKeyword('부동산') && !isCoreKeyword('다이어트') && !isCoreKeyword('캠핑') && isNoiseKeyword('반드시') && isNoiseKeyword('직장인을') && isNoiseKeyword('충격적인') && isNoiseKeyword('뒤집힌다') && isNoiseKeyword('알아서') && !isNoiseKeyword('가업승계 증여특례') && !isNoiseKeyword('고용지원금') && !isNoiseKeyword('부모님') && !isNoiseKeyword('바다'))
   check('사이드 급상승은 핵심 영상(경제 · 경영 · AI)을 넣지 않는다', side.every((x) => !isCore(x.v)))
+}
+
+/* ---------------- D-198 숫자 뒤 영상 목록 — 숫자 = 목록 길이 · 채널 수 = 목록 속 채널 수 ---------------- */
+{
+  const chCount = (vs: ReadonlyArray<{ channelId: string }>) => new Set(vs.map((v) => v.channelId)).size
+  const num = (t: string, re: RegExp) => {
+    const m = t.match(re)
+    return m ? Number(m[m.length - 1]) : null
+  }
+  /** 후보 카드 핵심 근거 글의 숫자가 그 근거 영상 목록과 맞나 */
+  const factOk = (text: string, hits: ReadonlyArray<{ channelId: string; tier: string; channelName: string }>) => {
+    const cov = text.match(/(\d+)곳 중 (\d+)곳/)
+    if (cov) return chCount(hits) === Number(cov[2])
+    const chs = num(text, /(\d+)개 채널/)
+    if (chs !== null) return chCount(hits) === chs
+    if (/터진 영상 (\d+)편/.test(text)) return hits.length === num(text, /터진 영상 (\d+)편/) && hits.every((v) => v.tier === 'breakout')
+    if (/잘된 영상 (\d+)편/.test(text)) return hits.length === num(text, /잘된 영상 (\d+)편/) && hits.every((v) => v.tier === 'breakout' || v.tier === 'above')
+    if (/혼자 (\d+)편/.test(text)) return hits.length === num(text, /혼자 (\d+)편/) && chCount(hits) === 1
+    if (/전체 (\d+)편/.test(text)) return hits.length === num(text, /전체 (\d+)편/)
+    if (/(최근 2주|최근 7일) (\d+)편/.test(text)) return hits.length === num(text, /(?:최근 2주|최근 7일) (\d+)편/)
+    if (/영상 (\d+)편/.test(text)) return hits.length === num(text, /영상 (\d+)편/)
+    if (/아직 없음/.test(text)) return hits.length === 0
+    return hits.length > 0 // '상승' — 그 AI 주제의 최근 영상
+  }
+  const runEvidence = (name: string, p: ReturnType<typeof prepareFeed>) => {
+    const rv = radarVideos(p, { now: NOW })
+    const plan = radarPlan(p, { now: NOW }, rv)
+    const bad: string[] = []
+    for (const o of plan.picks) {
+      if (o.factHits.length !== o.facts.length) bad.push(`${o.key}: 근거 ${o.facts.length} / 목록 ${o.factHits.length}`)
+      o.facts.forEach((f, i) => {
+        if (!factOk(f, o.factHits[i] ?? [])) bad.push(`${o.key}: '${f}' ≠ ${o.factHits[i]?.length}편 · ${chCount(o.factHits[i] ?? [])}채널`)
+      })
+      const c = o.cluster
+      if (c.hits.length !== c.videos30 || chCount(c.hits) !== c.channels30) bad.push(`${o.key}: 관련 영상 ${c.videos30} / ${c.hits.length}`)
+      if (clusterHot(c).length !== c.breakouts) bad.push(`${o.key}: 터진 ${c.breakouts} / ${clusterHot(c).length}`)
+      if (clusterRecent(c).length !== c.videos14 || chCount(clusterRecent(c)) !== c.channels14) bad.push(`${o.key}: 2주 ${c.videos14} / ${clusterRecent(c).length}`)
+      for (const g of c.coverage) if (chCount(coverageHits(c, g.group)) !== g.covered || coverageHits(c, g.group).some((v) => v.group !== g.group)) bad.push(`${o.key}: ${g.group} ${g.covered}곳 / ${chCount(coverageHits(c, g.group))}`)
+    }
+    check(`E1 ${name}: 후보 카드 숫자(n곳 중 m곳 · n개 채널 · 터진 영상 n편 · 최근 2주 n편 …) = 그 숫자를 센 영상 목록 · 묶음별 'n곳 중 m곳' 도 같은 묶음 채널 수`, plan.picks.length > 0 && bad.length === 0, bad.slice(0, 6))
+
+    const dbad: string[] = []
+    for (const d of domainSignals(plan.clusters))
+      for (const x of d.items) {
+        if (x.recent.length !== x.videos14 || chCount(x.recent) !== x.channels14) dbad.push(`${x.topicId}: 2주 ${x.channels14}채널 · ${x.videos14}편 / ${chCount(x.recent)} · ${x.recent.length}`)
+        if (x.hot.length !== x.breakouts || x.hot.some((v) => v.tier !== 'breakout')) dbad.push(`${x.topicId}: 터진 ${x.breakouts} / ${x.hot.length}`)
+      }
+    check(`E2 ${name}: 지금 강한 흐름 '2주 n개 채널 · m편' · '터진 영상 n' = 목록`, dbad.length === 0, dbad)
+
+    const kw = aiKeywordBoard(rv)
+    const kbad = kw.filter((k) => k.hits.length !== k.videos || chCount(k.hits) !== k.channels || k.hot.length !== k.breakouts || k.hits.some((v) => !v.aiKeywords.includes(k.id)) || k.hot.some((v) => v.tier !== 'breakout')).map((k) => k.id)
+    check(`E3 ${name}: AI 핵심 키워드 'n개 채널 · m편' · '터진 영상 n' = 목록(목록 영상 제목에 그 이름이 실제로 있다)`, kbad.length === 0, kbad)
+
+    const wf = aiWorkflowSignals(plan.clusters)
+    check(`E4 ${name}: AI 업무 흐름 'n개 채널 · m편' = 목록`, wf.every((w) => w.hits.length === w.videos && chCount(w.hits) === w.channels), wf.map((w) => `${w.topicId}:${w.videos}/${w.hits.length}`))
+
+    const rs = risingTopics(p, rv, plan.clusters)
+    const rbad = rs.filter((r) => r.recent.length !== r.videos14 || chCount(r.recent) !== r.channels14 || r.hot.length !== r.breakouts).map((r) => `${r.label}(${r.fit ? '분류표' : '낱말'}): ${r.videos14}편 ${r.channels14}채널 터짐 ${r.breakouts} / ${r.recent.length} · ${chCount(r.recent)} · ${r.hot.length}`)
+    check(`E5 ${name}: 급상승 주제(분류표 · 분류표 밖 낱말 모두) '2주 n편 · m채널' · '터진 영상 n' = 목록`, rs.length > 0 && rbad.length === 0, rbad)
+    return { rv, plan }
+  }
+  const { rv: srv } = runEvidence('예시 데이터', prepareFeed(sampleFeed(NOW), NOW))
+
+  // 새 AI 키워드 · 같은 제목에 두 번 나와도 한 편
+  {
+    const chs2 = [1, 2, 3].map((i) => ({ ...ch(`q${i}`, `에이아이${'가나다'[i - 1]}`, 9_000, 1), group: 'ai' }))
+    const v2 = [
+      vid('q1_s', 'q1', 'Orbit 써보니 Orbit 이 다릅니다', 2 * D, 900),
+      vid('q2_s', 'q2', 'ORBIT 업무 활용', 3 * D, 900),
+      vid('q3_s', 'q3', 'orbit 으로 보고서', 4 * D, 900),
+      vid('q3_t', 'q3', 'Orbit 두 번째 후기', 5 * D, 900),
+    ]
+    const p2 = prepareFeed({ channels: chs2, videos: v2 }, NOW)
+    const nk = newAiKeywords(p2, radarVideos(p2, { now: NOW })).find((k) => k.word.toLowerCase() === 'orbit')
+    check(
+      "E6 새 AI 키워드 'n개 채널 · m편' = 목록 · 한 제목에 두 번(Orbit … Orbit) 나와도 영상은 한 편 · 목록 제목에 그 말이 있다",
+      !!nk && nk.videos === 4 && nk.hits.length === 4 && nk.channels === 3 && chCount(nk.hits) === 3 && nk.hits.every((v) => /orbit/i.test(v.title)),
+      nk && { videos: nk.videos, hits: nk.hits.map((v) => v.id) },
+    )
+  }
+
+  // 목록 순서 · 채널 칩
+  const ord = evidenceOrder(srv.filter((v) => v.ageDays <= 30))
+  const rank = (t: string) => ['breakout', 'above', 'normal', 'below', 'unknown'].indexOf(t)
+  check('E7 영상 목록 순서: 터진 것 → 잘된 것 → 나머지(같은 등급은 배수 높은 순) · 원본 배열은 그대로', ord.every((v, i) => i === 0 || rank(ord[i - 1].tier) < rank(v.tier) || (rank(ord[i - 1].tier) === rank(v.tier) && (ord[i - 1].adjusted ?? -1) >= (v.adjusted ?? -1))) && ord.length === srv.filter((v) => v.ageDays <= 30).length)
+  const chips = evidenceChannels(ord)
+  check('E8 채널 칩: 영상 많은 순 · 칩 숫자 합 = 목록 길이 · 칩 수 = 목록 속 채널 수', chips.reduce((a, c) => a + c.count, 0) === ord.length && chips.length === chCount(ord) && chips.every((c, i) => i === 0 || chips[i - 1].count >= c.count))
+
+  // 분석 탭 '단어로 본 주목 주제' — n개 채널 · 편수 = 센 영상
+  const sp = prepareFeed(sampleFeed(NOW), NOW)
+  const tps = extractTopics(periodVideos(sp.videos, 'month'), sp.channelWords)
+  check("E9 단어로 본 주목 주제 'n개 채널' = 센 영상 속 채널 수 · 편수 = 목록 길이 · 최고 조회수 = 목록 첫 영상", tps.length > 0 && tps.every((t) => t.hits.length === t.videos && chCount(t.hits) === t.channels && t.hits[0]?.views === t.topViews), tps.map((t) => `${t.keyword}:${t.videos}/${t.hits.length}`))
 }
 
 console.log(`\nyoutube: ${passed} passed, ${failed} failed`)

@@ -76,6 +76,7 @@ import {
 } from '../../services/marketing/ytRadar'
 import { PlanView, type FocusData } from './radar/PlanView'
 import { IconChip, RatioChip, VideoDetail } from './radar/RadarParts'
+import { Peek, PeekProvider } from './radar/EvidencePeek'
 import { ChannelManager } from './radar/ChannelManager'
 import { IdeaNotebook } from './radar/IdeaNotebook'
 import { HotPatternsCard, MyChannelCard } from './radar/AnalysisExtras'
@@ -175,6 +176,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   }
   const copy = useCallback((text: string, what = '제목') => void copyText(text).then((ok) => showToast(ok ? `${what}을 복사했습니다.` : '복사하지 못했습니다 — 길게 눌러 직접 복사해 주세요.')), [showToast])
   const openVideo = useCallback((v: YtVideo | RadarVideo) => setDetail(rvById.get(v.id) ?? null), [rvById])
+  // 숫자 뒤 영상 목록(D-198)에서 영상을 누르면 같은 영상 상세 창
+  const peekEnv = useMemo(() => ({ onOpenVideo: openVideo, noThumb: yt.sample }), [openVideo, yt.sample])
 
   const saveOpp = async (o: Opportunity) => {
     if (readOnly) return showToast('팀장 화면을 보는 중에는 저장하지 않습니다.')
@@ -278,7 +281,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
       {!prepared ? (
         <SetupCard status={yt.status} message={yt.message} onSample={yt.showSample} />
       ) : (
-        <>
+        <PeekProvider value={peekEnv}>
           <FeedNotices sample={yt.sample} message={yt.status === 'ready' || yt.status === 'sample' ? '' : yt.message} extraMessage={extra.status === 'error' ? extra.message : ''} />
 
           <div role="tablist" className="flex max-w-2xl rounded-(--radius-control) border border-slate-200 bg-slate-50 p-0.5" data-testid="yt-views">
@@ -335,8 +338,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
             </>
           )}
           {view === 'channels' && <ChannelManager channels={fullFeed?.channels ?? []} prefs={prefs} readOnly={readOnly} failed={yt.feed?.failed ?? []} onPrefs={(p) => void savePrefs(p)} notify={showToast} />}
-          {view === 'analysis' && <AnalysisView prepared={prepared} rvideos={rvideos} onCopy={(t) => copy(t)} />}
-        </>
+          {view === 'analysis' && <AnalysisView prepared={prepared} rvideos={rvideos} rv={rvById} onCopy={(t) => copy(t)} />}
+        </PeekProvider>
       )}
 
       <VideoDetail v={detail} clusters={plan?.clusters ?? []} onClose={() => setDetail(null)} noThumb={yt.sample} />
@@ -716,7 +719,7 @@ function VideoCard({ v, r, rank, rising, noThumb, onOpen }: { v: YtVideo; r: Rad
 /* 분석                                                                  */
 /* ------------------------------------------------------------------ */
 
-function AnalysisView({ prepared, rvideos, onCopy }: { prepared: Prepared; rvideos: RadarVideo[]; onCopy: (t: string) => void }) {
+function AnalysisView({ prepared, rvideos, rv, onCopy }: { prepared: Prepared; rvideos: RadarVideo[]; rv: ReadonlyMap<string, RadarVideo>; onCopy: (t: string) => void }) {
   const cmp = useMemo(() => compareMine(prepared), [prepared])
   const wd = useMemo(() => byWeekday(prepared.videos), [prepared])
   const hr = useMemo(() => byHour(prepared.videos), [prepared])
@@ -777,11 +780,11 @@ function AnalysisView({ prepared, rvideos, onCopy }: { prepared: Prepared; rvide
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <p className="t-sub font-bold text-slate-900">이번 주</p>
-            <TopicGrid topics={week} onCopy={onCopy} />
+            <TopicGrid topics={week} rv={rv} basis="이번 주" onCopy={onCopy} />
           </div>
           <div className="flex flex-col gap-2">
             <p className="t-sub font-bold text-slate-900">이번 달</p>
-            <TopicGrid topics={month} onCopy={onCopy} />
+            <TopicGrid topics={month} rv={rv} basis="이번 달" onCopy={onCopy} />
           </div>
         </div>
       </Fold>
@@ -789,7 +792,7 @@ function AnalysisView({ prepared, rvideos, onCopy }: { prepared: Prepared; rvide
   )
 }
 
-function TopicGrid({ topics, onCopy }: { topics: Topic[]; onCopy: (t: string) => void }) {
+function TopicGrid({ topics, rv, basis, onCopy }: { topics: Topic[]; rv: ReadonlyMap<string, RadarVideo>; basis: string; onCopy: (t: string) => void }) {
   if (topics.length === 0) return <p className="t-sub rounded-(--radius-card) border border-dashed border-slate-300 bg-white px-4 py-4 text-slate-500">이 기간에 2개 이상 채널이 같이 다룬 주제가 없습니다.</p>
   return (
     <ol className="grid grid-cols-1 gap-3 lg:grid-cols-2">
@@ -800,7 +803,9 @@ function TopicGrid({ topics, onCopy }: { topics: Topic[]; onCopy: (t: string) =>
             <span className="t-card font-bold break-keep text-slate-900 [overflow-wrap:anywhere]">{t.keyword}</span>
           </div>
           <p className="t-sub text-slate-600">
-            {t.channels}개 채널 · 최고 {fmt(t.topViews)}회 · 평균 {fmt(t.avgViews)}회
+            <Peek videos={t.hits.map((v) => rv.get(v.id)).filter((v): v is RadarVideo => v !== undefined)} title={t.keyword} basis={`${basis} 제목에 나온 영상`} kind="topic">
+              {t.channels}개 채널 · 최고 {fmt(t.topViews)}회 · 평균 {fmt(t.avgViews)}회
+            </Peek>
           </p>
           <p className="t-sub break-keep text-slate-600 [overflow-wrap:anywhere]">
             대표 영상{' '}

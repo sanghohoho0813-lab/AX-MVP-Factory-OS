@@ -550,6 +550,136 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   await ctx.close()
 }
 
+/* ---------------- D-198 숫자 뒤 영상 목록 — PC 마우스 올리면 목록 · 누르면 고정 / 휴대폰 누르면 창 ---------------- */
+{
+  const lastNum = (t) => {
+    const hot = t.match(/터진 영상 (\d+)/)
+    if (hot) return Number(hot[1])
+    const ps = [...t.matchAll(/(\d+)편/g)]
+    return ps.length ? Number(ps[ps.length - 1][1]) : null
+  }
+  for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height: 844, tag: '390', mobile: true }]) {
+    const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, locale: 'ko-KR', ...(vp.mobile ? { isMobile: true, hasTouch: true } : {}) })
+    const page = await ctx.newPage()
+    const errors = []
+    page.on('pageerror', (e) => errors.push(e.message))
+    await page.route('https://i.ytimg.com/**', (r) => r.fulfill({ status: 404, body: '' }))
+    await page.route('**/api/yt-bench**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: FJSON }))
+    await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+    await page.evaluate(seedScript())
+    await page.evaluate(() => localStorage.removeItem('axmvp.fold.all'))
+    await page.goto(BASE + '/marketing/youtube', { waitUntil: 'networkidle' })
+    await page.waitForTimeout(900)
+    const T = vp.tag
+    const over = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+    // 숫자가 쓰인 곳마다 목록이 붙었나 — 글 속 숫자(…편 · 터진 영상 n) = 목록 길이
+    const peeks = await page.getByTestId('radar-plan').getByTestId('radar-peek').evaluateAll((els) => els.map((e) => ({ kind: e.getAttribute('data-kind'), n: Number(e.getAttribute('data-count')), text: e.textContent ?? '', h: e.getBoundingClientRect().height })))
+    const kinds = new Set(peeks.map((x) => x.kind))
+    const mismatch = peeks.filter((x) => lastNum(x.text) !== null && lastNum(x.text) !== x.n)
+    check(`D198 ${T} 숫자마다 영상 목록이 붙었다(후보 근거 · 지금 강한 흐름 · AI 키워드 · 터진 영상 · 업무 흐름 · 새 키워드 · 급상승) · 글 속 숫자 = 목록 길이`, ['fact', 'domain', 'domain-hot', 'ai-kw', 'ai-kw-hot', 'ai-new', 'rising', 'rising-hot'].every((k) => kinds.has(k)) && ((await page.getByTestId('radar-ai-flow').count()) === 0 || kinds.has('ai-flow')) && peeks.every((x) => x.n > 0) && mismatch.length === 0, { kinds: [...kinds], mismatch: mismatch.slice(0, 4) })
+    const claude = page.locator('[data-testid="radar-ai-kw"][data-kw="claude"] [data-testid="radar-peek"][data-kind="ai-kw"]')
+    const claudeText = (await claude.innerText()) ?? ''
+    const [cCh, cVid] = (claudeText.match(/(\d+)개 채널 · (\d+)편/) ?? []).slice(1).map(Number)
+    if (!vp.mobile) {
+      // 마우스 올리기 → 떠 있는 목록
+      await claude.scrollIntoViewIfNeeded()
+      await claude.hover()
+      await page.waitForTimeout(400)
+      const panel = page.getByTestId('radar-peek-panel')
+      const rows = await panel.getByTestId('radar-peek-row').count()
+      const basis = (await panel.getByTestId('radar-peek-basis').innerText()) ?? ''
+      const titles = (await panel.getByTestId('radar-peek-row').allInnerTexts()).join(' | ')
+      check(`D198 ${T} AI 키워드 'Claude ${cCh}개 채널 · ${cVid}편' 에 마우스를 올리면 그 영상 ${cVid}편이 바로 뜬다(채널 ${cCh}곳 · 제목에 Claude/클로드)`, (await panel.getAttribute('data-mode')) === 'hover' && rows === cVid && basis.includes(`채널 ${cCh}곳`) && basis.includes(`영상 ${cVid}편`) && (await panel.getByTestId('radar-peek-row').evaluateAll((els) => els.every((e) => /claude|클로드/i.test(e.textContent ?? '')))), { rows, basis, titles: titles.slice(0, 160) })
+      const box = await panel.boundingBox()
+      check(`D198 ${T} 떠 있는 목록이 화면 안에(잘리지 않음)`, !!box && box.x >= 0 && box.y >= 0 && box.x + box.width <= vp.width && box.y + box.height <= vp.height, box)
+      // 목록 위로 마우스를 옮겨도 닫히지 않는다 → 밖으로 빼면 닫힌다
+      await panel.getByTestId('radar-peek-row').first().hover()
+      await page.waitForTimeout(300)
+      const stay = await page.getByTestId('radar-peek-panel').count()
+      await page.mouse.move(5, 450)
+      await page.waitForTimeout(450)
+      check(`D198 ${T} 목록으로 마우스를 옮겨도 그대로 · 밖으로 빼면 닫힘`, stay === 1 && (await page.getByTestId('radar-peek-panel').count()) === 0)
+      // 터진 영상 배지 — 터진 것만
+      const hotBadge = page.locator('[data-testid="radar-peek"][data-kind="domain-hot"]').first()
+      const hotN = lastNum((await hotBadge.innerText()) ?? '')
+      await hotBadge.hover()
+      await page.waitForTimeout(400)
+      const hotRows = await page.getByTestId('radar-peek-panel').getByTestId('radar-peek-row').count()
+      const hotChips = await page.getByTestId('radar-peek-panel').getByTestId('radar-breakout-chip').count()
+      check(`D198 ${T} '터진 영상 ${hotN}' 에 올리면 터진 영상 ${hotN}편만(모두 🔥 평소보다 n배)`, hotN !== null && hotRows === hotN && hotChips === hotN, { hotN, hotRows, hotChips })
+      await page.mouse.move(5, 450)
+      await page.waitForTimeout(400)
+      // 누르면 고정 — 마우스를 빼도 남고, Esc · 바깥 · 닫기로 닫힘
+      const fact = page.locator('[data-testid="radar-opp"][data-size="hero"] [data-testid="radar-peek"][data-kind="fact"]').first()
+      await fact.click()
+      await page.mouse.move(5, 450)
+      await page.waitForTimeout(450)
+      const pinned = page.getByTestId('radar-peek-panel')
+      check(`D198 ${T} 숫자를 누르면 목록이 고정(마우스를 빼도 남음) · 닫기 단추`, (await pinned.count()) === 1 && (await pinned.getAttribute('data-mode')) === 'pinned' && (await page.getByTestId('radar-peek-close').count()) === 1 && Number(await pinned.getAttribute('data-count')) === Number(await fact.getAttribute('data-count')))
+      await page.keyboard.press('Escape')
+      await page.waitForTimeout(200)
+      const escClosed = (await page.getByTestId('radar-peek-panel').count()) === 0
+      await fact.click()
+      await page.waitForTimeout(200)
+      await page.mouse.click(5, 450)
+      await page.waitForTimeout(200)
+      check(`D198 ${T} Esc · 바깥을 누르면 고정 목록이 닫힌다`, escClosed && (await page.getByTestId('radar-peek-panel').count()) === 0)
+      // 목록의 영상을 누르면 영상 상세
+      await claude.click()
+      await page.waitForTimeout(250)
+      const firstTitle = ((await page.getByTestId('radar-peek-panel').getByTestId('radar-peek-row').first().getAttribute('aria-label')) ?? '').replace(/ — 자세히$/, '')
+      await page.getByTestId('radar-peek-panel').getByTestId('radar-peek-row').first().click()
+      await page.waitForTimeout(300)
+      check(`D198 ${T} 목록의 영상을 누르면 그 영상 상세 창(목록은 닫힘)`, (await page.getByTestId('radar-video-detail').isVisible()) && ((await page.getByTestId('radar-video-detail').innerText()) ?? '').includes(firstTitle) && (await page.getByTestId('radar-peek-panel').count()) === 0, firstTitle)
+      await page.keyboard.press('Escape')
+      await page.waitForTimeout(200)
+      // [근거 보기] 안 숫자도
+      await page.locator('[data-testid="radar-opp"][data-size="hero"]').getByTestId('radar-opp-more').click()
+      await page.waitForTimeout(200)
+      const ev = page.locator('[data-testid="radar-opp"][data-size="hero"] [data-testid="radar-evidence"] [data-testid="radar-peek"][data-kind="related"]')
+      const evN = lastNum((await ev.innerText()) ?? '')
+      await ev.hover()
+      await page.waitForTimeout(400)
+      check(`D198 ${T} [근거 보기] '관련 영상 ${evN}편(30일)' 에 올리면 ${evN}편`, evN !== null && (await page.getByTestId('radar-peek-panel').getByTestId('radar-peek-row').count()) === evN)
+      await page.mouse.move(5, 450)
+      await page.waitForTimeout(400)
+    } else {
+      // 휴대폰 — 누르면 창(떠 있는 목록 대신) · 영상 누르면 상세
+      check(`D198 ${T} 숫자 단추는 손가락으로 누를 만큼(44px)`, peeks.every((x) => x.h >= 43.5), peeks.filter((x) => x.h < 43.5).slice(0, 4))
+      await claude.scrollIntoViewIfNeeded()
+      await claude.tap()
+      await page.waitForTimeout(400)
+      const sheet = page.getByTestId('radar-peek-sheet')
+      const rows = await sheet.getByTestId('radar-peek-row').count()
+      check(`D198 ${T} AI 키워드 'Claude ${cCh}개 채널 · ${cVid}편' 을 누르면 영상 ${cVid}편 창 · 떠 있는 목록은 없음`, (await sheet.isVisible()) && rows === cVid && (await page.getByTestId('radar-peek-panel').count()) === 0 && ((await sheet.getByTestId('radar-peek-basis').innerText()) ?? '').includes(`채널 ${cCh}곳`), { rows, cVid })
+      check(`D198 ${T} 영상 목록 창이 열려도 가로 넘침 0`, (await over()) <= 0, await over())
+      await sheet.getByTestId('radar-peek-row').first().tap()
+      await page.waitForTimeout(400)
+      check(`D198 ${T} 창의 영상을 누르면 영상 상세(목록 창은 닫힘)`, (await page.getByTestId('radar-video-detail').isVisible()) && (await page.getByTestId('radar-peek-sheet').count()) === 0)
+      await page.keyboard.press('Escape')
+      await page.waitForTimeout(200)
+    }
+    // 분석 탭 '단어로 본 주목 주제' 도
+    await page.getByTestId('yt-view-analysis').click()
+    await page.waitForTimeout(400)
+    if ((await page.getByTestId('yt-ideas').getAttribute('data-open')) !== '1') await page.getByTestId('yt-ideas').getByTestId('fold-toggle').click()
+    await page.waitForTimeout(300)
+    const tp = page.locator('[data-testid="yt-topic"] [data-testid="radar-peek"][data-kind="topic"]').first()
+    if ((await tp.count()) > 0) {
+      const tCh = Number(((await tp.innerText()) ?? '').match(/(\d+)개 채널/)?.[1] ?? -1)
+      if (vp.mobile) await tp.tap()
+      else await tp.click()
+      await page.waitForTimeout(350)
+      const host = vp.mobile ? page.getByTestId('radar-peek-sheet') : page.getByTestId('radar-peek-panel')
+      check(`D198 ${T} 분석 탭 주목 주제 'n개 채널' 도 그 영상 목록(채널 수 맞음)`, ((await host.getByTestId('radar-peek-basis').innerText()) ?? '').includes(`채널 ${tCh}곳`) && (await host.getByTestId('radar-peek-row').count()) === Number(await tp.getAttribute('data-count')), tCh)
+      await page.keyboard.press('Escape')
+      await page.waitForTimeout(200)
+    } else check(`D198 ${T} 분석 탭 주목 주제(예시 피드에 주제가 있다)`, false)
+    check(`D198 ${T} 넘침 0 · JS 오류 0`, (await over()) <= 0 && errors.length === 0, errors.join(' | '))
+    await ctx.close()
+  }
+}
+
 /* ---------------- 휴대폰 360 · 390 · 430 ---------------- */
 for (const width of [360, 390, 430]) {
   const ctx = await browser.newContext({ viewport: { width, height: 844 }, locale: 'ko-KR', isMobile: true, hasTouch: true })

@@ -346,6 +346,8 @@ export interface Topic {
   avgViews: number
   top: YtVideo
   ideas: string[]
+  /** 이 주제로 센 영상 — 조회수 순(D-198 · 숫자 뒤 영상 목록) */
+  hits: YtVideo[]
 }
 
 /** 주목 주제 — 두 단어 묶음(2편 · 2채널) 먼저, 그다음 한 단어(3편 · 2채널, 앞 묶음에 든 단어는 뺀다) */
@@ -374,6 +376,7 @@ export function extractTopics(videos: readonly YtVideo[], channelWords: Readonly
       avgViews: hits.length ? Math.floor(hits.reduce((s, v) => s + v.views, 0) / hits.length) : 0,
       top: hits[0],
       ideas: titleIdeas(keyword, rank),
+      hits,
     }
   })
 }
