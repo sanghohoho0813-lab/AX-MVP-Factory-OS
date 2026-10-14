@@ -1,24 +1,29 @@
 /**
- * 유튜브 벤치마킹 (D-193) — 마케팅 · 브랜딩 안. 대표가 예전에 만든 '김팀장 벤치마킹 대시보드'(Streamlit)를 OS 화면으로 옮겼다.
+ * 콘텐츠 레이더 (D-194) — 예전 이름 '유튜브 벤치마킹'(D-193). 주소는 그대로 /marketing/youtube.
  *
- * 대표 지시: "이걸 마케팅 브랜딩 목차에 넣고 싶다 — 유튜브 조회수 잘 나오는 곳 벤치마킹." (A안: 'AI 대본 생성' 만 빼고)
- *  - 데이터: 서버 함수(/api/yt-bench)가 채널 20곳 · 최근 영상 50편씩을 매일 아침 9시에 받아 온다(키는 서버에만).
- *  - 화면은 세 갈래 — 인기 영상(이번 주 · 이번 달 · 올해 · 쇼츠) · 콘텐츠 추천(주목 주제 + 제목 아이디어) · 채널 · 분석.
- *    예전 앱의 탭 7개를 셋으로 줄였다(D-192 — 글씨는 적게, 분석은 접어 두고 목차 설명으로).
- *  - 계산은 모두 규칙(services/marketing/ytBench) — 'AI' 라고 부르지 않는다. 대본 만들기는 없다(LLM 호출 0).
- *  - 키를 넣기 전에는 [예시로 보기](지어낸 채널 · 숫자, 크게 '예시 데이터').
+ * 대표 지시(D-194): "벤치마킹 대시보드 → 실제 콘텐츠 의사결정 엔진. 첫 화면을 열면 '이번 주에 무엇을 찍을까' 가 먼저."
+ *  - 탭 넷: 이번 주 찍을 것(첫 화면) · 인기 · 급상승(D-193 순위 판 그대로) · 채널(네 묶음 · 끄기 · 채널 추가) · 분석(D-193 분석 + 내 채널 · 제목 구조).
+ *  - D-193 기능은 하나도 빼지 않았다 — 기간 4칸 · 키워드 · 순위 · 급상승 · 채널 현황 · 요일/시간/길이 · 롱폼/쇼츠 · 업로드 주기 ·
+ *    내 채널 비교 · 주목 주제 · 제목 아이디어 · CSV · 새로 가져오기 · 키 없음 · 예시 데이터. 자리만 옮기고 접어 두었다(필요할 때 펼침).
+ *  - 계산은 모두 규칙(ytBench · ytRadar) — 'AI' 라고 부르지 않는다. 대본 만들기 · 외부 AI 호출은 없다(브리프 복사만).
+ *  - 저장(콘텐츠 수첩 · 채널 설정)은 기존 모듈 기록(moduleData) — 작업공간마다 따로. 팀장 화면을 보는 중이면 읽기만.
  */
-import { useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ClipboardCopy, Download, Eye, Flame, MessageCircle, PlayCircle, RefreshCw, Rocket, ThumbsUp, TriangleAlert, UserRound } from 'lucide-react'
+import { ChevronDown, ClipboardCopy, Download, ExternalLink, Eye, Flame, MessageCircle, PlayCircle, RefreshCw, Rocket, SlidersHorizontal, ThumbsUp, TriangleAlert, UserRound } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Badge, MetricTile } from '../../components/ui/primitives'
-import { Fold, HintTip } from '../../components/ui/fold'
+import { Fold, HintTip, openFold } from '../../components/ui/fold'
 import { hintFor } from '../../content/sectionHints'
 import { useToast } from '../../components/ui/toastContext'
 import { copyText, downloadText } from '../../components/consulting/studioParts'
+import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
+import { useViewingPilot } from '../../auth/osAccess'
 import { useYtFeed } from '../../services/marketing/ytFeed'
+import { mergeFeeds, useYtExtra } from '../../services/marketing/ytExtra'
+import { useIdeas, useRadarPrefs } from '../../services/marketing/useRadarStore'
+import { ideaFromOpportunity, type ContentIdea, type IdeaStatus, type RadarPrefs } from '../../services/marketing/radarStore'
 import {
   PERIOD_HINT,
   PERIOD_LABEL,
@@ -27,7 +32,6 @@ import {
   byLength,
   byWeekday,
   bestOf,
-  channelTable,
   compareMine,
   dateKo,
   extractKeywords,
@@ -43,16 +47,24 @@ import {
   type GroupStat,
   type Prepared,
   type Topic,
+  type YtFeed,
   type YtPeriod,
   type YtType,
   type YtVideo,
 } from '../../services/marketing/ytBench'
+import { breakoutVideos, groupOf, hotPatterns, myChannelStats, radarPlan, radarVideos, risingTopics, type Opportunity, type RadarVideo } from '../../services/marketing/ytRadar'
+import { PlanView } from './radar/PlanView'
+import { RatioChip, VideoDetail } from './radar/RadarParts'
+import { ChannelManager } from './radar/ChannelManager'
+import { IdeaNotebook } from './radar/IdeaNotebook'
+import { HotPatternsCard, MyChannelCard } from './radar/AnalysisExtras'
 
-type View = 'top' | 'ideas' | 'channels'
-const VIEWS: Array<[View, string]> = [
-  ['top', '인기 영상'],
-  ['ideas', '콘텐츠 추천'],
-  ['channels', '채널 · 분석'],
+type View = 'plan' | 'top' | 'channels' | 'analysis'
+const VIEWS: Array<[View, string, string]> = [
+  ['plan', '이번 주 찍을 것', '찍을 것'],
+  ['top', '인기 · 급상승', '인기'],
+  ['channels', '채널', '채널'],
+  ['analysis', '분석', '분석'],
 ]
 const PERIODS: YtPeriod[] = ['week', 'month', 'year', 'shorts']
 const TOP_NS = [20, 30, 40, 60]
@@ -60,15 +72,40 @@ const TOP_NS = [20, 30, 40, 60]
 const seg = (on: boolean) => `tap t-sub flex-1 rounded-[8px] px-3 py-2 font-semibold whitespace-nowrap ${on ? 'bg-white text-slate-900 shadow-(--shadow-card)' : 'text-slate-500'}`
 
 export default function YoutubeBenchPage() {
+  return <WorkspaceScope>{(ctx) => <RadarPage workspaceId={ctx.workspaceId} />}</WorkspaceScope>
+}
+
+function viewOf(raw: string | null): View {
+  if (raw === 'ideas') return 'analysis' // D-193 '콘텐츠 추천' 주소 → 분석 탭(단어로 본 주목 주제)
+  return (VIEWS.some(([k]) => k === raw) ? raw : 'plan') as View
+}
+
+/** 꺼 둔 채널은 계산에서 뺀다(내 채널은 끌 수 없다) */
+function withoutDisabled(feed: YtFeed, overrides: Readonly<Record<string, { enabled?: boolean }>>): YtFeed {
+  const off = new Set(Object.entries(overrides).filter(([, o]) => o.enabled === false).map(([id]) => id))
+  if (off.size === 0) return feed
+  const keep = feed.channels.filter((c) => c.mine || !off.has(c.id))
+  const ids = new Set(keep.map((c) => c.id))
+  return { ...feed, channels: keep, videos: feed.videos.filter((v) => ids.has(v.ch)) }
+}
+
+function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const yt = useYtFeed()
   const { showToast } = useToast()
+  const readOnly = useViewingPilot() !== null
+  const { prefs, update: updatePrefs } = useRadarPrefs(workspaceId, readOnly)
+  const notebook = useIdeas(workspaceId, readOnly)
+  const [extraKey, setExtraKey] = useState(0)
+  const addedIds = useMemo(() => (yt.sample ? [] : prefs.added.map((a) => a.id)), [yt.sample, prefs.added])
+  const extra = useYtExtra(addedIds, extraKey)
   const [params, setParams] = useSearchParams()
-  const view = (VIEWS.some(([k]) => k === params.get('view')) ? params.get('view') : 'top') as View
+  const view = viewOf(params.get('view'))
   const period = (PERIODS.includes(params.get('p') as YtPeriod) ? params.get('p') : 'week') as YtPeriod
   const kw = params.get('kw') ?? ''
   const [type, setType] = useState<YtType>('all')
   const [channel, setChannel] = useState('')
   const [topN, setTopN] = useState(30)
+  const [detail, setDetail] = useState<RadarVideo | null>(null)
 
   const setParam = (patch: Record<string, string>) => {
     const next = new URLSearchParams(params)
@@ -79,10 +116,23 @@ export default function YoutubeBenchPage() {
     setParams(next, { replace: true })
   }
 
-  const prepared = useMemo(() => (yt.feed ? prepareFeed(yt.feed) : null), [yt.feed])
+  const groupsOfAdded = useMemo(() => Object.fromEntries(prefs.added.map((a) => [a.id, a.group])), [prefs.added])
+  const fullFeed = useMemo(() => (yt.feed ? mergeFeeds(yt.feed, extra.feed, groupsOfAdded) : null), [yt.feed, extra.feed, groupsOfAdded])
+  const feed = useMemo(() => (fullFeed ? withoutDisabled(fullFeed, prefs.overrides) : null), [fullFeed, prefs.overrides])
+  const prepared = useMemo(() => (feed ? prepareFeed(feed) : null), [feed])
+  const opts = useMemo(() => ({ overrides: prefs.overrides, mix: prefs.mix }), [prefs.overrides, prefs.mix])
+  const rvideos = useMemo(() => (prepared ? radarVideos(prepared, opts) : []), [prepared, opts])
+  const rvById = useMemo(() => new Map(rvideos.map((v) => [v.id, v])), [rvideos])
+  const plan = useMemo(() => (prepared ? radarPlan(prepared, opts, rvideos) : null), [prepared, opts, rvideos])
+  const rising = useMemo(() => (prepared && plan ? risingTopics(prepared, rvideos, plan.clusters) : []), [prepared, rvideos, plan])
+  const breakouts = useMemo(() => breakoutVideos(rvideos), [rvideos])
+  const savedKeys = useMemo(() => new Set(notebook.ideas.map((i) => i.key)), [notebook.ideas])
   const loading = yt.status === 'loading'
 
-  const refresh = () => void yt.refresh()
+  const refresh = () => {
+    void yt.refresh()
+    if (prefs.added.length) setExtraKey((k) => k + 1)
+  }
   const filter = useMemo(() => ({ type, channels: channel ? [channel] : [] }), [type, channel])
 
   const csv = () => {
@@ -91,101 +141,135 @@ export default function YoutubeBenchPage() {
     // 파일 이름은 영문(브라우저마다 한글 이름이 'download' 로 바뀌는 일이 있다) — 매출 · 비용 CSV 와 같은 꼴
     downloadText(`youtube-benchmark-${d}${yt.sample ? '-sample' : ''}.csv`, videosCsv(prepared.videos), 'text/csv')
   }
+  const copy = useCallback((text: string, what = '제목') => void copyText(text).then((ok) => showToast(ok ? `${what}을 복사했습니다.` : '복사하지 못했습니다 — 길게 눌러 직접 복사해 주세요.')), [showToast])
+  const openVideo = useCallback((v: YtVideo | RadarVideo) => setDetail(rvById.get(v.id) ?? null), [rvById])
+
+  const saveOpp = async (o: Opportunity) => {
+    if (readOnly) return showToast('팀장 화면을 보는 중에는 저장하지 않습니다.')
+    try {
+      await notebook.save(ideaFromOpportunity(o))
+      // 담은 것이 바로 보이게 — 접혀 있던 수첩을 연다
+      openFold('radar.notebook')
+      showToast(`'${o.topic}' 을 콘텐츠 수첩에 담았습니다.`)
+    } catch {
+      showToast('수첩에 담지 못했습니다 — 잠시 뒤 다시 눌러 주세요.')
+    }
+  }
+  const setStatus = async (i: ContentIdea, status: IdeaStatus) => {
+    try {
+      await notebook.save({ ...i, status })
+    } catch {
+      showToast('단계를 바꾸지 못했습니다.')
+    }
+  }
+  const setMemo = async (i: ContentIdea, memo: string) => {
+    try {
+      await notebook.save({ ...i, memo })
+      showToast('메모를 저장했습니다.')
+    } catch {
+      showToast('메모를 저장하지 못했습니다 — 적은 글은 그대로 있습니다.')
+    }
+  }
+  const removeIdea = async (i: ContentIdea) => {
+    try {
+      await notebook.remove(i.id)
+      showToast(`'${i.topic}' 을 수첩에서 뺐습니다.`)
+    } catch {
+      showToast('빼지 못했습니다.')
+    }
+  }
+  const savePrefs = async (next: RadarPrefs) => {
+    if (readOnly) return showToast('팀장 화면을 보는 중에는 바꾸지 않습니다.')
+    const ok = await updatePrefs(next)
+    if (!ok) showToast('설정을 저장하지 못했습니다.')
+  }
+
+  const benchChannels = prepared ? prepared.channels.filter((c) => !c.mine).length : 0
+  const aiAx = prepared ? prepared.channels.filter((c) => !c.mine && ['ai', 'ax'].includes(groupOf(c, prefs.overrides))).length : 0
+  const recent30 = rvideos.filter((v) => !v.mine && v.ageDays <= 30).length
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5" data-testid="yt-page">
-      <PageHeader
-        title="유튜브 벤치마킹"
-        descriptionAsHint
-        description="정해 둔 채널 20곳(내 채널 + 벤치마킹 19곳)의 최근 영상으로 잘 되는 주제 · 키워드 · 올리기 좋은 요일과 시간을 찾습니다. 규칙 계산이고, 매일 아침 9시에 새로 받습니다."
-        actions={
-          <>
-            <Button variant="secondary" onClick={refresh} disabled={loading} data-testid="yt-refresh">
-              <RefreshCw aria-hidden="true" className={`size-4 ${loading ? 'animate-spin' : ''}`} /> 지금 새로 가져오기
-            </Button>
-            <Button variant="secondary" onClick={csv} disabled={!prepared} data-testid="yt-csv">
-              <Download aria-hidden="true" className="size-4" /> CSV
-            </Button>
-          </>
-        }
-      />
+      <div className="flex flex-col gap-1">
+        <PageHeader
+          title="콘텐츠 레이더"
+          descriptionAsHint
+          description="잘되는 콘텐츠를 보고 이번 주에 찍을 주제를 고릅니다. 벤치마킹 채널의 최근 영상을 매일 아침 9시에 새로 받아, 여러 채널에서 함께 오르고 채널 평소보다 잘된 주제를 근거와 함께 보여 줍니다(규칙 계산)."
+          actions={
+            <>
+              <Button variant="secondary" onClick={refresh} disabled={loading} data-testid="yt-refresh">
+                <RefreshCw aria-hidden="true" className={`size-4 ${loading ? 'animate-spin' : ''}`} /> 지금 새로 가져오기
+              </Button>
+              <Button variant="secondary" onClick={csv} disabled={!prepared} data-testid="yt-csv">
+                <Download aria-hidden="true" className="size-4" /> CSV
+              </Button>
+            </>
+          }
+        />
+        <p className="t-sub break-keep text-slate-500" data-testid="radar-subtitle">
+          YouTube 벤치마킹 · 잘되는 콘텐츠를 보고 이번 주에 찍을 주제를 고릅니다.
+        </p>
+      </div>
 
       {!prepared ? (
         <SetupCard status={yt.status} message={yt.message} onSample={yt.showSample} />
       ) : (
         <>
-          <FeedLine prepared={prepared} fetchedAt={yt.feed?.fetchedAt ?? ''} failed={yt.feed?.failed ?? []} sample={yt.sample} message={yt.status === 'ready' || yt.status === 'sample' ? '' : yt.message} />
+          <FeedLine prepared={prepared} fetchedAt={yt.feed?.fetchedAt ?? ''} failed={yt.feed?.failed ?? []} sample={yt.sample} message={yt.status === 'ready' || yt.status === 'sample' ? '' : yt.message} extraMessage={extra.status === 'error' ? extra.message : ''} />
 
-          <HotBanner prepared={prepared} onPick={(k) => setParam({ view: '', p: '', kw: k })} />
-
-          <div role="tablist" className="flex max-w-xl rounded-(--radius-control) border border-slate-200 bg-slate-50 p-0.5" data-testid="yt-views">
-            {VIEWS.map(([k, l]) => (
-              <button key={k} type="button" role="tab" aria-selected={view === k} data-testid={`yt-view-${k}`} onClick={() => setParam({ view: k === 'top' ? '' : k })} className={seg(view === k)}>
-                {l}
+          <div role="tablist" className="flex max-w-2xl rounded-(--radius-control) border border-slate-200 bg-slate-50 p-0.5" data-testid="yt-views">
+            {VIEWS.map(([k, l, short]) => (
+              <button key={k} type="button" role="tab" aria-selected={view === k} data-testid={`yt-view-${k}`} onClick={() => setParam({ view: k === 'plan' ? '' : k })} className={seg(view === k)}>
+                <span className="sm:hidden">{short}</span>
+                <span className="hidden sm:inline">{l}</span>
               </button>
             ))}
           </div>
 
-          {view !== 'channels' && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2" data-testid="yt-filters">
-              {!(view === 'top' && period === 'shorts') && (
-                <div role="group" aria-label="영상 종류" className="flex rounded-(--radius-control) border border-slate-200 bg-slate-50 p-0.5">
-                  {(
-                    [
-                      ['all', '전체'],
-                      ['long', '롱폼'],
-                      ['short', '쇼츠'],
-                    ] as Array<[YtType, string]>
-                  ).map(([k, l]) => (
-                    <button key={k} type="button" aria-pressed={type === k} onClick={() => setType(k)} className={seg(type === k)} data-testid={`yt-type-${k}`}>
-                      {l}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <label className="flex min-w-0 items-center gap-2">
-                <span className="t-sub shrink-0 text-slate-600">채널</span>
-                <select value={channel} onChange={(e) => setChannel(e.target.value)} data-testid="yt-channel" className="tap t-sub max-w-[14rem] min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-2 py-2 text-slate-800">
-                  <option value="">전체 채널</option>
-                  {prepared.channels.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.title}
-                      {c.mine ? ' (내 채널)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {view === 'top' && (
-                <label className="flex items-center gap-2">
-                  <span className="t-sub shrink-0 text-slate-600">보기</span>
-                  <select value={topN} onChange={(e) => setTopN(Number(e.target.value))} data-testid="yt-topn" className="tap t-sub rounded-(--radius-control) border border-slate-300 bg-white px-2 py-2 text-slate-800">
-                    {TOP_NS.map((n) => (
-                      <option key={n} value={n}>
-                        TOP {n}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-            </div>
+          {view === 'plan' && plan && (
+            <>
+              <PlanView
+                plan={plan}
+                rising={rising}
+                breakouts={breakouts}
+                basis={`최근 30일 영상 ${fmt(recent30)}편 · 벤치마킹 채널 ${benchChannels}곳(AI · AX ${aiAx}곳) — 점수가 아니라 근거로 고릅니다`}
+                savedKeys={savedKeys}
+                readOnly={readOnly}
+                noThumb={yt.sample}
+                onSave={(o) => void saveOpp(o)}
+                onCopy={(t) => copy(t)}
+                onOpenVideo={openVideo}
+                onMix={(mix) => void savePrefs({ ...prefs, mix })}
+                onGoChannels={() => setParam({ view: 'channels' })}
+              />
+              <IdeaNotebook ideas={notebook.ideas} readOnly={readOnly} onStatus={(i, s) => void setStatus(i, s)} onMemo={(i, m) => void setMemo(i, m)} onRemove={(i) => void removeIdea(i)} onCopy={(t, what) => copy(t, what)} />
+            </>
           )}
 
           {view === 'top' && (
-            <TopView
-              prepared={prepared}
-              period={period}
-              kw={kw}
-              topN={topN}
-              filter={filter}
-              sample={yt.sample}
-              onPeriod={(p) => setParam({ p: p === 'week' ? '' : p, kw: '' })}
-              onKeyword={(k) => setParam({ kw: k })}
-            />
+            <>
+              <HotBanner prepared={prepared} onPick={(k) => setParam({ p: '', kw: k })} />
+              <Filters prepared={prepared} period={period} type={type} channel={channel} topN={topN} onType={setType} onChannel={setChannel} onTopN={setTopN} />
+              <TopView
+                prepared={prepared}
+                rv={rvById}
+                period={period}
+                kw={kw}
+                topN={topN}
+                filter={filter}
+                sample={yt.sample}
+                onPeriod={(p) => setParam({ p: p === 'week' ? '' : p, kw: '' })}
+                onKeyword={(k) => setParam({ kw: k })}
+                onOpen={openVideo}
+              />
+            </>
           )}
-          {view === 'ideas' && <IdeasView prepared={prepared} filter={filter} onCopy={(t) => void copyText(t).then((ok) => showToast(ok ? '제목을 복사했습니다.' : '복사하지 못했습니다 — 길게 눌러 직접 복사해 주세요.'))} />}
-          {view === 'channels' && <ChannelsView prepared={prepared} />}
+          {view === 'channels' && <ChannelManager channels={fullFeed?.channels ?? []} prefs={prefs} readOnly={readOnly} failed={yt.feed?.failed ?? []} onPrefs={(p) => void savePrefs(p)} notify={showToast} />}
+          {view === 'analysis' && <AnalysisView prepared={prepared} rvideos={rvideos} onCopy={(t) => copy(t)} />}
         </>
       )}
+
+      <VideoDetail v={detail} clusters={plan?.clusters ?? []} onClose={() => setDetail(null)} noThumb={yt.sample} />
     </div>
   )
 }
@@ -211,7 +295,7 @@ function SetupCard({ status, message, onSample }: { status: string; message: str
         <ol className="t-sub flex list-decimal flex-col gap-1 pl-6 break-keep text-slate-600" data-testid="yt-key-steps">
           <li>Google Cloud 콘솔에서 'YouTube Data API v3' 를 켜고 API 키를 만듭니다(예전 대시보드에 쓰던 키도 됩니다).</li>
           <li>Vercel › 이 프로젝트 › Settings › Environment Variables 에 이름 YOUTUBE_API_KEY 로 넣습니다.</li>
-          <li>다시 배포(Redeploy)하면 이 화면이 실제 채널 20곳으로 바뀝니다.</li>
+          <li>다시 배포(Redeploy)하면 이 화면이 실제 벤치마킹 채널로 바뀝니다.</li>
         </ol>
       )}
       <div>
@@ -223,14 +307,14 @@ function SetupCard({ status, message, onSample }: { status: string; message: str
   )
 }
 
-function FeedLine({ prepared, fetchedAt, failed, sample, message }: { prepared: Prepared; fetchedAt: string; failed: string[]; sample: boolean; message: string }) {
+function FeedLine({ prepared, fetchedAt, failed, sample, message, extraMessage }: { prepared: Prepared; fetchedAt: string; failed: string[]; sample: boolean; message: string; extraMessage: string }) {
   const t = Date.parse(fetchedAt)
   const when = Number.isFinite(t) ? new Date(t + 9 * 3_600_000).toISOString().slice(5, 16).replace('-', '월 ').replace('T', '일 ') : ''
   return (
     <div className="flex flex-col gap-2">
       {sample && (
         <p className="t-body rounded-(--radius-control) border border-amber-300 bg-amber-50 px-4 py-3 font-semibold break-keep text-amber-900" data-testid="yt-sample-banner">
-          예시 데이터입니다 — 지어낸 채널 · 숫자입니다. 유튜브 키를 넣으면 실제 채널 20곳으로 바뀝니다.
+          예시 데이터입니다 — 지어낸 채널 · 숫자입니다. 유튜브 키를 넣으면 실제 벤치마킹 채널로 바뀝니다.
         </p>
       )}
       {message && (
@@ -238,6 +322,7 @@ function FeedLine({ prepared, fetchedAt, failed, sample, message }: { prepared: 
           {message}
         </p>
       )}
+      {extraMessage && <p className="t-meta break-keep text-warning-700">{extraMessage}</p>}
       <p className="t-sub flex flex-wrap gap-x-3 gap-y-1 text-slate-500" data-testid="yt-feedline">
         {when && <span>받은 때 {when}</span>}
         <span>채널 {prepared.channels.length}곳</span>
@@ -279,11 +364,91 @@ function HotBanner({ prepared, onPick }: { prepared: Prepared; onPick: (keyword:
 }
 
 /* ------------------------------------------------------------------ */
-/* 인기 영상                                                              */
+/* 인기 · 급상승                                                          */
 /* ------------------------------------------------------------------ */
+
+/** 거르기 — 필요할 때만 펼친다(D-194: 첫 화면에 필터 · 칩 · 숫자 · 카드가 한꺼번에 다투지 않게) */
+function Filters({
+  prepared,
+  period,
+  type,
+  channel,
+  topN,
+  onType,
+  onChannel,
+  onTopN,
+}: {
+  prepared: Prepared
+  period: YtPeriod
+  type: YtType
+  channel: string
+  topN: number
+  onType: (t: YtType) => void
+  onChannel: (c: string) => void
+  onTopN: (n: number) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const chName = prepared.channels.find((c) => c.id === channel)?.title
+  const summary = [type === 'long' ? '롱폼' : type === 'short' ? '쇼츠' : '전체', chName ?? '전체 채널', `TOP ${topN}`].join(' · ')
+  const active = (type !== 'all' ? 1 : 0) + (channel ? 1 : 0)
+  return (
+    <div className="flex flex-col gap-2">
+      <div>
+        <button type="button" onClick={() => setOpen((x) => !x)} aria-expanded={open} className="tap t-sub inline-flex max-w-full items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700 hover:border-brand-400" data-testid="yt-filter-toggle">
+          <SlidersHorizontal aria-hidden="true" className="size-4 shrink-0" />
+          <span className="min-w-0 truncate">거르기 · {summary}</span>
+          {active > 0 && <Badge tone="brand">{active}</Badge>}
+          <ChevronDown aria-hidden="true" className={`size-4 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
+      {open && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2" data-testid="yt-filters">
+          {period !== 'shorts' && (
+            <div role="group" aria-label="영상 종류" className="flex rounded-(--radius-control) border border-slate-200 bg-slate-50 p-0.5">
+              {(
+                [
+                  ['all', '전체'],
+                  ['long', '롱폼'],
+                  ['short', '쇼츠'],
+                ] as Array<[YtType, string]>
+              ).map(([k, l]) => (
+                <button key={k} type="button" aria-pressed={type === k} onClick={() => onType(k)} className={seg(type === k)} data-testid={`yt-type-${k}`}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          )}
+          <label className="flex min-w-0 items-center gap-2">
+            <span className="t-sub shrink-0 text-slate-600">채널</span>
+            <select value={channel} onChange={(e) => onChannel(e.target.value)} data-testid="yt-channel" className="tap t-sub max-w-[14rem] min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-2 py-2 text-slate-800">
+              <option value="">전체 채널</option>
+              {prepared.channels.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.title}
+                  {c.mine ? ' (내 채널)' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2">
+            <span className="t-sub shrink-0 text-slate-600">보기</span>
+            <select value={topN} onChange={(e) => onTopN(Number(e.target.value))} data-testid="yt-topn" className="tap t-sub rounded-(--radius-control) border border-slate-300 bg-white px-2 py-2 text-slate-800">
+              {TOP_NS.map((n) => (
+                <option key={n} value={n}>
+                  TOP {n}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function TopView({
   prepared,
+  rv,
   period,
   kw,
   topN,
@@ -291,8 +456,10 @@ function TopView({
   sample,
   onPeriod,
   onKeyword,
+  onOpen,
 }: {
   prepared: Prepared
+  rv: ReadonlyMap<string, RadarVideo>
   period: YtPeriod
   kw: string
   topN: number
@@ -300,13 +467,16 @@ function TopView({
   sample: boolean
   onPeriod: (p: YtPeriod) => void
   onKeyword: (k: string) => void
+  onOpen: (v: YtVideo) => void
 }) {
+  const [allKw, setAllKw] = useState(false)
   const counts = useMemo(() => Object.fromEntries(PERIODS.map((p) => [p, periodVideos(prepared.videos, p, filter).length])) as Record<YtPeriod, number>, [prepared, filter])
   const pool = useMemo(() => periodVideos(prepared.videos, period, filter), [prepared, period, filter])
   const keywords = useMemo(() => extractKeywords(pool, prepared.channelWords), [pool, prepared])
   const board = useMemo(() => boardOf(pool, topN, kw), [pool, topN, kw])
   const top = board.rows[0]
   const second = board.rows[1]
+  const shownKw = allKw ? keywords : keywords.slice(0, 8)
   return (
     <div className="flex flex-col gap-4" data-testid="yt-top">
       <div className="flex flex-wrap gap-2" role="group" aria-label="기간" data-testid="yt-periods">
@@ -334,7 +504,7 @@ function TopView({
             <button type="button" aria-pressed={!kw} onClick={() => onKeyword('')} className={`tap t-sub rounded-full border px-3 py-1 font-medium ${!kw ? 'border-slate-800 bg-slate-800 text-white' : 'border-slate-300 bg-white text-slate-600'}`}>
               전체
             </button>
-            {keywords.map((k, i) => (
+            {shownKw.map((k, i) => (
               <button
                 key={k.word}
                 type="button"
@@ -346,6 +516,11 @@ function TopView({
                 #{k.word} <span className="opacity-60">{k.videos}</span>
               </button>
             ))}
+            {keywords.length > 8 && !allKw && (
+              <button type="button" onClick={() => setAllKw(true)} className="tap t-sub rounded-full border border-dashed border-slate-300 px-3 py-1 font-medium text-slate-500" data-testid="yt-keyword-more">
+                +{keywords.length - 8} 더 보기
+              </button>
+            )}
           </div>
         </section>
       )}
@@ -365,9 +540,9 @@ function TopView({
               <MetricTile label="조회수 2위" value={second ? `${shortNum(second.views)}회` : '—'} hint={second?.channelName} hintOnMobile />
             )}
           </div>
-          <ol className="grid grid-cols-2 gap-2.5 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5" data-testid="yt-grid">
+          <ol className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5" data-testid="yt-grid">
             {board.rows.map((v, i) => (
-              <VideoCard key={v.id} v={v} rank={i + 1} rising={isRising(v, board.periodAvg)} noThumb={sample} />
+              <VideoCard key={v.id} v={v} r={rv.get(v.id)} rank={i + 1} rising={isRising(v, board.periodAvg)} noThumb={sample} onOpen={onOpen} />
             ))}
           </ol>
         </>
@@ -376,12 +551,13 @@ function TopView({
   )
 }
 
-function VideoCard({ v, rank, rising, noThumb }: { v: YtVideo; rank: number; rising: boolean; noThumb: boolean }) {
+function VideoCard({ v, r, rank, rising, noThumb, onOpen }: { v: YtVideo; r: RadarVideo | undefined; rank: number; rising: boolean; noThumb: boolean; onOpen: (v: YtVideo) => void }) {
   const [broken, setBroken] = useState(false)
   const medal = rank === 1 ? 'bg-amber-400 text-amber-950' : rank === 2 ? 'bg-slate-300 text-slate-900' : rank === 3 ? 'bg-orange-300 text-orange-950' : 'bg-slate-900/80 text-white'
   return (
-    <li className={`flex min-w-0 flex-col overflow-hidden rounded-(--radius-card) border bg-white ${v.mine ? 'border-amber-400 ring-1 ring-amber-300' : 'border-slate-200'}`} data-testid="yt-card" data-mine={v.mine ? '1' : '0'} data-rising={rising ? '1' : '0'}>
-      <a href={v.url} target="_blank" rel="noopener noreferrer" className="relative block aspect-video bg-slate-100" aria-label={`${v.title} — 유튜브에서 보기`}>
+    <li className={`flex min-w-0 flex-row overflow-hidden rounded-(--radius-card) border bg-white sm:flex-col ${v.mine ? 'border-amber-400 ring-1 ring-amber-300' : 'border-slate-200'}`} data-testid="yt-card" data-mine={v.mine ? '1' : '0'} data-rising={rising ? '1' : '0'} data-tier={r?.tier ?? 'unknown'}>
+      {/* 휴대폰은 한 줄 목록(썸네일 왼쪽) — PC 카드 여러 칸을 작게 줄이지 않는다(D-194) */}
+      <button type="button" onClick={() => onOpen(v)} className="relative block aspect-video w-36 shrink-0 self-start bg-slate-100 sm:w-full" aria-label={`${v.title} — 자세히 보기`} data-testid="yt-card-thumb">
         {noThumb || broken ? (
           <span className="flex size-full items-center justify-center text-slate-300">
             <PlayCircle aria-hidden="true" className="size-10" />
@@ -403,12 +579,13 @@ function VideoCard({ v, rank, rising, noThumb }: { v: YtVideo; rank: number; ris
           )}
         </span>
         <span className="t-meta absolute right-1.5 bottom-1.5 rounded bg-slate-900/80 px-1.5 font-semibold text-white">{v.isShort ? '쇼츠' : '롱폼'}</span>
-      </a>
+      </button>
       <div className="flex min-w-0 flex-1 flex-col gap-1 p-2.5">
         <p className="t-meta truncate text-slate-500">{v.channelName}</p>
-        <a href={v.url} target="_blank" rel="noopener noreferrer" className="t-sub line-clamp-2 font-semibold break-keep text-slate-900 [overflow-wrap:anywhere] hover:text-brand-700 hover:underline">
+        <button type="button" onClick={() => onOpen(v)} className="t-sub line-clamp-2 text-left font-semibold break-keep text-slate-900 [overflow-wrap:anywhere] hover:text-brand-700 hover:underline">
           {v.title}
-        </a>
+        </button>
+        {r && r.ratio !== null && <RatioChip v={r} />}
         <p className="t-meta mt-auto flex flex-wrap items-center gap-x-2 gap-y-0.5 pt-1 text-slate-600">
           <span className="inline-flex items-center gap-0.5 font-semibold text-slate-800">
             <Eye aria-hidden="true" className="size-3.5" /> {shortNum(v.views)}
@@ -420,26 +597,89 @@ function VideoCard({ v, rank, rising, noThumb }: { v: YtVideo; rank: number; ris
             <MessageCircle aria-hidden="true" className="size-3.5" /> {shortNum(v.comments)}
           </span>
         </p>
-        <p className="t-meta text-slate-400">{dateKo(v.publishedAt)}</p>
+        <p className="t-meta flex items-center justify-between gap-2 text-slate-400">
+          <span>{dateKo(v.publishedAt)}</span>
+          <a href={v.url} target="_blank" rel="noopener noreferrer" className="tap -my-3 inline-flex items-center justify-end gap-0.5 font-semibold text-slate-500 hover:text-brand-700" aria-label={`${v.title} — 유튜브에서 보기`}>
+            유튜브 <ExternalLink aria-hidden="true" className="size-3" />
+          </a>
+        </p>
       </div>
     </li>
   )
 }
 
 /* ------------------------------------------------------------------ */
-/* 콘텐츠 추천                                                            */
+/* 분석                                                                  */
 /* ------------------------------------------------------------------ */
 
-function IdeasView({ prepared, filter, onCopy }: { prepared: Prepared; filter: { type: YtType; channels: string[] }; onCopy: (t: string) => void }) {
-  const week = useMemo(() => extractTopics(periodVideos(prepared.videos, 'week', filter), prepared.channelWords), [prepared, filter])
-  const month = useMemo(() => extractTopics(periodVideos(prepared.videos, 'month', filter), prepared.channelWords), [prepared, filter])
+function AnalysisView({ prepared, rvideos, onCopy }: { prepared: Prepared; rvideos: RadarVideo[]; onCopy: (t: string) => void }) {
+  const cmp = useMemo(() => compareMine(prepared), [prepared])
+  const wd = useMemo(() => byWeekday(prepared.videos), [prepared])
+  const hr = useMemo(() => byHour(prepared.videos), [prepared])
+  const ln = useMemo(() => byLength(prepared.videos), [prepared])
+  const fm = useMemo(() => formatByChannel(prepared.videos), [prepared])
+  const cad = useMemo(() => uploadCadence(prepared.videos), [prepared])
+  const mine = useMemo(() => myChannelStats(rvideos), [rvideos])
+  const pats = useMemo(() => hotPatterns(rvideos), [rvideos])
+  const week = useMemo(() => extractTopics(periodVideos(prepared.videos, 'week'), prepared.channelWords), [prepared])
+  const month = useMemo(() => extractTopics(periodVideos(prepared.videos, 'month'), prepared.channelWords), [prepared])
+  const best = (g: GroupStat | null) => (g ? `1위 ${g.label} · 평균 ${shortNum(g.avg)}회` : undefined)
   return (
-    <div className="flex flex-col gap-4" data-testid="yt-ideas">
-      <Fold id="yt.ideas.week" title="이번 주 주목 주제" defaultOpen count={week.length} countTone="brand">
-        <TopicGrid topics={week} onCopy={onCopy} />
+    <div className="flex flex-col gap-3" data-testid="yt-analysis">
+      <MyChannelCard s={mine} />
+      {cmp.length > 0 && (
+        <Fold panel id="yt.compare" title="내 채널 vs 벤치마킹 평균" defaultOpen testId="yt-compare">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-4 gap-y-1.5">
+            <span className="t-meta text-slate-400" />
+            <span className="t-meta text-right font-semibold text-amber-700">내 채널</span>
+            <span className="t-meta text-right font-semibold text-slate-500">벤치마킹 평균</span>
+            {cmp.map((r) => (
+              <Row3 key={r.label} a={r.label} b={r.mine} c={r.bench} />
+            ))}
+          </div>
+        </Fold>
+      )}
+      <HotPatternsCard stats={pats} />
+      <Fold panel id="yt.weekday" title="잘 되는 요일" summary={best(bestOf(wd))} testId="yt-weekday">
+        <StatList stats={wd} />
       </Fold>
-      <Fold id="yt.ideas.month" title="이번 달 주목 주제" defaultOpen count={month.length} countTone="brand">
-        <TopicGrid topics={month} onCopy={onCopy} />
+      <Fold panel id="yt.hour" title="잘 되는 시간대" summary={best(bestOf(hr))} testId="yt-hour">
+        {hr.length ? <StatList stats={hr} /> : <p className="t-sub text-slate-500">같은 시간대에 올린 영상이 2편 넘는 곳이 아직 없습니다.</p>}
+      </Fold>
+      <Fold panel id="yt.length" title="영상 길이별" summary={best(bestOf(ln))} testId="yt-length">
+        <StatList stats={ln} />
+      </Fold>
+      <Fold panel id="yt.format" title="롱폼 vs 쇼츠" testId="yt-format">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-4 gap-y-1.5">
+          <span className="t-meta text-slate-400">채널</span>
+          <span className="t-meta text-right font-semibold text-slate-500">롱폼 평균(편)</span>
+          <span className="t-meta text-right font-semibold text-slate-500">쇼츠 평균(편)</span>
+          {fm.map((r) => (
+            <Row3 key={r.channel} a={r.channel} b={`${shortNum(r.longAvg)} (${r.longCount})`} c={`${shortNum(r.shortAvg)} (${r.shortCount})`} />
+          ))}
+        </div>
+      </Fold>
+      <Fold panel id="yt.cadence" title="채널별 업로드 주기" testId="yt-cadence">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-4 gap-y-1.5">
+          <span className="t-meta text-slate-400">채널</span>
+          <span className="t-meta text-right font-semibold text-slate-500">평균 간격</span>
+          <span className="t-meta text-right font-semibold text-slate-500">7일 · 30일</span>
+          {cad.map((r) => (
+            <Row3 key={r.channel} a={r.channel} b={r.avgDays === null ? '데이터 부족' : `${r.avgDays.toFixed(1)}일`} c={`${r.recent7} · ${r.recent30}편`} />
+          ))}
+        </div>
+      </Fold>
+      <Fold panel id="yt.ideas" title="단어로 본 주목 주제" summary={week[0] ? `이번 주 1위 ${week[0].keyword}` : undefined} count={week.length + month.length} testId="yt-ideas">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <p className="t-sub font-bold text-slate-900">이번 주</p>
+            <TopicGrid topics={week} onCopy={onCopy} />
+          </div>
+          <div className="flex flex-col gap-2">
+            <p className="t-sub font-bold text-slate-900">이번 달</p>
+            <TopicGrid topics={month} onCopy={onCopy} />
+          </div>
+        </div>
       </Fold>
     </div>
   )
@@ -478,86 +718,6 @@ function TopicGrid({ topics, onCopy }: { topics: Topic[]; onCopy: (t: string) =>
         </li>
       ))}
     </ol>
-  )
-}
-
-/* ------------------------------------------------------------------ */
-/* 채널 · 분석                                                            */
-/* ------------------------------------------------------------------ */
-
-function ChannelsView({ prepared }: { prepared: Prepared }) {
-  const table = useMemo(() => channelTable(prepared.channels), [prepared])
-  const cmp = useMemo(() => compareMine(prepared), [prepared])
-  const wd = useMemo(() => byWeekday(prepared.videos), [prepared])
-  const hr = useMemo(() => byHour(prepared.videos), [prepared])
-  const ln = useMemo(() => byLength(prepared.videos), [prepared])
-  const fm = useMemo(() => formatByChannel(prepared.videos), [prepared])
-  const cad = useMemo(() => uploadCadence(prepared.videos), [prepared])
-  const best = (g: GroupStat | null) => (g ? `1위 ${g.label} · 평균 ${shortNum(g.avg)}회` : undefined)
-  return (
-    <div className="flex flex-col gap-3" data-testid="yt-channels">
-      <Fold panel id="yt.channels" title="채널 현황" defaultOpen count={table.length} testId="yt-channel-table">
-        <ul className="flex flex-col divide-y divide-slate-100">
-          {table.map((c, i) => (
-            <li key={c.id} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 py-2" data-testid="yt-channel-row">
-              <span className="t-meta w-6 shrink-0 text-right text-slate-400">{i + 1}</span>
-              <span className="t-body min-w-0 flex-[1_1_10rem] font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]">
-                {c.title} {c.mine && <Badge tone="warning">내 채널</Badge>}
-              </span>
-              <span className="t-sub flex flex-wrap gap-x-3 pl-9 text-slate-600 sm:pl-0">
-                <span>구독자 {shortNum(c.subs)}</span>
-                <span>영상 {fmt(c.videoCount)}</span>
-                <span>총 조회 {shortNum(c.views)}</span>
-                <span className="font-semibold text-slate-800">구독자당 {c.viewsPerSub.toFixed(1)}회</span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      </Fold>
-
-      {cmp.length > 0 && (
-        <Fold panel id="yt.compare" title="내 채널 vs 벤치마킹 평균" defaultOpen testId="yt-compare">
-          <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-4 gap-y-1.5">
-            <span className="t-meta text-slate-400" />
-            <span className="t-meta text-right font-semibold text-amber-700">내 채널</span>
-            <span className="t-meta text-right font-semibold text-slate-500">벤치마킹 평균</span>
-            {cmp.map((r) => (
-              <Row3 key={r.label} a={r.label} b={r.mine} c={r.bench} />
-            ))}
-          </div>
-        </Fold>
-      )}
-
-      <Fold panel id="yt.weekday" title="잘 되는 요일" summary={best(bestOf(wd))} testId="yt-weekday">
-        <StatList stats={wd} />
-      </Fold>
-      <Fold panel id="yt.hour" title="잘 되는 시간대" summary={best(bestOf(hr))} testId="yt-hour">
-        {hr.length ? <StatList stats={hr} /> : <p className="t-sub text-slate-500">같은 시간대에 올린 영상이 2편 넘는 곳이 아직 없습니다.</p>}
-      </Fold>
-      <Fold panel id="yt.length" title="영상 길이별" summary={best(bestOf(ln))} testId="yt-length">
-        <StatList stats={ln} />
-      </Fold>
-      <Fold panel id="yt.format" title="롱폼 vs 쇼츠" testId="yt-format">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-4 gap-y-1.5">
-          <span className="t-meta text-slate-400">채널</span>
-          <span className="t-meta text-right font-semibold text-slate-500">롱폼 평균(편)</span>
-          <span className="t-meta text-right font-semibold text-slate-500">쇼츠 평균(편)</span>
-          {fm.map((r) => (
-            <Row3 key={r.channel} a={r.channel} b={`${shortNum(r.longAvg)} (${r.longCount})`} c={`${shortNum(r.shortAvg)} (${r.shortCount})`} />
-          ))}
-        </div>
-      </Fold>
-      <Fold panel id="yt.cadence" title="채널별 업로드 주기" testId="yt-cadence">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-4 gap-y-1.5">
-          <span className="t-meta text-slate-400">채널</span>
-          <span className="t-meta text-right font-semibold text-slate-500">평균 간격</span>
-          <span className="t-meta text-right font-semibold text-slate-500">7일 · 30일</span>
-          {cad.map((r) => (
-            <Row3 key={r.channel} a={r.channel} b={r.avgDays === null ? '데이터 부족' : `${r.avgDays.toFixed(1)}일`} c={`${r.recent7} · ${r.recent30}편`} />
-          ))}
-        </div>
-      </Fold>
-    </div>
   )
 }
 

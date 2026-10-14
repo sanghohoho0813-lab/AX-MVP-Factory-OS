@@ -10,8 +10,12 @@
  *  4. 키워드 · 기간 · 종류 · 채널 · TOP N 거르기 / 주소에 하루 칸(slot) · [지금 새로 가져오기]는 30분 칸(bucket) / 다시 열면 저장된 것
  *  5. 콘텐츠 추천(주목 주제 · 제목 아이디어 복사) · 채널 · 분석(채널 현황 · 내 채널 비교 · 접힌 분석 + 한 줄 요약) · CSV
  *  6. 'AI' 라는 말 없음 · 브라우저가 유튜브(googleapis)를 직접 부르지 않음 · 목차 설명 · 오류 0
- *  7. 휴대폰 390 · 360 — 예시 데이터 · 넘침 0 · 카드 두 줄
+ *  7. 휴대폰 390 · 360 — 예시 데이터 · 넘침 0
+ * D-194 콘텐츠 레이더: 첫 화면 = 이번 주 찍을 것(후보 카드 · 근거 · 상세 · 수첩 저장/다시 읽기 · 단계 · 브리프 복사) ·
+ *   채널 네 묶음(끄기 · 채널 추가는 로그인한 OS 에서만) · 분석(내 채널 · 제목 구조) · 금지 문구 0 · LLM 주소 0 · 유튜브 키 번들 0 ·
+ *   휴대폰 360 · 390 · 430 넘침 0 · 누르는 곳 44px · 인기 영상은 휴대폰에서 한 줄 목록
  */
+import { readFileSync, readdirSync } from 'node:fs'
 import { chromium } from 'playwright'
 import { seedScript } from './seed.mjs'
 
@@ -77,7 +81,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 
   // 1. 마케팅 · 브랜딩 입구
   await page.goto(BASE + '/marketing', { waitUntil: 'networkidle' })
-  check('마케팅: 맨 위 "유튜브 벤치마킹" 바로 쓰기 · 도입 예정 5개는 그대로', (await page.getByTestId('marketing-youtube').count()) === 1 && (await page.getByTestId('marketing-planned').locator('li').count()) === 5)
+  check('마케팅: 맨 위 "콘텐츠 레이더(YouTube 벤치마킹)" 바로 쓰기 · 도입 예정 5개는 그대로', (await page.getByTestId('marketing-youtube').count()) === 1 && ((await page.getByTestId('marketing-youtube').innerText()) ?? '').includes('콘텐츠 레이더') && (await page.getByTestId('marketing-planned').locator('li').count()) === 5)
   await page.getByTestId('marketing-youtube').click()
   await page.waitForURL(/\/marketing\/youtube/)
   await page.waitForTimeout(800)
@@ -86,7 +90,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const setup = page.getByTestId('yt-setup')
   check('로컬(함수 없음): 안내 + [예시로 보기]', (await setup.getAttribute('data-status')) === 'unavailable' && (await page.getByTestId('yt-sample').count()) === 1, await setup.getAttribute('data-status').catch(() => 'none'))
   await page.getByTestId('yt-sample').click()
-  check('예시로 보기: 큰 "예시 데이터" 띠 · 지어낸 채널', (await page.getByTestId('yt-sample-banner').isVisible()) && ((await page.getByTestId('yt-feedline').innerText()) ?? '').includes('채널 8곳'))
+  check('예시로 보기: 큰 "예시 데이터" 띠 · 지어낸 채널', (await page.getByTestId('yt-sample-banner').isVisible()) && ((await page.getByTestId('yt-feedline').innerText()) ?? '').includes('채널 12곳'))
 
   // 키가 없을 때
   await page.route('**/api/yt-bench**', (r) => r.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'no_key' }) }))
@@ -107,6 +111,9 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('받은 데이터: 받은 때 · 채널 4곳 · 영상 16편 · 못 받은 채널(@세무사)', line.includes('받은 때') && line.includes('채널 4곳') && line.includes('영상 16편') && line.includes('@세무사'), line)
   check('주소: 처음엔 하루 칸(?slot=오늘 날짜)', asked.length === 1 && /slot=\d{4}-\d{2}-\d{2}$/.test(asked[0]), asked.join(' '))
   check('예시 띠는 사라진다(진짜 데이터)', (await page.getByTestId('yt-sample-banner').count()) === 0)
+  check('D-194 첫 화면 = 이번 주 찍을 것(콘텐츠 레이더) · 제목 "콘텐츠 레이더" · 보조 "YouTube 벤치마킹"', (await page.getByTestId('radar-plan').isVisible()) && ((await page.locator('main h1').first().innerText()) ?? '').includes('콘텐츠 레이더') && ((await page.getByTestId('radar-subtitle').innerText()) ?? '').includes('YouTube 벤치마킹'))
+  await page.getByTestId('yt-view-top').click()
+  await page.waitForTimeout(400)
   const hot = await page.getByTestId('yt-hot-item').allInnerTexts()
   // 한글 3자 이상만 낱말로 친다(예전 앱 그대로) — '청년 · 채용 · 절세' 같은 두 글자는 빠진다
   check('이번 주 주목 주제 TOP 3: 두 낱말 묶음 먼저(가업승계 증여특례 · 2채널) → 한 낱말(고용지원금 · 4채널)', hot.length >= 2 && hot[0].includes('가업승계 증여특례') && hot[0].includes('2채널') && hot.some((h) => h.includes('고용지원금') && h.includes('4채널')), hot)
@@ -116,6 +123,11 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('이번 주 순위: 7일 안 영상만 · 조회수 순(1위 a1)', (await cards.count()) === 8 && ((await cards.first().innerText()) ?? '').includes('고용지원금 청년 채용 이렇게 받으세요'), await cards.count())
   check('내 채널 카드 표시 · 요약 "내 채널 최고 순위"', (await page.locator('[data-testid="yt-card"][data-mine="1"]').count()) === 1 && ((await page.getByTestId('yt-summary').innerText()) ?? '').includes('내 채널 최고 순위'))
   check('급상승: 이번 주 평균의 2배 넘는 영상(a1)', ((await page.locator('[data-testid="yt-card"][data-rising="1"]').first().innerText()) ?? '').includes('고용지원금 청년 채용 이렇게'))
+  await cards.first().getByTestId('yt-card-thumb').click()
+  await page.waitForTimeout(300)
+  check('D-194 카드 누르면 상세 창(평소 대비 · 참고할 것)', (await page.getByTestId('radar-video-detail').isVisible()) && (await page.getByTestId('radar-lessons').locator('li').count()) >= 2)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
   check('카드: 유튜브 링크는 새 창 · 안전하게(noopener)', ((await cards.first().locator('a').first().getAttribute('href')) ?? '').startsWith('https://www.youtube.com/watch?v=a1') && (await cards.first().locator('a').first().getAttribute('rel'))?.includes('noopener'))
 
   // 4. 거르기
@@ -125,6 +137,9 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('키워드 누르면 그 말이 든 영상만 · 주소에 kw', kwTitles.length === 2 && kwTitles.every((t) => t.includes('가업승계') && t.includes('증여특례')) && new URL(page.url()).searchParams.get('kw') === '가업승계 증여특례', page.url())
   await page.getByTestId('yt-period-month').click()
   await page.waitForTimeout(300)
+  // D-194: 거르기는 필요할 때만 펼친다
+  check('D-194 거르기는 접혀 있다(한 줄 요약)', (await page.getByTestId('yt-filters').count()) === 0 && ((await page.getByTestId('yt-filter-toggle').innerText()) ?? '').includes('거르기'))
+  await page.getByTestId('yt-filter-toggle').click()
   check('기간 바꾸면 키워드는 풀린다 · 이번 달 = 30일 안(12편)', !page.url().includes('kw=') && (await page.getByTestId('yt-card').count()) === 12, await page.getByTestId('yt-card').count())
   await page.getByTestId('yt-type-short').click()
   await page.waitForTimeout(300)
@@ -160,8 +175,10 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.route('**/api/yt-bench**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FEED) }))
 
   // 5. 콘텐츠 추천
-  await page.getByTestId('yt-view-ideas').click()
+  await page.getByTestId('yt-view-analysis').click()
   await page.waitForTimeout(400)
+  await page.getByTestId('yt-ideas').getByTestId('fold-toggle').click()
+  await page.waitForTimeout(300)
   const topics = page.getByTestId('yt-topic')
   check('콘텐츠 추천: 이번 주 · 이번 달 주목 주제(1위 가업승계 증여특례 · 2개 채널 · 대표 영상)', (await topics.count()) >= 3 && ((await topics.first().innerText()) ?? '').includes('가업승계 증여특례') && ((await topics.first().innerText()) ?? '').includes('2개 채널') && ((await topics.first().innerText()) ?? '').includes('가업승계 증여특례 한눈에'), await topics.count())
   check('제목 아이디어 3개씩 · 대본 만들기(AI) 단추 없음', (await topics.first().getByTestId('yt-idea').count()) === 3 && !/AI/.test((await page.locator('main').innerText()) ?? ''))
@@ -176,6 +193,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(400)
   const rows = await page.getByTestId('yt-channel-row').allInnerTexts()
   check('채널 현황: 4곳 · 구독자 많은 순 · 구독자당 조회수', rows.length === 4 && rows[0].includes('세무 알려주는 채널') && rows[0].includes('구독자당 200.0회'), rows[0])
+  await page.getByTestId('yt-view-analysis').click()
+  await page.waitForTimeout(400)
   check('내 채널 vs 벤치마킹 평균: 4줄', ((await page.getByTestId('yt-compare').innerText()) ?? '').includes('최근 30일 업로드'))
   const wdSum = (await page.getByTestId('yt-weekday').getByTestId('fold-summary').innerText().catch(() => '')) ?? ''
   check('잘 되는 요일: 접혀 있어도 한 줄 요약(1위 ○요일 · 평균)', (await page.getByTestId('yt-weekday').getAttribute('data-open')) === '0' && /1위 .요일 · 평균/.test(wdSum), wdSum)
@@ -189,40 +208,228 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const csv = readFileSync(path, 'utf8')
   check('CSV: 파일 이름 · 한글 깨짐 방지(BOM) · 16편', /^youtube-benchmark-\d{8}\.csv$/.test(dl.suggestedFilename()) && csv.startsWith('﻿채널,제목') && csv.trim().split('\n').length === 17, dl.suggestedFilename())
 
-  // 6. 목차 설명 · 바깥 연결 · 오류
-  const noHint = await page.evaluate(() =>
-    [...document.querySelectorAll('main h1, main h2')]
-      .filter((h) => h.offsetParent && !h.classList.contains('sr-only'))
-      .filter((h) => !h.closest('.group\\/hint')?.querySelector('[data-testid=hint-tip]'))
-      .map((h) => h.innerText.trim().split('\n')[0]),
-  )
-  check('목차 설명: 화면 제목 · 목차 전부(ⓘ)', noHint.length === 0, noHint.join(' · '))
+  // 6. 목차 설명 · 바깥 연결 · 오류 — 탭 넷 모두
+  const noHintAll = []
+  for (const k of ['plan', 'top', 'channels', 'analysis']) {
+    await page.getByTestId(`yt-view-${k}`).click()
+    await page.waitForTimeout(300)
+    noHintAll.push(
+      ...(await page.evaluate(() =>
+        [...document.querySelectorAll('main h1, main h2')]
+          .filter((h) => h.offsetParent && !h.classList.contains('sr-only'))
+          .filter((h) => !h.closest('.group\\/hint')?.querySelector('[data-testid=hint-tip]'))
+          .map((h) => h.innerText.trim().split('\n')[0]),
+      )),
+    )
+  }
+  check('목차 설명: 화면 제목 · 목차 전부(ⓘ) — 탭 넷 모두', noHintAll.length === 0, noHintAll.join(' · '))
   check('브라우저는 유튜브(googleapis)를 직접 부르지 않는다(키는 서버에만)', outside.length === 0, outside.join(' '))
   check('JS 오류 없음', errors.length === 0, errors.join(' | '))
   await ctx.close()
 }
 
-/* ---------------- 휴대폰 ---------------- */
-for (const width of [390, 360]) {
+/* ---------------- 콘텐츠 레이더(D-194) — 네 묶음 시험 데이터 ---------------- */
+const gch = (id, title, subs, group, mine = false) => ({ ...ch(id, title, subs, subs * 80, mine), group })
+const base = (c, n, views, from = 10) => Array.from({ length: n }, (_, i) => v(`${c}_b${i}`, c, `${c} 평범한 이야기 ${i}`, (from + i * 3) * D, views + i))
+const RADAR = {
+  fetchedAt: new Date(NOW - H).toISOString(),
+  channels: [
+    gch('UCme', '김팀장의 경영노트', 8_000, 'direct', true), gch('UCd1', '정책 소식 채널', 30_000, 'direct'), gch('UCd2', '세무 이야기 채널', 120_000, 'direct'), gch('UCd3', '사장님 지원금 채널', 8_000, 'direct'),
+    gch('UCa1', 'AI 실무 채널 하나', 9_000, 'ai'), gch('UCa2', 'AI 실무 채널 둘', 40_000, 'ai'), gch('UCx1', '자동화 채널', 20_000, 'ax'), gch('UCf1', '포맷 채널', 500_000, 'format'),
+  ],
+  videos: [
+    ...base('UCme', 8, 300), ...base('UCd1', 8, 3_000), ...base('UCd2', 8, 12_000), ...base('UCd3', 8, 800), ...base('UCa1', 8, 900), ...base('UCa2', 8, 4_000), ...base('UCx1', 8, 2_000), ...base('UCf1', 8, 50_000),
+    v('r1', 'UCd1', '정책자금 신청 전에 꼭 볼 것', 5 * D, 9_000), v('r2', 'UCd1', '지원사업 공고 정리', 9 * D, 3_100),
+    v('r3', 'UCd2', '정책자금 떨어지는 회사 특징', 6 * D, 18_000), v('r4', 'UCd2', '법인세 절세 3가지', 8 * D, 50_000),
+    v('r5', 'UCd3', '정책자금 오픈런 마감 이유', 4 * D, 4_000), v('r6', 'UCd3', '지원사업 사업계획서 핵심', 11 * D, 900),
+    v('r15', 'UCd1', '절세 놓치면 손해 보는 이유', 7 * D, 8_000), v('r16', 'UCd3', '세금 신고 전에 확인할 것', 6 * D, 2_600),
+    v('r7', 'UCa1', 'Claude로 보고서 10분 만에', 3 * D, 5_400), v('r8', 'UCa1', 'ChatGPT 업무 자동화 해봤습니다', 9 * D, 1_000),
+    v('r9', 'UCa2', 'Claude 업무 활용 실제 후기', 5 * D, 8_000), v('r10', 'UCa2', 'n8n 자동화 처음이면', 12 * D, 4_100),
+    v('r11', 'UCx1', '업무자동화 실제로 얼마나 줄까', 8 * D, 6_000), v('r12', 'UCx1', 'Claude 사내 시스템 만들기', 10 * D, 2_100),
+    v('r13', 'UCf1', '정책자금 인터뷰 대표 이야기', 7 * D, 60_000), v('r14', 'UCme', '정책자금 설명만 잘하면 받던 시대', 6 * D, 700),
+  ],
+  failed: [],
+}
+const RJSON = JSON.stringify(RADAR)
+const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '이 영상은 뜹니다', '% 성공']
+
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+  await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE })
+  const page = await ctx.newPage()
+  const errors = []
+  const outside = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  page.on('request', (r) => {
+    const u = r.url()
+    if (!u.startsWith(BASE) && !u.startsWith('data:') && !/i\.ytimg\.com/.test(u)) outside.push(u)
+  })
+  const asked = []
+  await page.route('https://i.ytimg.com/**', (r) => r.fulfill({ status: 404, body: '' }))
+  await page.route('**/api/yt-bench**', (r) => {
+    asked.push(r.request().url())
+    return r.fulfill({ status: 200, contentType: 'application/json', body: RJSON })
+  })
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(() => localStorage.removeItem('axmvp.fold.all'))
+  await page.goto(BASE + '/marketing/youtube', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+
+  const tops = page.getByTestId('radar-top').getByTestId('radar-opp')
+  const axes = [...(await tops.evaluateAll((els) => els.map((e) => e.getAttribute('data-axis')))), ...(await page.getByTestId('radar-opp-compact').evaluateAll((els) => els.slice(0, 2).map((e) => e.getAttribute('data-axis'))))]
+  check('레이더: 첫 화면에 후보 카드 3장 + 4~5위 한 줄', (await tops.count()) === 3 && axes.length === 5, axes)
+  check('레이더: 이번 주 5개에 시장수요 · AX·AI · BRIDGE 가 섞인다(비중 가이드 45 · 35 · 20)', ['market', 'axai', 'bridge'].every((a) => axes.includes(a)), axes)
+  const first = tops.first()
+  const strengthText = (await first.getByTestId('radar-strength').innerText()) ?? ''
+  check('레이더 카드: 신호 세기(강함 · 보통 · 초기 — 점수 없음) · 왜 지금 2줄 넘게 · 증거 · MIRAE 관점', /신호 (강함|보통)|초기 신호/.test(strengthText) && !/\d+점/.test(strengthText) && (await first.getByTestId('radar-why').locator('li').count()) >= 2 && ((await first.getByTestId('radar-evidence').innerText()) ?? '').includes('관련 영상') && ((await first.getByTestId('radar-view').innerText()) ?? '').length > 15)
+  check('레이더: AI · AX 채널이 있으니 "AI 데이터 부족" 안내는 없다', (await page.getByTestId('radar-ai-short').count()) === 0)
+  const mainText = (await page.locator('main').innerText()) ?? ''
+  check('문구: "AI 추천 · AI가 분석 · 성공 가능 % · 이 영상은 뜹니다" 같은 말이 없다(근거 → 제안)', FORBIDDEN.every((w) => !mainText.includes(w)), FORBIDDEN.filter((w) => mainText.includes(w)))
+  const bridgeCard = page.locator('[data-testid="radar-opp"][data-axis="bridge"], [data-testid="radar-opp-compact"][data-axis="bridge"]').first()
+  check('BRIDGE 카드: "시장 주제 × AX 방향" 이름', ((await bridgeCard.innerText()) ?? '').includes('×'))
+
+  await first.getByTestId('radar-opp-more').click()
+  await page.waitForTimeout(200)
+  check('카드 펼치기: 제목 후보 3 · 썸네일 문구 2 · 추천 접근 · 대표 벤치마킹', (await first.getByTestId('radar-title').count()) === 3 && (await first.getByTestId('radar-thumb-text').count()) === 2 && ((await first.getByTestId('radar-approach').innerText()) ?? '').includes('추천 접근') && (await first.getByTestId('radar-video-row').count()) >= 2)
+  await first.getByTestId('radar-bench-thumb').first().click()
+  await page.waitForTimeout(300)
+  const det = page.getByTestId('radar-video-detail')
+  check('영상 상세: 평소 대비 · 조회 속도 · 채널 안 순위 · 참고할 것 · 유튜브 링크(noopener)', (await det.isVisible()) && ((await det.innerText()) ?? '').includes('조회 속도') && ((await det.innerText()) ?? '').includes('채널 안 순위') && (await page.getByTestId('radar-lessons').locator('li').count()) >= 2 && ((await page.getByTestId('radar-open-youtube').getAttribute('rel')) ?? '').includes('noopener'))
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  check('영상 상세: Esc 로 닫힘', (await det.count()) === 0)
+
+  // 수첩 — 저장 · 다시 읽기 · 단계 · 브리프 · 빼기
+  const topic = ((await first.getByTestId('radar-opp-topic').innerText()) ?? '').trim()
+  await first.getByTestId('radar-save').click()
+  await page.waitForTimeout(400)
+  check('아이디어 저장: 카드에 "수첩에 있음" · 수첩 1개', (await first.getByTestId('radar-saved').count()) === 1 && (await page.getByTestId('radar-idea').count()) === 1)
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check('다시 열어도 수첩에 그대로(저장 → 다시 읽기)', (await page.getByTestId('radar-idea').count()) === 1 && ((await page.getByTestId('radar-idea').first().innerText()) ?? '').includes(topic.split(' × ')[0]))
+  await page.getByTestId('radar-idea-status').first().selectOption('script')
+  await page.waitForTimeout(400)
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  check('단계: 대본 준비로 바꾸면 다시 열어도 그대로', (await page.getByTestId('radar-idea').first().getAttribute('data-status')) === 'script')
+  await page.getByTestId('radar-idea-brief').first().click()
+  await page.waitForTimeout(300)
+  const brief = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '')
+  check('브리프 복사: 주제 · 제목 후보 · 근거 · 참고 영상(그대로 쓰지 않는다는 말)', brief.includes('[콘텐츠 브리프]') && brief.includes('제목 후보') && brief.includes('그대로 쓰지 않는다') && brief.includes('youtube.com/watch'), brief.slice(0, 120))
+  await page.getByTestId('radar-idea-remove').first().click()
+  check('빼기는 한 번 더 묻는다', (await page.getByTestId('radar-idea-confirm').count()) === 1)
+  await page.getByTestId('radar-idea-confirm').getByRole('button', { name: '빼기' }).click()
+  await page.waitForTimeout(400)
+  check('빼면 수첩에서 사라진다', (await page.getByTestId('radar-idea').count()) === 0)
+
+  // 시장 신호
+  check('시장 신호: 급상승 주제 · 평소보다 터진 영상(🔥 평소보다 n배)', (await page.getByTestId('radar-rising-row').count()) >= 1 && (await page.getByTestId('radar-breakouts').getByTestId('radar-breakout-chip').count()) >= 1)
+
+  // 비중 가이드 — 시장 100 이면 앞 3장이 시장수요
+  await page.getByTestId('radar-mix').click()
+  const panel = page.getByTestId('radar-mix-panel')
+  await panel.getByLabel('시장수요 비중').fill('100')
+  await panel.getByLabel('AX · AI 비중').fill('0')
+  await panel.getByLabel('BRIDGE 비중').fill('0')
+  await panel.getByRole('button', { name: '적용' }).click()
+  await page.waitForTimeout(400)
+  const mAxes = await page.getByTestId('radar-top').getByTestId('radar-opp').evaluateAll((els) => els.map((e) => e.getAttribute('data-axis')))
+  check('비중 가이드: 시장 100 · 나머지 0 → 앞 3장 시장수요(가이드는 바꿀 수 있다)', mAxes.length === 3 && mAxes.every((a) => a === 'market'), mAxes)
+  await page.getByTestId('radar-mix').click()
+  await page.getByTestId('radar-mix-panel').getByRole('button', { name: /기본값/ }).click()
+  await page.getByTestId('radar-mix-panel').getByRole('button', { name: '적용' }).click()
+  await page.waitForTimeout(300)
+
+  // 채널 — 네 묶음 · 끄기 · 채널 추가(로컬은 안내)
+  await page.getByTestId('yt-view-channels').click()
+  await page.waitForTimeout(400)
+  check('채널: 네 묶음(직접 경쟁 · AI 실무 · AX · 포맷) · 채널마다 묶음 고르기', ['direct', 'ai', 'ax', 'format'].every(() => true) && (await page.getByTestId('radar-group-direct').count()) === 1 && (await page.getByTestId('radar-group-ai').count()) === 1 && (await page.getByTestId('radar-group-ax').count()) === 1 && (await page.getByTestId('radar-group-format').count()) === 1 && (await page.locator('[data-testid="yt-channel-row"][data-group="ai"]').count()) === 2)
+  for (const g of ['ai', 'ax']) {
+    const rows = page.locator(`[data-testid="yt-channel-row"][data-group="${g}"]`)
+    for (let k = 0; k < (await rows.count()); k += 1) await rows.nth(k).getByTestId('radar-ch-toggle').click()
+  }
+  await page.waitForTimeout(400)
+  check('채널 끄기: 끈 채널은 "꺼 둠" 으로', (await page.locator('[data-testid="yt-channel-row"][data-enabled="0"]').count()) === 3)
+  await page.getByTestId('yt-view-plan').click()
+  await page.waitForTimeout(400)
+  check('AI · AX 채널을 모두 끄면 "AI 벤치마킹 데이터가 부족합니다" · AX·AI 카드는 억지로 만들지 않는다', (await page.getByTestId('radar-ai-short').count()) === 1 && (await page.locator('[data-testid^="radar-opp"][data-axis="axai"]').count()) === 0)
+  await page.getByTestId('yt-view-channels').click()
+  await page.waitForTimeout(300)
+  const offRows = page.locator('[data-testid="yt-channel-row"][data-enabled="0"]')
+  while ((await offRows.count()) > 0) await offRows.first().getByTestId('radar-ch-toggle').click()
+  await page.getByTestId('radar-add-channel').getByTestId('fold-toggle').click()
+  await page.getByTestId('radar-add-input').fill('https://www.youtube.com/@someone')
+  await page.getByTestId('radar-add-check').click()
+  await page.waitForTimeout(400)
+  check('채널 추가: 로컬(로그인 없음)에서는 안내만 · 서버에 묻지 않는다(할당량 0)', ((await page.getByTestId('radar-add-msg').innerText()) ?? '').includes('로그인') && !asked.some((u) => u.includes('resolve=') || u.includes('extra=')), asked.filter((u) => u.includes('resolve') || u.includes('extra')))
+
+  // 분석 — 내 채널 · 제목 구조
+  await page.getByTestId('yt-view-analysis').click()
+  await page.waitForTimeout(400)
+  check('분석: 내 채널(최근 20편) · "시청 지속시간 · 노출 클릭률은 YouTube Analytics 연결 예정"(어림하지 않음)', ((await page.getByTestId('radar-mine').innerText()) ?? '').includes('평소 조회수') && ((await page.getByTestId('radar-analytics-note').innerText()) ?? '').includes('YouTube Analytics 연결 예정'))
+  check('분석: 이번 달 잘된 제목 구조(접힘 · 한 줄 요약)', (await page.getByTestId('radar-patterns').count()) === 1)
+
+  // R13 · R14 — 번들 검사
+  const dist = new URL('../dist/assets/', import.meta.url)
+  const js = readdirSync(dist).filter((f) => f.endsWith('.js')).map((f) => readFileSync(new URL(f, dist), 'utf8')).join('\n')
+  const LLM = ['api.openai.com', 'api.anthropic.com', 'generativelanguage.googleapis.com', 'chat/completions', '/v1/messages']
+  check('R13 LLM 호출 0: 번들에 OpenAI · Claude · Gemini API 주소가 없다 · 화면이 바깥(유튜브 썸네일 말고)을 부르지 않는다', LLM.every((h) => !js.includes(h)) && outside.length === 0, [LLM.filter((h) => js.includes(h)), outside.slice(0, 3)])
+  check('R14 유튜브 키 번들 0: 구글 API 키 모양(AIza…) 없음 · googleapis 유튜브 주소 없음(서버만 부름)', !/AIza[0-9A-Za-z_-]{35}/.test(js) && !js.includes('googleapis.com/youtube'))
+  check('레이더: JS 오류 없음', errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
+/* ---------------- 휴대폰 360 · 390 · 430 ---------------- */
+for (const width of [360, 390, 430]) {
   const ctx = await browser.newContext({ viewport: { width, height: 844 }, locale: 'ko-KR', isMobile: true, hasTouch: true })
   const page = await ctx.newPage()
   const errors = []
   page.on('pageerror', (e) => errors.push(e.message))
+  await page.route('https://i.ytimg.com/**', (r) => r.fulfill({ status: 404, body: '' }))
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
   await page.goto(BASE + '/marketing/youtube', { waitUntil: 'networkidle' })
   await page.waitForTimeout(600)
-  await page.getByTestId('yt-sample').tap()
-  await page.waitForTimeout(500)
   const over = async () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
-  const cols = await page.evaluate(() => {
-    const cs = [...document.querySelectorAll('[data-testid="yt-card"]')].slice(0, 3).map((e) => Math.round(e.getBoundingClientRect().top))
-    return cs[0] === cs[1] && cs[1] !== cs[2]
+  if (width === 390) {
+    await page.getByTestId('yt-sample').tap()
+    await page.waitForTimeout(500)
+    check(`${width} 예시 데이터: 후보 카드 · 넘침 0`, (await page.getByTestId('radar-opp').count()) >= 1 && (await over()) <= 0, await over())
+  }
+  await page.route('**/api/yt-bench**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: RJSON }))
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const order = await page.evaluate(() => {
+    const a = document.querySelector('[data-testid="radar-opp"]')?.getBoundingClientRect().top ?? 1e9
+    const b = document.querySelector('[data-testid="radar-signals"]')?.getBoundingClientRect().top ?? 0
+    return a < b
   })
-  check(`${width}: 카드 두 줄(2열) · 넘침 0`, cols && (await over()) <= 0, await over())
-  const chip = await page.getByTestId('yt-period-week').boundingBox()
-  check(`${width}: 기간 단추 누르기 쉬운 높이(40px 이상)`, !!chip && chip.height >= 40, JSON.stringify(chip))
-  for (const k of ['ideas', 'channels']) {
+  check(`${width} 이번 주 찍을 것: 후보 카드가 먼저(이유 → 관련 영상) · 넘침 0`, order && (await over()) <= 0, await over())
+  await page.getByTestId('radar-opp-more').first().tap()
+  await page.waitForTimeout(200)
+  const small = await page.evaluate(() =>
+    [...document.querySelectorAll('main button, main a, main select, main input')]
+      .filter((e) => e.offsetParent)
+      .map((e) => ({ t: (e.innerText || e.getAttribute('aria-label') || e.tagName).slice(0, 24), r: e.getBoundingClientRect() }))
+      .filter((x) => x.r.height < 44 || x.r.width < 44)
+      .map((x) => `${x.t}(${Math.round(x.r.width)}×${Math.round(x.r.height)})`),
+  )
+  check(`${width} 누르는 곳 44px 이상(후보 · 펼친 카드 · 신호 · 수첩)`, small.length === 0, small.slice(0, 6).join(' · '))
+  check(`${width} 펼친 카드 넘침 0`, (await over()) <= 0, await over())
+  await page.getByTestId('radar-bench-thumb').first().tap()
+  await page.waitForTimeout(300)
+  check(`${width} 영상 상세 창 넘침 0`, (await page.getByTestId('radar-video-detail').isVisible()) && (await over()) <= 0, await over())
+  await page.keyboard.press('Escape')
+  await page.getByTestId('yt-view-top').tap()
+  await page.waitForTimeout(300)
+  const list = await page.evaluate(() => {
+    const cards = [...document.querySelectorAll('[data-testid="yt-card"]')].slice(0, 2).map((e) => e.getBoundingClientRect())
+    const thumb = document.querySelector('[data-testid="yt-card-thumb"]')?.getBoundingClientRect()
+    return cards.length === 2 && cards[1].top > cards[0].top && !!thumb && thumb.width < window.innerWidth * 0.5
+  })
+  check(`${width} 인기 영상: 휴대폰은 한 줄 목록(썸네일 왼쪽 · PC 카드를 줄이지 않음) · 넘침 0`, list && (await over()) <= 0, await over())
+  for (const k of ['channels', 'analysis']) {
     await page.getByTestId(`yt-view-${k}`).tap()
     await page.waitForTimeout(300)
     check(`${width} ${k}: 넘침 0`, (await over()) <= 0, await over())

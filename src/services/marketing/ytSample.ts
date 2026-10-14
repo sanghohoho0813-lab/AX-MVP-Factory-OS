@@ -4,6 +4,7 @@
  * 진짜 채널 이름 · 진짜 숫자를 쓰지 않는다(지어낸 숫자가 실제 채널 성적처럼 보이면 안 된다).
  * 채널은 '예시 채널 가 · 나 …', 숫자는 정해진 씨앗으로 만든 가짜 — 화면 맨 위에 '예시 데이터' 를 크게 단다.
  * 같은 '지금' 이면 늘 같은 데이터가 나온다(시험이 흔들리지 않게).
+ * D-194: 콘텐츠 레이더가 네 묶음을 다 보여 줄 수 있게 AI 실무 2 · AX 1 · 포맷 1 예시 채널을 더했다(따로 씨앗 — 앞 8곳 숫자는 그대로).
  */
 import type { YtChannel, YtFeed, YtVideoRaw } from './ytBench'
 
@@ -48,6 +49,7 @@ export function sampleFeed(now: number = Date.now()): YtFeed {
       videoCount: Math.round(80 + r() * 600),
       views: Math.round(subs * (40 + r() * 160)),
       mine: i === 0,
+      group: 'direct',
     }
   })
   const videos: YtVideoRaw[] = []
@@ -75,5 +77,54 @@ export function sampleFeed(now: number = Date.now()): YtFeed {
       t -= Math.floor(1 + r() * 8) * day + Math.floor(r() * 15) * 3_600_000 - 7 * 3_600_000
     }
   })
+  addRadarSamples(now, channels, videos)
   return { fetchedAt: new Date(now).toISOString(), channels, videos, failed: [], units: 0 }
+}
+
+/** D-194 — AI 실무 · AX · 포맷 묶음 예시(따로 씨앗). 최근 영상 몇 편은 채널 평소보다 크게 나오게(터진 영상 예시) */
+const EXTRA = [
+  { title: '예시 AI 채널 아', group: 'ai', subs: 9_000 },
+  { title: '예시 AI 채널 자', group: 'ai', subs: 38_000 },
+  { title: '예시 자동화 채널 차', group: 'ax', subs: 21_000 },
+  { title: '예시 포맷 채널 카', group: 'format', subs: 420_000 },
+] as const
+const AI_TOPICS = ['ChatGPT 업무', 'Claude', '업무 자동화', 'n8n 자동화', '엑셀 자동화', 'AI 에이전트', '프롬프트']
+const FORMAT_TOPICS = ['창업 실패', '부자 습관', '대표의 하루', '회사 돈 관리']
+const AI_SHAPES = [
+  (k: string) => `${k} 실제로 써 본 결과`,
+  (k: string) => `${k} 10분 만에 끝내는 법`,
+  (k: string) => `직원 없이 ${k} 해봤습니다`,
+  (k: string) => `${k} 처음이면 이것부터 3가지`,
+  (k: string) => `${k}, 회사에서 바로 쓰는 장면`,
+]
+
+function addRadarSamples(now: number, channels: YtChannel[], videos: YtVideoRaw[]) {
+  const r = rng(20261014)
+  const day = 86_400_000
+  EXTRA.forEach((e, j) => {
+    const ci = NAMES.length + j
+    const id = `sample_ch_${ci}`
+    channels.push({ id, handle: `@sample${ci}`, title: e.title, customUrl: `@sample${ci}`, thumb: '', subs: e.subs, videoCount: Math.round(60 + r() * 300), views: Math.round(e.subs * (30 + r() * 120)), mine: false, group: e.group })
+    const topics = e.group === 'format' ? FORMAT_TOPICS : AI_TOPICS
+    let t = now - Math.floor(r() * 2) * day - 5 * 3_600_000
+    for (let k = 0; k < 30; k += 1) {
+      const topic = topics[Math.floor(r() * (k < 6 && e.group !== 'format' ? 3 : topics.length))]
+      const short = r() < 0.3
+      const base = e.subs * (0.08 + r() * (short ? 0.5 : 0.9))
+      // 최근 영상 중 하나씩은 평소보다 크게(작은 채널에서 터진 예시)
+      const hot = k === 2 || (k === 1 && e.group === 'ax') ? 6 : 1
+      const views = Math.round(base * hot)
+      videos.push({
+        id: `sample_${ci}_${k}`,
+        ch: id,
+        t: AI_SHAPES[Math.floor(r() * AI_SHAPES.length)](topic),
+        at: new Date(t).toISOString(),
+        d: short ? 30 + Math.floor(r() * 140) : 300 + Math.floor(r() * 1500),
+        v: views,
+        l: Math.round(views * (0.015 + r() * 0.04)),
+        c: Math.round(views * (0.001 + r() * 0.004)),
+      })
+      t -= Math.floor(1 + r() * 4) * day + Math.floor(r() * 10) * 3_600_000
+    }
+  })
 }

@@ -29,6 +29,9 @@ export interface YtChannel {
   videoCount: number
   views: number
   mine: boolean
+  /** D-194: 서버가 붙여 보내는 묶음(direct · ai · ax · format) · 메모 */
+  group?: string
+  note?: string
 }
 
 /** 서버가 보내는 영상 한 편(칸 이름을 줄였다 — 1,000편을 보내므로) */

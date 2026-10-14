@@ -36,10 +36,10 @@ export default function MarketingSoonPage() {
           </span>
           <span className="flex min-w-0 flex-1 flex-col gap-1">
             <span className="flex flex-wrap items-center gap-2">
-              <span className="t-card font-bold break-keep text-slate-900">유튜브 벤치마킹</span>
+              <span className="t-card font-bold break-keep text-slate-900">콘텐츠 레이더</span>
               <Badge tone="success">바로 쓰기</Badge>
             </span>
-            <span className="t-sub break-keep text-slate-600">벤치마킹 채널 20곳의 인기 영상 · 키워드 · 주목 주제 · 올리기 좋은 요일과 시간</span>
+            <span className="t-sub break-keep text-slate-600">YouTube 벤치마킹 — 이번 주에 찍을 주제 후보와 근거 · 평소보다 터진 영상 · 콘텐츠 수첩</span>
           </span>
           <ArrowRight aria-hidden="true" className="size-5 shrink-0 self-center text-red-500 group-hover:translate-x-0.5" />
         </Link>

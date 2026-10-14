@@ -4,9 +4,28 @@
  *    순위 판 · 급상승 · 채널 현황 · 내 채널 비교 · 요일/시간/길이/롱폼·쇼츠/업로드 주기 · CSV
  *  - 예시 데이터: 같은 시각이면 같은 데이터 · 진짜 채널 이름 없음
  *  - 서버 함수(api/yt-bench.js): 유튜브를 흉내 낸 fetch 로 — 키 없음 · 주소 칸 검사 · 채널 하나 실패 · 할당량 · 틀린 키 · 캐시 · 키가 응답에 없음
+ *  - 콘텐츠 레이더(D-194) R1~R12: 롱폼/쇼츠 기준 · 작은 채널 · 평소 대비 · 나이 · 한 번 터진 영상 · 여러 채널 · 한 채널 반복 ·
+ *    네 묶음 · 3축 · BRIDGE · 수첩 저장/다시 읽기 · 작업공간 격리 + [채널 추가](로그인 확인 · 저렴한 호출만)
  * 실행: npm run test:youtube
  */
-import handler, { CHANNELS, checkQuery, parseDuration, secondsUntilNine } from '../../../api/yt-bench.js'
+import handler, { CHANNELS, checkQuery, parseChannelInput, parseDuration, secondsUntilNine } from '../../../api/yt-bench.js'
+import { TOPICS, normalizeTitle, topicsOf } from '../marketing/radarPlaybook'
+import {
+  breakoutVideos,
+  clusterOrder,
+  clusters,
+  expectedShare,
+  groupOf,
+  hotPatterns,
+  mixPicks,
+  myChannelStats,
+  radarPlan,
+  radarVideos,
+  ratioLine,
+  stripChannelTag,
+  titlePatterns,
+} from '../marketing/ytRadar'
+import { briefText, ideaFromOpportunity, listIdeas, loadPrefs, normalizeIdea, normalizePrefs, removeIdea, saveIdea, savePrefs } from '../marketing/radarStore'
 import {
   boardOf,
   byHour,
@@ -179,9 +198,9 @@ const mkRes = (): Res => {
   }
   return r
 }
-const call = async (q: string) => {
+const call = async (q: string, headers: Record<string, string> = {}) => {
   const res = mkRes()
-  await handler({ url: `/api/yt-bench${q}` }, res)
+  await handler({ url: `/api/yt-bench${q}`, headers }, res)
   return res
 }
 const slot = new Date().toISOString().slice(0, 10)
@@ -192,8 +211,13 @@ type FetchMode = 'ok' | 'quota' | 'badkey'
 let mode: FetchMode = 'ok'
 const calls: string[] = []
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
-globalThis.fetch = (async (input: string | URL) => {
+const GOOD_TOKEN = 'good-token-0123456789abcdef'
+globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const u = new URL(String(input))
+  if (u.hostname.endsWith('supabase.test')) {
+    const auth = new Headers(init?.headers).get('authorization')
+    return auth === `Bearer ${GOOD_TOKEN}` ? json(200, { id: 'user-1' }) : json(401, { msg: 'bad jwt' })
+  }
   calls.push(u.pathname.split('/').pop() + '?' + [...u.searchParams.keys()].join(','))
   if (mode === 'quota') return json(403, { error: { errors: [{ reason: 'quotaExceeded' }], message: 'quota' } })
   if (mode === 'badkey') return json(400, { error: { errors: [{ reason: 'badRequest' }], message: 'API key not valid. Please pass a valid API key.' } })
@@ -223,7 +247,7 @@ globalThis.fetch = (async (input: string | URL) => {
   const ENV = process.env as Record<string, string | undefined>
   delete ENV.YOUTUBE_API_KEY
   const st = await call('?status=1')
-  check('서버: 키 없음 → status 는 configured=false · 채널 20곳', st.code === 200 && (st.body as { configured: boolean }).configured === false && (st.body as { channels: number }).channels === 20 && CHANNELS.length === 20)
+  check('서버: 키 없음 → status 는 configured=false · 채널 34곳(D-194: AI 8 · AX 4 · 포맷 2 더함)', st.code === 200 && (st.body as { configured: boolean }).configured === false && (st.body as { channels: number }).channels === 34 && CHANNELS.length === 34)
   const nk = await call(`?slot=${slot}`)
   check('서버: 키 없음 → 503 no_key · 캐시 안 함 · 유튜브를 부르지 않음', nk.code === 503 && (nk.body as { error: string }).error === 'no_key' && nk.headers['cache-control'] === 'no-store' && calls.length === 0)
 
@@ -238,13 +262,13 @@ globalThis.fetch = (async (input: string | URL) => {
 
   const ok = await call(`?slot=${slot}`)
   const body = ok.body as { channels: YtChannel[]; videos: YtVideoRaw[]; failed: string[]; units: number; fetchedAt: string }
-  check('서버: 200 · 채널 19곳(1곳 못 찾음) · 영상 50편씩', ok.code === 200 && body.channels.length === 19 && body.videos.length === 19 * 50, { code: ok.code, ch: body.channels?.length, v: body.videos?.length })
+  check('서버: 200 · 채널 33곳(1곳 못 찾음) · 영상 50편씩', ok.code === 200 && body.channels.length === 33 && body.videos.length === 33 * 50, { code: ok.code, ch: body.channels?.length, v: body.videos?.length })
   check('서버: 못 받은 채널 이름을 같이 보낸다(@사장노트 — 유튜브에 그 주소가 없음)', body.failed.join() === '@사장노트', body.failed)
   check('서버: 내 채널 표시(@김팀장의경영노트 · 채널 번호 UCjXWwM0…) · 핸들 · 숫자', body.channels[0].mine && body.channels[0].id === 'UCjXWwM0_25vl1Mpr2Pc5amQ' && body.channels[0].handle === '@김팀장의경영노트' && body.channels[0].subs === 12000 && body.channels.filter((c) => c.mine).length === 1)
-  check('채널 목록: 20곳 · 번호 없는 곳은 @사장노트 하나 · 번호가 겹치지 않음', CHANNELS.length === 20 && CHANNELS.filter((c) => !c.id).map((c) => c.handle).join() === '@사장노트' && new Set(CHANNELS.filter((c) => c.id).map((c) => c.id)).size === 19)
+  check('채널 목록: 34곳 · 번호 없는 곳은 @사장노트 하나 · 번호가 겹치지 않음', CHANNELS.length === 34 && CHANNELS.filter((c) => !c.id).map((c) => c.handle).join() === '@사장노트' && new Set(CHANNELS.filter((c) => c.id).map((c) => c.id)).size === 33)
   check('서버: 영상 칸 — 길이(초) · 조회수 숫자', body.videos[0].d === 45 && body.videos[1].d === 723 && body.videos[0].v === 1000 && typeof body.videos[0].at === 'string')
   check('서버: 응답 어디에도 키 값이 없다', !JSON.stringify(ok.body).includes(KEYVAL))
-  check('서버: 할당량 약 40단위(채널 번호로 바로 · 채널 정보는 한 번에 묶음 · 주소로 찾는 건 번호 없는 1곳만)', body.units === calls.length && body.units <= 42 && calls.filter((c) => c.startsWith('channels?part,id')).length === 1 && calls.filter((c) => c.includes('forHandle')).length === 1, { units: body.units, calls: calls.length })
+  check('서버: 할당량 약 69단위(채널 번호로 바로 · 채널 정보는 한 번에 묶음 · 주소로 찾는 건 번호 없는 1곳만)', body.units === calls.length && body.units <= 70 && calls.filter((c) => c.startsWith('channels?part,id')).length === 1 && calls.filter((c) => c.includes('forHandle')).length === 1, { units: body.units, calls: calls.length })
   const maxAge = Number(/s-maxage=(\d+)/.exec(ok.headers['cache-control'] ?? '')?.[1] ?? -1)
   check('서버: 하루 칸은 다음 아침 9시까지 캐시', Math.abs(maxAge - secondsUntilNine()) <= 2, ok.headers['cache-control'])
   const fr = await call(`?bucket=${bucket}`)
@@ -263,6 +287,157 @@ globalThis.fetch = (async (input: string | URL) => {
   check('길이 읽기: PT1H2M3S = 3723 · PT45S · P1DT1S · 빈 값 0', parseDuration('PT1H2M3S') === 3723 && parseDuration('PT45S') === 45 && parseDuration('P1DT1S') === 86401 && parseDuration('') === 0 && parseDuration(undefined) === 0)
   const nine = Date.parse('2026-10-14T00:00:00Z') // 한국 9시
   check('9시까지 남은 초: 8시 59분 → 60 · 9시 30초 → 하루 가까이', secondsUntilNine(nine - 60_000) === 60 && secondsUntilNine(nine + 30_000) === 86_370)
+}
+
+/* ---------------- 콘텐츠 레이더(D-194) ---------------- */
+{
+  // 채널마다 평소 영상을 깔고(7일 넘은 것) 그 위에 시험 영상을 얹는다
+  const base = (chId: string, n: number, views: number, d = 600, from = 10) => Array.from({ length: n }, (_, i) => vid(`${chId}_b${i}`, chId, `평범한 이야기 ${chId} ${i}`, (from + i * 3) * D, views + i, d))
+
+  // R1 — 롱폼과 쇼츠는 따로 잰다
+  {
+    const p = prepareFeed({ channels: [ch('k', '롱쇼채널', 50_000, 1)], videos: [...base('k', 6, 10_000, 900), ...base('k', 6, 1_000, 40), vid('k_s', 'k', '쇼츠 하나', 10 * D, 3_500, 40)] }, NOW)
+    const v = radarVideos(p, { now: NOW }).find((x) => x.id === 'k_s')!
+    check('R1 롱폼 · 쇼츠 기준 따로: 쇼츠 3,500 = 쇼츠 평소(약 1천)의 3.5배 → 터짐(롱폼 1만과 섞지 않음)', v.baseline !== null && v.baseline < 1_100 && v.baseline > 900 && v.tier === 'breakout', { baseline: v.baseline, tier: v.tier })
+  }
+  // R2 · R3 — 작은 채널 · 같은 조회수라도 평소가 다르면 신호가 다르다
+  {
+    const p = prepareFeed({ channels: [ch('s', '작은채널', 5_000, 1), ch('b', '큰채널', 900_000, 1)], videos: [...base('s', 8, 5_000), ...base('b', 8, 50_000), vid('s_x', 's', '정책자금 받은 회사 이야기', 9 * D, 40_000), vid('b_x', 'b', '정책자금 받은 회사 이야기 2', 9 * D, 40_000)] }, NOW)
+    const rv = radarVideos(p, { now: NOW })
+    const sx = rv.find((x) => x.id === 's_x')!
+    const bx = rv.find((x) => x.id === 'b_x')!
+    check('R2 작은 채널 터짐: 구독자 5천 채널 · 평소 5천 → 4만 = 8배 · 작은 채널 표시', sx.tier === 'breakout' && sx.small && Math.round(sx.ratio ?? 0) === 8, { tier: sx.tier, ratio: sx.ratio })
+    check('R3 같은 4만 회라도 평소 5천 채널(8배)이 평소 5만 채널(0.8배)보다 강한 신호', (sx.adjusted ?? 0) > 5 * (bx.adjusted ?? 0) && bx.tier === 'normal' && breakoutVideos(rv).map((x) => x.id).join() === 's_x')
+    check('R2 화면 말: "평소보다 8.0배" 근거를 그대로', ratioLine(sx) === '평소보다 8.0배', ratioLine(sx))
+  }
+  // R4 — 올린 지 얼마 안 된 영상은 나이를 반영한다
+  {
+    const p = prepareFeed({ channels: [ch('a', '나이채널', 30_000, 1)], videos: [...base('a', 8, 2_000), vid('a_young', 'a', '이틀 된 영상', 2 * D, 2_200), vid('a_old', 'a', '한 달 된 영상', 30 * D, 2_200)] }, NOW)
+    const rv = radarVideos(p, { now: NOW })
+    const y = rv.find((x) => x.id === 'a_young')!
+    const o = rv.find((x) => x.id === 'a_old')!
+    check('R4 경과시간: 같은 2,200회라도 2일 된 영상은 평소 기대(약 42%)의 2배 넘게 → 잘됨, 30일 된 것은 평소 수준', y.tier === 'above' && o.tier === 'normal' && (y.adjusted ?? 0) > 2 * (o.adjusted ?? 0), { y: y.adjusted, o: o.adjusted })
+    check('R4 기대 비율 곡선: 1일 이하 0.3 → 7일 1.0(실제 데이터로 정함)', expectedShare(0.5) === 0.3 && expectedShare(7) === 1 && expectedShare(30) === 1 && expectedShare(4) > 0.6 && expectedShare(4) < 0.7)
+    check('R4 화면 말: "2일 만에 평소의 1.1배"', ratioLine(y) === '2일 만에 평소의 1.1배', ratioLine(y))
+  }
+  // R5 — 한 번 터진 영상이 평소를 끌어올리지 않는다(중앙값)
+  {
+    const p = prepareFeed({ channels: [ch('v', '한방채널', 20_000, 1)], videos: [...base('v', 8, 1_000), vid('v_viral', 'v', '한 번 터진 영상', 20 * D, 1_000_000), vid('v_x', 'v', '평소보다 잘된 영상', 9 * D, 3_600)] }, NOW)
+    const x = radarVideos(p, { now: NOW }).find((q) => q.id === 'v_x')!
+    check('R5 100만 회 한 편이 있어도 평소는 약 1천(평균이면 11만) → 3,600 은 터짐', x.baseline !== null && x.baseline < 1_100 && x.tier === 'breakout', { baseline: x.baseline })
+  }
+  // R6 · R7 — 여러 채널 vs 한 채널 반복
+  {
+    const chs = [ch('m1', '시장채널하나', 10_000, 1), ch('m2', '시장채널둘', 12_000, 1), ch('m3', '시장채널셋', 15_000, 1), ch('solo', '혼자채널', 20_000, 1)]
+    const vids = [
+      ...base('m1', 6, 1_000, 600, 20), ...base('m2', 6, 1_000, 600, 20), ...base('m3', 6, 1_000, 600, 20), ...base('solo', 6, 1_000, 600, 20),
+      vid('m1_t', 'm1', '정책자금 신청 전에 볼 것', 8 * D, 4_000),
+      vid('m2_t', 'm2', '정책 자금 직접대출 열렸다', 9 * D, 1_200),
+      vid('m3_t', 'm3', '정책자금 떨어지는 이유', 10 * D, 1_500),
+      ...Array.from({ length: 5 }, (_, i) => vid(`solo_${i}`, 'solo', `가업승계 이야기 ${i}편`, (8 + i) * D, 1_100)),
+    ]
+    const rv = radarVideos(prepareFeed({ channels: chs, videos: vids }, NOW), { now: NOW })
+    const cs = clusters(rv)
+    const pf = cs.find((c) => c.topicId === 'policy_fund')!
+    const su = cs.find((c) => c.topicId === 'succession')!
+    check('R6 같은 주제가 3개 채널에서 + 터진 영상 → 신호 강함 · 이유에 "3개 채널"', pf.strength === 'strong' && pf.channels14 === 3 && pf.reasons.some((r) => r.includes('3개 채널')), pf)
+    check('R6 표기 차이 합침: "정책 자금" 도 정책자금으로 센다', pf.videos30 === 3)
+    check('R7 한 채널이 5편 올린 주제는 여러 채널 흐름으로 과대평가하지 않는다(초기 신호 · 이유에 "한 채널")', su.strength === 'early' && su.dominant === '혼자채널' && su.reasons.some((r) => r.includes('한 채널')) && clusterOrder(pf, su) < 0, su)
+  }
+  // R8 — 네 묶음
+  {
+    check('R8 묶음: 서버가 붙인 묶음 → 대표가 바꾼 묶음 순 · 모르면 직접 경쟁', groupOf({ id: 'x', group: 'ai' }) === 'ai' && groupOf({ id: 'x', group: 'ai' }, { x: { group: 'format' } }) === 'format' && groupOf({ id: 'y' }) === 'direct' && groupOf({ id: 'z', group: 'weird' }) === 'direct')
+    const groups = new Map(CHANNELS.map((c) => [c.id ?? c.handle, c.group]))
+    const count = (g: string) => [...groups.values()].filter((x) => x === g).length
+    check('R8 기본 채널: 직접 20 · AI 실무 8 · AX 4 · 포맷 2(모두 묶음이 있다)', count('direct') === 20 && count('ai') === 8 && count('ax') === 4 && count('format') === 2 && CHANNELS.every((c) => typeof c.note === 'string' && c.note.length > 0))
+    const chs = [{ ...ch('d1', '직접하나', 10_000, 1), group: 'direct' }, { ...ch('f1', '포맷하나', 900_000, 1), group: 'format' }, { ...ch('a1', '에이아이', 9_000, 1), group: 'ai' }, { ...ch('d2', '직접둘', 10_000, 1), group: 'direct' }]
+    const vids = [...base('d1', 5, 1_000), ...base('f1', 5, 1_000), ...base('a1', 5, 1_000), ...base('d2', 5, 1_000), vid('f_t', 'f1', '정책자금 포맷 영상', 8 * D, 9_000), vid('f_t2', 'f1', '정책자금 포맷 영상 둘', 9 * D, 9_000), vid('d_t', 'd1', '정책자금 직접 영상', 8 * D, 900)]
+    const p = prepareFeed({ channels: chs, videos: vids }, NOW)
+    const plan = radarPlan(p, { now: NOW })
+    check('R8 포맷 묶음 영상은 주제 수요로 세지 않는다(표현 방식 참고용) · AI 채널 수는 AI+AX 묶음', !plan.clusters.some((c) => c.topicId === 'policy_fund') && plan.aiChannels === 1)
+    const off = radarPlan(p, { now: NOW, overrides: { a1: { enabled: false } } })
+    check('R8 채널 끄기: 끈 AI 채널은 AI 채널 수에서도 빠진다 → AI 데이터 부족 안내', off.aiChannels === 0 && off.aiDataShort)
+  }
+  // R9 — 표기 정규화 · 3축 분류
+  {
+    check('R9 정규화: 챗GPT · 챗지피티 · ChatGPT → chatgpt / 클로드 → claude / 인공지능 → ai / AI 도입 → ax', normalizeTitle('챗지피티 활용').includes('chatgpt') && normalizeTitle('ChatGPT 활용').includes('chatgpt') && normalizeTitle('챗GPT 써보니').includes('chatgpt') && normalizeTitle('클로드 써보니').includes('claude') && normalizeTitle('인공지능 시대').includes(' ai ') && normalizeTitle('우리 회사 AI 도입기').includes(' ax '))
+    check('R9 시장수요: 정책자금 · 지원사업 · 고용지원금 · 절세 · 가업승계', topicsOf('소상공인 정책자금 직접대출 오픈런').includes('policy_fund') && topicsOf('정부지원사업 사업계획서 쓰는 법').includes('grant_program') && topicsOf('청년 채용하면 고용지원금').includes('employ_subsidy') && topicsOf('법인세 줄이는 절세').includes('tax_saving') && topicsOf('비상장주식 증여 시기').includes('succession'))
+    check('R9 지원금 계열은 합치지 않고 좁은 주제 하나만(고용지원금이면 소상공인 지원금으로 또 세지 않음)', topicsOf('고용지원금 받는 법').join() === 'employ_subsidy' && topicsOf('민생지원금 지역 발표').join() === 'sme_subsidy')
+    check('R9 AI · AX: Claude + 업무자동화 / n8n → 노코드 / 엑셀 자동화 / AI 도입 → AX', topicsOf('Claude로 업무 자동화 해봤습니다').join() === 'claude,automation' && topicsOf('n8n 으로 회사 업무 돌리기').includes('nocode') && topicsOf('엑셀 자동화 10분').includes('sheets') && topicsOf('중소기업 AI 도입 사례').includes('ax_adopt'))
+    check('R9 채널 이름 꼬리표는 주제로 세지 않는다("| 절세미녀" → 절세 아님)', topicsOf(stripChannelTag('퇴직금 1억 = 연금 50만 원 | 절세미녀', '절세미녀 김희연 회계사')).join() === 'ceo_money' && stripChannelTag('세제개편 분석[보고파TV]', '보고파TV') === '세제개편 분석' && stripChannelTag('지원금 꼭 받으세요 #shorts #여의도정보맨', '여의도 정보맨') === '지원금 꼭 받으세요')
+    check('R9 제목 구조: 숫자형 · 경고형 · 결과형 · 질문형 · 마감형 · 비교형', titlePatterns('5가지 꼭 챙기세요').includes('number') && titlePatterns('모르면 손해 보는 지원금').includes('warning') && titlePatterns('AI로 해봤더니 달라졌다').includes('result') && titlePatterns('법인전환 해야 할까?').includes('question') && titlePatterns('오늘까지 마감').includes('deadline') && titlePatterns('개인 vs 법인').includes('compare'))
+  }
+  // R10 — BRIDGE · 섞기 · 제목 품질
+  {
+    const chs = [ch('p1', '정책하나', 10_000, 1), ch('p2', '정책둘', 12_000, 1), ch('p3', '정책셋', 15_000, 1), { ...ch('ai1', '에이아이하나', 8_000, 1), group: 'ai' }, { ...ch('ai2', '에이아이둘', 9_000, 1), group: 'ai' }]
+    const vids = [
+      ...base('p1', 6, 1_000, 600, 20), ...base('p2', 6, 1_000, 600, 20), ...base('p3', 6, 1_000, 600, 20), ...base('ai1', 6, 1_000, 600, 20), ...base('ai2', 6, 1_000, 600, 20),
+      vid('p1_t', 'p1', '지원사업 선정되는 사업계획서', 8 * D, 5_000), vid('p2_t', 'p2', '정부지원사업 공고 정리', 9 * D, 1_200), vid('p3_t', 'p3', '지원사업 떨어지는 이유', 10 * D, 1_300),
+      vid('ai1_t', 'ai1', 'Claude로 보고서 써봤습니다', 8 * D, 6_000), vid('ai2_t', 'ai2', 'Claude 업무에 써보니', 9 * D, 1_500),
+    ]
+    const p = prepareFeed({ channels: chs, videos: vids }, NOW)
+    const plan = radarPlan(p, { now: NOW })
+    const bridge = plan.picks.find((o) => o.axis === 'bridge')
+    check('R10 BRIDGE 후보: "정부지원사업 × AI 자동 선별" · 왜 BRIDGE 인지가 맨 앞', !!bridge && bridge.topic === '정부지원사업 × AI 자동 선별' && /AI|자동화/.test(bridge.whyNow[0]), bridge?.whyNow)
+    check('R10 이번 주 앞 5개에 시장수요 · AX·AI · BRIDGE 가 섞인다', ['market', 'axai', 'bridge'].every((a) => plan.picks.slice(0, 5).some((o) => o.axis === a)), plan.picks.map((o) => o.axis))
+    check('R10 같은 주제가 시장형 · BRIDGE 두 장으로 앞 5개에 겹치지 않는다(다른 후보가 있으면)', new Set(plan.picks.slice(0, 3).map((o) => o.topicId)).size === Math.min(3, new Set(plan.picks.map((o) => o.topicId)).size))
+    const inputTitles = new Set(vids.map((x) => x.t))
+    const allTitles = TOPICS.flatMap((t) => [...t.main.titles, ...(t.bridge?.titles ?? [])])
+    check('R10 제목 후보는 경쟁 영상 제목을 그대로 쓰지 않는다', plan.picks.every((o) => o.titles.every((t) => !inputTitles.has(t.text))))
+    check('R10 제목 문장 품질: 모든 주제 · 3개씩 · 10~45자 · 빈칸 · 템플릿 흔적 없음 · 키워드만 붙인 꼴(예: "정책자금 AI 10월 방법") 없음', allTitles.length === TOPICS.length * 3 + TOPICS.filter((t) => t.bridge).length * 3 && allTitles.every((t) => t.length >= 10 && t.length <= 45 && !/[{}]|undefined|\s{2}/.test(t) && !/^\S+ AI \d+월/.test(t)), allTitles.filter((t) => t.length < 10 || t.length > 45))
+    const mixed = mixPicks({ market: plan.picks.filter((o) => o.axis === 'market'), axai: [], bridge: plan.picks.filter((o) => o.axis === 'bridge') }, { market: 45, axai: 35, bridge: 20 })
+    check('R10 AI 후보가 없으면 그 자리는 다른 축으로(억지 카드 없음)', mixed.every((o) => o.axis !== 'axai') && mixed.length > 0)
+    const empty = radarPlan(prepareFeed({ channels: [ch('e', '빈채널', 1_000, 1)], videos: base('e', 5, 100) }, NOW), { now: NOW })
+    check('R10 데이터가 없으면 후보를 만들지 않는다', empty.picks.length === 0)
+    check('R10 이번 달 잘된 제목 구조 · 내 채널 통계(Analytics 없이 공개 숫자만)', hotPatterns(radarVideos(p, { now: NOW })).length > 0 && myChannelStats(radarVideos(p, { now: NOW })) === null)
+  }
+  // R11 · R12 — 콘텐츠 수첩 저장 · 다시 읽기 · 작업공간 격리
+  {
+    const chs = [ch('p1', '정책하나', 10_000, 1), ch('p2', '정책둘', 12_000, 1)]
+    const p = prepareFeed({ channels: chs, videos: [...base('p1', 6, 1_000), ...base('p2', 6, 1_000), vid('x1', 'p1', '정책자금 받는 순서', 8 * D, 5_000), vid('x2', 'p2', '정책자금 오픈런', 9 * D, 1_200)] }, NOW)
+    const o = radarPlan(p, { now: NOW }).picks[0]
+    const saved = await saveIdea('ws-A', ideaFromOpportunity(o))
+    const back = await listIdeas('ws-A')
+    check('R11 아이디어 저장 → 다시 읽기(주제 · 관점 · 유형 · 참고 영상 · 제목 3 · 썸네일 2 · 저장 시각 · 단계=아이디어)', back.length === 1 && back[0].id === saved.id && back[0].topic === o.topic && back[0].type === o.axis && back[0].benchmarkVideoIds.length > 0 && back[0].titleCandidates.length === 3 && back[0].thumbnailCandidates.length === 2 && !!back[0].savedAt && back[0].status === 'idea', back[0])
+    await saveIdea('ws-A', { ...back[0], status: 'script', memo: '화요일 촬영' })
+    const again = await listIdeas('ws-A')
+    check('R11 단계 바꾸기 · 메모가 남는다(같은 줄을 고쳐 씀 · 두 줄 안 됨)', again.length === 1 && again[0].status === 'script' && again[0].memo === '화요일 촬영')
+    check('R11 브리프 복사 글: 주제 · 관점 · 제목 · 근거 · 참고 영상(그대로 쓰지 않는다는 말)', briefText(again[0]).includes(o.topic) && briefText(again[0]).includes('그대로 쓰지 않는다') && briefText(again[0]).includes('youtube.com/watch'))
+    check('R11 잘못된 기록은 버린다(주제 없음) · 모르는 단계는 아이디어', normalizeIdea({ topic: '' }, 'z') === null && normalizeIdea({ topic: '주제', status: 'weird' }, 'z')?.status === 'idea')
+    check('R12 다른 작업공간에서는 안 보인다(팀장 작업공간 ≠ 대표 작업공간)', (await listIdeas('ws-B')).length === 0)
+    await savePrefs('ws-A', normalizePrefs({ overrides: { UCaaaaaaaaaaaaaaaaaaaaaa: { enabled: false } }, added: [{ id: 'UCbbbbbbbbbbbbbbbbbbbbbb', title: '더한 채널', group: 'ax' }] }))
+    const pa = await loadPrefs('ws-A')
+    const pb = await loadPrefs('ws-B')
+    check('R12 채널 설정도 작업공간마다 · 잘못된 채널 번호는 버린다', pa.overrides.UCaaaaaaaaaaaaaaaaaaaaaa?.enabled === false && pa.added[0]?.group === 'ax' && Object.keys(pb.overrides).length === 0 && pb.added.length === 0 && Object.keys(normalizePrefs({ overrides: { 'bad id<x>': { enabled: false } } }).overrides).length === 0 && normalizePrefs({ added: [{ id: 'notAnId', title: 'x' }] }).added.length === 0)
+    await removeIdea('ws-A', saved.id)
+    check('R11 빼기 → 수첩에서 사라진다', (await listIdeas('ws-A')).length === 0)
+  }
+}
+
+/* ---------------- [채널 추가] — 로그인 확인 · 저렴한 호출만(D-194) ---------------- */
+{
+  const ENV = process.env as Record<string, string | undefined>
+  ENV.YOUTUBE_API_KEY = KEYVAL
+  check('채널 주소 읽기: @주소 · youtube.com/@주소 · /channel/UC… · UC… · /c/이름 · 그냥 이름 · 이상한 글은 null', parseChannelInput('@abc')?.handle === '@abc' && parseChannelInput('https://www.youtube.com/@오늘쓰는AI/videos')?.handle === '@오늘쓰는AI' && parseChannelInput('https://youtube.com/channel/UCgi5InkiecEitESPWd-n0vA')?.id === 'UCgi5InkiecEitESPWd-n0vA' && parseChannelInput('UCgi5InkiecEitESPWd-n0vA')?.id === 'UCgi5InkiecEitESPWd-n0vA' && parseChannelInput('youtube.com/c/somename')?.username === 'somename' && parseChannelInput('routeai')?.handle === '@routeai' && parseChannelInput('<script>') === null && parseChannelInput('') === null)
+  check('주소 칸: extra 는 UC 번호 1~10개 · 겹치면 안 됨 · resolve 는 하나', checkQuery(new URLSearchParams('extra=UCgi5InkiecEitESPWd-n0vA')).ok && !checkQuery(new URLSearchParams('extra=abc')).ok && !checkQuery(new URLSearchParams(`extra=${Array(11).fill(0).map((_, i) => `UC${String(i).padStart(22, 'x')}`).join(',')}`)).ok && !checkQuery(new URLSearchParams('extra=UCgi5InkiecEitESPWd-n0vA,UCgi5InkiecEitESPWd-n0vA')).ok && !checkQuery(new URLSearchParams('resolve=@a&slot=x')).ok)
+  delete ENV.SUPABASE_URL
+  delete ENV.VITE_SUPABASE_URL
+  calls.length = 0
+  const noCfg = await call('?resolve=@abc', { authorization: `Bearer ${GOOD_TOKEN}` })
+  check('[채널 추가] 서버에 로그인 확인 설정이 없으면 503 · 유튜브를 부르지 않는다', noCfg.code === 503 && (noCfg.body as { error: string }).error === 'no_auth_config' && calls.length === 0)
+  ENV.VITE_SUPABASE_URL = 'https://proj.supabase.test'
+  ENV.VITE_SUPABASE_ANON_KEY = 'anon-public-key'
+  const anon = await call('?resolve=@abc')
+  const badTok = await call('?resolve=@abc', { authorization: 'Bearer wrong-token-0123456789abcdef' })
+  const ex401 = await call('?extra=UCgi5InkiecEitESPWd-n0vA')
+  check('[채널 추가] 로그인 안 하면 401 — 아무나 주소를 바꿔 가며 할당량을 쓰지 못함 · 유튜브 호출 0', anon.code === 401 && badTok.code === 401 && ex401.code === 401 && calls.length === 0 && anon.headers['cache-control'] === 'no-store')
+  const ok = await call('?resolve=https://www.youtube.com/@routeai', { authorization: `Bearer ${GOOD_TOKEN}` })
+  const ch1 = (ok.body as { channel: { id: string; title: string; subs: number }; units: number })
+  check('[채널 추가] 로그인하면 채널 확인 — 채널 정보 1단위(검색 100단위 안 씀) · 키 값 없음 · 캐시 안 함', ok.code === 200 && ch1.channel.id === 'UC_routeai' && ch1.units === 1 && !calls.some((c) => c.startsWith('search')) && !JSON.stringify(ok.body).includes(KEYVAL) && ok.headers['cache-control'] === 'no-store', ok.body)
+  calls.length = 0
+  const ex = await call(`?extra=UCnewchannel00000000000a,${CHANNELS[1].id}`, { authorization: `Bearer ${GOOD_TOKEN}` })
+  const exb = ex.body as { channels: YtChannel[]; videos: YtVideoRaw[]; units: number }
+  check('[채널 추가] 더한 채널 영상 — 기본 목록과 겹치는 채널은 다시 부르지 않음 · 채널마다 2단위 + 정보 1', ex.code === 200 && exb.channels.length === 1 && exb.channels[0].id === 'UCnewchannel00000000000a' && exb.videos.length === 50 && exb.units === 3 && ex.headers['cache-control'] === 'no-store', { units: exb.units, ch: exb.channels.map((c) => c.id) })
 }
 
 console.log(`\nyoutube: ${passed} passed, ${failed} failed`)
