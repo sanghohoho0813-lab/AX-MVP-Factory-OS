@@ -11,7 +11,7 @@
  * 카드 문구는 '근거 → 제안' 순서. 'AI 추천' · '성공 가능 %' 같은 말을 쓰지 않는다.
  */
 import { useMemo, useState } from 'react'
-import { BookmarkCheck, BookmarkPlus, CalendarCheck, Check, ChevronDown, CircleHelp, ClipboardCopy, EyeOff, Flame, Info, Minus, NotebookPen, RotateCcw, Settings2, TrendingUp } from 'lucide-react'
+import { BarChart3, BookmarkCheck, BookmarkPlus, CalendarCheck, Check, ChevronDown, CircleHelp, Clapperboard, ClipboardCopy, EyeOff, Flame, Info, Minus, NotebookPen, RotateCcw, Settings2, TrendingUp } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
 import { Badge } from '../../../components/ui/primitives'
 import { HintTip } from '../../../components/ui/fold'
@@ -41,7 +41,7 @@ import {
   type SideBreakout,
 } from '../../../services/marketing/ytRadar'
 import { AiKeywordBoard, DomainBoard, SideBreakouts } from './FocusSignals'
-import { AxisBadge, DomainBadge, RatioChip, StrengthMeter, Thumb, VideoRow } from './RadarParts'
+import { AxisBadge, DomainBadge, IconChip, RatioChip, StrengthMeter, Thumb, VideoRow } from './RadarParts'
 
 /** 시장 신호 첫 화면 개수(나머지는 [더 보기]) */
 const SIGNAL_FIRST = 4
@@ -97,7 +97,8 @@ export function PlanView({
       <section className="flex flex-col gap-3" aria-labelledby="radar-plan-h">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <HintTip tip={hintFor('이번 주 찍을 것')} label="이번 주 찍을 것">
-            <h2 id="radar-plan-h" className="t-section font-bold text-slate-900">
+            <h2 id="radar-plan-h" className="flex items-center gap-2 text-[1.375rem] leading-tight font-extrabold text-slate-900 sm:text-2xl">
+              <IconChip icon={Clapperboard} tone="rose" size="lg" />
               이번 주 찍을 것
             </h2>
           </HintTip>
@@ -612,7 +613,8 @@ function MarketSignals({ rising, breakouts, focus, noThumb, onOpenVideo }: { ris
     <section className="flex flex-col gap-2.5" aria-labelledby="radar-signals-h" data-testid="radar-signals">
       <div className="flex flex-wrap items-baseline gap-x-2">
         <HintTip tip={hintFor('시장 신호')} label="경제 · 경영 · AI 시장 신호">
-          <h2 id="radar-signals-h" className="t-card font-bold break-keep text-slate-900">
+          <h2 id="radar-signals-h" className="t-section flex items-center gap-2 font-extrabold break-keep text-slate-900">
+            <IconChip icon={BarChart3} tone="indigo" />
             경제 · 경영 · AI 시장 신호
           </h2>
         </HintTip>
@@ -621,10 +623,10 @@ function MarketSignals({ rising, breakouts, focus, noThumb, onOpenVideo }: { ris
       <DomainBoard signals={focus.domains} />
       <AiKeywordBoard keywords={focus.aiKeywords} workflow={focus.workflow} fresh={focus.fresh} />
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-slate-50/60 p-3 sm:p-4" data-testid="radar-rising">
+        <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-emerald-100 bg-emerald-50/40 p-3 sm:p-4" data-testid="radar-rising">
           <HintTip tip={hintFor('급상승 주제')} label="급상승 주제">
-            <h3 className="t-sub flex items-center gap-1.5 font-bold text-slate-800">
-              <TrendingUp aria-hidden="true" className="size-4 text-brand-600" /> 급상승 주제
+            <h3 className="t-card flex items-center gap-2 font-bold text-slate-900">
+              <IconChip icon={TrendingUp} tone="emerald" /> 급상승 주제
             </h3>
           </HintTip>
           {rising.length === 0 ? (
@@ -654,10 +656,10 @@ function MarketSignals({ rising, breakouts, focus, noThumb, onOpenVideo }: { ris
             </>
           )}
         </div>
-        <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-slate-50/60 p-3 sm:p-4" data-testid="radar-breakouts">
+        <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-red-100 bg-red-50/30 p-3 sm:p-4" data-testid="radar-breakouts">
           <HintTip tip={hintFor('평소보다 터진 영상')} label="평소보다 터진 영상">
-            <h3 className="t-sub flex items-center gap-1.5 font-bold text-slate-800">
-              <Flame aria-hidden="true" className="size-4 text-red-500" /> 평소보다 터진 영상
+            <h3 className="t-card flex items-center gap-2 font-bold text-slate-900">
+              <IconChip icon={Flame} tone="red" /> 평소보다 터진 영상
             </h3>
           </HintTip>
           {breakouts.length === 0 ? (

@@ -6,7 +6,7 @@
  *  - 사이드 급상승: 경제 · 경영 · AI 밖에서 비정상적으로 크게 터진 영상만(최대 5) — 주제가 아니라 포맷 · 훅 · 구성 참고.
  *    TOP 보다 작게(작은 제목 · 작은 썸네일 · 한 줄씩).
  */
-import { Flame, Sparkles, Waypoints } from 'lucide-react'
+import { Sparkles, Waypoints, Zap } from 'lucide-react'
 import { HintTip } from '../../../components/ui/fold'
 import { Badge } from '../../../components/ui/primitives'
 import { hintFor } from '../../../content/sectionHints'
@@ -22,7 +22,7 @@ import {
   type RadarVideo,
   type SideBreakout,
 } from '../../../services/marketing/ytRadar'
-import { RatioChip, Thumb } from './RadarParts'
+import { IconChip, RatioChip, Thumb } from './RadarParts'
 
 /** 영역마다 무엇을 보나(빈 칸일 때 한 줄로) */
 const DOMAIN_SCOPE: Record<DomainSignal['domain'], string> = {
@@ -32,19 +32,28 @@ const DOMAIN_SCOPE: Record<DomainSignal['domain'], string> = {
   other: '',
 }
 
+/** 영역마다 아주 연한 바탕색 — 세 칸이 한눈에 나뉘게(D-197 대표 요청) */
+const DOMAIN_BOX: Record<DomainSignal['domain'], string> = {
+  economy: 'border-sky-100 bg-sky-50/50',
+  business: 'border-amber-100 bg-amber-50/50',
+  ai: 'border-violet-100 bg-violet-50/50',
+  other: 'border-slate-200 bg-white',
+}
+const DOMAIN_TEXT: Record<DomainSignal['domain'], string> = { economy: 'text-sky-800', business: 'text-amber-800', ai: 'text-violet-800', other: 'text-slate-900' }
+
 /** 지금 강한 흐름 — 경제 · 경영 · AI 세 칸(PC 세 줄 · 휴대폰 위아래) */
 export function DomainBoard({ signals }: { signals: readonly DomainSignal[] }) {
   return (
     <div className="flex min-w-0 flex-col gap-2" data-testid="radar-domains">
       <HintTip tip={hintFor('지금 강한 흐름')} label="지금 강한 흐름">
-        <h3 className="t-sub flex items-center gap-1.5 font-bold text-slate-800">
-          <Waypoints aria-hidden="true" className="size-4 text-brand-600" /> 지금 강한 흐름
+        <h3 className="t-card flex items-center gap-2 font-bold text-slate-900">
+          <IconChip icon={Waypoints} tone="sky" /> 지금 강한 흐름
         </h3>
       </HintTip>
       <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
         {signals.map((d) => (
-          <div key={d.domain} className="flex min-w-0 flex-col gap-1 rounded-(--radius-card) border border-slate-200 bg-white p-3" data-testid={`radar-domain-${d.domain}`} data-count={d.items.length}>
-            <p className="t-sub font-bold text-slate-900">{DOMAIN_LABEL[d.domain]}</p>
+          <div key={d.domain} className={`flex min-w-0 flex-col gap-1 rounded-(--radius-card) border p-3 ${DOMAIN_BOX[d.domain]}`} data-testid={`radar-domain-${d.domain}`} data-count={d.items.length}>
+            <p className={`t-card font-bold ${DOMAIN_TEXT[d.domain]}`}>{DOMAIN_LABEL[d.domain]}</p>
             {d.items.length === 0 ? (
               <p className="t-meta break-keep text-slate-500" data-testid="radar-domain-empty">
                 최근 2주에 여러 채널이 함께 다룬 주제가 아직 없습니다 <span className="text-slate-400">({DOMAIN_SCOPE[d.domain]})</span>
@@ -88,11 +97,11 @@ export function AiKeywordBoard({
   if (keywords.length === 0 && workflow.length === 0 && fresh.length === 0) return null
   const vendors = VENDORS.map((v) => ({ v, list: keywords.filter((k) => k.vendor === v) })).filter((x) => x.list.length > 0)
   return (
-    <div className="flex min-w-0 flex-col gap-2" data-testid="radar-ai-keywords">
-      <div className="flex flex-wrap items-baseline gap-x-2">
+    <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-violet-100 bg-violet-50/30 p-3 sm:p-4" data-testid="radar-ai-keywords">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <HintTip tip={hintFor('AI 핵심 키워드')} label="AI 핵심 키워드">
-          <h3 className="t-sub flex items-center gap-1.5 font-bold text-slate-800">
-            <Sparkles aria-hidden="true" className="size-4 text-brand-600" /> AI 핵심 키워드
+          <h3 className="t-card flex items-center gap-2 font-bold text-slate-900">
+            <IconChip icon={Sparkles} tone="violet" /> AI 핵심 키워드
           </h3>
         </HintTip>
         <span className="t-meta text-slate-500">최근 30일 제목에 실제로 나온 이름만</span>
@@ -151,11 +160,11 @@ export function AiKeywordBoard({
 /** 사이드 급상승 — TOP 보다 작게. 없으면 한 줄만 */
 export function SideBreakouts({ items, noThumb, onOpenVideo }: { items: readonly SideBreakout[]; noThumb: boolean; onOpenVideo: (v: RadarVideo) => void }) {
   return (
-    <section className="flex flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-slate-50/60 p-3 sm:p-4" aria-labelledby="radar-side-h" data-testid="radar-side" data-count={items.length}>
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+    <section className="flex flex-col gap-2 rounded-(--radius-card) border border-amber-100 bg-amber-50/40 p-3 sm:p-4" aria-labelledby="radar-side-h" data-testid="radar-side" data-count={items.length}>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
         <HintTip tip={hintFor('사이드 급상승')} label="사이드 급상승">
-          <h2 id="radar-side-h" className="t-sub flex items-center gap-1.5 font-bold text-slate-800">
-            <Flame aria-hidden="true" className="size-4 text-amber-600" /> 사이드 급상승
+          <h2 id="radar-side-h" className="t-card flex items-center gap-2 font-bold text-slate-900">
+            <IconChip icon={Zap} tone="amber" /> 사이드 급상승
           </h2>
         </HintTip>
         <span className="t-meta break-keep text-slate-500">경제 · 경영 · AI 밖에서 크게 터진 영상 — 주제가 아니라 포맷 · 훅 · 구성 참고</span>

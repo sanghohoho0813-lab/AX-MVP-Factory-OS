@@ -3,7 +3,7 @@
  * 숫자 점수는 없다 — 신호는 '강함 · 보통 · 초기' 세 칸 막대와 글로만.
  */
 import { useState } from 'react'
-import { ExternalLink, Flame, PlayCircle, UserRound } from 'lucide-react'
+import { ExternalLink, Flame, PlayCircle, UserRound, type LucideIcon } from 'lucide-react'
 import { Modal } from '../../../components/ui/Modal'
 import { Badge } from '../../../components/ui/primitives'
 import { dateKo, fmt, shortNum } from '../../../services/marketing/ytBench'
@@ -36,6 +36,26 @@ export function AxisBadge({ axis }: { axis: ContentAxis }) {
   return (
     <span className={`t-meta inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-bold ${cls}`} data-testid="radar-axis">
       {AXIS_LABEL[axis]}
+    </span>
+  )
+}
+
+const CHIP_TONE = {
+  rose: 'bg-rose-100 text-rose-600',
+  indigo: 'bg-indigo-100 text-indigo-600',
+  sky: 'bg-sky-100 text-sky-700',
+  violet: 'bg-violet-100 text-violet-600',
+  emerald: 'bg-emerald-100 text-emerald-700',
+  red: 'bg-red-100 text-red-600',
+  amber: 'bg-amber-100 text-amber-700',
+} as const
+export type ChipTone = keyof typeof CHIP_TONE
+
+/** 구역 제목 앞 색 아이콘(D-197 대표 요청 — 제목이 눈에 띄게) */
+export function IconChip({ icon: Icon, tone, size = 'md' }: { icon: LucideIcon; tone: ChipTone; size?: 'md' | 'lg' }) {
+  return (
+    <span aria-hidden="true" className={`inline-flex shrink-0 items-center justify-center rounded-lg ${CHIP_TONE[tone]} ${size === 'lg' ? 'size-9' : 'size-7'}`}>
+      <Icon className={size === 'lg' ? 'size-5' : 'size-4'} />
     </span>
   )
 }

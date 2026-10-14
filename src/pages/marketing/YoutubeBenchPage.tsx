@@ -13,7 +13,7 @@
  */
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ChevronDown, ClipboardCopy, Download, ExternalLink, Eye, Flame, MessageCircle, PlayCircle, RefreshCw, Rocket, SlidersHorizontal, ThumbsUp, TriangleAlert, UserRound } from 'lucide-react'
+import { ChevronDown, ClipboardCopy, Download, ExternalLink, Eye, Flame, Hash, MessageCircle, PlayCircle, RefreshCw, Rocket, SlidersHorizontal, ThumbsUp, TriangleAlert, UserRound } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Badge, MetricTile } from '../../components/ui/primitives'
@@ -75,7 +75,7 @@ import {
   type RadarVideo,
 } from '../../services/marketing/ytRadar'
 import { PlanView, type FocusData } from './radar/PlanView'
-import { RatioChip, VideoDetail } from './radar/RadarParts'
+import { IconChip, RatioChip, VideoDetail } from './radar/RadarParts'
 import { ChannelManager } from './radar/ChannelManager'
 import { IdeaNotebook } from './radar/IdeaNotebook'
 import { HotPatternsCard, MyChannelCard } from './radar/AnalysisExtras'
@@ -419,8 +419,8 @@ function HotBanner({ prepared, onPick }: { prepared: Prepared; onPick: (keyword:
   return (
     <section className="flex flex-col gap-2" data-testid="yt-hot">
       <HintTip tip={hintFor('이번 주 주목 주제 TOP 3')} label="이번 주 주목 주제 TOP 3">
-        <h2 className="t-card flex items-center gap-1.5 font-bold text-slate-900">
-          <Flame aria-hidden="true" className="size-5 text-red-500" /> 이번 주 주목 주제 TOP 3
+        <h2 className="t-card flex items-center gap-2 font-bold text-slate-900">
+          <IconChip icon={Flame} tone="red" /> 이번 주 주목 주제 TOP 3
         </h2>
       </HintTip>
       <ol className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -580,7 +580,9 @@ function TopView({
       {allKeywords.length > 0 && (
         <section className="flex flex-col gap-2" data-testid="yt-keywords">
           <HintTip tip={hintFor('인기 핵심 키워드')} label="인기 핵심 키워드">
-            <h2 className="t-card font-bold text-slate-900">인기 핵심 키워드</h2>
+            <h2 className="t-card flex items-center gap-2 font-bold text-slate-900">
+              <IconChip icon={Hash} tone="sky" /> 인기 핵심 키워드
+            </h2>
           </HintTip>
           <p className="t-meta text-slate-500">경제 · 경영 · AI 주제</p>
           <div className="flex flex-wrap gap-1.5">
