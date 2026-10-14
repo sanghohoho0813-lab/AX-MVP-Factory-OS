@@ -7,10 +7,14 @@
  *    direct(직접 경쟁 · 시장수요) · ai(AI 실무) · ax(AX · 업무자동화) · format(포맷 벤치마킹).
  *  - 쓰는 할당량: 채널 정보 1단위(50곳까지 한 번에) + 채널마다 2단위(최근 영상 목록 · 영상 정보).
  *    D-194 채널 33곳(모두 채널 번호) → 한 번에 약 67단위(하루 무료 10,000단위의 0.7%). 검색(search.list · 100단위)은 쓰지 않는다.
- *  - 매일 아침 9시(한국 시간)까지 Vercel 캐시에 둔다(?slot=오늘) → 9시가 지나면 처음 여는 순간 새로 받는다.
+ *  - D-196 6시간 칸: 화면은 ?win=6시간 칸&rev=채널 구성 판 으로 부른다 — 그 칸이 끝날 때까지 Vercel 캐시에 둔다
+ *    → 같은 6시간 · 같은 판이면 몇 명이 열어도 유튜브는 한 번(하루 4번 × 67단위). 예전 화면의 ?slot=오늘(9시까지 캐시)도 그대로 받는다.
  *  - [지금 새로 가져오기] 는 ?bucket=30분 칸 — 같은 30분 안에서는 몇 번을 눌러도 한 번만 유튜브를 부른다
  *    (아무나 주소를 두드려 하루 할당량을 다 쓰지 못하게). 정해 둔 칸 · 값 말고는 받지 않는다(400).
- *  - ?status=1 이면 키가 있는지만 알려 준다(키 값은 절대 안 보낸다).
+ *  - 채널 구성 판(feedRevision): 채널 번호 · 묶음 · 내 채널 · 채널마다 받는 편수 · 응답 모양 판으로 만든 짧은 글(같은 설정이면 늘 같다).
+ *    응답마다 싣는다. 화면이 보낸 rev 가 지금 판과 다르면 유튜브를 부르지 않고 409 + 지금 판(화면이 그 판으로 다시 부른다) —
+ *    아무 rev 값으로 캐시를 비켜 가며 할당량을 쓰지 못하게.
+ *  - ?status=1 이면 키가 있는지 · 채널 수 · 채널 구성 판만 알려 준다(유튜브를 부르지 않는다 · 할당량 0 · 키 값은 절대 안 보낸다).
  *  - 채널 하나가 실패해도 나머지는 보낸다 — 실패한 채널 이름을 같이 보낸다(예전 앱은 조용히 빠졌다).
  *  - D-194 [채널 추가] — ?resolve=@주소(또는 채널 주소 · 번호) 는 채널 한 곳 확인(1~2단위) ·
  *    ?extra=UC…,UC… 는 대표가 더한 채널(10곳까지)의 영상. 둘 다 값이 정해져 있지 않아 캐시로 막을 수 없으므로
@@ -27,6 +31,10 @@ const SUPA_ANON_NAMES = ['SUPABASE_ANON_KEY', 'VITE_SUPABASE_ANON_KEY']
 const API = 'https://www.googleapis.com/youtube/v3'
 const PER_CHANNEL = 50
 const BUCKET_MS = 30 * 60_000
+/** 데이터를 쓰는 최대 시간(D-196) — 화면 저장소(ytFeed)의 FRESH_MS 와 같은 값 */
+const WINDOW_MS = 6 * 3_600_000
+/** 응답 모양 판 — 채널 칸 · 영상 칸이 바뀌면 올린다(D-194 묶음 · 메모를 실은 것이 2) */
+export const FEED_SCHEMA = 2
 const POOL = 8
 const MAX_EXTRA = 10
 
@@ -78,6 +86,23 @@ export const CHANNELS = [
   { id: 'UCvil4OAt-zShzkKHsg9EQAw', handle: '@lucky_tv', name: '김작가 TV', group: 'format', note: "'이것' + 출연자 제목 공식 · 인터뷰 구성(대형 채널)" },
 ]
 
+/**
+ * 채널 구성 판(D-196) — 결과에 영향을 주는 설정(채널 번호 · 묶음 · 내 채널 · 채널마다 받는 편수 · 응답 모양 판)만으로 만든다.
+ * 같은 설정이면 언제 어디서 만들어도 같은 글. 채널 이름 · 메모처럼 결과에 영향이 없는 칸은 넣지 않는다.
+ * 꼴: '응답판-채널수-요약값'(예: 2-33-1k9x0qz) — 사람이 봐도 채널 수는 알 수 있게.
+ */
+export function feedRevisionOf(list = CHANNELS, schema = FEED_SCHEMA) {
+  const basis = [`schema:${schema}`, `per:${PER_CHANNEL}`, ...list.map((c) => `${c.id || c.handle}|${c.group || ''}|${c.mine ? 1 : 0}`)].join('\n')
+  // FNV-1a 32비트 — 다른 파일 · 모듈을 부르지 않고 늘 같은 값
+  let h = 0x811c9dc5
+  for (let i = 0; i < basis.length; i++) {
+    h ^= basis.charCodeAt(i)
+    h = Math.imul(h, 0x01000193) >>> 0
+  }
+  return `${schema}-${list.length}-${h.toString(36)}`
+}
+export const FEED_REVISION = feedRevisionOf()
+
 const envFirst = (names) => {
   for (const name of names) {
     const v = process.env[name]
@@ -105,12 +130,20 @@ export function secondsUntilNine(now = Date.now()) {
 /** 가장 최근 한국 시간 오전 9시의 날짜 칸(= 세계 표준시 날짜) */
 export const slotOf = (now = Date.now()) => new Date(now).toISOString().slice(0, 10)
 export const bucketOf = (now = Date.now()) => Math.floor(now / BUCKET_MS)
+/** 6시간 칸(D-196) — 세계 표준시 0 · 6 · 12 · 18시(한국 9 · 15 · 21 · 3시)에 바뀐다 */
+export const windowOf = (now = Date.now()) => Math.floor(now / WINDOW_MS)
+/** 지금 6시간 칸이 끝날 때까지 남은 초(최소 60초) */
+export const secondsUntilWindowEnd = (now = Date.now()) => Math.max(60, Math.round(((windowOf(now) + 1) * WINDOW_MS - now) / 1000))
 
 /** 주소의 칸이 받을 만한지 — 지금 칸이나 바로 앞 칸만(시계가 조금 어긋나도 되게) */
 export function checkQuery(searchParams, now = Date.now()) {
   const keys = [...searchParams.keys()]
-  const allowed = new Set(['status', 'slot', 'bucket', 'resolve', 'extra'])
-  if (keys.some((k) => !allowed.has(k)) || keys.length > 1) return { ok: false }
+  const allowed = new Set(['status', 'slot', 'bucket', 'win', 'rev', 'resolve', 'extra'])
+  if (keys.some((k) => !allowed.has(k)) || new Set(keys).size !== keys.length) return { ok: false }
+  // rev(채널 구성 판)는 6시간 칸 · 30분 칸과만 같이 — 그 밖에 두 칸을 같이 보내면 받지 않는다
+  const main = keys.filter((k) => k !== 'rev')
+  if (main.length > 1 || (keys.includes('rev') && !['win', 'bucket'].includes(main[0]))) return { ok: false }
+  const rev = searchParams.has('rev') ? String(searchParams.get('rev')) : null
   if (searchParams.has('status')) return { ok: true, kind: 'status' }
   if (searchParams.has('resolve')) {
     const target = parseChannelInput(searchParams.get('resolve'))
@@ -121,10 +154,15 @@ export function checkQuery(searchParams, now = Date.now()) {
     const fine = ids.length >= 1 && ids.length <= MAX_EXTRA && new Set(ids).size === ids.length && ids.every((x) => /^UC[\w-]{22}$/.test(x))
     return fine ? { ok: true, kind: 'extra', ids } : { ok: false }
   }
+  if (searchParams.has('win')) {
+    const w = Number(searchParams.get('win'))
+    const cur = windowOf(now)
+    return Number.isInteger(w) && (w === cur || w === cur - 1) ? { ok: true, kind: 'window', rev } : { ok: false }
+  }
   if (searchParams.has('bucket')) {
     const b = Number(searchParams.get('bucket'))
     const cur = bucketOf(now)
-    return Number.isInteger(b) && (b === cur || b === cur - 1) ? { ok: true, kind: 'fresh' } : { ok: false }
+    return Number.isInteger(b) && (b === cur || b === cur - 1) ? { ok: true, kind: 'fresh', rev } : { ok: false }
   }
   if (searchParams.has('slot')) {
     const s = searchParams.get('slot')
@@ -319,7 +357,10 @@ export default async function handler(req, res) {
   const key = keyFromEnv()
 
   if (!q.ok) return fail(res, 400, { error: 'bad_query' })
-  if (q.kind === 'status') return fail(res, 200, { configured: !!key, keyName: key ? key.name : null, channels: CHANNELS.length })
+  // 유튜브를 부르지 않는다(할당량 0) — 화면은 이것으로 저장해 둔 데이터의 채널 구성 판이 지금과 같은지 본다
+  if (q.kind === 'status') return fail(res, 200, { configured: !!key, keyName: key ? key.name : null, channels: CHANNELS.length, feedRevision: FEED_REVISION })
+  // 화면이 아는 판이 지금과 다르다(그사이 배포로 채널 구성이 바뀜) — 유튜브를 부르지 않고 지금 판만 알려 준다
+  if (q.rev !== undefined && q.rev !== null && q.rev !== FEED_REVISION) return fail(res, 409, { error: 'revision', feedRevision: FEED_REVISION })
   if (!key) return fail(res, 503, { error: 'no_key', message: '유튜브 API 키가 서버 환경변수에 없습니다(YOUTUBE_API_KEY).' })
   // 값이 정해져 있지 않은 두 갈래는 로그인한 사람만 — 남이 주소를 바꿔 가며 할당량을 쓰지 못하게
   if (q.kind === 'resolve' || q.kind === 'extra') {
@@ -371,9 +412,15 @@ export default async function handler(req, res) {
     const degraded = failed.length > CHANNELS.length / 2
     res.setHeader(
       'Cache-Control',
-      degraded ? 'no-store' : q.kind === 'fresh' ? `public, max-age=0, s-maxage=${BUCKET_MS / 1000}` : `public, max-age=0, s-maxage=${secondsUntilNine()}, stale-while-revalidate=300`,
+      degraded
+        ? 'no-store'
+        : q.kind === 'fresh'
+          ? `public, max-age=0, s-maxage=${BUCKET_MS / 1000}`
+          : q.kind === 'window'
+            ? `public, max-age=0, s-maxage=${secondsUntilWindowEnd()}, stale-while-revalidate=300`
+            : `public, max-age=0, s-maxage=${secondsUntilNine()}, stale-while-revalidate=300`,
     )
-    res.status(200).json({ fetchedAt: new Date().toISOString(), channels, videos, failed, units: meter.units })
+    res.status(200).json({ fetchedAt: new Date().toISOString(), feedRevision: FEED_REVISION, channels, videos, failed, units: meter.units })
   } catch (e) {
     if (e instanceof QuotaError) fail(res, 429, { error: 'quota' })
     else if (e instanceof KeyError) fail(res, 502, { error: 'bad_key' })

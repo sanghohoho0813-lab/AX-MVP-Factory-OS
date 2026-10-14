@@ -6,9 +6,12 @@
  *  - 서버 함수(api/yt-bench.js): 유튜브를 흉내 낸 fetch 로 — 키 없음 · 주소 칸 검사 · 채널 하나 실패 · 할당량 · 틀린 키 · 캐시 · 키가 응답에 없음
  *  - 콘텐츠 레이더(D-194) R1~R12: 롱폼/쇼츠 기준 · 작은 채널 · 평소 대비 · 나이 · 한 번 터진 영상 · 여러 채널 · 한 채널 반복 ·
  *    네 묶음 · 3축 · BRIDGE · 수첩 저장/다시 읽기 · 작업공간 격리 + [채널 추가](로그인 확인 · 저렴한 호출만)
+ *  - D-196 6시간 자동 갱신: 채널 구성 판 · status 할당량 0 · 6시간 칸 · 409 · 예전 18채널 저장본 → 33채널 · 5시간 59분 그대로 ·
+ *    6시간 넘으면 새로 · 돌아올 때 · 판 바뀜 · [지금 새로] · 실패하면 지난번 것 + 받은 때(화면 저장소를 진짜 서버 함수로 이어서)
  * 실행: npm run test:youtube
  */
-import handler, { CHANNELS, checkQuery, parseChannelInput, parseDuration, secondsUntilNine } from '../../../api/yt-bench.js'
+import handler, { CHANNELS, FEED_REVISION, FEED_SCHEMA, checkQuery, feedRevisionOf, parseChannelInput, parseDuration, secondsUntilNine, secondsUntilWindowEnd, windowOf as serverWindowOf } from '../../../api/yt-bench.js'
+import { FRESH_MS, ensureYt, isStale, kstWhen, readCache, refreshYt, resetYtForTest, windowOf, ytSnapshot } from '../marketing/ytFeed'
 import { TOPICS, aiToolsOf, normalizeTitle, topicsOf } from '../marketing/radarPlaybook'
 import {
   breakoutVideos,
@@ -574,6 +577,181 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const ex = await call(`?extra=UCnewchannel00000000000a,${CHANNELS[1].id}`, { authorization: `Bearer ${GOOD_TOKEN}` })
   const exb = ex.body as { channels: YtChannel[]; videos: YtVideoRaw[]; units: number }
   check('[채널 추가] 더한 채널 영상 — 기본 목록과 겹치는 채널은 다시 부르지 않음 · 채널마다 2단위 + 정보 1', ex.code === 200 && exb.channels.length === 1 && exb.channels[0].id === 'UCnewchannel00000000000a' && exb.videos.length === 50 && exb.units === 3 && ex.headers['cache-control'] === 'no-store', { units: exb.units, ch: exb.channels.map((c) => c.id) })
+}
+
+/* ---------------- 6시간 자동 갱신 · 채널 구성 판(D-196) ---------------- */
+{
+  const ENV = process.env as Record<string, string | undefined>
+  ENV.YOUTUBE_API_KEY = KEYVAL
+  mode = 'ok'
+  // 예전 18채널(직접 경쟁 19곳 중 앞 18곳 — Production PC 에 남아 있던 것과 같은 수)
+  const old18 = CHANNELS.slice(0, 18)
+  const REV18 = feedRevisionOf(old18)
+  check('판: 같은 설정이면 늘 같은 값 · 꼴 "응답판-채널수-요약값"(2-33-…)', FEED_REVISION === feedRevisionOf() && feedRevisionOf(CHANNELS.map((c) => ({ ...c }))) === FEED_REVISION && /^2-33-[0-9a-z]+$/.test(FEED_REVISION), FEED_REVISION)
+  check(
+    '판: 18채널 ≠ 33채널 · 묶음 하나만 바뀌어도 ≠ · 응답 판이 바뀌면 ≠ · 채널 순서 ≠ · 이름/메모만 바뀌면 같다(결과에 영향 없는 칸)',
+    REV18 !== FEED_REVISION &&
+      /^2-18-/.test(REV18) &&
+      feedRevisionOf(CHANNELS.map((c, i) => (i === 20 ? { ...c, group: 'ax' } : c))) !== FEED_REVISION &&
+      feedRevisionOf(CHANNELS, FEED_SCHEMA + 1) !== FEED_REVISION &&
+      feedRevisionOf([...CHANNELS].reverse()) !== FEED_REVISION &&
+      feedRevisionOf(CHANNELS.map((c) => ({ ...c, name: '다른 이름', note: '다른 메모' }))) === FEED_REVISION,
+  )
+
+  // 서버
+  calls.length = 0
+  const st = await call('?status=1')
+  const sb = st.body as { configured: boolean; channels: number; feedRevision: string }
+  check('8 status=1: configured · 채널 33 · feedRevision — 유튜브 호출 0(할당량 0) · 키 값 없음 · 캐시 안 함', st.code === 200 && sb.configured && sb.channels === 33 && sb.feedRevision === FEED_REVISION && calls.length === 0 && !JSON.stringify(sb).includes(KEYVAL) && st.headers['cache-control'] === 'no-store', sb)
+  const w = serverWindowOf()
+  const win = await call(`?win=${w}&rev=${FEED_REVISION}`)
+  const wb = win.body as { feedRevision: string; channels: YtChannel[] }
+  const wMax = Number(/s-maxage=(\d+)/.exec(win.headers['cache-control'] ?? '')?.[1] ?? -1)
+  check('6시간 칸(?win=&rev=): 200 · 33채널 · 응답에 판 · 그 칸이 끝날 때까지만 캐시(6시간 이하)', win.code === 200 && wb.feedRevision === FEED_REVISION && wb.channels.length === 33 && Math.abs(wMax - secondsUntilWindowEnd()) <= 2 && wMax <= 6 * 3600, win.headers['cache-control'])
+  calls.length = 0
+  const r409 = await call(`?win=${w}&rev=${REV18}`)
+  check('판이 다르면 409 + 지금 판 · 유튜브를 부르지 않는다(아무 rev 로 캐시를 비켜 가며 할당량을 쓰지 못함) · 캐시 안 함', r409.code === 409 && (r409.body as { feedRevision: string }).feedRevision === FEED_REVISION && calls.length === 0 && r409.headers['cache-control'] === 'no-store', r409.body)
+  const fr2 = await call(`?bucket=${Math.floor(Date.now() / 1_800_000)}&rev=${FEED_REVISION}`)
+  check('9 [지금 새로](?bucket=&rev=) — 30분 캐시 그대로 · 응답에 판', fr2.code === 200 && fr2.headers['cache-control'] === 'public, max-age=0, s-maxage=1800' && (fr2.body as { feedRevision: string }).feedRevision === FEED_REVISION)
+  calls.length = 0
+  for (const bad of [`?rev=${FEED_REVISION}`, `?status=1&rev=${FEED_REVISION}`, `?slot=${slot}&rev=${FEED_REVISION}`, `?win=${w + 1}`, `?win=${w - 2}`, '?win=abc', `?win=${w}&win=${w}`, `?win=${w}&rev=a&rev=b`, `?win=${w}&bucket=${bucket}`, `?win=${w}&x=1`]) {
+    const r = await call(bad)
+    check(`6시간 칸 주소 검사 400 ${bad}`, r.code === 400 && r.headers['cache-control'] === 'no-store')
+  }
+  check('6시간 칸 400 은 유튜브를 부르지 않는다', calls.length === 0)
+  check(
+    '6시간 칸: 지금 · 바로 앞 칸만 · 세계 표준시 6시(한국 15시)에 바뀜 · 남은 초(최소 60)',
+    checkQuery(new URLSearchParams(`win=${w - 1}`)).ok &&
+      serverWindowOf(Date.parse('2026-10-14T05:59:59Z')) + 1 === serverWindowOf(Date.parse('2026-10-14T06:00:00Z')) &&
+      secondsUntilWindowEnd(Date.parse('2026-10-14T05:59:30Z')) === 60 &&
+      secondsUntilWindowEnd(Date.parse('2026-10-14T00:00:00Z')) === 21_600 &&
+      serverWindowOf(Date.parse('2026-10-14T07:00:00Z')) === windowOf(Date.parse('2026-10-14T07:00:00Z')),
+  )
+
+  // 화면 저장소 — 브라우저 fetch 를 진짜 서버 함수로 잇는다(유튜브만 흉내)
+  const store = new Map<string, string>()
+  ;(globalThis as unknown as { localStorage: Storage }).localStorage = {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => void store.set(k, String(v)),
+    removeItem: (k: string) => void store.delete(k),
+    clear: () => store.clear(),
+    key: () => null,
+    length: 0,
+  }
+  const ytMock = globalThis.fetch
+  const asked: string[] = []
+  let netDown = false
+  let statusRev: string | null = null // 배포가 막 바뀐 때 흉내(서버가 예전 판을 알려 줌)
+  let statusHtml = false // 함수가 없는 곳(로컬 미리보기) 흉내
+  globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
+    const u = new URL(String(input), 'https://os.test')
+    if (u.hostname !== 'os.test') return ytMock(input, init)
+    asked.push(u.search)
+    if (netDown) throw new TypeError('Failed to fetch')
+    if (statusHtml && u.searchParams.has('status')) return new Response('<!doctype html>', { status: 200, headers: { 'content-type': 'text/html' } })
+    const res = await call(u.search)
+    const body = statusRev && u.searchParams.has('status') ? { ...(res.body as object), feedRevision: statusRev } : res.body
+    return new Response(JSON.stringify(body), { status: res.code, headers: { 'content-type': 'application/json' } })
+  }) as typeof fetch
+  const H6 = FRESH_MS
+  const feedOf = (n: number, at: number) => ({ fetchedAt: new Date(at).toISOString(), channels: CHANNELS.slice(0, n).map((c) => ch(c.id, c.name, 1000, 10_000)), videos: [vid('old1', CHANNELS[0].id, '예전에 받은 영상', 3 * D, 500)], failed: [] })
+  const KEY = 'axmvp.yt.feed.v1'
+  const begin = (cache: unknown) => {
+    store.clear()
+    if (cache) store.set(KEY, JSON.stringify(cache))
+    asked.length = 0
+    calls.length = 0
+    netDown = false
+    statusRev = null
+    statusHtml = false
+    mode = 'ok'
+    resetYtForTest()
+  }
+  const feedAsks = () => asked.filter((q) => !q.includes('status=1'))
+  const snap = () => ytSnapshot()
+
+  // 1 · 2 · 3 같은 날짜의 18채널 예전 저장본(예전 모양 { slot, feed }) + 서버 판은 33채널 → 열자마자 버리고 33채널
+  const now0 = Date.now()
+  begin({ slot: new Date(now0).toISOString().slice(0, 10), feed: feedOf(18, now0 - 3_600_000) })
+  await ensureYt()
+  const saved = readCache()
+  check(
+    '1~3 같은 날 18채널 예전 저장본 + 서버 판 33채널 → 열자마자 새로 받음 → 33채널 · 저장본도 { 받은 때 · 판 · 데이터 }',
+    snap().status === 'ready' && snap().feed?.channels.length === 33 && snap().feedRevision === FEED_REVISION && saved?.feedRevision === FEED_REVISION && saved?.feed.channels.length === 33 && typeof JSON.parse(store.get(KEY) ?? '{}').fetchedAt === 'number',
+    { st: snap().status, n: snap().feed?.channels.length, asked },
+  )
+  check('1~3 묻는 순서: 판 확인(status) 한 번 → 6시간 칸 + 지금 판(?win=…&rev=…) 한 번', asked.length === 2 && asked[0] === '?status=1' && asked[1] === `?win=${windowOf()}&rev=${encodeURIComponent(FEED_REVISION)}`, asked)
+
+  // 4 5시간 59분 된 저장본(판 같음) → 다시 쓰고 유튜브 · 데이터 요청 0
+  begin({ fetchedAt: Date.now() - (H6 - 60_000), feedRevision: FEED_REVISION, feed: feedOf(33, Date.now() - (H6 - 60_000)) })
+  await ensureYt()
+  check('4 5시간 59분 된 저장본 → 그대로 씀 · 데이터 요청 0 · 유튜브 호출 0(판 확인만)', snap().status === 'ready' && snap().feed?.videos[0]?.id === 'old1' && feedAsks().length === 0 && calls.length === 0 && asked.join() === '?status=1', asked)
+
+  // 6 열어 둔 채로 6시간이 지남 → 돌아올 때(focus · visible 이 부르는 ensureYt) 새로 받는다
+  const tFocus = Date.now()
+  begin({ fetchedAt: tFocus - H6 + 1500, feedRevision: FEED_REVISION, feed: feedOf(33, tFocus - H6 + 1500) })
+  let fakeNow = tFocus
+  resetYtForTest(() => fakeNow)
+  await ensureYt()
+  const beforeFocus = feedAsks().length
+  fakeNow = tFocus + 2000
+  await ensureYt()
+  check('6 열어 둔 채로 6시간이 지남 → 돌아오면 새로 받음(열 때 0번 → 돌아올 때 1번) · 판 확인은 10분에 한 번(다시 묻지 않음)', beforeFocus === 0 && feedAsks().length === 1 && snap().feed?.videos[0]?.id !== 'old1' && asked.filter((q) => q === '?status=1').length === 1, asked)
+  await ensureYt()
+  await ensureYt()
+  check('6 곧바로 또 돌아와도(focus 여러 번) 다시 받지 않는다 — 시계로 계속 묻지 않음', feedAsks().length === 1, asked)
+
+  // 5 6시간 지난 저장본 → 열자마자 새로
+  begin({ fetchedAt: Date.now() - H6 - 60_000, feedRevision: FEED_REVISION, feed: feedOf(33, Date.now() - H6 - 60_000) })
+  await ensureYt()
+  check('5 6시간 1분 된 저장본 → 열자마자 새로 받음(?win=)', feedAsks().length === 1 && /^\?win=\d+&rev=/.test(feedAsks()[0]) && snap().feed?.videos[0]?.id !== 'old1' && snap().status === 'ready', asked)
+
+  // 7 판이 바뀜 → 1시간 전 것이어도 새로
+  begin({ fetchedAt: Date.now() - 3_600_000, feedRevision: REV18, feed: feedOf(18, Date.now() - 3_600_000) })
+  await ensureYt()
+  check('7 판이 바뀜(18채널 판 → 33채널 판) → 1시간 전 것이어도 바로 새로 받음 → 33채널', feedAsks().length === 1 && snap().feed?.channels.length === 33 && snap().feedRevision === FEED_REVISION, asked)
+
+  // 판 확인과 데이터 요청 사이에 배포가 바뀜(409) → 서버가 알려 준 판으로 한 번만 다시
+  begin(null)
+  statusRev = REV18
+  await ensureYt()
+  check('판 확인과 받기 사이에 배포가 바뀜 → 409 → 서버가 알려 준 판으로 한 번만 다시 → 33채널', feedAsks().length === 2 && feedAsks()[0].endsWith(`rev=${encodeURIComponent(REV18)}`) && feedAsks()[1].endsWith(`rev=${encodeURIComponent(FEED_REVISION)}`) && snap().feed?.channels.length === 33 && readCache()?.feedRevision === FEED_REVISION, asked)
+
+  // 판을 알 수 없는 곳(함수 없음) → 6시간만 본다(예전 저장본도 6시간 안이면 그대로)
+  begin({ slot: new Date().toISOString().slice(0, 10), feed: feedOf(18, Date.now() - 3_600_000) })
+  statusHtml = true
+  await ensureYt()
+  check('판을 알 수 없으면(함수가 없는 곳) 6시간만 본다 — 1시간 된 저장본 그대로 · 데이터 요청 0', snap().status === 'ready' && snap().feed?.channels.length === 18 && feedAsks().length === 0, asked)
+
+  // 9 [지금 새로 가져오기] — 6시간 안이어도 30분 칸으로 새로
+  begin({ fetchedAt: Date.now() - 60_000, feedRevision: FEED_REVISION, feed: feedOf(33, Date.now() - 60_000) })
+  await ensureYt()
+  await refreshYt()
+  check('9 [지금 새로 가져오기] → 1분 전 것이어도 새로(?bucket=…&rev=…) · 열 때는 받지 않음', feedAsks().length === 1 && /^\?bucket=\d+&rev=/.test(feedAsks()[0]) && snap().feed?.videos[0]?.id !== 'old1' && snap().status === 'ready', asked)
+
+  // 10 저절로 받기 실패 → 지난번 것 그대로 + 받은 때
+  const oldAt = Date.now() - H6 - 3_600_000
+  begin({ fetchedAt: oldAt, feedRevision: FEED_REVISION, feed: feedOf(33, oldAt) })
+  mode = 'quota'
+  await ensureYt()
+  const m = snap().message
+  check('10 6시간 넘은 저장본 + 유튜브 한도 초과 → 빈 화면 아님: 지난번 것 그대로 · "지난번 받은 데이터로 보여드리고 있습니다." · 받은 때', snap().feed?.videos[0]?.id === 'old1' && snap().feed?.channels.length === 33 && m.startsWith('지난번 받은 데이터로 보여드리고 있습니다.') && m.includes(`받은 때 ${kstWhen(oldAt)}`) && m.includes('한도') && snap().status === 'quota', m)
+  mode = 'ok'
+  await ensureYt()
+  check('10 실패 뒤 곧바로 돌아와도 다시 두드리지 않는다(5분 뒤)', feedAsks().length === 1, asked)
+  begin({ fetchedAt: oldAt, feedRevision: FEED_REVISION, feed: feedOf(33, oldAt) })
+  netDown = true
+  await ensureYt()
+  check('10 인터넷이 끊겨도(판 확인도 실패) 지난번 것 그대로 + 받은 때', snap().feed?.videos[0]?.id === 'old1' && snap().message.startsWith('지난번 받은 데이터로 보여드리고 있습니다.') && snap().message.includes('인터넷'), snap().message)
+  begin(null)
+  mode = 'quota'
+  await ensureYt()
+  check('10 지난번 것도 없으면 안내만(지난번 문구 없음)', snap().feed === null && snap().status === 'quota' && !snap().message.includes('지난번 받은'), snap().message)
+  mode = 'ok'
+  check('6시간 판정: 없음 · 6시간 정각 · 판 다름 → 다시 / 5시간 59분 · 판 모름 → 그대로', isStale(null, null) && isStale({ fetchedAt: 0, feedRevision: 'a' }, null, H6) && isStale({ fetchedAt: 0, feedRevision: 'a' }, 'b', 1000) && !isStale({ fetchedAt: 0, feedRevision: 'a' }, 'a', H6 - 60_000) && !isStale({ fetchedAt: 0, feedRevision: '' }, null, 1000))
+
+  globalThis.fetch = ytMock
+  resetYtForTest()
 }
 
 console.log(`\nyoutube: ${passed} passed, ${failed} failed`)
