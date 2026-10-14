@@ -131,6 +131,12 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 const ctx = await browser.newContext({ locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
 const orig = await ctx.newPage()
 const ours = await ctx.newPage()
+// 한 탭에서 계산기 화면을 수십 번 옮기면 시험 브라우저가 쓰레기를 늦게 치워 탭이 죽었다(2026-10-14 · tools 와 같은 까닭).
+// 2초마다 정리한다 — 앱이 아니라 시험 브라우저 문제라 시험 쪽에서 정리한다(e2e/tools.mjs 와 같음).
+for (const pg of [orig, ours]) {
+  const gc = await ctx.newCDPSession(pg)
+  setInterval(() => void gc.send('HeapProfiler.collectGarbage').catch(() => {}), 2000).unref()
+}
 await orig.goto(ORIGINAL)
 await ours.goto(BASE + '/tools/tax', { waitUntil: 'networkidle' })
 await ours.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('axmvp.tax.')).forEach((k) => localStorage.removeItem(k)))
