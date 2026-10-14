@@ -32,6 +32,10 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
   const page = await ctx.newPage()
+  // 한 탭에서 화면을 110번 넘게 옮기면 시험 브라우저가 쓰레기를 늦게 치워(힙 200MB) 탭이 죽었다(2026-10-14 · main 도 같음).
+  // 2초마다 정리하면 힙 12MB 안 · 224개 통과 — 앱 메모리 누수가 아니라 시험 브라우저 문제라 시험 쪽에서 정리한다.
+  const gc = await ctx.newCDPSession(page)
+  setInterval(() => void gc.send('HeapProfiler.collectGarbage').catch(() => {}), 2000).unref()
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
