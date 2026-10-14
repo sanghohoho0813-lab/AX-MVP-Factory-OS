@@ -13,7 +13,11 @@
  * 4) 주제 — 제목을 정규화해 주제 분류표(radarPlaybook)로 묶는다. 신호 A~E:
  *    A 여러 채널 · B 최근 2주 증가 · C 평소보다 잘됨 · D 작은 채널 · E MIRAE 분야. 점수(0~100)를 만들지 않는다 —
  *    '신호 강함 · 보통 · 초기' 세 칸과 그 이유 문장만. 한 채널이 거의 다 올린 주제는 '초기 신호' 까지만(여러 채널 흐름이 아님).
- * 5) 이번 주 후보 — 시장수요 · AX·AI · BRIDGE 를 비중 가이드(기본 45 · 35 · 20)로 섞어 최대 10개. 데이터가 없으면 만들지 않는다.
+ * 5) 이번 주 후보 — 데이터가 센 후보가 먼저(D-195). 비중 가이드(기본 45 · 35 · 20)는 앞 5개에서 한 종류가 몰리지 않게만
+ *    막는다(종류마다 많아야 가이드 몫 + 1개 · 후보가 있으면 적어도 1개) — 4.5 · 3.5 · 2 개를 억지로 맞추지 않는다. 최대 10개 · 데이터가 없으면 만들지 않는다.
+ * 6) 묶음 크기 보정(D-195) — 직접 경쟁 채널이 AI 실무 채널보다 많다. 그래서 '몇 개 채널' 만이 아니라
+ *    '그 묶음 채널 중 몇 곳이 다뤘나'(예: AI 실무 8곳 중 4곳 · 직접 경쟁 18곳 중 5곳)를 같이 보고, 같은 세기면 비율이 높은 쪽이 먼저.
+ *    새 점수(0~100)는 만들지 않는다 — 화면에는 'n곳 중 m곳' 그대로 쓴다.
  */
 import { SHORT_MAX_SEC, extractTopics, periodVideos, type Prepared, type YtChannel, type YtVideo } from './ytBench'
 import { TOPICS, TOPIC_BY_ID, normalizeTitle, topicsOf, type Angle, type ContentAxis, type TopicDef } from './radarPlaybook'
@@ -182,6 +186,8 @@ export interface RadarOptions {
   /** 채널 번호 → 묶음 · 사용 여부(대표가 바꾼 것) */
   overrides?: Readonly<Record<string, { group?: BenchmarkChannelGroup; enabled?: boolean }>>
   mix?: Partial<MixGuide>
+  /** 대표가 [관심 없음] 으로 숨긴 후보(Opportunity.key — '축:주제' 그대로 · D-195) */
+  muted?: readonly string[]
 }
 
 /** 영상마다 평소 · 배수 · 등급 · 주제 · 제목 구조 */
@@ -289,11 +295,48 @@ export interface Cluster {
   reasons: string[]
   /** 이미 '시장 주제 + AI/자동화' 를 함께 다룬 영상 수(BRIDGE 근거) */
   bridgeHits: number
+  /** 묶음마다 '채널 n곳 중 m곳이 다뤘다'(최근 2주 — 2주에 2곳이 안 되면 30일) · 직접 경쟁 · AI 실무 · AX 만 */
+  coverage: GroupCoverage[]
+  coverageDays: 14 | 30
+  /** 가장 촘촘한 묶음의 비율(0~1 · 채널 5곳 넘는 묶음만) — 순서를 정할 때만 쓰고(세 칸으로) 화면에는 'n곳 중 m곳' 으로 쓴다 */
+  density: number
+  densityGroup: BenchmarkChannelGroup | null
 }
+
+export interface GroupCoverage {
+  group: BenchmarkChannelGroup
+  covered: number
+  total: number
+}
+
+/** 화면에 쓰는 짧은 묶음 이름 */
+export const GROUP_SHORT: Record<BenchmarkChannelGroup, string> = { direct: '직접 경쟁', ai: 'AI 실무', ax: 'AX · 자동화', format: '포맷' }
+
+/** '직접 경쟁 채널 18곳 중 6곳' */
+export const coverageLine = (g: GroupCoverage) => `${GROUP_SHORT[g.group]} 채널 ${g.total}곳 중 ${g.covered}곳`
 
 const isBench = (v: RadarVideo) => !v.mine && v.group !== 'format'
 
-function clusterOf(def: TopicDef, all: readonly RadarVideo[]): Cluster | null {
+/** 묶음마다 계산에 쓰는 채널 수(내 채널 · 포맷 · 꺼 둔 채널 빼고 · 받아 온 영상이 있는 채널) */
+function groupTotals(all: readonly RadarVideo[]): Map<BenchmarkChannelGroup, number> {
+  const ids = new Map<BenchmarkChannelGroup, Set<string>>()
+  for (const v of all) {
+    if (!isBench(v)) continue
+    const s = ids.get(v.group) ?? new Set<string>()
+    s.add(v.channelId)
+    ids.set(v.group, s)
+  }
+  return new Map([...ids.entries()].map(([g, s]) => [g, s.size]))
+}
+
+/**
+ * 비율을 순서에 쓰는 묶음 — 채널이 5곳 넘어야(4곳 중 3곳 = 75% 처럼 작은 묶음이 부풀지 않게 · 실제 데이터에서 AX 4곳 묶음이 그랬다).
+ * 비율 자체도 세 칸으로만 비교한다 — 절반 넘게 · 4분의 1 넘게 · 그 아래(작은 차이로 순서가 뒤집히지 않게).
+ */
+const DENSITY_MIN_TOTAL = 5
+export const densityBand = (d: number): 0 | 1 | 2 => (d >= 0.5 ? 2 : d >= 0.25 ? 1 : 0)
+
+function clusterOf(def: TopicDef, all: readonly RadarVideo[], totals: ReadonlyMap<BenchmarkChannelGroup, number> = groupTotals(all)): Cluster | null {
   const rel = all.filter((v) => isBench(v) && v.topics.includes(def.id))
   const hits = rel.filter((v) => v.ageDays <= 30).sort((a, b) => b.publishedAt - a.publishedAt)
   if (hits.length < 2) return null
@@ -340,6 +383,15 @@ function clusterOf(def: TopicDef, all: readonly RadarVideo[]): Cluster | null {
   if (dominant) reasons.push(`대부분 한 채널(${dominant})이 올린 주제 — 여러 채널 흐름은 아직 아닙니다`)
 
   const bridgeHits = def.area === 'market' ? hits.filter((v) => v.topics.some((t) => TOPIC_BY_ID.get(t)?.area !== 'market')).length : 0
+  // 묶음 크기 보정 — 같은 채널이 여러 편 올려도 한 곳으로 센다
+  const coverageDays: 14 | 30 = ch14.size >= 2 ? 14 : 30
+  const win = coverageDays === 14 ? in14 : hits
+  const coverage: GroupCoverage[] = (['direct', 'ai', 'ax'] as const)
+    .map((g) => ({ group: g, covered: new Set(win.filter((v) => v.group === g).map((v) => v.channelId)).size, total: totals.get(g) ?? 0 }))
+    .filter((x) => x.covered > 0)
+    .sort((a, b) => b.covered / Math.max(1, b.total) - a.covered / Math.max(1, a.total))
+  const dense = coverage.filter((x) => x.total >= DENSITY_MIN_TOTAL)
+  const density = dense.length ? dense[0].covered / dense[0].total : 0
   return {
     topicId: def.id,
     label: def.label,
@@ -359,6 +411,10 @@ function clusterOf(def: TopicDef, all: readonly RadarVideo[]): Cluster | null {
     strength,
     reasons,
     bridgeHits,
+    coverage,
+    coverageDays,
+    density,
+    densityGroup: dense[0]?.group ?? null,
   }
 }
 
@@ -368,6 +424,8 @@ const shortSubs = (n: number) => (n >= 10_000 ? `${(n / 10_000).toFixed(n >= 100
 export function clusterOrder(a: Cluster, b: Cluster): number {
   return (
     STRENGTH_ORDER[a.strength] - STRENGTH_ORDER[b.strength] ||
+    // 같은 세기면 '그 묶음 채널 중 얼마나 다뤘나'(절반 넘게 · 4분의 1 넘게 · 그 아래)가 높은 쪽 — 채널이 많은 묶음이라서 앞서지 않게(D-195)
+    densityBand(b.density) - densityBand(a.density) ||
     b.breakouts - a.breakouts ||
     b.channels14 - a.channels14 ||
     b.above - a.above ||
@@ -378,7 +436,8 @@ export function clusterOrder(a: Cluster, b: Cluster): number {
 }
 
 export function clusters(videos: readonly RadarVideo[]): Cluster[] {
-  return TOPICS.map((d) => clusterOf(d, videos))
+  const totals = groupTotals(videos)
+  return TOPICS.map((d) => clusterOf(d, videos, totals))
     .filter((c): c is Cluster => c !== null)
     .sort(clusterOrder)
 }
@@ -397,9 +456,14 @@ export interface Opportunity {
   /** 카드 머리 — BRIDGE 는 '정책자금 × 공고 자동 수집' */
   topic: string
   strength: Strength
+  /** 왜 지금 — 사람이 읽는 한 문장(규칙으로 이어 붙인 것 · D-195 카드 기본 상태) */
+  summary: string
+  /** 핵심 근거 1~2개(카드 기본 상태) — 나머지 숫자는 [근거 보기] 에 다 있다 */
+  facts: string[]
+  /** 근거 문장 전부([근거 보기] · 수첩 · 브리프) */
   whyNow: string[]
   cluster: Cluster
-  /** 대표 벤치마킹 3~5편(터진 것 · 배수 높은 것 먼저) */
+  /** 대표 벤치마킹 0~3편 — 평소보다 잘된 영상만(터진 것 · 배수 높은 것 먼저). 약한 영상으로 칸을 채우지 않는다(D-195) */
   benchmarks: RadarVideo[]
   view: string
   titles: Array<{ text: string; patterns: string[] }>
@@ -433,20 +497,79 @@ export function hotPatterns(videos: readonly RadarVideo[], days = 30): PatternSt
     .sort((a, b) => b.hot - a.hot || b.hotShare - b.baseShare - (a.hotShare - a.baseShare))
 }
 
-function pickBenchmarks(c: Cluster, n = 5): RadarVideo[] {
+/**
+ * 대표 벤치마킹 1~3편(가변) — 그 채널 평소보다 실제로 더 본 영상(평소의 1배 이상)만.
+ * D-195: 실제 데이터에서 3칸을 채우려고 '3일 만에 평소의 0.9배' 영상이 들어갔다 — 좋은 것이 하나면 하나만 보인다.
+ * 순서: 터진 것(3배+) → 잘된 것(2배+) → 평소 넘음 · 같은 등급이면 나이 반영 배수 순 · 먼저 채널마다 한 편, 그다음 두 편까지.
+ */
+export function pickBenchmarks(c: Pick<Cluster, 'hits'>, n = 3): RadarVideo[] {
   const tierRank: Record<VideoTier, number> = { breakout: 0, above: 1, normal: 2, below: 3, unknown: 4 }
-  const sorted = [...c.hits].sort((a, b) => tierRank[a.tier] - tierRank[b.tier] || (b.adjusted ?? 0) - (a.adjusted ?? 0) || b.views - a.views)
+  const good = c.hits.filter((v) => v.ratio !== null && v.ratio >= 1 && v.tier !== 'below' && v.tier !== 'unknown')
+  const sorted = [...good].sort((a, b) => tierRank[a.tier] - tierRank[b.tier] || (b.adjusted ?? 0) - (a.adjusted ?? 0) || b.views - a.views)
   const out: RadarVideo[] = []
   const per = new Map<string, number>()
   const add = (v: RadarVideo) => {
     out.push(v)
     per.set(v.channelId, (per.get(v.channelId) ?? 0) + 1)
   }
-  // 1) 잘된 영상(2배+) — 채널마다 한 편씩 2) 평소 수준까지 — 채널마다 두 편까지 3) 그래도 3편이 안 되면 남은 것
-  for (const v of sorted) if (out.length < n && (v.tier === 'breakout' || v.tier === 'above') && !per.has(v.channelId)) add(v)
-  for (const v of sorted) if (out.length < n && !out.includes(v) && tierRank[v.tier] <= 2 && (per.get(v.channelId) ?? 0) < 2) add(v)
-  for (const v of sorted) if (out.length < 3 && !out.includes(v)) add(v)
+  for (const v of sorted) if (out.length < n && !per.has(v.channelId)) add(v)
+  for (const v of sorted) if (out.length < n && !out.includes(v) && (per.get(v.channelId) ?? 0) < 2) add(v)
   return out
+}
+
+/** 이 주제에서 가장 촘촘한 묶음 — 'AI 실무 채널 8곳 중 4곳' (2곳 넘게 다뤘을 때만) */
+function topCoverage(c: Cluster): GroupCoverage | null {
+  const g = c.coverage.find((x) => x.group === c.densityGroup) ?? c.coverage[0]
+  return g && g.covered >= 2 ? g : null
+}
+
+/** 왜 지금 — 한 문장(규칙). 예: '최근 2주 동안 6개 채널에서 반복해서 다뤘고, 평소보다 크게 터진 영상이 4편 나왔습니다.' */
+function summaryOf(axis: ContentAxis, c: Cluster, label: string, axSignal: Cluster | undefined): string {
+  if (c.dominant) return `대부분 한 채널(${c.dominant})이 올린 주제라 아직 여러 채널 흐름은 아닙니다.`
+  const spread = c.channels14 >= 2 ? `최근 2주 동안 ${c.channels14}개 채널에서 반복해서 다뤘고` : c.channels30 >= 2 ? `최근 30일 동안 ${c.channels30}개 채널에서 다뤘고` : `최근 30일에 관련 영상이 ${c.videos30}편 올라왔고`
+  if (axis === 'bridge') {
+    const tail =
+      c.bridgeHits > 0
+        ? `이미 '${label} + AI · 자동화' 영상이 ${c.bridgeHits}편 나와 우리 AX 이야기를 붙이기 좋습니다`
+        : axSignal && axSignal.strength !== 'early'
+          ? `AI 실무 채널에서는 지금 '${axSignal.label}' 이 오르고 있어 둘을 붙여 말하기 좋은 때입니다`
+          : `'${label} + AI' 를 다룬 영상은 아직 없어 먼저 말할 수 있습니다`
+    return `${spread}, ${tail}.`
+  }
+  const tail =
+    c.breakouts > 0
+      ? `평소보다 크게 터진 영상이 ${c.breakouts}편 나왔습니다`
+      : c.above > 0
+        ? `평소보다 잘된 영상이 ${c.above}편 있습니다`
+        : c.growing
+          ? '그 전 6주보다 빠르게 늘고 있습니다'
+          : '아직 평소보다 크게 터진 영상은 없습니다'
+  return `${spread}, ${tail}.`
+}
+
+/** 핵심 근거 1~2개 — 카드 기본 상태에 보이는 것(나머지는 근거 보기) */
+function factsOf(axis: ContentAxis, c: Cluster, label: string, axSignal: Cluster | undefined): string[] {
+  if (c.dominant) return [`${c.dominant} 혼자 ${c.videos30}편`]
+  const cov = topCoverage(c)
+  const spread = cov ? `${coverageLine(cov)}이 다룸` : `${c.channels14 >= 2 ? c.channels14 : c.channels30}개 채널에서 다룸`
+  const heat =
+    c.breakouts > 0
+      ? `평소보다 터진 영상 ${c.breakouts}편`
+      : c.above > 0
+        ? `평소보다 잘된 영상 ${c.above}편`
+        : c.growing
+          ? `최근 2주 ${c.videos14}편 · 빠르게 늘어남`
+          : `최근 7일 ${c.videos7}편`
+  if (axis === 'bridge') {
+    const why =
+      c.bridgeHits > 0
+        ? `'${label} + AI · 자동화' 영상 ${c.bridgeHits}편`
+        : axSignal && axSignal.strength !== 'early'
+          ? `AI 실무에서 '${axSignal.label}' 상승`
+          : `'${label} + AI' 영상 아직 없음`
+    return [why, spread]
+  }
+  return [spread, heat]
 }
 
 function titlesFor(angle: Angle, hot: readonly PatternStat[]): Array<{ text: string; patterns: string[] }> {
@@ -484,6 +607,8 @@ function opportunity(axis: ContentAxis, c: Cluster, hot: readonly PatternStat[],
     topicId: c.topicId,
     topic: axis === 'bridge' && angle.name ? `${def.label} × ${angle.name}` : def.label,
     strength: c.strength,
+    summary: summaryOf(axis, c, def.label, axSignal),
+    facts: factsOf(axis, c, def.label, axSignal),
     whyNow: whyNow.slice(0, 4),
     cluster: c,
     benchmarks: pickBenchmarks(c),
@@ -506,58 +631,53 @@ export interface RadarPlan {
   clusters: Cluster[]
   hot: PatternStat[]
   mix: MixGuide
+  /** 숨긴 후보 키(화면 '숨긴 주제' 관리용) */
+  muted: string[]
 }
 
 const MAX_PICKS = 10
 
 /**
- * 비중 가이드로 섞기 — 자리마다 '목표 몫 − 이미 뽑은 수' 가 가장 큰 축에서 그 축의 가장 센 후보.
- * 그 축에 후보가 없으면 남은 것 중 가장 센 것. 앞 5개 안에서 초기 신호는 뒤로 · 비중 0 인 축은 맨 뒤.
+ * 이번 주 후보 순서(D-195) — 데이터가 센 후보가 먼저(신호 세기 → 묶음 안 비율 → 터진 영상 수 …, clusterOrder).
+ * 비중 가이드는 '안내' — 앞 5개 안에서만 ① 한 종류가 몰리지 않게(종류마다 많아야 가이드 몫 + 1개: 기본 45 · 35 · 20 → 3 · 3 · 2)
+ * ② 비중을 준 종류에 쓸 만한 후보(초기 신호 아님)가 있으면 적어도 1개. 4.5 · 3.5 · 2 개를 억지로 맞추지 않는다.
+ * 같은 주제가 시장형 · BRIDGE 두 장으로 겹치면 뒤로 · 비중 0 인 종류는 맨 뒤(빈자리 채움).
  */
 export function mixPicks(pools: Record<ContentAxis, Opportunity[]>, mix: MixGuide, max = MAX_PICKS): Opportunity[] {
   const total = mix.market + mix.axai + mix.bridge
   const share: Record<ContentAxis, number> = { market: mix.market / total, axai: mix.axai / total, bridge: mix.bridge / total }
-  const left: Record<ContentAxis, Opportunity[]> = { market: [...pools.market], axai: [...pools.axai], bridge: [...pools.bridge] }
-  const count: Record<ContentAxis, number> = { market: 0, axai: 0, bridge: 0 }
-  const usedTopics = new Set<string>()
-  const out: Opportunity[] = []
   const axes: ContentAxis[] = ['market', 'axai', 'bridge']
-  const takeFrom = (axis: ContentAxis): Opportunity | null => {
-    const list = left[axis]
-    if (list.length === 0) return null
-    // 이미 뽑힌 주제는 피한다(같은 주제가 시장형 · BRIDGE 두 장으로 나오지 않게) — 다 겹치면 그대로
-    let i = list.findIndex((o) => !usedTopics.has(o.topicId))
-    if (i < 0) i = 0
-    return list.splice(i, 1)[0]
+  const FRONT = Math.min(5, max)
+  const cap = (a: ContentAxis) => (share[a] > 0 ? Math.round(share[a] * 5) + 1 : 0)
+  const left = axes.flatMap((a) => pools[a]).sort((x, y) => clusterOrder(x.cluster, y.cluster) || axes.indexOf(x.axis) - axes.indexOf(y.axis))
+  const count: Record<ContentAxis, number> = { market: 0, axai: 0, bridge: 0 }
+  const used = new Set<string>()
+  const out: Opportunity[] = []
+  while (out.length < FRONT && left.length > 0) {
+    const slots = FRONT - out.length
+    // 아직 하나도 없는데 쓸 만한 후보가 남은 종류 — 남은 자리가 그 수만큼이면 그 종류에서만
+    const must = axes.filter((a) => share[a] > 0 && count[a] === 0 && left.some((o) => o.axis === a && o.strength !== 'early'))
+    const ok = (o: Opportunity) => count[o.axis] < cap(o.axis) && (must.length < slots || must.includes(o.axis))
+    let i = left.findIndex((o) => ok(o) && !used.has(o.topicId))
+    if (i < 0) i = left.findIndex(ok)
+    if (i < 0) break
+    const o = left.splice(i, 1)[0]
+    out.push(o)
+    count[o.axis] += 1
+    used.add(o.topicId)
   }
-  while (out.length < max) {
-    const slot = out.length + 1
-    const order = [...axes].filter((a) => share[a] > 0).sort((a, b) => share[b] * slot - count[b] - (share[a] * slot - count[a]))
-    let picked: Opportunity | null = null
-    for (const a of order) {
-      picked = takeFrom(a)
-      if (picked) break
+  const rest: Opportunity[] = []
+  const dup: Opportunity[] = []
+  const zero: Opportunity[] = []
+  for (const o of left) {
+    if (share[o.axis] === 0) zero.push(o)
+    else if (used.has(o.topicId)) dup.push(o)
+    else {
+      rest.push(o)
+      used.add(o.topicId)
     }
-    if (!picked) {
-      // 비중 0 인 축에만 남았으면 그것도 쓴다
-      for (const a of axes) {
-        picked = takeFrom(a)
-        if (picked) break
-      }
-    }
-    if (!picked) break
-    count[picked.axis] += 1
-    usedTopics.add(picked.topicId)
-    out.push(picked)
   }
-  // 순서: 비중 가이드 순서를 지키되 ① 비중 0 인 축(빈자리 채움)은 늘 뒤 ② 초기 신호는 보통 · 강함 뒤로 — 앞 5개 · 나머지 따로
-  const key = (o: Opportunity, i: number) => [share[o.axis] > 0 ? 0 : 1, o.strength === 'early' ? 1 : 0, i]
-  const order = (xs: Opportunity[]) =>
-    xs
-      .map((o, i) => ({ o, k: key(o, i) }))
-      .sort((a, b) => a.k[0] - b.k[0] || a.k[1] - b.k[1] || a.k[2] - b.k[2])
-      .map((x) => x.o)
-  return [...order(out.slice(0, 5)), ...order(out.slice(5))]
+  return [...out, ...rest, ...dup, ...zero].slice(0, max)
 }
 
 /** '지금은 보류' 카드는 맨 뒤로 — 앞 5개(이번 주 찍을 것)는 찍을 만한 것만 */
@@ -581,6 +701,7 @@ export function radarPlan(p: Prepared, opts: RadarOptions = {}, precomputed?: re
   const aiChannels = p.channels.filter((c) => !off.has(c.id) && !c.mine && ['ai', 'ax'].includes(groupOf(c as YtChannel & { group?: unknown }, opts.overrides))).length
   const aiDataShort = aiChannels === 0 || aiax.length === 0
   const axTop = aiax.find((c) => c.strength !== 'early')
+  const muted = new Set(opts.muted ?? [])
   const pools: Record<ContentAxis, Opportunity[]> = {
     market: market.map((c) => opportunity('market', c, hot, undefined)).filter((o): o is Opportunity => o !== null),
     // AI · AX 벤치마킹 채널이 없으면 시장 채널에 섞인 AI 영상 몇 편으로 억지 후보를 만들지 않는다(신호 보통 이상만)
@@ -591,7 +712,9 @@ export function radarPlan(p: Prepared, opts: RadarOptions = {}, precomputed?: re
     // BRIDGE 는 시장 신호가 보통 이상인 주제 먼저(시장 수요가 있어야 다리를 놓는다) — 초기 신호는 뒤로
     bridge: market.map((c) => opportunity('bridge', c, hot, axTop)).filter((o): o is Opportunity => o !== null),
   }
-  return { picks: withHoldsLast(pools, mix), aiDataShort, aiChannels, clusters: cs, hot, mix }
+  // [관심 없음] 으로 숨긴 후보는 뺀다 — 정확히 그 후보(축:주제)만(같은 주제의 다른 축 · 비슷한 낱말은 그대로)
+  for (const a of ['market', 'axai', 'bridge'] as const) pools[a] = pools[a].filter((o) => !muted.has(o.key))
+  return { picks: withHoldsLast(pools, mix), aiDataShort, aiChannels, clusters: cs, hot, mix, muted: [...muted] }
 }
 
 /* ------------------------------------------------------------------ */

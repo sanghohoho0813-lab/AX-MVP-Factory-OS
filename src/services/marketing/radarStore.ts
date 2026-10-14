@@ -2,7 +2,7 @@
  * 콘텐츠 레이더 저장 (D-194) — 새 데이터 시스템을 만들지 않고 기존 모듈 기록(`moduleData`)을 쓴다.
  *
  *  - `marketing/ideas` — 콘텐츠 수첩(아이디어 → 제작 예정 → 대본 준비 → 촬영 완료 → 게시 완료).
- *  - `marketing/radar_prefs` — 채널 묶음 바꿈 · 사용 여부 · 대표가 더한 채널 · 비중 가이드(작업공간마다 한 줄).
+ *  - `marketing/radar_prefs` — 채널 묶음 바꿈 · 사용 여부 · 대표가 더한 채널 · 비중 가이드 · 숨긴 후보(D-195)(작업공간마다 한 줄).
  *  - 작업공간(workspace)마다 따로 — 클라우드는 module_data 표의 RLS(그 작업공간 사람만), 로컬은 사용자별 금고(axmvp.*).
  *    팀장(Pilot) 작업공간과 대표 작업공간은 서로 보이지 않는다(D-163 · qa:isolation 이 표 전체를 본다).
  *  - 영상 제목 · 숫자는 공개된 유튜브 정보만. 대본 · 자막은 저장하지 않는다(이번 단계에서 만들지 않는다).
@@ -87,6 +87,22 @@ export function ideaFromOpportunity(o: Opportunity): Omit<ContentIdea, 'id' | 's
     whyNow: [...o.whyNow],
   }
 }
+
+/**
+ * [이번 주로 확정](D-195) — 새 저장 방식을 만들지 않고 수첩(ContentIdea)에 '제작 예정' 으로 담는다.
+ * 이미 수첩에 있으면 그 줄의 단계만 바꾼다(새 줄을 만들지 않는다). 이미 대본 준비 · 촬영 · 게시까지 갔으면 단계를 되돌리지 않는다.
+ */
+export function confirmInput(o: Opportunity, ideas: readonly ContentIdea[]): { input: Parameters<typeof saveIdea>[1]; existed: boolean; changed: boolean } {
+  const old = ideas.find((i) => i.key === o.key)
+  if (old) {
+    const changed = old.status === 'idea'
+    return { input: { ...old, status: changed ? 'selected' : old.status }, existed: true, changed }
+  }
+  return { input: { ...ideaFromOpportunity(o), status: 'selected' }, existed: false, changed: true }
+}
+
+/** 이번 주 제작 예정(머리에 작게) — 최근 담은 것부터 3개까지 */
+export const selectedIdeas = (ideas: readonly ContentIdea[], n = 3) => ideas.filter((i) => i.status === 'selected').slice(0, n)
 
 export async function listIdeas(workspaceId: string | null): Promise<ContentIdea[]> {
   const rows = await listRows(workspaceId, MODULE, IDEAS)
@@ -181,10 +197,15 @@ export interface RadarPrefs {
   /** 대표가 [채널 추가] 로 더한 채널 — 10곳까지 */
   added: AddedChannel[]
   mix: MixGuide
+  /** [관심 없음] 으로 숨긴 후보 — Opportunity.key('축:주제') 그대로. 정확히 그 후보만 빠진다(D-195) */
+  muted: string[]
 }
 
 export const MAX_ADDED = 10
-export const EMPTY_PREFS: RadarPrefs = { overrides: {}, added: [], mix: normalizeMix(null) }
+export const MAX_MUTED = 60
+export const EMPTY_PREFS: RadarPrefs = { overrides: {}, added: [], mix: normalizeMix(null), muted: [] }
+/** 숨긴 후보 키 — '시장수요 · AX·AI · BRIDGE : 주제 번호' 모양만 */
+const MUTED_KEY = /^(market|axai|bridge):[a-z_]{1,40}$/
 
 const UC = /^UC[\w-]{22}$/
 /** 묶음 바꿈 · 끄기는 받아 온 채널 번호 그대로(예시 채널 'sample_ch_3' 도) — 글자 · 숫자 · _ · - 만 */
@@ -221,7 +242,8 @@ export function normalizePrefs(raw: unknown): RadarPrefs {
       })
     }
   }
-  return { overrides, added, mix: normalizeMix(r.mix as Partial<MixGuide> | undefined) }
+  const muted = Array.isArray(r.muted) ? [...new Set((r.muted as unknown[]).filter((k): k is string => typeof k === 'string' && MUTED_KEY.test(k)))].slice(0, MAX_MUTED) : []
+  return { overrides, added, mix: normalizeMix(r.mix as Partial<MixGuide> | undefined), muted }
 }
 
 /** 작업공간마다 한 줄 — 번호는 작업공간 번호로(클라우드 표의 번호는 모든 작업공간에서 하나여야 한다) */

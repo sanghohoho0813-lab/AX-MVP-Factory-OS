@@ -428,15 +428,42 @@ export const TOPICS: readonly TopicDef[] = [
 export const TOPIC_BY_ID: ReadonlyMap<string, TopicDef> = new Map(TOPICS.map((t) => [t.id, t]))
 
 /**
+ * AI 도구 이름 — ChatGPT · Claude · Gemini 는 서로 다른 것이다(위 표기 합치기에서도 하나로 합치지 않는다).
+ * 상위 개념은 'AI 업무 활용'(ai_work).
+ */
+export const AI_TOOL_TOPICS: readonly string[] = ['chatgpt', 'claude', 'gemini']
+
+/**
+ * 제목이 다루는 AI 도구 — 본문(# 꼬리표 뺀 것)에서 먼저, 본문에 없을 때만 꼬리표에서.
+ * D-195: 실제 데이터에서 'Claude 소넷 5.5 출시! … vs GPT-6 비교' 가 ChatGPT 주제의 대표 영상으로 들어갔다 —
+ * 두 도구 이상을 함께 말하는 제목(비교 · 나열)은 어느 한 도구 주제로 세지 않고 'AI 업무 활용' 으로 센다.
+ */
+export function aiToolsOf(title: string): string[] {
+  const raw = String(title ?? '')
+  const find = (s: string) => {
+    const n = normalizeTitle(s)
+    return AI_TOOL_TOPICS.filter((id) => TOPIC_BY_ID.get(id)?.match.test(n))
+  }
+  const body = find(raw.replace(/#[^\s#]+/g, ' '))
+  return body.length ? body : find((raw.match(/#[^\s#]+/g) ?? []).map((t) => t.slice(1)).join(' '))
+}
+
+/**
  * 제목(정규화 전) → 맞는 주제들. 같은 묶음(parent) 안에서는 먼저 맞은 좁은 주제 하나만 —
  * '고용지원금' 이 맞으면 같은 묶음의 넓은 '지원금' 으로 또 세지 않는다. 'AI 업무 활용' 은 다른 AI 주제가 없을 때만.
+ * AI 도구(ChatGPT · Claude · Gemini)는 그 도구 하나만 말하는 제목일 때만 그 도구 주제 — 둘 이상이면 'AI 업무 활용'.
  */
 export function topicsOf(title: string): string[] {
   const s = normalizeTitle(title)
+  const tools = aiToolsOf(title)
   const out: string[] = []
   const parents = new Set<string>()
   for (const t of TOPICS) {
-    if (!t.match.test(s)) continue
+    if (AI_TOOL_TOPICS.includes(t.id)) {
+      if (!(tools.length === 1 && tools[0] === t.id)) continue
+    } else if (t.id === 'ai_work') {
+      if (!t.match.test(s) && tools.length < 2) continue
+    } else if (!t.match.test(s)) continue
     if (t.id === 'ai_work' && out.some((id) => TOPIC_BY_ID.get(id)?.area === 'ai')) continue
     if (t.id === 'automation' && out.some((id) => TOPIC_BY_ID.get(id)?.area === 'ax')) continue
     // 시장 묶음은 좁은 주제 하나만(지원금 계열 · 세금 계열이 겹쳐 세지지 않게)

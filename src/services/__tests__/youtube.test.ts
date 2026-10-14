@@ -9,7 +9,7 @@
  * 실행: npm run test:youtube
  */
 import handler, { CHANNELS, checkQuery, parseChannelInput, parseDuration, secondsUntilNine } from '../../../api/yt-bench.js'
-import { TOPICS, normalizeTitle, topicsOf } from '../marketing/radarPlaybook'
+import { TOPICS, aiToolsOf, normalizeTitle, topicsOf } from '../marketing/radarPlaybook'
 import {
   breakoutVideos,
   clusterOrder,
@@ -19,13 +19,14 @@ import {
   hotPatterns,
   mixPicks,
   myChannelStats,
+  pickBenchmarks,
   radarPlan,
   radarVideos,
   ratioLine,
   stripChannelTag,
   titlePatterns,
 } from '../marketing/ytRadar'
-import { briefText, ideaFromOpportunity, listIdeas, loadPrefs, normalizeIdea, normalizePrefs, removeIdea, saveIdea, savePrefs } from '../marketing/radarStore'
+import { briefText, confirmInput, ideaFromOpportunity, listIdeas, loadPrefs, normalizeIdea, normalizePrefs, removeIdea, saveIdea, savePrefs, selectedIdeas } from '../marketing/radarStore'
 import {
   boardOf,
   byHour,
@@ -418,6 +419,132 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     check('R12 채널 설정도 작업공간마다 · 잘못된 채널 번호는 버린다', pa.overrides.UCaaaaaaaaaaaaaaaaaaaaaa?.enabled === false && pa.added[0]?.group === 'ax' && Object.keys(pb.overrides).length === 0 && pb.added.length === 0 && Object.keys(normalizePrefs({ overrides: { 'bad id<x>': { enabled: false } } }).overrides).length === 0 && normalizePrefs({ added: [{ id: 'notAnId', title: 'x' }] }).added.length === 0)
     await removeIdea('ws-A', saved.id)
     check('R11 빼기 → 수첩에서 사라진다', (await listIdeas('ws-A')).length === 0)
+  }
+}
+
+/* ---------------- D-195 콘텐츠 레이더 UX 3.0 — 추천 품질 Q1~Q7 · 관심 없음 · 이번 주로 확정 ---------------- */
+{
+  const base = (chId: string, n: number, views: number, d = 600, from = 10) => Array.from({ length: n }, (_, i) => vid(`${chId}_b${i}`, chId, `평범한 이야기 ${chId} ${i}`, (from + i * 3) * D, views + i, d))
+  const aich = (id: string, title: string, group = 'ai') => ({ ...ch(id, title, 9_000, 1), group })
+
+  // Q1 · Q2 · Q3 — ChatGPT · Claude 는 다른 것(상위 'AI 업무 활용')
+  check('Q 정규화: ChatGPT · Claude · Gemini 를 같은 말로 합치지 않는다', (() => {
+    const n = normalizeTitle('챗GPT 클로드 제미나이 비교')
+    return n.includes(' chatgpt ') && n.includes(' claude ') && n.includes(' gemini ') && !normalizeTitle('클로드 써보니').includes('chatgpt') && !normalizeTitle('챗지피티 써보니').includes('claude')
+  })())
+  check('Q 한 도구만 말하면 그 도구 주제(ChatGPT → chatgpt · 클로드 → claude)', topicsOf('ChatGPT로 견적서 10분 만에').join() === 'chatgpt' && topicsOf('클로드로 계약서 요약해봤습니다').join() === 'claude', [topicsOf('ChatGPT로 견적서 10분 만에'), topicsOf('클로드로 계약서 요약해봤습니다')])
+  check('Q 두 도구를 함께 말하면(비교 · 나열) 어느 한 도구로 세지 않고 "AI 업무 활용"(실제 데이터: 클로드 소넷 … vs GPT-6 비교)', (() => {
+    const a = topicsOf('클로드 소넷 5.5 출시! 2배 비싼 AI가 진짜 더 좋을까? | 소넷 5.5 vs 오퍼스 5.5 vs GPT-6 Sol 직접 비교')
+    const b = topicsOf('지피티와 클로드 중 더 뛰어난 모델은 누구일까?')
+    return !a.includes('chatgpt') && !a.includes('claude') && a.includes('ai_work') && b.join() === 'ai_work'
+  })(), [topicsOf('클로드 소넷 5.5 출시! 2배 비싼 AI가 진짜 더 좋을까? | 소넷 5.5 vs 오퍼스 5.5 vs GPT-6 Sol 직접 비교'), topicsOf('지피티와 클로드 중 더 뛰어난 모델은 누구일까?')])
+  check('Q 본문이 먼저 · # 꼬리표는 본문에 도구가 없을 때만("클로드로 회의록 #chatgpt" → Claude)', topicsOf('클로드로 회의록 정리 #chatgpt').join() === 'claude' && aiToolsOf('업무 자동화 꿀팁 #claude #chatgpt').length === 2 && !topicsOf('업무 자동화 꿀팁 #claude #chatgpt').includes('claude') && topicsOf('업무 자동화 꿀팁 #claude #chatgpt').includes('ai_work'), topicsOf('업무 자동화 꿀팁 #claude #chatgpt'))
+  {
+    const chs = [aich('g1', '지피티하나'), aich('g2', '지피티둘'), aich('c1', '클로드하나'), aich('c2', '클로드둘'), aich('x1', '둘다채널')]
+    const vids = [
+      ...base('g1', 6, 1_000), ...base('g2', 6, 1_000), ...base('c1', 6, 1_000), ...base('c2', 6, 1_000), ...base('x1', 6, 1_000),
+      vid('g1_t', 'g1', 'ChatGPT로 견적서 만들기', 8 * D, 5_000), vid('g2_t', 'g2', '챗GPT 업무 활용 10가지', 9 * D, 4_000),
+      vid('c1_t', 'c1', '클로드로 계약서 요약', 8 * D, 6_000), vid('c2_t', 'c2', 'Claude 업무에 써보니', 9 * D, 4_500),
+      vid('x1_t', 'x1', '클로드 신모델 출시 vs GPT 직접 비교', 8 * D, 9_000), vid('x1_t2', 'x1', 'ChatGPT와 클로드 중 무엇이 맞을까', 9 * D, 8_000),
+    ]
+    const plan = radarPlan(prepareFeed({ channels: chs, videos: vids }, NOW), { now: NOW })
+    const gpt = plan.clusters.find((c) => c.topicId === 'chatgpt')
+    const cl = plan.clusters.find((c) => c.topicId === 'claude')
+    const work = plan.clusters.find((c) => c.topicId === 'ai_work')
+    const gptOpp = plan.picks.find((o) => o.topicId === 'chatgpt')
+    const clOpp = plan.picks.find((o) => o.topicId === 'claude')
+    check('Q1 ChatGPT 주제 · 대표 영상에 Claude 영상이 없다', !!gpt && gpt.hits.every((v) => !/claude|클로드/i.test(v.title)) && !!gptOpp && gptOpp.benchmarks.length > 0 && gptOpp.benchmarks.every((v) => !/claude|클로드/i.test(v.title)), gpt?.hits.map((v) => v.title))
+    check('Q2 Claude 주제 · 대표 영상에 ChatGPT 영상이 없다', !!cl && cl.hits.every((v) => !/gpt|지피티/i.test(v.title)) && !!clOpp && clOpp.benchmarks.every((v) => !/gpt|지피티/i.test(v.title)), cl?.hits.map((v) => v.title))
+    check('Q3 넓은 "AI 업무 활용" 에는 둘 다 나온 영상이 들어간다', !!work && work.hits.some((v) => v.id === 'x1_t') && work.hits.some((v) => v.id === 'x1_t2'), work?.hits.map((v) => v.title))
+  }
+
+  // Q4 · Q5 — 대표 벤치마킹 1~3편 가변 · 약한 영상(평소의 1배 아래)으로 칸을 채우지 않는다
+  {
+    const chs = [ch('b1', '하나채널', 10_000, 1), ch('b2', '둘채널', 12_000, 1), ch('b3', '셋채널', 15_000, 1)]
+    const vids = [
+      ...base('b1', 6, 1_000), ...base('b2', 6, 1_000), ...base('b3', 6, 1_000),
+      vid('b1_t', 'b1', '정책자금 신청 전에 볼 것', 8 * D, 6_000), // 평소의 6배 — 터짐
+      vid('b2_t', 'b2', '정책자금 떨어지는 이유', 9 * D, 900), // 평소의 0.9배
+      vid('b3_t', 'b3', '정책자금 오픈런 마감', 3 * D, 900), // 3일 만에 평소의 0.9배(실제 데이터에서 칸 채우기로 들어간 꼴)
+    ]
+    const plan = radarPlan(prepareFeed({ channels: chs, videos: vids }, NOW), { now: NOW })
+    const o = plan.picks.find((x) => x.topicId === 'policy_fund')!
+    check('Q4 좋은 영상이 하나면 하나만(항상 3편 아님)', !!o && o.benchmarks.length === 1 && o.benchmarks[0].id === 'b1_t', o?.benchmarks.map((v) => [v.id, v.ratio]))
+    check('Q5 평소의 1배 아래(0.9배) 영상은 칸을 채우려고 넣지 않는다', !!o && o.benchmarks.every((v) => (v.ratio ?? 0) >= 1))
+    const many = radarVideos(prepareFeed({ channels: [ch('m1', 'a', 1, 1), ch('m2', 'b', 1, 1), ch('m3', 'c', 1, 1), ch('m4', 'd', 1, 1)], videos: [...base('m1', 6, 1_000), ...base('m2', 6, 1_000), ...base('m3', 6, 1_000), ...base('m4', 6, 1_000), ...['m1', 'm2', 'm3', 'm4'].map((c, i) => vid(`${c}_t`, c, '정책자금 이야기', (8 + i) * D, 5_000 + i))] }, NOW), { now: NOW })
+    check('Q4 좋은 영상이 많아도 3편까지 · 채널마다 한 편 먼저', pickBenchmarks({ hits: many.filter((v) => v.topics.includes('policy_fund')) }).length === 3 && new Set(pickBenchmarks({ hits: many.filter((v) => v.topics.includes('policy_fund')) }).map((v) => v.channelId)).size === 3)
+  }
+
+  // Q6 — 묶음 크기 보정: 직접 경쟁 19곳 중 5곳 vs AI 실무 8곳 중 4곳 → AI 쪽이 더 촘촘한 신호
+  {
+    const direct = Array.from({ length: 19 }, (_, i) => ch(`d${i}`, `직접${i}`, 50_000, 1))
+    const ai = Array.from({ length: 8 }, (_, i) => aich(`a${i}`, `에이아이${i}`))
+    const vids = [
+      ...direct.flatMap((c) => base(c.id, 5, 1_000)),
+      ...ai.flatMap((c) => base(c.id, 5, 1_000)),
+      ...[0, 1, 2, 3, 4].map((i) => vid(`d${i}_t`, `d${i}`, '정책자금 직접대출 열렸다', (8 + i) * D, i === 0 ? 5_000 : 1_300)),
+      ...[0, 1, 2, 3].map((i) => vid(`a${i}_t`, `a${i}`, '클로드로 업무 정리', (8 + i) * D, i === 0 ? 5_000 : 1_300)),
+    ]
+    const plan = radarPlan(prepareFeed({ channels: [...direct, ...ai], videos: vids }, NOW), { now: NOW })
+    const pf = plan.clusters.find((c) => c.topicId === 'policy_fund')!
+    const cl = plan.clusters.find((c) => c.topicId === 'claude')!
+    check('Q6 묶음마다 "n곳 중 m곳" — 직접 경쟁 19곳 중 5곳 · AI 실무 8곳 중 4곳', pf.coverage.some((g) => g.group === 'direct' && g.covered === 5 && g.total === 19) && cl.coverage.some((g) => g.group === 'ai' && g.covered === 4 && g.total === 8), [pf.coverage, cl.coverage])
+    check('Q6 같은 세기 · 같은 터진 수면 비율이 높은 AI 쪽이 먼저(채널 수가 많다는 이유만으로 시장수요가 앞서지 않음)', pf.strength === cl.strength && pf.breakouts === cl.breakouts && pf.channels14 > cl.channels14 && clusterOrder(cl, pf) < 0 && plan.picks[0].topicId === 'claude', plan.picks.map((o) => o.key))
+    check('Q6 카드 핵심 근거에 "AI 실무 채널 8곳 중 4곳" 이 그대로(점수 0~100 없음)', plan.picks[0].facts.some((f) => f.includes('AI 실무 채널 8곳 중 4곳')) && plan.picks.every((o) => o.facts.every((f) => !/\d+점/.test(f))), plan.picks[0].facts)
+    check('비중 가이드는 안내: 앞 5개에 한 종류가 몰리지 않는다(시장 3 · AX·AI 3 · BRIDGE 2 까지)', ['market', 'axai', 'bridge'].every((a, i) => plan.picks.slice(0, 5).filter((o) => o.axis === a).length <= [3, 3, 2][i]), plan.picks.map((o) => o.axis))
+  }
+
+  // Q7 — 한 채널이 여러 편 올려도 여러 채널 흐름으로 세지 않는다
+  {
+    const chs = [ch('s1', '혼자채널', 10_000, 1), ch('s2', '다른채널', 10_000, 1), ch('s3', '셋째채널', 10_000, 1)]
+    const vids = [...base('s1', 6, 1_000), ...base('s2', 6, 1_000), ...base('s3', 6, 1_000), ...Array.from({ length: 6 }, (_, i) => vid(`s1_${i}`, 's1', `가업승계 이야기 ${i}`, (8 + i) * D, 4_000)), vid('s2_x', 's2', '가업승계 한 편', 9 * D, 1_000)]
+    const su = radarPlan(prepareFeed({ channels: chs, videos: vids }, NOW), { now: NOW }).clusters.find((c) => c.topicId === 'succession')!
+    check('Q7 한 채널 6편 + 다른 채널 1편 → 초기 신호 · 채널 수는 2곳(편수가 아니라 채널)', su.strength === 'early' && su.channels30 === 2 && su.coverage.every((g) => g.covered <= 2) && !!su.dominant, su)
+  }
+
+  // 왜 지금 한 문장 · 핵심 근거 2개
+  {
+    const chs = [ch('w1', 'w하나', 10_000, 1), ch('w2', 'w둘', 10_000, 1), ch('w3', 'w셋', 10_000, 1)]
+    const vids = [...base('w1', 6, 1_000), ...base('w2', 6, 1_000), ...base('w3', 6, 1_000), vid('w1_t', 'w1', '절세 놓치면 손해', 8 * D, 6_000), vid('w2_t', 'w2', '법인세 줄이는 법', 9 * D, 1_200), vid('w3_t', 'w3', '세금 신고 전에 볼 것', 10 * D, 1_300)]
+    const o = radarPlan(prepareFeed({ channels: chs, videos: vids }, NOW), { now: NOW }).picks[0]
+    check('U5 왜 지금 = 사람이 읽는 한 문장(규칙) — "최근 2주 동안 3개 채널에서 반복해서 다뤘고, 평소보다 크게 터진 영상이 1편 나왔습니다."', o.summary === '최근 2주 동안 3개 채널에서 반복해서 다뤘고, 평소보다 크게 터진 영상이 1편 나왔습니다.', o.summary)
+    check('U5 핵심 근거는 2개까지 · 나머지 숫자는 근거(whyNow · cluster)에 그대로', o.facts.length >= 1 && o.facts.length <= 2 && o.whyNow.length >= 2 && o.cluster.videos30 === 3, o.facts)
+  }
+
+  // U10 · U11 — 관심 없음 · 숨긴 주제 되살리기(정확히 그 후보만)
+  {
+    const chs = [ch('p1', '정책하나', 10_000, 1), ch('p2', '정책둘', 12_000, 1), ch('p3', '정책셋', 15_000, 1), { ...ch('ai1', '에이아이하나', 8_000, 1), group: 'ai' }, { ...ch('ai2', '에이아이둘', 9_000, 1), group: 'ai' }]
+    const vids = [
+      ...base('p1', 6, 1_000), ...base('p2', 6, 1_000), ...base('p3', 6, 1_000), ...base('ai1', 6, 1_000), ...base('ai2', 6, 1_000),
+      vid('p1_t', 'p1', '지원사업 선정되는 사업계획서', 8 * D, 5_000), vid('p2_t', 'p2', '정부지원사업 공고 정리', 9 * D, 1_200), vid('p3_t', 'p3', '지원사업 떨어지는 이유', 10 * D, 1_300),
+      vid('ai1_t', 'ai1', 'Claude로 보고서 써봤습니다', 8 * D, 6_000), vid('ai2_t', 'ai2', 'Claude 업무에 써보니', 9 * D, 1_500),
+    ]
+    const p = prepareFeed({ channels: chs, videos: vids }, NOW)
+    const all = radarPlan(p, { now: NOW })
+    const muted = radarPlan(p, { now: NOW, muted: ['market:grant_program'] })
+    check('U10 관심 없음 → 그 후보는 다음 추천에서 빠진다', all.picks.some((o) => o.key === 'market:grant_program') && !muted.picks.some((o) => o.key === 'market:grant_program') && muted.muted.includes('market:grant_program'))
+    check('U10 정확히 그 후보만 — 같은 주제의 BRIDGE · 다른 주제(Claude)는 그대로', muted.picks.some((o) => o.key === 'bridge:grant_program') && muted.picks.some((o) => o.topicId === 'claude'), muted.picks.map((o) => o.key))
+    check('U11 숨긴 주제 되살리기(목록에서 빼면 다시 나온다)', radarPlan(p, { now: NOW, muted: [] }).picks.some((o) => o.key === 'market:grant_program'))
+    const np = normalizePrefs({ muted: ['market:grant_program', 'market:grant_program', '<script>', 'axai:claude', 'weird:x', 42] })
+    check('U11 숨긴 후보 저장 모양 — 겹침 · 이상한 값은 버림 · 예전 기록(muted 없음)은 빈 목록', np.muted.join() === 'market:grant_program,axai:claude' && normalizePrefs({}).muted.length === 0)
+    await savePrefs('ws-M', { ...normalizePrefs({}), muted: ['axai:claude'] })
+    check('U11 숨긴 후보도 작업공간마다(다른 작업공간에는 없음)', (await loadPrefs('ws-M')).muted.join() === 'axai:claude' && (await loadPrefs('ws-N')).muted.length === 0)
+
+    // U8 · U9 — 이번 주로 확정 = 수첩에 '제작 예정' · 이미 있으면 줄을 새로 만들지 않는다
+    const o = all.picks[0]
+    const c1 = confirmInput(o, [])
+    const saved = await saveIdea('ws-C', c1.input)
+    check('U8 이번 주로 확정 → 기존 수첩(ContentIdea)에 단계 "제작 예정"(selected)', !c1.existed && saved.status === 'selected' && saved.key === o.key && (await listIdeas('ws-C')).length === 1)
+    const back = await listIdeas('ws-C')
+    await saveIdea('ws-C', { ...back[0], status: 'idea' })
+    const c2 = confirmInput(o, await listIdeas('ws-C'))
+    await saveIdea('ws-C', c2.input)
+    const after = await listIdeas('ws-C')
+    check('U9 이미 담긴 아이디어면 줄을 새로 만들지 않고 단계만 바꾼다', c2.existed && c2.changed && after.length === 1 && after[0].id === saved.id && after[0].status === 'selected', after.map((i) => [i.id, i.status]))
+    await saveIdea('ws-C', { ...after[0], status: 'filmed' })
+    const c3 = confirmInput(o, await listIdeas('ws-C'))
+    check('U9 이미 촬영까지 간 것은 단계를 되돌리지 않는다', c3.existed && !c3.changed && c3.input.status === 'filmed')
+    check('이번 주 제작 예정 줄: 제작 예정만 · 3개까지', selectedIdeas([{ ...after[0], status: 'selected' }, { ...after[0], id: 'b', status: 'idea' }, { ...after[0], id: 'c', status: 'selected' }, { ...after[0], id: 'd', status: 'selected' }, { ...after[0], id: 'e', status: 'selected' }]).length === 3)
   }
 }
 
