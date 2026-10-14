@@ -201,7 +201,7 @@ globalThis.fetch = (async (input: string | URL) => {
   const sp = u.searchParams
   if (path === 'channels' && sp.get('forHandle')) {
     const h = sp.get('forHandle')!
-    return json(200, h === '@세무사' ? { items: [] } : { items: [{ id: `UC_${h.replace('@', '')}` }] })
+    return json(200, h === '@사장노트' ? { items: [] } : { items: [{ id: `UC_${h.replace('@', '')}` }] })
   }
   if (path === 'channels' && sp.get('forUsername')) return json(200, { items: [] })
   if (path === 'channels' && sp.get('id')) {
@@ -239,11 +239,12 @@ globalThis.fetch = (async (input: string | URL) => {
   const ok = await call(`?slot=${slot}`)
   const body = ok.body as { channels: YtChannel[]; videos: YtVideoRaw[]; failed: string[]; units: number; fetchedAt: string }
   check('서버: 200 · 채널 19곳(1곳 못 찾음) · 영상 50편씩', ok.code === 200 && body.channels.length === 19 && body.videos.length === 19 * 50, { code: ok.code, ch: body.channels?.length, v: body.videos?.length })
-  check('서버: 못 받은 채널 이름을 같이 보낸다(@세무사)', body.failed.join() === '@세무사')
-  check('서버: 내 채널 표시(@김팀장의경영노트) · 핸들 · 숫자', body.channels[0].mine && body.channels[0].handle === '@김팀장의경영노트' && body.channels[0].subs === 12000 && body.channels.filter((c) => c.mine).length === 1)
+  check('서버: 못 받은 채널 이름을 같이 보낸다(@사장노트 — 유튜브에 그 주소가 없음)', body.failed.join() === '@사장노트', body.failed)
+  check('서버: 내 채널 표시(@김팀장의경영노트 · 채널 번호 UCjXWwM0…) · 핸들 · 숫자', body.channels[0].mine && body.channels[0].id === 'UCjXWwM0_25vl1Mpr2Pc5amQ' && body.channels[0].handle === '@김팀장의경영노트' && body.channels[0].subs === 12000 && body.channels.filter((c) => c.mine).length === 1)
+  check('채널 목록: 20곳 · 번호 없는 곳은 @사장노트 하나 · 번호가 겹치지 않음', CHANNELS.length === 20 && CHANNELS.filter((c) => !c.id).map((c) => c.handle).join() === '@사장노트' && new Set(CHANNELS.filter((c) => c.id).map((c) => c.id)).size === 19)
   check('서버: 영상 칸 — 길이(초) · 조회수 숫자', body.videos[0].d === 45 && body.videos[1].d === 723 && body.videos[0].v === 1000 && typeof body.videos[0].at === 'string')
   check('서버: 응답 어디에도 키 값이 없다', !JSON.stringify(ok.body).includes(KEYVAL))
-  check('서버: 할당량 약 60단위(채널 정보는 한 번에 묶음)', body.units === calls.length && body.units <= 62 && calls.filter((c) => c.startsWith('channels?part,id')).length === 1, { units: body.units, calls: calls.length })
+  check('서버: 할당량 약 40단위(채널 번호로 바로 · 채널 정보는 한 번에 묶음 · 주소로 찾는 건 번호 없는 1곳만)', body.units === calls.length && body.units <= 42 && calls.filter((c) => c.startsWith('channels?part,id')).length === 1 && calls.filter((c) => c.includes('forHandle')).length === 1, { units: body.units, calls: calls.length })
   const maxAge = Number(/s-maxage=(\d+)/.exec(ok.headers['cache-control'] ?? '')?.[1] ?? -1)
   check('서버: 하루 칸은 다음 아침 9시까지 캐시', Math.abs(maxAge - secondsUntilNine()) <= 2, ok.headers['cache-control'])
   const fr = await call(`?bucket=${bucket}`)

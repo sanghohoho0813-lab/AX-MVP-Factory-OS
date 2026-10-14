@@ -4,7 +4,7 @@
  * 대표가 예전에 만든 '김팀장 벤치마킹 대시보드'(Streamlit) 의 수집 부분(youtube_api.py)을 옮긴 것.
  *  - 유튜브 키는 서버 환경변수에서만 읽는다(브라우저 · git · 번들에 넣지 않는다). 응답에 키를 싣지 않는다.
  *  - 정해 둔 채널 20곳(내 채널 1 + 벤치마킹 19)의 정보 + 채널마다 최근 영상 50편.
- *  - 쓰는 할당량: 한 번에 약 60단위(하루 무료 10,000단위의 0.6%) — 예전 앱보다 채널 정보를 한 번에 묶어 부른다.
+ *  - 쓰는 할당량: 한 번에 약 40단위(하루 무료 10,000단위의 0.4%) — 채널 번호로 바로 부르고 채널 정보는 한 번에 묶는다.
  *  - 매일 아침 9시(한국 시간)까지 Vercel 캐시에 둔다(?slot=오늘) → 9시가 지나면 처음 여는 순간 새로 받는다.
  *  - [지금 새로 가져오기] 는 ?bucket=30분 칸 — 같은 30분 안에서는 몇 번을 눌러도 한 번만 유튜브를 부른다
  *    (아무나 주소를 두드려 하루 할당량을 다 쓰지 못하게). 정해 둔 칸 · 값 말고는 받지 않는다(400).
@@ -20,28 +20,33 @@ const PER_CHANNEL = 50
 const BUCKET_MS = 30 * 60_000
 const POOL = 6
 
-/** 내 채널 1 + 벤치마킹 19 — 예전 앱 그대로(youtube_api.py CHANNELS) */
+/**
+ * 내 채널 1 + 벤치마킹 19 — 예전 앱(youtube_api.py CHANNELS) 그대로.
+ * 2026-10-14: 핸들(@주소)은 채널이 바꾸면 끊긴다 — 바뀌지 않는 채널 번호(id)로 부른다. handle 은 화면 · '못 받은 채널' 이름표.
+ *  - @엘아이파트너스여팀장 → 지금 주소 @정책자금해답사여팀장(같은 채널 · 주소만 바뀜)
+ *  - @사장노트 는 유튜브에 그 주소가 없다(404) — 대표 확인 전까지 '못 받은 채널' 로 남긴다
+ */
 export const CHANNELS = [
-  { handle: '@김팀장의경영노트', mine: true },
-  { id: 'UCnnqB7SaH8o-NHLonSFfE3A' },
-  { handle: '@소상공인도우미' },
-  { handle: '@onetop-1' },
-  { handle: '@엘아이파트너스여팀장' },
-  { handle: '@giupinfo' },
-  { handle: '@jeongel' },
-  { handle: '@kstartuptv' },
-  { handle: '@richceo' },
-  { handle: '@businesshelperJo' },
-  { handle: '@bogopatv' },
-  { handle: '@money_recipe' },
-  { handle: '@사장님성장솔루션' },
-  { handle: '@사장노트' },
-  { handle: '@슬기로운정책지원' },
-  { handle: '@rodemtax' },
-  { handle: '@nicetax' },
-  { handle: '@세금전문회계사김희연' },
-  { handle: '@dowssem' },
-  { handle: '@세무사' },
+  { id: 'UCjXWwM0_25vl1Mpr2Pc5amQ', handle: '@김팀장의경영노트', mine: true }, // 김팀장의 경영노트
+  { id: 'UCnnqB7SaH8o-NHLonSFfE3A' }, // 여의도 정보맨(예전 앱도 번호로만 적혀 있었다)
+  { id: 'UC5EQkCVDppT_5B9X7i6TIWg', handle: '@소상공인도우미' }, // 소상공인 도우미 | 정책원
+  { id: 'UCaiqXSUrOib0SZjBIvXTzjw', handle: '@onetop-1' }, // ONETOP_경영컨설팅
+  { id: 'UCkA6KFq2mI76yexZAqX8dDA', handle: '@정책자금해답사여팀장' }, // 여팀장 여바른 l 정책자금 l 엘아이파트너스 (예전 주소 @엘아이파트너스여팀장)
+  { id: 'UCgq3pl1WHBorKFlu4yBr1TQ', handle: '@giupinfo' }, // 기업꿀정보TV
+  { id: 'UCOsUUoxhs69bPAi1N03D9Og', handle: '@jeongel' }, // 정엘 가업승계 연구소
+  { id: 'UC_IJ2OlHt3dS7uuEHu3Dvhw', handle: '@kstartuptv' }, // 스타트업TV
+  { id: 'UCb1KRnbtUYVb1thGLOtBEAQ', handle: '@richceo' }, // 부자사장연구소
+  { id: 'UC73RuX0YCYWBJoDHMCnfNIQ', handle: '@businesshelperJo' }, // 비즈니스헬퍼
+  { id: 'UC4-jNRLcNNcPHG864icJcKQ', handle: '@bogopatv' }, // 보고파TV
+  { id: 'UC3kRdLEVPaFmr3obvmNafNA', handle: '@money_recipe' }, // 머니해결사 정대표
+  { id: 'UCX_Jg2GJWeSy2jGd7M0bRlQ', handle: '@사장님성장솔루션' }, // 준쌤 l 사장님성장솔루션
+  { handle: '@사장노트' }, // 유튜브에 이 주소가 없음(2026-10-14 확인) — 맞는 채널을 대표에게 묻는 중
+  { id: 'UCgHvFTVYFo-oWV6vu7it1PQ', handle: '@슬기로운정책지원' }, // 슬기로운 정책지원
+  { id: 'UCO6JRTAtKstRDZww8qGUcxg', handle: '@rodemtax' }, // 로뎀세무법인
+  { id: 'UCSYUQrcXUnRuvqBdqDlT74g', handle: '@nicetax' }, // 이상화세무사의 모래세무
+  { id: 'UC2ByczqyZtt0Lj2DCkQuXJA', handle: '@세금전문회계사김희연' }, // 절세미녀 김희연 회계사
+  { id: 'UCOrN9I5NyZ7ZQWW30togg-w', handle: '@dowssem' }, // 도혜연세무사ㅣ자본거래 & 가업승계 전문세무사
+  { id: 'UCFSVU2_P0L2n21_d2J-ZQ2Q', handle: '@세무사' }, // 이상호 세무사 씽크택스 전국민세금학교
 ]
 
 function keyFromEnv() {
