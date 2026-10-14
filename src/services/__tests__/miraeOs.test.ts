@@ -217,8 +217,9 @@ check('modules: AX STUDIO 는 전문 모듈의 분야 한 줄(D-127) — 안의 
   check('메뉴: 오늘 · 확인할 것(D-158) · 일정이 한 묶음', inGroup('today').join() === 'today,decide,calendar')
   check('메뉴: 특허·MVP → 기술사업화 · 지원사업 알림 → 기업성장 줄 아래(D-163) · 자금·지원사업 · 기관 전략은 숨김(D-167), 모듈 전체가 맨 끝 (D-127) · 검토중 도구가 없으면 도입 검토중 줄도 없다 (D-118)',
     MODULES.find((m) => m.key === 'consulting-studio')?.parent === 'cat-tech-biz' && !MODULES.some((m) => m.key === 'funding' || m.key === 'institutions') && MODULES.find((m) => m.key === 'grants')?.parent === 'cat-growth' && MODULES.find((m) => m.key === 'grants')?.group === 'modules' && !MODULES.some((m) => m.key === 'cat-gov-support') && inGroup('modules').slice(-1).join() === 'tools' && !inGroup('modules').includes('tools-review'), inGroup('modules').join())
-  check('메뉴: 영업 묶음 = 영업 관리(D-114) · 영업자 정산 · 매출 · 비용(D-142) · 1차 미팅 체크리스트(준비 중) — 지원사업 알림은 기업성장으로(D-163)',
-    inGroup('sales').join() === 'sales,agents,money,marketing,first-meeting' && MODULES.find((m) => m.key === 'marketing')?.status === 'soon' && MODULES.find((m) => m.key === 'first-meeting')?.status === 'soon', inGroup('sales').join())
+  // D-193: 마케팅 · 브랜딩은 유튜브 벤치마킹이 들어와 '준비 중' 이 아니다
+  check('메뉴: 영업 묶음 = 영업 관리(D-114) · 영업자 정산 · 매출 · 비용(D-142) · 마케팅(유튜브 벤치마킹 · D-193) · 1차 미팅 체크리스트(준비 중) — 지원사업 알림은 기업성장으로(D-163)',
+    inGroup('sales').join() === 'sales,agents,money,marketing,first-meeting' && MODULES.find((m) => m.key === 'marketing')?.status !== 'soon' && MODULES.find((m) => m.key === 'first-meeting')?.status === 'soon' && moduleForPath('/marketing/youtube')?.key === 'marketing', inGroup('sales').join())
   check('메뉴: 고객 묶음에서 영업자 정산이 빠졌다', !inGroup('clients').includes('agents'))
   check('메뉴(D-185): 처음 사용 가이드는 없앴다 — 이 시스템 맨 위는 기획의도', !MODULES.some((m) => m.key === 'guide' || m.path === '/getting-started') && inGroup('about')[0] === 'why', inGroup('about').join())
   check('메뉴: 향후 확장은 눌러도 이동하지 않고 펼쳐진다', MODULES.find((m) => m.key === 'roadmap')?.expand === 'future-items')

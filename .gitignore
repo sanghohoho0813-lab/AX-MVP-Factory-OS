@@ -40,6 +40,7 @@ dist-ssr
 .client-ops-alerts-out
 .doc-parser-out
 .client-ops-stage2-out
+.youtube-out
 .datamode-out
 .autherrors-out
 .mirae-os-out

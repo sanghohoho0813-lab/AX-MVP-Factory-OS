@@ -2,9 +2,13 @@
  * 마케팅 · 브랜딩 (D-169) — 도입 예정. 가입한 컨설턴트가 OS 안에서 블로그 · 유튜브 · SNS 까지 하게 될 자리.
  * 지금은 무엇이 들어올지 안내만 한다(아무것도 밖으로 보내지 않는다).
  * D-171 대표: 유튜브는 가로 영상, 릴스 · 쇼츠는 세로 영상으로 나누고, 카드마다 맞는 색 아이콘.
+ * D-193: 맨 위에 '지금 바로 쓸 수 있어요' — 유튜브 벤치마킹(대표가 예전에 만든 대시보드를 옮김). 도입 예정 카드는 그대로.
  */
-import { Images, Megaphone, MonitorPlay, PenLine, Smartphone } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ArrowRight, BarChart3, Images, Megaphone, MonitorPlay, PenLine, Smartphone } from 'lucide-react'
 import { Badge, ScreenTitle } from '../components/ui/primitives'
+import { HintTip } from '../components/ui/fold'
+import { hintFor } from '../content/sectionHints'
 
 const PLANNED = [
   { icon: PenLine, tone: 'bg-green-50 text-green-700 ring-green-200', title: '블로그 글', text: '컨설팅 사례 · 제도 소식을 블로그 글로 쓰고 올리기' },
@@ -17,8 +21,33 @@ const PLANNED = [
 export default function MarketingSoonPage() {
   return (
     <div className="flex max-w-3xl flex-col gap-5">
-      <ScreenTitle title="마케팅 · 브랜딩" sub="도입 예정 — 이 OS 안에서 내 마케팅까지 합니다" />
-      <ul className="grid gap-3 sm:grid-cols-2" data-testid="marketing-planned">
+      <ScreenTitle title="마케팅 · 브랜딩" sub="이 OS 안에서 내 마케팅까지 합니다" />
+      <section className="flex flex-col gap-2" data-testid="marketing-live">
+        <HintTip tip={hintFor('지금 바로 쓸 수 있어요')} label="지금 바로 쓸 수 있어요">
+          <h2 className="t-section text-slate-900">지금 바로 쓸 수 있어요</h2>
+        </HintTip>
+        <Link
+          to="/marketing/youtube"
+          data-testid="marketing-youtube"
+          className="tap group flex gap-3 rounded-(--radius-panel) border-2 border-red-200 bg-gradient-to-br from-red-50 via-white to-white p-4 hover:border-red-400"
+        >
+          <span aria-hidden="true" className="flex size-12 shrink-0 items-center justify-center rounded-(--radius-control) bg-red-600 text-white">
+            <BarChart3 className="size-6" />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col gap-1">
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="t-card font-bold break-keep text-slate-900">유튜브 벤치마킹</span>
+              <Badge tone="success">바로 쓰기</Badge>
+            </span>
+            <span className="t-sub break-keep text-slate-600">벤치마킹 채널 20곳의 인기 영상 · 키워드 · 주목 주제 · 올리기 좋은 요일과 시간</span>
+          </span>
+          <ArrowRight aria-hidden="true" className="size-5 shrink-0 self-center text-red-500 group-hover:translate-x-0.5" />
+        </Link>
+      </section>
+      <HintTip tip={hintFor('도입 예정')} label="도입 예정">
+        <h2 className="t-section text-slate-900">도입 예정</h2>
+      </HintTip>
+      <ul className="-mt-2 grid gap-3 sm:grid-cols-2" data-testid="marketing-planned">
         {PLANNED.map((x) => (
           <li key={x.title} className="flex gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4">
             <span aria-hidden="true" className={`flex size-11 shrink-0 items-center justify-center rounded-(--radius-control) ring-1 ${x.tone}`}>

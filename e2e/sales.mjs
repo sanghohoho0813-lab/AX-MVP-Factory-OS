@@ -569,6 +569,7 @@ for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
   await page.waitForTimeout(300)
   check(`출시 예정(${tag}): 누르면 그 상품의 기간 · 상품표 설명`, page.url().endsWith('/upcoming/job-invention') && /임직원 발명에 대한 보상 규정/.test(await page.getByTestId('upcoming-desc').innerText()))
   await page.goto(BASE + '/marketing', { waitUntil: 'networkidle' })
+  check(`마케팅 · 브랜딩(${tag}): 맨 위 '유튜브 벤치마킹' 바로 쓰기(D-193)`, (await page.getByTestId('marketing-youtube').count()) === 1 && ((await page.getByTestId('marketing-youtube').getAttribute('href')) ?? '').endsWith('/marketing/youtube'))
   check(`마케팅 · 브랜딩(${tag}): 도입 예정 안내`, (await page.getByTestId('marketing-planned').locator('li').count()) === 5 && (await page.getByTestId('marketing-planned').innerText()).includes('릴스 · 쇼츠 (세로 영상)') && (await page.getByTestId('marketing-planned').innerText()).includes('유튜브 (가로 영상)'))
   await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
   await page.getByTestId('ai-client-assistant').click()
@@ -578,7 +579,8 @@ for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
   if (tag === 'PC') {
     await page.keyboard.press('Escape')
     const nav = page.locator('aside nav')
-    check('메뉴: 영업 묶음에 마케팅 · 브랜딩(준비 중)', /준비 중/.test(await nav.getByRole('link', { name: /마케팅 · 브랜딩/ }).innerText()))
+    // D-193: 유튜브 벤치마킹이 들어와 '준비 중' 을 뗐다
+    check('메뉴: 영업 묶음에 마케팅 · 브랜딩(준비 중 아님 — D-193)', !/준비 중/.test(await nav.getByRole('link', { name: /마케팅 · 브랜딩/ }).innerText()))
     const up = nav.getByRole('button', { name: /출시 예정/ }).first()
     if ((await up.getAttribute('aria-expanded')) !== 'true') await up.click()
     await page.waitForTimeout(200)
