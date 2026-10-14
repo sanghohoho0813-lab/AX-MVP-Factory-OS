@@ -15,7 +15,9 @@
  *   채널 네 묶음(끄기 · 채널 추가는 로그인한 OS 에서만) · 분석(내 채널 · 제목 구조) · 금지 문구 0 · LLM 주소 0 · 유튜브 키 번들 0 ·
  *   휴대폰 360 · 390 · 430 넘침 0 · 누르는 곳 44px · 인기 영상은 휴대폰에서 한 줄 목록
  */
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 import { seedScript } from './seed.mjs'
 
@@ -371,8 +373,10 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
   check('분석: 이번 달 잘된 제목 구조(접힘 · 한 줄 요약)', (await page.getByTestId('radar-patterns').count()) === 1)
 
   // R13 · R14 — 번들 검사
-  const dist = new URL('../dist/assets/', import.meta.url)
-  const js = readdirSync(dist).filter((f) => f.endsWith('.js')).map((f) => readFileSync(new URL(f, dist), 'utf8')).join('\n')
+  // 게이트는 시험 파일을 e2e/.gate/ 로 떠서 돌린다 — 번들은 저장소 맨 위(dist/)에서 찾는다
+  const distDir = [join(process.cwd(), 'dist', 'assets'), fileURLToPath(new URL('../dist/assets/', import.meta.url))].find((d) => existsSync(d))
+  const js = distDir ? readdirSync(distDir).filter((f) => f.endsWith('.js')).map((f) => readFileSync(join(distDir, f), 'utf8')).join('\n') : ''
+  check('번들 찾음(dist/assets)', js.length > 0, distDir)
   const LLM = ['api.openai.com', 'api.anthropic.com', 'generativelanguage.googleapis.com', 'chat/completions', '/v1/messages']
   check('R13 LLM 호출 0: 번들에 OpenAI · Claude · Gemini API 주소가 없다 · 화면이 바깥(유튜브 썸네일 말고)을 부르지 않는다', LLM.every((h) => !js.includes(h)) && outside.length === 0, [LLM.filter((h) => js.includes(h)), outside.slice(0, 3)])
   check('R14 유튜브 키 번들 0: 구글 API 키 모양(AIza…) 없음 · googleapis 유튜브 주소 없음(서버만 부름)', !/AIza[0-9A-Za-z_-]{35}/.test(js) && !js.includes('googleapis.com/youtube'))
