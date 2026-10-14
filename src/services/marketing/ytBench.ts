@@ -32,6 +32,8 @@ export interface YtChannel {
   /** D-194: 서버가 붙여 보내는 묶음(direct · ai · ax · format) · 메모 */
   group?: string
   note?: string
+  /** D-197: 대표가 [채널 추가] 로 더한 채널(기본 벤치마킹이 아님) — 화면에서만 붙인다 */
+  added?: boolean
 }
 
 /** 서버가 보내는 영상 한 편(칸 이름을 줄였다 — 1,000편을 보내므로) */

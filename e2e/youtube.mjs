@@ -444,6 +444,112 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
   await ctx.close()
 }
 
+/* ---------------- D-197 경제 · 경영 · AI 집중 · 사이드 급상승 · 기본/내 추가 채널 ---------------- */
+const nch = (id, title, subs, group, note) => ({ ...gch(id, title, subs, group), note })
+const FOCUS = {
+  fetchedAt: new Date(NOW - H).toISOString(),
+  channels: [
+    { ...gch('UCme', '김팀장의 경영노트', 8_000, 'direct', true), note: '내 채널 — 벤치마킹과 견줄 기준' },
+    nch('UCd1', '정책 소식 채널', 30_000, 'direct', '정책자금 · 지원사업 소식 — 대표님 관심 주제'),
+    nch('UCd2', '세무 이야기 채널', 120_000, 'direct', '절세 · 세금 신고 — 세금 주제 수요'),
+    nch('UCd3', '경제 읽어주는 채널', 60_000, 'direct', '금리 · 경기 · 부동산 — 경제 흐름'),
+    nch('UCa1', 'AI 실무 하나', 9_000, 'ai', 'Claude · ChatGPT 업무 활용 — 작은 채널'),
+    nch('UCa2', 'AI 실무 둘', 40_000, 'ai', 'AI 도구 실무 후기 — 설명 방식'),
+    nch('UCa3', 'AI 실무 셋', 20_000, 'ai', '새 AI 도구 빠른 후기'),
+    nch('UCx1', '자동화 채널', 20_000, 'ax', '업무자동화 · 사내 시스템'),
+    nch('UCf1', '대담 채널', 500_000, 'format', '전문가 인터뷰 · 대담 포맷 — 구성 참고'),
+    nch('UCo1', '생활 채널', 100_000, 'direct', '생활 · 일상 — 포맷 참고'),
+  ],
+  videos: [
+    ...base('UCme', 8, 300), ...base('UCd1', 8, 3_000), ...base('UCd2', 8, 12_000), ...base('UCd3', 8, 6_000), ...base('UCa1', 8, 900), ...base('UCa2', 8, 4_000), ...base('UCa3', 8, 2_000), ...base('UCx1', 8, 2_000), ...base('UCf1', 8, 50_000), ...base('UCo1', 8, 5_000),
+    // 경제
+    v('e1', 'UCd3', '금리 인하, 중소기업 대출 이자 얼마나 줄까', 4 * D, 20_000), v('e2', 'UCd1', '금리 오르면 정책자금 이자는?', 3 * D, 3_500), v('e3', 'UCd2', '금리 동결, 법인 대출 어떻게', 7 * D, 14_000),
+    v('e4', 'UCd1', '환율 1500원, 수입 원가 이렇게 바뀝니다', 6 * D, 9_000), v('e5', 'UCd2', '사옥을 살까 임대할까', 5 * D, 30_000),
+    // 경영
+    v('b1', 'UCd1', '정책자금 신청 전에 꼭 볼 것', 5 * D, 9_000), v('b2', 'UCd2', '정책자금 떨어지는 회사 특징', 6 * D, 18_000), v('b3', 'UCd3', '정책자금 오픈런 마감 이유', 4 * D, 7_000), v('b4', 'UCd2', '법인세 절세 3가지', 8 * D, 50_000),
+    // AI
+    v('c1', 'UCa1', 'Claude로 보고서 10분 만에', 3 * D, 5_400), v('c2', 'UCa2', 'Claude 업무 활용 실제 후기', 5 * D, 8_000), v('c3', 'UCa3', '클로드 오퍼스 써보니', 4 * D, 4_000),
+    v('g1', 'UCa1', 'ChatGPT 업무 자동화 해봤습니다', 9 * D, 1_000), v('g2', 'UCa2', '챗GPT로 견적서 만들기', 10 * D, 4_000),
+    v('x1', 'UCa2', 'Codex로 사내 도구 만들기', 6 * D, 9_000), v('x2', 'UCa3', '코덱스 실무 후기', 8 * D, 3_000),
+    // 새 AI 이름(분류표 밖) — AI · AX 채널 세 곳
+    v('s1', 'UCa1', 'Spark 써보니 달라진 점', 2 * D, 900), v('s2', 'UCa2', 'Spark 로 회의 정리', 3 * D, 3_000), v('s3', 'UCx1', '새로 나온 Spark 후기', 4 * D, 1_500),
+    // 기타 — 크게 터진 것(사이드) · 평범한 것(어디에도 없음)
+    v('o1', 'UCo1', '다이어트 브이로그 30일 결과', 6 * D, 60_000), v('o2', 'UCd3', '다이어트 브이로그 2주 차', 5 * D, 6_000), v('o3', 'UCo1', '주말 캠핑 다녀왔습니다', 8 * D, 5_100),
+    v('i1', 'UCf1', '앞으로 10년 이렇게 바뀝니다 (김교수 풀버전)', 7 * D, 500_000),
+  ],
+  failed: [],
+}
+const FJSON = JSON.stringify(FOCUS)
+
+for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height: 844, tag: '390', mobile: true }]) {
+  const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, locale: 'ko-KR', ...(vp.mobile ? { isMobile: true, hasTouch: true } : {}) })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  await page.route('https://i.ytimg.com/**', (r) => r.fulfill({ status: 404, body: '' }))
+  await page.route('**/api/yt-bench**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: FJSON }))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(() => localStorage.removeItem('axmvp.fold.all'))
+  await page.goto(BASE + '/marketing/youtube', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  const T = vp.tag
+  const over = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  const tops = await page.evaluate(() => ['radar-top', 'radar-signals', 'radar-side'].map((id) => Math.round((document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect().top ?? -1) + scrollY)))
+  check(`F ${T} 첫 화면 순서: 이번 주 찍을 것 TOP → 경제 · 경영 · AI 시장 신호 → 사이드 급상승`, tops[0] >= 0 && tops[0] < tops[1] && tops[1] < tops[2] && ((await page.locator('#radar-signals-h').innerText()) ?? '').includes('경제 · 경영 · AI 시장 신호'), tops)
+  const domainsOfCards = await page.locator('[data-testid="radar-opp"], [data-testid="radar-opp-compact"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-domain')))
+  check(`F11 ${T} 후보 카드는 모두 경제 · 경영 · AI(기타 없음) · 다이어트 · 캠핑 카드 없음`, domainsOfCards.length >= 3 && domainsOfCards.every((d) => ['economy', 'business', 'ai'].includes(d)) && !/다이어트|캠핑/.test((await page.getByTestId('radar-plan').locator('[data-testid="radar-opp-topic"]').allInnerTexts()).join()), domainsOfCards)
+  const dc = async (d) => Number((await page.getByTestId(`radar-domain-${d}`).getAttribute('data-count')) ?? -1)
+  const econText = (await page.getByTestId('radar-domain-economy').innerText()) ?? ''
+  check(`F1 · F2 ${T} 지금 강한 흐름: 경제(금리 → 중소기업 대출 · 정책자금 금리) · 경영(정책자금) · AI(Claude) 칸이 데이터로 채워짐`, (await dc('economy')) >= 1 && econText.includes('금리') && econText.includes('정책자금 금리') && (await dc('business')) >= 1 && ((await page.getByTestId('radar-domain-business').innerText()) ?? '').includes('정책자금') && (await dc('ai')) >= 1, econText.replace(/\n/g, ' | '))
+  const kws = await page.getByTestId('radar-ai-kw').evaluateAll((els) => els.map((e) => e.getAttribute('data-kw')))
+  const vendors = await page.getByTestId('radar-ai-vendor').evaluateAll((els) => els.map((e) => e.getAttribute('data-vendor')))
+  const aiText = (await page.getByTestId('radar-ai-keywords').innerText()) ?? ''
+  check(`F4 · F5 · F6 · F7 · F10 ${T} AI 핵심 키워드: Claude · ChatGPT · Codex 는 회사별로 따로 / 영상이 없는 Astra · Sol · Gemini 는 칸이 없다 · 점수 없음`, kws.includes('claude') && kws.includes('chatgpt') && kws.includes('codex') && kws.includes('opus') && !kws.includes('astra') && !kws.includes('sol') && !kws.includes('gemini') && vendors.join() === 'openai,anthropic' && !/\d+\s*점/.test(aiText) && aiText.includes('채널'), { kws, vendors })
+  check(`F17 ${T} 새 AI 키워드 후보: Spark(AI · AX 3채널) — 저절로 넣지 않는다는 말`, ((await page.getByTestId('radar-ai-new').innerText()) ?? '').includes('Spark') && ((await page.getByTestId('radar-ai-new').innerText()) ?? '').includes('저절로 넣지 않습니다'))
+  const sideTitles = (await page.getByTestId('radar-side-row').allInnerTexts()).join(' | ')
+  check(`F12 · F14 ${T} 사이드 급상승: 다이어트(평소의 12배) · 전문가 인터뷰(10배 · "전문가 인터뷰" 꼬리표) · 포맷 참고 문장`, (await page.getByTestId('radar-side-row').count()) === 2 && sideTitles.includes('다이어트') && sideTitles.includes('풀버전') && (await page.locator('[data-testid="radar-side-format"][data-format="interview"]').count()) === 1 && (await page.getByTestId('radar-side-notes').count()) === 2, sideTitles)
+  check(`F13 ${T} 평범한 기타 영상(캠핑)은 사이드 · 메인 신호 어디에도 없다 · Spark 영상도 사이드에 없음`, !sideTitles.includes('캠핑') && !sideTitles.includes('Spark') && !((await page.getByTestId('radar-signals').innerText()) ?? '').includes('캠핑'))
+  const size = await page.evaluate(() => {
+    const f = (s) => parseFloat(getComputedStyle(document.querySelector(s)).fontSize)
+    const h = (s) => document.querySelector(s)?.getBoundingClientRect().height ?? 0
+    return { plan: f('#radar-plan-h'), signals: f('#radar-signals-h'), side: f('#radar-side-h'), hero: h('[data-testid="radar-opp"][data-size="hero"]'), sideBox: h('[data-testid="radar-side"]') }
+  })
+  check(`${T} SIDE 가 TOP 보다 커 보이지 않는다: 제목 글자 TOP > 시장 신호 > 사이드 · 사이드 칸 높이 < 1순위 카드`, size.plan > size.signals && size.signals > size.side && size.sideBox < size.hero, size)
+  // 왜 추천됐나요
+  const hero = page.locator('[data-testid="radar-opp"][data-size="hero"]')
+  await hero.getByTestId('radar-why-rec').click()
+  await page.waitForTimeout(200)
+  const whyItems = await hero.getByTestId('radar-why-item').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-id')}:${e.getAttribute('data-met')}`))
+  check(`${T} [왜 추천됐나요?] → 다섯 가지 맞음/아님(여러 채널 · 평소보다 잘됨 · 늘어남 · 작은 채널 · 경제·경영·AI) · 점수 없음`, whyItems.length === 5 && whyItems[4] === 'domain:1' && !/\d+\s*점/.test((await hero.getByTestId('radar-why-panel').innerText()) ?? ''), whyItems)
+  await hero.getByTestId('radar-why-rec').click()
+  await page.getByTestId('radar-mix').click()
+  await page.waitForTimeout(200)
+  const crit = (await page.getByTestId('radar-criteria-list').innerText()) ?? ''
+  check(`${T} 추천 기준: 여러 채널 반복 · 평소보다 잘됨 · 늘어남 · 작은 채널 · 경제·경영·AI — 점수 없음`, ['최근 여러 채널에서 반복', '채널 평소보다 잘됨', '최근 2주에 늘어남', '작은 채널에서도 터짐', '경제 · 경영 · AI 주제', '점수를 매기지 않습니다'].every((w) => crit.includes(w)), crit.slice(0, 200))
+  await page.getByTestId('radar-mix').click()
+  // 사이드 영상 상세 — [기본 벤치마킹] · 영역 · 형식
+  await page.getByTestId('radar-side-row').filter({ hasText: '풀버전' }).locator('button').click()
+  await page.waitForTimeout(300)
+  check(`F15 ${T} 영상 상세: [기본 벤치마킹] 표시 · 영역 · 기타 · 형식 · 전문가 인터뷰`, ((await page.getByTestId('radar-detail-source').innerText()) ?? '').includes('기본 벤치마킹') && (await page.getByTestId('radar-detail-source').getAttribute('data-added')) === '0' && ((await page.getByTestId('radar-detail-tags').innerText()) ?? '').includes('영역 · 기타') && ((await page.getByTestId('radar-detail-tags').innerText()) ?? '').includes('형식 · 전문가 인터뷰'))
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  check(`${T} 첫 화면 넘침 0`, (await over()) <= 0, await over())
+  // 채널 — 기본 벤치마킹(왜 보나) · 내가 추가한 채널
+  await page.getByTestId('yt-view-channels').click()
+  await page.waitForTimeout(400)
+  check(`F16 ${T} 채널: "기본 벤치마킹 채널" 10곳(내 채널 포함) · 채널마다 "왜 보나" 한 줄 · "내가 추가한 채널" 0곳(빈 안내)`, (await page.getByTestId('radar-default-channels').getAttribute('data-count')) === '10' && (await page.getByTestId('radar-ch-note').count()) === 10 && (await page.getByTestId('radar-added-channels').getAttribute('data-count')) === '0' && (await page.getByTestId('radar-added-empty').isVisible()) && (await page.locator('[data-testid="yt-channel-row"][data-source="default"]').count()) === 10)
+  check(`${T} 채널 화면 넘침 0`, (await over()) <= 0, await over())
+  // 인기 탭 — 핵심 키워드 / 기타 급상승
+  await page.getByTestId('yt-view-top').click()
+  await page.waitForTimeout(400)
+  const core = await page.getByTestId('yt-keyword').allInnerTexts()
+  const other = await page.getByTestId('yt-keyword-other').allInnerTexts()
+  check(`${T} 인기 탭: 핵심 키워드(정책자금 · 클로드 …)와 기타 급상승(다이어트 …)이 나뉜다`, core.some((k) => /정책자금|클로드|금리/.test(k)) && !core.some((k) => /다이어트|브이로그/.test(k)) && other.some((k) => /다이어트|브이로그/.test(k)), { core, other })
+  check(`${T} 인기 탭 넘침 0 · JS 오류 0`, (await over()) <= 0 && errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 /* ---------------- 휴대폰 360 · 390 · 430 ---------------- */
 for (const width of [360, 390, 430]) {
   const ctx = await browser.newContext({ viewport: { width, height: 844 }, locale: 'ko-KR', isMobile: true, hasTouch: true })

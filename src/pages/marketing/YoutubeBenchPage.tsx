@@ -55,8 +55,26 @@ import {
   type YtType,
   type YtVideo,
 } from '../../services/marketing/ytBench'
-import { breakoutVideos, groupOf, hotPatterns, myChannelStats, radarPlan, radarVideos, risingTopics, type Opportunity, type RadarVideo } from '../../services/marketing/ytRadar'
-import { PlanView } from './radar/PlanView'
+import {
+  SIDE_MAX,
+  aiKeywordBoard,
+  aiWorkflowSignals,
+  breakoutVideos,
+  domainSignals,
+  groupOf,
+  hotPatterns,
+  isCoreKeyword,
+  isNoiseKeyword,
+  myChannelStats,
+  newAiKeywords,
+  radarPlan,
+  radarVideos,
+  risingTopics,
+  sideBreakouts,
+  type Opportunity,
+  type RadarVideo,
+} from '../../services/marketing/ytRadar'
+import { PlanView, type FocusData } from './radar/PlanView'
 import { RatioChip, VideoDetail } from './radar/RadarParts'
 import { ChannelManager } from './radar/ChannelManager'
 import { IdeaNotebook } from './radar/IdeaNotebook'
@@ -129,6 +147,18 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const plan = useMemo(() => (prepared ? radarPlan(prepared, opts, rvideos) : null), [prepared, opts, rvideos])
   const rising = useMemo(() => (prepared && plan ? risingTopics(prepared, rvideos, plan.clusters) : []), [prepared, rvideos, plan])
   const breakouts = useMemo(() => breakoutVideos(rvideos), [rvideos])
+  // D-197 — 경제 · 경영 · AI 신호판 · AI 핵심 키워드 · 새 AI 키워드 후보 · 사이드 급상승(새 AI 키워드 영상은 사이드에서 뺀다)
+  const focus = useMemo<FocusData | null>(() => {
+    if (!prepared || !plan) return null
+    const fresh = newAiKeywords(prepared, rvideos)
+    return {
+      domains: domainSignals(plan.clusters),
+      aiKeywords: aiKeywordBoard(rvideos),
+      workflow: aiWorkflowSignals(plan.clusters),
+      fresh,
+      side: sideBreakouts(rvideos, 14, SIDE_MAX, fresh.map((k) => k.word)),
+    }
+  }, [prepared, plan, rvideos])
   const loading = yt.status === 'loading'
 
   const refresh = () => {
@@ -260,12 +290,14 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
             ))}
           </div>
 
-          {view === 'plan' && plan && (
+          {view === 'plan' && plan && focus && (
             <>
               <PlanView
                 plan={plan}
-                rising={rising}
+                // 시장 신호는 경제 · 경영 · AI 주제만(D-197) — 분류표 밖 낱말은 '인기' 탭의 기타 급상승에서 본다
+                rising={rising.filter((r) => r.fit)}
                 breakouts={breakouts}
+                focus={focus}
                 basis={`최근 30일 영상 ${fmt(recent30)}편 · 벤치마킹 채널 ${benchChannels}곳(AI · AX ${aiAx}곳) — 점수가 아니라 근거로 고릅니다`}
                 ideas={notebook.ideas}
                 readOnly={readOnly}
@@ -381,7 +413,8 @@ function FeedNotices({ sample, message, extraMessage }: { sample: boolean; messa
 
 /** 이번 주 주목 주제 TOP 3 — 거르기 없이 7일 안 전체에서. 누르면 그 키워드로 인기 영상 */
 function HotBanner({ prepared, onPick }: { prepared: Prepared; onPick: (keyword: string) => void }) {
-  const topics = useMemo(() => extractTopics(periodVideos(prepared.videos, 'week'), prepared.channelWords, 3), [prepared])
+  // D-197 — '반드시 · 완전히' 같은 흔한 말은 주제가 아니다(같은 계산 · 걸러내기만)
+  const topics = useMemo(() => extractTopics(periodVideos(prepared.videos, 'week'), prepared.channelWords, 8).filter((t) => !isNoiseKeyword(t.keyword)).slice(0, 3), [prepared])
   if (topics.length === 0) return null
   return (
     <section className="flex flex-col gap-2" data-testid="yt-hot">
@@ -518,7 +551,10 @@ function TopView({
   const [allKw, setAllKw] = useState(false)
   const counts = useMemo(() => Object.fromEntries(PERIODS.map((p) => [p, periodVideos(prepared.videos, p, filter).length])) as Record<YtPeriod, number>, [prepared, filter])
   const pool = useMemo(() => periodVideos(prepared.videos, period, filter), [prepared, period, filter])
-  const keywords = useMemo(() => extractKeywords(pool, prepared.channelWords), [pool, prepared])
+  // D-197 — 경제 · 경영 · AI 핵심 키워드와 기타 급상승을 나눈다(같은 낱말 계산 · 나누기만)
+  const allKeywords = useMemo(() => extractKeywords(pool, prepared.channelWords).filter((k) => !isNoiseKeyword(k.word)), [pool, prepared])
+  const keywords = useMemo(() => allKeywords.filter((k) => isCoreKeyword(k.word)), [allKeywords])
+  const otherKeywords = useMemo(() => allKeywords.filter((k) => !isCoreKeyword(k.word)).slice(0, 8), [allKeywords])
   const board = useMemo(() => boardOf(pool, topN, kw), [pool, topN, kw])
   const top = board.rows[0]
   const second = board.rows[1]
@@ -541,11 +577,12 @@ function TopView({
         ))}
       </div>
 
-      {keywords.length > 0 && (
+      {allKeywords.length > 0 && (
         <section className="flex flex-col gap-2" data-testid="yt-keywords">
           <HintTip tip={hintFor('인기 핵심 키워드')} label="인기 핵심 키워드">
             <h2 className="t-card font-bold text-slate-900">인기 핵심 키워드</h2>
           </HintTip>
+          <p className="t-meta text-slate-500">경제 · 경영 · AI 주제</p>
           <div className="flex flex-wrap gap-1.5">
             <button type="button" aria-pressed={!kw} onClick={() => onKeyword('')} className={`tap t-sub rounded-full border px-3 py-1 font-medium ${!kw ? 'border-slate-800 bg-slate-800 text-white' : 'border-slate-300 bg-white text-slate-600'}`}>
               전체
@@ -568,6 +605,25 @@ function TopView({
               </button>
             )}
           </div>
+          {otherKeywords.length > 0 && (
+            <div className="flex flex-col gap-1.5 border-t border-slate-100 pt-2" data-testid="yt-keywords-other">
+              <p className="t-meta text-slate-500">기타 급상승 — 경제 · 경영 · AI 밖(참고)</p>
+              <div className="flex flex-wrap gap-1.5">
+                {otherKeywords.map((k) => (
+                  <button
+                    key={k.word}
+                    type="button"
+                    aria-pressed={kw === k.word}
+                    onClick={() => onKeyword(kw === k.word ? '' : k.word)}
+                    data-testid="yt-keyword-other"
+                    className={`tap t-sub rounded-full border px-3 py-1 font-medium break-keep ${kw === k.word ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-200 bg-slate-50 text-slate-600'}`}
+                  >
+                    #{k.word} <span className="opacity-60">{k.videos}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       )}
 

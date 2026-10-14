@@ -10,6 +10,8 @@ import { dateKo, fmt, shortNum } from '../../../services/marketing/ytBench'
 import { TOPIC_BY_ID } from '../../../services/marketing/radarPlaybook'
 import {
   AXIS_LABEL,
+  DOMAIN_LABEL,
+  FORMAT_LABEL,
   GROUP_LABEL,
   PATTERN_LABEL,
   STRENGTH_LABEL,
@@ -19,6 +21,7 @@ import {
   tierLabel,
   type Cluster,
   type ContentAxis,
+  type ContentDomain,
   type RadarVideo,
   type Strength,
 } from '../../../services/marketing/ytRadar'
@@ -33,6 +36,16 @@ export function AxisBadge({ axis }: { axis: ContentAxis }) {
   return (
     <span className={`t-meta inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-bold ${cls}`} data-testid="radar-axis">
       {AXIS_LABEL[axis]}
+    </span>
+  )
+}
+
+/** 내용 영역(경제 · 경영) — 시장수요 · BRIDGE 카드에만(AX · AI 카드는 축 배지가 이미 말한다 · D-197) */
+export function DomainBadge({ axis, domain }: { axis: ContentAxis; domain: ContentDomain }) {
+  if (axis === 'axai' || domain === 'ai' || domain === 'other') return null
+  return (
+    <span className="t-meta inline-flex shrink-0 items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 font-semibold text-slate-600" data-testid="radar-domain-badge" data-domain={domain}>
+      {DOMAIN_LABEL[domain]}
     </span>
   )
 }
@@ -125,6 +138,13 @@ export function VideoDetail({ v, clusters, onClose, noThumb }: { v: RadarVideo |
             <p className="t-sub flex flex-wrap items-center gap-x-2 gap-y-1 text-slate-600">
               <span className="font-semibold text-slate-800">{v.channelName}</span>
               <Badge>{GROUP_LABEL[v.group]}</Badge>
+              {!v.mine && (
+                <Badge tone={v.added ? 'warning' : 'neutral'}>
+                  <span data-testid="radar-detail-source" data-added={v.added ? '1' : '0'}>
+                    {v.added ? '내가 추가' : '기본 벤치마킹'}
+                  </span>
+                </Badge>
+              )}
               {v.mine && (
                 <Badge tone="warning">
                   <UserRound aria-hidden="true" className="size-3" /> 내 채널
@@ -157,8 +177,16 @@ export function VideoDetail({ v, clusters, onClose, noThumb }: { v: RadarVideo |
           </p>
         )}
 
-        {(v.topics.length > 0 || v.patterns.length > 0) && (
-          <div className="flex flex-wrap gap-1.5">
+        {(v.topics.length > 0 || v.patterns.length > 0 || v.formats.length > 0) && (
+          <div className="flex flex-wrap gap-1.5" data-testid="radar-detail-tags">
+            {v.domains.map((d) => (
+              <Badge key={d} tone={d === 'other' ? 'neutral' : 'success'}>
+                영역 · {DOMAIN_LABEL[d]}
+              </Badge>
+            ))}
+            {v.formats.map((f) => (
+              <Badge key={f}>형식 · {FORMAT_LABEL[f]}</Badge>
+            ))}
             {v.topics.map((t) => (
               <Badge key={t} tone="brand">
                 주제 · {TOPIC_BY_ID.get(t)?.label ?? t}

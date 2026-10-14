@@ -6,16 +6,26 @@
  *  - 서버 함수(api/yt-bench.js): 유튜브를 흉내 낸 fetch 로 — 키 없음 · 주소 칸 검사 · 채널 하나 실패 · 할당량 · 틀린 키 · 캐시 · 키가 응답에 없음
  *  - 콘텐츠 레이더(D-194) R1~R12: 롱폼/쇼츠 기준 · 작은 채널 · 평소 대비 · 나이 · 한 번 터진 영상 · 여러 채널 · 한 채널 반복 ·
  *    네 묶음 · 3축 · BRIDGE · 수첩 저장/다시 읽기 · 작업공간 격리 + [채널 추가](로그인 확인 · 저렴한 호출만)
- *  - D-196 6시간 자동 갱신: 채널 구성 판 · status 할당량 0 · 6시간 칸 · 409 · 예전 18채널 저장본 → 33채널 · 5시간 59분 그대로 ·
+ *  - D-196 6시간 자동 갱신: 채널 구성 판 · status 할당량 0 · 6시간 칸 · 409 · 예전 18채널 저장본 → 49채널(D-197) · 5시간 59분 그대로 ·
  *    6시간 넘으면 새로 · 돌아올 때 · 판 바뀜 · [지금 새로] · 실패하면 지난번 것 + 받은 때(화면 저장소를 진짜 서버 함수로 이어서)
  * 실행: npm run test:youtube
  */
 import handler, { CHANNELS, FEED_REVISION, FEED_SCHEMA, checkQuery, feedRevisionOf, parseChannelInput, parseDuration, secondsUntilNine, secondsUntilWindowEnd, windowOf as serverWindowOf } from '../../../api/yt-bench.js'
 import { FRESH_MS, ensureYt, isStale, kstWhen, readCache, refreshYt, resetYtForTest, windowOf, ytSnapshot } from '../marketing/ytFeed'
-import { TOPICS, aiToolsOf, normalizeTitle, topicsOf } from '../marketing/radarPlaybook'
+import { TOPICS, aiMentions, aiToolsOf, domainsOf, formatTagsOf, normalizeTitle, toolTopicsOf, topicsOf } from '../marketing/radarPlaybook'
+import { mergeFeeds } from '../marketing/ytExtra'
+import { enabledModulesByGroup, isPilotHiddenPath } from '../../config/moduleRegistry'
 import {
+  aiKeywordBoard,
   breakoutVideos,
   clusterOrder,
+  domainSignals,
+  isCore,
+  isCoreKeyword,
+  isNoiseKeyword,
+  newAiKeywords,
+  sideBreakouts,
+  whyRecommended,
   clusters,
   expectedShare,
   groupOf,
@@ -58,6 +68,8 @@ import {
 import { sampleFeed } from '../marketing/ytSample'
 
 let passed = 0
+/** 기본 벤치마킹 채널 수(D-197: 33 → 49 — AI 실무 11 · AX 5 더함) */
+const NCH = 49
 let failed = 0
 function check(name: string, ok: boolean, detail?: unknown) {
   if (ok) {
@@ -253,7 +265,7 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const ENV = process.env as Record<string, string | undefined>
   delete ENV.YOUTUBE_API_KEY
   const st = await call('?status=1')
-  check('서버: 키 없음 → status 는 configured=false · 채널 33곳(D-194: AI 8 · AX 4 · 포맷 2 더함 · 주소가 없어진 @사장노트 뺌)', st.code === 200 && (st.body as { configured: boolean }).configured === false && (st.body as { channels: number }).channels === 33 && CHANNELS.length === 33)
+  check('서버: 키 없음 → status 는 configured=false · 채널 49곳(D-194: AI 8 · AX 4 · 포맷 2 더함 · @사장노트 뺌 → D-197: AI 11 · AX 5 더함)', st.code === 200 && (st.body as { configured: boolean }).configured === false && (st.body as { channels: number }).channels === NCH && CHANNELS.length === NCH)
   const nk = await call(`?slot=${slot}`)
   check('서버: 키 없음 → 503 no_key · 캐시 안 함 · 유튜브를 부르지 않음', nk.code === 503 && (nk.body as { error: string }).error === 'no_key' && nk.headers['cache-control'] === 'no-store' && calls.length === 0)
 
@@ -268,12 +280,12 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
 
   const ok = await call(`?slot=${slot}`)
   const body = ok.body as { channels: YtChannel[]; videos: YtVideoRaw[]; failed: string[]; units: number; fetchedAt: string }
-  check('서버: 200 · 채널 33곳 모두 · 영상 50편씩 · 못 받은 채널 없음', ok.code === 200 && body.channels.length === 33 && body.videos.length === 33 * 50 && body.failed.length === 0, { code: ok.code, ch: body.channels?.length, v: body.videos?.length, failed: body.failed })
+  check('서버: 200 · 채널 49곳 모두 · 영상 50편씩 · 못 받은 채널 없음', ok.code === 200 && body.channels.length === NCH && body.videos.length === NCH * 50 && body.failed.length === 0, { code: ok.code, ch: body.channels?.length, v: body.videos?.length, failed: body.failed })
   check('서버: 내 채널 표시(@김팀장의경영노트 · 채널 번호 UCjXWwM0…) · 핸들 · 숫자', body.channels[0].mine && body.channels[0].id === 'UCjXWwM0_25vl1Mpr2Pc5amQ' && body.channels[0].handle === '@김팀장의경영노트' && body.channels[0].subs === 12000 && body.channels.filter((c) => c.mine).length === 1)
-  check('채널 목록: 33곳 · 모두 채널 번호(주소가 바뀌어도 안 끊김) · 번호가 겹치지 않음 · @사장노트 없음', CHANNELS.length === 33 && CHANNELS.every((c) => /^UC[\w-]{22}$/.test(c.id)) && new Set(CHANNELS.map((c) => c.id)).size === 33 && !CHANNELS.some((c) => c.handle === '@사장노트'))
+  check('채널 목록: 49곳 · 모두 채널 번호(주소가 바뀌어도 안 끊김) · 번호가 겹치지 않음 · @사장노트 없음', CHANNELS.length === NCH && CHANNELS.every((c) => /^UC[\w-]{22}$/.test(c.id)) && new Set(CHANNELS.map((c) => c.id)).size === NCH && !CHANNELS.some((c) => c.handle === '@사장노트'))
   check('서버: 영상 칸 — 길이(초) · 조회수 숫자', body.videos[0].d === 45 && body.videos[1].d === 723 && body.videos[0].v === 1000 && typeof body.videos[0].at === 'string')
   check('서버: 응답 어디에도 키 값이 없다', !JSON.stringify(ok.body).includes(KEYVAL))
-  check('서버: 할당량 67단위(채널 번호로 바로 · 채널 정보는 한 번에 묶음 · 주소로 찾는 호출 0)', body.units === calls.length && body.units === 1 + 33 * 2 && calls.filter((c) => c.startsWith('channels?part,id')).length === 1 && calls.filter((c) => c.includes('forHandle') || c.includes('forUsername')).length === 0, { units: body.units, calls: calls.length })
+  check('서버: 할당량 99단위(채널 번호로 바로 · 채널 정보는 한 번에 묶음 · 주소로 찾는 호출 0)', body.units === calls.length && body.units === 1 + NCH * 2 && calls.filter((c) => c.startsWith('channels?part,id')).length === 1 && calls.filter((c) => c.includes('forHandle') || c.includes('forUsername')).length === 0, { units: body.units, calls: calls.length })
   const maxAge = Number(/s-maxage=(\d+)/.exec(ok.headers['cache-control'] ?? '')?.[1] ?? -1)
   check('서버: 하루 칸은 다음 아침 9시까지 캐시', Math.abs(maxAge - secondsUntilNine()) <= 2, ok.headers['cache-control'])
   const fr = await call(`?bucket=${bucket}`)
@@ -282,7 +294,7 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const gone = await call(`?slot=${slot}`)
   goneIds.clear()
   const gb = gone.body as { channels: YtChannel[]; videos: YtVideoRaw[]; failed: string[] }
-  check('서버: 채널 하나가 없어져도 나머지는 보내고 · 못 받은 채널 이름(@세무사)을 같이 보낸다', gone.code === 200 && gb.channels.length === 32 && gb.videos.length === 32 * 50 && gb.failed.join() === '@세무사', gb.failed)
+  check('서버: 채널 하나가 없어져도 나머지는 보내고 · 못 받은 채널 이름(@세무사)을 같이 보낸다', gone.code === 200 && gb.channels.length === NCH - 1 && gb.videos.length === (NCH - 1) * 50 && gb.failed.join() === '@세무사', gb.failed)
 
   mode = 'quota'
   const q = await call(`?slot=${slot}`)
@@ -359,7 +371,7 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     check('R8 묶음: 서버가 붙인 묶음 → 대표가 바꾼 묶음 순 · 모르면 직접 경쟁', groupOf({ id: 'x', group: 'ai' }) === 'ai' && groupOf({ id: 'x', group: 'ai' }, { x: { group: 'format' } }) === 'format' && groupOf({ id: 'y' }) === 'direct' && groupOf({ id: 'z', group: 'weird' }) === 'direct')
     const groups = new Map(CHANNELS.map((c) => [c.id, c.group]))
     const count = (g: string) => [...groups.values()].filter((x) => x === g).length
-    check('R8 기본 채널: 직접 19(@사장노트 뺌) · AI 실무 8 · AX 4 · 포맷 2(모두 묶음이 있다)', count('direct') === 19 && count('ai') === 8 && count('ax') === 4 && count('format') === 2 && CHANNELS.every((c) => typeof c.note === 'string' && c.note.length > 0))
+    check('R8 기본 채널: 직접 19(@사장노트 뺌) · AI 실무 19 · AX 9 · 포맷 2(모두 묶음이 있다 · D-197 AI 11 · AX 5 더함)', count('direct') === 19 && count('ai') === 19 && count('ax') === 9 && count('format') === 2 && CHANNELS.every((c) => typeof c.note === 'string' && c.note.length > 0))
     const chs = [{ ...ch('d1', '직접하나', 10_000, 1), group: 'direct' }, { ...ch('f1', '포맷하나', 900_000, 1), group: 'format' }, { ...ch('a1', '에이아이', 9_000, 1), group: 'ai' }, { ...ch('d2', '직접둘', 10_000, 1), group: 'direct' }]
     const vids = [...base('d1', 5, 1_000), ...base('f1', 5, 1_000), ...base('a1', 5, 1_000), ...base('d2', 5, 1_000), vid('f_t', 'f1', '정책자금 포맷 영상', 8 * D, 9_000), vid('f_t2', 'f1', '정책자금 포맷 영상 둘', 9 * D, 9_000), vid('d_t', 'd1', '정책자금 직접 영상', 8 * D, 900)]
     const p = prepareFeed({ channels: chs, videos: vids }, NOW)
@@ -587,9 +599,9 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   // 예전 18채널(직접 경쟁 19곳 중 앞 18곳 — Production PC 에 남아 있던 것과 같은 수)
   const old18 = CHANNELS.slice(0, 18)
   const REV18 = feedRevisionOf(old18)
-  check('판: 같은 설정이면 늘 같은 값 · 꼴 "응답판-채널수-요약값"(2-33-…)', FEED_REVISION === feedRevisionOf() && feedRevisionOf(CHANNELS.map((c) => ({ ...c }))) === FEED_REVISION && /^2-33-[0-9a-z]+$/.test(FEED_REVISION), FEED_REVISION)
+  check('판: 같은 설정이면 늘 같은 값 · 꼴 "응답판-채널수-요약값"(2-49-…)', FEED_REVISION === feedRevisionOf() && feedRevisionOf(CHANNELS.map((c) => ({ ...c }))) === FEED_REVISION && /^2-49-[0-9a-z]+$/.test(FEED_REVISION), FEED_REVISION)
   check(
-    '판: 18채널 ≠ 33채널 · 묶음 하나만 바뀌어도 ≠ · 응답 판이 바뀌면 ≠ · 채널 순서 ≠ · 이름/메모만 바뀌면 같다(결과에 영향 없는 칸)',
+    '판: 18채널 ≠ 49채널 · 묶음 하나만 바뀌어도 ≠ · 응답 판이 바뀌면 ≠ · 채널 순서 ≠ · 이름/메모만 바뀌면 같다(결과에 영향 없는 칸)',
     REV18 !== FEED_REVISION &&
       /^2-18-/.test(REV18) &&
       feedRevisionOf(CHANNELS.map((c, i) => (i === 20 ? { ...c, group: 'ax' } : c))) !== FEED_REVISION &&
@@ -602,12 +614,12 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   calls.length = 0
   const st = await call('?status=1')
   const sb = st.body as { configured: boolean; channels: number; feedRevision: string }
-  check('8 status=1: configured · 채널 33 · feedRevision — 유튜브 호출 0(할당량 0) · 키 값 없음 · 캐시 안 함', st.code === 200 && sb.configured && sb.channels === 33 && sb.feedRevision === FEED_REVISION && calls.length === 0 && !JSON.stringify(sb).includes(KEYVAL) && st.headers['cache-control'] === 'no-store', sb)
+  check('8 status=1: configured · 채널 49 · feedRevision — 유튜브 호출 0(할당량 0) · 키 값 없음 · 캐시 안 함', st.code === 200 && sb.configured && sb.channels === NCH && sb.feedRevision === FEED_REVISION && calls.length === 0 && !JSON.stringify(sb).includes(KEYVAL) && st.headers['cache-control'] === 'no-store', sb)
   const w = serverWindowOf()
   const win = await call(`?win=${w}&rev=${FEED_REVISION}`)
   const wb = win.body as { feedRevision: string; channels: YtChannel[] }
   const wMax = Number(/s-maxage=(\d+)/.exec(win.headers['cache-control'] ?? '')?.[1] ?? -1)
-  check('6시간 칸(?win=&rev=): 200 · 33채널 · 응답에 판 · 그 칸이 끝날 때까지만 캐시(6시간 이하)', win.code === 200 && wb.feedRevision === FEED_REVISION && wb.channels.length === 33 && Math.abs(wMax - secondsUntilWindowEnd()) <= 2 && wMax <= 6 * 3600, win.headers['cache-control'])
+  check('6시간 칸(?win=&rev=): 200 · 49채널 · 응답에 판 · 그 칸이 끝날 때까지만 캐시(6시간 이하)', win.code === 200 && wb.feedRevision === FEED_REVISION && wb.channels.length === NCH && Math.abs(wMax - secondsUntilWindowEnd()) <= 2 && wMax <= 6 * 3600, win.headers['cache-control'])
   calls.length = 0
   const r409 = await call(`?win=${w}&rev=${REV18}`)
   check('판이 다르면 409 + 지금 판 · 유튜브를 부르지 않는다(아무 rev 로 캐시를 비켜 가며 할당량을 쓰지 못함) · 캐시 안 함', r409.code === 409 && (r409.body as { feedRevision: string }).feedRevision === FEED_REVISION && calls.length === 0 && r409.headers['cache-control'] === 'no-store', r409.body)
@@ -670,26 +682,26 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const feedAsks = () => asked.filter((q) => !q.includes('status=1'))
   const snap = () => ytSnapshot()
 
-  // 1 · 2 · 3 같은 날짜의 18채널 예전 저장본(예전 모양 { slot, feed }) + 서버 판은 33채널 → 열자마자 버리고 33채널
+  // 1 · 2 · 3 같은 날짜의 18채널 예전 저장본(예전 모양 { slot, feed }) + 서버 판은 49채널 → 열자마자 버리고 49채널
   const now0 = Date.now()
   begin({ slot: new Date(now0).toISOString().slice(0, 10), feed: feedOf(18, now0 - 3_600_000) })
   await ensureYt()
   const saved = readCache()
   check(
-    '1~3 같은 날 18채널 예전 저장본 + 서버 판 33채널 → 열자마자 새로 받음 → 33채널 · 저장본도 { 받은 때 · 판 · 데이터 }',
-    snap().status === 'ready' && snap().feed?.channels.length === 33 && snap().feedRevision === FEED_REVISION && saved?.feedRevision === FEED_REVISION && saved?.feed.channels.length === 33 && typeof JSON.parse(store.get(KEY) ?? '{}').fetchedAt === 'number',
+    '1~3 같은 날 18채널 예전 저장본 + 서버 판 49채널 → 열자마자 새로 받음 → 49채널 · 저장본도 { 받은 때 · 판 · 데이터 }',
+    snap().status === 'ready' && snap().feed?.channels.length === NCH && snap().feedRevision === FEED_REVISION && saved?.feedRevision === FEED_REVISION && saved?.feed.channels.length === NCH && typeof JSON.parse(store.get(KEY) ?? '{}').fetchedAt === 'number',
     { st: snap().status, n: snap().feed?.channels.length, asked },
   )
   check('1~3 묻는 순서: 판 확인(status) 한 번 → 6시간 칸 + 지금 판(?win=…&rev=…) 한 번', asked.length === 2 && asked[0] === '?status=1' && asked[1] === `?win=${windowOf()}&rev=${encodeURIComponent(FEED_REVISION)}`, asked)
 
   // 4 5시간 59분 된 저장본(판 같음) → 다시 쓰고 유튜브 · 데이터 요청 0
-  begin({ fetchedAt: Date.now() - (H6 - 60_000), feedRevision: FEED_REVISION, feed: feedOf(33, Date.now() - (H6 - 60_000)) })
+  begin({ fetchedAt: Date.now() - (H6 - 60_000), feedRevision: FEED_REVISION, feed: feedOf(NCH, Date.now() - (H6 - 60_000)) })
   await ensureYt()
   check('4 5시간 59분 된 저장본 → 그대로 씀 · 데이터 요청 0 · 유튜브 호출 0(판 확인만)', snap().status === 'ready' && snap().feed?.videos[0]?.id === 'old1' && feedAsks().length === 0 && calls.length === 0 && asked.join() === '?status=1', asked)
 
   // 6 열어 둔 채로 6시간이 지남 → 돌아올 때(focus · visible 이 부르는 ensureYt) 새로 받는다
   const tFocus = Date.now()
-  begin({ fetchedAt: tFocus - H6 + 1500, feedRevision: FEED_REVISION, feed: feedOf(33, tFocus - H6 + 1500) })
+  begin({ fetchedAt: tFocus - H6 + 1500, feedRevision: FEED_REVISION, feed: feedOf(NCH, tFocus - H6 + 1500) })
   let fakeNow = tFocus
   resetYtForTest(() => fakeNow)
   await ensureYt()
@@ -702,20 +714,20 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   check('6 곧바로 또 돌아와도(focus 여러 번) 다시 받지 않는다 — 시계로 계속 묻지 않음', feedAsks().length === 1, asked)
 
   // 5 6시간 지난 저장본 → 열자마자 새로
-  begin({ fetchedAt: Date.now() - H6 - 60_000, feedRevision: FEED_REVISION, feed: feedOf(33, Date.now() - H6 - 60_000) })
+  begin({ fetchedAt: Date.now() - H6 - 60_000, feedRevision: FEED_REVISION, feed: feedOf(NCH, Date.now() - H6 - 60_000) })
   await ensureYt()
   check('5 6시간 1분 된 저장본 → 열자마자 새로 받음(?win=)', feedAsks().length === 1 && /^\?win=\d+&rev=/.test(feedAsks()[0]) && snap().feed?.videos[0]?.id !== 'old1' && snap().status === 'ready', asked)
 
   // 7 판이 바뀜 → 1시간 전 것이어도 새로
   begin({ fetchedAt: Date.now() - 3_600_000, feedRevision: REV18, feed: feedOf(18, Date.now() - 3_600_000) })
   await ensureYt()
-  check('7 판이 바뀜(18채널 판 → 33채널 판) → 1시간 전 것이어도 바로 새로 받음 → 33채널', feedAsks().length === 1 && snap().feed?.channels.length === 33 && snap().feedRevision === FEED_REVISION, asked)
+  check('7 판이 바뀜(18채널 판 → 49채널 판) → 1시간 전 것이어도 바로 새로 받음 → 49채널', feedAsks().length === 1 && snap().feed?.channels.length === NCH && snap().feedRevision === FEED_REVISION, asked)
 
   // 판 확인과 데이터 요청 사이에 배포가 바뀜(409) → 서버가 알려 준 판으로 한 번만 다시
   begin(null)
   statusRev = REV18
   await ensureYt()
-  check('판 확인과 받기 사이에 배포가 바뀜 → 409 → 서버가 알려 준 판으로 한 번만 다시 → 33채널', feedAsks().length === 2 && feedAsks()[0].endsWith(`rev=${encodeURIComponent(REV18)}`) && feedAsks()[1].endsWith(`rev=${encodeURIComponent(FEED_REVISION)}`) && snap().feed?.channels.length === 33 && readCache()?.feedRevision === FEED_REVISION, asked)
+  check('판 확인과 받기 사이에 배포가 바뀜 → 409 → 서버가 알려 준 판으로 한 번만 다시 → 49채널', feedAsks().length === 2 && feedAsks()[0].endsWith(`rev=${encodeURIComponent(REV18)}`) && feedAsks()[1].endsWith(`rev=${encodeURIComponent(FEED_REVISION)}`) && snap().feed?.channels.length === NCH && readCache()?.feedRevision === FEED_REVISION, asked)
 
   // 판을 알 수 없는 곳(함수 없음) → 6시간만 본다(예전 저장본도 6시간 안이면 그대로)
   begin({ slot: new Date().toISOString().slice(0, 10), feed: feedOf(18, Date.now() - 3_600_000) })
@@ -724,22 +736,22 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   check('판을 알 수 없으면(함수가 없는 곳) 6시간만 본다 — 1시간 된 저장본 그대로 · 데이터 요청 0', snap().status === 'ready' && snap().feed?.channels.length === 18 && feedAsks().length === 0, asked)
 
   // 9 [지금 새로 가져오기] — 6시간 안이어도 30분 칸으로 새로
-  begin({ fetchedAt: Date.now() - 60_000, feedRevision: FEED_REVISION, feed: feedOf(33, Date.now() - 60_000) })
+  begin({ fetchedAt: Date.now() - 60_000, feedRevision: FEED_REVISION, feed: feedOf(NCH, Date.now() - 60_000) })
   await ensureYt()
   await refreshYt()
   check('9 [지금 새로 가져오기] → 1분 전 것이어도 새로(?bucket=…&rev=…) · 열 때는 받지 않음', feedAsks().length === 1 && /^\?bucket=\d+&rev=/.test(feedAsks()[0]) && snap().feed?.videos[0]?.id !== 'old1' && snap().status === 'ready', asked)
 
   // 10 저절로 받기 실패 → 지난번 것 그대로 + 받은 때
   const oldAt = Date.now() - H6 - 3_600_000
-  begin({ fetchedAt: oldAt, feedRevision: FEED_REVISION, feed: feedOf(33, oldAt) })
+  begin({ fetchedAt: oldAt, feedRevision: FEED_REVISION, feed: feedOf(NCH, oldAt) })
   mode = 'quota'
   await ensureYt()
   const m = snap().message
-  check('10 6시간 넘은 저장본 + 유튜브 한도 초과 → 빈 화면 아님: 지난번 것 그대로 · "지난번 받은 데이터로 보여드리고 있습니다." · 받은 때', snap().feed?.videos[0]?.id === 'old1' && snap().feed?.channels.length === 33 && m.startsWith('지난번 받은 데이터로 보여드리고 있습니다.') && m.includes(`받은 때 ${kstWhen(oldAt)}`) && m.includes('한도') && snap().status === 'quota', m)
+  check('10 6시간 넘은 저장본 + 유튜브 한도 초과 → 빈 화면 아님: 지난번 것 그대로 · "지난번 받은 데이터로 보여드리고 있습니다." · 받은 때', snap().feed?.videos[0]?.id === 'old1' && snap().feed?.channels.length === NCH && m.startsWith('지난번 받은 데이터로 보여드리고 있습니다.') && m.includes(`받은 때 ${kstWhen(oldAt)}`) && m.includes('한도') && snap().status === 'quota', m)
   mode = 'ok'
   await ensureYt()
   check('10 실패 뒤 곧바로 돌아와도 다시 두드리지 않는다(5분 뒤)', feedAsks().length === 1, asked)
-  begin({ fetchedAt: oldAt, feedRevision: FEED_REVISION, feed: feedOf(33, oldAt) })
+  begin({ fetchedAt: oldAt, feedRevision: FEED_REVISION, feed: feedOf(NCH, oldAt) })
   netDown = true
   await ensureYt()
   check('10 인터넷이 끊겨도(판 확인도 실패) 지난번 것 그대로 + 받은 때', snap().feed?.videos[0]?.id === 'old1' && snap().message.startsWith('지난번 받은 데이터로 보여드리고 있습니다.') && snap().message.includes('인터넷'), snap().message)
@@ -752,6 +764,156 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
 
   globalThis.fetch = ytMock
   resetYtForTest()
+}
+
+
+/* ---------------- D-197 경제 · 경영 · AI 집중 · 사이드 급상승 F1~F20 ---------------- */
+{
+  const baseOf = (chId: string, n: number, views: number, d = 600, from = 10) => Array.from({ length: n }, (_, i) => vid(`${chId}_b${i}`, chId, `평범한 이야기 ${chId} ${i}`, (from + i * 3) * D, views + i, d))
+  const doms = (t: string) => domainsOf(topicsOf(t))
+
+  // F1 경제 — 금리 · 환율 · 부동산 · 주식 · 경제 정책(정치 일반 뉴스는 아님)
+  check(
+    'F1 경제: 금리 → 중소기업 대출 · 환율 · 부동산 · 주식 인터뷰 · 세법 개정은 경제 / 정치 일반 뉴스는 경제 아님',
+    topicsOf('금리 인하, 중소기업 대출 이자 얼마나 줄까').includes('rate') &&
+      doms('환율 1500원 시대 수입 원가 이렇게').includes('economy') &&
+      doms('사옥을 살까 임대할까').includes('economy') &&
+      doms("2027년 주도주 완전히 바뀐다, '이 3개 주식' 모아가면 큰돈 번다 (박세익 대표 풀버전)").includes('economy') &&
+      doms('삼성전자 정말 무서울 겁니다, 100년에 1번 나오는 폭등').includes('economy') &&
+      doms('2027년 세법 개정안 총정리').includes('economy') &&
+      doms('대선 여론조사 결과 총정리').join() === 'other' &&
+      !topicsOf('비상장주식 가치평가 이렇게').includes('stocks'),
+    [topicsOf("2027년 주도주 완전히 바뀐다, '이 3개 주식' 모아가면 큰돈 번다"), doms('대선 여론조사 결과 총정리'), topicsOf('비상장주식 가치평가 이렇게')],
+  )
+  // F2 경영
+  check(
+    'F2 경영: 정책자금 · 절세 · 고용지원금 · 인사 · 마케팅은 경영(경제 아님)',
+    doms('정책자금 신청 전 꼭 볼 것').join() === 'business' && doms('법인 절세 방법 5가지').join() === 'business' && doms('청년 고용지원금 받는 법').join() === 'business' && doms('직원 채용 · 연봉 협상 이렇게').includes('business'),
+    [doms('정책자금 신청 전 꼭 볼 것'), doms('직원 채용 · 연봉 협상 이렇게')],
+  )
+  // F3 AI
+  check('F3 AI: 업무자동화 · AI 에이전트 · 바이브코딩은 AI 영역', doms('AI로 업무 자동화하는 법').join() === 'ai' && doms('AI 에이전트로 비서 만들기').join() === 'ai' && doms('바이브코딩으로 앱 만들기').join() === 'ai', [doms('AI로 업무 자동화하는 법'), doms('AI 에이전트로 비서 만들기')])
+  // F4 Claude
+  check(
+    'F4 Claude: 클로드 · Claude · 오퍼스 · 소넷 → Claude 묶음(세부 이름은 따로 센다)',
+    toolTopicsOf('클로드 오퍼스 써보니').join() === 'claude' && aiMentions('클로드 오퍼스 써보니').join() === 'claude,opus' && toolTopicsOf('Sonnet 새 버전 실무 후기').join() === 'claude' && topicsOf('Claude로 계약서 5분 요약').includes('claude'),
+    [aiMentions('클로드 오퍼스 써보니'), toolTopicsOf('Sonnet 새 버전 실무 후기')],
+  )
+  // F5 ChatGPT
+  check('F5 ChatGPT: 챗GPT · 챗지피티 · ChatGPT · GPTs → ChatGPT 묶음', toolTopicsOf('챗GPT로 보고서 만들기').join() === 'chatgpt' && toolTopicsOf('챗지피티 업무 활용').join() === 'chatgpt' && toolTopicsOf('GPTs 만들어 팔기').join() === 'chatgpt' && aiMentions('ChatGPT 업무 10가지').join() === 'chatgpt', [toolTopicsOf('GPTs 만들어 팔기')])
+  // F6 Codex
+  check('F6 Codex: 코덱스 · Codex → Codex 묶음(ChatGPT 묶음으로 세지 않음 · OpenAI 의 좁은 제품이 먼저)', toolTopicsOf('코덱스로 사내 도구 만들기').join() === 'codex' && toolTopicsOf('ChatGPT Codex 로 앱 만들어 봤다').join() === 'codex' && !topicsOf('코덱스로 사내 도구 만들기').includes('chatgpt'), [toolTopicsOf('ChatGPT Codex 로 앱 만들어 봤다')])
+  // F7 Astra · Sol 은 데이터가 있을 때만
+  {
+    const chs = [{ ...ch('k1', '에이아이하나', 9_000, 1), group: 'ai' }, { ...ch('k2', '에이아이둘', 9_000, 1), group: 'ai' }]
+    const none = radarVideos(prepareFeed({ channels: chs, videos: [...baseOf('k1', 5, 1_000), ...baseOf('k2', 5, 1_000), vid('k1_c', 'k1', 'Claude 업무 활용', 3 * D, 1_500), vid('k2_c', 'k2', '클로드 써보니', 4 * D, 1_500)] }, NOW), { now: NOW })
+    const some = radarVideos(prepareFeed({ channels: chs, videos: [...baseOf('k1', 5, 1_000), ...baseOf('k2', 5, 1_000), vid('k1_a', 'k1', 'Astra 써보니 달라진 점', 3 * D, 1_500), vid('k2_a', 'k2', '아스트라로 회사 업무', 4 * D, 1_500), vid('k2_s', 'k2', 'GPT-6 Sol 직접 써봤습니다', 5 * D, 9_000)] }, NOW), { now: NOW })
+    const kNone = aiKeywordBoard(none).map((k) => k.id)
+    const kSome = aiKeywordBoard(some)
+    check(
+      'F7 Astra · Sol 은 최근 영상에 실제로 나올 때만 — 0편이면 칸이 없다 · 아스트라제네카는 Astra 아님',
+      !kNone.includes('astra') && !kNone.includes('sol') && !kNone.includes('codex') && kNone.includes('claude') && kSome.find((k) => k.id === 'astra')?.videos === 2 && kSome.find((k) => k.id === 'astra')?.channels === 2 && kSome.some((k) => k.id === 'sol') && aiMentions('아스트라제네카 주가 전망').length === 0,
+      [kNone, kSome.map((k) => `${k.id}:${k.videos}`)],
+    )
+  }
+  // F8 · F9 섞이지 않음
+  check(
+    'F8 ChatGPT 영상은 Claude 묶음에 안 들어간다 · 둘을 비교하면 어느 쪽도 아니고 AI 업무 활용',
+    !topicsOf('챗GPT로 보고서 만들기').includes('claude') && !topicsOf('ChatGPT vs Claude 무엇이 맞을까').includes('claude') && !topicsOf('ChatGPT vs Claude 무엇이 맞을까').includes('chatgpt') && topicsOf('ChatGPT vs Claude 무엇이 맞을까').includes('ai_work'),
+    topicsOf('ChatGPT vs Claude 무엇이 맞을까'),
+  )
+  check('F9 Claude 영상은 Codex 묶음에 안 들어간다 · Codex 영상은 Claude 묶음에 안 들어간다', !topicsOf('Claude Code로 앱 만들기').includes('codex') && !topicsOf('Codex로 앱 만들기').includes('claude') && topicsOf('Codex와 Claude Code 비교').every((t) => t !== 'codex' && t !== 'claude'), [topicsOf('Claude Code로 앱 만들기'), topicsOf('Codex와 Claude Code 비교')])
+  // F10 Gemini · NotebookLM(Google)
+  check('F10 Gemini: 제미나이 · Gemini → Gemini 묶음 · NotebookLM 은 따로 · 둘 다 Google', toolTopicsOf('제미나이로 메일 정리').join() === 'gemini' && toolTopicsOf('노트북LM으로 회사 자료 정리').join() === 'notebooklm' && toolTopicsOf('Gemini와 NotebookLM 같이 쓰기').join() === 'gemini,notebooklm', [toolTopicsOf('Gemini와 NotebookLM 같이 쓰기')])
+
+  // F11~F14 — 채널 묶음 피드(직접 경쟁 3 · AI 3 · 포맷 1 · 생활 1)
+  const chs = [
+    { ...ch('d1', '세금채널', 50_000, 1), group: 'direct' },
+    { ...ch('d2', '자금채널', 50_000, 1), group: 'direct' },
+    { ...ch('d3', '경영채널', 50_000, 1), group: 'direct' },
+    { ...ch('a1', 'AI하나', 20_000, 1), group: 'ai' },
+    { ...ch('a2', 'AI둘', 20_000, 1), group: 'ai' },
+    { ...ch('a3', 'AI셋', 20_000, 1), group: 'ai' },
+    { ...ch('f1', '대담채널', 900_000, 1), group: 'format', note: '전문가 인터뷰 · 대담 포맷' },
+    { ...ch('o1', '생활채널', 100_000, 1), group: 'direct' },
+  ]
+  const vids = [
+    ...baseOf('d1', 6, 1_000), ...baseOf('d2', 6, 1_000), ...baseOf('d3', 6, 1_000),
+    ...baseOf('a1', 6, 1_000), ...baseOf('a2', 6, 1_000), ...baseOf('a3', 6, 1_000),
+    ...baseOf('f1', 6, 10_000), ...baseOf('o1', 6, 5_000),
+    vid('d1_t', 'd1', '정책자금 신청 전 꼭 볼 것', 3 * D, 5_000), vid('d2_t', 'd2', '정책자금 거절 이유 3가지', 4 * D, 4_500), vid('d3_t', 'd3', '올해 정책자금 달라진 점', 5 * D, 1_200),
+    vid('a1_t', 'a1', 'Claude 로 계약서 요약', 3 * D, 6_000), vid('a2_t', 'a2', '클로드 업무 활용', 4 * D, 5_000), vid('a3_t', 'a3', 'Claude 써보니', 5 * D, 1_100),
+    // 생활 채널 — 다이어트 영상이 여러 채널에서 크게 터져도 메인 후보가 되지 않는다(분류표 밖)
+    vid('o1_x', 'o1', '다이어트 브이로그 30일 결과', 6 * D, 60_000), vid('d3_x', 'd3', '다이어트 브이로그 2주 차', 5 * D, 9_000),
+    // 평범한 기타 영상(평소 수준)
+    vid('o1_n', 'o1', '주말 캠핑 다녀왔습니다', 8 * D, 5_100),
+    // 기타인데 3.5배(작은 채널도 아님 · 형식 반복 없음) — 사이드에도 안 뜬다
+    vid('o1_m', 'o1', '여름 휴가 짐 싸기', 9 * D, 17_500),
+    // 전문가 인터뷰 10배 — 사이드
+    vid('f1_i', 'f1', '앞으로 10년 이렇게 바뀝니다 (김교수 풀버전)', 8 * D, 100_000),
+  ]
+  const p = prepareFeed({ channels: chs, videos: vids }, NOW)
+  const rv = radarVideos(p, { now: NOW })
+  const plan = radarPlan(p, { now: NOW }, rv)
+  const byId = new Map(rv.map((v) => [v.id, v]))
+  check(
+    'F11 TOP 은 경제 · 경영 · AI 주제만 — 기타(다이어트) 영상이 크게 터져도 후보 · 묶음이 생기지 않는다',
+    plan.picks.length > 0 && plan.picks.every((o) => o.domain !== 'other') && plan.clusters.every((c) => c.domain !== 'other') && byId.get('o1_x')?.domains.join() === 'other' && !breakoutVideos(rv).some((v) => v.id === 'o1_x'),
+    [plan.picks.map((o) => `${o.topic}/${o.domain}`), byId.get('o1_x')?.domains],
+  )
+  const side = sideBreakouts(rv)
+  check('F12 기타 영상이 평소의 5배 넘게 터지면 사이드 급상승에(포맷 · 훅 · 구성 참고 문장과 함께)', side.some((x) => x.v.id === 'o1_x' && x.notes.length > 0) && byId.get('o1_x')?.tier === 'breakout', side.map((x) => `${x.v.id}:${x.why}`))
+  check(
+    'F13 평범한 기타 영상(평소 수준 · 3.5배인 큰 채널 영상)은 사이드에도 안 뜬다 · 최대 5편 · 채널마다 1편',
+    !side.some((x) => x.v.id === 'o1_n') && !side.some((x) => x.v.id === 'o1_m') && side.length <= 5 && new Set(side.map((x) => x.v.channelId)).size === side.length && !side.some((x) => x.v.id === 'd3_x' && side.some((y) => y.v.id === 'o1_x' && y.v.channelId === 'd3')),
+    side.map((x) => `${x.v.id}:${(x.v.adjusted ?? 0).toFixed(1)}`),
+  )
+  const iv = side.find((x) => x.v.id === 'f1_i')
+  check('F14 전문가 인터뷰(채널 메모 · 풀버전) 10배 → 사이드 · "전문가 인터뷰" 꼬리표 · 인터뷰 구성 참고', !!iv && iv.v.formats.includes('interview') && iv.notes.some((n) => n.includes('인터뷰')) && formatTagsOf('박세익 대표 풀버전 인터뷰').includes('interview'), iv)
+
+  // F15 · F16 — 기본 벤치마킹 vs 내가 추가한 채널
+  {
+    const baseFeed = { fetchedAt: new Date(NOW).toISOString(), channels: [ch('b1', '기본채널', 10_000, 1)], videos: [vid('b1_v', 'b1', '정책자금 이야기', 3 * D, 100)], failed: [] }
+    const extra = { fetchedAt: new Date(NOW).toISOString(), channels: [ch('x1', '더한채널', 10_000, 1)], videos: [vid('x1_v', 'x1', '클로드 이야기', 3 * D, 100)], failed: [] }
+    const merged = mergeFeeds(baseFeed, extra, { x1: 'ai' })
+    const mv = radarVideos(prepareFeed(merged, NOW), { now: NOW })
+    check('F15 기본 채널 영상은 added=false · [채널 추가] 로 더한 채널 영상은 added=true(영상 상세 [기본 벤치마킹] · [내가 추가])', mv.find((v) => v.id === 'b1_v')?.added === false && mv.find((v) => v.id === 'x1_v')?.added === true && merged.channels.find((c) => c.id === 'x1')?.added === true, mv.map((v) => `${v.id}:${v.added}`))
+  }
+  check('F16 기본 채널 49곳 모두 "왜 보는 채널인지" 메모가 있다(8자 넘게) · 채널 번호 겹침 없음', CHANNELS.length === NCH && CHANNELS.every((c) => typeof c.note === 'string' && c.note.trim().length >= 8) && new Set(CHANNELS.map((c) => c.id)).size === NCH, CHANNELS.filter((c) => !c.note || c.note.length < 8).map((c) => c.handle))
+
+  // F17 · F18 — 새 AI 키워드(보여 주기만)
+  {
+    const ai = (id: string, title: string) => ({ ...ch(id, title, 9_000, 1), group: 'ai' })
+    const chs2 = [ai('n1', '에이아이 하나'), ai('n2', '에이아이 둘'), ai('n3', '에이아이 셋'), ai('n4', 'Nova Lab'), { ...ch('n5', '직접채널', 9_000, 1), group: 'direct' }]
+    const v2 = [
+      ...baseOf('n1', 5, 1_000), ...baseOf('n2', 5, 1_000), ...baseOf('n3', 5, 1_000), ...baseOf('n4', 5, 1_000), ...baseOf('n5', 5, 1_000),
+      vid('n1_s', 'n1', 'Spark 로 회사 문서 정리', 2 * D, 900), vid('n2_s', 'n2', '새로 나온 Spark 써봤습니다', 3 * D, 900), vid('n3_s', 'n3', 'Spark 무료 사용법 #shorts', 4 * D, 900, 40),
+      // 채널 이름에 든 말(Nova) — 세 채널에서 나와도 새 키워드가 아님
+      vid('n4_n', 'n4', 'Nova 실험 1', 2 * D, 900), vid('n1_n', 'n1', 'Nova 써보니', 3 * D, 900), vid('n2_n', 'n2', 'Nova 후기', 3 * D, 900),
+      // 흔한 말(shorts · free · tutorial) · 이미 아는 이름(Claude)은 새 키워드가 아님
+      vid('n1_c', 'n1', 'Claude tutorial free', 2 * D, 900), vid('n2_c', 'n2', 'Claude tutorial free', 2 * D, 900), vid('n3_c', 'n3', 'Claude tutorial free', 2 * D, 900),
+      // 직접 경쟁 채널에서만 나온 말은 세지 않는다(AI · AX 채널 기준)
+      vid('n5_z', 'n5', 'Zeta 정책자금', 2 * D, 900),
+    ]
+    const p2 = prepareFeed({ channels: chs2, videos: v2 }, NOW)
+    const rv2 = radarVideos(p2, { now: NOW })
+    const nk = newAiKeywords(p2, rv2)
+    check('F17 새 AI 키워드: 분류표에 없는 이름(Spark)이 최근 14일 AI 채널 3곳에서 → 후보(3채널 · 3편) — 분류표에 저절로 넣지 않음', nk.some((k) => k.word === 'Spark' && k.channels === 3 && k.videos === 3) && !TOPICS.some((t) => t.match.test(normalizeTitle(' spark '))), nk)
+    check('F18 채널 이름(Nova) · 흔한 말(tutorial · free · shorts) · 이미 아는 이름(Claude) · AI 채널 밖 말(Zeta)은 새 키워드가 아니다', !nk.some((k) => /^(nova|tutorial|free|shorts|claude|zeta)$/i.test(k.word)), nk)
+  }
+
+  // F19 · F20
+  check('F19 마케팅 · 콘텐츠 레이더는 여전히 대표 전용 — 팀장(Pilot) 메뉴에 없고 직접 주소도 막힘', isPilotHiddenPath('/marketing/youtube') && isPilotHiddenPath('/marketing') && enabledModulesByGroup({ pilot: true }).every((g) => g.items.every((m) => m.key !== 'marketing')) && enabledModulesByGroup({}).some((g) => g.items.some((m) => m.key === 'marketing')))
+  check('F20 6시간 자동 갱신 그대로 — 6시간 · 채널이 49곳으로 바뀌어 판(2-49-…)이 달라져 열자마자 새로 받음(위 1~12 시험 그대로 통과)', FRESH_MS === 6 * H && /^2-49-/.test(FEED_REVISION) && FEED_REVISION === feedRevisionOf() && feedRevisionOf(CHANNELS.slice(0, 33)) !== FEED_REVISION, FEED_REVISION)
+
+  // 추가 — 왜 추천됐나요 · 지금 강한 흐름 · 인기 탭 핵심/기타 · 흔한 말
+  const top = plan.picks[0]
+  const why = top ? whyRecommended(top) : []
+  check('왜 추천됐나요: 다섯 가지(여러 채널 · 평소보다 잘됨 · 늘어남 · 작은 채널 · 경제·경영·AI) — 맞음/아님 + 사람 말 · 점수 없음', why.length === 5 && why.map((w) => w.id).join() === 'spread,hot,growing,small,domain' && why.every((w) => w.text.length > 5 && !/\d+\s*점/.test(w.text)) && why[4].met, why)
+  const ds = domainSignals(plan.clusters)
+  check('지금 강한 흐름: 데이터가 있는 영역만 채운다(경제 영상이 없으면 경제 칸은 비어 있음) · 경영 · AI 는 채워짐', ds.map((d) => d.domain).join() === 'economy,business,ai' && ds[0].items.length === 0 && ds[1].items.some((x) => x.topicId === 'policy_fund') && ds[2].items.some((x) => x.topicId === 'claude'), ds.map((d) => `${d.domain}:${d.items.map((x) => x.topicId)}`))
+  check('인기 탭 핵심 키워드: 클로드 · 정책자금 · 부동산 = 핵심 / 다이어트 · 캠핑 = 기타 · 반드시 · 직장인을 · 충격적인 · 뒤집힌다 · 알아서 = 흔한 말', isCoreKeyword('클로드') && isCoreKeyword('정책자금') && isCoreKeyword('부동산') && !isCoreKeyword('다이어트') && !isCoreKeyword('캠핑') && isNoiseKeyword('반드시') && isNoiseKeyword('직장인을') && isNoiseKeyword('충격적인') && isNoiseKeyword('뒤집힌다') && isNoiseKeyword('알아서') && !isNoiseKeyword('가업승계 증여특례') && !isNoiseKeyword('고용지원금') && !isNoiseKeyword('부모님') && !isNoiseKeyword('바다'))
+  check('사이드 급상승은 핵심 영상(경제 · 경영 · AI)을 넣지 않는다', side.every((x) => !isCore(x.v)))
 }
 
 console.log(`\nyoutube: ${passed} passed, ${failed} failed`)

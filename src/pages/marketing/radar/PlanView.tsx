@@ -3,12 +3,15 @@
  *  1) 1순위 하나만 크게(HERO) — 주제 · 왜 지금 한 문장 · 핵심 근거 2개 · MIRAE 관점 · 제목 예 · [이번 주로 확정] [근거 보기]
  *  2) 2 · 3순위는 작게 — 핵심 근거 · MIRAE 관점 한 줄 · [이번 주로 확정] [근거]
  *  3) 4 · 5위 한 줄 · [후보 더 보기] 6~10위
- *  4) 시장 신호(다음 후보를 찾는 곳) — 급상승 주제 · 평소보다 터진 영상 각 4개 + [더 보기]
+ *  4) 경제 · 경영 · AI 시장 신호(D-197 · 다음 후보를 찾는 곳) — 지금 강한 흐름(세 영역) · AI 핵심 키워드 ·
+ *     급상승 주제 · 평소보다 터진 영상 각 4개 + [더 보기] — 메인 후보처럼 경제 · 경영 · AI 주제만
+ *  5) 사이드 급상승(D-197) — 그 밖 주제에서 비정상적으로 크게 터진 영상만(최대 5) · TOP 보다 작게
+ * 카드마다 [왜 추천됐나요?] — 추천 기준 다섯 가지 중 맞는 것 · 아닌 것(점수 없음).
  * 썸네일 · 배수 · 모든 숫자는 [근거 보기] 안에 — 숨기지 않고 자리만 옮겼다(기본 상태에서 시선을 뺏지 않게).
  * 카드 문구는 '근거 → 제안' 순서. 'AI 추천' · '성공 가능 %' 같은 말을 쓰지 않는다.
  */
 import { useMemo, useState } from 'react'
-import { BookmarkCheck, BookmarkPlus, CalendarCheck, ChevronDown, ClipboardCopy, EyeOff, Flame, Info, NotebookPen, RotateCcw, Settings2, TrendingUp } from 'lucide-react'
+import { BookmarkCheck, BookmarkPlus, CalendarCheck, Check, ChevronDown, CircleHelp, ClipboardCopy, EyeOff, Flame, Info, Minus, NotebookPen, RotateCcw, Settings2, TrendingUp } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
 import { Badge } from '../../../components/ui/primitives'
 import { HintTip } from '../../../components/ui/fold'
@@ -21,16 +24,24 @@ import {
   AXIS_LABEL,
   DEFAULT_MIX,
   PATTERN_LABEL,
+  SMALL_CHANNEL_SUBS,
+  WHY_LABEL,
   coverageLine,
   normalizeMix,
   opportunityLabel,
+  whyRecommended,
+  type AiKeywordStat,
+  type DomainSignal,
   type MixGuide,
+  type NewAiKeyword,
   type Opportunity,
   type RadarPlan,
   type RadarVideo,
   type RisingTopic,
+  type SideBreakout,
 } from '../../../services/marketing/ytRadar'
-import { AxisBadge, RatioChip, StrengthMeter, Thumb, VideoRow } from './RadarParts'
+import { AiKeywordBoard, DomainBoard, SideBreakouts } from './FocusSignals'
+import { AxisBadge, DomainBadge, RatioChip, StrengthMeter, Thumb, VideoRow } from './RadarParts'
 
 /** 시장 신호 첫 화면 개수(나머지는 [더 보기]) */
 const SIGNAL_FIRST = 4
@@ -39,6 +50,7 @@ export function PlanView({
   plan,
   rising,
   breakouts,
+  focus,
   basis,
   ideas,
   readOnly,
@@ -56,6 +68,8 @@ export function PlanView({
   plan: RadarPlan
   rising: RisingTopic[]
   breakouts: RadarVideo[]
+  /** D-197 — 지금 강한 흐름 · AI 핵심 키워드 · 업무 흐름 · 새 AI 키워드 후보 · 사이드 급상승 */
+  focus: FocusData
   basis: string
   ideas: readonly ContentIdea[]
   readOnly: boolean
@@ -178,9 +192,18 @@ export function PlanView({
         )}
       </section>
 
-      <MarketSignals rising={rising} breakouts={breakouts} noThumb={noThumb} onOpenVideo={onOpenVideo} />
+      <MarketSignals rising={rising} breakouts={breakouts} focus={focus} noThumb={noThumb} onOpenVideo={onOpenVideo} />
+      <SideBreakouts items={focus.side} noThumb={noThumb} onOpenVideo={onOpenVideo} />
     </div>
   )
+}
+
+export interface FocusData {
+  domains: DomainSignal[]
+  aiKeywords: AiKeywordStat[]
+  workflow: Array<{ topicId: string; label: string; channels: number; videos: number; breakouts: number }>
+  fresh: NewAiKeyword[]
+  side: SideBreakout[]
 }
 
 /* ------------------------------------------------------------------ */
@@ -240,12 +263,13 @@ function HeroCard(props: CardProps) {
   const { o } = props
   const [open, setOpen] = useState(false)
   return (
-    <article className="flex min-w-0 flex-col gap-4 self-start rounded-(--radius-panel) border border-slate-300 bg-white p-4 shadow-(--shadow-card) sm:p-6 md:col-span-2 xl:col-span-1" data-testid="radar-opp" data-size="hero" data-rank="1" data-axis={o.axis} data-strength={o.strength} aria-labelledby={`radar-h-${o.key}`}>
+    <article className="flex min-w-0 flex-col gap-4 self-start rounded-(--radius-panel) border border-slate-300 bg-white p-4 shadow-(--shadow-card) sm:p-6 md:col-span-2 xl:col-span-1" data-testid="radar-opp" data-size="hero" data-rank="1" data-axis={o.axis} data-domain={o.domain} data-strength={o.strength} aria-labelledby={`radar-h-${o.key}`}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="t-meta rounded-full bg-slate-900 px-2.5 py-0.5 font-bold text-white" data-testid="radar-rank1">
           이번 주 1순위
         </span>
         <AxisBadge axis={o.axis} />
+        <DomainBadge axis={o.axis} domain={o.domain} />
         <StrengthMeter strength={o.strength} />
       </div>
       <h3 id={`radar-h-${o.key}`} className="text-2xl leading-tight font-bold break-keep text-slate-900 [overflow-wrap:anywhere] sm:text-[28px]" data-testid="radar-opp-topic">
@@ -257,6 +281,7 @@ function HeroCard(props: CardProps) {
           {o.summary}
         </p>
         <Facts o={o} />
+        <WhyRecommended o={o} />
       </div>
       <div className="flex flex-col gap-1.5 rounded-(--radius-card) border-l-4 border-brand-500 bg-brand-50/50 px-4 py-3">
         <p className="t-meta font-bold tracking-wide text-brand-800">MIRAE 는 이렇게 다르게 말합니다</p>
@@ -282,16 +307,18 @@ function SubCard(props: CardProps & { rank: number }) {
   const { o, rank } = props
   const [open, setOpen] = useState(false)
   return (
-    <article className="flex min-w-0 flex-col gap-2.5 rounded-(--radius-card) border border-slate-200 bg-white p-4" data-testid="radar-opp" data-size="sub" data-rank={rank} data-axis={o.axis} data-strength={o.strength} aria-labelledby={`radar-h-${o.key}`}>
+    <article className="flex min-w-0 flex-col gap-2.5 rounded-(--radius-card) border border-slate-200 bg-white p-4" data-testid="radar-opp" data-size="sub" data-rank={rank} data-axis={o.axis} data-domain={o.domain} data-strength={o.strength} aria-labelledby={`radar-h-${o.key}`}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="t-meta flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-200 font-bold text-slate-700">{rank}</span>
         <AxisBadge axis={o.axis} />
+        <DomainBadge axis={o.axis} domain={o.domain} />
         <StrengthMeter strength={o.strength} />
       </div>
       <h3 id={`radar-h-${o.key}`} className="t-card font-bold break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="radar-opp-topic">
         {o.topic}
       </h3>
       <Facts o={o} size="sm" />
+      <WhyRecommended o={o} />
       <p className="t-sub break-keep text-slate-700" data-testid="radar-view">
         <span className="t-meta font-bold text-brand-800">MIRAE 관점 </span>
         {o.view}
@@ -310,10 +337,11 @@ function CompactOpportunity(props: CardProps & { rank: number }) {
   const { o, rank } = props
   const [open, setOpen] = useState(false)
   return (
-    <li className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-3 py-2.5" data-testid="radar-opp-compact" data-axis={o.axis}>
+    <li className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-white px-3 py-2.5" data-testid="radar-opp-compact" data-axis={o.axis} data-domain={o.domain}>
       <button type="button" onClick={() => setOpen((x) => !x)} aria-expanded={open} className="tap flex w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-left">
         <span className="t-meta flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-200 font-bold text-slate-700">{rank}</span>
         <AxisBadge axis={o.axis} />
+        <DomainBadge axis={o.axis} domain={o.domain} />
         <span className="t-body min-w-0 flex-[1_1_12rem] font-bold break-keep text-slate-900 [overflow-wrap:anywhere]">{o.topic}</span>
         <StrengthMeter strength={o.strength} />
         <ChevronDown aria-hidden="true" className={`size-4 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -322,6 +350,7 @@ function CompactOpportunity(props: CardProps & { rank: number }) {
         <div className="flex flex-col gap-2 pl-1">
           <p className="t-sub break-keep text-slate-700">{o.summary}</p>
           <Facts o={o} size="sm" />
+          <WhyRecommended o={o} />
           <p className="t-sub break-keep text-slate-800">
             <span className="t-meta font-bold text-brand-800">MIRAE 관점 </span>
             {o.view}
@@ -333,6 +362,40 @@ function CompactOpportunity(props: CardProps & { rank: number }) {
         </div>
       )}
     </li>
+  )
+}
+
+/**
+ * [왜 추천됐나요?] — 추천 기준 다섯 가지(여러 채널 반복 · 평소보다 잘됨 · 늘어남 · 작은 채널 · 경제·경영·AI) 중
+ * 이 후보에 맞는 것 · 아닌 것. 점수를 매기지 않는다(D-197).
+ */
+function WhyRecommended({ o }: { o: Opportunity }) {
+  const [open, setOpen] = useState(false)
+  const items = useMemo(() => whyRecommended(o), [o])
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <button type="button" onClick={() => setOpen((x) => !x)} aria-expanded={open} className="tap t-sub inline-flex items-center gap-1 self-start font-semibold text-slate-600 hover:text-slate-900" data-testid="radar-why-rec">
+        <CircleHelp aria-hidden="true" className="size-4" /> 왜 추천됐나요?
+        <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2.5" data-testid="radar-why-panel">
+          <ul className="flex flex-col gap-1">
+            {items.map((i) => (
+              <li key={i.id} className="t-sub flex min-w-0 items-start gap-2 break-keep" data-testid="radar-why-item" data-id={i.id} data-met={i.met ? '1' : '0'}>
+                {i.met ? <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-success-600" /> : <Minus aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-slate-400" />}
+                <span className="min-w-0">
+                  <span className={`font-semibold ${i.met ? 'text-slate-900' : 'text-slate-500'}`}>{i.label}</span>
+                  <span className={i.met ? 'text-slate-700' : 'text-slate-500'}> — {i.text}</span>
+                  <span className="sr-only">{i.met ? '(맞음)' : '(아직 아님)'}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="t-meta break-keep text-slate-500">점수를 매기지 않습니다 — 맞는 근거와 [추천 기준] 의 규칙으로 순서를 정합니다.</p>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -446,6 +509,27 @@ function Criteria({ plan, basis, readOnly, onMix, onUnmute, onClose }: { plan: R
   const [draft, setDraft] = useState<MixGuide>(plan.mix)
   return (
     <div className="flex flex-col gap-4 rounded-(--radius-card) border border-slate-200 bg-white p-4 shadow-(--shadow-card)" data-testid="radar-criteria">
+      <div className="flex flex-col gap-1.5" data-testid="radar-criteria-list">
+        <p className="t-sub font-bold text-slate-900">이 레이더는 이렇게 고릅니다</p>
+        <ol className="flex list-decimal flex-col gap-0.5 pl-5">
+          <li className="t-sub break-keep text-slate-700">
+            <span className="font-semibold text-slate-900">{WHY_LABEL.spread}</span> — 최근 2주 여러 채널이 같은 주제를 다뤘는지
+          </li>
+          <li className="t-sub break-keep text-slate-700">
+            <span className="font-semibold text-slate-900">{WHY_LABEL.hot}</span> — 그 채널 평소(같은 롱폼/쇼츠 중앙값)보다 2배 넘게 잘됐는지 · 3배 넘으면 '터짐'(올린 지 7일 안 된 영상은 나이를 반영)
+          </li>
+          <li className="t-sub break-keep text-slate-700">
+            <span className="font-semibold text-slate-900">{WHY_LABEL.growing}</span> — 그 전 6주보다 최근 2주에 빠르게 늘었는지
+          </li>
+          <li className="t-sub break-keep text-slate-700">
+            <span className="font-semibold text-slate-900">{WHY_LABEL.small}</span> — 구독자 {shortNum(SMALL_CHANNEL_SUBS)} 이하 채널에서도 터졌는지
+          </li>
+          <li className="t-sub break-keep text-slate-700">
+            <span className="font-semibold text-slate-900">{WHY_LABEL.domain}</span> — 메인 후보는 경제 · 경영 · AI 주제에서만. 그 밖에서 크게 터진 영상은 아래 '사이드 급상승' 에 따로(포맷 참고용)
+          </li>
+        </ol>
+        <p className="t-meta break-keep text-slate-500">점수를 매기지 않습니다 — 신호 강함 = 최근 2주 3개 넘는 채널 + 터진 영상 · 신호 보통 = 2개 넘는 채널 + 늘어남이나 잘된 영상 · 그 밖은 초기 신호. 한 채널이 거의 다 올린 주제는 초기 신호까지만.</p>
+      </div>
       <p className="t-sub break-keep text-slate-600" data-testid="radar-basis">
         {basis}
       </p>
@@ -519,7 +603,7 @@ function Criteria({ plan, basis, readOnly, onMix, onUnmute, onClose }: { plan: R
 /* 시장 신호 — 다음 후보를 찾는 곳(후보보다 눈에 덜 띄게)                      */
 /* ------------------------------------------------------------------ */
 
-function MarketSignals({ rising, breakouts, noThumb, onOpenVideo }: { rising: RisingTopic[]; breakouts: RadarVideo[]; noThumb: boolean; onOpenVideo: (v: RadarVideo) => void }) {
+function MarketSignals({ rising, breakouts, focus, noThumb, onOpenVideo }: { rising: RisingTopic[]; breakouts: RadarVideo[]; focus: FocusData; noThumb: boolean; onOpenVideo: (v: RadarVideo) => void }) {
   const [allRising, setAllRising] = useState(false)
   const [allBreakouts, setAllBreakouts] = useState(false)
   const shownRising = allRising ? rising : rising.slice(0, SIGNAL_FIRST)
@@ -527,13 +611,15 @@ function MarketSignals({ rising, breakouts, noThumb, onOpenVideo }: { rising: Ri
   return (
     <section className="flex flex-col gap-2.5" aria-labelledby="radar-signals-h" data-testid="radar-signals">
       <div className="flex flex-wrap items-baseline gap-x-2">
-        <HintTip tip={hintFor('시장 신호')} label="시장 신호">
-          <h2 id="radar-signals-h" className="t-card font-bold text-slate-900">
-            시장 신호
+        <HintTip tip={hintFor('시장 신호')} label="경제 · 경영 · AI 시장 신호">
+          <h2 id="radar-signals-h" className="t-card font-bold break-keep text-slate-900">
+            경제 · 경영 · AI 시장 신호
           </h2>
         </HintTip>
         <span className="t-meta text-slate-500">다음 후보를 찾는 곳</span>
       </div>
+      <DomainBoard signals={focus.domains} />
+      <AiKeywordBoard keywords={focus.aiKeywords} workflow={focus.workflow} fresh={focus.fresh} />
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-slate-50/60 p-3 sm:p-4" data-testid="radar-rising">
           <HintTip tip={hintFor('급상승 주제')} label="급상승 주제">

@@ -6,7 +6,7 @@
  *  - 정해 둔 채널(내 채널 + 벤치마킹)의 정보 + 채널마다 최근 영상 50편. 채널마다 묶음(group)을 붙여 보낸다:
  *    direct(직접 경쟁 · 시장수요) · ai(AI 실무) · ax(AX · 업무자동화) · format(포맷 벤치마킹).
  *  - 쓰는 할당량: 채널 정보 1단위(50곳까지 한 번에) + 채널마다 2단위(최근 영상 목록 · 영상 정보).
- *    D-194 채널 33곳(모두 채널 번호) → 한 번에 약 67단위(하루 무료 10,000단위의 0.7%). 검색(search.list · 100단위)은 쓰지 않는다.
+ *    D-197 채널 49곳(모두 채널 번호) → 한 번에 99단위(하루 무료 10,000단위의 1%). 검색(search.list · 100단위)은 쓰지 않는다.
  *  - D-196 6시간 칸: 화면은 ?win=6시간 칸&rev=채널 구성 판 으로 부른다 — 그 칸이 끝날 때까지 Vercel 캐시에 둔다
  *    → 같은 6시간 · 같은 판이면 몇 명이 열어도 유튜브는 한 번(하루 4번 × 67단위). 예전 화면의 ?slot=오늘(9시까지 캐시)도 그대로 받는다.
  *  - [지금 새로 가져오기] 는 ?bucket=30분 칸 — 같은 30분 안에서는 몇 번을 눌러도 한 번만 유튜브를 부른다
@@ -45,10 +45,13 @@ const MAX_EXTRA = 10
  *  - @사장노트 는 유튜브에 그 주소가 없어(404) 대표 지시로 목록에서 뺐다(2026-10-14)
  * D-194: 묶음(group) · 메모(note). AI 실무 8 · AX 4 · 포맷 2 를 더했다 — 모두 2026-10-14 유튜브 채널 화면에서
  *   채널 번호 · 이름 · 구독자를 직접 확인한 곳만(지어낸 채널 없음). 구독자 수는 그날 화면에 보인 값.
+ * D-197: AI 실무 11 · AX 5 를 더 더했다(AI 19 · AX 9 · 모두 49곳) — 후보 70여 곳을 채널 화면으로 확인해
+ *   최근 30~60일 업로드 · 실무 활용 중심만. 메모(note)는 화면 '왜 보는 채널인지' 에 그대로 보인다.
+ *   49곳이라 채널 정보는 여전히 한 번(50곳까지) · 한 번 받기 1 + 49 × 2 = 99단위.
  */
 export const CHANNELS = [
   // ---- 직접 경쟁 · 시장수요(예전 앱 20곳 — 주소가 없어진 @사장노트 만 뺌) ----
-  { id: 'UCjXWwM0_25vl1Mpr2Pc5amQ', handle: '@김팀장의경영노트', name: '김팀장의 경영노트', group: 'direct', mine: true, note: '내 채널' },
+  { id: 'UCjXWwM0_25vl1Mpr2Pc5amQ', handle: '@김팀장의경영노트', name: '김팀장의 경영노트', group: 'direct', mine: true, note: '내 채널 — 벤치마킹과 견줄 평소 조회수 · 잘된 주제 기준' },
   { id: 'UCnnqB7SaH8o-NHLonSFfE3A', handle: '@yoido', name: '여의도 정보맨', group: 'direct', note: '소상공인 정책자금 · 지원금 속보 — (속보) 말머리 · 공문 화법은 포맷 참고로도 좋다' },
   { id: 'UC5EQkCVDppT_5B9X7i6TIWg', handle: '@소상공인도우미', name: '소상공인 도우미 | 정책원', group: 'direct', note: '소상공인 지원 정책 · 쇼츠 위주' },
   { id: 'UCaiqXSUrOib0SZjBIvXTzjw', handle: '@onetop-1', name: 'ONETOP_경영컨설팅', group: 'direct', note: '정책자금 · 경영컨설팅' },
@@ -57,7 +60,7 @@ export const CHANNELS = [
   { id: 'UCOsUUoxhs69bPAi1N03D9Og', handle: '@jeongel', name: '정엘 가업승계 연구소', group: 'direct', note: '가업승계 · 법인 자금' },
   { id: 'UC_IJ2OlHt3dS7uuEHu3Dvhw', handle: '@kstartuptv', name: '스타트업TV', group: 'direct', note: '창업자금 · 소상공인 정책자금' },
   { id: 'UCb1KRnbtUYVb1thGLOtBEAQ', handle: '@richceo', name: '부자사장연구소', group: 'direct', note: '법인 대표 돈 · 법인전환' },
-  { id: 'UC73RuX0YCYWBJoDHMCnfNIQ', handle: '@businesshelperJo', name: '비즈니스헬퍼', group: 'direct', note: '사업자 지원' },
+  { id: 'UC73RuX0YCYWBJoDHMCnfNIQ', handle: '@businesshelperJo', name: '비즈니스헬퍼', group: 'direct', note: '사업자 지원 제도 설명 — 대표님이 찾는 지원 주제 수요 확인' },
   { id: 'UC4-jNRLcNNcPHG864icJcKQ', handle: '@bogopatv', name: '보고파TV', group: 'direct', note: '가업승계 · 세제 개편' },
   { id: 'UC3kRdLEVPaFmr3obvmNafNA', handle: '@money_recipe', name: '머니해결사 정대표', group: 'direct', note: '정책자금 · 법인영업' },
   { id: 'UCX_Jg2GJWeSy2jGd7M0bRlQ', handle: '@사장님성장솔루션', name: '준쌤 l 사장님성장솔루션', group: 'direct', note: '소상공인 지원금 · 창업지원' },
@@ -66,7 +69,7 @@ export const CHANNELS = [
   { id: 'UCSYUQrcXUnRuvqBdqDlT74g', handle: '@nicetax', name: '이상화세무사의 모래세무', group: 'direct', note: '법인세 · 세무조사' },
   { id: 'UC2ByczqyZtt0Lj2DCkQuXJA', handle: '@세금전문회계사김희연', name: '절세미녀 김희연 회계사', group: 'direct', note: '절세 · 연금 — 쇼츠 화법도 참고' },
   { id: 'UCOrN9I5NyZ7ZQWW30togg-w', handle: '@dowssem', name: '도혜연세무사', group: 'direct', note: '자본거래 · 가업승계' },
-  { id: 'UCFSVU2_P0L2n21_d2J-ZQ2Q', handle: '@세무사', name: '이상호 세무사 씽크택스', group: 'direct', note: '세금 일반' },
+  { id: 'UCFSVU2_P0L2n21_d2J-ZQ2Q', handle: '@세무사', name: '이상호 세무사 씽크택스', group: 'direct', note: '세금 일반 — 절세 · 세금 신고 주제 수요 확인' },
   // ---- AI 실무(D-194 · 구독자 약 10만 이하 · 최근 30일 업로드 · 실무 적용) ----
   { id: 'UCgi5InkiecEitESPWd-n0vA', handle: '@HappyAI_0612', name: '해피AI | 이진규', group: 'ai', note: 'Claude · 에이전트로 업무자동화 실습 — 구독자 1만대인데 조회가 강함' },
   { id: 'UCDq9_N34UnlMSlFB4kWE15w', handle: '@routeai', name: '이동훈의 루트AI', group: 'ai', note: "ChatGPT 업무 활용 · '우리 회사 업무자동화' 실습 파일" },
@@ -76,11 +79,29 @@ export const CHANNELS = [
   { id: 'UCFmYIak2sRBXt2M3ep6U3QA', handle: '@jayychoii', name: 'Jay Choi | 인디해커 라이프', group: 'ai', note: 'AI로 직접 만들기 · 긴 실전 가이드' },
   { id: 'UCZ-cyNeQAQfcZt-gEuX06Zg', handle: '@SURVIVALAI2025', name: '생존AI', group: 'ai', note: '경영관리 직장인의 AI 실험(에이전트에게 일 맡기기)' },
   { id: 'UCn26HGVN_pmHzMHZDWOiKZA', handle: '@choiceuniverse', name: '시간기획자 최민정', group: 'ai', note: '1~10인 회사 생산성 · 노션 + AI' },
+  // D-197 AI 실무 더함(2026-10-14 채널 화면에서 번호 · 이름 · 구독자 · 최근 업로드 직접 확인 — 지어낸 채널 없음)
+  { id: 'UC1L4zVeBF0UNt3lDPgTDm7w', handle: '@ai.dingco', name: '딩코의 AI 심야 아지트', group: 'ai', note: '주간보고 · 회의록 · 엑셀을 Claude · ChatGPT · Codex 로 — 60~70분 총정리 강의 포맷' },
+  { id: 'UCztt42h03X49HFRGW9--Bhg', handle: '@aiadjunct', name: 'AI 겸임교수 이종범', group: 'ai', note: '보고서 · 기획서 · 엑셀 · 회의록 실무 AI — AX · AI 네이티브 회사 이야기도' },
+  { id: 'UCc3-QWjpSyx7D_x7kh3TdgQ', handle: '@Vibe_RaiN', name: '레인 | AI 바이브코딩', group: 'ai', note: '비개발자의 Claude 업무 연결(보고서 · 에이전트) — 작은 채널인데 조회 강함' },
+  { id: 'UCtuLRvs6DgN5DZvxbNoL5IQ', handle: '@digital_ggultip', name: '디꿀방', group: 'ai', note: 'Gemini · NotebookLM 으로 업무 에이전트(계약 검토 · 일정) — 구글 도구 실무' },
+  { id: 'UCWRWkyubH0HCnjLsXoCCLzQ', handle: '@라핀_AI_자동화', name: '직장인 AI 업무 자동화 | 라핀', group: 'ai', note: '보고서 · 엑셀 취합 · 회의록을 코딩 없이 나만의 프로그램으로' },
+  { id: 'UCBlTB7GyNQLqZMDRFEZ_cSg', handle: '@ai.yeongseon', name: '신영선의 AI탐구', group: 'ai', note: '대표 · 사장님 사례로 보는 AI 자동화(블로그 · 마케팅 · 에이전트) — 사업자 눈높이' },
+  { id: 'UCCw1Ng1uXaemhIMYRyla7Vw', handle: '@online_techtree', name: '온라인 사업 전략, 온크트리', group: 'ai', note: '온라인 사업자용 AI 자동화 — "(N분 완성)" 제목 공식' },
+  { id: 'UCXVkzJyouB52ycIz40VPQcg', handle: '@workai_lab', name: '외부강사 김지백 (모두의 AI 교육)', group: 'ai', note: '직장인 · 사장님용 오늘 바로 쓰는 AI — 회의 · 보고 도구 · 프롬프트 배포형' },
+  { id: 'UC6PuL8-eXqizOYtvLCK9iJQ', handle: '@에이커-돈이되는AI', name: '에이커, 돈이되는 AI와 이커머스', group: 'ai', note: 'ChatGPT · Gemini · Claude "기능 N가지" — 조회 강한 제목 · 썸네일 공식(업로드는 드문 편)' },
+  { id: 'UCidyOPC0asenYpq_Mgbfa0w', handle: '@honjobs', name: '혼잡스', group: 'ai', note: '"지도 한 장으로 끝내기" 정리 포맷 · 모조리 자동화 연재(대형 · 일반 IT 도 섞임)' },
+  { id: 'UCN3c2S-RZCh1PIVpkL4STVg', handle: '@engine_excel_AI', name: 'AI도 엑셀 이것만!', group: 'ai', note: '엑셀 실무자에게 Claude(파워쿼리 · 엑셀 보고서) — 쉬운 설명' },
   // ---- AX · 업무자동화(D-194) ----
   { id: 'UCDLlMjELbrJdETmSiAB68AA', handle: '@citizendev9c', name: '시민개발자 구씨', group: 'ax', note: '노코드 + AI 사내 시스템' },
   { id: 'UCXKXULkq--aSgzScYeLYJog', handle: '@dante-labs', name: '단테랩스', group: 'ax', note: '에이전트 · n8n 직접 구축' },
   { id: 'UCYg51KBo-UcA4QILcYl5LEw', handle: '@yunjadong', name: '윤자동', group: 'ax', note: '기업 대상 시스템 구축 · 교육 — 사업 모델이 가장 비슷' },
   { id: 'UChu25pJgVZB3p0dVEgmU0PQ', handle: '@mcodeM', name: '메타코드M', group: 'ax', note: '기업 AX · DX 강의' },
+  // D-197 AX · 업무자동화 더함(같은 날 직접 확인)
+  { id: 'UCDieGYS2T1fy-j9_GZeZeqQ', handle: '@stevesurfing', name: '스티브의 파도타기', group: 'ax', note: '아버지 제조업 회사에 AI 영업비서 · 프로젝트 비서 구축 — 중소기업 사내 시스템 실사례' },
+  { id: 'UCWyi-m_CdIbRpcwZN6MgBfg', handle: '@naminsoo_aimax', name: '나민수 AI', group: 'ax', note: '"AI 직원" 연재(잠재고객 · 제안메일 · 영업 준비) · AX 컨설팅 — 사업 모델이 비슷' },
+  { id: 'UC2z8dKsrZIiuGiIVNsRfD1A', handle: '@workbyax', name: '신성진 · Work by AX', group: 'ax', note: '기업 출강 AX 강사의 업무별 실습 · 에이전트 업무자동화 연재 구성' },
+  { id: 'UCxj3eVTAv9KLdrowXcuCFDQ', handle: '@builderjoshkim', name: '빌더 조쉬 Builder Josh', group: 'ax', note: 'AI 네이티브 회사 인터뷰 — 기업 AX 사례 · 대표 인터뷰 포맷' },
+  { id: 'UCKdKdx5-eLZUmAgsdvxkKiA', handle: '@VibecodingUniversity', name: '양실장의 바이브코딩대학', group: 'ax', note: '비개발자 바이브코딩 · AX 컨설턴트 양성 — 교육 사업 모델' },
   // ---- 포맷 벤치마킹(D-194 · 주제가 아니라 제목 · 구성 참고) ----
   { id: 'UCxKStIHz831RiHAiiCY3pnQ', handle: '@교양식', name: '교양식', group: 'format', note: '정부지원 주제를 전문가 인터뷰로 — 인용형 제목' },
   { id: 'UCvil4OAt-zShzkKHsg9EQAw', handle: '@lucky_tv', name: '김작가 TV', group: 'format', note: "'이것' + 출연자 제목 공식 · 인터뷰 구성(대형 채널)" },

@@ -18,11 +18,35 @@
  * 6) 묶음 크기 보정(D-195) — 직접 경쟁 채널이 AI 실무 채널보다 많다. 그래서 '몇 개 채널' 만이 아니라
  *    '그 묶음 채널 중 몇 곳이 다뤘나'(예: AI 실무 8곳 중 4곳 · 직접 경쟁 18곳 중 5곳)를 같이 보고, 같은 세기면 비율이 높은 쪽이 먼저.
  *    새 점수(0~100)는 만들지 않는다 — 화면에는 'n곳 중 m곳' 그대로 쓴다.
+ * 7) 내용 영역(D-197) — 영상마다 경제 · 경영 · AI · 기타(채널 묶음과 따로). 메인 후보는 경제 · 경영 · AI 주제에서만 나온다
+ *    (분류표 밖 영상은 주제 묶음이 생기지 않는다). 분류표 밖이라도 비정상적으로 크게 터진 영상은 '사이드 급상승' 으로 따로 —
+ *    주제를 따라 하라는 것이 아니라 포맷 · 훅 · 구성 참고용. AI 는 회사(OpenAI · Anthropic · Google)와 세부 이름(ChatGPT · Codex ·
+ *    Claude · Gemini …)으로 따로 센다 — 최근 영상에 실제로 나온 이름만 보인다. 분류표에 없는 새 영문 이름이 AI · AX 채널 3곳 넘게
+ *    반복되면 '새 AI 키워드' 후보로만 보여 준다(분류표에 저절로 넣지 않는다).
  */
 import { SHORT_MAX_SEC, extractTopics, periodVideos, type Prepared, type YtChannel, type YtVideo } from './ytBench'
-import { TOPICS, TOPIC_BY_ID, normalizeTitle, topicsOf, type Angle, type ContentAxis, type TopicDef } from './radarPlaybook'
+import {
+  AI_KEYWORDS,
+  CORE_DOMAINS,
+  DOMAIN_LABEL,
+  TOPICS,
+  TOPIC_BY_ID,
+  aiMentions,
+  domainOfTopic,
+  domainsOf,
+  formatTagsOf,
+  normalizeTitle,
+  topicsOf,
+  type AiVendor,
+  type Angle,
+  type ContentAxis,
+  type ContentDomain,
+  type FormatTag,
+  type TopicDef,
+} from './radarPlaybook'
 
-export type { ContentAxis } from './radarPlaybook'
+export type { AiVendor, ContentAxis, ContentDomain, FormatTag } from './radarPlaybook'
+export { DOMAIN_LABEL, FORMAT_LABEL, VENDOR_LABEL } from './radarPlaybook'
 
 /* ------------------------------------------------------------------ */
 /* 채널 묶음                                                              */
@@ -172,6 +196,14 @@ export interface RadarVideo extends YtVideo {
   patterns: string[]
   /** 이 채널에서 받은 영상이 며칠 전까지 거슬러 가나(채널마다 최근 50편만 받으므로 자주 올리는 채널은 짧다) */
   coverageDays: number
+  /** 내용 영역(D-197) — 주제가 있으면 경제 · 경영 · AI 중 맞는 것들, 없으면 ['other'] */
+  domains: ContentDomain[]
+  /** 제목에 나온 AI 세부 이름(ChatGPT · GPT · Codex · Claude · Opus …) */
+  aiKeywords: string[]
+  /** 형식 꼬리표 — 전문가 인터뷰 · 일상 · 자기계발 · 커리어(사이드 급상승에서 씀) */
+  formats: FormatTag[]
+  /** 대표가 [채널 추가] 로 더한 채널의 영상(기본 벤치마킹이 아님) */
+  added: boolean
 }
 
 const median = (xs: readonly number[]): number => {
@@ -195,6 +227,8 @@ export function radarVideos(p: Prepared, opts: RadarOptions = {}): RadarVideo[] 
   const now = opts.now ?? Date.now()
   const subs = new Map(p.channels.map((c) => [c.id, c.subs]))
   const titles = new Map(p.channels.map((c) => [c.id, c.title]))
+  const notes = new Map(p.channels.map((c) => [c.id, String((c as YtChannel & { note?: unknown }).note ?? '')]))
+  const addedCh = new Set(p.channels.filter((c) => (c as YtChannel & { added?: unknown }).added === true).map((c) => c.id))
   const coverage = new Map<string, number>()
   for (const v of p.videos) coverage.set(v.channelId, Math.max(coverage.get(v.channelId) ?? 0, (now - v.publishedAt) / DAY))
   const groups = new Map(p.channels.map((c) => [c.id, groupOf(c as YtChannel & { group?: unknown }, opts.overrides)]))
@@ -227,6 +261,7 @@ export function radarVideos(p: Prepared, opts: RadarOptions = {}): RadarVideo[] 
     const sorted = [...peers].sort((a, b) => b.views - a.views)
     const s = subs.get(v.channelId) ?? 0
     const clean = stripChannelTag(v.title, titles.get(v.channelId) ?? '')
+    const topics = topicsOf(clean)
     return {
       ...v,
       group: groups.get(v.channelId) ?? 'direct',
@@ -243,9 +278,13 @@ export function radarVideos(p: Prepared, opts: RadarOptions = {}): RadarVideo[] 
       viewsPerSub: s > 0 ? v.views / s : 0,
       rank: sorted.findIndex((x) => x.id === v.id) + 1,
       rankOf: sorted.length,
-      topics: topicsOf(clean),
+      topics,
       patterns: titlePatterns(clean),
       coverageDays: coverage.get(v.channelId) ?? 0,
+      domains: domainsOf(topics),
+      aiKeywords: aiMentions(clean),
+      formats: formatTagsOf(clean, notes.get(v.channelId) ?? ''),
+      added: addedCh.has(v.channelId),
     }
   })
 }
@@ -275,6 +314,8 @@ export interface Cluster {
   topicId: string
   label: string
   area: TopicDef['area']
+  /** 내용 영역(D-197) — 경제 · 경영 · AI */
+  domain: ContentDomain
   /** 30일 안 관련 영상(내 채널 · 포맷 묶음 · 꺼 둔 채널 제외) */
   hits: RadarVideo[]
   videos7: number
@@ -396,6 +437,7 @@ function clusterOf(def: TopicDef, all: readonly RadarVideo[], totals: ReadonlyMa
     topicId: def.id,
     label: def.label,
     area: def.area,
+    domain: domainOfTopic(def),
     hits,
     videos7: in7.length,
     videos14: in14.length,
@@ -452,6 +494,8 @@ export const APPROACH_LABEL: Record<Approach, string> = { market: '시장형', a
 export interface Opportunity {
   key: string
   axis: ContentAxis
+  /** 내용 영역(D-197) — BRIDGE 는 그 시장 주제의 영역(경제 · 경영) */
+  domain: ContentDomain
   topicId: string
   /** 카드 머리 — BRIDGE 는 '정책자금 × 공고 자동 수집' */
   topic: string
@@ -604,6 +648,7 @@ function opportunity(axis: ContentAxis, c: Cluster, hot: readonly PatternStat[],
   return {
     key: `${axis}:${c.topicId}`,
     axis,
+    domain: c.domain,
     topicId: c.topicId,
     topic: axis === 'bridge' && angle.name ? `${def.label} × ${angle.name}` : def.label,
     strength: c.strength,
@@ -686,7 +731,31 @@ export function mixPicks(pools: Record<ContentAxis, Opportunity[]>, mix: MixGuid
       used.add(o.topicId)
     }
   }
+  balanceDomains(out, rest)
   return [...out, ...rest, ...dup, ...zero].slice(0, max)
+}
+
+/**
+ * 시장수요 안에서 경제 · 경영이 한쪽으로만 몰리지 않게(D-197) — 강제 몫은 없다.
+ * 앞 5개의 시장 후보가 2개 넘게 한쪽 영역뿐이고, 다른 영역에 '초기 신호' 가 아닌 후보가 남아 있으면
+ * 그쪽에서 가장 센 후보 하나를 앞 5개의 가장 약한 같은 축 후보와 바꾼다(데이터가 없으면 그대로).
+ */
+function balanceDomains(front: Opportunity[], rest: Opportunity[]) {
+  const market = front.filter((o) => o.axis === 'market')
+  if (market.length < 2) return
+  for (const want of ['economy', 'business'] as const) {
+    if (market.some((o) => o.domain === want)) continue
+    const i = rest.findIndex((o) => o.axis === 'market' && o.domain === want && o.strength !== 'early')
+    if (i < 0) continue
+    let j = -1
+    for (let k = front.length - 1; k >= 0; k -= 1) if (front[k].axis === 'market') { j = k; break }
+    if (j < 0) return
+    const [incoming] = rest.splice(i, 1)
+    const outgoing = front[j]
+    front[j] = incoming
+    rest.unshift(outgoing)
+    return
+  }
 }
 
 /** '지금은 보류' 카드는 맨 뒤로 — 앞 5개(이번 주 찍을 것)는 찍을 만한 것만 */
@@ -772,7 +841,8 @@ export function risingTopics(p: Prepared, videos: readonly RadarVideo[], cs: rea
 export function breakoutVideos(videos: readonly RadarVideo[], days = 30, max = 12, perChannel = 2): RadarVideo[] {
   const per = new Map<string, number>()
   const out: RadarVideo[] = []
-  const sorted = videos.filter((v) => !v.mine && v.ageDays <= days && v.tier === 'breakout').sort((a, b) => (b.adjusted ?? 0) - (a.adjusted ?? 0) || a.ageDays - b.ageDays)
+  // D-197: 메인 시장 신호는 경제 · 경영 · AI 영상만 — 분류표 밖 영상은 사이드 급상승(더 높은 기준)으로
+  const sorted = videos.filter((v) => !v.mine && v.ageDays <= days && v.tier === 'breakout' && isCore(v)).sort((a, b) => (b.adjusted ?? 0) - (a.adjusted ?? 0) || a.ageDays - b.ageDays)
   // 한 채널이 판을 다 차지하지 않게 채널마다 두 편까지
   for (const v of sorted) {
     if (out.length >= max) break
@@ -781,6 +851,268 @@ export function breakoutVideos(videos: readonly RadarVideo[], days = 30, max = 1
     out.push(v)
   }
   return out
+}
+
+/* ------------------------------------------------------------------ */
+/* D-197 경제 · 경영 · AI 신호판 · AI 핵심 키워드 · 새 AI 키워드 · 사이드 급상승  */
+/* ------------------------------------------------------------------ */
+
+/** 경제 · 경영 · AI 주제를 다룬 영상인가(분류표 밖 = 기타) */
+export const isCore = (v: Pick<RadarVideo, 'domains'>) => v.domains.some((d) => d !== 'other')
+
+export interface DomainSignal {
+  domain: ContentDomain
+  /** 최근 데이터가 있는 주제만(없으면 빈 칸 — 억지로 채우지 않는다) */
+  items: Array<{ topicId: string; label: string; channels14: number; videos14: number; breakouts: number; growing: boolean; focus: string }>
+}
+
+/** 지금 강한 흐름 — 경제 · 경영 · AI 마다 최근 2주 2곳 넘게 다뤘거나 평소보다 터진 영상이 있는 주제만(센 순 · 영역마다 3개까지) */
+export function domainSignals(cs: readonly Cluster[], perDomain = 3): DomainSignal[] {
+  return CORE_DOMAINS.map((domain) => ({
+    domain,
+    items: cs
+      .filter((c) => c.domain === domain && !c.dominant && (c.channels14 >= 2 || (c.breakouts >= 1 && c.videos14 >= 1)))
+      .slice(0, perDomain)
+      .map((c) => ({ topicId: c.topicId, label: c.label, channels14: c.channels14, videos14: c.videos14, breakouts: c.breakouts, growing: c.growing, focus: TOPIC_BY_ID.get(c.topicId)?.focus ?? '' })),
+  }))
+}
+
+export interface AiKeywordStat {
+  id: string
+  label: string
+  vendor: AiVendor
+  videos: number
+  channels: number
+  breakouts: number
+  /** MIRAE 관점 짧게(그 이름이 주제 자신일 때만 — Opus · Sonnet 은 Claude 줄에 이미 있다) */
+  focus: string
+}
+
+/** AI 핵심 키워드 칸에 보일 최소 신호 — 30일에 2편 넘게 나왔거나 평소보다 터진 영상이 1편 넘게(없으면 화면에 없음) */
+export const AI_KEYWORD_MIN_VIDEOS = 2
+
+/**
+ * AI 핵심 키워드(세부 이름) — 최근 30일 영상 제목에 실제로 나온 것만(늘 띄우지 않는다 · Astra 0편이면 없음).
+ * 같은 영상이 두 이름을 말하면 둘 다 센다(비교 영상) — 묶음(주제)과 달리 '얼마나 오르내리나' 만 본다.
+ */
+export function aiKeywordBoard(videos: readonly RadarVideo[], days = 30): AiKeywordStat[] {
+  const pool = videos.filter((v) => !v.mine && v.ageDays <= days)
+  return AI_KEYWORDS.map((k) => {
+    const hits = pool.filter((v) => v.aiKeywords.includes(k.id))
+    const focus = k.topic === k.id ? (TOPIC_BY_ID.get(k.topic)?.focus ?? '') : ''
+    return { id: k.id, label: k.label, vendor: k.vendor, videos: hits.length, channels: new Set(hits.map((v) => v.channelId)).size, breakouts: hits.filter((v) => v.tier === 'breakout').length, focus }
+  })
+    .filter((x) => x.videos >= AI_KEYWORD_MIN_VIDEOS || x.breakouts >= 1)
+    .sort((a, b) => b.channels - a.channels || b.videos - a.videos || b.breakouts - a.breakouts)
+}
+
+/** AI 업무 흐름 키워드 — 도구 이름이 아닌 AI · AX 주제(업무자동화 · 에이전트 · 노코드 · 바이브코딩 …) 중 최근 신호가 있는 것 */
+export function aiWorkflowSignals(cs: readonly Cluster[], max = 5): Array<{ topicId: string; label: string; channels: number; videos: number; breakouts: number }> {
+  const toolIds = new Set(AI_KEYWORDS.map((k) => k.topic))
+  return cs
+    .filter((c) => c.domain === 'ai' && !toolIds.has(c.topicId) && c.topicId !== 'ai_work' && (c.videos30 >= AI_KEYWORD_MIN_VIDEOS || c.breakouts >= 1))
+    .slice(0, max)
+    .map((c) => ({ topicId: c.topicId, label: c.label, channels: c.channels30, videos: c.videos30, breakouts: c.breakouts }))
+}
+
+/** 새 AI 키워드 후보에서 빼는 흔한 영문 낱말 · 회사 이름 · 형식 말 */
+const NEW_KW_STOP = new Set(
+  'the and for with how why what top best free new update updates tip tips guide tutorial ep part vs ver version pro plus max mini ultra lite app apps api code coding shorts short live full vlog review test day week month year ai chat bot bots it ok tv ch feat ft official korea korean youtube google openai anthropic microsoft apple meta naver kakao ms ceo cto cfo ui ux web site sns pdf ppt excel word doc docs mvp b2b b2c kpi okr erp crm rpa vba sql html css js pc os ios android mac windows chrome gpt chatgpt llm agent agents ax dx it biz no yes my me you we us vs. q a i in on of to by at is be do go up so or as an if all one two my ep. pt part1 part2 point step steps the1 hot real just now only more most first last next easy fast quick simple basic master class course lecture study prompt prompts template templates image images video videos photo voice text data file files work skill skills tool tools mode model models system automation workflow make n8n zapier notion slack mcp'
+    .split(' '),
+)
+
+export interface NewAiKeyword {
+  word: string
+  channels: number
+  videos: number
+}
+
+/**
+ * 분류표 밖 새 AI 이름(D-197) — 최근 14일 AI 실무 · AX 채널 3곳 넘게(영상 3편 넘게) 제목에 나온 영문 낱말.
+ * 빼는 것: 분류표에 이미 있는 이름 · 흔한 영문 낱말 · 채널 이름에 든 말 · 한 채널 영상 절반 가까이에 붙는 꼬리표.
+ * 화면에 '새 AI 키워드' 후보로만 보여 준다 — 분류표에 저절로 넣지 않는다(대표가 보고 판단).
+ * 한글로만 쓴 새 이름(예: 어사이드)은 아직 잡지 않는다 — 영문으로 함께 쓰인 것만.
+ */
+export function newAiKeywords(p: Prepared, videos: readonly RadarVideo[], days = 14, minChannels = 3, max = 5): NewAiKeyword[] {
+  const aiCh = new Set(videos.filter((v) => v.group === 'ai' || v.group === 'ax').map((v) => v.channelId))
+  const chanWords = new Set(
+    p.channels.flatMap((c) => `${c.title} ${c.handle} ${c.customUrl}`.toLowerCase().match(/[a-z][a-z0-9]+/g) ?? []),
+  )
+  const tokensOf = (t: string) => [...new Set(t.match(/[A-Za-z][A-Za-z0-9]*(?:[-.][A-Za-z0-9]+)*/g) ?? [])]
+  // 채널 꼬리표 — 그 채널 받은 영상의 40% 넘게 붙는 낱말(영상 5편 넘는 채널만)
+  const tagWords = new Set<string>()
+  const byCh = new Map<string, RadarVideo[]>()
+  for (const v of videos) byCh.set(v.channelId, [...(byCh.get(v.channelId) ?? []), v])
+  for (const list of byCh.values()) {
+    if (list.length < 5) continue
+    const cnt = new Map<string, number>()
+    for (const v of list) for (const w of tokensOf(v.title)) cnt.set(w.toLowerCase(), (cnt.get(w.toLowerCase()) ?? 0) + 1)
+    for (const [w, n] of cnt) if (n / list.length >= 0.4) tagWords.add(w)
+  }
+  const known = (w: string) => AI_KEYWORDS.some((k) => k.match.test(normalizeTitle(w))) || TOPICS.some((t) => t.area !== 'market' && t.match.test(normalizeTitle(` ${w} `)))
+  const seen = new Map<string, { forms: Map<string, number>; ch: Set<string>; vids: number }>()
+  for (const v of videos) {
+    if (v.ageDays > days || !aiCh.has(v.channelId)) continue
+    for (const raw of tokensOf(v.title)) {
+      const w = raw.toLowerCase()
+      if (w.length < 3 || /^\d/.test(w) || NEW_KW_STOP.has(w) || chanWords.has(w) || tagWords.has(w)) continue
+      const e = seen.get(w) ?? { forms: new Map(), ch: new Set(), vids: 0 }
+      e.forms.set(raw, (e.forms.get(raw) ?? 0) + 1)
+      e.ch.add(v.channelId)
+      e.vids += 1
+      seen.set(w, e)
+    }
+  }
+  return [...seen.entries()]
+    .filter(([w, e]) => e.ch.size >= minChannels && e.vids >= 3 && !known(w))
+    .map(([, e]) => ({ word: [...e.forms.entries()].sort((a, b) => b[1] - a[1])[0][0], channels: e.ch.size, videos: e.vids }))
+    .sort((a, b) => b.channels - a.channels || b.videos - a.videos)
+    .slice(0, max)
+}
+
+/** 사이드 급상승 기준(D-197 · 실제 데이터 분포로 정함 — QA 기록) */
+export const SIDE_X = 5
+export const SIDE_VIEWS_PER_SUB = 3
+export const SIDE_MAX = 5
+
+export interface SideBreakout {
+  v: RadarVideo
+  /** 왜 사이드에 올라왔나 — '평소보다 n배' · '작은 채널인데 구독자의 n배' · '같은 형식이 여러 채널에서' */
+  why: string
+  /** 포맷 · 훅 · 구성 참고 문장(규칙) */
+  notes: string[]
+}
+
+/**
+ * 사이드 급상승 — 경제 · 경영 · AI 주제가 아닌 영상(기타) 중 비정상적으로 크게 터진 것만, 최대 5편.
+ * 메인 추천과 섞지 않는다. 기준(최근 14일 · 평소보다 터짐 + 아래 중 하나):
+ *  ① 나이 반영 배수 5배 넘게 ② 구독자 3만 이하 채널인데 조회수가 구독자의 3배 넘게
+ *  ③ 같은 형식(인터뷰 · 일상 …)이 최근 7일 2개 채널 넘게에서 함께 터짐
+ * 평범한 기타 영상(평소 수준 · 평소보다 조금 잘됨)은 여기에도 안 뜬다.
+ * aiWords(새 AI 키워드 후보)를 제목에 쓴 영상은 뺀다 — 분류표에 아직 없을 뿐 AI 이야기라 '새 AI 키워드' 칸에서 본다.
+ */
+export function sideBreakouts(videos: readonly RadarVideo[], days = 14, max = SIDE_MAX, aiWords: readonly string[] = []): SideBreakout[] {
+  const words = aiWords.map((w) => w.toLowerCase())
+  const mentionsNew = (t: string) => {
+    const toks = new Set((t.match(/[A-Za-z][A-Za-z0-9]*(?:[-.][A-Za-z0-9]+)*/g) ?? []).map((x) => x.toLowerCase()))
+    return words.some((w) => toks.has(w))
+  }
+  const pool = videos.filter((v) => !v.mine && !isCore(v) && v.ageDays <= days && v.tier === 'breakout' && v.adjusted !== null && !mentionsNew(v.title))
+  const repeated = new Set<string>()
+  for (const tag of ['interview', 'vlog', 'selfdev', 'career'] as const) {
+    const recent = pool.filter((v) => v.ageDays <= 7 && v.formats.includes(tag))
+    if (new Set(recent.map((v) => v.channelId)).size >= 2) repeated.add(tag)
+  }
+  const reason = (v: RadarVideo): string | null => {
+    if ((v.adjusted ?? 0) >= SIDE_X) return ratioLine(v)
+    if (v.small && v.viewsPerSub >= SIDE_VIEWS_PER_SUB) return `구독자 ${shortSubs(v.channelSubs)} 채널인데 조회수가 구독자의 ${v.viewsPerSub.toFixed(1)}배`
+    const tag = v.formats.find((f) => repeated.has(f))
+    if (tag) return `최근 7일 여러 채널에서 같은 형식(${FORMAT_LABEL_SHORT[tag]})이 함께 터짐`
+    return null
+  }
+  const picked = pool
+    .map((v) => ({ v, why: reason(v) }))
+    .filter((x): x is { v: RadarVideo; why: string } => x.why !== null)
+    .sort((a, b) => (b.v.adjusted ?? 0) - (a.v.adjusted ?? 0) || a.v.ageDays - b.v.ageDays)
+  const out: SideBreakout[] = []
+  const per = new Set<string>()
+  // 채널마다 한 편 — 한 채널이 사이드를 다 차지하지 않게
+  for (const x of picked) {
+    if (out.length >= max) break
+    if (per.has(x.v.channelId)) continue
+    per.add(x.v.channelId)
+    out.push({ ...x, notes: sideNotes(x.v) })
+  }
+  return out
+}
+
+const FORMAT_LABEL_SHORT: Record<FormatTag, string> = { interview: '인터뷰', vlog: '일상', selfdev: '자기계발', career: '커리어' }
+
+/** 사이드 급상승 '참고할 점' — 주제가 아니라 포맷 · 훅 · 구성(규칙 문장 · 최대 3개) */
+export function sideNotes(v: RadarVideo): string[] {
+  const out: string[] = []
+  if (v.formats.includes('interview')) out.push('인터뷰 · 대담 구성 — 출연자 이야기를 앞세움')
+  if (/["“”'‘’「」]/.test(v.title)) out.push('출연자 말을 따옴표로 그대로 제목에 씀')
+  for (const id of v.patterns) {
+    if (out.length >= 3) break
+    const p = TITLE_PATTERNS.find((x) => x.id === id)
+    if (p) out.push(id === 'number' && /^\s*[\d[(]/.test(v.title) ? '숫자를 제목 맨 앞에 둠' : p.note)
+  }
+  if (out.length < 3 && v.small && v.viewsPerSub >= 1) out.push(`구독자 ${shortSubs(v.channelSubs)} 채널인데 조회수가 구독자의 ${v.viewsPerSub.toFixed(1)}배`)
+  if (out.length < 3) out.push(v.isShort ? `${v.durationSec}초 쇼츠` : `${Math.round(v.durationSec / 60)}분 롱폼`)
+  return out.slice(0, 3)
+}
+
+/* ------------------------------------------------------------------ */
+/* 왜 추천됐나요 · 인기 탭 핵심 키워드(D-197)                                  */
+/* ------------------------------------------------------------------ */
+
+export type WhyId = 'spread' | 'hot' | 'growing' | 'small' | 'domain'
+
+/** 추천 기준 다섯 가지 — '추천 기준' 도움말과 카드의 [왜 추천됐나요?] 가 같은 말을 쓴다 */
+export const WHY_LABEL: Record<WhyId, string> = {
+  spread: '최근 여러 채널에서 반복',
+  hot: '채널 평소보다 잘됨',
+  growing: '최근 2주에 늘어남',
+  small: '작은 채널에서도 터짐',
+  domain: '경제 · 경영 · AI 주제',
+}
+
+export interface WhyItem {
+  id: WhyId
+  label: string
+  met: boolean
+  text: string
+}
+
+/**
+ * [왜 추천됐나요?] — 추천 기준 다섯 가지를 이 후보에 맞춰 '맞음 · 아님' 으로(점수 없음).
+ * 숫자는 근거 보기와 같은 것(묶음 계산 그대로) — 새로 세지 않는다.
+ */
+export function whyRecommended(o: Pick<Opportunity, 'axis' | 'domain' | 'cluster'>): WhyItem[] {
+  const c = o.cluster
+  const spreadMet = c.channels14 >= 2 || c.channels30 >= 2
+  const item = (id: WhyId, met: boolean, text: string): WhyItem => ({ id, label: WHY_LABEL[id], met, text })
+  return [
+    item(
+      'spread',
+      spreadMet && !c.dominant,
+      c.dominant
+        ? `대부분 한 채널(${c.dominant})이 올렸습니다 — 아직 여러 채널 흐름은 아닙니다`
+        : c.channels14 >= 2
+          ? `최근 2주 ${c.channels14}개 채널이 다뤘습니다`
+          : c.channels30 >= 2
+            ? `최근 30일 ${c.channels30}개 채널이 다뤘습니다`
+            : '아직 한 채널에서만 나왔습니다',
+    ),
+    item(
+      'hot',
+      c.breakouts > 0 || c.above > 0,
+      c.breakouts > 0 ? `그 채널 평소보다 ${BREAKOUT_X}배 넘게 터진 영상 ${c.breakouts}편` : c.above > 0 ? `그 채널 평소보다 ${ABOVE_X}배 넘게 잘된 영상 ${c.above}편` : '아직 평소보다 크게 잘된 영상은 없습니다',
+    ),
+    item('growing', c.growing, c.growing ? (c.prior === 0 ? `최근 2주 ${c.videos14}편 — 그 전 6주에는 없던 주제` : `최근 2주 ${c.videos14}편 — 그 전 6주보다 빠르게 늘었습니다`) : '그 전 6주보다 뚜렷하게 늘지는 않았습니다'),
+    item('small', c.smallBreakouts > 0, c.smallBreakouts > 0 ? `구독자 3만 이하 채널에서도 터진 영상 ${c.smallBreakouts}편` : '작은 채널에서 터진 영상은 아직 없습니다'),
+    item('domain', o.domain !== 'other', o.axis === 'bridge' ? `${DOMAIN_LABEL[o.domain]} 주제 — 여기에 우리 AX 이야기를 붙입니다` : `${DOMAIN_LABEL[o.domain]} 주제입니다`),
+  ]
+}
+
+/** 주제가 아닌 흔한 말(부사 · 꾸밈말 · 형식 말) — 인기 탭 낱말 · 주목 주제에서 뺀다(D-197 · 실제 데이터에서 '반드시 · 완전히 · 활용법' 이 올라왔다) */
+const KW_NOISE_WORDS = new Set(
+  '반드시 완전히 무조건 진짜 정말 충격 충격적인 역대급 레전드 드디어 무료 방법 활용법 사용법 하는법 공개 총정리 꿀팁 필수 최신 이렇게 여러분 사장님 대표님 지금 당장 바로 모르면 알려드립니다 쇼츠'.split(' '),
+)
+/** 조사 · 어미가 붙은 낱말(띄어쓰기 없는 한 낱말만) — '직장인을' · '명에게' · '충격적인' · '뒤집힌다' · '알아서' */
+const KW_TAIL = /(을|를|에게|에서|으로|에는|하는|적인|해야|하면|했더니|니다|세요|아서|어서|해서|하고|[가-힣]{2}다)$/
+
+export function isNoiseKeyword(word: string): boolean {
+  const w = String(word ?? '').trim()
+  if (!w || KW_NOISE_WORDS.has(w)) return true
+  return !/\s/.test(w) && KW_TAIL.test(w)
+}
+
+/** 인기 탭 낱말이 경제 · 경영 · AI 핵심 키워드인가(분류표 주제나 AI 세부 이름에 걸리면) — 아니면 '기타 급상승' */
+export function isCoreKeyword(word: string): boolean {
+  if (aiMentions(word).length > 0) return true
+  return domainsOf(topicsOf(word)).some((d) => d !== 'other')
 }
 
 /* ------------------------------------------------------------------ */

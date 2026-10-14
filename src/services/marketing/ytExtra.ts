@@ -138,7 +138,8 @@ export function mergeFeeds(base: YtFeed, extra: YtFeed | null, groups: Readonly<
   if (!extra) return base
   const known = new Set(base.channels.map((c) => c.id))
   const seenVid = new Set(base.videos.map((v) => v.id))
-  const channels = [...base.channels, ...extra.channels.filter((c) => !known.has(c.id)).map((c) => ({ ...c, group: groups[c.id] ?? c.group ?? 'ai' }))]
+  // added: 대표가 [채널 추가] 로 더한 채널(D-197 — 화면에 '내가 추가' 로 구분)
+  const channels = [...base.channels, ...extra.channels.filter((c) => !known.has(c.id)).map((c) => ({ ...c, group: groups[c.id] ?? c.group ?? 'ai', added: true }))]
   const videos = [...base.videos, ...extra.videos.filter((v) => !seenVid.has(v.id) && !known.has(v.ch))]
   return { ...base, channels, videos, failed: [...base.failed, ...extra.failed] }
 }
