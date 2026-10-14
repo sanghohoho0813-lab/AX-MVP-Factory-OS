@@ -14,6 +14,8 @@
  * D-194 콘텐츠 레이더: 첫 화면 = 이번 주 찍을 것(후보 카드 · 근거 · 상세 · 수첩 저장/다시 읽기 · 단계 · 브리프 복사) ·
  *   채널 네 묶음(끄기 · 채널 추가는 로그인한 OS 에서만) · 분석(내 채널 · 제목 구조) · 금지 문구 0 · LLM 주소 0 · 유튜브 키 번들 0 ·
  *   휴대폰 360 · 390 · 430 넘침 0 · 누르는 곳 44px · 인기 영상은 휴대폰에서 한 줄 목록
+ * D-196 6시간 자동 갱신: 같은 날 18채널 예전 저장본 + 서버 판 → 열자마자 새로 · 5시간 59분 그대로 · 6시간 넘으면 새로 ·
+ *   돌아올 때(focus · visibilitychange) · 판 바뀜 · [지금 새로] · 실패하면 지난번 것 + 받은 때 · PC 1440 = 휴대폰 390 같은 추천
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -111,7 +113,9 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(800)
   const line = (await page.getByTestId('yt-feedline').innerText()) ?? ''
   check('받은 데이터: 받은 때 · 채널 4곳 · 영상 16편 · 못 받은 채널(@세무사)', line.includes('받은 때') && line.includes('채널 4곳') && line.includes('영상 16편') && line.includes('@세무사'), line)
-  check('주소: 처음엔 하루 칸(?slot=오늘 날짜)', asked.length === 1 && /slot=\d{4}-\d{2}-\d{2}$/.test(asked[0]), asked.join(' '))
+  // D-196: 판 확인(?status=1 · 유튜브 할당량 0)은 데이터 요청이 아니므로 따로 센다
+  const feedAsked = () => asked.filter((u) => !u.includes('status=1'))
+  check('주소: 처음엔 6시간 칸(?win=…) — D-196 전에는 하루 칸(?slot=)', feedAsked().length === 1 && /[?&]win=\d+$/.test(feedAsked()[0]), asked.join(' '))
   check('예시 띠는 사라진다(진짜 데이터)', (await page.getByTestId('yt-sample-banner').count()) === 0)
   check('D-194 첫 화면 = 이번 주 찍을 것(콘텐츠 레이더) · 제목 "콘텐츠 레이더" · 보조 "YouTube 벤치마킹"', (await page.getByTestId('radar-plan').isVisible()) && ((await page.locator('main h1').first().innerText()) ?? '').includes('콘텐츠 레이더') && ((await page.getByTestId('radar-subtitle').innerText()) ?? '').includes('YouTube 벤치마킹'))
   await page.getByTestId('yt-view-top').click()
@@ -162,10 +166,10 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 
   await page.getByTestId('yt-refresh').click()
   await page.waitForTimeout(600)
-  check('[지금 새로 가져오기]: 30분 칸(?bucket=…)으로 부른다', asked.length === 2 && /bucket=\d+$/.test(asked[1]), asked.join(' '))
+  check('[지금 새로 가져오기]: 30분 칸(?bucket=…)으로 부른다', feedAsked().length === 2 && /bucket=\d+$/.test(feedAsked()[1]), asked.join(' '))
   await page.reload({ waitUntil: 'networkidle' })
   await page.waitForTimeout(600)
-  check('다시 열면 이 기기에 저장된 것(같은 하루 칸이면 다시 안 부름)', asked.length === 2 && (await page.getByTestId('yt-card').count()) > 0, asked.length)
+  check('다시 열면 이 기기에 저장된 것(받은 지 6시간 안이면 다시 안 부름)', feedAsked().length === 2 && (await page.getByTestId('yt-card').count()) > 0, asked.join(' '))
 
   // 할당량 초과 — 지난번 것으로 보여 준다
   await page.unroute('**/api/yt-bench**')
@@ -440,6 +444,155 @@ for (const width of [360, 390, 430]) {
   }
   check(`${width}: JS 오류 없음`, errors.length === 0, errors.join(' | '))
   await ctx.close()
+}
+
+/* ---------------- D-196 6시간 자동 갱신 · 채널 구성 판 · PC/휴대폰 같은 추천 ---------------- */
+{
+  const REV_NEW = '2-33-newrev'
+  const REV_OLD = '2-18-oldrev'
+  const H6 = 6 * H
+  const KEY = 'axmvp.yt.feed.v1'
+  // Production PC 에 남아 있던 것 흉내 — 예전 18채널 데이터
+  const OLD18 = (at) => ({
+    fetchedAt: new Date(at).toISOString(),
+    channels: Array.from({ length: 18 }, (_, i) => ch(`UCold${String(i).padStart(2, '0')}`, `예전 채널 ${i + 1}`, 10_000, 1_000_000)),
+    videos: [v('o1', 'UCold00', '예전 정책자금 영상', 2 * D, 9_000), v('o2', 'UCold01', '예전 정책자금 사례', 3 * D, 4_000), v('o3', 'UCold02', '예전 정책자금 신청', 4 * D, 3_000)],
+    failed: [],
+  })
+  /** 서버 흉내 — status 는 지금 판(유튜브 안 부름) · 데이터는 RADAR + 판 · 판이 다르면 409(실제 서버와 같은 규칙) */
+  const serve = async (page, o) => {
+    const log = []
+    await page.route('**/api/yt-bench**', (r) => {
+      const u = new URL(r.request().url())
+      log.push(u.search)
+      if (u.searchParams.has('status')) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ configured: true, keyName: 'YOUTUBE_API_KEY', channels: 33, feedRevision: REV_NEW }) })
+      if (o.fail) return r.fulfill({ status: 504, contentType: 'application/json', body: JSON.stringify({ error: 'timeout' }) })
+      const rev = u.searchParams.get('rev')
+      if (rev && rev !== REV_NEW) return r.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'revision', feedRevision: REV_NEW }) })
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...RADAR, fetchedAt: new Date(Date.now() - (o.lag ?? 0)).toISOString(), feedRevision: REV_NEW }) })
+    })
+    return log
+  }
+  const dataAsks = (log) => log.filter((q) => !q.includes('status=1'))
+  const open = async (vp, mobile, cache, o = {}) => {
+    const ctx = await browser.newContext({ viewport: vp, locale: 'ko-KR', ...(mobile ? { isMobile: true, hasTouch: true } : {}) })
+    const page = await ctx.newPage()
+    const errors = []
+    page.on('pageerror', (e) => errors.push(e.message))
+    await page.route('https://i.ytimg.com/**', (r) => r.fulfill({ status: 404, body: '' }))
+    await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+    await page.evaluate(seedScript())
+    await page.evaluate(([k, val]) => (val ? localStorage.setItem(k, val) : localStorage.removeItem(k)), [KEY, cache ? JSON.stringify(cache) : ''])
+    const log = await serve(page, o)
+    await page.goto(BASE + '/marketing/youtube', { waitUntil: 'networkidle' })
+    await page.waitForTimeout(800)
+    return { ctx, page, errors, log }
+  }
+  const line = async (page) => ((await page.getByTestId('yt-feedline').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+  const stored = (page) => page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? 'null'), KEY)
+  const RN = RADAR.channels.length
+
+  // 1~3 같은 날 18채널 예전 저장본(예전 모양 { slot, feed }) · 서버는 새 판 → 열자마자 새 데이터
+  {
+    const at = Date.now() - H
+    const { ctx, page, errors, log } = await open({ width: 1440, height: 900 }, false, { slot: new Date().toISOString().slice(0, 10), feed: OLD18(at) })
+    const s = await stored(page)
+    const l = await line(page)
+    check(`D-196 1~3 같은 날 18채널 예전 저장본 + 서버 판(33채널) → 열자마자 새로 받음 → "채널 ${RN}곳"(18곳 아님) · 저장본 { 받은 때 · 판 · 데이터 }`, l.includes(`채널 ${RN}곳`) && !l.includes('채널 18곳') && s?.feedRevision === REV_NEW && typeof s?.fetchedAt === 'number' && s?.feed?.channels?.length === RN, [l, log])
+    check('D-196 1~3 묻는 순서: 판 확인(status · 할당량 0) → 6시간 칸 + 판(?win=…&rev=…) 한 번', log[0] === '?status=1' && dataAsks(log).length === 1 && new RegExp(`^\\?win=\\d+&rev=${REV_NEW}$`).test(dataAsks(log)[0]), log)
+    await page.reload({ waitUntil: 'networkidle' })
+    await page.waitForTimeout(800)
+    check('D-196 새로고침 → 방금 받은 것(6시간 안 · 판 같음) 그대로 · 데이터 요청 늘지 않음', dataAsks(log).length === 1 && (await line(page)).includes(`채널 ${RN}곳`), log)
+    // 9 [지금 새로 가져오기] — 6시간 안이어도 30분 칸
+    await page.getByTestId('yt-refresh').click()
+    await page.waitForTimeout(800)
+    check('D-196 9 [지금 새로 가져오기] → 6시간과 상관없이 30분 칸(?bucket=…&rev=…)', dataAsks(log).length === 2 && new RegExp(`^\\?bucket=\\d+&rev=${REV_NEW}$`).test(dataAsks(log)[1]), log)
+    check('D-196 1~3 · 9 JS 오류 없음', errors.length === 0, errors.join(' | '))
+    await ctx.close()
+  }
+
+  // 4 5시간 59분 → 그대로
+  {
+    const at = Date.now() - H6 + 60_000
+    const { ctx, page, log } = await open({ width: 1440, height: 900 }, false, { fetchedAt: at, feedRevision: REV_NEW, feed: { ...RADAR, fetchedAt: new Date(at).toISOString() } })
+    check('D-196 4 5시간 59분 된 저장본(판 같음) → 그대로 씀 · 데이터 요청 0(판 확인만)', dataAsks(log).length === 0 && log.length === 1 && (await page.getByTestId('radar-plan').count()) === 1, log)
+    await ctx.close()
+  }
+  // 5 6시간 넘음 → 새로
+  {
+    const at = Date.now() - H6 - 60_000
+    const { ctx, page, log } = await open({ width: 1440, height: 900 }, false, { fetchedAt: at, feedRevision: REV_NEW, feed: OLD18(at) })
+    check('D-196 5 6시간 1분 된 저장본 → 열자마자 새로 받음', dataAsks(log).length === 1 && (await line(page)).includes(`채널 ${RN}곳`), log)
+    await ctx.close()
+  }
+  // 7 판이 바뀜 → 1시간 전 것이어도 새로
+  {
+    const at = Date.now() - H
+    const { ctx, page, log } = await open({ width: 1440, height: 900 }, false, { fetchedAt: at, feedRevision: REV_OLD, feed: OLD18(at) })
+    check('D-196 7 판이 바뀜(예전 판 저장본 · 1시간 전) → 바로 새로 받음', dataAsks(log).length === 1 && (await line(page)).includes(`채널 ${RN}곳`), log)
+    await ctx.close()
+  }
+  // 10 저절로 받기 실패 → 지난번 것 + 받은 때
+  {
+    const at = Date.now() - H6 - H
+    const { ctx, page, log, errors } = await open({ width: 1440, height: 900 }, false, { fetchedAt: at, feedRevision: REV_NEW, feed: OLD18(at) }, { fail: true })
+    const msg = (await page.getByTestId('yt-message').innerText().catch(() => '')) ?? ''
+    const l = await line(page)
+    check('D-196 10 6시간 넘었는데 받기 실패 → 빈 화면 아님: 지난번 데이터(채널 18곳) 그대로 · "지난번 받은 데이터로 보여드리고 있습니다." · 받은 때', dataAsks(log).length === 1 && l.includes('채널 18곳') && (await page.getByTestId('yt-views').count()) === 1 && msg.includes('지난번 받은 데이터로 보여드리고 있습니다.') && msg.includes('받은 때'), [msg, l])
+    check('D-196 10 실패해도 JS 오류 없음', errors.length === 0, errors.join(' | '))
+    await ctx.close()
+  }
+  // 6 열어 둔 채로 6시간이 지남 → 돌아오면 새로(PC focus · 휴대폰 visibilitychange)
+  for (const [label, vp, mobile, evt] of [
+    ['PC focus', { width: 1440, height: 900 }, false, 'focus'],
+    ['휴대폰 390 visibilitychange', { width: 390, height: 844 }, true, 'visibilitychange'],
+  ]) {
+    const o = { lag: H6 - 5_000 }
+    const { ctx, page, log } = await open(vp, mobile, null, o)
+    const fire = () => page.evaluate((e) => (e === 'focus' ? window : document).dispatchEvent(new Event(e)), evt)
+    const first = dataAsks(log).length
+    o.lag = 0
+    await fire()
+    await page.waitForTimeout(400)
+    const early = dataAsks(log).length
+    await page.waitForTimeout(5_500)
+    await fire()
+    await page.waitForTimeout(800)
+    check(`D-196 6 ${label}: 열어 둔 채로 6시간이 지나면 돌아올 때 새로 받음(열 때 1 · 6시간 전에 돌아옴 1 그대로 · 지난 뒤 돌아옴 2)`, first === 1 && early === 1 && dataAsks(log).length === 2, log)
+    await fire()
+    await fire()
+    await page.waitForTimeout(600)
+    check(`D-196 6 ${label}: 곧바로 여러 번 돌아와도 더 받지 않음 · 판 확인도 10분에 한 번(시계로 계속 묻지 않음)`, dataAsks(log).length === 2 && log.filter((q) => q === '?status=1').length === 1, log)
+    await ctx.close()
+  }
+
+  // 11 PC 1440 = PC 휴대폰 폭(390) = 휴대폰 390 — 같은 데이터 · 같은 설정이면 같은 추천
+  const picks = async (page) => {
+    if (await page.getByTestId('radar-more').count()) await page.getByTestId('radar-more').click()
+    await page.waitForTimeout(200)
+    return page.evaluate(() => {
+      const t = (sel) => [...document.querySelectorAll(sel)].map((e) => (e.textContent ?? '').replace(/\s+/g, ' ').trim())
+      return {
+        top: t('[data-testid="radar-top"] [data-testid="radar-opp-topic"]'),
+        axes: [...document.querySelectorAll('[data-testid="radar-opp"], [data-testid="radar-opp-compact"]')].map((e) => e.getAttribute('data-axis')),
+        rest: t('[data-testid="radar-opp-compact"]'),
+        rising: t('[data-testid="radar-rising-row"]'),
+        breakouts: t('[data-testid="radar-breakouts"] [data-testid="radar-breakout-chip"]'),
+      }
+    })
+  }
+  const seen = []
+  for (const [vp, mobile] of [
+    [{ width: 1440, height: 900 }, false],
+    [{ width: 390, height: 844 }, false],
+    [{ width: 390, height: 844 }, true],
+  ]) {
+    const { ctx, page } = await open(vp, mobile, null)
+    seen.push(await picks(page))
+    await ctx.close()
+  }
+  const same = seen.every((x) => JSON.stringify(x) === JSON.stringify(seen[0]))
+  check('D-196 11 같은 데이터 · 같은 설정 → PC 1440 · PC 를 휴대폰 폭(390)으로 · 휴대폰 390 의 1~3순위 · 4위부터 · 축 · 급상승 · 터진 영상이 모두 같다(화면 폭은 배치만)', same && seen[0].top.length === 3 && seen[0].rest.length >= 2 && seen[0].rising.length >= 1 && seen[0].breakouts.length >= 1, same ? seen[0].top : seen.map((x) => x.top))
 }
 
 await browser.close()

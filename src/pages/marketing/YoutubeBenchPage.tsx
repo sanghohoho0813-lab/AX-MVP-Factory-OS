@@ -97,7 +97,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const notebook = useIdeas(workspaceId, readOnly)
   const [extraKey, setExtraKey] = useState(0)
   const addedIds = useMemo(() => (yt.sample ? [] : prefs.added.map((a) => a.id)), [yt.sample, prefs.added])
-  const extra = useYtExtra(addedIds, extraKey)
+  const extra = useYtExtra(addedIds, extraKey, yt.feed?.fetchedAt ?? '')
   const [params, setParams] = useSearchParams()
   const view = viewOf(params.get('view'))
   const period = (PERIODS.includes(params.get('p') as YtPeriod) ? params.get('p') : 'week') as YtPeriod
@@ -194,7 +194,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
         <PageHeader
           title="콘텐츠 레이더"
           descriptionAsHint
-          description="잘되는 콘텐츠를 보고 이번 주에 찍을 주제를 고릅니다. 벤치마킹 채널의 최근 영상을 매일 아침 9시에 새로 받아, 여러 채널에서 함께 오르고 채널 평소보다 잘된 주제를 근거와 함께 보여 줍니다(규칙 계산)."
+          description="잘되는 콘텐츠를 보고 이번 주에 찍을 주제를 고릅니다. 벤치마킹 채널의 최근 영상을 6시간마다 저절로 새로 받아, 여러 채널에서 함께 오르고 채널 평소보다 잘된 주제를 근거와 함께 보여 줍니다(규칙 계산)."
           actions={
             <>
               <Button variant="secondary" onClick={refresh} disabled={loading} data-testid="yt-refresh">

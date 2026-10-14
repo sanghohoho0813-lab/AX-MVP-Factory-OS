@@ -4,13 +4,14 @@
  *  - 채널 확인: /api/yt-bench?resolve=@주소 (채널 정보 1~2단위 · 검색 100단위는 쓰지 않는다).
  *  - 더한 채널 영상: /api/yt-bench?extra=UC…,UC… (10곳까지 · 채널마다 2단위).
  *  - 둘 다 OS 에 로그인한 사람만 — 로그인 토큰을 붙여 보낸다(서버가 Supabase 에 물어 확인). 로컬 모드에서는 쓸 수 없다.
- *  - 받은 것은 이 브라우저에 그날 9시 칸 · 채널 묶음별로 둔다(사용자별 금고 axmvp.* 안) — 화면을 열 때마다 부르지 않는다.
+ *  - 받은 것은 이 브라우저에 6시간 칸 · 채널 묶음별로 둔다(사용자별 금고 axmvp.* 안) — 화면을 열 때마다 부르지 않는다.
+ *    D-196: 기본 채널과 같은 6시간 칸 — 기본 데이터를 새로 받으면(받은 때가 바뀌면) 칸이 지난 더한 채널도 다시 받는다.
  */
 import { useEffect, useState } from 'react'
 import { getDataModeConfig } from '../../data/dataMode'
 import { getSupabaseClient } from '../../lib/supabase/client'
 import type { YtFeed } from './ytBench'
-import { YT_PATH, slotOf } from './ytFeed'
+import { YT_PATH, windowOf } from './ytFeed'
 
 const EXTRA_KEY = 'axmvp.yt.extra.v1'
 
@@ -87,8 +88,8 @@ function writeCache(slot: string, ids: string, feed: YtFeed) {
   }
 }
 
-/** 더한 채널의 영상 — 같은 9시 칸 · 같은 채널 묶음이면 저장된 것 */
-export function useYtExtra(ids: readonly string[], refreshKey = 0): ExtraState {
+/** 더한 채널의 영상 — 같은 6시간 칸 · 같은 채널 묶음이면 저장된 것. baseFetchedAt: 기본 데이터를 받은 때(바뀌면 다시 본다) */
+export function useYtExtra(ids: readonly string[], refreshKey = 0, baseFetchedAt = ''): ExtraState {
   const key = [...ids].sort().join(',')
   const [state, setState] = useState<ExtraState>({ status: 'none', message: '', feed: null })
   useEffect(() => {
@@ -97,7 +98,7 @@ export function useYtExtra(ids: readonly string[], refreshKey = 0): ExtraState {
       setState({ status: 'none', message: '', feed: null })
       return
     }
-    const slot = slotOf()
+    const slot = `w${windowOf()}`
     const cached = refreshKey === 0 ? readCache(slot, key) : null
     if (cached) {
       setState({ status: 'ready', message: '', feed: cached })
@@ -128,7 +129,7 @@ export function useYtExtra(ids: readonly string[], refreshKey = 0): ExtraState {
     return () => {
       alive = false
     }
-  }, [key, refreshKey])
+  }, [key, refreshKey, baseFetchedAt])
   return state
 }
 
