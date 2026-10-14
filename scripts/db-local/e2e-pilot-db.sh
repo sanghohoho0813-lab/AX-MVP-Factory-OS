@@ -14,7 +14,7 @@ psqlq() { su postgres -c "psql -q -v ON_ERROR_STOP=1 -d $DB"; }
 su postgres -c "dropdb --if-exists $DB; createdb $DB"
 psqlq < $DIR/supabase-shim.sql > /dev/null
 for f in supabase/migrations/*.sql; do
-  case "$f" in *_os_access_pilot.sql|*_owner_views_pilot.sql) continue ;; esac
+  case "$f" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql) continue ;; esac
   psqlq < "$f" > /dev/null
 done
 
@@ -67,3 +67,6 @@ end $$;
 grant anon, authenticated to authenticator;
 SQL
 su postgres -c "psql -At -d $DB -c \"select tier || ':' || (select email from auth.users u where u.id = a.user_id) from public.os_access a order by 1\""
+
+# 0021 — 대표 AI 작업실(기능 권한 · Company Case · 기억 · 실행 기록) — 0019 뒤라야 대표 한 사람에게만 권한이 간다
+psqlq < supabase/migrations/20261014000021_owner_ai_workspace.sql > /dev/null

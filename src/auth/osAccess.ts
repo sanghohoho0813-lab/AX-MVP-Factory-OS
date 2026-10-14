@@ -23,6 +23,20 @@ export async function fetchMyAccess(): Promise<OsAccess> {
   return data === 'full' || data === 'pilot' ? data : 'none'
 }
 
+/**
+ * 기능 권한(capability) — 서버 0021 my_capabilities(). 등급 full 이 아니면 서버가 빈 목록을 준다.
+ * 함수가 아직 없으면(0021 전) null — 화면은 'DB 설정 필요' 로 안내한다(열지 않는다).
+ */
+export async function fetchMyCapabilities(): Promise<string[] | null> {
+  try {
+    const { data, error } = await getSupabaseClient().rpc('my_capabilities')
+    if (error) return null
+    return Array.isArray(data) ? data.map(String) : []
+  } catch {
+    return null
+  }
+}
+
 /** D-164: 대표가 바로 볼 수 있는 Pilot(팀장) 화면 — 서버 0020. 함수가 없거나(0020 전) 실패하면 빈 목록 */
 export interface PilotView {
   workspaceId: string

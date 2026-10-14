@@ -406,7 +406,7 @@ try {
   }
   await go(page, `/ops/clients/${OWNER_CLIENT}`)
   check('Pilot 교차: 대표 업체 주소 → "찾지 못했습니다"', /찾지 못|없는 업체|없습니다/.test(await bodyText(page)))
-  for (const p of ['/ops/inbox', '/ops/agents', '/sales/first-meeting', '/getting-started', '/why', '/kpi', '/roadmap', '/studio', '/clients', '/ax/open?client=' + OWNER_CLIENT, '/website-studio', '/modules/tech-biz', '/funding', '/tools/review', '/marketing', '/marketing/youtube', '/marketing/youtube?view=analysis', '/marketing/youtube?view=channels&p=month']) {
+  for (const p of ['/ops/inbox', '/ops/agents', '/sales/first-meeting', '/getting-started', '/why', '/kpi', '/roadmap', '/studio', '/clients', '/ax/open?client=' + OWNER_CLIENT, '/website-studio', '/modules/tech-biz', '/funding', '/tools/review', '/marketing', '/marketing/youtube', '/marketing/youtube?view=analysis', '/marketing/youtube?view=channels&p=month', '/ai', '/ai/new', '/ai/usage', '/ai/cases/case_qa_owner_01', '/ai/cases/case_qa_owner_01/proposal/x']) {
     await go(page, p)
     check(`Pilot 주소 막힘: ${p}`, (await bodyText(page)).includes('화면을 찾지 못했습니다'), (await bodyText(page)).slice(0, 120))
   }
@@ -461,9 +461,19 @@ try {
     out.tier = await fetch(`${base}/os_access?user_id=eq.${s.user.id}`, { method: 'PATCH', headers: h, body: JSON.stringify({ tier: 'full' }) }).then((r) => r.status)
     out.mkt = await fetch(`${base}/module_data?module_key=eq.marketing&select=*`, { headers: h }).then((r) => r.text())
     out.mktById = await fetch(`${base}/module_data?id=eq.idea_qa_owner_mkt`, { headers: h }).then((r) => r.text())
+    out.cases = await fetch(`${base}/company_cases?select=*`, { headers: h }).then((r) => r.text())
+    out.runs = await fetch(`${base}/ai_runs?select=*`, { headers: h }).then((r) => r.text())
+    out.caps = await fetch(`${base}/rpc/my_capabilities`, { method: 'POST', headers: h, body: '{}' }).then((r) => r.text())
+    out.hasCap = await fetch(`${base}/rpc/has_capability`, { method: 'POST', headers: h, body: JSON.stringify({ p_cap: 'can_use_owner_ai_workspace' }) }).then((r) => r.text())
+    out.caseIns = await fetch(`${base}/company_cases`, { method: 'POST', headers: h, body: JSON.stringify({ id: 'case_pilot_sneak_01', workspace_id: ws, owner_id: s.user.id, company_name: '몰래', relation: 'reviewed' }) }).then((r) => r.status)
+    out.capIns = await fetch(`${base}/user_capabilities`, { method: 'POST', headers: h, body: JSON.stringify({ user_id: s.user.id, capability: 'can_use_owner_ai_workspace' }) }).then((r) => r.status)
     out.lvPatch = await fetch(`${base}/consulting_projects?id=eq.qa-legacy-venture`, { method: 'PATCH', headers: h, body: JSON.stringify({ payload: { venture: { submittedAt: '2099-01-01' } } }) }).then((r) => r.text())
     return out
   }, [REF, OWNER_WS, OWNER_CLIENT])
+  check('AI Pilot REST: 대표 AI 작업실 업체 · 실행 기록 읽기 = []', direct.cases === '[]' && direct.runs === '[]', `${direct.cases} ${direct.runs}`)
+  check('AI Pilot REST: 내 기능 권한 = [] · has_capability = false', direct.caps === '[]' && direct.hasCap === 'false', `${direct.caps} ${direct.hasCap}`)
+  check('AI Pilot REST: AI 작업실 업체 넣기 · 자기 권한 넣기 막힘', direct.caseIns >= 400 && direct.capIns >= 400, `${direct.caseIns} ${direct.capIns}`)
+  check('AI DB: 기능 권한은 대표 한 사람 · 대표 AI 업체 그대로', sql(`select string_agg(user_id::text, ',') from public.user_capabilities where capability = 'can_use_owner_ai_workspace'`) === OWNER.id && sql(`select count(*) from public.company_cases where id = 'case_pilot_sneak_01'`) === '0')
   check('Pilot REST(D-180 S8): 대표의 예전 벤처 기록 고치기 = 0줄 · DB 그대로', direct.lvPatch === '[]' && sql(`select payload->'venture'->>'submittedAt' from public.consulting_projects where id = 'qa-legacy-venture'`) === '2026-07-15', direct.lvPatch)
   check('Pilot REST: 표 8개 어디에도 대표 자료 없음', Object.entries(direct).filter(([k]) => !['patch', 'del', 'insert', 'ws2', 'tier'].includes(k)).every(([, v]) => leaked(String(v)).length === 0 && !String(v).includes(OWNER_WS)), JSON.stringify(direct).slice(0, 400))
   check('Pilot REST: 대표 업체 id 로 읽기 = []', direct.byId === '[]', direct.byId)
@@ -812,6 +822,9 @@ try {
   check('P7 대표 → 팀장 화면(D-195): 마케팅 · 브랜딩 메뉴 없음', !pnav.includes('마케팅'), pnav.replace(/\n/g, '|').slice(0, 300))
   await go(page, '/ops/agents')
   check('대표 → 팀장 화면: 대표 전용 주소도 팀장처럼 막힘', (await bodyText(page)).includes('화면을 찾지 못했습니다'))
+  check('AI 대표 → 팀장 화면: AI 작업실 메뉴 없음', !pnav.includes('AI 작업실'), pnav.replace(/\n/g, '|').slice(0, 300))
+  await go(page, '/ai')
+  check('AI 대표 → 팀장 화면: /ai 막힘', (await bodyText(page)).includes('화면을 찾지 못했습니다') && (await page.getByTestId('case-workspace').count()) === 0)
   for (const p of ['/marketing', '/marketing/youtube', '/marketing/youtube?view=analysis']) {
     await go(page, p)
     const t = await bodyText(page)
@@ -827,6 +840,10 @@ try {
   const back2 = await bodyText(page)
   check('팀장 → 대표 화면: 대표 업체 다시 · 팀장 줄 없음 · 대표 메뉴', back2.includes('대표비밀정밀') && (await page.getByTestId('viewing-pilot').count()) === 0 && ((await page.locator('aside').first().innerText()) ?? '').includes('영업자 정산'))
   check('P1 대표(D-195): 마케팅 · 브랜딩 메뉴 보임', ((await page.locator('aside').first().innerText()) ?? '').includes('마케팅 · 브랜딩'))
+  check('AI 대표: 사이드바에 AI 작업실', ((await page.locator('aside').first().innerText()) ?? '').includes('AI 작업실'))
+  await go(page, '/ai')
+  await page.getByTestId('case-new').waitFor({ timeout: 8000 }).catch(() => {})
+  check('AI 대표: /ai 열림(업체 등록 단추 · 권한 막힘 안내 없음)', (await page.getByTestId('case-new').count()) === 1 && (await page.getByTestId('owner-ai-denied').count()) === 0 && (await page.getByTestId('owner-ai-db-setup').count()) === 0, (await bodyText(page)).slice(0, 200))
   await go(page, '/marketing/youtube')
   check('P2 대표(D-195): /marketing/youtube 열림(콘텐츠 레이더 화면)', (await page.getByTestId('yt-page').count()) === 1 && !(await bodyText(page)).includes('화면을 찾지 못했습니다'))
   check('대표 데이터 그대로(D-195): 대표 콘텐츠 레이더 기록 2줄 · 지워지거나 옮겨지지 않음', sql(`select count(*) from public.module_data where workspace_id = '${OWNER_WS}' and module_key = 'marketing'`) === '2')

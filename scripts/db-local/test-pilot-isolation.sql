@@ -32,6 +32,7 @@ begin
   -- 형식이 정해진 칸(정규식 · 범위)
   if tbl = 'ops_custom_services' and col = 'key' then return quote_literal('custom_qa' || substr(md5(random()::text), 1, 6)); end if;
   if tbl = 'consulting_evidence' and col = 'slot' then return '1'; end if;
+  if tbl = 'company_cases' and col = 'id' then return quote_literal('case_qa' || substr(md5(random()::text), 1, 8)); end if;
   -- 허용 값이 정해진 칸(check)은 첫 값
   select pg_get_constraintdef(c.oid) into chk from pg_constraint c join pg_class r on r.oid = c.conrelid join pg_namespace n on n.oid = r.relnamespace
    where n.nspname = 'public' and r.relname = tbl and c.contype = 'c' and pg_get_constraintdef(c.oid) like '%' || col || '%' limit 1;

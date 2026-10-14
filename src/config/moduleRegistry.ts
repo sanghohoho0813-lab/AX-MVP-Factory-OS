@@ -29,6 +29,7 @@ import {
   Megaphone,
   Rocket,
   CircleDashed,
+  Sparkles,
 } from 'lucide-react'
 import { SALES_EXTRA_PATHS, SALES_TAB_PATHS } from './salesTabs'
 import { REVIEW_HUB_PATH, type ToolDefinition, liveTools, movedTools, reviewTools } from './toolRegistry'
@@ -109,6 +110,8 @@ export interface ModuleDefinition {
   moduleKey?: string
   /** D-162: 대표 · 기존 구성원(full)에게만 — Pilot 에게는 메뉴에도 없고 주소로도 열리지 않는다 */
   ownerOnly?: boolean
+  /** 기능 권한(capability)이 있어야 메뉴에 보인다(예: 대표 AI 작업실). 화면 · DB · 서버 함수가 따로 또 막는다 */
+  capability?: string
 }
 
 /*
@@ -213,6 +216,8 @@ export const MODULES: ModuleDefinition[] = [
   // D-104: '고객 운영' → '고객 관리', '고객 이벤트함' → '잠재고객 상담신청' (주소는 그대로)
   { key: 'client-ops', label: '고객 관리', path: '/ops/clients', icon: ListChecks, group: 'clients', accent: 'ops', enabled: true, badge: 'clients' },
   // D-162: 공개 사이트(고객 플랫폼) 상담신청은 대표 작업공간으로만 들어온다 — Pilot 에게는 없다
+  // 대표 AI 작업실(Company Case Intelligence) — 기능 권한 can_use_owner_ai_workspace 가 있는 사람만(지금은 대표). 팀장 · 팀장 화면 보기에는 없다
+  { key: 'ai-workspace', label: 'AI 작업실', path: '/ai', icon: Sparkles, group: 'clients', accent: 'ai', enabled: true, hint: '대표 전용 — 업체별 AX 분석 · 특허 · 벤처 · 자금 · 제안서 · 동료 전달문구 · 기억', ownerOnly: true, capability: 'can_use_owner_ai_workspace' },
   { key: 'inbox', label: '잠재고객 상담신청', path: '/ops/inbox', icon: Inbox, group: 'clients', accent: 'alert', enabled: true, badge: 'requests', hint: '고객 이벤트함', ownerOnly: true },
 
   // D-114: 기업컨설팅 OS(영업 도구 모음)를 옮긴 곳 — 목차는 이 한 줄, 보드 · 미팅 준비 · 상품·견적 · 전략은 안의 탭
@@ -251,14 +256,21 @@ export const MODULES: ModuleDefinition[] = [
  * 목차 묶음. opts.advanced 가 false 면 '고급 운영 기능' 메뉴(검증 · 기관 전략 · 사례)를 뺀다(D-120) —
  * 설정의 '고급 운영 기능 보기' 가 말한 대로. 주소로는 계속 열린다. opts 를 안 주면 전부(시험 · 옛 호출).
  */
-export function enabledModulesByGroup(opts: { advanced?: boolean; pilot?: boolean } = {}): { group: ModuleGroup; items: ModuleDefinition[] }[] {
+export function enabledModulesByGroup(opts: { advanced?: boolean; pilot?: boolean; caps?: ReadonlySet<string> } = {}): { group: ModuleGroup; items: ModuleDefinition[] }[] {
   const showAdvanced = opts.advanced ?? true
   const pilot = opts.pilot ?? false
+  const caps = opts.caps ?? new Set<string>()
   return MODULE_GROUPS.filter((group) => !(pilot && group.ownerOnly)).map((group) => ({
     group,
     // D-162: Pilot 에게는 대표 전용 줄 · 고급 운영 기능(검증 · 기관 전략 · 사례)을 빼고 보인다
-    items: MODULES.filter((m) => m.enabled && m.group === group.key && (showAdvanced || !m.advanced) && !(pilot && (m.ownerOnly || m.advanced || isPilotHiddenPath(m.path)))),
+    // 기능 권한이 필요한 줄(AI 작업실)은 권한이 있을 때만
+    items: MODULES.filter((m) => m.enabled && m.group === group.key && (showAdvanced || !m.advanced) && !(pilot && (m.ownerOnly || m.advanced || isPilotHiddenPath(m.path))) && (!m.capability || caps.has(m.capability))),
   })).filter((g) => g.items.length > 0)
+}
+
+/** 기능 권한이 없으면 열지 않는 주소(메뉴 표에서 계산) */
+export function isCapabilityHiddenPath(pathname: string, caps: ReadonlySet<string>): boolean {
+  return MODULES.some((m) => m.enabled && m.capability && !caps.has(m.capability) && moduleMatchLength(m, pathname) > 0)
 }
 
 /**

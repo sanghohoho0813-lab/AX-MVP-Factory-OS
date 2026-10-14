@@ -16,6 +16,8 @@ export interface AuthContextValue {
   access: OsAccess | null
   /** D-164: 대표가 바로 볼 수 있는 팀장 화면(작업공간) — 대표가 아니면 빈 목록 */
   pilotViews: PilotView[]
+  /** 대표 AI 작업실 등 기능 권한(서버 0021) — 로컬 모드 · 로그인 전은 빈 목록, 0021 전이면 null */
+  capabilities: string[] | null
   selectWorkspace: (workspaceId: string) => void
   refreshWorkspaces: () => Promise<void>
   signOut: () => Promise<void>

@@ -25,6 +25,7 @@ import { ViewAsSwitch } from './ViewAsSwitch'
 import { AccountSwitchItems } from './AccountSwitch'
 import { useNavCounts, type NavCounts } from './useNavCounts'
 import { useIsPilot } from '../../auth/osAccess'
+import { useCapabilitySet } from '../../auth/ownerAiAccess'
 import { useBackToClose } from '../../lib/backToClose'
 import { useEntitlements } from '../../lib/entitlementsStore'
 
@@ -80,7 +81,8 @@ function SidebarContent({
   useStoreVersion()
   // D-162: Pilot 에게는 대표 전용 묶음 · 줄을 빼고 보인다(같은 메뉴 표에서)
   const pilot = useIsPilot()
-  const groups = enabledModulesByGroup({ advanced: isAdvancedVisible(), pilot })
+  const caps = useCapabilitySet()
+  const groups = enabledModulesByGroup({ advanced: isAdvancedVisible(), pilot, caps })
   const counts = useNavCounts()
   const [userCollapsed, setUserCollapsed] = useState<Set<ModuleGroupKey> | null>(null)
 

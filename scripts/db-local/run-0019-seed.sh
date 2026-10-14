@@ -7,7 +7,7 @@ DB=axqa19seed
 q() { su postgres -c "psql -q -v ON_ERROR_STOP=1 -d $DB"; }
 su postgres -c "dropdb --if-exists $DB; createdb $DB" || exit 1
 q < scripts/db-local/supabase-shim.sql > /dev/null || exit 1
-for f in $(ls supabase/migrations/*.sql | grep -v -E '0000(19|20)'); do q < "$f" > /dev/null 2>/tmp/s19 || { echo "적용 실패 $f"; cat /tmp/s19; exit 1; }; done
+for f in $(ls supabase/migrations/*.sql | grep -v -E '0000(19|20|21)'); do q < "$f" > /dev/null 2>/tmp/s19 || { echo "적용 실패 $f"; cat /tmp/s19; exit 1; }; done
 q <<'SQL' > /dev/null || { echo "상황 만들기 실패"; exit 1; }
 insert into auth.users (id, email) values ('5e000000-0000-0000-0000-0000000000a1','ceo@x.kr'),('5e000000-0000-0000-0000-0000000000a2','staff@x.kr'),('5e000000-0000-0000-0000-0000000000c1','random@x.kr') on conflict (id) do update set email = excluded.email;
 insert into public.profiles (id, email) values ('5e000000-0000-0000-0000-0000000000a1','ceo@x.kr'),('5e000000-0000-0000-0000-0000000000a2','staff@x.kr'),('5e000000-0000-0000-0000-0000000000c1','random@x.kr') on conflict (id) do update set email = excluded.email;
@@ -40,12 +40,18 @@ check "Pilot 작업공간 하나 · 멤버 = Pilot 혼자" "$(v "select count(di
 check "대표 작업공간 멤버에 Pilot 없음" "$(v "select count(*) from public.workspace_members where workspace_id='5e000000-0000-0000-0000-00000000aaaa' and user_id='5e000000-0000-0000-0000-0000000000b1'")" "0"
 sed "s/여기에_Pilot_이메일@example.com/ceo@x.kr/" supabase/manual/pilot_provision.sql | su postgres -c "psql -q -v ON_ERROR_STOP=1 -d $DB" > /tmp/s19c 2>&1 && { echo "FAIL  대표 계정을 Pilot 으로 바꿈"; BAD=1; } || echo "PASS  대표 계정은 Pilot 으로 바뀌지 않음"
 
+# 0021(대표 AI 작업실) 을 0019 다음에 처음 실행 — 권한은 상담신청 받는 작업공간의 주인(대표) 한 사람에게만(직원 · 가입자 · Pilot 아님)
+q < supabase/migrations/20261014000021_owner_ai_workspace.sql > /dev/null 2>/tmp/s21 || { echo "FAIL  0021 적용 실패"; cat /tmp/s21; BAD=1; }
+check "0021: AI 작업실 권한 = 대표 한 사람" "$(v "select string_agg(p.email, ',') from public.user_capabilities c join public.profiles p on p.id = c.user_id where c.capability = 'can_use_owner_ai_workspace'")" "ceo@x.kr"
+q < supabase/migrations/20261014000021_owner_ai_workspace.sql > /dev/null 2>/tmp/s21 || { echo "FAIL  0021 두 번째 실행 실패"; cat /tmp/s21; BAD=1; }
+check "0021: 두 번 실행해도 권한 줄 1" "$(v "select count(*) from public.user_capabilities")" "1"
+
 # 가입자가 0019 전에 자기 작업공간에 업체를 대표보다 많이 넣어 둔 경우 — 0019 는 멈추고 아무것도 바꾸지 않는다(대표가 id 를 정해 다시)
 DB2=axqa19inflate
 q2() { su postgres -c "psql -q -v ON_ERROR_STOP=1 -d $DB2"; }
 su postgres -c "dropdb --if-exists $DB2; createdb $DB2" || exit 1
 q2 < scripts/db-local/supabase-shim.sql > /dev/null || exit 1
-for f in $(ls supabase/migrations/*.sql | grep -v -E '0000(19|20)'); do q2 < "$f" > /dev/null 2>/tmp/s19 || { echo "적용 실패 $f"; cat /tmp/s19; exit 1; }; done
+for f in $(ls supabase/migrations/*.sql | grep -v -E '0000(19|20|21)'); do q2 < "$f" > /dev/null 2>/tmp/s19 || { echo "적용 실패 $f"; cat /tmp/s19; exit 1; }; done
 q2 <<'SQL' > /dev/null || { echo "상황 만들기 실패(부풀림)"; exit 1; }
 insert into auth.users (id, email, created_at) values ('6e000000-0000-0000-0000-0000000000a1','ceo@x.kr','2026-01-01'),('6e000000-0000-0000-0000-0000000000c1','evil@x.kr','2026-09-01');
 insert into public.workspaces (id, name, owner_id, created_at) values

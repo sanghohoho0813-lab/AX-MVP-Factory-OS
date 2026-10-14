@@ -15,7 +15,8 @@ import { useScrollMemory } from '../../lib/scrollMemory'
 import { EntitlementsProvider } from '../../lib/entitlementsContext'
 import { ModuleBoundary } from '../modules/ModuleBoundary'
 import { useIsPilot } from '../../auth/osAccess'
-import { isPilotHiddenPath } from '../../config/moduleRegistry'
+import { isCapabilityHiddenPath, isPilotHiddenPath } from '../../config/moduleRegistry'
+import { useCapabilitySet } from '../../auth/ownerAiAccess'
 import { NotFoundState } from '../ui/NotFoundState'
 import { FrameBridge } from './DeviceView'
 import { ViewingPilotBanner } from './ViewAsSwitch'
@@ -25,7 +26,9 @@ function PilotRouteGuard({ pathname, children }: { pathname: string; children: R
   const pilot = useIsPilot()
   // D-188: 팀장 화면은 기본 업무 6종을 빼고 그린다(화면 목록만 — 업체 기록은 그대로). 화면을 그리기 전에 정한다
   setBuiltinServicesHidden(pilot)
-  if (pilot && isPilotHiddenPath(pathname)) {
+  // 대표 AI 작업실처럼 기능 권한이 필요한 화면 — 권한이 없으면(팀장 · 권한 없는 구성원) 직접 주소로도 없는 화면
+  const caps = useCapabilitySet()
+  if ((pilot && isPilotHiddenPath(pathname)) || isCapabilityHiddenPath(pathname, caps)) {
     return <NotFoundState title="화면을 찾지 못했습니다" description="주소가 바뀌었거나 없는 화면입니다." backTo="/" backLabel="오늘로" />
   }
   return <>{children}</>

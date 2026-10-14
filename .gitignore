@@ -57,6 +57,7 @@ dist-qa*/
 .facts-out
 .taxplan-out
 .scenarios-out
+.ownerai-out
 .grants-out
 .cert-out
 .finance-out

@@ -1,5 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useIsPilot } from '../auth/osAccess'
+import { useOwnerAiAccess } from '../auth/ownerAiAccess'
 import { NextStepEditor } from '../components/ops/NextStepEditor'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { LINK_BUTTON } from '../components/sales/salesStyle'
@@ -30,6 +31,7 @@ import {
   Presentation,
   ArrowRightLeft,
   FileText,
+  Sparkles,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { getDataModeConfig } from '../data/dataMode'
@@ -117,6 +119,8 @@ import { pendingFacts } from '../services/customerFacts'
 const ClientSmartTab = lazy(() => import('../components/ops/ClientSmartTab'))
 // D-190: 개요 맨 위 '이 업체에 먼저 제안할 것' — 판정 엔진(정책자금 · 창업감면 …)은 따로 받아 첫 화면을 무겁게 하지 않는다
 const ClientTopPicks = lazy(() => import('../components/ops/ClientTopPicks'))
+// 대표 AI 작업실(V1) — 대표 전용 탭(기능 권한). 팀장 화면 · 권한 없는 계정에는 탭 · 더보기 단추 · 주소 모두 없다
+const ClientAiTab = lazy(() => import('./ownerAi/ClientAiTab'))
 import { factNoteFor, readFact, withFactValue, withProfileFieldEdit } from '../services/customerFacts'
 import { TodoComposer } from '../components/journal/TodoBoard'
 import { createJournalEntry } from '../services/journalService'
@@ -188,7 +192,7 @@ function hasContractInfo(r: ClientOpsRecord): boolean {
   return r.contract.signedAt !== '' || r.contract.kind !== '' || (r.contract.cashAmount ?? 0) > 0 || r.contract.policies.length > 0
 }
 
-type DetailTab = 'smart' | 'overview' | 'work' | 'consulting' | 'docs' | 'fees' | 'funding' | 'portal' | 'journal'
+type DetailTab = 'smart' | 'overview' | 'work' | 'consulting' | 'docs' | 'fees' | 'funding' | 'portal' | 'journal' | 'ai'
 /**
  * D-129: 매일 쓰는 순서 — 개요 → 서류 → 업무 → 업무 일기 → 고객 플랫폼 → 수금.
  * 컨설팅(특허·MVP) · 자금·지원은 기본 줄에서 뺐다(hidden) — 기능 · 데이터 · 주소(?tab=)는 그대로이고, 더보기에서 연다.
@@ -206,8 +210,10 @@ const DETAIL_TABS: { key: DetailTab; label: string; hidden?: boolean }[] = [
   { key: 'consulting', label: '컨설팅', hidden: true },
   // D-151: 공고에서 '신청 준비' 를 건 업체는 줄에 보인다(아래 showTab)
   { key: 'funding', label: '지원사업 신청', hidden: true },
+  // 대표 AI 작업실 — 기본 줄에 없고(탭 순서 그대로) 더보기에서 연다. 대표 전용
+  { key: 'ai', label: 'AI 작업실', hidden: true },
 ]
-const PILOT_HIDDEN_TABS = new Set<DetailTab>(['portal', 'consulting'])
+const PILOT_HIDDEN_TABS = new Set<DetailTab>(['portal', 'consulting', 'ai'])
 function isDetailTab(v: string | null): v is DetailTab {
   return DETAIL_TABS.some((t) => t.key === v)
 }
@@ -221,7 +227,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   // D-162: Pilot 에게는 고객 플랫폼(대표 공개 사이트와 이어짐) · 컨설팅(특허·MVP) 탭이 없다 — 주소로 와도 개요로
   const pilot = useIsPilot()
   const requested: DetailTab = tabParam === 'files' ? 'docs' : isDetailTab(tabParam) ? tabParam : 'overview'
-  const tab: DetailTab = pilot && PILOT_HIDDEN_TABS.has(requested) ? 'overview' : requested
+  const ownerAi = useOwnerAiAccess()
+  const tab: DetailTab = (pilot && PILOT_HIDDEN_TABS.has(requested)) || (requested === 'ai' && ownerAi === 'no') ? 'overview' : requested
   /** 개요에서 항목을 누르면 그 항목이 열린 채로 업무 탭이 뜨도록 svc 를 함께 싣는다 */
   const location = useLocation()
   /** D-124: 영업에서 왔으면 돌아갈 곳 — 탭을 바꿔도 잃지 않게 state 를 함께 싣는다 */
@@ -1684,6 +1691,12 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
       {tab === 'fees' && <FeesPanel record={record} onChange={commit} today={today} />}
 
+      {tab === 'ai' && (
+        <Suspense fallback={<p className="t-sub text-slate-500">AI 작업실을 여는 중…</p>}>
+          <ClientAiTab record={record} />
+        </Suspense>
+      )}
+
       {tab === 'portal' && <PortalTab record={record} workspaceId={workspaceId} onRecordChange={commit} latest={() => current() ?? record} />}
 
       {tab === 'journal' && (
@@ -1791,6 +1804,20 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 >
                   <Workflow aria-hidden="true" className="size-4" />
                   컨설팅 프로젝트(특허·MVP) 보기
+                </Button>
+              )}
+              {!pilot && ownerAi !== 'no' && (
+                <Button
+                  variant="secondary"
+                  className="w-full justify-start"
+                  data-testid="more-ai"
+                  onClick={() => {
+                    setMoreOpen(false)
+                    setTab('ai')
+                  }}
+                >
+                  <Sparkles aria-hidden="true" className="size-4" />
+                  AI 작업실(대표 전용)
                 </Button>
               )}
               <Button
