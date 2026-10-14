@@ -247,10 +247,11 @@ export function radarVideos(p: Prepared, opts: RadarOptions = {}): RadarVideo[] 
 /** '평소보다 6.2배' · 7일 안이면 '3일 만에 평소의 1.7배' */
 export function ratioLine(v: Pick<RadarVideo, 'ratio' | 'adjusted' | 'young' | 'ageDays'>): string {
   if (v.ratio === null) return '평소 기준 부족'
-  const x = (n: number) => (n >= 10 ? Math.round(n).toString() : n.toFixed(1))
-  if (!v.young) return `평소보다 ${x(v.ratio)}배`
+  // 100배 넘게는 그냥 '100배 넘게'(평소가 아주 작은 채널에서 숫자만 커 보이지 않게)
+  const x = (n: number) => (n >= 100 ? '100배 넘게' : `${n >= 10 ? Math.round(n).toString() : n.toFixed(1)}배`)
+  if (!v.young) return `평소보다 ${x(v.ratio)}`
   const d = Math.max(1, Math.floor(v.ageDays))
-  return `${d}일 만에 평소의 ${x(v.ratio)}배`
+  return `${d}일 만에 평소의 ${x(v.ratio)}`
 }
 
 /** 화면용 배수 숫자(나이 반영) — 7일 안 영상은 '같은 나이 기대치' 대비 */
@@ -463,7 +464,7 @@ function opportunity(axis: ContentAxis, c: Cluster, hot: readonly PatternStat[],
   // BRIDGE 는 '왜 BRIDGE 인가' 를 맨 앞에(카드에는 앞 3줄만 보인다)
   if (axis === 'bridge') {
     if (c.bridgeHits > 0) whyNow.unshift(`이미 '${def.label} + AI · 자동화' 를 같이 다룬 영상 ${c.bridgeHits}편 — 시장이 이 조합을 받아 줍니다`)
-    else if (axSignal && axSignal.strength !== 'early') whyNow.unshift(`AI · 자동화 쪽에서도 '${axSignal.label}' 신호(${STRENGTH_LABEL[axSignal.strength]}) — 두 흐름을 잇는 주제입니다`)
+    else if (axSignal && axSignal.strength !== 'early') whyNow.unshift(`AI 실무 채널에서는 지금 '${axSignal.label}' 이 오릅니다(${axSignal.channels14 || axSignal.channels30}개 채널) — 이 주제에 붙여 말하기 좋은 때입니다`)
     else whyNow.unshift(`'${def.label} + AI' 를 다룬 벤치마킹 영상은 아직 없습니다 — 먼저 말할 수 있는 자리입니다`)
   }
   const hold = c.strength === 'early' && (c.dominant !== '' || c.videos14 === 0)

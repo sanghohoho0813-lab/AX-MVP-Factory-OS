@@ -365,6 +365,7 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     check('R9 지원금 계열은 합치지 않고 좁은 주제 하나만(고용지원금이면 소상공인 지원금으로 또 세지 않음)', topicsOf('고용지원금 받는 법').join() === 'employ_subsidy' && topicsOf('민생지원금 지역 발표').join() === 'sme_subsidy')
     check('R9 AI · AX: Claude + 업무자동화 / n8n → 노코드 / 엑셀 자동화 / AI 도입 → AX', topicsOf('Claude로 업무 자동화 해봤습니다').join() === 'claude,automation' && topicsOf('n8n 으로 회사 업무 돌리기').includes('nocode') && topicsOf('엑셀 자동화 10분').includes('sheets') && topicsOf('중소기업 AI 도입 사례').includes('ax_adopt'))
     check('R9 채널 이름 꼬리표는 주제로 세지 않는다("| 절세미녀" → 절세 아님)', topicsOf(stripChannelTag('퇴직금 1억 = 연금 50만 원 | 절세미녀', '절세미녀 김희연 회계사')).join() === 'ceo_money' && stripChannelTag('세제개편 분석[보고파TV]', '보고파TV') === '세제개편 분석' && stripChannelTag('지원금 꼭 받으세요 #shorts #여의도정보맨', '여의도 정보맨') === '지원금 꼭 받으세요')
+    check('R9 낱말 속 겹침은 주제로 세지 않는다("일정관리" 의 정관 · "법인 만들어 봤습니다" 는 AI 만들기 아님 · "interpret" 의 erp)', topicsOf('노션 일정관리 템플릿').length === 0 && !topicsOf('법인 만들어 봤습니다').includes('vibe_coding') && topicsOf('AI로 사내 프로그램 만들어 봤습니다').includes('vibe_coding') && !topicsOf('interpret the data').includes('inhouse') && topicsOf('정관 변경 꼭 하세요').includes('incorporation'))
     check('R9 제목 구조: 숫자형 · 경고형 · 결과형 · 질문형 · 마감형 · 비교형', titlePatterns('5가지 꼭 챙기세요').includes('number') && titlePatterns('모르면 손해 보는 지원금').includes('warning') && titlePatterns('AI로 해봤더니 달라졌다').includes('result') && titlePatterns('법인전환 해야 할까?').includes('question') && titlePatterns('오늘까지 마감').includes('deadline') && titlePatterns('개인 vs 법인').includes('compare'))
   }
   // R10 — BRIDGE · 섞기 · 제목 품질
