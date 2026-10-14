@@ -6,7 +6,7 @@
  *  - 정해 둔 채널(내 채널 + 벤치마킹)의 정보 + 채널마다 최근 영상 50편. 채널마다 묶음(group)을 붙여 보낸다:
  *    direct(직접 경쟁 · 시장수요) · ai(AI 실무) · ax(AX · 업무자동화) · format(포맷 벤치마킹).
  *  - 쓰는 할당량: 채널 정보 1단위(50곳까지 한 번에) + 채널마다 2단위(최근 영상 목록 · 영상 정보).
- *    D-194 채널 34곳(번호 있는 33곳) → 한 번에 약 69단위(하루 무료 10,000단위의 0.7%). 검색(search.list · 100단위)은 쓰지 않는다.
+ *    D-194 채널 33곳(모두 채널 번호) → 한 번에 약 67단위(하루 무료 10,000단위의 0.7%). 검색(search.list · 100단위)은 쓰지 않는다.
  *  - 매일 아침 9시(한국 시간)까지 Vercel 캐시에 둔다(?slot=오늘) → 9시가 지나면 처음 여는 순간 새로 받는다.
  *  - [지금 새로 가져오기] 는 ?bucket=30분 칸 — 같은 30분 안에서는 몇 번을 눌러도 한 번만 유튜브를 부른다
  *    (아무나 주소를 두드려 하루 할당량을 다 쓰지 못하게). 정해 둔 칸 · 값 말고는 받지 않는다(400).
@@ -34,12 +34,12 @@ const MAX_EXTRA = 10
  * 내 채널 1 + 벤치마킹.
  * 2026-10-14: 핸들(@주소)은 채널이 바꾸면 끊긴다 — 바뀌지 않는 채널 번호(id)로 부른다. handle · name 은 화면 · '못 받은 채널' 이름표.
  *  - @엘아이파트너스여팀장 → 지금 주소 @정책자금해답사여팀장(같은 채널 · 주소만 바뀜)
- *  - @사장노트 는 유튜브에 그 주소가 없다(404) — 대표 확인 전까지 '못 받은 채널' 로 남긴다
+ *  - @사장노트 는 유튜브에 그 주소가 없어(404) 대표 지시로 목록에서 뺐다(2026-10-14)
  * D-194: 묶음(group) · 메모(note). AI 실무 8 · AX 4 · 포맷 2 를 더했다 — 모두 2026-10-14 유튜브 채널 화면에서
  *   채널 번호 · 이름 · 구독자를 직접 확인한 곳만(지어낸 채널 없음). 구독자 수는 그날 화면에 보인 값.
  */
 export const CHANNELS = [
-  // ---- 직접 경쟁 · 시장수요(예전 앱 20곳 그대로) ----
+  // ---- 직접 경쟁 · 시장수요(예전 앱 20곳 — 주소가 없어진 @사장노트 만 뺌) ----
   { id: 'UCjXWwM0_25vl1Mpr2Pc5amQ', handle: '@김팀장의경영노트', name: '김팀장의 경영노트', group: 'direct', mine: true, note: '내 채널' },
   { id: 'UCnnqB7SaH8o-NHLonSFfE3A', handle: '@yoido', name: '여의도 정보맨', group: 'direct', note: '소상공인 정책자금 · 지원금 속보 — (속보) 말머리 · 공문 화법은 포맷 참고로도 좋다' },
   { id: 'UC5EQkCVDppT_5B9X7i6TIWg', handle: '@소상공인도우미', name: '소상공인 도우미 | 정책원', group: 'direct', note: '소상공인 지원 정책 · 쇼츠 위주' },
@@ -53,7 +53,6 @@ export const CHANNELS = [
   { id: 'UC4-jNRLcNNcPHG864icJcKQ', handle: '@bogopatv', name: '보고파TV', group: 'direct', note: '가업승계 · 세제 개편' },
   { id: 'UC3kRdLEVPaFmr3obvmNafNA', handle: '@money_recipe', name: '머니해결사 정대표', group: 'direct', note: '정책자금 · 법인영업' },
   { id: 'UCX_Jg2GJWeSy2jGd7M0bRlQ', handle: '@사장님성장솔루션', name: '준쌤 l 사장님성장솔루션', group: 'direct', note: '소상공인 지원금 · 창업지원' },
-  { handle: '@사장노트', name: '사장노트', group: 'direct', note: '유튜브에 이 주소가 없음(2026-10-14 확인) — 맞는 채널을 대표에게 묻는 중' },
   { id: 'UCgHvFTVYFo-oWV6vu7it1PQ', handle: '@슬기로운정책지원', name: '슬기로운 정책지원', group: 'direct', note: '소상공인 정책지원' },
   { id: 'UCO6JRTAtKstRDZww8qGUcxg', handle: '@rodemtax', name: '로뎀세무법인', group: 'direct', note: '세무 · 가족법인' },
   { id: 'UCSYUQrcXUnRuvqBdqDlT74g', handle: '@nicetax', name: '이상화세무사의 모래세무', group: 'direct', note: '법인세 · 세무조사' },

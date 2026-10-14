@@ -212,6 +212,8 @@ let mode: FetchMode = 'ok'
 const calls: string[] = []
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 const GOOD_TOKEN = 'good-token-0123456789abcdef'
+// 유튜브에서 없어진 채널 흉내(채널 정보 응답에서 빠짐)
+const goneIds = new Set<string>()
 globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const u = new URL(String(input))
   if (u.hostname.endsWith('supabase.test')) {
@@ -225,11 +227,11 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const sp = u.searchParams
   if (path === 'channels' && sp.get('forHandle')) {
     const h = sp.get('forHandle')!
-    return json(200, h === '@사장노트' ? { items: [] } : { items: [{ id: `UC_${h.replace('@', '')}` }] })
+    return json(200, h === '@없는채널' ? { items: [] } : { items: [{ id: `UC_${h.replace('@', '')}` }] })
   }
   if (path === 'channels' && sp.get('forUsername')) return json(200, { items: [] })
   if (path === 'channels' && sp.get('id')) {
-    const ids = sp.get('id')!.split(',')
+    const ids = sp.get('id')!.split(',').filter((id) => !goneIds.has(id))
     return json(200, { items: ids.map((id) => ({ id, snippet: { title: `채널 ${id}`, customUrl: `@${id}`, thumbnails: { default: { url: 'https://yt3.example/t.jpg' } } }, statistics: { subscriberCount: '12000', videoCount: '300', viewCount: '4500000' }, contentDetails: { relatedPlaylists: { uploads: `UU_${id}` } } })) })
   }
   if (path === 'playlistItems') {
@@ -247,7 +249,7 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const ENV = process.env as Record<string, string | undefined>
   delete ENV.YOUTUBE_API_KEY
   const st = await call('?status=1')
-  check('서버: 키 없음 → status 는 configured=false · 채널 34곳(D-194: AI 8 · AX 4 · 포맷 2 더함)', st.code === 200 && (st.body as { configured: boolean }).configured === false && (st.body as { channels: number }).channels === 34 && CHANNELS.length === 34)
+  check('서버: 키 없음 → status 는 configured=false · 채널 33곳(D-194: AI 8 · AX 4 · 포맷 2 더함 · 주소가 없어진 @사장노트 뺌)', st.code === 200 && (st.body as { configured: boolean }).configured === false && (st.body as { channels: number }).channels === 33 && CHANNELS.length === 33)
   const nk = await call(`?slot=${slot}`)
   check('서버: 키 없음 → 503 no_key · 캐시 안 함 · 유튜브를 부르지 않음', nk.code === 503 && (nk.body as { error: string }).error === 'no_key' && nk.headers['cache-control'] === 'no-store' && calls.length === 0)
 
@@ -262,17 +264,21 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
 
   const ok = await call(`?slot=${slot}`)
   const body = ok.body as { channels: YtChannel[]; videos: YtVideoRaw[]; failed: string[]; units: number; fetchedAt: string }
-  check('서버: 200 · 채널 33곳(1곳 못 찾음) · 영상 50편씩', ok.code === 200 && body.channels.length === 33 && body.videos.length === 33 * 50, { code: ok.code, ch: body.channels?.length, v: body.videos?.length })
-  check('서버: 못 받은 채널 이름을 같이 보낸다(@사장노트 — 유튜브에 그 주소가 없음)', body.failed.join() === '@사장노트', body.failed)
+  check('서버: 200 · 채널 33곳 모두 · 영상 50편씩 · 못 받은 채널 없음', ok.code === 200 && body.channels.length === 33 && body.videos.length === 33 * 50 && body.failed.length === 0, { code: ok.code, ch: body.channels?.length, v: body.videos?.length, failed: body.failed })
   check('서버: 내 채널 표시(@김팀장의경영노트 · 채널 번호 UCjXWwM0…) · 핸들 · 숫자', body.channels[0].mine && body.channels[0].id === 'UCjXWwM0_25vl1Mpr2Pc5amQ' && body.channels[0].handle === '@김팀장의경영노트' && body.channels[0].subs === 12000 && body.channels.filter((c) => c.mine).length === 1)
-  check('채널 목록: 34곳 · 번호 없는 곳은 @사장노트 하나 · 번호가 겹치지 않음', CHANNELS.length === 34 && CHANNELS.filter((c) => !c.id).map((c) => c.handle).join() === '@사장노트' && new Set(CHANNELS.filter((c) => c.id).map((c) => c.id)).size === 33)
+  check('채널 목록: 33곳 · 모두 채널 번호(주소가 바뀌어도 안 끊김) · 번호가 겹치지 않음 · @사장노트 없음', CHANNELS.length === 33 && CHANNELS.every((c) => /^UC[\w-]{22}$/.test(c.id)) && new Set(CHANNELS.map((c) => c.id)).size === 33 && !CHANNELS.some((c) => c.handle === '@사장노트'))
   check('서버: 영상 칸 — 길이(초) · 조회수 숫자', body.videos[0].d === 45 && body.videos[1].d === 723 && body.videos[0].v === 1000 && typeof body.videos[0].at === 'string')
   check('서버: 응답 어디에도 키 값이 없다', !JSON.stringify(ok.body).includes(KEYVAL))
-  check('서버: 할당량 약 69단위(채널 번호로 바로 · 채널 정보는 한 번에 묶음 · 주소로 찾는 건 번호 없는 1곳만)', body.units === calls.length && body.units <= 70 && calls.filter((c) => c.startsWith('channels?part,id')).length === 1 && calls.filter((c) => c.includes('forHandle')).length === 1, { units: body.units, calls: calls.length })
+  check('서버: 할당량 67단위(채널 번호로 바로 · 채널 정보는 한 번에 묶음 · 주소로 찾는 호출 0)', body.units === calls.length && body.units === 1 + 33 * 2 && calls.filter((c) => c.startsWith('channels?part,id')).length === 1 && calls.filter((c) => c.includes('forHandle') || c.includes('forUsername')).length === 0, { units: body.units, calls: calls.length })
   const maxAge = Number(/s-maxage=(\d+)/.exec(ok.headers['cache-control'] ?? '')?.[1] ?? -1)
   check('서버: 하루 칸은 다음 아침 9시까지 캐시', Math.abs(maxAge - secondsUntilNine()) <= 2, ok.headers['cache-control'])
   const fr = await call(`?bucket=${bucket}`)
   check('서버: [지금 새로] 는 30분 캐시(같은 30분에 여러 번 눌러도 유튜브는 한 번)', fr.code === 200 && fr.headers['cache-control'] === 'public, max-age=0, s-maxage=1800')
+  goneIds.add('UCFSVU2_P0L2n21_d2J-ZQ2Q')
+  const gone = await call(`?slot=${slot}`)
+  goneIds.clear()
+  const gb = gone.body as { channels: YtChannel[]; videos: YtVideoRaw[]; failed: string[] }
+  check('서버: 채널 하나가 없어져도 나머지는 보내고 · 못 받은 채널 이름(@세무사)을 같이 보낸다', gone.code === 200 && gb.channels.length === 32 && gb.videos.length === 32 * 50 && gb.failed.join() === '@세무사', gb.failed)
 
   mode = 'quota'
   const q = await call(`?slot=${slot}`)
@@ -347,9 +353,9 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   // R8 — 네 묶음
   {
     check('R8 묶음: 서버가 붙인 묶음 → 대표가 바꾼 묶음 순 · 모르면 직접 경쟁', groupOf({ id: 'x', group: 'ai' }) === 'ai' && groupOf({ id: 'x', group: 'ai' }, { x: { group: 'format' } }) === 'format' && groupOf({ id: 'y' }) === 'direct' && groupOf({ id: 'z', group: 'weird' }) === 'direct')
-    const groups = new Map(CHANNELS.map((c) => [c.id ?? c.handle, c.group]))
+    const groups = new Map(CHANNELS.map((c) => [c.id, c.group]))
     const count = (g: string) => [...groups.values()].filter((x) => x === g).length
-    check('R8 기본 채널: 직접 20 · AI 실무 8 · AX 4 · 포맷 2(모두 묶음이 있다)', count('direct') === 20 && count('ai') === 8 && count('ax') === 4 && count('format') === 2 && CHANNELS.every((c) => typeof c.note === 'string' && c.note.length > 0))
+    check('R8 기본 채널: 직접 19(@사장노트 뺌) · AI 실무 8 · AX 4 · 포맷 2(모두 묶음이 있다)', count('direct') === 19 && count('ai') === 8 && count('ax') === 4 && count('format') === 2 && CHANNELS.every((c) => typeof c.note === 'string' && c.note.length > 0))
     const chs = [{ ...ch('d1', '직접하나', 10_000, 1), group: 'direct' }, { ...ch('f1', '포맷하나', 900_000, 1), group: 'format' }, { ...ch('a1', '에이아이', 9_000, 1), group: 'ai' }, { ...ch('d2', '직접둘', 10_000, 1), group: 'direct' }]
     const vids = [...base('d1', 5, 1_000), ...base('f1', 5, 1_000), ...base('a1', 5, 1_000), ...base('d2', 5, 1_000), vid('f_t', 'f1', '정책자금 포맷 영상', 8 * D, 9_000), vid('f_t2', 'f1', '정책자금 포맷 영상 둘', 9 * D, 9_000), vid('d_t', 'd1', '정책자금 직접 영상', 8 * D, 900)]
     const p = prepareFeed({ channels: chs, videos: vids }, NOW)
@@ -435,6 +441,8 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const ok = await call('?resolve=https://www.youtube.com/@routeai', { authorization: `Bearer ${GOOD_TOKEN}` })
   const ch1 = (ok.body as { channel: { id: string; title: string; subs: number }; units: number })
   check('[채널 추가] 로그인하면 채널 확인 — 채널 정보 1단위(검색 100단위 안 씀) · 키 값 없음 · 캐시 안 함', ok.code === 200 && ch1.channel.id === 'UC_routeai' && ch1.units === 1 && !calls.some((c) => c.startsWith('search')) && !JSON.stringify(ok.body).includes(KEYVAL) && ok.headers['cache-control'] === 'no-store', ok.body)
+  const nf = await call('?resolve=@없는채널', { authorization: `Bearer ${GOOD_TOKEN}` })
+  check('[채널 추가] 유튜브에 없는 주소 → 404 not_found(주소 · 예전 이름으로 2단위만) · 캐시 안 함', nf.code === 404 && (nf.body as { error: string; units: number }).error === 'not_found' && (nf.body as { units: number }).units === 2 && nf.headers['cache-control'] === 'no-store', nf.body)
   calls.length = 0
   const ex = await call(`?extra=UCnewchannel00000000000a,${CHANNELS[1].id}`, { authorization: `Bearer ${GOOD_TOKEN}` })
   const exb = ex.body as { channels: YtChannel[]; videos: YtVideoRaw[]; units: number }
