@@ -132,7 +132,7 @@ const policyInsight: Provider = ({ record, facts }) => {
   }
 }
 
-function startupRegion(address: string): { region: Region | ''; over: StartupForm['overconcentration'] } {
+export function startupRegion(address: string): { region: Region | ''; over: StartupForm['overconcentration'] } {
   const { sido } = placeOf(address)
   if (sido === '서울') return { region: 'seoul', over: 'yes' }
   if (sido === '경기' || sido === '인천') return { region: 'gyeonggi_incheon', over: 'unknown' }

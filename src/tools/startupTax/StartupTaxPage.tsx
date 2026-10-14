@@ -10,6 +10,9 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { scenarioPreset } from '../../services/scenarioPresets'
+import { startupRegion } from '../../services/clientInsights'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
 import { ModuleDashboard } from '../shared/ModuleDashboard'
@@ -100,6 +103,28 @@ function StartupTaxScreen() {
     return filled
   })
 
+  // D-199 상황 예시(?preset=) — 그 상황의 가정(창업 형태 · 권역)을 넣고 바로 판정한다. 권역이 비어 있으면 업체 주소로
+  const { clientRecord } = useToolClient()
+  const [params, setParams] = useSearchParams()
+  const presetId = params.get('preset')
+  const presetDone = useRef(false)
+  const [presetTitle, setPresetTitle] = useState('')
+  useEffect(() => {
+    if (presetDone.current || !presetId || (clientId && !clientRecord)) return
+    presetDone.current = true
+    const preset = scenarioPreset(presetId)
+    if (!preset || preset.module !== 'startup-tax') return
+    const place = startupRegion(clientRecord?.businessAddress ?? '')
+    setForm((f) => ({ ...f, ...(f.region ? {} : { region: place.region, overconcentration: place.over }), ...(preset.startup ?? {}) }))
+    setSubmitted(true)
+    markStartupTaxJudged(clientId, true)
+    setPresetTitle(preset.title)
+    const next = new URLSearchParams(params)
+    next.delete('preset')
+    setParams(next, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presetId, clientRecord, clientId])
+
   const top = () => window.scrollTo({ top: 0, behavior: 'smooth' })
   // D-94: 판정하면 결과 첫 칸으로 — 위의 업체 띠·안내·제목을 건너뛴다(휴대폰에서 결과가 화면 아래로 밀리던 것)
   const handleSubmit = () => {
@@ -121,6 +146,11 @@ function StartupTaxScreen() {
   return (
     <div className="st-orig flex flex-col gap-4">
       <PrefillNote note={prefillNote} />
+      {presetTitle && (
+        <p className="t-sub rounded-(--radius-control) border border-success-200 bg-success-50 px-3 py-2 font-semibold break-keep text-success-800" data-testid="startup-preset-note">
+          상황 예시 · {presetTitle} — 이 업체 숫자로 바로 판정했어요(아래 칸을 바꾸면 다시 판정)
+        </p>
+      )}
       {/* D-167: 판정기 안에서만 글자 크기 고르기 — 기본은 OS 글자와 어울리게(예전 1.25배는 따로 노는 느낌) */}
       <div className="flex justify-end">
         <StartupZoomPicker value={zoom} onChange={setZoom} />

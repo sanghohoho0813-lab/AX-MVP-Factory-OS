@@ -100,12 +100,15 @@ function SaveCustomerBar({
 // 이 OS 에서 더한 것: 업체 정보로 채운 첫 값(initialInput) · 결과 아래 '업체 기록에 붙이기'(extras) · 입력 기억(onInputChange)
 export default function DiagnosisSection({
   autoSample = false,
+  autoRun = false,
   initialInput,
   presetClientId,
   extras,
   onInputChange,
 }: {
   autoSample?: boolean;
+  /** D-199 상황 예시 — 첫 값(initialInput)으로 바로 진단해 결과를 보여 준다 */
+  autoRun?: boolean;
   initialInput?: DiagnosisInput;
   presetClientId?: string;
   extras?: (input: DiagnosisInput, result: DiagnosisResult) => ReactNode;
@@ -118,10 +121,10 @@ export default function DiagnosisSection({
     onInputChange?.(input);
   }, [input, onInputChange]);
   const [result, setResult] = useState<DiagnosisResult | null>(
-    autoSample ? runDiagnosis(SAMPLE_INPUT) : null,
+    autoSample ? runDiagnosis(SAMPLE_INPUT) : autoRun && initialInput ? runDiagnosis(initialInput) : null,
   );
   const [quickInput, setQuickInput] = useState<DiagnosisInput | null>(
-    autoSample ? SAMPLE_INPUT : null,
+    autoSample ? SAMPLE_INPUT : autoRun && initialInput ? initialInput : null,
   );
   const [deepInput, setDeepInput] = useState<DiagnosisInput | null>(null);
   const [deepOpen, setDeepOpen] = useState(false);

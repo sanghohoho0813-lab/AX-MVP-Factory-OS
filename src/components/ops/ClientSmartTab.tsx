@@ -11,7 +11,7 @@
  *
  * 판정은 규칙 계산이다(모듈 화면과 같은 엔진) — 'AI' 라고 부르지 않는다. 선정 · 승인 가능성을 보장하지 않는다.
  */
-import { useMemo, useRef } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, CalendarPlus, Check, CircleAlert, FileUp } from 'lucide-react'
 import type { ClientOpsRecord, OpsAlert } from '../../types/clientOps'
@@ -22,6 +22,7 @@ import { FactInboxCard } from './ClientFactsCards'
 import { ClientAdvisor } from './ClientAdvisor'
 import { ClientGrantsCard } from '../grants/ClientGrantsCard'
 import { TopPicksCard } from './ClientTopPicks'
+import { ClientScenarios } from './ClientScenarios'
 import { Fold, FoldAllButton, HintTip, openFold } from '../ui/fold'
 import { hintFor } from '../../content/sectionHints'
 import { recoRequestMessage } from '../../services/recoRequest'
@@ -106,6 +107,8 @@ export default function ClientSmartTab({
   })
 
   const setNext = (text: string) => void onCommit(withNextAction(record, text, addDaysLocal(today, 3)), `다음 약속으로 걸었습니다 — ${text.slice(0, 30)}`)
+  // D-199: 상황 예시도 요금제에 있는 모듈만(모듈 키 = 기능 권한 키)
+  const scenarioUsable = useCallback((key: string) => ent.feature(key).usable, [ent])
 
   return (
     <div className="flex flex-col gap-4" data-testid="smart-tab">
@@ -188,6 +191,9 @@ export default function ClientSmartTab({
           </ol>
         )}
       </Section>
+
+      {/* 4-0. D-199 상황 예시로 바로 설계 — 한 번 누르면 이 업체 숫자로(같은 엔진) · 모듈에서 같은 가정으로 이어서 */}
+      <ClientScenarios record={record} today={today} usable={scenarioUsable} onRequestText={onRequestText} onSetNext={setNext} />
 
       {/* 4-1. 맞춤 상담(D-145) — 목차에서 고르거나 직접 묻기 · 이 회사 기록 · 모듈 판정으로 답한다. D-192: 접어 둔다 */}
       <Fold id="smart.advisor" title="맞춤 상담">

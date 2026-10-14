@@ -10,6 +10,9 @@
  */
 
 import { useToolClient } from '../shared/toolClientContext'
+import { useSearchParams } from 'react-router-dom'
+import { scenarioPreset } from '../../services/scenarioPresets'
+import { clientFacts } from '../shared/clientPrefill'
 import { sharedToolKey } from '../shared/toolStorage'
 import { useEffect, useMemo, useState, type ReactNode, useRef } from 'react'
 import { Check, Copy, RotateCcw } from 'lucide-react'
@@ -291,6 +294,26 @@ function TaxTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taxKey])
   usePersist(taxKey, form)
+  // D-199 상황 예시(?preset=) — 그 상황의 연구개발비(인건비 · 재료비)를 넣는다. 사업자 구분은 업체 기록에서
+  const { clientRecord } = useToolClient()
+  const [params, setParams] = useSearchParams()
+  const presetId = params.get('preset')
+  const presetDone = useRef(false)
+  const [presetTitle, setPresetTitle] = useState('')
+  useEffect(() => {
+    if (presetDone.current || !presetId || (clientId && !clientRecord)) return
+    presetDone.current = true
+    const preset = scenarioPreset(presetId)
+    if (!preset || preset.module !== 'labcare' || !preset.lab) return
+    const lab = preset.lab
+    const bt = clientRecord ? clientFacts(clientRecord, new Date()).businessType : ''
+    setForm((f) => ({ ...f, payroll: lab.payroll, material: lab.material, other: lab.other, currentYearRndCost: '', category: lab.category, ...(bt ? { businessType: bt === 'individual' ? '개인사업자' : '법인사업자' } : {}) }))
+    setPresetTitle(preset.title)
+    const next = new URLSearchParams(params)
+    next.delete('preset')
+    setParams(next, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presetId, clientRecord, clientId])
   const copyState = useCopy()
   const set = <K extends keyof TaxForm>(k: K, v: TaxForm[K]) => setForm((f) => ({ ...f, [k]: v }))
   const toggleBenefit = (key: string) => setForm((f) => ({ ...f, benefitKeys: f.benefitKeys.includes(key) ? f.benefitKeys.filter((k) => k !== key) : [...f.benefitKeys, key] }))
@@ -309,6 +332,11 @@ function TaxTab() {
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
       <Surface className="flex flex-col gap-4">
+        {presetTitle && (
+          <p className="t-sub rounded-(--radius-control) border border-success-200 bg-success-50 px-3 py-2 font-semibold break-keep text-success-800" data-testid="lab-preset-note">
+            상황 예시 · {presetTitle} — 이 상황의 연구개발비를 넣어 바로 계산했어요(칸을 바꾸면 다시 계산)
+          </p>
+        )}
         <CardTitle>연구개발비 입력 (연간 · 원)</CardTitle>
         <NumField label="연구전담요원 인건비 합계" value={form.payroll} onChange={(v) => set('payroll', v)} unit="원" step={100000} />
         <NumField label="연구 재료비·시약·부품비" value={form.material} onChange={(v) => set('material', v)} unit="원" step={100000} />

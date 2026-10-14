@@ -1598,6 +1598,62 @@ export function parseGoalText(text: string): ParsedGoal {
 }
 
 /* ------------------------------------------------------------------ */
+/* 결과를 정확히 하려면 필요한데 비어 있는 값(D-131 → D-199 화면 밖으로)      */
+/* ------------------------------------------------------------------ */
+
+export interface GoalNeed {
+  key: string
+  label: string
+}
+
+/**
+ * 목표마다 결과를 정확히 하려면 필요한데 비어 있는 값 — 절세 설계 화면(빨간 안내)과 상황 예시(✓/✗)가 같은 목록을 쓴다.
+ * giftRecipient — 증여받을 사람(자녀면 특례 요건까지 묻는다)
+ */
+export function goalNeeds(g: GoalKey, p: ProfileView, reg: readonly ShareholderRow[], sv: ShareValue, profile: TaxProfile, giftRecipient?: Pick<ShareholderRow, 'relation'> | null): GoalNeed[] {
+  const out: GoalNeed[] = []
+  const add = (key: string, label: string) => {
+    if (!out.some((x) => x.key === key)) out.push({ key, label })
+  }
+  const ceo = ceoOf([...reg])
+  const noCeo = !ceo || ceo.shares <= 0
+  const noValue = !(sv.perShare > 0)
+  if (g === 'cash') {
+    if (!p.monthlySalary) add('monthlySalary', '대표 월 급여')
+    if (noCeo) add('holders', '주주명부(대표 주식 수)')
+    if (noValue) add('value', '주식가치 재료(자산 · 순이익)')
+    if (!p.retainedEarnings) add('retainedEarnings', '배당 가능한 이익')
+    if (!p.ceoStartDate) add('ceoStartDate', '대표 취임일')
+    if (ceo && !ceo.acquirePrice && !p.par) add('par', '1주 액면가')
+  }
+  if (g === 'salary' && !p.monthlySalary) add('monthlySalary', '대표 월 급여(지금과 비교)')
+  if (g === 'gift') {
+    if (noCeo) add('holders', '주주명부(대표 주식 수)')
+    if (noValue) add('value', '주식가치 재료(자산 · 순이익)')
+    if (giftRecipient && (giftRecipient.relation === 'child' || giftRecipient.relation === 'minor_child')) {
+      if (p.ceoAge === null) add('ceoAge', '대표 나이(특례 요건)')
+      if (p.bizYears === null) add('bizYears', '경영한 햇수(특례 요건)')
+      if (!p.bizAssetRatioGiven) add('bizAssetRatio', '가업자산 비율')
+    }
+  }
+  if (g === 'inherit') {
+    if (!p.estateRealEstate && !p.estateFinancial) add('estateRealEstate', '대표 부동산 · 금융재산')
+    if (!(profile.children ?? '').trim()) add('children', '자녀 수')
+    if (noValue) add('value', '주식가치 재료(자산 · 순이익)')
+    if (p.bizYears === null) add('bizYears', '경영한 햇수(가업상속공제)')
+  }
+  if (g === 'loan') {
+    if (!p.loanBalance) add('loanBalance', '가지급금 잔액')
+    if (!p.monthlySalary) add('monthlySalary', '대표 월 급여')
+  }
+  if (g === 'retire') {
+    if (!p.ceoStartDate) add('ceoStartDate', '대표 취임일')
+    if (!p.monthlySalary) add('monthlySalary', '대표 월 급여')
+  }
+  return out
+}
+
+/* ------------------------------------------------------------------ */
 /* 업체 기록 · 카톡에 붙일 글                                             */
 /* ------------------------------------------------------------------ */
 

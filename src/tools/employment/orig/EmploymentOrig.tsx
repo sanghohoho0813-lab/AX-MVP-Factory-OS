@@ -10,7 +10,9 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { scenarioPreset } from '../../../services/scenarioPresets'
+import { clientFacts } from '../../shared/clientPrefill'
 import { deleteRow, listRows, saveRow } from '../../../services/moduleData'
 import { canUploadFiles, documentFileUrl, uploadModuleFile } from '../../../services/clientOpsService'
 import { useToast } from '../../../components/ui/toastContext'
@@ -104,7 +106,20 @@ export function EmploymentOrig({
   /** 업체 상세에서 연 도구(?client=) — 등록된 업체면 그 업체 화면으로, 아니면 추가 창에 골라 둔다 (D-94) */
   focusClient?: string | null
 }) {
-  const { loadClients, workspaceId } = useToolClient()
+  const { loadClients, workspaceId, clientRecord } = useToolClient()
+  // D-199 상황 예시(?preset=) — 채용 진단을 그 상황 · 이 업체 직원 수 · 권역으로 채워 바로 진단한다(처음 연 한 번만)
+  const [params] = useSearchParams()
+  const [presetOf] = useState(() => {
+    const p = scenarioPreset(params.get('preset'))
+    return p && p.module === 'employment' && p.hiring ? p : null
+  })
+  const hiringPreset = presetOf?.hiring ?? null
+  const hiringWithCompany = useMemo(() => {
+    if (!hiringPreset) return null
+    const f = clientRecord ? clientFacts(clientRecord, new Date()) : null
+    const sido = f?.address.match(/^(서울|경기|인천|부산|대구|광주|대전|울산|세종|강원|충북|충남|전북|전남|경북|경남|제주)/)?.[1] ?? ''
+    return { ...hiringPreset, companySize: f?.employeeCount ?? null, region: !sido || ['서울', '경기', '인천'].includes(sido) ? '수도권' : '비수도권' }
+  }, [hiringPreset, clientRecord])
   const { showToast } = useToast()
   const navigate = useNavigate()
   const [data, setData] = useState<Loaded | null>(null)
@@ -344,10 +359,11 @@ export function EmploymentOrig({
     if (companyId && companyId !== focusClient) return
     if (data.companies.some((c) => c.id === focusClient)) {
       if (view === 'dashboard' || view === 'company') onNav({ view: 'company', company: focusClient })
-    } else if (data.clients.some((c) => c.id === focusClient && !c.archivedAt)) {
+    } else if (!presetOf && data.clients.some((c) => c.id === focusClient && !c.archivedAt)) {
+      // D-199: 상황 예시(채용 진단)로 열었으면 등록 창을 띄우지 않는다 — 진단은 등록 없이 되고, 창이 결과를 가렸다
       setOpenAddFor(focusClient)
     }
-  }, [data, focusClient, companyId, view, onNav])
+  }, [data, focusClient, companyId, view, onNav, presetOf])
 
   const call = useCallback(
     <A extends unknown[]>(fn: (...a: A) => Promise<void>) =>
@@ -363,7 +379,14 @@ export function EmploymentOrig({
 
   return (
     <div className="hr-orig">
+      {presetOf && view === 'diagnosis' && (
+        <p className="t-sub mb-3 rounded-(--radius-control) border border-success-200 bg-success-50 px-3 py-2 font-semibold break-keep text-success-800" data-testid="emp-preset-note">
+          상황 예시 · {presetOf.title} — 이 업체 직원 수 · 권역으로 바로 진단했어요(아래 칸을 바꾸고 다시 진단할 수 있어요)
+        </p>
+      )}
       <SubsidyApp
+        key={hiringWithCompany ? `preset-${hiringWithCompany.companySize ?? 'x'}` : 'app'}
+        hiringPreset={hiringWithCompany}
         view={view}
         companyId={companyId && registered.has(companyId) ? companyId : null}
         onNav={onNav}

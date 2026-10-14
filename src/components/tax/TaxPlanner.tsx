@@ -7,6 +7,8 @@
  */
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { scenarioPreset } from '../../services/scenarioPresets'
 import { BadgeCheck, ChevronDown, ClipboardCopy, ExternalLink, Plus, Printer, Save, Search, Trash2 } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { useToast } from '../ui/toastContext'
@@ -27,6 +29,7 @@ import {
   ceoOf,
   cretopStockOf,
   giftPlan,
+  goalNeeds,
   holdersFromText,
   holdingsOf,
   inheritancePlan,
@@ -212,6 +215,20 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
 
   /* ---- 문장으로 찾기 ---- */
   const [heard, setHeard] = useState<string[]>([])
+  /** 읽은 목표 · 금액을 칸에 넣는다 — replace 면 고른 목표를 이 문장 것으로 바꾼다(상황 예시) */
+  const withParsed = (cur: PlanState, g: ReturnType<typeof parseGoalText>, replace: boolean): PlanState => {
+    const next: PlanState = { ...cur, goals: replace ? [...g.goals] : [...new Set([...cur.goals, ...g.goals])] }
+    // 적힌 금액은 사람이 읽는 모양(1억원 · 800만원)으로 칸에 넣는다
+    if (g.cash) next.cashTarget = formatWon(g.cash)
+    if (g.loan) next.profile = { ...next.profile, loanBalance: formatWon(g.loan) }
+    if (g.salary) next.salary = { mode: g.salary.mode, rate: g.salary.ratePct ? String(g.salary.ratePct) : cur.salary.rate, net: g.salary.netMonthly ? formatWon(g.salary.netMonthly) : cur.salary.net }
+    if (g.gift) {
+      const firstKid = cur.register.find((r) => r.relation === 'child' || r.relation === 'minor_child')
+      const amount = !g.gift.amount ? '' : g.gift.mode === 'value' || g.gift.mode === 'budget' ? formatWon(g.gift.amount) : String(g.gift.amount)
+      next.gift = { recipientId: cur.gift.recipientId || firstKid?.id || '', mode: g.gift.mode, amount }
+    }
+    return next
+  }
   const find = () => {
     const g = parseGoalText(st.text)
     if (g.goals.length === 0) {
@@ -220,20 +237,45 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
       return
     }
     setHeard(g.heard)
-    setSt((cur) => {
-      const next: PlanState = { ...cur, goals: [...new Set([...cur.goals, ...g.goals])] }
-      // 적힌 금액은 사람이 읽는 모양(1억원 · 800만원)으로 칸에 넣는다
-      if (g.cash) next.cashTarget = formatWon(g.cash)
-      if (g.loan) next.profile = { ...next.profile, loanBalance: formatWon(g.loan) }
-      if (g.salary) next.salary = { mode: g.salary.mode, rate: g.salary.ratePct ? String(g.salary.ratePct) : cur.salary.rate, net: g.salary.netMonthly ? formatWon(g.salary.netMonthly) : cur.salary.net }
-      if (g.gift) {
-        const firstKid = cur.register.find((r) => r.relation === 'child' || r.relation === 'minor_child')
-        const amount = !g.gift.amount ? '' : g.gift.mode === 'value' || g.gift.mode === 'budget' ? formatWon(g.gift.amount) : String(g.gift.amount)
-        next.gift = { recipientId: cur.gift.recipientId || firstKid?.id || '', mode: g.gift.mode, amount }
-      }
-      return next
-    })
+    setSt((cur) => withParsed(cur, g, false))
   }
+  /** D-199: 예시 칩 — 누르면 글만 넣지 않고 바로 찾는다(로드맵 5단계 '한 번 누르면') */
+  const findExample = (ex: string) => {
+    const g = parseGoalText(ex)
+    setHeard(g.heard)
+    setSt((cur) => withParsed({ ...cur, text: ex }, g, false))
+  }
+
+  /* ---- D-199 상황 예시(?preset=) — 업체 숫자로 채우고(비어 있는 칸만) 그 상황 문장으로 바로 계산 ---- */
+  const [params, setParams] = useSearchParams()
+  const presetId = params.get('preset')
+  const presetDone = useRef(false)
+  /** filled 는 칸을 채우는 그 계산(setSt 안)이 적는다 — 같은 그리기에서 읽힌다 */
+  const [presetNote, setPresetNote] = useState<{ title: string; filled: { list: string[] } } | null>(null)
+  useEffect(() => {
+    if (presetDone.current || !presetId || !clientRecord) return
+    const preset = scenarioPreset(presetId)
+    presetDone.current = true
+    if (!preset || preset.module !== 'tax' || !preset.taxText) return
+    const g = parseGoalText(preset.taxText)
+    const filled = { list: [] as string[] }
+    setSt((cur) => {
+      const profile = { ...cur.profile }
+      const sug = profileSuggestions(clientRecord, cur.profile, today)
+      for (const x of sug) profile[x.key] = x.value
+      filled.list = sug.map((x) => x.from)
+      return withParsed({ ...cur, profile, text: preset.taxText ?? '' }, g, true)
+    })
+    setHeard(g.heard)
+    if (preset.taxSplit) setSplitOpen(true)
+    setPresetNote({ title: preset.title, filled })
+    // 새로고침하면 다시 덮지 않게 주소에서 뺀다(적은 것은 이 브라우저 초안에 남는다)
+    const next = new URLSearchParams(params)
+    next.delete('preset')
+    setParams(next, { replace: true })
+    // withParsed · today 는 그리기마다 같은 규칙 — 업체 기록이 들어온 첫 번에만 한다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presetId, clientRecord])
 
   /* ---- 업체 기록에 저장 ---- */
   const summaryParts = () => {
@@ -313,48 +355,7 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
   }
 
   /* ---- D-131: 결과를 정확히 하려면 필요한데 비어 있는 값 ---- */
-  const needsFor = (g: GoalKey): NeedItem[] => {
-    const out: NeedItem[] = []
-    const add = (key: string, label: string) => {
-      if (!out.some((x) => x.key === key)) out.push({ key, label })
-    }
-    const noCeo = !ceo || ceo.shares <= 0
-    const noValue = !(sv.perShare > 0)
-    if (g === 'cash') {
-      if (!p.monthlySalary) add('monthlySalary', '대표 월 급여')
-      if (noCeo) add('holders', '주주명부(대표 주식 수)')
-      if (noValue) add('value', '주식가치 재료(자산 · 순이익)')
-      if (!p.retainedEarnings) add('retainedEarnings', '배당 가능한 이익')
-      if (!p.ceoStartDate) add('ceoStartDate', '대표 취임일')
-      if (ceo && !ceo.acquirePrice && !p.par) add('par', '1주 액면가')
-    }
-    if (g === 'salary' && !p.monthlySalary) add('monthlySalary', '대표 월 급여(지금과 비교)')
-    if (g === 'gift') {
-      if (noCeo) add('holders', '주주명부(대표 주식 수)')
-      if (noValue) add('value', '주식가치 재료(자산 · 순이익)')
-      const who = st.register.find((r) => r.id === st.gift.recipientId)
-      if (who && (who.relation === 'child' || who.relation === 'minor_child')) {
-        if (p.ceoAge === null) add('ceoAge', '대표 나이(특례 요건)')
-        if (p.bizYears === null) add('bizYears', '경영한 햇수(특례 요건)')
-        if (!p.bizAssetRatioGiven) add('bizAssetRatio', '가업자산 비율')
-      }
-    }
-    if (g === 'inherit') {
-      if (!p.estateRealEstate && !p.estateFinancial) add('estateRealEstate', '대표 부동산 · 금융재산')
-      if (!(st.profile.children ?? '').trim()) add('children', '자녀 수')
-      if (noValue) add('value', '주식가치 재료(자산 · 순이익)')
-      if (p.bizYears === null) add('bizYears', '경영한 햇수(가업상속공제)')
-    }
-    if (g === 'loan') {
-      if (!p.loanBalance) add('loanBalance', '가지급금 잔액')
-      if (!p.monthlySalary) add('monthlySalary', '대표 월 급여')
-    }
-    if (g === 'retire') {
-      if (!p.ceoStartDate) add('ceoStartDate', '대표 취임일')
-      if (!p.monthlySalary) add('monthlySalary', '대표 월 급여')
-    }
-    return out
-  }
+  const needsFor = (g: GoalKey): NeedItem[] => goalNeeds(g, p, st.register, sv, st.profile, st.register.find((r) => r.id === st.gift.recipientId) ?? null)
   const needSet = new Set<string>()
   for (const g of GOAL_ORDER) {
     if (!on(g)) continue
@@ -454,6 +455,17 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
           </div>
         </div>
       )}
+      {/* D-199 상황 예시로 열었을 때 — 무엇을 가정했고 무엇을 업체 기록에서 채웠는지 */}
+      {presetNote && (
+        <div className="no-print flex flex-col gap-0.5 rounded-(--radius-panel) border border-success-200 bg-success-50 px-4 py-3" data-testid="tax-preset-note">
+          <p className="t-sub font-semibold break-keep text-success-800">상황 예시 · {presetNote.title} — 이 업체 숫자로 바로 계산했어요</p>
+          {presetNote.filled.list.length > 0 && (
+            <p className="t-meta break-keep text-success-800">
+              업체 기록에서 채움 · {presetNote.filled.list.join(' · ')} — 업체 기록에는 [업체 기록에 저장] 을 누를 때만 들어가요
+            </p>
+          )}
+        </div>
+      )}
       {/* ① 원하는 것 */}
       <section className="no-print flex flex-col gap-3 rounded-(--radius-panel) border border-brand-200 bg-brand-50 p-4" aria-labelledby="plan-want">
         <h2 id="plan-want" className="t-card font-bold text-slate-900">
@@ -489,7 +501,8 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
             <button
               key={ex}
               type="button"
-              onClick={() => setSt((cur) => ({ ...cur, text: ex }))}
+              onClick={() => findExample(ex)}
+              data-testid="plan-example"
               className="tap t-sub rounded-full border border-brand-200 bg-white px-3 py-1.5 text-brand-800 hover:border-brand-500"
             >
               {ex}

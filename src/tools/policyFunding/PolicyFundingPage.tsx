@@ -23,6 +23,7 @@ import { PolicyDashboardExtra } from './screens/DashboardExtra'
 import { usePrefillFromClient } from '../shared/usePrefill'
 import { PrefillNote } from '../shared/PrefillNote'
 import { DEFAULT_INPUT } from './diagnosis'
+import { scenarioPreset } from '../../services/scenarioPresets'
 import { REPORT_DISCLAIMER } from './report'
 import type { DiagnosisInput, DiagnosisResult } from './types'
 import { getStoredCustomers, hydratePolicyStore } from './orig/storage'
@@ -94,6 +95,11 @@ function DiagnosisScreen() {
   const [params] = useSearchParams()
   const { clientId, clientRecord } = useToolClient()
   const autoSample = params.get('sample') === '1'
+  // D-199 상황 예시(?preset=) — 그 상황의 가정(자금 목적 · 채용 계획)을 업체 값 위에 얹고 바로 진단한다
+  const [preset] = useState(() => {
+    const p = scenarioPreset(params.get('preset'))
+    return p && p.module === 'policy-funding' ? p : null
+  })
   const [seed, setSeed] = useState<{ input: DiagnosisInput; key: number }>(() => ({ input: loadInput(clientId), key: 0 }))
   const loadedFor = useRef<string | null | undefined>(clientId)
   useEffect(() => {
@@ -200,6 +206,11 @@ function DiagnosisScreen() {
   return (
     <OrigPolicy>
       <PrefillNote note={prefillNote} />
+      {preset && (
+        <p className="t-sub mx-2 mt-3 rounded-(--radius-control) border border-success-200 bg-success-50 px-3 py-2 font-semibold break-keep text-success-800" data-testid="pf-preset-note">
+          상황 예시 · {preset.title} — 이 업체 숫자로 바로 진단했어요(아래 칸을 바꾸고 다시 진단할 수 있어요)
+        </p>
+      )}
       {/* D-126: 다른 화면과 같은 제목 크기 · 왼쪽 정렬(가운데 큰 배너는 이 OS 에서 이 화면만 달랐다) */}
       <section className="w-full px-2 pt-4 pb-4">
         <div className="mx-auto max-w-6xl">
@@ -211,9 +222,10 @@ function DiagnosisScreen() {
       </section>
       <section className="w-full pb-16">
         <DiagnosisSection
-          key={`${seed.key}-${autoSample ? 's' : ''}`}
+          key={`${seed.key}-${autoSample ? 's' : ''}${preset ? `-${preset.id}` : ''}`}
           autoSample={autoSample}
-          initialInput={seed.input}
+          autoRun={!!preset && !autoSample}
+          initialInput={preset ? { ...seed.input, ...(preset.policy ?? {}) } : seed.input}
           presetClientId={clientId ?? undefined}
           extras={extras}
           onInputChange={remember}

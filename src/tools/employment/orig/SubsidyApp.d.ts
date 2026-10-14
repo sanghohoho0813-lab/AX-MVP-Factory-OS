@@ -4,6 +4,8 @@ import type { ReactElement } from 'react'
 type Rec = Record<string, unknown>
 
 export interface SubsidyAppProps {
+  /** D-199 상황 예시 — 채용 진단을 이 값으로 채워 바로 진단(situation · cats · specials · age · gender · empType · companySize · region) */
+  hiringPreset?: Record<string, unknown> | null
   view: string
   companyId: string | null
   onNav: (next: { view?: string; company?: string | null }) => void

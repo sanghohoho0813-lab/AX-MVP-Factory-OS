@@ -23,10 +23,17 @@ const DEFS: RequestDef[] = [
   { match: /크레탑/, label: '크레탑 기업종합보고서', where: '', ours: true },
   { match: /4대보험|가입자 명부|직원 수/, label: '4대보험 사업장 가입자 명부', where: '4대사회보험 정보연계센터(4insure.or.kr) › 사업장 가입자 명부 출력(PDF)' },
   { match: /주주명부/, label: '주주명부(최근 것)', where: '회사에 보관 중인 주주명부 — 사진도 됩니다' },
-  { match: /대표 급여/, label: '대표님 급여(월 세전)', where: '급여대장이나 원천징수영수증이면 됩니다' },
+  { match: /대표 (월 )?급여/, label: '대표님 급여(월 세전)', where: '급여대장이나 원천징수영수증이면 됩니다' },
   { match: /설립일|창업일|회사 주소|업종|업력/, label: '사업자등록증 사본', where: '홈택스 › 사업자등록증 발급(PDF) 또는 사진' },
-  { match: /생년월일/, label: '대표님 생년월일', where: '날짜만 알려 주셔도 됩니다(주민등록번호는 받지 않습니다)' },
-  { match: /매출|재무|부채비율|자본잠식|영업이익/, label: '최근 재무제표(표준재무제표증명)', where: '홈택스 › 표준재무제표증명 발급(PDF)' },
+  { match: /생년월일|대표 나이/, label: '대표님 생년월일', where: '날짜만 알려 주셔도 됩니다(주민등록번호는 받지 않습니다)' },
+  { match: /매출|재무|부채비율|자본잠식|영업이익|자산 · 순이익|주식가치|배당 가능한 이익/, label: '최근 재무제표(표준재무제표증명)', where: '홈택스 › 표준재무제표증명 발급(PDF)' },
+  // D-199 상황 예시(절세)에서 쓰는 것
+  { match: /대표 취임일|1주 액면가/, label: '법인 등기사항전부증명서', where: '인터넷등기소 › 법인 등기사항전부증명서(PDF) — 대표 취임일 · 1주 금액이 나옵니다' },
+  { match: /경영한 햇수/, label: '대표님이 회사를 경영한 기간', where: '설립 때부터 대표였는지 한 줄이면 됩니다' },
+  { match: /가업자산 비율/, label: '사업용 자산 비율', where: '담당 세무사께 여쭤 보셔도 됩니다(모르면 비워 둡니다)' },
+  { match: /부동산 · 금융재산/, label: '대표님 부동산 · 금융재산 대략 금액', where: '대략적인 금액이면 됩니다' },
+  { match: /자녀 수/, label: '자녀 수', where: '숫자만 알려 주시면 됩니다' },
+  { match: /가지급금 잔액/, label: '가지급금 잔액', where: '최근 재무제표나 담당 세무사께 확인한 금액' },
   { match: /연구조직|전담부서/, label: '연구소(전담부서) 인정서', where: '한국산업기술진흥협회 인정서 사본 — 없으면 "없음" 이라고만 알려 주세요' },
   { match: /연구개발비|연구개발 활동/, label: '연구개발비 · 하고 있는 연구 내용', where: '대략적인 금액과 연구 내용 한두 줄이면 됩니다' },
   { match: /특허|지식재산/, label: '특허 · 상표 등록 현황', where: '등록번호나 등록증 사진 — 없으면 "없음" 이라고만 알려 주세요' },
@@ -71,7 +78,25 @@ export function requestItemsFrom(insights: readonly Insight[]): { items: Request
 
 /** 카톡으로 보낼 자료 요청 문구 — 받을 것이 없으면 '' */
 export function recoRequestMessage(record: Pick<ClientOpsRecord, 'contactName' | 'representativeName' | 'companyName'>, insights: readonly Insight[]): string {
-  const { items } = requestItemsFrom(insights)
+  return requestMessage(record, requestItemsFrom(insights).items)
+}
+
+/** 빠진 항목(사람 말) 하나 → 고객에게 받을 자료(우리가 조회하는 것이면 null) — D-199 상황 예시도 같은 표를 쓴다 */
+export function requestItemFor(raw: string, forLabel: string): RequestItem | null {
+  const def = DEFS.find((d) => d.match.test(raw))
+  if (def?.ours) return null
+  const label = def?.label ?? raw.trim()
+  return label ? { label, where: def?.where ?? '', for: [forLabel] } : null
+}
+
+/** 자료 목록 → 카톡 문구(같은 자료는 하나로) */
+export function requestMessage(record: Pick<ClientOpsRecord, 'contactName' | 'representativeName' | 'companyName'>, list: readonly RequestItem[]): string {
+  const items: RequestItem[] = []
+  for (const it of list) {
+    const have = items.find((x) => x.label === it.label)
+    if (have) for (const f of it.for) if (!have.for.includes(f)) have.for.push(f)
+    if (!have) items.push({ ...it, for: [...it.for] })
+  }
   if (items.length === 0) return ''
   const who = (record.representativeName || record.contactName || '').trim()
   const name = who ? `${who} 대표님` : '대표님'
