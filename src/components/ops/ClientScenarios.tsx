@@ -1,11 +1,14 @@
 /**
- * 업체 상세 '맞춤 추천' › 상황 예시로 바로 설계 (D-199 · 로드맵 5단계).
+ * 업체 상세 '맞춤 추천' › 상황 예시로 바로 설계 (D-199 · 로드맵 5단계 · D-201 기준 바로잡기).
  *
  * 대표 지시(고도화 목표 3): 계산기는 상황 예시로 — 상황 예시를 많이 두고, 한 번 누르면 그 업체 숫자로 설계까지.
- *  - 줄 하나 = 상황 하나. 바로 설계된 것이 먼저(같으면 카탈로그 순서) · 모듈 칩으로 거르기.
- *  - 누르면 그 자리에서 설계(결과 · 이 상황에 필요한 숫자 ✓/✗ · 업체 기록에서 채운 값 · 가정 ★)
- *    + [모듈에서 이어서](같은 가정 · 같은 업체로 열림) · [요청 문구](빠진 것만) · [다음 약속으로].
- *  - 계산은 services/scenarios.ts(모듈 화면과 같은 엔진). 규칙 계산 — 'AI' 라고 부르지 않는다.
+ * D-201 대표 지적: "무슨 기준으로 나오는지 모르겠다 · 그냥 갖다 붙인 것 같다" — 이제 맞는지 먼저 따진다.
+ *  1. 이 업체에 맞는 상황 — 업체 기록에 근거가 있는 것만 설계한다. 줄마다 '왜' 한 줄(이 업체 숫자).
+ *  2. 물어보면 열리는 상황 — 채용 계획 · 계약직 · 설비 투자처럼 기록에 없는 사정은 예/아니요 하나만 묻는다
+ *     (같은 질문을 쓰는 상황은 한 번에). 답하면 업체 기록에 남고 그 자리에서 다시 맞춘다.
+ *  3. 자료를 받으면 판단 — 영업이익 · 이익잉여금처럼 숫자가 없으면 받을 자료를 한 장의 요청 문구로.
+ *  4. 이 업체엔 안 맞는 상황 — 까닭과 함께 접어 둔다(대표 답 때문이면 '답 바꾸기').
+ *  - 계산은 services/scenarios.ts(모듈 화면과 같은 엔진) · 기준은 services/scenarioFit.ts. 규칙 계산 — 'AI' 라고 부르지 않는다.
  */
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -14,10 +17,13 @@ import type { ClientOpsRecord } from '../../types/clientOps'
 import { Button } from '../ui/Button'
 import { Badge, Section, type Tone } from '../ui/primitives'
 import { SCENARIO_MODULE_LABEL, type ScenarioModule } from '../../services/scenarioPresets'
-import { SCENARIO_STATE_LABEL, runScenarios, scenariosRequest, type ScenarioRun, type ScenarioState } from '../../services/scenarios'
+import { SCENARIO_STATE_LABEL, fitDataRequest, runScenarios, scenariosRequest, type ScenarioRun, type ScenarioState } from '../../services/scenarios'
+import { SCENARIO_QUESTIONS, scenarioAnswer, type QuestionKey } from '../../services/scenarioFit'
 
 const STATE_TONE: Record<ScenarioState, Tone> = { ready: 'success', partial: 'brand', need: 'warning' }
 const FIRST = 6
+/** 질문은 처음에 세 개만 — 한꺼번에 아홉 개를 묻지 않는다(나머지는 '질문 더 보기') */
+const FIRST_Q = 3
 
 /** '회사 정보 · 자산', '회사 정보 · 부채' … → '회사 정보(자산 · 부채 …)' — 같은 출처는 한 번만 */
 function tidyFilled(list: readonly string[]): string {
@@ -37,86 +43,241 @@ export function ClientScenarios({
   usable,
   onRequestText,
   onSetNext,
+  onAnswer,
 }: {
   record: ClientOpsRecord
   today: string
   usable: (module: ScenarioModule) => boolean
   onRequestText?: (text: string) => void
   onSetNext: (text: string) => void
+  /** 대표 답 저장(null 이면 지움 — 답 바꾸기). 없으면 질문만 보여 준다 */
+  onAnswer?: (q: QuestionKey, a: 'yes' | 'no' | null) => void
 }) {
   const runs = useMemo(() => runScenarios(record, today, usable, true), [record, today, usable])
+  const fits = useMemo(() => runs.filter((r) => r.fit.kind === 'fit'), [runs])
+  const asks = useMemo(() => runs.filter((r) => r.fit.kind === 'ask'), [runs])
+  const datas = useMemo(() => runs.filter((r) => r.fit.kind === 'data'), [runs])
+  const nos = useMemo(() => runs.filter((r) => r.fit.kind === 'no'), [runs])
   const [mod, setMod] = useState<ScenarioModule | 'all'>('all')
   const [open, setOpen] = useState<string | null>(null)
   const [more, setMore] = useState(false)
-  const modules = useMemo(() => [...new Set(runs.map((r) => r.module))], [runs])
-  const shown = mod === 'all' ? runs : runs.filter((r) => r.module === mod)
+  const [moreQ, setMoreQ] = useState(false)
+  const modules = useMemo(() => [...new Set(fits.map((r) => r.module))], [fits])
+  const shown = mod === 'all' ? fits : fits.filter((r) => r.module === mod)
   const list = more || mod !== 'all' ? shown : shown.slice(0, FIRST)
-  const ready = runs.filter((r) => r.state === 'ready').length
-  const allRequest = useMemo(() => scenariosRequest(record, runs.filter((r) => r.state === 'need')), [record, runs])
+  const ready = fits.filter((r) => r.state === 'ready').length
+  const allRequest = useMemo(() => scenariosRequest(record, fits.filter((r) => r.state === 'need')), [record, fits])
+  const dataRequest = useMemo(() => fitDataRequest(record, datas), [record, datas])
+  // 같은 질문을 쓰는 상황은 한 줄로(한 번 답하면 같이 열린다)
+  const questions = useMemo(() => {
+    const m = new Map<QuestionKey, { why: string; titles: string[] }>()
+    for (const r of asks) {
+      const q = r.fit.question!
+      const cur = m.get(q)
+      if (cur) cur.titles.push(r.title)
+      else m.set(q, { why: r.fit.why, titles: [r.title] })
+    }
+    return [...m]
+  }, [asks])
   if (runs.length === 0) return null
   return (
-    <Section title="상황 예시로 바로 설계" count={runs.length} fold={{ id: 'smart.scenarios', open: true }}>
-      <div className="flex flex-col gap-3" data-testid="smart-scenarios" data-count={runs.length} data-ready={ready}>
+    <Section title="상황 예시로 바로 설계" count={fits.length} fold={{ id: 'smart.scenarios', open: true }}>
+      <div
+        className="flex flex-col gap-3"
+        data-testid="smart-scenarios"
+        data-count={fits.length}
+        data-ready={ready}
+        data-ask={questions.length}
+        data-data={datas.length}
+        data-no={nos.length}
+      >
         <p className="t-sub break-keep text-slate-600">
-          이 업체 숫자로 바로 계산해요 — 상황을 누르면 설계가 펼쳐지고, 모듈에서 같은 가정으로 이어서 볼 수 있어요.
+          업체 기록에 <b className="font-semibold text-slate-900">근거가 있는 상황만</b> 이 업체 숫자로 설계해요. 줄마다 '왜 이 업체에' 가 붙어요 — 기록에 없는 사정은 아래에서 예 · 아니요로 물어봐요.
           <span className="ml-1 font-semibold text-success-700" data-testid="scenario-ready-count">
-            바로 설계됨 {ready}가지
+            맞는 상황 {fits.length}가지 · 바로 설계됨 {ready}가지
           </span>
         </p>
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="모듈로 거르기">
-          {(['all', ...modules] as const).map((m) => {
-            const n = m === 'all' ? runs.length : runs.filter((r) => r.module === m).length
-            const on = mod === m
-            return (
-              <button
-                key={m}
-                type="button"
-                aria-pressed={on}
-                onClick={() => {
-                  setMod(m)
-                  setOpen(null)
-                }}
-                className={`tap t-sub inline-flex items-center gap-1 rounded-full border px-3 font-semibold ${on ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white text-slate-700 hover:border-brand-400'}`}
-                data-testid="scenario-filter"
-                data-module={m}
-              >
-                {m === 'all' ? '전체' : SCENARIO_MODULE_LABEL[m]} <span className={on ? 'text-white/80' : 'text-slate-400'}>{n}</span>
-              </button>
-            )
-          })}
-        </div>
-        <ul className="flex flex-col gap-2" data-testid="scenario-list">
-          {list.map((r) => (
-            <ScenarioRow key={r.id} r={r} open={open === r.id} onToggle={() => setOpen((x) => (x === r.id ? null : r.id))} onRequestText={onRequestText} onSetNext={onSetNext} />
-          ))}
-        </ul>
-        <div className="flex flex-wrap gap-2">
-          {mod === 'all' && !more && shown.length > FIRST && (
-            <Button size="sm" variant="secondary" onClick={() => setMore(true)} data-testid="scenario-more">
-              <ChevronDown aria-hidden="true" className="size-4" /> 상황 더 보기 ({shown.length - FIRST})
-            </Button>
-          )}
-          {allRequest && onRequestText && (
-            <Button size="sm" variant="ghost" onClick={() => onRequestText(allRequest)} data-testid="scenario-request-all">
-              <MessageSquareText aria-hidden="true" className="size-4" /> 빠진 것 한 번에 요청 문구
-            </Button>
-          )}
-        </div>
+
+        {fits.length === 0 ? (
+          <p className="t-sub rounded-(--radius-control) border border-dashed border-slate-300 px-3 py-3 break-keep text-slate-600" data-testid="scenario-fit-empty">
+            지금 기록으로는 이 업체에 맞다고 말할 수 있는 상황이 없어요. 아래 질문에 답하거나 자료를 받으면 맞는 상황이 열려요.
+          </p>
+        ) : (
+          <>
+            {modules.length > 1 && (
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label="모듈로 거르기">
+                {(['all', ...modules] as const).map((m) => {
+                  const n = m === 'all' ? fits.length : fits.filter((r) => r.module === m).length
+                  const on = mod === m
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => {
+                        setMod(m)
+                        setOpen(null)
+                      }}
+                      className={`tap t-sub inline-flex items-center gap-1 rounded-full border px-3 font-semibold ${on ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white text-slate-700 hover:border-brand-400'}`}
+                      data-testid="scenario-filter"
+                      data-module={m}
+                    >
+                      {m === 'all' ? '전체' : SCENARIO_MODULE_LABEL[m]} <span className={on ? 'text-white/80' : 'text-slate-400'}>{n}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            <ul className="flex flex-col gap-2" data-testid="scenario-list">
+              {list.map((r) => (
+                <ScenarioRow
+                  key={r.id}
+                  r={r}
+                  open={open === r.id}
+                  onToggle={() => setOpen((x) => (x === r.id ? null : r.id))}
+                  onRequestText={onRequestText}
+                  onSetNext={onSetNext}
+                  onUndo={r.fit.answered && onAnswer ? () => onAnswer(r.fit.answered!, null) : undefined}
+                />
+              ))}
+            </ul>
+            <div className="flex flex-wrap gap-2">
+              {mod === 'all' && !more && shown.length > FIRST && (
+                <Button size="sm" variant="secondary" onClick={() => setMore(true)} data-testid="scenario-more">
+                  <ChevronDown aria-hidden="true" className="size-4" /> 맞는 상황 더 보기 ({shown.length - FIRST})
+                </Button>
+              )}
+              {allRequest && onRequestText && (
+                <Button size="sm" variant="ghost" onClick={() => onRequestText(allRequest)} data-testid="scenario-request-all">
+                  <MessageSquareText aria-hidden="true" className="size-4" /> 설계에 빠진 숫자 요청 문구
+                </Button>
+              )}
+            </div>
+          </>
+        )}
+
+        {questions.length > 0 && (
+          <div className="flex flex-col gap-2 rounded-(--radius-card) border border-brand-200 bg-brand-50/40 px-3 py-3" data-testid="scenario-questions">
+            <p className="t-body font-bold break-keep text-slate-900">
+              물어보면 열리는 상황 <span className="text-slate-500">{asks.length}</span>
+            </p>
+            <p className="t-meta break-keep text-slate-600">기록에 없는 사정이에요. '예' 를 누르면 그 상황을 이 업체 숫자로 설계해요.</p>
+            <ul className="flex flex-col gap-2">
+              {(moreQ ? questions : questions.slice(0, FIRST_Q)).map(([q, v]) => (
+                <li key={q} className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 sm:flex-row sm:items-center" data-testid="scenario-question" data-q={q}>
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="t-body font-semibold break-keep text-slate-900">{SCENARIO_QUESTIONS[q]}</span>
+                    {v.why !== SCENARIO_QUESTIONS[q] && <span className="t-meta break-keep text-slate-500">{v.why.replace(`${SCENARIO_QUESTIONS[q]} — `, '')}</span>}
+                    <span className="t-meta break-keep text-slate-500">예 → {v.titles.join(' · ')}</span>
+                  </span>
+                  {onAnswer && (
+                    <span className="flex shrink-0 gap-1.5">
+                      <Button size="sm" variant="secondary" onClick={() => onAnswer(q, 'yes')} data-testid="scenario-answer-yes">
+                        예
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => onAnswer(q, 'no')} data-testid="scenario-answer-no">
+                        아니요
+                      </Button>
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {!moreQ && questions.length > FIRST_Q && (
+              <div>
+                <Button size="sm" variant="ghost" onClick={() => setMoreQ(true)} data-testid="scenario-questions-more">
+                  <ChevronDown aria-hidden="true" className="size-4" /> 질문 더 보기 ({questions.length - FIRST_Q})
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {datas.length > 0 && (
+          <details className="group rounded-(--radius-card) border border-slate-200 bg-white" data-testid="scenario-data">
+            <summary className="tap flex cursor-pointer list-none items-center gap-2 px-3 py-2.5">
+              <span className="t-body min-w-0 flex-1 font-semibold break-keep text-slate-900">
+                자료를 받으면 판단 <span className="text-slate-500">{datas.length}</span>
+              </span>
+              <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="flex flex-col gap-2 border-t border-slate-100 px-3 py-2.5">
+              <ul className="flex flex-col gap-1.5">
+                {datas.map((r) => (
+                  <li key={r.id} className="t-sub break-keep text-slate-700 [overflow-wrap:anywhere]" data-testid="scenario-data-row" data-id={r.id}>
+                    <b className="font-semibold text-slate-900">{r.title}</b> — {r.fit.why}
+                  </li>
+                ))}
+              </ul>
+              {dataRequest && onRequestText && (
+                <div>
+                  <Button size="sm" variant="secondary" onClick={() => onRequestText(dataRequest)} data-testid="scenario-data-request">
+                    <MessageSquareText aria-hidden="true" className="size-4" /> 받을 자료 요청 문구
+                  </Button>
+                </div>
+              )}
+            </div>
+          </details>
+        )}
+
+        {nos.length > 0 && (
+          <details className="group rounded-(--radius-card) border border-slate-200 bg-white" data-testid="scenario-nofit">
+            <summary className="tap flex cursor-pointer list-none items-center gap-2 px-3 py-2.5">
+              <span className="t-body min-w-0 flex-1 font-semibold break-keep text-slate-700">
+                이 업체엔 안 맞는 상황 <span className="text-slate-500">{nos.length}</span>
+              </span>
+              <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+            </summary>
+            <ul className="flex flex-col gap-1.5 border-t border-slate-100 px-3 py-2.5">
+              {nos.map((r) => (
+                <li key={r.id} className="t-sub flex flex-wrap items-baseline gap-x-2 break-keep text-slate-600 [overflow-wrap:anywhere]" data-testid="scenario-no-row" data-id={r.id}>
+                  <span className="min-w-0">
+                    <b className="font-semibold text-slate-800">{r.title}</b> — {r.fit.why}
+                  </span>
+                  {r.fit.answered && onAnswer && scenarioAnswer(record, r.fit.answered) !== null && (
+                    <button type="button" onClick={() => onAnswer(r.fit.answered!, null)} className="tap t-meta font-semibold text-brand-700 hover:underline" data-testid="scenario-undo">
+                      답 바꾸기
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       </div>
     </Section>
   )
 }
 
-function ScenarioRow({ r, open, onToggle, onRequestText, onSetNext }: { r: ScenarioRun; open: boolean; onToggle: () => void; onRequestText?: (text: string) => void; onSetNext: (text: string) => void }) {
+function ScenarioRow({
+  r,
+  open,
+  onToggle,
+  onRequestText,
+  onSetNext,
+  onUndo,
+}: {
+  r: ScenarioRun
+  open: boolean
+  onToggle: () => void
+  onRequestText?: (text: string) => void
+  onSetNext: (text: string) => void
+  onUndo?: () => void
+}) {
   // 머리글과 같은 줄은 펼친 곳에서 다시 쓰지 않는다
   const lines = r.lines.filter((l) => l !== r.headline)
   return (
-    <li className="flex min-w-0 flex-col rounded-(--radius-card) border border-slate-200 bg-white" data-testid="scenario-row" data-id={r.id} data-module={r.module} data-state={r.state}>
+    <li className="flex min-w-0 flex-col rounded-(--radius-card) border border-slate-200 bg-white" data-testid="scenario-row" data-id={r.id} data-module={r.module} data-state={r.state} data-fit={r.fit.kind}>
       <button type="button" onClick={onToggle} aria-expanded={open} className="tap flex w-full min-w-0 items-start gap-3 px-4 py-3 text-left hover:bg-slate-50" data-testid="scenario-toggle">
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
             <Badge tone="neutral">{r.moduleLabel}</Badge>
             <span className="t-body min-w-0 font-bold break-keep text-slate-900 [overflow-wrap:anywhere]">{r.title}</span>
+          </span>
+          {/* D-201: 왜 이 업체에 — 이 업체 기록의 근거 한 줄 */}
+          <span className="t-meta flex min-w-0 gap-1 break-keep text-success-800 [overflow-wrap:anywhere]" data-testid="scenario-why">
+            <Check aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+            <span className="min-w-0">왜 이 업체에: {r.fit.why}</span>
           </span>
           <span className="t-sub line-clamp-2 break-keep text-slate-700 [overflow-wrap:anywhere]" data-testid="scenario-headline">
             {r.headline}
@@ -194,6 +355,11 @@ function ScenarioRow({ r, open, onToggle, onRequestText, onSetNext }: { r: Scena
             <Button size="sm" variant="ghost" onClick={() => onSetNext(`${r.moduleLabel} — ${r.title} 설계 보여 드리기`)} data-testid="scenario-next">
               <CalendarPlus aria-hidden="true" className="size-4" /> 다음 약속으로
             </Button>
+            {onUndo && (
+              <Button size="sm" variant="ghost" onClick={onUndo} data-testid="scenario-undo">
+                답 바꾸기
+              </Button>
+            )}
           </div>
         </div>
       )}

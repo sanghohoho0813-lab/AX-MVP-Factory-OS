@@ -3,7 +3,9 @@
  */
 import { normalizeClientOps } from '../clientOpsService'
 import { SCENARIO_PRESETS, scenarioPath, scenarioPreset } from '../scenarioPresets'
-import { runScenario, runScenarios, scenarioTaxProfile, scenariosRequest } from '../scenarios'
+import { fitDataRequest, runScenario, runScenarios, scenarioTaxProfile, scenariosRequest, type ScenarioRun } from '../scenarios'
+import { SCENARIO_QUESTIONS, fitContext, scenarioAnswer, scenarioFit, withScenarioAnswer, type QuestionKey } from '../scenarioFit'
+import { salaryPlan, parseGoalText } from '../taxPlan'
 import { cashPlan, goalNeeds, shareValueOf, viewProfile } from '../taxPlan'
 import { diagnoseHiring } from '../../tools/employment/lib/eligibility'
 import { DEFAULT_PROGRAMS } from '../../tools/employment/lib/programs'
@@ -98,9 +100,14 @@ check(
 )
 
 // S15 순서 · 요금제
-const sorted = runScenarios(empty, today, () => true, true)
+const sorted = runScenarios(full, today, () => true, true)
 const rank = { ready: 0, partial: 1, need: 2 } as const
-check('S15 바로 설계된 것 먼저(같으면 카탈로그 순서)', sorted.every((x, i) => i === 0 || rank[sorted[i - 1].state] <= rank[x.state]))
+const frank = { fit: 0, ask: 1, data: 2, no: 3 } as const
+check(
+  'S15 D-201: 이 업체에 맞는 상황 먼저(맞음 → 물어볼 것 → 받을 자료 → 안 맞음) · 같은 칸 안에서는 바로 설계된 것 먼저',
+  sorted.every((x, i) => i === 0 || frank[sorted[i - 1].fit.kind] < frank[x.fit.kind] || (frank[sorted[i - 1].fit.kind] === frank[x.fit.kind] && rank[sorted[i - 1].state] <= rank[x.state])),
+  sorted.map((x) => `${x.id}:${x.fit.kind}/${x.state}`),
+)
 check('S16 요금제에 없는 모듈은 빼고 계산', runScenarios(full, today, (m) => m === 'tax').every((x) => x.module === 'tax') && runScenarios(full, today, () => false).length === 0)
 
 // S17 절세 설계 화면과 같은 '필요한 값' 목록
@@ -111,6 +118,206 @@ check('S17 필요한 값 목록(절세 설계 빨간 안내와 같은 함수) �
 // S18 한 상황이 실패해도 나머지는 보인다
 const one = runScenario(SCENARIO_PRESETS[0], full, today)
 check('S18 상황 하나만 계산해도 같은 결과', one.headline === cash.headline)
+
+/* ================================================================== */
+/* D-201 맞는 상황인가 — 대표 지적: "기준을 모르겠다 · 그냥 갖다 붙인 것 같다"       */
+/* ================================================================== */
+
+const mk = (o: Record<string, unknown>) =>
+  normalizeClientOps({ createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z', ...o } as unknown as Partial<ClientOpsRecord>)
+const kinds = (runs: readonly ScenarioRun[]) => Object.fromEntries(runs.map((x) => [x.id, x.fit.kind]))
+const fitIds = (runs: readonly ScenarioRun[]) => runs.filter((x) => x.fit.kind === 'fit').map((x) => x.id).sort()
+
+// 가연 인터내셔널 같은 업체 — 법인 · 도소매(무역) · 직원 2명 · 매출 1.5억 · 영업이익 적자 · 설립 2년 · 대표 만 45세 · 서울
+const gayeonBase = {
+  id: 'gy',
+  companyName: '가연인터내셔널 주식회사',
+  corporateNumber: '110111-1234567',
+  businessCategory: '도매 및 소매업',
+  businessItem: '무역',
+  establishedAt: '2024-05-01',
+  employeeCount: '2',
+  representativeBirth: '1981-03-03',
+  businessAddress: '서울특별시 강남구 테헤란로 1',
+  factValues: { revenue: '150,000,000', operatingProfit: '-5,000,000', netIncome: '-8,000,000' },
+}
+const gy = mk(gayeonBase)
+const gyRuns = runScenarios(gy, today, () => true, true)
+const gyK = kinds(gyRuns)
+check(
+  'F1 가연 같은 작은 업체 — 대표 급여(세후 월 800만 · 실효세율 20%)는 설계하지 않는다(이익이 모자람 → 안 맞음 + 까닭)',
+  gyK['tax-salary-net'] === 'no' && gyK['tax-salary-rate'] === 'no' && gyRuns.find((x) => x.id === 'tax-salary-net')!.fit.why.includes('영업이익') && gyRuns.find((x) => x.id === 'tax-salary-net')!.fit.why.includes('모자라요'),
+  gyRuns.filter((x) => x.id.startsWith('tax-salary')).map((x) => x.fit),
+)
+check(
+  'F2 가연 — 고용지원금 4가지(청년 · 만 60세 이상 · 육아휴직 · 계약직 전환)는 맞다고 하지 않고 대표에게 묻는다(직원 나이 · 계약직을 기록이 모름)',
+  ['emp-youth', 'emp-senior', 'emp-childcare', 'emp-convert'].every((id) => gyK[id] === 'ask') && gyRuns.find((x) => x.id === 'emp-senior')!.fit.question === 'hireSenior' && gyRuns.find((x) => x.id === 'emp-convert')!.fit.question === 'contract',
+  ['emp-youth', 'emp-senior', 'emp-childcare', 'emp-convert'].map((id) => gyK[id]),
+)
+check('F3 가연 — 연구소(무역 · 직원 2명)는 설계하지 않는다(맞음 아님)', gyK['lab-two'] !== 'fit' && gyK['lab-material'] !== 'fit', [gyK['lab-two'], gyK['lab-material']])
+check('F4 가연 — 목돈 · 자사주는 쌓인 이익을 몰라 "자료를 받으면 판단"(설계 안 함) · 가업승계는 업력 2년이라 안 맞음 · 상속은 대표 만 45세라 안 맞음', gyK['tax-cash-1e'] === 'data' && gyK['tax-treasury'] === 'data' && gyK['tax-succession'] === 'no' && gyK['tax-inherit'] === 'no', gyK)
+check(
+  'F5 가연 — 맞는 상황은 근거가 있는 것만: 창업감면(설립 2년) · 본점 이전(서울 과밀억제권역) · 운전자금(매출 1.5억)',
+  JSON.stringify(fitIds(gyRuns)) === JSON.stringify(['policy-working', 'startup-move', 'startup-new']),
+  fitIds(gyRuns),
+)
+check(
+  'F6 맞는 상황마다 "왜" 한 줄 — 이 업체 숫자가 들어 있다(설립일 · 매출 · 주소)',
+  gyRuns.find((x) => x.id === 'startup-new')!.fit.why.includes('2024-05-01') && gyRuns.find((x) => x.id === 'policy-working')!.fit.why.includes('1억 5,000만원') && gyRuns.find((x) => x.id === 'startup-move')!.fit.why.includes('서울'),
+  gyRuns.filter((x) => x.fit.kind === 'fit').map((x) => x.fit.why),
+)
+check('F7 가연 — 맞는 상황이 맨 앞(23개 중 3개 · 정렬)', gyRuns.slice(0, 3).every((x) => x.fit.kind === 'fit') && gyRuns.length === 23)
+
+// 대표가 답하면 — 같은 질문을 쓰는 상황이 함께 열린다
+const gyAns = withScenarioAnswer(withScenarioAnswer(withScenarioAnswer(gy, 'hireSenior', 'yes', '2026-10-15T00:00:00.000Z'), 'contract', 'no', '2026-10-15T00:00:00.000Z'), 'hireYouth', 'yes', '2026-10-15T00:00:00.000Z')
+const gaK = kinds(runScenarios(gyAns, today))
+check(
+  'F8 대표 답 — "만 60세 이상 뽑을 계획 있음" → 고령자 채용 맞음 · "계약직 없음" → 정규직 전환 안 맞음 · "청년 뽑을 계획" → 청년 채용 + 정책자금 청년 채용 함께 맞음',
+  gaK['emp-senior'] === 'fit' && gaK['emp-convert'] === 'no' && gaK['emp-youth'] === 'fit' && gaK['policy-hiring'] === 'fit' && scenarioAnswer(gyAns, 'hireSenior') === 'yes',
+  gaK,
+)
+const gyBack = withScenarioAnswer(gyAns, 'hireSenior', null, '2026-10-15T00:00:00.000Z')
+check('F9 답 지우기(답 바꾸기) → 다시 묻는다 · 다른 답은 그대로', kinds(runScenarios(gyBack, today))['emp-senior'] === 'ask' && scenarioAnswer(gyBack, 'contract') === 'no')
+check(
+  'F10 답은 업체 기록 decided 에 scn.질문 으로 — 확인함 답과 같은 칸 · 정규화(저장 · 다시 읽기)에도 남는다',
+  normalizeClientOps(JSON.parse(JSON.stringify(gyAns)) as Partial<ClientOpsRecord>).decided?.['scn.hireSenior']?.a === 'yes',
+)
+
+// 같은 회사가 개인사업자면
+const gyIndiv = mk({ ...gayeonBase, id: 'gyi', companyName: '가연인터내셔널', corporateNumber: '', businessNumber: '123-45-67890' })
+const giK = kinds(runScenarios(gyIndiv, today))
+const corpOnlyIds = ['tax-cash-1e', 'tax-cash-3e-split', 'tax-treasury', 'tax-salary-rate', 'tax-salary-net', 'tax-gift-10', 'tax-gift-free', 'tax-succession', 'tax-loan', 'tax-retire']
+check('F11 개인사업자(사업자번호 가운데 45) — 배당 · 자사주 · 대표 급여 · 증여 · 가지급금 · 퇴직금 10가지 모두 안 맞음(까닭: 개인사업자)', corpOnlyIds.every((id) => giK[id] === 'no') && giK['startup-convert'] === 'no', giK)
+// 이름에 '주식회사' 가 없을 뿐이면 개인으로 단정하지 않는다
+const gyUnknown = mk({ ...gayeonBase, id: 'gyu', companyName: '가연인터내셔널', corporateNumber: '' })
+const guRuns = runScenarios(gyUnknown, today)
+check(
+  'F12 법인인지 모름(번호 없음 · 이름에 주식회사 없음) — 개인으로 단정하지 않고 "사업자등록증을 받으면 판단"',
+  corpOnlyIds.every((id) => guRuns.find((x) => x.id === id)!.fit.kind === 'data') && fitDataRequest(gyUnknown, guRuns).includes('사업자등록증 사본'),
+  corpOnlyIds.map((id) => guRuns.find((x) => x.id === id)!.fit.kind),
+)
+
+// 40명 제조업 · 업력 28년 · 대표 만 64세 · 이익 큼 · 자녀 · 가지급금
+const big = mk({
+  id: 'big',
+  companyName: '(주)한빛정밀',
+  corporateNumber: '134511-0000001',
+  businessCategory: '제조업',
+  businessItem: '정밀기계 부품',
+  establishedAt: '1998-03-02',
+  employeeCount: '40',
+  representativeBirth: '1962-02-02',
+  businessAddress: '경기도 화성시 동탄대로 1',
+  taxProfile: { monthlySalary: '10,000,000', retainedEarnings: '2,000,000,000', loanBalance: '120,000,000', children: '2', par: '5000' },
+  shareholderRegister: [
+    { id: 'h1', name: '박한빛', relation: 'ceo', shares: 9000, acquirePrice: 5000 },
+    { id: 'h2', name: '박다온', relation: 'child', shares: 1000, acquirePrice: 5000 },
+  ],
+  factValues: { revenue: '10,000,000,000', operatingProfit: '800,000,000', netIncome: '600,000,000', totalAssets: '9,000,000,000', totalLiabilities: '3,000,000,000' },
+})
+const bigRuns = runScenarios(big, today, () => true, true)
+const bK = kinds(bigRuns)
+check(
+  'F13 40명 제조업 · 업력 28년 · 대표 만 64세 — 목돈 · 나눠 가져오기 · 자사주 · 급여 · 증여 · 가업승계 · 상속 · 가지급금 · 퇴직금 · 연구소 설립 · 운전자금 맞음',
+  ['tax-cash-1e', 'tax-cash-3e-split', 'tax-treasury', 'tax-salary-rate', 'tax-salary-net', 'tax-gift-10', 'tax-gift-free', 'tax-succession', 'tax-inherit', 'tax-loan', 'tax-retire', 'lab-two', 'policy-working'].every((id) => bK[id] === 'fit'),
+  bK,
+)
+check('F14 업력 28년 — 창업감면 3가지는 안 맞음(창업 5년 지남)', ['startup-new', 'startup-convert', 'startup-move'].every((id) => bK[id] === 'no') && bigRuns.find((x) => x.id === 'startup-new')!.fit.why.includes('5년'))
+check('F15 가업승계 근거 — 업력 · 대표 나이 · 자녀가 한 줄에', /업력 28년 · 대표 만 64세 · 자녀 2명/.test(bigRuns.find((x) => x.id === 'tax-succession')!.fit.why), bigRuns.find((x) => x.id === 'tax-succession')!.fit.why)
+// 연구소가 이미 있으면 설립 상황은 안 맞음
+const bigLab = mk({ ...JSON.parse(JSON.stringify(big)), id: 'bl', factValues: { ...big.factValues, researchLab: '기업부설연구소(2015 인정)' } })
+check('F16 연구소가 이미 있으면 "연구소 설립" 은 안 맞음(까닭: 이미 있음)', kinds(runScenarios(bigLab, today))['lab-two'] === 'no')
+
+// 개인 카페 · 부산 · 설립 1년
+const cafe = mk({ id: 'cafe', companyName: '행복카페', businessNumber: '123-45-67890', businessCategory: '숙박 및 음식점업', businessItem: '커피전문점', establishedAt: '2025-01-10', employeeCount: '3', representativeBirth: '1990-07-07', businessAddress: '부산광역시 해운대구 1', factValues: { revenue: '200,000,000' } })
+const cK = kinds(runScenarios(cafe, today))
+check('F17 개인 카페(부산 · 설립 1년) — 창업감면 맞음 · 본점 이전은 안 맞음(이미 과밀억제권역 밖) · 법인 전환 안 맞음 · 상속 안 맞음(만 36세)', cK['startup-new'] === 'fit' && cK['startup-move'] === 'no' && cK['startup-convert'] === 'no' && cK['tax-inherit'] === 'no' && cK['policy-working'] === 'fit', cK)
+
+// 빈 업체 — 아무것도 '맞음' 이 아니다
+const eRuns = runScenarios(empty, today)
+check('F18 빈 업체 — 맞는 상황 0개(짐작해서 붙이지 않음) · 물어볼 것과 받을 자료로만', eRuns.every((x) => x.fit.kind === 'ask' || x.fit.kind === 'data'), kinds(eRuns))
+const eReq = fitDataRequest(empty, eRuns)
+check('F19 받을 자료 요청 문구 — 같은 자료는 한 번(재무제표 · 사업자등록증) · 주민등록번호 요구 없음', (eReq.match(/^\d+\. 최근 재무제표/gm) ?? []).length === 1 && (eReq.match(/^\d+\. 사업자등록증 사본/gm) ?? []).length === 1 && !eReq.includes('주민등록번호를'), eReq)
+check('F20 질문 11가지 — 모두 예/아니요로 답할 수 있는 한 문장(물음표로 끝남)', Object.values(SCENARIO_QUESTIONS).length === 11 && Object.values(SCENARIO_QUESTIONS).every((q) => q.endsWith('?')))
+
+// 무작위 업체 2,000곳 — 기록이 반대를 말하는데 '맞음' 이 나오지 않는가
+let seed = 20261015
+const rnd = () => {
+  seed = (seed * 1103515245 + 12345) % 2147483648
+  return seed / 2147483648
+}
+const pick = <T,>(a: readonly T[]): T => a[Math.floor(rnd() * a.length)]
+const maybe = <T,>(v: T): T | '' => (rnd() < 0.3 ? '' : v)
+const won = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+let bad: string[] = []
+let fitCount = 0
+const QKEYS = Object.keys(SCENARIO_QUESTIONS) as QuestionKey[]
+for (let i = 0; i < 2000; i++) {
+  const corp = rnd() < 0.5
+  const indivNum = rnd() < 0.5
+  const estYear = 1990 + Math.floor(rnd() * 37)
+  const op = (rnd() - 0.3) * 2e9
+  const ni = op * (0.5 + rnd() * 0.5)
+  const emp = Math.floor(rnd() * 60)
+  const answers: Record<string, { a: 'yes' | 'no'; at: string }> = {}
+  for (const q of QKEYS) if (rnd() < 0.3) answers[`scn.${q}`] = { a: rnd() < 0.5 ? 'yes' : 'no', at: '2026-10-01T00:00:00.000Z' }
+  const rec = mk({
+    id: `r${i}`,
+    companyName: corp ? `(주)무작위${i}` : `무작위상회${i}`,
+    corporateNumber: corp && rnd() < 0.5 ? '110111-0000000' : '',
+    businessNumber: !corp && indivNum ? '123-45-67890' : corp && rnd() < 0.5 ? '123-81-67890' : '',
+    businessCategory: maybe(pick(['제조업', '도매 및 소매업', '정보통신업', '숙박 및 음식점업', '건설업', '전문 과학 및 기술 서비스업'])),
+    businessItem: maybe(pick(['부품', '무역', '소프트웨어 개발', '한식', '인테리어', '디자인'])),
+    establishedAt: maybe(`${estYear}-0${1 + Math.floor(rnd() * 9)}-15`),
+    employeeCount: maybe(String(emp)),
+    representativeBirth: maybe(`${1950 + Math.floor(rnd() * 45)}-05-05`),
+    businessAddress: maybe(pick(['서울특별시 강남구 1', '경기도 수원시 1', '경기도 화성시 1', '부산광역시 1', '인천광역시 남동구 1', '전라남도 순천시 1'])),
+    taxProfile: Object.fromEntries(
+      Object.entries({ monthlySalary: rnd() < 0.5 ? won(rnd() * 2e7) : '', retainedEarnings: rnd() < 0.5 ? won(rnd() * 3e9) : '', loanBalance: rnd() < 0.4 ? won(rnd() < 0.3 ? 0 : rnd() * 5e8) : '', children: rnd() < 0.4 ? String(Math.floor(rnd() * 3)) : '' }).filter(([, v]) => v !== ''),
+    ),
+    shareholderRegister: corp && rnd() < 0.4 ? [{ id: 'h1', name: '대표', relation: 'ceo', shares: 9000, acquirePrice: 5000 }, ...(rnd() < 0.5 ? [{ id: 'h2', name: '자녀', relation: 'child', shares: 1000, acquirePrice: 5000 }] : [])] : [],
+    factValues: Object.fromEntries(Object.entries({ revenue: rnd() < 0.6 ? won(Math.abs(op) * 10 + 1e8) : '', operatingProfit: rnd() < 0.5 ? (op < 0 ? '-' : '') + won(Math.abs(op)) : '', netIncome: rnd() < 0.5 ? (ni < 0 ? '-' : '') + won(Math.abs(ni)) : '', researchLab: rnd() < 0.15 ? '연구전담부서' : '' }).filter(([, v]) => v !== '')),
+    decided: answers,
+  })
+  const ctx = fitContext(rec, today)
+  // 판단만 바로(빠르다) — 스무 곳에 한 번은 계산까지 다 돌려 같은 판단 · 23개 · 멈춤 없음을 본다
+  const runs = SCENARIO_PRESETS.map((s) => ({ id: s.id, module: s.module, fit: scenarioFit(s, ctx) }))
+  if (i % 20 === 0) {
+    const full = runScenarios(rec, today)
+    if (full.length !== 23) bad.push(`${rec.id}: ${full.length}개`)
+    if (JSON.stringify(full.map((x) => x.fit)) !== JSON.stringify(runs.map((x) => x.fit))) bad.push(`${rec.id}: 계산까지 돌린 판단과 다름`)
+  }
+  if (JSON.stringify(SCENARIO_PRESETS.map((s) => scenarioFit(s, fitContext(rec, today)))) !== JSON.stringify(runs.map((x) => x.fit))) bad.push(`${rec.id}: 같은 입력 다른 판단`)
+  for (const r of runs) {
+    const fk = r.fit.kind
+    if (fk === 'fit') fitCount++
+    if (!r.fit.why.trim()) bad.push(`${rec.id} ${r.id}: 까닭 없음`)
+    if (fk === 'ask' && !r.fit.question) bad.push(`${rec.id} ${r.id}: 묻는데 질문 없음`)
+    if (fk === 'data' && !(r.fit.dataNeeds ?? []).length) bad.push(`${rec.id} ${r.id}: 자료 없음`)
+    if (r.fit.answered && scenarioAnswer(rec, r.fit.answered) !== (fk === 'fit' ? 'yes' : 'no')) bad.push(`${rec.id} ${r.id}: 답과 판단이 다름`)
+    if (fk !== 'fit') continue
+    if (ctx.entity !== 'corporation' && corpOnlyIds.includes(r.id)) bad.push(`${rec.id} ${r.id}: 법인 아닌데 맞음`)
+    if (ctx.facts.months !== null && ctx.facts.months >= 60 && r.module === 'startup-tax') bad.push(`${rec.id} ${r.id}: 창업 5년 지났는데 맞음`)
+    if (ctx.hasLab && r.id === 'lab-two') bad.push(`${rec.id}: 연구소 있는데 설립 맞음`)
+    if (ctx.facts.employeeCount === 0 && (r.id === 'emp-childcare' || r.id === 'emp-convert')) bad.push(`${rec.id} ${r.id}: 직원 0명인데 맞음`)
+    const askOnly: Partial<Record<string, QuestionKey>> = { 'emp-youth': 'hireYouth', 'emp-senior': 'hireSenior', 'emp-childcare': 'childcare', 'emp-convert': 'contract', 'policy-facility': 'facility', 'policy-hiring': 'hireYouth', 'lab-material': 'prototype' }
+    const q = askOnly[r.id]
+    if (q && scenarioAnswer(rec, q) !== 'yes') bad.push(`${rec.id} ${r.id}: 대표가 '예' 하지 않았는데 맞음`)
+    if (r.id === 'tax-salary-rate' || r.id === 'tax-salary-net') {
+      const plan = salaryPlan(ctx.p, parseGoalText(SCENARIO_PRESETS.find((s) => s.id === r.id)!.taxText ?? '').salary ?? { mode: 'min' })
+      const profit = ctx.opProfit ?? ctx.netIncome
+      if (profit === null || profit + ctx.p.monthlySalary * 12 < plan.monthly * 12 * 1.1 - 1) bad.push(`${rec.id} ${r.id}: 이익으로 못 주는 급여인데 맞음`)
+    }
+    if (r.id === 'tax-cash-1e') {
+      const room = (ctx.retained ?? 0) + Math.max(0, ctx.netIncome ?? 0)
+      if (room < 1e8) bad.push(`${rec.id}: 이익이 1억 안 되는데 1억 가져오기 맞음`)
+    }
+    if (r.id === 'tax-treasury' && !(ctx.retained !== null && ctx.retained >= 1e8)) bad.push(`${rec.id}: 배당 가능한 이익 1억 미만인데 자사주 맞음`)
+    if (r.id === 'tax-succession' && !((ctx.facts.months ?? 0) >= 120 && (ctx.facts.representativeAge ?? 0) >= 50)) bad.push(`${rec.id}: 업력 · 나이 안 되는데 가업승계 맞음`)
+  }
+}
+check('F21 무작위 업체 2,000곳 × 23 상황 — 기록이 반대를 말하는데 "맞음" 0건 · 까닭 없는 판단 0 · 같은 입력 같은 판단 · 답과 판단 일치', bad.length === 0, bad.slice(0, 8))
+check('F22 무작위 업체에서 "맞음" 도 실제로 나온다(전부 숨기는 것이 아님)', fitCount > 2000, fitCount)
 
 console.log(`\nscenarios: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

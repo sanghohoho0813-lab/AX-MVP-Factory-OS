@@ -23,6 +23,7 @@ import { ClientAdvisor } from './ClientAdvisor'
 import { ClientGrantsCard } from '../grants/ClientGrantsCard'
 import { TopPicksCard } from './ClientTopPicks'
 import { ClientScenarios } from './ClientScenarios'
+import { withScenarioAnswer } from '../../services/scenarioFit'
 import { Fold, FoldAllButton, HintTip, openFold } from '../ui/fold'
 import { hintFor } from '../../content/sectionHints'
 import { recoRequestMessage } from '../../services/recoRequest'
@@ -193,7 +194,16 @@ export default function ClientSmartTab({
       </Section>
 
       {/* 4-0. D-199 상황 예시로 바로 설계 — 한 번 누르면 이 업체 숫자로(같은 엔진) · 모듈에서 같은 가정으로 이어서 */}
-      <ClientScenarios record={record} today={today} usable={scenarioUsable} onRequestText={onRequestText} onSetNext={setNext} />
+      <ClientScenarios
+        record={record}
+        today={today}
+        usable={scenarioUsable}
+        onRequestText={onRequestText}
+        onSetNext={setNext}
+        onAnswer={(q, a) =>
+          void onCommit(withScenarioAnswer(recordRef.current, q, a, nowIso()), a === null ? '답을 지웠습니다 — 다시 여쭤 볼게요.' : '답을 저장했습니다 — 상황 예시를 다시 맞췄어요.')
+        }
+      />
 
       {/* 4-1. 맞춤 상담(D-145) — 목차에서 고르거나 직접 묻기 · 이 회사 기록 · 모듈 판정으로 답한다. D-192: 접어 둔다 */}
       <Fold id="smart.advisor" title="맞춤 상담">

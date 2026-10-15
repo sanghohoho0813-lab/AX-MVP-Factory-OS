@@ -1,7 +1,9 @@
 /**
  * 상황 예시로 바로 설계 시험 (D-199 · 로드맵 5단계 '계산기는 상황 예시로').
  *
- *  1440  숫자가 다 있는 업체 › 맞춤 추천 › 상황 예시 23가지 · 바로 설계된 것 먼저 · 처음 6개 · 더 보기 · 모듈 칩으로 거르기
+ *  D-201 기준 바로잡기: 이 업체에 맞는 상황만 설계(왜 한 줄) · 물어보면 열리는 상황(예/아니요 → 업체 기록) · 받을 자료 · 안 맞는 상황(까닭)
+ *        가연 인터내셔널 같은 작은 업체 — 대표 급여 800만 · 만 60세 채용 · 계약직 · 연구소를 설계하지 않는다
+ *  1440  숫자가 다 있는 업체 › 맞춤 추천 › 맞는 상황 12가지 · 바로 설계된 것 먼저 · 처음 6개 · 더 보기 · 모듈 칩으로 거르기
  *        · 누르면 그 자리에서 설계(결과 · 필요한 숫자 ✓ · 업체 기록에서 채운 값 · 가정 ★) · 한 번에 하나만 펼침
  *        · [다음 약속으로] → 업체 다음 약속
  *        · [모듈에서 이어서] → 절세 · 창업감면 · 정책자금 · 연구소 · 고용지원금 화면이 같은 가정으로 열려 바로 결과
@@ -46,18 +48,35 @@ const FULL = {
   updatedAt: NOW,
 }
 const EMPTY = { id: 'cli_scen_empty', companyName: '빈칸상사', status: 'active', createdAt: NOW, updatedAt: NOW }
+// D-201 대표 지적 업체 — 법인 · 무역 · 직원 2명 · 매출 1.5억 · 영업이익 적자 · 설립 2년 · 대표 만 45세 · 서울
+const SMALL = {
+  id: 'cli_scen_small',
+  companyName: '가연인터내셔널 주식회사',
+  corporateNumber: '110111-1234567',
+  representativeName: '이가연',
+  businessCategory: '도매 및 소매업',
+  businessItem: '무역',
+  establishedAt: '2024-05-01',
+  employeeCount: '2',
+  representativeBirth: '1981-03-03',
+  businessAddress: '서울특별시 강남구 테헤란로 1',
+  status: 'active',
+  factValues: { revenue: '150,000,000', operatingProfit: '-5,000,000', netIncome: '-8,000,000' },
+  createdAt: NOW,
+  updatedAt: NOW,
+}
 
 async function seed(page) {
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
   await page.evaluate(
-    ([a, b]) => {
+    (rows) => {
       const k = 'axmvp.v1.operations_clients'
-      const list = JSON.parse(localStorage.getItem(k) ?? '[]').filter((r) => r.id !== a.id && r.id !== b.id)
-      list.push(a, b)
+      const list = JSON.parse(localStorage.getItem(k) ?? '[]').filter((r) => !rows.some((x) => x.id === r.id))
+      list.push(...rows)
       localStorage.setItem(k, JSON.stringify(list))
     },
-    [FULL, EMPTY],
+    [FULL, EMPTY, SMALL],
   )
 }
 
@@ -102,19 +121,40 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const box = page.getByTestId('smart-scenarios')
   const count = Number(await box.getAttribute('data-count'))
   const ready = Number(await box.getAttribute('data-ready'))
-  check('맞춤 추천에 상황 예시 23가지 · 바로 설계됨 15가지 넘게(숫자가 다 있는 업체)', count === 23 && ready >= 15, `${count} · ${ready}`)
-  check('바로 설계됨 n가지 글자', (await page.getByTestId('scenario-ready-count').innerText()).includes(`바로 설계됨 ${ready}가지`))
-  const first = await page.getByTestId('scenario-row').evaluateAll((els) => els.map((e) => e.getAttribute('data-state')))
-  check('처음엔 6개 · 바로 설계된 것 먼저', first.length === 6 && first.every((s) => s === 'ready'), first.join(','))
+  check('D-201 맞춤 추천 › 이 업체에 맞는 상황 12가지 · 바로 설계됨 8가지(23가지를 다 붙이지 않음)', count === 12 && ready === 8, `${count} · ${ready}`)
+  check('맞는 상황 n가지 · 바로 설계됨 n가지 글자', (await page.getByTestId('scenario-ready-count').innerText()).includes(`맞는 상황 ${count}가지 · 바로 설계됨 ${ready}가지`))
+  const whys = await page.getByTestId('scenario-why').allInnerTexts()
+  check('D-201 맞는 상황마다 "왜 이 업체에" 한 줄 — 이 업체 숫자(이익 · 매출 · 설립일 …)', whys.length >= 6 && whys.every((w) => w.startsWith('왜 이 업체에:') && /\d/.test(w)), whys.slice(0, 3).join(' | '))
+  const first = await page.getByTestId('scenario-row').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-fit')}/${e.getAttribute('data-state')}`))
+  check('처음엔 6개 · 맞음 + 바로 설계된 것 먼저', first.length === 6 && first.every((s) => s === 'fit/ready'), first.join(','))
   await page.getByTestId('scenario-more').click()
-  check('상황 더 보기 → 23개 전부', (await page.getByTestId('scenario-row').count()) === 23)
+  check('맞는 상황 더 보기 → 12개 전부(모두 맞음)', (await page.getByTestId('scenario-row').count()) === 12 && (await page.locator('[data-testid="scenario-row"][data-fit="fit"]').count()) === 12)
 
-  // 모듈 칩으로 거르기
-  await page.locator('[data-testid="scenario-filter"][data-module="employment"]').click()
+  // 모듈 칩으로 거르기(맞는 상황 안에서)
+  await page.locator('[data-testid="scenario-filter"][data-module="tax"]').click()
   const mods = await page.getByTestId('scenario-row').evaluateAll((els) => els.map((e) => e.getAttribute('data-module')))
-  check('고용지원금 칩 → 4개 · 모두 고용지원금', mods.length === 4 && mods.every((m) => m === 'employment'), mods.join(','))
-  check('칩이 눌림 표시(aria-pressed)', (await page.locator('[data-testid="scenario-filter"][data-module="employment"]').getAttribute('aria-pressed')) === 'true')
+  check('절세 칩 → 9개 · 모두 절세', mods.length === 9 && mods.every((m) => m === 'tax'), mods.join(','))
+  check('칩이 눌림 표시(aria-pressed)', (await page.locator('[data-testid="scenario-filter"][data-module="tax"]').getAttribute('aria-pressed')) === 'true')
   await page.locator('[data-testid="scenario-filter"][data-module="all"]').click()
+
+  // 물어보면 열리는 상황 — 같은 질문은 한 줄 · 처음엔 세 개만 · 예 → 그 자리에서 설계로
+  check('D-201 질문은 처음에 세 개만(한꺼번에 묻지 않음) · 질문 더 보기', (await page.getByTestId('scenario-question').count()) === 3 && (await page.getByTestId('scenario-questions-more').count()) === 1)
+  await page.getByTestId('scenario-questions-more').click()
+  const qs = await page.getByTestId('scenario-question').evaluateAll((els) => els.map((e) => e.getAttribute('data-q')))
+  check('D-201 물어보면 열리는 상황 — 질문 8개(청년 채용 질문 하나에 청년 채용 · 정책자금 청년 채용 둘)', qs.length === 8 && qs.includes('hireYouth') && qs.includes('hireSenior') && qs.includes('contract') && ((await page.locator('[data-testid="scenario-question"][data-q="hireYouth"]').innerText()).match(/청년/g) ?? []).length >= 3, qs.join(','))
+  check('고용지원금 4가지는 맞음 목록에 없다(직원 나이 · 계약직은 기록에 없음 → 묻는다)', (await page.locator('[data-testid="scenario-row"][data-module="employment"]').count()) === 0)
+  await page.locator('[data-testid="scenario-question"][data-q="hireYouth"]').getByTestId('scenario-answer-yes').click()
+  await page.locator('[data-testid="scenario-row"][data-id="emp-youth"]').waitFor({ timeout: 10000 })
+  check('"예" → 청년 채용 · 정책자금 청년 채용 둘 다 맞음으로(그 자리에서) · 업체 기록에 답', (await row(page, 'policy-hiring').count()) === 1 && (await record(page, 'cli_scen'))?.decided?.['scn.hireYouth']?.a === 'yes')
+  check('맞음으로 온 까닭 — "대표 답"', (await row(page, 'emp-youth').getByTestId('scenario-why').innerText()).includes('대표 답'))
+  await page.locator('[data-testid="scenario-question"][data-q="contract"]').getByTestId('scenario-answer-no').click()
+  await page.waitForTimeout(500)
+  await page.getByTestId('scenario-nofit').locator('summary').click()
+  const noRows = await page.getByTestId('scenario-no-row').allInnerTexts()
+  check('"아니요" → 안 맞는 상황에 까닭과 함께 · 가업승계(업력 3년) · 본점 이전(이미 밖)도 까닭', noRows.some((t) => t.includes('계약직') && t.includes('대표 답')) && noRows.some((t) => t.includes('업력 3년')) && noRows.some((t) => t.includes('과밀억제권역 밖')), noRows.join(' | '))
+  await page.locator('[data-testid="scenario-no-row"][data-id="emp-convert"]').getByTestId('scenario-undo').click()
+  await page.waitForTimeout(500)
+  check('[답 바꾸기] → 다시 묻는다', (await page.locator('[data-testid="scenario-question"][data-q="contract"]').count()) === 1 && (await record(page, 'cli_scen'))?.decided?.['scn.contract'] === undefined)
 
   // 누르면 그 자리에서 설계
   const cash = await expand(page, 'tax-cash-1e')
@@ -182,22 +222,30 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   // 빈 업체 — 짐작하지 않고 받을 것을 말한다
   await openSmart(page, 'cli_scen_empty')
   const eb = page.getByTestId('smart-scenarios')
-  check('빈 업체 — 바로 설계됨 0 · 절세는 모두 받으면 설계', Number(await eb.getAttribute('data-ready')) === 0)
-  await page.getByTestId('scenario-more').click()
-  const taxStates = await page.locator('[data-testid="scenario-row"][data-module="tax"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-state')))
-  check('빈 업체 — 절세 상황은 하나도 결과를 내지 않음', taxStates.length === 11 && taxStates.every((s) => s !== 'ready'), taxStates.join(','))
-  const ec = await expand(page, 'tax-cash-1e')
-  check('빈 업체 — 금액 없음 · 필요한 숫자 ✗(주주명부 · 배당 가능한 이익)', (await ec.getByTestId('scenario-amount').count()) === 0 && (await ec.locator('[data-testid="scenario-need"][data-ok="0"]').count()) >= 2)
-  await ec.getByTestId('scenario-request').click()
-  const one = await dialogText(page)
-  check('빠진 것 요청 문구(상황 하나) — 회사 이름 · 주주명부 · 그 상황 확인용', one.includes('빈칸상사') && one.includes('주주명부') && one.includes('대표가 1억 가져오기 확인용'), one.slice(0, 200))
-  await page.getByTestId('scenario-request-all').click()
+  check('빈 업체 — 맞는 상황 0(짐작해서 붙이지 않음) · 안내 한 줄', Number(await eb.getAttribute('data-count')) === 0 && (await page.getByTestId('scenario-fit-empty').count()) === 1)
+  check('빈 업체 — 물어볼 것 · 받을 자료로만', Number(await eb.getAttribute('data-ask')) >= 5 && Number(await eb.getAttribute('data-data')) >= 10 && Number(await eb.getAttribute('data-no')) === 0)
+  await page.getByTestId('scenario-data').locator('summary').click()
+  await page.getByTestId('scenario-data-request').click()
   const all = await dialogText(page)
   check(
-    '한 번에 요청 문구 — 같은 자료 한 줄 · 모듈 이름만 · 주민등록번호 받지 않음',
-    (all.match(/^\d+\. 최근 재무제표/gm) ?? []).length === 1 && !all.includes('대표가 1억 가져오기') && all.includes('주민등록번호는 받지 않습니다'),
+    '받을 자료 요청 문구 — 회사 이름 · 같은 자료 한 줄(재무제표 · 사업자등록증) · 주민등록번호 받지 않음',
+    all.includes('빈칸상사') && (all.match(/^\d+\. 최근 재무제표/gm) ?? []).length === 1 && (all.match(/^\d+\. 사업자등록증 사본/gm) ?? []).length === 1 && all.includes('주민등록번호는 받지 않습니다'),
     all.slice(0, 300),
   )
+
+  // D-201 대표 지적 업체 — 작은 무역 법인
+  await openSmart(page, 'cli_scen_small')
+  const sb = page.getByTestId('smart-scenarios')
+  const smallIds = (await page.getByTestId('scenario-row').evaluateAll((els) => els.map((e) => e.getAttribute('data-id')))).sort()
+  check('가연 같은 작은 업체 — 맞는 상황은 근거 있는 3개뿐(창업감면 · 본점 이전 · 운전자금)', Number(await sb.getAttribute('data-count')) === 3 && smallIds.join(',') === 'policy-working,startup-move,startup-new', smallIds.join(','))
+  const bodyText = await sb.innerText()
+  check('가연 — "세후 월 800만원" 은 설계되지 않음(맞음 목록에 없음)', (await row(page, 'tax-salary-net').count()) === 0 && (await row(page, 'tax-salary-rate').count()) === 0)
+  if (await page.getByTestId('scenario-questions-more').count()) await page.getByTestId('scenario-questions-more').click()
+  check('가연 — 만 60세 이상 · 계약직은 질문으로만(설계 안 함)', (await page.locator('[data-testid="scenario-question"][data-q="hireSenior"]').count()) === 1 && (await page.locator('[data-testid="scenario-question"][data-q="contract"]').count()) === 1 && (await row(page, 'emp-senior').count()) === 0)
+  await page.getByTestId('scenario-nofit').locator('summary').click()
+  const smallNo = await page.getByTestId('scenario-no-row').allInnerTexts()
+  check('가연 — 대표 급여는 "이익이 모자라요" 까닭과 함께 안 맞음', smallNo.some((t) => t.includes('세후 월 800만원') && t.includes('영업이익') && t.includes('모자라요')), smallNo.join(' | ').slice(0, 300))
+  check('가연 — 화면에 "바로 설계됨" 이 붙은 급여 · 고령자 줄 없음', !/세후 월 800만원[^\n]*바로 설계됨/.test(bodyText))
 
   check('화면 오류 0', errors.length === 0, errors.slice(0, 3).join(' | '))
   await ctx.close()

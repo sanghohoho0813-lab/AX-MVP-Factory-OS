@@ -40,6 +40,7 @@ import { EMPTY_FORM } from '../tools/startupTax/lib/formDefaults'
 import type { FormData as StartupForm } from '../tools/startupTax/types'
 import { runDiagnosis } from '../tools/policyFunding/diagnosis'
 import { policyInputFromFacts } from '../tools/policyFunding/clientInput'
+import { fitContext, scenarioFit, type FitContext, type FitKind, type ScenarioFit } from './scenarioFit'
 
 export interface ScenarioNeed {
   /** 화면에 쓰는 이름 */
@@ -80,6 +81,8 @@ export interface ScenarioRun {
   openPath: string
   /** 대표님께 보낼 요청 문구(빠진 것만 · 없으면 '') */
   request: string
+  /** D-201: 이 업체에 맞는 상황인가 — 맞음(근거) · 물어볼 것 · 받을 자료 · 안 맞음(까닭) */
+  fit: ScenarioFit
 }
 
 const krw = (n: number) => (Number.isFinite(n) ? formatWon(n) : '-')
@@ -111,7 +114,7 @@ export function scenarioTaxProfile(record: ClientOpsRecord, today: string): { pr
   return { profile, filledFrom: sug.map((s) => s.from) }
 }
 
-function runTax(s: ScenarioPreset, record: ClientOpsRecord, today: string): Omit<ScenarioRun, 'id' | 'module' | 'moduleLabel' | 'title' | 'when' | 'openPath' | 'request'> {
+function runTax(s: ScenarioPreset, record: ClientOpsRecord, today: string): Omit<ScenarioRun, 'id' | 'module' | 'moduleLabel' | 'title' | 'when' | 'openPath' | 'request' | 'fit'> {
   const { profile, filledFrom } = scenarioTaxProfile(record, today)
   const reg = record.shareholderRegister ?? []
   const p = viewProfile(profile)
@@ -379,8 +382,8 @@ function runPolicy(s: ScenarioPreset, facts: ClientFacts): ReturnType<typeof run
 
 /* ------------------------------------------------------------------ */
 
-/** 상황 하나 → 이 업체 숫자로 설계 */
-export function runScenario(s: ScenarioPreset, record: ClientOpsRecord, today: string): ScenarioRun {
+/** 상황 하나 → 이 업체 숫자로 설계(맞는 상황인지도 함께 — D-201) */
+export function runScenario(s: ScenarioPreset, record: ClientOpsRecord, today: string, ctx: FitContext = fitContext(record, today)): ScenarioRun {
   const facts = clientFacts(record, new Date(`${today}T00:00:00`))
   const f = facts.industryText ? facts : { ...facts, industryText: [record.businessCategory, record.businessItem].map((v) => (v ?? '').trim()).filter(Boolean).join(' ') }
   const body =
@@ -396,10 +399,13 @@ export function runScenario(s: ScenarioPreset, record: ClientOpsRecord, today: s
     ...body,
     openPath: scenarioPath(s, record.id),
     request: items.length ? requestMessage(record, items) : '',
+    fit: scenarioFit(s, ctx),
   }
 }
 
 const STATE_RANK: Record<ScenarioState, number> = { ready: 0, partial: 1, need: 2 }
+/** D-201: 맞는 상황이 먼저 — 그다음 물어볼 것 · 받을 자료 · 안 맞는 것 */
+const FIT_RANK: Record<FitKind, number> = { fit: 0, ask: 1, data: 2, no: 3 }
 
 /**
  * 업체 하나 → 상황 예시 전부(모듈 순서 그대로 · 쓸 수 있는 모듈만). 한 상황이 실패해도 나머지는 보인다.
@@ -407,16 +413,29 @@ const STATE_RANK: Record<ScenarioState, number> = { ready: 0, partial: 1, need: 
  */
 export function runScenarios(record: ClientOpsRecord, today: string, usable: (module: ScenarioModule) => boolean = () => true, sortReady = false): ScenarioRun[] {
   const out: ScenarioRun[] = []
+  const ctx = fitContext(record, today)
   for (const s of SCENARIO_PRESETS) {
     if (!usable(s.module)) continue
     try {
-      out.push(runScenario(s, record, today))
+      out.push(runScenario(s, record, today, ctx))
     } catch {
       // 한 모듈 엔진이 이 업체 값으로 실패해도 다른 상황은 보인다
     }
   }
   if (!sortReady) return out
-  return out.map((x, i) => ({ x, i })).sort((a, b) => STATE_RANK[a.x.state] - STATE_RANK[b.x.state] || a.i - b.i).map((v) => v.x)
+  return out
+    .map((x, i) => ({ x, i }))
+    .sort((a, b) => FIT_RANK[a.x.fit.kind] - FIT_RANK[b.x.fit.kind] || STATE_RANK[a.x.state] - STATE_RANK[b.x.state] || a.i - b.i)
+    .map((v) => v.x)
+}
+
+/** D-201: '판단할 자료' 요청 문구 — 자료를 받으면 맞는지 판단할 상황들(같은 자료는 하나로) */
+export function fitDataRequest(record: ClientOpsRecord, runs: readonly ScenarioRun[]): string {
+  const items = runs
+    .filter((r) => r.fit.kind === 'data')
+    .flatMap((r) => (r.fit.dataNeeds ?? []).map((n) => requestItemFor(n, r.moduleLabel)))
+    .filter((x): x is RequestItem => x !== null)
+  return items.length ? requestMessage(record, items) : ''
 }
 
 /** 여러 상황의 빠진 것을 한 장으로(같은 자료는 하나로) */
