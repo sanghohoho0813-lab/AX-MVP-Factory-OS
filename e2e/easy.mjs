@@ -139,7 +139,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 /* ---- 2. 머리줄 — 어느 폭 · 어느 글자 크기에서도 넘치지 않는다 ---- */
 {
   const bad = []
-  for (const w of [360, 1024, 1280, 1366, 1440, 1920]) {
+  // D-201: 1600 · 1700 더(머리줄 [폭] 단추 · 1700~1800 에서 넘치던 것 바로잡음)
+  for (const w of [360, 1024, 1280, 1366, 1440, 1600, 1700, 1920]) {
     const ctx = await browser.newContext({ viewport: { width: w, height: 900 }, locale: 'ko-KR' })
     const page = await ctx.newPage()
     await page.goto(BASE + '/', { waitUntil: 'networkidle' })
@@ -160,7 +161,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     }
     await ctx.close()
   }
-  check('머리줄: 6폭 × 3글자 크기 모두 넘침 0 · 단추 밀림 0 · 휴대폰 제목 자리 있음', bad.length === 0, bad.join(' | '))
+  check('머리줄: 8폭 × 3글자 크기 모두 넘침 0 · 단추 밀림 0 · 휴대폰 제목 자리 있음', bad.length === 0, bad.join(' | '))
 }
 
 /* ---- 3. 다음 약속 · 일정 · 오늘 ---- */
@@ -390,6 +391,50 @@ for (const width of [390, 360]) {
     check(`D-192 ${width} ${r}: 옆으로 넘침 0`, over <= 0, String(over))
   }
   await ctx.close()
+}
+
+/* ---- 7. D-201 PC 본문 폭 — 머리줄 [폭] 한 번에 좁게 → 보통 → 넓게 · 글자 크기는 그대로 · 설정 › 화면과 같은 값 ---- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1920, height: 1000 }, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  const mainW = () => page.evaluate(() => Math.round(document.querySelector('main').getBoundingClientRect().width))
+  const fontPx = () => page.evaluate(() => getComputedStyle(document.querySelector('main h1') ?? document.body).fontSize)
+  const btn = page.getByTestId('content-width')
+  const f0 = await fontPx()
+  check('D-201 1920: 머리줄 [폭] 단추 · 처음엔 보통 · 본문 1,280px(정책자금 진단 · 고용지원금 정도)', (await btn.isVisible()) && (await btn.getAttribute('data-width')) === 'normal' && (await mainW()) === 1280, String(await mainW()))
+  await btn.click()
+  const wWide = await mainW()
+  await btn.click()
+  const wNarrow = await mainW()
+  await btn.click()
+  const wBack = await mainW()
+  check('D-201 한 번씩 누르면 넓게(예전 폭) → 좁게(1,100px) → 다시 보통', wWide > 1500 && wNarrow === 1100 && wBack === 1280, `${wWide} · ${wNarrow} · ${wBack}`)
+  check('D-201 폭을 바꿔도 글자 크기는 그대로', (await fontPx()) === f0, `${f0} → ${await fontPx()}`)
+  await btn.click()
+  await btn.click()
+  await page.reload({ waitUntil: 'networkidle' })
+  check('D-201 고른 폭은 새로고침해도 남는다(좁게)', (await page.getByTestId('content-width').getAttribute('data-width')) === 'narrow' && (await mainW()) === 1100)
+  await page.goto(BASE + '/settings', { waitUntil: 'networkidle' })
+  const box = page.getByTestId('settings-content-width')
+  if ((await box.count()) === 0) {
+    const tab = page.getByRole('tab', { name: /화면/ }).first()
+    if (await tab.count()) await tab.click()
+  }
+  await page.getByTestId('settings-content-width').waitFor({ timeout: 8000 })
+  check('D-201 설정 › 화면에도 같은 값(좁게가 눌림)', (await page.getByTestId('settings-content-width').locator('[data-width="narrow"]').getAttribute('aria-pressed')) === 'true')
+  await page.getByTestId('settings-content-width').locator('[data-width="normal"]').click()
+  check('D-201 설정에서 보통으로 → 머리줄 단추도 보통', (await page.getByTestId('content-width').getAttribute('data-width')) === 'normal' && (await mainW()) === 1280)
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  check('D-201 1920: 옆으로 넘침 0', over <= 0, String(over))
+  await ctx.close()
+  const small = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+  const sp = await small.newPage()
+  await sp.goto(BASE + '/', { waitUntil: 'networkidle' })
+  check('D-201 1440: 단추 없음(본문이 이미 1,280px 보다 좁다 · 설정에는 있다)', !(await sp.getByTestId('content-width').isVisible().catch(() => false)))
+  await small.close()
 }
 
 await browser.close()

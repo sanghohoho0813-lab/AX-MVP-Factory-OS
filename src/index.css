@@ -687,6 +687,12 @@ html[data-text-scale="extra_large"] .hdr-compact-search {
     display: none !important;
   }
 }
+/* D-201: '매우 크게' 는 1800px 아래까지 시계를 뺀다 — 1600~1799 에서 머리줄이 30~50px 넘쳤다(시계는 오늘 화면 맨 위에도 있다) */
+@media (max-width: 1799px) {
+  html[data-text-scale="extra_large"] .hdr-clock {
+    display: none !important;
+  }
+}
 /* 휴대폰 '매우 크게' — 머리줄 시계를 빼서 화면 제목 자리를 지킨다(시계는 오늘 화면 맨 위에도 있다) */
 html[data-text-scale="extra_large"] .hdr-mclock {
   display: none !important;

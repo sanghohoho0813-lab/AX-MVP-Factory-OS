@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useIsPilot } from '../../auth/osAccess'
 import { useNavPath } from '../../lib/navFrom'
 import { DeviceSwitch, DeviceSwitchCompact } from './DeviceView'
+import { ContentWidthButton } from './ContentWidthButton'
 import { ViewAsSwitch, ViewAsSwitchCompact } from './ViewAsSwitch'
 import {
   Building,
@@ -241,21 +242,25 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
           rel="noopener noreferrer"
           aria-label={brand.customerPlatformLabel}
           title={brand.customerPlatformLabel}
-          className="hdr-tight hidden h-10 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 px-2.5 text-[0.9rem] font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50 md:inline-flex min-[1700px]:px-3"
+          className="hdr-tight hidden h-10 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 px-2.5 text-[0.9rem] font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50 md:inline-flex min-[1900px]:px-3"
         >
           <ExternalLink aria-hidden="true" className="size-4 text-slate-400" />
-          {/* D-120: 1700px 아래에서는 아이콘만 — 머리줄이 옆으로 넘치지 않게 */}
-          <span className="hidden min-[1700px]:inline">{brand.customerPlatformLabel}</span>
+          {/* D-120 · D-201: 1900px 아래에서는 아이콘만 — 머리줄이 옆으로 넘치지 않게(1700~1800 에서 넘쳤다) */}
+          <span className="hidden min-[1900px]:inline">{brand.customerPlatformLabel}</span>
         </a>}
         {/* 가이드·저장상태·설정·계정은 모바일에서 서랍/더보기 로 옮겼다 */}
         {/* D-120: 저장 상태 글은 아주 넓은 화면에서만(글자 크기 단추 자리를 냈다) — 서랍 · 설정에도 있다 */}
-        <span className="hdr-opt hidden min-[2100px]:inline-flex">
+        <span className="hdr-opt hidden min-[2300px]:inline-flex">
           <CloudSaveStatus state={isSupabase ? 'saved' : 'local'} compact={false} />
         </span>
         {/* D-164: 머리줄 글자 크기 단추는 뺐다(설정 › 화면에 있다 · 휴대폰은 서랍 메뉴). 그 자리에 보기 방식 — PC · Mobile · PC+Mobile */}
         {/* 1440px 아래에서는 단추 하나 + 고르기 창(머리줄이 옆으로 넘치지 않게) */}
         <span className="hidden min-[1440px]:inline-flex">
           <DeviceSwitch />
+        </span>
+        {/* D-201: 본문 폭 — 누를 때마다 좁게 → 보통 → 넓게. 본문이 1,100px 보다 넓어지는 1600px 이상 PC 에서만(설정 › 화면에도 있다) */}
+        <span className="hdr-opt hidden min-[1600px]:inline-flex">
+          <ContentWidthButton />
         </span>
         <span className="hidden lg:max-[1440px]:inline-flex">
           <DeviceSwitchCompact />

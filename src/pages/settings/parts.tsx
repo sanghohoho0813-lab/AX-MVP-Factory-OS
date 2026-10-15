@@ -3,6 +3,7 @@
  */
 
 import { useMemo, type ReactNode } from 'react'
+import { CONTENT_WIDTH_LABEL, CONTENT_WIDTH_PX, setContentWidth, useContentWidth } from '../../lib/contentWidth'
 import { Database, Info, SlidersHorizontal, Users } from 'lucide-react'
 import { Panel } from '../../components/ui/Panel'
 import { HelpNote } from '../../components/ui/HelpNote'
@@ -80,7 +81,34 @@ export function TextScalePanel() {
       <div className="mt-4">
         <TextScaleControl showPreview />
       </div>
+      <ContentWidthControl />
     </Panel>
+  )
+}
+
+/** D-201: PC 본문 폭 — 머리줄 [폭] 단추와 같은 값(글자 크기는 그대로) */
+function ContentWidthControl() {
+  const w = useContentWidth()
+  return (
+    <fieldset className="mt-5" data-testid="settings-content-width">
+      <legend className="text-[0.95rem] font-semibold text-slate-800">PC 본문 폭</legend>
+      <p className="mt-0.5 text-[0.88rem] break-keep text-slate-500">글자 크기는 그대로 두고 본문 가로 길이만 바꿉니다 — 큰 모니터에서 눈이 좌우로 덜 움직이게. 머리줄 [폭] 단추와 같습니다.</p>
+      <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="PC 본문 폭">
+        {(['narrow', 'normal', 'wide'] as const).map((k) => (
+          <button
+            key={k}
+            type="button"
+            aria-pressed={w === k}
+            onClick={() => setContentWidth(k)}
+            data-width={k}
+            className={`tap min-h-11 rounded-full border px-4 text-[0.95rem] font-semibold ${w === k ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-300 bg-white text-slate-600 hover:border-brand-400'}`}
+          >
+            {CONTENT_WIDTH_LABEL[k]}
+            <span className="ml-1 text-[0.85rem] font-medium text-slate-500">{CONTENT_WIDTH_PX[k].toLocaleString('ko-KR')}px{k === 'normal' ? ' · 기본' : ''}</span>
+          </button>
+        ))}
+      </div>
+    </fieldset>
   )
 }
 

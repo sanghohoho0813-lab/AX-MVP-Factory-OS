@@ -21,6 +21,7 @@ import { NotFoundState } from '../ui/NotFoundState'
 import { FrameBridge } from './DeviceView'
 import { ViewingPilotBanner } from './ViewAsSwitch'
 import { setBuiltinServicesHidden } from '../../content/clientOpsCatalog'
+import { CONTENT_WIDTH_PX, useContentWidth } from '../../lib/contentWidth'
 
 function PilotRouteGuard({ pathname, children }: { pathname: string; children: React.ReactNode }) {
   const pilot = useIsPilot()
@@ -48,6 +49,7 @@ export function AppShell() {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
+  const contentWidth = useContentWidth()
 
   // 화면이 바뀌면 모바일 메뉴를 닫고 맨 위로 — 뒤로 · 앞으로 온 것이면 보던 자리로 (D-124)
   useScrollMemory(() => setMobileOpen(false))
@@ -73,7 +75,12 @@ export function AppShell() {
           <Header onOpenMobileMenu={() => setMobileOpen(true)} />
           {/* 하단 여백: 시연 안내 바가 본문을 가리지 않도록 확보 */}
           {/* pb-safe-nav: 하단 내비게이션과 iOS 홈 인디케이터가 본문 마지막 줄을 가리지 않게 한다 */}
-          <main className="pb-safe-nav mx-auto w-full max-w-[1840px] flex-1 px-4 py-5 sm:px-6 lg:px-10 lg:py-9 2xl:px-14">
+          {/* D-201: PC 본문 폭 — 머리줄 [폭] 단추로 좁게 · 보통(기본) · 넓게. 화면이 더 좁으면 바뀌는 것 없음 */}
+          <main
+            className="pb-safe-nav mx-auto w-full flex-1 px-4 py-5 sm:px-6 lg:px-10 lg:py-9 2xl:px-14"
+            style={{ maxWidth: CONTENT_WIDTH_PX[contentWidth] }}
+            data-content-width={contentWidth}
+          >
             {/* key: 화면이 바뀔 때마다 등장 효과를 한 번씩 다시 준다.
                 모듈(/tools/<모듈>/<화면>) 안에서 화면만 바꿀 때는 그대로 둔다 — 원본 앱의 고른 고객·열린 창이 살아 있어야 한다 (D-93) */}
             <StorageFullNotice />

@@ -51,7 +51,7 @@ export function DeviceSwitch({ wide = false }: { wide?: boolean }) {
           >
             <Icon aria-hidden="true" className="size-4" />
             {/* 넓은 화면에서만 글자 — 머리줄이 옆으로 넘치지 않게(무대 위쪽 줄에서는 늘 글자) */}
-            <span aria-hidden="true" className={wide ? '' : 'hdr-opt-label hidden min-[1700px]:inline'}>{label}</span>
+            <span aria-hidden="true" className={wide ? '' : 'hdr-opt-label hidden min-[1900px]:inline'}>{label}</span>
           </button>
         )
       })}
