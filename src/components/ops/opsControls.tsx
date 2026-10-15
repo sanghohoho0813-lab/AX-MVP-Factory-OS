@@ -50,6 +50,7 @@ export function DueDateField({
   onChange,
   hint,
   ariaLabel,
+  clearLabel,
 }: {
   label: string
   value: string
@@ -58,6 +59,8 @@ export function DueDateField({
   hint?: string
   /** 화면 글자와 다른 이름으로 찾을 때(시험 · 보조기기) */
   ariaLabel?: string
+  /** 날짜를 비우는 단추 글자 — 같은 창에 다른 '지우기' 가 있을 때 헷갈리지 않게(D-201) */
+  clearLabel?: string
 }) {
   return (
     <div>
@@ -88,7 +91,7 @@ export function DueDateField({
             onClick={() => onChange('')}
             className="tap rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[0.875rem] font-medium text-slate-400 hover:text-danger-600"
           >
-            지우기
+            {clearLabel ?? '지우기'}
           </button>
         )}
       </div>

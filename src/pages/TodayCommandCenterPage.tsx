@@ -26,7 +26,7 @@ import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { Button } from '../components/ui/Button'
 import { useToast } from '../components/ui/toastContext'
 import { QuickCapture } from '../components/journal/QuickCapture'
-import { TodoActionSheet, TodoComposer, TodoRow, type TodoAction } from '../components/journal/TodoBoard'
+import { TodoActionSheet, TodoComposer, TodoRow, type TodoAction, type TodoEdits } from '../components/journal/TodoBoard'
 import { JournalList } from '../components/journal/JournalList'
 import { EventCard } from '../components/ops/EventCard'
 import { LinkCustomerModal } from '../components/ops/LinkCustomerModal'
@@ -305,25 +305,20 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const clientNameOf = (id: string) => clientNames.get(id)
 
   /** 할 일 시트에서 고른 것을 실행한다 */
-  const applyTodoAction = (entry: JournalEntry, action: TodoAction) => {
-    setTodoPick(null)
-    if (action === 'delete') {
-      void journalMutate(() => deleteJournalEntry(entry), '지웠습니다.')
-      return
-    }
-    if (action === 'today') {
-      void journalMutate(() => updateJournalEntry(entry, { dueDate: today, completed: false }), '오늘 할 일로 옮겼습니다.')
-      return
-    }
-    if (action === 'tomorrow') {
-      void journalMutate(
-        () => updateJournalEntry(entry, { dueDate: postponedDue(entry.dueDate, today), completed: false }),
-        '내일로 미뤘습니다.',
-      )
-      return
-    }
-    void journalMutate(() => updateJournalEntry(entry, { completed: action === 'done' }))
+  const applyTodoAction = async (entry: JournalEntry, action: TodoAction, edits?: TodoEdits) => {
+    // D-201: 같은 창에서 고친 내용 · 기한 · 업체가 있으면 상태와 함께 한 번에 저장한다.
+    // 고친 것이 있으면 저장이 된 뒤에만 창을 닫는다(실패하면 적은 것이 창에 그대로 남는다).
+    if (!edits || action === 'delete') setTodoPick(null)
+    const base: Partial<JournalEntry> = edits ? { content: edits.content, dueDate: edits.dueDate, clientId: edits.clientId } : {}
+    let ok: boolean
+    if (action === 'delete') ok = await journalMutate(() => deleteJournalEntry(entry), '지웠습니다.')
+    else if (action === 'today') ok = await journalMutate(() => updateJournalEntry(entry, { ...base, dueDate: today, completed: false }), '오늘 할 일로 옮겼습니다.')
+    else if (action === 'tomorrow')
+      ok = await journalMutate(() => updateJournalEntry(entry, { ...base, dueDate: postponedDue(entry.dueDate, today), completed: false }), '내일로 미뤘습니다.')
+    else ok = await journalMutate(() => updateJournalEntry(entry, { ...base, completed: action === 'done' }), edits ? '저장했습니다.' : undefined)
+    if (ok && edits) setTodoPick(null)
   }
+
 
   /** 오늘 할 일 한 줄 넣기 — 업무 일기의 '할 일' 로 저장된다 */
   const addTodo = (draft: { content: string; dueDate: string; clientId: string | null }) =>
@@ -857,7 +852,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           entry={todoPick}
           clientName={todoPick.clientId ? clientNameOf(todoPick.clientId) : undefined}
           clients={active}
-          onPick={(action) => applyTodoAction(todoPick, action)}
+          onPick={(action, edits) => void applyTodoAction(todoPick, action, edits)}
           onSave={async (patch) => {
             // D-122: 저장이 된 뒤에만 닫는다 — 실패하면 고치던 칸이 그대로
             const ok = await journalMutate(() => updateJournalEntry(todoPick, patch), '고쳤습니다.')

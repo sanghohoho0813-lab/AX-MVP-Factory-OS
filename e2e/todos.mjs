@@ -65,29 +65,68 @@ await page.waitForTimeout(800)
 await page.getByText('고칠 할 일').first().click()
 await page.waitForTimeout(400)
 check('할 일 시트가 열린다', (await page.getByRole('dialog').count()) > 0)
-const editBtn = page.getByRole('button', { name: '내용 고치기' }).first()
-check('할 일: [내용 고치기] 가 있다', (await editBtn.count()) > 0)
-await editBtn.click()
-await page.waitForTimeout(350)
+// D-201: [내용 고치기] 를 한 번 더 누르지 않는다 — 창을 열면 칸이 바로 열려 있다
+check('D-201 할 일 창: [내용 고치기] 단추 없이 칸이 바로 열려 있다', (await page.getByRole('button', { name: '내용 고치기' }).count()) === 0 && (await page.getByLabel('할 일 내용 고치기').count()) === 1 && (await page.getByLabel('할 일 기한 고치기').count()) === 1)
+check('D-201 할 일 창: 같은 창에 진행 중 · 완료 · 내일로 미루기 · 지우기', (await page.getByTestId('todo-actions').locator('[data-todo-action]').count()) === 4)
+check('D-201 할 일 창: 아무것도 안 고쳤으면 [저장] 은 꺼져 있다', await page.getByTestId('todo-save').isDisabled())
 await page.getByLabel('할 일 내용 고치기').fill('고쳐 적은 할 일')
-await page.getByRole('button', { name: '저장', exact: true }).first().click()
+check('D-201 할 일 창: 고치면 [저장] 이 켜진다', await page.getByTestId('todo-save').isEnabled())
+await page.getByTestId('todo-save').click()
 await page.waitForTimeout(900)
 const edited = (await page.locator('main').innerText()) ?? ''
 check('할 일: 내용이 바뀐다', edited.includes('고쳐 적은 할 일'), edited.slice(0, 200))
 check('할 일: 옛 내용은 사라진다', !edited.includes('고칠 할 일'))
+check('D-201 할 일 창: 저장하면 창이 닫힌다', (await page.getByRole('dialog').count()) === 0)
+
+// D-201: 고치고 [완료] 를 바로 누르면 고친 내용 + 완료가 한 번에 저장된다
+{
+  const op = page.getByRole('button', { name: '할 일 적기' }).first()
+  if ((await op.count()) > 0) { await op.click(); await page.waitForTimeout(300) }
+  await page.getByLabel('할 일 내용').fill('한 번에 끝낼 일')
+  await page.getByRole('button', { name: '넣기', exact: true }).click()
+  await page.waitForTimeout(800)
+  await page.getByText('한 번에 끝낼 일').first().click()
+  await page.waitForTimeout(400)
+  await page.getByLabel('할 일 내용 고치기').fill('고치고 바로 끝낸 일')
+  check('D-201 할 일 창: 고친 뒤에는 "누르면 고친 내용도 함께 저장" 안내', ((await page.getByTestId('todo-actions').innerText()) ?? '').includes('함께 저장'))
+  await page.getByRole('dialog').locator('[data-todo-action="done"]').click()
+  await page.waitForTimeout(900)
+  const one = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]').find((x) => x.content === '고치고 바로 끝낸 일'))
+  check('D-201 할 일 창: 고치고 [완료] → 내용 · 완료 한 번에', one?.completed === true && (await page.getByRole('dialog').count()) === 0, JSON.stringify(one ?? null).slice(0, 160))
+}
+
+// D-201: 고친 것이 있는데 닫으면 한 번 묻는다 — '저장 안 하고 닫기' 는 그대로, '저장하고 닫기' 는 저장
+{
+  await page.getByText('고쳐 적은 할 일').first().click()
+  await page.waitForTimeout(400)
+  await page.getByLabel('할 일 내용 고치기').fill('저장 안 할 글')
+  await page.getByRole('dialog').getByRole('button', { name: '닫기', exact: true }).last().click()
+  await page.waitForTimeout(300)
+  check('D-201 할 일 창: 고친 채 닫으면 "저장할까요?" 를 묻는다', (await page.getByTestId('todo-close-confirm').count()) === 1)
+  await page.getByRole('button', { name: '저장 안 하고 닫기' }).click()
+  await page.waitForTimeout(500)
+  const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]').some((x) => x.content === '고쳐 적은 할 일'))
+  check('D-201 할 일 창: "저장 안 하고 닫기" → 원래 글 그대로', kept && (await page.getByRole('dialog').count()) === 0)
+  await page.getByText('고쳐 적은 할 일').first().click()
+  await page.waitForTimeout(400)
+  await page.getByLabel('할 일 내용 고치기').fill('')
+  check('D-201 할 일 창: 글을 다 지우면 저장 · 상태 단추가 잠긴다', (await page.getByTestId('todo-save').isDisabled()) && (await page.getByRole('dialog').locator('[data-todo-action="done"]').isDisabled()))
+  await page.getByLabel('할 일 내용 고치기').fill('고쳐 적은 할 일')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+  check('D-201 할 일 창: 원래대로 되돌리면 묻지 않고 닫힌다', (await page.getByRole('dialog').count()) === 0)
+}
 
 // 한 번 더 고칠 수 있다 — 고친 것을 또 고치는 것이 실제 쓰임새다
 await page.getByText('고쳐 적은 할 일').first().click()
 await page.waitForTimeout(400)
-await page.getByRole('button', { name: '내용 고치기' }).first().click()
-await page.waitForTimeout(350)
 await page.getByLabel('할 일 내용 고치기').fill('두 번 고친 할 일')
 await page.getByLabel('할 일 기한 고치기').fill('2026-12-24')
 // 업체도 그 자리에서 바꾼다 — 잘못 붙였다고 지우고 다시 적지 않는다
 const clientPick = page.getByLabel('할 일 업체 고치기')
 check('할 일: 업체 고르는 칸이 있다', (await clientPick.count()) === 1)
 await clientPick.selectOption('cli_daum')
-await page.getByRole('button', { name: '저장', exact: true }).first().click()
+await page.getByTestId('todo-save').click()
 await page.waitForTimeout(900)
 const movedDue = await page.evaluate(() =>
   JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]').find((x) => x.content === '두 번 고친 할 일'),

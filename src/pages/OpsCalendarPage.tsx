@@ -26,7 +26,7 @@ import { dueText } from '../services/clientOpsAlerts'
 import { todayLocalDate } from '../lib/appClock'
 import type { ClientOpsRecord } from '../types/clientOps'
 import type { JournalEntry } from '../types/bridge'
-import { TodoActionSheet, TodoComposer, TodoRow, type TodoAction } from '../components/journal/TodoBoard'
+import { TodoActionSheet, TodoComposer, TodoRow, type TodoAction, type TodoEdits } from '../components/journal/TodoBoard'
 import { Button } from '../components/ui/Button'
 import { PageHeader } from '../components/ui/PageHeader'
 import { ScheduleTabs } from '../components/journal/ScheduleTabs'
@@ -193,25 +193,20 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
   }
 
   /** 할 일 시트에서 고른 것을 실행한다 */
-  const applyTodoAction = (entry: JournalEntry, action: TodoAction) => {
-    setTodoPick(null)
-    if (action === 'delete') {
-      void mutate(() => deleteJournalEntry(entry), '지웠습니다.')
-      return
-    }
-    if (action === 'today') {
-      void mutate(() => updateJournalEntry(entry, { dueDate: today, completed: false }), '오늘 할 일로 옮겼습니다.')
-      return
-    }
-    if (action === 'tomorrow') {
-      void mutate(
-        () => updateJournalEntry(entry, { dueDate: postponedDue(entry.dueDate, today), completed: false }),
-        '내일로 미뤘습니다.',
-      )
-      return
-    }
-    void mutate(() => updateJournalEntry(entry, { completed: action === 'done' }))
+  const applyTodoAction = async (entry: JournalEntry, action: TodoAction, edits?: TodoEdits) => {
+    // D-201: 같은 창에서 고친 내용 · 기한 · 업체가 있으면 상태와 함께 한 번에 저장한다.
+    // 고친 것이 있으면 저장이 된 뒤에만 창을 닫는다(실패하면 적은 것이 창에 그대로 남는다).
+    if (!edits || action === 'delete') setTodoPick(null)
+    const base: Partial<JournalEntry> = edits ? { content: edits.content, dueDate: edits.dueDate, clientId: edits.clientId } : {}
+    let ok: boolean
+    if (action === 'delete') ok = await mutate(() => deleteJournalEntry(entry), '지웠습니다.')
+    else if (action === 'today') ok = await mutate(() => updateJournalEntry(entry, { ...base, dueDate: today, completed: false }), '오늘 할 일로 옮겼습니다.')
+    else if (action === 'tomorrow')
+      ok = await mutate(() => updateJournalEntry(entry, { ...base, dueDate: postponedDue(entry.dueDate, today), completed: false }), '내일로 미뤘습니다.')
+    else ok = await mutate(() => updateJournalEntry(entry, { ...base, completed: action === 'done' }), edits ? '저장했습니다.' : undefined)
+    if (ok && edits) setTodoPick(null)
   }
+
 
   /**
    * D-157: PC 에서 할 일을 끌어 다른 날짜 칸에 놓으면 그 날로 옮긴다(오른쪽 목록 · 칸 안의 할 일 줄).
@@ -629,7 +624,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
           entry={todoPick}
           clientName={todoPick.clientId ? clientNameOf(todoPick.clientId) : undefined}
           clients={activeClients}
-          onPick={(action) => applyTodoAction(todoPick, action)}
+          onPick={(action, edits) => void applyTodoAction(todoPick, action, edits)}
           onSave={async (patch) => {
             // D-122: 저장이 된 뒤에만 닫는다 — 실패하면 고치던 칸이 그대로
             const ok = await mutate(() => updateJournalEntry(todoPick, patch), '고쳤습니다.')

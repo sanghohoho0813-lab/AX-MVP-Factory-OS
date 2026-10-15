@@ -14,7 +14,7 @@
 
 import { useState, type LiHTMLAttributes } from 'react'
 import { ClientPickerOptions } from '../ops/ClientPickerOptions'
-import { ArrowRight, Check, Pencil, Plus, X } from 'lucide-react'
+import { ArrowRight, Check, Plus, X } from 'lucide-react'
 import type { JournalEntry } from '../../types/bridge'
 import { TODO_PRESETS } from '../../services/journalService'
 import { ScrollHintRow } from '../ui/ScrollHintRow'
@@ -204,13 +204,23 @@ export function TodoRow({
 }
 
 /**
- * 할 일로 무엇을 할지 고르는 시트.
+ * 할 일 한 창 — 내용 · 기한 · 업체를 바로 고치고, 같은 창에서 진행 중 / 완료 / 내일로 / 지우기.
  *
- * 네 가지만 둔다 — 진행 중 / 완료 / 내일로 미루기 / 삭제(D-167: 밀린 것은 맨 위에 '오늘 할 일로 바꾸기' 하나 더).
+ * D-201(대표 요청): 예전에는 [내용 고치기] 를 한 번 더 눌러 다른 창으로 들어가야 날짜 · 이름을 바꿀 수 있었다.
+ * 이제 창을 열면 칸이 처음부터 열려 있다. 고친 뒤 [저장] 을 누르거나, 그냥 상태 단추(완료 등)를
+ * 누르면 고친 내용까지 한 번에 저장된다. 고친 것이 있는데 닫으려 하면 한 번 묻는다(적은 것이 사라지지 않게).
+ *
  * '내일로 미루기' 가 있는 이유: 오늘 못 한 일을 그냥 두면 다음 날에도 빨갛게
  * 남아 목록이 밀린 것으로 뒤덮인다. 미루는 것도 정직한 처리다.
  */
 export type TodoAction = 'open' | 'done' | 'today' | 'tomorrow' | 'delete'
+
+/** 창에서 고친 칸 — 상태 단추와 함께 한 번에 저장된다 */
+export interface TodoEdits {
+  content: string
+  dueDate: string
+  clientId: string | null
+}
 
 export function TodoActionSheet({
   entry,
@@ -223,11 +233,12 @@ export function TodoActionSheet({
 }: {
   entry: JournalEntry
   clientName?: string
-  /** 고치기 화면에서 업체를 바꿀 수 있게 — 없으면 업체 칸을 숨긴다 */
+  /** 업체를 바꿀 수 있게 — 없으면 업체 칸을 숨긴다 */
   clients?: { id: string; companyName: string; businessNumber?: string; corporateNumber?: string }[]
-  onPick: (action: TodoAction) => void
-  /** 적어 둔 내용·기한·업체를 고칠 때 */
-  onSave?: (patch: { content: string; dueDate: string; clientId: string | null }) => unknown
+  /** 상태 단추 — 고친 칸이 있으면 edits 로 함께 넘긴다(한 번에 저장) */
+  onPick: (action: TodoAction, edits?: TodoEdits) => void
+  /** [저장] — 적어 둔 내용 · 기한 · 업체만 고칠 때. false 를 돌려주면(실패) 창을 그대로 둔다 */
+  onSave?: (patch: TodoEdits) => unknown
   /** 관련 업체가 있을 때만 */
   onOpenClient?: () => void
   onClose: () => void
@@ -237,7 +248,7 @@ export function TodoActionSheet({
    * 통화 중에 급히 적은 한 줄은 대개 나중에 다듬게 된다 — 고칠 수 없으면
    * 지우고 다시 적게 되고, 그러면 언제 적었는지가 사라진다.
    */
-  const [editing, setEditing] = useState(false)
+  const editable = !!onSave
   const [content, setContent] = useState(entry.content)
   const [dueDate, setDueDate] = useState(entry.dueDate)
   const today = todayLocalDate()
@@ -251,125 +262,132 @@ export function TodoActionSheet({
       ? [{ id: entry.clientId, companyName: clientName }, ...clients]
       : clients
 
+  const edits: TodoEdits = { content: content.trim(), dueDate, clientId: clientId === '' ? null : clientId }
+  const dirty =
+    editable && (edits.content !== entry.content.trim() || edits.dueDate !== entry.dueDate || edits.clientId !== (entry.clientId ?? null))
+  const emptyContent = edits.content === ''
+
   const [saving, setSaving] = useState(false)
   /** D-122: 저장이 된 뒤에만 닫는다 — false 가 오면(실패) 고치던 칸 그대로 */
   const save = async () => {
-    if (!onSave || content.trim() === '' || saving) return
+    if (!onSave || emptyContent || saving || !dirty) return false
     setSaving(true)
-    const ok = await onSave({ content: content.trim(), dueDate, clientId: clientId === '' ? null : clientId })
+    const ok = await onSave(edits)
     setSaving(false)
-    if (ok !== false) setEditing(false)
+    return ok !== false
+  }
+  /** 상태 단추 — 고친 칸이 있으면 같이 넘긴다(지우기는 고친 것과 상관없다) */
+  const pick = (action: TodoAction) => {
+    if (action !== 'delete' && dirty && emptyContent) return
+    onPick(action, action !== 'delete' && dirty ? edits : undefined)
   }
   /** 삭제는 한 번 더 묻는다(D-122) */
   const [confirmDelete, setConfirmDelete] = useState(false)
+  /** 고친 것이 있는데 닫으려 하면 한 번 묻는다 */
+  const [confirmClose, setConfirmClose] = useState(false)
+  const requestClose = () => (dirty ? setConfirmClose(true) : onClose())
 
   // D-167: 밀린(빨간) 할 일은 맨 위에 '오늘 할 일로' — 기한을 오늘로 옮겨 밀린 것에서 뺀다(대표 요청)
-  const overdue = !entry.completed && entry.dueDate < today
-  const rows: { action: TodoAction; label: string; hint: string; tone?: 'danger' }[] = [
-    ...(overdue ? [{ action: 'today' as const, label: '오늘 할 일로 바꾸기', hint: `기한을 오늘로 옮깁니다 (지금 ${entry.dueDate})` }] : []),
-    { action: 'open', label: '진행 중', hint: '아직 안 끝났습니다 (목록에 남습니다)' },
-    { action: 'done', label: '완료', hint: '끝났습니다 (아래로 접힙니다)' },
-    { action: 'tomorrow', label: '내일로 미루기', hint: '기한을 내일로 옮깁니다' },
-    { action: 'delete', label: '지우기', hint: '기록에서 지웁니다 — 되돌릴 수 없습니다', tone: 'danger' },
-  ]
+  const overdue = !entry.completed && entry.dueDate !== '' && entry.dueDate < today
+  const statusBtn = (action: TodoAction, label: string, hint: string, active = false, tone?: 'danger') => (
+    <button
+      key={action}
+      type="button"
+      data-todo-action={action}
+      aria-pressed={action === 'open' || action === 'done' ? active : undefined}
+      disabled={action !== 'delete' && dirty && emptyContent}
+      onClick={() => (action === 'delete' ? setConfirmDelete(true) : pick(action))}
+      className={`tap flex min-h-14 min-w-0 items-center gap-2 rounded-(--radius-control) border px-3 py-2.5 text-left disabled:opacity-50 ${
+        active
+          ? 'border-brand-500 bg-brand-50'
+          : tone === 'danger'
+            ? 'border-danger-200 bg-white hover:bg-danger-50'
+            : 'border-slate-200 bg-white hover:bg-slate-50'
+      }`}
+    >
+      <span className="min-w-0 flex-1">
+        <span className={`t-body block font-semibold break-keep ${tone === 'danger' ? 'text-danger-700' : active ? 'text-brand-800' : 'text-slate-900'}`}>{label}</span>
+        <span className="t-meta block break-keep text-slate-500">{hint}</span>
+      </span>
+      {active && <Check aria-hidden="true" className="size-4 shrink-0 text-brand-600" />}
+    </button>
+  )
 
-  if (editing) {
-    return (
-      <BottomSheet
-        title="할 일 고치기"
-        onClose={onClose}
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button onClick={() => { setContent(entry.content); setDueDate(entry.dueDate); setClientId(entry.clientId ?? ''); setEditing(false) }}>취소</Button>
-            <Button variant="primary" disabled={content.trim() === '' || saving} onClick={() => void save()}>
+  return (
+    <BottomSheet
+      title="할 일"
+      onClose={requestClose}
+      footer={
+        confirmClose ? (
+          <div role="alertdialog" aria-label="고친 내용 저장 확인" data-testid="todo-close-confirm" className="flex flex-col gap-2">
+            <p className="t-body font-semibold break-keep text-slate-900">고친 내용이 있습니다. 저장할까요?</p>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button onClick={onClose}>저장 안 하고 닫기</Button>
+              <Button variant="primary" disabled={emptyContent || saving} onClick={() => void save().then((ok) => ok && onClose())}>
+                저장하고 닫기
+              </Button>
+            </div>
+          </div>
+        ) : editable ? (
+          <div className="flex items-center justify-end gap-2">
+            <span className={`t-meta mr-auto break-keep text-slate-500 ${dirty ? '' : 'hidden sm:inline'}`}>{dirty ? '고친 내용이 있습니다' : '칸을 눌러 바로 고칠 수 있습니다'}</span>
+            <Button onClick={requestClose}>닫기</Button>
+            <Button variant="primary" data-testid="todo-save" disabled={!dirty || emptyContent || saving} onClick={() => void save()}>
               {saving ? '저장 중…' : '저장'}
             </Button>
           </div>
-        }
-      >
-        <div className="flex flex-col gap-3">
-          <label className="block">
-            <span className="t-sub font-medium text-slate-700">할 일</span>
-            <textarea
-              autoFocus
-              aria-label="할 일 내용 고치기"
-              value={content}
-              rows={3}
-              onChange={(e) => setContent(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void save()
-              }}
-              className="t-body mt-1 w-full resize-y rounded-(--radius-control) border border-slate-300 px-3 py-2.5 focus:border-brand-500 focus:outline-none"
-            />
-          </label>
-          <label className="block">
-            {/* D-126: 다른 곳과 같은 오늘 · 내일 · 3일 뒤 단추 */}
-            <DueDateField label="언제까지" ariaLabel="할 일 기한 고치기" value={dueDate} today={today} onChange={setDueDate} />
-            {dueDate !== '' && (
-              <button
-                type="button"
-                onClick={() => setDueDate('')}
-                className="t-sub mt-1 font-medium text-slate-500 hover:text-brand-700 hover:underline"
-              >
-                기한 없애기
-              </button>
-            )}
-          </label>
-          {/* 업체를 잘못 붙였거나 안 붙였을 때 — 지우고 다시 적지 않아도 된다 */}
-          {(clientOptions.length > 0 || clientId !== '') && (
+        ) : undefined
+      }
+    >
+      <div className="flex flex-col gap-3">
+        {editable ? (
+          <>
             <label className="block">
-              <span className="t-sub font-medium text-slate-700">업체</span>
-              <select
-                aria-label="할 일 업체 고치기"
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                className="t-body mt-1 h-12 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3"
-              >
-                <option value="">업체 없음</option>
-                <ClientPickerOptions clients={clientOptions} />
-              </select>
+              <span className="t-sub font-medium text-slate-700">할 일</span>
+              <textarea
+                aria-label="할 일 내용 고치기"
+                value={content}
+                rows={2}
+                onChange={(e) => setContent(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void save()
+                }}
+                className={`t-body mt-1 w-full resize-y rounded-(--radius-control) border px-3 py-2.5 focus:border-brand-500 focus:outline-none ${emptyContent ? 'border-danger-300' : 'border-slate-300'}`}
+              />
+              {emptyContent && <span className="t-meta text-danger-700">할 일을 적어 주세요.</span>}
             </label>
-          )}
-        </div>
-      </BottomSheet>
-    )
-  }
+            {/* D-126: 다른 곳과 같은 오늘 · 내일 · 1주 단추 */}
+            <DueDateField label="언제까지" ariaLabel="할 일 기한 고치기" value={dueDate} today={today} onChange={setDueDate} clearLabel="기한 없애기" />
+            {/* 업체를 잘못 붙였거나 안 붙였을 때 — 지우고 다시 적지 않아도 된다 */}
+            {(clientOptions.length > 0 || clientId !== '') && (
+              <label className="block">
+                <span className="t-sub font-medium text-slate-700">업체</span>
+                <select
+                  aria-label="할 일 업체 고치기"
+                  value={clientId}
+                  onChange={(e) => setClientId(e.target.value)}
+                  className="t-body mt-1 h-12 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3"
+                >
+                  <option value="">업체 없음</option>
+                  <ClientPickerOptions clients={clientOptions} />
+                </select>
+              </label>
+            )}
+          </>
+        ) : (
+          <p className="t-body break-keep [overflow-wrap:anywhere] text-slate-900">{entry.content}</p>
+        )}
 
-  return (
-    <BottomSheet title={entry.content} onClose={onClose}>
-      {/* 고치기를 맨 위에 둔다 — 목록에서 누르는 이유의 절반은 '뭐라고 적었더라' 다 */}
-      {onSave && (
-        <Button variant="secondary" className="mb-3 w-full" onClick={() => setEditing(true)}>
-          <Pencil aria-hidden="true" className="size-4" />
-          내용 고치기
-        </Button>
-      )}
-      <div className="flex flex-col gap-1">
-        {rows.map((r) => {
-          const active = (r.action === 'done' && entry.completed) || (r.action === 'open' && !entry.completed)
-          return (
-            <button
-              key={r.action}
-              type="button"
-              onClick={() => (r.action === 'delete' ? setConfirmDelete(true) : onPick(r.action))}
-              className={`flex items-center gap-3 rounded-(--radius-control) border px-3 py-3 text-left ${
-                active
-                  ? 'border-brand-400 bg-brand-50'
-                  : r.tone === 'danger'
-                    ? 'border-danger-200 bg-white hover:bg-danger-50'
-                    : 'border-slate-200 bg-white hover:bg-slate-50'
-              }`}
-            >
-              <span className="min-w-0 flex-1">
-                <span className={`t-body block font-semibold ${r.tone === 'danger' ? 'text-danger-700' : 'text-slate-900'}`}>
-                  {r.label}
-                </span>
-                <span className="t-meta block break-keep text-slate-500">{r.hint}</span>
-              </span>
-              {active && <Check aria-hidden="true" className="size-4 shrink-0 text-brand-600" />}
-            </button>
-          )
-        })}
+        <div className="flex flex-col gap-1.5" data-testid="todo-actions">
+          <span className="t-sub font-medium text-slate-700">어떻게 할까요?{dirty ? ' (누르면 고친 내용도 함께 저장)' : ''}</span>
+          {overdue && statusBtn('today', '오늘 할 일로 바꾸기', `기한을 오늘로 (지금 ${entry.dueDate})`)}
+          <div className="grid grid-cols-2 gap-1.5">
+            {statusBtn('open', '진행 중', '목록에 남습니다', !entry.completed)}
+            {statusBtn('done', '완료', '끝난 일로 접힙니다', entry.completed)}
+            {statusBtn('tomorrow', '내일로 미루기', '기한을 내일로')}
+            {statusBtn('delete', '지우기', '되돌릴 수 없습니다', false, 'danger')}
+          </div>
+        </div>
       </div>
       {confirmDelete && (
         <div role="alertdialog" aria-label="할 일 삭제 확인" data-testid="todo-delete-confirm" className="mt-2 flex flex-col gap-2 rounded-(--radius-control) border border-danger-200 bg-danger-50 px-3 py-3">
