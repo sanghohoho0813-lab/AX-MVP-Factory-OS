@@ -325,6 +325,7 @@ const DIFFER_HOLE = '[다른 곳과 다른 점 한 가지 — 업체와 확인�
 function contactLines(p: ContentProfile): string {
   return [
     `전화 ${p.phone || '[대표 전화]'}`,
+    p.channel ? `구매 · 예약 ${p.channel}` : '',
     p.address ? `주소 ${p.address}` : p.region ? `지역 ${p.region}` : '',
     `시간 ${p.hours || '[운영 시간]'}`,
     p.homepage ? `홈페이지 ${p.homepage}` : '',
@@ -441,7 +442,7 @@ function reviewGuide(p: ContentProfile, topic: Topic): DraftBlock[] {
         `• 하는 일: ${p.services.length ? p.services.join(' · ') : p.item}`,
         `• 업체가 강조하는 점: ${p.differ || '[업체가 강조하고 싶은 점 한 가지]'}`,
         `• 진행 순서: ${lib.process.map((s) => s.name).join(' → ')}`,
-        `• 이용 정보: 위치 · 운영 시간(${p.hours || '[운영 시간]'}) · 연락처(${p.phone || '[대표 전화]'})`,
+        `• 이용 정보: 위치 · 운영 시간(${p.hours || '[운영 시간]'}) · 연락처(${p.phone || '[대표 전화]'})${p.channel ? ` · 구매 · 예약(${p.channel})` : ''}`,
       ].join('\n'),
     },
     { label: `찍어 주세요(사진 ${shots.length}장 이상)`, text: shots.map((v) => `• ${v}`).join('\n') },
@@ -612,7 +613,7 @@ function cardsDraft(p: ContentProfile, topic: Topic, variant: number, pages: 5 |
     cover = page(1, '표지', thumb, `${p.company}${p.area ? ` · ${p.area}` : ''}`, `${visuals[0] ?? ''} 위에 큰 글자`)
     inner = points.map((pt, i) => page(i + 2, '', `${i + 1}. ${pt.title}`, firstSentence(pt.body), `${at(visuals, i + 1)} 또는 아이콘 하나`))
   }
-  const last = page(inner.length + 2, '마무리', lib.ctaTitle, `${p.phone || '[연락처]'}${p.region ? ` · ${p.region}` : ''}`, '로고 · 연락처 · 지도 화면')
+  const last = page(inner.length + 2, '마무리', lib.ctaTitle, `${p.phone || '[연락처]'}${p.channel ? ` · ${p.channel}` : p.region ? ` · ${p.region}` : ''}`, '로고 · 연락처 · 지도 화면')
   const caption = `${topic.title}\n\n${inner.map((b) => /큰 글자: (.*)/.exec(b.text)?.[1] ?? '').filter(Boolean).map((t) => `• ${t}`).join('\n')}\n\n${lib.ctaShort.replace('{company}', p.company)}\n\n${hashtags(p).join(' ')}`
   return [{ ...cover, hint: AD_TYPE_LABEL[adType] }, ...inner, last, { label: '올릴 때 쓰는 글', text: caption }]
 }
@@ -645,7 +646,7 @@ function placeDraft(p: ContentProfile): DraftBlock[] {
     { label: '한 줄 소개', text: `${introSentence(p)} ${lib.ctaBody}` },
     { label: '하는 일', text: p.services.length ? p.services.map((s) => `• ${s}`).join('\n') : `• ${p.item}\n• [하는 일 두세 가지]` },
     { label: '이런 점을 챙겨요', text: [...(p.differ ? [`• ${p.differ}`] : []), ...p.strengths.map((s) => `• ${s}`), ...(p.differ ? [] : ['• [다른 곳과 다른 점 한 가지]'])].join('\n') },
-    { label: '이용 안내', text: `• 시간: ${p.hours || '[운영 시간 · 쉬는 날]'}\n• 주차: [주차 안내]\n• 예약 · 문의: ${p.phone || '[대표 전화]'}` },
+    { label: '이용 안내', text: `• 시간: ${p.hours || '[운영 시간 · 쉬는 날]'}\n• 주차: [주차 안내]\n• 예약 · 문의: ${p.phone || '[대표 전화]'}${p.channel ? ` · ${p.channel}` : ''}` },
     { label: '찾아오시는 길', text: `${p.address || '[주소]'}\n[가까운 역 · 큰 건물 기준 길 안내]` },
   ]
 }

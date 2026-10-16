@@ -247,6 +247,8 @@ check('C56 한 달 계획 — 주 2회 8개(화 · 금) · 주 4회 16개(월 ·
 const it7: ContentItem = { ...item, id: 'i7', rootId: 'i7', input: { ...item.input, blogType: 'review', shortLen: '30-60', adType: 'loss' } }
 const back7 = normalizeItem('i7', itemData(it7), it7.createdAt, it7.updatedAt)
 check('C57 보관함에 글 종류 · 쇼츠 길이 · 광고 유형도 남음 · 이상한 값은 버림', back7?.input.blogType === 'review' && back7?.input.shortLen === '30-60' && back7?.input.adType === 'loss' && normalizeItem('x', { ...itemData(it7), input: { blogType: 'hack', shortLen: '99', adType: 'spam' } })?.input.adType === undefined, back7?.input)
+const chText = ['blog', 'place', 'cards'].map((k) => plainText(k as ContentKind, makeDraft(fp7, { kind: k as ContentKind, topic: topics[0] }, today).blocks)).concat(plainText('blog', rg.blocks))
+check('C58 판매 채널(네이버 예약) → 블로그 문의 칸 · 플레이스 이용 안내 · 카드뉴스 마무리 · 체험단 가이드에 들어감 · 없으면 그 줄 없음', chText.every((x) => x.includes('네이버 예약')) && !plainText('blog', makeDraft(fp, { kind: 'blog', topic: topics[0] }, today).blocks).includes('구매 · 예약'), chText.map((x) => x.includes('네이버 예약')))
 
 /* ---------------- 견본 문구 자체 ---------------- */
 const libBad = INDUSTRIES.flatMap((k) => {
