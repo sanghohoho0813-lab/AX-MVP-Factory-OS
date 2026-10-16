@@ -8,7 +8,7 @@
  * 규칙 계산이다 — 외부 호출 없음. 사진·스캔본은 처음 한 번 한글 인식 준비가 걸린다.
  */
 
-import { DROP_FILE_LIMIT, filesFromDrop } from '../../lib/dropFiles'
+import { DROP_FILE_LIMIT, filesFromDrop, folderOfFile } from '../../lib/dropFiles'
 import { useEffect, useRef, useState } from 'react'
 import { Check, FileUp, FolderUp, Loader2, X } from 'lucide-react'
 import type { ClientOpsRecord, DocumentKey, DocumentState } from '../../types/clientOps'
@@ -243,11 +243,15 @@ export function BulkDocUploadSheet({
             ? { kind: 'new', label: label || `${OTHER_DOC_LABEL} · ${shortName(it.file.name)}`, sure: true, reason: '', issuedAt: null }
             : { kind: 'existing', key: it.target as DocumentKey, label: metas.find((m) => m.key === it.target)?.label ?? '', sure: true, reason: '', issuedAt: null }
         const pathKey: DocumentKey = placement.kind === 'existing' ? placement.key : 'customdoc_new'
-        const filePatch: Partial<DocumentState> = uploadable
-          ? // D-120: 파일만 올리고, 기록 저장은 끝에 한 번
-            await storeDocumentFile(recordRef.current, pathKey, it.file)
-          : // 이 브라우저 모드에는 파일 보관이 없다 — 받았다는 사실과 이름·발급일만 남긴다
-            { received: true, fileName: it.file.name, fileSize: it.file.size }
+        const filePatch: Partial<DocumentState> = {
+          ...(uploadable
+            ? // D-120: 파일만 올리고, 기록 저장은 끝에 한 번
+              await storeDocumentFile(recordRef.current, pathKey, it.file)
+            : // 이 브라우저 모드에는 파일 보관이 없다 — 받았다는 사실과 이름·발급일만 남긴다
+              { received: true, fileName: it.file.name, fileSize: it.file.size }),
+          // D-204: 폴더째 올렸으면 원래 폴더 경로(서류함 '폴더로 보기') — 파일 하나면 '' 로 예전 값을 지운다
+          folderPath: folderOfFile(it.file),
+        }
         // D-181: 서류에 찍힌 유효기간 끝도 함께 — 없으면 그 칸의 예전 값을 지운다(새 파일로 바뀌었다)
         const validUntil = it.result?.validUntil ?? undefined
         stored.push({ it, placement, patch: { ...(it.issuedAt ? { ...filePatch, received: true, issuedAt: it.issuedAt } : filePatch), validUntil } })

@@ -45,7 +45,8 @@ import { previewKindOf } from '../../lib/filePreview'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { NOTE_CONFLICT, NOTE_OCR, autoFillFromDocs } from '../docAutoFill'
 import { pdfItemsToText } from '../pdfTextLines'
-import { filesFromDrop } from '../../lib/dropFiles'
+import { filesFromDrop, folderOfPath, relativePathOf } from '../../lib/dropFiles'
+import { crumbsOf, docFolderTree, fileKindOf, folderAt } from '../docFolders'
 import { parseFinancialStatement } from '../finStatementParser'
 import { looksLikeCretop, looksLikeRoster } from '../docAutoAnalyze'
 import { buildInsights, cardRecoChips, isPick, missingForPicks, recoScore, recommendNextSteps, topPicks, type Insight } from '../clientInsights'
@@ -855,6 +856,30 @@ await (async () => {
   check('D-192 목차 설명: 모르는 목차 · 빈 글자는 설명 없음', hintFor('없는 목차') === undefined && hintFor('') === undefined && hintFor(undefined) === undefined)
   check("D-192 목차 설명: '회사 기본 정보' 는 '조각마다 따로 복사' 를 말한다", (hintFor('회사 기본 정보') ?? '').includes('조각마다'))
   check('D-192 목차 설명: 사전이 비어 있지 않고 설명마다 두 줄 안(110자 이하)', SECTION_HINT_COUNT >= 60 && SECTION_HINT_KEYS.every((k) => (hintFor(k) ?? '').length <= 110), String(SECTION_HINT_COUNT))
+}
+
+/* ---------------- D-204 서류함 폴더로 보기 ---------------- */
+{
+  check('D-204 경로 → 폴더: 파일 이름 빼기 · 시스템 폴더(__MACOSX · 숨김) 빼기 · 깊이 6 · 칸마다 40자', folderOfPath('비원미래/정관 개정_260410/정관.pdf') === '비원미래/정관 개정_260410' && folderOfPath('정관.pdf') === '' && folderOfPath('a/__MACOSX/.git/b/x.pdf') === 'a/b' && folderOfPath('1/2/3/4/5/6/7/8/x.pdf') === '1/2/3/4/5/6' && folderOfPath(`${'가'.repeat(50)}/x.pdf`).length === 40)
+  check('D-204 파일 하나(폴더 아님) → 경로 없음', relativePathOf(new File(['x'], '사업자등록증.pdf')) === '')
+  let r = normalizeClientOps({ id: 'fd', companyName: '비원미래' } as Partial<ClientOpsRecord>)
+  r = withDocument(r, 'businessRegistration', { received: true, fileName: '사업자등록증.pdf', fileSize: 10, storagePath: 'w/fd/b/1.pdf', folderPath: '비원미래' })
+  r = withDocument(r, 'corporateRegistry', { received: true, fileName: '법인등기부등본 캡쳐.png', fileSize: 10, storagePath: 'w/fd/c/2.png', folderPath: '비원미래/정관 개정_260410' })
+  r = withDocument(r, 'financialStatements', { received: true, fileName: '2025년 재무제표.pdf', fileSize: 10, storagePath: 'w/fd/f/3.pdf', folderPath: '비원미래/재무' })
+  r = withDocument(r, 'payrollRoster', { received: true, fileName: '4대보험 명부.xlsx', fileSize: 10, storagePath: 'w/fd/p/4.xlsx' })
+  r = withDocument(r, 'smeCertificate', { received: true, issuedAt: '2026-01-01' })
+  const tree = docFolderTree(normalizeClientOps(JSON.parse(JSON.stringify(r))))
+  check('D-204 폴더 나무 — 맨 위: 폴더 1(비원미래) + 폴더 없이 올린 파일 1 · 파일 없는 칸은 안 나옴 · 전체 4', tree.folders.map((f) => f.name).join() === '비원미래' && tree.files.map((f) => f.fileName).join() === '4대보험 명부.xlsx' && tree.total === 4, tree)
+  const b = folderAt(tree, '비원미래')
+  check('D-204 비원미래 안 — 하위 폴더 2(이름 순: 재무 · 정관…) · 파일 1 · 아래 파일 3', b?.folders.map((f) => f.name).join('|') === '재무|정관 개정_260410' && b?.files.length === 1 && b?.total === 3, b)
+  check('D-204 폴더 경로로 찾기 · 없는 폴더는 null · 빵 부스러기', folderAt(tree, '비원미래/재무')?.files[0]?.label === allDocumentMetas(r).find((m) => m.key === 'financialStatements')?.label && folderAt(tree, '없음') === null && crumbsOf('비원미래/재무').map((c) => c.name).join('>') === '서류함>비원미래>재무')
+  check('D-204 파일 종류 — PDF · 사진 · 엑셀 · 한글 · 워드 · 압축 · 모름', ['a.PDF', 'b.jpeg', 'c.xlsx', 'd.hwp', 'e.docx', 'f.zip', 'g.xyz'].map(fileKindOf).join() === 'pdf,image,excel,hwp,word,zip,other')
+  // 칸을 옮겨도(다시 분류) 폴더 경로가 따라감 · 파일을 지우면 경로도 지워짐
+  const moved = moveDocTo(r, 'corporateRegistry', 'new:정관')
+  const toKey = moved ? Object.entries(moved.record.documents).find(([, v]) => v?.fileName === '법인등기부등본 캡쳐.png')?.[0] : undefined
+  check('D-204 다른 칸으로 옮겨도 폴더 경로가 파일을 따라감', !!toKey && moved?.record.documents[toKey as never]?.folderPath === '비원미래/정관 개정_260410', toKey)
+  const gone = withoutDocumentFile(r, 'financialStatements', { withDoc: withDocument, withoutCustom: withoutCustomDocument })
+  check('D-204 파일을 빼면 폴더 경로도 지워져 폴더 보기에서 빠짐', (gone.documents.financialStatements.folderPath ?? '') === '' && !folderAt(docFolderTree(gone), '비원미래/재무'))
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

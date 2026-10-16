@@ -13,6 +13,8 @@ interface FsEntry {
   isFile: boolean
   isDirectory: boolean
   name: string
+  /** '/폴더/하위/파일.pdf' — 놓은 것 기준 경로 */
+  fullPath?: string
   file?: (ok: (f: File) => void, fail: (e: unknown) => void) => void
   createReader?: () => { readEntries: (ok: (list: FsEntry[]) => void, fail: (e: unknown) => void) => void }
 }
@@ -38,11 +40,20 @@ async function childrenOf(entry: FsEntry): Promise<FsEntry[]> {
   return out
 }
 
+/**
+ * D-204: 끌어다 놓은 폴더 안 파일의 원래 경로. 폴더 고르기(input webkitdirectory)는 브라우저가 webkitRelativePath 로 주지만,
+ * 끌어다 놓기는 File 에 경로가 없다 — 훑을 때 여기에 적어 둔다(File 자체는 고치지 않는다).
+ */
+const RELATIVE = new WeakMap<File, string>()
+
 async function walk(entry: FsEntry, depth: number, out: File[]): Promise<void> {
   if (out.length >= DROP_FILE_LIMIT) return
   if (entry.isFile) {
     const f = await fileOf(entry)
-    if (f) out.push(f)
+    if (f) {
+      if (entry.fullPath) RELATIVE.set(f, entry.fullPath.replace(/^\/+/, ''))
+      out.push(f)
+    }
     return
   }
   if (!entry.isDirectory || depth >= MAX_DEPTH) return
@@ -63,4 +74,29 @@ export async function filesFromDrop(dt: DataTransfer | null): Promise<{ files: F
   const out: File[] = []
   for (const e of entries) if (e) await walk(e, 0, out)
   return { files: out, folders, capped: out.length >= DROP_FILE_LIMIT }
+}
+
+/** 파일의 원래 경로('비원미래/정관 개정/정관.pdf') — 폴더째 올린 게 아니면 '' */
+export function relativePathOf(file: File): string {
+  const web = (file as File & { webkitRelativePath?: string }).webkitRelativePath ?? ''
+  return (web || RELATIVE.get(file) || '').replace(/\\/g, '/')
+}
+
+/** 경로 → 폴더 부분만, 정리해서('a/b/c.pdf' → 'a/b'). 칸마다 40자 · 깊이 6 · 시스템 폴더(__MACOSX 등)는 뺀다 */
+export function folderOfPath(path: string): string {
+  const parts = path
+    .split('/')
+    .map((p) => p.trim())
+    .filter(Boolean)
+  parts.pop()
+  return parts
+    .filter((p) => p !== '.' && p !== '..' && !/^__MACOSX$|^\./.test(p))
+    .slice(0, 6)
+    .map((p) => p.slice(0, 40))
+    .join('/')
+}
+
+/** 파일 → 올릴 때 남길 폴더 경로('' 이면 폴더 없이 올림) */
+export function folderOfFile(file: File): string {
+  return folderOfPath(relativePathOf(file))
 }

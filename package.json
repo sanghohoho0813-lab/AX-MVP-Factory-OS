@@ -63,6 +63,7 @@
     "qa:taxplan": "node e2e/taxplan.mjs",
     "qa:site": "node e2e/site.mjs",
     "qa:content": "node e2e/content.mjs",
+    "qa:folder": "node e2e/folder-cloud.mjs",
     "qa:scenarios": "node e2e/scenarios.mjs",
     "qa:ownerai": "node e2e/ownerai.mjs",
     "qa:calendar": "node e2e/calendar.mjs",

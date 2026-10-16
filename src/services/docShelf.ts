@@ -154,6 +154,7 @@ export function withDedupedShelf(record: ClientOpsRecord, keys: readonly Documen
       issuedAt: kept.issuedAt,
       validUntil: kept.validUntil,
       note: kept.note,
+      folderPath: kept.folderPath ?? '',
     })
   }
   return rec

@@ -33,6 +33,9 @@ import {
   FileText,
   Sparkles,
 } from 'lucide-react'
+import { FolderOpen, ListTree } from 'lucide-react'
+import { DocFolderView } from '../components/ops/DocFolderView'
+import { readDocView, writeDocView, type DocView } from '../lib/docViewPref'
 import { useAuth } from '../auth/AuthProvider'
 import { getDataModeConfig } from '../data/dataMode'
 import {
@@ -287,6 +290,12 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const [newDocMonths, setNewDocMonths] = useState('')
   /** D-122: 서류 탭에서 펼쳐 둔 줄 — 받았고 문제없는 서류는 한 줄로 접는다 */
   const [openDocs, setOpenDocs] = useState<Set<string>>(() => new Set())
+  // D-204: 서류함 보기 — 목차(서류 칸) · 폴더(올린 그대로). 이 브라우저에 기억
+  const [docView, setDocView] = useState<DocView>(() => readDocView())
+  const changeDocView = (v: DocView) => {
+    setDocView(v)
+    writeDocView(v)
+  }
   const [renamingDoc, setRenamingDoc] = useState<string | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
   /* 서류 한꺼번에 올리기 시트 (D-84) · D-144 머리줄 '서류 올리기'(읽자마자 저절로) */
@@ -535,6 +544,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       // D-120: 파일을 올리는 동안 고친 것이 있어도 덮지 않게 — 올린 뒤의 가장 새 기록에 얹는다
       const patch = await storeDocumentFile(record, key, file)
       const base = current() ?? record
+      // D-204: 칸에서 파일 하나를 고르면 폴더 정보는 그대로 둔다(같은 서류를 새 파일로 바꾼 것 — 폴더로 보기에서 제자리)
       const ok = await commit(withDocument(base, key, patch))
       showToast('파일을 보관했습니다.')
       // D-144: 올린 서류를 읽어 — 확실한 회사 정보는 바로 넣고, 애매한 것은 까닭과 함께 묻는다 · 크레탑 · 명부는 그 엔진이 읽는다
@@ -1306,6 +1316,43 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           }}
         />
 
+        {/* D-204: 보기 방식 — 목차(서류 칸)와 폴더(올린 그대로)를 같이 쓴다 */}
+        <div role="group" aria-label="서류함 보기" className="flex flex-wrap items-center gap-2" data-testid="doc-view-switch">
+          {(
+            [
+              ['list', '목차로 보기', ListTree],
+              ['folder', '폴더로 보기', FolderOpen],
+            ] as const
+          ).map(([v, name, Icon]) => (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={docView === v}
+              onClick={() => changeDocView(v)}
+              data-testid={`doc-view-${v}`}
+              className={`tap t-body flex min-h-11 items-center gap-2 rounded-full border px-4 font-semibold ${docView === v ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'}`}
+            >
+              <Icon aria-hidden="true" className="size-4" />
+              {name}
+            </button>
+          ))}
+        </div>
+
+        {docView === 'folder' ? (
+          <DocFolderView
+            record={record}
+            cloud={uploadable}
+            onShowInList={(key) => {
+              changeDocView('list')
+              setOpenDocs((cur) => new Set(cur).add(key))
+              window.setTimeout(() => {
+                const el = document.getElementById(`doc-card-${key}`)
+                el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+                el?.focus({ preventScroll: true })
+              }, 80)
+            }}
+          />
+        ) : (
         <div className="grid gap-3 lg:grid-cols-2">
           {docOrder(allDocumentMetas(record), urgentDocs)
             .map((meta) => {
@@ -1611,6 +1658,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               )
             })}
         </div>
+        )}
 
         {/*
           서류 칸 직접 만들기 (D-82).

@@ -113,7 +113,7 @@ export function applyResort(
     const state = rec.documents[m.fromKey]
     if (!state || !(state.fileName || state.storagePath)) continue
     taken.push({ m, state })
-    rec = ops.withDoc(rec, m.fromKey, { received: false, fileName: '', fileSize: 0, storagePath: '', issuedAt: '', validUntil: undefined, note: '' })
+    rec = ops.withDoc(rec, m.fromKey, { received: false, fileName: '', fileSize: 0, storagePath: '', issuedAt: '', validUntil: undefined, note: '', folderPath: '' })
   }
   const used = new Set<string>()
   const moved: { fileName: string; from: string; to: string; key: DocumentKey; fromKey: DocumentKey }[] = []
@@ -128,6 +128,8 @@ export function applyResort(
       // D-181: 서류에 찍힌 유효기간 끝은 파일을 따라 옮긴다
       validUntil: m.placement.validUntil ?? state.validUntil,
       note: state.note,
+      // D-204: 원래 폴더 경로도 파일을 따라 옮긴다(폴더로 보기에서 제자리)
+      folderPath: state.folderPath ?? '',
     })
     moved.push({ fileName: state.fileName, from: m.fromLabel, to: cell.label, key: cell.key, fromKey: m.fromKey })
   }
@@ -152,7 +154,7 @@ export function withoutDocumentFile(
     withoutCustom: (r: ClientOpsRecord, id: string) => ClientOpsRecord
   },
 ): ClientOpsRecord {
-  let rec = ops.withDoc(record, key, { received: false, fileName: '', fileSize: 0, storagePath: '', issuedAt: '', note: '' })
+  let rec = ops.withDoc(record, key, { received: false, fileName: '', fileSize: 0, storagePath: '', issuedAt: '', note: '', folderPath: '' })
   const custom = rec.customDocuments.find((d) => d.key === key)
   if (custom) rec = ops.withoutCustom(rec, custom.id)
   return rec
