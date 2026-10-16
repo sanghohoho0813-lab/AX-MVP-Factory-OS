@@ -2,6 +2,7 @@
  * D-202 홈페이지 만들기 — 업종 알아보기 · 업체 기록으로 초안 · 지어내지 않기 · HTML 안전(무작위 공격 글) · 꾸밈 대비 · 고치기 · 저장본 읽기 · 점검.
  * D-207 — 블록 바탕 · 첫 화면 사진 가득 · 사진 모음 · 고객 후기 · 거래처 로고 · 연락처 단추(카카오톡 · 상담 신청서) · 휴대폰 고정 단추 ·
  *         질문 하나만 열기 · 탭 아이콘 · 공유 정보 · h1 점검.
+ * D-208 — 디자인 한 번에(스타일 6) · 홈페이지 점수 100점 · 이것만 하면 · 업종 맞춤 블록.
  */
 import { normalizeClientOps } from '../clientOpsService'
 import {
@@ -37,6 +38,12 @@ import {
   heroArt,
   imageChars,
   paletteOf,
+  STYLE_PRESETS,
+  INDUSTRY_STYLE,
+  applyStylePreset,
+  currentStyle,
+  siteScore,
+  blockSuggestions,
   type BlockType,
   type SiteDoc,
 } from '../siteBuilder'
@@ -407,6 +414,43 @@ const old7Html = renderSiteHtml(old7)
 check('H72 예전 저장본(D-206 이전) → 바탕 자동 · 카카오톡 · 신청서 빈칸 · 고정 단추 꺼짐(예전 화면에 없던 것을 저절로 켜지 않음)', old7.blocks.every((b) => !('bg' in b.props) || b.props.bg === 'auto') && !old7Html.includes('class="fbar"') && !old7Html.includes('class="bg-') && !old7Html.includes('카카오톡 상담'))
 const darkCount = [gAbout, gSrv, gFaq].reduce((doc, b) => setProp(doc, b.id, 'bg', 'dark', now), gd)
 check('H73 진한 바탕이 셋 이상이면 "한두 곳만" 참고 알림', siteChecks(darkCount).some((c) => c.key === 'dark') && !siteChecks(darkDoc).some((c) => c.key === 'dark'))
+
+/* ---------------- D-208 디자인 한 번에 · 점수 · 업종 맞춤 블록 ---------------- */
+check('H74 스타일 6가지 — 이름 · 색 · 업종 추천은 모두 있는 스타일 · 색 묶음은 표에 있는 것만', STYLE_PRESETS.length === 6 && new Set(STYLE_PRESETS.map((x) => x.key)).size === 6 && Object.values(INDUSTRY_STYLE).every((k) => STYLE_PRESETS.some((x) => x.key === k)) && STYLE_PRESETS.every((x) => PALETTES.some((p) => p.key === x.palette)))
+const textOf = (doc: SiteDoc) => JSON.stringify(doc.blocks.map((b) => Object.fromEntries(Object.entries(b.props).filter(([k]) => !['layout', 'align', 'bg'].includes(k)))))
+const before208 = JSON.stringify(gd)
+const warm = applyStylePreset(gd, 'warm', now)
+const wHero = warm.blocks.find((b) => b.type === 'hero')!
+const wSrv = warm.blocks.find((b) => b.type === 'services')!
+check('H75 스타일 바꾸기 — 꾸밈(노을 · 아주 둥글게) · 사업 카드 모양 · 바탕 흐름이 바뀌고, 글 · 사진 · 순서 · 견본 표시는 그대로 · 원래 문서는 안 바뀜', warm.theme.palette === 'sunset' && warm.theme.corner === 'pill' && wSrv.props.layout === 'icons' && warm.blocks.find((b) => b.type === 'about')?.props.bg === 'tint' && textOf(warm) === textOf(gd) && warm.blocks.map((b) => `${b.id}:${(b.sample ?? []).join()}`).join() === gd.blocks.map((b) => `${b.id}:${(b.sample ?? []).join()}`).join() && JSON.stringify(gd) === before208 && currentStyle(warm) === 'warm')
+const withPhoto = applyStylePreset(setProp(gd, gHero.id, 'image', 'https://example.com/a.jpg', now), 'bold', now)
+check("H76 '사진 가득' 스타일 — 사진이 없으면 색 바탕으로(빈 사진 경고 0) · 사진이 있으면 사진 가득", wHero.props.layout === 'band' && !siteChecks(warm).some((c) => c.key.startsWith('photo-')) && withPhoto.blocks.find((b) => b.type === 'hero')?.props.layout === 'photo')
+const presetBad: unknown[] = []
+for (const ind of allInd) {
+  const base = draftSite(full, { today, now, makeId, industry: ind })
+  for (const sp of STYLE_PRESETS) {
+    const out = applyStylePreset(base, sp.key, now)
+    const html = renderSiteHtml(out)
+    if (siteChecks(out).some((c) => c.key === 'dark' || c.key.startsWith('photo-')) || !html.includes('<h1') || currentStyle(out) !== sp.key || JSON.stringify(applyStylePreset(out, sp.key, now)) !== JSON.stringify(out) || JSON.stringify(normalizeSiteDoc(JSON.parse(JSON.stringify(out)))?.blocks) !== JSON.stringify(out.blocks)) presetBad.push({ ind, sp: sp.key })
+  }
+}
+check(`H77 업종 ${allInd.length} × 스타일 6 — 진한 바탕 세 곳 넘음 0 · 빈 사진 경고 0 · h1 · 두 번 눌러도 같음 · 저장본 읽기 그대로`, presetBad.length === 0, presetBad.slice(0, 3))
+const sc = siteScore(gd)
+const scE = siteScore(de)
+check('H78 홈페이지 점수 — 11가지 합 100점 · 0~100 · 빈 업체 < 꽉 찬 업체 · 이것만 하면 = 아직인 것 중 큰 점수 셋', sc.items.reduce((a, it) => a + it.points, 0) === 100 && sc.items.length === 11 && sc.score >= 0 && sc.score <= 100 && scE.score < sc.score && sc.next.length <= 3 && sc.next.every((it) => !it.done) && sc.next.every((it, i, all) => i === 0 || all[i - 1].points >= it.points) && sc.items.filter((it) => !it.done && !sc.next.includes(it)).every((it) => it.points <= (sc.next.at(-1)?.points ?? 0)), { score: sc.score, empty: scE.score, next: sc.next.map((x) => `${x.key}+${x.points}`) })
+const gGal = newBlock('gallery', full, 'manufacturing', today, 'gal1')
+let up = insertBlock(gd, gGal, null, now)
+up = setProp(up, 'gal1', 'items', [1, 2, 3].map((i) => ({ image: `https://example.com/${i}.jpg`, title: `사진 ${i}`, desc: '' })), now)
+const scUp = siteScore(up)
+check('H79 실제 사진 3장(사진 모음) → +15점 · 그 항목 끝남', scUp.items.find((x) => x.key === 'photos')?.done === true && scUp.score - sc.score === 15 && !sc.items.find((x) => x.key === 'photos')?.done, { before: sc.score, after: scUp.score })
+const confirmed = gd.blocks.filter((b) => b.sample?.length).reduce((doc, b) => confirmSample(doc, b.id, now), gd)
+check('H80 견본 모두 확인 → 견본 항목 끝남 · 아직 남은 견본 블록을 누르면 그 블록', siteScore(confirmed).items.find((x) => x.key === 'sample')?.done === true && gd.blocks.some((b) => b.id === sc.items.find((x) => x.key === 'sample')?.open.blockId))
+check('H81 누르면 열 곳 — 블록이 있으면 그 블록(문서에 있는 id) · 없으면 블록 더하기 · 검색 정보는 꾸밈 탭', sc.items.every((it) => (it.open.blockId ? gd.blocks.some((b) => b.id === it.open.blockId) : true)) && sc.items.find((x) => x.key === 'seo')?.open.tab === 'style' && siteScore(removeBlock(gd, gHero.id, now)).items.find((x) => x.key === 'hero')?.open.add === 'hero')
+const con = draftSite(full, { today, now, makeId, industry: 'construction' })
+const conSug = blockSuggestions(con).map((x) => x.type)
+const conAfter = blockSuggestions(insertBlock(con, newBlock('gallery', full, 'construction', today, 'cg'), null, now)).map((x) => x.type)
+const healthSug = blockSuggestions(draftSite(full, { today, now, makeId, industry: 'health' })).map((x) => x.type)
+check('H82 업종 맞춤 블록 — 건설은 사진 모음 · 후기 · 넣으면 빠짐 · 병의원은 후기 권하지 않음 · 이유 한 줄', conSug.includes('gallery') && conSug.includes('reviews') && !conAfter.includes('gallery') && !healthSug.includes('reviews') && allInd.every((k) => blockSuggestions(draftSite(full, { today, now, makeId, industry: k })).every((x) => x.why.length > 10)), { conSug, conAfter, healthSug })
 
 console.log(`\n홈페이지 만들기: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

@@ -6,10 +6,12 @@
  * 규칙 + 업종 견본으로 채우며 'AI' 가 아니다. 업체마다 다른 내용은 [대괄호] 로 비워 두고 점검이 알린다.
  * D-207: 차별점 · 판매 채널 · 손님이 망설이는 점 칸, '이 칸만 채우면' 안내, 블로그 글 종류(우리 글 / 체험단 가이드), 주제 카드에 전략,
  *        쇼츠 길이 20~30 / 30~60초, 카드뉴스 광고 유형 5가지, 키워드 검색량 붙여넣기 정리, 한 달 올릴 계획(주 2회 / 주 4회).
+ * D-208: '이런 일이 있을 때' 상황 12가지(누르면 카톡 · 블로그 · 카드뉴스 묶음 · 묶음 모두 저장), 한 달 치 한 번에 만들기 ·
+ *        업체 일정에 올릴 날 걸기 · 계획 칸에 만듦/올림, 보관함 '올렸어요' 표시 · 거르기.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, CalendarDays, Check, ChevronDown, ChevronRight, Copy, Info, ListOrdered, PencilLine, RefreshCw, Save, Sparkles, Star, Trash2 } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { AlertTriangle, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight, Circle, Copy, Globe, Info, Layers, ListOrdered, PencilLine, RefreshCw, Save, Sparkles, Star, Trash2, Wand2 } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { Badge, BottomSheet } from '../../components/ui/primitives'
 import { ConfirmModal } from '../../components/ui/ConfirmModal'
@@ -23,8 +25,15 @@ import {
   BLOG_TYPE_HINT,
   BLOG_TYPE_LABEL,
   SHORT_LEN_LABEL,
+  activePlan,
   monthPlan,
+  monthPlanFrom,
   parseKeywordVolumes,
+  planDrafts,
+  planSlotStates,
+  situationPack,
+  situationsFor,
+  SITUATION_SHORT,
   profileGaps,
   CONTENT_KINDS,
   CONTENT_LIB,
@@ -55,10 +64,12 @@ import {
   type BlogType,
   type ProfileOverrides,
   type ShortLen,
+  type SituationKey,
   type Tone,
   type TopicType,
 } from '../../services/contentStudio'
 import { INDUSTRIES, type IndustryKey } from '../../services/siteBuilder'
+import { KR_PUBLIC_HOLIDAYS } from '../../services/daysOff'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { copyToClipboard, useOwnerAiIdentity, useOwnerAiRepo } from '../../pages/ownerAi/shared'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
@@ -77,6 +88,22 @@ function chip(on: boolean): string {
 interface Shown {
   draft: Draft
   item: ContentItem | null
+}
+
+/** D-208 상황 묶음 — 화면에 띄운 글은 늘 items[at] 이다(묶음이 null 이 아니면) */
+interface PackState {
+  key: SituationKey
+  label: string
+  fill: string[]
+  items: { tab: string; draft: Draft }[]
+  saved: (ContentItem | null)[]
+  at: number
+}
+
+/** 공휴일 표(올해 · 내년) — 상황 '쉬는 날을 알려요' 의 지금 때 */
+function holidaysAround(today: string) {
+  const y = Number(today.slice(0, 4))
+  return [...(KR_PUBLIC_HOLIDAYS[y] ?? []), ...(KR_PUBLIC_HOLIDAYS[y + 1] ?? [])]
 }
 
 export function ContentStudio({ record, store }: { record: ClientOpsRecord; store: ContentStore }) {
@@ -101,7 +128,11 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   const [editing, setEditing] = useState<DraftBlock[] | null>(null)
   const [busy, setBusy] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [pack, setPack] = useState<PackState | null>(null)
+  const packRef = useRef<PackState | null>(null)
+  packRef.current = pack
   const resultRef = useRef<HTMLDivElement | null>(null)
+  const holidays = useMemo(() => holidaysAround(today), [today])
 
   const topics = useMemo(() => topicsFor(profile, keyword, today, variant), [profile, keyword, today, variant])
   const made = useMemo(() => store.items.map((i) => ({ kind: i.kind, topicType: i.input.topicType, purpose: i.input.purpose, createdAt: i.createdAt })), [store.items])
@@ -125,6 +156,16 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   useEffect(() => {
     if (profile.tone === lastTone.current) return
     lastTone.current = profile.tone
+    const pk = packRef.current
+    if (pk) {
+      // 묶음은 통째로 새 말투로 — 이미 저장한 글은 보관함에 그대로 있다
+      const sp = situationPack(profile, pk.key, today, holidaysAround(today))
+      const next = { ...pk, items: sp.items, saved: sp.items.map(() => null) }
+      setPack(next)
+      setShown((cur) => (cur && !cur.item ? { draft: next.items[next.at]?.draft ?? cur.draft, item: null } : cur))
+      setEditing(null)
+      return
+    }
     setShown((cur) => {
       if (!cur || cur.item) return cur
       const inp = cur.draft.input
@@ -146,9 +187,10 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
     return () => window.removeEventListener('beforeunload', h)
   }, [dirty])
 
-  const show = (d: Draft, item: ContentItem | null = null) => {
+  const show = (d: Draft, item: ContentItem | null = null, keepPack = false) => {
     setShown({ draft: d, item })
     setEditing(null)
+    if (!keepPack) setPack(null)
     // 창만 굴린다 — scrollIntoView 는 overflow 가 숨겨진 바깥 상자까지 굴려서 머리줄 · 메뉴가 밀렸다
     window.setTimeout(() => {
       const el = resultRef.current
@@ -197,11 +239,64 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
         if (!r) return showToast('저장하지 못했어요. 적은 글은 화면에 그대로 있어요 — 다시 눌러 주세요.')
         setShown({ draft: { ...shown.draft, blocks: r.item.blocks }, item: r.item })
         setEditing(null)
+        setPack((pk) => (pk ? { ...pk, items: pk.items.map((x, i) => (i === pk.at ? { ...x, draft: { ...x.draft, blocks: r.item.blocks } } : x)), saved: pk.saved.map((x, i) => (i === pk.at ? r.item : x)) } : pk))
         showToast(r.dup ? '같은 글이 이미 보관함에 있어요.' : '보관함에 저장했어요.')
       }
     } finally {
       setBusy(false)
     }
+  }
+
+  /** D-208 상황 하나 → 묶음 */
+  const openPack = (key: SituationKey) => {
+    const sp = situationPack(profile, key, today, holidays)
+    if (!sp.items.length) return
+    setPack({ key, label: sp.situation.label, fill: sp.situation.fill, items: sp.items, saved: sp.items.map(() => null), at: 0 })
+    show(sp.items[0].draft, null, true)
+  }
+
+  const packGo = (i: number) => {
+    if (!pack || i === pack.at || !shown) return
+    let items = pack.items
+    if (dirty) {
+      // 저장 전 글을 고치던 중이면 고친 글을 묶음에 남기고 넘어간다 · 저장한 글을 고치던 중이면 먼저 저장하라고 알린다
+      if (shown.item) return showToast('고친 글을 먼저 [고친 판으로 저장] 해 주세요.')
+      items = items.map((x, j) => (j === pack.at && editing ? { ...x, draft: { ...x.draft, blocks: editing } } : x))
+    }
+    setPack({ ...pack, items, at: i })
+    show(items[i].draft, pack.saved[i], true)
+  }
+
+  const packSaveAll = async () => {
+    if (!pack || busy) return
+    const items = pack.items.map((x, j) => (j === pack.at && editing && !shown?.item ? { ...x, draft: { ...x.draft, blocks: editing } } : x))
+    const todo = items.map((x, j) => ({ d: x.draft, j })).filter((x) => !pack.saved[x.j])
+    if (!todo.length) return
+    setBusy(true)
+    try {
+      const r = await store.addMany(todo.map((x) => x.d))
+      const saved = [...pack.saved]
+      todo.forEach((x, k) => {
+        if (r.items[k]) saved[x.j] = r.items[k]
+      })
+      const next = { ...pack, items, saved }
+      setPack(next)
+      const cur = saved[pack.at]
+      if (cur) {
+        setShown({ draft: { ...items[pack.at].draft, blocks: cur.blocks }, item: cur })
+        setEditing(null)
+      }
+      showToast(r.failed ? `${r.failed}편을 저장하지 못했어요 — 다시 눌러 주세요.` : `묶음 ${r.added}편을 보관함에 저장했어요${r.dup ? ` · 이미 있던 ${r.dup}편은 건너뛰었어요` : ''}.`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const togglePosted = async (it: ContentItem) => {
+    const on = !it.postedAt
+    if (!(await store.setPosted(it.rootId, on))) return showToast('바꾸지 못했어요. 다시 눌러 주세요.')
+    showToast(on ? '올렸어요로 표시했어요.' : '아직 안 올린 글로 바꿨어요.')
+    setShown((cur) => (cur?.item && cur.item.rootId === it.rootId ? { ...cur, item: { ...cur.item, ...(on ? { postedAt: new Date().toISOString() } : { postedAt: undefined }) } } : cur))
   }
 
   const toAi = async () => {
@@ -247,9 +342,14 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
         </ul>
       </section>
 
+      <SituationCard profile={profile} today={today} holidays={holidays} openKey={pack?.key ?? null} onPick={openPack} />
+
       <PlanCard
+        record={record}
         profile={profile}
         today={today}
+        store={store}
+        onOpen={(it) => show({ kind: it.kind, title: it.title, blocks: it.blocks, notes: [], input: it.input }, it)}
         onPick={(slot) => {
           setKind(slot.kind)
           if (slot.topicType) setTopicType(slot.topicType)
@@ -390,9 +490,40 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
         <div ref={resultRef}>
           {shown ? (
             <section className={`${card} flex flex-col gap-3 p-4 sm:p-5`} data-testid="content-result" data-kind={shown.draft.kind}>
+              {pack && (
+                <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50/70 p-3" data-testid="content-pack" data-key={pack.key}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="t-sub flex min-w-0 items-center gap-1.5 font-semibold break-keep text-brand-900">
+                      <Layers className="size-4 shrink-0 text-brand-600" aria-hidden="true" />
+                      <span className="min-w-0">
+                        {pack.label} · 글 {pack.items.length}편 묶음
+                      </span>
+                    </p>
+                    <Button size="sm" variant="primary" onClick={() => void packSaveAll()} disabled={busy || pack.saved.every(Boolean)} data-testid="content-pack-save-all">
+                      <Save className="size-4" aria-hidden="true" />
+                      {pack.saved.every(Boolean) ? '묶음 모두 저장됨' : `${pack.items.length}편 모두 보관함에 저장`}
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="묶음 글">
+                    {pack.items.map((x, i) => (
+                      <button key={x.tab} type="button" role="tab" aria-selected={i === pack.at} onClick={() => packGo(i)} className={`tap t-sub flex min-h-11 items-center gap-1.5 rounded-full border px-4 font-semibold ${i === pack.at ? 'border-brand-600 bg-white text-brand-800' : 'border-brand-200 bg-white/60 text-slate-600 hover:border-brand-400'}`} data-testid="content-pack-tab" data-saved={pack.saved[i] ? '1' : '0'}>
+                        <span className="tabular-nums text-slate-400">{i + 1}</span>
+                        {x.tab}
+                        {pack.saved[i] && <Check className="size-4 text-success-600" aria-label="저장됨" />}
+                      </button>
+                    ))}
+                  </div>
+                  {pack.fill.length > 0 && (
+                    <p className="t-meta break-keep text-slate-700" data-testid="content-pack-fill">
+                      <b className="font-semibold text-slate-800">업체에 물어 채울 것</b> — {pack.fill.join(' · ')}. 글 안의 [대괄호] 자리예요.
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone="brand">{KIND_LABEL[shown.draft.kind]}</Badge>
                 {shown.item && <Badge tone="success">보관함 · {shown.item.version}판</Badge>}
+                {shown.item?.postedAt && <Badge tone="success">올림 · {shown.item.postedAt.slice(5, 10).replace('-', '/')}</Badge>}
                 {shown.draft.input.topicType && <Badge>{TOPIC_LABEL[shown.draft.input.topicType]}</Badge>}
               </div>
               <h2 className="t-section break-keep text-slate-900" data-testid="content-result-title">{shown.draft.title}</h2>
@@ -421,7 +552,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                   <Copy className="size-4" aria-hidden="true" />
                   전체 복사
                 </Button>
-                {!shown.item && (
+                {!shown.item && !pack && (
                   <Button
                     size="sm"
                     onClick={() => {
@@ -445,6 +576,12 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                   <Save className="size-4" aria-hidden="true" />
                   {shown.item ? (dirty ? '고친 판으로 저장' : '저장됨') : '보관함에 저장'}
                 </Button>
+                {shown.item && (
+                  <Button size="sm" onClick={() => void togglePosted(shown.item as ContentItem)} aria-pressed={!!shown.item.postedAt} data-testid="content-posted">
+                    {shown.item.postedAt ? <CheckCircle2 className="size-4 text-success-600" aria-hidden="true" /> : <Circle className="size-4" aria-hidden="true" />}
+                    {shown.item.postedAt ? '올렸어요 · 되돌리기' : '올렸어요 표시'}
+                  </Button>
+                )}
                 {ownerAi === 'yes' && (
                   <Button size="sm" variant="ghost" onClick={() => void toAi()} disabled={busy} data-testid="content-to-ai">
                     <Sparkles className="size-4 text-violet-600" aria-hidden="true" />
@@ -564,7 +701,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
         </div>
       </div>
 
-      <ArchiveCard store={store} onOpen={(it) => show({ kind: it.kind, title: it.title, blocks: it.blocks, notes: [], input: it.input }, it)} openId={shown?.item?.rootId ?? null} />
+      <ArchiveCard store={store} onOpen={(it) => show({ kind: it.kind, title: it.title, blocks: it.blocks, notes: [], input: it.input }, it)} onPosted={(it) => void togglePosted(it)} openId={shown?.item?.rootId ?? null} />
 
       {profileOpen && (
         <ProfileSheet
@@ -606,10 +743,16 @@ function ProfileCard({ record, profile, source, onEdit }: { record: ClientOpsRec
           <h2 className="t-section break-keep text-slate-900">{record.companyName} 홍보 정보</h2>
           <p className="t-sub mt-0.5 break-keep text-slate-600">업체 기록에서 저절로 채웠어요. 모든 글이 이 정보를 같이 써요.{missing ? ` 빈 칸 ${missing}개를 채우면 글이 더 정확해져요.` : ''}</p>
         </div>
-        <Button size="sm" onClick={onEdit} data-testid="content-profile-edit">
-          <PencilLine className="size-4" aria-hidden="true" />
-          고치기
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Link to={`/tools/homepage/build?client=${encodeURIComponent(record.id)}`} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 px-3 font-semibold text-slate-700 hover:bg-slate-50" data-testid="content-to-site">
+            <Globe className="size-4" aria-hidden="true" />
+            이 업체 홈페이지
+          </Link>
+          <Button size="sm" onClick={onEdit} data-testid="content-profile-edit">
+            <PencilLine className="size-4" aria-hidden="true" />
+            고치기
+          </Button>
+        </div>
       </div>
       <dl className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
         {rows.map((r) => (
@@ -652,45 +795,181 @@ function shortDate(d: string): string {
   return `${m}/${dd} (${DOW[new Date(`${d}T00:00:00Z`).getUTCDay()]})`
 }
 
-function PlanCard({ profile, today, onPick }: { profile: ReturnType<typeof buildProfile>['profile']; today: string; onPick: (slot: PlanSlot) => void }) {
+function PlanCard({ record, profile, today, store, onPick, onOpen }: { record: ClientOpsRecord; profile: ReturnType<typeof buildProfile>['profile']; today: string; store: ContentStore; onPick: (slot: PlanSlot) => void; onOpen: (it: ContentItem) => void }) {
+  const { showToast } = useToast()
   const [open, setOpen] = useState(false)
   const [perWeek, setPerWeek] = useState<2 | 4>(2)
-  const slots = useMemo(() => (open ? monthPlan(profile, today, perWeek) : []), [open, profile, today, perWeek])
+  const [fresh, setFresh] = useState(false)
+  const [busy, setBusy] = useState(false)
+  // 진행 중인 계획(보관함 글의 올릴 날)이 있으면 그 칸을 그대로 — 날이 지나도 같은 칸
+  const running = useMemo(() => (fresh ? null : activePlan(store.items, today)), [fresh, store.items, today])
+  const slots = useMemo(() => (running ? monthPlanFrom(profile, running.monday, running.perWeek, today) : monthPlan(profile, today, perWeek)), [running, profile, today, perWeek])
+  const states = useMemo(() => planSlotStates(slots, store.items), [slots, store.items])
+  const made = states.filter((x) => x.item).length
+  const posted = states.filter((x) => x.posted).length
+  const deadlines = slots.map((sl) => ({ date: sl.date, title: `홍보 글 올리기 · ${KIND_LABEL[sl.kind]}`, note: sl.title }))
+
+  const makeAll = async () => {
+    if (busy) return
+    setBusy(true)
+    try {
+      const todo = slots.filter((_, i) => !states[i].item)
+      const r = await store.addMany(planDrafts(profile, todo, today))
+      setFresh(false)
+      showToast(r.failed ? `${r.failed}편을 만들지 못했어요 — 다시 눌러 주세요.` : `한 달 치 ${r.added + r.dup}편을 보관함에 넣었어요. 아래 [업체 일정에 올릴 날 걸기] 를 누르면 달력에도 올라가요.`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <section className={`${card} flex flex-col gap-3 p-4 sm:p-5`} data-testid="content-plan">
       <button type="button" className="tap flex w-full min-w-0 items-center gap-2 text-left" aria-expanded={open} onClick={() => setOpen((v) => !v)} data-testid="content-plan-toggle">
         <CalendarDays className="size-5 shrink-0 text-brand-700" aria-hidden="true" />
         <span className="min-w-0 flex-1">
-          <span className="t-section block break-keep text-slate-900">한 달 올릴 계획</span>
-          <span className="t-sub block break-keep text-slate-600">다음 주 월요일부터 4주 — 무엇을 언제 올릴지 정해 줘요. 하나 누르면 바로 글이 돼요.</span>
+          <span className="t-section flex flex-wrap items-center gap-x-2 break-keep text-slate-900">
+            한 달 올릴 계획
+            {running && (
+              <span className="t-meta rounded-full bg-success-50 px-2 py-0.5 font-semibold text-success-700" data-testid="content-plan-progress">
+                올림 {posted}/{slots.length}
+              </span>
+            )}
+          </span>
+          <span className="t-sub block break-keep text-slate-600">{running ? `진행 중 · ${shortDate(slots[0].date)} ~ ${shortDate(slots[slots.length - 1].date)} · 만듦 ${made}/${slots.length}` : '다음 주 월요일부터 4주 — 무엇을 언제 올릴지 정하고, 한 번에 만들어 달력에 올려요.'}</span>
         </span>
         <ChevronDown className={`size-5 shrink-0 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
       </button>
       {open && (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="t-sub font-semibold text-slate-700">얼마나 자주</span>
-            {([2, 4] as const).map((n) => (
-              <button key={n} type="button" aria-pressed={perWeek === n} onClick={() => setPerWeek(n)} className={chip(perWeek === n)} data-testid="content-plan-per" data-value={n}>
-                주 {n}회
-              </button>
-            ))}
+            {running ? (
+              <>
+                <span className="t-sub font-semibold text-slate-700">주 {running.perWeek}회 계획</span>
+                <button type="button" className="tap t-sub min-h-11 px-2 font-semibold text-brand-700 underline-offset-2 hover:underline" onClick={() => setFresh(true)} data-testid="content-plan-new">
+                  새 계획 짜기
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="t-sub font-semibold text-slate-700">얼마나 자주</span>
+                {([2, 4] as const).map((n) => (
+                  <button key={n} type="button" aria-pressed={perWeek === n} onClick={() => setPerWeek(n)} className={chip(perWeek === n)} data-testid="content-plan-per" data-value={n}>
+                    주 {n}회
+                  </button>
+                ))}
+              </>
+            )}
             <span className="t-meta text-slate-500">· {slots.length}개</span>
           </div>
           <ol className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-4">
-            {slots.map((sl, i) => (
-              <li key={`${sl.date}-${i}`} className="min-w-0">
-                <button type="button" onClick={() => onPick(sl)} className="tap flex w-full min-w-0 flex-col items-start gap-0.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-left hover:border-brand-400 hover:bg-brand-50" data-testid="content-plan-slot" data-kind={sl.kind}>
-                  <span className="t-meta flex w-full min-w-0 flex-wrap items-center gap-x-1.5 text-slate-500">
-                    <span className="tabular-nums">{shortDate(sl.date)}</span>
-                    <span className="font-semibold text-brand-700">{KIND_LABEL[sl.kind]}</span>
-                  </span>
-                  <span className="t-sub block w-full break-keep text-slate-800">{sl.title}</span>
-                </button>
-              </li>
-            ))}
+            {slots.map((sl, i) => {
+              const st = states[i]
+              return (
+                <li key={`${sl.date}-${i}`} className="min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => (st.item ? onOpen(st.item) : onPick(sl))}
+                    className={`tap flex w-full min-w-0 flex-col items-start gap-0.5 rounded-(--radius-control) border px-3 py-2 text-left hover:border-brand-400 hover:bg-brand-50 ${st.posted ? 'border-success-200 bg-success-50/60' : st.item ? 'border-brand-200 bg-white' : 'border-slate-200 bg-white'}`}
+                    data-testid="content-plan-slot"
+                    data-kind={sl.kind}
+                    data-state={st.posted ? 'posted' : st.item ? 'made' : 'none'}
+                  >
+                    <span className="t-meta flex w-full min-w-0 flex-wrap items-center gap-x-1.5 text-slate-500">
+                      <span className="tabular-nums">{shortDate(sl.date)}</span>
+                      <span className="font-semibold text-brand-700">{KIND_LABEL[sl.kind]}</span>
+                      {st.posted ? (
+                        <span className="ml-auto flex items-center gap-0.5 font-semibold text-success-700">
+                          <CheckCircle2 className="size-3.5" aria-hidden="true" />
+                          올림
+                        </span>
+                      ) : st.item ? (
+                        <span className="ml-auto font-semibold text-brand-700">만듦</span>
+                      ) : null}
+                    </span>
+                    <span className="t-sub block w-full break-keep text-slate-800">{sl.title}</span>
+                  </button>
+                </li>
+              )
+            })}
           </ol>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="primary" onClick={() => void makeAll()} disabled={busy || made === slots.length} data-testid="content-plan-make-all">
+              <Wand2 className="size-4" aria-hidden="true" />
+              {made === slots.length ? `${slots.length}편 모두 만들었어요` : made ? `남은 ${slots.length - made}편 한 번에 만들기` : `한 달 치 ${slots.length}편 한 번에 만들기`}
+            </Button>
+            <span className="t-meta break-keep text-slate-500">보관함에 날짜를 달아 넣어요 · 같은 글은 두 번 넣지 않아요.</span>
+          </div>
+          {made > 0 && (
+            <div className="flex flex-col gap-1.5 border-t border-slate-100 pt-3" data-testid="content-plan-attach">
+              <p className="t-sub font-semibold text-slate-800">업체 일정에 올릴 날 걸기</p>
+              <p className="t-meta break-keep text-slate-500">누르면 {record.companyName} 기록에 계획이 붙고, 올릴 날 {slots.length}개가 일정 달력 · 오늘 화면에 떠요. 다시 걸면 날짜만 새로 바뀌어요.</p>
+              <ToolResultAttach
+                toolKey="content"
+                title="홍보 글 한 달 계획"
+                verdict="ready"
+                verdictLabel={`주 ${running?.perWeek ?? perWeek}회 · ${slots.length}편`}
+                summary={`홍보 글 한 달 계획 — ${shortDate(slots[0].date)} ~ ${shortDate(slots[slots.length - 1].date)} · ${slots.length}편`}
+                data={{ perWeek: running?.perWeek ?? perWeek, slots: slots.map((sl) => ({ date: sl.date, kind: sl.kind, title: sl.title })) }}
+                deadlines={deadlines}
+                followUp={{ text: '홍보 글 첫 편 올렸는지 확인', days: 7 }}
+                presetClientId={record.id}
+              />
+            </div>
+          )}
         </>
+      )}
+    </section>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* 상황 예시                                                             */
+/* ------------------------------------------------------------------ */
+
+function SituationCard({ profile, today, holidays, openKey, onPick }: { profile: ReturnType<typeof buildProfile>['profile']; today: string; holidays: { date: string; name: string }[]; openKey: SituationKey | null; onPick: (key: SituationKey) => void }) {
+  const [more, setMore] = useState(false)
+  // 지금 때인 상황을 앞으로
+  const list = useMemo(() => {
+    const all = situationsFor(profile, today, holidays)
+    return [...all.filter((x) => x.now), ...all.filter((x) => !x.now)]
+  }, [profile, today, holidays])
+  return (
+    <section className={`${card} flex flex-col gap-3 p-4 sm:p-5`} data-testid="content-situations">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h2 className="t-section flex items-center gap-2 text-slate-900">
+          <Layers className="size-5 text-brand-600" aria-hidden="true" />
+          이런 일이 있을 때
+        </h2>
+        <span className="t-sub break-keep text-slate-600">하나 누르면 카톡 · 블로그 · 카드뉴스가 한 묶음으로 나와요</span>
+      </div>
+      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+        {list.map((sit, i) => (
+          <li key={sit.key} className={i >= 6 && !more ? 'hidden sm:block' : ''}>
+            <button
+              type="button"
+              onClick={() => onPick(sit.key)}
+              aria-pressed={openKey === sit.key}
+              className={`tap flex h-full w-full min-w-0 flex-col items-start gap-1 rounded-(--radius-control) border p-3 text-left ${openKey === sit.key ? 'border-brand-600 bg-brand-50' : sit.now ? 'border-brand-300 bg-brand-50/50 hover:border-brand-500' : 'border-slate-200 bg-white hover:border-brand-400'}`}
+              data-testid="content-situation"
+              data-key={sit.key}
+            >
+              {sit.now && (
+                <span className="t-meta flex w-full items-start gap-1 font-semibold break-keep text-brand-700" data-testid="content-situation-now">
+                  <Sparkles className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                  <span className="min-w-0">지금 때 · {sit.now}</span>
+                </span>
+              )}
+              <span className="t-body w-full font-semibold break-keep text-slate-900">{sit.label}</span>
+              <span className="t-meta hidden w-full break-keep text-slate-500 sm:block">{sit.hint}</span>
+              <span className="t-meta mt-auto w-full break-keep font-medium text-brand-700">{sit.tabs.join(' · ')}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {list.length > 6 && (
+        <button type="button" className="tap t-sub min-h-11 rounded-(--radius-control) border border-slate-200 font-semibold text-slate-700 sm:hidden" onClick={() => setMore((v) => !v)} aria-expanded={more} data-testid="content-situation-more">
+          {more ? '접기' : `상황 ${list.length - 6}개 더 보기`}
+        </button>
       )}
     </section>
   )
@@ -821,28 +1100,31 @@ function ProfileSheet({ overrides, profileItem, onClose, onSave }: { overrides: 
 /* 보관함                                                                */
 /* ------------------------------------------------------------------ */
 
-function ArchiveCard({ store, onOpen, openId }: { store: ContentStore; onOpen: (it: ContentItem) => void; openId: string | null }) {
+function ArchiveCard({ store, onOpen, onPosted, openId }: { store: ContentStore; onOpen: (it: ContentItem) => void; onPosted: (it: ContentItem) => void; openId: string | null }) {
   const { showToast } = useToast()
-  const [filter, setFilter] = useState<'all' | 'fav' | ContentKind>('all')
+  const [filter, setFilter] = useState<'all' | 'fav' | 'todo' | 'posted' | ContentKind>('all')
   const [del, setDel] = useState<{ rootId: string; title: string; versions: number } | null>(null)
   const [busy, setBusy] = useState(false)
   const rows = useMemo(() => latestByRoot(store.items), [store.items])
-  const shown = rows.filter((r) => (filter === 'all' ? true : filter === 'fav' ? r.item.favorite : r.item.kind === filter))
+  const shown = rows.filter((r) => (filter === 'all' ? true : filter === 'fav' ? r.item.favorite : filter === 'todo' ? !r.item.postedAt : filter === 'posted' ? !!r.item.postedAt : r.item.kind === filter))
+  const postedN = rows.filter((r) => r.item.postedAt).length
   const kindsHere = CONTENT_KINDS.filter((k) => rows.some((r) => r.item.kind === k))
   return (
     <section className={`${card} flex flex-col gap-3 p-4 sm:p-5`} data-testid="content-archive">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="t-section text-slate-900">보관함</h2>
-        <span className="t-sub text-slate-500">{rows.length}편</span>
+        <span className="t-sub text-slate-500" data-testid="content-archive-count">
+          {rows.length}편{rows.length ? ` · 올림 ${postedN}` : ''}
+        </span>
       </div>
       {rows.length === 0 ? (
         <p className="t-sub break-keep text-slate-500">아직 저장한 글이 없어요. 글을 만들고 [보관함에 저장] 을 누르면 여기에 남아요.</p>
       ) : (
         <>
           <div className="flex flex-wrap gap-1.5">
-            {(['all', 'fav', ...kindsHere] as const).map((f) => (
-              <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)} className={`tap t-sub min-h-9 rounded-full border px-3 ${filter === f ? 'border-brand-600 bg-brand-50 font-semibold text-brand-700' : 'border-slate-200 text-slate-600'}`}>
-                {f === 'all' ? '전체' : f === 'fav' ? '즐겨찾기' : KIND_LABEL[f]}
+            {(['all', 'todo', 'posted', 'fav', ...kindsHere] as const).map((f) => (
+              <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)} className={`tap t-sub min-h-9 rounded-full border px-3 ${filter === f ? 'border-brand-600 bg-brand-50 font-semibold text-brand-700' : 'border-slate-200 text-slate-600'}`} data-testid="content-archive-filter" data-value={f}>
+                {f === 'all' ? '전체' : f === 'fav' ? '즐겨찾기' : f === 'todo' ? '아직 안 올림' : f === 'posted' ? '올린 글' : KIND_LABEL[f]}
               </button>
             ))}
           </div>
@@ -862,11 +1144,26 @@ function ArchiveCard({ store, onOpen, openId }: { store: ContentStore; onOpen: (
                   <Star className={`size-5 ${item.favorite ? 'fill-amber-400 text-amber-500' : 'text-slate-300'}`} aria-hidden="true" />
                 </button>
                 <button type="button" className="tap flex min-h-11 min-w-0 flex-1 flex-col items-start justify-center text-left" onClick={() => onOpen(item)} data-testid="content-archive-open">
-                  <span className="t-body w-full truncate font-medium text-slate-800">{item.title}</span>
-                  <span className="t-meta text-slate-500">
-                    {KIND_LABEL[item.kind]} · {item.createdAt.slice(0, 10)}
+                  <span className="t-body line-clamp-2 w-full font-medium break-keep text-slate-800">{item.title}</span>
+                  <span className="t-meta w-full break-keep text-slate-500">
+                    {KIND_LABEL[item.kind]}
+                    {item.input.situation ? ` · ${SITUATION_SHORT[item.input.situation as SituationKey] ?? ''}` : ''}
+                    {item.input.planDate ? ` · ${shortDate(item.input.planDate)} 올릴 글` : ` · ${item.createdAt.slice(0, 10)}`}
                     {versions > 1 ? ` · ${versions}판` : ''}
                   </span>
+                </button>
+                <button
+                  type="button"
+                  className={`tap t-meta flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-full px-1.5 font-semibold sm:px-2.5 ${item.postedAt ? 'text-success-700 hover:bg-success-50' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'}`}
+                  aria-pressed={!!item.postedAt}
+                  aria-label={item.postedAt ? `${item.title} — 올렸어요(누르면 아직으로)` : `${item.title} — 올렸어요로 표시`}
+                  title={item.postedAt ? '누르면 아직 안 올린 글로 바꿔요' : "업체가 올렸으면 눌러 '올림' 으로 표시해요"}
+                  onClick={() => onPosted(item)}
+                  data-testid="content-archive-posted"
+                >
+                  {item.postedAt ? <CheckCircle2 className="size-5 sm:size-4" aria-hidden="true" /> : <Circle className="size-5 sm:size-4" aria-hidden="true" />}
+                  {/* 휴대폰은 동그라미만(제목 자리를 넓게) — 거르기 칩 '아직 안 올림 · 올린 글' 이 뜻을 알려 준다 */}
+                  <span className="hidden sm:inline">{item.postedAt ? '올림' : '아직'}</span>
                 </button>
                 <button type="button" className="tap flex size-11 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-400 hover:bg-danger-50 hover:text-danger-700" aria-label={`${item.title} 지우기`} onClick={() => setDel({ rootId: item.rootId, title: item.title, versions })} data-testid="content-del">
                   <Trash2 className="size-4" aria-hidden="true" />

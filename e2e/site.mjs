@@ -8,6 +8,8 @@
  *        공격 글(<img onerror>) → 미리보기에 이벤트 0 · 알림창 0 · HTML 내려받기(파일 이름 · 내용) · 업체 기록에 붙이기(다시 열기 주소)
  *        업체 상세 › 잘 안 쓰는 기능 › 웹 스튜디오 › 홈페이지 [만들기] 입구
  *  390 · 360  [고치기 | 미리보기] · 가로 넘침 0 · 누르는 것 44px · 휴대폰 미리보기
+ *  D-208  홈페이지 점수 · 이것만 하면(누르면 그 블록) · 업종 맞춤 블록 [넣기] · 디자인 한 번에(스타일 6 · 업종 추천 · 되돌리기) ·
+ *         사진 없으면 사진 가득 대신 색 바탕 · 이 업체 홍보 글로 바로 · 휴대폰 넘침 0
  *
  *   node e2e/site.mjs http://localhost:4390 [--shots <dir>]
  */
@@ -368,6 +370,68 @@ const errors = []
 }
 
 /* ================================================================== */
+/* D-208 점수 · 업종 맞춤 블록 · 디자인 한 번에                             */
+/* ================================================================== */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  const page = await ctx.newPage()
+  page.on('pageerror', (e) => errors.push(`D208 pageerror ${e.message}`))
+  await seed(page)
+  await page.goto(BASE + '/tools/homepage/build?client=cli_site', { waitUntil: 'networkidle' })
+  await page.getByTestId('site-create').click()
+  await page.getByTestId('site-score').waitFor()
+  await waitSaved(page)
+  const score0 = Number(await page.getByTestId('site-score').getAttribute('data-score'))
+  const next = await page.getByTestId('site-score-item').evaluateAll((els) => els.map((e) => [e.getAttribute('data-key'), e.textContent]))
+  check('S1 홈페이지 점수 0~100 · 이것만 하면 3개(+점수 · 큰 것부터)', score0 > 0 && score0 < 100 && next.length === 3 && next.every(([, t]) => /^\+\d+/.test(t)) && Number(/\+(\d+)/.exec(next[0][1])[1]) >= Number(/\+(\d+)/.exec(next[2][1])[1]), { score0, next })
+  if (SHOTS) await page.getByTestId('site-score').screenshot({ path: `${SHOTS}/site-d208-score.png` })
+  await page.locator('[data-testid="site-score-item"][data-key="about"]').click()
+  await wait(400)
+  check('S2 점수 항목 누르기 → 그 블록(회사 소개)이 열림', (await rowOf(page, 'about').getByTestId('block-row').getAttribute('aria-expanded')) === 'true')
+  await rowOf(page, 'about').getByTestId('sample-confirm').click()
+  await waitSaved(page)
+  await wait(300)
+  const score1 = Number(await page.getByTestId('site-score').getAttribute('data-score'))
+  check('S3 회사 소개 확인 → 점수 +10 이상', score1 - score0 >= 10, { score0, score1 })
+  const sug = await page.getByTestId('site-suggest-item').evaluateAll((els) => els.map((e) => e.getAttribute('data-type')))
+  check('S4 제조 업종 맞춤 블록 — 거래처 로고 · 사진 모음 · 연혁(이유 한 줄)', ['logos', 'gallery', 'history'].every((x) => sug.includes(x)), sug)
+  if (SHOTS) await page.getByTestId('site-suggest').screenshot({ path: `${SHOTS}/site-d208-suggest.png` })
+  await page.locator('[data-testid="site-suggest-item"][data-type="gallery"]').getByTestId('site-suggest-add').click()
+  await waitSaved(page)
+  const doc1 = await savedDoc(page)
+  const types1 = doc1.blocks.map((b) => b.type)
+  check('S5 [넣기] → 사진 모음이 연락처 위에 · 열림 · 추천에서 빠짐', types1.indexOf('gallery') > 0 && types1.indexOf('gallery') < types1.indexOf('contact') && (await rowOf(page, 'gallery').getByTestId('block-row').getAttribute('aria-expanded')) === 'true' && (await page.locator('[data-testid="site-suggest-item"][data-type="gallery"]').count()) === 0, types1)
+
+  await page.getByTestId('site-tab-style').click()
+  const presets = await page.getByTestId('site-preset').evaluateAll((els) => els.map((e) => [e.getAttribute('data-value'), e.getAttribute('aria-pressed'), /이 업종 추천/.test(e.textContent)]))
+  check('S6 디자인 한 번에 6가지 · 지금(자연스러운) 눌린 상태 · 제조 업종 추천 표시', presets.length === 6 && presets.find((x) => x[0] === 'nature')?.[1] === 'true' && presets.find((x) => x[0] === 'nature')?.[2] === true && presets.filter((x) => x[2]).length === 1, presets)
+  if (SHOTS) await page.getByTestId('site-presets').screenshot({ path: `${SHOTS}/site-d208-presets.png` })
+  await page.locator('[data-testid="site-preset"][data-value="premium"]').click()
+  await waitSaved(page)
+  await wait(600)
+  const doc2 = await savedDoc(page)
+  const html2 = await frameHtml(page)
+  const hero2 = doc2.blocks.find((b) => b.type === 'hero')
+  check('S7 고급스러운 → 와인색 · 명조 · 각지게 · 첫 화면 가운데 · 사업 카드 글 모양 · 미리보기에 바로', doc2.theme.palette === 'wine' && doc2.theme.font === 'serif' && doc2.theme.corner === 'square' && hero2.props.layout === 'band' && hero2.props.align === 'center' && doc2.blocks.find((b) => b.type === 'services').props.layout === 'plain' && html2.includes('#7f1d3f') && html2.includes('Noto Serif KR'), doc2.theme)
+  check('S8 글 · 순서는 그대로(블록 순서 · 큰 문구 같음)', JSON.stringify(doc2.blocks.map((b) => b.id)) === JSON.stringify(doc1.blocks.map((b) => b.id)) && hero2.props.title === doc1.blocks.find((b) => b.type === 'hero').props.title)
+  await page.getByTestId('site-undo').click()
+  await waitSaved(page)
+  await wait(500)
+  const doc3 = await savedDoc(page)
+  check('S9 되돌리기 한 번 → 원래 꾸밈(숲 · 고딕) · 첫 화면 모양 그대로', doc3.theme.palette === 'forest' && doc3.theme.font === 'sans' && doc3.blocks.find((b) => b.type === 'hero').props.layout === doc1.blocks.find((b) => b.type === 'hero').props.layout && (await page.locator('[data-testid="site-preset"][data-value="nature"]').getAttribute('aria-pressed')) === 'true', doc3.theme)
+  await page.locator('[data-testid="site-preset"][data-value="warm"]').click()
+  await waitSaved(page)
+  const doc4 = await savedDoc(page)
+  await page.getByTestId('site-tab-checks').click()
+  const ck4 = await page.getByTestId('site-check').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')))
+  check("S10 따뜻한 가게(사진 가득) — 첫 화면 사진이 없으면 색 바탕으로 · '사진 없음' 경고 0", doc4.theme.palette === 'sunset' && doc4.blocks.find((b) => b.type === 'hero').props.layout === 'band' && !ck4.some((k) => k?.startsWith('photo-')), { layout: doc4.blocks.find((b) => b.type === 'hero').props.layout, ck4 })
+  await page.getByTestId('site-to-content').click()
+  await page.waitForURL(/\/tools\/content\/build\?client=cli_site/)
+  check('S11 홈페이지 → 이 업체 홍보 글로 바로', /\/tools\/content\/build\?client=cli_site/.test(page.url()))
+  await ctx.close()
+}
+
+/* ================================================================== */
 /* 휴대폰 390 · 360                                                     */
 /* ================================================================== */
 for (const width of [390, 360]) {
@@ -391,6 +455,17 @@ for (const width of [390, 360]) {
   )
   check(`M${width} 누르는 것 40px 이상(44 기준 · 테두리 오차)`, small.length === 0, small)
   if (SHOTS && width === 390) await page.screenshot({ path: `${SHOTS}/site-edit-m390.png`, fullPage: false })
+  // D-208 점수 · 디자인 한 번에 — 휴대폰 넘침 0 · 누르는 것 44px
+  await page.getByTestId('site-tab-style').click()
+  await page.getByTestId('site-presets').waitFor()
+  const presetH = await page.getByTestId('site-preset').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
+  const scoreH = await page.getByTestId('site-score-item').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
+  check(`M${width} D-208 점수 · 스타일 6 — 넘침 0 · 44px 이상`, (await over()) <= 0 && presetH.length === 6 && presetH.every((h) => h >= 44) && scoreH.length === 3 && scoreH.every((h) => h >= 44), { presetH, scoreH })
+  if (SHOTS && width === 390) {
+    await page.getByTestId('site-score').scrollIntoViewIfNeeded()
+    await page.screenshot({ path: `${SHOTS}/site-m390-score.png`, fullPage: false })
+  }
+  await page.getByTestId('site-tab-blocks').click()
   await page.getByTestId('pane-preview').click()
   await page.getByTestId('preview-mobile').click()
   await wait(1000)

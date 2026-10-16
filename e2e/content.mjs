@@ -9,6 +9,8 @@
  *        대표 전화 없는 가게 → 휴대폰 번호 안 들어감 · [대표 전화] 로 비움
  *  390 · 360  가로 넘침 0 · 누르는 것 44px · 먼저 만들 것 → 결과
  *  D-207  이 칸만 채우면 · 주제 전략 · 체험단 가이드(대가 표시) · 쇼츠 30~60초 · 카드뉴스 광고 유형 · 검색량 붙여 넣기 · 한 달 계획
+ *  D-208  상황 예시 12(지금 때 · 묶음 탭 · 고친 글 남음 · 묶음 모두 저장 · 말투) · 한 달 치 한 번에 · 업체 일정에 올릴 날(달력) ·
+ *         계획 칸 만듦/올림 · 올렸어요 · 거르기 · 새로고침해도 진행 중 계획 · 홈페이지로 바로 가기 · 휴대폰 넘침 0
  *
  *   node e2e/content.mjs http://localhost:4390 [--shots <dir>]
  */
@@ -331,6 +333,98 @@ const errors = []
 }
 
 /* ================================================================== */
+/* D-208 상황 예시 · 한 달 치 · 올렸어요                                   */
+/* ================================================================== */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  const page = await ctx.newPage()
+  page.on('pageerror', (e) => errors.push(`D208 pageerror ${e.message}`))
+  await seed(page)
+  await page.goto(BASE + '/tools/content/build?client=cli_site', { waitUntil: 'networkidle' })
+  await page.getByTestId('content-situations').waitFor()
+  const sitKeys = await page.getByTestId('content-situation').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')))
+  const nowText = await page.getByTestId('content-situation-now').allInnerTexts()
+  check('D1 상황 예시 12가지 · 지금 때(이번 달 이야기)가 맨 앞', sitKeys.length === 12 && sitKeys[0] === 'season' && nowText.length >= 1 && /11월/.test(nowText[0]), { sitKeys, nowText })
+  if (SHOTS) await page.getByTestId('content-situations').screenshot({ path: `${SHOTS}/content-d208-situations.png` })
+
+  // 이사 · 확장 → 묶음 3편
+  await page.locator('[data-testid="content-situation"][data-key="move"]').click()
+  await page.getByTestId('content-pack').waitFor()
+  const tabs = await page.getByTestId('content-pack-tab').allInnerTexts()
+  const kakao = await resultText(page)
+  check('D2 누르면 묶음 3편(카톡 · 블로그 · 카드뉴스) · 카톡은 (광고) · 새 주소는 [대괄호] · 지금 주소 · 물어 채울 것', tabs.length === 3 && /카톡/.test(tabs[0]) && /블로그/.test(tabs[1]) && /카드뉴스/.test(tabs[2]) && kakao.includes('(광고) 한솔정밀(주) 새 주소 안내') && kakao.includes('[새 주소]') && kakao.includes('경기도 화성시 동탄산단 6길 15') && /옮기는 날짜/.test(await page.getByTestId('content-pack-fill').innerText()), { tabs, kakao: kakao.slice(0, 120) })
+  // 카톡을 고치고 블로그로 넘어갔다 돌아오면 고친 글이 남는다
+  await page.getByTestId('content-edit').click()
+  await page.getByTestId('content-block-input').first().fill('(광고) 한솔정밀(주) 새 주소 안내\n\n11월 3일부터 동탄2로 30에서 만나요.')
+  await page.getByTestId('content-pack-tab').nth(1).click()
+  await wait(300)
+  check('D3 탭 넘기기 → 블로그 · 제목에 키워드', (await page.getByTestId('content-result').getAttribute('data-kind')) === 'blog' && /화성 정밀 금속부품/.test(await page.getByTestId('content-result-title').innerText()))
+  await page.getByTestId('content-pack-tab').nth(0).click()
+  await wait(300)
+  check('D4 다시 카톡으로 → 고친 글이 남아 있음', (await resultText(page)).includes('동탄2로 30'))
+  const n0 = (await items(page)).length
+  await page.getByTestId('content-pack-save-all').click()
+  await wait(900)
+  const its = await items(page)
+  const moved = its.filter((x) => x.data?.input?.situation === 'move' || x.input?.situation === 'move')
+  const savedTabs = await page.getByTestId('content-pack-tab').evaluateAll((els) => els.map((e) => e.getAttribute('data-saved')))
+  check('D5 묶음 모두 저장 → 보관함 3편 · 상황 표시 · 고친 카톡 그대로 · 탭마다 저장됨 · 단추 잠김', its.length - n0 === 3 && moved.length === 3 && JSON.stringify(its).includes('동탄2로 30') && savedTabs.every((x) => x === '1') && (await page.getByTestId('content-pack-save-all').isDisabled()), { added: its.length - n0, moved: moved.length, savedTabs })
+  check("D6 보관함 줄에 '이사 안내'", (await page.getByTestId('content-archive').innerText()).includes('이사 안내'))
+  // 말투 격식 → 묶음이 새 말투로
+  await page.locator('[data-testid="content-situation"][data-key="event"]').click()
+  await page.getByTestId('content-pack').waitFor()
+  await page.locator('[data-testid="content-tone"][data-tone="formal"]').click()
+  await wait(500)
+  const formal = await resultText(page)
+  check('D7 말투 격식 있게 → 묶음 글도 "입니다" · 묶음은 그대로', formal.includes('입니다') && !/예요\./.test(formal) && (await page.getByTestId('content-pack-tab').count()) === 3, formal.slice(0, 160))
+  await page.locator('[data-testid="content-tone"][data-tone="friendly"]').click()
+  await wait(300)
+
+  // 한 달 치 한 번에
+  await page.getByTestId('content-plan-toggle').click()
+  const before8 = (await items(page)).length
+  await page.getByTestId('content-plan-make-all').click()
+  await wait(1500)
+  const after8 = await items(page)
+  const planned = after8.filter((x) => (x.data?.input?.planDate ?? x.input?.planDate))
+  const states = await page.getByTestId('content-plan-slot').evaluateAll((els) => els.map((e) => e.getAttribute('data-state')))
+  check('D8 한 달 치 8편 한 번에 → 보관함에 올릴 날 8개 · 칸마다 만듦 · 올림 0/8', after8.length - before8 === 8 && planned.length === 8 && states.length === 8 && states.every((x) => x === 'made') && /올림 0\/8/.test(await page.getByTestId('content-plan-progress').innerText()), { added: after8.length - before8, states })
+  await page.getByTestId('content-plan-attach').getByTestId('tool-attach-quick').click()
+  await wait(900)
+  const tr = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((r) => r.id === 'cli_site')?.toolResults?.find((t) => t.title === '홍보 글 한 달 계획'))
+  check('D9 업체 일정에 올릴 날 걸기 → 기록에 계획 · 올릴 날 8개(달력 · 오늘)', tr?.deadlines?.length === 8 && tr.deadlines.every((d) => /^홍보 글 올리기 · /.test(d.title) && /^\d{4}-\d{2}-\d{2}$/.test(d.date)), tr?.deadlines?.slice(0, 2))
+  // 칸 누르면 그 글 → 올렸어요
+  await page.getByTestId('content-plan-slot').first().click()
+  await wait(400)
+  await page.getByTestId('content-posted').click()
+  await wait(600)
+  const st2 = await page.getByTestId('content-plan-slot').first().getAttribute('data-state')
+  check('D10 계획 칸 → 만든 글이 열림 · 올렸어요 → 칸이 올림 · 올림 1/8', st2 === 'posted' && /올림 1\/8/.test(await page.getByTestId('content-plan-progress').innerText()) && (await page.getByTestId('content-posted').getAttribute('aria-pressed')) === 'true', st2)
+  await page.locator('[data-testid="content-archive-filter"][data-value="posted"]').click()
+  const postedRows = await page.getByTestId('content-archive-item').count()
+  await page.locator('[data-testid="content-archive-filter"][data-value="todo"]').click()
+  const todoRows = await page.getByTestId('content-archive-item').count()
+  check('D11 보관함 거르기 — 올린 글 1 · 아직 안 올림 = 나머지', postedRows === 1 && todoRows === (await items(page)).length - 1, { postedRows, todoRows })
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.getByTestId('content-plan').waitFor()
+  check('D12 새로고침해도 진행 중 계획 · 올림 1/8 그대로', /올림 1\/8/.test(await page.getByTestId('content-plan-progress').innerText()))
+  // 보관함 줄에서 올림 되돌리기
+  await page.getByTestId('content-archive-posted').filter({ has: page.locator('svg') }).first().waitFor()
+  const pressed = page.locator('[data-testid="content-archive-posted"][aria-pressed="true"]')
+  await pressed.first().click()
+  await wait(500)
+  check('D13 보관함 줄에서 올림 → 아직(되돌리기)', (await pressed.count()) === 0 && /올림 0\/8/.test(await page.getByTestId('content-plan-progress').innerText()))
+  if (SHOTS) {
+    await page.getByTestId('content-plan-toggle').click()
+    await page.getByTestId('content-plan').screenshot({ path: `${SHOTS}/content-d208-plan.png` })
+  }
+  await page.getByTestId('content-to-site').click()
+  await page.waitForURL(/\/tools\/homepage\/build\?client=cli_site/)
+  check('D14 홍보 글 → 이 업체 홈페이지로 바로', /\/tools\/homepage\/build\?client=cli_site/.test(page.url()), page.url())
+  await ctx.close()
+}
+
+/* ================================================================== */
 /* 휴대폰 390 · 360                                                     */
 /* ================================================================== */
 for (const width of [390, 360]) {
@@ -343,6 +437,16 @@ for (const width of [390, 360]) {
   const over = () => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   check(`M${width} 첫 화면 가로 넘침 0`, (await over()) <= 0, await over())
   if (SHOTS && width === 390) await page.screenshot({ path: `${SHOTS}/content-m390-top.png`, fullPage: false })
+  // D-208 상황 예시 — 휴대폰은 6개 + 더 보기 · 묶음 탭 · 넘침 0
+  const visSit = await page.locator('[data-testid="content-situation"]:visible').count()
+  await page.getByTestId('content-situation-more').click()
+  const visSit2 = await page.locator('[data-testid="content-situation"]:visible').count()
+  await page.locator('[data-testid="content-situation"][data-key="holiday"]').click()
+  await page.getByTestId('content-pack').waitFor()
+  await wait(400)
+  const tabH = await page.getByTestId('content-pack-tab').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
+  check(`M${width} D-208 상황 6개 → 더 보기 12개 · 묶음 탭 44px · 가로 넘침 0`, visSit === 6 && visSit2 === 12 && tabH.every((h) => h >= 44) && (await over()) <= 0, { visSit, visSit2, tabH })
+  if (SHOTS && width === 390) await page.getByTestId('content-pack').screenshot({ path: `${SHOTS}/content-m390-pack.png` })
   await page.getByTestId('content-pick').nth(1).click()
   await page.getByTestId('content-result').waitFor()
   await wait(500)

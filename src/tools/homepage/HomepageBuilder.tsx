@@ -5,9 +5,12 @@
  * 그다음: 왼쪽 블록 목록(누르면 칸이 펼쳐짐 · 위아래 · 복사 · 숨기기 · 지우기) / 오른쪽 PC · 휴대폰 미리보기(블록을 누르면 왼쪽에서 열림).
  * 꾸밈(색 · 글꼴 · 모서리 · 검색 정보) · 점검(꼭 고칠 것 · 확인할 것) 탭. [HTML 내려받기] · [새 창으로 보기] · [업체 기록에 붙이기].
  * 휴대폰에서는 [고치기 | 미리보기] 를 번갈아 본다.
+ * D-208: 디자인 한 번에(스타일 6가지 — 꾸밈 + 블록 모양 + 바탕 흐름) · 홈페이지 점수 100점 + '이것만 하면 +n점'(누르면 그 블록) ·
+ *        업종 맞춤 블록 [넣기] · 같은 업체 홍보 글 만들기로 바로 가기.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowDown, ArrowUp, Check, CheckCircle2, Copy, Download, ExternalLink, EyeOff, Maximize2, Minimize2, Monitor, Plus, Redo2, RefreshCw, Smartphone, Trash2, Undo2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { AlertTriangle, ArrowDown, ArrowUp, Check, CheckCircle2, ChevronRight, Copy, Download, ExternalLink, EyeOff, Gauge, Maximize2, Minimize2, Monitor, PenLine, Plus, Redo2, RefreshCw, Smartphone, Sparkles, Trash2, Undo2 } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { BottomSheet, Badge } from '../../components/ui/primitives'
 import { ConfirmModal } from '../../components/ui/ConfirmModal'
@@ -18,6 +21,13 @@ import { generateId } from '../../storage/localStore'
 import {
   BLOCK_DEFS,
   CORNERS,
+  INDUSTRY_STYLE,
+  STYLE_PRESETS,
+  applyStylePreset,
+  blockSuggestions,
+  currentStyle,
+  paletteOf,
+  siteScore,
   FONTS,
   INDUSTRIES,
   MAX_TOTAL_IMAGE_CHARS,
@@ -45,6 +55,7 @@ import {
   withContactPhone,
   type BlockType,
   type IndustryKey,
+  type ScoreItem,
   type SiteBlock,
   type SiteDoc,
 } from '../../services/siteBuilder'
@@ -172,6 +183,8 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
   const checks = useMemo(() => (doc ? siteChecks(doc, { contactPhone: record.contactPhone }) : []), [doc, record.contactPhone])
   const must = checks.filter((c) => c.level === 'must').length
   const should = checks.filter((c) => c.level === 'should').length
+  const score = useMemo(() => (doc ? siteScore(doc) : null), [doc])
+  const suggestions = useMemo(() => (doc ? blockSuggestions(doc) : []), [doc])
 
   // 미리보기에서 블록을 누르면 → 블록 탭에서 그 블록을 연다(휴대폰은 고치기 화면으로)
   const selectBlock = useCallback(
@@ -222,6 +235,33 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
   const mismatch = detected !== doc.industry && detected !== 'general' && Boolean(heroBlock?.sample?.includes('title'))
   const visibleCount = doc.blocks.filter((b) => hasContent(b) && !(b.hidePc && b.hideMobile)).length
 
+  /** D-208 블록 하나 더하기(맨 아래 줄 · 연락처 바로 위) — 업종 맞춤 · 점수에서 */
+  const addBlock = (type: BlockType) => {
+    const b = newBlock(type, record, doc.industry, today, generateId())
+    const contact = doc.blocks.find((x) => x.type === 'contact')
+    const before = contact ? doc.blocks[doc.blocks.indexOf(contact) - 1] : undefined
+    change(insertBlock(doc, b, before?.id ?? selected, nowIso()))
+    setSelected(b.id)
+    setTab('blocks')
+    setBig(false)
+    if (phone) setPane('edit')
+    window.setTimeout(() => document.querySelector(`[data-block-row="${CSS.escape(b.id)}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 50)
+    showToast(`${blockDef(type)?.label ?? ''} 블록을 넣었어요 — 칸을 채우면 홈페이지에 나와요.`)
+  }
+
+  /** D-208 점수 항목 누르기 → 그 블록 · 꾸밈 탭 · 블록 더하기 */
+  const openScore = (it: ScoreItem) => {
+    if (it.open.blockId) selectBlock(it.open.blockId)
+    else if (it.open.tab) {
+      setTab(it.open.tab)
+      setBig(false)
+      if (phone) setPane('edit')
+    } else if (it.open.add) addBlock(it.open.add)
+  }
+
+  const nowStyle = currentStyle(doc)
+  const recommendStyle = INDUSTRY_STYLE[doc.industry]
+
   /* ---- 머리 도구줄 ---- */
   const toolbar = (
     <div className="flex flex-wrap items-center gap-2" data-testid="site-toolbar">
@@ -246,6 +286,9 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
         {must ? <AlertTriangle className="size-4" aria-hidden="true" /> : <CheckCircle2 className="size-4" aria-hidden="true" />}
         {must ? `꼭 고칠 것 ${must}` : should ? `확인할 것 ${should}` : '점검 통과'}
       </button>
+      <Link to={`/tools/content/build?client=${encodeURIComponent(record.id)}`} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 px-3 font-semibold text-slate-700 hover:bg-slate-50" data-testid="site-to-content">
+        <PenLine className="size-4" aria-hidden="true" /> 이 업체 홍보 글
+      </Link>
       <Button size="sm" onClick={onOpen} data-testid="site-open">
         <ExternalLink className="size-4" aria-hidden="true" /> 새 창으로 보기
       </Button>
@@ -268,6 +311,25 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
   /* ---- 블록 목록 ---- */
   const blocksTab = (
     <div className="flex flex-col gap-2" data-testid="site-blocks">
+      {suggestions.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50/60 p-3" data-testid="site-suggest">
+          <p className="t-sub flex items-center gap-1.5 font-semibold text-brand-900">
+            <Sparkles className="size-4 shrink-0 text-brand-600" aria-hidden="true" />
+            {industryDef(doc.industry).label}에 있으면 좋은 블록
+          </p>
+          {suggestions.map((sg) => (
+            <div key={sg.type} className="flex items-center gap-2" data-testid="site-suggest-item" data-type={sg.type}>
+              <span className="min-w-0 flex-1">
+                <span className="t-sub block font-semibold text-slate-800">{blockDef(sg.type)?.label}</span>
+                <span className="t-meta block break-keep text-slate-600">{sg.why}</span>
+              </span>
+              <Button size="sm" onClick={() => addBlock(sg.type)} data-testid="site-suggest-add">
+                <Plus className="size-4" aria-hidden="true" /> 넣기
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
       {doc.blocks.map((b, i) => {
         const def = blockDef(b.type)
         const open = selected === b.id
@@ -348,8 +410,50 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
   /* ---- 꾸밈 ---- */
   const styleTab = (
     <div className="flex flex-col gap-5" data-testid="site-style">
+      <fieldset className="flex flex-col gap-2" data-testid="site-presets">
+        <legend className="t-card mb-1 font-semibold text-slate-900">디자인 한 번에</legend>
+        <p className="t-meta -mt-1 break-keep text-slate-500">누르면 색 · 글꼴 · 모서리 · 블록 모양 · 바탕이 한꺼번에 바뀌어요. 글 · 사진 · 순서는 그대로 · 마음에 안 들면 [되돌리기].</p>
+        {/* 고치기 칸이 좁은 PC(lg)는 한 줄에 하나 — 설명이 잘게 꺾이지 않게 */}
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1">
+          {STYLE_PRESETS.map((sp) => {
+            const pal = paletteOf(sp.palette)
+            const on = nowStyle === sp.key
+            return (
+              <button
+                key={sp.key}
+                type="button"
+                aria-pressed={on}
+                onClick={() => {
+                  change(applyStylePreset(doc, sp.key, nowIso()))
+                  showToast(`'${sp.label}' 스타일로 바꿨어요 — 마음에 안 들면 [되돌리기] 를 눌러 주세요.`)
+                }}
+                className={`tap flex min-h-16 w-full min-w-0 items-center gap-3 border px-3 py-2 text-left ${on ? 'border-brand-500 ring-2 ring-brand-200' : 'border-slate-200 hover:border-slate-400'}`}
+                style={{ borderRadius: sp.corner === 'square' ? 6 : sp.corner === 'round' ? 14 : 22 }}
+                data-testid="site-preset"
+                data-value={sp.key}
+              >
+                <span className="flex h-11 w-14 shrink-0 flex-col overflow-hidden border border-slate-200" style={{ borderRadius: sp.corner === 'square' ? 3 : 10 }} aria-hidden="true">
+                  <span className="flex-[3]" style={{ background: `linear-gradient(135deg, ${pal.heroFrom}, ${pal.heroTo})` }} />
+                  <span className="flex flex-[2] items-center gap-1 px-1" style={{ background: pal.soft }}>
+                    <span className="h-1.5 flex-1" style={{ background: pal.primary, borderRadius: sp.corner === 'pill' ? 99 : 1 }} />
+                    <span className="h-1.5 w-2" style={{ background: pal.line }} />
+                  </span>
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className={`t-sub flex flex-wrap items-center gap-x-1.5 font-semibold text-slate-900 ${sp.font === 'serif' ? 'font-serif' : ''}`}>
+                    {sp.label}
+                    {sp.key === recommendStyle && <span className="t-meta rounded-full bg-brand-50 px-1.5 font-semibold text-brand-700">이 업종 추천</span>}
+                    {on && <Check className="size-4 text-brand-600" aria-label="지금 스타일" />}
+                  </span>
+                  <span className="t-meta block break-keep text-slate-500">{sp.hint}</span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </fieldset>
       <fieldset className="flex flex-col gap-2">
-        <legend className="t-card mb-1 font-semibold text-slate-900">색</legend>
+        <legend className="t-card mb-1 font-semibold text-slate-900">색만 바꾸기</legend>
         <div className="grid grid-cols-2 gap-2">
           {PALETTES.map((p) => (
             <button
@@ -504,6 +608,39 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
             맞는 견본으로 바꾸기
           </Button>
         </div>
+      )}
+      {score && (
+        <section className="flex flex-col gap-2 rounded-(--radius-panel) border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:gap-4 sm:p-4" data-testid="site-score" data-score={score.score}>
+          <div className="flex shrink-0 items-center gap-3">
+            <span className={`flex size-14 shrink-0 flex-col items-center justify-center rounded-full border-4 ${score.score >= 80 ? 'border-emerald-500 text-emerald-700' : score.score >= 50 ? 'border-amber-400 text-amber-700' : 'border-danger-400 text-danger-700'}`} aria-hidden="true">
+              <span className="text-lg leading-none font-bold tabular-nums">{score.score}</span>
+              <span className="t-meta leading-none">점</span>
+            </span>
+            <span className="min-w-0">
+              <span className="t-card flex items-center gap-1.5 font-semibold text-slate-900">
+                <Gauge className="size-4 text-slate-500" aria-hidden="true" />
+                홈페이지 점수 {score.score}점
+              </span>
+              <span className="t-meta block break-keep text-slate-500">손님이 믿고 연락하기까지 필요한 것 11가지(우리 기준 · 검색 순위 점수 아님)</span>
+            </span>
+          </div>
+          {score.next.length > 0 ? (
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5" data-testid="site-score-next">
+              <span className="t-meta font-semibold text-slate-600">이것만 하면</span>
+              <div className="flex flex-wrap gap-1.5">
+                {score.next.map((it) => (
+                  <button key={it.key} type="button" onClick={() => openScore(it)} title={it.how} className="tap t-sub inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-3 text-left font-semibold text-brand-800 hover:border-brand-400" data-testid="site-score-item" data-key={it.key}>
+                    <span className="t-meta shrink-0 rounded-full bg-brand-600 px-1.5 font-bold text-white tabular-nums">+{it.points}</span>
+                    <span className="min-w-0 break-keep">{it.label}</span>
+                    <ChevronRight className="size-4 shrink-0" aria-hidden="true" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="t-sub font-semibold text-emerald-700">다 갖췄어요 — 내려받아 올려도 좋아요.</p>
+          )}
+        </section>
       )}
       {phone ? (
         <>

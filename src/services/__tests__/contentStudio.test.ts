@@ -2,6 +2,7 @@
  * D-203 홍보 글 만들기 — 업체 홍보 정보(사실만) · 키워드 · 주제 · 7가지 형식 × 9업종 × 말투 × 다른 안 · 지어내지 않기 ·
  * 담당자 휴대폰 안 넣기 · 말투 바꾸기 표 · 점검(대괄호 · 광고 규정 말) · 카톡 (광고) · 먼저 만들 것 · 보관함(지문 · 판 · 읽기).
  * D-207: 차별점 · 망설이는 점 · 이 칸만 채우면 · 체험단 가이드(대가 표시) · 사진 자리 · 쇼츠 길이 · 광고 유형 5 · 검색량 정리 · 한 달 계획.
+ * D-208: 상황 예시 12가지 묶음(지어내지 않기 · (광고) · 1:1 · 말투 · 지금 때) · 한 달 치 한 번에(같은 글 없음 · 올릴 날) · 진행 중 계획 되찾기 · 올렸어요.
  * SHOW=1 이면 견본 글을 찍는다(눈으로 보기).
  */
 import { normalizeClientOps } from '../clientOpsService'
@@ -23,6 +24,15 @@ import {
   makeDraft,
   mainKeyword,
   monthPlan,
+  monthPlanFrom,
+  activePlan,
+  planDrafts,
+  planSlotStates,
+  withPosted,
+  situationPack,
+  situationsFor,
+  SITUATION_KEYS,
+  AD_NOTE,
   nextVersion,
   normalizeItem,
   normalizeOverrides,
@@ -265,6 +275,93 @@ const libBad = INDUSTRIES.flatMap((k) => {
 })
 check('C45 업종 견본 10개(디자인 · 광고 · 간판 포함) — 정보 5 · 기준 5 · 순서 3+ · 질문 3+ · 마무리에 회사 이름 자리 · 광고 규정 말 0', libBad.length === 0 && INDUSTRIES.length === 10, libBad)
 
+/* ---------------- D-208 상황 예시 · 한 달 치 · 올렸어요 ---------------- */
+const HOLI = [{ date: '2026-12-25', name: '성탄절' }, { date: '2027-01-01', name: '신정' }]
+const sitBad: unknown[] = []
+const sitResidual: unknown[] = []
+let sitMade = 0
+for (const rec of [full, empty, fresh]) {
+  for (const ind of INDUSTRIES) {
+    for (const tone of ['friendly', 'formal'] as const) {
+      const p = buildProfile(rec, today, { industry: ind, tone }).profile
+      for (const key of SITUATION_KEYS) {
+        const sp = situationPack(p, key, today, HOLI)
+        if (!sp.items.length || sp.items.length !== sp.situation.tabs.length || sp.items.map((x) => x.tab).join() !== sp.situation.tabs.join()) sitBad.push({ ind, key, tabs: sp.situation.tabs, got: sp.items.map((x) => x.tab) })
+        for (const { draft: d } of sp.items) {
+          sitMade += 1
+          const text = plainText(d.kind, d.blocks)
+          if (!d.title.trim() || !text.trim() || d.input.situation !== key || /undefined|null|NaN|\[object/.test(text + d.title) || /\bAI\b/.test(text) || text.includes('010-9999-8888') || text.includes('010-1111-2222') || /을\(를\)|이\(가\)|은\(는\)/.test(text) || /\s{3,}\S/.test(text.replace(/\n/g, ''))) sitBad.push({ ind, key, tone, title: d.title, text: text.slice(0, 160) })
+          if (tone === 'formal') {
+            const left = (text + '\n' + d.title).match(/[가-힣]+요(?=[.!\n]|$)/g)?.filter((w) => !/세요$/.test(w)) ?? []
+            if (left.length) sitResidual.push({ ind, key, left: [...new Set(left)] })
+          }
+        }
+      }
+    }
+  }
+}
+check(`C59 상황 12 × 업종 10 × 말투 2 × 업체 3 = ${sitMade}편 — 탭 순서 · 빈 글 · undefined · 'AI' · 담당자 휴대폰 · 어색한 조사 0 · 상황 표시`, sitBad.length === 0 && sitMade > 1500, sitBad.slice(0, 3))
+check('C60 상황 묶음도 격식 있게 — 문장 끝에 남은 "~요." 0', sitResidual.length === 0, sitResidual.slice(0, 5))
+const packOf = (p: ContentProfile, key: (typeof SITUATION_KEYS)[number], d = today) => situationPack(p, key, d, HOLI)
+const allPacks = SITUATION_KEYS.map((k) => packOf(fp7, k))
+const kakaos = allPacks.flatMap((sp) => sp.items.filter((x) => x.draft.kind === 'kakao'))
+const oneToOne = kakaos.filter((x) => x.tab.includes('1:1'))
+const broadcast = kakaos.filter((x) => !x.tab.includes('1:1'))
+check('C61 여러 분께 보내는 카톡은 (광고)로 시작 + 광고 안내 · 1:1 은 (광고) 없이 1:1 안내', broadcast.length >= 9 && broadcast.every((x) => x.draft.blocks[0].text.startsWith('(광고)') && x.draft.notes.includes(AD_NOTE)) && oneToOne.length === 2 && oneToOne.every((x) => !x.draft.blocks[0].text.includes('(광고)') && x.draft.notes.some((n) => n.includes('1:1'))), broadcast.filter((x) => !x.draft.blocks[0].text.startsWith('(광고)')).map((x) => x.draft.title))
+const textOf = (key: (typeof SITUATION_KEYS)[number], p = fp7) => packOf(p, key).items.map((x) => plainText(x.draft.kind, x.draft.blocks)).join('\n')
+const holes: [(typeof SITUATION_KEYS)[number], string[]][] = [
+  ['open', ['[문 연 날짜]']],
+  ['newItem', ['[새 상품 · 서비스 이름]', '[가격']],
+  ['event', ['[혜택 내용', '[시작일]', '[끝나는 날]', '[대상]']],
+  ['holiday', ['[쉬는 날짜]', '[다시 여는 날]']],
+  ['price', ['[지금 가격]', '[새 가격]', '[바뀌는 날짜]']],
+  ['move', ['[새 주소]', '[옮기는 날짜]']],
+  ['award', ['[받은 인증 · 상 이름]', '[주는 곳]']],
+  ['hiring', ['[급여', '[마감일]', '[직무']],
+  ['review', ['[후기 남기는 곳', '[고객 이름]']],
+]
+const holeBad = holes.filter(([k, hs]) => !hs.every((h) => textOf(k).includes(h))).map(([k]) => k)
+check('C62 모르는 것은 지어내지 않고 [대괄호] — 문 연 날 · 새 상품 · 혜택 · 쉬는 날 · 가격 · 새 주소 · 인증 이름 · 급여 · 후기 자리', holeBad.length === 0, holeBad)
+const openK = packOf(fp7, 'open').items[0].draft.blocks[0].text
+check('C63 업체 사실은 그대로 — 차별점 · 대표 전화 · 판매 채널(문 연 소식) · 기록(인증 · 상 블로그) · 근무지 주소(채용)', openK.includes('시공 뒤 1년 무상 점검') && openK.includes('031-123-4567') && openK.includes('네이버 예약') && textOf('award').includes('벤처기업 인증') && textOf('hiring').includes('경기도 화성시 동탄산단 6길 15'), openK)
+const hp = buildProfile(full, today, { industry: 'health' }).profile
+const hHire = packOf(hp, 'hiring').items
+const hEvent = packOf(hp, 'event').items
+check('C64 채용 글 — 성별 · 나이 제한 금지 · 급여 실제와 같게(법 이름) · 업종 광고 주의는 안 붙임 / 행사 글에는 업종 주의 · 할인 표시 안내', hHire.every((x) => x.draft.notes.some((n) => n.includes('남녀고용평등법') && n.includes('채용절차법')) && !x.draft.notes.includes(CONTENT_LIB.health.caution as string)) && hEvent.every((x) => x.draft.notes.includes(CONTENT_LIB.health.caution as string) && x.draft.notes.some((n) => n.includes('할인'))), hHire[0].draft.notes)
+const hCase = packOf(hp, 'caseDone')
+const mCase = packOf(fp7, 'caseDone')
+check('C65 병의원 · 뷰티는 사례 대신 진행 과정 소개(체험담 없음) · 제조는 사례 3편(블로그 · 영상 · 기록 증명 카드)', hCase.situation.label === '진행 과정을 소개해요' && hCase.items.every((x) => x.draft.input.topicType !== 'case') && mCase.items.length === 3 && mCase.items.every((x) => x.draft.input.topicType === 'case') && mCase.items[2].draft.input.adType === 'proof', [hCase.situation.label, mCase.items.map((x) => x.draft.input.topicType)])
+const sitNow = (p: ContentProfile, d: string) => Object.fromEntries(situationsFor(p, d, HOLI).map((x) => [x.key, x.now]))
+const nNew = sitNow(buildProfile(fresh, today).profile, today)
+const nDec = sitNow(fp, '2026-12-10')
+const nOct = sitNow(fp, today)
+check('C66 지금 때 — 올해 문 연 업체 → 문 연 소식 · 공휴일 3주 안 → 쉬는 날(성탄절) · 12월 → 감사 인사 · 이번 달 이야기 달 · 10월 16일엔 쉬는 날 없음', !!nNew.open && !nOct.open && nDec.holiday === '12월 25일 성탄절' && !nOct.holiday && !!nDec.thanks && !nOct.thanks && nOct.season.startsWith('11월'), { nNew, nDec, nOct })
+const cardsAll = allPacks.flatMap((sp) => sp.items.filter((x) => x.draft.kind === 'cards' && !x.draft.input.topicType))
+const shortsNew = packOf(fp7, 'newItem').items.find((x) => x.draft.kind === 'shorts')!.draft
+check('C67 카드뉴스 5장 + 올릴 때 쓰는 글 · 짧은 영상 27초(점검이 읽음) · 같은 상황 = 같은 묶음', cardsAll.length >= 6 && cardsAll.every((x) => x.draft.blocks.filter((b) => /^\d장/.test(b.label)).length === 5 && x.draft.blocks.at(-1)!.label === '올릴 때 쓰는 글') && draftChecks('shorts', shortsNew.blocks, fp7.industry).some((c) => c.key === 'dur' && c.text.includes('27초')) && JSON.stringify(packOf(fp7, 'move')) === JSON.stringify(packOf(fp7, 'move')), cardsAll.map((x) => x.draft.title))
+const blogsKw = allPacks.flatMap((sp) => sp.items.filter((x) => x.draft.kind === 'blog' && x.draft.input.keyword && !x.draft.input.topicType))
+const kwBad = blogsKw.filter((x) => draftChecks('blog', x.draft.blocks, fp7.industry, x.draft.input.keyword).some((c) => c.key === 'kw-title' || c.key === 'kw-first'))
+check('C68 상황 블로그 — 제목 · 첫 문단에 키워드(점검 알림 없음) · 채용 글은 키워드 점검 안 함', blogsKw.length >= 5 && kwBad.length === 0 && !packOf(fp7, 'hiring').items[0].draft.input.keyword, kwBad.map((x) => x.draft.title))
+
+const slots2 = monthPlan(fp, today, 2)
+const slots4 = monthPlan(fp, today, 4)
+const pd2 = planDrafts(fp, slots2, today)
+const pd4 = planDrafts(fp, slots4, today)
+const uniq = (ds: typeof pd4) => new Set(ds.map((d) => contentHash(d.kind, d.blocks))).size === ds.length
+check('C69 한 달 치 한 번에 — 주 2회 8편 · 주 4회 16편 · 같은 글 0(같은 형식 · 주제는 다른 안) · 편마다 올릴 날', pd2.length === 8 && pd4.length === 16 && uniq(pd2) && uniq(pd4) && pd4.every((d, i) => d.input.planDate === slots4[i].date && d.kind === slots4[i].kind), pd4.map((d) => `${d.input.planDate} ${d.kind} v${d.input.variant}`))
+const asItems = (ds: typeof pd4) => ds.map((d, i): ContentItem => ({ id: `p${i}`, kind: d.kind, title: d.title, blocks: d.blocks, input: d.input, rootId: `p${i}`, version: 1, favorite: false, hash: contentHash(d.kind, d.blocks), createdAt: '2026-10-16T01:00:00Z', updatedAt: '2026-10-16T01:00:00Z' }))
+const its2 = asItems(pd2)
+const posted2 = [...its2.filter((x) => x.rootId !== 'p0' && x.rootId !== 'p3'), ...withPosted(its2, 'p0', '2026-10-20T09:00:00Z'), ...withPosted(its2, 'p3', '2026-10-30T09:00:00Z')]
+const st2 = planSlotStates(slots2, posted2)
+const run2 = activePlan(posted2, '2026-10-29')
+const run4 = activePlan(asItems(pd4), today)
+check('C70 계획 칸 형편 — 만듦 8 · 올림 2 · 날이 지나도(10/29) 같은 계획(월요일 · 주 2회 · 같은 날짜) · 주 4회 알아봄 · 끝난 계획은 null · 날짜 없는 글뿐이면 null', st2.filter((x) => x.item).length === 8 && st2.filter((x) => x.posted).length === 2 && st2[0].posted && st2[3].posted && run2?.monday === '2026-10-19' && run2.perWeek === 2 && monthPlanFrom(fp, run2.monday, 2, '2026-10-29').map((x) => x.date).join() === slots2.map((x) => x.date).join() && run4?.perWeek === 4 && activePlan(posted2, '2026-11-30') === null && activePlan([item], today) === null, { run2, run4, st: st2.map((x) => [!!x.item, x.posted]) })
+const itS = { ...item, id: 's1', rootId: 's1', postedAt: '2026-10-20T09:00:00Z', input: { ...item.input, situation: 'move', planDate: '2026-10-20' } }
+const backS = normalizeItem('s1', itemData(itS))
+const badS = normalizeItem('s1', { ...itemData(itS), postedAt: 123, input: { ...itS.input, situation: 'hack', planDate: '2026/10/20' } })
+const chain = latestByRoot([{ ...itS, version: 1 }, { ...itS, id: 's2', version: 2, postedAt: undefined }])
+check('C71 보관함에 상황 · 올릴 날 · 올린 때가 남음 · 이상한 값은 버림 · 고친 판에도 올림 표시가 이어짐', backS?.input.situation === 'move' && backS.input.planDate === '2026-10-20' && backS.postedAt === '2026-10-20T09:00:00Z' && badS?.input.situation === undefined && badS?.input.planDate === undefined && badS?.postedAt === undefined && chain[0].item.id === 's2' && chain[0].item.postedAt === '2026-10-20T09:00:00Z', { backS: backS?.input, chain: chain[0].item.postedAt })
+
 if (SHOW) {
   const show = (p: ContentProfile, kind: ContentKind, extra: Record<string, unknown> = {}) => {
     const t = topicsFor(p, '', today)
@@ -282,6 +379,9 @@ if (SHOW) {
   show(fp, 'place')
   show(np, 'place')
   show(buildProfile(fresh, today).profile, 'blog', { t: 2 })
+  for (const [pp, key] of [[fp7, 'open'], [fp7, 'event'], [{ ...fp7, tone: 'formal' }, 'move'], [fp7, 'hiring'], [np, 'review'], [fp7, 'thanks']] as const) {
+    for (const { tab, draft: d } of situationPack(pp, key, today).items) console.log(`\n===== 상황 ${key} · ${tab} · ${pp.tone} · ${d.title}\n${plainText(d.kind, d.blocks)}\n-- notes: ${d.notes.join(' / ')}`)
+  }
 }
 
 console.log(`\n홍보 글 만들기: ${passed} passed, ${failed} failed`)

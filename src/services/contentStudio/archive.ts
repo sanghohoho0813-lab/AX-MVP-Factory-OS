@@ -5,8 +5,8 @@
  * DB 를 새로 만들지 않는다(이미 있는 module_data 표).
  * 같은 글을 두 번 넣지 않는다(지문 hash). 고쳐서 저장하면 원래 글을 지우지 않고 새 판(version)을 같은 사슬(rootId)에 단다.
  */
-import { AD_TYPES, CONTENT_KINDS, plainText, type AdType, type BlogType, type ContentKind, type DraftBlock, type KakaoPurpose, type ShortLen, type TopicType } from './generate'
-import type { Tone } from './tone'
+import { AD_TYPES, CONTENT_KINDS, plainText, type AdType, type ContentKind, type DraftBlock, type DraftInput, type KakaoPurpose, type TopicType } from './generate'
+import { SITUATION_KEYS } from './situations'
 
 export const CONTENT_MODULE = 'content'
 export const ITEMS_BUCKET = 'items'
@@ -17,11 +17,13 @@ export interface ContentItem {
   kind: ContentKind
   title: string
   blocks: DraftBlock[]
-  input: { keyword?: string; topicType?: TopicType; topicTitle?: string; pages?: 5 | 7; purpose?: KakaoPurpose; variant: number; tone: Tone; blogType?: BlogType; shortLen?: ShortLen; adType?: AdType }
+  input: DraftInput
   /** 처음 글의 id — 고친 판은 모두 같은 rootId */
   rootId: string
   version: number
   favorite: boolean
+  /** D-208 올렸어요 — 업체가 실제로 올린 때(ISO). 없으면 아직 */
+  postedAt?: string
   hash: string
   createdAt: string
   updatedAt: string
@@ -72,6 +74,9 @@ export function normalizeItem(id: string, raw: unknown, createdAt = '', updatedA
     ...(inp.blogType === 'brand' || inp.blogType === 'review' ? { blogType: inp.blogType } : {}),
     ...(inp.shortLen === '20-30' || inp.shortLen === '30-60' ? { shortLen: inp.shortLen } : {}),
     ...(typeof inp.adType === 'string' && (AD_TYPES as string[]).includes(inp.adType) ? { adType: inp.adType as AdType } : {}),
+    // D-208
+    ...(typeof inp.situation === 'string' && (SITUATION_KEYS as string[]).includes(inp.situation) ? { situation: inp.situation } : {}),
+    ...(typeof inp.planDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(inp.planDate) ? { planDate: inp.planDate } : {}),
   }
   return {
     id,
@@ -82,6 +87,7 @@ export function normalizeItem(id: string, raw: unknown, createdAt = '', updatedA
     rootId: typeof r.rootId === 'string' && r.rootId ? r.rootId : id,
     version: typeof r.version === 'number' && r.version >= 1 ? Math.floor(r.version) : 1,
     favorite: r.favorite === true,
+    ...(typeof r.postedAt === 'string' && /^\d{4}-\d{2}-\d{2}/.test(r.postedAt) ? { postedAt: r.postedAt.slice(0, 40) } : {}),
     hash: typeof r.hash === 'string' && r.hash ? r.hash : contentHash(kind, blocks),
     createdAt: typeof r.createdAt === 'string' && r.createdAt ? r.createdAt : createdAt,
     updatedAt: updatedAt || createdAt,
@@ -101,7 +107,8 @@ export function latestByRoot(items: readonly ContentItem[]): { item: ContentItem
   return [...byRoot.values()]
     .map((list) => {
       const sorted = [...list].sort((a, b) => b.version - a.version || b.createdAt.localeCompare(a.createdAt))
-      return { item: { ...sorted[0], favorite: list.some((x) => x.favorite) }, versions: list.length }
+      const posted = list.map((x) => x.postedAt).filter((x): x is string => !!x).sort().pop()
+      return { item: { ...sorted[0], favorite: list.some((x) => x.favorite), ...(posted ? { postedAt: posted } : {}) }, versions: list.length }
     })
     .sort((a, b) => Number(b.item.favorite) - Number(a.item.favorite) || b.item.createdAt.localeCompare(a.item.createdAt))
 }
@@ -117,4 +124,31 @@ export function nextVersion(items: readonly ContentItem[], base: ContentItem, bl
   const chain = items.filter((x) => x.rootId === base.rootId)
   const version = Math.max(base.version, ...chain.map((x) => x.version)) + 1
   return { ...base, id, blocks, version, hash: contentHash(base.kind, blocks), favorite: false, createdAt: now, updatedAt: now }
+}
+
+/** D-208 계획 칸 하나의 형편 — 만든 글(사슬의 새 판) · 올렸는지 */
+export interface PlanSlotState {
+  item: ContentItem | null
+  posted: boolean
+}
+
+/** 계획 칸마다 보관함에서 같은 날 · 같은 형식 글을 찾는다 */
+export function planSlotStates(slots: readonly { date: string; kind: ContentKind }[], items: readonly ContentItem[]): PlanSlotState[] {
+  const latest = latestByRoot(items).map((r) => r.item)
+  const used = new Set<string>()
+  return slots.map((sl) => {
+    const it = latest.find((x) => x.input.planDate === sl.date && x.kind === sl.kind && !used.has(x.rootId)) ?? null
+    if (it) used.add(it.rootId)
+    return { item: it, posted: !!it?.postedAt }
+  })
+}
+
+/** 올렸어요 / 아직 — 사슬 전체에 같은 표시(새 판을 만들어도 남게) */
+export function withPosted(items: readonly ContentItem[], rootId: string, at: string | null): ContentItem[] {
+  return items
+    .filter((x) => x.rootId === rootId)
+    .map((x) => {
+      const { postedAt: _p, ...rest } = x
+      return at ? { ...rest, postedAt: at } : rest
+    })
 }

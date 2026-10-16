@@ -17,6 +17,7 @@ import {
   normalizeItem,
   normalizeOverrides,
   sameContent,
+  withPosted,
   type ContentItem,
   type Draft,
   type DraftBlock,
@@ -38,6 +39,10 @@ export interface ContentStore {
   /** 고친 글을 같은 사슬의 새 판으로 */
   saveVersion: (base: ContentItem, blocks: DraftBlock[]) => Promise<ContentItem | null>
   toggleFavorite: (rootId: string) => Promise<boolean>
+  /** D-208 여러 편을 한 번에(상황 묶음 · 한 달 치) — 같은 글은 건너뛴다. 계획 날짜가 없는 같은 글에는 날짜만 단다 */
+  addMany: (ds: Draft[]) => Promise<{ items: (ContentItem | null)[]; added: number; dup: number; failed: number }>
+  /** D-208 올렸어요 / 아직 */
+  setPosted: (rootId: string, on: boolean) => Promise<boolean>
   removeChain: (rootId: string) => Promise<boolean>
 }
 
@@ -196,5 +201,46 @@ export function useContentStore(clientId: string | null, workspaceId: string | n
     [workspaceId, queue],
   )
 
-  return { status, overrides, items, site, saveOverrides, addDraft, saveVersion, toggleFavorite, removeChain }
+  const addMany = useCallback(
+    (ds: Draft[]) =>
+      queue(async () => {
+        const out = { items: [] as (ContentItem | null)[], added: 0, dup: 0, failed: 0 }
+        if (!clientId) return { ...out, items: ds.map(() => null), failed: ds.length }
+        for (const d of ds) {
+          try {
+            const dup = sameContent(itemsRef.current, d.kind, d.blocks)
+            if (dup) {
+              out.dup += 1
+              const plan = d.input.planDate
+              out.items.push(plan && !dup.input.planDate ? await put({ ...dup, input: { ...dup.input, planDate: plan } }) : dup)
+              continue
+            }
+            const id = generateId()
+            const now = nowIso()
+            out.items.push(await put({ id, kind: d.kind, title: d.title, blocks: d.blocks, input: d.input, rootId: id, version: 1, favorite: false, hash: contentHash(d.kind, d.blocks), createdAt: now, updatedAt: now }))
+            out.added += 1
+          } catch {
+            out.items.push(null)
+            out.failed += 1
+          }
+        }
+        return out
+      }),
+    [clientId, put, queue],
+  )
+
+  const setPosted = useCallback(
+    (rootId: string, on: boolean) =>
+      queue(async () => {
+        try {
+          for (const it of withPosted(itemsRef.current, rootId, on ? nowIso() : null)) await put(it)
+          return true
+        } catch {
+          return false
+        }
+      }),
+    [put, queue],
+  )
+
+  return { status, overrides, items, site, saveOverrides, addDraft, saveVersion, toggleFavorite, removeChain, addMany, setPosted }
 }

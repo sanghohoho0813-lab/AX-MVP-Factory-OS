@@ -120,20 +120,38 @@ export interface DraftBlock {
   hint?: string
 }
 
+/** 글을 다시 만들 때 쓰는 요청 — 보관함에도 같이 남는다 */
+export interface DraftInput {
+  keyword?: string
+  topicType?: TopicType
+  topicTitle?: string
+  pages?: 5 | 7
+  purpose?: KakaoPurpose
+  variant: number
+  tone: Tone
+  blogType?: BlogType
+  shortLen?: ShortLen
+  adType?: AdType
+  /** D-208 상황 예시 묶음에서 만든 글 */
+  situation?: string
+  /** D-208 한 달 계획에서 올릴 날(YYYY-MM-DD) */
+  planDate?: string
+}
+
 export interface Draft {
   kind: ContentKind
   title: string
   blocks: DraftBlock[]
   /** 화면에만 보이는 안내(복사에는 안 들어감) */
   notes: string[]
-  input: { keyword?: string; topicType?: TopicType; topicTitle?: string; pages?: 5 | 7; purpose?: KakaoPurpose; variant: number; tone: Tone; blogType?: BlogType; shortLen?: ShortLen; adType?: AdType }
+  input: DraftInput
 }
 
 /* ------------------------------------------------------------------ */
 /* 작은 도구                                                             */
 /* ------------------------------------------------------------------ */
 
-const at = <T>(list: readonly T[], n: number): T => list[((n % list.length) + list.length) % list.length]
+export const at = <T>(list: readonly T[], n: number): T => list[((n % list.length) + list.length) % list.length]
 
 /** 순서를 n 만큼 돌린다 */
 function rotate<T>(list: readonly T[], n: number): T[] {
@@ -142,14 +160,14 @@ function rotate<T>(list: readonly T[], n: number): T[] {
   return [...list.slice(k), ...list.slice(0, k)]
 }
 
-const j = (word: string, pair: '은/는' | '이/가' | '을/를' | '과/와' | '으로/로' | '이에요/예요') => `${word}${particle(word, pair)}`
+export const j = (word: string, pair: '은/는' | '이/가' | '을/를' | '과/와' | '으로/로' | '이에요/예요') => `${word}${particle(word, pair)}`
 
-function firstSentence(text: string): string {
+export function firstSentence(text: string): string {
   const m = /^(.+?[.!?])(\s|$)/.exec(text.trim())
   return (m ? m[1] : text).trim()
 }
 
-const clean = (s: string) => s.replace(/\s+/g, ' ').trim()
+export const clean = (s: string) => s.replace(/\s+/g, ' ').trim()
 
 export function monthOf(today: string): number {
   const m = /^\d{4}-(\d{2})/.exec(today)
@@ -279,7 +297,7 @@ interface Point {
   body: string
 }
 
-function introSentence(p: ContentProfile): string {
+export function introSentence(p: ContentProfile): string {
   const lib = contentLib(p.industry)
   const where = [p.since ? `${p.since}년에` : '', p.region ? `${p.region}에서` : ''].filter(Boolean).join(' ')
   return clean(`${j(p.company, '은/는')} ${where ? `${where} 문을 연 ` : ''}${p.item} ${j(lib.placeNoun, '이에요/예요')}.`)
@@ -320,9 +338,9 @@ function pointsFor(p: ContentProfile, topic: Topic, variant: number): Point[] {
 /* 형식별                                                               */
 /* ------------------------------------------------------------------ */
 
-const DIFFER_HOLE = '[다른 곳과 다른 점 한 가지 — 업체와 확인해 적어 주세요]'
+export const DIFFER_HOLE = '[다른 곳과 다른 점 한 가지 — 업체와 확인해 적어 주세요]'
 
-function contactLines(p: ContentProfile): string {
+export function contactLines(p: ContentProfile): string {
   return [
     `전화 ${p.phone || '[대표 전화]'}`,
     p.channel ? `구매 · 예약 ${p.channel}` : '',
@@ -351,9 +369,9 @@ function ctaBlock(p: ContentProfile, kw: string): DraftBlock {
  * 사진 자리 — [대괄호] 가 아니라 (사진 자리: …) 로 적는다. 채울 글이 아니라 사진을 넣을 곳이라 점검의 '꼭' 에 세지 않는다.
  */
 const PHOTO_PREFIX = '(사진 자리:'
-const photo = (what: string): DraftBlock => ({ label: '', text: `${PHOTO_PREFIX} ${what})`, hint: '사진 자리' })
+export const photo = (what: string): DraftBlock => ({ label: '', text: `${PHOTO_PREFIX} ${what})`, hint: '사진 자리' })
 
-function visualsOf(lib: ContentLib): string[] {
+export function visualsOf(lib: ContentLib): string[] {
   return lib.visual
     .split(' · ')
     .map((v) => v.trim())
@@ -618,7 +636,7 @@ function cardsDraft(p: ContentProfile, topic: Topic, variant: number, pages: 5 |
   return [{ ...cover, hint: AD_TYPE_LABEL[adType] }, ...inner, last, { label: '올릴 때 쓰는 글', text: caption }]
 }
 
-const AD_NOTE = '여러 사람에게 보내는 소식은 광고로 봐요 — 맨 앞에 (광고)를 넣었어요. 받는 분이 거부할 방법(채널 차단)을 알리고, 따로 동의받지 않았다면 밤 9시 ~ 아침 8시에는 보내지 마세요.'
+export const AD_NOTE = '여러 사람에게 보내는 소식은 광고로 봐요 — 맨 앞에 (광고)를 넣었어요. 받는 분이 거부할 방법(채널 차단)을 알리고, 따로 동의받지 않았다면 밤 9시 ~ 아침 8시에는 보내지 마세요.'
 
 function kakaoDraft(p: ContentProfile, purpose: KakaoPurpose, today: string, variant: number): { blocks: DraftBlock[]; notes: string[] } {
   const lib = contentLib(p.industry)
@@ -890,7 +908,11 @@ function addDays(iso: string, n: number): string {
 /** 다음 월요일부터 4주 — 주 2회는 화 · 금, 주 4회는 월 · 화 · 목 · 금 */
 export function monthPlan(p: ContentProfile, today: string, perWeek: 2 | 4): PlanSlot[] {
   const dow = new Date(`${today}T00:00:00Z`).getUTCDay()
-  const monday = addDays(today, ((8 - dow) % 7) || 7)
+  return monthPlanFrom(p, addDays(today, ((8 - dow) % 7) || 7), perWeek, today)
+}
+
+/** D-208 정해 둔 월요일부터 4주(진행 중인 계획을 날이 지나도 같은 칸으로 보이게) */
+export function monthPlanFrom(p: ContentProfile, monday: string, perWeek: 2 | 4, today: string): PlanSlot[] {
   const days = perWeek === 2 ? [1, 4] : [0, 1, 3, 4]
   const seq = perWeek === 2 ? PLAN_2 : PLAN_2.flatMap((x, i) => [x, PLAN_4_EXTRA[i]])
   const kw = mainKeyword(p)
@@ -907,4 +929,36 @@ export function monthPlan(p: ContentProfile, today: string, perWeek: 2 | 4): Pla
     }
   }
   return out
+}
+
+/**
+ * D-208 한 달 치 한 번에 — 계획 칸마다 글 한 편. 같은 형식 · 주제가 또 나오면 다른 안(variant)으로 바꿔 같은 글이 두 번 생기지 않게 한다.
+ * 글마다 올릴 날(planDate)을 남겨 계획 칸에 '만듦 · 올림' 을 표시한다.
+ */
+export function planDrafts(p: ContentProfile, slots: readonly PlanSlot[], today: string): Draft[] {
+  const kw = mainKeyword(p)
+  const seen = new Map<string, number>()
+  return slots.map((sl) => {
+    const key = `${sl.kind}|${sl.topicType ?? ''}|${sl.purpose ?? ''}`
+    const variant = seen.get(key) ?? 0
+    seen.set(key, variant + 1)
+    const topic = sl.topicType ? topicsFor(p, kw, today, variant).find((t) => t.type === sl.topicType) : undefined
+    const d = makeDraft(p, { kind: sl.kind, keyword: kw, topic, purpose: sl.purpose, variant }, today)
+    return { ...d, input: { ...d.input, planDate: sl.date } }
+  })
+}
+
+/**
+ * D-208 진행 중인 계획 — 보관함 글의 올릴 날(planDate)로 되찾는다. 마지막 날이 지났으면 null(새 계획을 짤 때).
+ * 시작 = 가장 이른 날이 있는 주의 월요일 · 월요일이나 목요일 글이 있으면 주 4회.
+ */
+export function activePlan(items: readonly { input: { planDate?: string } }[], today: string): { monday: string; perWeek: 2 | 4 } | null {
+  const dates = items.map((x) => x.input.planDate).filter((d): d is string => !!d)
+  if (!dates.length) return null
+  const max = dates.reduce((a, b) => (a > b ? a : b))
+  if (max < today) return null
+  const win = dates.filter((d) => d > addDays(max, -28))
+  const min = win.reduce((a, b) => (a < b ? a : b))
+  const dow = (d: string) => new Date(`${d}T00:00:00Z`).getUTCDay()
+  return { monday: addDays(min, -((dow(min) + 6) % 7)), perWeek: win.some((d) => dow(d) === 1 || dow(d) === 4) ? 4 : 2 }
 }
