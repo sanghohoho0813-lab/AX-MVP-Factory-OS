@@ -545,7 +545,9 @@ function feedItems(n) {
   check('다시 열어도: 체크 남음 2/5', /낼 서류 2\/5/.test(await page.getByTestId('apply-count').innerText()))
 
   await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
-  await page.waitForTimeout(500)
+  // 맞춤 추천 탭은 따로 불러오는 화면(0.8~1.9초) — 결정 목록이 뜰 때까지 기다린다(D-204 flow 와 같은 고침)
+  await page.getByTestId('smart-decisions').waitFor({ timeout: 8000 }).catch(() => {})
+  await page.waitForTimeout(300)
   const smart = await page.locator('main').innerText()
   check('맞춤 추천: 다음 행동 맨 위에 \'서류 3가지 받기 · 5일 남음\'', /해외인증 지원사업 공고 — 서류 3가지 받기 · 5일 남음/.test(smart), smart.split('\n').filter((l) => /받기|확인하기|정리하기/.test(l)).slice(0, 6))
 
@@ -599,7 +601,9 @@ function feedItems(n) {
   await page.locator('[data-testid="apply-stage"][data-stage="selected"]').waitFor()
   check('선정: 성공보수 10% → \'300만원 수금에 걸기\'', /300만원 수금에 걸기/.test(await page.getByTestId('apply-fee').innerText()), await page.getByTestId('apply-fee').innerText())
   await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
-  await page.waitForTimeout(500)
+  // 맞춤 추천 탭은 따로 불러오는 화면(0.8~1.9초) — 결정 목록이 뜰 때까지 기다린다(D-204 flow 와 같은 고침)
+  await page.getByTestId('smart-decisions').waitFor({ timeout: 8000 }).catch(() => {})
+  await page.waitForTimeout(300)
   check('맞춤 추천: \'선정 — 성공보수 수금에 걸기\'', (await page.locator('main').innerText()).includes('선정 — 성공보수 수금에 걸기'))
   await page.goto(BASE + '/ops/clients/cli_hansol?tab=funding', { waitUntil: 'networkidle' })
   await page.getByTestId('apply-fee').click()
