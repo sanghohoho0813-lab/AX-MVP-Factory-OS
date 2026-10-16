@@ -36,7 +36,40 @@ async function fetchBytes(storagePath: string): Promise<ArrayBuffer | null> {
   return buf.byteLength > MAX_BYTES ? null : buf
 }
 
+/**
+ * PDF 그림 그리기(pdfjs 6)가 쓰는 새 함수(Map · WeakMap getOrInsertComputed)가 아직 없는 브라우저가 많다
+ * (이 환경의 Chromium 도 없음 → 그림이 안 나왔다). 없을 때만 표준과 같은 동작으로 채운다.
+ */
+function ensureMapUpsert() {
+  for (const C of [Map, WeakMap]) {
+    const proto = C.prototype as unknown as Record<string, unknown>
+    if (typeof proto.getOrInsertComputed !== 'function') {
+      Object.defineProperty(proto, 'getOrInsertComputed', {
+        configurable: true,
+        writable: true,
+        value(this: Map<unknown, unknown>, key: unknown, make: (k: unknown) => unknown) {
+          if (this.has(key)) return this.get(key)
+          const v = make(key)
+          this.set(key, v)
+          return v
+        },
+      })
+    }
+    if (typeof proto.getOrInsert !== 'function') {
+      Object.defineProperty(proto, 'getOrInsert', {
+        configurable: true,
+        writable: true,
+        value(this: Map<unknown, unknown>, key: unknown, v: unknown) {
+          if (!this.has(key)) this.set(key, v)
+          return this.get(key)
+        },
+      })
+    }
+  }
+}
+
 async function pdfThumb(buf: ArrayBuffer): Promise<string | null> {
+  ensureMapUpsert()
   const pdfjs = await import('pdfjs-dist')
   const workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default
   pdfjs.GlobalWorkerOptions.workerSrc = workerSrc

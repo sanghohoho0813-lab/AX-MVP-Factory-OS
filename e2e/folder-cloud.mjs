@@ -177,6 +177,8 @@ async function newCtx(viewport, mobile = false) {
 }
 
 const errors = []
+// 이 시험 환경은 바깥 CDN 에 못 나간다 — 사진 글자 인식(tesseract) 일꾼을 못 받아 생기는 오류만 뺀다(실제 사용자 PC 는 받는다 · files-cloud 와 같음)
+const realErrors = () => errors.filter((e) => !/tesseract\.js@.*worker\.min\.js/.test(e))
 const ctx = await newCtx({ width: 1440, height: 900 })
 const page = await ctx.newPage()
 page.on('pageerror', (e) => errors.push(String(e)))
@@ -253,7 +255,7 @@ try {
   check('10 폴더 보기 맨 위에 새봄상사 폴더가 생김', (await page.getByTestId('folder-item').evaluateAll((els) => els.map((e) => e.getAttribute('data-name')))).includes('새봄상사'))
 
   check('11 저장소는 비공개 그대로(공개 주소 0) · 작은 그림도 서명 주소로', publicHits.length === 0 && signed.some((k) => k.endsWith('a-biz.pdf')))
-  check('12 화면 오류 0', errors.length === 0, errors)
+  check('12 화면 오류 0', realErrors().length === 0, realErrors())
 } finally {
   await ctx.close()
 }
@@ -273,7 +275,7 @@ try {
   const small = await mp.locator('[data-testid="folder-view"] button:visible').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)).filter((h) => h > 0 && h < 44))
   check('M390 누르는 곳 44px 이상', small.length === 0, small)
   if (SHOTS) await mp.screenshot({ path: `${SHOTS}/folder-m390.png` })
-  check('M390 화면 오류 0', errors.length === 0, errors)
+  check('M390 화면 오류 0', realErrors().length === 0, realErrors())
 } finally {
   await m.close()
   await browser.close()
