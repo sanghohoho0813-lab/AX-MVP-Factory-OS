@@ -849,7 +849,8 @@ for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
 
   // 맞춤 추천 탭으로 — 모든 판정
   await page.getByTestId('top-picks-all').click()
-  await page.waitForTimeout(900)
+  // 맞춤 추천 탭은 따로 불러오는 화면이라 0.8~1.9초 걸린다(main · 이 판 같은 범위로 잼) — 고정 0.9초 대신 판정 목록이 뜰 때까지 기다린다
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="smart-insight"]').length >= 3, null, { timeout: 8000 }).catch(() => {})
   check(`D-190 ${tag} [모듈별 판정 n개] → 맞춤 추천 탭 · 판정 목록으로`, /tab=smart/.test(page.url()) && (await page.getByTestId('smart-insight').count()) >= 3, page.url())
   const firstSmart = await page.evaluate(() => document.querySelector('[data-testid="smart-tab"]')?.firstElementChild?.getAttribute('data-testid'))
   check(`D-190 ${tag} 맞춤 추천 탭도 맨 위가 "먼저 제안할 것"`, firstSmart === 'top-picks', String(firstSmart))
