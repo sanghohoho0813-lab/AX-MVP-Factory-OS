@@ -74,6 +74,7 @@ const LabcarePage = lazy(() => import('../tools/labcare/LabcarePage').then((m) =
 const CertPage = lazy(() => import('../certification/ui/CertPage'))
 const PolicyFundingPage = lazy(() => import('../tools/policyFunding/PolicyFundingPage').then((m) => ({ default: m.PolicyFundingPage })))
 const HomepagePage = lazy(() => import('../tools/homepage/HomepagePage').then((m) => ({ default: m.HomepagePage })))
+const ContentPage = lazy(() => import('../tools/content/ContentPage').then((m) => ({ default: m.ContentPage })))
 const SalesKitPage = lazy(() => import('../tools/salesKit/SalesKitPage').then((m) => ({ default: m.SalesKitPage })))
 const TodayCommandCenterPage = lazy(() => import('../pages/TodayCommandCenterPage').then((m) => ({ default: m.TodayCommandCenterPage })))
 const WhyAxPage = lazy(() => import('../pages/WhyAxPage').then((m) => ({ default: m.WhyAxPage })))
@@ -458,6 +459,7 @@ export const appRouteChildren = [
       { path: 'tools/review', element: <ToolsReviewPage /> },
       ...moduleRoutes('startup-tax', <StartupTaxPage />),
       ...moduleRoutes('homepage', <HomepagePage />),
+      ...moduleRoutes('content', <ContentPage />),
       ...moduleRoutes('cretop', <CretopPage />),
       ...moduleRoutes('employment', <EmploymentPage />),
       ...moduleRoutes('labcare', <LabcarePage />),

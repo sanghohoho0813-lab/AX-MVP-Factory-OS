@@ -63,3 +63,4 @@ dist-qa*/
 .finance-out
 .cache/
 .site-out
+.content-out

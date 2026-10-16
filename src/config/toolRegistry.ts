@@ -30,6 +30,7 @@ import {
   FlaskConical,
   Globe,
   LayoutTemplate,
+  PenLine,
   Gauge,
   Handshake,
   Landmark,
@@ -318,6 +319,19 @@ export const TOOLS: ToolDefinition[] = [
     keywords: '홈페이지 웹사이트 랜딩페이지 블록 사이트 만들기 HTML 내려받기 사업자 정보',
     recommendedDocs: ['businessRegistration'],
     sections: [{ key: 'build', label: '만들기', icon: LayoutTemplate, hint: '블록 · 꾸밈 · 점검 · PC/휴대폰 미리보기 · 내려받기' }],
+  },
+  {
+    key: 'content',
+    label: '홍보 글 만들기',
+    desc: '업체 기록과 업종 견본으로 블로그 · 짧은 영상 · 긴 영상 · 카드뉴스 · 카톡 소식 · 플레이스 소개 · 키워드를 바로 만들고, 업체별 보관함에 남깁니다.',
+    navHint: '업체 기록 → 먼저 만들 글 3개 → 복사 · 보관',
+    path: '/tools/content',
+    icon: PenLine,
+    status: 'live',
+    origin: 'D-203 — 콘텐츠 생성 흐름만 참고(이상한 AI 분해) · 규칙 + 업종 견본으로 자체 구현',
+    keywords: '홍보 마케팅 블로그 글 인스타 카드뉴스 쇼츠 릴스 유튜브 대본 기획 썸네일 카톡 채널 소식 플레이스 소개글 키워드 해시태그',
+    recommendedDocs: ['businessRegistration'],
+    sections: [{ key: 'build', label: '만들기', icon: PenLine, hint: '먼저 만들 것 · 형식 · 키워드 · 주제 · 보관함' }],
   },
 ]
 

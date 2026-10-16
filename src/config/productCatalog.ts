@@ -197,8 +197,8 @@ export const MODULE_CATALOG: CatalogModule[] = [
   {
     key: 'web-studio',
     name: '웹 스튜디오',
-    description: '업체 홈페이지를 설계하고, 블록으로 바로 만들어 내려받습니다.',
-    covers: ['홈페이지 만들기', '홈페이지 설계'],
+    description: '업체 홈페이지와 홍보 글(블로그 · 영상 대본 · 카드뉴스 · 카톡 · 플레이스 소개)을 업체 기록으로 바로 만듭니다.',
+    covers: ['홈페이지 만들기', '홍보 글 만들기', '홈페이지 설계'],
     upcoming: [],
     category: 'web',
     route: '/modules/web-studio',
@@ -276,6 +276,8 @@ export const FEATURE_CATALOG: CatalogFeature[] = [
   { key: 'clients', source: 'nav', module: 'ax-studio', lockedPreview: 'intro', clientEntry: { topic: 'AX 프로젝트', verb: '열기', path: '/ax/open' }, summary: 'AX 프로젝트를 고객사 단위로 관리합니다.' },
   // WEB STUDIO — D-202 홈페이지 만들기(블록 · 업체 기록으로 초안 · 내려받기)
   { key: 'homepage', source: 'tool', module: 'web-studio', lockedPreview: 'first-section', clientEntry: { topic: '홈페이지', verb: '만들기', path: '/tools/homepage/build' } },
+  // D-203 홍보 글 만들기(블로그 · 영상 대본 · 카드뉴스 · 카톡 · 플레이스 소개 · 키워드 — 규칙 + 업종 견본)
+  { key: 'content', source: 'tool', module: 'web-studio', lockedPreview: 'first-section', clientEntry: { topic: '홍보 글', verb: '만들기', path: '/tools/content/build' } },
   { key: 'website-studio', source: 'nav', module: 'web-studio', lockedPreview: 'intro', summary: '업체 홈페이지의 구성 · 문구 · 디자인을 설계합니다.' },
 ]
 
