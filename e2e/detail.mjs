@@ -678,6 +678,23 @@ for (const width of [1440, 390]) {
   await page.waitForTimeout(600)
   const sb = page.getByTestId('smart-batch')
   check(`D-183 새로고침해도 맞춤 추천에 '지난번에 올린 서류 3개' ${tag}`, (await sb.count()) === 1 && (await sb.getAttribute('data-fresh')) === '0' && (await sb.innerText()).includes('지난번에 올린 서류 3개'), (await sb.innerText().catch(() => '')).slice(0, 120))
+  // D-212: 못 올린 파일이 있던 올리기 — 창을 닫고 새로고침해도 맞춤 추천에 남고 [다시 올리기] 로 바로 올리기 창
+  await page.evaluate(() => {
+    const all = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+    const r = all.find((x) => x.id === 'cli_mirae')
+    r.docUploads[0].failed = [{ fileName: '2026년_법인등기부등본_최종본_스캔_아주아주긴파일이름_정말로긴이름.pdf', reason: '파일을 저장하지 못했습니다 — 잠시 뒤 다시 올려 주세요' }]
+    localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(all))
+  })
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  const sf = page.getByTestId('smart-failed')
+  const sfText = (await sf.innerText().catch(() => '')) ?? ''
+  const sfW = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  check(`D-212 못 올린 파일 1개 — 맞춤 추천에 이름 · 까닭 · 넘침 0 ${tag}`, (await sf.count()) === 1 && (await sf.getAttribute('data-count')) === '1' && sfText.includes('못 올린 파일 1개') && sfText.includes('법인등기부등본') && sfText.includes('저장하지 못했습니다') && sfW <= 0, JSON.stringify({ sfText: sfText.slice(0, 160), sfW }))
+  await page.getByTestId('smart-failed-retry').click()
+  await page.waitForTimeout(400)
+  check(`D-212 [다시 올리기] → 서류 올리기 창이 바로 열림 ${tag}`, (await page.getByLabel('서류 파일 고르기').count()) >= 1)
+  await page.keyboard.press('Escape')
 
   // 확인할 것 — 새 종류 둘
   await page.goto(BASE + '/ops/decide', { waitUntil: 'networkidle' })
@@ -983,7 +1000,21 @@ for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
   const day = (await page.getByTestId('folder-file-sheet').innerText()).match(/올린 날\s*\n?\s*(\d{4}\.\d{2}\.\d{2})/)?.[1] ?? ''
   const today = await page.evaluate(() => { const d = new Date(); return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}` })
   check(`D-209 ${tag} 폴더 보기 — 기타 칸 파일에 '확인 필요' · 파일 창(긴 제목) 넘침 0 · 올린 날 = 오늘(로컬)`, otherBadges >= 1 && sheetW <= 1 && day === today, JSON.stringify({ otherBadges, sheetW, day, today }))
-  await page.keyboard.press('Escape')
+  // D-212: 폴더 보기 파일 창에서 바로 '무슨 서류인가요?' — 목차 보기로 가지 않고 맞는 칸으로
+  const kindSel = page.getByTestId('folder-file-sheet').locator('[data-testid^="doc-kind-"] select')
+  const pickerShown = (await kindSel.count()) === 1
+  let moved = false
+  if (pickerShown) {
+    const opt = await kindSel.locator('option').evaluateAll((os) => os.map((o) => o.value).find((v) => v && v !== '__type__'))
+    if (opt) {
+      await kindSel.selectOption(opt)
+      await page.waitForTimeout(700)
+      // 기타 표시가 하나 줄어든다(그 파일이 맞는 칸으로 갔다)
+      moved = (await page.getByTestId('folder-file-other').count()) === otherBadges - 1
+    }
+  }
+  check(`D-212 ${tag} 폴더 보기 파일 창에 '무슨 서류인가요?' · 고르면 기타 칸에서 빠짐 · 창 닫힘`, pickerShown && moved && (await page.getByTestId('folder-file-sheet').count()) === 0, JSON.stringify({ pickerShown, moved }))
+  if (await page.getByTestId('folder-file-sheet').count()) await page.keyboard.press('Escape')
   await page.getByTestId('doc-view-list').click()
   // 업체를 옮기면 새 화면 — 열어 둔 창 · 고르던 칸이 다음 업체로 넘어가지 않는다
   await page.getByRole('button', { name: '한꺼번에 올리기' }).first().click()

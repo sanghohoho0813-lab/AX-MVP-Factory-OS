@@ -92,12 +92,22 @@ export const CUSTOMER_STAGE_LABEL: Record<CustomerStage, string> = {
  * 자동으로 고객 단계를 바꾸지 않는다. "고객에게 업데이트" 모달의 기본값 제안에만 쓴다.
  */
 export function suggestCustomerStage(statuses: ServiceStatus[]): CustomerStage {
-  const started = statuses.filter((s) => s !== 'on_hold' && s !== 'not_started')
+  // D-212: '해당 없음' 은 시작한 업무가 아니다 — 예전에는 완료 + 해당 없음이 '준비 중' 으로 추천됐다
+  const started = statuses.filter((s) => s !== 'on_hold' && s !== 'not_started' && s !== 'not_applicable')
   if (started.length === 0) return 'preparing'
   if (started.every((s) => s === 'done')) return 'completed'
   if (started.some((s) => s === 'in_progress')) return 'in_progress'
   if (started.some((s) => s === 'waiting_client')) return 'reviewing_docs'
   return 'preparing'
+}
+
+/**
+ * 고객에게 업데이트할 때 단계 칸의 처음 값 — 추천이 지금보다 **앞선 단계일 때만** 고른다(D-212).
+ * 추천은 '기관 접수 · 결과 대기' 를 모른다 — 예전에는 결과 대기인 고객에게 소식을 올리면 '진행 중' 으로 뒤로 돌아갔다.
+ */
+export function stageToOffer(current: CustomerStage | null | undefined, suggested: CustomerStage): CustomerStage | '' {
+  const at = current ? CUSTOMER_STAGE_ORDER.indexOf(current) : -1
+  return CUSTOMER_STAGE_ORDER.indexOf(suggested) > at ? suggested : ''
 }
 
 export function isCustomerStage(v: unknown): v is CustomerStage {

@@ -14,6 +14,7 @@ import { isGrantBookmark } from '../types/clientOps'
 import { SERVICES, SERVICE_STATUS_LABEL } from '../content/clientOpsCatalog'
 import { allDocumentMetas } from './clientOpsDocuments'
 import { daysLeftFrom, documentStatus, documentsWithExpiry } from './clientOpsAlerts'
+import { localDateOf } from '../lib/appClock'
 
 export type ReportPeriod = 'year' | 'last12' | 'contract'
 
@@ -62,7 +63,14 @@ export interface ClientReport {
 }
 
 const DAY = /^\d{4}-\d{2}-\d{2}/
-const dayOf = (iso: string | null | undefined) => (iso && DAY.test(iso) ? iso.slice(0, 10) : '')
+// D-212: 시각이 붙은 값(끝낸 때 · 결과를 붙인 때)은 한국 날짜로 — 예전에는 UTC 로 잘라 오전 9시 전에 끝낸 일이 전날로 적혔다(1/1 이면 올해에서 빠짐)
+const dayOf = (iso: string | null | undefined) => (iso && DAY.test(iso) ? localDateOf(iso) : '')
+
+/**
+ * 고객 종이에 넣어도 되는 도구 결과(D-212). 크레탑은 '미팅 전 1장 요약 · 우선 미팅 질문 · 추천 컨설팅 항목' 같은 영업 준비 글이라 넣지 않는다.
+ * 새 도구는 여기에 적어야 들어간다 — 모르는 것은 빼는 쪽이 안전하다.
+ */
+export const REPORT_TOOL_KEYS: ReadonlySet<string> = new Set(['startup-tax', 'policy-funding', 'employment', 'labcare', 'tax', 'cert-os', 'content', 'homepage'])
 
 function addMonths(ymd: string, months: number): string {
   const [y, m, d] = ymd.split('-').map(Number)
@@ -122,7 +130,7 @@ export function buildClientReport(record: ClientOpsRecord, today: string, period
   // 도구 판정 — 고객용 요약 글만, 같은 도구는 가장 최근 것 하나
   const latest = new Map<string, ClientOpsRecord['toolResults'][number]>()
   for (const t of record.toolResults) {
-    if (!inRange(dayOf(t.createdAt))) continue
+    if (!REPORT_TOOL_KEYS.has(t.toolKey) || !inRange(dayOf(t.createdAt))) continue
     const prev = latest.get(t.toolKey)
     if (!prev || t.createdAt > prev.createdAt) latest.set(t.toolKey, t)
   }
@@ -130,11 +138,15 @@ export function buildClientReport(record: ClientOpsRecord, today: string, period
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
     .map((t) => ({ title: t.title, verdict: t.verdictLabel, summary: t.summary.trim().slice(0, 400), date: dayOf(t.createdAt) }))
 
-  // 정리된 서류 — 지금 쓸 수 있는 서류 수
-  const documentsReady = allDocumentMetas(record).filter((m) => {
-    const s = record.documents[m.key]
-    return s?.received && documentStatus(m.key, s, today, m).usable
-  }).length
+  // 정리된 서류 — 지금 쓸 수 있는 서류 가짓수(D-212: '사업자등록증' 과 '사업자등록증 (2)' 는 한 가지)
+  const documentsReady = new Set(
+    allDocumentMetas(record)
+      .filter((m) => {
+        const s = record.documents[m.key]
+        return s?.received && documentStatus(m.key, s, today, m).usable
+      })
+      .map((m) => m.label.replace(/\s*\(\d+\)$/, '').replace(/[\s·ㆍ]/g, '')),
+  ).size
 
   // 다음에 챙길 것 — 60일 안의 신청 마감 · 결과 발표 · 업무 마감 · 서류 만료
   const until = addMonths(today, 2)

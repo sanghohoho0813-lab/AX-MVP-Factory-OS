@@ -238,6 +238,8 @@ export function BulkDocUploadSheet({
     setPhase('uploading')
     let okCount = 0
     const doneIds: string[] = []
+    /** D-212: 못 올린 파일 — 올리기 기록에 남겨 맞춤 추천에서 '다시 올리기' 로 */
+    const failedFiles: { fileName: string; reason: string }[] = []
     // D-209: 파일 경로도 이 창을 연 업체로(올리는 중에 화면이 바뀌어도)
     const owner = recordRef.current
     /*
@@ -272,7 +274,9 @@ export function BulkDocUploadSheet({
         doneIds.push(it.id)
         okCount += 1
       } catch (cause) {
-        patch(it.id, { status: 'error', error: cause instanceof Error ? cause.message : '올리지 못했습니다.' })
+        const reason = cause instanceof Error ? cause.message : '올리지 못했습니다.'
+        patch(it.id, { status: 'error', error: reason })
+        failedFiles.push({ fileName: it.file.name, reason })
       }
     }
     // (2) 최신 기록 위에 칸을 정해 적는다 — 이번 묶음에서 이미 넣은 칸은 '(2)' 칸으로(덮지 않는다)
@@ -317,7 +321,7 @@ export function BulkDocUploadSheet({
         analyzed = await analyzeUploadedDocs(rec, readDocs, ctx)
       }
       // D-183: 올리기 기록을 업체에 남긴다 — 새로고침해도 '올린 서류' 가 보이고, '확인할 것' 이 바로 넣은 값을 한 번 더 묻는다
-      const summary = { ...analyzed.summary, files: okCount, placed }
+      const summary = { ...analyzed.summary, files: okCount, placed, ...(failedFiles.length ? { failed: failedFiles } : {}) }
       const saved = await saveClient(withUploadSummary(analyzed.record, summary, `up_${generateId()}`))
       onSaved(saved, summary)
       const sm = analyzed.summary

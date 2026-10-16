@@ -125,11 +125,22 @@ function ReportDocument({ r, printing, sender }: { r: ClientReport; printing?: b
   )
 }
 
-export function ClientReportSheet({ record, today, onClose }: { record: ClientOpsRecord; today: string; onClose: () => void }) {
+export function ClientReportSheet({
+  record,
+  today,
+  initialPeriod = 'year',
+  onClose,
+}: {
+  record: ClientOpsRecord
+  today: string
+  /** D-212: 오늘 · 1주년 줄에서 열면 최근 12개월 */
+  initialPeriod?: ReportPeriod
+  onClose: () => void
+}) {
   // D-162: 보고서 서명 — Pilot 은 자기 이름(대표 이름으로 나가지 않는다)
   const sender = useSenderLine()
   const { showToast } = useToast()
-  const [period, setPeriod] = useState<ReportPeriod>('year')
+  const [period, setPeriod] = useState<ReportPeriod>(initialPeriod)
   const r = useMemo(() => buildClientReport(record, today, period), [record, today, period])
   return (
     <>

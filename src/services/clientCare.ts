@@ -107,8 +107,12 @@ export function nextAnniversary(signedAt: string, today: string): { date: string
   return null
 }
 
-/** 계약 중인 업체(보관 · 계약 끝남 · 계약 전 제외) */
-const isCareTarget = (r: ClientOpsRecord) => r.archivedAt === null && contractStageOf(r.status) === 'signed'
+/**
+ * 계약한 업체(보관 · 계약 전 제외).
+ * D-212: 예전 '끝남'(completed) 업체도 넣는다 — D-157 부터 화면에는 '계약 완료' 로만 보여 대표는 계약 고객으로 아는데
+ * 한 달 넘게 조용해도 · 1주년이 와도 안 떴다(D-168 할 일 업체 고르기와 같은 구멍). 끝난 고객일수록 안부가 재계약으로 이어진다.
+ */
+const isCareTarget = (r: ClientOpsRecord) => r.archivedAt === null && contractStageOf(r.status) !== 'pre'
 
 export function careItemFor(record: ClientOpsRecord, today: string): CareItem | null {
   if (!isCareTarget(record)) return null

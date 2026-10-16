@@ -20,6 +20,7 @@ import {
   CUSTOMER_STAGE_ORDER,
   SERVICE_REGISTRY,
   enabledServices,
+  stageToOffer,
   suggestCustomerStage,
   suggestServiceForProduct,
 } from '../../config/serviceCatalog'
@@ -38,6 +39,7 @@ import signupSql from '../../../supabase/migrations/20260925000014_signup_event.
 import hardenSql from '../../../supabase/migrations/20261004000016_security_hardening.sql?raw'
 import publicLinksSql from '../../../supabase/migrations/20261005000017_public_links_hardening.sql?raw'
 import { buildClientReport, reportFrom, reportKakao } from '../clientReport'
+import { documentsWithExpiry } from '../clientOpsAlerts'
 import { careItemFor, careList, careMessage, careSnoozeUntil, lastTouchOf, nextAnniversary, withCareContact, withCareSnooze } from '../clientCare'
 import staffLookupSql from '../../../supabase/migrations/20261006000018_staff_customer_lookup.sql?raw'
 import { normalizeClientOps, withContract, withCustomField, withFee, withNewFee, withNewFunding, withService, withoutCustomField, withoutFee } from '../clientOpsService'
@@ -502,6 +504,49 @@ check('events: 요약 who 는 회사명 우선', eventSummary(ev({ payload: { co
   check('안부 문구(1주년): 대표님 · 1년 · 보고서 · 30분 — 수수료 · 영업자 · 메모 없음', msg.startsWith('안녕하세요, 박대표 대표님.') && msg.includes('함께한 지 1년') && msg.includes('30분') && !/성공보수|홍영업|까다로운|1,000,000|100만원/.test(msg), msg)
   check('안부 문구(조용): 안부 여쭙니다', careMessage(quiet, q as never, T).includes('안부 여쭙니다'))
   check('다음에: 조용함은 2주 · 1주년은 그 날 + 7일을 넘기지 않음(1주년 4일 앞 → 10/17)', careSnoozeUntil(q as never, T) === '2026-10-20' && careSnoozeUntil(y as never, T) === '2026-10-20' && careSnoozeUntil({ ...(y as object), anniversary: { date: '2026-10-10', years: 1, daysLeft: 4 } } as never, T) === '2026-10-17')
+}
+
+// D-212: 성과 보고서 · 돌봄 · 고객 단계 — 점검에서 찾은 것
+{
+  const T = '2026-10-06'
+  const base = normalizeClientOps({
+    id: 'r9', companyName: '점검상사', representativeName: '한대표', status: 'active', createdAt: '2025-03-01T00:00:00Z',
+    contract: { signedAt: '2025-03-10', kind: 'cash', cashAmount: null, policies: [], note: '' },
+    toolResults: [
+      { id: 'c1', toolKey: 'cretop', title: '크레탑 분석', verdict: null, verdictLabel: '부채비율 높음', summary: '[점검상사] 미팅 전 1장 요약 ■ 우선 미팅 질문 ■ 추천 컨설팅 항목', data: {}, deadlines: [], createdAt: '2026-05-01T00:00:00Z' },
+      { id: 't1', toolKey: 'startup-tax', title: '창업감면 판정', verdict: 'good', verdictLabel: '감면 가능성 높음', summary: '5년간 50% 감면', data: {}, deadlines: [], createdAt: '2026-05-02T00:00:00Z' },
+      { id: 'x1', toolKey: 'future-tool', title: '새 도구', verdict: null, verdictLabel: '', summary: '모르는 도구', data: {}, deadlines: [], createdAt: '2026-05-03T00:00:00Z' },
+    ],
+    services: { venture: { status: 'done', completedAt: '2025-12-31T23:30:00Z', dueDate: '', nextStep: '', note: '', startedAt: null, waitingSince: null } },
+  } as never)
+  const r = buildClientReport(base, T, 'year')
+  check('D-212 보고서: 크레탑(영업 준비 글) · 모르는 도구는 고객 종이에 없음 · 창업감면은 그대로', r.tools.length === 1 && r.tools[0].title === '창업감면 판정' && !/미팅 질문|컨설팅 항목|부채비율/.test(JSON.stringify(r) + reportKakao(r)), r.tools.map((t) => t.title))
+  const tz = process.env.TZ
+  process.env.TZ = 'Asia/Seoul'
+  try {
+    const kr = buildClientReport(base, T, 'year')
+    check('D-212 보고서: 1/1 오전 8:30(한국)에 끝낸 일 → 올해 · 1/1 로(예전: UTC 12/31 이라 빠짐)', kr.done.length === 1 && kr.done[0].date === '2026-01-01', kr.done)
+  } finally {
+    if (tz === undefined) delete process.env.TZ
+    else process.env.TZ = tz
+  }
+  // 같은 서류 두 장 — 옛 것이 곧 끝나도 새로 받은 (2) 가 더 길면 '새로 발급' 을 묻지 않고, 서류 수도 한 가지
+  let d = withCustomDocument(base, { label: '법인인감증명서', validMonths: 3 })
+  d = withCustomDocument(d, { label: '법인인감증명서 (2)', validMonths: 3 })
+  const [oldKey, newKey] = d.customDocuments.map((c) => c.key)
+  d = withDocument(d, oldKey, { received: true, issuedAt: '2026-07-20', fileName: 'old.pdf' })
+  d = withDocument(d, newKey, { received: true, issuedAt: '2026-10-01', fileName: 'new.pdf' })
+  const exp = documentsWithExpiry(d, T)
+  check('D-212 만료: 같은 서류 두 장이면 늦게 끝나는 한 장만(옛 것 10/20 만료 알림 없음)', exp.filter((x) => x.meta.label.startsWith('법인인감')).length === 1 && exp.find((x) => x.meta.label.startsWith('법인인감'))?.meta.key === newKey, exp.map((x) => `${x.meta.label}:${x.view.expiresOn}`))
+  const dr = buildClientReport(d, T, 'year')
+  check('D-212 보고서: 법인인감 · 법인인감 (2) 는 서류 한 가지 · 다음에 챙길 것에 옛 것 새로 발급 없음', dr.headline.documentsReady === 1 && !dr.next.some((n) => n.text.includes('법인인감증명서 유효기간')), { n: dr.headline.documentsReady, next: dr.next })
+  // 돌봄 — 예전 '끝남' 업체도 화면에는 '계약 완료' 라 넣는다
+  const oldDone = normalizeClientOps({ id: 'od', companyName: '예전상사', representativeName: '오대표', status: 'completed', createdAt: '2025-01-01T00:00:00Z', contract: { signedAt: '2025-01-05', kind: 'cash', cashAmount: null, policies: [], note: '' }, notes_list: [{ id: 'n', text: '전화', createdAt: '2026-07-01T00:00:00Z' }] } as never)
+  check('D-212 돌봄: 예전 끝남(화면엔 계약 완료) 업체도 한 달 넘게 조용하면 뜬다', careItemFor(oldDone, T)?.reason === 'quiet')
+  // 고객 단계 — 추천이 지금보다 앞설 때만 고른다 · 해당 없음은 시작한 업무가 아님
+  check('D-212 고객 단계: 완료 + 해당 없음 → 완료(예전: 준비 중)', suggestCustomerStage(['done', 'not_applicable', 'not_applicable']) === 'completed')
+  check('D-212 고객 단계: 결과 대기인데 추천이 진행 중이면 그대로 둠(뒤로 안 감)', stageToOffer('awaiting_result', 'in_progress') === '' && stageToOffer('completed', 'preparing') === '')
+  check('D-212 고객 단계: 앞선 추천만 고름', stageToOffer('preparing', 'in_progress') === 'in_progress' && stageToOffer('in_progress', 'completed') === 'completed' && stageToOffer('in_progress', 'in_progress') === '')
 }
 check('events: 값 없으면 고객', eventSummary(ev({ payload: {} })).who === '고객')
 // D-107: 오래 기다린 상담신청 — "N일째 대기" (정오 UTC 로 잡아 시간대가 달라도 같은 날)

@@ -405,6 +405,10 @@ function normalizeDocUploads(value: unknown): { docUploads?: DocUploadLog[] } {
       ...(cretop && typeof cretop.fileName === 'string' ? { cretop: { fileName: str(cretop.fileName), filled: Array.isArray(cretop.filled) ? cretop.filled.filter((s): s is string => typeof s === 'string').slice(0, 20) : [] } } : {}),
       ...(roster && typeof roster.fileName === 'string' ? { roster: { fileName: str(roster.fileName), employees: n(roster.employees), active: n(roster.active), candidates: n(roster.candidates), youthDeadlines: n(roster.youthDeadlines) } } : {}),
       warnings: Array.isArray(v.warnings) ? v.warnings.filter((s): s is string => typeof s === 'string').slice(0, 5).map((s) => s.slice(0, 300)) : [],
+      ...((): { failed?: { fileName: string; reason: string }[] } => {
+        const failed = arr(v.failed, 30, (x) => (typeof x.fileName === 'string' ? { fileName: str(x.fileName), reason: str(x.reason, 120) } : null))
+        return failed.length ? { failed } : {}
+      })(),
     })
   }
   return out.length ? { docUploads: out } : {}
@@ -1291,8 +1295,18 @@ function uploadErrorMessage(raw: string, file: File): string {
   if (m.includes('duplicate') || m.includes('already exists')) {
     return '같은 이름의 파일이 이미 있습니다. 잠시 뒤 다시 시도해 주세요.'
   }
+  // D-212: 영어 오류 글자 대신 무슨 일인지 — 인터넷이 끊겼는지, 저장소가 잠깐 멈췄는지
+  if (m.includes('failed to fetch') || m.includes('network') || m.includes('load failed') || m.includes('timeout') || m.includes('timed out')) {
+    return '인터넷 연결이 잠깐 끊겨 올리지 못했습니다. 연결을 확인하고 다시 올려 주세요.'
+  }
+  if (/\b50[0234]\b/.test(m) || m.includes('internal server') || m.includes('unavailable') || m.includes('gateway')) {
+    return '저장소가 잠깐 응답하지 않아 올리지 못했습니다. 잠시 뒤 다시 올려 주세요.'
+  }
   return `파일을 올리지 못했습니다. ${raw}`
 }
+
+/** 다시 해도 안 되는 거절(용량 · 형식) — 이것은 한 번 더 올려 보지 않는다 */
+const UPLOAD_PERMANENT = /exceeded|too large|payload|mime|not supported|content type/i
 
 /**
  * 파일만 보관함에 올리고, 업체 기록에 넣을 서류 칸 값을 돌려준다(저장은 하지 않는다) — D-120.
@@ -1310,12 +1324,26 @@ export async function storeDocumentFile(
   // 저장 경로에는 영문·숫자만 남긴다(한글 파일명도 안전하게 올라간다).
   // 원래 이름은 fileName 에 그대로 보관해 화면에는 한글로 보인다.
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-  const path = `${record.workspaceId}/${record.id}/${key}/${generateId()}-${safeName}`
-  const { error } = await getSupabaseClient()
-    .storage.from('client-documents')
-    .upload(path, file, { contentType: file.type || 'application/octet-stream' })
-  if (error) throw new Error(uploadErrorMessage(error.message, file))
-  return { received: true, fileName: file.name, fileSize: file.size, storagePath: path }
+  const once = async () => {
+    const path = `${record.workspaceId}/${record.id}/${key}/${generateId()}-${safeName}`
+    try {
+      const { error } = await getSupabaseClient()
+        .storage.from('client-documents')
+        .upload(path, file, { contentType: file.type || 'application/octet-stream' })
+      return { path, raw: error ? error.message || '알 수 없는 오류' : '' }
+    } catch (cause) {
+      return { path, raw: cause instanceof Error ? cause.message : String(cause) }
+    }
+  }
+  // D-212: 잠깐 끊긴 것(인터넷 · 저장소 잠깐 오류)은 알아서 한 번 더 — 예전에는 바로 빨간 줄이 되어 대표가 다시 골라야 했다.
+  // 용량 · 형식 거절은 다시 해도 같으니 바로 알린다.
+  let got = await once()
+  if (got.raw && !UPLOAD_PERMANENT.test(got.raw)) {
+    await new Promise((done) => setTimeout(done, 1200))
+    got = await once()
+  }
+  if (got.raw) throw new Error(uploadErrorMessage(got.raw, file))
+  return { received: true, fileName: file.name, fileSize: file.size, storagePath: got.path }
 }
 
 export async function uploadDocumentFile(

@@ -136,7 +136,7 @@ export default function ClientSmartTab({
       </Surface>
 
       {/* 2. 방금 올린 서류 — D-183: 새로고침해도 지난 올리기 기록이 보인다(업체 기록에 남김) */}
-      {lastBatch ? <BatchSummary batch={lastBatch} fresh /> : record.docUploads?.[0] ? <BatchSummary batch={batchOfLog(record.docUploads[0])} fresh={false} /> : null}
+      {lastBatch ? <BatchSummary batch={lastBatch} fresh onRetry={onUpload} /> : record.docUploads?.[0] ? <BatchSummary batch={batchOfLog(record.docUploads[0])} fresh={false} onRetry={onUpload} /> : null}
 
       {/* 3. 확인이 필요한 정보 */}
       <FactInboxCard record={record} now={nowIso()} onCommit={onCommit} />
@@ -262,12 +262,35 @@ export default function ClientSmartTab({
   )
 }
 
-function BatchSummary({ batch, fresh }: { batch: DocBatchSummary; fresh: boolean }) {
+function BatchSummary({ batch, fresh, onRetry }: { batch: DocBatchSummary; fresh: boolean; onRetry: () => void }) {
   const when = batch.at ? new Date(batch.at) : null
   const time = when ? (fresh ? when.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' }) : when.toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })) : ''
+  const failed = batch.failed ?? []
   // D-192: 방금 올린 것은 펼쳐 두고, 지난번 것은 접어 둔다(한 줄 제목만)
   return (
-    <div data-testid="smart-batch" data-fresh={fresh ? '1' : '0'}>
+    <div data-testid="smart-batch" data-fresh={fresh ? '1' : '0'} className="flex flex-col gap-2">
+    {/* D-212: 못 올린 파일은 접지 않고 늘 보인다 — 올리기 창을 닫으면 빨간 줄이 사라져 잊어버렸다 */}
+    {failed.length > 0 && (
+      <div data-testid="smart-failed" data-count={failed.length}>
+      <Surface edge="danger" showEdge className="flex flex-col gap-2">
+        <p className="t-sub font-semibold break-keep text-danger-700">
+          못 올린 파일 {failed.length}개 — 같은 파일을 다시 골라 올려 주세요
+        </p>
+        <ul className="flex flex-col gap-1">
+          {failed.slice(0, 8).map((f, i) => (
+            <li key={`${f.fileName}-${i}`} className="t-sub flex flex-wrap items-baseline gap-x-2 break-keep">
+              <span className="min-w-0 font-semibold text-slate-900 [overflow-wrap:anywhere]">{f.fileName}</span>
+              <span className="t-meta min-w-0 text-danger-700 [overflow-wrap:anywhere]">{f.reason}</span>
+            </li>
+          ))}
+          {failed.length > 8 && <li className="t-meta text-slate-500">그 밖에 {failed.length - 8}개</li>}
+        </ul>
+        <Button variant="secondary" size="sm" onClick={onRetry} className="self-start" data-testid="smart-failed-retry">
+          <FileUp aria-hidden="true" className="size-4" /> 다시 올리기
+        </Button>
+      </Surface>
+      </div>
+    )}
     <Fold
       id={fresh ? 'smart.batch.fresh' : 'smart.batch.last'}
       title={fresh ? `방금 올린 서류 ${batch.files}개를 읽었어요` : `지난번에 올린 서류 ${batch.files}개`}

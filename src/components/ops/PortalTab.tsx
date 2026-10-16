@@ -40,6 +40,7 @@ import {
 import { activityTimeText } from '../../services/clientOpsActivity'
 import { CUSTOMER_STAGE_LABEL, CUSTOMER_STAGE_ORDER, type CustomerStage } from '../../config/serviceCatalog'
 import { DOCUMENTS } from '../../content/clientOpsCatalog'
+import { DELETED_DOC_LABEL, documentMetaOf } from '../../services/clientOpsDocuments'
 import { getDataModeConfig } from '../../data/dataMode'
 import { brand } from '../../brand/brand.config'
 
@@ -333,25 +334,26 @@ export function PortalTab({
                 ))}
               </ul>
             )}
-            {/* 내부 파일 공유 */}
+            {/* 내부 파일 공유 — D-212: 제목은 그 칸의 이름(직접 만든 칸 · (2) 칸도). 예전에는 'customdoc_…' 가 고객 화면 제목이 됐다 */}
             {Object.entries(record.documents).some(([, v]) => v.storagePath) && (
               <div className="mt-3 rounded-(--radius-control) bg-slate-50 p-3">
                 <p className="text-[0.88rem] font-semibold text-slate-600">내 서류함 파일을 고객에게 공유</p>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {(Object.entries(record.documents) as [DocumentKey, ClientOpsRecord['documents'][DocumentKey]][])
-                    .filter(([, v]) => v.storagePath && !documents.some((d) => d.storagePath === v.storagePath))
+                    // D-212: 지운 칸에 남은 파일은 내놓지 않는다
+                    .filter(([key, v]) => v.storagePath && !documents.some((d) => d.storagePath === v.storagePath) && documentMetaOf(record, key).label !== DELETED_DOC_LABEL)
                     .map(([key, v]) => (
                       // D-122: 누르면 바로 고객 화면에 올라가던 것을 한 번 묻는다
                       <InlineConfirm
                         key={key}
                         icon={<Share2 aria-hidden="true" className="size-4" />}
-                        label={`${DOCUMENTS.find((x) => x.key === key)?.label ?? key} 공유`}
+                        label={`${documentMetaOf(record, key).label} 공유`}
                         question="고객 화면에 보입니다. 공유할까요?"
                         confirmLabel="공유"
                         className="!text-slate-700 hover:!bg-brand-50 hover:!text-brand-700"
                         onConfirm={() =>
                           void run(
-                            () => shareDocument(workspaceId, { linkId: link.id, operationsClientId: record.id, documentType: key, title: DOCUMENTS.find((x) => x.key === key)?.label ?? key, storagePath: v.storagePath, fileName: v.fileName }),
+                            () => shareDocument(workspaceId, { linkId: link.id, operationsClientId: record.id, documentType: key, title: documentMetaOf(record, key).label, storagePath: v.storagePath, fileName: v.fileName }),
                             '고객에게 공유했습니다.',
                           )
                         }

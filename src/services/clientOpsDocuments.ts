@@ -49,11 +49,14 @@ export function allDocumentMetas(record: Pick<ClientOpsRecord, 'customDocuments'
  * 못 찾으면 기본 서류의 첫 항목으로 떨어지지 않고 **키를 이름으로 쓴 빈 설명**을 준다 —
  * 지워진 칸에 파일이 남아 있을 때 엉뚱하게 '사업자등록증' 으로 보이는 것이 더 나쁘다.
  */
+/** 지운 직접 만든 칸에 파일만 남았을 때의 이름 */
+export const DELETED_DOC_LABEL = '(지운 서류 칸)'
+
 export function documentMetaOf(record: Pick<ClientOpsRecord, 'customDocuments'>, key: DocumentKey): DocumentMeta {
   if (!isCustomDocumentKey(key)) return documentMeta(key)
   const found = record.customDocuments.find((d) => d.key === key)
   if (found) return customDocumentMeta(found)
-  return { key, label: '(지운 서류 칸)', validMonths: null, needsFile: true, sensitive: false, hint: '' }
+  return { key, label: DELETED_DOC_LABEL, validMonths: null, needsFile: true, sensitive: false, hint: '' }
 }
 
 /** 아직 아무것도 안 적은 서류 칸 — 직접 만든 칸이 막 생겼을 때 */

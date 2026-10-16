@@ -17,6 +17,7 @@ import { OTHER_DOC_LABEL } from '../../services/docClassify'
 import { BottomSheet } from '../ui/primitives'
 import { Button } from '../ui/Button'
 import { DocFileActions } from './DocFileActions'
+import { DocKindPicker } from './DocShelfBar'
 
 const KIND_STYLE: Record<FileKind, { bg: string; fg: string; name: string }> = {
   pdf: { bg: 'bg-red-50', fg: 'text-red-600', name: 'PDF' },
@@ -70,7 +71,18 @@ function Thumb({ file, cloud }: { file: FolderFile; cloud: boolean }) {
   )
 }
 
-export function DocFolderView({ record, cloud, onShowInList }: { record: ClientOpsRecord; cloud: boolean; onShowInList: (key: DocumentKey) => void }) {
+export function DocFolderView({
+  record,
+  cloud,
+  onShowInList,
+  onMove,
+}: {
+  record: ClientOpsRecord
+  cloud: boolean
+  onShowInList: (key: DocumentKey) => void
+  /** D-212: 기타 · 확인 필요 파일을 폴더 보기에서 바로 맞는 칸으로(목차 보기로 가지 않고) */
+  onMove?: (next: ClientOpsRecord, to: string) => void
+}) {
   const tree = useMemo(() => docFolderTree(record), [record])
   const [path, setPath] = useState('')
   const [open, setOpen] = useState<FolderFile | null>(null)
@@ -134,10 +146,10 @@ export function DocFolderView({ record, cloud, onShowInList }: { record: ClientO
             <button type="button" onClick={() => setOpen(f)} className="tap flex w-full flex-col items-center gap-1 rounded-(--radius-control) p-1.5 text-center hover:bg-slate-50" data-testid="folder-file" data-key={f.key} title={f.fileName}>
               <Thumb file={f} cloud={cloud} />
               <span className="t-sub line-clamp-2 w-full break-all text-slate-800">{f.fileName}</span>
-              {/* D-209: 무슨 서류인지 모르는 파일(기타 칸)은 폴더 보기에서도 눈에 띄게 — 목차 보기로 가서 칸을 고른다 */}
+              {/* D-209: 무슨 서류인지 모르는 파일(기타 칸)은 폴더 보기에서도 눈에 띄게 — D-212: 눌러서 바로 칸을 고른다 */}
               {f.label.startsWith(OTHER_DOC_LABEL) ? (
-                <span className="t-meta line-clamp-1 w-full font-semibold text-warning-700" data-testid="folder-file-other">
-                  확인 필요
+                <span className="t-meta line-clamp-2 w-full font-semibold break-keep text-warning-700" data-testid="folder-file-other">
+                  무슨 서류? 고르기
                 </span>
               ) : (
                 <span className="t-meta line-clamp-1 w-full text-slate-500">{f.label}</span>
@@ -171,6 +183,17 @@ export function DocFolderView({ record, cloud, onShowInList }: { record: ClientO
                 </>
               )}
             </dl>
+            {/* D-212: 무슨 서류인지 모르는 파일은 이 창에서 바로 고른다 — 예전에는 목차 보기로 가서 그 칸을 찾아야 했다 */}
+            {onMove && open.label.startsWith(OTHER_DOC_LABEL) && (
+              <DocKindPicker
+                record={record}
+                docKey={open.key}
+                onMove={(next, to) => {
+                  setOpen(null)
+                  onMove(next, to)
+                }}
+              />
+            )}
             {open.storagePath ? <DocFileActions label={open.label} storagePath={open.storagePath} fileName={open.fileName} /> : <p className="t-sub break-keep text-slate-500">이 브라우저에만 저장 중이라 파일은 열 수 없어요(클라우드를 연결하면 열려요).</p>}
             <Button
               variant="secondary"

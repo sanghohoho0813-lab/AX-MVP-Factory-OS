@@ -185,6 +185,7 @@ import { josa } from '../lib/josa'
 import { activeApplications, withApplyDocDone } from '../services/grants/grantApply'
 import { usePortalDocRequests } from '../components/grants/usePortalDocRequests'
 import { ClientReportSheet } from '../components/ops/ClientReportSheet'
+import type { ReportPeriod } from '../services/clientReport'
 
 
 
@@ -273,6 +274,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const [reportOpen, setReportOpen] = useState(() => searchParams.get('report') === '1')
   // 같은 화면이 떠 있는 채 다른 업체의 ?report=1 로 와도 연다
   const reportParam = searchParams.get('report') === '1'
+  const reportPeriodParam: ReportPeriod = (['year', 'last12', 'contract'] as const).find((p) => p === searchParams.get('period')) ?? 'year'
   useEffect(() => {
     if (reportParam) setReportOpen(true)
   }, [reportParam, clientId])
@@ -1397,6 +1399,11 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           <DocFolderView
             record={record}
             cloud={uploadable}
+            onMove={(next, to) => {
+              void commit(next).then((ok) => {
+                if (ok) showToast(`'${to}' 칸으로 옮겼습니다.`)
+              })
+            }}
             onShowInList={(key) => {
               changeDocView('list')
               setOpenDocs((cur) => new Set(cur).add(key))
@@ -1821,11 +1828,13 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         <ClientReportSheet
           record={record}
           today={today}
+          initialPeriod={reportPeriodParam}
           onClose={() => {
             setReportOpen(false)
             if (searchParams.has('report')) {
               const next = new URLSearchParams(searchParams)
               next.delete('report')
+              next.delete('period')
               setSearchParams(next, { replace: true, state: location.state })
             }
           }}

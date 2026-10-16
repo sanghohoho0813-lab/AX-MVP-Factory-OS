@@ -871,6 +871,8 @@ export interface DocUploadLog {
   cretop?: { fileName: string; filled: string[] }
   roster?: { fileName: string; employees: number; active: number; candidates: number; youthDeadlines: number }
   warnings: string[]
+  /** D-212: 이번에 못 올린 파일(이름 · 까닭) — 창을 닫아도 맞춤 추천에 남아 '다시 올리기' 를 잊지 않게 */
+  failed?: { fileName: string; reason: string }[]
 }
 
 /** D-130: 주주와 대표의 관계 — 증여공제 · 상속 · 특수관계 판단에 쓴다 */

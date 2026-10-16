@@ -8,7 +8,7 @@ import { Link } from 'react-router-dom'
 import { Check, Copy, FileText, HeartHandshake } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { careList, careMessage, careSnoozeUntil, withCareContact, withCareSnooze } from '../../services/clientCare'
-import { saveClient } from '../../services/clientOpsService'
+import { listClients, saveClient } from '../../services/clientOpsService'
 import { copyText } from '../consulting/studioParts'
 import { useToast } from '../ui/toastContext'
 import { Button } from '../ui/Button'
@@ -17,7 +17,18 @@ import { Fold } from '../ui/fold'
 
 const SHOW = 4
 
-export function TodayCare({ clients, today, onSaved }: { clients: ClientOpsRecord[]; today: string; onSaved: (record: ClientOpsRecord) => void }) {
+export function TodayCare({
+  clients,
+  today,
+  workspaceId,
+  onSaved,
+}: {
+  clients: ClientOpsRecord[]
+  today: string
+  /** D-212: 누르기 직전에 이 작업실 기록을 새로 읽는다 */
+  workspaceId: string | null
+  onSaved: (record: ClientOpsRecord) => void
+}) {
   const { showToast } = useToast()
   const sender = useSenderLine()
   const items = useMemo(() => careList(clients, today), [clients, today])
@@ -31,7 +42,9 @@ export function TodayCare({ clients, today, onSaved }: { clients: ClientOpsRecor
     if (!rec || busy) return
     setBusy(id)
     try {
-      onSaved(await saveClient(change(rec)))
+      // D-212: 오늘 화면을 아침에 열어 둔 채 다른 창 · 팀장이 이 업체에 메모 · 수수료를 적었으면, 처음 읽어 둔 기록으로 저장해 그것을 지웠다 — 저장 직전에 새로 읽는다
+      const fresh = (await listClients(workspaceId).catch(() => null))?.find((c) => c.id === id) ?? rec
+      onSaved(await saveClient(change(fresh)))
       showToast(done)
     } catch (cause) {
       showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
@@ -81,7 +94,8 @@ export function TodayCare({ clients, today, onSaved }: { clients: ClientOpsRecor
                 )}
                 {it.reason === 'anniversary' && (
                   <Link
-                    to={`/ops/clients/${it.clientId}?report=1`}
+                    // D-212: 1주년 카톡이 '지난 1년' 을 말하니 보고서도 최근 12개월로 연다(예전: 올해 — 2월이면 거의 빈 종이)
+                    to={`/ops/clients/${it.clientId}?report=1&period=last12`}
                     data-testid="care-report"
                     className="tap t-sub inline-flex h-10 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-medium text-slate-800 hover:bg-slate-50"
                   >

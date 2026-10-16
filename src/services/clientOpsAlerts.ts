@@ -142,9 +142,18 @@ export function documentsWithExpiry(record: ClientOpsRecord, today: string): { m
   const base = (l: string) => l.replace(/\s*\(\d+\)$/, '').replace(/[\s·ㆍ]/g, '')
   const all = allDocumentMetas(record).map((meta) => ({ meta, view: documentStatus(meta.key, record.documents[meta.key] ?? emptyDocumentState(), today, meta) }))
   const usableBase = new Set(all.filter((x) => x.view.usable).map((x) => base(x.meta.label)))
+  // D-212: 같은 서류가 둘 이상이면(사업자등록증 · 사업자등록증 (2)) 가장 늦게 끝나는 한 장만 — 새로 받은 서류가 있는데
+  // 옛 서류의 '곧 만료 · 새로 발급' 이 오늘 · 달력 · 서류 요청 문구 · 성과 보고서에 계속 뜨던 것
+  const keep = new Map<string, { key: DocumentKey; end: string }>()
+  for (const x of all) {
+    if (!x.view.received || x.view.expiresOn === null) continue
+    const b = base(x.meta.label)
+    const cur = keep.get(b)
+    if (!cur || x.view.expiresOn > cur.end) keep.set(b, { key: x.meta.key, end: x.view.expiresOn })
+  }
   return all.filter(
     (x): x is { meta: DocumentMeta; view: DocumentStatusView & { expiresOn: string } } =>
-      x.view.received && x.view.expiresOn !== null && !(x.view.expired && usableBase.has(base(x.meta.label))),
+      x.view.received && x.view.expiresOn !== null && !(x.view.expired && usableBase.has(base(x.meta.label))) && keep.get(base(x.meta.label))?.key === x.meta.key,
   )
 }
 

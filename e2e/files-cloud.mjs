@@ -104,6 +104,9 @@ const publicHits = []
 const fetched = []
 /** D-209: 이 이름이 든 파일은 저장소가 거절(용량 초과) — 자동 올리기에서 못 올린 파일이 말없이 사라지지 않는지 */
 let failBig = false
+/** D-212: 이 이름이 든 파일은 처음 한 번만 저장소가 503(잠깐 멈춤) — 알아서 한 번 더 올리는지 */
+const flakyHits = {}
+const shared = []
 
 // 컨테이너에 로캘이 없으면 크롬이 한글 파일 이름을 'download' 로 바꾼다 — 사용자 PC 와 같게 UTF-8 로 띄운다
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', env: { ...process.env, LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8' } })
@@ -153,6 +156,11 @@ await ctx.route(`https://${REF}.supabase.co/**`, async (route) => {
   // 올리기
   if (method === 'POST' && path.startsWith('/storage/v1/object/client-documents/')) {
     if (failBig && path.includes('TOO-BIG')) return route.fulfill({ status: 413, contentType: 'application/json', body: JSON.stringify({ statusCode: '413', error: 'Payload too large', message: 'The object exceeded the maximum allowed size' }) })
+    const flaky = path.match(/FLAKY[\w.-]*/)?.[0]
+    if (flaky) {
+      flakyHits[flaky] = (flakyHits[flaky] ?? 0) + 1
+      if (flakyHits[flaky] === 1) return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ statusCode: '503', error: 'Service Unavailable', message: 'Service Unavailable' }) })
+    }
     uploads.push(path.slice('/storage/v1/object/client-documents/'.length))
     return route.fulfill(json({ Key: path.slice('/storage/v1/object/'.length) }))
   }
@@ -160,6 +168,12 @@ await ctx.route(`https://${REF}.supabase.co/**`, async (route) => {
     return route.fulfill(json([{ id: 'lnk1', workspace_id: WS, operations_client_id: CID, profile_id: 'p1', status: 'active', customer_stage: 'contracted', display_name: '', consultant_name: '', linked_at: '2026-09-01T00:00:00Z', created_at: '2026-09-01T00:00:00Z', updated_at: '2026-09-01T00:00:00Z', profiles: { email: 'c@x.kr', name: '고객' } }]))
   }
   if (path.includes('/rest/v1/portal_documents')) {
+    // D-212: 내 서류함 파일을 고객에게 공유 — 고객 화면에 보일 제목
+    if (method === 'POST') {
+      const body = JSON.parse(req.postData() ?? '{}')
+      shared.push(Array.isArray(body) ? body[0] : body)
+      return route.fulfill(json(Array.isArray(body) ? body : { id: 'pd-new', ...body }))
+    }
     // D-148: 확인 완료(PATCH) → 그 한 줄을 돌려준다(.single())
     if (method === 'PATCH') {
       const body = JSON.parse(req.postData() ?? '{}')
@@ -331,12 +345,40 @@ await page.waitForTimeout(800)
 const bodyText = (await page.locator('body').innerText()) ?? ''
 const failRows = await page.locator('[data-testid="bulk-item"][data-status="error"]').count()
 check('D-209 자동 올리기: 못 올린 1건은 창에 빨간 줄로 남음(창이 닫히지 않음) · 알림에 "못 올린 1건" · 업체 이름', failRows === 1 && (await page.getByTestId('bulk-retry').count()) === 1 && bodyText.includes('못 올린 1건') && bodyText.includes('클라우드정밀(주) —'), JSON.stringify({ failRows, has: bodyText.includes('못 올린 1건') }))
+// D-212: 못 올린 파일이 업체 올리기 기록에도 남는다(창을 닫아도 맞춤 추천에서 다시 올리기)
+const failedLog = row.payload?.docUploads?.[0]?.failed ?? []
+check('D-212 못 올린 파일이 올리기 기록에 남음(이름 · 까닭)', failedLog.length === 1 && failedLog[0].fileName === 'TOO-BIG-scan.txt' && /너무 큽니다/.test(failedLog[0].reason), JSON.stringify(failedLog))
 failBig = false
 await page.getByTestId('bulk-retry').click()
 await page.waitForFunction(() => !document.querySelector('[data-testid="bulk-item"][data-status="error"]') && !document.querySelector('[data-testid="bulk-item"][data-status="uploading"]'), null, { timeout: 30000 })
 await page.waitForTimeout(800)
 const big = Object.values(row.payload?.documents ?? {}).find((d) => d?.fileName === 'TOO-BIG-scan.txt')
 check('D-209 [다시 올리기] → 그 파일도 서류함에 들어감', !!big?.storagePath, JSON.stringify(big))
+check('D-212 다시 올려 성공하면 최신 올리기 기록에 못 올린 파일 없음', !(row.payload?.docUploads?.[0]?.failed?.length), JSON.stringify(row.payload?.docUploads?.[0]?.failed))
+// D-212: 저장소가 잠깐 멈춰도(503) 알아서 한 번 더 — 빨간 줄 없이 들어간다
+await page.goto(`${BASE}/ops/clients/${CID}?tab=docs`, { waitUntil: 'networkidle' })
+await page.waitForTimeout(600)
+await page.getByTestId('client-upload').click()
+await page.getByLabel('서류 파일 고르기').last().setInputFiles([{ name: 'FLAKY-memo.txt', mimeType: 'text/plain', buffer: Buffer.from('회의 메모 두 번째', 'utf8') }])
+for (let i = 0; i < 80 && !Object.values(row.payload?.documents ?? {}).some((d) => d?.fileName === 'FLAKY-memo.txt'); i += 1) await page.waitForTimeout(250)
+await page.waitForTimeout(500)
+const flakyKey = Object.keys(flakyHits)[0] ?? ''
+const flakyDoc = Object.values(row.payload?.documents ?? {}).find((d) => d?.fileName === 'FLAKY-memo.txt')
+const flakyErr = await page.locator('[data-testid="bulk-item"][data-status="error"]').count()
+check('D-212 저장소가 처음 한 번 503 → 알아서 한 번 더 올려 서류함에 들어감 · 빨간 줄 0', flakyHits[flakyKey] === 2 && !!flakyDoc?.storagePath && flakyErr === 0, JSON.stringify({ flakyHits, flakyErr, flakyDoc }))
+
+// D-212: 직접 만든 칸을 고객에게 공유하면 제목이 그 칸 이름(예전: 'customdoc_photo')
+await page.goto(`${BASE}/ops/clients/${CID}?tab=portal`, { waitUntil: 'networkidle' })
+await page.waitForTimeout(1000)
+const shareBtn = page.getByRole('button', { name: '현장 사진 공유' })
+const mainText = (await page.locator('main').innerText().catch(() => '')) ?? ''
+check('D-212 고객에게 공유: 단추 이름이 칸 이름(현장 사진) · customdoc_ 글자 없음', (await shareBtn.count()) === 1 && !mainText.includes('customdoc_'), mainText.match(/내 서류함 파일을 고객에게 공유[\s\S]{0,200}/)?.[0] ?? mainText.slice(0, 200))
+if (await shareBtn.count()) {
+  await shareBtn.click()
+  await page.getByRole('alertdialog').getByRole('button', { name: '공유' }).click()
+  await page.waitForTimeout(800)
+}
+check('D-212 고객에게 공유: 고객 화면 제목 = 현장 사진', shared.length === 1 && shared[0]?.title === '현장 사진', JSON.stringify(shared))
 
 check('비공개 저장소: 공개 주소를 한 번도 쓰지 않았다', publicHits.length === 0, publicHits.join(' | '))
 // 이 시험 환경은 바깥 CDN 에 못 나간다 — 사진 글자 인식(tesseract) 일꾼을 못 받아 생기는 오류만 뺀다(실제 사용자 PC 는 받는다).

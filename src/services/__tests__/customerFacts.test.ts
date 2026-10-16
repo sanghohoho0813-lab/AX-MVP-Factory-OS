@@ -665,6 +665,13 @@ await (async () => {
   const log = docUploadLogOf(filled, summary, 'upA')
   check('D-183 올리기 기록: 바로 넣은 값은 저장된 값 그대로도 남긴다(번호는 숫자만)', log.entered[0].value === '1248100998' && log.entered[1].value === '2019-03-02', JSON.stringify(log.entered))
   check('D-183 올리기 기록 → 화면 모양(맞춤 추천 지난 올리기)', batchOfLog(log).files === 1 && batchOfLog(log).placed?.[0].label === '사업자등록증')
+  // D-212: 못 올린 파일도 기록에 — 창을 닫아도 맞춤 추천에 '다시 올리기' 로 남는다
+  const withFail = docUploadLogOf(filled, { ...summary, failed: [{ fileName: '등기부등본.pdf', reason: '파일이 너무 큽니다(30MB 넘음)' }] }, 'upF')
+  const round = normalizeClientOps(JSON.parse(JSON.stringify(withDocUploadLog(filled, withFail))))
+  check('D-212 못 올린 파일: 기록에 남고 · 저장했다 읽어도 그대로 · 화면 모양에도', round.docUploads?.[0].failed?.[0].fileName === '등기부등본.pdf' && batchOfLog(round.docUploads![0]).failed?.[0].reason.startsWith('파일이 너무 큽니다') === true, JSON.stringify(round.docUploads?.[0].failed))
+  check('D-212 못 올린 것이 없으면 칸도 없음(예전 기록 모양 그대로)', !('failed' in log) && !('failed' in batchOfLog(log)))
+  const junkFail = normalizeClientOps({ id: 'uf', companyName: 'x', docUploads: [{ id: 'up9', at: NOW, files: 0, placed: [], entered: [], flagged: [], warnings: [], failed: [{ fileName: 'a.pdf', reason: 'r' }, 'bad', { reason: 'no name' }] }] } as never)
+  check('D-212 못 올린 파일 기록: 이상한 줄은 버림', junkFail.docUploads?.[0].failed?.length === 1)
   const rec = withDocUploadLog(filled, log)
   const ds = buildDecisions(rec, T, [])
   const af = ds.find((d) => d.kind === 'autofill')

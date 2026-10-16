@@ -32,6 +32,8 @@ export interface DocBatchSummary {
   at: string
   /** D-146: 파일마다 서류함 어느 칸에 넣었나(올리는 쪽이 채운다) — '다 어디 갔는지 모르겠다' 를 없앤다 */
   placed?: { fileName: string; label: string; other: boolean; numbered: boolean; same?: boolean }[]
+  /** D-212: 못 올린 파일 — 올리는 쪽이 채운다 */
+  failed?: { fileName: string; reason: string }[]
 }
 
 /**
@@ -50,6 +52,7 @@ export function docUploadLogOf(record: ClientOpsRecord, summary: DocBatchSummary
     ...(summary.cretop ? { cretop: { fileName: summary.cretop.fileName, filled: summary.cretop.filled.slice(0, 20) } } : {}),
     ...(summary.roster ? { roster: summary.roster } : {}),
     warnings: summary.warnings.slice(0, 5),
+    ...(summary.failed?.length ? { failed: summary.failed.slice(0, 30).map((f) => ({ fileName: f.fileName.slice(0, 200), reason: f.reason.slice(0, 120) })) } : {}),
   }
 }
 
@@ -64,6 +67,7 @@ export function batchOfLog(log: DocUploadLog): DocBatchSummary {
     warnings: log.warnings,
     at: log.at,
     placed: log.placed,
+    ...(log.failed?.length ? { failed: log.failed } : {}),
   }
 }
 

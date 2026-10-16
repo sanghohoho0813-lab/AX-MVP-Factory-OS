@@ -10,6 +10,7 @@ import {
   CUSTOMER_STAGE_LABEL,
   CUSTOMER_STAGE_ORDER,
   suggestCustomerStage,
+  stageToOffer,
   type CustomerStage,
 } from '../../config/serviceCatalog'
 import { SERVICES } from '../../content/clientOpsCatalog'
@@ -46,7 +47,7 @@ export function PublishUpdateModal({
   const [actionRequired, setActionRequired] = useState(initialDraft?.customerActionRequired ?? false)
   const [actionLabel, setActionLabel] = useState(initialDraft?.customerActionLabel ?? '')
   const [dueDate, setDueDate] = useState('')
-  const [stage, setStage] = useState<CustomerStage | ''>(link.customerStage === suggested ? '' : suggested)
+  const [stage, setStage] = useState<CustomerStage | ''>(stageToOffer(link.customerStage, suggested))
   const [preview, setPreview] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
