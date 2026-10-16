@@ -157,7 +157,7 @@ export function normalizeOverrides(raw: unknown): ProfileOverrides {
           .filter(Boolean)
           .slice(0, 8)
       : undefined
-  const keys: IndustryKey[] = ['manufacturing', 'it', 'trade', 'food', 'health', 'professional', 'education', 'construction', 'general']
+  const keys: IndustryKey[] = ['manufacturing', 'it', 'trade', 'food', 'health', 'professional', 'education', 'construction', 'design', 'general']
   const out: ProfileOverrides = {}
   if (typeof r.industry === 'string' && (keys as string[]).includes(r.industry)) out.industry = r.industry as IndustryKey
   const item = str(r.item, 30)

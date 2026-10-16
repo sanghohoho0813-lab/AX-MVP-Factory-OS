@@ -7,3 +7,4 @@ export { renderSiteHtml, siteFileName, esc, safeHref, safeImage, telHref, mapHre
 export { siteChecks, type SiteCheck, type CheckLevel } from './checks'
 export * from './ops'
 export { normalizeSiteDoc, normalizeBlock, imageChars, MAX_TOTAL_IMAGE_CHARS } from './normalize'
+export { heroArt, serviceIcon, ALL_ART } from './art'

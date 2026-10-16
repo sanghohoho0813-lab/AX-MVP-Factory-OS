@@ -29,6 +29,15 @@ export const BLOCK_DEFS: BlockDef[] = [
     desc: '들어오자마자 보이는 큰 문구와 단추',
     anchor: 'home',
     fields: [
+      {
+        key: 'layout',
+        label: '모양',
+        kind: 'select',
+        options: [
+          { value: 'split', label: '글 + 그림 나란히(밝은 바탕)' },
+          { value: 'band', label: '색 바탕에 글만' },
+        ],
+      },
       { key: 'eyebrow', label: '작은 윗글(회사 이름 · 분야)', kind: 'text', max: 40 },
       { key: 'title', label: '큰 문구', kind: 'textarea', max: 80, hint: '줄을 바꾸면 화면에서도 줄이 바뀝니다' },
       { key: 'subtitle', label: '설명 한두 줄', kind: 'textarea', max: 200 },
@@ -45,7 +54,7 @@ export const BLOCK_DEFS: BlockDef[] = [
         ],
       },
       { key: 'buttonUrl', label: '갈 주소(https://…)', kind: 'text', max: 300, showWhen: { key: 'buttonTarget', value: 'url' } },
-      { key: 'image', label: '배경 사진(없으면 색)', kind: 'image' },
+      { key: 'image', label: '사진(없으면 업종 그림)', kind: 'image', hint: '나란히 모양은 오른쪽에, 색 바탕 모양은 뒤에 깔려요' },
       {
         key: 'align',
         label: '글 맞춤',
@@ -54,7 +63,9 @@ export const BLOCK_DEFS: BlockDef[] = [
           { value: 'left', label: '왼쪽' },
           { value: 'center', label: '가운데' },
         ],
+        showWhen: { key: 'layout', value: 'band' },
       },
+      { key: 'showFacts', label: '회사 정보 칩 보이기(설립 · 소재지 · 직원 — 회사 소개 블록에서)', kind: 'toggle' },
     ],
   },
   {
@@ -86,6 +97,16 @@ export const BLOCK_DEFS: BlockDef[] = [
     menu: '사업 소개',
     anchor: 'services',
     fields: [
+      {
+        key: 'layout',
+        label: '모양',
+        kind: 'select',
+        options: [
+          { value: 'icons', label: '아이콘 카드' },
+          { value: 'rows', label: '번호 줄' },
+          { value: 'plain', label: '글 카드' },
+        ],
+      },
       TITLE,
       INTRO,
       {
@@ -106,6 +127,15 @@ export const BLOCK_DEFS: BlockDef[] = [
     desc: '업력 · 직원 · 인증 같은 숫자를 크게',
     anchor: 'numbers',
     fields: [
+      {
+        key: 'layout',
+        label: '모양',
+        kind: 'select',
+        options: [
+          { value: 'band', label: '색 띠' },
+          { value: 'plain', label: '흰 바탕' },
+        ],
+      },
       TITLE,
       {
         key: 'items',

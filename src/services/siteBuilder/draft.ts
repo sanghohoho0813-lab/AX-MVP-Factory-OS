@@ -144,6 +144,7 @@ export function draftSite(record: ClientOpsRecord, opts: DraftOptions): SiteDoc 
       'hero',
       makeId(),
       {
+        layout: 'split',
         eyebrow: [company, f.item ? shortItem(f.item, '') : ''].filter(Boolean).join(' · '),
         title: fill(ind.heroTitle),
         subtitle: fill(ind.heroSubtitle),
@@ -152,6 +153,7 @@ export function draftSite(record: ClientOpsRecord, opts: DraftOptions): SiteDoc 
         buttonUrl: '',
         image: '',
         align: 'left',
+        showFacts: true,
       },
       ['title', 'subtitle'],
     ),
@@ -186,18 +188,17 @@ export function draftSite(record: ClientOpsRecord, opts: DraftOptions): SiteDoc 
   if (f.certifications.length + (f.researchLab ? 1 : 0) > 0) numbers.push({ value: `${f.certifications.length + (f.researchLab ? 1 : 0)}건`, label: '보유 인증' })
   if (f.patents.length > 0) numbers.push({ value: `${f.patents.length}건`, label: '특허' })
 
-  const services: ListItem[] = (() => {
-    const own = listOf(f.item).slice(0, 6)
-    return own.length >= 2 ? own.map((name) => ({ name, desc: '' })) : ind.services.map((s) => ({ ...s }))
-  })()
-  const servicesFromRecord = listOf(f.item).length >= 2
+  // 종목이 여럿이면 그것을 사업 카드로 — 단 '광고물 제조업' 처럼 업종 분류 이름(…업)이 섞여 있으면 견본 카드가 낫다(D-205)
+  const ownItems = listOf(f.item).slice(0, 6)
+  const servicesFromRecord = ownItems.length >= 2 && !ownItems.some((x) => /업$/.test(x))
+  const services: ListItem[] = servicesFromRecord ? ownItems.map((name) => ({ name, desc: '' })) : ind.services.map((s) => ({ ...s }))
 
   for (const t of ind.include) {
     if (t === 'about') {
       blocks.push(block('about', makeId(), { title: '회사 소개', body: `${first}\n${ind.aboutPromise}`, image: '', facts }, ['body']))
-      if (numbers.length >= 2) blocks.push(block('numbers', makeId(), { title: `숫자로 보는 ${company}`, items: numbers }))
+      if (numbers.length >= 2) blocks.push(block('numbers', makeId(), { layout: 'band', title: `숫자로 보는 ${company}`, items: numbers }))
     } else if (t === 'services') {
-      blocks.push(block('services', makeId(), { title: ind.servicesTitle, intro: '', items: services }, servicesFromRecord ? [] : ['items']))
+      blocks.push(block('services', makeId(), { layout: 'icons', title: ind.servicesTitle, intro: '', items: services }, servicesFromRecord ? [] : ['items']))
       if (certItems.length > 0) blocks.push(block('certs', makeId(), { title: '인증 · 특허', intro: '', items: certItems }))
     } else if (t === 'process') {
       blocks.push(block('process', makeId(), { title: ind.processTitle, intro: '', items: ind.process.map((s) => ({ ...s })) }, ['items']))
@@ -250,13 +251,13 @@ export function newBlock(type: BlockType, record: ClientOpsRecord | null, indust
     case 'header':
       return block(type, id, { logoText: company, logoImage: '', showMenu: true, ctaLabel: '문의하기' })
     case 'hero':
-      return block(type, id, { eyebrow: company, title: ind.heroTitle.replace(/\{item\}/g, ind.fallbackItem), subtitle: '', buttonLabel: '문의하기', buttonTarget: 'contact', buttonUrl: '', image: '', align: 'left' }, ['title'])
+      return block(type, id, { layout: 'split', eyebrow: company, title: ind.heroTitle.replace(/\{item\}/g, ind.fallbackItem), subtitle: '', buttonLabel: '문의하기', buttonTarget: 'contact', buttonUrl: '', image: '', align: 'left', showFacts: true }, ['title'])
     case 'about':
       return block(type, id, { title: '회사 소개', body: ind.aboutPromise, image: '', facts: [] }, ['body'])
     case 'services':
-      return block(type, id, { title: ind.servicesTitle, intro: '', items: ind.services.map((s) => ({ ...s })) }, ['items'])
+      return block(type, id, { layout: 'icons', title: ind.servicesTitle, intro: '', items: ind.services.map((s) => ({ ...s })) }, ['items'])
     case 'numbers':
-      return block(type, id, { title: '숫자로 보기', items: [{ value: '', label: '' }] })
+      return block(type, id, { layout: 'band', title: '숫자로 보기', items: [{ value: '', label: '' }] })
     case 'certs':
       return block(type, id, { title: '인증 · 특허', intro: '', items: [{ name: '', detail: '' }] })
     case 'history': {

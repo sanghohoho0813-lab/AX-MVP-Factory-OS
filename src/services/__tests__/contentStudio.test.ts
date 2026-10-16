@@ -208,7 +208,7 @@ const libBad = INDUSTRIES.flatMap((k) => {
   if (/최고|1위|100%|보장|완치/.test(text.replace(l.caution ?? '', ''))) problems.push(`${k} risky`)
   return problems
 })
-check('C45 업종 견본 9개 — 정보 5 · 기준 5 · 순서 3+ · 질문 3+ · 마무리에 회사 이름 자리 · 광고 규정 말 0', libBad.length === 0 && INDUSTRIES.length === 9, libBad)
+check('C45 업종 견본 10개(디자인 · 광고 · 간판 포함) — 정보 5 · 기준 5 · 순서 3+ · 질문 3+ · 마무리에 회사 이름 자리 · 광고 규정 말 0', libBad.length === 0 && INDUSTRIES.length === 10, libBad)
 
 if (SHOW) {
   const show = (p: ContentProfile, kind: ContentKind, extra: Record<string, unknown> = {}) => {

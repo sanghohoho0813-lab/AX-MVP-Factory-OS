@@ -3,6 +3,7 @@
  */
 import { normalizeClientOps } from '../clientOpsService'
 import {
+  ALL_ART,
   BLOCK_DEFS,
   PALETTES,
   blockAnchors,
@@ -31,6 +32,7 @@ import {
   siteChecks,
   siteFileName,
   withContactPhone,
+  heroArt,
   type SiteDoc,
 } from '../siteBuilder'
 
@@ -82,9 +84,15 @@ const IND: [string[], string][] = [
   [['건설업', '실내 인테리어 공사'], 'construction'],
   [['', ''], 'general'],
   [['기타', '잡화'], 'general'],
+  // D-205 — 간판 · 광고 · 인쇄 · 디자인은 '제조' 가 붙어도 디자인 · 광고(샤인디자인이 제조 견본으로 나가던 것)
+  [['제조업', '간판 및 광고물 제조업'], 'design'],
+  [['서비스업', '시각 디자인업'], 'design'],
+  [['제조업', '인쇄물 출력'], 'design'],
+  [['서비스', '광고 대행업'], 'design'],
+  [['제조업', '인쇄회로기판 제조'], 'manufacturing'],
 ]
 const indBad = IND.filter(([t, k]) => industryOf(...t) !== k).map(([t, k]) => ({ t, want: k, got: industryOf(...t) }))
-check('H1 업종 알아보기 13가지(제조 먼저 · 식품 제조는 제조 · 카페는 음식 · 모르면 기타)', indBad.length === 0, indBad)
+check('H1 업종 알아보기 18가지(간판 · 광고 · 인쇄 · 디자인 먼저 · 인쇄회로기판은 제조 · 제조 · 식품 제조는 제조 · 카페는 음식 · 모르면 기타)', indBad.length === 0, indBad)
 
 check('H2 사업자등록번호 000-00-00000 · 10자리 아니면 그대로', formatBizNo('1234567890') === '123-45-67890' && formatBizNo('123-45-678') === '123-45-678')
 check('H3 지역: 경기도 화성시 → 경기 화성시 · 서울특별시 강남구 → 서울 강남구', regionOf('경기도 화성시 동탄') === '경기 화성시' && regionOf('서울특별시 강남구 테헤란로 1') === '서울 강남구' && regionOf('') === '')
@@ -133,9 +141,9 @@ const dp2 = withContactPhone(dp, '010-1111-2222', now)
 check('H16 [담당자 번호 넣기] → 연락처 · 바닥 줄 전화 채움 · 점검에서 사라짐', dp2.blocks.filter((b) => b.props.phone === '010-1111-2222').length === 2 && !siteChecks(dp2, { contactPhone: '010-1111-2222' }).some((c) => c.key === 'phone'))
 
 // 업종 9개 모두 초안 → 그려짐
-const allInd = ['manufacturing', 'it', 'trade', 'food', 'health', 'professional', 'education', 'construction', 'general'] as const
+const allInd = ['manufacturing', 'it', 'trade', 'food', 'health', 'professional', 'education', 'construction', 'design', 'general'] as const
 const indRender = allInd.map((k) => ({ k, html: renderSiteHtml(draftSite(full, { today, now, makeId, industry: k })) }))
-check('H17 업종 9개 모두 초안 → HTML(<!doctype · 회사명 · 스크립트 0)', indRender.every((x) => x.html.startsWith('<!doctype html>') && x.html.includes('한솔정밀(주)') && !/<script/i.test(x.html)), indRender.filter((x) => !x.html.includes('한솔정밀')).map((x) => x.k))
+check('H17 업종 10개 모두 초안 → HTML(<!doctype · 회사명 · 스크립트 0)', indRender.every((x) => x.html.startsWith('<!doctype html>') && x.html.includes('한솔정밀(주)') && !/<script/i.test(x.html)), indRender.filter((x) => !x.html.includes('한솔정밀')).map((x) => x.k))
 
 /* ---------------- 그리기 ---------------- */
 const html = renderSiteHtml(d)
@@ -180,7 +188,9 @@ for (let i = 0; i < 600; i++) {
     }
   }
   doc = { ...doc, seo: { title: pick(EVIL), description: pick(EVIL) } }
-  const out = renderSiteHtml(doc, { preview: rnd() < 0.5, selectedId: pick(doc.blocks).id })
+  const raw = renderSiteHtml(doc, { preview: rnd() < 0.5, selectedId: pick(doc.blocks).id })
+  // 우리 그림 · 아이콘(art.ts — 사람이 적은 글 없음)만 빼고 본다: 그 밖의 <svg 는 하나도 없어야 한다
+  const out = ALL_ART.reduce((acc, a) => acc.split(a).join(''), raw)
   const problems = [
     /<script/i.test(out) && 'script',
     /<(img|svg|iframe)[^>]*\son\w+=/i.test(out) && 'on-handler',
@@ -211,7 +221,7 @@ const contrastBad = PALETTES.flatMap((p) => {
   ]
   return pairs.filter(([, a, b, min]) => contrastRatio(a, b) < min).map(([name, a, b]) => `${p.key} ${name} ${contrastRatio(a, b).toFixed(2)}`)
 })
-check('H28 색 묶음 6개 × 글자/바탕 7쌍 — 모두 대비 기준 넘음', contrastBad.length === 0, contrastBad)
+check('H28 색 묶음 7개 × 글자/바탕 7쌍 — 모두 대비 기준 넘음', contrastBad.length === 0, contrastBad)
 
 /* ---------------- 고치기 ---------------- */
 const hdr = d.blocks[0]
@@ -286,6 +296,46 @@ check('H43 점검 순서 = 꼭 → 확인 → 참고', (() => {
 
 check('H44 내려받을 파일 이름 = 회사명-홈페이지.html(못 쓰는 글자 · 빈칸 뺌)', siteFileName(d) === '한솔정밀(주)-홈페이지.html' && siteFileName(setProp(d, footer.id, 'companyName', 'A/B: C*D', now)) === 'ABCD-홈페이지.html')
 check('H45 블록 정의 12종 · 칸 이름 겹침 없음 · 목록 칸엔 줄 칸 정의', BLOCK_DEFS.length === 12 && BLOCK_DEFS.every((b) => new Set(b.fields.map((f) => f.key)).size === b.fields.length && b.fields.every((f) => f.kind !== 'list' || (f.itemFields?.length ?? 0) > 0)))
+
+/* ---------------- D-205 모양 · 그림 · 업종 ---------------- */
+n = 0
+const shine = normalizeClientOps({
+  id: 'c-shine',
+  companyName: '(주)샤인디자인',
+  representativeName: '권유진',
+  businessCategory: '제조업',
+  businessItem: '간판 및 광고물 제조업',
+  businessAddress: '경기도 남양주시 진접읍 1',
+  establishedAt: '2024-04-02',
+  employeeCount: '3',
+  companyPhone: '031-555-1234',
+})
+const sd = draftSite(shine, { today, now, makeId })
+const sHero = sd.blocks.find((b) => b.type === 'hero')!
+const sHtml = renderSiteHtml(sd)
+check('H46 샤인디자인(간판 및 광고물 제조업) → 디자인 · 광고 견본(제조 문구 0) · 보라 색', sd.industry === 'design' && sd.theme.palette === 'violet' && !/제조 파트너|납기/.test(String(sHero.props.title) + String(sHero.props.subtitle)) && /간판/.test(String(sHero.props.title)), { industry: sd.industry, title: sHero.props.title })
+check('H47 첫 화면 기본 = 글 + 그림 나란히 · 업종 그림 · 마지막 줄 강조 · 전화 단추 · 칩(설립 · 소재지 · 직원)', sHtml.includes('class="hero split"') && sHtml.includes(ALL_ART.find((a) => a === heroArt('design'))!) && sHtml.includes('<span class="hl">간판과 디자인</span>') && sHtml.includes('href="tel:0315551234"') && /<ul class="chips"><li><span>설립<\/span>2024년 4월<\/li><li><span>소재지<\/span>경기 남양주시<\/li><li><span>직원<\/span>3명<\/li><\/ul>/.test(sHtml), sHtml.slice(sHtml.indexOf('class="hero'), sHtml.indexOf('class="hero') + 400))
+const bandDoc = setProp(sd, sHero.id, 'layout', 'band', now)
+const bandHtml = renderSiteHtml(bandDoc)
+check('H48 첫 화면 색 바탕 → 그림 없음 · class hero band · 칩은 그대로', bandHtml.includes('class="hero band"') && !bandHtml.includes('<svg class="art"') && bandHtml.includes('<ul class="chips">'))
+const sSrv = sd.blocks.find((b) => b.type === 'services')!
+const srvCount = (sSrv.props.items as unknown[]).length
+check('H49 사업 카드 기본 = 아이콘 카드(카드마다 아이콘) · 번호 줄(01 …) · 글 카드(아이콘 0)', (sHtml.match(/<span class="icw"><svg class="ic"/g) ?? []).length === srvCount && renderSiteHtml(setProp(sd, sSrv.id, 'layout', 'rows', now)).includes('<ol class="rows"><li><em>01</em>') && !renderSiteHtml(setProp(sd, sSrv.id, 'layout', 'plain', now)).includes('class="icw"'), srvCount)
+// 예전 저장본(모양 칸 없음) → 새 모양 · 칩은 꺼진 채(예전 화면에 없던 것을 저절로 켜지 않음)
+const oldRaw = JSON.parse(JSON.stringify(d)) as { blocks: { type: string; props: Record<string, unknown> }[] }
+for (const b of oldRaw.blocks) {
+  delete b.props.layout
+  delete b.props.showFacts
+}
+const oldDoc = normalizeSiteDoc(oldRaw)!
+const oldHero = oldDoc.blocks.find((b) => b.type === 'hero')!
+check('H50 예전 저장본(모양 칸 없음) → 첫 화면 나란히 · 사업 아이콘 카드 · 숫자 색 띠 · 칩은 꺼짐', oldHero.props.layout === 'split' && oldHero.props.showFacts === false && oldDoc.blocks.find((b) => b.type === 'services')!.props.layout === 'icons' && oldDoc.blocks.find((b) => b.type === 'numbers')!.props.layout === 'band' && !renderSiteHtml(oldDoc).includes('class="chips"'))
+const fullHtml = renderSiteHtml(d)
+check('H51 숫자 색 띠 = class numband · 번갈아 옅은 바탕은 띠를 세지 않음(소개 흰 → 사업 옅은)', fullHtml.includes('id="numbers" class="numband"') && fullHtml.includes('id="about" class=""') && fullHtml.includes('id="services" class="alt"'), /id="(about|services|numbers)" class="[^"]*"/g.exec(fullHtml)?.[0])
+const artBad = ALL_ART.filter((a) => /\son\w+=|<text|href|<script|<foreignObject|url\(/i.test(a) || !a.startsWith('<svg class="'))
+check('H52 그림 · 아이콘(업종 10 + 아이콘 18) — 이벤트 · 글자 · 링크 · 바깥 주소 0 · 업종마다 그림이 다름', artBad.length === 0 && ALL_ART.length === 28 && new Set(allInd.map((k) => heroArt(k))).size === allInd.length, artBad.length)
+check('H53 로고 자리 글자 — (주)샤인디자인 → 샤 · 한솔정밀(주) → 한', sHtml.includes('<span class="mark" aria-hidden="true">샤</span>') && fullHtml.includes('<span class="mark" aria-hidden="true">한</span>'))
+check('H54 구역 머리글(ABOUT · BUSINESS · PROCESS · FAQ · CONTACT) — 고정 글', ['ABOUT', 'BUSINESS', 'PROCESS', 'FAQ', 'CONTACT'].every((k) => fullHtml.includes(`<p class="kicker">${k}</p>`)))
 
 console.log(`\n홈페이지 만들기: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

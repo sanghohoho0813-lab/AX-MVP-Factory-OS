@@ -42,7 +42,7 @@ export interface SiteBlock {
   sample?: string[]
 }
 
-export type PaletteKey = 'navy' | 'forest' | 'ocean' | 'wine' | 'sunset' | 'charcoal'
+export type PaletteKey = 'navy' | 'forest' | 'ocean' | 'wine' | 'sunset' | 'charcoal' | 'violet'
 export type FontKey = 'sans' | 'serif'
 export type CornerKey = 'square' | 'round' | 'pill'
 
@@ -61,6 +61,7 @@ export type IndustryKey =
   | 'professional'
   | 'education'
   | 'construction'
+  | 'design'
   | 'general'
 
 export interface SiteSeo {

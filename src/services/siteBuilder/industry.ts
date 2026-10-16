@@ -169,6 +169,23 @@ export const INDUSTRIES: IndustryDef[] = [
     include: ['about', 'services', 'process', 'faq', 'cta', 'contact'],
   },
   {
+    key: 'design',
+    label: '디자인 · 광고 · 간판 · 인쇄',
+    heroTitle: '보는 순간 기억되는\n간판과 디자인',
+    heroSubtitle: '{item} — 상담 · 시안 · 제작 · 설치까지 한 곳에서 챙깁니다.',
+    fallbackItem: '간판 · 광고물 제작',
+    aboutPromise: '가게와 회사의 얼굴이 되는 일이라, 시안 한 장부터 설치 마무리까지 직접 확인합니다.',
+    servicesTitle: '하는 일',
+    services: [CARD('간판 제작 · 설치', '가게 · 건물 외부 간판을 디자인하고 만들어 설치합니다.'), CARD('실내 사인 · 안내물', '안내판 · 실내 사인 · 시트 작업을 합니다.'), CARD('인쇄물 · 현수막', '현수막 · 배너 · 전단 · 명함을 만듭니다.'), CARD('디자인', '로고 · 브랜드 · 홍보물 디자인을 합니다.')],
+    processTitle: '제작은 이렇게 진행돼요',
+    process: [STEP('상담 · 현장 실측', '설치할 곳을 보고 크기와 조건을 확인합니다.'), STEP('시안 · 견적', '디자인 시안과 비용을 함께 드립니다.'), STEP('제작', '확정한 시안대로 만듭니다.'), STEP('설치 · A/S', '설치 뒤에도 문제가 없는지 챙깁니다.')],
+    faq: [QA('설치까지 해 주나요?', '설치 가능 지역과 조건을 적어 주세요.'), QA('허가 · 신고도 도와주나요?', '설치할 곳에 따라 필요한 절차가 다릅니다. 상담 때 확인해 안내해 드립니다.'), QA('시안은 몇 번 고칠 수 있나요?', '시안 수정 횟수와 조건을 적어 주세요.')],
+    ctaTitle: '시안 · 견적 문의',
+    ctaBody: '설치할 곳 사진과 원하는 느낌을 보내 주시면 시안과 견적을 드립니다.',
+    hours: '평일 09:00 – 18:00 · 토요일 상담 가능',
+    include: ['about', 'services', 'process', 'faq', 'cta', 'contact'],
+  },
+  {
     key: 'general',
     label: '기타',
     heroTitle: '찾아 주셔서\n감사합니다',
@@ -192,23 +209,30 @@ export function industryDef(key: string): IndustryDef {
 }
 
 /**
- * 업태 · 종목 · 업종 글로 업종을 알아본다. '제조' 가 들어 있으면 먼저 제조(식품 제조는 제조) —
- * 그다음 겹치지 않는 낱말 순서로. 모르면 '기타'.
+ * 업태 · 종목 · 업종 글로 업종을 알아본다.
+ *  1) 간판 · 광고물 · 인쇄 · 디자인은 '제조' 가 붙어 있어도 디자인 · 광고(D-205 — '간판 및 광고물 제조업' 이 제조 견본으로 나가던 것)
+ *  2) 그다음 '제조' 가 들어 있으면 제조(식품 제조는 제조)
+ *  3) 그다음 겹치지 않는 낱말 순서로. 모르면 '기타'.
  */
 const RULES: { key: IndustryKey; re: RegExp }[] = [
   { key: 'construction', re: /건설|건축|인테리어|시공|토목|공사업|설비공사|전기공사|조경|리모델링|도배|타일/ },
   { key: 'food', re: /음식점|식당|카페|커피|베이커리|제과점|외식|주점|휴게음식|일반음식|분식|치킨|한식|중식|일식|양식/ },
   { key: 'health', re: /의원|병원|한의원|치과|약국|의료|뷰티|미용|피부|네일|헬스|필라테스|요가|마사지|에스테틱/ },
   { key: 'education', re: /교육|학원|교습|강의|코칭|훈련|어학|과외/ },
-  { key: 'professional', re: /세무|회계|법률|법무|노무|변리|컨설팅|경영자문|자문|디자인|광고|마케팅|번역|감정평가|행정사/ },
+  { key: 'professional', re: /세무|회계|법률|법무|노무|변리|컨설팅|경영자문|자문|번역|감정평가|행정사/ },
   { key: 'it', re: /소프트웨어|정보통신|플랫폼|응용|시스템\s*통합|데이터|인공지능|컴퓨터|프로그램|웹|앱|IT|SI\b|클라우드/i },
   { key: 'trade', re: /도매|소매|유통|무역|상사|수출|수입|전자상거래|통신판매|쇼핑/ },
   { key: 'manufacturing', re: /생산|가공|금속|부품|기계|플라스틱|화학|섬유|소재|주조|금형|사출|도금|용접/ },
 ]
 
+/** 간판 · 광고 · 인쇄 · 디자인 — '제조' 보다 먼저 본다 */
+const DESIGN = /간판|광고물|옥외광고|사인물|사인\s*제작|현수막|실사\s*출력|인쇄|디자인|광고|마케팅|브랜딩/
+
 export function industryOf(...texts: string[]): IndustryKey {
   const text = texts.filter(Boolean).join(' ')
   if (!text.trim()) return 'general'
+  // 인쇄회로기판(PCB)은 전자부품 제조
+  if (DESIGN.test(text.replace(/인쇄\s*회로/g, '')) && !/음식점|식당|카페|의원|병원/.test(text)) return 'design'
   if (/제조/.test(text) && !/음식점|식당|카페/.test(text)) return 'manufacturing'
   for (const r of RULES) if (r.re.test(text)) return r.key
   return 'general'

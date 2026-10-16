@@ -37,6 +37,7 @@ export const PALETTES: Palette[] = [
   { key: 'ocean', label: '바다', hint: 'IT · 소프트웨어 · 의료', primary: '#0e6a8a', onPrimary: '#ffffff', heroFrom: '#063349', heroTo: '#0e6a8a', soft: '#eef7fa', ink: '#0f172a', muted: '#475569', line: '#d3e7ee', footBg: '#04202e', footInk: '#c8dde5' },
   { key: 'wine', label: '와인', hint: '뷰티 · 법률 · 고급 서비스', primary: '#7f1d3f', onPrimary: '#ffffff', heroFrom: '#3d0b1f', heroTo: '#7f1d3f', soft: '#faf2f5', ink: '#1f1218', muted: '#5b4750', line: '#ecd9e0', footBg: '#24070f', footInk: '#e5cfd6' },
   { key: 'sunset', label: '노을', hint: '음식 · 카페 · 교육', primary: '#b4410f', onPrimary: '#ffffff', heroFrom: '#5c1d05', heroTo: '#b4410f', soft: '#fdf5ef', ink: '#1c1410', muted: '#5c4b40', line: '#f1ddd0', footBg: '#2b1206', footInk: '#ecd8cb' },
+  { key: 'violet', label: '보라', hint: '디자인 · 광고 · 간판', primary: '#5b21b6', onPrimary: '#ffffff', heroFrom: '#2a0c5e', heroTo: '#5b21b6', soft: '#f6f3fd', ink: '#17112a', muted: '#4c4663', line: '#e3dcf3', footBg: '#170833', footInk: '#ddd3f5' },
   { key: 'charcoal', label: '먹색', hint: '건설 · 인테리어 · 제조', primary: '#27272a', onPrimary: '#ffffff', heroFrom: '#09090b', heroTo: '#3f3f46', soft: '#f4f4f5', ink: '#18181b', muted: '#52525b', line: '#e4e4e7', footBg: '#09090b', footInk: '#d4d4d8' },
 ]
 
@@ -83,6 +84,7 @@ export const INDUSTRY_PALETTE: Record<IndustryKey, PaletteKey> = {
   professional: 'navy',
   education: 'sunset',
   construction: 'charcoal',
+  design: 'violet',
   general: 'navy',
 }
 

@@ -7,7 +7,7 @@
  * 휴대폰에서는 [고치기 | 미리보기] 를 번갈아 본다.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowDown, ArrowUp, Check, CheckCircle2, Copy, Download, ExternalLink, EyeOff, Monitor, Plus, Redo2, RefreshCw, Smartphone, Trash2, Undo2 } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowUp, Check, CheckCircle2, Copy, Download, ExternalLink, EyeOff, Maximize2, Minimize2, Monitor, Plus, Redo2, RefreshCw, Smartphone, Trash2, Undo2 } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { BottomSheet, Badge } from '../../components/ui/primitives'
 import { ConfirmModal } from '../../components/ui/ConfirmModal'
@@ -162,6 +162,8 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
   const [adding, setAdding] = useState(false)
   const [removing, setRemoving] = useState<SiteBlock | null>(null)
   const [redraft, setRedraft] = useState<IndustryKey | null>(null)
+  // PC 미리보기 크게(왼쪽 고치기 칸을 접고 미리보기만) — D-205
+  const [big, setBig] = useState(false)
   const doc = store.doc
   const today = todayLocalDate()
 
@@ -176,6 +178,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
     (id: string) => {
       setSelected(id)
       setTab('blocks')
+      setBig(false)
       if (phone) setPane('edit')
       window.setTimeout(() => document.querySelector(`[data-block-row="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 50)
     },
@@ -213,6 +216,10 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
   }
   const imageRoom = MAX_TOTAL_IMAGE_CHARS - imageChars(doc)
+  // 업체 기록으로 본 업종과 지금 견본이 다르고, 첫 화면 문구가 아직 견본이면 → 맞는 견본으로 바꾸자고 알린다(D-205)
+  const detected = industryForRecord(record)
+  const heroBlock = doc.blocks.find((b) => b.type === 'hero')
+  const mismatch = detected !== doc.industry && detected !== 'general' && Boolean(heroBlock?.sample?.includes('title'))
   const visibleCount = doc.blocks.filter((b) => hasContent(b) && !(b.hidePc && b.hideMobile)).length
 
   /* ---- 머리 도구줄 ---- */
@@ -472,15 +479,32 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
             {d === 'pc' ? 'PC' : '휴대폰'}
           </button>
         ))}
-        <span className="t-meta ml-auto break-keep text-slate-500">{phone ? '블록을 누르면 고치기 화면에서 열려요' : '블록을 누르면 왼쪽에서 열려요'}</span>
+        <span className="t-meta ml-auto break-keep text-slate-500">{phone ? '블록을 누르면 고치기 화면에서 열려요' : big ? '블록을 누르면 고치기 칸이 다시 열려요' : '블록을 누르면 왼쪽에서 열려요'}</span>
+        {!phone && (
+          <Button size="sm" onClick={() => setBig((v) => !v)} aria-pressed={big} data-testid="preview-big">
+            {big ? <Minimize2 className="size-4" aria-hidden="true" /> : <Maximize2 className="size-4" aria-hidden="true" />}
+            {big ? '고치기 칸 같이 보기' : '미리보기 크게'}
+          </Button>
+        )}
       </div>
-      <SitePreview doc={doc} device={device} selectedId={selected} onSelect={selectBlock} height={phone ? 620 : 760} />
+      <SitePreview doc={doc} device={device} selectedId={selected} onSelect={selectBlock} height={phone ? 620 : big ? 860 : 760} />
     </div>
   )
 
   return (
     <div className="flex flex-col gap-4" data-testid="site-builder">
       {toolbar}
+      {mismatch && (
+        <div className="flex flex-wrap items-center gap-3 rounded-(--radius-panel) border border-amber-200 bg-amber-50 p-3 sm:p-4" data-testid="site-industry-mismatch" data-detected={detected}>
+          <AlertTriangle className="size-5 shrink-0 text-amber-600" aria-hidden="true" />
+          <p className="t-body min-w-0 flex-1 break-keep text-amber-900">
+            업체 기록으로 보면 <b>{industryDef(detected).label}</b> 업종이에요. 지금은 {industryDef(doc.industry).label} 견본이라 첫 화면 문구가 안 맞을 수 있어요.
+          </p>
+          <Button size="sm" variant="primary" onClick={() => setRedraft(detected)} data-testid="site-industry-fix">
+            맞는 견본으로 바꾸기
+          </Button>
+        </div>
+      )}
       {phone ? (
         <>
           <div className="flex gap-1 rounded-(--radius-control) bg-slate-100 p-1">
@@ -493,8 +517,8 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
           {pane === 'edit' ? editor : preview}
         </>
       ) : (
-        <div className="grid items-start gap-4 lg:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]">
-          {editor}
+        <div className={`grid items-start gap-4 ${big ? '' : 'lg:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]'}`} data-big={big}>
+          {!big && editor}
           {preview}
         </div>
       )}

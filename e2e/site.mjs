@@ -125,6 +125,20 @@ const errors = []
   const html = await frameHtml(page)
   check('3 미리보기 — 회사명 · 사업자등록번호 · 대표 전화 · 스크립트 0', html.includes('한솔정밀(주)') && html.includes('사업자등록번호 123-45-67890') && html.includes('031-123-4567') && !/<script/i.test(html))
   check('3 미리보기 — 숫자(업력 12년 · 42명) · 인증(이노비즈 · 기업부설연구소)', /12년/.test(html) && /42명/.test(html) && html.includes('이노비즈') && html.includes('기업부설연구소'))
+  // D-205 모양 · 그림
+  const look = await frameEval(page, (doc) => ({
+    split: doc.querySelectorAll('section.hero.split').length,
+    art: doc.querySelectorAll('.hero-art svg.art').length,
+    hl: doc.querySelector('.hero h1 .hl')?.textContent ?? '',
+    chips: [...doc.querySelectorAll('.hero .chips li')].map((li) => li.textContent),
+    icw: doc.querySelectorAll('#services .icw svg.ic').length,
+    cards: doc.querySelectorAll('#services .card').length,
+    numband: doc.querySelectorAll('section.numband').length,
+    kicker: [...doc.querySelectorAll('.kicker')].map((k) => k.textContent),
+    mark: doc.querySelector('.logo .mark')?.textContent ?? '',
+  }))
+  check('3b 첫 화면 = 글 + 업종 그림 나란히 · 마지막 줄 강조 · 칩(설립 · 소재지 · 직원)', look.split === 1 && look.art === 1 && look.hl.length > 0 && look.chips.length === 3 && look.chips[0].startsWith('설립'), look)
+  check('3b 사업 = 아이콘 카드(카드마다 아이콘) · 숫자 = 색 띠 · 구역 머리글 · 로고 글자', look.cards >= 2 && look.icw === look.cards && look.numband === 1 && look.kicker.includes('ABOUT') && look.kicker.includes('BUSINESS') && look.mark === '한', look)
   check('3 저장됨', await waitSaved(page))
   const firstSaved = await savedDoc(page)
   check('3 이 브라우저 모듈 기록(homepage · site)에 업체별 한 줄', firstSaved?.blocks?.length === types.length)
@@ -234,10 +248,27 @@ const errors = []
   await heroEditor.locator('textarea[data-field="title"]').fill('<img src=x onerror=alert(1)><script>alert(2)</script>')
   await rowOf(page, 'hero').locator('input[data-field="buttonLabel"]').fill('"><svg onload=alert(3)>')
   await wait(1200)
-  const evil = await frameEval(page, (doc) => ({ img: doc.querySelectorAll('img[onerror], svg, script').length, text: doc.querySelector('h1')?.textContent ?? '' }))
-  check('13 공격 글 → 미리보기에 img/svg/script 0 · 글자로만 보임 · 알림창 0', evil.img === 0 && evil.text.includes('<img src=x onerror=alert(1)>') && dialogs === 0, evil)
+  const evil = await frameEval(page, (doc) => ({ img: doc.querySelectorAll('img[onerror], svg:not(.art):not(.ic), script, [onload], [onerror]').length, text: doc.querySelector('h1')?.textContent ?? '' }))
+  check('13 공격 글 → 미리보기에 img/svg(우리 그림 · 아이콘 말고)/script · on 이벤트 0 · 글자로만 보임 · 알림창 0', evil.img === 0 && evil.text.includes('<img src=x onerror=alert(1)>') && dialogs === 0, evil)
   await heroEditor.locator('textarea[data-field="title"]').fill('정밀 부품은\n한솔정밀이 끝까지 책임집니다')
   await rowOf(page, 'hero').locator('input[data-field="buttonLabel"]').fill('견적 문의')
+  await wait(400)
+
+  // 13b 미리보기 크게(D-205) — 왼쪽 고치기 칸 접고 미리보기만 → 블록 누르면 고치기 칸 다시
+  const wBefore = await page.getByTestId('site-preview').evaluate((e) => e.clientWidth)
+  await page.getByTestId('preview-big').click()
+  await wait(400)
+  const wBig = await page.getByTestId('site-preview').evaluate((e) => e.clientWidth)
+  check('13b [미리보기 크게] → 고치기 칸 접힘 · 미리보기가 넓어짐', (await page.getByTestId('site-blocks').count()) === 0 && wBig > wBefore + 300, { wBefore, wBig })
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/site-big-pc.png`, fullPage: false })
+  const svcId = await page.locator('[data-testid="site-frame"]').evaluate((f) => f.contentDocument.querySelector('#services')?.getAttribute('data-block'))
+  await page.locator('[data-testid="site-frame"]').evaluate((f, id) => f.contentDocument.querySelector(`[data-block="${id}"]`).dispatchEvent(new MouseEvent('click', { bubbles: true })), svcId)
+  await wait(400)
+  check('13b 크게 보다가 블록 누르기 → 고치기 칸 다시 · 그 블록 열림', (await page.getByTestId('site-blocks').count()) === 1 && (await rowOf(page, 'services').getByTestId('block-row').getAttribute('aria-expanded')) === 'true')
+  await rowOf(page, 'services').locator('select[data-field="layout"]').selectOption('rows')
+  await wait(700)
+  check('13b 사업 모양 [번호 줄] → 미리보기 01 · 02 … · 아이콘 없음', (await frameEval(page, (doc) => doc.querySelectorAll('#services ol.rows li em').length)) >= 2 && (await frameEval(page, (doc) => doc.querySelectorAll('#services .icw').length)) === 0)
+  await rowOf(page, 'services').locator('select[data-field="layout"]').selectOption('icons')
   await wait(400)
 
   // 14 내려받기
@@ -272,8 +303,17 @@ const errors = []
   await page.goto(BASE + '/tools/homepage/build?client=cli_site_np', { waitUntil: 'networkidle' })
   await page.getByTestId('site-start').waitFor()
   check('17 카페 → 업종 음식 · 카페 · 담당자 휴대폰은 저절로 안 넣는다는 안내', (await page.getByTestId('site-industry').inputValue()) === 'food' && /저절로 넣지 않아요/.test(await page.getByTestId('site-start').innerText()))
+  // 17a 일부러 다른 업종(제조) 견본으로 만들면 → '맞는 견본으로 바꾸기' 안내(D-205)
+  await page.getByTestId('site-industry').selectOption('manufacturing')
   await page.getByTestId('site-create').click()
   await page.getByTestId('site-builder').waitFor()
+  await wait(300)
+  check('17a 업체 기록(카페)과 다른 견본 → 맞는 견본 안내(음식 · 카페)', (await page.getByTestId('site-industry-mismatch').count()) === 1 && (await page.getByTestId('site-industry-mismatch').getAttribute('data-detected')) === 'food')
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/site-mismatch-pc.png`, fullPage: false })
+  await page.getByTestId('site-industry-fix').click()
+  await page.getByRole('dialog').getByRole('button', { name: '다시 만들기' }).click()
+  await wait(700)
+  check('17a [맞는 견본으로 바꾸기] → 음식 견본 · 안내 사라짐', (await page.getByTestId('site-industry-mismatch').count()) === 0 && (await frameHtml(page)).includes('한 그릇'))
   await page.getByTestId('site-tab-checks').click()
   check('17 점검 — 대표 전화 없음 · [담당자 번호 넣기]', (await page.getByTestId('fix-contact-phone').count()) === 1)
   await page.getByTestId('fix-contact-phone').click()
