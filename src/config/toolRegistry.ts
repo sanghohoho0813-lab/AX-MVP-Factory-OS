@@ -28,6 +28,8 @@ import {
   FileSpreadsheet,
   FileText,
   FlaskConical,
+  Globe,
+  LayoutTemplate,
   Gauge,
   Handshake,
   Landmark,
@@ -303,6 +305,19 @@ export const TOOLS: ToolDefinition[] = [
       { key: 'lab', label: '기업부설연구소', icon: FlaskConical, group: '인증별', accent: 'customer', hint: '인력 기준 → 연구소 관리 화면으로' },
       { key: 'iso', label: 'ISO', icon: ClipboardCheck, group: '인증별', accent: 'customer', hint: '어떤 ISO 를 검토할지 · 상담 요청' },
     ],
+  },
+  {
+    key: 'homepage',
+    label: '홈페이지 만들기',
+    desc: '업체 기록(회사명 · 대표 · 사업자번호 · 주소 · 전화 · 설립일 · 인증)으로 업종 견본 홈페이지를 바로 만들고, 블록을 고쳐 PC · 휴대폰으로 보고 HTML 한 장으로 내려받습니다.',
+    navHint: '업체 기록 → 블록 홈페이지 → 미리보기 · 내려받기',
+    path: '/tools/homepage',
+    icon: Globe,
+    status: 'live',
+    origin: 'D-202 — 블록 구성 방식만 참고(식스샵 분해) · 자체 구현',
+    keywords: '홈페이지 웹사이트 랜딩페이지 블록 사이트 만들기 HTML 내려받기 사업자 정보',
+    recommendedDocs: ['businessRegistration'],
+    sections: [{ key: 'build', label: '만들기', icon: LayoutTemplate, hint: '블록 · 꾸밈 · 점검 · PC/휴대폰 미리보기 · 내려받기' }],
   },
 ]
 

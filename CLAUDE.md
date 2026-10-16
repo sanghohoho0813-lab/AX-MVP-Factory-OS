@@ -53,6 +53,7 @@ npm run qa:detail -- http://localhost:4390        # 업체 상세(탭 순서 · 
 npm run qa:files                                  # 서류 파일(클라우드 흉내 — 미리보기 · 새 창 · 내려받기 · 교체 · 비공개 저장소)
 npm run qa:taxplan -- http://localhost:4390       # 절세 설계(원하는 결과 → 계산기 식으로 거꾸로 · 계산기 열기 · 업체 기록 저장)
 npm run qa:scenarios -- http://localhost:4390     # 상황 예시로 바로 설계(이 업체에 맞는 상황만 · 왜 한 줄 · 예/아니요 질문 · 안 맞는 까닭 · 누르면 업체 숫자로 설계 · 필요한 숫자 ✓/✗ · 요청 문구 · 모듈이 같은 가정으로 열려 바로 결과 · 360/390)
+npm run qa:site -- http://localhost:4390          # 홈페이지 만들기(업체 기록 → 업종 견본 초안 · 블록 고치기 · PC/휴대폰 미리보기 · 공격 글 안전 · HTML 내려받기 · 업체 기록에 붙이기 · 360/390)
 npm run qa:calendar -- http://localhost:4390      # 큰 달력(날짜 칸 → 일요일부터 · 창 위 · Esc · 직접 적기 · 휴대폰)
 npm run qa:connect -- http://localhost:4390       # 모듈 ↔ 업체 잇기(계산기 업체 숫자 채움 · 붙이며 할 일 걸기 · 결과 묶음 · 다시 열기)
 npm run qa:enroll -- http://localhost:4390        # 명부 → 직원 → 참여신청 기한(청년도약 등록 · 겹치지 않음 · 오늘 '놓치면 끝나는 기한' · 직원 D-N)

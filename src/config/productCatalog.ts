@@ -197,9 +197,9 @@ export const MODULE_CATALOG: CatalogModule[] = [
   {
     key: 'web-studio',
     name: '웹 스튜디오',
-    description: '업체 홈페이지 · 랜딩페이지를 설계합니다.',
-    covers: ['홈페이지', '랜딩페이지'],
-    upcoming: ['랜딩페이지'],
+    description: '업체 홈페이지를 설계하고, 블록으로 바로 만들어 내려받습니다.',
+    covers: ['홈페이지 만들기', '홈페이지 설계'],
+    upcoming: [],
     category: 'web',
     route: '/modules/web-studio',
     icon: Globe,
@@ -274,7 +274,8 @@ export const FEATURE_CATALOG: CatalogFeature[] = [
   { key: 'deliverables', source: 'nav', module: 'ax-studio', lockedPreview: 'intro', summary: '제출용 결과자료를 만듭니다.' },
   { key: 'cases', source: 'nav', module: 'ax-studio', lockedPreview: 'intro', summary: '지난 사례를 찾아봅니다.' },
   { key: 'clients', source: 'nav', module: 'ax-studio', lockedPreview: 'intro', clientEntry: { topic: 'AX 프로젝트', verb: '열기', path: '/ax/open' }, summary: 'AX 프로젝트를 고객사 단위로 관리합니다.' },
-  // WEB STUDIO
+  // WEB STUDIO — D-202 홈페이지 만들기(블록 · 업체 기록으로 초안 · 내려받기)
+  { key: 'homepage', source: 'tool', module: 'web-studio', lockedPreview: 'first-section', clientEntry: { topic: '홈페이지', verb: '만들기', path: '/tools/homepage/build' } },
   { key: 'website-studio', source: 'nav', module: 'web-studio', lockedPreview: 'intro', summary: '업체 홈페이지의 구성 · 문구 · 디자인을 설계합니다.' },
 ]
 
