@@ -3029,3 +3029,9 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 - **스크린샷 육안** — 상황 예시 '방금 열림'(PC · 390) · 할 일 창 '날짜를 정해 주세요'(390) · [업체 열기] 확인(390 — 단추 글이 길어 세 줄 → '저장 안 하고 열기' 로 줄임) · 달력 적기 창 닫기 확인(PC).
 - 확인하지 못한 것: 두 기기에서 **동시에** 같은 업체를 고치는 경우(서버 낙관적 잠금 없음 — 돌아올 때 다시 읽기만). 예전 'completed' 상태 업체 처리(점검 12번) · 업체 화면 계약 완료 창의 영업자 기본 수수료(점검 10번)는 다음 묶음.
   Production 에 실제로 주민등록번호가 들어간 업체가 있는지는 열어 보지 않았다(있으면 '확인할 것' 맨 위에 뜬다).
+- **병합 전 게이트 42단계** — 한 번에 돌린 판에서 **38단계 녹색**(tsc · lint · build · test:all 30묶음 · simple 88 · board 170 · todos 44 · mobile 15 · tools 224 · tax 74 · shell 67 · modules 896 ·
+  sales 178 · journey 56 · easy 82 · steady 72 · phone 174 · facts 22 · detail 310 · files 33 · folder 19 · taxplan 72 · scenarios 57 · site 91 · content 98 · ownerai 59 · calendar 21 · connect 36 ·
+  enroll 24 · planner 42 · contract 72 · grants 152 · money 41 · youtube 169 · db · pilot 240 · isolation 24 · cert 153).
+  **4단계(studio · flow · real · squeeze)는 확인이 틀린 것이 아니라 브라우저가 죽어 멈췄다**('Page crashed' · 'ERR_INSUFFICIENT_RESOURCES'). 원인은 컨테이너 디스크 여유 부족(4GB · 91%) —
+  어제 통과한 D-209(main) 빌드도 같은 자리에서 똑같이 죽는 것으로 확인했다. 지난 작업 폴더의 시험 빌드 산출물을 지워 11GB 로 늘린 뒤 4단계를 다른 작업 없이 다시 돌려 모두 녹색:
+  studio **63** · flow **169** · real **188** · squeeze '짜부라진 글자 없음'. 앱 코드 변경 없음.
