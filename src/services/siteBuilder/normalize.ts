@@ -11,12 +11,14 @@ import type { FieldDef, IndustryKey, ListItem, PropValue, SiteBlock, SiteDoc } f
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 const s = (v: unknown, max: number): string => (typeof v === 'string' ? v.slice(0, max) : '')
 
+const imageValue = (raw: unknown): string => (typeof raw === 'string' && raw.length <= MAX_IMAGE_CHARS ? raw : '')
+
 function fieldValue(f: FieldDef, raw: unknown): PropValue {
   switch (f.kind) {
     case 'toggle':
       return raw === true
     case 'image':
-      return typeof raw === 'string' && raw.length <= MAX_IMAGE_CHARS ? raw : ''
+      return imageValue(raw)
     case 'select': {
       const v = s(raw, 40)
       return f.options?.some((o) => o.value === v) ? v : (f.options?.[0]?.value ?? '')
@@ -28,7 +30,7 @@ function fieldValue(f: FieldDef, raw: unknown): PropValue {
         .slice(0, f.maxItems ?? 12)
         .map((it) => {
           const row: ListItem = {}
-          for (const sub of f.itemFields ?? []) row[sub.key] = s(it[sub.key], sub.max ?? 200)
+          for (const sub of f.itemFields ?? []) row[sub.key] = sub.kind === 'image' ? imageValue(it[sub.key]) : s(it[sub.key], sub.max ?? 200)
           return row
         })
     }
@@ -90,13 +92,20 @@ export function normalizeSiteDoc(raw: unknown): SiteDoc | null {
   }
 }
 
-/** 그림 data URL 들의 전체 크기(글자 수) — 저장 공간 지키기 */
+/** 그림 data URL 들의 전체 크기(글자 수) — 저장 공간 지키기. 목록 안 그림(사진 모음 · 로고)도 센다(D-207) */
 export function imageChars(doc: SiteDoc): number {
   let n = 0
-  for (const b of doc.blocks) for (const f of blockDef(b.type)?.fields ?? []) if (f.kind === 'image') {
-    const v = b.props[f.key]
+  const add = (v: unknown) => {
     if (typeof v === 'string' && v.startsWith('data:')) n += v.length
   }
+  for (const b of doc.blocks)
+    for (const f of blockDef(b.type)?.fields ?? []) {
+      if (f.kind === 'image') add(b.props[f.key])
+      else if (f.kind === 'list' && f.itemFields?.some((x) => x.kind === 'image')) {
+        const items = b.props[f.key]
+        if (Array.isArray(items)) for (const it of items) for (const sub of f.itemFields) if (sub.kind === 'image') add(it[sub.key])
+      }
+    }
   return n
 }
 

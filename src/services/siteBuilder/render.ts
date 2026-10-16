@@ -10,9 +10,13 @@
  *
  * 모양(D-205): 첫 화면 '글 + 그림 나란히' · '색 바탕', 사업 '아이콘 카드' · '번호 줄' · '글 카드', 숫자 '색 띠' · '흰 바탕'.
  * 구역 제목 위에 작은 영문 머리글(ABOUT · BUSINESS …)을 단다.
+ * D-207(식스샵 회사 템플릿 숫자에서): 블록마다 바탕(흰 · 옅은 회색 · 옅은 색 · 꾸밈 색 · 어둡게), 첫 화면 '사진 가득'(사진 + 어둡게 덮기),
+ *   사진 모음(격자 · 번갈아) · 고객 후기 · 거래처 로고, 연락처 단추(전화 · 카카오톡 · 상담 신청서), 휴대폰 아래 고정 연락 단추,
+ *   자주 묻는 질문은 하나만 열리게(첫 질문 열어 둠), 탭 아이콘 · 공유 정보(og:locale · og:image · theme-color).
+ *   여전히 스크립트 0 — 모두 HTML · CSS 로만.
  */
 import { heroArt, serviceIcon } from './art'
-import { blockDef } from './blocks'
+import { BG_OPTIONS, blockDef } from './blocks'
 import { cornerOf, fontOf, paletteOf } from './theme'
 import type { ListItem, PropValue, SiteBlock, SiteDoc } from './types'
 
@@ -49,6 +53,12 @@ export function safeImage(raw: string): string {
 
 /** 그림 하나 상한(약 450KB) — 저장 공간을 지키려고 */
 export const MAX_IMAGE_CHARS = 600_000
+
+/** https 주소만(카카오톡 채널 · 상담 신청서) — 아니면 '' */
+export function httpsHref(raw: string): string {
+  const u = safeHref(raw)
+  return /^https:\/\//i.test(u) ? u : ''
+}
 
 /** 전화번호 → tel: (숫자 · + · - 만) */
 export function telHref(phone: string): string {
@@ -138,7 +148,18 @@ const KICKER: Partial<Record<SiteBlock['type'], string>> = {
   process: 'PROCESS',
   faq: 'FAQ',
   contact: 'CONTACT',
+  gallery: 'WORKS',
+  reviews: 'REVIEWS',
+  logos: 'CLIENTS',
 }
+
+/** 웹 주소 사진만 늦게 불러오기 — 올린 사진(data URL)은 이미 HTML 안에 있어 미룰 까닭이 없고, 인쇄 · 전체 화면 찍기에서 빈칸이 된다 */
+const lazy = (src: string): string => (/^https?:/i.test(src) ? ' loading="lazy"' : '')
+
+/** 사진 모음 비율 — 표에 있는 값만 CSS 로 */
+const RATIO: Record<string, string> = { '4:3': '4/3', '3:2': '3/2', '16:9': '16/9', '1:1': '1/1', '3:4': '3/4' }
+const BG_VALUES = new Set(BG_OPTIONS.map((o) => o.value))
+const HERO_LAYOUTS = new Set(['split', 'band', 'photo'])
 
 function heading(title: string, intro = '', kicker = ''): string {
   return `${kicker ? `<p class="kicker">${kicker}</p>` : ''}${title.trim() ? `<h2>${esc(title.trim())}</h2>` : ''}${intro.trim() ? `<p class="lead">${multi(intro)}</p>` : ''}`
@@ -170,9 +191,9 @@ function contactAnchor(ctx: Ctx): string {
   return '#footer'
 }
 
-function renderBlock(b: SiteBlock, ctx: Ctx, alt: boolean): string {
+function renderBlock(b: SiteBlock, ctx: Ctx, tone: string): string {
   const p = b.props
-  const sec = (inner: string, cls = '') => `<section ${attrs(b, ctx, [alt ? 'alt' : '', cls].filter(Boolean).join(' '))}><div class="w">${inner}</div></section>`
+  const sec = (inner: string, cls = '') => `<section ${attrs(b, ctx, [tone, cls].filter(Boolean).join(' '))}><div class="w">${inner}</div></section>`
   switch (b.type) {
     case 'header': {
       const logoImg = safeImage(str(p.logoImage))
@@ -200,7 +221,11 @@ function renderBlock(b: SiteBlock, ctx: Ctx, alt: boolean): string {
               : contactAnchor(ctx)
       const label = str(p.buttonLabel).trim()
       const ext = /^https?:/.test(href)
-      const split = str(p.layout) !== 'band'
+      const layoutRaw = HERO_LAYOUTS.has(str(p.layout)) ? str(p.layout) : 'split'
+      // 사진 가득인데 사진이 없으면 색 바탕으로
+      const layout = layoutRaw === 'photo' && !img ? 'band' : layoutRaw
+      const split = layout === 'split'
+      const photo = layout === 'photo'
       const chips = on(p.showFacts) ? heroChips(ctx) : []
       const eyebrow = str(p.eyebrow).trim() ? `<p class="eyebrow">${esc(str(p.eyebrow).trim())}</p>` : ''
       // 나란히 모양: 큰 문구의 마지막 줄을 강조색으로
@@ -208,16 +233,20 @@ function renderBlock(b: SiteBlock, ctx: Ctx, alt: boolean): string {
       const h1 = lines.length === 0 ? '' : split && lines.length > 1 ? `<h1>${lines.slice(0, -1).map(esc).join('<br>')}<br><span class="hl">${esc(lines[lines.length - 1])}</span></h1>` : `<h1>${multi(str(p.title))}</h1>`
       const sub = str(p.subtitle).trim() ? `<p class="sub">${multi(str(p.subtitle))}</p>` : ''
       const tel = target !== 'phone' ? telHref(ctx.phone) : ''
+      const telBtn = (split || photo) && tel
       const btns =
-        label || (split && tel)
+        label || telBtn
           ? `<div class="btns">${label ? `<a class="btn hero-btn" href="${esc(href)}"${ext ? ' target="_blank" rel="noopener"' : ''}>${esc(label)}</a>` : ''}${
-              split && tel ? `<a class="btn line" href="${esc(tel)}">전화 ${esc(ctx.phone)}</a>` : ''
+              telBtn ? `<a class="btn line" href="${esc(tel)}">전화 ${esc(ctx.phone)}</a>` : ''
             }</div>`
           : ''
       const chipHtml = chips.length ? `<ul class="chips">${chips.map((c) => `<li><span>${esc(c.label)}</span>${esc(c.value)}</li>`).join('')}</ul>` : ''
       if (split) {
         const art = img ? `<img class="hero-ph" src="${esc(img)}" alt="${esc(str(p.eyebrow).trim() || '대표 사진')}">` : heroArt(ctx.doc.industry)
         return `<section ${attrs(b, ctx, 'hero split')}><div class="w"><div class="hero-grid"><div class="hero-copy">${eyebrow}${h1}${sub}${btns}${chipHtml}</div><div class="hero-art">${art}</div></div></div></section>`
+      }
+      if (photo) {
+        return `<section ${attrs(b, ctx, 'hero photo')} style="background-image:url('${esc(img)}')"><div class="w"><div class="hero-copy">${eyebrow}${h1}${sub}${btns}${chipHtml}</div></div></section>`
       }
       const cls = ['hero', 'band', img ? 'img' : '', str(p.align) === 'center' ? 'center' : ''].filter(Boolean).join(' ')
       const style = img ? ` style="background-image:linear-gradient(rgba(10,14,25,.58),rgba(10,14,25,.58)),url('${esc(img)}')"` : ''
@@ -271,7 +300,46 @@ function renderBlock(b: SiteBlock, ctx: Ctx, alt: boolean): string {
     }
     case 'faq': {
       const items = filled(list(p.items))
-      return sec(`${heading(str(p.title), '', KICKER.faq)}<div class="faq">${items.map((it) => `<details><summary>${esc(it.q ?? '')}</summary>${(it.a ?? '').trim() ? `<p>${multi(it.a ?? '')}</p>` : ''}</details>`).join('')}</div>`)
+      // 하나를 열면 나머지는 닫힌다(details name) · 첫 질문은 열어 둔다
+      const group = esc(ctx.anchors.get(b.id) ?? 'faq')
+      return sec(`${heading(str(p.title), '', KICKER.faq)}<div class="faq">${items.map((it, i) => `<details name="${group}"${i === 0 ? ' open' : ''}><summary>${esc(it.q ?? '')}</summary>${(it.a ?? '').trim() ? `<p>${multi(it.a ?? '')}</p>` : ''}</details>`).join('')}</div>`)
+    }
+    case 'gallery': {
+      const items = filled(list(p.items))
+      const ratio = RATIO[str(p.ratio)] ?? '4/3'
+      const media = (it: ListItem, i: number) => {
+        const img = safeImage(it.image ?? '')
+        return img ? `<img src="${esc(img)}" alt="${esc((it.title ?? '').trim() || '사진')}"${lazy(img)}>` : `<span class="gph" aria-hidden="true">${serviceIcon(ctx.doc.industry, i)}</span>`
+      }
+      const text = (it: ListItem) => `${(it.title ?? '').trim() ? `<h3>${esc((it.title ?? '').trim())}</h3>` : ''}${(it.desc ?? '').trim() ? `<p>${multi(it.desc ?? '')}</p>` : ''}`
+      const inner =
+        str(p.layout) === 'zigzag'
+          ? `<div class="zz" style="--ar:${ratio}">${items.map((it, i) => `<div class="zi"><div class="gm">${media(it, i)}</div><div class="zt"><em>${String(i + 1).padStart(2, '0')}</em>${text(it)}</div></div>`).join('')}</div>`
+          : `<div class="gal" style="--ar:${ratio}">${items.map((it, i) => `<figure class="gi"><div class="gm">${media(it, i)}</div>${text(it) ? `<figcaption>${text(it)}</figcaption>` : ''}</figure>`).join('')}</div>`
+      return sec(`${heading(str(p.title), str(p.intro), KICKER.gallery)}${inner}`)
+    }
+    case 'reviews': {
+      const items = filled(list(p.items))
+      return sec(
+        `${heading(str(p.title), str(p.intro), KICKER.reviews)}<div class="revs">${items
+          .map(
+            (it) =>
+              `<figure class="rev"><span class="qm" aria-hidden="true">“</span>${(it.text ?? '').trim() ? `<blockquote>${multi(it.text ?? '')}</blockquote>` : ''}<figcaption>${(it.name ?? '').trim() ? `<b>${esc((it.name ?? '').trim())}</b>` : ''}${(it.meta ?? '').trim() ? `<span>${esc((it.meta ?? '').trim())}</span>` : ''}</figcaption></figure>`,
+          )
+          .join('')}</div>`,
+      )
+    }
+    case 'logos': {
+      const items = filled(list(p.items))
+      return sec(
+        `${heading(str(p.title), str(p.intro), KICKER.logos)}<ul class="logos${on(p.gray) ? ' gray' : ''}">${items
+          .map((it) => {
+            const img = safeImage(it.image ?? '')
+            const name = (it.name ?? '').trim()
+            return `<li>${img ? `<img src="${esc(img)}" alt="${esc(name || '로고')}"${lazy(img)}>` : `<span>${esc(name)}</span>`}</li>`
+          })
+          .join('')}</ul>`,
+      )
     }
     case 'cta': {
       const tel = on(p.showPhone) ? telHref(ctx.phone) : ''
@@ -289,13 +357,22 @@ function renderBlock(b: SiteBlock, ctx: Ctx, alt: boolean): string {
       const email = str(p.email).trim()
       const hours = str(p.hours).trim()
       const map = on(p.showMapLink) ? mapHref(address) : ''
+      const tel = telHref(phone)
+      const kakao = httpsHref(str(p.kakaoUrl))
+      const form = httpsHref(str(p.formUrl))
+      const actions = [
+        tel ? `<a class="btn" href="${esc(tel)}">전화하기</a>` : '',
+        kakao ? `<a class="btn kakao" href="${esc(kakao)}" target="_blank" rel="noopener">카카오톡 상담</a>` : '',
+        form ? `<a class="btn line" href="${esc(form)}" target="_blank" rel="noopener">상담 신청하기</a>` : '',
+        map ? `<a class="btn ghost" href="${esc(map)}" target="_blank" rel="noopener">네이버 지도에서 보기</a>` : '',
+      ].join('')
       const rows = [
         address ? `<div><dt>주소</dt><dd>${esc(address)}</dd></div>` : '',
         phone ? `<div><dt>전화</dt><dd>${telHref(phone) ? `<a href="${esc(telHref(phone))}">${esc(phone)}</a>` : esc(phone)}</dd></div>` : '',
         email ? `<div><dt>메일</dt><dd>${safeHref(`mailto:${email}`) ? `<a href="${esc(`mailto:${email}`)}">${esc(email)}</a>` : esc(email)}</dd></div>` : '',
         hours ? `<div><dt>운영 시간</dt><dd>${multi(hours)}</dd></div>` : '',
       ].join('')
-      return sec(`${heading(str(p.title), '', KICKER.contact)}<div class="contact-box"><dl class="facts contact">${rows}</dl>${map ? `<a class="btn ghost" href="${esc(map)}" target="_blank" rel="noopener">네이버 지도에서 보기</a>` : ''}</div>`)
+      return sec(`${heading(str(p.title), '', KICKER.contact)}<div class="contact-box"><dl class="facts contact">${rows}</dl>${actions ? `<div class="cbtns">${actions}</div>` : ''}</div>`)
     }
     case 'footer': {
       const name = str(p.companyName).trim()
@@ -343,7 +420,7 @@ section.alt{background:var(--soft)}
 h2{font-size:38px;line-height:1.28;letter-spacing:-.025em;margin-bottom:16px;font-weight:800}
 h3{font-size:20px;line-height:1.4;margin-bottom:8px;letter-spacing:-.01em}
 .lead{color:var(--muted);font-size:18px;max-width:720px;margin-bottom:40px}
-h2+.cards,h2+.nums,h2+.certs,h2+.timeline,h2+.steps,h2+.faq,h2+.about,h2+.facts,h2+.rows,h2+.contact-box{margin-top:40px}
+h2+.cards,h2+.nums,h2+.certs,h2+.timeline,h2+.steps,h2+.faq,h2+.about,h2+.facts,h2+.rows,h2+.contact-box,h2+.gal,h2+.zz,h2+.revs,h2+.logos{margin-top:40px}
 .hd{position:sticky;top:0;z-index:10;background:rgba(255,255,255,.92);backdrop-filter:saturate(1.6) blur(10px);-webkit-backdrop-filter:saturate(1.6) blur(10px);border-bottom:1px solid var(--line)}
 .hd .w{display:flex;align-items:center;gap:28px;min-height:72px}
 .logo{display:inline-flex;align-items:center;gap:10px;font-weight:800;font-size:20px;text-decoration:none;white-space:nowrap;letter-spacing:-.02em}
@@ -454,6 +531,63 @@ details p{margin-top:12px;color:var(--muted);padding-left:22px}
 .ft p{margin-top:4px}
 .ft .sep{opacity:.4;margin:0 8px;font-style:normal}
 .ft .copy{margin-top:20px;opacity:.7}
+/* D-207 첫 화면 사진 가득 */
+.hero.photo{min-height:min(86vh,760px);display:flex;align-items:center;background-color:var(--ht);background-size:cover;background-position:center;padding:120px 0}
+.hero.photo::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,12,22,.82) 0%,rgba(8,12,22,.6) 48%,rgba(8,12,22,.18) 100%)}
+.hero.photo .w{position:relative;z-index:1;width:100%}
+.hero.photo .hero-copy{max-width:720px}
+.hero.photo .eyebrow{display:inline-block;opacity:1;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:6px 16px;font-size:14px}
+.hero.photo .hero-btn{background:var(--p);color:var(--op)}
+.hero.photo .btn.line{background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.55)}
+.hero.photo .chips li{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.28);color:#fff}
+.hero.photo .chips li span{color:rgba(255,255,255,.75)}
+/* D-207 구역 바탕 */
+section.bg-white{background:#fff}
+section.bg-gray{background:#f5f6f8}
+section.bg-tint{background:var(--soft)}
+section.bg-brand{background:linear-gradient(135deg,var(--hf),var(--p));color:var(--op)}
+section.bg-dark{background:var(--fb);color:#fff}
+.card,.cert,.step,details,.contact-box,.about .facts,.rev,.logos li{color:var(--ink)}
+.bg-brand .kicker,.bg-dark .kicker{color:rgba(255,255,255,.75)}
+.bg-brand .lead,.bg-dark .lead,.bg-brand .about .body p+p,.bg-dark .about .body p+p,.bg-brand .rows p,.bg-dark .rows p,.bg-brand .zt p,.bg-dark .zt p,.bg-brand .gi p,.bg-dark .gi p{color:rgba(255,255,255,.82)}
+.bg-brand .rows,.bg-dark .rows{border-top-color:rgba(255,255,255,.6)}
+.bg-brand .rows li,.bg-dark .rows li{border-bottom-color:rgba(255,255,255,.16)}
+.bg-brand .rows em,.bg-dark .rows em,.bg-brand .timeline b,.bg-dark .timeline b,.bg-brand .zt em,.bg-dark .zt em{color:#fff}
+.bg-brand .timeline,.bg-dark .timeline{border-left-color:rgba(255,255,255,.3)}
+.bg-brand .timeline li::before,.bg-dark .timeline li::before{background:#fff;box-shadow:none}
+/* D-207 사진 모음 */
+.gal{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+.gm{aspect-ratio:var(--ar,4/3);border-radius:var(--rc);overflow:hidden;background:var(--soft);border:1px solid var(--line)}
+.gm img{width:100%;height:100%;object-fit:cover}
+.gph{width:100%;height:100%;display:grid;place-items:center;color:var(--p);opacity:.55}
+.gph .ic{width:44px;height:44px}
+.gi figcaption{padding-top:16px}
+.gi h3{margin-bottom:4px}
+.gi p{color:var(--muted);font-size:15px}
+.zz{display:flex;flex-direction:column;gap:56px}
+.zi{display:grid;grid-template-columns:1.15fr 1fr;gap:56px;align-items:center}
+.zi:nth-child(even){grid-template-columns:1fr 1.15fr}
+.zi:nth-child(even) .gm{order:2}
+.zt em{display:block;font-style:normal;font-weight:800;font-size:15px;letter-spacing:.08em;color:var(--p);margin-bottom:12px}
+.zt h3{font-size:26px;margin-bottom:12px}
+.zt p{color:var(--muted)}
+/* D-207 고객 후기 */
+.revs{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:22px}
+.rev{background:#fff;border:1px solid var(--line);border-radius:var(--rc);padding:30px 28px;display:flex;flex-direction:column;gap:14px}
+.qm{font-size:54px;line-height:.6;color:var(--p);font-weight:800;height:24px}
+.rev blockquote{font-size:17px;line-height:1.75}
+.rev figcaption{margin-top:auto;padding-top:14px;border-top:1px solid var(--line);display:flex;flex-direction:column}
+.rev figcaption span{color:var(--muted);font-size:14px}
+/* D-207 거래처 로고 */
+.logos{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px}
+.logos li{display:grid;place-items:center;min-height:92px;padding:18px 20px;background:#fff;border:1px solid var(--line);border-radius:var(--rc);text-align:center;font-weight:700}
+.logos img{max-height:48px;width:auto;object-fit:contain}
+.logos.gray img{filter:grayscale(1);opacity:.75}
+/* D-207 연락처 단추 · 휴대폰 아래 고정 단추 */
+.cbtns{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+.cbtns .btn.ghost{margin-top:0}
+.btn.kakao{background:#fee500;color:#191919;box-shadow:none}
+.fbar{display:none}
 @media (max-width:900px){
 .hero-grid{grid-template-columns:1fr;gap:36px}
 .hero-art{max-width:460px}
@@ -489,9 +623,43 @@ h2{font-size:27px}
 .ft .sep{display:none}
 .ft p span{display:block}
 .hide-m{display:none!important}
+.hero.photo{min-height:540px;align-items:flex-end;padding:96px 0 56px}
+.hero.photo::before{background:linear-gradient(0deg,rgba(8,12,22,.88) 0%,rgba(8,12,22,.55) 55%,rgba(8,12,22,.28) 100%)}
+.gal{grid-template-columns:1fr;gap:28px}
+.zz{gap:40px}
+.zi,.zi:nth-child(even){grid-template-columns:1fr;gap:20px}
+.zi:nth-child(even) .gm{order:0}
+.zt h3{font-size:21px}
+.logos{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.logos li{min-height:76px;padding:14px}
+.logos img{max-height:36px}
+.cbtns .btn{flex:1 1 100%}
+.fbar{display:flex;position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:30;gap:8px;padding:8px;background:rgba(255,255,255,.97);border:1px solid var(--line);border-radius:18px;box-shadow:0 18px 40px -16px rgba(15,23,42,.45)}
+.fbar a{flex:1 1 0;min-height:52px;display:flex;align-items:center;justify-content:center;border-radius:12px;font-weight:800;text-decoration:none;font-size:16px;white-space:nowrap}
+.fbar .fb-tel{background:var(--p);color:var(--op)}
+.fbar .fb-2{background:#f1f3f5;color:var(--ink)}
+.fbar .fb-2.kakao{background:#fee500;color:#191919}
+body.has-fbar{padding-bottom:88px}
 }
+@media (min-width:721px) and (max-width:1000px){.gal{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (min-width:721px){.hide-pc{display:none!important}}
 ${preview}`
+}
+
+/** 휴대폰 화면 아래 고정 연락 단추(D-207) — 연락처 블록에서 켰을 때만. 전화 + (카카오톡 · 상담 신청서 · 오시는 길) */
+function floatBar(ctx: Ctx): string {
+  const c = ctx.doc.blocks.find((b) => b.type === 'contact' && b.props.floatBar === true && !b.hideMobile && hasContent(b))
+  if (!c) return ''
+  const tel = telHref(str(c.props.phone).trim() || ctx.phone)
+  const kakao = httpsHref(str(c.props.kakaoUrl))
+  const form = httpsHref(str(c.props.formUrl))
+  if (!tel && !kakao && !form) return ''
+  const second = kakao
+    ? `<a class="fb-2 kakao" href="${esc(kakao)}" target="_blank" rel="noopener">카카오톡 상담</a>`
+    : form
+      ? `<a class="fb-2" href="${esc(form)}" target="_blank" rel="noopener">상담 신청</a>`
+      : `<a class="fb-2" href="#${esc(ctx.anchors.get(c.id) ?? 'contact')}">오시는 길</a>`
+  return `<nav class="fbar" aria-label="빠른 연락">${tel ? `<a class="fb-tel" href="${esc(tel)}">전화 걸기</a>` : ''}${second}</nav>\n`
 }
 
 /** 홈페이지 한 장 (완성된 HTML 문서) */
@@ -506,15 +674,32 @@ export function renderSiteHtml(doc: SiteDoc, opts: RenderOptions = {}): string {
   const body = doc.blocks
     .filter(hasContent)
     .map((b) => {
+      // 바탕을 직접 고른 블록(D-207) — 그 바탕. 다음 '자동' 블록은 흰 바탕이 이어지지 않게(흰색 다음은 옅은 바탕)
+      const bg = str(b.props.bg)
+      if (bg && bg !== 'auto' && BG_VALUES.has(bg) && blockDef(b.type)?.fields.some((f) => f.key === 'bg')) {
+        alt = bg === 'white'
+        return renderBlock(b, ctx, `bg-${bg}`)
+      }
       // 번갈아 옅은 바탕 — 색 바탕 블록(첫 화면 · 문의 띠) · 머리 · 바닥은 세지 않는다
       const plain = !['header', 'hero', 'cta', 'footer'].includes(b.type) && !(b.type === 'numbers' && str(b.props.layout) !== 'plain')
-      const html = renderBlock(b, ctx, plain && alt)
+      const html = renderBlock(b, ctx, plain && alt ? 'alt' : '')
       if (plain) alt = !alt
       return html
     })
     .join('\n')
+  const fbar = floatBar(ctx)
   const font = fontOf(doc.theme.font)
+  const pal = paletteOf(doc.theme.palette)
   const title = doc.seo.title.trim() || str(footer?.props.companyName) || '홈페이지'
+  // 공유할 때 보일 사진 — 첫 화면 사진이 웹 주소일 때만(올린 그림 data URL 은 공유 미리보기에 못 쓴다)
+  const hero = doc.blocks.find((b) => b.type === 'hero' && hasContent(b))
+  const ogImage = hero && /^https?:/i.test(safeImage(str(hero.props.image))) ? safeImage(str(hero.props.image)) : ''
+  // 탭 아이콘 — 로고 첫 글자(꾸밈 색 네모). 글자는 이스케이프 뒤 주소 부호화
+  const header = doc.blocks.find((b) => b.type === 'header')
+  const mark = logoMark(str(header?.props.logoText) || str(footer?.props.companyName))
+  const favicon = mark
+    ? `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="${pal.primary}"/><text x="32" y="43" font-size="32" font-weight="700" text-anchor="middle" fill="${pal.onPrimary}" font-family="sans-serif">${esc(mark)}</text></svg>`)}`
+    : ''
   return `<!doctype html>
 <html lang="ko">
 <head>
@@ -525,14 +710,16 @@ export function renderSiteHtml(doc: SiteDoc, opts: RenderOptions = {}): string {
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(doc.seo.description.trim())}">
 <meta property="og:type" content="website">
-${font.link ? `<link rel="stylesheet" href="${esc(font.link)}">` : ''}
+<meta property="og:locale" content="ko_KR">
+${ogImage ? `<meta property="og:image" content="${esc(ogImage)}">\n` : ''}<meta name="theme-color" content="${pal.primary}">
+${favicon ? `<link rel="icon" href="${esc(favicon)}">\n` : ''}${font.link ? `<link rel="stylesheet" href="${esc(font.link)}">` : ''}
 <style>
 ${css(doc, opts)}
 </style>
 </head>
-<body id="top">
+<body id="top"${fbar ? ' class="has-fbar"' : ''}>
 ${body}
-</body>
+${fbar}</body>
 </html>
 `
 }

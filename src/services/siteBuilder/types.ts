@@ -23,6 +23,9 @@ export type BlockType =
   | 'cta'
   | 'contact'
   | 'footer'
+  | 'gallery'
+  | 'reviews'
+  | 'logos'
 
 /** 목록 칸의 한 줄 (예: 서비스 이름 · 설명) */
 export type ListItem = Record<string, string>

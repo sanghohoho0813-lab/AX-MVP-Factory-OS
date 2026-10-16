@@ -125,7 +125,7 @@ function Field({ block, field: f, onChange, onImageError, imageRoom }: { block: 
   if (f.kind === 'image') return <ImageField id={id} label={label} value={str(value)} onChange={(v) => onChange(f.key, v)} onImageError={onImageError} imageRoom={imageRoom} hint={f.hint} fieldKey={f.key} />
   if (f.kind === 'list') {
     const items = Array.isArray(value) ? value : []
-    return <ListField label={label} field={f} items={items} onChange={(next, g) => onChange(f.key, next, g ? `${group}:${g}` : undefined)} />
+    return <ListField label={label} field={f} items={items} idBase={id} onChange={(next, g) => onChange(f.key, next, g ? `${group}:${g}` : undefined)} onImageError={onImageError} imageRoom={imageRoom} />
   }
   const common = {
     id,
@@ -228,7 +228,23 @@ function ImageField({
   )
 }
 
-function ListField({ label, field, items, onChange }: { label: React.ReactNode; field: FieldDef; items: ListItem[]; onChange: (next: ListItem[], group?: string) => void }) {
+function ListField({
+  label,
+  field,
+  items,
+  idBase,
+  onChange,
+  onImageError,
+  imageRoom,
+}: {
+  label: React.ReactNode
+  field: FieldDef
+  items: ListItem[]
+  idBase: string
+  onChange: (next: ListItem[], group?: string) => void
+  onImageError: (m: string) => void
+  imageRoom: number
+}) {
   const max = field.maxItems ?? 12
   const blank: ListItem = Object.fromEntries((field.itemFields ?? []).map((s) => [s.key, '']))
   return (
@@ -242,6 +258,21 @@ function ListField({ label, field, items, onChange }: { label: React.ReactNode; 
       {items.map((it, i) => (
         <div key={i} className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-slate-50 p-3" data-testid="list-item">
           {(field.itemFields ?? []).map((sub) => {
+            // 목록 안 사진(사진 모음 · 로고) — D-207
+            if (sub.kind === 'image')
+              return (
+                <ImageField
+                  key={sub.key}
+                  id={`${idBase}-${i}-${sub.key}`}
+                  label={<span className="t-meta font-semibold text-slate-600">{sub.label}</span>}
+                  value={it[sub.key] ?? ''}
+                  onChange={(v) => onChange(listSet(items, i, sub.key, v))}
+                  onImageError={onImageError}
+                  imageRoom={imageRoom}
+                  hint={sub.hint}
+                  fieldKey={sub.key}
+                />
+              )
             const props = {
               value: it[sub.key] ?? '',
               maxLength: sub.max,

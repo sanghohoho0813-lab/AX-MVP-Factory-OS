@@ -1,5 +1,7 @@
 /**
  * D-202 홈페이지 만들기 — 업종 알아보기 · 업체 기록으로 초안 · 지어내지 않기 · HTML 안전(무작위 공격 글) · 꾸밈 대비 · 고치기 · 저장본 읽기 · 점검.
+ * D-207 — 블록 바탕 · 첫 화면 사진 가득 · 사진 모음 · 고객 후기 · 거래처 로고 · 연락처 단추(카카오톡 · 상담 신청서) · 휴대폰 고정 단추 ·
+ *         질문 하나만 열기 · 탭 아이콘 · 공유 정보 · h1 점검.
  */
 import { normalizeClientOps } from '../clientOpsService'
 import {
@@ -33,6 +35,9 @@ import {
   siteFileName,
   withContactPhone,
   heroArt,
+  imageChars,
+  paletteOf,
+  type BlockType,
   type SiteDoc,
 } from '../siteBuilder'
 
@@ -179,6 +184,7 @@ const pick = <T,>(a: readonly T[]): T => a[Math.floor(rnd() * a.length)]
 const evilBad: unknown[] = []
 for (let i = 0; i < 600; i++) {
   let doc: SiteDoc = draftSite(full, { today, now, makeId, industry: pick(allInd) })
+  for (const t of ['gallery', 'reviews', 'logos'] as BlockType[]) doc = insertBlock(doc, newBlock(t, full, doc.industry, today, makeId()), null, now)
   for (const b of doc.blocks) {
     for (const f of BLOCK_DEFS.find((x) => x.type === b.type)!.fields) {
       if (rnd() < 0.5) continue
@@ -295,7 +301,7 @@ check('H43 점검 순서 = 꼭 → 확인 → 참고', (() => {
 })())
 
 check('H44 내려받을 파일 이름 = 회사명-홈페이지.html(못 쓰는 글자 · 빈칸 뺌)', siteFileName(d) === '한솔정밀(주)-홈페이지.html' && siteFileName(setProp(d, footer.id, 'companyName', 'A/B: C*D', now)) === 'ABCD-홈페이지.html')
-check('H45 블록 정의 12종 · 칸 이름 겹침 없음 · 목록 칸엔 줄 칸 정의', BLOCK_DEFS.length === 12 && BLOCK_DEFS.every((b) => new Set(b.fields.map((f) => f.key)).size === b.fields.length && b.fields.every((f) => f.kind !== 'list' || (f.itemFields?.length ?? 0) > 0)))
+check('H45 블록 정의 15종(D-207 사진 모음 · 후기 · 로고) · 칸 이름 겹침 없음 · 목록 칸엔 줄 칸 정의', BLOCK_DEFS.length === 15 && BLOCK_DEFS.every((b) => new Set(b.fields.map((f) => f.key)).size === b.fields.length && b.fields.every((f) => f.kind !== 'list' || (f.itemFields?.length ?? 0) > 0)))
 
 /* ---------------- D-205 모양 · 그림 · 업종 ---------------- */
 n = 0
@@ -336,6 +342,71 @@ const artBad = ALL_ART.filter((a) => /\son\w+=|<text|href|<script|<foreignObject
 check('H52 그림 · 아이콘(업종 10 + 아이콘 18) — 이벤트 · 글자 · 링크 · 바깥 주소 0 · 업종마다 그림이 다름', artBad.length === 0 && ALL_ART.length === 28 && new Set(allInd.map((k) => heroArt(k))).size === allInd.length, artBad.length)
 check('H53 로고 자리 글자 — (주)샤인디자인 → 샤 · 한솔정밀(주) → 한', sHtml.includes('<span class="mark" aria-hidden="true">샤</span>') && fullHtml.includes('<span class="mark" aria-hidden="true">한</span>'))
 check('H54 구역 머리글(ABOUT · BUSINESS · PROCESS · FAQ · CONTACT) — 고정 글', ['ABOUT', 'BUSINESS', 'PROCESS', 'FAQ', 'CONTACT'].every((k) => fullHtml.includes(`<p class="kicker">${k}</p>`)))
+
+/* ---------------- D-207 식스샵 회사 템플릿에서 얻은 것 ---------------- */
+n = 0
+const gd = draftSite(full, { today, now, makeId })
+const gAbout = gd.blocks.find((b) => b.type === 'about')!
+const gSrv = gd.blocks.find((b) => b.type === 'services')!
+const gHero = gd.blocks.find((b) => b.type === 'hero')!
+const gContact = gd.blocks.find((b) => b.type === 'contact')!
+const gFaq = gd.blocks.find((b) => b.type === 'faq')!
+const withBg = BLOCK_DEFS.filter((b) => b.fields.some((f) => f.key === 'bg')).map((b) => b.type)
+check('H55 바탕 칸 — 내용 블록 10종에만 · 늘 맨 끝 칸 · 첫 값 자동 / 머리 · 첫 화면 · 숫자 · 문의 띠 · 바닥에는 없음', withBg.length === 10 && BLOCK_DEFS.every((b) => !b.fields.some((f) => f.key === 'bg') || b.fields[b.fields.length - 1].key === 'bg') && ['header', 'hero', 'numbers', 'cta', 'footer'].every((t) => !withBg.includes(t as BlockType)) && gAbout.props.bg === 'auto', withBg)
+const darkDoc = setProp(gd, gAbout.id, 'bg', 'dark', now)
+const darkHtml = renderSiteHtml(darkDoc)
+const whiteHtml = renderSiteHtml(setProp(gd, gAbout.id, 'bg', 'white', now))
+check('H56 바탕 고르기 — 어둡게 → class bg-dark · 다음 자동 블록은 흰 바탕 / 흰색 → 다음 자동 블록은 옅은 바탕 / 엉뚱한 값은 자동', darkHtml.includes('id="about" class="bg-dark"') && darkHtml.includes('id="services" class=""') && whiteHtml.includes('id="about" class="bg-white"') && whiteHtml.includes('id="services" class="alt"') && renderSiteHtml(setProp(gd, gAbout.id, 'bg', 'x" onclick="y', now)).includes('id="about" class=""') && normalizeSiteDoc({ ...gd, blocks: [{ ...gAbout, props: { ...gAbout.props, bg: 'neon' } }] })!.blocks[0].props.bg === 'auto')
+const brandBad = PALETTES.flatMap((p) => [['흰 글자 · 꾸밈 색 바탕', '#ffffff', p.primary], ['흰 글자 · 어두운 바탕', '#ffffff', p.footBg], ['흐린 글자 · 옅은 회색', p.muted, '#f5f6f8'], ['본문 · 옅은 회색', p.ink, '#f5f6f8']].filter(([, a, b]) => contrastRatio(a, b) < 4.5).map(([name, a, b]) => `${p.key} ${name} ${contrastRatio(a, b).toFixed(2)}`))
+check('H57 새 바탕 대비 — 색 묶음 7개 × (꾸밈 색 · 어둡게 · 옅은 회색) 모두 4.5:1 넘음', brandBad.length === 0, brandBad)
+const photoDoc = setProp(setProp(gd, gHero.id, 'layout', 'photo', now), gHero.id, 'image', 'https://cdn.example.kr/hero.jpg', now)
+const photoHtml = renderSiteHtml(photoDoc)
+const photoNoImg = setProp(gd, gHero.id, 'layout', 'photo', now)
+check('H58 첫 화면 사진 가득 — class hero photo · 사진 깔림 · 전화 단추 · 공유 사진(og:image) / 사진 없으면 색 바탕 + 점검 알림', photoHtml.includes(`class="hero photo" style="background-image:url('https://cdn.example.kr/hero.jpg')"`) && photoHtml.includes('<a class="btn line" href="tel:') && photoHtml.includes('<meta property="og:image" content="https://cdn.example.kr/hero.jpg">') && renderSiteHtml(photoNoImg).includes('class="hero band"') && siteChecks(photoNoImg).some((c) => c.key === `photo-${gHero.id}`) && !renderSiteHtml(gd).includes('og:image'))
+const png = 'data:image/png;base64,iVBORw0KGgo='
+const gal0 = newBlock('gallery', full, 'construction', today, 'g1')
+check('H59 사진 모음 새로 더하기 — 빈 칸 3개 · 제목은 업종 말(시공 사례) · 견본 글 0 · 채우기 전엔 안 나옴', (gal0.props.items as unknown[]).length === 3 && gal0.props.title === '시공 사례' && !gal0.sample && !hasContent(gal0))
+let galDoc = insertBlock(gd, gal0, gSrv.id, now)
+galDoc = setProp(galDoc, 'g1', 'items', [{ image: png, title: '동탄 욕실', desc: '3일 시공' }, { image: '', title: '망원 주방', desc: '' }, { image: 'javascript:alert(1)', title: '', desc: '' }], now)
+const galHtml = renderSiteHtml(galDoc)
+check('H60 사진 모음 격자 — 비율 4:3 · 사진 1장 · 사진 없는 칸은 아이콘 자리 · 나쁜 주소는 빠짐 · 점검 "사진 없는 칸 2개" · 메뉴에 사례', galHtml.includes('<div class="gal" style="--ar:4/3">') && (galHtml.match(/<div class="gm"><img src="data:image\/png/g) ?? []).length === 1 && (galHtml.match(/<span class="gph"/g) ?? []).length === 2 && !galHtml.includes('javascript:') && siteChecks(galDoc).some((c) => c.key === 'gallery-g1' && c.text.includes('2개')) && siteChecks(galDoc).some((c) => c.key === 'img-g1-items') && menuItems(galDoc).some((m) => m.label === '시공 사례' && m.href === '#works'))
+const zzHtml = renderSiteHtml(setProp(setProp(galDoc, 'g1', 'layout', 'zigzag', now), 'g1', 'ratio', '16:9', now))
+check('H61 사진 모음 번갈아 · 비율 16:9 · 엉뚱한 비율은 4:3', zzHtml.includes('<div class="zz" style="--ar:16/9">') && zzHtml.includes('<div class="zt"><em>01</em><h3>동탄 욕실</h3>') && renderSiteHtml(setProp(galDoc, 'g1', 'ratio', '"><b>', now)).includes('--ar:4/3'))
+const galRound = normalizeSiteDoc(JSON.parse(JSON.stringify(galDoc)))!
+const galBlk = galRound.blocks.find((b) => b.id === 'g1')!
+check('H62 사진 모음 저장 → 읽기 그대로 · 목록 안 사진도 저장 공간 셈 · 너무 큰 사진 · 글 아닌 값은 버림', JSON.stringify(galRound) === JSON.stringify(galDoc) && imageChars(galDoc) === png.length && (normalizeSiteDoc({ ...galDoc, blocks: [{ ...galBlk, props: { ...galBlk.props, items: [{ image: 'data:image/png;base64,' + 'A'.repeat(700_000), title: 'x' }, { image: 42, title: 'y' }] } }] })!.blocks[0].props.items as { image: string }[]).every((it) => it.image === ''))
+const rv0 = newBlock('reviews', full, 'construction', today, 'r1')
+let rvDoc = insertBlock(gd, rv0, gSrv.id, now)
+check('H63 고객 후기 새로 더하기 — 지어낸 후기 0(빈 칸) · 채우기 전엔 안 나옴', !hasContent(rv0) && JSON.stringify(rv0.props.items) === JSON.stringify([{ text: '', name: '', meta: '' }]) && !renderSiteHtml(rvDoc).includes('class="rev"'))
+rvDoc = setProp(rvDoc, 'r1', 'items', [{ text: '꼼꼼하게 해 주셨어요\n추천해요', name: '김○○ 님', meta: '네이버 리뷰 · 욕실' }], now)
+const rvHtml = renderSiteHtml(rvDoc)
+check('H64 고객 후기 — 카드 · 줄바꿈 · 이름 · 받은 곳 · 점검에 "실제 고객 글만" 안내 · 메뉴에 후기', rvHtml.includes('<figure class="rev"><span class="qm" aria-hidden="true">“</span><blockquote>꼼꼼하게 해 주셨어요<br>추천해요</blockquote><figcaption><b>김○○ 님</b><span>네이버 리뷰 · 욕실</span></figcaption></figure>') && siteChecks(rvDoc).some((c) => c.key === 'reviews-r1' && c.text.includes('실제 고객')) && menuItems(rvDoc).some((m) => m.href === '#reviews'))
+let lgDoc = insertBlock(gd, newBlock('logos', full, 'manufacturing', today, 'l1'), null, now)
+lgDoc = setProp(lgDoc, 'l1', 'items', [{ name: '현대모비스', image: '' }, { name: '삼성전자', image: png }], now)
+const lgHtml = renderSiteHtml(lgDoc)
+check('H65 거래처 로고 — 흑백 기본 · 로고 없으면 이름 글자 · 로고는 그림 · 흑백 끄면 색 그대로', lgHtml.includes('<ul class="logos gray"><li><span>현대모비스</span></li><li><img src="data:image/png') && renderSiteHtml(setProp(lgDoc, 'l1', 'gray', false, now)).includes('<ul class="logos">'))
+let ctDoc = setProp(gd, gContact.id, 'kakaoUrl', 'https://pf.kakao.com/_abc', now)
+ctDoc = setProp(ctDoc, gContact.id, 'formUrl', 'https://form.naver.com/response/xyz', now)
+const ctHtml = renderSiteHtml(ctDoc)
+check('H66 연락처 단추 — 전화하기 · 카카오톡 상담(노란) · 상담 신청하기 · 지도, 새 창은 noopener', ctHtml.includes('<div class="cbtns"><a class="btn" href="tel:0311234567">전화하기</a><a class="btn kakao" href="https://pf.kakao.com/_abc" target="_blank" rel="noopener">카카오톡 상담</a><a class="btn line" href="https://form.naver.com/response/xyz" target="_blank" rel="noopener">상담 신청하기</a><a class="btn ghost"'), ctHtml.slice(ctHtml.indexOf('cbtns'), ctHtml.indexOf('cbtns') + 300))
+const badCt = setProp(setProp(gd, gContact.id, 'kakaoUrl', 'http://pf.kakao.com/_abc', now), gContact.id, 'formUrl', 'javascript:alert(1)', now)
+check('H67 카카오톡 · 신청서는 https 만 — http · javascript 는 단추 없음 + 점검 알림', !renderSiteHtml(badCt).includes('카카오톡 상담') && !renderSiteHtml(badCt).includes('상담 신청하기') && ['kakaoUrl', 'formUrl'].every((k) => siteChecks(badCt).some((c) => c.key === `${k}-${gContact.id}`)))
+const fbHtml = renderSiteHtml(gd)
+check('H68 휴대폰 고정 단추 — 대표 전화가 있으면 처음부터 켬 · 전화 걸기 + 오시는 길 · body has-fbar / 카카오톡 있으면 카카오톡 · 끄면 없음 · 연락처를 휴대폰에서 숨기면 없음', gContact.props.floatBar === true && fbHtml.includes('<body id="top" class="has-fbar">') && fbHtml.includes('<nav class="fbar" aria-label="빠른 연락"><a class="fb-tel" href="tel:0311234567">전화 걸기</a><a class="fb-2" href="#contact">오시는 길</a></nav>') && ctHtml.includes('<a class="fb-2 kakao" href="https://pf.kakao.com/_abc"') && !renderSiteHtml(setProp(gd, gContact.id, 'floatBar', false, now)).includes('class="fbar"') && !renderSiteHtml(setHidden(gd, gContact.id, 'mobile', true, now)).includes('class="fbar"'))
+const faqHtml = renderSiteHtml(gd)
+const faqN = (gFaq.props.items as unknown[]).length
+check('H69 자주 묻는 질문 — 하나를 열면 나머지 닫힘(같은 name) · 첫 질문만 열려 있음', (faqHtml.match(/<details name="faq"/g) ?? []).length === faqN && (faqHtml.match(/<details name="faq" open>/g) ?? []).length === 1)
+check('H70 머리 정보 — og:locale ko_KR · theme-color = 꾸밈 색 · 탭 아이콘(로고 첫 글자, 부호화 · <svg 그대로 0)', fbHtml.includes('<meta property="og:locale" content="ko_KR">') && fbHtml.includes(`<meta name="theme-color" content="${paletteOf(gd.theme.palette).primary}">`) && /<link rel="icon" href="data:image\/svg\+xml,%3Csvg[^"]*%ED%95%9C/.test(fbHtml))
+const noHero = removeBlock(gd, gHero.id, now)
+const twoHero = insertBlock(gd, newBlock('hero', full, 'manufacturing', today, 'h9'), null, now)
+check('H71 큰 제목(h1) 점검 — 첫 화면 없으면 알림 · 둘이면 "하나가 좋아요" · 하나면 조용', siteChecks(noHero).some((c) => c.key === 'h1' && c.level === 'should') && siteChecks(twoHero).some((c) => c.key === 'h1' && c.level === 'info') && !siteChecks(gd).some((c) => c.key === 'h1'))
+const oldRaw7 = JSON.parse(JSON.stringify(gd)) as { blocks: { props: Record<string, unknown> }[] }
+for (const b of oldRaw7.blocks) for (const k of ['bg', 'kakaoUrl', 'formUrl', 'floatBar']) delete b.props[k]
+const old7 = normalizeSiteDoc(oldRaw7)!
+const old7Html = renderSiteHtml(old7)
+check('H72 예전 저장본(D-206 이전) → 바탕 자동 · 카카오톡 · 신청서 빈칸 · 고정 단추 꺼짐(예전 화면에 없던 것을 저절로 켜지 않음)', old7.blocks.every((b) => !('bg' in b.props) || b.props.bg === 'auto') && !old7Html.includes('class="fbar"') && !old7Html.includes('class="bg-') && !old7Html.includes('카카오톡 상담'))
+const darkCount = [gAbout, gSrv, gFaq].reduce((doc, b) => setProp(doc, b.id, 'bg', 'dark', now), gd)
+check('H73 진한 바탕이 셋 이상이면 "한두 곳만" 참고 알림', siteChecks(darkCount).some((c) => c.key === 'dark') && !siteChecks(darkDoc).some((c) => c.key === 'dark'))
 
 console.log(`\n홈페이지 만들기: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

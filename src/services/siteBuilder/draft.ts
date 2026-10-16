@@ -12,7 +12,22 @@ import { usableFactValue } from '../customerFacts'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { INDUSTRY_PALETTE } from './theme'
 import { industryDef, industryOf } from './industry'
-import type { BlockType, IndustryKey, ListItem, PropValue, SiteBlock, SiteDoc } from './types'
+import { blockDef } from './blocks'
+import type { BlockType, FieldDef, IndustryKey, ListItem, PropValue, SiteBlock, SiteDoc } from './types'
+
+/** 사진 모음 제목 — 업종마다(D-207) */
+const GALLERY_TITLE: Record<IndustryKey, string> = {
+  manufacturing: '생산 · 납품 사례',
+  it: '진행 사례',
+  trade: '취급 제품',
+  food: '메뉴 · 매장',
+  health: '공간 둘러보기',
+  professional: '진행 사례',
+  education: '수업 모습',
+  construction: '시공 사례',
+  design: '작업 사례',
+  general: '사례',
+}
 
 export interface SiteFacts {
   companyName: string
@@ -108,9 +123,22 @@ function shortItem(item: string, fallback: string): string {
   return first && first.length <= 24 ? first : fallback
 }
 
-/** 블록 하나 — 칸 기본값 + 이번에 채운 값 */
+/** 칸 기본값 — 켜고 끄기 꺼짐 · 고르기 첫 값 · 목록 빈 것 · 글 빈 것 */
+function fieldDefault(f: FieldDef): PropValue {
+  if (f.kind === 'toggle') return false
+  if (f.kind === 'select') return f.options?.[0]?.value ?? ''
+  if (f.kind === 'list') return []
+  return ''
+}
+
+/**
+ * 블록 하나 — 칸 정의 순서대로 '이번에 채운 값 · 없으면 기본값'.
+ * 저장본 읽기(normalize)도 정의 순서로 다시 쌓으므로, 칸을 새로 더해도(D-207 바탕 · 카카오톡 …) 저장 → 읽기가 그대로다.
+ */
 function block(type: BlockType, id: string, props: Record<string, PropValue>, sample: string[] = []): SiteBlock {
-  return { id, type, props, ...(sample.length ? { sample } : {}) }
+  const fields = blockDef(type)?.fields ?? []
+  const ordered = Object.fromEntries(fields.map((f) => [f.key, props[f.key] ?? fieldDefault(f)]))
+  return { id, type, props: ordered, ...(sample.length ? { sample } : {}) }
 }
 
 export interface DraftOptions {
@@ -211,7 +239,7 @@ export function draftSite(record: ClientOpsRecord, opts: DraftOptions): SiteDoc 
         block(
           'contact',
           makeId(),
-          { title: '연락처 · 오시는 길', address: f.address, phone: f.phone, email: f.email, hours: ind.hours, showMapLink: Boolean(f.address) },
+          { title: '연락처 · 오시는 길', address: f.address, phone: f.phone, email: f.email, hours: ind.hours, showMapLink: Boolean(f.address), floatBar: Boolean(f.phone) },
           ['hours'],
         ),
       )
@@ -271,8 +299,15 @@ export function newBlock(type: BlockType, record: ClientOpsRecord | null, indust
     case 'cta':
       return block(type, id, { title: ind.ctaTitle, body: ind.ctaBody, buttonLabel: '문의하기', showPhone: true }, ['body'])
     case 'contact':
-      return block(type, id, { title: '연락처 · 오시는 길', address: f?.address ?? '', phone: f?.phone ?? '', email: f?.email ?? '', hours: ind.hours, showMapLink: Boolean(f?.address) }, ['hours'])
+      return block(type, id, { title: '연락처 · 오시는 길', address: f?.address ?? '', phone: f?.phone ?? '', email: f?.email ?? '', hours: ind.hours, showMapLink: Boolean(f?.address), floatBar: Boolean(f?.phone) }, ['hours'])
     case 'footer':
       return block(type, id, { companyName: f?.companyName ?? '', representative: f?.representative ?? '', businessNumber: f?.businessNumber ?? '', showBusinessNumber: true, address: f?.address ?? '', phone: f?.phone ?? '', email: f?.email ?? '', extra: '' })
+    // D-207 — 사진 · 후기 · 로고는 지어낼 수 없다: 빈 칸으로 시작(채우기 전에는 홈페이지에 안 나온다)
+    case 'gallery':
+      return block(type, id, { layout: 'grid', title: GALLERY_TITLE[industry], intro: '', ratio: '4:3', items: [{ image: '', title: '', desc: '' }, { image: '', title: '', desc: '' }, { image: '', title: '', desc: '' }] })
+    case 'reviews':
+      return block(type, id, { title: '고객 후기', intro: '', items: [{ text: '', name: '', meta: '' }] })
+    case 'logos':
+      return block(type, id, { title: '함께한 곳', intro: '', gray: true, items: [{ name: '', image: '' }] })
   }
 }

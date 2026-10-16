@@ -1,5 +1,7 @@
 /**
- * 블록 12종 (D-202) — 블록마다 어떤 칸이 있는가.
+ * 블록 15종 (D-202 · D-207) — 블록마다 어떤 칸이 있는가.
+ * D-207(식스샵 회사 템플릿에서 얻은 생각): 블록마다 '바탕' 고르기 · 첫 화면 '사진 가득' · 사진 모음 · 고객 후기 · 거래처 로고 ·
+ *        연락처에 카카오톡 · 상담 신청서 · 휴대폰 아래 고정 단추. 새 칸은 늘 맨 뒤에 붙인다(저장본 읽기 순서 그대로).
  *
  * 편집 화면은 이 표만 보고 칸을 그리고, HTML 그리기(render.ts)는 같은 칸 이름을 읽는다.
  * 새 블록이 필요하면 여기 한 줄 + render 한 함수.
@@ -8,6 +10,16 @@ import type { BlockDef, BlockType, FieldDef } from './types'
 
 const TITLE: FieldDef = { key: 'title', label: '제목', kind: 'text', max: 60 }
 const INTRO: FieldDef = { key: 'intro', label: '짧은 소개(없어도 됨)', kind: 'textarea', max: 300 }
+/** 구역 바탕 — '자동' 은 흰 바탕 · 옅은 바탕을 번갈아(D-202 그대로) */
+export const BG_OPTIONS = [
+  { value: 'auto', label: '자동(흰 바탕 · 옅은 바탕 번갈아)' },
+  { value: 'white', label: '흰색' },
+  { value: 'gray', label: '옅은 회색' },
+  { value: 'tint', label: '옅은 색(꾸밈 색)' },
+  { value: 'brand', label: '꾸밈 색으로 꽉 채우기' },
+  { value: 'dark', label: '어둡게' },
+]
+const BG: FieldDef = { key: 'bg', label: '바탕', kind: 'select', options: BG_OPTIONS, hint: '진한 바탕(꾸밈 색 · 어둡게)은 한 페이지에 한두 곳이 보기 좋아요' }
 
 export const BLOCK_DEFS: BlockDef[] = [
   {
@@ -36,6 +48,7 @@ export const BLOCK_DEFS: BlockDef[] = [
         options: [
           { value: 'split', label: '글 + 그림 나란히(밝은 바탕)' },
           { value: 'band', label: '색 바탕에 글만' },
+          { value: 'photo', label: '사진 가득(사진 위에 글)' },
         ],
       },
       { key: 'eyebrow', label: '작은 윗글(회사 이름 · 분야)', kind: 'text', max: 40 },
@@ -54,7 +67,7 @@ export const BLOCK_DEFS: BlockDef[] = [
         ],
       },
       { key: 'buttonUrl', label: '갈 주소(https://…)', kind: 'text', max: 300, showWhen: { key: 'buttonTarget', value: 'url' } },
-      { key: 'image', label: '사진(없으면 업종 그림)', kind: 'image', hint: '나란히 모양은 오른쪽에, 색 바탕 모양은 뒤에 깔려요' },
+      { key: 'image', label: '사진(없으면 업종 그림)', kind: 'image', hint: '나란히 모양은 오른쪽에, 색 바탕 · 사진 가득 모양은 뒤에 깔려요. 가로로 긴 사진(가로 1,600px 넘게)이 좋아요' },
       {
         key: 'align',
         label: '글 맞춤',
@@ -88,6 +101,7 @@ export const BLOCK_DEFS: BlockDef[] = [
           { key: 'value', label: '내용', kind: 'text', max: 60 },
         ],
       },
+      BG,
     ],
   },
   {
@@ -119,6 +133,7 @@ export const BLOCK_DEFS: BlockDef[] = [
           { key: 'desc', label: '설명', kind: 'textarea', max: 240 },
         ],
       },
+      BG,
     ],
   },
   {
@@ -168,6 +183,7 @@ export const BLOCK_DEFS: BlockDef[] = [
           { key: 'detail', label: '설명(번호 · 날짜 · 기관, 없어도 됨)', kind: 'text', max: 60 },
         ],
       },
+      BG,
     ],
   },
   {
@@ -188,6 +204,7 @@ export const BLOCK_DEFS: BlockDef[] = [
           { key: 'text', label: '내용', kind: 'text', max: 80 },
         ],
       },
+      BG,
     ],
   },
   {
@@ -208,6 +225,7 @@ export const BLOCK_DEFS: BlockDef[] = [
           { key: 'desc', label: '설명', kind: 'text', max: 100 },
         ],
       },
+      BG,
     ],
   },
   {
@@ -228,6 +246,96 @@ export const BLOCK_DEFS: BlockDef[] = [
           { key: 'a', label: '답', kind: 'textarea', max: 400 },
         ],
       },
+      BG,
+    ],
+  },
+  {
+    type: 'gallery',
+    label: '사진 모음(사례 · 시공 · 메뉴)',
+    desc: '사진 여러 장을 격자로 · 사진과 글을 번갈아',
+    menu: '사례',
+    anchor: 'works',
+    fields: [
+      {
+        key: 'layout',
+        label: '모양',
+        kind: 'select',
+        options: [
+          { value: 'grid', label: '격자(사진 아래 글)' },
+          { value: 'zigzag', label: '사진 · 글 번갈아(큰 사진)' },
+        ],
+      },
+      TITLE,
+      INTRO,
+      {
+        key: 'ratio',
+        label: '사진 비율',
+        kind: 'select',
+        options: [
+          { value: '4:3', label: '가로 4:3' },
+          { value: '3:2', label: '가로 3:2' },
+          { value: '16:9', label: '가로 16:9(넓게)' },
+          { value: '1:1', label: '정사각 1:1' },
+          { value: '3:4', label: '세로 3:4' },
+        ],
+      },
+      {
+        key: 'items',
+        label: '사진',
+        kind: 'list',
+        maxItems: 9,
+        itemFields: [
+          { key: 'image', label: '사진', kind: 'image' },
+          { key: 'title', label: '제목(예: 동탄 아파트 욕실)', kind: 'text', max: 40 },
+          { key: 'desc', label: '설명(없어도 됨)', kind: 'textarea', max: 200 },
+        ],
+      },
+      BG,
+    ],
+  },
+  {
+    type: 'reviews',
+    label: '고객 후기',
+    desc: '실제 고객이 남긴 글을 카드로',
+    menu: '후기',
+    anchor: 'reviews',
+    fields: [
+      TITLE,
+      INTRO,
+      {
+        key: 'items',
+        label: '후기',
+        kind: 'list',
+        maxItems: 6,
+        itemFields: [
+          { key: 'text', label: '후기 글(받은 그대로)', kind: 'textarea', max: 300 },
+          { key: 'name', label: '이름(예: 김○○ 님)', kind: 'text', max: 30 },
+          { key: 'meta', label: '어디서 받은 후기 · 무엇을 이용(예: 네이버 리뷰 · 욕실 리모델링)', kind: 'text', max: 40 },
+        ],
+      },
+      BG,
+    ],
+  },
+  {
+    type: 'logos',
+    label: '거래처 · 협력사',
+    desc: '함께 일한 회사 이름 · 로고',
+    anchor: 'clients',
+    fields: [
+      TITLE,
+      INTRO,
+      { key: 'gray', label: '로고를 흑백으로(여러 색이 섞여도 차분하게)', kind: 'toggle' },
+      {
+        key: 'items',
+        label: '회사',
+        kind: 'list',
+        maxItems: 18,
+        itemFields: [
+          { key: 'name', label: '회사 이름', kind: 'text', max: 40 },
+          { key: 'image', label: '로고(없으면 이름 글자)', kind: 'image' },
+        ],
+      },
+      BG,
     ],
   },
   {
@@ -255,6 +363,10 @@ export const BLOCK_DEFS: BlockDef[] = [
       { key: 'email', label: '메일', kind: 'text', max: 80 },
       { key: 'hours', label: '운영 시간', kind: 'textarea', max: 120 },
       { key: 'showMapLink', label: '네이버 지도 바로가기 단추', kind: 'toggle' },
+      { key: 'kakaoUrl', label: '카카오톡 채널 주소(없어도 됨)', kind: 'text', max: 200, placeholder: 'https://pf.kakao.com/…', hint: '카카오톡 채널 관리자 화면의 채널 주소를 붙여 넣으면 [카카오톡 상담] 단추가 생겨요' },
+      { key: 'formUrl', label: '상담 신청서 주소(없어도 됨)', kind: 'text', max: 300, placeholder: 'https://form.naver.com/…', hint: '네이버폼 · 구글폼 주소를 붙여 넣으면 [상담 신청하기] 단추가 생겨요' },
+      { key: 'floatBar', label: '휴대폰 화면 아래에 전화 · 상담 단추 늘 보이기', kind: 'toggle' },
+      BG,
     ],
   },
   {
