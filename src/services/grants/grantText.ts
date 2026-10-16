@@ -84,8 +84,20 @@ export function periodOf(text: string): { applyStart: string; applyEnd: string; 
   }
   if (dates.length >= 2) return { applyStart: dates[0], applyEnd: dates[1], deadlineKind: firstCome ? 'first_come' : 'date', ...endTime(1) }
   if (dates.length === 1) {
-    const before = t.slice(0, found[0].at)
-    const isEnd = /[~∼]|까지|마감/.test(before) || /까지|마감/.test(t.slice(found[0].at))
+    // D-211: 끝날에 해가 없는 흔한 공고 꼴 — '2026. 10. 1.(목) ~ 10. 30.(금) 18:00' → 앞 날짜의 해(달이 앞서면 다음 해)
+    const tail = /^\s*\.?\s*(?:\([^)]{0,4}\)\s*)?(?:\d{1,2}\s*:\s*\d{2}\s*)?[~∼]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})(?!\d)\s*일?\.?/.exec(t.slice(found[0].end, found[0].end + 40))
+    if (tail) {
+      const y0 = Number(dates[0].slice(0, 4))
+      const end = ymd(String(Number(tail[1]) < Number(dates[0].slice(5, 7)) ? y0 + 1 : y0), tail[1], tail[2])
+      if (end && end >= dates[0]) {
+        const tm = timeAfter(t, found[0].end + tail.index + tail[0].length)
+        return { applyStart: dates[0], applyEnd: end, deadlineKind: firstCome ? 'first_come' : 'date', ...(tm ? { applyEndTime: tm } : {}) }
+      }
+    }
+    // D-211: 날짜 바로 뒤 '부터' · '~' 는 시작날이다 — '2026.10.01(목)부터 예산 소진 시까지' 의 '까지' 를 끝날로 읽어 다음 날부터 '마감' 이었다
+    const after = t.slice(found[0].end, found[0].end + 20)
+    const startsHere = /^\s*\.?\s*(?:\([^)]{0,4}\)\s*)?(?:\d{1,2}\s*:\s*\d{2}\s*)?(?:부터|[~∼]|이후)/.test(after)
+    const isEnd = !startsHere && (/[~∼]|까지|마감/.test(t.slice(Math.max(0, found[0].at - 30), found[0].at)) || /까지|마감/.test(after))
     return isEnd ? { applyStart: '', applyEnd: dates[0], deadlineKind: firstCome ? 'first_come' : 'date', ...endTime(0) } : { applyStart: dates[0], applyEnd: '', deadlineKind: firstCome ? 'first_come' : always ? 'always' : 'date' }
   }
   return { applyStart: '', applyEnd: '', deadlineKind: firstCome ? 'first_come' : always ? 'always' : 'date' }
@@ -126,8 +138,16 @@ const INDUSTRY_WORDS: [string, RegExp][] = [
 /** 지원대상 글 → 조건. 이 글에 분명히 적힌 것만 */
 export function rulesFromText(target: string, whole = target, title = ''): GrantRules {
   const r: GrantRules = { ...NO_RULES, regions: [], cities: [], industries: [], excludeIndustries: [], sizes: [], certs: [] }
-  const t = target.replace(/\s+/g, ' ')
-  const all = `${title} ${whole}`.replace(/\s+/g, ' ')
+  // D-211: '(여성기업 우대)' 같은 괄호는 조건이 아니다 — 지원대상 글에서도 뺀다
+  const t = target.replace(/\s+/g, ' ').replace(/[(（][^)）]*(?:우대|가점|가산)[^)）]*[)）]/g, ' ')
+  // D-211: 우대 · 가점 문장과 수행기관 · 문의처 문장은 조건이 아니다 — '※ 우대: 청년기업(만 39세 이하)' 를 '청년만' 으로 읽어 다른 업체를 숨겼다
+  // 줄이 나뉘어 있으면 줄마다(붙여넣은 공고의 '문의처' 줄이 지원대상 줄을 끌고 가지 않게)
+  const pieces = `${title}\n${whole}`
+    .replace(/[(（][^)）]*(?:우대|가점|가산)[^)）]*[)）]/g, ' ')
+    .split(/\n|\.(?=\s|$)|。|※|•|▶|○|◦|□|■|◎|\*/)
+    .map((x) => x.replace(/\s+/g, ' '))
+  const all = pieces.filter((x) => !/우대|가점|가산|우선\s*(?:선정|지원|순위)/.test(x)).join(' ')
+  const allPlace = pieces.filter((x) => !/우대|가점|가산|우선\s*(?:선정|지원|순위)|(?:수행|주관|운영|전담)\s*기관|문의|접수처|담당/.test(x)).join(' ')
 
   // 창업 N년 이내 · 업력 N년 미만 / 이상 — 강한 표현이라 본문 전체에서
   const within = /(?:창업|설립|업력)\s*(?:후\s*)?(\d{1,2})\s*년\s*(?:이내|미만|이하)/.exec(all)
@@ -155,7 +175,9 @@ export function rulesFromText(target: string, whole = target, title = ''): Grant
       const at = m.index ?? 0
       const after = t.slice(at + m[0].length, at + m[0].length + 12)
       const before = t.slice(Math.max(0, at - 14), at)
-      if (/^[^.。\n]{0,10}제외/.test(after) || /제외\s*(?:업종|대상|업체)?\s*[:：]\s*[^.\n]{0,12}$/.test(before)) exclude = true
+      // D-211: 괄호 안은 다른 말이다 — '제조업체(체납기업 제외)' 는 제조업 제외가 아니다 · '(제조업 우대)' 는 조건이 아니다
+      if (/^[^.。\n(（]{0,10}(?:우대|가점|가산|우선)/.test(after)) continue
+      if (/^[^.。\n(（]{0,10}제외/.test(after) || /제외\s*(?:업종|대상|업체)?\s*[:：]\s*[^.\n]{0,12}$/.test(before)) exclude = true
       else include = true
     }
     if (include) r.industries.push(label)
@@ -182,7 +204,7 @@ export function rulesFromText(target: string, whole = target, title = ''): Grant
     // [서울ㆍ경기] 처럼 둘 이상도 · [전남광주] 는 전남 · 광주
     for (const part of head[1].split(/[ㆍ·,/\s]+/)) for (const s of sidosOf(part)) if (!r.regions.includes(s)) r.regions.push(s)
   }
-  for (const m of all.matchAll(/([가-힣]{1,6}(?:특별자치시|특별자치도|광역시|특별시|도)?)\s*([가-힣]{1,5}[시군구])?\s*(?:내\s*)?(?:소재|관내|에\s*본사|주된\s*사무소)/g)) {
+  for (const m of allPlace.matchAll(/([가-힣]{1,6}(?:특별자치시|특별자치도|광역시|특별시|도)?)\s*([가-힣]{1,5}[시군구])?\s*(?:내\s*)?(?:소재|관내|에\s*본사|주된\s*사무소)/g)) {
     const ss = sidosOf(m[1])
     for (const s of ss) if (!r.regions.includes(s)) r.regions.push(s)
     const city = m[2] ?? (ss.length === 0 ? m[1] : '')
@@ -226,6 +248,17 @@ function section(lines: string[], label: RegExp, max = 4): string {
   return out.join(' ').trim()
 }
 
+/** 신청기간 줄이 없을 때 — 날짜 옆의 '~' 를 찾는다(D-211: 앞에 나온 '업력 1~3년' 의 ~ 를 잡아 날짜를 잃었다) */
+function periodWindow(raw: string): string {
+  const flat = raw.replace(/\s+/g, ' ')
+  for (const m of flat.matchAll(/[~∼]/g)) {
+    const at = m.index ?? 0
+    const win = flat.slice(Math.max(0, at - 40), at + 40)
+    if (/20\d{2}\s*[.\-/년]\s*\d{1,2}|20\d{6}/.test(win)) return win
+  }
+  return /선착순|소진|상시/.test(raw) ? raw : ''
+}
+
 export function parseNoticeText(raw: string): NoticeDraft {
   const lines = raw
     .split(/\r?\n/)
@@ -241,8 +274,8 @@ export function parseNoticeText(raw: string): NoticeDraft {
   const amount = /(?:최대|업체당|기업당|과제당|개사당)\s*[\d,.]+\s*(?:억|천만|백만|만)?\s*원(?:\s*이내)?/.exec(raw.replace(/\s+/g, ' '))
   const url = /https?:\/\/[^\s<>"')]+/.exec(raw)?.[0] ?? ''
   // 신청기간 줄이 없으면 글 전체에서 '~ 날짜' 를 찾는다
-  const period = periodText ? periodOf(periodText) : periodOf(/[~∼].{0,30}20\d{2}|20\d{2}.{0,30}[~∼]/.test(raw) ? (/.{0,40}[~∼].{0,40}/.exec(raw.replace(/\s+/g, ' '))?.[0] ?? '') : /선착순|소진|상시/.test(raw) ? raw : '')
-  const whole = lines.join(' ')
+  const period = periodText ? periodOf(periodText) : periodOf(periodWindow(raw))
+  const whole = lines.join('\n')
   return {
     title,
     agency,

@@ -16,7 +16,7 @@ import { useToast } from '../../components/ui/toastContext'
 import { Button } from '../../components/ui/Button'
 import { BottomSheet } from '../../components/ui/primitives'
 import type { ClientOpsRecord, ToolDeadline } from '../../types/clientOps'
-import { saveClient, withToolResult, withToolResultPublished } from '../../services/clientOpsService'
+import { listClients, saveClient, withToolResult, withToolResultPublished } from '../../services/clientOpsService'
 import { listLinksForClient, publishUpdate } from '../../services/customerBridgeService'
 import { buildToolPublishInput } from '../../services/toolPublish'
 import { matchesClientSearch } from '../../services/clientOpsSearch'
@@ -126,7 +126,8 @@ export function ToolResultAttach(props: ToolResultAttachProps) {
   /** 실제로 붙이는 일 — 시트에서 고른 업체든, 주소로 물고 온 업체든 같은 길을 쓴다 */
   const attachTo = async (targetId: string, alsoPublish: boolean, confirmed = false) => {
     // D-165: 늘 지금 기록을 다시 읽는다 — 시트를 처음 열 때 받아 둔 목록으로 저장하면 그 뒤에 붙인 결과 · 할 일이 지워졌다
-    const list = await loadClients()
+    // D-211: loadClients 는 틀이 한 번 읽어 둔 목록이라(캐시) 그 사이 '업체 정보로' 보낸 값 · 다른 기기에서 고친 것을 덮었다 — 저장 직전에 새로 읽는다
+    const list = await listClients(workspaceId).catch(() => loadClients())
     const target = list.find((c) => c.id === targetId)
     if (!target) {
       showToast('업체를 찾지 못했습니다.')
@@ -190,7 +191,7 @@ export function ToolResultAttach(props: ToolResultAttachProps) {
     }
     setBusy(true)
     try {
-      const list = await loadClients()
+      const list = await listClients(workspaceId).catch(() => loadClients())
       const target = list.find((c) => c.id === done.id)
       if (!target) throw new Error('업체를 찾지 못했습니다.')
       const date = addDaysLocal(todayLocalDate(), followDays)

@@ -204,6 +204,11 @@ const recs = [
   const oct = costInMonth({ subscriptions: [sub150], expenses: [], records: [], settings: s1 }, '2026-10')
   check('달러 정기 결제: 9월 13만원 · 10월 14.5만원', sep.lines[0]?.krw === 130_000 && oct.lines[0]?.krw === 145_000, [sep.lines[0]?.krw, oct.lines[0]?.krw])
   check('환율 기록: 저장했다 읽어도 남음', normalizeSettings(JSON.parse(JSON.stringify(s1))).rateHistory?.length === 2)
+  // D-211: 아직 정하지 않은(1,400 가정) 환율은 지난 달에 박지 않는다 — 처음 정한 환율이 지난 달에도
+  const first = withRate({ ...DEFAULT_SETTINGS, rateSet: false }, 1380, '2026-10')
+  check('D211 처음 정한 환율은 지난 달에도 그 환율(예전: 9월은 1,400 가정 그대로)', rateFor(first, '2026-09') === 1380 && rateFor(first, '2026-10') === 1380 && first.rateSet === true, JSON.stringify(first))
+  const second = withRate(first, 1450, '2026-11')
+  check('D211 그 뒤에 바꾸면 그 달부터(10월 1,380 · 11월 1,450)', rateFor(second, '2026-10') === 1380 && rateFor(second, '2026-11') === 1450)
 }
 
 console.log(`\nfinance: ${pass} passed, ${fail} failed`)

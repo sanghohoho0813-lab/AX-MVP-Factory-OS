@@ -11,7 +11,8 @@
 
 import { useToolClient } from '../shared/toolClientContext'
 import { useSearchParams } from 'react-router-dom'
-import { scenarioPreset } from '../../services/scenarioPresets'
+import { presetAssumptions, presetFieldsKept, scenarioPreset, withoutPresetFields } from '../../services/scenarioPresets'
+import { PresetNote } from '../shared/PresetNote'
 import { clientFacts } from '../shared/clientPrefill'
 import { sharedToolKey } from '../shared/toolStorage'
 import { useEffect, useMemo, useState, type ReactNode, useRef } from 'react'
@@ -299,7 +300,8 @@ function TaxTab() {
   const [params, setParams] = useSearchParams()
   const presetId = params.get('preset')
   const presetDone = useRef(false)
-  const [presetTitle, setPresetTitle] = useState('')
+  // D-211: 무엇을 가정으로 넣었는지(칩) · 넣기 전 값(가정 빼기) — 사업자 구분은 업체 기록이라 가정이 아니다
+  const [presetUsed, setPresetUsed] = useState<{ title: string; applied: Partial<TaxForm>; before: Partial<TaxForm>; chips: { field: string; text: string }[]; cleared: boolean } | null>(null)
   useEffect(() => {
     if (presetDone.current || !presetId || (clientId && !clientRecord)) return
     presetDone.current = true
@@ -308,13 +310,18 @@ function TaxTab() {
     const lab = preset.lab
     const bt = clientRecord ? clientFacts(clientRecord, new Date()).businessType : ''
     // D-209: 예전에 고른 공제율 · 기업 규모도 비운다 — 남아 있으면 카드(약 2,000만원)와 계산기 숫자가 달랐다
-    setForm((f) => ({ ...f, payroll: lab.payroll, material: lab.material, other: lab.other, currentYearRndCost: '', category: lab.category, rate: '', size: '', ...(bt ? { businessType: bt === 'individual' ? '개인사업자' : '법인사업자' } : {}) }))
-    setPresetTitle(preset.title)
+    const applied: Partial<TaxForm> = { payroll: lab.payroll, material: lab.material, other: lab.other, currentYearRndCost: '', category: lab.category, rate: '', size: '' }
+    const before: Partial<TaxForm> = { payroll: form.payroll, material: form.material, other: form.other, currentYearRndCost: form.currentYearRndCost, category: form.category, rate: form.rate, size: form.size }
+    setForm((f) => ({ ...f, ...applied, ...(bt ? { businessType: bt === 'individual' ? '개인사업자' : '법인사업자' } : {}) }))
+    setPresetUsed({ title: preset.title, applied, before, chips: presetAssumptions(preset), cleared: false })
     const next = new URLSearchParams(params)
     next.delete('preset')
     setParams(next, { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presetId, clientRecord, clientId])
+  // 칸을 직접 고치면 그 칸의 가정 칩은 사라진다(이제 대표 값)
+  const presetKept = presetUsed ? new Set<string>(presetFieldsKept(form, presetUsed.applied).map(String)) : null
+  const presetKeptChips = presetUsed && presetKept ? presetUsed.chips.filter((c) => !c.field || presetKept.has(c.field)).map((c) => c.text) : []
   const copyState = useCopy()
   const set = <K extends keyof TaxForm>(k: K, v: TaxForm[K]) => setForm((f) => ({ ...f, [k]: v }))
   const toggleBenefit = (key: string) => setForm((f) => ({ ...f, benefitKeys: f.benefitKeys.includes(key) ? f.benefitKeys.filter((k) => k !== key) : [...f.benefitKeys, key] }))
@@ -333,10 +340,19 @@ function TaxTab() {
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
       <Surface className="flex flex-col gap-4">
-        {presetTitle && (
-          <p className="t-sub rounded-(--radius-control) border border-success-200 bg-success-50 px-3 py-2 font-semibold break-keep text-success-800" data-testid="lab-preset-note">
-            상황 예시 · {presetTitle} — 이 상황의 연구개발비를 넣어 바로 계산했어요(칸을 바꾸면 다시 계산)
-          </p>
+        {presetUsed && (
+          <PresetNote
+            testId="lab-preset-note"
+            title={presetUsed.title}
+            done="이 상황의 연구개발비를 넣어 바로 계산했어요(칸을 바꾸면 다시 계산)"
+            chips={presetKeptChips}
+            cleared={presetUsed.cleared}
+            clearedText="연구개발비 칸을 상황 예시 전 값으로 돌렸어요(직접 고친 칸은 그대로)."
+            onClear={() => {
+              setForm((f) => withoutPresetFields(f, presetUsed.applied, presetUsed.before))
+              setPresetUsed({ ...presetUsed, cleared: true })
+            }}
+          />
         )}
         <CardTitle>연구개발비 입력 (연간 · 원)</CardTitle>
         <NumField label="연구전담요원 인건비 합계" value={form.payroll} onChange={(v) => set('payroll', v)} unit="원" step={100000} />

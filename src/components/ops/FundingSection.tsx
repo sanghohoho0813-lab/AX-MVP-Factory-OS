@@ -234,7 +234,8 @@ export function FundingSection({
                     <GrantApplyChecklist record={record} app={a} today={today} onToggle={(label, done) => onToggleDoc(a.id, label, done)} docsHref={docsHref} portal={portal} />
                   )}
 
-                  {onUpdate && <ApplyStageBar record={record} app={a} today={today} onUpdate={onUpdate} feesHref={feesHref ?? '?tab=fees'} publish={portal?.publish ?? null} />}
+                  {/* D-211: 지원사업(공고로 만든) 건만 — 손으로 적은 정책자금 건은 계약의 성공보수를 따로 갖고 있어 '수금에 걸기' 를 또 두면 받을 돈이 두 번 잡혔다 */}
+                  {onUpdate && (a.docs || a.noticeId) && <ApplyStageBar record={record} app={a} today={today} onUpdate={onUpdate} feesHref={feesHref ?? '?tab=fees'} publish={portal?.publish ?? null} />}
 
                   {(a.submittedAt || a.resultAt) && (
                     <p className="text-[0.875rem] text-slate-500">

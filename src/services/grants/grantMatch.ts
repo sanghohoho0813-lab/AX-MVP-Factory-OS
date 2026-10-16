@@ -399,8 +399,12 @@ const COMPANY_INDUSTRY: [string, RegExp][] = [
   ['콘텐츠', /콘텐츠|문화|영상|게임|출판|방송|공연/],
 ]
 
+// D-211: 물건 이름(식품 · 부품 · 기계)만으로는 제조가 아니다 — '식품 도매' · '기계 임대업' 을 제조로 읽었다. 만드는 말(제조 · 생산 · 가공 · 공장)이 있으면 제조
+const MAKE_ACT = /제조|생산|가공|공장/
+const TRADE_ACT = /도매|소매|도소매|유통|판매|쇼핑몰|무역|상사|임대|대여|렌탈|수리/
+
 export function industryClasses(text: string): string[] {
-  return COMPANY_INDUSTRY.filter(([, re]) => re.test(text)).map(([label]) => label)
+  return COMPANY_INDUSTRY.filter(([label, re]) => (label === '제조' ? MAKE_ACT.test(text) || (re.test(text) && !TRADE_ACT.test(text)) : re.test(text))).map(([label]) => label)
 }
 
 function industryHit(text: string, words: string[]): boolean {

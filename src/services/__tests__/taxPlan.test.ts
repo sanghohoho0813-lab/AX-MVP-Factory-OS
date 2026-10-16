@@ -7,7 +7,7 @@
  */
 
 import { normalizeClientOps } from '../clientOpsService'
-import { calculatorOf, computeSalary, defaultValues, inheritGiftTax, unlistedShareValuation } from '../taxCalc'
+import { calculatorOf, cleanNum, computeSalary, defaultValues, inheritGiftTax, unlistedShareValuation } from '../taxCalc'
 import {
   ASSUMPTIONS,
   calcDefault,
@@ -76,6 +76,9 @@ check('현황: 모르는 순이익은 null(0 으로 짐작하지 않음)', viewP
 const sv = shareValueOf(p, reg)
 const direct = unlistedShareValuation({ shares: 100000, ratePct: 10, asset: 5e9, debt: 2e9, reBook: 0, reFair: 0, severance: 0, goodwill: 0, corpType: '일반법인', income: [4e8, 5e8, 6e8], months: [0, 0, 0], caps: [0, 0, 0] })
 check('주식가치: 09 식과 같다(발행주식 = 주주명부 합계 100,000주)', sv.source === '09' && sv.totalShares === 100000 && sv.perShare === Math.round(direct.finalPerShare), { sv: sv.perShare, direct: direct.finalPerShare })
+check('D211 주식 수: \'10만\' · \'10만주\' · \'1만 5천주\' · \'100,000\' 은 10만 · 1만5천 주(예전: 10주 · 1주 가치 1만 배)', viewProfile({ totalShares: '10만' }).totalShares === 100000 && viewProfile({ totalShares: '10만주' }).totalShares === 100000 && viewProfile({ totalShares: '1만 5천주' }).totalShares === 15000 && viewProfile({ totalShares: '100,000' }).totalShares === 100000)
+check('D211 세금 계산기 칸: \'1억\' · \'3억 5천만\' · \'8000만원\' · \'-3억\' 은 그 금액(예전: 1 · 3 · 8000 · -3)', cleanNum('1억') === 1e8 && cleanNum('3억 5천만') === 3.5e8 && cleanNum('8000만원') === 8e7 && cleanNum('-3억') === -3e8 && cleanNum('120,000,000') === 1.2e8 && cleanNum('25') === 25 && cleanNum('') === 0)
+check('D211 나이 · 해는 그대로(62세 · 15년)', viewProfile({ ceoAge: '62세' }).ceoAge === 62 && viewProfile({ bizYears: '15년' }).bizYears === 15)
 check('주식가치: 직접 적으면 그 값', shareValueOf(viewProfile({ ...raw, perShareManual: '12만' }), reg).perShare === 120000)
 const noInc = shareValueOf(viewProfile({ vAsset: '50억', vDebt: '20억', vInc2: '6억' }), reg)
 check('주식가치: 없는 연도 순이익은 0원 + 알림', noInc.notes.some((n) => n.includes('2년 전 · 직전 연도')), noInc.notes)

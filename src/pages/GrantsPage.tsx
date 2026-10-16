@@ -23,7 +23,7 @@ import { isFeedNotice } from '../services/grants/grantFeed'
 import { listClients, saveClient } from '../services/clientOpsService'
 import { applicationBoard, applicationFor, applyReadiness, withGrantApplication, withGrantChallenge, withoutGrantChallenge } from '../services/grants/grantApply'
 import { ApplyBoardView } from '../components/grants/ApplyBoardView'
-import { todayLocalDate } from '../lib/appClock'
+import { localDateOf, todayLocalDate } from '../lib/appClock'
 import type { ClientOpsRecord } from '../types/clientOps'
 import { SIDO_LIST, deadlineOf, deadlineRank, inRegion, targetsSomeone, type GrantCategory, type GrantMatch, type GrantNotice } from '../services/grants/grantMatch'
 import { exampleNotices } from '../services/grants/grantExamples'
@@ -395,7 +395,7 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
                 const fit = sum.fit
                 // D-156: '7일 안 마감' 을 자동으로 세지 않는다 — 대표가 도전 체크한 공고 수만
                 const picked = c.record.fundingApplications.filter((a) => a.noticeId && a.status === 'watching').length
-                const last = sent.find((s) => s.clientId === c.record.id)?.at ?? ''
+                const last = localDateOf(sent.find((s) => s.clientId === c.record.id)?.at ?? '')
                 return (
                   <li key={c.record.id}>
                     <button type="button" onClick={() => setParam('client', c.record.id)} data-testid="grant-client-row" data-client={c.record.id} className="tap flex w-full items-start gap-3 px-4 py-3.5 text-left hover:bg-slate-50 sm:px-5">

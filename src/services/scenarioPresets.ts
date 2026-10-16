@@ -91,6 +91,61 @@ export const SCENARIO_PRESETS: readonly ScenarioPreset[] = [
   p({ id: 'policy-hiring', module: 'policy-funding', title: '청년 채용 계획과 함께 신청', when: '자금과 함께 고용을 늘릴 때 — 가점', policy: { purpose: '운전자금', hiringPlan: '있음', youthEmployment: '예정' } }),
 ]
 
+/* ---- D-211 모듈 화면 '넣은 가정' 칩 · [가정 빼기] ---- */
+
+/** 칩 하나 — field 는 그 모듈 입력 칸 이름(고용지원금은 칸이 아니라 상황 전체라 ''). 절세는 상황 문장이 '원하는 것' 칸에 그대로 보여 칩을 두지 않는다 */
+export interface PresetAssumption {
+  field: string
+  text: string
+}
+
+const man = (won: number) => `${Math.round(won / 10_000).toLocaleString('ko-KR')}만원`
+// 고용지원금 진단 화면의 '1. 상황' 단추와 같은 말
+const SITUATION_LABEL: Record<string, string> = { new: '신규 채용', retain: '재직자 처우개선', childcare: '출산·육아' }
+const STARTUP_FORM_LABEL: Record<string, string> = { brand_new: '새로 창업', conversion: '개인 → 법인전환', acquisition: '사업 양수', reopen_same: '같은 업종 재창업', succession: '사업 승계' }
+const REGION_LABEL: Record<string, string> = { seoul: '서울', gyeonggi_incheon: '경기/인천', metro_city: '지방 광역시', other_local: '기타 지방' }
+
+/** 이 상황 예시가 넣은 가정 — 업체 숫자(직원 수 · 매출 · 주소)는 빼고, 상황을 그리는 값만 */
+export function presetAssumptions(s: ScenarioPreset): PresetAssumption[] {
+  const out: PresetAssumption[] = []
+  if (s.lab) {
+    if (s.lab.payroll > 0) out.push({ field: 'payroll', text: `인건비 ${man(s.lab.payroll)}` })
+    if (s.lab.material > 0) out.push({ field: 'material', text: `재료비 ${man(s.lab.material)}` })
+    if (s.lab.other > 0) out.push({ field: 'other', text: `기타 연구비 ${man(s.lab.other)}` })
+    out.push({ field: 'category', text: s.lab.category })
+  }
+  if (s.startup) {
+    if (s.startup.startupForm) out.push({ field: 'startupForm', text: STARTUP_FORM_LABEL[s.startup.startupForm] ?? s.startup.startupForm })
+    if (s.startup.region) out.push({ field: 'region', text: `본점 ${REGION_LABEL[s.startup.region] ?? s.startup.region}` })
+    if (s.startup.overconcentration === 'no') out.push({ field: 'overconcentration', text: '과밀억제권역 밖' })
+    else if (s.startup.overconcentration === 'yes') out.push({ field: 'overconcentration', text: '과밀억제권역 안' })
+  }
+  if (s.policy) {
+    if (s.policy.purpose) out.push({ field: 'purpose', text: s.policy.purpose })
+    if (s.policy.quoteReady === '있음') out.push({ field: 'quoteReady', text: '설비 견적 있음' })
+    if (s.policy.hiringPlan === '있음') out.push({ field: 'hiringPlan', text: '채용 계획 있음' })
+    if (s.policy.youthEmployment === '예정') out.push({ field: 'youthEmployment', text: '청년 채용 예정' })
+  }
+  if (s.hiring) {
+    const h = s.hiring
+    const words = [SITUATION_LABEL[h.situation] ?? '', ...h.cats.filter((c) => c !== '육아' && c !== '재직'), ...h.specials, h.age !== null ? `만 ${h.age}세` : '', h.empType ?? '']
+    for (const w of [...new Set(words)]) if (w) out.push({ field: '', text: w })
+  }
+  return out
+}
+
+/** 상황 예시가 넣은 칸 중 아직 그 값 그대로인 칸 — 그 뒤에 직접 고친 칸은 대표 값이라 빼지 않는다 */
+export function presetFieldsKept<T extends object>(cur: T, applied: Partial<T>): (keyof T)[] {
+  return (Object.keys(applied) as (keyof T)[]).filter((k) => String(cur[k] ?? '') === String(applied[k] ?? ''))
+}
+
+/** [가정 빼기] — 아직 가정 그대로인 칸만 상황 예시 전 값으로 되돌린다 */
+export function withoutPresetFields<T extends object>(cur: T, applied: Partial<T>, before: Partial<T>): T {
+  const next = { ...cur }
+  for (const k of presetFieldsKept(cur, applied)) next[k] = before[k] as T[keyof T]
+  return next
+}
+
 export function scenarioPreset(id: string | null | undefined): ScenarioPreset | null {
   if (!id) return null
   return SCENARIO_PRESETS.find((s) => s.id === id) ?? null

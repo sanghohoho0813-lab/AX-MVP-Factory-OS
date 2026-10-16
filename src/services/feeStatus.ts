@@ -45,9 +45,13 @@ export interface FundingFacts {
 
 export const NO_FUNDING: FundingFacts = { executedTotal: 0, executedAny: false }
 
-export function fundingFactsOf(apps: readonly Pick<FundingApplication, 'executedAmount'>[] | undefined): FundingFacts {
+export function fundingFactsOf(apps: readonly Pick<FundingApplication, 'executedAmount' | 'noticeId' | 'docs'>[] | undefined): FundingFacts {
   let total = 0
-  for (const a of apps ?? []) if (typeof a.executedAmount === 'number' && Number.isFinite(a.executedAmount) && a.executedAmount > 0) total += a.executedAmount
+  for (const a of apps ?? []) {
+    // D-211: 지원사업(공고로 만든 신청 건)의 지원금은 정책자금 조달이 아니다 — 그 건에 걸린 성공보수만 따로 충족된다(withApplyExecuted)
+    if (a.noticeId || a.docs) continue
+    if (typeof a.executedAmount === 'number' && Number.isFinite(a.executedAmount) && a.executedAmount > 0) total += a.executedAmount
+  }
   return { executedTotal: total, executedAny: total > 0 }
 }
 

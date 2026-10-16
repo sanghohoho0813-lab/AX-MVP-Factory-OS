@@ -215,6 +215,11 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByTestId('startup-preset-note').waitFor({ timeout: 15000 })
   const oneline = (await page.getByTestId('startup-tax-oneline').innerText()).trim()
   check('창업감면 — 바로 판정 · 업체 상세 결론과 같은 한 줄', oneline.length > 0 && oneline === startupHead, `${oneline} | ${startupHead}`)
+  const stChips = await page.getByTestId('startup-preset-note').getByTestId('preset-chip').allInnerTexts()
+  check('D211 창업감면 — 넣은 가정 칩(새로 창업) · 업체 숫자는 칩에 없음', stChips.includes('새로 창업') && !stChips.some((c) => /직원|매출|주소/.test(c)), stChips)
+  await page.getByTestId('startup-preset-note').getByTestId('preset-clear').click()
+  await page.waitForTimeout(400)
+  check('D211 창업감면 — [가정 빼기] → 알림이 \'가정을 뺐어요\' 로 · 칩 없음', (await page.getByTestId('startup-preset-note').getAttribute('data-cleared')) === '1' && (await page.getByTestId('preset-chip').count()) === 0)
 
   // 정책자금
   await page.goto(`${BASE}/tools/policy-funding/diagnosis?client=cli_scen&preset=policy-working`, { waitUntil: 'networkidle' })
@@ -223,6 +228,11 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const agency = policyHead.split('추천 기관 ')[1] ?? ''
   check('정책자금 — 바로 진단 · 같은 추천 기관', !!agency && (await page.locator('#result').innerText()).includes(agency), policyHead)
   check('D-209 정책자금 — 주소의 preset 은 한 번 쓰고 지움(새로고침 · 다시 열기 주소가 그 가정을 또 덮지 않음)', !page.url().includes('preset='), page.url())
+  const pfChips = await page.getByTestId('pf-preset-note').getByTestId('preset-chip').allInnerTexts()
+  check('D211 정책자금 — 넣은 가정 칩(운전자금)', pfChips.join() === '운전자금', pfChips)
+  await page.getByTestId('pf-preset-note').getByTestId('preset-clear').click()
+  await page.waitForTimeout(500)
+  check('D211 정책자금 — [가정 빼기] → \'가정을 뺐어요\' · 진단 결과는 다시 누를 때(자동 진단 안 함)', (await page.getByTestId('pf-preset-note').getAttribute('data-cleared')) === '1' && (await page.locator('#result').count()) === 0)
 
   // D-209 연구소 — 예전에 '중견기업' 을 골라 두었어도 상황 예시는 그 가정을 비우고 카드와 같은 숫자로
   await page.goto(`${BASE}/tools/labcare/tax?client=cli_scen`, { waitUntil: 'networkidle' })
@@ -234,6 +244,17 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByTestId('lab-preset-note').waitFor({ timeout: 15000 })
   const payroll = await page.getByLabel('연구전담요원 인건비 합계').inputValue()
   check('연구소 — 연구원 2명 인건비 8,000만원이 칸에 · 바로 계산(업체 상세와 같은 연간 약 2,000만원)', payroll.replace(/\D/g, '') === '80000000' && (await page.locator('body').innerText()).includes(`연간 약 ${labAmount}`), `${payroll} | ${labAmount}`)
+  const labChips = await page.getByTestId('lab-preset-note').getByTestId('preset-chip').allInnerTexts()
+  check('D211 연구소 — 넣은 가정 칩(인건비 8,000만원 · 일반 R&D)', labChips.join('|') === '인건비 8,000만원|일반 R&D', labChips)
+  // 칸을 직접 고치면 그 칸은 이제 대표 값 — 칩에서 빠지고, [가정 빼기] 도 그 칸은 그대로 둔다
+  await page.getByLabel('연구 재료비·시약·부품비').fill('12000000')
+  await page.getByLabel('연구전담요원 인건비 합계').fill('90000000')
+  await page.waitForTimeout(400)
+  const labChips2 = await page.getByTestId('lab-preset-note').getByTestId('preset-chip').allInnerTexts()
+  check('D211 연구소 — 인건비를 직접 고치면 인건비 칩은 빠짐(일반 R&D 만 남음)', labChips2.join('|') === '일반 R&D', labChips2)
+  await page.getByTestId('lab-preset-note').getByTestId('preset-clear').click()
+  await page.waitForTimeout(400)
+  check('D211 연구소 — [가정 빼기] 뒤에도 직접 고친 인건비 9,000만 · 재료비 1,200만은 그대로', (await page.getByLabel('연구전담요원 인건비 합계').inputValue()).replace(/\D/g, '') === '90000000' && (await page.getByLabel('연구 재료비·시약·부품비').inputValue()).replace(/\D/g, '') === '12000000' && (await page.getByTestId('lab-preset-note').getAttribute('data-cleared')) === '1')
 
   // D-209 가업승계 준비 — 카드처럼 첫째 자녀 · 지분 10% 로(예전: 받는 사람이 비어 '골라 주세요')
   await page.goto(`${BASE}/tools/tax?client=cli_scen&preset=tax-succession`, { waitUntil: 'networkidle' })
@@ -249,6 +270,11 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const top = youthHead.split(' — ')[1] ?? ''
   check('고용지원금 — 청년 1명 바로 진단 · 같은 1순위 지원금', !!top && (await page.locator('body').innerText()).includes(top), youthHead)
   check('고용지원금 — 회사 규모 칸에 이 업체 직원 수(12)', (await page.getByPlaceholder('피보험자 수').inputValue()) === '12')
+  const empChips = await page.getByTestId('emp-preset-note').getByTestId('preset-chip').allInnerTexts()
+  check('D211 고용지원금 — 넣은 가정 칩(신규 채용 · 청년 · 만 29세 · 정규직) · 직원 수는 칩에 없음', empChips.join('|') === '신규 채용|청년|만 29세|정규직', empChips)
+  await page.getByTestId('emp-preset-note').getByTestId('preset-clear').click()
+  await page.waitForTimeout(600)
+  check('D211 고용지원금 — [가정 빼기] → 나이 칸 비고 · 직원 수(12)는 남고 · 결과는 다시 누를 때', (await page.getByTestId('emp-preset-note').getAttribute('data-cleared')) === '1' && (await page.getByPlaceholder('피보험자 수').inputValue()) === '12' && (await page.getByPlaceholder('29').inputValue()) === '' && !(await page.getByText('가능성 높음', { exact: false }).first().isVisible().catch(() => false)))
   // 고용지원금에 아직 등록 안 한 업체라도 상황 예시로 열면 등록 창이 결과를 가리지 않는다(D-94 등록 창은 업체 입구로 열 때만)
   await page.waitForTimeout(600)
   check('고용지원금 — 업체 등록 창이 진단 결과를 가리지 않음', !(await page.getByText('🏢 업체 정보').first().isVisible().catch(() => false)))

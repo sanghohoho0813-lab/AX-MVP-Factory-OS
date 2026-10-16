@@ -54,13 +54,21 @@ export async function removeExpense(workspaceId: string | null, id: string): Pro
   await deleteRow(workspaceId, MODULE, 'expenses', id)
 }
 
+/**
+ * D-211: 설정 줄 이름에 워크스페이스를 붙인다 — module_data.id 는 전체에서 하나라서, 예전처럼 모두 'finance_settings' 면
+ * 다른 워크스페이스가 저장할 때 첫 워크스페이스의 줄과 부딪쳐 저장이 막히거나(권한) 그 줄을 빼앗았다.
+ * 예전 이름의 줄은 읽기만 한다(지우지 않는다).
+ */
+const settingsId = (workspaceId: string | null) => `finance_settings:${workspaceId ?? 'local'}`
+
 export async function loadSettings(workspaceId: string | null): Promise<FinanceSettings> {
   const rows = await listRows(workspaceId, MODULE, 'settings')
-  return rows[0] ? normalizeSettings(rows[0].data) : DEFAULT_SETTINGS
+  const row = rows.find((r) => r.id === settingsId(workspaceId)) ?? rows.find((r) => r.id === 'finance_settings') ?? rows[0]
+  return row ? normalizeSettings(row.data) : DEFAULT_SETTINGS
 }
 
 export async function saveSettings(workspaceId: string | null, s: FinanceSettings): Promise<FinanceSettings> {
   const clean = normalizeSettings(s)
-  await saveRow(workspaceId, MODULE, 'settings', { id: 'finance_settings', data: clean as unknown as Record<string, unknown> })
+  await saveRow(workspaceId, MODULE, 'settings', { id: settingsId(workspaceId), data: clean as unknown as Record<string, unknown> })
   return clean
 }

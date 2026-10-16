@@ -42,6 +42,7 @@ import {
   shareValueOf,
   splitPlan,
   viewProfile,
+  numOf,
   wonOf,
   type CalcOpen,
   type CashRouteKey,
@@ -878,7 +879,10 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
             </div>
           )}
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <NumberField k="totalShares" st={st} set={setProfile} hint="비우면 주주명부 합계" />
+            <div>
+              <NumberField k="totalShares" st={st} set={setProfile} hint="비우면 주주명부 합계" />
+              <ShareHint text={st.profile.totalShares ?? ''} registerSum={st.register.reduce((a, h) => a + (h.shares > 0 ? h.shares : 0), 0)} />
+            </div>
             <MoneyField k="par" st={st} set={setProfile} />
           </div>
         </Fold>
@@ -965,7 +969,20 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
 function WonHint({ text }: { text: string }) {
   const n = wonOf(text)
   if (!text.trim()) return null
-  return <span className={`t-meta mt-1 block ${n > 0 ? 'text-slate-500' : 'text-danger-700'}`}>{n > 0 ? `= ${formatWon(n)}` : '금액을 읽지 못했습니다 (예: 120000000 또는 1억 2천만)'}</span>
+  // D-211: 손실(-3억)도 읽은 값 그대로 보인다 — 예전에는 빨간 '읽지 못했습니다' 라서 양수로 고쳐 주식가치가 부풀 수 있었다
+  return <span className={`t-meta mt-1 block ${n !== 0 ? 'text-slate-500' : 'text-danger-700'}`}>{n !== 0 ? `= ${formatWon(n)}` : '금액을 읽지 못했습니다 (예: 120000000 또는 1억 2천만)'}</span>
+}
+
+/** D-211: 발행주식 총수 — 읽은 주식 수를 보이고, 주주명부 합계보다 적으면 알린다('10만' 을 10 으로 읽던 일) */
+function ShareHint({ text, registerSum }: { text: string; registerSum: number }) {
+  if (!text.trim()) return null
+  const n = Math.floor(numOf(text, NaN))
+  if (!Number.isFinite(n) || n <= 0) return <span className="t-meta mt-1 block text-danger-700" data-testid="share-hint">주식 수를 읽지 못했습니다 (예: 100000 또는 10만)</span>
+  return (
+    <span className={`t-meta mt-1 block ${registerSum > n ? 'text-danger-700' : 'text-slate-500'}`} data-testid="share-hint">
+      = {n.toLocaleString('ko-KR')}주{registerSum > n ? ` — 주주명부 합계(${registerSum.toLocaleString('ko-KR')}주)보다 적어요. 다시 확인해 주세요` : ''}
+    </span>
+  )
 }
 
 type SetProfile = (k: ProfileKey, v: string) => void

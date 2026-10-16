@@ -102,11 +102,22 @@ export function wonOf(text: string | undefined): number {
   return v !== null && Number.isFinite(v) ? v : 0
 }
 
-function numOf(text: string | undefined, fallback = 0): number {
+const COUNT_UNIT: Record<string, number> = { 억: 100_000_000, 만: 10_000, 천: 1_000 }
+
+/** 개수 · 나이 · 해 — '62세' · '10,000주' · '10만주' · '1만 5천주' */
+export function numOf(text: string | undefined, fallback = 0): number {
   if (!text || text.trim() === '') return fallback
+  const t = text.replace(/[,%\s]/g, '')
+  // D-211: '10만' · '10만주' 는 100,000 — 예전에는 뒤 글자를 떼어 10 으로 읽어 1주 가치가 1만 배가 됐다
+  const k = /^(\d+(?:\.\d+)?)(억|만|천)(?:(\d+(?:\.\d+)?)(만|천))?[^\d]*$/.exec(t)
+  if (k) {
+    const v = Number(k[1]) * COUNT_UNIT[k[2]] + (k[3] ? Number(k[3]) * COUNT_UNIT[k[4]] : 0)
+    return Number.isFinite(v) ? v : fallback
+  }
   // D-165: '62세' · '15년' · '10,000주' · '2명' 처럼 뒤에 단위를 붙여 적어도 숫자로(전에는 0 이 됐다)
-  const n = Number(text.replace(/[,%\s]/g, '').replace(/[^\d.]+$/, ''))
-  return Number.isFinite(n) && text.replace(/[,%\s]/g, '').replace(/[^\d.]+$/, '') !== '' ? n : fallback
+  const plain = t.replace(/[^\d.]+$/, '')
+  const n = Number(plain)
+  return Number.isFinite(n) && plain !== '' ? n : fallback
 }
 
 export interface ProfileView {

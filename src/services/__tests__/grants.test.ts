@@ -35,6 +35,7 @@ import {
   parseBizinfoJson,
   parseNoticeText,
   periodOf,
+  rulesFromText,
   profileFromQuery,
   profileToQuery,
   shareMessage,
@@ -42,6 +43,8 @@ import {
 import { exampleNotices } from '../grants/grantExamples'
 import { alertPayload, publicPayload, sameNotice, validateAlert, type AlertRequest } from '../grants/grantStore'
 import { mergeNotices, noticesFromFeed, slotOf } from '../grants/grantFeed'
+import { industryClasses } from '../grants/grantMatch'
+import { sentAt } from '../grants/grantStore'
 import { withAgencyRegion } from '../grants/grantText'
 import { clientsForNotice, fitSummary, grantClients, grantIndex } from '../grants/grantView'
 import { applyNews, grantYearStats, withApplyExecuted, applicationBoard, applyDocViews, applyDocsFor, applyReadiness, applyStage, docIdentity, grantDocRequestMessage, openApplications, portalRequestTitles, successFeeAmount, withApplyDocDone, withApplyResult, withApplySubmitted, withGrantApplication, withGrantChallenge, withoutGrantChallenge, withResultDueDate, withSuccessFee } from '../grants/grantApply'
@@ -957,6 +960,58 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   check('공고 요약(D-182): 상시 접수 · 예산 소진 시까지', b3.period === '상시 접수' && b4.period === '10.02부터 예산 소진 시까지', [b3.period, b4.period])
   check('공고 요약(D-182): 다른 결정(정보 · 서류)에는 요약이 없다', ds.filter((d) => d.kind !== 'grant').every((d) => d.grant === undefined))
   check('공고 요약(D-182): 자르기 — 짧으면 그대로 · 길면 …', clip('짧은 글', 10) === '짧은 글' && clip('가'.repeat(50), 10).endsWith('…') && clip('가'.repeat(50), 10).length === 11)
+}
+
+// D-211 점검 결과 — 공고 날짜 · 조건 읽기 · 지원금과 정책자금 · 금액 · 업종 · 알림 날짜
+{
+  const p1 = periodOf('2026.10.01(목)부터 예산 소진 시까지')
+  check('D211 기간: \'부터 … 소진 시까지\' 는 시작날(예전: 끝날로 읽어 다음 날부터 마감)', p1.applyStart === '2026-10-01' && p1.applyEnd === '' && p1.deadlineKind === 'first_come', p1)
+  const p2 = periodOf('2026.10.01 ~ 예산 소진 시까지')
+  check('D211 기간: \'날짜 ~ 소진 시까지\' 도 시작날', p2.applyStart === '2026-10-01' && p2.applyEnd === '', p2)
+  const p3 = periodOf('2026. 10. 1.(목) ~ 10. 30.(금) 18:00')
+  check('D211 기간: 끝날에 해가 없는 꼴 → 앞 날짜의 해 · 시각까지(예전: 마감 없음으로 계속 열림)', p3.applyStart === '2026-10-01' && p3.applyEnd === '2026-10-30' && p3.applyEndTime === '18:00', p3)
+  const p4 = periodOf('2026.12.15 ~ 1.10')
+  check('D211 기간: 해를 넘기는 끝날(12/15 ~ 1/10) → 다음 해', p4.applyEnd === '2027-01-10', p4)
+  check('D211 기간: 예전 꼴은 그대로(~ 날짜 · 날짜까지 · 마감: 날짜)', periodOf('~ 2026.10.15').applyEnd === '2026-10-15' && periodOf('2026.10.15(수) 18:00까지').applyEnd === '2026-10-15' && periodOf('접수마감: 2026.10.15').applyEnd === '2026-10-15')
+  const pn = parseNoticeText('2026 판로 지원사업\n지원대상: 업력 1~3년 중소기업\n일정 안내 2026.10.01 ~ 2026.10.31 까지 접수')
+  check('D211 붙여넣기: 신청기간 줄이 없으면 날짜 옆 ~ 를 찾음(예전: 앞의 \'업력 1~3년\' ~ 를 잡아 날짜를 잃음)', pn.applyStart === '2026-10-01' && pn.applyEnd === '2026-10-31', [pn.applyStart, pn.applyEnd])
+  const ind = (t: string) => { const r = rulesFromText(t); return [r.industries.join(), r.excludeIndustries.join()] }
+  check('D211 업종: \'제조업체(체납기업 제외)\' · \'제조업(유흥업 제외)\' 는 제조 대상(예전: 제조 제외로 뒤집힘)', JSON.stringify(ind('도내 제조업체(체납기업 제외)')) === JSON.stringify(['제조', '']) && JSON.stringify(ind('제조업(유흥업 제외)')) === JSON.stringify(['제조', '']))
+  check('D211 업종: \'제조업 및 지식서비스업(사치향락업 제외)\' 둘 다 대상 · \'(제조업 제외)\' 는 제외 그대로', JSON.stringify(ind('제조업 및 지식서비스업(사치향락업 제외)')) === JSON.stringify(['제조,지식서비스', '']) && JSON.stringify(ind('(제조업 제외)')) === JSON.stringify(['', '제조']))
+  const pref = rulesFromText('국내 중소기업', '국내 중소기업\n※ 우대사항: 청년기업(대표자 만 39세 이하), 창업 3년 이내 기업은 가점')
+  check('D211 조건: 우대 · 가점 문장은 조건이 아님(예전: 청년 대표 · 3년 이내만으로 읽어 다른 업체 숨김)', !pref.youthCeo && pref.withinYears === null, pref)
+  const op = rulesFromText('국내 중소기업', '국내 중소기업 대상\n수행기관: 서울 소재 창업보육센터')
+  check('D211 조건: 수행기관 소재지는 지역 조건이 아님', op.regions.length === 0, op.regions)
+  const keep = rulesFromText('창업 3년 이내 기업(여성기업 우대)', '창업 3년 이내 기업(여성기업 우대)')
+  check('D211 조건: 괄호 \'(여성기업 우대)\' 만 빼고 앞 조건(3년 이내)은 남김', keep.withinYears === 3 && !keep.womenCeo, keep)
+  check('D211 조건: 지역 \'경기도 소재\' 는 그대로', rulesFromText('경기도 소재 중소기업').regions.join() === '경기')
+  check('D211 금액: 2천5백만 · 1천5백만 · 1억 2천 5백만 → 2,500 · 1,500 · 12,500만원(예전: 모두 500만원)', amountOf({ amountText: '최대 2천5백만원', title: '', summary: '' }).man === 2500 && amountOf({ amountText: '1천5백만원', title: '', summary: '' }).man === 1500 && amountOf({ amountText: '1억 2천 5백만원', title: '', summary: '' }).man === 12500 && amountOf({ amountText: '최대 5천만원', title: '', summary: '' }).man === 5000)
+  check('D211 업종: \'식품 도매\' · \'부품 도매\' · \'기계 임대업\' 은 제조가 아님 · \'식품 제조 및 도매\' 는 둘 다', JSON.stringify(industryClasses('도매 및 소매업 · 식품 도매')) === '["도소매"]' && !industryClasses('부품 도매').includes('제조') && !industryClasses('기계 임대업').includes('제조') && JSON.stringify(industryClasses('식품 제조 및 도매')) === '["제조","도소매"]' && industryClasses('기계 부품').includes('제조'))
+
+  // 지원금 입금 ≠ 정책자금 조달
+  const pf = normalizeClientOps({
+    id: 'c211', companyName: '정책상사',
+    fees: [{ id: 'pf-fee', kind: 'success', label: '정책자금 성공보수', amount: 5_000_000, dueDate: '', receivedAt: null, conditionKind: 'funding_executed', conditionMetAt: null }],
+  } as never)
+  let gr = withGrantApplication(pf, notice({}, { id: 'n-211', title: '2026 수출바우처', applyEnd: '2026-10-20' })).record
+  const gid = gr.fundingApplications[0].id
+  gr = withApplyExecuted(withApplyResult(withApplySubmitted(gr, gid, '2026-11-30'), gid, 'selected', 30_000_000), gid, 30_000_000, '2026-12-10').record
+  const pfFee = gr.fees.find((f) => f.id === 'pf-fee')!
+  check('D211 지원금 3천만 입금이 정책자금 성공보수(정책자금 실행 시)를 받을 돈으로 바꾸지 않음(예전: claimable)', feeStateOf(pfFee, TODAY, fundingFactsOf(gr.fundingApplications)) === 'waiting' && fundingFactsOf(gr.fundingApplications).executedTotal === 0)
+  const manualPf = normalizeClientOps({ id: 'c212', companyName: '정책상사', fundingApplications: [{ id: 'mp', programName: '중진공 신시장진출자금', status: 'selected', applyDueDate: '', resultAt: '2026-09-20', approvedAmount: 200_000_000, executedAmount: 200_000_000 }] } as never)
+  check('D211 손으로 적은 정책자금 실행은 그대로 정책자금 조달로 셈', fundingFactsOf(manualPf.fundingApplications).executedTotal === 200_000_000)
+  const bd = applicationBoard([manualPf], TODAY)
+  check('D211 신청 진행판: 손으로 적은 정책자금 선정 건은 \'성공보수 안 건 곳\' · 진행판에 없음(예전: feeMissing 1)', bd.feeMissing === 0 && bd.done.length === 0 && bd.preparing.length === 0)
+  check('D211 올해 지원사업 성과: 정책자금 2억 선정은 넣지 않음', grantYearStats([manualPf], 2026).approvedTotal === 0 && grantYearStats([manualPf], 2026).selected === 0)
+  const fc = withGrantChallenge(normalizeClientOps({ id: 'c213', companyName: 'x' } as never), notice({}, { id: 'n-fc', title: '선착순 바우처', applyStart: '2026-10-01', applyEnd: '2026-10-31', deadlineKind: 'first_come' }))
+  const fp = withGrantApplication(normalizeClientOps({ id: 'c214', companyName: 'x' } as never), notice({}, { id: 'n-fc2', title: '선착순 바우처2', applyStart: '2026-10-01', applyEnd: '2026-10-31', deadlineKind: 'first_come' }))
+  check('D211 선착순이어도 끝날이 있으면 도전 체크 · 신청 준비에 마감(예전: 마감 없음 → 일정 · 오늘에 안 뜸)', fc.app.applyDueDate === '2026-10-31' && fp.app.applyDueDate === '2026-10-31')
+  check('D211 상시 공고는 마감 없음 그대로', withGrantChallenge(normalizeClientOps({ id: 'c215', companyName: 'x' } as never), notice({}, { id: 'n-al', title: '상시', applyEnd: '2026-12-31', deadlineKind: 'always' })).app.applyDueDate === '')
+  const prevTz = process.env.TZ
+  process.env.TZ = 'Asia/Seoul'
+  check('D211 알림 보낸 날은 로컬 날짜(한국 오전 8시 30분 보낸 것 = 그날)', sentAt([{ clientId: 'a', noticeIds: ['n'], at: '2026-10-15T23:30:00.000Z', via: 'kakao' } as never], 'a', 'n') === '2026-10-16')
+  if (prevTz === undefined) delete process.env.TZ
+  else process.env.TZ = prevTz
 }
 
 console.log(`\ngrants: ${pass} passed, ${fail} failed`)

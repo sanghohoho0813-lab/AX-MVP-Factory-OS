@@ -318,7 +318,8 @@ function ScheduleTab() {
           </select>
         </Field>
         <Field label="② 입사일 (또는 전환·휴직 시작일)" hint="회차마다 입사일 + n개월이 신청 가능일입니다">
-          <input type="date" aria-label="입사일" value={form.startDate} onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))} className={inputCls} />
+          {/* D-211: 입사일이 바뀌면 다른 직원(또는 다른 회차표)이다 — 앞 사람의 '받음' 표시를 넘기지 않는다 */}
+          <input type="date" aria-label="입사일" value={form.startDate} onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value, paid: e.target.value === f.startDate ? f.paid : [] }))} className={inputCls} />
         </Field>
         <Surface className="flex flex-col gap-1 p-3">
           <span className="t-body font-medium text-slate-800">{program.name}</span>
@@ -366,12 +367,12 @@ function ScheduleTab() {
                 <CopyButton text={summary} />
                 <ToolResultAttach
                   toolKey="employment"
-                  title="고용지원금 회차 일정"
+                  title={`고용지원금 회차 일정 · ${program.name} · 입사 ${form.startDate}`}
                   verdict={null}
                   verdictLabel={`${program.name} · 총 ${fMan(sch.total)}`}
                   summary={summary}
                   data={{ tab: 'schedule', programId: program.id, startDate: form.startDate, rows: sch.rows, total: sch.total, received: sch.received, remaining: sch.remaining }}
-                  deadlines={roundDeadlines(program.name, sch.rows)}
+                  deadlines={roundDeadlines(`${program.name}(입사 ${fD(form.startDate)})`, sch.rows)}
                 />
               </div>
             </Surface>
@@ -580,6 +581,14 @@ function RosterTab() {
   const unitNormal = form.unitsTouched && form.unitNormal !== '' ? form.unitNormal : String(units.normal)
 
   const analysis: RosterAnalysis | null = useMemo(() => (employees && employees.length > 0 ? analyzeRoster(employees, { baseDate }) : null), [employees, baseDate])
+  // D-211: '올해 상시근로자' 는 재직 중인 사람만(상실한 사람 빼고) — 예전에는 명부 줄 수 전부라 늘어난 인원 · 공제가 부풀었다.
+  // 명부가 채운 값이면 다음 명부가 다시 채운다(직접 적은 값은 그대로)
+  const curAuto = useRef(false)
+  const fillCurTotal = (list: RosterEmployee[]) => {
+    if (form.curTotal && !curAuto.current) return
+    curAuto.current = true
+    set('curTotal', String(analyzeRoster(list, { baseDate }).counts.activeCount))
+  }
   // D-138: 지금 참여신청할 수 있는 청년도약 후보 — 기한이 달력 · 오늘에 붙고, 직원으로 바로 등록할 수 있다
   const youthItems = useMemo(() => (analysis ? youthEnrollItems(analysis.rows, baseDate) : []), [analysis, baseDate])
   const estimate = useMemo(
@@ -600,7 +609,7 @@ function RosterTab() {
     }
     setEmployees(r.employees)
     setMeta(r.meta)
-    if (!form.curTotal) set('curTotal', String(r.employees.length))
+    fillCurTotal(r.employees)
     setNotice(r.missingCount > 0 ? `${r.employees.length}명 후보 · 이름·생년월일·입사일이 빈 ${r.missingCount}명은 확인이 필요합니다.` : `${r.employees.length}명 후보를 찾았습니다.`)
   }
 
@@ -640,7 +649,7 @@ function RosterTab() {
       }
       setEmployees(r.employees)
       setMeta(r.meta ?? null)
-      if (!form.curTotal) set('curTotal', String(r.employees.length))
+      fillCurTotal(r.employees)
       setNotice(`${file.name} 에서 ${r.employees.length}명 후보를 찾았습니다.`)
     } finally {
       setBusy(false)
@@ -732,7 +741,7 @@ function RosterTab() {
             <div className="grid grid-cols-2 gap-3">
               <NumberField label="전년도 상시근로자" value={form.prevTotal} onChange={(v) => set('prevTotal', v)} unit="명" />
               <NumberField label="전년도 청년 등" value={form.prevYouth} onChange={(v) => set('prevYouth', v)} unit="명" />
-              <NumberField label="올해 상시근로자" value={form.curTotal} onChange={(v) => set('curTotal', v)} unit="명" />
+              <NumberField label="올해 상시근로자" value={form.curTotal} onChange={(v) => { curAuto.current = false; set('curTotal', v) }} unit="명" />
               <NumberField label="올해 청년 등" value={form.curYouth} onChange={(v) => set('curYouth', v)} unit="명" />
               <NumberField label="청년 등 단가" value={unitYouth} onChange={(v) => setForm((f) => ({ ...f, unitYouth: v, unitsTouched: true }))} unit="만원" hint="귀속연도 법령표 확인 필요" />
               <NumberField label="일반 단가" value={unitNormal} onChange={(v) => setForm((f) => ({ ...f, unitNormal: v, unitsTouched: true }))} unit="만원" />

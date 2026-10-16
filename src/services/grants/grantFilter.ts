@@ -75,7 +75,10 @@ export interface AmountRead {
 }
 
 export function amountOf(n: Pick<GrantNotice, 'amountText' | 'title' | 'summary'>): AmountRead {
-  const body = `${n.amountText} ${n.title} ${n.summary}`.replace(/\s+/g, ' ')
+  // D-211: '2천5백만원' · '1억 2천 5백만원' — 천 · 백이 이어진 꼴을 먼저 만 단위 숫자로(예전: 500만원으로 읽어 금액 거르기에서 숨겼다)
+  const body = `${n.amountText} ${n.title} ${n.summary}`
+    .replace(/\s+/g, ' ')
+    .replace(/(\d+)\s*천\s*(\d+)\s*백\s*만/g, (_, a: string, b: string) => `${Number(a) * 1000 + Number(b) * 100}만`)
   const months = /(\d{1,2})\s*개월/.exec(body)
   type Hit = { man: number; strong: boolean; text: string }
   const hits: Hit[] = []

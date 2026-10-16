@@ -11,7 +11,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { scenarioPreset } from '../../services/scenarioPresets'
+import { presetAssumptions, presetFieldsKept, scenarioPreset, withoutPresetFields } from '../../services/scenarioPresets'
+import { PresetNote } from '../shared/PresetNote'
 import { startupRegion } from '../../services/clientInsights'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { toolOf } from '../../config/toolRegistry'
@@ -27,6 +28,8 @@ import { loadStartupTaxForm, saveStartupTaxForm, markStartupTaxJudged } from './
 import type { FormData as StartupTaxForm, JudgementResult } from './types'
 import { EMPTY_ADVANCED, EMPTY_FORM, PLACEHOLDER_BIRTH, PLACEHOLDER_STARTUP, withoutPlaceholders } from './lib/formDefaults'
 import { judge, VERDICT_EMOJI, VERDICT_LABEL } from './lib/judgement'
+// D-211: 판정 기준일은 한국 날짜로 남긴다(UTC 로 자르면 오전 9시 전 판정이 어제 날짜였다)
+import { formatDate } from './lib/date'
 import { buildSummaryText } from './lib/summary'
 import InputForm from './orig/components/InputForm'
 import { StartupZoomPicker, useStartupZoom } from './StartupZoom'
@@ -108,17 +111,22 @@ function StartupTaxScreen() {
   const [params, setParams] = useSearchParams()
   const presetId = params.get('preset')
   const presetDone = useRef(false)
-  const [presetTitle, setPresetTitle] = useState('')
+  // D-211: 넣은 가정(창업 형태 · 옮길 권역)만 칩으로 · [가정 빼기]는 그 칸만 넣기 전 값으로(업체 주소로 채운 권역은 가정이 아니다)
+  const [presetUsed, setPresetUsed] = useState<{ title: string; applied: Partial<StartupTaxForm>; before: Partial<StartupTaxForm>; chips: { field: string; text: string }[]; cleared: boolean } | null>(null)
   useEffect(() => {
     if (presetDone.current || !presetId || (clientId && !clientRecord)) return
     presetDone.current = true
     const preset = scenarioPreset(presetId)
     if (!preset || preset.module !== 'startup-tax') return
     const place = startupRegion(clientRecord?.businessAddress ?? '')
-    setForm((f) => ({ ...f, ...(f.region ? {} : { region: place.region, overconcentration: place.over }), ...(preset.startup ?? {}) }))
+    const applied: Partial<StartupTaxForm> = { ...(preset.startup ?? {}) }
+    const filledRegion = form.region ? {} : { region: place.region, overconcentration: place.over }
+    const base = { ...form, ...filledRegion }
+    const before: Partial<StartupTaxForm> = Object.fromEntries(Object.keys(applied).map((k) => [k, base[k as keyof StartupTaxForm]]))
+    setForm((f) => ({ ...f, ...(f.region ? {} : filledRegion), ...applied }))
     setSubmitted(true)
     markStartupTaxJudged(clientId, true)
-    setPresetTitle(preset.title)
+    setPresetUsed({ title: preset.title, applied, before, chips: presetAssumptions(preset), cleared: false })
     const next = new URLSearchParams(params)
     next.delete('preset')
     setParams(next, { replace: true })
@@ -146,10 +154,19 @@ function StartupTaxScreen() {
   return (
     <div className="st-orig flex flex-col gap-4">
       <PrefillNote note={prefillNote} />
-      {presetTitle && (
-        <p className="t-sub rounded-(--radius-control) border border-success-200 bg-success-50 px-3 py-2 font-semibold break-keep text-success-800" data-testid="startup-preset-note">
-          상황 예시 · {presetTitle} — 이 업체 숫자로 바로 판정했어요(아래 칸을 바꾸면 다시 판정)
-        </p>
+      {presetUsed && (
+        <PresetNote
+          testId="startup-preset-note"
+          title={presetUsed.title}
+          done="이 업체 숫자로 바로 판정했어요(아래 칸을 바꾸면 다시 판정)"
+          chips={presetUsed.chips.filter((c) => !c.field || presetFieldsKept(form, presetUsed.applied).map(String).includes(c.field)).map((c) => c.text)}
+          cleared={presetUsed.cleared}
+          clearedText="창업 형태 · 권역을 상황 예시 전 값으로 돌렸어요(직접 고친 칸은 그대로)."
+          onClear={() => {
+            setForm((f) => withoutPresetFields(f, presetUsed.applied, presetUsed.before))
+            setPresetUsed({ ...presetUsed, cleared: true })
+          }}
+        />
       )}
       {/* D-167: 판정기 안에서만 글자 크기 고르기 — 기본은 OS 글자와 어울리게(예전 1.25배는 따로 노는 느낌) */}
       <div className="flex justify-end">
@@ -183,7 +200,7 @@ function StartupTaxScreen() {
                     verdict={result.overall}
                     verdictLabel={`${VERDICT_EMOJI[result.overall]} ${VERDICT_LABEL[result.overall]}`}
                     summary={summaryText}
-                    data={{ form, baseDate: baseDate.toISOString().slice(0, 10) }}
+                    data={{ form, baseDate: formatDate(baseDate) }}
                   />
                   <span className="text-sm text-gray-500">판정 결과를 고객 관리 업체 기록에 붙입니다.</span>
                 </div>

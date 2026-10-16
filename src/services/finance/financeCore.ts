@@ -187,6 +187,8 @@ export function rateFor(settings: FinanceSettings, ym: string): number {
 
 /** D-150: 환율을 바꾼다 — 이번 달부터 새 환율, 그 전 달은 예전 환율로 남긴다 */
 export function withRate(settings: FinanceSettings, usdKrw: number, ym: string): FinanceSettings {
+  // D-211: 아직 한 번도 정하지 않은 환율(1,400 가정)은 지난 달에 박아 두지 않는다 — 처음 정한 환율이 지난 달에도 쓰인다
+  if (!settings.rateSet && (settings.rateHistory ?? []).length === 0) return { ...settings, usdKrw, rateSet: true, rateHistory: [] }
   const h = [...(settings.rateHistory ?? [])].filter((e) => e.from !== ym)
   if (h.length === 0) h.push({ from: '0000-00', usdKrw: settings.usdKrw })
   h.push({ from: ym, usdKrw })

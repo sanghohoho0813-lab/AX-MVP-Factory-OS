@@ -11,7 +11,7 @@
 import { getDataModeConfig } from '../../data/dataMode'
 import { getSupabaseClient } from '../../lib/supabase/client'
 import { generateId } from '../../storage/localStore'
-import { nowIso } from '../../lib/appClock'
+import { localDateOf, nowIso } from '../../lib/appClock'
 import { deleteRow, listRows, saveRow } from '../moduleData'
 import { recordLocalEvent } from '../customerBridgeService'
 import { normalizeNotice, type GrantNotice } from './grantMatch'
@@ -239,6 +239,7 @@ export async function recordSent(workspaceId: string | null, clientId: string, n
 }
 
 /** 이 업체에 이 공고를 이미 알렸나 → 마지막으로 알린 때 */
+/** 알림 보낸 날(로컬 날짜 YYYY-MM-DD) — D-211: 저장 시각은 UTC 라 한국 오전 9시 전에 보낸 알림이 '어제' 로 보였다 */
 export function sentAt(sent: readonly SentRecord[], clientId: string, noticeId: string): string {
-  return sent.find((s) => s.clientId === clientId && s.noticeIds.includes(noticeId))?.at ?? ''
+  return localDateOf(sent.find((s) => s.clientId === clientId && s.noticeIds.includes(noticeId))?.at ?? '')
 }

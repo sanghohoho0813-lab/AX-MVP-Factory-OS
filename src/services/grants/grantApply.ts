@@ -211,7 +211,7 @@ export function withGrantApplication(
   record: ClientOpsRecord,
   notice: GrantNotice,
 ): { record: ClientOpsRecord; app: FundingApplication; created: boolean } {
-  const due = notice.deadlineKind === 'date' ? notice.applyEnd : ''
+  const due = notice.deadlineKind !== 'always' ? notice.applyEnd : ''
   const extra: Partial<FundingApplication> = {
     noticeId: notice.id,
     ...(notice.url ? { noticeUrl: notice.url } : {}),
@@ -254,7 +254,7 @@ export function withGrantChallenge(record: ClientOpsRecord, notice: GrantNotice)
     programName: notice.title,
     institution: notice.agency || notice.operator,
     status: 'watching',
-    applyDueDate: notice.deadlineKind === 'date' ? notice.applyEnd : '',
+    applyDueDate: notice.deadlineKind !== 'always' ? notice.applyEnd : '',
   })
   const [first, ...rest] = made.fundingApplications
   const app: FundingApplication = {
@@ -438,6 +438,8 @@ export function applicationBoard(records: readonly ClientOpsRecord[], today: str
   for (const r of records) {
     if (r.archivedAt) continue
     for (const app of r.fundingApplications) {
+      // D-211: 손으로 적은 정책자금 건은 지원사업 신청 진행판에 없다(activeApplications 와 같은 기준)
+      if (!app.docs && !app.noticeId) continue
       const stage = applyStage(app)
       const base = { clientId: r.id, clientName: r.companyName, app, stage }
       if (isGrantBookmark(app)) {
@@ -555,6 +557,7 @@ export function grantYearStats(records: readonly ClientOpsRecord[], year: number
   const s: GrantYearStats = { year, submitted: 0, selected: 0, rejected: 0, selectionRate: null, approvedTotal: 0, feeTotal: 0, feeReceived: 0 }
   for (const r of records) {
     for (const a of r.fundingApplications) {
+      if (!a.docs && !a.noticeId) continue
       if (a.submittedAt?.startsWith(y)) s.submitted += 1
       if (!a.resultAt?.startsWith(y)) continue
       if (a.status === 'selected') {

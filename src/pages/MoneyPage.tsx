@@ -32,6 +32,7 @@ import {
   monthlyEquivalent,
   nextCharge,
   outlook,
+  rateFor,
   undatedRevenue,
   ymOf,
   type Expense,
@@ -421,7 +422,8 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
           onClose={() => setSheet(null)}
           onSave={async (v) => {
             // D-149: 달러 비용은 적는 순간의 환율을 함께 남긴다(고칠 때는 처음 환율 그대로 — 통화를 바꿨으면 지금 환율)
-            const rate = v.currency === 'USD' ? (sheet.item?.currency === 'USD' && sheet.item.usdKrw ? sheet.item.usdKrw : settings.usdKrw) : undefined
+            // D-211: 새로 적는 달러 비용은 그 날짜가 속한 달의 환율로(지난 달 비용을 오늘 환율로 적지 않는다)
+            const rate = v.currency === 'USD' ? (sheet.item?.currency === 'USD' && sheet.item.usdKrw ? sheet.item.usdKrw : rateFor(settings, ymOf(v.date))) : undefined
             const saved = await saveExpense(workspaceId, { ...v, ...(rate ? { usdKrw: rate } : {}), id: sheet.item?.id, createdAt: sheet.item?.createdAt })
             setExpenses((prev) => [saved, ...prev.filter((x) => x.id !== saved.id)].sort((a, b) => b.date.localeCompare(a.date)))
             setSheet(null)
@@ -473,7 +475,13 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
           onClose={() => setSheet(null)}
           onSave={async (s) => {
             // D-150: 환율을 바꾸면 이번 달부터 — 지난 달 달러 정기 결제는 예전 환율 그대로
-            setSettings(await saveSettings(workspaceId, s.usdKrw !== settings.usdKrw ? withRate(settings, s.usdKrw, ymOf(today)) : { ...settings, ...s }))
+            try {
+              setSettings(await saveSettings(workspaceId, s.usdKrw !== settings.usdKrw ? withRate(settings, s.usdKrw, ymOf(today)) : { ...settings, ...s }))
+            } catch {
+              // D-211: 저장이 막히면 창을 그대로 두고 알린다(예전: 아무 말 없이 멈춰 있었다)
+              showToast('환율을 저장하지 못했습니다. 잠시 뒤 다시 눌러 주세요.')
+              return
+            }
             setSheet(null)
             showToast(`1달러 = ${s.usdKrw.toLocaleString('ko-KR')}원으로 셉니다`)
           }}

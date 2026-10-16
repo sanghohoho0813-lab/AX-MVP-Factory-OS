@@ -166,7 +166,8 @@ export function useGrantActions(o: {
           dueDate: due,
         })
         toast(`${client.record.companyName} 고객 화면에 올렸습니다`)
-        await remember(client.record.id, matches.map((m) => m.notice.id), 'portal')
+        // D-211: 올린 글에 실제로 넣은 공고만 '보냄' 으로(예전: 9건째부터는 안 올렸는데 보낸 것으로 적혀 오늘 알림에서 사라졌다)
+        await remember(client.record.id, (one ? [one] : matches.slice(0, 8)).map((m) => m.notice.id), 'portal')
       } catch (cause) {
         toast(cause instanceof Error ? cause.message : '고객 화면에 올리지 못했습니다')
       }

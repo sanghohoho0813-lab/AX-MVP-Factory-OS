@@ -138,7 +138,7 @@ export function formatKRW(v: number): string {
   return `${v.toLocaleString("ko-KR")}원`;
 }
 
-/** 원 단위 금액을 "1,250만원" 형태로 (만원 미만 절사) */
+/** 원 단위 금액을 "1,250만원" 형태로 (만원 미만 반올림 — 업체 상세 · 상황 예시 카드와 같은 숫자) */
 export function formatManwon(v: number): string {
   return `${Math.round(v / 10000).toLocaleString("ko-KR")}만원`;
 }

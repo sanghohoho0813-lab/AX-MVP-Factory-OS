@@ -23,7 +23,8 @@ import { PolicyDashboardExtra } from './screens/DashboardExtra'
 import { usePrefillFromClient } from '../shared/usePrefill'
 import { PrefillNote } from '../shared/PrefillNote'
 import { DEFAULT_INPUT } from './diagnosis'
-import { scenarioPreset } from '../../services/scenarioPresets'
+import { presetAssumptions, presetFieldsKept, scenarioPreset, withoutPresetFields } from '../../services/scenarioPresets'
+import { PresetNote } from '../shared/PresetNote'
 import { REPORT_DISCLAIMER } from './report'
 import type { DiagnosisInput, DiagnosisResult } from './types'
 import { getStoredCustomers, hydratePolicyStore } from './orig/storage'
@@ -96,10 +97,12 @@ function DiagnosisScreen() {
   const { clientId, clientRecord } = useToolClient()
   const autoSample = params.get('sample') === '1'
   // D-199 상황 예시(?preset=) — 그 상황의 가정(자금 목적 · 채용 계획)을 업체 값 위에 얹고 바로 진단한다
-  const [preset] = useState(() => {
+  const [preset, setPreset] = useState(() => {
     const p = scenarioPreset(params.get('preset'))
     return p && p.module === 'policy-funding' ? p : null
   })
+  // D-211 [가정 빼기] — 상황 예시 제목은 남기고(무엇을 뺐는지) 가정만 뺀다
+  const [presetCleared, setPresetCleared] = useState<string>('')
   // D-209: 상황 예시는 한 번만 — 주소에서 지운다(새로고침 · 업체 기록에 붙인 '다시 열기' 주소가 그 가정을 또 덮어쓰지 않게)
   useEffect(() => {
     if (!params.get('preset')) return
@@ -195,7 +198,10 @@ function DiagnosisScreen() {
     return filled
   })
 
+  // D-211: 지금 칸 값 — 가정 칩은 아직 그 값 그대로인 칸만(직접 고친 칸은 이제 대표 값)
+  const [liveInput, setLiveInput] = useState<DiagnosisInput | null>(null)
   const remember = useCallback((input: DiagnosisInput) => {
+    setLiveInput(input)
     try {
       localStorage.setItem(keyFor(clientId), JSON.stringify(input))
     } catch {
@@ -223,10 +229,25 @@ function DiagnosisScreen() {
   return (
     <OrigPolicy>
       <PrefillNote note={prefillNote} />
-      {preset && (
-        <p className="t-sub mx-2 mt-3 rounded-(--radius-control) border border-success-200 bg-success-50 px-3 py-2 font-semibold break-keep text-success-800" data-testid="pf-preset-note">
-          상황 예시 · {preset.title} — 이 업체 숫자로 바로 진단했어요(아래 칸을 바꾸고 다시 진단할 수 있어요)
-        </p>
+      {(preset || presetCleared) && (
+        <div className="mx-2 mt-3">
+          <PresetNote
+            testId="pf-preset-note"
+            title={preset?.title ?? presetCleared}
+            done="이 업체 숫자로 바로 진단했어요(아래 칸을 바꾸고 다시 진단할 수 있어요)"
+            chips={preset ? presetAssumptions(preset).filter((c) => !liveInput || presetFieldsKept(liveInput, preset.policy ?? {}).map(String).includes(c.field)).map((c) => c.text) : []}
+            cleared={!preset}
+            clearedText="자금 목적 · 채용 계획 칸을 상황 예시 전 값으로 돌렸어요 — 칸을 확인하고 [진단하기] 를 누르세요."
+            onClear={() => {
+              if (!preset) return
+              // 가정 칸만 상황 예시 전 값으로 — 그 뒤에 고친 다른 칸(매출 · 업력 …)은 그대로
+              const cur = liveInput ?? { ...seed.input, ...(preset.policy ?? {}) }
+              setPresetCleared(preset.title)
+              setPreset(null)
+              setSeed((s) => ({ input: withoutPresetFields(cur, preset.policy ?? {}, s.input), key: s.key + 1 }))
+            }}
+          />
+        </div>
       )}
       {/* D-126: 다른 화면과 같은 제목 크기 · 왼쪽 정렬(가운데 큰 배너는 이 OS 에서 이 화면만 달랐다) */}
       <section className="w-full px-2 pt-4 pb-4">

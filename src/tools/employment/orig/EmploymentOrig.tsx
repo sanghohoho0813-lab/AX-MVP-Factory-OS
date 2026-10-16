@@ -11,7 +11,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { scenarioPreset } from '../../../services/scenarioPresets'
+import { presetAssumptions, scenarioPreset } from '../../../services/scenarioPresets'
+import { PresetNote } from '../../shared/PresetNote'
 import { clientFacts } from '../../shared/clientPrefill'
 import { deleteRow, listRows, saveRow } from '../../../services/moduleData'
 import { canUploadFiles, documentFileUrl, uploadModuleFile } from '../../../services/clientOpsService'
@@ -109,17 +110,20 @@ export function EmploymentOrig({
   const { loadClients, workspaceId, clientRecord } = useToolClient()
   // D-199 상황 예시(?preset=) — 채용 진단을 그 상황 · 이 업체 직원 수 · 권역으로 채워 바로 진단한다(처음 연 한 번만)
   const [params] = useSearchParams()
-  const [presetOf] = useState(() => {
+  const [presetOf, setPresetOf] = useState(() => {
     const p = scenarioPreset(params.get('preset'))
     return p && p.module === 'employment' && p.hiring ? p : null
   })
+  // D-211 [가정 빼기] — 채용 상황(대상 · 나이 · 형태) 가정만 빼고 업체 숫자(직원 수 · 권역)는 남긴다. 진단은 다시 누를 때
+  const [presetCleared, setPresetCleared] = useState('')
   const hiringPreset = presetOf?.hiring ?? null
   const hiringWithCompany = useMemo(() => {
-    if (!hiringPreset) return null
+    if (!hiringPreset && !presetCleared) return null
     const f = clientRecord ? clientFacts(clientRecord, new Date()) : null
     const sido = f?.address.match(/^(서울|경기|인천|부산|대구|광주|대전|울산|세종|강원|충북|충남|전북|전남|경북|경남|제주)/)?.[1] ?? ''
-    return { ...hiringPreset, companySize: f?.employeeCount ?? null, region: !sido || ['서울', '경기', '인천'].includes(sido) ? '수도권' : '비수도권' }
-  }, [hiringPreset, clientRecord])
+    const company = { companySize: f?.employeeCount ?? null, region: !sido || ['서울', '경기', '인천'].includes(sido) ? '수도권' : '비수도권' }
+    return hiringPreset ? { ...hiringPreset, ...company } : { ...company, noRun: true }
+  }, [hiringPreset, presetCleared, clientRecord])
   const { showToast } = useToast()
   const navigate = useNavigate()
   const [data, setData] = useState<Loaded | null>(null)
@@ -379,13 +383,25 @@ export function EmploymentOrig({
 
   return (
     <div className="hr-orig">
-      {presetOf && view === 'diagnosis' && (
-        <p className="t-sub mb-3 rounded-(--radius-control) border border-success-200 bg-success-50 px-3 py-2 font-semibold break-keep text-success-800" data-testid="emp-preset-note">
-          상황 예시 · {presetOf.title} — 이 업체 직원 수 · 권역으로 바로 진단했어요(아래 칸을 바꾸고 다시 진단할 수 있어요)
-        </p>
+      {(presetOf || presetCleared) && view === 'diagnosis' && (
+        <div className="mb-3">
+          <PresetNote
+            testId="emp-preset-note"
+            title={presetOf?.title ?? presetCleared}
+            done="이 업체 직원 수 · 권역으로 바로 진단했어요(아래 칸을 바꾸고 다시 진단할 수 있어요)"
+            chips={presetOf ? presetAssumptions(presetOf).map((c) => c.text) : []}
+            cleared={!presetOf}
+            clearedText="직원 수 · 권역만 남겼어요 — 채용 대상을 고르고 [진단 결과 보기] 를 누르세요."
+            onClear={() => {
+              if (!presetOf) return
+              setPresetCleared(presetOf.title)
+              setPresetOf(null)
+            }}
+          />
+        </div>
       )}
       <SubsidyApp
-        key={hiringWithCompany ? `preset-${hiringWithCompany.companySize ?? 'x'}` : 'app'}
+        key={hiringWithCompany ? `preset-${presetOf ? 'on' : 'off'}-${hiringWithCompany.companySize ?? 'x'}` : 'app'}
         hiringPreset={hiringWithCompany}
         view={view}
         companyId={companyId && registered.has(companyId) ? companyId : null}

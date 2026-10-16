@@ -543,6 +543,22 @@ function check(name: string, cond: boolean, detail?: string): void {
     check('기한: 옛 결과 자체는 기록에 남는다', again.toolResults.length === 2 && again.toolResults[1].summary === '요약')
     const other = withToolResult(again, { toolKey: 'labcare', title: '연구소 기한', verdict: null, verdictLabel: '', summary: '', data: null, deadlines: [{ date: '2027-04-30', title: '활동조사', note: '' }] })
     check('기한: 다른 도구의 기한은 건드리지 않는다', buildClientSchedule(other, '2026-09-22').filter((e) => e.kind === 'tool').length === 2)
+    // D-211: 다시 붙인 결과에 기한이 없으면(열린 기한 없음 · 회차를 다 받음) 옛 기한도 내린다 — 사람이 건 할 일은 남는다
+    const withTodo = { ...again, toolResults: again.toolResults.map((r, i) => (i === 0 ? { ...r, deadlines: [...r.deadlines, { date: '2026-12-01', title: '대표님께 전화', note: '', todo: true }] } : r)) }
+    const none = withToolResult(withTodo, { toolKey: 'employment', title: '고용지원금 회차 일정', verdict: null, verdictLabel: '', summary: '다 받음', data: null, deadlines: [] })
+    const left = buildClientSchedule(none, '2026-09-22').filter((e) => e.kind === 'tool').map((e) => e.title)
+    check('D211 기한: 기한 없는 새 결과를 붙이면 옛 도구 기한은 내려가고 사람이 건 할 일만 남음(예전: 옛 기한이 계속 뜸)', left.length === 1 && left[0] === '대표님께 전화', JSON.stringify(left))
+    // D-211: 회차 일정은 직원(사업 · 입사일)마다 따로 — 두 번째 직원 일정이 첫 직원 기한을 지우지 않는다 · 예전 짧은 제목의 같은 직원 일정은 새 일정이 대신한다
+    const sched = (start: string, title: string, date: string) => ({ toolKey: 'employment', title, verdict: null, verdictLabel: '', summary: '', data: { tab: 'schedule', programId: 'youth_jump', startDate: start }, deadlines: [{ date, title: `청년도약(입사 ${start}) 1차 신청`, note: '' }] })
+    const a1 = withToolResult(base, sched('2026-05-04', '고용지원금 회차 일정 · 청년도약 · 입사 2026-05-04', '2026-11-04'))
+    const a2 = withToolResult(a1, sched('2026-07-01', '고용지원금 회차 일정 · 청년도약 · 입사 2026-07-01', '2027-01-01'))
+    check('D211 회차 일정: 다른 입사일 직원 일정을 붙여도 앞 직원 기한이 남음(예전: 두 번째가 첫 번째를 지움)', buildClientSchedule(a2, '2026-09-22').filter((e) => e.kind === 'tool').length === 2)
+    const legacy = withToolResult(base, sched('2026-05-04', '고용지원금 회차 일정', '2026-11-04'))
+    const upgraded = withToolResult(legacy, sched('2026-05-04', '고용지원금 회차 일정 · 청년도약 · 입사 2026-05-04', '2026-11-05'))
+    const up = buildClientSchedule(upgraded, '2026-09-22').filter((e) => e.kind === 'tool').map((e) => e.date)
+    check('D211 회차 일정: 예전 짧은 제목으로 붙인 같은 직원 일정은 새 일정으로 바뀜(겹치지 않음)', up.length === 1 && up[0] === '2026-11-05', JSON.stringify(up))
+    const otherEmp = withToolResult(legacy, sched('2026-07-01', '고용지원금 회차 일정 · 청년도약 · 입사 2026-07-01', '2027-01-01'))
+    check('D211 회차 일정: 예전 제목이어도 다른 직원(입사일 다름) 기한은 그대로', buildClientSchedule(otherEmp, '2026-09-22').filter((e) => e.kind === 'tool').length === 2)
   }
 
   check('기한: 결과에 기한이 없으면 달력에도 없다', buildClientSchedule(withToolResult(base, { toolKey: 'cretop', title: 'x', verdict: null, verdictLabel: '', summary: '', data: null }), '2026-09-22').filter((e) => e.kind === 'tool').length === 0)

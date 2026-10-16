@@ -69,7 +69,9 @@ export function FactSendButton({
     setBusy(true)
     try {
       const fresh = (await listClients(workspaceId)).find((c) => c.id === clientId) ?? clientRecord
-      await saveClient(withFactValue(fresh, factKey, value, { source, status: 'confirmed', asOf, now: nowIso() }))
+      const saved = await saveClient(withFactValue(fresh, factKey, value, { source, status: 'confirmed', asOf, now: nowIso() }))
+      // D-211: 틀이 들고 있는 기록도 바꾼다 — 안 그러면 뒤이은 [업체 기록에 붙이기] 가 예전 기록으로 저장해 이 값을 지웠다
+      ctx.replaceClient(saved)
       setSent(true)
       showToast(`${clientName} — ${def?.label} ${display}. 다른 전문 모듈도 이 값을 씁니다.`)
     } catch (cause) {

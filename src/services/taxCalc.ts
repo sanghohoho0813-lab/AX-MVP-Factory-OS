@@ -28,8 +28,19 @@ export function pct(n: number | null | undefined, d?: number): string {
   return (n * 100).toFixed(d === undefined ? 1 : d) + '%'
 }
 
+const KOREAN_WON = /^(-?)(?:(\d+(?:\.\d+)?)억)?(?:(\d+(?:\.\d+)?)천만)?(?:(\d+(?:\.\d+)?)만)?(\d+(?:\.\d+)?)?$/
+
 export function cleanNum(v: unknown): number {
-  const n = parseFloat(String(v ?? '').replace(/,/g, ''))
+  const s = String(v ?? '').replace(/[\s,]/g, '').replace(/원$/, '')
+  // D-211: '1억' · '3억 5천만' · '8000만' 은 그 금액으로 — 예전에는 앞 숫자만 읽어 1억이 1원이었다(절세 설계 칸과 같은 읽기)
+  if (/[억만]/.test(s)) {
+    const m = KOREAN_WON.exec(s)
+    if (m && (m[2] || m[3] || m[4])) {
+      const won = Number(m[2] ?? 0) * 1e8 + Number(m[3] ?? 0) * 1e7 + Number(m[4] ?? 0) * 1e4 + Number(m[5] ?? 0)
+      return m[1] ? -won : won
+    }
+  }
+  const n = parseFloat(s)
   return isNaN(n) ? 0 : n
 }
 

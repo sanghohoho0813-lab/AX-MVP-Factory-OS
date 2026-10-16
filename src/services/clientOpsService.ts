@@ -1234,13 +1234,18 @@ export function withToolResult(
   // 같은 도구의 같은 결과를 다시 붙이면, 먼저 붙였던 기한은 달력에서 내린다 (D-89).
   // 입사일을 고쳐 다시 판정했는데 옛 회차 날짜가 달력에 함께 남아 있으면 무엇이 맞는지 알 수 없다.
   // 옛 결과 자체는 기록으로 남는다 — 기한만 비운다.
-  const prior =
-    item.deadlines.length > 0
-      ? record.toolResults.map((r) =>
-          // 사람이 건 할 일(todo)은 남긴다 — 도구가 계산한 기한만 새 것으로 바뀐다 (D-134)
-          r.toolKey === item.toolKey && r.title === item.title && r.deadlines.some((d) => !d.todo) ? { ...r, deadlines: r.deadlines.filter((d) => d.todo) } : r,
-        )
-      : record.toolResults
+  // D-211: 새 결과에 기한이 없어도 내린다 — 명부를 다시 돌려 열린 기한이 없어졌는데(또는 회차를 모두 받았는데) 옛 '놓치면 끝나는 기한' 이 계속 떴다
+  // D-211: 제목에 ' · 무엇' 을 붙여 나눈 결과(회차 일정 · 사업 · 입사일)는, 예전 짧은 제목으로 붙인 같은 대상(data 의 사업 · 입사일이 같음)도 같은 결과로 본다
+  const sameData = (a: unknown, b: unknown) => {
+    const x = (a ?? {}) as Record<string, unknown>
+    const y = (b ?? {}) as Record<string, unknown>
+    return typeof x.startDate === 'string' && x.startDate !== '' && x.startDate === y.startDate && x.programId === y.programId
+  }
+  const sameResult = (r: ToolResult) => r.toolKey === item.toolKey && (r.title === item.title || (item.title.startsWith(`${r.title} · `) && sameData(r.data, item.data)))
+  const prior = record.toolResults.map((r) =>
+    // 사람이 건 할 일(todo)은 남긴다 — 도구가 계산한 기한만 새 것으로 바뀐다 (D-134)
+    sameResult(r) && r.deadlines.some((d) => !d.todo) ? { ...r, deadlines: r.deadlines.filter((d) => d.todo) } : r,
+  )
   return withActivity({ ...record, toolResults: [item, ...prior].slice(0, TOOL_RESULT_LIMIT) }, 'tool', text)
 }
 

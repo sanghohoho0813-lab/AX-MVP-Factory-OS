@@ -2,7 +2,7 @@
  * D-199 상황 예시로 바로 설계 — 카탈로그 · 업체 숫자로 계산 · 필요한 숫자 ✓/✗ · 요청 문구 · 모듈 엔진과 같은 답.
  */
 import { normalizeClientOps } from '../clientOpsService'
-import { SCENARIO_PRESETS, scenarioPath, scenarioPreset } from '../scenarioPresets'
+import { SCENARIO_PRESETS, presetAssumptions, presetFieldsKept, scenarioPath, scenarioPreset, withoutPresetFields } from '../scenarioPresets'
 import { fitDataRequest, runScenario, runScenarios, scenarioTaxProfile, scenariosRequest, type ScenarioRun } from '../scenarios'
 import { SCENARIO_QUESTIONS, fitContext, scenarioAnswer, scenarioFit, withScenarioAnswer, type QuestionKey } from '../scenarioFit'
 import { salaryPlan, parseGoalText } from '../taxPlan'
@@ -344,6 +344,30 @@ const corpName = mk({ id: 'bt2', companyName: '한빛산업 주식회사', busin
 check('F25 사업자번호가 개인(가운데 45) → 계산기도 개인사업자 · 이름에 주식회사 → 법인(예전: 둘 다 "모름" 으로 법인세 계산)', businessTypeOf(indivNo) === 'individual' && fitContext(indivNo, today).entity === 'individual' && businessTypeOf(corpName) === 'corporation' && fitContext(corpName, today).entity === 'corporation')
 const labIndiv = runScenario(SCENARIO_PRESETS.find((x) => x.id === 'lab-two')!, indivNo, today)
 check('F26 연구소 2명 상황 — 개인사업자면 소득세로 계산 · "사업자 구분" 을 모자란 것으로 묻지 않음', /소득세/.test(labIndiv.headline) && labIndiv.needs.every((n) => !JSON.stringify(n).includes('사업자 구분') || (n as { ok?: boolean }).ok), { h: labIndiv.headline, needs: labIndiv.needs })
+
+/* ---------------- D-211 모듈 화면 '넣은 가정' 칩 · [가정 빼기] ---------------- */
+const chipsOf = (id: string) => presetAssumptions(scenarioPreset(id)!).map((c) => c.text)
+check('G1 연구소 2명 — 칩은 인건비 8,000만원 · 일반 R&D (0원인 재료비는 칩 없음)', JSON.stringify(chipsOf('lab-two')) === JSON.stringify(['인건비 8,000만원', '일반 R&D']), chipsOf('lab-two'))
+check('G2 연구원 1명 + 재료비 — 인건비 4,000만원 · 재료비 3,000만원 · 일반 R&D', JSON.stringify(chipsOf('lab-material')) === JSON.stringify(['인건비 4,000만원', '재료비 3,000만원', '일반 R&D']), chipsOf('lab-material'))
+check('G3 본점 이전 — 새로 창업 · 본점 기타 지방 · 과밀억제권역 밖', JSON.stringify(chipsOf('startup-move')) === JSON.stringify(['새로 창업', '본점 기타 지방', '과밀억제권역 밖']), chipsOf('startup-move'))
+check('G4 정책자금 청년 채용 — 운전자금 · 채용 계획 있음 · 청년 채용 예정', JSON.stringify(chipsOf('policy-hiring')) === JSON.stringify(['운전자금', '채용 계획 있음', '청년 채용 예정']), chipsOf('policy-hiring'))
+check('G5 고용 육아휴직 — 같은 말 한 번씩(육아휴직이 상황 · 구체 상황 둘 다여도 하나)', new Set(chipsOf('emp-childcare')).size === chipsOf('emp-childcare').length && chipsOf('emp-childcare').includes('대체인력'), chipsOf('emp-childcare'))
+check('G6 고용 청년 — 신규 채용 · 청년 · 만 29세 · 정규직(진단 화면 단추와 같은 말)', JSON.stringify(chipsOf('emp-youth')) === JSON.stringify(['신규 채용', '청년', '만 29세', '정규직']), chipsOf('emp-youth'))
+const noTaxChips = SCENARIO_PRESETS.filter((x) => x.module === 'tax').every((x) => presetAssumptions(x).length === 0)
+const allOthers = SCENARIO_PRESETS.filter((x) => x.module !== 'tax').every((x) => presetAssumptions(x).length > 0)
+check('G7 절세는 칩 없음(상황 문장이 칸에 그대로) · 나머지 12 상황은 칩이 하나 이상', noTaxChips && allOthers)
+check('G8 칩에 업체 숫자(직원 수 · 매출 · 주소)는 없음 — 가정만', SCENARIO_PRESETS.flatMap(presetAssumptions).every((c) => !/직원 ?수|매출|피보험자|주소/.test(c.text)), SCENARIO_PRESETS.flatMap(presetAssumptions).map((c) => c.text))
+type LabF = { payroll: number | ''; material: number | ''; category: string; rate: number | '' }
+const applied: Partial<LabF> = { payroll: 80_000_000, material: 0, category: '일반 R&D', rate: '' }
+const before: Partial<LabF> = { payroll: 30_000_000, material: 5_000_000, category: '미정', rate: 25 }
+const afterEdit: LabF = { payroll: 80_000_000, material: 12_000_000, category: '일반 R&D', rate: '' }
+const kept = presetFieldsKept(afterEdit, applied).map(String).sort()
+check('G9 가정 칸 중 직접 고친 재료비는 "남은 가정" 에서 빠짐', JSON.stringify(kept) === JSON.stringify(['category', 'payroll', 'rate']), kept)
+const cleared = withoutPresetFields(afterEdit, applied, before)
+check('G10 [가정 빼기] — 가정 그대로인 칸만 예전 값(인건비 3,000만 · 미정 · 25%) · 직접 고친 재료비 1,200만은 그대로', cleared.payroll === 30_000_000 && cleared.category === '미정' && cleared.rate === 25 && cleared.material === 12_000_000, cleared)
+check('G11 [가정 빼기] — 원래 객체는 바꾸지 않음', afterEdit.payroll === 80_000_000 && afterEdit.category === '일반 R&D')
+const emptyBefore = withoutPresetFields({ purpose: '운전자금', revenue: '10억' }, { purpose: '운전자금' }, { purpose: '' })
+check('G12 상황 예시 전이 빈 칸이면 빈 칸으로(짐작해서 채우지 않음) · 다른 칸 그대로', emptyBefore.purpose === '' && emptyBefore.revenue === '10억', emptyBefore)
 
 console.log(`\nscenarios: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
