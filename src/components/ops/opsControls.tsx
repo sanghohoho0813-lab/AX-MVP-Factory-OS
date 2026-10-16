@@ -51,6 +51,7 @@ export function DueDateField({
   hint,
   ariaLabel,
   clearLabel,
+  clearable = true,
 }: {
   label: string
   value: string
@@ -61,6 +62,8 @@ export function DueDateField({
   ariaLabel?: string
   /** 날짜를 비우는 단추 글자 — 같은 창에 다른 '지우기' 가 있을 때 헷갈리지 않게(D-201) */
   clearLabel?: string
+  /** D-210: 날짜가 꼭 있어야 하는 칸(할 일 기한)은 비우는 단추를 두지 않는다 */
+  clearable?: boolean
 }) {
   return (
     <div>
@@ -85,7 +88,7 @@ export function DueDateField({
             {q.label}
           </button>
         ))}
-        {value && (
+        {value && clearable && (
           <button
             type="button"
             onClick={() => onChange('')}

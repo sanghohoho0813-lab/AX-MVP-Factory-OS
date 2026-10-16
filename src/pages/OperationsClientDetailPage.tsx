@@ -124,7 +124,7 @@ const ClientSmartTab = lazy(() => import('../components/ops/ClientSmartTab'))
 const ClientTopPicks = lazy(() => import('../components/ops/ClientTopPicks'))
 // 대표 AI 작업실(V1) — 대표 전용 탭(기능 권한). 팀장 화면 · 권한 없는 계정에는 탭 · 더보기 단추 · 주소 모두 없다
 const ClientAiTab = lazy(() => import('./ownerAi/ClientAiTab'))
-import { factNoteFor, readFact, withFactValue, withProfileFieldEdit } from '../services/customerFacts'
+import { factNoteFor, readFact, withFactValue, withProfileFieldEdit, withProfileFieldTyped } from '../services/customerFacts'
 import { TodoComposer } from '../components/journal/TodoBoard'
 import { createJournalEntry } from '../services/journalService'
 import { FundingSection } from '../components/ops/FundingSection'
@@ -367,6 +367,43 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
     void load()
   }, [load])
 
+  /*
+   * D-210: 다른 기기 · 다른 창에서 고친 것을 덮지 않게 — 이 화면을 한동안 떠났다가 돌아오면(탭 · 앱 전환)
+   * 저장된 기록을 다시 읽어 더 새 것이면 바꿔 둔다. 예전에는 PC 에 열어 둔 화면이 휴대폰에서 한 입금 확인을
+   * 모른 채 다음 약속을 고치며 통째로 저장해, 입금 확인이 말없이 되돌아갔다. 저장 중일 때는 건드리지 않는다.
+   */
+  useEffect(() => {
+    let hiddenAt = 0
+    const onVisible = () => {
+      if (document.visibilityState === 'hidden') {
+        hiddenAt = Date.now()
+        return
+      }
+      if (hiddenAt === 0 || Date.now() - hiddenAt < 5000) return
+      hiddenAt = 0
+      void (async () => {
+        try {
+          const mine = latestRef.current
+          const all = await listClients(workspaceId)
+          const hit = all.find((r) => r.id === clientId)
+          if (!hit || !mine || loopRef.current || !aliveRef.current) return
+          // 읽는 사이 이 화면에서 고친 것이 있으면 덮지 않는다 — 그 저장 결과가 최신이다
+          if (latestRef.current !== mine) return
+          if ((hit.updatedAt ?? '') > (mine.updatedAt ?? '')) {
+            const fresh = normalizeClientOps(hit)
+            latestRef.current = fresh
+            setRecord(fresh)
+            showToast('다른 곳에서 고친 내용이 있어 새로 불러왔습니다.')
+          }
+        } catch {
+          // 못 읽어도 화면은 그대로 둔다(다음에 돌아올 때 다시)
+        }
+      })()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [workspaceId, clientId, showToast])
+
   // D-187: 등록 창에서 넘겨받은 서류가 있으면 업체를 읽은 뒤 바로 '서류 올리기' 를 연다(한 번만 꺼낸다)
   useEffect(() => {
     if (!record || record.id !== clientId) return
@@ -428,10 +465,20 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   /** D-122: 계약 완료 확인 시트 — 영업 카드 · 계약 단계에서 '계약 완료' 를 고르면 */
   const [closing, setClosing] = useState<ContractCloseDraft | null>(null)
   const [allRecords, setAllRecords] = useState<ClientOpsRecord[]>([])
-  const openClose = () => {
+  const openClose = async () => {
     if (!record) return
-    setClosing(contractCloseDraft(record, { today, records: allRecords.length > 0 ? allRecords : [record] }))
-    void listClients(workspaceId).then(setAllRecords).catch(() => undefined)
+    // D-210: 다른 업체 기록을 먼저 읽고 초안을 만든다 — 소개자가 늘 받던 영업자 수수료가 처음 열 때도 채워지게
+    // (예전에는 목록을 읽기 전에 창이 열려 처음 한 번은 비어 있었다. 보드에서는 채워졌다)
+    let all = allRecords
+    if (all.length === 0) {
+      try {
+        all = await listClients(workspaceId)
+        setAllRecords(all)
+      } catch {
+        all = []
+      }
+    }
+    setClosing(contractCloseDraft(record, { today, records: all.length > 0 ? all : [record] }))
   }
 
   /**
@@ -447,8 +494,11 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       openClose()
       return
     }
+    // D-210: '단계만 옮기기' 로 계약 완료가 되어도 계약일이 비지 않게(오늘) — 보드에서 옮길 때와 같게.
+    // 계약일이 없으면 머리줄 · 목록의 계약 기간 · 계약 1주년 안부가 빠졌다
+    const signedAt = stage === 'signed' && before === 'pre' && !record.contract.signedAt ? today : record.contract.signedAt
     let next = withActivity(
-      { ...record, status: statusForStage(stage) },
+      { ...record, status: statusForStage(stage), contract: { ...record.contract, signedAt } },
       'profile',
       `계약 단계 · ${CONTRACT_STAGE_LABEL[before]} → ${CONTRACT_STAGE_LABEL[stage]}`,
     )
@@ -2083,22 +2133,22 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         {infoOpen && (
         <Panel>
           <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
-            <TextField label="업체명" value={record.companyName} onChange={(v) => void commit({ ...record, companyName: v })} />
-            <TextField label="설립일(개업일)" value={record.establishedAt} onChange={(v) => void commit({ ...record, establishedAt: v })} placeholder="2019-03-05" />
-            <TextField label="사업자등록번호" value={record.businessNumber} onChange={(v) => void commit({ ...record, businessNumber: v })} placeholder="000-00-00000" />
-            <TextField label="법인등록번호" value={record.corporateNumber} onChange={(v) => void commit({ ...record, corporateNumber: v })} />
-            <TextField label="업태" value={record.businessCategory} onChange={(v) => void commit({ ...record, businessCategory: v })} placeholder="예: 제조업" />
-            <TextField label="종목" value={record.businessItem} onChange={(v) => void commit({ ...record, businessItem: v })} placeholder="예: 간판 및 광고물 제조업" />
+            <TextField label="업체명" value={record.companyName} onChange={(v) => void commit(withProfileFieldTyped(record, 'companyName', v, nowIso()))} />
+            <TextField label="설립일(개업일)" value={record.establishedAt} onChange={(v) => void commit(withProfileFieldTyped(record, 'establishedAt', v, nowIso()))} placeholder="2019-03-05" />
+            <TextField label="사업자등록번호" value={record.businessNumber} onChange={(v) => void commit(withProfileFieldTyped(record, 'businessNumber', v, nowIso()))} placeholder="000-00-00000" />
+            <TextField label="법인등록번호" value={record.corporateNumber} onChange={(v) => void commit(withProfileFieldTyped(record, 'corporateNumber', v, nowIso()))} />
+            <TextField label="업태" value={record.businessCategory} onChange={(v) => void commit(withProfileFieldTyped(record, 'businessCategory', v, nowIso()))} placeholder="예: 제조업" />
+            <TextField label="종목" value={record.businessItem} onChange={(v) => void commit(withProfileFieldTyped(record, 'businessItem', v, nowIso()))} placeholder="예: 간판 및 광고물 제조업" />
             <TextField label="종목(그 외)" value={record.businessItemsExtra} onChange={(v) => void commit({ ...record, businessItemsExtra: v })} placeholder="여러 개면 · 로 이어서" />
             <TextField label="업종(분류)" value={record.industry} onChange={(v) => void commit({ ...record, industry: v })} />
-            <TextField label="본점 주소" value={record.businessAddress} onChange={(v) => void commit({ ...record, businessAddress: v })} />
+            <TextField label="본점 주소" value={record.businessAddress} onChange={(v) => void commit(withProfileFieldTyped(record, 'businessAddress', v, nowIso()))} />
 
             {/* 대표자와 담당자는 다른 사람일 수 있다 — 대표는 김대표인데 실무는 이과장이 하는 경우 */}
-            <TextField label="대표자 이름" value={record.representativeName} onChange={(v) => void commit({ ...record, representativeName: v })} placeholder="비우면 담당자 이름을 씁니다" />
-            <TextField label="대표자 생년월일" value={record.representativeBirth} onChange={(v) => void commit({ ...record, representativeBirth: v })} placeholder="1980-12-31" />
+            <TextField label="대표자 이름" value={record.representativeName} onChange={(v) => void commit(withProfileFieldTyped(record, 'representativeName', v, nowIso()))} placeholder="비우면 담당자 이름을 씁니다" />
+            <TextField label="대표자 생년월일" value={record.representativeBirth} onChange={(v) => void commit(withProfileFieldTyped(record, 'representativeBirth', v, nowIso()))} placeholder="1980-12-31" />
             <TextField label="담당자 이름" value={record.contactName} onChange={(v) => void commit({ ...record, contactName: v })} />
             <TextField label="담당자 직급" value={record.contactTitle} onChange={(v) => void commit({ ...record, contactTitle: v })} placeholder="예: 대표이사, 부장" />
-            <TextField label="상시근로자 수" value={record.employeeCount} onChange={(v) => void commit({ ...record, employeeCount: v })} placeholder="예: 5명(대표 포함)" />
+            <TextField label="상시근로자 수" value={record.employeeCount} onChange={(v) => void commit(withProfileFieldTyped(record, 'employeeCount', v, nowIso()))} placeholder="예: 5명(대표 포함)" />
             <TextField label="주주·임원 구성" value={record.shareholders} onChange={(v) => void commit({ ...record, shareholders: v })} placeholder="예: 대표 60% · 배우자 40% / 등기임원 2명" />
 
             <TextField label="담당자 휴대폰" value={record.contactPhone} onChange={(v) => void commit({ ...record, contactPhone: v })} placeholder="010-0000-0000" />

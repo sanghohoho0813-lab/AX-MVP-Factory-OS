@@ -526,6 +526,31 @@ export function withProfileFieldEdit(record: ClientOpsRecord, key: string, value
   return { ...record, [key]: value }
 }
 
+/**
+ * D-210: '업체 정보 수정' 칸에 글자를 칠 때마다 — 값은 친 그대로(앞뒤 빈칸도 · 칠 때마다 저장되므로 자르지 않는다),
+ * 사실이면 출처를 '직접 적음' 으로 바꾼다. 예전에는 서류에서 확인한 번호를 손으로 고쳐도 '사업자등록증 · 확인됨' 이 남았고,
+ * 신청 전 확인 목록에서도 빠졌다. 값이 같으면 그대로 둔다.
+ */
+export function withProfileFieldTyped(record: ClientOpsRecord, key: string, raw: string, now: string): ClientOpsRecord {
+  const def = factDef(key)
+  if (!def?.field) return { ...record, [key]: raw }
+  const cur = (record as unknown as Record<string, unknown>)[def.field]
+  if (cur === raw) return record
+  const next = { ...record, [def.field]: raw } as ClientOpsRecord
+  const factMeta = { ...(record.factMeta ?? {}) }
+  if (raw.trim() === '') delete factMeta[key]
+  else
+    factMeta[key] = {
+      source: 'manual',
+      status: 'entered',
+      asOf: '',
+      confirmedAt: '',
+      updatedAt: now,
+      ...(record.factMeta?.[key]?.dismissed ? { dismissed: record.factMeta[key].dismissed } : {}),
+    }
+  return { ...next, factMeta }
+}
+
 /** 업체 화면에서 보여 줄 출처 한 줄 — 직접 적은 평범한 값은 조용히(없음) */
 export function factNoteFor(record: ClientOpsRecord, key: string): { text: string; confirmed: boolean } | null {
   const f = readFact(record, key)

@@ -143,6 +143,12 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   check('계약 완료: 계약함(진행 중) · 계약일 채움', s3.status === 'active' && /^\d{4}-\d{2}-\d{2}$/.test(s3.contract.signedAt), JSON.stringify({ st: s3.status, c: s3.contract.signedAt }))
   check('계약 완료: 수금 항목이 받을 날(계약 7일 뒤)과 함께 생긴다', s3.fees.length >= 1 && s3.fees.every((f) => /^\d{4}-\d{2}-\d{2}$/.test(f.dueDate)), JSON.stringify(s3.fees.map((f) => [f.label, f.amount, f.dueDate])))
   check('계약 완료: 계약 완료 칸으로', ((await page.getByTestId('sales-board').locator('[data-sales-col="contracted"]').innerText()) ?? '').includes('보드시험테크'))
+  // D-210: 계약한 업체를 보드에서 계약 전 단계로 옮기지 못한다(머리줄 '계약 완료' · 보드 '진행 중' 두 상태가 되던 것)
+  {
+    const sel = page.getByTestId('sales-board').getByLabel('보드시험테크 영업 단계')
+    const dis = await sel.locator('option').evaluateAll((els) => els.filter((o) => o.disabled).map((o) => o.value))
+    check('D-210 보드: 계약한 업체는 계약 전 단계(클로징 · 이탈 등)를 고를 수 없다 · 계약 완료는 그대로', dis.includes('closing') && dis.includes('lost') && !dis.includes('contracted'), dis.join(','))
+  }
   await page.getByRole('navigation', { name: '주 메뉴' }).getByRole('link', { name: /^일정/ }).click()
   await page.waitForTimeout(700)
   check('계약 완료: 메뉴 숫자(계약 고객)가 하나 는다', Number(await clientsBadge(page)) === before2 + 1, `${before2} → ${await clientsBadge(page)}`)

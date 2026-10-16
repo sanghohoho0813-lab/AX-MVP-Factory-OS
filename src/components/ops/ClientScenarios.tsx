@@ -9,8 +9,10 @@
  *  3. 자료를 받으면 판단 — 영업이익 · 이익잉여금처럼 숫자가 없으면 받을 자료를 한 장의 요청 문구로.
  *  4. 이 업체엔 안 맞는 상황 — 까닭과 함께 접어 둔다(대표 답 때문이면 '답 바꾸기').
  *  - 계산은 services/scenarios.ts(모듈 화면과 같은 엔진) · 기준은 services/scenarioFit.ts. 규칙 계산 — 'AI' 라고 부르지 않는다.
+ *  - D-210: 답하는 동안과 바로 뒤에는 다른 답을 받지 않는다(질문 줄이 빠지며 아래 질문이 손가락 밑으로 올라와 두 번 눌림 = 엉뚱한 답).
+ *    '예' 로 새로 맞게 된 상황은 펼쳐 그 자리로 옮기고 '방금 열림' 표시 — 위쪽 목록에 조용히 생겨 못 보던 것.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, CalendarPlus, Check, ChevronDown, MessageSquareText, Minus } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
@@ -18,12 +20,15 @@ import { Button } from '../ui/Button'
 import { Badge, Section, type Tone } from '../ui/primitives'
 import { SCENARIO_MODULE_LABEL, type ScenarioModule } from '../../services/scenarioPresets'
 import { SCENARIO_STATE_LABEL, fitDataRequest, runScenarios, scenariosRequest, type ScenarioRun, type ScenarioState } from '../../services/scenarios'
-import { SCENARIO_QUESTIONS, scenarioAnswer, type QuestionKey } from '../../services/scenarioFit'
+import { SCENARIO_QUESTIONS, scenarioAnswer, withScenarioAnswer, type QuestionKey } from '../../services/scenarioFit'
+import { nowIso } from '../../lib/appClock'
 
 const STATE_TONE: Record<ScenarioState, Tone> = { ready: 'success', partial: 'brand', need: 'warning' }
 const FIRST = 6
 /** 질문은 처음에 세 개만 — 한꺼번에 아홉 개를 묻지 않는다(나머지는 '질문 더 보기') */
 const FIRST_Q = 3
+/** 답한 뒤 목록이 움직이는 동안 다음 누름을 받지 않는 시간 */
+const ANSWER_LOCK_MS = 600
 
 /** '회사 정보 · 자산', '회사 정보 · 부채' … → '회사 정보(자산 · 부채 …)' — 같은 출처는 한 번만 */
 function tidyFilled(list: readonly string[]): string {
@@ -50,8 +55,8 @@ export function ClientScenarios({
   usable: (module: ScenarioModule) => boolean
   onRequestText?: (text: string) => void
   onSetNext: (text: string) => void
-  /** 대표 답 저장(null 이면 지움 — 답 바꾸기). 없으면 질문만 보여 준다 */
-  onAnswer?: (q: QuestionKey, a: 'yes' | 'no' | null) => void
+  /** 대표 답 저장(null 이면 지움 — 답 바꾸기). 없으면 질문만 보여 준다. 약속을 돌려주면 저장이 끝날 때까지 다른 답을 막는다 */
+  onAnswer?: (q: QuestionKey, a: 'yes' | 'no' | null) => void | Promise<unknown>
 }) {
   const runs = useMemo(() => runScenarios(record, today, usable, true), [record, today, usable])
   const fits = useMemo(() => runs.filter((r) => r.fit.kind === 'fit'), [runs])
@@ -62,6 +67,41 @@ export function ClientScenarios({
   const [open, setOpen] = useState<string | null>(null)
   const [more, setMore] = useState(false)
   const [moreQ, setMoreQ] = useState(false)
+  /** 저장 중인 답(그동안 예 · 아니요 · 답 바꾸기 모두 막음) */
+  const [busy, setBusy] = useState<QuestionKey | null>(null)
+  const lockUntil = useRef(0)
+  /** '예' 로 새로 맞게 된 상황 — 펼쳐 그 자리로 옮기고 잠깐 표시 */
+  const [flash, setFlash] = useState<string[]>([])
+  const scrolledFor = useRef<string | null>(null)
+  /** '예' 로 답했는데 새로 맞는 상황이 없을 때 한 줄로 알림 */
+  const [note, setNote] = useState('')
+  const answer = async (q: QuestionKey, a: 'yes' | 'no' | null) => {
+    if (!onAnswer || busy !== null || Date.now() < lockUntil.current) return
+    // 답한 뒤 맞게 될 상황을 같은 엔진으로 미리 셈 — 저장 순서와 상관없이 무엇이 새로 열리는지 안다
+    const before = new Set(fits.map((r) => r.id))
+    let opened: string[] = []
+    try {
+      opened = runScenarios(withScenarioAnswer(record, q, a, nowIso()), today, usable, true)
+        .filter((r) => r.fit.kind === 'fit' && !before.has(r.id))
+        .map((r) => r.id)
+    } catch {
+      opened = []
+    }
+    setBusy(q)
+    setNote('')
+    try {
+      await onAnswer(q, a)
+    } finally {
+      lockUntil.current = Date.now() + ANSWER_LOCK_MS
+      setBusy(null)
+    }
+    if (opened.length > 0) {
+      scrolledFor.current = null
+      setFlash(opened)
+    } else if (a === 'yes') {
+      setNote('답을 반영했어요 — 새로 맞게 된 상황은 없어요(자료가 더 필요하거나 다른 조건이 걸려 있어요).')
+    }
+  }
   const modules = useMemo(() => [...new Set(fits.map((r) => r.module))], [fits])
   // D-209: 고른 모듈이 '맞는 상황' 에서 빠지면(답을 바꿈) 전체로 — 예전에는 빈 목록에 갇혀 '전체' 칩도 사라졌다
   const active: ScenarioModule | 'all' = mod !== 'all' && modules.includes(mod) && modules.length > 1 ? mod : 'all'
@@ -71,6 +111,33 @@ export function ClientScenarios({
   }, [mod, active])
   const shown = active === 'all' ? fits : fits.filter((r) => r.module === active)
   const list = more || active !== 'all' ? shown : shown.slice(0, FIRST)
+  // 새로 열린 상황이 거른 목록 밖이거나 '더 보기' 뒤에 있으면 보이게 — 펼쳐서 그 줄로
+  const flashKey = flash.join(',')
+  useEffect(() => {
+    if (!flash.length || scrolledFor.current === flashKey) return
+    const first = fits.find((r) => flash.includes(r.id))
+    if (!first) return
+    if (active !== 'all' && first.module !== active) {
+      setMod('all')
+      return
+    }
+    if (!more && active === 'all' && fits.indexOf(first) >= FIRST) {
+      setMore(true)
+      return
+    }
+    scrolledFor.current = flashKey
+    setOpen(first.id)
+    requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLElement>(`[data-testid="scenario-row"][data-id="${CSS.escape(first.id)}"]`)
+      el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    })
+  }, [flash, flashKey, fits, active, more])
+  // 표시는 잠깐만
+  useEffect(() => {
+    if (!flash.length) return
+    const t = window.setTimeout(() => setFlash([]), 6000)
+    return () => window.clearTimeout(t)
+  }, [flash])
   const ready = fits.filter((r) => r.state === 'ready').length
   const allRequest = useMemo(() => scenariosRequest(record, fits.filter((r) => r.state === 'need')), [record, fits])
   const dataRequest = useMemo(() => fitDataRequest(record, datas), [record, datas])
@@ -143,7 +210,9 @@ export function ClientScenarios({
                   onToggle={() => setOpen((x) => (x === r.id ? null : r.id))}
                   onRequestText={onRequestText}
                   onSetNext={onSetNext}
-                  onUndo={r.fit.answered && onAnswer ? () => onAnswer(r.fit.answered!, null) : undefined}
+                  onUndo={r.fit.answered && onAnswer ? () => void answer(r.fit.answered!, null) : undefined}
+                  fresh={flash.includes(r.id)}
+                  busy={busy !== null}
                 />
               ))}
             </ul>
@@ -168,6 +237,11 @@ export function ClientScenarios({
               물어보면 열리는 상황 <span className="text-slate-500">{asks.length}</span>
             </p>
             <p className="t-meta break-keep text-slate-600">기록에 없는 사정이에요. '예' 를 누르면 그 상황을 이 업체 숫자로 설계해요.</p>
+            {note && (
+              <p className="t-meta break-keep text-slate-700" role="status" data-testid="scenario-answer-note">
+                {note}
+              </p>
+            )}
             <ul className="flex flex-col gap-2">
               {(moreQ ? questions : questions.slice(0, FIRST_Q)).map(([q, v]) => (
                 <li key={q} className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 sm:flex-row sm:items-center" data-testid="scenario-question" data-q={q}>
@@ -178,10 +252,10 @@ export function ClientScenarios({
                   </span>
                   {onAnswer && (
                     <span className="flex shrink-0 gap-1.5">
-                      <Button size="sm" variant="secondary" onClick={() => onAnswer(q, 'yes')} data-testid="scenario-answer-yes">
+                      <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void answer(q, 'yes')} data-testid="scenario-answer-yes">
                         예
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => onAnswer(q, 'no')} data-testid="scenario-answer-no">
+                      <Button size="sm" variant="ghost" disabled={busy !== null} onClick={() => void answer(q, 'no')} data-testid="scenario-answer-no">
                         아니요
                       </Button>
                     </span>
@@ -241,7 +315,7 @@ export function ClientScenarios({
                     <b className="font-semibold text-slate-800">{r.title}</b> — {r.fit.why}
                   </span>
                   {r.fit.answered && onAnswer && scenarioAnswer(record, r.fit.answered) !== null && (
-                    <button type="button" onClick={() => onAnswer(r.fit.answered!, null)} className="tap t-meta font-semibold text-brand-700 hover:underline" data-testid="scenario-undo">
+                    <button type="button" disabled={busy !== null} onClick={() => void answer(r.fit.answered!, null)} className="tap t-meta font-semibold text-brand-700 hover:underline disabled:opacity-50" data-testid="scenario-undo">
                       답 바꾸기
                     </button>
                   )}
@@ -262,6 +336,8 @@ function ScenarioRow({
   onRequestText,
   onSetNext,
   onUndo,
+  fresh = false,
+  busy = false,
 }: {
   r: ScenarioRun
   open: boolean
@@ -269,14 +345,30 @@ function ScenarioRow({
   onRequestText?: (text: string) => void
   onSetNext: (text: string) => void
   onUndo?: () => void
+  /** 방금 '예' 로 열린 상황 */
+  fresh?: boolean
+  busy?: boolean
 }) {
   // 머리글과 같은 줄은 펼친 곳에서 다시 쓰지 않는다
   const lines = r.lines.filter((l) => l !== r.headline)
   return (
-    <li className="flex min-w-0 flex-col rounded-(--radius-card) border border-slate-200 bg-white" data-testid="scenario-row" data-id={r.id} data-module={r.module} data-state={r.state} data-fit={r.fit.kind}>
+    <li
+      className={`flex min-w-0 scroll-mt-32 flex-col rounded-(--radius-card) border bg-white transition-shadow ${fresh ? 'border-success-400 ring-2 ring-success-300' : 'border-slate-200'}`}
+      data-testid="scenario-row"
+      data-id={r.id}
+      data-module={r.module}
+      data-state={r.state}
+      data-fit={r.fit.kind}
+      data-fresh={fresh ? '1' : undefined}
+    >
       <button type="button" onClick={onToggle} aria-expanded={open} className="tap flex w-full min-w-0 items-start gap-3 px-4 py-3 text-left hover:bg-slate-50" data-testid="scenario-toggle">
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            {fresh && (
+              <Badge tone="success">
+                <span data-testid="scenario-fresh">방금 열림</span>
+              </Badge>
+            )}
             <Badge tone="neutral">{r.moduleLabel}</Badge>
             <span className="t-body min-w-0 font-bold break-keep text-slate-900 [overflow-wrap:anywhere]">{r.title}</span>
           </span>
@@ -362,7 +454,7 @@ function ScenarioRow({
               <CalendarPlus aria-hidden="true" className="size-4" /> 다음 약속으로
             </Button>
             {onUndo && (
-              <Button size="sm" variant="ghost" onClick={onUndo} data-testid="scenario-undo">
+              <Button size="sm" variant="ghost" disabled={busy} onClick={onUndo} data-testid="scenario-undo">
                 답 바꾸기
               </Button>
             )}

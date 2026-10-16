@@ -83,12 +83,26 @@ export function CalendarQuickSheet({
     if (ok) onClose()
   }
 
+  // D-210: 적던 것이 있으면 닫기(Esc · X · 뒤로) 전에 묻는다 — 예전에는 반복 설정까지 말없이 사라졌다
+  const [confirmClose, setConfirmClose] = useState(false)
+  const requestClose = () => (text.trim() !== '' || offName.trim() !== '' ? setConfirmClose(true) : onClose())
+
   return (
     <BottomSheet
       title={`${dateLabel(date)} — 적기`}
-      onClose={onClose}
+      onClose={requestClose}
       footer={
-        tab === 'todo' ? (
+        confirmClose ? (
+          <div role="alertdialog" aria-label="적던 것 닫기 확인" data-testid="quick-close-confirm" className="flex flex-col gap-2">
+            <p className="t-body font-semibold break-keep text-slate-900">적던 것이 있어요. 닫으면 사라져요.</p>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button onClick={onClose}>버리고 닫기</Button>
+              <Button variant="primary" onClick={() => setConfirmClose(false)}>
+                계속 적기
+              </Button>
+            </div>
+          </div>
+        ) : tab === 'todo' ? (
           <Button variant="primary" onClick={() => void saveTodo()} disabled={!text.trim() || busy} className="w-full" data-testid="quick-save-todo">
             {busy ? '넣는 중…' : dates.length > 1 ? `할 일 ${dates.length}개 넣기` : '할 일 넣기'}
           </Button>

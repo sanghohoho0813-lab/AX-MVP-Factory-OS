@@ -75,7 +75,7 @@ import {
   withSalesInfo,
   withSalesStage,
 } from '../salesPipeline'
-import { closingRoundOf, salesStageLabelOf, withClosingRound } from '../salesPipeline'
+import { closingRoundOf, salesMoveBlocked, salesStageLabelOf, withClosingRound } from '../salesPipeline'
 import { SALES_FLOW_STAGES, SALES_STAGE_ORDER } from '../../types/clientOps'
 import { SALES_TABS, SALES_TAB_PATHS } from '../../config/salesTabs'
 import {
@@ -141,7 +141,7 @@ import { formatYmd, profileAsText, yearsInBusiness } from '../clientOpsProfile'
 import { SERVICE_STATUS_ORDER, isServiceOpen, isServiceNotApplicable, normalizeServiceStatus } from '../../content/clientOpsCatalog'
 import { BUILTIN_SERVICES, SERVICES, builtinServicesHidden, clearBuiltinServiceUse, isServiceTouched, noteBuiltinServiceUse, registerCustomServices, setBuiltinServicesHidden } from '../../content/clientOpsCatalog'
 import type { CustomerEvent, JournalEntry, PortalClientLink, PortalDocument, PortalRequest, PortalUpdate } from '../../types/bridge'
-import { entityKindOf, orderForPicker, pickerGroups } from '../clientOrder'
+import { compactName, compareCompanyName, entityKindOf, orderForPicker, pickerGroups } from '../clientOrder'
 
 let passed = 0
 let failed = 0
@@ -1963,6 +1963,8 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('계약 완료: 고른 업무는 진행 중으로', closed.services.venture.status === 'in_progress' && closed.services.policyFund.status === 'in_progress')
   const twice = withContractClose(closed, { ...withProducts, agentName: '', agentRatePct: null, kind: 'mixed', monthlyPremium: 3_000_000 }, at)
   check('계약 완료: 두 번 눌러도 수금 · 보험이 두 번 생기지 않는다', twice.fees.length === 2 && twice.contract.policies.length === 1)
+  const noAgent = withContractClose(lead, { ...withProducts, agentName: '  ', agentRatePct: 10, kind: 'cash', monthlyPremium: null }, at)
+  check('D210 계약 완료: 영업자 이름을 비우면 수수료도 없다(이름 없는 10% 가 붙지 않음)', noAgent.fees.length === 2 && noAgent.fees.every((f) => f.agentFee === null && f.agentName === ''), JSON.stringify(noAgent.fees.map((f) => [f.agentFee, f.agentName])))
   check('계약 · 수금 차이: 같으면 없음 · 다르면 차이', contractGap(closed) === null && contractGap({ ...closed, contract: { ...closed.contract, cashAmount: 10_000_000 } })?.gap === 2_000_000)
   check('계약 경로 → 방식: 현금 · 법인보험 · 종합', PATH_TO_KIND.cash === 'cash' && PATH_TO_KIND.insurance === 'insurance' && PATH_TO_KIND.total === 'mixed')
 
@@ -2275,6 +2277,31 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('D-188 대표 화면: 기본 6종 그대로 + 내 항목', BUILTIN_SERVICES.every((b) => SERVICES.some((x) => x.key === b.key)) && SERVICES.some((x) => x.key === 'custom_lab'))
   check('D-188 대표 화면 계약 완료: 예전처럼 이름으로 기본 항목(특허) + 같은 이름 내 항목', JSON.stringify(servicesForProducts(['기업부설연구소 설립 패키지', '특허/상표/디자인권 검토']).sort()) === JSON.stringify(['custom_lab', 'patent'].sort()))
   registerCustomServices([])
+}
+
+// D-210 — 영업 단계 머문 날은 달력 날짜 · 계약한 업체는 영업 화면에서 계약 전으로 안 옮김 · 이름 찾기 · 가나다 순
+{
+  const prevTz = process.env.TZ
+  process.env.TZ = 'Asia/Seoul'
+  // 어제(10/15) 밤 11시에 옮긴 것 — 오늘(10/16) 아침 9시
+  const moved = { sales: { movedAt: '2026-10-15T14:00:00.000Z' } } as never
+  check('D210 영업 단계: 어제 밤에 옮긴 것은 오늘 아침 "1일째"(오늘 옮김 아님)', daysInStage(moved, new Date('2026-10-16T00:00:00.000Z')) === 1, String(daysInStage(moved, new Date('2026-10-16T00:00:00.000Z'))))
+  check('D210 영업 단계: 같은 날은 0', daysInStage(moved, new Date('2026-10-15T14:30:00.000Z')) === 0)
+  if (prevTz === undefined) delete process.env.TZ
+  else process.env.TZ = prevTz
+
+  const signed = normalizeClientOps({ id: 'd210s', companyName: '계약상사', status: 'active' } as never)
+  const pre = normalizeClientOps({ id: 'd210p', companyName: '잠재상사', status: 'waiting' } as never)
+  check('D210 계약한 업체: 계약 전 단계(클로징 · 이탈)로는 막힘 · 계약 완료는 그대로', salesMoveBlocked(signed, 'closing') !== null && salesMoveBlocked(signed, 'lost') !== null && salesMoveBlocked(signed, 'contracted') === null)
+  check('D210 계약 전 업체는 어디로든', salesMoveBlocked(pre, 'closing') === null && salesMoveBlocked(pre, 'lost') === null)
+
+  const ga = normalizeClientOps({ id: 'g1', companyName: '주식회사 가나 테크' } as never)
+  check('D210 찾기: (주)가나테크 → 주식회사 가나 테크', matchesClientSearch(ga, '(주)가나테크') && matchesClientSearch(ga, '가나테크') && matchesClientSearch(ga, '㈜가나'))
+  check('D210 찾기: 다른 이름은 안 맞음', !matchesClientSearch(ga, '다라테크'))
+  const names = ['', '(주)마바', '가나다', '주식회사 다라', '㈜나라']
+  const sorted = [...names].sort(compareCompanyName)
+  check('D210 가나다 순: (주) · 주식회사 빼고 · 빈 이름은 맨 뒤', JSON.stringify(sorted) === JSON.stringify(['가나다', '㈜나라', '주식회사 다라', '(주)마바', '']), JSON.stringify(sorted))
+  check('D210 compactName', compactName('(주) 가나 테크') === '가나테크' && compactName('주식회사가나') === '가나')
 }
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

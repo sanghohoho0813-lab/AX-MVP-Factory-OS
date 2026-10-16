@@ -54,7 +54,7 @@ import {
   daySummaryText,
 } from '../services/dailyBriefService'
 import { agendaWhen, buildAgenda, type AgendaItem } from '../services/upcomingAgenda'
-import { nowDate, todayLocalDate } from '../lib/appClock'
+import { localDateOf, nowDate, todayLocalDate } from '../lib/appClock'
 import { krwTile } from '../lib/format'
 import { getDataModeConfig } from '../data/dataMode'
 import { Fold } from '../components/ui/fold'
@@ -217,7 +217,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const alerts = useMemo(() => buildAllAlerts(clients, today), [clients, today])
   const schedule = useMemo(() => buildAllSchedule(clients, today), [clients, today])
   // '이번 주 마감' 은 마감만 — 다음 약속(D-120)은 아래 '약속' 줄에 따로
-  const weekDue = useMemo(() => upcomingWithin(schedule, 7).filter((e) => !e.done && e.kind !== 'next'), [schedule])
+  // D-210: '이번 주' 는 오늘 ~ 6일 뒤(7일) — 아래 '이번 주 받을 것' 과 같은 기간(예전: 8일을 셌다)
+  const weekDue = useMemo(() => upcomingWithin(schedule, 6).filter((e) => !e.done && e.kind !== 'next'), [schedule])
   /** 계약 전 업체 — 약속 줄에서 '미팅 준비' 로, 나머지는 '업체 열기' 로 */
   const prospectIds = useMemo(() => new Set(clients.filter(isProspect).map((c) => c.id)), [clients])
   /** 다음 약속 — 지난 것 · 오늘 · 내일 (D-120). 날짜 순 */
@@ -299,7 +300,11 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const byCreated = (a: JournalEntry, b: JournalEntry) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)
   const overdueTodos = useMemo(() => openTodos.filter((e) => e.dueDate < today).sort(byCreated), [openTodos, today])
   const todayTodos = useMemo(() => openTodos.filter((e) => e.dueDate >= today).sort(byCreated), [openTodos, today])
-  const doneTodos = useMemo(() => dueToday.filter((e) => e.completed), [dueToday])
+  // D-210: '끝낸 것' 은 오늘 끝낸 할 일 — 예전에는 기한이 지난 끝낸 할 일을 전부(몇 달 치) 세고, 미리 끝낸 다음 주 할 일은 빠졌다
+  const doneTodos = useMemo(
+    () => journal.filter((j) => j.entryType === 'follow_up' && j.completed && j.completedAt !== null && localDateOf(j.completedAt) === today),
+    [journal, today],
+  )
   const todoCount = openTodos.length
 
   const clientNameOf = (id: string) => clientNames.get(id)

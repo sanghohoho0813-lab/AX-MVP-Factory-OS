@@ -157,7 +157,9 @@ export function useDecisionAnswer({
             ? `요청 문구를 복사하고 고객 화면에도 서류 ${posted}건을 요청했습니다`
             : d.doneText
               ? d.doneText
-              : d.effect.type === 'fact'
+              : d.effect.type === 'clear-corp-number'
+                ? '법인등록번호 칸을 비웠습니다'
+                : d.effect.type === 'fact'
                 ? '업체 정보에 넣었습니다'
                 : d.effect.type === 'todo'
                   ? `할 일로 걸었습니다 — ${weekdayOnOrAfter(addDaysLocal(today, d.effect.dueInDays)).slice(5).replace('-', '/')}`
@@ -188,7 +190,8 @@ export function useDecisionAnswer({
     let ok = 0
     try {
       for (const d of ds) {
-        if (d.effect.type === 'copy') continue
+        // 지우는 결정(주민등록번호일 수 있는 법인번호)은 한 번에 처리하지 않는다 — 하나씩 보고 누른다
+        if (d.effect.type === 'copy' || d.effect.type === 'clear-corp-number') continue
         const rec = fresh.get(d.clientId) ?? latest(d.clientId)
         if (!rec) continue
         // 할 일 먼저 — 기록 저장이 실패하면 지운다

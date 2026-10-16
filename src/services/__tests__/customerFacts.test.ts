@@ -12,7 +12,7 @@ import { normalizeClientOps, withCustomDocument, withDocument, withDocUploadLog,
 import { buildDecisions, undoDecision, withDecisionAnswer, isImportantFactKey } from '../decisions'
 import { docUploadLogOf, batchOfLog } from '../docAutoAnalyze'
 import { newestOf, otherCellSuggestion, withDedupedShelf } from '../docShelf'
-import { NOTE_RECHECK, withRecheckFacts } from '../customerFacts'
+import { NOTE_RECHECK, withProfileFieldTyped, withRecheckFacts } from '../customerFacts'
 import { allDocumentMetas } from '../clientOpsDocuments'
 import { OTHER_DOC_LABEL, documentTitle, findIssuedDate, findValidUntil, knownDocValidMonths, placeDocument, titleFromFileName } from '../docClassify'
 import { smeSizeOf } from '../certDocParser'
@@ -924,6 +924,53 @@ await (async () => {
   const mv = moveDocTo({ ...r4, factInbox: [fc('m1', 'doc:smeCertificate:t:0')] }, 'smeCertificate', 'new:벤처기업확인서')
   const mvKey = mv ? Object.entries(mv.record.documents).find(([, v]) => v?.fileName === 'sme.pdf')?.[0] : undefined
   check('D209-10 다른 칸으로 옮기면 올린 때 · 확인할 정보도 따라감', !!mvKey && mv?.record.documents[mvKey as never]?.uploadedAt === r4.documents.smeCertificate.uploadedAt && mv?.record.factInbox[0]?.ref.startsWith(`doc:${mvKey}:`) === true, { mvKey, inbox: mv?.record.factInbox })
+}
+
+// D-210 — '확인할 것' 다시 묻는 날은 로컬 날짜로 · 업체 정보 수정 칸은 출처를 '직접 적음' 으로
+{
+  const prevTz = process.env.TZ
+  process.env.TZ = 'Asia/Seoul'
+  const base = normalizeClientOps({
+    id: 'd210m',
+    companyName: '돈받을상사',
+    status: 'active',
+    fees: [{ id: 'f1', serviceKey: null, kind: 'deposit', label: '계약금', amount: 1_000_000, agentFee: null, agentName: '', agentPaidAt: null, dueDate: '2026-10-01', receivedAt: null, note: '' }],
+  } as never)
+  const moneyId = buildDecisions(base, '2026-10-16', []).find((d) => d.kind === 'money')?.id ?? ''
+  // 한국 10/16 오전 8:30 에 '나중에' — UTC 로는 10/15
+  const answered = { ...base, decided: { [moneyId]: { a: 'no' as const, at: '2026-10-15T23:30:00.000Z' } } }
+  const day13 = buildDecisions(answered, '2026-10-29', []).some((d) => d.id === moneyId)
+  const day14 = buildDecisions(answered, '2026-10-30', []).some((d) => d.id === moneyId)
+  check('D210-1 받을 돈 "나중에" — 한국 날짜로 14일 뒤에 다시 묻는다(하루 일찍 묻지 않음)', moneyId !== '' && !day13 && day14, `${moneyId} ${day13} ${day14}`)
+  if (prevTz === undefined) delete process.env.TZ
+  else process.env.TZ = prevTz
+
+  const fromDoc = { ...normalizeClientOps({ id: 'd210f', companyName: '서류상사' } as never), businessNumber: '124-81-00998', factMeta: { businessNumber: { source: 'businessRegistration', status: 'confirmed', asOf: '', confirmedAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z' } } } as ClientOpsRecord
+  const typed = withProfileFieldTyped(fromDoc, 'businessNumber', '124-81-00999', '2026-10-16T01:00:00.000Z')
+  check('D210-2 서류로 확인된 번호를 손으로 고치면 출처가 "직접 적음" 으로(확인됨이 남지 않음)', typed.businessNumber === '124-81-00999' && typed.factMeta?.businessNumber?.source === 'manual' && typed.factMeta?.businessNumber?.status === 'entered')
+  const spaced = withProfileFieldTyped(fromDoc, 'businessAddress', '서울 강남구 ', '2026-10-16T01:00:00.000Z')
+  check('D210-3 칠 때마다 저장해도 빈칸이 잘리지 않음(주소를 띄어 쓸 수 있음)', spaced.businessAddress === '서울 강남구 ')
+  check('D210-4 같은 값이면 그대로(확인됨 유지)', withProfileFieldTyped(fromDoc, 'businessNumber', '124-81-00998', 'x') === fromDoc)
+  const cleared = withProfileFieldTyped(fromDoc, 'businessNumber', '', 'x')
+  check('D210-5 비우면 출처도 지움', cleared.businessNumber === '' && cleared.factMeta?.businessNumber === undefined)
+  check('D210-6 사실이 아닌 칸(담당자 이름)은 값만', withProfileFieldTyped(fromDoc, 'contactName', '김 담당', 'x').contactName === '김 담당')
+
+  // 예전 서류 읽기가 개인사업자의 주민등록번호를 법인등록번호 칸에 넣은 기록 — 묻고(번호는 안 보임) · [지우기] 면 칸과 후보를 함께 비움
+  const rrnRec = { ...normalizeClientOps({ id: 'd210r', companyName: '가나상회' } as never), businessNumber: '123-45-67891', corporateNumber: '800101-1234567', factInbox: [{ id: 'fi1', key: 'corporateNumber', value: '800101-1234567', source: 'businessRegistration', asOf: '', ref: 'doc:businessRegistration:x:0', foundAt: '2026-10-01T00:00:00.000Z' }] } as ClientOpsRecord
+  const rrnDs = buildDecisions(rrnRec, '2026-10-16', [])
+  const ask = rrnDs.find((d) => d.effect.type === 'clear-corp-number')
+  check('D210-7 개인사업자 + 법인등록번호 칸 13자리 → 지울지 묻는다(맨 위) · 번호는 화면 글에 없음', !!ask && rrnDs[0] === ask && !`${ask.title}${ask.why}`.includes('1234567'), JSON.stringify(ask?.title))
+  check('D210-8 같은 번호를 "맞나요?" 로 띄우지 않는다', !rrnDs.some((d) => d.effect.type === 'fact' && d.title.includes('800101')))
+  const cleared2 = withDecisionAnswer(rrnRec, ask!, 'yes', [], '2026-10-16T01:00:00.000Z')
+  check('D210-9 [지우기] → 칸 · 확인할 정보 후보 모두 비움 · 다시 묻지 않음', cleared2.corporateNumber === '' && !cleared2.factInbox.some((c) => c.key === 'corporateNumber') && !buildDecisions(cleared2, '2026-10-16', []).some((d) => d.effect.type === 'clear-corp-number'))
+  const kept2 = withDecisionAnswer(rrnRec, ask!, 'no', [], '2026-10-16T01:00:00.000Z')
+  check('D210-10 [법인번호가 맞아요] → 그대로 · 다시 묻지 않음(30일 뒤에도)', kept2.corporateNumber === '800101-1234567' && !buildDecisions(kept2, '2026-11-20', []).some((d) => d.effect.type === 'clear-corp-number'))
+  const corpRec = { ...rrnRec, businessNumber: '124-81-00998', corporateNumber: '110111-0085450', factInbox: [] } as ClientOpsRecord
+  check('D210-11 법인 사업자번호면 묻지 않는다', !buildDecisions(corpRec, '2026-10-16', []).some((d) => d.effect.type === 'clear-corp-number'))
+  const namedCorp = { ...rrnRec, companyName: '한솔테크(주)', corporateNumber: '134511-0022334', factInbox: [] } as ClientOpsRecord
+  check('D210-12 사업자번호를 잘못 적은 법인((주) 이름)은 묻지 않는다(헛경보 없음)', !buildDecisions(namedCorp, '2026-10-16', []).some((d) => d.effect.type === 'clear-corp-number'))
+  const validCorpNo = { ...rrnRec, corporateNumber: '110111-0085450', factInbox: [] } as ClientOpsRecord
+  check('D210-13 법인번호 검증 숫자가 맞는 번호는 묻지 않는다', !buildDecisions(validCorpNo, '2026-10-16', []).some((d) => d.effect.type === 'clear-corp-number'))
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

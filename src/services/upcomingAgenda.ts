@@ -27,7 +27,8 @@ export interface AgendaItem {
   href: string
 }
 
-const LATE_KINDS: ReadonlySet<ScheduleKind> = new Set(['task', 'funding'])
+/** 지나도 30일 동안 '늦음' 으로 보이는 것 — D-210: 도구 기한(못 낸 고용지원금 회차 · 지난 참여신청 기한)도 */
+const LATE_KINDS: ReadonlySet<ScheduleKind> = new Set(['task', 'funding', 'tool'])
 
 function daysFrom(today: string, date: string): number {
   const a = Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1, Number(today.slice(8, 10)))
@@ -53,7 +54,7 @@ export function buildAgenda(o: {
     if (left < 0 && !(LATE_KINDS.has(e.kind) && left >= -30)) continue
     // 위 칸에 이미 있는 것
     if (e.kind === 'next' && left <= 1) continue
-    if (e.kind === 'tool' && e.hard && left <= 7) continue
+    if (e.kind === 'tool' && e.hard && left >= 0 && left <= 7) continue
     const href =
       e.kind === 'next' && prospectIds.has(e.clientId)
         ? `/sales/meeting?client=${e.clientId}`

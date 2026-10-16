@@ -101,6 +101,32 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('반복: 할 일 4줄이 날짜마다', made.join() === '2026-10-12,2026-11-12,2026-12-11,2027-01-12', made.join())
   check('반복: 창이 닫히고 알림', (await page.getByTestId('calendar-quick-sheet').count()) === 0 && (await page.locator('body').innerText()).includes('할 일 4개를 넣었습니다'))
 
+  // D-210: 적던 것이 있으면 Esc · 닫기 전에 묻는다(예전: 반복 설정까지 말없이 사라짐)
+  {
+    await cell(page, '2026-10-13').click()
+    await cell(page, '2026-10-13').click()
+    await page.waitForTimeout(300)
+    await page.getByLabel('할 일 내용').fill('닫기 전에 묻는 글')
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(300)
+    check('D-210 적기 창: 적던 글이 있으면 Esc 에 "닫으면 사라져요" 를 묻는다', (await page.getByTestId('quick-close-confirm').count()) === 1 && (await page.getByTestId('calendar-quick-sheet').count()) === 1)
+    await page.getByRole('button', { name: '계속 적기' }).click()
+    await page.waitForTimeout(200)
+    check('D-210 적기 창: [계속 적기] → 글 그대로', (await page.getByLabel('할 일 내용').inputValue()) === '닫기 전에 묻는 글')
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(300)
+    await page.getByRole('button', { name: '버리고 닫기' }).click()
+    await page.waitForTimeout(300)
+    const leaked = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]').some((x) => x.content === '닫기 전에 묻는 글'))
+    check('D-210 적기 창: [버리고 닫기] → 닫히고 저장 안 됨', (await page.getByTestId('calendar-quick-sheet').count()) === 0 && !leaked)
+    await cell(page, '2026-10-14').click()
+    await cell(page, '2026-10-14').click()
+    await page.waitForTimeout(300)
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(300)
+    check('D-210 적기 창: 아무것도 안 적었으면 묻지 않고 닫힘', (await page.getByTestId('calendar-quick-sheet').count()) === 0)
+  }
+
   // D-171: 고른 날 할 일 적기 — 자주 쓰는 문구 칩 줄 오른쪽 '›' 는 누르면 옆으로 넘어간다(예전엔 단추처럼 보였는데 안 눌렸다) · '‹' 로 돌아온다
   {
     await cell(page, '2026-10-15').click()
@@ -195,9 +221,22 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
   await page.evaluate(() => localStorage.setItem('axmvp.ui.text_scale', JSON.stringify('extra_large')))
+  // D-210: 끝낸 할 일만 있는 날(10/20) · 남은 할 일이 있는 날(10/21)
+  await page.evaluate(() => {
+    const list = JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]')
+    const now = '2026-10-01T03:00:00.000Z'
+    const mk = (id, dueDate, completed) => ({ id, entryType: 'follow_up', content: `점 ${id}`, dueDate, completed, completedAt: completed ? now : null, createdAt: now, updatedAt: now, clientId: null, entryDate: '2026-10-01' })
+    list.push(mk('d210_dot_done', '2026-10-20', true), mk('d210_dot_open', '2026-10-21', false))
+    localStorage.setItem('axmvp.v1.ops_journal_entries', JSON.stringify(list))
+  })
   await page.goto(BASE + '/ops/calendar', { waitUntil: 'networkidle' })
   await page.waitForTimeout(600)
   await goMonth(page, 2026, 10)
+  {
+    const doneDots = await cell(page, '2026-10-20').locator('[data-done]').evaluateAll((els) => els.map((e) => e.getAttribute('data-done')))
+    const openDots = await cell(page, '2026-10-21').locator('[data-done]').evaluateAll((els) => els.map((e) => e.getAttribute('data-done')))
+    check('D-210 360 달력: 끝낸 할 일은 회색 점 · 남은 할 일은 파란 점', doneDots.length >= 1 && doneDots.every((x) => x === '1') && openDots.includes('0'), `${doneDots} / ${openDots}`)
+  }
   await page.getByTestId('holiday-import-open').click()
   await page.waitForTimeout(300)
   await page.getByTestId('holiday-import-save').click()

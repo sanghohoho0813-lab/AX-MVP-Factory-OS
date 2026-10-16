@@ -18,6 +18,7 @@ const localDateOf = (iso: string) => {
 }
 import { yearsInBusiness } from './clientOpsProfile'
 import { monthsSinceContract } from './contractSummary'
+import { compareCompanyName } from './clientOrder'
 
 export type ClientSortKey = 'active' | 'reco' | 'urgency' | 'name' | 'years' | 'contract'
 
@@ -124,7 +125,8 @@ export function sortClients(
       return sortClientsByUrgency(list, today)
     case 'name':
       // 한글 이름은 코드 순서가 아니라 사람이 읽는 순서로 — localeCompare('ko')
-      return list.sort((a, b) => a.companyName.localeCompare(b.companyName, 'ko'))
+      // D-210: '(주)' · '주식회사' 는 빼고 견준다(업체 고르기와 같은 순서) · 이름 없는 업체는 맨 뒤
+      return list.sort((a, b) => compareCompanyName(a.companyName, b.companyName))
     case 'years':
       return list.sort(
         (a, b) =>

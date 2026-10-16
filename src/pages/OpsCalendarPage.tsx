@@ -423,8 +423,9 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                         점만 찍고 내용은 아래 그날 목록에서 읽게 한다. */}
                     <span className="mt-0.5 flex flex-wrap gap-0.5 lg:hidden">
                       {/* 내가 적은 할 일은 브랜드색 점으로 — 마감(회사 일정)과 구분된다 */}
-                      {Array.from({ length: Math.min(todos.length, 3) }, (_, i) => (
-                        <span key={`t${i}`} aria-hidden="true" className="size-1.5 rounded-full bg-brand-500" />
+                      {/* D-210: 끝낸 할 일은 회색 점(업체 일정처럼) — 다 끝낸 날이 할 일 남은 날처럼 보이지 않게 */}
+                      {todos.slice(0, 3).map((t) => (
+                        <span key={`t${t.id}`} aria-hidden="true" data-done={t.completed ? '1' : '0'} className={`size-1.5 rounded-full ${t.completed ? 'bg-slate-200' : 'bg-brand-500'}`} />
                       ))}
                       {list.slice(0, 4).map((e) => (
                         <span

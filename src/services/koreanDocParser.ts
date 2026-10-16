@@ -219,12 +219,57 @@ function findBusinessNumber(t: string): string | undefined {
   return loose ? formatBusinessNumber(loose[1]) : undefined
 }
 
-/** 법인등록번호 (000000-0000000) */
-function findCorporateNumber(t: string): string | undefined {
+/** 법인등록번호 검증 숫자 — 앞 12자리에 1 · 2 를 번갈아 곱한 합 → (10 - 합 % 10) % 10 */
+export function corpNoChecksumOk(value: string): boolean {
+  const d = digits(value).split('').map(Number)
+  if (d.length !== 13) return false
+  let sum = 0
+  for (let i = 0; i < 12; i += 1) sum += d[i] * (i % 2 === 0 ? 1 : 2)
+  return (10 - (sum % 10)) % 10 === d[12]
+}
+
+/** 사업자등록번호 가운데 두 자리로 본 사업자 종류(81~88 법인 · 01~79 · 90~99 개인) */
+export function bizNoKind(bizNo: string | undefined): 'corp' | 'individual' | 'unknown' {
+  const d = digits(bizNo ?? '')
+  if (d.length !== 10) return 'unknown'
+  const mid = Number(d.slice(3, 5))
+  if (mid >= 81 && mid <= 88) return 'corp'
+  if ((mid >= 1 && mid <= 79) || mid >= 90) return 'individual'
+  return 'unknown'
+}
+
+/**
+ * 법인등록번호 (000000-0000000).
+ * D-210: 개인사업자 사업자등록증명의 '주민(법인)등록번호' 칸이나 이름표 없는 13자리는 **주민등록번호**일 수 있다 —
+ * 예전에는 그대로 법인등록번호로 넣어 주민등록번호를 저장했다(절대 규칙 위반). 이제
+ *  - '법인등록번호' 이름표 → 그대로
+ *  - '주민(법인)등록번호' · 등기부 '등록번호' → 법인 서류(사업자번호 가운데 81~88 · 등기부)일 때만
+ *  - 이름표 없는 13자리 → 법인 서류 + 법인번호 검증 숫자가 맞고 + 바로 앞이 사람 이름 · '주민' 이 아닐 때만
+ */
+function findCorporateNumber(t: string, source: DocSource, bizNo: string | undefined): string | undefined {
   const labeled = /법\s*인\s*등\s*록\s*번\s*호\s*[:：]?\s*(\d{6}\s*-\s*\d{7})/.exec(t)
   if (labeled) return formatCorporateNumber(labeled[1])
-  const loose = /\b(\d{6}\s*-\s*\d{7})\b/.exec(t)
-  return loose ? formatCorporateNumber(loose[1]) : undefined
+  const kind = bizNoKind(bizNo)
+  const corpDoc = kind === 'corp' || (source === 'corporate_registry' && kind !== 'individual')
+  if (!corpDoc) return undefined
+  const mixed = /주\s*민\s*\(\s*법\s*인\s*\)\s*등\s*록\s*번\s*호\s*[:：]?\s*(\d{6}\s*-\s*\d{7})/.exec(t)
+  if (mixed) return formatCorporateNumber(mixed[1])
+  // 등기부 맨 위 '등기번호 012345  등록번호 110111-0123456' — 사업자 · 주민 등록번호 이름표는 아님
+  const plain = /(?<![가-힣)]\s*)등\s*록\s*번\s*호\s*[:：]?\s*(\d{6}\s*-\s*\d{7})/.exec(t)
+  if (plain && source === 'corporate_registry') return formatCorporateNumber(plain[1])
+  const re = /\b(\d{6}\s*-\s*\d{7})\b/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(t)) !== null) {
+    // 같은 줄 앞부분만 본다(윗줄 회사 이름을 사람 이름으로 읽지 않게)
+    const before = t.slice(Math.max(0, m.index - 16, t.lastIndexOf('\n', m.index) + 1), m.index)
+    const after = t.slice(m.index + m[0].length, m.index + m[0].length + 12).split('\n')[0]
+    if (/주\s*민/.test(before)) continue
+    // '홍길동 800101-1234567' · '800101-1234567 홍길동' — 사람 이름 옆의 13자리는 주민등록번호
+    if (/[가-힣]{2,6}[ \t]*$/.test(before) && !/(번호|등록)[ \t]*[:：]?[ \t]*$/.test(before)) continue
+    if (/^[ \t]*[가-힣]{2,4}(?:[ \t]|$)/.test(after)) continue
+    if (corpNoChecksumOk(m[1])) return formatCorporateNumber(m[1])
+  }
+  return undefined
 }
 
 /** 회사명 */
@@ -264,18 +309,28 @@ function findRepresentative(t: string, source: DocSource): string | undefined {
   return undefined
 }
 
-/** 대표자 생년월일 — 등기부의 '홍길동 801231-1******' 형태 */
-function findRepresentativeBirth(t: string): string | undefined {
-  // '대표이사 홍길동 801231-1******' 형태만 인정한다.
+/**
+ * 대표자 생년월일 — 등기부의 '홍길동 801231-1******' 형태.
+ * D-210: 등기부에는 이사 · 감사가 여럿 적힌다 — 예전에는 처음 나온 사람의 생년월일을 대표 것으로 넣었다.
+ * 대표 이름을 알면 그 이름이 붙은 것만, 모르면 '대표' 가 붙은 줄의 것만 쓴다.
+ */
+function findRepresentativeBirth(t: string, repName: string | undefined): string | undefined {
   // 성별코드 뒤에 마스킹(*)이 오거나 6자리가 더 이어져야 주민등록번호로 본다.
   const re = /([가-힣]{2,6})\s+(\d{6})\s*[-–]\s*([1-8])(\*{4,7}|\d{6})/g
   let m: RegExpExecArray | null
+  const found: { name: string; birth: string; line: string }[] = []
   while ((m = re.exec(t)) !== null) {
     // '법인등록번호 131111-0098765' 같은 항목은 이름이 아니므로 제외
     if (/번호$|번호\s*$/.test(m[1])) continue
     const b = birthFromRrnPrefix(m[2], m[3])
-    if (b) return b
+    if (!b) continue
+    const lineStart = t.lastIndexOf('\n', m.index) + 1
+    found.push({ name: m[1], birth: b, line: t.slice(lineStart, m.index) })
   }
+  const mine = repName ? found.find((f) => f.name === repName) : found.find((f) => /대\s*표/.test(f.line))
+  if (mine) return mine.birth
+  // 사람이 한 명뿐이면 그 사람(개인사업자 등록증 · 대표만 적힌 서류)
+  if (found.length === 1 && (!repName || found[0].name === repName)) return found[0].birth
   const labeled = valueAfter(t, '생\\s*년\\s*월\\s*일')
   return labeled ? parseKoreanDate(labeled) : undefined
 }
@@ -357,10 +412,12 @@ export function parseKoreanBusinessDocument(raw: string): ParsedCompanyInfo {
   }
 
   set('companyName', findCompanyName(t, source))
-  set('businessNumber', findBusinessNumber(t))
-  set('corporateNumber', findCorporateNumber(t))
-  set('representativeName', findRepresentative(t, source))
-  set('representativeBirth', findRepresentativeBirth(t))
+  const bizNo = findBusinessNumber(t)
+  set('businessNumber', bizNo)
+  set('corporateNumber', findCorporateNumber(t, source, bizNo))
+  const rep = findRepresentative(t, source)
+  set('representativeName', rep)
+  set('representativeBirth', findRepresentativeBirth(t, rep))
   set('establishedAt', findEstablishedAt(t, source))
   set('address', findAddress(t, source))
 

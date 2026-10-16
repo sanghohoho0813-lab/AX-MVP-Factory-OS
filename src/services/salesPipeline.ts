@@ -239,7 +239,9 @@ export function daysInStage(record: Pick<ClientOpsRecord, 'sales'>, now: Date = 
   if (!at) return null
   const t = Date.parse(at)
   if (!Number.isFinite(t)) return null
-  return Math.max(0, Math.floor((now.getTime() - t) / 86_400_000))
+  // D-210: 달력 날짜로 센다 — 24시간 단위로 세면 어제 밤 11시에 옮긴 것이 오늘 아침에도 '오늘 옮김' 이었다
+  const days = Math.round((Date.parse(localDate(now)) - Date.parse(localDate(new Date(t)))) / 86_400_000)
+  return Math.max(0, days)
 }
 
 /* ------------------------------------------------------------------ */
@@ -281,6 +283,16 @@ export function withSalesStage(record: ClientOpsRecord, stage: SalesStage, at: s
     next = { ...next, nextAction: '', nextActionDueDate: '' }
   }
   return withActivity(next, 'sales', text, null, at)
+}
+
+/**
+ * D-210: 계약한 업체(계약 완료 · 종료)는 영업 화면에서 계약 전 단계로 옮기지 않는다 — 옮기면 머리줄은 '계약 완료',
+ * 보드는 '진행 중'(예상 수임료에도 더해짐)인 두 상태가 됐다. 계약을 되돌리는 것은 업체 화면 '계약 상태' 에서 한 곳으로.
+ * 막힌 까닭(화면에 보일 말)을 돌려준다. 막히지 않으면 null.
+ */
+export function salesMoveBlocked(record: Pick<ClientOpsRecord, 'status' | 'companyName'>, stage: SalesStage): string | null {
+  if (stage === 'contracted' || contractStageOf(record.status) === 'pre') return null
+  return `${record.companyName || '이 업체'} — 계약 완료 업체예요. 계약 전으로 되돌리려면 업체 화면의 '계약 상태' 에서 바꿔 주세요.`
 }
 
 export type SalesInfoPatch = Partial<Pick<SalesInfo, 'source' | 'referrer' | 'interests' | 'concern' | 'expectedFee' | 'grantQuery' | 'picks'>>

@@ -4,6 +4,8 @@
  */
 
 import {
+  bizNoKind,
+  corpNoChecksumOk,
   birthFromRrnPrefix,
   detectDocSource,
   formatBusinessNumber,
@@ -197,6 +199,25 @@ check('판별: 알 수 없음', detectDocSource('그냥 아무 글') === 'unknow
   check('실물: 나머지 종목 6개 보관', (r.businessItemsExtra ?? '').split(' · ').length === 6, r.businessItemsExtra)
   check('실물: 나머지 종목에 대표 종목이 없다', !(r.businessItemsExtra ?? '').includes('간판 및'), r.businessItemsExtra)
   check('실물: 어떤 값도 문단이 되지 않는다', [r.address, r.businessCategory, r.businessItem].every((v) => (v ?? '').length < 80))
+}
+
+// D-210 — 주민등록번호를 법인등록번호로 넣지 않는다(절대 규칙) · 대표 생년월일은 대표 줄에서만
+{
+  const indiv = parseKoreanBusinessDocument(['사업자등록증명', '등록번호 : 123-45-67891', '상호 : 가나상회', '성명 : 홍길동', '주민(법인)등록번호 800101-1234567', '개업연월일 : 2020 년 03 월 02 일'].join('\n'))
+  check('D210 개인사업자 주민(법인)등록번호 → 법인번호로 넣지 않음', indiv.corporateNumber === undefined, indiv.corporateNumber)
+  const loose = parseKoreanBusinessDocument(['사업자등록증', '등록번호 : 123-45-67891', '상호 : 가나상회', '대표자 : 홍길동', '홍길동 800101-1234567', '개업연월일 : 2020 년 03 월 02 일'].join('\n'))
+  check('D210 이름표 없는 13자리(사람 이름 뒤 · 개인사업자) → 법인번호 아님', loose.corporateNumber === undefined, loose.corporateNumber)
+  const corpMixed = parseKoreanBusinessDocument(['사업자등록증명', '등록번호 : 124-81-00998', '법인명(단체명) : 미래바이오랩', '대표자 : 이대표', '주민(법인)등록번호 110111-0085450'].join('\n'))
+  check('D210 법인(가운데 81) 주민(법인)등록번호 → 법인번호로', corpMixed.corporateNumber === '110111-0085450', corpMixed.corporateNumber)
+  const reg = parseKoreanBusinessDocument(['등기사항전부증명서(현재 유효사항)', '등기번호 012345', '등록번호 110111-1234567', '상 호 미래바이오랩', '사내이사 이수민 850505-2******', '대표이사 박지훈 801231-1******', '회사성립연월일 2015 년 03 월 02 일'].join('\n'))
+  check('D210 등기부 등록번호 → 법인번호(검증 숫자 몰라도 이름표로)', reg.corporateNumber === '110111-1234567', reg.corporateNumber)
+  check('D210 등기부 — 대표 생년월일은 대표이사 줄(먼저 나온 사내이사 것이 아님)', reg.representativeName === '박지훈' && reg.representativeBirth === '1980-12-31', `${reg.representativeName} ${reg.representativeBirth}`)
+  const regLoose = parseKoreanBusinessDocument(['등기사항전부증명서', '상 호 가나테크', '110111-0085450', '대표이사 김가나 750101-1******', '회사성립연월일 2015 년 03 월 02 일'].join('\n'))
+  check('D210 등기부 이름표 없는 13자리 — 법인번호 검증 숫자가 맞으면', regLoose.corporateNumber === '110111-0085450', regLoose.corporateNumber)
+  const regBad = parseKoreanBusinessDocument(['등기사항전부증명서', '상 호 가나테크', '800101-1234567 김감사', '대표이사 김가나 750101-1******', '회사성립연월일 2015 년 03 월 02 일'].join('\n'))
+  check('D210 등기부 이름표 없는 13자리 — 검증 숫자가 틀리면 넣지 않음', regBad.corporateNumber === undefined, regBad.corporateNumber)
+  check('D210 법인번호 검증 숫자(실제 번호 3개)', corpNoChecksumOk('130111-0006246') && corpNoChecksumOk('110111-0085450') && corpNoChecksumOk('110111-2487050') && !corpNoChecksumOk('110111-1234567'))
+  check('D210 사업자 종류', bizNoKind('124-81-00998') === 'corp' && bizNoKind('123-45-67891') === 'individual' && bizNoKind('123-80-12345') === 'unknown' && bizNoKind('') === 'unknown')
 }
 
 console.log(`\ndoc-parser: ${passed} passed, ${failed} failed`)

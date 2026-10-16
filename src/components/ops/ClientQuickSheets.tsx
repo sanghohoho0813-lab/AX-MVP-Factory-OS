@@ -130,11 +130,20 @@ export function ClientMoneySheet({
   const unpaid = record.fees.filter((f) => f.receivedAt === null && !isWaiting(f, funding)).reduce((n, f) => n + netAmountOf(f), 0)
   const waiting = record.fees.filter((f) => isWaiting(f, funding)).reduce((n, f) => n + (f.amount ?? 0), 0)
 
+  // D-210: 넣는 동안 [넣기] 를 막는다 — 두 번 누르면 같은 수금 줄이 둘 생겨 못 받은 돈이 두 배로 보였다
+  const [adding, setAdding] = useState(false)
   const add = async () => {
-    const ok = await onSave(withNewFee(record, { kind, label: FEE_KIND_LABEL[kind], amount: amount > 0 ? amount : null, dueDate: due }))
-    if (ok === false) return
-    setAmount(0)
-    setDue('')
+    // 금액이 없으면 넣지 않는다 — 넣고 나면 금액 칸이 비므로 두 번째 누름이 '금액 없음' 줄을 만들던 것도 함께 막힌다
+    if (adding || amount <= 0) return
+    setAdding(true)
+    try {
+      const ok = await onSave(withNewFee(record, { kind, label: FEE_KIND_LABEL[kind], amount: amount > 0 ? amount : null, dueDate: due }))
+      if (ok === false) return
+      setAmount(0)
+      setDue('')
+    } finally {
+      setAdding(false)
+    }
   }
 
   return (
@@ -244,9 +253,9 @@ export function ClientMoneySheet({
             className="min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 px-2 py-2 text-[0.92rem]"
           />
         </div>
-        <Button variant="primary" size="sm" className="mt-2 w-full" onClick={() => void add()}>
+        <Button variant="primary" size="sm" className="mt-2 w-full" disabled={adding || amount <= 0} onClick={() => void add()} data-testid="quick-fee-add">
           <Plus aria-hidden="true" className="size-3.5" />
-          넣기
+          {adding ? '넣는 중…' : '넣기'}
         </Button>
       </div>
 

@@ -57,11 +57,16 @@ function TodayContent({ workspaceId }: { workspaceId: string | null }) {
   const today = todayLocalDate()
   const [records, setRecords] = useState<ClientOpsRecord[]>([])
   const [loading, setLoading] = useState(true)
+  // D-210: 못 읽었는데 '급한 일이 없습니다' 로 보이지 않게
+  const [failed, setFailed] = useState('')
 
   const load = useCallback(async () => {
     try {
       setLoading(true)
+      setFailed('')
       setRecords(await listClients(workspaceId))
+    } catch (cause) {
+      setFailed(cause instanceof Error ? cause.message : '업체 목록을 불러오지 못했습니다.')
     } finally {
       setLoading(false)
     }
@@ -111,6 +116,10 @@ function TodayContent({ workspaceId }: { workspaceId: string | null }) {
       {loading ? (
         <p className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-10 text-[0.95rem] text-slate-500">
           불러오는 중…
+        </p>
+      ) : failed ? (
+        <p role="alert" className="rounded-(--radius-panel) border border-danger-200 bg-danger-50 px-5 py-6 text-[0.95rem] break-keep text-danger-800">
+          {failed} — 잠시 뒤 새로고침해 주세요.
         </p>
       ) : nothing ? (
         <div className="rounded-(--radius-panel) border border-success-200 bg-success-50/60 px-5 py-12 text-center">

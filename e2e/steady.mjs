@@ -318,6 +318,62 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   await ctx.close()
 }
 
+// D-210: 고객 관리 목록의 빠른 수금 [넣기] 를 두 번 눌러도 한 줄만(예전: 같은 줄 둘 · 못 받은 돈 두 배)
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' })
+  await page.evaluate(seedScript())
+  await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  const moneyBtn = page.locator('main button:visible', { hasText: /못 받은|미수/ }).first()
+  if ((await moneyBtn.count()) === 0) check('D-210 빠른 수금: 못 받은 돈 단추가 있는 업체', false)
+  else {
+    await moneyBtn.click()
+    await page.waitForTimeout(400)
+    const sheet = page.getByRole('dialog')
+    const title = (await sheet.locator('h2, [id]').first().innerText().catch(() => '')) || ''
+    const fees = () => page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').reduce((n, c) => n + (c.fees?.length ?? 0), 0))
+    const before = await fees()
+    check('D-210 빠른 수금: 금액이 없으면 [넣기] 잠김', await page.getByTestId('quick-fee-add').isDisabled())
+    await sheet.getByPlaceholder('금액').fill('300000')
+    await page.getByTestId('quick-fee-add').dblclick()
+    await page.waitForTimeout(900)
+    const after = await fees()
+    check('D-210 빠른 수금: [넣기] 를 두 번 눌러도 수금 줄은 하나만', after === before + 1, `${title} ${before} → ${after}`)
+  }
+  await ctx.close()
+}
+
+// D-210: 다른 기기에서 고친 것 — 이 화면에 돌아오면 새로 읽어 덮지 않는다
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' })
+  await page.evaluate(seedScript())
+  await page.goto(BASE + '/ops/clients/cli_daum', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  const setVis = (state) =>
+    page.evaluate((st) => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => st })
+      document.dispatchEvent(new Event('visibilitychange'))
+    }, state)
+  await setVis('hidden')
+  // 다른 기기(휴대폰)에서 입금 확인 · 담당자 이름을 고침
+  await page.evaluate(() => {
+    const list = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+    const i = list.findIndex((c) => c.id === 'cli_daum')
+    list[i] = { ...list[i], contactName: '휴대폰에서고친이름', updatedAt: new Date(Date.now() + 60_000).toISOString() }
+    localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(list))
+  })
+  await page.waitForTimeout(5300)
+  await setVis('visible')
+  await page.waitForTimeout(1200)
+  const body = await page.locator('body').innerText()
+  check('D-210 업체 화면: 한동안 떠났다 돌아오면 다른 곳에서 고친 내용을 새로 불러온다(알림)', body.includes('다른 곳에서 고친 내용이 있어 새로 불러왔습니다') && body.includes('휴대폰에서고친이름'), body.slice(0, 160))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n튼튼하게: ${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

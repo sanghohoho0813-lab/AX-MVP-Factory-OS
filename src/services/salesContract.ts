@@ -149,7 +149,8 @@ export function withContractClose(record: ClientOpsRecord, d: ContractCloseDraft
   // D-150: 이미 같은 계약 마무리로 넣은 줄(이름 · 금액 같음)만 건너뛴다 — 다시 눌러도 두 번 안 들어가게.
   // 이름만 같은 다른 줄은 '계약금 (2)' 로 따로 넣는다(예전에는 빠져서 금액 합계와 수금 항목이 안 맞았다)
   const closedBefore = new Set(next.fees.filter((f) => f.note === '계약 완료에서').map((f) => `${f.label.replace(/\s*\(\d+\)$/, '')}|${f.amount ?? ''}`))
-  const rate = d.agentRatePct !== null && d.agentRatePct > 0 ? d.agentRatePct : null
+  // D-210: 영업자 이름을 비우면(없으면 비워 두세요) 수수료도 없다 — 예전에는 이름 없는 10% 가 줄마다 붙어 받은 내 돈이 줄고 '이름 없음' 정산이 생겼다
+  const rate = d.agentRatePct !== null && d.agentRatePct > 0 && d.agentName.trim() !== '' ? d.agentRatePct : null
   const added: FeeItem[] = []
   for (const l of d.lines) {
     const base = l.label.trim() || '계약금'

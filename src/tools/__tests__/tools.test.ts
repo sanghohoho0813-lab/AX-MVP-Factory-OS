@@ -7,6 +7,7 @@
  * 실행: npm run test:tools
  */
 
+import { buildAgenda } from '../../services/upcomingAgenda'
 import { DEFAULT_INPUT, SAMPLE_INPUT, runDiagnosis } from '../policyFunding/diagnosis'
 import { subjectMismatch } from '../shared/toolSubject'
 import { isStaleChunkError, reloadOnceForNewVersion } from '../../lib/staleChunk'
@@ -513,7 +514,13 @@ function check(name: string, cond: boolean, detail?: string): void {
   const toolEvents = events.filter((e) => e.kind === 'tool')
   check('기한: 달력 일정으로 나온다', toolEvents.length === 2 && toolEvents[0].title === '1회차 신청', JSON.stringify(toolEvents.map((e) => e.title)))
   check('기한: 남은 날짜를 센다', toolEvents[0].daysLeft === 9, String(toolEvents[0].daysLeft))
-  check('기한: 지난 것은 지난 일로 표시', buildClientSchedule(withDeadlines, '2026-10-02').filter((e) => e.kind === 'tool')[0].done === true)
+  // D-210: 도구 기한은 '했다' 는 기록이 없다 — 지났다고 '처리됨'(줄 긋기)이 아니라 '지남'(남은 날 음수)으로 남는다
+  const lapsed = buildClientSchedule(withDeadlines, '2026-10-02').filter((e) => e.kind === 'tool')[0]
+  check('D210 기한: 지난 도구 기한(못 낸 회차)은 처리됨이 아니라 지남', lapsed.done === false && lapsed.daysLeft === -1, JSON.stringify(lapsed))
+  const lateAgenda = buildAgenda({ schedule: buildClientSchedule(withDeadlines, '2026-10-16'), journal: [], clientNames: new Map(), prospectIds: new Set(), today: '2026-10-16' })
+  check('D210 기한: 지난 회차는 오늘 화면 다가오는 일에 늦은 일로(30일 안)', lateAgenda.some((a) => a.title === '1회차 신청' && a.daysLeft === -15), JSON.stringify(lateAgenda.map((a) => [a.title, a.daysLeft])))
+  const farAgenda = buildAgenda({ schedule: buildClientSchedule(withDeadlines, '2026-11-20'), journal: [], clientNames: new Map(), prospectIds: new Set(), today: '2026-11-20' })
+  check('D210 기한: 30일이 넘게 지난 것은 오늘 화면에서 빠짐', !farAgenda.some((a) => a.title === '1회차 신청'))
   check('기한: 종류 이름이 있다', SCHEDULE_KIND_LABEL.tool === '도구 기한')
   const overflow = withToolResult(base, {
     toolKey: 'employment', title: 't', verdict: null, verdictLabel: '', summary: '', data: null,

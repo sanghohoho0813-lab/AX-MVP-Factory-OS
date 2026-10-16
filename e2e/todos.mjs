@@ -117,6 +117,40 @@ check('D-201 할 일 창: 저장하면 창이 닫힌다', (await page.getByRole(
   check('D-201 할 일 창: 원래대로 되돌리면 묻지 않고 닫힌다', (await page.getByRole('dialog').count()) === 0)
 }
 
+// D-210: 할 일 기한은 비울 수 없다(비우면 오늘 · 달력에서 사라졌다) · 업체 열기도 고친 것이 있으면 먼저 묻는다
+{
+  await page.getByText('고쳐 적은 할 일').first().click()
+  await page.waitForTimeout(400)
+  const dlg = page.getByRole('dialog')
+  check('D-210 할 일 창: 기한이 있는 할 일에는 [기한 없애기] 가 없다', (await dlg.getByRole('button', { name: '기한 없애기' }).count()) === 0)
+  await page.getByLabel('할 일 기한 고치기').fill('')
+  await page.waitForTimeout(200)
+  check('D-210 할 일 창: 날짜를 지우면 "날짜를 정해 주세요" · [저장] 잠김', (await page.getByTestId('todo-due-required').count()) === 1 && (await page.getByTestId('todo-save').isDisabled()))
+  await page.getByRole('button', { name: '오늘', exact: true }).first().click()
+  await page.waitForTimeout(200)
+  // 업체를 붙여 저장해 둔다(업체 열기 단추가 생기게)
+  await page.getByLabel('할 일 업체 고치기').selectOption('cli_daum')
+  await page.getByTestId('todo-save').click()
+  await page.waitForTimeout(900)
+  await page.getByText('고쳐 적은 할 일').first().click()
+  await page.waitForTimeout(400)
+  await page.getByLabel('할 일 내용 고치기').fill('업체로 가기 전 고친 글')
+  await page.getByTestId('todo-open-client').click()
+  await page.waitForTimeout(300)
+  check('D-210 할 일 창: 고친 채 [업체 열기] → 먼저 묻는다(말없이 넘어가지 않음)', (await page.getByTestId('todo-close-confirm').count()) === 1 && page.url().endsWith('/'))
+  await page.getByRole('button', { name: '계속 고치기' }).click()
+  await page.waitForTimeout(200)
+  check('D-210 할 일 창: [계속 고치기] → 고친 글 그대로', (await page.getByLabel('할 일 내용 고치기').inputValue()) === '업체로 가기 전 고친 글')
+  await page.getByTestId('todo-open-client').click()
+  await page.waitForTimeout(300)
+  await page.getByRole('button', { name: /저장 안 하고 .*열기/ }).click()
+  await page.waitForTimeout(900)
+  const keptOld = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]').some((x) => x.content === '고쳐 적은 할 일'))
+  check('D-210 할 일 창: [저장 안 하고 열기] → 업체 화면으로 · 원래 글 그대로', page.url().includes('/ops/clients/cli_daum') && keptOld, page.url())
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+}
+
 // 한 번 더 고칠 수 있다 — 고친 것을 또 고치는 것이 실제 쓰임새다
 await page.getByText('고쳐 적은 할 일').first().click()
 await page.waitForTimeout(400)
@@ -175,6 +209,23 @@ const stored = await page.evaluate(() => {
 })
 check('완료가 저장된다', stored === true, String(stored))
 check('끝낸 것은 접혀 있다', (await page.getByText('끝낸 것').count()) > 0)
+
+// D-210: '끝낸 것' 은 오늘 끝낸 것만 — 지난달에 끝낸 할 일이 몇 달 치 쌓여 보이지 않는다
+{
+  await page.evaluate(() => {
+    const list = JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]')
+    const base = list.find((e) => e.entryType === 'follow_up')
+    list.push({ ...base, id: 'd210_old_done', content: '지난달에 끝낸 할 일', dueDate: '2026-09-01', completed: true, completedAt: '2026-09-01T03:00:00.000Z', createdAt: '2026-08-30T03:00:00.000Z', updatedAt: '2026-09-01T03:00:00.000Z', clientId: null })
+    localStorage.setItem('axmvp.v1.ops_journal_entries', JSON.stringify(list))
+  })
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  const doneBox = page.getByText('끝낸 것').first()
+  if ((await doneBox.count()) > 0) await doneBox.click()
+  await page.waitForTimeout(300)
+  const main = (await page.locator('main').innerText()) ?? ''
+  check('D-210 오늘 "끝낸 것": 지난달에 끝낸 할 일은 없다(오늘 끝낸 것만)', !main.includes('지난달에 끝낸 할 일'), main.slice(0, 200))
+}
 
 // 내일로 미루기
 await page.getByText('테스트 할 일 하나').first().click()

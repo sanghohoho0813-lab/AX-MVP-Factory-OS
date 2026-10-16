@@ -18,8 +18,11 @@
  */
 
 import type { ClientOpsRecord } from '../types/clientOps'
+import { localDateOf } from '../lib/appClock'
 import { contractStageOf } from '../types/clientOps'
-import { factDef, pendingFacts, readFact, sameFactValue, withFactDecisions, withRecheckFacts } from './customerFacts'
+import { factDef, pendingFacts, readFact, sameFactValue, withFactDecisions, withFactValue, withRecheckFacts } from './customerFacts'
+import { birthFromRrnPrefix, bizNoKind, corpNoChecksumOk } from './koreanDocParser'
+import { entityKindOf } from './clientOrder'
 import { docShelfSummary, moveDocTo, moveTargets, newestOf, otherCellSuggestion, withDedupedShelf } from './docShelf'
 import { allDocumentMetas } from './clientOpsDocuments'
 import { OTHER_DOC_LABEL } from './docClassify'
@@ -71,6 +74,8 @@ export type DecisionEffect =
   | { type: 'shelf-dedupe'; keys: string[]; keep: string }
   /** D-183: 바로 넣은 값 — [아니요] 면 이 값들을 다시 확인으로 */
   | { type: 'recheck'; logId: string; items: { key: string; value: string }[] }
+  /** D-210: 개인사업자의 '법인등록번호' 칸(주민등록번호일 수 있음)을 비운다 — 확인할 정보에 남은 같은 칸 후보도 함께 */
+  | { type: 'clear-corp-number' }
 
 export interface Decision {
   /** 업체 안에서 변하지 않는 이름 — 답을 이 이름으로 남긴다 */
@@ -145,13 +150,40 @@ export function buildDecisions(record: ClientOpsRecord, today: string, notices: 
   const push = (d: Omit<Decision, 'clientId' | 'clientName'>) => {
     const prev = answered[d.id]
     // D-161: 받을 돈 · 서류는 답한 뒤 14일이 지나도 그대로면 다시 묻는다(나중에 = 영영 아님). 다른 종류는 한 번 답하면 끝
-    if (prev && !((d.kind === 'money' || d.kind === 'doc') && isYmd(prev.at.slice(0, 10)) && daysBetween(prev.at.slice(0, 10), today) >= 14)) return
+    // D-210: 답한 날은 로컬 날짜로(한국 오전 9시 전에 답하면 UTC 로 하루 전이 되어 하루 일찍 다시 물었다)
+    const answeredOn = prev ? localDateOf(prev.at) : ''
+    if (prev && !((d.kind === 'money' || d.kind === 'doc') && isYmd(answeredOn) && daysBetween(answeredOn, today) >= 14)) return
     out.push({ ...base, ...d })
+  }
+
+  // 0) D-210: 개인사업자인데 '법인등록번호' 칸에 13자리 — 예전 서류 읽기가 '주민(법인)등록번호' 칸의 주민등록번호를 넣었을 수 있다.
+  //    주민등록번호는 저장하지 않는다(절대 규칙) — 지울지 대표에게 묻는다(묻지 않고 지우지 않는다). 번호는 화면에 다 보이지 않게.
+  //    법인 이름((주) 등)이거나 법인번호 검증 숫자가 맞는 번호는 묻지 않는다(사업자번호를 잘못 적은 법인일 뿐) — 생년월일 + 성별 자리 모양일 때만
+  const individual = bizNoKind(record.businessNumber) === 'individual' && entityKindOf({ companyName: record.companyName }) !== 'corporation'
+  const rrnLike = (v: string) => {
+    const d = v.replace(/\D/g, '')
+    return d.length === 13 && /[1-8]/.test(d[6]) && birthFromRrnPrefix(d.slice(0, 6), d[6]) !== undefined && !corpNoChecksumOk(d)
+  }
+  const corpInField = individual && rrnLike(record.corporateNumber ?? '')
+  const corpInInbox = individual && (record.factInbox ?? []).some((c) => c.key === 'corporateNumber' && rrnLike(c.value))
+  if (corpInField || corpInInbox) {
+    push({
+      id: 'rrn-check:corporateNumber',
+      kind: 'fact',
+      title: "개인사업자인데 '법인등록번호' 칸에 13자리 번호가 있어요 — 주민등록번호일 수 있어요. 지울까요?",
+      why: `사업자등록번호(${record.businessNumber})로 보면 개인사업자예요. 개인사업자는 법인등록번호가 없어요. 주민등록번호는 저장하지 않아요.`,
+      yesLabel: '지우기',
+      noLabel: '법인번호가 맞아요',
+      effect: { type: 'clear-corp-number' },
+      openPath: `/ops/clients/${record.id}?tab=overview`,
+      rank: 1,
+    })
   }
 
   // 1) 자료에서 읽은 정보 — 맞나요?
   try {
-    for (const p of pendingFacts(record).slice(0, 6)) {
+    // D-210: 개인사업자의 법인등록번호 후보는 위 '지울까요?' 로 묻는다(번호를 화면에 그대로 띄우지 않게)
+    for (const p of pendingFacts(record).filter((x) => !(individual && x.key === 'corporateNumber' && rrnLike(x.value))).slice(0, 6)) {
       push({
         id: `fact:${p.id}`,
         kind: 'fact',
@@ -462,6 +494,9 @@ export function withDecisionAnswer(record: ClientOpsRecord, d: Pick<Decision, 'i
     next = moveDocTo(next, d.effect.fromKey, d.effect.to)?.record ?? next
   } else if (d.effect.type === 'shelf-dedupe' && answer === 'yes') {
     next = withDedupedShelf(next, d.effect.keys, d.effect.keep)
+  } else if (d.effect.type === 'clear-corp-number' && answer === 'yes') {
+    next = withFactValue(next, 'corporateNumber', '', { now })
+    next = { ...next, factInbox: (next.factInbox ?? []).filter((c) => c.key !== 'corporateNumber') }
   } else if (d.effect.type === 'recheck' && answer === 'no') {
     next = withRecheckFacts(next, d.effect.items, d.effect.logId, now)
   } else if (d.effect.type === 'copy' && answer === 'yes' && d.effect.log) {

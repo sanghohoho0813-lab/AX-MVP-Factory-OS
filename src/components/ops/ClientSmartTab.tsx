@@ -201,7 +201,7 @@ export default function ClientSmartTab({
         onRequestText={onRequestText}
         onSetNext={setNext}
         onAnswer={(q, a) =>
-          void onCommit(withScenarioAnswer(recordRef.current, q, a, nowIso()), a === null ? '답을 지웠습니다 — 다시 여쭤 볼게요.' : '답을 저장했습니다 — 상황 예시를 다시 맞췄어요.')
+          onCommit(withScenarioAnswer(recordRef.current, q, a, nowIso()), a === null ? '답을 지웠습니다 — 다시 여쭤 볼게요.' : '답을 저장했습니다 — 상황 예시를 다시 맞췄어요.')
         }
       />
 

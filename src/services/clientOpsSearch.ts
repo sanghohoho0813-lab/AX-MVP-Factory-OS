@@ -12,6 +12,7 @@
  */
 
 import type { ClientOpsRecord } from '../types/clientOps'
+import { compactName } from './clientOrder'
 
 /** 검색 대상 문자열 하나로 모은다 (소문자). 화면은 이것을 includes 로만 본다. */
 export function clientSearchText(r: ClientOpsRecord): string {
@@ -96,6 +97,9 @@ export function matchesClientSearch(r: ClientOpsRecord, query: string): boolean 
   const q = query.trim().toLowerCase()
   if (q === '') return true
   if (clientSearchText(r).includes(q)) return true
+  // D-210: 회사 이름은 (주) · 주식회사 · 빈칸을 빼고도 견준다
+  const cq = compactName(q)
+  if (cq !== '' && compactName(r.companyName).includes(cq)) return true
   // 숫자·하이픈만 넣었으면 번호에서도 찾는다
   const qd = q.replace(/\D/g, '')
   if (qd !== '' && /^[\d\s-]+$/.test(q)) return digitsText(r).includes(qd)

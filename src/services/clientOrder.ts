@@ -34,8 +34,21 @@ const RANK: Record<EntityKind, number> = { individual: 0, corporation: 1, unknow
 export const ENTITY_GROUP_LABEL: Record<EntityKind, string> = { individual: '개인사업자', corporation: '법인', unknown: '구분 모름' }
 
 /** 이름 가나다 순 — '(주)' · '주식회사' 같은 앞말은 빼고 견준다(㈜가나 가 '가' 에 오게) */
-function sortName(name: string): string {
+export function sortName(name: string): string {
   return name.replace(/^\s*(\(주\)|㈜|주식회사|\(유\)|유한회사)\s*/, '').trim()
+}
+
+/** D-210: 찾기용 이름 — (주) · 주식회사 같은 말과 빈칸을 모두 뺀다('(주)가나테크' 로 '주식회사 가나 테크' 를 찾게) */
+export function compactName(name: string): string {
+  return name.replace(new RegExp(CORP_NAME.source, 'g'), '').replace(/\s+/g, '').toLowerCase()
+}
+
+/** D-210: 가나다 순 비교 — 앞말은 빼고, 이름이 빈 업체는 맨 뒤로 */
+export function compareCompanyName(a: string, b: string): number {
+  const x = sortName(a)
+  const y = sortName(b)
+  if (x === '' || y === '') return x === y ? 0 : x === '' ? 1 : -1
+  return x.localeCompare(y, 'ko')
 }
 
 /** 개인사업자 → 법인, 묶음 안에서는 가나다 순 */

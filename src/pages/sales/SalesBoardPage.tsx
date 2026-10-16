@@ -42,6 +42,7 @@ import {
   withNewProspect,
   withSalesInfo,
   withSalesStage,
+  salesMoveBlocked,
 } from '../../services/salesPipeline'
 import { SALES_SOURCES, SALES_STALE_DAYS } from '../../content/salesCatalog'
 import { formatKrwCompact, krwTile } from '../../lib/format'
@@ -75,7 +76,8 @@ function StageSelect({ record, onMove }: { record: ClientOpsRecord; onMove: (r: 
       className="tap t-meta w-full min-w-0 rounded-(--radius-control) border border-slate-200 bg-white px-2 py-1.5 font-medium text-slate-700 focus:border-brand-500 focus:outline-none"
     >
       {SALES_STAGE_ORDER.map((s) => (
-        <option key={s} value={s}>
+        // D-210: 계약한 업체는 계약 전 단계로 고를 수 없다(되돌리기는 업체 화면 '계약 상태' 에서)
+        <option key={s} value={s} disabled={salesMoveBlocked(record, s) !== null}>
           {SALES_STAGE_LABEL[s]}
         </option>
       ))}
@@ -337,6 +339,11 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
     async (record: ClientOpsRecord, stage: SalesStage, direct = false) => {
       if (stage === 'contracted' && !direct && salesStageOf(record) !== 'contracted') {
         setClosing({ record, draft: contractCloseDraft(record, { today, records }) })
+        return
+      }
+      const blocked = salesMoveBlocked(record, stage)
+      if (blocked) {
+        showToast(blocked)
         return
       }
       const next = withSalesStage(record, stage)

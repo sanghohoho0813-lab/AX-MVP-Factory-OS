@@ -56,6 +56,8 @@ function DecideContent({ workspaceId, userId }: { workspaceId: string | null; us
     linkOf,
   })
   const clients = new Set(all.map((d) => d.clientId)).size
+  // D-210: 지우는 결정(주민등록번호일 수 있는 법인번호)은 '모두 맞아요' 에 넣지 않는다
+  const bulkable = shown.filter((d) => d.effect.type !== 'clear-corp-number')
 
   return (
     <div className="flex flex-col gap-5">
@@ -88,13 +90,13 @@ function DecideContent({ workspaceId, userId }: { workspaceId: string | null; us
         </div>
       )}
       {/* D-160: 종류를 고르면 그 종류를 한 번에 — 카톡 문구(복사)는 하나씩 보내야 하므로 없다 */}
-      {kind !== 'all' && DECISION_BULK_KINDS.includes(kind) && shown.length >= 2 && (
+      {kind !== 'all' && DECISION_BULK_KINDS.includes(kind) && bulkable.length >= 2 && (
         <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50/50 px-4 py-3 sm:flex-row sm:items-center" data-testid="decide-bulk">
           <p className="t-sub min-w-0 flex-1 break-keep text-slate-700">
-            {DECISION_KIND_LABEL[kind]} {shown.length}건을 다 읽어 보셨으면 한 번에 처리할 수 있어요.
+            {DECISION_KIND_LABEL[kind]} {bulkable.length}건을 다 읽어 보셨으면 한 번에 처리할 수 있어요.
           </p>
-          <Button size="sm" variant="primary" className="self-start sm:self-auto" disabled={busy !== null} onClick={() => void answerMany(shown)} data-testid="decide-bulk-yes">
-            <CheckCheck aria-hidden="true" className="size-4" /> 이 {shown.length}건 모두 맞아요
+          <Button size="sm" variant="primary" className="self-start sm:self-auto" disabled={busy !== null} onClick={() => void answerMany(bulkable)} data-testid="decide-bulk-yes">
+            <CheckCheck aria-hidden="true" className="size-4" /> 이 {bulkable.length}건 모두 맞아요
           </Button>
         </div>
       )}

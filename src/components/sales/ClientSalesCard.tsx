@@ -10,7 +10,7 @@ import { Link } from 'react-router-dom'
 import { KanbanSquare, Presentation } from 'lucide-react'
 import { Disclosure } from '../ui/primitives'
 import { Button } from '../ui/Button'
-import { daysInStage, isProspect, salesStageOf, stageReached, withSalesInfo, withSalesStage } from '../../services/salesPipeline'
+import { daysInStage, isProspect, salesMoveBlocked, salesStageOf, stageReached, withSalesInfo, withSalesStage } from '../../services/salesPipeline'
 import { SALES_INTERESTS, SALES_SOURCES } from '../../content/salesCatalog'
 import { formatKrwCompact } from '../../lib/format'
 import { SALES_STAGE_LABEL, SALES_STAGE_ORDER, type ClientOpsRecord, type SalesStage } from '../../types/clientOps'
@@ -100,7 +100,8 @@ export function ClientSalesCard({
                 className={`${inputClass} font-semibold`}
               >
                 {SALES_STAGE_ORDER.map((st) => (
-                  <option key={st} value={st}>
+                  // D-210: 계약한 업체는 계약 전 단계로 고를 수 없다(되돌리기는 '계약 상태' 에서 — 두 상태가 되지 않게)
+                  <option key={st} value={st} disabled={salesMoveBlocked(record, st) !== null}>
                     {SALES_STAGE_LABEL[st]}
                   </option>
                 ))}
@@ -109,6 +110,7 @@ export function ClientSalesCard({
             <p className="t-sub pb-2 text-slate-500">
               {days !== null ? (days === 0 ? '오늘 옮김' : `이 단계 ${days}일째`) : '단계를 옮긴 기록 없음'}
               {prospect && stage !== 'contracted' ? ' · 계약 완료로 옮기면 계약 고객이 됩니다' : ''}
+              {salesMoveBlocked(record, 'closing') ? " · 계약 전으로 되돌리려면 위 '계약 상태' 에서" : ''}
             </p>
             <span className="ml-auto flex items-center gap-3 pb-2">
               <Link to={`/sales/meeting?client=${record.id}`} className="t-sub inline-flex items-center gap-1 font-medium text-brand-700 hover:underline">

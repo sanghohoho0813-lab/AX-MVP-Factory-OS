@@ -187,7 +187,9 @@ export function buildClientSchedule(record: ClientOpsRecord, today: string): Sch
         title: d.title,
         detail: d.note || result.title,
         serviceKey: null,
-        done: d.date < today,
+        // D-210: 도구 기한은 '했다' 는 기록이 없다 — 날짜가 지났다고 '처리됨' 이 아니다(못 낸 고용지원금 회차가 줄 긋고 사라졌다).
+        // 지나면 '지남' 으로 남고, 오늘 화면에도 30일 동안 늦은 일로 보인다
+        done: false,
         daysLeft: daysLeftFrom(today, d.date),
         ...(d.hard ? { hard: true } : {}),
       })

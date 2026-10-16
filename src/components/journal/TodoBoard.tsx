@@ -86,7 +86,8 @@ export function TodoComposer({
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') submit()
+            // D-210: 한글을 조합하는 중의 Enter 는 글자 확정이다(마지막 글자가 칸에 남거나 두 번 들어가지 않게)
+            if (e.key === 'Enter' && !e.nativeEvent.isComposing) submit()
             if (e.key === 'Escape') setOpen(false)
           }}
           placeholder="예: 한솔테크 대표님 통화 — 벤처인증 서류 요청"
@@ -266,11 +267,14 @@ export function TodoActionSheet({
   const dirty =
     editable && (edits.content !== entry.content.trim() || edits.dueDate !== entry.dueDate || edits.clientId !== (entry.clientId ?? null))
   const emptyContent = edits.content === ''
+  // D-210: 할 일은 기한이 있어야 오늘 · 달력에 보인다 — 비우면(기한 없애기) 전체 기록에만 남아 사라진 것처럼 됐다
+  const emptyDue = editable && edits.dueDate === '' && entry.dueDate !== ''
+  const invalid = emptyContent || emptyDue
 
   const [saving, setSaving] = useState(false)
   /** D-122: 저장이 된 뒤에만 닫는다 — false 가 오면(실패) 고치던 칸 그대로 */
   const save = async () => {
-    if (!onSave || emptyContent || saving || !dirty) return false
+    if (!onSave || invalid || saving || !dirty) return false
     setSaving(true)
     const ok = await onSave(edits)
     setSaving(false)
@@ -278,14 +282,21 @@ export function TodoActionSheet({
   }
   /** 상태 단추 — 고친 칸이 있으면 같이 넘긴다(지우기는 고친 것과 상관없다) */
   const pick = (action: TodoAction) => {
-    if (action !== 'delete' && dirty && emptyContent) return
+    if (action !== 'delete' && dirty && invalid) return
     onPick(action, action !== 'delete' && dirty ? edits : undefined)
   }
   /** 삭제는 한 번 더 묻는다(D-122) */
   const [confirmDelete, setConfirmDelete] = useState(false)
   /** 고친 것이 있는데 닫으려 하면 한 번 묻는다 */
   const [confirmClose, setConfirmClose] = useState(false)
-  const requestClose = () => (dirty ? setConfirmClose(true) : onClose())
+  /** D-210: 닫은 뒤 할 일 — '(업체) 열기' 도 고친 것이 있으면 먼저 묻는다(예전: 묻지 않고 업체로 넘어가 고친 것이 사라졌다) */
+  const [afterClose, setAfterClose] = useState<{ run: () => void; label: string; what: string } | null>(null)
+  const requestClose = (next?: { run: () => void; label: string; what: string }) => {
+    if (!dirty) return (next?.run ?? onClose)()
+    setAfterClose(next ?? null)
+    setConfirmClose(true)
+  }
+  const leave = () => (afterClose?.run ?? onClose)()
 
   // D-167: 밀린(빨간) 할 일은 맨 위에 '오늘 할 일로' — 기한을 오늘로 옮겨 밀린 것에서 뺀다(대표 요청)
   const overdue = !entry.completed && entry.dueDate !== '' && entry.dueDate < today
@@ -295,7 +306,7 @@ export function TodoActionSheet({
       type="button"
       data-todo-action={action}
       aria-pressed={action === 'open' || action === 'done' ? active : undefined}
-      disabled={action !== 'delete' && dirty && emptyContent}
+      disabled={action !== 'delete' && dirty && invalid}
       onClick={() => (action === 'delete' ? setConfirmDelete(true) : pick(action))}
       className={`tap flex min-h-14 min-w-0 items-center gap-2 rounded-(--radius-control) border px-3 py-2.5 text-left disabled:opacity-50 ${
         active
@@ -316,23 +327,24 @@ export function TodoActionSheet({
   return (
     <BottomSheet
       title="할 일"
-      onClose={requestClose}
+      onClose={() => requestClose()}
       footer={
         confirmClose ? (
           <div role="alertdialog" aria-label="고친 내용 저장 확인" data-testid="todo-close-confirm" className="flex flex-col gap-2">
-            <p className="t-body font-semibold break-keep text-slate-900">고친 내용이 있습니다. 저장할까요?</p>
+            <p className="t-body font-semibold break-keep text-slate-900">{afterClose ? `고친 내용이 있습니다. ${afterClose.what} 전에 저장할까요?` : '고친 내용이 있습니다. 저장할까요?'}</p>
             <div className="flex flex-wrap justify-end gap-2">
-              <Button onClick={onClose}>저장 안 하고 닫기</Button>
-              <Button variant="primary" disabled={emptyContent || saving} onClick={() => void save().then((ok) => ok && onClose())}>
-                저장하고 닫기
+              <Button onClick={() => setConfirmClose(false)}>계속 고치기</Button>
+              <Button onClick={leave}>저장 안 하고 {afterClose?.label ?? '닫기'}</Button>
+              <Button variant="primary" disabled={invalid || saving} onClick={() => void save().then((ok) => ok && leave())}>
+                저장하고 {afterClose?.label ?? '닫기'}
               </Button>
             </div>
           </div>
         ) : editable ? (
           <div className="flex items-center justify-end gap-2">
             <span className={`t-meta mr-auto break-keep text-slate-500 ${dirty ? '' : 'hidden sm:inline'}`}>{dirty ? '고친 내용이 있습니다' : '칸을 눌러 바로 고칠 수 있습니다'}</span>
-            <Button onClick={requestClose}>닫기</Button>
-            <Button variant="primary" data-testid="todo-save" disabled={!dirty || emptyContent || saving} onClick={() => void save()}>
+            <Button onClick={() => requestClose()}>닫기</Button>
+            <Button variant="primary" data-testid="todo-save" disabled={!dirty || invalid || saving} onClick={() => void save()}>
               {saving ? '저장 중…' : '저장'}
             </Button>
           </div>
@@ -357,7 +369,8 @@ export function TodoActionSheet({
               {emptyContent && <span className="t-meta text-danger-700">할 일을 적어 주세요.</span>}
             </label>
             {/* D-126: 다른 곳과 같은 오늘 · 내일 · 1주 단추 */}
-            <DueDateField label="언제까지" ariaLabel="할 일 기한 고치기" value={dueDate} today={today} onChange={setDueDate} clearLabel="기한 없애기" />
+            <DueDateField label="언제까지" ariaLabel="할 일 기한 고치기" value={dueDate} today={today} onChange={setDueDate} clearable={entry.dueDate === ''} clearLabel="기한 없애기" />
+            {emptyDue && <span className="t-meta -mt-2 text-danger-700" data-testid="todo-due-required">언제까지 할지 날짜를 정해 주세요(날짜가 없으면 오늘 · 달력에 안 보여요).</span>}
             {/* 업체를 잘못 붙였거나 안 붙였을 때 — 지우고 다시 적지 않아도 된다 */}
             {(clientOptions.length > 0 || clientId !== '') && (
               <label className="block">
@@ -402,7 +415,7 @@ export function TodoActionSheet({
       )}
 
       {clientName && onOpenClient && (
-        <Button variant="secondary" className="mt-3 w-full" onClick={onOpenClient}>
+        <Button variant="secondary" className="mt-3 w-full" onClick={() => requestClose({ run: onOpenClient, label: '열기', what: `${clientName} 열기` })} data-testid="todo-open-client">
           <ArrowRight aria-hidden="true" className="size-4" />
           {clientName} 열기
         </Button>

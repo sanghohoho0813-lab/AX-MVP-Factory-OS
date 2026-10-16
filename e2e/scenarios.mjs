@@ -148,6 +148,17 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.locator('[data-testid="scenario-row"][data-id="emp-youth"]').waitFor({ timeout: 10000 })
   check('"예" → 청년 채용 · 정책자금 청년 채용 둘 다 맞음으로(그 자리에서) · 업체 기록에 답', (await row(page, 'policy-hiring').count()) === 1 && (await record(page, 'cli_scen'))?.decided?.['scn.hireYouth']?.a === 'yes')
   check('맞음으로 온 까닭 — "대표 답"', (await row(page, 'emp-youth').getByTestId('scenario-why').innerText()).includes('대표 답'))
+  // D-210 '예' 로 새로 맞게 된 상황 — 위쪽 목록에 조용히 생기지 않고, 펼쳐서 그 자리로 · '방금 열림'
+  await page.locator('[data-testid="scenario-row"][data-fresh="1"] [data-testid="scenario-detail"]').waitFor({ timeout: 5000 }).catch(() => {})
+  await page.waitForTimeout(700)
+  const fresh = await page.locator('[data-testid="scenario-row"][data-fresh="1"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-id')).sort())
+  const openFresh = page.locator('[data-testid="scenario-row"][data-fresh="1"]:has([data-testid="scenario-detail"])')
+  const inView = await openFresh.first().evaluate((e) => {
+    const b = e.getBoundingClientRect()
+    return b.top < window.innerHeight && b.bottom > 0
+  }).catch(() => false)
+  check('D-210 "예" → 새로 맞게 된 두 상황에 "방금 열림" · 그중 하나를 펼쳐 화면 안으로', fresh.join(',') === 'emp-youth,policy-hiring' && (await openFresh.count()) === 1 && inView && (await page.getByTestId('scenario-fresh').count()) === 2, `${fresh.join(',')} · ${inView}`)
+  await page.waitForTimeout(500)
   await page.locator('[data-testid="scenario-question"][data-q="contract"]').getByTestId('scenario-answer-no').click()
   await page.waitForTimeout(500)
   await page.getByTestId('scenario-nofit').locator('summary').click()
@@ -310,6 +321,41 @@ for (const width of [360, 390]) {
       )
     check(`${width} ${scale}: 누르는 것 44px`, small.length === 0, small.slice(0, 6).join('|'))
   }
+  await ctx.close()
+}
+
+/* ---------------- D-210 휴대폰 — 답을 두 번 눌러도 한 번만(아래 질문이 손가락 밑으로 올라와도) ---------------- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  await seed(page)
+  await openSmart(page, 'cli_scen_small')
+  if (await page.getByTestId('scenario-questions-more').count()) await page.getByTestId('scenario-questions-more').click()
+  const qRow = (q) => page.locator(`[data-testid="scenario-question"][data-q="${q}"]`)
+  const qIds = await page.getByTestId('scenario-question').evaluateAll((els) => els.map((e) => e.getAttribute('data-q')))
+  const [q1, q2] = qIds
+  const center = async (loc) => {
+    await loc.evaluate((e) => e.scrollIntoView({ block: 'center' }))
+    const b = await loc.boundingBox()
+    return [b.x + b.width / 2, b.y + b.height / 2]
+  }
+  const answered = async () => Object.keys((await record(page, 'cli_scen_small'))?.decided ?? {}).filter((k) => k.startsWith('scn.'))
+  const before = await answered()
+  await page.waitForTimeout(300)
+  const [x1, y1] = await center(qRow(q1).getByTestId('scenario-answer-yes'))
+  await page.touchscreen.tap(x1, y1)
+  // 첫 답으로 그 질문 줄이 빠지면 아래 질문이 올라온다 — 두 번째 손가락이 바로 그 '예' 에 닿은 경우
+  await qRow(q1).waitFor({ state: 'detached', timeout: 3000 }).catch(() => {})
+  const b2 = await qRow(q2).getByTestId('scenario-answer-yes').boundingBox()
+  await page.touchscreen.tap(b2.x + b2.width / 2, b2.y + b2.height / 2)
+  await page.waitForTimeout(1000)
+  const after = await answered()
+  check('D-210 390 — 첫 답 바로 뒤 올라온 아래 질문을 같이 누르지 않음(답 하나)', after.length === before.length + 1 && after.includes(`scn.${q1}`) && !after.includes(`scn.${q2}`), `${q1}/${q2} · ${before.join(',')} → ${after.join(',')}`)
+  // 잠깐 뒤에는 다음 질문에 답할 수 있다(막힌 채로 남지 않음)
+  const [x2, y2] = await center(qRow(q2).getByTestId('scenario-answer-yes'))
+  await page.touchscreen.tap(x2, y2)
+  await page.waitForTimeout(1000)
+  check('D-210 390 — 조금 뒤 다음 질문은 정상으로 답해짐', (await answered()).includes(`scn.${q2}`))
   await ctx.close()
 }
 
