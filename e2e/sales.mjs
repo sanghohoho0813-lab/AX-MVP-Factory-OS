@@ -570,6 +570,8 @@ for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
   check(`출시 예정(${tag}): 누르면 그 상품의 기간 · 상품표 설명`, page.url().endsWith('/upcoming/job-invention') && /임직원 발명에 대한 보상 규정/.test(await page.getByTestId('upcoming-desc').innerText()))
   await page.goto(BASE + '/marketing', { waitUntil: 'networkidle' })
   check(`마케팅 · 브랜딩(${tag}): 맨 위 '유튜브 벤치마킹' 바로 쓰기(D-193)`, (await page.getByTestId('marketing-youtube').count()) === 1 && ((await page.getByTestId('marketing-youtube').getAttribute('href')) ?? '').endsWith('/marketing/youtube'))
+  // D-206: 홍보 글 · 홈페이지도 마케팅 · 브랜딩에서 바로
+  check(`마케팅 · 브랜딩(${tag}): 바로 쓰기에 홍보 글 만들기 · 홈페이지 만들기(D-206)`, ((await page.getByTestId('marketing-content').getAttribute('href')) ?? '').endsWith('/tools/content') && ((await page.getByTestId('marketing-homepage').getAttribute('href')) ?? '').endsWith('/tools/homepage'))
   check(`마케팅 · 브랜딩(${tag}): 도입 예정 안내`, (await page.getByTestId('marketing-planned').locator('li').count()) === 5 && (await page.getByTestId('marketing-planned').innerText()).includes('릴스 · 쇼츠 (세로 영상)') && (await page.getByTestId('marketing-planned').innerText()).includes('유튜브 (가로 영상)'))
   await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
   await page.getByTestId('ai-client-assistant').click()
@@ -581,6 +583,11 @@ for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
     const nav = page.locator('aside nav')
     // D-193: 유튜브 벤치마킹이 들어와 '준비 중' 을 뗐다
     check('메뉴: 영업 묶음에 마케팅 · 브랜딩(준비 중 아님 — D-193)', !/준비 중/.test(await nav.getByRole('link', { name: /마케팅 · 브랜딩/ }).innerText()))
+    const mk = await nav.locator('[data-nav-children="marketing"] a').evaluateAll((els) => els.map((a) => `${a.textContent?.trim()}>${a.getAttribute('href')}`))
+    check('메뉴: 마케팅 · 브랜딩 아래 콘텐츠 레이더 · 홍보 글 만들기 · 홈페이지 만들기(D-206)', mk.length === 3 && mk[0].endsWith('>/marketing/youtube') && mk[1].includes('홍보 글 만들기>/tools/content') && mk[2].includes('홈페이지 만들기>/tools/homepage'), mk)
+    await nav.locator('[data-nav-children="marketing"] a[href="/tools/content"]').click()
+    await page.waitForTimeout(500)
+    check('메뉴: 홍보 글 만들기 누르면 그 화면 · 메뉴에 불(D-206)', page.url().endsWith('/tools/content') && (await nav.locator('[data-nav-children="marketing"] a[href="/tools/content"]').getAttribute('aria-current')) === 'page')
     const up = nav.getByRole('button', { name: /출시 예정/ }).first()
     if ((await up.getAttribute('aria-expanded')) !== 'true') await up.click()
     await page.waitForTimeout(200)

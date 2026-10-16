@@ -213,15 +213,29 @@ function SidebarContent({
                             onToggle={toggleCategory}
                           />
                         ) : (
-                          <NavLinkRow
-                            item={item}
-                            isActive={moduleMatchLength(item, navPath) > 0}
-                            collapsed={collapsed}
-                            onNavigate={onNavigate}
-                            counts={counts}
-                            iconClass={group.key === 'modules' ? 'nav-ramp' : navAccentClass(item.accent)}
-                            iconStyle={group.key === 'modules' ? rampStyle(idx, top.length) : undefined}
-                          />
+                          <>
+                            <NavLinkRow
+                              item={item}
+                              isActive={moduleMatchLength(item, navPath) > 0}
+                              collapsed={collapsed}
+                              onNavigate={onNavigate}
+                              counts={counts}
+                              iconClass={group.key === 'modules' ? 'nav-ramp' : navAccentClass(item.accent)}
+                              iconStyle={group.key === 'modules' ? rampStyle(idx, top.length) : undefined}
+                            />
+                            {/* D-206: 일반 줄 아래 늘 펼쳐 둔 기능 줄(마케팅 · 브랜딩 › 콘텐츠 레이더 · 홍보 글 · 홈페이지) — 접힌 사이드바에서는 숨김 */}
+                            {!collapsed && items.some((c) => c.parent === item.key) && (
+                              <ul aria-label={`${item.label} 기능`} className="mt-0.5 ml-5 flex flex-col gap-0.5 border-l border-navy-700 pl-2" data-nav-children={item.key}>
+                                {items
+                                  .filter((c) => c.parent === item.key)
+                                  .map((c) => (
+                                    <li key={c.key}>
+                                      <NavLinkRow item={c} isActive={moduleMatchLength(c, navPath) > 0} collapsed={false} onNavigate={onNavigate} counts={counts} iconClass="text-navy-300" nested />
+                                    </li>
+                                  ))}
+                              </ul>
+                            )}
+                          </>
                         )}
                       </li>
                     ))}

@@ -30,6 +30,9 @@ import {
   Rocket,
   CircleDashed,
   Sparkles,
+  BarChart3,
+  PenLine,
+  Globe,
 } from 'lucide-react'
 import { SALES_EXTRA_PATHS, SALES_TAB_PATHS } from './salesTabs'
 import { REVIEW_HUB_PATH, type ToolDefinition, liveTools, movedTools, reviewTools } from './toolRegistry'
@@ -229,7 +232,12 @@ export const MODULES: ModuleDefinition[] = [
   // D-193: 유튜브 벤치마킹이 들어와 '준비 중' 을 뗐다(블로그 · 릴스 · SNS 는 화면 안에서 도입 예정)
   // D-195: 마케팅 · 브랜딩은 대표(full) 전용 — 대표의 콘텐츠 전략 · 내 채널 분석이 들어 있다. 팀장(Pilot) · 대표가 팀장 화면으로 볼 때는
   //   메뉴 · 찾기 · 휴대폰 메뉴 · 직접 주소(/marketing/…) 모두 닫힌다(isPilotHiddenPath · PilotRouteGuard 한 곳에서 — 권한 판정을 두 벌 만들지 않는다)
-  { key: 'marketing', label: '마케팅 · 브랜딩', path: '/marketing', icon: Megaphone, group: 'sales', accent: 'revenue', enabled: true, hint: '콘텐츠 레이더(YouTube 벤치마킹) · 블로그 · 릴스 · SNS(도입 예정)', ownerOnly: true },
+  { key: 'marketing', label: '마케팅 · 브랜딩', path: '/marketing', icon: Megaphone, group: 'sales', accent: 'revenue', enabled: true, hint: '콘텐츠 레이더 · 홍보 글 만들기 · 홈페이지 만들기', ownerOnly: true },
+  // D-206 대표 "이상한마케팅 툴 · 홈페이지 툴 다 마케팅 브랜딩 목차에" — 마케팅 · 브랜딩 줄 아래에 늘 펼쳐 둔 기능 줄(대표 전용).
+  //   주소는 그대로(/tools/content · /tools/homepage) — 웹 스튜디오(잘 안 쓰는 기능) 자리도 그대로 둔다(기존 입구를 없애지 않음)
+  { key: 'mk-radar', label: '콘텐츠 레이더', path: '/marketing/youtube', icon: BarChart3, group: 'sales', accent: 'revenue', enabled: true, parent: 'marketing', hint: 'YouTube 벤치마킹 — 이번 주에 찍을 주제', ownerOnly: true },
+  { key: 'mk-content', label: '홍보 글 만들기', path: '/tools/content', icon: PenLine, group: 'sales', accent: 'revenue', enabled: true, parent: 'marketing', hint: '업체 기록 → 키워드 · 블로그 · 영상 대본 · 카드뉴스 · 카톡 · 플레이스', ownerOnly: true },
+  { key: 'mk-homepage', label: '홈페이지 만들기', path: '/tools/homepage', icon: Globe, group: 'sales', accent: 'revenue', enabled: true, parent: 'marketing', hint: '업체 기록 → 업종 견본 홈페이지 · HTML 내려받기', ownerOnly: true },
   // 만들고 있는 프로그램이 들어올 자리 — 들어오면 status 를 지우고 화면만 바꾼다 (docs/DECISIONS D-103)
   { key: 'first-meeting', label: '1차 미팅 체크리스트', path: '/sales/first-meeting', icon: ClipboardCheck, group: 'sales', accent: 'revenue', enabled: true, status: 'soon', badge: 'first-meetings', hint: '영업자용 AX 1차 미팅 체크리스트 — 만드는 중', ownerOnly: true },
 

@@ -395,6 +395,7 @@ try {
   check('메뉴(D-163): 정부지원사업 줄 없음 · 영업 묶음에 지원사업 알림 없음', !nav.includes('정부지원사업') && !/영업 관리\n지원사업 알림/.test(nav), nav.replace(/\n/g, '|').slice(0, 400))
   check('Pilot(D-164): 대표 ↔ 팀장 전환 단추 없음', (await page.getByTestId('view-as-switch').count()) === 0)
   check('P3 Pilot 메뉴(D-195): 마케팅 · 브랜딩 없음(대표 전용)', !nav.includes('마케팅'), nav.replace(/\n/g, '|').slice(0, 400))
+  check('P3 Pilot 메뉴(D-206): 홍보 글 만들기 · 홈페이지 만들기 · 콘텐츠 레이더 없음(대표 전용)', !nav.includes('홍보 글') && !nav.includes('홈페이지 만들기') && !nav.includes('콘텐츠 레이더'))
   check('Pilot(D-164): 머리줄 글자 크기 단추 없음 · 보기 방식(PC · Mobile · PC+Mobile) 단추 있음', (await page.locator('header [data-testid="text-scale-quick"]').count()) === 0 && (await page.locator('header [data-testid="device-switch"]').count()) === 1)
   check('Pilot 머리줄: 고객 플랫폼 링크 없음', (await page.locator('header').innerText()).includes('고객 플랫폼') === false)
 
