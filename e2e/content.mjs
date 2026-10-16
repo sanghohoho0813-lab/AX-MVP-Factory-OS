@@ -8,6 +8,7 @@
  *        업체 기록에 붙이기(다시 열기 주소) · AI 작업실 자료로(대표) · 지우기(한 번 더 묻기) · 업체 상세 [홍보 글 만들기] 입구
  *        대표 전화 없는 가게 → 휴대폰 번호 안 들어감 · [대표 전화] 로 비움
  *  390 · 360  가로 넘침 0 · 누르는 것 44px · 먼저 만들 것 → 결과
+ *  D-207  이 칸만 채우면 · 주제 전략 · 체험단 가이드(대가 표시) · 쇼츠 30~60초 · 카드뉴스 광고 유형 · 검색량 붙여 넣기 · 한 달 계획
  *
  *   node e2e/content.mjs http://localhost:4390 [--shots <dir>]
  */
@@ -179,7 +180,7 @@ const errors = []
   await page.locator('[data-testid="content-chain-kind"][data-kind="shorts"]').click()
   await wait(300)
   const sh = await resultText(page)
-  check('12 같은 주제로 → 짧은 영상 대본(0~3초 · 말/화면 · 마무리에 회사 · 대표 전화)', (await page.getByTestId('content-result').getAttribute('data-kind')) === 'shorts' && sh.includes('0~3초') && sh.includes('말:') && sh.includes('화면:') && sh.includes('한솔정밀(주) · 031-123-4567'))
+  check('12 같은 주제로 → 짧은 영상 대본(0:00 - 0:03 · 나레이션/자막/장면 · 마무리에 회사 · 대표 전화)', (await page.getByTestId('content-result').getAttribute('data-kind')) === 'shorts' && sh.includes('0:00 - 0:03') && sh.includes('나레이션:') && sh.includes('자막:') && sh.includes('장면:') && sh.includes('한솔정밀(주) · 031-123-4567'))
 
   // 13 카톡 혜택 = (광고)
   await page.locator('[data-testid="content-kind"][data-kind="kakao"]').click()
@@ -261,6 +262,70 @@ const errors = []
   const place = await resultText(page)
   check('21 플레이스 소개 — 휴대폰 번호 안 들어감 · [대표 전화] 로 비움 · 음식 주의 안내', !place.includes('010-2222-3333') && place.includes('[대표 전화]') && /건강/.test(await page.getByTestId('content-checks').innerText()))
 
+  /* ---------------- D-207 마케팅 규칙 ---------------- */
+  await page.goto(BASE + '/tools/content/build?client=cli_site', { waitUntil: 'networkidle' })
+  await page.getByTestId('content-studio').waitFor()
+  const gapKeys = await page.getByTestId('content-profile-gap').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')))
+  check('D1 이 칸만 채우면 — 차별점이 맨 앞(업체 기록에 없음)', gapKeys[0] === 'differ', gapKeys)
+  await page.getByTestId('content-profile-gaps').click()
+  await page.getByTestId('content-ov-differ').fill('도면 받은 날 바로 견적을 회신해요')
+  await page.getByTestId('content-ov-objection').fill('소량 주문도 받아 줄까')
+  await page.getByTestId('content-ov-save').click()
+  await wait(500)
+  const gapKeys2 = await page.getByTestId('content-profile-gap').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')))
+  check('D1 차별점 · 망설이는 점 채움 → 안내에서 빠지고 홍보 정보 카드에 보임', !gapKeys2.includes('differ') && !gapKeys2.includes('objection') && (await page.getByTestId('content-profile').innerText()).includes('도면 받은 날 바로 견적을 회신해요'), gapKeys2)
+
+  await page.locator('[data-testid="content-kind"][data-kind="blog"]').click()
+  await page.locator('[data-testid="content-topic"][data-type="choose"] input').check()
+  check('D2 고른 주제에 전략 한 줄', /전략 · /.test(await page.getByTestId('content-topic-strategy').innerText()))
+  await page.getByTestId('content-make').click()
+  await wait(300)
+  const brand = await resultText(page)
+  check('D2 우리 블로그 글 — 사진 자리 · 한눈에 정리 표 · 차별점 · 망설이는 점 풀기 · 점검에 소제목/사진 자리', /\(사진 자리:/.test(brand) && brand.includes('확인할 것 | 이유') && brand.includes('도면 받은 날 바로 견적을 회신해요') && brand.includes('소량 주문도 받아 줄까') && /사진 자리 \d+곳/.test(await page.getByTestId('content-checks').innerText()), brand.slice(0, 300))
+  await page.locator('[data-testid="content-blogtype-btn"][data-value="review"]').click()
+  check('D3 체험단 가이드 고르면 단추 말도 바뀜', /체험단 가이드 만들기/.test(await page.getByTestId('content-make').innerText()))
+  await page.getByTestId('content-make').click()
+  await wait(300)
+  const guide = await resultText(page)
+  check('D3 체험단 가이드 — 제목 · 꼭 넣을 키워드 · 찍을 사진 · 대가 표시(공정위) · 점검에 대가 표시', /^체험단 가이드 · 한솔정밀\(주\)/.test(await page.getByTestId('content-result-title').innerText()) && guide.includes('꼭 넣을 키워드') && guide.includes('찍어 주세요') && guide.includes('제공받아') && /대가/.test(await page.getByTestId('content-checks').innerText()), guide.slice(0, 200))
+  await page.locator('[data-testid="content-blogtype-btn"][data-value="brand"]').click()
+
+  await page.locator('[data-testid="content-kind"][data-kind="shorts"]').click()
+  await page.locator('[data-testid="content-shortlen-btn"][data-value="30-60"]').click()
+  await page.getByTestId('content-make').click()
+  await wait(300)
+  check('D4 쇼츠 30~60초 — 6구간 · 0:38 - 0:45 · 점검에 전체 약 45초', (await resultText(page)).includes('0:38 - 0:45') && /약 45초/.test(await page.getByTestId('content-checks').innerText()))
+
+  await page.locator('[data-testid="content-kind"][data-kind="cards"]').click()
+  await page.locator('[data-testid="content-adtype-btn"][data-value="objection"]').click()
+  await page.getByTestId('content-make').click()
+  await wait(300)
+  check('D5 카드뉴스 걱정 풀기 — 표지에 손님이 망설이는 점', (await resultText(page)).includes('소량 주문도 받아 줄까, 걱정되시죠?'))
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/content-pc-adtype.png`, fullPage: false })
+
+  await page.locator('[data-testid="content-kind"][data-kind="keywords"]').click()
+  await page.getByTestId('content-make').click()
+  await wait(300)
+  await page.getByTestId('content-volume-input').fill('연관키워드\t월간검색수(PC)\t월간검색수(모바일)\n화성 금형\t1,230\t4,560\n화성 정밀가공\t< 10\t< 10\n동탄 시제품 제작\t300\t2,100')
+  await page.getByTestId('content-volume-run').click()
+  const vrows = await page.getByTestId('content-volume-row').allInnerTexts()
+  check('D6 검색량 붙여 넣기 → 많이 찾는 순(화성 금형 5,790 → 동탄 시제품 제작 → 화성 정밀가공 < 10)', vrows.length === 3 && vrows[0].includes('화성 금형') && vrows[0].includes('5,790') && vrows[1].includes('동탄 시제품 제작') && vrows[2].includes('< 10'), vrows)
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/content-pc-volume.png`, fullPage: false })
+  await page.getByTestId('content-volume-pick').nth(1).click()
+  await wait(400)
+  check('D6 "이 말로 글" → 그 키워드로 블로그 글', (await page.getByTestId('content-result').getAttribute('data-kind')) === 'blog' && (await page.getByTestId('content-result-title').innerText()).includes('동탄 시제품 제작') && (await page.getByTestId('content-keyword').inputValue()) === '동탄 시제품 제작')
+
+  await page.getByTestId('content-plan-toggle').click()
+  check('D7 한 달 계획 — 주 2회 8개', (await page.getByTestId('content-plan-slot').count()) === 8)
+  await page.locator('[data-testid="content-plan-per"][data-value="4"]').click()
+  check('D7 주 4회 16개', (await page.getByTestId('content-plan-slot').count()) === 16)
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/content-pc-plan.png`, fullPage: false })
+  const slot = page.getByTestId('content-plan-slot').nth(1)
+  const slotKind = await slot.getAttribute('data-kind')
+  await slot.click()
+  await wait(400)
+  check('D7 계획 하나 누르면 바로 그 글', (await page.getByTestId('content-result').getAttribute('data-kind')) === slotKind, slotKind)
+
   check('22 화면 오류 0', errors.length === 0, errors)
   await ctx.close()
 }
@@ -292,6 +357,26 @@ for (const width of [390, 360]) {
   )
   check(`M${width} 누르는 것 36px 이상(낱말 칩 36 · 단추 44)`, small.length === 0, small)
   if (SHOTS && width === 390) await page.screenshot({ path: `${SHOTS}/content-m390-result.png`, fullPage: false })
+  // D-207 — 한 달 계획 · 광고 유형 · 쇼츠 길이 · 검색량 칸도 휴대폰에서 넘침 0
+  await page.getByTestId('content-plan-toggle').click()
+  await page.locator('[data-testid="content-plan-per"][data-value="4"]').click()
+  await page.locator('[data-testid="content-kind"][data-kind="cards"]').click()
+  await wait(200)
+  check(`M${width} 한 달 계획 · 광고 유형 펼쳐도 가로 넘침 0`, (await over()) <= 0 && (await page.getByTestId('content-plan-slot').count()) === 16, await over())
+  if (SHOTS && width === 390) {
+    await page.getByTestId('content-plan').scrollIntoViewIfNeeded()
+    await page.screenshot({ path: `${SHOTS}/content-m390-plan.png`, fullPage: false })
+    await page.getByTestId('content-adtype').scrollIntoViewIfNeeded()
+    await page.screenshot({ path: `${SHOTS}/content-m390-adtype.png`, fullPage: false })
+  }
+  await page.locator('[data-testid="content-kind"][data-kind="keywords"]').click()
+  await page.getByTestId('content-make').click()
+  await wait(300)
+  await page.getByTestId('content-volume-input').fill('아주 긴 키워드가 들어와도 줄이 넘치지 않아야 하는 동탄 정밀 금속부품 시제품 가공\t1,230\t45,600')
+  await page.getByTestId('content-volume-run').click()
+  check(`M${width} 검색량 정리(긴 키워드) 가로 넘침 0`, (await over()) <= 0, await over())
+  const small2 = await page.locator('[data-testid="content-studio"] button:visible').evaluateAll((els) => els.map((e) => ({ t: (e.textContent || '').trim().slice(0, 20), h: Math.round(e.getBoundingClientRect().height) })).filter((x) => x.h > 0 && x.h < 36))
+  check(`M${width} D-207 새 단추도 36px 이상`, small2.length === 0, small2)
   await ctx.close()
 }
 check('23 휴대폰 화면 오류 0', errors.length === 0, errors)

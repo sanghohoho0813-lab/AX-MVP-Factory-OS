@@ -4,10 +4,12 @@
  * 순서: 업체 홍보 정보(업체 기록에서 저절로 · 고치기) → 먼저 만들 것 3개(누르면 바로 글) → 직접 고르기(형식 · 키워드 · 주제)
  *      → 결과(복사 · 다른 안 · 고치기 · 보관함 · 업체 기록에 붙이기 · 대표는 AI 작업실로) → 보관함.
  * 규칙 + 업종 견본으로 채우며 'AI' 가 아니다. 업체마다 다른 내용은 [대괄호] 로 비워 두고 점검이 알린다.
+ * D-207: 차별점 · 판매 채널 · 손님이 망설이는 점 칸, '이 칸만 채우면' 안내, 블로그 글 종류(우리 글 / 체험단 가이드), 주제 카드에 전략,
+ *        쇼츠 길이 20~30 / 30~60초, 카드뉴스 광고 유형 5가지, 키워드 검색량 붙여넣기 정리, 한 달 올릴 계획(주 2회 / 주 4회).
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, Check, ChevronRight, Copy, Info, PencilLine, RefreshCw, Save, Sparkles, Star, Trash2 } from 'lucide-react'
+import { AlertTriangle, CalendarDays, Check, ChevronDown, ChevronRight, Copy, Info, ListOrdered, PencilLine, RefreshCw, Save, Sparkles, Star, Trash2 } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { Badge, BottomSheet } from '../../components/ui/primitives'
 import { ConfirmModal } from '../../components/ui/ConfirmModal'
@@ -15,6 +17,15 @@ import { useToast } from '../../components/ui/toastContext'
 import { todayLocalDate } from '../../lib/appClock'
 import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
 import {
+  AD_TYPES,
+  AD_TYPE_HINT,
+  AD_TYPE_LABEL,
+  BLOG_TYPE_HINT,
+  BLOG_TYPE_LABEL,
+  SHORT_LEN_LABEL,
+  monthPlan,
+  parseKeywordVolumes,
+  profileGaps,
   CONTENT_KINDS,
   CONTENT_LIB,
   KIND_HINT,
@@ -38,7 +49,12 @@ import {
   type Draft,
   type DraftBlock,
   type KakaoPurpose,
+  type KeywordVolume,
+  type PlanSlot,
+  type AdType,
+  type BlogType,
   type ProfileOverrides,
+  type ShortLen,
   type Tone,
   type TopicType,
 } from '../../services/contentStudio'
@@ -78,6 +94,9 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   const [pages, setPages] = useState<5 | 7>(5)
   const [purpose, setPurpose] = useState<KakaoPurpose>('news')
   const [variant, setVariant] = useState(0)
+  const [blogType, setBlogType] = useState<BlogType>('brand')
+  const [shortLen, setShortLen] = useState<ShortLen>('20-30')
+  const [adType, setAdType] = useState<AdType>('info')
   const [shown, setShown] = useState<Shown | null>(null)
   const [editing, setEditing] = useState<DraftBlock[] | null>(null)
   const [busy, setBusy] = useState(false)
@@ -110,7 +129,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
       if (!cur || cur.item) return cur
       const inp = cur.draft.input
       const ts = topicsFor(profile, inp.keyword ?? '', today, inp.variant)
-      return { draft: makeDraft(profile, { kind: cur.draft.kind, keyword: inp.keyword, topic: ts.find((t) => t.type === inp.topicType), pages: inp.pages, purpose: inp.purpose, variant: inp.variant }, today), item: null }
+      return { draft: makeDraft(profile, { kind: cur.draft.kind, keyword: inp.keyword, topic: ts.find((t) => t.type === inp.topicType), pages: inp.pages, purpose: inp.purpose, variant: inp.variant, blogType: inp.blogType, shortLen: inp.shortLen, adType: inp.adType }, today), item: null }
     })
     setEditing(null)
   }, [profile, today])
@@ -139,13 +158,14 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
     }, 60)
   }
 
-  const generate = (over: Partial<{ kind: ContentKind; topicType: TopicType; purpose: KakaoPurpose; variant: number; pages: 5 | 7 }> = {}) => {
+  const generate = (over: Partial<{ kind: ContentKind; topicType: TopicType; purpose: KakaoPurpose; variant: number; pages: 5 | 7; keyword: string }> = {}) => {
     const k = over.kind ?? kind
     const v = over.variant ?? variant
     const tt = over.topicType ?? topicType
-    const ts = topicsFor(profile, keyword, today, v)
+    const kw = over.keyword ?? keyword
+    const ts = topicsFor(profile, kw, today, v)
     const t = ts.find((x) => x.type === tt) ?? ts[0]
-    show(makeDraft(profile, { kind: k, keyword, topic: t, pages: over.pages ?? pages, purpose: over.purpose ?? purpose, variant: v }, today))
+    show(makeDraft(profile, { kind: k, keyword: kw, topic: t, pages: over.pages ?? pages, purpose: over.purpose ?? purpose, variant: v, blogType, shortLen, adType }, today))
   }
 
   const onPick = (p: ContentPick) => {
@@ -227,6 +247,18 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
         </ul>
       </section>
 
+      <PlanCard
+        profile={profile}
+        today={today}
+        onPick={(slot) => {
+          setKind(slot.kind)
+          if (slot.topicType) setTopicType(slot.topicType)
+          if (slot.purpose) setPurpose(slot.purpose)
+          setVariant(0)
+          generate({ kind: slot.kind, topicType: slot.topicType, purpose: slot.purpose, variant: 0 })
+        }}
+      />
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:items-start">
         {/* 직접 고르기 */}
         <section className={`${card} flex flex-col gap-4 p-4 sm:p-5`} data-testid="content-maker">
@@ -251,6 +283,19 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
             </div>
           </fieldset>
 
+          {kind === 'blog' && (
+            <fieldset className="flex flex-col gap-1.5" data-testid="content-blogtype">
+              <legend className="t-sub mb-1 font-semibold text-slate-700">누가 쓰는 글인가요?</legend>
+              <div className="grid grid-cols-2 gap-2">
+                {(['brand', 'review'] as BlogType[]).map((b) => (
+                  <button key={b} type="button" aria-pressed={blogType === b} onClick={() => setBlogType(b)} data-testid="content-blogtype-btn" data-value={b} className={`tap flex min-h-[3.75rem] flex-col items-start justify-center rounded-(--radius-control) border px-3 py-2 text-left ${blogType === b ? 'border-brand-600 bg-brand-50' : 'border-slate-200 bg-white hover:border-slate-400'}`}>
+                    <span className={`t-body font-semibold break-keep ${blogType === b ? 'text-brand-800' : 'text-slate-800'}`}>{BLOG_TYPE_LABEL[b]}</span>
+                    <span className="t-meta break-keep text-slate-500">{BLOG_TYPE_HINT[b]}</span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          )}
           {NEEDS_TOPIC.has(kind) && (
             <>
               <label className="flex flex-col gap-1.5">
@@ -272,11 +317,39 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                     <span className="min-w-0">
                       <span className="t-meta font-semibold text-brand-700">{TOPIC_LABEL[t.type]}</span>
                       <span className="t-body block break-keep text-slate-800">{t.title}</span>
+                      {topicType === t.type && (
+                        <span className="t-meta mt-0.5 block break-keep text-slate-500" data-testid="content-topic-strategy">
+                          전략 · {t.strategy}
+                        </span>
+                      )}
                     </span>
                   </label>
                 ))}
               </fieldset>
             </>
+          )}
+          {kind === 'shorts' && (
+            <div className="flex flex-wrap items-center gap-2" data-testid="content-shortlen">
+              <span className="t-sub font-semibold text-slate-700">길이</span>
+              {(['20-30', '30-60'] as ShortLen[]).map((l) => (
+                <button key={l} type="button" aria-pressed={shortLen === l} onClick={() => setShortLen(l)} className={chip(shortLen === l)} data-testid="content-shortlen-btn" data-value={l}>
+                  {SHORT_LEN_LABEL[l]}
+                </button>
+              ))}
+            </div>
+          )}
+          {kind === 'cards' && (
+            <fieldset className="flex flex-col gap-1.5" data-testid="content-adtype">
+              <legend className="t-sub mb-1 font-semibold text-slate-700">어떤 마음을 움직일까요?</legend>
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                {AD_TYPES.map((a) => (
+                  <button key={a} type="button" aria-pressed={adType === a} onClick={() => setAdType(a)} data-testid="content-adtype-btn" data-value={a} className={`tap flex min-h-12 flex-col items-start justify-center rounded-(--radius-control) border px-3 py-1.5 text-left ${adType === a ? 'border-brand-600 bg-brand-50' : 'border-slate-200 bg-white hover:border-slate-400'}`}>
+                    <span className={`t-sub font-semibold break-keep ${adType === a ? 'text-brand-800' : 'text-slate-800'}`}>{AD_TYPE_LABEL[a]}</span>
+                    <span className="t-meta break-keep text-slate-500">{AD_TYPE_HINT[a]}</span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
           )}
           {kind === 'cards' && (
             <div className="flex flex-wrap items-center gap-2">
@@ -308,7 +381,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
           </div>
           <Button variant="primary" onClick={() => generate()} data-testid="content-make">
             <Sparkles className="size-4" aria-hidden="true" />
-            {KIND_LABEL[kind]} 만들기
+            {kind === 'blog' && blogType === 'review' ? '체험단 가이드 만들기' : `${KIND_LABEL[kind]} 만들기`}
           </Button>
           <p className="t-meta break-keep text-slate-500">업체 기록과 업종 견본으로 채워요(규칙 · 'AI' 아님). 업체마다 다른 곳은 [대괄호] 로 비워 둬요.</p>
         </section>
@@ -356,7 +429,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                       setVariant(v)
                       const tt = shown.draft.input.topicType ?? topicType
                       const ts = topicsFor(profile, shown.draft.input.keyword ?? keyword, today, v)
-                      show(makeDraft(profile, { kind: shown.draft.kind, keyword: shown.draft.input.keyword ?? keyword, topic: ts.find((x) => x.type === tt) ?? ts[0], pages: shown.draft.input.pages, purpose: shown.draft.input.purpose, variant: v }, today))
+                      show(makeDraft(profile, { kind: shown.draft.kind, keyword: shown.draft.input.keyword ?? keyword, topic: ts.find((x) => x.type === tt) ?? ts[0], pages: shown.draft.input.pages, purpose: shown.draft.input.purpose, variant: v, blogType: shown.draft.input.blogType, shortLen: shown.draft.input.shortLen, adType: shown.draft.input.adType }, today))
                     }}
                     data-testid="content-again"
                   >
@@ -433,6 +506,18 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                 ))}
               </ol>
 
+              {shown.draft.kind === 'keywords' && (
+                <KeywordVolumeBox
+                  onPick={(w) => {
+                    setKeyword(w)
+                    setKind('blog')
+                    setBlogType('brand')
+                    generate({ kind: 'blog', keyword: w, variant: 0 })
+                    showToast(`"${w}" 로 블로그 글을 만들었어요 — 다른 주제는 왼쪽에서 고를 수 있어요.`)
+                  }}
+                />
+              )}
+
               {NEEDS_TOPIC.has(shown.draft.kind) && shown.draft.input.topicType && (
                 <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3" data-testid="content-chain">
                   <span className="t-sub font-semibold text-slate-700">같은 주제로</span>
@@ -447,7 +532,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                           setKind(k)
                           setTopicType(shown.draft.input.topicType as TopicType)
                           setKeyword(shown.draft.input.keyword ?? keyword)
-                          show(makeDraft(profile, { kind: k, keyword: shown.draft.input.keyword, topic: topicsFor(profile, shown.draft.input.keyword ?? keyword, today, shown.draft.input.variant).find((t) => t.type === shown.draft.input.topicType), pages, variant: shown.draft.input.variant }, today))
+                          show(makeDraft(profile, { kind: k, keyword: shown.draft.input.keyword, topic: topicsFor(profile, shown.draft.input.keyword ?? keyword, today, shown.draft.input.variant).find((t) => t.type === shown.draft.input.topicType), pages, variant: shown.draft.input.variant, shortLen, adType }, today))
                         }}
                         data-testid="content-chain-kind"
                         data-kind={k}
@@ -510,8 +595,10 @@ function ProfileCard({ record, profile, source, onEdit }: { record: ClientOpsRec
     { label: '지역', value: profile.region || profile.area, missing: !profile.area },
     { label: '대표 전화', value: profile.phone, missing: !profile.phone },
     { label: '강점(사실)', value: profile.strengths.join(' · ') },
+    { label: '차별점', value: profile.differ, missing: !profile.differ },
   ]
   const missing = rows.filter((r) => r.missing).length
+  const gaps = profileGaps(profile)
   return (
     <section className={`${card} flex flex-col gap-3 p-4 sm:p-5`} data-testid="content-profile">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -535,6 +622,124 @@ function ProfileCard({ record, profile, source, onEdit }: { record: ClientOpsRec
           </div>
         ))}
       </dl>
+      {gaps.length > 0 && (
+        <button type="button" onClick={onEdit} className="tap flex w-full min-w-0 items-start gap-2 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2.5 text-left hover:border-warning-500" data-testid="content-profile-gaps">
+          <Info className="mt-0.5 size-4 shrink-0 text-warning-700" aria-hidden="true" />
+          <span className="min-w-0 flex-1">
+            <span className="t-sub block font-semibold break-keep text-warning-700">이 칸만 채우면 글이 훨씬 좋아져요 · {gaps.length}개</span>
+            <span className="mt-1 flex flex-col gap-0.5">
+              {gaps.slice(0, 3).map((g) => (
+                <span key={g.key} className="t-meta block break-keep text-slate-700" data-testid="content-profile-gap" data-key={g.key}>
+                  <b className="font-semibold text-slate-800">{g.label}</b> — {g.why}
+                </span>
+              ))}
+            </span>
+          </span>
+          <ChevronRight className="mt-0.5 size-4 shrink-0 text-warning-700" aria-hidden="true" />
+        </button>
+      )}
+    </section>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* 한 달 올릴 계획                                                        */
+/* ------------------------------------------------------------------ */
+
+const DOW = ['일', '월', '화', '수', '목', '금', '토']
+function shortDate(d: string): string {
+  const [, m, dd] = d.split('-').map(Number)
+  return `${m}/${dd} (${DOW[new Date(`${d}T00:00:00Z`).getUTCDay()]})`
+}
+
+function PlanCard({ profile, today, onPick }: { profile: ReturnType<typeof buildProfile>['profile']; today: string; onPick: (slot: PlanSlot) => void }) {
+  const [open, setOpen] = useState(false)
+  const [perWeek, setPerWeek] = useState<2 | 4>(2)
+  const slots = useMemo(() => (open ? monthPlan(profile, today, perWeek) : []), [open, profile, today, perWeek])
+  return (
+    <section className={`${card} flex flex-col gap-3 p-4 sm:p-5`} data-testid="content-plan">
+      <button type="button" className="tap flex w-full min-w-0 items-center gap-2 text-left" aria-expanded={open} onClick={() => setOpen((v) => !v)} data-testid="content-plan-toggle">
+        <CalendarDays className="size-5 shrink-0 text-brand-700" aria-hidden="true" />
+        <span className="min-w-0 flex-1">
+          <span className="t-section block break-keep text-slate-900">한 달 올릴 계획</span>
+          <span className="t-sub block break-keep text-slate-600">다음 주 월요일부터 4주 — 무엇을 언제 올릴지 정해 줘요. 하나 누르면 바로 글이 돼요.</span>
+        </span>
+        <ChevronDown className={`size-5 shrink-0 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+      </button>
+      {open && (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="t-sub font-semibold text-slate-700">얼마나 자주</span>
+            {([2, 4] as const).map((n) => (
+              <button key={n} type="button" aria-pressed={perWeek === n} onClick={() => setPerWeek(n)} className={chip(perWeek === n)} data-testid="content-plan-per" data-value={n}>
+                주 {n}회
+              </button>
+            ))}
+            <span className="t-meta text-slate-500">· {slots.length}개</span>
+          </div>
+          <ol className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-4">
+            {slots.map((sl, i) => (
+              <li key={`${sl.date}-${i}`} className="min-w-0">
+                <button type="button" onClick={() => onPick(sl)} className="tap flex w-full min-w-0 flex-col items-start gap-0.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-left hover:border-brand-400 hover:bg-brand-50" data-testid="content-plan-slot" data-kind={sl.kind}>
+                  <span className="t-meta flex w-full min-w-0 flex-wrap items-center gap-x-1.5 text-slate-500">
+                    <span className="tabular-nums">{shortDate(sl.date)}</span>
+                    <span className="font-semibold text-brand-700">{KIND_LABEL[sl.kind]}</span>
+                  </span>
+                  <span className="t-sub block w-full break-keep text-slate-800">{sl.title}</span>
+                </button>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+    </section>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* 키워드 검색량 정리                                                      */
+/* ------------------------------------------------------------------ */
+
+function KeywordVolumeBox({ onPick }: { onPick: (word: string) => void }) {
+  const [text, setText] = useState('')
+  const [rows, setRows] = useState<KeywordVolume[] | null>(null)
+  const fmt = (n: number | null, small: boolean) => (n === null ? '—' : small && n === 0 ? '< 10' : n.toLocaleString('ko-KR'))
+  return (
+    <section className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-slate-50 p-3" data-testid="content-volume">
+      <h3 className="t-sub flex items-center gap-1.5 font-semibold text-slate-800">
+        <ListOrdered className="size-4 text-brand-700" aria-hidden="true" />
+        검색량 붙여 넣어 정리하기
+      </h3>
+      <p className="t-meta break-keep text-slate-600">네이버 광고 '키워드 도구' 표를 그대로 복사해 붙여 넣으세요(키워드 · PC · 모바일 칸). 많이 찾는 순으로 줄 세워 드려요. 쉼표로 적은 목록도 돼요.</p>
+      <textarea className={`${inputClass} min-h-24 font-mono text-[0.8125rem]`} value={text} onChange={(e) => setText(e.target.value)} placeholder={'동탄 욕실 리모델링\t320\t1,450\n동탄 인테리어\t880\t3,200'} data-testid="content-volume-input" aria-label="검색량 표 붙여 넣기" />
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" onClick={() => setRows(parseKeywordVolumes(text))} disabled={!text.trim()} data-testid="content-volume-run">
+          <ListOrdered className="size-4" aria-hidden="true" />
+          정리하기
+        </Button>
+        {rows && <span className="t-meta text-slate-500" data-testid="content-volume-count">{rows.length}개{rows.length > 30 ? ' · 위 30개만 보여요' : ''}</span>}
+      </div>
+      {rows && rows.length > 0 && (
+        <ol className="flex flex-col divide-y divide-slate-200 rounded-(--radius-control) border border-slate-200 bg-white">
+          {rows.slice(0, 30).map((r, i) => (
+            <li key={r.word} className="flex min-w-0 items-center gap-2 px-3 py-2" data-testid="content-volume-row">
+              <span className="t-meta w-5 shrink-0 text-right tabular-nums text-slate-400">{i + 1}</span>
+              <span className="min-w-0 flex-1">
+                <span className="t-sub block break-keep text-slate-800">{r.word}</span>
+                {r.total !== null && (
+                  <span className="t-meta block tabular-nums text-slate-500">
+                    합 <b className="font-semibold text-slate-700">{fmt(r.total, r.small)}</b> · PC {fmt(r.pc, r.small)} · 모바일 {fmt(r.mobile, r.small)}
+                  </span>
+                )}
+              </span>
+              <Button size="sm" onClick={() => onPick(r.word)} data-testid="content-volume-pick">
+                이 말로 글
+              </Button>
+            </li>
+          ))}
+        </ol>
+      )}
+      {rows && rows.length === 0 && <p className="t-meta text-warning-700">읽을 수 있는 키워드가 없어요. 표를 그대로 복사해 붙여 넣어 주세요.</p>}
     </section>
   )
 }
@@ -549,7 +754,7 @@ function ProfileSheet({ overrides, profileItem, onClose, onSave }: { overrides: 
       .filter(Boolean)
   const [servicesText, setServicesText] = useState((overrides.services ?? []).join(', '))
   const [extraText, setExtraText] = useState((overrides.extraStrengths ?? []).join(', '))
-  const field = (label: string, key: 'item' | 'area' | 'target' | 'phone' | 'hours', placeholder: string) => (
+  const field = (label: string, key: 'item' | 'area' | 'target' | 'phone' | 'hours' | 'differ' | 'channel' | 'objection', placeholder: string) => (
     <label className="flex flex-col gap-1.5">
       <span className="t-sub font-semibold text-slate-700">{label}</span>
       <input className={inputClass} value={ov[key] ?? ''} placeholder={placeholder} onChange={(e) => setOv((p) => ({ ...p, [key]: e.target.value }))} data-testid={`content-ov-${key}`} />
@@ -604,6 +809,9 @@ function ProfileSheet({ overrides, profileItem, onClose, onSave }: { overrides: 
         </label>
         {field('대표 전화(글에 넣을 번호)', 'phone', '회사 대표 번호')}
         {field('운영 시간', 'hours', '예: 평일 09:00 – 18:00 · 토 휴무')}
+        {field('차별점(다른 곳과 다른 한 가지 · 사실만)', 'differ', '예: 시공 뒤 1년 무상 점검을 계약서에 적어 드려요')}
+        {field('판매 채널(어디서 사거나 예약하나요)', 'channel', '예: 네이버 예약 · 스마트스토어 · 전화')}
+        {field('손님이 망설이는 점', 'objection', '예: 공사 기간 동안 생활이 불편할까 봐')}
       </div>
     </BottomSheet>
   )

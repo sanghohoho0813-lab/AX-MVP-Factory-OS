@@ -5,7 +5,7 @@
  * DB 를 새로 만들지 않는다(이미 있는 module_data 표).
  * 같은 글을 두 번 넣지 않는다(지문 hash). 고쳐서 저장하면 원래 글을 지우지 않고 새 판(version)을 같은 사슬(rootId)에 단다.
  */
-import { CONTENT_KINDS, plainText, type ContentKind, type DraftBlock, type KakaoPurpose, type TopicType } from './generate'
+import { AD_TYPES, CONTENT_KINDS, plainText, type AdType, type BlogType, type ContentKind, type DraftBlock, type KakaoPurpose, type ShortLen, type TopicType } from './generate'
 import type { Tone } from './tone'
 
 export const CONTENT_MODULE = 'content'
@@ -17,7 +17,7 @@ export interface ContentItem {
   kind: ContentKind
   title: string
   blocks: DraftBlock[]
-  input: { keyword?: string; topicType?: TopicType; topicTitle?: string; pages?: 5 | 7; purpose?: KakaoPurpose; variant: number; tone: Tone }
+  input: { keyword?: string; topicType?: TopicType; topicTitle?: string; pages?: 5 | 7; purpose?: KakaoPurpose; variant: number; tone: Tone; blogType?: BlogType; shortLen?: ShortLen; adType?: AdType }
   /** 처음 글의 id — 고친 판은 모두 같은 rootId */
   rootId: string
   version: number
@@ -68,6 +68,10 @@ export function normalizeItem(id: string, raw: unknown, createdAt = '', updatedA
     ...(typeof inp.topicTitle === 'string' && inp.topicTitle ? { topicTitle: inp.topicTitle.slice(0, 120) } : {}),
     ...(inp.pages === 5 || inp.pages === 7 ? { pages: inp.pages } : {}),
     ...(typeof inp.purpose === 'string' && (PURPOSES as string[]).includes(inp.purpose) ? { purpose: inp.purpose as KakaoPurpose } : {}),
+    // D-207
+    ...(inp.blogType === 'brand' || inp.blogType === 'review' ? { blogType: inp.blogType } : {}),
+    ...(inp.shortLen === '20-30' || inp.shortLen === '30-60' ? { shortLen: inp.shortLen } : {}),
+    ...(typeof inp.adType === 'string' && (AD_TYPES as string[]).includes(inp.adType) ? { adType: inp.adType as AdType } : {}),
   }
   return {
     id,

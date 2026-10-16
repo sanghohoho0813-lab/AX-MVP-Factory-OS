@@ -33,6 +33,12 @@ export interface ContentProfile {
   /** 설립 연도(없으면 '') */
   since: string
   years: number | null
+  /** D-207 차별점 — 다른 곳과 다른 점(사람이 적은 것만 · 없으면 '') */
+  differ: string
+  /** 판매 채널 — 매장 · 온라인 · 방문 …(사람이 적은 것만) */
+  channel: string
+  /** 손님이 가장 많이 망설이는 점(사람이 적은 것만) — 카드뉴스 '망설임 풀기' 에 */
+  objection: string
 }
 
 /** 사람이 고친 칸 — 비어 있지 않은 것만 저장한다 */
@@ -46,6 +52,10 @@ export interface ProfileOverrides {
   phone?: string
   hours?: string
   tone?: Tone
+  /** D-207 */
+  differ?: string
+  channel?: string
+  objection?: string
 }
 
 export interface ProfileSource {
@@ -139,6 +149,9 @@ export function buildProfile(record: ClientOpsRecord, today: string, ov: Profile
       tone: ov.tone ?? 'friendly',
       since: /^(\d{4})/.exec(f.establishedAt)?.[1] ?? '',
       years: f.years,
+      differ: ov.differ?.trim() ?? '',
+      channel: ov.channel?.trim() ?? '',
+      objection: ov.objection?.trim() ?? '',
     },
     source: { item: itemSource, services: servicesSource, target: ov.target?.trim() ? 'override' : 'industry' },
   }
@@ -175,5 +188,25 @@ export function normalizeOverrides(raw: unknown): ProfileOverrides {
   const hours = str(r.hours, 60)
   if (hours) out.hours = hours
   if (r.tone === 'formal' || r.tone === 'friendly') out.tone = r.tone
+  const differ = str(r.differ, 200)
+  if (differ) out.differ = differ
+  const channel = str(r.channel, 60)
+  if (channel) out.channel = channel
+  const objection = str(r.objection, 120)
+  if (objection) out.objection = objection
+  return out
+}
+
+/**
+ * D-207 '이 칸만 채우면 글이 좋아져요' — 글 곳곳의 [대괄호] 를 줄이는 칸(마케팅의 핵심은 차별점을 손님 눈높이로 전하는 것).
+ * 중요한 순서대로. 화면은 첫 몇 개만 보여 준다.
+ */
+export function profileGaps(p: ContentProfile): { key: 'differ' | 'phone' | 'services' | 'hours' | 'objection'; label: string; why: string }[] {
+  const out: { key: 'differ' | 'phone' | 'services' | 'hours' | 'objection'; label: string; why: string }[] = []
+  if (!p.differ) out.push({ key: 'differ', label: '차별점', why: '다른 곳과 다른 점 한 가지 — 모든 글의 중심이에요' })
+  if (!p.phone) out.push({ key: 'phone', label: '대표 전화', why: '글 끝 문의 칸 · 카톡 · 플레이스에 들어가요' })
+  if (!p.services.length) out.push({ key: 'services', label: '하는 일', why: '소개 · 플레이스 · 해시태그에 들어가요' })
+  if (!p.hours) out.push({ key: 'hours', label: '운영 시간', why: '문의 칸 · 플레이스 이용 안내에 들어가요' })
+  if (!p.objection) out.push({ key: 'objection', label: '손님이 망설이는 점', why: '카드뉴스 · 블로그에서 그 걱정을 먼저 풀어 줘요' })
   return out
 }
