@@ -3049,5 +3049,9 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
   qa:grants 152 · qa:money 41 · qa:contract 72 · qa:connect 36 · qa:enroll 24 · qa:taxplan 72 · qa:tax 74 그대로 녹색.
 - **스크린샷 육안** — 연구소 · 정책자금 · 고용지원금 · 창업감면 칩(PC 1440 · 390) · 연구소 [가정 빼기] 뒤(PC · 390). 칩이 390 에서 두 줄로 접히고 [가정 빼기] 가 오른쪽 끝 · 가로 넘침 0(8화면 모두 -15).
 - **환경** — D-210 게이트에서 브라우저가 죽은 원인이 디스크 여유 부족(4GB)이었다 → 지난 작업 폴더의 시험 빌드 산출물(.*-out · dist-qa-*)을 지워 11GB 로 늘린 뒤 돌림.
+- **병합 전 게이트 42단계 — 한 번에 모두 녹색**(tsc · lint · build · test:all 30묶음 · simple 88 · studio 63 · board 170 · todos 44 · mobile 15 · tools 224 · tax 74 · shell 67 ·
+  modules 896 · sales 178 · journey 56 · easy 82 · steady 72 · flow 169 · real 188 · squeeze 짜부라짐 0 · phone 174 · facts 22 · detail 310 · files 33 · folder 19 · taxplan 72 ·
+  scenarios 66 · site 91 · content 98 · ownerai 59 · calendar 21 · connect 36 · enroll 24 · planner 42 · contract 72 · grants 152 · money 41 · youtube 169 · db 217 · pilot 240 ·
+  isolation 24 · cert 153). 게이트 도는 동안 다른 브라우저 시험을 같이 돌리지 않았고, 디스크 여유를 9GB 이상으로 지켰다.
 - 확인하지 못한 것: 환율 설정 줄 이름 변경이 실제 클라우드 DB 에서 두 작업실 충돌을 없애는지(로컬 · 단위로만). 자리표시 날짜와 같은 실제 생년월일 · 창업일(점검 6번) ·
   엑셀 다섯 자리 생년월일(점검 8번)은 고치지 않았다.
