@@ -103,9 +103,19 @@ export function BulkDocUploadSheet({
   }, [showSignal])
   /* D-147: 저장은 '그때의 최신 기록' 위에 — 오래 읽는 동안 다른 데서 고친 것을 덮지 않게 */
   const recordRef = useRef(record)
+  /*
+   * D-209: 이 창을 연 업체 — 올리는 동안 다른 업체로 옮겨 가도 그 업체에 저장하지 않는다.
+   * 예전에는 저장할 때의 '화면의 최신 기록' 이 옮겨 간 업체여서 A 의 서류가 B 서류함에 들어가고 B 회사 정보가 A 서류로 채워졌다.
+   */
+  const ownerId = useRef(record.id)
   useEffect(() => {
-    recordRef.current = record
+    if (record.id === ownerId.current) recordRef.current = record
   }, [record])
+  /** 저장할 때의 이 업체 최신 기록 — 화면이 다른 업체면 이 창이 들고 있는 것 */
+  const latestOwn = (): ClientOpsRecord => {
+    const l = latest ? latest() : recordRef.current
+    return l.id === ownerId.current ? l : recordRef.current
+  }
   const fileRef = useRef<HTMLInputElement>(null)
   const folderRef = useRef<HTMLInputElement>(null)
   const metas = allDocumentMetas(record).filter((m) => m.needsFile)
@@ -215,7 +225,8 @@ export function BulkDocUploadSheet({
     })
   }
 
-  const readyItems = items.filter((it) => it.status === 'ready')
+  // D-209: 못 올린 것(빨간 줄)도 다시 올릴 수 있게 — 예전에는 [고른 것 전부 올리기] 에서 빠져 다시 올릴 길이 없었다
+  const readyItems = items.filter((it) => it.status === 'ready' || it.status === 'error')
   // D-148: 이름 없는 새 칸은 '확실' 에도 넣지 않는다(고른 것 전부와 같은 기준)
   const sureItems = readyItems.filter((it) => it.result?.sure && it.target !== '' && !(it.target === NEW_CELL && it.newLabel.trim() === ''))
   const assignedItems = readyItems.filter((it) => it.target !== '' && !(it.target === NEW_CELL && it.newLabel.trim() === ''))
@@ -227,6 +238,8 @@ export function BulkDocUploadSheet({
     setPhase('uploading')
     let okCount = 0
     const doneIds: string[] = []
+    // D-209: 파일 경로도 이 창을 연 업체로(올리는 중에 화면이 바뀌어도)
+    const owner = recordRef.current
     /*
      * D-148: 두 단계로 — (1) 파일만 보관함에 올린다 (2) 다 올린 뒤 '그때의 최신 기록' 위에 칸을 정해 적는다.
      * 예전에는 시작할 때 기록을 들고 칸부터 만들었다 — 그 사이 다른 데서 저장한 것(카드 하나 올리기 · 다른 묶음)을 덮었고,
@@ -246,7 +259,7 @@ export function BulkDocUploadSheet({
         const filePatch: Partial<DocumentState> = {
           ...(uploadable
             ? // D-120: 파일만 올리고, 기록 저장은 끝에 한 번
-              await storeDocumentFile(recordRef.current, pathKey, it.file)
+              await storeDocumentFile(owner, pathKey, it.file)
             : // 이 브라우저 모드에는 파일 보관이 없다 — 받았다는 사실과 이름·발급일만 남긴다
               { received: true, fileName: it.file.name, fileSize: it.file.size }),
           // D-204: 폴더째 올렸으면 원래 폴더 경로(서류함 '폴더로 보기') — 파일 하나면 '' 로 예전 값을 지운다
@@ -263,23 +276,29 @@ export function BulkDocUploadSheet({
       }
     }
     // (2) 최신 기록 위에 칸을 정해 적는다 — 이번 묶음에서 이미 넣은 칸은 '(2)' 칸으로(덮지 않는다)
-    let rec = latest ? latest() : recordRef.current
-    /** D-147: 이미 서류함에 있던 파일(이름 · 크기 같음) — 겹친 줄 알도록 표시만 한다(올리기는 그대로) */
-    const seen = new Set(Object.values(rec.documents).filter((d) => d?.fileName).map((d) => `${d.fileName}|${d.fileSize}`))
-    const readDocs: ReadDoc[] = []
-    const placed: NonNullable<DocBatchSummary['placed']> = []
-    const used = new Set<string>()
-    for (const { it, placement, patch: filePatch } of stored) {
-      const cell = cellForPlacement(rec, placement, used)
-      rec = withDocument(cell.record, cell.key, filePatch)
-      const sig = `${it.file.name}|${it.file.size}`
-      placed.push({ fileName: it.file.name, label: cell.label, other: cell.label.startsWith(OTHER_DOC_LABEL), numbered: cell.numbered, same: seen.has(sig) })
-      seen.add(sig)
-      // D-144: 읽은 글자는 끝에 한 번에 — 회사 정보 · 크레탑 · 명부.
-      // D-148: '사업자등록증 (2)' 칸에 들어가도 사업자등록증으로 읽는다(칸 키가 아니라 서류 종류로)
-      const factKey: DocumentKey = placement.kind === 'existing' ? placement.key : cell.key
-      readDocs.push({ key: factKey, fileName: it.file.name, text: it.text, method: it.method, docSure: Boolean(it.result?.sure) || it.manual })
+    const placeOn = (base: ClientOpsRecord) => {
+      let rec = base
+      /** D-147: 이미 서류함에 있던 파일(이름 · 크기 같음) — 겹친 줄 알도록 표시만 한다(올리기는 그대로) */
+      const seen = new Set(Object.values(rec.documents).filter((d) => d?.fileName).map((d) => `${d.fileName}|${d.fileSize}`))
+      const readDocs: ReadDoc[] = []
+      const placed: NonNullable<DocBatchSummary['placed']> = []
+      const used = new Set<string>()
+      for (const { it, placement, patch: filePatch } of stored) {
+        const cell = cellForPlacement(rec, placement, used)
+        rec = withDocument(cell.record, cell.key, filePatch)
+        const sig = `${it.file.name}|${it.file.size}`
+        placed.push({ fileName: it.file.name, label: cell.label, other: cell.label.startsWith(OTHER_DOC_LABEL), numbered: cell.numbered, same: seen.has(sig) })
+        seen.add(sig)
+        // D-144: 읽은 글자는 끝에 한 번에 — 회사 정보 · 크레탑 · 명부.
+        // D-148: '사업자등록증 (2)' 칸에 들어가도 사업자등록증으로 읽는다(칸 키가 아니라 서류 종류로)
+        const factKey: DocumentKey = placement.kind === 'existing' ? placement.key : cell.key
+        readDocs.push({ key: factKey, fileName: it.file.name, text: it.text, method: it.method, docSure: Boolean(it.result?.sure) || it.manual })
+      }
+      return { rec, readDocs, placed }
     }
+    let base = latestOwn()
+    let { rec, readDocs, placed } = placeOn(base)
+    const failed = targets.length - okCount
     // D-122: 하나도 못 올렸으면 저장하지 않는다('0건을 올렸습니다' 라고 하지 않게)
     if (okCount === 0) {
       showToast('올린 서류가 없습니다. 빨간 줄의 까닭을 확인하고 다시 올려 주세요.')
@@ -288,7 +307,15 @@ export function BulkDocUploadSheet({
       return
     }
     try {
-      const analyzed = await analyzeUploadedDocs(rec, readDocs, { now: nowIso(), today: todayLocalDate(), makeId: generateId })
+      const ctx = { now: nowIso(), today: todayLocalDate(), makeId: generateId }
+      let analyzed = await analyzeUploadedDocs(rec, readDocs, ctx)
+      // D-209: 읽는 동안 다른 데서 이 업체를 저장했으면(창을 숨긴 채 고친 것 · 다른 묶음) 그 최신 기록 위에 다시 얹는다 — 덮지 않게
+      const now = latestOwn()
+      if (now !== base) {
+        base = now
+        ;({ rec, readDocs, placed } = placeOn(base))
+        analyzed = await analyzeUploadedDocs(rec, readDocs, ctx)
+      }
       // D-183: 올리기 기록을 업체에 남긴다 — 새로고침해도 '올린 서류' 가 보이고, '확인할 것' 이 바로 넣은 값을 한 번 더 묻는다
       const summary = { ...analyzed.summary, files: okCount, placed }
       const saved = await saveClient(withUploadSummary(analyzed.record, summary, `up_${generateId()}`))
@@ -301,12 +328,16 @@ export function BulkDocUploadSheet({
         sm.cretop ? '크레탑 분석 붙임' : '',
         sm.roster ? `명부 진단(후보 지원금 ${sm.roster.candidates}건)` : '',
       ].filter(Boolean)
+      // D-209: 어느 업체에 올렸는지 함께(다른 업체 화면에서 끝나도 헷갈리지 않게) · 못 올린 파일은 창에 남겨 다시 올리게
       showToast(
-        (uploadable ? `서류 ${okCount}건을 서류함에 올렸습니다.` : `서류 ${okCount}건을 서류함에 기록했습니다. 파일 자체는 클라우드 연결 후 보관됩니다.`) +
+        `${saved.companyName} — ` +
+          (uploadable ? `서류 ${okCount}건을 서류함에 올렸습니다.` : `서류 ${okCount}건을 서류함에 기록했습니다. 파일 자체는 클라우드 연결 후 보관됩니다.`) +
+          (failed ? ` 못 올린 ${failed}건은 창에 빨간 줄로 남겨 두었습니다 — [다시 올리기] 를 눌러 주세요.` : '') +
           (others ? ` 무슨 서류인지 모르는 ${others}건은 '${OTHER_DOC_LABEL}' 칸에 있습니다.` : '') +
           (tail.length ? ` ${tail.join(' · ')} — 맞춤 추천에서 보세요.` : ''),
       )
-      if (opts.closeWhenDone) onClose()
+      if (opts.closeWhenDone && failed === 0) onClose()
+      else if (failed > 0) setHidden(false)
     } catch (cause) {
       // D-122: 파일은 올라갔는데 업체 기록 저장이 실패했다 — 초록 체크로 두면 다시 올릴 수 없으니 '다시 올리기' 로 되돌린다
       for (const id of doneIds) patch(id, { status: 'ready', error: '업체 기록에 저장하지 못했습니다 — 다시 올려 주세요' })
@@ -486,7 +517,7 @@ export function BulkDocUploadSheet({
                       </span>
                     )}
                     {it.status === 'done' && (
-                      <span className="shrink-0 rounded-full border border-success-200 bg-success-50 px-2 py-0.5 t-meta font-bold text-success-700">
+                      <span className="max-w-full rounded-full border border-success-200 bg-success-50 px-2 py-0.5 t-meta font-bold text-success-700 [overflow-wrap:anywhere]">
                         올림 · {targetLabel}
                       </span>
                     )}
@@ -495,7 +526,14 @@ export function BulkDocUploadSheet({
                   {it.status === 'reading' && it.progress && (
                     <p className="t-sub text-slate-500">{it.progress.label}</p>
                   )}
-                  {(it.status === 'error' || (it.status === 'ready' && it.error !== '')) && <p className="t-sub text-danger-700">{it.error}</p>}
+                  {(it.status === 'error' || (it.status === 'ready' && it.error !== '')) && <p className="t-sub break-keep text-danger-700 [overflow-wrap:anywhere]">{it.error}</p>}
+                  {it.status === 'error' && (
+                    <div>
+                      <Button variant="secondary" size="sm" disabled={busy} onClick={() => void upload([it])} data-testid="bulk-retry">
+                        다시 올리기
+                      </Button>
+                    </div>
+                  )}
 
                   {it.status === 'ready' && it.result && (
                     <>

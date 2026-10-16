@@ -46,7 +46,10 @@ import {
   TOPIC_LABEL,
   buildProfile,
   draftChecks,
+  fillHoles,
   firstPicks,
+  holeGroups,
+  holeNames,
   keywordGroups,
   latestByRoot,
   mainKeyword,
@@ -98,6 +101,8 @@ interface PackState {
   fill: string[]
   items: { tab: string; draft: Draft }[]
   saved: (ContentItem | null)[]
+  /** D-209 저장 전 글을 고치거나 빈 칸을 채운 탭 — 다른 글로 넘어가기 전에 묻는다 */
+  touched: boolean[]
   at: number
 }
 
@@ -126,7 +131,13 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   const [shortLen, setShortLen] = useState<ShortLen>('20-30')
   const [adType, setAdType] = useState<AdType>('info')
   const [shown, setShown] = useState<Shown | null>(null)
+  /** 고친 글(저장 전) — 고치기 칸을 닫아도 남는다 */
   const [editing, setEditing] = useState<DraftBlock[] | null>(null)
+  /** D-209 고치기 칸이 열려 있는지 — '고치기 그만' 은 칸만 닫고 고친 글은 남긴다(전에는 말없이 버렸다) */
+  const [editOpen, setEditOpen] = useState(false)
+  useEffect(() => {
+    if (!editing) setEditOpen(false)
+  }, [editing])
   const [busy, setBusy] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [pack, setPack] = useState<PackState | null>(null)
@@ -161,7 +172,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
     if (pk) {
       // 묶음은 통째로 새 말투로 — 이미 저장한 글은 보관함에 그대로 있다
       const sp = situationPack(profile, pk.key, today, holidaysAround(today))
-      const next = { ...pk, items: sp.items, saved: sp.items.map(() => null) }
+      const next = { ...pk, items: sp.items, saved: sp.items.map(() => null), touched: sp.items.map(() => false) }
       setPack(next)
       setShown((cur) => (cur && !cur.item ? { draft: next.items[next.at]?.draft ?? cur.draft, item: null } : cur))
       setEditing(null)
@@ -178,27 +189,42 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
 
   // 고치는 중에 창을 닫으면 묻는다
   const dirty = !!editing && !!shown && JSON.stringify(editing) !== JSON.stringify(shown.draft.blocks)
+  // D-209 묶음의 다른 탭에 저장 전 고침 · 채움이 남아 있는지
+  const packTouched = !!pack && pack.touched.some((t, i) => t && !pack.saved[i])
+  const unsaved = dirty || packTouched
+  const [leaveAsk, setLeaveAsk] = useState<{ run: () => void } | null>(null)
+  /** D-209 저장 전 고침이 있으면 다른 글을 열기 전에 묻는다(말없이 사라지지 않게) */
+  const guard = (run: () => void) => (unsaved ? setLeaveAsk({ run }) : run())
   useEffect(() => {
-    if (!dirty) return
+    if (!unsaved) return
     const h = (e: BeforeUnloadEvent) => {
       e.preventDefault()
       e.returnValue = ''
     }
     window.addEventListener('beforeunload', h)
     return () => window.removeEventListener('beforeunload', h)
-  }, [dirty])
+  }, [unsaved])
 
-  const show = (d: Draft, item: ContentItem | null = null, keepPack = false) => {
-    setShown({ draft: d, item })
-    setEditing(null)
-    if (!keepPack) setPack(null)
-    // 창만 굴린다 — scrollIntoView 는 overflow 가 숨겨진 바깥 상자까지 굴려서 머리줄 · 메뉴가 밀렸다
+  // 창만 굴린다 — scrollIntoView 는 overflow 가 숨겨진 바깥 상자까지 굴려서 머리줄 · 메뉴가 밀렸다
+  const toResult = () =>
     window.setTimeout(() => {
       const el = resultRef.current
       if (!el) return
       const top = el.getBoundingClientRect().top + window.scrollY - 88
       window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
     }, 60)
+
+  const show = (d: Draft, item: ContentItem | null = null, keepPack = false) => {
+    setShown({ draft: d, item })
+    setEditing(null)
+    if (!keepPack) setPack(null)
+    toResult()
+  }
+
+  /** 보관함 · 계획 칸에서 글 열기 — 이미 띄운 글이면 그 자리로만(고치던 것 그대로) */
+  const openItem = (it: ContentItem) => {
+    if (shown?.item?.rootId === it.rootId) return toResult()
+    guard(() => show({ kind: it.kind, title: it.title, blocks: it.blocks, notes: [], input: it.input }, it))
   }
 
   const generate = (over: Partial<{ kind: ContentKind; topicType: TopicType; purpose: KakaoPurpose; variant: number; pages: 5 | 7; keyword: string }> = {}) => {
@@ -222,6 +248,30 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   const blocks = editing ?? shown?.draft.blocks ?? []
   const checks = shown ? draftChecks(shown.draft.kind, blocks, profile.industry, shown.draft.input.keyword) : []
   const text = shown ? plainText(shown.draft.kind, blocks) : ''
+  // D-209 [대괄호] 한 번에 채우기 — 묶음이면 지금 글 + 저장 전 탭 모두
+  const fillNames = shown ? holeNames(pack ? [blocks, ...pack.items.filter((_, j) => j !== pack.at && !pack.saved[j]).map((x) => x.draft.blocks)] : [blocks]) : []
+  const applyFill = (vals: Record<string, string>, drop: string[]) => {
+    if (!shown) return
+    const cur = fillHoles(blocks, vals, drop)
+    let tabs = cur.filled ? 1 : 0
+    let spots = cur.filled
+    if (cur.filled) setEditing(cur.blocks)
+    if (pack) {
+      const touched = [...pack.touched]
+      const items = pack.items.map((x, j) => {
+        if (j === pack.at || pack.saved[j]) return x
+        const r = fillHoles(x.draft.blocks, vals, drop)
+        if (!r.filled) return x
+        tabs += 1
+        spots += r.filled
+        touched[j] = true
+        return { ...x, draft: { ...x.draft, blocks: r.blocks } }
+      })
+      setPack({ ...pack, items, touched })
+    }
+    const kept = pack ? pack.saved.filter((x, j) => x && j !== pack.at).length : 0
+    showToast(spots ? `빈 칸 ${spots}곳을 채웠어요${pack ? `(글 ${tabs}편)` : ''} — 저장해야 남아요.${kept ? ` 이미 저장한 ${kept}편은 그대로예요.` : ''}` : '넣을 값을 적어 주세요.')
+  }
 
   const copy = async (t: string, what = '글') => showToast((await copyToClipboard(t)) ? `${what}을 복사했어요.` : '복사하지 못했어요 — 글을 길게 눌러 복사해 주세요.')
 
@@ -252,21 +302,27 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
 
   /** D-208 상황 하나 → 묶음 */
   const openPack = (key: SituationKey) => {
+    // D-209 이미 연 묶음을 다시 누르면 새로 만들지 않고 그 자리로(채우던 것 그대로)
+    if (pack?.key === key) return toResult()
     const sp = situationPack(profile, key, today, holidays)
     if (!sp.items.length) return
-    setPack({ key, label: sp.situation.label, fill: sp.situation.fill, items: sp.items, saved: sp.items.map(() => null), at: 0 })
-    show(sp.items[0].draft, null, true)
+    guard(() => {
+      setPack({ key, label: sp.situation.label, fill: sp.situation.fill, items: sp.items, saved: sp.items.map(() => null), touched: sp.items.map(() => false), at: 0 })
+      show(sp.items[0].draft, null, true)
+    })
   }
 
   const packGo = (i: number) => {
     if (!pack || i === pack.at || !shown) return
     let items = pack.items
+    let touched = pack.touched
     if (dirty) {
       // 저장 전 글을 고치던 중이면 고친 글을 묶음에 남기고 넘어간다 · 저장한 글을 고치던 중이면 먼저 저장하라고 알린다
       if (shown.item) return showToast('고친 글을 먼저 [고친 판으로 저장] 해 주세요.')
       items = items.map((x, j) => (j === pack.at && editing ? { ...x, draft: { ...x.draft, blocks: editing } } : x))
+      touched = touched.map((t, j) => t || j === pack.at)
     }
-    setPack({ ...pack, items, at: i })
+    setPack({ ...pack, items, touched, at: i })
     show(items[i].draft, pack.saved[i], true)
   }
 
@@ -334,7 +390,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
         <ul className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
           {picks.map((p, i) => (
             <li key={p.key}>
-              <button type="button" onClick={() => onPick(p)} className="tap flex h-full w-full flex-col items-start gap-1 rounded-(--radius-control) border border-brand-200 bg-white p-3 text-left hover:border-brand-500" data-testid="content-pick" data-key={p.key} data-kind={p.kind}>
+              <button type="button" onClick={() => guard(() => onPick(p))} className="tap flex h-full w-full flex-col items-start gap-1 rounded-(--radius-control) border border-brand-200 bg-white p-3 text-left hover:border-brand-500" data-testid="content-pick" data-key={p.key} data-kind={p.kind}>
                 <span className="flex w-full items-center gap-2">
                   <span className="t-meta flex size-6 shrink-0 items-center justify-center rounded-full bg-brand-600 font-bold text-white">{i + 1}</span>
                   <span className="t-body min-w-0 flex-1 font-semibold break-keep text-slate-900">{p.label}</span>
@@ -354,15 +410,17 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
         profile={profile}
         today={today}
         store={store}
-        onOpen={(it) => show({ kind: it.kind, title: it.title, blocks: it.blocks, notes: [], input: it.input }, it)}
-        onPick={(slot) => {
-          setKind(slot.kind)
-          if (slot.topicType) setTopicType(slot.topicType)
-          if (slot.purpose) setPurpose(slot.purpose)
-          setVariant(0)
-          // D-208 고침: 계획 칸에서 만든 글에도 올릴 날을 달아 저장하면 그 칸이 '만듦' 이 된다
-          show(planDrafts(profile, [slot], today, (d) => !!sameContent(store.items, d.kind, d.blocks))[0])
-        }}
+        onOpen={openItem}
+        onPick={(slot) =>
+          guard(() => {
+            setKind(slot.kind)
+            if (slot.topicType) setTopicType(slot.topicType)
+            if (slot.purpose) setPurpose(slot.purpose)
+            setVariant(0)
+            // D-208 고침: 계획 칸에서 만든 글에도 올릴 날을 달아 저장하면 그 칸이 '만듦' 이 된다
+            show(planDrafts(profile, [slot], today, (d) => !!sameContent(store.items, d.kind, d.blocks))[0])
+          })
+        }
       />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:items-start">
@@ -480,12 +538,12 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
           <div className="flex flex-wrap items-center gap-2">
             <span className="t-sub w-full font-semibold text-slate-700">말투</span>
             {(['friendly', 'formal'] as Tone[]).map((t) => (
-              <button key={t} type="button" aria-pressed={profile.tone === t} onClick={() => void store.saveOverrides({ ...store.overrides, tone: t })} className={chip(profile.tone === t)} data-testid="content-tone" data-tone={t}>
+              <button key={t} type="button" aria-pressed={profile.tone === t} onClick={() => (profile.tone === t ? undefined : guard(() => void store.saveOverrides({ ...store.overrides, tone: t })))} className={chip(profile.tone === t)} data-testid="content-tone" data-tone={t}>
                 {TONE_LABEL[t]}
               </button>
             ))}
           </div>
-          <Button variant="primary" onClick={() => generate()} data-testid="content-make">
+          <Button variant="primary" onClick={() => guard(() => generate())} data-testid="content-make">
             <Sparkles className="size-4" aria-hidden="true" />
             {kind === 'blog' && blogType === 'review' ? '체험단 가이드 만들기' : `${KIND_LABEL[kind]} 만들기`}
           </Button>
@@ -529,6 +587,11 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone="brand">{KIND_LABEL[shown.draft.kind]}</Badge>
                 {shown.item && <Badge tone="success">보관함 · {shown.item.version}판</Badge>}
+                {dirty && (
+                  <span data-testid="content-unsaved">
+                    <Badge tone="warning">고친 내용 · 저장 전</Badge>
+                  </span>
+                )}
                 {shown.item?.postedAt && <Badge tone="success">올림 · {localDateOf(shown.item.postedAt).slice(5).replace('-', '/')}</Badge>}
                 {shown.draft.input.topicType && <Badge>{TOPIC_LABEL[shown.draft.input.topicType]}</Badge>}
               </div>
@@ -553,6 +616,8 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                 </ul>
               )}
 
+              {fillNames.length > 0 && <FillBox key={`fill-${pack ? `pack-${pack.key}` : (shown.item?.rootId ?? shown.draft.title)}`} names={fillNames} scope={pack ? `저장 전 글 ${1 + pack.items.filter((_, j) => j !== pack.at && !pack.saved[j]).length}편` : '이 글'} onApply={applyFill} />}
+
               <div className="flex flex-wrap gap-2">
                 <Button variant="primary" size="sm" onClick={() => void copy(text)} data-testid="content-copy">
                   <Copy className="size-4" aria-hidden="true" />
@@ -561,22 +626,33 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                 {!shown.item && !pack && (
                   <Button
                     size="sm"
-                    onClick={() => {
-                      const v = variant + 1
-                      setVariant(v)
-                      const tt = shown.draft.input.topicType ?? topicType
-                      const ts = topicsFor(profile, shown.draft.input.keyword ?? keyword, today, v)
-                      show(makeDraft(profile, { kind: shown.draft.kind, keyword: shown.draft.input.keyword ?? keyword, topic: ts.find((x) => x.type === tt) ?? ts[0], pages: shown.draft.input.pages, purpose: shown.draft.input.purpose, variant: v, blogType: shown.draft.input.blogType, shortLen: shown.draft.input.shortLen, adType: shown.draft.input.adType }, today))
-                    }}
+                    onClick={() =>
+                      guard(() => {
+                        const v = variant + 1
+                        setVariant(v)
+                        const tt = shown.draft.input.topicType ?? topicType
+                        const ts = topicsFor(profile, shown.draft.input.keyword ?? keyword, today, v)
+                        show(makeDraft(profile, { kind: shown.draft.kind, keyword: shown.draft.input.keyword ?? keyword, topic: ts.find((x) => x.type === tt) ?? ts[0], pages: shown.draft.input.pages, purpose: shown.draft.input.purpose, variant: v, blogType: shown.draft.input.blogType, shortLen: shown.draft.input.shortLen, adType: shown.draft.input.adType }, today))
+                      })
+                    }
                     data-testid="content-again"
                   >
                     <RefreshCw className="size-4" aria-hidden="true" />
                     다른 안
                   </Button>
                 )}
-                <Button size="sm" onClick={() => setEditing(editing ? null : shown.draft.blocks.map((b) => ({ ...b })))} data-testid="content-edit" aria-pressed={!!editing}>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (editOpen) return setEditOpen(false)
+                    setEditing((e) => e ?? shown.draft.blocks.map((b) => ({ ...b })))
+                    setEditOpen(true)
+                  }}
+                  data-testid="content-edit"
+                  aria-pressed={editOpen}
+                >
                   <PencilLine className="size-4" aria-hidden="true" />
-                  {editing ? '고치기 그만' : '고치기'}
+                  {editOpen ? '고치기 그만' : '고치기'}
                 </Button>
                 <Button size="sm" onClick={() => void save()} disabled={busy || (!!shown.item && !dirty)} data-testid="content-save">
                   <Save className="size-4" aria-hidden="true" />
@@ -607,7 +683,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                             {b.hint && <span className="t-meta break-keep text-slate-500">{b.hint}</span>}
                           </p>
                         )}
-                        {editing ? (
+                        {editOpen && editing ? (
                           <textarea
                             className={`${inputClass} mt-1 min-h-24 font-normal`}
                             value={b.text}
@@ -639,7 +715,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                           <p className="t-body mt-1 break-words whitespace-pre-wrap text-slate-700">{b.text}</p>
                         )}
                       </div>
-                      {!editing && (
+                      {!editOpen && (
                         <button type="button" className="tap flex size-11 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-white hover:text-slate-800" onClick={() => void copy(b.label ? `${b.label}\n${b.text}` : b.text, '이 칸')} aria-label={`${b.label || b.hint || '이 칸'} 복사`}>
                           <Copy className="size-4" aria-hidden="true" />
                         </button>
@@ -651,13 +727,15 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
 
               {shown.draft.kind === 'keywords' && (
                 <KeywordVolumeBox
-                  onPick={(w) => {
-                    setKeyword(w)
-                    setKind('blog')
-                    setBlogType('brand')
-                    generate({ kind: 'blog', keyword: w, variant: 0 })
-                    showToast(`"${w}" 로 블로그 글을 만들었어요 — 다른 주제는 왼쪽에서 고를 수 있어요.`)
-                  }}
+                  onPick={(w) =>
+                    guard(() => {
+                      setKeyword(w)
+                      setKind('blog')
+                      setBlogType('brand')
+                      generate({ kind: 'blog', keyword: w, variant: 0 })
+                      showToast(`"${w}" 로 블로그 글을 만들었어요 — 다른 주제는 왼쪽에서 고를 수 있어요.`)
+                    })
+                  }
                 />
               )}
 
@@ -671,12 +749,14 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                         key={k}
                         size="sm"
                         variant="ghost"
-                        onClick={() => {
-                          setKind(k)
-                          setTopicType(shown.draft.input.topicType as TopicType)
-                          setKeyword(shown.draft.input.keyword ?? keyword)
-                          show(makeDraft(profile, { kind: k, keyword: shown.draft.input.keyword, topic: topicsFor(profile, shown.draft.input.keyword ?? keyword, today, shown.draft.input.variant).find((t) => t.type === shown.draft.input.topicType), pages, variant: shown.draft.input.variant, shortLen, adType }, today))
-                        }}
+                        onClick={() =>
+                          guard(() => {
+                            setKind(k)
+                            setTopicType(shown.draft.input.topicType as TopicType)
+                            setKeyword(shown.draft.input.keyword ?? keyword)
+                            show(makeDraft(profile, { kind: k, keyword: shown.draft.input.keyword, topic: topicsFor(profile, shown.draft.input.keyword ?? keyword, today, shown.draft.input.variant).find((t) => t.type === shown.draft.input.topicType), pages, variant: shown.draft.input.variant, shortLen, adType }, today))
+                          })
+                        }
                         data-testid="content-chain-kind"
                         data-kind={k}
                       >
@@ -710,7 +790,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
 
       <ArchiveCard
         store={store}
-        onOpen={(it) => show({ kind: it.kind, title: it.title, blocks: it.blocks, notes: [], input: it.input }, it)}
+        onOpen={openItem}
         onPosted={(it) => void togglePosted(it)}
         onRemoved={(rootId) => {
           // D-208 고침: 화면에 띄운 글을 지우면 결과 칸도 비운다(지운 글을 '올렸어요' · '고친 판' 으로 되살리지 않게)
@@ -721,6 +801,23 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
           setPack((pk) => (pk ? { ...pk, saved: pk.saved.map((x) => (x?.rootId === rootId ? null : x)) } : pk))
         }}
         openId={shown?.item?.rootId ?? null}
+      />
+
+      <ConfirmModal
+        open={!!leaveAsk}
+        title="저장하지 않은 고침이 있어요"
+        message={packTouched && !dirty ? '묶음에서 채우거나 고친 글이 아직 보관함에 없어요. 넘어가면 그 내용이 사라져요.' : '고친 내용이 아직 저장되지 않았어요. 넘어가면 고친 내용이 사라져요.'}
+        confirmLabel="고침 버리고 넘어가기"
+        cancelLabel="계속 고치기"
+        danger
+        onCancel={() => setLeaveAsk(null)}
+        onConfirm={() => {
+          const run = leaveAsk?.run
+          setLeaveAsk(null)
+          setEditing(null)
+          if (pack) setPack((pk) => (pk ? { ...pk, touched: pk.touched.map(() => false) } : pk))
+          run?.()
+        }}
       />
 
       {profileOpen && (
@@ -827,6 +924,9 @@ function PlanCard({ record, profile, today, store, onPick, onOpen }: { record: C
   const states = useMemo(() => planSlotStates(slots, store.items), [slots, store.items])
   const made = states.filter((x) => x.item).length
   const posted = states.filter((x) => x.posted).length
+  // D-209 접어 둬도 다음에 올릴 글 하나는 보이게 · 지난 날인데 안 올린 글 수
+  const nextAt = running ? slots.findIndex((sl, i) => !states[i].posted && sl.date >= today) : -1
+  const late = running ? slots.filter((sl, i) => !states[i].posted && sl.date < today).length : 0
   const deadlines = slots.map((sl) => ({ date: sl.date, title: `홍보 글 올리기 · ${KIND_LABEL[sl.kind]}`, note: sl.title }))
 
   const makeAll = async () => {
@@ -859,6 +959,27 @@ function PlanCard({ record, profile, today, store, onPick, onOpen }: { record: C
         </span>
         <ChevronDown className={`size-5 shrink-0 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
       </button>
+      {!open && running && (nextAt >= 0 || late > 0) && (
+        <div className="flex flex-col gap-1.5 border-t border-slate-100 pt-3" data-testid="content-plan-next">
+          {nextAt >= 0 && (
+            <button type="button" onClick={() => (states[nextAt].item ? onOpen(states[nextAt].item as ContentItem) : onPick(slots[nextAt]))} className="tap flex w-full min-w-0 items-center gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50/60 px-3 py-2 text-left hover:border-brand-400" data-testid="content-plan-next-open">
+              <span className="min-w-0 flex-1">
+                <span className="t-meta block font-semibold text-brand-700">
+                  {slots[nextAt].date === today ? '오늘 올릴 글' : '다음에 올릴 글'} · {shortDate(slots[nextAt].date)} · {KIND_LABEL[slots[nextAt].kind]}
+                  {states[nextAt].item ? ' · 만듦' : ''}
+                </span>
+                <span className="t-sub block break-keep text-slate-800">{slots[nextAt].title}</span>
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-brand-600" aria-hidden="true" />
+            </button>
+          )}
+          {late > 0 && (
+            <p className="t-meta break-keep text-warning-700" data-testid="content-plan-late">
+              올릴 날이 지났는데 아직 안 올린 글 {late}편 — 펼쳐서 확인해 주세요.
+            </p>
+          )}
+        </div>
+      )}
       {open && (
         <>
           <div className="flex flex-wrap items-center gap-2">
@@ -992,6 +1113,68 @@ function SituationCard({ profile, today, holidays, openKey, onPick }: { profile:
         </button>
       )}
     </section>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* [대괄호] 한 번에 채우기 (D-209)                                          */
+/* ------------------------------------------------------------------ */
+
+function FillBox({ names, scope, onApply }: { names: string[]; scope: string; onApply: (vals: Record<string, string>, drop: string[]) => void }) {
+  const [open, setOpen] = useState(false)
+  // 같은 이름(— 앞)은 입력 하나로 — 적은 값은 묶인 [대괄호] 모두에
+  const groups = useMemo(() => holeGroups(names), [names])
+  const [vals, setVals] = useState<Record<string, string>>({})
+  const [drop, setDrop] = useState<string[]>([])
+  const ready = groups.some((g) => vals[g.label]?.trim() || drop.includes(g.label))
+  const apply = () => {
+    const out: Record<string, string> = {}
+    const dropNames: string[] = []
+    for (const g of groups) {
+      if (drop.includes(g.label)) dropNames.push(...g.names)
+      else for (const n of g.names) out[n] = vals[g.label] ?? ''
+    }
+    onApply(out, dropNames)
+  }
+  return (
+    <div className="rounded-(--radius-control) border border-warning-200 bg-warning-50/60" data-testid="content-fill">
+      <button type="button" className="tap flex min-h-11 w-full min-w-0 items-center gap-2 px-3 py-2 text-left" aria-expanded={open} onClick={() => setOpen((v) => !v)} data-testid="content-fill-toggle">
+        <PencilLine className="size-4 shrink-0 text-warning-700" aria-hidden="true" />
+        <span className="t-sub min-w-0 flex-1 font-semibold break-keep text-slate-800">
+          빈 칸 {groups.length}가지 한 번에 채우기 <span className="font-normal text-slate-600">· 적으면 {scope}의 같은 [대괄호] 가 모두 바뀌어요</span>
+        </span>
+        <ChevronDown className={`size-5 shrink-0 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+      </button>
+      {open && (
+        <div className="flex flex-col gap-2.5 border-t border-warning-200 px-3 pt-2.5 pb-3">
+          {groups.map((g) => {
+            const off = drop.includes(g.label)
+            return (
+              <div key={g.label} className="flex min-w-0 flex-col gap-1" data-testid="content-fill-row">
+                <label className="flex min-w-0 flex-col gap-1">
+                  <span className="t-sub min-w-0 font-semibold break-keep text-slate-700 [overflow-wrap:anywhere]">{g.label}</span>
+                  {g.hint && <span className="t-meta min-w-0 break-keep text-slate-500 [overflow-wrap:anywhere]">{g.hint}</span>}
+                  <input className={inputClass} value={vals[g.label] ?? ''} disabled={off} maxLength={200} onChange={(e) => setVals((v) => ({ ...v, [g.label]: e.target.value }))} data-testid="content-fill-input" data-name={g.label} />
+                </label>
+                {g.optional && (
+                  <label className="tap t-sub flex min-h-11 w-fit cursor-pointer items-center gap-2 text-slate-700">
+                    <input type="checkbox" className="size-4 accent-brand-600" checked={off} onChange={(e) => setDrop((d) => (e.target.checked ? [...d, g.label] : d.filter((x) => x !== g.label)))} data-testid="content-fill-drop" />
+                    없어요 — 이 줄 지우기
+                  </label>
+                )}
+              </div>
+            )
+          })}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="primary" disabled={!ready} onClick={apply} data-testid="content-fill-apply">
+              <Check className="size-4" aria-hidden="true" />
+              {scope}에 넣기
+            </Button>
+            <span className="t-meta break-keep text-slate-500">비운 칸은 [대괄호] 그대로 남아요.</span>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 

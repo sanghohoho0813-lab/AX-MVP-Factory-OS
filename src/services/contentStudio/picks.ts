@@ -2,6 +2,7 @@
  * 먼저 만들 것 (D-203) — 업체 기록 · 이번 달 · 이미 만든 글을 보고 3개를 고른다. 누르면 그 업체 글이 바로 나온다.
  * 왜 골랐는지(why)는 사실로만 적는다.
  */
+import { localDateOf } from '../../lib/appClock'
 import { particle } from '../../lib/josa'
 import { contentLib } from './library'
 import { seasonHook, type ContentKind, type KakaoPurpose, type TopicType } from './generate'
@@ -23,8 +24,9 @@ export interface MadeItem {
   createdAt: string
 }
 
+/** a = 저장 시각(ISO, UTC) · b = 오늘(로컬 날짜). 한국 오전 9시 전 기록이 '어제' 로 세지지 않게 로컬 날짜로 맞춘다. */
 function daysBetween(a: string, b: string): number {
-  return Math.round((Date.parse(b.slice(0, 10)) - Date.parse(a.slice(0, 10))) / 86400000)
+  return Math.round((Date.parse(localDateOf(b)) - Date.parse(localDateOf(a))) / 86400000)
 }
 
 export function firstPicks(p: ContentProfile, today: string, made: readonly MadeItem[] = []): ContentPick[] {

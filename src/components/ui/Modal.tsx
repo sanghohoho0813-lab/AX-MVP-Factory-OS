@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { useBackToClose } from '../../lib/backToClose'
+import { useEscToClose } from '../../lib/escStack'
 
 interface ModalProps {
   open: boolean
@@ -25,15 +26,11 @@ export function Modal({ open, title, onClose, children, footer, size = 'md' }: M
   // D-124: 휴대폰 뒤로가기는 창만 닫는다(앞 화면으로 넘어가지 않는다)
   useBackToClose(open, onClose)
 
+  // D-209: 겹친 창이면 맨 위 창만 Esc 로 닫는다
+  useEscToClose(open, onClose)
   useEffect(() => {
-    if (!open) return
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    panelRef.current?.focus()
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [open, onClose])
+    if (open) panelRef.current?.focus()
+  }, [open])
 
   if (!open) return null
 

@@ -12,6 +12,8 @@ import type { ClientOpsRecord, DocumentKey } from '../../types/clientOps'
 import { crumbsOf, docFolderTree, extLabel, fileKindOf, folderAt, type FileKind, type FolderFile, type FolderNode } from '../../services/docFolders'
 import { fileThumb } from '../../lib/fileThumb'
 import { formatFileSize } from '../../lib/format'
+import { localDateOf } from '../../lib/appClock'
+import { OTHER_DOC_LABEL } from '../../services/docClassify'
 import { BottomSheet } from '../ui/primitives'
 import { Button } from '../ui/Button'
 import { DocFileActions } from './DocFileActions'
@@ -29,7 +31,8 @@ const KIND_STYLE: Record<FileKind, { bg: string; fg: string; name: string }> = {
   other: { bg: 'bg-slate-50', fg: 'text-slate-500', name: '파일' },
 }
 
-const day = (iso: string | null) => (iso ? iso.slice(0, 10).replace(/-/g, '.') : '')
+/** D-209 로컬 날짜로 — UTC 로 자르면 한국 오전 9시 전에 올린 파일이 '어제' 로 보였다 */
+const day = (iso: string | null) => (iso ? localDateOf(iso).replace(/-/g, '.') : '')
 
 function Thumb({ file, cloud }: { file: FolderFile; cloud: boolean }) {
   const ref = useRef<HTMLDivElement | null>(null)
@@ -131,7 +134,14 @@ export function DocFolderView({ record, cloud, onShowInList }: { record: ClientO
             <button type="button" onClick={() => setOpen(f)} className="tap flex w-full flex-col items-center gap-1 rounded-(--radius-control) p-1.5 text-center hover:bg-slate-50" data-testid="folder-file" data-key={f.key} title={f.fileName}>
               <Thumb file={f} cloud={cloud} />
               <span className="t-sub line-clamp-2 w-full break-all text-slate-800">{f.fileName}</span>
-              <span className="t-meta line-clamp-1 w-full text-slate-500">{f.label}</span>
+              {/* D-209: 무슨 서류인지 모르는 파일(기타 칸)은 폴더 보기에서도 눈에 띄게 — 목차 보기로 가서 칸을 고른다 */}
+              {f.label.startsWith(OTHER_DOC_LABEL) ? (
+                <span className="t-meta line-clamp-1 w-full font-semibold text-warning-700" data-testid="folder-file-other">
+                  확인 필요
+                </span>
+              ) : (
+                <span className="t-meta line-clamp-1 w-full text-slate-500">{f.label}</span>
+              )}
             </button>
           </li>
         ))}
@@ -147,7 +157,7 @@ export function DocFolderView({ record, cloud, onShowInList }: { record: ClientO
               <dt className="t-sub text-slate-500">폴더</dt>
               <dd className="t-body break-words text-slate-800">{open.folderPath || '폴더 없이 올림'}</dd>
               <dt className="t-sub text-slate-500">올린 날</dt>
-              <dd className="t-body text-slate-800">{day(open.updatedAt) || '—'}</dd>
+              <dd className="t-body text-slate-800">{day(open.uploadedAt) || '—'}</dd>
               {open.issuedAt && (
                 <>
                   <dt className="t-sub text-slate-500">발급일</dt>

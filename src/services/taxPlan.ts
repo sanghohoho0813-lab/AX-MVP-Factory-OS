@@ -1509,6 +1509,12 @@ export const GOAL_LABEL: Record<GoalKey, string> = {
   retire: '퇴직금 한도 · 세금',
 }
 
+/**
+ * D-209 '가업승계 준비' 처럼 증여 목표만 있고 얼마인지 없을 때 — 상황 예시 카드와 절세 설계 화면이 같은 기본값을 쓴다
+ * (첫째 자녀에게 지분 10%). 예전에는 카드는 10% 로 계산하고 화면은 '받는 사람을 골라 주세요' 로 비어 있었다.
+ */
+export const DEFAULT_GIFT_GOAL: { mode: GiftMode; amount: number } = { mode: 'pct', amount: 10 }
+
 export interface ParsedGoal {
   goals: GoalKey[]
   cash?: number

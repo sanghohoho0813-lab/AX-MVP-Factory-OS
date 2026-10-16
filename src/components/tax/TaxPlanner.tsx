@@ -57,6 +57,7 @@ import {
   type ProfileKey,
   type SalaryMode,
   type TaxProfile,
+  DEFAULT_GIFT_GOAL,
 } from '../../services/taxPlan'
 import type { ShareholderRelation, ShareholderRow } from '../../types/clientOps'
 
@@ -222,10 +223,16 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
     if (g.cash) next.cashTarget = formatWon(g.cash)
     if (g.loan) next.profile = { ...next.profile, loanBalance: formatWon(g.loan) }
     if (g.salary) next.salary = { mode: g.salary.mode, rate: g.salary.ratePct ? String(g.salary.ratePct) : cur.salary.rate, net: g.salary.netMonthly ? formatWon(g.salary.netMonthly) : cur.salary.net }
-    if (g.gift) {
+    // D-209: '가업승계 준비' 처럼 금액 없이 증여만 말하면 — 상황 예시 카드와 같은 기본값(첫째 자녀 · 지분 10%).
+    // 직접 적은 문장이면 이미 고른 받는 사람 · 금액은 그대로 두고 빈 것만 채운다
+    const giftGoal = g.gift ?? (g.goals.includes('gift') && (replace || !cur.gift.amount) ? DEFAULT_GIFT_GOAL : null)
+    if (giftGoal) {
       const firstKid = cur.register.find((r) => r.relation === 'child' || r.relation === 'minor_child')
-      const amount = !g.gift.amount ? '' : g.gift.mode === 'value' || g.gift.mode === 'budget' ? formatWon(g.gift.amount) : String(g.gift.amount)
-      next.gift = { recipientId: cur.gift.recipientId || firstKid?.id || '', mode: g.gift.mode, amount }
+      const amount = !giftGoal.amount ? '' : giftGoal.mode === 'value' || giftGoal.mode === 'budget' ? formatWon(giftGoal.amount) : String(giftGoal.amount)
+      next.gift = { recipientId: (replace ? '' : cur.gift.recipientId) || firstKid?.id || cur.gift.recipientId || '', mode: giftGoal.mode, amount }
+    } else if (g.goals.includes('gift') && !cur.gift.recipientId) {
+      const firstKid = cur.register.find((r) => r.relation === 'child' || r.relation === 'minor_child')
+      if (firstKid) next.gift = { ...cur.gift, recipientId: firstKid.id }
     }
     return next
   }

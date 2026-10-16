@@ -16,6 +16,7 @@
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { josa } from '../../lib/josa'
 import { readFact, usableFactValue, wonOf } from '../../services/customerFacts'
+import { entityKindOf } from '../../services/clientOrder'
 
 /**
  * 업체가 적어 둔 업종 말 → 창업감면·정책자금이 쓰는 업종 값.
@@ -43,9 +44,19 @@ export function industryValueOf(text: string): string {
   return ''
 }
 
-/** 법인인지 개인인지 — 법인번호가 적혀 있으면 법인으로 본다 */
-export function businessTypeOf(record: Pick<ClientOpsRecord, 'corporateNumber'>): '' | 'individual' | 'corporation' {
-  return record.corporateNumber.trim() ? 'corporation' : ''
+/**
+ * 법인인지 개인인지 (D-209 — 상황 예시 판정 fitContext 와 같은 규칙).
+ * 법인: 법인번호 · 사업자번호 가운데 81·82·84~88 · 이름의 (주)/주식회사 등 · 주주명부.
+ * 개인: 사업자번호 가운데 01~79 · 90~99. 둘 다 아니면 모름('').
+ * 예전에는 법인번호만 봐서 사업자번호가 개인인 업체도 '모름' → 도구는 법인세로 계산하고, 상황 예시는 개인으로 봤다.
+ */
+export function businessTypeOf(record: Pick<ClientOpsRecord, 'corporateNumber'> & Partial<Pick<ClientOpsRecord, 'companyName' | 'businessNumber' | 'shareholderRegister'>>): '' | 'individual' | 'corporation' {
+  if (entityKindOf({ companyName: record.companyName ?? '', businessNumber: record.businessNumber, corporateNumber: record.corporateNumber }) === 'corporation') return 'corporation'
+  if ((record.shareholderRegister ?? []).length > 0) return 'corporation'
+  const digits = (record.businessNumber ?? '').replace(/\D/g, '')
+  const mid = digits.length === 10 ? Number(digits.slice(3, 5)) : null
+  if (mid !== null && ((mid >= 1 && mid <= 79) || (mid >= 90 && mid <= 99))) return 'individual'
+  return ''
 }
 
 /** "5명(대표 포함)" 같은 글에서 숫자만 (없으면 null) */

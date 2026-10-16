@@ -102,6 +102,8 @@ const uploads = []
 const patches = []
 const publicHits = []
 const fetched = []
+/** D-209: 이 이름이 든 파일은 저장소가 거절(용량 초과) — 자동 올리기에서 못 올린 파일이 말없이 사라지지 않는지 */
+let failBig = false
 
 // 컨테이너에 로캘이 없으면 크롬이 한글 파일 이름을 'download' 로 바꾼다 — 사용자 PC 와 같게 UTF-8 로 띄운다
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', env: { ...process.env, LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8' } })
@@ -150,6 +152,7 @@ await ctx.route(`https://${REF}.supabase.co/**`, async (route) => {
   }
   // 올리기
   if (method === 'POST' && path.startsWith('/storage/v1/object/client-documents/')) {
+    if (failBig && path.includes('TOO-BIG')) return route.fulfill({ status: 413, contentType: 'application/json', body: JSON.stringify({ statusCode: '413', error: 'Payload too large', message: 'The object exceeded the maximum allowed size' }) })
     uploads.push(path.slice('/storage/v1/object/client-documents/'.length))
     return route.fulfill(json({ Key: path.slice('/storage/v1/object/'.length) }))
   }
@@ -253,6 +256,7 @@ const inbox = row.payload?.factInbox ?? []
 check('파일 교체: 글자에서 회사 정보 후보(사업자등록번호) — 확정하지 않는다', inbox.some((c) => c.key === 'businessNumber' && c.value === '214-88-01234') && row.payload.businessNumber === '123-45-67890', JSON.stringify(inbox).slice(0, 300))
 const shown = (await page.locator('main').innerText()) ?? ''
 check('파일 교체: 화면에 새 파일 이름', shown.includes('사업자등록증_새.txt'))
+check('D-209 파일 교체: 옛 발급일(2026-09-01)을 물려받지 않음 · 올린 때 기록', !saved.issuedAt && !saved.validUntil && !!saved.uploadedAt, JSON.stringify(saved))
 
 // D-148: 고객 플랫폼 '확인 완료' — 서류함 사업자등록증 칸(이미 파일 있음)을 덮지 않고 '사업자등록증 (2)' 칸으로
 const bizBefore = row.payload?.documents?.businessRegistration?.storagePath
@@ -298,6 +302,41 @@ await page.getByTestId(`doc-remove-${gradCell?.key}-yes`).click()
 await page.waitForTimeout(1200)
 check('파일 지우기: 졸업증명서 칸이 서류함에서 빠짐', !(row.payload?.customDocuments ?? []).some((d) => d.key === gradCell?.key))
 check('파일 지우기: 보관함 파일은 지우지 않음(되돌릴 수 없는 삭제 0)', deletes.length === 0, deletes.join(' | '))
+
+/* ---- D-209 ---- */
+// Esc — 폴더 보기 파일 창 위의 미리보기에서 Esc 는 미리보기만 닫는다
+await page.goto(`${BASE}/ops/clients/${CID}?tab=docs`, { waitUntil: 'networkidle' })
+await page.waitForTimeout(800)
+await page.getByTestId('doc-view-folder').click()
+await page.locator('[data-testid="folder-file"]', { hasText: '현장사진.png' }).first().click()
+await page.getByTestId('folder-file-sheet').waitFor()
+await page.getByTestId('folder-file-sheet').getByRole('button', { name: /미리보기/ }).first().click()
+await pv.waitFor({ timeout: 8000 })
+await page.keyboard.press('Escape')
+await page.waitForTimeout(300)
+check('D-209 Esc — 미리보기만 닫히고 아래 파일 창은 남음(예전: 둘 다 닫힘)', (await pv.count()) === 0 && (await page.getByTestId('folder-file-sheet').count()) === 1)
+await page.keyboard.press('Escape')
+await page.waitForTimeout(300)
+check('D-209 Esc 한 번 더 → 파일 창 닫힘', (await page.getByTestId('folder-file-sheet').count()) === 0)
+await page.getByTestId('doc-view-list').click()
+// 자동 올리기 — 한 파일을 저장소가 거절해도 창이 남고 빨간 줄 · [다시 올리기]
+failBig = true
+await page.getByTestId('client-upload').click()
+await page.getByLabel('서류 파일 고르기').last().setInputFiles([
+  { name: 'ok-memo.txt', mimeType: 'text/plain', buffer: Buffer.from('회의 메모', 'utf8') },
+  { name: 'TOO-BIG-scan.txt', mimeType: 'text/plain', buffer: Buffer.from('큰 스캔', 'utf8') },
+])
+await page.waitForFunction(() => !!document.querySelector('[data-testid="bulk-item"][data-status="error"]'), null, { timeout: 30000 })
+await page.waitForTimeout(800)
+const bodyText = (await page.locator('body').innerText()) ?? ''
+const failRows = await page.locator('[data-testid="bulk-item"][data-status="error"]').count()
+check('D-209 자동 올리기: 못 올린 1건은 창에 빨간 줄로 남음(창이 닫히지 않음) · 알림에 "못 올린 1건" · 업체 이름', failRows === 1 && (await page.getByTestId('bulk-retry').count()) === 1 && bodyText.includes('못 올린 1건') && bodyText.includes('클라우드정밀(주) —'), JSON.stringify({ failRows, has: bodyText.includes('못 올린 1건') }))
+failBig = false
+await page.getByTestId('bulk-retry').click()
+await page.waitForFunction(() => !document.querySelector('[data-testid="bulk-item"][data-status="error"]') && !document.querySelector('[data-testid="bulk-item"][data-status="uploading"]'), null, { timeout: 30000 })
+await page.waitForTimeout(800)
+const big = Object.values(row.payload?.documents ?? {}).find((d) => d?.fileName === 'TOO-BIG-scan.txt')
+check('D-209 [다시 올리기] → 그 파일도 서류함에 들어감', !!big?.storagePath, JSON.stringify(big))
 
 check('비공개 저장소: 공개 주소를 한 번도 쓰지 않았다', publicHits.length === 0, publicHits.join(' | '))
 // 이 시험 환경은 바깥 CDN 에 못 나간다 — 사진 글자 인식(tesseract) 일꾼을 못 받아 생기는 오류만 뺀다(실제 사용자 PC 는 받는다).

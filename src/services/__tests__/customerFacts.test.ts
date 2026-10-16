@@ -18,7 +18,7 @@ import { OTHER_DOC_LABEL, documentTitle, findIssuedDate, findValidUntil, knownDo
 import { smeSizeOf } from '../certDocParser'
 import { documentStatus, documentsWithExpiry } from '../clientOpsAlerts'
 import { docShelfSummary, filePortalDocument, isSystemFile, moveDocTo, moveTargets, shelfCellOf } from '../docShelf'
-import { applyResort, cellForPlacement, resortDecision, withoutDocumentFile } from '../docPlacementApply'
+import { applyResort, cellForPlacement, resortDecision, withFactRefs, withoutDocumentFile } from '../docPlacementApply'
 import {
   FACT_DEFS,
   cretopFacts,
@@ -880,6 +880,50 @@ await (async () => {
   check('D-204 다른 칸으로 옮겨도 폴더 경로가 파일을 따라감', !!toKey && moved?.record.documents[toKey as never]?.folderPath === '비원미래/정관 개정_260410', toKey)
   const gone = withoutDocumentFile(r, 'financialStatements', { withDoc: withDocument, withoutCustom: withoutCustomDocument })
   check('D-204 파일을 빼면 폴더 경로도 지워져 폴더 보기에서 빠짐', (gone.documents.financialStatements.folderPath ?? '') === '' && !folderAt(docFolderTree(gone), '비원미래/재무'))
+}
+
+/* ---------------- D-209 서류함 안정화(점검 결과) ---------------- */
+{
+  const ops = { withDoc: withDocument, withoutCustom: withoutCustomDocument }
+  const fc = (id: string, ref: string) => ({ id, key: 'businessNumber', value: '111-22-33333', source: 'businessRegistration', asOf: '', ref, foundAt: '' }) as never
+  let r = normalizeClientOps({ id: 'd209', companyName: '안정정밀' } as Partial<ClientOpsRecord>)
+  r = withDocument(r, 'businessRegistration', { received: true, fileName: '사업자등록증.pdf', fileSize: 10, storagePath: 'w/d/b/1.pdf' })
+  const up1 = r.documents.businessRegistration.uploadedAt
+  r = withDocument(r, 'businessRegistration', { note: '원본 확인함' })
+  check('D209-1 올린 때(uploadedAt) — 메모를 고쳐도 그대로 · 저장했다 읽어도 남음', !!up1 && r.documents.businessRegistration.uploadedAt === up1 && normalizeClientOps(JSON.parse(JSON.stringify(r))).documents.businessRegistration.uploadedAt === up1, r.documents.businessRegistration)
+  check('D209-2 폴더 보기 파일의 올린 때 = uploadedAt(고친 때가 아님)', docFolderTree(r).files[0]?.uploadedAt === up1)
+  // 기본 칸의 번호 칸도 유효기간
+  const r2 = withDocument(r, 'corporateRegistry', { received: true, fileName: '등기1.pdf', fileSize: 1, storagePath: 'w/d/c/1.pdf' })
+  const cell = cellForPlacement(r2, { kind: 'existing', key: 'corporateRegistry', label: '법인등기부등본', sure: true, reason: '', issuedAt: null }, new Set())
+  const nm = allDocumentMetas(cell.record).find((m) => m.key === cell.key)
+  check('D209-3 "법인등기부등본 (2)" 칸도 기본 칸처럼 유효기간 3개월(만료 알림이 걸림)', cell.numbered && nm?.validMonths === 3, { label: nm?.label, vm: nm?.validMonths })
+  // 직접 만든 칸 이름만 고치면 유효기간 그대로
+  let r3 = withCustomDocument(r, { label: '법인인감증명서', validMonths: 3 })
+  const cd = r3.customDocuments[r3.customDocuments.length - 1]
+  r3 = withCustomDocument(r3, { id: cd.id, label: '법인 인감증명서' })
+  check('D209-4 직접 만든 칸 이름만 고치면 유효기간 3개월 그대로(예전: 비워짐)', r3.customDocuments.find((d) => d.id === cd.id)?.validMonths === 3 && r3.customDocuments.find((d) => d.id === cd.id)?.label === '법인 인감증명서')
+  // 파일을 빼면 유효기간 끝 · 올린 때 · 그 파일의 확인할 정보도
+  let r4 = withDocument(r, 'smeCertificate', { received: true, fileName: 'sme.pdf', fileSize: 1, storagePath: 'w/d/s/1.pdf', validUntil: '2027-03-31', issuedAt: '2026-04-01' })
+  r4 = { ...r4, factInbox: [fc('f1', 'doc:smeCertificate:2026-10-16T00:00:00.000Z:0'), fc('f2', 'doc:businessRegistration:2026-10-16T00:00:00.000Z:0'), fc('f3', 'cretop:abc:businessNumber')] }
+  const g = withoutDocumentFile(r4, 'smeCertificate', ops)
+  check('D209-5 파일을 빼면 유효기간 끝 · 올린 때도 지움 · 그 파일에서 읽은 "확인할 정보" 만 빠짐', g.documents.smeCertificate.validUntil === undefined && g.documents.smeCertificate.uploadedAt === undefined && g.factInbox.map((c) => c.id).join() === 'f2,f3', g.factInbox.map((c) => c.id))
+  const re = withDocument(g, 'smeCertificate', { received: true, fileName: 'sme2.pdf', fileSize: 1, storagePath: 'w/d/s/2.pdf' })
+  check('D209-6 그 칸에 다시 올려도 옛 만료일을 물려받지 않음', re.documents.smeCertificate.validUntil === undefined && !!re.documents.smeCertificate.uploadedAt)
+  const sw = withFactRefs(r4, { smeCertificate: 'businessRegistration', businessRegistration: 'smeCertificate' })
+  check('D209-7 두 칸을 서로 바꿔도 "확인할 정보" 출처가 섞이지 않음 · 크레탑 것은 그대로', sw.factInbox.find((c) => c.id === 'f1')?.ref.startsWith('doc:businessRegistration:') === true && sw.factInbox.find((c) => c.id === 'f2')?.ref.startsWith('doc:smeCertificate:') === true && sw.factInbox.find((c) => c.id === 'f3')?.ref === 'cretop:abc:businessNumber')
+  // 최신 것만 남기기 — 발급일을 한쪽만 알면 늦게 올린 파일
+  let r5 = normalizeClientOps({ id: 'n209', companyName: '겹침상사' } as Partial<ClientOpsRecord>)
+  r5 = withDocument(r5, 'businessRegistration', { received: true, fileName: 'old.pdf', fileSize: 1, storagePath: 'w/n/o.pdf', issuedAt: '2025-01-01', uploadedAt: '2026-01-01T00:00:00.000Z' })
+  const c2 = cellForPlacement(r5, { kind: 'existing', key: 'businessRegistration', label: '사업자등록증', sure: true, reason: '', issuedAt: null }, new Set())
+  r5 = withDocument(c2.record, c2.key, { received: true, fileName: 'new.pdf', fileSize: 1, storagePath: 'w/n/n.pdf', uploadedAt: '2026-10-01T00:00:00.000Z' })
+  check('D209-8 "최신 것만 남기기" — 발급일을 한쪽만 알면 늦게 올린 파일을 남김(예전: 발급일 있는 옛 파일)', newestOf(r5, ['businessRegistration', c2.key]) === c2.key)
+  r5 = { ...r5, factInbox: [fc('old', 'doc:businessRegistration:t:0'), fc('new', `doc:${c2.key}:t:0`)] }
+  const dd = withDedupedShelf(r5, ['businessRegistration', c2.key], c2.key)
+  check('D209-9 겹친 서류 정리 — 남긴 파일은 기본 칸 · 올린 때 그대로 · 그 파일의 확인할 정보는 기본 칸으로 · 뺀 옛 파일 것은 빠짐', dd.documents.businessRegistration.fileName === 'new.pdf' && dd.documents.businessRegistration.uploadedAt === '2026-10-01T00:00:00.000Z' && dd.factInbox.map((c) => `${c.id}@${c.ref.split(':')[1]}`).join() === 'new@businessRegistration', dd.factInbox)
+  // 다시 분류(옮기기) — 올린 때 · 확인할 정보가 파일을 따라감
+  const mv = moveDocTo({ ...r4, factInbox: [fc('m1', 'doc:smeCertificate:t:0')] }, 'smeCertificate', 'new:벤처기업확인서')
+  const mvKey = mv ? Object.entries(mv.record.documents).find(([, v]) => v?.fileName === 'sme.pdf')?.[0] : undefined
+  check('D209-10 다른 칸으로 옮기면 올린 때 · 확인할 정보도 따라감', !!mvKey && mv?.record.documents[mvKey as never]?.uploadedAt === r4.documents.smeCertificate.uploadedAt && mv?.record.factInbox[0]?.ref.startsWith(`doc:${mvKey}:`) === true, { mvKey, inbox: mv?.record.factInbox })
 }
 
 console.log(`\ncustomer-facts: ${passed} passed, ${failed} failed`)

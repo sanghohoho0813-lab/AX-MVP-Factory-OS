@@ -136,6 +136,7 @@ import { fundingFactsOf, isWaiting } from '../services/feeStatus'
 import { withActivity } from '../services/clientOpsActivity'
 import { CLIENT_TYPE_LABEL, clientTypeOf, rememberClientTypeView, withClientType } from '../services/clientType'
 import { allDocumentMetas, emptyDocumentState } from '../services/clientOpsDocuments'
+import { placeDocument } from '../services/docClassify'
 import { ActivityLog } from '../components/ops/ActivityLog'
 import { ClientSalesCard } from '../components/sales/ClientSalesCard'
 import { SalesJourneyCard } from '../components/sales/SalesJourneyCard'
@@ -325,6 +326,14 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
    * 늦게 온 예전 응답은 화면에 되돌려 쓰지 않는다.
    */
   const latestRef = useRef<ClientOpsRecord | null>(null)
+  /** D-209: 이 업체 화면이 아직 떠 있나 — 다른 업체로 옮긴 뒤 끝난 올리기가 그 화면의 탭을 바꾸지 않게 */
+  const aliveRef = useRef(true)
+  useEffect(() => {
+    aliveRef.current = true
+    return () => {
+      aliveRef.current = false
+    }
+  }, [])
   /** 지금 돌고 있는 저장 — 그동안 또 고친 사람도 이 저장이 끝난 결과(됐는지)를 기다린다(D-122) */
   const loopRef = useRef<Promise<boolean> | null>(null)
   /** 업체를 빨리 옮겨 다닐 때 늦게 온 예전 업체 응답을 버린다(D-122) */
@@ -544,14 +553,25 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       // D-120: 파일을 올리는 동안 고친 것이 있어도 덮지 않게 — 올린 뒤의 가장 새 기록에 얹는다
       const patch = await storeDocumentFile(record, key, file)
       const base = current() ?? record
+      // D-209: 파일을 '바꾸면' 옛 발급일 · 유효기간 끝을 물려받지 않는다(새 서류가 옛 만료일로 '만료됨' 이 됐다).
+      // 파일 없이 적어 둔 발급일에 스캔본을 처음 붙일 때는 그대로 둔다. 새 파일에서 날짜를 읽으면 아래에서 다시 넣는다.
+      const hadFile = Boolean(base.documents[key]?.fileName || base.documents[key]?.storagePath)
       // D-204: 칸에서 파일 하나를 고르면 폴더 정보는 그대로 둔다(같은 서류를 새 파일로 바꾼 것 — 폴더로 보기에서 제자리)
-      const ok = await commit(withDocument(base, key, patch))
-      showToast('파일을 보관했습니다.')
+      const ok = await commit(withDocument(base, key, hadFile ? { ...patch, issuedAt: '', validUntil: undefined } : patch))
+      // D-209: 저장에 실패하면 '보관했습니다' 라고 하지 않는다(실패 알림은 저장 쪽이 띄운다)
+      if (!ok) return
+      showToast(hadFile ? '새 파일로 바꿨습니다 — 발급일은 새 서류에서 다시 읽거나 적어 주세요.' : '파일을 보관했습니다.')
       // D-144: 올린 서류를 읽어 — 확실한 회사 정보는 바로 넣고, 애매한 것은 까닭과 함께 묻는다 · 크레탑 · 명부는 그 엔진이 읽는다
       const reader = ok ? await import('../services/docTextExtract') : null
       if (reader && reader.canExtractText(file)) {
         const res = await reader.extractTextFromFile(file).catch(() => null)
         if (res && res.text.trim()) {
+          // D-209: 새 서류에 찍힌 발급일 · 유효기간 끝을 그 칸에(사람이 그새 적었으면 그대로)
+          const dated = placeDocument({ text: res.text, fileName: file.name }, allDocumentMetas(current() ?? record).filter((m) => m.needsFile))
+          const now0 = current() ?? record
+          if ((dated.issuedAt || dated.validUntil) && !now0.documents[key]?.issuedAt && !now0.documents[key]?.validUntil) {
+            await commit(withDocument(now0, key, { ...(dated.issuedAt ? { issuedAt: dated.issuedAt } : {}), ...(dated.validUntil ? { validUntil: dated.validUntil } : {}) }))
+          }
           const latest = current() ?? record
           const out = await analyzeUploadedDocs(latest, [{ key, fileName: file.name, text: res.text, method: res.method, docSure: true }], { now: nowIso(), today: todayLocalDate(), makeId: generateId })
           const sm = out.summary
@@ -1278,21 +1298,6 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               void commit(next).then((ok) => {
                 if (ok) showToast(`서류 ${moved}개를 맞는 칸으로 옮겼습니다.`)
               })
-            }}
-          />
-        )}
-
-        {bulkOpen && (
-          <BulkDocUploadSheet
-            showSignal={bulkShow}
-            record={record}
-            latest={() => latestRef.current ?? record}
-            onClose={() => setBulkOpen(false)}
-            onSaved={(saved, summary) => {
-              latestRef.current = saved
-              setRecord(saved)
-              setSavedAt(Date.now())
-              setLastBatch(summary)
             }}
           />
         )}
@@ -2179,6 +2184,22 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         />
       )}
 
+      {/* D-209: 서류 탭의 '한꺼번에 올리기' 도 화면 맨 바깥에 — 서류 탭 안에 있으면 다른 탭으로 가는 순간 창이 없어져 읽어 둔 파일이 사라졌다 */}
+      {bulkOpen && (
+        <BulkDocUploadSheet
+          showSignal={bulkShow}
+          record={record}
+          latest={() => latestRef.current ?? record}
+          onClose={() => setBulkOpen(false)}
+          onSaved={(saved, summary) => {
+            latestRef.current = saved
+            setRecord(saved)
+            setSavedAt(Date.now())
+            setLastBatch(summary)
+          }}
+        />
+      )}
+
       {/* D-144: 머리줄 '서류 올리기' — 읽자마자 확실한 것은 저절로 올리고 분석 → 맞춤 추천으로 */}
       {autoUploadOpen && (
         <BulkDocUploadSheet
@@ -2196,7 +2217,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             setRecord(saved)
             setSavedAt(Date.now())
             setLastBatch(summary)
-            setTab('smart')
+            // D-209: 올리는 동안 다른 업체로 옮겨 갔으면 그 화면을 맞춤 추천으로 바꾸지 않는다
+            if (aliveRef.current) setTab('smart')
           }}
         />
       )}
@@ -2239,7 +2261,14 @@ function TextField({
 
 function CloudClientDetail() {
   const { currentWorkspaceId, session } = useAuth()
-  return <ClientDetailContent workspaceId={currentWorkspaceId} userId={session?.user.id ?? null} />
+  const { clientId = '' } = useParams()
+  // D-209: 업체마다 새로 — 같은 화면을 다른 업체로 다시 쓰면 열어 둔 창 · 올리기 · 고르던 칸이 다음 업체로 넘어갔다
+  return <ClientDetailContent key={clientId} workspaceId={currentWorkspaceId} userId={session?.user.id ?? null} />
+}
+
+function LocalClientDetail() {
+  const { clientId = '' } = useParams()
+  return <ClientDetailContent key={clientId} workspaceId={null} userId={null} />
 }
 
 /** D-146: 서류 칸 순서 — 지금 필요한 것 먼저, 같은 이름 칸('사업자등록증 (2)')은 원래 칸 바로 뒤에(나란히 보고 하나 지운다) */
@@ -2260,6 +2289,6 @@ export function OperationsClientDetailPage() {
   return getDataModeConfig().mode === 'supabase' ? (
     <CloudClientDetail />
   ) : (
-    <ClientDetailContent workspaceId={null} userId={null} />
+    <LocalClientDetail />
   )
 }

@@ -307,7 +307,8 @@ function TaxTab() {
     if (!preset || preset.module !== 'labcare' || !preset.lab) return
     const lab = preset.lab
     const bt = clientRecord ? clientFacts(clientRecord, new Date()).businessType : ''
-    setForm((f) => ({ ...f, payroll: lab.payroll, material: lab.material, other: lab.other, currentYearRndCost: '', category: lab.category, ...(bt ? { businessType: bt === 'individual' ? '개인사업자' : '법인사업자' } : {}) }))
+    // D-209: 예전에 고른 공제율 · 기업 규모도 비운다 — 남아 있으면 카드(약 2,000만원)와 계산기 숫자가 달랐다
+    setForm((f) => ({ ...f, payroll: lab.payroll, material: lab.material, other: lab.other, currentYearRndCost: '', category: lab.category, rate: '', size: '', ...(bt ? { businessType: bt === 'individual' ? '개인사업자' : '법인사업자' } : {}) }))
     setPresetTitle(preset.title)
     const next = new URLSearchParams(params)
     next.delete('preset')

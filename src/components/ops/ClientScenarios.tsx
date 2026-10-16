@@ -10,7 +10,7 @@
  *  4. 이 업체엔 안 맞는 상황 — 까닭과 함께 접어 둔다(대표 답 때문이면 '답 바꾸기').
  *  - 계산은 services/scenarios.ts(모듈 화면과 같은 엔진) · 기준은 services/scenarioFit.ts. 규칙 계산 — 'AI' 라고 부르지 않는다.
  */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, CalendarPlus, Check, ChevronDown, MessageSquareText, Minus } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
@@ -63,8 +63,14 @@ export function ClientScenarios({
   const [more, setMore] = useState(false)
   const [moreQ, setMoreQ] = useState(false)
   const modules = useMemo(() => [...new Set(fits.map((r) => r.module))], [fits])
-  const shown = mod === 'all' ? fits : fits.filter((r) => r.module === mod)
-  const list = more || mod !== 'all' ? shown : shown.slice(0, FIRST)
+  // D-209: 고른 모듈이 '맞는 상황' 에서 빠지면(답을 바꿈) 전체로 — 예전에는 빈 목록에 갇혀 '전체' 칩도 사라졌다
+  const active: ScenarioModule | 'all' = mod !== 'all' && modules.includes(mod) && modules.length > 1 ? mod : 'all'
+  // 빠진 모듈을 기억해 두지 않는다 — 나중에 그 모듈이 다시 맞아도 거른 목록으로 갑자기 돌아가지 않게
+  useEffect(() => {
+    if (mod !== active) setMod(active)
+  }, [mod, active])
+  const shown = active === 'all' ? fits : fits.filter((r) => r.module === active)
+  const list = more || active !== 'all' ? shown : shown.slice(0, FIRST)
   const ready = fits.filter((r) => r.state === 'ready').length
   const allRequest = useMemo(() => scenariosRequest(record, fits.filter((r) => r.state === 'need')), [record, fits])
   const dataRequest = useMemo(() => fitDataRequest(record, datas), [record, datas])
@@ -108,7 +114,7 @@ export function ClientScenarios({
               <div className="flex flex-wrap gap-1.5" role="group" aria-label="모듈로 거르기">
                 {(['all', ...modules] as const).map((m) => {
                   const n = m === 'all' ? fits.length : fits.filter((r) => r.module === m).length
-                  const on = mod === m
+                  const on = active === m
                   return (
                     <button
                       key={m}
@@ -142,7 +148,7 @@ export function ClientScenarios({
               ))}
             </ul>
             <div className="flex flex-wrap gap-2">
-              {mod === 'all' && !more && shown.length > FIRST && (
+              {active === 'all' && !more && shown.length > FIRST && (
                 <Button size="sm" variant="secondary" onClick={() => setMore(true)} data-testid="scenario-more">
                   <ChevronDown aria-hidden="true" className="size-4" /> 맞는 상황 더 보기 ({shown.length - FIRST})
                 </Button>

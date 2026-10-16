@@ -316,6 +316,8 @@ export function scenarioFit(s: ScenarioPreset, c: FitContext): ScenarioFit {
       if (months !== null && months >= 60) return no(`설립 ${est} — 창업 5년이 지났어요`)
       const { region, over } = startupRegion(f.address)
       if (!region) return data('본점 주소를 알면 판단해요(수도권 과밀억제권역 안이 대상)', ['회사 주소'])
+      // D-209: 경기 · 인천은 시 · 구 · 동마다 달라 '모름' — 예전에는 모두 '이미 밖' 이라고 잘못 말했다
+      if (over === 'unknown') return data(`본점 ${f.address.split(' ').slice(0, 2).join(' ')} — 이 시 · 구는 동마다 과밀억제권역 안팎이 달라요. 창업감면 판정에서 확인해요`, ['본점이 과밀억제권역 안인지(동 · 번지 — 창업감면 판정에서 고르기)'])
       if (over !== 'yes') return no('본점이 이미 과밀억제권역 밖이에요')
       return fit(`본점 ${f.address.split(' ').slice(0, 2).join(' ')} — 수도권 과밀억제권역 안`)
     }

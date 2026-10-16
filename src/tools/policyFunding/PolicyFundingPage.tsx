@@ -92,7 +92,7 @@ function OrigPolicy({ children }: { children: ReactNode }) {
 /* ------------------------------------------------------------------ */
 
 function DiagnosisScreen() {
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const { clientId, clientRecord } = useToolClient()
   const autoSample = params.get('sample') === '1'
   // D-199 상황 예시(?preset=) — 그 상황의 가정(자금 목적 · 채용 계획)을 업체 값 위에 얹고 바로 진단한다
@@ -100,6 +100,14 @@ function DiagnosisScreen() {
     const p = scenarioPreset(params.get('preset'))
     return p && p.module === 'policy-funding' ? p : null
   })
+  // D-209: 상황 예시는 한 번만 — 주소에서 지운다(새로고침 · 업체 기록에 붙인 '다시 열기' 주소가 그 가정을 또 덮어쓰지 않게)
+  useEffect(() => {
+    if (!params.get('preset')) return
+    const next = new URLSearchParams(params)
+    next.delete('preset')
+    setParams(next, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [seed, setSeed] = useState<{ input: DiagnosisInput; key: number }>(() => ({ input: loadInput(clientId), key: 0 }))
   const loadedFor = useRef<string | null | undefined>(clientId)
   useEffect(() => {
@@ -126,9 +134,10 @@ function DiagnosisScreen() {
 
   // 업체에서 열었으면 아는 것을 채운다 (D-90).
   // 이 도구는 기본값이 빈 값이 아니라서(개인사업자·1~3년 …), **아직 손대지 않은 칸만** 바꾼다.
-  const { note: prefillNote } = usePrefillFromClient((facts) => {
+  // D-209: 같은 때 '지난 진단 되살리기' 가 먼저 넣은 입력 위에 채운다(그때의 seed 가 아니라 최신 seed) — 예전에는 되살린 입력을 기본값으로 덮었다
+  const fillFrom = (base: DiagnosisInput, facts: Parameters<Parameters<typeof usePrefillFromClient>[0]>[0]): { next: DiagnosisInput; filled: string[] } => {
     const filled: string[] = []
-    const next = { ...seed.input }
+    const next = { ...base }
     if (!next.companyName && facts.companyName) {
       next.companyName = facts.companyName
       filled.push('업체명')
@@ -174,7 +183,15 @@ function DiagnosisScreen() {
       next.ceoAge = age
       filled.push('대표 나이')
     }
-    if (filled.length > 0) setSeed((s) => ({ input: next, key: s.key + 1 }))
+    return { next, filled }
+  }
+  const { note: prefillNote } = usePrefillFromClient((facts) => {
+    const { filled } = fillFrom(seed.input, facts)
+    if (filled.length > 0)
+      setSeed((s) => {
+        const r = fillFrom(s.input, facts)
+        return r.filled.length > 0 ? { input: r.next, key: s.key + 1 } : s
+      })
     return filled
   })
 

@@ -153,6 +153,11 @@ export interface DocumentState {
    */
   folderPath?: string
   /**
+   * D-209: 이 파일을 올린 때(ISO). 폴더 보기 '올린 날' — updatedAt 은 메모 · 발급일만 고쳐도 바뀐다.
+   * 이 칸이 생기기 전에 올린 파일은 없음(updatedAt 으로 대신 본다).
+   */
+  uploadedAt?: string
+  /**
    * 보관 위치·비고 메모.
    * 공동인증서의 경우 "어디에 보관 중인지"만 적는다. 비밀번호는 적지 않는다.
    */

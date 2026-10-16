@@ -121,7 +121,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const box = page.getByTestId('smart-scenarios')
   const count = Number(await box.getAttribute('data-count'))
   const ready = Number(await box.getAttribute('data-ready'))
-  check('D-201 맞춤 추천 › 이 업체에 맞는 상황 12가지 · 바로 설계됨 8가지(23가지를 다 붙이지 않음)', count === 12 && ready === 8, `${count} · ${ready}`)
+  // D-209: '한솔정밀(주)' 은 이름으로 법인 — 계산기도 상황 예시처럼 법인으로 알아(사업자 구분 ✓) 연구소 2명 상황이 '바로 설계됨' 으로(8 → 9)
+  check('D-201 맞춤 추천 › 이 업체에 맞는 상황 12가지 · 바로 설계됨 9가지(23가지를 다 붙이지 않음 · D-209 법인 판단 하나로)', count === 12 && ready === 9, `${count} · ${ready}`)
   check('맞는 상황 n가지 · 바로 설계됨 n가지 글자', (await page.getByTestId('scenario-ready-count').innerText()).includes(`맞는 상황 ${count}가지 · 바로 설계됨 ${ready}가지`))
   const whys = await page.getByTestId('scenario-why').allInnerTexts()
   check('D-201 맞는 상황마다 "왜 이 업체에" 한 줄 — 이 업체 숫자(이익 · 매출 · 설립일 …)', whys.length >= 6 && whys.every((w) => w.startsWith('왜 이 업체에:') && /\d/.test(w)), whys.slice(0, 3).join(' | '))
@@ -155,6 +156,15 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.locator('[data-testid="scenario-no-row"][data-id="emp-convert"]').getByTestId('scenario-undo').click()
   await page.waitForTimeout(500)
   check('[답 바꾸기] → 다시 묻는다', (await page.locator('[data-testid="scenario-question"][data-q="contract"]').count()) === 1 && (await record(page, 'cli_scen'))?.decided?.['scn.contract'] === undefined)
+  // D-209 고용지원금 칩으로 거른 채 그 답을 바꾸면(고용지원금이 맞는 상황에서 빠짐) → 빈 목록에 갇히지 않고 전체로
+  await page.locator('[data-testid="scenario-filter"][data-module="employment"]').click()
+  const empRow = await expand(page, 'emp-youth')
+  await empRow.getByTestId('scenario-undo').click()
+  await page.waitForTimeout(600)
+  const rowsAfter = await page.getByTestId('scenario-row').count()
+  check('D-209 거른 모듈이 맞는 상황에서 빠지면 → 전체 목록으로(빈 목록 · 칩 없음에 갇히지 않음)', rowsAfter >= 6 && (await page.locator('[data-testid="scenario-row"][data-module="employment"]').count()) === 0, String(rowsAfter))
+  await page.locator('[data-testid="scenario-question"][data-q="hireYouth"]').getByTestId('scenario-answer-yes').click()
+  await page.locator('[data-testid="scenario-row"][data-id="emp-youth"]').waitFor({ timeout: 10000 })
 
   // 누르면 그 자리에서 설계
   const cash = await expand(page, 'tax-cash-1e')
@@ -201,12 +211,25 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.locator('#result').waitFor({ timeout: 10000 })
   const agency = policyHead.split('추천 기관 ')[1] ?? ''
   check('정책자금 — 바로 진단 · 같은 추천 기관', !!agency && (await page.locator('#result').innerText()).includes(agency), policyHead)
+  check('D-209 정책자금 — 주소의 preset 은 한 번 쓰고 지움(새로고침 · 다시 열기 주소가 그 가정을 또 덮지 않음)', !page.url().includes('preset='), page.url())
+
+  // D-209 연구소 — 예전에 '중견기업' 을 골라 두었어도 상황 예시는 그 가정을 비우고 카드와 같은 숫자로
+  await page.goto(`${BASE}/tools/labcare/tax?client=cli_scen`, { waitUntil: 'networkidle' })
+  await page.getByRole('button', { name: '중견기업', exact: true }).first().click().catch(async () => page.getByText('중견기업', { exact: true }).first().click())
+  await page.waitForTimeout(600)
 
   // 연구소
   await page.goto(`${BASE}/tools/labcare/tax?client=cli_scen&preset=lab-two`, { waitUntil: 'networkidle' })
   await page.getByTestId('lab-preset-note').waitFor({ timeout: 15000 })
   const payroll = await page.getByLabel('연구전담요원 인건비 합계').inputValue()
   check('연구소 — 연구원 2명 인건비 8,000만원이 칸에 · 바로 계산(업체 상세와 같은 연간 약 2,000만원)', payroll.replace(/\D/g, '') === '80000000' && (await page.locator('body').innerText()).includes(`연간 약 ${labAmount}`), `${payroll} | ${labAmount}`)
+
+  // D-209 가업승계 준비 — 카드처럼 첫째 자녀 · 지분 10% 로(예전: 받는 사람이 비어 '골라 주세요')
+  await page.goto(`${BASE}/tools/tax?client=cli_scen&preset=tax-succession`, { waitUntil: 'networkidle' })
+  await page.getByTestId('tax-preset-note').waitFor({ timeout: 15000 })
+  await page.waitForTimeout(500)
+  const giftTo = await page.getByLabel('받는 사람').first().inputValue().catch(() => '')
+  check('D-209 절세 — 가업승계 준비 상황은 받는 사람(첫째 자녀 h2)이 골라진 채로 열림', giftTo === 'h2', giftTo)
 
   // 고용지원금
   await page.goto(`${BASE}/tools/employment/diagnosis?client=cli_scen&preset=emp-youth`, { waitUntil: 'networkidle' })

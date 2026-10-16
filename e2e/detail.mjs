@@ -938,6 +938,65 @@ for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
   await ctx.close()
 }
 
+/* ---------------- D-209 서류 올리기 창 — 다른 탭으로 가도 남음 · 업체를 옮기면 새 화면 · 긴 파일 이름 · 폴더 보기 '확인 필요' ---------------- */
+for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
+  const ctx = await browser.newContext({ viewport: { width: w, height: h }, locale: 'ko-KR', timezoneId: 'Asia/Seoul', ...(w < 500 ? { isMobile: true, hasTouch: true } : {}) })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=docs', { waitUntil: 'networkidle' })
+  await page.getByRole('button', { name: '한꺼번에 올리기' }).first().click()
+  const LONG = '스캔_2026_10_16_사업장_현장_사진_모음_최종본_수정본_진짜최종_ABCDEFGHIJKLMNOPQRSTUVWXYZ.txt'
+  await page.getByLabel('서류 파일 고르기').first().setInputFiles([{ name: LONG, mimeType: 'text/plain', buffer: Buffer.from('메모 — 무슨 서류인지 모름', 'utf8') }])
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="bulk-item"][data-status="ready"]').length === 1, null, { timeout: 15000 })
+  const sheetOver = await page.evaluate(() => { const d = document.querySelector('[role="dialog"]'); return d ? d.scrollWidth - d.clientWidth : -1 })
+  check(`D-209 ${tag} 긴 파일 이름(밑줄로 이은 80자) — 올리기 창 가로 넘침 0`, sheetOver <= 1, String(sheetOver))
+  // 창을 닫으면(고르던 것 있음) 숨기고 '올릴 서류' 알약 → 다른 탭으로 가도 알약 · 고르던 것 그대로
+  await page.getByRole('dialog').getByRole('button', { name: '닫기' }).first().click()
+  await page.getByTestId('bulk-minimized').waitFor()
+  await page.getByRole('tab', { name: /^개요/ }).click()
+  await page.waitForTimeout(400)
+  const pillStays = (await page.getByTestId('bulk-minimized').count()) === 1
+  await page.getByTestId('bulk-minimized').click().catch(() => {})
+  await page.waitForTimeout(300)
+  const kept = await page.locator('[data-testid="bulk-item"]').count()
+  check(`D-209 ${tag} 한꺼번에 올리기 창을 숨기고 개요 탭으로 가도 → 알약 · 고르던 파일 그대로(예전: 사라짐)`, pillStays && kept === 1, JSON.stringify({ pillStays, kept }))
+  await page.getByRole('dialog').getByRole('button', { name: /고른 것 전부 올리기/ }).click()
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="bulk-item"][data-status="done"]').length === 1, null, { timeout: 15000 })
+  const doneOver = await page.evaluate(() => { const d = document.querySelector('[role="dialog"]'); return d ? d.scrollWidth - d.clientWidth : 0 })
+  check(`D-209 ${tag} 올린 뒤 '올림 · 기타 · 확인 필요 · 긴 이름' 배지도 넘침 0`, doneOver <= 1, String(doneOver))
+  const r = await record(page)
+  const up = Object.values(r.documents).find((d) => d?.fileName === LONG)
+  check(`D-209 ${tag} 올린 파일에 올린 때(uploadedAt) 기록`, !!up?.uploadedAt, JSON.stringify(up))
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+  // 폴더 보기 — 무슨 서류인지 모르는 파일은 '확인 필요' · 파일 창 제목(긴 이름) 넘침 0
+  await page.getByRole('tab', { name: /^서류/ }).click()
+  await page.getByTestId('doc-view-folder').click()
+  await page.getByTestId('folder-grid').waitFor()
+  const otherBadges = await page.getByTestId('folder-file-other').count()
+  await page.locator('[data-testid="folder-file"]', { has: page.getByTestId('folder-file-other') }).first().click()
+  await page.getByTestId('folder-file-sheet').waitFor()
+  const sheetW = await page.evaluate(() => { const d = [...document.querySelectorAll('[role="dialog"]')].pop(); return d ? d.scrollWidth - d.clientWidth : -1 })
+  const day = (await page.getByTestId('folder-file-sheet').innerText()).match(/올린 날\s*\n?\s*(\d{4}\.\d{2}\.\d{2})/)?.[1] ?? ''
+  const today = await page.evaluate(() => { const d = new Date(); return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}` })
+  check(`D-209 ${tag} 폴더 보기 — 기타 칸 파일에 '확인 필요' · 파일 창(긴 제목) 넘침 0 · 올린 날 = 오늘(로컬)`, otherBadges >= 1 && sheetW <= 1 && day === today, JSON.stringify({ otherBadges, sheetW, day, today }))
+  await page.keyboard.press('Escape')
+  await page.getByTestId('doc-view-list').click()
+  // 업체를 옮기면 새 화면 — 열어 둔 창 · 고르던 칸이 다음 업체로 넘어가지 않는다
+  await page.getByRole('button', { name: '한꺼번에 올리기' }).first().click()
+  await page.getByRole('dialog').waitFor()
+  const other = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((x) => x.id !== 'cli_hansol')?.id)
+  await page.evaluate((id) => { history.pushState({}, '', `/ops/clients/${id}?tab=docs`); dispatchEvent(new PopStateEvent('popstate')) }, other)
+  await page.waitForTimeout(900)
+  const titles = await page.locator('[role="dialog"]').allInnerTexts()
+  check(`D-209 ${tag} 다른 업체로 옮기면 앞 업체의 올리기 창이 따라오지 않음`, !!other && !titles.some((t) => t.includes('한솔테크(주) — 서류 한꺼번에 올리기')), JSON.stringify({ other, titles: titles.map((t) => t.slice(0, 40)) }))
+  check(`D-209 ${tag} 오류 0`, errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n업체 상세: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

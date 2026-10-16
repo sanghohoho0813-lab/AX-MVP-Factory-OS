@@ -219,9 +219,12 @@ const errors = []
   await page.getByTestId('content-edit').click()
   await wait(200)
   check('16 공격 글은 글자로만(그림 요소 0 · 실행 0)', (await page.locator('[data-testid="content-blocks"] img').count()) === 0 && (await page.evaluate(() => window.__pwn)) === undefined)
+  check('16 [고치기 그만] → 고친 글은 그대로 남음(글자로) · "저장 전" 표시', (await resultText(page)).includes('업계 최고 1위') && (await page.getByTestId('content-unsaved').count()) === 1)
 
-  // 17 업체 기록에 붙이기
+  // 17 업체 기록에 붙이기 — 고친 글이 남아 있으면 새로 만들기 전에 한 번 묻는다
   await page.getByTestId('content-make').click()
+  check('16 저장 전 고침이 있는데 [만들기] → 한 번 묻기', /저장하지 않은 고침/.test(await page.getByRole('dialog').innerText()))
+  await page.getByRole('dialog').getByRole('button', { name: '고침 버리고 넘어가기' }).click()
   await wait(300)
   await page.getByTestId('tool-attach-quick').click()
   await wait(900)
@@ -469,6 +472,121 @@ const errors = []
   await ctx.close()
 }
 
+
+/* ================================================================== */
+/* D-209 고친 글 지키기 · [대괄호] 한 번에 채우기 · 계획 다음 글               */
+/* ================================================================== */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  const page = await ctx.newPage()
+  page.on('pageerror', (e) => errors.push(`D209 pageerror ${e.message}`))
+  await seed(page)
+  await page.goto(BASE + '/tools/content/build?client=cli_site', { waitUntil: 'networkidle' })
+  await page.getByTestId('content-studio').waitFor()
+  const dialog = () => page.getByRole('dialog')
+
+  // G1 고친 글 → 다른 글 열기 전에 묻기 · [계속 고치기] 면 그대로
+  await page.getByTestId('content-make').click()
+  await page.getByTestId('content-result').waitFor()
+  await page.getByTestId('content-edit').click()
+  await page.getByTestId('content-block-input').nth(1).fill('G1 고친 문장 — 지켜져야 함')
+  const kind0 = await page.getByTestId('content-result').getAttribute('data-kind')
+  await page.getByTestId('content-pick').nth(1).click()
+  const asked = /저장하지 않은 고침/.test(await dialog().innerText())
+  await dialog().getByRole('button', { name: '계속 고치기' }).click()
+  await wait(200)
+  check('G1 고친 글이 있는데 다른 글(먼저 만들 것) → 묻기 · [계속 고치기] → 고친 글 그대로', asked && (await page.getByTestId('content-block-input').nth(1).inputValue()).includes('G1 고친 문장') && (await page.getByTestId('content-result').getAttribute('data-kind')) === kind0)
+  // G2 [고치기 그만] 은 칸만 닫음 → 저장하면 고친 글이 보관함에
+  await page.getByTestId('content-edit').click()
+  await wait(150)
+  const closedText = await resultText(page)
+  await page.getByTestId('content-save').click()
+  await wait(500)
+  check('G2 [고치기 그만] → 고친 글이 화면에 남음 · 저장하면 고친 글이 보관함에(전에는 고치기 전 글이 저장됨)', closedText.includes('G1 고친 문장') && (await page.getByTestId('content-block-input').count()) === 0 && JSON.stringify(await items(page)).includes('G1 고친 문장'))
+  // G3 보관함의 같은 글을 다시 눌러도 고치던 것이 날아가지 않음
+  await page.getByTestId('content-edit').click()
+  await page.getByTestId('content-block-input').nth(1).fill('G3 보관함 글 고치는 중')
+  await page.getByTestId('content-archive-open').first().click()
+  await wait(300)
+  check('G3 띄운 글을 보관함에서 다시 눌러도 → 묻지 않고 고치던 것 그대로', (await dialog().count()) === 0 && (await page.getByTestId('content-block-input').nth(1).inputValue()) === 'G3 보관함 글 고치는 중')
+  // [버리고 넘어가기] → 상황 묶음으로
+  await page.locator('[data-testid="content-situation"][data-key="event"]').click()
+  await dialog().getByRole('button', { name: '고침 버리고 넘어가기' }).click()
+  await page.getByTestId('content-pack').waitFor()
+
+  // G4 [대괄호] 한 번에 채우기 — 묶음 3편 모두
+  const fillCount0 = await page.getByTestId('content-checks').innerText()
+  await page.getByTestId('content-fill-toggle').click()
+  const names = await page.getByTestId('content-fill-input').evaluateAll((els) => els.map((e) => e.getAttribute('data-name')))
+  for (let i = 0; i < names.length; i++) await page.getByTestId('content-fill-input').nth(i).fill(`채움${i}`)
+  await page.getByTestId('content-fill-apply').click()
+  await wait(300)
+  const tabTexts = []
+  for (let i = 0; i < 3; i++) {
+    await page.getByTestId('content-pack-tab').nth(i).click()
+    await wait(250)
+    tabTexts.push(await resultText(page))
+  }
+  const holesLeft = tabTexts.map((t) => (t.match(/\[[^\]\n]{1,80}\]/g) ?? []).filter((m) => !/^\[\d+:\d{2} - \d+:\d{2}\]$|^\[\d+장\]$/.test(m)))
+  check('G4 빈 칸 한 번에 채우기 → 묶음 3편의 [대괄호] 가 모두 바뀜(남은 빈 칸 0)', /\[대괄호\]/.test(fillCount0) && names.length >= 3 && holesLeft.every((h) => h.length === 0) && tabTexts.every((t) => t.includes('채움0') || t.includes('채움1')), { names, holesLeft })
+  check('G4 채운 뒤 점검에 "[대괄호] 채우기" 없음', !/\[대괄호\] \d+곳/.test(await page.getByTestId('content-checks').innerText().catch(() => '')))
+  // 저장 전에 다른 상황을 누르면 묻기(채운 것이 날아가지 않게)
+  await page.locator('[data-testid="content-situation"][data-key="holiday"]').click()
+  const asked2 = (await dialog().count()) === 1
+  await dialog().getByRole('button', { name: '계속 고치기' }).click()
+  const n0 = (await items(page)).length
+  await page.getByTestId('content-pack-save-all').click()
+  await wait(900)
+  const its = await items(page)
+  check('G5 채운 묶음 저장 전 다른 상황 → 묻기 · [모두 저장] → 3편 모두 채운 글로 보관함에', asked2 && its.length - n0 === 3 && its.filter((r) => r.data?.input?.situation === 'event').length === 3 && its.filter((r) => r.data?.input?.situation === 'event').every((r) => /채움\d/.test(JSON.stringify(r.data?.blocks))), { asked2, added: its.length - n0 })
+
+  // G6 짧은 영상 — 빈 칸을 다 채우면 "[대괄호] 채우기" 경고가 사라짐(칸 이름 [0:00 - 0:03] 을 빈 칸으로 세던 것)
+  await page.locator('[data-testid="content-kind"][data-kind="shorts"]').click()
+  await page.getByTestId('content-make').click()
+  await page.getByTestId('content-result').waitFor()
+  await wait(200)
+  const shortHas = (await page.getByTestId('content-fill').count()) === 1
+  if (shortHas) {
+    await page.getByTestId('content-fill-toggle').click()
+    const n = await page.getByTestId('content-fill-input').count()
+    for (let i = 0; i < n; i++) await page.getByTestId('content-fill-input').nth(i).fill(`값${i}`)
+    await page.getByTestId('content-fill-apply').click()
+    await wait(300)
+  }
+  const shortChecks = await page.getByTestId('content-checks').innerText().catch(() => '')
+  check('G6 짧은 영상 — 빈 칸 다 채우면 "[대괄호] n곳" 빨간 경고 없음 · 채우기 칸도 사라짐', !/\[대괄호\] \d+곳/.test(shortChecks) && (await page.getByTestId('content-fill').count()) === 0, shortChecks.slice(0, 160))
+  if (SHOTS) await page.getByTestId('content-result').screenshot({ path: `${SHOTS}/content-d209-short-filled.png` })
+  await page.getByTestId('content-save').click()
+  await wait(400)
+
+  // G7 상황 묶음 '없어요 — 이 줄 지우기'
+  await page.locator('[data-testid="content-situation"][data-key="open"]').click()
+  await page.getByTestId('content-pack').waitFor()
+  await page.getByTestId('content-fill-toggle').click()
+  if (SHOTS) await page.getByTestId('content-fill').screenshot({ path: `${SHOTS}/content-d209-fill-pc.png` })
+  const drops = await page.getByTestId('content-fill-drop').count()
+  await page.getByTestId('content-fill-drop').first().check()
+  await page.getByTestId('content-fill-apply').click()
+  await wait(300)
+  const afterDrop = await resultText(page)
+  check('G7 "없으면 지워 주세요" 칸 — [없어요] 체크하면 그 줄이 지워짐', drops >= 1 && !/없으면 이 (줄|칸|장)/.test(afterDrop.split('\n').filter((l) => /혜택/.test(l)).join('\n')), afterDrop.slice(0, 200))
+  await page.getByTestId('content-pack-save-all').click()
+  await wait(800)
+
+  // G8 한 달 계획 — 접어 둬도 '다음에 올릴 글' 한 줄 → 누르면 그 글
+  await page.getByTestId('content-plan-toggle').click()
+  await page.getByTestId('content-plan-make-all').click()
+  await wait(1500)
+  await page.getByTestId('content-plan-toggle').click()
+  await wait(200)
+  const nextTxt = await page.getByTestId('content-plan-next').innerText()
+  await page.getByTestId('content-plan-next-open').click()
+  await wait(400)
+  check('G8 계획을 접어도 "다음에 올릴 글" 이 보임 → 누르면 그 글(보관함)', /다음에 올릴 글|오늘 올릴 글/.test(nextTxt) && /보관함/.test(await page.getByTestId('content-result').innerText()), nextTxt)
+  if (SHOTS) await page.getByTestId('content-plan').screenshot({ path: `${SHOTS}/content-d209-plan-next.png` })
+  await ctx.close()
+}
+
 /* ================================================================== */
 /* 휴대폰 390 · 360                                                     */
 /* ================================================================== */
@@ -492,6 +610,12 @@ for (const width of [390, 360]) {
   const tabH = await page.getByTestId('content-pack-tab').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
   check(`M${width} D-208 상황 6개 → 더 보기 12개 · 묶음 탭 44px · 가로 넘침 0`, visSit === 6 && visSit2 === 12 && tabH.every((h) => h >= 44) && (await over()) <= 0, { visSit, visSit2, tabH })
   if (SHOTS && width === 390) await page.getByTestId('content-pack').screenshot({ path: `${SHOTS}/content-m390-pack.png` })
+  // D-209 빈 칸 한 번에 채우기 — 휴대폰에서 넘침 0 · 입력 칸 44px
+  await page.getByTestId('content-fill-toggle').click()
+  const fillH = await page.locator('[data-testid="content-fill"] input, [data-testid="content-fill"] button').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)).filter((h) => h > 0 && h < 40))
+  check(`M${width} D-209 빈 칸 채우기 펼침 — 가로 넘침 0 · 입력/단추 40px 이상`, (await over()) <= 0 && fillH.length === 0, { over: await over(), fillH })
+  if (SHOTS && width === 390) await page.getByTestId('content-fill').screenshot({ path: `${SHOTS}/content-m390-fill.png` })
+  await page.getByTestId('content-fill-toggle').click()
   await page.getByTestId('content-pick').nth(1).click()
   await page.getByTestId('content-result').waitFor()
   await wait(500)

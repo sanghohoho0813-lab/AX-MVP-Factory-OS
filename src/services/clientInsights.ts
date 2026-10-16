@@ -132,10 +132,28 @@ const policyInsight: Provider = ({ record, facts }) => {
   }
 }
 
+/*
+ * D-209 수도권 과밀억제권역 — 수도권정비계획법 시행령 [별표 1] 제1호(조세특례제한법 창업감면이 이 구역을 쓴다).
+ *  경기: 의정부 · 구리 · 하남 · 고양 · 수원 · 성남 · 안양 · 부천 · 광명 · 과천 · 의왕 · 군포 — 시 전체가 안.
+ *        남양주(호평 · 평내 등 일부 동만) · 시흥(반월특수지역 제외)은 동까지 봐야 해 '모름'. 그 밖의 시 · 군은 밖.
+ *  인천: 강화 · 옹진군은 밖. 서구(일부 동 · 청라) · 연수구(송도) · 중구(영종) · 남동구(국가산업단지)는 경제자유구역 · 산업단지가 빠져
+ *        동 · 번지까지 봐야 해 '모름'. 동구 · 미추홀구 · 부평구 · 계양구는 안.
+ * 예전에는 경기 · 인천을 모두 '모름' 으로 두어 상황 예시가 성남 · 인천 업체에도 '이미 밖' 이라고 말했다.
+ */
+const GG_OVER = ['의정부시', '구리시', '하남시', '고양시', '수원시', '성남시', '안양시', '부천시', '광명시', '과천시', '의왕시', '군포시']
+const GG_PART = ['남양주시', '시흥시']
+const IC_OUT = ['강화군', '옹진군']
+const IC_PART = ['서구', '연수구', '중구', '남동구']
+function metroOver(sido: string, city: string): StartupForm['overconcentration'] {
+  if (!city) return 'unknown'
+  if (sido === '경기') return GG_OVER.includes(city) ? 'yes' : GG_PART.includes(city) ? 'unknown' : 'no'
+  return IC_OUT.includes(city) ? 'no' : IC_PART.includes(city) ? 'unknown' : 'yes'
+}
+
 export function startupRegion(address: string): { region: Region | ''; over: StartupForm['overconcentration'] } {
-  const { sido } = placeOf(address)
+  const { sido, city } = placeOf(address)
   if (sido === '서울') return { region: 'seoul', over: 'yes' }
-  if (sido === '경기' || sido === '인천') return { region: 'gyeonggi_incheon', over: 'unknown' }
+  if (sido === '경기' || sido === '인천') return { region: 'gyeonggi_incheon', over: metroOver(sido, city) }
   if (['부산', '대구', '광주', '대전', '울산'].includes(sido)) return { region: 'metro_city', over: 'no' }
   if (sido) return { region: 'other_local', over: 'no' }
   return { region: '', over: '' }

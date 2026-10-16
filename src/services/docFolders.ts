@@ -19,6 +19,8 @@ export interface FolderFile {
   storagePath: string
   /** 올린 · 고친 때 */
   updatedAt: string | null
+  /** D-209 올린 때(없으면 updatedAt) */
+  uploadedAt: string | null
   issuedAt: string
   folderPath: string
 }
@@ -59,6 +61,7 @@ export function docFolderTree(record: ClientOpsRecord): FolderNode {
       fileSize: st.fileSize ?? 0,
       storagePath: st.storagePath ?? '',
       updatedAt: st.updatedAt ?? null,
+      uploadedAt: st.uploadedAt ?? st.updatedAt ?? null,
       issuedAt: st.issuedAt ?? '',
       folderPath,
     }
@@ -80,7 +83,7 @@ export function docFolderTree(record: ClientOpsRecord): FolderNode {
     node.files.push(file)
     for (const n of chain) {
       n.total += 1
-      if (file.updatedAt && (!n.latest || file.updatedAt > n.latest)) n.latest = file.updatedAt
+      if (file.uploadedAt && (!n.latest || file.uploadedAt > n.latest)) n.latest = file.uploadedAt
     }
   }
   const sortNode = (n: FolderNode) => {

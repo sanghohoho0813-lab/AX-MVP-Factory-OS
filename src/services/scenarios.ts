@@ -30,6 +30,7 @@ import {
   viewProfile,
   type GoalKey,
   type TaxProfile,
+  DEFAULT_GIFT_GOAL,
 } from './taxPlan'
 import { diagnoseHiring, type HiringAnswers } from '../tools/employment/lib/eligibility'
 import { DEFAULT_PROGRAMS } from '../tools/employment/lib/programs'
@@ -170,7 +171,7 @@ function runTax(s: ScenarioPreset, record: ClientOpsRecord, today: string): Omit
       } else lines.push(sal.message)
     }
     if (goal === 'gift') {
-      const gm = g.gift ?? { mode: 'pct' as const, amount: 10 }
+      const gm = g.gift ?? DEFAULT_GIFT_GOAL
       const gift = giftPlan(p, reg, sv, { recipientId: kid?.id ?? '', mode: gm.mode, amount: gm.amount })
       if (gift.ok) {
         okGoals.push(goal)

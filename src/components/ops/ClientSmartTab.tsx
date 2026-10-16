@@ -284,7 +284,7 @@ function BatchSummary({ batch, fresh }: { batch: DocBatchSummary; fresh: boolean
                 <Check aria-hidden="true" className="size-4 shrink-0 self-center text-success-600" />
                 <span className="w-28 shrink-0 text-slate-500">{f.label}</span>
                 <span className="min-w-0 font-semibold text-slate-900 [overflow-wrap:anywhere]">{f.display}</span>
-                <span className="t-meta text-slate-400">{f.fileName}</span>
+                <span className="t-meta min-w-0 text-slate-400 [overflow-wrap:anywhere]">{f.fileName}</span>
               </li>
             ))}
           </ul>
@@ -315,7 +315,7 @@ function BatchSummary({ batch, fresh }: { batch: DocBatchSummary; fresh: boolean
               <li key={`${x.fileName}-${i}`} className="t-sub flex flex-wrap items-baseline gap-x-2 break-keep">
                 <span className="min-w-0 text-slate-600 [overflow-wrap:anywhere]">{x.fileName}</span>
                 <span aria-hidden="true" className="text-slate-400">→</span>
-                <span className={`font-semibold ${x.other ? 'text-warning-800' : 'text-slate-900'}`}>{x.label}</span>
+                <span className={`min-w-0 font-semibold [overflow-wrap:anywhere] ${x.other ? 'text-warning-800' : 'text-slate-900'}`}>{x.label}</span>
                 {x.same ? (
                   <span className="t-meta text-warning-800">(이름 · 크기가 같은 파일이 이미 있어요 — '확인할 것' 에서 최신 것만 남기거나 서류 탭에서 하나 지우세요)</span>
                 ) : (

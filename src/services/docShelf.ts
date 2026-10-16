@@ -13,7 +13,7 @@ import type { ClientOpsRecord, DocumentKey } from '../types/clientOps'
 import { allDocumentMetas } from './clientOpsDocuments'
 import { documentsWithExpiry } from './clientOpsAlerts'
 import { KNOWN_EXTRA_DOCS, OTHER_DOC_LABEL, placeDocument, type DocPlacement } from './docClassify'
-import { applyResort, cellForPlacement, withoutDocumentFile } from './docPlacementApply'
+import { applyResort, cellForPlacement, withFactRefs, withoutDocumentFile } from './docPlacementApply'
 import { withDocument, withoutCustomDocument } from './clientOpsService'
 
 /**
@@ -129,7 +129,13 @@ export function newestOf(record: ClientOpsRecord, keys: readonly DocumentKey[]):
   return [...keys].sort((a, b) => {
     const da = record.documents[a]
     const db = record.documents[b]
-    return (db?.issuedAt ?? '').localeCompare(da?.issuedAt ?? '') || (db?.updatedAt ?? '').localeCompare(da?.updatedAt ?? '') || numberOf(label(b)) - numberOf(label(a))
+    // D-209: 발급일은 둘 다 알 때만 견준다 — 하나만 알면 늦게 올린 것(새로 받은 서류에 발급일을 아직 안 적었을 수 있다)
+    const ia = da?.issuedAt ?? ''
+    const ib = db?.issuedAt ?? ''
+    if (ia && ib && ia !== ib) return ib.localeCompare(ia)
+    const ua = da?.uploadedAt ?? da?.updatedAt ?? ''
+    const ub = db?.uploadedAt ?? db?.updatedAt ?? ''
+    return ub.localeCompare(ua) || numberOf(label(b)) - numberOf(label(a))
   })[0]
 }
 
@@ -143,7 +149,8 @@ export function withDedupedShelf(record: ClientOpsRecord, keys: readonly Documen
   const primary = keys.find((k) => !/\(\d+\)$/.test(metas.find((m) => m.key === k)?.label ?? '')) ?? keys[0]
   const kept = record.documents[keep]
   const ops = { withDoc: withDocument, withoutCustom: withoutCustomDocument }
-  let rec = record
+  // D-209: 남길 파일에서 읽은 '확인할 정보' 는 남길 칸으로 · 빼는 파일(기본 칸의 옛 파일 포함)의 것은 뺀다
+  let rec = withFactRefs(record, Object.fromEntries(keys.map((k) => [k, k === keep ? primary : null])))
   for (const k of keys) if (k !== primary) rec = withoutDocumentFile(rec, k, ops)
   if (keep !== primary && kept) {
     rec = withDocument(rec, primary, {
@@ -155,6 +162,7 @@ export function withDedupedShelf(record: ClientOpsRecord, keys: readonly Documen
       validUntil: kept.validUntil,
       note: kept.note,
       folderPath: kept.folderPath ?? '',
+      uploadedAt: kept.uploadedAt ?? kept.updatedAt ?? undefined,
     })
   }
   return rec

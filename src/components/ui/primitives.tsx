@@ -23,6 +23,7 @@ import { screenTitleForPath } from '../../config/moduleRegistry'
 import { hintFor } from '../../content/sectionHints'
 import { Fold, HintTip } from './fold'
 import { useBackToClose } from '../../lib/backToClose'
+import { useEscToClose } from '../../lib/escStack'
 
 /* ------------------------------------------------------------------ */
 /* 색 계약                                                              */
@@ -440,18 +441,15 @@ export function BottomSheet({
     const t = window.setTimeout(() => setNudge('still'), 420)
     return () => window.clearTimeout(t)
   }, [nudge])
+  // D-209: 겹친 창이면 맨 위 창만 Esc 로 닫는다(미리보기에서 Esc → 아래 파일 창까지 닫히던 것)
+  useEscToClose(true, onClose)
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
-      document.removeEventListener('keydown', onKey)
       document.body.style.overflow = prev
     }
-  }, [onClose])
+  }, [])
 
   return (
     <div
@@ -466,7 +464,7 @@ export function BottomSheet({
     >
       <div className={`${nudge === 'shake' ? 'ax-nudge' : nudge === 'pop' ? 'ax-pop' : ''} flex max-h-[92vh] w-full flex-col rounded-t-2xl bg-white sm:max-w-lg sm:rounded-(--radius-panel)`}>
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
-          <h2 className="t-section min-w-0 break-keep text-slate-900">{title}</h2>
+          <h2 className="t-section min-w-0 break-keep text-slate-900 [overflow-wrap:anywhere]">{title}</h2>
           <button
             type="button"
             onClick={onClose}

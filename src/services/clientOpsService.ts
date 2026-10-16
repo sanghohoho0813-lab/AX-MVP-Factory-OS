@@ -854,11 +854,15 @@ export function withDocument(
   patch: Partial<DocumentState>,
 ): ClientOpsRecord {
   const prev = record.documents[key]
+  const now = nowIso()
+  // D-209: 올린 때를 따로 — 새 파일이 들어오면 지금, 파일을 빼면 지운다, 옮길 때는 넘겨받은 값(patch.uploadedAt)
+  const newFile = (patch.storagePath !== undefined && patch.storagePath !== '' && patch.storagePath !== prev?.storagePath) || (patch.fileName !== undefined && patch.fileName !== '' && patch.fileName !== prev?.fileName)
+  const uploadedAt = 'uploadedAt' in patch ? patch.uploadedAt : newFile ? now : patch.fileName === '' ? undefined : prev?.uploadedAt
   let out: ClientOpsRecord = {
     ...record,
     documents: {
       ...record.documents,
-      [key]: { ...prev, ...patch, updatedAt: nowIso() },
+      [key]: { ...prev, ...patch, uploadedAt, updatedAt: now },
     },
   }
   const label = documentMetaOf(record, key).label
@@ -891,7 +895,8 @@ export function withCustomDocument(
     const next: ClientOpsRecord = {
       ...record,
       customDocuments: record.customDocuments.map((d) =>
-        d.id === prev.id ? { ...d, label, validMonths, sensitive: input.sensitive ?? d.sensitive } : d,
+        // D-209: 이름만 고치면 유효기간은 그대로(예전에는 비워져 발급일 칸 · 만료 알림이 사라졌다)
+        d.id === prev.id ? { ...d, label, validMonths: input.validMonths === undefined ? d.validMonths : validMonths, sensitive: input.sensitive ?? d.sensitive } : d,
       ),
     }
     if (prev.label === label) return next

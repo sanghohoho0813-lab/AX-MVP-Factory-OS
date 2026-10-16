@@ -38,6 +38,10 @@ import {
   normalizeOverrides,
   parseKeywordVolumes,
   placeholders,
+  holeNames,
+  holeLabel,
+  holeGroups,
+  fillHoles,
   plainText,
   profileGaps,
   sameContent,
@@ -48,6 +52,7 @@ import {
   type ContentKind,
   type ContentProfile,
   type KakaoPurpose,
+  type MadeItem,
 } from '../contentStudio'
 import type { IndustryKey, SiteDoc } from '../siteBuilder'
 
@@ -372,6 +377,49 @@ const takenSet = new Set(pd2.map(keyOf))
 const nextMonth = planDrafts(fp, slots2.map((s) => ({ ...s, date: s.date.replace('2026-10', '2026-11') })), today, (d) => takenSet.has(keyOf(d)))
 check('C73 이미 보관함에 있는 글(지난 계획)과 같은 글은 다른 안으로 — 블로그 · 영상 · 카드 · 카톡 모두 새 글', nextMonth.filter((d) => takenSet.has(keyOf(d))).length === 0, nextMonth.filter((d) => takenSet.has(keyOf(d))).map((d) => d.kind))
 check('C74 짧은 영상 안내 길이 = 실제 대본(20~60초 · 40초라고 쓰지 않음)', !JSON.stringify(firstPicks(fp, today)).includes('40초'))
+
+/* ---------------- D-209 [대괄호] 한 번에 채우기 · 점검이 칸 이름을 빈 칸으로 세지 않기 · 먼저 만들 것 로컬 날짜 ---------------- */
+// 짧은 영상 · 긴 영상 · 카드뉴스는 복사할 때 칸 이름을 [0:00 - 0:03] · [1장] 처럼 감싼다 — 이건 채울 자리가 아니다
+const noHoleKinds = (['shorts', 'video', 'cards'] as const).map((k) => {
+  const t = topicsFor(fp, '', today)
+  const d = makeDraft(fp, { kind: k, topic: t[0] }, today)
+  const clean = d.blocks.map((b) => ({ ...b, text: b.text.replace(/\[[^\]\n]{1,80}\]/g, '채움') }))
+  return { k, holes: draftChecks(k, clean, fp.industry).find((c) => c.key === 'holes')?.text ?? '' }
+})
+check('C75 본문 [대괄호] 를 다 채운 짧은 영상 · 긴 영상 · 카드뉴스는 "[대괄호] 채우기" 가 남지 않음(칸 이름은 빈 칸이 아님)', noHoleKinds.every((x) => !x.holes), noHoleKinds)
+const evPack = situationPack(fp7, 'event', today)
+const evNames = holeNames(evPack.items.map((x) => x.draft.blocks))
+check('C76 묶음 빈 칸 이름 — 겹치는 이름은 한 번만 · 나온 순서대로 · 칸 이름(라벨)은 넣지 않음', evNames.length > 0 && new Set(evNames).size === evNames.length && !evNames.some((n) => /^\d+:\d{2}|^\d+장$/.test(n)), evNames)
+const evVals = Object.fromEntries(evNames.map((n, i) => [n, `값${i}$&$1`]))
+const evFilled = evPack.items.map((x) => fillHoles(x.draft.blocks, evVals))
+check('C77 한 번 적으면 묶음 모든 글의 같은 [대괄호] 가 바뀜 · $& 같은 기호도 그대로 · 남은 빈 칸 0', evFilled.every((f, i) => f.filled > 0 && draftChecks(evPack.items[i].draft.kind, f.blocks, fp7.industry).every((c) => c.key !== 'holes')) && evFilled.some((f) => f.blocks.some((b) => b.text.includes('값0$&$1'))), evFilled.map((f) => f.filled))
+const half = fillHoles(evPack.items[0].draft.blocks, { [evNames[0]]: '  ', [evNames[1] ?? 'x']: '' })
+check('C78 빈 값 · 띄어쓰기만 적은 칸은 그대로 [대괄호] 로 남음(지우지 않음)', half.filled === 0 && JSON.stringify(half.blocks) === JSON.stringify(evPack.items[0].draft.blocks))
+const packHoles = SITUATION_KEYS.map((k) => ({ k, names: holeNames(situationPack(fp7, k, today).items.map((x) => x.draft.blocks)) }))
+check('C79 상황 12가지 모두 빈 칸 입력 이름(— 앞)이 30자 안 · 괄호 · 줄바꿈 없음', packHoles.every((x) => x.names.every((n) => holeLabel(n).label.length <= 30 && !/[[\]\n]/.test(n))), packHoles.map((x) => x.names.filter((n) => holeLabel(n).label.length > 30)).flat())
+const optName = packHoles.find((x) => x.k === 'open')?.names.find((n) => holeLabel(n).optional) ?? ''
+const openPk = situationPack(fp7, 'open', today)
+const dropped = openPk.items.map((x) => fillHoles(x.draft.blocks, {}, [optName]))
+check('C81 "없으면 지워 주세요" 칸은 [없어요] 로 그 줄만 지움 — 다른 줄 · 다른 [대괄호] 는 그대로 · 빈 칸 칸은 뺌', !!optName && holeLabel(optName).optional && dropped.every((f) => !f.blocks.some((b) => b.text.includes(`[${optName}]`))) && dropped.some((f, i) => f.filled > 0 && f.blocks.length <= openPk.items[i].draft.blocks.length) && dropped.every((f) => f.blocks.every((b) => b.text.trim().length > 0)), { optName, n: dropped.map((f) => f.filled) })
+const grp = holeGroups(['다른 곳과 다른 점 한 가지', '다른 곳과 다른 점 한 가지 — 업체와 확인해 적어 주세요', '기간', '혜택 — 없으면 이 줄을 지워 주세요'])
+check('C82 같은 이름(— 앞)의 빈 칸은 입력 하나로 묶음 · 도움말은 있는 쪽 · 없어도 되는 칸 표시', grp.length === 3 && grp[0].names.length === 2 && grp[0].hint === '업체와 확인해 적어 주세요' && !grp[1].optional && grp[2].optional, grp)
+// 먼저 만들 것 — 한국 오전 9시 전에 저장한 글(UTC 로는 어제)도 그날 만든 글로 센다
+const prevTz = process.env.TZ
+process.env.TZ = 'Asia/Seoul'
+const longAgo = '2026-10-01T03:00:00.000Z'
+const doneMost: MadeItem[] = [
+  { kind: 'keywords', createdAt: longAgo },
+  { kind: 'place', createdAt: longAgo },
+  { kind: 'blog', topicType: 'intro', createdAt: longAgo },
+  { kind: 'blog', topicType: 'choose', createdAt: longAgo },
+  { kind: 'blog', topicType: 'faq', createdAt: longAgo },
+  { kind: 'kakao', purpose: 'news', createdAt: longAgo },
+  { kind: 'shorts', topicType: 'tips', createdAt: '2026-10-15T23:30:00.000Z' }, // 한국 10/16 08:30
+]
+const kstPicks = firstPicks(fp, '2026-11-15', doneMost)
+if (prevTz === undefined) delete process.env.TZ
+else process.env.TZ = prevTz
+check('C80 먼저 만들 것 — 한국 10/16 오전에 만든 짧은 영상은 11/15 에 "30일 안" (UTC 날짜 10/15 로 세어 다시 권하지 않음)', !kstPicks.some((p) => p.key === 'shorts'), kstPicks.map((p) => p.key))
 
 if (SHOW) {
   const show = (p: ContentProfile, kind: ContentKind, extra: Record<string, unknown> = {}) => {

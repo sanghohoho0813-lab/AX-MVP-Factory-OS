@@ -10,6 +10,8 @@ import { cashPlan, goalNeeds, shareValueOf, viewProfile } from '../taxPlan'
 import { diagnoseHiring } from '../../tools/employment/lib/eligibility'
 import { DEFAULT_PROGRAMS } from '../../tools/employment/lib/programs'
 import type { ClientOpsRecord } from '../../types/clientOps'
+import { businessTypeOf } from '../../tools/shared/clientPrefill'
+import { startupRegion } from '../clientInsights'
 
 let passed = 0
 let failed = 0
@@ -251,6 +253,7 @@ const maybe = <T,>(v: T): T | '' => (rnd() < 0.3 ? '' : v)
 const won = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 let bad: string[] = []
 let fitCount = 0
+const entityMismatch: string[] = []
 const QKEYS = Object.keys(SCENARIO_QUESTIONS) as QuestionKey[]
 for (let i = 0; i < 2000; i++) {
   const corp = rnd() < 0.5
@@ -280,6 +283,8 @@ for (let i = 0; i < 2000; i++) {
     decided: answers,
   })
   const ctx = fitContext(rec, today)
+  // D-209: 도구(사실 창고)와 상황 예시가 법인 · 개인을 같게 본다
+  if ((businessTypeOf(rec) || 'unknown') !== ctx.entity) entityMismatch.push(`${rec.id}:${rec.businessNumber}/${rec.companyName}→${businessTypeOf(rec) || '?'}≠${ctx.entity}`)
   // 판단만 바로(빠르다) — 스무 곳에 한 번은 계산까지 다 돌려 같은 판단 · 23개 · 멈춤 없음을 본다
   const runs = SCENARIO_PRESETS.map((s) => ({ id: s.id, module: s.module, fit: scenarioFit(s, ctx) }))
   if (i % 20 === 0) {
@@ -318,6 +323,27 @@ for (let i = 0; i < 2000; i++) {
 }
 check('F21 무작위 업체 2,000곳 × 23 상황 — 기록이 반대를 말하는데 "맞음" 0건 · 까닭 없는 판단 0 · 같은 입력 같은 판단 · 답과 판단 일치', bad.length === 0, bad.slice(0, 8))
 check('F22 무작위 업체에서 "맞음" 도 실제로 나온다(전부 숨기는 것이 아님)', fitCount > 2000, fitCount)
+check('F23 무작위 업체 2,000곳 — 계산기(사실 창고)와 상황 예시의 법인 · 개인 판단이 모두 같음', entityMismatch.length === 0, entityMismatch.slice(0, 6))
+
+/* ---------------- D-209 점검 결과 ---------------- */
+const moveOf = (addr: string) => {
+  const r = mk({ id: `mv-${addr}`, companyName: '(주)이전정밀', corporateNumber: '110111-1234567', establishedAt: '2024-05-02', businessAddress: addr })
+  return scenarioFit(SCENARIO_PRESETS.find((x) => x.id === 'startup-move')!, fitContext(r, today))
+}
+const mvSn = moveOf('경기도 성남시 분당구 판교로 1')
+const mvHs = moveOf('경기도 화성시 동탄대로 1')
+const mvNd = moveOf('인천광역시 남동구 남동대로 1')
+const mvSe = moveOf('서울특별시 강남구 테헤란로 1')
+const mvBs = moveOf('부산광역시 해운대구 센텀로 1')
+check('F24 본점 이전 — 성남(과밀억제권역)은 맞음 · 화성은 이미 밖 · 인천 남동구(산업단지 일부 제외)는 확인할 것 · 서울 맞음 · 부산 밖(예전: 경기 · 인천 모두 "이미 밖")', mvSn.kind === 'fit' && mvHs.kind === 'no' && mvNd.kind === 'data' && !/이미 과밀억제권역 밖/.test(mvNd.why) && mvSe.kind === 'fit' && mvBs.kind === 'no', { mvSn: mvSn.kind, mvHs: mvHs.kind, mvNd, mvSe: mvSe.kind, mvBs: mvBs.kind })
+const overTable: [string, string][] = [['경기도 수원시 영통구 1', 'yes'], ['경기도 고양시 일산동구 1', 'yes'], ['경기도 과천시 1', 'yes'], ['경기도 용인시 수지구 1', 'no'], ['경기도 평택시 1', 'no'], ['경기도 남양주시 별내동 1', 'unknown'], ['경기도 시흥시 정왕동 1', 'unknown'], ['인천광역시 부평구 1', 'yes'], ['인천광역시 계양구 1', 'yes'], ['인천광역시 강화군 1', 'no'], ['인천광역시 연수구 송도동 1', 'unknown'], ['경기 수원 1', 'unknown']]
+const overBad = overTable.filter(([a, want]) => startupRegion(a).over !== want).map(([a, want]) => `${a}: ${startupRegion(a).over}≠${want}`)
+check('F27 과밀억제권역 표(수도권정비계획법 시행령 별표1) — 시 전체 · 일부 · 밖 · 줄인 주소는 모름', overBad.length === 0, overBad)
+const indivNo = mk({ id: 'bt1', companyName: '정밀상회', businessNumber: '123-45-67890', establishedAt: '2022-01-01', businessCategory: '제조업' })
+const corpName = mk({ id: 'bt2', companyName: '한빛산업 주식회사', businessNumber: '', establishedAt: '2022-01-01' })
+check('F25 사업자번호가 개인(가운데 45) → 계산기도 개인사업자 · 이름에 주식회사 → 법인(예전: 둘 다 "모름" 으로 법인세 계산)', businessTypeOf(indivNo) === 'individual' && fitContext(indivNo, today).entity === 'individual' && businessTypeOf(corpName) === 'corporation' && fitContext(corpName, today).entity === 'corporation')
+const labIndiv = runScenario(SCENARIO_PRESETS.find((x) => x.id === 'lab-two')!, indivNo, today)
+check('F26 연구소 2명 상황 — 개인사업자면 소득세로 계산 · "사업자 구분" 을 모자란 것으로 묻지 않음', /소득세/.test(labIndiv.headline) && labIndiv.needs.every((n) => !JSON.stringify(n).includes('사업자 구분') || (n as { ok?: boolean }).ok), { h: labIndiv.headline, needs: labIndiv.needs })
 
 console.log(`\nscenarios: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

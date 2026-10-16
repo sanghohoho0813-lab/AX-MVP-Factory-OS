@@ -56,8 +56,10 @@ export function cellForPlacement(record: ClientOpsRecord, p: DocPlacement, used:
   const taken = allDocumentMetas(rec).some((m) => compact(m.label.replace(/\s*\(\d+\)$/, '')) === compact(label))
   const finalLabel = taken ? nextNumberedLabel(rec, label) : label
   // D-147: 알려진 서류면 유효기간도 함께(인감 3개월 · 납세 30일 …) — 만료 알림이 바로 걸린다
+  // D-209: '법인등기부등본 (2)' 처럼 기본 칸의 번호 칸이면 그 기본 칸의 유효기간을 그대로(예전에는 비어 만료를 안 봤다)
+  const sameBase = allDocumentMetas(rec).find((m) => compact(m.label.replace(/\s*\(\d+\)$/, '')) === compact(label) && m.validMonths)
   const before = rec.customDocuments.length
-  rec = withCustomDocument(rec, { label: finalLabel, validMonths: knownDocValidMonths(label) })
+  rec = withCustomDocument(rec, { label: finalLabel, validMonths: sameBase?.validMonths ?? knownDocValidMonths(label) })
   // 새 칸이 정말 생겼을 때만 그 키를 쓴다 — 아니면 마지막 칸(다른 서류)에 덮어 쓰게 된다
   if (rec.customDocuments.length !== before + 1) throw new Error(`'${finalLabel}' 칸을 만들지 못했습니다.`)
   const key = rec.customDocuments[rec.customDocuments.length - 1].key
@@ -117,6 +119,7 @@ export function applyResort(
   }
   const used = new Set<string>()
   const moved: { fileName: string; from: string; to: string; key: DocumentKey; fromKey: DocumentKey }[] = []
+  const refMap: Record<string, string> = {}
   for (const { m, state } of taken) {
     const cell = cellForPlacement(rec, m.placement, used)
     rec = ops.withDoc(cell.record, cell.key, {
@@ -130,9 +133,14 @@ export function applyResort(
       note: state.note,
       // D-204: 원래 폴더 경로도 파일을 따라 옮긴다(폴더로 보기에서 제자리)
       folderPath: state.folderPath ?? '',
+      // D-209: 올린 때도 그대로(옮겼다고 오늘 올린 파일이 되지 않게)
+      uploadedAt: state.uploadedAt ?? state.updatedAt ?? undefined,
     })
     moved.push({ fileName: state.fileName, from: m.fromLabel, to: cell.label, key: cell.key, fromKey: m.fromKey })
+    refMap[m.fromKey] = cell.key
   }
+  // D-209: 그 파일에서 읽은 '확인할 정보' 도 새 칸을 가리키게(옛 칸에 다른 파일이 들어와도 섞이지 않게)
+  rec = withFactRefs(rec, refMap)
   // 비어 버린 직접 만든 칸은 없앤다(받음만 적은 칸은 남긴다 — 이번에 옮긴 칸만)
   for (const { m } of taken) {
     const custom = rec.customDocuments.find((d) => d.key === m.fromKey)
@@ -154,8 +162,32 @@ export function withoutDocumentFile(
     withoutCustom: (r: ClientOpsRecord, id: string) => ClientOpsRecord
   },
 ): ClientOpsRecord {
-  let rec = ops.withDoc(record, key, { received: false, fileName: '', fileSize: 0, storagePath: '', issuedAt: '', note: '', folderPath: '' })
+  // D-209: 유효기간 끝도 지운다 — 남아 있으면 다시 올린 파일이 옛 만료일을 물려받았다
+  let rec = ops.withDoc(record, key, { received: false, fileName: '', fileSize: 0, storagePath: '', issuedAt: '', validUntil: undefined, note: '', folderPath: '', uploadedAt: undefined })
   const custom = rec.customDocuments.find((d) => d.key === key)
   if (custom) rec = ops.withoutCustom(rec, custom.id)
-  return rec
+  // D-209: 뺀 파일에서 읽은 '확인할 정보' 도 함께 뺀다(거래처 사업자등록증을 지웠는데 번호가 다르다는 물음이 남았다)
+  return withFactRefs(rec, { [key]: null })
+}
+
+/**
+ * D-209 '확인할 정보'(factInbox)의 출처 칸 바꾸기 — ref 'doc:<칸>:…' 의 칸을 새 칸으로(null 이면 그 후보를 뺀다).
+ * 원래 ref 로 한 번에 바꾼다(두 칸을 서로 바꿔도 섞이지 않게).
+ */
+export function withFactRefs(record: ClientOpsRecord, map: Readonly<Record<string, string | null>>): ClientOpsRecord {
+  const inbox = record.factInbox ?? []
+  if (!inbox.length || !Object.keys(map).length) return record
+  let changed = false
+  const next: typeof inbox = []
+  for (const c of inbox) {
+    const m = /^doc:([^:]+):/.exec(c.ref ?? '')
+    if (!m || !(m[1] in map)) {
+      next.push(c)
+      continue
+    }
+    changed = true
+    const to = map[m[1]]
+    if (to) next.push({ ...c, ref: `doc:${to}:${c.ref.slice(m[0].length)}` })
+  }
+  return changed ? { ...record, factInbox: next } : record
 }

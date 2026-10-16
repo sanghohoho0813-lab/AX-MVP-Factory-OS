@@ -766,14 +766,74 @@ export interface DraftCheck {
   text: string
 }
 
+const HOLE_RE = /\[([^\]\n]{1,80})\]/g
+
 export function placeholders(text: string): string[] {
-  return [...text.matchAll(/\[([^\]\n]{1,80})\]/g)].map((m) => m[1])
+  return [...text.matchAll(HOLE_RE)].map((m) => m[1])
+}
+
+/** D-209 여러 글의 [대괄호] 자리 이름 — 나온 순서대로 한 번씩(한 번 적어 묶음 모든 글에 넣을 때). 칸 이름(라벨)은 채울 자리가 아니다. */
+export function holeNames(blockSets: readonly (readonly DraftBlock[])[]): string[] {
+  const out: string[] = []
+  for (const bs of blockSets) for (const b of bs) for (const h of placeholders(b.text)) if (!out.includes(h)) out.push(h)
+  return out
+}
+
+/** D-209 입력 칸에 쓸 이름 — '문 연 기념 혜택 — 없으면 이 줄을 지워 주세요' → 이름 · 도움말 · 없어도 되는 칸인지 */
+export function holeLabel(name: string): { label: string; hint: string; optional: boolean } {
+  const [label, ...rest] = name.split(' — ')
+  return { label: label.trim(), hint: rest.join(' — ').trim(), optional: /없으면|있다면|있으면/.test(name) }
+}
+
+/** D-209 같은 이름(— 앞)의 빈 칸은 입력 칸 하나로 — '다른 점 한 가지' 와 '다른 점 한 가지 — 업체와 확인해…' 를 한 번에 */
+export function holeGroups(names: readonly string[]): { label: string; hint: string; optional: boolean; names: string[] }[] {
+  const out: { label: string; hint: string; optional: boolean; names: string[] }[] = []
+  for (const n of names) {
+    const h = holeLabel(n)
+    const g = out.find((x) => x.label === h.label)
+    if (g) {
+      g.names.push(n)
+      if (!g.hint && h.hint) g.hint = h.hint
+      g.optional = g.optional || h.optional
+    } else out.push({ label: h.label, hint: h.hint, optional: h.optional, names: [n] })
+  }
+  return out
+}
+
+/**
+ * D-209 [대괄호] 자리를 적은 값으로 바꾼다. 빈 값(띄어쓰기만 포함)은 그대로 둔다 · 값 안의 $& 같은 기호도 글자 그대로.
+ * drop 에 든 자리('없어요')는 그 줄을 지우고, 칸 글이 비면 칸도 뺀다.
+ */
+export function fillHoles(blocks: readonly DraftBlock[], values: Readonly<Record<string, string>>, drop: readonly string[] = []): { blocks: DraftBlock[]; filled: number } {
+  let filled = 0
+  const out: DraftBlock[] = []
+  for (const b of blocks) {
+    let text = b.text
+    if (drop.length) {
+      const lines = text.split('\n')
+      const kept = lines.filter((ln) => !drop.some((n) => ln.includes(`[${n}]`)))
+      if (kept.length !== lines.length) {
+        filled += lines.length - kept.length
+        text = kept.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+        if (!text) continue
+      }
+    }
+    text = text.replace(HOLE_RE, (m, name: string) => {
+      const v = values[name]?.trim()
+      if (!v) return m
+      filled += 1
+      return v
+    })
+    out.push({ ...b, text })
+  }
+  return { blocks: out, filled }
 }
 
 export function draftChecks(kind: ContentKind, blocks: readonly DraftBlock[], industry: ContentProfile['industry'], keyword?: string): DraftCheck[] {
   const text = plainText(kind, blocks)
   const out: DraftCheck[] = []
-  const holes = placeholders(text)
+  // D-209 고침: 영상 · 카드뉴스는 복사할 때 칸 이름을 [0:00 - 0:03] · [1장] 으로 감싼다 — 칸 이름은 채울 자리로 세지 않는다
+  const holes = blocks.flatMap((b) => placeholders(b.text))
   if (holes.length) out.push({ key: 'holes', level: 'must', text: `[대괄호] ${holes.length}곳을 실제 내용으로 바꾸거나 지워 주세요.` })
   for (const r of RISKY_WORDS) {
     const m = r.re.exec(text)
