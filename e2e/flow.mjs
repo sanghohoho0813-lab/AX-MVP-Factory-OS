@@ -559,7 +559,9 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   check(`다음 약속 [다시 잡기] → 업체 다음 약속 날짜가 앞날로 ${tag}`, nrec.nextActionDueDate > T && nrec.nextActionDueDate !== before, `${before} → ${nrec.nextActionDueDate}`)
   // 업체 상세 맞춤 추천에도 같은 종류가 보인다
   await page.goto(BASE + '/ops/clients/cli_daum?tab=smart', { waitUntil: 'networkidle' })
-  await page.waitForTimeout(800)
+  // 맞춤 추천 탭은 따로 불러오는 화면이라 0.8~1.9초 걸린다(D-190 에서 main · 판 같은 범위로 잼) — 고정 0.8초 대신 결정 목록이 뜰 때까지
+  await page.getByTestId('smart-decisions').waitFor({ timeout: 8000 }).catch(() => {})
+  await page.waitForTimeout(300)
   const smart = page.getByTestId('smart-decisions')
   const sk = (await smart.count()) ? await smart.getByTestId('decision').evaluateAll((els) => els.map((e) => e.getAttribute('data-kind'))) : []
   check(`업체 상세(다움): 받을 돈 · 다음 약속 같은 결정도 보인다 ${tag}`, sk.some((k) => k === 'money' || k === 'next'), sk)
