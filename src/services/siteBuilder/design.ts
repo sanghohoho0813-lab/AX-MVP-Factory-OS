@@ -107,6 +107,20 @@ export interface ScoreItem {
   open: { blockId?: string; tab?: 'style'; add?: BlockType }
 }
 
+/** 믿음 기록이 하나도 없을 때 더할 블록 — 병의원은 후기 대신 인증(의료 광고 규정) */
+const TRUST_ADD: Record<IndustryKey, BlockType> = {
+  manufacturing: 'logos',
+  it: 'logos',
+  trade: 'logos',
+  food: 'reviews',
+  health: 'certs',
+  professional: 'reviews',
+  education: 'reviews',
+  construction: 'reviews',
+  design: 'logos',
+  general: 'reviews',
+}
+
 export interface SiteScore {
   score: number
   items: ScoreItem[]
@@ -130,7 +144,10 @@ export function siteScore(doc: SiteDoc): SiteScore {
   const phone = str(contact?.props.phone) || str(footer?.props.phone)
   const address = str(contact?.props.address) || str(footer?.props.address)
   const photos = [safeImage(str(hero?.props.image)), safeImage(str(about?.props.image)), ...list(gallery?.props.items).map((it) => safeImage(str(it.image)))].filter(Boolean).length
-  const trust = (['certs', 'numbers', 'reviews', 'logos', 'history'] as BlockType[]).filter((t) => live(t)).length
+  const TRUST: BlockType[] = ['certs', 'numbers', 'reviews', 'logos', 'history']
+  const trust = TRUST.filter((t) => live(t)).length
+  // 아직 비어 있는 믿음 블록이 있으면 그것을 열고(겹쳐 넣지 않게), 없으면 업종에 맞는 블록을 더한다
+  const emptyTrust = doc.blocks.find((b) => TRUST.includes(b.type) && !hasContent(b))
   const samples = doc.blocks.filter((b) => b.sample?.length && hasContent(b) && !(b.hidePc && b.hideMobile))
   const kakaoOrForm = !!contact && (!!httpsHref(str(contact.props.kakaoUrl)) || !!httpsHref(str(contact.props.formUrl)))
 
@@ -140,7 +157,7 @@ export function siteScore(doc: SiteDoc): SiteScore {
     { key: 'about', label: '회사 소개 글(업체 말)', points: 10, done: !!about && hasContent(about) && notSample(about, 'body'), how: '견본 소개 글을 업체가 하는 말로 고치거나 확인해요.', open: about ? { blockId: about.id } : { add: 'about' } },
     { key: 'services', label: '사업 · 서비스 3개 이상', points: 10, done: !!services && notSample(services, 'items') && list(services.props.items).filter((it) => str(it.name)).length >= 3, how: '하는 일을 세 가지 이상, 업체가 쓰는 이름으로 적어요.', open: services ? { blockId: services.id } : { add: 'services' } },
     { key: 'photos', label: '실제 사진 3장 이상', points: 15, done: photos >= 3, how: `실제 사진이 ${photos}장이에요 — 첫 화면 · 회사 소개 · 사진 모음에 올려요.`, open: gallery ? { blockId: gallery.id } : hero ? { blockId: hero.id } : { add: 'gallery' } },
-    { key: 'trust', label: '믿음을 주는 기록(인증 · 숫자 · 후기 · 거래처 · 연혁)', points: 12, done: trust >= 1, how: '인증 · 숫자 · 후기 · 거래처 · 연혁 중 하나를 채워요.', open: { add: 'reviews' } },
+    { key: 'trust', label: '믿음을 주는 기록(인증 · 숫자 · 후기 · 거래처 · 연혁)', points: 12, done: trust >= 1, how: '인증 · 숫자 · 후기 · 거래처 · 연혁 중 하나를 채워요.', open: emptyTrust ? { blockId: emptyTrust.id } : { add: TRUST_ADD[doc.industry] } },
     { key: 'contact', label: '전화 · 주소', points: 12, done: !!phone && !!address, how: !phone ? '대표 전화를 적어요.' : '주소를 적어요.', open: contact ? { blockId: contact.id } : footer ? { blockId: footer.id } : { add: 'contact' } },
     { key: 'kakao', label: '카카오톡 · 상담 신청서 연결', points: 5, done: kakaoOrForm, how: '연락처 블록에 카카오톡 채널이나 상담 신청서 주소(https://)를 넣어요.', open: contact ? { blockId: contact.id } : { add: 'contact' } },
     { key: 'floatbar', label: '휴대폰 아래 고정 단추', points: 4, done: !!contact && contact.props.floatBar === true && !!phone, how: "연락처 블록의 '휴대폰 아래 고정 단추' 를 켜요(대표 전화가 있어야 해요).", open: contact ? { blockId: contact.id } : { add: 'contact' } },

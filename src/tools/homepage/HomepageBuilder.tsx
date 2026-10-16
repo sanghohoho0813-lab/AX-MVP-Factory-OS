@@ -200,7 +200,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
 
   useEffect(() => {
     // 저장 실패를 알린다(적은 것은 화면에 남아 있다)
-    if (store.save === 'error') showToast('저장하지 못했어요 — 적은 것은 이 화면에 남아 있어요. 잠시 뒤 다시 저장합니다.')
+    if (store.save === 'error') showToast('저장하지 못했어요 — 적은 것은 이 화면에 남아 있어요. 잠시 뒤 다시 저장하고, 위의 [지금 다시 저장] 으로 바로 할 수도 있어요.')
   }, [store.save, showToast])
 
   if (!doc) {
@@ -271,9 +271,14 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
       <IconBtn label="다시 하기" disabled={!store.canRedo} onClick={store.redo} testId="site-redo">
         <Redo2 className="size-4" />
       </IconBtn>
-      <span className="t-meta text-slate-500" data-testid="site-save" data-state={store.save}>
-        {store.save === 'saved' ? '저장됨' : store.save === 'saving' ? '저장하는 중…' : store.save === 'pending' ? '고친 것 저장 대기' : '저장 실패 — 다시 시도해요'}
+      <span className={`t-meta ${store.save === 'error' ? 'font-semibold text-danger-700' : 'text-slate-500'}`} data-testid="site-save" data-state={store.save}>
+        {store.save === 'saved' ? '저장됨' : store.save === 'saving' ? '저장하는 중…' : store.save === 'pending' ? '고친 것 저장 대기' : '저장 실패 — 잠시 뒤 다시 저장해요'}
       </span>
+      {store.save === 'error' && (
+        <Button size="sm" onClick={() => void store.flush().then((ok) => showToast(ok ? '저장했어요.' : '아직 저장하지 못했어요 — 인터넷 연결을 확인해 주세요.'))} data-testid="site-save-retry">
+          <RefreshCw className="size-4" aria-hidden="true" /> 지금 다시 저장
+        </Button>
+      )}
       <span className="ml-auto" />
       <button
         type="button"

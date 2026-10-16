@@ -173,7 +173,7 @@ function ImageField({
       {shown ? (
         <div className="flex items-center gap-3">
           <img src={shown} alt="" className="h-16 w-24 rounded-md border border-slate-200 object-cover" />
-          <button type="button" className="tap t-sub inline-flex items-center gap-1 text-danger-700 hover:underline" onClick={() => onChange('')} data-testid="image-remove">
+          <button type="button" className="tap t-sub inline-flex min-h-11 items-center gap-1 px-2 text-danger-700 hover:underline" onClick={() => onChange('')} data-testid="image-remove">
             <X className="size-4" aria-hidden="true" /> 빼기
           </button>
         </div>

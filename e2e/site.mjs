@@ -425,6 +425,29 @@ const errors = []
   await page.getByTestId('site-tab-checks').click()
   const ck4 = await page.getByTestId('site-check').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')))
   check("S10 따뜻한 가게(사진 가득) — 첫 화면 사진이 없으면 색 바탕으로 · '사진 없음' 경고 0", doc4.theme.palette === 'sunset' && doc4.blocks.find((b) => b.type === 'hero').props.layout === 'band' && !ck4.some((k) => k?.startsWith('photo-')), { layout: doc4.blocks.find((b) => b.type === 'hero').props.layout, ck4 })
+  // D-208 고침 — 저장이 실패하면(저장 공간 막힘 흉내) 실패 표시 · [지금 다시 저장] → 풀리면 저장됨
+  await page.getByTestId('site-tab-style').click()
+  await page.evaluate(() => {
+    window.__realSet = Storage.prototype.setItem
+    Storage.prototype.setItem = function (k, v) {
+      if (String(k).startsWith('axmvp.module.homepage')) throw new DOMException('QuotaExceededError', 'QuotaExceededError')
+      return window.__realSet.call(this, k, v)
+    }
+  })
+  await page.locator('[data-testid="site-preset"][data-value="modern"]').click()
+  let errState = ''
+  for (let i = 0; i < 30 && errState !== 'error'; i++) {
+    await wait(100)
+    errState = await page.getByTestId('site-save').getAttribute('data-state')
+  }
+  const retryShown = await page.getByTestId('site-save-retry').count()
+  await page.evaluate(() => {
+    Storage.prototype.setItem = window.__realSet
+  })
+  await page.getByTestId('site-save-retry').click()
+  await waitSaved(page)
+  const docR = await savedDoc(page)
+  check('S12 저장 실패 → 실패 표시 · [지금 다시 저장] → 풀리면 저장됨(산뜻한 꾸밈이 남음)', errState === 'error' && retryShown === 1 && (await page.getByTestId('site-save').getAttribute('data-state')) === 'saved' && docR?.theme?.palette === 'ocean', { errState, retryShown, palette: docR?.theme?.palette })
   await page.getByTestId('site-to-content').click()
   await page.waitForURL(/\/tools\/content\/build\?client=cli_site/)
   check('S11 홈페이지 → 이 업체 홍보 글로 바로', /\/tools\/content\/build\?client=cli_site/.test(page.url()))

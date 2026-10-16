@@ -137,7 +137,16 @@ export function useContentStore(clientId: string | null, workspaceId: string | n
         if (!clientId) return null
         const bl = blocks ?? d.blocks
         const dup = sameContent(itemsRef.current, d.kind, bl)
-        if (dup) return { item: dup, dup: true }
+        const plan = d.input.planDate
+        // D-208 고침: 계획 칸에서 만든 글 — 날짜 없는 같은 글이면 날짜만 달고, 다른 날 계획의 같은 글이면 새로 넣는다
+        if (dup && plan && !dup.input.planDate) {
+          try {
+            return { item: await put({ ...dup, input: { ...dup.input, planDate: plan } }), dup: true }
+          } catch {
+            return null
+          }
+        }
+        if (dup && !(plan && dup.input.planDate !== plan)) return { item: dup, dup: true }
         const id = generateId()
         const now = nowIso()
         const item: ContentItem = { id, kind: d.kind, title: d.title, blocks: bl, input: d.input, rootId: id, version: 1, favorite: false, hash: contentHash(d.kind, bl), createdAt: now, updatedAt: now }
@@ -209,9 +218,10 @@ export function useContentStore(clientId: string | null, workspaceId: string | n
         for (const d of ds) {
           try {
             const dup = sameContent(itemsRef.current, d.kind, d.blocks)
-            if (dup) {
+            const plan = d.input.planDate
+            // D-208 고침: 다른 날 계획에 이미 쓴 같은 글이면 건너뛰지 않고 그 날짜로 새로 넣는다(건너뛰면 칸이 영영 빈다)
+            if (dup && !(plan && dup.input.planDate && dup.input.planDate !== plan)) {
               out.dup += 1
-              const plan = d.input.planDate
               out.items.push(plan && !dup.input.planDate ? await put({ ...dup, input: { ...dup.input, planDate: plan } }) : dup)
               continue
             }
@@ -233,7 +243,9 @@ export function useContentStore(clientId: string | null, workspaceId: string | n
     (rootId: string, on: boolean) =>
       queue(async () => {
         try {
-          for (const it of withPosted(itemsRef.current, rootId, on ? nowIso() : null)) await put(it)
+          const list = withPosted(itemsRef.current, rootId, on ? nowIso() : null)
+          if (!list.length) return false
+          for (const it of list) await put(it)
           return true
         } catch {
           return false

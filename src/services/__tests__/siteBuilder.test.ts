@@ -452,5 +452,13 @@ const conAfter = blockSuggestions(insertBlock(con, newBlock('gallery', full, 'co
 const healthSug = blockSuggestions(draftSite(full, { today, now, makeId, industry: 'health' })).map((x) => x.type)
 check('H82 업종 맞춤 블록 — 건설은 사진 모음 · 후기 · 넣으면 빠짐 · 병의원은 후기 권하지 않음 · 이유 한 줄', conSug.includes('gallery') && conSug.includes('reviews') && !conAfter.includes('gallery') && !healthSug.includes('reviews') && allInd.every((k) => blockSuggestions(draftSite(full, { today, now, makeId, industry: k })).every((x) => x.why.length > 10)), { conSug, conAfter, healthSug })
 
+/* ---------------- D-208 고침 — 믿음 기록 열 곳 ---------------- */
+const noTrust = (doc: SiteDoc) => doc.blocks.filter((b) => !['certs', 'numbers', 'reviews', 'logos', 'history'].includes(b.type)).reduce((d0, b) => d0, { ...doc, blocks: doc.blocks.filter((b) => !['certs', 'numbers', 'reviews', 'logos', 'history'].includes(b.type)) })
+const hNo = noTrust(draftSite(full, { today, now, makeId, industry: 'health' }))
+const mNo = noTrust(draftSite(full, { today, now, makeId, industry: 'manufacturing' }))
+const withEmptyRev = insertBlock(mNo, newBlock('reviews', full, 'manufacturing', today, 'rv1'), null, now)
+const trustOf = (d: SiteDoc) => siteScore(d).items.find((x) => x.key === 'trust')!
+check('H83 믿음 기록이 없으면 업종에 맞는 블록 더하기(병의원 = 인증 · 후기 아님 · 제조 = 거래처) · 빈 후기 블록이 이미 있으면 그것을 엶(겹쳐 넣지 않음)', trustOf(hNo).open.add === 'certs' && trustOf(mNo).open.add === 'logos' && trustOf(withEmptyRev).open.blockId === 'rv1' && !trustOf(withEmptyRev).open.add, [trustOf(hNo).open, trustOf(mNo).open, trustOf(withEmptyRev).open])
+
 console.log(`\n홈페이지 만들기: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

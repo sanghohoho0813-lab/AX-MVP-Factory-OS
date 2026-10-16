@@ -37,7 +37,7 @@ export const KIND_LABEL: Record<ContentKind, string> = {
 export const KIND_HINT: Record<ContentKind, string> = {
   keywords: '손님이 찾는 말 — 모든 글의 바탕',
   blog: '네이버 블로그 · 홈페이지 소식',
-  shorts: '유튜브 쇼츠 · 인스타 릴스 40초',
+  shorts: '유튜브 쇼츠 · 인스타 릴스 20~60초',
   video: '유튜브 5~8분 · 썸네일 · 순서',
   cards: '인스타 카드뉴스 5장 · 7장',
   kakao: '카카오톡 채널 소식 · 안부',
@@ -935,16 +935,26 @@ export function monthPlanFrom(p: ContentProfile, monday: string, perWeek: 2 | 4,
  * D-208 한 달 치 한 번에 — 계획 칸마다 글 한 편. 같은 형식 · 주제가 또 나오면 다른 안(variant)으로 바꿔 같은 글이 두 번 생기지 않게 한다.
  * 글마다 올릴 날(planDate)을 남겨 계획 칸에 '만듦 · 올림' 을 표시한다.
  */
-export function planDrafts(p: ContentProfile, slots: readonly PlanSlot[], today: string): Draft[] {
+export function planDrafts(p: ContentProfile, slots: readonly PlanSlot[], today: string, taken: (d: Draft) => boolean = () => false): Draft[] {
   const kw = mainKeyword(p)
   const seen = new Map<string, number>()
-  return slots.map((sl) => {
-    const key = `${sl.kind}|${sl.topicType ?? ''}|${sl.purpose ?? ''}`
-    const variant = seen.get(key) ?? 0
-    seen.set(key, variant + 1)
-    const topic = sl.topicType ? topicsFor(p, kw, today, variant).find((t) => t.type === sl.topicType) : undefined
+  const made = new Set<string>()
+  const make = (sl: PlanSlot, variant: number) => {
+    const topic = sl.topicType ? topicsFor(p, kw, today, variant).find((t) => t.type === sl.topicType) ?? topicsFor(p, kw, today, variant)[0] : undefined
     const d = makeDraft(p, { kind: sl.kind, keyword: kw, topic, purpose: sl.purpose, variant }, today)
     return { ...d, input: { ...d.input, planDate: sl.date } }
+  }
+  return slots.map((sl) => {
+    const key = `${sl.kind}|${sl.topicType ?? ''}|${sl.purpose ?? ''}`
+    const start = seen.get(key) ?? 0
+    // D-208 고침: 같은 묶음 안에서 같은 글(이번 달 이야기가 없어 '정보' 로 바뀐 칸 등)이나 이미 보관함에 있는 글이면 다른 안으로 — 다섯 번까지
+    let v = start
+    let d = make(sl, v)
+    for (let i = 1; i <= 5 && (made.has(`${d.kind}\u0000${plainText(d.kind, d.blocks)}`) || taken(d)); i++) d = make(sl, start + i)
+    v = d.input.variant
+    seen.set(key, v + 1)
+    made.add(`${d.kind}\u0000${plainText(d.kind, d.blocks)}`)
+    return d
   })
 }
 

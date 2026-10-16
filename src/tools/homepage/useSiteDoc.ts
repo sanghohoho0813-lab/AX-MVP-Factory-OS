@@ -5,6 +5,7 @@
  * 아니면 이 브라우저. DB 를 새로 만들지 않는다(이미 있는 추가 전용 표).
  * 고치면 0.7초 뒤 저장(타자 중에는 기다렸다가 한 번). 저장이 겹치지 않게 줄을 세운다.
  * 되돌리기: 이 화면에 있는 동안 50번까지. 같은 칸을 이어서 치는 것은 한 번으로 묶는다.
+ * D-208 고침: 저장이 실패하면 5초 · 15초 · 30초 · 60초 뒤 다시 저장(그 사이 또 고치면 그것까지). 실패한 채 창을 닫으려 하면 묻는다.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { listRows, saveRow } from '../../services/moduleData'
@@ -14,6 +15,7 @@ export const SITE_MODULE = 'homepage'
 export const SITE_BUCKET = 'site'
 const SAVE_DELAY = 700
 const UNDO_LIMIT = 50
+const RETRY_MS = [5000, 15000, 30000, 60000]
 
 export type SaveState = 'saved' | 'pending' | 'saving' | 'error'
 
@@ -44,6 +46,7 @@ export function useSiteDoc(clientId: string | null, workspaceId: string | null):
   const timer = useRef<number | null>(null)
   const chain = useRef<Promise<boolean>>(Promise.resolve(true))
   const lastGroup = useRef<{ key: string; at: number } | null>(null)
+  const retry = useRef<{ timer: number | null; n: number }>({ timer: null, n: 0 })
 
   useEffect(() => {
     let alive = true
@@ -83,16 +86,48 @@ export function useSiteDoc(clientId: string | null, workspaceId: string | null):
       try {
         const row = await saveRow(workspaceId, SITE_MODULE, SITE_BUCKET, { id: rowId.current ?? undefined, clientId, data: { doc: d } })
         rowId.current = row.id
+        retry.current.n = 0
         // 저장하는 동안 또 고쳤으면 기다리는 중으로 남긴다
         setSave(latest.current === d ? 'saved' : 'pending')
         return true
       } catch {
         setSave('error')
+        // 잠시 뒤 다시 — 네 번까지(그 뒤에는 [지금 다시 저장] 단추)
+        if (retry.current.timer === null && retry.current.n < RETRY_MS.length) {
+          const wait = RETRY_MS[retry.current.n]
+          retry.current.n += 1
+          retry.current.timer = window.setTimeout(() => {
+            retry.current.timer = null
+            void writeRef.current()
+          }, wait)
+        }
         return false
       }
     })
     return chain.current
   }, [clientId, workspaceId])
+  const writeRef = useRef(write)
+  writeRef.current = write
+
+  // 저장에 실패한 채 창을 닫으려 하면 묻는다(0.7초 대기 중은 화면을 떠날 때 마저 저장하므로 묻지 않는다)
+  useEffect(() => {
+    if (save !== 'error') return
+    const h = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', h)
+    return () => window.removeEventListener('beforeunload', h)
+  }, [save])
+
+  // 화면을 떠나면 다시 저장 예약을 지운다
+  useEffect(
+    () => () => {
+      if (retry.current.timer !== null) window.clearTimeout(retry.current.timer)
+      retry.current.timer = null
+    },
+    [],
+  )
 
   const schedule = useCallback(() => {
     if (timer.current) window.clearTimeout(timer.current)
@@ -109,7 +144,17 @@ export function useSiteDoc(clientId: string | null, workspaceId: string | null):
       timer.current = null
       return write()
     }
-    return chain.current
+    // 실패한 채 남아 있으면 지금 다시
+    if (retry.current.timer !== null) {
+      window.clearTimeout(retry.current.timer)
+      retry.current.timer = null
+    }
+    const ok = await chain.current
+    if (!ok) {
+      retry.current.n = 0
+      return write()
+    }
+    return ok
   }, [write])
 
   // 화면을 떠날 때 기다리던 저장을 마저 한다

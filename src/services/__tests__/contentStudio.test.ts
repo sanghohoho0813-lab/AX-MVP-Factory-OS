@@ -362,6 +362,17 @@ const badS = normalizeItem('s1', { ...itemData(itS), postedAt: 123, input: { ...
 const chain = latestByRoot([{ ...itS, version: 1 }, { ...itS, id: 's2', version: 2, postedAt: undefined }])
 check('C71 보관함에 상황 · 올릴 날 · 올린 때가 남음 · 이상한 값은 버림 · 고친 판에도 올림 표시가 이어짐', backS?.input.situation === 'move' && backS.input.planDate === '2026-10-20' && backS.postedAt === '2026-10-20T09:00:00Z' && badS?.input.situation === undefined && badS?.input.planDate === undefined && badS?.postedAt === undefined && chain[0].item.id === 's2' && chain[0].item.postedAt === '2026-10-20T09:00:00Z', { backS: backS?.input, chain: chain[0].item.postedAt })
 
+/* ---------------- D-208 고침(게이트 뒤 코드 점검) ---------------- */
+const foodP = buildProfile(fresh, today, { industry: 'food' }).profile
+const foodSlots = monthPlan(foodP, today, 4)
+const foodDrafts = planDrafts(foodP, foodSlots, today)
+const keyOf = (d: { kind: ContentKind; blocks: { label: string; text: string }[] }) => `${d.kind}\u0000${plainText(d.kind, d.blocks)}`
+check('C72 이번 달 이야기가 없는 업종(음식 · 10월)도 한 달 치 16편이 모두 다른 글 — 같은 글로 여겨 칸이 비지 않음', new Set(foodDrafts.map(keyOf)).size === 16 && foodDrafts.every((d, i) => d.input.planDate === foodSlots[i].date), foodDrafts.map((d) => `${d.kind}/${d.input.topicType}/v${d.input.variant}`))
+const takenSet = new Set(pd2.map(keyOf))
+const nextMonth = planDrafts(fp, slots2.map((s) => ({ ...s, date: s.date.replace('2026-10', '2026-11') })), today, (d) => takenSet.has(keyOf(d)))
+check('C73 이미 보관함에 있는 글(지난 계획)과 같은 글은 다른 안으로 — 블로그 · 영상 · 카드 · 카톡 모두 새 글', nextMonth.filter((d) => takenSet.has(keyOf(d))).length === 0, nextMonth.filter((d) => takenSet.has(keyOf(d))).map((d) => d.kind))
+check('C74 짧은 영상 안내 길이 = 실제 대본(20~60초 · 40초라고 쓰지 않음)', !JSON.stringify(firstPicks(fp, today)).includes('40초'))
+
 if (SHOW) {
   const show = (p: ContentProfile, kind: ContentKind, extra: Record<string, unknown> = {}) => {
     const t = topicsFor(p, '', today)

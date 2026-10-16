@@ -47,7 +47,7 @@ export function firstPicks(p: ContentProfile, today: string, made: readonly Made
   if (p.years !== null && p.years < 1 && !madeKind('kakao', 'news')) cands.push({ key: 'open', kind: 'kakao', purpose: 'news', label: '새로 연 소식(카톡)', why: '설립 1년이 안 됐어요 — 문을 연 소식을 알리기 좋은 때예요.', score: 72 })
 
   if (!madeKind('blog', 'choose', 60)) cands.push({ key: 'choose', kind: 'blog', topicType: 'choose', label: '고르는 기준 블로그', why: `${lib.target}${particle(lib.target, '이/가')} 가장 많이 찾는 글이에요.`, score: 60 })
-  if (!madeKind('shorts', undefined, 30)) cands.push({ key: 'shorts', kind: 'shorts', topicType: 'tips', label: '짧은 영상 대본', why: '40초 대본 — 휴대폰으로 바로 찍을 수 있어요.', score: 55 })
+  if (!madeKind('shorts', undefined, 30)) cands.push({ key: 'shorts', kind: 'shorts', topicType: 'tips', label: '짧은 영상 대본', why: '20~30초 대본 — 휴대폰으로 바로 찍을 수 있어요.', score: 55 })
   if (!madeKind('blog', 'faq', 90)) cands.push({ key: 'faq', kind: 'blog', topicType: 'faq', label: '자주 묻는 질문 블로그', why: '미리 답해 두면 같은 문의 전화가 줄어요.', score: 50 })
 
   return cands

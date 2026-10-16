@@ -16,7 +16,7 @@ import { Button } from '../../components/ui/Button'
 import { Badge, BottomSheet } from '../../components/ui/primitives'
 import { ConfirmModal } from '../../components/ui/ConfirmModal'
 import { useToast } from '../../components/ui/toastContext'
-import { todayLocalDate } from '../../lib/appClock'
+import { localDateOf, todayLocalDate } from '../../lib/appClock'
 import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
 import {
   AD_TYPES,
@@ -31,6 +31,7 @@ import {
   parseKeywordVolumes,
   planDrafts,
   planSlotStates,
+  sameContent,
   situationPack,
   situationsFor,
   SITUATION_SHORT,
@@ -233,6 +234,8 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
         if (!v) return showToast('저장하지 못했어요. 적은 글은 화면에 그대로 있어요 — 다시 눌러 주세요.')
         setShown({ draft: { ...shown.draft, blocks: v.blocks }, item: v })
         setEditing(null)
+        // D-208 고침: 묶음 탭을 넘겼다 와도 새 판이 보이게
+        setPack((pk) => (pk ? { ...pk, items: pk.items.map((x, i) => (i === pk.at ? { ...x, draft: { ...x.draft, blocks: v.blocks } } : x)), saved: pk.saved.map((x, i) => (i === pk.at ? v : x)) } : pk))
         showToast(v.id === shown.item.id ? '바뀐 곳이 없어요.' : `고친 글을 ${v.version}판으로 저장했어요(이전 판도 남아 있어요).`)
       } else {
         const r = await store.addDraft(shown.draft, blocks)
@@ -269,6 +272,8 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
 
   const packSaveAll = async () => {
     if (!pack || busy) return
+    // D-208 고침: 이미 저장한 글을 고치던 중이면 그 고침을 덮지 않게 먼저 저장하라고 알린다
+    if (dirty && shown?.item) return showToast('고친 글을 먼저 [고친 판으로 저장] 해 주세요.')
     const items = pack.items.map((x, j) => (j === pack.at && editing && !shown?.item ? { ...x, draft: { ...x.draft, blocks: editing } } : x))
     const todo = items.map((x, j) => ({ d: x.draft, j })).filter((x) => !pack.saved[x.j])
     if (!todo.length) return
@@ -355,7 +360,8 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
           if (slot.topicType) setTopicType(slot.topicType)
           if (slot.purpose) setPurpose(slot.purpose)
           setVariant(0)
-          generate({ kind: slot.kind, topicType: slot.topicType, purpose: slot.purpose, variant: 0 })
+          // D-208 고침: 계획 칸에서 만든 글에도 올릴 날을 달아 저장하면 그 칸이 '만듦' 이 된다
+          show(planDrafts(profile, [slot], today, (d) => !!sameContent(store.items, d.kind, d.blocks))[0])
         }}
       />
 
@@ -523,7 +529,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone="brand">{KIND_LABEL[shown.draft.kind]}</Badge>
                 {shown.item && <Badge tone="success">보관함 · {shown.item.version}판</Badge>}
-                {shown.item?.postedAt && <Badge tone="success">올림 · {shown.item.postedAt.slice(5, 10).replace('-', '/')}</Badge>}
+                {shown.item?.postedAt && <Badge tone="success">올림 · {localDateOf(shown.item.postedAt).slice(5).replace('-', '/')}</Badge>}
                 {shown.draft.input.topicType && <Badge>{TOPIC_LABEL[shown.draft.input.topicType]}</Badge>}
               </div>
               <h2 className="t-section break-keep text-slate-900" data-testid="content-result-title">{shown.draft.title}</h2>
@@ -682,6 +688,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
               )}
 
               <ToolResultAttach
+                key={shown.item?.rootId ?? `${shown.draft.kind}-${shown.draft.title}`}
                 toolKey="content"
                 title={`홍보 글 · ${KIND_LABEL[shown.draft.kind]}`}
                 verdict={checks.some((c) => c.level === 'must') ? 'check' : 'ready'}
@@ -701,7 +708,20 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
         </div>
       </div>
 
-      <ArchiveCard store={store} onOpen={(it) => show({ kind: it.kind, title: it.title, blocks: it.blocks, notes: [], input: it.input }, it)} onPosted={(it) => void togglePosted(it)} openId={shown?.item?.rootId ?? null} />
+      <ArchiveCard
+        store={store}
+        onOpen={(it) => show({ kind: it.kind, title: it.title, blocks: it.blocks, notes: [], input: it.input }, it)}
+        onPosted={(it) => void togglePosted(it)}
+        onRemoved={(rootId) => {
+          // D-208 고침: 화면에 띄운 글을 지우면 결과 칸도 비운다(지운 글을 '올렸어요' · '고친 판' 으로 되살리지 않게)
+          if (shown?.item?.rootId === rootId) {
+            setShown(null)
+            setEditing(null)
+          }
+          setPack((pk) => (pk ? { ...pk, saved: pk.saved.map((x) => (x?.rootId === rootId ? null : x)) } : pk))
+        }}
+        openId={shown?.item?.rootId ?? null}
+      />
 
       {profileOpen && (
         <ProfileSheet
@@ -814,9 +834,9 @@ function PlanCard({ record, profile, today, store, onPick, onOpen }: { record: C
     setBusy(true)
     try {
       const todo = slots.filter((_, i) => !states[i].item)
-      const r = await store.addMany(planDrafts(profile, todo, today))
+      const r = await store.addMany(planDrafts(profile, todo, today, (d) => !!sameContent(store.items, d.kind, d.blocks)))
       setFresh(false)
-      showToast(r.failed ? `${r.failed}편을 만들지 못했어요 — 다시 눌러 주세요.` : `한 달 치 ${r.added + r.dup}편을 보관함에 넣었어요. 아래 [업체 일정에 올릴 날 걸기] 를 누르면 달력에도 올라가요.`)
+      showToast(r.failed ? `${r.failed}편을 만들지 못했어요 — 다시 눌러 주세요.` : `한 달 치 ${todo.length}편을 보관함에 넣었어요${r.dup ? `(이미 있던 글 ${r.dup}편에 날짜를 달았어요)` : ''}. 아래 [업체 일정에 올릴 날 걸기] 를 누르면 달력에도 올라가요.`)
     } finally {
       setBusy(false)
     }
@@ -1100,7 +1120,7 @@ function ProfileSheet({ overrides, profileItem, onClose, onSave }: { overrides: 
 /* 보관함                                                                */
 /* ------------------------------------------------------------------ */
 
-function ArchiveCard({ store, onOpen, onPosted, openId }: { store: ContentStore; onOpen: (it: ContentItem) => void; onPosted: (it: ContentItem) => void; openId: string | null }) {
+function ArchiveCard({ store, onOpen, onPosted, onRemoved, openId }: { store: ContentStore; onOpen: (it: ContentItem) => void; onPosted: (it: ContentItem) => void; onRemoved: (rootId: string) => void; openId: string | null }) {
   const { showToast } = useToast()
   const [filter, setFilter] = useState<'all' | 'fav' | 'todo' | 'posted' | ContentKind>('all')
   const [del, setDel] = useState<{ rootId: string; title: string; versions: number } | null>(null)
@@ -1123,7 +1143,7 @@ function ArchiveCard({ store, onOpen, onPosted, openId }: { store: ContentStore;
         <>
           <div className="flex flex-wrap gap-1.5">
             {(['all', 'todo', 'posted', 'fav', ...kindsHere] as const).map((f) => (
-              <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)} className={`tap t-sub min-h-9 rounded-full border px-3 ${filter === f ? 'border-brand-600 bg-brand-50 font-semibold text-brand-700' : 'border-slate-200 text-slate-600'}`} data-testid="content-archive-filter" data-value={f}>
+              <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)} className={`tap t-sub min-h-11 rounded-full border px-3 ${filter === f ? 'border-brand-600 bg-brand-50 font-semibold text-brand-700' : 'border-slate-200 text-slate-600'}`} data-testid="content-archive-filter" data-value={f}>
                 {f === 'all' ? '전체' : f === 'fav' ? '즐겨찾기' : f === 'todo' ? '아직 안 올림' : f === 'posted' ? '올린 글' : KIND_LABEL[f]}
               </button>
             ))}
@@ -1148,7 +1168,7 @@ function ArchiveCard({ store, onOpen, onPosted, openId }: { store: ContentStore;
                   <span className="t-meta w-full break-keep text-slate-500">
                     {KIND_LABEL[item.kind]}
                     {item.input.situation ? ` · ${SITUATION_SHORT[item.input.situation as SituationKey] ?? ''}` : ''}
-                    {item.input.planDate ? ` · ${shortDate(item.input.planDate)} 올릴 글` : ` · ${item.createdAt.slice(0, 10)}`}
+                    {item.input.planDate ? ` · ${shortDate(item.input.planDate)} 올릴 글` : ` · ${localDateOf(item.createdAt)}`}
                     {versions > 1 ? ` · ${versions}판` : ''}
                   </span>
                 </button>
@@ -1186,6 +1206,7 @@ function ArchiveCard({ store, onOpen, onPosted, openId }: { store: ContentStore;
           if (!del) return
           setBusy(true)
           const ok = await store.removeChain(del.rootId)
+          if (ok) onRemoved(del.rootId)
           setBusy(false)
           setDel(null)
           showToast(ok ? '지웠어요.' : '지우지 못했어요. 다시 눌러 주세요.')
