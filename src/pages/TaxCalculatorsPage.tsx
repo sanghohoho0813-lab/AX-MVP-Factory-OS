@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useToolClient } from '../tools/shared/toolClientContext'
-import { useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { sharedToolKey } from '../tools/shared/toolStorage'
 import { useOutsideTap } from '../lib/useDismissable'
 import { Check, ChevronDown, Plus, RotateCcw, Trash2 } from 'lucide-react'
@@ -148,7 +148,19 @@ export function TaxCalculatorsPage() {
   const { clientId, clientRecord } = useToolClient()
   /** D-134: 업체 기록이 아직 안 왔으면 기다린다 — 그 사이 예시값을 저장하면 업체 숫자로 채울 기회를 잃는다 */
   const recordReady = !clientId || !!clientRecord
-  const [first] = useState(() => loadValuesWithPrefill(calc, clientId, clientRecord))
+  // D-225: 다른 화면(크레탑 주식가치)이 이동에 실어 보낸 값 — 받으면 이 계산기 칸에 넣고(아래 저장 효과가 작업공간 칸에 저장) 이동 기록에서 지운다
+  const location = useLocation()
+  const navigate = useNavigate()
+  const handoff = location.state as { calcKey?: string; calcValues?: Record<string, string> } | null
+  const [first] = useState(() => {
+    const base = loadValuesWithPrefill(calc, clientId, clientRecord)
+    return handoff?.calcKey === calc.key && handoff.calcValues ? { values: { ...base.values, ...handoff.calcValues }, prefilled: [] } : base
+  })
+  useEffect(() => {
+    if (handoff?.calcValues) navigate(location.pathname + location.search, { replace: true, state: null })
+    // 처음 한 번 — 새로고침해도 받은 값으로 다시 덮지 않게
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [prefilled, setPrefilled] = useState<string[]>(first.prefilled)
   const [values, setValues] = useState<Values>(first.values)
   const [pickerOpen, setPickerOpen] = useState(false)
