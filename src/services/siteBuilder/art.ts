@@ -136,6 +136,15 @@ const SCENES: Record<IndustryKey, string> = {
     '<rect class="f7" x="264" y="272" width="126" height="22" rx="3"/>',
     [0, 1, 2, 3, 4, 5, 6, 7].map((i) => `<rect class="f2" x="${274 + i * 14}" y="272" width="3" height="${i % 2 ? 8 : 12}"/>`).join(''),
   ].join(''),
+  // D-220 개인 컨설턴트 — 사람 · 말풍선 · 오르는 막대
+  consultant: [
+    '<circle class="f5 e" cx="168" cy="146" r="40"/>',
+    '<path class="f5 e" d="M98 304c0-52 32-86 70-86s70 34 70 86z"/>',
+    '<rect class="f6" x="266" y="88" width="170" height="96" rx="16"/><path class="f6" d="M292 184l-18 28 42-28z"/>',
+    '<rect class="o2" x="290" y="112" width="114" height="10" rx="5"/><rect class="o2" x="290" y="136" width="86" height="10" rx="5"/><circle class="f1" cx="414" cy="158" r="8"/>',
+    '<rect class="f3" x="298" y="254" width="26" height="48" rx="4"/><rect class="f1" x="334" y="230" width="26" height="72" rx="4"/><rect class="f7" x="370" y="202" width="26" height="100" rx="4"/>',
+    '<path class="s3" d="M292 238l40-30 32 14 44-40"/>',
+  ].join(''),
   general: [
     '<rect class="f5 e" x="86" y="96" width="216" height="134" rx="16"/>',
     '<circle class="f1" cx="128" cy="138" r="19"/>',
@@ -190,6 +199,7 @@ const ICON_SETS: Record<IndustryKey, IconKey[]> = {
   education: ['book', 'star', 'chat', 'chart', 'clock', 'check'],
   construction: ['home', 'wrench', 'check', 'clock', 'shield', 'chart'],
   design: ['pen', 'spark', 'star', 'monitor', 'check', 'truck'],
+  consultant: ['chat', 'chart', 'shield', 'check', 'star', 'clock'],
   general: ['star', 'check', 'chat', 'clock', 'shield', 'heart'],
 }
 

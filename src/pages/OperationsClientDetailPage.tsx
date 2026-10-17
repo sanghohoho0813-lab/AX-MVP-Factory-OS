@@ -33,7 +33,8 @@ import {
   FileText,
   Sparkles,
 } from 'lucide-react'
-import { FolderOpen, ListTree } from 'lucide-react'
+import { FlaskConical, FolderOpen, ListTree } from 'lucide-react'
+import { withoutProvisional } from '../services/marketingTrial'
 import { DocFolderView } from '../components/ops/DocFolderView'
 import { readDocView, writeDocView, type DocView } from '../lib/docViewPref'
 import { useAuth } from '../auth/AuthProvider'
@@ -677,6 +678,17 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 <span data-testid="client-type-badge" className="t-meta inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-2.5 py-1 font-semibold whitespace-nowrap text-brand-700">
                   <BriefcaseBusiness aria-hidden="true" className="size-3.5" />
                   {CLIENT_TYPE_LABEL.consultant}
+                </span>
+              )}
+              {/* D-220: 마케팅 도구에서 가상으로 만들어 보다 임시등록한 기록 */}
+              {record.provisional && (
+                <span
+                  data-testid="client-provisional-badge"
+                  title={`마케팅 도구(홈페이지 · 홍보 글)에서 임시등록${record.provisional.requestedBy ? ` · 부탁한 사람 ${record.provisional.requestedBy}` : ''} — 더보기에서 표시를 지울 수 있어요`}
+                  className="t-meta inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 font-semibold whitespace-nowrap text-amber-800"
+                >
+                  <FlaskConical aria-hidden="true" className="size-3.5" />
+                  임시등록
                 </span>
               )}
             </div>
@@ -1975,6 +1987,22 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 >
                   {clientTypeOf(record) === 'consultant' ? <Building2 aria-hidden="true" className="size-4" /> : <BriefcaseBusiness aria-hidden="true" className="size-4" />}
                   {clientTypeOf(record) === 'consultant' ? '중소기업 고객으로 되돌리기' : '컨설턴트 고객으로 옮기기'}
+                </Button>
+              )}
+              {/* D-220: 임시등록 표시 지우기 — 기록은 그대로, 보통 고객 기록이 된다 */}
+              {record.provisional && (
+                <Button
+                  variant="secondary"
+                  className="w-full justify-start"
+                  data-testid="more-clear-provisional"
+                  onClick={() => {
+                    const next = withActivity(withoutProvisional(record), 'profile', '임시등록 표시 지움 — 정식 고객 기록으로')
+                    setMoreOpen(false)
+                    void commit(next).then((ok) => ok && showToast('임시등록 표시를 지웠어요. 이제 보통 고객 기록이에요.'))
+                  }}
+                >
+                  <FlaskConical aria-hidden="true" className="size-4" />
+                  임시등록 표시 지우기(정식으로)
                 </Button>
               )}
               <Button

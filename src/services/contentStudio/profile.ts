@@ -93,6 +93,7 @@ export function shortItemOf(item: string): string {
 }
 
 export function industryForContent(record: ClientOpsRecord, today: string): IndustryKey {
+  if (record.clientType === 'consultant') return 'consultant'
   const f = siteFacts(record, today)
   return industryOf(f.category, f.item, record.industry ?? '')
 }
@@ -170,7 +171,7 @@ export function normalizeOverrides(raw: unknown): ProfileOverrides {
           .filter(Boolean)
           .slice(0, 8)
       : undefined
-  const keys: IndustryKey[] = ['manufacturing', 'it', 'trade', 'food', 'health', 'professional', 'education', 'construction', 'design', 'general']
+  const keys: IndustryKey[] = ['manufacturing', 'it', 'trade', 'food', 'health', 'professional', 'education', 'construction', 'design', 'consultant', 'general']
   const out: ProfileOverrides = {}
   if (typeof r.industry === 'string' && (keys as string[]).includes(r.industry)) out.industry = r.industry as IndustryKey
   const item = str(r.item, 30)

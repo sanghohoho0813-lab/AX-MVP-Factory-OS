@@ -60,9 +60,9 @@ export function httpsHref(raw: string): string {
   return /^https:\/\//i.test(u) ? u : ''
 }
 
-/** 전화번호 → tel: (숫자 · + · - 만) */
+/** 전화번호 → tel: (숫자 · + · - 만). '02-123-4567~8' · '031-1, 031-2' 처럼 여럿이면 첫 번호만(이어 붙이면 없는 번호가 된다) */
 export function telHref(phone: string): string {
-  const d = phone.replace(/[^\d+]/g, '')
+  const d = (phone.split(/[~,/]|또는/)[0] ?? '').replace(/[^\d+]/g, '')
   return d.length >= 7 && d.length <= 16 ? `tel:${d}` : ''
 }
 

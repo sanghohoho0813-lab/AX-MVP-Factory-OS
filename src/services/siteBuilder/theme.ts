@@ -85,6 +85,7 @@ export const INDUSTRY_PALETTE: Record<IndustryKey, PaletteKey> = {
   education: 'sunset',
   construction: 'charcoal',
   design: 'violet',
+  consultant: 'navy',
   general: 'navy',
 }
 

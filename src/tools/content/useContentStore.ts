@@ -27,6 +27,7 @@ import { normalizeSiteDoc, type SiteDoc } from '../../services/siteBuilder'
 import { nowIso } from '../../lib/appClock'
 import { generateId } from '../../storage/localStore'
 import { SITE_BUCKET, SITE_MODULE } from '../homepage/useSiteDoc'
+import { rowSubjectId, subjectRow } from '../../services/marketingTrial'
 
 export interface ContentStore {
   status: 'loading' | 'ready' | 'error'
@@ -78,16 +79,17 @@ export function useContentStore(clientId: string | null, workspaceId: string | n
     ])
       .then(([profiles, rows, sites]) => {
         if (!alive) return
-        const prof = profiles.find((r) => r.clientId === clientId)
+        // D-220: 가상 업체 · 컨설턴트 줄은 업체 칸이 비고 내용에 가상 id 가 있다
+        const prof = profiles.find((r) => rowSubjectId(r) === clientId)
         profileRowId.current = prof?.id ?? null
         setOverrides(normalizeOverrides(prof?.data.overrides))
         setAll(
           rows
-            .filter((r) => r.clientId === clientId)
+            .filter((r) => rowSubjectId(r) === clientId)
             .map((r) => normalizeItem(r.id, r.data, r.createdAt, r.updatedAt))
             .filter((x): x is ContentItem => !!x),
         )
-        const s = sites.find((r) => r.clientId === clientId)
+        const s = sites.find((r) => rowSubjectId(r) === clientId)
         setSite(s ? normalizeSiteDoc(s.data.doc) : null)
         setStatus('ready')
       })
@@ -110,7 +112,7 @@ export function useContentStore(clientId: string | null, workspaceId: string | n
         if (!clientId) return false
         const clean = normalizeOverrides(ov)
         try {
-          const row = await saveRow(workspaceId, CONTENT_MODULE, PROFILE_BUCKET, { id: profileRowId.current ?? undefined, clientId, data: { overrides: clean } })
+          const row = await saveRow(workspaceId, CONTENT_MODULE, PROFILE_BUCKET, { id: profileRowId.current ?? undefined, ...subjectRow(clientId, { overrides: clean }) })
           profileRowId.current = row.id
           setOverrides(clean)
           return true
@@ -123,7 +125,7 @@ export function useContentStore(clientId: string | null, workspaceId: string | n
 
   const put = useCallback(
     async (item: ContentItem): Promise<ContentItem> => {
-      const row = await saveRow(workspaceId, CONTENT_MODULE, ITEMS_BUCKET, { id: item.id, clientId: clientId ?? '', data: itemData(item) })
+      const row = await saveRow(workspaceId, CONTENT_MODULE, ITEMS_BUCKET, { id: item.id, ...subjectRow(clientId ?? '', itemData(item)) })
       const saved = { ...item, id: row.id, updatedAt: row.updatedAt }
       setAll([...itemsRef.current.filter((x) => x.id !== saved.id), saved])
       return saved

@@ -37,7 +37,7 @@ function Inner({ record }: { record: ClientOpsRecord }) {
     let alive = true
     repo
       .listCases()
-      .then((l) => alive && setLinked(findCaseForClient(l, record).linked))
+      .then((l) => alive && setLinked(findCaseForClient(l, { id: record.id }).linked))
       .catch((e) => {
         if (!alive) return
         if (e instanceof OwnerAiSetupError) setDbSetup(true)

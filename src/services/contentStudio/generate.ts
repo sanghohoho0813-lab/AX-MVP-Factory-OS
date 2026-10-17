@@ -538,7 +538,7 @@ function shortsDraft(p: ContentProfile, topic: Topic, variant: number, len: Shor
   const rows: { nar: string; sub: string; scene: string }[] = [
     { nar: hook, sub: fixed, scene: `${at(visuals, 0)} — 첫 장면은 움직임이 있게` },
     { nar: painFor(topic), sub: painFor(topic), scene: at(visuals, 1) },
-    ...points.map((pt, i) => ({ nar: `${pt.title}. ${firstSentence(pt.body)}`, sub: `${i + 1}. ${pt.title}`, scene: at(visuals, i + 2) })),
+    ...points.map((pt, i) => ({ nar: `${/[.?!]$/.test(pt.title) ? pt.title : `${pt.title}.`} ${firstSentence(pt.body)}`, sub: `${i + 1}. ${pt.title}`, scene: at(visuals, i + 2) })),
     { nar: cta, sub: `${p.company} · ${p.phone || '[연락처]'}`, scene: '로고 · 연락처 화면' },
   ]
   let t = 0
@@ -602,7 +602,7 @@ function cardsDraft(p: ContentProfile, topic: Topic, variant: number, pages: 5 |
     ].slice(0, body)
   } else if (adType === 'objection') {
     const worry = p.objection || '[손님이 가장 많이 망설이는 점]'
-    cover = page(1, '표지', `${worry}, 걱정되시죠?`, `${p.company}가 먼저 답해 드려요`, `${at(visuals, 0)} · 질문 말풍선`)
+    cover = page(1, '표지', `${worry}, 걱정되시죠?`, `${j(p.company, '이/가')} 먼저 답해 드려요`, `${at(visuals, 0)} · 질문 말풍선`)
     inner = [
       page(2, '공감', '많은 분이 같은 걱정을 하세요', `${kw} 알아볼 때 가장 많이 묻는 것`, '고개를 갸웃하는 사람 · 물음표'),
       page(3, '이렇게 챙겨요', '[이 걱정을 어떻게 덜어 드리는지 한 문장]', p.differ || '[다른 곳과 다른 점 한 가지]', at(visuals, 1)),

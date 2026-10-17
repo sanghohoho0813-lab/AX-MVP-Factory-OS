@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { listRows, saveRow } from '../../services/moduleData'
 import { normalizeSiteDoc, type SiteDoc } from '../../services/siteBuilder'
+import { rowSubjectId, subjectRow } from '../../services/marketingTrial'
 
 export const SITE_MODULE = 'homepage'
 export const SITE_BUCKET = 'site'
@@ -63,7 +64,8 @@ export function useSiteDoc(clientId: string | null, workspaceId: string | null):
     listRows(workspaceId, SITE_MODULE, SITE_BUCKET)
       .then((rows) => {
         if (!alive) return
-        const row = rows.filter((r) => r.clientId === clientId).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
+        // D-220: 가상 업체 · 컨설턴트 것은 업체 칸이 비고 내용에 가상 id 가 있다
+        const row = rows.filter((r) => rowSubjectId(r) === clientId).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
         const d = row ? normalizeSiteDoc((row.data as { doc?: unknown }).doc) : null
         rowId.current = row?.id ?? null
         latest.current = d
@@ -84,7 +86,7 @@ export function useSiteDoc(clientId: string | null, workspaceId: string | null):
     chain.current = chain.current.then(async () => {
       setSave('saving')
       try {
-        const row = await saveRow(workspaceId, SITE_MODULE, SITE_BUCKET, { id: rowId.current ?? undefined, clientId, data: { doc: d } })
+        const row = await saveRow(workspaceId, SITE_MODULE, SITE_BUCKET, { id: rowId.current ?? undefined, ...subjectRow(clientId, { doc: d }) })
         rowId.current = row.id
         retry.current.n = 0
         // 저장하는 동안 또 고쳤으면 기다리는 중으로 남긴다

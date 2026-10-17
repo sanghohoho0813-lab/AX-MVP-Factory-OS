@@ -79,6 +79,7 @@ import { copyToClipboard, useOwnerAiIdentity, useOwnerAiRepo } from '../../pages
 import { ToolResultAttach } from '../shared/ToolResultAttach'
 import { inputClass } from '../homepage/BlockFields'
 import { sendDraftToOwnerAi } from './aiHandoff'
+import { isTrialId, subjectQuery } from '../../services/marketingTrial'
 import type { ContentStore } from './useContentStore'
 
 const card = 'rounded-(--radius-panel) border border-slate-200 bg-white'
@@ -664,7 +665,8 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                     {shown.item.postedAt ? '올렸어요 · 되돌리기' : '올렸어요 표시'}
                   </Button>
                 )}
-                {ownerAi === 'yes' && (
+                {/* D-220: 가상 업체 · 컨설턴트는 AI 작업실(업체마다)에 아직 없다 — 임시등록한 뒤에 */}
+                {ownerAi === 'yes' && !isTrialId(record.id) && (
                   <Button size="sm" variant="ghost" onClick={() => void toAi()} disabled={busy} data-testid="content-to-ai">
                     <Sparkles className="size-4 text-violet-600" aria-hidden="true" />
                     AI 작업실에서 다듬기
@@ -767,6 +769,8 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                 </div>
               )}
 
+              {/* D-220: 가상 업체 · 컨설턴트는 붙일 업체 기록이 없다 — 임시등록하면 붙일 수 있다 */}
+              {!isTrialId(record.id) && (
               <ToolResultAttach
                 key={shown.item?.rootId ?? `${shown.draft.kind}-${shown.draft.title}`}
                 toolKey="content"
@@ -778,6 +782,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                 followUp={{ text: `홍보 글(${KIND_LABEL[shown.draft.kind]}) 업체 확인 · 올리기`, days: 3 }}
                 presetClientId={record.id}
               />
+              )}
             </section>
           ) : (
             <section className={`${card} flex flex-col items-start gap-2 p-5`} data-testid="content-empty">
@@ -861,7 +866,7 @@ function ProfileCard({ record, profile, source, onEdit }: { record: ClientOpsRec
           <p className="t-sub mt-0.5 break-keep text-slate-600">업체 기록에서 저절로 채웠어요. 모든 글이 이 정보를 같이 써요.{missing ? ` 빈 칸 ${missing}개를 채우면 글이 더 정확해져요.` : ''}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link to={`/tools/homepage/build?client=${encodeURIComponent(record.id)}`} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 px-3 font-semibold text-slate-700 hover:bg-slate-50" data-testid="content-to-site">
+          <Link to={`/tools/homepage/build?${subjectQuery(record.id)}`} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 px-3 font-semibold text-slate-700 hover:bg-slate-50" data-testid="content-to-site">
             <Globe className="size-4" aria-hidden="true" />
             이 업체 홈페이지
           </Link>
@@ -1040,7 +1045,12 @@ function PlanCard({ record, profile, today, store, onPick, onOpen }: { record: C
             </Button>
             <span className="t-meta break-keep text-slate-500">보관함에 날짜를 달아 넣어요 · 같은 글은 두 번 넣지 않아요.</span>
           </div>
-          {made > 0 && (
+          {made > 0 && isTrialId(record.id) && (
+            <p className="t-meta break-keep border-t border-slate-100 pt-3 text-slate-500" data-testid="content-plan-attach-trial">
+              임시등록하면 업체 일정에 올릴 날을 걸 수 있어요(일정 달력 · 오늘 화면에 떠요).
+            </p>
+          )}
+          {made > 0 && !isTrialId(record.id) && (
             <div className="flex flex-col gap-1.5 border-t border-slate-100 pt-3" data-testid="content-plan-attach">
               <p className="t-sub font-semibold text-slate-800">업체 일정에 올릴 날 걸기</p>
               <p className="t-meta break-keep text-slate-500">누르면 {record.companyName} 기록에 계획이 붙고, 올릴 날 {slots.length}개가 일정 달력 · 오늘 화면에 떠요. 다시 걸면 날짜만 새로 바뀌어요.</p>

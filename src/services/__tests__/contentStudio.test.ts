@@ -152,6 +152,10 @@ for (const rec of [full, empty, fresh]) {
 }
 check(`C17 형식 7 × 업종 9 × 말투 2 × 다른 안 3 × 업체 3 = ${made}편 — 빈 글 · undefined · 'AI' · 담당자 휴대폰 · 어색한 조사 0`, bad.length === 0 && made > 2000, bad.slice(0, 3))
 check('C18 격식 있게 — 문장 끝에 남은 "~요." 0(부탁 "~세요" 는 그대로)', residual.length === 0, residual.slice(0, 5))
+const freshP = buildProfile(fresh, today).profile
+const objCard = plainText('cards', makeDraft(freshP, { kind: 'cards', topic: topicsFor(freshP, '', today)[0], adType: 'objection' }, today).blocks)
+const shortsAll = INDUSTRIES.flatMap((ind) => { const ip = buildProfile(full, today, { industry: ind }).profile; return topicsFor(ip, '', today).flatMap((t) => [0, 1, 2].map((v) => plainText('shorts', makeDraft(ip, { kind: 'shorts', topic: t, variant: v }, today).blocks))) })
+check('C83 받침 있는 이름 — "맛나식당이 먼저 답해" · 짧은 영상 말에 "?." · "!." 0', objCard.includes('맛나식당이 먼저 답해') && !objCard.includes('맛나식당가') && shortsAll.every((t) => !/[?!]\./.test(t)), { obj: objCard.slice(0, 120), bad: shortsAll.find((t) => /[?!]\./.test(t))?.match(/.{0,30}[?!]\..{0,10}/)?.[0] })
 
 const FORMAL: [string, string][] = [
   ['어떤 곳인가요', null as unknown as string], ['주차되나요', null as unknown as string], ['해요', '합니다'], ['줄어요', '줍니다'], ['쉬워요', '쉽습니다'], ['보여요', '보입니다'], ['돼요', '됩니다'], ['드려요', '드립니다'], ['좋아요', '좋습니다'], ['했어요', '했습니다'], ['손님이에요', '손님입니다'],
@@ -278,7 +282,7 @@ const libBad = INDUSTRIES.flatMap((k) => {
   if (/최고|1위|100%|보장|완치/.test(text.replace(l.caution ?? '', ''))) problems.push(`${k} risky`)
   return problems
 })
-check('C45 업종 견본 10개(디자인 · 광고 · 간판 포함) — 정보 5 · 기준 5 · 순서 3+ · 질문 3+ · 마무리에 회사 이름 자리 · 광고 규정 말 0', libBad.length === 0 && INDUSTRIES.length === 10, libBad)
+check('C45 업종 견본 11개(디자인 · 광고 · 간판 · D-220 개인 컨설턴트 포함) — 정보 5 · 기준 5 · 순서 3+ · 질문 3+ · 마무리에 회사 이름 자리 · 광고 규정 말 0', libBad.length === 0 && INDUSTRIES.length === 11 && INDUSTRIES.includes('consultant'), libBad)
 
 /* ---------------- D-208 상황 예시 · 한 달 치 · 올렸어요 ---------------- */
 const HOLI = [{ date: '2026-12-25', name: '성탄절' }, { date: '2027-01-01', name: '신정' }]

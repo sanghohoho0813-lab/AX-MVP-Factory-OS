@@ -846,6 +846,11 @@ export interface ClientOpsRecord {
    */
   clientType?: 'consultant'
   /**
+   * D-220: 임시등록 — 마케팅 도구(홈페이지 · 홍보 글)에서 가상 업체 · 컨설턴트로 만들어 보다가 고객 관리에 올린 기록.
+   * 고객 관리 카드 · 업체 상세에 '임시등록' 이 붙는다. 표시를 지우면 보통 기록과 같다(payload, DB 변경 없음).
+   */
+  provisional?: ProvisionalMark
+  /**
    * D-183: 서류 올리기 기록(최근 5번) — 무엇을 어느 칸에 넣었고 무엇을 바로 넣었나.
    * 예전에는 올린 직후 화면에만 보이고 새로고침하면 사라졌다. '확인할 것' 이 이 기록으로 '바로 넣은 값 — 맞나요?' 를 묻는다.
    * payload 에 함께 저장된다(DB 변경 없음). 파일 글자 · 주민등록번호는 남기지 않는다.
@@ -855,6 +860,13 @@ export interface ClientOpsRecord {
   archivedAt: string | null
   createdAt: string
   updatedAt: string
+}
+
+/** D-220: 임시등록 표시 — 언제 · 어디서(마케팅 도구) · 부탁한 동료(있으면) */
+export interface ProvisionalMark {
+  at: string
+  from: 'marketing'
+  requestedBy?: string
 }
 
 /** D-183: 서류 올리기 한 번의 기록 */

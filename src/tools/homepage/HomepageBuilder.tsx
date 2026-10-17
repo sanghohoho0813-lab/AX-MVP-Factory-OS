@@ -61,6 +61,7 @@ import {
 } from '../../services/siteBuilder'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { ToolResultAttach } from '../shared/ToolResultAttach'
+import { isTrialId, subjectQuery } from '../../services/marketingTrial'
 import { BlockFields, IconBtn, inputClass } from './BlockFields'
 import { SitePreview, type Device } from './SitePreview'
 import type { SiteStore } from './useSiteDoc'
@@ -291,7 +292,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
         {must ? <AlertTriangle className="size-4" aria-hidden="true" /> : <CheckCircle2 className="size-4" aria-hidden="true" />}
         {must ? `꼭 고칠 것 ${must}` : should ? `확인할 것 ${should}` : '점검 통과'}
       </button>
-      <Link to={`/tools/content/build?client=${encodeURIComponent(record.id)}`} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 px-3 font-semibold text-slate-700 hover:bg-slate-50" data-testid="site-to-content">
+      <Link to={`/tools/content/build?${subjectQuery(record.id)}`} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 px-3 font-semibold text-slate-700 hover:bg-slate-50" data-testid="site-to-content">
         <PenLine className="size-4" aria-hidden="true" /> 이 업체 홍보 글
       </Link>
       <Button size="sm" onClick={onOpen} data-testid="site-open">
@@ -300,6 +301,8 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
       <Button size="sm" variant="primary" onClick={() => void onDownload()} data-testid="site-download">
         <Download className="size-4" aria-hidden="true" /> HTML 내려받기
       </Button>
+      {/* D-220: 가상 업체 · 컨설턴트는 붙일 업체 기록이 없다 — 임시등록하면 붙일 수 있다 */}
+      {!isTrialId(record.id) && (
       <ToolResultAttach
         toolKey="homepage"
         title="홈페이지 초안"
@@ -310,6 +313,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
         followUp={{ text: '홈페이지 초안 업체 확인 · 견본 문구 고치기', days: 3 }}
         presetClientId={record.id}
       />
+      )}
     </div>
   )
 

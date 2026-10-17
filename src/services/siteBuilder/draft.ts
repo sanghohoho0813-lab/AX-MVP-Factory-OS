@@ -11,7 +11,7 @@ import { particle } from '../../lib/josa'
 import { usableFactValue } from '../customerFacts'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { INDUSTRY_PALETTE } from './theme'
-import { industryDef, industryOf } from './industry'
+import { heroTitleFor, industryDef, industryOf } from './industry'
 import { blockDef } from './blocks'
 import type { BlockType, FieldDef, IndustryKey, ListItem, PropValue, SiteBlock, SiteDoc } from './types'
 
@@ -26,6 +26,7 @@ const GALLERY_TITLE: Record<IndustryKey, string> = {
   education: '수업 모습',
   construction: '시공 사례',
   design: '작업 사례',
+  consultant: '함께한 일',
   general: '사례',
 }
 
@@ -114,6 +115,8 @@ export function siteFacts(record: ClientOpsRecord, today: string): SiteFacts {
 
 /** 업체 기록에서 업종 알아보기 */
 export function industryForRecord(record: ClientOpsRecord): IndustryKey {
+  // D-220: 컨설턴트 고객(동료 컨설턴트) — 개인 컨설턴트 견본으로
+  if (record.clientType === 'consultant') return 'consultant'
   return industryOf(usableFactValue(record, 'businessCategory'), usableFactValue(record, 'businessItem'), record.industry ?? '')
 }
 
@@ -174,7 +177,7 @@ export function draftSite(record: ClientOpsRecord, opts: DraftOptions): SiteDoc 
       {
         layout: 'split',
         eyebrow: [company, f.item ? shortItem(f.item, '') : ''].filter(Boolean).join(' · '),
-        title: fill(ind.heroTitle),
+        title: fill(heroTitleFor(industry, [f.category, f.item, record.industry ?? ''].join(' '))),
         subtitle: fill(ind.heroSubtitle),
         buttonLabel: '문의하기',
         buttonTarget: 'contact',
@@ -258,7 +261,7 @@ export function draftSite(record: ClientOpsRecord, opts: DraftOptions): SiteDoc 
     }),
   )
 
-  const description = `${first} ${f.region ? `${f.region} · ` : ''}${item} 문의는 ${f.phone || '홈페이지 연락처'}로.`.slice(0, 150)
+  const description = `${first} ${f.region ? `${f.region} · ` : ''}${item} 문의는 ${f.phone ? `${f.phone}${particle(f.phone, '으로/로')}` : '홈페이지 연락처로'}.`.slice(0, 150)
   return {
     v: 1,
     industry,

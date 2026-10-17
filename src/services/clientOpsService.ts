@@ -34,6 +34,7 @@ import type {
   ToolDeadline,
   ToolResult,
   ActivityEntry,
+  ProvisionalMark,
   ClientNote,
   ClientOpsRecord,
   ContractInfo,
@@ -430,6 +431,15 @@ function normalizeCare(value: unknown): { care?: { lastContactAt?: string; snooz
   return Object.keys(care).length ? { care } : {}
 }
 
+/** D-220: 임시등록 표시 — 모양이 맞을 때만 남긴다 */
+function normalizeProvisional(value: unknown): { provisional?: ProvisionalMark } {
+  if (!value || typeof value !== 'object') return {}
+  const v = value as Record<string, unknown>
+  if (typeof v.at !== 'string' || !v.at) return {}
+  const by = typeof v.requestedBy === 'string' ? v.requestedBy.trim().slice(0, 40) : ''
+  return { provisional: { at: v.at, from: 'marketing', ...(by ? { requestedBy: by } : {}) } }
+}
+
 export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape): ClientOpsRecord {
   const now = nowIso()
   const customDocuments = normalizeCustomDocuments(value.customDocuments)
@@ -560,6 +570,7 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
     ...normalizeDocUploads(value.docUploads),
     // D-181: 컨설턴트 고객만 표시가 남는다 — 예전 기록 · 다른 값은 중소기업 대표님 고객(칸 없음)
     ...(value.clientType === 'consultant' ? { clientType: 'consultant' as const } : {}),
+    ...normalizeProvisional(value.provisional),
     archivedAt: typeof value.archivedAt === 'string' ? value.archivedAt : null,
     createdAt: value.createdAt ?? now,
     updatedAt: value.updatedAt ?? now,

@@ -186,6 +186,23 @@ export const INDUSTRIES: IndustryDef[] = [
     include: ['about', 'services', 'process', 'faq', 'cta', 'contact'],
   },
   {
+    key: 'consultant',
+    label: '컨설턴트 · 전문가(개인)',
+    heroTitle: '대표님 회사에 맞는 길을\n함께 찾아 드립니다',
+    heroSubtitle: '{item} — 첫 상담부터 실행 · 사후 관리까지 한 사람이 끝까지 챙깁니다.',
+    fallbackItem: '중소기업 경영 컨설팅',
+    aboutPromise: '회사 사정을 먼저 듣고, 지금 할 수 있는 일부터 정직하게 제안합니다.',
+    servicesTitle: '도와드리는 일',
+    services: [CARD('회사 진단', '지금 회사가 받을 수 있는 것과 챙겨야 할 것을 정리합니다.'), CARD('자금 · 지원사업', '맞는 정책자금과 지원사업을 찾고 신청 준비를 함께합니다.'), CARD('인증 · 절세 · 고용', '기업 인증, 절세, 고용 지원금처럼 놓치기 쉬운 것을 챙깁니다.')],
+    processTitle: '이렇게 진행돼요',
+    process: [STEP('첫 상담', '전화나 방문으로 회사 상황을 듣습니다.'), STEP('진단 · 제안', '자료를 보고 할 수 있는 일을 정리해 드립니다.'), STEP('실행', '서류 준비부터 신청까지 함께 진행합니다.'), STEP('사후 관리', '결과가 나온 뒤에도 다음 일을 챙깁니다.')],
+    faq: [QA('상담 비용이 있나요?', '첫 상담 조건을 적어 주세요.'), QA('어떤 회사를 주로 돕나요?', '주로 돕는 업종 · 규모를 적어 주세요.'), QA('멀리 있는 회사도 가능한가요?', '전화 · 온라인으로도 진행할 수 있습니다.')],
+    ctaTitle: '상담 신청',
+    ctaBody: '회사 이름과 고민을 짧게 남겨 주시면 확인 후 연락드립니다.',
+    hours: '평일 09:00 – 18:00',
+    include: ['about', 'services', 'process', 'faq', 'cta', 'contact'],
+  },
+  {
     key: 'general',
     label: '기타',
     heroTitle: '찾아 주셔서\n감사합니다',
@@ -208,6 +225,15 @@ export function industryDef(key: string): IndustryDef {
   return INDUSTRIES.find((i) => i.key === key) ?? INDUSTRIES[INDUSTRIES.length - 1]
 }
 
+/** 음식 견본 안에서도 빵집 · 카페는 '한 그릇' 이 어색하다 — 첫 화면 큰 문구만 바꾼다 */
+export function heroTitleFor(key: string, text: string): string {
+  const ind = industryDef(key)
+  if (ind.key !== 'food') return ind.heroTitle
+  if (/베이커리|제과|빵|디저트|케이크/.test(text)) return '매일 아침\n정성껏 굽습니다'
+  if (/카페|커피|찻집/.test(text)) return '정성껏 내린\n한 잔'
+  return ind.heroTitle
+}
+
 /**
  * 업태 · 종목 · 업종 글로 업종을 알아본다.
  *  1) 간판 · 광고물 · 인쇄 · 디자인은 '제조' 가 붙어 있어도 디자인 · 광고(D-205 — '간판 및 광고물 제조업' 이 제조 견본으로 나가던 것)
@@ -219,6 +245,8 @@ const RULES: { key: IndustryKey; re: RegExp }[] = [
   { key: 'food', re: /음식점|식당|카페|커피|베이커리|제과점|외식|주점|휴게음식|일반음식|분식|치킨|한식|중식|일식|양식/ },
   { key: 'health', re: /의원|병원|한의원|치과|약국|의료|뷰티|미용|피부|네일|헬스|필라테스|요가|마사지|에스테틱/ },
   { key: 'education', re: /교육|학원|교습|강의|코칭|훈련|어학|과외/ },
+  // D-220: '컨설턴트' 라고 적은 사람(개인 전문가)은 사무소 견본보다 개인 컨설턴트 견본으로
+  { key: 'consultant', re: /컨설턴트/ },
   { key: 'professional', re: /세무|회계|법률|법무|노무|변리|컨설팅|경영자문|자문|번역|감정평가|행정사/ },
   { key: 'it', re: /소프트웨어|정보통신|플랫폼|응용|시스템\s*통합|데이터|인공지능|컴퓨터|프로그램|웹|앱|IT|SI\b|클라우드/i },
   { key: 'trade', re: /도매|소매|유통|무역|상사|수출|수입|전자상거래|통신판매|쇼핑/ },
@@ -228,11 +256,16 @@ const RULES: { key: IndustryKey; re: RegExp }[] = [
 /** 간판 · 광고 · 인쇄 · 디자인 — '제조' 보다 먼저 본다 */
 const DESIGN = /간판|광고물|옥외광고|사인물|사인\s*제작|현수막|실사\s*출력|인쇄|디자인|광고|마케팅|브랜딩/
 
+/** 인테리어 · 시공 회사는 '디자인' 이 붙어 있어도 공사 견본(간판 · 광고물 · 인쇄 말이 같이 있으면 디자인) */
+const BUILD_WORK = /인테리어|시공|리모델링|건축|공사업/
+const SIGN_WORK = /간판|광고물|옥외광고|사인물|사인\s*제작|현수막|실사\s*출력|인쇄/
+
 export function industryOf(...texts: string[]): IndustryKey {
   const text = texts.filter(Boolean).join(' ')
   if (!text.trim()) return 'general'
+  const buildNotSign = BUILD_WORK.test(text) && !SIGN_WORK.test(text.replace(/인쇄\s*회로/g, ''))
   // 인쇄회로기판(PCB)은 전자부품 제조
-  if (DESIGN.test(text.replace(/인쇄\s*회로/g, '')) && !/음식점|식당|카페|의원|병원/.test(text)) return 'design'
+  if (DESIGN.test(text.replace(/인쇄\s*회로/g, '')) && !/음식점|식당|카페|의원|병원/.test(text) && !buildNotSign) return 'design'
   if (/제조/.test(text) && !/음식점|식당|카페/.test(text)) return 'manufacturing'
   for (const r of RULES) if (r.re.test(text)) return r.key
   return 'general'

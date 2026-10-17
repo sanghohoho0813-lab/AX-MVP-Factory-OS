@@ -257,6 +257,12 @@ export function ClientBoardCard({
             </span>
             <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
           </button>
+          {/* D-220: 마케팅 도구에서 임시등록한 기록 */}
+          {record.provisional && (
+            <span data-provisional-badge className="t-meta shrink-0 self-center rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 font-semibold whitespace-nowrap text-amber-800">
+              임시등록
+            </span>
+          )}
           {kindBadge && (
             <span data-contract-badge className={`t-meta shrink-0 self-center rounded-full ${open ? '' : 'max-sm:hidden '} border border-brand-200 bg-brand-50 px-2 py-0.5 font-semibold whitespace-nowrap text-brand-700`}>
               {kindBadge}

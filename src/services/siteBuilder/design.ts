@@ -58,6 +58,7 @@ export const INDUSTRY_STYLE: Record<IndustryKey, StyleKey> = {
   education: 'warm',
   construction: 'bold',
   design: 'premium',
+  consultant: 'trust',
   general: 'trust',
 }
 
@@ -118,6 +119,7 @@ const TRUST_ADD: Record<IndustryKey, BlockType> = {
   education: 'reviews',
   construction: 'reviews',
   design: 'logos',
+  consultant: 'reviews',
   general: 'reviews',
 }
 
@@ -212,6 +214,10 @@ const SUGGEST: Record<IndustryKey, BlockSuggestion[]> = {
   design: [
     { type: 'gallery', why: '작업물 사진이 곧 실력이에요.' },
     { type: 'logos', why: '함께한 브랜드 로고가 믿음을 줘요.' },
+  ],
+  consultant: [
+    { type: 'reviews', why: '함께한 대표님의 한마디가 컨설턴트를 고르는 가장 큰 이유예요.' },
+    { type: 'process', why: '첫 상담부터 사후 관리까지 순서를 보여 주면 처음 맡기는 대표님도 안심해요.' },
   ],
   general: [{ type: 'reviews', why: '고객 후기가 처음 보는 손님의 믿음을 만들어요.' }],
 }

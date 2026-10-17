@@ -1,0 +1,194 @@
+/**
+ * D-220: 홈페이지 만들기 · 홍보 글 만들기 — '누구 것을 만들까요?'
+ *
+ * 예전에는 '어느 업체' 목록 하나뿐이라 잠재고객 · 컨설턴트 고객이 섞여 있어도 구분이 없었고, 고객 관리에 없는 곳은 만들 수 없었다.
+ * 이제 계약 고객 · 잠재고객 · 컨설턴트 · 가상(직접 넣은 업체 · 컨설턴트)으로 나눠 보고, 가상으로 바로 만들어 볼 수 있다.
+ */
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { BriefcaseBusiness, Plus, Search, Sparkles } from 'lucide-react'
+import { useToolClient } from '../shared/toolClientContext'
+import { matchesClientSearch } from '../../services/clientOpsSearch'
+import { isContractClient } from '../../services/salesPipeline'
+import { clientTypeOf } from '../../services/clientType'
+import { emptyTrial, TRIAL_KIND_LABEL, type TrialKind, type TrialProfile } from '../../services/marketingTrial'
+import type { ClientOpsRecord } from '../../types/clientOps'
+import { useToast } from '../../components/ui/toastContext'
+import { inputClass } from '../homepage/BlockFields'
+import { TrialForm } from './TrialForm'
+import { useTrials } from './trialStore'
+
+type Group = 'contract' | 'lead' | 'consultant' | 'trial'
+type Filter = 'all' | Group
+
+const GROUP_LABEL: Record<Group, string> = { contract: '계약 고객', lead: '잠재고객', consultant: '컨설턴트', trial: '가상' }
+
+function groupOf(c: ClientOpsRecord): Group {
+  if (clientTypeOf(c) === 'consultant') return 'consultant'
+  return isContractClient(c) ? 'contract' : 'lead'
+}
+
+interface Row {
+  id: string
+  name: string
+  group: Group
+  href: string
+  provisional: boolean
+  kindLabel?: string
+  search: (q: string) => boolean
+}
+
+export function SubjectPicker({
+  buildPath,
+  made,
+  madeLabel,
+  icon,
+  testPrefix,
+  title,
+  desc,
+}: {
+  buildPath: string
+  /** 만든 것이 있는 곳(id → 마지막으로 고친 때) — 먼저 보이고 표시가 붙는다 */
+  made: Map<string, string>
+  madeLabel: (id: string) => string
+  icon: (on: boolean) => ReactNode
+  testPrefix: string
+  title: string
+  desc: string
+}) {
+  const { loadClients, workspaceId } = useToolClient()
+  const trialsStore = useTrials(workspaceId)
+  const navigate = useNavigate()
+  const { showToast } = useToast()
+  const [clients, setClients] = useState<ClientOpsRecord[] | null>(null)
+  const [q, setQ] = useState('')
+  const [filter, setFilter] = useState<Filter>('all')
+  const [form, setForm] = useState<TrialProfile | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    void loadClients().then((list) => alive && setClients(list.filter((c) => !c.archivedAt)))
+    return () => {
+      alive = false
+    }
+  }, [loadClients])
+
+  const rows = useMemo<Row[]>(() => {
+    const out: Row[] = (clients ?? []).map((c) => ({
+      id: c.id,
+      name: c.companyName,
+      group: groupOf(c),
+      href: `${buildPath}?client=${encodeURIComponent(c.id)}`,
+      provisional: !!c.provisional,
+      search: (s: string) => matchesClientSearch(c, s),
+    }))
+    // 임시등록까지 마친 가상은 이제 고객 관리에 있다 — 여기서는 뺀다
+    for (const t of trialsStore.trials.filter((x) => !x.registeredAt)) {
+      const hay = [t.name, t.person, t.industry, t.phone, t.region].join(' ').toLowerCase()
+      out.push({ id: t.id, name: t.name, group: 'trial', href: `${buildPath}?trial=${encodeURIComponent(t.id)}`, provisional: false, kindLabel: TRIAL_KIND_LABEL[t.kind], search: (s: string) => hay.includes(s.trim().toLowerCase()) })
+    }
+    return out
+  }, [clients, trialsStore.trials, buildPath])
+
+  const counts = useMemo(() => {
+    const n: Record<Filter, number> = { all: rows.length, contract: 0, lead: 0, consultant: 0, trial: 0 }
+    for (const r of rows) n[r.group] += 1
+    return n
+  }, [rows])
+
+  const list = useMemo(() => {
+    const shown = rows.filter((r) => (filter === 'all' || r.group === filter) && (!q.trim() || r.search(q)))
+    // 만든 곳 먼저(최근 고친 순), 그다음 가나다
+    return shown.sort((a, b) => (made.get(b.id) ?? '').localeCompare(made.get(a.id) ?? '') || a.name.localeCompare(b.name, 'ko'))
+  }, [rows, filter, q, made])
+
+  const openForm = (kind: TrialKind) => setForm(emptyTrial(kind))
+
+  const saveTrial = async (p: TrialProfile) => {
+    if (saving) return
+    setSaving(true)
+    const saved = await trialsStore.save(p)
+    setSaving(false)
+    if (!saved) return showToast('저장하지 못했어요. 잠시 뒤 다시 눌러 주세요.')
+    setForm(null)
+    navigate(`${buildPath}?trial=${encodeURIComponent(saved.id)}`)
+  }
+
+  const loading = clients === null || trialsStore.status === 'loading'
+
+  return (
+    <section className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-5" data-testid={testPrefix}>
+      <div>
+        <h2 className="t-section text-slate-900">{title}</h2>
+        <p className="t-sub mt-1 break-keep text-slate-600">{desc}</p>
+      </div>
+
+      {/* 고객 관리에 없어도 — 가상 업체 · 컨설턴트로 바로 */}
+      <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50/60 p-3" data-testid="trial-start">
+        <p className="t-sub flex items-start gap-1.5 break-keep font-semibold text-brand-900">
+          <Sparkles className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden="true" />
+          고객 관리에 없어도 돼요 — 잠재고객 · 동료 컨설턴트 · 가상의 업체로 먼저 만들어 보고, 마음에 들면 임시등록하세요.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => openForm('company')} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-brand-300 bg-white px-3 font-semibold text-brand-800 hover:bg-brand-50" data-testid="trial-new-company">
+            <Plus className="size-4" aria-hidden="true" /> 가상 업체로 만들기
+          </button>
+          <button type="button" onClick={() => openForm('consultant')} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-brand-300 bg-white px-3 font-semibold text-brand-800 hover:bg-brand-50" data-testid="trial-new-consultant">
+            <BriefcaseBusiness className="size-4" aria-hidden="true" /> 컨설턴트로 만들기
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="누구 것인지 거르기">
+        {(['all', 'contract', 'lead', 'consultant', 'trial'] as const).map((f) => (
+          <button
+            key={f}
+            type="button"
+            role="tab"
+            aria-selected={filter === f}
+            onClick={() => setFilter(f)}
+            className={`tap t-sub min-h-11 rounded-full border px-3 ${filter === f ? 'border-brand-600 bg-brand-600 font-semibold text-white' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+            data-testid="subject-filter"
+            data-filter={f}
+          >
+            {f === 'all' ? '전체' : GROUP_LABEL[f]} {counts[f]}
+          </button>
+        ))}
+      </div>
+
+      <label className="relative">
+        <Search className="pointer-events-none absolute top-1/2 left-3 mt-0.5 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+        <input className={`${inputClass} pl-9`} placeholder="이름 · 대표 · 전화로 찾기" value={q} onChange={(e) => setQ(e.target.value)} aria-label="찾기" data-testid={`${testPrefix}-search`} />
+      </label>
+
+      {loading ? (
+        <p className="t-sub text-slate-400">목록을 읽는 중…</p>
+      ) : list.length === 0 ? (
+        <p className="t-sub break-keep text-slate-500">{filter === 'trial' ? '아직 가상으로 만든 곳이 없어요. 위의 [가상 업체로 만들기] 를 눌러 보세요.' : '맞는 곳이 없어요.'}</p>
+      ) : (
+        <ul className="flex flex-col divide-y divide-slate-100">
+          {list.slice(0, 60).map((r) => (
+            <li key={r.id}>
+              <Link to={r.href} className="tap flex min-h-12 items-center gap-3 py-2 hover:bg-slate-50" data-testid={`${testPrefix}-item`} data-group={r.group}>
+                {icon(made.has(r.id))}
+                {/* 휴대폰에서는 '만든 것' 표시를 이름 아래 줄로 — 오른쪽에 두면 이름이 '한솔정…' 처럼 잘린다 */}
+                <span className="min-w-0 flex-1">
+                  <span className="t-body block truncate font-medium text-slate-800">{r.name}</span>
+                  {made.has(r.id) && <span className="t-meta block text-brand-700 sm:hidden">{madeLabel(r.id)}</span>}
+                </span>
+                <span className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                  {made.has(r.id) && <span className="t-meta hidden text-brand-700 sm:inline">{madeLabel(r.id)}</span>}
+                  {r.provisional && <span className="t-meta rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 font-semibold text-amber-800">임시등록</span>}
+                  <span className={`t-meta rounded-full border px-2 py-0.5 ${r.group === 'trial' ? 'border-brand-200 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600'}`}>{r.kindLabel ?? GROUP_LABEL[r.group]}</span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {form && <TrialForm initial={form} busy={saving} onClose={() => setForm(null)} onSave={(p) => void saveTrial(p)} />}
+    </section>
+  )
+}

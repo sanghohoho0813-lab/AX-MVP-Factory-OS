@@ -5,6 +5,8 @@
  * D-208 — 디자인 한 번에(스타일 6) · 홈페이지 점수 100점 · 이것만 하면 · 업종 맞춤 블록.
  */
 import { normalizeClientOps } from '../clientOpsService'
+import { adoptRow, isTrialId, normalizeTrial, registerInput, rowSubjectId, sameNameClient, subjectQuery, subjectRow, trialRecord, TRIAL_SAMPLES, withoutProvisional, withTrialDetails, type TrialProfile } from '../marketingTrial'
+import { industryForRecord, siteFacts } from '../siteBuilder'
 import {
   ALL_ART,
   BLOCK_DEFS,
@@ -28,6 +30,7 @@ import {
   regionOf,
   removeBlock,
   renderSiteHtml,
+  telHref,
   safeHref,
   safeImage,
   setHidden,
@@ -153,9 +156,9 @@ const dp2 = withContactPhone(dp, '010-1111-2222', now)
 check('H16 [담당자 번호 넣기] → 연락처 · 바닥 줄 전화 채움 · 점검에서 사라짐', dp2.blocks.filter((b) => b.props.phone === '010-1111-2222').length === 2 && !siteChecks(dp2, { contactPhone: '010-1111-2222' }).some((c) => c.key === 'phone'))
 
 // 업종 9개 모두 초안 → 그려짐
-const allInd = ['manufacturing', 'it', 'trade', 'food', 'health', 'professional', 'education', 'construction', 'design', 'general'] as const
+const allInd = ['manufacturing', 'it', 'trade', 'food', 'health', 'professional', 'education', 'construction', 'design', 'consultant', 'general'] as const
 const indRender = allInd.map((k) => ({ k, html: renderSiteHtml(draftSite(full, { today, now, makeId, industry: k })) }))
-check('H17 업종 10개 모두 초안 → HTML(<!doctype · 회사명 · 스크립트 0)', indRender.every((x) => x.html.startsWith('<!doctype html>') && x.html.includes('한솔정밀(주)') && !/<script/i.test(x.html)), indRender.filter((x) => !x.html.includes('한솔정밀')).map((x) => x.k))
+check('H17 업종 11개 모두 초안(D-220 개인 컨설턴트 포함) → HTML(<!doctype · 회사명 · 스크립트 0)', indRender.every((x) => x.html.startsWith('<!doctype html>') && x.html.includes('한솔정밀(주)') && !/<script/i.test(x.html)), indRender.filter((x) => !x.html.includes('한솔정밀')).map((x) => x.k))
 
 /* ---------------- 그리기 ---------------- */
 const html = renderSiteHtml(d)
@@ -346,7 +349,7 @@ check('H50 예전 저장본(모양 칸 없음) → 첫 화면 나란히 · 사�
 const fullHtml = renderSiteHtml(d)
 check('H51 숫자 색 띠 = class numband · 번갈아 옅은 바탕은 띠를 세지 않음(소개 흰 → 사업 옅은)', fullHtml.includes('id="numbers" class="numband"') && fullHtml.includes('id="about" class=""') && fullHtml.includes('id="services" class="alt"'), /id="(about|services|numbers)" class="[^"]*"/g.exec(fullHtml)?.[0])
 const artBad = ALL_ART.filter((a) => /\son\w+=|<text|href|<script|<foreignObject|url\(/i.test(a) || !a.startsWith('<svg class="'))
-check('H52 그림 · 아이콘(업종 10 + 아이콘 18) — 이벤트 · 글자 · 링크 · 바깥 주소 0 · 업종마다 그림이 다름', artBad.length === 0 && ALL_ART.length === 28 && new Set(allInd.map((k) => heroArt(k))).size === allInd.length, artBad.length)
+check('H52 그림 · 아이콘(업종 11 + 아이콘 18 · D-220 개인 컨설턴트 그림) — 이벤트 · 글자 · 링크 · 바깥 주소 0 · 업종마다 그림이 다름', artBad.length === 0 && ALL_ART.length === 29 && new Set(allInd.map((k) => heroArt(k))).size === allInd.length, artBad.length)
 check('H53 로고 자리 글자 — (주)샤인디자인 → 샤 · 한솔정밀(주) → 한', sHtml.includes('<span class="mark" aria-hidden="true">샤</span>') && fullHtml.includes('<span class="mark" aria-hidden="true">한</span>'))
 check('H54 구역 머리글(ABOUT · BUSINESS · PROCESS · FAQ · CONTACT) — 고정 글', ['ABOUT', 'BUSINESS', 'PROCESS', 'FAQ', 'CONTACT'].every((k) => fullHtml.includes(`<p class="kicker">${k}</p>`)))
 
@@ -459,6 +462,59 @@ const mNo = noTrust(draftSite(full, { today, now, makeId, industry: 'manufacturi
 const withEmptyRev = insertBlock(mNo, newBlock('reviews', full, 'manufacturing', today, 'rv1'), null, now)
 const trustOf = (d: SiteDoc) => siteScore(d).items.find((x) => x.key === 'trust')!
 check('H83 믿음 기록이 없으면 업종에 맞는 블록 더하기(병의원 = 인증 · 후기 아님 · 제조 = 거래처) · 빈 후기 블록이 이미 있으면 그것을 엶(겹쳐 넣지 않음)', trustOf(hNo).open.add === 'certs' && trustOf(mNo).open.add === 'logos' && trustOf(withEmptyRev).open.blockId === 'rv1' && !trustOf(withEmptyRev).open.add, [trustOf(hNo).open, trustOf(mNo).open, trustOf(withEmptyRev).open])
+
+/* ---------------- D-220 잠재고객 · 동료 컨설턴트 · 가상 업체 · 임시등록 ---------------- */
+{
+  const at = '2026-10-17T03:00:00.000Z'
+  const sample = (key: string): TrialProfile => {
+    const sm = TRIAL_SAMPLES.find((x) => x.key === key)!
+    return normalizeTrial({ id: `trial_${key}000001`, kind: sm.kind, ...sm.fill, createdAt: at, updatedAt: at })!
+  }
+  const cons = sample('consultant')
+  const bakery = sample('bakery')
+  const consRec = trialRecord(cons)
+  const consDoc = draftSite(consRec, { today, now, makeId })
+  const consHtml = renderSiteHtml(consDoc)
+  check('D220-1 동료 컨설턴트(가상) → 개인 컨설턴트 견본 · 이름 · 전문 분야 · 그려짐(스크립트 0)', consDoc.industry === 'consultant' && consHtml.includes('정다온 경영컨설턴트') && consHtml.includes('도와드리는 일') && !/<script/i.test(consHtml), consDoc.industry)
+  const bakeDoc = draftSite(trialRecord(bakery), { today, now, makeId })
+  const bf = siteFacts(trialRecord(bakery), today)
+  check('D220-2 가상 업체(빵집) → 음식 견본 · 대표 · 주소 · 전화 · 지역 · 종목이 업체 정보 자리에(지어낸 숫자 0)', bakeDoc.industry === 'food' && bf.representative === '김봄날' && bf.address.includes('수원시') && bf.phone === '031-123-4567' && bf.region !== '' && bf.item.includes('빵') && bf.employees === null && bf.years === null, { ind: bakeDoc.industry, bf })
+  check('D220-3 가상 업체는 계약 전(잠재) · 컨설턴트는 컨설턴트 고객 표시 · 업체는 표시 없음', consRec.status === 'waiting' && consRec.clientType === 'consultant' && trialRecord(bakery).clientType === undefined)
+  check('D220-4 컨설턴트 고객 기록은 업종 글과 상관없이 개인 컨설턴트 견본 · 회사 업종 글 "경영컨설팅업" 은 그대로 전문 서비스 · "컨설턴트" 라고 적으면 개인 컨설턴트',
+    industryForRecord(normalizeClientOps({ id: 'c1', companyName: '김세무', industry: '세무사무소', clientType: 'consultant' })) === 'consultant' && industryOf('경영컨설팅업') === 'professional' && industryOf('정책자금 컨설턴트') === 'consultant')
+  check('D220-5 가상 프로필 읽기 — 이름 없으면 · 가상 id 아니면 버림 · 칸 길이 자름 · 옮기기 끝(registeredAt)은 업체 id 가 있을 때만',
+    normalizeTrial({ id: 'trial_x1', name: '' }) === null && normalizeTrial({ id: 'cli_1', name: '가' }) === null && normalizeTrial({ id: 'trial_x1', name: '가'.repeat(80) })!.name.length === 60 && normalizeTrial({ id: 'trial_x1', name: '가', registeredAt: at })!.registeredAt === undefined && normalizeTrial({ id: 'trial_x1', name: '가', registeredClientId: 'cli_9', registeredAt: at })!.registeredAt === at)
+  const sr = subjectRow(cons.id, { doc: 1 })
+  const adopted = adoptRow({ id: 'row1', ...sr }, 'cli_new')
+  check('D220-6 저장 줄 — 가상은 업체 칸 비우고 내용에 가상 id(클라우드 외래 키 때문) · 누구 것인지 읽힘 · 임시등록 때 업체 줄로(가상 id 빠짐) · 진짜 업체는 그대로',
+    sr.clientId === '' && sr.data.trialId === cons.id && rowSubjectId(sr) === cons.id && adopted.clientId === 'cli_new' && adopted.id === 'row1' && !('trialId' in adopted.data) && adopted.data.doc === 1 && subjectRow('cli_1', { doc: 1 }).clientId === 'cli_1' && !('trialId' in subjectRow('cli_1', { doc: 1 }).data) && rowSubjectId({ clientId: 'cli_1', data: {} }) === 'cli_1')
+  check('D220-7 도구 사이 이동 주소 — 가상은 ?trial= · 업체는 ?client=', subjectQuery(cons.id) === `trial=${cons.id}` && subjectQuery('cli_1') === 'client=cli_1' && isTrialId(cons.id) && !isTrialId('cli_1') && !isTrialId('trial_'))
+  const reg = registerInput({ ...bakery, requestedBy: '최동료' })
+  const base = normalizeClientOps({ id: 'cli_new', companyName: reg.companyName, contactName: reg.contactName, contactPhone: reg.contactPhone, industry: reg.industry, status: reg.status })
+  const det = withTrialDetails(base, { ...bakery, requestedBy: '최동료' }, at)
+  const round = normalizeClientOps(JSON.parse(JSON.stringify(det)))
+  check('D220-8 임시등록 — 잠재고객(계약 전) · 대표 · 주소 · 종목 채움 · 임시등록 표시 · 부탁한 사람 · 기록 한 줄 · 저장 → 읽기에도 표시 남음 · 표시 지우면 사라짐',
+    reg.status === 'waiting' && reg.clientType === undefined && registerInput(cons).clientType === 'consultant' && det.representativeName === '김봄날' && det.businessAddress.includes('수원') && det.businessItem.includes('빵') && det.provisional?.requestedBy === '최동료' && det.activity[0].text.includes('임시등록') && round.provisional?.at === at && withoutProvisional(round).provisional === undefined,
+    { prov: det.provisional, act: det.activity[0]?.text })
+  check('D220-9 이상한 임시등록 표시는 버림(시각 없음)', normalizeClientOps({ id: 'c2', companyName: 'x', provisional: { from: 'marketing' } as never }).provisional === undefined)
+  const clients = [normalizeClientOps({ id: 'a', companyName: '(주)봄날 베이커리' }), normalizeClientOps({ id: 'b', companyName: '한결정밀', archivedAt: at })]
+  check('D220-10 같은 이름 업체 알아보기 — (주) · 띄어쓰기 무시 · 보관한 업체는 아님', sameNameClient(clients, '봄날베이커리')?.id === 'a' && sameNameClient(clients, '한결정밀') === null && sameNameClient(clients, '') === null)
+  const sampleDocs = TRIAL_SAMPLES.map((sm) => draftSite(trialRecord(sample(sm.key)), { today, now, makeId }))
+  check('D220-11 예시 4가지 모두 초안 · 업종이 맞게(빵집 음식 · 공장 제조 · 학원 교육 · 컨설턴트 개인 컨설턴트)', sampleDocs.map((d) => d.industry).join() === 'food,manufacturing,education,consultant', sampleDocs.map((d) => d.industry))
+  const heroOf = (d: SiteDoc) => String(d.blocks.find((b) => b.type === 'hero')?.props.title ?? '')
+  const cafeDoc = draftSite(normalizeClientOps({ id: 'c3', companyName: '정다방', businessCategory: '휴게음식점', businessItem: '커피 전문점' }), { today, now, makeId })
+  const dineDoc = draftSite(normalizeClientOps({ id: 'c4', companyName: '한솥밥', businessCategory: '일반음식점', businessItem: '한식' }), { today, now, makeId })
+  check('D220-12 음식 견본 큰 문구 — 빵집은 굽는 말 · 카페는 한 잔 · 식당은 그대로 한 그릇',
+    !heroOf(sampleDocs[0]).includes('그릇') && heroOf(sampleDocs[0]).includes('굽') && heroOf(cafeDoc).includes('한 잔') && heroOf(dineDoc).includes('한 그릇'), [heroOf(sampleDocs[0]), heroOf(cafeDoc), heroOf(dineDoc)])
+  check('D220-13 인테리어 디자인 · 시공 → 공사 견본(간판 아님) · 간판 디자인 · 실내 인테리어 간판은 디자인 · PCB 는 제조',
+    industryOf('실내 인테리어 디자인 시공') === 'construction' && industryOf('인테리어 디자인') === 'construction' && industryOf('간판 디자인') === 'design' && industryOf('인테리어 간판 제작') === 'design' && industryOf('인쇄회로기판 제조') === 'manufacturing')
+  const descOf = (phone: string) => draftSite(normalizeClientOps({ id: 'c5', companyName: '가나상사', companyPhone: phone, businessItem: '도매' }), { today, now, makeId }).seo.description
+  check('D220-15 소개 글 조사 — 끝자리 0 은 "으로" · 7 은 "로" · 번호 없으면 홈페이지 연락처로 · 전화 링크는 여러 번호 중 첫 번호만(이어 붙이지 않음)',
+    descOf('02-123-4560').includes('4560으로') && descOf('031-123-4567').includes('4567로') && descOf('').includes('홈페이지 연락처로') && telHref('02-123-4567~8') === 'tel:021234567' && telHref('031-111-2222, 010-3333-4444') === 'tel:0311112222' && telHref('(02) 123-4567') === 'tel:021234567' && telHref('+82 10 1234 5678') === 'tel:+821012345678',
+    [descOf('02-123-4560'), telHref('02-123-4567~8')])
+  check('D220-14 가상 업체 업종은 업태 칸으로(회사 기본 정보에 보임) · 임시등록 때도 업태 채움 · 이미 있는 업태는 그대로',
+    trialRecord(bakery).businessCategory === '베이커리 카페' && det.businessCategory === '베이커리 카페' && withTrialDetails({ ...base, businessCategory: '음식점업' }, bakery, at).businessCategory === '음식점업')
+}
 
 console.log(`\n홈페이지 만들기: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

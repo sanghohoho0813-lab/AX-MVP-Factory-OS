@@ -65,6 +65,8 @@ export type IndustryKey =
   | 'education'
   | 'construction'
   | 'design'
+  /** D-220: 개인 컨설턴트 · 전문가(동료 컨설턴트 홍보) */
+  | 'consultant'
   | 'general'
 
 export interface SiteSeo {
