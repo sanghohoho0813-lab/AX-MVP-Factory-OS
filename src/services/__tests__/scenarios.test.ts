@@ -369,5 +369,86 @@ check('G11 [가정 빼기] — 원래 객체는 바꾸지 않음', afterEdit.pay
 const emptyBefore = withoutPresetFields({ purpose: '운전자금', revenue: '10억' }, { purpose: '운전자금' }, { purpose: '' })
 check('G12 상황 예시 전이 빈 칸이면 빈 칸으로(짐작해서 채우지 않음) · 다른 칸 그대로', emptyBefore.purpose === '' && emptyBefore.revenue === '10억', emptyBefore)
 
+// ---------------- D-224 무작위 업체(기본 150곳 · FUZZ_N=1500 으로 크게) — 23 상황 × 5 모듈이 멈추거나 깨진 글자를 내지 않는지 ----------------
+{
+  let seed = 20241017
+  const rnd = () => {
+    seed = (seed + 0x6d2b79f5) | 0
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+  const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(rnd() * xs.length)]
+  const MONEY = ['', '0', '-1', '-999,999,999,999', '1', '150,000,000', '5,000,000,000', '90,000,000,000', '1e309', 'abc', '3억', '1억5000', '12.5', ' ', '0원', '9'.repeat(30)]
+  const DATES = ['', '2026-07-01', '2019-03-02', '1995-06-01', '2031-01-01', '1890-01-01', '2026-13-45', 'abc', '2026-10-14', '2021-02-29', '20200101']
+  const CATS = ['', '제조업', '정보통신업', '숙박 및 음식점업', '도매 및 소매업', '건설업', '전문, 과학 및 기술 서비스업', '???', '농업', '금융 및 보험업']
+  const ADDR = ['', '서울특별시 강남구 테헤란로 1', '경기도 화성시 동탄대로 1', '경기도 수원시', '인천광역시 연수구', '전라남도 순천시', '부산광역시 해운대구', '세종특별자치시', '해외 주소', '서울']
+  const EMP = ['', '0', '1', '4', '12', '32', '420', '많음', '-3', '12명(대표 포함)', '1e9']
+  const BAD = /\bNaN\b|undefined|Infinity|\[object Object\]/
+  let throws = 0
+  let badText = 0
+  let runsSeen = 0
+  const firstBad: unknown[] = []
+  const slow: unknown[] = []
+  let dropped = 0
+  const droppedEx: unknown[] = []
+  // 업체 한 곳에 0.3초 남짓(23 상황 · 5 모듈 엔진) — 게이트에서는 150곳, 크게 볼 때는 FUZZ_N=1500
+  const N = Number(process.env.FUZZ_N ?? 150)
+  for (let i = 0; i < N; i += 1) {
+    if (process.env.FUZZ_TRACE && i % 25 === 0) console.log('fuzz', i, Date.now())
+    const holders = Array.from({ length: Math.floor(rnd() * 4) }, (_, k) => ({ id: `h${k}`, name: pick(['김대표', '', '배우자', '자녀']), relation: pick(['ceo', 'spouse', 'child', 'other', 'x']), shares: pick([0, -10, 100, 9000, 1e12, NaN]), acquirePrice: pick([0, 5000, -1, 1e9]) }))
+    const raw = {
+      id: `fz${i}`,
+      companyName: pick(['', '가', '테스트(주)', '아주긴이름'.repeat(30)]),
+      representativeName: pick(['', '김대표']),
+      corporateNumber: pick(['', '110111-1234567']),
+      establishedAt: pick(DATES),
+      representativeBirth: pick(DATES),
+      businessCategory: pick(CATS),
+      businessItem: pick(['', '정밀기계 부품', '한식', '앱 개발', '무역', '연구개발']),
+      businessAddress: pick(ADDR),
+      employeeCount: pick(EMP),
+      taxProfile: rnd() < 0.5 ? {} : { monthlySalary: pick(MONEY), retainedEarnings: pick(MONEY), ceoStartDate: pick(DATES), par: pick(['', '0', '5000', '-1']), loanBalance: pick(MONEY), children: pick(['', '0', '2', '-3', 'abc']), estateRealEstate: pick(MONEY) },
+      shareholderRegister: holders,
+      factValues: rnd() < 0.3 ? {} : { revenue: pick(MONEY), operatingProfit: pick(MONEY), netIncome: pick(MONEY), totalAssets: pick(MONEY), totalLiabilities: pick(MONEY) },
+      createdAt: '2026-09-01T00:00:00.000Z',
+      updatedAt: '2026-09-01T00:00:00.000Z',
+    }
+    let rec = normalizeClientOps(raw as unknown as Partial<ClientOpsRecord>)
+    // 질문 몇 개에 아무렇게나 답해 둔다
+    for (const q of Object.keys(SCENARIO_QUESTIONS) as QuestionKey[]) if (rnd() < 0.3) rec = withScenarioAnswer(rec, q, pick(['yes', 'no', null] as const), '2026-10-01T00:00:00.000Z')
+    const t0 = Date.now()
+    try {
+      const rs = runScenarios(rec, today, () => true, true)
+      const ms = Date.now() - t0
+      if (ms > 1500 && slow.length < 3) slow.push({ i, ms, raw })
+      runsSeen += rs.length
+      // runScenarios 는 한 상황이 실패하면 조용히 뺀다 — 빠진 상황을 하나씩 다시 돌려 까닭을 잡는다
+      if (rs.length !== SCENARIO_PRESETS.length) {
+        for (const p of SCENARIO_PRESETS.filter((x) => !rs.some((r) => r.id === x.id))) {
+          try {
+            runScenario(p, rec, today)
+          } catch (e) {
+            dropped += 1
+            if (droppedEx.length < 5) droppedEx.push({ i, id: p.id, error: String(e).slice(0, 160), raw })
+          }
+        }
+      }
+      for (const r of rs) {
+        const txt = [r.title, r.when, r.headline, r.amount, r.request, r.openPath, ...r.lines, ...r.assumptions, ...r.filledFrom, ...r.needs.map((n) => JSON.stringify(n))].join(' | ')
+        if (BAD.test(txt)) {
+          badText += 1
+          if (firstBad.length < 3) firstBad.push({ i, id: r.id, txt: txt.match(BAD)?.[0], at: txt.slice(Math.max(0, txt.search(BAD) - 80), txt.search(BAD) + 30), raw })
+        }
+      }
+      scenariosRequest(rec, rs)
+    } catch (e) {
+      throws += 1
+      if (firstBad.length < 3) firstBad.push({ i, error: String(e).slice(0, 200), raw })
+    }
+  }
+  check(`Z1 무작위 업체 ${N.toLocaleString()}곳 × 23 상황(${runsSeen}번 계산) — 멈춤 0 · 조용히 빠진 상황 0 · NaN/undefined/Infinity 0 · 한 곳 1.5초 넘게 걸림 0`, throws === 0 && dropped === 0 && badText === 0 && slow.length === 0, { throws, dropped, droppedEx, badText, firstBad, slow })
+}
+
 console.log(`\nscenarios: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

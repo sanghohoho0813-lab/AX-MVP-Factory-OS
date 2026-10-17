@@ -75,6 +75,7 @@
     "qa:youtube": "node e2e/youtube.mjs",
     "qa:radar": "node e2e/radar-cloud.mjs",
     "qa:session": "node e2e/session-cloud.mjs",
+    "qa:matrix": "node e2e/matrix.mjs",
     "qa:cert": "node e2e/cert.mjs",
     "qa:money": "node e2e/money.mjs",
     "qa:pilot": "node e2e/pilot.mjs",
