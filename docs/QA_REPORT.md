@@ -3086,3 +3086,5 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
   영업자 정산 '보관한 업체' 표시 · 지금 줄 돈 50만(PC · 390). 가로 넘침 0(6화면 모두 -15) · JS 오류 0.
   처음 찍은 390 시뮬레이션에서 '930만원 · 적정' / '상한' 이 가운데 정렬로 쪼개져 → 금액 아래 작은 줄로 바꿔 다시 찍음.
 - 확인하지 못한 것: 영업자 정산 '하나씩 차례로 저장' 을 실제 클라우드 두 기기 동시 저장으로는 재현하지 못함.
+- **게이트 42/42 녹색**(HEAD 828e984) — tsc · oxlint · build · test:all 30묶음(mirae-os 863 · cert 243 · employment 314 · startup-tax 1,918,461 …) · simple 88 · studio 63 · board 170 · todos 44 · mobile 15 · tools 224 · tax 74 · shell 67 · modules 896 · sales 180 · journey 56 · easy 82 · steady 72 · flow 171 · real 188 · squeeze 0 · phone 174 · facts 22 · detail 316 · files 38 · folder 19 · taxplan 72 · scenarios 66 · site 91 · content 98 · ownerai 59 · calendar 21 · connect 36 · enroll 24 · planner 42 · contract 72 · grants 152 · money 41 · youtube 169 · db 217 · pilot 240 · isolation 24 · cert 153.
+  마지막 cert 단계 도중 컨테이너가 재시작돼 끊김 → 같은 커밋으로 다시 빌드해 cert 단계만 다시 돌려 153/153 녹색.
