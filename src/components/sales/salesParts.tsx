@@ -78,12 +78,13 @@ export function PillList({ items }: { items: string[] }) {
 }
 
 /** 영업 단계 배지 — 점 + 이름, 옅은 단계색 바탕 (D-118) */
-export function StageBadge({ stage }: { stage: SalesStage }) {
+/** label: 단계 이름을 바꿔 보일 때(D-218: 클로징 차수 '4차 클로징') */
+export function StageBadge({ stage, label }: { stage: SalesStage; label?: string }) {
   const c = stageColor(stage)
   return (
     <span data-stage-badge={stage} className={`t-meta inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 font-semibold ${c.soft} ${c.text} ${c.border}`} style={c.style}>
       <span aria-hidden="true" className={`size-1.5 rounded-full ${c.dot}`} style={c.style} />
-      {SALES_STAGE_LABEL[stage]}
+      {label ?? SALES_STAGE_LABEL[stage]}
     </span>
   )
 }

@@ -16,7 +16,7 @@
  */
 
 import { MeetingGrantTalk } from '../../components/grants/MeetingGrantTalk'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { fromState } from '../../lib/navFrom'
 import { NEXT_QUICK_DAYS } from '../../services/clientOpsNextAction'
@@ -41,15 +41,15 @@ import { ToolClientScope } from '../../tools/shared/toolClientContext'
 import type { CretopMiniUi } from '../../tools/cretop/mini/MiniApp.jsx'
 import { registerFromCretop } from '../../services/salesIntake'
 import { companyKey } from '../../services/salesCretop'
-import { withSalesPath } from '../../services/salesJourney'
+import { requestedDocsStatus, withSalesPath } from '../../services/salesJourney'
 import { listClients, saveClient } from '../../services/clientOpsService'
-import { CLOSING_ROUNDS, closingRoundOf, salesStageOf, stageReached, withClosingRound, withSalesStage } from '../../services/salesPipeline'
+import { CLOSING_ROUNDS, closingRoundOf, salesStageLabelOf, salesStageOf, stageReached, withClosingRound, withSalesStage } from '../../services/salesPipeline'
 import { SALES_INTERESTS } from '../../content/salesCatalog'
 import {
   interestsFromIssues,
+  liveRoundOf,
   missingDocSlots,
   profileFromMemo,
-  roundForStage,
   stageAfterMeeting,
   toEngineItem,
   withDocSlots,
@@ -72,7 +72,7 @@ import {
 } from '../../services/salesEngine'
 import { todayLocalDate, localDateOf } from '../../lib/appClock'
 import { SALES_STAGE_LABEL, SALES_STAGE_ORDER, type ClientOpsRecord, type SalesStage } from '../../types/clientOps'
-import { josa } from '../../lib/josa'
+import { josa, particle } from '../../lib/josa'
 import { SALES_SIMPLE } from '../../config/salesSimple'
 import { DirectPickPanel } from '../../components/sales/DirectPickPanel'
 import { HintTip } from '../../components/ui/fold'
@@ -110,7 +110,7 @@ function addDays(date: string, n: number): string {
 /* 고객 정보 (점수 · 대본 재료)                                          */
 /* ------------------------------------------------------------------ */
 
-function ProfileEditor({ record, onSave }: { record: ClientOpsRecord; onSave: (next: ClientOpsRecord, msg: string) => void }) {
+function ProfileEditor({ record, onSave }: { record: ClientOpsRecord; onSave: (next: ClientOpsRecord, msg: string) => Promise<boolean> }) {
   const s = record.sales
   const init = useMemo(
     () => ({
@@ -123,20 +123,24 @@ function ProfileEditor({ record, onSave }: { record: ClientOpsRecord; onSave: (n
   )
   // D-125: 적던 것은 이 탭에 남긴다 — 다른 화면에 다녀와도(저장 전이면) 그대로
   const [d, setD, resetD] = useDraftState(`axmvp.draft.profile.${record.id}`, init)
+  /** D-218: 저장하는 동안 · 저장이 안 됐을 때 지킬 값 — 예전엔 저장이 실패하면 저장 전 기록으로 돌아가면서 칸도 옛 값으로 비워져 적은 것이 사라졌다 */
+  const holdRef = useRef<typeof d | null>(null)
   // D-120: 값으로 비교 — 다른 저장(단계 · 계약 경로 …)에 적던 칸이 지워지지 않게
   const initKey = JSON.stringify(init)
   const [seen, setSeen] = useState(initKey)
   if (seen !== initKey) {
     setSeen(initKey)
-    resetD()
+    if (holdRef.current) setD(holdRef.current)
+    else resetD()
   }
   const dirty = JSON.stringify(d) !== JSON.stringify(init)
   const onCount = Object.values(d.flags).filter(Boolean).length
 
-  const save = () => {
+  const save = async () => {
     const age = parseInt(d.ceoAge, 10)
     const eok = parseFloat(d.revenueEok)
-    onSave(
+    holdRef.current = d
+    const ok = await onSave(
       withSalesProfile(record, {
         ceoAge: Number.isFinite(age) && age > 0 ? age : null,
         revenueM: Number.isFinite(eok) && eok > 0 ? Math.round(eok * 100) : null,
@@ -145,6 +149,8 @@ function ProfileEditor({ record, onSave }: { record: ClientOpsRecord; onSave: (n
       }),
       '회사 사정을 저장했습니다. 중요도 · 대본이 새 값으로 바뀌었습니다.',
     )
+    if (ok) holdRef.current = null
+    else setD(holdRef.current ?? d) // 저장이 안 됐다 — 적은 것 그대로(다시 누르면 저장)
   }
   const fillFromMemo = () => {
     const { patch, filled } = profileFromMemo({ ...record, sales: record.sales ? { ...record.sales, ceoAge: d.ceoAge ? parseInt(d.ceoAge, 10) : null, revenueM: d.revenueEok ? Math.round(parseFloat(d.revenueEok) * 100) : null, flags: d.flags } : record.sales }, d.memo)
@@ -212,7 +218,7 @@ function ProfileEditor({ record, onSave }: { record: ClientOpsRecord; onSave: (n
           <Button variant="secondary" size="sm" onClick={fillFromMemo} disabled={d.memo.trim() === ''}>
             메모로 빈 칸 채우기
           </Button>
-          <Button variant="primary" size="sm" onClick={save} disabled={!dirty} data-testid="profile-save">
+          <Button variant="primary" size="sm" onClick={() => void save()} disabled={!dirty} data-testid="profile-save">
             저장
           </Button>
         </div>
@@ -297,7 +303,7 @@ function ShareTextButton({ text }: { text: string }) {
   )
 }
 
-function MeetingRecorder({ record, round, today, onSave, onNextRound }: { record: ClientOpsRecord; round: 1 | 2 | 3; today: string; onSave: (next: ClientOpsRecord, msg: string) => Promise<boolean>; onNextRound: () => void }) {
+function MeetingRecorder({ record, round, today, onSave, onNextRound, onPinRound }: { record: ClientOpsRecord; round: 1 | 2 | 3; today: string; onSave: (next: ClientOpsRecord, msg: string) => Promise<boolean>; onNextRound: () => void; onPinRound: () => void }) {
   const stage = salesStageOf(record)
   const target = stageAfterMeeting(round)
   // D-171: 클로징은 3차가 아닐 수도 — 고른 차수(3 · 4 · 5)로 부른다
@@ -321,13 +327,22 @@ function MeetingRecorder({ record, round, today, onSave, onNextRound }: { record
   const [slots, setSlots] = useState<string[]>([])
   /** D-124: 1차 미팅에서 확인한 관심사 — 관심사는 1차 미팅을 마친 뒤에 정한다(미리 적어 둔 것 + 메모에 나온 주제) */
   const [interests, setInterests] = useState<string[]>([])
+  /** D-218: 메모를 고쳐 다시 정리해도 사람이 고친 다음 약속 · 관심사 · 뺀 서류 칸은 그대로 둔다(예전엔 다시 정리하면 처음 값으로) */
+  const [touched, setTouched] = useState({ next: false, interests: false })
+  const [slotsOff, setSlotsOff] = useState<string[]>([])
+  /** D-218: 이미 받은 자료 — 다시 달라고 하지 않는다 */
+  const [had, setHad] = useState<string[]>([])
   const analyze = () => {
-    const a = analyzeTranscript(text)
+    const raw = analyzeTranscript(text)
+    // D-218: 서류함에서 '받음' 인 자료는 뺀다 — 예전엔 엔진이 늘 재무제표 · 주주명부 · 정관 · 계정별원장을 넣어, 받은 자료를 미팅마다 다시 요청했다
+    const received = requestedDocsStatus(record, raw.nextDocs).filter((d) => d.received).map((d) => d.name)
+    const a = { ...raw, nextDocs: raw.nextDocs.filter((d) => !received.includes(d.trim())) }
     setResult(a)
-    setSlots(missingDocSlots(record, a.nextDocs))
-    if (round === 1) setInterests([...new Set([...(record.sales?.interests ?? []), ...interestsFromIssues(a.issues)])])
+    setHad(received)
+    setSlots(missingDocSlots(record, a.nextDocs).filter((d) => !slotsOff.includes(d)))
+    if (round === 1 && !touched.interests) setInterests([...new Set([...(record.sales?.interests ?? []), ...interestsFromIssues(a.issues)])])
     const docs = a.nextDocs.slice(0, 3).join(' · ')
-    setNext(round === 3 ? '계약 조건 회신 확인' : `${round + 1}차 미팅 준비${docs ? ` — 자료 받기: ${docs}` : ''}`)
+    if (!touched.next) setNext(round === 3 ? '계약 조건 회신 확인' : `${round + 1}차 미팅 준비${docs ? ` — 자료 받기: ${docs}` : ''}`)
   }
   const save = async () => {
     if (!result || saving) return
@@ -335,11 +350,16 @@ function MeetingRecorder({ record, round, today, onSave, onNextRound }: { record
     if (slots.length > 0) rec = withDocSlots(rec, slots)
     if (canMove && move) rec = withSalesStage(rec, target)
     setSaving(true)
-    const ok = await onSave(rec, `${roundNo}차 미팅을 기록했습니다${canMove && move ? ` · ${targetLabel}로 옮김` : ''}${slots.length > 0 ? ` · 서류함에 칸 ${slots.length}개` : ''}.`)
+    // D-218: 단계가 옮겨 가도 이 차수에 머문다 — 예전엔 주소에 차수가 없으면(영업 보드 · 오늘 약속에서 들어오면) 1차 저장과 함께
+    // 단계가 '1차 미팅 완료' 가 되며 화면이 2차로 넘어가, 저장 뒤 마무리 카드(요청 자료 · 카톡 · 전화)가 한 번도 보이지 않았다
+    onPinRound()
+    const ok = await onSave(rec, `${roundNo}차 미팅을 기록했습니다${canMove && move ? ` · ${josa(targetLabel, '으로/로')} 옮김` : ''}${slots.length > 0 ? ` · 서류함에 칸 ${slots.length}개` : ''}.`)
     setSaving(false)
     // D-120: 저장이 된 뒤에만 비운다 — 실패하면 적은 메모가 그대로 남는다
     if (ok) {
       writeDraft(record.id, round, '')
+      setTouched({ next: false, interests: false })
+      setSlotsOff([])
       setWrap({
         // 감사 인사는 한 번만 — 자료 요청 쪽의 인사 줄은 뺀다
         // D-167: 카톡 인사 문구는 숨기고 받을 자료 요청만(대표: 요청 자료는 있으면 좋다)
@@ -385,7 +405,7 @@ function MeetingRecorder({ record, round, today, onSave, onNextRound }: { record
             )}
           </div>
         </div>
-        <p className="t-meta break-keep text-slate-500">다음 약속 날짜는 위 '다음 약속' 의 바꾸기에서 고칠 수 있습니다.</p>
+        <p className="t-meta break-keep text-slate-500">다음 약속 날짜는 위 '다음 약속' 의 [고치기] 에서 바꿀 수 있습니다.</p>
         <div className="flex flex-wrap justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={() => setWrap(null)}>
             기록 하나 더
@@ -448,7 +468,8 @@ function MeetingRecorder({ record, round, today, onSave, onNextRound }: { record
             </div>
             <div className="sm:col-span-2">
               <dt className="t-meta font-semibold text-slate-500">다음에 받을 자료</dt>
-              <dd className="mt-1"><PillList items={result.nextDocs} /></dd>
+              <dd className="mt-1">{result.nextDocs.length > 0 ? <PillList items={result.nextDocs} /> : <span className="t-sub text-slate-500">더 받을 자료 없음</span>}</dd>
+              {had.length > 0 && <dd data-testid="meeting-docs-had" className="t-meta mt-1 break-keep text-slate-500">이미 받은 자료는 뺐습니다 — {had.join(' · ')}</dd>}
             </div>
           </dl>
           {/* D-126: 카톡 문구는 저장 뒤 마무리 카드에서 한 번만 — 여기서는 방향만, 접어서 */}
@@ -469,7 +490,10 @@ function MeetingRecorder({ record, round, today, onSave, onNextRound }: { record
                       key={x}
                       type="button"
                       aria-pressed={on}
-                      onClick={() => setInterests((cur) => (on ? cur.filter((v) => v !== x) : [...cur, x]))}
+                      onClick={() => {
+                        setTouched((t) => ({ ...t, interests: true }))
+                        setInterests((cur) => (on ? cur.filter((v) => v !== x) : [...cur, x]))
+                      }}
                       className={`tap t-meta rounded-full border px-2.5 py-1 font-medium ${on ? 'border-brand-400 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
                     >
                       {on && <Check aria-hidden="true" className="mr-0.5 inline size-3.5" />}
@@ -489,7 +513,11 @@ function MeetingRecorder({ record, round, today, onSave, onNextRound }: { record
                     <input
                       type="checkbox"
                       checked={slots.includes(d)}
-                      onChange={(e) => setSlots((cur) => (e.target.checked ? [...cur, d] : cur.filter((x) => x !== d)))}
+                      onChange={(e) => {
+                        const on = e.target.checked
+                        setSlots((cur) => (on ? [...cur, d] : cur.filter((x) => x !== d)))
+                        setSlotsOff((cur) => (on ? cur.filter((x) => x !== d) : [...cur, d]))
+                      }}
                       className="size-4 accent-brand-600"
                     />
                     {d}
@@ -501,7 +529,14 @@ function MeetingRecorder({ record, round, today, onSave, onNextRound }: { record
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem]">
             <label className="block text-[0.875rem] text-slate-500">
               다음 약속
-              <input value={next} onChange={(e) => setNext(e.target.value)} className={inputClass} />
+              <input
+                value={next}
+                onChange={(e) => {
+                  setNext(e.target.value)
+                  setTouched((t) => ({ ...t, next: true }))
+                }}
+                className={inputClass}
+              />
             </label>
             <label className="block text-[0.875rem] text-slate-500">
               날짜
@@ -523,7 +558,11 @@ function MeetingRecorder({ record, round, today, onSave, onNextRound }: { record
           {canMove && (
             <label className="t-sub flex items-center gap-2 text-slate-700">
               <input type="checkbox" checked={move} onChange={(e) => setMove(e.target.checked)} className="size-4 accent-brand-600" />
-              영업 단계를 <strong className="font-semibold">{targetLabel}</strong>로 옮기기
+              {/* D-218: '3차 클로징로' → '3차 클로징으로' — 받침에 맞는 조사 */}
+              <span>
+                영업 단계를 <strong className="font-semibold">{targetLabel}</strong>
+                {particle(targetLabel, '으로/로')} 옮기기
+              </span>
             </label>
           )}
           <div className="flex justify-end">
@@ -580,9 +619,13 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
   // 차수 — 고르지 않았으면 단계로 정한다(잠재 고객은 첫 연락부터)
   const rp = params.get('round')
   // D-167: '첫 연락' 차수를 숨기면 잠재고객도 1차 미팅부터(예전 주소 round=0 도 1차로)
-  const round: Round = (rp === '0' && SALES_SIMPLE.showFirstContact) || rp === '1' || rp === '2' || rp === '3' ? (Number(rp) as Round) : stage === 'lead' && SALES_SIMPLE.showFirstContact ? 0 : roundForStage(stage)
-  // D-124: 지금 기록할 수 있는 차수 — 그보다 뒤는 미리 보기
-  const liveRound: Round = roundForStage(stage)
+  // D-124: 지금 기록할 수 있는 차수 — 그보다 뒤는 미리 보기. D-218: 이미 남긴 미팅 기록까지 본다(2차를 기록하면 다음은 클로징)
+  const liveRound: Round = record ? liveRoundOf(record) : 1
+  // D-218: 미팅 기록을 저장하는 그 차수에 머문다 — 주소 바꾸기는 기록 저장과 따로 그려져, 그 사이 단계가 옮겨 간 기록으로
+  // 차수를 다시 셈하면 기록 칸이 새로 그려지며 마무리 카드가 사라졌다. 화면 상태로 붙잡아 저장과 같은 차례에 그린다
+  const [pin, setPin] = useState<{ id: string; round: Round } | null>(null)
+  const pinned = pin && record && pin.id === record.id ? pin.round : null
+  const round: Round = (rp === '0' && SALES_SIMPLE.showFirstContact) || rp === '1' || rp === '2' || rp === '3' ? (Number(rp) as Round) : pinned ?? (stage === 'lead' && SALES_SIMPLE.showFirstContact ? 0 : liveRound)
   const closingN = record ? closingRoundOf(record) : 3
   const ahead = round > liveRound
   const [prepMode, setPrepModeState] = useState<'cretop' | 'direct'>(readPrepMode)
@@ -610,6 +653,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
       showToast(msg)
       return true
     }
+    const prev = records.find((r) => r.id === next.id)
     setRecords((list) => list.map((r) => (r.id === next.id ? next : r)))
     try {
       const saved = await saveClient(next)
@@ -617,7 +661,10 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
       showToast(msg)
       return true
     } catch (cause) {
-      showToast(cause instanceof Error ? `${cause.message} — 다시 눌러 주세요.` : '저장하지 못했습니다. 다시 눌러 주세요.')
+      // D-218: 저장이 안 됐으면 화면도 저장 전으로 — 예전엔 다시 읽기마저 실패하면(인터넷 끊김) 저장 안 된 미팅 기록 · 단계가
+      // 저장된 것처럼 남고, 다시 누르면 같은 미팅 기록이 두 번 쌓였다
+      if (prev) setRecords((list) => list.map((r) => (r === next ? prev : r)))
+      showToast(saveFailMessage(cause))
       void load(true)
       return false
     }
@@ -666,7 +713,7 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
             고객
             <select value={record?.id ?? ''} onChange={(e) => pick(e.target.value)} aria-label="미팅 준비할 고객" className={`${inputClass} !mt-0 font-semibold`}>
               {grouped.map((g) => (
-                <optgroup key={g.st} label={SALES_STAGE_LABEL[g.st]}>
+                <optgroup key={g.st} label={g.st === 'closing' ? '클로징' : SALES_STAGE_LABEL[g.st]}>
                   {g.list.map((r) => (
                     <option key={r.id} value={r.id}>
                       {r.companyName}
@@ -691,14 +738,15 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                     {record.companyName}
                     <ChevronRight aria-hidden="true" className="size-4 text-slate-400" />
                   </Link>
-                  <StageBadge stage={stage} />
+                  <StageBadge stage={stage} label={salesStageLabelOf(record)} />
                   <span className="ml-auto"><CallButton phone={record.contactPhone.trim() || record.companyPhone.trim()} name={record.companyName} /></span>
                   {/* D-123: 점수(64점) 대신 중요도 5단계 색 — 빨강 · 주황 · 노랑 · 초록 · 파랑 */}
                   <LeadLevel tier={tier.key} score={score} withHint />
                   {theme && <span className="t-sub text-slate-500">미팅 테마 · {theme.label}</span>}
                 </div>
                 <div className="border-t border-slate-100 pt-2.5">
-                  <NextStepEditor record={record} today={today} onSave={(n, m) => persist(n, m)} />
+                  {/* D-218: 업체를 바꾸면 새로 — 예전엔 열어 둔 고치기 창이 앞 업체의 글 · 날짜를 다음 업체로 가져갔다 */}
+                  <NextStepEditor key={record.id} record={record} today={today} onSave={(n, m) => persist(n, m)} />
                 </div>
               </section>
 
@@ -755,7 +803,8 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
               {round === 0 && <FirstContactPlan item={item} />}
 
               {/* D-126: 미팅 날이 됐으면(오늘 · 지남) 기록 칸이 분석기 한참 아래에 있다 — 한 번에 내려가는 단추 */}
-              {round === 1 && !ahead && record.nextActionDueDate !== '' && record.nextActionDueDate <= today && (
+              {/* D-218: 1차 미팅 예정이고 1차 기록이 아직 없을 때만 — 예전엔 '첫 연락' 같은 다른 약속 날에도 '오늘 1차 미팅' 이라고 떴다 */}
+              {round === 1 && !ahead && stage === 'm1sched' && !(record.sales?.meetings ?? []).some((m) => m.round === 1) && record.nextActionDueDate !== '' && record.nextActionDueDate <= today && (
                 <button
                   type="button"
                   data-testid="meeting-jump-record"
@@ -806,7 +855,11 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                             variant="secondary"
                             size="sm"
                             data-testid="meeting-cretop-apply"
-                            onClick={() => void applyCretop(record, ui, selected, selected.length > 0 ? `고른 항목 ${selected.length}개를 이 업체에 반영했습니다` : '이 업체에 다시 반영했습니다')}
+                            onClick={() => {
+                              // D-218: 다른 회사 보고서면 한 번 더 묻는다 — 예전엔 이력에서 아무 회사 분석을 열어 눌러도 그 회사 사업자번호 · 대표자 · 주소가 이 업체 빈 칸에 들어갔다
+                              if (!sameCompany(record, ui) && !window.confirm(`${ui.companyInfo?.companyName || '이 보고서'} 보고서는 ${josa(record.companyName, '과/와')} 다른 회사 같습니다.\n그래도 이 업체에 반영할까요? (빈 칸이 이 보고서 값으로 채워집니다)`)) return
+                              void applyCretop(record, ui, selected, selected.length > 0 ? `고른 항목 ${selected.length}개를 이 업체에 반영했습니다` : '이 업체에 다시 반영했습니다')
+                            }}
                           >
                             <Check aria-hidden="true" className="size-4" />
                             {selected.length > 0 ? `고른 항목 ${selected.length}개 반영` : '이 업체에 반영'}
@@ -831,10 +884,13 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
                   onSave={persist}
                   // D-125: 저장하면 마무리 카드(카톡 · 전화 · 다음 약속) — 다음 차수로는 누를 때 간다
                   onNextRound={() => setRound((round + 1) as Round)}
+                  onPinRound={() => {
+                    if (params.get('round') === null) setPin({ id: record.id, round })
+                  }}
                 />}
 
               {/* D-123: 미팅에서 알게 된 것은 미팅 기록 바로 아래 — 크레탑을 보기도 전(맨 위)에는 알 수 없는 것들이었다 */}
-              {round !== 0 && !ahead && <ProfileEditor key={record.id} record={record} onSave={(n, m) => void persist(n, m)} />}
+              {round !== 0 && !ahead && <ProfileEditor key={record.id} record={record} onSave={persist} />}
 
               {(record.sales?.meetings?.length ?? 0) > 0 && (
                 <Disclosure title="지난 미팅 기록" hint={`${record.sales?.meetings?.length}건`}>
@@ -862,6 +918,12 @@ function MeetingContent({ workspaceId }: { workspaceId: string | null }) {
 }
 
 type EngineItem = ReturnType<typeof toEngineItem>
+
+/** D-218: 저장 실패 알림 — 영어 오류(Failed to fetch 등)는 쉬운 말로 */
+function saveFailMessage(cause: unknown): string {
+  const m = cause instanceof Error ? cause.message.trim() : ''
+  return m !== '' && /[가-힣]/.test(m) ? `${m} — 다시 눌러 주세요.` : '저장하지 못했습니다(인터넷 연결을 확인해 주세요). 다시 눌러 주세요.'
+}
 
 /** 보고서가 이 업체 것인가 — 사업자번호가 둘 다 있으면 그것으로, 아니면 이름으로. 모르면 같다고 본다 */
 function sameCompany(record: ClientOpsRecord, ui: CretopMiniUi): boolean {

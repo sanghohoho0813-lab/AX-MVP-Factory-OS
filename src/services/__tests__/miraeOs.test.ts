@@ -92,7 +92,7 @@ import {
   scoreLead,
   scoreTier,
 } from '../salesEngine'
-import { engineIndustry, interestsFromIssues, missingDocSlots, profileFromMemo, roundForStage, stageAfterMeeting, toEngineItem, withDocSlots, withMeetingNote, withSalesProfile } from '../salesMeeting'
+import { engineIndustry, interestsFromIssues, liveRoundOf, missingDocSlots, profileFromMemo, roundForStage, stageAfterMeeting, toEngineItem, withDocSlots, withMeetingNote, withSalesProfile } from '../salesMeeting'
 import { PATH_TO_KIND, agentRateOf, contractCloseDraft, contractGap, contractedNamesOf, servicesForProducts, withContractClose } from '../salesContract'
 import { withInboxPayload } from '../inboxToSales'
 import salesAppSource from '../../tools/salesKit/orig/SalesApp.jsx?raw'
@@ -1671,6 +1671,12 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('미팅: 체크 → 관심사 (가지급금 · 자녀 근무 → 가업승계 · 정관정비)', ['절세', '가지급금', '가업승계', '미처분이익잉여금', '정관정비'].every((x) => it.interests?.includes(x)), JSON.stringify(it.interests))
   check('미팅: 영업 칸 새 값이 저장 → 다시 읽기에서 살아남는다', normalizeClientOps(JSON.parse(JSON.stringify(rec))).sales?.flags?.gajigeup === true && rec.sales?.revenueM === 3500 && rec.sales.memo === '메모')
   check('미팅: 차수 — 단계별 기본값 · 기록 뒤 단계', roundForStage('lead') === 1 && roundForStage('m1done') === 2 && roundForStage('closing') === 3 && stageAfterMeeting(1) === 'm1done' && stageAfterMeeting(3) === 'closing')
+  // D-218: 지금 기록할 차수 = 단계 + 이미 남긴 미팅 — 예전에는 2차를 기록해도(단계 '2차 미팅') 다음이 2차라 클로징을 기록할 수 없었다
+  const lr = (stage: 'lead' | 'm1sched' | 'm1done' | 'm2' | 'closing' | 'contracted' | 'hold' | 'lost', rounds: (1 | 2 | 3)[]) =>
+    liveRoundOf({ status: 'active', sales: { stage, source: '', referrer: '', interests: [], concern: '', expectedFee: null, history: [], movedAt: at, meetings: rounds.map((r, i) => ({ id: `m${i}`, at, round: r, text: '', reaction: '', issues: [], hesitant: [], nextDocs: [] })) } } as unknown as Parameters<typeof liveRoundOf>[0])
+  check('D-218 미팅 차수: 2차를 기록해 단계가 2차 미팅이면 다음은 클로징(3) · 2차 기록 전이면 2', lr('m2', [1, 2]) === 3 && lr('m2', []) === 2, `${lr('m2', [1, 2])} ${lr('m2', [])}`)
+  check('D-218 미팅 차수: 미팅 전에 보류한 잠재고객은 1차(예전 3차 클로징) · 1차 뒤 보류는 2차', lr('hold', []) === 1 && lr('hold', [1]) === 2 && lr('lost', [1, 2]) === 3 && roundForStage('hold') === 3)
+  check('D-218 미팅 차수: 단계가 앞서면 단계대로', lr('m1done', []) === 2 && lr('closing', []) === 3 && lr('m1sched', []) === 1 && lr('contracted', []) === 3 && lr('m1sched', [1]) === 2)
 
   // 고객 정보 고치기 · 메모 채우기
   const p1 = withSalesProfile(rec, { ceoAge: 60, flags: { gajigeup: true, childWorks: true } }, at)

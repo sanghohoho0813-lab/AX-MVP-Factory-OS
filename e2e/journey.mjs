@@ -225,10 +225,18 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(600)
   const m0 = (await clients(page)).find((c) => c.id === 'cli_mirae')
   check('1차: 다른 회사 보고서는 저절로 붙이지 않는다', !m0.toolResults.some((t) => t.toolKey === 'cretop'), JSON.stringify(m0.toolResults.map((t) => t.toolKey)))
+  // D-218: 다른 회사 보고서는 한 번 더 묻는다 — 아니오면 붙이지 않고, 예면 붙인다
+  let asked = ''
+  page.once('dialog', (d) => { asked = d.message(); void d.dismiss() })
+  await mc2.getByTestId('meeting-cretop-apply').click()
+  await page.waitForTimeout(500)
+  const m05 = (await clients(page)).find((c) => c.id === 'cli_mirae')
+  check("D-218 1차: 다른 회사 보고서를 '이 업체에 반영' 하면 한 번 더 묻고, 아니오면 붙이지 않는다", asked.includes('다른 회사 같습니다') && asked.includes('한빛정밀') && !m05.toolResults.some((t) => t.toolKey === 'cretop'), asked)
+  page.once('dialog', (d) => void d.accept())
   await mc2.getByTestId('meeting-cretop-apply').click()
   await page.waitForTimeout(600)
   const m1 = (await clients(page)).find((c) => c.id === 'cli_mirae')
-  check("1차: '이 업체에 반영' 을 누르면 붙는다", m1.toolResults.some((t) => t.toolKey === 'cretop' && t.data.ranked.length === 26))
+  check("1차: '이 업체에 반영' 을 누르면(확인 뒤) 붙는다", m1.toolResults.some((t) => t.toolKey === 'cretop' && t.data.ranked.length === 26))
   const h2 = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.module.cretop.analyses') ?? '[]'))
   check('1차: 분석 이력은 한 번만(작업대가 남김)', h2.filter((h) => h.data.company === '한빛정밀(주)').length === 1, String(h2.length))
 

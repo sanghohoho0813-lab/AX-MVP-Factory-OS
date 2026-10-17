@@ -325,6 +325,134 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   await ctx.close()
 }
 
+/* ---- D-218 미팅 준비 — 마무리 카드 · 클로징 기록 · 받은 자료 · 저장 실패 · 다음 약속 창 · 배너 · 보류 차수 · 클로징 이름 (1440) ---- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+  // 저장 실패 흉내 — 이 키에 쓰는 것만 막는다(qa:steady 와 같은 방법)
+  await ctx.addInitScript(() => {
+    const orig = Storage.prototype.setItem
+    Storage.prototype.setItem = function (k, v) {
+      if (window.__failKey && k === window.__failKey) throw new Error('저장 실패(시험)')
+      return orig.call(this, k, v)
+    }
+  })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e).slice(0, 160)))
+  const CK = 'axmvp.v1.operations_clients'
+  const failOn = (k) => page.evaluate((x) => { window.__failKey = x }, k)
+  const rec = (id) => page.evaluate(([k, x]) => JSON.parse(localStorage.getItem(k)).find((c) => c.id === x), [CK, id])
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  const today = await page.evaluate(() => { const d = new Date(); const p = (x) => String(x).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` })
+  await page.evaluate(([k, today]) => {
+    const list = JSON.parse(localStorage.getItem(k) ?? '[]')
+    const now = new Date().toISOString()
+    const base = { workspaceId: null, contactName: '박대표', industry: '금속 제조', employeeCount: '12', establishedAt: '2015-03-02', status: 'waiting', createdAt: now, updatedAt: now }
+    const sales = (stage) => ({ stage, source: '소개', referrer: '', interests: [], concern: '', expectedFee: null, history: [{ at: now, from: null, to: stage }], movedAt: now })
+    list.push({ ...base, id: 'cli_d218', companyName: '마무리정밀', documents: { financialStatements: { received: true, issuedAt: today, fileName: '' } }, sales: sales('m1sched') })
+    list.push({ ...base, id: 'cli_d218b', companyName: '첫연락상사', nextAction: '첫 연락', nextActionDueDate: today, sales: sales('lead') })
+    list.push({ ...base, id: 'cli_d218c', companyName: '보류기공', sales: sales('hold') })
+    localStorage.setItem(k, JSON.stringify(list))
+  }, [CK, today])
+
+  // 1) 영업 보드 · 오늘 약속처럼 주소에 차수 없이 열고 1차를 기록해도 마무리 카드가 보인다
+  await page.goto(BASE + '/sales/meeting?client=cli_d218', { waitUntil: 'networkidle' })
+  await page.getByRole('heading', { name: '1차 미팅 기록' }).waitFor()
+  const r1 = page.getByTestId('meeting-recorder')
+  await r1.getByLabel('미팅에서 나온 말 · 메모').fill('가지급금 정리에 관심. 재무제표는 지난주에 보냈다고 하심. 주주명부 보내 주기로 함')
+  await r1.getByRole('button', { name: '메모 정리하기' }).click()
+  const nextDocs = (await page.getByTestId('meeting-analysis').locator('dt', { hasText: '다음에 받을 자료' }).locator('xpath=following-sibling::dd[1]').innerText()) ?? ''
+  check('D-218 받은 자료: 서류함에서 받은 재무제표는 다음에 받을 자료에서 빠지고 "이미 받은 자료" 로 알린다', !nextDocs.includes('재무제표') && nextDocs.includes('주주명부') && (await page.getByTestId('meeting-docs-had').count()) === 1 && ((await page.getByTestId('meeting-docs-had').innerText()) ?? '').includes('재무제표'), nextDocs.slice(0, 200))
+  check('D-218 받은 자료: 다음 약속 문구에도 재무제표 없음', !(await r1.getByLabel('다음 약속').inputValue()).includes('재무제표'), await r1.getByLabel('다음 약속').inputValue())
+  await r1.getByRole('button', { name: '기록 저장' }).click()
+  await page.waitForTimeout(800)
+  const wrap1 = page.getByTestId('meeting-wrapup')
+  check('D-218 1차 기록(주소에 차수 없음): 저장 뒤 마무리 카드가 보인다(예전: 2차 기록 칸으로 넘어가 사라짐)', (await wrap1.count()) === 1 && ((await wrap1.innerText()) ?? '').includes('1차 미팅을 기록했습니다'), `${await wrap1.count()} ${page.url()}`)
+  const kakao1 = (await page.getByTestId('wrapup-kakao').innerText().catch(() => '')) ?? ''
+  check('D-218 받은 자료: 요청 자료 카톡에 재무제표 없음 · 주주명부는 있음', kakao1 !== '' && !kakao1.includes('재무제표') && kakao1.includes('주주명부'), kakao1.slice(0, 200))
+  check('D-218 마무리 카드: 다음 약속 고치는 곳 이름이 실제 단추와 같다([고치기])', ((await wrap1.innerText()) ?? '').includes('[고치기]'))
+
+  // 2) 2차를 기록하면 다음은 클로징 — 클로징 미팅도 이 화면에서 기록하고 단계를 옮긴다
+  await page.getByTestId('wrapup-next').click()
+  await page.getByRole('heading', { name: '2차 미팅 기록' }).waitFor()
+  const r2 = page.getByTestId('meeting-recorder')
+  await r2.getByLabel('미팅에서 나온 말 · 메모').fill('제안서 보고 긍정적. 비용은 나눠 내고 싶다고 함')
+  await r2.getByRole('button', { name: '메모 정리하기' }).click()
+  await r2.getByRole('button', { name: '기록 저장' }).click()
+  await page.waitForTimeout(800)
+  check('D-218 2차 기록: 저장 · 2차 미팅 단계 · 마무리 카드', (await rec('cli_d218')).sales.stage === 'm2' && (await page.getByTestId('meeting-wrapup').count()) === 1)
+  await page.getByTestId('wrapup-next').click()
+  await page.waitForTimeout(300)
+  check('D-218 클로징: 2차를 기록한 뒤 3차는 미리 보기가 아니라 기록 칸 + 단계 옮기기(예전: "아직 2차 미팅 단계" 로 막힘)', (await page.getByTestId('round-ahead').count()) === 0 && (await page.getByTestId('meeting-recorder').count()) === 1, ((await page.getByTestId('round-ahead').innerText().catch(() => '')) ?? '').slice(0, 80))
+  const r3 = page.getByTestId('meeting-recorder')
+  await r3.getByLabel('미팅에서 나온 말 · 메모').fill('계약 조건 회신 주기로 함. 다음 주 계약서 검토')
+  await r3.getByRole('button', { name: '메모 정리하기' }).click()
+  const r3t = ((await r3.innerText()) ?? '').replace(/\s+/g, ' ').replace(/ (으로|로) 옮기기/, '$1 옮기기')
+  check('D-218 클로징: 정리하면 "영업 단계를 3차 클로징으로 옮기기" 가 켜져 있다(조사도 바르게)', r3t.includes('3차 클로징으로 옮기기') && (await r3.locator('label', { hasText: '옮기기' }).locator('input[type=checkbox]').isChecked()), r3t.slice(-300))
+  await r3.getByRole('button', { name: '기록 저장' }).click()
+  await page.waitForTimeout(800)
+  const c3 = await rec('cli_d218')
+  check('D-218 클로징: 3차 기록 저장 → 3차 클로징 단계 · 미팅 기록 3건', c3.sales.stage === 'closing' && c3.sales.meetings.length === 3, JSON.stringify({ st: c3.sales.stage, n: c3.sales.meetings?.length }))
+
+  // 3) 클로징을 4차로 고르면 단계 표시도 4차 클로징(예전: 단계 표시 '3차 클로징' · 차수 단추 '4차 클로징' 이 함께)
+  await page.getByTestId('closing-round').getByRole('radio', { name: '4차' }).click()
+  await page.waitForTimeout(500)
+  const badge = (await page.getByTestId('meeting-summary').locator('[data-stage-badge]').innerText()) ?? ''
+  check('D-218 클로징 4차: 단계 표시 "4차 클로징" (차수 단추와 같다)', badge.includes('4차 클로징'), badge)
+
+  // 4) 미팅 기록 저장 실패 — 화면은 저장 전으로(미팅 기록 수 · 단계 그대로) · 다시 누르면 한 건만
+  await page.getByTestId('meeting-wrapup').getByRole('button', { name: '기록 하나 더' }).click().catch(() => {})
+  const r4 = page.getByTestId('meeting-recorder')
+  await r4.getByLabel('미팅에서 나온 말 · 메모').fill('계약서 문구 한 줄 고쳐 달라고 함')
+  await r4.getByRole('button', { name: '메모 정리하기' }).click()
+  await failOn(CK)
+  await r4.getByRole('button', { name: '기록 저장' }).click()
+  await page.waitForTimeout(800)
+  const pastBtn = (await page.getByRole('button', { name: /지난 미팅 기록/ }).innerText()) ?? ''
+  check('D-218 저장 실패: 지난 미팅 기록이 저장 안 된 건까지 세지 않는다(4건 아님) · 적은 메모 그대로', !pastBtn.includes('4건') && pastBtn.includes('3건') && (await r4.getByLabel('미팅에서 나온 말 · 메모').inputValue()).includes('한 줄'), pastBtn)
+  await failOn(null)
+  await r4.getByRole('button', { name: '메모 정리하기' }).click().catch(() => {})
+  await r4.getByRole('button', { name: '기록 저장' }).click()
+  await page.waitForTimeout(800)
+  check('D-218 저장 실패 뒤 다시 저장: 미팅 기록은 한 건만 더해진다(4건)', (await rec('cli_d218')).sales.meetings.length === 4, String((await rec('cli_d218')).sales.meetings.length))
+
+  // 5) 회사 사정 저장 실패 — 적은 메모가 사라지지 않는다
+  await page.getByRole('button', { name: /미팅에서 알게 된 회사 사정/ }).click()
+  const memoBox = page.getByLabel('상담 메모')
+  await memoBox.fill('가지급금 2억 · 자녀 1명 근무')
+  await failOn(CK)
+  await page.getByTestId('profile-save').click()
+  await page.waitForTimeout(800)
+  check('D-218 회사 사정 저장 실패: 적은 상담 메모가 그대로 남는다(예전: 옛 값으로 비워짐)', (await memoBox.inputValue()) === '가지급금 2억 · 자녀 1명 근무', await memoBox.inputValue())
+  await failOn(null)
+  await page.getByTestId('profile-save').click()
+  await page.waitForTimeout(800)
+  check('D-218 회사 사정: 다시 누르면 저장된다', (await rec('cli_d218')).sales.memo === '가지급금 2억 · 자녀 1명 근무')
+
+  // 6) 다음 약속 고치기 창 — 업체를 바꾸면 앞 업체 글이 따라오지 않는다
+  await page.getByTestId('next-step-edit').click()
+  await page.getByTestId('next-step').locator('input').first().fill('마무리정밀 계약서 회신')
+  await page.getByLabel('미팅 준비할 고객').selectOption('cli_d218b')
+  await page.waitForTimeout(500)
+  const ns = page.getByTestId('next-step')
+  const leaked = (await ns.getAttribute('data-open')) === '1' && (await ns.locator('input').first().inputValue()).includes('마무리정밀')
+  check('D-218 다음 약속: 고치던 글이 다른 업체로 넘어가지 않는다', !leaked)
+
+  // 7) '오늘 1차 미팅' 안내는 1차 미팅 예정일 때만(첫 연락 약속에는 안 뜬다)
+  await page.goto(BASE + '/sales/meeting?client=cli_d218b&round=1', { waitUntil: 'networkidle' })
+  await page.getByTestId('meeting-rounds').waitFor()
+  check("D-218 안내: 잠재고객의 '첫 연락' 약속 날에는 '오늘 1차 미팅' 안내가 없다", (await page.getByTestId('meeting-jump-record').count()) === 0)
+
+  // 8) 미팅 전에 보류한 업체는 1차로 열린다(예전: 3차 클로징)
+  await page.goto(BASE + '/sales/meeting?client=cli_d218c', { waitUntil: 'networkidle' })
+  await page.getByTestId('meeting-rounds').waitFor()
+  check('D-218 보류: 미팅 기록이 없으면 1차 미팅으로 열린다', (await page.getByTestId('meeting-rounds').getByRole('button', { name: '1차 미팅' }).getAttribute('aria-pressed')) === 'true')
+
+  check('JS 오류 없음 (D-218)', errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 /* ---- D-114 3단계: 상품·제안 (1440) ---- */
 {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })

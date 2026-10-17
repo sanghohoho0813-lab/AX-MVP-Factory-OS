@@ -86,6 +86,19 @@ export function roundForStage(stage: SalesStage): 1 | 2 | 3 {
   return 3
 }
 
+/**
+ * D-218: 지금 기록할 미팅 차수 — 단계 + 이미 남긴 미팅 기록.
+ * 예전에는 단계만 봐서 2차를 기록하면(단계 '2차 미팅') 다음 차수가 여전히 2차라, 클로징 미팅을 이 화면에서 기록할 수 없었다.
+ * 보류 · 이탈은 미팅을 한 만큼만(미팅 전에 보류한 잠재고객이 '3차 클로징' 으로 열리던 것).
+ */
+export function liveRoundOf(record: Pick<ClientOpsRecord, 'sales' | 'status'>): 1 | 2 | 3 {
+  const stage = salesStageOf(record)
+  const recorded = Math.max(0, ...(record.sales?.meetings ?? []).map((m) => m.round))
+  const next = Math.min(3, recorded + 1) as 1 | 2 | 3
+  if (stage === 'hold' || stage === 'lost') return next
+  return Math.max(roundForStage(stage), next) as 1 | 2 | 3
+}
+
 /** 미팅을 기록하면 옮겨 갈 단계 — 1차 기록 → 1차 미팅 완료, 2차 → 2차 미팅, 3차 → 3차 클로징 */
 export function stageAfterMeeting(round: 1 | 2 | 3): SalesStage {
   return round === 1 ? 'm1done' : round === 2 ? 'm2' : 'closing'
