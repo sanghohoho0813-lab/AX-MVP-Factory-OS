@@ -14,6 +14,7 @@
 import { listRows, saveRow } from '../../../services/moduleData'
 import { generateId } from '../../../storage/localStore'
 import type { ClientOpsRecord } from '../../../types/clientOps'
+import { isKeyedList, mergeKeyedList } from './mergeList'
 
 const MODULE = 'labcare'
 const BUCKET = 'orig'
@@ -21,9 +22,22 @@ const BUCKET = 'orig'
 const mem = new Map<string, unknown>()
 const rowIdOf = new Map<string, string>()
 const timers = new Map<string, ReturnType<typeof setTimeout>>()
+/** D-217: 이 창이 처음 읽어 온 값 · 이 창이 본 id — 저장 직전 합치기의 기준 */
+const snap = new Map<string, unknown>()
+const seen = new Map<string, Set<string>>()
 let workspace: string | null = null
 let osClients: ClientOpsRecord[] = []
 let hydratedFor: string | null | undefined
+let hydratedAt = 0
+/** 같은 화면을 다시 열 때 이만큼 지났으면(그리고 내보낼 쓰기가 없으면) 서버에서 새로 읽는다 */
+const REFRESH_MS = 60_000
+
+function noteSeen(key: string, value: unknown): void {
+  if (!isKeyedList(value)) return
+  const s = seen.get(key) ?? new Set<string>()
+  for (const x of value) s.add(x.id)
+  seen.set(key, s)
+}
 
 export function storeRead<T>(key: string, fallback: T): T {
   const v = mem.get(key)
@@ -32,6 +46,7 @@ export function storeRead<T>(key: string, fallback: T): T {
 
 export function storeWrite<T>(key: string, value: T): void {
   mem.set(key, structuredCloneSafe(value))
+  noteSeen(key, value)
   const prev = timers.get(key)
   if (prev) clearTimeout(prev)
   timers.set(
@@ -52,12 +67,43 @@ export function storeKeys(): string[] {
   return [...mem.keys()].filter((k) => mem.get(k) !== null)
 }
 
+/** 저장 직전 서버 줄 — 이 창의 줄, 없으면 같은 칸의 다른 줄. 못 읽으면 undefined(그때는 예전처럼 이 창 값으로 저장) */
+async function remoteRow(key: string, id: string): Promise<{ id: string; value: unknown } | null | undefined> {
+  try {
+    const rows = await listRows(workspace, MODULE, BUCKET)
+    const row = rows.find((r) => r.id === id) ?? rows.find((r) => r.data.key === key)
+    return row ? { id: row.id, value: row.data.value ?? null } : null
+  } catch {
+    return undefined
+  }
+}
+
 async function persist(key: string): Promise<void> {
   try {
     // D-165: 줄 id 를 저장 전에 정한다 — 첫 저장이 돌아오기 전에 또 저장하면 줄이 둘 생겼다
-    const id = rowIdOf.get(key) ?? generateId()
+    let id = rowIdOf.get(key) ?? generateId()
     rowIdOf.set(key, id)
-    await saveRow(workspace, MODULE, BUCKET, { id, clientId: '', data: { key, value: mem.get(key) ?? null } })
+    let value: unknown = mem.get(key) ?? null
+    // D-217: 그 사이 다른 창 · 기기가 저장했으면 id 로 합친다(이 창이 지운 것은 살리지 않음)
+    // 연구소 기록은 늘 이 저장소 함수가 메모리를 읽고 고쳐 쓰므로, 메모리에 합쳐 넣은 기록은 이 창 화면도 그대로 쓴다
+    if (isKeyedList(value)) {
+      const remote = await remoteRow(key, id)
+      if (remote) {
+        // 다른 창이 먼저 만든 줄이면 그 줄에 — 같은 칸이 두 줄로 갈라져 서로의 저장을 못 보는 일이 없게
+        if (remote.id !== id) {
+          id = remote.id
+          rowIdOf.set(key, id)
+        }
+        const s = seen.get(key) ?? new Set<string>()
+        value = mergeKeyedList(snap.get(key), value, remote.value, s)
+        // 저장을 기다리는 동안 이 창에서 또 적었으면 그것도 합친 값 위에 — 다음 저장이 다른 곳의 기록을 지우지 않게
+        mem.set(key, structuredCloneSafe(mergeKeyedList(snap.get(key), mem.get(key) ?? null, remote.value, s)))
+      }
+    }
+    await saveRow(workspace, MODULE, BUCKET, { id, clientId: '', data: { key, value } })
+    // 저장한 값이 이제 서버 값 — 다음 저장은 이것을 기준으로(다른 곳에서 지운 기록이 이 창의 다음 저장으로 되살아나지 않게)
+    snap.set(key, structuredCloneSafe(value))
+    noteSeen(key, value)
   } catch {
     /* 저장 실패는 다음 쓰기 때 다시 시도된다 */
   }
@@ -100,19 +146,28 @@ export interface HydrateInput {
 /** 연구소 화면을 열기 전에 한 번 */
 export async function hydrateLabStore(input: HydrateInput): Promise<void> {
   osClients = input.clients
-  if (hydratedFor === input.workspaceId && mem.size > 0) return
+  // D-217: 같은 화면을 다시 열면 1분이 지났고 내보낼 쓰기가 없을 때 새로 읽는다(예전: 한 번 읽으면 창을 닫을 때까지 옛 값)
+  if (hydratedFor === input.workspaceId && mem.size > 0 && (timers.size > 0 || Date.now() - hydratedAt < REFRESH_MS)) return
   workspace = input.workspaceId
+  const rows = await listRows(workspace, MODULE, BUCKET)
+  if (timers.size > 0 && hydratedFor === input.workspaceId && mem.size > 0) return // 읽는 사이 적은 것이 있으면 지금 메모리를 지킨다
   mem.clear()
   rowIdOf.clear()
-  const rows = await listRows(workspace, MODULE, BUCKET)
+  snap.clear()
+  seen.clear()
   for (const r of rows) {
     const key = typeof r.data.key === 'string' ? r.data.key : ''
     // 새것부터 온다 — 같은 칸이 둘이면(예전 겹친 줄) 새것을 쓴다
     if (!key || rowIdOf.has(key)) continue
     rowIdOf.set(key, r.id)
-    if (r.data.value !== null && r.data.value !== undefined) mem.set(key, r.data.value)
+    if (r.data.value !== null && r.data.value !== undefined) {
+      mem.set(key, r.data.value)
+      snap.set(key, structuredCloneSafe(r.data.value))
+      noteSeen(key, r.data.value)
+    }
   }
   hydratedFor = workspace
+  hydratedAt = Date.now()
   if (input.legacy && !mem.has('pmsaas:migrated:d91')) {
     try {
       const moved = await input.legacy()

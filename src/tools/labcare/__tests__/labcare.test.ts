@@ -23,6 +23,9 @@ import { surveyRequestText } from '../lib/surveyText'
 import { BENEFIT_OPTIONS, composeBenefitText } from '../lib/report'
 import { DEFAULT_ANSWERS, REASONS, mapChangeStatus } from '../lib/changes'
 import { isExcludedIndustryText, newCandidate } from '../lib/assessmentOptions'
+import { mergeKeyedList } from '../orig/mergeList'
+import { flushLabStore, hydrateLabStore, storeRead, storeWrite } from '../orig/store'
+import { listRows, saveRow } from '../../../services/moduleData'
 
 let passed = 0
 let failed = 0
@@ -445,6 +448,66 @@ check('혜택 문장 조합은 표 순서 유지', composed.split('\n').length =
 
   // 10. 업체 기록에서 채운 업종도 제외 업종 검사
   check('업종: 제외 업종 글 알아봄', isExcludedIndustryText('유흥주점업') && isExcludedIndustryText('가상자산 거래') && !isExcludedIndustryText('소프트웨어 개발') && !isExcludedIndustryText(''))
+}
+
+/* ───────────────── D-217: 저장 직전 합치기(다른 창 · 기기가 그 사이 저장) ───────────────── */
+{
+  const n = (id: string, text: string) => ({ id, text })
+  const ids = (v: unknown) => (v as { id: string }[]).map((x) => x.id).join(',')
+  const snap = [n('a', '연구노트 1'), n('b', '연구노트 2')]
+  // 다른 창이 c 를 더함 · 이 창은 d 를 더함 → 둘 다 남는다(예전: 이 창 목록으로 덮어 c 가 사라짐)
+  const m1 = mergeKeyedList(snap, [...snap, n('d', '이 창')], [...snap, n('c', '다른 창')], new Set(['a', 'b', 'd']))
+  check('D-217 합치기: 다른 창이 더한 기록 + 이 창이 더한 기록 둘 다 남음(먼저 저장된 c 가 앞)', ids(m1) === 'a,b,c,d', ids(m1))
+  // 이 창이 b 를 지움 · 다른 창은 그대로 → b 는 되살리지 않는다
+  const m2 = mergeKeyedList(snap, [n('a', '연구노트 1')], snap, new Set(['a', 'b']))
+  check('D-217 합치기: 이 창이 지운 기록은 되살리지 않음', ids(m2) === 'a', ids(m2))
+  // 다른 창이 a 를 고침 · 이 창은 a 를 안 건드림 → 고친 것이 남는다
+  const m3 = mergeKeyedList(snap, snap, [n('a', '다른 창이 고침'), n('b', '연구노트 2')], new Set(['a', 'b'])) as { id: string; text: string }[]
+  check('D-217 합치기: 이 창이 안 건드린 기록은 다른 창이 고친 대로', m3[0].text === '다른 창이 고침', JSON.stringify(m3))
+  // 둘 다 a 를 고침 → 이 창 것
+  const m4 = mergeKeyedList(snap, [n('a', '이 창이 고침'), n('b', '연구노트 2')], [n('a', '다른 창이 고침'), n('b', '연구노트 2')], new Set(['a', 'b'])) as { id: string; text: string }[]
+  check('D-217 합치기: 같은 기록을 둘 다 고치면 지금 저장하는 이 창 것', m4[0].text === '이 창이 고침')
+  // 다른 창이 b 를 지움 · 이 창은 b 를 안 건드림 → 빠진다
+  const m5 = mergeKeyedList(snap, snap, [n('a', '연구노트 1')], new Set(['a', 'b']))
+  check('D-217 합치기: 다른 창이 지운 기록(이 창은 안 건드림)은 빠짐', ids(m5) === 'a', ids(m5))
+  // 목록이 아닌 값(설정 · 표시)은 예전처럼 이 창 값
+  check('D-217 합치기: 목록이 아니면 이 창 값 그대로', mergeKeyedList({ x: 1 }, { x: 2 }, { x: 3 }, new Set()) && (mergeKeyedList({ x: 1 }, { x: 2 }, { x: 3 }, new Set()) as { x: number }).x === 2)
+}
+
+/* D-217: 저장소 전체 — 이 창(저장소) + 다른 창(같은 줄에 직접 저장) */
+{
+  const WS = 'ws-d217'
+  const K = 'pmsaas:changerecs:v1'
+  const ids = (v: unknown) => ((v ?? []) as { id: string }[]).map((x) => x.id).join(',')
+  const rowsOf = async (key: string) => (await listRows(WS, 'labcare', 'orig')).filter((r) => r.data.key === key)
+  const otherTab = async (key: string, edit: (v: { id: string }[]) => { id: string }[], newId = 'row-other') => {
+    const row = (await rowsOf(key))[0]
+    await saveRow(WS, 'labcare', 'orig', { id: row?.id ?? newId, data: { key, value: edit((row?.data.value ?? []) as { id: string }[]) } })
+  }
+  await hydrateLabStore({ workspaceId: WS, clients: [] })
+  storeWrite(K, [{ id: 'b1' }])
+  await flushLabStore()
+  await otherTab(K, (v) => [...v, { id: 'a1' }]) // 다른 창이 a1 을 더함
+  storeWrite(K, [...storeRead<{ id: string }[]>(K, []), { id: 'b2' }])
+  await flushLabStore()
+  const r1 = (await rowsOf(K))[0]?.data.value
+  check('D-217 저장소: 다른 창이 더한 a1 이 이 창 저장 뒤에도 남음(적은 차례대로)', ids(r1) === 'b1,a1,b2', ids(r1))
+  check('D-217 저장소: 합친 a1 이 이 창 화면(메모리)에도 보임', ids(storeRead(K, [])) === 'b1,a1,b2', ids(storeRead(K, [])))
+  await otherTab(K, (v) => v.filter((x) => x.id !== 'a1')) // 다른 창이 a1 을 지움
+  storeWrite(K, [...storeRead<{ id: string }[]>(K, []), { id: 'b3' }])
+  await flushLabStore()
+  const r2 = (await rowsOf(K))[0]?.data.value
+  check('D-217 저장소: 다른 창이 지운 a1 이 이 창 다음 저장으로 되살아나지 않음', ids(r2) === 'b1,b2,b3', ids(r2))
+  storeWrite(K, storeRead<{ id: string }[]>(K, []).filter((x) => x.id !== 'b2')) // 이 창이 b2 를 지움
+  await flushLabStore()
+  check('D-217 저장소: 이 창이 지운 b2 는 빠짐', ids((await rowsOf(K))[0]?.data.value) === 'b1,b3')
+  // 두 창 모두 줄이 없을 때 시작 → 다른 창이 먼저 줄을 만들면 이 창은 그 줄에 합쳐 저장(줄이 둘로 갈라지지 않음)
+  const K2 = 'pmsaas:notes:v1'
+  await otherTab(K2, () => [{ id: 'n-other' }], 'row-notes-other')
+  storeWrite(K2, [{ id: 'n-mine' }])
+  await flushLabStore()
+  const notesRows = await rowsOf(K2)
+  check('D-217 저장소: 같은 칸이 두 줄로 갈라지지 않고 한 줄에 둘 다', notesRows.length === 1 && ids(notesRows[0].data.value) === 'n-other,n-mine', `${notesRows.length} ${notesRows.map((r) => ids(r.data.value)).join(' | ')}`)
 }
 
 console.log(`\nlabcare: ${passed} passed, ${failed} failed`)

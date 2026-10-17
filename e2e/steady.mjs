@@ -18,6 +18,7 @@
  *      전략 목록 12 + 더 보기 · 정산 체크 칸 '지급' 글자
  *  10. (D-125) 업무 일기 화면 저장 실패 → 적은 글 남음 · 업체 메모 · 회사 사정 · 제안 고르던 것은 다른 화면에 다녀와도 남음 ·
  *      회사 사정 칸이 다른 업체로 넘어가지 않음 · 계약 완료 시트 수수료 3.3% 를 칠 수 있음
+ *  11. (D-217) 연구소 기록 — 두 창에서 따로 적어도 둘 다 남고, 한 창에서 지운 것은 다른 창 저장으로 되살아나지 않는다
  */
 
 import { chromium } from 'playwright'
@@ -371,6 +372,57 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   await page.waitForTimeout(1200)
   const body = await page.locator('body').innerText()
   check('D-210 업체 화면: 한동안 떠났다 돌아오면 다른 곳에서 고친 내용을 새로 불러온다(알림)', body.includes('다른 곳에서 고친 내용이 있어 새로 불러왔습니다') && body.includes('휴대폰에서고친이름'), body.slice(0, 160))
+  await ctx.close()
+}
+
+// D-217: 연구소 기록 — 두 창(PC 두 탭 · PC 와 휴대폰)에서 따로 적어도 둘 다 남는다
+// (예전: 나중에 저장한 창이 목록을 통째로 덮어 먼저 적은 기록이 사라졌다)
+{
+  const LAB = 'axmvp.module.labcare.orig'
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'ko-KR' })
+  const a = await ctx.newPage()
+  await a.goto(BASE + '/', { waitUntil: 'domcontentloaded' })
+  await a.evaluate(seedScript())
+  await a.evaluate((k) => {
+    const os = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')[0]
+    const at = '2026-01-01T00:00:00.000Z'
+    const row = (id, key, value) => ({ id, clientId: '', data: { key, value }, createdAt: at, updatedAt: at })
+    localStorage.setItem(k, JSON.stringify([
+      row('row-lab-seeded', 'pmsaas:seeded:v6', '1'),
+      row('row-lab-clients', 'pmsaas:clients:v1', [{ id: os.id, name: os.companyName, labType: '기업부설연구소', createdAt: at }]),
+    ]))
+  }, LAB)
+  const open = async (p) => {
+    await p.goto(BASE + '/tools/labcare/changes', { waitUntil: 'networkidle' })
+    await p.getByRole('button', { name: '변경사항 추가' }).waitFor({ timeout: 15000 })
+  }
+  const add = async (p, text) => {
+    await p.getByPlaceholder('기타 직접입력').fill(text)
+    await p.getByRole('button', { name: '변경사항 추가' }).click()
+    await p.waitForTimeout(900) // 저장(0.25초 뒤) 이 끝날 때까지
+  }
+  const b = await ctx.newPage()
+  await open(a)
+  await open(b) // 두 창 모두 아직 아무것도 적지 않은 상태로 열려 있다
+  await add(a, 'A창에서 적은 사유')
+  await add(b, 'B창에서 적은 사유')
+  const c = await ctx.newPage()
+  await open(c)
+  const body1 = await c.locator('body').innerText()
+  check('D-217 연구소: 두 창에서 따로 적은 변경 기록이 둘 다 남는다', body1.includes('A창에서 적은 사유') && body1.includes('B창에서 적은 사유'), body1.match(/변경 기록 \(\d+\)/)?.[0])
+  const lines = await c.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? '[]').filter((r) => r.data.key === 'pmsaas:changerecs:v1').length, LAB)
+  check('D-217 연구소: 같은 기록 칸이 두 줄로 갈라지지 않음', lines === 1, lines)
+  // 새 창(C)에서 A 기록을 지운 뒤, 열려 있던 B 창에서 하나 더 적어도 A 는 되살아나지 않는다
+  let asked = ''
+  c.once('dialog', (dlg) => { asked = dlg.message(); void dlg.accept() })
+  await c.locator('div.px-5.py-4', { hasText: 'A창에서 적은 사유' }).getByRole('button', { name: '지우기' }).click()
+  await c.waitForTimeout(900)
+  check('D-217 연구소: 변경 기록 [지우기] 는 한 번 더 묻는다(예전: ✕ 한 번에 바로 지움)', asked.includes('지울까요'), asked)
+  await add(b, 'B창에서 하나 더')
+  const d = await ctx.newPage()
+  await open(d)
+  const body2 = await d.locator('body').innerText()
+  check('D-217 연구소: 다른 창에서 지운 기록은 열려 있던 창이 다시 저장해도 되살아나지 않음', !body2.includes('A창에서 적은 사유') && body2.includes('B창에서 적은 사유') && body2.includes('B창에서 하나 더'), body2.match(/변경 기록 \(\d+\)/)?.[0])
   await ctx.close()
 }
 

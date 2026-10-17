@@ -152,6 +152,8 @@ export default function ChangesPage() {
     setTick((t) => t + 1);
   }
   function remove(id: string) {
+    // D-217: 예전에는 ✕(읽어 주기로는 '닫기') 한 번에 바로 지워졌다
+    if (!confirm("이 변경 기록을 지울까요?")) return;
     deleteChangeRecord(id);
     setTick((t) => t + 1);
   }
@@ -418,7 +420,7 @@ export default function ChangesPage() {
                           className={`rounded-full border-0 px-3 py-1.5 text-sm font-bold ring-1 ring-inset focus:outline-none ${STATUS_STYLE[r.status]}`}>
                           {STATUSES.map((s) => <option key={s}>{s}</option>)}
                         </select>
-                        <button type="button" onClick={() => remove(r.id)} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm text-slate-400 hover:border-red-200 hover:text-status-danger">✕</button>
+                        <button type="button" onClick={() => remove(r.id)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm font-semibold text-slate-500 hover:border-red-200 hover:text-status-danger">지우기</button>
                       </div>
                     </div>
                     {d.tone === "over" && !done ? (
