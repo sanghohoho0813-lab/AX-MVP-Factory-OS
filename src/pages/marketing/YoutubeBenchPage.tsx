@@ -13,7 +13,7 @@
  */
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ChevronDown, ClipboardCopy, Download, ExternalLink, Eye, Flame, Hash, MessageCircle, PlayCircle, RefreshCw, Rocket, SlidersHorizontal, ThumbsUp, TriangleAlert, UserRound } from 'lucide-react'
+import { BarChart3, ChevronDown, Clapperboard, ClipboardCopy, Download, ExternalLink, Eye, Flame, Hash, MessageCircle, PlayCircle, RefreshCw, Rocket, SlidersHorizontal, ThumbsUp, TriangleAlert, Tv, UserRound, type LucideIcon } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Badge, MetricTile } from '../../components/ui/primitives'
@@ -89,10 +89,17 @@ const VIEWS: Array<[View, string, string]> = [
   ['channels', '채널', '채널'],
   ['analysis', '분석', '분석'],
 ]
+/** D-227 탭마다 그림 — 글자를 읽기 전에 어디인지 보이게 */
+const VIEW_ICON: Record<View, LucideIcon> = { plan: Clapperboard, top: Flame, channels: Tv, analysis: BarChart3 }
+function ViewIcon({ view }: { view: View }) {
+  const Icon = VIEW_ICON[view]
+  return <Icon aria-hidden="true" className="size-4 shrink-0" />
+}
 const PERIODS: YtPeriod[] = ['week', 'month', 'year', 'shorts']
 const TOP_NS = [20, 30, 40, 60]
 
-const seg = (on: boolean) => `tap t-sub flex-1 rounded-[8px] px-3 py-2 font-semibold whitespace-nowrap ${on ? 'bg-white text-slate-900 shadow-(--shadow-card)' : 'text-slate-500'}`
+// D-227 고른 탭은 레이더 색(빨강)으로 꽉 — 지금 어디인지 멀리서도 보이게
+const seg = (on: boolean) => `tap t-sub inline-flex flex-1 items-center justify-center gap-1.5 rounded-[8px] px-2 py-2 font-semibold whitespace-nowrap sm:px-3 ${on ? 'bg-gradient-to-r from-red-600 to-rose-700 text-white shadow-(--shadow-card)' : 'text-slate-600 hover:bg-white/70'}`
 
 export default function YoutubeBenchPage() {
   return <WorkspaceScope>{(ctx) => <RadarPage workspaceId={ctx.workspaceId} />}</WorkspaceScope>
@@ -303,9 +310,10 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
         <PeekProvider value={peekEnv}>
           <FeedNotices sample={yt.sample} message={yt.status === 'ready' || yt.status === 'sample' ? '' : yt.message} extraMessage={extra.status === 'error' ? extra.message : ''} />
 
-          <div role="tablist" className="flex max-w-2xl rounded-(--radius-control) border border-slate-200 bg-slate-50 p-0.5" data-testid="yt-views">
+          <div role="tablist" className="flex max-w-2xl rounded-(--radius-control) border border-rose-100 bg-rose-50/60 p-1" data-testid="yt-views">
             {VIEWS.map(([k, l, short]) => (
               <button key={k} type="button" role="tab" aria-selected={view === k} data-testid={`yt-view-${k}`} onClick={() => setParam({ view: k === 'plan' ? '' : k })} className={seg(view === k)}>
+                <ViewIcon view={k} />
                 <span className="sm:hidden">{short}</span>
                 <span className="hidden sm:inline">{l}</span>
               </button>

@@ -9,9 +9,15 @@
  * 카드마다 [왜 추천됐나요?] — 추천 기준 다섯 가지 중 맞는 것 · 아닌 것(점수 없음).
  * 썸네일 · 배수 · 모든 숫자는 [근거 보기] 안에 — 숨기지 않고 자리만 옮겼다(기본 상태에서 시선을 뺏지 않게).
  * 카드 문구는 '근거 → 제안' 순서. 'AI 추천' · '성공 가능 %' 같은 말을 쓰지 않는다.
+ * D-227 대표 "한 페이지에 너무 많으면 역효과 · 길을 잃지 않게 · 토스처럼 다음 단계로":
+ *  - 맨 위 길잡이 ① 주제 고르기 → ② 이번 주로 확정 → ③ 찍고 올리기(수첩) — 지금 할 일 한 줄 · 제작 예정 주제는 길잡이 안에.
+ *  - 시장 신호(지금 강한 흐름 · AI 키워드 · 급상승 · 터진 영상 · 사이드 급상승)는 접어 두고 숫자 요약만 —
+ *    펼치면 판 하나만 고르게(한 번에 한 판). 지운 것은 없다.
  */
 import { useMemo, useState } from 'react'
-import { BarChart3, BookmarkCheck, BookmarkPlus, CalendarCheck, Check, ChevronDown, CircleHelp, Clapperboard, ClipboardCopy, EyeOff, Flame, Info, Minus, NotebookPen, RotateCcw, Settings2, TrendingUp } from 'lucide-react'
+import { Fold } from '../../../components/ui/fold'
+import { MkPick, MkSteps } from '../../../tools/marketing/mkKit'
+import { ArrowRight, BarChart3, BookmarkCheck, BookmarkPlus, CalendarCheck, Check, ChevronDown, CircleHelp, Clapperboard, ClipboardCopy, EyeOff, Flame, Info, LayoutList, Minus, NotebookPen, RotateCcw, Settings2, Sparkles, TrendingUp, Zap } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
 import { Badge } from '../../../components/ui/primitives'
 import { HintTip } from '../../../components/ui/fold'
@@ -92,6 +98,8 @@ export function PlanView({
   const [criteria, setCriteria] = useState(false)
   const status = useMemo(() => new Map(ideas.map((i) => [i.key, i.status])), [ideas])
   const selected = useMemo(() => ideas.filter((i) => i.status === 'selected').slice(0, 3), [ideas])
+  // 제작 예정 · 대본 · 촬영 중인 것이 있으면 길잡이는 ③ 찍고 올리기
+  const inWork = useMemo(() => ideas.filter((i) => i.status === 'selected' || i.status === 'script' || i.status === 'filmed').length, [ideas])
   const [hero, ...subs] = plan.picks.slice(0, 3)
   const next = plan.picks.slice(3, 5)
   const rest = plan.picks.slice(5)
@@ -127,21 +135,45 @@ export function PlanView({
 
         {criteria && <Criteria plan={plan} basis={basis} readOnly={readOnly} onMix={onMix} onUnmute={onUnmute} onClose={() => setCriteria(false)} />}
 
-        {selected.length > 0 && (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-(--radius-control) border border-success-200 bg-success-50/60 px-3 py-1.5" data-testid="radar-selected">
-            <span className="t-meta inline-flex items-center gap-1 font-bold text-success-800">
-              <CalendarCheck aria-hidden="true" className="size-4" /> 이번 주 제작 예정
-            </span>
-            {selected.map((i) => (
-              <span key={i.id} className="t-sub min-w-0 font-semibold break-keep text-slate-800 [overflow-wrap:anywhere]" data-testid="radar-selected-item">
-                {i.topic}
-              </span>
-            ))}
-            <button type="button" onClick={onGoNotebook} className="tap t-meta ml-auto inline-flex items-center gap-1 font-semibold text-success-800 hover:underline">
-              <NotebookPen aria-hidden="true" className="size-3.5" /> 수첩
-            </button>
+        {/* D-227 길잡이 — 지금 몇 단계 · 다음에 누를 것 한 줄(제작 예정 주제도 여기 안에) */}
+        <div className="flex flex-col gap-3 rounded-(--radius-panel) border border-rose-200 bg-gradient-to-br from-rose-50 via-white to-white p-3 sm:p-4" data-testid="radar-guide">
+          <div className="mx-auto w-full max-w-xl">
+            <MkSteps
+              steps={[
+                { key: 'pick', label: '주제 고르기' },
+                { key: 'confirm', label: '이번 주로 확정' },
+                { key: 'make', label: '찍고 올리기' },
+              ]}
+              current={inWork > 0 ? 2 : 0}
+              tone="rose"
+              onGo={(k) => (k === 'make' ? onGoNotebook() : document.querySelector('[data-testid="radar-top"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))}
+              testId="radar-steps"
+            />
           </div>
-        )}
+          {selected.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-(--radius-control) border border-success-200 bg-success-50/70 px-3 py-2" data-testid="radar-selected">
+              <span className="t-sub inline-flex items-center gap-1 font-bold text-success-800">
+                <CalendarCheck aria-hidden="true" className="size-4" /> 이번 주 제작 예정
+              </span>
+              {selected.map((i) => (
+                <span key={i.id} className="t-sub min-w-0 font-semibold break-keep text-slate-800 [overflow-wrap:anywhere]" data-testid="radar-selected-item">
+                  {i.topic}
+                </span>
+              ))}
+              <button type="button" onClick={onGoNotebook} className="tap t-sub ml-auto inline-flex items-center gap-1 rounded-full bg-success-700 px-3 font-bold text-white hover:bg-success-800" data-testid="radar-guide-notebook">
+                <NotebookPen aria-hidden="true" className="size-4" /> 다음: 수첩에서 단계 바꾸기 <ArrowRight aria-hidden="true" className="size-4" />
+              </button>
+            </div>
+          ) : (
+            <p className="t-sub flex items-start gap-1.5 break-keep text-slate-700" data-testid="radar-guide-next">
+              <Sparkles aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-rose-600" />
+              <span className="min-w-0">
+                <b className="font-bold text-slate-900">지금 할 일 — </b>
+                {hero ? '아래 1순위 카드를 읽고, 마음에 들면 [이번 주로 확정] 을 눌러 주세요. 다른 주제가 궁금하면 2 · 3순위나 [후보 더 보기].' : '후보가 생기면 여기서 바로 고를 수 있어요.'}
+              </span>
+            </p>
+          )}
+        </div>
 
         {plan.aiDataShort && (
           <p className="t-sub flex flex-wrap items-center gap-x-2 gap-y-1 rounded-(--radius-control) border border-slate-300 bg-slate-50 px-3 py-2 break-keep text-slate-700" data-testid="radar-ai-short">
@@ -198,7 +230,6 @@ export function PlanView({
       </section>
 
       <MarketSignals rising={rising} breakouts={breakouts} focus={focus} noThumb={noThumb} onOpenVideo={onOpenVideo} />
-      <SideBreakouts items={focus.side} noThumb={noThumb} onOpenVideo={onOpenVideo} />
     </div>
   )
 }
@@ -621,17 +652,61 @@ function Criteria({ plan, basis, readOnly, onMix, onUnmute, onClose }: { plan: R
 /* 시장 신호 — 다음 후보를 찾는 곳(후보보다 눈에 덜 띄게)                      */
 /* ------------------------------------------------------------------ */
 
+type Board = 'flow' | 'ai' | 'hot' | 'side' | 'all'
+const BOARDS: Board[] = ['flow', 'ai', 'hot', 'side', 'all']
+/** 고른 판은 이 기기에 기억 — '전부 보기' 를 고른 사람은 다음에도 예전처럼 한 화면에 */
+const BOARD_KEY = 'axmvp.radar.board'
+function readBoard(): Board {
+  try {
+    const v = localStorage.getItem(BOARD_KEY) as Board | null
+    if (v && BOARDS.includes(v)) return v
+  } catch {
+    // 기억을 못 읽어도 첫 판으로
+  }
+  return 'flow'
+}
+
 function MarketSignals({ rising, breakouts, focus, noThumb, onOpenVideo }: { rising: RisingTopic[]; breakouts: RadarVideo[]; focus: FocusData; noThumb: boolean; onOpenVideo: (v: RadarVideo) => void }) {
   const [allRising, setAllRising] = useState(false)
   const [allBreakouts, setAllBreakouts] = useState(false)
+  // D-227 한 번에 한 판 — 고르지 않은 판은 그리지 않는다(지운 것은 없다 · [전부 보기] 는 예전처럼 다 펼친다)
+  const [board, setBoardState] = useState<Board>(readBoard)
+  const setBoard = (b: Board) => {
+    setBoardState(b)
+    try {
+      localStorage.setItem(BOARD_KEY, b)
+    } catch {
+      // 기억만 못 할 뿐 화면은 바뀐다
+    }
+  }
+  const on = (b: Board) => board === b || board === 'all'
   const shownRising = allRising ? rising : rising.slice(0, SIGNAL_FIRST)
   const shown = useMemo(() => (allBreakouts ? breakouts : breakouts.slice(0, SIGNAL_FIRST)), [allBreakouts, breakouts])
+  const flowN = focus.domains.reduce((n, d) => n + d.items.length, 0)
+  const aiN = focus.aiKeywords.length
+  const top = focus.domains.flatMap((d) => d.items).sort((a, b) => b.channels14 - a.channels14 || b.videos14 - a.videos14)[0]
   return (
+    <Fold
+      id="radar.signals"
+      title="다음 후보 찾기 · 시장 신호"
+      hint="지금 강한 흐름 · AI 키워드 · 급상승 · 터진 영상 · 사이드 급상승 — 다음 후보를 찾을 때 펼쳐 보세요. 한 번에 한 판씩 보여요."
+      icon={<IconChip icon={BarChart3} tone="indigo" />}
+      testId="radar-signals-fold"
+      summary={
+        <span className="flex flex-wrap items-center gap-1.5" data-testid="radar-signals-summary">
+          {top && <span className="t-meta rounded-full bg-indigo-50 px-2 py-0.5 font-semibold text-indigo-800">가장 센 흐름 · {top.label}</span>}
+          <span className="t-meta rounded-full bg-slate-100 px-2 py-0.5 text-slate-700">흐름 {flowN}</span>
+          <span className="t-meta rounded-full bg-violet-50 px-2 py-0.5 text-violet-800">AI 키워드 {aiN}</span>
+          <span className="t-meta rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-800">급상승 {rising.length}</span>
+          <span className="t-meta rounded-full bg-red-50 px-2 py-0.5 text-red-700">터진 영상 {breakouts.length}</span>
+          {focus.side.length > 0 && <span className="t-meta rounded-full bg-amber-50 px-2 py-0.5 text-amber-800">사이드 {focus.side.length}</span>}
+        </span>
+      }
+    >
     <section className="flex flex-col gap-2.5" aria-labelledby="radar-signals-h" data-testid="radar-signals">
       <div className="flex flex-wrap items-baseline gap-x-2">
         <HintTip tip={hintFor('시장 신호')} label="경제 · 경영 · AI 시장 신호">
           <h2 id="radar-signals-h" className="t-section flex items-center gap-2 font-extrabold break-keep text-slate-900">
-            <IconChip icon={BarChart3} tone="indigo" />
             경제 · 경영 · AI 시장 신호
           </h2>
         </HintTip>
@@ -639,8 +714,23 @@ function MarketSignals({ rising, breakouts, focus, noThumb, onOpenVideo }: { ris
           다음 후보를 찾는 곳 · 밑줄 친 숫자에 마우스를 올리면(휴대폰은 누르면) 그 영상이 바로 보입니다
         </span>
       </div>
-      <DomainBoard signals={focus.domains} />
-      <AiKeywordBoard keywords={focus.aiKeywords} workflow={focus.workflow} fresh={focus.fresh} />
+      <MkPick
+        label="볼 신호 고르기"
+        testId="radar-board-pick"
+        value={board}
+        onChange={(k) => setBoard(k as Board)}
+        options={[
+          { key: 'flow', label: '지금 강한 흐름', hint: '경제 · 경영 · AI', icon: BarChart3, tone: 'indigo', badge: flowN },
+          { key: 'ai', label: 'AI 핵심 키워드', hint: '회사별 · 업무 흐름', icon: Sparkles, tone: 'violet', badge: aiN },
+          { key: 'hot', label: '급상승 · 터진 영상', hint: '2주 · 평소보다', icon: Flame, tone: 'red', badge: rising.length + breakouts.length },
+          { key: 'side', label: '사이드 급상승', hint: '분야 밖 · 포맷 참고', icon: Zap, tone: 'amber', badge: focus.side.length },
+          { key: 'all', label: '전부 보기', hint: '네 판을 한 화면에', icon: LayoutList, tone: 'slate' },
+        ]}
+        cols={5}
+      />
+      {on('flow') && <DomainBoard signals={focus.domains} />}
+      {on('ai') && <AiKeywordBoard keywords={focus.aiKeywords} workflow={focus.workflow} fresh={focus.fresh} />}
+      {on('hot') && (
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-emerald-100 bg-emerald-50/40 p-3 sm:p-4" data-testid="radar-rising">
           <HintTip tip={hintFor('급상승 주제')} label="급상승 주제">
@@ -706,6 +796,9 @@ function MarketSignals({ rising, breakouts, focus, noThumb, onOpenVideo }: { ris
           )}
         </div>
       </div>
+      )}
+      {on('side') && <SideBreakouts items={focus.side} noThumb={noThumb} onOpenVideo={onOpenVideo} />}
     </section>
+    </Fold>
   )
 }

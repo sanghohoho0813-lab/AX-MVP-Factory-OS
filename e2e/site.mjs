@@ -723,6 +723,58 @@ check('19 휴대폰 화면 오류 0', errors.length === 0, errors)
   await ctx.close()
 }
 
+// D-227 — 대표 "한 페이지에 너무 많으면 역효과 · 토스처럼 다음 단계로". 블록 · 꾸밈 · 점검 탭 → ① 내용 고치기 → ② 꾸미기 → ③ 내려받기
+for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height: 844, tag: '390', mobile: true }]) {
+  const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, acceptDownloads: true, ...(vp.mobile ? { deviceScaleFactor: 2, isMobile: true, hasTouch: true } : {}) })
+  const p = await ctx.newPage()
+  p.on('pageerror', (e) => errors.push(`D227 ${e.message}`))
+  await seed(p)
+  // 처음 쓰는 사람 모양 — 시드의 '모두 펼치기' 를 지운다
+  await p.evaluate(() => localStorage.removeItem('axmvp.fold.all'))
+  await p.goto(BASE + '/tools/homepage/build?client=cli_site', { waitUntil: 'networkidle' })
+  await p.getByTestId('site-create').click()
+  await p.getByTestId('site-hero').waitFor()
+  const T = vp.tag
+  const over = () => p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  const steps = p.getByTestId('site-steps')
+  const nums = await steps.locator('[role="tab"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-step')))
+  const labels = await steps.locator('[role="tab"]').allInnerTexts()
+  check(`D227-H1 ${T} 단계 3개(1 내용 고치기 · 2 꾸미기 · 3 내려받기) · 지금 1단계`, nums.join() === '1,2,3' && /내용 고치기/.test(labels[0]) && /꾸미기/.test(labels[1]) && /내려받기/.test(labels[2]) && (await steps.getAttribute('data-current')) === 'blocks', labels)
+  // 점수 카드 — '이것만 하면' 첫 칸만 · 나머지는 [n개 더 보기]
+  const items1 = await p.getByTestId('site-score-item').count()
+  const more = p.getByTestId('site-score-more')
+  const moreTxt = (await more.count()) ? await more.innerText() : ''
+  await more.click()
+  const items2 = await p.getByTestId('site-score-item').count()
+  check(`D227-H2 ${T} 점수 카드 '이것만 하면' 처음엔 1칸 → [n개 더 보기] 누르면 전부(n+1)`, items1 === 1 && items2 > 1 && moreTxt.includes(`${items2 - 1}개 더 보기`), { items1, items2, moreTxt })
+  await more.click()
+  const sugTxt = await p.getByTestId('site-suggest-toggle').innerText()
+  const sug0 = await p.getByTestId('site-suggest-item').count()
+  await p.getByTestId('site-suggest-toggle').click()
+  const sug1 = await p.getByTestId('site-suggest-item').count()
+  await p.getByTestId('site-suggest-toggle').click()
+  check(`D227-H2b ${T} '있으면 좋은 블록' 도 한 줄(이름만 · n개) → 누르면 까닭 · [넣기]`, sug0 === 0 && sug1 >= 1 && sugTxt.includes(`${sug1}개`), { sug0, sug1, sugTxt })
+  // 편집 칸은 휴대폰에서 [고치기] 화면
+  const next = p.getByTestId('site-next')
+  check(`D227-H3 ${T} 1단계 끝에 [다음 단계 · 꾸미기]`, (await next.innerText()).includes('꾸미기') && (await next.getAttribute('data-to')) === 'style')
+  await next.click()
+  await p.getByTestId('site-style').waitFor()
+  check(`D227-H4 ${T} [다음 단계] → 2단계 꾸미기(디자인 한 번에) · 단추는 이제 [다음 단계 · 내려받기]`, (await steps.getAttribute('data-current')) === 'style' && (await p.getByTestId('site-presets').count()) === 1 && (await p.getByTestId('site-next').getAttribute('data-to')) === 'checks')
+  await p.getByTestId('site-next').click()
+  await p.getByTestId('site-checks').waitFor()
+  const fin = p.getByTestId('site-finish')
+  const finTxt = await fin.innerText()
+  const [dl] = await Promise.all([p.waitForEvent('download'), p.getByTestId('site-finish-download').click()])
+  const dlHtml = readFileSync(await dl.path(), 'utf8')
+  check(`D227-H5 ${T} 3단계 — 점검 목록 + 마무리 칸([HTML 내려받기] 크게 · 새 창으로 보기) · 내려받기 됨 · [다음 단계] 없음`, (await steps.getAttribute('data-current')) === 'checks' && /HTML 내려받기/.test(finTxt) && (await p.getByTestId('site-finish-open').count()) === 1 && dlHtml.startsWith('<!doctype html>') && dlHtml.includes('한솔정밀(주)') && (await p.getByTestId('site-next').count()) === 0, { finTxt: finTxt.slice(0, 80), head: dlHtml.slice(0, 40) })
+  await steps.locator('[data-step="1"]').click()
+  check(`D227-H6 ${T} 아무 단계나 눌러 돌아가기(3 → 1) · 블록 목록 그대로`, (await steps.getAttribute('data-current')) === 'blocks' && (await p.getByTestId('block-row').count()) > 5)
+  const tabW = await steps.locator('[role="tab"] .t-sub').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))
+  const tabH = await steps.locator('[role="tab"]').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
+  check(`D227-H7 ${T} 단계 칸 44px 이상 · 이름 한 줄(높이) · 가로 넘침 0 · 오류 0`, tabH.every((h) => h >= 44) && tabW.every((w) => w >= 60) && (await over()) <= 0 && !errors.some((e) => e.startsWith('D227')), { tabH, tabW, over: await over(), errs: errors.filter((e) => e.startsWith('D227')) })
+  await ctx.close()
+}
+
 await browser.close()
 console.log(`\n홈페이지 만들기 e2e: ${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

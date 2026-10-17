@@ -8,8 +8,12 @@
  *        쇼츠 길이 20~30 / 30~60초, 카드뉴스 광고 유형 5가지, 키워드 검색량 붙여넣기 정리, 한 달 올릴 계획(주 2회 / 주 4회).
  * D-208: '이런 일이 있을 때' 상황 12가지(누르면 카톡 · 블로그 · 카드뉴스 묶음 · 묶음 모두 저장), 한 달 치 한 번에 만들기 ·
  *        업체 일정에 올릴 날 걸기 · 계획 칸에 만듦/올림, 보관함 '올렸어요' 표시 · 거르기.
+ * D-227: 대표 "한 페이지에 너무 많으면 역효과 · 길을 잃지 않게 · 토스처럼 다음 단계로" —
+ *        길잡이 ① 고르기 → ② 다듬기 → ③ 저장 · 올리기, '무엇을 만들까요' 는 네 길(추천 · 상황 · 직접 · 한 달 계획) 중
+ *        고른 하나만 펼친다. 홍보 정보 칸 · 보관함은 접어 둔다(펼침은 이 기기에 기억). 지운 기능은 없다.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useFold } from '../../components/ui/fold'
 import { Link, useNavigate } from 'react-router-dom'
 import { AlertTriangle, Archive, Award, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight, Circle, Copy, Factory, Gem, Globe, Info, Layers, ListChecks, ListOrdered, MapPin, Megaphone, Package, PencilLine, Phone, RefreshCw, Save, Sparkles, Star, Trash2, Wand2, type LucideIcon } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
@@ -83,7 +87,7 @@ import { inputClass } from '../homepage/BlockFields'
 import { sendDraftToOwnerAi } from './aiHandoff'
 import { isTrialId, subjectQuery } from '../../services/marketingTrial'
 import type { ContentStore } from './useContentStore'
-import { KindGlyph, MkHead, MkHero, MkIcon, MkTag } from '../marketing/mkKit'
+import { KindGlyph, MkHead, MkHero, MkIcon, MkPick, MkSteps, MkTag } from '../marketing/mkKit'
 import { HERO_BTN, KIND_ACCENT, KIND_STYLE, MK_PRIMARY, SITUATION_STYLE, TONE, mkChip, tabTone, type MkTone } from '../marketing/mkTheme'
 
 const card = 'rounded-(--radius-panel) border border-slate-200 bg-white shadow-sm'
@@ -92,6 +96,9 @@ const PURPOSES: KakaoPurpose[] = ['news', 'event', 'season', 'thanks']
 // D-226 고르는 칩 · 칸은 테마 색이 아니라 홍보 글 색(보라)
 const chip = (on: boolean) => mkChip(on, 'violet')
 const pickBox = (on: boolean) => (on ? TONE.violet.on : `border-slate-200 bg-white ${TONE.violet.hover}`)
+
+/** D-227 무엇을 만들까요 — 추천 · 상황 · 직접 · 한 달 계획 중 하나만 펼친다 */
+type Mode = 'pick' | 'situation' | 'direct' | 'plan'
 
 /** 화면에 띄운 글 — 새로 만든 것(item 없음) 또는 보관함에서 연 것 */
 interface Shown {
@@ -145,6 +152,8 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   }, [editing])
   const [busy, setBusy] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  /** D-227 무엇을 만들까요 — 네 길 중 지금 펼친 하나 */
+  const [mode, setMode] = useState<Mode>('pick')
   const [pack, setPack] = useState<PackState | null>(null)
   const packRef = useRef<PackState | null>(null)
   packRef.current = pack
@@ -156,6 +165,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   const picks = useMemo(() => firstPicks(profile, today, made), [profile, today, made])
   const findWords = useMemo(() => keywordGroups(profile).find((g) => g.key === 'find')?.words.slice(0, 4) ?? [], [profile])
   const archiveRows = useMemo(() => latestByRoot(store.items), [store.items])
+  const situationNow = useMemo(() => situationsFor(profile, today, holidays).filter((x) => x.now).length, [profile, today, holidays])
 
   // 지역 · 대표 상품을 고치면 키워드 칸도 따라간다(사람이 직접 친 키워드는 그대로)
   const lastMain = useRef(mainKeyword(profile))
@@ -198,6 +208,8 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   // D-209 묶음의 다른 탭에 저장 전 고침 · 채움이 남아 있는지
   const packTouched = !!pack && pack.touched.some((t, i) => t && !pack.saved[i])
   const unsaved = dirty || packTouched
+  /** D-227 길잡이 단계 — 0 고르기 · 1 다듬기(새 글 · 고치는 중) · 2 저장함(올리기 남음) · 3 올림까지 끝 */
+  const step = !shown ? 0 : !shown.item || dirty ? 1 : shown.item.postedAt ? 3 : 2
   const [leaveAsk, setLeaveAsk] = useState<{ run: () => void } | null>(null)
   /** D-209 저장 전 고침이 있으면 다른 글을 열기 전에 묻는다(말없이 사라지지 않게) */
   const guard = (run: () => void) => (unsaved ? setLeaveAsk({ run }) : run())
@@ -386,7 +398,50 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
     <div className="flex flex-col gap-4" data-testid="content-studio">
       <ProfileCard record={record} profile={profile} source={source} saved={archiveRows.length} posted={archiveRows.filter((r) => r.item.postedAt).length} onEdit={() => setProfileOpen(true)} />
 
+      {/* D-227 길잡이 — 지금 몇 단계 · 다음에 누를 것 · 네 길 중 하나 */}
+      <section className={`${card} flex flex-col gap-4 p-4 sm:p-5`} data-testid="content-guide">
+        <div className="mx-auto w-full max-w-xl">
+          <MkSteps
+            steps={[
+              { key: 'choose', label: '고르기' },
+              { key: 'edit', label: '다듬기' },
+              { key: 'save', label: '저장 · 올리기' },
+            ]}
+            current={step}
+            tone="violet"
+            onGo={(k) => (k === 'choose' ? document.querySelector('[data-testid="content-guide"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) : toResult())}
+            testId="content-steps"
+          />
+        </div>
+        <p className="t-sub flex items-start gap-1.5 break-keep text-slate-700" data-testid="content-next">
+          <Sparkles aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-violet-600" />
+          <span className="min-w-0">
+            <b className="font-bold text-slate-900">지금 할 일 — </b>
+            {step === 0
+              ? '아래 네 가지 중 하나를 고르세요. 처음이면 [추천 3개] 를 누르면 이 업체에 맞는 글이 바로 나와요.'
+              : step === 1
+                ? '아래 글을 읽고 [대괄호] 를 채우거나 [고치기] 로 다듬은 뒤 [보관함에 저장] 을 눌러 주세요.'
+                : step === 2
+                  ? '저장했어요. 업체가 글을 올리면 [올렸어요 표시] 를 눌러 주세요 — 한 달 계획 · 오늘 화면에 반영돼요.'
+                  : '올린 글까지 표시했어요. 다음 글을 만들려면 위에서 다시 고르세요.'}
+          </span>
+        </p>
+        <MkPick
+          label="무엇을 만들까요"
+          testId="content-mode"
+          value={mode}
+          onChange={(k) => setMode(k as Mode)}
+          options={[
+            { key: 'pick', label: '추천 3개', hint: '이 업체에 먼저 만들 글', icon: Sparkles, tone: 'violet', badge: picks.length },
+            { key: 'situation', label: '이런 일이 있을 때', hint: '새 상품 · 휴무 · 행사 …', icon: Layers, tone: 'fuchsia', badge: situationNow || undefined },
+            { key: 'direct', label: '직접 고르기', hint: '블로그 · 영상 · 카드뉴스 …', icon: Wand2, tone: 'sky' },
+            { key: 'plan', label: '한 달 계획', hint: '4주 치 한 번에 · 달력', icon: CalendarDays, tone: 'emerald' },
+          ]}
+        />
+      </section>
+
       {/* 먼저 만들 것 — 눈에 잘 띄게(D-226 글 종류마다 색 아이콘) */}
+      {mode === 'pick' && (
       <section className="rounded-(--radius-panel) border-2 border-violet-200 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50 p-4 shadow-sm sm:p-5" data-testid="content-picks">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="t-section flex min-w-0 items-center gap-2.5 text-violet-900">
@@ -421,10 +476,13 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
           })}
         </ul>
       </section>
-
+      )}
+      {mode === 'situation' && (
       <SituationCard profile={profile} today={today} holidays={holidays} openKey={pack?.key ?? null} onPick={openPack} />
-
+      )}
+      {mode === 'plan' && (
       <PlanCard
+        startOpen
         record={record}
         profile={profile}
         today={today}
@@ -441,9 +499,12 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
           })
         }
       />
+      )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:items-start">
+      {/* D-227 직접 고르기일 때만 왼쪽 칸 + 오른쪽 결과, 다른 길은 결과가 고른 판 바로 아래 한 줄로 */}
+      <div className={mode === 'direct' ? 'grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:items-start' : 'flex flex-col gap-4'}>
         {/* 직접 고르기 */}
+        {mode === 'direct' && (
         <section className={`${card} flex flex-col gap-4 p-4 sm:p-5`} data-testid="content-maker">
           <MkHead icon={Wand2} tone="violet" title="직접 고르기" />
           <fieldset className="flex flex-col gap-2">
@@ -575,8 +636,9 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
           </button>
           <p className="t-meta break-keep text-slate-500">업체 기록과 업종 견본으로 채워요(규칙 · 'AI' 아님). 업체마다 다른 곳은 [대괄호] 로 비워 둬요.</p>
         </section>
+        )}
 
-        {/* 결과 */}
+        {/* 결과 — D-227 고른 길 아래 한 자리(② 글 다듬기 · ③ 저장 · 올리기) */}
         <div ref={resultRef}>
           {shown ? (
             <section className={`${card} flex flex-col gap-3 overflow-hidden p-4 sm:p-5`} data-testid="content-result" data-kind={shown.draft.kind}>
@@ -741,7 +803,8 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                                 onClick={() => {
                                   setKeyword(w)
                                   setKind('blog')
-                                  showToast(`키워드를 "${w}" 로 바꿨어요 — 주제를 골라 [블로그 글 만들기] 를 눌러 주세요.`)
+                                  setMode('direct')
+                                  showToast(`키워드를 "${w}" 로 바꿨어요 — 위 [직접 고르기] 에서 주제를 골라 [블로그 글 만들기] 를 눌러 주세요.`)
                                 }}
                                 className="tap t-sub min-h-9 rounded-full border border-sky-200 bg-sky-50 px-3 text-sky-900 hover:border-sky-500"
                                 data-testid="content-word"
@@ -772,7 +835,8 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                       setKind('blog')
                       setBlogType('brand')
                       generate({ kind: 'blog', keyword: w, variant: 0 })
-                      showToast(`"${w}" 로 블로그 글을 만들었어요 — 다른 주제는 왼쪽에서 고를 수 있어요.`)
+                      setMode('direct')
+                      showToast(`"${w}" 로 블로그 글을 만들었어요 — 다른 주제는 위 [직접 고르기] 에서 고를 수 있어요.`)
                     })
                   }
                 />
@@ -832,7 +896,9 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                 ))}
               </span>
               <h2 className="t-section text-slate-900">여기에 글이 나와요</h2>
-              <p className="t-sub max-w-md break-keep text-slate-600">위의 '먼저 만들 것' 을 누르거나, 왼쪽에서 형식을 고르고 [만들기] 를 눌러 주세요.</p>
+              <p className="t-sub max-w-md break-keep text-slate-600">
+                {mode === 'pick' ? "위의 추천 글 하나를 누르면 여기에 바로 나와요." : mode === 'situation' ? '위에서 지금 있는 일 하나를 누르면 카톡 · 블로그 · 카드뉴스가 한 묶음으로 여기에 나와요.' : mode === 'plan' ? '위 한 달 계획에서 칸 하나를 누르면 그 글이 여기에 나와요.' : '형식을 고르고 [만들기] 를 눌러 주세요.'}
+              </p>
             </section>
           )}
         </div>
@@ -913,6 +979,8 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit }: { recor
   ]
   const missing = rows.filter((r) => r.missing).length
   const gaps = profileGaps(profile)
+  // D-227 칸 7개는 접어 둔다 — 머리 띠(숫자) · 채울 칸 안내만 늘 보이게. 펼침은 이 기기에 기억
+  const [open, setOpen] = useFold('content.profile', false)
   return (
     <section className={`${card} flex flex-col overflow-hidden`} data-testid="content-profile">
       {/* D-226 머리 띠 — 누구 홍보 정보인지 · 보관함 · 올림 · 채운 칸이 한눈에 */}
@@ -941,6 +1009,12 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit }: { recor
         }
       />
       <div className="flex flex-col gap-3 p-4 sm:p-5">
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="tap -my-1 flex min-h-11 w-full min-w-0 items-center gap-2 rounded-(--radius-control) text-left hover:bg-slate-50" data-testid="content-profile-toggle">
+        <ChevronRight aria-hidden="true" className={`size-5 shrink-0 text-violet-500 transition-transform duration-150 ${open ? 'rotate-90' : ''}`} />
+        <span className="t-sub min-w-0 flex-1 font-semibold break-keep text-slate-800">{open ? '홍보 정보 접기' : `홍보 정보 ${rows.length}칸 보기`}</span>
+        <span className={`t-meta shrink-0 rounded-full px-2 py-0.5 font-semibold ${missing ? 'bg-amber-100 text-amber-900' : 'bg-violet-50 text-violet-800'}`}>{missing ? `빈 칸 ${missing}` : '다 채움'}</span>
+      </button>
+      {open && (
       <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {rows.map((r) => (
           <div key={r.label} className={`flex min-w-0 items-start gap-2.5 rounded-(--radius-control) border p-2.5 ${r.missing ? 'border-dashed border-amber-300 bg-amber-50/70' : 'border-slate-200 bg-white'}`} data-testid="content-profile-row" data-missing={r.missing ? '1' : '0'}>
@@ -955,6 +1029,7 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit }: { recor
           </div>
         ))}
       </dl>
+      )}
       {gaps.length > 0 && (
         <button type="button" onClick={onEdit} className="tap flex w-full min-w-0 items-start gap-2.5 rounded-(--radius-control) border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 px-3 py-2.5 text-left hover:border-amber-500" data-testid="content-profile-gaps">
           <MkIcon icon={Sparkles} tone="amber" size="sm" />
@@ -986,9 +1061,10 @@ function shortDate(d: string): string {
   return `${m}/${dd} (${DOW[new Date(`${d}T00:00:00Z`).getUTCDay()]})`
 }
 
-function PlanCard({ record, profile, today, store, onPick, onOpen }: { record: ClientOpsRecord; profile: ReturnType<typeof buildProfile>['profile']; today: string; store: ContentStore; onPick: (slot: PlanSlot) => void; onOpen: (it: ContentItem) => void }) {
+function PlanCard({ record, profile, today, store, onPick, onOpen, startOpen = false }: { record: ClientOpsRecord; profile: ReturnType<typeof buildProfile>['profile']; today: string; store: ContentStore; onPick: (slot: PlanSlot) => void; onOpen: (it: ContentItem) => void; startOpen?: boolean }) {
   const { showToast } = useToast()
-  const [open, setOpen] = useState(false)
+  // D-227 '한 달 계획' 을 골라 들어오면 바로 펼친 채로(누른 뒤 또 누르지 않게)
+  const [open, setOpen] = useState(startOpen)
   const [perWeek, setPerWeek] = useState<2 | 4>(2)
   const [fresh, setFresh] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -1403,18 +1479,35 @@ function ArchiveCard({ store, onOpen, onPosted, onRemoved, openId }: { store: Co
   const shown = rows.filter((r) => (filter === 'all' ? true : filter === 'fav' ? r.item.favorite : filter === 'todo' ? !r.item.postedAt : filter === 'posted' ? !!r.item.postedAt : r.item.kind === filter))
   const postedN = rows.filter((r) => r.item.postedAt).length
   const kindsHere = CONTENT_KINDS.filter((k) => rows.some((r) => r.item.kind === k))
+  // D-227 보관함은 접어 둔다(제목 줄에 편수 · 올림 수) — 지금 띄운 글이 보관함 글이면 펼친 채로
+  const [open, setOpen] = useFold('content.archive', false)
+  /** 지금 띄운 글인데도 사람이 접은 경우 — 그 글에서는 다시 펼치지 않는다 */
+  const [shut, setShut] = useState<string | null>(null)
+  const isOpen = open || (!!openId && openId !== shut && rows.some((r) => r.item.rootId === openId))
+  const toggle = () => {
+    if (isOpen) {
+      setOpen(false)
+      setShut(openId)
+    } else {
+      setOpen(true)
+      setShut(null)
+    }
+  }
   return (
-    <section className={`${card} flex flex-col gap-3 p-4 sm:p-5`} data-testid="content-archive">
+    <section className={`${card} flex flex-col ${isOpen ? 'gap-3' : ''} p-4 sm:p-5`} data-testid="content-archive" data-open={isOpen ? '1' : '0'}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="t-section flex items-center gap-2.5 text-slate-900">
-          <MkIcon icon={Archive} tone="indigo" />
-          보관함
+        <h2 className="t-section min-w-0 text-slate-900">
+          <button type="button" onClick={toggle} aria-expanded={isOpen} className="tap flex min-h-11 min-w-0 items-center gap-2 text-left" data-testid="content-archive-toggle">
+            <ChevronRight aria-hidden="true" className={`size-5 shrink-0 text-indigo-400 transition-transform duration-150 ${isOpen ? 'rotate-90' : ''}`} />
+            <MkIcon icon={Archive} tone="indigo" />
+            보관함
+          </button>
         </h2>
         <span className="t-sub rounded-full bg-indigo-50 px-3 py-0.5 font-semibold text-indigo-800" data-testid="content-archive-count">
           {rows.length}편{rows.length ? ` · 올림 ${postedN}` : ''}
         </span>
       </div>
-      {rows.length === 0 ? (
+      {!isOpen ? null : rows.length === 0 ? (
         <p className="t-sub break-keep text-slate-500">아직 저장한 글이 없어요. 글을 만들고 [보관함에 저장] 을 누르면 여기에 남아요.</p>
       ) : (
         <>

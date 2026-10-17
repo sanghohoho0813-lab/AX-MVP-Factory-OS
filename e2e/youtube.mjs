@@ -80,6 +80,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.route('https://i.ytimg.com/**', (r) => r.fulfill({ status: 404, body: '' }))
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
+  // D-227 시장 신호는 접힌 채 한 판씩 — 이 시험들은 예전처럼 다 펼친 모양([전부 보기] · 펼침 기억)을 본다. 처음 모양은 D-227 시험에서
+  await page.evaluate(() => { localStorage.setItem('axmvp.fold.radar.signals', '1'); localStorage.setItem('axmvp.radar.board', 'all') })
   // 이 시험은 처음 연 모양(분석은 접힘 · 한 줄 요약)을 본다 — 시드의 '모두 펼치기' 를 지운다
   await page.evaluate(() => localStorage.removeItem('axmvp.fold.all'))
 
@@ -278,6 +280,8 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
   })
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
+  // D-227 시장 신호는 접힌 채 한 판씩 — 이 시험들은 예전처럼 다 펼친 모양([전부 보기] · 펼침 기억)을 본다. 처음 모양은 D-227 시험에서
+  await page.evaluate(() => { localStorage.setItem('axmvp.fold.radar.signals', '1'); localStorage.setItem('axmvp.radar.board', 'all') })
   await page.evaluate(() => localStorage.removeItem('axmvp.fold.all'))
   await page.goto(BASE + '/marketing/youtube', { waitUntil: 'networkidle' })
   await page.waitForTimeout(900)
@@ -490,6 +494,8 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   await page.route('**/api/yt-bench**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: FJSON }))
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
+  // D-227 시장 신호는 접힌 채 한 판씩 — 이 시험들은 예전처럼 다 펼친 모양([전부 보기] · 펼침 기억)을 본다. 처음 모양은 D-227 시험에서
+  await page.evaluate(() => { localStorage.setItem('axmvp.fold.radar.signals', '1'); localStorage.setItem('axmvp.radar.board', 'all') })
   await page.evaluate(() => localStorage.removeItem('axmvp.fold.all'))
   await page.goto(BASE + '/marketing/youtube', { waitUntil: 'networkidle' })
   await page.waitForTimeout(900)
@@ -567,6 +573,8 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
     await page.route('**/api/yt-bench**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: FJSON }))
     await page.goto(BASE + '/', { waitUntil: 'networkidle' })
     await page.evaluate(seedScript())
+    // D-227 시장 신호는 접힌 채 한 판씩 — 이 시험들은 예전처럼 다 펼친 모양([전부 보기] · 펼침 기억)을 본다. 처음 모양은 D-227 시험에서
+    await page.evaluate(() => { localStorage.setItem('axmvp.fold.radar.signals', '1'); localStorage.setItem('axmvp.radar.board', 'all') })
     await page.evaluate(() => localStorage.removeItem('axmvp.fold.all'))
     await page.goto(BASE + '/marketing/youtube', { waitUntil: 'networkidle' })
     await page.waitForTimeout(900)
@@ -689,6 +697,8 @@ for (const width of [360, 390, 430]) {
   await page.route('https://i.ytimg.com/**', (r) => r.fulfill({ status: 404, body: '' }))
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
+  // D-227 시장 신호는 접힌 채 한 판씩 — 이 시험들은 예전처럼 다 펼친 모양([전부 보기] · 펼침 기억)을 본다. 처음 모양은 D-227 시험에서
+  await page.evaluate(() => { localStorage.setItem('axmvp.fold.radar.signals', '1'); localStorage.setItem('axmvp.radar.board', 'all') })
   await page.goto(BASE + '/marketing/youtube', { waitUntil: 'networkidle' })
   await page.waitForTimeout(600)
   const over = async () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
@@ -774,6 +784,8 @@ for (const width of [360, 390, 430]) {
     await page.route('https://i.ytimg.com/**', (r) => r.fulfill({ status: 404, body: '' }))
     await page.goto(BASE + '/', { waitUntil: 'networkidle' })
     await page.evaluate(seedScript())
+    // D-227 시장 신호는 접힌 채 한 판씩 — 이 시험들은 예전처럼 다 펼친 모양([전부 보기] · 펼침 기억)을 본다. 처음 모양은 D-227 시험에서
+    await page.evaluate(() => { localStorage.setItem('axmvp.fold.radar.signals', '1'); localStorage.setItem('axmvp.radar.board', 'all') })
     await page.evaluate(([k, val]) => (val ? localStorage.setItem(k, val) : localStorage.removeItem(k)), [KEY, cache ? JSON.stringify(cache) : ''])
     const log = await serve(page, o)
     await page.goto(BASE + '/marketing/youtube', { waitUntil: 'networkidle' })
@@ -885,6 +897,56 @@ for (const width of [360, 390, 430]) {
   }
   const same = seen.every((x) => JSON.stringify(x) === JSON.stringify(seen[0]))
   check('D-196 11 같은 데이터 · 같은 설정 → PC 1440 · PC 를 휴대폰 폭(390)으로 · 휴대폰 390 의 1~3순위 · 4위부터 · 축 · 급상승 · 터진 영상이 모두 같다(화면 폭은 배치만)', same && seen[0].top.length === 3 && seen[0].rest.length >= 2 && seen[0].rising.length >= 1 && seen[0].breakouts.length >= 1, same ? seen[0].top : seen.map((x) => x.top))
+}
+
+// D-227 — 대표 "한 페이지에 너무 많으면 역효과 · 길을 잃지 않게 · 펼치기/접어두기 · 토스처럼 다음 단계". 처음 연 모양(시드의 '모두 펼치기' 없음)
+for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height: 844, tag: '390', mobile: true }]) {
+  const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, locale: 'ko-KR', ...(vp.mobile ? { isMobile: true, hasTouch: true } : {}) })
+  const page = await ctx.newPage()
+  const errs = []
+  page.on('pageerror', (e) => errs.push(e.message))
+  await page.route('https://i.ytimg.com/**', (r) => r.fulfill({ status: 404, body: '' }))
+  await page.route('**/api/yt-bench**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: FJSON }))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(() => localStorage.removeItem('axmvp.fold.all'))
+  await page.goto(BASE + '/marketing/youtube', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  const T = vp.tag
+  const over = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  const steps = page.getByTestId('radar-steps')
+  check(`D227-1 ${T} 길잡이 — 단계 3개(주제 고르기 → 이번 주로 확정 → 찍고 올리기) · 지금 1단계 · '지금 할 일' 한 줄`, (await steps.locator('li').count()) === 3 && (await steps.getAttribute('data-current')) === 'pick' && /지금 할 일/.test(await page.getByTestId('radar-guide-next').innerText()))
+  const fold = page.getByTestId('radar-signals-fold')
+  const sum = (await page.getByTestId('radar-signals-summary').innerText()).replace(/\s+/g, ' ')
+  check(`D227-2 ${T} 시장 신호는 처음에 접혀 있고(판 0개) 한 줄 요약(가장 센 흐름 · 흐름 · AI 키워드 · 급상승 · 터진 영상 · 사이드)만`, (await fold.getAttribute('data-open')) === '0' && (await page.getByTestId('radar-board-pick').count()) === 0 && /가장 센 흐름/.test(sum) && /흐름 \d+/.test(sum) && /AI 키워드 \d+/.test(sum) && /급상승 \d+/.test(sum) && /터진 영상 \d+/.test(sum) && /사이드 \d+/.test(sum), sum)
+  await fold.getByTestId('fold-toggle').click()
+  const boards = page.getByTestId('radar-board-pick').getByTestId('mk-pick')
+  const keys = await boards.evaluateAll((els) => els.map((e) => e.getAttribute('data-key')))
+  const n = async () => ({ flow: await page.getByTestId('radar-domain-economy').count(), ai: await page.getByTestId('radar-ai-keywords').count(), hot: await page.getByTestId('radar-rising').count(), side: await page.getByTestId('radar-side').count() })
+  const first = await n()
+  check(`D227-3 ${T} 펼치면 판 고르기 5칸(흐름 · AI · 급상승 · 사이드 · 전부) · 처음엔 '지금 강한 흐름' 한 판만`, keys.join() === 'flow,ai,hot,side,all' && first.flow === 1 && first.ai + first.hot + first.side === 0, { keys, first })
+  await page.locator('[data-testid="radar-board-pick"] [data-key="ai"]').click()
+  const ai = await n()
+  await page.locator('[data-testid="radar-board-pick"] [data-key="hot"]').click()
+  const hot = await n()
+  const hotBreak = await page.getByTestId('radar-breakouts').count()
+  await page.locator('[data-testid="radar-board-pick"] [data-key="side"]').click()
+  const side = await n()
+  check(`D227-4 ${T} 판을 누르면 그 판만(AI → 급상승 · 터진 영상 → 사이드)`, ai.ai === 1 && ai.flow + ai.hot + ai.side === 0 && hot.hot === 1 && hotBreak === 1 && hot.flow + hot.ai + hot.side === 0 && side.side === 1 && side.flow + side.ai + side.hot === 0, { ai, hot, side })
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  const back = await n()
+  check(`D227-5 ${T} 새로고침해도 펼침 · 고른 판(사이드) 기억`, (await page.getByTestId('radar-signals-fold').getAttribute('data-open')) === '1' && back.side === 1 && back.flow + back.ai + back.hot === 0, back)
+  await page.locator('[data-testid="radar-board-pick"] [data-key="all"]').click()
+  const all = await n()
+  const order = await page.evaluate(() => ['radar-domain-economy', 'radar-ai-keywords', 'radar-rising', 'radar-side'].map((id) => Math.round(document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect().top ?? -1)))
+  check(`D227-6 ${T} [전부 보기] — 예전처럼 네 판이 한 화면에(흐름 → AI → 급상승 → 사이드 순) · 지운 기능 0`, all.flow === 1 && all.ai === 1 && all.hot === 1 && all.side === 1 && order.every((y, i) => i === 0 || y > order[i - 1]), { all, order })
+  const tabs = await page.locator('[data-testid^="yt-view-"]').evaluateAll((els) => els.map((e) => ({ k: e.dataset.testid, svg: e.querySelectorAll('svg').length, on: e.getAttribute('aria-selected') === 'true', img: getComputedStyle(e).backgroundImage })))
+  check(`D227-7 ${T} 화면 탭 4개 모두 아이콘 · 고른 탭은 빨강 그라데이션`, tabs.length === 4 && tabs.every((t) => t.svg >= 1) && tabs.filter((t) => t.on).length === 1 && /gradient/.test(tabs.find((t) => t.on)?.img ?? ''), tabs)
+  const pickH = await boards.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
+  const labelW = await page.locator('[data-testid="radar-board-pick"] [data-testid="mk-pick"] .t-body').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))
+  check(`D227-8 ${T} 판 칸 44px 이상 · 이름 칸 짜부라짐 0(폭 ≥ 90) · 가로 넘침 0 · 오류 0`, pickH.every((h) => h >= 44) && labelW.every((w) => w >= 90) && (await over()) <= 0 && errs.length === 0, { pickH, labelW, over: await over(), errs })
+  await ctx.close()
 }
 
 await browser.close()

@@ -7,15 +7,19 @@
  * 휴대폰에서는 [고치기 | 미리보기] 를 번갈아 본다.
  * D-208: 디자인 한 번에(스타일 6가지 — 꾸밈 + 블록 모양 + 바탕 흐름) · 홈페이지 점수 100점 + '이것만 하면 +n점'(누르면 그 블록) ·
  *        업종 맞춤 블록 [넣기] · 같은 업체 홍보 글 만들기로 바로 가기.
+ * D-227: 대표 "한 페이지에 너무 많으면 역효과 · 길을 잃지 않게 · 토스처럼 다음 단계로" —
+ *        블록 · 꾸밈 · 점검 탭을 ① 내용 고치기 → ② 꾸미기 → ③ 점검 · 내려받기 단계로(아무 단계나 눌러 가도 된다),
+ *        단계 끝마다 [다음 단계] 단추, ③ 에 [HTML 내려받기] 를 크게. 점수 카드는 '이것만 하면' 첫 칸만 보이고 나머지는 접는다.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, ArrowDown, ArrowUp, Check, CheckCircle2, ChevronRight, Copy, Download, ExternalLink, EyeOff, Gauge, Globe, LayoutGrid, Maximize2, Minimize2, Monitor, Palette, PenLine, Plus, Redo2, RefreshCw, Smartphone, Sparkles, Trash2, Undo2, Wand2 } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowRight, ArrowUp, Check, CheckCircle2, ChevronRight, Copy, Download, ExternalLink, EyeOff, Gauge, Globe, LayoutGrid, Maximize2, Minimize2, Monitor, Palette, PenLine, Plus, Redo2, RefreshCw, Smartphone, Sparkles, Trash2, Undo2, Wand2 } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { BottomSheet, Badge } from '../../components/ui/primitives'
 import { ConfirmModal } from '../../components/ui/ConfirmModal'
 import { useToast } from '../../components/ui/toastContext'
 import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard'
+import { useFold } from '../../components/ui/fold'
 import { useIsPhone } from '../../lib/useIsPhone'
 import { nowIso, todayLocalDate } from '../../lib/appClock'
 import { generateId } from '../../storage/localStore'
@@ -217,6 +221,10 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
   const should = checks.filter((c) => c.level === 'should').length
   const score = useMemo(() => (doc ? siteScore(doc) : null), [doc])
   const suggestions = useMemo(() => (doc ? blockSuggestions(doc) : []), [doc])
+  // D-227 점수 '이것만 하면' — 첫 칸만 보이고 나머지는 접어 둔다(펼침은 이 기기에 기억)
+  const [scoreOpen, setScoreOpen] = useFold('site.score', false)
+  // D-227 '있으면 좋은 블록' 도 한 줄로 접어 둔다(블록 이름만 보이고 누르면 까닭 · [넣기])
+  const [suggestOpen, setSuggestOpen] = useFold('site.suggest', false)
 
   // 미리보기에서 블록을 누르면 → 블록 탭에서 그 블록을 연다(휴대폰은 고치기 화면으로)
   const selectBlock = useCallback(
@@ -356,11 +364,15 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
     <div className="flex flex-col gap-2" data-testid="site-blocks">
       {suggestions.length > 0 && (
         <div className="flex flex-col gap-2 rounded-(--radius-control) border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-3" data-testid="site-suggest">
-          <p className="t-sub flex items-center gap-1.5 font-semibold text-emerald-900">
+          <button type="button" onClick={() => setSuggestOpen(!suggestOpen)} aria-expanded={suggestOpen} className="tap -m-1 flex min-h-11 min-w-0 items-center gap-1.5 rounded-(--radius-control) p-1 text-left" data-testid="site-suggest-toggle">
+            <ChevronRight className={`size-4 shrink-0 text-emerald-700 transition-transform duration-150 ${suggestOpen ? 'rotate-90' : ''}`} aria-hidden="true" />
             <Sparkles className="size-4 shrink-0 text-emerald-700" aria-hidden="true" />
-            {industryDef(doc.industry).label}에 있으면 좋은 블록
-          </p>
-          {suggestions.map((sg) => (
+            <span className="t-sub min-w-0 flex-1 font-semibold break-keep text-emerald-900">
+              {industryDef(doc.industry).label}에 있으면 좋은 블록 {suggestions.length}개
+              {!suggestOpen && <span className="font-normal text-emerald-800"> · {suggestions.map((sg) => blockDef(sg.type)?.label).join(' · ')}</span>}
+            </span>
+          </button>
+          {suggestOpen && suggestions.map((sg) => (
             <div key={sg.type} className="flex items-center gap-2" data-testid="site-suggest-item" data-type={sg.type}>
               <MkIcon icon={BLOCK_STYLE[sg.type].icon} tone={BLOCK_STYLE[sg.type].tone} size="sm" />
               <span className="min-w-0 flex-1">
@@ -604,23 +616,61 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
     </div>
   )
 
-  const tabs: { key: Tab; label: string }[] = [
-    { key: 'blocks', label: `블록 ${doc.blocks.length}` },
-    { key: 'style', label: '꾸밈' },
-    { key: 'checks', label: `점검${must + should ? ` ${must + should}` : ''}` },
+  // D-227 단계 — 탭 이름 대신 ① ② ③(아무 단계나 눌러 가도 된다 · 순서만 알려 준다)
+  const tabs: { key: Tab; label: string; sub: string }[] = [
+    { key: 'blocks', label: '내용 고치기', sub: `블록 ${doc.blocks.length}` },
+    { key: 'style', label: '꾸미기', sub: STYLE_PRESETS.find((sp) => sp.key === nowStyle)?.label ?? '색 · 글꼴' },
+    { key: 'checks', label: '내려받기', sub: must ? `꼭 고칠 것 ${must}` : should ? `확인 ${should}` : '통과' },
   ]
+  const at = tabs.findIndex((t) => t.key === tab)
+  const goTab = (k: Tab) => {
+    setTab(k)
+    window.setTimeout(() => document.querySelector('[data-testid="site-steps"]')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 30)
+  }
+  /** 단계 끝 [다음 단계] — ③ 에서는 내려받기 · 새 창 보기를 크게 */
+  const stepFoot =
+    at < tabs.length - 1 ? (
+      <button type="button" onClick={() => goTab(tabs[at + 1].key)} className={`${MK_PRIMARY.emerald} w-full justify-center`} data-testid="site-next" data-to={tabs[at + 1].key}>
+        다음 단계 · {tabs[at + 1].label}
+        <ArrowRight className="size-4" aria-hidden="true" />
+      </button>
+    ) : (
+      <div className="flex flex-col gap-2 rounded-(--radius-control) border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-3" data-testid="site-finish">
+        <p className="t-sub break-keep text-emerald-900">
+          <b className="font-bold">{must ? `꼭 고칠 것 ${must}개를 고친 뒤 내려받는 것이 좋아요.` : '다 됐어요 — 내려받아 업체에 보내거나 올려 주세요.'}</b> 내려받은 HTML 파일 하나가 홈페이지 전체예요.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={`${MK_PRIMARY.emerald} flex-1 justify-center`} onClick={() => void onDownload()} data-testid="site-finish-download">
+            <Download className="size-4" aria-hidden="true" /> HTML 내려받기
+          </button>
+          <Button size="sm" onClick={onOpen} data-testid="site-finish-open">
+            <ExternalLink className="size-4" aria-hidden="true" /> 새 창으로 보기
+          </Button>
+        </div>
+      </div>
+    )
 
   const editor = (
     <div className="flex min-w-0 flex-col gap-3">
-      <div className="flex gap-1 rounded-(--radius-control) bg-emerald-50 p-1 ring-1 ring-emerald-100" role="tablist">
-        {tabs.map((t) => (
-          <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)} className={`tap t-sub inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-(--radius-control) px-2 font-semibold ${tab === t.key ? 'bg-emerald-700 text-white shadow-sm' : 'text-emerald-900 hover:bg-white/70'}`} data-testid={`site-tab-${t.key}`}>
-            {t.key === 'blocks' ? <LayoutGrid className="size-4" aria-hidden="true" /> : t.key === 'style' ? <Palette className="size-4" aria-hidden="true" /> : must ? <AlertTriangle className="size-4" aria-hidden="true" /> : <CheckCircle2 className="size-4" aria-hidden="true" />}
-            {t.label}
-          </button>
-        ))}
+      <div className="flex items-stretch gap-1 rounded-(--radius-control) bg-emerald-50 p-1 ring-1 ring-emerald-100" role="tablist" aria-label="홈페이지 만들기 단계" data-testid="site-steps" data-current={tab}>
+        {tabs.map((t, i) => {
+          const on = tab === t.key
+          return (
+            <button key={t.key} type="button" role="tab" aria-selected={on} onClick={() => goTab(t.key)} className={`tap flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-(--radius-control) px-1 py-1.5 text-center ${on ? 'bg-emerald-700 text-white shadow-sm' : 'text-emerald-900 hover:bg-white/70'}`} data-testid={`site-tab-${t.key}`} data-step={i + 1}>
+              <span className="t-sub flex items-center gap-1 font-bold break-keep">
+                <span className={`flex size-5 shrink-0 items-center justify-center rounded-full text-xs tabular-nums ${on ? 'bg-white text-emerald-800' : 'bg-emerald-700 text-white'}`}>{i + 1}</span>
+                {t.label}
+              </span>
+              <span className={`t-meta flex items-center gap-1 break-keep ${on ? 'text-white/90' : t.key === 'checks' && must ? 'font-semibold text-danger-700' : 'text-emerald-800'}`}>
+                {t.key === 'blocks' ? <LayoutGrid className="size-3.5" aria-hidden="true" /> : t.key === 'style' ? <Palette className="size-3.5" aria-hidden="true" /> : must ? <AlertTriangle className="size-3.5" aria-hidden="true" /> : <CheckCircle2 className="size-3.5" aria-hidden="true" />}
+                {t.sub}
+              </span>
+            </button>
+          )
+        })}
       </div>
       {tab === 'blocks' ? blocksTab : tab === 'style' ? styleTab : checksTab}
+      {stepFoot}
     </div>
   )
 
@@ -700,13 +750,18 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
             <div className="flex min-w-0 flex-1 flex-col gap-1.5" data-testid="site-score-next">
               <span className="t-meta font-semibold text-slate-600">이것만 하면</span>
               <div className="flex flex-wrap gap-1.5">
-                {score.next.map((it) => (
+                {(scoreOpen ? score.next : score.next.slice(0, 1)).map((it) => (
                   <button key={it.key} type="button" onClick={() => openScore(it)} title={it.how} className="tap t-sub inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-(--radius-control) border border-emerald-200 bg-white px-3 text-left font-semibold text-emerald-900 shadow-sm hover:border-emerald-400" data-testid="site-score-item" data-key={it.key}>
                     <span className="t-meta shrink-0 rounded-full bg-emerald-700 px-1.5 font-bold text-white tabular-nums">+{it.points}</span>
                     <span className="min-w-0 break-keep">{it.label}</span>
                     <ChevronRight className="size-4 shrink-0" aria-hidden="true" />
                   </button>
                 ))}
+                {score.next.length > 1 && (
+                  <button type="button" onClick={() => setScoreOpen(!scoreOpen)} aria-expanded={scoreOpen} className="tap t-sub inline-flex min-h-11 items-center gap-1 rounded-(--radius-control) px-2 font-semibold text-emerald-800 hover:bg-white/70" data-testid="site-score-more">
+                    {scoreOpen ? '접기' : `${score.next.length - 1}개 더 보기`}
+                  </button>
+                )}
               </div>
             </div>
           ) : (
