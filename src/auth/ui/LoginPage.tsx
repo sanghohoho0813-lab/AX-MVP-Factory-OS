@@ -13,6 +13,7 @@ import {
   type RecentAccount,
 } from '../recentAccounts'
 import { AuthLayout, AuthField, AuthError } from './AuthLayout'
+import { afterSignInPath } from '../workspaceStorage'
 
 function focusPassword(): void {
   window.setTimeout(() => document.getElementById('password')?.focus(), 0)
@@ -61,7 +62,7 @@ export function LoginPage() {
     }
     clearSwitchTarget()
     // 세션 확립 후 부트스트랩/가드가 목적지를 결정한다.
-    navigate('/', { replace: true })
+    navigate(afterSignInPath(), { replace: true })
   }
 
   return (

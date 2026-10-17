@@ -5,6 +5,7 @@
  * [모듈 살펴보기] 하나, 대표가 바로 쓰는 [14일 체험] 하나. 결제는 아직 없다고 적는다.
  */
 
+import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Lock, Sparkles } from 'lucide-react'
 import { Button } from '../ui/Button'
@@ -38,16 +39,27 @@ export function LockedModuleCard({
   const { ent, workspaceId } = useEntitlements()
   const { showToast } = useToast()
   const [params] = useSearchParams()
+  const [busy, setBusy] = useState(false)
   const m = catalogModule(moduleKey)
   if (!m) return null
   const why = source ?? ent.module(moduleKey).source
   const clientId = params.get('client')
   const more = withClient(m.route, clientId)
+  // D-223 대표가 잠근 모듈 · 체험이 끝난 모듈은 여기서 다시 체험을 걸지 않는다(요금제와 모듈 화면과 같은 기준) — 예전에는 잠금을 이 단추가 풀었다
+  const canTrial = why !== 'locked' && why !== 'trial-ended'
 
   const startTrial = async () => {
-    await setAccess(workspaceId, accessKey ?? m.entitlementKey, 'trial', todayLocalDate())
-    notifyEntitlementsChanged()
-    showToast(`${m.name} 모듈 체험을 시작했습니다 (${TRIAL_DAYS}일).`)
+    if (busy) return
+    setBusy(true)
+    try {
+      await setAccess(workspaceId, accessKey ?? m.entitlementKey, 'trial', todayLocalDate())
+      notifyEntitlementsChanged()
+      showToast(`${m.name} 모듈 체험을 시작했습니다 (${TRIAL_DAYS}일).`)
+    } catch {
+      showToast('체험을 시작하지 못했습니다 — 잠시 뒤 다시 눌러 주세요.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   if (compact) {
@@ -87,9 +99,11 @@ export function LockedModuleCard({
           >
             모듈 살펴보기
           </Link>
-          <Button variant="ghost" onClick={() => void startTrial()} data-testid="module-trial">
-            <Sparkles aria-hidden="true" className="size-4" /> {TRIAL_DAYS}일 체험
-          </Button>
+          {canTrial && (
+            <Button variant="ghost" onClick={() => void startTrial()} disabled={busy} data-testid="module-trial">
+              <Sparkles aria-hidden="true" className="size-4" /> {TRIAL_DAYS}일 체험
+            </Button>
+          )}
         </div>
         <p className="t-meta break-keep text-slate-500">결제는 아직 붙어 있지 않습니다 — 대표가 ‘모듈 전체’ 화면의 요금제에서 바로 엽니다.</p>
       </div>

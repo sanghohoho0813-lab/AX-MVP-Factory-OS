@@ -32,6 +32,7 @@ export function ModuleAccessPanel() {
   const [raw, setRaw] = useState<Map<string, ModuleAccess> | null>(null)
   const [planKey, setPlanKey] = useState(ent.subscription.planKey)
   const [picked, setPicked] = useState<string[]>(ent.subscription.selectedModules)
+  const [saving, setSaving] = useState(false)
 
   // 저장된 요금제가 읽히면(또는 바뀌면) 고르던 것을 그것으로
   const savedKey = `${ent.subscription.planKey}|${ent.subscription.selectedModules.join()}`
@@ -59,15 +60,33 @@ export function ModuleAccessPanel() {
   const dirty = plan.key !== ent.subscription.planKey || check.selected.join() !== ent.subscription.selectedModules.join()
   const modules = visibleModules()
 
+  // D-223 저장 실패를 알리고 · 저장 중 두 번 눌러도 한 번만(예전에는 실패해도 아무 말이 없었다)
   const savePlan = async () => {
-    await saveSubscription(workspaceId, plan.key, check.selected)
-    notifyEntitlementsChanged()
-    showToast(`${plan.name} 요금제로 바꿨습니다.`)
+    if (saving) return
+    setSaving(true)
+    try {
+      await saveSubscription(workspaceId, plan.key, check.selected)
+      notifyEntitlementsChanged()
+      showToast(`${plan.name} 요금제로 바꿨습니다.`)
+    } catch {
+      showToast('요금제를 저장하지 못했습니다 — 잠시 뒤 다시 눌러 주세요.')
+    } finally {
+      setSaving(false)
+    }
   }
   const toggle = (key: string) => setPicked((cur) => (cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]))
 
   const change = async (accessKey: string, label: string, state: ModuleAccessState) => {
-    await setAccess(workspaceId, accessKey, state, today)
+    if (saving) return
+    setSaving(true)
+    try {
+      await setAccess(workspaceId, accessKey, state, today)
+    } catch {
+      showToast(`${josa(label, '을/를')} 바꾸지 못했습니다 — 잠시 뒤 다시 눌러 주세요.`)
+      return
+    } finally {
+      setSaving(false)
+    }
     notifyEntitlementsChanged()
     showToast(
       state === 'open'
@@ -137,7 +156,7 @@ export function ModuleAccessPanel() {
           {check.errors.length > 0 && <p className="t-sub break-keep text-danger-700">{check.errors.join(' ')}</p>}
           {dirty && (
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="primary" onClick={() => void savePlan()} data-testid="plan-save">
+              <Button variant="primary" onClick={() => void savePlan()} disabled={saving} data-testid="plan-save">
                 {plan.name} 요금제로 바꾸기
               </Button>
               <Button variant="ghost" onClick={() => { setPlanKey(ent.subscription.planKey); setPicked(ent.subscription.selectedModules) }}>

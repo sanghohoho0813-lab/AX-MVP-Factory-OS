@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom'
 import { Building, Check, ChevronDown, Plus, Settings } from 'lucide-react'
 import { useDismissable } from '../../lib/useDismissable'
 import { useToast } from '../ui/toastContext'
+import { switchWorkspaceThenGo } from '../../auth/workspaceStorage'
 import { useAuth } from '../../auth/AuthProvider'
 import { createWorkspace } from '../../auth/workspaceService'
 import { useCurrentUser } from './useCurrentUser'
@@ -19,7 +20,7 @@ const ROLE_LABEL: Record<string, string> = { owner: '소유자', admin: '관리�
 
 export function SupabaseWorkspaceSelector() {
   const { open, setOpen, containerRef } = useDismissable<HTMLDivElement>()
-  const { workspaces, currentWorkspaceId, selectWorkspace, refreshWorkspaces } = useAuth()
+  const { workspaces, currentWorkspaceId, access } = useAuth()
   const { showToast } = useToast()
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
@@ -31,10 +32,9 @@ export function SupabaseWorkspaceSelector() {
       setOpen(false)
       return
     }
-    selectWorkspace(id)
     setOpen(false)
     // 워크스페이스 전환 시 현재 화면을 홈으로 되돌려 이전 데이터 잔상을 막는다.
-    window.location.assign('/')
+    switchWorkspaceThenGo(id, () => window.location.assign('/'))
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -43,10 +43,8 @@ export function SupabaseWorkspaceSelector() {
     setBusy(true)
     try {
       const ws = await createWorkspace(name.trim())
-      await refreshWorkspaces()
-      selectWorkspace(ws.id)
       showToast('작업공간을 만들었습니다.')
-      window.location.assign('/')
+      switchWorkspaceThenGo(ws.id, () => window.location.assign('/'))
     } catch (err) {
       showToast(err instanceof Error ? err.message : '작업공간을 만들지 못했습니다.')
     } finally {
@@ -89,7 +87,8 @@ export function SupabaseWorkspaceSelector() {
             ))}
           </ul>
           <div className="mt-1 border-t border-slate-100 pt-1.5">
-            {creating ? (
+            {/* D-223 팀장(Pilot) 계정은 작업공간을 하나만 쓴다 — 서버가 늘 거절하는 단추를 보이지 않는다 */}
+            {access === 'pilot' ? null : creating ? (
               <form onSubmit={handleCreate} className="flex items-center gap-1.5 px-1.5 py-1">
                 <input
                   autoFocus

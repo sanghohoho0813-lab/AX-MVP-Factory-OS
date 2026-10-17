@@ -38,8 +38,8 @@ import { clearSwitchTarget, rememberAccount } from './recentAccounts'
 import { getCurrentSession, onAuthStateChange, signOut as authSignOut } from './authService'
 import { listMyWorkspaces, type WorkspaceMembership } from './workspaceService'
 import { AuthContext, type AuthContextValue } from './authContext'
+import { readStoredWorkspace as safeReadWorkspace, writeStoredWorkspace as safeWriteWorkspace } from './workspaceStorage'
 
-const WORKSPACE_STORAGE_KEY = 'axmvp.active_workspace'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const cfg = getDataModeConfig()
@@ -53,16 +53,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [access, setAccess] = useState<OsAccess | null>(null)
   const [pilotViews, setPilotViews] = useState<PilotView[]>([])
   const [capabilities, setCapabilities] = useState<string[] | null>([])
-  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(() => {
-    try {
-      return window.localStorage.getItem(WORKSPACE_STORAGE_KEY)
-    } catch {
-      return null
-    }
-  })
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(() => safeReadWorkspace())
   const mounted = useRef(true)
   /** D-162: 지금 로그인한 사람 — 다른 창에서 사람이 바뀌면 새로 연다 */
   const userRef = useRef<string | null>(null)
+  /** D-223 시작 확인이 끝까지 갔는가(앱 · 권한 없음 · 작업공간 없음) — 끝났으면 같은 사람의 신호로 다시 돌리지 않는다 */
+  const settled = useRef(false)
 
   const resolveForSession = useCallback(
     async (nextSession: Session | null) => {
@@ -79,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!mounted.current) return
         setAccess(tier)
         if (tier === 'none') {
+          settled.current = true
           setBootstrap(noAccessState('supabase'))
           return
         }
@@ -106,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setCapabilities(caps)
         if (memberships.length === 0) {
           // 0019 전(legacy)에는 새 작업공간을 만들지 않는다 — 공개 사이트 가입자가 내부 OS 를 여는 길을 막는다
+          settled.current = true
           setBootstrap(tier === 'legacy' ? noAccessState('supabase') : noWorkspaceState('supabase'))
           return
         }
@@ -122,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const who = identityFromSession(nextSession.user, owned.length > 0 ? 'owner' : memberships.find((m) => m.workspaceId === chosen)?.role, tier)
         rememberAccount({ email: nextSession.user.email, name: who.name === '사용자' ? '' : who.name, title: who.title })
         clearSwitchTarget()
+        settled.current = true
         setBootstrap(readyState('supabase'))
       } catch {
         if (mounted.current) {
@@ -160,6 +159,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return
           }
           setSession(next)
+          // D-223 같은 사람의 신호(탭을 다시 볼 때마다 오는 '로그인됨' · 한 시간마다 토큰 새로 받기 · 다른 탭이 열릴 때)는 세션만 바꾼다.
+          // 예전에는 그때마다 시작 확인을 처음부터 다시 돌려, 다른 탭에서 고른 작업공간(팀장 화면 등)으로 이 탭이 새로 열지 않은 채 옮겨 가
+          // 쓰던 것이 그쪽에 저장되거나, 잠깐 끊기면 쓰던 화면이 통째로 '연결에 실패했습니다' 로 바뀌었다. 첫 확인이 실패한 경우만 다시 확인한다.
+          if (prevUser && next && next.user.id === prevUser && settled.current) return
           void resolveForSession(next)
         })
       } catch {
@@ -222,21 +225,4 @@ export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth 는 AuthProvider 안에서만 사용할 수 있습니다.')
   return ctx
-}
-
-function safeReadWorkspace(): string | null {
-  try {
-    return window.localStorage.getItem(WORKSPACE_STORAGE_KEY)
-  } catch {
-    return null
-  }
-}
-
-function safeWriteWorkspace(id: string | null): void {
-  try {
-    if (id) window.localStorage.setItem(WORKSPACE_STORAGE_KEY, id)
-    else window.localStorage.removeItem(WORKSPACE_STORAGE_KEY)
-  } catch {
-    // 무시 (세션 내 상태는 유지)
-  }
 }

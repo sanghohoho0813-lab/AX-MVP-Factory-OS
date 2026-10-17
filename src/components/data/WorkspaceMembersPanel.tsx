@@ -27,6 +27,9 @@ const ROLE_LABEL: Record<WorkspaceRole, string> = {
   viewer: '뷰어',
 }
 
+/** 받는 분이 그대로 여는 초대 링크(/join/코드) */
+const inviteLink = (token: string) => `${window.location.origin}/join/${encodeURIComponent(token)}`
+
 export function WorkspaceMembersPanel() {
   const { session, currentWorkspaceId, workspaces } = useAuth()
   const { showToast } = useToast()
@@ -190,14 +193,15 @@ export function WorkspaceMembersPanel() {
 
           {issuedToken && (
             <div className="mt-3 rounded-(--radius-control) border border-brand-200 bg-white px-3 py-2.5">
-              <p className="text-[0.875rem] text-slate-500">아래 초대 코드는 지금만 표시됩니다(서버에는 해시만 저장). 7일 후 만료, 1회 사용.</p>
+              <p className="text-[0.875rem] text-slate-500">아래 초대 링크는 지금만 표시됩니다(서버에는 해시만 저장). 7일 후 만료, 1회 사용. 받는 분은 링크를 열어 로그인(회원가입)하면 바로 합류 단추가 보입니다.</p>
               <div className="mt-1.5 flex items-center gap-2">
-                <code className="min-w-0 flex-1 truncate rounded bg-slate-100 px-2 py-1 text-[0.875rem] text-slate-800">{issuedToken}</code>
+                {/* D-223 코드만 주면 받는 분이 넣을 곳이 없었다(가입 뒤 '접근 권한 없음' 화면만) — 링크 그대로 */}
+                <code className="min-w-0 flex-1 truncate rounded bg-slate-100 px-2 py-1 text-[0.875rem] text-slate-800" data-testid="invite-link">{inviteLink(issuedToken)}</code>
                 <button
                   type="button"
                   onClick={() => {
-                    void navigator.clipboard?.writeText(issuedToken)
-                    showToast('초대 코드를 복사했습니다.')
+                    void navigator.clipboard?.writeText(inviteLink(issuedToken))
+                    showToast('초대 링크를 복사했습니다.')
                   }}
                   className="tap flex h-8 cursor-pointer items-center gap-1 rounded-(--radius-control) border border-slate-300 px-2 text-[0.875rem] text-slate-600 hover:bg-slate-50"
                 >

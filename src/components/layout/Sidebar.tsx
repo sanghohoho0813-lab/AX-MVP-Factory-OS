@@ -559,7 +559,8 @@ function NavBadge({ kind, counts, active, collapsed }: { kind: ModuleDefinition[
   if (!kind) return null
   const n = kind === 'clients' ? counts.clients : kind === 'requests' ? counts.requests : counts.firstMeetings
   if (n === null) return null
-  const text = n > 99 ? '99+' : String(n)
+  // D-223 계약 고객 수는 휴대폰 아래 메뉴와 같게 999 까지(예전: PC 는 '99+', 휴대폰은 실제 숫자) · 빨간 숫자는 99+
+  const text = kind === 'clients' ? (n > 999 ? '999+' : String(n)) : n > 99 ? '99+' : String(n)
   if (kind === 'clients') {
     if (collapsed) return null
     return (

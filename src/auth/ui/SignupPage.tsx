@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { signUpWithPassword } from '../authService'
 import { AuthLayout, AuthField, AuthError, AuthNotice } from './AuthLayout'
+import { afterSignInPath } from '../workspaceStorage'
 
 export function SignupPage() {
   const navigate = useNavigate()
@@ -43,7 +44,7 @@ export function SignupPage() {
       setSubmitting(false)
       return
     }
-    navigate('/', { replace: true })
+    navigate(afterSignInPath(), { replace: true })
   }
 
   return (

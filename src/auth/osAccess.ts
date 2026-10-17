@@ -28,13 +28,18 @@ export async function fetchMyAccess(): Promise<OsAccess> {
  * 함수가 아직 없으면(0021 전) null — 화면은 'DB 설정 필요' 로 안내한다(열지 않는다).
  */
 export async function fetchMyCapabilities(): Promise<string[] | null> {
-  try {
-    const { data, error } = await getSupabaseClient().rpc('my_capabilities')
-    if (error) return null
-    return Array.isArray(data) ? data.map(String) : []
-  } catch {
-    return null
+  // D-223 잠깐 끊긴 것을 'DB 설정 필요' 로 보이지 않게 — 함수가 없을 때만 null, 다른 실패는 한 번 더 묻는다
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const { data, error } = await getSupabaseClient().rpc('my_capabilities')
+      if (!error) return Array.isArray(data) ? data.map(String) : []
+      const code = (error as { code?: string }).code
+      if (code === 'PGRST202' || code === '42883' || /could not find the function|does not exist/i.test(error.message ?? '')) return null
+    } catch {
+      /* 다시 묻는다 */
+    }
   }
+  return null
 }
 
 /** D-164: 대표가 바로 볼 수 있는 Pilot(팀장) 화면 — 서버 0020. 함수가 없거나(0020 전) 실패하면 빈 목록 */

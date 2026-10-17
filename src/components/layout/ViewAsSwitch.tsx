@@ -9,6 +9,7 @@ import { useContext } from 'react'
 import { ChevronDown, UserRound, UsersRound } from 'lucide-react'
 import { useDismissable } from '../../lib/useDismissable'
 import { AuthContext } from '../../auth/authContext'
+import { switchWorkspaceThenGo } from '../../auth/workspaceStorage'
 import { brand } from '../../brand/brand.config'
 
 /** 보이는 이름 — 팀장님이 아직 이름을 저장하지 않았으면(서버가 'Pilot' 을 준다) '팀장님' */
@@ -38,8 +39,7 @@ export function useViewTargets() {
   const current = auth.currentWorkspaceId
   const go = (id: string | undefined) => {
     if (!id || id === current) return
-    auth.selectWorkspace(id)
-    reloadAll()
+    switchWorkspaceThenGo(id, reloadAll)
   }
   return { own, views: auth.pilotViews, current, go }
 }

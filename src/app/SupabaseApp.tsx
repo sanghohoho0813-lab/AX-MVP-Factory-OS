@@ -24,6 +24,7 @@ import { SignupPage } from '../auth/ui/SignupPage'
 import { ForgotPasswordPage } from '../auth/ui/ForgotPasswordPage'
 import { ResetPasswordPage } from '../auth/ui/ResetPasswordPage'
 import { JoinPage } from '../auth/ui/JoinPage'
+import { afterSignInPath } from '../auth/workspaceStorage'
 import { appRouteChildren, PublicGrantFinder, publicSurveyRoute, publicTestRoute } from './appRouteChildren'
 import { RouteErrorScreen } from '../components/layout/RouteErrorScreen'
 
@@ -31,7 +32,8 @@ import { RouteErrorScreen } from '../components/layout/RouteErrorScreen'
 function GuestOnly({ children }: { children: ReactNode }) {
   const { bootstrap } = useAuth()
   if (bootstrap.status === 'ready' || bootstrap.status === 'authenticated_no_workspace' || bootstrap.status === 'no_access' || bootstrap.status === 'storage_blocked') {
-    return <Navigate to="/" replace />
+    // D-223 초대 링크로 왔다가 로그인 · 가입한 사람은 그 초대 화면으로(예전에는 홈 → '접근 권한 없음' 에 갇혔다)
+    return <Navigate to={afterSignInPath()} replace />
   }
   return <>{children}</>
 }
