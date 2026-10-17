@@ -11,7 +11,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { AlertTriangle, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight, Circle, Copy, Globe, Info, Layers, ListOrdered, PencilLine, RefreshCw, Save, Sparkles, Star, Trash2, Wand2 } from 'lucide-react'
+import { AlertTriangle, Archive, Award, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight, Circle, Copy, Factory, Gem, Globe, Info, Layers, ListChecks, ListOrdered, MapPin, Megaphone, Package, PencilLine, Phone, RefreshCw, Save, Sparkles, Star, Trash2, Wand2, type LucideIcon } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { Badge, BottomSheet } from '../../components/ui/primitives'
 import { ConfirmModal } from '../../components/ui/ConfirmModal'
@@ -83,13 +83,15 @@ import { inputClass } from '../homepage/BlockFields'
 import { sendDraftToOwnerAi } from './aiHandoff'
 import { isTrialId, subjectQuery } from '../../services/marketingTrial'
 import type { ContentStore } from './useContentStore'
+import { KindGlyph, MkHead, MkHero, MkIcon, MkTag } from '../marketing/mkKit'
+import { HERO_BTN, KIND_ACCENT, KIND_STYLE, MK_PRIMARY, SITUATION_STYLE, TONE, mkChip, tabTone, type MkTone } from '../marketing/mkTheme'
 
-const card = 'rounded-(--radius-panel) border border-slate-200 bg-white'
+const card = 'rounded-(--radius-panel) border border-slate-200 bg-white shadow-sm'
 const PURPOSES: KakaoPurpose[] = ['news', 'event', 'season', 'thanks']
 
-function chip(on: boolean): string {
-  return `tap t-body min-h-11 rounded-full border px-4 font-semibold ${on ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'}`
-}
+// D-226 고르는 칩 · 칸은 테마 색이 아니라 홍보 글 색(보라)
+const chip = (on: boolean) => mkChip(on, 'violet')
+const pickBox = (on: boolean) => (on ? TONE.violet.on : `border-slate-200 bg-white ${TONE.violet.hover}`)
 
 /** 화면에 띄운 글 — 새로 만든 것(item 없음) 또는 보관함에서 연 것 */
 interface Shown {
@@ -153,6 +155,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   const made = useMemo(() => store.items.map((i) => ({ kind: i.kind, topicType: i.input.topicType, purpose: i.input.purpose, createdAt: i.createdAt })), [store.items])
   const picks = useMemo(() => firstPicks(profile, today, made), [profile, today, made])
   const findWords = useMemo(() => keywordGroups(profile).find((g) => g.key === 'find')?.words.slice(0, 4) ?? [], [profile])
+  const archiveRows = useMemo(() => latestByRoot(store.items), [store.items])
 
   // 지역 · 대표 상품을 고치면 키워드 칸도 따라간다(사람이 직접 친 키워드는 그대로)
   const lastMain = useRef(mainKeyword(profile))
@@ -381,31 +384,41 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
 
   return (
     <div className="flex flex-col gap-4" data-testid="content-studio">
-      <ProfileCard record={record} profile={profile} source={source} onEdit={() => setProfileOpen(true)} />
+      <ProfileCard record={record} profile={profile} source={source} saved={archiveRows.length} posted={archiveRows.filter((r) => r.item.postedAt).length} onEdit={() => setProfileOpen(true)} />
 
-      {/* 먼저 만들 것 — 눈에 잘 띄게 */}
-      <section className="rounded-(--radius-panel) border-2 border-brand-300 bg-brand-50 p-4 sm:p-5" data-testid="content-picks">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="t-section flex min-w-0 items-center gap-2 text-brand-900">
-            <Sparkles className="size-5 shrink-0 text-brand-600" aria-hidden="true" />
+      {/* 먼저 만들 것 — 눈에 잘 띄게(D-226 글 종류마다 색 아이콘) */}
+      <section className="rounded-(--radius-panel) border-2 border-violet-200 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50 p-4 shadow-sm sm:p-5" data-testid="content-picks">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="t-section flex min-w-0 items-center gap-2.5 text-violet-900">
+            <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 to-fuchsia-700 text-white shadow-sm">
+              <Sparkles className="size-5" />
+            </span>
             {/* D-224 띄어쓰기 없는 아주 긴 업체 이름도 줄을 바꿔 휴대폰에서 옆으로 넘치지 않게 */}
             <span className="min-w-0 [overflow-wrap:anywhere]">{record.companyName}에 먼저 만들 것</span>
           </h2>
-          <span className="t-sub break-keep text-brand-800">누르면 이 업체 글이 바로 나와요</span>
+          <span className="t-sub break-keep text-violet-800">누르면 이 업체 글이 바로 나와요</span>
         </div>
-        <ul className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
-          {picks.map((p, i) => (
-            <li key={p.key}>
-              <button type="button" onClick={() => guard(() => onPick(p))} className="tap flex h-full w-full flex-col items-start gap-1 rounded-(--radius-control) border border-brand-200 bg-white p-3 text-left hover:border-brand-500" data-testid="content-pick" data-key={p.key} data-kind={p.kind}>
-                <span className="flex w-full items-center gap-2">
-                  <span className="t-meta flex size-6 shrink-0 items-center justify-center rounded-full bg-brand-600 font-bold text-white">{i + 1}</span>
-                  <span className="t-body min-w-0 flex-1 font-semibold break-keep text-slate-900">{p.label}</span>
-                  <ChevronRight className="size-4 shrink-0 text-brand-600" aria-hidden="true" />
-                </span>
-                <span className="t-sub break-keep text-slate-600">{p.why}</span>
-              </button>
-            </li>
-          ))}
+        <ul className="mt-3 grid grid-cols-1 gap-2.5 md:grid-cols-3">
+          {picks.map((p, i) => {
+            const ks = KIND_STYLE[p.kind]
+            return (
+              <li key={p.key}>
+                <button type="button" onClick={() => guard(() => onPick(p))} className={`tap group flex h-full w-full flex-col items-start gap-2 rounded-(--radius-control) border-2 bg-white p-3 text-left shadow-sm transition-shadow hover:shadow-md ${TONE[ks.tone].line} ${TONE[ks.tone].hover}`} data-testid="content-pick" data-key={p.key} data-kind={p.kind}>
+                  <span className="flex w-full items-center gap-2.5">
+                    <MkIcon icon={ks.icon} tone={ks.tone} />
+                    <span className="min-w-0 flex-1">
+                      <span className={`t-meta block font-bold ${TONE[ks.tone].text}`}>
+                        {i + 1}순위{p.label.includes(KIND_LABEL[p.kind].slice(0, 2)) ? '' : ` · ${KIND_LABEL[p.kind]}`}
+                      </span>
+                      <span className="t-body block font-semibold break-keep text-slate-900">{p.label}</span>
+                    </span>
+                    <ChevronRight className={`size-5 shrink-0 transition-transform group-hover:translate-x-0.5 ${TONE[ks.tone].text}`} aria-hidden="true" />
+                  </span>
+                  <span className="t-sub break-keep text-slate-600">{p.why}</span>
+                </button>
+              </li>
+            )
+          })}
         </ul>
       </section>
 
@@ -432,24 +445,31 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:items-start">
         {/* 직접 고르기 */}
         <section className={`${card} flex flex-col gap-4 p-4 sm:p-5`} data-testid="content-maker">
-          <h2 className="t-section text-slate-900">직접 고르기</h2>
+          <MkHead icon={Wand2} tone="violet" title="직접 고르기" />
           <fieldset className="flex flex-col gap-2">
             <legend className="t-sub mb-1 font-semibold text-slate-700">무엇을 만들까요?</legend>
             <div className="grid grid-cols-2 gap-2">
-              {CONTENT_KINDS.map((k) => (
-                <button
-                  key={k}
-                  type="button"
-                  aria-pressed={kind === k}
-                  onClick={() => setKind(k)}
-                  data-testid="content-kind"
-                  data-kind={k}
-                  className={`tap flex min-h-[3.75rem] flex-col items-start justify-center rounded-(--radius-control) border px-3 py-2 text-left ${kind === k ? 'border-brand-600 bg-brand-50' : 'border-slate-200 bg-white hover:border-slate-400'}`}
-                >
-                  <span className={`t-body font-semibold break-keep ${kind === k ? 'text-brand-800' : 'text-slate-800'}`}>{KIND_LABEL[k]}</span>
-                  <span className="t-meta break-keep text-slate-500">{KIND_HINT[k]}</span>
-                </button>
-              ))}
+              {CONTENT_KINDS.map((k) => {
+                const ks = KIND_STYLE[k]
+                const on = kind === k
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setKind(k)}
+                    data-testid="content-kind"
+                    data-kind={k}
+                    className={`tap flex min-h-[3.75rem] min-w-0 items-start gap-2 rounded-(--radius-control) border px-2.5 py-2 text-left ${on ? TONE[ks.tone].on : `border-slate-200 bg-white ${TONE[ks.tone].hover}`}`}
+                  >
+                    <MkIcon icon={ks.icon} tone={ks.tone} size="sm" />
+                    <span className="min-w-0 flex-1">
+                      <span className={`t-body block font-semibold break-keep ${on ? TONE[ks.tone].deep : 'text-slate-800'}`}>{KIND_LABEL[k]}</span>
+                      <span className="t-meta block break-keep text-slate-500">{KIND_HINT[k]}</span>
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           </fieldset>
 
@@ -458,8 +478,8 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
               <legend className="t-sub mb-1 font-semibold text-slate-700">누가 쓰는 글인가요?</legend>
               <div className="grid grid-cols-2 gap-2">
                 {(['brand', 'review'] as BlogType[]).map((b) => (
-                  <button key={b} type="button" aria-pressed={blogType === b} onClick={() => setBlogType(b)} data-testid="content-blogtype-btn" data-value={b} className={`tap flex min-h-[3.75rem] flex-col items-start justify-center rounded-(--radius-control) border px-3 py-2 text-left ${blogType === b ? 'border-brand-600 bg-brand-50' : 'border-slate-200 bg-white hover:border-slate-400'}`}>
-                    <span className={`t-body font-semibold break-keep ${blogType === b ? 'text-brand-800' : 'text-slate-800'}`}>{BLOG_TYPE_LABEL[b]}</span>
+                  <button key={b} type="button" aria-pressed={blogType === b} onClick={() => setBlogType(b)} data-testid="content-blogtype-btn" data-value={b} className={`tap flex min-h-[3.75rem] flex-col items-start justify-center rounded-(--radius-control) border px-3 py-2 text-left ${pickBox(blogType === b)}`}>
+                    <span className={`t-body font-semibold break-keep ${blogType === b ? 'text-violet-900' : 'text-slate-800'}`}>{BLOG_TYPE_LABEL[b]}</span>
                     <span className="t-meta break-keep text-slate-500">{BLOG_TYPE_HINT[b]}</span>
                   </button>
                 ))}
@@ -474,7 +494,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
               </label>
               <div className="-mt-2 flex flex-wrap gap-1.5">
                 {findWords.map((w) => (
-                  <button key={w} type="button" onClick={() => setKeyword(w)} className={`tap t-sub min-h-9 rounded-full border px-3 ${keyword === w ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600'}`}>
+                  <button key={w} type="button" onClick={() => setKeyword(w)} className={`tap t-sub min-h-9 rounded-full border px-3 ${keyword === w ? 'border-sky-500 bg-sky-50 font-semibold text-sky-800' : 'border-slate-200 text-slate-600 hover:border-sky-300'}`}>
                     {w}
                   </button>
                 ))}
@@ -482,10 +502,10 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
               <fieldset className="flex flex-col gap-1.5">
                 <legend className="t-sub mb-1 font-semibold text-slate-700">주제</legend>
                 {topics.map((t) => (
-                  <label key={t.type} className={`tap flex cursor-pointer items-start gap-2 rounded-(--radius-control) border px-3 py-2 ${topicType === t.type ? 'border-brand-600 bg-brand-50' : 'border-slate-200'}`} data-testid="content-topic" data-type={t.type}>
-                    <input type="radio" name="topic" className="mt-1.5 size-4 accent-brand-600" checked={topicType === t.type} onChange={() => setTopicType(t.type)} />
+                  <label key={t.type} className={`tap flex cursor-pointer items-start gap-2 rounded-(--radius-control) border px-3 py-2 ${pickBox(topicType === t.type)}`} data-testid="content-topic" data-type={t.type}>
+                    <input type="radio" name="topic" className="mt-1.5 size-4 accent-violet-600" checked={topicType === t.type} onChange={() => setTopicType(t.type)} />
                     <span className="min-w-0">
-                      <span className="t-meta font-semibold text-brand-700">{TOPIC_LABEL[t.type]}</span>
+                      <span className="t-meta font-semibold text-violet-700">{TOPIC_LABEL[t.type]}</span>
                       <span className="t-body block break-keep text-slate-800">{t.title}</span>
                       {topicType === t.type && (
                         <span className="t-meta mt-0.5 block break-keep text-slate-500" data-testid="content-topic-strategy">
@@ -513,8 +533,8 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
               <legend className="t-sub mb-1 font-semibold text-slate-700">어떤 마음을 움직일까요?</legend>
               <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                 {AD_TYPES.map((a) => (
-                  <button key={a} type="button" aria-pressed={adType === a} onClick={() => setAdType(a)} data-testid="content-adtype-btn" data-value={a} className={`tap flex min-h-12 flex-col items-start justify-center rounded-(--radius-control) border px-3 py-1.5 text-left ${adType === a ? 'border-brand-600 bg-brand-50' : 'border-slate-200 bg-white hover:border-slate-400'}`}>
-                    <span className={`t-sub font-semibold break-keep ${adType === a ? 'text-brand-800' : 'text-slate-800'}`}>{AD_TYPE_LABEL[a]}</span>
+                  <button key={a} type="button" aria-pressed={adType === a} onClick={() => setAdType(a)} data-testid="content-adtype-btn" data-value={a} className={`tap flex min-h-12 flex-col items-start justify-center rounded-(--radius-control) border px-3 py-1.5 text-left ${adType === a ? TONE.fuchsia.on : `border-slate-200 bg-white ${TONE.fuchsia.hover}`}`}>
+                    <span className={`t-sub font-semibold break-keep ${adType === a ? 'text-fuchsia-900' : 'text-slate-800'}`}>{AD_TYPE_LABEL[a]}</span>
                     <span className="t-meta break-keep text-slate-500">{AD_TYPE_HINT[a]}</span>
                   </button>
                 ))}
@@ -549,39 +569,42 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
               </button>
             ))}
           </div>
-          <Button variant="primary" onClick={() => guard(() => generate())} data-testid="content-make">
-            <Sparkles className="size-4" aria-hidden="true" />
+          <button type="button" className={MK_PRIMARY.violet} onClick={() => guard(() => generate())} data-testid="content-make">
+            <Sparkles className="size-5" aria-hidden="true" />
             {kind === 'blog' && blogType === 'review' ? '체험단 가이드 만들기' : `${KIND_LABEL[kind]} 만들기`}
-          </Button>
+          </button>
           <p className="t-meta break-keep text-slate-500">업체 기록과 업종 견본으로 채워요(규칙 · 'AI' 아님). 업체마다 다른 곳은 [대괄호] 로 비워 둬요.</p>
         </section>
 
         {/* 결과 */}
         <div ref={resultRef}>
           {shown ? (
-            <section className={`${card} flex flex-col gap-3 p-4 sm:p-5`} data-testid="content-result" data-kind={shown.draft.kind}>
+            <section className={`${card} flex flex-col gap-3 overflow-hidden p-4 sm:p-5`} data-testid="content-result" data-kind={shown.draft.kind}>
               {pack && (
-                <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50/70 p-3" data-testid="content-pack" data-key={pack.key}>
+                <div className="flex flex-col gap-2 rounded-(--radius-control) border border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-3" data-testid="content-pack" data-key={pack.key}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="t-sub flex min-w-0 items-center gap-1.5 font-semibold break-keep text-brand-900">
-                      <Layers className="size-4 shrink-0 text-brand-600" aria-hidden="true" />
+                    <p className="t-sub flex min-w-0 items-center gap-2 font-semibold break-keep text-violet-900">
+                      <MkIcon icon={SITUATION_STYLE[pack.key]?.icon ?? Layers} tone={SITUATION_STYLE[pack.key]?.tone ?? 'violet'} size="sm" />
                       <span className="min-w-0">
                         {pack.label} · 글 {pack.items.length}편 묶음
                       </span>
                     </p>
-                    <Button size="sm" variant="primary" onClick={() => void packSaveAll()} disabled={busy || pack.saved.every(Boolean)} data-testid="content-pack-save-all">
+                    <button type="button" className={MK_PRIMARY.violet} onClick={() => void packSaveAll()} disabled={busy || pack.saved.every(Boolean)} data-testid="content-pack-save-all">
                       <Save className="size-4" aria-hidden="true" />
                       {pack.saved.every(Boolean) ? '묶음 모두 저장됨' : `${pack.items.length}편 모두 보관함에 저장`}
-                    </Button>
+                    </button>
                   </div>
                   <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="묶음 글">
-                    {pack.items.map((x, i) => (
-                      <button key={x.tab} type="button" role="tab" aria-selected={i === pack.at} onClick={() => packGo(i)} className={`tap t-sub flex min-h-11 items-center gap-1.5 rounded-full border px-4 font-semibold ${i === pack.at ? 'border-brand-600 bg-white text-brand-800' : 'border-brand-200 bg-white/60 text-slate-600 hover:border-brand-400'}`} data-testid="content-pack-tab" data-saved={pack.saved[i] ? '1' : '0'}>
-                        <span className="tabular-nums text-slate-400">{i + 1}</span>
-                        {x.tab}
-                        {pack.saved[i] && <Check className="size-4 text-success-600" aria-label="저장됨" />}
-                      </button>
-                    ))}
+                    {pack.items.map((x, i) => {
+                      const tt = tabTone(x.tab)
+                      return (
+                        <button key={x.tab} type="button" role="tab" aria-selected={i === pack.at} onClick={() => packGo(i)} className={`tap t-sub flex min-h-11 items-center gap-1.5 rounded-full border px-4 font-semibold ${i === pack.at ? `${TONE[tt].solid} border-transparent shadow-sm` : `bg-white text-slate-700 ${TONE[tt].line} ${TONE[tt].hover}`}`} data-testid="content-pack-tab" data-saved={pack.saved[i] ? '1' : '0'}>
+                          <span className={`tabular-nums ${i === pack.at ? 'opacity-90' : 'text-slate-500'}`}>{i + 1}</span>
+                          {x.tab}
+                          {pack.saved[i] && <Check className={`size-4 ${i === pack.at ? '' : 'text-success-600'}`} aria-label="저장됨" />}
+                        </button>
+                      )
+                    })}
                   </div>
                   {pack.fill.length > 0 && (
                     <p className="t-meta break-keep text-slate-700" data-testid="content-pack-fill">
@@ -590,8 +613,16 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                   )}
                 </div>
               )}
+              {/* D-226 글 종류 색 띠 — 무슨 글인지 한눈에 */}
+              {!pack && (
+                <div className={`-mx-4 -mt-4 flex min-w-0 items-center gap-2.5 border-b px-4 py-2.5 sm:-mx-5 sm:-mt-5 sm:px-5 ${TONE[KIND_STYLE[shown.draft.kind].tone].soft} ${TONE[KIND_STYLE[shown.draft.kind].tone].line}`} data-testid="content-result-band">
+                  <MkIcon icon={KIND_STYLE[shown.draft.kind].icon} tone={KIND_STYLE[shown.draft.kind].tone} size="sm" />
+                  <span className={`t-sub shrink-0 font-bold ${TONE[KIND_STYLE[shown.draft.kind].tone].deep}`}>{KIND_LABEL[shown.draft.kind]}</span>
+                  <span className="t-meta min-w-0 break-keep text-slate-600">{KIND_HINT[shown.draft.kind]}</span>
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-2">
-                <Badge tone="brand">{KIND_LABEL[shown.draft.kind]}</Badge>
+                {pack && <MkTag tone={KIND_STYLE[shown.draft.kind].tone}>{KIND_LABEL[shown.draft.kind]}</MkTag>}
                 {shown.item && <Badge tone="success">보관함 · {shown.item.version}판</Badge>}
                 {dirty && (
                   <span data-testid="content-unsaved">
@@ -625,10 +656,10 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
               {fillNames.length > 0 && <FillBox key={`fill-${pack ? `pack-${pack.key}` : (shown.item?.rootId ?? shown.draft.title)}`} names={fillNames} scope={pack ? `저장 전 글 ${1 + pack.items.filter((_, j) => j !== pack.at && !pack.saved[j]).length}편` : '이 글'} onApply={applyFill} />}
 
               <div className="flex flex-wrap gap-2">
-                <Button variant="primary" size="sm" onClick={() => void copy(text)} data-testid="content-copy">
+                <button type="button" className={MK_PRIMARY.violet} onClick={() => void copy(text)} data-testid="content-copy">
                   <Copy className="size-4" aria-hidden="true" />
                   전체 복사
-                </Button>
+                </button>
                 {!shown.item && !pack && (
                   <Button
                     size="sm"
@@ -682,12 +713,12 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
 
               <ol className="flex flex-col gap-2" data-testid="content-blocks">
                 {blocks.map((b, i) => (
-                  <li key={i} className="rounded-(--radius-control) border border-slate-200 bg-slate-50/60 p-3" data-testid="content-block">
+                  <li key={i} className={`rounded-(--radius-control) border border-l-4 border-slate-200 bg-white p-3 ${KIND_ACCENT[shown.draft.kind]}`} data-testid="content-block">
                     <div className="flex items-start gap-2">
                       <div className="min-w-0 flex-1">
                         {(b.label || b.hint) && (
                           <p className="flex flex-wrap items-baseline gap-x-2">
-                            {b.label && <span className="t-body font-semibold break-keep text-slate-900">{b.label}</span>}
+                            {b.label && <span className={`t-body font-semibold break-keep ${TONE[KIND_STYLE[shown.draft.kind].tone].deep}`}>{b.label}</span>}
                             {b.hint && <span className="t-meta break-keep text-slate-500">{b.hint}</span>}
                           </p>
                         )}
@@ -712,7 +743,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                                   setKind('blog')
                                   showToast(`키워드를 "${w}" 로 바꿨어요 — 주제를 골라 [블로그 글 만들기] 를 눌러 주세요.`)
                                 }}
-                                className="tap t-sub min-h-9 rounded-full border border-slate-300 bg-white px-3 text-slate-700 hover:border-brand-500"
+                                className="tap t-sub min-h-9 rounded-full border border-sky-200 bg-sky-50 px-3 text-sky-900 hover:border-sky-500"
                                 data-testid="content-word"
                               >
                                 {w}
@@ -753,10 +784,10 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                   {(['blog', 'shorts', 'cards', 'video'] as ContentKind[])
                     .filter((k) => k !== shown.draft.kind)
                     .map((k) => (
-                      <Button
+                      <button
                         key={k}
-                        size="sm"
-                        variant="ghost"
+                        type="button"
+                        className={`tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 font-semibold ${TONE[KIND_STYLE[k].tone].line} ${TONE[KIND_STYLE[k].tone].soft} ${TONE[KIND_STYLE[k].tone].deep} ${TONE[KIND_STYLE[k].tone].hover}`}
                         onClick={() =>
                           guard(() => {
                             setKind(k)
@@ -768,9 +799,10 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                         data-testid="content-chain-kind"
                         data-kind={k}
                       >
+                        <KindGlyph kind={k} />
                         {KIND_LABEL[k]}
                         <ChevronRight className="size-4" aria-hidden="true" />
-                      </Button>
+                      </button>
                     ))}
                 </div>
               )}
@@ -791,9 +823,16 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
               )}
             </section>
           ) : (
-            <section className={`${card} flex flex-col items-start gap-2 p-5`} data-testid="content-empty">
+            <section className="flex flex-col items-center gap-3 rounded-(--radius-panel) border-2 border-dashed border-violet-200 bg-gradient-to-br from-violet-50/70 via-white to-fuchsia-50/70 p-6 text-center" data-testid="content-empty">
+              <span aria-hidden="true" className="flex -space-x-2">
+                {(['blog', 'shorts', 'cards', 'kakao'] as ContentKind[]).map((k) => (
+                  <span key={k} className="rounded-xl ring-4 ring-white">
+                    <MkIcon icon={KIND_STYLE[k].icon} tone={KIND_STYLE[k].tone} size="lg" />
+                  </span>
+                ))}
+              </span>
               <h2 className="t-section text-slate-900">여기에 글이 나와요</h2>
-              <p className="t-sub break-keep text-slate-600">위의 '먼저 만들 것' 을 누르거나, 왼쪽에서 형식을 고르고 [만들기] 를 눌러 주세요.</p>
+              <p className="t-sub max-w-md break-keep text-slate-600">위의 '먼저 만들 것' 을 누르거나, 왼쪽에서 형식을 고르고 [만들기] 를 눌러 주세요.</p>
             </section>
           )}
         </div>
@@ -861,53 +900,66 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
 /* 업체 홍보 정보                                                        */
 /* ------------------------------------------------------------------ */
 
-function ProfileCard({ record, profile, source, onEdit }: { record: ClientOpsRecord; profile: ReturnType<typeof buildProfile>['profile']; source: ReturnType<typeof buildProfile>['source']; onEdit: () => void }) {
+function ProfileCard({ record, profile, source, saved, posted, onEdit }: { record: ClientOpsRecord; profile: ReturnType<typeof buildProfile>['profile']; source: ReturnType<typeof buildProfile>['source']; saved: number; posted: number; onEdit: () => void }) {
   const ind = INDUSTRIES.find((i) => i.key === profile.industry)
-  const rows: { label: string; value: string; from?: string; missing?: boolean }[] = [
-    { label: '업종', value: ind?.label ?? '기타' },
-    { label: '대표 상품 · 서비스', value: profile.item, from: source.item === 'industry' ? '업종 말 — 고쳐 주세요' : source.item === 'override' ? '직접 적음' : '업체 기록', missing: source.item === 'industry' },
-    { label: '하는 일', value: profile.services.join(' · '), from: source.services === 'site' ? '홈페이지' : source.services === 'override' ? '직접 적음' : source.services === 'record' ? '업체 기록' : '', missing: !profile.services.length },
-    { label: '지역', value: profile.region || profile.area, missing: !profile.area },
-    { label: '대표 전화', value: profile.phone, missing: !profile.phone },
-    { label: '강점(사실)', value: profile.strengths.join(' · ') },
-    { label: '차별점', value: profile.differ, missing: !profile.differ },
+  const rows: { label: string; value: string; from?: string; missing?: boolean; icon: LucideIcon; tone: MkTone }[] = [
+    { label: '업종', value: ind?.label ?? '기타', icon: Factory, tone: 'indigo' },
+    { label: '대표 상품 · 서비스', value: profile.item, from: source.item === 'industry' ? '업종 말 — 고쳐 주세요' : source.item === 'override' ? '직접 적음' : '업체 기록', missing: source.item === 'industry', icon: Package, tone: 'violet' },
+    { label: '하는 일', value: profile.services.join(' · '), from: source.services === 'site' ? '홈페이지' : source.services === 'override' ? '직접 적음' : source.services === 'record' ? '업체 기록' : '', missing: !profile.services.length, icon: ListChecks, tone: 'sky' },
+    { label: '지역', value: profile.region || profile.area, missing: !profile.area, icon: MapPin, tone: 'rose' },
+    { label: '대표 전화', value: profile.phone, missing: !profile.phone, icon: Phone, tone: 'emerald' },
+    { label: '강점(사실)', value: profile.strengths.join(' · '), icon: Award, tone: 'orange' },
+    { label: '차별점', value: profile.differ, missing: !profile.differ, icon: Gem, tone: 'fuchsia' },
   ]
   const missing = rows.filter((r) => r.missing).length
   const gaps = profileGaps(profile)
   return (
-    <section className={`${card} flex flex-col gap-3 p-4 sm:p-5`} data-testid="content-profile">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h2 className="t-section break-keep text-slate-900 [overflow-wrap:anywhere]">{record.companyName} 홍보 정보</h2>
-          <p className="t-sub mt-0.5 break-keep text-slate-600">업체 기록에서 저절로 채웠어요. 모든 글이 이 정보를 같이 써요.{missing ? ` 빈 칸 ${missing}개를 채우면 글이 더 정확해져요.` : ''}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link to={`/tools/homepage/build?${subjectQuery(record.id)}`} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 px-3 font-semibold text-slate-700 hover:bg-slate-50" data-testid="content-to-site">
-            <Globe className="size-4" aria-hidden="true" />
-            이 업체 홈페이지
-          </Link>
-          <Button size="sm" onClick={onEdit} data-testid="content-profile-edit">
-            <PencilLine className="size-4" aria-hidden="true" />
-            고치기
-          </Button>
-        </div>
-      </div>
-      <dl className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+    <section className={`${card} flex flex-col overflow-hidden`} data-testid="content-profile">
+      {/* D-226 머리 띠 — 누구 홍보 정보인지 · 보관함 · 올림 · 채운 칸이 한눈에 */}
+      <MkHero
+        tone="violet"
+        icon={Megaphone}
+        eyebrow="홍보 정보 · 모든 글이 이 정보로"
+        title={record.companyName}
+        sub={`업체 기록에서 저절로 채웠어요. 모든 글이 이 정보를 같이 써요.${missing ? ` 빈 칸 ${missing}개를 채우면 글이 더 정확해져요.` : ''}`}
+        stats={[
+          { label: '보관함', value: `${saved}편`, testId: 'content-stat-saved' },
+          { label: '올림', value: `${posted}편`, testId: 'content-stat-posted' },
+          { label: '채운 칸', value: `${rows.length - missing}/${rows.length}`, testId: 'content-stat-filled' },
+        ]}
+        actions={
+          <>
+            <Link to={`/tools/homepage/build?${subjectQuery(record.id)}`} className={HERO_BTN} data-testid="content-to-site">
+              <Globe className="size-4 text-emerald-700" aria-hidden="true" />
+              이 업체 홈페이지
+            </Link>
+            <button type="button" onClick={onEdit} className={HERO_BTN} data-testid="content-profile-edit">
+              <PencilLine className="size-4 text-violet-700" aria-hidden="true" />
+              고치기
+            </button>
+          </>
+        }
+      />
+      <div className="flex flex-col gap-3 p-4 sm:p-5">
+      <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {rows.map((r) => (
-          <div key={r.label} className="min-w-0" data-testid="content-profile-row" data-missing={r.missing ? '1' : '0'}>
-            <dt className="t-meta flex flex-wrap items-center gap-1.5 text-slate-500">
-              {r.label}
-              {r.from && <span className="text-slate-400">· {r.from}</span>}
-            </dt>
-            <dd className={`t-body break-words ${r.missing ? 'text-warning-700' : 'text-slate-800'}`}>{r.value || (r.missing ? '비어 있어요' : '—')}</dd>
+          <div key={r.label} className={`flex min-w-0 items-start gap-2.5 rounded-(--radius-control) border p-2.5 ${r.missing ? 'border-dashed border-amber-300 bg-amber-50/70' : 'border-slate-200 bg-white'}`} data-testid="content-profile-row" data-missing={r.missing ? '1' : '0'}>
+            <MkIcon icon={r.icon} tone={r.missing ? 'amber' : r.tone} size="sm" />
+            <div className="min-w-0 flex-1">
+              <dt className="t-meta flex flex-wrap items-center gap-1.5 text-slate-500">
+                <span className="font-semibold text-slate-600">{r.label}</span>
+                {r.from && <span className="text-slate-500">· {r.from}</span>}
+              </dt>
+              <dd className={`t-body break-words ${r.missing ? 'font-semibold text-amber-800' : 'text-slate-900'}`}>{r.value || (r.missing ? '비어 있어요' : '—')}</dd>
+            </div>
           </div>
         ))}
       </dl>
       {gaps.length > 0 && (
-        <button type="button" onClick={onEdit} className="tap flex w-full min-w-0 items-start gap-2 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2.5 text-left hover:border-warning-500" data-testid="content-profile-gaps">
-          <Info className="mt-0.5 size-4 shrink-0 text-warning-700" aria-hidden="true" />
+        <button type="button" onClick={onEdit} className="tap flex w-full min-w-0 items-start gap-2.5 rounded-(--radius-control) border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 px-3 py-2.5 text-left hover:border-amber-500" data-testid="content-profile-gaps">
+          <MkIcon icon={Sparkles} tone="amber" size="sm" />
           <span className="min-w-0 flex-1">
-            <span className="t-sub block font-semibold break-keep text-warning-700">이 칸만 채우면 글이 훨씬 좋아져요 · {gaps.length}개</span>
+            <span className="t-sub block font-bold break-keep text-amber-900">이 칸만 채우면 글이 훨씬 좋아져요 · {gaps.length}개</span>
             <span className="mt-1 flex flex-col gap-0.5">
               {gaps.slice(0, 3).map((g) => (
                 <span key={g.key} className="t-meta block break-keep text-slate-700" data-testid="content-profile-gap" data-key={g.key}>
@@ -916,9 +968,10 @@ function ProfileCard({ record, profile, source, onEdit }: { record: ClientOpsRec
               ))}
             </span>
           </span>
-          <ChevronRight className="mt-0.5 size-4 shrink-0 text-warning-700" aria-hidden="true" />
+          <ChevronRight className="mt-1 size-5 shrink-0 text-amber-700" aria-hidden="true" />
         </button>
       )}
+      </div>
     </section>
   )
 }
@@ -965,8 +1018,8 @@ function PlanCard({ record, profile, today, store, onPick, onOpen }: { record: C
 
   return (
     <section className={`${card} flex flex-col gap-3 p-4 sm:p-5`} data-testid="content-plan">
-      <button type="button" className="tap flex w-full min-w-0 items-center gap-2 text-left" aria-expanded={open} onClick={() => setOpen((v) => !v)} data-testid="content-plan-toggle">
-        <CalendarDays className="size-5 shrink-0 text-brand-700" aria-hidden="true" />
+      <button type="button" className="tap flex w-full min-w-0 items-center gap-2.5 text-left" aria-expanded={open} onClick={() => setOpen((v) => !v)} data-testid="content-plan-toggle">
+        <MkIcon icon={CalendarDays} tone="sky" />
         <span className="min-w-0 flex-1">
           <span className="t-section flex flex-wrap items-center gap-x-2 break-keep text-slate-900">
             한 달 올릴 계획
@@ -983,15 +1036,16 @@ function PlanCard({ record, profile, today, store, onPick, onOpen }: { record: C
       {!open && running && (nextAt >= 0 || late > 0) && (
         <div className="flex flex-col gap-1.5 border-t border-slate-100 pt-3" data-testid="content-plan-next">
           {nextAt >= 0 && (
-            <button type="button" onClick={() => (states[nextAt].item ? onOpen(states[nextAt].item as ContentItem) : onPick(slots[nextAt]))} className="tap flex w-full min-w-0 items-center gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50/60 px-3 py-2 text-left hover:border-brand-400" data-testid="content-plan-next-open">
+            <button type="button" onClick={() => (states[nextAt].item ? onOpen(states[nextAt].item as ContentItem) : onPick(slots[nextAt]))} className="tap flex w-full min-w-0 items-center gap-2.5 rounded-(--radius-control) border border-sky-200 bg-sky-50 px-3 py-2 text-left hover:border-sky-400" data-testid="content-plan-next-open">
+              <MkIcon icon={KIND_STYLE[slots[nextAt].kind].icon} tone={KIND_STYLE[slots[nextAt].kind].tone} size="sm" />
               <span className="min-w-0 flex-1">
-                <span className="t-meta block font-semibold text-brand-700">
+                <span className="t-meta block font-semibold text-sky-800">
                   {slots[nextAt].date === today ? '오늘 올릴 글' : '다음에 올릴 글'} · {shortDate(slots[nextAt].date)} · {KIND_LABEL[slots[nextAt].kind]}
                   {states[nextAt].item ? ' · 만듦' : ''}
                 </span>
                 <span className="t-sub block break-keep text-slate-800">{slots[nextAt].title}</span>
               </span>
-              <ChevronRight className="size-4 shrink-0 text-brand-600" aria-hidden="true" />
+              <ChevronRight className="size-4 shrink-0 text-sky-700" aria-hidden="true" />
             </button>
           )}
           {late > 0 && (
@@ -1007,7 +1061,7 @@ function PlanCard({ record, profile, today, store, onPick, onOpen }: { record: C
             {running ? (
               <>
                 <span className="t-sub font-semibold text-slate-700">주 {running.perWeek}회 계획</span>
-                <button type="button" className="tap t-sub min-h-11 px-2 font-semibold text-brand-700 underline-offset-2 hover:underline" onClick={() => setFresh(true)} data-testid="content-plan-new">
+                <button type="button" className="tap t-sub min-h-11 px-2 font-semibold text-violet-700 underline-offset-2 hover:underline" onClick={() => setFresh(true)} data-testid="content-plan-new">
                   새 계획 짜기
                 </button>
               </>
@@ -1031,21 +1085,24 @@ function PlanCard({ record, profile, today, store, onPick, onOpen }: { record: C
                   <button
                     type="button"
                     onClick={() => (st.item ? onOpen(st.item) : onPick(sl))}
-                    className={`tap flex w-full min-w-0 flex-col items-start gap-0.5 rounded-(--radius-control) border px-3 py-2 text-left hover:border-brand-400 hover:bg-brand-50 ${st.posted ? 'border-success-200 bg-success-50/60' : st.item ? 'border-brand-200 bg-white' : 'border-slate-200 bg-white'}`}
+                    className={`tap flex w-full min-w-0 flex-col items-start gap-0.5 rounded-(--radius-control) border border-l-4 px-3 py-2 text-left ${KIND_ACCENT[sl.kind]} ${TONE[KIND_STYLE[sl.kind].tone].hover} ${st.posted ? 'border-success-200 bg-success-50/60' : st.item ? 'border-violet-200 bg-white' : 'border-slate-200 bg-white'}`}
                     data-testid="content-plan-slot"
                     data-kind={sl.kind}
                     data-state={st.posted ? 'posted' : st.item ? 'made' : 'none'}
                   >
                     <span className="t-meta flex w-full min-w-0 flex-wrap items-center gap-x-1.5 text-slate-500">
                       <span className="tabular-nums">{shortDate(sl.date)}</span>
-                      <span className="font-semibold text-brand-700">{KIND_LABEL[sl.kind]}</span>
+                      <span className={`inline-flex items-center gap-1 font-semibold ${TONE[KIND_STYLE[sl.kind].tone].text}`}>
+                        <KindGlyph kind={sl.kind} className="size-3.5" />
+                        {KIND_LABEL[sl.kind]}
+                      </span>
                       {st.posted ? (
                         <span className="ml-auto flex items-center gap-0.5 font-semibold text-success-700">
                           <CheckCircle2 className="size-3.5" aria-hidden="true" />
                           올림
                         </span>
                       ) : st.item ? (
-                        <span className="ml-auto font-semibold text-brand-700">만듦</span>
+                        <span className="ml-auto font-semibold text-violet-700">만듦</span>
                       ) : null}
                     </span>
                     <span className="t-sub block w-full break-keep text-slate-800">{sl.title}</span>
@@ -1055,10 +1112,10 @@ function PlanCard({ record, profile, today, store, onPick, onOpen }: { record: C
             })}
           </ol>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="primary" onClick={() => void makeAll()} disabled={busy || made === slots.length} data-testid="content-plan-make-all">
+            <button type="button" className={MK_PRIMARY.violet} onClick={() => void makeAll()} disabled={busy || made === slots.length} data-testid="content-plan-make-all">
               <Wand2 className="size-4" aria-hidden="true" />
               {made === slots.length ? `${slots.length}편 모두 만들었어요` : made ? `남은 ${slots.length - made}편 한 번에 만들기` : `한 달 치 ${slots.length}편 한 번에 만들기`}
-            </Button>
+            </button>
             <span className="t-meta break-keep text-slate-500">보관함에 날짜를 달아 넣어요 · 같은 글은 두 번 넣지 않아요.</span>
           </div>
           {made > 0 && isTrialId(record.id) && (
@@ -1102,36 +1159,44 @@ function SituationCard({ profile, today, holidays, openKey, onPick }: { profile:
   }, [profile, today, holidays])
   return (
     <section className={`${card} flex flex-col gap-3 p-4 sm:p-5`} data-testid="content-situations">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="t-section flex items-center gap-2 text-slate-900">
-          <Layers className="size-5 text-brand-600" aria-hidden="true" />
-          이런 일이 있을 때
-        </h2>
-        <span className="t-sub break-keep text-slate-600">하나 누르면 카톡 · 블로그 · 카드뉴스가 한 묶음으로 나와요</span>
-      </div>
+      <MkHead icon={Layers} tone="fuchsia" title="이런 일이 있을 때" aside="하나 누르면 카톡 · 블로그 · 카드뉴스가 한 묶음으로 나와요" />
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-        {list.map((sit, i) => (
-          <li key={sit.key} className={i >= 6 && !more ? 'hidden sm:block' : ''}>
-            <button
-              type="button"
-              onClick={() => onPick(sit.key)}
-              aria-pressed={openKey === sit.key}
-              className={`tap flex h-full w-full min-w-0 flex-col items-start gap-1 rounded-(--radius-control) border p-3 text-left ${openKey === sit.key ? 'border-brand-600 bg-brand-50' : sit.now ? 'border-brand-300 bg-brand-50/50 hover:border-brand-500' : 'border-slate-200 bg-white hover:border-brand-400'}`}
-              data-testid="content-situation"
-              data-key={sit.key}
-            >
-              {sit.now && (
-                <span className="t-meta flex w-full items-start gap-1 font-semibold break-keep text-brand-700" data-testid="content-situation-now">
-                  <Sparkles className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-                  <span className="min-w-0">지금 때 · {sit.now}</span>
+        {list.map((sit, i) => {
+          const ss = SITUATION_STYLE[sit.key] ?? { icon: Layers, tone: 'violet' as MkTone }
+          const on = openKey === sit.key
+          return (
+            <li key={sit.key} className={i >= 6 && !more ? 'hidden sm:block' : ''}>
+              <button
+                type="button"
+                onClick={() => onPick(sit.key)}
+                aria-pressed={on}
+                className={`tap flex h-full w-full min-w-0 flex-col items-start gap-1.5 rounded-(--radius-control) border p-3 text-left transition-shadow hover:shadow-sm ${on ? TONE[ss.tone].on : sit.now ? 'border-2 border-violet-300 bg-gradient-to-br from-violet-50 to-fuchsia-50 hover:border-violet-500' : `border-slate-200 bg-white ${TONE[ss.tone].hover}`}`}
+                data-testid="content-situation"
+                data-key={sit.key}
+              >
+                {sit.now && (
+                  <span className="t-meta flex w-full items-start gap-1 rounded-md bg-violet-600 px-2 py-1 font-semibold break-keep text-white" data-testid="content-situation-now">
+                    <Sparkles className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                    <span className="min-w-0">지금 때 · {sit.now}</span>
+                  </span>
+                )}
+                {/* 휴대폰(두 칸)은 아이콘을 위 줄에 — 옆에 두면 이름이 세 줄로 짜부라진다 */}
+                <span className="flex w-full min-w-0 flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                  <MkIcon icon={ss.icon} tone={ss.tone} size="sm" />
+                  <span className="t-body w-full min-w-0 font-semibold break-keep text-slate-900 sm:w-auto sm:flex-1">{sit.label}</span>
                 </span>
-              )}
-              <span className="t-body w-full font-semibold break-keep text-slate-900">{sit.label}</span>
-              <span className="t-meta hidden w-full break-keep text-slate-500 sm:block">{sit.hint}</span>
-              <span className="t-meta mt-auto w-full break-keep font-medium text-brand-700">{sit.tabs.join(' · ')}</span>
-            </button>
-          </li>
-        ))}
+                <span className="t-meta hidden w-full break-keep text-slate-500 sm:block">{sit.hint}</span>
+                <span className="mt-auto flex w-full flex-wrap gap-1">
+                  {sit.tabs.map((t) => (
+                    <MkTag key={t} tone={tabTone(t)}>
+                      {t}
+                    </MkTag>
+                  ))}
+                </span>
+              </button>
+            </li>
+          )
+        })}
       </ul>
       {list.length > 6 && (
         <button type="button" className="tap t-sub min-h-11 rounded-(--radius-control) border border-slate-200 font-semibold text-slate-700 sm:hidden" onClick={() => setMore((v) => !v)} aria-expanded={more} data-testid="content-situation-more">
@@ -1184,7 +1249,7 @@ function FillBox({ names, scope, onApply }: { names: string[]; scope: string; on
                 </label>
                 {g.optional && (
                   <label className="tap t-sub flex min-h-11 w-fit cursor-pointer items-center gap-2 text-slate-700">
-                    <input type="checkbox" className="size-4 accent-brand-600" checked={off} onChange={(e) => setDrop((d) => (e.target.checked ? [...d, g.label] : d.filter((x) => x !== g.label)))} data-testid="content-fill-drop" />
+                    <input type="checkbox" className="size-4 accent-violet-600" checked={off} onChange={(e) => setDrop((d) => (e.target.checked ? [...d, g.label] : d.filter((x) => x !== g.label)))} data-testid="content-fill-drop" />
                     없어요 — 이 줄 지우기
                   </label>
                 )}
@@ -1215,7 +1280,7 @@ function KeywordVolumeBox({ onPick }: { onPick: (word: string) => void }) {
   return (
     <section className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-slate-50 p-3" data-testid="content-volume">
       <h3 className="t-sub flex items-center gap-1.5 font-semibold text-slate-800">
-        <ListOrdered className="size-4 text-brand-700" aria-hidden="true" />
+        <ListOrdered className="size-4 text-sky-700" aria-hidden="true" />
         검색량 붙여 넣어 정리하기
       </h3>
       <p className="t-meta break-keep text-slate-600">네이버 광고 '키워드 도구' 표를 그대로 복사해 붙여 넣으세요(키워드 · PC · 모바일 칸). 많이 찾는 순으로 줄 세워 드려요. 쉼표로 적은 목록도 돼요.</p>
@@ -1340,9 +1405,12 @@ function ArchiveCard({ store, onOpen, onPosted, onRemoved, openId }: { store: Co
   const kindsHere = CONTENT_KINDS.filter((k) => rows.some((r) => r.item.kind === k))
   return (
     <section className={`${card} flex flex-col gap-3 p-4 sm:p-5`} data-testid="content-archive">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="t-section text-slate-900">보관함</h2>
-        <span className="t-sub text-slate-500" data-testid="content-archive-count">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="t-section flex items-center gap-2.5 text-slate-900">
+          <MkIcon icon={Archive} tone="indigo" />
+          보관함
+        </h2>
+        <span className="t-sub rounded-full bg-indigo-50 px-3 py-0.5 font-semibold text-indigo-800" data-testid="content-archive-count">
           {rows.length}편{rows.length ? ` · 올림 ${postedN}` : ''}
         </span>
       </div>
@@ -1352,14 +1420,14 @@ function ArchiveCard({ store, onOpen, onPosted, onRemoved, openId }: { store: Co
         <>
           <div className="flex flex-wrap gap-1.5">
             {(['all', 'todo', 'posted', 'fav', ...kindsHere] as const).map((f) => (
-              <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)} className={`tap t-sub min-h-11 rounded-full border px-3 ${filter === f ? 'border-brand-600 bg-brand-50 font-semibold text-brand-700' : 'border-slate-200 text-slate-600'}`} data-testid="content-archive-filter" data-value={f}>
+              <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)} className={`tap t-sub min-h-11 rounded-full border px-3 ${filter === f ? 'border-transparent bg-indigo-600 font-semibold text-white shadow-sm' : 'border-slate-200 text-slate-600 hover:border-indigo-300'}`} data-testid="content-archive-filter" data-value={f}>
                 {f === 'all' ? '전체' : f === 'fav' ? '즐겨찾기' : f === 'todo' ? '아직 안 올림' : f === 'posted' ? '올린 글' : KIND_LABEL[f]}
               </button>
             ))}
           </div>
           <ul className="flex flex-col divide-y divide-slate-100">
             {shown.map(({ item, versions }) => (
-              <li key={item.rootId} className={`flex items-center gap-2 py-1.5 ${openId === item.rootId ? 'bg-brand-50/60' : ''}`} data-testid="content-archive-item" data-kind={item.kind}>
+              <li key={item.rootId} className={`flex items-center gap-2 py-1.5 ${openId === item.rootId ? 'bg-violet-50' : ''}`} data-testid="content-archive-item" data-kind={item.kind}>
                 <button
                   type="button"
                   className="tap flex size-11 shrink-0 items-center justify-center rounded-(--radius-control) hover:bg-slate-50"
@@ -1372,10 +1440,13 @@ function ArchiveCard({ store, onOpen, onPosted, onRemoved, openId }: { store: Co
                 >
                   <Star className={`size-5 ${item.favorite ? 'fill-amber-400 text-amber-500' : 'text-slate-300'}`} aria-hidden="true" />
                 </button>
+                <span className="hidden sm:inline-flex">
+                  <MkIcon icon={KIND_STYLE[item.kind].icon} tone={KIND_STYLE[item.kind].tone} size="sm" />
+                </span>
                 <button type="button" className="tap flex min-h-11 min-w-0 flex-1 flex-col items-start justify-center text-left" onClick={() => onOpen(item)} data-testid="content-archive-open">
                   <span className="t-body line-clamp-2 w-full font-medium break-keep text-slate-800">{item.title}</span>
                   <span className="t-meta w-full break-keep text-slate-500">
-                    {KIND_LABEL[item.kind]}
+                    <b className={`font-semibold ${TONE[KIND_STYLE[item.kind].tone].text}`}>{KIND_LABEL[item.kind]}</b>
                     {item.input.situation ? ` · ${SITUATION_SHORT[item.input.situation as SituationKey] ?? ''}` : ''}
                     {item.input.planDate ? ` · ${shortDate(item.input.planDate)} 올릴 글` : ` · ${localDateOf(item.createdAt)}`}
                     {versions > 1 ? ` · ${versions}판` : ''}

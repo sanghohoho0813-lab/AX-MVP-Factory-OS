@@ -10,7 +10,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, ArrowDown, ArrowUp, Check, CheckCircle2, ChevronRight, Copy, Download, ExternalLink, EyeOff, Gauge, Maximize2, Minimize2, Monitor, PenLine, Plus, Redo2, RefreshCw, Smartphone, Sparkles, Trash2, Undo2 } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowUp, Check, CheckCircle2, ChevronRight, Copy, Download, ExternalLink, EyeOff, Gauge, Globe, LayoutGrid, Maximize2, Minimize2, Monitor, Palette, PenLine, Plus, Redo2, RefreshCw, Smartphone, Sparkles, Trash2, Undo2, Wand2 } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { BottomSheet, Badge } from '../../components/ui/primitives'
 import { ConfirmModal } from '../../components/ui/ConfirmModal'
@@ -66,8 +66,14 @@ import { isTrialId, subjectQuery } from '../../services/marketingTrial'
 import { BlockFields, IconBtn, inputClass } from './BlockFields'
 import { SitePreview, type Device } from './SitePreview'
 import type { SiteStore } from './useSiteDoc'
+import { MkHero, MkIcon } from '../marketing/mkKit'
+import { BLOCK_STYLE, MK_PRIMARY, TONE } from '../marketing/mkTheme'
 
 type Tab = 'blocks' | 'style' | 'checks'
+
+// D-226 고른 칸 · 칩은 테마 색이 아니라 홈페이지 색(초록)
+const onBox = 'border-emerald-500 ring-2 ring-emerald-200'
+const onSoft = 'border-emerald-500 bg-emerald-50 text-emerald-900'
 
 function blockSummary(b: SiteBlock): string {
   const p = b.props
@@ -125,37 +131,58 @@ function StartCard({ record, onStart }: { record: ClientOpsRecord; onStart: (ind
   ]
   const have = rows.filter(([, v]) => v).length
   return (
-    <section className="rounded-(--radius-panel) border border-slate-200 bg-white flex flex-col gap-4 p-5" data-testid="site-start">
-      <div>
-        <h2 className="t-section text-slate-900">업체 기록으로 홈페이지 초안을 만듭니다</h2>
-        <p className="t-body mt-1 break-keep text-slate-600">
-          아래 {rows.length}가지 중 {have}가지가 업체 기록에 있어요. 있는 것은 그대로 넣고, 없는 것은 비워 둔 채 점검에서 알려 드려요. 숫자 · 인증은 기록에 있을 때만 넣어요(지어내지 않아요).
-        </p>
-      </div>
-      <dl className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2" data-testid="site-start-facts">
-        {rows.map(([k, v]) => (
-          <div key={k} className="flex min-h-9 items-start gap-2 border-b border-slate-100 py-1.5">
-            {v ? <Check className="mt-0.5 size-4 shrink-0 text-emerald-600" aria-label="있음" /> : <span className="mt-0.5 size-4 shrink-0 text-center text-slate-400" aria-label="없음">–</span>}
-            <dt className="t-sub w-28 shrink-0 text-slate-500">{k}</dt>
-            <dd className={`t-sub min-w-0 break-words [overflow-wrap:anywhere] ${v ? 'font-medium text-slate-800' : 'text-slate-400'}`}>{v || '없음'}</dd>
-          </div>
-        ))}
-      </dl>
-      {!f.phone && f.contactPhone && <p className="t-sub break-keep text-amber-800">회사 대표 전화가 없어요 — 담당자 휴대폰은 저절로 넣지 않아요. 만든 뒤 점검에서 넣을 수 있어요.</p>}
-      <label className="flex flex-col sm:max-w-sm">
-        <span className="t-sub font-semibold text-slate-700">업종 견본 {industry === detected && <span className="t-meta font-normal text-slate-500">(업체 기록으로 알아봄)</span>}</span>
-        <select className={inputClass} value={industry} onChange={(e) => setIndustry(e.target.value as IndustryKey)} data-testid="site-industry">
-          {INDUSTRIES.map((i) => (
-            <option key={i.key} value={i.key}>
-              {i.label}
-            </option>
+    <section className="flex flex-col overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white shadow-sm" data-testid="site-start">
+      {/* D-226 머리 띠 — 무엇이 채워질지 한눈에(몇 가지 있는지 막대로) */}
+      <MkHero
+        tone="emerald"
+        icon={Globe}
+        eyebrow="홈페이지 초안 · 업체 기록으로"
+        title={record.companyName}
+        sub={`업체 기록으로 홈페이지 초안을 만듭니다. 아래 ${rows.length}가지 중 ${have}가지가 있어요.`}
+        stats={[{ label: '채울 수 있는 것', value: `${have}/${rows.length}` }]}
+      >
+        <div className="h-2.5 w-full max-w-md overflow-hidden rounded-full bg-white/25" aria-hidden="true">
+          <div className="h-full rounded-full bg-white" style={{ width: `${Math.round((have / rows.length) * 100)}%` }} />
+        </div>
+      </MkHero>
+      <div className="flex flex-col gap-4 p-4 sm:p-5">
+        <p className="t-body break-keep text-slate-600">있는 것은 그대로 넣고, 없는 것은 비워 둔 채 점검에서 알려 드려요. 숫자 · 인증은 기록에 있을 때만 넣어요(지어내지 않아요).</p>
+        <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid="site-start-facts">
+          {rows.map(([k, v]) => (
+            <div key={k} className={`flex min-h-12 min-w-0 items-start gap-2.5 rounded-(--radius-control) border px-3 py-2 ${v ? 'border-emerald-200 bg-emerald-50/60' : 'border-dashed border-slate-300 bg-slate-50'}`}>
+              {v ? (
+                <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white" aria-label="있음">
+                  <Check className="size-4" aria-hidden="true" />
+                </span>
+              ) : (
+                <span className="t-meta mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-200 font-bold text-slate-500" aria-label="없음">
+                  –
+                </span>
+              )}
+              <div className="min-w-0 flex-1">
+                <dt className="t-meta font-semibold text-slate-600">{k}</dt>
+                <dd className={`t-sub min-w-0 break-words [overflow-wrap:anywhere] ${v ? 'font-medium text-slate-900' : 'text-slate-500'}`}>{v || '없음'}</dd>
+              </div>
+            </div>
           ))}
-        </select>
-      </label>
-      <div>
-        <Button variant="primary" onClick={() => onStart(industry)} data-testid="site-create">
-          초안 만들기
-        </Button>
+        </dl>
+        {!f.phone && f.contactPhone && <p className="t-sub break-keep rounded-(--radius-control) bg-amber-50 px-3 py-2 text-amber-800">회사 대표 전화가 없어요 — 담당자 휴대폰은 저절로 넣지 않아요. 만든 뒤 점검에서 넣을 수 있어요.</p>}
+        <div className="flex flex-col gap-3 rounded-(--radius-control) border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-3 sm:flex-row sm:items-end">
+          <label className="flex min-w-0 flex-1 flex-col sm:max-w-sm">
+            <span className="t-sub font-semibold text-slate-700">업종 견본 {industry === detected && <span className="t-meta font-normal text-slate-500">(업체 기록으로 알아봄)</span>}</span>
+            <select className={inputClass} value={industry} onChange={(e) => setIndustry(e.target.value as IndustryKey)} data-testid="site-industry">
+              {INDUSTRIES.map((i) => (
+                <option key={i.key} value={i.key}>
+                  {i.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" className={MK_PRIMARY.emerald} onClick={() => onStart(industry)} data-testid="site-create">
+            <Wand2 className="size-5" aria-hidden="true" />
+            초안 만들기
+          </button>
+        </div>
       </div>
     </section>
   )
@@ -299,15 +326,15 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
         {must ? <AlertTriangle className="size-4" aria-hidden="true" /> : <CheckCircle2 className="size-4" aria-hidden="true" />}
         {must ? `꼭 고칠 것 ${must}` : should ? `확인할 것 ${should}` : '점검 통과'}
       </button>
-      <Link to={`/tools/content/build?${subjectQuery(record.id)}`} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 px-3 font-semibold text-slate-700 hover:bg-slate-50" data-testid="site-to-content">
+      <Link to={`/tools/content/build?${subjectQuery(record.id)}`} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-violet-200 bg-violet-50 px-3 font-semibold text-violet-800 hover:border-violet-400" data-testid="site-to-content">
         <PenLine className="size-4" aria-hidden="true" /> 이 업체 홍보 글
       </Link>
       <Button size="sm" onClick={onOpen} data-testid="site-open">
         <ExternalLink className="size-4" aria-hidden="true" /> 새 창으로 보기
       </Button>
-      <Button size="sm" variant="primary" onClick={() => void onDownload()} data-testid="site-download">
+      <button type="button" className={MK_PRIMARY.emerald} onClick={() => void onDownload()} data-testid="site-download">
         <Download className="size-4" aria-hidden="true" /> HTML 내려받기
-      </Button>
+      </button>
       {/* D-220: 가상 업체 · 컨설턴트는 붙일 업체 기록이 없다 — 임시등록하면 붙일 수 있다 */}
       {!isTrialId(record.id) && (
       <ToolResultAttach
@@ -328,13 +355,14 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
   const blocksTab = (
     <div className="flex flex-col gap-2" data-testid="site-blocks">
       {suggestions.length > 0 && (
-        <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50/60 p-3" data-testid="site-suggest">
-          <p className="t-sub flex items-center gap-1.5 font-semibold text-brand-900">
-            <Sparkles className="size-4 shrink-0 text-brand-600" aria-hidden="true" />
+        <div className="flex flex-col gap-2 rounded-(--radius-control) border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-3" data-testid="site-suggest">
+          <p className="t-sub flex items-center gap-1.5 font-semibold text-emerald-900">
+            <Sparkles className="size-4 shrink-0 text-emerald-700" aria-hidden="true" />
             {industryDef(doc.industry).label}에 있으면 좋은 블록
           </p>
           {suggestions.map((sg) => (
             <div key={sg.type} className="flex items-center gap-2" data-testid="site-suggest-item" data-type={sg.type}>
+              <MkIcon icon={BLOCK_STYLE[sg.type].icon} tone={BLOCK_STYLE[sg.type].tone} size="sm" />
               <span className="min-w-0 flex-1">
                 <span className="t-sub block font-semibold text-slate-800">{blockDef(sg.type)?.label}</span>
                 <span className="t-meta block break-keep text-slate-600">{sg.why}</span>
@@ -351,9 +379,14 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
         const open = selected === b.id
         const pinned = b.type === 'header' || b.type === 'footer'
         return (
-          <div key={b.id} data-block-row={b.id} data-type={b.type} className={`rounded-(--radius-control) border bg-white ${open ? 'border-brand-400 shadow-sm' : 'border-slate-200'}`}>
+          <div key={b.id} data-block-row={b.id} data-type={b.type} className={`rounded-(--radius-control) border bg-white ${open ? 'border-emerald-400 shadow-md ring-1 ring-emerald-200' : `border-slate-200 ${TONE[BLOCK_STYLE[b.type].tone].hover}`}`}>
             <button type="button" className="tap flex w-full min-h-14 items-center gap-3 px-3 py-2 text-left" onClick={() => setSelected(open ? null : b.id)} aria-expanded={open} data-testid="block-row">
-              <span className="t-meta flex size-7 shrink-0 items-center justify-center rounded-full bg-slate-100 font-semibold text-slate-600">{i + 1}</span>
+              <span className="relative shrink-0">
+                <MkIcon icon={BLOCK_STYLE[b.type].icon} tone={BLOCK_STYLE[b.type].tone} />
+                <span className="absolute -top-1.5 -left-1.5 flex size-5 items-center justify-center rounded-full bg-white text-[0.6875rem] font-bold text-slate-600 tabular-nums shadow ring-1 ring-slate-200" aria-hidden="true">
+                  {i + 1}
+                </span>
+              </span>
               <span className="min-w-0 flex-1">
                 <span className="t-card block break-keep font-semibold text-slate-900">{def?.label}</span>
                 <span className="t-meta block truncate text-slate-500">{blockSummary(b) || def?.desc}</span>
@@ -395,11 +428,11 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
                     </IconBtn>
                   )}
                   <label className="tap t-sub inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-(--radius-control) border border-slate-300 px-3 text-slate-700">
-                    <input type="checkbox" className="size-4 accent-brand-600" checked={Boolean(b.hidePc)} onChange={(e) => change(setHidden(doc, b.id, 'pc', e.target.checked, nowIso()))} data-testid="block-hide-pc" />
+                    <input type="checkbox" className="size-4 accent-emerald-600" checked={Boolean(b.hidePc)} onChange={(e) => change(setHidden(doc, b.id, 'pc', e.target.checked, nowIso()))} data-testid="block-hide-pc" />
                     <EyeOff className="size-4" aria-hidden="true" /> PC 숨김
                   </label>
                   <label className="tap t-sub inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-(--radius-control) border border-slate-300 px-3 text-slate-700">
-                    <input type="checkbox" className="size-4 accent-brand-600" checked={Boolean(b.hideMobile)} onChange={(e) => change(setHidden(doc, b.id, 'mobile', e.target.checked, nowIso()))} data-testid="block-hide-mobile" />
+                    <input type="checkbox" className="size-4 accent-emerald-600" checked={Boolean(b.hideMobile)} onChange={(e) => change(setHidden(doc, b.id, 'mobile', e.target.checked, nowIso()))} data-testid="block-hide-mobile" />
                     <EyeOff className="size-4" aria-hidden="true" /> 휴대폰 숨김
                   </label>
                   <span className="ml-auto" />
@@ -415,7 +448,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
       <button
         type="button"
         onClick={() => setAdding(true)}
-        className="tap t-body inline-flex min-h-12 items-center justify-center gap-2 rounded-(--radius-control) border border-dashed border-brand-300 bg-brand-50 font-semibold text-brand-700 hover:bg-brand-100"
+        className="tap t-body inline-flex min-h-12 items-center justify-center gap-2 rounded-(--radius-control) border-2 border-dashed border-emerald-300 bg-emerald-50 font-semibold text-emerald-800 hover:bg-emerald-100"
         data-testid="block-add"
       >
         <Plus className="size-5" aria-hidden="true" /> 블록 더하기
@@ -443,7 +476,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
                   change(applyStylePreset(doc, sp.key, nowIso()))
                   showToast(`'${sp.label}' 스타일로 바꿨어요 — 마음에 안 들면 [되돌리기] 를 눌러 주세요.`)
                 }}
-                className={`tap flex min-h-16 w-full min-w-0 items-center gap-3 border px-3 py-2 text-left ${on ? 'border-brand-500 ring-2 ring-brand-200' : 'border-slate-200 hover:border-slate-400'}`}
+                className={`tap flex min-h-16 w-full min-w-0 items-center gap-3 border px-3 py-2 text-left ${on ? onBox : 'border-slate-200 hover:border-emerald-300'}`}
                 style={{ borderRadius: sp.corner === 'square' ? 6 : sp.corner === 'round' ? 14 : 22 }}
                 data-testid="site-preset"
                 data-value={sp.key}
@@ -458,8 +491,8 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
                 <span className="min-w-0 flex-1">
                   <span className={`t-sub flex flex-wrap items-center gap-x-1.5 font-semibold text-slate-900 ${sp.font === 'serif' ? 'font-serif' : ''}`}>
                     {sp.label}
-                    {sp.key === recommendStyle && <span className="t-meta rounded-full bg-brand-50 px-1.5 font-semibold text-brand-700">이 업종 추천</span>}
-                    {on && <Check className="size-4 text-brand-600" aria-label="지금 스타일" />}
+                    {sp.key === recommendStyle && <span className="t-meta rounded-full bg-amber-100 px-1.5 font-semibold text-amber-800">이 업종 추천</span>}
+                    {on && <Check className="size-4 text-emerald-600" aria-label="지금 스타일" />}
                   </span>
                   <span className="t-meta block break-keep text-slate-500">{sp.hint}</span>
                 </span>
@@ -477,7 +510,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
               type="button"
               aria-pressed={doc.theme.palette === p.key}
               onClick={() => change(setTheme(doc, { palette: p.key }, nowIso()))}
-              className={`tap flex min-h-14 items-center gap-2.5 rounded-(--radius-control) border px-3 py-2 text-left ${doc.theme.palette === p.key ? 'border-brand-500 ring-2 ring-brand-200' : 'border-slate-200'}`}
+              className={`tap flex min-h-14 items-center gap-2.5 rounded-(--radius-control) border px-3 py-2 text-left ${doc.theme.palette === p.key ? onBox : 'border-slate-200 hover:border-emerald-300'}`}
               data-testid="theme-palette"
               data-value={p.key}
             >
@@ -498,7 +531,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
         <legend className="t-card mb-1 font-semibold text-slate-900">글꼴</legend>
         <div className="flex flex-wrap gap-2">
           {FONTS.map((f) => (
-            <button key={f.key} type="button" aria-pressed={doc.theme.font === f.key} onClick={() => change(setTheme(doc, { font: f.key }, nowIso()))} className={`tap t-sub min-h-11 rounded-(--radius-control) border px-4 font-medium ${doc.theme.font === f.key ? 'border-brand-500 bg-brand-50 text-brand-800' : 'border-slate-300 text-slate-700'}`} data-testid="theme-font" data-value={f.key}>
+            <button key={f.key} type="button" aria-pressed={doc.theme.font === f.key} onClick={() => change(setTheme(doc, { font: f.key }, nowIso()))} className={`tap t-sub min-h-11 rounded-(--radius-control) border px-4 font-medium ${doc.theme.font === f.key ? onSoft : 'border-slate-300 text-slate-700'}`} data-testid="theme-font" data-value={f.key}>
               {f.label}
             </button>
           ))}
@@ -508,7 +541,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
         <legend className="t-card mb-1 font-semibold text-slate-900">모서리</legend>
         <div className="flex flex-wrap gap-2">
           {CORNERS.map((c) => (
-            <button key={c.key} type="button" aria-pressed={doc.theme.corner === c.key} onClick={() => change(setTheme(doc, { corner: c.key }, nowIso()))} className={`tap t-sub min-h-11 border px-4 font-medium ${doc.theme.corner === c.key ? 'border-brand-500 bg-brand-50 text-brand-800' : 'border-slate-300 text-slate-700'}`} style={{ borderRadius: Math.min(c.button, 22) }} data-testid="theme-corner" data-value={c.key}>
+            <button key={c.key} type="button" aria-pressed={doc.theme.corner === c.key} onClick={() => change(setTheme(doc, { corner: c.key }, nowIso()))} className={`tap t-sub min-h-11 border px-4 font-medium ${doc.theme.corner === c.key ? onSoft : 'border-slate-300 text-slate-700'}`} style={{ borderRadius: Math.min(c.button, 22) }} data-testid="theme-corner" data-value={c.key}>
               {c.label}
             </button>
           ))}
@@ -579,9 +612,10 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
 
   const editor = (
     <div className="flex min-w-0 flex-col gap-3">
-      <div className="flex gap-1 rounded-(--radius-control) bg-slate-100 p-1" role="tablist">
+      <div className="flex gap-1 rounded-(--radius-control) bg-emerald-50 p-1 ring-1 ring-emerald-100" role="tablist">
         {tabs.map((t) => (
-          <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)} className={`tap t-sub min-h-11 flex-1 rounded-(--radius-control) px-2 font-semibold ${tab === t.key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`} data-testid={`site-tab-${t.key}`}>
+          <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)} className={`tap t-sub inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-(--radius-control) px-2 font-semibold ${tab === t.key ? 'bg-emerald-700 text-white shadow-sm' : 'text-emerald-900 hover:bg-white/70'}`} data-testid={`site-tab-${t.key}`}>
+            {t.key === 'blocks' ? <LayoutGrid className="size-4" aria-hidden="true" /> : t.key === 'style' ? <Palette className="size-4" aria-hidden="true" /> : must ? <AlertTriangle className="size-4" aria-hidden="true" /> : <CheckCircle2 className="size-4" aria-hidden="true" />}
             {t.label}
           </button>
         ))}
@@ -594,7 +628,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
     <div className="flex min-w-0 flex-col gap-2 lg:sticky lg:top-20">
       <div className="flex items-center gap-2">
         {(['pc', 'mobile'] as const).map((d) => (
-          <button key={d} type="button" aria-pressed={device === d} onClick={() => setDevice(d)} className={`tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border px-3 font-semibold ${device === d ? 'border-brand-500 bg-brand-50 text-brand-800' : 'border-slate-300 text-slate-600'}`} data-testid={`preview-${d}`}>
+          <button key={d} type="button" aria-pressed={device === d} onClick={() => setDevice(d)} className={`tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border px-3 font-semibold ${device === d ? onSoft : 'border-slate-300 text-slate-600'}`} data-testid={`preview-${d}`}>
             {d === 'pc' ? <Monitor className="size-4" aria-hidden="true" /> : <Smartphone className="size-4" aria-hidden="true" />}
             {d === 'pc' ? 'PC' : '휴대폰'}
           </button>
@@ -613,7 +647,22 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
 
   return (
     <div className="flex flex-col gap-4" data-testid="site-builder">
-      {toolbar}
+      {/* D-226 머리 띠 — 누구 홈페이지 · 어떤 견본 · 블록 · 점수가 한눈에, 아래에 도구줄 */}
+      <section className="overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white shadow-sm">
+        <MkHero
+          tone="emerald"
+          icon={Globe}
+          eyebrow={`홈페이지 · ${industryDef(doc.industry).label} 견본`}
+          title={record.companyName}
+          stats={[
+            { label: '보이는 블록', value: `${visibleCount}개`, testId: 'site-stat-blocks' },
+            ...(score ? [{ label: '점수', value: `${score.score}점`, testId: 'site-stat-score' }] : []),
+            { label: '점검', value: must ? `꼭 고칠 것 ${must}` : should ? `확인 ${should}` : '통과', testId: 'site-stat-checks' },
+          ]}
+          testId="site-hero"
+        />
+        <div className="p-3 sm:p-4">{toolbar}</div>
+      </section>
       {mismatch && (
         <div className="flex flex-wrap items-center gap-3 rounded-(--radius-panel) border border-amber-200 bg-amber-50 p-3 sm:p-4" data-testid="site-industry-mismatch" data-detected={detected}>
           <AlertTriangle className="size-5 shrink-0 text-amber-600" aria-hidden="true" />
@@ -626,15 +675,22 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
         </div>
       )}
       {score && (
-        <section className="flex flex-col gap-2 rounded-(--radius-panel) border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:gap-4 sm:p-4" data-testid="site-score" data-score={score.score}>
+        <section className={`flex flex-col gap-3 rounded-(--radius-panel) border-2 p-3 shadow-sm sm:flex-row sm:items-center sm:gap-4 sm:p-4 ${score.score >= 80 ? 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50' : score.score >= 50 ? 'border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50' : 'border-danger-200 bg-gradient-to-br from-danger-50 to-rose-50'}`} data-testid="site-score" data-score={score.score}>
           <div className="flex shrink-0 items-center gap-3">
-            <span className={`flex size-14 shrink-0 flex-col items-center justify-center rounded-full border-4 ${score.score >= 80 ? 'border-emerald-500 text-emerald-700' : score.score >= 50 ? 'border-amber-400 text-amber-700' : 'border-danger-400 text-danger-700'}`} aria-hidden="true">
-              <span className="text-lg leading-none font-bold tabular-nums">{score.score}</span>
-              <span className="t-meta leading-none">점</span>
+            {/* D-226 점수만큼 차오르는 고리 */}
+            <span
+              className="relative flex size-16 shrink-0 items-center justify-center rounded-full"
+              style={{ background: `conic-gradient(${score.score >= 80 ? '#059669' : score.score >= 50 ? '#f59e0b' : '#dc2626'} ${Math.round(score.score * 3.6)}deg, #e2e8f0 0)` }}
+              aria-hidden="true"
+            >
+              <span className={`flex size-12 flex-col items-center justify-center rounded-full bg-white ${score.score >= 80 ? 'text-emerald-700' : score.score >= 50 ? 'text-amber-700' : 'text-danger-700'}`}>
+                <span className="text-lg leading-none font-bold tabular-nums">{score.score}</span>
+                <span className="t-meta leading-none">점</span>
+              </span>
             </span>
             <span className="min-w-0">
               <span className="t-card flex items-center gap-1.5 font-semibold text-slate-900">
-                <Gauge className="size-4 text-slate-500" aria-hidden="true" />
+                <Gauge className="size-4 text-emerald-700" aria-hidden="true" />
                 홈페이지 점수 {score.score}점
               </span>
               <span className="t-meta block break-keep text-slate-500">손님이 믿고 연락하기까지 필요한 것 11가지(우리 기준 · 검색 순위 점수 아님)</span>
@@ -645,8 +701,8 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
               <span className="t-meta font-semibold text-slate-600">이것만 하면</span>
               <div className="flex flex-wrap gap-1.5">
                 {score.next.map((it) => (
-                  <button key={it.key} type="button" onClick={() => openScore(it)} title={it.how} className="tap t-sub inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-(--radius-control) border border-brand-200 bg-brand-50 px-3 text-left font-semibold text-brand-800 hover:border-brand-400" data-testid="site-score-item" data-key={it.key}>
-                    <span className="t-meta shrink-0 rounded-full bg-brand-600 px-1.5 font-bold text-white tabular-nums">+{it.points}</span>
+                  <button key={it.key} type="button" onClick={() => openScore(it)} title={it.how} className="tap t-sub inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-(--radius-control) border border-emerald-200 bg-white px-3 text-left font-semibold text-emerald-900 shadow-sm hover:border-emerald-400" data-testid="site-score-item" data-key={it.key}>
+                    <span className="t-meta shrink-0 rounded-full bg-emerald-700 px-1.5 font-bold text-white tabular-nums">+{it.points}</span>
                     <span className="min-w-0 break-keep">{it.label}</span>
                     <ChevronRight className="size-4 shrink-0" aria-hidden="true" />
                   </button>
@@ -691,12 +747,15 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
                   setAdding(false)
                   setTab('blocks')
                 }}
-                className="tap flex min-h-14 flex-col items-start rounded-(--radius-control) border border-slate-200 px-3 py-2 text-left hover:border-brand-300 hover:bg-brand-50"
+                className={`tap flex min-h-14 items-center gap-3 rounded-(--radius-control) border border-slate-200 px-3 py-2 text-left hover:bg-slate-50 ${TONE[BLOCK_STYLE[d.type as BlockType].tone].hover}`}
                 data-testid="palette-item"
                 data-type={d.type}
               >
-                <span className="t-card font-semibold text-slate-900">{d.label}</span>
-                <span className="t-meta text-slate-500">{d.desc}</span>
+                <MkIcon icon={BLOCK_STYLE[d.type as BlockType].icon} tone={BLOCK_STYLE[d.type as BlockType].tone} />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="t-card font-semibold text-slate-900">{d.label}</span>
+                  <span className="t-meta text-slate-500">{d.desc}</span>
+                </span>
               </button>
             ))}
           </div>

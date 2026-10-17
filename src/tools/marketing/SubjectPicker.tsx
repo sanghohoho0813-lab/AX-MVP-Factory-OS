@@ -16,6 +16,7 @@ import type { ClientOpsRecord } from '../../types/clientOps'
 import { useToast } from '../../components/ui/toastContext'
 import { inputClass } from '../homepage/BlockFields'
 import { TrialForm } from './TrialForm'
+import { TONE } from './mkTheme'
 import { useTrials } from './trialStore'
 
 type Group = 'contract' | 'lead' | 'consultant' | 'trial'
@@ -46,6 +47,8 @@ export function SubjectPicker({
   testPrefix,
   title,
   desc,
+  tone = 'violet',
+  headIcon,
 }: {
   buildPath: string
   /** 만든 것이 있는 곳(id → 마지막으로 고친 때) — 먼저 보이고 표시가 붙는다 */
@@ -55,7 +58,12 @@ export function SubjectPicker({
   testPrefix: string
   title: string
   desc: string
+  /** D-226 도구 색 — 홍보 글 보라 · 홈페이지 초록 */
+  tone?: 'violet' | 'emerald'
+  /** 제목 앞 색 아이콘 */
+  headIcon?: ReactNode
 }) {
+  const t = TONE[tone]
   const { loadClients, workspaceId } = useToolClient()
   const trialsStore = useTrials(workspaceId)
   const navigate = useNavigate()
@@ -118,23 +126,26 @@ export function SubjectPicker({
   const loading = clients === null || trialsStore.status === 'loading'
 
   return (
-    <section className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-5" data-testid={testPrefix}>
+    <section className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-5 shadow-sm" data-testid={testPrefix}>
       <div>
-        <h2 className="t-section text-slate-900">{title}</h2>
+        <h2 className="t-section flex items-center gap-2.5 text-slate-900">
+          {headIcon && <span aria-hidden="true" className={`inline-flex size-9 shrink-0 items-center justify-center rounded-lg ${t.solid}`}>{headIcon}</span>}
+          {title}
+        </h2>
         <p className="t-sub mt-1 break-keep text-slate-600">{desc}</p>
       </div>
 
       {/* 고객 관리에 없어도 — 가상 업체 · 컨설턴트로 바로 */}
-      <div className="flex flex-col gap-2 rounded-(--radius-control) border border-brand-200 bg-brand-50/60 p-3" data-testid="trial-start">
-        <p className="t-sub flex items-start gap-1.5 break-keep font-semibold text-brand-900">
-          <Sparkles className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden="true" />
+      <div className={`flex flex-col gap-2 rounded-(--radius-control) border p-3 ${t.line} ${t.soft}`} data-testid="trial-start">
+        <p className={`t-sub flex items-start gap-1.5 break-keep font-semibold ${t.deep}`}>
+          <Sparkles className={`mt-0.5 size-4 shrink-0 ${t.text}`} aria-hidden="true" />
           고객 관리에 없어도 돼요 — 잠재고객 · 동료 컨설턴트 · 가상의 업체로 먼저 만들어 보고, 마음에 들면 임시등록하세요.
         </p>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => openForm('company')} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-brand-300 bg-white px-3 font-semibold text-brand-800 hover:bg-brand-50" data-testid="trial-new-company">
+          <button type="button" onClick={() => openForm('company')} className={`tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border bg-white px-3 font-semibold ${t.line} ${t.deep} ${t.hover}`} data-testid="trial-new-company">
             <Plus className="size-4" aria-hidden="true" /> 가상 업체로 만들기
           </button>
-          <button type="button" onClick={() => openForm('consultant')} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-brand-300 bg-white px-3 font-semibold text-brand-800 hover:bg-brand-50" data-testid="trial-new-consultant">
+          <button type="button" onClick={() => openForm('consultant')} className={`tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border bg-white px-3 font-semibold ${t.line} ${t.deep} ${t.hover}`} data-testid="trial-new-consultant">
             <BriefcaseBusiness className="size-4" aria-hidden="true" /> 컨설턴트로 만들기
           </button>
         </div>
@@ -148,7 +159,7 @@ export function SubjectPicker({
             role="tab"
             aria-selected={filter === f}
             onClick={() => setFilter(f)}
-            className={`tap t-sub min-h-11 rounded-full border px-3 ${filter === f ? 'border-brand-600 bg-brand-600 font-semibold text-white' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+            className={`tap t-sub min-h-11 rounded-full border px-3 ${filter === f ? `border-transparent font-semibold shadow-sm ${t.solid}` : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
             data-testid="subject-filter"
             data-filter={f}
           >
@@ -175,12 +186,12 @@ export function SubjectPicker({
                 {/* 휴대폰에서는 '만든 것' 표시를 이름 아래 줄로 — 오른쪽에 두면 이름이 '한솔정…' 처럼 잘린다 */}
                 <span className="min-w-0 flex-1">
                   <span className="t-body block truncate font-medium text-slate-800">{r.name}</span>
-                  {made.has(r.id) && <span className="t-meta block text-brand-700 sm:hidden">{madeLabel(r.id)}</span>}
+                  {made.has(r.id) && <span className={`t-meta block font-semibold sm:hidden ${t.text}`}>{madeLabel(r.id)}</span>}
                 </span>
                 <span className="flex shrink-0 flex-wrap items-center justify-end gap-1">
-                  {made.has(r.id) && <span className="t-meta hidden text-brand-700 sm:inline">{madeLabel(r.id)}</span>}
+                  {made.has(r.id) && <span className={`t-meta hidden rounded-full px-2 py-0.5 font-semibold sm:inline ${t.icon}`}>{madeLabel(r.id)}</span>}
                   {r.provisional && <span className="t-meta rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 font-semibold text-amber-800">임시등록</span>}
-                  <span className={`t-meta rounded-full border px-2 py-0.5 ${r.group === 'trial' ? 'border-brand-200 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600'}`}>{r.kindLabel ?? GROUP_LABEL[r.group]}</span>
+                  <span className={`t-meta rounded-full border px-2 py-0.5 ${r.group === 'trial' ? `${t.line} ${t.soft} ${t.text}` : 'border-slate-200 text-slate-600'}`}>{r.kindLabel ?? GROUP_LABEL[r.group]}</span>
                 </span>
               </Link>
             </li>

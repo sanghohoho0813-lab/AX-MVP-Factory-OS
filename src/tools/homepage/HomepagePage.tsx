@@ -39,8 +39,10 @@ function ClientPicker() {
       buildPath={BUILD}
       made={made}
       madeLabel={() => '만든 홈페이지 있음'}
-      icon={(on) => <Globe className={`size-4 shrink-0 ${on ? 'text-brand-600' : 'text-slate-300'}`} aria-hidden="true" />}
+      icon={(on) => <Globe className={`size-4 shrink-0 ${on ? 'text-emerald-600' : 'text-slate-300'}`} aria-hidden="true" />}
       testPrefix="site-picker"
+      tone="emerald"
+      headIcon={<Globe className="size-5" />}
       title="누구 홈페이지인가요?"
       desc="계약 고객 · 잠재고객 · 컨설턴트를 고르면 그 기록으로 초안을 바로 만들어요. 업체 상세의 [홈페이지 만들기] 로 와도 같아요."
     />

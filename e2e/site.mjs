@@ -10,6 +10,7 @@
  *  390 · 360  [고치기 | 미리보기] · 가로 넘침 0 · 누르는 것 44px · 휴대폰 미리보기
  *  D-208  홈페이지 점수 · 이것만 하면(누르면 그 블록) · 업종 맞춤 블록 [넣기] · 디자인 한 번에(스타일 6 · 업종 추천 · 되돌리기) ·
  *         사진 없으면 사진 가득 대신 색 바탕 · 이 업체 홍보 글로 바로 · 휴대폰 넘침 0
+ *  D-226  색 — 처음 카드 · 편집 머리 띠(초록 · 점수 같은 숫자) · 블록마다 색 아이콘 · 고른 탭 초록 · 블록 더하기 창 아이콘
  *
  *   node e2e/site.mjs http://localhost:4390 [--shots <dir>]
  */
@@ -680,6 +681,47 @@ for (const width of [390, 360]) {
   await ctx.close()
 }
 check('19 휴대폰 화면 오류 0', errors.length === 0, errors)
+
+// D-226 — 색: 홈페이지는 초록. 처음 카드 · 편집 머리 띠 · 블록마다 색 아이콘 · 고른 탭 · 블록 더하기 창
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  const p = await ctx.newPage()
+  p.on('pageerror', (e) => errors.push(`D226 pageerror ${e.message}`))
+  const chroma = (sel) =>
+    p.locator(sel).first().evaluate((el) => {
+      const cs = getComputedStyle(el)
+      const s = `${cs.backgroundImage} ${cs.backgroundColor}`
+      let best = 0
+      for (const m of s.matchAll(/oklch\(\s*([\d.]+%?)\s+([\d.]+)/g)) best = Math.max(best, Number(m[2]))
+      for (const m of s.matchAll(/rgba?\((\d+),\s*(\d+),\s*(\d+)/g)) {
+        const [r, g, b] = [m[1], m[2], m[3]].map((x) => Number(x) / 255)
+        const mx = Math.max(r, g, b)
+        best = Math.max(best, mx === 0 ? 0 : ((mx - Math.min(r, g, b)) / mx) * 0.4)
+      }
+      return best
+    })
+  await seed(p)
+  await p.goto(BASE + '/tools/homepage/build?client=cli_site', { waitUntil: 'networkidle' })
+  await p.getByTestId('site-start').waitFor()
+  const startC = await chroma('[data-testid="site-start"] > div')
+  const startTxt = await p.getByTestId('site-start').innerText()
+  check(`H1 처음 카드 머리 띠 — 초록 그라데이션(채도 ${startC.toFixed(2)}) · 채울 수 있는 것 n/9`, startC > 0.09 && /\d\/9/.test(startTxt), startC)
+  check('H1 [초안 만들기] — 테마 색이 아니라 초록', (await chroma('[data-testid="site-create"]')) > 0.09)
+  await p.getByTestId('site-create').click()
+  await p.getByTestId('site-hero').waitFor()
+  const score = await p.getByTestId('site-score').getAttribute('data-score')
+  check('H2 편집 머리 띠 — 보이는 블록 · 점수(아래 점수 카드와 같은 숫자) · 점검', (await p.getByTestId('site-stat-score').innerText()).includes(`${score}점`) && /\d+개/.test(await p.getByTestId('site-stat-blocks').innerText()) && (await chroma('[data-testid="site-hero"]')) > 0.09, score)
+  const rowN = await p.getByTestId('block-row').count()
+  const rowIco = await p.locator('[data-testid="block-row"] > span:first-child > span[aria-hidden="true"]:first-child').evaluateAll((els) => els.map((e) => getComputedStyle(e).backgroundColor))
+  check(`H3 블록 ${rowN}줄 모두 색 아이콘 · 블록 종류마다 색 여러 가지`, rowIco.length === rowN && new Set(rowIco).size >= 5, rowIco.length)
+  check('H3 고른 탭(블록) — 초록 바탕', (await chroma('[data-testid="site-tab-blocks"]')) > 0.09)
+  await p.getByTestId('block-add').click()
+  const palN = await p.getByTestId('palette-item').count()
+  const palIco = await p.locator('[data-testid="palette-item"] svg').count()
+  check('H4 블록 더하기 창 — 항목마다 색 아이콘', palN > 0 && palIco >= palN, { palN, palIco })
+  check('H5 D-226 화면 오류 0', !errors.some((e) => e.startsWith('D226')), errors.filter((e) => e.startsWith('D226')))
+  await ctx.close()
+}
 
 await browser.close()
 console.log(`\n홈페이지 만들기 e2e: ${pass} passed, ${fail} failed`)

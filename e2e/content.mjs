@@ -11,6 +11,8 @@
  *  D-207  이 칸만 채우면 · 주제 전략 · 체험단 가이드(대가 표시) · 쇼츠 30~60초 · 카드뉴스 광고 유형 · 검색량 붙여 넣기 · 한 달 계획
  *  D-208  상황 예시 12(지금 때 · 묶음 탭 · 고친 글 남음 · 묶음 모두 저장 · 말투) · 한 달 치 한 번에 · 업체 일정에 올릴 날(달력) ·
  *         계획 칸 만듦/올림 · 올렸어요 · 거르기 · 새로고침해도 진행 중 계획 · 홈페이지로 바로 가기 · 휴대폰 넘침 0
+ *  D-226  색 — 홍보 정보 머리 띠(테마와 상관없이 보라) · 먼저 만들 것 · 형식 · 상황마다 색 아이콘 · 결과 색 띠 · 마케팅 첫 화면 색 띠 3 ·
+ *         360/390 상황 이름 칸 짜부라짐 0
  *
  *   node e2e/content.mjs http://localhost:4390 [--shots <dir>]
  */
@@ -714,6 +716,72 @@ for (const width of [390, 360]) {
   await ctx.close()
 }
 check('23 휴대폰 화면 오류 0', errors.length === 0, errors)
+
+// D-226 — 색: 대표 "색이 안 들어가 눈에 하나도 안 들어온다 · 최소한 콘텐츠 레이더처럼". 테마(기본 오닉스 골드)와 상관없이 도구 색 · 글 종류마다 색
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  const page2 = await ctx.newPage()
+  page2.on('pageerror', (e) => errors.push(`D226 pageerror ${e.message}`))
+  // 바탕 그림(그라데이션) · 바탕색에서 가장 진한 채도 — oklch 의 C 값, rgb 는 HSL 채도를 0~0.4 로 맞춘다
+  const chroma = (sel) =>
+    page2.locator(sel).first().evaluate((el) => {
+      const cs = getComputedStyle(el)
+      const s = `${cs.backgroundImage} ${cs.backgroundColor}`
+      let best = 0
+      for (const m of s.matchAll(/oklch\(\s*([\d.]+%?)\s+([\d.]+)/g)) best = Math.max(best, Number(m[2]))
+      for (const m of s.matchAll(/rgba?\((\d+),\s*(\d+),\s*(\d+)/g)) {
+        const [r, g, b] = [m[1], m[2], m[3]].map((x) => Number(x) / 255)
+        const mx = Math.max(r, g, b)
+        const mn = Math.min(r, g, b)
+        best = Math.max(best, mx === 0 ? 0 : ((mx - mn) / mx) * 0.4)
+      }
+      return best
+    })
+  const bgs = (sel) => page2.locator(sel).evaluateAll((els) => els.map((e) => getComputedStyle(e).backgroundColor))
+  await seed(page2)
+  await page2.goto(BASE + '/tools/content/build?client=cli_site', { waitUntil: 'networkidle' })
+  await page2.getByTestId('content-studio').waitFor()
+  const theme = await page2.evaluate(() => document.documentElement.dataset.theme ?? '')
+  const heroC = await chroma('[data-testid="content-profile"] > div')
+  check(`K1 홍보 정보 머리 띠 — 테마(${theme || '기본'})와 상관없이 보라 그라데이션(채도 ${heroC.toFixed(2)})`, heroC > 0.12, heroC)
+  check(
+    'K1 머리 띠 숫자 — 보관함 · 올림 · 채운 칸',
+    /0편/.test(await page2.getByTestId('content-stat-saved').innerText()) && /\d+\/7/.test(await page2.getByTestId('content-stat-filled').innerText()),
+  )
+  const pickBg = await bgs('[data-testid="content-pick"] > span:first-child > span[aria-hidden="true"]')
+  check('K2 먼저 만들 것 3개 — 글 종류마다 다른 색 아이콘', pickBg.length === 3 && new Set(pickBg).size === 3, pickBg)
+  const sitN = await page2.getByTestId('content-situation').count()
+  const sitIco = await page2.locator('[data-testid="content-situation"] svg').count()
+  const tagN = await page2.locator('[data-testid="content-situation"] .rounded-full.t-meta').count()
+  check('K3 상황 12개 모두 색 아이콘 · 묶음(카톡 · 블로그 …) 색 꼬리표', sitN === 12 && sitIco >= 12 && tagN >= 24, { sitN, sitIco, tagN })
+  const kindBg = await bgs('[data-testid="content-kind"] > span[aria-hidden="true"]')
+  check('K4 직접 고르기 형식 7개 — 형식마다 색 아이콘(7가지 색)', kindBg.length === 7 && new Set(kindBg).size === 7, kindBg)
+  check('K4 [만들기] 단추 — 테마 색이 아니라 보라 그라데이션', (await chroma('[data-testid="content-make"]')) > 0.12)
+  await page2.locator('[data-testid="content-kind"][data-kind="cards"]').click()
+  await page2.getByTestId('content-make').click()
+  await page2.getByTestId('content-result-band').waitFor()
+  check('K5 결과 위 글 종류 색 띠(카드뉴스)', (await page2.getByTestId('content-result-band').innerText()).includes('카드뉴스') && (await chroma('[data-testid="content-result-band"]')) > 0.01)
+  await page2.goto(BASE + '/marketing', { waitUntil: 'networkidle' })
+  const bandC = await Promise.all(['marketing-youtube', 'marketing-content', 'marketing-homepage'].map((id) => chroma(`[data-testid="${id}"] > span:first-child`)))
+  const bandImg = await page2.locator('[data-testid="marketing-live"] a > span:first-child').evaluateAll((els) => els.map((e) => getComputedStyle(e).backgroundImage))
+  check('K6 마케팅 첫 화면 바로 쓰기 3 — 도구마다 다른 색 띠(빨강 · 보라 · 초록)', bandC.every((c) => c > 0.09) && new Set(bandImg).size === 3, bandC)
+  await ctx.close()
+
+  for (const width of [390, 360]) {
+    const c2 = await browser.newContext({ viewport: { width, height: 800 } })
+    const p = await c2.newPage()
+    p.on('pageerror', (e) => errors.push(`D226 m${width} ${e.message}`))
+    await seed(p)
+    await p.goto(BASE + '/tools/content/build?client=cli_site', { waitUntil: 'networkidle' })
+    await p.getByTestId('content-studio').waitFor()
+    const labelW = await p.locator('[data-testid="content-situation"] .t-body').evaluateAll((els) => els.filter((e) => e.getBoundingClientRect().width > 0).map((e) => Math.round(e.getBoundingClientRect().width)))
+    const heroBtn = await p.locator('[data-testid="content-to-site"], [data-testid="content-profile-edit"]').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
+    const ov = await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+    check(`K7 ${width} 상황 이름 칸 짜부라짐 0(폭 ${Math.min(...labelW)}px ≥ 100) · 머리 띠 단추 44px · 가로 넘침 0`, labelW.length >= 6 && Math.min(...labelW) >= 100 && heroBtn.every((h) => h >= 44) && ov <= 0, { labelW, heroBtn, ov })
+    await c2.close()
+  }
+  check('K8 D-226 화면 오류 0', !errors.some((e) => e.startsWith('D226')), errors.filter((e) => e.startsWith('D226')))
+}
 
 await browser.close()
 console.log(`\n홍보 글 만들기 e2e: ${pass} passed, ${fail} failed`)

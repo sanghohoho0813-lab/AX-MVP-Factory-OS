@@ -4,17 +4,66 @@
  * D-171 대표: 유튜브는 가로 영상, 릴스 · 쇼츠는 세로 영상으로 나누고, 카드마다 맞는 색 아이콘.
  * D-193: 맨 위에 '지금 바로 쓸 수 있어요' — 유튜브 벤치마킹(대표가 예전에 만든 대시보드를 옮김). 도입 예정 카드는 그대로.
  * D-206: 대표 "홍보 글 · 홈페이지 툴도 마케팅 · 브랜딩에" — 바로 쓰기에 홍보 글 만들기 · 홈페이지 만들기(업체를 고르면 그 업체로).
+ * D-226: 대표 "색이 안 들어가 눈에 하나도 안 들어온다" — 바로 쓰기 세 도구를 도구 색(빨강 · 보라 · 초록) 큰 카드로, 할 수 있는 일을 색 꼬리표로.
  */
 import { Link } from 'react-router-dom'
-import { ArrowRight, BarChart3, Globe, Images, Megaphone, MonitorPlay, PenLine, Smartphone } from 'lucide-react'
+import { ArrowRight, BarChart3, Globe, Images, Megaphone, MonitorPlay, PenLine, Smartphone, type LucideIcon } from 'lucide-react'
 import { Badge, ScreenTitle } from '../components/ui/primitives'
 import { HintTip } from '../components/ui/fold'
 import { hintFor } from '../content/sectionHints'
 
-/** D-206 바로 쓰기 — 업체 홍보 도구(웹 스튜디오와 같은 화면 · 같은 주소) */
-const LIVE_TOOLS = [
-  { to: '/tools/content', testId: 'marketing-content', icon: PenLine, title: '홍보 글 만들기', text: '업체 기록으로 키워드 · 블로그 · 짧은/긴 영상 대본 · 카드뉴스 · 카톡 소식 · 플레이스 소개 — 먼저 만들 글 3개 추천', box: 'border-violet-200 from-violet-50 hover:border-violet-400', chip: 'bg-violet-600', arrow: 'text-violet-500' },
-  { to: '/tools/homepage', testId: 'marketing-homepage', icon: Globe, title: '홈페이지 만들기', text: '업체 기록 → 업종 견본 홈페이지(그림 · 아이콘 카드) · PC/휴대폰 미리보기 · HTML 내려받기', box: 'border-emerald-200 from-emerald-50 hover:border-emerald-400', chip: 'bg-emerald-600', arrow: 'text-emerald-500' },
+interface LiveTool {
+  to: string
+  testId: string
+  icon: LucideIcon
+  title: string
+  text: string
+  /** 할 수 있는 일 — 색 꼬리표 */
+  can: string[]
+  band: string
+  border: string
+  tag: string
+  cta: string
+}
+
+/** 바로 쓰기 — 콘텐츠 레이더(대표 채널) · 업체 홍보 도구 둘(웹 스튜디오와 같은 화면 · 같은 주소) */
+const LIVE_TOOLS: LiveTool[] = [
+  {
+    to: '/marketing/youtube',
+    testId: 'marketing-youtube',
+    icon: BarChart3,
+    title: '콘텐츠 레이더',
+    text: 'YouTube 벤치마킹 — 이번 주에 찍을 주제 후보와 근거 · 평소보다 터진 영상 · 콘텐츠 수첩',
+    can: ['이번 주 찍을 것', '터진 영상', '급상승 주제'],
+    band: 'from-red-600 to-rose-700',
+    border: 'border-red-200 hover:border-red-400',
+    tag: 'bg-red-50 text-red-700',
+    cta: 'text-red-700',
+  },
+  {
+    to: '/tools/content',
+    testId: 'marketing-content',
+    icon: PenLine,
+    title: '홍보 글 만들기',
+    text: '업체 기록으로 키워드 · 블로그 · 짧은/긴 영상 대본 · 카드뉴스 · 카톡 소식 · 플레이스 소개 — 먼저 만들 글 3개 추천',
+    can: ['블로그', '쇼츠 대본', '카드뉴스', '카톡 소식', '한 달 계획'],
+    band: 'from-violet-700 to-fuchsia-700',
+    border: 'border-violet-200 hover:border-violet-400',
+    tag: 'bg-violet-50 text-violet-700',
+    cta: 'text-violet-700',
+  },
+  {
+    to: '/tools/homepage',
+    testId: 'marketing-homepage',
+    icon: Globe,
+    title: '홈페이지 만들기',
+    text: '업체 기록 → 업종 견본 홈페이지(그림 · 아이콘 카드) · PC/휴대폰 미리보기 · HTML 내려받기',
+    can: ['업종 견본', '디자인 한 번에', '점수 · 점검', 'HTML 내려받기'],
+    band: 'from-emerald-700 to-teal-700',
+    border: 'border-emerald-200 hover:border-emerald-400',
+    tag: 'bg-emerald-50 text-emerald-700',
+    cta: 'text-emerald-700',
+  },
 ]
 
 const PLANNED = [
@@ -27,49 +76,48 @@ const PLANNED = [
 
 export default function MarketingSoonPage() {
   return (
-    <div className="flex max-w-3xl flex-col gap-5">
+    <div className="flex max-w-5xl flex-col gap-5">
       <ScreenTitle title="마케팅 · 브랜딩" sub="이 OS 안에서 내 마케팅까지 합니다" />
-      <section className="flex flex-col gap-2" data-testid="marketing-live">
+      <section className="flex flex-col gap-3" data-testid="marketing-live">
         <HintTip tip={hintFor('지금 바로 쓸 수 있어요')} label="지금 바로 쓸 수 있어요">
           <h2 className="t-section text-slate-900">지금 바로 쓸 수 있어요</h2>
         </HintTip>
-        <Link
-          to="/marketing/youtube"
-          data-testid="marketing-youtube"
-          className="tap group flex gap-3 rounded-(--radius-panel) border-2 border-red-200 bg-gradient-to-br from-red-50 via-white to-white p-4 hover:border-red-400"
-        >
-          <span aria-hidden="true" className="flex size-12 shrink-0 items-center justify-center rounded-(--radius-control) bg-red-600 text-white">
-            <BarChart3 className="size-6" />
-          </span>
-          <span className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className="flex flex-wrap items-center gap-2">
-              <span className="t-card font-bold break-keep text-slate-900">콘텐츠 레이더</span>
-              <Badge tone="success">바로 쓰기</Badge>
-            </span>
-            <span className="t-sub break-keep text-slate-600">YouTube 벤치마킹 — 이번 주에 찍을 주제 후보와 근거 · 평소보다 터진 영상 · 콘텐츠 수첩</span>
-          </span>
-          <ArrowRight aria-hidden="true" className="size-5 shrink-0 self-center text-red-500 group-hover:translate-x-0.5" />
-        </Link>
-        {LIVE_TOOLS.map((x) => (
-          <Link key={x.to} to={x.to} data-testid={x.testId} className={`tap group flex gap-3 rounded-(--radius-panel) border-2 bg-gradient-to-br via-white to-white p-4 ${x.box}`}>
-            <span aria-hidden="true" className={`flex size-12 shrink-0 items-center justify-center rounded-(--radius-control) text-white ${x.chip}`}>
-              <x.icon className="size-6" />
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col gap-1">
-              <span className="flex flex-wrap items-center gap-2">
-                <span className="t-card font-bold break-keep text-slate-900">{x.title}</span>
-                <Badge tone="success">바로 쓰기</Badge>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          {LIVE_TOOLS.map((x) => (
+            <Link key={x.to} to={x.to} data-testid={x.testId} className={`tap group flex min-w-0 flex-col overflow-hidden rounded-(--radius-panel) border-2 bg-white shadow-sm transition-shadow hover:shadow-md ${x.border}`}>
+              {/* 도구 색 띠 — 흰 글자가 읽히는 진한 단계만 */}
+              <span className={`relative flex items-center gap-3 overflow-hidden bg-gradient-to-br p-4 text-white ${x.band}`}>
+                <span aria-hidden="true" className="pointer-events-none absolute -top-8 -right-6 size-24 rounded-full bg-white/10" />
+                <span aria-hidden="true" className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/30">
+                  <x.icon className="size-6" />
+                </span>
+                <span className="relative flex min-w-0 flex-1 flex-col">
+                  <span className="t-card font-bold break-keep text-white">{x.title}</span>
+                  <span className="t-meta font-semibold text-white/90">바로 쓰기</span>
+                </span>
               </span>
-              <span className="t-sub break-keep text-slate-600">{x.text}</span>
-            </span>
-            <ArrowRight aria-hidden="true" className={`size-5 shrink-0 self-center group-hover:translate-x-0.5 ${x.arrow}`} />
-          </Link>
-        ))}
+              <span className="flex flex-1 flex-col gap-2.5 p-4">
+                <span className="t-sub break-keep text-slate-700">{x.text}</span>
+                <span className="flex flex-wrap gap-1.5">
+                  {x.can.map((c) => (
+                    <span key={c} className={`t-meta rounded-full px-2 py-0.5 font-semibold ${x.tag}`}>
+                      {c}
+                    </span>
+                  ))}
+                </span>
+                <span className={`t-sub mt-auto inline-flex items-center gap-1 pt-1 font-bold ${x.cta}`}>
+                  열기
+                  <ArrowRight aria-hidden="true" className="size-4 group-hover:translate-x-0.5" />
+                </span>
+              </span>
+            </Link>
+          ))}
+        </div>
       </section>
       <HintTip tip={hintFor('도입 예정')} label="도입 예정">
         <h2 className="t-section text-slate-900">도입 예정</h2>
       </HintTip>
-      <ul className="-mt-2 grid gap-3 sm:grid-cols-2" data-testid="marketing-planned">
+      <ul className="-mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="marketing-planned">
         {PLANNED.map((x) => (
           <li key={x.title} className="flex gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4">
             <span aria-hidden="true" className={`flex size-11 shrink-0 items-center justify-center rounded-(--radius-control) ring-1 ${x.tone}`}>
@@ -78,7 +126,7 @@ export default function MarketingSoonPage() {
             <span className="flex min-w-0 flex-col gap-1">
               <span className="flex flex-wrap items-center gap-2">
                 <span className="t-body font-bold break-keep text-slate-900">{x.title}</span>
-                <Badge tone="brand">도입 예정</Badge>
+                <Badge tone="neutral">도입 예정</Badge>
               </span>
               <span className="t-sub break-keep text-slate-600">{x.text}</span>
             </span>

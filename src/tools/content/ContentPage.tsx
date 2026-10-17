@@ -54,8 +54,10 @@ function ClientPicker() {
       buildPath={BUILD}
       made={made}
       madeLabel={(id) => `글 ${count.get(id)?.roots.size ?? 0}편`}
-      icon={(on) => <PenLine className={`size-4 shrink-0 ${on ? 'text-brand-600' : 'text-slate-300'}`} aria-hidden="true" />}
+      icon={(on) => <PenLine className={`size-4 shrink-0 ${on ? 'text-violet-600' : 'text-slate-300'}`} aria-hidden="true" />}
       testPrefix="content-picker"
+      tone="violet"
+      headIcon={<PenLine className="size-5" />}
       title="누구 홍보 글인가요?"
       desc="계약 고객 · 잠재고객 · 컨설턴트를 고르면 그 기록으로 홍보 정보를 채우고, 먼저 만들 글 3개를 바로 골라 드려요. 업체 상세의 [홍보 글 만들기] 로 와도 같아요."
     />
