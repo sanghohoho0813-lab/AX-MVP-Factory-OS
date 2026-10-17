@@ -12,6 +12,8 @@ import { Button } from '../../components/ui/Button'
 import { ToolResultAttach } from '../../tools/shared/ToolResultAttach'
 import { CERT_RULES, EVIDENCE_CLASS, evidenceClassOf } from '../rules/officialRules'
 import { explainFor } from '../core/explain'
+import { renewalDeadlines, renewalPlan } from '../core/renewal'
+import { daysBetween } from '../core/assess'
 import { READINESS_LABEL, RECOMMENDATION_LABEL, type CertificationAssessment, type CertificationClientContext } from '../core/types'
 import type { Answer } from '../core/selfCheck'
 import type { PreparedAnswer } from '../core/inspection'
@@ -65,7 +67,7 @@ export function CertWorkspace({
   onPrep: (id: string, p: PreparedAnswer) => void
   onNote: (key: string, text: string) => Promise<void>
   life: CertLifecycle
-  onStatus: (s: CertStatus) => Promise<void>
+  onStatus: (s: CertStatus, seed?: CertLifecycle) => Promise<boolean>
   onComplete: (input: CompletionInput, toProfile: boolean) => Promise<void>
   onPatchLife: (patch: Partial<Pick<CertLifecycle, 'memo' | 'postAuditAt'>>) => Promise<void>
   /** 서류함에 빈 칸(없는 것만) — 만든 칸 수 */
@@ -96,12 +98,21 @@ export function CertWorkspace({
   const unconfirmed = (ctx.basis ?? []).filter((b) => b.state === 'estimated' && !b.from.startsWith('컨설턴트')).length
   // AX Hotfix: 벤처는 기업인증 안에서 끝난다 — 예전 '특허+벤처' 화면으로 보내지 않는다. 연구소는 살아 있는 연구소 관리로 잇는다.
   const existingTool = a.key === 'lab' ? { label: '연구소 관리 열기', href: `/tools/labcare?client=${clientId}` } : null
-  const deadlines = a.renewal
-    ? [
-        { date: a.renewal.prepareFrom, title: `${rule.label} 갱신 준비 시작`, note: rule.renewalNote, todo: true as const },
-        { date: a.renewal.validUntil, title: `${rule.label} 유효기간 끝`, note: '', hard: true as const },
-      ]
-    : []
+  // D-214: 갱신 일정은 진행 기록([인증 완료 기록])과 같은 계산(renewalDeadlines) — 만료된 인증엔 붙이지 않고, 연장 기간이면 '연장 신청 마지막 날' 하나.
+  //   예전: 만료된 인증에도 이미 지난 '갱신 준비 시작' · '유효기간 끝' 을 붙여 오늘 화면에 한 달 동안 '기한 지남' 으로 떴고, 진짜 마지막 날(연장 기간 끝)은 없었다.
+  const renewal = a.renewal && !a.expired ? renewalPlan(a.key, a.renewal.validUntil, ctx.today) : null
+  const deadlines = renewal ? renewalDeadlines(renewal, rule.label) : []
+  const renewalSummary = !renewal
+    ? ''
+    : renewal.phase === 'grace'
+      ? `${rule.label} ${renewal.validUntil} 만료 · 연장 신청 ${renewal.graceUntil} 까지`
+      : `${rule.label} ${renewal.validUntil} 까지 · 갱신 서류 준비 ${renewal.todoOn} 부터`
+  // 갱신 서류 준비 날은 위 일정에 이미 있다 — 사람이 걸 할 일은 '대표님께 안내'(급하면 바로 신청)
+  const renewalFollowUp = !renewal
+    ? undefined
+    : renewal.phase === 'grace' || renewal.phase === 'todo'
+      ? { text: `${rule.label} ${renewal.phase === 'grace' ? '연장' : '갱신'} 신청 서류 받기`, days: 1 }
+      : { text: `${rule.label} 갱신 일정 대표님께 안내`, days: Math.max(1, Math.min(14, daysBetween(ctx.today, renewal.noticeOn))) }
   // AX: 실제 진행 — 지금 단계 · 다음 행동 하나 · 진행 상태(사전진단 · 대표 확인 · 서류)
   const ownerLeft = pkg?.ownerQuestions.length ?? 0
   const ownerDone = Object.values(notes).filter((v) => v.trim()).length
@@ -478,8 +489,8 @@ export function CertWorkspace({
             <p className="t-sub break-keep text-slate-700">
               <b className="font-semibold">사후관리 · 갱신</b> · {rule.renewalNote}
             </p>
-            {a.renewal && life.status !== 'certified' && life.status !== 'renewal' ? (
-              <ToolResultAttach toolKey="cert-os" title={`${rule.label} 유효기간 · 갱신`} verdict={a.recommendation} verdictLabel={RECOMMENDATION_LABEL[a.recommendation]} summary={`${rule.label} ${a.renewal.validUntil} 까지 · 갱신 준비 ${a.renewal.prepareFrom} 부터`} data={{ kind: 'renewal', cert: a.key, ...a.renewal }} deadlines={deadlines} followUp={{ text: `${rule.label} 갱신 서류 준비`, days: Math.max(1, Math.min(90, a.renewal.daysLeft - 30)) }} openPathFor={(cid) => `/tools/cert-os/${a.key}?client=${cid}`} />
+            {renewal && a.renewal && life.status !== 'certified' && life.status !== 'renewal' ? (
+              <ToolResultAttach toolKey="cert-os" title={`${rule.label} 유효기간 · 갱신`} verdict={a.recommendation} verdictLabel={RECOMMENDATION_LABEL[a.recommendation]} summary={renewalSummary} data={{ kind: 'renewal', cert: a.key, ...a.renewal }} deadlines={deadlines} followUp={renewalFollowUp} openPathFor={(cid) => `/tools/cert-os/${a.key}?client=${cid}`} />
             ) : (
               <p className="t-sub break-keep text-slate-600">인증을 받으면 '3. 실제 진행' 의 [인증 완료 기록] 에 번호 · 인증일 · 유효기간을 적어 주세요 — 갱신 일정이 달력 · 오늘에 걸립니다(확인서를 서류함에 올려도 읽습니다).</p>
             )}

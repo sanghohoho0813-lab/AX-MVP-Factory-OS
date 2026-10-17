@@ -11,6 +11,9 @@
  *  - 모르는 값은 추측하지 않는다(null = 모름 → '추가 확인 필요').
  */
 
+/** D-214: 갱신 단계(core/renewal 의 RenewalPhase 와 같은 값 — 순환 import 없이) */
+export type RenewalPhaseKey = 'ok' | 'notice' | 'todo' | 'grace' | 'expired'
+
 export type CertificationKey = 'venture' | 'lab' | 'innobiz' | 'mainbiz' | 'iso9001' | 'iso14001' | 'iso45001'
 
 /** 자체 준비도 — 근거와 늘 같이 보인다 */
@@ -26,7 +29,8 @@ export const READINESS_LABEL: Record<Readiness, string> = {
 }
 
 /** 추천 — 가능 여부만이 아니라 지금 할지 */
-export type Recommendation = 'held' | 'now' | 'possible' | 'after_fix' | 'too_early' | 'low_priority' | 'not_needed' | 'need_info'
+/** D-214: ineligible — 제외 사유(제외 업종 · 부채비율 · 중소기업 아님 …)로 지금은 신청할 수 없음. 예전에는 '굳이 필요 없음' 과 같은 말이라 카톡에 '굳이 필요 없음 — 부채비율 1,200%' 로 나갔다 */
+export type Recommendation = 'held' | 'now' | 'possible' | 'after_fix' | 'too_early' | 'low_priority' | 'not_needed' | 'ineligible' | 'need_info'
 
 export const RECOMMENDATION_LABEL: Record<Recommendation, string> = {
   held: '보유 중',
@@ -36,6 +40,7 @@ export const RECOMMENDATION_LABEL: Record<Recommendation, string> = {
   too_early: '아직 이르다',
   low_priority: '우선순위 낮음',
   not_needed: '지금은 굳이 필요 없음',
+  ineligible: '지금은 신청할 수 없음',
   need_info: '추가 확인 필요',
 }
 
@@ -109,6 +114,8 @@ export interface CertificationClientContext {
   /** 오늘 기준 꽉 찬 업력(년) */
   years: number | null
   months: number | null
+  /** D-214: 설립일(YYYY-MM-DD · 모르면 없음) — '업력 n년부터 신청 가능' 날짜를 정확히 */
+  establishedAt?: string
   industryText: string
   /** 제조 · 건설 · SW · 바이오 · 서비스 … 대분류(모르면 '') */
   industryGroup: 'manufacturing' | 'construction' | 'agriculture' | 'software' | 'bio' | 'environment' | 'design' | 'service' | 'retail' | 'food' | 'other' | ''
@@ -204,7 +211,7 @@ export interface CertificationAssessment {
   timing: string
   nextAction: NextAction
   /** 보유 중이면 만료 · 갱신 */
-  renewal?: { validUntil: string; daysLeft: number; prepareFrom: string; note: string }
+  renewal?: { validUntil: string; daysLeft: number; prepareFrom: string; note: string; phase?: RenewalPhaseKey; graceUntil?: string }
   /** P1: 이전 인증이 만료(연장 기간도 지남) — 새로 신청할 대상 */
   expired?: true
 }

@@ -23,12 +23,24 @@ export function addDays(date: string, n: number): string {
   return d.toISOString().slice(0, 10)
 }
 
-/** 업력 n년이 되는 날(설립일을 모르면 '') */
+/**
+ * 업력 n년이 되는 날(설립일을 모르면 '').
+ * D-214: 설립일 + n년으로 바로 센다(2023-10-20 설립 → 2026-10-20). 예전에는 오늘 + 남은 달 수의 '년-월' 이라
+ *   한 달 늦게(2026-11) 나오거나 달 끝(01-31)에 3월로 넘어갔다. 2/29 설립은 평년 2/28.
+ */
 function yearsReachedOn(c: CertificationClientContext, years: number): string {
   if (c.months === null) return ''
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(c.establishedAt ?? '')
+  if (m) {
+    const y = Number(m[1]) + years
+    const mo = Number(m[2])
+    const last = new Date(Date.UTC(y, mo, 0)).getUTCDate()
+    const on = `${y}-${m[2]}-${String(Math.min(Number(m[3]), last)).padStart(2, '0')}`
+    return on <= c.today ? c.today : on
+  }
   const left = years * 12 - c.months
   if (left <= 0) return c.today
-  const d = new Date(`${c.today}T00:00:00Z`)
+  const d = new Date(`${c.today.slice(0, 7)}-01T00:00:00Z`)
   d.setUTCMonth(d.getUTCMonth() + left)
   return d.toISOString().slice(0, 7)
 }
@@ -66,7 +78,7 @@ function withExpired(a: CertificationAssessment, c: CertificationClientContext):
     ...a,
     oneLine: `이전 인증 만료(${ex.h.validUntil}, ${ago}일 지남) — 다시 신청해야 합니다 · ${a.oneLine}`,
     reasons: [{ state: 'no', text: `이전 ${a.label} 만료 ${ex.h.validUntil}(${ago}일 지남)${ex.plan.graceUntil ? ` · 연장 신청 기간(${ex.plan.graceUntil}까지)도 지남` : ''} — 신규로 신청` }, ...a.reasons],
-    renewal: { validUntil: ex.h.validUntil, daysLeft: ex.plan.daysLeft, prepareFrom: ex.plan.todoOn, note: CERT_RULES[a.key].renewalNote },
+    renewal: { validUntil: ex.h.validUntil, daysLeft: ex.plan.daysLeft, prepareFrom: ex.plan.todoOn, note: CERT_RULES[a.key].renewalNote, phase: 'expired', graceUntil: ex.plan.graceUntil },
     expired: true,
   }
 }
@@ -146,7 +158,7 @@ function finish(
   if (held && held.validUntil) {
     const plan = renewalPlan(rule.key, held.validUntil, c.today)
     const daysLeft = daysBetween(c.today, held.validUntil)
-    renewal = { validUntil: held.validUntil, daysLeft, prepareFrom: plan ? plan.noticeOn : addDays(held.validUntil, -rule.prepareDaysBefore), note: rule.renewalNote }
+    renewal = { validUntil: held.validUntil, daysLeft, prepareFrom: plan ? plan.noticeOn : addDays(held.validUntil, -rule.prepareDaysBefore), note: rule.renewalNote, ...(plan ? { phase: plan.phase, graceUntil: plan.graceUntil } : {}) }
   }
   const raw = readinessOverride ?? readinessOf(checks)
   const capped = rec === 'held' ? raw : capReadiness(raw, evidenceCap(ev.have.length, ev.have.length + ev.missing.length))
@@ -236,7 +248,7 @@ export function assessInnobiz(c: CertificationClientContext): CertificationAsses
     timing = t.lab ? '그 사이 연구소 · 특허를 쌓아 두면 바로 신청' : '먼저 연구소 · 벤처로 기반을 만들고 3년 차에'
     next = { label: '업력 되는 날 알림', kind: 'wait' }
   } else if (mustNo) {
-    rec = 'not_needed'
+    rec = 'ineligible'
     oneLine = checks.find((x) => x.weight === 'must' && x.state === 'no')!.text
     timing = '제외 사유 해소 전에는 신청 불가'
     next = { label: '제외 사유 확인', kind: 'confirm_facts' }
@@ -309,7 +321,7 @@ export function assessMainbiz(c: CertificationClientContext, innobiz?: Certifica
     timing = '그 사이 사업계획 · 성과 관리 기록을 쌓아 두기'
     next = { label: '업력 되는 날 알림', kind: 'wait' }
   } else if (mustNo) {
-    rec = 'not_needed'
+    rec = 'ineligible'
     oneLine = mustNo.text
     timing = '제외 사유 해소 전에는 신청 불가'
     next = { label: '제외 사유 확인', kind: 'confirm_facts' }
@@ -359,12 +371,17 @@ export function assessVenture(c: CertificationClientContext): CertificationAsses
   else if (rndNeedsExact(c)) checks.push({ weight: 'core', state: 'unknown', text: `정확한 연구개발비 확인 필요 — 고른 범위(${RND_RANGE_LABEL[c.rndRange!]})로는 공식 판단 불가(${min} 이상 · 매출 대비 비율)` })
   else checks.push({ weight: 'core', state: 'unknown', text: `연구개발비 — ${min} 이상인지 확인 필요` })
   const young = c.years !== null && c.years < 3
+  // D-214: 연구개발유형은 5천만원 + 매출 대비 비율(창업 3년 미만은 비율 면제) 둘 다 — 비율이 기준 미만인데 '지금 추천' 이던 것
+  let ratioOk: boolean | null = young || c.revenue === 0 ? true : null
   if (young) checks.push({ weight: 'core', state: 'ok', text: '창업 3년 미만 — 매출 대비 비율 미적용(법 제2조의2 단서 · 5천만원 이상은 그대로)' })
   else if (c.rndExpense !== null && c.revenue !== null && c.revenue > 0) {
     const r = c.rndExpense / c.revenue
     const pct = (x: number) => `${Math.round(x * 1000) / 10}%`
     // 확인요령 별표1 — 세부 업종(KSIC) · 매출 구간별 비율. 세부 업종을 모르면 비율을 고르지 않는다
     const need = ventureRndRatio(c.ksic, c.revenue)
+    // 세부 업종을 몰라도 5% 미만이면 어느 업종이든 미달(별표1 가장 낮은 비율 5%)
+    if (need) ratioOk = r >= need.ratio
+    else if (r < VENTURE_RND.minRatio) ratioOk = false
     if (!need) checks.push({ weight: 'core', state: 'unknown', text: `세부 업종 확인 필요 — 매출 대비 연구개발비 ${pct(r)} · 기준 비율은 세부 업종(KSIC)과 매출 구간으로 정해짐(5~10%)` })
     else checks.push(r >= need.ratio ? { weight: 'core', state: 'ok', text: `매출 대비 연구개발비 ${pct(r)}(기준 ${pct(need.ratio)} 이상 · 별표1 '${need.row}')` } : { weight: 'core', state: 'warn', text: `매출 대비 연구개발비 ${pct(r)} — 기준 ${pct(need.ratio)} 미만(별표1 '${need.row}')` })
   }
@@ -373,7 +390,9 @@ export function assessVenture(c: CertificationClientContext): CertificationAsses
   checks.push(filed && c.patents === null ? { weight: 'core', state: 'unknown', text: `특허 등록 여부 — ${filed} · 등록 확인 필요(출원도 기술성 자료)` } : c.patents === null ? { weight: 'core', state: 'unknown', text: '특허 — 확인 필요' } : c.patents > 0 ? { weight: 'core', state: 'ok', text: `특허 ${c.patents}건 — 혁신성 증빙` } : { weight: 'core', state: 'warn', text: filed ? `등록 특허 없음 · ${filed} — 혁신성장유형은 사업계획 · 기술성으로 평가` : '특허 없음 — 혁신성장유형은 사업계획 · 기술성으로 평가' })
   const readiness = readinessOf(checks)
   const missingFacts = factsOf(checks)
-  const rndType = lab && (c.rndExpense ?? 0) >= VENTURE_RND.minExpenseWon
+  const rndAmount = lab && (c.rndExpense ?? 0) >= VENTURE_RND.minExpenseWon
+  // 비율을 아직 모르면(세부 업종 모름) 예전처럼 '지금 추천' + 위 '세부 업종 확인 필요' 줄 — 기준 미만으로 확인된 때만 낮춘다
+  const rndType = rndAmount && ratioOk !== false
   const rndMaybe = lab && rndNeedsExact(c)
   let rec: Recommendation
   let oneLine: string
@@ -386,6 +405,10 @@ export function assessVenture(c: CertificationClientContext): CertificationAsses
     rec = 'now'
     oneLine = '연구개발유형 요건에 가까움 — 연구소 · 연구개발비 증빙으로'
     timing = c.policyFundPlan ? '정책자금 신청 전에 준비 추천' : '지금 진행 추천'
+  } else if (rndAmount && ratioOk === false) {
+    rec = 'possible'
+    oneLine = '연구개발비 금액은 넘지만 매출 대비 비율이 기준 미만 — 비율을 맞추거나 혁신성장유형으로 검토'
+    timing = '연구개발비 비율을 맞춘 뒤(또는 혁신성장유형)'
   } else if (rndMaybe) {
     rec = 'possible'
     oneLine = '연구개발유형 가능성 — 정확한 연구개발비 확인 필요'
@@ -415,7 +438,8 @@ export function assessVenture(c: CertificationClientContext): CertificationAsses
 
 /** 연구전담요원 기준 — 규모 · 업력 · 벤처 여부 */
 export function labResearchersNeeded(c: CertificationClientContext): number | null {
-  if (c.held.some((h) => h.key === 'venture')) return LAB_RESEARCHERS.venture
+  // D-214: 유효기간이 지난 벤처는 벤처 기준(2명)으로 보지 않는다
+  if (liveHeld(c, 'venture')) return LAB_RESEARCHERS.venture
   if (c.size === 'small' || (c.size === null && c.employees !== null && c.employees < 50)) return c.months !== null && c.months < 36 ? LAB_RESEARCHERS.smallStartup : LAB_RESEARCHERS.small
   if (c.size === 'medium') return LAB_RESEARCHERS.medium
   if (c.size === 'mid_large') return LAB_RESEARCHERS.midLarge
@@ -432,6 +456,8 @@ export function assessLab(c: CertificationClientContext): CertificationAssessmen
   const need = labResearchersNeeded(c)
   const checks: Check[] = []
   if (c.researchers === null) checks.push({ weight: 'must', state: 'unknown', text: `연구전담요원 수 — 확인 필요${need ? `(${need}명 이상)` : ''}` })
+  // D-214: 기준 인원을 모르면(규모 · 직원 수 모름) '미만' 도 '충족' 도 아니다 — 예전에는 '기준(?명) 미만' 이라 적고 판정은 '지금 추천'
+  else if (need === null && c.researchers >= LAB_RESEARCHERS.dept) checks.push({ weight: 'must', state: 'unknown', text: `기업 규모 — 확인 필요(연구전담요원 ${c.researchers}명 · 연구소 기준은 규모에 따라 2~10명)` })
   else if (need !== null && c.researchers >= need) checks.push({ weight: 'must', state: 'ok', text: `연구전담요원 ${c.researchers}명(기준 ${need}명 이상)` })
   else if (c.researchers >= LAB_RESEARCHERS.dept) checks.push({ weight: 'core', state: 'warn', text: `연구전담요원 ${c.researchers}명 — 연구소 기준(${need ?? '?'}명) 미만, 전담부서는 가능` })
   else checks.push({ weight: 'must', state: 'no', text: '연구전담요원 없음 — 최소 1명(전담부서)' })

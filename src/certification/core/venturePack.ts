@@ -5,6 +5,7 @@
  */
 import { factKit, OWNER_BASIS, type Sourced } from './answerGuide'
 import type { CertificationClientContext } from './types'
+import { ventureRndRatio } from '../rules/officialRules'
 
 export type PackState = 'ok' | 'partly' | 'ask'
 export const PACK_MARK: Record<PackState, string> = { ok: '✓', partly: '△', ask: '?' }
@@ -102,6 +103,21 @@ export interface VentureRoute {
   text: string
 }
 
+/** D-214: 5천만원을 넘어도 매출 대비 비율(창업 3년 미만 면제)을 맞춰야 연구개발유형 — assessVenture 와 같은 기준 */
+function rndRatioRoute(c: CertificationClientContext, exact: number): VentureRoute {
+  const young = c.years !== null && c.years < 3
+  if (young || c.revenue === 0) return { type: 'rnd', label: '연구개발유형', state: 'fit', text: `연구조직 · 연구개발비 5천만원 이상${young ? ' · 창업 3년 미만(비율 면제)' : ''}` }
+  const need = c.revenue !== null && c.revenue > 0 ? ventureRndRatio(c.ksic, c.revenue) : null
+  const r = c.revenue ? exact / c.revenue : null
+  const pct = (x: number) => `${Math.round(x * 1000) / 10}%`
+  // 세부 업종을 몰라도 5% 미만이면 어느 업종이든 미달
+  if (r !== null && r < 0.05 && !need) return { type: 'rnd', label: '연구개발유형', state: 'check', text: `연구개발비 5천만원은 넘지만 매출 대비 ${pct(r)} — 가장 낮은 기준(5%)에도 못 미침 · 비율을 맞추면 가능` }
+  if (!need || r === null) return { type: 'rnd', label: '연구개발유형', state: 'fit', text: '연구조직 · 연구개발비 5천만원 이상 — 매출 대비 비율 확인' }
+  return r >= need.ratio
+    ? { type: 'rnd', label: '연구개발유형', state: 'fit', text: `연구조직 · 연구개발비 5천만원 이상 · 매출 대비 ${pct(r)}(기준 ${pct(need.ratio)} 이상)` }
+    : { type: 'rnd', label: '연구개발유형', state: 'check', text: `연구개발비 5천만원은 넘지만 매출 대비 ${pct(r)} — 기준 ${pct(need.ratio)} 미만 · 비율을 맞추면 가능` }
+}
+
 /**
  * 유형별 길(벤처기업법 제2조의2 · 확인요령) — 정보가 모자라면 유형을 확정하지 않고 '확인 필요'.
  * 판정 숫자는 assessVenture 와 같은 기준(연구조직 · 연구개발비 5천만원 · 비율)을 그대로 읽는다.
@@ -117,7 +133,7 @@ export function ventureRoutes(c: CertificationClientContext): VentureRoute[] {
         ? { type: 'rnd', label: '연구개발유형', state: 'no', text: '연구소 · 전담부서가 있어야 함 — 지금은 해당 없음' }
         : exact !== null
           ? exact >= 50_000_000
-            ? { type: 'rnd', label: '연구개발유형', state: 'fit', text: '연구조직 · 연구개발비 5천만원 이상 — 매출 대비 비율 확인' }
+            ? rndRatioRoute(c, exact)
             : { type: 'rnd', label: '연구개발유형', state: 'no', text: '연구개발비 5천만원 미만' }
           : range === 'none' || range === 'under_50m'
             ? { type: 'rnd', label: '연구개발유형', state: 'no', text: '연구개발비 5천만원 미만(고른 범위)' }

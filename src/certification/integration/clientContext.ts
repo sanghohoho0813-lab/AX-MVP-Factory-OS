@@ -356,7 +356,8 @@ export function certContextOf(record: ClientOpsRecord, today: string, profile: C
   for (const h of heldFromLives(extra.lives ?? [])) {
     const cur = held.find((x) => x.key === h.key)
     if (!cur) held.push(h)
-    else if (!cur.validUntil && h.validUntil) cur.validUntil = h.validUntil
+    // D-214: 더 늦은 끝날짜를 쓴다 — 갱신을 기록하며 '인증서 칸에도 저장' 을 끄면 칸의 옛 날짜가 새 기록(2029)을 이겨 '만료 · 다시 신청' 으로 떴다
+    else if (h.validUntil && (!cur.validUntil || h.validUntil > cur.validUntil)) cur.validUntil = h.validUntil
   }
   if (extra.lab && extra.lab.unit === 'lab' && !held.some((h) => h.key === 'lab')) held.push({ key: 'lab', validUntil: '', note: `연구소 관리 기록 · 인정 ${extra.lab.recognizedAt}${extra.lab.number ? ` · ${extra.lab.number}` : ''}` })
   const unit = resolveUnit(record, profile, extra, held)
@@ -371,6 +372,7 @@ export function certContextOf(record: ClientOpsRecord, today: string, profile: C
     entity: f.businessType === 'corporation' ? 'corporation' : f.businessType === 'individual' ? 'individual' : null,
     years: f.years,
     months: f.months,
+    ...(/^\d{4}-\d{2}-\d{2}$/.test(f.establishedAt) ? { establishedAt: f.establishedAt } : {}),
     industryText: f.industryText,
     industryGroup: industryGroupOf(f.industryText),
     ksic: ksicOf(record, f, profile),

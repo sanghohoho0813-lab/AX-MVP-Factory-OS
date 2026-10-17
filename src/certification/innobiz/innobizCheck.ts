@@ -56,7 +56,8 @@ export const INNOBIZ_CHECK: SelfCheckItem[] = [
     question: '품질 관리 체계(ISO · 검사 기록)가 있나요?',
     plain: '만든 제품의 품질을 어떻게 관리하는지 봅니다.',
     evidence: [{ id: 'quality', label: '품질 · 인증 현황(ISO 등)' }],
-    suggest: (c) => (c.held.some((h) => h.key === 'iso9001') ? { answer: 'yes', because: 'ISO 9001 보유' } : null),
+    // D-214: 유효기간이 지난 ISO 9001 은 '보유' 로 미리 답하지 않는다
+    suggest: (c) => (c.held.some((h) => h.key === 'iso9001' && (!h.validUntil || h.validUntil >= c.today)) ? { answer: 'yes', because: 'ISO 9001 보유' } : null),
   },
   {
     id: 'ib_ceo',

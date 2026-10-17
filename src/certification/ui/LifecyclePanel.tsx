@@ -52,7 +52,7 @@ export function LifecyclePanel({
   life: CertLifecycle
   ctx: CertificationClientContext
   clientId: string
-  onStatus: (s: CertStatus) => Promise<void>
+  onStatus: (s: CertStatus, seed?: CertLifecycle) => Promise<boolean>
   onComplete: (input: CompletionInput, toProfile: boolean) => Promise<void>
   onPatch: (patch: Partial<Pick<CertLifecycle, 'memo' | 'postAuditAt'>>) => Promise<void>
 }) {
@@ -78,11 +78,29 @@ export function LifecyclePanel({
   const [busy, setBusy] = useState(false)
   const [memo, setMemo] = useState(life.memo)
   const [audit, setAudit] = useState(life.postAuditAt)
+  // D-214: 저장된 메모 · 사후 점검일이 바뀌면(기록을 다 읽음 · 다른 업체로 넘어감) 칸도 따라간다 — 예전에는 처음 값에 머물러,
+  //   기록을 읽기 전에 연 칸을 벗어나면 빈 메모로 덮거나 앞 업체 메모를 다른 업체에 적었다
+  const syncKey = `${clientId}|${cert}|${life.memo}|${life.postAuditAt}`
+  const [syncedKey, setSyncedKey] = useState(syncKey)
+  if (syncedKey !== syncKey) {
+    setSyncedKey(syncKey)
+    setMemo(life.memo)
+    setAudit(life.postAuditAt)
+  }
   const plan = life.validUntil ? renewalPlan(cert, life.validUntil, ctx.today) : null
   const after = done ? nextAfterCertified(cert, ctx) : []
   const problems = form ? completionProblems(form, ctx.today, rule.validYears !== null) : []
 
   const openForm = () => setForm({ number: life.number, certifiedAt: life.certifiedAt, validUntil: life.validUntil })
+  // D-214: 인증서 칸으로만 아는 인증은 보이는 번호 · 날짜에서 시작(빈 기록으로 바꾸면 유효기간 · 갱신 일정이 사라졌다) · 바뀐 것이 없으면 알림도 없음
+  const changeStatus = async (s: CertStatus) => {
+    try {
+      const changed = await onStatus(s, viaProfile ? shown : undefined)
+      if (changed) showToast(`${rule.label} — ${CERT_STATUS_LABEL[s]}(활동 기록에 남김)`)
+    } catch {
+      showToast('저장하지 못했습니다 — 다시 눌러 주세요')
+    }
+  }
   const save = async () => {
     if (!form || problems.length > 0 || busy) return
     setBusy(true)
@@ -115,7 +133,7 @@ export function LifecyclePanel({
             type="button"
             role="radio"
             aria-checked={life.status === s}
-            onClick={() => (s === 'certified' && !done ? openForm() : void onStatus(s).then(() => showToast(`${rule.label} — ${CERT_STATUS_LABEL[s]}(활동 기록에 남김)`)))}
+            onClick={() => (s === 'certified' && !done ? openForm() : void changeStatus(s))}
             className={`tap t-sub min-h-10 rounded-full border px-3 font-semibold ${life.status === s ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white text-slate-700 hover:border-brand-400'}`}
             data-testid={`cert-life-${s}`}
           >

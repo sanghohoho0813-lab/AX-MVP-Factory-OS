@@ -5,6 +5,7 @@
 import { CERT_RULES } from '../rules/officialRules'
 import { pickBenefits } from '../core/benefits'
 import { READINESS_RANK, readinessOf, reasonsOf, type Check } from '../core/readiness'
+import { renewalPlan, RENEWAL_PHASE_LABEL } from '../core/renewal'
 import type { CertificationAssessment, CertificationClientContext, CertificationKey, Readiness, Recommendation } from '../core/types'
 
 type IsoKey = Extract<CertificationKey, 'iso9001' | 'iso14001' | 'iso45001'>
@@ -50,9 +51,17 @@ const FIELD_FIT: Record<IsoKey, (c: CertificationClientContext) => { rec: Recomm
 export function assessIso(c: CertificationClientContext): CertificationAssessment[] {
   return (['iso9001', 'iso14001', 'iso45001'] as IsoKey[]).map((key) => {
     const rule = CERT_RULES[key]
-    const held = c.held.find((h) => h.key === key)
+    const heldRaw = c.held.find((h) => h.key === key)
+    // D-214: 유효기간을 본다 — 예전에는 '보유' 만 보고 2026-04-30 에 끝난 ISO 도 '보유 중 · 매우 높음'(고객 요약 · 이노비즈 자가진단까지)
+    const plan = heldRaw?.validUntil ? renewalPlan(key, heldRaw.validUntil, c.today) : null
+    const expired = !!heldRaw && plan?.phase === 'expired'
+    const held = expired ? undefined : heldRaw
     const fit = FIELD_FIT[key](c)
-    const checks = held ? [{ weight: 'must' as const, state: 'ok' as const, text: `${rule.label} 보유${held.note ? ` · ${held.note}` : ''}` }] : fit.checks
+    const checks: Check[] = held
+      ? [{ weight: 'must', state: 'ok', text: `${rule.label} 보유${held.note ? ` · ${held.note}` : ''}` }]
+      : expired
+        ? [{ weight: 'core', state: 'no', text: `이전 ${rule.label} 만료 ${heldRaw!.validUntil}(${-plan!.daysLeft}일 지남) — 다시 인증 받아야 함` }, ...fit.checks]
+        : fit.checks
     const have = rule.evidence.filter((e) => c.evidence.some((d) => d.id === e.id && d.have)).map((e) => e.label)
     // FV: 필요성이 커도 문서 · 절차가 없으면 '매우 높음' 이 아니다 — 자료 3분의 1 미만이면 '보통' 까지, 4분의 3 미만이면 '높음' 까지
     const ratio = rule.evidence.length ? have.length / rule.evidence.length : 1
@@ -63,7 +72,13 @@ export function assessIso(c: CertificationClientContext): CertificationAssessmen
       label: rule.label,
       readiness: held ? 'very_high' : fit.rec === 'not_needed' || fit.rec === 'low_priority' ? (READINESS_RANK[capped] > 2 ? 'low' : capped) : capped,
       recommendation: held ? 'held' : fit.rec,
-      oneLine: held ? '이미 보유 중 — 매년 사후심사 · 3년 갱신' : fit.line,
+      oneLine: held
+        ? plan && (plan.phase === 'notice' || plan.phase === 'todo')
+          ? `${RENEWAL_PHASE_LABEL[plan.phase]} — ${plan.validUntil} 만료(${plan.daysLeft}일 남음) · 인증기관과 갱신심사 날짜 잡기`
+          : `이미 보유 중 — 매년 사후심사 · 3년 갱신${plan ? `(${plan.validUntil}까지)` : ''}`
+        : expired
+          ? `이전 인증 만료(${heldRaw!.validUntil}) — 다시 인증 · ${fit.line}`
+          : fit.line,
       reasons: reasonsOf(checks),
       missingFacts: checks.filter((x) => x.state === 'unknown').map((x) => x.text.split(' — ')[0]),
       missingEvidence: rule.evidence.filter((e) => !have.includes(e.label)).map((e) => e.label),
@@ -71,6 +86,8 @@ export function assessIso(c: CertificationClientContext): CertificationAssessmen
       benefits: pickBenefits(rule.benefits, c),
       timing: held ? '사후심사 일정 관리' : fit.rec === 'possible' ? '거래처 · 입찰 일정에 맞춰 검토' : '필요가 생기면',
       nextAction: { label: '상담 요청', kind: 'consult' },
+      ...(plan && heldRaw ? { renewal: { validUntil: heldRaw.validUntil, daysLeft: plan.daysLeft, prepareFrom: plan.noticeOn, note: rule.renewalNote, phase: plan.phase, graceUntil: plan.graceUntil } } : {}),
+      ...(expired ? { expired: true as const } : {}),
     }
   })
 }

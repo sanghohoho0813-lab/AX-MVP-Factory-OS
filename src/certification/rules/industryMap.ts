@@ -167,6 +167,9 @@ export function innobizIndustry(ksic: string | null | undefined, group: string, 
   if (ksic && ksic.length === 5 && INNOBIZ_EXCLUDED_KSIC.includes(ksic)) return { weight: 'must', state: 'no', text: `이노비즈 제외 업종(별표2 · KSIC ${ksic})` }
   if (ksic) {
     const j = innobizSectorOfKsic(ksic)
+    // D-214: 짧은 코드 아래에 제외 업종(5자리)이 있으면 '신청 가능' 으로 확정하지 않는다(예: 5611 → 아래가 모두 제외)
+    const under = ksic.length < 5 ? INNOBIZ_EXCLUDED_KSIC.filter((x) => x.startsWith(ksic)) : []
+    if (under.length) return { weight: 'core', state: 'warn', text: `세세분류 확인 필요 — KSIC ${ksic} 아래에 이노비즈 제외 업종(별표2 · ${under.slice(0, 3).join(' · ')}${under.length > 3 ? ` 외 ${under.length - 3}개` : ''})이 있음 · 5자리 코드로 확인` }
     const tail = ksic.length < 5 ? ' · 세세분류로 제외 업종 최종 확인' : ''
     // 신청 가능은 확정(8가지 평가표 중 하나) — 어느 평가표인지가 갈리면 '업종 평가표 추가 확인 필요'(틀린 확정보다 확인 필요)
     if (!j.sector) return { weight: 'core', state: 'ok', text: `신청 가능한 업종(KSIC ${ksic}) — 업종 평가표 추가 확인 필요: ${j.candidates.map((x) => INNOBIZ_SECTOR_LABEL[x]).join(' · ')} 중(바이오 · 환경은 신청 기술 분야로 정함)${tail}` }
@@ -209,6 +212,9 @@ export function mainbizIndustry(ksic: string | null | undefined, text: string): 
     if (full) return { weight: 'must', state: 'no', text: `메인비즈 제외 업종(운영규정 제3조① — KSIC ${ksic} ${full[1]})` }
     const part = MAINBIZ_EXCLUDED_PART.find(([p]) => ksic.startsWith(p))
     if (part) return { weight: 'note', state: 'warn', text: `세부 사업내용 확인 필요 — KSIC ${ksic}: ${part[1]} 제외 · 실제 사업 내용으로 확인` }
+    // D-214: 짧은 코드(562 · 46 · 4633)는 그 아래 제외 업종(5621 주점 · 46331 주류 도매 …)을 품을 수 있다 — '제외 업종 아님' 으로 확정하지 않는다
+    const under = [...MAINBIZ_EXCLUDED_FULL, ...MAINBIZ_EXCLUDED_PART].filter(([p]) => p.startsWith(ksic) && p !== ksic)
+    if (under.length) return { weight: 'note', state: 'warn', text: `세세분류 확인 필요 — KSIC ${ksic} 아래에 제외 업종(${under.map(([p, n]) => `${p} ${n}`).join(' · ')})이 있음 · 더 긴 코드 · 실제 사업 내용으로 확인` }
     return { weight: 'must', state: 'ok', text: `제외 업종 아님(KSIC ${ksic})` }
   }
   if (!text) return { weight: 'must', state: 'unknown', text: '업종 — 확인 필요' }

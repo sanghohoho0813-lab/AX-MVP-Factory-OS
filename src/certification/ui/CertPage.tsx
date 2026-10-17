@@ -29,7 +29,8 @@ export default function CertPage() {
       </div>
     )
   }
-  if (!d.ctx) {
+  // D-214: 모듈 기록(칩 · 답 · 진행 기록)을 다 읽은 뒤에 보여 준다 — 읽기 전에 누르면 같은 업체 줄이 하나 더 생겨 원래 줄을 가렸다
+  if (!d.ctx || !d.loaded) {
     return (
       <div className="flex flex-col gap-5">
         {head}
@@ -58,11 +59,11 @@ export default function CertPage() {
           answers={work.answers}
           prep={work.prep}
           notes={work.notes}
-          onAnswer={(id, v) => void d.saveWork(a.key, { answers: { ...work.answers, [id]: v } })}
-          onPrep={(id, p) => void d.saveWork(a.key, { prep: { ...work.prep, [id]: p } })}
-          onNote={(k, text) => d.saveWork(a.key, { notes: { ...work.notes, [k]: text } })}
+          onAnswer={(id, v) => void d.saveWork(a.key, { answers: { [id]: v } })}
+          onPrep={(id, p) => void d.saveWork(a.key, { prep: { [id]: p } })}
+          onNote={(k, text) => d.saveWork(a.key, { notes: { [k]: text } })}
           life={d.lifeOf(a.key).life}
-          onStatus={(s) => d.setStatus(a.key, s)}
+          onStatus={(s, seed) => d.setStatus(a.key, s, seed)}
           onComplete={(input, toProfile) => d.complete(a.key, input, { toProfile })}
           onPatchLife={(patch) => d.patchLife(a.key, patch)}
           onRequestDocs={(labels) => d.requestDocs(labels)}

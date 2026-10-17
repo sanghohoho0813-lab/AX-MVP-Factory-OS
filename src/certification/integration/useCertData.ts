@@ -7,11 +7,11 @@
  *   - [고객에게 자료 요청] → 서류함에 빈 칸(없는 것만)
  * 새 표 · 마이그레이션 없음.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useToolClient } from '../../tools/shared/toolClientContext'
 import { useModuleBucket } from '../../tools/shared/useModuleBucket'
 import { nowIso, todayLocalDate } from '../../lib/appClock'
-import { saveClient, withCustomField, withToolResult } from '../../services/clientOpsService'
+import { listClients, saveClient, withCustomField, withToolResult } from '../../services/clientOpsService'
 import { withActivity } from '../../services/clientOpsActivity'
 import { withFactValue } from '../../services/customerFacts'
 import { withDocSlots } from '../../services/salesMeeting'
@@ -78,7 +78,23 @@ export function withCertCompletion(record: ClientOpsRecord, cert: CertificationK
   const plan = life.validUntil ? renewalPlan(cert, life.validUntil, opts.today) : null
   const title = `${rule.label} 인증 · 갱신`
   // 인증 정보를 고쳐 다시 저장하면 앞 결과(갱신 할 일 포함)를 바꾼다 — 달력 · 오늘에 같은 할 일이 두 번 뜨지 않게
-  rec = { ...rec, toolResults: (rec.toolResults ?? []).filter((t) => !(t.toolKey === CERT_MODULE && t.title === title)) }
+  // D-214: 단계 4 '유효기간 · 갱신' 으로 붙인 결과(제목이 다름)의 계산 기한도 내린다 — 같은 만료일이 두 번 뜨고, 갱신을 기록한 뒤에도 옛 주기의 '유효기간 끝' 이 남아 '기한 지남' 으로 떴다.
+  //   사람이 건 할 일(todo)은 남긴다(D-134).
+  const isAttachedRenewal = (t: { toolKey: string; data?: unknown }) => {
+    const d = (t.data ?? {}) as { kind?: unknown; cert?: unknown }
+    return t.toolKey === CERT_MODULE && d.kind === 'renewal' && d.cert === cert
+  }
+  rec = {
+    ...rec,
+    toolResults: (rec.toolResults ?? [])
+      .filter((t) => !(t.toolKey === CERT_MODULE && t.title === title))
+      // 예전 화면이 계산한 '갱신 준비 시작' 에 할 일 표시를 붙여 두었다 — 사람이 건 것이 아니니 같이 내린다
+      .map((t) => {
+        if (!isAttachedRenewal(t)) return t
+        const keep = t.deadlines.filter((d) => d.todo && !d.title.endsWith('갱신 준비 시작'))
+        return keep.length === t.deadlines.length ? t : { ...t, deadlines: keep }
+      }),
+  }
   return withToolResult(rec, {
     toolKey: CERT_MODULE,
     title,
@@ -132,12 +148,40 @@ export function useCertData() {
   const list = useMemo(() => (ctx ? assessAll(ctx) : []), [ctx])
   const roadmap = useMemo(() => (ctx ? buildRoadmap(list, ctx) : { steps: [], later: [] }), [ctx, list])
 
+  /*
+   * D-214: 칩 · 자가진단 답 · 대표 답 · 진행 상태를 빨리 연달아 눌러도 앞 것이 지워지지 않게 —
+   *   저장을 한 줄로 세우고(앞 저장이 끝난 뒤에), 저장할 때마다 바로 앞에 저장한 값 위에 덧붙인다.
+   *   예전: 화면을 그린 때의 값으로 저장 내용을 만들어, 칩 1 저장이 끝나기 전에 칩 2 를 누르면 칩 1 이 사라졌고,
+   *   모듈 기록을 읽기 전에 저장하면 같은 업체 줄이 하나 더 생겨 원래 줄을 가렸다(loaded 전에는 저장하지 않음).
+   */
+  const chain = useRef<Promise<unknown>>(Promise.resolve())
+  const pending = useRef(0)
+  const latest = useRef(new Map<string, { id?: string; data: unknown }>())
+  const serial = useCallback(<R,>(job: () => Promise<R>): Promise<R> => {
+    pending.current += 1
+    const run = chain.current.catch(() => undefined).then(job)
+    chain.current = run
+      .catch(() => undefined)
+      .finally(() => {
+        pending.current -= 1
+        if (pending.current === 0) latest.current.clear()
+      })
+    return run
+  }, [])
+  const loaded = profiles.rows !== null && works.rows !== null && lifeRows.rows !== null
+
   const saveProfile = useCallback(
     async (patch: Partial<CertProfile>) => {
-      if (!clientId) return
-      await profiles.save({ id: profileRow?.id, clientId, data: { profile: { ...profile, ...patch } } })
+      if (!clientId || !loaded) return
+      const k = `profile|${clientId}`
+      await serial(async () => {
+        const prev = latest.current.get(k) as { id?: string; data: CertProfile } | undefined
+        const next = { ...(prev?.data ?? profile), ...patch }
+        const row = await profiles.save({ id: prev?.id ?? profileRow?.id, clientId, data: { profile: next } })
+        latest.current.set(k, { id: row.id, data: next })
+      })
     },
-    [clientId, profiles, profileRow, profile],
+    [clientId, loaded, serial, profiles, profileRow, profile],
   )
 
   const workOf = useCallback(
@@ -148,14 +192,22 @@ export function useCertData() {
     [clientId, works.rows],
   )
 
+  /** 바뀐 칸만 넘긴다 — 저장할 때 바로 앞 값(answers · prep · notes) 위에 덧붙인다 */
   const saveWork = useCallback(
     async (cert: CertificationKey, patch: { answers?: Record<string, Answer>; prep?: Record<string, PreparedAnswer>; notes?: Record<string, string> }) => {
-      if (!clientId) return
+      if (!clientId || !loaded) return
+      const k = `work|${clientId}|${cert}`
       const cur = workOf(cert)
-      // P2: 대표 답(notes) — 다른 칸을 저장할 때 지워지지 않게 늘 같이 쓴다
-      await works.save({ id: cur.row?.id, clientId, data: { ...(cur.row?.data ?? {}), cert, answers: patch.answers ?? cur.answers, prep: patch.prep ?? cur.prep, notes: patch.notes ?? cur.notes } })
+      await serial(async () => {
+        const prev = latest.current.get(k) as { id?: string; data: WorkRow } | undefined
+        const base: WorkRow = prev?.data ?? { ...(cur.row?.data ?? {}), cert, answers: cur.answers, prep: cur.prep, notes: cur.notes }
+        // P2: 대표 답(notes) — 다른 칸을 저장할 때 지워지지 않게 늘 같이 쓴다
+        const next: WorkRow = { ...base, cert, answers: { ...base.answers, ...patch.answers }, prep: { ...base.prep, ...patch.prep }, notes: { ...(base.notes ?? {}), ...patch.notes } }
+        const row = await works.save({ id: prev?.id ?? cur.row?.id, clientId, data: next })
+        latest.current.set(k, { id: row.id, data: next })
+      })
     },
-    [clientId, works, workOf],
+    [clientId, loaded, serial, works, workOf],
   )
 
   const lifeOf = useCallback(
@@ -166,45 +218,62 @@ export function useCertData() {
     [clientId, lifeRows.rows],
   )
 
-  /** 업체 기록 저장 — 화면이 쓰는 기록도 바꾼다(다음 단추가 예전 기록 위에 저장하지 않게) */
+  /** 업체 기록 저장 — 저장 직전에 그 업체 기록을 새로 읽어 그 위에 고친다(그 사이 다른 창 · 팀장이 적은 것을 덮지 않게) · 화면이 쓰는 기록도 바꾼다 */
   const commit = useCallback(
-    async (next: ClientOpsRecord) => {
+    async (change: (rec: ClientOpsRecord) => ClientOpsRecord) => {
+      if (!clientRecord) return null
+      const fresh = (await listClients(workspaceId).catch(() => [] as ClientOpsRecord[])).find((c) => c.id === clientRecord.id) ?? clientRecord
+      const next = change(fresh)
+      if (next === fresh) return fresh
       const saved = await saveClient(next)
       replaceClient(saved)
       return saved
     },
-    [replaceClient],
+    [clientRecord, workspaceId, replaceClient],
   )
 
-  const saveLife = useCallback(
-    async (cert: CertificationKey, life: CertLifecycle) => {
-      if (!clientId) return
-      await lifeRows.save({ id: lifeOf(cert).row?.id, clientId, data: { cert, life } })
+  /** 진행 기록 저장 — 바로 앞에 저장한 진행 기록(없으면 지금 기록) 위에서 바꾼다. 바뀐 게 없으면 저장하지 않고 null */
+  const saveLifeWith = useCallback(
+    async (cert: CertificationKey, change: (cur: CertLifecycle) => CertLifecycle, seed?: CertLifecycle): Promise<CertLifecycle | null> => {
+      if (!clientId || !loaded) return null
+      const k = `life|${clientId}|${cert}`
+      const curRow = lifeOf(cert)
+      return serial(async () => {
+        const prev = latest.current.get(k) as { id?: string; data: CertLifecycle } | undefined
+        const base = prev?.data ?? seed ?? curRow.life
+        const next = change(base)
+        if (next === base) return null
+        const row = await lifeRows.save({ id: prev?.id ?? curRow.row?.id, clientId, data: { cert, life: next } })
+        latest.current.set(k, { id: row.id, data: next })
+        return next
+      })
     },
-    [clientId, lifeRows, lifeOf],
+    [clientId, loaded, serial, lifeRows, lifeOf],
   )
 
-  /** 진행 상태 바꾸기 — 진행 기록 + 업체 활동 기록 한 줄 */
+  /**
+   * 진행 상태 바꾸기 — 진행 기록 + 업체 활동 기록 한 줄. 바뀌었으면 true.
+   * D-214: seed — 회사 정보 '인증서' 칸으로만 아는 인증(진행 기록 없음)은 화면에 보이는 번호 · 날짜에서 시작한다
+   *   (예전: 빈 기록에서 시작해 '갱신 준비' 를 누르면 번호 · 유효기간이 사라지고 갱신 일정도 숨었다).
+   */
   const setStatus = useCallback(
-    async (cert: CertificationKey, status: CertStatus) => {
-      if (!clientRecord) return
+    async (cert: CertificationKey, status: CertStatus, seed?: CertLifecycle): Promise<boolean> => {
+      if (!clientRecord) return false
       const at = nowIso()
-      const cur = lifeOf(cert).life
-      const next = withCertStatus(cur, status, at)
-      if (next === cur) return
-      await saveLife(cert, next)
-      await commit(withActivity(clientRecord, 'tool', `${CERT_RULES[cert].label} 진행 — ${CERT_STATUS_LABEL[status]}`, null, at))
+      const next = await saveLifeWith(cert, (cur) => withCertStatus(cur, status, at), seed)
+      if (!next) return false
+      await commit((rec) => withActivity(rec, 'tool', `${CERT_RULES[cert].label} 진행 — ${CERT_STATUS_LABEL[status]}`, null, at))
+      return true
     },
-    [clientRecord, lifeOf, saveLife, commit],
+    [clientRecord, saveLifeWith, commit],
   )
 
   /** 메모 · 사후 점검일 같은 덧붙임(활동 기록 없음) */
   const patchLife = useCallback(
     async (cert: CertificationKey, patch: Partial<Pick<CertLifecycle, 'memo' | 'postAuditAt'>>) => {
-      const cur = lifeOf(cert).life
-      await saveLife(cert, { ...cur, ...patch, updatedAt: nowIso() })
+      await saveLifeWith(cert, (cur) => ((Object.keys(patch) as (keyof typeof patch)[]).every((x) => cur[x] === patch[x]) ? cur : { ...cur, ...patch, updatedAt: nowIso() }))
     },
-    [lifeOf, saveLife],
+    [saveLifeWith],
   )
 
   /**
@@ -215,34 +284,39 @@ export function useCertData() {
     async (cert: CertificationKey, input: CompletionInput, opts: { toProfile: boolean }) => {
       if (!clientRecord || !clientId) return
       const at = nowIso()
-      const life = withCompletion(lifeOf(cert).life, input, at)
-      await saveLife(cert, life)
-      const rec = withCertCompletion(clientRecord, cert, life, { toProfile: opts.toProfile, today, clientId })
-      await commit(rec)
+      const life = await saveLifeWith(cert, (cur) => withCompletion(cur, input, at))
+      if (!life) return
+      await commit((rec) => withCertCompletion(rec, cert, life, { toProfile: opts.toProfile, today, clientId }))
     },
-    [clientRecord, clientId, lifeOf, saveLife, commit, today],
+    [clientRecord, clientId, saveLifeWith, commit, today],
   )
 
   /** [회사 정보에 확인된 사실로 저장] — 칩으로 고른 특허 · 연구소를 사실 창고에 '확인됨' 으로 */
   const confirmFacts = useCallback(async () => {
     if (!clientRecord) return 0
     const now = nowIso()
-    let rec = clientRecord
     const patch = factPatchOf(profile)
-    for (const f of patch) rec = withFactValue(rec, f.key, f.value, { source: 'manual', status: 'confirmed', asOf: todayLocalDate(), now })
-    if (rec === clientRecord) return 0
-    rec = withActivity(rec, 'profile', `기업인증에서 확인한 사실 저장 — ${patch.map((f) => `${f.label} ${f.value}`).join(' · ')}`, null, now)
-    await commit(rec)
-    return patch.length
+    let changed = false
+    await commit((fresh) => {
+      let rec = fresh
+      for (const f of patch) rec = withFactValue(rec, f.key, f.value, { source: 'manual', status: 'confirmed', asOf: todayLocalDate(), now })
+      if (rec === fresh) return fresh
+      changed = true
+      return withActivity(rec, 'profile', `기업인증에서 확인한 사실 저장 — ${patch.map((f) => `${f.label} ${f.value}`).join(' · ')}`, null, now)
+    })
+    return changed ? patch.length : 0
   }, [clientRecord, profile, commit])
 
   /** [고객에게 자료 요청] — 서류함에 없는 것만 빈 칸으로(고객 화면 · 서류 요청 문구가 같이 쓴다) */
   const requestDocs = useCallback(
     async (labels: string[]) => {
       if (!clientRecord) return 0
-      const next = withDocSlots(clientRecord, labels)
-      const added = (next.customDocuments?.length ?? 0) - (clientRecord.customDocuments?.length ?? 0)
-      if (added > 0) await commit(withActivity(next, 'document', `기업인증 자료 요청 — 서류함에 칸 ${added}개`, null, nowIso()))
+      let added = 0
+      await commit((fresh) => {
+        const next = withDocSlots(fresh, labels)
+        added = (next.customDocuments?.length ?? 0) - (fresh.customDocuments?.length ?? 0)
+        return added > 0 ? withActivity(next, 'document', `기업인증 자료 요청 — 서류함에 칸 ${added}개`, null, nowIso()) : fresh
+      })
       return Math.max(0, added)
     },
     [clientRecord, commit],
@@ -252,7 +326,7 @@ export function useCertData() {
     clientId,
     clientName,
     clientRecord,
-    loaded: profiles.rows !== null && works.rows !== null && lifeRows.rows !== null,
+    loaded,
     profile,
     lab,
     lives,

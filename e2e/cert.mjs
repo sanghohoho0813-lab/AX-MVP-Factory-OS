@@ -281,7 +281,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const cred = (wc.customFields ?? []).find((f) => f.group === 'credential' && /이노비즈/.test(f.label))
   const tr = (wc.toolResults ?? []).find((t) => t.toolKey === 'cert-os' && /이노비즈/.test(t.title))
   check('C 회사 정보 인증서 칸 · 번호 · 2029-03-14까지', !!cred && cred.value.includes('260315-00123') && cred.value.includes('2029-03-14까지'), cred)
-  check('C 갱신 일정: 갱신 준비 시기(D-120) · 갱신 서류 준비(D-90, 할 일) · 유효기간 끝', !!tr && tr.deadlines.length === 3 && tr.deadlines[0].date === '2028-11-14' && tr.deadlines[1].date === '2028-12-14' && tr.deadlines[1].todo === true && tr.deadlines[2].hard === true, tr?.deadlines)
+  // D-214: 계산한 날짜엔 '할 일(todo)' 표시를 붙이지 않는다(사람이 건 할 일만 — 다시 붙여도 줄이 늘지 않게)
+  check('C 갱신 일정: 갱신 준비 시기(D-120) · 갱신 서류 준비(D-90) · 유효기간 끝 — 계산한 줄은 todo 아님', !!tr && tr.deadlines.length === 3 && tr.deadlines[0].date === '2028-11-14' && tr.deadlines[1].date === '2028-12-14' && tr.deadlines.every((d) => !d.todo) && tr.deadlines[2].hard === true, tr?.deadlines)
   check('C 완료 뒤: 진행 기록 인증 완료 · 갱신 줄 · 다음 할 일 1~3(정책자금 먼저)', (await page.getByTestId('cert-life-status').innerText()) === '인증 완료' && (await page.getByTestId('cert-renewal').count()) === 1 && (await page.getByTestId('cert-after-item').count()) >= 1 && (await page.getByTestId('cert-after-item').count()) <= 3 && /정책자금/.test(await page.getByTestId('cert-after-item').first().innerText()))
   await page.goto(BASE + '/tools/cert-os?client=cli_wooil', { waitUntil: 'networkidle' })
   await page.waitForTimeout(600)
@@ -415,6 +416,28 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const daum = await recOf('cli_daum')
   const ibFields = (daum.customFields ?? []).filter((f) => f.group === 'credential' && /이노비즈/.test(f.label))
   check('릴리스: 두 번 저장해도 인증서 칸 1개(기관 남음) · 갱신 결과 1개', ibFields.length === 1 && ibFields[0].value.includes('중소벤처기업부') && (daum.toolResults ?? []).filter((t) => t.toolKey === 'cert-os').length === 1, { ibFields, n: (daum.toolResults ?? []).filter((t) => t.toolKey === 'cert-os').length })
+
+  // D-214 — 인증서 칸으로만 아는 인증: 상태 칩을 눌러도 번호 · 유효기간 · 갱신 줄이 남는다 / 만료된 인증엔 갱신 일정 붙이기 없음
+  await page.evaluate(() => {
+    const list = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+    const c = list.find((x) => x.id === 'cli_hansol')
+    c.customFields = [...(c.customFields ?? []).filter((f) => !/메인비즈|벤처/.test(f.label)), { id: 'cf_mb', group: 'credential', label: '메인비즈', value: '확인번호 MB-77 · 확인일 2025-06-01 · 2028-05-31까지' }, { id: 'cf_vt', group: 'credential', label: '벤처기업', value: '확인번호 V-1 · 2025-01-01까지' }]
+    localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(list))
+  })
+  await page.goto(BASE + '/tools/cert-os/mainbiz?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  await page.getByTestId('cert-step-2').click()
+  const viaBefore = await page.getByTestId('cert-life-done').getAttribute('data-source')
+  await page.getByTestId('cert-life-renewal').click()
+  await page.waitForTimeout(900)
+  const lifeRowsMb = await page.evaluate(() => Object.entries(localStorage).filter(([k]) => k.includes('cert-os') && k.includes('life')).flatMap(([, v]) => JSON.parse(v)).filter((r) => r.clientId === 'cli_hansol' && r.data?.cert === 'mainbiz'))
+  check('D-214 인증서 칸 인증 → [갱신 준비]: 진행 기록에 번호 · 유효기간이 그대로 · 갱신 줄 남음', viaBefore === 'profile' && (await page.getByTestId('cert-life').getAttribute('data-status')) === 'renewal' && (await page.getByTestId('cert-renewal').count()) === 1 && lifeRowsMb.length === 1 && lifeRowsMb[0].data.life.validUntil === '2028-05-31' && lifeRowsMb[0].data.life.number === 'MB-77', lifeRowsMb.map((r) => r.data.life))
+  await page.goto(BASE + '/tools/cert-os/venture?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  const expiredLine = (await page.locator('body').innerText()).includes('이전 인증 만료')
+  await page.getByTestId('cert-step-3').click()
+  await page.waitForTimeout(300)
+  check('D-214 만료 벤처(2025-01-01): \'이전 인증 만료\' · 4단계에 지난 날짜 갱신 일정 붙이기 없음', expiredLine && (await page.getByTestId('cert-step-body-3').count()) === 1 && (await page.getByTestId('cert-step-body-3').locator('[data-testid="tool-attach-quick"], [data-testid="tool-attach-open"]').count()) === 0)
 
   // 업체 상세 모듈 입구
   await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
