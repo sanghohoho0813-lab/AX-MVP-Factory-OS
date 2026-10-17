@@ -23,7 +23,11 @@ export default function CertPage() {
   const d = useCertData()
   const { showToast } = useToast()
   // D-225 저장이 안 되면 알린다 — 예전에는 칩 · 답 저장 실패를 삼켜 '✓ 확인했습니다' 만 보였다
-  const saveFailed = (e: unknown) => showToast(`저장하지 못했습니다: ${e instanceof Error && e.message ? e.message : '연결을 확인하세요'} — 고른 것은 화면에 있지만 다시 열면 사라질 수 있어요. 다시 눌러 주세요.`)
+  const saveFailed = (e: unknown) => {
+    const why = e instanceof Error && e.message ? e.message : '연결을 확인하세요'
+    // 저장소 오류 문구에 이미 '저장하지 못했…' 이 있으면 같은 말을 두 번 쓰지 않는다
+    showToast(`${/저장하지 못했/.test(why) ? why : `저장하지 못했습니다: ${why}`} — 고른 것은 화면에 있지만 다시 열면 사라질 수 있어요. 다시 눌러 주세요.`)
+  }
   const head = <PageHeader title={d.clientName ? `${d.clientName} 기업인증` : '기업인증'} description={meta?.hint ? `${meta.label} — ${meta.hint}` : '어떤 인증을 왜 · 언제 · 무엇을 준비해서'} />
 
   if (!d.clientId) {

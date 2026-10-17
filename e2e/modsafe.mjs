@@ -381,7 +381,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.locator('[data-testid^="cert-q-"]').first().click({ timeout: 3000 }).catch(() => {})
   await page.waitForTimeout(800)
   const certBody = await page.locator('body').innerText()
-  check('D-225 기업인증: 저장이 막히면 \'저장하지 못했습니다\' 안내', certBody.includes('저장하지 못했습니다'), certBody.match(/저장[^\n]{0,40}/)?.[0] ?? '안내 없음')
+  // 앱 전체의 저장 공간 오류 문구에도 '저장하지 못했습니다' 가 있어, 기업인증 안내 끝말('다시 눌러 주세요')까지 본다
+  check('D-225 기업인증: 저장이 막히면 \'저장하지 못했… 다시 눌러 주세요\' 안내', /저장하지 못했[^\n]*다시 눌러 주세요/.test(certBody), certBody.match(/저장[^\n]{0,60}/)?.[0] ?? '안내 없음')
   await shot(page, '11-cert-save-failed')
   await unblockWrites(page)
 
