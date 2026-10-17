@@ -29,18 +29,26 @@ function SaveCustomerBar({
   const byName = clients.find((c) => input.companyName && c.companyName.replace(/\s|\(주\)|주식회사/g, "") === input.companyName.replace(/\s|\(주\)|주식회사/g, ""));
   const [clientId, setClientId] = useState(presetClientId && clients.some((c) => c.id === presetClientId) ? presetClientId : byName?.id ?? "");
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState(false);
   const already = clientId ? getStoredCustomerById(clientId) : undefined;
 
   const handleSave = () => {
-    if (!clientId) return;
-    saveCustomer(
+    if (!clientId || saving) return;
+    setSaving(true);
+    setFailed(false);
+    // D-224 실제로 저장된 뒤에 '저장했습니다' — 예전에는 실패해도 저장했다고 보였다
+    void saveCustomer(
       buildCustomerFromDiagnosis(input, result, {
         quickInput: quickInput ?? undefined,
         deepInput: deepInput ?? undefined,
         clientId,
       }),
-    );
-    setSaved(true);
+    ).then((ok) => {
+      setSaving(false);
+      if (ok) setSaved(true);
+      else setFailed(true);
+    });
   };
 
   return (
@@ -81,14 +89,19 @@ function SaveCustomerBar({
           ) : already ? (
             <p className="text-xs text-slate-500">이미 상담 중인 업체입니다 — 진단 결과만 새로 바뀌고 단계·메모는 이어집니다.</p>
           ) : null}
+          {failed ? (
+            <p className="text-sm font-semibold text-red-700" role="alert" data-testid="pf-save-failed">
+              저장하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요.
+            </p>
+          ) : null}
           <button
             type="button"
             onClick={handleSave}
-            disabled={!clientId}
+            disabled={!clientId || saving}
             data-testid="pf-save-consult"
             className="rounded-xl bg-blue-600 px-6 py-3 text-base font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            이 업체 상담으로 저장
+            {saving ? "저장하는 중…" : "이 업체 상담으로 저장"}
           </button>
         </div>
       )}
@@ -127,6 +140,10 @@ export default function DiagnosisSection({
     autoSample ? SAMPLE_INPUT : autoRun && initialInput ? initialInput : null,
   );
   const [deepInput, setDeepInput] = useState<DiagnosisInput | null>(null);
+  // D-224 결과를 낸 그때의 입력 — 결과를 본 뒤 칸을 고치면 결과 카드 · 붙이기 · 저장이 새 칸 + 옛 결과로 섞이던 것
+  const [resultInput, setResultInput] = useState<DiagnosisInput | null>(
+    autoSample ? SAMPLE_INPUT : autoRun && initialInput ? initialInput : null,
+  );
   const [deepOpen, setDeepOpen] = useState(false);
   const [deepApplied, setDeepApplied] = useState(false);
   const [runId, setRunId] = useState(0);
@@ -141,6 +158,7 @@ export default function DiagnosisSection({
 
   const handleQuickSubmit = () => {
     setResult(runDiagnosis(input));
+    setResultInput(input);
     setQuickInput(input);
     setDeepOpen(false);
     setDeepApplied(false);
@@ -149,6 +167,7 @@ export default function DiagnosisSection({
 
   const handleDeepSubmit = () => {
     setResult(runDiagnosis(input));
+    setResultInput(input);
     setDeepInput(input);
     setDeepApplied(true);
     setRunId((r) => r + 1);
@@ -163,6 +182,8 @@ export default function DiagnosisSection({
   };
 
   const topAgencies = result?.agencies.map((a) => a.name) ?? [];
+  const shown = resultInput ?? input;
+  const stale = !!result && !!resultInput && (Object.keys(input) as (keyof DiagnosisInput)[]).some((k) => input[k] !== resultInput[k]);
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -179,8 +200,13 @@ export default function DiagnosisSection({
               🔍 심층 진단이 반영된 결과입니다.
             </div>
           )}
-          <ResultCard input={input} result={result} />
-          {extras ? <div className="mt-4">{extras(input, result)}</div> : null}
+          {stale && (
+            <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900" data-testid="pf-stale">
+              칸을 바꿨어요. 아래 결과는 바꾸기 전 값 기준입니다 — {deepOpen ? "[심층 진단 반영해 결과 업데이트]" : "[진단 결과 보기]"} 를 누르면 새 값으로 바뀝니다.
+            </div>
+          )}
+          <ResultCard input={shown} result={result} />
+          {extras ? <div className="mt-4">{extras(shown, result)}</div> : null}
 
           {/* 심층 진단으로 정확도 높이기 */}
           <div ref={deepRef} className="mt-6 scroll-mt-24">
@@ -209,7 +235,7 @@ export default function DiagnosisSection({
 
           <SaveCustomerBar
             key={runId}
-            input={input}
+            input={shown}
             result={result}
             quickInput={quickInput}
             deepInput={deepInput}

@@ -22,7 +22,7 @@ import { mapHref as labHref } from '../labcare/orig/nav'
 import { sharedToolKey } from '../shared/toolStorage'
 import { osCompanyDefaults } from '../employment/orig/store'
 import { mapHref as pfHref } from '../policyFunding/orig/nav'
-import { buildCustomerFromDiagnosis, customerFromRow, getStoredCustomerById, resetPolicyStoreForTest, todayStr } from '../policyFunding/orig/storage'
+import { buildCustomerFromDiagnosis, customerFromRow, getStoredCustomerById, resetPolicyStoreForTest, saveCustomer, todayStr } from '../policyFunding/orig/storage'
 import { aiReasoning, oneLineConclusion, todayTasks } from '../policyFunding/coach'
 import { assessHeadlineFor, buildProfile, inferIndustryCategory } from '../policyFunding/engine/knowledgeEngine'
 import { blockerApplies, hardBlockers, screenIndustry, smallBizStatus } from '../policyFunding/engine/eligibility'
@@ -1195,6 +1195,48 @@ check('칸 이름: 설명문처럼 긴 글은 이름으로 쓰지 않는다', cl
   const base = normalizeClientOps({ id: 'x', companyName: '가', industry: '', businessCategory: '제조업', businessItem: '정밀기계', employeeCount: '12명(2025.6 기준)' } as Record<string, unknown>)
   check('D-165 업종 칸이 비면 업태 · 종목으로(업체 카드와 같은 업종)', clientFacts(base, new Date('2026-09-23T00:00:00')).industryText === '제조업 정밀기계', clientFacts(base, new Date('2026-09-23T00:00:00')).industryText)
   check('D-165 고용지원금 직원 수: 첫 숫자만(1220256 이 아님)', osCompanyDefaults(base).empCount === '12', osCompanyDefaults(base).empCount)
+}
+
+/* ---- D-224: 정책자금 — 저장 실패를 '저장됨' 으로 보이지 않게 · 진단 문장 조사 ---- */
+{
+  const os = { id: 'cli_pf', companyName: '라마(주)', industry: '제조업' } as never
+  resetPolicyStoreForTest([], [os])
+  const r = runDiagnosis(SAMPLE_INPUT)
+  const c = buildCustomerFromDiagnosis(SAMPLE_INPUT, r, { clientId: 'cli_pf' })
+  const store = new Map<string, string>()
+  let failing = false
+  ;(globalThis as unknown as { localStorage: unknown }).localStorage = {
+    get length() {
+      return store.size
+    },
+    key: (i: number) => [...store.keys()][i] ?? null,
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => {
+      if (failing) {
+        const e = new Error('quota')
+        e.name = 'QuotaExceededError'
+        throw e
+      }
+      store.set(k, v)
+    },
+    removeItem: (k: string) => void store.delete(k),
+    clear: () => store.clear(),
+  }
+  const ok = await saveCustomer(c)
+  check('D-224 정책자금 저장: 저장되면 true(화면이 그때 저장됨이라고 말한다)', ok === true, String(ok))
+  failing = true
+  const bad = await saveCustomer({ ...c, memo: '실패할 메모' })
+  check('D-224 정책자금 저장: 실패하면 false(예전: 실패를 삼키고 저장됨)', bad === false, String(bad))
+  check('D-224 정책자금 저장: 실패해도 화면(명단)에는 적은 것이 남는다', getStoredCustomerById('cli_pf')?.memo === '실패할 메모')
+  failing = false
+  resetPolicyStoreForTest([], [])
+
+  // 진단 문장 — 기관 · 회사 이름 뒤 조사가 받침에 맞게(예전: '신용보증기금이(가)' · '…재단가' · '…회사는' 고정)
+  const texts = [SAMPLE_INPUT, DEFAULT_INPUT, { ...SAMPLE_INPUT, companyName: '하나로' }, { ...SAMPLE_INPUT, companyName: '미래산업' }]
+    .map((i) => JSON.stringify(runDiagnosis(i as DiagnosisInput)))
+    .join('\n')
+  const awkward = texts.match(/이\(가\)|을\(를\)|은\(는\)|과\(와\)|(기금|재단|공단|금융)(가|는|와) /g) ?? []
+  check('D-224 진단 문장: 이(가) · 을(를) · 받침과 안 맞는 조사 0', awkward.length === 0, awkward.slice(0, 5).join(' | '))
 }
 
 console.log(`\ntools: ${passed} passed, ${failed} failed`)

@@ -114,6 +114,8 @@ async function inspect(page, bucket, label, path, { overflow = false } = {}) {
   if (page.isClosed()) return check(`${label} ${path}`, false, '시험 창이 닫혀 열지 못함')
   await page.goto(BASE + path, { waitUntil: 'networkidle' }).catch(() => {})
   await page.waitForTimeout(500)
+  // 맞춤 추천은 계산에 1초 남짓 걸린다(휴대폰 흉내에서 더) — 계산 중 글자가 사라질 때까지 기다린다
+  await page.waitForFunction(() => !document.body.innerText.includes('계산하는 중'), null, { timeout: 8000 }).catch(() => {})
   const r = await page.evaluate(() => {
     const main = document.querySelector('main') ?? document.body
     const text = main.innerText ?? ''

@@ -33,6 +33,7 @@ import {
   type Rec,
 } from './store'
 import { scrubRrnDeep } from '../lib/privacy'
+import { mergeImportedCompany } from '../lib/excelImport'
 import './hr-orig.css'
 
 interface Loaded {
@@ -273,7 +274,9 @@ export function EmploymentOrig({
       }
       for (const [comp, os] of pairs) {
         remap.current.set(String(comp.id), os.id)
-        await saveCompany({ ...comp, id: os.id })
+        const prev = cur.metaRows.get(os.id)?.data
+        // D-224 이미 있는 업체면 빈 칸으로 덮지 않고 값 있는 칸만 더한다(업무 일지 · 업체 서류 · 대표 · 법인/개인이 지워지던 것)
+        await saveCompany(prev ? mergeImportedCompany({ ...comp, id: os.id }) : { ...comp, id: os.id })
       }
     },
     [saveCompany],

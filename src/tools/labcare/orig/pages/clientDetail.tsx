@@ -169,7 +169,9 @@ export default function ClientDetailPage() {
               <button
                 type="button"
                 onClick={() => {
-                  updateClient(id, { researchersPayrollTotal: taxForm.payroll, rndMaterialCost: taxForm.material, rndOtherCost: taxForm.other });
+                  // D-224 세 칸 합계를 올해 연구개발비로도 — 예전에는 등록 때 적은 '올해 연구개발비' 가 먼저라 여기서 고쳐도 예상 절세액이 그대로였다
+                  const sum = (taxForm.payroll || 0) + (taxForm.material || 0) + (taxForm.other || 0);
+                  updateClient(id, { researchersPayrollTotal: taxForm.payroll, rndMaterialCost: taxForm.material, rndOtherCost: taxForm.other, currentYearRndCost: sum > 0 ? sum : client?.currentYearRndCost });
                   setClient(getClient(id) ?? null);
                   setTaxSaved(true);
                 }}
@@ -181,7 +183,7 @@ export default function ClientDetailPage() {
                 const est = getTaxCreditEstimate(client);
                 return est.available ? (
                   <p className="rounded-lg bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-800">
-                    예상 연간 절세 효과: 약 {formatManwon(est.annual)} ({est.taxType}, 검토용{est.sizeAssumed ? " · ★ 중소기업 기준" : ""})
+                    예상 연간 절세 효과: 약 {formatManwon(est.annual)} ({est.taxType}, 검토용{est.sizeAssumed ? " · ★ 중소기업 기준" : ""}) · 연구개발비 {formatManwon(est.totalRnd)} × {est.rate}%
                   </p>
                 ) : (
                   <p className="text-sm text-slate-400">금액 입력 시 예상 절세액(검토용)이 표시됩니다.</p>

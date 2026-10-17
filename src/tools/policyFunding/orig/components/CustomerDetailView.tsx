@@ -1,6 +1,6 @@
 
 
-import { useState, useSyncExternalStore } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import Link from "../next";
 import { useRouter } from "../nav";
 import type {
@@ -128,9 +128,12 @@ function CustomerEditor({
     leadReaction: reaction,
   });
 
+  const noticeTimer = useRef<number | undefined>(undefined);
   const showNotice = (msg: string) => {
     setNotice(msg);
-    window.setTimeout(() => setNotice(null), 2500);
+    window.clearTimeout(noticeTimer.current);
+    // 실패 안내는 더 오래 — 2.5초면 읽기 전에 사라진다
+    noticeTimer.current = window.setTimeout(() => setNotice(null), msg.startsWith("저장하지 못했습니다") ? 8000 : 2500);
   };
 
   // 항상 최신 로컬 상태 + override 를 합쳐 저장하고 closingScore 를 재계산한다.
@@ -145,8 +148,10 @@ function CustomerEditor({
       ...override,
     };
     next.closingScore = computeClosingScore(next);
-    saveCustomer(next);
-    showNotice(msg);
+    // D-224 실제로 저장됐을 때만 '저장됨' — 실패하면 적은 내용은 화면에 남기고 다시 누르게
+    void saveCustomer(next).then((ok) =>
+      showNotice(ok ? msg : "저장하지 못했습니다. 적은 내용은 그대로 있으니 인터넷 연결을 확인하고 [저장] 을 다시 눌러 주세요."),
+    );
   };
 
   const toggleChecklist = (key: ConsultationChecklistKey) => {
@@ -197,11 +202,15 @@ function CustomerEditor({
       </div>
 
       {/* 저장 안내 */}
-      {notice && (
+      {notice && (notice.startsWith("저장하지 못했습니다") ? (
+        <div role="alert" data-testid="pf-detail-save-failed" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
+          ⚠️ {notice}
+        </div>
+      ) : (
         <div className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800">
           ✅ {notice}
         </div>
-      )}
+      ))}
 
       {/* 오늘 해야 할 일 (최상단) */}
       <div className="mt-5 rounded-3xl border-2 border-blue-100 bg-white p-6 shadow-sm">

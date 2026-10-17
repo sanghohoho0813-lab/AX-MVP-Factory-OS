@@ -76,6 +76,7 @@
     "qa:radar": "node e2e/radar-cloud.mjs",
     "qa:session": "node e2e/session-cloud.mjs",
     "qa:matrix": "node e2e/matrix.mjs",
+    "qa:modsafe": "node e2e/modsafe.mjs",
     "qa:cert": "node e2e/cert.mjs",
     "qa:money": "node e2e/money.mjs",
     "qa:pilot": "node e2e/pilot.mjs",

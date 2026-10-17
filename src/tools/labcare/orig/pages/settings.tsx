@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { flushLabStore } from "../store";
+import { flushLabStore, labUnsavedCount } from "../store";
 import Layout from "../components/Layout";
 import SampleDataBox from "../components/SampleDataBox";
 import { exportData, importData, resetData } from "../lib/localData";
@@ -24,7 +24,7 @@ export default function SettingsPage() {
       const r = importData(String(reader.result));
       if (r.ok) {
         flash("ok", `${r.message} 새로고침 후 반영됩니다.`);
-        void flushLabStore().then(() => setTimeout(() => window.location.reload(), 600));
+        void flushLabStore().then(reloadIfSaved);
       } else {
         flash("err", r.message);
       }
@@ -37,7 +37,16 @@ export default function SettingsPage() {
     resetData();
     setResetText("");
     flash("ok", "로컬 데이터를 초기화했습니다. 새로고침 후 데모 데이터가 다시 채워집니다.");
-    void flushLabStore().then(() => setTimeout(() => window.location.reload(), 600));
+    void flushLabStore().then(reloadIfSaved);
+  }
+
+  // D-224 저장이 끝난 뒤에만 새로고침 — 실패했는데 새로고침하면 방금 되돌린/지운 내용이 서버 값으로 되돌아갔다
+  function reloadIfSaved() {
+    if (labUnsavedCount() > 0) {
+      window.alert("저장하지 못했습니다. 인터넷 연결을 확인한 뒤 화면 위의 [지금 다시 저장] 을 누르고 새로고침하세요.");
+      return;
+    }
+    setTimeout(() => window.location.reload(), 600);
   }
 
 

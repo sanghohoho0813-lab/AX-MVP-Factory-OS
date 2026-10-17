@@ -2,6 +2,7 @@
 // '어디를 추천하는가'를 넘어 '왜 승인될 것 같은가 / 어떤 논리로 써야 하는가'를 만든다.
 // 전략 흐름은 business-plan-strategies.json, 논리 흐름은 business-plan-patterns.json 에서 읽는다.
 
+import { josa } from "../../../lib/josa";
 import type { Profile } from "./knowledgeEngine";
 import type { PlanStrategy, PlanLogicStep } from "../types";
 import strategiesJson from "../knowledge/business-plan-strategies.json";
@@ -109,12 +110,12 @@ export function buildAgencyComparison(
     regional: `신용·규모 이슈로 중앙 보증기금 문턱이 높아, 대표 성실성과 사업 실체로 소액 보증이 열리는 지역신용보증재단이 더 현실적입니다.`,
     misaeng: `고금리 부채 정리와 재기가 급한 상황이라, 일반 정책자금보다 소액·자활 중심의 미소금융이 첫 단추로 적합합니다.`,
   };
-  out.push(topReason[topKey] ?? `현재 조건에서 ${top}가 가장 적합합니다.`);
+  out.push(topReason[topKey] ?? `현재 조건에서 ${josa(top, "이/가")} 가장 적합합니다.`);
 
   // 2순위 대비 보완/전환 조건
   if (second) {
     out.push(
-      `2순위 ${second}는 백업으로 남겨두되, ${
+      `2순위 ${josa(second, "은/는")} 백업으로 남겨두되, ${
         topKey === "kibo"
           ? "기술 증빙이 약해질 경우"
           : topKey === "kosme"

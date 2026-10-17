@@ -32,7 +32,8 @@ import { simulate, simulationText } from '../lib/simulator'
 import { HIRE_WINDOWS, enrollBadgeText, enrollWindowOf, fullMonthsSince, hireWindowBlocks, hireWindowOf, notEnrolledYet } from '../lib/hireWindow'
 import { notYetRegistered, youthEmployeeRecord, youthEnrollDeadlines, youthEnrollItems } from '../lib/rosterEnroll'
 import { agencyAutoComment, agencyDocRequestText, agencyReportData, agencySummaryText, commissionSummary, companyRanking, companyRiskRanking, ddayAlerts, emptyCompanyMeta, monthlyReceived, pendingPayments, programPipeline } from '../lib/companyMeta'
-import { buildImportPreview, parseBulkPaste, parseMoneyCell, xlAutoMap, xlBizNoCheck, xlDetectHeader, xlNormDate } from '../lib/excelImport'
+import { buildImportPreview, makeCompanyFinder, mergeImportedCompany, normCoName, parseBulkPaste, parseMoneyCell, xlAutoMap, xlBizNoCheck, xlDetectHeader, xlNormDate } from '../lib/excelImport'
+import { escDeep, escHtml } from '../lib/htmlEscape'
 import { birthFromCell, looksLikeRrn, safeBizNo } from '../lib/privacy'
 import { normBirthCell } from '../lib/birthCell'
 import { latestEmploymentRoster } from '../../../services/toolResultGroups'
@@ -1013,6 +1014,39 @@ check('ROSTER_FIELDS 9', ROSTER_FIELDS.length === 9 && ROSTER_FIELDS[0].key === 
     { id: 't1', toolKey: 'employment', title: '고용지원금 명부 진단', verdict: 'candidates', verdictLabel: '후보 2건', summary: '', data: { tab: 'roster' }, deadlines: [], createdAt: '2026-10-16T01:00:00Z', publishedUpdateId: null },
   ] } as unknown as Parameters<typeof latestEmploymentRoster>[0]
   check('D-215 명부 결과: 회차 일정이 더 최근이어도 명부 진단을 찾는다', latestEmploymentRoster(rec)?.id === 't1')
+}
+
+/* ---- D-224: 보고서 글자 · 엑셀 업체 이름 · 덮지 않고 더하기 · 성별 모름 ---- */
+{
+  const bad = '<img src=x onerror=alert(1)>'
+  check('D-224 보고서 글자: 태그가 글자로(실행 안 됨)', escHtml(bad) === '&lt;img src=x onerror=alert(1)&gt;', escHtml(bad))
+  check('D-224 보고서 글자: 따옴표 · & · 빈 값', escHtml(`"a" & 'b'`) === '&quot;a&quot; &amp; &#39;b&#39;' && escHtml(undefined) === '' && escHtml(null) === '' && escHtml(0) === '0')
+  const rd = escDeep({ empCount: 3, employees: [{ name: bad, startDate: '2026-01-02', rounds: [{ isPaid: true, received: 100 }] }], upcomingRounds: [{ empName: '<b>홍</b>', dday: 5 }] })
+  check('D-224 보고서 묶음: 안의 글자만 바꾸고 숫자 · 참거짓 · 날짜는 그대로',
+    rd.empCount === 3 && rd.employees[0].name.startsWith('&lt;img') && rd.employees[0].startDate === '2026-01-02' && rd.employees[0].rounds[0].isPaid === true && rd.employees[0].rounds[0].received === 100 && rd.upcomingRounds[0].empName === '&lt;b&gt;홍&lt;/b&gt;' && rd.upcomingRounds[0].dday === 5)
+
+  check('D-224 업체명 비교: (주) · 주식회사 · ㈜ · 띄어쓰기 무시', normCoName('(주) 미래 테크') === normCoName('미래테크 주식회사') && normCoName('㈜미래테크') === '미래테크')
+  const comps = [
+    { id: 'c-num', name: '번호있는(주)', bizNo: '123-45-67890' },
+    { id: 'c-nonum', name: '번호없는상사', bizNo: '' },
+    { id: 'c-other', name: '같은이름', bizNo: '111-11-11111' },
+  ]
+  const find = makeCompanyFinder(comps)
+  check('D-224 엑셀 업체 찾기: 사업자번호가 같으면 그 업체', find({ name: '아무이름', bizNo: '1234567890' })?.id === 'c-num')
+  check('D-224 엑셀 업체 찾기: 엑셀에 번호가 없으면 이름으로(예전: 새 업체로 잡힘)', find({ name: '(주)번호있는', bizNo: '' })?.id === 'c-num')
+  check('D-224 엑셀 업체 찾기: 기존 업체에 번호가 없으면 이름으로', find({ name: '번호없는 상사', bizNo: '222-22-22222' })?.id === 'c-nonum')
+  check('D-224 엑셀 업체 찾기: 둘 다 번호가 있는데 다르면 다른 업체(이름이 같아도)', find({ name: '같은이름', bizNo: '999-99-99999' }) === undefined)
+  check('D-224 엑셀 업체 찾기: 처음 보는 업체는 없음', find({ name: '처음보는', bizNo: '' }) === undefined)
+
+  const merged = mergeImportedCompany({ id: 'os-1', name: '미래', bizNo: '1234567890', ceoName: '', corpType: '', notes: [], companyDocs: [], importedFromExcel: true, importBatchId: 'b1', createdAt: '2026-10-17T00:00:00Z', empCount: 12, reviewIssues: [] })
+  check('D-224 기존 업체에 얹기: 빈 칸 · 빈 목록 · 업무 일지 · 업체 서류 · 가져오기 표시는 빼고 값 있는 칸만',
+    merged.id === 'os-1' && merged.name === '미래' && merged.empCount === 12 && !('ceoName' in merged) && !('corpType' in merged) && !('notes' in merged) && !('companyDocs' in merged) && !('importedFromExcel' in merged) && !('importBatchId' in merged) && !('createdAt' in merged) && !('reviewIssues' in merged),
+    JSON.stringify(merged))
+
+  const it = { name: '김청년', birthDate: '2001-02-03', gender: '' as const, hireDate: '2026-09-01', deadline: '2026-12-31', daysLeft: 70 }
+  const r = youthEmployeeRecord(it, 'c1', DEFAULT_PROGRAMS.youth_jump as never, 'emp-g')
+  check('D-224 명부 → 직원: 성별을 모르면 빈 칸(예전: 남)', r.gender === '', String(r.gender))
+  check('D-224 명부 → 직원: 성별을 알면 그대로', youthEmployeeRecord({ ...it, gender: 'female' }, 'c1', DEFAULT_PROGRAMS.youth_jump as never, 'emp-f').gender === 'female')
 }
 
 console.log(`\nemployment: ${passed} passed, ${failed} failed`)

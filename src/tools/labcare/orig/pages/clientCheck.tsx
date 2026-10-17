@@ -42,11 +42,17 @@ export default function CheckPage() {
   useEffect(() => {
     ensureSeeded();
     setClient(getClient(id) ?? null);
-    // 가장 최근 점검 응답을 기본값으로 가져와 편집 편의 제공
+    // 가장 최근 점검 응답을 기본값으로 가져와 편집 편의 제공 — 메모는 그달 것이라 옮기지 않는다
     const prev = getChecksByClient(id)[0];
-    if (prev) setAnswers(prev.answers);
+    if (prev) setAnswers({ ...prev.answers, memo: prev.month === currentMonth() ? prev.answers.memo : "" });
     setLoaded(true);
   }, [id]);
+
+  // D-224 고른 달에 이미 점검 기록이 있으면 그 답을 보여 준다 — 예전에는 최근 달 답이 그대로 보여, 지난달을 고르고 저장하면 지난달 기록이 최근 답으로 덮였다
+  const monthRecord = useMemo(() => (loaded ? getChecksByClient(id).find((c) => c.month === month) : undefined), [id, month, loaded]);
+  useEffect(() => {
+    if (monthRecord) setAnswers(monthRecord.answers);
+  }, [monthRecord]);
 
   const preview = useMemo(() => evaluateRisk(answers), [answers]);
 
@@ -96,6 +102,11 @@ export default function CheckPage() {
               onChange={(e) => setMonth(e.target.value)}
               className="mt-1 block w-48 rounded-lg border border-slate-300 px-3.5 py-2.5 text-base focus:border-navy-600 focus:outline-none focus:ring-1 focus:ring-navy-600"
             />
+            {monthRecord ? (
+              <p className="mt-2 text-sm font-semibold text-amber-800" data-testid="lab-check-existing">
+                이 달 점검 기록이 이미 있어 그 답을 불러왔습니다 — 저장하면 이 달 기록을 고칩니다.
+              </p>
+            ) : null}
           </div>
 
           <CheckSection title="① 인적·물적 변동 (변경신고 검토)">

@@ -2,6 +2,7 @@
 // knowledge/review-objections.json (질문+모범답안) 과 review-checkpoints.json
 // (기관별 심사 관점)을 읽어, 기관·목적·상태별 예상 질문과 답변을 조립한다.
 
+import { josa } from "../../../lib/josa";
 import type { Profile } from "./knowledgeEngine";
 import type { ReviewQA, ReviewSimulation } from "../types";
 import objectionsJson from "../knowledge/review-objections.json";
@@ -62,18 +63,18 @@ function whenApplies(when: string | undefined, p: Profile): boolean {
   }
 }
 
-// 플레이스홀더 치환
+// 플레이스홀더 치환 — D-224: '{purpose}이(가)' 처럼 뒤에 붙은 조사는 들어간 낱말 받침에 맞춰 하나로
 function fill(text: string, p: Profile): string {
+  const values: Record<string, string> = {
+    company: p.companyName,
+    industry: p.input.industry || p.industryCategory,
+    purpose: p.input.purpose,
+    career: p.input.ceoCareer && p.input.ceoCareer !== "미확인" ? p.input.ceoCareer : "XX년",
+  };
+  const pairs: Record<string, "이/가" | "을/를" | "은/는" | "과/와"> = { "이(가)": "이/가", "을(를)": "을/를", "은(는)": "은/는", "과(와)": "과/와" };
   return text
-    .replaceAll("{company}", p.companyName)
-    .replaceAll("{industry}", p.input.industry || p.industryCategory)
-    .replaceAll("{purpose}", p.input.purpose)
-    .replaceAll(
-      "{career}",
-      p.input.ceoCareer && p.input.ceoCareer !== "미확인"
-        ? p.input.ceoCareer
-        : "XX년",
-    );
+    .replace(/\{(company|industry|purpose|career)\}(이\(가\)|을\(를\)|은\(는\)|과\(와\))/g, (_m, k: string, pt: string) => josa(values[k] ?? "", pairs[pt]))
+    .replace(/\{(company|industry|purpose|career)\}/g, (_m, k: string) => values[k] ?? "");
 }
 
 export function buildReviewSimulation(

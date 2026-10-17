@@ -2,6 +2,7 @@
 // 예: "제조업이며 특허를 보유하고 있고 시설투자 목적이기 때문에
 //      기술보증기금이 가장 적합합니다. 다만 최근 재무제표와 부채비율 확인이 필요합니다."
 
+import { josa } from "../../../lib/josa";
 import type { KnowledgeBase, Profile } from "./knowledgeEngine";
 import type {
   AgencyRecommendation,
@@ -46,7 +47,7 @@ export function generateReasoning(
   // 1문장: 판단 근거
   const first =
     `${industry}이며 ${strengthPart}${purposeLabel} 목적이기 때문에 ` +
-    `${top}이(가) 가장 적합합니다.`;
+    `${josa(top, "이/가")} 가장 적합합니다.`;
 
   // 2문장: 사례 근거
   const strongCases = cases.filter((c) => (c.matchRate ?? 0) >= 55).length;

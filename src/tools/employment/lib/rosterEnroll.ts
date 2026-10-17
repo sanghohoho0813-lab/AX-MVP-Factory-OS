@@ -83,7 +83,7 @@ export function youthEmployeeRecord(it: YouthEnrollItem, companyId: string, prog
     programId: 'youth_jump',
     startDate: it.hireDate,
     birthDate: it.birthDate,
-    gender: it.gender || 'male',
+    gender: it.gender || '', // D-224 모르면 비움 — 예전에는 '남' 으로 채워 명부에 성별이 없는 직원이 모두 남자로 등록됐다
     milSvc: 0,
     status: 'preparing',
     salary: '',

@@ -24,7 +24,7 @@ import { BENEFIT_OPTIONS, composeBenefitText } from '../lib/report'
 import { DEFAULT_ANSWERS, REASONS, mapChangeStatus } from '../lib/changes'
 import { isExcludedIndustryText, newCandidate } from '../lib/assessmentOptions'
 import { mergeKeyedList } from '../orig/mergeList'
-import { flushLabStore, hydrateLabStore, storeRead, storeWrite } from '../orig/store'
+import { flushLabStore, hydrateLabStore, labUnsavedCount, storeRead, storeWrite, subscribeLabSave } from '../orig/store'
 import { listRows, saveRow } from '../../../services/moduleData'
 
 let passed = 0
@@ -508,6 +508,59 @@ check('혜택 문장 조합은 표 순서 유지', composed.split('\n').length =
   await flushLabStore()
   const notesRows = await rowsOf(K2)
   check('D-217 저장소: 같은 칸이 두 줄로 갈라지지 않고 한 줄에 둘 다', notesRows.length === 1 && ids(notesRows[0].data.value) === 'n-other,n-mine', `${notesRows.length} ${notesRows.map((r) => ids(r.data.value)).join(' | ')}`)
+}
+
+/* D-224: 저장 실패 — 조용히 넘어가지 않는다(센다 · 알린다 · 다시 저장) */
+{
+  const backing = new Map<string, string>()
+  let failing = true
+  const g = globalThis as unknown as { localStorage?: unknown; window?: unknown }
+  g.localStorage = {
+    getItem: (k: string) => backing.get(k) ?? null,
+    setItem: (k: string, v: string) => {
+      if (failing) {
+        const e = new Error('quota')
+        e.name = 'QuotaExceededError'
+        throw e
+      }
+      backing.set(k, v)
+    },
+    removeItem: (k: string) => void backing.delete(k),
+    key: (i: number) => [...backing.keys()][i] ?? null,
+    get length() {
+      return backing.size
+    },
+    clear: () => backing.clear(),
+  }
+  // 화면 위 안내가 듣는 신호 — 시험에서는 window 를 잠깐 흉내 낸다
+  const heard: string[] = []
+  const listeners = new Map<string, Set<() => void>>()
+  g.window = {
+    addEventListener: (t: string, cb: () => void) => void (listeners.get(t) ?? listeners.set(t, new Set()).get(t)!).add(cb),
+    removeEventListener: (t: string, cb: () => void) => void listeners.get(t)?.delete(cb),
+    dispatchEvent: (ev: { type: string }) => {
+      heard.push(ev.type)
+      for (const cb of listeners.get(ev.type) ?? []) cb()
+      return true
+    },
+  }
+  let notified = 0
+  const off = subscribeLabSave(() => (notified += 1))
+  const WS = 'ws-d224'
+  await hydrateLabStore({ workspaceId: WS, clients: [] })
+  const K = 'pmsaas:checks:v1'
+  storeWrite(K, [{ id: 'chk-1' }])
+  await flushLabStore()
+  check('D-224 저장 실패: 못 한 칸을 센다(예전: 조용히 넘어감)', labUnsavedCount() === 1, String(labUnsavedCount()))
+  check('D-224 저장 실패: 화면 위 안내에 알린다', notified >= 1, String(notified))
+  check('D-224 저장 실패: 적은 내용은 화면(메모리)에 그대로', JSON.stringify(storeRead(K, [])) === '[{"id":"chk-1"}]')
+  failing = false
+  await flushLabStore() // [지금 다시 저장] 과 같은 길 — 실패한 칸도 다시 내보낸다
+  const saved = (await listRows(WS, 'labcare', 'orig')).find((r) => r.data.key === K)
+  check('D-224 다시 저장: 성공하면 센 것이 0 · 서버에 들어감', labUnsavedCount() === 0 && JSON.stringify(saved?.data.value) === '[{"id":"chk-1"}]', `${labUnsavedCount()} ${JSON.stringify(saved?.data.value)}`)
+  off()
+  g.localStorage = undefined
+  g.window = undefined
 }
 
 console.log(`\nlabcare: ${passed} passed, ${failed} failed`)

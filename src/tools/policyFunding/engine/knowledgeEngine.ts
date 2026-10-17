@@ -9,6 +9,7 @@
 //   → 유사도 → risk → reasoning → scripts → upsell → roadmap → confidence → DiagnosisResult
 // ─────────────────────────────────────────────────────────────
 
+import { josa } from "../../../lib/josa";
 import type {
   DiagnosisInput,
   DiagnosisResult,
@@ -665,7 +666,7 @@ export function runKnowledgeDiagnosis(rawInput: DiagnosisInput): DiagnosisResult
     .map((d) => d.label);
   const docLine =
     missingDocs.length > 0
-      ? ` 현재 자료 기준으로는 ${missingDocs.join("과 ")}이(가) 가장 중요합니다.`
+      ? ` 현재 자료 기준으로는 ${josa(missingDocs.map((d, i) => (i < missingDocs.length - 1 ? josa(d, "과/와") : d)).join(" "), "이/가")} 가장 중요합니다.`
       : "";
   const coachLead =
     low && headline.firstFix

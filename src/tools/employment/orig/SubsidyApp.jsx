@@ -17,7 +17,8 @@ import { simulate } from "../lib/simulator";
 import { roundsMismatch, roundsSum, ROUNDS_CHECK_NOTE } from "../lib/programs";
 import { stripRrn, bizNoLooksLikeRrn, birthFromCell, isRrnHeader, RRN_REMOVED } from "../lib/privacy";
 import { normBirthCell, SIX_DIGIT_BIRTH_HEADER } from "../lib/birthCell"; // [D-215] 숫자로 들어온 생년월일(앞 0 빠짐 · 6자리)
-import { parseBulkPaste as parseExcelData } from "../lib/excelImport";
+import { parseBulkPaste as parseExcelData, makeCompanyFinder } from "../lib/excelImport";
+import { escHtml, escDeep } from "../lib/htmlEscape";
 import { hireWindowOf, hireWindowBlocks, enrollWindowOf, enrollBadgeText } from "../lib/hireWindow"; // [D-137] 입사일로 본 신청 기한 · [D-138] 등록 직원 참여신청 기한
 
 // ── 상수 ──────────────────────────────────────────────────
@@ -763,10 +764,10 @@ function EligChk(props){ var bd=props.bd,gen=props.gen,mil=props.mil,ec=props.ec
   return(<div style={{border:"2px solid var(--color-brand-200)",borderRadius:10,padding:12,background:"#F0F7FF"}}><div style={{fontSize:14,fontWeight:700,color:"var(--color-brand-700)",marginBottom:8}}>🔍 청년도약 자격요건</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:8}}><div><Label color="var(--color-brand-700)">생년월일</Label><input type="date" style={Object.assign({},inp,{borderColor:"var(--color-brand-200)",background:"#fff",fontSize:12,padding:"8px 10px"})} value={bd||""} onChange={function(e){props.setBd(e.target.value);}}/></div><div><Label color="var(--color-brand-700)">성별</Label><div style={{display:"flex",gap:3}}>{[["male","남"],["female","여"]].map(function(arr){return <button key={arr[0]} onClick={function(){props.setGen(arr[0]);}} style={Object.assign({},btnSm,{flex:1,background:gen===arr[0]?"var(--color-brand-100)":"#fff",color:gen===arr[0]?"var(--color-brand-600)":"#64748B",border:gen===arr[0]?"2px solid var(--color-brand-200)":"1px solid #E2E8F0",fontSize:11})}>{arr[1]}</button>;})}</div></div>{gen==="male"&&<div><Label color="var(--color-brand-700)">군복무(월)</Label><input type="number" style={Object.assign({},inp,{borderColor:"var(--color-brand-200)",background:"#fff",fontSize:12,padding:"8px 10px"})} value={mil||""} onChange={function(e){props.setMil(Number(e.target.value));}} placeholder="18"/></div>}</div>{age!==null&&<div style={{padding:"4px 8px",borderRadius:4,marginBottom:6,background:aOk?"#D1FAE5":"#FEE2E2",fontSize:12,fontWeight:600}}>{aOk?<span style={{color:"#059669"}}>✅ 만{age}세 (상한: {maxLabel})</span>:<span style={{color:"#DC2626"}}>❌ 만{age}세 미충족</span>}</div>}{nearBorder&&<div style={{padding:"4px 8px",borderRadius:4,marginBottom:6,background:"#F1F5F9",fontSize:11,color:"#64748B"}}>⚠️ 경계선 — 관할기관 확인 필요</div>}{hd&&hw.state!=="unknown"&&<div data-testid="youth-hire-window" style={{padding:"4px 8px",borderRadius:4,marginBottom:6,background:hwBlock?"#FEE2E2":hw.state==="open"?"#ECFDF5":"#F1F5F9",fontSize:12,fontWeight:600,color:hwBlock?"#DC2626":hw.state==="open"?"#059669":"#64748B"}}>{hwBlock?"❌ "+hw.text+" — 이미 참여신청했다면 진행 상태를 바꾸세요":hw.state==="open"?"✅ "+hw.text:props.enrolled&&hireWindowBlocks(hw)?"참여 중 — 회차대로 신청":hw.text}</div>}<div style={{marginBottom:8}}><div style={{fontSize:12,fontWeight:600,marginBottom:4,color:"var(--color-brand-700)"}}>📋 취업애로요건 (1개↑)</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:3}}>{ELIG.map(function(e){var isChecked=!!ec[e.id];return(<label key={e.id} style={{display:"flex",alignItems:"center",gap:4,padding:"4px 6px",borderRadius:4,cursor:"pointer",background:isChecked?"#ECFDF5":"#fff",border:isChecked?"1px solid #A7F3D0":"1px solid #E2E8F0",fontSize:11}} title={e.desc}><input type="checkbox" checked={isChecked} onChange={function(){props.setEc(function(p){var n=Object.assign({},p);n[e.id]=!p[e.id];return n;});}} style={{accentColor:"#059669",width:12,height:12}}/><span style={{color:isChecked?"#059669":"#475569"}}>{e.label}</span></label>);})}</div></div><div style={{marginBottom:8}}><div style={{fontSize:12,fontWeight:600,marginBottom:4,color:"#DC2626"}}>🚫 제외요건 확인</div><div style={{display:"grid",gap:3}}>{EXCL.map(function(x){var isChecked=!!xc[x.id];return(<label key={x.id} style={{display:"flex",alignItems:"center",gap:4,padding:"4px 6px",borderRadius:4,cursor:"pointer",background:isChecked?"#ECFDF5":"#FEF2F2",border:isChecked?"1px solid #A7F3D0":"1px solid #FECACA",fontSize:11}} title={x.desc}><input type="checkbox" checked={isChecked} onChange={function(){props.setXc(function(p){var n=Object.assign({},p);n[x.id]=!p[x.id];return n;});}} style={{accentColor:"#059669",width:12,height:12}}/><span style={{color:isChecked?"#059669":"#DC2626"}}>{x.label}</span></label>);})}</div></div>{has&&failedX.length>0&&<div style={{padding:"7px 10px",marginBottom:6,borderRadius:6,background:"#FEF2F2",border:"1px solid #FECACA",fontSize:11,color:"#DC2626",fontWeight:600,lineHeight:1.5}}>🚫 제외요건 {failedX.length}개에 해당할 수 있습니다. 진행 전 반드시 운영기관 확인이 필요합니다. (저장은 가능하며, 상태를 '보류'로 관리하세요)</div>}<div style={{padding:"8px",borderRadius:6,textAlign:"center",background:ok?"#ECFDF5":hwBlock?"#FEE2E2":"#F1F5F9",fontSize:13,fontWeight:700}}>{ok?<span style={{color:"#059669"}}>✅ 대상자 예상</span>:hwBlock?<span data-testid="youth-verdict-closed" style={{color:"#DC2626"}}>❌ 새로 신청할 수 없음 — 입사 후 3개월이 지났습니다</span>:has?<span style={{color:"#64748B"}}>⚠️ 일부 요건 확인 필요</span>:<span style={{color:"#64748B"}}>정보입력</span>}</div></div>);
 }
 
-function BulkUpload(props){ var programs=props.programs,onUpload=props.onUpload; var st1=useState(false),st2=useState(""),st3=useState([]),st4=useState(""); function parseData(){if(!st2[0].trim()){st4[1]("데이터를 붙여넣어 주세요");return;}var parsed=parseExcelData(st2[0],programs);if(parsed.length===0){st4[1]("유효한 데이터가 없습니다.");return;}st3[1](parsed);st4[1]("");} function doUpload(){if(st3[0].length===0)return;var n=st3[0].length;onUpload(st3[0]);st1[1](false);st2[1]("");st3[1]([]);toast(n+"명이 등록되었습니다.","success");} function copyTemplate(){navigator.clipboard.writeText(makeExcelTemplate());toast("엑셀 양식이 복사되었습니다.","success");} return(<React.Fragment><button style={btnSm} onClick={function(){st1[1](true);st2[1]("");st3[1]([]);st4[1]("");}}>📥 일괄등록</button><Modal open={st1[0]} onClose={function(){st1[1](false);}} title="📥 직원 일괄 등록" width={600}><div style={{display:"grid",gap:16}}><div style={{padding:14,background:"var(--color-brand-50)",borderRadius:10,border:"1px solid var(--color-brand-200)"}}><div style={{fontSize:14,fontWeight:700,color:"var(--color-brand-600)",marginBottom:8}}>Step 1. 양식 복사</div><button style={btnSm} onClick={copyTemplate}>📋 양식 복사</button></div><div style={{padding:14,background:"#F8FAFC",borderRadius:10,border:"1px solid #E2E8F0"}}><div style={{fontSize:14,fontWeight:700,color:"#475569",marginBottom:8}}>Step 2. 데이터 붙여넣기</div><textarea style={Object.assign({},inp,{height:110,resize:"none",fontFamily:"monospace",fontSize:11})} value={st2[0]} onChange={function(e){st2[1](e.target.value);st3[1]([]);}} placeholder={"이름\t주민번호앞7자리\t입사일\t연락처\t이메일\t지원금ID"}/>{st4[0]&&<p style={{fontSize:12,color:"#DC2626",marginTop:4}}>{st4[0]}</p>}<button style={Object.assign({},btnP,{marginTop:8})} onClick={parseData}>데이터 확인</button></div>{st3[0].length>0&&(<div style={{padding:14,background:"#F8FAFC",borderRadius:10,border:"1px solid #E2E8F0"}}><div style={{fontSize:14,fontWeight:700,color:"#475569",marginBottom:8}}>Step 3. 확인 및 등록 ({st3[0].length}명)</div><div style={{maxHeight:150,overflow:"auto",marginBottom:8}}>{st3[0].map(function(row,i){return(<div key={i} style={{fontSize:11,padding:"4px 0",borderBottom:"1px solid #F1F5F9"}}>{row.name} · {row.birthDate||"생년월일 모름"} · {row.startDate||"입사일 확인"} · {row.phone}</div>);})}</div><button style={Object.assign({},btnP,{width:"100%"})} onClick={doUpload}>✅ {st3[0].length}명 등록하기</button></div>)}</div></Modal></React.Fragment>); }
+function BulkUpload(props){ var programs=props.programs,onUpload=props.onUpload; var st1=useState(false),st2=useState(""),st3=useState([]),st4=useState(""); function parseData(){if(!st2[0].trim()){st4[1]("데이터를 붙여넣어 주세요");return;}var parsed=parseExcelData(st2[0],programs);if(parsed.length===0){st4[1]("유효한 데이터가 없습니다.");return;}st3[1](parsed);st4[1]("");} function doUpload(){if(st3[0].length===0)return;var n=st3[0].length;var r=onUpload(st3[0])||{added:n,skipped:[]};st1[1](false);st2[1]("");st3[1]([]);toast(r.added+"명이 등록되었습니다."+(r.skipped.length?" 이미 있는 "+r.skipped.length+"명("+r.skipped.slice(0,3).join(", ")+(r.skipped.length>3?" 외":"")+")은 건너뛰었습니다.":""),r.added?"success":"info");} function copyTemplate(){navigator.clipboard.writeText(makeExcelTemplate());toast("엑셀 양식이 복사되었습니다.","success");} return(<React.Fragment><button style={btnSm} onClick={function(){st1[1](true);st2[1]("");st3[1]([]);st4[1]("");}}>📥 일괄등록</button><Modal open={st1[0]} onClose={function(){st1[1](false);}} title="📥 직원 일괄 등록" width={600}><div style={{display:"grid",gap:16}}><div style={{padding:14,background:"var(--color-brand-50)",borderRadius:10,border:"1px solid var(--color-brand-200)"}}><div style={{fontSize:14,fontWeight:700,color:"var(--color-brand-600)",marginBottom:8}}>Step 1. 양식 복사</div><button style={btnSm} onClick={copyTemplate}>📋 양식 복사</button></div><div style={{padding:14,background:"#F8FAFC",borderRadius:10,border:"1px solid #E2E8F0"}}><div style={{fontSize:14,fontWeight:700,color:"#475569",marginBottom:8}}>Step 2. 데이터 붙여넣기</div><textarea style={Object.assign({},inp,{height:110,resize:"none",fontFamily:"monospace",fontSize:11})} value={st2[0]} onChange={function(e){st2[1](e.target.value);st3[1]([]);}} placeholder={"이름\t주민번호앞7자리\t입사일\t연락처\t이메일\t지원금ID"}/>{st4[0]&&<p style={{fontSize:12,color:"#DC2626",marginTop:4}}>{st4[0]}</p>}<button style={Object.assign({},btnP,{marginTop:8})} onClick={parseData}>데이터 확인</button></div>{st3[0].length>0&&(<div style={{padding:14,background:"#F8FAFC",borderRadius:10,border:"1px solid #E2E8F0"}}><div style={{fontSize:14,fontWeight:700,color:"#475569",marginBottom:8}}>Step 3. 확인 및 등록 ({st3[0].length}명)</div><div style={{maxHeight:150,overflow:"auto",marginBottom:8}}>{st3[0].map(function(row,i){return(<div key={i} style={{fontSize:11,padding:"4px 0",borderBottom:"1px solid #F1F5F9"}}>{row.name} · {row.birthDate||"생년월일 모름"} · {row.startDate||"입사일 확인"} · {row.phone}</div>);})}</div><button style={Object.assign({},btnP,{width:"100%"})} onClick={doUpload}>✅ {st3[0].length}명 등록하기</button></div>)}</div></Modal></React.Fragment>); }
 
 function PDFReport(props){ var company=props.company,employees=props.employees,programs=props.programs,profile=props.profile; var st1=useState(false); var rd=useMemo(function(){ var emps=employees.filter(function(e){return e.companyId===company.id&&e.status!=="resigned";}); var totalReceived=emps.reduce(function(s,e){return s+(e.rounds||[]).reduce(function(ss,r){return ss+(r.isPaid?r.received||0:0);},0);},0); var totalExpected=emps.reduce(function(s,e){return s+(e.totalExpected||0);},0); var upcoming=[]; emps.forEach(function(e){var p=programs[e.programId];if(!e.startDate||!p)return;(e.rounds||[]).forEach(function(r){if(r.isPaid)return;var ed=addMo(e.startDate,r.month);var dd=getDday(ed);if(dd!==null&&dd>=0&&dd<=90)upcoming.push({empName:e.name,roundLabel:r.label,eligDate:ed,dday:dd,amount:r.expectedAmount||r.amount||0});});}); upcoming.sort(function(a,b){return a.dday-b.dday;}); return{empCount:emps.length,totalExpected:totalExpected,totalReceived:totalReceived,remaining:totalExpected-totalReceived,upcomingRounds:upcoming.slice(0,10),employees:emps}; },[company,employees,programs]);
-  function generatePDF(){ var cl=company.corpType==="법인"?(company.juPosition==="앞"?"(주)"+company.name:company.name+"(주)"):company.name; var today=new Date(); var rd2=today.getFullYear()+"년 "+(today.getMonth()+1)+"월 "+today.getDate()+"일"; var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+cl+' 고용지원금 현황</title><style>body{font-family:-apple-system,sans-serif;padding:40px;max-width:800px;margin:0 auto;color:#1E293B}h1{font-size:24px;border-bottom:3px solid #2563EB;padding-bottom:10px;margin-bottom:20px}h2{font-size:16px;color:#2563EB;margin-top:30px;border-left:4px solid #2563EB;padding-left:10px}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-bottom:30px}.sc{background:#F8FAFC;border-radius:8px;padding:15px;text-align:center}.sc .l{font-size:12px;color:#64748B}.sc .v{font-size:24px;font-weight:700;color:#2563EB}table{width:100%;border-collapse:collapse}th,td{border:1px solid #E2E8F0;padding:8px 12px;text-align:left;font-size:13px}th{background:#F8FAFC}@media print{body{padding:20px}}</style></head><body>'; html+='<h1>📋 '+cl+' 고용지원금 현황</h1><p style="color:#64748B;font-size:13px">작성일: '+rd2+' | 작성자: '+(profile.display_name||"")+" "+(profile.title||"")+'</p>'; html+='<div class="summary"><div class="sc"><div class="l">대상자</div><div class="v">'+rd.empCount+'명</div></div><div class="sc"><div class="l">수령완료</div><div class="v">'+fMan(rd.totalReceived)+'</div></div><div class="sc"><div class="l">수령예정</div><div class="v">'+fMan(rd.remaining)+'</div></div></div>'; if(rd.upcomingRounds.length>0){html+='<h2>🔔 향후 90일 내 신청 예정</h2><table><tr><th>직원</th><th>회차</th><th>신청가능일</th><th>D-Day</th><th>예상금액</th></tr>';rd.upcomingRounds.forEach(function(r){html+='<tr><td>'+r.empName+'</td><td>'+r.roundLabel+'</td><td>'+fD(r.eligDate)+'</td><td>D-'+r.dday+'</td><td>'+fMan(r.amount)+'</td></tr>';});html+='</table>';} html+='<h2>👤 직원별 현황</h2><table><tr><th>이름</th><th>지원금</th><th>상태</th><th>입사일</th><th>수령액</th></tr>';rd.employees.forEach(function(e){var p2=programs[e.programId];var s2=STS.find(function(s){return s.key===e.status;});var rcv=(e.rounds||[]).reduce(function(s,r){return s+(r.isPaid?r.received||0:0);},0);html+='<tr><td>'+e.name+'</td><td>'+(p2?p2.name:"")+'</td><td>'+(s2?s2.label:"")+'</td><td>'+(e.startDate||"-")+'</td><td>'+fMan(rcv)+'</td></tr>';});html+='</table>'; html+='<div style="margin-top:40px;padding-top:20px;border-top:1px solid #E2E8F0;text-align:center;font-size:12px;color:#64748B">고용지원금 매니저 Pro에서 자동 생성 · 신청 전 최신 공고 확인 필요</div></body></html>'; var blob=new Blob([themeHtml(html)],{type:"text/html;charset=utf-8"});var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download=cl+"_고용지원금_"+today.toISOString().split("T")[0]+".html";a.click();URL.revokeObjectURL(url);st1[1](false); if(props.onLog)props.onLog(company.id,"내부 관리 보고서 출력","기타"); toast("내부 보고서가 생성되었습니다.","success"); }
+  function generatePDF(){ var cl=company.corpType==="법인"?(company.juPosition==="앞"?"(주)"+company.name:company.name+"(주)"):company.name; var today=new Date(); var rd2=today.getFullYear()+"년 "+(today.getMonth()+1)+"월 "+today.getDate()+"일"; var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+escHtml(cl)+' 고용지원금 현황</title><style>body{font-family:-apple-system,sans-serif;padding:40px;max-width:800px;margin:0 auto;color:#1E293B}h1{font-size:24px;border-bottom:3px solid #2563EB;padding-bottom:10px;margin-bottom:20px}h2{font-size:16px;color:#2563EB;margin-top:30px;border-left:4px solid #2563EB;padding-left:10px}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-bottom:30px}.sc{background:#F8FAFC;border-radius:8px;padding:15px;text-align:center}.sc .l{font-size:12px;color:#64748B}.sc .v{font-size:24px;font-weight:700;color:#2563EB}table{width:100%;border-collapse:collapse}th,td{border:1px solid #E2E8F0;padding:8px 12px;text-align:left;font-size:13px}th{background:#F8FAFC}@media print{body{padding:20px}}</style></head><body>'; html+='<h1>📋 '+escHtml(cl)+' 고용지원금 현황</h1><p style="color:#64748B;font-size:13px">작성일: '+rd2+' | 작성자: '+escHtml(profile.display_name||"")+" "+escHtml(profile.title||"")+'</p>'; html+='<div class="summary"><div class="sc"><div class="l">대상자</div><div class="v">'+rd.empCount+'명</div></div><div class="sc"><div class="l">수령완료</div><div class="v">'+fMan(rd.totalReceived)+'</div></div><div class="sc"><div class="l">수령예정</div><div class="v">'+fMan(rd.remaining)+'</div></div></div>'; if(rd.upcomingRounds.length>0){html+='<h2>🔔 향후 90일 내 신청 예정</h2><table><tr><th>직원</th><th>회차</th><th>신청가능일</th><th>D-Day</th><th>예상금액</th></tr>';rd.upcomingRounds.forEach(function(r){html+='<tr><td>'+escHtml(r.empName)+'</td><td>'+escHtml(r.roundLabel)+'</td><td>'+fD(r.eligDate)+'</td><td>D-'+r.dday+'</td><td>'+fMan(r.amount)+'</td></tr>';});html+='</table>';} html+='<h2>👤 직원별 현황</h2><table><tr><th>이름</th><th>지원금</th><th>상태</th><th>입사일</th><th>수령액</th></tr>';rd.employees.forEach(function(e){var p2=programs[e.programId];var s2=STS.find(function(s){return s.key===e.status;});var rcv=(e.rounds||[]).reduce(function(s,r){return s+(r.isPaid?r.received||0:0);},0);html+='<tr><td>'+escHtml(e.name)+'</td><td>'+escHtml(p2?p2.name:"")+'</td><td>'+(s2?s2.label:"")+'</td><td>'+escHtml(e.startDate||"-")+'</td><td>'+fMan(rcv)+'</td></tr>';});html+='</table>'; html+='<div style="margin-top:40px;padding-top:20px;border-top:1px solid #E2E8F0;text-align:center;font-size:12px;color:#64748B">고용지원금 매니저 Pro에서 자동 생성 · 신청 전 최신 공고 확인 필요</div></body></html>'; var blob=new Blob([themeHtml(html)],{type:"text/html;charset=utf-8"});var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download=cl+"_고용지원금_"+toYMD(today)+".html";a.click();URL.revokeObjectURL(url);st1[1](false); if(props.onLog)props.onLog(company.id,"내부 관리 보고서 출력","기타"); toast("내부 보고서가 생성되었습니다.","success"); }
   return(<React.Fragment><button className="prog-tap" style={Object.assign({},btnSm,{background:"#fff",color:"#475569",border:"1px solid #E2E8F0"})} onClick={function(){st1[1](true);}}>📄 내부 보고서</button><Modal open={st1[0]} onClose={function(){st1[1](false);}} title="📄 내부 관리 보고서" width={480}><div style={{textAlign:"center",padding:"20px 0"}}><div style={{fontSize:48,marginBottom:16}}>📄</div><h3 style={{margin:"0 0 8px",fontSize:18,fontWeight:700}}>{company.name}</h3><p style={{color:"#64748B",fontSize:13,marginBottom:24}}>대상자 {rd.empCount}명 | 수령완료 {fMan(rd.totalReceived)}</p><button style={Object.assign({},btnP,{padding:"14px 40px",fontSize:15})} onClick={generatePDF}>📥 HTML 보고서 다운로드</button><p style={{fontSize:11,color:"#94A3B8",marginTop:12}}>브라우저에서 열어 인쇄(Ctrl+P)하면 PDF로 저장됩니다</p><div style={{marginTop:10,padding:"8px 12px",background:"#D1FAE5",borderRadius:8,fontSize:12,color:"#065F46",textAlign:"left"}}>💡 <strong>영업 팁:</strong> 보고서를 고객사 담당자에게 정기 공유하면 재계약률·추가 의뢰 확률이 높아집니다!</div></div></Modal></React.Fragment>); }
 
 function CommissionReport(props){
@@ -781,13 +782,13 @@ function CommissionReport(props){
     var rows=activeEmps.map(function(e){var p=programs[e.programId];var rcv=(e.rounds||[]).reduce(function(s,r){return s+(r.isPaid?r.received||0:0);},0);return{name:e.name,program:p?p.name:"",received:rcv,fee:Math.round(rcv*(Number(stRate[0])||0)/100)};}).filter(function(r){return r.received>0;});
     var totalFee=rows.reduce(function(s,r){return s+r.fee;},0);
     var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>수수료 정산서</title><style>body{font-family:-apple-system,sans-serif;padding:40px;max-width:700px;margin:0 auto;color:#1E293B}h1{font-size:22px;border-bottom:3px solid #059669;padding-bottom:10px;margin-bottom:16px}.summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:20px 0}.sc{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:16px;text-align:center}.sc .l{font-size:12px;color:#64748B}.sc .v{font-size:22px;font-weight:700;color:#2563EB}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #E2E8F0;padding:10px 12px;font-size:13px;text-align:left}th{background:#F8FAFC;font-weight:700}.num{text-align:right}tfoot td{font-weight:700;background:#F8FAFC}@media print{body{padding:20px}}</style></head><body>';
-    html+='<h1>💰 수수료 정산서</h1><p style="color:#64748B;font-size:13px">업체: <strong>'+cl+'</strong> | 정산일: '+rd2+' | 작성자: '+(profile&&profile.display_name||"")+'</p><p style="font-size:14px">수수료율: <strong style="color:#059669">'+stRate[0]+'%</strong></p>';
+    html+='<h1>💰 수수료 정산서</h1><p style="color:#64748B;font-size:13px">업체: <strong>'+escHtml(cl)+'</strong> | 정산일: '+rd2+' | 작성자: '+escHtml(profile&&profile.display_name||"")+'</p><p style="font-size:14px">수수료율: <strong style="color:#059669">'+stRate[0]+'%</strong></p>';
     html+='<div class="summary"><div class="sc"><div class="l">수령완료 합계</div><div class="v">'+fMan(totalReceived)+'</div></div><div class="sc"><div class="l">수수료율</div><div class="v">'+stRate[0]+'%</div></div><div class="sc"><div class="l">정산 수수료</div><div class="v" style="color:#059669">'+fMan(totalFee)+'</div></div></div>';
     html+='<table><thead><tr><th>직원명</th><th>지원금</th><th class="num">수령액 합계</th><th class="num">수수료 ('+stRate[0]+'%)</th></tr></thead><tbody>';
-    rows.forEach(function(r){html+='<tr><td>'+r.name+'</td><td>'+r.program+'</td><td class="num">'+fMan(r.received)+'</td><td class="num" style="color:#059669;font-weight:600">'+fMan(r.fee)+'</td></tr>';});
+    rows.forEach(function(r){html+='<tr><td>'+escHtml(r.name)+'</td><td>'+escHtml(r.program)+'</td><td class="num">'+fMan(r.received)+'</td><td class="num" style="color:#059669;font-weight:600">'+fMan(r.fee)+'</td></tr>';});
     html+='</tbody><tfoot><tr><td colspan="2">합계</td><td class="num">'+fMan(totalReceived)+'</td><td class="num" style="color:#059669">'+fMan(totalFee)+'</td></tr></tfoot></table>';
     html+='<div style="margin-top:32px;padding-top:16px;border-top:1px solid #E2E8F0;font-size:11px;color:#94A3B8;text-align:center">고용지원금 매니저 Pro 자동 생성 · 실제 수수료는 계약서에 따름</div></body></html>';
-    var blob=new Blob([themeHtml(html)],{type:"text/html;charset=utf-8"});var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download=cl+"_수수료정산_"+today.toISOString().split("T")[0]+".html";a.click();URL.revokeObjectURL(url);st1[1](false);
+    var blob=new Blob([themeHtml(html)],{type:"text/html;charset=utf-8"});var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download=cl+"_수수료정산_"+toYMD(today)+".html";a.click();URL.revokeObjectURL(url);st1[1](false);
     if(props.onLog)props.onLog(company.id,"수수료 정산서 출력","수수료청구");
     toast("수수료 정산서가 생성되었습니다.","success");
   }
@@ -928,7 +929,9 @@ function AgencyReport(props){
     return "대표님 안녕하세요. 고용지원금 신청을 위해 아래 서류 확인이 필요합니다.\n\n"+lines.join("\n")+"\n\n확인 후 전달 부탁드립니다.";
   }
 
+  // D-224 보고서에 들어가는 글(직원 · 업체 · 지원금 이름 · 주소 · 코멘트 · 담당자)은 모두 HTML 로 안전하게 — 예전에는 엑셀로 들어온 이름에 <img onerror=…> 가 있으면 인쇄 창에서 그대로 돌았다
   function genHTML(){
+    return (function(rd,company,programs,stName,stEmail,stFirm,stPhone,stComment){
     var today=new Date();
     var dateStr=today.getFullYear()+"년 "+(today.getMonth()+1)+"월 "+today.getDate()+"일";
     var cl=company.name;
@@ -1148,6 +1151,7 @@ function AgencyReport(props){
       '</body></html>'
     ];
     return parts.flat().join("");
+    })(escDeep(rd),escDeep(company),escDeep(programs),[escHtml(stName[0])],[escHtml(stEmail[0])],[escHtml(stFirm[0])],[escHtml(stPhone[0])],[escHtml(stComment[0])]);
   }
 
   function download(){
@@ -1883,12 +1887,13 @@ function ExcelImport(props){
       // 이번 가져오기 배치 식별자 — 이번에 생성되는 모든 신규 행에 기록 (가져오기 취소의 삭제 조건)
       var batchId=(typeof crypto!=="undefined"&&crypto.randomUUID)?crypto.randomUUID():ruuid();
       // 1) 기존 업체 매핑 (사업자번호 숫자 10자리 기준 · 기존 업체 정보는 덮어쓰지 않음)
-      var existing={};
-      (props.companies||[]).forEach(function(c){var d=String(c.bizNo||"").replace(/\D/g,"");if(d&&!existing[d])existing[d]=c;});
+      // D-224 사업자번호가 비었으면 이름으로도 찾는다(둘 다 번호가 있는데 다르면 다른 업체)
+      var findExisting=makeCompanyFinder(props.companies||[]);
       var newComps=[],keyToId={},mergedSet={};
       pv0.companies.forEach(function(pc){
         var key=String(pc.bizNo||"").replace(/\D/g,"")||pc.name;
-        if(existing[key]){keyToId[key]=existing[key].id;mergedSet[existing[key].id]=true;return;}
+        var ex=findExisting(pc);
+        if(ex){keyToId[key]=ex.id;mergedSet[ex.id]=true;return;}
         var id=ruuid();
         keyToId[key]=id;
         var comp={id:id,createdAt:new Date().toISOString(),name:pc.name,bizNo:pc.bizNo,
@@ -3865,9 +3870,15 @@ function EmpModal(props){
       }).length;
       if(curCnt+1>quota&&!window.confirm("지원한도를 초과할 수 있습니다. 운영기관 확인 후 저장하시겠습니까?"))return;
     }
-    var rounds=init.rounds||(p?JSON.parse(JSON.stringify(p.rounds||[])).map(function(r){return Object.assign({},r,{isPaid:false,received:0});}):[]);
-    var certDocs=init.certDocs||(p?(CERT_TYPES[st.programId[0]]||[]).map(function(ct){return{id:uid(),label:ct,done:false,files:[]};}):[]);
-    var empDocs=init.employeeDocs||(p?(p.employeeDocs||[]).map(function(d){return{id:uid(),label:typeof d==="string"?d:d.label||"",done:false,files:[]};}):[]);
+    // D-224 지원금을 바꾸면 회차 · 서류를 새 지원금으로 — 예전에는 처음 것(미지정이면 빈 회차)이 남아 일정 · D-day · 기한이 안 생겼다
+    var progChanged=!!init.id&&init.programId!==st.programId[0];
+    if(progChanged&&(init.rounds||[]).some(function(r){return r.isPaid;})&&!window.confirm("이미 받은 회차가 있습니다. 지원금을 바꾸면 회차 기록을 새 지원금 기준으로 다시 만듭니다. 바꿀까요?"))return;
+    var freshRounds=p?JSON.parse(JSON.stringify(p.rounds||[])).map(function(r){return Object.assign({},r,{isPaid:false,received:0});}):[];
+    var freshCert=p?(CERT_TYPES[st.programId[0]]||[]).map(function(ct){return{id:uid(),label:ct,done:false,files:[]};}):[];
+    var freshEmpDocs=p?(p.employeeDocs||[]).map(function(d){return{id:uid(),label:typeof d==="string"?d:d.label||"",done:false,files:[]};}):[];
+    var rounds=!progChanged&&init.rounds&&init.rounds.length?init.rounds:freshRounds;
+    var certDocs=!progChanged&&init.certDocs?init.certDocs:freshCert;
+    var empDocs=!progChanged&&init.employeeDocs?init.employeeDocs:freshEmpDocs;
     props.onSave({
       id:init.id||ruuid(),
       companyId:company.id,
@@ -4220,19 +4231,30 @@ function CompDet(props){
     }
     st3[1](null);st4[1](null);
   }
+  // D-224 같은 사람(이름 · 생년월일 · 입사일이 같으면)은 건너뛴다 — 같은 명단을 두 번 붙이면 직원이 둘씩 생겼다
+  //       지원금 번호가 틀리면 첫 지원금으로 회차를 만들면서 번호는 틀린 채로 남던 것 → 쓴 지원금 번호로 맞춘다 · 직원 서류 칸도 만든다
   function handleBulkUpload(rows){
+    var empKey=function(e){return [String(e.name||"").replace(/\s/g,""),e.birthDate||"",e.startDate||""].join("|");};
+    var have=new Set(compEmps.map(empKey));
+    var added=0,skipped=[];
     rows.forEach(function(row){
       var p=programs[row.programId]||Object.values(programs)[0];
       if(!p)return;
+      var k=empKey(row);
+      if(have.has(k)){skipped.push(row.name);return;}
+      have.add(k);
       var rounds=(p.rounds||[]).map(function(r){return Object.assign({},r,{isPaid:false,received:0});});
       props.onSaveEmployee({
-        id:ruuid(),companyId:company.id,name:row.name,programId:row.programId||p.id,
+        id:ruuid(),companyId:company.id,name:row.name,programId:p.id,
         startDate:row.startDate,birthDate:row.birthDate,gender:row.gender||"", /* [D-136] 모르면 비움 */
         status:"preparing",phone:row.phone,email:row.email,
         totalExpected:p.totalAmount||0,rounds:rounds,
-        certDocs:(CERT_TYPES[p.id]||[]).map(function(ct){return{id:uid(),label:ct,done:false,files:[]};})
+        certDocs:(CERT_TYPES[p.id]||[]).map(function(ct){return{id:uid(),label:ct,done:false,files:[]};}),
+        employeeDocs:(p.employeeDocs||[]).map(function(d){return{id:uid(),label:typeof d==="string"?d:d.label||"",done:false,files:[]};})
       });
+      added++;
     });
+    return {added:added,skipped:skipped};
   }
 
   var TABS=[{key:"overview",icon:"📋",label:"개요"},{key:"employees",icon:"👤",label:"직원 ("+compEmps.length+")"},{key:"docs",icon:"📁",label:"업체 서류"},{key:"commission",icon:"🧾",label:"수수료 정산"},{key:"notes",icon:"📝",label:"업무 일지"+(notes.length>0?" ("+notes.length+")":"")}];
@@ -5732,7 +5754,7 @@ function AdminFeedback(props){
     var blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
     var url=URL.createObjectURL(blob);
     var a=document.createElement("a");
-    a.href=url;a.download="feedback_"+new Date().toISOString().slice(0,10)+".csv";
+    a.href=url;a.download="feedback_"+toYMD(new Date())+".csv";
     document.body.appendChild(a);a.click();document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
@@ -5977,7 +5999,7 @@ function SettingsScreen(props){
       var blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
       var url=URL.createObjectURL(blob);
       var a=document.createElement("a");
-      a.href=url; a.download="고용지원금Pro_백업_"+new Date().toISOString().slice(0,10)+".json";
+      a.href=url; a.download="고용지원금Pro_백업_"+toYMD(new Date())+".json";
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(function(){URL.revokeObjectURL(url);},1000);
       toast("백업 파일을 내려받았습니다.","success");

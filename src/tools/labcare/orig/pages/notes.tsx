@@ -1,9 +1,10 @@
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "../next";
 import { useSearchParams } from "../nav";
 import Layout from "../components/Layout";
 import PageGuide from "../components/PageGuide";
 import {
+  addProject,
   currentMonth,
   ensureSeeded,
   getClient,
@@ -20,6 +21,12 @@ import type {
   ResearcherRole,
   ResearchProject,
 } from "../../types";
+
+/** D-224 적은 내용 비교용 — 고객사 · 과제 · 달을 바꾸기 전에 저장 안 한 것이 있는지 본다 */
+function noteSnap(v: { activities: string; tests: string; problems: string; nextPlan: string; roles: ResearcherRole[]; relevance: string; draft: string }): string {
+  return JSON.stringify([v.activities, v.tests, v.problems, v.nextPlan, v.roles.filter((r) => r.name || r.role), v.relevance, v.draft]);
+}
+const EMPTY_SNAP = noteSnap({ activities: "", tests: "", problems: "", nextPlan: "", roles: [], relevance: "", draft: "" });
 
 const NOTE_STATUS_STYLE: Record<NoteStatus, string> = {
   "작성 필요": "bg-amber-50 text-amber-700 ring-amber-200",
@@ -55,6 +62,15 @@ function NotesWorkspace() {
   const [auditReviewed, setAuditReviewed] = useState(false);
   const [status, setStatus] = useState<NoteStatus>("작성 필요");
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  // D-224 연구과제 바로 만들기 — 예전에는 과제를 만드는 화면이 없어 예시 고객사가 아니면 연구노트를 쓸 수 없었다
+  const [newProjName, setNewProjName] = useState("");
+  const [newProjProduct, setNewProjProduct] = useState("");
+  /** 마지막으로 불러오거나 저장한 내용 — 이것과 다르면 저장 안 한 것이 있다 */
+  const baseline = useRef(EMPTY_SNAP);
+  const isDirty = () => noteSnap({ activities, tests, problems, nextPlan, roles, relevance, draft }) !== baseline.current;
+  /** D-224 바꾸면 적은 것이 사라지는 동작 전에 한 번 묻는다 — 예전에는 달 · 과제를 바꾸면 말없이 빈 칸이 됐다 */
+  const okToDiscard = () =>
+    !isDirty() || window.confirm("저장하지 않은 연구노트 내용이 있습니다.\n바꾸면 지금 적은 내용이 사라집니다. 바꿀까요?");
 
   // 초기 로드 + 쿼리 파라미터 선택
   useEffect(() => {
@@ -86,6 +102,7 @@ function NotesWorkspace() {
     if (!projectId || !month) return;
     const existing = getNoteFor(projectId, month);
     if (existing) {
+      baseline.current = noteSnap({ ...existing, roles: existing.roles });
       setActivities(existing.activities);
       setTests(existing.tests);
       setProblems(existing.problems);
@@ -96,6 +113,7 @@ function NotesWorkspace() {
       setAuditReviewed(existing.auditReviewed);
       setStatus(existing.status);
     } else {
+      baseline.current = EMPTY_SNAP;
       setActivities("");
       setTests("");
       setProblems("");
@@ -111,6 +129,21 @@ function NotesWorkspace() {
 
   const client = clientId ? getClient(clientId) : undefined;
   const project = projectId ? getProject(projectId) : undefined;
+
+  function handleAddProject() {
+    if (!clientId || !newProjName.trim()) return;
+    const p = addProject({
+      clientId,
+      name: newProjName.trim(),
+      productService: newProjProduct.trim(),
+      startDate: `${month}-01`,
+      status: "진행중",
+    });
+    setProjects(getProjectsByClient(clientId));
+    setProjectId(p.id);
+    setNewProjName("");
+    setNewProjProduct("");
+  }
 
   const relevanceCheck = useMemo(() => {
     if (!project) return null;
@@ -192,6 +225,7 @@ function NotesWorkspace() {
     });
     setStatus("저장 완료");
     setSavedAt(new Date().toLocaleString("ko-KR"));
+    baseline.current = noteSnap({ activities, tests, problems, nextPlan, roles, relevance, draft });
   }
 
   const inputCls =
@@ -240,7 +274,7 @@ function NotesWorkspace() {
                 <select
                   className={inputCls}
                   value={clientId}
-                  onChange={(e) => setClientId(e.target.value)}
+                  onChange={(e) => { if (okToDiscard()) setClientId(e.target.value); }}
                 >
                   <option value="">선택</option>
                   {clients.map((c) => (
@@ -255,7 +289,7 @@ function NotesWorkspace() {
                 <select
                   className={inputCls}
                   value={projectId}
-                  onChange={(e) => setProjectId(e.target.value)}
+                  onChange={(e) => { if (okToDiscard()) setProjectId(e.target.value); }}
                   disabled={!clientId}
                 >
                   <option value="">선택</option>
@@ -272,10 +306,22 @@ function NotesWorkspace() {
                   type="month"
                   className={inputCls}
                   value={month}
-                  onChange={(e) => setMonth(e.target.value)}
+                  onChange={(e) => { if (okToDiscard()) setMonth(e.target.value); }}
                 />
               </div>
             </div>
+            {clientId && projects.length === 0 ? (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3" data-testid="lab-note-new-project">
+                <p className="text-sm font-semibold text-amber-900">이 고객사에는 연구과제가 아직 없어요. 과제를 하나 만들면 바로 연구노트를 쓸 수 있습니다.</p>
+                <div className="mt-2 grid grid-cols-1 gap-2">
+                  <input className={inputCls} placeholder="연구과제 이름 (예: 저염 소스 배합 개선)" value={newProjName} onChange={(e) => setNewProjName(e.target.value)} aria-label="연구과제 이름" />
+                  <input className={inputCls} placeholder="연결된 제품 · 서비스 (예: 업소용 소스)" value={newProjProduct} onChange={(e) => setNewProjProduct(e.target.value)} aria-label="연결된 제품 · 서비스" />
+                  <button type="button" onClick={handleAddProject} disabled={!newProjName.trim()} className="min-h-11 justify-self-end rounded-lg bg-navy-700 px-5 text-base font-bold text-white hover:bg-navy-800 disabled:opacity-40">
+                    과제 만들기
+                  </button>
+                </div>
+              </div>
+            ) : null}
             {project ? (
               <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-base text-slate-600">
                 제품/서비스: <span className="font-semibold text-slate-700">{project.productService}</span>

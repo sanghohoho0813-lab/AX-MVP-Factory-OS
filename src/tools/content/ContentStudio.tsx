@@ -386,9 +386,10 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
       {/* 먼저 만들 것 — 눈에 잘 띄게 */}
       <section className="rounded-(--radius-panel) border-2 border-brand-300 bg-brand-50 p-4 sm:p-5" data-testid="content-picks">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="t-section flex items-center gap-2 text-brand-900">
-            <Sparkles className="size-5 text-brand-600" aria-hidden="true" />
-            {record.companyName}에 먼저 만들 것
+          <h2 className="t-section flex min-w-0 items-center gap-2 text-brand-900">
+            <Sparkles className="size-5 shrink-0 text-brand-600" aria-hidden="true" />
+            {/* D-224 띄어쓰기 없는 아주 긴 업체 이름도 줄을 바꿔 휴대폰에서 옆으로 넘치지 않게 */}
+            <span className="min-w-0 [overflow-wrap:anywhere]">{record.companyName}에 먼저 만들 것</span>
           </h2>
           <span className="t-sub break-keep text-brand-800">누르면 이 업체 글이 바로 나와요</span>
         </div>
@@ -877,7 +878,7 @@ function ProfileCard({ record, profile, source, onEdit }: { record: ClientOpsRec
     <section className={`${card} flex flex-col gap-3 p-4 sm:p-5`} data-testid="content-profile">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <h2 className="t-section break-keep text-slate-900">{record.companyName} 홍보 정보</h2>
+          <h2 className="t-section break-keep text-slate-900 [overflow-wrap:anywhere]">{record.companyName} 홍보 정보</h2>
           <p className="t-sub mt-0.5 break-keep text-slate-600">업체 기록에서 저절로 채웠어요. 모든 글이 이 정보를 같이 써요.{missing ? ` 빈 칸 ${missing}개를 채우면 글이 더 정확해져요.` : ''}</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -1068,7 +1069,7 @@ function PlanCard({ record, profile, today, store, onPick, onOpen }: { record: C
           {made > 0 && !isTrialId(record.id) && (
             <div className="flex flex-col gap-1.5 border-t border-slate-100 pt-3" data-testid="content-plan-attach">
               <p className="t-sub font-semibold text-slate-800">업체 일정에 올릴 날 걸기</p>
-              <p className="t-meta break-keep text-slate-500">누르면 {record.companyName} 기록에 계획이 붙고, 올릴 날 {slots.length}개가 일정 달력 · 오늘 화면에 떠요. 다시 걸면 날짜만 새로 바뀌어요.</p>
+              <p className="t-meta break-keep text-slate-500 [overflow-wrap:anywhere]">누르면 {record.companyName} 기록에 계획이 붙고, 올릴 날 {slots.length}개가 일정 달력 · 오늘 화면에 떠요. 다시 걸면 날짜만 새로 바뀌어요.</p>
               <ToolResultAttach
                 toolKey="content"
                 title="홍보 글 한 달 계획"

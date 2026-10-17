@@ -24,6 +24,8 @@ let cacheVal: Customer[] = EMPTY
 let workspace: string | null = null
 let osClients: ClientOpsRecord[] = []
 const rowIdOf = new Map<string, string>()
+/** D-224 업체별 저장 차례 — 먼저 누른 저장의 응답이 늦게 와도 나중 것을 덮지 않게 */
+const chainOf = new Map<string, Promise<unknown>>()
 
 /** 오늘 날짜(YYYY-MM-DD) — D-136: 이 기기의 날짜로 (UTC 로 자르면 한국 아침 9시 전에는 어제가 된다) */
 export function todayStr(now: Date = new Date()): string {
@@ -61,13 +63,22 @@ function emit(): void {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(EVENT))
 }
 
-function persist(c: Customer): void {
+/** 저장이 끝나면 true · 실패하면 false — D-224: 예전에는 실패를 삼켜 '저장되었습니다' 만 떴다(새로고침하면 사라짐) */
+function persist(c: Customer): Promise<boolean> {
   // D-91 화면·대시보드가 읽던 이름(topAgency)도 같이 적어 둔다
   const data = { ...c, topAgency: c.recommendedAgency } as unknown as Record<string, unknown>
   // D-165: 줄 id 를 저장 전에 정한다 — 첫 저장이 돌아오기 전에 또 저장하면 같은 업체 줄이 둘 생겼다
   const id = rowIdOf.get(c.id) ?? generateId()
   rowIdOf.set(c.id, id)
-  void saveRow(workspace, MODULE, BUCKET, { id, clientId: c.id, data }).catch(() => undefined)
+  const ws = workspace
+  const run = (chainOf.get(c.id) ?? Promise.resolve()).then(() =>
+    saveRow(ws, MODULE, BUCKET, { id, clientId: c.id, data }).then(
+      () => true,
+      () => false,
+    ),
+  )
+  chainOf.set(c.id, run)
+  return run
 }
 
 // 캐시된 스냅샷 — 값이 바뀔 때만 새 배열이다 (useSyncExternalStore 무한 렌더 방지)
@@ -89,15 +100,16 @@ export function getStoredCustomerById(id: string): Customer | undefined {
   return cacheVal.find((c) => c.id === id)
 }
 
-// 신규 저장 또는 동일 id 덮어쓰기(업서트)
-export function saveCustomer(customer: Customer): void {
+// 신규 저장 또는 동일 id 덮어쓰기(업서트) — 화면은 바로 바뀌고, 돌려주는 약속은 실제로 저장됐는지(true/false)
+export function saveCustomer(customer: Customer): Promise<boolean> {
   const list = cacheVal.slice()
   const idx = list.findIndex((c) => c.id === customer.id)
   if (idx >= 0) list[idx] = customer
   else list.unshift(customer)
   cacheVal = list
-  persist(customer)
+  const done = persist(customer)
   emit()
+  return done
 }
 
 export function updateCustomer(id: string, patch: Partial<Customer>): Customer | undefined {
@@ -107,7 +119,7 @@ export function updateCustomer(id: string, patch: Partial<Customer>): Customer |
   const updated: Customer = { ...list[idx], ...patch, updatedAt: todayStr() }
   list[idx] = updated
   cacheVal = list
-  persist(updated)
+  void persist(updated)
   emit()
   return updated
 }

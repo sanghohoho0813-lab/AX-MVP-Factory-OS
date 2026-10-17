@@ -132,12 +132,12 @@ function StartCard({ record, onStart }: { record: ClientOpsRecord; onStart: (ind
           아래 {rows.length}가지 중 {have}가지가 업체 기록에 있어요. 있는 것은 그대로 넣고, 없는 것은 비워 둔 채 점검에서 알려 드려요. 숫자 · 인증은 기록에 있을 때만 넣어요(지어내지 않아요).
         </p>
       </div>
-      <dl className="grid gap-x-6 gap-y-1 sm:grid-cols-2" data-testid="site-start-facts">
+      <dl className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2" data-testid="site-start-facts">
         {rows.map(([k, v]) => (
           <div key={k} className="flex min-h-9 items-start gap-2 border-b border-slate-100 py-1.5">
             {v ? <Check className="mt-0.5 size-4 shrink-0 text-emerald-600" aria-label="있음" /> : <span className="mt-0.5 size-4 shrink-0 text-center text-slate-400" aria-label="없음">–</span>}
             <dt className="t-sub w-28 shrink-0 text-slate-500">{k}</dt>
-            <dd className={`t-sub min-w-0 break-words ${v ? 'font-medium text-slate-800' : 'text-slate-400'}`}>{v || '없음'}</dd>
+            <dd className={`t-sub min-w-0 break-words [overflow-wrap:anywhere] ${v ? 'font-medium text-slate-800' : 'text-slate-400'}`}>{v || '없음'}</dd>
           </div>
         ))}
       </dl>

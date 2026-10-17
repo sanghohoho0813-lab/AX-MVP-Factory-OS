@@ -10,9 +10,11 @@ import {
   clearAllClients,
   deleteClient,
   ensureSeeded,
+  getClient,
   getClients,
   getLatestCheck,
   getNotesByClient,
+  updateClient,
 } from "../lib/storage";
 import { riskSummary } from "../../lib/riskEngine";
 import { getHiringSupportTip } from "../lib/hiringTip";
@@ -159,6 +161,7 @@ export default function ClientsPage() {
       const text = String(reader.result).replace(/^﻿/, "");
       const lines = text.split(/\r?\n/).filter((l) => l.trim());
       let added = 0;
+      let updated = 0;
       const skipped: string[] = [];
       for (const line of lines) {
         const cols = line.split(",").map((s) => s.trim());
@@ -167,6 +170,21 @@ export default function ClientsPage() {
         // 이 OS 에서는 고객 운영에 있는 업체만 연구소 고객사로 붙인다 (이름으로 맞춘다)
         const os = findOsClientByName(cols[0]);
         if (!os) { skipped.push(cols[0]); continue; }
+        // D-224 이미 연구소 고객사면 새로 만들지 않고 CSV 에 적힌 칸만 고친다 — 예전에는 통째로 바꿔 연구소 이름 · 인정번호 · 연구비 · 메모가 지워졌다
+        if (getClient(os.id)) {
+          const patch: Partial<Client> = {};
+          if (cols[1]) patch.industry = cols[1];
+          if (cols[2] === "기업부설연구소" || cols[2] === "연구개발전담부서") patch.labType = labType;
+          if (cols[3]) patch.ceoName = cols[3];
+          if (Number(cols[4]) > 0) patch.employeeCount = Number(cols[4]);
+          if (Number(cols[5]) > 0) patch.researcherCount = Number(cols[5]);
+          if (cols[6]) patch.foundedDate = cols[6];
+          if (cols[7]) patch.certifiedDate = cols[7];
+          if (cols[8]) patch.consultant = cols[8];
+          updateClient(os.id, patch);
+          updated += 1;
+          continue;
+        }
         addClient({
           id: os.id,
           name: cols[0], industry: cols[1] ?? "", labType, ceoName: cols[3] ?? "",
@@ -177,7 +195,7 @@ export default function ClientsPage() {
         added += 1;
       }
       refresh();
-      alert((added ? `${added}개 고객사를 추가했습니다.` : "추가된 행이 없습니다. 양식을 확인해 주세요.") + (skipped.length ? `\n고객 관리에 없는 업체라 건너뜀: ${skipped.join(", ")}` : ""));
+      alert((added || updated ? [added ? `${added}개 고객사를 추가했습니다.` : "", updated ? `이미 있던 ${updated}개는 CSV 에 적힌 칸만 고쳤습니다(다른 기록은 그대로).` : ""].filter(Boolean).join("\n") : "추가된 행이 없습니다. 양식을 확인해 주세요.") + (skipped.length ? `\n고객 관리에 없는 업체라 건너뜀: ${skipped.join(", ")}` : ""));
     };
     reader.readAsText(file, "utf-8");
     e.target.value = "";

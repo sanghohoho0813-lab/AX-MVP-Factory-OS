@@ -3,6 +3,7 @@
 // 엔진은 프로필 사실을 끼워 기관이 좋아하는 문체로 조립만 한다.
 // XX 는 대표와 함께 채울 숫자 자리.
 
+import { josa } from "../../../lib/josa";
 import type { Profile } from "./knowledgeEngine";
 import type {
   PlanDraft,
@@ -103,7 +104,7 @@ export function buildPlanDraft(
     {
       no: 1,
       title: "사업 개요",
-      text: `${company}는 ${industry} 분야에서 ${i.years} 동안 사업을 운영해 온 ${i.businessType}입니다. ${career}${growth.reviewerNote.split(".")[0]}에 강점을 두고 있습니다.${strengthLine}`,
+      text: `${josa(company, "은/는")} ${industry} 분야에서 ${i.years} 동안 사업을 운영해 온 ${i.businessType}입니다. ${career}${growth.reviewerNote.split(".")[0]}에 강점을 두고 있습니다.${strengthLine}`,
     },
     {
       no: 2,

@@ -31,6 +31,38 @@ let hydratedFor: string | null | undefined
 let hydratedAt = 0
 /** 같은 화면을 다시 열 때 이만큼 지났으면(그리고 내보낼 쓰기가 없으면) 서버에서 새로 읽는다 */
 const REFRESH_MS = 60_000
+/** D-224 저장하지 못한 칸 — 예전에는 실패를 삼키고 같은 칸을 또 적을 때만 다시 저장해, 1분 뒤 다시 열면 메모리를 새로 읽어 적은 것이 사라졌다 */
+const failed = new Map<string, number>()
+const inflight = new Map<string, Promise<void>>()
+const SAVE_EVENT = 'labcare:save-state'
+const RETRY_MS = [3_000, 10_000, 30_000, 60_000]
+
+function emitSaveState(): void {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(SAVE_EVENT))
+}
+
+/** 저장하지 못해 다시 시도 중인 칸 수 — 화면 위 안내에 쓴다 */
+export function labUnsavedCount(): number {
+  return failed.size
+}
+
+export function subscribeLabSave(cb: () => void): () => void {
+  if (typeof window === 'undefined') return () => {}
+  window.addEventListener(SAVE_EVENT, cb)
+  return () => window.removeEventListener(SAVE_EVENT, cb)
+}
+
+function schedule(key: string, ms: number): void {
+  const prev = timers.get(key)
+  if (prev) clearTimeout(prev)
+  timers.set(
+    key,
+    setTimeout(() => {
+      timers.delete(key)
+      void persist(key)
+    }, ms),
+  )
+}
 
 function noteSeen(key: string, value: unknown): void {
   if (!isKeyedList(value)) return
@@ -47,15 +79,7 @@ export function storeRead<T>(key: string, fallback: T): T {
 export function storeWrite<T>(key: string, value: T): void {
   mem.set(key, structuredCloneSafe(value))
   noteSeen(key, value)
-  const prev = timers.get(key)
-  if (prev) clearTimeout(prev)
-  timers.set(
-    key,
-    setTimeout(() => {
-      timers.delete(key)
-      void persist(key)
-    }, 250),
-  )
+  schedule(key, 250)
 }
 
 export function storeRemove(key: string): void {
@@ -78,7 +102,17 @@ async function remoteRow(key: string, id: string): Promise<{ id: string; value: 
   }
 }
 
-async function persist(key: string): Promise<void> {
+/** 같은 칸 저장은 차례대로 — 앞 저장이 서버 값을 읽는 사이 뒤 저장이 끼어들어 서로 덮지 않게 */
+function persist(key: string): Promise<void> {
+  const run = (inflight.get(key) ?? Promise.resolve()).then(() => persistNow(key))
+  inflight.set(key, run)
+  void run.finally(() => {
+    if (inflight.get(key) === run) inflight.delete(key)
+  })
+  return run
+}
+
+async function persistNow(key: string): Promise<void> {
   try {
     // D-165: 줄 id 를 저장 전에 정한다 — 첫 저장이 돌아오기 전에 또 저장하면 줄이 둘 생겼다
     let id = rowIdOf.get(key) ?? generateId()
@@ -104,14 +138,19 @@ async function persist(key: string): Promise<void> {
     // 저장한 값이 이제 서버 값 — 다음 저장은 이것을 기준으로(다른 곳에서 지운 기록이 이 창의 다음 저장으로 되살아나지 않게)
     snap.set(key, structuredCloneSafe(value))
     noteSeen(key, value)
+    if (failed.delete(key)) emitSaveState()
   } catch {
-    /* 저장 실패는 다음 쓰기 때 다시 시도된다 */
+    // 메모리 값은 그대로 두고 조금 뒤 다시 — 다시 시도 타이머가 있는 동안에는 화면을 다시 열어도 메모리를 지킨다
+    const n = failed.get(key) ?? 0
+    failed.set(key, n + 1)
+    if (!timers.has(key)) schedule(key, RETRY_MS[Math.min(n, RETRY_MS.length - 1)])
+    emitSaveState()
   }
 }
 
 /** 남은 쓰기를 바로 내보낸다 (백업·화면 떠나기 전에) */
 export async function flushLabStore(): Promise<void> {
-  const keys = [...timers.keys()]
+  const keys = [...new Set([...timers.keys(), ...failed.keys()])]
   for (const k of keys) {
     clearTimeout(timers.get(k))
     timers.delete(k)
@@ -147,10 +186,12 @@ export interface HydrateInput {
 export async function hydrateLabStore(input: HydrateInput): Promise<void> {
   osClients = input.clients
   // D-217: 같은 화면을 다시 열면 1분이 지났고 내보낼 쓰기가 없을 때 새로 읽는다(예전: 한 번 읽으면 창을 닫을 때까지 옛 값)
-  if (hydratedFor === input.workspaceId && mem.size > 0 && (timers.size > 0 || Date.now() - hydratedAt < REFRESH_MS)) return
+  // D-224 저장 못 한 칸이 있거나 저장 중이면 메모리를 지킨다(새로 읽으면 그 기록이 사라진다)
+  const pending = () => timers.size > 0 || failed.size > 0 || inflight.size > 0
+  if (hydratedFor === input.workspaceId && mem.size > 0 && (pending() || Date.now() - hydratedAt < REFRESH_MS)) return
   workspace = input.workspaceId
   const rows = await listRows(workspace, MODULE, BUCKET)
-  if (timers.size > 0 && hydratedFor === input.workspaceId && mem.size > 0) return // 읽는 사이 적은 것이 있으면 지금 메모리를 지킨다
+  if (pending() && hydratedFor === input.workspaceId && mem.size > 0) return // 읽는 사이 적은 것이 있으면 지금 메모리를 지킨다
   mem.clear()
   rowIdOf.clear()
   snap.clear()
@@ -185,6 +226,7 @@ export async function hydrateLabStore(input: HydrateInput): Promise<void> {
 /** 시험·백업 되돌리기용 — 메모리를 통째로 갈아끼운다 */
 export function resetLabStoreForTest(entries: Record<string, unknown>, clients: ClientOpsRecord[] = []): void {
   mem.clear()
+  failed.clear()
   for (const [k, v] of Object.entries(entries)) mem.set(k, v)
   osClients = clients
   hydratedFor = undefined

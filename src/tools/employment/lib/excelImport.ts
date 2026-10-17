@@ -484,3 +484,51 @@ export function parseBulkPaste(text: string, programs: Record<string, unknown>):
   }
   return out
 }
+
+/* ---------------- D-224 이미 있는 업체 찾기 · 덮지 않고 더하기 ---------------- */
+
+/** 업체명 비교용 — 띄어쓰기 · (주) · 주식회사 · ㈜ · 유한회사 를 빼고 본다 */
+export function normCoName(s: unknown): string {
+  return String(s ?? '')
+    .replace(/\(\s*주\s*\)|㈜|주식회사|\(\s*유\s*\)|유한회사|\(\s*사\s*\)|사단법인|재단법인/g, '')
+    .replace(/\s+/g, '')
+    .toLowerCase()
+}
+
+/**
+ * 엑셀 줄의 업체 → 이미 고용지원금에 있는 업체.
+ * 사업자번호(숫자)가 같으면 그 업체. 아니면 이름이 같은 업체 — 단, 둘 다 사업자번호가 있는데 서로 다르면 다른 업체로 본다.
+ * 예전에는 사업자번호로만 찾아, 엑셀에 번호가 비어 있으면 같은 업체가 새 업체로 잡혔다(직원 중복 검사가 빠지고 · 가져오기 취소가 기존 업체를 지울 수 있었다).
+ */
+export function makeCompanyFinder<C extends { id: string; name?: unknown; bizNo?: unknown }>(companies: readonly C[]): (pc: { name?: unknown; bizNo?: unknown }) => C | undefined {
+  const digits = (v: unknown) => String(v ?? '').replace(/\D/g, '')
+  const byBiz = new Map<string, C>()
+  const byName = new Map<string, C>()
+  for (const c of companies) {
+    const d = digits(c.bizNo)
+    if (d && !byBiz.has(d)) byBiz.set(d, c)
+    const n = normCoName(c.name)
+    if (n && !byName.has(n)) byName.set(n, c)
+  }
+  return (pc) => {
+    const d = digits(pc.bizNo)
+    if (d && byBiz.has(d)) return byBiz.get(d)
+    const c = byName.get(normCoName(pc.name))
+    if (!c) return undefined
+    return d && digits(c.bizNo) ? undefined : c
+  }
+}
+
+/**
+ * 이미 있는 업체 위에 엑셀 업체를 얹을 때 — 빈 칸 · 빈 목록은 건너뛰고(기존 값을 지우지 않게),
+ * 업무 일지 · 업체 서류 · 만든 때 · '이번 가져오기에서 만든 업체' 표시는 옮기지 않는다(가져오기 취소가 기존 업체를 지우지 않게).
+ */
+export function mergeImportedCompany(comp: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { id: comp.id }
+  for (const [k, v] of Object.entries(comp)) {
+    if (k === 'notes' || k === 'companyDocs' || k === 'importedFromExcel' || k === 'importBatchId' || k === 'createdAt') continue
+    if (v === '' || v === null || v === undefined || (Array.isArray(v) && v.length === 0)) continue
+    out[k] = v
+  }
+  return out
+}
