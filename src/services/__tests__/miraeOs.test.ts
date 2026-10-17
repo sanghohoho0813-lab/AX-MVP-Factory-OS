@@ -93,7 +93,7 @@ import {
   scoreTier,
 } from '../salesEngine'
 import { engineIndustry, interestsFromIssues, missingDocSlots, profileFromMemo, roundForStage, stageAfterMeeting, toEngineItem, withDocSlots, withMeetingNote, withSalesProfile } from '../salesMeeting'
-import { PATH_TO_KIND, agentRateOf, contractCloseDraft, contractGap, servicesForProducts, withContractClose } from '../salesContract'
+import { PATH_TO_KIND, agentRateOf, contractCloseDraft, contractGap, contractedNamesOf, servicesForProducts, withContractClose } from '../salesContract'
 import { withInboxPayload } from '../inboxToSales'
 import salesAppSource from '../../tools/salesKit/orig/SalesApp.jsx?raw'
 import cretopCompanyText from '../../../e2e/fixtures/cretop-company.txt?raw'
@@ -1445,7 +1445,7 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   const rows = agentLedger([
     { id: 'a', companyName: '가나', archivedAt: null, fees: [fee('f1', 300_000, '김영업', '2026-09-01', null), fee('f2', 100_000, '김영업', null, null)] },
     { id: 'b', companyName: '다라', archivedAt: null, fees: [fee('f3', 500_000, ' 김영업 ', '2026-08-01', '2026-08-05'), fee('f4', 200_000, '', '2026-09-02', null)] },
-    { id: 'c', companyName: '보관', archivedAt: '2026-01-01T00:00:00.000Z', fees: [fee('f5', 900_000, '김영업', '2026-09-01', null)] },
+    { id: 'c', companyName: '보관', archivedAt: '2026-01-01T00:00:00.000Z', fees: [fee('f5', 900_000, '김영업', null, null)] },
     { id: 'd', companyName: '수수료 없음', archivedAt: null, fees: [fee('f6', null, '박영업', '2026-09-01', null)] },
   ])
   const kim = rows.find((r) => r.name === '김영업')
@@ -1453,7 +1453,7 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   check('정산: 지금 줄 돈 = 고객 입금됨 · 미지급', kim?.payable === 300_000)
   check('정산: 고객 입금 전은 줄 돈이 아니다', kim?.waiting === 100_000)
   check('정산: 준 돈', kim?.paid === 500_000)
-  check('정산: 보관한 업체는 넣지 않는다', !kim?.items.some((i) => i.clientId === 'c'))
+  check('정산: 보관한 업체의 고객 입금 전 몫은 넣지 않는다', !kim?.items.some((i) => i.clientId === 'c'))
   check('정산: 수수료 없는 항목은 넣지 않는다', !rows.some((r) => r.name === '박영업'))
   check('정산: 이름 없는 수수료는 "이름 없음"', rows.find((r) => r.name === '이름 없음')?.payable === 200_000)
   check('정산: 줄 돈 많은 사람이 위', rows[0]?.name === '김영업')
@@ -2347,6 +2347,24 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   const sorted = [...names].sort(compareCompanyName)
   check('D210 가나다 순: (주) · 주식회사 빼고 · 빈 이름은 맨 뒤', JSON.stringify(sorted) === JSON.stringify(['가나다', '㈜나라', '주식회사 다라', '(주)마바', '']), JSON.stringify(sorted))
   check('D210 compactName', compactName('(주) 가나 테크') === '가나테크' && compactName('주식회사가나') === '가나')
+}
+// D-213: 영업자 정산 · 수수료 · 상품표 — 점검에서 찾은 돈 버그
+{
+  const at = '2026-10-16T03:00:00.000Z'
+  const lead = withSalesInfo(withNewProspect(normalizeClientOps({ id: 'c_add', companyName: '추가상사', status: 'waiting' }), '소개', at), { referrer: '김영업' }, at)
+  // 2) 추가 계약 — 이미 계약한 상품은 빼고, 계약 현금 금액은 더한다
+  const first = withContractClose(lead, { ...contractCloseDraft(lead, { today: '2026-10-16', products: [{ name: 'A 패키지', fee: 300 }, { name: 'B 패키지', fee: 300 }] }), agentName: '', agentRatePct: null }, at)
+  check('D-213 첫 계약: 수금 2줄 · 계약 현금 600만', first.fees.length === 2 && first.contract.cashAmount === 6_000_000)
+  const addOn = contractCloseDraft(first, { today: '2026-10-20', products: [{ name: 'A 패키지', fee: 300 }, { name: 'B 패키지', fee: 300 }, { name: 'C 패키지', fee: 200 }] })
+  check('D-213 추가 계약 초안: 이미 계약한 A · B 는 빼고 C 만 · 뺀 이름 알림', addOn.lines.length === 1 && addOn.lines[0].label === 'C 패키지' && JSON.stringify(addOn.skipped) === JSON.stringify(['A 패키지', 'B 패키지']), JSON.stringify(addOn))
+  const after = withContractClose(first, { ...addOn, agentName: '', agentRatePct: null }, '2026-10-20T03:00:00.000Z')
+  check('D-213 추가 계약: 수금 3줄(두 번 안 잡힘) · 계약 현금 600만 + 200만 = 800만', after.fees.length === 3 && after.contract.cashAmount === 8_000_000 && contractGap(after) === null, JSON.stringify({ n: after.fees.length, cash: after.contract.cashAmount }))
+  const boardFirst = withContractClose(withProposal(lead, { packages: ['A 패키지', 'B 패키지'], feeManwon: 600, status: '계약 예정', monthly: null }, at), { ...contractCloseDraft(withProposal(lead, { packages: ['A 패키지', 'B 패키지'], feeManwon: 600, status: '계약 예정', monthly: null }, at), { today: '2026-10-16' }), agentName: '', agentRatePct: null }, at)
+  check('D-213 보드에서 계약금 한 줄로 계약한 제안 상품도 이미 계약한 것으로', contractedNamesOf(boardFirst).has('A 패키지') && contractCloseDraft(boardFirst, { today: '2026-10-20', products: [{ name: 'A 패키지', fee: 300 }] }).lines.length === 0)
+  // 3) 보관한 업체도 고객이 입금했는데 영업자에게 안 준 몫은 정산에 남는다
+  const fee = (id: string, receivedAt: string | null, agentPaidAt: string | null) => ({ id, label: '계약금', amount: 10_000_000, agentFee: 1_000_000, agentName: '김영업', receivedAt, agentPaidAt })
+  const rows = agentLedger([{ id: 'z', companyName: '끝난업체', archivedAt: '2026-10-11T00:00:00.000Z', fees: [fee('z1', '2026-10-10', null), fee('z2', null, null), fee('z3', '2026-09-01', '2026-09-05')] }])
+  check('D-213 정산: 보관한 업체의 줄 돈 100만은 남고(보관 표시) · 입금 전 · 이미 준 것은 빠짐', rows.length === 1 && rows[0].payable === 1_000_000 && rows[0].items.length === 1 && rows[0].items[0].archived === true && agentLedgerTotals(rows).payable === 1_000_000, JSON.stringify(rows))
 }
 console.log(`\nmirae-os: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

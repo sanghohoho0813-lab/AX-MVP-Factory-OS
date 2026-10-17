@@ -171,6 +171,8 @@ export interface AgentLedgerItem {
   receivedAt: string | null
   /** 영업자에게 준 날. 아직이면 null */
   agentPaidAt: string | null
+  /** D-213: 보관한 업체의 항목(줄 돈이 남아 있어 보인다) */
+  archived?: true
 }
 
 export interface AgentLedgerRow {
@@ -193,7 +195,8 @@ export interface AgentLedgerRow {
  * 그래서 '줄 돈' 은 **고객 입금이 확인된 항목** 에서만 센다. 고객이 아직 안 준 돈을
  * 영업자에게 먼저 주는 일은 없어야 하므로, 그 몫은 `waiting` 으로 따로 둔다.
  *
- * 보관한 업체는 넣지 않는다. 수수료 0 인 항목도 넣지 않는다.
+ * 보관한 업체는 넣지 않는다 — 단, 고객은 입금했는데 영업자에게 아직 안 준 몫은 남긴다(D-213: 일이 끝나 보관하면
+ * '지금 줄 돈' 에서 사라졌지만 갚을 돈은 그대로였다). 수수료 0 인 항목도 넣지 않는다.
  * 줄 돈이 많은 사람이 위, 같으면 전체 수수료가 많은 사람, 그래도 같으면 가나다순.
  */
 export function agentLedger(
@@ -201,10 +204,11 @@ export function agentLedger(
 ): AgentLedgerRow[] {
   const rows = new Map<string, AgentLedgerRow>()
   for (const r of records) {
-    if (r.archivedAt !== null) continue
+    const archived = r.archivedAt !== null
     for (const f of r.fees) {
       const agent = typeof f.agentFee === 'number' && Number.isFinite(f.agentFee) && f.agentFee > 0 ? f.agentFee : 0
       if (agent === 0) continue
+      if (archived && !(f.receivedAt && !f.agentPaidAt)) continue
       const name = (f.agentName ?? '').trim() || UNNAMED_AGENT
       const row = rows.get(name) ?? { name, total: 0, payable: 0, paid: 0, waiting: 0, items: [] }
       row.total += agent
@@ -220,6 +224,7 @@ export function agentLedger(
         agentFee: agent,
         receivedAt: f.receivedAt,
         agentPaidAt: f.agentPaidAt,
+        ...(archived ? { archived: true as const } : {}),
       })
       rows.set(name, row)
     }

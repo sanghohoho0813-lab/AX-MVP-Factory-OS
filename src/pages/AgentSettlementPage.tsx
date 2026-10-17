@@ -7,7 +7,7 @@
  * 지급 완료는 여기서 바로 체크한다 — 업체 상세까지 들어가지 않아도 된다.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowRight, Handshake } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
@@ -48,20 +48,29 @@ function SettlementContent({ workspaceId }: { workspaceId: string | null }) {
   const rows = useMemo(() => agentLedger(records), [records])
   const totals = useMemo(() => agentLedgerTotals(rows), [rows])
 
+  /*
+   * D-213: 저장은 한 번에 하나씩, 저장 직전에 그 업체 기록을 새로 읽어 그 위에 체크만 얹는다.
+   * 예전에는 화면을 연 때 읽어 둔 기록 통째로 저장해, 그 사이 휴대폰에서 '입금 확인' 한 다른 항목이 되돌아갔다(다시 미수금).
+   */
+  const queue = useRef<Promise<void>>(Promise.resolve())
   /** 지급 완료 체크 — 업체 기록을 찾아 그 항목만 고치고 저장한다 */
-  const togglePaid = async (item: AgentLedgerItem, paid: boolean) => {
+  const togglePaid = (item: AgentLedgerItem, paid: boolean) => {
     const rec = records.find((r) => r.id === item.clientId)
     if (!rec) return
-    const next = withFee(rec, item.feeId, { agentPaidAt: paid ? today : null })
-    setRecords((list) => list.map((r) => (r.id === next.id ? next : r)))
-    try {
-      const saved = await saveClient(next)
-      setRecords((list) => list.map((r) => (r === next ? saved : r))) // D-125: 그 사이 더 새로 고친 것이 있으면 늦게 온 응답으로 덮지 않는다
-      showToast(paid ? '지급 완료로 표시했습니다.' : '지급 완료를 취소했습니다.')
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
-      void load()
-    }
+    const patch = { agentPaidAt: paid ? today : null }
+    // 화면은 바로 바꾼다(체크가 늦게 들어가 보이지 않게)
+    setRecords((list) => list.map((r) => (r.id === rec.id ? withFee(r, item.feeId, patch) : r)))
+    queue.current = queue.current.then(async () => {
+      try {
+        const fresh = (await listClients(workspaceId).catch(() => null))?.find((r) => r.id === item.clientId) ?? rec
+        const saved = await saveClient(withFee(fresh, item.feeId, patch))
+        setRecords((list) => list.map((r) => (r.id === saved.id ? saved : r)))
+        showToast(paid ? '지급 완료로 표시했습니다.' : '지급 완료를 취소했습니다.')
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
+        void load()
+      }
+    })
   }
 
   return (
@@ -144,7 +153,7 @@ function SettlementContent({ workspaceId }: { workspaceId: string | null }) {
                             aria-label={`${item.clientName} ${item.label} 영업자 지급 완료`}
                             checked={state === 'paid'}
                             disabled={state === 'waiting'}
-                            onChange={(e) => void togglePaid(item, e.target.checked)}
+                            onChange={(e) => togglePaid(item, e.target.checked)}
                             className="size-5 accent-brand-600 disabled:opacity-40"
                           />
                           <span className={`t-meta font-semibold ${state === 'waiting' ? 'text-slate-400' : 'text-slate-600'}`}>지급</span>
@@ -174,6 +183,12 @@ function SettlementContent({ workspaceId }: { workspaceId: string | null }) {
                             ) : (
                               <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 t-meta text-slate-500">
                                 고객 입금 전{item.amount !== null ? ` · 청구 ${formatKrw(item.amount)}` : ''}
+                              </span>
+                            )}
+                            {item.archived && (
+                              // D-213: 일이 끝나 보관한 업체도 줄 돈이 남아 있으면 여기 남는다
+                              <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 t-meta text-slate-500" data-testid="settle-archived">
+                                보관한 업체
                               </span>
                             )}
                           </div>

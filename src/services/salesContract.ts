@@ -16,7 +16,7 @@
  */
 
 import type { ClientOpsRecord, ContractKind, FeeItem, InsurancePolicy, SalesPath, ServiceKey } from '../types/clientOps'
-import { isCustomServiceKey } from '../types/clientOps'
+import { contractStageOf, isCustomServiceKey } from '../types/clientOps'
 import { SERVICES } from '../content/clientOpsCatalog'
 import { localDateOf } from '../lib/appClock'
 import { withActivity } from './clientOpsActivity'
@@ -43,6 +43,29 @@ export interface ContractCloseDraft {
   monthlyPremium: number | null
   /** 시작할 업무 */
   services: ServiceKey[]
+  /** D-213: 이미 계약한 상품이라 이번 추가 계약에서 뺀 것(같은 돈이 두 번 잡히지 않게) */
+  skipped?: string[]
+}
+
+/** 고른 상품 한 줄 — 금액은 만원 */
+export interface ContractCloseProduct {
+  name: string
+  fee: number
+}
+
+const baseLabel = (v: string) => v.replace(/\s*\(\d+\)$/, '').trim()
+
+/**
+ * D-213: 이 업체가 이미 계약한 상품 이름 — 수금 항목 이름 · 계약 완료로 저장된 제안(지금 · 지난) 상품.
+ * 계약 고객의 '추가 계약' 에서 이 상품들은 다시 넣지 않는다(예전에는 처음 계약한 상품이 미리 골라져 있어 같은 돈이 두 번 잡혔다).
+ */
+export function contractedNamesOf(record: ClientOpsRecord): Set<string> {
+  const out = new Set<string>()
+  for (const f of record.fees) out.add(baseLabel(f.label))
+  const s = record.sales
+  if (s?.proposal?.status === '계약 완료') for (const n of s.proposal.packages) out.add(n)
+  for (const p of s?.pastProposals ?? []) if (p.status === '계약 완료') for (const n of p.packages) out.add(n)
+  return out
 }
 
 /** 계약 경로 → 계약 방식 */
@@ -89,12 +112,16 @@ export function agentRateOf(records: ClientOpsRecord[], agentName: string): numb
 /** 확인 시트에 채워 둘 값 */
 export function contractCloseDraft(
   record: ClientOpsRecord,
-  opts: { today: string; products?: { name: string; fee: number }[]; records?: ClientOpsRecord[] },
+  opts: { today: string; products?: ContractCloseProduct[]; records?: ClientOpsRecord[] },
 ): ContractCloseDraft {
   const s = record.sales
-  const products = opts.products ?? []
+  // D-213: 이미 계약 고객이면 계약한 상품은 빼고(추가 계약만)
+  const already = contractStageOf(record.status) !== 'pre' ? contractedNamesOf(record) : new Set<string>()
+  const picked = opts.products ?? []
+  const products = picked.filter((p) => !already.has(p.name))
+  const skipped = picked.filter((p) => already.has(p.name)).map((p) => p.name)
   const lines: ContractCloseLine[] =
-    products.length > 0
+    picked.length > 0
       ? products.map((p) => ({ label: p.name, amount: p.fee > 0 ? p.fee * 10_000 : null }))
       : s?.expectedFee
         ? [{ label: '계약금', amount: s.expectedFee }]
@@ -103,7 +130,7 @@ export function contractCloseDraft(
   const monthly = s?.proposal?.monthly
   const kindFromPath = s?.path ? PATH_TO_KIND[s.path] : ''
   const kind: ContractKind | '' = record.contract.kind || kindFromPath || (monthly ? 'mixed' : '')
-  const names = [...products.map((p) => p.name), ...(s?.proposal?.packages ?? []), ...(s?.interests ?? [])]
+  const names = [...products.map((p) => p.name), ...(already.size ? [] : [...(s?.proposal?.packages ?? []), ...(s?.interests ?? [])])]
   return {
     signedAt: record.contract.signedAt || opts.today,
     dueDate: addDaysLocal(opts.today, 7),
@@ -113,6 +140,7 @@ export function contractCloseDraft(
     agentRatePct: agentName ? agentRateOf(opts.records ?? [record], agentName) : null,
     monthlyPremium: monthly?.premium ? monthly.premium * 10_000 : null,
     services: servicesForProducts(names).filter((k) => record.services[k]?.status === 'not_started' || record.services[k] === undefined),
+    ...(skipped.length ? { skipped } : {}),
   }
 }
 
@@ -125,24 +153,10 @@ function newId(prefix: string): string {
  * 보험 한 줄 · 업무 시작 · 제안 상태. 같은 이름의 수금 항목이 이미 있으면 새로 만들지 않는다(두 번 눌러도 한 번).
  */
 export function withContractClose(record: ClientOpsRecord, d: ContractCloseDraft, at: string = new Date().toISOString()): ClientOpsRecord {
+  // D-213: 이미 계약한 업체인지(추가 계약) — 단계를 옮기기 전에 본다
+  const wasSigned = contractStageOf(record.status) !== 'pre' && /^\d{4}-\d{2}-\d{2}$/.test(record.contract.signedAt ?? '')
   let next = withSalesStage(record, 'contracted', at)
   const signedAt = /^\d{4}-\d{2}-\d{2}$/.test(d.signedAt) ? d.signedAt : localDateOf(at)
-
-  // 계약 정보 — 현금 금액은 수금 합계, 보험은 월납 한 줄(이미 같은 월납 보험이 있으면 더하지 않는다)
-  const total = d.lines.reduce((sum, l) => sum + (l.amount ?? 0), 0)
-  const wantsCash = d.kind === 'cash' || d.kind === 'mixed' || d.kind === ''
-  const wantsIns = d.kind === 'insurance' || d.kind === 'mixed'
-  const policies: InsurancePolicy[] = [...next.contract.policies]
-  if (wantsIns && d.monthlyPremium && !policies.some((p) => p.monthlyPremium === d.monthlyPremium)) {
-    policies.push({ id: newId('pol'), insurer: '', productName: '법인보험(제안 월납)', monthlyPremium: d.monthlyPremium, startedAt: signedAt, payTerm: '', note: '영업 제안의 월납에서' })
-  }
-  next = withContract(next, {
-    ...next.contract,
-    signedAt,
-    kind: d.kind,
-    cashAmount: wantsCash ? (next.contract.cashAmount ?? (total > 0 ? total : null)) : next.contract.cashAmount,
-    policies,
-  })
 
   // 수금 항목
   const have = new Set(next.fees.map((f) => f.label))
@@ -172,11 +186,30 @@ export function withContractClose(record: ClientOpsRecord, d: ContractCloseDraft
       note: '계약 완료에서',
     })
   }
+  const addedSum = added.reduce((sum, f) => sum + (f.amount ?? 0), 0)
   if (added.length > 0) {
     next = { ...next, fees: [...next.fees, ...added] }
-    const sum = added.reduce((s, f) => s + (f.amount ?? 0), 0)
+    const sum = addedSum
     next = withActivity(next, 'fee_added', `수금 항목 ${added.length}개${sum > 0 ? ` ${sum.toLocaleString('ko-KR')}원` : ''}${d.dueDate ? ` · 받을 날 ${d.dueDate}` : ''}${rate !== null && d.agentName ? ` · 영업자 ${d.agentName} ${rate}%` : ''}`, null, at)
   }
+
+  // 계약 정보 — 현금 금액은 수금 합계, 보험은 월납 한 줄(이미 같은 월납 보험이 있으면 더하지 않는다)
+  const total = d.lines.reduce((sum, l) => sum + (l.amount ?? 0), 0)
+  const wantsCash = d.kind === 'cash' || d.kind === 'mixed' || d.kind === ''
+  const wantsIns = d.kind === 'insurance' || d.kind === 'mixed'
+  const policies: InsurancePolicy[] = [...next.contract.policies]
+  if (wantsIns && d.monthlyPremium && !policies.some((p) => p.monthlyPremium === d.monthlyPremium)) {
+    policies.push({ id: newId('pol'), insurer: '', productName: '법인보험(제안 월납)', monthlyPremium: d.monthlyPremium, startedAt: signedAt, payTerm: '', note: '영업 제안의 월납에서' })
+  }
+  next = withContract(next, {
+    ...next.contract,
+    signedAt,
+    kind: d.kind,
+    // D-213: 이미 계약한 업체의 추가 계약이면 계약 현금 금액에 이번에 더한 만큼 더한다 — 예전에는 처음 금액 그대로라
+    // 계약 카드가 '수금 계획이 계약금액보다 많습니다' 라고 잘못 알렸다
+    cashAmount: wantsCash ? (wasSigned && addedSum > 0 ? (next.contract.cashAmount ?? 0) + addedSum : (next.contract.cashAmount ?? (total > 0 ? total : null))) : next.contract.cashAmount,
+    policies,
+  })
 
   // 업무 시작
   for (const key of d.services) {

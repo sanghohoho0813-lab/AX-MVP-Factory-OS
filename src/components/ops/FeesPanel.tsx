@@ -295,6 +295,9 @@ export function FeesPanel({
   const m = moneyPlanOf(record, today)
   const totals = feeTotals(record.fees, funding)
   const shares = agentShares(record.fees)
+  // D-213: 영업자 수수료 줄은 사람별 합과 같은 숫자로 — 금액을 아직 안 적은 항목의 영업자 몫도 센다(정산 화면과 같게).
+  // 예전에는 합계가 그 몫을 빼고, 괄호 안 사람별 금액은 넣어 '200만 (이 200만 · 김 100만)' 처럼 안 맞았다
+  const agentAll = shares.reduce((sum, s) => sum + s.amount, 0)
   const [planOpen, setPlanOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   // 한 줄 더 넣기(드물게) — 예전 입력 칸을 그대로 두되 접어 둔다
@@ -381,9 +384,9 @@ export function FeesPanel({
             />
           </div>
 
-          {totals.agent > 0 && (
+          {agentAll > 0 && (
             <p className="t-sub break-keep text-slate-500" data-testid="fees-agent">
-              영업자 수수료 {formatKrw(totals.agent)}
+              영업자 수수료 {formatKrw(agentAll)}
               {shares.length > 0 && ` (${shares.map((s) => `${s.name} ${formatKrw(s.amount)}`).join(' · ')})`} → 내 몫 {formatKrw(totals.net)}
               {totals.marginPct !== null && ` · 이익률 ${marginText(totals.marginPct)}`} · {moneyWords.unpaid} {krwTile(totals.unpaidNet)}
               {totals.unpaidGross !== totals.unpaidNet && ` (청구 기준 ${krwTile(totals.unpaidGross)})`}{' '}

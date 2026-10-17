@@ -367,6 +367,8 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   // D-167: 월납 시뮬레이션 — 후보 금액 표 · 지금 금액 줄이 눌린 채 · 다른 줄을 누르면 그 금액으로
   const simTbl = page.getByTestId('monthly-sim')
   check('월납 시뮬레이션(D-167): 후보 표 · 300만원 줄 선택 · 적정성', (await simTbl.getByRole('button', { name: /^300만원/, pressed: true }).count()) === 1 && ((await simTbl.innerText()) ?? '').includes('2억 5,200만원') && ((await simTbl.innerText()) ?? '').includes('초록'))
+  // D-213: 적정 상한 = 순이익 3.1억 × 1억당 300만 = 930만원 — 예전에는 12로 한 번 더 나눠 '80만원 · 적정 상한' 이었다
+  check('D-213 월납 시뮬레이션: 적정 상한 930만원(순이익 3.1억 × 1억당 300만) · 80만원 줄 없음', (await simTbl.getByRole('button', { name: /^930만원\s*적정 상한/ }).count()) === 1 && (await simTbl.getByRole('button', { name: /^80만원/ }).count()) === 0, ((await simTbl.innerText()) ?? '').slice(0, 300))
   await simTbl.getByRole('button', { name: /^500만원/ }).click()
   check('월납 시뮬레이션: 줄을 누르면 그 금액으로', (await page.getByLabel('월납 (만원)').inputValue()) === '500')
   await page.getByLabel('월납 (만원)').fill('300')
@@ -391,6 +393,9 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   check('계약 완료: 계약함 · 영업 단계 · 수금 항목 4개(상품표 가격)', saved.status === 'active' && saved.sales.stage === 'contracted' && saved.fees.length === 4 && saved.fees.some((f) => f.label === '정관정비 패키지' && f.amount === 1_500_000), JSON.stringify(saved.fees.map((f) => [f.label, f.amount])))
   check('계약 완료: 계약 정보도 — 방식 · 현금 금액 · 월납 보험 한 줄 · 받을 날', saved.contract.kind !== '' && saved.contract.cashAmount === 10_500_000 && saved.contract.policies.some((p) => p.monthlyPremium === 3_000_000) && saved.fees.every((f) => f.dueDate !== ''), JSON.stringify(saved.contract))
   check('계약 완료: 제안 준비 체크 유지', saved.sales.contractPrep?.includes('제안 범위 확인'))
+  // D-213: 계약 고객이 되면 이미 계약한 상품만 골라진 채로 '추가 계약' 을 누를 수 없다(같은 돈이 두 번 잡히던 것)
+  const addBtn = page.getByTestId('proposal-contract')
+  check('D-213 추가 계약: 이미 계약한 4개만 골라져 있으면 단추 꺼짐 · 안내', (await addBtn.isDisabled()) && ((await page.getByTestId('contract-prep').innerText()) ?? '').includes('이미 계약한 상품만'), ((await page.getByTestId('contract-prep').innerText()) ?? '').slice(-200))
   await page.getByRole('navigation', { name: '주 메뉴' }).getByRole('link', { name: /^일정/ }).click()
   await page.waitForTimeout(600)
   check('계약 완료: 메뉴 숫자(계약 고객) +1', Number(((await page.locator('aside [data-nav-badge="clients"]').innerText()) ?? '0').trim()) === before + 1)

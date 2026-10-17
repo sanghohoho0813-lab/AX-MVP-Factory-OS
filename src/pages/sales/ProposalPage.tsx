@@ -29,7 +29,7 @@ import { salesStageOf, stageReached } from '../../services/salesPipeline'
 import { SALES_PATH_INFO } from '../../services/salesJourney'
 import { amountText, catalogWithPrices, cleanKinds, cleanPrices, feeSplit, feeSum, FEE_KIND_LABEL, kindOf, toProposalItem, withContractPrep, withProposal, type FeeKind } from '../../services/salesOffer'
 import { SALES_SIMPLE } from '../../config/salesSimple'
-import { contractCloseDraft, withContractClose, type ContractCloseDraft } from '../../services/salesContract'
+import { contractCloseDraft, contractedNamesOf, withContractClose, type ContractCloseDraft } from '../../services/salesContract'
 import { ContractCloseSheet } from '../../components/sales/ContractCloseSheet'
 import {
   CONTRACT_CHECKLIST,
@@ -166,8 +166,9 @@ function CatalogView({ catalog, prices, kinds, onSavePrice, onSaveKind }: { cata
 function MonthlySimulation({ months, rate, net, current, onPick }: { months: number; rate: number; net: number | null; current: number; onPick: (premium: number) => void }) {
   const settings = getAffordSettings(null)
   const base = [30, 50, 100, 200, 300, 500]
-  // 순이익(만원)이 있으면 1억당 초록 기준의 월 상한(=연 순이익 × 초록/억 ÷ 12) 근처를 더한다
-  const greenMonthly = net && net > 0 ? Math.max(10, Math.round((net / 10000) * settings.greenPerEok / 12 / 10) * 10) : null
+  // 순이익(만원)이 있으면 초록(적정) 월납 상한 근처를 더한다 — 기준은 '순이익 1억원당 월납 n만원'(원본 affordability 와 같은 식).
+  // D-213: 예전에는 12로 한 번 더 나눠 상한이 12배 낮게 찍혔다(순이익 3.1억 → '80만원 · 적정 상한', 실제 상한 930만)
+  const greenMonthly = net && net > 0 ? Math.max(10, Math.round(((net / 10000) * settings.greenPerEok) / 10) * 10) : null
   const candidates = [...new Set([...base, ...(greenMonthly ? [greenMonthly] : []), ...(current > 0 ? [current] : [])])].sort((a, b) => a - b)
   return (
     <div data-testid="monthly-sim" className="flex flex-col gap-1.5">
@@ -192,8 +193,10 @@ function MonthlySimulation({ months, rate, net, current, onPick }: { months: num
               return (
                 <tr key={c} className={`border-t border-slate-100 ${on ? 'bg-brand-50' : ''}`}>
                   <td className="px-3 py-1.5">
-                    <button type="button" onClick={() => onPick(c)} aria-pressed={on} className="tap font-semibold text-brand-700 tabular-nums hover:underline">
-                      {c.toLocaleString('ko-KR')}만원{c === greenMonthly ? ' · 적정 상한' : ''}
+                    <button type="button" onClick={() => onPick(c)} aria-pressed={on} className="tap flex flex-col items-start text-left font-semibold text-brand-700 tabular-nums hover:underline">
+                      <span className="whitespace-nowrap">{c.toLocaleString('ko-KR')}만원</span>
+                      {/* D-213: '적정 상한' 은 금액 아래 작게 — 휴대폰에서 '930만원 · 적정' / '상한' 으로 가운데 정렬돼 쪼개지던 것 */}
+                      {c === greenMonthly && <span className="t-meta font-semibold whitespace-nowrap text-success-700"> 적정 상한</span>}
                     </button>
                   </td>
                   <td className="px-3 py-1.5 tabular-nums text-slate-700">{manToText(sim.total)}</td>
@@ -309,6 +312,9 @@ function ProposalWork({
   const prepDone = CONTRACT_CHECKLIST.filter((c) => prep.has(c)).length
   const docsDone = REQUIRED_DOCS.filter((c) => prep.has(`서류:${c}`)).length
   const stage = salesStageOf(record)
+  // D-213: 계약 고객이면 이미 계약한 상품은 추가 계약에서 뺀다(같은 돈이 두 번 잡히지 않게)
+  const contracted = contractedNamesOf(record)
+  const newPicked = stage === 'contracted' ? picked.filter((p) => !contracted.has(p.name)) : picked
   // D-124: 계약 준비는 3차 클로징부터(현금 · 단계별처럼 클로징을 건너뛰는 경로는 2차 미팅부터) — 그 전에는 한 줄 안내만
   const path = record.sales?.path ?? null
   const showPrep = stage === 'contracted' || stageReached(record, 'closing') || (path !== null && SALES_PATH_INFO[path].skipClosing && stageReached(record, 'm2'))
@@ -542,13 +548,15 @@ function ProposalWork({
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
             <p className="t-sub break-keep text-slate-600">
               {stage === 'contracted'
-                ? `이미 계약 고객입니다. 새로 고른 상품 ${picked.length}개를 추가 계약으로 — 수금 항목에 더합니다(같은 이름은 빼고).`
+                ? newPicked.length > 0
+                  ? `이미 계약 고객입니다. 새로 고른 상품 ${newPicked.length}개를 추가 계약으로 더합니다${picked.length > newPicked.length ? ` — 이미 계약한 ${picked.length - newPicked.length}개는 빼고` : ''}.`
+                  : '이미 계약한 상품만 골라져 있습니다 — 추가로 계약할 상품을 위에서 더 고르세요.'
                 : `계약 완료로 넘기면 계약 고객이 되고, 고른 상품 ${picked.length}개가 수금 항목으로 들어갑니다. 받을 날 · 영업자 · 계약 방식은 다음 창에서 확인합니다.`}
             </p>
             <Button
               variant="primary"
               data-testid="proposal-contract"
-              disabled={picked.length === 0}
+              disabled={stage === 'contracted' ? newPicked.length === 0 : picked.length === 0}
               onClick={() => setClosing(contractCloseDraft(record, { today: todayLocalDate(), products: picked.map((p) => ({ name: p.name, fee: p.fee })), records }))}
             >
               <FileSignature aria-hidden="true" className="size-4" />
