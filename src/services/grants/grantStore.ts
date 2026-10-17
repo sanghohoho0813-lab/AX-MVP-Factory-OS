@@ -196,8 +196,9 @@ export async function submitAlertRequest(r: AlertRequest): Promise<void> {
   if (problem) throw new Error(problem)
   const payload = alertPayload(r)
   if (isCloud()) {
-    const { error } = await getSupabaseClient().rpc('portal_grant_alert_request', { p_payload: payload })
-    if (error) throw new Error('지금은 신청을 받지 못했습니다. 잠시 뒤 다시 눌러 주세요.')
+    const { data, error } = await getSupabaseClient().rpc('portal_grant_alert_request', { p_payload: payload })
+    // D-222 받을 작업공간이 없으면 서버가 오류 대신 false 를 돌려준다 — 예전에는 그래도 '신청했습니다' 로 보여 상담신청함에 아무것도 안 남았다
+    if (error || data === false) throw new Error('지금은 신청을 받지 못했습니다. 잠시 뒤 다시 눌러 주세요.')
     return
   }
   recordLocalEvent({ eventType: 'consultation_requested', sourceType: 'grant_finder', sourceId: `gf-${Date.now().toString(36)}`, priority: 'high', payload })

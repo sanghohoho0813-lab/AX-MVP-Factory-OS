@@ -26,6 +26,7 @@ import { useViewingPilot } from '../../auth/osAccess'
 import { useYtFeed } from '../../services/marketing/ytFeed'
 import { mergeFeeds, useYtExtra } from '../../services/marketing/ytExtra'
 import { useIdeas, useRadarPrefs } from '../../services/marketing/useRadarStore'
+import { particle, quoted as q } from '../../lib/josa'
 import { IDEA_STATUS_LABEL, confirmInput, ideaFromOpportunity, type ContentIdea, type IdeaStatus, type RadarPrefs } from '../../services/marketing/radarStore'
 import {
   PERIOD_HINT,
@@ -115,7 +116,9 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const yt = useYtFeed()
   const { showToast } = useToast()
   const readOnly = useViewingPilot() !== null
-  const { prefs, update: updatePrefs } = useRadarPrefs(workspaceId, readOnly)
+  const { prefs, ready: prefsReady, failed: prefsFailed, reload: reloadPrefs, update: updatePrefs } = useRadarPrefs(workspaceId, readOnly)
+  /** D-222 설정을 아직 못 읽었으면 바꾸지 않는다(빈 설정으로 덮지 않게) */
+  const prefsBlocked = () => (prefsReady ? false : (showToast(prefsFailed ? '채널 · 추천 설정을 읽지 못했습니다 — 위의 [다시 읽기] 를 누른 뒤 바꿔 주세요.' : '설정을 읽는 중입니다 — 잠시 뒤 다시 눌러 주세요.'), true))
   const notebook = useIdeas(workspaceId, readOnly)
   const [extraKey, setExtraKey] = useState(0)
   const addedIds = useMemo(() => (yt.sample ? [] : prefs.added.map((a) => a.id)), [yt.sample, prefs.added])
@@ -166,7 +169,9 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
     void yt.refresh()
     if (prefs.added.length) setExtraKey((k) => k + 1)
   }
-  const filter = useMemo(() => ({ type, channels: channel ? [channel] : [] }), [type, channel])
+  // D-222 거르던 채널을 [채널] 탭에서 꺼 두면 그 채널은 목록에서 빠진다 — 그대로 거르면 '영상이 없습니다' 만 보여 '전체 채널' 로 본다
+  const liveChannel = channel && prepared?.channels.some((c) => c.id === channel) ? channel : ''
+  const filter = useMemo(() => ({ type, channels: liveChannel ? [liveChannel] : [] }), [type, liveChannel])
 
   const csv = () => {
     if (!prepared) return
@@ -174,19 +179,20 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
     // 파일 이름은 영문(브라우저마다 한글 이름이 'download' 로 바뀌는 일이 있다) — 매출 · 비용 CSV 와 같은 꼴
     downloadText(`youtube-benchmark-${d}${yt.sample ? '-sample' : ''}.csv`, videosCsv(prepared.videos), 'text/csv')
   }
-  const copy = useCallback((text: string, what = '제목') => void copyText(text).then((ok) => showToast(ok ? `${what}을 복사했습니다.` : '복사하지 못했습니다 — 길게 눌러 직접 복사해 주세요.')), [showToast])
+  const copy = useCallback((text: string, what = '제목') => void copyText(text).then((ok) => showToast(ok ? `${what}${particle(what, '을/를')} 복사했습니다.` : '복사하지 못했습니다 — 길게 눌러 직접 복사해 주세요.')), [showToast])
   const openVideo = useCallback((v: YtVideo | RadarVideo) => setDetail(rvById.get(v.id) ?? null), [rvById])
   // 숫자 뒤 영상 목록(D-198)에서 영상을 누르면 같은 영상 상세 창
   const peekEnv = useMemo(() => ({ onOpenVideo: openVideo, noThumb: yt.sample }), [openVideo, yt.sample])
 
   const saveOpp = async (o: Opportunity) => {
     if (readOnly) return showToast('팀장 화면을 보는 중에는 저장하지 않습니다.')
-    if (notebook.ideas.some((i) => i.key === o.key)) return showToast(`'${o.topic}' 은 이미 수첩에 있습니다.`)
+    if (notebook.failed) return showToast('콘텐츠 수첩을 읽지 못했습니다 — 새로고침한 뒤 다시 눌러 주세요(같은 주제가 두 번 담기지 않게).')
+    if (notebook.ideas.some((i) => i.key === o.key)) return showToast(`${q(o.topic, '은/는')} 이미 수첩에 있습니다.`)
     try {
-      await notebook.save(ideaFromOpportunity(o))
+      if (!(await notebook.save(ideaFromOpportunity(o)))) return showToast('담는 중입니다 — 잠시만 기다려 주세요.')
       // 담은 것이 바로 보이게 — 접혀 있던 수첩을 연다
       openFold('radar.notebook')
-      showToast(`'${o.topic}' 을 콘텐츠 수첩에 담았습니다.`)
+      showToast(`${q(o.topic, '을/를')} 콘텐츠 수첩에 담았습니다.`)
     } catch {
       showToast('수첩에 담지 못했습니다 — 잠시 뒤 다시 눌러 주세요.')
     }
@@ -194,11 +200,12 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   /** [이번 주로 확정] — 수첩에 '제작 예정' 으로(이미 있으면 그 줄의 단계만 · D-195) */
   const confirmOpp = async (o: Opportunity) => {
     if (readOnly) return showToast('팀장 화면을 보는 중에는 저장하지 않습니다.')
+    if (notebook.failed) return showToast('콘텐츠 수첩을 읽지 못했습니다 — 새로고침한 뒤 다시 눌러 주세요(같은 주제가 두 번 담기지 않게).')
     const c = confirmInput(o, notebook.ideas)
-    if (!c.changed) return showToast(`'${o.topic}' 은 이미 '${IDEA_STATUS_LABEL[c.input.status ?? 'idea']}' 단계입니다.`)
+    if (!c.changed) return showToast(`${q(o.topic, '은/는')} 이미 '${IDEA_STATUS_LABEL[c.input.status ?? 'idea']}' 단계입니다.`)
     try {
-      await notebook.save(c.input)
-      showToast(`'${o.topic}' 을 이번 주 제작 예정으로 담았습니다 — 콘텐츠 수첩에서 단계를 바꿀 수 있습니다.`)
+      if (!(await notebook.save(c.input))) return showToast('담는 중입니다 — 잠시만 기다려 주세요.')
+      showToast(`${q(o.topic, '을/를')} 이번 주 제작 예정으로 담았습니다 — 콘텐츠 수첩에서 단계를 바꿀 수 있습니다.`)
     } catch {
       showToast('담지 못했습니다 — 잠시 뒤 다시 눌러 주세요.')
     }
@@ -206,11 +213,13 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   /** [관심 없음] — 정확히 이 후보만 다음 추천에서 뺀다(추천 기준 › 숨긴 주제에서 되살림) */
   const muteOpp = async (o: Opportunity) => {
     if (readOnly) return showToast('팀장 화면을 보는 중에는 바꾸지 않습니다.')
+    if (prefsBlocked()) return
     const ok = await updatePrefs({ ...prefs, muted: [...prefs.muted.filter((k) => k !== o.key), o.key] })
-    showToast(ok ? `'${o.topic}' 을 후보에서 뺐습니다 — 추천 기준 › 숨긴 주제에서 되살릴 수 있습니다.` : '숨기지 못했습니다.')
+    showToast(ok ? `${q(o.topic, '을/를')} 후보에서 뺐습니다 — 추천 기준 › 숨긴 주제에서 되살릴 수 있습니다.` : '숨기지 못했습니다.')
   }
   const unmute = async (key: string) => {
     if (readOnly) return showToast('팀장 화면을 보는 중에는 바꾸지 않습니다.')
+    if (prefsBlocked()) return
     const ok = await updatePrefs({ ...prefs, muted: prefs.muted.filter((k) => k !== key) })
     if (!ok) showToast('되살리지 못했습니다.')
   }
@@ -220,14 +229,14 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   }
   const setStatus = async (i: ContentIdea, status: IdeaStatus) => {
     try {
-      await notebook.save({ ...i, status })
+      await notebook.patch(i.id, { status })
     } catch {
       showToast('단계를 바꾸지 못했습니다.')
     }
   }
   const setMemo = async (i: ContentIdea, memo: string) => {
     try {
-      await notebook.save({ ...i, memo })
+      await notebook.patch(i.id, { memo })
       showToast('메모를 저장했습니다.')
     } catch {
       showToast('메모를 저장하지 못했습니다 — 적은 글은 그대로 있습니다.')
@@ -236,15 +245,17 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const removeIdea = async (i: ContentIdea) => {
     try {
       await notebook.remove(i.id)
-      showToast(`'${i.topic}' 을 수첩에서 뺐습니다.`)
+      showToast(`${q(i.topic, '을/를')} 수첩에서 뺐습니다.`)
     } catch {
       showToast('빼지 못했습니다.')
     }
   }
-  const savePrefs = async (next: RadarPrefs) => {
-    if (readOnly) return showToast('팀장 화면을 보는 중에는 바꾸지 않습니다.')
+  const savePrefs = async (next: RadarPrefs): Promise<boolean> => {
+    if (readOnly) return (showToast('팀장 화면을 보는 중에는 바꾸지 않습니다.'), false)
+    if (prefsBlocked()) return false
     const ok = await updatePrefs(next)
     if (!ok) showToast('설정을 저장하지 못했습니다.')
+    return ok
   }
 
   const benchChannels = prepared ? prepared.channels.filter((c) => !c.mine).length : 0
@@ -277,6 +288,14 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           {prepared && <FeedMeta prepared={prepared} fetchedAt={yt.feed?.fetchedAt ?? ''} failed={yt.feed?.failed ?? []} />}
         </p>
       </div>
+      {prefsFailed && !readOnly && (
+        <div role="alert" className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-warning-200 bg-warning-50 px-3 py-2" data-testid="radar-prefs-failed">
+          <p className="t-sub min-w-0 flex-1 break-keep text-warning-700">채널 · 추천 설정을 읽지 못했습니다. 저장해 둔 설정은 그대로 있고, 다시 읽기 전에는 바꾸지 않습니다.</p>
+          <Button size="sm" variant="secondary" onClick={reloadPrefs} data-testid="radar-prefs-retry">
+            <RefreshCw aria-hidden="true" className="size-4" /> 다시 읽기
+          </Button>
+        </div>
+      )}
 
       {!prepared ? (
         <SetupCard status={yt.status} message={yt.message} onSample={yt.showSample} />
@@ -322,7 +341,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           {view === 'top' && (
             <>
               <HotBanner prepared={prepared} onPick={(k) => setParam({ p: '', kw: k })} />
-              <Filters prepared={prepared} period={period} type={type} channel={channel} topN={topN} onType={setType} onChannel={setChannel} onTopN={setTopN} />
+              <Filters prepared={prepared} period={period} type={type} channel={liveChannel} topN={topN} onType={setType} onChannel={setChannel} onTopN={setTopN} />
               <TopView
                 prepared={prepared}
                 rv={rvById}
@@ -337,7 +356,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
               />
             </>
           )}
-          {view === 'channels' && <ChannelManager channels={fullFeed?.channels ?? []} prefs={prefs} readOnly={readOnly} failed={yt.feed?.failed ?? []} onPrefs={(p) => void savePrefs(p)} notify={showToast} />}
+          {view === 'channels' && <ChannelManager channels={fullFeed?.channels ?? []} prefs={prefs} readOnly={readOnly} failed={yt.feed?.failed ?? []} onPrefs={savePrefs} notify={showToast} />}
           {view === 'analysis' && <AnalysisView prepared={prepared} rvideos={rvideos} rv={rvById} onCopy={(t) => copy(t)} />}
         </PeekProvider>
       )}
@@ -634,7 +653,7 @@ function TopView({
 
       {board.rows.length === 0 ? (
         <p className="t-body rounded-(--radius-card) border border-dashed border-slate-300 bg-white px-4 py-6 text-slate-500" data-testid="yt-empty">
-          {kw ? `'${kw}' 이 든 영상이 없습니다.` : '이 기간에 올린 영상이 없습니다.'}
+          {kw ? `${q(kw, '이/가')} 든 영상이 없습니다.` : '이 기간에 올린 영상이 없습니다.'}
         </p>
       ) : (
         <>

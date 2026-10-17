@@ -165,6 +165,8 @@ export async function markFeedbackRead(entries: readonly FeedbackEntry[], at: st
 
 export interface FeedbackSummary {
   responses: number
+  /** D-222 보낸 사람 수(같은 사람이 여러 번 보내도 1명) */
+  people: number
   ratings: { id: string; title: string; average: number | null; count: number; low: string; high: string }[]
   choices: { id: string; title: string; multi: boolean; counts: { option: string; count: number }[] }[]
   texts: { at: string; name: string; text: string }[]
@@ -188,5 +190,6 @@ export function summarizeFeedback(entries: readonly FeedbackEntry[]): FeedbackSu
   const texts = entries
     .filter((e) => typeof e.answers.note === 'string')
     .map((e) => ({ at: e.at, name: e.author.name, text: String(e.answers.note) }))
-  return { responses: entries.length, ratings, choices, texts }
+  const people = new Set(entries.map((e) => e.author.id || e.author.email || e.author.name)).size
+  return { responses: entries.length, people, ratings, choices, texts }
 }

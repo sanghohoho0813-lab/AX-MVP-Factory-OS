@@ -8,6 +8,7 @@
  *  - 판정은 '조건 맞음 · 확인 필요' 뿐 — 선정 가능성을 말하지 않는다.
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { josa } from '../../lib/josa'
 import { useSearchParams } from 'react-router-dom'
 import { BellRing, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react'
 import { brand } from '../../brand/brand.config'
@@ -338,7 +339,7 @@ function AlertSheet({ profile, from, titles, fitCount, onClose, onDone }: { prof
         <label className="tap flex items-start gap-2.5 rounded-(--radius-control) border border-slate-200 bg-slate-50 p-3">
           <input type="checkbox" checked={form.consent} onChange={(e) => setForm({ ...form, consent: e.target.checked })} className="mt-1 size-5 accent-brand-600" data-testid="finder-consent" />
           <span className="t-sub break-keep text-slate-700">
-            지원사업 안내 · 상담 연락을 위해 회사 이름 · 이름 · 연락처 · 고른 조건을 {brand.brandNameKo}가 받는 데 동의합니다. 안내가 끝나거나 그만 받기를 원하시면 지웁니다.
+            지원사업 안내 · 상담 연락을 위해 회사 이름 · 이름 · 연락처 · 고른 조건을 {josa(brand.brandNameKo, '이/가')} 받는 데 동의합니다. 안내가 끝나거나 그만 받기를 원하시면 지웁니다.
           </span>
         </label>
         {error && (

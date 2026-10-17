@@ -464,6 +464,8 @@ export async function updateEvent(
     .select()
     .single()
   if (error) throw error
+  // D-222 클라우드에서도 바꿨다고 알린다 — 예전에는 처리 완료 · 보류로 바꿔도 종 · 메뉴 숫자가 새로고침 전까지 그대로였다
+  notifyStoreChanged()
   return eventFromRow(data as Record<string, unknown>)
 }
 

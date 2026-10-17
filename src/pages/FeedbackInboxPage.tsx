@@ -86,13 +86,21 @@ export function FeedbackInboxPage() {
   const [round, setRound] = useState<string>('all')
   /** 이번에 열었을 때 새것이던 줄 — 읽음으로 적은 뒤에도 이 화면에서는 '새로' 를 둔다 */
   const freshIds = useRef<Set<string> | null>(null)
+  /** 읽음으로 적은 줄 — 같은 줄을 두 번 적지 않게 */
+  const marked = useRef(new Set<string>())
   const [, setTick] = useState(0)
 
+  // D-222 열어 둔 동안 새로 온 피드백도 '새로' 를 달고 읽음으로 적는다 — 예전에는 처음 열 때 한 번만 적어, 그 뒤에 온 것은 종 · 메뉴 숫자에 계속 남았다
   useEffect(() => {
-    if (!entries || freshIds.current !== null) return
-    freshIds.current = new Set(entries.filter((e) => !e.readAt).map((e) => e.id))
-    setTick((n) => n + 1)
-    const toRead = entries.filter((e) => !e.readAt)
+    if (!entries) return
+    const first = freshIds.current === null
+    if (first) freshIds.current = new Set()
+    const toRead = entries.filter((e) => !e.readAt && !marked.current.has(e.id))
+    for (const e of toRead) {
+      freshIds.current?.add(e.id)
+      marked.current.add(e.id)
+    }
+    if (first || toRead.length > 0) setTick((n) => n + 1)
     if (toRead.length > 0) void markFeedbackRead(toRead, nowIso()).catch(() => {})
   }, [entries])
 
@@ -146,7 +154,7 @@ export function FeedbackInboxPage() {
           {/* 모아 보기 */}
           <section data-testid="feedback-summary" className="grid gap-4 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-4 sm:px-5 lg:grid-cols-2">
             <div className="flex flex-col gap-2.5">
-              <h2 className="t-section text-slate-900">점수 평균 <span className="t-meta font-normal text-slate-500">({sum.responses}명 기준)</span></h2>
+              <h2 className="t-section text-slate-900">점수 평균 <span className="t-meta font-normal text-slate-500" data-testid="feedback-basis">(응답 {sum.responses}건 · {sum.people}명)</span></h2>
               {sum.ratings.map((r) => (
                 <div key={r.id} className="flex flex-col gap-1">
                   <p className="t-sub break-keep text-slate-700">{r.title}</p>

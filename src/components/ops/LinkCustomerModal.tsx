@@ -169,6 +169,8 @@ export function LinkCustomerModal({
         }))
       createdRef.current = created
       madeFromEvent.set(event.id, { created, saved: savedRef.current })
+      // D-222 실패 뒤 다시 누를 때 창에서 고친 칸(회사명 · 담당자 · 전화 · 업종 · 메일)을 이어서 쓴다 — 예전에는 처음 만든 값이 그대로 남고 메일만 바뀌었다
+      const formFields = { companyName: form.companyName.trim(), contactName: form.contactName, contactPhone: form.contactPhone, industry: form.industry, contactEmail: form.contactEmail.trim() }
       let saved =
         savedRef.current ??
         (await saveClient(
@@ -176,7 +178,7 @@ export function LinkCustomerModal({
         withInboxPayload(withNewProspect(
           withActivity(
             // D-182: 만든 뒤 종류를 바꿔 다시 눌러도 고른 쪽으로 저장한다(팀장 화면은 손대지 않는다)
-            pilot ? { ...created, contactEmail: form.contactEmail.trim() } : withClientType({ ...created, contactEmail: form.contactEmail.trim() }, asType),
+            pilot ? { ...created, ...formFields } : withClientType({ ...created, ...formFields }, asType),
             'profile',
             `고객 플랫폼 이벤트(${event.eventType})에서 업체 생성${pilot ? '' : ` · ${CLIENT_TYPE_LABEL[asType]}`}`,
           ),
@@ -185,6 +187,9 @@ export function LinkCustomerModal({
         event.payload,
         todayLocalDate(),
       )))
+      if (savedRef.current && (Object.keys(formFields) as (keyof typeof formFields)[]).some((k) => saved[k] !== formFields[k])) {
+        saved = await saveClient(withActivity({ ...saved, ...formFields }, 'profile', '상담신청 연결 — 창에서 고친 업체 정보 반영'))
+      }
       // 연결이 실패한 뒤 종류를 바꿔 다시 누른 경우 — 이미 저장한 업체를 고른 쪽으로 옮겨 둔다
       if (!pilot && clientTypeOf(saved) !== asType) {
         saved = await saveClient(withActivity(withClientType(saved, asType), 'profile', `고객 종류 → ${CLIENT_TYPE_LABEL[asType]}`))

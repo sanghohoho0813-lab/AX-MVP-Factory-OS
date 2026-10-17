@@ -777,6 +777,8 @@ try {
     const entText = (await ent.innerText()) ?? ''
     check('대표(D-188): 받은 피드백함 — 보낸 사람 · 새로 표시 · 점수 · 고른 것 · 직접 쓴 말이 정리돼 보임', (await ent.getAttribute('data-fresh')) === '1' && entText.includes('최은혜') && entText.includes('고객 관리') && entText.includes('서류함') && entText.includes('서류 탭이 바로 보였으면'), entText.slice(0, 300))
     check('대표(D-188): 모아 보기 — 편한가 평균 4 / 5', ((await page.getByTestId('feedback-avg').first().innerText()) ?? '').includes('4 / 5'))
+    // D-222 '몇 명' 이 아니라 응답 건수였다 — 한 사람이 두 번 보내면 '2명' 으로 보이던 것
+    check('대표(D-222): 모아 보기 기준 — "(응답 1건 · 1명)"', /응답 1건 · 1명/.test((await page.getByTestId('feedback-basis').innerText().catch(() => '')) ?? ''), await page.getByTestId('feedback-basis').innerText().catch(() => 'none'))
     const readAt = sql(`select coalesce(payload->>'readAt', '') from public.module_data where workspace_id = '${PILOT_WS}' and module_key = 'feedback' order by created_at desc limit 1`)
     check('대표(D-188): 열면 읽음으로 적힘(DB readAt) · 사이드바 숫자 사라짐', readAt.length > 10 && (await page.locator('aside [data-testid="feedback-inbox-open"]').first().getAttribute('data-unread')) === '0', readAt)
     await shot(page, 'owner-feedback-inbox')

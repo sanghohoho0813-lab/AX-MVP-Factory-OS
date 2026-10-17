@@ -14,6 +14,8 @@ import { fmt, shortNum, type YtChannel } from '../../../services/marketing/ytBen
 import { GROUPS, GROUP_LABEL, GROUP_PURPOSE, groupOf, type BenchmarkChannelGroup } from '../../../services/marketing/ytRadar'
 import { MAX_ADDED, type RadarPrefs } from '../../../services/marketing/radarStore'
 import { resolveChannel, type ResolvedChannel } from '../../../services/marketing/ytExtra'
+import { quoted as q } from '../../../lib/josa'
+import { localDateOf } from '../../../lib/appClock'
 
 export function ChannelManager({
   channels,
@@ -27,7 +29,7 @@ export function ChannelManager({
   prefs: RadarPrefs
   readOnly: boolean
   failed: readonly string[]
-  onPrefs: (p: RadarPrefs) => void
+  onPrefs: (p: RadarPrefs) => Promise<boolean> | void
   notify: (msg: string) => void
 }) {
   const addedIds = useMemo(() => new Set(prefs.added.map((a) => a.id)), [prefs.added])
@@ -67,8 +69,10 @@ export function ChannelManager({
   return (
     <div className="flex flex-col gap-3" data-testid="yt-channels">
       <AddChannel readOnly={readOnly} full={prefs.added.length >= MAX_ADDED} known={new Set(rows.map((r) => r.id))} onAdd={(c, group) => {
-        onPrefs({ ...prefs, added: [...prefs.added, { id: c.id, title: c.title, handle: c.handle, group, note: '', subs: c.subs, addedAt: new Date().toISOString() }] })
-        notify(`'${c.title}' 를 ${GROUP_LABEL[group]} 묶음에 더했습니다 — 영상은 곧 받아 옵니다.`)
+        // D-222 저장된 뒤에만 '더했습니다'(설정을 못 읽었거나 저장 실패면 그 안내만) · 더한 날은 한국 날짜로 보이게 시각 그대로
+        void Promise.resolve(onPrefs({ ...prefs, added: [...prefs.added, { id: c.id, title: c.title, handle: c.handle, group, note: '', subs: c.subs, addedAt: new Date().toISOString() }] })).then((ok) => {
+          if (ok !== false) notify(`${q(c.title, '을/를')} ${GROUP_LABEL[group]} 묶음에 더했습니다 — 영상은 곧 받아 옵니다.`)
+        })
       }} />
       {failed.length > 0 && <p className="t-meta break-keep text-warning-700">이번에 못 받은 채널: {failed.join(' · ')}</p>}
       <div className="flex flex-col gap-5" data-testid="yt-channel-table">
@@ -122,7 +126,7 @@ export function ChannelManager({
               {addedRows.map((c) => (
                 <ChannelRow key={c.id} c={c} group={groupOf(c, prefs.overrides)} enabled={prefs.overrides[c.id]?.enabled !== false} readOnly={readOnly} onOverride={setOverride} onRemove={() => removeAdded(c.id)} added>
                   <p className="t-meta text-slate-500">
-                    {GROUP_LABEL[groupOf(c, prefs.overrides)]} 묶음{addedAt.get(c.id) ? ` · ${String(addedAt.get(c.id)).slice(0, 10)} 더함` : ''}
+                    {GROUP_LABEL[groupOf(c, prefs.overrides)]} 묶음{addedAt.get(c.id) ? ` · ${localDateOf(String(addedAt.get(c.id)))} 더함` : ''}
                   </p>
                 </ChannelRow>
               ))}
@@ -219,7 +223,7 @@ function AddChannel({ readOnly, full, known, onAdd }: { readOnly: boolean; full:
     const r = await resolveChannel(text)
     setBusy(false)
     if (!r.ok) return setMsg(r.message)
-    if (r.channel.already || known.has(r.channel.id)) return setMsg(`'${r.channel.title}' 은 이미 목록에 있습니다.`)
+    if (r.channel.already || known.has(r.channel.id)) return setMsg(`${q(r.channel.title, '은/는')} 이미 목록에 있습니다.`)
     setFound(r.channel)
   }
   return (

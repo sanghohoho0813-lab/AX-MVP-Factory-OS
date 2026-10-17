@@ -568,7 +568,8 @@ export function shortNum(n: number): string {
 /** 엑셀에서 바로 열리는 CSV(한글 깨지지 않게 BOM) */
 export function videosCsv(videos: readonly YtVideo[]): string {
   const esc = (s: string | number) => {
-    const t = String(s)
+    // D-222 글 칸이 = + - @ 로 시작하면(대표가 더한 채널의 제목은 아무 글이나 올 수 있다) 엑셀이 식으로 돌리지 않게 앞에 ' — 숫자 칸은 그대로
+    const t = typeof s === 'string' && /^[=+\-@\t\r]/.test(s) ? `'${s}` : String(s)
     return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t
   }
   const head = ['채널', '제목', '올린 날', '조회수', '좋아요', '댓글', '좋아요율(%)', '길이(초)', '종류', '주소']

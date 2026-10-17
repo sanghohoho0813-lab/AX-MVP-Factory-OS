@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Bell } from 'lucide-react'
 import { useDismissable } from '../../lib/useDismissable'
@@ -20,9 +20,25 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
   const [alerts, setAlerts] = useState<OpsAlert[]>([])
   /** 종 목록에 보일 상담신청 한 줄 (누구 · 종류) — 읽을 때 한 번 만든다 */
   const [events, setEvents] = useState<{ id: string; text: string }[]>([])
+  // D-222 창으로 돌아오면 다시 센다(다른 기기 · 홈페이지에서 새로 들어온 상담신청) — 메뉴 숫자와 같게, 15초에 한 번까지
+  const [tick, setTick] = useState(0)
+  const lastAt = useRef(0)
+  useEffect(() => {
+    const back = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - lastAt.current < 15_000) return
+      setTick((t) => t + 1)
+    }
+    window.addEventListener('focus', back)
+    document.addEventListener('visibilitychange', back)
+    return () => {
+      window.removeEventListener('focus', back)
+      document.removeEventListener('visibilitychange', back)
+    }
+  }, [])
 
   useEffect(() => {
     let alive = true
+    lastAt.current = Date.now()
     void (async () => {
       // D-112: 서비스는 종이 처음 셀 때 불러온다 — 첫 파일에서 뺀다
       try {
@@ -49,7 +65,7 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
       }
     })()
     return () => { alive = false }
-  }, [workspaceId, version, pilot])
+  }, [workspaceId, version, pilot, tick])
 
   const critical = useMemo(() => alerts.filter((a) => a.severity === 'critical'), [alerts])
   // D-188: 팀장이 보낸 새 피드백 — 대표 종에도

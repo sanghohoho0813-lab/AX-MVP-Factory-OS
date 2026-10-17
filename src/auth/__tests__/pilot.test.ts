@@ -420,6 +420,9 @@ check('키: 상관없는 다른 사이트 값은 옮기지 않는다', !isUserSc
   const mk = (id: string, answers: Record<string, unknown>): FeedbackEntry => ({ id, workspaceId: 'w', round: '2026-10-A', roundLabel: '10월 1차 설문', answers: cleanAnswers(answers as never), author: { id: 'u', name: '최은혜', title: '팀장', email: '' }, at: `2026-10-1${id}T09:00:00Z`, readAt: null, device: 'PC' })
   const sum = summarizeFeedback([mk('1', { easy: 4, used: ['고객 관리', '서류 올리기'], note: '좋아요' }), mk('2', { easy: 5, used: ['고객 관리'], first: '서류함' })])
   check('피드백 모아 보기: 점수 평균(4.5) · 많이 고른 것 순 · 하나 고르기 · 직접 쓴 말', sum.responses === 2 && sum.ratings.find((r) => r.id === 'easy')?.average === 4.5 && sum.ratings.find((r) => r.id === 'docs')?.average === null && sum.choices.find((c) => c.id === 'used')?.counts[0]?.option === '고객 관리' && sum.choices.find((c) => c.id === 'used')?.counts[0]?.count === 2 && sum.choices.find((c) => c.id === 'first')?.counts[0]?.option === '서류함' && sum.texts.length === 1 && sum.texts[0].text === '좋아요')
+  // D-222 같은 팀장이 두 번 보내도 '2명' 이 아니라 응답 2건 · 1명
+  const sum2 = summarizeFeedback([mk('1', { easy: 4 }), mk('2', { easy: 5 }), { ...mk('3', { easy: 3 }), author: { id: 'u2', name: '박팀장', title: '팀장', email: '' } }])
+  check('피드백 모아 보기: 응답 3건 · 보낸 사람 2명(같은 사람 여러 번은 1명)', sum2.responses === 3 && sum2.people === 2 && sum.people === 1, { r: sum2.responses, p: sum2.people })
 }
 
 console.log(`pilot: ${passed} passed, ${failed} failed`)

@@ -187,6 +187,10 @@ const vid = (id: string, chId: string, t: string, ago: number, v: number, d = 60
 
   const csv = videosCsv([...p.videos, { ...p.videos[0], id: 'q', title: '따옴표 "있는", 제목' }])
   check('CSV: 한글 깨짐 방지(BOM) · 머리줄 · 따옴표 · 쉼표 처리', csv.startsWith('﻿채널,제목,올린 날') && csv.includes('"따옴표 ""있는"", 제목"') && csv.split('\n').length === p.videos.length + 3)
+  // D-222 대표가 더한 채널의 제목은 아무 글이나 — 엑셀에서 열 때 식으로 돌지 않게
+  const inj = videosCsv([{ ...p.videos[0], id: 'f1', title: '=HYPERLINK("http://x","눌러")', channelName: '@채널' }, { ...p.videos[0], id: 'f2', title: '-10% 할인', channelName: '+보통' }])
+  const injRows = inj.split('\n').slice(1)
+  check('CSV: = + - @ 로 시작하는 글 칸은 앞에 \' (식 실행 막기) · 숫자 칸은 그대로', injRows[0].startsWith("'@채널,\"'=HYPERLINK(") && injRows[1].startsWith("'+보통,'-10% 할인,") && !/,'\d/.test(inj), injRows)
   check('짧은 숫자: 1.2만 · 30만 · 1.5억', shortNum(12_000) === '1.2만' && shortNum(300_000) === '30만' && shortNum(150_000_000) === '1.5억' && shortNum(950) === '950')
 }
 
@@ -747,6 +751,13 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   await ensureYt()
   await refreshYt()
   check('9 [지금 새로 가져오기] → 1분 전 것이어도 새로(?bucket=…&rev=…) · 열 때는 받지 않음', feedAsks().length === 1 && /^\?bucket=\d+&rev=/.test(feedAsks()[0]) && snap().feed?.videos[0]?.id !== 'old1' && snap().status === 'ready', asked)
+  // D-222 창으로 돌아온 순간의 저절로 확인이 도는 중에 [지금 새로 가져오기] → 그 확인이 끝난 뒤 마저 새로 받는다(묻혀서 아무것도 안 받던 것)
+  begin({ fetchedAt: Date.now() - 60_000, feedRevision: FEED_REVISION, feed: feedOf(NCH, Date.now() - 60_000) })
+  const autoP = ensureYt()
+  const manualP = refreshYt()
+  const twiceP = refreshYt()
+  await Promise.all([autoP, manualP, twiceP])
+  check('9b 저절로 확인 중에 눌러도 새로 받음(?bucket=) · 두 번 눌러도 한 번 · 새 데이터', feedAsks().length === 1 && /^\?bucket=\d+&rev=/.test(feedAsks()[0]) && snap().feed?.videos[0]?.id !== 'old1' && manualP === twiceP, asked)
 
   // 10 저절로 받기 실패 → 지난번 것 그대로 + 받은 때
   const oldAt = Date.now() - H6 - 3_600_000

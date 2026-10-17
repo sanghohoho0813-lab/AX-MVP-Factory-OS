@@ -39,3 +39,8 @@ export function particle(word: string, pair: Pair): string {
 export function josa(word: string, pair: Pair): string {
   return `${word}${particle(word, pair)}`
 }
+
+/** D-222 따옴표로 감싼 낱말 + 조사 — "'환율 · 달러'를" (따옴표 뒤에 붙여도 받침은 낱말로 본다) */
+export function quoted(word: string, pair: Pair): string {
+  return `'${word}'${particle(word, pair)}`
+}

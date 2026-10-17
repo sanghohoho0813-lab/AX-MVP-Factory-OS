@@ -25,6 +25,7 @@
  *    반복되면 '새 AI 키워드' 후보로만 보여 준다(분류표에 저절로 넣지 않는다).
  */
 import { SHORT_MAX_SEC, extractTopics, periodVideos, type Prepared, type YtChannel, type YtVideo } from './ytBench'
+import { quoted } from '../../lib/josa'
 import {
   AI_KEYWORDS,
   CORE_DOMAINS,
@@ -606,7 +607,7 @@ function summaryOf(axis: ContentAxis, c: Cluster, label: string, axSignal: Clust
       c.bridgeHits > 0
         ? `이미 '${label} + AI · 자동화' 영상이 ${c.bridgeHits}편 나와 우리 AX 이야기를 붙이기 좋습니다`
         : axSignal && axSignal.strength !== 'early'
-          ? `AI 실무 채널에서는 지금 '${axSignal.label}' 이 오르고 있어 둘을 붙여 말하기 좋은 때입니다`
+          ? `AI 실무 채널에서는 지금 ${quoted(axSignal.label, '이/가')} 오르고 있어 둘을 붙여 말하기 좋은 때입니다`
           : `'${label} + AI' 를 다룬 영상은 아직 없어 먼저 말할 수 있습니다`
     return `${spread}, ${tail}.`
   }
@@ -673,7 +674,7 @@ function opportunity(axis: ContentAxis, c: Cluster, hot: readonly PatternStat[],
   // BRIDGE 는 '왜 BRIDGE 인가' 를 맨 앞에(카드에는 앞 3줄만 보인다)
   if (axis === 'bridge') {
     if (c.bridgeHits > 0) whyNow.unshift(`이미 '${def.label} + AI · 자동화' 를 같이 다룬 영상 ${c.bridgeHits}편 — 시장이 이 조합을 받아 줍니다`)
-    else if (axSignal && axSignal.strength !== 'early') whyNow.unshift(`AI 실무 채널에서는 지금 '${axSignal.label}' 이 오릅니다(${axSignal.channels14 || axSignal.channels30}개 채널) — 이 주제에 붙여 말하기 좋은 때입니다`)
+    else if (axSignal && axSignal.strength !== 'early') whyNow.unshift(`AI 실무 채널에서는 지금 ${quoted(axSignal.label, '이/가')} 오릅니다(${axSignal.channels14 || axSignal.channels30}개 채널) — 이 주제에 붙여 말하기 좋은 때입니다`)
     else whyNow.unshift(`'${def.label} + AI' 를 다룬 벤치마킹 영상은 아직 없습니다 — 먼저 말할 수 있는 자리입니다`)
   }
   const facts = factsOf(axis, c, def.label, axSignal)

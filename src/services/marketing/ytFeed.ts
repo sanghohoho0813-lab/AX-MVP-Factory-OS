@@ -204,14 +204,35 @@ async function check(): Promise<void> {
 /** 화면을 열 때 · 다른 탭/앱에서 돌아올 때 */
 export function ensureYt(): Promise<void> {
   if (state.status === 'sample') return Promise.resolve()
-  if (!inflight) inflight = check().finally(() => (inflight = null))
+  if (!inflight) {
+    const run: Promise<void> = check().finally(() => {
+      if (inflight === run) inflight = null
+    })
+    inflight = run
+  }
   return inflight
 }
 
-/** [지금 새로 가져오기] — 6시간과 상관없이(30분 칸) */
+let manual: Promise<void> | null = null
+
+/**
+ * [지금 새로 가져오기] — 6시간과 상관없이(30분 칸).
+ * D-222 창으로 돌아온 순간의 저절로 확인(focus)이 도는 중에 눌러도 그 확인이 끝난 뒤 마저 받는다 —
+ * 예전에는 그 확인을 그대로 돌려줘 '아직 6시간 안' 이면 아무것도 받지 않았다(돌지도 않고 새 데이터도 없음).
+ */
 export function refreshYt(): Promise<void> {
-  if (!inflight) inflight = (async () => load('manual', await serverRevision(), current()))().finally(() => (inflight = null))
-  return inflight
+  if (manual) return manual
+  const prev = inflight
+  const run: Promise<void> = (async () => {
+    if (prev) await prev.catch(() => undefined)
+    await load('manual', await serverRevision(), current())
+  })().finally(() => {
+    if (manual === run) manual = null
+    if (inflight === run) inflight = null
+  })
+  manual = run
+  inflight = run
+  return run
 }
 
 /** [예시로 보기] — 저장하지 않는다 */
@@ -250,6 +271,7 @@ export function useYtFeed(): YtState & { refresh: () => Promise<void>; showSampl
 export function resetYtForTest(now?: () => number) {
   state = EMPTY
   inflight = null
+  manual = null
   server = null
   autoAfter = 0
   clock = now ?? (() => Date.now())
