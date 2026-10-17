@@ -43,6 +43,18 @@ export interface CretopWorkbenchProps {
 }
 
 const digits = (v: string) => v.replace(/[^0-9]/g, '')
+const companyKey = (name: string) => name.replace(/\(\s*주\s*\)|㈜|주식회사|\(\s*유\s*\)|유한회사/g, '').replace(/\s+/g, '').toLowerCase()
+
+/** D-225 보고서 회사가 연 업체와 같은가 — 미팅 준비 '이 업체에 반영' 과 같은 규칙(사업자번호 둘 다 있으면 번호로, 아니면 이름) */
+function sameCompanyAs(record: { businessNumber: string; companyName: string }, company: string, bizNo: string): boolean {
+  const a = digits(record.businessNumber)
+  const b = digits(bizNo)
+  if (a.length === 10 && b.length === 10) return a === b
+  const x = companyKey(record.companyName)
+  const y = companyKey(company)
+  if (x === '' || y === '') return true
+  return x.includes(y) || y.includes(x)
+}
 
 export function CretopWorkbench({ embedded = false, onAnalyzed, actions, attachSlot }: CretopWorkbenchProps) {
   const { clientRecord, clientName, clientId, loadClients } = useToolClient()
@@ -98,7 +110,10 @@ export function CretopWorkbench({ embedded = false, onAnalyzed, actions, attachS
       rows.find((r) => mine !== '' && digits(String(r.data.bizNo ?? '')) === mine) ??
       rows.find((r) => r.data.company === company && (mine === '' || digits(String(r.data.bizNo ?? '')) === ''))
     // 원본처럼 저장이 안 되면 알려 준다 ('분석 저장 실패') — 결과 화면은 그대로 남는다
-    bucket.save({ id: prev?.id, clientId: clientId ?? prev?.clientId ?? '', data: { company, bizNo, ts: new Date().toISOString(), ui, sv: prev?.data.sv ?? null } }).catch((e: unknown) => {
+    // D-225: 다른 회사 보고서를 이 업체 화면에서 넣었으면 이 업체로 잇지 않는다 — 예전에는 그 분석이 이 업체 것이 되어
+    //        다음에 이 업체 1차 미팅 준비를 열면 다른 회사 보고서가 먼저 열렸다(반영은 거절했는데도)
+    const linkHere = clientId && (!clientRecord || sameCompanyAs(clientRecord, company, bizNo))
+    bucket.save({ id: prev?.id, clientId: (linkHere ? clientId : null) ?? prev?.clientId ?? '', data: { company, bizNo, ts: new Date().toISOString(), ui, sv: prev?.data.sv ?? null } }).catch((e: unknown) => {
       showToast(`분석 저장 실패: ${e instanceof Error ? e.message : '오류'} — 연결을 확인하세요. 결과는 화면에 그대로 있습니다.`)
     })
     onAnalyzed?.(ui)
@@ -231,7 +246,18 @@ export function CretopWorkbench({ embedded = false, onAnalyzed, actions, attachS
   }
 
   // embedded 는 이력을 다 읽은 뒤에 연다 — 이 업체의 지난 분석으로 시작해야 하므로
-  if (embedded && bucket.rows === null) return <p className="t-sub px-1 py-6 text-slate-500">크레탑 분석을 불러오는 중…</p>
+  if (embedded && bucket.rows === null)
+    return bucket.error ? (
+      // D-225 못 읽으면 '불러오는 중…' 에서 멈추지 않고 알린다
+      <div role="alert" data-testid="cretop-load-error" className="flex flex-col gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center">
+        <p className="t-sub min-w-0 flex-1 break-keep font-semibold text-amber-900">크레탑 분석 기록을 읽지 못했습니다. 저장해 둔 분석은 그대로 있습니다.</p>
+        <Button variant="secondary" size="sm" onClick={() => void bucket.reload()}>
+          다시 읽기
+        </Button>
+      </div>
+    ) : (
+      <p className="t-sub px-1 py-6 text-slate-500">크레탑 분석을 불러오는 중…</p>
+    )
 
   return (
     <div className="flex flex-col gap-4">
@@ -239,7 +265,13 @@ export function CretopWorkbench({ embedded = false, onAnalyzed, actions, attachS
         key={embedded ? (clientRecord?.id ?? 'none') : 'tool'}
         history={history}
         onSaved={onSaved}
-        onDelete={(h) => void bucket.remove(h.id)}
+        onDelete={(h) => {
+          // D-225 한 번 더 묻는다 — 예전에는 ✕ 한 번에 바로 지워졌고(작업실 모두가 보는 기록) 실패해도 말이 없었다
+          if (!window.confirm(`${h.company} 분석 이력을 지울까요?\n작업실의 다른 사람 화면에서도 사라지고 되돌릴 수 없습니다.`)) return
+          bucket.remove(h.id).catch((e: unknown) => {
+            showToast(`이력을 지우지 못했습니다: ${e instanceof Error ? e.message : '오류'} — 연결을 확인하고 다시 눌러 주세요.`)
+          })
+        }}
         extraInput={extraInput}
         resultBar={resultBar}
         pendingFile={pendingFile}

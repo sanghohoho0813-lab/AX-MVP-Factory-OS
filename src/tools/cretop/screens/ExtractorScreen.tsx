@@ -14,6 +14,7 @@ import { Check, Copy, Download, RotateCcw } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
 import { Badge, MetricTile, Section, Surface, type Tone } from '../../../components/ui/primitives'
 import { useToast } from '../../../components/ui/toastContext'
+import { todayLocalDate } from '../../../lib/appClock'
 import {
   CRETOP_EXTRACT_SAMPLE,
   extractCretopNumbers,
@@ -36,8 +37,13 @@ export function ExtractorScreen() {
   const { showToast } = useToast()
   // D-94: 보고서 분석에서 방금 읽은 글이 있으면 그것으로 시작한다 — 같은 보고서를 다시 붙여 넣지 않게
   const last = lastCretopSource()
-  const [text, setText] = useState(() => last?.text ?? '')
+  const [text, setTextRaw] = useState(() => last?.text ?? '')
   const [off, setOff] = useState<Set<string>>(new Set())
+  // D-225 글이 바뀌면 끈 줄도 비운다 — 줄 번호(x0 …)는 자리 순서라, 새 보고서의 같은 자리 줄이 말없이 꺼진 채 CSV · 복사에서 빠졌다
+  const setText = (t: string) => {
+    setTextRaw(t)
+    setOff(new Set())
+  }
   const [copied, setCopied] = useState(false)
 
   const result = useMemo(() => {
@@ -67,7 +73,7 @@ export function ExtractorScreen() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `크레탑-숫자-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `크레탑-숫자-${todayLocalDate()}.csv`
     a.click()
     URL.revokeObjectURL(url)
     showToast('고른 줄을 CSV 로 내보냈습니다.')
@@ -98,7 +104,7 @@ export function ExtractorScreen() {
             <Button variant="ghost" size="sm" onClick={() => setText(CRETOP_EXTRACT_SAMPLE)} data-testid="cretop-extract-sample">
               샘플 넣기
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => { setText(''); setOff(new Set()) }}>
+            <Button variant="ghost" size="sm" onClick={() => setText('')}>
               <RotateCcw aria-hidden="true" className="size-4" /> 처음부터
             </Button>
           </div>

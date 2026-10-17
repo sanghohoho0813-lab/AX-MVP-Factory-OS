@@ -24,22 +24,73 @@ export function won(n: number | null | undefined): string {
 }
 
 export function pct(n: number | null | undefined, d?: number): string {
-  if (n === null || n === undefined || isNaN(n)) return '-'
+  // D-225: 급여 · 과표가 0 이면 원본은 'Infinity%' 를 보였다 — 셀 수 없는 비율은 '-'
+  if (n === null || n === undefined || !Number.isFinite(n)) return '-'
   return (n * 100).toFixed(d === undefined ? 1 : d) + '%'
 }
 
-const KOREAN_WON = /^(-?)(?:(\d+(?:\.\d+)?)억)?(?:(\d+(?:\.\d+)?)천만)?(?:(\d+(?:\.\d+)?)만)?(\d+(?:\.\d+)?)?$/
+const SMALL_UNITS = /^(?:(\d*(?:\.\d+)?)천)?(?:(\d*(?:\.\d+)?)백)?(?:(\d*(?:\.\d+)?)십)?(\d+(?:\.\d+)?)?$/
+const BIG_UNITS = /^(?:([\d.천백십]*)조)?(?:([\d.천백십]*)억)?(?:([\d.천백십]*)만)?([\d.천백십]*)$/
+
+/** 만 아래 묶음 — '2천3백' 2,300 · '1천500' 1,500 · '천' 1,000. 못 읽으면 null */
+function smallUnits(seg: string): number | null {
+  if (seg === '') return 1
+  const m = SMALL_UNITS.exec(seg)
+  if (!m) return null
+  const unit = (x: string | undefined) => (x === undefined ? 0 : x === '' ? 1 : Number(x))
+  return unit(m[1]) * 1000 + unit(m[2]) * 100 + unit(m[3]) * 10 + (m[4] ? Number(m[4]) : 0)
+}
+
+/**
+ * 사람이 적은 금액 → 원. 계산기 9종과 절세 설계가 함께 쓴다(한 벌).
+ * '1억 2천만' · '3억5천'(= 3억 5천만) · '5백만' · '1억2천3백만' · '1.2억' · '300백만' · '120,000,000원' ·
+ * 음수 '-3억' · '△250,000,000' · '(1,234)'. 못 읽으면 null
+ */
+export function koreanWon(text: unknown): number | null {
+  let t = String(text ?? '').replace(/[\s,]/g, '').replace(/원$/, '')
+  let neg = false
+  const paren = /^\((.+)\)$/.exec(t)
+  if (paren) {
+    neg = true
+    t = paren[1]
+  }
+  if (/^[-△]/.test(t)) {
+    neg = !neg
+    t = t.slice(1)
+  }
+  if (t === '') return null
+  const m = BIG_UNITS.exec(t)
+  if (!m) return null
+  const [, jo, eok, man, rest] = m
+  let v = 0
+  if (jo === undefined && eok === undefined && man === undefined) {
+    if (rest === '') return null
+    const r = /^\d+(?:\.\d+)?$/.test(rest) ? Number(rest) : smallUnits(rest)
+    if (r === null) return null
+    v = r
+  } else {
+    for (const [seg, unit] of [[jo, 1e12], [eok, 1e8], [man, 1e4]] as const) {
+      if (seg === undefined) continue
+      const n = smallUnits(seg)
+      if (n === null) return null
+      v += n * unit
+    }
+    if (rest) {
+      const r = smallUnits(rest)
+      if (r === null) return null
+      // '3억 5천' 은 말로 3억 5천만 — 억 바로 뒤에 만 없이 천 · 백으로 적은 것은 만 단위로 읽는다(그냥 숫자는 그대로)
+      v += man === undefined && eok !== undefined && /[천백십]/.test(rest) ? r * 1e4 : r
+    }
+  }
+  return neg ? -v : v
+}
 
 export function cleanNum(v: unknown): number {
   const s = String(v ?? '').replace(/[\s,]/g, '').replace(/원$/, '')
-  // D-211: '1억' · '3억 5천만' · '8000만' 은 그 금액으로 — 예전에는 앞 숫자만 읽어 1억이 1원이었다(절세 설계 칸과 같은 읽기)
-  if (/[억만]/.test(s)) {
-    const m = KOREAN_WON.exec(s)
-    if (m && (m[2] || m[3] || m[4])) {
-      const won = Number(m[2] ?? 0) * 1e8 + Number(m[3] ?? 0) * 1e7 + Number(m[4] ?? 0) * 1e4 + Number(m[5] ?? 0)
-      return m[1] ? -won : won
-    }
-  }
+  // D-211: '1억' · '3억 5천만' · '8000만' 은 그 금액으로 — 예전에는 앞 숫자만 읽어 1억이 1원이었다
+  // D-225: '3억5천' · '5백만' · '1억2천3백만' · '△2억' · '(1,234)' 도(예전: 3 · 5 · 1 · 0 · 0) — 절세 설계와 같은 읽기 한 벌
+  const k = koreanWon(s)
+  if (k !== null && Number.isFinite(k)) return k
   const n = parseFloat(s)
   return isNaN(n) ? 0 : n
 }
@@ -777,8 +828,14 @@ function calc6p2(v: Values): Output {
   const cutoff = new Date(2019, 11, 31)
   let monthsC = (2019 - start.getFullYear()) * 12 + (12 - (start.getMonth() + 1)) + 1
   if (start > cutoff) monthsC = 0
-  let monthsD = (end.getFullYear() - 2020) * 12 + (end.getMonth() + 1 - 1) + 1
-  if (end < new Date(2020, 0, 1)) monthsD = 0
+  // D-225 원본과 다르게 고친 곳: 2020년 뒤에 취임했으면 2020년 1월이 아니라 취임한 달부터 센다
+  // 원본은 늘 2020년 1월부터 세어, 2024년 6월 취임 대표의 한도가 29개월이 아닌 82개월치로 부풀었다(소득세법 §22③ 은 근무기간)
+  const fromD = start > cutoff ? start : new Date(2020, 0, 1)
+  let monthsD = (end.getFullYear() - fromD.getFullYear()) * 12 + (end.getMonth() - fromD.getMonth()) + 1
+  if (end < new Date(2020, 0, 1) || end < fromD) monthsD = 0
+  // 날짜를 비우면 원본은 'NaN개월' 을 보였다 — 비운 칸은 0개월로
+  if (!Number.isFinite(monthsC)) monthsC = 0
+  if (!Number.isFinite(monthsD)) monthsD = 0
   const totalMonths = monthsC + monthsD
 
   const capC = Math.min(multPre, 3)
@@ -840,7 +897,7 @@ function calc6p3(v: Values): Output {
         title: '퇴직소득세 계산 결과',
         tone: 'dark',
         lines: [
-          L('근속연수', years + '년'),
+          L('근속연수', Number.isFinite(years) ? years + '년' : '-'),
           L('근속공제', won(serviceDed)),
           L('근속공제 후 산출액', won(afterService)),
           L('환산급여액', won(converted)),
@@ -1319,7 +1376,7 @@ function scenario(v: Values, p: string): Scenario {
     {
       id: `${p}_out2`, title: '퇴직소득세 계산 결과', tone: 'dark',
       lines: [
-        L('① 근속연수(1년미만 절상)', years + '년'), L('② 근속연수공제', won(svcDed)), L('③ 공제후금액', won(afterDed)), L('④ 환산급여', won(converted)),
+        L('① 근속연수(1년미만 절상)', Number.isFinite(years) ? years + '년' : '-'), L('② 근속연수공제', won(svcDed)), L('③ 공제후금액', won(afterDed)), L('④ 환산급여', won(converted)),
         L('⑤ 환산급여공제', won(convDed)), L('⑥ 퇴직소득 과세표준', won(taxBase2)), L('⑦ 환산산출세액', won(convTax)),
         L('⑧ 퇴직소득 산출세액(연분연승)', won(calcTax2)), L('⑨ 지방소득세', won(localTax2)), L('⑩ 퇴직소득세 총부담액', won(total2), 'big'),
       ],

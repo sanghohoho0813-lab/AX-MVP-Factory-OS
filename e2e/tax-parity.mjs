@@ -46,7 +46,9 @@ const PLAN = [
 /** 값을 바꾼 두 번째 벌 — 각 계산기의 가지를 다르게 태운다 (줄 목록 입력은 건드리지 않는다) */
 const VARIANT = {
   t2: { s_monthly: '3500000' },
-  t6: { q_pay: '250000000', q_corptax_base: '150000000', r_start: '2021-06-01', r_end: '2026-09-01', t_start: '2019-01-15', t_end: '2026-03-31', t_amount: '90000000' },
+  // D-225: 임원 퇴직 한도(r_)는 원본과 다르게 고친 곳 하나 — 2020년 뒤 취임이면 원본은 2020년 1월부터 세어 한도가 부푼다.
+  //        원본과 같아야 하는 2019년 전 취임으로 대조하고, 2020년 뒤 취임은 단위 시험(test:taxplan D-225)이 바른 값을 지킨다
+  t6: { q_pay: '250000000', q_corptax_base: '150000000', r_start: '2016-06-01', r_end: '2026-09-01', t_start: '2019-01-15', t_end: '2026-03-31', t_amount: '90000000' },
   t9: { inc_a_transferPrice: '60000', inc_a_isMajor: '소액주주', inc_a_basicDed: '여', inc_a_salary: '150000000', inc_b_dividend: '15000000', inc_b_under1yr: '1년미만', inc_b_isSme: '비중소기업' },
   t5: { j_price: '1200000000', j_rel: '특수관계없는자(타인)', j_major: '대주주 외(소액주주)', k_rel1: '배우자', k_prior2: '0' },
   t7: { w1_principal: '800000000', w2_amount: '50000000', w3_amount: '900000000', w4_ratio: '15' },

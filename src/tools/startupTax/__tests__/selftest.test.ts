@@ -894,6 +894,22 @@ const CASES: Expect[] = [
     form: mkForm({ birthDate: '1995-06-01', startupDate: '2026-02-01' }),
     expect: (r) => [r.savingsLevel.level !== 'A', `level=${r.savingsLevel.level}`],
   },
+  // ---- D-225 지방세 창업감면은 창업 후 4년 안 취득만 — 업력을 보지 않아 오래된 업체도 '가능성 높음' 이었다 ----
+  {
+    name: '[D-225] 2015년 창업 · 비과밀 · 제조 → 취득세 good 아님 · 재산세 bad(4년 + 감면 기간 지남)',
+    form: mkForm({ startupDate: '2015-03-01', birthDate: '1980-06-01' }),
+    expect: (r) => [item(r, 'acquisitionTax') !== 'good' && item(r, 'propertyTax') === 'bad' && r.coreItems.some((i) => i.reasons.some((x) => x.includes('창업 후 4년 안'))), `acq=${item(r, 'acquisitionTax')} prop=${item(r, 'propertyTax')}`],
+  },
+  {
+    name: '[D-225] 2021년 창업(5년 남짓) → 취득세 · 재산세 모두 good 아님(주의) · 까닭에 산 날 확인',
+    form: mkForm({ startupDate: '2021-03-01', birthDate: '1980-06-01' }),
+    expect: (r) => [item(r, 'acquisitionTax') === 'caution' && item(r, 'propertyTax') === 'caution', `acq=${item(r, 'acquisitionTax')} prop=${item(r, 'propertyTax')}`],
+  },
+  {
+    name: '[D-225] 2024년 창업(2년 남짓) → 업력으로는 내리지 않음(취득세 · 재산세 good 그대로)',
+    form: mkForm({ startupDate: '2024-01-01', birthDate: '1980-06-01' }),
+    expect: (r) => [item(r, 'acquisitionTax') === 'good' && item(r, 'propertyTax') === 'good', `acq=${item(r, 'acquisitionTax')} prop=${item(r, 'propertyTax')}`],
+  },
   {
     name: '요약문: ★ 세무사 확인 필요 건수가 들어간다',
     form: mkForm({ industry: 'wholesale_retail', birthDate: '1995-06-01' }),

@@ -9,9 +9,9 @@
  *  - 규칙 계산이다. 외부 호출 없음. 'AI' 라고 부르지 않는다. 결과는 참고용 — 실행 전 세무사 검토.
  */
 
-import { calculatorOf, computeSalary, defaultValues, unlistedShareValuation, type Output, type UnlistedShareResult } from './taxCalc'
-import { parseWonInput } from './customerFacts'
+import { calculatorOf, computeSalary, defaultValues, koreanWon, unlistedShareValuation, type Output, type UnlistedShareResult } from './taxCalc'
 import type { ClientOpsRecord, ShareholderRelation, ShareholderRow } from '../types/clientOps'
+import { josa } from '../lib/josa'
 
 /* ------------------------------------------------------------------ */
 /* 현황 — 업체 기록 taxProfile(글자) ↔ 계산용 숫자                        */
@@ -94,12 +94,12 @@ export const ASSUMPTIONS = {
 /** '1억 2천만' · '120,000,000' · '1.2억' · '300백만' → 원. 못 읽으면 0 */
 export function wonOf(text: string | undefined): number {
   if (!text) return 0
-  const t = text
-    .replace(/(\d+(?:\.\d+)?)\s*백만/g, (_, n: string) => `${Number(n) * 100}만`)
-    // '1억 5천' 은 말로는 1억 5천만 — 억 뒤의 '천' 만 천만으로 읽는다(그냥 '5천' 은 5천원인지 5천만원인지 몰라 읽지 않는다 — 칸 아래 '읽지 못했습니다')
-    .replace(/억\s*(\d+)\s*천(?!만)/g, (_, n: string) => `억${n}천만`)
-  const v = parseWonInput(t)
-  return v !== null && Number.isFinite(v) ? v : 0
+  // 그냥 '5천' 은 5천원인지 5천만원인지 몰라 읽지 않는다 — 칸 아래 '읽지 못했습니다'
+  const t = text.replace(/[\s,]/g, '')
+  if (!/[조억만]/.test(t) && /[천백십]/.test(t)) return 0
+  // D-225: 계산기 9종과 같은 읽기 한 벌(koreanWon) — '1억 5천' = 1억 5천만 · '1천5백만' · '△2억' 도
+  const v = koreanWon(t)
+  return v !== null && Number.isFinite(v) ? Math.round(v) : 0
 }
 
 const COUNT_UNIT: Record<string, number> = { 억: 100_000_000, 만: 10_000, 천: 1_000 }
@@ -846,7 +846,7 @@ function retireRoute(c: Ctx, target: number): CashRoute {
     key: 'retire',
     label: '퇴직금(퇴임 때)',
     ok: !overLimit,
-    reason: overLimit ? `임원 퇴직금 한도 ${fmt(limit)}를 넘습니다 — 넘는 부분은 근로소득으로 과세됩니다.` : '',
+    reason: overLimit ? `임원 퇴직금 한도 ${josa(fmt(limit), '을/를')} 넘습니다 — 넘는 부분은 근로소득으로 과세됩니다.` : '',
     companyOut: R,
     personalTax: r.retireTax,
     corpSaving: R * c.p.corpRate,

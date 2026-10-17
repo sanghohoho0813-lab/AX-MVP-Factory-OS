@@ -19,6 +19,7 @@ import { MAINBIZ_CHECK } from '../mainbiz/mainbizCheck'
 import { isoConsultSummary } from '../iso/isoAdvice'
 import { certContextOf, heldCertifications, industryGroupOf, normalizeCertProfile } from '../integration/clientContext'
 import { normalizeClientOps } from '../../services/clientOpsService'
+import { withFactValue } from '../../services/customerFacts'
 import { completionProblems, emptyLifecycle, normalizeLifecycle, validUntilByYears, withCertStatus, withCompletion } from '../core/lifecycle'
 import { renewalDeadlines, renewalPlan } from '../core/renewal'
 import { nextAfterCertified } from '../core/nextAfter'
@@ -747,6 +748,15 @@ check('어댑터: 설정 읽기 — 이상한 값은 모름', JSON.stringify(nor
   const files = import.meta.glob(['../core/*.ts', '../rules/*.ts', '../innobiz/*.ts', '../mainbiz/*.ts', '../iso/*.ts'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>
   const bad = Object.entries(files).filter(([, src]) => /from\s+'\.\.\/\.\.\//.test(src)).map(([f]) => f)
   check(`Core 독립: ${Object.keys(files).length}개 파일이 OS 를 import 하지 않는다`, Object.keys(files).length >= 14 && bad.length === 0, bad)
+}
+
+/* ---- D-225 특허 건수 읽기 — '10건' 안의 '0건' 에 걸려 0건이 되던 것 ---- */
+{
+  const base = normalizeClientOps({ id: 'p225', companyName: '특허많은', businessType: 'corporation' } as never)
+  const withPat = (v: string) => certContextOf(withFactValue(base, 'patents', v, { source: 'manual', status: 'confirmed', asOf: '2026-10-01', now: '2026-10-01T00:00:00Z' }), TODAY).patents
+  check('D-225 특허 10건 → 10(예전 0)', withPat('특허 10건') === 10, withPat('특허 10건'))
+  check('D-225 등록 20 건 → 20 · 30건 → 30', withPat('등록 20 건') === 20 && withPat('30건') === 30, [withPat('등록 20 건'), withPat('30건')])
+  check('D-225 0건 · 없음 → 0', withPat('0건') === 0 && withPat('없음') === 0, [withPat('0건'), withPat('없음')])
 }
 
 console.log(`\ncert: ${pass} passed, ${fail} failed`)

@@ -139,8 +139,9 @@ function patentsOf(record: ClientOpsRecord): number | null {
   const t = usableFactValue(record, 'patents')
   const credPatents = (record.customFields ?? []).filter((f) => f.group === 'credential' && /특허/.test(f.label)).length
   if (!t) return credPatents > 0 ? credPatents : null
-  if (/없음|0\s*건/.test(t)) return credPatents
+  // D-225: 숫자를 먼저 읽는다 — 예전 /0\s*건/ 은 '10건' · '20건' 안의 '0건' 에 걸려 특허 10건을 0건으로 셌다
   const n = /(\d+)\s*건/.exec(t)
+  if ((n && Number(n[1]) === 0) || (!n && /없음|없다|미보유/.test(t))) return credPatents
   return Math.max(n ? Number(n[1]) : t.split(/[,·/\n]/).filter((x) => x.trim()).length, credPatents)
 }
 

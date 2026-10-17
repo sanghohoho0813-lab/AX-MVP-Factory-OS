@@ -18,6 +18,7 @@ import { sharedToolKey } from '../../tools/shared/toolStorage'
 import { listClients, saveClient, withToolResult } from '../../services/clientOpsService'
 import { generateId } from '../../storage/localStore'
 import { formatWon } from '../../services/customerFacts'
+import { josa } from '../../lib/josa'
 import { computeSalary } from '../../services/taxCalc'
 import {
   CORP_BAND_OPTIONS,
@@ -331,6 +332,16 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
     try {
       const fresh = (await listClients(workspaceId)).find((c) => c.id === clientId)
       if (!fresh) throw new Error('업체를 찾지 못했습니다.')
+      // D-225 화면을 열 때 업체 기록을 못 읽었으면(채우기 전) 저장된 주주명부 · 현황을 빈 칸 · 옛 초안으로 덮지 않는다 —
+      // 지금 읽은 기록을 화면에 넣어(위 효과가 채우거나 '바뀌었습니다' 안내) 확인한 뒤 다시 누르게
+      if (!seeded.current) {
+        const recSnap = snapOf(fresh.taxProfile ?? {}, fresh.shareholderRegister ?? [])
+        if (recSnap !== snapOf({}, []) && recSnap !== snapOf(st.profile, st.register)) {
+          replaceClient(fresh)
+          showToast('업체 기록을 이제 읽었습니다 — 저장된 주주명부 · 절세 현황이 있어 덮지 않았습니다. 화면을 확인한 뒤 다시 저장해 주세요.')
+          return
+        }
+      }
       const profile = Object.fromEntries(Object.entries(st.profile).filter(([, v]) => typeof v === 'string' && v.trim() !== '')) as Record<string, string>
       let next = { ...fresh, taxProfile: profile, shareholderRegister: st.register }
       const parts = summaryParts()
@@ -349,7 +360,7 @@ export function TaxPlanner({ onOpenCalc }: { onOpenCalc: (open: CalcOpen) => voi
       replaceClient(saved)
       setSt((cur) => ({ ...cur, base: snapOf(saved.taxProfile ?? {}, saved.shareholderRegister ?? []) }))
       setRecordChanged(false)
-      showToast(`${saved.companyName} 기록에 주주명부 · 절세 현황${parts.length > 0 ? ' · 결과' : ''}를 저장했습니다.`)
+      showToast(`${saved.companyName} 기록에 주주명부 · 절세 현황${parts.length > 0 ? ' · 결과를' : '을'} 저장했습니다.`)
     } catch (cause) {
       showToast(cause instanceof Error ? cause.message : '저장하지 못했습니다 — 적은 것은 이 브라우저에 남아 있습니다.')
     } finally {
@@ -1453,11 +1464,11 @@ function ProofBadge({ proof, outside }: { proof?: Proof | null; outside?: string
     <span className="flex flex-wrap items-center gap-1.5" data-proof={res ? (res.ok ? 'ok' : 'bad') : 'none'}>
       {res && res.ok && (
         <span className="t-meta inline-flex items-center gap-1 rounded-full border border-success-200 bg-success-50 px-2 py-0.5 font-semibold text-success-700">
-          ✓ 계산기 {calcNo(proof!.calc)}과 같은 숫자
+          ✓ 계산기 {josa(calcNo(proof!.calc), '과/와')} 같은 숫자
         </span>
       )}
       {res && !res.ok && (
-        <span className="t-meta rounded-full border border-danger-300 bg-danger-50 px-2 py-0.5 font-bold text-danger-800">⚠ 계산기 {calcNo(proof!.calc)}과 다름 — 세무사 확인</span>
+        <span className="t-meta rounded-full border border-danger-300 bg-danger-50 px-2 py-0.5 font-bold text-danger-800">⚠ 계산기 {josa(calcNo(proof!.calc), '과/와')} 다름 — 세무사 확인</span>
       )}
       {outside && <span className="t-meta rounded-(--radius-control) border border-amber-300 bg-amber-50 px-2 py-0.5 font-semibold break-keep text-amber-900">★ {outside}</span>}
     </span>
@@ -1630,7 +1641,7 @@ function SplitBox({ open, onToggle, split }: { open: boolean; onToggle: (v: bool
           <span className="flex flex-wrap items-center gap-1.5" data-proof={proofs.length === 0 ? 'none' : bad === 0 ? 'ok' : 'bad'}>
             {proofs.length > 0 && bad === 0 && (
               <span className="t-meta inline-flex items-center gap-1 rounded-full border border-success-200 bg-success-50 px-2 py-0.5 font-semibold text-success-700">
-                ✓ 해마다 계산기 {calcs}과 같은 숫자({proofs.length}번 맞춰 봄)
+                ✓ 해마다 계산기 {josa(calcs, '과/와')} 같은 숫자({proofs.length}번 맞춰 봄)
               </span>
             )}
             {bad > 0 && <span className="t-meta rounded-full border border-danger-300 bg-danger-50 px-2 py-0.5 font-bold text-danger-800">⚠ 계산기와 다른 해 {bad}개 — 세무사 확인</span>}

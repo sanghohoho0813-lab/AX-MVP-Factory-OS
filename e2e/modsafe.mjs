@@ -10,6 +10,8 @@
  *            지원금을 바꾸면 회차가 새 지원금 것으로
  *            이름에 태그가 있어도 내부 보고서에서 글자로만 보임
  *  390      위 화면들이 가로로 넘치지 않음
+ *  D-225    세금 계산기 '1억2천만' · '3억5천' 읽기 · 2020년 뒤 취임 임원 퇴직 한도(29개월) · 크레탑 추출기 글 바꾸면 끈 줄 풀림 ·
+ *           크레탑 이력 ✕ 한 번 더 묻기 · 기업인증 저장 실패 알림
  *
  *   node e2e/modsafe.mjs http://localhost:4390    (SHOTS=폴더 면 스크린샷)
  */
@@ -296,6 +298,94 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('D-224 고용: 보고서를 만들어도 화면에서 태그가 실행되지 않는다', (await page.evaluate(() => window.__xss)) === undefined)
 
   check('오류 없이 끝남', errors.length === 0, errors.join(' | ').slice(0, 300))
+  await ctx.close()
+}
+
+/* ---------------- D-225 창업감면 · 크레탑 · 기업인증 · 절세 ---------------- */
+{
+  const SEBANG = [
+    '기업명 세방형(주)', '요약 손익계산서 단위:백만원', '구분 2023 2024 2025', '매출액 6000 6200 6397', '영업이익 90 95 104', '당기순이익 150 180 202',
+    '요약 재무상태표 단위:백만원', '구분 2023 2024 2025', '자산총계 12000 11500 11000', '부채총계 9800 10100 8740', '자본총계 2200 1400 1000', '유동자산 3000 2900 2801', '유동부채 9500 9800 10000',
+  ].join('\n')
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+
+  // 세금 계산기 — 사람이 적는 금액 · 2020년 뒤 취임 임원의 퇴직 한도
+  await page.goto(BASE + '/tools/tax?c=t6&s=p2', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+  await page.locator('#r_start').fill('2024-06-01')
+  await page.locator('#r_end').fill('2026-10-17')
+  await page.locator('#r_avg2').fill('1억2천만')
+  await page.locator('#r_avg2').blur()
+  await page.locator('#r_avg3').fill('3억5천')
+  await page.locator('#r_avg3').blur()
+  await page.waitForTimeout(400)
+  const avg2 = await page.locator('#r_avg2').inputValue()
+  const avg3 = await page.locator('#r_avg3').inputValue()
+  check('D-225 계산기 금액 칸: 1억2천만 → 120,000,000 · 3억5천 → 350,000,000', avg2 === '120,000,000' && avg3 === '350,000,000', `${avg2} / ${avg3}`)
+  const rOut = await page.locator('[data-block="r_out"]').innerText().catch(() => '')
+  check('D-225 임원 퇴직 한도: 2024-06 취임 → 2020년 이후 29개월 · 정관 한도 58,000,000원', rOut.includes('29개월') && rOut.includes('58,000,000원'), rOut.replace(/\n/g, ' ').slice(0, 220))
+  await page.locator('[data-block="r_out"]').scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {})
+  await shot(page, '10-tax-retire-limit')
+
+  // 크레탑 숫자 추출기 — 글을 바꾸면 끈 줄이 풀린다(새 보고서의 같은 자리 줄이 말없이 빠지지 않게)
+  await page.goto(BASE + '/tools/cretop/extractor', { waitUntil: 'networkidle' })
+  await page.getByTestId('cretop-extract-sample').click()
+  await page.waitForTimeout(300)
+  const box1 = page.getByTestId('cretop-extract-rows').locator('input[type="checkbox"]').first()
+  const wasOn = await box1.isChecked().catch(() => false)
+  await box1.click().catch(() => {})
+  await page.waitForTimeout(150)
+  const offNow = !(await box1.isChecked().catch(() => true))
+  const area = page.getByLabel('크레탑 표 붙여넣기')
+  await area.fill((await area.inputValue()) + '\n')
+  await page.waitForTimeout(300)
+  check('D-225 크레탑 추출기: 줄을 끈 뒤 글을 바꾸면 다시 켜짐(예전: 꺼진 채 CSV 에서 빠짐)', wasOn && offNow && (await box1.isChecked().catch(() => false)), JSON.stringify({ wasOn, offNow }))
+
+  // 크레탑 이력 ✕ — 한 번 더 묻고, 취소면 그대로
+  await page.goto(BASE + '/tools/cretop', { waitUntil: 'networkidle' })
+  await page.getByRole('button', { name: '텍스트 붙여넣기' }).click()
+  await page.getByLabel('크레탑 원문').fill(SEBANG)
+  await page.getByTestId('cretop-run').click()
+  await page.waitForTimeout(900)
+  await page.getByTestId('cretop-mini-menu').click()
+  await page.waitForTimeout(400)
+  const histText = () => page.getByTestId('cretop-mini-history').innerText().catch(() => '')
+  const del = page.locator('[title="이력에서 지우기"]').first()
+  let asked = ''
+  page.once('dialog', (d) => {
+    asked = d.message()
+    void d.dismiss()
+  })
+  await del.click({ timeout: 3000 }).catch(() => {})
+  await page.waitForTimeout(500)
+  check('D-225 크레탑 이력 ✕: 한 번 더 묻고 [취소] 면 그대로(예전: 바로 지워짐)', asked.includes('지울까요') && (await histText()).includes('세방형'), asked || '묻지 않음')
+  page.removeAllListeners('dialog')
+  page.once('dialog', (d) => void d.accept())
+  await del.click({ timeout: 3000 }).catch(() => {})
+  await page.waitForTimeout(600)
+  check('D-225 크레탑 이력 ✕ → [확인] 이면 지워짐', !(await histText()).includes('세방형'))
+  page.removeAllListeners('dialog')
+
+  // 기업인증 — 저장이 안 되면 알린다(예전: 실패를 삼키고 '✓ 확인했습니다' 만)
+  await page.goto(BASE + '/tools/cert-os?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  await blockWrites(page, 'cert-os')
+  if (await page.getByTestId('cert-cta').count()) await page.getByTestId('cert-cta').first().click().catch(() => {})
+  if (!(await page.getByTestId('cert-stepper').count())) await page.getByTestId('cert-ask-open').click({ timeout: 3000 }).catch(() => {})
+  await page.waitForTimeout(300)
+  await page.locator('[data-testid^="cert-q-"]').first().click({ timeout: 3000 }).catch(() => {})
+  await page.waitForTimeout(800)
+  const certBody = await page.locator('body').innerText()
+  check('D-225 기업인증: 저장이 막히면 \'저장하지 못했습니다\' 안내', certBody.includes('저장하지 못했습니다'), certBody.match(/저장[^\n]{0,40}/)?.[0] ?? '안내 없음')
+  await shot(page, '11-cert-save-failed')
+  await unblockWrites(page)
+
+  check('D-225 화면 오류 0', errors.length === 0, errors.join(' | ').slice(0, 300))
   await ctx.close()
 }
 

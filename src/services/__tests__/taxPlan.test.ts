@@ -7,7 +7,7 @@
  */
 
 import { normalizeClientOps } from '../clientOpsService'
-import { calculatorOf, cleanNum, computeSalary, defaultValues, inheritGiftTax, unlistedShareValuation } from '../taxCalc'
+import { calculatorOf, cleanNum, computeSalary, defaultValues, inheritGiftTax, koreanWon, pct, unlistedShareValuation } from '../taxCalc'
 import {
   ASSUMPTIONS,
   calcDefault,
@@ -404,6 +404,45 @@ if (process.env.SHOW) {
   check('D-165 퇴직급여(02): 끝나는 날 = 오늘 · 최근 3년 연 급여 = 월 급여 × 12', pf6.values.r_end === '2026-09-28' && pf6.values.t_end === '2026-09-28' && pf6.values.r_avg1 === String(8e6 * 12) && pf6.values.r_avg3 === String(8e6 * 12), pf6.values)
   const pf6none = calcPrefill('t6', { companyName: '가', taxProfile: {}, shareholderRegister: [] }, '2026-09-28')
   check('D-165 퇴직급여(02): 취임일 · 급여를 모르면 끝나는 날도 채우지 않는다', pf6none.values.r_end === undefined && pf6none.values.r_avg1 === undefined)
+}
+
+/* ---- D-225 점검 고침 ---- */
+{
+  // 금액 읽기 한 벌 — 예전 계산기 칸: '3억5천' → 3 · '5백만' → 5 · '1억2천3백만' → 1 · '△2억' → 0
+  const cases: [string, number][] = [
+    ['3억5천', 3.5e8], ['3억 5천', 3.5e8], ['5백만', 5e6], ['1억2천3백만', 1.23e8], ['1천5백만', 1.5e7],
+    ['△250,000,000', -2.5e8], ['(1,234)', -1234], ['-3억', -3e8], ['1.2억', 1.2e8], ['300백만', 3e8], ['120,000,000원', 1.2e8], ['8000만', 8e7],
+  ]
+  const bad = cases.filter(([t, want]) => cleanNum(t) !== want).map(([t, want]) => `${t}: ${cleanNum(t)} ≠ ${want}`)
+  check('D-225 계산기 금액 읽기: 3억5천 · 5백만 · 1억2천3백만 · 1천5백만 · △ · (괄호) 음수', bad.length === 0, bad)
+  check('D-225 계산기 금액 읽기: 그냥 숫자 · 비율은 그대로(9.9 · 12.5% · 빈 칸 0)', cleanNum('9.9') === 9.9 && cleanNum('12.5%') === 12.5 && cleanNum('') === 0 && cleanNum('abc') === 0)
+  check('D-225 절세 설계 금액 칸도 같은 읽기: 1천5백만 · △2억 · 그냥 5천은 모름(0)', wonOf('1천5백만') === 1.5e7 && wonOf('△2억') === -2e8 && wonOf('5천') === 0 && wonOf('1억 5천') === 1.5e8)
+  check('D-225 koreanWon: 못 읽는 글은 null', koreanWon('일억') === null && koreanWon('') === null && koreanWon('억억') === null)
+
+  // 임원 퇴직금 한도 — 2020년 뒤 취임이면 취임한 달부터 센다(원본은 늘 2020년 1월부터 → 82개월)
+  const t6 = calculatorOf('t6')!
+  const p2 = t6.subs.find((x) => x.key === 'p2')!
+  const run6 = (start: string, end: string) => p2.compute({ ...defaultValues(t6), r_start: start, r_end: end, r_avg1: '120000000', r_avg2: '120000000', r_avg3: '120000000', r_mult_post: '2' })
+  const lineOf = (o: ReturnType<typeof run6>, k: string) => o.blocks[0].lines.find((l) => l.k === k)?.v
+  const late = run6('2024-06-01', '2026-10-17')
+  check('D-225 퇴직 한도: 2024-06 취임 → 2020년 이후 29개월(예전 82개월)', lineOf(late, '근속월수 (2020.1.1~)') === '29개월', lineOf(late, '근속월수 (2020.1.1~)'))
+  check('D-225 퇴직 한도: 2024-06 취임 · 연 1.2억 · 2배 → 58,000,000원(예전 164,000,000원)', lineOf(late, '정관 규정 있을 시 퇴직소득한도') === '58,000,000원', lineOf(late, '정관 규정 있을 시 퇴직소득한도'))
+  const early = run6('2015-03-01', '2026-10-17')
+  check('D-225 퇴직 한도: 2019년 전 취임은 그대로(2020-01 ~ 2026-10 = 82개월 · 원본과 같음)', lineOf(early, '근속월수 (2020.1.1~)') === '82개월', lineOf(early, '근속월수 (2020.1.1~)'))
+  const empty = run6('', '')
+  check('D-225 퇴직 한도: 날짜를 비우면 NaN 대신 0개월', !JSON.stringify(empty).includes('NaN'), lineOf(empty, '근속월수 (~2019.12.31)'))
+  check('D-225 비율: 급여 0 → Infinity% 대신 -', pct(Infinity) === '-' && pct(-Infinity) === '-' && pct(0.123) === '12.3%')
+  const t6p1 = t6.subs.find((x) => x.key === 'p1')!
+  check('D-225 급여 0 이면 부담률 줄에 Infinity 없음', !JSON.stringify(t6p1.compute({ ...defaultValues(t6), q_pay: '0', q_corptax_base: '0' })).includes('Infinity'))
+  const t6p3 = t6.subs.find((x) => x.key === 'p3')!
+  check('D-225 퇴직소득세: 날짜를 비우면 NaN년 대신 -', !JSON.stringify(t6p3.compute({ ...defaultValues(t6), t_start: '', t_end: '' })).includes('NaN년'))
+
+  // 절세 설계도 같은 한도 — 젊은 회사 대표의 한도가 부풀지 않는다
+  const young = viewProfile({ ...raw, monthlySalary: '1000만', ceoStartDate: '2024-06-01' })
+  const rYoung = retirePlan(young, '2026-10-17')
+  check('D-225 절세 설계 퇴직금: 2024-06 취임 · 월 1천만 → 한도 58,000,000원', rYoung.ok && Math.round(rYoung.limit) === 58000000, rYoung.limit)
+  const over = cashPlan(young, reg, shareValueOf(young, reg), 1e8, '2026-10-17').routes.find((r) => r.key === 'retire')
+  check('D-225 퇴직금으로 1억 가져오기: 한도를 넘는다고 알림 · 조사 \'을\'', !!over && !over.ok && over.reason.includes('58,000,000원을 넘습니다'), over?.reason)
 }
 
 console.log(`\ntax-plan: ${pass} passed, ${fail} failed`)

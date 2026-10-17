@@ -297,6 +297,27 @@ function applyLocalIndustry(verdict: Verdict, reasons: string[], form: FormData)
   return verdict
 }
 
+/**
+ * D-225 지방세 창업감면(지특법 §58의3)은 창업일부터 4년 안에 취득한 사업용 재산만 본다 — 업력을 보지 않아
+ *   2015년 창업 업체도 취득세 · 재산세가 '가능성 높음' 으로 나왔다. 업력이 4년을 넘으면 '가능성 높음' 을 내리고 까닭을 적는다.
+ *   재산세는 감면이 취득 뒤 몇 해 이어지므로 4년 + 5년(9년)을 넘으면 '어려움'.
+ */
+function applyLocalAge(verdict: Verdict, reasons: string[], facts: Facts, kind: 'acquisition' | 'property'): Verdict {
+  const age = facts.lineage.businessAgeYears
+  if (age === null || age <= 4) return verdict
+  const years = Math.floor(age)
+  if (kind === 'acquisition') {
+    reasons.push(`창업한 지 ${years}년이 지나 지금 사는 부동산은 취득세 창업감면(창업 후 4년 안 취득) 대상이 아닙니다 — 4년 안에 산 것은 그때 신고했는지 ★확인`)
+    return worstOf(verdict, 'caution')
+  }
+  if (age > 9) {
+    reasons.push(`창업한 지 ${years}년이 지나 재산세 창업감면 기간(창업 후 4년 안 취득 · 그 뒤 감면 기간)이 끝났을 가능성이 높습니다.`)
+    return worstOf(verdict, 'bad')
+  }
+  reasons.push(`창업한 지 ${years}년이 지나 창업 후 4년 안에 산 사업용 부동산만 재산세 감면이 남아 있을 수 있습니다 — 산 날 ★확인`)
+  return worstOf(verdict, 'caution')
+}
+
 // ---------------------------------------------------------------------------
 // D. 취득세 감면
 // ---------------------------------------------------------------------------
@@ -343,6 +364,7 @@ function judgeAcquisitionTax(form: FormData, recognition: Verdict, facts: Facts)
   }
 
   verdict = applyLocalIndustry(verdict, reasons, form)
+  verdict = applyLocalAge(verdict, reasons, facts, 'acquisition')
   verdict = applyInputCaps(verdict, reasons, facts)
 
   return { key: 'acquisitionTax', title: '취득세 감면', verdict, reasons, checkPoints, consultScript }
@@ -392,6 +414,7 @@ function judgePropertyTax(form: FormData, recognition: Verdict, facts: Facts): I
   }
 
   verdict = applyLocalIndustry(verdict, reasons, form)
+  verdict = applyLocalAge(verdict, reasons, facts, 'property')
   verdict = applyInputCaps(verdict, reasons, facts)
 
   return { key: 'propertyTax', title: '재산세 감면', verdict, reasons, checkPoints, consultScript }

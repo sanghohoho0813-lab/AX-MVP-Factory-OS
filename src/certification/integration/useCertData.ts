@@ -169,6 +169,11 @@ export function useCertData() {
     return run
   }, [])
   const loaded = profiles.rows !== null && works.rows !== null && lifeRows.rows !== null
+  /** D-225 모듈 기록을 못 읽었으면 그 까닭 — 화면이 '읽는 중…' 에서 멈추지 않고 [다시 읽기] 를 보인다 */
+  const loadError = loaded ? null : (profiles.error ?? works.error ?? lifeRows.error)
+  const reloadAll = useCallback(async () => {
+    await Promise.all([profiles.error || profiles.rows === null ? profiles.reload() : null, works.error || works.rows === null ? works.reload() : null, lifeRows.error || lifeRows.rows === null ? lifeRows.reload() : null])
+  }, [profiles, works, lifeRows])
 
   const saveProfile = useCallback(
     async (patch: Partial<CertProfile>) => {
@@ -327,6 +332,8 @@ export function useCertData() {
     clientName,
     clientRecord,
     loaded,
+    loadError,
+    reloadAll,
     profile,
     lab,
     lives,

@@ -21,6 +21,9 @@ export interface BucketRow<T> {
 export interface BucketStore<T> {
   /** 아직 못 읽었으면 null */
   rows: BucketRow<T>[] | null
+  /** D-225 읽지 못했으면 그 까닭 — 예전에는 rows 가 null 로 남아 화면이 '읽는 중…' 에서 멈췄다 */
+  error: string | null
+  /** 다시 읽기(실패해도 던지지 않고 error 에 남긴다) */
   reload: () => Promise<void>
   save: (input: { id?: string; clientId?: string; data: T }) => Promise<BucketRow<T>>
   remove: (id: string) => Promise<void>
@@ -29,17 +32,29 @@ export interface BucketStore<T> {
 export function useModuleBucket<T extends Record<string, unknown>>(moduleKey: string, bucket: string): BucketStore<T> {
   const { workspaceId } = useToolClient()
   const [rows, setRows] = useState<BucketRow<T>[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const read = useCallback(async () => {
-    const list = await listRows(workspaceId, moduleKey, bucket)
-    setRows(list.map((r) => ({ id: r.id, clientId: r.clientId, data: r.data as T, updatedAt: r.updatedAt })))
+    setError(null)
+    try {
+      const list = await listRows(workspaceId, moduleKey, bucket)
+      setRows(list.map((r) => ({ id: r.id, clientId: r.clientId, data: r.data as T, updatedAt: r.updatedAt })))
+    } catch (e) {
+      setError(e instanceof Error && e.message ? e.message : '기록을 읽지 못했습니다')
+    }
   }, [workspaceId, moduleKey, bucket])
 
   useEffect(() => {
     let alive = true
-    void listRows(workspaceId, moduleKey, bucket).then((list) => {
-      if (alive) setRows(list.map((r) => ({ id: r.id, clientId: r.clientId, data: r.data as T, updatedAt: r.updatedAt })))
-    })
+    setError(null)
+    listRows(workspaceId, moduleKey, bucket).then(
+      (list) => {
+        if (alive) setRows(list.map((r) => ({ id: r.id, clientId: r.clientId, data: r.data as T, updatedAt: r.updatedAt })))
+      },
+      (e: unknown) => {
+        if (alive) setError(e instanceof Error && e.message ? e.message : '기록을 읽지 못했습니다')
+      },
+    )
     return () => {
       alive = false
     }
@@ -70,5 +85,5 @@ export function useModuleBucket<T extends Record<string, unknown>>(moduleKey: st
     [workspaceId, moduleKey, bucket],
   )
 
-  return { rows, reload: read, save, remove }
+  return { rows, error, reload: read, save, remove }
 }

@@ -9,7 +9,7 @@
  * 마이그레이션이 없다: 결과는 업체 레코드의 payload 에 들어간다.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Building2, CalendarPlus, Check, Paperclip, Search } from 'lucide-react'
 import { useToast } from '../../components/ui/toastContext'
@@ -123,8 +123,22 @@ export function ToolResultAttach(props: ToolResultAttachProps) {
 
   const [mismatch, setMismatch] = useState<{ target: ClientOpsRecord; alsoPublish: boolean } | null>(null)
 
-  /** 실제로 붙이는 일 — 시트에서 고른 업체든, 주소로 물고 온 업체든 같은 길을 쓴다 */
+  /** D-225 두 번 눌러도 한 번만 — 예전에는 업체 목록을 새로 읽는 동안 단추가 켜져 있어 결과가 두 줄 붙었다 */
+  const attaching = useRef(false)
   const attachTo = async (targetId: string, alsoPublish: boolean, confirmed = false) => {
+    if (attaching.current) return
+    attaching.current = true
+    setBusy(true)
+    try {
+      await attachOnce(targetId, alsoPublish, confirmed)
+    } finally {
+      attaching.current = false
+      setBusy(false)
+    }
+  }
+
+  /** 실제로 붙이는 일 — 시트에서 고른 업체든, 주소로 물고 온 업체든 같은 길을 쓴다 */
+  const attachOnce = async (targetId: string, alsoPublish: boolean, confirmed = false) => {
     // D-165: 늘 지금 기록을 다시 읽는다 — 시트를 처음 열 때 받아 둔 목록으로 저장하면 그 뒤에 붙인 결과 · 할 일이 지워졌다
     // D-211: loadClients 는 틀이 한 번 읽어 둔 목록이라(캐시) 그 사이 '업체 정보로' 보낸 값 · 다른 기기에서 고친 것을 덮었다 — 저장 직전에 새로 읽는다
     const list = await listClients(workspaceId).catch(() => loadClients())

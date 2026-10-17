@@ -1512,7 +1512,7 @@ function Sidebar({ history, onClose, onOpen, onNew, onDelete }) {
                     <div style={{ fontSize: "calc(13px * var(--fs,1))", fontWeight: 800, color: T.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{h.company}{h.clientName ? <span style={{ color: T.teal, fontWeight: 700 }}> · {h.clientName}</span> : null}</div>
                     <div style={{ fontSize: "calc(10.5px * var(--fs,1))", color: T.mute, marginTop: 2 }}>{(() => { try { return new Date(h.ts).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; } })()}</div>
                   </button>
-                  {onDelete ? <button onClick={() => onDelete(h)} title="이력에서 지우기" style={{ border: `1px solid ${T.line}`, borderRadius: 9, background: "#fff", color: T.mute, cursor: "pointer", padding: "0 10px", fontFamily: FF }}>✕</button> : null}
+                  {onDelete ? <button onClick={() => onDelete(h)} title="이력에서 지우기" aria-label={`${h.company} 이력에서 지우기`} data-testid="cretop-history-delete" style={{ border: `1px solid ${T.line}`, borderRadius: 9, background: "#fff", color: T.mute, cursor: "pointer", padding: "0 10px", fontFamily: FF }}>✕</button> : null}
                 </div>
               ))}
             </div>

@@ -7,6 +7,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { T, FF, card } from "./theme.js";
+import { sharedToolKey } from "../../shared/toolStorage";
 import { SV_EVENT, autoShares as autoSharesOf, bsWon, commas, netIncomeSlots, netIncomeYears, num, parseShares, pctText, svCompute, svDefaults, svLoad, svMerge, svSave, won } from "./stockValueCalc.js";
 
 const CORP_TYPES = ["일반법인", "부동산과다보유법인", "특수법인"];
@@ -91,7 +92,8 @@ export function StockValue({ ui }) {
       v_inc1: cond.inc1, v_month1: cond.month1, v_cap1: cond.cap1,
       v_inc2: cond.inc2, v_month2: cond.month2, v_cap2: cond.cap2,
     };
-    try { localStorage.setItem(TAX_STORE, JSON.stringify(v)); } catch { /* 못 넘겨도 계산기는 열린다 */ }
+    // D-225: 계산기는 작업공간마다 따로 기억한다(sharedToolKey) — 예전에는 공용 칸에 적어, 작업공간에서 09 를 한 번 쓴 뒤로는 옛 입력이 열렸다
+    try { localStorage.setItem(sharedToolKey(TAX_STORE), JSON.stringify(v)); } catch { /* 못 넘겨도 계산기는 열린다 */ }
     navigate("/tools/tax?c=t3");
   };
 
