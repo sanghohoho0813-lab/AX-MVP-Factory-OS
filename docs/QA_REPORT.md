@@ -3253,3 +3253,7 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
 - **단위 시험** — 고용 337(새: 보고서 글자 · 업체 찾기 5 · 기존 업체에 얹기 · 성별 빈 칸 2 · 빨강: 성별 'male') · 연구소 183(새: 저장 실패 세기 · 알림 · 메모리 유지 · 다시 저장) · 도구 430(새: 정책자금 저장 true/false · 실패해도 명단 유지 · 진단 문장 조사 — 빨강 3: undefined 2 · '이(가)' · '공단는').
 - **스크린샷 육안** — 정책자금 칸 바꿈 안내(결과 바로 위 노란 띠) · 저장 실패(빨간 글씨 · 단추 그대로) · 연구소 저장 실패 띠([지금 다시 저장]) · 연구노트 과제 만들기(세로로 쌓아 예시 글 안 잘림) · 휴대폰 390 정책자금 안내.
 - 확인하지 못한 것: 클라우드(Supabase)에서 실제 네트워크 끊김으로 저장 실패 — 저장 공간 가득 참으로 흉내 · 고용지원금 엑셀 가져오기 화면에서의 이름 맞추기(단위 시험만) · 연구소 예전(D-91) 기록 옮기기와 예시 데이터가 겹치는 경우.
+- **병합 전 게이트 46단계(HEAD 5b5c5f4 · 고친 파일 0) — 한 번에 46/46 녹색.** tsc · oxlint · build · test:all(mirae-os 866 · startup-tax 1,918,580 · tools 430 · employment 337 · labcare 183 · tax-plan 120 · cert 268 · grants 365 …) ·
+  simple 88 · studio 63 · board 170 · todos 44 · mobile 15 · tools 228 · tax 74 · shell 67 · modules 896 · sales 198 · journey 57 · easy 82 · steady 76 · flow 171 · real 188 · squeeze 0 · phone 174 · facts 24 · detail 316 · files 38 · folder 19 ·
+  taxplan 72 · scenarios 66 · site 117 · content 104 · ownerai 65 · calendar 21 · connect 36 · enroll 24 · planner 42 · contract 72 · grants 152 · money 41 · youtube 169 · radar 14 · session 14 · **matrix 516/516** · **modsafe 33/33** · db · pilot 241 · isolation 24 · cert 155.
+  게이트 도는 동안 다른 브라우저 시험을 같이 돌리지 않았다. main fast-forward 82043e5 → 5b5c5f4(D-223 · D-224).
