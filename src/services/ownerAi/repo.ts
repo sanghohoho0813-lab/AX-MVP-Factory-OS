@@ -11,11 +11,18 @@ import { getSupabaseClient } from '../../lib/supabase/client'
 import { announceStorageFull, isQuotaError, StorageFullError } from '../../storage/storageFull'
 import { normalizeContext } from './memory'
 import { CASE_RELATIONS, type AiRevision, type AiRun, type CaseRelation, type CompanyCase, type ContextSnapshot, type CurrentContext, type Evaluation } from './types'
-import { newId } from './caseUtil'
+import { caseClash, newId } from './caseUtil'
 
 export class OwnerAiSetupError extends Error {
   constructor() {
     super('AI 작업실 DB 설정이 필요합니다(0021).')
+  }
+}
+
+/** D-219: 같은 사업자번호 · 같은 고객으로 이미 열린 작업실이 있다(예전에는 '저장에 실패했습니다' 로만 보여 왜 막혔는지 몰랐다) */
+export class OwnerAiDuplicateError extends Error {
+  constructor() {
+    super('같은 사업자번호(또는 같은 고객)로 만든 작업실이 이미 있습니다 — AI 작업실 목록에서 열어 주세요.')
   }
 }
 
@@ -117,6 +124,9 @@ function localRepo(userId: string | null): OwnerAiRepo {
       const list = readList<CompanyCase>(K.cases)
       const next = normalizeCase({ ...c, updatedAt: nowIso() })
       const i = list.findIndex((x) => x.id === c.id)
+      // DB 와 같은 규칙 — 새로 만들거나 사업자번호 · 이은 고객 · 보관 해제가 바뀔 때만 본다(예전에 겹쳐 쌓인 것은 막지 않는다)
+      const prev = i >= 0 ? normalizeCase(list[i]) : null
+      if ((!prev || prev.bizNo !== next.bizNo || prev.clientId !== next.clientId || (!!prev.archivedAt && !next.archivedAt)) && caseClash(list.map(normalizeCase), next)) throw new OwnerAiDuplicateError()
       if (i >= 0) list[i] = next
       else list.push(next)
       writeList(K.cases, list)
@@ -275,7 +285,9 @@ function cloudRepo(workspaceId: string, userId: string): OwnerAiRepo {
       return rows[0] ? caseFromRow(rows[0]) : null
     },
     async saveCase(c) {
-      const rows = check<Row[]>(await db().from('company_cases').upsert(rowOfCase(c, c.workspaceId ?? workspaceId, userId)).select('*'))
+      const r = await db().from('company_cases').upsert(rowOfCase(c, c.workspaceId ?? workspaceId, userId)).select('*')
+      if ((r.error as { code?: string } | null)?.code === '23505') throw new OwnerAiDuplicateError()
+      const rows = check<Row[]>(r)
       return caseFromRow(rows[0])
     },
     async listSnapshots(caseId) {

@@ -5,6 +5,8 @@
  *  - PDF(인쇄 · 쪽마다 1280×720) · PNG(지금 페이지).
  */
 import { useMemo, useRef, useState } from 'react'
+import { DraftTextarea } from './parts/DraftTextarea'
+import { tidyLines } from './parts/draftLines'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft, Download, FileText, Plus, Printer, SpellCheck, Trash2, Wand2 } from 'lucide-react'
 import { applyFix, emptyPage, layoutPage, proofreadInput, proposalFrom, qaProposal, PAGE_H, PAGE_W, QA_LABEL, type Measure, type ProposalDoc, type ProposalPage, type QaIssue } from '../../services/ownerAi/proposal'
@@ -16,6 +18,7 @@ import { useToast } from '../../components/ui/toastContext'
 import { Badge, ScreenTitle, Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { ConfirmModal } from '../../components/ui/ConfirmModal'
+import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard'
 import { AiSetupBanner, OwnerAiGate, useAiSetup, useOwnerAiIdentity } from './shared'
 import { PrintSheet, STUDIO_FONT, downloadBlob, safeFileName, svgToPng, useStudioRun } from './studioShared'
 
@@ -102,6 +105,8 @@ function Studio() {
   const [exportAsk, setExportAsk] = useState<null | 'pdf' | 'png'>(null)
   const [delAsk, setDelAsk] = useState(false)
   const svgRef = useRef<SVGSVGElement>(null)
+  // D-219: 고친 글을 저장하지 않고 나가면 한 번 묻는다(작업실로 · 창 닫기) — 예전엔 말없이 사라졌다
+  const { blocker, allowNavigation } = useUnsavedChangesGuard(dirty && !saving)
 
   // 처음 한 번 — 마지막으로 고친 제안서(있으면) 또는 AI 결과
   if (state.kind === 'ready' && doc === null) {
@@ -145,10 +150,12 @@ function Studio() {
     if (proofing) return
     setProofing(true)
     try {
-      const { run } = await runSkill({ repo, bundle: state.bundle, skill: 'PROOFREAD', input: { task: proofreadInput(doc) }, requestId: newUuid(), today: todayLocalDate(), userId, materialIds: [] })
+      const { run } = await runSkill({ repo, bundle: state.bundle, skill: 'PROOFREAD', input: { task: proofreadInput(doc) }, requestId: newUuid(), today: todayLocalDate(), userId })
       const list = Array.isArray((run.structured as { fixes?: unknown })?.fixes) ? ((run.structured as { fixes: { where: string; before: string; after: string; reason?: string }[] }).fixes) : []
       setFixes(list.map((f) => ({ ...f, on: true })))
-      if (!list.length) showToast('고칠 곳을 찾지 못했습니다.')
+      // D-219: 답을 읽지 못한 것(형식 다름)을 '고칠 곳 없음' 으로 알리지 않는다
+      if (run.status === 'parse_fallback') showToast('맞춤법 결과를 읽지 못했습니다(답의 형식이 달랐습니다). 다시 눌러 주세요.')
+      else if (!list.length) showToast('고칠 곳을 찾지 못했습니다.')
     } catch (e) {
       showToast(e instanceof AiCallError ? e.message : '맞춤법 검사를 하지 못했습니다.')
     } finally {
@@ -184,11 +191,17 @@ function Studio() {
   }
 
   const regenerate = async () => {
+    // D-219: 창에 '고친 글은 그대로 남습니다' 라고 했는데, 저장 전 고친 글은 새 판으로 넘어가며 사라졌다 — 먼저 저장한다
+    if (dirty && !(await persist(`${sel + 1}쪽 수정`))) {
+      setRegen(null)
+      return
+    }
     setRegen('running')
     try {
       const opts = (state.run.input.options ?? {}) as Record<string, string>
       const { run } = await runSkill({ repo, bundle: state.bundle, skill: 'SANGHO_PROPOSAL', input: { task: state.run.input.task, options: opts }, requestId: newUuid(), today: todayLocalDate(), userId })
       showToast('새 제안서 구성을 만들었습니다. 지난 판은 그대로 남습니다.')
+      allowNavigation()
       navigate(`/ai/cases/${caseId}/proposal/${run.id}`)
     } catch (e) {
       showToast(e instanceof AiCallError ? e.message : '다시 만들지 못했습니다.')
@@ -330,6 +343,16 @@ function Studio() {
       </PrintSheet>
 
       <ConfirmModal
+        open={blocker.state === 'blocked'}
+        title="고친 글을 아직 저장하지 않았습니다"
+        message="이 화면을 나가면 저장하지 않은 고친 글이 사라집니다. 나갈까요?"
+        confirmLabel="저장하지 않고 나가기"
+        cancelLabel="계속 고치기"
+        danger
+        onConfirm={() => blocker.proceed?.()}
+        onCancel={() => blocker.reset?.()}
+      />
+      <ConfirmModal
         open={regen === 'ask'}
         title="전체 AI 재생성"
         message="같은 목적 · 쪽수로 제안서 구성을 처음부터 다시 만듭니다. 지금 판과 고친 글은 그대로 남고, 새 결과가 따로 생깁니다."
@@ -378,7 +401,7 @@ function PageEditor({ page, onChange }: { page: ProposalPage; onChange: (p: Prop
       </label>
       <label className="flex flex-col gap-1">
         <span className="t-sub font-semibold text-slate-700">본문(한 줄에 하나)</span>
-        <textarea rows={5} value={page.bullets.join('\n')} onChange={(e) => onChange({ ...page, bullets: e.target.value.split('\n').map((s) => s.trim()).filter((s, i, a) => s || i < a.length - 1) })} className={input} data-testid="page-bullets" />
+        <DraftTextarea rows={5} value={page.bullets} toText={(v) => v.join('\n')} fromText={(t) => tidyLines(t)} onValue={(v) => onChange({ ...page, bullets: v })} className={input} data-testid="page-bullets" />
       </label>
       <fieldset className="flex flex-col gap-2">
         <legend className="t-sub font-semibold text-slate-700">핵심 수치(최대 3개 · 근거 꼭)</legend>

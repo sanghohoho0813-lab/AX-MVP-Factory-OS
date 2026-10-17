@@ -26,7 +26,8 @@ const DOC_KIND: Record<string, MaterialKind> = {
   smeCertificate: 'other',
 }
 
-export type AddMaterials = (list: CaseMaterial[], note: string) => Promise<void>
+/** 저장됐으면 true — D-219: 창은 저장된 뒤에만 닫는다(실패하면 적은 글이 그대로) */
+export type AddMaterials = (list: CaseMaterial[], note: string) => Promise<boolean>
 
 export function MaterialsCard({
   materials,
@@ -51,13 +52,14 @@ export function MaterialsCard({
   const [reading, setReading] = useState<string | null>(null)
   const [dialog, setDialog] = useState<null | 'url' | 'paste' | 'memo' | 'docs'>(null)
 
-  const addOne = async (m: CaseMaterial, note: string) => {
+  /** 창을 닫아도 되면 true — 이미 넣은 자료(알리고 닫음) · 저장됨. 저장이 안 됐으면 false(창 · 적은 글 그대로) */
+  const addOne = async (m: CaseMaterial, note: string): Promise<boolean> => {
     const dup = sameMaterial(materials, m)
     if (dup) {
       toast(`이미 넣은 자료입니다 — ${dup.title}`)
-      return
+      return true
     }
-    await onAdd([m], note)
+    return onAdd([m], note)
   }
 
   const onFiles = async (files: FileList | null) => {
@@ -146,7 +148,11 @@ export function MaterialsCard({
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={() => onToggleExclude(m.id, m.excluded ? undefined : '대표가 뺌')}
+                  onClick={() => {
+                    // D-219: 명부라서 스스로 뺀 자료는 한 번 더 묻는다 — 직원 개인별 원문이 AI 로 나간다.
+                    if (m.excluded?.startsWith('4대보험 명부') && !window.confirm('직원 개인별 명부입니다. 이름 · 급여가 AI 로 나갑니다. 그래도 보낼까요?')) return
+                    void onToggleExclude(m.id, m.excluded ? undefined : '대표가 뺌')
+                  }}
                   className="t-meta tap min-h-11 font-semibold text-brand-700 hover:underline disabled:opacity-50"
                 >
                   {m.excluded ? '다시 보내기' : 'AI 에 안 보내기'}
@@ -173,8 +179,7 @@ export function MaterialsCard({
           onSave={async (v) => {
             const url = normalizeUrl(v.url)
             if (!url) return '주소를 확인해 주세요.'
-            await addOne(makeMaterial({ kind: 'url', title: url.replace(/^https?:\/\//, ''), text: v.text ? `${url}\n${v.text}` : url, url, source: '직접' }, new Date().toISOString()), '홈페이지 주소 추가')
-            setDialog(null)
+            if (await addOne(makeMaterial({ kind: 'url', title: url.replace(/^https?:\/\//, ''), text: v.text ? `${url}\n${v.text}` : url, url, source: '직접' }, new Date().toISOString()), '홈페이지 주소 추가')) setDialog(null)
             return null
           }}
         />
@@ -187,8 +192,7 @@ export function MaterialsCard({
           onClose={() => setDialog(null)}
           onSave={async (v) => {
             if (!v.text.trim()) return '글을 붙여넣어 주세요.'
-            await addOne(makeMaterial({ kind: guessMaterialKind(v.title, v.text) === 'other' ? 'paste' : guessMaterialKind(v.title, v.text), title: v.title || '붙여넣은 글', text: v.text, source: '직접' }, new Date().toISOString()), '붙여넣은 글 추가')
-            setDialog(null)
+            if (await addOne(makeMaterial({ kind: guessMaterialKind(v.title, v.text) === 'other' ? 'paste' : guessMaterialKind(v.title, v.text), title: v.title || '붙여넣은 글', text: v.text, source: '직접' }, new Date().toISOString()), '붙여넣은 글 추가')) setDialog(null)
             return null
           }}
         />
@@ -201,13 +205,12 @@ export function MaterialsCard({
           onClose={() => setDialog(null)}
           onSave={async (v) => {
             if (!v.text.trim()) return '메모를 적어 주세요.'
-            await addOne(makeMaterial({ kind: 'memo', title: v.text.trim().split('\n')[0].slice(0, 40), text: v.text, source: '직접' }, new Date().toISOString()), '메모 추가')
-            setDialog(null)
+            if (await addOne(makeMaterial({ kind: 'memo', title: v.text.trim().split('\n')[0].slice(0, 40), text: v.text, source: '직접' }, new Date().toISOString()), '메모 추가')) setDialog(null)
             return null
           }}
         />
       )}
-      {dialog === 'docs' && client && <DocsDialog client={client} materials={materials} busy={busy} onClose={() => setDialog(null)} onAdd={async (list) => { await onAdd(list, `업체 서류함에서 ${list.length}개 가져옴`); setDialog(null) }} toast={toast} />}
+      {dialog === 'docs' && client && <DocsDialog client={client} materials={materials} busy={busy} onClose={() => setDialog(null)} onAdd={async (list) => { if (await onAdd(list, `업체 서류함에서 ${list.length}개 가져옴`)) setDialog(null) }} toast={toast} />}
     </Surface>
   )
 }

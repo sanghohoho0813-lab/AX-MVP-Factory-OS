@@ -10,7 +10,7 @@
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { buildAiContext } from './context'
 import { callAi, type ServerRun } from './aiClient'
-import { emptyCase, newUuid, normalizeBizNo, normalizeUrl, withCaseActivity } from './caseUtil'
+import { emptyCase, newUuid, normalizeBizNo, normalizeUrl, safeMaterialText, withCaseActivity } from './caseUtil'
 import { proposeFromRun } from './memory'
 import { renderStructured, runSummary } from './render'
 import type { OwnerAiRepo } from './repo'
@@ -186,7 +186,8 @@ export async function saveContext(repo: OwnerAiRepo, bundle: CaseBundle, content
 /** ChatGPT 결과 붙여넣기 — OS 는 ChatGPT 대화 · 기억을 읽지 못한다. 대표가 가져온 결과만 기록으로 남긴다 */
 export async function pasteChatGpt(repo: OwnerAiRepo, bundle: CaseBundle, skill: SkillId, text: string, userId: string | null): Promise<{ run: AiRun; c: CompanyCase }> {
   const at = new Date().toISOString()
-  const body = text.trim().slice(0, 30000)
+  // D-219: 붙여넣은 글도 자료처럼 주민번호 · 비밀번호 · 키를 지우고 남긴다(예전엔 원문 그대로 저장)
+  const body = safeMaterialText(text).trim().slice(0, 30000)
   const run: AiRun = {
     id: newUuid(),
     caseId: bundle.c.id,

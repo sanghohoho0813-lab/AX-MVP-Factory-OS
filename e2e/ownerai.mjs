@@ -401,6 +401,15 @@ let caseId = ''
   await page.getByTestId('page-save').click()
   await page.waitForTimeout(300)
   await page.locator('[data-testid="slide-list"] button').nth(3).click()
+  // D-219: 본문 칸에서 실제로 치기 — 줄 끝 띄어쓰기 · 엔터가 그대로 남는다(예전: 한 글자마다 다듬어 '감소자동' · 새 줄 안 됨)
+  const bl = page.getByTestId('page-bullets')
+  await bl.fill('정산 오류 감소')
+  await bl.press('End')
+  await bl.pressSequentially(' 자동')
+  await bl.press('Enter')
+  await bl.pressSequentially('새 줄')
+  check('D-219 본문 칸: 줄 끝 띄어쓰기 · 엔터가 그대로(정산 오류 감소 자동 / 새 줄)', (await bl.inputValue()) === '정산 오류 감소 자동\n새 줄', JSON.stringify(await bl.inputValue()))
+  await shot(page, 'D3-bullets-typing', false)
   await page.getByTestId('page-bullets').fill('정산 오류 감소\n연 절감 150만 원 이상')
   await page.getByTestId('page-save').click()
   await page.waitForTimeout(400)
@@ -447,6 +456,14 @@ let caseId = ''
   const m1 = await page.getByTestId('front-m1').innerText()
   const m2 = await page.getByTestId('front-m2').innerText()
   check('E PC 대시보드 1 + 모바일 2 · KPI · 예시 데이터 표시', pc.includes('오늘 배차') && pc.includes('예시 데이터') && m1.includes('오늘 내 배차') && m2.includes('정산 확인'))
+  // D-219: 메뉴 칸 — 엔터로 새 메뉴를 더할 수 있다(예전: 새 줄이 바로 지워짐)
+  const nav = page.getByTestId('front-nav')
+  const navBefore = await nav.inputValue()
+  await nav.press('Control+End')
+  await nav.press('Enter')
+  await nav.pressSequentially('정산 관리')
+  check('D-219 메뉴 칸: 엔터로 새 메뉴 더하기', (await nav.inputValue()) === `${navBefore}\n정산 관리`, JSON.stringify(await nav.inputValue()))
+  await nav.fill(navBefore)
   await page.getByTestId('front-app-name').fill('그린 배차 플러스')
   await page.getByTestId('front-save').click()
   await page.waitForTimeout(400)
@@ -485,6 +502,29 @@ let caseId = ''
   const pasted = (await runs()).find((r) => r.status === 'pasted')
   check('F ChatGPT 결과 붙여넣기: 기록(붙여넣기 · 비용 없음) · AI 호출 0', !!pasted && pasted.tier === 'manual' && pasted.estimatedCostUsd === null)
 
+  // D-219: '자료 요약 · 업체 정보 채우기' — 올린 자료를 실제로 보낸다(예전: 빈 목록을 '이것만' 으로 읽어 자료 0개)
+  const nS = (await runs()).length
+  await page.getByTestId('material-summarize').click()
+  await waitRuns(nS + 1)
+  const sum = llm.filter((c) => c.skill === 'SNAPSHOT_EXTRACT').at(-1)
+  check('D-219 자료 요약: 올린 자료(회사소개서 · 메모)를 AI 에 함께 보낸다', !!sum && sum.user.includes('배차') && sum.user.includes('화주'), sum?.user.slice(0, 300))
+
+  // D-219: 명부라서 스스로 뺀 자료를 '다시 보내기' — 한 번 더 묻고, 아니오면 그대로 뺀 채(예전: 바로 AI 로 나감)
+  await page.getByTestId('material-memo').click()
+  await page.locator('[data-field="text"]').fill('사업장 가입자 명부\n피보험자 홍길동 자격취득 2024-03-01 취득일 2024-03-01 상실일 - 보험료 부과 210,000')
+  await page.getByTestId('material-save').click()
+  await page.waitForTimeout(400)
+  const rosterRow = page.locator('[data-testid="material-list"] li', { hasText: '명부' }).first()
+  check('D-219 명부 자료: 스스로 AI 에 안 보냄', (await rosterRow.innerText()).includes('AI 에 안 보냄'))
+  let askedRoster = ''
+  page.once('dialog', (d) => { askedRoster = d.message(); void d.dismiss() })
+  await rosterRow.getByRole('button', { name: '다시 보내기' }).click()
+  await page.waitForTimeout(400)
+  const rosterMat = ((await cases()).find((c) => c.id === caseId)?.materials ?? []).find((m) => m.title.includes('명부'))
+  check('D-219 명부 다시 보내기: 한 번 더 묻고 · 아니오면 그대로 뺀 채', askedRoster.includes('개인별 명부') && !!rosterMat?.excluded, { askedRoster, excluded: rosterMat?.excluded })
+  await rosterRow.scrollIntoViewIfNeeded()
+  await shot(page, 'F0-roster-kept', false)
+
   // 업체 상세 — 탭 줄은 그대로, 더보기에서 AI 작업실
   await page.goto(`${BASE}/ops/clients/cli_hansol`, { waitUntil: 'networkidle' })
   const tabs = await page.locator('[role="tab"]').allInnerTexts()
@@ -500,6 +540,26 @@ let caseId = ''
   await page.getByTestId('case-name').fill('한솔테크')
   await page.getByTestId('case-dups').waitFor()
   check('F 같은 고객으로 또 만들려 하면 이어 둔 작업실을 연다', (await page.getByTestId('case-dups').innerText()).includes('이어 둔 작업실 열기'))
+
+  // D-219: 같은 사업자번호로 먼저 만든 작업실(빠른 등록 · 아직 안 이음)이 있으면 업체 탭에서 새로 만들지 않고 묻고 잇는다
+  // (예전: 클라우드는 DB 고유 규칙에 걸려 '저장에 실패했습니다' 만 뜨고 탭이 영영 안 열림 · 로컬은 둘째 작업실)
+  const owner = (await cases())[0]?.ownerId ?? null
+  await page.evaluate((o) => {
+    const k = 'axmvp.v1.owner_ai.cases'
+    const list = JSON.parse(localStorage.getItem(k) || '[]')
+    const at = new Date().toISOString()
+    list.push({ id: 'case_d219_wooil', companyName: '우일 산업(빠른 등록)', relation: 'reviewed', bizNo: '3138112508', clientId: null, ownerId: o, workspaceId: null, materials: [], facts: [], activity: [], createdAt: at, updatedAt: at, archivedAt: null, contextVersion: 0 })
+    localStorage.setItem(k, JSON.stringify(list))
+  }, owner)
+  await page.goto(`${BASE}/ops/clients/cli_wooil`, { waitUntil: 'networkidle' })
+  await page.getByRole('button', { name: /더보기/ }).first().click()
+  await page.getByTestId('more-ai').click()
+  let askedLink = ''
+  page.once('dialog', (d) => { askedLink = d.message(); void d.accept() })
+  await page.getByTestId('client-ai-open').click()
+  await page.getByTestId('case-workspace').waitFor()
+  const wooil = (await cases()).filter((c) => c.bizNo === '3138112508' && !c.archivedAt)
+  check('D-219 업체 탭: 같은 사업자번호 작업실이 있으면 묻고 그 작업실에 잇는다(둘째 작업실 안 만듦)', askedLink.includes('같은 사업자번호') && wooil.length === 1 && wooil[0].id === 'case_d219_wooil' && wooil[0].clientId === 'cli_wooil', { askedLink, wooil: wooil.map((c) => [c.id, c.clientId]) })
 
   // Partner OS 주소
   await page.goto(`${BASE}/ai/new?event=ax_proposal_requested&company=${encodeURIComponent('파트너상사')}&requester=${encodeURIComponent('이○○')}&memo=${encodeURIComponent('AX 제안 요청')}`, { waitUntil: 'networkidle' })

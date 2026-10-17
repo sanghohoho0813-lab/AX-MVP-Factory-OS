@@ -4,12 +4,16 @@
  * 글은 오른쪽에서 고치고 저장(수정 이력 새 번호) · PNG(화면마다) · 인쇄.
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { DraftTextarea } from './parts/DraftTextarea'
+import { tidyLines, titledLines } from './parts/draftLines'
 import { Link, useParams } from 'react-router-dom'
 import { ChevronLeft, Download, Printer } from 'lucide-react'
 import { frontFrom, frontIsEmpty, type FrontMobile, type FrontSpec } from '../../services/ownerAi/front'
 import { useToast } from '../../components/ui/toastContext'
 import { ScreenTitle, Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
+import { ConfirmModal } from '../../components/ui/ConfirmModal'
+import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard'
 import { OwnerAiGate } from './shared'
 import { PrintSheet, STUDIO_FONT, downloadBlob, safeFileName, useStudioRun } from './studioShared'
 
@@ -163,6 +167,8 @@ function Studio() {
   const [saving, setSaving] = useState(false)
   const [exporting, setExporting] = useState<Frame | null>(null)
   const exportRef = useRef<HTMLDivElement>(null)
+  // D-219: 고친 글을 저장하지 않고 나가면 한 번 묻는다 — 예전엔 말없이 사라졌다
+  const { blocker } = useUnsavedChangesGuard(dirty && !saving)
 
   if (state.kind === 'ready' && spec === null) {
     const rev = state.bundle.latestRevision.get(state.run.id)?.content
@@ -298,6 +304,16 @@ function Studio() {
           <div style={{ transform: 'scale(0.85)', transformOrigin: 'top center' }}><MobileScreen s={spec} m={spec.mobile2} /></div>
         </div>
       </PrintSheet>
+      <ConfirmModal
+        open={blocker.state === 'blocked'}
+        title="고친 글을 아직 저장하지 않았습니다"
+        message="이 화면을 나가면 저장하지 않은 고친 글이 사라집니다. 나갈까요?"
+        confirmLabel="저장하지 않고 나가기"
+        cancelLabel="계속 고치기"
+        danger
+        onConfirm={() => blocker.proceed?.()}
+        onCancel={() => blocker.reset?.()}
+      />
     </div>
   )
 }
@@ -305,7 +321,6 @@ function Studio() {
 function SpecEditor({ spec, onChange }: { spec: FrontSpec; onChange: (s: FrontSpec) => void }) {
   const input = 't-body min-h-11 w-full rounded-(--radius-control) border border-slate-300 px-3'
   const area = 't-body w-full rounded-(--radius-control) border border-slate-300 px-3 py-2'
-  const lines = (v: string) => v.split('\n').map((x) => x.trim()).filter(Boolean)
   const mobile = (key: 'mobile1' | 'mobile2', label: string) => {
     const m = spec[key]
     return (
@@ -314,14 +329,13 @@ function SpecEditor({ spec, onChange }: { spec: FrontSpec; onChange: (s: FrontSp
         <input value={m.title} onChange={(e) => onChange({ ...spec, [key]: { ...m, title: e.target.value } })} className={input} placeholder="화면 이름" />
         <input value={m.purpose} onChange={(e) => onChange({ ...spec, [key]: { ...m, purpose: e.target.value } })} className={input} placeholder="이 화면에서 하는 일" />
         {m.blocks.map((b, i) => (
-          <textarea
+          <DraftTextarea
             key={i}
             rows={3}
-            value={[b.title, ...b.lines].join('\n')}
-            onChange={(e) => {
-              const [t = '', ...rest] = e.target.value.split('\n')
-              onChange({ ...spec, [key]: { ...m, blocks: m.blocks.map((x, j) => (j === i ? { title: t, lines: rest.map((r) => r.trim()).filter(Boolean).slice(0, 4) } : x)) } })
-            }}
+            value={{ title: b.title, lines: b.lines }}
+            toText={(v) => [v.title, ...v.lines].join('\n')}
+            fromText={(t) => titledLines(t, 4)}
+            onValue={(v) => onChange({ ...spec, [key]: { ...m, blocks: m.blocks.map((x, j) => (j === i ? v : x)) } })}
             className={area}
             aria-label={`${label} 칸 ${i + 1}(첫 줄 제목)`}
           />
@@ -350,18 +364,17 @@ function SpecEditor({ spec, onChange }: { spec: FrontSpec; onChange: (s: FrontSp
       </fieldset>
       <label className="flex flex-col gap-1">
         <span className="t-sub font-semibold text-slate-700">메뉴(한 줄에 하나)</span>
-        <textarea rows={4} value={spec.navigation.join('\n')} onChange={(e) => onChange({ ...spec, navigation: lines(e.target.value).slice(0, 7) })} className={area} />
+        <DraftTextarea rows={4} value={spec.navigation} toText={(v) => v.join('\n')} fromText={(t) => tidyLines(t, 7)} onValue={(v) => onChange({ ...spec, navigation: v })} className={area} data-testid="front-nav" />
       </label>
       {spec.sections.map((sec, i) => (
         <label key={i} className="flex flex-col gap-1">
           <span className="t-sub font-semibold text-slate-700">구역 {i + 1}(첫 줄 제목)</span>
-          <textarea
+          <DraftTextarea
             rows={4}
-            value={[sec.title, ...sec.items].join('\n')}
-            onChange={(e) => {
-              const [t = '', ...rest] = e.target.value.split('\n')
-              onChange({ ...spec, sections: spec.sections.map((x, j) => (j === i ? { ...x, title: t, items: rest.map((r) => r.trim()).filter(Boolean).slice(0, 6) } : x)) })
-            }}
+            value={{ title: sec.title, lines: sec.items }}
+            toText={(v) => [v.title, ...v.lines].join('\n')}
+            fromText={(t) => titledLines(t, 6)}
+            onValue={(v) => onChange({ ...spec, sections: spec.sections.map((x, j) => (j === i ? { ...x, title: v.title, items: v.lines } : x)) })}
             className={area}
           />
         </label>

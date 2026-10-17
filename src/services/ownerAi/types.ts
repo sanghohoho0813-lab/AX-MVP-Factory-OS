@@ -82,6 +82,19 @@ export interface CaseFact {
 
 export type CaseFactKey = 'industry' | 'founded' | 'ceo' | 'employees' | 'revenue' | 'homepage' | 'mainProblem' | 'currentSystem' | 'coreBusiness'
 
+/** D-219: 업체 정보 칸 이름 — 결과 글에 영어 키(industry · mainProblem)가 그대로 보이던 것 */
+export const FACT_LABEL: Record<CaseFactKey, string> = {
+  industry: '업종',
+  founded: '설립',
+  ceo: '대표자',
+  employees: '직원 수',
+  revenue: '매출',
+  homepage: '홈페이지',
+  mainProblem: '주요 문제',
+  currentSystem: '지금 쓰는 시스템',
+  coreBusiness: '핵심 사업',
+}
+
 export interface CompanyCase {
   id: string
   workspaceId: string | null

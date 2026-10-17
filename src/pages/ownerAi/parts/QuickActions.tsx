@@ -20,7 +20,8 @@ export interface RunRequest {
   skill: SkillId
   input: AiRunInput
   requestId: string
-  materialIds: string[]
+  /** 사람이 고른 자료 — 없으면 작업마다 정한 자료(빈 목록이면 '하나도 보내지 않음') */
+  materialIds?: string[]
   label: string
 }
 

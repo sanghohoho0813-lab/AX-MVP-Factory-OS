@@ -2,7 +2,7 @@
  * AI 결과(구조 JSON) → 사람이 읽는 글(Markdown) · 한 줄 요약.
  * 저장할 때 둘 다 남긴다(ai_runs.structured_output + rendered_output). 모양이 맞지 않으면 원문을 그대로.
  */
-import type { AiRun, SkillId } from './types'
+import { CONTEXT_FIELDS, FACT_LABEL, type AiRun, type CaseFactKey, type SkillId } from './types'
 import { skillName } from './skillCatalog'
 
 type O = Record<string, unknown>
@@ -136,14 +136,26 @@ export function renderStructured(skill: SkillId, s: unknown): string {
     case 'FREE_CHAT':
       return str(o.answer)
     case 'CONTEXT_UPDATE':
-      return Object.entries(obj(o.proposed)).filter(([, v]) => str(v)).map(([k, v]) => `- ${k}: ${str(v)}`).join('\n')
+      return Object.entries(obj(o.proposed)).filter(([, v]) => str(v)).map(([k, v]) => `- ${CONTEXT_FIELDS.find((f) => f.key === k)?.label ?? k}: ${str(v)}`).join('\n')
     case 'PROOFREAD':
       return arr(o.fixes).map((f) => `- ${str(obj(f).where)}: "${str(obj(f).before)}" → "${str(obj(f).after)}"${str(obj(f).reason) ? ` (${str(obj(f).reason)})` : ''}`).join('\n') || '고칠 곳이 없습니다.'
     case 'SNAPSHOT_EXTRACT':
-      return [str(o.summary), '', ...arr(o.facts).map((f) => `- ${str(obj(f).key)}: ${str(obj(f).value) || '미확인'}${str(obj(f).source) ? ` (${str(obj(f).source)})` : ''}`)].join('\n').trim()
+      return [str(o.summary), '', ...arr(o.facts).map((f) => `- ${FACT_LABEL[str(obj(f).key) as CaseFactKey] ?? str(obj(f).key)}: ${str(obj(f).value) || '미확인'}${str(obj(f).source) ? ` (${str(obj(f).source)})` : ''}`)].join('\n').trim()
     default:
       return ''
   }
+}
+
+/**
+ * D-219: 고친 판을 글로 — 스튜디오에서 고친 제안서 · 화면 글은 구조(글자 아님)로 남아, 결과 카드가 원래 AI 글을 보여 주고 복사했다.
+ * 글이면 그대로, 구조면 같은 모양으로 그린다(화면 글은 대시보드 칸 이름만 맞춘다). 못 그리면 ''.
+ */
+export function revisedText(skill: SkillId, content: unknown): string {
+  if (typeof content === 'string') return content
+  const c = obj(content)
+  if (!Object.keys(c).length) return ''
+  const shaped = skill === 'AX_FRONT' ? { ...c, dashboard: { title: c.dashboardTitle, sections: c.sections } } : c
+  return renderStructured(skill, shaped)
 }
 
 /** 기억 · 다음 호출에 쓸 짧은 요약(채택한 결과는 고친 글이 있으면 그 글) */

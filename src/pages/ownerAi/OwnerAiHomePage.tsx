@@ -117,7 +117,7 @@ function Home() {
       navigate(`/ai/cases/${c.id}`)
     } catch (e) {
       if (e instanceof OwnerAiSetupError) setDbSetup(true)
-      showToast(e instanceof Error && /duplicate|23505|unique/i.test(e.message) ? '이미 이 고객과 이어 둔 작업실이 있습니다.' : e instanceof Error ? e.message : '만들지 못했습니다.')
+      showToast(e instanceof Error ? e.message : '만들지 못했습니다.')
     } finally {
       setSaving(false)
     }

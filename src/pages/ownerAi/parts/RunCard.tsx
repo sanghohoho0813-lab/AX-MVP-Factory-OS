@@ -10,12 +10,14 @@ import { EVALUATION_LABEL, type AiRevision, type AiRun, type Evaluation } from '
 import { Badge, Surface, type Tone } from '../../../components/ui/primitives'
 import { Button } from '../../../components/ui/Button'
 import { Modal } from '../../../components/ui/Modal'
+import { revisedText } from '../../../services/ownerAi/render'
 import { Md, TierBadge, copyToClipboard, fmtDateTime, fmtUsd } from '../shared'
 
 const EVAL_TONE: Record<Evaluation, Tone> = { draft: 'neutral', adopted: 'success', partially_adopted: 'brand', rejected: 'danger' }
 
 export function runText(run: AiRun, rev: AiRevision | undefined): string {
-  return typeof rev?.content === 'string' ? rev.content : run.rendered
+  // D-219: 스튜디오에서 고친 판(구조)도 글로 — 예전엔 '고친 글 n번째' 배지를 달고 원래 AI 글을 보여 주고 복사했다
+  return (rev ? revisedText(run.skillId, rev.content) : '') || run.rendered
 }
 
 export function RunCard({
@@ -32,8 +34,9 @@ export function RunCard({
   revision?: AiRevision
   defaultOpen: boolean
   busy: boolean
-  onEvaluate: (evaluation: Evaluation, note: string, part: unknown) => Promise<void>
-  onRevise: (text: string, note: string) => Promise<void>
+  /** 저장됐으면 true — D-219: 창은 저장된 뒤에만 닫는다 */
+  onEvaluate: (evaluation: Evaluation, note: string, part: unknown) => Promise<boolean>
+  onRevise: (text: string, note: string) => Promise<boolean>
   onToMemory: () => void
   toast: (m: string) => void
 }) {
@@ -139,9 +142,9 @@ export function RunCard({
         </>
       )}
 
-      {dialog === 'partial' && <PartialDialog run={run} busy={busy} onClose={() => setDialog(null)} onSave={async (note, part) => { await onEvaluate('partially_adopted', note, part); setDialog(null) }} />}
-      {dialog === 'reject' && <RejectDialog busy={busy} onClose={() => setDialog(null)} onSave={async (note) => { await onEvaluate('rejected', note, null); setDialog(null) }} />}
-      {dialog === 'edit' && <EditDialog initial={text} busy={busy} onClose={() => setDialog(null)} onSave={async (t, note) => { await onRevise(t, note); setDialog(null) }} />}
+      {dialog === 'partial' && <PartialDialog run={run} busy={busy} onClose={() => setDialog(null)} onSave={async (note, part) => { if (await onEvaluate('partially_adopted', note, part)) setDialog(null) }} />}
+      {dialog === 'reject' && <RejectDialog busy={busy} onClose={() => setDialog(null)} onSave={async (note) => { if (await onEvaluate('rejected', note, null)) setDialog(null) }} />}
+      {dialog === 'edit' && <EditDialog initial={text} busy={busy} onClose={() => setDialog(null)} onSave={async (t, note) => { if (await onRevise(t, note)) setDialog(null) }} />}
     </Surface>
     </div>
   )

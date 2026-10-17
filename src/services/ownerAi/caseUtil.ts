@@ -54,6 +54,32 @@ export function normalizeBizNo(v: string): string {
   return d.length === 10 ? d : ''
 }
 
+/**
+ * D-219: DB 고유 규칙(0021 — 주인별 사업자번호 하나 · 고객 하나에 작업실 하나)에 걸리는 작업실.
+ * 로컬 저장도 같은 규칙을 지키고, 화면은 새로 만들기 전에 이걸로 미리 알아본다.
+ */
+export function caseClash(list: readonly CompanyCase[], next: CompanyCase): CompanyCase | null {
+  if (next.archivedAt) return null
+  return (
+    list.find(
+      (x) =>
+        x.id !== next.id &&
+        !x.archivedAt &&
+        (x.ownerId ?? null) === (next.ownerId ?? null) &&
+        ((!!next.bizNo && x.bizNo === next.bizNo) || (!!next.clientId && x.clientId === next.clientId)),
+    ) ?? null
+  )
+}
+
+/** D-219: 업체 상세에서 열 작업실 — 이 고객과 이은 것 먼저, 없으면 같은 사업자번호로 만든 것(새로 만들면 DB 가 막는다) */
+export function findCaseForClient(cases: readonly CompanyCase[], client: { id: string; businessNumber?: string | null }): { linked: CompanyCase | null; sameBiz: CompanyCase | null } {
+  const live = cases.filter((c) => !c.archivedAt)
+  const linked = live.find((c) => c.clientId === client.id) ?? null
+  const biz = normalizeBizNo(client.businessNumber ?? '')
+  const sameBiz = linked || !biz ? null : (live.find((c) => c.bizNo === biz) ?? null)
+  return { linked, sameBiz }
+}
+
 export function normalizeUrl(v: string): string {
   const t = (v ?? '').trim()
   if (!t) return ''
@@ -70,6 +96,24 @@ export function normalizeUrl(v: string): string {
 const hostOf = (url: string) => {
   try {
     return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return ''
+  }
+}
+
+/** 여러 회사가 같은 주소(host)를 나눠 쓰는 곳 — 주소 첫 칸(blog.naver.com/한빛식품)까지 봐야 같은 회사다 */
+const SHARED_HOSTS = new Set(['blog.naver.com', 'm.blog.naver.com', 'smartstore.naver.com', 'm.smartstore.naver.com', 'cafe.naver.com', 'band.us', 'instagram.com', 'facebook.com', 'm.facebook.com', 'youtube.com', 'm.youtube.com', 'linktr.ee', 'sites.google.com', 'pf.kakao.com', 'x.com', 'twitter.com'])
+
+/**
+ * D-219: 홈페이지가 같은지 보는 열쇠 — 보통은 host(경로가 달라도 같은 회사), 함께 쓰는 곳은 host + 첫 칸.
+ * 예전엔 host 만 봐서 blog.naver.com 을 쓰는 다른 회사를 '홈페이지 같음 · 새로 만들 수 없음' 으로 막았다.
+ */
+export function siteKeyOf(url: string): string {
+  const host = hostOf(url)
+  if (!host || !SHARED_HOSTS.has(host)) return host
+  try {
+    const first = new URL(url).pathname.split('/').filter(Boolean)[0] ?? ''
+    return first ? `${host.replace(/^m\./, '')}/${decodeURIComponent(first).toLowerCase()}` : ''
   } catch {
     return ''
   }
@@ -94,7 +138,7 @@ export function findDuplicates(
 ): DuplicateHit[] {
   const name = normalizeCompany(input.name ?? '')
   const biz = normalizeBizNo(input.bizNo ?? '')
-  const host = hostOf(normalizeUrl(input.url ?? ''))
+  const host = siteKeyOf(normalizeUrl(input.url ?? ''))
   const out: DuplicateHit[] = []
   const nameMatch = (other: string): string | null => {
     const o = normalizeCompany(other)
@@ -107,7 +151,7 @@ export function findDuplicates(
     if (c.archivedAt) continue
     const reasons: string[] = []
     if (biz && c.bizNo === biz) reasons.push('사업자번호 같음')
-    if (host && hostOf(c.homepageUrl) === host) reasons.push('홈페이지 같음')
+    if (host && siteKeyOf(c.homepageUrl) === host) reasons.push('홈페이지 같음')
     const n = nameMatch(c.companyName)
     if (n) reasons.push(n)
     if (reasons.length) out.push({ kind: 'case', id: c.id, name: c.companyName, reason: reasons.join(' · '), strong: reasons.some((r) => r !== '회사 이름 비슷함') })

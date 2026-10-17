@@ -4,6 +4,7 @@
  */
 import type { AiRun, SkillId, Tier } from './types'
 import { skillName } from './skillCatalog'
+import { localDateOf } from '../../lib/appClock'
 
 export interface MonthUsage {
   month: string
@@ -18,7 +19,8 @@ export interface MonthUsage {
   bySkill: { skillId: SkillId; name: string; calls: number; adopted: number; rejected: number }[]
 }
 
-export const monthOf = (iso: string) => (iso ?? '').slice(0, 7)
+/** D-219: 한국 날짜 기준 달 — 예전 `slice(0, 7)` 은 UTC 라 매달 1일 오전 9시 전 호출이 지난달로 셌다 */
+export const monthOf = (iso: string) => localDateOf(iso).slice(0, 7)
 
 export function monthUsage(runs: readonly AiRun[], month: string): MonthUsage {
   const list = runs.filter((r) => monthOf(r.createdAt) === month && r.tier !== 'manual')

@@ -8,12 +8,12 @@ import handler, { __resetAiRunState } from '../../../api/ai-run.js'
 import { SKILLS, COMMON_RULES } from '../../../api/_ai/skills.js'
 import { aiConfig, buildPrompt, extractJson, scrubDeep, validate } from '../../../api/_ai/core.js'
 import { SKILL_META, QUICK_ACTIONS } from '../ownerAi/skillCatalog'
-import { emptyCase, findDuplicates, makeMaterial, sameMaterial, normalizeCompany, newUuid } from '../ownerAi/caseUtil'
+import { emptyCase, findDuplicates, makeMaterial, sameMaterial, normalizeCompany, newUuid, caseClash, findCaseForClient } from '../ownerAi/caseUtil'
 import { buildAiContext, caseSnapshot, UNKNOWN } from '../ownerAi/context'
-import { renderStructured, runSummary, PATENT_WARNING, fundingBasis } from '../ownerAi/render'
+import { renderStructured, revisedText, runSummary, PATENT_WARNING, fundingBasis } from '../ownerAi/render'
 import { proposeFromRun, contextDiff, applyContext } from '../ownerAi/memory'
-import { ownerAiRepo } from '../ownerAi/repo'
-import { runSkill, evaluate, saveContext, saveRevision, pasteChatGpt, latestSnapshot, type CaseBundle } from '../ownerAi/workflow'
+import { ownerAiRepo, OwnerAiDuplicateError } from '../ownerAi/repo'
+import { runSkill, evaluate, saveContext, saveRevision, pasteChatGpt, latestSnapshot, patchCase, type CaseBundle } from '../ownerAi/workflow'
 import { monthUsage } from '../ownerAi/usage'
 import { parsePartnerHandoff } from '../ownerAi/partnerBridge'
 import { proposalFrom, qaProposal, roughMeasure, layoutPage, applyFix, proofreadInput } from '../ownerAi/proposal'
@@ -322,6 +322,10 @@ async function engineTests() {
     check('H2 중복 업체 — 홈페이지 같음(www · 경로 달라도)', d2.length === 1 && d2[0].reason.includes('홈페이지'), d2)
     check('H3 회사 이름 맞추기 — (주) · 주식회사 · 띄어쓰기', normalizeCompany('(주)한빛 정밀') === normalizeCompany('한빛정밀 주식회사'))
     check('H4 다른 회사는 중복 아님', findDuplicates({ name: '대성산업' }, [c1], [client]).length === 0)
+    // D-219: 네이버 블로그 · 스마트스토어처럼 여러 회사가 나눠 쓰는 주소는 첫 칸까지 같아야 같은 회사
+    const blogCase = { ...c1, id: 'blog1', companyName: '그린로직스', bizNo: '', homepageUrl: 'https://blog.naver.com/greenlogis' }
+    check('D-219 중복 업체 — 같은 블로그 주소(blog.naver.com)여도 블로그 이름이 다르면 다른 회사', findDuplicates({ name: '한빛식품', url: 'blog.naver.com/hanbitfood' }, [blogCase], []).length === 0, findDuplicates({ name: '한빛식품', url: 'blog.naver.com/hanbitfood' }, [blogCase], []))
+    check('D-219 중복 업체 — 같은 블로그(m. 주소 · 대소문자 달라도)는 홈페이지 같음', findDuplicates({ name: '그린', url: 'https://m.blog.naver.com/GreenLogis' }, [blogCase], []).some((d) => d.reason.includes('홈페이지')))
   }
   {
     const m = makeMaterial({ kind: 'memo', title: '메모', text: '대표 900101-1234567 비밀번호: qwer1234 매출 50억' }, at)
@@ -356,6 +360,17 @@ async function engineTests() {
   {
     const md = renderStructured('AX_PENGUIN', SKILLS.AX_PENGUIN.example)
     check('L1 결과 글 — AX 전략: 가장 추천 · 차선 · 12단계', md.includes('가장 추천') && md.includes('차선 1') && md.includes('12단계'))
+    // D-219: 결과 글에 영어 칸 이름이 보이지 않게 · 스튜디오에서 고친 판도 글로
+    const ctxMd = renderStructured('CONTEXT_UPDATE', { proposed: { oneLine: '수도권 물류', problems: '배차가 늦다' } })
+    check('D-219 기억 정리 결과 — 한글 칸 이름(oneLine 아님)', ctxMd.includes('회사 한줄 정의: 수도권 물류') && ctxMd.includes('해결할 문제') && !ctxMd.includes('oneLine'), ctxMd)
+    const snapMd = renderStructured('SNAPSHOT_EXTRACT', { summary: '요약', facts: [{ key: 'industry', value: '물류' }, { key: 'mainProblem', value: '배차' }] })
+    check('D-219 자료 요약 결과 — 한글 칸 이름(industry · mainProblem 아님)', snapMd.includes('- 업종: 물류') && snapMd.includes('- 주요 문제: 배차') && !snapMd.includes('industry'), snapMd)
+    const doc = { companyName: '그린로직스', purpose: 'AX 제안', audience: '대표', pages: [{ id: 'p1', title: '고친 제목 그린 로드맵', message: '핵심', bullets: ['정산 자동'], keyNumbers: [], visual: '' }] }
+    check('D-219 고친 제안서(구조) → 글: 고친 제목이 나온다', revisedText('SANGHO_PROPOSAL', doc).includes('고친 제목 그린 로드맵'))
+    const spec = { appName: '그린 배차 플러스', userType: '배차 담당', oneLine: '', kpis: [], navigation: [], dashboardTitle: '오늘 배차판', sections: [{ title: '배차 대기', items: ['3건'] }], table: { title: '', columns: [], rows: [] }, mobile1: { title: 'm1', purpose: '', blocks: [] }, mobile2: { title: 'm2', purpose: '', blocks: [] } }
+    const ft = revisedText('AX_FRONT', spec)
+    check('D-219 고친 화면 글(구조) → 글: 서비스 이름 · 대시보드 제목 · 구역', ft.includes('그린 배차 플러스') && ft.includes('오늘 배차판') && ft.includes('배차 대기'), ft)
+    check('D-219 고친 글이 글이면 그대로', revisedText('FREE_CHAT', '손으로 고친 글') === '손으로 고친 글')
     check('L2 결과 글 — 특허는 경고가 맨 위', renderStructured('PATENT_IDEA', SKILLS.PATENT_IDEA.example).startsWith(`> ⚠ ${PATENT_WARNING}`))
     check('L3 자금 근거 — 다섯 가지 밖의 값은 "미확인"', fundingBasis('승인 확실') === '미확인' && fundingBasis('업체 사실') === '업체 사실')
     const fmd = renderStructured('FUNDING_STRATEGY', { oneLine: 'x', items: [{ title: '운전자금', detail: 'd', basis: '확실함', needsLatestCheck: true }] })
@@ -407,6 +422,23 @@ async function engineTests() {
     const back = await reloaded.getCase(c.id)
     check('N8 다시 열기(새 저장소 객체) — Case · 기억 · 기록 · 타임라인 그대로', !!back && back.contextVersion === 2 && (await reloaded.listRuns(c.id)).length === 2 && (await reloaded.listSnapshots(c.id)).length === 2 && back.activity.length >= 6)
     check('N9 최신 기억 = 마지막 판', latestSnapshot({ snapshots: snaps })?.version === 2)
+    // D-219: 붙여넣은 ChatGPT 결과도 주민번호 · 인증서 비밀번호를 지우고 남긴다(예전엔 원문 그대로)
+    const pastedPii = await pasteChatGpt(repo, { ...bundle, c: pasted.c, snapshots: snaps }, 'FREE_CHAT', '대표 김○○ 900101-1234567 · 공동인증서 비밀번호 abc!23 · 결론: 견적 자동화', 'owner-1')
+    check('D-219 ChatGPT 붙여넣기 — 주민번호 · 비밀번호는 지우고 결론은 남긴다', !pastedPii.run.rendered.includes('1234567') && !pastedPii.run.rendered.includes('abc!23') && pastedPii.run.rendered.includes('견적 자동화'), pastedPii.run.rendered)
+    // D-219: 같은 사업자번호 작업실 — 로컬도 DB 처럼 막고(이유를 말하는 오류) · 업체 탭은 그 작업실을 찾아 잇는다
+    const bizA = await repo.saveCase({ ...emptyCase({ companyName: '사업자 같은 회사', relation: 'reviewed', ownerId: 'owner-1', at }), bizNo: '2208112345' })
+    let dupErr: unknown = null
+    try {
+      await repo.saveCase({ ...emptyCase({ companyName: '사업자 같은 회사(2)', relation: 'reviewed', ownerId: 'owner-1', at }), bizNo: '2208112345' })
+    } catch (e) {
+      dupErr = e
+    }
+    check('D-219 같은 사업자번호로 새 작업실 — 막고 이유를 말한다(저장 실패 아님)', dupErr instanceof OwnerAiDuplicateError && String((dupErr as Error).message).includes('같은 사업자번호'), String(dupErr))
+    const found = findCaseForClient(await repo.listCases(), { id: 'cli_same', businessNumber: '220-81-12345' })
+    check('D-219 업체 탭 — 이은 작업실이 없어도 같은 사업자번호 작업실을 찾는다', !found.linked && found.sameBiz?.id === bizA.id, found)
+    const linkedA = await patchCase(repo, bizA, (x) => ({ ...x, clientId: 'cli_same' }))
+    check('D-219 업체 탭 — 이은 뒤엔 그 작업실을 바로 연다', findCaseForClient(await repo.listCases(), { id: 'cli_same', businessNumber: '2208112345' }).linked?.id === linkedA.id)
+    check('D-219 보관한 작업실은 겹침으로 안 본다', caseClash([{ ...bizA, archivedAt: at }], { ...bizA, id: 'other' }) === null && caseClash([bizA], { ...bizA, id: 'other' })?.id === bizA.id)
   }
   setEnv({ OPENAI_API_KEY: undefined })
   {
@@ -430,6 +462,13 @@ async function engineTests() {
     ]
     const u = monthUsage(runs, '2026-10')
     check('O1 사용량 — 이번 달 호출 2(붙여넣기 · 지난달 빼고) · 빠르게 1 · 깊게 1 · 토큰 · 비용 모르는 호출 1', u.calls === 2 && u.byTier.cheap === 1 && u.byTier.deep === 1 && u.inputTokens === 1100 && u.costUsd === 0.001 && u.costUnknownCalls === 1, u)
+    // D-219: 한국 10월 1일 새벽(UTC 로는 9월 30일) 호출은 10월로 센다(예전: 지난달로 셈)
+    const prevTz = process.env.TZ
+    process.env.TZ = 'Asia/Seoul'
+    const early: AiRun[] = [{ ...adoptedRun, tier: 'cheap', createdAt: '2026-09-30T16:30:00Z' }]
+    check('D-219 사용량 — 한국 10월 1일 01:30 호출은 10월(UTC 9월 아님)', monthUsage(early, '2026-10').calls === 1 && monthUsage(early, '2026-09').calls === 0)
+    if (prevTz === undefined) delete process.env.TZ
+    else process.env.TZ = prevTz
   }
   {
     const j = parsePartnerHandoff(JSON.stringify({ event: 'ax_proposal_requested', company: { name: '협력테크', homepage: 'xx.kr', businessNumber: '111-22-33333' }, consultant: { name: '이동료' }, message: 'AX 봐주세요' }))

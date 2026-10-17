@@ -125,11 +125,13 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
     }
   }
 
-  const runInternal = (skill: SkillId, label: string, input: RunRequest['input'] = {}) => doRun({ skill, label, input, requestId: newUuid(), materialIds: [] })
+  // D-219: 자료를 고르지 않는 작업은 작업마다 정한 자료를 보낸다(undefined) — 예전엔 빈 목록 [] 을 '이것만' 으로 읽어
+  // '자료 요약 · 업체 정보 채우기' 가 올린 자료를 하나도 보내지 않았다
+  const runInternal = (skill: SkillId, label: string, input: RunRequest['input'] = {}) => doRun({ skill, label, input, requestId: newUuid() })
 
   const onEvaluate = (run: AiRun) => async (evaluation: Evaluation, note: string, part: unknown) => {
     const r = await guard(() => evaluate(repo, b, run, evaluation, note, part, currentContext))
-    if (!r) return
+    if (!r) return false
     let c = r.c
     // 자료 요약을 채택하면 자료에 있던 값만 업체 정보 칸으로(이미 적힌 칸은 덮지 않는다)
     if (run.skillId === 'SNAPSHOT_EXTRACT' && (evaluation === 'adopted' || evaluation === 'partially_adopted')) {
@@ -139,11 +141,12 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
     setBundle((prev) => (prev ? { ...prev, c, runs: prev.runs.map((x) => (x.id === run.id ? r.run : x)) } : prev))
     showToast(`${skillName(run.skillId)} — ${evaluation === 'rejected' ? '폐기했습니다(기록은 남습니다).' : evaluation === 'adopted' ? "채택했습니다. '기억에 넣기' 로 다음 작업에 이어 쓸 수 있습니다." : '일부 채택했습니다.'}`)
     if (Object.keys(r.proposal).length) setMemoryApply({ run: r.run, proposed: applyContext(currentContext, r.proposal) })
+    return true
   }
 
   const onRevise = (run: AiRun) => async (text: string, note: string) => {
     const r = await guard(() => saveRevision(repo, b, run, text, note))
-    if (!r) return
+    if (!r) return false
     setBundle((prev) => {
       if (!prev) return prev
       const m = new Map(prev.latestRevision)
@@ -151,6 +154,7 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
       return { ...prev, c: r.c, latestRevision: m }
     })
     showToast('고친 글을 저장했습니다(원래 결과도 그대로 남습니다).')
+    return true
   }
 
   const toMemory = (run: AiRun) => {
@@ -299,6 +303,7 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
                 const excluded = list.filter((m) => m.excluded).length
                 showToast(excluded ? `${note} — ${excluded}개는 명부(개인별 원문)라 AI 에 보내지 않습니다.` : `${note}.`)
               }
+              return !!c
             }}
             onToggleExclude={async (id, excluded) => {
               const c = await guard(() =>

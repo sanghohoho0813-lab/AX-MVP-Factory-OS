@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
-import { monthUsage, usageMonths } from '../../services/ownerAi/usage'
+import { monthOf, monthUsage, usageMonths } from '../../services/ownerAi/usage'
 import { OwnerAiSetupError } from '../../services/ownerAi/repo'
 import type { AiRun } from '../../services/ownerAi/types'
 import { todayLocalDate } from '../../lib/appClock'
@@ -43,7 +43,7 @@ function Usage() {
   }, [repo])
   const months = useMemo(() => usageMonths(runs ?? [], today), [runs, today])
   const u = useMemo(() => monthUsage(runs ?? [], month), [runs, month])
-  const pasted = (runs ?? []).filter((r) => r.tier === 'manual' && r.createdAt.slice(0, 7) === month).length
+  const pasted = (runs ?? []).filter((r) => r.tier === 'manual' && monthOf(r.createdAt) === month).length
 
   return (
     <div className="flex flex-col gap-4">
