@@ -136,6 +136,12 @@ export interface DraftInput {
   situation?: string
   /** D-208 한 달 계획에서 올릴 날(YYYY-MM-DD) */
   planDate?: string
+  /**
+   * D-221 그 계획의 시작 월요일 · 주 몇 회. 예전에는 올릴 날만 남겨 계획을 짐작했다 —
+   * 주 4회 계획에서 화요일 글 하나만 저장하면 다시 열 때 주 2회로, 둘째 주 글부터 저장하면 한 주 밀려 보였다.
+   */
+  planStart?: string
+  planPer?: 2 | 4
 }
 
 export interface Draft {
@@ -936,6 +942,9 @@ export interface PlanSlot {
   topicType?: TopicType
   purpose?: KakaoPurpose
   title: string
+  /** D-221 이 칸이 속한 계획(시작 월요일 · 주 몇 회) — 글에 같이 남긴다 */
+  start?: string
+  per?: 2 | 4
 }
 
 const PLAN_2: { kind: ContentKind; topicType?: TopicType; purpose?: KakaoPurpose }[] = [
@@ -985,7 +994,7 @@ export function monthPlanFrom(p: ContentProfile, monday: string, perWeek: 2 | 4,
       k += 1
       const t = slot.topicType ? topics.find((x) => x.type === slot.topicType) : undefined
       const title = slot.kind === 'kakao' ? `카톡 · ${PURPOSE_LABEL[slot.purpose ?? 'news']}` : slot.kind === 'place' ? `${p.company} 플레이스 소개 다듬기` : (t?.title ?? `${kw} ${KIND_LABEL[slot.kind]}`)
-      out.push({ date: addDays(monday, w * 7 + d), kind: slot.kind, ...(t ? { topicType: t.type } : {}), ...(slot.purpose ? { purpose: slot.purpose } : {}), title })
+      out.push({ date: addDays(monday, w * 7 + d), kind: slot.kind, ...(t ? { topicType: t.type } : {}), ...(slot.purpose ? { purpose: slot.purpose } : {}), title, start: monday, per: perWeek })
     }
   }
   return out
@@ -1002,7 +1011,7 @@ export function planDrafts(p: ContentProfile, slots: readonly PlanSlot[], today:
   const make = (sl: PlanSlot, variant: number) => {
     const topic = sl.topicType ? topicsFor(p, kw, today, variant).find((t) => t.type === sl.topicType) ?? topicsFor(p, kw, today, variant)[0] : undefined
     const d = makeDraft(p, { kind: sl.kind, keyword: kw, topic, purpose: sl.purpose, variant }, today)
-    return { ...d, input: { ...d.input, planDate: sl.date } }
+    return { ...d, input: { ...d.input, planDate: sl.date, ...(sl.start && sl.per ? { planStart: sl.start, planPer: sl.per } : {}) } }
   }
   return slots.map((sl) => {
     const key = `${sl.kind}|${sl.topicType ?? ''}|${sl.purpose ?? ''}`
@@ -1018,11 +1027,24 @@ export function planDrafts(p: ContentProfile, slots: readonly PlanSlot[], today:
   })
 }
 
+/** D-221 '다른 안' 으로 새로 만들어도 계획 칸(올릴 날 · 시작 · 주 몇 회)은 그대로 */
+export function keepPlan(d: Draft, from: DraftInput): Draft {
+  if (!from.planDate) return d
+  return { ...d, input: { ...d.input, planDate: from.planDate, ...(from.planStart && from.planPer ? { planStart: from.planStart, planPer: from.planPer } : {}) } }
+}
+
 /**
  * D-208 진행 중인 계획 — 보관함 글의 올릴 날(planDate)로 되찾는다. 마지막 날이 지났으면 null(새 계획을 짤 때).
  * 시작 = 가장 이른 날이 있는 주의 월요일 · 월요일이나 목요일 글이 있으면 주 4회.
  */
-export function activePlan(items: readonly { input: { planDate?: string } }[], today: string): { monday: string; perWeek: 2 | 4 } | null {
+export function activePlan(items: readonly { input: { planDate?: string; planStart?: string; planPer?: 2 | 4 } }[], today: string): { monday: string; perWeek: 2 | 4 } | null {
+  // D-221 계획 정보가 남은 글이 있으면 그것으로(가장 늦게 시작한 계획) — 마지막 칸(4주째 금요일)이 지나면 끝
+  const known = items.map((x) => x.input).filter((i) => !!i.planDate && !!i.planStart && (i.planPer === 2 || i.planPer === 4))
+  if (known.length) {
+    const last = known.reduce((a, b) => ((b.planStart as string) > (a.planStart as string) ? b : a))
+    return addDays(last.planStart as string, 25) < today ? null : { monday: last.planStart as string, perWeek: last.planPer as 2 | 4 }
+  }
+  // 예전 글(올릴 날만 있음) — 날짜로 짐작
   const dates = items.map((x) => x.input.planDate).filter((d): d is string => !!d)
   if (!dates.length) return null
   const max = dates.reduce((a, b) => (a > b ? a : b))

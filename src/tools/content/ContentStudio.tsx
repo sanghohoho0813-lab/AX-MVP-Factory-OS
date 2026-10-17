@@ -16,6 +16,7 @@ import { Button } from '../../components/ui/Button'
 import { Badge, BottomSheet } from '../../components/ui/primitives'
 import { ConfirmModal } from '../../components/ui/ConfirmModal'
 import { useToast } from '../../components/ui/toastContext'
+import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard'
 import { localDateOf, todayLocalDate } from '../../lib/appClock'
 import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
 import {
@@ -26,6 +27,7 @@ import {
   BLOG_TYPE_LABEL,
   SHORT_LEN_LABEL,
   activePlan,
+  keepPlan,
   monthPlan,
   monthPlanFrom,
   parseKeywordVolumes,
@@ -196,6 +198,8 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   const [leaveAsk, setLeaveAsk] = useState<{ run: () => void } | null>(null)
   /** D-209 저장 전 고침이 있으면 다른 글을 열기 전에 묻는다(말없이 사라지지 않게) */
   const guard = (run: () => void) => (unsaved ? setLeaveAsk({ run }) : run())
+  // D-221 메뉴 · 링크로 다른 화면에 가도 묻는다(예전에는 창 닫기만 막아 고친 글이 말없이 사라졌다)
+  const { blocker: leaveRoute } = useUnsavedChangesGuard(unsaved)
   useEffect(() => {
     if (!unsaved) return
     const h = (e: BeforeUnloadEvent) => {
@@ -283,17 +287,17 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
       if (shown.item) {
         const v = await store.saveVersion(shown.item, blocks)
         if (!v) return showToast('저장하지 못했어요. 적은 글은 화면에 그대로 있어요 — 다시 눌러 주세요.')
-        setShown({ draft: { ...shown.draft, blocks: v.blocks }, item: v })
+        setShown({ draft: { ...shown.draft, title: v.title, blocks: v.blocks }, item: v })
         setEditing(null)
         // D-208 고침: 묶음 탭을 넘겼다 와도 새 판이 보이게
-        setPack((pk) => (pk ? { ...pk, items: pk.items.map((x, i) => (i === pk.at ? { ...x, draft: { ...x.draft, blocks: v.blocks } } : x)), saved: pk.saved.map((x, i) => (i === pk.at ? v : x)) } : pk))
+        setPack((pk) => (pk ? { ...pk, items: pk.items.map((x, i) => (i === pk.at ? { ...x, draft: { ...x.draft, title: v.title, blocks: v.blocks } } : x)), saved: pk.saved.map((x, i) => (i === pk.at ? v : x)) } : pk))
         showToast(v.id === shown.item.id ? '바뀐 곳이 없어요.' : `고친 글을 ${v.version}판으로 저장했어요(이전 판도 남아 있어요).`)
       } else {
         const r = await store.addDraft(shown.draft, blocks)
         if (!r) return showToast('저장하지 못했어요. 적은 글은 화면에 그대로 있어요 — 다시 눌러 주세요.')
-        setShown({ draft: { ...shown.draft, blocks: r.item.blocks }, item: r.item })
+        setShown({ draft: { ...shown.draft, title: r.item.title, blocks: r.item.blocks }, item: r.item })
         setEditing(null)
-        setPack((pk) => (pk ? { ...pk, items: pk.items.map((x, i) => (i === pk.at ? { ...x, draft: { ...x.draft, blocks: r.item.blocks } } : x)), saved: pk.saved.map((x, i) => (i === pk.at ? r.item : x)) } : pk))
+        setPack((pk) => (pk ? { ...pk, items: pk.items.map((x, i) => (i === pk.at ? { ...x, draft: { ...x.draft, title: r.item.title, blocks: r.item.blocks } } : x)), saved: pk.saved.map((x, i) => (i === pk.at ? r.item : x)) } : pk))
         showToast(r.dup ? '같은 글이 이미 보관함에 있어요.' : '보관함에 저장했어요.')
       }
     } finally {
@@ -633,7 +637,8 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                         setVariant(v)
                         const tt = shown.draft.input.topicType ?? topicType
                         const ts = topicsFor(profile, shown.draft.input.keyword ?? keyword, today, v)
-                        show(makeDraft(profile, { kind: shown.draft.kind, keyword: shown.draft.input.keyword ?? keyword, topic: ts.find((x) => x.type === tt) ?? ts[0], pages: shown.draft.input.pages, purpose: shown.draft.input.purpose, variant: v, blogType: shown.draft.input.blogType, shortLen: shown.draft.input.shortLen, adType: shown.draft.input.adType }, today))
+                        // D-221 계획 칸에서 연 글이면 '다른 안' 도 같은 칸(올릴 날)으로 — 예전에는 날짜가 빠져 칸이 '안 만듦' 으로 남았다
+                        show(keepPlan(makeDraft(profile, { kind: shown.draft.kind, keyword: shown.draft.input.keyword ?? keyword, topic: ts.find((x) => x.type === tt) ?? ts[0], pages: shown.draft.input.pages, purpose: shown.draft.input.purpose, variant: v, blogType: shown.draft.input.blogType, shortLen: shown.draft.input.shortLen, adType: shown.draft.input.adType }, today), shown.draft.input))
                       })
                     }
                     data-testid="content-again"
@@ -823,6 +828,16 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
           if (pack) setPack((pk) => (pk ? { ...pk, touched: pk.touched.map(() => false) } : pk))
           run?.()
         }}
+      />
+      <ConfirmModal
+        open={leaveRoute.state === 'blocked'}
+        title="저장하지 않은 고침이 있어요"
+        message="이 화면을 나가면 보관함에 저장하지 않은 고친 내용이 사라져요. 나갈까요?"
+        confirmLabel="저장하지 않고 나가기"
+        cancelLabel="계속 고치기"
+        danger
+        onConfirm={() => leaveRoute.proceed?.()}
+        onCancel={() => leaveRoute.reset?.()}
       />
 
       {profileOpen && (

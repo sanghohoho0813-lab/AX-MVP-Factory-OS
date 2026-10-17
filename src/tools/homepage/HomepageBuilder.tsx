@@ -8,13 +8,14 @@
  * D-208: 디자인 한 번에(스타일 6가지 — 꾸밈 + 블록 모양 + 바탕 흐름) · 홈페이지 점수 100점 + '이것만 하면 +n점'(누르면 그 블록) ·
  *        업종 맞춤 블록 [넣기] · 같은 업체 홍보 글 만들기로 바로 가기.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertTriangle, ArrowDown, ArrowUp, Check, CheckCircle2, ChevronRight, Copy, Download, ExternalLink, EyeOff, Gauge, Maximize2, Minimize2, Monitor, PenLine, Plus, Redo2, RefreshCw, Smartphone, Sparkles, Trash2, Undo2 } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { BottomSheet, Badge } from '../../components/ui/primitives'
 import { ConfirmModal } from '../../components/ui/ConfirmModal'
 import { useToast } from '../../components/ui/toastContext'
+import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard'
 import { useIsPhone } from '../../lib/useIsPhone'
 import { nowIso, todayLocalDate } from '../../lib/appClock'
 import { generateId } from '../../storage/localStore'
@@ -177,6 +178,9 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
   // PC 미리보기 크게(왼쪽 고치기 칸을 접고 미리보기만) — D-205
   const [big, setBig] = useState(false)
   const doc = store.doc
+  // D-221 사진처럼 늦게 들어오는 값은 그때의 최신 홈페이지에 넣는다(예전에는 사진을 줄이는 동안 다른 칸에 적은 글이 옛 값으로 덮였다)
+  const docRef = useRef(doc)
+  docRef.current = doc
   const today = todayLocalDate()
 
   const change = useCallback((next: SiteDoc, group?: string) => store.change(next, group), [store])
@@ -203,6 +207,9 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
     // 저장 실패를 알린다(적은 것은 화면에 남아 있다)
     if (store.save === 'error') showToast('저장하지 못했어요 — 적은 것은 이 화면에 남아 있어요. 잠시 뒤 다시 저장하고, 위의 [지금 다시 저장] 으로 바로 할 수도 있어요.')
   }, [store.save, showToast])
+  // D-221 저장에 실패한 채 메뉴 · 링크로 다른 화면에 가면 묻는다(예전에는 창 닫기만 막아 고친 것이 말없이 사라졌다)
+  const { blocker: leaveRoute } = useUnsavedChangesGuard(store.save === 'error')
+  const retrySave = () => void store.flush().then((ok) => showToast(ok ? '저장했어요.' : '아직 저장하지 못했어요 — 인터넷 연결을 확인해 주세요.'))
 
   if (!doc) {
     return (
@@ -276,7 +283,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
         {store.save === 'saved' ? '저장됨' : store.save === 'saving' ? '저장하는 중…' : store.save === 'pending' ? '고친 것 저장 대기' : '저장 실패 — 잠시 뒤 다시 저장해요'}
       </span>
       {store.save === 'error' && (
-        <Button size="sm" onClick={() => void store.flush().then((ok) => showToast(ok ? '저장했어요.' : '아직 저장하지 못했어요 — 인터넷 연결을 확인해 주세요.'))} data-testid="site-save-retry">
+        <Button size="sm" onClick={retrySave} data-testid="site-save-retry">
           <RefreshCw className="size-4" aria-hidden="true" /> 지금 다시 저장
         </Button>
       )}
@@ -373,7 +380,7 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
                   fields={def.fields}
                   imageRoom={imageRoom}
                   onImageError={(m) => showToast(m)}
-                  onChange={(key, value, group) => change(setProp(doc, b.id, key, value, nowIso()), group)}
+                  onChange={(key, value, group) => change(setProp(docRef.current ?? doc, b.id, key, value, nowIso()), group)}
                 />
                 <div className="flex flex-wrap gap-1.5 border-t border-slate-100 pt-3" data-testid="block-actions">
                   <IconBtn label="위로" disabled={pinned || i <= 1 || doc.blocks[i - 1]?.type === 'header'} onClick={() => change(moveBlock(doc, b.id, -1, nowIso()))} testId="block-up">
@@ -723,6 +730,19 @@ export function HomepageBuilder({ record, store }: { record: ClientOpsRecord; st
           setRedraft(null)
         }}
         onCancel={() => setRedraft(null)}
+      />
+      <ConfirmModal
+        open={leaveRoute.state === 'blocked'}
+        title="저장하지 못한 홈페이지가 있어요"
+        message="마지막으로 고친 것을 아직 저장하지 못했어요. 지금 나가면 그 내용이 사라져요."
+        confirmLabel="저장하지 않고 나가기"
+        cancelLabel="남아서 다시 저장"
+        danger
+        onConfirm={() => leaveRoute.proceed?.()}
+        onCancel={() => {
+          leaveRoute.reset?.()
+          retrySave()
+        }}
       />
     </div>
   )

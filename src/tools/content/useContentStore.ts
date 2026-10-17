@@ -15,6 +15,7 @@ import {
   itemData,
   nextVersion,
   normalizeItem,
+  titleOf,
   normalizeOverrides,
   sameContent,
   withPosted,
@@ -28,6 +29,9 @@ import { nowIso } from '../../lib/appClock'
 import { generateId } from '../../storage/localStore'
 import { SITE_BUCKET, SITE_MODULE } from '../homepage/useSiteDoc'
 import { rowSubjectId, subjectRow } from '../../services/marketingTrial'
+
+/** D-221 같은 글에 계획 칸을 달 때 — 올릴 날과 함께 계획(시작 · 주 몇 회)도 */
+const planOf = (i: Draft['input']) => ({ planDate: i.planDate, ...(i.planStart && i.planPer ? { planStart: i.planStart, planPer: i.planPer } : {}) })
 
 export interface ContentStore {
   status: 'loading' | 'ready' | 'error'
@@ -143,7 +147,7 @@ export function useContentStore(clientId: string | null, workspaceId: string | n
         // D-208 고침: 계획 칸에서 만든 글 — 날짜 없는 같은 글이면 날짜만 달고, 다른 날 계획의 같은 글이면 새로 넣는다
         if (dup && plan && !dup.input.planDate) {
           try {
-            return { item: await put({ ...dup, input: { ...dup.input, planDate: plan } }), dup: true }
+            return { item: await put({ ...dup, input: { ...dup.input, ...planOf(d.input) } }), dup: true }
           } catch {
             return null
           }
@@ -151,7 +155,7 @@ export function useContentStore(clientId: string | null, workspaceId: string | n
         if (dup && !(plan && dup.input.planDate !== plan)) return { item: dup, dup: true }
         const id = generateId()
         const now = nowIso()
-        const item: ContentItem = { id, kind: d.kind, title: d.title, blocks: bl, input: d.input, rootId: id, version: 1, favorite: false, hash: contentHash(d.kind, bl), createdAt: now, updatedAt: now }
+        const item: ContentItem = { id, kind: d.kind, title: titleOf(bl, d.title), blocks: bl, input: d.input, rootId: id, version: 1, favorite: false, hash: contentHash(d.kind, bl), createdAt: now, updatedAt: now }
         try {
           return { item: await put(item), dup: false }
         } catch {
@@ -224,12 +228,12 @@ export function useContentStore(clientId: string | null, workspaceId: string | n
             // D-208 고침: 다른 날 계획에 이미 쓴 같은 글이면 건너뛰지 않고 그 날짜로 새로 넣는다(건너뛰면 칸이 영영 빈다)
             if (dup && !(plan && dup.input.planDate && dup.input.planDate !== plan)) {
               out.dup += 1
-              out.items.push(plan && !dup.input.planDate ? await put({ ...dup, input: { ...dup.input, planDate: plan } }) : dup)
+              out.items.push(plan && !dup.input.planDate ? await put({ ...dup, input: { ...dup.input, ...planOf(d.input) } }) : dup)
               continue
             }
             const id = generateId()
             const now = nowIso()
-            out.items.push(await put({ id, kind: d.kind, title: d.title, blocks: d.blocks, input: d.input, rootId: id, version: 1, favorite: false, hash: contentHash(d.kind, d.blocks), createdAt: now, updatedAt: now }))
+            out.items.push(await put({ id, kind: d.kind, title: titleOf(d.blocks, d.title), blocks: d.blocks, input: d.input, rootId: id, version: 1, favorite: false, hash: contentHash(d.kind, d.blocks), createdAt: now, updatedAt: now }))
             out.added += 1
           } catch {
             out.items.push(null)

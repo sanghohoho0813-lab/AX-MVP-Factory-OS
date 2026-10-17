@@ -247,6 +247,9 @@ function ListField({
 }) {
   const max = field.maxItems ?? 12
   const blank: ListItem = Object.fromEntries((field.itemFields ?? []).map((s) => [s.key, '']))
+  // D-221 사진은 줄이는 동안 기다렸다 들어온다 — 그때의 최신 목록에 넣어야 그새 적은 칸이 덮이지 않는다
+  const itemsRef = useRef(items)
+  itemsRef.current = items
   return (
     <div className="flex flex-col gap-2" data-field={field.key}>
       <div className="flex items-center justify-between gap-2">
@@ -266,7 +269,7 @@ function ListField({
                   id={`${idBase}-${i}-${sub.key}`}
                   label={<span className="t-meta font-semibold text-slate-600">{sub.label}</span>}
                   value={it[sub.key] ?? ''}
-                  onChange={(v) => onChange(listSet(items, i, sub.key, v))}
+                  onChange={(v) => onChange(listSet(itemsRef.current, i, sub.key, v))}
                   onImageError={onImageError}
                   imageRoom={imageRoom}
                   hint={sub.hint}

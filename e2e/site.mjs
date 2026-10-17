@@ -308,6 +308,29 @@ const errors = []
   await rowOf(page, 'gallery').getByTestId('list-item').nth(1).locator('input[aria-label="2번째 제목(예: 동탄 아파트 욕실)"]').fill('금형 수리')
   await wait(800)
   check('D3 사진 없는 칸 → 미리보기엔 아이콘 자리', (await frameEval(page, (doc) => doc.querySelectorAll('#works .gph').length)) === 1)
+  // D-221 사진을 줄이는 동안(느린 휴대폰 흉내로 1.5초) 다른 칸에 적어도 — 사진이 들어올 때 적은 글이 옛 값으로 덮이지 않음
+  await page.evaluate(() => {
+    const Real = window.Image
+    window.__RealImage = Real
+    window.Image = function () {
+      const el = new Real()
+      let cb = null
+      Object.defineProperty(el, 'onload', { set(f) { cb = f }, get() { return cb } })
+      el.addEventListener('load', () => setTimeout(() => cb && cb(), 1500))
+      return el
+    }
+  })
+  await rowOf(page, 'gallery').getByTestId('list-item').nth(2).getByTestId('image-file').setInputFiles({ name: 'work3.png', mimeType: 'image/png', buffer: shot })
+  await wait(200)
+  await rowOf(page, 'gallery').locator('input[data-field="title"], textarea[data-field="title"]').first().fill('이런 일을 했어요')
+  await rowOf(page, 'gallery').getByTestId('list-item').nth(1).locator('input[aria-label="2번째 제목(예: 동탄 아파트 욕실)"]').fill('금형 수리 · 재생')
+  await wait(2600)
+  await page.evaluate(() => {
+    window.Image = window.__RealImage
+  })
+  await waitSaved(page)
+  const galD = (await savedDoc(page))?.blocks.find((b) => b.type === 'gallery')?.props
+  check('D221 사진 줄이는 중에 적은 칸 — 블록 제목 · 2번째 제목 그대로 · 3번째 사진도 들어감', galD?.title === '이런 일을 했어요' && galD?.items?.[1]?.title === '금형 수리 · 재생' && String(galD?.items?.[2]?.image ?? '').startsWith('data:image/'), { title: galD?.title, t2: galD?.items?.[1]?.title, img3: String(galD?.items?.[2]?.image ?? '').slice(0, 12) })
   await page.getByTestId('site-tab-checks').click()
   await wait(300)
   const galChecks = await page.getByTestId('site-check').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-key')}|${e.textContent}`))
@@ -441,11 +464,19 @@ const errors = []
     errState = await page.getByTestId('site-save').getAttribute('data-state')
   }
   const retryShown = await page.getByTestId('site-save-retry').count()
+  // D-221 저장 실패 중에 다른 화면으로 가려 하면 묻는다 → [남아서 다시 저장] 이면 그 자리에서 다시 저장
+  await page.getByTestId('site-to-content').click()
+  const leaveDlg = page.getByRole('dialog').filter({ hasText: '저장하지 못한 홈페이지가 있어요' })
+  await leaveDlg.waitFor({ timeout: 5000 }).catch(() => {})
+  const askedLeave = (await leaveDlg.count()) === 1 && /\/tools\/homepage\/build/.test(page.url())
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/d221-site-leave.png`, fullPage: false })
   await page.evaluate(() => {
     Storage.prototype.setItem = window.__realSet
   })
-  await page.getByTestId('site-save-retry').click()
+  if (askedLeave) await leaveDlg.getByRole('button', { name: '남아서 다시 저장' }).click()
+  else await page.getByTestId('site-save-retry').click()
   await waitSaved(page)
+  check('D221 저장 실패 중 다른 화면으로 → 묻는 창 · 이 화면 그대로 · [남아서 다시 저장] → 저장됨', askedLeave && /\/tools\/homepage\/build/.test(page.url()) && (await page.getByTestId('site-save').getAttribute('data-state')) === 'saved', { url: page.url() })
   const docR = await savedDoc(page)
   check('S12 저장 실패 → 실패 표시 · [지금 다시 저장] → 풀리면 저장됨(산뜻한 꾸밈이 남음)', errState === 'error' && retryShown === 1 && (await page.getByTestId('site-save').getAttribute('data-state')) === 'saved' && docR?.theme?.palette === 'ocean', { errState, retryShown, palette: docR?.theme?.palette })
   await page.getByTestId('site-to-content').click()

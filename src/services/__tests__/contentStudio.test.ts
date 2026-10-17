@@ -26,6 +26,8 @@ import {
   monthPlan,
   monthPlanFrom,
   activePlan,
+  keepPlan,
+  titleOf,
   planDrafts,
   planSlotStates,
   withPosted,
@@ -365,6 +367,31 @@ const st2 = planSlotStates(slots2, posted2)
 const run2 = activePlan(posted2, '2026-10-29')
 const run4 = activePlan(asItems(pd4), today)
 check('C70 계획 칸 형편 — 만듦 8 · 올림 2 · 날이 지나도(10/29) 같은 계획(월요일 · 주 2회 · 같은 날짜) · 주 4회 알아봄 · 끝난 계획은 null · 날짜 없는 글뿐이면 null', st2.filter((x) => x.item).length === 8 && st2.filter((x) => x.posted).length === 2 && st2[0].posted && st2[3].posted && run2?.monday === '2026-10-19' && run2.perWeek === 2 && monthPlanFrom(fp, run2.monday, 2, '2026-10-29').map((x) => x.date).join() === slots2.map((x) => x.date).join() && run4?.perWeek === 4 && activePlan(posted2, '2026-11-30') === null && activePlan([item], today) === null, { run2, run4, st: st2.map((x) => [!!x.item, x.posted]) })
+// D-221 계획 정보를 글에 남김 — 주 4회 계획에서 화요일 글 하나 · 둘째 주 글 하나만 저장해도 같은 계획
+const tue4 = asItems(pd4).filter((x) => x.input.planDate === slots4[1].date)
+const wk2 = asItems(pd4).filter((x) => x.input.planDate === slots4[5].date)
+const legacy4 = tue4.map((x) => ({ ...x, input: { ...x.input, planStart: undefined, planPer: undefined } }))
+const rt = normalizeItem('t1', itemData(tue4[0]))
+const rtBad = normalizeItem('t1', { ...itemData(tue4[0]), input: { ...tue4[0].input, planStart: '2026/10/19', planPer: 3 } })
+const shownSlot = pd4[1]
+const again = keepPlan(makeDraft(fp, { kind: shownSlot.kind, variant: 9 }, today), shownSlot.input)
+const after = (n: number) => { const d = new Date(`${slots4[0].date}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10) }
+check('C84 계획 정보 — 칸 · 글마다 시작 월요일 · 주 4회 · 화요일 글 하나만 있어도 주 4회 · 둘째 주 글 하나만 있어도 시작 그대로 · 마지막 칸 지나면 끝 · 예전 글은 짐작(화요일만 → 주 2회) · 저장 → 읽기 그대로 · 망가진 값 버림 · 다른 안도 같은 칸',
+  slots4.every((sl) => sl.start === slots4[0].date && sl.per === 4) && pd4.every((d) => d.input.planStart === slots4[0].date && d.input.planPer === 4) &&
+  activePlan(tue4, today)?.perWeek === 4 && activePlan(tue4, today)?.monday === slots4[0].date && activePlan(wk2, today)?.monday === slots4[0].date &&
+  activePlan(tue4, after(25)) !== null && activePlan(tue4, after(26)) === null && activePlan(legacy4, today)?.perWeek === 2 &&
+  rt?.input.planStart === slots4[0].date && rt?.input.planPer === 4 && rtBad?.input.planStart === undefined && rtBad?.input.planPer === undefined && rtBad?.input.planDate === tue4[0].input.planDate &&
+  again.input.planDate === shownSlot.input.planDate && again.input.planStart === slots4[0].date && again.input.planPer === 4 && keepPlan(again, { variant: 0, tone: 'friendly' }) === again,
+  { tue: activePlan(tue4, today), wk2: activePlan(wk2, today), legacy: activePlan(legacy4, today), rt: rt?.input })
+// D-221 보관함 제목은 글 안 제목 칸을 따라간다(고친 판 · 대괄호 채움)
+const blogD = makeDraft(fp, { kind: 'blog', topic: topics[0] }, today)
+const blogIt: ContentItem = { id: 'b1', kind: 'blog', title: blogD.title, blocks: blogD.blocks, input: blogD.input, rootId: 'b1', version: 1, favorite: false, hash: contentHash('blog', blogD.blocks), createdAt: '2026-10-16T01:00:00Z', updatedAt: '2026-10-16T01:00:00Z' }
+const editedT = blogD.blocks.map((b) => (b.hint === '제목' ? { ...b, text: '화성 금속부품, 이것만 보면 됩니다\n(둘째 줄)' } : b))
+const v2T = nextVersion([blogIt], blogIt, editedT, 'b2', '2026-10-17T01:00:00Z')
+const kakaoD = makeDraft(fp, { kind: 'kakao', purpose: 'news' }, today)
+check('C85 보관함 제목 — 제목 칸을 고쳐 저장하면 새 제목(첫 줄만) · 제목 칸 없는 글(카톡)은 그대로 · 빈 제목 칸이면 그대로',
+  blogIt.title === titleOf(blogD.blocks, 'x') && v2T.title === '화성 금속부품, 이것만 보면 됩니다' && titleOf(kakaoD.blocks, kakaoD.title) === kakaoD.title && titleOf(blogD.blocks.map((b) => (b.hint === '제목' ? { ...b, text: ' ' } : b)), '옛 제목') === '옛 제목',
+  { v2: v2T.title, blog: blogIt.title })
 const itS = { ...item, id: 's1', rootId: 's1', postedAt: '2026-10-20T09:00:00Z', input: { ...item.input, situation: 'move', planDate: '2026-10-20' } }
 const backS = normalizeItem('s1', itemData(itS))
 const badS = normalizeItem('s1', { ...itemData(itS), postedAt: 123, input: { ...itS.input, situation: 'hack', planDate: '2026/10/20' } })

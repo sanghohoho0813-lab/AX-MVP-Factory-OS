@@ -588,6 +588,67 @@ const errors = []
 }
 
 /* ================================================================== */
+/* D-221 한 달 계획 정보 · 다른 안 올릴 날 · 보관함 제목 · 메뉴로 나가면 묻기           */
+/* ================================================================== */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  const page = await ctx.newPage()
+  page.on('pageerror', (e) => errors.push(`D221 pageerror ${e.message}`))
+  await seed(page)
+  await page.goto(BASE + '/tools/content/build?client=cli_site', { waitUntil: 'networkidle' })
+  await page.getByTestId('content-studio').waitFor()
+  // 주 4회 계획에서 둘째 칸(화요일) 하나만 — [다른 안] 으로 바꿔 저장
+  await page.getByTestId('content-plan-toggle').click()
+  await page.locator('[data-testid="content-plan-per"][data-value="4"]').click()
+  await page.getByTestId('content-plan-slot').nth(1).click()
+  await page.getByTestId('content-result').waitFor()
+  await page.getByTestId('content-again').click()
+  await wait(300)
+  await page.getByTestId('content-save').click()
+  await wait(700)
+  const planned = (await items(page)).map((r) => r.data?.input ?? {}).filter((i) => i.planDate)
+  check('D221 다른 안으로 바꿔 저장해도 올릴 날 · 계획(주 4회 · 시작 월요일)이 글에 남음', planned.length === 1 && planned[0].planPer === 4 && /^\d{4}-\d{2}-\d{2}$/.test(planned[0].planStart ?? ''), planned)
+  await page.goto(BASE + '/tools/content/build?client=cli_site', { waitUntil: 'networkidle' })
+  await page.getByTestId('content-plan').waitFor()
+  await page.getByTestId('content-plan-toggle').click()
+  const planTxt = await page.getByTestId('content-plan').innerText()
+  const st = await page.getByTestId('content-plan-slot').evaluateAll((els) => els.map((e) => e.getAttribute('data-state')))
+  check('D221 다시 열어도 주 4회 계획 그대로 · 16칸 · 둘째 칸 만듦(화요일 글 하나만 저장해도 주 2회로 바뀌지 않음)', /주 4회 계획/.test(planTxt) && st.length === 16 && st[1] === 'made' && st.filter((x) => x === 'made').length === 1, { st, txt: planTxt.slice(0, 80) })
+  if (SHOTS) await page.getByTestId('content-plan').screenshot({ path: `${SHOTS}/d221-plan4.png` })
+
+  // 보관함 제목 — 제목 칸을 고쳐 저장하면 목록 제목도
+  await page.locator('[data-testid="content-kind"][data-kind="blog"]').click()
+  await page.getByTestId('content-make').click()
+  await page.getByTestId('content-result').waitFor()
+  await page.getByTestId('content-edit').click()
+  await page.getByTestId('content-block-input').first().fill('동탄 시제품, 처음 맡기기 전에 볼 3가지')
+  // 저장 전에 메뉴로 나가려 하면 묻는다
+  await page.getByRole('link', { name: '일정', exact: true }).first().click()
+  const ask = page.getByRole('dialog').filter({ hasText: '이 화면을 나가면' })
+  await ask.waitFor({ timeout: 5000 }).catch(() => {})
+  const asked = (await ask.count()) === 1 && /\/tools\/content\/build/.test(page.url())
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/d221-content-leave.png`, fullPage: false })
+  if (asked) await ask.getByRole('button', { name: '계속 고치기' }).click()
+  await wait(200)
+  check('D221 고친 글을 저장하지 않고 메뉴(일정)를 누르면 묻는 창 · [계속 고치기] → 그 자리 · 고친 글 그대로', asked && /\/tools\/content\/build/.test(page.url()) && (await page.getByTestId('content-block-input').first().inputValue()) === '동탄 시제품, 처음 맡기기 전에 볼 3가지', page.url())
+  await page.getByTestId('content-save').click()
+  await wait(700)
+  const arch1 = await page.getByTestId('content-archive-item').allInnerTexts()
+  check('D221 저장 → 보관함 줄 · 결과 제목이 고친 제목', arch1.some((t) => t.includes('동탄 시제품, 처음 맡기기 전에 볼 3가지')) && (await page.getByTestId('content-result-title').innerText()) === '동탄 시제품, 처음 맡기기 전에 볼 3가지', arch1.slice(0, 3))
+  await page.getByTestId('content-edit').click()
+  await page.getByTestId('content-block-input').first().fill('동탄 시제품 맡기기 전 체크 3가지')
+  await page.getByTestId('content-save').click()
+  await wait(700)
+  const arch2 = await page.getByTestId('content-archive-item').allInnerTexts()
+  check('D221 고친 판으로 저장 → 보관함 제목도 새 제목(옛 제목 줄 없음)', arch2.some((t) => t.includes('동탄 시제품 맡기기 전 체크 3가지')) && !arch2.some((t) => t.includes('처음 맡기기 전에 볼 3가지')), arch2.slice(0, 3))
+  // 저장한 뒤에는 메뉴로 바로 나감(묻지 않음)
+  await page.getByRole('link', { name: '일정', exact: true }).first().click()
+  await wait(600)
+  check('D221 저장한 뒤 메뉴 → 묻지 않고 그 화면으로', !/\/tools\/content/.test(page.url()) && (await page.getByRole('dialog').count()) === 0, page.url())
+  await ctx.close()
+}
+
+/* ================================================================== */
 /* 휴대폰 390 · 360                                                     */
 /* ================================================================== */
 for (const width of [390, 360]) {

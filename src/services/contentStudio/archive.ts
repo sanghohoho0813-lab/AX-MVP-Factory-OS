@@ -77,6 +77,8 @@ export function normalizeItem(id: string, raw: unknown, createdAt = '', updatedA
     // D-208
     ...(typeof inp.situation === 'string' && (SITUATION_KEYS as string[]).includes(inp.situation) ? { situation: inp.situation } : {}),
     ...(typeof inp.planDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(inp.planDate) ? { planDate: inp.planDate } : {}),
+    // D-221
+    ...(typeof inp.planStart === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(inp.planStart) && (inp.planPer === 2 || inp.planPer === 4) ? { planStart: inp.planStart, planPer: inp.planPer } : {}),
   }
   return {
     id,
@@ -123,7 +125,16 @@ export function sameContent(items: readonly ContentItem[], kind: ContentKind, bl
 export function nextVersion(items: readonly ContentItem[], base: ContentItem, blocks: DraftBlock[], id: string, now: string): ContentItem {
   const chain = items.filter((x) => x.rootId === base.rootId)
   const version = Math.max(base.version, ...chain.map((x) => x.version)) + 1
-  return { ...base, id, blocks, version, hash: contentHash(base.kind, blocks), favorite: false, createdAt: now, updatedAt: now }
+  return { ...base, id, title: titleOf(blocks, base.title), blocks, version, hash: contentHash(base.kind, blocks), favorite: false, createdAt: now, updatedAt: now }
+}
+
+/**
+ * D-221 보관함 제목 = 글 안 '제목' 칸(블로그 · 긴 영상). 예전에는 처음 만든 제목을 그대로 둬서
+ * 제목 칸을 고치거나 [대괄호]를 채워 저장해도 목록에는 옛 제목 · 대괄호가 남았다. 제목 칸이 없는 글은 그대로.
+ */
+export function titleOf(blocks: readonly DraftBlock[], fallback: string): string {
+  const t = (blocks.find((b) => b.hint?.startsWith('제목'))?.text ?? '').split('\n')[0].trim()
+  return t ? t.slice(0, 120) : fallback
 }
 
 /** D-208 계획 칸 하나의 형편 — 만든 글(사슬의 새 판) · 올렸는지 */
