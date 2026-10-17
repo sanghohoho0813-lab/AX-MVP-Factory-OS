@@ -53,10 +53,11 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
           groupLabel="② 대표자 생년월일"
           value={form.birthDate}
           onChange={(v) => update('birthDate', v)}
+          startAt="1980-01-01"
           minYear={1930}
           maxYear={currentYear - 10}
         />
-        <HintText>창업 당시 만 15~34세면 청년 창업에 해당할 수 있습니다. (병역 기간 최대 6년 빼기) 처음 보이는 1980년 1월 1일은 예시라 판정에 쓰지 않습니다.</HintText>
+        <HintText>창업 당시 만 15~34세면 청년 창업에 해당할 수 있습니다. (병역 기간 최대 6년 빼기)</HintText>
       </Section>
 
       {/* 3. 창업일 */}
@@ -66,11 +67,12 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
           groupLabel="③ 창업일"
           value={form.startupDate}
           onChange={(v) => update('startupDate', v)}
+          startAt="2020-01-01"
           minYear={1990}
           maxYear={currentYear}
           yearStep={5}
         />
-        <HintText>처음 보이는 2020년 1월 1일은 예시라 판정에 쓰지 않습니다. 실제 창업일로 바꿔 주세요.</HintText>
+        <HintText>사업자등록증의 개업일(법인은 설립등기일)을 고르세요.</HintText>
       </Section>
 
       {/* 4. 지역 */}

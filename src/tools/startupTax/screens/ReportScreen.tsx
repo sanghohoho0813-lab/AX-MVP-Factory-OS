@@ -36,7 +36,8 @@ export function StartupTaxReportScreen() {
   const form = useMemo(() => {
     const saved = loadStartupTaxForm(clientId)
     // D-165: 판정을 누른 폼만 결과서로(열기만 한 빈 폼은 '아직 판정한 내용이 없습니다')
-    return saved && isStartupTaxJudged(clientId, saved) ? withoutPlaceholders(saved) : null
+    // D-215: 예시 날짜를 빈 칸으로 바꾸는 것은 예전에 저장된 폼만(지금 폼은 빈 칸을 빈 칸으로 둔다 — 진짜 1980-01-01 도 판정)
+    return saved && isStartupTaxJudged(clientId, saved) ? (saved.placeholdersCleared ? saved : withoutPlaceholders(saved)) : null
   }, [clientId])
   const result = useMemo(() => (form ? judge(form) : null), [form])
 

@@ -13,7 +13,7 @@
 import type { ClientOpsRecord } from '../types/clientOps'
 import { clientFacts, type ClientFacts } from '../tools/shared/clientPrefill'
 import { usableFactValue } from './customerFacts'
-import { latestToolResult } from './toolResultGroups'
+import { latestToolResult, latestEmploymentRoster } from './toolResultGroups'
 import { certInsightOf } from '../certification/integration/certInsight'
 import { matchesFor, type GrantNotice } from './grants/grantMatch'
 import { profileOfRecord, missingForMatch } from './grants/grantProfile'
@@ -111,21 +111,24 @@ const grantsInsight: Provider = ({ record, today, notices }) => {
 }
 
 const policyInsight: Provider = ({ record, facts }) => {
-  const { input, missing } = policyInputFromFacts(facts)
+  const { input, missing, assumed } = policyInputFromFacts(facts)
   const open = `/tools/policy-funding/diagnosis${q(record)}`
   const core = missing.filter((m) => m !== '매출')
   if (core.length) return { key: 'policy-funding', label: '정책자금', tone: 'need', headline: `${core.join(' · ')}을(를) 알면 바로 판정해요`, detail: '사업자등록증을 올리면 설립일 · 업종이 저절로 들어가요.', missing: core, openPath: open, openLabel: '정책자금 진단', action: null }
   const r = runDiagnosis(input)
   const level = r.likelihoodLevel ?? r.headline?.level ?? '보통'
-  const tone: InsightTone = level === '높음' ? 'good' : level === '보통' ? 'maybe' : 'no'
+  // D-215: 직원 수를 모르면 1~4명(소상공인)으로 계산된다 — '높음' 으로 단정하지 않고 가정이라고 알린다
+  const noHeadcount = assumed.includes('직원 수')
+  const tone: InsightTone = level === '높음' ? (noHeadcount ? 'maybe' : 'good') : level === '보통' ? 'maybe' : 'no'
   const why = r.headline?.reasons[0] ?? r.nextAction
+  const more = [missing.includes('매출') ? '매출' : '', noHeadcount ? '직원 수' : ''].filter(Boolean)
   return {
     key: 'policy-funding',
     label: '정책자금',
     tone,
     headline: `진행 가능성 ${level} · 추천 기관 ${r.topAgency}`,
-    detail: missing.includes('매출') ? `${why} · 매출을 알면 더 정확해요` : why,
-    missing: missing.includes('매출') ? ['매출(재무제표 · 크레탑)'] : [],
+    detail: more.length ? `${why} · ${more.join(' · ')}을(를) 알면 더 정확해요${noHeadcount ? '(지금은 직원 1~4명 · 소상공인으로 가정)' : ''}` : why,
+    missing: [...(missing.includes('매출') ? ['매출(재무제표 · 크레탑)'] : []), ...(noHeadcount ? ['직원 수(4대보험 가입자 명부)'] : [])],
     openPath: open,
     openLabel: '정책자금 진단 열기',
     action: tone === 'good' || tone === 'maybe' ? `정책자금 상담 — ${r.topAgency} 쪽으로 준비` : null,
@@ -194,8 +197,7 @@ const startupInsight: Provider = ({ record, today, facts }) => {
 
 const employmentInsight: Provider = ({ record }) => {
   const open = `/tools/employment/roster${q(record)}`
-  const last = latestToolResult(record, 'employment')
-  const roster = last && (last.data as { tab?: string } | null)?.tab === 'roster' ? last : null
+  const roster = latestEmploymentRoster(record)
   if (!roster) return { key: 'employment', label: '고용지원금', tone: 'need', headline: '4대보험 가입자 명부를 올리면 직원별 지원금 후보를 바로 봐요', detail: '청년 · 고령 · 신규 입사 후보와 청년도약 참여신청 기한까지.', missing: ['4대보험 가입자 명부'], openPath: open, openLabel: '명부 진단', action: null }
   const hard = roster.deadlines.filter((d) => d.hard).length
   // D-191: 명부 진단이 계산한 최대 예상 지원금 — 저장된 값, 옛 결과는 요약 글의 '최대 n만원'

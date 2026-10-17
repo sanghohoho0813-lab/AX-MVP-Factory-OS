@@ -34,6 +34,8 @@ import { notYetRegistered, youthEmployeeRecord, youthEnrollDeadlines, youthEnrol
 import { agencyAutoComment, agencyDocRequestText, agencyReportData, agencySummaryText, commissionSummary, companyRanking, companyRiskRanking, ddayAlerts, emptyCompanyMeta, monthlyReceived, pendingPayments, programPipeline } from '../lib/companyMeta'
 import { buildImportPreview, parseBulkPaste, parseMoneyCell, xlAutoMap, xlBizNoCheck, xlDetectHeader, xlNormDate } from '../lib/excelImport'
 import { birthFromCell, looksLikeRrn, safeBizNo } from '../lib/privacy'
+import { normBirthCell } from '../lib/birthCell'
+import { latestEmploymentRoster } from '../../../services/toolResultGroups'
 import {
   analyzeRoster,
   buildCopyText,
@@ -685,7 +687,8 @@ check('ROSTER_FIELDS 9', ROSTER_FIELDS.length === 9 && ROSTER_FIELDS[0].key === 
   check('청년: 40세 0개월 · 복무 72개월 → 탈락(최대 만 39세)', !youthAgeAt('1986-06-01', '2026-06-01', 72).ok)
   check('청년: 복무 100개월도 6년까지만', calcMilitaryLimit(100).extMonths === 72)
   check('청년: 여성은 복무 가산을 쓰지 않는다(입력 화면과 같게)', !gate('1990-06-01', 24, 'female').ageOk && gate('1990-06-01', 24, 'male').ageOk)
-  check('청년: 생년월일 자리값(2000-01-01)이면 대상자 예상으로 올리지 않는다', !gate('2000-01-01').ok && !gate('2000-01-01').hasBirth && !gate('').ok)
+  // D-215: 직원 창이 빈 칸으로 시작하므로 2000-01-01 은 진짜 생년월일이다(예전: 자리값이라 '미입력' — 2000년 1월 1일생 청년은 판정이 안 됐다)
+  check('청년/D-215: 2000-01-01 은 진짜 생년월일로 판정 · 빈 칸만 미입력', gate('2000-01-01').hasBirth && gate('2000-01-01').ageOk && !gate('').ok && !gate('').hasBirth)
   check('청년: 나이(만 N세)만 알 때', youthByYears(34, 0) === 'ok' && youthByYears(35, 0) === 'fail' && youthByYears(14, 0) === 'fail' && youthByYears(36, 24) === 'ok' && youthByYears(36, 18) === 'border' && youthByYears(40, 72) === 'fail')
   {
     // 두 화면이 서로 다른 답을 내지 않는다: 자격요건(생년월일) 통과인데 채용 진단(만 N세)이 막거나, 진단이 '충족' 인데 자격요건이 떨어뜨리는 일 없음
@@ -970,6 +973,46 @@ check('ROSTER_FIELDS 9', ROSTER_FIELDS.length === 9 && ROSTER_FIELDS[0].key === 
   check('  이미 신청(접수)했으면 · 입사일과 상관없는 지원금이면 · 입사일 모르면 → 표시 없음', enrollWindowOf('youth_jump', '2024-01-02', 'submitted', T) === null && enrollWindowOf('parental_leave', '2010-01-01', 'preparing', T) === null && enrollWindowOf('youth_jump', '', 'preparing', T) === null)
   const w3 = enrollWindowOf('saeil_women', '2026-09-01', 'preparing', T)
   check('  새일 인턴을 이미 채용한 뒤 준비로 등록 → 채용 전 약정 필요', !!w3 && enrollBadgeText(w3) === '채용 전 약정 필요')
+}
+
+// ── D-215 표 명부 보험 칸 · 숫자 생년월일 · 명부 결과 찾기 ────────────
+{
+  const BASE215 = new Date(2026, 9, 17)
+  // 1) 보험 칸이 없는 표(엑셀 · CSV) 명부 — 청년을 '추가자료 필요' 로 빼지 않는다
+  const grid = textToGrid(['성명,주민등록번호,자격취득일', '김청년,000315-3******,2026-09-01'].join('\n'))
+  const emps = extractEmployees(grid, detectRoster(grid))
+  const a = analyzeRoster(emps, { baseDate: BASE215 })
+  const yj = a.subsidySummary.find((x) => x.key === 'youth_jump')!
+  check('D-215 표 명부(보험 칸 없음): 청년 후보로 셈 · 후보 지원금 1건 이상 · 특수관계자 의심 아님', yj.candidateCount === 1 && a.candidateSubsidyCount >= 1 && !a.rows[0].diag.relSuspect && a.rows[0].diag.candidates.find((c) => c.key === 'youth_jump')?.level === 'check', JSON.stringify({ yj, rel: a.rows[0].diag.relSuspect }))
+  check('D-215 표 명부: 보험 칸이 없으면 \'가입 여부 확인 필요\' 로만(미가입 단정 아님)', /고용보험 가입 여부 확인 필요/.test(a.rows[0].diag.candidates.find((c) => c.key === 'youth_jump')!.note) && !/미가입으로 보임/.test(a.rows[0].diag.candidates.find((c) => c.key === 'youth_jump')!.note))
+  // 보험 칸이 있고 고용보험이 빠졌으면 예전처럼 '추가자료 필요'
+  const g2 = textToGrid(['성명,주민등록번호,자격취득일,가입보험', '박청년,000315-3******,2026-09-01,국민·건강'].join('\n'))
+  const a2 = analyzeRoster(extractEmployees(g2, detectRoster(g2)), { baseDate: BASE215 })
+  check('D-215 표 명부(보험 칸 국민·건강 — 고용 빠짐): 청년은 추가자료 필요 · 특수관계자 확인', a2.rows[0].diag.candidates.find((c) => c.key === 'youth_jump')?.level === 'more' && a2.rows[0].diag.relSuspect, JSON.stringify(a2.rows[0].diag.candidates))
+  const g3 = textToGrid(['성명,주민등록번호,자격취득일,가입보험', '최청년,000315-3******,2026-09-01,국민·건강·고용·산재'].join('\n'))
+  const a3 = analyzeRoster(extractEmployees(g3, detectRoster(g3)), { baseDate: BASE215 })
+  check('D-215 표 명부(4대보험 모두): 청년 후보 · 고용보험 문구 없음', a3.rows[0].diag.candidates.find((c) => c.key === 'youth_jump')?.level === 'check' && !/고용보험/.test(a3.rows[0].diag.candidates.find((c) => c.key === 'youth_jump')!.note))
+
+  // 2) 숫자로 들어온 생년월일
+  const T = new Date(2026, 9, 17)
+  check('D-215 생년월일: 6자리 950115 → 1995-01-15 · 010203 → 2001-02-03', normBirthCell('950115', { today: T }) === '1995-01-15' && normBirthCell('010203', { today: T }) === '2001-02-03')
+  check('D-215 생년월일: 앞 0 빠진 10203(엑셀 숫자) → 2001-02-03(예전 1927-12-07) · 6자리 칸이면 315 → 2000-03-15', normBirthCell('10203', { today: T }) === '2001-02-03' && normBirthCell(10203, { today: T }) === '2001-02-03' && normBirthCell('315', { sixDigit: true, today: T }) === '2000-03-15' && normBirthCell('315', { today: T }) === null)
+  check('D-215 생년월일: 진짜 엑셀 날짜 번호 33970 → 1993-01-01 · 6자리 칸이면 30101 → 2003-01-01', normBirthCell('33970', { today: T }) === '1993-01-01' && normBirthCell('30101', { sixDigit: true, today: T }) === '2003-01-01')
+  check('D-215 생년월일: 날짜 글자 · 8자리 · 없는 날은 그대로 규칙', normBirthCell('1995.01.15', { today: T }) === '1995-01-15' && normBirthCell('19950115', { today: T }) === '1995-01-15' && normBirthCell('950230', { today: T }) === null)
+  const g4 = [['성명', '주민앞자리', '취득일'], ['정청년', 10203, '2026-09-01']] as unknown as Parameters<typeof extractEmployees>[0]
+  const e4 = extractEmployees(g4, detectRoster(g4))
+  check('D-215 명부 표: \'주민앞자리\' 칸의 숫자 10203 → 2001-02-03(예전 1927-12-07)', e4.length === 1 && e4[0].birthDate === '2001-02-03', JSON.stringify(e4.map((e) => e.birthDate)))
+  const xg = [['업체명', '사업자번호', '성명', '입사일자', '생년월일6자리'], ['한솔테크(주)', '123-45-67890', '김둘', '2026-09-01', '10203'], ['한솔테크(주)', '123-45-67890', '이셋', '2026-09-01', '950115']]
+  const xm = xlAutoMap(xg[0])
+  const xpv = buildImportPreview({ grid: xg, headerRow: 0, map: xm.map, clients: [{ id: 'c1', companyName: '(주)한솔테크', businessNumber: '1234567890' }], programs: [], existing: [] })
+  check('D-215 엑셀 가져오기: 생년월일6자리 10203 → 2001-02-03 · 950115 → 1995-01-15(예전 1927 · 빈 칸)', xpv.toSave.map((r) => r.birthDate).join() === '2001-02-03,1995-01-15', JSON.stringify(xpv.toSave.map((r) => r.birthDate)))
+
+  // 3) 회차 일정을 더 최근에 붙여도 명부 결과를 찾는다
+  const rec = { toolResults: [
+    { id: 't2', toolKey: 'employment', title: '고용지원금 · 회차 일정 · 김청년', verdict: null, verdictLabel: '', summary: '', data: { tab: 'schedule' }, deadlines: [], createdAt: '2026-10-17T01:00:00Z', publishedUpdateId: null },
+    { id: 't1', toolKey: 'employment', title: '고용지원금 명부 진단', verdict: 'candidates', verdictLabel: '후보 2건', summary: '', data: { tab: 'roster' }, deadlines: [], createdAt: '2026-10-16T01:00:00Z', publishedUpdateId: null },
+  ] } as unknown as Parameters<typeof latestEmploymentRoster>[0]
+  check('D-215 명부 결과: 회차 일정이 더 최근이어도 명부 진단을 찾는다', latestEmploymentRoster(rec)?.id === 't1')
 }
 
 console.log(`\nemployment: ${passed} passed, ${failed} failed`)

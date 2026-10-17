@@ -15,6 +15,7 @@
 import { EMP_STAGES, type EmpStage } from './empRecords'
 import { parseJumin, toYMD } from './dates'
 import { birthFromCell, bizNoLooksLikeRrn, isRrnHeader, stripRrn } from './privacy'
+import { normBirthCell, SIX_DIGIT_BIRTH_HEADER } from './birthCell'
 
 export interface XlField {
   key: string
@@ -330,6 +331,8 @@ export function buildImportPreview(input: {
   const seenPair: Record<string, number> = {}
   const seenSave = new Set<string>()
   let junk = 0
+  // D-215: '생년월일6자리 · 주민앞자리' 칸이면 짧은 숫자는 앞 0이 빠진 YYMMDD
+  const birthSix = map.birthDate != null && map.birthDate >= 0 && SIX_DIGIT_BIRTH_HEADER.test(String((grid[headerRow] || [])[map.birthDate] ?? ''))
   for (let i = headerRow + 1; i < grid.length; i++) {
     const raw = grid[i]
     if (!raw || raw.every((v) => String(v == null ? '' : v).trim() === '')) continue
@@ -353,10 +356,8 @@ export function buildImportPreview(input: {
       continue
     }
     const startD = xlNormDate(cell(raw, 'startDate'))
-    const birthC = birthFromCell(cell(raw, 'birthDate'), (x) => {
-      const r = xlNormDate(x)
-      return r.ok && !r.empty ? r.value : ''
-    })
+    // D-215: 생년월일 전용 읽기(10203 → 2001-02-03 · 950115 → 1995-01-15) — 화면(SubsidyApp)과 같은 읽기
+    const birthC = birthFromCell(cell(raw, 'birthDate'), (x) => normBirthCell(x, { sixDigit: birthSix }) ?? '')
     const birthD = { ok: birthC.ok, value: birthC.value }
     const programName = cell(raw, 'programName')
     const warns: string[] = []

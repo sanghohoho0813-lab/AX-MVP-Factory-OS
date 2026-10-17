@@ -283,13 +283,16 @@ export interface YouthGateResult {
   hireWindowText: string
 }
 
-/** 생년월일을 모를 때 원본 폼이 넣어 두던 자리값 — 이 값이면 '생년월일 미입력' 으로 본다 */
+/**
+ * 생년월일을 모를 때 원본 폼이 넣어 두던 자리값.
+ * D-215: 더는 '미입력' 으로 보지 않는다 — 직원 창이 빈 칸으로 시작하므로, 이 날짜는 진짜 2000년 1월 1일생이다.
+ */
 export const BIRTH_PLACEHOLDER = '2000-01-01'
 
 /**
  * 청년도약 자격요건 관문 — 원본 EligChk 의 aOk/anyE/allXok/nearBorder.
  * D-136: 나이는 youthAgeAt(입사일 기준 만 나이, 병역 가산 최대 6년) 하나로 본다 — 채용 진단과 같은 규칙.
- *        생년월일이 비었거나 자리값(2000-01-01)이면 ok 로 올리지 않는다.
+ *        생년월일이 비었으면 ok 로 올리지 않는다(D-215: 2000-01-01 도 진짜 날짜로 본다).
  */
 export function youthGate(input: YouthGateInput): YouthGateResult {
   const mil = input.gender === 'male' ? input.milMonths : 0
@@ -298,7 +301,7 @@ export function youthGate(input: YouthGateInput): YouthGateResult {
   const anyE = ELIG.some((e) => !!input.elig[e.id])
   const failedX = EXCL.filter((x) => input.excl[x.id] === false)
   const allXok = EXCL.every((x) => input.excl[x.id] === true)
-  const has = !!input.birthDate && input.birthDate !== BIRTH_PLACEHOLDER
+  const has = !!input.birthDate
   const hw = hireWindowOf('youth_jump', input.hireDate || null, input.today ?? new Date())
   const hwBlocked = hireWindowBlocks(hw) && !input.enrolled
   const ok = has && aOk && anyE && allXok && !hwBlocked

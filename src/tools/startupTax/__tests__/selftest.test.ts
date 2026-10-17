@@ -22,7 +22,7 @@ import {
 import { buildSummaryText } from '../lib/summary'
 import { calcAge, formatDate, parseLocalDate } from '../lib/date'
 import { calendarYearsBetween, formatAge, formatTaxRemaining } from '../lib/lineage'
-import { EMPTY_FORM, PLACEHOLDER_BIRTH, PLACEHOLDER_STARTUP, withoutPlaceholders } from '../lib/formDefaults'
+import { EMPTY_FORM, PLACEHOLDER_BIRTH, PLACEHOLDER_STARTUP, openSavedForm, withoutPlaceholders } from '../lib/formDefaults'
 import { REVISED_RULE_ALERT } from '../lib/rules'
 import {
   BUSINESS_TYPES,
@@ -816,6 +816,17 @@ const CASES: Expect[] = [
     name: '[10] 생년월일만 예시 → 입력해야 판정',
     form: withoutPlaceholders(mkForm({ birthDate: PLACEHOLDER_BIRTH, startupDate: '2024-01-01' })),
     expect: (r) => [r.notice === NOTICE_MISSING_DATES && r.overall !== 'good', `overall=${r.overall}`],
+  },
+  {
+    // D-215: 예시 날짜 비교는 예전에 저장된 폼만 — 지금 폼에서 고른 1980-01-01 · 2020-01-01 은 진짜 날짜라 판정한다
+    name: '[10] D-215 지금 폼의 1980-01-01 · 2020-01-01 → 판정함(입력해야 판정 아님)',
+    form: openSavedForm({ ...mkForm({ birthDate: PLACEHOLDER_BIRTH, startupDate: PLACEHOLDER_STARTUP }), placeholdersCleared: true }),
+    expect: (r) => [r.notice !== NOTICE_MISSING_DATES, `notice=${r.notice}`],
+  },
+  {
+    name: '[10] D-215 예전에 저장된 폼(표시 없음)의 예시 날짜 → 한 번 빈 칸 → 입력해야 판정',
+    form: openSavedForm(mkForm({ birthDate: PLACEHOLDER_BIRTH, startupDate: PLACEHOLDER_STARTUP })),
+    expect: (r) => [r.notice === NOTICE_MISSING_DATES, `notice=${r.notice}`],
   },
   {
     name: '[10] 빈 폼 → 죽지 않고 입력해야 판정 · good 아님',

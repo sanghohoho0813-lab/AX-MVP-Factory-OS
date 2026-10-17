@@ -17,7 +17,7 @@ import { clientFacts, type ClientFacts } from '../tools/shared/clientPrefill'
 import { policyInputFromFacts } from '../tools/policyFunding/clientInput'
 import { runDiagnosis } from '../tools/policyFunding/diagnosis'
 import { buildDocumentRequestMessage } from './clientOpsMessages'
-import { latestToolResult } from './toolResultGroups'
+import { latestEmploymentRoster } from './toolResultGroups'
 import { usableFactValue } from './customerFacts'
 import { buildInsights, recommendNextSteps, type Insight, type InsightTone } from './clientInsights'
 import { pendingFacts } from './customerFacts'
@@ -179,7 +179,7 @@ const ANSWERS: Record<string, (ctx: AdvisorContext) => AdvisorAnswer> = {
   policy: (ctx) => {
     const a = empty('policy', '정책자금')
     const f = factsOf(ctx)
-    const { input, missing } = policyInputFromFacts(f)
+    const { input, missing, assumed } = policyInputFromFacts(f)
     a.links = [{ label: '정책자금 진단 열기', href: `/tools/policy-funding/diagnosis${q(ctx.record)}` }]
     const core = missing.filter((m) => m !== '매출')
     if (core.length) {
@@ -190,8 +190,10 @@ const ANSWERS: Record<string, (ctx: AdvisorContext) => AdvisorAnswer> = {
     }
     const r = runDiagnosis(input)
     const level = r.likelihoodLevel ?? r.headline?.level ?? '보통'
-    a.verdict = { tone: level === '높음' ? 'good' : level === '보통' ? 'maybe' : 'no', text: `진행 가능성 ${level}` }
-    a.facts = [...profileLines(ctx.record, f).slice(0, 4), ...(r.headline?.reasons ?? []).slice(0, 2).map((x) => `판단 이유: ${x}`), ...(r.headline?.checks ?? []).slice(0, 2).map((x) => `확인 필요: ${x}`)]
+    // D-215: 직원 수를 모르면 1~4명(소상공인)으로 계산된다 — 가정이라고 적고 '높음' 은 '보통 이상' 으로만
+    const noHeadcount = assumed.includes('직원 수')
+    a.verdict = { tone: level === '높음' ? (noHeadcount ? 'maybe' : 'good') : level === '보통' ? 'maybe' : 'no', text: `진행 가능성 ${level}${noHeadcount ? ' (직원 수 모름 — 소상공인으로 가정)' : ''}` }
+    a.facts = [...profileLines(ctx.record, f).slice(0, 4), ...(noHeadcount ? ['가정: 직원 수를 몰라 1~4명(소상공인)으로 계산 — 4대보험 명부로 확인하면 소진공 해당 여부까지 정확해요'] : []), ...(r.headline?.reasons ?? []).slice(0, 2).map((x) => `판단 이유: ${x}`), ...(r.headline?.checks ?? []).slice(0, 2).map((x) => `확인 필요: ${x}`)]
     a.steps = [...r.agencies.slice(0, 3).map((ag) => `${ag.rank}순위 ${ag.name}${ag.reasons[0] ? ` — ${ag.reasons[0]}` : ''}`), r.nextAction ? `다음: ${r.nextAction}` : ''].filter(Boolean)
     a.docs = r.documents.slice(0, 8)
     a.missing = missing.includes('매출') ? ['매출(재무제표 · 크레탑) — 알면 기관 · 한도가 더 정확해요'] : []
@@ -220,8 +222,8 @@ const ANSWERS: Record<string, (ctx: AdvisorContext) => AdvisorAnswer> = {
     const a = empty('employment', '고용지원금')
     const ins = insightOf(ctx, 'employment')
     a.links = [{ label: '명부 진단 열기', href: `/tools/employment/roster${q(ctx.record)}` }]
-    const last = latestToolResult(ctx.record, 'employment')
-    if (!last || (last.data as { tab?: string } | null)?.tab !== 'roster') {
+    const last = latestEmploymentRoster(ctx.record)
+    if (!last) {
       a.verdict = { tone: 'need', text: '4대보험 가입자 명부가 있으면 바로 봐요' }
       a.docs = ['4대보험 사업장 가입자 명부(최근 발급)']
       a.steps = ['명부를 서류 올리기로 넣기 → 직원별 후보 · 청년도약 참여신청 기한이 저절로 계산돼요', '입사 예정자가 있으면 입사 전에 지원금 조건(나이 · 근로 형태)을 먼저 확인']

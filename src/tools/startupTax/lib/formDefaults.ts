@@ -51,6 +51,14 @@ export function withoutPlaceholders(form: StartupTaxForm): StartupTaxForm {
   return { ...form, birthDate, startupDate }
 }
 
+/**
+ * D-215: 저장된 폼 열기 — 예전(D-136~214)에 예시 날짜로 채워 저장한 폼만 한 번 빈 칸으로 바꾸고 표시를 남긴다.
+ * 표시가 있는 폼의 1980-01-01 · 2020-01-01 은 사람이 고른 진짜 날짜다(판정한다).
+ */
+export function openSavedForm(f: StartupTaxForm): StartupTaxForm {
+  return f.placeholdersCleared ? f : { ...withoutPlaceholders(f), placeholdersCleared: true }
+}
+
 /** 판정 4단계 → OS 색 (초록·노랑·주황·빨강 그대로) */
 export const VERDICT_TONE: Record<Verdict, Tone> = {
   good: 'success',

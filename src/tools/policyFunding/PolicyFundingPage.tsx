@@ -38,6 +38,22 @@ const STORAGE_KEY = 'axmvp.tools.policyFunding'
 /** D-126: 업체마다 따로 기억한다 — 예전에는 브라우저에 하나라 다른 업체로 열어도 앞 업체 답이 그대로 보였다 */
 const keyFor = (clientId: string | null | undefined) => (clientId ? `${STORAGE_KEY}.${clientId}` : sharedToolKey(STORAGE_KEY))
 
+/**
+ * D-215: 사람이 직접 바꾼 칸 — 업체 정보로 채울 때 건드리지 않는다.
+ * 이 도구는 기본값이 빈 값이 아니라(개인사업자 · 1~3년 · 1~4명) '기본값과 같으면 안 고친 칸' 으로 봤는데,
+ * 일부러 고른 '개인사업자' · '1~3년' 이 기본값과 같아 다시 열 때마다 업체 정보(법인 · 5년)로 바뀌었다.
+ */
+const touchedKey = (clientId: string | null | undefined) => `${keyFor(clientId)}:touched`
+function loadTouched(clientId: string | null | undefined): Set<string> {
+  try {
+    const raw = localStorage.getItem(touchedKey(clientId))
+    const list = raw ? (JSON.parse(raw) as unknown) : []
+    return new Set(Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string') : [])
+  } catch {
+    return new Set()
+  }
+}
+
 function loadInput(clientId: string | null | undefined): DiagnosisInput {
   try {
     const raw = localStorage.getItem(keyFor(clientId))
@@ -138,9 +154,15 @@ function DiagnosisScreen() {
   // 업체에서 열었으면 아는 것을 채운다 (D-90).
   // 이 도구는 기본값이 빈 값이 아니라서(개인사업자·1~3년 …), **아직 손대지 않은 칸만** 바꾼다.
   // D-209: 같은 때 '지난 진단 되살리기' 가 먼저 넣은 입력 위에 채운다(그때의 seed 가 아니라 최신 seed) — 예전에는 되살린 입력을 기본값으로 덮었다
-  const fillFrom = (base: DiagnosisInput, facts: Parameters<Parameters<typeof usePrefillFromClient>[0]>[0]): { next: DiagnosisInput; filled: string[] } => {
+  const touched = useRef<{ client: string | null | undefined; keys: Set<string> }>({ client: clientId, keys: loadTouched(clientId) })
+  if (touched.current.client !== clientId) touched.current = { client: clientId, keys: loadTouched(clientId) }
+  const fillFrom = (base0: DiagnosisInput, facts: Parameters<Parameters<typeof usePrefillFromClient>[0]>[0]): { next: DiagnosisInput; filled: string[] } => {
     const filled: string[] = []
+    // D-215: 사람이 바꾼 칸은 '기본값이 아닌 것' 처럼 다룬다 — 아래 '기본값과 같으면 채움' 비교에서 빠지게
+    const t = touched.current.keys
+    const base = { ...base0 }
     const next = { ...base }
+    const isUntouched = (k: keyof DiagnosisInput) => !t.has(k as string)
     if (!next.companyName && facts.companyName) {
       next.companyName = facts.companyName
       filled.push('업체명')
@@ -149,17 +171,17 @@ function DiagnosisScreen() {
       next.industry = facts.industryText
       filled.push('업종')
     }
-    if (next.businessType === DEFAULT_INPUT.businessType && facts.businessType === 'corporation') {
+    if (isUntouched('businessType') && next.businessType === DEFAULT_INPUT.businessType && facts.businessType === 'corporation') {
       next.businessType = '법인사업자'
       filled.push('사업자 유형')
     }
     const years = yearsBand(facts.years)
-    if (next.years === DEFAULT_INPUT.years && years) {
+    if (isUntouched('years') && next.years === DEFAULT_INPUT.years && years) {
       next.years = years
       filled.push('업력')
     }
     const emp = employeesBand(facts.employeeCount)
-    if (next.employees === DEFAULT_INPUT.employees && emp) {
+    if (isUntouched('employees') && next.employees === DEFAULT_INPUT.employees && emp) {
       next.employees = emp
       filled.push('직원 수')
     }
@@ -167,7 +189,7 @@ function DiagnosisScreen() {
     const rev = facts.revenue && !facts.revenue.estimated ? facts.revenue.won : null
     if (rev !== null) {
       const band = revenueBand(rev)
-      if (next.revenue === DEFAULT_INPUT.revenue && band !== next.revenue) {
+      if (isUntouched('revenue') && next.revenue === DEFAULT_INPUT.revenue && band !== next.revenue) {
         next.revenue = band
         filled.push('매출 규모')
       }
@@ -200,14 +222,34 @@ function DiagnosisScreen() {
 
   // D-211: 지금 칸 값 — 가정 칩은 아직 그 값 그대로인 칸만(직접 고친 칸은 이제 대표 값)
   const [liveInput, setLiveInput] = useState<DiagnosisInput | null>(null)
+  // D-215: 같은 화면(같은 key) 안에서 바뀐 칸 = 사람이 바꾼 칸 — 저장해 두고 업체 정보로 채울 때 건너뛴다
+  const lastSeen = useRef<{ mount: string; input: DiagnosisInput } | null>(null)
+  const mountKey = `${clientId ?? ''}|${seed.key}`
   const remember = useCallback((input: DiagnosisInput) => {
+    const prev = lastSeen.current
+    if (prev && prev.mount === mountKey) {
+      let changed = false
+      for (const k of Object.keys(input) as (keyof DiagnosisInput)[]) {
+        if (input[k] !== prev.input[k] && !touched.current.keys.has(k)) {
+          touched.current.keys.add(k)
+          changed = true
+        }
+      }
+      if (changed)
+        try {
+          localStorage.setItem(touchedKey(clientId), JSON.stringify([...touched.current.keys]))
+        } catch {
+          /* 못 적어도 진단은 된다 */
+        }
+    }
+    lastSeen.current = { mount: mountKey, input }
     setLiveInput(input)
     try {
       localStorage.setItem(keyFor(clientId), JSON.stringify(input))
     } catch {
       /* 저장 못 해도 진단은 된다 */
     }
-  }, [clientId])
+  }, [clientId, mountKey])
 
   const extras = useCallback(
     (input: DiagnosisInput, result: DiagnosisResult) => (

@@ -19,7 +19,7 @@ import { clientFacts, type ClientFacts } from '../tools/shared/clientPrefill'
 import { formatWon, usableFactValue } from './customerFacts'
 import { startupRegion } from './clientInsights'
 import { entityKindOf } from './clientOrder'
-import { latestToolResult } from './toolResultGroups'
+import { latestEmploymentRoster } from './toolResultGroups'
 import { isExcludedIndustryText } from '../tools/labcare/lib/assessmentOptions'
 import type { ScenarioPreset } from './scenarioPresets'
 import { parseGoalText, profileSuggestions, salaryPlan, viewProfile, type ProfileView, type TaxProfile } from './taxPlan'
@@ -130,8 +130,8 @@ export function fitContext(record: ClientOpsRecord, today: string): FitContext {
   }
   const kids = reg.filter((r) => r.relation === 'child' || r.relation === 'minor_child').length
   const children = kids > 0 ? Math.max(kids, p.children) : given('children') ? p.children : null
-  const roster = latestToolResult(record, 'employment')
-  const rd = roster && (roster.data as { tab?: string } | null)?.tab === 'roster' ? (roster.data as { counts?: { youthCount?: number; seniorCount?: number; activeCount?: number } }).counts : null
+  const roster = latestEmploymentRoster(record)
+  const rd = roster ? (roster.data as { counts?: { youthCount?: number; seniorCount?: number; activeCount?: number } }).counts : null
   return {
     record,
     facts,

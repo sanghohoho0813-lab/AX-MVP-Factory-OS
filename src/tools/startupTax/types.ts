@@ -62,6 +62,8 @@ export interface FormData {
   businessType: BusinessType | ''
   birthDate: string // YYYY-MM-DD
   startupDate: string // YYYY-MM-DD
+  /** D-215: 예전에 예시 날짜로 채워 저장된 폼을 한 번 빈 칸으로 읽었음(그 뒤 고른 1980-01-01 · 2020-01-01 은 진짜 값) */
+  placeholdersCleared?: true
   region: Region | ''
   overconcentration: Overconcentration | ''
   industry: Industry | ''

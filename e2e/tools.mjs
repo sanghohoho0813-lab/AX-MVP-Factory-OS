@@ -63,8 +63,11 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     await g.getByLabel('월').selectOption(String(m))
     await g.getByLabel('일').selectOption(String(d))
   }
+  // D-215: 빈 날짜는 빈 값 — 예시 날짜(1980-01-01 · 2020-01-01) 아래에 '아직 고르지 않았어요'
+  check('D-215 창업감면: 고르지 않은 날짜 두 칸은 예시라고 알려 준다', (await page.getByTestId('date-unpicked').count()) === 2)
   await pickDate('② 대표자 생년월일', 1995, 3, 1)
   await pickDate('③ 창업일', 2025, 1, 15)
+  check('D-215 창업감면: 고르면 예시 안내가 사라진다', (await page.getByTestId('date-unpicked').count()) === 0)
   await page.getByRole('button', { name: '아니오', exact: true }).first().click()
   await page.getByRole('button', { name: '제조업', exact: true }).click()
   await page.getByRole('button', { name: '완전 신규 창업', exact: true }).click()
@@ -236,6 +239,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await empApp.getByRole('button', { name: '+ 직원 추가' }).first().click()
   await page.waitForTimeout(400)
   const empModal = page.locator('#hr-orig-portal')
+  // D-215: 생년월일은 빈 칸으로 시작(예전 자리값 2000-01-01 없음) · 비어 있어도 청년도약 자격요건 칸이 보여 바로 적는다
+  check('D-215 직원 추가: 생년월일 빈 칸 · 청년도약 자격요건 칸이 보인다', (await empModal.getByText('청년도약 자격요건').count()) === 1 && (await empModal.locator('input[type=date]').first().inputValue()) === '')
   await empModal.getByPlaceholder('홍길동').fill('김청년')
   await empModal.locator('input[type=date]').first().fill('2026-03-02')
   await empModal.getByRole('button', { name: '직원 저장' }).click()

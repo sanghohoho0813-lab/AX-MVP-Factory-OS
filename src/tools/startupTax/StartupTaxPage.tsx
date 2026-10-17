@@ -26,7 +26,7 @@ import { FactSendButton } from '../shared/FactSendButton'
 import { useToolClient } from '../shared/toolClientContext'
 import { loadStartupTaxForm, saveStartupTaxForm, markStartupTaxJudged } from './lib/formStore'
 import type { FormData as StartupTaxForm, JudgementResult } from './types'
-import { EMPTY_ADVANCED, EMPTY_FORM, PLACEHOLDER_BIRTH, PLACEHOLDER_STARTUP, withoutPlaceholders } from './lib/formDefaults'
+import { EMPTY_ADVANCED, EMPTY_FORM, openSavedForm } from './lib/formDefaults'
 import { judge, VERDICT_EMOJI, VERDICT_LABEL } from './lib/judgement'
 // D-211: 판정 기준일은 한국 날짜로 남긴다(UTC 로 자르면 오전 9시 전 판정이 어제 날짜였다)
 import { formatDate } from './lib/date'
@@ -37,20 +37,19 @@ import ResultCards from './orig/components/ResultCards'
 import PrintSheet from './orig/components/PrintSheet'
 
 /**
- * 원본 기본값 (요청 사양: 생년월일 1980-01-01, 창업일 2020-01-01) — 업체 정보로 채울 때 이 값은 '안 적은 것' 으로 본다.
- * D-136: 판정할 때도 '안 적은 것' 이다 — 예시 날짜 그대로 누르면 '생년월일·창업일을 입력해야 판정합니다' 가 나온다.
+ * D-215: 빈 날짜는 빈 값으로 둔다 — 예시 날짜(1980-01-01 · 2020-01-01)는 날짜 고르기 칸이 처음 보여 주는 자리일 뿐 값이 아니다.
+ *   예전(D-136): 빈 칸을 예시 날짜로 채워 두고 '예시와 같으면 안 적은 것' 으로 봐서, 대표 생년월일이 정말 1980-01-01 이면
+ *   업체 정보로 채워도 판정이 안 되고(맞춤 추천은 판정 — 서로 다름), [업체 정보로 보내기] 도 숨었다.
+ *   예전에 저장된 폼의 예시 날짜(그때 채워 둔 값)는 한 번만 빈 칸으로 읽는다(legacy).
  */
-const ORIG_BIRTH = PLACEHOLDER_BIRTH
-const ORIG_STARTUP = PLACEHOLDER_STARTUP
-
 function freshForm(): StartupTaxForm {
-  return { ...EMPTY_FORM, birthDate: ORIG_BIRTH, startupDate: ORIG_STARTUP, checkItems: { ...EMPTY_FORM.checkItems }, advanced: { ...EMPTY_ADVANCED } }
+  return { ...EMPTY_FORM, checkItems: { ...EMPTY_FORM.checkItems }, advanced: { ...EMPTY_ADVANCED }, placeholdersCleared: true }
 }
 
 function formFor(clientId: string | null): StartupTaxForm {
   const f = loadStartupTaxForm(clientId)
   if (!f) return freshForm()
-  return { ...f, birthDate: f.birthDate || ORIG_BIRTH, startupDate: f.startupDate || ORIG_STARTUP }
+  return openSavedForm(f)
 }
 
 function StartupTaxScreen() {
@@ -77,8 +76,8 @@ function StartupTaxScreen() {
     saveStartupTaxForm(clientId, form)
   }, [form, clientId])
 
-  // D-136: 예시 날짜는 빈 칸으로 바꿔 판정한다 (화면에는 그대로 둔다)
-  const judgedForm = useMemo(() => withoutPlaceholders(form), [form])
+  // D-215: 빈 칸은 빈 칸 그대로 판정한다(예시 날짜 비교 없음)
+  const judgedForm = form
   const result: JudgementResult | null = useMemo(() => (submitted ? judge(judgedForm, baseDate) : null), [submitted, judgedForm, baseDate])
   const summaryText = useMemo(() => (result ? buildSummaryText(result) : ''), [result])
 
@@ -90,11 +89,11 @@ function StartupTaxScreen() {
       next.businessType = facts.businessType
       filled.push('사업자 유형')
     }
-    if ((!next.birthDate || next.birthDate === ORIG_BIRTH) && facts.representativeBirth) {
+    if (!next.birthDate && facts.representativeBirth) {
       next.birthDate = facts.representativeBirth
       filled.push('대표자 생년월일')
     }
-    if ((!next.startupDate || next.startupDate === ORIG_STARTUP) && facts.establishedAt) {
+    if (!next.startupDate && facts.establishedAt) {
       next.startupDate = facts.establishedAt
       filled.push('창업일')
     }
@@ -218,8 +217,8 @@ function StartupTaxScreen() {
           확대해 그리는 원본 화면 밖에 둔다 — 안에 두면 휴대폰 큰 글자에서 단추가 화면 밖으로 밀렸다 */}
       {submitted && result && (
         <div className="no-print flex flex-wrap items-center gap-2" data-testid="startup-facts">
-          {/^\d{4}-\d{2}-\d{2}$/.test(form.birthDate) && form.birthDate !== ORIG_BIRTH && <FactSendButton factKey="representativeBirth" value={form.birthDate} display={form.birthDate.replace(/-/g, '.')} source="manual" />}
-          {/^\d{4}-\d{2}-\d{2}$/.test(form.startupDate) && form.startupDate !== ORIG_STARTUP && <FactSendButton factKey="establishedAt" value={form.startupDate} display={form.startupDate.replace(/-/g, '.')} source="manual" />}
+          {/^\d{4}-\d{2}-\d{2}$/.test(form.birthDate) && <FactSendButton factKey="representativeBirth" value={form.birthDate} display={form.birthDate.replace(/-/g, '.')} source="manual" />}
+          {/^\d{4}-\d{2}-\d{2}$/.test(form.startupDate) && <FactSendButton factKey="establishedAt" value={form.startupDate} display={form.startupDate.replace(/-/g, '.')} source="manual" />}
         </div>
       )}
 

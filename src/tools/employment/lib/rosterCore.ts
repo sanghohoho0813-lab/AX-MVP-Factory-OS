@@ -20,6 +20,7 @@
 import { calcAgeDetailed, daysInMonth, parseYMD, youthAgeAt } from './dates'
 import { DEFAULT_PROGRAMS } from './programs'
 import { hireWindowBlocks, hireWindowOf } from './hireWindow'
+import { normBirthCell, SIX_DIGIT_BIRTH_HEADER } from './birthCell'
 
 // ── 결과 단계(레벨) 정의 ──────────────────────────────────
 export type LevelKey = 'likely' | 'check' | 'more' | 'unknown'
@@ -346,6 +347,17 @@ export function idCellKind(raw: Cell): 'rrn' | 'date' | 'none' {
 }
 
 // ── 명부 행 → 직원 객체 추출 (RRN 원본 미보관) ────────────
+/**
+ * D-215: 표(엑셀 · CSV) 명부의 '보험' 칸 → 보험별 가입 표시. 칸에 보험 이름이 하나라도 적혀 있으면 네 보험 모두 '파악됨'
+ * (적히지 않은 보험은 미가입). 칸이 없거나 '가입 · Y' 처럼 어느 보험인지 모르면 아무것도 파악하지 않는다(미가입으로 단정하지 않음).
+ */
+export function insFromCell(raw: string): { ins?: InsFlags; insKnown?: InsFlags } {
+  const t = (raw || '').replace(/\s+/g, '')
+  const ins: InsFlags = { np: /국민|연금/.test(t), hi: /건강/.test(t), wc: /산재/.test(t), ei: /고용/.test(t) }
+  if (!ins.np && !ins.hi && !ins.wc && !ins.ei) return {}
+  return { ins, insKnown: { np: true, hi: true, wc: true, ei: true } }
+}
+
 export function extractEmployees(grid: Grid, det: RosterDetect): RosterEmployee[] {
   const map = det.map
   const h = det.headerIdx
@@ -354,6 +366,8 @@ export function extractEmployees(grid: Grid, det: RosterDetect): RosterEmployee[
     return i == null || i < 0 ? '' : String(row[i] == null ? '' : row[i]).trim()
   }
   const out: RosterEmployee[] = []
+  // D-215: '주민앞자리 · 생년월일6자리' 칸이면 짧은 숫자는 앞 0이 빠진 YYMMDD(엑셀이 010203 → 10203 으로 바꿈)
+  const birthSix = map.rrn != null && map.rrn >= 0 && SIX_DIGIT_BIRTH_HEADER.test(String((grid[h] || [])[map.rrn] ?? ''))
   for (let i = h + 1; i < grid.length; i++) {
     const row = grid[i]
     if (!row || row.every((v) => String(v == null ? '' : v).trim() === '')) continue
@@ -365,7 +379,8 @@ export function extractEmployees(grid: Grid, det: RosterDetect): RosterEmployee[
     let birthDate: string | null = null
     let gender: GenderMF | null = null
     let rrnMasked: string | null = null
-    const kind = idCellKind(rrnRaw)
+    const kind0 = idCellKind(rrnRaw)
+    const kind = kind0 === 'none' && birthSix && /^\d{3,5}$/.test(rrnRaw) ? 'date' : kind0
     if (kind === 'rrn') {
       const der = deriveFromRRN(rrnRaw)
       if (der) {
@@ -375,7 +390,8 @@ export function extractEmployees(grid: Grid, det: RosterDetect): RosterEmployee[
       rrnMasked = maskRRN(rrnRaw)
     } else if (kind === 'date') {
       // 생년월일(1995-01-15 · 19950115 · 엑셀 날짜) — 성별은 모른다
-      birthDate = normDate(rrnRaw)
+      // D-215: 생년월일 전용 읽기 — 5자리를 늘 엑셀 날짜 번호로 읽어 10203(2001-02-03)이 1927-12-07 이 되던 것
+      birthDate = normBirthCell(rrnRaw, { sixDigit: birthSix }) ?? normDate(rrnRaw)
       rrnMasked = digitsOnly(rrnRaw).length === 6 ? maskRRN(rrnRaw) : null
     }
     // 성별 컬럼이 명시되어 있으면 우선
@@ -392,6 +408,7 @@ export function extractEmployees(grid: Grid, det: RosterDetect): RosterEmployee[
       loseDate: normDate(cell(row, 'loseDate')),
       statusRaw: cell(row, 'status'),
       insuranceRaw: cell(row, 'insurance'),
+      ...insFromCell(cell(row, 'insurance')),
       workplace: cell(row, 'workplace') || (det.meta && det.meta.workplace) || '',
       bizNo: cell(row, 'bizNo') || (det.meta && det.meta.bizNo) || '',
     })
@@ -792,14 +809,21 @@ export function classifyEmployee(emp: RosterEmployee, opts?: { baseDate?: Date |
   const wcOn = !!ins.wc
   const eiNeedsCheck = !eiOn // 고용보험 OFF 또는 미파악 → 확인 필요
   const wcNeedsCheck = !wcOn
-  const eiNote = eiNeedsCheck ? ' · 고용보험 피보험자격 확인 필요(미가입/확인 불가 시 대상 판단 제한)' : ''
+  /**
+   * D-215: 후보 단계는 '미가입으로 확인된' 경우에만 낮춘다 — 표(엑셀 · CSV) 명부처럼 보험 칸이 없으면 모르는 것이지 미가입이 아니다.
+   *   예전: 보험 칸이 없는 명부는 모두 '고용보험 미가입' 처럼 다뤄 청년이 전부 '추가자료 필요' 로 빠지고 '후보 지원금 0건' 이 됐다.
+   */
+  const eiKnownOff = !!insKnown.ei && !eiOn
+  const eiNote = eiKnownOff ? ' · 고용보험 미가입으로 보임 — 피보험자격 확인 필요(미가입이면 대상 아님)' : eiNeedsCheck ? ' · 고용보험 가입 여부 확인 필요' : ''
 
   // 특수관계자/대표자/임원: 사용자가 표시했거나, 연금·건강만 있고 고용·산재 없는 경우 의심
   const rel: RelKind = emp.rel || 'none' // none|ceo|exec|special
   const relMarked = rel === 'ceo' || rel === 'exec' || rel === 'special'
   // 4대보험 중 2개 이상 미가입(체크 안 됨)이면 특수관계자/대표자/임원 의심
   const insMissingCount = [ins.np, ins.hi, ins.wc, ins.ei].filter((b) => !b).length
-  const relSuspect = insMissingCount >= 2
+  // D-215: 칸이 파악된 보험 중 미가입만 센다(보험 칸이 없는 명부의 직원 전부를 '특수관계자 의심' 으로 만들지 않게)
+  const insKnownMissing = (['np', 'hi', 'wc', 'ei'] as const).filter((k) => insKnown[k] && !ins[k]).length
+  const relSuspect = insKnownMissing >= 2
   const relNote = relMarked
     ? ' · 대표자/임원/특수관계자 표시됨 → 지원금 대상 제한 가능성(판단 제한)'
     : relSuspect
@@ -831,7 +855,7 @@ export function classifyEmployee(emp: RosterEmployee, opts?: { baseDate?: Date |
   if (youth)
     push({
       key: 'youth_jump',
-      level: lvl(eiNeedsCheck ? 'more' : 'check'),
+      level: lvl(eiKnownOff ? 'more' : 'check'),
       note: '청년 연령(' + ageBasis + '만 ' + hireAge + '세) 1차 해당 · 취업애로청년 요건 확인 필요' + eiNote + relNote,
     })
   else if (emp.gender === 'M' && hireAge != null && hireAge >= 35 && hireAge <= 39)
@@ -841,7 +865,7 @@ export function classifyEmployee(emp: RosterEmployee, opts?: { baseDate?: Date |
   if (hireKnown && !hireWindowBlocks(hireWindowOf('emp_promo', emp.hireDate, base))) push({ key: 'emp_promo', level: 'more', note: '신규 입사 · 취업취약계층·취업지원프로그램 이수 등 추가자료 필요' + eiNote + relNote })
   if (senior) {
     push({ key: 'senior_continue', level: lvl('check'), note: '고령 연령(만 ' + age + '세) 1차 해당 · 정년·계속고용제도·취업규칙 확인 필요' + eiNote + relNote })
-    push({ key: 'senior_intern', level: lvl(eiNeedsCheck ? 'more' : 'check'), note: '고령 연령 1차 해당 · 참여기관·사업요건 확인 필요' + eiNote + relNote })
+    push({ key: 'senior_intern', level: lvl(eiKnownOff ? 'more' : 'check'), note: '고령 연령 1차 해당 · 참여기관·사업요건 확인 필요' + eiNote + relNote })
   }
   if (female && age != null && age >= 20 && age <= 59) push({ key: 'saeil_women', level: lvl('check'), note: '여성 1차 해당 · 경력단절 여부·새일센터 연계 확인 필요' + eiNote + relNote })
 

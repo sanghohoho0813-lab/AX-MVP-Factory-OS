@@ -9,12 +9,15 @@ interface Props {
   yearStep?: number
   // 이 OS 에서 더함 — 화면 읽기·시험용 이름 (생년월일 / 창업일 구분)
   groupLabel?: string
+  /** D-215: 값이 비었을 때 처음 보여 줄 날짜(예시) — 값으로 쓰지 않는다. 비었으면 '아직 고르지 않음' + [이 날짜로 정하기] */
+  startAt?: string
 }
 
 // HTML date 입력 대신 연/월/일 분리 선택 방식.
 // 연도 드롭다운 + 빠른 이동(±10년) 버튼으로 연도 이동을 매우 편하게 한다.
-export default function DateSelect({ value, onChange, minYear, maxYear, yearStep = 10, groupLabel }: Props) {
-  const parts = splitDate(value) ?? { year: maxYear, month: 1, day: 1 }
+export default function DateSelect({ value, onChange, minYear, maxYear, yearStep = 10, groupLabel, startAt }: Props) {
+  const picked = splitDate(value)
+  const parts = picked ?? splitDate(startAt ?? '') ?? { year: maxYear, month: 1, day: 1 }
   const { year, month, day } = parts
 
   // 연도: 최신 연도가 위로 오도록 내림차순
@@ -102,6 +105,19 @@ export default function DateSelect({ value, onChange, minYear, maxYear, yearStep
           <Caret />
         </div>
       </div>
+      {!picked && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-base text-amber-900" data-testid="date-unpicked">
+          <span className="break-keep">아직 고르지 않았어요 — 위 날짜는 예시입니다.</span>
+          <button
+            type="button"
+            onClick={() => onChange(joinDate(year, month, day))}
+            className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 font-semibold text-amber-900 hover:bg-amber-100"
+            data-testid="date-pick-this"
+          >
+            {year}.{String(month).padStart(2, '0')}.{String(day).padStart(2, '0')} 로 정하기
+          </button>
+        </div>
+      )}
     </div>
   )
 }

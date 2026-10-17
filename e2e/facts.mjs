@@ -111,6 +111,16 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(900)
   const note = (await page.locator('main').innerText()) ?? ''
   check('정책자금: 매출 규모 · 작년 매출(2025) · 순이익을 업체 기록에서 채웠다', note.includes('매출 규모') && note.includes('작년 매출') && note.includes('순이익') && note.includes('업체 기록에서 채웠습니다'), (note.match(/[^\n]*업체 기록에서 채웠습니다[^\n]*/) ?? [''])[0])
+  // D-215: 직접 고른 칸은 다시 열어도 업체 정보로 덮지 않는다 — '개인사업자' 는 기본값과 같아 예전에는 법인으로 되돌아갔다
+  // 단추가 <label> 안에 있어 첫 단추의 접근 이름이 칸 이름 전체가 된다 — 글자로 찾는다
+  const bizBtn = (name) => page.locator('label', { hasText: '② 사업자 구분' }).locator('button', { hasText: new RegExp(`^${name}$`) })
+  const isOn = async (name) => ((await bizBtn(name).getAttribute('class')) ?? '').includes('bg-blue-600')
+  check('D-215 정책자금: 법인번호가 있으니 처음엔 법인사업자', await isOn('법인사업자'))
+  await bizBtn('개인사업자').click()
+  await page.waitForTimeout(400)
+  await page.goto(BASE + '/tools/policy-funding/diagnosis?client=cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  check('D-215 정책자금: 직접 고른 개인사업자가 다시 열어도 그대로', (await isOn('개인사업자')) && !(await isOn('법인사업자')))
 
   // 숫자 직접 적기 — 예상값
   await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })

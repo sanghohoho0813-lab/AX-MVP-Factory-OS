@@ -350,6 +350,19 @@ const withCretop = (r: ClientOpsRecord): ClientOpsRecord => ({
   const none = buildInsights(empty, '2026-10-02', [])
   check('맞춤 추천: 정보가 없으면 짐작하지 않고 무엇이 필요한지', none.find((i) => i.key === 'policy-funding')?.tone === 'need' && (none.find((i) => i.key === 'policy-funding')?.missing.length ?? 0) > 0)
   check('맞춤 추천: 요금제에 없는 모듈은 빠짐', !buildInsights(full, '2026-10-02', [], (k) => k !== 'labcare').some((i) => i.key === 'labcare'))
+  // D-215: 직원 수를 모르면 정책자금은 1~4명(소상공인)으로 계산된다 — 가정이라고 알리고 '좋음' 으로 단정하지 않는다
+  const noEmp = { ...full, employeeCount: '' } as typeof full
+  const pfNo = buildInsights(noEmp, '2026-10-02', []).find((i) => i.key === 'policy-funding')
+  check('D-215 정책자금: 직원 수 모름 → 모자란 것에 직원 수 · 가정 문구 · 좋음 아님', !!pfNo && pfNo.missing.some((m) => m.startsWith('직원 수')) && /소상공인으로 가정/.test(pfNo.detail) && pfNo.tone !== 'good', JSON.stringify(pfNo))
+  const withEmp = { ...full, employeeCount: '25' } as typeof full
+  const pfYes = buildInsights(withEmp, '2026-10-02', []).find((i) => i.key === 'policy-funding')
+  check('D-215 정책자금: 직원 수를 알면 가정 문구 없음', !!pfYes && !pfYes.missing.some((m) => m.startsWith('직원 수')) && !/소상공인으로 가정/.test(pfYes.detail), JSON.stringify(pfYes?.missing))
+  // D-215: 명부 진단 뒤에 회차 일정을 붙여도 고용지원금 카드는 명부 판정을 보여 준다
+  const rosterTr = { id: 'tr1', toolKey: 'employment', title: '고용지원금 명부 진단', verdict: 'candidates', verdictLabel: '후보 지원금 2건', summary: '고용지원금 명부 진단\n· 청년 1명', data: { tab: 'roster', subsidyTotal: 12_000_000 }, deadlines: [], createdAt: '2026-10-01T00:00:00Z', publishedUpdateId: null }
+  const schedTr = { id: 'tr2', toolKey: 'employment', title: '고용지원금 · 회차 일정 · 김청년', verdict: null, verdictLabel: '', summary: '', data: { tab: 'schedule' }, deadlines: [], createdAt: '2026-10-02T00:00:00Z', publishedUpdateId: null }
+  const emRec = { ...full, toolResults: [schedTr, rosterTr] } as unknown as typeof full
+  const em = buildInsights(emRec, '2026-10-02', []).find((i) => i.key === 'employment')
+  check('D-215 고용지원금 카드: 회차 일정이 더 최근이어도 명부 판정(후보 2건)을 보여 줌', em?.tone === 'good' && em.headline === '후보 지원금 2건', JSON.stringify(em))
   check('맞춤 추천: 좋은 것 먼저', ins.findIndex((i) => i.tone === 'need') === -1 || ins.findIndex((i) => i.tone === 'good' || i.tone === 'maybe') < ins.findIndex((i) => i.tone === 'need') || !ins.some((i) => i.tone === 'good' || i.tone === 'maybe'))
   const steps = recommendNextSteps(none, 2)
   check('다음 행동: 확인할 정보가 맨 앞 · 빠진 서류 받기', steps[0]?.id === 'facts' && steps.some((s) => s.id === 'docs'), JSON.stringify(steps.map((s) => s.text)))

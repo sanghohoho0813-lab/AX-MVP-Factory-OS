@@ -29,6 +29,14 @@ export function latestToolResult(record: Pick<ClientOpsRecord, 'toolResults'>, t
   return record.toolResults.find((r) => r.toolKey === toolKey) ?? null
 }
 
+/**
+ * D-215: 고용지원금 '명부 진단' 결과(가장 최근) — 같은 도구의 회차 일정 · 입사일 결과가 더 최근이어도 명부 결과를 찾는다.
+ * 예전: 가장 최근 고용지원금 결과만 보고 명부가 아니면 '명부를 올리면…' 으로 돌아가, 회차 일정 하나 붙이면 명부 판정 · 금액 · 기한 수가 사라졌다.
+ */
+export function latestEmploymentRoster(record: Pick<ClientOpsRecord, 'toolResults'>): ToolResult | null {
+  return record.toolResults.find((r) => r.toolKey === 'employment' && (r.data as { tab?: string } | null)?.tab === 'roster') ?? null
+}
+
 /** 결과 한 건에 할 일 기한을 하나 더 건다 — 달력 · 오늘 화면에 뜬다(같은 날 · 같은 글이면 두 번 걸지 않는다) */
 export function withToolResultDeadline(record: ClientOpsRecord, resultId: string, d: ToolDeadline): ClientOpsRecord {
   const target = record.toolResults.find((r) => r.id === resultId)

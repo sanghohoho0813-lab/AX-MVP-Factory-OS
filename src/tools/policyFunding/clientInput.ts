@@ -54,10 +54,12 @@ export function ceoAgeBand(age: number | null): NonNullable<DiagnosisInput['ceoA
 
 
 /** 업체 사실 → 진단 입력 · 채운 칸 이름 · 모자란 것(업력 · 업종이 없으면 판정하지 않는다) */
-export function policyInputFromFacts(facts: ClientFacts): { input: DiagnosisInput; filled: string[]; missing: string[] } {
+export function policyInputFromFacts(facts: ClientFacts): { input: DiagnosisInput; filled: string[]; missing: string[]; assumed: string[] } {
   const input: DiagnosisInput = { ...DEFAULT_INPUT, companyName: facts.companyName }
   const filled: string[] = []
   const missing: string[] = []
+  /** D-215: 모르는데 기본값으로 넣은 칸 — 판정은 하되 '가정' 이라고 알린다(직원 수를 모르면 1~4명 = 소상공인으로 계산됨) */
+  const assumed: string[] = []
   if (facts.industryText) {
     input.industry = facts.industryText
     filled.push('업종')
@@ -72,7 +74,7 @@ export function policyInputFromFacts(facts: ClientFacts): { input: DiagnosisInpu
   if (emp) {
     input.employees = emp
     filled.push('직원 수')
-  }
+  } else assumed.push('직원 수')
   const rev = facts.revenue && !facts.revenue.estimated ? facts.revenue.won : null
   if (rev !== null) {
     input.revenue = revenueBand(rev)
@@ -89,5 +91,5 @@ export function policyInputFromFacts(facts: ClientFacts): { input: DiagnosisInpu
     input.ceoAge = age
     filled.push('대표 나이')
   }
-  return { input, filled, missing }
+  return { input, filled, missing, assumed }
 }
