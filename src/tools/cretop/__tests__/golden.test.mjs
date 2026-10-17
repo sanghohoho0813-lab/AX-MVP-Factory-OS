@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import { buildCretopParsedForUi, normalizeCretopLine, cretopSplitLineMetrics, parseAcctRow } from "../engine/index.js";
 import { cretopYearPool, cretopFillYears } from "../mini/years.js";
-import { extractCeoAge } from "../mini/analysisCore.js";
+import { extractCeoAge, extractMultiOwner } from "../mini/analysisCore.js";
 import { extractShareCount } from "../mini/extract.js";
 const FIXTURE = readFileSync(new URL("../../../../e2e/fixtures/cretop-company.txt", import.meta.url), "utf8");
 const NOW = new Date().getFullYear();
@@ -151,5 +151,13 @@ const HYO = ["기업명 효성형(주)","요약 손익계산서 단위:백만원
     const co = ui.companyInfo;
     ok(co.ceoName === "김한빛" && co.businessNo === "214-87-35291" && co.established === "2008-04-15" && co.employees === "23", "D-136 픽스처: 회사 정보 그대로"); }
 }
+// D-216: 쉼표 숫자는 한 해 값 · 최신 해 분모 0 · 합계 줄은 주주 아님
+{ const ui = buildCretopParsedForUi("요약 손익계산서\n(단위: 백만원)\n구분 2023 2024\n매출액 1,234\n영업이익 100 120\n"), r = ui.corePreview.revenue;
+  ok(r && r.value === 1234 && r.needsCheck === true, "D-216 크레탑: '매출액 1,234'(연도 둘) → 1,234 · 확인 필요(예전 12/34 로 나눠 34)");
+  const icrUi = buildCretopParsedForUi("요약 손익계산서 단위:백만원\n매출액 1,000 1,200 1,500\n영업이익 30 20 150\n당기순이익 10 5 100\n구분 2022 2023 2024\n\n상세 손익계산서 단위:백만원\n매출액 1,000 1,200 1,500\n영업이익 30 20 150\n이자비용 40 25 0\n구분 2022 2023 2024\n"), icr = icrUi.corePreview.interestCoverageRatio;
+  ok(icr && icr.value === null && icr.year === 2024 && icr.display === "이자비용 없음", "D-216 크레탑: 2024 이자비용 0 → '이자비용 없음'(예전 2023 0.8배)");
+  ok(extractMultiOwner("주주현황\n홍길동 100.00%\n합계 100.00%") === false, "D-216 크레탑: 1인 100% + 합계 줄 → 주주 복수 아님");
+  ok(extractMultiOwner("주주현황 홍길동 10,000주 100% 합 계 10,000주 100%") === false, "D-216 크레탑: '합 계' 띄어 쓴 줄도 주주 아님");
+  ok(extractMultiOwner("주주명부\n홍길동 70% 김영희 30% 합계 100%") === true, "D-216 크레탑: 두 사람이면 그대로 복수"); }
 console.log(`크레탑 엔진 골든 ${pass} PASS / ${fail} FAIL`);
 if (fail) { fails.forEach(f => console.log("  ✗ " + f)); process.exit(1); }

@@ -148,6 +148,12 @@ function coreLatestText(key, obj) {
   const isR = !!(obj && obj.isRatio) || ratioKeys.has(key);
   // [D-136] 자본총계 0 이하 — 부채비율은 계산 불가(자본잠식)
   if (isR && obj && obj.capitalErosion && obj.display) return { val: "계산 불가", note: `자본잠식${obj.year ? ` · ${obj.year}년 자본총계 0 이하` : ""}` };
+  // [D-216] 최신 해 분모 0(이자비용 없음 등) — 옛 해 숫자 대신 그 사실을 그대로
+  //   큰 글자 칸이 좁아 짧게(5글자) — 자세한 말은 아래 작은 글로
+  if (isR && obj && obj.latestMissing && obj.display) {
+    const icr = key === "interestCoverageRatio";
+    return { val: icr ? "이자 없음" : "계산 불가", note: `${obj.year ? `${obj.year}년 ` : ""}${icr ? "이자비용 0원" : "분모 0"}` };
+  }
   if (isR) { const v = obj && obj.value; return typeof v === "number" ? { val: `${num(v)}${obj.unit || "%"}` } : { val: "원문 확인 필요", weak: true }; }
   // [D-136] 엔진이 확인 필요로 표시한 금액(최신 연도 빈칸 · 단위 모름 · 표끼리 다름) — 이유를 함께
   const why = obj && obj.needsCheck && Array.isArray(obj.checkReasons) && obj.checkReasons.length ? `확인 필요 · ${obj.checkReasons[0]}` : null;
@@ -167,8 +173,9 @@ function ratioVerdict(key, obj) {
   const v = obj && typeof obj.value === "number" ? obj.value : null;
   if (v == null) return null;
   if (key === "debtRatio") return v < 200 ? "양호" : "위험";          // 부채비율 200% 미만 양호
-  if (key === "currentRatio") return v > 200 ? "양호" : "위험";        // 유동비율 200% 초과 양호
-  if (key === "interestCoverageRatio") return v <= 2 ? "위험" : "양호"; // 이자보상배수 2배 이하 위험
+  // [D-216] 설명 글과 같은 구간 — 예전에는 100~200% · 1~2배도 빨간 '위험' 이라 글('추가 확인 · 주의 구간')과 달랐다
+  if (key === "currentRatio") return v >= 200 ? "양호" : v >= 100 ? "주의" : "위험";        // 유동비율 200% 이상 양호 · 100% 미만 위험
+  if (key === "interestCoverageRatio") return v >= 2 ? "양호" : v >= 1 ? "주의" : "위험"; // 이자보상배수 2배 이상 양호 · 1배 미만 위험
   return null;
 }
 // 현금흐름등급(CR1~CR6) → 등급 판정

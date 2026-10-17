@@ -61,9 +61,10 @@ export function businessTypeOf(record: Pick<ClientOpsRecord, 'corporateNumber'> 
 
 /** "5명(대표 포함)" 같은 글에서 숫자만 (없으면 null) */
 export function employeeCountOf(text: string): number | null {
-  const m = /(\d+)/.exec(text ?? '')
+  // D-216: '1,234명' 은 1,234 — 예전에는 쉼표 앞에서 끊겨 1명이 됐다
+  const m = /(\d{1,3}(?:,\d{3})+|\d+)/.exec(text ?? '')
   if (!m) return null
-  const n = Number(m[1])
+  const n = Number(m[1].replace(/,/g, ''))
   return Number.isFinite(n) ? n : null
 }
 

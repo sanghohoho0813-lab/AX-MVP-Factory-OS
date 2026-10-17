@@ -728,6 +728,7 @@ function check(name: string, cond: boolean, detail?: string): void {
   check('채우기: 모르는 업종은 비워 둔다', industryValueOf('우주선 조종') === '')
   check('채우기: 직원 수는 숫자만 뽑는다', f.employeeCount === 12, String(f.employeeCount))
   check('채우기: 직원 수를 못 읽으면 null', employeeCountOf('여러 명') === null)
+  check('D-216 채우기: 쉼표 직원 수 1,234명 → 1234(예전 1)', employeeCountOf('1,234명') === 1234, String(employeeCountOf('1,234명')))
   check('채우기: 업력 계산', f.years === 7, String(f.years))
   check('채우기: 설립일이 없으면 null', yearsInBusiness('', T) === null)
   check('채우기: 대표 나이 계산 (생일 전)', f.representativeAge === 48, String(f.representativeAge))
@@ -967,6 +968,7 @@ function check(name: string, cond: boolean, detail?: string): void {
   check('상담 기록: D-91 기록도 원본 고객 모양으로 읽힌다', old.id === 'cli_a' && old.companyName === '가나(주)' && old.recommendedAgency === '기술보증기금' && old.stage === '서류 요청' && old.score === 71)
   check('상담 기록: 법인번호가 있으면 법인사업자', old.businessType === '법인사업자')
   check('상담 기록: 모르는 단계는 신규 DB', customerFromRow('cli_a', { stage: '???' }, os).stage === '신규 DB')
+  check('D-216 상담 기록: 연락한 날을 모르면 빈 칸(오늘로 채우지 않음)', customerFromRow('cli_a', { stage: '1차 상담 완료' }, os).lastContactedAt === '' && old.lastContactedAt === '2026-09-01')
 
   resetPolicyStoreForTest([old], [os])
   const r = runDiagnosis(SAMPLE_INPUT)

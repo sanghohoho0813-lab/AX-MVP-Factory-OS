@@ -190,6 +190,9 @@ check('문장: 가지급금 3억 → 손실 + 갚을 돈 가져오기', q5.goals
 const q6 = parseGoalText('가업승계 준비')
 check('문장: 가업승계 → 증여 + 상속', q6.goals.includes('gift') && q6.goals.includes('inherit'), q6)
 check('문장: 1억 5천만원', parseGoalText('1억 5천만원 필요해').cash === 1.5e8)
+// D-216: 억 뒤 'N천' 은 N천만 — 예전에는 '1억 5' 에서 끊겨 1억 5원
+check('D-216 문장: 1억 5천 → 1억 5천만', parseGoalText('1억 5천 정도 가져가고 싶어요').cash === 1.5e8, parseGoalText('1억 5천 정도 가져가고 싶어요'))
+check('D-216 문장: 가지급금 2억 5천 정리 → 2억 5천만', parseGoalText('가지급금 2억 5천 정리').loan === 2.5e8, parseGoalText('가지급금 2억 5천 정리'))
 check('문장: 퇴직', parseGoalText('퇴직금 얼마까지 되나').goals.includes('retire'))
 const q7 = parseGoalText('자사주 소각으로 1억 가져오기')
 check('문장: 자사주 소각 1억 → 현금 1억(양도 · 소각 비교)', q7.goals.includes('cash') && q7.cash === 1e8, q7)

@@ -279,7 +279,7 @@ function CustomerEditor({
           <InfoTile label="추천 기관" value={customer.recommendedAgency} />
           <InfoTile
             label="최근 연락 / 업데이트"
-            value={`${customer.lastContactedAt} / ${customer.updatedAt}`}
+            value={`${customer.lastContactedAt || "연락 기록 없음"} / ${customer.updatedAt}`}
           />
           {/* [D-94] 고객 ID(내부 번호)는 보이지 않는다 — 업체는 고객 운영 업체로 이어진다 */}
         </div>

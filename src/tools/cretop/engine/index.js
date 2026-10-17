@@ -515,7 +515,9 @@ function extractCretopCandidatesFromLines(rawText, opts) {
     let unit = acct.isRatio ? acct.unit : unitIn;
     // 붙어버린 다년치 정수(금액) 재분할 — 음수 부호는 첫 값에 적용
     let splitNote = "";
-    if (!acct.isRatio && valueNums.length === 1 && years.length >= 2 && Number.isInteger(valueNums[0])) {
+    // [D-216] 쉼표로 자리를 나눈 숫자(1,234)는 한 해 값이다 — 붙은 다년치가 아니다(예전: 12 · 34 로 나눠 매출 34백만원)
+    const groupedOne = (() => { const tx = String((L && (L.ntext || L.text)) || ""); const toks = tx.match(/-?\d{1,3}(?:,\d{3})+(?![\d,])/g) || []; return toks.some((tk) => Math.abs(Number(tk.replace(/,/g, ""))) === Math.abs(valueNums[0])); })();
+    if (!acct.isRatio && valueNums.length === 1 && years.length >= 2 && Number.isInteger(valueNums[0]) && !groupedOne) {
       const ds = String(valueNums[0]);
       if (ds.replace(/^-/, "").length > years.length) { const split = splitCretopCompactNumbersByYears(ds, years, acct.label); if (split && split.length === years.length) { valueNums = split; splitNote = ` · 글자 단위 PDF로 ${years.length}개년 숫자가 붙어 ${years.length}분할 후 자연스러운 조합 선택`; } }
     }
@@ -698,7 +700,9 @@ function extractCretopDetail(rawText) {
     let vals = seg.values.slice(); let splitDone = false;
     // 글자단위로 붙어버린 다년치 순수정수(예 "410256102")를 연도 수만큼 재분할
     // 단, '-'(빈칸) 칸이 있는 행(예 "88470 - -")은 단일연도 실제값이므로 분할 금지 → 토큰이 정확히 1개(placeholder 없음)일 때만 적용
-    if (vals.length === 1 && yearN >= 2) { const only = vals[0]; if (only != null && Number.isInteger(only) && only >= 0 && String(only).length > yearN && !/[,.]/.test(seg.name)) { const sp = splitCretopCompactNumbersByYears(String(only), yearsText.length ? yearsText : Array.from({ length: yearN }, (_, i) => i), seg.name); if (sp && sp.length === yearN) { vals = sp; splitDone = true; } } }
+    // [D-216] 쉼표로 자리를 나눈 숫자(1,234)는 한 해 값 — 붙은 다년치로 나누지 않는다
+    const groupedOnly = vals.length === 1 && vals[0] != null && (String(L.ntext || "").match(/-?\d{1,3}(?:,\d{3})+(?![\d,])/g) || []).some((tk) => Math.abs(Number(tk.replace(/,/g, ""))) === Math.abs(vals[0]));
+    if (vals.length === 1 && yearN >= 2 && !groupedOnly) { const only = vals[0]; if (only != null && Number.isInteger(only) && only >= 0 && String(only).length > yearN && !/[,.]/.test(seg.name)) { const sp = splitCretopCompactNumbersByYears(String(only), yearsText.length ? yearsText : Array.from({ length: yearN }, (_, i) => i), seg.name); if (sp && sp.length === yearN) { vals = sp; splitDone = true; } } }
     // [D-136] 값 개수≠연도 수 → 어느 칸이 비었는지 모른다(countMismatch — 최신값을 사실로 쓰지 않음)
     const countMismatch = yearsText.length > 0 && vals.length !== yearN;
     vals = vals.slice(0, yearN); while (vals.length < yearN) vals.push(null);  // 3개년 컬럼 유지(빈칸은 null)
@@ -1249,6 +1253,11 @@ function buildCretopParsedForUi(rawText) {
     const P = def.pair(); const numMap = P.num.map, denMap = P.den.map;   // 분자·분모 같은 출처/같은 단위(백만원 정규화) → 단위 혼합 없음
     // [D-136] 부채비율은 자본총계가 정확히 0 인 해도 버리지 않는다 — 값은 계산 불가(null)지만 자본잠식 신호로 남긴다(예전에는 0 을 건너뛰어 전 연도 값이 최신처럼 보였다)
     const keepZero = key === "debtRatio";
+    // [D-216] 최신 해의 분모가 0(이자비용 없음 · 유동부채 0 …)이면 옛 해 값을 최신처럼 쓰지 않는다 — 예전: 이자비용을 다 갚은 회사가 2년 전 0.8배로 '이자 부담 큼'
+    const latestY = computedRatioYears.length ? computedRatioYears[computedRatioYears.length - 1] : null;
+    if (!keepZero && latestY != null && typeof numMap[latestY] === "number" && denMap[latestY] === 0) {
+      return { value: null, year: latestY, series: [null], years: [latestY], isRatio: true, unit: def.unit, source: "computedFromFinancialStatements", formula: def.formula, confidence: "computed", capitalErosion: false, latestMissing: true, display: key === "interestCoverageRatio" ? "이자비용 없음" : "계산 불가(분모 0)", _numProv: P.num.prov[latestY] || null, _denProv: P.den.prov[latestY] || null };
+    }
     const ys = computedRatioYears.filter((y) => typeof numMap[y] === "number" && typeof denMap[y] === "number" && (denMap[y] !== 0 || keepZero));
     if (!ys.length) return null;
     const values = ys.map((y) => (denMap[y] === 0 ? null : Math.round((numMap[y] / denMap[y]) * def.factor * 100) / 100));
@@ -1267,7 +1276,7 @@ function buildCretopParsedForUi(rawText) {
   // 미리보기 비율: ① 재무제표 직접 계산(최신연도) → ② 보조: 재무비율 표(단, 표 최신연도 == 재무제표 최신연도일 때만) → ③ 원문 확인 필요
   const previewRatio = (key) => {
     const comp = computeRatio(key);
-    if (comp && (typeof comp.value === "number" || comp.capitalErosion)) { corePreviewRatioSource[key] = "computedFromFinancialStatements"; return comp; }
+    if (comp && (typeof comp.value === "number" || comp.capitalErosion || comp.display)) { corePreviewRatioSource[key] = "computedFromFinancialStatements"; return comp; }
     const def = COMPUTED_RATIO_DEFS[key] || {};
     if (!def.computedOnly && reportLatestYear != null && latestFinYear != null && reportLatestYear === latestFinYear) { const rl = ratioLatest(key); if (rl && typeof rl.value === "number") { corePreviewRatioSource[key] = "reportRatioTable"; return Object.assign({}, rl, { source: "reportRatioTable", formula: def.formula || null }); } }
     corePreviewRatioSource[key] = "unavailable"; return null;   // null → 카드에 '원문 확인 필요'

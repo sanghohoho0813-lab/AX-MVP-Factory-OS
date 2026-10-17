@@ -245,8 +245,10 @@ export function extractCeoAge(raw) {
 // 원문에서 주주 복수 여부 추정(best-effort) — 주주현황/주주명에 2명 이상 또는 1인 지분<100%
 export function extractMultiOwner(raw) {
   const t = String(raw || "");
-  const seg = (t.match(/주주\s*(?:현황|명부|구성)[\s\S]{0,400}/) || [])[0] || "";
-  if (!seg) return false;
+  const seg0 = (t.match(/주주\s*(?:현황|명부|구성)[\s\S]{0,400}/) || [])[0] || "";
+  if (!seg0) return false;
+  // [D-216] '합계 · 총계 · 소계' 줄은 주주가 아니다 — 예전: '홍길동 100% · 합계 100%' 가 지분율 2개라 늘 '주주 복수'
+  const seg = seg0.replace(/(?:합\s*계|총\s*계|소\s*계)(?:\s*[\d.,]+\s*(?:%|주)?)*/g, " ");
   const pcts = (seg.match(/\d{1,3}(?:\.\d+)?\s*%/g) || []).map((x) => parseFloat(x));
   if (pcts.length >= 2) return true;          // 지분율이 2개 이상 → 복수 주주
   if (pcts.length === 1 && pcts[0] < 99.5) return true; // 1인 지분 100% 미만 → 타 주주 존재

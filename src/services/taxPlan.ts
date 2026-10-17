@@ -1535,7 +1535,8 @@ export interface ParsedGoal {
   heard: string[]
 }
 
-const MONEY_RE = /(?:\d[\d,]*(?:\.\d+)?\s*(?:억|천만|백만|만)\s*)+(?:\d[\d,]*\s*)?원?|\d{1,3}(?:,\d{3})+\s*원?|\d+\s*원/g
+// D-216: 억 뒤의 'N천'(1억 5천 = 1억 5천만)까지 한 덩어리로 — 예전에는 '1억 5' 에서 끊겨 1억 5원으로 읽었다
+const MONEY_RE = /(?:\d[\d,]*(?:\.\d+)?\s*(?:억|천만|백만|만)\s*)+(?:\d[\d,]*\s*천(?!만)\s*|\d[\d,]*\s*)?원?|\d{1,3}(?:,\d{3})+\s*원?|\d+\s*원/g
 
 export function parseGoalText(text: string): ParsedGoal {
   const t = text.trim()
