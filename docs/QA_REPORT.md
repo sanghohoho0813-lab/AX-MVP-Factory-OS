@@ -3067,5 +3067,9 @@ BASIC · GROWTH(2) · PRO(4) · ALL 권한 · 셋을 골라도 둘만 · 잠그�
   고객에게 공유 단추 이름 '현장 사진 공유'(customdoc_ 글자 0) · 고객 화면 제목 = '현장 사진') · qa:flow **171**(+1: 1주년 [성과 보고서] 가 최근 12개월로 열림 · 닫으면 주소에서 period 도 빠짐).
 - **스크린샷 육안** — 맞춤 추천 '못 올린 파일 2개'(긴 파일 이름 · 긴 까닭 · PC 1440 · 390), 폴더 보기 기타 파일 '무슨 서류? 고르기'(390 두 줄) · 파일 창 안 '무슨 서류인가요?' 고르기(PC · 390). 가로 넘침 0(4화면 모두 -15) · JS 오류 0.
   처음에는 표시 글자 '무슨 서류? 눌러서 고르기' 가 390 에서 '무슨 서류?..' 로 잘려 → '무슨 서류? 고르기' + 두 줄 허용으로 바꿔 다시 찍음.
+- **병합 전 게이트 42단계 — 한 번에 모두 녹색**(tsc · lint · build · test:all 30묶음 · simple 88 · studio 63 · board 170 · todos 44 · mobile 15 · tools 224 · tax 74 · shell 67 ·
+  modules 896 · sales 178 · journey 56 · easy 82 · steady 72 · flow 171 · real 188 · squeeze 짜부라짐 0 · phone 174 · facts 22 · detail 316 · files 38 · folder 19 · taxplan 72 ·
+  scenarios 66 · site 91 · content 98 · ownerai 59 · calendar 21 · connect 36 · enroll 24 · planner 42 · contract 72 · grants 152 · money 41 · youtube 169 · db 217 · pilot 240 ·
+  isolation 24 · cert 153). 디스크 여유 12GB 이상 · 게이트 도는 동안 다른 브라우저 시험 0.
 - 확인하지 못한 것: 실제 클라우드 저장소에서 잠깐 끊긴 뒤 한 번 더 올리는 것(흉내 낸 저장소로만). 점검이 의심만 한 5건(상담신청 관심사 · 고객 화면 공고 알림 마감일 · 다시 요청한 서류 수 · 수금 요청 복사의 활동 종류 ·
   결제 주문 → 새 업체의 계약 상태)은 고치지 않았다.
