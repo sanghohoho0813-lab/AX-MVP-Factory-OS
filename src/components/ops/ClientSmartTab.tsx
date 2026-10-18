@@ -290,7 +290,8 @@ function ClientPromoRow({ record }: { record: ClientOpsRecord }) {
   if (pilot || tools.length === 0) return null
   const q = `?client=${encodeURIComponent(record.id)}`
   return (
-    <Surface className="flex flex-col gap-2.5 py-3 sm:py-3" data-testid="smart-promo">
+    <section aria-label="홍보도 같이" data-testid="smart-promo">
+    <Surface className="flex flex-col gap-2.5 py-3 sm:py-3">
       <HintTip tip={hintFor('홍보도 같이')} label="홍보도 같이">
         <h3 className="t-card font-bold break-keep text-slate-900">홍보도 같이</h3>
       </HintTip>
@@ -318,6 +319,7 @@ function ClientPromoRow({ record }: { record: ClientOpsRecord }) {
         })}
       </ul>
     </Surface>
+    </section>
   )
 }
 

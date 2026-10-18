@@ -186,7 +186,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('D238 업체 상세: 홍보 글 · 홈페이지(웹 스튜디오)는 접지 않고 바로 보인다', (await tools.locator('[data-client-module="web-studio"]:visible').count()) === 1 && (await tools.locator('a[data-feature="content"]:visible').count()) === 1)
   check('D238 업체 상세: 잘 안 쓰는 기능 단추에 웹 스튜디오 이름이 빠짐', !(((await page.getByTestId('client-tools-more').innerText()) ?? '').includes('웹 스튜디오')), await page.getByTestId('client-tools-more').innerText())
   await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
-  await page.waitForTimeout(900)
+  // 맞춤 추천은 판정 계산이 많아 그려지는 데 1초 남짓
+  await page.locator('[data-testid="smart-insight"][data-key="policy-funding"] [data-testid="smart-insight-last"]').waitFor({ timeout: 8000 }).catch(() => {})
   const last = page.locator('[data-testid="smart-insight"][data-key="policy-funding"]').getByTestId('smart-insight-last')
   check('D238 맞춤 추천: 정책자금 판정에 지난번 결과 · 언제', (await last.count()) === 1 && ((await last.innerText()) ?? '').includes('진행 가능성 높음 · 중진공(D238)') && ((await last.innerText()) ?? '').includes('2일 전'), (await last.count()) ? await last.innerText() : 'none')
   const promo = page.getByTestId('smart-promo')
