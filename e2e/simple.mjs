@@ -181,7 +181,8 @@ check('5 탭이 가로 스크롤되지 않는다', await page.evaluate(() => {
   await page.goto(BASE + '/studio', { waitUntil: 'networkidle' })
   await wait(800)
   check('초보: 처음 안내가 세 줄로 뜬다', (await page.getByText('처음이신가요? 세 가지만 알면 됩니다.').count()) > 0)
-  const steps = await page.locator('ol li').count()
+  // D-235: 경로 줄(ol · crumb)은 안내 단계가 아니다
+  const steps = await page.locator('ol li:not([data-testid="crumb"])').count()
   check('초보: 안내가 3단계를 넘지 않는다', steps <= 3, String(steps))
   await page.getByRole('button', { name: '안내 닫기' }).click()
   await wait(400)

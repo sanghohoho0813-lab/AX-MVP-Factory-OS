@@ -133,7 +133,8 @@ export function HintTip({
     })
   if (!tip) return <>{children}</>
   return (
-    <div ref={wrapRef} className={`group/hint relative flex min-w-0 items-center ${className}`} onMouseEnter={fit} onFocusCapture={fit} onMouseLeave={() => setShown(false)}>
+    // 긴 이름이 붙은 소제목(업체 이름 등)도 줄을 바꿔 ? 가 화면 밖으로 밀리지 않게 — 첫 칸(소제목)이 줄어들 수 있고, 띄어쓰기 없는 긴 낱말도 필요하면 끊는다
+    <div ref={wrapRef} className={`group/hint relative flex min-w-0 items-center [overflow-wrap:anywhere] [&>:first-child]:min-w-0 ${className}`} onMouseEnter={fit} onFocusCapture={fit} onMouseLeave={() => setShown(false)}>
       {children}
       {dot && (
       <button
