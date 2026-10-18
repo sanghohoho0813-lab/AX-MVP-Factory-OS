@@ -10,14 +10,16 @@
  *  - D-195: 마케팅 · 브랜딩은 대표(full) 전용 — 팀장(Pilot) · 대표가 팀장 화면으로 볼 때는 메뉴 · 찾기 · 주소 모두 닫힌다
  *    (moduleRegistry ownerOnly · AppShell 의 PilotRouteGuard 한 곳에서). 이 화면 안에서 따로 숨기지 않는다.
  *  - D-195 UX 3.0: 첫 화면은 1순위 하나만 크게 · 받은 때 · 채널 수는 작은 글로 · 비중 가이드는 [추천 기준] 안으로.
+ *  - D-231: 마케팅 · 브랜딩(/marketing)을 누르면 바로 이 화면. 목차 한 줄에 '내 콘텐츠'(일정 · 체크리스트 · 예전 콘텐츠 수첩) ·
+ *    홍보 글 만들기 · 홈페이지 만들기까지(MarketingTabs). 후보 카드마다 미래AI랩 관점 상자 + 이번 주 찍기 키트.
  */
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { BarChart3, ChevronDown, Clapperboard, ClipboardCopy, Download, ExternalLink, Eye, Flame, Hash, MessageCircle, PlayCircle, RefreshCw, Rocket, SlidersHorizontal, ThumbsUp, TriangleAlert, Tv, UserRound, type LucideIcon } from 'lucide-react'
+import { ChevronDown, ClipboardCopy, Download, ExternalLink, Eye, Flame, Hash, MessageCircle, PlayCircle, RefreshCw, Rocket, SlidersHorizontal, ThumbsUp, TriangleAlert, UserRound } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Badge, MetricTile } from '../../components/ui/primitives'
-import { Fold, HintTip, openFold } from '../../components/ui/fold'
+import { Fold, HintTip } from '../../components/ui/fold'
 import { hintFor } from '../../content/sectionHints'
 import { useToast } from '../../components/ui/toastContext'
 import { copyText, downloadText } from '../../components/consulting/studioParts'
@@ -27,7 +29,7 @@ import { useYtFeed } from '../../services/marketing/ytFeed'
 import { mergeFeeds, useYtExtra } from '../../services/marketing/ytExtra'
 import { useIdeas, useRadarPrefs } from '../../services/marketing/useRadarStore'
 import { particle, quoted as q } from '../../lib/josa'
-import { IDEA_STATUS_LABEL, confirmInput, ideaFromOpportunity, type ContentIdea, type IdeaStatus, type RadarPrefs } from '../../services/marketing/radarStore'
+import { IDEA_STATUS_LABEL, confirmInput, customIdea, ideaFromOpportunity, type ContentIdea, type IdeaStatus, type RadarPrefs } from '../../services/marketing/radarStore'
 import {
   PERIOD_HINT,
   PERIOD_LABEL,
@@ -79,27 +81,17 @@ import { PlanView, type FocusData } from './radar/PlanView'
 import { IconChip, RatioChip, VideoDetail } from './radar/RadarParts'
 import { Peek, PeekProvider } from './radar/EvidencePeek'
 import { ChannelManager } from './radar/ChannelManager'
-import { IdeaNotebook } from './radar/IdeaNotebook'
+import { MakeView } from './radar/MakeView'
+import { MarketingTabs, RADAR_VIEWS, type RadarView } from '../../tools/marketing/MarketingTabs'
 import { HotPatternsCard, MyChannelCard } from './radar/AnalysisExtras'
 
-type View = 'plan' | 'top' | 'channels' | 'analysis'
-const VIEWS: Array<[View, string, string]> = [
-  ['plan', '이번 주 찍을 것', '찍을 것'],
-  ['top', '인기 · 급상승', '인기'],
-  ['channels', '채널', '채널'],
-  ['analysis', '분석', '분석'],
-]
-/** D-227 탭마다 그림 — 글자를 읽기 전에 어디인지 보이게 */
-const VIEW_ICON: Record<View, LucideIcon> = { plan: Clapperboard, top: Flame, channels: Tv, analysis: BarChart3 }
-function ViewIcon({ view }: { view: View }) {
-  const Icon = VIEW_ICON[view]
-  return <Icon aria-hidden="true" className="size-4 shrink-0" />
-}
+/** D-231 탭(목차)은 MarketingTabs — 이번 주 찍을 것 · 인기 · 급상승 · 채널 · 분석 · 내 콘텐츠 + 홍보 글 · 홈페이지 */
+type View = RadarView
+// 롱폼 · 쇼츠 고르기 칸(인기 탭) — 고른 칸은 레이더 색(빨강)
+const seg = (on: boolean) => `tap t-sub inline-flex flex-1 items-center justify-center gap-1.5 rounded-[8px] px-2 py-2 font-semibold whitespace-nowrap sm:px-3 ${on ? 'bg-gradient-to-r from-red-600 to-rose-700 text-white shadow-(--shadow-card)' : 'text-slate-600 hover:bg-white/70'}`
 const PERIODS: YtPeriod[] = ['week', 'month', 'year', 'shorts']
 const TOP_NS = [20, 30, 40, 60]
 
-// D-227 고른 탭은 레이더 색(빨강)으로 꽉 — 지금 어디인지 멀리서도 보이게
-const seg = (on: boolean) => `tap t-sub inline-flex flex-1 items-center justify-center gap-1.5 rounded-[8px] px-2 py-2 font-semibold whitespace-nowrap sm:px-3 ${on ? 'bg-gradient-to-r from-red-600 to-rose-700 text-white shadow-(--shadow-card)' : 'text-slate-600 hover:bg-white/70'}`
 
 export default function YoutubeBenchPage() {
   return <WorkspaceScope>{(ctx) => <RadarPage workspaceId={ctx.workspaceId} />}</WorkspaceScope>
@@ -107,7 +99,8 @@ export default function YoutubeBenchPage() {
 
 function viewOf(raw: string | null): View {
   if (raw === 'ideas') return 'analysis' // D-193 '콘텐츠 추천' 주소 → 분석 탭(단어로 본 주목 주제)
-  return (VIEWS.some(([k]) => k === raw) ? raw : 'plan') as View
+  if (raw === 'notebook') return 'make' // D-231 예전 콘텐츠 수첩 → 내 콘텐츠
+  return (RADAR_VIEWS.some((v) => v.key === raw) ? raw : 'plan') as View
 }
 
 /** 꺼 둔 채널은 계산에서 뺀다(내 채널은 끌 수 없다) */
@@ -197,9 +190,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
     if (notebook.ideas.some((i) => i.key === o.key)) return showToast(`${q(o.topic, '은/는')} 이미 수첩에 있습니다.`)
     try {
       if (!(await notebook.save(ideaFromOpportunity(o)))) return showToast('담는 중입니다 — 잠시만 기다려 주세요.')
-      // 담은 것이 바로 보이게 — 접혀 있던 수첩을 연다
-      openFold('radar.notebook')
-      showToast(`${q(o.topic, '을/를')} 콘텐츠 수첩에 담았습니다.`)
+      showToast(`${q(o.topic, '을/를')} 아이디어로 담았습니다 — [내 콘텐츠] 에 있습니다.`)
     } catch {
       showToast('수첩에 담지 못했습니다 — 잠시 뒤 다시 눌러 주세요.')
     }
@@ -212,7 +203,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
     if (!c.changed) return showToast(`${q(o.topic, '은/는')} 이미 '${IDEA_STATUS_LABEL[c.input.status ?? 'idea']}' 단계입니다.`)
     try {
       if (!(await notebook.save(c.input))) return showToast('담는 중입니다 — 잠시만 기다려 주세요.')
-      showToast(`${q(o.topic, '을/를')} 이번 주 제작 예정으로 담았습니다 — 콘텐츠 수첩에서 단계를 바꿀 수 있습니다.`)
+      showToast(`${q(o.topic, '을/를')} 이번 주 제작 예정으로 담았습니다 — [내 콘텐츠] 에서 촬영일 · 체크리스트를 적을 수 있습니다.`)
     } catch {
       showToast('담지 못했습니다 — 잠시 뒤 다시 눌러 주세요.')
     }
@@ -231,8 +222,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
     if (!ok) showToast('되살리지 못했습니다.')
   }
   const goNotebook = () => {
-    openFold('radar.notebook')
-    window.setTimeout(() => document.querySelector('[data-testid="radar-notebook"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+    setParam({ view: 'make' })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   const setStatus = async (i: ContentIdea, status: IdeaStatus) => {
     try {
@@ -241,12 +232,28 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
       showToast('단계를 바꾸지 못했습니다.')
     }
   }
-  const setMemo = async (i: ContentIdea, memo: string) => {
+  /** D-231 내 콘텐츠 — 메모 · 촬영일 · 게시일 · 체크 · 올린 주소 */
+  const patchIdea = async (i: ContentIdea, fields: Partial<Pick<ContentIdea, 'memo' | 'shootDate' | 'publishDate' | 'checks' | 'link'>>, what: string) => {
+    if (fields.link !== undefined && fields.link && !/^https:\/\/\S{4,}$/.test(fields.link)) return showToast('올린 주소는 https:// 로 시작하는 주소만 적을 수 있습니다.')
     try {
-      await notebook.patch(i.id, { memo })
-      showToast('메모를 저장했습니다.')
+      await notebook.patch(i.id, fields)
+      if (what === '메모' || what === '올린 주소') showToast(`${what}${particle(what, '을/를')} 저장했습니다.`)
     } catch {
-      showToast('메모를 저장하지 못했습니다 — 적은 글은 그대로 있습니다.')
+      showToast(`${what}${particle(what, '을/를')} 저장하지 못했습니다 — 적은 것은 화면에 그대로 있습니다.`)
+    }
+  }
+  const addCustom = async (topic: string): Promise<boolean> => {
+    if (readOnly) return (showToast('팀장 화면을 보는 중에는 저장하지 않습니다.'), false)
+    if (notebook.failed) return (showToast('콘텐츠 수첩을 읽지 못했습니다 — 새로고침한 뒤 다시 눌러 주세요.'), false)
+    if (notebook.ideas.some((i) => i.topic === topic.trim())) return (showToast(`${q(topic.trim(), '은/는')} 이미 담겨 있습니다.`), false)
+    try {
+      const saved = await notebook.save(customIdea(topic))
+      if (!saved) return false
+      showToast(`${q(saved.topic, '을/를')} 제작 예정으로 담았습니다.`)
+      return true
+    } catch {
+      showToast('담지 못했습니다 — 잠시 뒤 다시 눌러 주세요.')
+      return false
     }
   }
   const removeIdea = async (i: ContentIdea) => {
@@ -304,21 +311,27 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
         </div>
       )}
 
-      {!prepared ? (
+      {/* D-231 목차는 데이터를 받기 전에도 — 내 콘텐츠 · 홍보 글 · 홈페이지는 유튜브 데이터 없이도 쓴다 */}
+      <div role="tablist" data-testid="yt-views">
+        <MarketingTabs active={view} onRadar={(k) => setParam({ view: k === 'plan' ? '' : k })} />
+      </div>
+
+      {view === 'make' ? (
+        <MakeView
+          ideas={notebook.ideas}
+          readOnly={readOnly}
+          failed={notebook.failed}
+          onStatus={(i, s) => void setStatus(i, s)}
+          onPatch={(i, f, what) => void patchIdea(i, f, what)}
+          onRemove={(i) => void removeIdea(i)}
+          onCopy={(t, what) => copy(t, what)}
+          onAdd={addCustom}
+        />
+      ) : !prepared ? (
         <SetupCard status={yt.status} message={yt.message} onSample={yt.showSample} />
       ) : (
         <PeekProvider value={peekEnv}>
           <FeedNotices sample={yt.sample} message={yt.status === 'ready' || yt.status === 'sample' ? '' : yt.message} extraMessage={extra.status === 'error' ? extra.message : ''} />
-
-          <div role="tablist" className="flex max-w-2xl rounded-(--radius-control) border border-rose-100 bg-rose-50/60 p-1" data-testid="yt-views">
-            {VIEWS.map(([k, l, short]) => (
-              <button key={k} type="button" role="tab" aria-selected={view === k} data-testid={`yt-view-${k}`} onClick={() => setParam({ view: k === 'plan' ? '' : k })} className={seg(view === k)}>
-                <ViewIcon view={k} />
-                <span className="sm:hidden">{short}</span>
-                <span className="hidden sm:inline">{l}</span>
-              </button>
-            ))}
-          </div>
 
           {view === 'plan' && plan && focus && (
             <>
@@ -336,13 +349,12 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
                 onSave={(o) => void saveOpp(o)}
                 onMute={(o) => void muteOpp(o)}
                 onUnmute={(k) => void unmute(k)}
-                onCopy={(t) => copy(t)}
+                onCopy={(t, what) => copy(t, what)}
                 onOpenVideo={openVideo}
                 onMix={(mix) => void savePrefs({ ...prefs, mix })}
                 onGoChannels={() => setParam({ view: 'channels' })}
                 onGoNotebook={goNotebook}
               />
-              <IdeaNotebook ideas={notebook.ideas} readOnly={readOnly} onStatus={(i, s) => void setStatus(i, s)} onMemo={(i, m) => void setMemo(i, m)} onRemove={(i) => void removeIdea(i)} onCopy={(t, what) => copy(t, what)} />
             </>
           )}
 

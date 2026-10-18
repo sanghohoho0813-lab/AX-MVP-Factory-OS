@@ -18,6 +18,7 @@ import { SITE_BUCKET, SITE_MODULE, useSiteDoc } from './useSiteDoc'
 import { SubjectPicker } from '../marketing/SubjectPicker'
 import { TrialBanner } from '../marketing/TrialBanner'
 import { useTrials } from '../marketing/trialStore'
+import { MarketingTabs } from '../marketing/MarketingTabs'
 
 const LIST = '/tools/homepage'
 const BUILD = '/tools/homepage/build'
@@ -98,6 +99,8 @@ export function HomepagePage() {
         description="고객 · 잠재고객 · 동료 컨설턴트, 고객 관리에 없는 가상 업체까지 — 기록으로 업종 견본 홈페이지를 만들고, 블록을 고쳐 PC · 휴대폰으로 확인한 뒤 HTML 한 장으로 내려받습니다. 규칙으로 채우며 'AI' 가 아닙니다."
         descriptionAsHint
       />
+      {/* D-231 마케팅 · 브랜딩 목차 한 줄(콘텐츠 레이더 · 내 콘텐츠 · 홍보 글과 같은 줄) */}
+      <MarketingTabs active="homepage" />
       {section === 'build' ? <BuildScreen /> : <ClientPicker />}
     </div>
   )

@@ -426,7 +426,9 @@ export const appRouteChildren = [
       { path: 'money', element: <MoneyPage /> },
       { path: 'upcoming', element: <UpcomingPage /> },
       { path: 'upcoming/:key', element: <UpcomingPage /> },
-      { path: 'marketing', element: <MarketingSoonPage /> },
+      // D-231 대표 "마케팅 · 브랜딩을 누르면 바로 콘텐츠 레이더" — 예전 안내(바로 쓰기 · 도입 예정) 화면은 /marketing/more
+      { path: 'marketing', element: <YoutubeBenchPage /> },
+      { path: 'marketing/more', element: <MarketingSoonPage /> },
       // D-193: 유튜브 벤치마킹(대표가 예전에 만든 대시보드 — AI 대본만 빼고)
       { path: 'marketing/youtube', element: <YoutubeBenchPage /> },
       { path: 'ai', element: <OwnerAiHomePage /> },

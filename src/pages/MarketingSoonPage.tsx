@@ -5,6 +5,7 @@
  * D-193: 맨 위에 '지금 바로 쓸 수 있어요' — 유튜브 벤치마킹(대표가 예전에 만든 대시보드를 옮김). 도입 예정 카드는 그대로.
  * D-206: 대표 "홍보 글 · 홈페이지 툴도 마케팅 · 브랜딩에" — 바로 쓰기에 홍보 글 만들기 · 홈페이지 만들기(업체를 고르면 그 업체로).
  * D-226: 대표 "색이 안 들어가 눈에 하나도 안 들어온다" — 바로 쓰기 세 도구를 도구 색(빨강 · 보라 · 초록) 큰 카드로, 할 수 있는 일을 색 꼬리표로.
+ * D-231: 마케팅 · 브랜딩(/marketing)을 누르면 바로 콘텐츠 레이더 — 이 안내 화면은 /marketing/more 로 옮겼다(지운 것 없음).
  */
 import { Link } from 'react-router-dom'
 import { ArrowRight, BarChart3, Globe, Images, Megaphone, MonitorPlay, PenLine, Smartphone, type LucideIcon } from 'lucide-react'

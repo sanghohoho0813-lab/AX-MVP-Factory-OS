@@ -5,7 +5,7 @@
  * 이제 계약 고객 · 잠재고객 · 컨설턴트 · 가상(직접 넣은 업체 · 컨설턴트)으로 나눠 보고, 가상으로 바로 만들어 볼 수 있다.
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { BriefcaseBusiness, Plus, Search, Sparkles } from 'lucide-react'
 import { useToolClient } from '../shared/toolClientContext'
 import { matchesClientSearch } from '../../services/clientOpsSearch'
@@ -82,22 +82,26 @@ export function SubjectPicker({
     }
   }, [loadClients])
 
+  // D-231 콘텐츠 레이더 › 내 콘텐츠 [홍보 글로] — 주제(kw)를 고른 업체 화면까지 들고 간다
+  const [sp] = useSearchParams()
+  const kw = (sp.get('kw') ?? '').trim().slice(0, 40)
+  const carry = kw ? `&kw=${encodeURIComponent(kw)}` : ''
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = (clients ?? []).map((c) => ({
       id: c.id,
       name: c.companyName,
       group: groupOf(c),
-      href: `${buildPath}?client=${encodeURIComponent(c.id)}`,
+      href: `${buildPath}?client=${encodeURIComponent(c.id)}${carry}`,
       provisional: !!c.provisional,
       search: (s: string) => matchesClientSearch(c, s),
     }))
     // 임시등록까지 마친 가상은 이제 고객 관리에 있다 — 여기서는 뺀다
     for (const t of trialsStore.trials.filter((x) => !x.registeredAt)) {
       const hay = [t.name, t.person, t.industry, t.phone, t.region].join(' ').toLowerCase()
-      out.push({ id: t.id, name: t.name, group: 'trial', href: `${buildPath}?trial=${encodeURIComponent(t.id)}`, provisional: false, kindLabel: TRIAL_KIND_LABEL[t.kind], search: (s: string) => hay.includes(s.trim().toLowerCase()) })
+      out.push({ id: t.id, name: t.name, group: 'trial', href: `${buildPath}?trial=${encodeURIComponent(t.id)}${carry}`, provisional: false, kindLabel: TRIAL_KIND_LABEL[t.kind], search: (s: string) => hay.includes(s.trim().toLowerCase()) })
     }
     return out
-  }, [clients, trialsStore.trials, buildPath])
+  }, [clients, trialsStore.trials, buildPath, carry])
 
   const counts = useMemo(() => {
     const n: Record<Filter, number> = { all: rows.length, contract: 0, lead: 0, consultant: 0, trial: 0 }
@@ -120,7 +124,7 @@ export function SubjectPicker({
     setSaving(false)
     if (!saved) return showToast('저장하지 못했어요. 잠시 뒤 다시 눌러 주세요.')
     setForm(null)
-    navigate(`${buildPath}?trial=${encodeURIComponent(saved.id)}`)
+    navigate(`${buildPath}?trial=${encodeURIComponent(saved.id)}${carry}`)
   }
 
   const loading = clients === null || trialsStore.status === 'loading'

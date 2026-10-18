@@ -13,17 +13,23 @@
  *  - 맨 위 길잡이 ① 주제 고르기 → ② 이번 주로 확정 → ③ 찍고 올리기(수첩) — 지금 할 일 한 줄 · 제작 예정 주제는 길잡이 안에.
  *  - 시장 신호(지금 강한 흐름 · AI 키워드 · 급상승 · 터진 영상 · 사이드 급상승)는 접어 두고 숫자 요약만 —
  *    펼치면 판 하나만 고르게(한 번에 한 판). 지운 것은 없다.
+ * D-231 대표 "미래는 이렇게 말합니다가 애매 — 미래AI랩 관점을 강조 · 어떤 제목 · 어떤 내용으로 찍을지 예시까지 한 번에 ·
+ *        몇 분 안에 '오늘 이거 찍자' 가 판단되게":
+ *  - 'MIRAE 관점' → 눈에 띄는 '미래AI랩 관점' 상자(1순위는 크게).
+ *  - 후보마다 '이번 주 이렇게 찍으세요'(찍기 키트) — 제목 예 · 첫 문장 · 준비 시간은 늘 보이고, 펼치면 잘 된 틀 → 우리 제목 ·
+ *    긴 영상 구성 · 쇼츠 3컷 · 그대로/바꿀 것 · 준비물 · 키트 복사. 1순위는 펼친 채로. 4위 아래 한 줄에도 제목 예.
  */
 import { useMemo, useState } from 'react'
 import { Fold } from '../../../components/ui/fold'
 import { MkPick, MkSteps } from '../../../tools/marketing/mkKit'
-import { ArrowRight, BarChart3, BookmarkCheck, BookmarkPlus, CalendarCheck, Check, ChevronDown, CircleHelp, Clapperboard, ClipboardCopy, EyeOff, Flame, Info, LayoutList, Minus, NotebookPen, RotateCcw, Settings2, Sparkles, TrendingUp, Zap } from 'lucide-react'
+import { ArrowRight, BarChart3, BookmarkCheck, BookmarkPlus, CalendarCheck, Check, ChevronDown, CircleHelp, Clapperboard, ClipboardCopy, Clock, EyeOff, Flame, Info, LayoutList, Lightbulb, Minus, NotebookPen, RotateCcw, Settings2, Sparkles, TrendingUp, Zap } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
 import { Badge } from '../../../components/ui/primitives'
 import { HintTip } from '../../../components/ui/fold'
 import { hintFor } from '../../../content/sectionHints'
 import { shortNum } from '../../../services/marketing/ytBench'
 import { IDEA_STATUS_LABEL, type ContentIdea, type IdeaStatus } from '../../../services/marketing/radarStore'
+import { kitText, shootKit } from '../../../services/marketing/shootKit'
 import {
   APPROACH_LABEL,
   AXIS_HINT,
@@ -88,7 +94,7 @@ export function PlanView({
   onSave: (o: Opportunity) => void
   onMute: (o: Opportunity) => void
   onUnmute: (key: string) => void
-  onCopy: (text: string) => void
+  onCopy: (text: string, what?: string) => void
   onOpenVideo: (v: RadarVideo) => void
   onMix: (m: MixGuide) => void
   onGoChannels: () => void
@@ -161,7 +167,7 @@ export function PlanView({
                 </span>
               ))}
               <button type="button" onClick={onGoNotebook} className="tap t-sub ml-auto inline-flex items-center gap-1 rounded-full bg-success-700 px-3 font-bold text-white hover:bg-success-800" data-testid="radar-guide-notebook">
-                <NotebookPen aria-hidden="true" className="size-4" /> 다음: 수첩에서 단계 바꾸기 <ArrowRight aria-hidden="true" className="size-4" />
+                <NotebookPen aria-hidden="true" className="size-4" /> 다음: 내 콘텐츠에서 일정 · 체크 <ArrowRight aria-hidden="true" className="size-4" />
               </button>
             </div>
           ) : (
@@ -169,7 +175,7 @@ export function PlanView({
               <Sparkles aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-rose-600" />
               <span className="min-w-0">
                 <b className="font-bold text-slate-900">지금 할 일 — </b>
-                {hero ? '아래 1순위 카드를 읽고, 마음에 들면 [이번 주로 확정] 을 눌러 주세요. 다른 주제가 궁금하면 2 · 3순위나 [후보 더 보기].' : '후보가 생기면 여기서 바로 고를 수 있어요.'}
+                {hero ? "아래 1순위 카드의 '미래AI랩 관점' 과 '이번 주 이렇게 찍으세요' 를 읽고, 찍을 만하면 [이번 주로 확정] 을 눌러 주세요. 2~10순위도 제목 예 · 첫 문장이 바로 보여요." : '후보가 생기면 여기서 바로 고를 수 있어요.'}
               </span>
             </p>
           )}
@@ -254,7 +260,7 @@ interface CardProps {
   onConfirm: (o: Opportunity) => void
   onSave: (o: Opportunity) => void
   onMute: (o: Opportunity) => void
-  onCopy: (text: string) => void
+  onCopy: (text: string, what?: string) => void
   onOpenVideo: (v: RadarVideo) => void
 }
 
@@ -322,16 +328,8 @@ function HeroCard(props: CardProps) {
         <Facts o={o} />
         <WhyRecommended o={o} />
       </div>
-      <div className="flex flex-col gap-1.5 rounded-(--radius-card) border-l-4 border-brand-500 bg-brand-50/50 px-4 py-3">
-        <p className="t-meta font-bold tracking-wide text-brand-800">MIRAE 는 이렇게 다르게 말합니다</p>
-        <p className="t-body break-keep text-slate-900" data-testid="radar-view">
-          {o.view}
-        </p>
-        <p className="t-sub break-keep text-slate-900">
-          <span className="t-meta text-slate-500">제목 예 </span>
-          <span className="font-semibold">{o.titles[0]?.text}</span>
-        </p>
-      </div>
+      <MiraeView o={o} size="lg" />
+      <ShootKitPanel o={o} onCopy={props.onCopy} defaultOpen />
       {open && <Details {...props} />}
       <div className="mt-auto flex flex-wrap items-center gap-2">
         <ConfirmButton {...props} />
@@ -358,10 +356,8 @@ function SubCard(props: CardProps & { rank: number }) {
       </h3>
       <Facts o={o} size="sm" />
       <WhyRecommended o={o} />
-      <p className="t-sub break-keep text-slate-700" data-testid="radar-view">
-        <span className="t-meta font-bold text-brand-800">MIRAE 관점 </span>
-        {o.view}
-      </p>
+      <MiraeView o={o} size="sm" />
+      <ShootKitPanel o={o} onCopy={props.onCopy} />
       {open && <Details {...props} />}
       <div className="mt-auto flex flex-wrap items-center gap-2">
         <ConfirmButton {...props} quiet />
@@ -384,16 +380,20 @@ function CompactOpportunity(props: CardProps & { rank: number }) {
         <span className="t-body min-w-0 flex-[1_1_12rem] font-bold break-keep text-slate-900 [overflow-wrap:anywhere]">{o.topic}</span>
         <StrengthMeter strength={o.strength} />
         <ChevronDown aria-hidden="true" className={`size-4 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+        {o.titles[0] && (
+          <span className="t-sub w-full min-w-0 pl-8 break-keep text-slate-700 [overflow-wrap:anywhere]" data-testid="radar-compact-title">
+            <span className="t-meta font-bold text-rose-700">제목 예 </span>
+            {o.titles[0].text}
+          </span>
+        )}
       </button>
       {open && (
         <div className="flex flex-col gap-2 pl-1">
           <p className="t-sub break-keep text-slate-700">{o.summary}</p>
           <Facts o={o} size="sm" />
           <WhyRecommended o={o} />
-          <p className="t-sub break-keep text-slate-800">
-            <span className="t-meta font-bold text-brand-800">MIRAE 관점 </span>
-            {o.view}
-          </p>
+          <MiraeView o={o} size="sm" />
+          <ShootKitPanel o={o} onCopy={props.onCopy} />
           <Details {...props} />
           <div>
             <ConfirmButton {...props} quiet />
@@ -401,6 +401,148 @@ function CompactOpportunity(props: CardProps & { rank: number }) {
         </div>
       )}
     </li>
+  )
+}
+
+/** D-231 미래AI랩 관점 — 남들과 다르게 말하는 한 줄(눈에 띄는 상자 · 1순위는 크게) */
+function MiraeView({ o, size }: { o: Opportunity; size: 'lg' | 'sm' }) {
+  const lg = size === 'lg'
+  return (
+    <div className={`flex min-w-0 flex-col gap-1.5 rounded-(--radius-card) border-2 border-indigo-300 bg-gradient-to-br from-indigo-50 via-violet-50 to-white shadow-sm ${lg ? 'px-4 py-3.5' : 'px-3 py-2.5'}`} data-testid="radar-mirae">
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+        <span aria-hidden="true" className={`flex shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-600 to-violet-700 text-white shadow-sm ${lg ? 'size-8' : 'size-7'}`}>
+          <Lightbulb className={lg ? 'size-5' : 'size-4'} />
+        </span>
+        <span className={`font-extrabold text-indigo-950 ${lg ? 't-card' : 't-sub'}`}>미래AI랩 관점</span>
+        <span className="t-meta font-semibold break-keep text-indigo-700">남들은 소식을 전할 때, 우리는 이렇게 말해요</span>
+      </p>
+      <p className={`font-semibold break-keep text-slate-900 [overflow-wrap:anywhere] ${lg ? 'text-[1.0625rem] leading-relaxed' : 't-sub'}`} data-testid="radar-view">
+        {o.view}
+      </p>
+    </div>
+  )
+}
+
+/**
+ * D-231 이번 주 이렇게 찍으세요(찍기 키트) — 판단에 필요한 것(제목 예 · 첫 문장 · 준비 시간)은 늘 보이고,
+ * 펼치면 잘 된 틀 → 우리 제목 · 긴 영상 구성 · 쇼츠 3컷 · 그대로/바꿀 것 · 준비물 · [키트 전체 복사].
+ */
+function ShootKitPanel({ o, onCopy, defaultOpen = false }: { o: Opportunity; onCopy: (text: string, what?: string) => void; defaultOpen?: boolean }) {
+  const kit = useMemo(() => shootKit(o), [o])
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <section className="flex min-w-0 flex-col gap-2.5 rounded-(--radius-card) border-2 border-rose-200 bg-gradient-to-br from-rose-50/80 via-white to-white p-3 sm:p-4" data-testid="radar-kit" data-open={open ? '1' : '0'} aria-label={`${o.topic} — 이번 주 이렇게 찍으세요`}>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <IconChip icon={Clapperboard} tone="rose" />
+        <span className="t-sub font-extrabold text-rose-900">이번 주 이렇게 찍으세요</span>
+        <span className="t-meta inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 font-semibold text-slate-700 ring-1 ring-slate-200" data-testid="radar-kit-effort">
+          <Clock aria-hidden="true" className="size-3.5" /> {kit.effort.label} · {kit.effort.minutes}분쯤
+        </span>
+        <span className="t-meta rounded-full bg-rose-100 px-2 py-0.5 font-semibold text-rose-800">{kit.format}</span>
+      </div>
+      <div className="flex min-w-0 items-start gap-2">
+        <p className="t-sub min-w-0 flex-1 break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="radar-kit-title">
+          <span className="t-meta font-bold text-rose-700">제목 예 </span>
+          <span className="font-bold">{kit.titles[0]}</span>
+        </p>
+        <Button size="sm" variant="ghost" onClick={() => onCopy(kit.titles[0] ?? '')} aria-label={`제목 복사 — ${kit.titles[0]}`}>
+          <ClipboardCopy aria-hidden="true" className="size-4" /> 복사
+        </Button>
+      </div>
+      <p className="t-sub break-keep text-slate-800 [overflow-wrap:anywhere]" data-testid="radar-kit-hook">
+        <span className="t-meta font-bold text-rose-700">첫 문장 </span>"{kit.hook}"
+      </p>
+      {open && (
+        <div className="flex min-w-0 flex-col gap-3 border-t border-rose-100 pt-3" data-testid="radar-kit-body">
+          {kit.frames.length > 0 && (
+            <div className="flex flex-col gap-1.5" data-testid="radar-kit-frames">
+              <p className="t-sub font-bold text-slate-900">잘 된 틀 → 우리 제목 <span className="t-meta font-normal text-slate-500">구조만 가져오고 제목 · 대사는 새로</span></p>
+              <ul className="flex flex-col gap-1.5">
+                {kit.frames.map((f) => (
+                  <li key={f.pattern} className="flex min-w-0 flex-col gap-0.5 rounded-(--radius-control) bg-white px-3 py-2 ring-1 ring-slate-200" data-testid="radar-kit-frame" data-pattern={f.pattern}>
+                    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <span className="t-meta rounded-full bg-slate-900 px-2 py-0.5 font-bold text-white">{f.label}</span>
+                      <span className="t-meta break-keep text-slate-500">{f.note}</span>
+                    </span>
+                    {f.ref && (
+                      <span className="t-meta line-clamp-2 break-keep text-slate-500 [overflow-wrap:anywhere]">
+                        잘된 영상 · {f.ref.title} — {f.ref.channel}
+                        {f.ref.ratio && <b className="font-semibold text-red-700"> · {f.ref.ratio}</b>}
+                        {f.ref.short ? ' · 쇼츠' : ''}
+                      </span>
+                    )}
+                    <span className="t-sub font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]">→ {f.mine}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <div className="flex min-w-0 flex-col gap-1.5" data-testid="radar-kit-outline">
+              <p className="t-sub font-bold text-slate-900">긴 영상 구성(6~7분)</p>
+              <ol className="flex flex-col gap-1">
+                {kit.outline.map((st) => (
+                  <li key={st.at} className="t-sub flex min-w-0 gap-2 break-keep text-slate-800">
+                    <span className="w-11 shrink-0 font-semibold text-rose-700 tabular-nums">{st.at}</span>
+                    <span className="min-w-0 [overflow-wrap:anywhere]">{st.what}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <div className="flex min-w-0 flex-col gap-1.5" data-testid="radar-kit-shorts">
+              <p className="t-sub font-bold text-slate-900">쇼츠 3컷(60초)</p>
+              <ol className="flex flex-col gap-1">
+                {kit.shorts.map((st) => (
+                  <li key={st.at} className="t-sub flex min-w-0 gap-2 break-keep text-slate-800">
+                    <span className="w-16 shrink-0 font-semibold text-rose-700 tabular-nums">{st.at}</span>
+                    <span className="min-w-0 [overflow-wrap:anywhere]">{st.what}</span>
+                  </li>
+                ))}
+              </ol>
+              <p className="t-sub font-bold text-slate-900">제목 후보 · 썸네일</p>
+              <ul className="flex flex-col gap-0.5">
+                {kit.titles.map((t) => (
+                  <li key={t} className="t-sub break-keep text-slate-800 [overflow-wrap:anywhere]">· {t}</li>
+                ))}
+              </ul>
+              <div className="flex flex-wrap gap-1.5">
+                {kit.thumbs.map((t) => (
+                  <span key={t} className="t-meta rounded-[6px] bg-slate-900 px-2 py-0.5 font-bold text-white">{t}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="flex min-w-0 flex-col gap-1 rounded-(--radius-control) bg-emerald-50/70 px-3 py-2" data-testid="radar-kit-keep">
+              <p className="t-meta font-bold text-emerald-800">그대로 가져올 것</p>
+              {kit.keep.map((x) => (
+                <p key={x} className="t-sub break-keep text-slate-800 [overflow-wrap:anywhere]">· {x}</p>
+              ))}
+            </div>
+            <div className="flex min-w-0 flex-col gap-1 rounded-(--radius-control) bg-indigo-50/70 px-3 py-2" data-testid="radar-kit-change">
+              <p className="t-meta font-bold text-indigo-800">내 스타일로 바꿀 것</p>
+              {kit.change.map((x) => (
+                <p key={x} className="t-sub break-keep text-slate-800 [overflow-wrap:anywhere]">· {x}</p>
+              ))}
+            </div>
+            <div className="flex min-w-0 flex-col gap-1 rounded-(--radius-control) bg-amber-50/70 px-3 py-2" data-testid="radar-kit-prep">
+              <p className="t-meta font-bold text-amber-800">찍기 전 준비</p>
+              {kit.prep.map((x) => (
+                <p key={x} className="t-sub break-keep text-slate-800 [overflow-wrap:anywhere]">· {x}</p>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" variant="secondary" onClick={() => setOpen((x) => !x)} aria-expanded={open} data-testid="radar-kit-toggle">
+          <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${open ? 'rotate-180' : ''}`} /> {open ? '키트 접기' : '찍기 키트 전체 보기'}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => onCopy(kitText(o, kit), '찍기 키트')} data-testid="radar-kit-copy">
+          <ClipboardCopy aria-hidden="true" className="size-4" /> 키트 전체 복사
+        </Button>
+      </div>
+    </section>
   )
 }
 

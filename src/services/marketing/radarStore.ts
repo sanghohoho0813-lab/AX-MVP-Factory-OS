@@ -7,11 +7,13 @@
  *    팀장(Pilot) 작업공간과 대표 작업공간은 서로 보이지 않는다(D-163 · qa:isolation 이 표 전체를 본다).
  *  - 영상 제목 · 숫자는 공개된 유튜브 정보만. 대본 · 자막은 저장하지 않는다(이번 단계에서 만들지 않는다).
  *  - 나중에 대본 만들기(LLM)를 붙일 때는 toContentBrief() 가 넘길 모양이다 — 지금은 호출 0(복사해서 쓰는 글만).
+ *  - D-231 '내 콘텐츠' — 같은 수첩 줄에 촬영일 · 게시일 · 체크리스트 · 게시 주소 · 첫 문장 · 직접 적은 주제(custom)를 더했다(새 표 없음).
  */
 import { generateId } from '../../storage/localStore'
-import { nowIso } from '../../lib/appClock'
+import { nowIso, todayLocalDate } from '../../lib/appClock'
 import { deleteRow, listRows, saveRow } from '../moduleData'
 import { isGroup, normalizeMix, type BenchmarkChannelGroup, type ContentAxis, type MixGuide, type Opportunity } from './ytRadar'
+import { shootKit } from './shootKit'
 
 const MODULE = 'marketing'
 const IDEAS = 'ideas'
@@ -44,7 +46,33 @@ export interface ContentIdea {
   savedAt: string
   status: IdeaStatus
   memo: string
+  /** D-231 첫 문장(찍기 키트) */
+  hook: string
+  /** D-231 촬영일 · 게시일(YYYY-MM-DD, 없으면 '') */
+  shootDate: string
+  publishDate: string
+  /** D-231 체크리스트 — 끝낸 칸 번호(MAKE_CHECKS) */
+  checks: MakeCheckId[]
+  /** D-231 올린 주소(https 만) */
+  link: string
+  /** D-231 레이더에서 담음 · 직접 적음 */
+  source: 'radar' | 'custom'
 }
+
+/** D-231 만들기 체크리스트 — 찍고 올리고 나눠 올리기까지 */
+export const MAKE_CHECKS = [
+  { id: 'title', label: '제목 · 썸네일 문구' },
+  { id: 'script', label: '대본 · 첫 문장' },
+  { id: 'shoot', label: '촬영' },
+  { id: 'edit', label: '편집 · 자막' },
+  { id: 'upload', label: '업로드(제목 · 설명 · 태그)' },
+  { id: 'shorts', label: '쇼츠로 잘라 올리기' },
+  { id: 'promo', label: '블로그 · 카드뉴스로 나눠 올리기' },
+] as const
+export type MakeCheckId = (typeof MAKE_CHECKS)[number]['id']
+const CHECK_IDS: readonly string[] = MAKE_CHECKS.map((c) => c.id)
+const DAY = /^\d{4}-\d{2}-\d{2}$/
+const day = (v: unknown) => (typeof v === 'string' && DAY.test(v) ? v : '')
 
 const str = (v: unknown, max = 300) => (typeof v === 'string' ? v.slice(0, max) : '')
 const strs = (v: unknown, n: number, max = 200) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(0, n).map((x) => x.slice(0, max)) : [])
@@ -69,13 +97,67 @@ export function normalizeIdea(raw: Record<string, unknown>, id: string): Content
     savedAt: str(raw.savedAt, 40) || nowIso(),
     status: isStatus(raw.status) ? raw.status : 'idea',
     memo: str(raw.memo, 1000),
+    hook: str(raw.hook, 200),
+    shootDate: day(raw.shootDate),
+    publishDate: day(raw.publishDate),
+    checks: Array.isArray(raw.checks) ? [...new Set(raw.checks.filter((c): c is MakeCheckId => typeof c === 'string' && CHECK_IDS.includes(c)))] : [],
+    link: typeof raw.link === 'string' && /^https:\/\/[^\s<>"']{4,}$/.test(raw.link) ? raw.link.slice(0, 300) : '',
+    source: raw.source === 'custom' ? 'custom' : 'radar',
   }
 }
 
+/** D-231 레이더에 없는 주제를 직접 적어 담기 */
+export function customIdea(topic: string, memo = ''): Omit<ContentIdea, 'id' | 'savedAt'> {
+  const t = topic.trim().slice(0, 120)
+  return { ...EMPTY_EXTRA, key: `custom:${generateId()}`, topic: t, topicId: '', angle: '', type: 'market', benchmarkVideoIds: [], benchmarkTitles: [], titleCandidates: [], thumbnailCandidates: [], whyNow: [], status: 'selected', memo: memo.trim().slice(0, 1000), source: 'custom' }
+}
+
+const EMPTY_EXTRA = { hook: '', shootDate: '', publishDate: '', checks: [] as MakeCheckId[], link: '', source: 'radar' as const }
+
+/** D-231 이번 주(월~일) 일정 — 촬영일 · 게시일이 이번 주인 것, 날짜 순 */
+export interface WeekItem {
+  date: string
+  what: 'shoot' | 'publish'
+  idea: ContentIdea
+}
+export function weekRange(today = todayLocalDate()): { from: string; to: string } {
+  const d = new Date(`${today}T00:00:00Z`)
+  const dow = (d.getUTCDay() + 6) % 7
+  const from = new Date(d.getTime() - dow * 86_400_000).toISOString().slice(0, 10)
+  const to = new Date(d.getTime() + (6 - dow) * 86_400_000).toISOString().slice(0, 10)
+  return { from, to }
+}
+export function weekSchedule(ideas: readonly ContentIdea[], today = todayLocalDate()): WeekItem[] {
+  const { from, to } = weekRange(today)
+  const out: WeekItem[] = []
+  for (const i of ideas) {
+    if (i.shootDate && i.shootDate >= from && i.shootDate <= to && i.status !== 'published') out.push({ date: i.shootDate, what: 'shoot', idea: i })
+    if (i.publishDate && i.publishDate >= from && i.publishDate <= to) out.push({ date: i.publishDate, what: 'publish', idea: i })
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date) || (a.what === 'shoot' ? -1 : 1))
+}
+
+/** D-231 단계마다 몇 개 */
+export function stageCounts(ideas: readonly ContentIdea[]): Record<IdeaStatus, number> {
+  const out = Object.fromEntries(IDEA_STATUSES.map((s) => [s, 0])) as Record<IdeaStatus, number>
+  for (const i of ideas) out[i.status] += 1
+  return out
+}
+
+/** D-231 날짜가 지난 일(촬영일이 지났는데 촬영 전 · 게시일이 지났는데 게시 전) */
+export function lateOf(i: ContentIdea, today = todayLocalDate()): 'shoot' | 'publish' | null {
+  if (i.status === 'published') return null
+  if (i.publishDate && i.publishDate < today) return 'publish'
+  if (i.shootDate && i.shootDate < today && (i.status === 'idea' || i.status === 'selected' || i.status === 'script')) return 'shoot'
+  return null
+}
+
 /** 후보 카드 → 수첩에 담을 모양 */
-export function ideaFromOpportunity(o: Opportunity): Omit<ContentIdea, 'id' | 'savedAt' | 'status' | 'memo'> {
+export function ideaFromOpportunity(o: Opportunity): Omit<ContentIdea, 'id' | 'savedAt' | 'status' | 'memo' | 'shootDate' | 'publishDate' | 'checks' | 'link' | 'source'> & Partial<Pick<ContentIdea, 'source'>> {
   return {
     key: o.key,
+    hook: shootKit(o).hook,
+    source: 'radar',
     topic: o.topic,
     topicId: o.topicId,
     angle: o.view,
@@ -112,7 +194,11 @@ export async function listIdeas(workspaceId: string | null): Promise<ContentIdea
     .sort((a, b) => b.savedAt.localeCompare(a.savedAt))
 }
 
-export async function saveIdea(workspaceId: string | null, input: Omit<ContentIdea, 'id' | 'savedAt' | 'status' | 'memo'> & Partial<Pick<ContentIdea, 'id' | 'savedAt' | 'status' | 'memo'>>): Promise<ContentIdea> {
+/** 저장할 때 받는 모양 — D-231 새 칸은 없어도 된다(예전 줄 · 예전 부르는 곳 그대로) */
+export type IdeaInput = Omit<ContentIdea, 'id' | 'savedAt' | 'status' | 'memo' | 'hook' | 'shootDate' | 'publishDate' | 'checks' | 'link' | 'source'> &
+  Partial<Pick<ContentIdea, 'id' | 'savedAt' | 'status' | 'memo' | 'hook' | 'shootDate' | 'publishDate' | 'checks' | 'link' | 'source'>>
+
+export async function saveIdea(workspaceId: string | null, input: IdeaInput): Promise<ContentIdea> {
   const id = input.id ?? `idea_${generateId()}`
   const clean = normalizeIdea({ ...input, savedAt: input.savedAt ?? nowIso(), status: input.status ?? 'idea', memo: input.memo ?? '' }, id)
   if (!clean) throw new Error('주제가 비어 있습니다.')
@@ -162,7 +248,9 @@ export function briefText(i: ContentIdea): string {
   return [
     `[콘텐츠 브리프] ${b.topic}`,
     `유형: ${AXIS_WORD[b.type]} · 시청자: ${b.audience}`,
-    `MIRAE 관점: ${b.angle}`,
+    `미래AI랩 관점: ${b.angle}`,
+    ...(i.hook ? [`첫 문장: ${i.hook}`] : []),
+    ...(i.shootDate || i.publishDate ? [`일정: ${i.shootDate ? `촬영 ${i.shootDate}` : ''}${i.shootDate && i.publishDate ? ' · ' : ''}${i.publishDate ? `게시 ${i.publishDate}` : ''}`] : []),
     '',
     '제목 후보',
     ...b.titleCandidates.map((t, k) => `${k + 1}. ${t}`),

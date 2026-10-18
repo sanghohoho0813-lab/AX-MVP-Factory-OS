@@ -20,7 +20,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFold } from '../../components/ui/fold'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, Archive, Award, BarChart3, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight, Circle, ClipboardCheck, Copy, Factory, Gem, Globe, Info, Layers, ListChecks, ListOrdered, MapPin, Megaphone, Package, PencilLine, Phone, RefreshCw, Save, Send, Sparkles, Star, Trash2, Wand2, type LucideIcon } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { Badge, BottomSheet } from '../../components/ui/primitives'
@@ -188,8 +188,11 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   const aiIdent = useOwnerAiIdentity()
   const { profile, source } = useMemo(() => buildProfile(record, today, store.overrides, store.site), [record, today, store.overrides, store.site])
 
+  // D-231 콘텐츠 레이더 › 내 콘텐츠 [홍보 글로] — 주제를 키워드에 넣고 '직접 고르기 › 블로그' 로 연다
+  const [urlParams] = useSearchParams()
+  const carried = (urlParams.get('kw') ?? '').trim().slice(0, 40)
   const [kind, setKind] = useState<ContentKind>('blog')
-  const [keyword, setKeyword] = useState(() => mainKeyword(profile))
+  const [keyword, setKeyword] = useState(() => carried || mainKeyword(profile))
   const [topicType, setTopicType] = useState<TopicType>('tips')
   // D-229 규칙집 3-5 — 카드뉴스는 보통 7~8장
   const [pages, setPages] = useState<5 | 7>(7)
@@ -217,7 +220,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   /** 받은 글 점검에 붙여 넣은 글 — 창을 닫았다 열어도 남게 여기 둔다 */
   const [aiGot, setAiGot] = useState('')
   /** D-227 무엇을 만들까요 — 네 길 중 지금 펼친 하나 */
-  const [mode, setMode] = useState<Mode>('pick')
+  const [mode, setMode] = useState<Mode>(() => (carried ? 'direct' : 'pick'))
   const [pack, setPack] = useState<PackState | null>(null)
   const packRef = useRef<PackState | null>(null)
   packRef.current = pack

@@ -19,6 +19,7 @@ import { useContentStore } from './useContentStore'
 import { SubjectPicker } from '../marketing/SubjectPicker'
 import { TrialBanner } from '../marketing/TrialBanner'
 import { useTrials } from '../marketing/trialStore'
+import { MarketingTabs } from '../marketing/MarketingTabs'
 
 const LIST = '/tools/content'
 const BUILD = '/tools/content/build'
@@ -112,6 +113,8 @@ export function ContentPage() {
         description="고객 · 잠재고객 · 동료 컨설턴트, 고객 관리에 없는 가상 업체까지 — 기록과 업종 견본으로 블로그 · 짧은 영상 · 긴 영상 · 카드뉴스 · 카톡 소식 · 플레이스 소개 · 키워드를 바로 만들고 보관합니다. 규칙으로 채우며 'AI' 가 아닙니다."
         descriptionAsHint
       />
+      {/* D-231 마케팅 · 브랜딩 목차 한 줄(콘텐츠 레이더 · 내 콘텐츠 · 홈페이지와 같은 줄) */}
+      <MarketingTabs active="content" />
       {section === 'build' ? <StudioScreen /> : <ClientPicker />}
     </div>
   )

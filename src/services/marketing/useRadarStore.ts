@@ -125,7 +125,7 @@ export function useIdeas(workspaceId: string | null, readOnly: boolean) {
   )
   /** 칸 몇 개만 바꾸기 — 그때의 최신 줄 위에 합친다(D-222: 메모를 적고 바로 단계를 바꾸면 옛 메모로 덮이던 것) */
   const patch = useCallback(
-    async (id: string, fields: Partial<Pick<ContentIdea, 'status' | 'memo'>>): Promise<ContentIdea | null> => {
+    async (id: string, fields: Partial<Pick<ContentIdea, 'status' | 'memo' | 'shootDate' | 'publishDate' | 'checks' | 'link' | 'topic'>>): Promise<ContentIdea | null> => {
       if (readOnly) return null
       const cur = ideasRef.current.find((i) => i.id === id)
       if (!cur) return null

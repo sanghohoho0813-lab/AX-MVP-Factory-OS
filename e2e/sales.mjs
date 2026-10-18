@@ -707,7 +707,7 @@ for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
   await page.getByTestId('upcoming-card').filter({ hasText: '직무발명보상제도' }).click()
   await page.waitForTimeout(300)
   check(`출시 예정(${tag}): 누르면 그 상품의 기간 · 상품표 설명`, page.url().endsWith('/upcoming/job-invention') && /임직원 발명에 대한 보상 규정/.test(await page.getByTestId('upcoming-desc').innerText()))
-  await page.goto(BASE + '/marketing', { waitUntil: 'networkidle' })
+  await page.goto(BASE + '/marketing/more', { waitUntil: 'networkidle' })
   check(`마케팅 · 브랜딩(${tag}): 맨 위 '유튜브 벤치마킹' 바로 쓰기(D-193)`, (await page.getByTestId('marketing-youtube').count()) === 1 && ((await page.getByTestId('marketing-youtube').getAttribute('href')) ?? '').endsWith('/marketing/youtube'))
   // D-206: 홍보 글 · 홈페이지도 마케팅 · 브랜딩에서 바로
   check(`마케팅 · 브랜딩(${tag}): 바로 쓰기에 홍보 글 만들기 · 홈페이지 만들기(D-206)`, ((await page.getByTestId('marketing-content').getAttribute('href')) ?? '').endsWith('/tools/content') && ((await page.getByTestId('marketing-homepage').getAttribute('href')) ?? '').endsWith('/tools/homepage'))

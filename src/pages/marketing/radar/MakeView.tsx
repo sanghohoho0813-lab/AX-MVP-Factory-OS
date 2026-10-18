@@ -1,0 +1,309 @@
+/**
+ * 내 콘텐츠 (D-231) — 레이더에서 고른 주제를 실제로 찍고 · 올리고 · 나눠 올리기까지 한 곳에서.
+ *
+ * 대표: "그걸 만들었으면 뭘 만들었고 앞으로 뭘 만들 건지 일정 · 체크리스트 같은 기능이 따로 하나 생겨야 —
+ *        콘텐츠를 실제로 만들어 나가는 과정에 필요한 모든 것. 홍보 글 만들기랑도 연동."
+ *  - 단계판(아이디어 → 제작 예정 → 대본 준비 → 촬영 완료 → 게시 완료) — 누르면 그 단계만.
+ *  - 이번 주 일정(월~일) — 촬영일 · 게시일이 이번 주인 것, 날짜가 지난 일은 빨갛게.
+ *  - 줄마다: 단계 · 촬영일 · 게시일 · 체크리스트 7칸 · 메모 · 올린 주소 · 첫 문장 · 제목 후보 · 브리프 복사 · [홍보 글로](주제를 키워드로) · 빼기(한 번 더 묻기).
+ *  - 레이더에 없는 주제도 직접 적어 담는다.
+ * 예전 '콘텐츠 수첩'(D-194)의 줄 · 단계 · 메모 · 브리프 · 빼기는 그대로 여기로 옮겼다(지운 것 없음). 저장은 같은 수첩 줄.
+ */
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { AlertTriangle, CalendarDays, CheckCircle2, ClipboardCopy, Clapperboard, ExternalLink, NotebookPen, PenLine, Plus, Trash2 } from 'lucide-react'
+import { Button } from '../../../components/ui/Button'
+import { todayLocalDate } from '../../../lib/appClock'
+import { IDEA_STATUSES, IDEA_STATUS_LABEL, MAKE_CHECKS, briefText, lateOf, stageCounts, weekRange, weekSchedule, type ContentIdea, type IdeaStatus, type MakeCheckId } from '../../../services/marketing/radarStore'
+import { AxisBadge, IconChip } from './RadarParts'
+
+const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토']
+const shortDay = (d: string) => {
+  const t = new Date(`${d}T00:00:00Z`)
+  return `${d.slice(5, 7).replace(/^0/, '')}/${d.slice(8, 10).replace(/^0/, '')}(${WEEKDAY[t.getUTCDay()]})`
+}
+const STAGE_TONE: Record<IdeaStatus, string> = {
+  idea: 'border-slate-300 text-slate-700',
+  selected: 'border-rose-300 text-rose-800',
+  script: 'border-amber-300 text-amber-800',
+  filmed: 'border-sky-300 text-sky-800',
+  published: 'border-emerald-300 text-emerald-800',
+}
+
+export interface MakeActions {
+  onStatus: (i: ContentIdea, s: IdeaStatus) => void
+  onPatch: (i: ContentIdea, fields: Partial<Pick<ContentIdea, 'memo' | 'shootDate' | 'publishDate' | 'checks' | 'link'>>, what: string) => void
+  onRemove: (i: ContentIdea) => void
+  onCopy: (text: string, what: string) => void
+  onAdd: (topic: string) => Promise<boolean>
+}
+
+export function MakeView({ ideas, readOnly, failed, today = todayLocalDate(), ...act }: { ideas: readonly ContentIdea[]; readOnly: boolean; failed: boolean; today?: string } & MakeActions) {
+  const [stage, setStage] = useState<IdeaStatus | 'all'>('all')
+  const [topic, setTopic] = useState('')
+  const counts = useMemo(() => stageCounts(ideas), [ideas])
+  const week = useMemo(() => weekSchedule(ideas, today), [ideas, today])
+  const range = weekRange(today)
+  const late = useMemo(() => ideas.filter((i) => lateOf(i, today)), [ideas, today])
+  const shown = useMemo(() => {
+    const list = stage === 'all' ? ideas : ideas.filter((i) => i.status === stage)
+    // 게시 완료는 뒤로 · 날짜가 있는 것 먼저(가까운 날 순) — 그다음 최근 담은 순
+    const key = (i: ContentIdea) => [i.shootDate, i.publishDate].filter(Boolean).sort()[0] ?? '9999'
+    return [...list].sort((a, b) => Number(a.status === 'published') - Number(b.status === 'published') || key(a).localeCompare(key(b)) || b.savedAt.localeCompare(a.savedAt))
+  }, [ideas, stage])
+  const add = async () => {
+    const t = topic.trim()
+    if (!t) return
+    if (await act.onAdd(t)) setTopic('')
+  }
+  return (
+    <div className="flex flex-col gap-4" data-testid="make-view">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-[1.375rem] leading-tight font-extrabold text-slate-900 sm:text-2xl">
+          <IconChip icon={NotebookPen} tone="rose" size="lg" />
+          내 콘텐츠 만들기
+        </h2>
+        <p className="t-sub break-keep text-slate-600">고른 주제를 찍고 · 올리고 · 블로그 · 쇼츠로 나눠 올리기까지</p>
+      </div>
+      {readOnly && <p className="t-meta text-warning-700">팀장 화면을 보는 중에는 바꾸지 않습니다(읽기만).</p>}
+      {failed && <p className="t-sub rounded-(--radius-control) bg-warning-50 px-3 py-2 text-warning-700">콘텐츠 수첩을 읽지 못했습니다 — 새로고침한 뒤 다시 열어 주세요.</p>}
+
+      {/* 단계판 */}
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6" role="tablist" aria-label="단계" data-testid="make-stages">
+        {(['all', ...IDEA_STATUSES] as const).map((s) => {
+          const n = s === 'all' ? ideas.length : counts[s]
+          const on = stage === s
+          return (
+            <button key={s} type="button" role="tab" aria-selected={on} onClick={() => setStage(on ? 'all' : s)} className={`tap flex min-h-14 flex-col items-center justify-center rounded-(--radius-control) border-2 px-1 py-1.5 ${on ? 'border-transparent bg-gradient-to-br from-red-600 to-rose-700 text-white shadow-sm' : `bg-white ${s === 'all' ? 'border-slate-300 text-slate-800' : STAGE_TONE[s]}`}`} data-testid="make-stage" data-status={s}>
+              <span className="text-xl leading-none font-extrabold tabular-nums">{n}</span>
+              <span className="t-meta mt-0.5 font-semibold break-keep">{s === 'all' ? '전체' : IDEA_STATUS_LABEL[s]}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        {/* 이번 주 일정 */}
+        <section className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-rose-200 bg-white p-3 sm:p-4" data-testid="make-week">
+          <p className="t-sub flex flex-wrap items-center gap-x-2 font-bold text-slate-900">
+            <CalendarDays aria-hidden="true" className="size-4 text-rose-600" /> 이번 주 일정
+            <span className="t-meta font-normal text-slate-500">
+              {shortDay(range.from)} ~ {shortDay(range.to)}
+            </span>
+          </p>
+          {week.length === 0 ? (
+            <p className="t-sub break-keep text-slate-500" data-testid="make-week-empty">
+              아래 줄에서 촬영일 · 게시일을 적으면 여기 이번 주 일정으로 모여요.
+            </p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-slate-100">
+              {week.map((w) => (
+                <li key={`${w.idea.id}-${w.what}`} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 py-1.5" data-testid="make-week-item" data-what={w.what}>
+                  <span className={`t-sub w-[4.75rem] shrink-0 font-bold tabular-nums ${w.date === today ? 'text-rose-700' : 'text-slate-700'}`}>{w.date === today ? '오늘' : shortDay(w.date)}</span>
+                  <span className={`t-meta shrink-0 rounded-full px-2 py-0.5 font-bold ${w.what === 'shoot' ? 'bg-sky-100 text-sky-800' : 'bg-emerald-100 text-emerald-800'}`}>{w.what === 'shoot' ? '촬영' : '게시'}</span>
+                  <span className="t-sub min-w-0 flex-1 font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]">{w.idea.topic}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {late.length > 0 && (
+            <p className="t-sub flex items-start gap-1.5 rounded-(--radius-control) bg-danger-50 px-3 py-2 break-keep text-danger-700" data-testid="make-late">
+              <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+              <span className="min-w-0">
+                날짜가 지난 일 {late.length}개 — {late.slice(0, 2).map((i) => i.topic).join(' · ')}
+                {late.length > 2 ? ' …' : ''}. 단계를 바꾸거나 날짜를 다시 잡아 주세요.
+              </span>
+            </p>
+          )}
+        </section>
+
+        {/* 직접 담기 */}
+        <section className="flex min-w-0 flex-col gap-2 rounded-(--radius-card) border border-slate-200 bg-white p-3 sm:p-4">
+          <p className="t-sub font-bold text-slate-900">레이더에 없는 주제 직접 담기</p>
+          <div className="flex min-w-0 gap-2">
+            <input
+              value={topic}
+              maxLength={120}
+              disabled={readOnly}
+              onChange={(e) => setTopic(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && void add()}
+              placeholder="예: 정책자금 상담 전 꼭 준비할 서류 5가지"
+              className="tap t-sub min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2"
+              aria-label="담을 주제"
+              data-testid="make-add-input"
+            />
+            <Button variant="primary" onClick={() => void add()} disabled={readOnly || !topic.trim()} data-testid="make-add">
+              <Plus aria-hidden="true" className="size-4" /> 담기
+            </Button>
+          </div>
+          <p className="t-meta break-keep text-slate-500">담으면 '제작 예정' 으로 들어가요. 레이더 카드의 [이번 주로 확정] 도 여기로 모여요.</p>
+        </section>
+      </div>
+
+      {/* 콘텐츠 줄 */}
+      <section className="flex flex-col" data-testid="radar-notebook">
+        {ideas.length === 0 ? (
+          <p className="t-sub rounded-(--radius-card) border border-dashed border-slate-300 bg-white px-4 py-6 break-keep text-slate-500" data-testid="make-empty">
+            아직 담은 콘텐츠가 없어요. [이번 주 찍을 것] 에서 카드의 [이번 주로 확정] 을 누르거나, 위에 주제를 직접 적어 담아 주세요.
+          </p>
+        ) : shown.length === 0 ? (
+          <p className="t-sub break-keep text-slate-500">이 단계의 콘텐츠가 없어요.</p>
+        ) : (
+          <ul className="flex flex-col gap-2.5">
+            {shown.map((i) => (
+              <MakeRow key={i.id} i={i} readOnly={readOnly} today={today} {...act} />
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  )
+}
+
+function MakeRow({ i, readOnly, today, onStatus, onPatch, onRemove, onCopy }: { i: ContentIdea; readOnly: boolean; today: string } & MakeActions) {
+  const [memo, setMemo] = useState(i.memo)
+  const [link, setLink] = useState(i.link)
+  const [confirm, setConfirm] = useState(false)
+  const [open, setOpen] = useState(false)
+  const late = lateOf(i, today)
+  const done = i.checks.length
+  const toggle = (id: MakeCheckId) => onPatch(i, { checks: i.checks.includes(id) ? i.checks.filter((c) => c !== id) : [...i.checks, id] }, '체크')
+  return (
+    <li className={`flex min-w-0 flex-col gap-2.5 rounded-(--radius-card) border bg-white p-3 sm:p-4 ${late ? 'border-danger-300' : 'border-slate-200'}`} data-testid="radar-idea" data-status={i.status}>
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        {i.source === 'custom' ? <span className="t-meta rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">직접 담음</span> : <AxisBadge axis={i.type} />}
+        <button type="button" onClick={() => setOpen((x) => !x)} aria-expanded={open} className="tap t-body min-w-0 flex-[1_1_12rem] text-left font-bold break-keep text-slate-900 [overflow-wrap:anywhere] hover:text-rose-700" data-testid="make-row-toggle">
+          {i.topic}
+        </button>
+        <label className="flex items-center gap-1.5">
+          <span className="sr-only">단계</span>
+          <select value={i.status} disabled={readOnly} onChange={(e) => onStatus(i, e.target.value as IdeaStatus)} className="tap t-sub rounded-(--radius-control) border border-slate-300 bg-white px-2 py-1.5 text-slate-800" data-testid="radar-idea-status">
+            {IDEA_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {IDEA_STATUS_LABEL[s]}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+        <label className="flex items-center gap-2">
+          <span className="t-sub w-12 shrink-0 font-semibold text-sky-800">촬영일</span>
+          <input type="date" value={i.shootDate} disabled={readOnly} onChange={(e) => onPatch(i, { shootDate: e.target.value }, '촬영일')} className="tap t-sub w-40 rounded-(--radius-control) border border-slate-300 bg-white px-2 py-1.5" data-testid="make-shoot-date" />
+        </label>
+        <label className="flex items-center gap-2">
+          <span className="t-sub w-12 shrink-0 font-semibold text-emerald-800">게시일</span>
+          <input type="date" value={i.publishDate} disabled={readOnly} onChange={(e) => onPatch(i, { publishDate: e.target.value }, '게시일')} className="tap t-sub w-40 rounded-(--radius-control) border border-slate-300 bg-white px-2 py-1.5" data-testid="make-publish-date" />
+        </label>
+        {late && (
+          <span className="t-meta inline-flex items-center gap-1 rounded-full bg-danger-50 px-2 py-0.5 font-bold text-danger-700" data-testid="make-row-late">
+            <AlertTriangle aria-hidden="true" className="size-3.5" /> {late === 'shoot' ? '촬영일이 지났어요' : '게시일이 지났어요'}
+          </span>
+        )}
+      </div>
+
+      {/* 체크리스트 */}
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <p className="t-meta flex items-center gap-1.5 font-semibold text-slate-600">
+          <CheckCircle2 aria-hidden="true" className={`size-4 ${done === MAKE_CHECKS.length ? 'text-success-600' : 'text-slate-400'}`} /> 할 일 {done}/{MAKE_CHECKS.length}
+          <span className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
+            <span className="block h-full rounded-full bg-gradient-to-r from-red-500 to-rose-600" style={{ width: `${Math.round((done / MAKE_CHECKS.length) * 100)}%` }} />
+          </span>
+        </p>
+        <div className="flex flex-wrap gap-1.5" data-testid="make-checks">
+          {MAKE_CHECKS.map((c) => {
+            const on = i.checks.includes(c.id)
+            return (
+              <label key={c.id} className={`tap t-sub inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-full border px-3 ${on ? 'border-success-300 bg-success-50 font-semibold text-success-800' : 'border-slate-200 bg-white text-slate-700 hover:border-rose-300'}`} data-testid="make-check" data-id={c.id} data-on={on ? '1' : '0'}>
+                <input type="checkbox" className="size-4 accent-rose-600" checked={on} disabled={readOnly} onChange={() => toggle(c.id)} />
+                {c.label}
+              </label>
+            )
+          })}
+        </div>
+      </div>
+
+      {open && (
+        <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-control) bg-slate-50 px-3 py-2.5" data-testid="make-row-body">
+          {i.angle && (
+            <p className="t-sub break-keep text-slate-800">
+              <span className="t-meta font-bold text-indigo-800">미래AI랩 관점 </span>
+              {i.angle}
+            </p>
+          )}
+          {i.hook && (
+            <p className="t-sub break-keep text-slate-800">
+              <span className="t-meta font-bold text-rose-700">첫 문장 </span>"{i.hook}"
+            </p>
+          )}
+          {i.titleCandidates.length > 0 && (
+            <ol className="t-sub flex list-decimal flex-col gap-0.5 pl-5 break-keep text-slate-800">
+              {i.titleCandidates.map((t) => (
+                <li key={t}>{t}</li>
+              ))}
+            </ol>
+          )}
+          {i.benchmarkTitles.length > 0 && <p className="t-meta break-keep text-slate-500">참고 영상 {i.benchmarkTitles.length}편 — {i.benchmarkTitles[0]}</p>}
+          <label className="flex flex-col gap-1">
+            <span className="t-meta font-semibold text-slate-600">메모</span>
+            <input
+              value={memo}
+              disabled={readOnly}
+              onChange={(e) => setMemo(e.target.value)}
+              onBlur={() => memo !== i.memo && onPatch(i, { memo }, '메모')}
+              placeholder="예: 화요일 오전 촬영 · 사례는 A사(이름 빼고)"
+              className="tap t-sub rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-2"
+              data-testid="radar-idea-memo"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="t-meta font-semibold text-slate-600">올린 주소(유튜브 · 블로그)</span>
+            <input
+              value={link}
+              disabled={readOnly}
+              inputMode="url"
+              onChange={(e) => setLink(e.target.value)}
+              onBlur={() => link.trim() !== i.link && onPatch(i, { link: link.trim() }, '올린 주소')}
+              placeholder="https://"
+              className="tap t-sub rounded-(--radius-control) border border-slate-300 bg-white px-2.5 py-2"
+              data-testid="make-link"
+            />
+          </label>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" variant="ghost" onClick={() => setOpen((x) => !x)} aria-expanded={open}>
+          <Clapperboard aria-hidden="true" className="size-4" /> {open ? '접기' : '관점 · 제목 · 메모'}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => onCopy(briefText(i), '브리프')} data-testid="radar-idea-brief">
+          <ClipboardCopy aria-hidden="true" className="size-4" /> 브리프 복사
+        </Button>
+        <Link to={`/tools/content?kw=${encodeURIComponent(i.topic.split(/\s*×\s*/)[0].slice(0, 40))}`} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) px-3 font-semibold text-violet-700 hover:bg-violet-50" data-testid="make-to-content" title="누구 글인지 고르면 이 주제를 키워드로 넣은 채 블로그 · 쇼츠 · 카드뉴스를 만들어요">
+          <PenLine aria-hidden="true" className="size-4" /> 홍보 글로
+        </Link>
+        {i.link && (
+          <a href={i.link} target="_blank" rel="noreferrer noopener" className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) px-3 font-semibold text-emerald-700 hover:bg-emerald-50" data-testid="make-open-link">
+            <ExternalLink aria-hidden="true" className="size-4" /> 올린 글 보기
+          </a>
+        )}
+        {confirm ? (
+          <span className="flex flex-wrap items-center gap-2" data-testid="radar-idea-confirm">
+            <span className="t-sub font-semibold text-danger-700">수첩에서 뺄까요?</span>
+            <Button size="sm" variant="danger" onClick={() => onRemove(i)} disabled={readOnly}>
+              빼기
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setConfirm(false)}>
+              그대로 두기
+            </Button>
+          </span>
+        ) : (
+          <Button size="sm" variant="ghost" onClick={() => setConfirm(true)} disabled={readOnly} aria-label={`수첩에서 빼기 — ${i.topic}`} data-testid="radar-idea-remove">
+            <Trash2 aria-hidden="true" className="size-4" /> 빼기
+          </Button>
+        )}
+      </div>
+    </li>
+  )
+}
