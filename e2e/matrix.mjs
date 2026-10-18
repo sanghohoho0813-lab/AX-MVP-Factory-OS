@@ -108,35 +108,48 @@ async function newPage(vp, mobile) {
   return { ctx, page, bucket }
 }
 
-/** 한 화면을 열고 볼 것을 본다 */
+/**
+ * 한 화면을 열고 볼 것을 본다.
+ * D-237: 화면마다 같은 창(같은 저장소)의 새 탭으로 연다 — 한 탭에서 80번 넘게 무거운 화면을 열면 시험 브라우저 탭이 메모리로 죽었다
+ * (앱 문제 아님: 같은 저장소 · 같은 화면을 따로 열면 정상, 예전 main(D-234) 빌드도 이 기계에서 같은 자리에서 죽음). 탭은 보고 나면 닫는다.
+ */
 async function inspect(page, bucket, label, path, { overflow = false } = {}) {
   bucket.length = 0
   if (page.isClosed()) return check(`${label} ${path}`, false, '시험 창이 닫혀 열지 못함')
-  await page.goto(BASE + path, { waitUntil: 'networkidle' }).catch(() => {})
-  await page.waitForTimeout(500)
-  // 맞춤 추천은 계산에 1초 남짓 걸린다(휴대폰 흉내에서 더) — 계산 중 글자가 사라질 때까지 기다린다
-  await page.waitForFunction(() => !document.body.innerText.includes('계산하는 중'), null, { timeout: 8000 }).catch(() => {})
-  const r = await page.evaluate(() => {
-    const main = document.querySelector('main') ?? document.body
-    const text = main.innerText ?? ''
-    return {
-      text,
-      len: text.trim().length,
-      err: !!document.querySelector('[data-testid="screen-error"]'),
-      sw: document.documentElement.scrollWidth,
-      cw: document.documentElement.clientWidth,
-    }
-  })
-  const bad = r.text.match(BAD)
-  const problems = []
-  if (bucket.length) problems.push(`화면 오류 ${bucket.join(' | ')}`)
-  if (r.err) problems.push('오류 울타리')
-  if (bad) problems.push(`깨진 글자 "${bad[0]}" … ${r.text.slice(Math.max(0, r.text.indexOf(bad[0]) - 60), r.text.indexOf(bad[0]) + 40).replace(/\s+/g, ' ')}`)
-  if (r.len < 20) problems.push(`본문이 거의 비었음(${r.len}자)`)
-  if (overflow && r.sw > r.cw + 1) problems.push(`가로 넘침 ${r.sw}>${r.cw}`)
-  check(`${label} ${path}`, problems.length === 0, problems.join(' · '))
-  if (problems.length && SHOTS) await page.screenshot({ path: join(SHOTS, `mx-${label.replace(/[^\w가-힣]+/g, '_')}-${path.replace(/[^\w]+/g, '_')}.png`) }).catch(() => {})
-  return r
+  const tab = await page.context().newPage()
+  tab.on('pageerror', (e) => bucket.push(String(e).slice(0, 200)))
+  try {
+    await tab.goto(BASE + path, { waitUntil: 'networkidle' }).catch(() => {})
+    await tab.waitForTimeout(500)
+    // 맞춤 추천은 계산에 1초 남짓 걸린다(휴대폰 흉내에서 더) — 계산 중 글자가 사라질 때까지 기다린다
+    await tab.waitForFunction(() => !document.body.innerText.includes('계산하는 중'), null, { timeout: 8000 }).catch(() => {})
+    const r = await tab.evaluate(() => {
+      const main = document.querySelector('main') ?? document.body
+      const text = main.innerText ?? ''
+      return {
+        text,
+        len: text.trim().length,
+        err: !!document.querySelector('[data-testid="screen-error"]'),
+        sw: document.documentElement.scrollWidth,
+        cw: document.documentElement.clientWidth,
+      }
+    })
+    const bad = r.text.match(BAD)
+    const problems = []
+    if (bucket.length) problems.push(`화면 오류 ${bucket.join(' | ')}`)
+    if (r.err) problems.push('오류 울타리')
+    if (bad) problems.push(`깨진 글자 "${bad[0]}" … ${r.text.slice(Math.max(0, r.text.indexOf(bad[0]) - 60), r.text.indexOf(bad[0]) + 40).replace(/\s+/g, ' ')}`)
+    if (r.len < 20) problems.push(`본문이 거의 비었음(${r.len}자)`)
+    if (overflow && r.sw > r.cw + 1) problems.push(`가로 넘침 ${r.sw}>${r.cw}`)
+    check(`${label} ${path}`, problems.length === 0, problems.join(' · '))
+    if (problems.length && SHOTS) await tab.screenshot({ path: join(SHOTS, `mx-${label.replace(/[^\w가-힣]+/g, '_')}-${path.replace(/[^\w]+/g, '_')}.png`) }).catch(() => {})
+    return r
+  } catch (e) {
+    check(`${label} ${path}`, false, `시험 탭 오류 ${String(e).slice(0, 120)}`)
+    return null
+  } finally {
+    await tab.close().catch(() => {})
+  }
 }
 
 let scenarioOpened = 0
