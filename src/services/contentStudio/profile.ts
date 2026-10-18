@@ -283,6 +283,12 @@ export function normalizeOverrides(raw: unknown): ProfileOverrides {
  * D-207 '이 칸만 채우면 글이 좋아져요' — 글 곳곳의 [대괄호] 를 줄이는 칸(마케팅의 핵심은 차별점을 손님 눈높이로 전하는 것).
  * 중요한 순서대로. 화면은 첫 몇 개만 보여 준다.
  */
+/** 후기 칸에 이미 어디 후기인지 적혀 있으면('네이버 후기 1,240개') 출처를 또 묻지 않는다 */
+const REVIEW_PLACE_IN = /네이버|플레이스|스마트\s*스토어|구글|카카오|당근|쿠팡|배민|배달의\s*민족|요기요|인스타|자사몰|홈페이지|매장|오늘의\s*집|아이디어스|크몽|숨고|11번가|지마켓/
+export function reviewPlaceIn(reviews: string): boolean {
+  return REVIEW_PLACE_IN.test(reviews)
+}
+
 export type GapKey = 'differ' | 'phone' | 'services' | 'hours' | 'objection' | 'speaker' | 'reviews' | 'reviewSource' | 'voice' | 'offer' | 'price'
 
 /** D-234 규칙집 0-12 — 가격에 숫자는 있는데 단위(1회 · 월 · 공임 · 1인분 · 개 · 부터 …)가 없으면 다른 도구가 '월 N원' 처럼 바꿔 썼다 */
@@ -303,7 +309,7 @@ export function profileGaps(p: ContentProfile): { key: GapKey; label: string; wh
   // D-228 재료 — 없으면 숫자 · 후기 · 혜택 자리를 [대괄호] 로 비워 둬요(지어내지 않음)
   if (!p.reviews) out.push({ key: 'reviews', label: '후기 수 · 평점', why: '카드뉴스 첫 장 · 블로그 소개 표에 믿음을 주는 숫자로 들어가요' })
   // D-234 규칙집 ⟲4차 — 후기 출처 · 가격 단위가 비면 다른 도구가 지어내거나 바꿔 쓴다
-  else if (!p.reviewSource) out.push({ key: 'reviewSource', label: '후기 출처', why: '자사몰 · 매장 · 플레이스처럼 — 비우면 다른 도구가 후기 위치를 지어내거나 다른 플랫폼 이름을 넣어요' })
+  else if (!p.reviewSource && !reviewPlaceIn(p.reviews)) out.push({ key: 'reviewSource', label: '후기 출처', why: '자사몰 · 매장 · 플레이스처럼 — 비우면 다른 도구가 후기 위치를 지어내거나 다른 플랫폼 이름을 넣어요' })
   if (p.price && priceWithoutUnit(p.price)) out.push({ key: 'price', label: '가격 단위', why: `'${p.price}' 에 단위가 없어요 — '1회' · '월' · '공임' 처럼 적지 않으면 '월 ○원' 같은 오해 문구가 나와요` })
   if (!p.voice) out.push({ key: 'voice', label: '실제 고객 한마디', why: '카드뉴스 · 블로그에 고객의 말로 들어가요(동의 받은 말만)' })
   // 기한 지난 혜택은 맨 앞에 — 날짜가 걸린 일이라 위 3개 안에 보여야 한다

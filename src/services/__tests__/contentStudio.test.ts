@@ -89,6 +89,7 @@ import {
   speakerLine,
   contactLine,
   priceWithoutUnit,
+  reviewPlaceIn,
   AI_REQUEST_TIPS,
 } from '../contentStudio'
 import type { IndustryKey, SiteDoc } from '../siteBuilder'
@@ -891,6 +892,10 @@ check('C80 먼저 만들 것 — 한국 10/16 오전에 만든 짧은 영상은 
     priceWithoutUnit('32,000원') && !priceWithoutUnit('1회 32,000원') && !priceWithoutUnit('공임 3만 원(부품값 별도)') && !priceWithoutUnit('300만 원부터') && !priceWithoutUnit('월 9,900원') && !priceWithoutUnit('') &&
     materialList(srcP).includes('후기 620개 (후기 출처: 자사몰)') && briefSlots(srcP, srcS).find((x) => x.key === 'contact')!.ok && briefSlots(srcP, srcS).find((x) => x.key === 'contact')!.note.includes('031-123-4567') && !briefSlots(ep, eS).find((x) => x.key === 'contact')!.ok,
     { gaps: profileGaps(noSrc).map((g) => g.key), slot: briefSlots(ep, eS).find((x) => x.key === 'contact') })
+  const namedSrc = buildProfile(full, today, normalizeOverrides({ reviews: '네이버 후기 1,240개 · 평점 4.8' })).profile
+  check('D234-12 후기 칸에 어디 후기인지 이미 적혀 있으면(네이버 후기 …) 출처를 또 묻지 않음 · 장소 없는 후기는 물음',
+    !profileGaps(namedSrc).some((g) => g.key === 'reviewSource') && reviewPlaceIn('스마트스토어 리뷰 320') && reviewPlaceIn('매장 후기 50개') && !reviewPlaceIn('후기 620개 · 평점 4.8'),
+    profileGaps(namedSrc).map((g) => g.key))
 
   const rcl = (kind: ContentKind, keys: string[], pp: ContentProfile, guide = false) => reviewChecklist(kind, keys.map((key) => ({ key, level: 'should' as const, text: '' })), pp, { guide })
   const st = (items: ReturnType<typeof rcl>, part: string) => items.find((x) => x.text.includes(part))?.state ?? null
