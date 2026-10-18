@@ -95,7 +95,8 @@ import {
   scoreLead,
   scoreTier,
 } from '../salesEngine'
-import { engineIndustry, interestsFromIssues, liveRoundOf, missingDocSlots, profileFromMemo, roundForStage, stageAfterMeeting, toEngineItem, withDocSlots, withMeetingNote, withSalesProfile } from '../salesMeeting'
+import { engineIndustry, factSalesDefaults, interestsFromIssues, liveRoundOf, missingDocSlots, profileFromMemo, roundForStage, stageAfterMeeting, toEngineItem, withDocSlots, withMeetingNote, withSalesProfile } from '../salesMeeting'
+import { withFactValue } from '../customerFacts'
 import { PATH_TO_KIND, agentRateOf, contractCloseDraft, contractGap, contractedNamesOf, servicesForProducts, withContractClose } from '../salesContract'
 import { withInboxPayload } from '../inboxToSales'
 import salesAppSource from '../../tools/salesKit/orig/SalesApp.jsx?raw'
@@ -1674,6 +1675,16 @@ check('묶음 표시: 메뉴에 없는 주소는 없음', screenGroupForPath('/z
   const rec = normalizeClientOps({ id: 'mt', workspaceId: null, companyName: '미팅테크', industry: '정밀기계 제조', employeeCount: '26명', establishedAt: '2008-03-02', status: 'waiting', nextActionDueDate: '2026-10-01', createdAt: at, updatedAt: at, sales: { stage: 'm1sched', source: '소개', referrer: '', interests: ['절세'], concern: '승계 고민', expectedFee: null, history: [], movedAt: at, ceoAge: 58, revenueM: 3500, flags: { gajigeup: true, childWorks: true }, memo: '메모' } })
   const it = toEngineItem(rec, new Date('2026-09-26T00:00:00Z'))
   check('미팅: 고객 기록 → 엔진 한 줄 (업종 · 직원 · 업력 · 나이 · 매출 · 단계 · 다음 날짜)', it.industry === '제조업' && it.empCount === 26 && it.estYears === 18 && it.ceoAge === 58 && it.revenue === 3500 && it.stage === 'meeting1_scheduled' && it.nextDate === '2026-10-01', JSON.stringify(it))
+  {
+    // D-238: 회사 사정(매출 · 대표 나이)을 안 적었으면 서류에서 읽은 사실로 — 적은 값이 있으면 그것이 먼저
+    const bare = normalizeClientOps({ ...rec, sales: { ...rec.sales!, ceoAge: null, revenueM: null } })
+    const withFacts = withFactValue(withFactValue(bare, 'revenue', '1230000000', { source: 'cretop', status: 'confirmed', now: at }), 'representativeBirth', '1970-12-01', { source: 'manual', status: 'confirmed', now: at })
+    const fd = factSalesDefaults(withFacts, new Date('2026-10-18T00:00:00'))
+    const fi = toEngineItem(withFacts, new Date('2026-10-18T00:00:00'))
+    check('D-238 미팅: 비운 매출 · 대표 나이는 서류 사실로(12.3억 → 1230 · 1970-12-01 → 55세, 생일 전)', fd.revenueM === 1230 && fd.ceoAge === 55 && fi.revenue === 1230 && fi.ceoAge === 55, JSON.stringify({ fd, r: fi.revenue, a: fi.ceoAge }))
+    check('D-238 미팅: 적은 값이 있으면 적은 값이 먼저', toEngineItem(withFactValue(rec, 'revenue', '1230000000', { source: 'cretop', status: 'confirmed', now: at }), new Date('2026-09-26T00:00:00Z')).revenue === 3500)
+    check('D-238 미팅: 사실도 없으면 예전처럼 비움', toEngineItem(bare, new Date('2026-10-18T00:00:00')).revenue === undefined && toEngineItem(bare, new Date('2026-10-18T00:00:00')).ceoAge === undefined)
+  }
   check('미팅: 체크 → 관심사 (가지급금 · 자녀 근무 → 가업승계 · 정관정비)', ['절세', '가지급금', '가업승계', '미처분이익잉여금', '정관정비'].every((x) => it.interests?.includes(x)), JSON.stringify(it.interests))
   check('미팅: 영업 칸 새 값이 저장 → 다시 읽기에서 살아남는다', normalizeClientOps(JSON.parse(JSON.stringify(rec))).sales?.flags?.gajigeup === true && rec.sales?.revenueM === 3500 && rec.sales.memo === '메모')
   check('미팅: 차수 — 단계별 기본값 · 기록 뒤 단계', roundForStage('lead') === 1 && roundForStage('m1done') === 2 && roundForStage('closing') === 3 && stageAfterMeeting(1) === 'm1done' && stageAfterMeeting(3) === 'closing')

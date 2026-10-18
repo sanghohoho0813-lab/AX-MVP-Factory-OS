@@ -9,7 +9,8 @@
  */
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, FileUp, Send, Sparkles } from 'lucide-react'
+import { ArrowRight, FileUp, History, Send, Sparkles } from 'lucide-react'
+import { activityTimeText } from '../../services/clientOpsActivity'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { Badge, type Tone } from '../ui/primitives'
 import { Button } from '../ui/Button'
@@ -77,6 +78,15 @@ export function TopPicksCard({
                 {p.amount && (
                   <span data-testid="top-pick-amount" className="t-sub font-bold break-keep text-success-700 [overflow-wrap:anywhere]">
                     {p.amount}
+                  </span>
+                )}
+                {/* D-238: 이미 해 본 모듈이면 지난번 결과 · 언제 — 처음부터 다시 하지 않고 이어서 */}
+                {p.last && (
+                  <span data-testid="top-pick-last" className="t-meta flex items-start gap-1 break-keep text-slate-600 [overflow-wrap:anywhere]">
+                    <History aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-slate-500" />
+                    <span className="min-w-0 line-clamp-2">
+                      지난번 {p.last.label} · {activityTimeText(p.last.at)}
+                    </span>
                   </span>
                 )}
                 <span className="t-sub mt-auto inline-flex items-center gap-1 pt-0.5 font-semibold text-brand-700 group-hover:underline">

@@ -143,6 +143,16 @@ export function SubjectPicker({
         <p className="t-sub mt-1 break-keep text-slate-600">{desc}</p>
       </div>
 
+      {/* D-238: 콘텐츠 레이더에서 들고 온 주제가 있으면 먼저 보여 준다 — 업체를 고르면 그 화면까지 같이 간다 */}
+      {kw && (
+        <p className={`t-sub flex items-start gap-1.5 rounded-(--radius-control) border px-3 py-2 break-keep [overflow-wrap:anywhere] ${t.line} ${t.soft} ${t.deep}`} data-testid="subject-carry-kw">
+          <Sparkles className={`mt-0.5 size-4 shrink-0 ${t.text}`} aria-hidden="true" />
+          <span className="min-w-0">
+            콘텐츠 레이더에서 가져온 주제 <b className="font-bold">‘{kw}’</b> — 아래에서 업체를 고르면 이 주제로 바로 써요.
+          </span>
+        </p>
+      )}
+
       {/* 고객 관리에 없어도 — 가상 업체 · 컨설턴트로 바로 */}
       <div className={`flex flex-col gap-2 rounded-(--radius-control) border p-3 ${t.line} ${t.soft}`} data-testid="trial-start">
         <p className={`t-sub flex items-start gap-1.5 break-keep font-semibold ${t.deep}`}>

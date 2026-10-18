@@ -329,12 +329,13 @@ function HeroCard(props: CardProps) {
         <WhyRecommended o={o} />
       </div>
       <MiraeView o={o} size="lg" />
-      <ShootKitPanel o={o} onCopy={props.onCopy} defaultOpen />
       {open && <Details {...props} />}
-      <div className="mt-auto flex flex-wrap items-center gap-2">
+      {/* D-238: [이번 주로 확정] 을 찍기 키트 위로 — 키트를 펼쳐 둔 채라 단추가 화면 한참 아래로 밀려 있었다 */}
+      <div className="flex flex-wrap items-center gap-2">
         <ConfirmButton {...props} />
         <DetailsToggle open={open} onToggle={() => setOpen((x) => !x)} />
       </div>
+      <ShootKitPanel o={o} onCopy={props.onCopy} defaultOpen />
     </article>
   )
 }

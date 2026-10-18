@@ -11,6 +11,7 @@ import { withActivity } from './clientOpsActivity'
 import { salesStageOf } from './salesPipeline'
 import { allDocumentMetas } from './clientOpsDocuments'
 import { withCustomDocument } from './clientOpsService'
+import { usableFactValue, wonOf } from './customerFacts'
 import {
   analyzeTranscript,
   deriveInterests,
@@ -58,17 +59,36 @@ function yearsSince(date: string, today: Date): number | null {
   return Math.max(0, today.getFullYear() - y)
 }
 
+/**
+ * D-238: 미팅에서 적은 회사 사정이 비어 있을 때 쓸 값 — 서류에서 읽어 둔 사실(크레탑 · 재무제표 매출, 대표 생년월일).
+ * 예전에는 서류함에 매출 · 생년월일이 있어도 미팅 준비 중요도 · 대본이 '모름' 으로 계산됐다. 적은 값이 있으면 그것이 먼저다.
+ */
+export function factSalesDefaults(record: ClientOpsRecord, today: Date = new Date()): { revenueM: number | null; ceoAge: number | null } {
+  const won = wonOf(usableFactValue(record, 'revenue'))
+  const revenueM = won !== null && won > 0 ? Math.round(won / 1_000_000) : null
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(usableFactValue(record, 'representativeBirth'))
+  let ceoAge: number | null = null
+  if (m) {
+    const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])]
+    const md = (today.getMonth() + 1) * 100 + today.getDate()
+    const age = today.getFullYear() - y - (md < mo * 100 + d ? 1 : 0)
+    ceoAge = y >= 1900 && age > 0 && age < 120 ? age : null
+  }
+  return { revenueM, ceoAge }
+}
+
 /** 고객 기록 → 엔진이 읽는 한 줄 */
 export function toEngineItem(record: ClientOpsRecord, today: Date = new Date()): SalesEngineItem {
   const s = record.sales
   const emp = parseInt(String(record.employeeCount ?? '').replace(/[^0-9]/g, ''), 10)
+  const fact = !s?.revenueM || !s?.ceoAge ? factSalesDefaults(record, today) : { revenueM: null, ceoAge: null }
   return {
     name: record.companyName,
     industry: engineIndustry(record.businessCategory || record.industry || ''),
-    revenue: s?.revenueM ?? undefined,
+    revenue: s?.revenueM ?? fact.revenueM ?? undefined,
     empCount: Number.isFinite(emp) ? emp : undefined,
     estYears: yearsSince(record.establishedAt, today) ?? undefined,
-    ceoAge: s?.ceoAge ?? undefined,
+    ceoAge: s?.ceoAge ?? fact.ceoAge ?? undefined,
     interests: deriveInterests({ interests: s?.interests ?? [], flags: s?.flags ?? {} }),
     concern: s?.concern ?? '',
     memo: s?.memo ?? '',

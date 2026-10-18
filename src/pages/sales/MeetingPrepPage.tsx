@@ -46,6 +46,7 @@ import { listClients, saveClient } from '../../services/clientOpsService'
 import { CLOSING_ROUNDS, closingRoundOf, salesStageLabelOf, salesStageOf, stageReached, withClosingRound, withSalesStage } from '../../services/salesPipeline'
 import { SALES_INTERESTS } from '../../content/salesCatalog'
 import {
+  factSalesDefaults,
   interestsFromIssues,
   liveRoundOf,
   missingDocSlots,
@@ -135,6 +136,9 @@ function ProfileEditor({ record, onSave }: { record: ClientOpsRecord; onSave: (n
   }
   const dirty = JSON.stringify(d) !== JSON.stringify(init)
   const onCount = Object.values(d.flags).filter(Boolean).length
+  // D-238: 비워 둔 칸은 서류에서 읽은 값으로 계산된다 — 무엇으로 계산 중인지 칸에 보여 준다
+  const fact = useMemo(() => factSalesDefaults(record), [record])
+  const factLine = [!d.revenueEok && fact.revenueM ? `매출 ${Math.round(fact.revenueM) / 100}억` : '', !d.ceoAge && fact.ceoAge ? `대표 ${fact.ceoAge}세` : ''].filter(Boolean).join(' · ')
 
   const save = async () => {
     const age = parseInt(d.ceoAge, 10)
@@ -168,19 +172,24 @@ function ProfileEditor({ record, onSave }: { record: ClientOpsRecord; onSave: (n
   }
 
   return (
-    <Disclosure title="미팅에서 알게 된 회사 사정" hint={`대표 나이 · 매출 · 가지급금 같은 사정 — 적으면 중요도 · 대본이 맞춰집니다 · 지금 대표 ${d.ceoAge || '?'}세 · 매출 ${d.revenueEok ? `${d.revenueEok}억` : '?'} · 체크 ${onCount}개`}>
+    <Disclosure title="미팅에서 알게 된 회사 사정" hint={`대표 나이 · 매출 · 가지급금 같은 사정 — 적으면 중요도 · 대본이 맞춰집니다 · 지금 대표 ${d.ceoAge || (fact.ceoAge ? `${fact.ceoAge}(서류)` : '?')}세 · 매출 ${d.revenueEok ? `${d.revenueEok}억` : fact.revenueM ? `${Math.round(fact.revenueM) / 100}억(서류)` : '?'} · 체크 ${onCount}개`}>
       <div className="flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <label className="block text-[0.875rem] text-slate-500">
             대표 나이
-            <input value={d.ceoAge} inputMode="numeric" onChange={(e) => setD({ ...d, ceoAge: e.target.value.replace(/[^0-9]/g, '') })} className={inputClass} />
+            <input value={d.ceoAge} inputMode="numeric" placeholder={fact.ceoAge ? `서류: ${fact.ceoAge}` : undefined} onChange={(e) => setD({ ...d, ceoAge: e.target.value.replace(/[^0-9]/g, '') })} className={inputClass} />
           </label>
           <label className="block text-[0.875rem] text-slate-500">
             매출 (억원)
-            <input value={d.revenueEok} inputMode="decimal" onChange={(e) => setD({ ...d, revenueEok: e.target.value.replace(/[^0-9.]/g, '') })} className={inputClass} />
+            <input value={d.revenueEok} inputMode="decimal" placeholder={fact.revenueM ? `서류: ${Math.round(fact.revenueM) / 100}` : undefined} onChange={(e) => setD({ ...d, revenueEok: e.target.value.replace(/[^0-9.]/g, '') })} className={inputClass} />
           </label>
           <p className="t-meta col-span-2 self-end pb-2 break-keep text-slate-500">
             직원 수 · 설립일 · 업종은 고객 관리 기본 정보에서 읽습니다.
+            {factLine && (
+              <span className="block text-slate-600" data-testid="meeting-fact-defaults">
+                비워 둔 칸은 서류에서 읽은 값({factLine})으로 계산해요 — 다르면 적으세요.
+              </span>
+            )}
           </p>
         </div>
         {CUST_SECTIONS.map((sec) => (

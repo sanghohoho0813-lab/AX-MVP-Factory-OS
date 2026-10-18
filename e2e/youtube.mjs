@@ -362,6 +362,12 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
   // U8 · U9 — [이번 주로 확정] → 기존 수첩에 '제작 예정' · 다시 눌러도 줄이 늘지 않음
   const heroCard = page.locator('[data-testid="radar-opp"][data-size="hero"]')
   const heroTopic = ((await heroCard.getByTestId('radar-opp-topic').innerText()) ?? '').trim()
+  // D-238: [이번 주로 확정] 은 찍기 키트(펼쳐 둔 채) 위 — 예전엔 키트 아래로 한참 밀려 있었다
+  {
+    const cb = await heroCard.getByTestId('radar-confirm').boundingBox()
+    const kb = await heroCard.getByTestId('radar-kit').boundingBox()
+    check('D238-1 1순위 카드 [이번 주로 확정] 이 찍기 키트보다 위', !!cb && !!kb && cb.y + cb.height <= kb.y + 1, JSON.stringify({ cb: cb?.y, kb: kb?.y }))
+  }
   await heroCard.getByTestId('radar-confirm').click()
   await page.waitForTimeout(500)
   const u8card = ((await heroCard.getByTestId('radar-confirmed').innerText()) ?? '').includes('제작 예정') && ((await page.getByTestId('radar-selected').innerText()) ?? '').includes(heroTopic)

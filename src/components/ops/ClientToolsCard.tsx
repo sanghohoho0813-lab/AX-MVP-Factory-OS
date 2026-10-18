@@ -27,6 +27,12 @@ import { missingDocsForTools, missingDocsText, missingReason, readinessOf } from
 import { Badge, Section, Surface } from '../ui/primitives'
 
 
+/**
+ * D-238: 업체 화면에서는 접지 않는 '잘 안 쓰는' 모듈 — 홍보 글 · 홈페이지는 업체마다 만드는 것이라 업체 화면에서 바로 보인다.
+ * (메뉴의 '잘 안 쓰는 기능' 자리는 그대로 · 팀장 화면은 예전처럼 입구 없음)
+ */
+const OPEN_IN_CLIENT = new Set(['web-studio'])
+
 export function ClientToolsCard({
   record,
   today,
@@ -58,7 +64,9 @@ export function ClientToolsCard({
     .map((m) => ({ m, features: FEATURE_CATALOG.filter((f) => f.module === m.key && f.clientEntry) }))
     .filter((g) => g.features.length > 0)
   const count = groups.reduce((n, g) => n + g.features.length, 0)
-  const rareCount = groups.filter((g) => g.m.rarelyUsed).length
+  const folded = (m: (typeof groups)[number]['m']) => !!m.rarelyUsed && !OPEN_IN_CLIENT.has(m.key)
+  const rare = groups.filter((g) => folded(g.m))
+  const rareCount = rare.length
   if (count === 0) return null
 
   return (
@@ -98,8 +106,8 @@ export function ClientToolsCard({
                 key={m.key}
                 aria-label={`${m.name} 모듈`}
                 data-client-module={m.key}
-                data-rare={m.rarelyUsed ? 'yes' : undefined}
-                className={`overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white ${m.rarelyUsed && !showAll ? 'hidden' : ''}`}
+                data-rare={folded(m) ? 'yes' : undefined}
+                className={`overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white ${folded(m) && !showAll ? 'hidden' : ''}`}
               >
                 <header className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50/70 px-3.5 py-2">
                   <m.icon aria-hidden="true" className="size-4 shrink-0 text-slate-500" />
@@ -132,7 +140,7 @@ export function ClientToolsCard({
             onClick={() => setShowAll((v) => !v)}
             className="tap t-sub inline-flex w-full items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white py-2 font-semibold text-slate-700 hover:bg-slate-50"
           >
-            {showAll ? '잘 안 쓰는 기능 접기' : `잘 안 쓰는 기능 ${rareCount}개 보기 (특허·MVP · AX · 웹 스튜디오)`}
+            {showAll ? '잘 안 쓰는 기능 접기' : `잘 안 쓰는 기능 ${rareCount}개 보기 (${rare.map((g) => g.m.name).join(' · ')})`}
           </button>
         )}
 

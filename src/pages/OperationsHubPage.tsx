@@ -399,6 +399,9 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
    * 전화를 받으면 가나다순, 정책자금을 보면 업력순으로 두고 그대로 일한다.
    */
   const [sortKey, setSortKey] = useState<ClientSortKey>(() => {
+    // D-238: 오늘 화면 '먼저 제안할 업체 n곳' 처럼 주소로 정렬을 정해 오면 그것 먼저(고르면 다시 기억)
+    const fromUrl = searchParams.get('sort')
+    if (isClientSortKey(fromUrl)) return fromUrl
     try {
       const v = localStorage.getItem(SORT_KEY)
       return isClientSortKey(v) ? v : 'active'
@@ -406,7 +409,13 @@ function OperationsHubContent({ workspaceId }: { workspaceId: string | null }) {
       return 'active'
     }
   })
+  // D-238: 주소로 정해 온 정렬은 기억해 둔 정렬을 덮지 않는다 — 사람이 직접 고르면 그때부터 기억
+  const sortFromUrl = useRef(isClientSortKey(searchParams.get('sort')))
   useEffect(() => {
+    if (sortFromUrl.current) {
+      sortFromUrl.current = false
+      return
+    }
     try {
       localStorage.setItem(SORT_KEY, sortKey)
     } catch {

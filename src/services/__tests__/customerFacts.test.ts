@@ -897,7 +897,23 @@ await (async () => {
 
   const shareOnly = normalizeClientOps({ ...base, shareholderRegister: [{ id: 'h1', name: '박대표', relation: 'ceo', shares: 10000, acquirePrice: 5000 }] } as never)
   const so = taxOf(shareOnly)
-  check('D-232 절세: 계산할 숫자가 없으면 금액을 짐작하지 않음(예전 문구 · 금액 없음)', so?.tone === 'maybe' && so?.amount === undefined && !!so?.headline.includes('찾아볼 수 있어요'), JSON.stringify(so))
+  // D-238: 계산해 낸 것 없이 주주명부만 있으면(대표 급여 모름) '검토해 볼 만함' 이 아니라 '정보가 더 필요해요' — 먼저 제안할 것에 오르지 않는다
+  check('D-232 절세: 계산할 숫자가 없으면 금액을 짐작하지 않음(금액 없음) · D-238 대표 급여를 모르면 정보가 더 필요해요', so?.tone === 'need' && so?.amount === undefined && !!so?.headline.includes('대표 급여를 알면') && !!so?.missing.includes('대표 급여') && !topPicks([so!]).length, JSON.stringify(so))
+  {
+    // D-238: 주주명부 · 대표 급여가 다 있는데 계산해 낼 것(가지급금 · 배당 가능한 이익)이 없으면 예전처럼 검토해 볼 만함
+    const both = normalizeClientOps({ ...base, shareholderRegister: [{ id: 'h1', name: '박대표', relation: 'ceo', shares: 10000, acquirePrice: 5000 }], establishedAt: '', taxProfile: { monthlySalary: '500만' } } as never)
+    const b = taxOf(both)
+    check('D-238 절세: 주주명부 · 대표 급여가 다 있으면 계산 거리가 없어도 검토해 볼 만함', b?.tone === 'maybe' || (b?.amount ?? '') !== '', JSON.stringify(b))
+    // D-238 지난 결과 — 정책자금 진단을 붙여 둔 업체는 판정 카드에 '지난번 무엇 · 언제'
+    const tr = (toolKey: string, verdictLabel: string) => ({ id: `t-${toolKey}`, toolKey, title: `${toolKey} 결과`, verdict: null, verdictLabel, summary: '', data: null, deadlines: [], createdAt: '2026-10-15T01:00:00.000Z', publishedUpdateId: null })
+    const done = normalizeClientOps({ ...base, toolResults: [tr('policy-funding', '진행 가능성 높음 · 중진공'), tr('cretop', '재무 안정')] } as never)
+    const ins = buildInsights(done, T, [])
+    const pf = ins.find((i) => i.key === 'policy-funding')
+    const ct = ins.find((i) => i.key === 'cretop')
+    check('D-238 지난 결과: 정책자금 진단을 붙였으면 판정에 지난번 결과 · 날짜', pf?.last?.label === '진행 가능성 높음 · 중진공' && pf?.last?.at === '2026-10-15T01:00:00.000Z', JSON.stringify(pf?.last))
+    check('D-238 지난 결과: 판정 글이 이미 그 결과(크레탑)면 같은 말을 두 번 쓰지 않음', ct?.headline === '재무 안정' && ct?.last === undefined, JSON.stringify(ct))
+    check('D-238 지난 결과: 붙인 결과가 없으면 없음', buildInsights(base, T, []).every((i) => i.last === undefined))
+  }
   const loanNoSalary = taxOf(withTax({ loanBalance: '1억' }))
   check('D-232 절세: 대표 급여를 모르면 가지급금 손해가 작게 나온다고 알림 · 받을 것에 대표 급여', !!loanNoSalary?.detail.includes('대표 급여를 모르면') && !!loanNoSalary?.missing.includes('대표 급여'), JSON.stringify(loanNoSalary))
   check('D-232 고객 관리 카드 띠(계산 건너뜀)도 같은 판정 색 — 가지급금이면 가능성 높음', cardRecoChips(loanRec, T, 0).find((c) => c.key === 'tax')?.tone === 'good' && cardRecoChips(retRec, T, 0).find((c) => c.key === 'tax')?.tone === 'maybe')

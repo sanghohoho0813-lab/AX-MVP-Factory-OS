@@ -163,6 +163,59 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await ctx.close()
 }
 
+/* ---------------- D-238 모듈끼리 잇기 3차 (1440) ---------------- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await setup(page)
+  // 정책자금 진단을 붙여 둔 업체 — 맞춤 추천에 '지난번' 이 보여야 한다
+  await page.evaluate((k) => {
+    const list = JSON.parse(localStorage.getItem(k) ?? '[]')
+    const r = list.find((x) => x.id === 'cli_hansol')
+    const t = r.payload ?? r
+    t.toolResults = [{ id: 'd238pf', toolKey: 'policy-funding', title: '정책자금 진단', verdict: null, verdictLabel: '진행 가능성 높음 · 중진공(D238)', summary: '', data: null, deadlines: [], createdAt: new Date(Date.now() - 2 * 86400000).toISOString(), publishedUpdateId: null }, ...(t.toolResults ?? [])]
+    localStorage.setItem(k, JSON.stringify(list))
+  }, KEY)
+  await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  const tools = page.getByTestId('client-tools')
+  check('D238 업체 상세: 홍보 글 · 홈페이지(웹 스튜디오)는 접지 않고 바로 보인다', (await tools.locator('[data-client-module="web-studio"]:visible').count()) === 1 && (await tools.locator('a[data-feature="content"]:visible').count()) === 1)
+  check('D238 업체 상세: 잘 안 쓰는 기능 단추에 웹 스튜디오 이름이 빠짐', !(((await page.getByTestId('client-tools-more').innerText()) ?? '').includes('웹 스튜디오')), await page.getByTestId('client-tools-more').innerText())
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  const last = page.locator('[data-testid="smart-insight"][data-key="policy-funding"]').getByTestId('smart-insight-last')
+  check('D238 맞춤 추천: 정책자금 판정에 지난번 결과 · 언제', (await last.count()) === 1 && ((await last.innerText()) ?? '').includes('진행 가능성 높음 · 중진공(D238)') && ((await last.innerText()) ?? '').includes('2일 전'), (await last.count()) ? await last.innerText() : 'none')
+  const promo = page.getByTestId('smart-promo')
+  check('D238 맞춤 추천: 홍보도 같이 — 홈페이지 · 홍보 글 입구(이 업체로)', (await promo.count()) === 1 && (await promo.locator('[data-tool="homepage"]').getAttribute('href')) === '/tools/homepage/build?client=cli_hansol' && (await promo.locator('[data-tool="content"]').getAttribute('href')) === '/tools/content/build?client=cli_hansol')
+  // 오늘 — 먼저 제안할 업체 수 → 고객 관리 추천 많은 순
+  await page.goto(BASE + '/today', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(900)
+  const reco = page.getByTestId('today-reco-count')
+  const recoText = (await reco.count()) ? ((await reco.innerText()) ?? '') : ''
+  check('D238 오늘: 먼저 제안할 업체 n곳 줄', /먼저 제안할 업체 \d+곳/.test(recoText), recoText)
+  const savedSort = await page.evaluate(() => Object.entries(localStorage).find(([k]) => k.includes('clients.sort'))?.[1] ?? null)
+  if (recoText) {
+    await reco.click()
+    await page.waitForURL(/\/ops\/clients\?sort=reco/)
+    await page.waitForTimeout(700)
+    const sel = page.locator('select').filter({ has: page.locator('option[value="reco"]') }).first()
+    check('D238 오늘 → 고객 관리: 추천 많은 순으로 열린다', (await sel.inputValue()) === 'reco', await sel.inputValue())
+    const after = await page.evaluate(() => Object.entries(localStorage).find(([k]) => k.includes('clients.sort'))?.[1] ?? null)
+    check('D238 주소로 정한 정렬은 기억한 정렬을 덮지 않는다', after === savedSort, `${savedSort} → ${after}`)
+  }
+  // 콘텐츠 레이더에서 들고 온 주제
+  await page.goto(BASE + '/tools/content/build?kw=' + encodeURIComponent('AI 세무 자동화'), { waitUntil: 'networkidle' })
+  await page.waitForTimeout(700)
+  const band = page.getByTestId('subject-carry-kw')
+  check('D238 홍보 글 업체 고르기: 레이더에서 가져온 주제 띠', (await band.count()) === 1 && ((await band.innerText()) ?? '').includes('AI 세무 자동화'))
+  check('D238 JS 오류 없음', errors.length === 0, errors.join(' | '))
+  await ctx.close()
+}
+
 /* ---------------- 390 · 360(1.30배) ---------------- */
 for (const [width, scale] of [
   [390, 'default'],

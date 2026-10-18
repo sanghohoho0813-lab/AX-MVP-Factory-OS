@@ -1050,7 +1050,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       <ToolResultsCard record={record} fold={{ id: 'overview.results', panel: true }} onChange={(next) => void commit(next)} />
 
       {/* 이 업체로 도구 열기 — 결과가 다시 여기로 돌아온다 (D-89). 없는 서류는 여기서 빨갛게 (D-90) */}
-      <ClientToolsCard record={record} today={today} fold={{ id: 'overview.tools', panel: true }} onOpenDocs={() => setTab('docs')} />
+      {/* D-238: 처음 열 때는 펼쳐 둔다 — 업체 일로 모듈을 여는 문이다(접으면 그대로 기억) */}
+      <ClientToolsCard record={record} today={today} fold={{ id: 'overview.tools', panel: true, open: true }} onOpenDocs={() => setTab('docs')} />
 
       {/* D-135: 이 업체와 이어진 AX 스튜디오 프로젝트 */}
       <AxProjectsCard record={record} fold={{ id: 'overview.ax', panel: true }} />

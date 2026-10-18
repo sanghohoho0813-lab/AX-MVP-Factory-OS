@@ -5,6 +5,7 @@ import { TodayCharges } from '../components/money/TodayCharges'
 import { TodayCare } from '../components/ops/TodayCare'
 import { TodayDecisions } from '../components/ops/DecisionList'
 import { useGrantData } from '../components/grants/useGrants'
+import { useClientReco } from '../components/ops/useClientReco'
 import { useEntitlements } from '../lib/entitlementsStore'
 import { Link, useNavigate } from 'react-router-dom'
 import {
@@ -126,6 +127,9 @@ type SectionAccent = 'todo' | 'urgent' | 'journal' | 'event' | 'client' | 'money
 /** 휴대폰에서 처음 보여 줄 줄 수(D-166) */
 const PHONE_ROWS = 3
 
+/** D-238: 오늘 화면은 업체마다 공고를 대 보지 않는다 — 모듈 판정만 센다 */
+const noGrantFit = () => 0
+
 const SECTION_CHIP: Record<SectionAccent, string> = {
   todo: 'bg-brand-50 text-brand-600',
   urgent: 'bg-danger-50 text-danger-600',
@@ -169,6 +173,12 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const pilot = useIsPilot()
 
   const [clients, setClients] = useState<ClientOpsRecord[]>([])
+  // D-238: 먼저 제안할 것(가능성 높은 모듈)이 있는 업체 수 — 고객 관리 카드 띠와 같은 판정(지원사업 공고 수는 빼고 모듈 판정만)
+  const reco = useClientReco(clients, today, noGrantFit)
+  const pickCount = useMemo(
+    () => (reco.ready ? clients.filter((c) => c.archivedAt === null && c.status !== 'completed' && (reco.chips.get(c.id) ?? []).some((x) => x.tone === 'good')).length : 0),
+    [clients, reco],
+  )
   // D-166: 휴대폰에서는 목록을 짧게(3건 · 4건) — '더 보기' 로 펼친다. PC 는 그대로
   const phone = useIsPhone()
   const [showAllAppts, setShowAllAppts] = useState(false)
@@ -787,6 +797,14 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             진행 중 <strong className="font-semibold text-slate-800 tabular-nums">{salesFlow.count}곳</strong>
             {salesFlow.fee > 0 && <> · 예상 수임료 <strong className="font-semibold text-slate-800 tabular-nums">{krwTile(salesFlow.fee)}</strong></>}
             {salesRecontactList.length > 0 && <> · 다시 연락할 곳 {salesRecontactList.length}</>}
+            {pickCount > 0 && (
+              <>
+                {' · '}
+                <Link to="/ops/clients?sort=reco" data-testid="today-reco-count" className="tap inline-flex items-center font-semibold whitespace-nowrap text-success-700 hover:underline">
+                  먼저 제안할 업체 {pickCount}곳 →
+                </Link>
+              </>
+            )}
             {' · '}
             {/* D-119: 크레탑 보고서 한 번으로 잠재고객 등록 */}
             <Link to="/sales/new" data-testid="today-cretop-intake" className="tap inline-flex items-center font-semibold whitespace-nowrap text-brand-700 hover:underline">

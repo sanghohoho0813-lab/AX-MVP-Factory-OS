@@ -23,6 +23,7 @@ import { judge } from '../tools/startupTax/lib/judgement'
 import { EMPTY_FORM } from '../tools/startupTax/lib/formDefaults'
 import type { FormData as StartupForm, Region } from '../tools/startupTax/types'
 import { placeOf } from './grants/grantMatch'
+import { josa } from '../lib/josa'
 import { filledTaxProfile, loanPlan, retirePlan, salaryOrDividend, shareValueOf, viewProfile } from './taxPlan'
 
 export type InsightTone = 'good' | 'maybe' | 'done' | 'need' | 'no'
@@ -50,6 +51,8 @@ export interface Insight {
   action: string | null
   /** D-191: 엔진이 이미 계산한 금액만(명부 진단 최대 지원금 · 연구소 세액공제 · 공고 금액 글) — 없으면 짐작하지 않는다 */
   amount?: string
+  /** D-238: 이 업체 기록에 붙인 이 모듈의 가장 최근 결과 — 이미 해 본 것이면 '지난번 무엇 · 언제' 를 같이 보여 준다(판정 글과 같으면 없음) */
+  last?: { label: string; at: string }
 }
 
 /** 원 → '1,440만원' · 1억 이상은 '1.2억원' */
@@ -348,7 +351,13 @@ const taxInsight: Provider = ({ record, today, light }) => {
     }
   }
   const top = found[0]
-  if (!top) return { key: 'tax', label: '절세 설계', tone: 'maybe', headline: `절세 현황 ${filled}칸${hasShares ? ` · 주주 ${record.shareholderRegister.length}명` : ''} — 원하는 결과로 절세 방법을 찾아볼 수 있어요`, detail: '', missing: [!hasShares ? '주주명부' : '', p.monthlySalary > 0 ? '' : '대표 급여'].filter(Boolean), openPath: open, openLabel: '절세 설계 열기', action: null }
+  if (!top) {
+    const lack = [!hasShares ? '주주명부' : '', p.monthlySalary > 0 ? '' : '대표 급여'].filter(Boolean)
+    // light(카드 띠)는 계산을 건너뛰었다 — 계산할 숫자(취임일 · 급여 / 급여 · 주주명부 · 배당 가능한 이익)가 있으면 전체 판정과 같은 색
+    const skipped = !!light && ((!!p.ceoStartDate && p.monthlySalary > 0) || (p.monthlySalary > 0 && hasShares && p.retainedEarnings > 0))
+    // D-238: 계산해 낸 것이 없는데 주주명부나 대표 급여까지 없으면 '검토해 볼 만함' 이 아니라 '정보가 더 필요해요' — 근거 없이 먼저 제안할 것에 올리지 않는다
+    return { key: 'tax', label: '절세 설계', tone: lack.length && !skipped ? 'need' : 'maybe', headline: `절세 현황 ${filled}칸${hasShares ? ` · 주주 ${record.shareholderRegister.length}명` : ''} — ${lack.length ? `${josa(lack.join(' · '), '을/를')} 알면 절세 금액을 계산해요` : '원하는 결과로 절세 방법을 찾아볼 수 있어요'}`, detail: '', missing: lack, openPath: open, openLabel: '절세 설계 열기', action: null }
+  }
   const others = found.slice(1).map((f) => f.short)
   return {
     key: 'tax',
@@ -387,6 +396,16 @@ export const INSIGHT_PROVIDERS: { key: string; run: Provider }[] = [
 
 const TONE_RANK: Record<InsightTone, number> = { good: 0, maybe: 1, done: 2, need: 3, no: 4 }
 
+/** D-238: 붙인 결과가 있으면 '지난번' 한 줄 — 판정 글이 이미 그 결과(크레탑 · 연구소 진단)면 같은 말을 두 번 쓰지 않는다 */
+function withLast(ins: Insight, record: ClientOpsRecord): Insight {
+  if (ins.key === 'grants') return ins
+  const last = latestToolResult(record, ins.key)
+  if (!last) return ins
+  const label = (last.verdictLabel || last.title).trim()
+  if (!label || label === ins.headline.trim()) return ins
+  return { ...ins, last: { label, at: last.createdAt } }
+}
+
 /** 업체 하나 → 모듈별 판정(좋은 것 먼저). 한 모듈이 실패해도 나머지는 보인다 */
 export function buildInsights(record: ClientOpsRecord, today: string, notices: readonly GrantNotice[], usable: (key: string) => boolean = () => true, light = false): Insight[] {
   const base = clientFacts(record, new Date(`${today}T00:00:00`))
@@ -398,7 +417,7 @@ export function buildInsights(record: ClientOpsRecord, today: string, notices: r
     if (!usable(p.key)) continue
     try {
       const r = p.run(ctx)
-      if (r) out.push(r)
+      if (r) out.push(withLast(r, record))
     } catch {
       // 한 모듈 엔진이 이 업체 값으로 실패해도 맞춤 추천 전체가 멈추지 않는다
     }

@@ -13,7 +13,10 @@
  */
 import { useCallback, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, CalendarPlus, Check, CircleAlert, FileUp } from 'lucide-react'
+import { ArrowRight, CalendarPlus, Check, CircleAlert, FileUp, History } from 'lucide-react'
+import { activityTimeText } from '../../services/clientOpsActivity'
+import { latestToolResult } from '../../services/toolResultGroups'
+import { useIsPilot } from '../../auth/osAccess'
 import type { ClientOpsRecord, OpsAlert } from '../../types/clientOps'
 import { Button } from '../ui/Button'
 import { Badge, Section, Surface, type Tone } from '../ui/primitives'
@@ -225,6 +228,14 @@ export default function ClientSmartTab({
                 <p className="t-body break-keep font-semibold text-slate-800 [overflow-wrap:anywhere]">{ins.headline}</p>
                 {ins.amount && <p className="t-sub font-bold break-keep text-success-700" data-testid="smart-insight-amount">{ins.amount}</p>}
                 {ins.detail && <p className="t-sub break-keep text-slate-600 [overflow-wrap:anywhere]">{ins.detail}</p>}
+                {ins.last && (
+                  <p className="t-sub flex items-start gap-1 break-keep text-slate-600 [overflow-wrap:anywhere]" data-testid="smart-insight-last">
+                    <History aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-slate-500" />
+                    <span className="min-w-0">
+                      지난번 <b className="font-semibold text-slate-800">{ins.last.label}</b> · {activityTimeText(ins.last.at)}
+                    </span>
+                  </p>
+                )}
                 {ins.missing.length > 0 && (
                   <p className="t-sub flex flex-wrap items-center gap-1.5 text-slate-600">
                     <span className="text-slate-500">있으면 더 정확:</span>
@@ -245,6 +256,9 @@ export default function ClientSmartTab({
       </Section>
       </div>
 
+      {/* 5-1. D-238: 홍보도 같이 — 홈페이지 · 홍보 글(대표 화면 · 요금제에 있을 때만) */}
+      <ClientPromoRow record={record} />
+
       {/* 6. 지금 챙길 것 */}
       {alerts.length > 0 && (
         <Section title="지금 챙길 것" count={alerts.length} fold={{ id: 'smart.alerts' }}>
@@ -259,6 +273,51 @@ export default function ClientSmartTab({
       {/* 7. 맞는 지원사업 */}
       <ClientGrantsCard workspaceId={workspaceId} record={record} today={today} onFill={onFill} onCommit={onCommit} fold={{ id: 'smart.grants' }} />
     </div>
+  )
+}
+
+/**
+ * D-238 맞춤 추천 '홍보도 같이' — 모듈 판정(정책자금 · 고용 …)과 따로, 이 업체 홈페이지 · 홍보 글을 바로 만드는 한 줄.
+ * 판정이 아니라 입구다(가능성 · 금액을 말하지 않는다). 팀장 화면은 웹 스튜디오 입구가 없어(D-162) 그리지 않는다.
+ */
+function ClientPromoRow({ record }: { record: ClientOpsRecord }) {
+  const { ent } = useEntitlements()
+  const pilot = useIsPilot()
+  const tools = [
+    { key: 'homepage', label: '홈페이지', verb: '초안 만들기', again: '고치기', path: '/tools/homepage/build' },
+    { key: 'content', label: '홍보 글', verb: '만들기', again: '더 만들기', path: '/tools/content/build' },
+  ].filter((t) => ent.feature(t.key).usable)
+  if (pilot || tools.length === 0) return null
+  const q = `?client=${encodeURIComponent(record.id)}`
+  return (
+    <Surface className="flex flex-col gap-2.5 py-3 sm:py-3" data-testid="smart-promo">
+      <HintTip tip={hintFor('홍보도 같이')} label="홍보도 같이">
+        <h3 className="t-card font-bold break-keep text-slate-900">홍보도 같이</h3>
+      </HintTip>
+      <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {tools.map((t) => {
+          const last = latestToolResult(record, t.key)
+          return (
+            <li key={t.key} className="min-w-0">
+              <Link
+                to={`${t.path}${q}`}
+                data-testid="smart-promo-open"
+                data-tool={t.key}
+                className="tap flex h-full flex-wrap items-center gap-x-3 gap-y-1 rounded-(--radius-card) border border-slate-200 bg-white px-3.5 py-2.5 hover:border-brand-400"
+              >
+                <span className="flex min-w-0 grow basis-[10rem] flex-col">
+                  <span className="t-body font-bold text-slate-900">{t.label}</span>
+                  <span className="t-meta break-keep text-slate-600 [overflow-wrap:anywhere]">{last ? `지난번 ${last.verdictLabel || last.title} · ${activityTimeText(last.createdAt)}` : '아직 만든 것이 없어요 — 회사 정보가 미리 들어가요'}</span>
+                </span>
+                <span className="t-sub ml-auto inline-flex shrink-0 items-center gap-1 font-semibold text-brand-700">
+                  {last ? t.again : t.verb} <ArrowRight aria-hidden="true" className="size-4" />
+                </span>
+              </Link>
+            </li>
+          )
+        })}
+      </ul>
+    </Surface>
   )
 }
 
