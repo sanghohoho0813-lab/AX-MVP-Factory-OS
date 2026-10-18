@@ -19,6 +19,7 @@ import { particle } from '../../lib/josa'
 import { contentLib, RISKY_WORDS, type ContentLib } from './library'
 import type { ContentProfile } from './profile'
 import { applyTone, type Tone } from './tone'
+import { angleTitle, angleVideoTitle, type AngleId } from './angles'
 
 export type ContentKind = 'keywords' | 'blog' | 'shorts' | 'video' | 'cards' | 'kakao' | 'place'
 
@@ -119,6 +120,8 @@ export interface DraftRequest {
   blogType?: BlogType
   shortLen?: ShortLen
   adType?: AdType
+  /** D-230 제목 각도(블로그 · 긴 영상) — 없으면 주제 제목 */
+  angle?: AngleId
 }
 
 export interface DraftBlock {
@@ -150,6 +153,8 @@ export interface DraftInput {
    */
   planStart?: string
   planPer?: 2 | 4
+  /** D-230 고른 제목 각도 — 키워드별로 쓴 각도를 기록해 다음에 빼고 고른다(규칙집 2-2) */
+  angle?: AngleId
 }
 
 export interface Draft {
@@ -323,7 +328,7 @@ export function fitText(cands: readonly string[], min: number, max: number): str
 }
 
 /** 블로그 제목 25~35자 — 짧으면 소비자형은 (괄호 보충), 기업형은 줄표 꼬리 */
-function blogTitleFit(p: ContentProfile, title: string): string {
+export function blogTitleFit(p: ContentProfile, title: string): string {
   if (title.length >= 25 || placeholders(title).length) return title
   const tails = isB2B(p) ? [' — 맡기기 전 확인', ' — 견적 전에 보세요', ' — 담당자가 먼저 보는 기준'] : [' (처음이라면 필독)', ' (꼭 보세요)', ' (손해 보기 전에 보세요)']
   return fitText([title, ...tails.map((x) => `${title}${x}`)], 25, 35)
@@ -814,11 +819,11 @@ export function videoThumb(p: ContentProfile, topic: Topic, c: number): string {
 }
 
 /** 롱폼 — 기획 카드(썸네일 문구 · 제목 · 도입부 · 주제 · 타겟 · 전략) → 대본(체크포인트 3 + 마무리) */
-function videoDraft(p: ContentProfile, topic: Topic, variant: number): DraftBlock[] {
+function videoDraft(p: ContentProfile, topic: Topic, variant: number, titleOverride?: string): DraftBlock[] {
   const lib = contentLib(p.industry)
   const points = pointsFor(p, topic, variant).slice(0, 3)
   const c = points.length
-  const title = videoTitle(p, topic, c)
+  const title = titleOverride || videoTitle(p, topic, c)
   const thumb = videoThumb(p, topic, c)
   const visuals = visualsOf(lib)
   const item = withoutArea(p, topic.keyword) || p.item
@@ -1011,7 +1016,11 @@ export function makeDraft(p: ContentProfile, req: DraftRequest, today: string): 
   const topic0 = req.topic ?? topicsFor(p, kw, today, variant)[0]
   // D-229 제목의 'N가지' 는 그 형식이 실제로 다루는 개수(블로그 2 · 영상 3 · 쇼츠 2~3 · 정보형 카드는 본문 장 수)
   const per = req.kind === 'blog' ? 2 : req.kind === 'shorts' ? ((req.shortLen ?? '20-30') === '20-30' ? 2 : 3) : req.kind === 'cards' && (req.adType ?? 'info') === 'info' ? (req.pages ?? 5) - 2 : 3
-  const topic = { ...topic0, title: withCount(topic0.title, per) }
+  // D-230 고른 각도가 있으면 그 각도로 제목(블로그) — 조건이 안 맞는 각도는 null 이라 주제 제목 그대로
+  const angled = req.angle && req.kind === 'blog' && (req.blogType ?? 'brand') === 'brand' ? angleTitle(p, req.angle, topic0.keyword, per, today) : null
+  const angleVideo = req.angle && req.kind === 'video' ? angleVideoTitle(p, req.angle, topic0.keyword, per, today) : null
+  const angle = angled || angleVideo ? req.angle : undefined
+  const topic = { ...topic0, title: angled ? blogTitleFit(p, angled) : withCount(topic0.title, per) }
   const lib = contentLib(p.industry)
   let blocks: DraftBlock[] = []
   let notes: string[] = []
@@ -1036,7 +1045,7 @@ export function makeDraft(p: ContentProfile, req: DraftRequest, today: string): 
       title = topic.title
       break
     case 'video':
-      blocks = videoDraft(p, topic, variant)
+      blocks = videoDraft(p, topic, variant, angleVideo ?? undefined)
       title = blocks[0].text
       break
     case 'cards':
@@ -1069,10 +1078,22 @@ export function makeDraft(p: ContentProfile, req: DraftRequest, today: string): 
       ...(req.kind === 'blog' ? { blogType: req.blogType ?? 'brand' } : {}),
       ...(req.kind === 'shorts' ? { shortLen: req.shortLen ?? '20-30' } : {}),
       ...(req.kind === 'kakao' ? { purpose: req.purpose ?? 'news' } : {}),
+      ...(angle ? { angle } : {}),
       variant,
       tone: p.tone,
     },
   }
+}
+
+/** D-230 규칙집 3-5 — 카드뉴스 5안, 순서 고정(반박 없애기 → 문제 해결 → 전후 변화 → 궁금증 → 권위) */
+export const CARD_FIVE: AdType[] = ['objection', 'problem', 'before', 'curious', 'proof']
+
+/** 한 상품 · 한 주제로 카드뉴스 5안 — 탭 이름은 유형(번호는 탭이 붙인다), 보관함에서 갈리게 제목 끝에 유형을 붙인다 */
+export function cardFive(p: ContentProfile, req: { keyword?: string; topic?: Topic; pages?: 5 | 7; variant?: number }, today: string): { tab: string; draft: Draft }[] {
+  return CARD_FIVE.map((a) => {
+    const d = makeDraft(p, { kind: 'cards', keyword: req.keyword, topic: req.topic, pages: req.pages ?? 7, variant: req.variant ?? 0, adType: a }, today)
+    return { tab: AD_TYPE_LABEL[a].replace(/형$/, ''), draft: { ...d, title: `${d.title} · ${AD_TYPE_LABEL[a]}` } }
+  })
 }
 
 /** 복사할 글 — 형식마다 읽기 좋은 모양으로 */

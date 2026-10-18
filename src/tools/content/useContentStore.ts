@@ -19,6 +19,8 @@ import {
   normalizeOverrides,
   sameContent,
   withPosted,
+  withStats,
+  type ContentStats,
   type ContentItem,
   type Draft,
   type DraftBlock,
@@ -48,6 +50,8 @@ export interface ContentStore {
   addMany: (ds: Draft[]) => Promise<{ items: (ContentItem | null)[]; added: number; dup: number; failed: number }>
   /** D-208 올렸어요 / 아직 */
   setPosted: (rootId: string, on: boolean) => Promise<boolean>
+  /** D-230 올린 뒤 숫자(조회 · 저장 · 문의) — null 이면 지움 */
+  setStats: (rootId: string, stats: ContentStats | null) => Promise<boolean>
   removeChain: (rootId: string) => Promise<boolean>
 }
 
@@ -260,5 +264,20 @@ export function useContentStore(clientId: string | null, workspaceId: string | n
     [put, queue],
   )
 
-  return { status, overrides, items, site, saveOverrides, addDraft, saveVersion, toggleFavorite, removeChain, addMany, setPosted }
+  const setStats = useCallback(
+    (rootId: string, stats: ContentStats | null) =>
+      queue(async () => {
+        try {
+          const list = withStats(itemsRef.current, rootId, stats)
+          if (!list.length) return false
+          for (const it of list) await put(it)
+          return true
+        } catch {
+          return false
+        }
+      }),
+    [put, queue],
+  )
+
+  return { status, overrides, items, site, saveOverrides, addDraft, saveVersion, toggleFavorite, removeChain, addMany, setPosted, setStats }
 }

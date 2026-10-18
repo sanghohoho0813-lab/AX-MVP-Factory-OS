@@ -18,6 +18,9 @@
  *         390 넘침 0 · 44px
  *  D-229  콘텐츠 작성 규칙집 — 브리프 6칸 줄(화자 이름 비면 노랑) · 흔한 반박 · 배송 · 교환 · 넣지 말 것 → 요청문 · 점검 ·
  *         요청문은 고른 채널로(길이 · 지역 · 마지막 제안) · 결과 아래 발행 전 검수표(자동 · 사람 체크) · 카드 5안 순서 · 기본 7장 · 360/390
+
+ *  D-230  제목 각도 후보 5개(검색 의도 다르게 · 고른 각도 = 만든 글 제목 · 저장하면 '쓴 각도' 로 빠짐 · 다른 각도 보기 · 영상도) ·
+ *         카드뉴스 5안 한 번에(순서 · 탭 5 · 모두 저장) · 올린 글 숫자(조회 · 저장 · 문의) → 보관함 '무엇이 잘 됐나' · 새로고침 · 360/390
  *
  *   node e2e/content.mjs http://localhost:4390 [--shots <dir>]
  */
@@ -1214,6 +1217,157 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
     await c2.close()
   }
   check('D229-11 화면 오류 0', !errors.some((e) => e.startsWith('D229')), errors.filter((e) => e.startsWith('D229')))
+}
+
+// D-230 — 규칙집 남은 것: 제목 각도(2장) · 카드뉴스 5안(3-5) · 올린 뒤 숫자(머리말 · 6장)
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  const p = await ctx.newPage()
+  p.on('pageerror', (e) => errors.push(`D230 ${e.message}`))
+  await seed(p)
+  await p.goto(BASE + '/tools/content/build?client=cli_site', { waitUntil: 'networkidle' })
+  await p.getByTestId('content-studio').waitFor()
+  await mode(p, 'direct')
+  await p.locator('[data-testid="content-kind"][data-kind="blog"]').click()
+  const kw = await p.getByTestId('content-keyword').inputValue()
+  const fold = p.getByTestId('content-angle')
+  check('D230-1 블로그 — 제목 각도 고르기는 접혀 있고 고르지 않으면 주제 제목 그대로(후보 5개)', (await fold.getAttribute('data-open')) === '0' && /후보 5개/.test(await p.getByTestId('content-angle-summary').innerText()))
+  await p.getByTestId('content-angle-toggle').click()
+  const cands = () => p.locator('[data-testid="content-angle-btn"]:not([data-value=""])')
+  const ids0 = await cands().evaluateAll((els) => els.map((e) => e.getAttribute('data-value')))
+  const intents0 = await cands().evaluateAll((els) => els.map((e) => e.getAttribute('data-intent')))
+  const titles0 = await p.getByTestId('content-angle-title').allInnerTexts()
+  check('D230-2 펼치면 후보 5개 — 각도 겹침 0 · 검색 의도 4가지 이상 · 모두 키워드로 시작 · 통계 · 비교 각도 없음', ids0.length === 5 && new Set(ids0).size === 5 && new Set(intents0).size >= 4 && titles0.every((t) => t.startsWith(`${kw},`)) && !ids0.includes('stat') && !ids0.includes('compare'), { ids0, intents0, titles0 })
+  if (SHOTS) {
+    await fold.scrollIntoViewIfNeeded()
+    await p.screenshot({ path: `${SHOTS}/content-pc-d230-angles.png`, fullPage: false })
+  }
+  const pick = ids0[1]
+  await cands().nth(1).click()
+  await p.getByTestId('content-make').click()
+  await wait(300)
+  const t1 = await p.getByTestId('content-result-title').innerText()
+  check('D230-3 각도를 골라 만들면 그 제목 그대로 · 결과에 각도 표시', t1 === titles0[1] && (await p.getByTestId('content-result-angle').count()) === 1, { t1, want: titles0[1] })
+  await p.getByTestId('content-save').click()
+  await wait(400)
+  const ids1 = await cands().evaluateAll((els) => els.map((e) => e.getAttribute('data-value')))
+  const usedTxt = await p.getByTestId('content-angle-used').innerText()
+  const savedAngle = (await items(p)).map((r) => r.data?.input?.angle).filter(Boolean)
+  check("D230-4 저장하면 그 각도는 '이 키워드로 쓴 각도' 로 빠지고 새 후보 5개 · 보관함에 각도 기록", !ids1.includes(pick) && ids1.length === 5 && usedTxt.includes('이 키워드로 쓴 각도') && savedAngle.join() === pick, { ids1, usedTxt, savedAngle })
+  await p.getByTestId('content-angle-more').click()
+  const ids2 = await cands().evaluateAll((els) => els.map((e) => e.getAttribute('data-value')))
+  check('D230-5 다른 각도 보기 — 후보가 바뀜(쓴 각도는 계속 빠짐)', ids2.join() !== ids1.join() && !ids2.includes(pick), { ids1, ids2 })
+
+  // 영상
+  await p.locator('[data-testid="content-kind"][data-kind="video"]').click()
+  const vTitles = await p.getByTestId('content-angle-title').allInnerTexts()
+  await cands().first().click()
+  await p.getByTestId('content-make').click()
+  await wait(300)
+  const vt = await p.getByTestId('content-result-title').innerText()
+  check('D230-6 긴 영상도 각도 후보 — 지역(화성 · 동탄) 없음 · 고른 제목 = 만든 영상 제목', vTitles.length === 5 && vTitles.every((t) => !/화성|동탄/.test(t)) && vt === vTitles[0], { vTitles, vt })
+
+  // 카드 5안
+  await p.locator('[data-testid="content-kind"][data-kind="cards"]').click()
+  check('D230-7 카드뉴스는 각도 대신 [5안 한 번에 만들기](순서 안내)', (await p.getByTestId('content-angle').count()) === 0 && (await p.getByTestId('content-cards5').innerText()).includes('망설임 풀기 → 고민 공감 → 전후 변화 → 궁금증 → 기록 증명'))
+  await p.getByTestId('content-cards5').click()
+  await wait(300)
+  const tabs = await p.getByTestId('content-pack-tab').allInnerTexts()
+  const note = await p.getByTestId('content-pack-note').innerText()
+  check('D230-8 5안 묶음 — 탭 1~5 순서(망설임 풀기 → 고민 공감 → 전후 변화 → 궁금증 → 기록 증명) · 글 재료 안내 · 첫 장은 망설임 풀기', (await p.getByTestId('content-pack').getAttribute('data-key')) === 'cards5' && tabs.length === 5 && tabs.map((t) => t.replace(/\s+/g, ' ').trim()).join() === '1 망설임 풀기,2 고민 공감,3 전후 변화,4 궁금증,5 기록 증명' && note.includes('글 재료'), { tabs, note })
+  const first = await resultText(p)
+  await p.getByTestId('content-pack-tab').nth(2).click()
+  await wait(200)
+  const third = await resultText(p)
+  if (SHOTS) {
+    await p.getByTestId('content-pack').scrollIntoViewIfNeeded()
+    await p.screenshot({ path: `${SHOTS}/content-pc-d230-cards5.png`, fullPage: false })
+  }
+  await p.getByTestId('content-pack-save-all').click()
+  await wait(600)
+  const cardRows = (await items(p)).filter((r) => r.data?.kind === 'cards').map((r) => r.data.input.adType)
+  check('D230-9 탭마다 다른 안(③ 전후 변화는 [전] · [후]) · 5편 모두 보관함 · 유형 5가지', first !== third && third.includes('[전]') && new Set(cardRows).size === 5 && ['objection', 'problem', 'before', 'curious', 'proof'].every((a) => cardRows.includes(a)), cardRows)
+
+  // 올린 뒤 숫자 — 각도로 만든 블로그 글 열기
+  if ((await p.getByTestId('content-archive').getAttribute('data-open')) !== '1') await p.getByTestId('content-archive-toggle').click()
+  const perf0 = await p.getByTestId('content-perf').count()
+  await p.locator('[data-testid="content-archive-item"][data-kind="blog"] [data-testid="content-archive-open"]').first().click()
+  await wait(300)
+  check('D230-10 올린 글이 없으면 숫자 칸 · 잘 됐나 상자 없음', perf0 === 0 && (await p.getByTestId('content-stats').count()) === 0)
+  await p.getByTestId('content-posted').click()
+  await wait(300)
+  await p.locator('[data-testid="content-stats-input"][data-key="views"]').fill('1,200')
+  await p.locator('[data-testid="content-stats-input"][data-key="saves"]').fill('30')
+  await p.locator('[data-testid="content-stats-input"][data-key="inquiries"]').fill('2')
+  await p.getByTestId('content-stats-save').click()
+  await wait(400)
+  const stRows = (await items(p)).filter((r) => r.data?.stats)
+  const perfRow = await p.getByTestId('content-perf-row').first().innerText()
+  const archStats = await p.getByTestId('content-archive-stats').first().innerText()
+  check("D230-11 올렸어요 → 숫자 칸 · 저장하면 보관함 '무엇이 잘 됐나' 1위 = 그 각도 · 목록에 조회 1,200 · 저장 30 · 문의 2", stRows.length === 1 && stRows[0].data.stats.views === 1200 && stRows[0].data.stats.inquiries === 2 && perfRow.includes('1위') && perfRow.includes('제목 각도') && perfRow.includes('문의 2') && archStats.includes('조회 1,200') && archStats.includes('문의 2'), { perfRow, archStats })
+  if (SHOTS) {
+    await p.getByTestId('content-stats').scrollIntoViewIfNeeded()
+    await p.screenshot({ path: `${SHOTS}/content-pc-d230-stats.png`, fullPage: false })
+    await p.getByTestId('content-perf').scrollIntoViewIfNeeded()
+    await p.screenshot({ path: `${SHOTS}/content-pc-d230-perf.png`, fullPage: false })
+  }
+  // 카드 한 편을 올렸어요로 → 숫자 안 적은 올린 글
+  await p.locator('[data-testid="content-archive-item"][data-kind="cards"] [data-testid="content-archive-posted"]').first().click()
+  await wait(300)
+  const needN = await p.getByTestId('content-perf-need-open').count()
+  await p.getByTestId('content-perf-need-open').first().click()
+  await wait(300)
+  check('D230-12 숫자를 안 적은 올린 글 → 눌러 열면 그 글의 숫자 칸', needN === 1 && (await p.getByTestId('content-result').getAttribute('data-kind')) === 'cards' && (await p.getByTestId('content-stats').count()) === 1)
+  await p.reload({ waitUntil: 'networkidle' })
+  await p.getByTestId('content-studio').waitFor()
+  if ((await p.getByTestId('content-archive').getAttribute('data-open')) !== '1') await p.getByTestId('content-archive-toggle').click()
+  const perfAfter = await p.getByTestId('content-perf-row').first().innerText()
+  check('D230-13 새로고침해도 숫자 · 1위 그대로', perfAfter.includes('1위') && perfAfter.includes('조회 1,200'), perfAfter)
+  await ctx.close()
+
+  for (const vp of [390, 360]) {
+    const c2 = await browser.newContext({ viewport: { width: vp, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true })
+    const m = await c2.newPage()
+    m.on('pageerror', (e) => errors.push(`D230 m${vp} ${e.message}`))
+    await seed(m)
+    await m.goto(BASE + '/tools/content/build?client=cli_site', { waitUntil: 'networkidle' })
+    await m.getByTestId('content-studio').waitFor()
+    const over = () => m.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+    await mode(m, 'direct')
+    await m.locator('[data-testid="content-kind"][data-kind="blog"]').click()
+    await m.getByTestId('content-angle-toggle').click()
+    const angH = await m.getByTestId('content-angle-btn').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
+    const angOver = await over()
+    if (SHOTS && vp === 390) {
+      await m.getByTestId('content-angle').scrollIntoViewIfNeeded()
+      await m.screenshot({ path: `${SHOTS}/content-m390-d230-angles.png`, fullPage: false })
+    }
+    await m.locator('[data-testid="content-angle-btn"]:not([data-value=""])').first().click()
+    await m.getByTestId('content-make').click()
+    await m.getByTestId('content-save').click()
+    await wait(400)
+    await m.getByTestId('content-posted').click()
+    await wait(300)
+    const inW = await m.getByTestId('content-stats-input').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))
+    const statsOver = await over()
+    if (SHOTS && vp === 390) {
+      await m.getByTestId('content-stats').scrollIntoViewIfNeeded()
+      await m.screenshot({ path: `${SHOTS}/content-m390-d230-stats.png`, fullPage: false })
+    }
+    await mode(m, 'direct')
+    await m.locator('[data-testid="content-kind"][data-kind="cards"]').click()
+    await m.getByTestId('content-cards5').click()
+    await wait(300)
+    const tabOver = await m.getByTestId('content-pack').evaluate((e) => e.scrollWidth - e.clientWidth)
+    const packOver = await over()
+    if (SHOTS && vp === 390) {
+      await m.getByTestId('content-pack').scrollIntoViewIfNeeded()
+      await m.screenshot({ path: `${SHOTS}/content-m390-d230-cards5.png`, fullPage: false })
+    }
+    check(`D230-M${vp} 각도 단추 44px · 숫자 칸 폭(${inW.join('/')}px ≥ 64) · 5안 탭 줄바꿈 · 가로 넘침 0`, angH.length === 6 && angH.every((h) => h >= 44) && inW.length === 3 && inW.every((w) => w >= 64) && angOver <= 0 && statsOver <= 0 && tabOver <= 0 && packOver <= 0, { angH, inW, angOver, statsOver, tabOver, packOver })
+    await c2.close()
+  }
+  check('D230-14 화면 오류 0', !errors.some((e) => e.startsWith('D230')), errors.filter((e) => e.startsWith('D230')))
 }
 
 await browser.close()

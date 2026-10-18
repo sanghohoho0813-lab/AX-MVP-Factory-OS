@@ -9,6 +9,19 @@ import { normalizeClientOps } from '../clientOpsService'
 import {
   AD_TYPES,
   AD_TYPE_LABEL,
+  ANGLES,
+  ANGLE_IDS,
+  CARD_FIVE,
+  angleTitle,
+  angleVideoTitle,
+  cardFive,
+  normalizeStats,
+  performanceBy,
+  perfKey,
+  titleCandidates,
+  usedAngles,
+  withStats,
+  type AngleId,
   CONTENT_KINDS,
   CONTENT_LIB,
   areaOf,
@@ -665,6 +678,80 @@ check('C80 먼저 만들 것 — 한국 10/16 오전에 만든 짧은 영상은 
   const rqv = aiRequestText(rp, { kind: 'video', keyword: '화성 정밀 금속부품' })
   const rqs = aiRequestText(rp, { kind: 'shorts', shortLen: '30-60' })
   check('C125 요청문 채널별 — 채널 · 길이(숫자) · 지역 방침 · 걱정 · 흔한 반박 · 마지막 제안(업종표) · 업체가 막은 말 · 직함만이면 이름 금지 · 배송 조건', rq.includes('채널 · 종류: 네이버 블로그 글') && rq.includes('2,100~3,000자') && rq.includes('검색 키워드 "화성 정밀 금속부품" 를 띄어쓰기까지 그대로 제목 맨 앞에') && rq.includes('흔한 반박 1개: "소량은 아무 데나 맡겨도 똑같다"') && rq.includes('독자의 걱정 1개: "소량도 받아 줄까"') && rq.includes('끝: 도면 검토 · 방문 상담 안내 하나만') && rq.includes('"최저가"') && rq.includes('사람 이름은 쓰지 마세요') && rq.includes('배송 · 교환 조건: 전국 택배') && rqv.includes('("정밀 금속부품")') && rqv.includes('괄호 없이 25~35자') && rqs.includes('60초 이내 · 컷 15개 이하') && !aiRequestText(rp).includes('채널 · 종류'), rq)
+}
+
+/* ---------------- D-230 제목 각도 · 카드 5안 · 올린 뒤 숫자 ---------------- */
+{
+  const intents = new Set(ANGLES.map((a) => a.intent))
+  check('C126 제목 각도 17개 — 규칙집 번호 1~17 · 검색 의도 5가지 모두', ANGLES.length === 17 && ANGLES.map((a) => a.no).join() === Array.from({ length: 17 }, (_, i) => i + 1).join() && intents.size === 5 && new Set(ANGLE_IDS).size === 17)
+  const kw = '화성 정밀 금속부품'
+  const hp = buildProfile(full, today, { industry: 'health' }).profile
+  const edp = buildProfile(full, today, { industry: 'education' }).profile
+  const vp = buildProfile(full, today, { voice: '도면 받은 날 바로 연락 주셔서 좋았어요', rebuttal: '소량은 아무 데나 맡겨도 똑같다', objection: '소량도 받아 줄까' }).profile
+  const at = (pp: ContentProfile, id: AngleId) => angleTitle(pp, id, kw, 2, today)
+  check('C127 각도 조건 — 통계 · 비교는 우리 데이터 없으면 안 씀 · 의료는 비용 · 역설 · 구조 · 긴급 안 씀 · 교육 긴급 안 씀 · 권위는 경력 3년 이상 · 사례는 고객 말 있을 때 · 질문 = 망설이는 점 · 통념 = 흔한 반박',
+    at(fp, 'stat') === null && at(fp, 'compare') === null && ['cost', 'paradox', 'inside', 'urgent'].every((id) => at(hp, id as AngleId) === null) && at(edp, 'urgent') === null && at(fp, 'urgent') !== null &&
+    at(ep, 'expert') === null && (at(fp, 'expert') ?? '').includes('12년 차') && at(fp, 'case') === null && at(vp, 'case') !== null && (at(vp, 'question') ?? '').includes('소량도 받아 줄까?') && (at(vp, 'myth') ?? '').includes('"소량은 아무 데나 맡겨도 똑같다"') && (angleTitle(fp, 'fail', '', 2, today) ?? '').startsWith(`${mainKeyword(fp)},`))
+  const candBad: unknown[] = []
+  for (const ind of INDUSTRIES) {
+    for (const pp of [buildProfile(full, today, { industry: ind }).profile, buildProfile(empty, today, { industry: ind }).profile, buildProfile(full, today, { industry: ind, tone: 'formal' }).profile]) {
+      const k = mainKeyword(pp)
+      for (const v of [0, 5, 10]) {
+        const cs = titleCandidates(pp, k, today, [], 5, 2, v)
+        const ok = cs.length === 5 && new Set(cs.map((c) => c.id)).size === 5 && new Set(cs.map((c) => c.intent)).size >= 4 && cs.every((c) => c.title.startsWith(`${k},`) && c.title.length >= 25 && c.title.length <= 40 && c.id !== 'stat' && c.id !== 'compare')
+        // 고른 각도로 만든 글의 제목 = 후보에 보인 제목(말투까지)
+        const same = cs.every((c) => makeDraft(pp, { kind: 'blog', keyword: k, topic: topicsFor(pp, k, today)[0], angle: c.id }, today).title === c.title)
+        if (!ok || !same) candBad.push({ ind, tone: pp.tone, v, same, cs: cs.map((c) => `${c.id}/${c.intent}/${c.title.length}:${c.title}`) })
+      }
+    }
+  }
+  check(`C128 후보 5개 — 업종 ${INDUSTRIES.length} × 꽉 찬/빈/합쇼체 × 돌리기 3 · 각도 겹침 0 · 검색 의도 4가지 이상 · 키워드로 시작 · 25~40자 · 만든 글 제목 = 후보 제목`, candBad.length === 0, candBad.slice(0, 2))
+  const c1 = titleCandidates(fp, kw, today, ['fail', 'myth'])
+  const avail = ANGLE_IDS.filter((id) => at(fp, id))
+  const usedAll = [...avail].reverse()
+  const c2 = titleCandidates(fp, kw, today, usedAll)
+  check('C129 쓴 각도는 빼고 · 새 각도를 다 쓰면 가장 오래전에 쓴 것부터 다시(전에 쓴 각도 표시)', !c1.some((c) => c.id === 'fail' || c.id === 'myth') && c1.length === 5 && c2.length === 5 && c2.every((c) => c.again) && c2[0].id === usedAll[usedAll.length - 1], { c2: c2.map((c) => c.id), last: usedAll[usedAll.length - 1] })
+  const mk = (angle: AngleId | undefined, keyword: string, createdAt: string) => ({ input: { keyword, ...(angle ? { angle } : {}) }, createdAt })
+  const ua = usedAngles([mk('fail', kw, '2026-10-01'), mk('myth', kw, '2026-10-05'), mk('fail', kw, '2026-10-09'), mk('trap', '다른 키워드', '2026-10-10'), mk(undefined, kw, '2026-10-11')], ` ${kw} `)
+  check('C130 키워드별 쓴 각도 — 최근 것 먼저 · 겹치지 않게 · 다른 키워드 · 각도 없는 글은 빼고', ua.join() === 'fail,myth', ua)
+  const tp = topicsFor(fp, kw, today)[0]
+  const dBlog = makeDraft(fp, { kind: 'blog', keyword: kw, topic: tp, angle: 'trap' }, today)
+  const dReview = makeDraft(fp, { kind: 'blog', keyword: kw, topic: tp, angle: 'trap', blogType: 'review' }, today)
+  const dHealth = makeDraft(hp, { kind: 'blog', keyword: kw, topic: topicsFor(hp, kw, today)[0], angle: 'cost' }, today)
+  const dVid = makeDraft(fp, { kind: 'video', keyword: kw, topic: tp, angle: 'fail' }, today)
+  const cp = buildProfile(full, today, { industry: 'cafe' }).profile
+  const dVidC = makeDraft(cp, { kind: 'video', keyword: mainKeyword(cp), topic: topicsFor(cp, '', today)[0], angle: 'fail' }, today)
+  const dCards = makeDraft(fp, { kind: 'cards', keyword: kw, topic: tp, angle: 'trap' }, today)
+  check('C131 각도로 만들기 — 블로그 제목 = 각도 제목 · 기록에 각도 / 체험단 가이드 · 조건 안 맞는 각도(의료 비용) · 카드는 각도 안 씀 / 영상 제목 지역 없음 · 기업형 괄호 없이 · 소비자형 (괄호 꼬리말)',
+    dBlog.title.startsWith(`${kw}, 고를 때 후회하는 함정 TOP 2`) && dBlog.blocks[0].text === dBlog.title && dBlog.input.angle === 'trap' && !dReview.input.angle && !dHealth.input.angle && !dCards.input.angle &&
+    dVid.input.angle === 'fail' && !dVid.title.includes('화성') && dVid.title.startsWith('정밀 금속부품 알아봐도') && !/\)$/.test(dVid.title) && dVid.title === angleVideoTitle(fp, 'fail', kw, 3, today) && dVidC.input.angle === 'fail' && /\)$/.test(dVidC.title) && dVidC.title.length >= 40 && dVidC.title.length <= 55,
+    { b: dBlog.title, v: dVid.title, vc: dVidC.title })
+  const saved = normalizeItem('x1', { ...itemData({ id: 'x1', kind: 'blog', title: dBlog.title, blocks: dBlog.blocks, input: dBlog.input, rootId: 'x1', version: 1, favorite: false, hash: '', createdAt: '2026-10-16T00:00:00Z', updatedAt: '' }) })
+  const hacked = normalizeItem('x2', { kind: 'blog', title: 't', blocks: [{ label: '', text: 't' }], input: { angle: 'hack', keyword: kw }, rootId: 'x2', version: 1 })
+  check('C132 보관함 읽기 — 각도 남김 · 모르는 각도 버림', saved?.input.angle === 'trap' && hacked !== null && !hacked.input.angle)
+
+  const five = cardFive(fp, { keyword: kw, topic: tp, pages: 7 }, today)
+  const fiveH = cardFive(hp, { keyword: kw, topic: topicsFor(hp, kw, today)[0] }, today)
+  check('C133 카드뉴스 5안 — 순서 고정(망설임 → 고민 → 전후 → 궁금증 → 기록) · 탭 이름 = 유형 · 5안 모두 다른 글 · 첫 장 모두 다름 · 7장 · 제목 끝에 유형 · 의료 전후는 과정만 안내',
+    CARD_FIVE.join() === 'objection,problem,before,curious,proof' && five.map((x) => x.draft.input.adType).join() === CARD_FIVE.join() && five.map((x) => x.tab).join() === '망설임 풀기,고민 공감,전후 변화,궁금증,기록 증명' && new Set(five.map((x) => contentHash('cards', x.draft.blocks))).size === 5 && new Set(five.map((x) => x.draft.blocks[0].text)).size === 5 && five.every((x) => x.draft.input.pages === 7 && x.draft.title.endsWith(AD_TYPE_LABEL[x.draft.input.adType!])) && fiveH[2].draft.notes.some((n) => n.includes('전후 비교를 쓰지 않아요')),
+    five.map((x) => `${x.tab}: ${x.draft.blocks[0].text}`))
+
+  const ns = normalizeStats({ views: 1200.7, saves: -3, inquiries: '5', at: '2026-10-16T09:00:00Z' })
+  check('C134 올린 뒤 숫자 읽기 — 0 이상 정수만 · 글자 · 음수 · 끝없는 수 버림 · 하나도 없으면 없음', ns?.views === 1200 && ns.saves === undefined && ns.inquiries === undefined && normalizeStats({ views: Infinity, at: 'x' }) === null && normalizeStats(null) === null && normalizeStats({ inquiries: 0, at: '2026-10-16' })?.inquiries === 0, ns)
+  const base = (id: string, rootId: string, version: number, extra: Partial<ContentItem> = {}): ContentItem => ({ id, kind: 'blog', title: id, blocks: [{ label: '', text: id }], input: { keyword: kw, topicType: 'tips', variant: 0, tone: 'friendly' }, rootId, version, favorite: false, hash: id, createdAt: `2026-10-0${version}T00:00:00Z`, updatedAt: '', ...extra })
+  const chain = [base('a1', 'a1', 1), base('a2', 'a1', 2), base('b1', 'b1', 1)]
+  const st = { views: 900, saves: 12, inquiries: 2, at: '2026-10-16T00:00:00Z' }
+  const ws = withStats(chain, 'a1', st)
+  const back = normalizeItem('a2', itemData(ws[1]))
+  check('C135 숫자는 사슬 전체에 · 지우면 빠짐 · 새 판에서도 보임 · 저장 · 읽기 그대로', ws.length === 2 && ws.every((x) => x.stats?.inquiries === 2) && withStats(ws, 'a1', null).every((x) => !x.stats) && latestByRoot([...ws, chain[2]]).find((r) => r.item.rootId === 'a1')?.item.stats?.views === 900 && back?.stats?.saves === 12)
+  const perfItems: ContentItem[] = [
+    base('p1', 'p1', 1, { input: { keyword: kw, topicType: 'tips', angle: 'fail', variant: 0, tone: 'friendly' }, stats: { views: 500, saves: 10, inquiries: 1, at: '2026-10-10' } }),
+    base('p2', 'p2', 2, { input: { keyword: kw, topicType: 'tips', angle: 'fail', variant: 0, tone: 'friendly' }, stats: { views: 300, saves: 5, inquiries: 2, at: '2026-10-11' } }),
+    base('p3', 'p3', 3, { kind: 'cards', input: { keyword: kw, topicType: 'tips', adType: 'objection', pages: 7, variant: 0, tone: 'friendly' }, stats: { views: 5000, saves: 80, inquiries: 1, at: '2026-10-12' } }),
+    base('p4', 'p4', 4, { input: { keyword: kw, topicType: 'faq', variant: 0, tone: 'friendly' } }),
+  ]
+  const perf = performanceBy(perfItems)
+  check('C136 무엇이 잘 됐나 — 각도 · 카드 유형 · 주제별로 더함 · 문의 → 저장 → 조회 순 · 숫자 없는 글은 빼고', perf.length === 2 && perf[0].key === 'angle:fail' && perf[0].n === 2 && perf[0].inquiries === 3 && perf[0].views === 800 && perf[1].key === 'ad:objection' && perfKey(perfItems[3]).key === 'topic:blog:faq' && perfKey(perfItems[0]).label.includes('실패'), perf)
 }
 
 if (SHOW) {

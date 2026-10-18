@@ -6,3 +6,4 @@ export { CONTENT_LIB, contentLib, RISKY_WORDS, type ContentLib } from './library
 export { toFormal, formalWord, applyTone, TONE_LABEL, type Tone } from './tone'
 export * from './situations'
 export * from './aiRequest'
+export * from './angles'

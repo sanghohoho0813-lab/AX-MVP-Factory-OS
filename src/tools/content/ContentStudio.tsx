@@ -15,11 +15,13 @@
  *        다른 AI 도구에 붙여 넣을 요청문 + 받은 글 점검(주지 않은 혜택 · 지어낸 출처 · 숫자 뜻 바뀜), 검색량 등급 · 월 100 이상만.
  * D-229: 콘텐츠 작성 규칙집(1~3차 합본) — 브리프 6칸 줄(업체 · 독자 · 알리는 것 · 화자 · 사실 목록 · 넣지 말 것) · 흔한 반박 ·
  *        배송 · 교환 조건 · 넣지 말 것 칸, 요청문은 고른 채널로(길이 · 지역 · 마지막 제안), 결과 아래 '발행 전 검수표', 카드 기본 7장.
+ * D-230: 규칙집 남은 것 — 제목 각도 17개 중 후보 5개(검색 의도 다르게 · 이 키워드로 쓴 각도는 빼고), 카드뉴스 5안 한 번에(순서 고정),
+ *        올린 글에 조회 · 저장 · 문의 숫자 적기 → 보관함 '무엇이 잘 됐나'(각도 · 카드 유형별).
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFold } from '../../components/ui/fold'
 import { Link, useNavigate } from 'react-router-dom'
-import { AlertTriangle, Archive, Award, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight, Circle, ClipboardCheck, Copy, Factory, Gem, Globe, Info, Layers, ListChecks, ListOrdered, MapPin, Megaphone, Package, PencilLine, Phone, RefreshCw, Save, Send, Sparkles, Star, Trash2, Wand2, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, Archive, Award, BarChart3, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight, Circle, ClipboardCheck, Copy, Factory, Gem, Globe, Info, Layers, ListChecks, ListOrdered, MapPin, Megaphone, Package, PencilLine, Phone, RefreshCw, Save, Send, Sparkles, Star, Trash2, Wand2, type LucideIcon } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { Badge, BottomSheet } from '../../components/ui/primitives'
 import { ConfirmModal } from '../../components/ui/ConfirmModal'
@@ -30,6 +32,19 @@ import { useOwnerAiAccess } from '../../auth/ownerAiAccess'
 import {
   AD_TYPES,
   AD_TYPE_HINT,
+  ANGLE_LABEL,
+  CARD_FIVE,
+  MATERIAL_GOAL,
+  angleVideoTitle,
+  applyTone,
+  cardFive,
+  materialList,
+  performanceBy,
+  titleCandidates,
+  usedAngles,
+  type AngleId,
+  type ContentStats,
+  type TitleCandidate,
   AI_REQUEST_TIPS,
   VOLUME_TIER_LABEL,
   aiRequestText,
@@ -123,9 +138,12 @@ interface Shown {
 
 /** D-208 상황 묶음 — 화면에 띄운 글은 늘 items[at] 이다(묶음이 null 이 아니면) */
 interface PackState {
-  key: SituationKey
+  /** D-230 'cards5' = 카드뉴스 5안 한 번에 */
+  key: SituationKey | 'cards5'
   label: string
   fill: string[]
+  /** 묶음 위에 한 줄 안내(카드 5안 — 글 재료 수) */
+  note?: string
   items: { tab: string; draft: Draft }[]
   saved: (ContentItem | null)[]
   /** D-209 저장 전 글을 고치거나 빈 칸을 채운 탭 — 다른 글로 넘어가기 전에 묻는다 */
@@ -137,6 +155,28 @@ interface PackState {
 function holidaysAround(today: string) {
   const y = Number(today.slice(0, 4))
   return [...(KR_PUBLIC_HOLIDAYS[y] ?? []), ...(KR_PUBLIC_HOLIDAYS[y + 1] ?? [])]
+}
+
+/** D-230 카드 5안 묶음 — 글 재료가 7개보다 적으면 5안이 서로 비슷해진다(규칙집 0-5) */
+function cardFivePack(profile: ContentProfile, keyword: string, topicType: TopicType, pages: 5 | 7, variant: number, today: string): PackState {
+  const ts = topicsFor(profile, keyword, today, variant)
+  const items = cardFive(profile, { keyword, topic: ts.find((x) => x.type === topicType) ?? ts[0], pages, variant }, today)
+  const mats = materialList(profile).length
+  return {
+    key: 'cards5',
+    label: '카드뉴스 5안',
+    fill: [],
+    note: mats < MATERIAL_GOAL ? `글 재료가 ${mats}개예요 — ${MATERIAL_GOAL}개 이상이면 5안이 서로 덜 비슷해져요(홍보 정보 › 글 재료).` : `글 재료 ${mats}개로 만들었어요. ${CARD_FIVE.map((a) => AD_TYPE_LABEL[a].replace(/형$/, '')).join(' → ')} 순서예요.`,
+    items,
+    saved: items.map(() => null),
+    touched: items.map(() => false),
+    at: 0,
+  }
+}
+
+/** 묶음 머리 아이콘 · 색 */
+function packStyle(key: PackState['key']): { icon: LucideIcon; tone: MkTone } {
+  return key === 'cards5' ? { icon: KIND_STYLE.cards.icon, tone: 'fuchsia' } : (SITUATION_STYLE[key] ?? { icon: Layers, tone: 'violet' })
 }
 
 export function ContentStudio({ record, store }: { record: ClientOpsRecord; store: ContentStore }) {
@@ -158,6 +198,10 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   const [blogType, setBlogType] = useState<BlogType>('brand')
   const [shortLen, setShortLen] = useState<ShortLen>('20-30')
   const [adType, setAdType] = useState<AdType>('info')
+  /** D-230 고른 제목 각도(없으면 주제 제목 그대로) · 후보 돌리기 · 접기 */
+  const [angle, setAngle] = useState<AngleId | null>(null)
+  const [angleRound, setAngleRound] = useState(0)
+  const [angleOpen, setAngleOpen] = useState(false)
   const [shown, setShown] = useState<Shown | null>(null)
   /** 고친 글(저장 전) — 고치기 칸을 닫아도 남는다 */
   const [editing, setEditing] = useState<DraftBlock[] | null>(null)
@@ -188,6 +232,15 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   const findWords = useMemo(() => keywordGroups(profile).find((g) => g.key === 'find')?.words.slice(0, 4) ?? [], [profile])
   const archiveRows = useMemo(() => latestByRoot(store.items), [store.items])
   const situationNow = useMemo(() => situationsFor(profile, today, holidays).filter((x) => x.now).length, [profile, today, holidays])
+  // D-230 제목 각도 — 블로그(우리 글) · 긴 영상만. 이 키워드로 저장한 글의 각도는 빼고 후보 5개
+  const angleOn = (kind === 'blog' && blogType === 'brand') || kind === 'video'
+  const usedHere = useMemo(() => usedAngles(store.items, keyword.trim() || mainKeyword(profile)), [store.items, keyword, profile])
+  const angleCands = useMemo(
+    () => (angleOn ? titleCandidates(profile, keyword, today, usedHere, 5, topicCount, angleRound * 5).map((c) => (kind === 'video' ? { ...c, title: applyTone(angleVideoTitle(profile, c.id, keyword, topicCount, today) ?? c.title, profile.tone) } : c)) : []),
+    [angleOn, profile, keyword, today, usedHere, topicCount, angleRound, kind],
+  )
+  const angleSel = angle && angleCands.some((c) => c.id === angle) ? angle : null
+  const bestAngle = useMemo(() => performanceBy(store.items).find((r) => r.key.startsWith('angle:') && (r.inquiries > 0 || r.saves > 0)) ?? null, [store.items])
 
   // 지역 · 대표 상품을 고치면 키워드 칸도 따라간다(사람이 직접 친 키워드는 그대로)
   const lastMain = useRef(mainKeyword(profile))
@@ -209,8 +262,9 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
     const pk = packRef.current
     if (pk) {
       // 묶음은 통째로 새 말투로 — 이미 저장한 글은 보관함에 그대로 있다
-      const sp = situationPack(profile, pk.key, today, holidaysAround(today))
-      const next = { ...pk, items: sp.items, saved: sp.items.map(() => null), touched: sp.items.map(() => false) }
+      const first = pk.items[0]?.draft.input
+      const items = pk.key === 'cards5' ? cardFivePack(profile, first?.keyword ?? '', first?.topicType ?? 'tips', first?.pages === 5 ? 5 : 7, first?.variant ?? 0, today).items : situationPack(profile, pk.key, today, holidaysAround(today)).items
+      const next = { ...pk, items, saved: items.map(() => null), touched: items.map(() => false) }
       setPack(next)
       setShown((cur) => (cur && !cur.item ? { draft: next.items[next.at]?.draft ?? cur.draft, item: null } : cur))
       setEditing(null)
@@ -220,7 +274,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
       if (!cur || cur.item) return cur
       const inp = cur.draft.input
       const ts = topicsFor(profile, inp.keyword ?? '', today, inp.variant)
-      return { draft: makeDraft(profile, { kind: cur.draft.kind, keyword: inp.keyword, topic: ts.find((t) => t.type === inp.topicType), pages: inp.pages, purpose: inp.purpose, variant: inp.variant, blogType: inp.blogType, shortLen: inp.shortLen, adType: inp.adType }, today), item: null }
+      return { draft: makeDraft(profile, { kind: cur.draft.kind, keyword: inp.keyword, topic: ts.find((t) => t.type === inp.topicType), pages: inp.pages, purpose: inp.purpose, variant: inp.variant, blogType: inp.blogType, shortLen: inp.shortLen, adType: inp.adType, angle: inp.angle }, today), item: null }
     })
     setEditing(null)
   }, [profile, today])
@@ -269,15 +323,22 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
     guard(() => show({ kind: it.kind, title: it.title, blocks: it.blocks, notes: [], input: it.input }, it))
   }
 
-  const generate = (over: Partial<{ kind: ContentKind; topicType: TopicType; purpose: KakaoPurpose; variant: number; pages: 5 | 7; keyword: string }> = {}) => {
+  const generate = (over: Partial<{ kind: ContentKind; topicType: TopicType; purpose: KakaoPurpose; variant: number; pages: 5 | 7; keyword: string; angle: AngleId | null }> = {}) => {
     const k = over.kind ?? kind
     const v = over.variant ?? variant
     const tt = over.topicType ?? topicType
     const kw = over.keyword ?? keyword
     const ts = topicsFor(profile, kw, today, v)
     const t = ts.find((x) => x.type === tt) ?? ts[0]
-    show(makeDraft(profile, { kind: k, keyword: kw, topic: t, pages: over.pages ?? pages, purpose: over.purpose ?? purpose, variant: v, blogType, shortLen, adType }, today))
+    show(makeDraft(profile, { kind: k, keyword: kw, topic: t, pages: over.pages ?? pages, purpose: over.purpose ?? purpose, variant: v, blogType, shortLen, adType, ...(over.angle ? { angle: over.angle } : {}) }, today))
   }
+
+  /** D-230 카드뉴스 5안 한 번에 — 상황 묶음처럼 탭 5개 · 모두 저장 */
+  const openCardFive = () => guard(() => {
+    const pk = cardFivePack(profile, keyword, topicType, pages, variant, today)
+    setPack(pk)
+    show(pk.items[0].draft, null, true)
+  })
 
   const onPick = (p: ContentPick) => {
     setKind(p.kind)
@@ -403,6 +464,21 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
     setShown((cur) => (cur?.item && cur.item.rootId === it.rootId ? { ...cur, item: { ...cur.item, ...(on ? { postedAt: new Date().toISOString() } : { postedAt: undefined }) } } : cur))
   }
 
+  /** D-230 올린 뒤 숫자 — 사슬 전체에 적는다 */
+  const saveStats = async (it: ContentItem, st: ContentStats | null) => {
+    if (!(await store.setStats(it.rootId, st))) {
+      showToast('저장하지 못했어요. 적은 숫자는 그대로 있어요 — 다시 눌러 주세요.')
+      return false
+    }
+    showToast(st ? "숫자를 적었어요 — 보관함 '무엇이 잘 됐나' 에 모여요." : '적은 숫자를 지웠어요.')
+    setShown((cur) => {
+      if (!cur?.item || cur.item.rootId !== it.rootId) return cur
+      const { stats: _s, ...rest } = cur.item
+      return { ...cur, item: st ? { ...rest, stats: st } : rest }
+    })
+    return true
+  }
+
   const toAi = async () => {
     if (!shown || busy) return
     setBusy(true)
@@ -501,7 +577,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
       </section>
       )}
       {mode === 'situation' && (
-      <SituationCard profile={profile} today={today} holidays={holidays} openKey={pack?.key ?? null} onPick={openPack} />
+      <SituationCard profile={profile} today={today} holidays={holidays} openKey={pack && pack.key !== 'cards5' ? pack.key : null} onPick={openPack} />
       )}
       {mode === 'plan' && (
       <PlanCard
@@ -600,6 +676,19 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                   </label>
                 ))}
               </fieldset>
+              {angleOn && (
+                <AnglePicker
+                  open={angleOpen}
+                  onToggle={() => setAngleOpen((o) => !o)}
+                  cands={angleCands}
+                  sel={angleSel}
+                  onSel={setAngle}
+                  onMore={() => setAngleRound((r) => r + 1)}
+                  used={usedHere}
+                  best={bestAngle?.label.replace(/^제목 각도 · /, '') ?? ''}
+                  video={kind === 'video'}
+                />
+              )}
             </>
           )}
           {kind === 'shorts' && (
@@ -653,10 +742,19 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
               </button>
             ))}
           </div>
-          <button type="button" className={MK_PRIMARY.violet} onClick={() => guard(() => generate())} data-testid="content-make">
+          <button type="button" className={MK_PRIMARY.violet} onClick={() => guard(() => generate({ angle: angleOn ? angleSel : null }))} data-testid="content-make">
             <Sparkles className="size-5" aria-hidden="true" />
             {kind === 'blog' && blogType === 'review' ? '체험단 가이드 만들기' : `${KIND_LABEL[kind]} 만들기`}
           </button>
+          {kind === 'cards' && (
+            <button type="button" onClick={openCardFive} className="tap flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-(--radius-control) border-2 border-fuchsia-300 bg-fuchsia-50 px-3 py-2 text-center hover:border-fuchsia-500" data-testid="content-cards5">
+              <span className="t-body inline-flex items-center gap-1.5 font-semibold text-fuchsia-900">
+                <Layers className="size-4" aria-hidden="true" />
+                5안 한 번에 만들기
+              </span>
+              <span className="t-meta break-keep text-fuchsia-800">{CARD_FIVE.map((a) => AD_TYPE_LABEL[a].replace(/형$/, '')).join(' → ')}</span>
+            </button>
+          )}
           <p className="t-meta break-keep text-slate-500">업체 기록과 업종 견본으로 채워요(규칙 · 'AI' 아님). 업체마다 다른 곳은 [대괄호] 로 비워 둬요.</p>
         </section>
         )}
@@ -669,7 +767,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                 <div className="flex flex-col gap-2 rounded-(--radius-control) border border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-3" data-testid="content-pack" data-key={pack.key}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="t-sub flex min-w-0 items-center gap-2 font-semibold break-keep text-violet-900">
-                      <MkIcon icon={SITUATION_STYLE[pack.key]?.icon ?? Layers} tone={SITUATION_STYLE[pack.key]?.tone ?? 'violet'} size="sm" />
+                      <MkIcon icon={packStyle(pack.key).icon} tone={packStyle(pack.key).tone} size="sm" />
                       <span className="min-w-0">
                         {pack.label} · 글 {pack.items.length}편 묶음
                       </span>
@@ -681,7 +779,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                   </div>
                   <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="묶음 글">
                     {pack.items.map((x, i) => {
-                      const tt = tabTone(x.tab)
+                      const tt = pack.key === 'cards5' ? 'fuchsia' : tabTone(x.tab)
                       return (
                         <button key={x.tab} type="button" role="tab" aria-selected={i === pack.at} onClick={() => packGo(i)} className={`tap t-sub flex min-h-11 items-center gap-1.5 rounded-full border px-4 font-semibold ${i === pack.at ? `${TONE[tt].solid} border-transparent shadow-sm` : `bg-white text-slate-700 ${TONE[tt].line} ${TONE[tt].hover}`}`} data-testid="content-pack-tab" data-saved={pack.saved[i] ? '1' : '0'}>
                           <span className={`tabular-nums ${i === pack.at ? 'opacity-90' : 'text-slate-500'}`}>{i + 1}</span>
@@ -691,6 +789,11 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                       )
                     })}
                   </div>
+                  {pack.note && (
+                    <p className="t-meta break-keep text-slate-700" data-testid="content-pack-note">
+                      {pack.note}
+                    </p>
+                  )}
                   {pack.fill.length > 0 && (
                     <p className="t-meta break-keep text-slate-700" data-testid="content-pack-fill">
                       <b className="font-semibold text-slate-800">업체에 물어 채울 것</b> — {pack.fill.join(' · ')}. 글 안의 [대괄호] 자리예요.
@@ -716,6 +819,11 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                 )}
                 {shown.item?.postedAt && <Badge tone="success">올림 · {localDateOf(shown.item.postedAt).slice(5).replace('-', '/')}</Badge>}
                 {shown.draft.input.topicType && <Badge>{TOPIC_LABEL[shown.draft.input.topicType]}</Badge>}
+                {shown.draft.input.angle && (
+                  <span data-testid="content-result-angle">
+                    <Badge tone="brand">각도 · {ANGLE_LABEL[shown.draft.input.angle]}</Badge>
+                  </span>
+                )}
               </div>
               <h2 className="t-section break-keep text-slate-900" data-testid="content-result-title">{shown.draft.title}</h2>
 
@@ -757,7 +865,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                         const tt = shown.draft.input.topicType ?? topicType
                         const ts = topicsFor(profile, shown.draft.input.keyword ?? keyword, today, v)
                         // D-221 계획 칸에서 연 글이면 '다른 안' 도 같은 칸(올릴 날)으로 — 예전에는 날짜가 빠져 칸이 '안 만듦' 으로 남았다
-                        show(keepPlan(makeDraft(profile, { kind: shown.draft.kind, keyword: shown.draft.input.keyword ?? keyword, topic: ts.find((x) => x.type === tt) ?? ts[0], pages: shown.draft.input.pages, purpose: shown.draft.input.purpose, variant: v, blogType: shown.draft.input.blogType, shortLen: shown.draft.input.shortLen, adType: shown.draft.input.adType }, today), shown.draft.input))
+                        show(keepPlan(makeDraft(profile, { kind: shown.draft.kind, keyword: shown.draft.input.keyword ?? keyword, topic: ts.find((x) => x.type === tt) ?? ts[0], pages: shown.draft.input.pages, purpose: shown.draft.input.purpose, variant: v, blogType: shown.draft.input.blogType, shortLen: shown.draft.input.shortLen, adType: shown.draft.input.adType, angle: shown.draft.input.angle }, today), shown.draft.input))
                       })
                     }
                     data-testid="content-again"
@@ -797,6 +905,8 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                   </Button>
                 )}
               </div>
+
+              {shown.item?.postedAt && <StatsBox key={`stats-${shown.item.rootId}`} item={shown.item} onSave={saveStats} />}
 
               <ol className="flex flex-col gap-2" data-testid="content-blocks">
                 {blocks.map((b, i) => (
@@ -882,7 +992,7 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                             setKind(k)
                             setTopicType(shown.draft.input.topicType as TopicType)
                             setKeyword(shown.draft.input.keyword ?? keyword)
-                            show(makeDraft(profile, { kind: k, keyword: shown.draft.input.keyword, topic: topicsFor(profile, shown.draft.input.keyword ?? keyword, today, shown.draft.input.variant).find((t) => t.type === shown.draft.input.topicType), pages, variant: shown.draft.input.variant, shortLen, adType }, today))
+                            show(makeDraft(profile, { kind: k, keyword: shown.draft.input.keyword, topic: topicsFor(profile, shown.draft.input.keyword ?? keyword, today, shown.draft.input.variant).find((t) => t.type === shown.draft.input.topicType), pages, variant: shown.draft.input.variant, shortLen, adType, angle: shown.draft.input.angle }, today))
                           })
                         }
                         data-testid="content-chain-kind"
@@ -1837,6 +1947,162 @@ function AiRequestSheet({ profile, store, got, setGot, onClose, onEditProfile, o
 }
 
 /* ------------------------------------------------------------------ */
+/* D-230 제목 각도 · 올린 뒤 숫자                                           */
+/* ------------------------------------------------------------------ */
+
+/** 제목 각도 고르기 — 접어 두고, 펼치면 후보 5개(각도 · 검색 의도 · 제목) */
+function AnglePicker({ open, onToggle, cands, sel, onSel, onMore, used, best, video }: { open: boolean; onToggle: () => void; cands: TitleCandidate[]; sel: AngleId | null; onSel: (a: AngleId | null) => void; onMore: () => void; used: AngleId[]; best: string; video: boolean }) {
+  const picked = cands.find((c) => c.id === sel)
+  return (
+    <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-sky-200 bg-sky-50/50 p-2.5" data-testid="content-angle" data-open={open ? '1' : '0'}>
+      <button type="button" onClick={onToggle} aria-expanded={open} className="tap flex min-h-11 w-full items-center gap-2 text-left" data-testid="content-angle-toggle">
+        <ChevronRight aria-hidden="true" className={`size-5 shrink-0 text-sky-500 transition-transform duration-150 ${open ? 'rotate-90' : ''}`} />
+        <span className="min-w-0 flex-1">
+          <span className="t-sub block font-semibold text-slate-800">제목 각도 고르기 <span className="font-normal text-slate-500">(선택)</span></span>
+          <span className="t-meta block break-keep text-slate-600" data-testid="content-angle-summary">
+            {picked ? `${picked.label} — ${picked.title}` : `고르지 않으면 주제 제목 그대로 · 후보 ${cands.length}개`}
+          </span>
+        </span>
+      </button>
+      {open && (
+        <>
+          <p className="t-meta break-keep text-slate-600">손님이 찾는 이유(검색 의도)가 서로 다르게 골랐어요. {video ? '영상은 지역을 빼고 괄호 꼬리말을 붙여요.' : '블로그 제목은 25~35자예요.'}</p>
+          <button type="button" aria-pressed={!sel} onClick={() => onSel(null)} className={`tap flex min-h-11 items-center rounded-(--radius-control) border px-3 py-1.5 text-left ${!sel ? TONE.sky.on : 'border-slate-200 bg-white hover:border-sky-300'}`} data-testid="content-angle-btn" data-value="">
+            <span className="t-sub font-semibold text-slate-800">주제 제목 그대로</span>
+          </button>
+          {cands.map((c) => (
+            <button key={c.id} type="button" aria-pressed={sel === c.id} onClick={() => onSel(c.id)} className={`tap flex min-h-12 flex-col items-start justify-center rounded-(--radius-control) border px-3 py-1.5 text-left ${sel === c.id ? TONE.sky.on : 'border-slate-200 bg-white hover:border-sky-300'}`} data-testid="content-angle-btn" data-value={c.id} data-intent={c.intent}>
+              <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                <span className="t-meta font-semibold break-keep text-sky-800">{c.label}</span>
+                <span className="t-meta rounded-full bg-sky-100 px-2 font-semibold break-keep text-sky-900" title="손님이 찾는 이유(검색 의도)">{c.intent}</span>
+                {c.again && <span className="t-meta rounded-full bg-slate-100 px-2 break-keep text-slate-600">전에 쓴 각도</span>}
+              </span>
+              <span className="t-body block break-keep text-slate-800" data-testid="content-angle-title">{c.title}</span>
+            </button>
+          ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={onMore} className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-full border border-sky-300 bg-white px-3 font-semibold text-sky-800 hover:border-sky-500" data-testid="content-angle-more">
+              <RefreshCw className="size-4" aria-hidden="true" />
+              다른 각도 보기
+            </button>
+          </div>
+          {used.length > 0 && (
+            <p className="t-meta break-keep text-slate-600" data-testid="content-angle-used">
+              <b className="font-semibold text-slate-700">이 키워드로 쓴 각도</b> — {used.map((a) => ANGLE_LABEL[a]).join(' · ')}. 같은 각도가 반복되지 않게 빼고 골랐어요.
+            </p>
+          )}
+          {best && (
+            <p className="t-meta break-keep text-emerald-800" data-testid="content-angle-best">
+              <b className="font-semibold">지난 기록에서 문의 · 저장이 많았던 각도</b> — {best}
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+const STAT_FIELDS: { key: 'views' | 'saves' | 'inquiries'; label: string }[] = [
+  { key: 'views', label: '조회' },
+  { key: 'saves', label: '저장 · 공감' },
+  { key: 'inquiries', label: '문의' },
+]
+
+/** 숫자 짧게 — 1,234 */
+function statLine(st: ContentStats): string {
+  return STAT_FIELDS.filter((f) => st[f.key] !== undefined).map((f) => `${f.label.split(' ')[0]} ${(st[f.key] as number).toLocaleString('ko-KR')}`).join(' · ')
+}
+
+/** 올린 글의 조회 · 저장 · 문의 — 채널 화면에서 본 숫자를 그대로 적는다 */
+function StatsBox({ item, onSave }: { item: ContentItem; onSave: (it: ContentItem, st: ContentStats | null) => Promise<boolean> }) {
+  const [vals, setVals] = useState<Record<string, string>>(() => Object.fromEntries(STAT_FIELDS.map((f) => [f.key, item.stats?.[f.key] !== undefined ? String(item.stats?.[f.key]) : ''])))
+  const [busy, setBusy] = useState(false)
+  const parsed = STAT_FIELDS.map((f) => ({ f, n: vals[f.key].replace(/[^\d]/g, '') }))
+  const changed = STAT_FIELDS.some((f) => (vals[f.key].replace(/[^\d]/g, '') || '') !== (item.stats?.[f.key] !== undefined ? String(item.stats?.[f.key]) : ''))
+  const submit = async () => {
+    if (busy) return
+    setBusy(true)
+    const st: ContentStats = { at: new Date().toISOString() }
+    for (const { f, n } of parsed) if (n) st[f.key] = Math.min(999_999_999, Number(n))
+    const empty = STAT_FIELDS.every((f) => st[f.key] === undefined)
+    await onSave(item, empty ? null : st)
+    setBusy(false)
+  }
+  return (
+    <div className="flex flex-col gap-2 rounded-(--radius-control) border border-emerald-200 bg-emerald-50/60 p-3" data-testid="content-stats">
+      <p className="t-sub flex flex-wrap items-center gap-x-2 gap-y-0.5 font-semibold text-emerald-900">
+        <BarChart3 className="size-4 shrink-0" aria-hidden="true" />
+        올린 뒤 숫자
+        <span className="t-meta font-normal break-keep text-emerald-800">{item.stats?.at ? `${localDateOf(item.stats.at).slice(5).replace('-', '/')} 적음` : '블로그 통계 · 인사이트에서 본 숫자를 그대로'}</span>
+      </p>
+      <div className="grid grid-cols-3 gap-2">
+        {STAT_FIELDS.map((f) => (
+          <label key={f.key} className="flex min-w-0 flex-col gap-1">
+            <span className="t-meta font-semibold break-keep text-slate-700">{f.label}</span>
+            <input className={`${inputClass} text-right tabular-nums`} inputMode="numeric" maxLength={11} value={vals[f.key]} onChange={(e) => setVals((v) => ({ ...v, [f.key]: e.target.value.replace(/[^\d,]/g, '') }))} placeholder="0" data-testid="content-stats-input" data-key={f.key} />
+          </label>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" onClick={() => void submit()} disabled={busy || !changed} data-testid="content-stats-save">
+          <Save className="size-4" aria-hidden="true" />
+          숫자 저장
+        </Button>
+        <span className="t-meta break-keep text-slate-600">어떤 제목 각도 · 카드 유형이 잘 됐는지 보관함에 모여요.</span>
+      </div>
+    </div>
+  )
+}
+
+/** 보관함 위 '무엇이 잘 됐나' — 숫자를 적은 글만 각도 · 유형별로 */
+function PerfBox({ items, rows, onOpen }: { items: readonly ContentItem[]; rows: { item: ContentItem }[]; onOpen: (it: ContentItem) => void }) {
+  const perf = useMemo(() => performanceBy(items), [items])
+  const posted = rows.filter((r) => r.item.postedAt)
+  const need = posted.filter((r) => !r.item.stats)
+  if (!posted.length) return null
+  const top = perf[0]
+  const lead = !!top && top.inquiries + top.saves + top.views > 0
+  return (
+    <div className="flex flex-col gap-2 rounded-(--radius-control) border border-emerald-200 bg-emerald-50/50 p-3" data-testid="content-perf">
+      <p className="t-sub flex items-center gap-2 font-semibold text-emerald-900">
+        <BarChart3 className="size-4 shrink-0" aria-hidden="true" />
+        무엇이 잘 됐나
+      </p>
+      {perf.length === 0 ? (
+        <p className="t-meta break-keep text-slate-700" data-testid="content-perf-empty">올린 글에 조회 · 저장 · 문의 숫자를 적으면 어떤 제목 각도 · 카드 유형이 잘 됐는지 여기 모여요. 만들기만 해서는 알 수 없어요.</p>
+      ) : (
+        <ol className="flex flex-col gap-1">
+          {perf.slice(0, 5).map((r, i) => (
+            <li key={r.key} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-(--radius-control) bg-white px-2.5 py-1.5" data-testid="content-perf-row" data-key={r.key}>
+              <span className="t-sub min-w-0 font-semibold break-keep text-slate-800">
+                {i === 0 && lead && <span className="mr-1 rounded-full bg-emerald-600 px-2 py-0.5 text-white">1위</span>}
+                {r.label}
+              </span>
+              <span className="t-meta break-keep text-slate-600">
+                글 {r.n}편 · 문의 {r.inquiries.toLocaleString('ko-KR')} · 저장 {r.saves.toLocaleString('ko-KR')} · 조회 {r.views.toLocaleString('ko-KR')}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+      {need.length > 0 && (
+        <div className="flex flex-col gap-1" data-testid="content-perf-need">
+          <span className="t-meta font-semibold text-slate-700">숫자를 아직 안 적은 올린 글 {need.length}편</span>
+          <div className="flex flex-wrap gap-1.5">
+            {need.slice(0, 3).map((r) => (
+              <button key={r.item.rootId} type="button" onClick={() => onOpen(r.item)} className="tap t-meta inline-flex min-h-11 max-w-full items-center gap-1 rounded-full border border-emerald-300 bg-white px-3 text-left font-semibold text-emerald-900 hover:border-emerald-500" data-testid="content-perf-need-open">
+                <span className="truncate">{r.item.title}</span>
+                <ChevronRight className="size-4 shrink-0" aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /* 보관함                                                                */
 /* ------------------------------------------------------------------ */
 
@@ -1888,6 +2154,7 @@ function ArchiveCard({ store, onOpen, onPosted, onRemoved, openId }: { store: Co
               </button>
             ))}
           </div>
+          <PerfBox items={store.items} rows={rows} onOpen={onOpen} />
           <ul className="flex flex-col divide-y divide-slate-100">
             {shown.map(({ item, versions }) => (
               <li key={item.rootId} className={`flex items-center gap-2 py-1.5 ${openId === item.rootId ? 'bg-violet-50' : ''}`} data-testid="content-archive-item" data-kind={item.kind}>
@@ -1913,7 +2180,13 @@ function ArchiveCard({ store, onOpen, onPosted, onRemoved, openId }: { store: Co
                     {item.input.situation ? ` · ${SITUATION_SHORT[item.input.situation as SituationKey] ?? ''}` : ''}
                     {item.input.planDate ? ` · ${shortDate(item.input.planDate)} 올릴 글` : ` · ${localDateOf(item.createdAt)}`}
                     {versions > 1 ? ` · ${versions}판` : ''}
+                    {item.input.angle ? ` · 각도 ${ANGLE_LABEL[item.input.angle]}` : ''}
                   </span>
+                  {item.stats && (
+                    <span className="t-meta w-full font-semibold break-keep text-emerald-700" data-testid="content-archive-stats">
+                      {statLine(item.stats)}
+                    </span>
+                  )}
                 </button>
                 <button
                   type="button"
