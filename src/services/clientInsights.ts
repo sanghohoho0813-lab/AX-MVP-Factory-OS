@@ -23,7 +23,7 @@ import { judge } from '../tools/startupTax/lib/judgement'
 import { EMPTY_FORM } from '../tools/startupTax/lib/formDefaults'
 import type { FormData as StartupForm, Region } from '../tools/startupTax/types'
 import { placeOf } from './grants/grantMatch'
-import { filledTaxProfile, loanPlan, retirePlan, viewProfile } from './taxPlan'
+import { filledTaxProfile, loanPlan, retirePlan, salaryOrDividend, shareValueOf, viewProfile } from './taxPlan'
 
 export type InsightTone = 'good' | 'maybe' | 'done' | 'need' | 'no'
 
@@ -282,9 +282,13 @@ const cretopInsight: Provider = ({ record }) => {
  * D-232 절세 — 절세 설계 엔진(세금 계산기 9종 식 그대로)으로 업체 숫자에서 바로 나오는 금액까지.
  *  - 가지급금 잔액이 있으면: 07 가지급금 계산기로 해마다 손해 → 가능성 높음(지금 새는 돈).
  *  - 대표 취임일 · 월 급여가 있으면: 02 퇴직급여 한도 · 03 퇴직소득세 → 검토해 볼 만함.
+ *  - D-233 월 급여 · 주주명부 · 배당 가능한 이익이 있으면: 세후 1억을 더 가져갈 때 급여 올리기 vs 배당(01 · 03 식) — 차이 100만원 넘을 때만.
  *  - 숫자가 없으면 짐작하지 않는다(예전처럼 '찾아볼 수 있어요' + 받을 것).
  *  - light(고객 관리 카드 띠) — 판정 색만 필요해 계산은 건너뛴다(가지급금이 있으면 가능성 높음 · 같은 답).
  */
+/** D-233 급여 vs 배당을 견줄 금액 — 상황 예시 '대표가 1억 가져오기'(tax-cash-1e)와 같은 세후 1억 */
+const PAY_COMPARE = 100_000_000
+
 const taxInsight: Provider = ({ record, today, light }) => {
   const open = `/tools/tax${q(record)}`
   const hasShares = record.shareholderRegister.length > 0
@@ -323,8 +327,28 @@ const taxInsight: Provider = ({ record, today, light }) => {
         note: filledKeys.includes('ceoStartDate') ? '취임일은 설립일로 보고 계산' : '',
       })
   }
+  // D-233 급여 vs 배당 — 상황 예시 '대표가 1억 가져오기' 와 같은 세후 1억 · 같은 경로 식. 지금 급여 · 주주명부 · 배당 가능한 이익을 알 때만(짐작하지 않음)
+  if (!light && p.monthlySalary > 0 && hasShares && p.retainedEarnings > 0) {
+    const reg = record.shareholderRegister
+    const { salary, dividend } = salaryOrDividend(p, reg, shareValueOf(p, reg), PAY_COMPARE, today)
+    const gap = salary.ok && dividend.ok ? Math.abs(salary.netBurden - dividend.netBurden) : 0
+    if (gap >= 1_000_000) {
+      const cheaper = dividend.netBurden < salary.netBurden ? '배당' : '급여'
+      const subj = cheaper === '배당' ? '배당이' : '급여가'
+      found.push({
+        tone: 'maybe',
+        headline: `대표가 1억 더 가져간다면 — ${cheaper} 쪽이 세금이 덜 나와요`,
+        short: `세후 1억이면 ${subj} 약 ${manwonText(gap)} 덜 냄`,
+        amount: `세후 1억 기준 약 ${manwonText(gap)} 덜 냄`,
+        action: null,
+        openPath: preset('tax-cash-1e'),
+        openLabel: '1억 가져오기 설계',
+        note: `급여 올리기 순부담 ${manwonText(salary.netBurden) || '0원'} · 배당 순부담 ${manwonText(dividend.netBurden) || '0원'} · 주식 · 퇴직금까지 견주면 더 싼 길이 있을 수 있어요`,
+      })
+    }
+  }
   const top = found[0]
-  if (!top) return { key: 'tax', label: '절세 설계', tone: 'maybe', headline: `절세 현황 ${filled}칸${hasShares ? ` · 주주 ${record.shareholderRegister.length}명` : ''} — 원하는 결과로 절세 방법을 찾아볼 수 있어요`, detail: '', missing: hasShares ? [] : ['주주명부'], openPath: open, openLabel: '절세 설계 열기', action: null }
+  if (!top) return { key: 'tax', label: '절세 설계', tone: 'maybe', headline: `절세 현황 ${filled}칸${hasShares ? ` · 주주 ${record.shareholderRegister.length}명` : ''} — 원하는 결과로 절세 방법을 찾아볼 수 있어요`, detail: '', missing: [!hasShares ? '주주명부' : '', p.monthlySalary > 0 ? '' : '대표 급여'].filter(Boolean), openPath: open, openLabel: '절세 설계 열기', action: null }
   const others = found.slice(1).map((f) => f.short)
   return {
     key: 'tax',

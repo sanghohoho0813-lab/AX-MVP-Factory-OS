@@ -11,7 +11,7 @@ import { brand, documentTitle } from '../../brand/brand.config'
 import { UI_THEMES, isThemeKey } from '../../lib/uiTheme'
 import { uiPreferencesRepository } from '../../repositories/uiPreferencesRepository'
 import { readRaw, writeRaw } from '../../storage/localStore'
-import { MODULES, MODULE_GROUPS, enabledModulesByGroup, isPilotHiddenPath, moduleForPath, navShortcuts, screenGroupForPath, screenTitleForPath } from '../../config/moduleRegistry'
+import { MODULES, MODULE_GROUPS, NAV_SHORTCUTS, enabledModulesByGroup, isPilotHiddenPath, moduleForPath, navParentForPath, navPathForSidebar, screenGroupForPath, screenTitleForPath } from '../../config/moduleRegistry'
 import { identityFromSession } from '../../auth/currentUser'
 import { FUTURE_ITEMS } from '../../config/capabilityStatus'
 import { REVIEW_HUB_PATH, TOOLS, liveTools, plannedTools, reviewTools, searchTools } from '../../config/toolRegistry'
@@ -234,16 +234,18 @@ check('modules: AX STUDIO 는 전문 모듈의 분야 한 줄(D-127) — 안의 
     plannedTools().every((t) => !MODULES.some((m) => m.key === `tool-${t.key}`)))
   check('메뉴: 없어진 그룹을 가리키는 모듈이 없다', MODULES.every((m) => MODULE_GROUPS.some((g) => g.key === m.group)))
   check('메뉴: 모든 모듈 주소가 겹치지 않는다', new Set(MODULES.map((m) => m.path)).size === MODULES.length)
-  // D-206: 마케팅 · 브랜딩 아래 바로 가기 셋 — 모듈이 아니다(주소는 원래 모듈이 맡음) · 머리줄은 '마케팅 · 브랜딩 › 홍보 글 만들기' · 팀장에게는 그대로 닫힘
-  const sc = navShortcuts('marketing')
-  check('메뉴(D-206): 마케팅 · 브랜딩 아래 콘텐츠 레이더 · 홍보 글 만들기 · 홈페이지 만들기 — MODULES 에는 없고 주소는 원래 모듈이 맡음',
-    sc.map((m) => m.path).join() === '/marketing/youtube,/tools/content,/tools/homepage' && sc.every((m) => !MODULES.some((x) => x.key === m.key)) &&
-      moduleForPath('/tools/content')?.key === 'tool-content' && moduleForPath('/tools/homepage')?.key === 'tool-homepage' && moduleForPath('/marketing/youtube')?.key === 'marketing',
-    sc.map((m) => m.key).join())
-  check('메뉴(D-206): 머리줄 — 마케팅 · 브랜딩 › 홍보 글 만들기 · 홈페이지 만들기 · 콘텐츠 레이더',
-    ['/tools/content', '/tools/homepage/build', '/marketing/youtube'].every((p) => screenGroupForPath(p)?.title === '마케팅 · 브랜딩') && screenTitleForPath('/tools/content/build') === '홍보 글 만들기' && screenTitleForPath('/marketing/youtube') === '콘텐츠 레이더' && screenTitleForPath('/marketing') === '마케팅 · 브랜딩',
+  // D-206 → D-233: 마케팅 · 브랜딩이 함께 맡는 화면 셋 — 모듈이 아니다(주소 권한은 원래 모듈이 맡음) · 대표 "3개 목차 나누지 말고 마케팅 · 브랜딩으로 통일"
+  check('메뉴(D-233): 콘텐츠 레이더 · 홍보 글 만들기 · 홈페이지 만들기 — MODULES 에는 없고 주소 권한은 원래 모듈 · 함께 맡는 줄은 마케팅 · 브랜딩',
+    NAV_SHORTCUTS.map((m) => m.path).join() === '/marketing/youtube,/tools/content,/tools/homepage' && NAV_SHORTCUTS.every((m) => !MODULES.some((x) => x.key === m.key)) &&
+      moduleForPath('/tools/content')?.key === 'tool-content' && moduleForPath('/tools/homepage')?.key === 'tool-homepage' && moduleForPath('/marketing/youtube')?.key === 'marketing' &&
+      ['/marketing/youtube', '/tools/content/build', '/tools/homepage'].every((p) => navParentForPath(p)?.key === 'marketing') && navParentForPath('/tools/tax') === null,
+    NAV_SHORTCUTS.map((m) => m.key).join())
+  check('메뉴(D-233): 머리줄 이름 하나 — 영업 › 마케팅 · 브랜딩(콘텐츠 레이더 · 홍보 글 · 홈페이지 모두)',
+    ['/tools/content', '/tools/content/build', '/tools/homepage/build', '/marketing/youtube', '/marketing'].every((p) => screenTitleForPath(p) === '마케팅 · 브랜딩' && screenGroupForPath(p)?.title === screenGroupForPath('/marketing')?.title) && screenGroupForPath('/marketing')?.title === '영업',
     ['/tools/content', '/marketing/youtube'].map((p) => `${screenGroupForPath(p)?.title}›${screenTitleForPath(p)}`).join())
-  check('메뉴(D-206): 팀장 화면에는 바로 가기 셋 모두 닫힘(부모 줄 · 주소)', ['/marketing/youtube', '/tools/content', '/tools/homepage'].every((p) => isPilotHiddenPath(p)) && enabledModulesByGroup({ pilot: true }).every((g) => g.items.every((m) => m.key !== 'marketing')))
+  check('메뉴(D-233): 사이드바 불 — 세 화면 모두 마케팅 · 브랜딩 줄 주소로 본다(웹 스튜디오 묶음이 저절로 펼쳐지지 않게) · 다른 주소는 그대로',
+    ['/marketing/youtube', '/tools/content/build', '/tools/homepage'].every((p) => navPathForSidebar(p) === '/marketing') && navPathForSidebar('/tools/tax') === '/tools/tax' && navPathForSidebar('/ops/clients') === '/ops/clients')
+  check('메뉴(D-206 · D-233): 팀장 화면에는 세 화면 모두 닫힘(부모 줄 · 주소)', ['/marketing/youtube', '/tools/content', '/tools/homepage'].every((p) => isPilotHiddenPath(p)) && enabledModulesByGroup({ pilot: true }).every((g) => g.items.every((m) => m.key !== 'marketing')))
 }
 
 /* 지금 쓰는 사람 이름 (D-103) */

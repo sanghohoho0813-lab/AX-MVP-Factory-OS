@@ -1033,6 +1033,16 @@ export function cashPlan(p: ProfileView, reg: ShareholderRow[], sv: ShareValue, 
   return { target, routes: ranked, best, notes }
 }
 
+/**
+ * D-233 맞춤 추천(절세 판정) — 대표가 세후 N원을 더 가져갈 때 '급여 올리기' vs '배당' 만 견준다.
+ * 위 cashPlan 과 같은 경로 함수(01 급여 · 03 소득세 계산기 식) — 절세 설계 '1억 가져오기' 의 두 줄과 같은 숫자.
+ * 주식 팔기 · 소각 · 퇴직금까지 견주는 것은 절세 설계 화면에서(판정 카드는 무거운 계산을 하지 않는다).
+ */
+export function salaryOrDividend(p: ProfileView, reg: ShareholderRow[], sv: ShareValue, target: number, today: string): { salary: CashRoute; dividend: CashRoute } {
+  const c: Ctx = { p, reg, sv, today }
+  return { salary: salaryRoute(c, target), dividend: dividendRoute(c, target) }
+}
+
 /* ------------------------------------------------------------------ */
 /* 목표 2-1 — 여러 해에 나눠 가져오기 (D-133)                               */
 /*  해마다는 위 cashPlan 그대로(계산기 9종 식). 더하는 것만 계산기 밖이다.     */

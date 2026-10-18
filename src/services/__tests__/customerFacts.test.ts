@@ -53,7 +53,7 @@ import { buildInsights, cardRecoChips, isPick, missingForPicks, recoScore, recom
 import { sortClients } from '../clientOpsSort'
 import { recoRequestMessage, requestItemsFrom } from '../recoRequest'
 import { manwonText } from '../clientInsights'
-import { loanPlan, retirePlan, viewProfile } from '../taxPlan'
+import { loanPlan, retirePlan, salaryOrDividend, shareValueOf, viewProfile } from '../taxPlan'
 import { ADVISOR_GROUPS, ALL_QUESTIONS, answerFor, answerText, matchQuestion } from '../clientAdvisor'
 import { classifyDocument } from '../docClassify'
 import { NOTE_BIZNO_CHECK, NOTE_DIFFERS, NOTE_FROM_PHOTO, applyNewClientGuess, guessNewClientFromDocs, looksLikeCretopForNewClient } from '../newClientFromDocs'
@@ -918,6 +918,36 @@ await (async () => {
   check('D-232 고용: 세액공제를 아직 안 했으면 금액 없이 "새로 들어온 직원 3명 — 전년 직원 수를 넣으면" 안내(지원금 금액은 그대로)', hires?.tone === 'good' && hires?.amount === '최대 1,440만원 검토(1차 추정)' && !!hires?.detail.includes('새로 들어온 직원 3명'), JSON.stringify(hires))
   const noneRec = normalizeClientOps({ ...base, toolResults: [roster({}, 'none')] } as never)
   check('D-232 고용: 후보도 세액공제도 새 직원도 없으면 예전처럼 "지금은 어려움"', buildInsights(noneRec, T, []).find((i) => i.key === 'employment')?.tone === 'no')
+}
+
+// D-233: 판정 넓히기 마무리 — 절세 급여 vs 배당(세후 1억 · 상황 예시 '대표가 1억 가져오기' 와 같은 경로 식)
+{
+  const T = '2026-10-18'
+  const holders = [{ id: 'h1', name: '오대표', relation: 'ceo', shares: 8000, acquirePrice: 5000 }, { id: 'h2', name: '오배우', relation: 'spouse', shares: 2000, acquirePrice: 5000 }]
+  // 설립일이 없으면 퇴직금(취임일)이 계산되지 않아 급여 vs 배당이 맨 앞
+  const base = normalizeClientOps({ id: 'w233', companyName: '견줌산업', businessCategory: '제조업', businessAddress: '충청북도 청주시 흥덕구 1', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' })
+  const rec = (tp: Record<string, string>, reg: unknown[] = holders) => normalizeClientOps({ ...base, taxProfile: tp, shareholderRegister: reg } as never)
+  const taxOf = (r: ClientOpsRecord) => buildInsights(r, T, []).find((i) => i.key === 'tax')
+  const tp = { monthlySalary: '1000만', retainedEarnings: '15억', par: '5000' }
+  const p = viewProfile(tp)
+  const sd = salaryOrDividend(p, holders as never, shareValueOf(p, holders as never), 100_000_000, T)
+  const gap = Math.abs(sd.salary.netBurden - sd.dividend.netBurden)
+  const cheaper = sd.dividend.netBurden < sd.salary.netBurden ? '배당' : '급여'
+  const pay = taxOf(rec(tp))
+  check('D-233 절세: 월 급여 · 주주명부 · 배당 가능한 이익 → 세후 1억이면 급여 vs 배당 어느 쪽이 덜 내는지 · 금액(01 · 03 식 그대로)',
+    sd.salary.ok && sd.dividend.ok && gap >= 1_000_000 && pay?.tone === 'maybe' && pay?.headline === `대표가 1억 더 가져간다면 — ${cheaper} 쪽이 세금이 덜 나와요` && pay?.amount === `세후 1억 기준 약 ${manwonText(gap)} 덜 냄`,
+    JSON.stringify({ pay, s: sd.salary.netBurden, d: sd.dividend.netBurden }))
+  check('D-233 절세: 두 순부담을 같이 보여 주고 · 주식 · 퇴직금까지 견주면 더 싼 길이 있을 수 있다고 밝힘 · 1억 가져오기 설계로 열림',
+    !!pay?.detail.includes(`급여 올리기 순부담 ${manwonText(sd.salary.netBurden)}`) && !!pay?.detail.includes(`배당 순부담 ${manwonText(sd.dividend.netBurden)}`) && !!pay?.detail.includes('주식 · 퇴직금까지') && !!pay?.openPath.includes('preset=tax-cash-1e'), pay?.detail)
+  const both = taxOf(rec({ ...tp, ceoStartDate: '2015-01-01' }))
+  check('D-233 절세: 퇴직금도 되면 퇴직금이 앞(D-232 그대로) · 급여 vs 배당은 "그 밖에" 한 줄로', !!both?.headline.startsWith('대표 퇴직금') && !!both?.detail.includes(`세후 1억이면 ${cheaper === '배당' ? '배당이' : '급여가'} 약 ${manwonText(gap)} 덜 냄`) && !both?.detail.includes('급여이'), both?.detail)
+  const noRe = taxOf(rec({ monthlySalary: '1000만' }))
+  check('D-233 절세: 배당 가능한 이익을 모르면 급여 vs 배당을 짐작하지 않음', !noRe?.amount?.includes('세후 1억') && !noRe?.headline.includes('1억'), JSON.stringify(noRe))
+  const noHolders = taxOf(rec(tp, []))
+  check('D-233 절세: 주주명부가 없으면 급여 vs 배당을 짐작하지 않음', !noHolders?.headline.includes('1억') && !!noHolders?.missing.includes('주주명부'), JSON.stringify(noHolders))
+  const noSalary = taxOf(rec({ retainedEarnings: '15억' }))
+  check('D-233 절세: 대표 급여를 모르면 급여 vs 배당을 짐작하지 않음', !noSalary?.headline.includes('1억') && !!noSalary?.missing.includes('대표 급여'), JSON.stringify(noSalary))
+  check('D-233 고객 관리 카드 띠(계산 건너뜀) — 급여 vs 배당 계산을 하지 않아도 판정 색은 그대로', cardRecoChips(rec(tp), T, 0).find((c) => c.key === 'tax')?.tone === 'maybe')
 }
 
 /* D-192 목차 설명 사전 — 목차 이름(숫자가 붙어도)으로 찾는다 */

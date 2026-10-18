@@ -13,7 +13,7 @@ import {
   groupAccentClass,
   moduleMatchLength,
   navAccentClass,
-  navShortcuts,
+  navPathForSidebar,
   type ModuleDefinition,
   type ModuleGroupKey,
 } from '../../config/moduleRegistry'
@@ -77,7 +77,8 @@ function SidebarContent({
 }) {
   const navigate = useNavigate()
   // D-124: 영업에서 온 업체 화면이면 영업 관리에 불을 켠 채로
-  const navPath = useNavPath()
+  // D-233: 마케팅 · 브랜딩이 함께 맡는 화면(콘텐츠 레이더 · 홍보 글 · 홈페이지)에서는 '마케팅 · 브랜딩' 한 줄에만 불
+  const navPath = navPathForSidebar(useNavPath())
   // D-120: 설정 '고급 운영 기능 보기' 를 따른다(끄면 검증 · 기관 전략 · 사례를 목차에서 뺀다). 바꾸면 바로 다시 그린다
   useStoreVersion()
   // D-162: Pilot 에게는 대표 전용 묶음 · 줄을 빼고 보인다(같은 메뉴 표에서)
@@ -214,28 +215,15 @@ function SidebarContent({
                             onToggle={toggleCategory}
                           />
                         ) : (
-                          <>
-                            <NavLinkRow
-                              item={item}
-                              isActive={moduleMatchLength(item, navPath) > 0}
-                              collapsed={collapsed}
-                              onNavigate={onNavigate}
-                              counts={counts}
-                              iconClass={group.key === 'modules' ? 'nav-ramp' : navAccentClass(item.accent)}
-                              iconStyle={group.key === 'modules' ? rampStyle(idx, top.length) : undefined}
-                            />
-                            {/* D-206: 일반 줄 아래 늘 펼쳐 둔 기능 줄(마케팅 · 브랜딩 › 콘텐츠 레이더 · 홍보 글 · 홈페이지) — 접힌 사이드바에서는 숨김 */}
-                            {!collapsed && navShortcuts(item.key).length > 0 && (
-                              <ul aria-label={`${item.label} 기능`} className="mt-0.5 ml-5 flex flex-col gap-0.5 border-l border-navy-700 pl-2" data-nav-children={item.key}>
-                                {navShortcuts(item.key)
-                                  .map((c) => (
-                                    <li key={c.key}>
-                                      <NavLinkRow item={c} isActive={moduleMatchLength(c, navPath) > 0} collapsed={false} onNavigate={onNavigate} counts={counts} iconClass="text-navy-300" nested />
-                                    </li>
-                                  ))}
-                              </ul>
-                            )}
-                          </>
+                          <NavLinkRow
+                            item={item}
+                            isActive={moduleMatchLength(item, navPath) > 0}
+                            collapsed={collapsed}
+                            onNavigate={onNavigate}
+                            counts={counts}
+                            iconClass={group.key === 'modules' ? 'nav-ramp' : navAccentClass(item.accent)}
+                            iconStyle={group.key === 'modules' ? rampStyle(idx, top.length) : undefined}
+                          />
                         )}
                       </li>
                     ))}

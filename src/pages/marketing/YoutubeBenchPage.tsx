@@ -283,10 +283,12 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5" data-testid="yt-page">
       <div className="flex flex-col gap-1">
+        {/* D-233 대표 "왼쪽 위 콘텐츠 레이더라는 이름 말고 마케팅 · 브랜딩으로" — 이름은 하나, 어디인지는 아래 목차 탭이 말한다 */}
         <PageHeader
-          title="콘텐츠 레이더"
+          title="마케팅 · 브랜딩"
+          showOnPhone
           descriptionAsHint
-          description="잘되는 콘텐츠를 보고 이번 주에 찍을 주제를 고릅니다. 벤치마킹 채널의 최근 영상을 6시간마다 저절로 새로 받아, 여러 채널에서 함께 오르고 채널 평소보다 잘된 주제를 근거와 함께 보여 줍니다(규칙 계산)."
+          description="잘되는 콘텐츠를 보고 이번 주에 찍을 주제를 고르고(콘텐츠 레이더), 찍고 올린 것의 성과까지 봅니다. 업체 홍보 글 · 홈페이지도 같은 목차에서. 벤치마킹 채널의 최근 영상을 6시간마다 저절로 새로 받아, 여러 채널에서 함께 오르고 채널 평소보다 잘된 주제를 근거와 함께 보여 줍니다(규칙 계산)."
           actions={
             <>
               <Button variant="secondary" onClick={refresh} disabled={loading} data-testid="yt-refresh">
@@ -301,7 +303,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
         {/* 보조 이름 · 받은 때 · 채널 수는 작은 글 한 줄(D-195 — '이번 주 찍을 것' 보다 먼저 눈을 끌지 않게) */}
         <p className="t-meta flex flex-wrap items-center gap-x-3 gap-y-0.5 text-slate-500">
           <span className="font-semibold text-slate-600" data-testid="radar-subtitle">
-            YouTube 벤치마킹
+            콘텐츠 레이더 · YouTube 벤치마킹
           </span>
           {prepared && <FeedMeta prepared={prepared} fetchedAt={yt.feed?.fetchedAt ?? ''} failed={yt.feed?.failed ?? []} />}
         </p>

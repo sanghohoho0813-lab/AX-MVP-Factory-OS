@@ -108,9 +108,11 @@ export function ContentPage() {
   const section = useModuleSection()
   return (
     <div className="flex flex-col gap-5">
+      {/* D-233: 이름은 '마케팅 · 브랜딩' 하나 — 홍보 글 만들기인 것은 아래 목차 탭이 말한다 */}
       <PageHeader
-        title="홍보 글 만들기"
-        description="고객 · 잠재고객 · 동료 컨설턴트, 고객 관리에 없는 가상 업체까지 — 기록과 업종 견본으로 블로그 · 짧은 영상 · 긴 영상 · 카드뉴스 · 카톡 소식 · 플레이스 소개 · 키워드를 바로 만들고 보관합니다. 규칙으로 채우며 'AI' 가 아닙니다."
+        title="마케팅 · 브랜딩"
+        showOnPhone
+        description="홍보 글 만들기 — 고객 · 잠재고객 · 동료 컨설턴트, 고객 관리에 없는 가상 업체까지 — 기록과 업종 견본으로 블로그 · 짧은 영상 · 긴 영상 · 카드뉴스 · 카톡 소식 · 플레이스 소개 · 키워드를 바로 만들고 보관합니다. 규칙으로 채우며 'AI' 가 아닙니다."
         descriptionAsHint
       />
       {/* D-231 마케팅 · 브랜딩 목차 한 줄(콘텐츠 레이더 · 내 콘텐츠 · 홈페이지와 같은 줄) */}

@@ -30,9 +30,6 @@ import {
   Rocket,
   CircleDashed,
   Sparkles,
-  BarChart3,
-  PenLine,
-  Globe,
 } from 'lucide-react'
 import { SALES_EXTRA_PATHS, SALES_TAB_PATHS } from './salesTabs'
 import { REVIEW_HUB_PATH, type ToolDefinition, liveTools, movedTools, reviewTools } from './toolRegistry'
@@ -138,27 +135,28 @@ export const MODULE_GROUPS: ModuleGroup[] = [
 ]
 
 /**
- * 메뉴 줄 아래에 늘 펼쳐 둔 바로 가기 (D-206 대표 "이상한마케팅 툴 · 홈페이지 툴 다 마케팅 브랜딩 목차에").
- * 모듈이 아니다 — 주소는 그 화면을 맡은 모듈이 그대로 맡는다(콘텐츠 레이더 → 마케팅 · 브랜딩, 홍보 글 · 홈페이지 → 웹 스튜디오 도구 줄).
- * 그래서 '주소 하나 = 모듈 하나'(머리줄 이름 · 권한 · 팀장 화면 판정의 기준)가 깨지지 않는다. 웹 스튜디오 자리도 그대로 둔다.
- * 부모 줄(마케팅 · 브랜딩)이 대표 전용이라 팀장 화면에는 바로 가기도 나오지 않는다.
+ * 메뉴 한 줄이 함께 맡는 화면 (D-206 → D-233).
+ * D-206 대표 "이상한마케팅 툴 · 홈페이지 툴 다 마케팅 브랜딩 목차에" — 처음에는 '마케팅 · 브랜딩' 줄 아래 바로 가기 셋을 펼쳐 두었다.
+ * D-233 대표 "마케팅 브랜딩 안에 3개 목차 나누지 말고 그냥 마케팅 · 브랜딩으로 통일" — 사이드바에는 '마케팅 · 브랜딩' 한 줄만 두고,
+ *   콘텐츠 레이더 · 홍보 글 만들기 · 홈페이지 만들기는 화면 안 목차 탭(MarketingTabs)으로만 오간다. 머리줄 이름도 '마케팅 · 브랜딩' 하나.
+ * 모듈이 아니다 — 주소 권한은 그 화면을 맡은 모듈이 그대로 맡는다(홍보 글 · 홈페이지 → 웹 스튜디오 도구 줄 · 웹 스튜디오 자리도 그대로).
+ * 그래서 '주소 하나 = 모듈 하나'(권한 · 팀장 화면 판정의 기준)가 깨지지 않고, 머리줄 이름 · 사이드바 불만 부모 줄을 따른다.
  */
-export const NAV_SHORTCUTS: ModuleDefinition[] = [
-  { key: 'mk-radar', label: '콘텐츠 레이더', path: '/marketing/youtube', icon: BarChart3, group: 'sales', accent: 'revenue', enabled: true, parent: 'marketing', hint: 'YouTube 벤치마킹 — 이번 주에 찍을 주제', ownerOnly: true },
-  { key: 'mk-content', label: '홍보 글 만들기', path: '/tools/content', icon: PenLine, group: 'sales', accent: 'revenue', enabled: true, parent: 'marketing', hint: '업체 기록 → 키워드 · 블로그 · 영상 대본 · 카드뉴스 · 카톡 · 플레이스', ownerOnly: true },
-  { key: 'mk-homepage', label: '홈페이지 만들기', path: '/tools/homepage', icon: Globe, group: 'sales', accent: 'revenue', enabled: true, parent: 'marketing', hint: '업체 기록 → 업종 견본 홈페이지 · HTML 내려받기', ownerOnly: true },
+export const NAV_SHORTCUTS: Pick<ModuleDefinition, 'key' | 'label' | 'path' | 'parent'>[] = [
+  { key: 'mk-radar', label: '콘텐츠 레이더', path: '/marketing/youtube', parent: 'marketing' },
+  { key: 'mk-content', label: '홍보 글 만들기', path: '/tools/content', parent: 'marketing' },
+  { key: 'mk-homepage', label: '홈페이지 만들기', path: '/tools/homepage', parent: 'marketing' },
 ]
 
-/** 이 줄 아래 바로 가기 */
-export function navShortcuts(parentKey: string): ModuleDefinition[] {
-  return NAV_SHORTCUTS.filter((s) => s.parent === parentKey)
+/** 지금 주소를 함께 맡는 메뉴 줄(마케팅 · 브랜딩) — 없으면 null */
+export function navParentForPath(pathname: string): ModuleDefinition | null {
+  const sc = NAV_SHORTCUTS.find((s) => moduleMatchLength(s, pathname) > 0)
+  return sc?.parent ? (MODULES.find((m) => m.key === sc.parent) ?? null) : null
 }
 
-/** 지금 주소의 바로 가기(가장 긴 것) — 머리줄 이름 · 묶음에만 쓴다 */
-function shortcutForPath(pathname: string): ModuleDefinition | null {
-  let best: ModuleDefinition | null = null
-  for (const s of NAV_SHORTCUTS) if (moduleMatchLength(s, pathname) > (best ? best.path.length : 0)) best = s
-  return best
+/** 사이드바가 불을 켤 때 볼 주소 — 함께 맡는 화면이면 부모 줄 주소로(웹 스튜디오 · 잘 안 쓰는 기능 묶음이 저절로 펼쳐지지 않게) */
+export function navPathForSidebar(pathname: string): string {
+  return navParentForPath(pathname)?.path ?? pathname
 }
 
 /**
@@ -256,8 +254,8 @@ export const MODULES: ModuleDefinition[] = [
   // D-193: 유튜브 벤치마킹이 들어와 '준비 중' 을 뗐다(블로그 · 릴스 · SNS 는 화면 안에서 도입 예정)
   // D-195: 마케팅 · 브랜딩은 대표(full) 전용 — 대표의 콘텐츠 전략 · 내 채널 분석이 들어 있다. 팀장(Pilot) · 대표가 팀장 화면으로 볼 때는
   //   메뉴 · 찾기 · 휴대폰 메뉴 · 직접 주소(/marketing/…) 모두 닫힌다(isPilotHiddenPath · PilotRouteGuard 한 곳에서 — 권한 판정을 두 벌 만들지 않는다)
-  { key: 'marketing', label: '마케팅 · 브랜딩', path: '/marketing', icon: Megaphone, group: 'sales', accent: 'revenue', enabled: true, hint: '콘텐츠 레이더 · 홍보 글 만들기 · 홈페이지 만들기', ownerOnly: true },
-  // D-206: 마케팅 · 브랜딩 줄 아래 기능 줄(콘텐츠 레이더 · 홍보 글 · 홈페이지)은 아래 NAV_SHORTCUTS — 모듈이 아니라 바로 가기(주소 하나 = 모듈 하나)
+  { key: 'marketing', label: '마케팅 · 브랜딩', path: '/marketing', icon: Megaphone, group: 'sales', accent: 'revenue', enabled: true, hint: '이번 주 찍을 것 · 내 콘텐츠 · 홍보 글 만들기 · 홈페이지 만들기 — 한 곳에서', ownerOnly: true },
+  // D-233: 콘텐츠 레이더 · 홍보 글 · 홈페이지는 이 한 줄 안의 목차 탭 — 위 NAV_SHORTCUTS 는 머리줄 이름 · 사이드바 불만 이 줄을 따르게 한다(주소 하나 = 모듈 하나)
   // 만들고 있는 프로그램이 들어올 자리 — 들어오면 status 를 지우고 화면만 바꾼다 (docs/DECISIONS D-103)
   { key: 'first-meeting', label: '1차 미팅 체크리스트', path: '/sales/first-meeting', icon: ClipboardCheck, group: 'sales', accent: 'revenue', enabled: true, status: 'soon', badge: 'first-meetings', hint: '영업자용 AX 1차 미팅 체크리스트 — 만드는 중', ownerOnly: true },
 
@@ -353,9 +351,9 @@ export function moduleForPath(pathname: string): ModuleDefinition | null {
 export function screenTitleForPath(pathname: string): string | null {
   const review = [...reviewTools(), ...movedTools()].find((t) => t.path && underPath(pathname, t.path))
   if (review) return review.label
-  // D-206: 마케팅 · 브랜딩 바로 가기 화면은 그 이름으로(콘텐츠 레이더 · 홍보 글 만들기 · 홈페이지 만들기)
-  const sc = shortcutForPath(pathname)
-  if (sc) return sc.label
+  // D-233: 마케팅 · 브랜딩이 함께 맡는 화면(콘텐츠 레이더 · 홍보 글 · 홈페이지)은 이름 하나 — '마케팅 · 브랜딩'
+  const parent = navParentForPath(pathname)
+  if (parent) return parent.label
   return moduleForPath(pathname)?.label ?? null
 }
 
@@ -365,11 +363,8 @@ export function screenTitleForPath(pathname: string): string | null {
  */
 export function screenGroupForPath(pathname: string): ModuleGroup | null {
   const review = reviewTools().find((t) => t.path && underPath(pathname, t.path))
-  // D-206: 바로 가기 화면은 그 부모 줄 이름으로(마케팅 · 브랜딩 › 홍보 글 만들기)
-  const sc = review ? null : shortcutForPath(pathname)
-  const scParent = sc?.parent ? MODULES.find((x) => x.key === sc.parent) : undefined
-  if (scParent) return { key: scParent.group, title: scParent.label, accent: scParent.accent }
-  const m = review ? null : moduleForPath(pathname)
+  // D-233: 마케팅 · 브랜딩이 함께 맡는 화면은 그 줄과 같은 묶음(영업 › 마케팅 · 브랜딩)
+  const m = review ? null : (navParentForPath(pathname) ?? moduleForPath(pathname))
   // D-127: 전문 모듈 안의 화면은 분야 이름으로(절세·재무 › 세금 계산기) — '전문 모듈' 보다 어디인지 잘 보인다
   const parent = m?.parent ? MODULES.find((x) => x.key === m.parent) : undefined
   if (parent) return { key: 'modules', title: parent.label, accent: parent.accent }

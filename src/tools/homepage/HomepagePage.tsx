@@ -94,9 +94,11 @@ export function HomepagePage() {
   const section = useModuleSection()
   return (
     <div className="flex flex-col gap-5">
+      {/* D-233: 이름은 '마케팅 · 브랜딩' 하나 — 홈페이지 만들기인 것은 아래 목차 탭이 말한다 */}
       <PageHeader
-        title="홈페이지 만들기"
-        description="고객 · 잠재고객 · 동료 컨설턴트, 고객 관리에 없는 가상 업체까지 — 기록으로 업종 견본 홈페이지를 만들고, 블록을 고쳐 PC · 휴대폰으로 확인한 뒤 HTML 한 장으로 내려받습니다. 규칙으로 채우며 'AI' 가 아닙니다."
+        title="마케팅 · 브랜딩"
+        showOnPhone
+        description="홈페이지 만들기 — 고객 · 잠재고객 · 동료 컨설턴트, 고객 관리에 없는 가상 업체까지 — 기록으로 업종 견본 홈페이지를 만들고, 블록을 고쳐 PC · 휴대폰으로 확인한 뒤 HTML 한 장으로 내려받습니다. 규칙으로 채우며 'AI' 가 아닙니다."
         descriptionAsHint
       />
       {/* D-231 마케팅 · 브랜딩 목차 한 줄(콘텐츠 레이더 · 내 콘텐츠 · 홍보 글과 같은 줄) */}

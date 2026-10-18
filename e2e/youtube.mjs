@@ -121,7 +121,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const feedAsked = () => asked.filter((u) => !u.includes('status=1'))
   check('주소: 처음엔 6시간 칸(?win=…) — D-196 전에는 하루 칸(?slot=)', feedAsked().length === 1 && /[?&]win=\d+$/.test(feedAsked()[0]), asked.join(' '))
   check('예시 띠는 사라진다(진짜 데이터)', (await page.getByTestId('yt-sample-banner').count()) === 0)
-  check('D-194 첫 화면 = 이번 주 찍을 것(콘텐츠 레이더) · 제목 "콘텐츠 레이더" · 보조 "YouTube 벤치마킹"', (await page.getByTestId('radar-plan').isVisible()) && ((await page.locator('main h1').first().innerText()) ?? '').includes('콘텐츠 레이더') && ((await page.getByTestId('radar-subtitle').innerText()) ?? '').includes('YouTube 벤치마킹'))
+  // D-233 대표 "왼쪽 위 콘텐츠 레이더라는 이름 말고 마케팅 · 브랜딩으로" — 제목은 '마케팅 · 브랜딩', 콘텐츠 레이더는 보조 줄에
+  check('D-194 · D-233 첫 화면 = 이번 주 찍을 것 · 제목 "마케팅 · 브랜딩"("콘텐츠 레이더" 아님) · 보조 "콘텐츠 레이더 · YouTube 벤치마킹"', (await page.getByTestId('radar-plan').isVisible()) && ((await page.locator('main h1').first().innerText()) ?? '').includes('마케팅 · 브랜딩') && !((await page.locator('main h1').first().innerText()) ?? '').includes('콘텐츠 레이더') && ((await page.getByTestId('radar-subtitle').innerText()) ?? '').includes('YouTube 벤치마킹') && ((await page.getByTestId('radar-subtitle').innerText()) ?? '').includes('콘텐츠 레이더'))
   await page.getByTestId('yt-view-top').click()
   await page.waitForTimeout(400)
   const hot = await page.getByTestId('yt-hot-item').allInnerTexts()

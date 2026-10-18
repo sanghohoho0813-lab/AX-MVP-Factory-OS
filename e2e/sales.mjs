@@ -722,11 +722,18 @@ for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
     const nav = page.locator('aside nav')
     // D-193: 유튜브 벤치마킹이 들어와 '준비 중' 을 뗐다
     check('메뉴: 영업 묶음에 마케팅 · 브랜딩(준비 중 아님 — D-193)', !/준비 중/.test(await nav.getByRole('link', { name: /마케팅 · 브랜딩/ }).innerText()))
-    const mk = await nav.locator('[data-nav-children="marketing"] a').evaluateAll((els) => els.map((a) => `${a.textContent?.trim()}>${a.getAttribute('href')}`))
-    check('메뉴: 마케팅 · 브랜딩 아래 콘텐츠 레이더 · 홍보 글 만들기 · 홈페이지 만들기(D-206)', mk.length === 3 && mk[0].endsWith('>/marketing/youtube') && mk[1].includes('홍보 글 만들기>/tools/content') && mk[2].includes('홈페이지 만들기>/tools/homepage'), mk)
-    await nav.locator('[data-nav-children="marketing"] a[href="/tools/content"]').click()
-    await page.waitForTimeout(500)
-    check('메뉴: 홍보 글 만들기 누르면 그 화면 · 메뉴에 불(D-206)', page.url().endsWith('/tools/content') && (await nav.locator('[data-nav-children="marketing"] a[href="/tools/content"]').getAttribute('aria-current')) === 'page')
+    // D-233 대표 "마케팅 브랜딩 안에 3개 목차 나누지 말고 그냥 마케팅 · 브랜딩으로 통일" — 사이드바에는 한 줄만 · 세 화면 모두 그 줄에 불 · 머리줄 이름 하나
+    check('메뉴(D-233): 마케팅 · 브랜딩 아래 펼친 줄 없음 — 콘텐츠 레이더 · 홍보 글 만들기 · 홈페이지 만들기 줄 0', (await nav.locator('[data-nav-children="marketing"]').count()) === 0 && (await nav.getByRole('link', { name: /콘텐츠 레이더|홍보 글 만들기/ }).count()) === 0)
+    // 레이더 칸은 그 자리에서 바뀌는 단추(yt-view-* · aria-selected) · 홍보 글 · 홈페이지는 주소 링크(mk-tab-* · aria-current)
+    const tabOn = async (tab) => (tab.startsWith('yt-') ? (await page.getByTestId(tab).getAttribute('aria-selected')) === 'true' : (await page.getByTestId(tab).getAttribute('aria-current')) === 'page')
+    for (const [path, tab] of [['/marketing', 'yt-view-plan'], ['/tools/content', 'mk-tab-content'], ['/tools/homepage', 'mk-tab-homepage']]) {
+      await page.goto(BASE + path, { waitUntil: 'networkidle' })
+      await page.waitForTimeout(300)
+      const lit = await nav.locator('a[aria-current="page"]').allInnerTexts()
+      const h1 = await page.locator('main h1').allInnerTexts()
+      check(`메뉴(D-233): ${path} — 사이드바 불은 마케팅 · 브랜딩 한 줄 · 제목 '마케팅 · 브랜딩' · 목차 탭이 지금 화면`, lit.length === 1 && lit[0].includes('마케팅 · 브랜딩') && h1.some((t) => t.includes('마케팅 · 브랜딩')) && (await tabOn(tab)), `${lit.join('|')} / ${h1.join('|')}`)
+    }
+    check('메뉴(D-233): 홍보 글 · 홈페이지 화면에서 잘 안 쓰는 기능 묶음이 저절로 펼쳐지지 않음', (await nav.locator('a[href="/tools/content"]').count()) === 0)
     const up = nav.getByRole('button', { name: /출시 예정/ }).first()
     if ((await up.getAttribute('aria-expanded')) !== 'true') await up.click()
     await page.waitForTimeout(200)

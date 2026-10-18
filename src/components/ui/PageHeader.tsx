@@ -9,6 +9,8 @@ interface PageHeaderProps {
   /** D-192: 설명을 화면에 깔지 않고 제목 옆 ⓘ · 마우스를 올리면(긴 설명이 있는 내부 화면) */
   descriptionAsHint?: boolean
   actions?: ReactNode
+  /** D-233: 휴대폰 위쪽 띠가 줄여 보여 주는 긴 이름(마케팅 · 브랜딩 → '마케…')이면 화면 안에도 제목을 그린다 */
+  showOnPhone?: boolean
 }
 
 /**
@@ -22,9 +24,9 @@ interface PageHeaderProps {
  * 한 번 더 쓰지 않는다(읽어 주는 기계에는 남긴다). 이름이 다를 때는 그대로 둔다.
  * 종이에는 위쪽 띠가 없으니 인쇄할 때는 늘 보인다 (D-102 — 전에는 A4 폭에서 제목 없이 찍혔다).
  */
-export function PageHeader({ title, description, descriptionAsHint = false, actions }: PageHeaderProps) {
+export function PageHeader({ title, description, descriptionAsHint = false, actions, showOnPhone = false }: PageHeaderProps) {
   const { pathname } = useLocation()
-  const sameAsHeader = screenTitleForPath(pathname) === title
+  const sameAsHeader = screenTitleForPath(pathname) === title && !showOnPhone
   const asHint = descriptionAsHint && !!description
 
   return (

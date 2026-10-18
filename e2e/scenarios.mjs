@@ -124,6 +124,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('D-232 모듈별 판정 › 절세 — 가지급금 1.2억 → 가능성 높음 · "해마다 약 n 손해" · 퇴직금 한도 · 세무사 검토 · [가지급금 정리 설계]', (await taxIns.getAttribute('data-tone')) === 'good' && /해마다 약 .+ 손해/.test(await taxIns.getByTestId('smart-insight-amount').innerText()) && taxTxt.includes('퇴직금 한도') && taxTxt.includes('세무사 검토') && taxTxt.includes('가지급금 정리 설계'), taxTxt.slice(0, 200))
   const taxHref = (await taxIns.getByRole('link').getAttribute('href')) ?? ''
   check('D-232 절세 판정 → 가지급금 정리 상황 예시로 열림(같은 업체 · preset=tax-loan)', taxHref.includes('/tools/tax') && taxHref.includes('client=cli_scen') && taxHref.includes('preset=tax-loan'), taxHref)
+  // D-233 판정 넓히기 마무리 — 월 급여 · 주주명부 · 배당 가능한 이익이 있는 업체: 세후 1억을 더 가져갈 때 급여 vs 배당(01 · 03 식)도 '그 밖에' 한 줄로
+  check('D-233 절세 판정 — 그 밖에 "세후 1억이면 급여/배당이 약 n 덜 냄"(가지급금 · 퇴직금 다음)', /세후 1억이면 (급여가|배당이) 약 .+ 덜 냄/.test(taxTxt) && !taxTxt.includes('급여이'), taxTxt.slice(0, 300))
 
   const box = page.getByTestId('smart-scenarios')
   const count = Number(await box.getAttribute('data-count'))
