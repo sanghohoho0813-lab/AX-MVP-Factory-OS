@@ -328,8 +328,10 @@ function DiagnosisScreen() {
 /* 인쇄 리포트 — 고객을 고르면 원본 /customers/{id}/report                  */
 /* ------------------------------------------------------------------ */
 
-function ReportPicker() {
+function ReportPicker({ quietWhenEmpty = false }: { quietWhenEmpty?: boolean }) {
   const list = getStoredCustomers()
+  // D-237: 업체에서 왔으면 위에 '진단을 먼저 저장해 주세요' 가 있다 — 빈 목록 안내를 또 깔지 않는다
+  if (quietWhenEmpty && list.length === 0) return null
   return (
     <section className="mx-auto w-full max-w-6xl px-2 pt-6 pb-16" data-testid="pf-report-picker">
       <h1 className="t-page break-keep text-slate-900">결과서</h1>
@@ -382,7 +384,7 @@ function ClientReport({ id }: { id: string }) {
           </Link>
         </div>
       </section>
-      <ReportPicker />
+      <ReportPicker quietWhenEmpty />
     </>
   )
 }
