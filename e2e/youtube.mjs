@@ -975,7 +975,8 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
 // 홍보 글과 연동 · 마케팅 브랜딩을 누르면 바로 레이더, 홍보 글 · 홈페이지도 같은 목차". 스크린샷: SHOTS231=<폴더>
 const SHOT231 = process.env.SHOTS231 || ''
 for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height: 844, tag: '390', mobile: true }, { width: 360, height: 780, tag: '360', mobile: true }]) {
-  const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, locale: 'ko-KR', ...(vp.mobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) })
+  // 한국 시각으로 — '오늘' 은 브라우저 지역 날짜(appClock)라, 한국 자정 ~ 오전 9시(UTC 전날)에 돌리면 오늘이 하루 어긋났다
+  const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, locale: 'ko-KR', timezoneId: 'Asia/Seoul', ...(vp.mobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) })
   await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE })
   const page = await ctx.newPage()
   const errs = []
