@@ -54,6 +54,10 @@ export interface ContentLib {
   ctaBody: string
   /** 짧은 영상 마지막 말 — {company} */
   ctaShort: string
+  /** D-229 규칙집 3-1 블로그 끝 — 직접 명령('예약하세요') 대신 가벼운 첫 행동 권유 */
+  softAsk: string
+  /** D-229 규칙집 4장 — 업종별 마지막 제안(다른 AI 도구 요청문 · 점검에 쓴다) */
+  offerRule: string
   /** 사진 · 화면 안내 */
   visual: string
   /** 이 업종 광고에서 조심할 것 */
@@ -101,6 +105,8 @@ export const CONTENT_LIB: Record<IndustryKey, ContentLib> = {
     ctaTitle: '견적 · 제작 문의',
     ctaBody: '도면이나 사양을 보내 주시면 검토한 뒤 연락드려요.',
     ctaShort: '제작 문의는 {company}에 편하게 남겨 주세요.',
+    softAsk: '도면 한 장만 먼저 보내 주셔도 검토해 드려요.',
+    offerRule: '끝: 도면 검토 · 방문 상담 안내 하나만(할인은 쓰지 마세요 · 실적은 사실만)',
     visual: '설비 · 작업 장면 · 완성품 실제 사진',
   },
   it: {
@@ -141,6 +147,8 @@ export const CONTENT_LIB: Record<IndustryKey, ContentLib> = {
     ctaTitle: '프로젝트 상담',
     ctaBody: '하고 싶은 일을 편하게 알려 주시면 가능한 방법과 일정을 정리해 드려요.',
     ctaShort: '상담은 {company}에 편하게 남겨 주세요.',
+    softAsk: '하고 싶은 일을 짧게 적어 보내 주셔도 방법을 정리해 드려요.',
+    offerRule: '끝: 상담 신청 하나만',
     visual: '실제 화면 캡처 · 쓰기 전과 쓴 뒤 비교',
   },
   trade: {
@@ -181,6 +189,8 @@ export const CONTENT_LIB: Record<IndustryKey, ContentLib> = {
     ctaTitle: '납품 · 구매 문의',
     ctaBody: '필요한 품목과 수량을 알려 주시면 견적을 보내 드려요.',
     ctaShort: '납품 문의는 {company}에 편하게 남겨 주세요.',
+    softAsk: '필요한 품목 목록만 먼저 보내 주셔도 견적을 정리해 드려요.',
+    offerRule: '끝: 견적 · 첫 거래 안내 하나만(첫 달 혜택 · 가격 유지는 업체가 정한 경우만)',
     visual: '창고 · 상품 실제 사진 · 포장 상태',
   },
   food: {
@@ -220,6 +230,8 @@ export const CONTENT_LIB: Record<IndustryKey, ContentLib> = {
     ctaTitle: '예약 · 포장 주문',
     ctaBody: '전화 한 통이면 예약과 포장 주문을 도와드려요.',
     ctaShort: '{company}에 편하게 들러 주세요.',
+    softAsk: '처음이라면 대표 메뉴 하나부터 맛보셔도 좋아요.',
+    offerRule: '끝: 바로 주문 · 예약 하나만(덤 · 기한 · 수량은 사실 목록에 있을 때만)',
     visual: '대표 메뉴 가까이 · 매장 안 · 간판',
     caution: '건강 · 치료 효과(예: 다이어트에 좋은 · 면역력)는 근거 없이 쓰지 마세요 — 식품 표시 · 광고 규정에 걸릴 수 있어요.',
   },
@@ -261,6 +273,8 @@ export const CONTENT_LIB: Record<IndustryKey, ContentLib> = {
     ctaTitle: '상담 · 예약',
     ctaBody: '궁금한 점은 전화로 편하게 물어봐 주세요.',
     ctaShort: '상담 예약은 {company}에 편하게 남겨 주세요.',
+    softAsk: '궁금한 점은 상담으로 먼저 물어보셔도 괜찮아요.',
+    offerRule: '끝: 예약 · 상담 안내만(가격 · 할인 · 비교 · 순위 · 후기는 쓰지 마세요)',
     visual: '깨끗한 내부 · 상담 공간 · 운영 시간 안내',
     caution: '병의원 광고는 의료법 · 광고 심의 대상일 수 있어요 — 치료 효과 장담 · 전후 사진 · 다른 곳과 비교 · 체험담은 넣지 마세요.',
     noCase: true,
@@ -303,6 +317,8 @@ export const CONTENT_LIB: Record<IndustryKey, ContentLib> = {
     ctaTitle: '상담 신청',
     ctaBody: '상황을 짧게 알려 주시면 확인한 뒤 연락드려요.',
     ctaShort: '상담은 {company}에 편하게 남겨 주세요.',
+    softAsk: '지금 상황을 짧게 정리해 보내 주셔도 확인해 드려요.',
+    offerRule: '끝: 상담 신청 하나만(결과 장담 · 다른 곳과 비교는 쓰지 마세요)',
     visual: '상담 장면 · 체크리스트 표 · 마감 달력',
     caution: '변호사 · 세무사 같은 전문직 광고는 직역별 광고 규정이 있어요 — 승소율 · 결과 장담 · 다른 곳과 비교하는 표현은 넣지 마세요.',
   },
@@ -344,6 +360,8 @@ export const CONTENT_LIB: Record<IndustryKey, ContentLib> = {
     ctaTitle: '수강 상담',
     ctaBody: '목표를 알려 주시면 맞는 과정을 안내해 드려요.',
     ctaShort: '수강 상담은 {company}에 편하게 남겨 주세요.',
+    softAsk: '상담으로 지금 수준부터 같이 확인해 보셔도 좋아요.',
+    offerRule: '끝: 상담 신청(위치 + 프로필 링크 · DM) 하나만(압박하는 말 · 지어낸 성적은 쓰지 마세요)',
     visual: '수업 장면 · 교실 · 시간표',
     caution: '합격률 · 성적 향상을 장담하는 표현은 쓰지 마세요 — 실제 결과를 쓸 때는 기간과 기준을 함께 적어 주세요.',
   },
@@ -385,6 +403,8 @@ export const CONTENT_LIB: Record<IndustryKey, ContentLib> = {
     ctaTitle: '견적 · 현장 상담',
     ctaBody: '공사할 곳과 원하는 내용을 알려 주시면 일정을 잡아 방문해요.',
     ctaShort: '견적 상담은 {company}에 편하게 남겨 주세요.',
+    softAsk: '현장 사진 몇 장만 먼저 보내 주셔도 상담할 수 있어요.',
+    offerRule: '끝: 상담 신청 하나만(선착순 수량은 업체가 정한 경우만)',
     visual: '시공 전 · 후 같은 각도 사진 · 작업 장면',
   },
   design: {
@@ -425,6 +445,8 @@ export const CONTENT_LIB: Record<IndustryKey, ContentLib> = {
     ctaTitle: '시안 · 견적 문의',
     ctaBody: '설치할 곳 사진과 원하는 느낌을 보내 주시면 시안과 견적을 드려요.',
     ctaShort: '시안 · 견적 문의는 {company}에 편하게 남겨 주세요.',
+    softAsk: '설치할 곳 사진 한 장만 보내 주셔도 시안 방향을 잡아 드려요.',
+    offerRule: '끝: 시안 · 견적 문의 하나만',
     visual: '설치 전 · 후 같은 자리 사진 · 밤 조명 사진 · 작업 장면',
   },
   // D-220 개인 컨설턴트 · 전문가 — 동료 컨설턴트의 홍보 글
@@ -466,6 +488,8 @@ export const CONTENT_LIB: Record<IndustryKey, ContentLib> = {
     ctaTitle: '상담 신청',
     ctaBody: '회사 이름과 고민을 짧게 남겨 주시면 확인한 뒤 연락드려요.',
     ctaShort: '상담은 {company}에 편하게 남겨 주세요.',
+    softAsk: '회사 상황을 짧게 남겨 주시면 먼저 확인해 드려요.',
+    offerRule: '끝: 상담 신청 하나만(심사 결과 장담은 쓰지 마세요)',
     visual: '상담 장면 · 회사 진단표 · 공고 달력',
     caution: '"반드시 승인" 처럼 심사 결과를 장담하는 말, 정부기관이나 공공기관처럼 보이게 하는 말은 넣지 마세요.',
   },
@@ -506,6 +530,8 @@ export const CONTENT_LIB: Record<IndustryKey, ContentLib> = {
     ctaTitle: '문의하기',
     ctaBody: '궁금한 점을 편하게 남겨 주시면 확인한 뒤 연락드려요.',
     ctaShort: '문의는 {company}에 편하게 남겨 주세요.',
+    softAsk: '궁금한 점부터 가볍게 물어보셔도 좋아요.',
+    offerRule: '끝: 문의 하나만',
     visual: '실제 일하는 모습 · 매장 · 대표 사진',
   },
 }

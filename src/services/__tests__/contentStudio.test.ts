@@ -21,6 +21,14 @@ import {
   offerLine,
   aiRequestText,
   aiRequestFacts,
+  briefSlots,
+  materialList,
+  reviewChecklist,
+  videoTitle,
+  videoThumb,
+  withoutArea,
+  isB2B,
+  CARE_NOTE,
   firstPicks,
   formalWord,
   hashtags,
@@ -125,7 +133,7 @@ const tags = hashtags(fp, 15)
 check('C13 해시태그 — 빈칸 · (주) · 같은 것 없음 · 15개까지', tags.length <= 15 && tags.every((t) => /^#\S+$/.test(t) && !t.includes('(주)')) && new Set(tags).size === tags.length && tags.includes('#한솔정밀') && tags.includes('#화성정밀금속부품'), tags)
 check('C13b 하는 일이 많아도 회사 이름 해시태그는 8개 안에 남음', hashtags({ ...fp, services: ['가', '나다', '라마', '바사', '아자', '차카'] }, 8).includes('#한솔정밀'))
 const topics = topicsFor(fp, mainKeyword(fp), today)
-check('C14 주제 6가지(정보 · 기준 · 질문 · 소개 · 사례 · 이번 달) — 10월이 없으면 11월 이야기', topics.map((t) => t.type).join() === 'tips,choose,faq,intro,case,season' && topics.every((t) => t.keyword === '화성 정밀 금속부품') && topics.find((t) => t.type === 'season')!.title.startsWith('11월'), topics.map((t) => t.title))
+check('C14 주제 6가지(정보 · 기준 · 질문 · 소개 · 사례 · 이번 달) — 10월이 없으면 11월 이야기 · D-229 제목은 모두 키워드로 시작', topics.map((t) => t.type).join() === 'tips,choose,faq,intro,case,season' && topics.every((t) => t.keyword === '화성 정밀 금속부품' && t.title.startsWith('화성 정밀 금속부품,')) && topics.find((t) => t.type === 'season')!.title.includes('11월') && topics.find((t) => t.type === 'season')!.month === 11, topics.map((t) => t.title))
 check('C15 병의원 · 뷰티는 사례(체험담) 주제를 만들지 않음', !topicsFor(buildProfile(full, today, { industry: 'health' }).profile, '', today).some((t) => t.type === 'case'))
 check('C16 다른 안 → 주제 제목이 바뀜 · 같은 번호면 같은 제목', topicsFor(fp, '', today, 1)[0].title !== topicsFor(fp, '', today, 0)[0].title && topicsFor(fp, '', today, 1)[0].title === topicsFor(fp, '', today, 1)[0].title)
 
@@ -192,12 +200,12 @@ check('C27 카톡 혜택은 기간 · 대상 · 혜택을 비워 둠(지어내�
 const kwd = makeDraft(fp, { kind: 'keywords' }, today)
 check('C28 키워드 글 — 묶음마다 설명(hint) · 검색량은 짐작하지 않는다는 안내', kwd.blocks.slice(0, -1).every((b) => !!b.hint) && kwd.notes.some((n) => n.includes('검색량')) && !/\d+회|\d+건 검색/.test(plainText('keywords', kwd.blocks)))
 const sh = makeDraft(fp, { kind: 'shorts', topic: topics[0] }, today)
-check('C29 쇼츠 · 릴스(D-207) — 고정 문구 · 첫 3초 · 구조 · 초 구간 대본(나레이션 · 자막 · 장면) · 마무리에 회사 · 대표 전화 · 캡션', ['고정 문구', '첫 3초 · 붙잡는 말', '구조', '캡션'].every((l) => sh.blocks.some((b) => b.label === l)) && sh.blocks.filter((b) => /^\d:\d{2} - \d:\d{2}$/.test(b.label)).length === 5 && sh.blocks.some((b) => b.text.includes('한솔정밀(주) · 031-123-4567')) && sh.blocks.filter((b) => /^\d:\d{2} - /.test(b.label)).every((b) => b.text.includes('나레이션:') && b.text.includes('자막:') && b.text.includes('장면:')), sh.blocks.map((b) => b.label))
+check('C29 쇼츠 · 릴스(D-207 · D-229) — 고정 문구 · 첫 3초 · 구조 · 초 구간 대본 · 끝은 요약(업체 말은 한 줄) · 캡션 해시태그 5개', ['고정 문구', '첫 3초 · 붙잡는 말', '구조', '캡션'].every((l) => sh.blocks.some((b) => b.label === l)) && sh.blocks.filter((b) => /^\d:\d{2} - \d:\d{2}$/.test(b.label)).length === 5 && /정리하면 .+, 이 2가지예요\./.test(sh.blocks.filter((b) => /^\d:\d{2} - /.test(b.label)).at(-1)!.text) && (sh.blocks.find((b) => b.label === '캡션')!.text.match(/#\S+/g) ?? []).length === 5 &&  sh.blocks.filter((b) => /^\d:\d{2} - /.test(b.label)).every((b) => b.text.includes('나레이션:') && b.text.includes('자막:') && b.text.includes('장면:')), sh.blocks.map((b) => b.label))
 const cards7 = makeDraft(fp, { kind: 'cards', topic: topics[0], pages: 7 }, today)
 const cards5 = makeDraft(fp, { kind: 'cards', topic: topics[0], pages: 5 }, today)
 check('C30 카드뉴스 5장 · 7장(표지 · 내용 · 마무리) + 올릴 때 쓰는 글', cards5.blocks.filter((b) => /장/.test(b.label)).length === 5 && cards7.blocks.filter((b) => /장/.test(b.label)).length === 7 && cards7.blocks.some((b) => b.label === '올릴 때 쓰는 글'))
 const vid = makeDraft(fp, { kind: 'video', topic: topics[1] }, today)
-check('C31 긴 영상(D-207) — 기획 카드(썸네일 문구 · 도입부 5~15초 · 주제 · 타겟 청중 · 전략) → 인사 · 본론 5 · 정리 · 마무리 · 설명란', ['썸네일 문구', '도입부 · 처음 5~15초', '주제', '타겟 청중', '전략', '0:15 · 인사', '설명란'].every((l) => vid.blocks.some((b) => b.label === l)) && vid.blocks.filter((b) => /^\d:00 · \d\. /.test(b.label)).length === 5, vid.blocks.map((b) => b.label))
+check('C31 긴 영상(D-207 · D-229) — 기획 카드(썸네일 문구 · 도입부 15초 · 주제 · 타겟 청중 · 전략) → 인사 · 체크포인트 3 · 마무리 · 설명란', ['썸네일 문구', '도입부 · 처음 15초', '주제', '타겟 청중', '전략', '0:15 · 인사', '4:00 · 마무리', '설명란'].every((l) => vid.blocks.some((b) => b.label === l)) && vid.blocks.filter((b) => /^\d:00 · \d\. /.test(b.label)).length === 3, vid.blocks.map((b) => b.label))
 check('C32 같은 요청 = 같은 글 · 다른 안 = 다른 글', JSON.stringify(makeDraft(fp, { kind: 'blog', topic: topics[0], variant: 1 }, today)) === JSON.stringify(makeDraft(fp, { kind: 'blog', topic: topics[0], variant: 1 }, today)) && plainText('blog', makeDraft(fp, { kind: 'blog', topic: topics[0], variant: 0 }, today).blocks) !== plainText('blog', makeDraft(fp, { kind: 'blog', topic: topics[0], variant: 1 }, today).blocks))
 check('C33 복사 모양 — 플레이스 ■ · 영상 [이름] · 블로그 제목 먼저', plainText('place', eDraft.blocks).includes('■ 하는 일') && plainText('shorts', sh.blocks).includes('[0:00 - 0:03]') && plainText('shorts', sh.blocks).includes('[고정 문구]') && plainText('blog', fBlog.blocks).startsWith(fBlog.title))
 const fb = makeDraft(buildProfile(full, today, { industry: 'food' }).profile, { kind: 'blog', topic: topicsFor(buildProfile(full, today, { industry: 'food' }).profile, '', today)[0] }, today)
@@ -234,12 +242,14 @@ check('C46 차별점 · 판매 채널 · 망설이는 점 칸 읽기(앞뒤 빈�
 const gp = profileGaps(fp)
 const fp7 = buildProfile(full, today, ov7).profile
 // D-228 재료(후기 수 · 고객 한마디)도 '이 칸만 채우면' 에 — 차별점 등 D-207 칸 뒤에
-check('C47 이 칸만 채우면 — 차별점이 맨 앞 · 채우면 빠짐 · D-207 칸을 다 채우면 재료 칸만 남음', gp[0]?.key === 'differ' && gp.some((g) => g.key === 'objection') && !gp.some((g) => g.key === 'phone') && profileGaps(fp7).map((g) => g.key).join() === 'reviews,voice' && profileGaps(ep).map((g) => g.key).join() === 'differ,phone,services,hours,objection,reviews,voice', gp.map((g) => g.key))
+check('C47 이 칸만 채우면 — 차별점이 맨 앞 · 채우면 빠짐 · D-207 칸을 다 채우면 재료 칸만 남음', gp[0]?.key === 'differ' && gp.some((g) => g.key === 'objection') && !gp.some((g) => g.key === 'phone') && profileGaps(fp7).map((g) => g.key).join() === 'speaker,reviews,voice' && profileGaps(ep).map((g) => g.key).join() === 'differ,phone,services,hours,objection,speaker,reviews,voice', gp.map((g) => g.key))
 check('C48 주제마다 전략 한 줄', topics.every((t) => t.strategy.length > 10) && new Set(topics.map((t) => t.strategy)).size === topics.length)
 const bChoose = makeDraft(fp7, { kind: 'blog', topic: topicsFor(fp7, '', today).find((t) => t.type === 'choose') }, today)
 const bTips = makeDraft(fp, { kind: 'blog', topic: topics[0] }, today)
 const photosOf = (d: { blocks: { text: string }[] }) => d.blocks.filter((b) => b.text.startsWith('(사진 자리:')).length
-check('C49 블로그 — 제목 → 첫 문단(키워드) → 사진 자리 3곳 이상 · 한눈에 정리 · 차별점 없으면 [자리] · 있으면 그 말 · 망설이는 점 풀기', bTips.blocks[0].hint === '제목' && bTips.blocks[1].hint === '첫 문단(도입부)' && bTips.blocks[1].text.includes(topics[0].keyword) && photosOf(bTips) >= 3 && photosOf(bChoose) >= 3 && bChoose.blocks.some((b) => b.label === '한눈에 정리' && b.text.startsWith('확인할 것 | 이유')) && plainText('blog', bChoose.blocks).includes('시공 뒤 1년 무상 점검') && plainText('blog', bChoose.blocks).includes('공사 기간이 길까 봐') && placeholders(plainText('blog', bChoose.blocks)).length < placeholders(plainText('blog', makeDraft(fp, { kind: 'blog', topic: topicsFor(fp, '', today).find((t) => t.type === 'choose') }, today).blocks)).length, bTips.blocks.map((b) => b.hint ?? b.label))
+const tablesOf = (d: { blocks: { text: string }[] }) => d.blocks.filter((b) => /^[^\n|]+ \| [^\n|]+\n/.test(b.text)).length
+const headsOf = (d: { blocks: { hint?: string }[] }) => d.blocks.filter((b) => b.hint?.startsWith('소제목')).length
+check('C49 블로그(D-229 규칙집 3-1) — 제목 → 첫 문단(키워드) → 사진 4곳 이상 · 소제목 3(기준 2 + 정리) · 표 1개 · 차별점 없으면 [자리] · 있으면 그 말 · 망설이는 점 풀기', bTips.blocks[0].hint === '제목' && bTips.blocks[1].hint === '첫 문단(도입부)' && bTips.blocks[1].text.includes(topics[0].keyword) && photosOf(bTips) >= 4 && photosOf(bChoose) >= 4 && headsOf(bTips) === 3 && headsOf(bChoose) === 3 && tablesOf(bChoose) === 1 && tablesOf(bTips) === 1 && plainText('blog', bChoose.blocks).includes('시공 뒤 1년 무상 점검') && plainText('blog', bChoose.blocks).includes('공사 기간이 길까 봐') && placeholders(plainText('blog', bChoose.blocks)).length < placeholders(plainText('blog', makeDraft(fp, { kind: 'blog', topic: topicsFor(fp, '', today).find((t) => t.type === 'choose') }, today).blocks)).length, bTips.blocks.map((b) => b.hint ?? b.label))
 const bChk = draftChecks('blog', bTips.blocks, fp.industry, topics[0].keyword)
 const bChkBad = draftChecks('blog', [{ label: '', text: '다른 제목', hint: '제목' }, { label: '', text: '다른 첫 문단', hint: '첫 문단(도입부)' }], fp.industry, topics[0].keyword)
 check('C50 블로그 점검 — 제목 · 첫 문단 키워드(있으면 조용 · 없으면 알림) · 소제목 · 사진 자리 수', !bChk.some((c) => c.key === 'kw-title' || c.key === 'kw-first') && bChk.some((c) => c.key === 'shape' && /사진 자리 \d+곳/.test(c.text)) && ['kw-title', 'kw-first'].every((k) => bChkBad.some((c) => c.key === k)), bChk.map((c) => c.key))
@@ -264,7 +274,7 @@ for (const ad of AD_TYPES) for (const pages of [5, 7] as const) for (const pp of
 }
 const objCards = plainText('cards', makeDraft(fp7, { kind: 'cards', topic: topics[0], adType: 'objection' }, today).blocks)
 const probCards = plainText('cards', makeDraft(fp, { kind: 'cards', topic: topics[0], adType: 'problem' }, today).blocks)
-check(`C54 카드뉴스 광고 유형 ${AD_TYPES.length}가지 × 5 · 7장 × 업체 3 + 빈 업체 × 업종 ${INDUSTRIES.length} — 장 수 · 1장 표지 · 끝 마무리 · 번호 차례 · 유형 표시`, AD_TYPES.length === 5 && adBad.length === 0 && objCards.includes('공사 기간이 길까 봐, 걱정되시죠?') && CONTENT_LIB.manufacturing.problems.some((w) => probCards.includes(w)), adBad.slice(0, 3))
+check(`C54 카드뉴스 광고 유형 ${AD_TYPES.length}가지(규칙집 5안 순서 + 예전 2) × 5 · 7장 × 업체 3 + 빈 업체 × 업종 ${INDUSTRIES.length} — 장 수 · 1장 표지 · 끝 마무리 · 번호 차례 · 유형 표시`, AD_TYPES.join() === 'objection,problem,before,curious,proof,info,loss' && adBad.length === 0 && objCards.includes('공사 기간이 길까 봐, 걱정되시죠?') && CONTENT_LIB.manufacturing.problems.some((w) => probCards.includes(w)), adBad.slice(0, 3))
 const kv = parseKeywordVolumes('연관키워드\t월간검색수(PC)\t월간검색수(모바일)\n화성 금형\t1,230\t4,560\n화성 정밀가공\t< 10\t< 10\n동탄 시제품\t300\t2,100\n화성  금형\t10\t20\n\n금형 수리, 지그 제작')
 check('C55 검색량 붙여 넣기 — 머리줄 버림 · 쉼표 숫자 · "< 10" · 같은 말은 큰 쪽 · 많이 찾는 순 · 쉼표 목록은 숫자 없이 뒤로', kv.map((r) => r.word).join('|') === '화성 금형|동탄 시제품|화성 정밀가공|금형 수리|지그 제작' && kv[0].total === 5790 && kv[0].pc === 1230 && kv[2].small && kv[2].total === 0 && kv[3].total === null && parseKeywordVolumes('').length === 0, kv)
 const p2 = monthPlan(fp, today, 2)
@@ -479,7 +489,7 @@ check('C80 먼저 만들 것 — 한국 10/16 오전에 만든 짧은 영상은 
   const blogQ = makeDraft(mpObj, { kind: 'blog', topic: choose, variant: 0 }, today)
   const first = blogQ.blocks.find((b) => b.hint?.startsWith('첫 문단'))!.text
   check('C94 블로그 첫 문단 — 망설이는 점을 고객 속마음 한 줄로 시작 · 키워드는 그대로', first.startsWith('"처음 맡기면 비싸지 않을까"') && first.includes(choose.keyword), first)
-  check('C95 블로그 문의 칸 — 이번 달 혜택(기한) · 가격 조건 · 소개 칸에 후기 · 고객 한마디', blogT.includes('이번 달 혜택 — 첫 견적 고객 시제품 1개 무상(10월 31일까지)') && blogT.includes('가격 · 조건 — 시제품 1개 5만 원부터') && blogT.includes('고객 한마디 — "납기를 하루도 안 넘겨요"'))
+  check('C95 블로그 문의 칸 — 이번 달 혜택(기한) · 가격 조건 · 정리에 고객 한마디', blogT.includes('이번 달 혜택 — 첫 견적 고객 시제품 1개 무상(10월 31일까지)') && blogT.includes('가격 · 조건 — 시제품 1개 5만 원부터') && blogT.includes('실제로 이런 말을 들어요 — "납기를 하루도 안 넘겨요"'))
   const proof = makeDraft(mp, { kind: 'cards', topic: t0[0], adType: 'proof', pages: 7 }, today)
   const pages = proof.blocks.filter((b) => /^\d+장/.test(b.label))
   check('C96 카드뉴스 기록 증명형 — 첫 장 = 후기 수(재료) · 고객 한마디 장 · 장 번호 이어짐 · 마지막 장 = 혜택 + 기한', pages[0].text.includes('큰 글자: 네이버 후기 1,240개 · 평점 4.8') && pages.some((b) => b.label.includes('고객 한마디') && b.text.includes('"납기를 하루도 안 넘겨요"')) && pages.map((b) => Number(/^(\d+)장/.exec(b.label)![1])).join() === '1,2,3,4,5,6,7' && pages.at(-1)!.text.includes('첫 견적 고객 시제품 1개 무상(10월 31일까지)'), pages.map((b) => b.label))
@@ -495,7 +505,7 @@ check('C80 먼저 만들 것 — 한국 10/16 오전에 만든 짧은 영상은 
   const vid = makeDraft(mp, { kind: 'video', topic: choose, variant: 0 }, today)
   const series = videoSeries(mp, choose)
   const end = vid.blocks.find((b) => b.label.endsWith('· 마무리'))!.text
-  check('C100 영상 — 5편 순서(깊게 → 손해 피하기 → 넓히기 → 결정 직전 → 우리 업체) · 1편에 업력(기록) · 마무리 전 다리 문장', series.length === 5 && series[0].title.includes('(12년 차 한솔정밀(주))') && series[4].title.startsWith('한솔정밀(주)만의 진행 방식') && ['깊게', '손해 피하기', '넓히기', '결정 직전', '우리 업체'].every((r, i) => series[i].role.startsWith(r)) && vid.blocks.some((b) => b.label === '이 주제로 이어 찍을 5편') && end.includes('오늘 말한') && end.includes('이 기준대로') && end.includes('도면 받은 날 바로 회신해요'), series.map((x) => x.title))
+  check('C100 영상 — 5편 순서(깊게 → 손해 피하기 → 넓히기 → 결정 직전 → 우리 업체) · 1편에 업력(기록) · 마무리 전 다리 문장', series.length === 5 && series[0].title.includes('(12년 차 한솔정밀(주))') && series[4].title.startsWith('한솔정밀(주)만의 진행 방식') && ['깊게', '손해 피하기', '넓히기', '결정 직전', '우리 업체'].every((r, i) => series[i].role.startsWith(r)) && vid.blocks.some((b) => b.label === '이 주제로 이어 찍을 5편') && end.includes('오늘 말한') && end.includes('이렇게 지켜요') && end.includes('도면 받은 날 바로 회신해요'), series.map((x) => x.title))
   const s60 = makeDraft(mp, { kind: 'shorts', topic: choose, shortLen: '30-60' }, today)
   const s60t = plainText('shorts', s60.blocks)
   check('C101 쇼츠 30~60초 — 첫째 · 둘째 · "셋째가 제일 중요한데요"(끝까지 보는 고리) · "그럼 … 냐고요?"(질문으로 넘기기) · 저장 · 6구간 45초 그대로', s60t.includes('첫째,') && s60t.includes('둘째,') && s60t.includes('셋째가 제일 중요한데요.') && /그럼 뭘 확인하면 되냐고요\?/.test(s60t) && s60t.includes('저장해 두고') && s60t.includes('0:38 - 0:45'), s60t.slice(0, 300))
@@ -519,7 +529,7 @@ check('C80 먼저 만들 것 — 한국 10/16 오전에 만든 짧은 영상은 
       }
     }
   }
-  check(`C102 사실 대조 — 우리가 만든 글 ${drafts}편(9업종 · 7형식 · 재료 있음/없음)에는 거짓 경보 0`, falseAlarm.length === 0 && drafts > 300, falseAlarm.slice(0, 3))
+  check(`C102 사실 대조 — 우리가 만든 글 ${drafts}편(${INDUSTRIES.length}업종 · 7형식 · 재료 있음/없음)에는 거짓 경보 0`, falseAlarm.length === 0 && drafts > 300, falseAlarm.slice(0, 3))
   const bad = '[주제 내용]\n10년 차 전문가가 직접 골랐어요. 1,240명이 매달 재구매! 무료 배송 · 오늘만 30% 할인, 선착순 100명 사은품 증정. 식품연구소에서 권장한 방법으로, 편의점 도시락은 나트륨 덩어리예요. 다른 업체보다 못한 곳은 없어요? 고객 후기 "여기 아니면 안 맡겨요" 라는 말이 많아요.'
   const keys = factChecks(bad, mp).map((x) => x.key)
   check('C103 받은 글 점검 — 주지 않은 무료 배송 · 할인 · 증정 · 선착순 · 오늘만 / 지어낸 출처 / 다른 상품 깎기 / 업력 모순(10년 ≠ 12년) / 후기 수 → 재구매 고객 수 / 주지 않은 후기 문장', ['policy-무료 배송', 'policy-할인', 'policy-증정', 'policy-선착순', 'policy-오늘만 · 마감 임박', 'source', 'bash', 'years', 'reviews-meaning', 'voice-made'].every((k) => keys.includes(k)), keys)
@@ -535,6 +545,126 @@ check('C80 먼저 만들 것 — 한국 10/16 오전에 만든 짧은 영상은 
   const reqE = aiRequestText(ep)
   const reqH = aiRequestText(hp)
   check('C108 요청문 — 사실 없는 업체는 "숫자 · 혜택 · 후기를 넣지 마세요" · 이름 없으면 "사람 이름은 쓰지 마세요" · 의료는 규정 줄 · 혜택 · 한마디 빼기 · 설립 연수 줄 하나만', reqE.includes('숫자 · 혜택 · 후기를 넣지 마세요') && reqE.includes('사람 이름은 쓰지 마세요') && reqH.includes('의료광고 규정') && !reqH.includes('무상') && !reqH.includes('납기를') && aiRequestFacts(mp).filter((f) => f.startsWith('설립')).length === 1, reqE)
+}
+
+/* ------------------------------------------------------------------ */
+/* D-229 콘텐츠 작성 규칙집(1~3차 관찰 합본) 대조                                                     */
+/* ------------------------------------------------------------------ */
+{
+  const rov = normalizeOverrides({ rebuttal: '“소량은 아무 데나 맡겨도 똑같다”', shipping: '전국 택배 · 3만 원 이상 무료 배송', avoid: '최저가, 할인, x', speaker: '대표', differ: '도면 받은 날 바로 회신해요', objection: '소량도 받아 줄까' })
+  const { profile: rp, source: rs } = buildProfile(full, today, rov)
+  check('C110 브리프 새 칸 — 흔한 반박(따옴표 벗김) · 배송 · 교환 조건 · 넣지 말 것(쉼표로 나눔 · 한 글자 버림)', rp.rebuttal === '소량은 아무 데나 맡겨도 똑같다' && rp.shipping.startsWith('전국 택배') && rp.avoid.join() === '최저가,할인' && normalizeOverrides({ avoid: 'x'.repeat(300) }).avoid?.length === 200, { r: rp.rebuttal, a: rp.avoid })
+  const slots = briefSlots(rp, rs)
+  check('C111 브리프 6칸 — 업체 · 독자 · 알리는 것 · 화자 · 사실 목록 · 넣지 말 것 / 직함만 적은 화자는 비었다고 · 재료 n/7', slots.map((x) => x.key).join() === 'company,target,item,speaker,facts,avoid' && slots.find((x) => x.key === 'speaker')!.ok === false && slots.find((x) => x.key === 'speaker')!.note.includes('이름') && /재료 \d+\/7/.test(slots.find((x) => x.key === 'facts')!.note) && slots.find((x) => x.key === 'avoid')!.note.includes('2개') && profileGaps(rp).some((g) => g.key === 'speaker' && g.why.includes('이름도')), slots)
+  check('C112 재료 목록 — 경력 · 배송 조건 · 차별점 · 인증(설립 N년째는 경력으로 한 번만)', materialList(rp).includes('경력 12년') && materialList(rp).some((m) => m.startsWith('전국 택배')) && !materialList(rp).some((m) => /^설립/.test(m)) && materialList(ep).length === 0, materialList(rp))
+
+  // 블로그 — 규칙집 3-1
+  const blogBad: unknown[] = []
+  for (const ind of INDUSTRIES) {
+    for (const pp of [buildProfile(full, today, { industry: ind }).profile, buildProfile(full, today, { ...rov, speaker: '대표 김한솔', industry: ind }).profile, buildProfile(empty, today, { industry: ind }).profile]) {
+      for (const tt of ['tips', 'choose', 'faq', 'season'] as const) {
+        const tp = topicsFor(pp, '', today).find((x) => x.type === tt)
+        if (!tp) continue
+        const d = makeDraft(pp, { kind: 'blog', topic: tp }, today)
+        const title = d.blocks[0].text
+        const tx = plainText('blog', d.blocks)
+        const heads = d.blocks.filter((b) => b.hint?.startsWith('소제목')).length
+        const photos = d.blocks.filter((b) => b.text.startsWith('(사진 자리:')).length
+        const tables = d.blocks.filter((b) => /^[^\n|]+ \| [^\n|]+\n/.test(b.text)).length
+        const end = d.blocks.find((b) => b.hint?.startsWith('끝'))?.text ?? ''
+        const ok = title.startsWith(`${tp.keyword},`) && title.includes('2가지') && heads === 3 && photos >= 4 && photos <= 7 && tables <= 1 && end.includes(CONTENT_LIB[ind].softAsk) && !/예약하세요|연락하세요|신청하세요/.test(end) && (pp.differ ? end.includes(pp.differ) : end.includes('[앞의 2가지 기준')) && tx.includes('(구분선)') && tx.includes('관련 글 [') && (ind !== 'health' || tx.includes(CARE_NOTE)) && (!pp.rebuttal || tx.includes(`"${pp.rebuttal}"`))
+        if (!ok) blogBad.push({ ind, tt, title, heads, photos, tables, end: end.slice(0, 80) })
+      }
+    }
+  }
+  check('C113 블로그 브랜드형 — 키워드로 시작 + 쉼표 · 기준 2가지 · 소제목 3 · 사진 4~7 · 표 1개 이하 · 끝은 부드럽게(직접 명령 없음) · 다리 문장(차별점 있으면 그 말, 없으면 빈칸) · 의료 개인차 안내 · 흔한 반박', blogBad.length === 0, blogBad.slice(0, 3))
+  const lens = INDUSTRIES.map((ind) => buildProfile(full, today, { industry: ind }).profile).flatMap((pp) => topicsFor(pp, '', today).filter((x) => x.type === 'tips' || x.type === 'choose').map((x) => x.title.length))
+  check(`C114 블로그 제목 25~35자 — 업종 ${INDUSTRIES.length} × 정보 · 기준(${Math.min(...lens)}~${Math.max(...lens)}자)`, lens.every((n) => n >= 25 && n <= 35), lens)
+
+  // 영상 — 규칙집 3-3
+  const vidBad: unknown[] = []
+  for (const ind of INDUSTRIES) {
+    for (const pp of [buildProfile(full, today, { industry: ind }).profile, buildProfile(empty, today, { industry: ind }).profile]) {
+      for (const tp of topicsFor(pp, '', today)) {
+        const d = makeDraft(pp, { kind: 'video', topic: tp }, today)
+        const title = d.blocks[0].text
+        const thumb = d.blocks.find((b) => b.label === '썸네일 문구')!.text
+        const intro = /말: (.*)/.exec(d.blocks.find((b) => b.label.startsWith('도입부'))!.text)![1]
+        const sentences = intro.split(/(?<=[.?!])\s+/).filter(Boolean).length
+        const cps = d.blocks.filter((b) => b.hint === '소제목 — 체크포인트').length
+        const turns = (plainText('video', d.blocks).match(/그런데 이것보다|여기까지는 기본|가장 많이 놓치는/g) ?? []).length
+        const holes = placeholders(title).length + placeholders(thumb).length
+        const area = [pp.area, ...pp.region.split(/\s+/)].filter((w) => w.length >= 2)
+        const b2b = isB2B(pp)
+        const titleOk = holes > 0 || (b2b ? title.length >= 25 && title.length <= 35 && !/ \([^)]*\)$/.test(title) : title.length >= 40 && title.length <= 55 && / \(.+\)$/.test(title))
+        const thumbOk = placeholders(thumb).length > 0 || (thumb.length >= 20 && thumb.length <= 35 && /\d/.test(thumb))
+        const ok = !area.some((w) => title.includes(w) || thumb.includes(w)) && titleOk && thumbOk && (tp.type === 'case' || (intro.length >= 100 && intro.length <= 160 && sentences >= 3 && sentences <= 5)) && cps === 3 && turns >= 3 && d.title === title && (ind !== 'health' || plainText('video', d.blocks).includes(CARE_NOTE))
+        if (!ok) vidBad.push({ ind, type: tp.type, title, tl: title.length, thumb, thl: thumb.length, il: intro.length, sentences, cps, turns })
+      }
+    }
+  }
+  check('C115 긴 영상 — 제목 · 썸네일에 지역 없음 · 기업형 25~35자 괄호 없음 / 소비자형 40~55자 (괄호 꼬리말) · 썸네일 20~35자 + 숫자 · 도입부 3~5문장 100~160자 · 체크포인트 3 · 반전 문장 3 · 의료 개인차', vidBad.length === 0, vidBad.slice(0, 3))
+  check('C116 지역 빼기 — "화성 정밀 금속부품" → "정밀 금속부품" · 영상 5편도 지역 없음', withoutArea(fp, '화성 정밀 금속부품') === '정밀 금속부품' && videoSeries(fp, topics[0]).every((x) => !x.title.includes('화성')) && videoTitle(fp, topics[1], 3).startsWith('정밀 금속부품 업체 고를 때 꼭 볼 3가지') && videoThumb(fp, topics[0], 3).length >= 20)
+
+  // 쇼츠 · 카드 — 규칙집 3-4 · 3-5
+  const shBad: unknown[] = []
+  for (const ind of INDUSTRIES) {
+    const pp = buildProfile(full, today, { industry: ind }).profile
+    for (const tp of topicsFor(pp, '', today)) for (const sl of ['20-30', '30-60'] as const) {
+      const d = makeDraft(pp, { kind: 'shorts', topic: tp, shortLen: sl }, today)
+      const fixed = d.blocks.find((b) => b.label === '고정 문구')!.text
+      const rows = d.blocks.filter((b) => /^\d:\d{2} - /.test(b.label)).map((b) => b.text).join('\n')
+      const tags = (d.blocks.find((b) => b.label === '캡션')!.text.match(/#\S+/g) ?? []).length
+      if (!(placeholders(fixed).length || (fixed.length >= 14 && fixed.length <= 22)) || rows.includes('안녕하세요') || tags > 5) shBad.push({ ind, type: tp.type, sl, fixed, fl: fixed.length, tags })
+    }
+  }
+  check('C117 쇼츠 — 상단 문구 14~22자 · 인사 없이 바로 · 캡션 해시태그 5개 이하(업종 × 주제 × 길이)', shBad.length === 0, shBad.slice(0, 3))
+  const before = plainText('cards', makeDraft(fp, { kind: 'cards', topic: topics[0], adType: 'before', pages: 7 }, today).blocks)
+  const hpB = buildProfile(full, today, { industry: 'health' }).profile
+  const beforeH = makeDraft(hpB, { kind: 'cards', topic: topicsFor(hpB, '', today)[0], adType: 'before', pages: 7 }, today)
+  const curious = makeDraft(fp, { kind: 'cards', topic: topics[0], adType: 'curious', pages: 7 }, today)
+  check('C118 카드 전후 변화형 — 전 · 후는 빈칸(실제 사례만) / 의료는 전후 없이 과정만 + 안내 · 궁금증형 표지 · 마지막 장 의료 개인차', before.includes('[전]: [바꾸기 전 모습] → [후]: [바뀐 뒤 모습]') && !plainText('cards', beforeH.blocks).includes('[전]') && beforeH.notes.some((n) => n.includes('전후 비교를 쓰지 않아요')) && plainText('cards', beforeH.blocks).includes(CARE_NOTE) && curious.blocks[0].text.includes('고를 때 이것은 꼭 보래요'))
+
+  // 점검 — 규칙집 5장 · 6장
+  const fk = (txt: string, pp = fp) => factChecks(txt, pp).map((x) => x.key)
+  const rpOffer = buildProfile(full, today, { offer: '첫 주문 증정', offerUntil: '2026-11-30' }).profile
+  check('C119 통계형 · 기간 한정 · 업체 모아 소개 — "10명 중 7~8명" · 기한 없는 "11월 한정" · 기한과 다른 달 · 같은 달은 통과 · "맛집 5곳 총정리"', fk('10명 중 7~8명이 놓쳐요').includes('stat') && fk('11월 한정 특가').includes('month-limit') && fk('12월 한정', rpOffer).includes('month-limit') && !fk('11월 한정', rpOffer).includes('month-limit') && fk('동네 맛집 5곳 총정리').includes('roundup'))
+  const hp2 = buildProfile(full, today, { industry: 'health' }).profile
+  const ed2 = buildProfile(full, today, { industry: 'education' }).profile
+  check('C120 압박형은 의료 · 교육만 · 업체가 막은 말 · 배송 조건에 적은 무료 배송은 통과', fk('지금 안 하면 내년에 후회해요', hp2).includes('pressure') && fk('지금 안 하면 내년에 후회해요', ed2).includes('pressure') && !fk('지금 안 하면 내년에 후회해요').includes('pressure') && fk('오늘은 최저가로 모십니다', rp).includes('avoid-최저가') && !fk('3만 원 이상 무료 배송', rp).some((k) => k.startsWith('policy-무료')) && fk('3만 원 이상 무료 배송').some((k) => k.startsWith('policy-무료')))
+  const dk = (kind: ContentKind, blocks: { label: string; text: string; hint?: string }[], pp = fp, kw?: string) => draftChecks(kind, blocks, pp.industry, kw, pp).map((x) => x.key)
+  check("C121 '정보 없음' · 의료 개인차 안내 없음 · 썸네일 15자(숫자 없음) · 고정 문구 30자 · 영상 제목에 지역 · 쇼츠 인사", dk('blog', [{ label: '', text: '연락처: 정보 없음' }]).includes('no-info') && dk('blog', [{ label: '', text: '치료 이야기' }], hp2).includes('care') && !dk('blog', [{ label: '', text: `치료 이야기 ${CARE_NOTE}` }], hp2).includes('care') && ['fixed-len', 'thumb-num'].every((k) => dk('video', [{ label: '썸네일 문구', text: '꼭 알아야 할 것들이에요' }]).includes(k)) && dk('shorts', [{ label: '고정 문구', text: '이 문구는 스물두 글자를 훌쩍 넘는 아주 긴 문구예요' }]).includes('fixed-len') && dk('video', [{ label: '', text: '화성 정밀 금속부품 고를 때 꼭 볼 3가지', hint: '제목' }], fp, '화성 정밀 금속부품').includes('video-area') && dk('shorts', [{ label: '0:00 - 0:03', text: '나레이션: 안녕하세요, 오늘은' }]).includes('shorts-hello'))
+  check('C122 블로그 제목 — 키워드가 맨 앞 + 쉼표가 아니면 알림 · 키워드 8번이면 많다고', dk('blog', [{ label: '', text: '꼭 알아야 할 화성 정밀 금속부품 2가지', hint: '제목' }], fp, '화성 정밀 금속부품').includes('kw-front') && !dk('blog', [{ label: '', text: '화성 정밀 금속부품, 꼭 알아야 할 2가지', hint: '제목' }], fp, '화성 정밀 금속부품').includes('kw-front') && dk('blog', [{ label: '', text: Array(8).fill('화성 정밀 금속부품').join(' '), hint: '제목' }], fp, '화성 정밀 금속부품').includes('kw-many'))
+  // 우리가 만든 글은 형식 · 규정 점검에 걸리지 않는다(빈칸 · 길이 안내 같은 info 는 빼고)
+  const fmtKeys = /^(kw-front|kw-title|kw-first|kw-many|video-area|thumb-num|fixed-len|shorts-hello|care|no-info|stat|roundup|pressure|month-limit|policy-|source|bash|years|reviews-meaning|voice-made|avoid-)/
+  const own: unknown[] = []
+  let ownN = 0
+  for (const ind of INDUSTRIES) {
+    for (const pp of [buildProfile(full, today, { industry: ind }).profile, buildProfile(full, today, { ...rov, speaker: '대표 김한솔', industry: ind }).profile, buildProfile(empty, today, { industry: ind }).profile]) {
+      for (const kind of CONTENT_KINDS) {
+        if (kind === 'keywords') continue
+        for (const tp of topicsFor(pp, '', today)) {
+          for (const ad of kind === 'cards' ? AD_TYPES : (['info'] as AdType[])) {
+            for (const sl of kind === 'shorts' ? (['20-30', '30-60'] as const) : (['20-30'] as const)) {
+              const d = makeDraft(pp, { kind, topic: tp, adType: ad, shortLen: sl, purpose: 'event', pages: 7 }, today)
+              ownN += 1
+              const bad = draftChecks(kind, d.blocks, pp.industry, d.input.keyword, pp).filter((c) => c.level !== 'info' && fmtKeys.test(c.key))
+              if (bad.length) own.push({ ind, kind, type: tp.type, ad, sl, keys: bad.map((c) => c.key), text: bad[0].text.slice(0, 90) })
+            }
+          }
+        }
+      }
+    }
+  }
+  check(`C123 우리가 만든 글 ${ownN}편 — 형식 · 규정 · 사실 대조 경보 0(빈칸 · 길이 안내 제외)`, own.length === 0 && ownN > 1000, own.slice(0, 4))
+  const okList = reviewChecklist('blog', draftChecks('blog', bTips.blocks, fp.industry, topics[0].keyword, fp), fp)
+  const badList = reviewChecklist('blog', draftChecks('blog', [{ label: '', text: '1,240명이 재구매! 무료 배송 · 식품연구소에서 권장한 방법. 연락처 정보 없음' }], fp.industry, undefined, fp), fp)
+  const st = (l: typeof okList, part: string) => l.find((x) => x.text.includes(part))?.state
+  check('C124 발행 전 검수표 — 다섯 묶음 · 사람이 볼 것(화자 · 독자 · 실명) · 자동(정책 · 출처 · 정보 없음) 통과/확인 · 키워드 글은 표 없음', ['사람 · 업체', '숫자 · 사실', '형식', '고친 뒤 · 올린 뒤'].every((g) => okList.some((x) => x.group === g)) && st(okList, '실명 브랜드') === 'manual' && st(okList, '정책') === 'pass' && st(badList, '정책') === 'warn' && st(badList, '출처') === 'warn' && st(badList, '정보 없음') === 'warn' && reviewChecklist('keywords', [], fp).length === 0 && reviewChecklist('blog', [], hp2).some((x) => x.text.includes('개인차')) && reviewChecklist('blog', [], fp, { guide: true }).some((x) => x.text.includes('광고 표시')), badList.map((x) => `${x.state}:${x.text.slice(0, 12)}`))
+  const rq = aiRequestText(rp, { kind: 'blog', keyword: '화성 정밀 금속부품' })
+  const rqv = aiRequestText(rp, { kind: 'video', keyword: '화성 정밀 금속부품' })
+  const rqs = aiRequestText(rp, { kind: 'shorts', shortLen: '30-60' })
+  check('C125 요청문 채널별 — 채널 · 길이(숫자) · 지역 방침 · 걱정 · 흔한 반박 · 마지막 제안(업종표) · 업체가 막은 말 · 직함만이면 이름 금지 · 배송 조건', rq.includes('채널 · 종류: 네이버 블로그 글') && rq.includes('2,100~3,000자') && rq.includes('검색 키워드 "화성 정밀 금속부품" 를 띄어쓰기까지 그대로 제목 맨 앞에') && rq.includes('흔한 반박 1개: "소량은 아무 데나 맡겨도 똑같다"') && rq.includes('독자의 걱정 1개: "소량도 받아 줄까"') && rq.includes('끝: 도면 검토 · 방문 상담 안내 하나만') && rq.includes('"최저가"') && rq.includes('사람 이름은 쓰지 마세요') && rq.includes('배송 · 교환 조건: 전국 택배') && rqv.includes('("정밀 금속부품")') && rqv.includes('괄호 없이 25~35자') && rqs.includes('60초 이내 · 컷 15개 이하') && !aiRequestText(rp).includes('채널 · 종류'), rq)
 }
 
 if (SHOW) {

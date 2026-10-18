@@ -66,6 +66,8 @@ export interface Topic {
   keyword: string
   /** D-207 전략 — 이 글이 손님을 어떻게 문의까지 데려오는가 */
   strategy: string
+  /** D-229 계절 글의 달(제목 맨 앞이 키워드라 제목에서 달을 읽지 않는다) */
+  month?: number
 }
 
 export type KakaoPurpose = 'news' | 'event' | 'season' | 'thanks'
@@ -90,14 +92,20 @@ export type ShortLen = '20-30' | '30-60'
 export const SHORT_LEN_LABEL: Record<ShortLen, string> = { '20-30': '20~30초', '30-60': '30~60초' }
 
 /** D-207 카드뉴스 광고 유형 — 어떤 마음을 움직이는 장인가 */
-export type AdType = 'info' | 'problem' | 'objection' | 'proof' | 'loss'
-export const AD_TYPES: AdType[] = ['info', 'problem', 'objection', 'proof', 'loss']
-export const AD_TYPE_LABEL: Record<AdType, string> = { info: '정보형', problem: '고민 공감형', objection: '망설임 풀기형', proof: '기록 증명형', loss: '손해 피하기형' }
+/**
+ * D-229 규칙집 3-5 — 한 상품에 5안을 이 순서로(반박 없애기 → 문제 해결 → 전후 변화 → 궁금증 → 권위 · 사회적 증거).
+ * 예전 유형(정보형 · 손해 피하기형)은 지우지 않고 뒤에 둔다.
+ */
+export type AdType = 'info' | 'problem' | 'objection' | 'proof' | 'loss' | 'before' | 'curious'
+export const AD_TYPES: AdType[] = ['objection', 'problem', 'before', 'curious', 'proof', 'info', 'loss']
+export const AD_TYPE_LABEL: Record<AdType, string> = { objection: '망설임 풀기형', problem: '고민 공감형', before: '전후 변화형', curious: '궁금증형', proof: '기록 증명형', info: '정보형', loss: '손해 피하기형' }
 export const AD_TYPE_HINT: Record<AdType, string> = {
-  info: '알아 둘 것을 장마다 하나씩',
-  problem: '손님의 고민을 먼저 말하고 해결로',
   objection: '망설이는 이유를 먼저 풀어 주기',
+  problem: '손님의 고민을 먼저 말하고 해결로',
+  before: '바꾸기 전과 뒤 — 실제 사례만',
+  curious: '고를 때 꼭 보는 것을 궁금하게',
   proof: '업력 · 인증 같은 기록으로 믿음',
+  info: '알아 둘 것을 장마다 하나씩',
   loss: '모르고 하면 손해 보는 것',
 }
 
@@ -277,22 +285,71 @@ const STRATEGY: Record<TopicType, string> = {
   season: '찾는 사람이 많아지는 때를 잡아 미리 눈에 띄게 해요.',
 }
 
-export function topicsFor(p: ContentProfile, keyword: string, today: string, variant = 0): Topic[] {
+export function topicsFor(p: ContentProfile, keyword: string, today: string, variant = 0, count = 3): Topic[] {
   const lib = contentLib(p.industry)
   const kw = clean(keyword) || mainKeyword(p)
   const n = variant
+  const c = count
   const season = seasonHook(lib, today)
-  const titles: Partial<Record<TopicType, string>> = {
-    tips: at([`${kw}, 알아보기 전에 꼭 알아야 할 5가지`, `${kw} 처음이라면 이것부터 보세요`, `${kw} 준비할 때 많이 놓치는 5가지`], n),
-    choose: at([`${kw} ${lib.placeNoun} 고를 때 확인할 5가지`, `${kw} 견적 받기 전 체크리스트`, `${kw}, 어디에 맡길지 고민될 때 보는 기준`], n),
-    faq: at([`${kw} 자주 묻는 질문, ${j(p.company, '이/가')} 답해 드려요`, `${kw} 궁금한 점 ${lib.faq.length}가지 정리`], n),
-    intro: at([`${clean(`${p.area} ${p.item}`)}, ${j(p.company, '을/를')} 소개합니다`, `${j(p.company, '은/는')} 이런 ${j(lib.placeNoun, '이에요/예요')}`], n),
-    ...(lib.noCase ? {} : { case: at([`[고객 상황] ${p.item} 진행 사례`, `${p.area ? `${p.area}에서 ` : ''}진행한 ${p.item} 이야기 — [고객 상황]`], n) }),
-    ...(season ? { season: at([`${season.month}월, ${season.hook} — ${kw} 미리 챙기세요`, `${season.month}월 ${season.hook}, ${kw} 미리 보기`], n) } : {}),
+  // D-229 규칙집 3-1 · 1-1 — 키워드를 띄어쓰기까지 그대로 제목 맨 앞에(바로 뒤에 쉼표) · 기준은 2~3개, 그 개수를 제목에
+  const titles: Partial<Record<TopicType, string[]>> = {
+    tips: [`${kw}, 시작 전에 놓치면 손해인 ${c}가지`, `${kw}, 처음이라면 이 ${c}가지만 보세요`, `${kw}, 준비할 때 많이 놓치는 ${c}가지`],
+    choose: [`${kw}, ${lib.placeNoun} 고를 때 꼭 볼 ${c}가지`, `${kw}, 견적 받기 전에 확인할 ${c}가지`, `${kw}, 어디에 맡길지 고민될 때 볼 ${c}가지`],
+    faq: [`${kw}, 자주 묻는 질문 ${c}가지에 답해 드려요`, `${kw}, 문의 전에 많이 묻는 ${c}가지`],
+    intro: [`${clean(`${p.area} ${p.item}`)}, ${j(p.company, '을/를')} 소개합니다`, `${clean(`${p.area} ${p.item}`)}, ${j(p.company, '은/는')} 이런 ${j(lib.placeNoun, '이에요/예요')}`],
+    ...(lib.noCase ? {} : { case: [`${kw}, [고객 유형]이 바꾼 한 가지 — 진행 사례`, `${kw}, [고객 상황]에서 시작한 이야기`] }),
+    ...(season ? { season: [`${kw}, ${season.month}월 ${season.hook} 앞두고 챙길 ${c}가지`, `${kw}, ${season.month}월에 미리 볼 ${c}가지`] } : {}),
   }
   const order: TopicType[] = ['tips', 'choose', 'faq', 'intro', 'case', 'season']
-  return order.filter((t) => titles[t]).map((t) => ({ type: t, title: clean(titles[t] as string), angle: ANGLE[t], keyword: kw, strategy: STRATEGY[t] }))
+  return order
+    .filter((t) => titles[t])
+    .map((t) => ({ type: t, title: blogTitleFit(p, clean(at(titles[t] as string[], n))), angle: ANGLE[t], keyword: kw, strategy: STRATEGY[t], ...(t === 'season' && season ? { month: season.month } : {}) }))
 }
+
+/* ------------------------------------------------------------------ */
+/* D-229 콘텐츠 작성 규칙집(1~3차 관찰 합본) — 길이 맞추기 · 지역 빼기 · 다리 문장 · 의료 안내              */
+/* ------------------------------------------------------------------ */
+
+/** 기업형(발주 · 구매 담당이 독자) — 제목에 괄호 꼬리말을 붙이지 않는다(규칙집 1-8 · 3-3) */
+export const B2B_INDUSTRIES: ReadonlySet<ContentProfile['industry']> = new Set(['manufacturing', 'it', 'trade', 'consultant'])
+export const isB2B = (p: Pick<ContentProfile, 'industry'>) => B2B_INDUSTRIES.has(p.industry)
+
+/** 후보 중 [min, max] 안의 첫 글 — 없으면 범위에 가장 가까운 것 */
+export function fitText(cands: readonly string[], min: number, max: number): string {
+  const ok = cands.find((x) => x.length >= min && x.length <= max)
+  if (ok) return ok
+  const dist = (x: string) => (x.length < min ? min - x.length : x.length - max)
+  return [...cands].sort((a, b) => dist(a) - dist(b))[0]
+}
+
+/** 블로그 제목 25~35자 — 짧으면 소비자형은 (괄호 보충), 기업형은 줄표 꼬리 */
+function blogTitleFit(p: ContentProfile, title: string): string {
+  if (title.length >= 25 || placeholders(title).length) return title
+  const tails = isB2B(p) ? [' — 맡기기 전 확인', ' — 견적 전에 보세요', ' — 담당자가 먼저 보는 기준'] : [' (처음이라면 필독)', ' (꼭 보세요)', ' (손해 보기 전에 보세요)']
+  return fitText([title, ...tails.map((x) => `${title}${x}`)], 25, 35)
+}
+
+/** 제목의 'N가지' 를 실제 개수로 */
+export const withCount = (title: string, n: number) => title.replace(/\d+가지/, `${n}가지`)
+
+/** 지역 말 빼기 — 유튜브 제목 · 썸네일은 전국 주제로(규칙집 1-11) */
+export function withoutArea(p: ContentProfile, text: string): string {
+  const words = [p.region, ...p.region.split(/\s+/), p.area]
+    .map((w) => w.trim())
+    .filter((w) => w.length >= 2)
+    .sort((a, b) => b.length - a.length)
+  let out = text
+  for (const w of words) out = out.split(w).join(' ')
+  return clean(out).replace(/^[,·\s]+|[,·\s]+$/g, '')
+}
+
+/** 다리 문장 — 앞에서 말한 기준을 우리 상품에 잇는 한 문장. 사실(차별점)이 있을 때만, 없으면 빈칸(규칙집 1-9) */
+export function bridgeLine(p: ContentProfile, c: number): string {
+  return p.differ ? `이 ${c}가지 기준, ${j(p.company, '은/는')} 이렇게 지켜요 — ${p.differ}` : `[앞의 ${c}가지 기준을 우리가 어떻게 지키는지 한 문장 — 사실만]`
+}
+
+/** 의료 — 개인차 · 부작용 안내(규칙집 5장 규제 업종: 꼭 넣을 것) */
+export const CARE_NOTE = '개인에 따라 결과가 다를 수 있고 부작용이 생길 수 있어요. 자세한 주의 사항은 상담 때 꼭 안내받으세요.'
 
 /* ------------------------------------------------------------------ */
 /* 글감(점) — 주제마다 본문에 쓰는 항목                                    */
@@ -391,11 +448,11 @@ function companyBlock(p: ContentProfile): DraftBlock {
   return { label: `${j(p.company, '을/를')} 소개해요`, text: lines.join('\n') }
 }
 
-function ctaBlock(p: ContentProfile, kw: string): DraftBlock {
+function ctaBlock(p: ContentProfile, kw: string, hint?: string): DraftBlock {
   const lib = contentLib(p.industry)
   // D-228 실제 혜택 · 가격 조건이 있을 때만(지어내지 않음 · 의료는 혜택을 싣지 않음)
   const extra = [!noOfferAd(p) && offerLine(p) ? `이번 달 혜택 — ${offerLine(p)}` : '', p.price ? `가격 · 조건 — ${p.price}` : ''].filter(Boolean).join('\n')
-  return { label: lib.ctaTitle, text: `${kw ? `${j(kw, '을/를')} 알아보고 계신다면 편하게 연락 주세요. ` : ''}${lib.ctaBody}${extra ? `\n\n${extra}` : ''}\n\n${contactLines(p)}` }
+  return { label: lib.ctaTitle, text: `${kw ? `${j(kw, '을/를')} 알아보고 계신다면 편하게 연락 주세요. ` : ''}${lib.ctaBody}${extra ? `\n\n${extra}` : ''}\n\n${contactLines(p)}`, ...(hint ? { hint } : {}) }
 }
 
 /**
@@ -415,7 +472,68 @@ function objectionBlock(p: ContentProfile): DraftBlock {
   return { label: '이런 걱정이 있으셨죠?', text: `${p.objection}\n[이 걱정을 어떻게 덜어 드리는지 한두 문장 — 업체와 확인해 적어 주세요]` }
 }
 
+/**
+ * D-229 규칙집 3-1 블로그 브랜드형 — 도입(속마음 → 인사 · 경력 → 진짜 고민 · 흔한 반박 → 약속) · 사진 · 작성자 소개 표 →
+ * 소제목① 기준 1 · ② 기준 2 · ③ 정리 → 구분선 → 부드러운 정리 · 다리 문장 · 가벼운 첫 행동 → 관련 글 · 연락처 · 지도.
+ * 표는 하나(작성자 소개 표가 없을 때만 비교 표). 소개 · 사례 글은 예전 틀을 그대로 쓴다.
+ */
+function blogRulebook(p: ContentProfile, topic: Topic, variant: number): DraftBlock[] {
+  const lib = contentLib(p.industry)
+  const kw = topic.keyword
+  const points = pointsFor(p, topic, variant).slice(0, 2)
+  const c = points.length
+  const visuals = visualsOf(lib)
+  const s = seasonHook(lib, todayOfTopic(topic))
+  const quote = p.objection ? `"${p.objection}"\n${lib.field}에서 자주 듣는 말이에요.\n` : ''
+  const hello = p.speaker ? `안녕하세요, ${p.company} ${j(p.speaker, '이에요/예요')}.` : `안녕하세요, ${j(p.company, '이에요/예요')}.`
+  const career = p.since && p.years !== null && p.years >= 1 ? ` ${p.since}년부터 ${p.years}년째 이 일을 하고 있어요.` : ''
+  const worry: Record<TopicType, string> = {
+    tips: `${j(kw, '을/를')} 알아볼 때 가장 막막한 건 무엇부터 봐야 하는지예요.`,
+    choose: `${j(kw, '을/를')} 맡길 곳은 겉으로 비슷해 보여서 더 고민이 돼요.`,
+    faq: `${kw}에 대해 문의 전에 가장 많이 받는 질문이 있어요.`,
+    intro: '',
+    case: '',
+    season: s ? `${s.month}월은 ${j(s.hook, '이에요/예요')}. 이맘때 ${j(kw, '을/를')} 알아보는 분들이 많아요.` : `이맘때 ${j(kw, '을/를')} 알아보는 분들이 많아요.`,
+  }
+  const rebut = p.rebuttal ? ` 흔히 "${p.rebuttal}" 라고들 하지만, 꼭 그렇지만은 않아요.` : ''
+  const promise = topic.type === 'faq' ? ` 그중 ${c}가지에 먼저 답해 드릴게요.` : ` 이 ${c}가지만 보면 돼요.`
+  const blocks: DraftBlock[] = [
+    { label: '', text: topic.title, hint: '제목' },
+    { label: '', text: `${quote}${hello}${career}\n${worry[topic.type]}${rebut}${promise}`, hint: '첫 문단(도입부)' },
+    photo(p.speaker ? '말하는 사람 또는 매장 · 작업 공간' : '대표 또는 매장 · 작업 공간'),
+  ]
+  const author = authorRows(p)
+  if (author.length >= 3) blocks.push({ label: '이 글을 쓴 곳', text: ['항목 | 내용', ...author.map(([k, v]) => `${k} | ${v}`)].join('\n'), hint: '작성자 소개 표 — 넣어 준 사실만' })
+  // 기준마다 '실제 현장 이야기' 자리 — 규칙집 본문 2,100~3,000자는 사실(재료)로 채운다(지어내 늘리지 않는다)
+  points.forEach((pt, i) => {
+    blocks.push({ label: topic.type === 'faq' ? `Q. ${pt.title}` : `${i + 1}. ${pt.title}`, text: `${topic.type === 'faq' ? `A. ${pt.body}` : pt.body}\n[우리 현장에서 실제로 있었던 일 한두 문장 — 없으면 이 줄을 지워 주세요]`, hint: '소제목 — 기준 · 경고' })
+    blocks.push(photo(at(visuals, i + 1)))
+  })
+  // 소제목③ 정리 — 표는 글 전체에 하나(작성자 소개 표가 없을 때만 비교 표)
+  const table = topic.type === 'choose' && author.length < 3 ? ['확인할 것 | 이유', ...points.map((pt) => `${pt.title} | ${firstSentence(pt.body)}`)] : points.map((pt, i) => `${i + 1}. ${pt.title.replace(/[.!]$/, '')}`)
+  // 정리 안에 업종 견본의 진행 순서 · 자주 묻는 질문 하나(소제목을 늘리지 않고 문단으로)
+  const faq1 = topic.type === 'faq' ? null : lib.faq[0]
+  const summary = [
+    ...table,
+    `\n진행은 이렇게 해요 — ${lib.process.map((st) => st.name).join(' → ')}`,
+    faq1 ? `\n자주 받는 질문 — ${faq1.q}\n${faq1.a}` : '',
+    p.objection && (topic.type === 'choose' || topic.type === 'faq') ? `\n${p.objection} — [이 걱정을 어떻게 덜어 드리는지 한 문장 — 업체와 확인해 적어 주세요]` : '',
+    p.voice && !noVoiceAd(p) ? `\n실제로 이런 말을 들어요 — "${p.voice}"` : '',
+  ].filter(Boolean)
+  blocks.push({ label: `정리 — 이 ${c}가지만 기억하세요`, text: summary.join('\n'), hint: '소제목 — 정리' })
+  blocks.push({ label: '', text: '(구분선)', hint: '구분선' })
+  const soft = topic.type === 'faq' ? '더 궁금한 점은 편하게 물어봐 주세요.' : `${kw}, 처음엔 막막해도 이 ${c}가지만 챙기면 훨씬 수월해요.`
+  blocks.push({ label: '', text: `${soft} ${bridgeLine(p, c)}\n${lib.softAsk}${p.industry === 'health' ? `\n${CARE_NOTE}` : ''}`, hint: '끝 — 부드러운 정리 · 다리 문장 · 가벼운 첫 행동(직접 명령은 쓰지 않아요)' })
+  blocks.push(photo(at(visuals, 3)))
+  const cta = ctaBlock(p, '', '연락처 · 지도 — 실제 값만')
+  blocks.push({ ...cta, text: `관련 글 [함께 보면 좋은 글 링크 — 없으면 이 줄을 지워 주세요]\n${cta.text}` })
+  blocks.push({ label: '', text: hashtags(p).join(' '), hint: '해시태그' })
+  return blocks
+}
+
 function blogDraft(p: ContentProfile, topic: Topic, variant: number): DraftBlock[] {
+  // 소개 · 사례 글만 예전 틀(includes 로 물어 타입이 좁혀지지 않게 — 아래 예전 코드가 모든 주제를 다룬다)
+  if (!(['intro', 'case'] as TopicType[]).includes(topic.type)) return blogRulebook(p, topic, variant)
   const lib = contentLib(p.industry)
   const kw = topic.keyword
   const points = pointsFor(p, topic, variant)
@@ -431,7 +549,7 @@ function blogDraft(p: ContentProfile, topic: Topic, variant: number): DraftBlock
     ],
     faq: [`${kw}에 대해 자주 받는 질문을 모았어요. 미리 알고 오시면 훨씬 편해요.`],
     intro: [`${j(kw, '을/를')} 찾는 분들께 ${j(p.company, '을/를')} 소개해요.`, `처음 찾아 주신 분들을 위해 ${j(p.company, '이/가')} 어떤 곳인지 정리했어요.`],
-    case: ['[고객 상황]으로 고민하던 분과 함께한 이야기를 나눠요. 고객 동의를 받은 내용만 적었어요.'],
+    case: [`${kw}, [고객 상황]으로 고민하던 분과 함께한 이야기를 나눠요. 고객 동의를 받은 내용만 적었어요.`],
     season: (() => {
       const s = seasonHook(lib, todayOfTopic(topic))
       return s ? [`${s.month}월은 ${j(s.hook, '이에요/예요')}. 이맘때 ${j(kw, '을/를')} 알아보는 분들이 많아요. 미리 챙기면 좋은 것을 정리했어요.`] : [`이맘때 ${j(kw, '을/를')} 알아보는 분들이 많아요. 미리 챙기면 좋은 것을 정리했어요.`]
@@ -467,6 +585,7 @@ function blogDraft(p: ContentProfile, topic: Topic, variant: number): DraftBlock
     blocks.push(companyBlock(p))
   }
   blocks.push(photo(at(visuals, 2)))
+  if (p.industry === 'health') blocks.push({ label: '', text: CARE_NOTE, hint: '의료 안내 — 개인차 · 부작용' })
   blocks.push(ctaBlock(p, kw))
   blocks.push({ label: '', text: hashtags(p).join(' '), hint: '해시태그' })
   return blocks
@@ -489,7 +608,8 @@ function reviewGuide(p: ContentProfile, topic: Topic): DraftBlock[] {
     { label: '꼭 넣을 키워드', text: `주 키워드: ${kw}\n함께 쓰면 좋은 말: ${extra.length ? extra.join(', ') : '[함께 쓸 말 두세 개]'}\n제목에 주 키워드를 한 번 넣고, 본문에는 자연스럽게 두세 번 넣어 주세요.` },
     {
       label: '제목 예시',
-      text: [`${kw}, ${p.company} 직접 이용해 본 이야기`, `${clean(`${p.area} ${p.item}`)} 찾다가 ${p.company} 다녀왔어요`, `${kw} 고민이라면 참고하세요 — ${p.company} 이용 과정`].map((t) => `• ${t}`).join('\n'),
+      // D-229 규칙집 3-2 — [키워드], [1인칭 의심 · 고민] [결과 한마디]
+      text: [`${kw}, 반신반의했는데 [결과 한마디]`, `${kw}, 처음엔 망설였지만 [결과 한마디]`, `${kw}, 고민하다 ${p.company} 직접 써 본 이야기`].map((t) => `• ${t}`).join('\n'),
     },
     {
       label: '꼭 담아 주세요',
@@ -501,7 +621,17 @@ function reviewGuide(p: ContentProfile, topic: Topic): DraftBlock[] {
       ].join('\n'),
     },
     { label: `찍어 주세요(사진 ${shots.length}장 이상)`, text: shots.map((v) => `• ${v}`).join('\n') },
-    { label: '글 순서', text: ['1. 찾게 된 이유 — 어떤 고민이 있었는지', '2. 처음 연락 · 방문했을 때', '3. 진행 과정 — 사진과 함께', '4. 좋았던 점 · 아쉬웠던 점(솔직하게)', '5. 이용 정보 — 위치 · 시간 · 연락처', '6. 마무리 한마디'].join('\n') },
+    {
+      label: '글 순서',
+      text: [
+        `맨 위: 광고 표시 문구 — "${p.company}에서 [제품 · 원고료]를 제공받아 직접 써 본 뒤 쓴 후기입니다"`,
+        '1. 도입 — 처음엔 의심 · 고민했던 이유(같은 처지인 분이 공감하게)',
+        '2. 소제목① 써 보기 전 — 실패하거나 손해 봤던 경험',
+        '3. 소제목② 써 보고 알게 된 것 → 결과(실제로 겪은 숫자만)',
+        '4. 끝 — 같은 처지인 분께 권하기 · 위치 · 시간 · 연락처(실제 값)',
+        '분량 1,800자 안팎 · 해요체 · 짧은 문단 · 소제목 2개 · 작성자 소개 표는 넣지 않아요.',
+      ].join('\n'),
+    },
     {
       label: '지켜 주세요',
       text: [
@@ -516,8 +646,8 @@ function reviewGuide(p: ContentProfile, topic: Topic): DraftBlock[] {
 
 // 주제에 날짜를 싣지 않으므로 계절 글은 주제 제목의 'N월' 로 달을 되찾는다
 function todayOfTopic(topic: Topic): string {
-  const m = /^(\d{1,2})월/.exec(topic.title)
-  return m ? `2000-${String(Number(m[1])).padStart(2, '0')}-01` : '2000-01-01'
+  const mm = topic.month ?? Number(/(\d{1,2})월/.exec(topic.title)?.[1] ?? 0)
+  return mm >= 1 && mm <= 12 ? `2000-${String(mm).padStart(2, '0')}-01` : '2000-01-01'
 }
 
 function hookFor(p: ContentProfile, topic: Topic, variant: number, count: number): string {
@@ -560,12 +690,28 @@ function thumbFor(p: ContentProfile, topic: Topic, count: number): string {
   return map[topic.type]
 }
 
+/** D-229 규칙집 3-4 — 쇼츠 상단 문구 14~22자 */
+function shortsFixed(p: ContentProfile, topic: Topic, c: number): string {
+  const lib = contentLib(p.industry)
+  const short = p.item.length <= 8 ? p.item : ''
+  const s = seasonHook(lib, todayOfTopic(topic))
+  const cands: Record<TopicType, string[]> = {
+    tips: [`${short ? `${short} ` : ''}꼭 알아야 할 ${c}가지`, `시작 전에 꼭 알아야 할 ${c}가지`, `모르면 손해 보는 ${c}가지`],
+    choose: [`맡기기 전 꼭 확인할 ${c}가지`, `${lib.placeNoun} 고르기 전 꼭 볼 ${c}가지`],
+    faq: [`가장 많이 묻는 질문 ${c}가지`, `${short ? `${short} ` : ''}자주 묻는 질문 ${c}가지`],
+    intro: [`${j(p.company, '은/는')} 이렇게 일해요`, `${j(p.company, '이/가')} 일하는 순서 한눈에`, `${p.company}${p.area ? ` · ${p.area}` : ''} 소개`],
+    case: ['[결과 한 줄 — 실제 사례만]'],
+    season: [`${s ? `${s.month}월에 ` : '지금 '}꼭 챙길 ${c}가지`, `${s ? `${s.month}월, ` : ''}미리 챙길 것 ${c}가지`],
+  }
+  return fitText(cands[topic.type], 14, 22)
+}
+
 /** 쇼츠 · 릴스 — 고정 문구 · 첫 3초 · 도입/중반/후반 · 초 구간 대본(나레이션 · 자막 · 장면) · 캡션 */
 function shortsDraft(p: ContentProfile, topic: Topic, variant: number, len: ShortLen): DraftBlock[] {
   const lib = contentLib(p.industry)
   const n = len === '20-30' ? 2 : 3
   const points = pointsFor(p, topic, variant).slice(0, n)
-  const fixed = thumbFor(p, topic, points.length)
+  const fixed = shortsFixed(p, topic, points.length)
   const visuals = visualsOf(lib)
   const hook = hookFor(p, topic, variant, points.length)
   const cta = lib.ctaShort.replace('{company}', p.company)
@@ -583,10 +729,12 @@ function shortsDraft(p: ContentProfile, topic: Topic, variant: number, len: Shor
       sub: `${i + 1}. ${pt.title}`,
       scene: at(visuals, i + 2),
     })),
+    // D-229 규칙집 3-4 — 끝은 요약(정보형)이 기본, 업체 말은 한 줄만
     {
-      nar: n === 3 ? `그럼 뭘 확인하면 되냐고요? 이 ${points.length}가지만 기억하세요 — ${points.map((pt) => pt.title.replace(/[.?!]$/, '')).join(' · ')}. 저장해 두고 필요할 때 다시 보세요. ${cta}` : cta,
-      sub: `${p.company} · ${p.phone || '[연락처]'}`,
-      scene: n === 3 ? '세 가지 체크 목록 → 로고 · 연락처 화면' : '로고 · 연락처 화면',
+      // 요약은 '…, 이 N가지만 기억하세요.' 로 끝낸다(질문형 항목 '…있나요' 로 문장이 끝나면 격식 말투로 바뀌지 않는다)
+      nar: n === 3 ? `그럼 뭘 확인하면 되냐고요? ${points.map((pt) => pt.title.replace(/[.!]$/, '')).join(' · ')}, 이 ${points.length}가지만 기억하세요. 저장해 두고 필요할 때 다시 보세요. ${cta}` : `정리하면 ${points.map((pt) => pt.title.replace(/[.!]$/, '')).join(' · ')}, 이 ${points.length}가지예요. 저장해 두고 다시 보세요. ${cta}`,
+      sub: points.map((pt, i) => `${i + 1}. ${pt.title.replace(/[.!]$/, '')}`).join(' / '),
+      scene: `${points.length}가지 체크 목록 화면(업체 이름 · 연락처는 한 줄만)`,
     },
   ]
   let t = 0
@@ -601,7 +749,8 @@ function shortsDraft(p: ContentProfile, topic: Topic, variant: number, len: Shor
     { label: '첫 3초 · 붙잡는 말', text: hook },
     { label: '구조', text: `도입부: ${painFor(topic)}\n중반부: ${points.map((pt) => pt.title).join(' · ')}\n후반부: ${cta}` },
     ...script,
-    { label: '캡션', text: `${topic.title}\n${points.map((pt, i) => `${i + 1}. ${pt.title}`).join('\n')}\n\n${cta}\n${hashtags(p, 8).join(' ')}` },
+    // 릴스 캡션 — 해시태그 5개(지역 + 업종 + 고민) · 의료는 개인차 안내
+    { label: '캡션', text: `${topic.title}\n${points.map((pt, i) => `${i + 1}. ${pt.title}`).join('\n')}\n\n${cta}${p.industry === 'health' ? `\n${CARE_NOTE}` : ''}\n${hashtags(p, 5).join(' ')}` },
   ]
 }
 
@@ -611,7 +760,8 @@ function shortsDraft(p: ContentProfile, topic: Topic, variant: number, len: Shor
  */
 export function videoSeries(p: ContentProfile, topic: Topic): { title: string; role: string }[] {
   const lib = contentLib(p.industry)
-  const kw = topic.keyword
+  // D-229 유튜브 제목에는 지역을 넣지 않는다
+  const kw = withoutArea(p, topic.keyword) || p.item
   const check = lib.checks[0]?.title.replace(/[.?!]$/, '') ?? '기본'
   const ask = lib.ctaTitle.split(' · ')[0]
   return [
@@ -623,32 +773,102 @@ export function videoSeries(p: ContentProfile, topic: Topic): { title: string; r
   ]
 }
 
-/** 롱폼 — 기획 카드(썸네일 문구 · 제목 · 도입부 · 주제 · 타겟 · 전략) → 대본 */
+/**
+ * D-229 규칙집 3-3 — 유튜브 제목: 소비자형은 '본제목 (괄호 꼬리말)' 40~55자, 기업형은 괄호 없이 25~35자. 지역은 넣지 않는다.
+ */
+export function videoTitle(p: ContentProfile, topic: Topic, c: number): string {
+  const lib = contentLib(p.industry)
+  const item = withoutArea(p, topic.keyword) || p.item
+  const s = seasonHook(lib, todayOfTopic(topic))
+  const core: Record<TopicType, string> = {
+    tips: `${item} 시작 전에 꼭 알아야 할 ${c}가지`,
+    choose: `${item} ${lib.placeNoun} 고를 때 꼭 볼 ${c}가지`,
+    faq: `${item} 자주 묻는 질문 ${c}가지`,
+    intro: `${item}, ${j(p.company, '은/는')} 이렇게 일해요`,
+    case: `[고객 유형]이 ${j(item, '으로/로')} 바꾼 한 가지`,
+    season: s ? `${s.month}월 ${s.hook}, ${item} 미리 챙길 ${c}가지` : `${item} 미리 챙길 ${c}가지`,
+  }
+  // 계절 이야기가 길면 짧은 모양도 후보로
+  const bases = [core[topic.type], ...(topic.type === 'season' && s ? [`${item}, ${s.month}월에 미리 챙길 ${c}가지`] : [])]
+  if (isB2B(p)) return fitText(bases.flatMap((b) => [b, `${b} 총정리`, `${b} — ${lib.field}에서 본 기준`]), 25, 35)
+  const tails = ['모르면 다시 알아보게 되는 이유', '현장에서 자주 보는 실수까지 정리', '처음 알아보는 분이라면 꼭 보세요', '맡기기 전에 꼭 보세요', '모르면 다시 알아보게 되는 이유까지 한 번에', '현장에서 자주 보는 실수까지 한 번에 정리']
+  return fitText(bases.flatMap((b) => tails.map((x) => `${b} (${x})`)), 40, 55)
+}
+
+/** D-229 규칙집 3-3 — 썸네일 문구 20~35자 · 숫자를 꼭 · [숫자] + [손해 · 결과 · 비밀] (+ (보충)) */
+export function videoThumb(p: ContentProfile, topic: Topic, c: number): string {
+  const lib = contentLib(p.industry)
+  const item = withoutArea(p, topic.keyword) || p.item
+  const s = seasonHook(lib, todayOfTopic(topic))
+  const base: Record<TopicType, string> = {
+    tips: `모르면 손해 보는 ${c}가지`,
+    choose: `맡기기 전 꼭 볼 ${c}가지`,
+    faq: `가장 많이 묻는 질문 ${c}가지`,
+    intro: p.years !== null && p.years >= 1 ? `${p.years}년 차 ${p.company}의 진행 방식` : `${lib.process.length}단계로 보는 ${p.company}`,
+    case: '[N개월] 만에 바뀐 [한 가지]',
+    season: `${s ? `${s.month}월에 ` : '지금 '}꼭 챙길 ${c}가지`,
+  }
+  const b = base[topic.type]
+  const cands = isB2B(p) ? [b, `${item} ${b}`, `${item} 시작 전, ${b}`, `${b} — ${lib.field}에서 본 기준`] : [b, `${b} (맡기기 전 필수)`, `${b} (처음이라면 필독)`, `${b} (이것부터 확인)`]
+  return fitText(cands, 20, 35)
+}
+
+/** 롱폼 — 기획 카드(썸네일 문구 · 제목 · 도입부 · 주제 · 타겟 · 전략) → 대본(체크포인트 3 + 마무리) */
 function videoDraft(p: ContentProfile, topic: Topic, variant: number): DraftBlock[] {
   const lib = contentLib(p.industry)
-  const points = pointsFor(p, topic, variant)
-  const thumb = thumbFor(p, topic, points.length)
+  const points = pointsFor(p, topic, variant).slice(0, 3)
+  const c = points.length
+  const title = videoTitle(p, topic, c)
+  const thumb = videoThumb(p, topic, c)
   const visuals = visualsOf(lib)
+  const item = withoutArea(p, topic.keyword) || p.item
   const hello = clean(`안녕하세요, ${p.area} ${p.item} ${lib.placeNoun} ${j(p.company, '이에요/예요')}.`)
+  // 도입 3~5문장: 질문 → 흔한 실패 장면 → 화자 근거 → "오늘 N가지" 약속
+  const q: Record<TopicType, string> = {
+    tips: `${item}, 무엇부터 봐야 할지 막막하셨죠?`,
+    choose: `${item}, 어디에 맡겨야 할지 고민되시죠?`,
+    faq: `${item}, 문의하기 전에 궁금한 게 많으시죠?`,
+    intro: `${item}, 어떤 곳에 맡겨야 할지 고민되시죠?`,
+    case: '[고객 상황], 비슷한 고민 있으시죠?',
+    season: `${item}, 이맘때 미리 챙기셨나요?`,
+  }
+  const fail: Record<TopicType, string> = {
+    tips: '알아보다 지쳐서 아무 데나 골랐다가 다시 알아보는 분이 많아요.',
+    choose: '겉으로 비슷해 보여서 골랐다가 다시 알아보는 분이 많아요.',
+    faq: '무엇을 물어야 할지 몰라 두세 번 다시 연락하는 분이 많아요.',
+    intro: '겉만 보고 골랐다가 다시 찾는 분이 많아요.',
+    case: '[처음 고민 — 한 문장]',
+    season: '미루다가 가장 바쁜 때를 맞아 서두르는 분이 많아요.',
+  }
+  const who = p.years !== null && p.years >= 1 ? `${p.years}년 동안 ${lib.field}에서 본 것을 바탕으로` : `${lib.field}에서 자주 받는 질문을 바탕으로`
+  const intro0 = `${q[topic.type]} ${fail[topic.type]} ${j(p.company, '이/가')} ${who} 오늘 꼭 볼 ${c}가지를 알려 드릴게요.`
+  // 도입부 100~160자 — 짧으면 한 문장 더(3~5문장 안)
+  const intro = intro0.length < 100 ? `${intro0} 끝까지 보시면 한 번에 정리돼요.` : intro0
   const blocks: DraftBlock[] = [
-    { label: '', text: topic.title, hint: '제목 — 클릭하게 하고, 무슨 영상인지 분명하게' },
-    { label: '썸네일 문구', text: thumb, hint: '눈길 + 궁금증 — 짧을수록 잘 읽혀요' },
-    { label: '도입부 · 처음 5~15초', text: `말: ${hookFor(p, topic, variant, points.length)} 끝까지 보시면 ${topic.keyword}에서 꼭 챙길 ${points.length}가지를 한 번에 정리할 수 있어요.\n화면: ${at(visuals, 0)} · 큰 자막 "${thumb}"`, hint: '왜 봐야 하는지 · 끝까지 보면 무엇을 얻는지' },
+    { label: '', text: title, hint: isB2B(p) ? '제목 — 기업형: 괄호 없이 짧고 단정하게(25~35자) · 지역은 빼요' : '제목 — 본제목 (괄호 꼬리말) 40~55자 · 지역은 빼요' },
+    { label: '썸네일 문구', text: thumb, hint: '20~35자 · 숫자를 꼭 넣어요' },
+    { label: '도입부 · 처음 15초', text: `말: ${intro}\n화면: ${at(visuals, 0)} · 큰 자막 "${thumb}"`, hint: '질문 → 흔한 실패 → 근거 → "오늘 N가지" 약속(3~5문장)' },
     { label: '주제', text: `${TOPIC_LABEL[topic.type]} — ${topic.angle}` },
     { label: '타겟 청중', text: p.target },
     { label: '전략', text: topic.strategy },
     { label: '0:15 · 인사', text: `말: ${hello}\n화면: 대표 · 매장 · 간판 중 하나` },
   ]
+  // 반전 문장 — 넘어갈 때마다 하나, 가운데에 '여기까지는 기본'(이탈을 막는다)
+  const turns = ['그런데 이것보다 더 자주 놓치는 게 있어요.', `여기까지는 기본이에요. 진짜 차이는 ${c >= 3 ? '세 번째' : '다음'} 이야기에서 생겨요.`]
   points.forEach((pt, i) => {
-    blocks.push({ label: `${i + 1}:00 · ${i + 1}. ${pt.title}`, text: `말: ${pt.body}\n화면: 자막 "${pt.title}" · 자료 화면: [실제 예시 사진이나 장면]` })
+    const lead = i === c - 1 && c >= 3 ? '세 번째는 가장 많이 놓치는 부분이에요. ' : ''
+    const turn = i < c - 1 ? `\n말(넘어가며): ${turns[i] ?? turns[0]}` : ''
+    blocks.push({ label: `${i + 1}:00 · ${i + 1}. ${pt.title}`, text: `말: ${lead}${pt.body}${turn}\n화면: 자막 "${pt.title}" · 자료 화면: [실제 예시 사진이나 장면]`, hint: '소제목 — 체크포인트' })
   })
-  const endMin = points.length + 1
-  blocks.push({ label: `${endMin}:00 · 정리`, text: `말: 오늘 이야기한 ${points.length}가지를 다시 짚어 봐요.\n화면: ${points.map((pt, i) => `${i + 1}. ${pt.title}`).join(' / ')}` })
-  // D-228 다리 문장 — '영상에서 말한 기준 = 우리가 지키는 기준' 을 먼저 말하고 문의로(갑자기 광고로 넘어가지 않게)
-  const bridge = `오늘 말한 ${points.length}가지, ${j(p.company, '은/는')} 이 기준대로 하나하나 확인하며 진행해요.${p.differ ? ` ${p.differ}` : ''}`
-  blocks.push({ label: `${endMin}:30 · 마무리`, text: `말: ${bridge} ${lib.ctaShort.replace('{company}', p.company)} 궁금한 점은 댓글로 남겨 주세요.\n화면: ${p.company} · ${p.phone || '[연락처]'}${p.homepage ? ` · ${p.homepage}` : ''}` })
-  blocks.push({ label: '설명란', text: `${topic.title}\n\n${contactLines(p)}\n\n${hashtags(p, 8).join(' ')}` })
-  blocks.push({ label: '이 주제로 이어 찍을 5편', text: videoSeries(p, topic).map((x, i) => `${i + 1}편 · ${x.title}\n(${x.role})`).join('\n'), hint: '1편 깊게 → 2편 손해 피하기 → 3편 넓히기 → 4편 결정 직전 → 5편 우리 업체 — 순서대로 올리면 보는 사람이 한 걸음씩 다가와요' })
+  const endMin = c + 1
+  const summary = points.map((pt) => pt.title.replace(/[.!]$/, '')).join(' · ')
+  blocks.push({
+    label: `${endMin}:00 · 마무리`,
+    text: `말: 오늘 말한 ${summary}, 이 ${c}가지를 다시 짚어 봐요. 결국 처음에 꼼꼼히 확인하는 게 시간과 비용을 아끼는 길이에요. ${bridgeLine(p, c)}${p.industry === 'health' ? ` ${CARE_NOTE}` : ''} ${lib.ctaShort.replace('{company}', p.company)}\n화면: ${p.company} · ${p.phone || '[연락처]'}${p.homepage ? ` · ${p.homepage}` : ''}`,
+    hint: `소제목 — ${p.speaker ? `${p.speaker}의 ` : ''}마지막 조언 · 요약 → 다리 문장 → CTA 하나. 구독 · 댓글 · 다음 영상 예고는 채널 방침에 따라 붙이거나 빼요`,
+  })
+  blocks.push({ label: '설명란', text: `${title}\n\n${contactLines(p)}\n\n${hashtags(p, 8).join(' ')}` })
+  blocks.push({ label: '이 주제로 이어 찍을 5편', text: videoSeries(p, topic).map((x, i) => `${i + 1}편 · ${x.title}\n(${x.role})`).join('\n'), hint: '1편 깊게 → 2편 손해 피하기 → 3편 넓히기 → 4편 결정 직전 → 5편 우리 업체 — 5편 자리는 꼭 이 업체로(다른 업체가 들어가지 않게)' })
   return blocks
 }
 
@@ -701,6 +921,30 @@ function cardsDraft(p: ContentProfile, topic: Topic, variant: number, pages: 5 |
     const checks = rotate(lib.checks, variant).slice(0, body - 1)
     cover = page(1, '표지', `${kw}, 이것 모르면 손해예요`, `맡기기 전 ${checks.length}가지만 확인하세요`, `${at(visuals, 0)} · 경고 표시`)
     inner = [...checks.map((c, i) => page(i + 2, '', `${i + 1}. ${c.title}`, `놓치면: ${c.why}`, at(visuals, i + 1))), page(checks.length + 2, '우리는', `${j(p.company, '은/는')} 이렇게 챙겨요`, p.differ || lib.process.map((s) => s.name).join(' → '), '진행 장면')].slice(0, body)
+  } else if (adType === 'before') {
+    if (noOfferAd(p)) {
+      // 의료 — 전후 비교를 쓰지 않는다(규칙집 5-2): 과정만 보여 주는 안
+      cover = page(1, '표지', `${kw}, 이렇게 진행돼요`, `${p.company} · 과정만 보여 드려요`, `${at(visuals, 0)} · 진행 순서 화면`)
+      inner = [
+        ...lib.process.map((st, i) => page(i + 2, '과정', `${i + 1}. ${st.name}`, st.desc, at(visuals, i + 1))),
+        page(0, '자주 묻는 질문', lib.faq[0]?.q ?? '자주 묻는 질문', lib.faq[0]?.a ?? '', at(visuals, 2)),
+        page(0, '다른 점', p.differ || '[다른 곳과 다른 점 한 가지]', p.strengths.slice(0, 2).join(' · ') || '[믿을 만한 기록 한 줄]', at(visuals, 3)),
+        page(0, '자주 묻는 질문', lib.faq[1]?.q ?? '더 궁금한 점', lib.faq[1]?.a ?? '', at(visuals, 1)),
+      ].slice(0, body)
+    } else {
+      cover = page(1, '표지', '[전]: [바꾸기 전 모습] → [후]: [바뀐 뒤 모습]', `${kw} · ${p.company} 실제 사례`, '같은 자리 · 같은 각도로 찍은 전후 사진 두 장')
+      inner = [
+        page(2, '전', '[바꾸기 전 — 어떤 불편이 있었나]', '[고객 상황 — 이름은 빼고]', '바꾸기 전 사진'),
+        page(3, '무엇을 했나', `${j(p.company, '이/가')} 이렇게 진행했어요`, lib.process.map((st) => st.name).join(' → '), '진행 장면'),
+        page(4, '후', '[바뀐 뒤 — 숫자나 고객의 말로]', '고객 동의를 받은 사례만 실어요', '바뀐 뒤 사진'),
+        page(5, '다른 점', p.differ || '[다른 곳과 다른 점 한 가지]', p.strengths.slice(0, 2).join(' · ') || '[믿을 만한 기록 한 줄]', at(visuals, 2)),
+        page(6, '자주 묻는 질문', lib.faq[0]?.q ?? '자주 묻는 질문', lib.faq[0]?.a ?? '', at(visuals, 3)),
+      ].slice(0, body)
+    }
+  } else if (adType === 'curious') {
+    const checks = rotate(lib.checks, variant).slice(0, body - 1)
+    cover = page(1, '표지', `${p.item} 고를 때 이것은 꼭 보래요`, `${kw} — ${checks.length}가지`, `${at(visuals, 0)} · 물음표`)
+    inner = [...checks.map((ck, i) => page(i + 2, '이유', `${i + 1}. ${ck.title}`, ck.why, at(visuals, i + 1))), page(checks.length + 2, '우리는', `${j(p.company, '은/는')} 이렇게 챙겨요`, p.differ || lib.process.map((st) => st.name).join(' → '), '진행 장면')].slice(0, body)
   } else {
     const points = pointsFor(p, topic, variant).slice(0, body)
     const thumb = thumbFor(p, topic, points.length)
@@ -711,8 +955,9 @@ function cardsDraft(p: ContentProfile, topic: Topic, variant: number, pages: 5 |
   inner = inner.map((b, i) => ({ ...b, label: b.label.replace(/^\d+장/, `${i + 2}장`) }))
   const offer = noOfferAd(p) ? '' : offerLine(p)
   const reach = `${p.phone || '[연락처]'}${p.channel ? ` · ${p.channel}` : p.region ? ` · ${p.region}` : ''}`
-  const last = offer ? page(inner.length + 2, '마무리 · 혜택', lib.ctaTitle, `${offer}\n연락: ${reach}`, '로고 · 혜택 · 연락처 화면') : page(inner.length + 2, '마무리', lib.ctaTitle, reach, '로고 · 연락처 · 지도 화면')
-  const caption = `${topic.title}\n\n${inner.map((b) => /큰 글자: (.*)/.exec(b.text)?.[1] ?? '').filter(Boolean).map((t) => `• ${t}`).join('\n')}\n\n${lib.ctaShort.replace('{company}', p.company)}\n\n${hashtags(p).join(' ')}`
+  const care = p.industry === 'health' ? `\n${CARE_NOTE}` : ''
+  const last = offer ? page(inner.length + 2, '마무리 · 혜택', lib.ctaTitle, `${offer}\n연락: ${reach}`, '로고 · 혜택 · 연락처 화면') : page(inner.length + 2, '마무리', lib.ctaTitle, `${reach}${care}`, '로고 · 연락처 · 지도 화면')
+  const caption = `${topic.title}\n\n${inner.map((b) => /큰 글자: (.*)/.exec(b.text)?.[1] ?? '').filter(Boolean).map((t) => `• ${t}`).join('\n')}\n\n${lib.ctaShort.replace('{company}', p.company)}${care}\n\n${hashtags(p).join(' ')}`
   return [{ ...cover, hint: AD_TYPE_LABEL[adType] }, ...inner, last, { label: '올릴 때 쓰는 글', text: caption }]
 }
 
@@ -763,7 +1008,10 @@ function keywordDraft(p: ContentProfile): DraftBlock[] {
 export function makeDraft(p: ContentProfile, req: DraftRequest, today: string): Draft {
   const variant = req.variant ?? 0
   const kw = clean(req.keyword ?? '') || mainKeyword(p)
-  const topic = req.topic ?? topicsFor(p, kw, today, variant)[0]
+  const topic0 = req.topic ?? topicsFor(p, kw, today, variant)[0]
+  // D-229 제목의 'N가지' 는 그 형식이 실제로 다루는 개수(블로그 2 · 영상 3 · 쇼츠 2~3 · 정보형 카드는 본문 장 수)
+  const per = req.kind === 'blog' ? 2 : req.kind === 'shorts' ? ((req.shortLen ?? '20-30') === '20-30' ? 2 : 3) : req.kind === 'cards' && (req.adType ?? 'info') === 'info' ? (req.pages ?? 5) - 2 : 3
+  const topic = { ...topic0, title: withCount(topic0.title, per) }
   const lib = contentLib(p.industry)
   let blocks: DraftBlock[] = []
   let notes: string[] = []
@@ -789,7 +1037,7 @@ export function makeDraft(p: ContentProfile, req: DraftRequest, today: string): 
       break
     case 'video':
       blocks = videoDraft(p, topic, variant)
-      title = topic.title
+      title = blocks[0].text
       break
     case 'cards':
       blocks = cardsDraft(p, topic, variant, req.pages ?? 5, req.adType ?? 'info')
@@ -808,6 +1056,7 @@ export function makeDraft(p: ContentProfile, req: DraftRequest, today: string): 
       break
   }
   if (lib.caution && req.kind !== 'keywords') notes.push(lib.caution)
+  if (req.kind === 'cards' && req.adType === 'before') notes.push(noOfferAd(p) ? '의료 · 규제 업종은 전후 비교를 쓰지 않아요 — 과정만 보여 주는 안으로 만들었어요.' : '전후 사진 · 숫자는 실제 사례(고객 동의)만 — [대괄호] 를 실제 값으로 채우거나, 사례가 없으면 이 안은 쓰지 마세요.')
   const toned = blocks.map((b) => ({ ...b, label: applyTone(b.label, p.tone), text: applyTone(b.text, p.tone) }))
   return {
     kind: req.kind,
@@ -928,13 +1177,18 @@ const POLICY_WORDS: { re: RegExp; what: string }[] = [
 const SOURCE_RE = /(?:연구소|연구원|협회|학회|소비자원|기관|교수|박사|전문가)(?:에서|가|이|의|도)?\s?[^\n.]{0,10}(?:권고|권장|발표|분석|밝혔|추천한|인정한)/
 const BASH_RE = /(?:다른|타)\s?(?:업체|곳|가게|회사)[^\n.]{0,12}(?:보다\s*(?:못|비싸|나쁘|떨어)|와\s*달리|과\s*달리)|(?:편의점|대형\s?마트|인터넷\s?최저가)[^\n.]{0,10}(?:덩어리|위험|최악|못\s*믿)/
 
+const STAT_RE = /\d+\s*명\s*중\s*\d+(?:\s*[~∼-]\s*\d+)?\s*명/
+const MONTH_LIMIT_RE = /(\d{1,2})\s*월\s*(?:한정|까지만|만\s*특가)/
+const ROUNDUP_RE = /(?:업체|가게|병원|학원|맛집|매장)\s*\d+\s*곳|\d+\s*곳\s*(?:총정리|비교|추천|모음)/
+const PRESSURE_RE = /지금\s*(?:안\s*하면|아니면|놓치면|시작하지\s*않으면)[^\n.]{0,20}(?:후회|늦)|후회\s*(?:하기\s*전에|하지\s*않으려면)/
+
 /** [대괄호] 자리는 빼고 본다 — 채울 자리 안내 글은 사실 주장이 아니다 */
 const withoutHoles = (t: string) => t.replace(/\[[^\]\n]{1,80}\]/g, ' ')
 
 export function factChecks(rawText: string, p: ContentProfile): DraftCheck[] {
   const text = withoutHoles(rawText)
   const out: DraftCheck[] = []
-  const given = `${p.offer} ${p.price} ${p.strengths.join(' ')} ${p.differ}`
+  const given = `${p.offer} ${p.price} ${p.shipping} ${p.strengths.join(' ')} ${p.differ}`
   for (const w of POLICY_WORDS) {
     const m = w.re.exec(text)
     if (m && !w.re.test(given)) out.push({ key: `policy-${w.what}`, level: 'should', text: `'${m[0]}' — 홍보 정보(이번 달 혜택 · 가격 조건)에 없는 ${w.what}이에요. 업체가 실제로 하는 것인지 확인하고, 아니면 지워 주세요.` })
@@ -947,6 +1201,26 @@ export function factChecks(rawText: string, p: ContentProfile): DraftCheck[] {
   const yearsSaid = [...text.matchAll(/(\d{1,3})\s*년\s*(?:차|째)|(?:경력|업력)\s*(\d{1,3})\s*년/g)].map((m) => Number(m[1] ?? m[2]))
   const odd = yearsSaid.filter((n) => p.years === null || n !== p.years)
   if (odd.length) out.push({ key: 'years', level: 'should', text: p.years === null ? `'${odd[0]}년' — 업체 기록에 설립 연도가 없어요. 업력 숫자는 확인한 뒤에만 써 주세요.` : `'${odd[0]}년' — 업체 기록은 설립 ${p.years}년째예요. 다른 글과 숫자가 엇갈리지 않게 맞춰 주세요.` })
+  // D-229 규칙집 1-6 통계형 — '10명 중 7명' 은 우리 조사 · 고객 데이터가 있을 때만
+  const stat = STAT_RE.exec(text)
+  if (stat) out.push({ key: 'stat', level: 'should', text: `'${stat[0]}' — 통계형 표현은 우리 조사 · 고객 데이터가 있을 때만 써요. 없으면 "많은 분들이" 로 바꿔 주세요.` })
+  // 실제 날짜 없는 기간 한정(규칙집 금지 2 · 4-3)
+  const lim = MONTH_LIMIT_RE.exec(text)
+  if (lim) {
+    const mm = /^\d{4}-(\d{2})-/.exec(p.offerUntil)
+    if (!mm) out.push({ key: 'month-limit', level: 'should', text: `'${lim[0]}' — 홍보 정보에 혜택 기한이 없어요. 실제 날짜가 정해졌을 때만 기간 한정을 써 주세요.` })
+    else if (Number(mm[1]) !== Number(lim[1])) out.push({ key: 'month-limit', level: 'should', text: `'${lim[0]}' — 적어 둔 혜택 기한은 ${Number(mm[1])}월이에요. 실제 달로 맞춰 주세요.` })
+  }
+  // 다른 업체를 모아 소개 · 비교(규칙집 금지 5)
+  const round = ROUNDUP_RE.exec(text)
+  if (round) out.push({ key: 'roundup', level: 'should', text: `'${round[0]}' — 다른 업체를 모아 소개 · 비교하는 글은 쓰지 않아요. 우리 업체 이야기만 해 주세요.` })
+  // 의료 · 교육 압박형(규칙집 5-4)
+  if (p.industry === 'health' || p.industry === 'education') {
+    const push = PRESSURE_RE.exec(text)
+    if (push) out.push({ key: 'pressure', level: 'should', text: `'${push[0]}' — 의료 · 교육 광고에는 압박하는 말(지금 안 하면 후회)을 쓰지 않아요.` })
+  }
+  // 업체가 넣지 말라고 한 말(브리프 '넣지 말 것')
+  for (const w of p.avoid.filter((x) => text.includes(x)).slice(0, 3)) out.push({ key: `avoid-${w}`, level: 'should', text: `'${w}' — 업체가 넣지 말라고 한 말이에요. 빼 주세요.` })
   // 주지 않은 후기 문장 — 따옴표 말을 고객 · 후기 말로 소개하는데 적어 둔 고객 한마디(또는 망설이는 점)가 아니면
   for (const m of text.matchAll(/["“]([^"”\n]{4,80})["”]/g)) {
     const q = m[1].trim()
@@ -985,6 +1259,12 @@ export function draftChecks(kind: ContentKind, blocks: readonly DraftBlock[], in
     const m = r.re.exec(text)
     if (m) out.push({ key: `risky-${r.word}`, level: 'should', text: `'${m[0]}' — ${r.why}. 광고 규정에 걸릴 수 있어요.` })
   }
+  // D-229 규칙집 3-1 · 6장 — 연락처 · 링크 자리에 '정보 없음' 을 남기지 않는다
+  const none = /정보\s*없음/.exec(text)
+  if (none) out.push({ key: 'no-info', level: 'must', text: "'정보 없음' 이 남아 있어요 — 실제 값을 넣거나 그 줄을 지워 주세요." })
+  // 의료 — 개인차 · 부작용 안내(규칙집 5장)
+  if (industry === 'health' && (kind === 'blog' || kind === 'video' || kind === 'shorts' || kind === 'cards') && !/개인차|개인에\s*따라/.test(text))
+    out.push({ key: 'care', level: 'should', text: '의료 글에는 개인차 · 부작용 안내를 넣어 주세요(예: 개인에 따라 결과가 다를 수 있어요).' })
   const lib = contentLib(industry)
   if (lib.caution && kind !== 'keywords') out.push({ key: 'caution', level: 'info', text: lib.caution })
   const guide = blocks.some((b) => b.hint === '가이드 제목')
@@ -995,22 +1275,41 @@ export function draftChecks(kind: ContentKind, blocks: readonly DraftBlock[], in
     const title = blocks.find((b) => b.hint === '제목')?.text ?? ''
     const first = blocks.find((b) => b.hint?.startsWith('첫 문단'))?.text ?? ''
     if (title && !title.includes(keyword)) out.push({ key: 'kw-title', level: 'should', text: `제목에 키워드 "${keyword}" 가 없어요 — 제목 앞쪽에 넣어 주세요.` })
+    // D-229 규칙집 3-1 — 키워드는 띄어쓰기까지 그대로 제목 맨 앞에, 바로 뒤에 쉼표나 물음표 · 제목 25~35자 · 키워드 2~7번
+    else if (title && !(title.startsWith(keyword) && /^[\s]*[,?]/.test(title.slice(keyword.length)))) out.push({ key: 'kw-front', level: 'should', text: `키워드 "${keyword}" 를 제목 맨 앞에 두고 바로 뒤에 쉼표나 물음표를 붙여 주세요.` })
+    if (title && (title.length < 25 || title.length > 35)) out.push({ key: 'title-len', level: 'info', text: `제목 ${title.length}자 — 25~35자가 좋아요.` })
+    // 두 글자 일반어('상담')는 다른 낱말 속에도 들어가 수가 부풀어 세지 않는다
+    if (n > 7 && (keyword.length >= 4 || keyword.includes(' '))) out.push({ key: 'kw-many', level: 'should', text: `키워드 "${keyword}" 가 ${n}번 — 2~7번이 자연스러워요(억지로 넣은 느낌이 나요).` })
     if (first && !first.includes(keyword)) out.push({ key: 'kw-first', level: 'should', text: `첫 문단에 키워드 "${keyword}" 가 없어요 — 첫 두 줄 안에 넣어 주세요.` })
-    const heads = blocks.filter((b) => b.label).length
+    // 소제목 — 규칙집 틀로 만든 글은 '소제목' 표시를 센다(예전에 저장한 글은 칸 이름 수)
+    const marked = blocks.filter((b) => b.hint?.startsWith('소제목')).length
+    const heads = marked || blocks.filter((b) => b.label).length
     const photos = blocks.filter((b) => b.text.startsWith(PHOTO_PREFIX)).length
-    out.push({ key: 'shape', level: 'info', text: `소제목 ${heads}개 · 사진 자리 ${photos}곳 — 사진 자리에 실제 사진을 넣고, 사진 아래에 한 줄 설명을 달면 읽기 쉬워요.` })
+    out.push({ key: 'shape', level: 'info', text: `소제목 ${heads}개 · 사진 자리 ${photos}곳 — 기준은 소제목 3개(기준 2 + 정리) · 사진 4~7곳이에요. 사진 아래에 한 줄 설명을 달면 읽기 쉬워요.` })
   }
   if (kind === 'blog' && guide) {
-    out.push({ key: 'disclose', level: text.includes('제공받아') ? 'info' : 'should', text: text.includes('제공받아') ? '체험단 글에 대가 표시("제공받아 작성")를 하라는 안내가 들어 있어요.' : '체험단 글에는 대가를 받은 사실을 제목이나 첫머리에 밝히라는 안내를 넣어 주세요.' })
+    const shown = /제공받아|원고료를\s*받고|받고\s*직접\s*써\s*본/.test(text)
+    out.push({ key: 'disclose', level: shown ? 'info' : 'should', text: shown ? '체험단 글에 대가 표시(광고 표시 "제공받아 써 본 후기")를 맨 위에 넣으라는 안내가 들어 있어요.' : '체험단 글에는 대가를 받은 사실을 제목이나 첫머리에 밝히라는 안내를 넣어 주세요.' })
   }
   if (kind === 'video' || kind === 'shorts') {
+    // D-229 규칙집 3-3 · 3-4 — 썸네일 문구 20~35자(숫자 꼭) · 쇼츠 상단 문구 14~22자 (예전 '15자 안쪽' 기준은 바꿨다)
     const fixed = blocks.find((b) => b.label === '썸네일 문구' || b.label === '고정 문구')?.text ?? ''
-    if (fixed && fixed.length > 15) out.push({ key: 'fixed-len', level: 'should', text: `${kind === 'video' ? '썸네일' : '고정'} 문구가 ${fixed.length}자예요 — 15자 안쪽이면 휴대폰에서도 한눈에 읽혀요.` })
+    if (fixed && !placeholders(fixed).length) {
+      const [min, max] = kind === 'video' ? [20, 35] : [14, 22]
+      if (fixed.length < min || fixed.length > max) out.push({ key: 'fixed-len', level: 'should', text: kind === 'video' ? `썸네일 문구가 ${fixed.length}자예요 — 20~35자에 숫자를 넣으면 눈에 잘 들어와요.` : `고정 문구가 ${fixed.length}자예요 — 14~22자면 휴대폰에서 한눈에 읽혀요.` })
+      if (kind === 'video' && !/\d/.test(fixed)) out.push({ key: 'thumb-num', level: 'should', text: '썸네일 문구에 숫자를 넣어 주세요(예: 3가지 · 12년 차).' })
+    }
     if (kind === 'video') {
       const vt = blocks.find((b) => b.hint?.startsWith('제목'))?.text ?? ''
-      if (keyword && vt && !vt.includes(keyword)) out.push({ key: 'kw-title', level: 'should', text: `제목에 키워드 "${keyword}" 가 없어요 — 유튜브 검색은 제목으로 무슨 영상인지 알아봐요.` })
+      const core = keyword && p ? withoutArea(p, keyword) || keyword : keyword
+      if (core && vt && !vt.includes(core)) out.push({ key: 'kw-title', level: 'should', text: `제목에 "${core}" 가 없어요 — 유튜브 검색은 제목으로 무슨 영상인지 알아봐요.` })
+      if (p && vt && [p.area, ...p.region.split(/\s+/)].some((w) => w.length >= 2 && vt.includes(w))) out.push({ key: 'video-area', level: 'should', text: '유튜브 제목에서는 지역을 빼고 전국 주제로 넓혀 주세요 — 지역은 본문 사례로만 써요.' })
+      const b2b = B2B_INDUSTRIES.has(industry)
+      if (vt && (b2b ? vt.length < 25 || vt.length > 35 : vt.length < 40 || vt.length > 55)) out.push({ key: 'title-len', level: 'info', text: b2b ? `제목 ${vt.length}자 — 기업형은 괄호 없이 25~35자가 좋아요.` : `제목 ${vt.length}자 — 소비자형은 '본제목 (괄호 꼬리말)' 40~55자가 좋아요.` })
       if (vt.length > 100) out.push({ key: 'title-len', level: 'should', text: `제목이 ${vt.length}자예요 — 100자 안으로 줄여 주세요.` })
     }
+    if (kind === 'shorts' && /안녕하세요/.test(blocks.filter((b) => /^\d+:\d{2} - /.test(b.label)).map((b) => b.text).join('\n')))
+      out.push({ key: 'shorts-hello', level: 'should', text: '쇼츠는 인사 없이 바로 첫 번째 항목으로 들어가요.' })
     if (kind === 'shorts') {
       const last = [...blocks].reverse().find((b) => /^\d+:\d{2} - \d+:\d{2}$/.test(b.label))
       const m = last ? /- (\d+):(\d{2})$/.exec(last.label) : null
@@ -1018,8 +1317,64 @@ export function draftChecks(kind: ContentKind, blocks: readonly DraftBlock[], in
     }
   }
   if (p && kind !== 'keywords') out.push(...factChecks(text, p))
-  if (kind !== 'keywords') out.push({ key: 'len', level: 'info', text: `${text.length.toLocaleString('ko-KR')}자(공백 포함)` })
+  if (kind !== 'keywords') out.push({ key: 'len', level: 'info', text: `${text.length.toLocaleString('ko-KR')}자(공백 포함)${kind === 'blog' && !guide ? ' — 블로그 기준은 2,100~3,000자예요. [대괄호] 를 실제 이야기로 채우면 늘어나요.' : ''}` })
   return out
+}
+
+/* ------------------------------------------------------------------ */
+/* D-229 발행 전 검수표 — 규칙집 6장. 규칙으로 볼 수 있는 것은 자동(통과 · 확인), 나머지는 사람이 체크          */
+/* ------------------------------------------------------------------ */
+
+export interface ReviewItem {
+  group: '사람 · 업체' | '숫자 · 사실' | '형식' | '규제 · 표시' | '고친 뒤 · 올린 뒤'
+  text: string
+  /** pass 자동 통과 · warn 자동으로 찾은 문제 · manual 사람이 볼 것 */
+  state: 'pass' | 'warn' | 'manual'
+}
+
+const FIXED_POINT: Record<ContentKind, string> = {
+  blog: '키워드를 띄어쓰기까지 그대로 제목 맨 앞에',
+  video: '제목 · 썸네일에 지역 없음 · 썸네일에 숫자',
+  shorts: '고정 문구 14~22자 · 인사 없이 바로 첫 번째',
+  cards: '5유형 순서 · 지역은 1장이나 위치 장에 한 번만',
+  kakao: '맨 앞 (광고) · 밤 9시 ~ 아침 8시에는 보내지 않기',
+  place: '실제 주소 · 운영 시간',
+  keywords: '월 검색량 100 이상',
+}
+
+export function reviewChecklist(kind: ContentKind, checks: readonly DraftCheck[], p: ContentProfile, opts: { guide?: boolean } = {}): ReviewItem[] {
+  if (kind === 'keywords') return []
+  const has = (re: RegExp) => checks.some((c) => c.level !== 'info' && re.test(c.key))
+  const auto = (bad: boolean): ReviewItem['state'] => (bad ? 'warn' : 'pass')
+  const regulated = p.industry === 'health' || p.industry === 'food' || p.industry === 'education' || p.industry === 'professional'
+  const items: ReviewItem[] = [
+    { group: '사람 · 업체', text: '말하는 사람이 업종과 맞는가(의료 정보는 의료인이)', state: 'manual' },
+    { group: '사람 · 업체', text: p.speaker ? `사람 이름이 '${p.speaker}' 그대로인가 — 다른 실명이 들어가지 않았는가` : '사람 이름이 들어가지 않았는가(말하는 사람을 정하지 않았어요)', state: 'manual' },
+    { group: '사람 · 업체', text: `독자가 '${p.target}' 그대로인가(손님 ↔ 사장님이 뒤집히지 않았는가)`, state: 'manual' },
+    { group: '사람 · 업체', text: '다른 업종 · 관계없는 사업 이야기가 섞이지 않았는가 — 끝 문단 · 캡션 · 영상 5편의 마지막 자리를 특히', state: 'manual' },
+    { group: '사람 · 업체', text: '실명 브랜드를 고객사 · 거래처처럼 쓰지 않았는가', state: 'manual' },
+    { group: '사람 · 업체', text: '다른 업체 · 다른 상품군을 모아 소개하거나 깎아내리지 않았는가', state: auto(has(/^(bash|roundup)$/)) },
+    { group: '숫자 · 사실', text: '모든 숫자가 사실 목록에 있는가(하나씩 맞춰 보기)', state: has(/^(stat|years)$/) ? 'warn' : 'manual' },
+    { group: '숫자 · 사실', text: '준 숫자의 뜻이 바뀌지 않았는가(후기 수 ↔ 고객 수 ↔ 재구매)', state: auto(has(/^reviews-meaning$/)) },
+    { group: '숫자 · 사실', text: '주지 않은 후기 문장 · 정책(교환 · 배송 · 할인)이 없는가', state: auto(has(/^(policy-|voice-made|avoid-)/)) },
+    { group: '숫자 · 사실', text: '기관 · 전문가 출처를 지어내지 않았는가', state: auto(has(/^source$/)) },
+    { group: '숫자 · 사실', text: '기한이 실제 날짜이고 올리는 날에 유효한가', state: auto(has(/^month-limit$/) || !!p.offerExpired) },
+    { group: '숫자 · 사실', text: '같은 업체의 다른 글과 숫자가 맞는가(업력 · 후기 수)', state: auto(has(/^years$/)) },
+    { group: '형식', text: '길이 · 장 수 · 컷 수가 정한 값대로인가', state: has(/^(fixed-len|kw-many)$/) || checks.some((c) => c.key === 'title-len') ? 'warn' : 'manual' },
+    { group: '형식', text: '틀의 빈칸 이름이 남지 않았는가([주제 내용] · [○년] 같은 것)', state: auto(has(/^holes$/)) },
+    { group: '형식', text: "연락처 · 링크 자리에 실제 값이 있거나 지웠는가('정보 없음' 없음)", state: auto(has(/^(no-info|holes)$/)) },
+    { group: '형식', text: `채널 고정점 — ${FIXED_POINT[kind]}`, state: kind === 'kakao' || kind === 'place' || kind === 'cards' ? 'manual' : auto(has(/^(kw-front|kw-title|kw-first|video-area|thumb-num|shorts-hello)$/)) },
+  ]
+  if (regulated || has(/^risky-/)) items.push({ group: '규제 · 표시', text: '광고 규정에 걸리는 말이 없는가(최고 · 1위 · 보장 · 100% …)', state: auto(has(/^risky-/)) })
+  if (p.industry === 'health') {
+    items.push({ group: '규제 · 표시', text: '개인차 · 부작용 안내가 들어갔는가', state: auto(has(/^care$/)) })
+    if (kind === 'cards') items.push({ group: '규제 · 표시', text: "카드 '전후 변화' 안은 버리거나 사람이 다시 썼는가", state: 'manual' })
+  }
+  if (p.industry === 'health' || p.industry === 'education') items.push({ group: '규제 · 표시', text: '압박하는 말(지금 안 하면 후회)이 없는가', state: auto(has(/^pressure$/)) })
+  if (opts.guide) items.push({ group: '규제 · 표시', text: '체험단 — 광고 표시 문구가 맨 위에 있는가', state: auto(has(/^disclose$/)) })
+  items.push({ group: '고친 뒤 · 올린 뒤', text: '크게 고쳤거나 다시 만들었다면 이 표를 처음부터 다시 봤는가', state: 'manual' })
+  items.push({ group: '고친 뒤 · 올린 뒤', text: '올린 뒤 조회 · 저장 · 문의를 기록해 어떤 각도가 잘 됐는지 남기는가', state: 'manual' })
+  return items
 }
 
 /** D-228 키워드 검색량 등급 — 월 100 아래는 롱테일, 10 아래는 거의 안 찾음(이상한AI 키워드 추천 30개 중 13개가 100 미만이었다) */

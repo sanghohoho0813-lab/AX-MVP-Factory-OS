@@ -13,6 +13,8 @@
  *        고른 하나만 펼친다. 홍보 정보 칸 · 보관함은 접어 둔다(펼침은 이 기기에 기억). 지운 기능은 없다.
  * D-228: 이상한AI 3차 관찰 — 홍보 정보에 '글 재료'(후기 · 고객 한마디 · 이번 달 혜택+끝나는 날 · 가격 · 말하는 사람),
  *        다른 AI 도구에 붙여 넣을 요청문 + 받은 글 점검(주지 않은 혜택 · 지어낸 출처 · 숫자 뜻 바뀜), 검색량 등급 · 월 100 이상만.
+ * D-229: 콘텐츠 작성 규칙집(1~3차 합본) — 브리프 6칸 줄(업체 · 독자 · 알리는 것 · 화자 · 사실 목록 · 넣지 말 것) · 흔한 반박 ·
+ *        배송 · 교환 조건 · 넣지 말 것 칸, 요청문은 고른 채널로(길이 · 지역 · 마지막 제안), 결과 아래 '발행 전 검수표', 카드 기본 7장.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFold } from '../../components/ui/fold'
@@ -31,6 +33,9 @@ import {
   AI_REQUEST_TIPS,
   VOLUME_TIER_LABEL,
   aiRequestText,
+  briefSlots,
+  reviewChecklist,
+  type ReviewItem,
   offerLine,
   volumeTier,
   AD_TYPE_LABEL,
@@ -146,7 +151,8 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   const [kind, setKind] = useState<ContentKind>('blog')
   const [keyword, setKeyword] = useState(() => mainKeyword(profile))
   const [topicType, setTopicType] = useState<TopicType>('tips')
-  const [pages, setPages] = useState<5 | 7>(5)
+  // D-229 규칙집 3-5 — 카드뉴스는 보통 7~8장
+  const [pages, setPages] = useState<5 | 7>(7)
   const [purpose, setPurpose] = useState<KakaoPurpose>('news')
   const [variant, setVariant] = useState(0)
   const [blogType, setBlogType] = useState<BlogType>('brand')
@@ -174,7 +180,9 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
   const resultRef = useRef<HTMLDivElement | null>(null)
   const holidays = useMemo(() => holidaysAround(today), [today])
 
-  const topics = useMemo(() => topicsFor(profile, keyword, today, variant), [profile, keyword, today, variant])
+  // D-229 주제 제목의 'N가지' 는 고른 형식이 실제로 다루는 개수(블로그 2 · 짧은 쇼츠 2 · 나머지 3)
+  const topicCount = kind === 'blog' || (kind === 'shorts' && shortLen === '20-30') ? 2 : 3
+  const topics = useMemo(() => topicsFor(profile, keyword, today, variant, topicCount), [profile, keyword, today, variant, topicCount])
   const made = useMemo(() => store.items.map((i) => ({ kind: i.kind, topicType: i.input.topicType, purpose: i.input.purpose, createdAt: i.createdAt })), [store.items])
   const picks = useMemo(() => firstPicks(profile, today, made), [profile, today, made])
   const findWords = useMemo(() => keywordGroups(profile).find((g) => g.key === 'find')?.words.slice(0, 4) ?? [], [profile])
@@ -730,6 +738,8 @@ export function ContentStudio({ record, store }: { record: ClientOpsRecord; stor
                 </ul>
               )}
 
+              <ReviewChecklist key={`review-${shown.item?.rootId ?? shown.draft.title}`} items={reviewChecklist(shown.draft.kind, checks, profile, { guide: shown.draft.kind === 'blog' && shown.draft.input.blogType === 'review' })} />
+
               {fillNames.length > 0 && <FillBox key={`fill-${pack ? `pack-${pack.key}` : (shown.item?.rootId ?? shown.draft.title)}`} names={fillNames} scope={pack ? `저장 전 글 ${1 + pack.items.filter((_, j) => j !== pack.at && !pack.saved[j]).length}편` : '이 글'} onApply={applyFill} />}
 
               <div className="flex flex-wrap gap-2">
@@ -1022,6 +1032,9 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit, onAiReq }
   ].filter((m) => m.value)
   // D-227 칸 7개는 접어 둔다 — 머리 띠(숫자) · 채울 칸 안내만 늘 보이게. 펼침은 이 기기에 기억
   const [open, setOpen] = useFold('content.profile', false)
+  // D-229 규칙집 0장 — 브리프 6칸 · 재료 n/7
+  const slots = briefSlots(profile, source)
+  const filled = slots.filter((x) => x.ok).length
   return (
     <section className={`${card} flex flex-col overflow-hidden`} data-testid="content-profile">
       {/* D-226 머리 띠 — 누구 홍보 정보인지 · 보관함 · 올림 · 채운 칸이 한눈에 */}
@@ -1054,6 +1067,21 @@ function ProfileCard({ record, profile, source, saved, posted, onEdit, onAiReq }
         }
       />
       <div className="flex flex-col gap-3 p-4 sm:p-5">
+      <button type="button" onClick={onEdit} className="tap flex w-full min-w-0 flex-col gap-2 rounded-(--radius-control) border border-violet-200 bg-violet-50/50 px-3 py-2.5 text-left hover:border-violet-400" data-testid="content-brief" data-filled={filled}>
+        <span className="t-sub flex flex-wrap items-baseline gap-x-2 gap-y-0.5 break-keep">
+          <b className="font-bold text-violet-900">브리프 6칸 · {filled}/6</b>
+          <span className="t-meta font-semibold text-violet-700">{slots.find((x) => x.key === 'facts')?.note}</span>
+          <span className="t-meta text-slate-500">모든 글이 이 한 장에서 시작해요</span>
+        </span>
+        <span className="flex flex-wrap gap-1.5">
+          {slots.map((x) => (
+            <span key={x.key} title={x.note} className={`t-meta inline-flex min-h-7 items-center gap-1 rounded-full px-2.5 py-0.5 font-semibold ${x.ok ? 'bg-white text-violet-900 ring-1 ring-violet-200' : 'bg-amber-100 text-amber-900 ring-1 ring-amber-300'}`} data-testid="content-brief-slot" data-key={x.key} data-ok={x.ok ? '1' : '0'}>
+              {x.ok ? <Check className="size-3.5" aria-hidden="true" /> : <AlertTriangle className="size-3.5" aria-hidden="true" />}
+              {x.label}
+            </span>
+          ))}
+        </span>
+      </button>
       <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="tap -my-1 flex min-h-11 w-full min-w-0 items-center gap-2 rounded-(--radius-control) text-left hover:bg-slate-50" data-testid="content-profile-toggle">
         <ChevronRight aria-hidden="true" className={`size-5 shrink-0 text-violet-500 transition-transform duration-150 ${open ? 'rotate-90' : ''}`} />
         <span className="t-sub min-w-0 flex-1 font-semibold break-keep text-slate-800">{open ? '홍보 정보 접기' : `홍보 정보 ${rows.length}칸 보기`}</span>
@@ -1491,7 +1519,7 @@ function ProfileSheet({ overrides, profileItem, onClose, onSave }: { overrides: 
       .filter(Boolean)
   const [servicesText, setServicesText] = useState((overrides.services ?? []).join(', '))
   const [extraText, setExtraText] = useState((overrides.extraStrengths ?? []).join(', '))
-  const field = (label: string, key: 'item' | 'area' | 'target' | 'phone' | 'hours' | 'differ' | 'channel' | 'objection' | 'reviews' | 'voice' | 'offer' | 'price' | 'speaker', placeholder: string) => (
+  const field = (label: string, key: 'item' | 'area' | 'target' | 'phone' | 'hours' | 'differ' | 'channel' | 'objection' | 'reviews' | 'voice' | 'offer' | 'price' | 'speaker' | 'rebuttal' | 'shipping' | 'avoid', placeholder: string) => (
     <label className="flex flex-col gap-1.5">
       <span className="t-sub font-semibold text-slate-700">{label}</span>
       <input className={inputClass} value={ov[key] ?? ''} placeholder={placeholder} onChange={(e) => setOv((p) => ({ ...p, [key]: e.target.value }))} data-testid={`content-ov-${key}`} />
@@ -1549,6 +1577,8 @@ function ProfileSheet({ overrides, profileItem, onClose, onSave }: { overrides: 
         {field('차별점(다른 곳과 다른 한 가지 · 사실만)', 'differ', '예: 시공 뒤 1년 무상 점검을 계약서에 적어 드려요')}
         {field('판매 채널(어디서 사거나 예약하나요)', 'channel', '예: 네이버 예약 · 스마트스토어 · 전화')}
         {field('손님이 망설이는 점', 'objection', '예: 공사 기간 동안 생활이 불편할까 봐')}
+        {/* D-229 규칙집 0-8 — 걱정 1개와 흔한 반박 1개가 모든 글의 출발점 */}
+        {field('흔한 반박(손님이 흔히 하는 생각 한 가지)', 'rebuttal', '예: 리모델링은 어디서 하나 다 똑같다')}
         {/* D-228 글 재료 — 적어 둔 것만 글에 넣는다(비우면 숫자 · 후기 · 혜택을 지어내지 않고 뺀다) */}
         <div className="flex flex-col gap-1 border-t border-slate-200 pt-4" data-testid="content-ov-material">
           <h3 className="t-sub flex items-center gap-1.5 font-bold text-violet-900">
@@ -1568,9 +1598,88 @@ function ProfileSheet({ overrides, profileItem, onClose, onSave }: { overrides: 
         </div>
         <p className="t-meta -mt-2 break-keep text-slate-500">끝나는 날이 지나면 혜택은 글에서 저절로 빠져요.</p>
         {field('가격 · 조건', 'price', '예: 욕실 리모델링 300만 원부터 · 자재 포함')}
-        {field('글에서 말하는 사람', 'speaker', '예: 대표 · 실장 · 원장 김OO')}
+        {field('배송 · 교환 조건', 'shipping', '예: 전국 택배 · 3만 원 이상 무료 배송 · 7일 안 교환')}
+        {field('글에서 말하는 사람(직함과 이름)', 'speaker', '예: 대표 김OO · 원장 이OO')}
+        <p className="t-meta -mt-2 break-keep text-slate-500">직함만 적으면 다른 도구가 엉뚱한 실명을 붙일 수 있어요 — 이름까지 적어 주세요.</p>
+        {/* D-229 브리프 '넣지 말 것' — 기본 금지는 늘 붙고, 업체가 따로 막은 말을 더한다 */}
+        <div className="flex flex-col gap-1 border-t border-slate-200 pt-4" data-testid="content-ov-avoid-section">
+          <h3 className="t-sub flex items-center gap-1.5 font-bold text-violet-900">
+            <AlertTriangle className="size-4 text-violet-600" aria-hidden="true" />
+            넣지 말 것
+          </h3>
+          <p className="t-meta break-keep text-slate-600">다른 업체 · 지어낸 출처 · 깎아내리기 · 관계없는 사업 이야기는 늘 막아요. 업체가 따로 막은 말이 있으면 더해 주세요 — 글 점검이 찾아 알려요.</p>
+        </div>
+        {field('업체가 넣지 말라고 한 말(쉼표로 나눔)', 'avoid', '예: 최저가, 다른 지점 이름')}
       </div>
     </BottomSheet>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* D-229 발행 전 검수표 — 규칙집 6장(자동으로 본 것 · 찾은 문제 · 사람이 체크할 것)                    */
+/* ------------------------------------------------------------------ */
+
+function ReviewChecklist({ items, testId = 'content-review' }: { items: ReviewItem[]; testId?: string }) {
+  const [open, setOpen] = useState(false)
+  const [done, setDone] = useState<ReadonlySet<number>>(new Set())
+  if (!items.length) return null
+  const warn = items.filter((x) => x.state === 'warn').length
+  const manual = items.filter((x) => x.state === 'manual').length
+  const checked = items.filter((x, i) => x.state === 'manual' && done.has(i)).length
+  const groups = items.map((x) => x.group).filter((g, i, all) => all.indexOf(g) === i)
+  return (
+    <section className="rounded-(--radius-control) border border-slate-200 bg-white" data-testid={testId} data-open={open ? '1' : '0'} data-warn={warn}>
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="tap flex min-h-11 w-full min-w-0 items-center gap-2 px-3 py-2 text-left hover:bg-slate-50" data-testid={`${testId}-toggle`}>
+        <ChevronRight aria-hidden="true" className={`size-5 shrink-0 text-violet-500 transition-transform duration-150 ${open ? 'rotate-90' : ''}`} />
+        <ListChecks aria-hidden="true" className="size-4 shrink-0 text-violet-700" />
+        <span className="t-sub min-w-0 flex-1 font-semibold break-keep text-slate-800">발행 전 검수표</span>
+        <span className={`t-meta shrink-0 rounded-full px-2 py-0.5 font-semibold ${warn ? 'bg-amber-100 text-amber-900' : 'bg-emerald-50 text-emerald-800'}`} data-testid={`${testId}-sum`}>
+          {warn ? `확인 ${warn}` : '자동 통과'} · 사람 {checked}/{manual}
+        </span>
+      </button>
+      {open && (
+        <div className="flex flex-col gap-3 border-t border-slate-100 px-3 py-3">
+          <p className="t-meta break-keep text-slate-500">초록 ✓ 은 규칙으로 확인한 것, 노랑 ! 은 찾은 문제, 네모는 사람이 보고 체크할 것이에요. 크게 고쳤으면 처음부터 다시 봐 주세요.</p>
+          {groups.map((g) => (
+            <div key={g}>
+              <p className="t-meta font-bold text-slate-700">{g}</p>
+              <ul className="mt-1 flex flex-col">
+                {items.map((x, i) =>
+                  x.group !== g ? null : (
+                    <li key={i} data-testid={`${testId}-item`} data-state={x.state} className="t-sub break-keep">
+                      {x.state === 'manual' ? (
+                        <label className="flex min-h-11 cursor-pointer items-start gap-2 py-1.5">
+                          <input
+                            type="checkbox"
+                            className="mt-0.5 size-5 shrink-0 accent-violet-600"
+                            checked={done.has(i)}
+                            onChange={() =>
+                              setDone((prev) => {
+                                const next = new Set(prev)
+                                if (next.has(i)) next.delete(i)
+                                else next.add(i)
+                                return next
+                              })
+                            }
+                            data-testid={`${testId}-check`}
+                          />
+                          <span className="min-w-0 text-slate-700">{x.text}</span>
+                        </label>
+                      ) : (
+                        <span className="flex items-start gap-2 py-1.5">
+                          {x.state === 'pass' ? <CheckCircle2 aria-label="통과" className="mt-0.5 size-5 shrink-0 text-success-600" /> : <AlertTriangle aria-label="확인" className="mt-0.5 size-5 shrink-0 text-warning-600" />}
+                          <span className={`min-w-0 ${x.state === 'pass' ? 'text-slate-600' : 'font-semibold text-warning-700'}`}>{x.text}</span>
+                        </span>
+                      )}
+                    </li>
+                  ),
+                )}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -1583,11 +1692,12 @@ const GOT_KINDS: ContentKind[] = ['blog', 'shorts', 'video', 'cards', 'kakao', '
 function AiRequestSheet({ profile, store, got, setGot, onClose, onEditProfile, onSaved }: { profile: ContentProfile; store: ContentStore; got: string; setGot: (v: string) => void; onClose: () => void; onEditProfile: () => void; onSaved: (it: ContentItem) => void }) {
   const { showToast } = useToast()
   const [stage, setStage] = useState(got.trim() ? 1 : 0)
+  // D-229 맡길 글(채널) — 요청문의 길이 · 지역 · 마지막 제안이 이것으로 바뀌고, 받은 글 점검도 같은 형식으로 본다
   const [gotKind, setGotKind] = useState<ContentKind>('blog')
   const [result, setResult] = useState<DraftCheck[] | null>(null)
   const [busy, setBusy] = useState(false)
   const resultRef = useRef<HTMLDivElement | null>(null)
-  const req = useMemo(() => aiRequestText(profile), [profile])
+  const req = useMemo(() => aiRequestText(profile, { kind: gotKind, keyword: mainKeyword(profile) }), [profile, gotKind])
   // 사실 목록이 얇으면 먼저 채우라고 — 재료가 없을수록 바깥 도구가 지어낸다
   const thin = profileGaps(profile).filter((g) => ['differ', 'reviews', 'voice', 'offer'].includes(g.key))
   const warn = result?.filter((c) => c.level !== 'info') ?? []
@@ -1647,6 +1757,14 @@ function AiRequestSheet({ profile, store, got, setGot, onClose, onEditProfile, o
         </div>
         {stage === 0 ? (
           <>
+            <div className="flex flex-wrap items-center gap-1.5" data-testid="content-ai-channel">
+              <span className="t-sub w-full font-semibold text-slate-700">어떤 글을 맡기나요?</span>
+              {GOT_KINDS.map((k) => (
+                <button key={k} type="button" aria-pressed={gotKind === k} onClick={() => setGotKind(k)} className={mkChip(gotKind === k, 'sky')} data-testid="content-ai-channel-btn" data-kind={k}>
+                  {KIND_LABEL[k]}
+                </button>
+              ))}
+            </div>
             <p className="t-sub break-keep text-slate-700">다른 AI 글쓰기 도구의 '추가 요청' 칸에 이 글을 그대로 붙여 넣으세요. 업체 · 독자 · 쓸 수 있는 사실 · 넣지 말 것을 적어 두면 엉뚱한 업종 이야기와 지어낸 숫자가 줄어요. 여기서는 AI 를 부르지 않아요 — 복사만 해요.</p>
             <pre className="t-sub max-h-72 overflow-auto rounded-(--radius-control) border border-sky-200 bg-sky-50/60 p-3 font-sans break-words whitespace-pre-wrap text-slate-800" data-testid="content-ai-req-text">
               {req}
@@ -1707,6 +1825,7 @@ function AiRequestSheet({ profile, store, got, setGot, onClose, onEditProfile, o
                     </li>
                   ))}
                 </ul>
+                <ReviewChecklist items={reviewChecklist(gotKind, result, profile)} testId="content-ai-review" />
               </div>
             )}
             <p className="t-meta break-keep text-slate-500">[보관함에 저장] 하면 우리 글처럼 고치기 · 올렸어요 표시 · 한 달 계획에 쓸 수 있어요.</p>

@@ -57,6 +57,13 @@ export interface ContentProfile {
   price: string
   /** 글을 말하는 사람('대표 김한솔' · 'MD 지은') — 없으면 이름을 쓰지 않는다 */
   speaker: string
+  /**
+   * D-229 콘텐츠 작성 규칙집(1~3차 관찰 합본) 브리프 칸 —
+   * 흔한 반박 1개(걱정과 함께 모든 글의 출발점) · 배송 · 교환 조건(사실 목록) · 넣지 말 것(업체가 따로 막은 말).
+   */
+  rebuttal: string
+  shipping: string
+  avoid: string[]
 }
 
 /** 사람이 고친 칸 — 비어 있지 않은 것만 저장한다 */
@@ -81,6 +88,10 @@ export interface ProfileOverrides {
   offerUntil?: string
   price?: string
   speaker?: string
+  /** D-229 */
+  rebuttal?: string
+  shipping?: string
+  avoid?: string
 }
 
 export interface ProfileSource {
@@ -189,6 +200,13 @@ export function buildProfile(record: ClientOpsRecord, today: string, ov: Profile
       offerExpired: expired ? offerText : '',
       price: ov.price?.trim() ?? '',
       speaker: ov.speaker?.trim() ?? '',
+      rebuttal: (ov.rebuttal?.trim() ?? '').replace(/^["“”'‘’]+|["“”'‘’]+$/g, ''),
+      shipping: ov.shipping?.trim() ?? '',
+      avoid: (ov.avoid ?? '')
+        .split(/\s*[,，·\n]\s*/)
+        .map((x) => x.trim())
+        .filter((x) => x.length >= 2)
+        .slice(0, 12),
     },
     source: { item: itemSource, services: servicesSource, target: ov.target?.trim() ? 'override' : 'industry' },
   }
@@ -242,6 +260,12 @@ export function normalizeOverrides(raw: unknown): ProfileOverrides {
   if (price) out.price = price
   const speaker = str(r.speaker, 30)
   if (speaker) out.speaker = speaker
+  const rebuttal = str(r.rebuttal, 120)
+  if (rebuttal) out.rebuttal = rebuttal
+  const shipping = str(r.shipping, 80)
+  if (shipping) out.shipping = shipping
+  const avoid = str(r.avoid, 200)
+  if (avoid) out.avoid = avoid
   return out
 }
 
@@ -249,7 +273,7 @@ export function normalizeOverrides(raw: unknown): ProfileOverrides {
  * D-207 '이 칸만 채우면 글이 좋아져요' — 글 곳곳의 [대괄호] 를 줄이는 칸(마케팅의 핵심은 차별점을 손님 눈높이로 전하는 것).
  * 중요한 순서대로. 화면은 첫 몇 개만 보여 준다.
  */
-export type GapKey = 'differ' | 'phone' | 'services' | 'hours' | 'objection' | 'reviews' | 'voice' | 'offer'
+export type GapKey = 'differ' | 'phone' | 'services' | 'hours' | 'objection' | 'speaker' | 'reviews' | 'voice' | 'offer'
 
 export function profileGaps(p: ContentProfile): { key: GapKey; label: string; why: string }[] {
   const out: { key: GapKey; label: string; why: string }[] = []
@@ -258,10 +282,56 @@ export function profileGaps(p: ContentProfile): { key: GapKey; label: string; wh
   if (!p.services.length) out.push({ key: 'services', label: '하는 일', why: '소개 · 플레이스 · 해시태그에 들어가요' })
   if (!p.hours) out.push({ key: 'hours', label: '운영 시간', why: '문의 칸 · 플레이스 이용 안내에 들어가요' })
   if (!p.objection) out.push({ key: 'objection', label: '손님이 망설이는 점', why: '카드뉴스 · 블로그에서 그 걱정을 먼저 풀어 줘요' })
+  // D-229 규칙집 0-4 — 화자는 직함과 이름을 둘 다(직함만 적으면 엉뚱한 실명이 붙을 수 있다)
+  if (!p.speaker) out.push({ key: 'speaker', label: '글에서 말하는 사람', why: '직함과 이름을 같이 — 작성자 소개 · 영상 마무리에 들어가요' })
+  else if (TITLE_ONLY.test(p.speaker)) out.push({ key: 'speaker', label: '말하는 사람 이름', why: `'${p.speaker}' 처럼 직함만 적으면 다른 도구가 엉뚱한 실명을 붙일 수 있어요 — 이름도 적어 주세요` })
   // D-228 재료 — 없으면 숫자 · 후기 · 혜택 자리를 [대괄호] 로 비워 둬요(지어내지 않음)
   if (!p.reviews) out.push({ key: 'reviews', label: '후기 수 · 평점', why: '카드뉴스 첫 장 · 블로그 소개 표에 믿음을 주는 숫자로 들어가요' })
   if (!p.voice) out.push({ key: 'voice', label: '실제 고객 한마디', why: '카드뉴스 · 블로그에 고객의 말로 들어가요(동의 받은 말만)' })
   // 기한 지난 혜택은 맨 앞에 — 날짜가 걸린 일이라 위 3개 안에 보여야 한다
   if (p.offerExpired) out.unshift({ key: 'offer', label: '이번 달 혜택', why: `적어 둔 혜택("${p.offerExpired}")의 기한이 지났어요 — 새 기한을 적거나 지워 주세요` })
   return out
+}
+
+/** D-229 직함만 적은 화자('대표' · '원장') */
+const TITLE_ONLY = /^(?:대표|대표님|원장|원장님|실장|팀장|이사|사장|소장|관장|점장|매니저|디자이너|선생님|강사|MD)$/
+
+/**
+ * D-229 규칙집 0장 — 브리프 6칸(업체 / 독자 / 알리는 것 / 화자+이름 / 사실 목록 / 넣지 말 것).
+ * '넣지 말 것' 은 기본 금지 목록이 늘 붙으므로 비지 않는다. 독자가 업종 견본이면 채운 것으로 세되 '견본' 이라고 알린다.
+ */
+export interface BriefSlot {
+  key: 'company' | 'target' | 'item' | 'speaker' | 'facts' | 'avoid'
+  label: string
+  ok: boolean
+  note: string
+}
+
+/** 재료(사실 목록) — 경력 · 후기 · 고객 한마디 · 혜택 · 가격 · 배송 · 교환 · 그 밖의 기록(증빙 있는 것) */
+export function materialList(p: ContentProfile): string[] {
+  return [
+    p.years !== null && p.years >= 1 ? `경력 ${p.years}년` : '',
+    p.reviews,
+    p.voice,
+    p.offer,
+    p.price,
+    p.shipping,
+    p.differ,
+    ...p.strengths.filter((s) => !/^설립 \d+년째$/.test(s)),
+  ].filter(Boolean)
+}
+
+/** 규칙집 0-5 — 재료 7개 이상이면 카드 5안 · 영상 5자리가 서로 다른 각도로 산다 */
+export const MATERIAL_GOAL = 7
+
+export function briefSlots(p: ContentProfile, source: ProfileSource): BriefSlot[] {
+  const facts = materialList(p).length
+  return [
+    { key: 'company', label: '업체', ok: true, note: p.region ? `${p.company} · ${p.region}` : p.company },
+    { key: 'target', label: '독자', ok: true, note: source.target === 'override' ? p.target : `업종 견본 — ${p.target}` },
+    { key: 'item', label: '알리는 것', ok: source.item !== 'industry', note: source.item === 'industry' ? '업종 말뿐이에요 — 대표 상품을 적어 주세요' : p.item },
+    { key: 'speaker', label: '화자 · 이름', ok: !!p.speaker && !TITLE_ONLY.test(p.speaker), note: !p.speaker ? '비어 있어요' : TITLE_ONLY.test(p.speaker) ? '직함만 있어요 — 이름도' : p.speaker },
+    { key: 'facts', label: '사실 목록', ok: facts >= 1, note: `재료 ${facts}/${MATERIAL_GOAL}` },
+    { key: 'avoid', label: '넣지 말 것', ok: true, note: p.avoid.length ? `기본 금지 + 업체가 막은 것 ${p.avoid.length}개` : '기본 금지 목록' },
+  ]
 }

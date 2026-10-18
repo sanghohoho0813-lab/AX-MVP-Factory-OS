@@ -16,6 +16,8 @@
  *  D-228  글 재료(후기 · 한마디 · 혜택+끝나는 날 · 가격 · 말하는 사람) → 카드뉴스 · 카톡에 그대로 · 기한 지나면 빠짐 · 고친 글 사실 대조 ·
  *         다른 AI 도구 요청문(복사 · 사실 목록) → 받은 글 점검(주지 않은 혜택 · 지어낸 출처 · 업력 모순) → 보관함 · 검색량 등급 · 월 100 이상만 ·
  *         390 넘침 0 · 44px
+ *  D-229  콘텐츠 작성 규칙집 — 브리프 6칸 줄(화자 이름 비면 노랑) · 흔한 반박 · 배송 · 교환 · 넣지 말 것 → 요청문 · 점검 ·
+ *         요청문은 고른 채널로(길이 · 지역 · 마지막 제안) · 결과 아래 발행 전 검수표(자동 · 사람 체크) · 카드 5안 순서 · 기본 7장 · 360/390
  *
  *   node e2e/content.mjs http://localhost:4390 [--shots <dir>]
  */
@@ -151,7 +153,8 @@ const errors = []
   await wait(300)
   const title1 = await page.getByTestId('content-result-title').innerText()
   const blog = await resultText(page)
-  check('5 블로그 — 제목에 키워드 · 기준 5가지 · 진행 순서 · 대표 전화 · 해시태그', title1.includes('화성 정밀 금속부품 추천') && /5\. /.test(blog) && blog.includes('이렇게 진행해요') && blog.includes('전화 031-123-4567') && blog.includes('#한솔정밀'), title1)
+  // D-229 규칙집 3-1 — 키워드로 시작 · 기준 2가지 + 정리 · 구분선 뒤 끝맺음 · 연락처 · 해시태그
+  check('5 블로그 — 제목 맨 앞에 키워드 + 쉼표 · 기준 2가지 + 정리 · 구분선 · 대표 전화 · 해시태그', title1.startsWith('화성 정밀 금속부품 추천,') && /2\. /.test(blog) && !/3\. /.test(blog.split('정리 —')[0]) && blog.includes('정리 — 이 2가지만 기억하세요') && blog.includes('(구분선)') && blog.includes('전화 031-123-4567') && blog.includes('#한솔정밀'), title1)
   const chk = await page.getByTestId('content-checks').innerText()
   check('5 점검 — [대괄호] 채우기(꼭) · 키워드 횟수 · 글자 수', /\[대괄호\] \d+곳/.test(chk) && /키워드 "화성 정밀 금속부품 추천"/.test(chk) && /자\(공백 포함\)/.test(chk), chk)
 
@@ -203,7 +206,7 @@ const errors = []
   await page.locator('[data-testid="content-chain-kind"][data-kind="shorts"]').click()
   await wait(300)
   const sh = await resultText(page)
-  check('12 같은 주제로 → 짧은 영상 대본(0:00 - 0:03 · 나레이션/자막/장면 · 마무리에 회사 · 대표 전화)', (await page.getByTestId('content-result').getAttribute('data-kind')) === 'shorts' && sh.includes('0:00 - 0:03') && sh.includes('나레이션:') && sh.includes('자막:') && sh.includes('장면:') && sh.includes('한솔정밀(주) · 031-123-4567'))
+  check('12 같은 주제로 → 짧은 영상 대본(0:00 - 0:03 · 나레이션/자막/장면 · 끝은 요약 + 업체 말 한 줄)', (await page.getByTestId('content-result').getAttribute('data-kind')) === 'shorts' && sh.includes('0:00 - 0:03') && sh.includes('나레이션:') && sh.includes('자막:') && sh.includes('장면:') && sh.includes('한솔정밀(주)에 편하게'))
 
   // 13 카톡 혜택 = (광고)
   await mode(page, 'direct')
@@ -322,7 +325,7 @@ const errors = []
   await page.getByTestId('content-make').click()
   await wait(300)
   const brand = await resultText(page)
-  check('D2 우리 블로그 글 — 사진 자리 · 한눈에 정리 표 · 차별점 · 망설이는 점 풀기 · 점검에 소제목/사진 자리', /\(사진 자리:/.test(brand) && brand.includes('확인할 것 | 이유') && brand.includes('도면 받은 날 바로 견적을 회신해요') && brand.includes('소량 주문도 받아 줄까') && /사진 자리 \d+곳/.test(await page.getByTestId('content-checks').innerText()), brand.slice(0, 300))
+  check('D2 우리 블로그 글 — 사진 자리 · 표 1개(작성자 소개 표) · 차별점(다리 문장) · 망설이는 점 풀기 · 점검에 소제목/사진 자리', /\(사진 자리:/.test(brand) && brand.includes('항목 | 내용') && !brand.includes('확인할 것 | 이유') && brand.includes('이렇게 지켜요 — 도면 받은 날 바로 견적을 회신해요') && brand.includes('도면 받은 날 바로 견적을 회신해요') && brand.includes('소량 주문도 받아 줄까') && /사진 자리 \d+곳/.test(await page.getByTestId('content-checks').innerText()), brand.slice(0, 300))
   await mode(page, 'direct')
   await page.locator('[data-testid="content-blogtype-btn"][data-value="review"]').click()
   await mode(page, 'direct')
@@ -948,7 +951,7 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   await wait(500)
   const mat = await p.getByTestId('content-profile-material').innerText()
   const gaps1 = await gapN()
-  check('D228-1 글 재료 칸 → 홍보 정보에 "적어 둔 것만" 줄(후기 · 한마디 따옴표 하나 · 혜택 끝나는 날 · 가격 · 말하는 사람) · 채운 2칸은 안내에서 빠짐', mat.includes('네이버 후기 1,240개') && mat.includes('"납기를 하루도 안 넘겨요"') && mat.includes('첫 견적 고객 시제품 1개 무상(12월 31일까지)') && mat.includes('시제품 1개 5만 원부터') && mat.includes('대표 김한솔') && gaps0 >= 5 && gaps1 === gaps0 - 2, { mat, gaps0, gaps1 })
+  check('D228-1 글 재료 칸 → 홍보 정보에 "적어 둔 것만" 줄(후기 · 한마디 따옴표 하나 · 혜택 끝나는 날 · 가격 · 말하는 사람) · 채운 3칸(후기 · 한마디 · 말하는 사람)은 안내에서 빠짐', mat.includes('네이버 후기 1,240개') && mat.includes('"납기를 하루도 안 넘겨요"') && mat.includes('첫 견적 고객 시제품 1개 무상(12월 31일까지)') && mat.includes('시제품 1개 5만 원부터') && mat.includes('대표 김한솔') && gaps0 >= 6 && gaps1 === gaps0 - 3, { mat, gaps0, gaps1 })
 
   await mode(p, 'direct')
   await p.locator('[data-testid="content-kind"][data-kind="cards"]').click()
@@ -1084,6 +1087,133 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
     await c2.close()
   }
   check('D228-15 화면 오류 0', !errors.some((e) => e.startsWith('D228')), errors.filter((e) => e.startsWith('D228')))
+}
+
+// D-229 — 콘텐츠 작성 규칙집(1~3차 합본): 브리프 6칸 · 채널별 요청문 · 발행 전 검수표 · 카드 5안 순서
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE })
+  const p = await ctx.newPage()
+  p.on('pageerror', (e) => errors.push(`D229 ${e.message}`))
+  await seed(p)
+  await p.goto(BASE + '/tools/content/build?client=cli_site', { waitUntil: 'networkidle' })
+  await p.getByTestId('content-studio').waitFor()
+  const slot = (k) => p.locator(`[data-testid="content-brief-slot"][data-key="${k}"]`)
+  const keys0 = await p.getByTestId('content-brief-slot').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-key')}:${e.getAttribute('data-ok')}`))
+  check('D229-1 브리프 6칸 줄 — 업체 · 독자 · 알리는 것 · 화자 · 사실 목록 · 넣지 말 것 · 화자 비면 노랑 · 재료 n/7', keys0.join() === 'company:1,target:1,item:1,speaker:0,facts:1,avoid:1' && /5\/6/.test(await p.getByTestId('content-brief').innerText()) && /재료 \d+\/7/.test(await p.getByTestId('content-brief').innerText()), keys0)
+  await p.getByTestId('content-brief').click()
+  await p.getByTestId('content-ov-rebuttal').fill('소량은 아무 데나 맡겨도 똑같다')
+  await p.getByTestId('content-ov-shipping').fill('전국 택배 · 3만 원 이상 무료 배송')
+  await p.getByTestId('content-ov-speaker').fill('대표 김한솔')
+  await p.getByTestId('content-ov-avoid').fill('최저가, 다른 지점 이름')
+  await p.getByTestId('content-ov-differ').fill('도면 받은 날 바로 회신해요')
+  await wait(900)
+  if (SHOTS) {
+    await p.getByTestId('content-ov-avoid-section').scrollIntoViewIfNeeded()
+    await p.screenshot({ path: `${SHOTS}/content-pc-d229-avoid.png`, fullPage: false })
+  }
+  await p.getByTestId('content-ov-save').click()
+  await wait(500)
+  check('D229-2 화자 · 이름을 적으면 6/6 · 넣지 말 것 줄에 업체가 막은 말 2개', (await slot('speaker').getAttribute('data-ok')) === '1' && /6\/6/.test(await p.getByTestId('content-brief').innerText()) && ((await slot('avoid').getAttribute('title')) ?? '').includes('2개'))
+  if (SHOTS) await p.screenshot({ path: `${SHOTS}/content-pc-d229-brief.png`, fullPage: false })
+
+  // 블로그 결과 → 발행 전 검수표
+  await mode(p, 'direct')
+  await p.locator('[data-testid="content-kind"][data-kind="blog"]').click()
+  const topicTxt = await p.locator('[data-testid="content-topic"][data-type="choose"]').innerText()
+  await p.locator('[data-testid="content-topic"][data-type="choose"] input').check()
+  await p.getByTestId('content-make').click()
+  await wait(300)
+  const blog = await resultText(p)
+  check('D229-3 블로그 — 주제 칸도 2가지 · 흔한 반박으로 시작 · 다리 문장(차별점) · 가벼운 첫 행동 · 구분선', topicTxt.includes('2가지') && blog.includes('흔히 "소량은 아무 데나 맡겨도 똑같다" 라고들 하지만') && blog.includes('이렇게 지켜요 — 도면 받은 날 바로 회신해요') && blog.includes('도면 한 장만 먼저 보내 주셔도 검토해 드려요') && blog.includes('(구분선)'), blog.slice(0, 200))
+  const rv = p.getByTestId('content-review')
+  check('D229-4 결과 아래 발행 전 검수표 — 처음엔 접힘 · 요약(확인 · 사람 0/N)', (await rv.getAttribute('data-open')) === '0' && /사람 0\/\d+/.test(await p.getByTestId('content-review-sum').innerText()))
+  await p.getByTestId('content-review-toggle').click()
+  const states = await p.getByTestId('content-review-item').evaluateAll((els) => els.map((e) => e.getAttribute('data-state')))
+  await p.getByTestId('content-review-check').first().check()
+  const sum1 = await p.getByTestId('content-review-sum').innerText()
+  check('D229-5 펼치면 자동(통과 · 확인)과 사람이 체크할 것 · 체크하면 숫자가 올라감', states.includes('pass') && states.includes('manual') && states.length >= 15 && /사람 1\//.test(sum1), { states, sum1 })
+  if (SHOTS) {
+    await rv.scrollIntoViewIfNeeded()
+    await wait(300)
+    await p.screenshot({ path: `${SHOTS}/content-pc-d229-review.png`, fullPage: false })
+  }
+
+  // 영상 — 제목에 지역 없음 · 썸네일 20~35자
+  await mode(p, 'direct')
+  await p.locator('[data-testid="content-kind"][data-kind="video"]').click()
+  await p.getByTestId('content-make').click()
+  await wait(300)
+  const vTitle = await p.getByTestId('content-result-title').innerText()
+  const vText = await resultText(p)
+  const thumb = /썸네일 문구\n[^\n]*\n?([^\n]+)/.exec(vText)?.[1] ?? ''
+  const vChecks = await p.getByTestId('content-checks').innerText()
+  check('D229-6 긴 영상 — 제목 · 썸네일에 지역(화성 · 동탄) 없음 · 체크포인트 3 + 마무리 · 반전 문장 · 썸네일 경보 없음', !/화성|동탄/.test(vTitle) && /3:00 · 3\./.test(vText) && vText.includes('4:00 · 마무리') && vText.includes('여기까지는 기본이에요') && !/썸네일 문구가/.test(vChecks), { vTitle, thumb })
+
+  // 카드 — 5안 순서 · 기본 7장
+  await mode(p, 'direct')
+  await p.locator('[data-testid="content-kind"][data-kind="cards"]').click()
+  const ads = await p.getByTestId('content-adtype-btn').evaluateAll((els) => els.map((e) => e.getAttribute('data-value')))
+  await p.locator('[data-testid="content-adtype-btn"][data-value="curious"]').click()
+  await p.getByTestId('content-make').click()
+  await wait(300)
+  const cardPages = await p.getByTestId('content-block').evaluateAll((els) => els.filter((e) => /^\d장/.test((e.textContent || '').trim())).length)
+  check('D229-7 카드뉴스 유형 — 규칙집 5안 순서(망설임 → 고민 → 전후 → 궁금증 → 기록) 다음 예전 2개 · 기본 7장 · 궁금증 표지', ads.join() === 'objection,problem,before,curious,proof,info,loss' && cardPages === 7 && (await resultText(p)).includes('고를 때 이것은 꼭 보래요'), { ads, cardPages })
+
+  // 다른 AI 도구 요청문 — 채널별
+  await p.getByTestId('content-ai-req').click()
+  await p.getByTestId('content-ai-sheet').waitFor()
+  const reqBlog = await p.getByTestId('content-ai-req-text').innerText()
+  await p.locator('[data-testid="content-ai-channel-btn"][data-kind="video"]').click()
+  const reqVideo = await p.getByTestId('content-ai-req-text').innerText()
+  check('D229-8 요청문 — 블로그: 2,100~3,000자 · 키워드 제목 맨 앞 · 흔한 반박 · 배송 조건 · 업체가 막은 말 · 마지막 제안 / 영상으로 바꾸면 썸네일 20~35자 · 지역 빼기', reqBlog.includes('채널 · 종류: 네이버 블로그 글') && reqBlog.includes('2,100~3,000자') && reqBlog.includes('제목 맨 앞에') && reqBlog.includes('흔한 반박 1개: "소량은 아무 데나 맡겨도 똑같다"') && reqBlog.includes('배송 · 교환 조건: 전국 택배') && reqBlog.includes('"최저가"') && reqBlog.includes('끝: 도면 검토') && reqVideo.includes('썸네일 문구 20~35자') && reqVideo.includes('지역명은 제목 · 썸네일에 넣지 말고') && !reqVideo.includes('2,100~3,000자'), reqVideo)
+  await wait(900)
+  if (SHOTS) await p.screenshot({ path: `${SHOTS}/content-pc-d229-request.png`, fullPage: false })
+  await p.getByTestId('content-ai-next').click()
+  check('D229-9 2단계 글 종류도 고른 채널(긴 영상 기획) 그대로', (await p.locator('[data-testid="content-ai-kind-btn"][data-kind="video"]').getAttribute('aria-pressed')) === 'true')
+  await p.getByTestId('content-ai-check-input').fill('동네 맛집 5곳 총정리! 10명 중 8명이 모르는 최저가 비법. 11월 한정 특가, 연락처: 정보 없음')
+  await p.getByTestId('content-ai-check-run').click()
+  const keys = await p.getByTestId('content-ai-check-item').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')))
+  await p.getByTestId('content-ai-review-toggle').click()
+  const warnN = Number(await p.getByTestId('content-ai-review').getAttribute('data-warn'))
+  check('D229-10 받은 글 점검 — 업체 모아 소개 · 통계형 · 업체가 막은 말 · 기한 없는 기간 한정 · 정보 없음 + 검수표 확인 표시', ['roundup', 'stat', 'avoid-최저가', 'month-limit', 'no-info'].every((k) => keys.includes(k)) && warnN >= 3, { keys, warnN })
+  await ctx.close()
+
+  for (const vp of [390, 360]) {
+    const c2 = await browser.newContext({ viewport: { width: vp, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true })
+    const m = await c2.newPage()
+    m.on('pageerror', (e) => errors.push(`D229 m${vp} ${e.message}`))
+    await seed(m)
+    await m.goto(BASE + '/tools/content/build?client=cli_site', { waitUntil: 'networkidle' })
+    await m.getByTestId('content-studio').waitFor()
+    const over = () => m.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+    const briefOver = await m.getByTestId('content-brief').evaluate((e) => e.scrollWidth - e.clientWidth)
+    const briefH = await m.getByTestId('content-brief').evaluate((e) => Math.round(e.getBoundingClientRect().height))
+    if (SHOTS && vp === 390) {
+      await m.getByTestId('content-brief').scrollIntoViewIfNeeded()
+      await m.screenshot({ path: `${SHOTS}/content-m390-d229-brief.png`, fullPage: false })
+    }
+    await mode(m, 'pick')
+    await m.getByTestId('content-pick').nth(1).click()
+    await m.getByTestId('content-result').waitFor()
+    await m.getByTestId('content-review-toggle').click()
+    const checkH = await m.getByTestId('content-review-check').evaluateAll((els) => els.map((e) => Math.round(e.closest('label').getBoundingClientRect().height)))
+    const rvOver = await over()
+    if (SHOTS && vp === 390) {
+      await m.getByTestId('content-review').scrollIntoViewIfNeeded()
+      await wait(300)
+      await m.screenshot({ path: `${SHOTS}/content-m390-d229-review.png`, fullPage: false })
+    }
+    await m.getByTestId('content-ai-req').click()
+    await m.getByTestId('content-ai-sheet').waitFor()
+    await wait(900)
+    const chH = await m.getByTestId('content-ai-channel-btn').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
+    const sheetOver = await over()
+    if (SHOTS && vp === 390) await m.screenshot({ path: `${SHOTS}/content-m390-d229-request.png`, fullPage: false })
+    check(`D229-M${vp} 브리프 줄 넘침 0(높이 ${briefH}px ≥ 44) · 검수표 체크 줄 44px · 채널 단추 44px · 가로 넘침 0`, briefOver <= 0 && briefH >= 44 && checkH.length > 0 && checkH.every((h) => h >= 44) && chH.every((h) => h >= 44) && rvOver <= 0 && sheetOver <= 0, { briefOver, briefH, checkH, chH, rvOver, sheetOver })
+    await c2.close()
+  }
+  check('D229-11 화면 오류 0', !errors.some((e) => e.startsWith('D229')), errors.filter((e) => e.startsWith('D229')))
 }
 
 await browser.close()
